@@ -370,24 +370,11 @@ config ATM_BR2684_IPFILTER
 config VLAN_8021Q
 	tristate "802.1Q VLAN Support"
 
-config LLC
-	tristate "ANSI/IEEE 802.2 - aka LLC (IPX, Appletalk, Token Ring)"
-	help
-	  This is a Logical Link Layer protocol used for Appletalk, IPX,
-	  Token Ring devices, the linux-sna.org project and in the future by
-	  NetBEUI. It originally came from Procom Inc. that released the code
-	  for 2.0.36 and was heavily modified to work with 2.{4,5}.
-	  Select this if you want to have support for those protocols or if
-	  you want to have the sockets interface for LLC.
-	  
-
-config LLC_UI
-	bool "LLC sockets interface"
-	depends on LLC
+source "net/llc/Kconfig"
 
 config IPX
 	tristate "The IPX protocol"
-	depends on LLC
+	select LLC_CORE
 	---help---
 	  This is support for the Novell networking protocol, IPX, commonly
 	  used for local networks of Windows machines.  You need it if you
@@ -424,7 +411,7 @@ source "net/ipx/Kconfig"
 
 config ATALK
 	tristate "Appletalk protocol support"
-	depends on LLC
+	select LLC_CORE
 	---help---
 	  AppleTalk is the protocol that Apple computers can use to communicate
 	  on a network.  If your Linux box is connected to such a network and you
@@ -479,9 +466,8 @@ config X25
 	  using the X.21 protocol (not yet supported by Linux) or one can do
 	  X.25 over a standard telephone line using an ordinary modem (say Y
 	  to "X.25 async driver" below) or over Ethernet using an ordinary
-	  Ethernet card and either the 802.2 LLC protocol (say Y to "802.2
-	  LLC" below) or LAPB over Ethernet (say Y to "LAPB Data Link Driver"
-	  and "LAPB over Ethernet driver" below).
+	  Ethernet card and the LAPB over Ethernet (say Y to "LAPB Data Link
+	  Driver" and "LAPB over Ethernet driver" below).
 
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),

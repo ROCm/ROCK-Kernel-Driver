@@ -100,6 +100,9 @@ extern struct sock *llc_lookup_established(struct llc_sap *sap,
 					   struct llc_addr *laddr);
 extern struct sock *llc_lookup_listener(struct llc_sap *sap,
 					struct llc_addr *laddr);
+extern void llc_sap_add_socket(struct llc_sap *sap, struct sock *sk);
+extern void llc_sap_remove_socket(struct llc_sap *sap, struct sock *sk);
+
 extern u8 llc_data_accept_state(u8 state);
 extern void llc_build_offset_table(void);
 extern int llc_release_sockets(struct llc_sap *sap);

@@ -79,13 +79,5 @@ enum llc_sockopts {
 #define LLC_SAP_DYN_TRIES	4
 
 #define llc_ui_skb_cb(__skb) ((struct sockaddr_llc *)&((__skb)->cb[0]))
-
-#ifdef CONFIG_LLC_UI
-extern int llc_ui_init(void);
-extern void llc_ui_exit(void);
-#else
-#define llc_ui_init()
-#define llc_ui_exit()
-#endif
 #endif /* __KERNEL__ */
 #endif /* __LINUX_LLC_H */

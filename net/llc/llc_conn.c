@@ -614,6 +614,36 @@ static int llc_find_offset(int state, int ev_type)
 }
 
 /**
+ *	llc_sap_add_socket - adds a socket to a SAP
+ *	@sap: SAP
+ *	@sk: socket
+ *
+ *	This function adds a socket to sk_list of a SAP.
+ */
+void llc_sap_add_socket(struct llc_sap *sap, struct sock *sk)
+{
+	write_lock_bh(&sap->sk_list.lock);
+	llc_sk(sk)->sap = sap;
+	sk_add_node(sk, &sap->sk_list.list);
+	write_unlock_bh(&sap->sk_list.lock);
+}
+
+/**
+ *	llc_sap_remove_socket - removes a socket from SAP
+ *	@sap: SAP
+ *	@sk: socket
+ *
+ *	This function removes a connection from sk_list.list of a SAP if
+ *	the connection was in this list.
+ */
+void llc_sap_remove_socket(struct llc_sap *sap, struct sock *sk)
+{
+	write_lock_bh(&sap->sk_list.lock);
+	sk_del_node_init(sk);
+	write_unlock_bh(&sap->sk_list.lock);
+}
+
+/**
  *	llc_conn_rcv - sends received pdus to the connection state machine
  *	@sk: current connection structure.
  *	@skb: received frame.
@@ -664,7 +694,7 @@ void llc_conn_handler(struct llc_sap *sap, struct sk_buff *skb)
 		llc = llc_sk(sk);
 		memcpy(&llc->laddr, &daddr, sizeof(llc->laddr));
 		memcpy(&llc->daddr, &saddr, sizeof(llc->daddr));
-		llc_sap_assign_sock(sap, sk);
+		llc_sap_add_socket(sap, sk);
 		sock_hold(sk);
 		sock_put(parent);
 		skb->sk = parent;
@@ -902,4 +932,3 @@ void llc_sk_reset(struct sock *sk)
 	llc->failed_data_req	= 0 ;
 	llc->last_nr		= 0;
 }
-

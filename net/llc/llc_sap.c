@@ -40,36 +40,6 @@ void llc_save_primitive(struct sk_buff* skb, u8 prim)
 }
 
 /**
- *	llc_sap_assign_sock - adds a connection to a SAP
- *	@sap: pointer to SAP.
- *	@conn: pointer to connection.
- *
- *	This function adds a connection to connection_list of a SAP.
- */
-void llc_sap_assign_sock(struct llc_sap *sap, struct sock *sk)
-{
-	write_lock_bh(&sap->sk_list.lock);
-	llc_sk(sk)->sap = sap;
-	sk_add_node(sk, &sap->sk_list.list);
-	write_unlock_bh(&sap->sk_list.lock);
-}
-
-/**
- *	llc_sap_unassign_sock - removes a connection from SAP
- *	@sap: SAP
- *	@sk: pointer to connection
- *
- *	This function removes a connection from sk_list.list of a SAP if
- *	the connection was in this list.
- */
-void llc_sap_unassign_sock(struct llc_sap *sap, struct sock *sk)
-{
-	write_lock_bh(&sap->sk_list.lock);
-	sk_del_node_init(sk);
-	write_unlock_bh(&sap->sk_list.lock);
-}
-
-/**
  *	llc_sap_rtn_pdu - Informs upper layer on rx of an UI, XID or TEST pdu.
  *	@sap: pointer to SAP
  *	@skb: received pdu
@@ -241,6 +211,58 @@ void llc_build_and_send_ui_pkt(struct llc_sap *sap, struct sk_buff *skb,
 }
 
 /**
+ *	llc_build_and_send_test_pkt - TEST interface for upper layers.
+ *	@sap: sap to use
+ *	@skb: packet to send
+ *	@dmac: destination mac address
+ *	@dsap: destination sap
+ *
+ *	This function is called when upper layer wants to send a TEST pdu.
+ *	Returns 0 for success, 1 otherwise.
+ */
+void llc_build_and_send_test_pkt(struct llc_sap *sap, 
+				 struct sk_buff *skb, u8 *dmac, u8 dsap)
+{
+	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
+
+	ev->saddr.lsap = sap->laddr.lsap;
+	ev->daddr.lsap = dsap;
+	memcpy(ev->saddr.mac, skb->dev->dev_addr, IFHWADDRLEN);
+	memcpy(ev->daddr.mac, dmac, IFHWADDRLEN);
+	
+	ev->type      = LLC_SAP_EV_TYPE_PRIM;
+	ev->prim      = LLC_TEST_PRIM;
+	ev->prim_type = LLC_PRIM_TYPE_REQ;
+	llc_sap_state_process(sap, skb);
+}
+
+/**
+ *	llc_build_and_send_xid_pkt - XID interface for upper layers
+ *	@sap: sap to use
+ *	@skb: packet to send
+ *	@dmac: destination mac address
+ *	@dsap: destination sap
+ *
+ *	This function is called when upper layer wants to send a XID pdu.
+ *	Returns 0 for success, 1 otherwise.
+ */
+void llc_build_and_send_xid_pkt(struct llc_sap *sap, struct sk_buff *skb,
+				u8 *dmac, u8 dsap)
+{
+	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
+
+	ev->saddr.lsap = sap->laddr.lsap;
+	ev->daddr.lsap = dsap;
+	memcpy(ev->saddr.mac, skb->dev->dev_addr, IFHWADDRLEN);
+	memcpy(ev->daddr.mac, dmac, IFHWADDRLEN);
+
+	ev->type      = LLC_SAP_EV_TYPE_PRIM;
+	ev->prim      = LLC_XID_PRIM;
+	ev->prim_type = LLC_PRIM_TYPE_REQ;
+	llc_sap_state_process(sap, skb);
+}
+
+/**
  *	llc_sap_rcv - sends received pdus to the sap state machine
  *	@sap: current sap component structure.
  *	@skb: received frame.
@@ -376,4 +398,8 @@ void llc_sap_close(struct llc_sap *sap)
 
 EXPORT_SYMBOL(llc_sap_open);
 EXPORT_SYMBOL(llc_sap_close);
+EXPORT_SYMBOL(llc_save_primitive);
+EXPORT_SYMBOL(llc_build_and_send_test_pkt);
 EXPORT_SYMBOL(llc_build_and_send_ui_pkt);
+EXPORT_SYMBOL(llc_build_and_send_xid_pkt);
+EXPORT_SYMBOL(llc_sap_handler);

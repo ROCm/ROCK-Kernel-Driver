@@ -40,8 +40,6 @@ struct llc_sap {
 	} sk_list;
 };
 
-extern void llc_sap_assign_sock(struct llc_sap *sap, struct sock *sk);
-extern void llc_sap_unassign_sock(struct llc_sap *sap, struct sock *sk);
 extern void llc_sap_state_process(struct llc_sap *sap, struct sk_buff *skb);
 extern void llc_sap_rtn_pdu(struct llc_sap *sap, struct sk_buff *skb);
 extern void llc_save_primitive(struct sk_buff* skb, u8 prim);

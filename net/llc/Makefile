@@ -2,7 +2,7 @@
 # Makefile for the Linux 802.2 LLC (fully-functional) layer.
 #
 # Copyright (c) 1997 by Procom Technology,Inc.
-#		2001, 2002 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
+#		2001-2003 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
 #
 # This program can be redistributed or modified under the terms of the 
 # GNU General Public License as published by the Free Software Foundation.
@@ -12,9 +12,14 @@
 # See the GNU General Public License for more details.
 ###########################################################################
 
-obj-$(CONFIG_LLC) += llc.o
+obj-$(CONFIG_LLC_CORE) += llc_core.o
 
-llc-y := llc_if.o llc_c_ev.o llc_c_ac.o llc_mac.o llc_sap.o llc_s_st.o \
-	 llc_main.o llc_s_ac.o llc_conn.o llc_c_st.o llc_stat.o llc_actn.o \
-	 llc_s_ev.o llc_evnt.o llc_pdu.o llc_proc.o
-llc-$(CONFIG_LLC_UI)	+= af_llc.o
+llc_core-y := llc_mac.o llc_sap.o llc_s_st.o llc_s_ac.o llc_s_ev.o llc_main.o \
+	      llc_actn.o llc_stat.o llc_evnt.o
+
+obj-$(CONFIG_LLC2) += llc2.o
+
+llc2-y := llc_if.o llc_c_ev.o llc_c_ac.o llc_conn.o llc_c_st.o llc_pdu.o \
+	  af_llc.o
+
+llc2-$(CONFIG_PROC_FS) += llc_proc.o

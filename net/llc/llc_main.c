@@ -300,12 +300,9 @@ static int __init llc_init(void)
 	llc_main_station.ack_timer.data     = (unsigned long)&llc_main_station;
 	llc_main_station.ack_timer.function = llc_station_ack_tmr_cb;
 
-	if (llc_proc_init())
-		goto err;
 	skb = alloc_skb(0, GFP_ATOMIC);
 	if (!skb)
-		goto err_skb;
-	llc_build_offset_table();
+		goto err;
 	ev = llc_station_ev(skb);
 	memset(ev, 0, sizeof(*ev));
 	if (dev_base->next)
@@ -319,13 +316,10 @@ static int __init llc_init(void)
 	ev->type	= LLC_STATION_EV_TYPE_SIMPLE;
 	ev->prim_type	= LLC_STATION_EV_ENABLE_WITHOUT_DUP_ADDR_CHECK;
 	rc = llc_station_next_state(&llc_main_station, skb);
-	llc_ui_init();
 	dev_add_pack(&llc_packet_type);
 	dev_add_pack(&llc_tr_packet_type);
 out:
 	return rc;
-err_skb:
-	llc_proc_exit();
 err:
 	printk(llc_error_msg);
 	rc = 1;
@@ -334,8 +328,6 @@ err:
 
 static void __exit llc_exit(void)
 {
-	llc_ui_exit();
-	llc_proc_exit();
 	dev_remove_pack(&llc_packet_type);
 	dev_remove_pack(&llc_tr_packet_type);
 }
@@ -343,7 +335,11 @@ static void __exit llc_exit(void)
 module_init(llc_init);
 module_exit(llc_exit);
 
+EXPORT_SYMBOL(llc_sap_find);
+EXPORT_SYMBOL(llc_alloc_frame);
+EXPORT_SYMBOL(llc_main_station);
+
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Procom, 1997, Arnaldo C. Melo, Jay Schullist, 2001-2003");
-MODULE_DESCRIPTION("LLC 2.0, IEEE 802.2 extended support");
+MODULE_AUTHOR("Procom 1997, Jay Schullist 2001, Arnaldo C. Melo 2001-2003");
+MODULE_DESCRIPTION("LLC IEEE 802.2 extended support");
 MODULE_ALIAS_NETPROTO(PF_LLC);
