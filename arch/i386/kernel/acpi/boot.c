@@ -653,9 +653,6 @@ acpi_parse_madt_ioapic_entries(void)
 		return count;
 	}
 
-	/* Build a default routing table for legacy (ISA) interrupts. */
-	mp_config_acpi_legacy_irqs();
-
 	count = acpi_table_parse_madt(ACPI_MADT_INT_SRC_OVR, acpi_parse_int_src_ovr, NR_IRQ_VECTORS);
 	if (count < 0) {
 		printk(KERN_ERR PREFIX "Error parsing interrupt source overrides entry\n");
@@ -669,6 +666,9 @@ acpi_parse_madt_ioapic_entries(void)
 	 */
 	if (!acpi_sci_override_gsi)
 		acpi_sci_ioapic_setup(acpi_fadt.sci_int, 0, 0);
+
+	/* Fill in identity legacy mapings where no override */
+	mp_config_acpi_legacy_irqs();
 
 	count = acpi_table_parse_madt(ACPI_MADT_NMI_SRC, acpi_parse_nmi_src, NR_IRQ_VECTORS);
 	if (count < 0) {
