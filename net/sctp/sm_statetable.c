@@ -295,7 +295,7 @@ sctp_sm_table_entry_t *sctp_sm_lookup_event(sctp_event_t event_type,
 	/* SCTP_STATE_COOKIE_WAIT */ \
 	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
 	/* SCTP_STATE_COOKIE_ECHOED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
+	{.fn = sctp_sf_cookie_echoed_err, .name = "sctp_sf_cookie_echoed_err"}, \
 	/* SCTP_STATE_ESTABLISHED */ \
 	{.fn = sctp_sf_operr_notify, .name = "sctp_sf_operr_notify"}, \
 	/* SCTP_STATE_SHUTDOWN_PENDING */ \

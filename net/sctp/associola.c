@@ -128,8 +128,9 @@ sctp_association_t *sctp_association_init(sctp_association_t *asoc,
 	asoc->state_timestamp = jiffies;
 
 	/* Set things that have constant value.  */
-	asoc->cookie_life.tv_sec = SCTP_DEFAULT_COOKIE_LIFE_SEC;
-	asoc->cookie_life.tv_usec = SCTP_DEFAULT_COOKIE_LIFE_USEC;
+	asoc->cookie_life.tv_sec = sctp_proto.valid_cookie_life / HZ;
+	asoc->cookie_life.tv_usec = (sctp_proto.valid_cookie_life % HZ) *
+					1000000L / HZ;
 
 	asoc->pmtu = 0;
 	asoc->frag_point = 0;
@@ -642,7 +643,7 @@ __u16 __sctp_association_get_next_ssn(sctp_association_t *asoc, __u16 sid)
 int sctp_cmp_addr_exact(const union sctp_addr *ss1,
 			const union sctp_addr *ss2)
 {
-	struct sctp_func *af;
+	struct sctp_af *af;
 
 	af = sctp_get_af_specific(ss1->sa.sa_family);
 	if (!af)
