@@ -36,12 +36,14 @@ DECLARE_MUTEX(dpm_sem);
 
 static inline void device_pm_hold(struct device * dev)
 {
-	atomic_inc(&dev->power.pm_users);
+	if (dev)
+		atomic_inc(&dev->power.pm_users);
 }
 
 static inline void device_pm_release(struct device * dev)
 {
-	atomic_inc(&dev->power.pm_users);
+	if (dev)
+		atomic_dec(&dev->power.pm_users);
 }
 
 
@@ -61,11 +63,9 @@ static inline void device_pm_release(struct device * dev)
 void device_pm_set_parent(struct device * dev, struct device * parent)
 {
 	struct device * old_parent = dev->power.pm_parent;
-	if (old_parent)
-		device_pm_release(old_parent);
+	device_pm_release(old_parent);
 	dev->power.pm_parent = parent;
-	if (parent)
-		device_pm_hold(parent);
+	device_pm_hold(parent);
 }
 EXPORT_SYMBOL(device_pm_set_parent);
 
@@ -91,6 +91,7 @@ void device_pm_remove(struct device * dev)
 		 dev->bus ? dev->bus->name : "No Bus", dev->kobj.name);
 	down(&dpm_sem);
 	dpm_sysfs_remove(dev);
+	device_pm_release(dev->power.pm_parent);
 	list_del(&dev->power.entry);
 	up(&dpm_sem);
 }
