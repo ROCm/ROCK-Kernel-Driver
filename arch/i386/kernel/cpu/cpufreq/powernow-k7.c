@@ -32,7 +32,7 @@
 #ifdef DEBUG
 #define dprintk(msg...) printk(msg)
 #else
-#define dprintk(msg...) do { } while(0);
+#define dprintk(msg...) do { } while(0)
 #endif
 
 #define PFX "powernow: "
@@ -89,7 +89,7 @@ static char have_a0;
 	rdmsr (msr, l__, h__);	\
 	val = l__;	\
 	val |= ((u64)h__<<32);	\
-} while(0);
+} while(0)
 #endif
 
 #ifndef wrmsrl
