@@ -55,7 +55,6 @@
 int isapnp_disable;			/* Disable ISA PnP */
 int isapnp_rdp;				/* Read Data Port */
 int isapnp_reset = 1;			/* reset all PnP cards (deactivate) */
-int isapnp_skip_pci_scan;		/* skip PCI resource scanning */
 int isapnp_verbose = 1;			/* verbose mode */
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
@@ -67,8 +66,6 @@ MODULE_PARM_DESC(isapnp_rdp, "ISA Plug & Play read data port");
 MODULE_PARM(isapnp_reset, "i");
 MODULE_PARM_DESC(isapnp_reset, "ISA Plug & Play reset all cards");
 MODULE_PARM(isapnp_allow_dma0, "i");
-MODULE_PARM(isapnp_skip_pci_scan, "i");
-MODULE_PARM_DESC(isapnp_skip_pci_scan, "ISA Plug & Play skip PCI resource scanning");
 MODULE_PARM(isapnp_verbose, "i");
 MODULE_PARM_DESC(isapnp_verbose, "ISA Plug & Play verbose mode");
 MODULE_LICENSE("GPL");
@@ -1175,7 +1172,6 @@ static int __init isapnp_setup_isapnp(char *str)
 {
 	(void)((get_option(&str,&isapnp_rdp) == 2) &&
 	       (get_option(&str,&isapnp_reset) == 2) &&
-	       (get_option(&str,&isapnp_skip_pci_scan) == 2) &&
 	       (get_option(&str,&isapnp_verbose) == 2));
 	return 1;
 }
