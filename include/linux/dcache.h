@@ -180,17 +180,6 @@ extern void shrink_dcache_parent(struct dentry *);
 extern void shrink_dcache_anon(struct list_head *);
 extern int d_invalidate(struct dentry *);
 
-/* dcache memory management */
-extern int shrink_dcache_memory(int, unsigned int);
-extern void prune_dcache(int);
-
-/* icache memory management (defined in linux/fs/inode.c) */
-extern int shrink_icache_memory(int, unsigned int);
-extern void prune_icache(int);
-
-/* quota cache memory management (defined in linux/fs/dquot.c) */
-extern int shrink_dqcache_memory(int, unsigned int);
-
 /* only used at mount-time */
 extern struct dentry * d_alloc_root(struct inode *);
 

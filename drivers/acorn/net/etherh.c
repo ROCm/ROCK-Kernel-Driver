@@ -42,6 +42,7 @@
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/delay.h>
+#include <linux/device.h>
 #include <linux/init.h>
 
 #include <asm/system.h>
@@ -56,14 +57,6 @@
 #define DEBUG_INIT 2
 
 static unsigned int net_debug = NET_DEBUG;
-
-static const card_ids __init etherh_cids[] = {
-	{ MANU_ANT, PROD_ANT_ETHERM      },
-	{ MANU_I3,  PROD_I3_ETHERLAN500  },
-	{ MANU_I3,  PROD_I3_ETHERLAN600  },
-	{ MANU_I3,  PROD_I3_ETHERLAN600A },
-	{ 0xffff,   0xffff }
-};
 
 struct etherh_priv {
 	struct ei_device eidev;
@@ -441,6 +434,12 @@ etherh_open(struct net_device *dev)
 {
 	struct ei_device *ei_local = (struct ei_device *) dev->priv;
 
+	if (!is_valid_ether_addr(dev->dev_addr)) {
+		printk(KERN_WARNING "%s: invalid ethernet MAC address\n",
+			dev->name);
+		return -EINVAL;
+	}
+
 	if (request_irq(dev->irq, ei_interrupt, 0, dev->name, dev))
 		return -EAGAIN;
 
@@ -480,6 +479,23 @@ etherh_close(struct net_device *dev)
 {
 	ei_close (dev);
 	free_irq (dev->irq, dev);
+	return 0;
+}
+
+static int
+etherh_set_mac_address(struct net_device *dev, void *p)
+{
+	struct sockaddr *addr = p;
+
+	if (netif_running(dev))
+		return -EBUSY;
+
+	memcpy(dev->dev_addr, addr->sa_data, dev->addr_len);
+
+	/*
+	 * We'll set the MAC address on the chip when we open it.
+	 */
+
 	return 0;
 }
 
@@ -541,21 +557,24 @@ static int __init etherm_addr(char *addr)
 static u32 etherh_regoffsets[16];
 static u32 etherm_regoffsets[16];
 
-static struct net_device * __init etherh_init_one(struct expansion_card *ec)
+static int __init
+etherh_probe(struct expansion_card *ec, const struct ecard_id *id)
 {
 	struct ei_device *ei_local;
 	struct net_device *dev;
 	struct etherh_priv *eh;
 	const char *dev_type;
-	int i, size;
+	int i, size, ret;
 
 	etherh_banner();
 
 	ecard_claim(ec);
 	
 	dev = init_etherdev(NULL, sizeof(struct etherh_priv));
-	if (!dev)
+	if (!dev) {
+		ret = -ENOMEM;
 		goto out;
+	}
 
 	/*
 	 * init_etherdev allocs and zeros dev->priv
@@ -566,33 +585,33 @@ static struct net_device * __init etherh_init_one(struct expansion_card *ec)
 
 	SET_MODULE_OWNER(dev);
 
-	dev->open	= etherh_open;
-	dev->stop	= etherh_close;
-	dev->set_config	= etherh_set_config;
-	dev->irq	= ec->irq;
-	dev->base_addr	= ecard_address(ec, ECARD_MEMC, 0);
-	dev->priv	= eh;
+	dev->open		= etherh_open;
+	dev->stop		= etherh_close;
+	dev->set_mac_address	= etherh_set_mac_address;
+	dev->set_config		= etherh_set_config;
+	dev->irq		= ec->irq;
+	dev->base_addr		= ecard_address(ec, ECARD_MEMC, 0);
 
 	/*
 	 * IRQ and control port handling
 	 */
-	ec->ops		= &etherh_ops;
-	ec->irq_data	= eh;
-	eh->ctrl	= 0;
-	eh->id		= ec->cid.product;
+	if (ec->irq != 11) {
+		ec->ops		= &etherh_ops;
+		ec->irq_data	= eh;
+	}
+	eh->ctrl		= 0;
+	eh->id			= ec->cid.product;
 
 	switch (ec->cid.product) {
 	case PROD_ANT_ETHERM:
-		if (etherm_addr(dev->dev_addr))
-			goto free;
+		etherm_addr(dev->dev_addr);
 		dev->base_addr += ETHERM_NS8390;
 		dev->mem_start  = dev->base_addr + ETHERM_DATAPORT;
 		eh->ctrl_port   = dev->base_addr + ETHERM_CTRLPORT;
 		break;
 
 	case PROD_I3_ETHERLAN500:
-		if (etherh_addr(dev->dev_addr, ec))
-			goto free;
+		etherh_addr(dev->dev_addr, ec);
 		dev->base_addr += ETHERH500_NS8390;
 		dev->mem_start  = dev->base_addr + ETHERH500_DATAPORT;
 		eh->ctrl_port   = ecard_address (ec, ECARD_IOC, ECARD_FAST)
@@ -601,8 +620,7 @@ static struct net_device * __init etherh_init_one(struct expansion_card *ec)
 
 	case PROD_I3_ETHERLAN600:
 	case PROD_I3_ETHERLAN600A:
-		if (etherh_addr(dev->dev_addr, ec))
-			goto free;
+		etherh_addr(dev->dev_addr, ec);
 		dev->base_addr += ETHERH600_NS8390;
 		dev->mem_start  = dev->base_addr + ETHERH600_DATAPORT;
 		eh->ctrl_port   = dev->base_addr + ETHERH600_CTRLPORT;
@@ -611,6 +629,7 @@ static struct net_device * __init etherh_init_one(struct expansion_card *ec)
 	default:
 		printk(KERN_ERR "%s: unknown card type %x\n",
 		       dev->name, ec->cid.product);
+		ret = -ENODEV;
 		goto free;
 	}
 
@@ -618,11 +637,15 @@ static struct net_device * __init etherh_init_one(struct expansion_card *ec)
 	if (ec->cid.product == PROD_ANT_ETHERM)
 		size <<= 3;
 
-	if (!request_region(dev->base_addr, size, dev->name))
+	if (!request_region(dev->base_addr, size, dev->name)) {
+		ret = -EBUSY;
 		goto free;
+	}
 
-	if (ethdev_init(dev))
+	if (ethdev_init(dev)) {
+		ret = -ENODEV;
 		goto release;
+	}
 
 	/*
 	 * If we're in the NIC slot, make sure the IRQ is enabled
@@ -690,7 +713,10 @@ static struct net_device * __init etherh_init_one(struct expansion_card *ec)
 
 	etherh_reset(dev);
 	NS8390_init(dev, 0);
-	return dev;
+
+	ecard_set_drvdata(ec, dev);
+
+	return 0;
 
 release:
 	release_region(dev->base_addr, 16);
@@ -700,67 +726,59 @@ free:
 	kfree(dev);
 out:
 	ecard_release(ec);
-	return NULL;
+	return ret;
 }
 
-#define MAX_ETHERH_CARDS 2
+static void __devexit etherh_remove(struct expansion_card *ec)
+{
+	struct net_device *dev = ecard_get_drvdata(ec);
+	int size = 16;
 
-static struct net_device *e_dev[MAX_ETHERH_CARDS];
-static struct expansion_card *e_card[MAX_ETHERH_CARDS];
+	ecard_set_drvdata(ec, NULL);
+
+	unregister_netdev(dev);
+	if (ec->cid.product == PROD_ANT_ETHERM)
+		size <<= 3;
+	release_region(dev->base_addr, size);
+	kfree(dev);
+
+	ec->ops = NULL;
+	kfree(ec->irq_data);
+	ecard_release(ec);
+}
+
+static const struct ecard_id etherh_ids[] = {
+	{ MANU_ANT, PROD_ANT_ETHERM      },
+	{ MANU_I3,  PROD_I3_ETHERLAN500  },
+	{ MANU_I3,  PROD_I3_ETHERLAN600  },
+	{ MANU_I3,  PROD_I3_ETHERLAN600A },
+	{ 0xffff,   0xffff }
+};
+
+static struct ecard_driver etherh_driver = {
+	.probe		= etherh_probe,
+	.remove		= __devexit_p(etherh_remove),
+	.id_table	= etherh_ids,
+	.drv = {
+		.name	= "etherh",
+	},
+};
 
 static int __init etherh_init(void)
 {
-	int i, ret = -ENODEV;
+	int i;
 
 	for (i = 0; i < 16; i++) {
 		etherh_regoffsets[i] = i;
 		etherm_regoffsets[i] = i << 3;
 	}
 
-	ecard_startfind();
-
-	for (i = 0; i < MAX_ECARDS; i++) {
-		struct expansion_card *ec;
-		struct net_device *dev;
-
-		ec = ecard_find(0, etherh_cids);
-		if (!ec)
-			break;
-
-		dev = etherh_init_one(ec);
-		if (!dev)
-			break;
-
-		e_card[i] = ec;
-		e_dev[i]  = dev;
-		ret = 0;
-	}
-
-	return ret;
+	return ecard_register_driver(&etherh_driver);
 }
 
 static void __exit etherh_exit(void)
 {
-	int i;
-
-	for (i = 0; i < MAX_ETHERH_CARDS; i++) {
-		if (e_dev[i]) {
-			int size;
-			unregister_netdev(e_dev[i]);
-			size = 16;
-			if (e_card[i]->cid.product == PROD_ANT_ETHERM)
-				size <<= 3;
-			release_region(e_dev[i]->base_addr, size);
-			kfree(e_dev[i]);
-			e_dev[i] = NULL;
-		}
-		if (e_card[i]) {
-			e_card[i]->ops = NULL;
-			kfree(e_card[i]->irq_data);
-			ecard_release(e_card[i]);
-			e_card[i] = NULL;
-		}
-	}
+	ecard_remove_driver(&etherh_driver);
 }
 
 module_init(etherh_init);

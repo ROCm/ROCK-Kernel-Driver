@@ -50,6 +50,9 @@ extern int usb_major_init(void);
 extern void usb_major_cleanup(void);
 
 
+int nousb;		/* Disable USB when built into kernel image */
+			/* Not honored on modular build */
+
 
 static int generic_probe (struct device *dev)
 {
@@ -166,6 +169,9 @@ int usb_device_remove(struct device *dev)
 int usb_register(struct usb_driver *new_driver)
 {
 	int retval = 0;
+
+	if (nousb)
+		return -ENODEV;
 
 	new_driver->driver.name = (char *)new_driver->name;
 	new_driver->driver.bus = &usb_bus_type;
@@ -1338,11 +1344,37 @@ struct bus_type usb_bus_type = {
 	.hotplug =	usb_hotplug,
 };
 
+#ifndef MODULE
+
+static int __init usb_setup_disable(char *str)
+{
+	nousb = 1;
+	return 1;
+}
+
+/* format to disable USB on kernel command line is: nousb */
+__setup("nousb", usb_setup_disable);
+
+#endif
+
+/*
+ * for external read access to <nousb>
+ */
+int usb_disabled(void)
+{
+	return nousb;
+}
+
 /*
  * Init
  */
 static int __init usb_init(void)
 {
+	if (nousb) {
+		info("USB support disabled\n");
+		return 0;
+	}
+
 	bus_register(&usb_bus_type);
 	usb_major_init();
 	usbfs_init();
@@ -1358,6 +1390,10 @@ static int __init usb_init(void)
  */
 static void __exit usb_exit(void)
 {
+	/* This will matter if shutdown/reboot does exitcalls. */
+	if (nousb)
+		return;
+
 	remove_driver(&usb_generic_driver);
 	usb_major_cleanup();
 	usbfs_cleanup();
@@ -1377,6 +1413,7 @@ EXPORT_SYMBOL(usb_epnum_to_ep_desc);
 
 EXPORT_SYMBOL(usb_register);
 EXPORT_SYMBOL(usb_deregister);
+EXPORT_SYMBOL(usb_disabled);
 
 EXPORT_SYMBOL(usb_device_probe);
 EXPORT_SYMBOL(usb_device_remove);

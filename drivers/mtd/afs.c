@@ -21,7 +21,7 @@
    This is access code for flashes using ARM's flash partitioning 
    standards.
 
-   $Id: afs.c,v 1.6 2001/10/02 10:04:51 rmk Exp $
+   $Id: afs.c,v 1.8 2002/05/04 08:49:09 rmk Exp $
 
 ======================================================================*/
 
@@ -80,6 +80,12 @@ afs_read_footer(struct mtd_info *mtd, u_int *img_start, u_int *iis_start,
 	 * Does it contain the magic number?
 	 */
 	if (fs.signature != 0xa0ffff9f)
+		ret = 1;
+
+	/*
+	 * Don't touch the SIB.
+	 */
+	if (fs.type == 2)
 		ret = 1;
 
 	*iis_start = fs.image_info_base & mask;
@@ -163,6 +169,7 @@ int parse_afs_partitions(struct mtd_info *mtd, struct mtd_partition **pparts)
 	if (!parts)
 		return -ENOMEM;
 
+	memset(parts, 0, sz);
 	str = (char *)(parts + idx);
 
 	/*

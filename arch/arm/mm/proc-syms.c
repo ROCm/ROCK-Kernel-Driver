@@ -10,8 +10,10 @@
 #include <linux/module.h>
 #include <linux/mm.h>
 
+#include <asm/cacheflush.h>
 #include <asm/pgalloc.h>
 #include <asm/proc-fns.h>
+#include <asm/tlbflush.h>
 
 #ifndef MULTI_CPU
 EXPORT_SYMBOL(cpu_cache_clean_invalidate_all);
@@ -29,11 +31,11 @@ EXPORT_SYMBOL(cpu_set_pte);
 EXPORT_SYMBOL(processor);
 #endif
 
-#ifndef MULTI_TLB
-EXPORT_SYMBOL_NOVERS(__cpu_flush_kern_tlb_all);
-EXPORT_SYMBOL_NOVERS(__cpu_flush_user_tlb_mm);
-EXPORT_SYMBOL_NOVERS(__cpu_flush_user_tlb_range);
-EXPORT_SYMBOL_NOVERS(__cpu_flush_user_tlb_page);
-#else
+/*
+ * No module should need to touch the TLB (and currently
+ * no modules do.  We export this for "loadkernel" support
+ * (booting a new kernel from within a running kernel.)
+ */
+#ifdef MULTI_TLB
 EXPORT_SYMBOL(cpu_tlb);
 #endif

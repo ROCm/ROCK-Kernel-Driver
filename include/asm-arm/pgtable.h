@@ -12,6 +12,7 @@
 
 #include <linux/config.h>
 #include <asm/memory.h>
+#include <asm/proc-fns.h>
 #include <asm/arch/vmalloc.h>
 
 /*

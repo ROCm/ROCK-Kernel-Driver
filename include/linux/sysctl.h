@@ -146,13 +146,14 @@ enum
 	VM_UNUSED9=9,		/* was: struct: Set page table cache parameters */
 	VM_PAGE_CLUSTER=10,	/* int: set number of pages to swap together */
 	VM_DIRTY_BACKGROUND=11,	/* dirty_background_ratio */
-	VM_DIRTY_ASYNC=12,	/* dirty_async_ratio */
+	VM_DIRTY_RATIO=12,	/* dirty_ratio */
 	VM_DIRTY_WB_CS=13,	/* dirty_writeback_centisecs */
 	VM_DIRTY_EXPIRE_CS=14,	/* dirty_expire_centisecs */
 	VM_NR_PDFLUSH_THREADS=15, /* nr_pdflush_threads */
 	VM_OVERCOMMIT_RATIO=16, /* percent of RAM to allow overcommit in */
 	VM_PAGEBUF=17,		/* struct: Control pagebuf parameters */
 	VM_HUGETLB_PAGES=18,	/* int: Number of available Huge Pages */
+	VM_SWAPPINESS=19,	/* Tendency to steal mapped memory */
 };
 
 

@@ -388,7 +388,7 @@ static void dio_prep_bio(struct dio *dio)
 /*
  * There is no bio.  Make one now.
  */
-static int dio_new_bio(struct dio *dio)
+static int dio_new_bio(struct dio *dio, sector_t blkno)
 {
 	sector_t sector;
 	int ret, nr_pages;
@@ -396,7 +396,7 @@ static int dio_new_bio(struct dio *dio)
 	ret = dio_bio_reap(dio);
 	if (ret)
 		goto out;
-	sector = dio->next_block_in_bio << (dio->blkbits - 9);
+	sector = blkno << (dio->blkbits - 9);
 	nr_pages = min(dio->pages_left, bio_get_nr_vecs(dio->map_bh.b_bdev));
 	BUG_ON(nr_pages <= 0);
 	ret = dio_bio_alloc(dio, dio->map_bh.b_bdev, sector, nr_pages);
@@ -408,23 +408,26 @@ out:
 
 static int
 dio_bio_add_page(struct dio *dio, struct page *page,
-		unsigned int bv_len, unsigned int bv_offset)
+		unsigned int bv_len, unsigned int bv_offset, sector_t blkno)
 {
 	int ret = 0;
 
 	if (bv_len == 0) 
 		goto out;
 
+	/* Take a ref against the page each time it is placed into a BIO */
 	page_cache_get(page);
 	if (bio_add_page(dio->bio, page, bv_len, bv_offset)) {
 		dio_bio_submit(dio);
-		ret = dio_new_bio(dio);
+		ret = dio_new_bio(dio, blkno);
 		if (ret == 0) {
 			ret = bio_add_page(dio->bio, page, bv_len, bv_offset);
 			BUG_ON(ret != 0);
+		} else {
+			/* The page didn't make it into a BIO */
+			page_cache_release(page);
 		}
 	}
-	page_cache_release(page);
 	dio->pages_left--;
 out:
 	return ret;
@@ -460,6 +463,7 @@ int do_direct_IO(struct dio *dio)
 		int new_page;	/* Need to insert this page into the BIO? */
 		unsigned int bv_offset;
 		unsigned int bv_len;
+		sector_t curr_blkno;
 
 		page = dio_get_page(dio);
 		if (IS_ERR(page)) {
@@ -470,6 +474,7 @@ int do_direct_IO(struct dio *dio)
 		new_page = 1;
 		bv_offset = 0;
 		bv_len = 0;
+		curr_blkno = 0;
 		while (block_in_page < blocks_per_page) {
 			unsigned this_chunk_bytes;	/* # of bytes mapped */
 			unsigned this_chunk_blocks;	/* # of blocks */
@@ -477,7 +482,7 @@ int do_direct_IO(struct dio *dio)
 
 			ret = get_more_blocks(dio);
 			if (ret)
-				goto out;
+				goto fail_release;
 
 			/* Handle holes */
 			if (!buffer_mapped(&dio->map_bh)) {
@@ -494,15 +499,16 @@ int do_direct_IO(struct dio *dio)
 
 			dio_prep_bio(dio);
 			if (dio->bio == NULL) {
-				ret = dio_new_bio(dio);
+				ret = dio_new_bio(dio, dio->next_block_in_bio);
 				if (ret)
-					goto out;
+					goto fail_release;
 				new_page = 1;
 			}
 
 			if (new_page) {
 				bv_len = 0;
 				bv_offset = block_in_page << blkbits;
+				curr_blkno = dio->next_block_in_bio;
 				new_page = 0;
 			}
 
@@ -530,11 +536,18 @@ next_block:
 			if (dio->block_in_file == dio->final_block_in_request)
 				break;
 		}
-		ret = dio_bio_add_page(dio, page, bv_len, bv_offset);
+		ret = dio_bio_add_page(dio, page, bv_len,
+					bv_offset, curr_blkno);
 		if (ret)
-			goto out;
+			goto fail_release;
+
+		/* Drop the ref which was taken in get_user_pages() */
+		page_cache_release(page);
 		block_in_page = 0;
 	}
+	goto out;
+fail_release:
+	page_cache_release(page);
 out:
 	return ret;
 }

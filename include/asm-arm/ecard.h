@@ -95,9 +95,10 @@ typedef enum {				/* Speed for ECARD_IOC space	*/
 	ECARD_SYNC	 = 3
 } card_speed_t;
 
-typedef struct  {			/* Card ID structure		*/
-	unsigned short manufacturer;
-	unsigned short product;
+typedef struct ecard_id {		/* Card ID structure		*/
+	unsigned short	manufacturer;
+	unsigned short	product;
+	void		*data;
 } card_ids;
 
 struct in_ecid {			/* Packed card ID information	*/
@@ -131,6 +132,8 @@ typedef struct {			/* Card handler routines	*/
  */
 struct expansion_card {
 	struct expansion_card  *next;
+
+	struct device		dev;
 
 	/* Public data */
 	volatile unsigned char *irqaddr;	/* address of IRQ register	*/
@@ -247,5 +250,25 @@ struct ex_chunk_dir {
 };
 
 #endif
+
+extern struct bus_type ecard_bus_type;
+
+#define ECARD_DEV(_d)	container_of((_d), struct expansion_card, dev)
+
+struct ecard_driver {
+	int			(*probe)(struct expansion_card *, const struct ecard_id *id);
+	void			(*remove)(struct expansion_card *);
+	const struct ecard_id	*id_table;
+	unsigned int		id;
+	struct device_driver	drv;
+};
+
+#define ECARD_DRV(_d)	container_of((_d), struct ecard_driver, drv)
+
+#define ecard_set_drvdata(ec,data)	dev_set_drvdata(&(ec)->dev, (data))
+#define ecard_get_drvdata(ec)		dev_get_drvdata(&(ec)->dev)
+
+int ecard_register_driver(struct ecard_driver *);
+void ecard_remove_driver(struct ecard_driver *);
 
 #endif

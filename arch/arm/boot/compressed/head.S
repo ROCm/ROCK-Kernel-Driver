@@ -55,6 +55,18 @@
 		.macro	writeb, rb
 		strb	\rb, [r3, #0]
 		.endm
+#elif defined(CONFIG_ARCH_SA1100)
+		.macro	loadsp, rb
+		mov	\rb, #0x80000000	@ physical base address
+#  if defined(CONFIG_DEBUG_LL_SER3)
+		add	\rb, \rb, #0x00050000	@ Ser3
+#  else
+		add	\rb, \rb, #0x00010000	@ Ser1
+#  endif
+		.endm
+		.macro	writeb, rb
+		str	\rb, [r3, #0x14]	@ UTDR
+		.endm
 #else
 #error no serial architecture defined
 #endif
@@ -151,22 +163,55 @@ not_angel:
 		ldmia	r0, {r1, r2, r3, r4, r5, r6, ip, sp}
 		subs	r0, r0, r1		@ calculate the delta offset
 
-		teq	r0, #0			@ if delta is zero, we're
+						@ if delta is zero, we're
 		beq	not_relocated		@ running at the address we
 						@ were linked at.
 
-		add	r2, r2, r0		@ different address, so we
-		add	r3, r3, r0		@ need to fix up various
-		add	r5, r5, r0		@ pointers.
+		/*
+		 * We're running at a different address.  We need to fix
+		 * up various pointers:
+		 *   r5 - zImage base address
+		 *   r6 - GOT start
+		 *   ip - GOT end
+		 */
+		add	r5, r5, r0
 		add	r6, r6, r0
 		add	ip, ip, r0
+
+#ifndef CONFIG_ZBOOT_ROM
+		/*
+		 * If we're running fully PIC === CONFIG_ZBOOT_ROM = n,
+		 * we need to fix up pointers into the BSS region.
+		 *   r2 - BSS start
+		 *   r3 - BSS end
+		 *   sp - stack pointer
+		 */
+		add	r2, r2, r0
+		add	r3, r3, r0
 		add	sp, sp, r0
 
+		/*
+		 * Relocate all entries in the GOT table.
+		 */
 1:		ldr	r1, [r6, #0]		@ relocate entries in the GOT
 		add	r1, r1, r0		@ table.  This fixes up the
 		str	r1, [r6], #4		@ C references.
 		cmp	r6, ip
 		blo	1b
+#else
+
+		/*
+		 * Relocate entries in the GOT table.  We only relocate
+		 * the entries that are outside the (relocated) BSS region.
+		 */
+1:		ldr	r1, [r6, #0]		@ relocate entries in the GOT
+		cmp	r1, r2			@ entry < bss_start ||
+		cmphs	r3, r1			@ _end < entry
+		addlo	r1, r1, r0		@ table.  This fixes up the
+		str	r1, [r6], #4		@ C references.
+		cmp	r6, ip
+		blo	1b
+#endif
 
 not_relocated:	mov	r0, #0
 1:		str	r0, [r2], #4		@ clear bss
@@ -176,6 +221,11 @@ not_relocated:	mov	r0, #0
 		cmp	r2, r3
 		blo	1b
 
+		/*
+		 * The C runtime environment should now be setup
+		 * sufficiently.  Turn the cache on, set up some
+		 * pointers, and start decompressing.
+		 */
 		bl	cache_on
 
 		mov	r1, sp			@ malloc space above stack

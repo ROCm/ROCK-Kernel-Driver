@@ -132,7 +132,7 @@ static int k_set_rtc_time(void)
 	if (rtc_command(RTC_GETDATETIME, &old_rtctm))
 		return 0;
 
-	new_rtctm.cs    = xtime.tv_usec / 10000;
+	new_rtctm.cs    = xtime.tv_nsec / 10000000;
 	new_rtctm.secs  = nowtime % 60;	nowtime /= 60;
 	new_rtctm.mins  = nowtime % 60;	nowtime /= 60;
 	new_rtctm.hours = nowtime % 24;
@@ -283,7 +283,7 @@ static int ioc_client_reg(struct i2c_client *client)
 		rtc_client = client;
 		get_rtc_time(&rtctm, &year);
 
-		xtime.tv_usec = rtctm.cs * 10000;
+		xtime.tv_nsec = rtctm.cs * 10000000;
 		xtime.tv_sec  = mktime(year, rtctm.mon, rtctm.mday,
 				       rtctm.hours, rtctm.mins, rtctm.secs);
 		set_rtc = k_set_rtc_time;

@@ -67,7 +67,7 @@ int wakeup_bdflush(long nr_pages);
 
 /* These 5 are exported to sysctl. */
 extern int dirty_background_ratio;
-extern int dirty_async_ratio;
+extern int vm_dirty_ratio;
 extern int dirty_writeback_centisecs;
 extern int dirty_expire_centisecs;
 

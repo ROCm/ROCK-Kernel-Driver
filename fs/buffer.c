@@ -28,7 +28,6 @@
 #include <linux/blkdev.h>
 #include <linux/file.h>
 #include <linux/quotaops.h>
-#include <linux/iobuf.h>
 #include <linux/highmem.h>
 #include <linux/module.h>
 #include <linux/writeback.h>
@@ -2298,65 +2297,6 @@ sector_t generic_block_bmap(struct address_space *mapping, sector_t block,
 	tmp.b_blocknr = 0;
 	get_block(inode, block, &tmp, 0);
 	return tmp.b_blocknr;
-}
-
-/*
- * Start I/O on a physical range of kernel memory, defined by a vector
- * of kiobuf structs (much like a user-space iovec list).
- *
- * The kiobuf must already be locked for IO.  IO is submitted
- * asynchronously: you need to check page->locked and page->uptodate.
- *
- * It is up to the caller to make sure that there are enough blocks
- * passed in to completely map the iobufs to disk.
- */
-int brw_kiovec(int rw, int nr, struct kiobuf *iovec[],
-	       struct block_device *bdev, sector_t b[], int size)
-{
-	int		transferred;
-	int		i;
-	int		err;
-	struct kiobuf *	iobuf;
-
-	if (!nr)
-		return 0;
-	
-	/* 
-	 * First, do some alignment and validity checks 
-	 */
-	for (i = 0; i < nr; i++) {
-		iobuf = iovec[i];
-		if ((iobuf->offset & (size-1)) || (iobuf->length & (size-1)))
-			return -EINVAL;
-		if (!iobuf->nr_pages)
-			panic("brw_kiovec: iobuf not initialised");
-	}
-
-	/* 
-	 * OK to walk down the iovec doing page IO on each page we find. 
-	 */
-	for (i = 0; i < nr; i++) {
-		iobuf = iovec[i];
-		iobuf->errno = 0;
-
-		ll_rw_kio(rw, iobuf, bdev, b[i] * (size >> 9));
-	}
-
-	/*
-	 * now they are all submitted, wait for completion
-	 */
-	transferred = 0;
-	err = 0;
-	for (i = 0; i < nr; i++) {
-		iobuf = iovec[i];
-		kiobuf_wait_for_io(iobuf);
-		if (iobuf->errno && !err)
-			err = iobuf->errno;
-		if (!err)
-			transferred += iobuf->length;
-	}
-
-	return err ? err : transferred;
 }
 
 static int end_bio_bh_io_sync(struct bio *bio, unsigned int bytes_done, int err)

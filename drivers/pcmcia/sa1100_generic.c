@@ -719,7 +719,7 @@ sa1100_pcmcia_set_mem_map(unsigned int sock, struct pccard_mem_map *map)
 	(map->flags&MAP_ATTRIB)?"ATTRIB ":"",
 	(map->flags&MAP_USE_WAIT)?"USE_WAIT ":"");
 
-  if (map->map >= MAX_WIN){
+  if (map->map >= MAX_WIN) {
     printk(KERN_ERR "%s(): map (%d) out of range\n", __FUNCTION__,
 	   map->map);
     return -1;
@@ -853,19 +853,19 @@ sa1100_pcmcia_proc_setup(unsigned int sock, struct proc_dir_entry *base)
 #endif  /* defined(CONFIG_PROC_FS) */
 
 static struct pccard_operations sa1100_pcmcia_operations = {
-  init:			sa1100_pcmcia_sock_init,
-  suspend:		sa1100_pcmcia_suspend,
-  register_callback:	sa1100_pcmcia_register_callback,
-  inquire_socket:	sa1100_pcmcia_inquire_socket,
-  get_status:		sa1100_pcmcia_get_status,
-  get_socket:		sa1100_pcmcia_get_socket,
-  set_socket:		sa1100_pcmcia_set_socket,
-  get_io_map:		sa1100_pcmcia_get_io_map,
-  set_io_map:		sa1100_pcmcia_set_io_map,
-  get_mem_map:		sa1100_pcmcia_get_mem_map,
-  set_mem_map:		sa1100_pcmcia_set_mem_map,
+  .init			= sa1100_pcmcia_sock_init,
+  .suspend		= sa1100_pcmcia_suspend,
+  .register_callback	= sa1100_pcmcia_register_callback,
+  .inquire_socket	= sa1100_pcmcia_inquire_socket,
+  .get_status		= sa1100_pcmcia_get_status,
+  .get_socket		= sa1100_pcmcia_get_socket,
+  .set_socket		= sa1100_pcmcia_set_socket,
+  .get_io_map		= sa1100_pcmcia_get_io_map,
+  .set_io_map		= sa1100_pcmcia_set_io_map,
+  .get_mem_map		= sa1100_pcmcia_get_mem_map,
+  .set_mem_map		= sa1100_pcmcia_set_mem_map,
 #ifdef CONFIG_PROC_FS
-  proc_setup:		sa1100_pcmcia_proc_setup
+  .proc_setup		= sa1100_pcmcia_proc_setup
 #endif
 };
 
@@ -927,7 +927,7 @@ sa1100_pcmcia_notifier(struct notifier_block *nb, unsigned long val,
 }
 
 static struct notifier_block sa1100_pcmcia_notifier_block = {
-	notifier_call:	sa1100_pcmcia_notifier
+	.notifier_call	= sa1100_pcmcia_notifier
 };
 #endif
 
@@ -1148,6 +1148,9 @@ static int __init sa1100_pcmcia_init(void)
 #ifdef CONFIG_SA1100_GRAPHICSCLIENT
 	pcmcia_gcplus_init();
 #endif
+#ifdef CONFIG_SA1100_H3600
+	pcmcia_h3600_init();
+#endif
 #ifdef CONFIG_SA1100_PANGOLIN
 	pcmcia_pangolin_init();
 #endif
@@ -1191,6 +1194,9 @@ static void __exit sa1100_pcmcia_exit(void)
 #endif
 #ifdef CONFIG_SA1100_GRAPHICSCLIENT
 	pcmcia_gcplus_exit();
+#endif
+#ifdef CONFIG_SA1100_H3600
+	pcmcia_h3600_exit();
 #endif
 #ifdef CONFIG_SA1100_PANGOLIN
 	pcmcia_pangolin_exit();

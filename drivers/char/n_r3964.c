@@ -1126,7 +1126,7 @@ static int r3964_open(struct tty_struct *tty)
    
    tty->disc_data = pInfo;
 
-   INIT_LIST_HEAD(&pInfo->tmr.list);
+   init_timer(&pInfo->tmr);
    pInfo->tmr.data = (unsigned long)pInfo;
    pInfo->tmr.function = on_timeout;
 

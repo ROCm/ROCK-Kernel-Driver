@@ -14,7 +14,6 @@
 #include <linux/major.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/smp_lock.h>
-#include <linux/iobuf.h>
 #include <linux/highmem.h>
 #include <linux/blkdev.h>
 #include <linux/module.h>
