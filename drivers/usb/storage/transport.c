@@ -988,7 +988,7 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 	US_DEBUGP("Bulk status Sig 0x%x T 0x%x R %d Stat 0x%x\n",
 		  le32_to_cpu(bcs.Signature), bcs.Tag, 
 		  bcs.Residue, bcs.Status);
-	if (bcs.Signature != cpu_to_le32(US_BULK_CS_SIGN) || 
+	if ((bcs.Signature != cpu_to_le32(US_BULK_CS_SIGN) && bcs.Signature != cpu_to_le32(US_BULK_CS_OLYMPUS_SIGN)) || 
 	    bcs.Tag != bcb.Tag || 
 	    bcs.Status > US_BULK_STAT_PHASE) {
 		US_DEBUGP("Bulk logical error\n");
