@@ -51,11 +51,13 @@
 			- Full duplex support
 		v1.19  16Oct2002 Zwane Mwaikambo <zwane@linuxpower.ca>
 			- Additional ethtool features
+		v1.19a 28Oct2002 Davud Ruggiero <jdr@farfalle.com>
+			- Increase *read_eeprom udelay to workaround oops with 2 cards.
 */
 
 #define DRV_NAME	"3c509"
-#define DRV_VERSION	"1.19"
-#define DRV_RELDATE	"16Oct2002"
+#define DRV_VERSION	"1.19a"
+#define DRV_RELDATE	"28Oct2002"
 
 /* A few values that may be tweaked. */
 
@@ -570,8 +572,9 @@ no_pnp:
 static ushort read_eeprom(int ioaddr, int index)
 {
 	outw(EEPROM_READ + index, ioaddr + 10);
-	/* Pause for at least 162 us. for the read to take place. */
-	udelay (500);
+	/* Pause for at least 162 us. for the read to take place. 
+	   Some chips seem to require much longer */
+	mdelay(2);
 	return inw(ioaddr + 12);
 }
 
@@ -585,7 +588,8 @@ static ushort __init id_read_eeprom(int index)
 	outb(EEPROM_READ + index, id_port);
 
 	/* Pause for at least 162 us. for the read to take place. */
-	udelay (500);
+	/* Some chips seem to require much longer */
+	mdelay(4);
 	
 	for (bit = 15; bit >= 0; bit--)
 		word = (word << 1) + (inb(id_port) & 0x01);
