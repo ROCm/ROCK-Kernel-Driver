@@ -998,14 +998,14 @@ static devfs_handle_t devfs_handle;
 int slm_init( void )
 
 {
-	if (devfs_register_chrdev( MAJOR_NR, "slm", &slm_fops )) {
+	if (register_chrdev( MAJOR_NR, "slm", &slm_fops )) {
 		printk( KERN_ERR "Unable to get major %d for ACSI SLM\n", MAJOR_NR );
 		return -EBUSY;
 	}
 	
 	if (!(SLMBuffer = atari_stram_alloc( SLM_BUFFER_SIZE, NULL, "SLM" ))) {
 		printk( KERN_ERR "Unable to get SLM ST-Ram buffer.\n" );
-		devfs_unregister_chrdev( MAJOR_NR, "slm" );
+		unregister_chrdev( MAJOR_NR, "slm" );
 		return -ENOMEM;
 	}
 	BufferP = SLMBuffer;
@@ -1038,7 +1038,7 @@ int init_module(void)
 void cleanup_module(void)
 {
 	devfs_unregister (devfs_handle);
-	if (devfs_unregister_chrdev( MAJOR_NR, "slm" ) != 0)
+	if (unregister_chrdev( MAJOR_NR, "slm" ) != 0)
 		printk( KERN_ERR "acsi_slm: cleanup_module failed\n");
 	atari_stram_free( SLMBuffer );
 }

@@ -56,7 +56,6 @@
 #include <linux/fs.h>
 #include <linux/kernel.h>
 #include <linux/genhd.h>
-#include <linux/devfs_fs_kernel.h>
 #include <linux/delay.h>
 #include <linux/mm.h>
 #include <linux/major.h>
@@ -1741,14 +1740,14 @@ int acsi_init( void )
 	int err = 0;
 	if (!MACH_IS_ATARI || !ATARIHW_PRESENT(ACSI))
 		return 0;
-	if (devfs_register_blkdev( MAJOR_NR, "ad", &acsi_fops )) {
+	if (register_blkdev( MAJOR_NR, "ad", &acsi_fops )) {
 		printk( KERN_ERR "Unable to get major %d for ACSI\n", MAJOR_NR );
 		return -EBUSY;
 	}
 	if (!(acsi_buffer =
 		  (char *)atari_stram_alloc(ACSI_BUFFER_SIZE, "acsi"))) {
 		printk( KERN_ERR "Unable to get ACSI ST-Ram buffer.\n" );
-		devfs_unregister_blkdev( MAJOR_NR, "ad" );
+		unregister_blkdev( MAJOR_NR, "ad" );
 		return -ENOMEM;
 	}
 	phys_acsi_buffer = virt_to_phys( acsi_buffer );
@@ -1786,7 +1785,7 @@ void cleanup_module(void)
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 	atari_stram_free( acsi_buffer );
 
-	if (devfs_unregister_blkdev( MAJOR_NR, "ad" ) != 0)
+	if (unregister_blkdev( MAJOR_NR, "ad" ) != 0)
 		printk( KERN_ERR "acsi: cleanup_module failed\n");
 
 	del_gendisk(&acsi_gendisk);

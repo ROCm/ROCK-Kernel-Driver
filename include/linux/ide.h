@@ -764,8 +764,6 @@ struct ata_device {
 	request_queue_t	queue;		/* per device request queue */
 	struct request *rq;		/* current request */
 
-	unsigned long sleep;		/* sleep until this time */
-
 	u8	 retry_pio;		/* retrying dma capable host in pio */
 	u8	 state;			/* retry state */
 
@@ -785,7 +783,6 @@ struct ata_device {
 	unsigned atapi_overlap	: 1;	/* flag: ATAPI overlap (not supported) */
 	unsigned doorlocking	: 1;	/* flag: for removable only: door lock/unlock works */
 	unsigned autotune	: 2;	/* 1=autotune, 2=noautotune, 0=default */
-	unsigned remap_0_to_1	: 2;	/* 0=remap if ezdrive, 1=remap, 2=noremap */
 	unsigned ata_flash	: 1;	/* 1=present, 0=default */
 	unsigned	addressing;	/* : 2; 0=28-bit, 1=48-bit, 2=64-bit */
 	u8		scsi;		/* 0=default, 1=skip current ide-subdriver for ide-scsi emulation */
@@ -797,7 +794,6 @@ struct ata_device {
 	u8		mult_count;	/* current multiple sector setting */
 	u8		bad_wstat;	/* used for ignoring WRERR_STAT */
 	u8		nowerr;		/* used for ignoring WRERR_STAT */
-	u8		sect0;		/* offset of first sector for DM6:DDO */
 	u8		head;		/* "real" number of heads */
 	u8		sect;		/* "real" sectors per track */
 	u8		bios_head;	/* BIOS/fdisk/LILO number of heads */
@@ -947,6 +943,8 @@ struct ata_channel {
 	void (*udma_timeout) (struct ata_device *);
 	void (*udma_irq_lost) (struct ata_device *);
 
+	unsigned long	seg_boundary_mask;
+	unsigned int	max_segment_size;
 	unsigned int	*dmatable_cpu;	/* dma physical region descriptor table (cpu view) */
 	dma_addr_t	dmatable_dma;	/* dma physical region descriptor table (dma view) */
 	struct scatterlist *sg_table;	/* Scatter-gather list used to build the above */

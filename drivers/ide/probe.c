@@ -41,19 +41,10 @@
 extern struct ata_device * get_info_ptr(kdev_t);
 
 /*
- * This is called from the partition-table code in pt/msdos.c.
+ * This is called from the partition-table code in pt/msdos.c
+ * to invent a translated geometry.
  *
- * It has two tasks:
- *
- * (I) to handle Ontrack DiskManager by offsetting everything by 63 sectors,
- *  or to handle EZdrive by remapping sector 0 to sector 1.
- *
- * (II) to invent a translated geometry.
- *
- * Part (I) is suppressed if the user specifies the "noremap" option
- * on the command line.
- *
- * Part (II) is suppressed if the user specifies an explicit geometry.
+ * This is suppressed if the user specifies an explicit geometry.
  *
  * The ptheads parameter is either 0 or tells about the number of
  * heads shown by the end of the first nonempty partition.
@@ -82,21 +73,6 @@ int ide_xlate_1024(kdev_t i_rdev, int xparm, int ptheads, const char *msg)
 	drive = get_info_ptr(i_rdev);
 	if (!drive)
 		return 0;
-
-	/* remap? */
-	if (drive->remap_0_to_1 != 2) {
-		if (xparm == 1) {		/* DM */
-			drive->sect0 = 63;
-			msg1 = " [remap +63]";
-			ret = 1;
-		} else if (xparm == -1) {	/* EZ-Drive */
-			if (drive->remap_0_to_1 == 0) {
-				drive->remap_0_to_1 = 1;
-				msg1 = " [remap 0->1]";
-				ret = 1;
-			}
-		}
-	}
 
 	/* There used to be code here that assigned drive->id->CHS to
 	 * drive->CHS and that to drive->bios_CHS. However, some disks have
@@ -1001,22 +977,24 @@ static int init_irq(struct ata_channel *ch)
 			ch->drive = drive;
 
 		/*
-		 * Init the per device request queue
+		 * Init the per device request queue.
 		 */
 
 		q = &drive->queue;
-		q->queuedata = drive->channel;
+		q->queuedata = drive;
 		blk_init_queue(q, do_ide_request, drive->channel->lock);
-		blk_queue_segment_boundary(q, 0xffff);
+		blk_queue_segment_boundary(q, ch->seg_boundary_mask);
+		blk_queue_max_segment_size(q, ch->max_segment_size);
 
-		/* ATA can do up to 128K per request, pdc4030 needs smaller limit */
+		/* ATA can do up to 128K per request, pdc4030 needs smaller
+		 * limit. */
 #ifdef CONFIG_BLK_DEV_PDC4030
 		if (drive->channel->chipset == ide_pdc4030)
 			max_sectors = 127;
 #endif
 		blk_queue_max_sectors(q, max_sectors);
 
-		/* IDE DMA can do PRD_ENTRIES number of segments. */
+		/* ATA DMA can do PRD_ENTRIES number of segments. */
 		blk_queue_max_hw_segments(q, PRD_ENTRIES);
 
 		/* FIXME: This is a driver limit and could be eliminated. */
@@ -1094,7 +1072,7 @@ static void channel_init(struct ata_channel *ch)
 	}
 #endif
 
-	if (devfs_register_blkdev(ch->major, ch->name, ide_fops)) {
+	if (register_blkdev(ch->major, ch->name, ide_fops)) {
 		printk("%s: UNABLE TO GET MAJOR NUMBER %d\n", ch->name, ch->major);
 
 		return;

@@ -1485,7 +1485,7 @@ static int __init capi_init(void)
 	} else
 		strcpy(rev, "1.0");
 
-	if (devfs_register_chrdev(capi_major, "capi20", &capi_fops)) {
+	if (register_chrdev(capi_major, "capi20", &capi_fops)) {
 		printk(KERN_ERR "capi20: unable to get major %d\n", capi_major);
 		MOD_DEC_USE_COUNT;
 		return -EIO;
@@ -1498,7 +1498,7 @@ static int __init capi_init(void)
 
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
 	if (capinc_tty_init() < 0) {
-		devfs_unregister_chrdev(capi_major, "capi20");
+		unregister_chrdev(capi_major, "capi20");
 		MOD_DEC_USE_COUNT;
 		return -ENOMEM;
 	}
@@ -1526,7 +1526,7 @@ static void __exit capi_exit(void)
 {
 	proc_exit();
 
-	devfs_unregister_chrdev(capi_major, "capi20");
+	unregister_chrdev(capi_major, "capi20");
 	devfs_find_and_unregister(NULL, "isdn/capi20", capi_major, 0, DEVFS_SPECIAL_CHR, 0);
 
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE

@@ -3826,7 +3826,7 @@ static int __init init_st(void)
 		verstr, st_fixed_buffer_size, st_write_threshold,
 		st_max_sg_segs);
 
-	if (devfs_register_chrdev(SCSI_TAPE_MAJOR, "st", &st_fops) >= 0) {
+	if (register_chrdev(SCSI_TAPE_MAJOR, "st", &st_fops) >= 0) {
 		if (scsi_register_device(&st_template) == 0) {
 			st_template.scsi_driverfs_driver.name = 
 				(char *)st_template.tag;
@@ -3846,7 +3846,7 @@ static void __exit exit_st(void)
 	int i;
 
 	scsi_unregister_device(&st_template);
-	devfs_unregister_chrdev(SCSI_TAPE_MAJOR, "st");
+	unregister_chrdev(SCSI_TAPE_MAJOR, "st");
 	if (scsi_tapes != NULL) {
 		for (i=0; i < st_template.dev_max; ++i)
 			if (scsi_tapes[i])

@@ -3367,7 +3367,7 @@ int __init cdu31a_init(void)
 		if (!request_region(cdu31a_port, 4, "cdu31a"))
 			goto errout3;
 
-		if (devfs_register_blkdev(MAJOR_NR, "cdu31a", &scd_bdops)) {
+		if (register_blkdev(MAJOR_NR, "cdu31a", &scd_bdops)) {
 			printk("Unable to get major %d for CDU-31a\n",
 			       MAJOR_NR);
 			goto errout2;
@@ -3460,7 +3460,7 @@ int __init cdu31a_init(void)
       errout0:
 	printk("Unable to register CDU-31a with Uniform cdrom driver\n");
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-	if (devfs_unregister_blkdev(MAJOR_NR, "cdu31a")) {
+	if (unregister_blkdev(MAJOR_NR, "cdu31a")) {
 		printk("Can't unregister block device for cdu31a\n");
 	}
       errout2:
@@ -3477,7 +3477,7 @@ void __exit cdu31a_exit(void)
 		    ("Can't unregister cdu31a from Uniform cdrom driver\n");
 		return;
 	}
-	if ((devfs_unregister_blkdev(MAJOR_NR, "cdu31a") == -EINVAL)) {
+	if ((unregister_blkdev(MAJOR_NR, "cdu31a") == -EINVAL)) {
 		printk("Can't unregister cdu31a\n");
 		return;
 	}

@@ -1572,7 +1572,7 @@ sony535_init(void)
 								MAJOR_NR, 0,
 								S_IFBLK | S_IRUGO | S_IWUGO,
 								&cdu_fops, NULL);
-				if (devfs_register_blkdev(MAJOR_NR, CDU535_HANDLE, &cdu_fops)) {
+				if (register_blkdev(MAJOR_NR, CDU535_HANDLE, &cdu_fops)) {
 					printk("Unable to get major %d for %s\n",
 							MAJOR_NR, CDU535_MESSAGE_NAME);
 					return -EIO;
@@ -1585,7 +1585,7 @@ sony535_init(void)
 					kmalloc(sizeof *sony_toc, GFP_KERNEL);
 				if (sony_toc == NULL) {
 					blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-					devfs_unregister_blkdev(MAJOR_NR, CDU535_HANDLE);
+					unregister_blkdev(MAJOR_NR, CDU535_HANDLE);
 					devfs_unregister(sony_devfs_handle);
 					return -ENOMEM;
 				}
@@ -1594,7 +1594,7 @@ sony535_init(void)
 				if (last_sony_subcode == NULL) {
 					blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 					kfree(sony_toc);
-					devfs_unregister_blkdev(MAJOR_NR, CDU535_HANDLE);
+					unregister_blkdev(MAJOR_NR, CDU535_HANDLE);
 					devfs_unregister(sony_devfs_handle);
 					return -ENOMEM;
 				}
@@ -1604,7 +1604,7 @@ sony535_init(void)
 					blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 					kfree(sony_toc);
 					kfree(last_sony_subcode);
-					devfs_unregister_blkdev(MAJOR_NR, CDU535_HANDLE);
+					unregister_blkdev(MAJOR_NR, CDU535_HANDLE);
 					devfs_unregister(sony_devfs_handle);
 					return -ENOMEM;
 				}
@@ -1618,7 +1618,7 @@ sony535_init(void)
 						kfree(sony_buffer);
 						kfree(sony_toc);
 						kfree(last_sony_subcode);
-						devfs_unregister_blkdev(MAJOR_NR, CDU535_HANDLE);
+						unregister_blkdev(MAJOR_NR, CDU535_HANDLE);
 						devfs_unregister(sony_devfs_handle);
 						return -ENOMEM;
 					}
@@ -1643,7 +1643,7 @@ sony535_init(void)
 		kfree(sony_buffer);
 		kfree(sony_toc);
 		kfree(last_sony_subcode);
-		devfs_unregister_blkdev(MAJOR_NR, CDU535_HANDLE);
+		unregister_blkdev(MAJOR_NR, CDU535_HANDLE);
 		devfs_unregister(sony_devfs_handle);
 		if (sony535_irq_used)
 			free_irq(sony535_irq_used, NULL);
@@ -1702,7 +1702,7 @@ sony535_exit(void)
 	kfree(sony_toc);
 	devfs_find_and_unregister(NULL, CDU535_HANDLE, 0, 0,
 				  DEVFS_SPECIAL_BLK, 0);
-	if (devfs_unregister_blkdev(MAJOR_NR, CDU535_HANDLE) == -EINVAL)
+	if (unregister_blkdev(MAJOR_NR, CDU535_HANDLE) == -EINVAL)
 		printk("Uh oh, couldn't unregister " CDU535_HANDLE "\n");
 	else
 		printk(KERN_INFO CDU535_HANDLE " module released\n");

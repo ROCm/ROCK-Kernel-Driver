@@ -2031,8 +2031,7 @@ int __init optcd_init(void)
 		DEBUG((DEBUG_VFS, "exec_cmd COMINITDOUBLE: %02x", -status));
 		return -EIO;
 	}
-	if (devfs_register_blkdev(MAJOR_NR, "optcd", &opt_fops) != 0)
-	{
+	if (register_blkdev(MAJOR_NR, "optcd", &opt_fops) != 0) {
 		printk(KERN_ERR "optcd: unable to get major %d\n", MAJOR_NR);
 		release_region(optcd_port, 4);
 		return -EIO;
@@ -2052,7 +2051,7 @@ int __init optcd_init(void)
 void __exit optcd_exit(void)
 {
 	devfs_find_and_unregister(NULL, "optcd", 0, 0, DEVFS_SPECIAL_BLK, 0);
-	if (devfs_unregister_blkdev(MAJOR_NR, "optcd") == -EINVAL) {
+	if (unregister_blkdev(MAJOR_NR, "optcd") == -EINVAL) {
 		printk(KERN_ERR "optcd: what's that: can't unregister\n");
 		return;
 	}

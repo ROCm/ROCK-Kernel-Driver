@@ -749,7 +749,7 @@ static devfs_handle_t devfs_handle;
 
 static int __init ppdev_init (void)
 {
-	if (devfs_register_chrdev (PP_MAJOR, CHRDEV, &pp_fops)) {
+	if (register_chrdev (PP_MAJOR, CHRDEV, &pp_fops)) {
 		printk (KERN_WARNING CHRDEV ": unable to get major %d\n",
 			PP_MAJOR);
 		return -EIO;
@@ -768,7 +768,7 @@ static void __exit ppdev_cleanup (void)
 {
 	/* Clean up all parport stuff */
 	devfs_unregister (devfs_handle);
-	devfs_unregister_chrdev (PP_MAJOR, CHRDEV);
+	unregister_chrdev (PP_MAJOR, CHRDEV);
 }
 
 module_init(ppdev_init);

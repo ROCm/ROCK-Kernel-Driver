@@ -85,7 +85,9 @@ extern volatile int logical_apicid_to_cpu[MAX_APICID];
  */
 #define smp_processor_id() (current_thread_info()->cpu)
 
-#define cpu_possible(cpu) (phys_cpu_present_map & (1<<(cpu)))
+extern volatile unsigned long cpu_callout_map;
+
+#define cpu_possible(cpu) (cpu_callout_map & (1<<(cpu)))
 #define cpu_online(cpu) (cpu_online_map & (1<<(cpu)))
 
 extern inline unsigned int num_online_cpus(void)
@@ -113,7 +115,6 @@ static __inline int logical_smp_processor_id(void)
 	return GET_APIC_LOGICAL_ID(*(unsigned long *)(APIC_BASE+APIC_LDR));
 }
 
-extern volatile unsigned long cpu_callout_map;
 /* We don't mark CPUs online until __cpu_up(), so we need another measure */
 static inline int num_booting_cpus(void)
 {

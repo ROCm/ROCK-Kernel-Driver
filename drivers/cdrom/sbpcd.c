@@ -5771,7 +5771,7 @@ int __init sbpcd_init(void)
 	OUT(MIXER_data,0xCC); /* one nibble per channel, max. value: 0xFF */
 #endif /* SOUND_BASE */
 
-	if (devfs_register_blkdev(MAJOR_NR, major_name, &sbpcd_bdops) != 0)
+	if (register_blkdev(MAJOR_NR, major_name, &sbpcd_bdops) != 0)
 	{
 		msg(DBG_INF, "Can't get MAJOR %d for Matsushita CDROM\n", MAJOR_NR);
 #ifdef MODULE
@@ -5806,7 +5806,7 @@ int __init sbpcd_init(void)
 		if (D_S[j].sbp_buf==NULL)
 		{
 			msg(DBG_INF,"data buffer (%d frames) not available.\n",D_S[j].sbp_bufsiz);
-			if ((devfs_unregister_blkdev(MAJOR_NR, major_name) == -EINVAL))
+			if ((unregister_blkdev(MAJOR_NR, major_name) == -EINVAL))
 			{
 				printk("Can't unregister %s\n", major_name);
 			}
@@ -5858,7 +5858,7 @@ void sbpcd_exit(void)
 {
 	int j;
 	
-	if ((devfs_unregister_blkdev(MAJOR_NR, major_name) == -EINVAL))
+	if ((unregister_blkdev(MAJOR_NR, major_name) == -EINVAL))
 	{
 		msg(DBG_INF, "What's that: can't unregister %s.\n", major_name);
 		return;
