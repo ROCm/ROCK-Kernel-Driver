@@ -23,7 +23,141 @@
 #include "lkc.h"
 
 static char menu_backtitle[128];
-static const char menu_instructions[] =
+static const char mconf_readme[] =
+"Overview\n"
+"--------\n"
+"Some kernel features may be built directly into the kernel.\n"
+"Some may be made into loadable runtime modules.  Some features\n"
+"may be completely removed altogether.  There are also certain\n"
+"kernel parameters which are not really features, but must be\n"
+"entered in as decimal or hexadecimal numbers or possibly text.\n"
+"\n"
+"Menu items beginning with [*], <M> or [ ] represent features\n"
+"configured to be built in, modularized or removed respectively.\n"
+"Pointed brackets <> represent module capable features.\n"
+"\n"
+"To change any of these features, highlight it with the cursor\n"
+"keys and press <Y> to build it in, <M> to make it a module or\n"
+"<N> to removed it.  You may also press the <Space Bar> to cycle\n"
+"through the available options (ie. Y->N->M->Y).\n"
+"\n"
+"Some additional keyboard hints:\n"
+"\n"
+"Menus\n"
+"----------\n"
+"o  Use the Up/Down arrow keys (cursor keys) to highlight the item\n"
+"   you wish to change or submenu wish to select and press <Enter>.\n"
+"   Submenus are designated by \"--->\".\n"
+"\n"
+"   Shortcut: Press the option's highlighted letter (hotkey).\n"
+"             Pressing a hotkey more than once will sequence\n"
+"             through all visible items which use that hotkey.\n"
+"\n"
+"   You may also use the <PAGE UP> and <PAGE DOWN> keys to scroll\n"
+"   unseen options into view.\n"
+"\n"
+"o  To exit a menu use the cursor keys to highlight the <Exit> button\n"
+"   and press <ENTER>.\n"
+"\n"
+"   Shortcut: Press <ESC><ESC> or <E> or <X> if there is no hotkey\n"
+"             using those letters.  You may press a single <ESC>, but\n"
+"             there is a delayed response which you may find annoying.\n"
+"\n"
+"   Also, the <TAB> and cursor keys will cycle between <Select>,\n"
+"   <Exit> and <Help>\n"
+"\n"
+"o  To get help with an item, use the cursor keys to highlight <Help>\n"
+"   and Press <ENTER>.\n"
+"\n"
+"   Shortcut: Press <H> or <?>.\n"
+"\n"
+"\n"
+"Radiolists  (Choice lists)\n"
+"-----------\n"
+"o  Use the cursor keys to select the option you wish to set and press\n"
+"   <S> or the <SPACE BAR>.\n"
+"\n"
+"   Shortcut: Press the first letter of the option you wish to set then\n"
+"             press <S> or <SPACE BAR>.\n"
+"\n"
+"o  To see available help for the item, use the cursor keys to highlight\n"
+"   <Help> and Press <ENTER>.\n"
+"\n"
+"   Shortcut: Press <H> or <?>.\n"
+"\n"
+"   Also, the <TAB> and cursor keys will cycle between <Select> and\n"
+"   <Help>\n"
+"\n"
+"\n"
+"Data Entry\n"
+"-----------\n"
+"o  Enter the requested information and press <ENTER>\n"
+"   If you are entering hexadecimal values, it is not necessary to\n"
+"   add the '0x' prefix to the entry.\n"
+"\n"
+"o  For help, use the <TAB> or cursor keys to highlight the help option\n"
+"   and press <ENTER>.  You can try <TAB><H> as well.\n"
+"\n"
+"\n"
+"Text Box    (Help Window)\n"
+"--------\n"
+"o  Use the cursor keys to scroll up/down/left/right.  The VI editor\n"
+"   keys h,j,k,l function here as do <SPACE BAR> and <B> for those\n"
+"   who are familiar with less and lynx.\n"
+"\n"
+"o  Press <E>, <X>, <Enter> or <Esc><Esc> to exit.\n"
+"\n"
+"\n"
+"Alternate Configuration Files\n"
+"-----------------------------\n"
+"Menuconfig supports the use of alternate configuration files for\n"
+"those who, for various reasons, find it necessary to switch\n"
+"between different kernel configurations.\n"
+"\n"
+"At the end of the main menu you will find two options.  One is\n"
+"for saving the current configuration to a file of your choosing.\n"
+"The other option is for loading a previously saved alternate\n"
+"configuration.\n"
+"\n"
+"Even if you don't use alternate configuration files, but you\n"
+"find during a Menuconfig session that you have completely messed\n"
+"up your settings, you may use the \"Load Alternate...\" option to\n"
+"restore your previously saved settings from \".config\" without\n"
+"restarting Menuconfig.\n"
+"\n"
+"Other information\n"
+"-----------------\n"
+"If you use Menuconfig in an XTERM window make sure you have your\n"
+"$TERM variable set to point to a xterm definition which supports color.\n"
+"Otherwise, Menuconfig will look rather bad.  Menuconfig will not\n"
+"display correctly in a RXVT window because rxvt displays only one\n"
+"intensity of color, bright.\n"
+"\n"
+"Menuconfig will display larger menus on screens or xterms which are\n"
+"set to display more than the standard 25 row by 80 column geometry.\n"
+"In order for this to work, the \"stty size\" command must be able to\n"
+"display the screen's current row and column geometry.  I STRONGLY\n"
+"RECOMMEND that you make sure you do NOT have the shell variables\n"
+"LINES and COLUMNS exported into your environment.  Some distributions\n"
+"export those variables via /etc/profile.  Some ncurses programs can\n"
+"become confused when those variables (LINES & COLUMNS) don't reflect\n"
+"the true screen size.\n"
+"\n"
+"Optional personality available\n"
+"------------------------------\n"
+"If you prefer to have all of the kernel options listed in a single\n"
+"menu, rather than the default multimenu hierarchy, run the menuconfig\n"
+"with MENUCONFIG_MODE environment variable set to single_menu. Example:\n"
+"\n"
+"make MENUCONFIG_MODE=single_menu menuconfig\n"
+"\n"
+"<Enter> will then unroll the appropriate category, or enfold it if it\n"
+"is already unrolled.\n"
+"\n"
+"Note that this mode can eventually be a little more CPU expensive\n"
+"(especially with a larger number of unrolled categories) than the\n"
+"default mode.\n",
+menu_instructions[] =
 	"Arrow keys navigate the menu.  "
 	"<Enter> selects submenus --->.  "
 	"Highlighted letters are hotkeys.  "
@@ -138,7 +272,6 @@ static void conf_save(void);
 static void show_textbox(const char *title, const char *text, int r, int c);
 static void show_helptext(const char *title, const char *text);
 static void show_help(struct menu *menu);
-static void show_readme(void);
 static void show_file(const char *filename, const char *title, int r, int c);
 
 static void cprint_init(void);
@@ -660,7 +793,7 @@ static void conf(struct menu *menu)
 			if (sym)
 				show_help(submenu);
 			else
-				show_readme();
+				show_helptext("README", mconf_readme);
 			break;
 		case 3:
 			if (type == 't') {
@@ -725,11 +858,6 @@ static void show_help(struct menu *menu)
 	get_symbol_str(&help, sym);
 	show_helptext(menu_get_prompt(menu), str_get(&help));
 	str_free(&help);
-}
-
-static void show_readme(void)
-{
-	show_file("scripts/README.Menuconfig", NULL, 0, 0);
 }
 
 static void show_file(const char *filename, const char *title, int r, int c)
