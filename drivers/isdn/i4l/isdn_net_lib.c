@@ -1,4 +1,4 @@
-/* Linux ISDN subsystem, Network interface configuration
+/* Linux ISDN subsystem, network interface support code
  *
  * Copyright 1994-1998  by Fritz Elfert (fritz@isdn4linux.de)
  *           1995,96    by Thinking Objects Software GmbH Wuerzburg
@@ -54,8 +54,10 @@
 #include <linux/capability.h>
 #include <linux/rtnetlink.h>
 #include "isdn_common.h"
+#include "isdn_net_lib.h"
 #include "isdn_net.h"
 #include "isdn_ppp.h"
+#include "isdn_ciscohdlck.h"
 
 #define ISDN_NET_TX_TIMEOUT (20*HZ) 
 
@@ -2335,12 +2337,25 @@ void
 isdn_net_lib_init(void)
 {
 	fsm_new(&isdn_net_fsm);
+
+	register_isdn_netif(ISDN_NET_ENCAP_ETHER,      &isdn_ether_ops);
+	register_isdn_netif(ISDN_NET_ENCAP_RAWIP,      &isdn_rawip_ops);
+	register_isdn_netif(ISDN_NET_ENCAP_IPTYP,      &isdn_iptyp_ops);
+	register_isdn_netif(ISDN_NET_ENCAP_UIHDLC,     &isdn_uihdlc_ops);
+	register_isdn_netif(ISDN_NET_ENCAP_CISCOHDLC,  &isdn_ciscohdlck_ops);
+	register_isdn_netif(ISDN_NET_ENCAP_CISCOHDLCK, &isdn_ciscohdlck_ops);
+#ifdef CONFIG_ISDN_X25
+	register_isdn_netif(ISDN_NET_ENCAP_X25IFACE,   &isdn_x25_ops);
+#endif
+#ifdef CONFIG_ISDN_PPP
+	register_isdn_netif(ISDN_NET_ENCAP_SYNCPPP,    &isdn_ppp_ops);
+#endif
 }
 
 void
 isdn_net_lib_exit(void)
 {
-	isdn_net_cleanup();
+
 
 	fsm_free(&isdn_net_fsm);
 }

@@ -9,18 +9,12 @@
  * of the GNU General Public License, incorporated herein by reference.
  */
 
-#include <linux/config.h>
 #include <linux/isdn.h>
-#include <net/arp.h>
-#include <net/dst.h>
-#include <net/pkt_sched.h>
 #include <linux/inetdevice.h>
+#include <net/arp.h>
 #include "isdn_common.h"
+#include "isdn_net_lib.h"
 #include "isdn_net.h"
-#include "isdn_ppp.h"
-#include <linux/concap.h>
-#include "isdn_concap.h"
-#include "isdn_ciscohdlck.h"
 
 // ISDN_NET_ENCAP_IPTYP
 // ethernet type field
@@ -46,7 +40,7 @@ isdn_iptyp_receive(isdn_net_local *lp, isdn_net_dev *idev,
 	isdn_netif_rx(idev, skb, protocol);
 }
 
-static struct isdn_netif_ops iptyp_ops = {
+struct isdn_netif_ops isdn_iptyp_ops = {
 	.hard_start_xmit     = isdn_net_start_xmit,
 	.hard_header         = isdn_iptyp_header,
 	.flags               = IFF_NOARP | IFF_POINTOPOINT,
@@ -76,7 +70,7 @@ isdn_uihdlc_receive(isdn_net_local *lp, isdn_net_dev *idev,
 	isdn_netif_rx(idev, skb, htons(ETH_P_IP));
 }
 
-static struct isdn_netif_ops uihdlc_ops = {
+struct isdn_netif_ops isdn_uihdlc_ops = {
 	.hard_start_xmit     = isdn_net_start_xmit,
 	.hard_header         = isdn_uihdlc_header,
 	.flags               = IFF_NOARP | IFF_POINTOPOINT,
@@ -98,7 +92,7 @@ isdn_rawip_receive(isdn_net_local *lp, isdn_net_dev *idev,
 	netif_rx(skb);
 }
 
-static struct isdn_netif_ops rawip_ops = {
+struct isdn_netif_ops isdn_rawip_ops = {
 	.hard_start_xmit     = isdn_net_start_xmit,
 	.flags               = IFF_NOARP | IFF_POINTOPOINT,
 	.type                = ARPHRD_PPP,
@@ -148,37 +142,9 @@ isdn_ether_init(isdn_net_local *lp)
 	return 0;
 }
 
-static struct isdn_netif_ops ether_ops = {
+struct isdn_netif_ops isdn_ether_ops = {
 	.hard_start_xmit     = isdn_net_start_xmit,
 	.receive             = isdn_ether_receive,
 	.init                = isdn_ether_init,
 	.open                = isdn_ether_open,
 };
-
-// ======================================================================
-
-void
-isdn_net_init(void)
-{
-	isdn_net_lib_init();
-
-	register_isdn_netif(ISDN_NET_ENCAP_ETHER,      &ether_ops);
-	register_isdn_netif(ISDN_NET_ENCAP_RAWIP,      &rawip_ops);
-	register_isdn_netif(ISDN_NET_ENCAP_IPTYP,      &iptyp_ops);
-	register_isdn_netif(ISDN_NET_ENCAP_UIHDLC,     &uihdlc_ops);
-	register_isdn_netif(ISDN_NET_ENCAP_CISCOHDLC,  &ciscohdlck_ops);
-	register_isdn_netif(ISDN_NET_ENCAP_CISCOHDLCK, &ciscohdlck_ops);
-#ifdef CONFIG_ISDN_X25
-	register_isdn_netif(ISDN_NET_ENCAP_X25IFACE,   &isdn_x25_ops);
-#endif
-#ifdef CONFIG_ISDN_PPP
-	register_isdn_netif(ISDN_NET_ENCAP_SYNCPPP,    &isdn_ppp_ops);
-#endif
-}
-
-void
-isdn_net_exit(void)
-{
-	isdn_net_lib_exit();
-}
-

@@ -278,37 +278,6 @@ struct isdn_net_phone {
      which holds the linux device structure (here: isdn_net_device)
 */
 
-struct isdn_net_dev_s;
-struct isdn_net_local_s;
-
-struct isdn_netif_ops {
-	int			(*hard_start_xmit) (struct sk_buff *skb,
-						    struct net_device *dev);
-	int			(*hard_header) (struct sk_buff *skb,
-						struct net_device *dev,
-						unsigned short type,
-						void *daddr,
-						void *saddr,
-						unsigned len);
-	int			(*do_ioctl)(struct net_device *dev,
-					    struct ifreq *ifr, int cmd);
-
-	unsigned short		flags;	/* interface flags (a la BSD)	*/
-	unsigned short		type;	/* interface hardware type	*/
-	unsigned char		addr_len;/* hardware address length	*/
-	void                    (*receive)(struct isdn_net_local_s *,
-					   struct isdn_net_dev_s *,
-					   struct sk_buff *);
-	void                    (*connected)(struct isdn_net_dev_s *);
-	void                    (*disconnected)(struct isdn_net_dev_s *);
-	int                     (*bind)(struct isdn_net_dev_s *);
-	void                    (*unbind)(struct isdn_net_dev_s *);
-	int                     (*init)(struct isdn_net_local_s *);
-	void                    (*cleanup)(struct isdn_net_local_s *);
-	int                     (*open)(struct isdn_net_local_s *);
-	void                    (*close)(struct isdn_net_local_s *);
-};
-
 typedef struct {
   unsigned long seqerrs;
   unsigned long frame_drops;

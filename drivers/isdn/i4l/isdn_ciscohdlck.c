@@ -13,7 +13,7 @@
  */
 
 #include "isdn_common.h"
-#include "isdn_net.h"
+#include "isdn_net_lib.h"
 #include "isdn_ciscohdlck.h"
 
 #include <linux/if_arp.h>
@@ -417,7 +417,7 @@ isdn_ciscohdlck_header(struct sk_buff *skb, struct net_device *dev,
 	return 4;
 }
 
-struct isdn_netif_ops ciscohdlck_ops = {
+struct isdn_netif_ops isdn_ciscohdlck_ops = {
 	.hard_start_xmit     = isdn_net_start_xmit,
 	.hard_header         = isdn_ciscohdlck_header,
 	.do_ioctl            = isdn_ciscohdlck_dev_ioctl,

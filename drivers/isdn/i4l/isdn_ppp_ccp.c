@@ -11,7 +11,7 @@
 
 #include "isdn_ppp_ccp.h"
 #include "isdn_common.h"
-#include "isdn_net.h"
+#include "isdn_net_lib.h"
 #include "isdn_ppp.h"
 #include <linux/ppp-comp.h>
 

@@ -18,8 +18,9 @@
 #include <linux/smp_lock.h>
 #include <linux/ctype.h>
 #include "isdn_common.h"
-#include "isdn_tty.h"
+#include "isdn_net_lib.h"
 #include "isdn_net.h"
+#include "isdn_tty.h"
 #include "isdn_ppp.h"
 #ifdef CONFIG_ISDN_AUDIO
 #include "isdn_audio.h"
@@ -2183,7 +2184,7 @@ static int __init isdn_init(void)
 	}
 #endif                          /* CONFIG_ISDN_PPP */
 
-	isdn_net_init();
+	isdn_net_lib_init();
 	printk(KERN_NOTICE "ISDN subsystem initialized\n");
 	isdn_info_update();
 	return 0;
@@ -2211,7 +2212,7 @@ static void __exit isdn_exit(void)
 #endif
 	save_flags(flags);
 	cli();
-	isdn_net_exit();
+	isdn_net_lib_exit();
 
 	isdn_tty_exit();
 	if (unregister_chrdev(ISDN_MAJOR, "isdn"))

@@ -10,6 +10,6 @@
 #ifndef ISDN_CISCOHDLCK_H
 #define ISDN_CISCOHDLCK_H
 
-extern struct isdn_netif_ops ciscohdlck_ops;
+extern struct isdn_netif_ops isdn_ciscohdlck_ops;
 
 #endif
