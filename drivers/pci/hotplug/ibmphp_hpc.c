@@ -205,7 +205,7 @@ static u8 i2c_ctrl_read (struct controller *ctlr_ptr, void *WPGBbar, u8 index)
 	// READ - step 4 : wait until start operation bit clears
 	i = CMD_COMPLETE_TOUT_SEC;
 	while (i) {
-		long_delay (1 * HZ / 100);
+		msleep(10);
 		wpg_addr = WPGBbar + WPG_I2CMCNTL_OFFSET;
 		wpg_data = readl (wpg_addr);
 		data = swab32 (wpg_data);
@@ -221,7 +221,7 @@ static u8 i2c_ctrl_read (struct controller *ctlr_ptr, void *WPGBbar, u8 index)
 	// READ - step 5 : read I2C status register
 	i = CMD_COMPLETE_TOUT_SEC;
 	while (i) {
-		long_delay (1 * HZ / 100);
+		msleep(10);
 		wpg_addr = WPGBbar + WPG_I2CSTAT_OFFSET;
 		wpg_data = readl (wpg_addr);
 		data = swab32 (wpg_data);
@@ -316,7 +316,7 @@ static u8 i2c_ctrl_write (struct controller *ctlr_ptr, void *WPGBbar, u8 index, 
 	// WRITE - step 4 : wait until start operation bit clears
 	i = CMD_COMPLETE_TOUT_SEC;
 	while (i) {
-		long_delay (1 * HZ / 100);
+		msleep(10);
 		wpg_addr = WPGBbar + WPG_I2CMCNTL_OFFSET;
 		wpg_data = readl (wpg_addr);
 		data = swab32 (wpg_data);
@@ -333,7 +333,7 @@ static u8 i2c_ctrl_write (struct controller *ctlr_ptr, void *WPGBbar, u8 index, 
 	// WRITE - step 5 : read I2C status register
 	i = CMD_COMPLETE_TOUT_SEC;
 	while (i) {
-		long_delay (1 * HZ / 100);
+		msleep(10);
 		wpg_addr = WPGBbar + WPG_I2CSTAT_OFFSET;
 		wpg_data = readl (wpg_addr);
 		data = swab32 (wpg_data);
@@ -748,7 +748,7 @@ int ibmphp_hpc_writeslot (struct slot * pslot, u8 cmd)
 					done = TRUE;
 			}
 			if (!done) {
-				long_delay (1 * HZ);
+				msleep(1000);
 				if (timeout < 1) {
 					done = TRUE;
 					err ("%s - Error command complete timeout\n", __FUNCTION__);
@@ -891,7 +891,7 @@ static void poll_hpc (void)
 		case POLL_SLEEP:
 			/* don't sleep with a lock on the hardware */
 			up (&semOperations);
-			long_delay (POLL_INTERVAL_SEC * HZ);
+			msleep(POLL_INTERVAL_SEC * 1000);
 
 			if (ibmphp_shutdown) 
 				break;
@@ -908,8 +908,7 @@ static void poll_hpc (void)
 		/* give up the harware semaphore */
 		up (&semOperations);
 		/* sleep for a short time just for good measure */
-		set_current_state (TASK_INTERRUPTIBLE);
-		schedule_timeout (HZ/10);
+		msleep(100);
 	}
 	up (&sem_exit);
 	debug ("%s - Exit\n", __FUNCTION__);
@@ -974,7 +973,7 @@ static int process_changeinstatus (struct slot *pslot, struct slot *poldslot)
 			if (SLOT_PWRGD (pslot->status)) {
 				// power goes on and off after closing latch
 				// check again to make sure power is still ON
-				long_delay (1 * HZ);
+				msleep(1000);
 				rc = ibmphp_hpc_readslot (pslot, READ_SLOTSTATUS, &status);
 				if (SLOT_PWRGD (status))
 					update = TRUE;
@@ -1147,7 +1146,7 @@ static int hpc_wait_ctlr_notworking (int timeout, struct controller *ctlr_ptr, v
 		if (CTLR_WORKING (*pstatus) == HPC_CTLR_WORKING_NO)
 			done = TRUE;
 		if (!done) {
-			long_delay (1 * HZ);
+			msleep(1000);
 			if (timeout < 1) {
 				done = TRUE;
 				err ("HPCreadslot - Error ctlr timeout\n");
