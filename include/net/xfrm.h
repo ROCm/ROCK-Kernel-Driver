@@ -304,47 +304,6 @@ extern int xfrm_register_km(struct xfrm_mgr *km);
 extern int xfrm_unregister_km(struct xfrm_mgr *km);
 
 
-#define XFRM_FLOWCACHE_HASH_SIZE	1024
-
-static inline u32 __flow_hash4(struct flowi *fl)
-{
-	u32 hash = fl->fl4_src ^ fl->fl_ip_sport;
-
-	hash = ((hash & 0xF0F0F0F0) >> 4) | ((hash & 0x0F0F0F0F) << 4);
-
-	hash ^= fl->fl4_dst ^ fl->fl_ip_dport;
-	hash ^= (hash >> 10);
-	hash ^= (hash >> 20);
-	return hash & (XFRM_FLOWCACHE_HASH_SIZE-1);
-}
-
-static inline u32 __flow_hash6(struct flowi *fl)
-{
-	u32 hash = fl->fl6_src.s6_addr32[2] ^
-		   fl->fl6_src.s6_addr32[3] ^ 
-		   fl->fl_ip_sport;
-
-	hash = ((hash & 0xF0F0F0F0) >> 4) | ((hash & 0x0F0F0F0F) << 4);
-
-	hash ^= fl->fl6_dst.s6_addr32[2] ^
-		fl->fl6_dst.s6_addr32[3] ^ 
-		fl->fl_ip_dport;
-	hash ^= (hash >> 10);
-	hash ^= (hash >> 20);
-	return hash & (XFRM_FLOWCACHE_HASH_SIZE-1);
-}
-
-static inline u32 flow_hash(struct flowi *fl, unsigned short family)
-{
-	switch (family) {
-	case AF_INET:
-		return __flow_hash4(fl);
-	case AF_INET6:
-		return __flow_hash6(fl);
-	}
-	return 0;	/*XXX*/
-}
-
 extern struct xfrm_policy *xfrm_policy_list[XFRM_POLICY_MAX*2];
 
 static inline void xfrm_pol_hold(struct xfrm_policy *policy)
