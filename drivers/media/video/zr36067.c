@@ -1416,7 +1416,7 @@ static int zr36060_reset(struct zoran *zr)
 		zr36060_sleep(zr, 0);
 		post_office_write(zr, 3, 0, 0);
 		udelay(2);
-	default:
+	default:;
 	}
 	return 0;
 }

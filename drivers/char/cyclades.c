@@ -3434,8 +3434,8 @@ set_line_char(struct cyclades_port * info)
 		}
 #ifdef CY_DEBUG_DTR
 		printk("cyc:set_line_char dropping DTR\n");
-		printk("     status: 0x%x,
-		    0x%x\n", cy_readb(base_addr+(CyMSVR1<<index)),
+		printk("     status: 0x%x, 0x%x\n", 
+		    cy_readb(base_addr+(CyMSVR1<<index)),
 		    cy_readb(base_addr+(CyMSVR2<<index)));
 #endif
 	    }else{

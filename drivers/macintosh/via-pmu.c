@@ -2605,7 +2605,7 @@ static int pmu_release(struct inode *inode, struct file *file)
 			disable_kernel_backlight--;
 			spin_unlock_irqrestore(&pmu_lock, flags);
 		}
-#endif defined(CONFIG_INPUT_ADBHID) && defined(CONFIG_PMAC_BACKLIGHT)
+#endif /* defined(CONFIG_INPUT_ADBHID) && defined(CONFIG_PMAC_BACKLIGHT) */
 		kfree(pp);
 	}
 	unlock_kernel();
