@@ -14,6 +14,9 @@
 #ifdef CONFIG_PCI
 #include <linux/pci.h>
 #endif
+#ifdef CONFIG_ALL_PPC
+#include <asm/prom.h>
+#endif
 
 /* 
  * EDID parser

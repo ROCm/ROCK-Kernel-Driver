@@ -103,8 +103,9 @@ static u32 cfb_tab32[] = {
 }
 #endif
 
-static inline void color_imageblit(struct fb_image *image, struct fb_info *p, 
-				   u8 *dst1, unsigned long start_index,
+static inline void color_imageblit(const struct fb_image *image, 
+				   struct fb_info *p, u8 *dst1, 
+				   unsigned long start_index,
 				   unsigned long pitch_index)
 {
 	/* Draw the penguin */
@@ -161,8 +162,9 @@ static inline void color_imageblit(struct fb_image *image, struct fb_info *p,
 	}
 }
 
-static inline void slow_imageblit(struct fb_image *image, struct fb_info *p, 
-				  u8 *dst1, unsigned long fgcolor,
+static inline void slow_imageblit(const struct fb_image *image, 
+				  struct fb_info *p, u8 *dst1, 
+				  unsigned long fgcolor,
 				  unsigned long bgcolor, 
 				  unsigned long start_index,
 				  unsigned long pitch_index)
@@ -237,8 +239,9 @@ static inline void slow_imageblit(struct fb_image *image, struct fb_info *p,
  *           fix->line_legth is divisible by 4;
  *           beginning and end of a scanline is dword aligned
  */
-static inline void fast_imageblit(struct fb_image *image, struct fb_info *p, 
-				  u8 *dst1, u32 fgcolor, u32 bgcolor) 
+static inline void fast_imageblit(const struct fb_image *image, 
+				  struct fb_info *p, u8 *dst1, 
+				  u32 fgcolor, u32 bgcolor) 
 {
 	u32 fgx = fgcolor, bgx = bgcolor, bpp = p->var.bits_per_pixel;
 	u32 ppw = BITS_PER_LONG/bpp, spitch = (image->width + 7)/8;
@@ -286,10 +289,12 @@ static inline void fast_imageblit(struct fb_image *image, struct fb_info *p,
 	}
 }	
 	
-void cfb_imageblit(struct fb_info *p, struct fb_image *image)
+void cfb_imageblit(struct fb_info *p, const struct fb_image *image)
 {
 	unsigned long fgcolor, bgcolor, start_index, bitstart, pitch_index = 0;
 	unsigned long bpl = sizeof(unsigned long), bpp = p->var.bits_per_pixel;
+	u32 width = image->width, height = image->height; 
+	u32 dx = image->dx, dy = image->dy;
 	int x2, y2, vxres, vyres;
 	u8 *dst1;
 
@@ -305,14 +310,14 @@ void cfb_imageblit(struct fb_info *p, struct fb_image *image)
 
 	x2 = image->dx + image->width;
 	y2 = image->dy + image->height;
-	image->dx = image->dx > 0 ? image->dx : 0;
-	image->dy = image->dy > 0 ? image->dy : 0;
+	dx = image->dx > 0 ? image->dx : 0;
+	dy = image->dy > 0 ? image->dy : 0;
 	x2 = x2 < vxres ? x2 : vxres;
 	y2 = y2 < vyres ? y2 : vyres;
-	image->width  = x2 - image->dx;
-	image->height = y2 - image->dy;
+	width  = x2 - dx;
+	height = y2 - dy;
 
-	bitstart = (image->dy * p->fix.line_length * 8) + (image->dx * bpp);
+	bitstart = (dy * p->fix.line_length * 8) + (dx * bpp);
 	start_index = bitstart & (BITS_PER_LONG - 1);
 	pitch_index = (p->fix.line_length & (bpl - 1)) * 8;
 
@@ -334,7 +339,7 @@ void cfb_imageblit(struct fb_info *p, struct fb_image *image)
 		}	
 		
 		if (BITS_PER_LONG % bpp == 0 && !start_index && !pitch_index && 
-		    ((image->width & (BITS_PER_LONG/bpp-1)) == 0) &&
+		    ((width & (BITS_PER_LONG/bpp-1)) == 0) &&
 		    bpp >= 8 && bpp <= 32) 			
 			fast_imageblit(image, p, dst1, fgcolor, bgcolor);
 		else 

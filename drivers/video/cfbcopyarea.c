@@ -342,8 +342,10 @@ static void bitcpy_rev(unsigned long *dst, int dst_idx,
 	}
 }
 
-void cfb_copyarea(struct fb_info *p, struct fb_copyarea *area)
+void cfb_copyarea(struct fb_info *p, const struct fb_copyarea *area)
 {
+	u32 dx = area->dx, dy = area->dy, sx = area->sx, sy = area->sy;
+	u32 height = area->height, width = area->width;
 	int x2, y2, old_dx, old_dy, vxres, vyres;
 	unsigned long next_line = p->fix.line_length;
 	int dst_idx = 0, src_idx = 0, rev_copy = 0;
@@ -370,40 +372,40 @@ void cfb_copyarea(struct fb_info *p, struct fb_copyarea *area)
 	 */
 	x2 = area->dx + area->width;
 	y2 = area->dy + area->height;
-	area->dx = area->dx > 0 ? area->dx : 0;
-	area->dy = area->dy > 0 ? area->dy : 0;
+	dx = area->dx > 0 ? area->dx : 0;
+	dy = area->dy > 0 ? area->dy : 0;
 	x2 = x2 < vxres ? x2 : vxres;
 	y2 = y2 < vyres ? y2 : vyres;
-	area->width = x2 - area->dx;
-	area->height = y2 - area->dy;
+	width = x2 - dx;
+	height = y2 - dy;
 
 	/* update sx1,sy1 */
-	area->sx += (area->dx - old_dx);
-	area->sy += (area->dy - old_dy);
+	sx += (dx - old_dx);
+	sy += (dy - old_dy);
 
 	/* the source must be completely inside the virtual screen */
-	if (area->sx < 0 || area->sy < 0 ||
-	    (area->sx + area->width) > vxres ||
-	    (area->sy + area->height) > vyres)
+	if (sx < 0 || sy < 0 ||
+	    (sx + width) > vxres ||
+	    (sy + height) > vyres)
 		return;
 
-	if ((area->dy == area->sy && area->dx > area->sx) ||	
-	    (area->dy > area->sy)) { 
-		area->dy += area->height;
-		area->sy += area->height;
+	if ((dy == sy && dx > sx) ||	
+	    (dy > sy)) { 
+		dy += height;
+		sy += height;
 		rev_copy = 1;
 	}
 
 	dst = src = (unsigned long *)((unsigned long)p->screen_base & 
 				      ~(BYTES_PER_LONG-1));
 	dst_idx = src_idx = (unsigned long)p->screen_base & (BYTES_PER_LONG-1);
-	dst_idx += area->dy*next_line*8 + area->dx*p->var.bits_per_pixel;
-	src_idx += area->sy*next_line*8 + area->sx*p->var.bits_per_pixel;
+	dst_idx += dy*next_line*8 + dx*p->var.bits_per_pixel;
+	src_idx += sy*next_line*8 + sx*p->var.bits_per_pixel;
 	
 	if (p->fbops->fb_sync)
 		p->fbops->fb_sync(p);
 	if (rev_copy) {
-		while (area->height--) {
+		while (height--) {
 			dst_idx -= next_line*8;
 			src_idx -= next_line*8;
 			dst += dst_idx >> SHIFT_PER_LONG;
@@ -412,17 +414,17 @@ void cfb_copyarea(struct fb_info *p, struct fb_copyarea *area)
 			src_idx &= (BYTES_PER_LONG-1);
 			bitcpy_rev((unsigned long*)dst, dst_idx, 
 				   (unsigned long *)src, src_idx, 
-				   area->width*p->var.bits_per_pixel);
+				   width*p->var.bits_per_pixel);
 		}	
 	} else {
-		while (area->height--) {
+		while (height--) {
 			dst += dst_idx >> SHIFT_PER_LONG;
 			dst_idx &= (BYTES_PER_LONG-1);
 			src += src_idx >> SHIFT_PER_LONG;
 			src_idx &= (BYTES_PER_LONG-1);
 			bitcpy((unsigned long*)dst, dst_idx, 
 			       (unsigned long *)src, src_idx, 
-			       area->width*p->var.bits_per_pixel);
+			       width*p->var.bits_per_pixel);
 			dst_idx += next_line*8;
 			src_idx += next_line*8;
 		}	

@@ -360,11 +360,11 @@ struct fb_ops {
     /* pan display */
     int (*fb_pan_display)(struct fb_var_screeninfo *var, struct fb_info *info);
     /* draws a rectangle */
-    void (*fb_fillrect)(struct fb_info *info, struct fb_fillrect *rect); 
+    void (*fb_fillrect)(struct fb_info *info, const struct fb_fillrect *rect); 
     /* Copy data from area to another */
-    void (*fb_copyarea)(struct fb_info *info, struct fb_copyarea *region); 
+    void (*fb_copyarea)(struct fb_info *info,const struct fb_copyarea *region); 
     /* Draws a image to the display */
-    void (*fb_imageblit)(struct fb_info *info, struct fb_image *image);
+    void (*fb_imageblit)(struct fb_info *info, const struct fb_image *image);
     /* Draws cursor */
     int (*fb_cursor)(struct fb_info *info, struct fb_cursor *cursor);
     /* Rotates the display */
@@ -457,9 +457,9 @@ extern int fb_set_var(struct fb_var_screeninfo *var, struct fb_info *info);
 extern int fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info); 
 extern int fb_blank(int blank, struct fb_info *info);
 extern int soft_cursor(struct fb_info *info, struct fb_cursor *cursor);
-extern void cfb_fillrect(struct fb_info *info, struct fb_fillrect *rect); 
-extern void cfb_copyarea(struct fb_info *info, struct fb_copyarea *area); 
-extern void cfb_imageblit(struct fb_info *info, struct fb_image *image);
+extern void cfb_fillrect(struct fb_info *info, const struct fb_fillrect *rect); 
+extern void cfb_copyarea(struct fb_info *info, const struct fb_copyarea *area); 
+extern void cfb_imageblit(struct fb_info *info, const struct fb_image *image);
 
 /* drivers/video/fbmem.c */
 extern int register_framebuffer(struct fb_info *fb_info);

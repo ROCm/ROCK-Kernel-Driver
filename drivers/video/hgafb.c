@@ -45,9 +45,6 @@
 #include <asm/io.h>
 #include <asm/vga.h>
 
-#define INCLUDE_LINUX_LOGO_DATA
-#include <linux/linux_logo.h>
-
 #if 0
 #define DPRINTK(args...) printk(KERN_DEBUG __FILE__": " ##args)
 #else
@@ -246,13 +243,15 @@ static void hga_gfx_mode(void)
 
 static void hga_show_logo(struct fb_info *info)
 {
+/*
 	unsigned long dest = hga_vram_base;
 	char *logo = linux_logo_bw;
 	int x, y;
 	
-	for (y = 134; y < 134 + 80 ; y++) /* this needs some cleanup */
+	for (y = 134; y < 134 + 80 ; y++) * this needs some cleanup *
 		for (x = 0; x < 10 ; x++)
 			isa_writeb(~*(logo++),(dest + HGA_ROWADDR(y) + x + 40));
+*/
 }
 
 static void hga_pan(unsigned int xoffset, unsigned int yoffset)
@@ -449,7 +448,7 @@ static int hgafb_blank(int blank_mode, struct fb_info *info)
 	return 0;
 }
 
-static void hgafb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
+static void hgafb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 {
 	u_int rows, y;
 	u8 *dest;

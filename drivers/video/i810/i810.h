@@ -170,13 +170,6 @@
 #define REF_FREQ                    24000000
 #define TARGET_N_MAX                30
 
-#define FLYBACK                     550
-#define V_FRONTPORCH                1
-#define H_OFFSET                    40
-#define H_SCALEFACTOR               20
-#define H_BLANKSCALE                128
-#define H_GRADIENT                   600
-
 #define MAX_PIXELCLOCK              230000000
 #define MIN_PIXELCLOCK               15000000
 #define VFMAX                       60

@@ -150,7 +150,7 @@ enum riva_chips {
 static struct riva_chip_info {
 	const char *name;
 	unsigned arch_rev;
-} riva_chip_info[] __devinitdata = {
+} riva_chip_info[] __initdata = {
 	{ "RIVA-128", NV_ARCH_03 },
 	{ "RIVA-TNT", NV_ARCH_04 },
 	{ "RIVA-TNT2", NV_ARCH_04 },
@@ -193,7 +193,7 @@ static struct riva_chip_info {
 	{ "Quadro4-700-XGL", NV_ARCH_20 }
 };
 
-static struct pci_device_id rivafb_pci_tbl[] __devinitdata = {
+static struct pci_device_id rivafb_pci_tbl[] __initdata = {
 	{ PCI_VENDOR_ID_NVIDIA_SGS, PCI_DEVICE_ID_NVIDIA_SGS_RIVA128,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_RIVA_128 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_TNT,
@@ -623,7 +623,7 @@ static void riva_load_video_mode(struct fb_info *info)
 	width = info->var.xres_virtual;
 	hDisplaySize = info->var.xres;
 	hDisplay = (hDisplaySize / 8) - 1;
-	hStart = (hDisplaySize + info->var.right_margin) / 8 + 2;
+	hStart = (hDisplaySize + info->var.right_margin) / 8 - 1;
 	hEnd = (hDisplaySize + info->var.right_margin +
 		info->var.hsync_len) / 8 - 1;
 	hTotal = (hDisplaySize + info->var.right_margin +
@@ -697,6 +697,15 @@ static void riva_load_video_mode(struct fb_info *info)
 
 	if (par->riva.Architecture >= NV_ARCH_10)
 		par->riva.CURSOR = (U032 *)(info->screen_base + par->riva.CursorStart);
+
+	if (info->var.sync & FB_SYNC_HOR_HIGH_ACT)
+		newmode.misc_output &= ~0x40;
+	else
+		newmode.misc_output |= 0x40;
+	if (info->var.sync & FB_SYNC_VERT_HIGH_ACT)
+		newmode.misc_output &= ~0x80;
+	else
+		newmode.misc_output |= 0x80;	
 
 	par->riva.CalcStateExt(&par->riva, &newmode.ext, bpp, width,
 				  hDisplaySize, height, dotClock);
@@ -932,7 +941,7 @@ static int rivafb_release(struct fb_info *info, int user)
 	if (cnt == 1) {
 		par->riva.LockUnlock(&par->riva, 0);
 		par->riva.LoadStateExt(&par->riva, &par->initial_state.ext);
-
+		riva_load_state(par, &par->initial_state);
 		restore_vga(&par->state);
 		par->riva.LockUnlock(&par->riva, 1);
 	}
@@ -1192,7 +1201,7 @@ static int rivafb_setcolreg(unsigned regno, unsigned red, unsigned green,
  * CALLED FROM:
  * framebuffer hook
  */
-static void rivafb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
+static void rivafb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 {
 	struct riva_par *par = (struct riva_par *) info->par;
 	u_int color, rop = 0;
@@ -1238,7 +1247,7 @@ static void rivafb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
  * CALLED FROM:
  * framebuffer hook
  */
-static void rivafb_copyarea(struct fb_info *info, struct fb_copyarea *region)
+static void rivafb_copyarea(struct fb_info *info, const struct fb_copyarea *region)
 {
 	struct riva_par *par = (struct riva_par *) info->par;
 
@@ -1317,7 +1326,7 @@ static inline void convert_bgcolor_16(u32 *col)
  * CALLED FROM:
  * framebuffer hook
  */
-static void rivafb_imageblit(struct fb_info *info, struct fb_image *image)
+static void rivafb_imageblit(struct fb_info *info, const struct fb_image *image)
 {
 	struct riva_par *par = (struct riva_par *) info->par;
 	u32 fgx = 0, bgx = 0, width, mod, tmp;
@@ -1546,7 +1555,7 @@ static struct fb_ops riva_fb_ops = {
 	.fb_sync 	= rivafb_sync,
 };
 
-static int __devinit riva_set_fbinfo(struct fb_info *info)
+static int __init riva_set_fbinfo(struct fb_info *info)
 {
 	struct riva_par *par = (struct riva_par *) info->par;
 	unsigned int cmap_len;
@@ -1692,8 +1701,8 @@ static void riva_get_dfpinfo(struct fb_info *info)
  *
  * ------------------------------------------------------------------------- */
 
-static int __devinit rivafb_probe(struct pci_dev *pd,
-				     const struct pci_device_id *ent)
+static int __init rivafb_probe(struct pci_dev *pd,
+			     	const struct pci_device_id *ent)
 {
 	struct riva_chip_info *rci = &riva_chip_info[ent->driver_data];
 	struct riva_par *default_par;
@@ -1822,21 +1831,15 @@ static int __devinit rivafb_probe(struct pci_dev *pd,
 	}
 #endif /* CONFIG_MTRR */
 
-	/* unlock io */
-	CRTCout(default_par, 0x11, 0xFF);/* vgaHWunlock() + riva unlock (0x7F) */
-	default_par->riva.LockUnlock(&default_par->riva, 0);
-
-	riva_save_state(default_par, &default_par->initial_state);
-
 	if (riva_set_fbinfo(info) < 0) {
 		printk(KERN_ERR PFX "error setting initial video mode\n");
-		goto err_out_load_state;
+		goto err_out_iounmap_fb;
 	}
 
 	if (register_framebuffer(info) < 0) {
 		printk(KERN_ERR PFX
 			"error registering riva framebuffer\n");
-		goto err_out_load_state;
+		goto err_out_iounmap_fb;
 	}
 
 	pci_set_drvdata(pd, info);
@@ -1850,9 +1853,7 @@ static int __devinit rivafb_probe(struct pci_dev *pd,
 		info->fix.smem_start);
 	return 0;
 
-err_out_load_state:
-	riva_load_state(default_par, &default_par->initial_state);
-/* err_out_iounmap_fb: */
+err_out_iounmap_fb:
 	iounmap(info->screen_base);
 err_out_free_base1:
 	release_mem_region(rivafb_fix.smem_start, rivafb_fix.smem_len);
@@ -1872,7 +1873,7 @@ err_out:
 	return -ENODEV;
 }
 
-static void __devexit rivafb_remove(struct pci_dev *pd)
+static void __exit rivafb_remove(struct pci_dev *pd)
 {
 	struct fb_info *info = pci_get_drvdata(pd);
 	struct riva_par *par = (struct riva_par *) info->par;
@@ -1880,10 +1881,7 @@ static void __devexit rivafb_remove(struct pci_dev *pd)
 	if (!info)
 		return;
 
-	riva_load_state(par, &par->initial_state);
-
 	unregister_framebuffer(info);
-
 #ifdef CONFIG_MTRR
 	if (par->mtrr.vram_valid)
 		mtrr_del(par->mtrr.vram, info->fix.smem_start,
@@ -1951,7 +1949,7 @@ static struct pci_driver rivafb_driver = {
 	name:		"rivafb",
 	id_table:	rivafb_pci_tbl,
 	probe:		rivafb_probe,
-	remove:		__devexit_p(rivafb_remove),
+	remove:		__exit_p(rivafb_remove),
 };
 
 
@@ -1964,12 +1962,7 @@ static struct pci_driver rivafb_driver = {
 
 int __init rivafb_init(void)
 {
-	int err;
-	err = pci_module_init(&rivafb_driver);
-	if (err)
-		return err;
-	pci_register_driver(&rivafb_driver);
-	return 0;
+	return pci_module_init(&rivafb_driver);
 }
 
 

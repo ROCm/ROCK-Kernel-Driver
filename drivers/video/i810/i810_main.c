@@ -623,7 +623,7 @@ static void i810_calc_dclk(u32 freq, u32 *m, u32 *n, u32 *p)
 	}
 
 	n_reg = m_reg = n_target = 3;	
-	while ((diff_min || mod_min) && (n_target < n_target_max)) {
+	while (diff_min && mod_min && (n_target < n_target_max)) {
 		f_out = (p_divisor * n_reg * 1000000)/(4 * 24 * m_reg);
 		mod = (p_divisor * n_reg * 1000000) % (4 * 24 * m_reg);
 		m_target = m_reg;
@@ -652,261 +652,6 @@ static void i810_calc_dclk(u32 freq, u32 *m, u32 *n, u32 *p)
 	if (m) *m = (m_best - 2) & 0x3FF;
 	if (n) *n = (n_best - 2) & 0x3FF;
 	if (p) *p = (p_target << 4);
-}
-
-/**
- * i810_get_vblank - get vertical blank time
- * @hfreq: horizontal freq
- *
- * DESCRIPTION:
- * vblank = right_margin + vsync_len + left_margin 
- *    given: right_margin = 1 (V_FRONTPORCH)
- *           vsync_len    = 3
- *           flyback      = 550
- *
- *                          flyback * hfreq
- *           left_margin  = --------------- - vsync_len
- *                           1000000
- *           and flyback is set to 550
- */
-static u32 i810_get_vblank(u32 hfreq)
-{
-	u32 vblank;
-
-	vblank = (hfreq * FLYBACK)/1000; 
-	vblank = (vblank + 500)/1000;
-	return (vblank + V_FRONTPORCH);
-}
-
-/** 
- * i810_get_hblank - get horizontal blank time
- * @hfreq: horizontal freq
- * @xres: horizontal resolution in pixels
- *
- * DESCRIPTION:
- * duty cycle is the percent of htotal assigned to inactive display
- * duty cycle = C - (M/Hfreq)
- * where: C = ((offset - scale factor) * blank_scale)
- *            -------------------------------------- + scale factor
- *                        256 
- *        M = blank_scale * gradient
- *
- *           xres * duty_cycle
- * hblank = ------------------
- *           100 - duty_cycle
- */
-static u32 i810_get_hblank(u32 hfreq, u32 xres)
-{
-	u32 c_val, m_val, duty_cycle, hblank;
-
-	c_val = (((H_OFFSET - H_SCALEFACTOR) * H_BLANKSCALE)/256 + 
-		 H_SCALEFACTOR) * 1000;
-	m_val = (H_BLANKSCALE * H_GRADIENT)/256;
-	m_val = (m_val * 1000000)/hfreq;
-	duty_cycle = c_val - m_val;
-	hblank = (xres * duty_cycle)/(100000 - duty_cycle);
-	hblank = (hblank + 4) & ~7;
-	return (hblank);
-}
-
-/**
- * i810_estimate_hfreq - estimate hsync
- * @vfreq: vertical refresh rate
- * @yres: vertical resolution
- *
- * DESCRIPTION:
- * Based on:
- *
- *          (yres + front_port) * vfreq * 1000000
- * hfreq = -------------------------------------
- *          (1000000 - (vfreq * FLYBACK)
- * 
- */
-
-static u32 i810_estimate_hfreq(u32 vfreq, u32 yres)
-{
-	u64 hfreq;
-	u32 divisor;
-	
-	divisor = 1000000 - (vfreq * FLYBACK);
-	
-	hfreq = (u64) (yres + V_FRONTPORCH) *  
-		(u64) (vfreq)  * 1000000;
-	do_div(hfreq, divisor);
-	
-	return ((u32) hfreq);
-}
-
-/**
- * i810_calculate_timings - calculate video timings 
- * @info: pointer to fb_info structure
- * @var: pointer to current var
- * 
- * DESCRIPTION:
- * htotal: calculated using GTF
- * vtotal: calculated using GTF
- * hsync pulse:  8% of htotal
- * vsync pulse:  3 
- * left margin : (htotal - xres)/2 - hsync
- * right margin: sync + left margin
- * upper margin: 1
- * lower margin: vtotal - (yres + vsync + upper margin)
- *
- * Calculates necessary timing information based on 
- * monitor specifications.  This will use the 
- * VESA generalized timing formula. New values are
- * written to @var.
- */                      
-static int i810_calculate_timings(struct fb_info *info, 
-				  struct fb_var_screeninfo *var,
-				  u32 xres, u32 yres)
-{
-	u64 num = 1000000000000;
-	u32 htotal = 0, vtotal, hfreq, vfreq, hblank, vblank; 
-	u32 dclk, interlace = 0, dscan = 0;
-	u32 max_pixclock = 0;
-
-	switch (var->bits_per_pixel) {
-	case 8:
-		max_pixclock = 234000000;
-		break;
-	case 16:
-		max_pixclock = 229000000;
-		break;
-	case 24:
-	case 32:
-		max_pixclock = 204000000;
-		break;
-	default:
-		max_pixclock = 0;
-	}
-
-	if (var->vmode & FB_VMODE_INTERLACED) { 
-		yres >>= 1;
-		interlace = 1;
-	}
-	if (var->vmode & FB_VMODE_DOUBLE) {
-		yres <<= 1;
-		dscan = 1;
-	}
-
-	hfreq = info->monspecs.hfmax;
-	vblank = i810_get_vblank(hfreq);
-	vtotal = yres + vblank;
-	vfreq = hfreq/vtotal;
-	if (vfreq > info->monspecs.vfmax) { 
-		vfreq = info->monspecs.vfmax;
-		hfreq = i810_estimate_hfreq(vfreq, yres);
-		vblank = i810_get_vblank(hfreq);
-		vtotal = yres + vblank;
-	}	
-	hblank = i810_get_hblank(hfreq, xres);
-	htotal = xres + hblank;
-	dclk = htotal * hfreq;
-	while(dclk > max_pixclock          &&  
-	      hfreq > info->monspecs.hfmin &&
-	      vfreq > info->monspecs.vfmin)   {
-		hfreq -= 1000;
-		vblank = i810_get_vblank(hfreq);
-		vtotal = yres + vblank;
-		vfreq = hfreq/vtotal;
-		hblank = i810_get_hblank(hfreq, xres);
-		htotal = xres + hblank;
-		dclk = hfreq * htotal;
-	} 
-	if (vfreq < info->monspecs.vfmin) {
-		printk("i810fb: required vertical refresh, %dHz, "
-		       "for %dx%d is out of range\n",
-		       vfreq, xres, yres);
-		return -1;
-	}
-	if (hfreq < info->monspecs.hfmin) {
-		printk("i810fb: required horizontal sync frequency, %dKHz, "
-		       "for %dx%d is out of range\n", hfreq/1000, xres, yres);
-		return -1;
-	}
-	if (dclk < MIN_PIXELCLOCK) {
-		printk("i810fb: required pixelclock, %dMHz, for %dx%d"
-		       " is out of range\n", dclk/1000000, xres, yres);
-		return -1;
-	}
-
-	do_div(num, dclk);
-	var->pixclock = (u32) num;
-	var->hsync_len = ((htotal * 8)/100 + 4) & ~7;
-	var->right_margin = ((hblank >> 1) - var->hsync_len + 4) & ~7;
-	var->left_margin = (hblank-var->right_margin-var->hsync_len + 4) & ~7;
-
-	var->vsync_len = (3 << interlace) >> dscan; 
-	var->lower_margin = (1 << interlace) >> dscan;
-	var->upper_margin = ((vblank << interlace) >> dscan) -
-		(var->vsync_len + var->lower_margin);
-
-	if (yres > 480 || (yres == 200 && vfreq == 60 && hfreq/100 == 157))
-		var->sync |= FB_SYNC_VERT_HIGH_ACT | FB_SYNC_HOR_HIGH_ACT;
-	else {
-		if (yres == 400 && vfreq == 70 && hfreq/100 == 315)
-			var->sync |= FB_SYNC_VERT_HIGH_ACT;
-		if (yres == 350 && vfreq == 60 && hfreq/100 == 218)
-			var->sync |= FB_SYNC_HOR_HIGH_ACT;
-	}
-	return 0;
-}
-
-/**
- * i810_check_custom_timings - validates user entered timings
- * @info: pointer to fb_info
- * @var: pointer to current fb_var_screeninfo
- *
- * DESCRIPTION:
- * Validates user entered timings in @var.
- */
-static int i810_check_custom_timings(struct fb_info *info, 
-				     struct fb_var_screeninfo *var,
-				     u32 xres, u32 yres)
-{
-	u64 num = 1000000000000;
-	u32 hfreq, vfreq, htotal, vtotal, pixclock;
-	u32 max_pixclock = 0;
-
-	if (!var->pixclock)
-		return -EINVAL;
-	do_div(num, var->pixclock);
-	pixclock = (u32) num;
-
-	htotal = xres + var->right_margin + var->hsync_len + var->left_margin;
-	vtotal = yres + var->lower_margin + var->vsync_len + var->upper_margin;
-
-	if (var->vmode & FB_VMODE_INTERLACED) 
-		vtotal >>= 1;
-
-	if (var->vmode & FB_VMODE_DOUBLE)
-		vtotal <<= 1;
-
-	hfreq = pixclock/htotal;
-	vfreq = hfreq/vtotal;
-
-	switch (var->bits_per_pixel) {
-	case 8:
-		max_pixclock = 234000000;
-		break;
-	case 16:
-		max_pixclock = 229000000;
-		break;
-	case 24:
-	case 32:
-		max_pixclock = 204000000;
-		break;
-	default:
-		max_pixclock = 0;
-	}
-
-	if (pixclock < MIN_PIXELCLOCK || pixclock > max_pixclock ||
-	    hfreq < info->monspecs.hfmin || hfreq > info->monspecs.hfmax ||
-	    vfreq < info->monspecs.vfmin || vfreq > info->monspecs.vfmax)
-		return -EINVAL;
-	
-	return 0;
 }
 
 /*************************************************************
@@ -950,19 +695,25 @@ static void i810_load_cursor_image(int width, int height, u8 *data,
 				   struct i810fb_par *par)
 {
 	u8 *addr = par->cursor_heap.virtual;
-	int i, j, w = (width + 7)/8;
-
+	int i, j, w = width/8;
+	int mod = width % 8, t_mask, d_mask;
+	
+	t_mask = 0xff >> mod;
+	d_mask = ~(0xff >> mod); 
 	for (i = height; i--; ) {
 		for (j = 0; j < w; j++) {
 			i810_writeb(j+0, addr, 0x00);
 			i810_writeb(j+8, addr, *data++);
 		}
+		if (mod) {
+			i810_writeb(j+0, addr, t_mask);
+			i810_writeb(j+8, addr, *data++ & d_mask);
+		}
 		addr += 16;
 	}
 }
 
-static void i810_load_cursor_colors(int fg, int bg, 
-				    struct fb_info *info)
+static void i810_load_cursor_colors(int fg, int bg, struct fb_info *info)
 {
 	struct i810fb_par *par = (struct i810fb_par *) info->par;
 	u8 *mmio = par->mmio_start_virtual, temp;
@@ -1097,28 +848,14 @@ static void set_color_bitfields(struct fb_var_screeninfo *var)
 		var->transp.length = 0;
 		break;
 	case 16:
-		if (var->green.length == 5) {
-			/* RGB 555 */
-			var->red.offset = 10;
-			var->red.length = 5;
-			var->green.offset = 5;
-			var->green.length = 5;
-			var->blue.offset = 0;
-			var->blue.length = 5;
-			var->transp.offset = 15;
-			var->transp.length = 1;
-		}
-		else {
-			/* RGB 565 */
-			var->red.offset = 11;
-			var->red.length = 5;
-			var->green.offset = 5;
-			var->green.length = 6;
-			var->blue.offset = 0;
-			var->blue.length = 5;
-			var->transp.offset = 0;
-			var->transp.length = 0;
-		}
+		var->green.length = (var->green.length == 5) ? 5 : 6;
+		var->red.length = 5;
+		var->blue.length = 5;
+		var->transp.length = 6 - var->green.length;
+		var->blue.offset = 0;
+		var->green.offset = 5;
+		var->red.offset = 5 + var->green.length;
+		var->transp.offset =  (5 + var->red.offset) & 15;
 		break;
 	case 24:	/* RGB 888   */
 	case 32:	/* RGBA 8888 */
@@ -1128,15 +865,9 @@ static void set_color_bitfields(struct fb_var_screeninfo *var)
 		var->green.length = 8;
 		var->blue.offset = 0;
 		var->blue.length = 8;
-		if (var->bits_per_pixel == 24) {
-			var->transp.offset = 0;
-			var->transp.length = 0;
-		}
-		else {
-			var->transp.offset = 24;
-			var->transp.length = 8;
-			break;
-		}
+		var->transp.length = var->bits_per_pixel - 24;
+		var->transp.offset = (var->transp.length) ? 24 : 0;
+		break;
 	}
 	var->red.msb_right = 0;
 	var->green.msb_right = 0;
@@ -1195,11 +926,24 @@ static int i810_check_params(struct fb_var_screeninfo *var,
 	/*
 	 * Monitor limit
 	 */
-	if (i810_check_custom_timings(info, var, xres, yres)) {
-		if (i810_calculate_timings(info, var, xres, yres)) {
-			return -EINVAL;
+	if (fb_validate_mode(var, info)) {
+		switch (var->bits_per_pixel) {
+		case 8:
+			info->monspecs.dclkmax = 234000000;
+			break;
+		case 16:
+			info->monspecs.dclkmax = 229000000;
+			break;
+		case 24:
+		case 32:
+			info->monspecs.dclkmax = 204000000;
+			break;
 		}
+		info->monspecs.dclkmin = 15000000;
+		if (fb_get_mode(FB_MAXTIMINGS, 0, var, info))
+			return -EINVAL;
 	}
+	
 	var->xres = xres;
 	var->yres = yres;
 	var->xres_virtual = vxres;
@@ -1245,8 +989,7 @@ static int encode_fix(struct fb_fix_screeninfo *fix, struct fb_info *info)
 		return -EINVAL;
 	}
     	fix->ywrapstep = 0;
-	fix->line_length = get_line_length(par, info->var.xres_virtual, 
-					   info->var.bits_per_pixel);
+	fix->line_length = par->pitch;
 	fix->mmio_start = par->mmio_start_phys;
 	fix->mmio_len = MMIO_SIZE;
 	fix->accel = FB_ACCEL_I810;
@@ -1258,14 +1001,13 @@ static int encode_fix(struct fb_fix_screeninfo *fix, struct fb_info *info)
  * decode_var - modify par according to contents of var
  * @var: pointer to fb_var_screeninfo
  * @par: pointer to i810fb_par
- * @info: pointer to fb_info
  *
  * DESCRIPTION:
  * Based on the contents of @var, @par will be dynamically filled up.
  * @par contains all information necessary to modify the hardware. 
 */
 static void decode_var(const struct fb_var_screeninfo *var, 
-		       struct i810fb_par *par, struct fb_info *info)
+		       struct i810fb_par *par)
 {
 	u32 xres, yres, vxres, vyres;
 
@@ -1569,7 +1311,7 @@ static int i810fb_set_par(struct fb_info *info)
 {
 	struct i810fb_par *par = (struct i810fb_par *) info->par;
 
-	decode_var(&info->var, par, info);
+	decode_var(&info->var, par);
 	i810_load_regs(par);
 	i810_init_cursor(par);
 	par->cursor_reset = 1;
@@ -1608,9 +1350,8 @@ static int i810fb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	u8 *mmio = par->mmio_start_virtual;	
 	u16 flags = cursor->set;
 
-	if (!info->var.accel_flags || par->dev_flags & LOCKUP) {
+	if (!info->var.accel_flags || par->dev_flags & LOCKUP) 
 		return soft_cursor(info, cursor);
-	}
 
 	if (cursor->image.width > 64 || cursor->image.height > 64 ||
 	    (cursor->dest == NULL && cursor->rop == ROP_XOR))
@@ -1655,9 +1396,9 @@ static int i810fb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 		switch (cursor->rop) {
 		case ROP_XOR:
 			for (i = 0; i < size; i++) {
-				data[i] = (cursor->image.data[i] & 
-					   cursor->mask[i]) ^
-					cursor->dest[i];
+				data[i] = ((cursor->image.data[i] & 
+					    cursor->mask[i]) ^
+					   cursor->dest[i]);
 			}
 			break;
 		case ROP_COPY:
@@ -1680,19 +1421,19 @@ static int i810fb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 }
 
 static struct fb_ops i810fb_ops __initdata = {
-    .owner =             THIS_MODULE,
-    .fb_open =           i810fb_open,
-    .fb_release =        i810fb_release,
-    .fb_check_var =      i810fb_check_var,
-    .fb_set_par =        i810fb_set_par,
-    .fb_setcolreg =      i810fb_setcolreg,
-    .fb_blank =          i810fb_blank,
-    .fb_pan_display =    i810fb_pan_display, 
-    .fb_fillrect =       i810fb_fillrect,
-    .fb_copyarea =       i810fb_copyarea,
-    .fb_imageblit =      i810fb_imageblit,
-    .fb_cursor =         i810fb_cursor,
-    .fb_sync =           i810fb_sync,
+	.owner =             THIS_MODULE,
+	.fb_open =           i810fb_open,
+	.fb_release =        i810fb_release,
+	.fb_check_var =      i810fb_check_var,
+	.fb_set_par =        i810fb_set_par,
+	.fb_setcolreg =      i810fb_setcolreg,
+	.fb_blank =          i810fb_blank,
+	.fb_pan_display =    i810fb_pan_display, 
+	.fb_fillrect =       i810fb_fillrect,
+	.fb_copyarea =       i810fb_copyarea,
+	.fb_imageblit =      i810fb_imageblit,
+	.fb_cursor =         i810fb_cursor,
+	.fb_sync =           i810fb_sync,
 };
 
 /***********************************************************************
@@ -1864,7 +1605,7 @@ static void __init i810_init_defaults(struct i810fb_par *par,
 	info->var.yres = yres;
 	info->var.yres_virtual = vyres;
 	info->var.bits_per_pixel = bpp;
-	
+
 	if (dcolor)
 		info->var.nonstd = 1;
 
@@ -2076,22 +1817,13 @@ static int __init i810fb_init_pci (struct pci_dev *dev,
 	vfreq = hfreq/(info->var.yres + info->var.upper_margin +
 		       info->var.vsync_len + info->var.lower_margin);
 
-      	printk("fb: %s v%d.%d.%d%s, Tony Daplas\n"
+      	printk("fb: %s v%d.%d.%d%s, (c) Tony Daplas\n"
       	       "     Video RAM      : %dK\n" 
-	       "     Mode           : %dx%d-%dbpp@%dHz\n"
-	       "     Acceleration   : %sabled\n"
-	       "     MTRR           : %sabled\n"
-	       "     External VGA   : %sabled\n"
-	       "     Video Timings  : %s\n",	
+	       "     Mode           : %dx%d-%dbpp@%dHz\n",
 	       i810_pci_list[entry->driver_data],
 	       VERSION_MAJOR, VERSION_MINOR, VERSION_TEENIE, BRANCH_VERSION,
 	       (int) par->fb.size>>10, info->var.xres, 
-	       info->var.yres, info->var.bits_per_pixel, vfreq, 
-	       (par->dev_flags & HAS_ACCELERATION) ? "en" : "dis", 
-	       (par->dev_flags & HAS_MTRR) ? "en" : "dis", 
-	       (ext_vga) ? "en" : "dis", (IS_DVT) ? 
-	       "Intel(R) DVT" : "VESA GTF (US)");
-
+	       info->var.yres, info->var.bits_per_pixel, vfreq);
 	return 0;
 }
 

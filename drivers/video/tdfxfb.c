@@ -162,7 +162,7 @@ static int tdfxfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 			    u_int transp, struct fb_info *info); 
 static int tdfxfb_blank(int blank, struct fb_info *info); 
 static int tdfxfb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info);
-static void tdfxfb_fillrect(struct fb_info *info, struct fb_fillrect *rect);
+static void tdfxfb_fillrect(struct fb_info *info, const struct fb_fillrect *rect);
 static void tdfxfb_copyarea(struct fb_info *info, struct fb_copyarea *area);  
 static void tdfxfb_imageblit(struct fb_info *info, struct fb_image *image); 
 static int tdfxfb_cursor(struct fb_info *info, struct fb_cursor *cursor);
@@ -872,7 +872,7 @@ static int tdfxfb_pan_display(struct fb_var_screeninfo *var,
 /*
  * FillRect 2D command (solidfill or invert (via ROP_XOR))   
  */
-static void tdfxfb_fillrect(struct fb_info *info, struct fb_fillrect *rect) 
+static void tdfxfb_fillrect(struct fb_info *info, const struct fb_fillrect *rect) 
 {
 	struct tdfx_par *par = (struct tdfx_par *) info->par;
 	u32 bpp = info->var.bits_per_pixel;
