@@ -102,12 +102,6 @@ int sirdev_get_dongle(struct sir_dev *dev, IRDA_DONGLE type)
 		err = -ESTALE;
 		goto out_unlock;	/* rmmod already pending */
 	}
-
-	/* Initialize dongle driver callbacks */
-	dev->read        = sirdev_raw_read;
-	dev->write       = sirdev_raw_write;
-	dev->set_dtr_rts = dev->drv->set_dtr_rts;
-
 	dev->dongle_drv = drv;
 
 	if (!drv->open  ||  (err=drv->open(dev))!=0)

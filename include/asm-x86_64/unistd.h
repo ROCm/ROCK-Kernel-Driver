@@ -533,6 +533,8 @@ __SYSCALL(__NR_utimes, sys_utimes)
 #define __NR_vserver		236
 __SYSCALL(__NR_vserver, sys_ni_syscall)
 
+/* 237,238,239 reserved for NUMA API */
+
 #define __NR_syscall_max __NR_vserver
 #ifndef __NO_STUBS
 
@@ -694,7 +696,7 @@ static inline long close(unsigned int fd)
 }
 
 extern long sys_exit(int) __attribute__((noreturn));
-extern inline long exit(int error_code)
+extern inline void exit(int error_code)
 {
 	sys_exit(error_code);
 }

@@ -10,6 +10,7 @@
  *  Copyright (c) 1998  Andrea Arcangeli
  *  Copyright (c) 2002  Vojtech Pavlik
  *  Copyright (c) 2003  Andi Kleen
+ *  RTC support code taken from arch/i386/kernel/timers/time_hpet.c
  *
  */
 
@@ -28,6 +29,7 @@
 #include <asm/vsyscall.h>
 #include <asm/timex.h>
 #include <asm/proto.h>
+#include <asm/hpet.h>
 #include <linux/cpufreq.h>
 #ifdef CONFIG_X86_LOCAL_APIC
 #include <asm/apic.h>
@@ -627,10 +629,10 @@ static int hpet_init(void)
  * and period also hpet_tick.
  */
 
-	hpet_writel(HPET_T0_ENABLE | HPET_T0_PERIODIC | HPET_T0_SETVAL |
-		    HPET_T0_32BIT, HPET_T0_CFG);
+	hpet_writel(HPET_TN_ENABLE | HPET_TN_PERIODIC | HPET_TN_SETVAL |
+		    HPET_TN_32BIT, HPET_T0_CFG);
 	hpet_writel(hpet_tick, HPET_T0_CMP);
-	hpet_writel(hpet_tick, HPET_T0_CMP);
+	hpet_writel(hpet_tick, HPET_T0_CMP); /* AK: why twice? */
 
 /*
  * Go!
@@ -733,3 +735,229 @@ void __init time_init_smp(void)
 }
 
 __setup("report_lost_ticks", time_setup);
+
+#ifdef CONFIG_HPET_EMULATE_RTC
+/* HPET in LegacyReplacement Mode eats up RTC interrupt line. When, HPET
+ * is enabled, we support RTC interrupt functionality in software.
+ * RTC has 3 kinds of interrupts:
+ * 1) Update Interrupt - generate an interrupt, every sec, when RTC clock
+ *    is updated
+ * 2) Alarm Interrupt - generate an interrupt at a specific time of day
+ * 3) Periodic Interrupt - generate periodic interrupt, with frequencies
+ *    2Hz-8192Hz (2Hz-64Hz for non-root user) (all freqs in powers of 2)
+ * (1) and (2) above are implemented using polling at a frequency of
+ * 64 Hz. The exact frequency is a tradeoff between accuracy and interrupt
+ * overhead. (DEFAULT_RTC_INT_FREQ)
+ * For (3), we use interrupts at 64Hz or user specified periodic
+ * frequency, whichever is higher.
+ */
+#include <linux/mc146818rtc.h>
+#include <linux/rtc.h>
+
+extern irqreturn_t rtc_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+
+#define DEFAULT_RTC_INT_FREQ 	64
+#define RTC_NUM_INTS 		1
+
+static unsigned long UIE_on;
+static unsigned long prev_update_sec;
+
+static unsigned long AIE_on;
+static struct rtc_time alarm_time;
+
+static unsigned long PIE_on;
+static unsigned long PIE_freq = DEFAULT_RTC_INT_FREQ;
+static unsigned long PIE_count;
+
+static unsigned long hpet_rtc_int_freq; /* RTC interrupt frequency */
+
+int is_hpet_enabled(void)
+{
+	return vxtime.hpet_address != 0;
+}
+
+/*
+ * Timer 1 for RTC, we do not use periodic interrupt feature,
+ * even if HPET supports periodic interrupts on Timer 1.
+ * The reason being, to set up a periodic interrupt in HPET, we need to
+ * stop the main counter. And if we do that everytime someone diables/enables
+ * RTC, we will have adverse effect on main kernel timer running on Timer 0.
+ * So, for the time being, simulate the periodic interrupt in software.
+ *
+ * hpet_rtc_timer_init() is called for the first time and during subsequent
+ * interuppts reinit happens through hpet_rtc_timer_reinit().
+ */
+int hpet_rtc_timer_init(void)
+{
+	unsigned int cfg, cnt;
+	unsigned long flags;
+
+	if (!is_hpet_enabled())
+		return 0;
+	/*
+	 * Set the counter 1 and enable the interrupts.
+	 */
+	if (PIE_on && (PIE_freq > DEFAULT_RTC_INT_FREQ))
+		hpet_rtc_int_freq = PIE_freq;
+	else
+		hpet_rtc_int_freq = DEFAULT_RTC_INT_FREQ;
+
+	local_irq_save(flags);
+	cnt = hpet_readl(HPET_COUNTER);
+	cnt += ((hpet_tick*HZ)/hpet_rtc_int_freq);
+	hpet_writel(cnt, HPET_T1_CMP);
+	local_irq_restore(flags);
+
+	cfg = hpet_readl(HPET_T1_CFG);
+	cfg |= HPET_TN_ENABLE | HPET_TN_SETVAL | HPET_TN_32BIT;
+	hpet_writel(cfg, HPET_T1_CFG);
+
+	return 1;
+}
+
+static void hpet_rtc_timer_reinit(void)
+{
+	unsigned int cfg, cnt;
+
+	if (!(PIE_on | AIE_on | UIE_on))
+		return;
+
+	if (PIE_on && (PIE_freq > DEFAULT_RTC_INT_FREQ))
+		hpet_rtc_int_freq = PIE_freq;
+	else
+		hpet_rtc_int_freq = DEFAULT_RTC_INT_FREQ;
+
+	/* It is more accurate to use the comparator value than current count.*/
+	cnt = hpet_readl(HPET_T1_CMP);
+	cnt += hpet_tick*HZ/hpet_rtc_int_freq;
+	hpet_writel(cnt, HPET_T1_CMP);
+
+	cfg = hpet_readl(HPET_T1_CFG);
+	cfg |= HPET_TN_ENABLE | HPET_TN_SETVAL | HPET_TN_32BIT;
+	hpet_writel(cfg, HPET_T1_CFG);
+
+	return;
+}
+
+/*
+ * The functions below are called from rtc driver.
+ * Return 0 if HPET is not being used.
+ * Otherwise do the necessary changes and return 1.
+ */
+int hpet_mask_rtc_irq_bit(unsigned long bit_mask)
+{
+	if (!is_hpet_enabled())
+		return 0;
+
+	if (bit_mask & RTC_UIE)
+		UIE_on = 0;
+	if (bit_mask & RTC_PIE)
+		PIE_on = 0;
+	if (bit_mask & RTC_AIE)
+		AIE_on = 0;
+
+	return 1;
+}
+
+int hpet_set_rtc_irq_bit(unsigned long bit_mask)
+{
+	int timer_init_reqd = 0;
+
+	if (!is_hpet_enabled())
+		return 0;
+
+	if (!(PIE_on | AIE_on | UIE_on))
+		timer_init_reqd = 1;
+
+	if (bit_mask & RTC_UIE) {
+		UIE_on = 1;
+	}
+	if (bit_mask & RTC_PIE) {
+		PIE_on = 1;
+		PIE_count = 0;
+	}
+	if (bit_mask & RTC_AIE) {
+		AIE_on = 1;
+	}
+
+	if (timer_init_reqd)
+		hpet_rtc_timer_init();
+
+	return 1;
+}
+
+int hpet_set_alarm_time(unsigned char hrs, unsigned char min, unsigned char sec)
+{
+	if (!is_hpet_enabled())
+		return 0;
+
+	alarm_time.tm_hour = hrs;
+	alarm_time.tm_min = min;
+	alarm_time.tm_sec = sec;
+
+	return 1;
+}
+
+int hpet_set_periodic_freq(unsigned long freq)
+{
+	if (!is_hpet_enabled())
+		return 0;
+
+	PIE_freq = freq;
+	PIE_count = 0;
+
+	return 1;
+}
+
+int hpet_rtc_dropped_irq(void)
+{
+	if (!is_hpet_enabled())
+		return 0;
+
+	return 1;
+}
+
+irqreturn_t hpet_rtc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+{
+	struct rtc_time curr_time;
+	unsigned long rtc_int_flag = 0;
+	int call_rtc_interrupt = 0;
+
+	hpet_rtc_timer_reinit();
+
+	if (UIE_on | AIE_on) {
+		rtc_get_rtc_time(&curr_time);
+	}
+	if (UIE_on) {
+		if (curr_time.tm_sec != prev_update_sec) {
+			/* Set update int info, call real rtc int routine */
+			call_rtc_interrupt = 1;
+			rtc_int_flag = RTC_UF;
+			prev_update_sec = curr_time.tm_sec;
+		}
+	}
+	if (PIE_on) {
+		PIE_count++;
+		if (PIE_count >= hpet_rtc_int_freq/PIE_freq) {
+			/* Set periodic int info, call real rtc int routine */
+			call_rtc_interrupt = 1;
+			rtc_int_flag |= RTC_PF;
+			PIE_count = 0;
+		}
+	}
+	if (AIE_on) {
+		if ((curr_time.tm_sec == alarm_time.tm_sec) &&
+		    (curr_time.tm_min == alarm_time.tm_min) &&
+		    (curr_time.tm_hour == alarm_time.tm_hour)) {
+			/* Set alarm int info, call real rtc int routine */
+			call_rtc_interrupt = 1;
+			rtc_int_flag |= RTC_AF;
+		}
+	}
+	if (call_rtc_interrupt) {
+		rtc_int_flag |= (RTC_IRQF | (RTC_NUM_INTS << 8));
+		rtc_interrupt(rtc_int_flag, dev_id, regs);
+	}
+	return IRQ_HANDLED;
+}
+#endif

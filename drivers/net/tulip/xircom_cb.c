@@ -342,6 +342,11 @@ static irqreturn_t xircom_interrupt(int irq, void *dev_instance, struct pt_regs 
 	printk("tx status 0x%08x 0x%08x \n",card->tx_buffer[0],card->tx_buffer[4]);
 	printk("rx status 0x%08x 0x%08x \n",card->rx_buffer[0],card->rx_buffer[4]);
 #endif	
+	/* Handle shared irq and hotplug */
+	if (status == 0 || status == 0xffffffff) {
+		spin_unlock(&card->lock);
+		return IRQ_NONE;
+	}
 
 	if (link_status_changed(card)) {
 		int newlink;

@@ -2102,7 +2102,7 @@ aty128_set_backlight_enable(int on, int level, void *data)
 	reg |= LVDS_BL_MOD_EN | LVDS_BLON;
 	if (on && level > BACKLIGHT_OFF) {
 		reg |= LVDS_DIGION;
-		if (!reg & LVDS_ON) {
+		if (!(reg & LVDS_ON)) {
 			reg &= ~LVDS_BLON;
 			aty_st_le32(LVDS_GEN_CNTL, reg);
 			(void)aty_ld_le32(LVDS_GEN_CNTL);

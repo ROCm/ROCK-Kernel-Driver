@@ -33,11 +33,14 @@
 #include <asm/user32.h>
 
 #undef WARN_OLD
+#undef CORE_DUMP /* probably broken */
 
 extern int ia32_setup_arg_pages(struct linux_binprm *bprm);
 
 static int load_aout_binary(struct linux_binprm *, struct pt_regs * regs);
 static int load_aout_library(struct file*);
+
+#if CORE_DUMP
 static int aout_core_dump(long signr, struct pt_regs * regs, struct file *file);
 
 /*
@@ -92,11 +95,15 @@ static void dump_thread32(struct pt_regs * regs, struct user32 * dump)
 #endif
 }
 
+#endif
+
 static struct linux_binfmt aout_format = {
 	.module		= THIS_MODULE,
 	.load_binary	= load_aout_binary,
 	.load_shlib	= load_aout_library,
+#if CORE_DUMP
 	.core_dump	= aout_core_dump,
+#endif
 	.min_coredump	= PAGE_SIZE
 };
 
@@ -109,6 +116,7 @@ static void set_brk(unsigned long start, unsigned long end)
 	do_brk(start, end - start);
 }
 
+#if CORE_DUMP
 /*
  * These are the only things you should do on a core-file: use only these
  * macros to write out all the necessary info.
@@ -201,6 +209,7 @@ end_coredump:
 	set_fs(fs);
 	return has_dumped;
 }
+#endif
 
 /*
  * create_aout_tables() parses the env- and arg-strings in new user
@@ -285,10 +294,11 @@ static int load_aout_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	regs->cs = __USER32_CS; 
 	regs->r8 = regs->r9 = regs->r10 = regs->r11 = regs->r12 =
 		regs->r13 = regs->r14 = regs->r15 = 0;
-	set_thread_flag(TIF_IA32); 
 
 	/* OK, This is the point of no return */
 	set_personality(PER_LINUX);
+	set_thread_flag(TIF_IA32); 
+	clear_thread_flag(TIF_ABI_PENDING);
 
 	current->mm->end_code = ex.a_text +
 		(current->mm->start_code = N_TXTADDR(ex));

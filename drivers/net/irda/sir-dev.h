@@ -121,15 +121,17 @@ extern int sirdev_set_dongle(struct sir_dev *dev, IRDA_DONGLE type);
 extern void sirdev_write_complete(struct sir_dev *dev);
 extern int sirdev_receive(struct sir_dev *dev, const unsigned char *cp, size_t count);
 
+/* low level helpers for SIR device/dongle setup */
+extern int sirdev_raw_write(struct sir_dev *dev, const char *buf, int len);
+extern int sirdev_raw_read(struct sir_dev *dev, char *buf, int len);
+extern int sirdev_set_dtr_rts(struct sir_dev *dev, int dtr, int rts);
+
 /* not exported */
 
 extern int sirdev_get_dongle(struct sir_dev *self, IRDA_DONGLE type);
 extern int sirdev_put_dongle(struct sir_dev *self);
 
-extern int sirdev_raw_write(struct sir_dev *dev, const char *buf, int len);
-extern int sirdev_raw_read(struct sir_dev *dev, char *buf, int len);
 extern void sirdev_enable_rx(struct sir_dev *dev);
-
 extern int sirdev_schedule_request(struct sir_dev *dev, int state, unsigned param);
 extern int __init irda_thread_create(void);
 extern void __exit irda_thread_join(void);
@@ -195,10 +197,6 @@ struct sir_dev {
 	const struct sir_driver * drv;
 	void *priv;
 
-	/* dongle callbacks to the SIR device */
-	int (*read)(struct sir_dev *, char *buf, int len);
-	int (*write)(struct sir_dev *, const char *buf, int len);
-	int (*set_dtr_rts)(struct sir_dev *, int dtr, int rts);
 };
 
 #endif	/* IRDA_SIR_H */

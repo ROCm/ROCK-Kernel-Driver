@@ -3106,7 +3106,8 @@ static inline void md_enter_safemode(mddev_t *mddev)
 {
 	if (!mddev->safemode) return;
 	if (mddev->safemode == 2 &&
-	    (atomic_read(&mddev->writes_pending) || mddev->in_sync))
+	    (atomic_read(&mddev->writes_pending) || mddev->in_sync ||
+		    mddev->recovery_cp != MaxSector))
 		return; /* avoid the lock */
 	mddev_lock_uninterruptible(mddev);
 	if (mddev->safemode && !atomic_read(&mddev->writes_pending) &&

@@ -35,6 +35,7 @@ int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 		BUG_ON(!s->page); 
 			s->dma_address = pci_map_page(hwdev, s->page, s->offset, 
 						      s->length, direction); 
+		s->dma_length = s->length;
 	}
 	return nents;
 }
@@ -53,7 +54,7 @@ void pci_unmap_sg(struct pci_dev *dev, struct scatterlist *sg,
 		struct scatterlist *s = &sg[i];
 		BUG_ON(s->page == NULL); 
 		BUG_ON(s->dma_address == 0); 
-		pci_unmap_single(dev, s->dma_address, s->length, dir); 
+		pci_unmap_single(dev, s->dma_address, s->dma_length, dir); 
 	} 
 }
 

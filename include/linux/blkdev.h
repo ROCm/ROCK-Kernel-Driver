@@ -485,7 +485,7 @@ static inline void blk_queue_bounce(request_queue_t *q, struct bio **bio)
 
 #define rq_for_each_bio(_bio, rq)	\
 	if ((rq->bio))			\
-		for (_bio = (rq)->bio; _bio; _bio = bio->bi_next)
+		for (_bio = (rq)->bio; _bio; _bio = _bio->bi_next)
 
 struct sec_size {
 	unsigned block_size;

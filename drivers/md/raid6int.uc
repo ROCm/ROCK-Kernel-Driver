@@ -15,7 +15,7 @@
  *
  * $#-way unrolled portable integer math RAID-6 instruction set
  *
- * This file is postprocessed using unroller.pl
+ * This file is postprocessed using unroll.pl
  */
 
 #include "raid6.h"
