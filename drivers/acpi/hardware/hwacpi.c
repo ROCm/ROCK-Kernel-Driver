@@ -24,7 +24,7 @@
  */
 
 
-#include "acpi.h"
+#include <acpi/acpi.h>
 
 
 #define _COMPONENT          ACPI_HARDWARE
