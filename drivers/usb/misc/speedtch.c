@@ -238,6 +238,7 @@ static struct atmdev_ops udsl_atm_devops = {
 	.ioctl =	udsl_atm_ioctl,
 	.send =		udsl_atm_send,
 	.proc_read =	udsl_atm_proc_read,
+	.owner =	THIS_MODULE,
 };
 
 /* USB */
@@ -247,6 +248,7 @@ static void udsl_usb_disconnect (struct usb_interface *intf);
 static int udsl_usb_ioctl (struct usb_interface *intf, unsigned int code, void *user_data);
 
 static struct usb_driver udsl_usb_driver = {
+	.owner =	THIS_MODULE,
 	.name =		udsl_driver_name,
 	.probe =	udsl_usb_probe,
 	.disconnect =	udsl_usb_disconnect,
