@@ -322,10 +322,8 @@ check_groups:
 
 check_capabilities:
 	/* Allowed to override Discretionary Access Control? */
-	if (!(mask & MAY_EXEC) || (inode->i_mode & S_IXUGO))
-		if (capable(CAP_DAC_OVERRIDE))
-			return 0;
-	if ((mask & MAY_EXEC) && S_ISDIR(inode->i_mode))
+	if (!(mask & MAY_EXEC) ||
+	    (inode->i_mode & S_IXUGO) || S_ISDIR(inode->i_mode))
 		if (capable(CAP_DAC_OVERRIDE))
 			return 0;
 	/* Read and search granted if capable(CAP_DAC_READ_SEARCH) */

@@ -191,13 +191,11 @@ check_capabilities:
 	 * Read/write DACs are always overridable.
 	 * Executable DACs are overridable if at least one exec bit is set.
 	 */
-	if (!(mask & MAY_EXEC) || (inode->i_mode & S_IXUGO))
+	if (!(mask & MAY_EXEC) ||
+	    (inode->i_mode & S_IXUGO) || S_ISDIR(inode->i_mode))
 		if (capable(CAP_DAC_OVERRIDE))
 			return 0;
 
-	if ((mask & MAY_EXEC) && S_ISDIR(inode->i_mode))
-		if (capable(CAP_DAC_OVERRIDE))
-			return 0;
 	/*
 	 * Searching includes executable on directories, else just read.
 	 */
