@@ -128,7 +128,7 @@ write_src(void)
 		if (table[i].addr == last_addr)
 			continue;
 
-		printf("\t.string\t\"%s\"\n", table[i].sym);
+		printf("\t.asciz\t\"%s\"\n", table[i].sym);
 		last_addr = table[i].addr;
 	}
 	printf("\n");
