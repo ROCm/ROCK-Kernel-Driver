@@ -27,21 +27,13 @@
 #include <asm/sal.h>
 #include <asm/page.h>
 #include <asm/processor.h>
-#ifdef CONFIG_SMP
 #include <linux/smp.h>
-#endif
 
 MODULE_AUTHOR("Stephane Eranian <eranian@hpl.hp.com>");
 MODULE_DESCRIPTION("/proc interface to IA-64 PAL");
 MODULE_LICENSE("GPL");
 
 #define PALINFO_VERSION "0.5"
-
-#ifdef CONFIG_SMP
-#define cpu_is_online(i) (cpu_online_map & (1UL << i))
-#else
-#define cpu_is_online(i)	1
-#endif
 
 typedef int (*palinfo_func_t)(char*);
 
@@ -933,7 +925,7 @@ palinfo_init(void)
 	 */
 	for (i=0; i < NR_CPUS; i++) {
 
-		if (!cpu_is_online(i)) continue;
+		if (!cpu_online(i)) continue;
 
 		sprintf(cpustr,CPUSTR, i);
 
