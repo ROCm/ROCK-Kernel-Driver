@@ -860,8 +860,20 @@ pagebuf_readahead(
 	size_t			isize,
 	page_buf_flags_t	flags)
 {
+	struct backing_dev_info *bdi;
+
+	bdi = target->pbr_mapping->backing_dev_info;
+	if (bdi_read_congested(bdi))
+		return;
+	if (bdi_write_congested(bdi))
+		return;
+
 	flags |= (PBF_TRYLOCK|PBF_READ|PBF_ASYNC|PBF_MAPPABLE|PBF_READ_AHEAD);
+
+	/* don't complain on allocation failure, it's fine with us */
+	current->flags |= PF_NOWARN;
 	pagebuf_get(target, ioff, isize, flags);
+	current->flags &= ~PF_NOWARN;
 }
 
 page_buf_t *
