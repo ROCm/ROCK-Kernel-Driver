@@ -930,6 +930,13 @@ static void __init quirk_usb_disable_smm_bios(struct pci_dev *pdev)
 }
 #endif
 
+int pciehp_msi_quirk;
+
+static void __devinit quirk_pciehp_msi(struct pci_dev *pdev)
+{
+	pciehp_msi_quirk = 1;
+}
+
 /*
  *  The main table of quirks.
  *
@@ -1050,6 +1057,8 @@ static struct pci_fixup pci_fixups[] __devinitdata = {
 	{ PCI_FIXUP_FINAL,	PCI_ANY_ID,		PCI_ANY_ID,			quirk_usb_disable_smm_bios },
 #endif
 
+	{ PCI_FIXUP_FINAL,      PCI_VENDOR_ID_INTEL,    PCI_DEVICE_ID_INTEL_SMCH,	quirk_pciehp_msi },
+
 	{ 0 }
 };
 
@@ -1074,3 +1083,5 @@ void pci_fixup_device(int pass, struct pci_dev *dev)
 	pci_do_fixups(dev, pass, pcibios_fixups);
 	pci_do_fixups(dev, pass, pci_fixups);
 }
+
+EXPORT_SYMBOL(pciehp_msi_quirk);
