@@ -446,9 +446,6 @@ kdbm_fl(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 	kdb_printf(" fl_type = %d fl_start = 0x%llx fl_end = 0x%llx\n",
 			fl.fl_type, fl.fl_start, fl.fl_end);
 
-	kdb_printf(" fl_notify = 0x%p fl_insert = 0x%p fl_remove = 0x%p\n",
-			fl.fl_notify, fl.fl_insert, fl.fl_remove);
-
 	kdb_printf(" fl_fasync = 0x%p fl_break 0x%lx\n",
 			fl.fl_fasync, fl.fl_break_time);
 
