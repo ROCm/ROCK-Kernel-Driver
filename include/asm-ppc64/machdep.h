@@ -110,6 +110,10 @@ struct machdep_calls {
 	ssize_t		(*nvram_size)(void);		
 	int		(*nvram_sync)(void);
 
+	/* Exception handlers */
+	void		(*system_reset_exception)(struct pt_regs *regs);
+	int 		(*machine_check_exception)(struct pt_regs *regs);
+
 	/* Motherboard/chipset features. This is a kind of general purpose
 	 * hook used to control some machine specific features (like reset
 	 * lines, chip power control, etc...).

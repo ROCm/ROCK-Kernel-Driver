@@ -738,7 +738,7 @@ __end_stab:
 
 /*** Common interrupt handlers ***/
 
-	STD_EXCEPTION_COMMON(0x100, SystemReset, .SystemResetException)
+	STD_EXCEPTION_COMMON(0x100, SystemReset, .system_reset_exception)
 
 	/*
 	 * Machine check is different because we use a different
@@ -751,20 +751,20 @@ MachineCheck_common:
 	DISABLE_INTS
 	bl	.save_nvgprs
 	addi	r3,r1,STACK_FRAME_OVERHEAD
-	bl	.MachineCheckException
+	bl	.machine_check_exception
 	b	.ret_from_except
 
 	STD_EXCEPTION_COMMON_LITE(0x900, Decrementer, .timer_interrupt)
-	STD_EXCEPTION_COMMON(0xa00, Trap_0a, .UnknownException)
-	STD_EXCEPTION_COMMON(0xb00, Trap_0b, .UnknownException)
-	STD_EXCEPTION_COMMON(0xd00, SingleStep, .SingleStepException)
-	STD_EXCEPTION_COMMON(0xe00, Trap_0e, .UnknownException)
-	STD_EXCEPTION_COMMON(0xf00, PerformanceMonitor, .PerformanceMonitorException)
-	STD_EXCEPTION_COMMON(0x1300, InstructionBreakpoint, .InstructionBreakpointException)
+	STD_EXCEPTION_COMMON(0xa00, Trap_0a, .unknown_exception)
+	STD_EXCEPTION_COMMON(0xb00, Trap_0b, .unknown_exception)
+	STD_EXCEPTION_COMMON(0xd00, SingleStep, .single_step_exception)
+	STD_EXCEPTION_COMMON(0xe00, Trap_0e, .unknown_exception)
+	STD_EXCEPTION_COMMON(0xf00, PerformanceMonitor, .performance_monitor_exception)
+	STD_EXCEPTION_COMMON(0x1300, InstructionBreakpoint, .instruction_breakpoint_exception)
 #ifdef CONFIG_ALTIVEC
-	STD_EXCEPTION_COMMON(0x1700, AltivecAssist, .AltivecAssistException)
+	STD_EXCEPTION_COMMON(0x1700, AltivecAssist, .altivec_assist_exception)
 #else
-	STD_EXCEPTION_COMMON(0x1700, AltivecAssist, .UnknownException)
+	STD_EXCEPTION_COMMON(0x1700, AltivecAssist, .unknown_exception)
 #endif
 
 /*
@@ -901,7 +901,7 @@ Alignment_common:
 	bl	.save_nvgprs
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	ENABLE_INTS
-	bl	.AlignmentException
+	bl	.alignment_exception
 	b	.ret_from_except
 
 	.align	7
@@ -911,7 +911,7 @@ ProgramCheck_common:
 	bl	.save_nvgprs
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	ENABLE_INTS
-	bl	.ProgramCheckException
+	bl	.program_check_exception
 	b	.ret_from_except
 
 	.align	7
@@ -922,7 +922,7 @@ FPUnavailable_common:
 	bl	.save_nvgprs
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	ENABLE_INTS
-	bl	.KernelFPUnavailableException
+	bl	.kernel_fp_unavailable_exception
 	BUG_OPCODE
 
 	.align	7
@@ -935,7 +935,7 @@ AltivecUnavailable_common:
 	bl	.save_nvgprs
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	ENABLE_INTS
-	bl	.AltivecUnavailableException
+	bl	.altivec_unavailable_exception
 	b	.ret_from_except
 
 /*
