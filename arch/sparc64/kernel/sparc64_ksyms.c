@@ -185,8 +185,6 @@ EXPORT_SYMBOL(atomic_dec_and_lock);
 EXPORT_SYMBOL(___test_and_set_bit);
 EXPORT_SYMBOL(___test_and_clear_bit);
 EXPORT_SYMBOL(___test_and_change_bit);
-EXPORT_SYMBOL(___test_and_set_le_bit);
-EXPORT_SYMBOL(___test_and_clear_le_bit);
 
 /* Bit searching */
 EXPORT_SYMBOL(find_next_bit);
