@@ -556,8 +556,9 @@ asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
 			regs->rip = fixup->fixup;
 			return;
 		}
-		notify_die(DIE_GPF, "general protection fault", regs, error_code,
-			   13, SIGSEGV); 
+		if (notify_die(DIE_GPF, "general protection fault", regs,
+					error_code, 13, SIGSEGV) == NOTIFY_STOP)
+			return;
 		die("general protection fault", regs, error_code);
 	}
 }
