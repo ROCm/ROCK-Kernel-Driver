@@ -12,7 +12,7 @@
 
 #include <linux/sys.h>
 
-	.section .text..SHmedia32,"ax"
+	.section .data, "aw"
 	.balign 32
 
 /*
