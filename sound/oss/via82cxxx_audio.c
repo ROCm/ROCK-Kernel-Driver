@@ -1357,12 +1357,12 @@ static int via_mixer_open (struct inode *inode, struct file *file)
 {
 	int minor = minor(inode->i_rdev);
 	struct via_info *card;
-	struct pci_dev *pdev;
+	struct pci_dev *pdev = NULL;
 	struct pci_driver *drvr;
 
 	DPRINTK ("ENTER\n");
 
-	pci_for_each_dev(pdev) {
+	while ((pdev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pdev)) != NULL) {
 		drvr = pci_dev_driver (pdev);
 		if (drvr == &via_driver) {
 			assert (pci_get_drvdata (pdev) != NULL);
@@ -2982,8 +2982,8 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 static int via_dsp_open (struct inode *inode, struct file *file)
 {
 	int minor = minor(inode->i_rdev);
-	struct via_info *card;
-	struct pci_dev *pdev;
+	struct via_info *card = NULL;
+	struct pci_dev *pdev = NULL;
 	struct via_channel *chan;
 	struct pci_driver *drvr;
 	int nonblock = (file->f_flags & O_NONBLOCK);
@@ -2995,8 +2995,7 @@ static int via_dsp_open (struct inode *inode, struct file *file)
 		return -EINVAL;
 	}
 
-	card = NULL;
-	pci_for_each_dev(pdev) {
+	while ((pdev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pdev)) != NULL) {
 		drvr = pci_dev_driver (pdev);
 		if (drvr == &via_driver) {
 			assert (pci_get_drvdata (pdev) != NULL);
