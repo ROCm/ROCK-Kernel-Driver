@@ -221,7 +221,7 @@ static int __init sa1100_cpu_init(struct cpufreq_policy *policy)
 {
 	if (policy->cpu != 0)
 		return -EINVAL;
-	sa1100_driver.cpu_cur_freq[policy->cpu] = policy->min = policy->max = sa11x0_getspeed();
+	policy->cur = policy->min = policy->max = sa11x0_getspeed();
 	policy->policy = CPUFREQ_POLICY_POWERSAVE;
 	policy->cpuinfo.min_freq = 59000;
 	policy->cpuinfo.max_freq = 287000;
@@ -238,7 +238,8 @@ static struct cpufreq_driver sa1100_driver = {
 
 static int __init sa1100_dram_init(void)
 {
-	if ((processor_id & CPU_SA1100_MASK) == CPU_SA1100_ID)
+	cpufreq_gov_userspace_init();
+ 	if ((processor_id & CPU_SA1100_MASK) == CPU_SA1100_ID)
 		return cpufreq_register_driver(&sa1100_driver);
 	else
 		return -ENODEV;

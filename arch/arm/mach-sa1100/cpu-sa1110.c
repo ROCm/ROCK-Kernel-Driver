@@ -314,7 +314,7 @@ static int __init sa1110_cpu_init(struct cpufreq_policy *policy)
 {
 	if (policy->cpu != 0)
 		return -EINVAL;
-	sa1110_driver.cpu_cur_freq[policy->cpu] = policy->min = policy->max = sa11x0_getspeed();
+	policy->cur = policy->min = policy->max = sa11x0_getspeed();
 	policy->policy = CPUFREQ_POLICY_POWERSAVE;
 	policy->cpuinfo.min_freq = 59000;
 	policy->cpuinfo.max_freq = 287000;
@@ -348,6 +348,8 @@ static int __init sa1110_clk_init(void)
 			sdram->tck, sdram->trcd, sdram->trp,
 			sdram->twr, sdram->refresh, sdram->cas_latency);
 
+		cpufreq_gov_userspace_init();
+ 
 		memcpy(&sdram_params, sdram, sizeof(sdram_params));
 
 		return cpufreq_register_driver(&sa1110_driver);

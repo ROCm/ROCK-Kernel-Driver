@@ -204,7 +204,7 @@ static int integrator_cpufreq_init(struct cpufreq *policy)
 	policy->cpuinfo.max_freq = 160000;
 	policy->cpuinfo.min_freq = 12000;
 	policy->cpuinfo.transition_latency = 1000; /* 1 ms, assumed */
-	integrator_driver.cpu_cur_freq[policy->cpu] = policy->min = policy->max = vco_to_freq(vco, 1); /* current freq */
+	policy->cur = policy->min = policy->max = vco_to_freq(vco, 1); /* current freq */
 
 	set_cpus_allowed(current, cpus_allowed);
 
