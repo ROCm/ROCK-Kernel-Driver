@@ -46,14 +46,39 @@
  * We use an array of pte pointers in this structure to minimise cache misses
  * while traversing reverse maps.
  */
-#define NRPTE ((L1_CACHE_BYTES - sizeof(void *))/sizeof(pte_addr_t))
+#define NRPTE ((L1_CACHE_BYTES - sizeof(unsigned long))/sizeof(pte_addr_t))
 
+/*
+ * next_and_idx encodes both the address of the next pte_chain and the
+ * offset of the highest-index used pte in ptes[].
+ */
 struct pte_chain {
-	struct pte_chain *next;
+	unsigned long next_and_idx;
 	pte_addr_t ptes[NRPTE];
 } ____cacheline_aligned;
 
 kmem_cache_t	*pte_chain_cache;
+
+static inline struct pte_chain *pte_chain_next(struct pte_chain *pte_chain)
+{
+	return (struct pte_chain *)(pte_chain->next_and_idx & ~NRPTE);
+}
+
+static inline struct pte_chain *pte_chain_ptr(unsigned long pte_chain_addr)
+{
+	return (struct pte_chain *)(pte_chain_addr & ~NRPTE);
+}
+
+static inline int pte_chain_idx(struct pte_chain *pte_chain)
+{
+	return pte_chain->next_and_idx & NRPTE;
+}
+
+static inline unsigned long
+pte_chain_encode(struct pte_chain *pte_chain, int idx)
+{
+	return (unsigned long)pte_chain | idx;
+}
 
 /*
  * pte_chain list management policy:
@@ -89,7 +114,7 @@ kmem_cache_t	*pte_chain_cache;
  */
 int page_referenced(struct page * page)
 {
-	struct pte_chain * pc;
+	struct pte_chain *pc;
 	int referenced = 0;
 
 	if (TestClearPageReferenced(page))
@@ -104,7 +129,7 @@ int page_referenced(struct page * page)
 		int nr_chains = 0;
 
 		/* Check all the page tables mapping this page. */
-		for (pc = page->pte.chain; pc; pc = pc->next) {
+		for (pc = page->pte.chain; pc; pc = pte_chain_next(pc)) {
 			int i;
 
 			for (i = NRPTE-1; i >= 0; i--) {
@@ -144,7 +169,6 @@ page_add_rmap(struct page *page, pte_t *ptep, struct pte_chain *pte_chain)
 {
 	pte_addr_t pte_paddr = ptep_to_paddr(ptep);
 	struct pte_chain *cur_pte_chain;
-	int i;
 
 #ifdef DEBUG_RMAP
 	if (!page || !ptep)
@@ -165,12 +189,14 @@ page_add_rmap(struct page *page, pte_t *ptep, struct pte_chain *pte_chain)
 	 * This stuff needs help to get up to highmem speed.
 	 */
 	{
-		struct pte_chain * pc;
+		struct pte_chain *pc;
+		int i;
+
 		if (PageDirect(page)) {
 			if (page->pte.direct == pte_paddr)
 				BUG();
 		} else {
-			for (pc = page->pte.chain; pc; pc = pc->next) {
+			for (pc = page->pte.chain; pc; pc=pte_chain_next(pc)) {
 				for (i = 0; i < NRPTE; i++) {
 					pte_addr_t p = pc->ptes[i];
 
@@ -194,6 +220,7 @@ page_add_rmap(struct page *page, pte_t *ptep, struct pte_chain *pte_chain)
 		ClearPageDirect(page);
 		pte_chain->ptes[NRPTE-1] = page->pte.direct;
 		pte_chain->ptes[NRPTE-2] = pte_paddr;
+		pte_chain->next_and_idx = pte_chain_encode(NULL, NRPTE-2);
 		page->pte.direct = 0;
 		page->pte.chain = pte_chain;
 		pte_chain = NULL;	/* We consumed it */
@@ -202,20 +229,15 @@ page_add_rmap(struct page *page, pte_t *ptep, struct pte_chain *pte_chain)
 
 	cur_pte_chain = page->pte.chain;
 	if (cur_pte_chain->ptes[0]) {	/* It's full */
-		pte_chain->next = cur_pte_chain;
+		pte_chain->next_and_idx = pte_chain_encode(cur_pte_chain,
+								NRPTE - 1);
 		page->pte.chain = pte_chain;
 		pte_chain->ptes[NRPTE-1] = pte_paddr;
 		pte_chain = NULL;	/* We consumed it */
 		goto out;
 	}
-
-	for (i = NRPTE-2; i >= 0; i--) {
-		if (!cur_pte_chain->ptes[i]) {
-			cur_pte_chain->ptes[i] = pte_paddr;
-			goto out;
-		}
-	}
-	BUG();
+	cur_pte_chain->ptes[pte_chain_idx(cur_pte_chain) - 1] = pte_paddr;
+	cur_pte_chain->next_and_idx--;
 out:
 	pte_chain_unlock(page);
 	return pte_chain;
@@ -253,18 +275,18 @@ void page_remove_rmap(struct page * page, pte_t * ptep)
 		}
 	} else {
 		struct pte_chain *start = page->pte.chain;
+		struct pte_chain *next;
 		int victim_i = -1;
 
-		for (pc = start; pc; pc = pc->next) {
+		for (pc = start; pc; pc = next) {
 			int i;
 
-			if (pc->next)
-				prefetch(pc->next);
-			for (i = 0; i < NRPTE; i++) {
+			next = pte_chain_next(pc);
+			if (next)
+				prefetch(next);
+			for (i = pte_chain_idx(pc); i < NRPTE; i++) {
 				pte_addr_t pa = pc->ptes[i];
 
-				if (!pa)
-					continue;
 				if (victim_i == -1)
 					victim_i = i;
 				if (pa != pte_paddr)
@@ -273,10 +295,10 @@ void page_remove_rmap(struct page * page, pte_t * ptep)
 				start->ptes[victim_i] = 0;
 				if (victim_i == NRPTE-1) {
 					/* Emptied a pte_chain */
-					page->pte.chain = start->next;
+					page->pte.chain = pte_chain_next(start);
 					__pte_chain_free(start);
 				} else {
-					/* Do singleton->PageDirect here */
+					start->next_and_idx++;
 				}
 				goto out;
 			}
@@ -289,7 +311,7 @@ void page_remove_rmap(struct page * page, pte_t * ptep)
 	if (PageDirect(page)) {
 		printk("%llx", (u64)page->pte.direct);
 	} else {
-		for (pc = page->pte.chain; pc; pc = pc->next) {
+		for (pc = page->pte.chain; pc; pc = pte_chain_next(pc)) {
 			int i;
 			for (i = 0; i < NRPTE; i++)
 				printk(" %d:%llx", i, (u64)pc->ptes[i]);
@@ -439,10 +461,10 @@ int try_to_unmap(struct page * page)
 	for (pc = start; pc; pc = next_pc) {
 		int i;
 
-		next_pc = pc->next;
+		next_pc = pte_chain_next(pc);
 		if (next_pc)
 			prefetch(next_pc);
-		for (i = 0; i < NRPTE; i++) {
+		for (i = pte_chain_idx(pc); i < NRPTE; i++) {
 			pte_addr_t pte_paddr = pc->ptes[i];
 
 			if (!pte_paddr)
@@ -462,10 +484,12 @@ int try_to_unmap(struct page * page)
 				start->ptes[victim_i] = 0;
 				victim_i++;
 				if (victim_i == NRPTE) {
-					page->pte.chain = start->next;
+					page->pte.chain = pte_chain_next(start);
 					__pte_chain_free(start);
 					start = page->pte.chain;
 					victim_i = 0;
+				} else {
+					start->next_and_idx++;
 				}
 				break;
 			case SWAP_AGAIN:
@@ -507,8 +531,8 @@ void __pte_chain_free(struct pte_chain *pte_chain)
 	int cpu = get_cpu();
 	struct pte_chain **pte_chainp;
 
-	if (pte_chain->next)
-		pte_chain->next = NULL;
+	if (pte_chain->next_and_idx)
+		pte_chain->next_and_idx = 0;
 	pte_chainp = &per_cpu(local_pte_chain, cpu);
 	if (*pte_chainp)
 		kmem_cache_free(pte_chain_cache, *pte_chainp);
@@ -553,7 +577,7 @@ void __init pte_chain_init(void)
 	pte_chain_cache = kmem_cache_create(	"pte_chain",
 						sizeof(struct pte_chain),
 						0,
-						0,
+						SLAB_MUST_HWCACHE_ALIGN,
 						pte_chain_ctor,
 						NULL);
 
