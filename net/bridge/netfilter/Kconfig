@@ -73,6 +73,17 @@ config BRIDGE_EBT_IP
 
 	  To compile it as a module, choose M here.  If unsure, say N.
 
+config BRIDGE_EBT_LIMIT
+	tristate "ebt: limit match support"
+	depends on BRIDGE_NF_EBTABLES
+	help
+	  This option adds the limit match, which allows you to control
+	  the rate at which a rule can be matched. This match is the
+	  equivalent of the iptables limit match.
+
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
 config BRIDGE_EBT_MARK
 	tristate "ebt: mark filter support"
 	depends on BRIDGE_NF_EBTABLES
