@@ -233,6 +233,30 @@ static inline struct inode *VFS_I(ntfs_inode *ni)
 	return &((big_ntfs_inode *)ni)->vfs_inode;
 }
 
+/**
+ * ntfs_attr - ntfs in memory attribute structure
+ * @mft_no:	mft record number of the base mft record of this attribute
+ * @name:	Unicode name of the attribute (NULL if unnamed)
+ * @name_len:	length of @name in Unicode characters (0 if unnamed)
+ * @type:	attribute type (see layout.h)
+ *
+ * This structure exists only to provide a small structure for the
+ * ntfs_{attr_}iget()/ntfs_test_inode()/ntfs_init_locked_inode() mechanism.
+ *
+ * NOTE: Elements are ordered by size to make the structure as compact as
+ * possible on all architectures.
+ */
+typedef struct {
+	unsigned long mft_no;
+	uchar_t *name;
+	u32 name_len;
+	ATTR_TYPES type;
+} ntfs_attr;
+
+typedef int (*test_t)(struct inode *, void *);
+
+extern int ntfs_test_inode(struct inode *vi, ntfs_attr *na);
+
 extern struct inode *ntfs_iget(struct super_block *sb, unsigned long mft_no);
 extern struct inode *ntfs_attr_iget(struct inode *base_vi, ATTR_TYPES type,
 		uchar_t *name, u32 name_len);

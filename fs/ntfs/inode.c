@@ -32,26 +32,6 @@
 #include "time.h"
 
 /**
- * ntfs_attr - ntfs in memory attribute structure
- * @mft_no:	mft record number of the base mft record of this attribute
- * @name:	Unicode name of the attribute (NULL if unnamed)
- * @name_len:	length of @name in Unicode characters (0 if unnamed)
- * @type:	attribute type (see layout.h)
- *
- * This structure exists only to provide a small structure for the
- * ntfs_{attr_}iget()/ntfs_test_inode()/ntfs_init_locked_inode() mechanism.
- *
- * NOTE: Elements are ordered by size to make the structure as compact as
- * possible on all architectures.
- */
-typedef struct {
-	unsigned long mft_no;
-	uchar_t *name;
-	u32 name_len;
-	ATTR_TYPES type;
-} ntfs_attr;
-
-/**
  * ntfs_test_inode - compare two (possibly fake) inodes for equality
  * @vi:		vfs inode which to test
  * @na:		ntfs attribute which is being tested with
@@ -67,7 +47,7 @@ typedef struct {
  * NOTE: This function runs with the inode_lock spin lock held so it is not
  * allowed to sleep.
  */
-static int ntfs_test_inode(struct inode *vi, ntfs_attr *na)
+int ntfs_test_inode(struct inode *vi, ntfs_attr *na)
 {
 	ntfs_inode *ni;
 
@@ -151,7 +131,6 @@ static int ntfs_init_locked_inode(struct inode *vi, ntfs_attr *na)
 	return 0;
 }
 
-typedef int (*test_t)(struct inode *, void *);
 typedef int (*set_t)(struct inode *, void *);
 static int ntfs_read_locked_inode(struct inode *vi);
 static int ntfs_read_locked_attr_inode(struct inode *base_vi, struct inode *vi);
