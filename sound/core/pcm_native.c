@@ -2791,7 +2791,8 @@ static struct page * snd_pcm_mmap_status_nopage(struct vm_area_struct *area, uns
 		return NOPAGE_OOM;
 	runtime = substream->runtime;
 	page = virt_to_page(runtime->status);
-	get_page(page);
+	if (!PageReserved(page))
+		get_page(page);
 	return page;
 }
 
@@ -2828,7 +2829,8 @@ static struct page * snd_pcm_mmap_control_nopage(struct vm_area_struct *area, un
 		return NOPAGE_OOM;
 	runtime = substream->runtime;
 	page = virt_to_page(runtime->control);
-	get_page(page);
+	if (!PageReserved(page))
+		get_page(page);
 	return page;
 }
 
@@ -2893,7 +2895,8 @@ static struct page * snd_pcm_mmap_data_nopage(struct vm_area_struct *area, unsig
 		vaddr = runtime->dma_area + offset;
 		page = virt_to_page(vaddr);
 	}
-	get_page(page);
+	if (!PageReserved(page))
+		get_page(page);
 	return page;
 }
 
