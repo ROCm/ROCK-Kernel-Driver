@@ -568,7 +568,8 @@ call_encode(struct rpc_task *task)
 		rpc_exit(task, -EIO);
 		return;
 	}
-	if (encode && (status = encode(req, p, task->tk_msg.rpc_argp)) < 0) {
+	if (encode && (status = rpcauth_wrap_req(task, encode, req, p,
+						 task->tk_msg.rpc_argp)) < 0) {
 		printk(KERN_WARNING "%s: can't encode arguments: %d\n",
 				clnt->cl_protname, -status);
 		rpc_exit(task, status);
@@ -827,7 +828,8 @@ call_decode(struct rpc_task *task)
 	task->tk_action = NULL;
 
 	if (decode)
-		task->tk_status = decode(req, p, task->tk_msg.rpc_resp);
+		task->tk_status = rpcauth_unwrap_resp(task, decode, req, p,
+						      task->tk_msg.rpc_resp);
 	dprintk("RPC: %4d call_decode result %d\n", task->tk_pid,
 					task->tk_status);
 	return;

@@ -115,18 +115,18 @@ enum seal_alg {
 #define ENCTYPE_UNKNOWN         0x01ff
 
 s32
-krb5_make_checksum(s32 cksumtype, char *header, char *body, int body_len,
+krb5_make_checksum(s32 cksumtype, char *header, struct xdr_buf *body,
 		   struct xdr_netobj *cksum);
 
 u32
 krb5_make_token(struct krb5_ctx *context_handle, int qop_req,
-	struct xdr_netobj *input_message_buffer,
+	struct xdr_buf *input_message_buffer,
 	struct xdr_netobj *output_message_buffer, int toktype);
 
 u32
 krb5_read_token(struct krb5_ctx *context_handle,
 	  struct xdr_netobj *input_token_buffer,
-	  struct xdr_netobj *message_buffer,
+	  struct xdr_buf *message_buffer,
 	  int *qop_state, int toktype);
 
 u32

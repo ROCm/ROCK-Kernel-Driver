@@ -80,7 +80,7 @@ gss_krb5_padding(int blocksize, int length) {
 
 u32
 krb5_make_token(struct krb5_ctx *ctx, int qop_req,
-		   struct xdr_netobj * text, struct xdr_netobj * token,
+		   struct xdr_buf *text, struct xdr_netobj *token,
 		   int toktype)
 {
 	s32			checksum_type;
@@ -134,24 +134,11 @@ krb5_make_token(struct krb5_ctx *ctx, int qop_req,
 		*(u16 *)(krb5_hdr + 4) = htons(ctx->sealalg);
 
 	if (toktype == KG_TOK_WRAP_MSG) {
-		unsigned char pad = gss_krb5_padding(blocksize, text->len);
-
-		get_random_bytes(msg_start, blocksize); /* "confounder" */
-		memcpy(msg_start + blocksize, text->data, text->len);
-
-		memset(msg_start + blocksize + text->len, pad, pad);
-
-		if (krb5_make_checksum(checksum_type, krb5_hdr, msg_start,
-				       tmsglen, &md5cksum))
-			goto out_err;
-
-		if (krb5_encrypt(ctx->enc, NULL, msg_start, msg_start,
-					tmsglen))
-			goto out_err;
-
+		/* XXX removing support for now */
+		goto out_err;
 	} else { /* Sign only.  */
-		if (krb5_make_checksum(checksum_type, krb5_hdr, text->data,
-				       text->len, &md5cksum))
+		if (krb5_make_checksum(checksum_type, krb5_hdr, text,
+				       &md5cksum))
 			goto out_err;
 	}
 

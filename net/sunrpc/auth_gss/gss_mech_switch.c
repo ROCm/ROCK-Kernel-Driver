@@ -196,7 +196,7 @@ gss_import_sec_context(struct xdr_netobj	*input_token,
 u32
 gss_get_mic(struct gss_ctx	*context_handle,
 	    u32			qop,
-	    struct xdr_netobj	*message,
+	    struct xdr_buf	*message,
 	    struct xdr_netobj	*mic_token)
 {
 	 return context_handle->mech_type->gm_ops
@@ -210,7 +210,7 @@ gss_get_mic(struct gss_ctx	*context_handle,
 
 u32
 gss_verify_mic(struct gss_ctx		*context_handle,
-	       struct xdr_netobj	*message,
+	       struct xdr_buf		*message,
 	       struct xdr_netobj	*mic_token,
 	       u32			*qstate)
 {

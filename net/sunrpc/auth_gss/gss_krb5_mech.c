@@ -183,7 +183,7 @@ gss_delete_sec_context_kerberos(void *internal_ctx) {
 
 static u32
 gss_verify_mic_kerberos(struct gss_ctx		*ctx,
-			struct xdr_netobj	*message,
+			struct xdr_buf		*message,
 			struct xdr_netobj	*mic_token,
 			u32			*qstate) {
 	u32 maj_stat = 0;
@@ -202,12 +202,10 @@ gss_verify_mic_kerberos(struct gss_ctx		*ctx,
 static u32
 gss_get_mic_kerberos(struct gss_ctx	*ctx,
 		     u32		qop,
-		     struct xdr_netobj	*message,
+		     struct xdr_buf 	*message,
 		     struct xdr_netobj	*mic_token) {
 	u32 err = 0;
 	struct krb5_ctx *kctx = ctx->internal_ctx_id;
-
-	if (!message->data) return GSS_S_FAILURE;
 
 	err = krb5_make_token(kctx, qop, message, mic_token, KG_TOK_MIC_MSG);
 
@@ -233,12 +231,14 @@ static int __init init_kerberos_module(void)
 		printk("Failed to register kerberos gss mechanism!\n");
 	gm = gss_mech_get_by_OID(&gss_mech_krb5_oid);
 	gss_register_triple(RPC_AUTH_GSS_KRB5 , gm, 0, RPC_GSS_SVC_NONE);
+	gss_register_triple(RPC_AUTH_GSS_KRB5I, gm, 0, RPC_GSS_SVC_INTEGRITY);
 	gss_mech_put(gm);
 	return 0;
 }
 
 static void __exit cleanup_kerberos_module(void)
 {
+	gss_unregister_triple(RPC_AUTH_GSS_KRB5I);
 	gss_unregister_triple(RPC_AUTH_GSS_KRB5);
 }
 

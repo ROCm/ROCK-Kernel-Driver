@@ -75,20 +75,19 @@
  *   to return the decrypted data.
  */
 
+/* XXX will need to change prototype and/or just split into a separate function
+ * when we add privacy (because read_token will be in pages too). */
 u32
 krb5_read_token(struct krb5_ctx *ctx,
 		struct xdr_netobj *read_token,
-		struct xdr_netobj *message_buffer,
+		struct xdr_buf *message_buffer,
 		int *qop_state, int toktype)
 {
 	int			signalg;
 	int			sealalg;
-	struct xdr_netobj	token = {.len = 0, .data = NULL};
 	s32			checksum_type;
 	struct xdr_netobj	md5cksum = {.len = 0, .data = NULL};
 	s32			now;
-	unsigned char		*plain = NULL;
-	int			plainlen = 0;
 	int			direction;
 	s32			seqnum;
 	unsigned char		*ptr = (unsigned char *)read_token->data;
@@ -100,10 +99,11 @@ krb5_read_token(struct krb5_ctx *ctx,
 	if (g_verify_token_header(&ctx->mech_used, &bodysize, &ptr, toktype,
 					read_token->len))
 		goto out;
+	/* XXX sanity-check bodysize?? */
 
 	if (toktype == KG_TOK_WRAP_MSG) {
-		message_buffer->len = 0;
-		message_buffer->data = NULL;
+		/* XXX gone */
+		goto out;
 	}
 
 	/* get the sign and seal algorithms */
@@ -135,43 +135,6 @@ krb5_read_token(struct krb5_ctx *ctx,
 	     signalg != SGN_ALG_HMAC_SHA1_DES3_KD))
 		goto out;
 
-	if (toktype == KG_TOK_WRAP_MSG) {
-		int conflen = crypto_tfm_alg_blocksize(ctx->enc);
-		int padlen;
-
-		plainlen = bodysize - (14 + KRB5_CKSUM_LENGTH);
-		plain = ptr + 14 + KRB5_CKSUM_LENGTH;
-
-		ret = krb5_decrypt(ctx->enc, NULL, plain, plain, plainlen);
-		if (ret)
-			goto out;
-
-		ret = GSS_S_FAILURE;
-		padlen = plain[plainlen -1];
-		if ((padlen < 1) || (padlen > 8))
-			goto out;
-		token.len = plainlen - conflen - padlen;
-
-		if (token.len) {
-			token.data = kmalloc(token.len, GFP_KERNEL);
-			if (token.data == NULL)
-				goto out;
-			memcpy(token.data, plain + conflen, token.len);
-		}
-
-	} else if (toktype == KG_TOK_MIC_MSG) {
-		token = *message_buffer;
-		plain = token.data;
-		plainlen = token.len;
-	} else {
-		printk("RPC: bad toktype in krb5_read_token");
-		ret = GSS_S_FAILURE;
-		goto out;
-	}
-
-	dprintk("RPC krb5_read_token: token.len %d plainlen %d\n", token.len,
-		plainlen);
-
 	/* compute the checksum of the message */
 
 	/* initialize the the cksum */
@@ -186,8 +149,8 @@ krb5_read_token(struct krb5_ctx *ctx,
 
 	switch (signalg) {
 	case SGN_ALG_DES_MAC_MD5:
-		ret = krb5_make_checksum(checksum_type, ptr - 2, plain,
-					 plainlen, &md5cksum);
+		ret = krb5_make_checksum(checksum_type, ptr - 2,
+					 message_buffer, &md5cksum);
 		if (ret)
 			goto out;
 
@@ -207,9 +170,6 @@ krb5_read_token(struct krb5_ctx *ctx,
 	}
 
 	/* it got through unscathed.  Make sure the context is unexpired */
-
-	if (toktype == KG_TOK_WRAP_MSG)
-		*message_buffer = token;
 
 	if (qop_state)
 		*qop_state = GSS_C_QOP_DEFAULT;
@@ -234,7 +194,5 @@ krb5_read_token(struct krb5_ctx *ctx,
 	ret = GSS_S_COMPLETE;
 out:
 	if (md5cksum.data) kfree(md5cksum.data);
-	if ((toktype == KG_TOK_WRAP_MSG) && ret && token.data)
-		kfree(token.data);
 	return ret;
 }

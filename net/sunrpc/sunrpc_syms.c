@@ -126,6 +126,9 @@ EXPORT_SYMBOL(xdr_inline_pages);
 EXPORT_SYMBOL(xdr_shift_buf);
 EXPORT_SYMBOL(xdr_write_pages);
 EXPORT_SYMBOL(xdr_read_pages);
+EXPORT_SYMBOL(xdr_buf_from_iov);
+EXPORT_SYMBOL(xdr_buf_subsegment);
+EXPORT_SYMBOL(xdr_buf_read_netobj);
 
 /* Debugging symbols */
 #ifdef RPC_DEBUG

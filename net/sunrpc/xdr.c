@@ -538,7 +538,7 @@ _copy_to_pages(struct page **pages, size_t pgbase, const char *p, size_t len)
  * Copies data into an arbitrary memory location from an array of pages
  * The copy is assumed to be non-overlapping.
  */
-static void
+void
 _copy_from_pages(char *p, struct page **pages, size_t pgbase, size_t len)
 {
 	struct page **pgfrom;
@@ -730,4 +730,146 @@ xdr_read_pages(struct xdr_stream *xdr, unsigned int len)
 	xdr->iov = iov = buf->tail;
 	xdr->p = (uint32_t *)((char *)iov->iov_base + padding);
 	xdr->end = (uint32_t *)((char *)iov->iov_base + iov->iov_len);
+}
+
+static struct iovec empty_iov = {.iov_base = NULL, .iov_len = 0};
+
+void
+xdr_buf_from_iov(struct iovec *iov, struct xdr_buf *buf)
+{
+	buf->head[0] = *iov;
+	buf->tail[0] = empty_iov;
+	buf->page_len = 0;
+	buf->len = iov->iov_len;
+}
+
+/* Sets subiov to the intersection of iov with the buffer of length len
+ * starting base bytes after iov.  Indicates empty intersection by setting
+ * length of subiov to zero.  Decrements len by length of subiov, sets base
+ * to zero (or decrements it by length of iov if subiov is empty). */
+static void
+iov_subsegment(struct iovec *iov, struct iovec *subiov, int *base, int *len)
+{
+	if (*base > iov->iov_len) {
+		subiov->iov_base = NULL;
+		subiov->iov_len = 0;
+		*base -= iov->iov_len;
+	} else {
+		subiov->iov_base = iov->iov_base + *base;
+		subiov->iov_len = min(*len, (int)iov->iov_len - *base);
+		*base = 0;
+	}
+	*len -= subiov->iov_len; 
+}
+
+/* Sets subbuf to the portion of buf of length len beginning base bytes
+ * from the start of buf. Returns -1 if base of length are out of bounds. */
+int
+xdr_buf_subsegment(struct xdr_buf *buf, struct xdr_buf *subbuf,
+			int base, int len)
+{
+	int i;
+
+	subbuf->len = len;
+	iov_subsegment(buf->head, subbuf->head, &base, &len);
+
+	if (base < buf->page_len) {
+		i = (base + buf->page_base) >> PAGE_CACHE_SHIFT;
+		subbuf->pages = &buf->pages[i];
+		subbuf->page_base = (base + buf->page_base) & ~PAGE_CACHE_MASK;
+		subbuf->page_len = min((int)buf->page_len - base, len);
+		len -= subbuf->page_len;
+		base = 0;
+	} else {
+		base -= buf->page_len;
+		subbuf->page_len = 0;
+	}
+
+	iov_subsegment(buf->tail, subbuf->tail, &base, &len);
+	if (base || len)
+		return -1;
+	return 0;
+}
+
+/* obj is assumed to point to allocated memory of size at least len: */
+static int
+read_bytes_from_xdr_buf(struct xdr_buf *buf, int base, void *obj, int len)
+{
+	struct xdr_buf subbuf;
+	int this_len;
+	int status;
+
+	status = xdr_buf_subsegment(buf, &subbuf, base, len);
+	if (status)
+		goto out;
+	this_len = min(len, (int)subbuf.head[0].iov_len);
+	memcpy(obj, subbuf.head[0].iov_base, this_len);
+	len -= this_len;
+	obj += this_len;
+	this_len = min(len, (int)subbuf.page_len);
+	if (this_len)
+		_copy_from_pages(obj, subbuf.pages, subbuf.page_base, this_len);
+	len -= this_len;
+	obj += this_len;
+	this_len = min(len, (int)subbuf.tail[0].iov_len);
+	memcpy(obj, subbuf.tail[0].iov_base, this_len);
+out:
+	return status;
+}
+
+static int
+read_u32_from_xdr_buf(struct xdr_buf *buf, int base, u32 *obj)
+{
+	u32	raw;
+	int	status;
+
+	status = read_bytes_from_xdr_buf(buf, base, &raw, sizeof(*obj));
+	if (status)
+		return status;
+	*obj = ntohl(raw);
+	return 0;
+}
+
+/* If the netobj starting offset bytes from the start of xdr_buf is contained
+ * entirely in the head or the tail, set object to point to it; otherwise
+ * try to find space for it at the end of the tail, copy it there, and
+ * set obj to point to it. */
+int
+xdr_buf_read_netobj(struct xdr_buf *buf, struct xdr_netobj *obj, int offset)
+{
+	u32	tail_offset = buf->head[0].iov_len + buf->page_len;
+	u32	obj_end_offset;
+
+	if (read_u32_from_xdr_buf(buf, offset, &obj->len))
+		goto out;
+	obj_end_offset = offset + 4 + obj->len;
+
+	if (obj_end_offset <= buf->head[0].iov_len) {
+		/* The obj is contained entirely in the head: */
+		obj->data = buf->head[0].iov_base + offset + 4;
+	} else if (offset + 4 >= tail_offset) {
+		if (obj_end_offset - tail_offset
+				> buf->tail[0].iov_len)
+			goto out;
+		/* The obj is contained entirely in the tail: */
+		obj->data = buf->tail[0].iov_base
+			+ offset - tail_offset + 4;
+	} else {
+		/* use end of tail as storage for obj:
+		 * (We don't copy to the beginning because then we'd have
+		 * to worry about doing a potentially overlapping copy.
+		 * This assumes the object is at most half the length of the
+		 * tail.) */
+		if (obj->len > buf->tail[0].iov_len)
+			goto out;
+		obj->data = buf->tail[0].iov_base + buf->tail[0].iov_len - 
+				obj->len;
+		if (read_bytes_from_xdr_buf(buf, offset + 4,
+					obj->data, obj->len))
+			goto out;
+
+	}
+	return 0;
+out:
+	return -1;
 }
