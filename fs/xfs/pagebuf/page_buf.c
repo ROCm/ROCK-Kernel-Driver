@@ -1448,7 +1448,7 @@ next_chunk:
 		if (nbytes > size)
 			nbytes = size;
 
-		if (bio_add_page(bio, pb->pb_pages[map_i], nbytes, offset))
+		if (bio_add_page(bio, pb->pb_pages[map_i], nbytes, offset) < nbytes)
 			break;
 
 		offset = 0;

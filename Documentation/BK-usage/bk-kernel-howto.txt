@@ -32,7 +32,7 @@ land at the right destination... but I'm getting ahead of myself.
 
 Let's start with this progression:
 Each BitKeeper source tree on disk is a repository unto itself.
-Each repository has a parent.
+Each repository has a parent (except the root/original, of course).
 Each repository contains a set of a changesets ("csets").
 Each cset is one or more changed files, bundled together.
 

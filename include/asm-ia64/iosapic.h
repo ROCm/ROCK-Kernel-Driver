@@ -55,6 +55,8 @@ extern void __devinit iosapic_init (unsigned long address,
 				    unsigned int gsi_base,
 				    int pcat_compat);
 extern int gsi_to_vector (unsigned int gsi);
+extern int gsi_to_irq (unsigned int gsi);
+extern void iosapic_parse_prt (void);
 extern int iosapic_register_intr (unsigned int gsi, unsigned long polarity,
 				  unsigned long edge_triggered,
 				  u32 gsi_base, char *iosapic_address);
