@@ -892,6 +892,9 @@ static int __init myri_ether_init(struct net_device *dev, struct sbus_dev *sdev,
 	DET(("myri_ether_init(%p,%p,%d):\n", dev, sdev, num));
 	dev = init_etherdev(0, sizeof(struct myri_eth));
 
+	if (!dev)
+		return -ENOMEM;
+
 	if (version_printed++ == 0)
 		printk(version);
 
@@ -982,7 +985,7 @@ static int __init myri_ether_init(struct net_device *dev, struct sbus_dev *sdev,
 					mp->reg_size, "MyriCOM Regs");
 		if (!mp->regs) {
 			printk("MyriCOM: Cannot map MyriCOM registers.\n");
-			return -ENODEV;
+			goto err;
 		}
 		mp->lanai = (unsigned short *) (mp->regs + (256 * 1024));
 		mp->lanai3 = (unsigned int *) mp->lanai;
@@ -1059,7 +1062,7 @@ static int __init myri_ether_init(struct net_device *dev, struct sbus_dev *sdev,
 	if (request_irq(dev->irq, &myri_interrupt,
 			SA_SHIRQ, "MyriCOM Ethernet", (void *) dev)) {
 		printk("MyriCOM: Cannot register interrupt handler.\n");
-		return -ENODEV;
+		goto err;
 	}
 
 	DET(("ether_setup()\n"));
@@ -1083,6 +1086,9 @@ static int __init myri_ether_init(struct net_device *dev, struct sbus_dev *sdev,
 	root_myri_dev = mp;
 #endif
 	return 0;
+err:	unregister_netdev(dev);
+	kfree(dev);
+	return -ENODEV;
 }
 
 static int __init myri_sbus_match(struct sbus_dev *sdev)

@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: dsobject - Dispatcher object management routines
- *              $Revision: 53 $
+ *              $Revision: 56 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -241,14 +241,14 @@ acpi_ds_init_object_from_op (
 
 		/* We are expecting a number */
 
-		if (arg_desc->common.type != ACPI_TYPE_NUMBER) {
+		if (arg_desc->common.type != ACPI_TYPE_INTEGER) {
 			acpi_cm_remove_reference (arg_desc);
 			return (AE_TYPE);
 		}
 
 		/* Get the value, delete the internal object */
 
-		(*obj_desc)->buffer.length = (u32) arg_desc->number.value;
+		(*obj_desc)->buffer.length = (u32) arg_desc->integer.value;
 		acpi_cm_remove_reference (arg_desc);
 
 		/* Allocate the buffer */
@@ -304,8 +304,8 @@ acpi_ds_init_object_from_op (
 		status = acpi_ds_build_internal_object (walk_state, op, obj_desc);
 		break;
 
-	case ACPI_TYPE_NUMBER:
-		(*obj_desc)->number.value = op->value.integer;
+	case ACPI_TYPE_INTEGER:
+		(*obj_desc)->integer.value = op->value.integer;
 		break;
 
 
@@ -411,18 +411,20 @@ acpi_ds_build_internal_simple_obj (
 					acpi_ns_externalize_name (ACPI_UINT32_MAX, op->value.string, &length, &name);
 
 					if (name) {
-						REPORT_WARNING (("Reference %s AML %X not found\n",
+						REPORT_WARNING (("Reference %s at AML %X not found\n",
 								 name, op->aml_offset));
 						acpi_cm_free (name);
 					}
 					else {
-						REPORT_WARNING (("Reference %s AML %X not found\n",
+						REPORT_WARNING (("Reference %s at AML %X not found\n",
 								   op->value.string, op->aml_offset));
 					}
 					*obj_desc_ptr = NULL;
 				}
 
-				return (status);
+				else {
+					return (status);
+				}
 			}
 		}
 

@@ -1,4 +1,4 @@
-/* $Id: ioctl32.c,v 1.104 2001/01/03 09:28:19 anton Exp $
+/* $Id: ioctl32.c,v 1.105 2001/01/18 04:47:44 davem Exp $
  * ioctl32.c: Conversion between 32bit and 64bit native ioctls.
  *
  * Copyright (C) 1997-2000  Jakub Jelinek  (jakub@redhat.com)
@@ -73,6 +73,7 @@
 #include <asm/audioio.h>
 #include <linux/ethtool.h>
 #include <asm/display7seg.h>
+#include <asm/watchdog.h>
 #include <asm/module.h>
 #include <linux/soundcard.h>
 
@@ -3600,6 +3601,16 @@ COMPATIBLE_IOCTL(DRM_IOCTL_FINISH)
 /* elevator */
 COMPATIBLE_IOCTL(BLKELVGET)
 COMPATIBLE_IOCTL(BLKELVSET)
+/* Big W */
+/* WIOC_GETSUPPORT not yet implemented -E */
+COMPATIBLE_IOCTL(WDIOC_GETSTATUS)
+COMPATIBLE_IOCTL(WDIOC_GETBOOTSTATUS)
+COMPATIBLE_IOCTL(WDIOC_GETTEMP)
+COMPATIBLE_IOCTL(WDIOC_SETOPTIONS)
+COMPATIBLE_IOCTL(WDIOC_KEEPALIVE)
+COMPATIBLE_IOCTL(WIOCSTART)
+COMPATIBLE_IOCTL(WIOCSTOP)
+COMPATIBLE_IOCTL(WIOCGSTAT)
 /* And these ioctls need translation */
 HANDLE_IOCTL(SIOCGIFNAME, dev_ifname32)
 HANDLE_IOCTL(SIOCGIFCONF, dev_ifconf)

@@ -391,11 +391,14 @@ sun_mouse_inbyte(unsigned char byte, int is_break)
 static int
 sun_mouse_open(struct inode * inode, struct file * file)
 {
+	spin_lock_irq(&sunmouse.lock);
 	if (sunmouse.active++)
-		return 0;
+		goto out;
 	sunmouse.delta_x = sunmouse.delta_y = 0;
 	sunmouse.button_state = 0x80;
 	sunmouse.vuid_mode = VUID_NATIVE;
+out:
+	spin_unlock_irq(&sunmouse.lock);
 	return 0;
 }
 
@@ -412,10 +415,12 @@ static int sun_mouse_fasync (int fd, struct file *filp, int on)
 static int
 sun_mouse_close(struct inode *inode, struct file *file)
 {
-	lock_kernel();
 	sun_mouse_fasync (-1, file, 0);
+
+	spin_lock_irq(&sunmouse.lock);
 	sunmouse.active--;
-	unlock_kernel();
+	spin_unlock_irq(&sunmouse.lock);
+
 	return 0;
 }
 

@@ -11,5 +11,3 @@ obj-y += sysctl_net_decnet.o
 
 include $(TOPDIR)/Rules.make
 
-tar:
-		tar -cvf /dev/f1 .

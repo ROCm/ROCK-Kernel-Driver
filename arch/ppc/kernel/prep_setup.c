@@ -32,7 +32,6 @@
 #include <linux/console.h>
 #include <linux/timex.h>
 #include <linux/pci.h>
-#include <linux/openpic.h>
 #include <linux/ide.h>
 
 #include <asm/init.h>
@@ -48,8 +47,9 @@
 #include <asm/prep_nvram.h>
 #include <asm/raven.h>
 #include <asm/keyboard.h>
-
+#include <asm/vga.h>
 #include <asm/time.h>
+
 #include "local_irq.h"
 #include "i8259.h"
 #include "open_pic.h"
@@ -84,7 +84,7 @@ extern void pckbd_leds(unsigned char leds);
 extern void pckbd_init_hw(void);
 extern unsigned char pckbd_sysrq_xlate[128];
 
-extern void prep_setup_pci_ptrs(void);
+extern void prep_find_bridges(void);
 extern char saved_command_line[256];
 
 int _prep_type;
@@ -101,23 +101,23 @@ unsigned long empty_zero_page[1024];
 extern PTE *Hash, *Hash_end;
 extern unsigned long Hash_size, Hash_mask;
 extern int probingmem;
-extern unsigned long loops_per_sec;
+extern unsigned long loops_per_jiffy;
 
 #ifdef CONFIG_BLK_DEV_RAM
 extern int rd_doload;		/* 1 = load ramdisk, 0 = don't load */
 extern int rd_prompt;		/* 1 = prompt for ramdisk, 0 = don't prompt */
 extern int rd_image_start;	/* starting block # of image */
 #endif
-#ifdef CONFIG_VGA_CONSOLE
-unsigned long vgacon_remap_base;
-#endif
 
 int __prep
 prep_get_cpuinfo(char *buffer)
 {
 	extern char *Motherboard_map_name;
-	int len, i;
-  
+	int len;
+#ifdef CONFIG_PREP_RESIDUAL
+	int i;
+#endif
+
 #ifdef CONFIG_SMP
 #define CD(X)		(cpu_data[n].X)  
 #else
@@ -190,7 +190,10 @@ prep_get_cpuinfo(char *buffer)
 	}
 	
 	
-no_l2:	
+no_l2:
+#ifndef CONFIG_PREP_RESIDUAL
+	return len;
+#else	
 	if ( res->ResidualLength == 0 )
 		return len;
 	
@@ -205,8 +208,8 @@ no_l2:
 				       res->Memories[i].SIMMSize);
 	}
 	len += sprintf(buffer+len,"\n");
-
 	return len;
+#endif
 }
 
 void __init
@@ -214,11 +217,16 @@ prep_setup_arch(void)
 {
 	extern char cmd_line[];
 	unsigned char reg;
+#if 0 /* unused?? */
 	unsigned char ucMothMemType;
 	unsigned char ucEquipPres1;
+#endif
 
 	/* init to some ~sane value until calibrate_delay() runs */
-	loops_per_sec = 50000000;
+	loops_per_jiffy = 50000000;
+	
+	/* Lookup PCI host bridges */
+	prep_find_bridges();
 	
 	/* Set up floppy in PS/2 mode */
 	outb(0x09, SIO_CONFIG_RA);
@@ -246,41 +254,6 @@ prep_setup_arch(void)
 		/* Enable L2.  Assume we don't need to flush -- Cort*/
 		*(unsigned char *)(0x8000081c) |= 3;
 		ROOT_DEV = to_kdev_t(0x0802); /* sda2 */
-		break;
-	case _PREP_Radstone:
-		ROOT_DEV = to_kdev_t(0x0801); /* sda1 */
-
-		/*
-		 * Determine system type
-		 */
-		ucMothMemType=inb(0x866);
-		ucEquipPres1=inb(0x80c);
-
-		ucSystemType=((ucMothMemType&0x03)<<1) |
-			     ((ucEquipPres1&0x80)>>7);
-		ucSystemType^=7;
-
-		/*
-		 * Determine board revision for use by
-		 * rev. specific code
-		 */
-		ucBoardRev=inb(0x854);
-		ucBoardRevMaj=ucBoardRev>>5;
-		ucBoardRevMin=ucBoardRev&0x1f;
-
-		/*
-		 * Most Radstone boards have memory mapped NvRAM
-		 */
-		if((ucSystemType==RS_SYS_TYPE_PPC1) && (ucBoardRevMaj<5))
-		{
-			ppc_md.nvram_read_val = prep_nvram_read_val;
-			ppc_md.nvram_write_val = prep_nvram_write_val;
-		}
-		else
-		{
-			ppc_md.nvram_read_val = rs_nvram_read_val;
-			ppc_md.nvram_write_val = rs_nvram_write_val;
-		}
 		break;
 	}
 
@@ -341,12 +314,6 @@ prep_setup_arch(void)
 #endif /* CONFIG_SOUND_CS4232 */	
 
 	/*print_residual_device_info();*/
-        request_region(0x20,0x20,"pic1");
-	request_region(0xa0,0x20,"pic2");
-	request_region(0x00,0x20,"dma1");
-	request_region(0x40,0x20,"timer");
-	request_region(0x80,0x10,"dma page reg");
-	request_region(0xc0,0x20,"dma2");
 
 	raven_init();
 
@@ -365,6 +332,7 @@ prep_setup_arch(void)
  */
 void __init prep_res_calibrate_decr(void)
 {
+#ifdef CONFIG_PREP_RESIDUAL	
 	unsigned long freq, divisor=4;
 
 	freq = res->VitalProductData.ProcessorBusHz;
@@ -372,6 +340,7 @@ void __init prep_res_calibrate_decr(void)
 	       (freq/divisor)/1000000, (freq/divisor)%1000000);
 	tb_ticks_per_jiffy = freq / HZ / divisor;
 	tb_to_us = mulhwu_scale_factor(freq/divisor, 1000000);
+#endif	
 }
 
 /*
@@ -585,15 +554,16 @@ prep_setup_residual(char *buffer)
 {
         int len = 0;
 
-
 	/* PREP's without residual data will give incorrect values here */
 	len += sprintf(len+buffer, "clock\t\t: ");
+#ifdef CONFIG_PREP_RESIDUAL	
 	if ( res->ResidualLength )
 		len += sprintf(len+buffer, "%ldMHz\n",
 		       (res->VitalProductData.ProcessorHz > 1024) ?
 		       res->VitalProductData.ProcessorHz>>20 :
 		       res->VitalProductData.ProcessorHz);
 	else
+#endif /* CONFIG_PREP_RESIDUAL */
 		len += sprintf(len+buffer, "???\n");
 
 	return len;
@@ -640,19 +610,11 @@ prep_init_IRQ(void)
 {
 	int i;
 
-	if (OpenPIC != NULL) {
-		for ( i = 16 ; i < 36 ; i++ )
-			irq_desc[i].handler = &open_pic;
-		openpic_init(1);
-	}
-	
-        for ( i = 0 ; i < 16  ; i++ )
+	if (OpenPIC_Addr != NULL)
+		openpic_init(1, NUM_8259_INTERRUPTS, 0, -1);
+        for ( i = 0 ; i < NUM_8259_INTERRUPTS  ; i++ )
                 irq_desc[i].handler = &i8259_pic;
-        i8259_init();
-#ifdef CONFIG_SMP
-	request_irq(openpic_to_irq(OPENPIC_VEC_SPURIOUS), openpic_ipi_action,
-		    0, "IPI0", 0);
-#endif /* CONFIG_SMP */
+        i8259_init();	
 }
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
@@ -708,19 +670,14 @@ prep_ide_request_region(ide_ioreg_t from,
 			unsigned int extent,
 			const char *name)
 {
-        request_region(from, extent, name);
+	request_region(from, extent, name);
 }
 
 void __prep
 prep_ide_release_region(ide_ioreg_t from,
 			unsigned int extent)
 {
-        release_region(from, extent);
-}
-
-void __prep
-prep_ide_fix_driveid(struct hd_driveid *id)
-{
+	release_region(from, extent);
 }
 
 void __init
@@ -743,17 +700,52 @@ prep_ide_init_hwif_ports (hw_regs_t *hw, ide_ioreg_t data_port, ide_ioreg_t ctrl
 }
 #endif
 
+unsigned long *MotSave_SmpIar;
+unsigned char *MotSave_CpusState[2];
+
+void __init
+prep_init2(void)
+{
+#ifdef CONFIG_NVRAM  
+	request_region(PREP_NVRAM_AS0, 0x8, "nvram");
+#endif
+	request_region(0x20,0x20,"pic1");
+	request_region(0xa0,0x20,"pic2");
+	request_region(0x00,0x20,"dma1");
+	request_region(0x40,0x20,"timer");
+	request_region(0x80,0x10,"dma page reg");
+	request_region(0xc0,0x20,"dma2");
+}
+
 void __init
 prep_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	  unsigned long r6, unsigned long r7)
 {
+#ifdef CONFIG_PREP_RESIDUAL	
+	RESIDUAL *old_res = (RESIDUAL *)(r3 + KERNELBASE);
+
 	/* make a copy of residual data */
 	if ( r3 )
 	{
 		memcpy((void *)res,(void *)(r3+KERNELBASE),
 		       sizeof(RESIDUAL));
-	}
 
+		/* These need to be saved for the Motorola Prep 
+		 * MVME4600 and Dual MTX boards.
+		 */
+		MotSave_SmpIar = &old_res->VitalProductData.SmpIar;
+		MotSave_CpusState[0] = &old_res->Cpus[0].CpuState;
+		MotSave_CpusState[1] = &old_res->Cpus[1].CpuState;
+	}
+#endif
+
+	/* Copy cmd_line parameters */
+	if ( r6)
+	{
+		*(char *)(r7 + KERNELBASE) = 0;
+		strcpy(cmd_line, (char *)(r6 + KERNELBASE));
+	}
+	
 	isa_io_base = PREP_ISA_IO_BASE;
 	isa_mem_base = PREP_ISA_MEM_BASE;
 	pci_dram_offset = PREP_PCI_DRAM_OFFSET;
@@ -762,28 +754,18 @@ prep_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	DMA_MODE_WRITE = 0x48;
 
 	/* figure out what kind of prep workstation we are */
+#ifdef CONFIG_PREP_RESIDUAL	
 	if ( res->ResidualLength != 0 )
 	{
 		if ( !strncmp(res->VitalProductData.PrintableModel,"IBM",3) )
 			_prep_type = _PREP_IBM;
-                else if (!strncmp(res->VitalProductData.PrintableModel,
-                                  "Radstone",8))
-                {
-                        extern char *Motherboard_map_name;
-
-                        _prep_type = _PREP_Radstone;
-                        Motherboard_map_name=
-                                res->VitalProductData.PrintableModel;
-                }
-		else
-			_prep_type = _PREP_Motorola;
+		_prep_type = _PREP_Motorola;
 	}
 	else /* assume motorola if no residual (netboot?) */
+#endif	  
 	{
 		_prep_type = _PREP_Motorola;
 	}
-
-	prep_setup_pci_ptrs();
 
 	ppc_md.setup_arch     = prep_setup_arch;
 	ppc_md.setup_residual = prep_setup_residual;
@@ -792,40 +774,14 @@ prep_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.init_IRQ       = prep_init_IRQ;
 	/* this gets changed later on if we have an OpenPIC -- Cort */
 	ppc_md.get_irq        = prep_get_irq;
-	ppc_md.init           = NULL;
+	ppc_md.init           = prep_init2;
 
 	ppc_md.restart        = prep_restart;
 	ppc_md.power_off      = prep_power_off;
 	ppc_md.halt           = prep_halt;
 
 	ppc_md.time_init      = NULL;
-	if (_prep_type == _PREP_Radstone) {
-		/*
-		 * We require a direct restart as port 92 does not work on
-		 * all Radstone boards
-		 */
-		ppc_md.restart        = prep_direct_restart;
-		/*
-		 * The RTC device used varies according to board type
-		 */
-		if(((ucSystemType==RS_SYS_TYPE_PPC1) && (ucBoardRevMaj>=5)) ||
-		   (ucSystemType==RS_SYS_TYPE_PPC1a))
-		{
-			ppc_md.set_rtc_time   = mk48t59_set_rtc_time;
-			ppc_md.get_rtc_time   = mk48t59_get_rtc_time;
-			ppc_md.time_init      = mk48t59_init;
-		}
-		else
-		{
-			ppc_md.set_rtc_time   = mc146818_set_rtc_time;
-			ppc_md.get_rtc_time   = mc146818_get_rtc_time;
-		}
-		/*
-		 * Determine the decrementer rate from the residual data
-		 */
-		ppc_md.calibrate_decr = prep_res_calibrate_decr;
-	}
-	else if (_prep_type == _PREP_IBM) {
+	if (_prep_type == _PREP_IBM) {
 		ppc_md.set_rtc_time   = mc146818_set_rtc_time;
 		ppc_md.get_rtc_time   = mc146818_get_rtc_time;
 		ppc_md.calibrate_decr = prep_calibrate_decr;
@@ -845,7 +801,7 @@ prep_init(unsigned long r3, unsigned long r4, unsigned long r5,
         ppc_ide_md.ide_check_region = prep_ide_check_region;
         ppc_ide_md.ide_request_region = prep_ide_request_region;
         ppc_ide_md.ide_release_region = prep_ide_release_region;
-        ppc_ide_md.fix_driveid = prep_ide_fix_driveid;
+        ppc_ide_md.fix_driveid = NULL;
         ppc_ide_md.ide_init_hwif = prep_ide_init_hwif_ports;
 #endif		
         ppc_ide_md.io_base = _IO_BASE;

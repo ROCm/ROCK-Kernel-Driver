@@ -52,7 +52,7 @@ void dn_stop_slow_timer(struct sock *sk)
 static void dn_slow_timer(unsigned long arg)
 {
 	struct sock *sk = (struct sock *)arg;
-	struct dn_scp *scp = &sk->protinfo.dn;
+	struct dn_scp *scp = DN_SK(sk);
 
 	sock_hold(sk);
 	bh_lock_sock(sk);
@@ -112,7 +112,7 @@ out:
 static void dn_fast_timer(unsigned long arg)
 {
 	struct sock *sk = (struct sock *)arg;
-	struct dn_scp *scp = &sk->protinfo.dn;
+	struct dn_scp *scp = DN_SK(sk);
 
 	bh_lock_sock(sk);
 	if (sk->lock.users != 0) {
@@ -131,7 +131,7 @@ out:
 
 void dn_start_fast_timer(struct sock *sk)
 {
-	struct dn_scp *scp = &sk->protinfo.dn;
+	struct dn_scp *scp = DN_SK(sk);
 
 	if (!scp->delack_pending) {
 		scp->delack_pending = 1;
@@ -145,7 +145,7 @@ void dn_start_fast_timer(struct sock *sk)
 
 void dn_stop_fast_timer(struct sock *sk)
 {
-	struct dn_scp *scp = &sk->protinfo.dn;
+	struct dn_scp *scp = DN_SK(sk);
 
 	if (scp->delack_pending) {
 		scp->delack_pending = 0;

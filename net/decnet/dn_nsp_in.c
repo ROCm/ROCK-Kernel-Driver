@@ -25,6 +25,9 @@
  *    Steve Whitehouse:
  *   Patrick Caulfield:  Checking conninits for correctness & sending of error
  *                       responses.
+ *    Steve Whitehouse:  Added backlog congestion level return codes.
+ *   Patrick Caulfield:
+ *    Steve Whitehouse:  Added flow control support (outbound)
  */
 
 /******************************************************************************
@@ -79,7 +82,7 @@ static void dn_log_martian(struct sk_buff *skb, const char *msg)
 {
 	if (decnet_log_martians && net_ratelimit()) {
 		char *devname = skb->dev ? skb->dev->name : "???";
-		struct dn_skb_cb *cb = (struct dn_skb_cb *)skb->cb;
+		struct dn_skb_cb *cb = DN_SKB_CB(skb);
 		printk(KERN_INFO "DECnet: Martian packet (%s) dev=%s src=0x%04hx dst=0x%04hx srcport=0x%04hx dstport=0x%04hx\n", msg, devname, cb->src, cb->dst, cb->src_port, cb->dst_port);
 	}
 }
@@ -91,7 +94,7 @@ static void dn_log_martian(struct sk_buff *skb, const char *msg)
  */
 static void dn_ack(struct sock *sk, struct sk_buff *skb, unsigned short ack)
 {
-	struct dn_scp *scp = &sk->protinfo.dn;
+	struct dn_scp *scp = DN_SK(sk);
 	unsigned short type = ((ack >> 12) & 0x0003);
 	int wakeup = 0;
 
@@ -212,7 +215,7 @@ static struct {
  */
 static struct sock *dn_find_listener(struct sk_buff *skb, unsigned short *reason)
 {
-	struct dn_skb_cb *cb = (struct dn_skb_cb *)skb->cb;
+	struct dn_skb_cb *cb = DN_SKB_CB(skb);
 	struct nsp_conn_init_msg *msg = (struct nsp_conn_init_msg *)skb->data;
 	struct sockaddr_dn dstaddr;
 	struct sockaddr_dn srcaddr;
@@ -331,33 +334,26 @@ static void dn_nsp_conn_init(struct sock *sk, struct sk_buff *skb)
 
 static void dn_nsp_conn_conf(struct sock *sk, struct sk_buff *skb)
 {
-	struct dn_skb_cb *cb = (struct dn_skb_cb *)skb->cb;
-	struct dn_scp *scp = &sk->protinfo.dn;
+	struct dn_skb_cb *cb = DN_SKB_CB(skb);
+	struct dn_scp *scp = DN_SK(sk);
+	unsigned char *ptr;
 
-	if (skb->len < 3)
+	if (skb->len < 4)
 		goto out;
 
-	cb->services = *skb->data;
-	cb->info = *(skb->data+1);
-	skb_pull(skb, 2);
-	cb->segsize = dn_ntohs(*(__u16 *)skb->data);
-	skb_pull(skb, 2);
-
-	/*
-	 * FIXME: Check out services and info fields to check that
-	 * we can talk to this kind of node.
-	 */
+	ptr = skb->data;
+	cb->services = *ptr++;
+	cb->info = *ptr++;
+	cb->segsize = dn_ntohs(*(__u16 *)ptr);
 
 	if ((scp->state == DN_CI) || (scp->state == DN_CD)) {
 		scp->persist = 0;
                 scp->addrrem = cb->src_port;
                 sk->state = TCP_ESTABLISHED;
                 scp->state = DN_RUN;
-
-		if (scp->mss > cb->segsize)
-			scp->mss = cb->segsize;
-		if (scp->mss < 230)
-			scp->mss = 230;
+		scp->services_rem = cb->services;
+		scp->info_rem = cb->info;
+		scp->segsize_rem = cb->segsize;
 
 		if (skb->len > 0) {
 			unsigned char dlen = *skb->data;
@@ -366,7 +362,7 @@ static void dn_nsp_conn_conf(struct sock *sk, struct sk_buff *skb)
 				memcpy(scp->conndata_in.opt_data, skb->data + 1, dlen);
 			}
 		}
-                dn_nsp_send_lnk(sk, DN_NOCHANGE);
+                dn_nsp_send_link(sk, DN_NOCHANGE, 0);
                 if (!sk->dead)
                 	sk->state_change(sk);
         }
@@ -377,7 +373,7 @@ out:
 
 static void dn_nsp_conn_ack(struct sock *sk, struct sk_buff *skb)
 {
-	struct dn_scp *scp = &sk->protinfo.dn;
+	struct dn_scp *scp = DN_SK(sk);
 
 	if (scp->state == DN_CI) {
 		scp->state = DN_CD;
@@ -389,8 +385,8 @@ static void dn_nsp_conn_ack(struct sock *sk, struct sk_buff *skb)
 
 static void dn_nsp_disc_init(struct sock *sk, struct sk_buff *skb)
 {
-	struct dn_scp *scp = &sk->protinfo.dn;
-	struct dn_skb_cb *cb = (struct dn_skb_cb *)skb->cb;
+	struct dn_scp *scp = DN_SK(sk);
+	struct dn_skb_cb *cb = DN_SKB_CB(skb);
 	unsigned short reason;
 
 	if (skb->len < 2)
@@ -448,7 +444,7 @@ out:
  */
 static void dn_nsp_disc_conf(struct sock *sk, struct sk_buff *skb)
 {
-	struct dn_scp *scp = &sk->protinfo.dn;
+	struct dn_scp *scp = DN_SK(sk);
 	unsigned short reason;
 
 	if (skb->len != 2)
@@ -492,38 +488,65 @@ out:
 
 static void dn_nsp_linkservice(struct sock *sk, struct sk_buff *skb)
 {
-	struct dn_skb_cb *cb = (struct dn_skb_cb *)skb->cb;
+	struct dn_scp *scp = DN_SK(sk);
 	unsigned short segnum;
 	unsigned char lsflags;
 	char fcval;
+	int wake_up = 0;
+	char *ptr = skb->data;
+	unsigned char fctype = scp->services_rem & NSP_FC_MASK;
 
 	if (skb->len != 4)
 		goto out;
 
-	cb->segnum = segnum = dn_ntohs(*(__u16 *)skb->data);
-	skb_pull(skb, 2);
-	lsflags = *(unsigned char *)skb->data;
-	skb_pull(skb, 1);
-	fcval = *(char *)skb->data;
+	segnum = dn_ntohs(*(__u16 *)ptr);
+	ptr += 2;
+	lsflags = *(unsigned char *)ptr++;
+	fcval = *ptr;
 
-	if (lsflags & 0xf0)
+	/*
+	 * Here we ignore erronous packets which should really
+	 * should cause a connection abort. It is not critical 
+	 * for now though.
+	 */
+	if (lsflags & 0xf8)
 		goto out;
 
-	if (((sk->protinfo.dn.numoth_rcv + 1) & 0x0FFF) == (segnum & 0x0FFF)) {
-        	sk->protinfo.dn.numoth_rcv += 1;        
-                switch(lsflags & 0x03) {
-                	case 0x00:      
-                        	break;
-                        case 0x01:      
-                                sk->protinfo.dn.flowrem_sw = DN_DONTSEND;
-                                break;
-                        case 0x02:      
-                                sk->protinfo.dn.flowrem_sw = DN_SEND;
+	if (seq_next(scp->numoth_rcv, segnum)) {
+		seq_add(&scp->numoth_rcv, 1);
+		switch(lsflags & 0x04) { /* FCVAL INT */
+		case 0x00: /* Normal Request */
+			switch(lsflags & 0x03) { /* FCVAL MOD */
+       	         	case 0x00: /* Request count */
+				if (fcval < 0) {
+					unsigned char p_fcval = -fcval;
+					if ((scp->flowrem_dat > p_fcval) &&
+					    (fctype == NSP_FC_SCMC)) {
+						scp->flowrem_dat -= p_fcval;
+					}
+				} else if (fcval > 0) {
+					scp->flowrem_dat += fcval;
+					wake_up = 1;
+				}
+               	       	 	break;
+			case 0x01: /* Stop outgoing data */
+				scp->flowrem_sw = DN_DONTSEND;
+				break;
+			case 0x02: /* Ok to start again */
+				scp->flowrem_sw = DN_SEND;
 				dn_nsp_output(sk);
-				if (!sk->dead)
-					sk->state_change(sk);
+				wake_up = 1;
+			}
+			break;
+		case 0x04: /* Interrupt Request */
+			if (fcval > 0) {
+				scp->flowrem_oth += fcval;
+				wake_up = 1;
+			}
+			break;
                 }
-                
+		if (wake_up && !sk->dead)
+			sk->state_change(sk);
         }
 
 	dn_nsp_send_oth_ack(sk);
@@ -582,9 +605,9 @@ static __inline__ int dn_queue_skb(struct sock *sk, struct sk_buff *skb, int sig
 
 static void dn_nsp_otherdata(struct sock *sk, struct sk_buff *skb)
 {
-	struct dn_scp *scp = &sk->protinfo.dn;
+	struct dn_scp *scp = DN_SK(sk);
 	unsigned short segnum;
-	struct dn_skb_cb *cb = (struct dn_skb_cb *)skb->cb;
+	struct dn_skb_cb *cb = DN_SKB_CB(skb);
 	int queued = 0;
 
 	if (skb->len < 2)
@@ -593,10 +616,10 @@ static void dn_nsp_otherdata(struct sock *sk, struct sk_buff *skb)
 	cb->segnum = segnum = dn_ntohs(*(__u16 *)skb->data);
 	skb_pull(skb, 2);
 
-	if (((sk->protinfo.dn.numoth_rcv + 1) & 0x0fff) == (segnum & 0x0fff)) {
+	if (seq_next(scp->numoth_rcv, segnum)) {
 
 		if (dn_queue_skb(sk, skb, SIGURG, &scp->other_receive_queue) == 0) {
-			sk->protinfo.dn.numoth_rcv++;
+			seq_add(&scp->numoth_rcv, 1);
 			scp->other_report = 0;
 			queued = 1;
 		}
@@ -612,8 +635,8 @@ static void dn_nsp_data(struct sock *sk, struct sk_buff *skb)
 {
 	int queued = 0;
 	unsigned short segnum;
-	struct dn_skb_cb *cb = (struct dn_skb_cb *)skb->cb;
-	struct dn_scp *scp = &sk->protinfo.dn;
+	struct dn_skb_cb *cb = DN_SKB_CB(skb);
+	struct dn_scp *scp = DN_SK(sk);
 
 	if (skb->len < 2)
 		goto out;
@@ -621,17 +644,15 @@ static void dn_nsp_data(struct sock *sk, struct sk_buff *skb)
 	cb->segnum = segnum = dn_ntohs(*(__u16 *)skb->data);
 	skb_pull(skb, 2);
 
-	if (((sk->protinfo.dn.numdat_rcv + 1) & 0x0FFF) == 
-                     (segnum & 0x0FFF)) {
-
+	if (seq_next(scp->numdat_rcv, segnum)) {
                 if (dn_queue_skb(sk, skb, SIGIO, &sk->receive_queue) == 0) {
-			sk->protinfo.dn.numdat_rcv++;
+			seq_add(&scp->numdat_rcv, 1);
                 	queued = 1;
                 }
 
 		if ((scp->flowloc_sw == DN_SEND) && dn_congested(sk)) {
 			scp->flowloc_sw = DN_DONTSEND;
-			dn_nsp_send_lnk(sk, DN_DONTSEND);
+			dn_nsp_send_link(sk, DN_DONTSEND, 0);
 		}
         }
 
@@ -648,7 +669,7 @@ out:
  */
 static void dn_returned_conn_init(struct sock *sk, struct sk_buff *skb)
 {
-	struct dn_scp *scp = &sk->protinfo.dn;
+	struct dn_scp *scp = DN_SK(sk);
 
 	if (scp->state == DN_CI) {
 		scp->state = DN_NC;
@@ -660,28 +681,37 @@ static void dn_returned_conn_init(struct sock *sk, struct sk_buff *skb)
 	kfree_skb(skb);
 }
 
-static void dn_nsp_no_socket(struct sk_buff *skb, unsigned short reason)
+static int dn_nsp_no_socket(struct sk_buff *skb, unsigned short reason)
 {
-	struct dn_skb_cb *cb = (struct dn_skb_cb *)skb->cb;
+	struct dn_skb_cb *cb = DN_SKB_CB(skb);
+	int ret = NET_RX_DROP;
+
+	/* Must not reply to returned packets */
+	if (cb->rt_flags & DN_RT_F_RTS)
+		goto out;
 
 	if ((reason != NSP_REASON_OK) && ((cb->nsp_flags & 0x0c) == 0x08)) {
 		switch(cb->nsp_flags & 0x70) {
 			case 0x10:
 			case 0x60: /* (Retransmitted) Connect Init */
 				dn_nsp_return_disc(skb, NSP_DISCINIT, reason);
+				ret = NET_RX_SUCCESS;
 				break;
 			case 0x20: /* Connect Confirm */
 				dn_nsp_return_disc(skb, NSP_DISCCONF, reason);
+				ret = NET_RX_SUCCESS;
 				break;
 		}
 	}
 
+out:
 	kfree_skb(skb);
+	return ret;
 }
 
 static int dn_nsp_rx_packet(struct sk_buff *skb)
 {
-	struct dn_skb_cb *cb = (struct dn_skb_cb *)skb->cb;
+	struct dn_skb_cb *cb = DN_SKB_CB(skb);
 	struct sock *sk = NULL;
 	unsigned char *ptr = (unsigned char *)skb->data;
 	unsigned short reason = NSP_REASON_NL;
@@ -754,14 +784,19 @@ static int dn_nsp_rx_packet(struct sk_buff *skb)
 	sk = dn_find_by_skb(skb);
 got_it:
 	if (sk != NULL) {
-		struct dn_scp *scp = &sk->protinfo.dn;
+		struct dn_scp *scp = DN_SK(sk);
 		int ret;
 
 		/* Reset backoff */
 		scp->nsp_rxtshift = 0;
 
 		bh_lock_sock(sk);
-		ret = 0;
+		ret = NET_RX_SUCCESS;
+		if (decnet_debug_level & 8)
+			printk(KERN_DEBUG "NSP: 0x%02x 0x%02x 0x%04x 0x%04x %d\n",
+				(int)cb->rt_flags, (int)cb->nsp_flags, 
+				(int)cb->src_port, (int)cb->dst_port, 
+				(int)sk->lock.users);
 		if (sk->lock.users == 0)
 			ret = dn_nsp_backlog_rcv(sk, skb);
 		else
@@ -772,12 +807,11 @@ got_it:
 		return ret;
 	}
 
-	dn_nsp_no_socket(skb, reason);
-	return 1;
+	return dn_nsp_no_socket(skb, reason);
 
 free_out:
 	kfree_skb(skb);
-	return 0;
+	return NET_RX_DROP;
 }
 
 int dn_nsp_rx(struct sk_buff *skb)
@@ -792,12 +826,12 @@ int dn_nsp_rx(struct sk_buff *skb)
  */
 int dn_nsp_backlog_rcv(struct sock *sk, struct sk_buff *skb)
 {
-	struct dn_scp *scp = &sk->protinfo.dn;
-	struct dn_skb_cb *cb = (struct dn_skb_cb *)skb->cb;
+	struct dn_scp *scp = DN_SK(sk);
+	struct dn_skb_cb *cb = DN_SKB_CB(skb);
 
 	if (cb->rt_flags & DN_RT_F_RTS) {
 		dn_returned_conn_init(sk, skb);
-		return 0;
+		return NET_RX_SUCCESS;
 	}
 
 	/*
@@ -875,6 +909,6 @@ free_out:
 		}
 	}
 
-	return 0;
+	return NET_RX_SUCCESS;
 }
 

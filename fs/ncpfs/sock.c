@@ -456,7 +456,10 @@ static int ncp_do_request(struct ncp_server *server, int size,
 
 		spin_lock_irqsave(&current->sigmask_lock, flags);
 		old_set = current->blocked;
-		mask = sigmask(SIGKILL) | sigmask(SIGSTOP);
+		if (current->flags & PF_EXITING)
+			mask = 0;
+		else
+			mask = sigmask(SIGKILL);
 		if (server->m.flags & NCP_MOUNT_INTR) {
 			/* FIXME: This doesn't seem right at all.  So, like,
 			   we can't handle SIGINT and get whatever to stop?

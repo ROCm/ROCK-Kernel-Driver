@@ -6,13 +6,11 @@
 #define IOBASE_BRIDGE_NUMBER	0
 #define IOBASE_MEMORY		1
 #define IOBASE_IO		2
+#define IOBASE_ISA_IO		3
+#define IOBASE_ISA_MEM		4
 
 
-/* Can be used to override the logic in pci_scan_bus for skipping
- * already-configured bus numbers - to be used for buggy BIOSes
- * or architectures with incomplete PCI setup by the loader.
- */
-#define pcibios_assign_all_busses()	0
+extern int pcibios_assign_all_busses(void);
 
 #define PCIBIOS_MIN_IO		0x1000
 #define PCIBIOS_MIN_MEM		0x10000000
@@ -27,6 +25,18 @@ extern inline void pcibios_penalize_isa_irq(int irq)
 	/* We don't do dynamic PCI IRQ allocation */
 }
 
+extern unsigned long pci_resource_to_bus(struct pci_dev *pdev, struct resource *res);
+
+/*
+ * The PCI bus bridge can translate addresses issued by the processor(s)
+ * into a different address on the PCI bus.  On 32-bit cpus, we assume
+ * this mapping is 1-1, but on 64-bit systems it often isn't.
+ * 
+ * Obsolete ! Drivers should now use pci_resource_to_bus
+ */
+extern unsigned long pci_phys_to_bus(unsigned long pa, int busnr);
+extern unsigned long pci_bus_to_phys(unsigned int ba, int busnr);
+    
 /* Dynamic DMA Mapping stuff
  * 	++ajoshi
  */

@@ -207,8 +207,13 @@ subsequent_board:
 					p += (p[0] & 0x3f) + 1;
 					continue;
 				} else if (p[1] & 1) {
+					int gpr_len, reset_len;
+
 					mtable->has_mii = 1;
 					leaf->media = 11;
+					gpr_len=p[3]*2;
+					reset_len=p[4+gpr_len]*2;
+					new_advertise |= get_u16(&p[7+gpr_len+reset_len]);
 				} else {
 					mtable->has_nonmii = 1;
 					leaf->media = p[2] & 0x0f;
@@ -247,9 +252,9 @@ subsequent_board:
 			}
 			printk(KERN_INFO "%s:  Index #%d - Media %s (#%d) described "
 				   "by a %s (%d) block.\n",
-				   dev->name, i, medianame[leaf->media], leaf->media,
-				   leaf->type >= ARRAY_SIZE(block_name) ? "UNKNOWN" :
-				   block_name[leaf->type], leaf->type);
+				   dev->name, i, medianame[leaf->media & 15], leaf->media,
+				   leaf->type < ARRAY_SIZE(block_name) ? block_name[leaf->type] : "<unknown>",
+				   leaf->type);
 		}
 		if (new_advertise)
 			tp->to_advertise = new_advertise;
@@ -278,6 +283,7 @@ int __devinit tulip_read_eeprom(long ioaddr, int location, int addr_len)
 		retval = (retval << 1) | ((inl(ee_addr) & EE_DATA_READ) ? 1 : 0);
 	}
 	outl(EE_ENB, ee_addr);
+	eeprom_delay();
 
 	for (i = 16; i > 0; i--) {
 		outl(EE_ENB | EE_SHIFT_CLK, ee_addr);

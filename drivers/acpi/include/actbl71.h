@@ -3,12 +3,12 @@
  * Name: actbl71.h - IA-64 Extensions to the ACPI Spec Rev. 0.71
  *                   This file includes tables specific to this
  *                   specification revision.
- *       $Revision: 7 $
+ *       $Revision: 9 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by

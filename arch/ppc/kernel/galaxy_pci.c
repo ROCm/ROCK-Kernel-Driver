@@ -36,67 +36,84 @@
 
 /* Function Prototypes */
 
-decl_config_access_method(galaxy);
-
-
 void __init
 galaxy_pcibios_fixup(void)
 {
 
 }
 
-void __init
-galaxy_setup_pci_ptrs(void)
+static int
+galaxy_pcibios_read_config_byte(struct pci_controller* hose,
+				  u8 bus, u8 dev, u8 offset, u8 *val)
 {
+
+	return (PCIBIOS_SUCCESSFUL);
+}
+
+static int
+galaxy_pcibios_read_config_word(struct pci_controller* hose,
+				  u8 bus, u8 dev, u8 offset, u16 *val)
+{
+
+	return (PCIBIOS_SUCCESSFUL);
+}
+
+static int
+galaxy_pcibios_read_config_dword(struct pci_controller* hose,
+				  u8 bus, u8 dev, u8 offset, u32 *val)
+{
+
+	return (PCIBIOS_SUCCESSFUL);
+}
+
+static int
+galaxy_pcibios_write_config_byte(struct pci_controller* hose,
+				  u8 bus, u8 dev, u8 offset, u8 val)
+{
+
+	return (PCIBIOS_SUCCESSFUL);
+}
+
+static int
+galaxy_pcibios_write_config_word(struct pci_controller* hose,
+				  u8 bus, u8 dev, u8 offset, u16 val)
+{
+
+	return (PCIBIOS_SUCCESSFUL);
+}
+
+static int
+galaxy_pcibios_write_config_dword(struct pci_controller* hose,
+				  u8 bus, u8 dev, u8 offset, u32 val)
+{
+
+	return (PCIBIOS_SUCCESSFUL);
+}
+
+static struct pci_controller_ops galaxy_pci_ops =
+{
+	galaxy_pcibios_read_config_byte,
+	galaxy_pcibios_read_config_word,
+	galaxy_pcibios_read_config_dword,
+	galaxy_pcibios_write_config_byte,
+	galaxy_pcibios_write_config_word,
+	galaxy_pcibios_write_config_dword
+};
+
+void __init
+galaxy_find_bridges(void)
+{
+	struct pci_controller* hose;
+
 	set_config_access_method(galaxy);
 
 	ppc_md.pcibios_fixup = galaxy_pcibios_fixup;
-}
-
-int
-galaxy_pcibios_read_config_byte(unsigned char bus, unsigned char dev_fn,
-				unsigned char offset, unsigned char *val)
-{
-
-	return (PCIBIOS_SUCCESSFUL);
-}
-
-int
-galaxy_pcibios_read_config_word(unsigned char bus, unsigned char dev_fn,
-				unsigned char offset, unsigned short *val)
-{
-
-	return (PCIBIOS_SUCCESSFUL);
-}
-
-int
-galaxy_pcibios_read_config_dword(unsigned char bus, unsigned char dev_fn,
-				 unsigned char offset, unsigned int *val)
-{
-
-	return (PCIBIOS_SUCCESSFUL);
-}
-
-int
-galaxy_pcibios_write_config_byte(unsigned char bus, unsigned char dev_fn,
-				 unsigned char offset, unsigned char val)
-{
-
-	return (PCIBIOS_SUCCESSFUL);
-}
-
-int
-galaxy_pcibios_write_config_word(unsigned char bus, unsigned char dev_fn,
-				 unsigned char offset, unsigned short val)
-{
-
-	return (PCIBIOS_SUCCESSFUL);
-}
-
-int
-galaxy_pcibios_write_config_dword(unsigned char bus, unsigned char dev_fn,
-				  unsigned char offset, unsigned int val)
-{
-
-	return (PCIBIOS_SUCCESSFUL);
+	hose = pcibios_alloc_controller();
+	if (!hose)
+		return;
+	hose->ops = &galaxy_pci_ops;
+	/* Todo ...
+	hose->cfg_data = ioremap(PCICFGDATA, ...);
+	hose->cfg_addr = ioremap(PCICFGADDR, ...);
+	*/
 }

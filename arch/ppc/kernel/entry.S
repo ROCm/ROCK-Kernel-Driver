@@ -234,7 +234,6 @@ _GLOBAL(_switch)
 	li	r0,0x0ff0
 	stw	r0,TRAP(r1)
 	stw	r1,KSP(r3)	/* Set old stack pointer */
-	sync
 	tophys(r0,r4)
 	CLR_TOP32(r0)
 	mtspr	SPRG3,r0	/* Update current THREAD phys addr */
@@ -251,7 +250,7 @@ _GLOBAL(_switch)
 #endif
         mtspr   M_TWB,r9	/* Update MMU base address */
 	tlbia
-	SYNC
+	sync
 #endif /* CONFIG_8xx */
 	lwz	r1,KSP(r4)	/* Load new stack pointer */
 	/* save the old current 'last' for return value */
@@ -342,23 +341,23 @@ lost_irq_ret:
 do_bottom_half_ret:
 2:	lwz	r3,_MSR(r1)	/* Returning to user mode? */
 	andi.	r3,r3,MSR_PR
-	beq+	restore		/* if so, check need_resched and signals */
-	.globl ret_to_user_hook	
-ret_to_user_hook:
-	nop
+	beq+	do_signal_ret	/* if so, check need_resched and signals */
 	lwz	r3,NEED_RESCHED(r2)
 	cmpi	0,r3,0		/* check need_resched flag */
 	beq+	7f
 	bl	schedule
 7:	lwz	r5,SIGPENDING(r2) /* Check for pending unblocked signals */
 	cmpwi	0,r5,0
-	beq+	restore
+	beq+	do_signal_ret
 	li	r3,0
 	addi	r4,r1,STACK_FRAME_OVERHEAD
 	MOL_HOOK_MMU(8,r8)
 	bl	do_signal
 	.globl	do_signal_ret
 do_signal_ret:
+	.globl ret_to_user_hook	
+ret_to_user_hook:
+	nop
 restore:
 	lwz	r3,_XER(r1)
 	mtspr	XER,r3
@@ -372,7 +371,7 @@ restore:
 	 */
 	mfmsr	r0		/* Get current interrupt state */
 	rlwinm	r0,r0,0,17,15	/* clear MSR_EE in r0 */
-	sync			/* Some chip revs have problems here... */
+	SYNC			/* Some chip revs have problems here... */
 	mtmsr	r0		/* Update machine state */
 	
 	/* if returning to user mode, set new sprg2 and save kernel SP */
@@ -468,7 +467,7 @@ enter_rtas:
 	andc	r0,r9,r0
 	li	r10,MSR_IR|MSR_DR|MSR_FE0|MSR_FE1|MSR_FP
 	andc	r9,r0,r10
-	sync			/* disable interrupts so SRR0/1 */
+	SYNC			/* disable interrupts so SRR0/1 */
 	mtmsr	r0		/* don't get trashed */
 	mtlr	r6
 	CLR_TOP32(r7)

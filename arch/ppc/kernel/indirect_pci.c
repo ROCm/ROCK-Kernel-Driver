@@ -9,113 +9,59 @@
  * 2 of the License, or (at your option) any later version.
  */
 
+#include <linux/kernel.h>
 #include <linux/pci.h>
+#include <linux/delay.h>
+#include <linux/string.h>
+#include <linux/init.h>
+#include <linux/bootmem.h>
+
+#include <asm/init.h>
 #include <asm/io.h>
-#include <asm/system.h>
+#include <asm/prom.h>
+#include <asm/pci-bridge.h>
+#include <asm/machdep.h>
 
-unsigned int * pci_config_address;
-unsigned char * pci_config_data;
+#include "pci.h"
 
-int indirect_pcibios_read_config_byte(unsigned char bus, unsigned char dev_fn,
-			     unsigned char offset, unsigned char *val)
-{
-	unsigned long flags;
+#define cfg_read(val, addr, type, op)	*val = op((type)(addr))
+#define cfg_write(val, addr, type, op)	op((type *)(addr), (val))
 
-	save_flags(flags); cli();
-	
-	out_be32(pci_config_address, 
-		 ((offset&0xfc)<<24) | (dev_fn<<16) | (bus<<8) | 0x80);
-
-	*val= in_8(pci_config_data + (offset&3));
-
-	restore_flags(flags);
-	return PCIBIOS_SUCCESSFUL;
+#define INDIRECT_PCI_OP(rw, size, type, op, mask)			 \
+static int								 \
+indirect_##rw##_config_##size(struct pci_dev *dev, int offset, type val) \
+{									 \
+	struct pci_controller *hose = dev->sysdata;			 \
+									 \
+	out_be32(hose->cfg_addr, 					 \
+		 ((offset & 0xfc) << 24) | (dev->devfn << 16)		 \
+		 | (dev->bus->number << 8) | 0x80);			 \
+	cfg_##rw(val, hose->cfg_data + (offset & mask), type, op);	 \
+	return PCIBIOS_SUCCESSFUL;    					 \
 }
 
-int indirect_pcibios_read_config_word(unsigned char bus, unsigned char dev_fn,
-			     unsigned char offset, unsigned short *val)
+INDIRECT_PCI_OP(read, byte, u8 *, in_8, 3)
+INDIRECT_PCI_OP(read, word, u16 *, in_le16, 2)
+INDIRECT_PCI_OP(read, dword, u32 *, in_le32, 0)
+INDIRECT_PCI_OP(write, byte, u8, out_8, 3)
+INDIRECT_PCI_OP(write, word, u16, out_le16, 2)
+INDIRECT_PCI_OP(write, dword, u32, out_le32, 0)
+
+static struct pci_ops indirect_pci_ops =
 {
-	unsigned long flags;
-	
-	if (offset&1) return PCIBIOS_BAD_REGISTER_NUMBER;
+	indirect_read_config_byte,
+	indirect_read_config_word,
+	indirect_read_config_dword,
+	indirect_write_config_byte,
+	indirect_write_config_word,
+	indirect_write_config_dword
+};
 
-	save_flags(flags); cli();
-	
-	out_be32(pci_config_address, 
-		 ((offset&0xfc)<<24) | (dev_fn<<16) | (bus<<8) | 0x80);
-
-	*val= in_le16((unsigned short *)(pci_config_data + (offset&3)));
-
-	restore_flags(flags);
-	return PCIBIOS_SUCCESSFUL;
+void __init
+setup_indirect_pci(struct pci_controller* hose, u32 cfg_addr, u32 cfg_data)
+{
+	hose->ops = &indirect_pci_ops;
+	hose->cfg_addr = (unsigned int *) ioremap(cfg_addr, 4);
+	hose->cfg_data = (unsigned char *) ioremap(cfg_data, 4);
 }
 
-int indirect_pcibios_read_config_dword(unsigned char bus, unsigned char dev_fn,
-			     unsigned char offset, unsigned int *val)
-{
-	unsigned long flags;
-	
-	if (offset&3) return PCIBIOS_BAD_REGISTER_NUMBER;
-
-	save_flags(flags); cli();
-	
-	out_be32(pci_config_address, 
-		 ((offset&0xfc)<<24) | (dev_fn<<16) | (bus<<8) | 0x80);
-
-	*val= in_le32((unsigned *)pci_config_data);
-
-	restore_flags(flags);
-	return PCIBIOS_SUCCESSFUL;
-}
-
-int indirect_pcibios_write_config_byte(unsigned char bus, unsigned char dev_fn,
-			     unsigned char offset, unsigned char val)
-{
-	unsigned long flags;
-
-	save_flags(flags); cli();
-	
-	out_be32(pci_config_address, 
-		 ((offset&0xfc)<<24) | (dev_fn<<16) | (bus<<8) | 0x80);
-
-	out_8(pci_config_data + (offset&3), val);
-
-	restore_flags(flags);
-	return PCIBIOS_SUCCESSFUL;
-}
-
-int indirect_pcibios_write_config_word(unsigned char bus, unsigned char dev_fn,
-			     unsigned char offset, unsigned short val)
-{
-	unsigned long flags;
-
-	if (offset&1) return PCIBIOS_BAD_REGISTER_NUMBER;
-
-	save_flags(flags); cli();
-	
-	out_be32(pci_config_address, 
-		 ((offset&0xfc)<<24) | (dev_fn<<16) | (bus<<8) | 0x80);
-
-	out_le16((unsigned short *)(pci_config_data + (offset&3)), val);
-
-	restore_flags(flags);
-	return PCIBIOS_SUCCESSFUL;
-}
-
-int indirect_pcibios_write_config_dword(unsigned char bus, unsigned char dev_fn,
-			     unsigned char offset, unsigned int val)
-{
-	unsigned long flags;
-
-	if (offset&3) return PCIBIOS_BAD_REGISTER_NUMBER;
-
-	save_flags(flags); cli();
-	
-	out_be32(pci_config_address, 
-		 ((offset&0xfc)<<24) | (dev_fn<<16) | (bus<<8) | 0x80);
-
-	out_le32((unsigned *)pci_config_data, val);
-
-	restore_flags(flags);
-	return PCIBIOS_SUCCESSFUL;
-}

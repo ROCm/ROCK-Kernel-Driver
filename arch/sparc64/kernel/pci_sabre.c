@@ -1,4 +1,4 @@
-/* $Id: pci_sabre.c,v 1.20 2000/06/26 19:40:27 davem Exp $
+/* $Id: pci_sabre.c,v 1.22 2001/01/16 13:03:48 anton Exp $
  * pci_sabre.c: Sabre specific PCI controller support.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@caipfs.rutgers.edu)
@@ -672,14 +672,15 @@ static void sabre_check_iommu_error(struct pci_controller_info *p,
 				    unsigned long afsr,
 				    unsigned long afar)
 {
+	struct pci_iommu *iommu = p->pbm_A.iommu;
 	unsigned long iommu_tag[16];
 	unsigned long iommu_data[16];
 	unsigned long flags;
 	u64 control;
 	int i;
 
-	spin_lock_irqsave(&p->iommu.lock, flags);
-	control = sabre_read(p->iommu.iommu_control);
+	spin_lock_irqsave(&iommu->lock, flags);
+	control = sabre_read(iommu->iommu_control);
 	if (control & SABRE_IOMMUCTRL_ERR) {
 		char *type_string;
 
@@ -687,7 +688,7 @@ static void sabre_check_iommu_error(struct pci_controller_info *p,
 		 * NOTE: On Sabre this is write 1 to clear,
 		 *       which is different from Psycho.
 		 */
-		sabre_write(p->iommu.iommu_control, control);
+		sabre_write(iommu->iommu_control, control);
 		switch((control & SABRE_IOMMUCTRL_ERRSTS) >> 25UL) {
 		case 1:
 			type_string = "Invalid Error";
@@ -706,7 +707,7 @@ static void sabre_check_iommu_error(struct pci_controller_info *p,
 		 * entries in the IOTLB.
 		 */
 		control &= ~(SABRE_IOMMUCTRL_ERRSTS | SABRE_IOMMUCTRL_ERR);
-		sabre_write(p->iommu.iommu_control,
+		sabre_write(iommu->iommu_control,
 			    (control | SABRE_IOMMUCTRL_DENAB));
 		for (i = 0; i < 16; i++) {
 			unsigned long base = p->controller_regs;
@@ -718,7 +719,7 @@ static void sabre_check_iommu_error(struct pci_controller_info *p,
 			sabre_write(base + SABRE_IOMMU_TAG + (i * 8UL), 0);
 			sabre_write(base + SABRE_IOMMU_DATA + (i * 8UL), 0);
 		}
-		sabre_write(p->iommu.iommu_control, control);
+		sabre_write(iommu->iommu_control, control);
 
 		for (i = 0; i < 16; i++) {
 			unsigned long tag, data;
@@ -752,7 +753,7 @@ static void sabre_check_iommu_error(struct pci_controller_info *p,
 			       ((data & SABRE_IOMMUDATA_PPN) << PAGE_SHIFT));
 		}
 	}
-	spin_unlock_irqrestore(&p->iommu.lock, flags);
+	spin_unlock_irqrestore(&iommu->lock, flags);
 }
 
 static void sabre_ue_intr(int irq, void *dev_id, struct pt_regs *regs)
@@ -1158,20 +1159,21 @@ static void __init sabre_iommu_init(struct pci_controller_info *p,
 				    int tsbsize, unsigned long dvma_offset,
 				    u32 dma_mask)
 {
+	struct pci_iommu *iommu = p->pbm_A.iommu;
 	unsigned long tsbbase, i, order;
 	u64 control;
 
 	/* Setup initial software IOMMU state. */
-	spin_lock_init(&p->iommu.lock);
-	p->iommu.iommu_cur_ctx = 0;
+	spin_lock_init(&iommu->lock);
+	iommu->iommu_cur_ctx = 0;
 
 	/* Register addresses. */
-	p->iommu.iommu_control  = p->controller_regs + SABRE_IOMMU_CONTROL;
-	p->iommu.iommu_tsbbase  = p->controller_regs + SABRE_IOMMU_TSBBASE;
-	p->iommu.iommu_flush    = p->controller_regs + SABRE_IOMMU_FLUSH;
-	p->iommu.write_complete_reg = p->controller_regs + SABRE_WRSYNC;
+	iommu->iommu_control  = p->controller_regs + SABRE_IOMMU_CONTROL;
+	iommu->iommu_tsbbase  = p->controller_regs + SABRE_IOMMU_TSBBASE;
+	iommu->iommu_flush    = p->controller_regs + SABRE_IOMMU_FLUSH;
+	iommu->write_complete_reg = p->controller_regs + SABRE_WRSYNC;
 	/* Sabre's IOMMU lacks ctx flushing. */
-	p->iommu.iommu_ctxflush = 0;
+	iommu->iommu_ctxflush = 0;
                                         
 	/* Invalidate TLB Entries. */
 	control = sabre_read(p->controller_regs + SABRE_IOMMU_CONTROL);
@@ -1192,9 +1194,9 @@ static void __init sabre_iommu_init(struct pci_controller_info *p,
 		prom_printf("SABRE_IOMMU: Error, gfp(tsb) failed.\n");
 		prom_halt();
 	}
-	p->iommu.page_table = (iopte_t *)tsbbase;
-	p->iommu.page_table_map_base = dvma_offset;
-	p->iommu.dma_addr_mask = dma_mask;
+	iommu->page_table = (iopte_t *)tsbbase;
+	iommu->page_table_map_base = dvma_offset;
+	iommu->dma_addr_mask = dma_mask;
 	memset((char *)tsbbase, 0, PAGE_SIZE << order);
 
 	sabre_write(p->controller_regs + SABRE_IOMMU_TSBBASE, __pa(tsbbase));
@@ -1205,11 +1207,11 @@ static void __init sabre_iommu_init(struct pci_controller_info *p,
 	switch(tsbsize) {
 	case 64:
 		control |= SABRE_IOMMU_TSBSZ_64K;
-		p->iommu.page_table_sz_bits = 16;
+		iommu->page_table_sz_bits = 16;
 		break;
 	case 128:
 		control |= SABRE_IOMMU_TSBSZ_128K;
-		p->iommu.page_table_sz_bits = 17;
+		iommu->page_table_sz_bits = 17;
 		break;
 	default:
 		prom_printf("iommu_init: Illegal TSB size %d\n", tsbsize);
@@ -1219,12 +1221,12 @@ static void __init sabre_iommu_init(struct pci_controller_info *p,
 	sabre_write(p->controller_regs + SABRE_IOMMU_CONTROL, control);
 
 	/* We start with no consistent mappings. */
-	p->iommu.lowest_consistent_map =
-		1 << (p->iommu.page_table_sz_bits - PBM_LOGCLUSTERS);
+	iommu->lowest_consistent_map =
+		1 << (iommu->page_table_sz_bits - PBM_LOGCLUSTERS);
 
 	for (i = 0; i < PBM_NCLUSTERS; i++) {
-		p->iommu.alloc_info[i].flush = 0;
-		p->iommu.alloc_info[i].next = 0;
+		iommu->alloc_info[i].flush = 0;
+		iommu->alloc_info[i].next = 0;
 	}
 }
 
@@ -1368,6 +1370,7 @@ void __init sabre_init(int pnode)
 {
 	struct linux_prom64_registers pr_regs[2];
 	struct pci_controller_info *p;
+	struct pci_iommu *iommu;
 	unsigned long flags;
 	int tsbsize, err;
 	u32 busrange[2];
@@ -1380,10 +1383,17 @@ void __init sabre_init(int pnode)
 		prom_printf("SABRE: Error, kmalloc(pci_controller_info) failed.\n");
 		prom_halt();
 	}
+	memset(p, 0, sizeof(*p));
+
+	iommu = kmalloc(sizeof(*iommu), GFP_ATOMIC);
+	if (!iommu) {
+		prom_printf("SABRE: Error, kmalloc(pci_iommu) failed.\n");
+		prom_halt();
+	}
+	memset(iommu, 0, sizeof(*iommu));
+	p->pbm_A.iommu = p->pbm_B.iommu = iommu;
 
 	upa_portid = prom_getintdefault(pnode, "upa-portid", 0xff);
-
-	memset(p, 0, sizeof(*p));
 
 	spin_lock_irqsave(&pci_controller_lock, flags);
 	p->next = pci_controller_root;

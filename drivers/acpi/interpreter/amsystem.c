@@ -2,12 +2,12 @@
 /******************************************************************************
  *
  * Module Name: amsystem - Interface to OS services
- *              $Revision: 52 $
+ *              $Revision: 54 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -202,7 +202,7 @@ acpi_aml_system_acquire_mutex (
 	}
 
 	status = acpi_aml_system_wait_semaphore (obj_desc->mutex.semaphore,
-			  (u32) time_desc->number.value);
+			  (u32) time_desc->integer.value);
 	return (status);
 }
 
@@ -299,7 +299,7 @@ acpi_aml_system_wait_event (
 
 	if (obj_desc) {
 		status = acpi_aml_system_wait_semaphore (obj_desc->event.semaphore,
-				  (u32) time_desc->number.value);
+				  (u32) time_desc->integer.value);
 	}
 
 

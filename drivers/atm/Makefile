@@ -46,7 +46,7 @@ ifeq ($(CONFIG_ATM_FORE200E_SBA),y)
   endif
 endif
 
-obj-$(CONFIG_ATM_FORE200E) += fore200e.o $(FORE200E_FW_OBJS)
+obj-$(CONFIG_ATM_FORE200E) += fore_200e.o
 
 EXTRA_CFLAGS=-g
 

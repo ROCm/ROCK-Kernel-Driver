@@ -4,8 +4,8 @@
 #include <linux/ip.h>
 #include <net/checksum.h>
 
-#include <linux/netfilter_ipv4/ip_tables.h>
-#include <linux/netfilter_ipv4/ipt_MARK.h>
+#include <linux/netfilter_ipv6/ip6_tables.h>
+#include <linux/netfilter_ipv6/ip6t_MARK.h>
 
 static unsigned int
 target(struct sk_buff **pskb,
@@ -15,26 +15,26 @@ target(struct sk_buff **pskb,
        const void *targinfo,
        void *userinfo)
 {
-	const struct ipt_mark_target_info *markinfo = targinfo;
+	const struct ip6t_mark_target_info *markinfo = targinfo;
 
 	if((*pskb)->nfmark != markinfo->mark) {
 		(*pskb)->nfmark = markinfo->mark;
 		(*pskb)->nfcache |= NFC_ALTERED;
 	}
-	return IPT_CONTINUE;
+	return IP6T_CONTINUE;
 }
 
 static int
 checkentry(const char *tablename,
-	   const struct ipt_entry *e,
+	   const struct ip6t_entry *e,
            void *targinfo,
            unsigned int targinfosize,
            unsigned int hook_mask)
 {
-	if (targinfosize != IPT_ALIGN(sizeof(struct ipt_mark_target_info))) {
+	if (targinfosize != IP6T_ALIGN(sizeof(struct ip6t_mark_target_info))) {
 		printk(KERN_WARNING "MARK: targinfosize %u != %Zu\n",
 		       targinfosize,
-		       IPT_ALIGN(sizeof(struct ipt_mark_target_info)));
+		       IP6T_ALIGN(sizeof(struct ip6t_mark_target_info)));
 		return 0;
 	}
 
@@ -46,12 +46,13 @@ checkentry(const char *tablename,
 	return 1;
 }
 
-static struct ipt_target ipt_mark_reg
+static struct ip6t_target ip6t_mark_reg
 = { { NULL, NULL }, "MARK", target, checkentry, NULL, THIS_MODULE };
 
 static int __init init(void)
 {
-	if (ipt_register_target(&ipt_mark_reg))
+	printk(KERN_DEBUG "registreing ipv6 mark target\n");
+	if (ip6t_register_target(&ip6t_mark_reg))
 		return -EINVAL;
 
 	return 0;
@@ -59,7 +60,7 @@ static int __init init(void)
 
 static void __exit fini(void)
 {
-	ipt_unregister_target(&ipt_mark_reg);
+	ip6t_unregister_target(&ip6t_mark_reg);
 }
 
 module_init(init);

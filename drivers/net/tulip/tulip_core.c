@@ -28,7 +28,7 @@
 #include <asm/unaligned.h>
 
 static char version[] __devinitdata =
-	"Linux Tulip driver version 0.9.13 (January 2, 2001)\n";
+	"Linux Tulip driver version 0.9.13a (January 20, 2001)\n";
 
 
 /* A few user-configurable values. */

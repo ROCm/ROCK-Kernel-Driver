@@ -113,10 +113,10 @@ acpi_get_battery_status(ACPI_HANDLE handle, struct cmbatt_status *result)
 	obj = (ACPI_OBJECT *) buf.pointer;
 	objs = obj->package.elements;
 
-	result->state = objs[0].number.value;
-	result->present_rate = objs[1].number.value;
-	result->remaining_capacity = objs[2].number.value;
-	result->present_voltage = objs[3].number.value;
+	result->state = objs[0].integer.value;
+	result->present_rate = objs[1].integer.value;
+	result->remaining_capacity = objs[2].integer.value;
+	result->present_voltage = objs[3].integer.value;
 
 	kfree(buf.pointer);
 
@@ -153,15 +153,15 @@ acpi_get_battery_info(ACPI_HANDLE handle, struct cmbatt_info *result)
 	obj = (ACPI_OBJECT *) buf.pointer;
 	objs = obj->package.elements;
 	
-	result->power_unit=objs[0].number.value;
-	result->design_capacity=objs[1].number.value;
-	result->last_full_capacity=objs[2].number.value;
-	result->battery_technology=objs[3].number.value;
-	result->design_voltage=objs[4].number.value;
-	result->design_capacity_warning=objs[5].number.value;
-	result->design_capacity_low=objs[6].number.value;
-	result->battery_capacity_granularity_1=objs[7].number.value;
-	result->battery_capacity_granularity_2=objs[8].number.value;
+	result->power_unit=objs[0].integer.value;
+	result->design_capacity=objs[1].integer.value;
+	result->last_full_capacity=objs[2].integer.value;
+	result->battery_technology=objs[3].integer.value;
+	result->design_voltage=objs[4].integer.value;
+	result->design_capacity_warning=objs[5].integer.value;
+	result->design_capacity_low=objs[6].integer.value;
+	result->battery_capacity_granularity_1=objs[7].integer.value;
+	result->battery_capacity_granularity_2=objs[8].integer.value;
 
 	/* BUG: trailing NULL issue */
 	strncpy(result->model_number, objs[9].string.pointer, MAX_BATT_STRLEN-1);

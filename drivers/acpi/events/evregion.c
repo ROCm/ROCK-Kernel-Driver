@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: evregion - ACPI Address_space (Op_region) handler dispatch
- *              $Revision: 93 $
+ *              $Revision: 94 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -122,8 +122,8 @@ acpi_ev_execute_reg_method (
 	u32                     function)
 {
 	ACPI_OPERAND_OBJECT    *params[3];
-	ACPI_OPERAND_OBJECT     space_iD_obj;
-	ACPI_OPERAND_OBJECT     function_obj;
+	ACPI_OPERAND_OBJECT     space_id_desc;
+	ACPI_OPERAND_OBJECT     function_desc;
 	ACPI_STATUS             status;
 
 
@@ -141,24 +141,24 @@ acpi_ev_execute_reg_method (
 	 *          Passed as a parameter
 	 */
 
-	acpi_cm_init_static_object (&space_iD_obj);
-	acpi_cm_init_static_object (&function_obj);
+	acpi_cm_init_static_object (&space_id_desc);
+	acpi_cm_init_static_object (&function_desc);
 
 	/*
 	 *  Method requires two parameters.
 	 */
-	params [0] = &space_iD_obj;
-	params [1] = &function_obj;
+	params [0] = &space_id_desc;
+	params [1] = &function_desc;
 	params [2] = NULL;
 
 	/*
 	 *  Set up the parameter objects
 	 */
-	space_iD_obj.common.type   = ACPI_TYPE_NUMBER;
-	space_iD_obj.number.value  = region_obj->region.space_id;
+	space_id_desc.common.type  = ACPI_TYPE_INTEGER;
+	space_id_desc.integer.value = region_obj->region.space_id;
 
-	function_obj.common.type   = ACPI_TYPE_NUMBER;
-	function_obj.number.value  = function;
+	function_desc.common.type  = ACPI_TYPE_INTEGER;
+	function_desc.integer.value = function;
 
 	/*
 	 *  Execute the method, no return value

@@ -714,6 +714,11 @@ static void compute_parity(struct stripe_head *sh, int method)
 		break;
 	}
 	spin_unlock_irq(&conf->device_lock);
+	if (count>1) {
+		xor_block(count, bh_ptr);
+		count = 1;
+	}
+	
 	for (i = disks; i--;)
 		if (chosen[i]) {
 			struct buffer_head *bh = sh->bh_cache[i];

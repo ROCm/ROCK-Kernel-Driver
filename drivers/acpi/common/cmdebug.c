@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: cmdebug - Debug print routines
- *              $Revision: 61 $
+ *              $Revision: 64 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -281,7 +281,7 @@ function_value_exit (
 	u32                     line_number,
 	u32                     component_id,
 	NATIVE_CHAR             *function_name,
-	NATIVE_UINT             value)
+	ACPI_INTEGER            value)
 {
 
 	debug_print (module_name, line_number, component_id, TRACE_FUNCTIONS,

@@ -1862,13 +1862,9 @@ static int DAC960_MergeRequestsFunction(RequestQueue_T *RequestQueue,
   DAC960_Controller_T *Controller =
     (DAC960_Controller_T *) RequestQueue->queuedata;
   int TotalSegments = Request->nr_segments + NextRequest->nr_segments;
-  int SameSegment = 0;
   if (Request->bhtail->b_data + Request->bhtail->b_size
       == NextRequest->bh->b_data)
-    {
       TotalSegments--;
-      SameSegment = 1;
-    }
   if (TotalSegments > MaxSegments ||
       TotalSegments > Controller->DriverScatterGatherLimit)
     return false;
@@ -2831,6 +2827,7 @@ static void DAC960_RequestFunction(RequestQueue_T *RequestQueue)
 static inline void DAC960_ProcessCompletedBuffer(BufferHeader_T *BufferHeader,
 						 boolean SuccessfulIO)
 {
+  blk_finished_io(BufferHeader->b_size >> 9);
   BufferHeader->b_end_io(BufferHeader, SuccessfulIO);
 }
 

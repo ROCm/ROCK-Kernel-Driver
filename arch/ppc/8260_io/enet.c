@@ -633,6 +633,9 @@ int __init scc_enet_init(void)
 	/* Allocate some private information.
 	*/
 	cep = (struct scc_enet_private *)kmalloc(sizeof(*cep), GFP_KERNEL);
+	if (cep == NULL)
+		return -ENOMEM;
+
 	__clear_user(cep,sizeof(*cep));
 	spin_lock_init(&cep->lock);
 

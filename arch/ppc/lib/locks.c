@@ -58,8 +58,9 @@ void _spin_unlock(spinlock_t *lp)
 {
 #ifdef DEBUG_LOCKS
   	if ( !lp->lock )
-		printk("_spin_unlock(%p): no lock cpu %d %s/%d\n", lp,
-		      smp_processor_id(),current->comm,current->pid);
+		printk("_spin_unlock(%p): no lock cpu %d curr PC %p %s/%d\n",
+		       lp, smp_processor_id(), __builtin_return_address(0),
+		       current->comm, current->pid);
 	if ( lp->owner_cpu != smp_processor_id() )
 		printk("_spin_unlock(%p): cpu %d trying clear of cpu %d pc %lx val %lx\n",
 		      lp, smp_processor_id(), (int)lp->owner_cpu,

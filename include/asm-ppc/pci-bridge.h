@@ -2,49 +2,70 @@
 #ifndef _ASM_PCI_BRIDGE_H
 #define _ASM_PCI_BRIDGE_H
 
-void pmac_find_bridges(void);
+struct device_node;
+struct pci_controller;
 
 /*
  * pci_io_base returns the memory address at which you can access
  * the I/O space for PCI bus number `bus' (or NULL on error).
- * 
- * NOTE: This doesn't handle the new Uni-N chip which requires
- *       per-device io_base. 
  */
-void *pci_io_base(unsigned int bus);
-
-/* This version handles the new Uni-N host bridge, the iobase is now
- * a per-device thing. I also added the memory base so PReP can
- * be fixed to return 0xc0000000 (I didn't actually implement it)
- *
- * pci_dev_io_base() returns either a virtual (ioremap'ed) address or
- * a physical address. In-kernel clients will use logical while the
- * sys_pciconfig_iobase syscall returns a physical one to userland.
- */
-void *pci_dev_io_base(unsigned char bus, unsigned char devfn, int physical);
-void *pci_dev_mem_base(unsigned char bus, unsigned char devfn);
-
-/* Returns the root-bridge number (Uni-N number) of a device */
-int pci_dev_root_bridge(unsigned char bus, unsigned char devfn);
+extern void *pci_bus_io_base(unsigned int bus);
+extern unsigned long pci_bus_io_base_phys(unsigned int bus);
+extern unsigned long pci_bus_mem_base_phys(unsigned int bus);
 
 /*
- * pci_device_loc returns the bus number and device/function number
- * for a device on a PCI bus, given its device_node struct.
- * It returns 0 if OK, -1 on error.
+ * PCI <-> OF matching functions 
  */
-int pci_device_loc(struct device_node *dev, unsigned char *bus_ptr,
-		   unsigned char *devfn_ptr);
+extern int pci_device_from_OF_node(struct device_node *node,
+				   u8* bus, u8* devfn);
+extern struct device_node* pci_device_to_OF_node(struct pci_dev *);
 
-struct bridge_data {
+/* Get the PCI host controller for a bus */
+extern struct pci_controller* pci_bus_to_hose(int bus);
+
+/* Get the PCI host controller for an OF device */
+extern struct pci_controller*
+pci_find_hose_for_OF_device(struct device_node* node);
+
+/*
+ * Structure of a PCI controller (host bridge)
+ */
+struct pci_controller {
+	struct pci_controller *next;
+        struct pci_bus *bus;
+	void *arch_data;
+
+	int first_busno;
+	int last_busno;
+        
+	void *io_base_virt;
+	unsigned long io_base_phys;
+	
+	/* Some machines (PReP) have a non 1:1 mapping of
+	 * the PCI memory space in the CPU bus space
+	 */
+	unsigned long pci_mem_offset;
+
+	struct pci_ops *ops;
 	volatile unsigned int *cfg_addr;
 	volatile unsigned char *cfg_data;
-	void *io_base;		/* virtual */
-	unsigned long io_base_phys;
-	int bus_number;
-	int max_bus;
-	struct bridge_data *next;
-	struct device_node *node;
+
+	/* Currently, we limit ourselves to 1 IO range and 3 mem
+	 * ranges since the common pci_bus structure can't handle more
+	 */
+	struct resource	io_resource;
+	struct resource mem_resources[3];
+	int mem_resource_count;
 };
+
+/* These are used for config access before all the PCI probing
+   has been done. */
+int early_read_config_byte(struct pci_controller *hose, int bus, int dev_fn, int where, u8 *val);
+int early_read_config_word(struct pci_controller *hose, int bus, int dev_fn, int where, u16 *val);
+int early_read_config_dword(struct pci_controller *hose, int bus, int dev_fn, int where, u32 *val);
+int early_write_config_byte(struct pci_controller *hose, int bus, int dev_fn, int where, u8 val);
+int early_write_config_word(struct pci_controller *hose, int bus, int dev_fn, int where, u16 val);
+int early_write_config_dword(struct pci_controller *hose, int bus, int dev_fn, int where, u32 val);
 
 #endif
 #endif /* __KERNEL__ */

@@ -2,12 +2,12 @@
 /******************************************************************************
  *
  * Module Name: amstore - AML Interpreter object store support
- *              $Revision: 117 $
+ *              $Revision: 119 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -260,10 +260,10 @@ acpi_aml_exec_store (
 		 * This loop to assign each of the elements is somewhat
 		 *  backward because of the Big Endian-ness of IA-64
 		 */
-		case ACPI_TYPE_NUMBER:
+		case ACPI_TYPE_INTEGER:
 			length = 4;
 			for (i = length; i != 0; i--) {
-				value = (u8)(val_desc->number.value >> (MUL_8 (i - 1)));
+				value = (u8)(val_desc->integer.value >> (MUL_8 (i - 1)));
 				tmp_desc->buffer.pointer[dest_desc->reference.offset] = value;
 			}
 			break;

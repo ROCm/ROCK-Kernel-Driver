@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: tbconvrt - ACPI Table conversion utilities
- *              $Revision: 15 $
+ *              $Revision: 18 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -47,7 +47,7 @@
 			   a.register_bit_width = (u8) MUL_8 (b);\
 			   a.register_bit_offset = 0;\
 			   a.reserved = 0;\
-			   a.address = (UINT64) c;}
+			   ACPI_STORE_ADDRESS (a.address,c);}
 
 
 /* ACPI V1.0 entries -- address space is always I/O */
@@ -126,8 +126,8 @@ acpi_tb_convert_to_xsdt (
 			new_table->table_offset_entry[i] =
 				((RSDT_DESCRIPTOR_REV071 *) table_info->pointer)->table_offset_entry[i];
 #else
-			new_table->table_offset_entry[i] =
-				((RSDT_DESCRIPTOR_REV1 *) table_info->pointer)->table_offset_entry[i];
+			ACPI_STORE_ADDRESS (new_table->table_offset_entry[i],
+				((RSDT_DESCRIPTOR_REV1 *) table_info->pointer)->table_offset_entry[i]);
 #endif
 		}
 		else {
@@ -384,8 +384,8 @@ acpi_tb_convert_table_fadt (void)
 
 		/* Convert table pointers to 64-bit fields */
 
-		FADT2->Xfirmware_ctrl = (UINT64) FADT1->firmware_ctrl;
-		FADT2->Xdsdt         = (UINT64) FADT1->dsdt;
+		ACPI_STORE_ADDRESS (FADT2->Xfirmware_ctrl, FADT1->firmware_ctrl);
+		ACPI_STORE_ADDRESS (FADT2->Xdsdt, FADT1->dsdt);
 
 		/* System Interrupt Model isn't used in ACPI 2.0*/
 		/* FADT2->Reserved1 = 0; */
@@ -448,6 +448,7 @@ acpi_tb_convert_table_fadt (void)
 	 * Global FADT pointer will point to the common V2.0 FADT
 	 */
 	acpi_gbl_FADT = FADT2;
+	acpi_gbl_FADT->header.length = sizeof (FADT_DESCRIPTOR);
 
 
 	/* Free the original table */
@@ -463,8 +464,6 @@ acpi_tb_convert_table_fadt (void)
 	table_desc->allocation = ACPI_MEM_ALLOCATED;
 	table_desc->length = sizeof (FADT_DESCRIPTOR_REV2);
 
-
-	/* Dump the FADT Header */
 
 	/* Dump the entire FADT */
 

@@ -19,7 +19,6 @@
  */
 
 #include <linux/config.h>
-#if defined(CONFIG_X25) || defined(CONFIG_X25_MODULE)
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>
@@ -232,7 +231,3 @@ void x25_limit_facilities(struct x25_facilities *facilities,
 		}
 	}
 }
-
-#endif
-
-

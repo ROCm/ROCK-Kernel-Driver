@@ -15,7 +15,7 @@
 #ifndef __ASSEMBLY__
 
 struct cpuinfo_PPC {
-	unsigned long loops_per_sec;
+	unsigned long loops_per_jiffy;
 	unsigned long pvr;
 	unsigned long *pgd_cache;
 	unsigned long *pte_cache;

@@ -21,6 +21,11 @@
 #ifndef _PPC_PREP_NVRAM_H
 #define _PPC_PREP_NVRAM_H
 
+#define MAX_PREP_NVRAM 0x8000
+#define PREP_NVRAM_AS0	0x74
+#define PREP_NVRAM_AS1	0x75
+#define PREP_NVRAM_DATA	0x77
+
 #define NVSIZE 4096	/* size of NVRAM */
 #define OSAREASIZE 512	/* size of OSArea space */
 #define CONFSIZE 1024	/* guess at size of Configuration space */

@@ -252,7 +252,7 @@ static u32 gen_new_htid(struct tc_u_common *tp_c)
 	do {
 		if (++tp_c->hgenerator == 0x7FF)
 			tp_c->hgenerator = 1;
-	} while (i>0 && u32_lookup_ht(tp_c, (tp_c->hgenerator|0x800)<<20));
+	} while (--i>0 && u32_lookup_ht(tp_c, (tp_c->hgenerator|0x800)<<20));
 
 	return i > 0 ? (tp_c->hgenerator|0x800)<<20 : 0;
 }

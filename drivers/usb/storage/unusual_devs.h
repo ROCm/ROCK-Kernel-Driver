@@ -28,10 +28,10 @@
  */
 
 /* IMPORTANT NOTE: This file must be included in another file which does
- * both of the following things for it to work:
- * (1) <include/config.h> _must_ be included before this file
- * (2) The macro UNUSUAL_DEV() must be defined before this file is included
+ * the following thing for it to work:
+ * The macro UNUSUAL_DEV() must be defined before this file is included
  */
+#include <linux/config.h>
 
 /* If you edit this file, please try to keep it sorted first by VendorID,
  * then by ProductID.

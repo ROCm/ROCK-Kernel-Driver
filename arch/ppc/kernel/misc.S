@@ -37,6 +37,14 @@
 
 	.text
 
+	.align	5
+_GLOBAL(__delay)
+	cmpwi	0,r3,0
+	mtctr	r3
+	beqlr
+1:	bdnz	1b
+	blr
+
 /*
  * Returns (address we're running at) - (address we were linked at)
  * for use before the text and data are mapped to KERNELBASE.
@@ -82,16 +90,16 @@ _GLOBAL(__no_use_restore_flags)
 	lwz	r7,ppc_n_lost_interrupts@l(r7)
 	cmpi	0,r7,0		/* lost interrupts to process first? */
 	bne-	do_lost_interrupts
-1:	sync
+1:	SYNC
 	mtmsr	r3
-	isync
+	SYNC
 	blr
 	
 _GLOBAL(__no_use_cli)
 	mfmsr	r0		/* Get current interrupt state */
 	rlwinm	r3,r0,16+1,32-1,31	/* Extract old value of 'EE' */
 	rlwinm	r0,r0,0,17,15	/* clear MSR_EE in r0 */
-	sync			/* Some chip revs have problems here... */
+	SYNC			/* Some chip revs have problems here... */
 	mtmsr	r0		/* Update machine state */
 	blr			/* Done */
 
@@ -102,7 +110,7 @@ _GLOBAL(__no_use_sti)
 	ori	r3,r3,MSR_EE	/* Turn on 'EE' bit */
 	cmpi	0,r4,0		/* lost interrupts to process first? */
 	bne-	do_lost_interrupts
-	sync			/* Some chip revs have problems here... */
+	SYNC			/* Some chip revs have problems here... */
 	mtmsr	r3		/* Update machine state */
 	blr
 
@@ -121,7 +129,7 @@ _GLOBAL(do_lost_interrupts)
 	cmpi	0,r4,0
 	bne-	1b
 	lwz	r3,8(r1)
-	sync
+	SYNC
 	mtmsr	r3
 	lwz	r0,20(r1)
 	mtlr	r0
@@ -137,8 +145,9 @@ _GLOBAL(do_lost_interrupts)
 	mfmsr	r0		/* Get current msr */
 	andc	r0,r0,r3	/* And off the bits set in r3 (first parm) */
 	or	r0,r0,r4		/* Or on the bits in r4 (second parm) */
-	sync			/* Some chip revs have problems here... */
+	SYNC			/* Some chip revs have problems here... */
 	mtmsr	r0		/* Update machine state */
+	isync
 	blr			/* Done */
 
 
@@ -148,7 +157,7 @@ _GLOBAL(do_lost_interrupts)
 _GLOBAL(_tlbia)
 #if defined(CONFIG_SMP)
 	mfmsr	r10
-	sync
+	SYNC
 	rlwinm	r0,r10,0,17,15		/* clear bit 16 (MSR_EE) */
 	mtmsr	r0
 	SYNC
@@ -161,7 +170,6 @@ _GLOBAL(_tlbia)
 	bne-	10b
 	stwcx.	r8,0,r9
 	bne-	10b
-	eieio
 #endif /* CONFIG_SMP */
 	sync
 	tlbia
@@ -182,7 +190,7 @@ _GLOBAL(_tlbia)
 _GLOBAL(_tlbie)
 #if defined(CONFIG_SMP)
 	mfmsr	r10
-	sync
+	SYNC
 	rlwinm	r0,r10,0,17,15		/* clear bit 16 (MSR_EE) */
 	mtmsr	r0
 	SYNC
@@ -228,7 +236,7 @@ _GLOBAL(flush_instruction_cache)
 	ori	r3,r3,HID0_ICFI
 	mtspr	HID0,r3
 #endif /* CONFIG_8xx */
-	SYNC
+	isync
 	blr
 
 /*
@@ -259,7 +267,6 @@ _GLOBAL(flush_icache_range)
 2:	icbi	0,r6
 	addi	r6,r6,CACHE_LINE_SIZE
 	bdnz	2b
-	sync
 	isync
 	blr
 
@@ -717,6 +724,8 @@ _GLOBAL(_get_SP)
 	mr	r3,r1		/* Close enough */
 	blr
 
+#if 0
+/* isn't it just easier to use the mtspr/mfspr inline macros?? --Troy */
 _GLOBAL(_get_THRM1)
 	mfspr	r3,THRM1
 	blr
@@ -740,6 +749,7 @@ _GLOBAL(_set_THRM2)
 _GLOBAL(_set_THRM3)
 	mtspr	THRM3,r3
 	blr
+#endif
 	
 _GLOBAL(_get_PVR)
 	mfspr	r3,PVR
@@ -755,6 +765,12 @@ _GLOBAL(_get_HID0)
 	mfspr	r3,HID0
 	blr
 
+_GLOBAL(_set_HID0)
+	sync
+	mtspr	HID0, r3
+	SYNC		/* Handle erratas in some cases */
+	blr
+
 _GLOBAL(_get_ICTC)
 	mfspr	r3,ICTC
 	blr
@@ -763,7 +779,6 @@ _GLOBAL(_set_ICTC)
 	mtspr	ICTC,r3
 	blr
 
-	
 /*
 	L2CR functions
 	Copyright © 1997-1998 by PowerLogix R & D, Inc.
@@ -785,6 +800,17 @@ _GLOBAL(_set_ICTC)
 /*
 	Thur, Dec. 12, 1998.
 	- First public release, contributed by PowerLogix.
+	***********
+	Sat, Aug. 7, 1999.
+	- Terry: Made sure code disabled interrupts before running. (Previously
+			it was assumed interrupts were already disabled).
+	- Terry: Updated for tentative G4 support.  4MB of memory is now flushed
+			instead of 2MB.  (Prob. only 3 is necessary).
+	- Terry: Updated for workaround to HID0[DPM] processor bug
+			during global invalidates.
+	***********
+	Thu, July 13, 2000.
+	- Terry: Added isync to correct for an errata.
 	
 	Author:	Terry Greeniaus (tgree@phys.ualberta.ca)
 	Please e-mail updates to this file to me, thanks!
@@ -823,82 +849,94 @@ _GLOBAL(_set_ICTC)
 	causes cache pushes from the L1 cache to go to the L2 cache
 	instead of to main memory.
 */
-
+/*
+ * Summary: this procedure ignores the L2I bit in the value passed in,
+ * flushes the cache if it was already enabled, always invalidates the
+ * cache, then enables the cache if the L2E bit is set in the value
+ * passed in.
+ *   -- paulus.
+ */
 _GLOBAL(_set_L2CR)
-	/* Make sure this is a 750 chip */
+	/* Make sure this is a 750 or 7400 chip */
 	mfspr	r4,PVR
 	rlwinm	r4,r4,16,16,31
-	cmplwi	r4,0x0008
-	beq	thisIs750
-	cmplwi	r4,0x000c
-	beq thisIs750
-	li	r3,-1
-	blr
-	
-thisIs750:
-	/* Get the current enable bit of the L2CR into r4 */
-	mfspr	r4,L2CR
-	mfmsr	r7
-	
-	/* See if we want to perform a global inval this time. */
-	rlwinm	r6,r3,0,10,10	/* r6 contains the new invalidate bit */
-	rlwinm.	r5,r3,0,0,0	/* r5 contains the new enable bit */
-	rlwinm	r3,r3,0,11,9	/* Turn off the invalidate bit */
-	rlwimi	r3,r4,0,0,0	/* Keep the enable bit the same as it was. */
-	bne	dontDisableCache /* Only disable the cache if L2CRApply
-				    has the enable bit off */
+	cmpwi	r4,0x0008
+	cmpwi	cr1,r4,0x000c
+	cror	2,2,4*cr1+2
+	bne	99f
 
-disableCache:
-	/* Disable the cache.  First, we turn off interrupts.
-	   An interrupt while we are flushing the cache could bring
-	   in data which may not get properly flushed. */
-	rlwinm	r4,r7,0,17,15	/* Turn off EE bit */
+	/* Turn off interrupts and data relocation. */
+	mfmsr	r7		/* Save MSR in r7 */
+	rlwinm	r4,r7,0,17,15
+	rlwinm	r4,r4,0,28,26	/* Turn off DR bit */
 	sync
 	mtmsr	r4
-	sync
+	isync
+
+	/* Get the current enable bit of the L2CR into r4 */
+	mfspr	r4,L2CR
 	
-/*
-	Now, read the first 2MB of memory to put new data in the cache.
-	(Actually we only need the size of the L2 cache plus the size
-	of the L1 cache, but 2MB will cover everything just to be safe).
-*/
-	lis	r4,0x0001
+	/* Tweak some bits */
+	rlwinm	r5,r3,0,0,0		/* r5 contains the new enable bit */
+	rlwinm	r3,r3,0,11,9		/* Turn off the invalidate bit */
+	rlwinm	r3,r3,0,1,31		/* Turn off the enable bit */
+
+	/* Check to see if we need to flush */
+	rlwinm.	r4,r4,0,0,0
+	beq	2f
+
+	/* Flush the cache. First, read the first 4MB of memory (physical) to
+	 * put new data in the cache.  (Actually we only need
+	 * the size of the L2 cache plus the size of the L1 cache, but 4MB will
+	 * cover everything just to be safe).
+	 */
+		
+	 /**** Might be a good idea to set L2DO here - to prevent instructions
+	       from getting into the cache.  But since we invalidate
+	       the next time we enable the cache it doesn't really matter.
+	  ****/
+
+	lis	r4,0x0002
 	mtctr	r4
-	lis	r4,KERNELBASE@h
-1:	lwzx	r0,r0,r4
-	addi	r4,r4,0x0020		/* Go to start of next cache line */
+	li	r4,0
+1:
+	lwzx	r0,r0,r4
+	addi	r4,r4,32		/* Go to start of next cache line */
 	bdnz	1b
 	
-	/* Now, flush the first 2MB of memory */
-	lis	r4,0x0001
+	/* Now, flush the first 4MB of memory */
+	lis	r4,0x0002
 	mtctr	r4
-	lis	r4,KERNELBASE@h
+	li	r4,0
 	sync
-2:	dcbf	r0,r4
-	addi	r4,r4,0x0020	/* Go to start of next cache line */
-	bdnz	2b
-	
-	/* Turn off the L2CR enable bit. */
-	rlwinm	r3,r3,0,1,31
-	
-dontDisableCache:
-	/* Set up the L2CR configuration bits */
+1:
+	dcbf	r0,r4
+	addi	r4,r4,32		/* Go to start of next cache line */
+	bdnz	1b
+
+2:
+	/* Set up the L2CR configuration bits (and switch L2 off) */
 	sync
 	mtspr	L2CR,r3
 	sync
 
-	/* Reenable interrupts if necessary. */
-	mtmsr	r7
+	/* Before we perform the global invalidation, we must disable dynamic
+	 * power management via HID0[DPM] to work around a processor bug where
+	 * DPM can possibly interfere with the state machine in the processor
+	 * that invalidates the L2 cache tags.
+	 */
+	mfspr	r8,HID0			/* Save HID0 in r8 */
+	rlwinm	r4,r8,0,12,10		/* Turn off HID0[DPM] */
 	sync
-	
-	cmplwi	r6,0
-	beq	noInval
-	
+	mtspr	HID0,r4			/* Disable DPM */
+	sync
+
 	/* Perform a global invalidation */
 	oris	r3,r3,0x0020
 	sync
 	mtspr	L2CR,r3
 	sync
+	isync				/* For errata */
 
 	/* Wait for the invalidation to complete */
 3:	mfspr	r3,L2CR
@@ -910,27 +948,38 @@ dontDisableCache:
 	mtspr	L2CR,r3
 	sync
 	
-noInval:
+	/* Restore HID0[DPM] to whatever it was before */
+	sync
+	mtspr	1008,r8
+	sync
+
 	/* See if we need to enable the cache */
 	cmplwi	r5,0
-	beqlr
+	beq	4f
 
 	/* Enable the cache */
 	oris	r3,r3,0x8000
 	mtspr	L2CR,r3
 	sync
+
+	/* Restore MSR (restores EE and DR bits to original state) */
+4:	SYNC
+	mtmsr	r7
+	isync
+	blr
+
+99:	li	r3,-1
 	blr
 
 _GLOBAL(_get_L2CR)
 	/* Make sure this is a 750 chip */
 	mfspr	r3,PVR
-	rlwinm	r3,r3,16,16,31
-	cmplwi	r3,0x0008
-	beq	1f
-	cmplwi	r3,0x000c
+	srwi	r3,r3,16
+	cmpwi	r3,0x0008
+	cmpwi	cr1,r3,0x000c
 	li	r3,0
+	cror	2,2,4*cr1+2
 	bnelr
-1:	
 	/* Return the L2CR contents */
 	mfspr	r3,L2CR
 	blr
@@ -985,15 +1034,6 @@ _GLOBAL(cvt_df)
 	stfd	0,-4(r5)
 	blr
 #endif
-
-_GLOBAL(__clear_msr_me)
-        mfmsr   r0                      /* Get current interrupt state */
-        lis     r3,0
-        ori     r3,r3,MSR_ME
-        andc    r0,r0,r3                /* Clears bit in (r4) */
-        sync                            /* Some chip revs have problems here */
-        mtmsr   r0                      /* Update machine state */
-        blr
 
 /*
  * Create a kernel thread
@@ -1244,16 +1284,20 @@ _GLOBAL(sys_call_table)
 	.long sys_getrlimit	/* 190 */
 	.long sys_ni_syscall		/* 191 */	/* Unused */
 	.long sys_ni_syscall		/* 192 - reserved - mmap2 */
-	.long sys_ni_syscall		/* 193 - reserved - truncate64 */
-	.long sys_ni_syscall		/* 194 - reserved - ftruncate64 */
-	.long sys_ni_syscall		/* 195 - reserved - stat64 */
-	.long sys_ni_syscall		/* 196 - reserved - lstat64 */
-	.long sys_ni_syscall		/* 197 - reserved - fstat64 */
+	.long sys_truncate64		/* 193 */
+	.long sys_ftruncate64		/* 194 */
+	.long sys_stat64		/* 195 */
+	.long sys_lstat64		/* 196 */
+	.long sys_fstat64		/* 197 */
 	.long sys_pciconfig_read	/* 198 */
 	.long sys_pciconfig_write 	/* 199 */
 	.long sys_pciconfig_iobase 	/* 200 */
 	.long sys_ni_syscall		/* 201 - reserved - MacOnLinux - new */
 	.long sys_getdents64		/* 202 */
+	.long sys_pivot_root		/* 203 */
+	.long sys_fcntl64		/* 204 */
+	.long sys_madvise		/* 205 */
+	.long sys_mincore		/* 206 */
 	.rept NR_syscalls-(.-sys_call_table)/4
 		.long sys_ni_syscall
 	.endr

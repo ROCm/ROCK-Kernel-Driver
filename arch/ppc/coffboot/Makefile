@@ -20,18 +20,13 @@ else
 MSIZE=
 endif
 
-ifeq ($(CONFIG_ALL_PPC),y)
-# yes, we want to build pmac stuff
-CONFIG_PMAC = y
-endif
-
 ifeq ($(CONFIG_SMP),y)
 TFTPIMAGE=/tftpboot/zImage.pmac.smp$(MSIZE)
 else
 TFTPIMAGE=/tftpboot/zImage.pmac$(MSIZE)
 endif
 
-ifeq ($(CONFIG_PMAC),y)
+ifeq ($(CONFIG_ALL_PPC),y)
 chrpmain.o: chrpmain.c
 	$(CC) $(CFLAGS) -DSYSMAP_OFFSET=0 -DSYSMAP_SIZE=0 -c chrpmain.c
 

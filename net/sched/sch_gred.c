@@ -110,12 +110,9 @@ gred_enqueue(struct sk_buff *skb, struct Qdisc* sch)
 	unsigned long	qave=0;	
 	int i=0;
 
-	if (!t->initd) {
-		DPRINTK("NO GRED Queues setup yet! Enqueued anyway\n");
-		if (q->backlog <= q->limit) {
-			__skb_queue_tail(&sch->q, skb);
-			return NET_XMIT_DROP; /* @@@@ */
-		}
+	if (!t->initd && skb_queue_len(&sch->q) <= sch->dev->tx_queue_len) {
+		D2PRINTK("NO GRED Queues setup yet! Enqueued anyway\n");
+		goto do_enqueue;
 	}
 
 
@@ -179,11 +176,12 @@ gred_enqueue(struct sk_buff *skb, struct Qdisc* sch)
 		q->qcount = -1;
 enqueue:
 		if (q->backlog <= q->limit) {
+			q->backlog += skb->len;
+do_enqueue:
 			__skb_queue_tail(&sch->q, skb);
 			sch->stats.backlog += skb->len;
 			sch->stats.bytes += skb->len;
 			sch->stats.packets++;
-			q->backlog += skb->len;
 			return 0;
 		} else {
 			q->pdrop++;

@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Name: acexcep.h - Exception codes returned by the ACPI subsystem
- *       $Revision: 37 $
+ *       $Revision: 41 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -116,8 +116,10 @@
 #define AE_AML_NAME_NOT_FOUND           (ACPI_STATUS) (0x0010 | AE_CODE_AML)
 #define AE_AML_INTERNAL                 (ACPI_STATUS) (0x0011 | AE_CODE_AML)
 #define AE_AML_INVALID_SPACE_ID         (ACPI_STATUS) (0x0012 | AE_CODE_AML)
+#define AE_AML_STRING_LIMIT             (ACPI_STATUS) (0x0013 | AE_CODE_AML)
+#define AE_AML_NO_RETURN_VALUE          (ACPI_STATUS) (0x0014 | AE_CODE_AML)
 
-#define AE_CODE_AML_MAX                 0x0012
+#define AE_CODE_AML_MAX                 0x0014
 
 /*
  * Internal exceptions used for control
@@ -202,6 +204,8 @@ static NATIVE_CHAR          *acpi_gbl_exception_names_aml[] =
 	"AE_AML_NAME_NOT_FOUND",
 	"AE_AML_INTERNAL",
 	"AE_AML_INVALID_SPACE_ID",
+	"AE_AML_STRING_LIMIT",
+	"AE_AML_NO_RETURN_VALUE",
 };
 
 static NATIVE_CHAR          *acpi_gbl_exception_names_ctrl[] =

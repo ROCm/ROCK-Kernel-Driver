@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: cmalloc - local memory allocation routines
- *              $Revision: 79 $
+ *              $Revision: 83 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -57,8 +57,6 @@ _cm_allocate (
 	u32                     line)
 {
 	void                    *address = NULL;
-	DEBUG_ONLY_MEMBERS (\
-	ACPI_STATUS             status)
 
 
 	/* Check for an inadvertent size of zero bytes */
@@ -107,8 +105,6 @@ _cm_callocate (
 	u32                     line)
 {
 	void                    *address = NULL;
-	DEBUG_ONLY_MEMBERS (\
-	ACPI_STATUS             status)
 
 
 	/* Check for an inadvertent size of zero bytes */

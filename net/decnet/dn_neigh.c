@@ -18,6 +18,8 @@
  *                            forwarding now stands a good chance of
  *                            working.
  *     Steve Whitehouse     : Fixed neighbour states (for now anyway).
+ *     Steve Whitehouse     : Made error_report functions dummies. This
+ *                            is not the right place to return skbs.
  *
  */
 
@@ -52,81 +54,66 @@ static int dn_phase3_output(struct sk_buff *);
  * For talking to broadcast devices: Ethernet & PPP
  */
 static struct neigh_ops dn_long_ops = {
-	AF_DECnet,
-	NULL,
-	NULL,
-	dn_long_error_report,
-	dn_long_output,
-	dn_long_output,
-	dev_queue_xmit,
-	dev_queue_xmit
+	family:			AF_DECnet,
+	error_report:		dn_long_error_report,
+	output:			dn_long_output,
+	connected_output:	dn_long_output,
+	hh_output:		dev_queue_xmit,
+	queue_xmit:		dev_queue_xmit,
 };
 
 /*
  * For talking to pointopoint and multidrop devices: DDCMP and X.25
  */
 static struct neigh_ops dn_short_ops = {
-	AF_DECnet,
-	NULL,
-	NULL,
-	dn_short_error_report,
-	dn_short_output,
-	dn_short_output,
-	dev_queue_xmit,
-	dev_queue_xmit
+	family:			AF_DECnet,
+	error_report:		dn_short_error_report,
+	output:			dn_short_output,
+	connected_output:	dn_short_output,
+	hh_output:		dev_queue_xmit,
+	queue_xmit:		dev_queue_xmit,
 };
 
 /*
  * For talking to DECnet phase III nodes
  */
 static struct neigh_ops dn_phase3_ops = {
-	AF_DECnet,
-	NULL,
-	NULL,
-	dn_short_error_report, /* Can use short version here */
-	dn_phase3_output,
-	dn_phase3_output,
-	dev_queue_xmit,
-	dev_queue_xmit
+	family:			AF_DECnet,
+	error_report:		dn_short_error_report, /* Can use short version here */
+	output:			dn_phase3_output,
+	connected_output:	dn_phase3_output,
+	hh_output:		dev_queue_xmit,
+	queue_xmit:		dev_queue_xmit
 };
 
 struct neigh_table dn_neigh_table = {
-	NULL,
-	PF_DECnet,
-	sizeof(struct dn_neigh),
-	sizeof(dn_address),
-	dn_neigh_hash,
-	dn_neigh_construct,
-	NULL, /* pconstructor */
-	NULL, /* pdestructor */
-	NULL, /* proxyredo */
-	"dn_neigh_cache",
-	{ 
-		NULL,
-		NULL,
-		&dn_neigh_table,
-		0,
-		NULL,
-		NULL,
-		30 * HZ,	/* base_reachable_time */
-		1 * HZ,		/* retrans_time */
-		60 * HZ,	/* gc_staletime */
-		30 * HZ,	/* reachable_time */
-		5 * HZ,		/* delay_probe_time */
-		3,	/* queue_len */
-		0,	/* ucast_probes */
-		0,	/* app_probes */
-		0,	/* mcast_probes */
-		0,	/* anycast_delay */
-		0,	/* proxy_delay */
-		0,	/* proxy_qlen */
-		1 * HZ,	/* locktime */
+	family:				PF_DECnet,
+	entry_size:			sizeof(struct dn_neigh),
+	key_len:			sizeof(dn_address),
+	hash:				dn_neigh_hash,
+	constructor:			dn_neigh_construct,
+	id:				"dn_neigh_cache",
+	parms:	{
+		tbl:			&dn_neigh_table,
+		entries:		0,
+		base_reachable_time:	30 * HZ,
+		retrans_time:		1 * HZ,
+		gc_staletime:		60 * HZ,
+		reachable_time:		30 * HZ,
+		delay_probe_time:	5 * HZ,
+		queue_len:		3,
+		ucast_probes:		0,
+		app_probes:		0,
+		mcast_probes:		0,
+		anycast_delay:		0,
+		proxy_delay:		0,
+		proxy_qlen:		0,
+		locktime:		1 * HZ,
 	},
-	30 * HZ,	/* gc_interval */
-	128,		/* gc_thresh1 */
-	512,		/* gc_thresh2 */
-	1024,		/* gc_thresh3 */
-	
+	gc_interval:			30 * HZ,
+	gc_thresh1:			128,
+	gc_thresh2:			512,
+	gc_thresh3:			1024,
 };
 
 static u32 dn_neigh_hash(const void *pkey, const struct net_device *dev)
@@ -180,66 +167,15 @@ static int dn_neigh_construct(struct neighbour *neigh)
 
 static void dn_long_error_report(struct neighbour *neigh, struct sk_buff *skb)
 {
-	struct dn_skb_cb *cb = (struct dn_skb_cb *)skb->cb;
-	unsigned char *ptr;
-
 	printk(KERN_DEBUG "dn_long_error_report: called\n");
-
-	if (!(cb->rt_flags & DN_RT_F_RQR)) {
-		kfree_skb(skb);
-		return;
-	}
-
-	skb_push(skb, skb->data - skb->nh.raw);
-	ptr = skb->data;
-
-	*(unsigned short *)ptr = dn_htons(skb->len - 2);
-	ptr += 2;
-
-	if (*ptr & DN_RT_F_PF) {
-		char padlen = (*ptr & ~DN_RT_F_PF);
-		ptr += padlen;
-	}
-
-	*ptr++ |= (cb->rt_flags & ~DN_RT_F_RQR) | DN_RT_F_RTS;
-
-	ptr += 2;
-	dn_dn2eth(ptr, dn_ntohs(cb->src));
-	ptr += 8;
-	dn_dn2eth(ptr, dn_ntohs(cb->dst));
-	ptr += 6;
-	*ptr = 0;
-
-	skb->dst->neighbour->ops->queue_xmit(skb);
+	kfree_skb(skb);
 }
 
 
 static void dn_short_error_report(struct neighbour *neigh, struct sk_buff *skb)
 {
-	struct dn_skb_cb *cb = (struct dn_skb_cb *)skb->cb;
-	unsigned char *ptr;
-
 	printk(KERN_DEBUG "dn_short_error_report: called\n");
-
-	if (!(cb->rt_flags & DN_RT_F_RQR)) {
-		kfree_skb(skb);
-		return;
-	}
-
-	skb_push(skb, skb->data - skb->nh.raw);
-	ptr = skb->data;
-
-	*(unsigned short *)ptr = dn_htons(skb->len - 2);
-	ptr += 2;
-	*ptr++ = (cb->rt_flags & ~DN_RT_F_RQR) | DN_RT_F_RTS;
-
-	*(dn_address *)ptr = cb->src;
-	ptr += 2;
-	*(dn_address *)ptr = cb->dst;
-	ptr += 2;
-	*ptr = 0;
-
-	skb->dst->neighbour->ops->queue_xmit(skb);
+	kfree_skb(skb);
 }
 
 static int dn_neigh_output_packet(struct sk_buff *skb)
@@ -266,7 +202,7 @@ static int dn_long_output(struct sk_buff *skb)
 	int headroom = dev->hard_header_len + sizeof(struct dn_long_packet) + 3;
 	unsigned char *data;
 	struct dn_long_packet *lp;
-	struct dn_skb_cb *cb = (struct dn_skb_cb *)skb->cb;
+	struct dn_skb_cb *cb = DN_SKB_CB(skb);
 
 
 	if (skb_headroom(skb) < headroom) {
@@ -312,7 +248,7 @@ static int dn_short_output(struct sk_buff *skb)
 	int headroom = dev->hard_header_len + sizeof(struct dn_short_packet) + 2;
 	struct dn_short_packet *sp;
 	unsigned char *data;
-	struct dn_skb_cb *cb = (struct dn_skb_cb *)skb->cb;
+	struct dn_skb_cb *cb = DN_SKB_CB(skb);
 
 
         if (skb_headroom(skb) < headroom) {
@@ -355,7 +291,7 @@ static int dn_phase3_output(struct sk_buff *skb)
 	int headroom = dev->hard_header_len + sizeof(struct dn_short_packet) + 2;
 	struct dn_short_packet *sp;
 	unsigned char *data;
-	struct dn_skb_cb *cb = (struct dn_skb_cb *)skb->cb;
+	struct dn_skb_cb *cb = DN_SKB_CB(skb);
 
 	if (skb_headroom(skb) < headroom) {
 		struct sk_buff *skb2 = skb_realloc_headroom(skb, headroom);
@@ -659,8 +595,6 @@ void __init dn_neigh_init(void)
 
 void __exit dn_neigh_cleanup(void)
 {
-#ifdef CONFIG_PROC_FS
 	proc_net_remove("decnet_neigh");
-#endif /* CONFIG_PROC_FS */
 	neigh_table_clear(&dn_neigh_table);
 }

@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: cmeval - Object evaluation
- *              $Revision: 19 $
+ *              $Revision: 21 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -77,7 +77,7 @@ acpi_cm_evaluate_numeric_object (
 
 	/* Is the return object of the correct type? */
 
-	if (obj_desc->common.type != ACPI_TYPE_NUMBER) {
+	if (obj_desc->common.type != ACPI_TYPE_INTEGER) {
 		status = AE_TYPE;
 	}
 	else {
@@ -85,7 +85,7 @@ acpi_cm_evaluate_numeric_object (
 		 * Since the structure is a union, setting any field will set all
 		 * of the variables in the union
 		 */
-		*address = obj_desc->number.value;
+		*address = obj_desc->integer.value;
 	}
 
 	/* On exit, we must delete the return object */
@@ -142,17 +142,17 @@ acpi_cm_execute_HID (
 	 *  a string
 	 */
 
-	if ((obj_desc->common.type != ACPI_TYPE_NUMBER) &&
+	if ((obj_desc->common.type != ACPI_TYPE_INTEGER) &&
 		(obj_desc->common.type != ACPI_TYPE_STRING))
 	{
 		status = AE_TYPE;
 	}
 
 	else {
-		if (obj_desc->common.type == ACPI_TYPE_NUMBER) {
+		if (obj_desc->common.type == ACPI_TYPE_INTEGER) {
 			/* Convert the Numeric HID to string */
 
-			acpi_aml_eisa_id_to_string ((u32) obj_desc->number.value, hid->buffer);
+			acpi_aml_eisa_id_to_string ((u32) obj_desc->integer.value, hid->buffer);
 		}
 
 		else {
@@ -217,17 +217,17 @@ acpi_cm_execute_UID (
 	 *  a string
 	 */
 
-	if ((obj_desc->common.type != ACPI_TYPE_NUMBER) &&
+	if ((obj_desc->common.type != ACPI_TYPE_INTEGER) &&
 		(obj_desc->common.type != ACPI_TYPE_STRING))
 	{
 		status = AE_TYPE;
 	}
 
 	else {
-		if (obj_desc->common.type == ACPI_TYPE_NUMBER) {
+		if (obj_desc->common.type == ACPI_TYPE_INTEGER) {
 			/* Convert the Numeric UID to string */
 
-			acpi_aml_unsigned_integer_to_string (obj_desc->number.value, uid->buffer);
+			acpi_aml_unsigned_integer_to_string (obj_desc->integer.value, uid->buffer);
 		}
 
 		else {
@@ -289,14 +289,14 @@ acpi_cm_execute_STA (
 
 		/* Is the return object of the correct type? */
 
-		if (obj_desc->common.type != ACPI_TYPE_NUMBER) {
+		if (obj_desc->common.type != ACPI_TYPE_INTEGER) {
 			status = AE_TYPE;
 		}
 
 		else {
 			/* Extract the status flags */
 
-			*flags = (u32) obj_desc->number.value;
+			*flags = (u32) obj_desc->integer.value;
 		}
 
 		/* On exit, we must delete the return object */

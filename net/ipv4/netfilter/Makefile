@@ -35,7 +35,7 @@ obj-$(CONFIG_IP_NF_CONNTRACK) += ip_conntrack.o
 obj-$(CONFIG_IP_NF_FTP) += ip_conntrack_ftp.o
 
 # NAT helpers 
-obj-$(CONFIG_IP_NF_FTP) += ip_nat_ftp.o
+obj-$(CONFIG_IP_NF_NAT_FTP) += ip_nat_ftp.o
 
 # generic IP tables 
 obj-$(CONFIG_IP_NF_IPTABLES) += ip_tables.o

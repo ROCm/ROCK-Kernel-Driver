@@ -17,22 +17,22 @@ extern void local_flush_tlb_mm(struct mm_struct *mm);
 extern void local_flush_tlb_page(struct vm_area_struct *vma, unsigned long vmaddr);
 extern void local_flush_tlb_range(struct mm_struct *mm, unsigned long start,
 				  unsigned long end);
-extern inline void flush_hash_page(unsigned context, unsigned long va)
+static inline void flush_hash_page(unsigned context, unsigned long va)
 	{ }
 #elif defined(CONFIG_8xx)
 #define __tlbia()	asm volatile ("tlbia" : : )
 
-extern inline void local_flush_tlb_all(void)
+static inline void local_flush_tlb_all(void)
 	{ __tlbia(); }
-extern inline void local_flush_tlb_mm(struct mm_struct *mm)
+static inline void local_flush_tlb_mm(struct mm_struct *mm)
 	{ __tlbia(); }
-extern inline void local_flush_tlb_page(struct vm_area_struct *vma,
+static inline void local_flush_tlb_page(struct vm_area_struct *vma,
 				unsigned long vmaddr)
 	{ __tlbia(); }
-extern inline void local_flush_tlb_range(struct mm_struct *mm,
+static inline void local_flush_tlb_range(struct mm_struct *mm,
 				unsigned long start, unsigned long end)
 	{ __tlbia(); }
-extern inline void flush_hash_page(unsigned context, unsigned long va)
+static inline void flush_hash_page(unsigned context, unsigned long va)
 	{ }
 #else
 struct mm_struct;
@@ -49,7 +49,7 @@ extern void local_flush_tlb_range(struct mm_struct *mm, unsigned long start,
 #define flush_tlb_page local_flush_tlb_page
 #define flush_tlb_range local_flush_tlb_range
 
-extern inline void flush_tlb_pgtables(struct mm_struct *mm,
+static inline void flush_tlb_pgtables(struct mm_struct *mm,
 				unsigned long start, unsigned long end)
 {
 	/* PPC has hw page tables. */
@@ -323,9 +323,9 @@ extern pte_t * __bad_pagetable(void);
  * setup: the pgd is never bad, and a pmd always exists (as it's folded
  * into the pgd entry)
  */
-extern inline int pgd_none(pgd_t pgd)		{ return 0; }
-extern inline int pgd_bad(pgd_t pgd)		{ return 0; }
-extern inline int pgd_present(pgd_t pgd)	{ return 1; }
+static inline int pgd_none(pgd_t pgd)		{ return 0; }
+static inline int pgd_bad(pgd_t pgd)		{ return 0; }
+static inline int pgd_present(pgd_t pgd)	{ return 1; }
 #define pgd_clear(xp)				do { } while (0)
 
 #define pgd_page(pgd) \
@@ -335,45 +335,45 @@ extern inline int pgd_present(pgd_t pgd)	{ return 1; }
  * The following only work if pte_present() is true.
  * Undefined behaviour if not..
  */
-extern inline int pte_read(pte_t pte)		{ return pte_val(pte) & _PAGE_USER; }
-extern inline int pte_write(pte_t pte)		{ return pte_val(pte) & _PAGE_RW; }
-extern inline int pte_exec(pte_t pte)		{ return pte_val(pte) & _PAGE_USER; }
-extern inline int pte_dirty(pte_t pte)		{ return pte_val(pte) & _PAGE_DIRTY; }
-extern inline int pte_young(pte_t pte)		{ return pte_val(pte) & _PAGE_ACCESSED; }
+static inline int pte_read(pte_t pte)		{ return pte_val(pte) & _PAGE_USER; }
+static inline int pte_write(pte_t pte)		{ return pte_val(pte) & _PAGE_RW; }
+static inline int pte_exec(pte_t pte)		{ return pte_val(pte) & _PAGE_USER; }
+static inline int pte_dirty(pte_t pte)		{ return pte_val(pte) & _PAGE_DIRTY; }
+static inline int pte_young(pte_t pte)		{ return pte_val(pte) & _PAGE_ACCESSED; }
 
-extern inline void pte_uncache(pte_t pte)       { pte_val(pte) |= _PAGE_NO_CACHE; }
-extern inline void pte_cache(pte_t pte)         { pte_val(pte) &= ~_PAGE_NO_CACHE; }
+static inline void pte_uncache(pte_t pte)       { pte_val(pte) |= _PAGE_NO_CACHE; }
+static inline void pte_cache(pte_t pte)         { pte_val(pte) &= ~_PAGE_NO_CACHE; }
 
-extern inline pte_t pte_rdprotect(pte_t pte) {
+static inline pte_t pte_rdprotect(pte_t pte) {
 	pte_val(pte) &= ~_PAGE_USER; return pte; }
-extern inline pte_t pte_exprotect(pte_t pte) {
+static inline pte_t pte_exprotect(pte_t pte) {
 	pte_val(pte) &= ~_PAGE_USER; return pte; }
-extern inline pte_t pte_wrprotect(pte_t pte) {
+static inline pte_t pte_wrprotect(pte_t pte) {
 	pte_val(pte) &= ~(_PAGE_RW | _PAGE_HWWRITE); return pte; }
-extern inline pte_t pte_mkclean(pte_t pte) {
+static inline pte_t pte_mkclean(pte_t pte) {
 	pte_val(pte) &= ~(_PAGE_DIRTY | _PAGE_HWWRITE); return pte; }
-extern inline pte_t pte_mkold(pte_t pte) {
+static inline pte_t pte_mkold(pte_t pte) {
 	pte_val(pte) &= ~_PAGE_ACCESSED; return pte; }
 
-extern inline pte_t pte_mkread(pte_t pte) {
+static inline pte_t pte_mkread(pte_t pte) {
 	pte_val(pte) |= _PAGE_USER; return pte; }
-extern inline pte_t pte_mkexec(pte_t pte) {
+static inline pte_t pte_mkexec(pte_t pte) {
 	pte_val(pte) |= _PAGE_USER; return pte; }
-extern inline pte_t pte_mkwrite(pte_t pte)
+static inline pte_t pte_mkwrite(pte_t pte)
 {
 	pte_val(pte) |= _PAGE_RW;
 	if (pte_val(pte) & _PAGE_DIRTY)
 		pte_val(pte) |= _PAGE_HWWRITE;
 	return pte;
 }
-extern inline pte_t pte_mkdirty(pte_t pte)
+static inline pte_t pte_mkdirty(pte_t pte)
 {
 	pte_val(pte) |= _PAGE_DIRTY;
 	if (pte_val(pte) & _PAGE_RW)
 		pte_val(pte) |= _PAGE_HWWRITE;
 	return pte;
 }
-extern inline pte_t pte_mkyoung(pte_t pte) {
+static inline pte_t pte_mkyoung(pte_t pte) {
 	pte_val(pte) |= _PAGE_ACCESSED; return pte; }
 
 /* Certain architectures need to do special things when pte's
@@ -387,7 +387,7 @@ extern inline pte_t pte_mkyoung(pte_t pte) {
  * and a page entry and page directory to the page they refer to.
  */
 
-extern inline pte_t mk_pte_phys(unsigned long physpage, pgprot_t pgprot)
+static inline pte_t mk_pte_phys(unsigned long physpage, pgprot_t pgprot)
 {
 	pte_t pte;
 	pte_val(pte) = physpage | pgprot_val(pgprot);
@@ -401,11 +401,72 @@ extern inline pte_t mk_pte_phys(unsigned long physpage, pgprot_t pgprot)
 	pte;							\
 })
 
-extern inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
+static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 {
 	pte_val(pte) = (pte_val(pte) & _PAGE_CHG_MASK) | pgprot_val(newprot);
 	return pte;
 }
+
+/*
+ * Atomic PTE updates.
+ *
+ * pte_update clears and sets bit atomically, and returns
+ * the old pte value.
+ */
+static inline unsigned long pte_update(pte_t *p, unsigned long clr,
+				       unsigned long set)
+{
+	unsigned long old, tmp;
+	
+	__asm__ __volatile__("\
+1:	lwarx	%0,0,%3
+	andc	%1,%0,%4
+	or	%1,%1,%5
+	stwcx.	%1,0,%3
+	bne-	1b"
+	: "=&r" (old), "=&r" (tmp), "=m" (*p)
+	: "r" (p), "r" (clr), "r" (set), "m" (*p)
+	: "cc" );
+	return old;
+}
+
+static inline int ptep_test_and_clear_young(pte_t *ptep)
+{
+	return (pte_update(ptep, _PAGE_ACCESSED, 0) & _PAGE_ACCESSED) != 0;
+}
+
+static inline int ptep_test_and_clear_dirty(pte_t *ptep)
+{
+	return (pte_update(ptep, _PAGE_DIRTY | _PAGE_HWWRITE, 0)
+		& _PAGE_DIRTY) != 0;
+}
+
+static inline pte_t ptep_get_and_clear(pte_t *ptep)
+{
+	return __pte(pte_update(ptep, ~0UL, 0));
+}
+
+static inline void ptep_set_wrprotect(pte_t *ptep)
+{
+	pte_update(ptep, _PAGE_RW | _PAGE_HWWRITE, 0);
+}
+
+static inline void ptep_mkdirty(pte_t *ptep)
+{
+	/*
+	 * N.B. this doesn't set the _PAGE_HWWRITE bit in the case
+	 * where _PAGE_RW is set and _PAGE_DIRTY was clear.  This
+	 * doesn't matter; all it will mean is that if the next call
+	 * to hash_page for this page is for a read, it will put a
+	 * readonly HPTE into the hash table rather than a R/W HPTE.
+	 * A call to hash_page for a write to this page will set
+	 * _PAGE_HWWRITE and put a R/W HPTE into the hash table.
+	 *  -- paulus.
+	 */
+	pte_update(ptep, 0, _PAGE_DIRTY);
+}
+
+#define pte_same(A,B)	(pte_val(A) == pte_val(B))
 
 #define pmd_page(pmd)	(pmd_val(pmd))
 
@@ -417,13 +478,13 @@ extern inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 #define pgd_offset(mm, address)	 ((mm)->pgd + pgd_index(address))
 
 /* Find an entry in the second-level page table.. */
-extern inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)
+static inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)
 {
 	return (pmd_t *) dir;
 }
 
 /* Find an entry in the third-level page table.. */ 
-extern inline pte_t * pte_offset(pmd_t * dir, unsigned long address)
+static inline pte_t * pte_offset(pmd_t * dir, unsigned long address)
 {
 	return (pte_t *) pmd_page(*dir) + ((address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1));
 }
@@ -486,8 +547,6 @@ extern void kernel_set_cachemode (unsigned long address, unsigned long size,
 
 #define io_remap_page_range remap_page_range 
 
-#include <asm-generic/pgtable.h>
-
-#endif __ASSEMBLY__
+#endif /* __ASSEMBLY__ */
 #endif /* _PPC_PGTABLE_H */
 #endif /* __KERNEL__ */

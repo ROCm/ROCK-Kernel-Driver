@@ -12,3 +12,4 @@ unsigned short lmc_proto_type(lmc_softc_t *sc const, struct skbuff *skb)
 
 
 #endif
+

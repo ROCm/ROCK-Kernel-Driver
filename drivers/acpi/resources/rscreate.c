@@ -3,12 +3,12 @@
  * Module Name: rscreate - Acpi_rs_create_resource_list
  *                         Acpi_rs_create_pci_routing_table
  *                         Acpi_rs_create_byte_stream
- *              $Revision: 22 $
+ *              $Revision: 24 $
  *
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -223,9 +223,9 @@ acpi_rs_create_pci_routing_table (
 			/*
 			 * Dereference the Address
 			 */
-			if (ACPI_TYPE_NUMBER == (*sub_object_list)->common.type) {
+			if (ACPI_TYPE_INTEGER == (*sub_object_list)->common.type) {
 				user_prt->data.address =
-						(*sub_object_list)->number.value;
+						(*sub_object_list)->integer.value;
 			}
 
 			else {
@@ -237,9 +237,9 @@ acpi_rs_create_pci_routing_table (
 			 */
 			sub_object_list++;
 
-			if (ACPI_TYPE_NUMBER == (*sub_object_list)->common.type) {
+			if (ACPI_TYPE_INTEGER == (*sub_object_list)->common.type) {
 				user_prt->data.pin =
-						(u32) (*sub_object_list)->number.value;
+						(u32) (*sub_object_list)->integer.value;
 			}
 
 			else {
@@ -267,7 +267,7 @@ acpi_rs_create_pci_routing_table (
 				 * is NULL, since the entire buffer was zeroed
 				 * out, we can leave this alone.
 				 */
-				if (ACPI_TYPE_NUMBER == (*sub_object_list)->common.type) {
+				if (ACPI_TYPE_INTEGER == (*sub_object_list)->common.type) {
 					/*
 					 * Add to the Length field the length of
 					 * the u32 NULL
@@ -289,9 +289,9 @@ acpi_rs_create_pci_routing_table (
 			 */
 			sub_object_list++;
 
-			if (ACPI_TYPE_NUMBER == (*sub_object_list)->common.type) {
+			if (ACPI_TYPE_INTEGER == (*sub_object_list)->common.type) {
 				user_prt->data.source_index =
-						(u32) (*sub_object_list)->number.value;
+						(u32) (*sub_object_list)->integer.value;
 			}
 
 			else {

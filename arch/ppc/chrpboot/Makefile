@@ -23,11 +23,6 @@ LD_ARGS = -Ttext 0x00400000
 OBJS = crt0.o start.o main.o misc.o ../coffboot/string.o ../coffboot/zlib.o image.o
 LIBS = $(TOPDIR)/lib/lib.a
 
-ifeq ($(CONFIG_ALL_PPC),y)
-# yes, we want to build chrp stuff
-CONFIG_CHRP = y
-endif
-
 ifeq ($(CONFIG_SMP),y)
 TFTPIMAGE=/tftpboot/zImage.chrp.smp$(MSIZE)
 else
@@ -37,10 +32,10 @@ endif
 all:	$(TOPDIR)/zImage
 
 #
-# Only build anything here if we're configured for CHRP
+# Only build anything here if we're configured for ALL_PPC
 # -- cort
 #
-ifeq ($(CONFIG_CHRP),y)
+ifeq ($(CONFIG_ALL_PPC),y)
 znetboot: zImage
 	cp zImage $(TFTPIMAGE)
 
@@ -96,6 +91,7 @@ vmlinux.coff.initrd:
 
 clean:
 	rm -f piggyback note addnote $(OBJS) zImage
+	rm -f zImage.rs6k zImage.initrd zImage.initrd.rs6k
 
 fastdep:
 	$(TOPDIR)/scripts/mkdep *.[Sch] > .depend

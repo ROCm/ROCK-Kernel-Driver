@@ -13,3 +13,4 @@ void lmc_proto_netif(lmc_softc_t *sc, struct sk_buff *skb);
 int lmc_skb_rawpackets(char *buf, char **start, off_t offset, int len, int unused);
 
 #endif
+

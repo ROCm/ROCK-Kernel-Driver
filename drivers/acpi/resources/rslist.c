@@ -2,12 +2,12 @@
  *
  * Module Name: rslist - Acpi_rs_byte_stream_to_list
  *                       Acpi_list_to_byte_stream
- *              $Revision: 8 $
+ *              $Revision: 10 $
  *
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by

@@ -2,12 +2,12 @@
 /******************************************************************************
  *
  * Module Name: amregion - ACPI default Op_region (address space) handlers
- *              $Revision: 41 $
+ *              $Revision: 44 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -99,8 +99,8 @@ acpi_aml_system_memory_space_handler (
 	 */
 
 	if ((address < mem_info->mapped_physical_address) ||
-		((address + length) >
-			(mem_info->mapped_physical_address + mem_info->mapped_length)))
+		(((ACPI_INTEGER) address + length) >
+			((ACPI_INTEGER) mem_info->mapped_physical_address + mem_info->mapped_length)))
 	{
 		/*
 		 * The request cannot be resolved by the current memory mapping;
@@ -139,7 +139,7 @@ acpi_aml_system_memory_space_handler (
 	/* TBD: should these pointers go to 64-bit in all cases ? */
 
 	logical_addr_ptr = mem_info->mapped_logical_address +
-			  (address - mem_info->mapped_physical_address);
+			  ((ACPI_INTEGER) address - (ACPI_INTEGER) mem_info->mapped_physical_address);
 
 	/* Perform the memory read or write */
 

@@ -270,25 +270,6 @@ ec_transaction (
     return_ACPI_STATUS(status);
 }
 
-static ACPI_STATUS 
-ec_space_setup (
-    ACPI_HANDLE                 region_handle,
-    UINT32                      function,
-    void                        *handler_context,
-    void                        **return_context)
-{
-	// TODO: What is this function for?
-	/* 
-	 * The ec object is in the handler context and is needed
-	 * when calling the ec_space_handler.
-	 */
-	*return_context = handler_context;
-
-    return AE_OK;
-}
-
-
-
 
 static void
 ec_query_handler (
@@ -556,10 +537,10 @@ found_ec(
 	buf.length = sizeof(obj);
 	buf.pointer = &obj;
 	if (!ACPI_SUCCESS(acpi_evaluate_object(handle, "_GPE", NULL, &buf))
-		|| obj.type != ACPI_TYPE_NUMBER)
+		|| obj.type != ACPI_TYPE_INTEGER)
 		return AE_OK;
 
-	ec_cxt->gpe_bit = obj.number.value;
+	ec_cxt->gpe_bit = obj.integer.value;
 
 	/* determine if we need the Global Lock when accessing */
 	buf.length = sizeof(obj);
@@ -568,12 +549,12 @@ found_ec(
 	status = acpi_evaluate_object(handle, "_GLK", NULL, &buf);
 	if (status == AE_NOT_FOUND)
 		ec_cxt->need_global_lock = 0;
-	else if (!ACPI_SUCCESS(status) || obj.type != ACPI_TYPE_NUMBER) {
+	else if (!ACPI_SUCCESS(status) || obj.type != ACPI_TYPE_INTEGER) {
 		DEBUG_PRINT(ACPI_ERROR, ("_GLK failed\n"));
 		return AE_OK;
 	}
 
-	ec_cxt->need_global_lock = obj.number.value;
+	ec_cxt->need_global_lock = obj.integer.value;
 
 	printk(KERN_INFO "ACPI: found EC @ (0x%02x,0x%02x,gpe %d GL %d)\n",
 		ec_cxt->data_port, ec_cxt->status_port, ec_cxt->gpe_bit,

@@ -505,9 +505,7 @@ static int jsfd_open(struct inode *inode, struct file *file)
 
 static int jsf_release(struct inode *inode, struct file *file)
 {
-	lock_kernel();
 	jsf0.busy = 0;
-	unlock_kernel();
 	return 0;
 }
 

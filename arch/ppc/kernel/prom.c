@@ -28,10 +28,11 @@
 #include <asm/smp.h>
 #include <asm/bootx.h>
 #include <asm/system.h>
-#include <asm/gemini.h>
 #include <asm/mmu.h>
 #include <asm/pgtable.h>
 #include <asm/bitops.h>
+/* for openpic_to_irq */
+#include "open_pic.h"
 
 #ifdef CONFIG_FB
 #include <asm/linux_logo.h>
@@ -95,26 +96,28 @@ static interpret_func interpret_root_props;
 #define FB_MAX	8
 #endif
 char *prom_display_paths[FB_MAX] __initdata = { 0, };
-unsigned int prom_num_displays = 0;
-char *of_stdout_device = 0;
+unsigned int prom_num_displays __initdata = 0;
+char *of_stdout_device __initdata = 0;
+ihandle prom_disp_node __initdata = 0;
 
-prom_entry prom = 0;
-ihandle prom_chosen = 0, prom_stdout = 0, prom_disp_node = 0;
+prom_entry prom __initdata = 0;
+ihandle prom_chosen __initdata = 0;
+ihandle prom_stdout __initdata = 0;
 
 extern char *klimit;
-char *bootpath = 0;
-char *bootdevice = 0;
+char *bootpath;
+char *bootdevice;
 
-unsigned int rtas_data = 0;   /* physical pointer */
-unsigned int rtas_entry = 0;  /* physical pointer */
-unsigned int rtas_size = 0;
-unsigned int old_rtas = 0;
+unsigned int rtas_data;   /* physical pointer */
+unsigned int rtas_entry;  /* physical pointer */
+unsigned int rtas_size;
+unsigned int old_rtas;
 
 /* Set for a newworld machine */
-int use_of_interrupt_tree = 0;
-int pmac_newworld = 0;
+int use_of_interrupt_tree;
+int pmac_newworld;
 
-static struct device_node *allnodes = 0;
+static struct device_node *allnodes;
 
 #ifdef CONFIG_BOOTX_TEXT
 
@@ -134,13 +137,12 @@ static void draw_byte_32(unsigned char *bits, unsigned long *base, int rb);
 static void draw_byte_16(unsigned char *bits, unsigned long *base, int rb);
 static void draw_byte_8(unsigned char *bits, unsigned long *base, int rb);
 
-/* We want those in data, not BSS */
-static long				g_loc_X = 0;
-static long				g_loc_Y = 0;
-static long				g_max_loc_X = 0;
-static long				g_max_loc_Y = 0;
+static int g_loc_X;
+static int g_loc_Y;
+static int g_max_loc_X;
+static int g_max_loc_Y;
 
-unsigned long disp_BAT[2] = {0, 0};
+unsigned long disp_BAT[2] __initdata = {0, 0};
 
 #define cmapsz	(16*256)
 
@@ -173,10 +175,10 @@ extern unsigned long reloc_offset(void);
 void phys_call_rtas(int, int, int, ...);
 
 extern char cmd_line[512];	/* XXX */
-boot_infos_t *boot_infos = 0;	/* init it so it's in data segment not bss */
+boot_infos_t *boot_infos;
 #ifdef CONFIG_BOOTX_TEXT
-boot_infos_t *disp_bi = 0;
-boot_infos_t fake_bi = {0,};
+boot_infos_t *disp_bi;
+boot_infos_t fake_bi;
 #endif
 unsigned long dev_tree_size;
 
@@ -195,10 +197,6 @@ unsigned long dev_tree_size;
  * OF calls should be done within prom_init(), and prom_init()
  * and all routines called within it must be careful to relocate
  * references as necessary.
- *
- * Note that the bss is cleared *after* prom_init runs, so we have
- * to make sure that any static or extern variables it accesses
- * are put in the data segment.
  */
 #define PTRRELOC(x)	((typeof(x))((unsigned long)(x) + offset))
 #define PTRUNRELOC(x)	((typeof(x))((unsigned long)(x) - offset))
@@ -618,6 +616,11 @@ prom_init(int r3, int r4, prom_entry pp)
 	char *p, *d;
 	int prom_version = 0;
  	unsigned long phys;
+	extern char __bss_start, _end;
+
+	/* First zero the BSS -- use memset, some arches don't have
+	 * caches on yet */
+	memset_io(PTRRELOC(&__bss_start),0 , &_end - &__bss_start);
 
  	/* Default */
  	phys = offset + KERNELBASE;
@@ -948,34 +951,6 @@ check_display(unsigned long mem)
 		if ((int) call_prom(RELOC("package-to-path"), 3, 1,
 				    node, path, 255) < 0)
 			continue;
-		prom_print(RELOC("opening display "));
-		prom_print(path);
-		ih = call_prom(RELOC("open"), 1, 1, path);
-		if (ih == 0 || ih == (ihandle) -1) {
-			prom_print(RELOC("... failed\n"));
-			continue;
-		}
-		prom_print(RELOC("... ok\n"));
-
-		if (RELOC(prom_disp_node) == 0)
-			RELOC(prom_disp_node) = node;
-			
-		/* Setup a useable color table when the appropriate
-		 * method is available. Should update this to set-colors */
-		for (i = 0; i < 32; i++)
-			if (prom_set_color(ih, i, RELOC(default_colors)[i*3],
-					   RELOC(default_colors)[i*3+1],
-					   RELOC(default_colors)[i*3+2]) != 0)
-				break;
-
-#ifdef CONFIG_FB
-		for (i = 0; i < LINUX_LOGO_COLORS; i++)
-			if (prom_set_color(ih, i + 32,
-					   RELOC(linux_logo_red)[i],
-					   RELOC(linux_logo_green)[i],
-					   RELOC(linux_logo_blue)[i]) != 0)
-				break;
-#endif /* CONFIG_FB */
 
 		/*
 		 * If this display is the device that OF is using for stdout,
@@ -990,9 +965,44 @@ check_display(unsigned long mem)
 					= RELOC(prom_display_paths[i-1]);
 		}
 		RELOC(prom_display_paths[i]) = PTRUNRELOC(path);
+		if (i == 0)
+			RELOC(prom_disp_node) = node;
 		if (RELOC(prom_num_displays) >= FB_MAX)
 			break;
 	}
+
+	/*
+	 * Open the first display and set its colormap.
+	 */
+	if (RELOC(prom_num_displays) > 0) {
+		path = PTRRELOC(RELOC(prom_display_paths[0]));
+		prom_print(RELOC("opening display "));
+		prom_print(path);
+		ih = call_prom(RELOC("open"), 1, 1, path);
+		if (ih == 0 || ih == (ihandle) -1) {
+			prom_print(RELOC("... failed\n"));
+		} else {
+			prom_print(RELOC("... ok\n"));
+
+			/* Setup a useable color table when the appropriate
+			 * method is available. Should update this to set-colors */
+			for (i = 0; i < 32; i++)
+				if (prom_set_color(ih, i, RELOC(default_colors)[i*3],
+						   RELOC(default_colors)[i*3+1],
+						   RELOC(default_colors)[i*3+2]) != 0)
+					break;
+
+#ifdef CONFIG_FB
+			for (i = 0; i < LINUX_LOGO_COLORS; i++)
+				if (prom_set_color(ih, i + 32,
+						   RELOC(linux_logo_red)[i],
+						   RELOC(linux_logo_green)[i],
+						   RELOC(linux_logo_blue)[i]) != 0)
+					break;
+#endif /* CONFIG_FB */
+		}
+	}
+
 	return ALIGN(mem);
 }
 
@@ -1277,7 +1287,7 @@ finish_node(struct device_node *np, unsigned long mem_start,
 	if (!strcmp(np->name, "display"))
 		np->name = get_property(np, "compatible", 0);
 
-	if (!strcmp(np->name, "device-tree"))
+	if (np->parent == NULL)
 		ifunc = interpret_root_props;
 	else if (np->type == 0)
 		ifunc = NULL;
@@ -1370,7 +1380,7 @@ finish_node_interrupts(struct device_node *np, unsigned long mem_start)
 		    np->intrs[i].line = *interrupts++;
 		    if (cvt_irq)
 			np->intrs[i].line = openpic_to_irq(np->intrs[i].line);
-		    np->intrs[i].sense = 0;
+		    np->intrs[i].sense = 1;
 		    if (isize > 1)
 		        np->intrs[i].sense = *interrupts++;
 		    for (j=2; j<isize; j++)
@@ -1540,7 +1550,7 @@ interpret_pci_props(struct device_node *np, unsigned long mem_start,
 		for (i = 0; (ml -= cell_size) >= 0; ++i) {
 			if (imp->addr.a_hi == devfn) {
 				np->intrs[np->n_intrs].line = imp->intr;
-				np->intrs[np->n_intrs].sense = 0; /* FIXME */
+				np->intrs[np->n_intrs].sense = 1; /* FIXME */
 				++np->n_intrs;
 			}
 			imp = (struct pci_intr_map *)(((unsigned int)imp)
@@ -1561,7 +1571,7 @@ interpret_pci_props(struct device_node *np, unsigned long mem_start,
 		mem_start += np->n_intrs * sizeof(struct interrupt_info);
 		for (i = 0; i < np->n_intrs; ++i) {
 			np->intrs[i].line = *ip++;
-			np->intrs[i].sense = 0;
+			np->intrs[i].sense = 1;
 		}
 	}
 
@@ -1614,7 +1624,7 @@ interpret_dbdma_props(struct device_node *np, unsigned long mem_start,
 		mem_start += np->n_intrs * sizeof(struct interrupt_info);
 		for (i = 0; i < np->n_intrs; ++i) {
 			np->intrs[i].line = *ip++;
-			np->intrs[i].sense = 0;
+			np->intrs[i].sense = 1;
 		}
 	}
 
@@ -1675,7 +1685,7 @@ interpret_macio_props(struct device_node *np, unsigned long mem_start,
 				if (keylargo)
 					np->intrs[i].sense = *ip++;
 				else
-					np->intrs[i].sense = 0;
+					np->intrs[i].sense = 1;
 			}
 		} else {
 			/* CHRP machines */
@@ -1771,11 +1781,35 @@ interpret_root_props(struct device_node *np, unsigned long mem_start,
 		mem_start += np->n_intrs * sizeof(struct interrupt_info);
 		for (i = 0; i < np->n_intrs; ++i) {
 			np->intrs[i].line = *ip++;
-			np->intrs[i].sense = 0;
+			np->intrs[i].sense = 1;
 		}
 	}
 
 	return mem_start;
+}
+
+/*
+ * Work out the sense (active-low level / active-high edge)
+ * of each interrupt from the device tree.
+ */
+void __init
+prom_get_irq_senses(unsigned char *senses, int off, int max)
+{
+	struct device_node *np;
+	int i, j;
+
+	/* default to level-triggered */
+	memset(senses, 1, max - off);
+	if (!use_of_interrupt_tree)
+		return;
+
+	for (np = allnodes; np != 0; np = np->allnext) {
+		for (j = 0; j < np->n_intrs; j++) {
+			i = np->intrs[j].line;
+			if (i >= off && i < max)
+				senses[i-off] = np->intrs[j].sense;
+		}
+	}
 }
 
 /*
@@ -1816,39 +1850,6 @@ find_type_devices(const char *type)
 	}
 	*prevp = 0;
 	return head;
-}
-
-/* Finds a device node given its PCI bus number, device number
- * and function number
- */
-__openfirmware
-struct device_node *
-find_pci_device_OFnode(unsigned char bus, unsigned char dev_fn)
-{
-	struct device_node* np;
-	unsigned int *reg;
-	int l;
-	
-	for (np = allnodes; np != 0; np = np->allnext) {
-		int in_macio = 0;
-		struct device_node* parent = np->parent;
-		while(parent) {
-			char *pname = (char *)get_property(parent, "name", &l);
-			if (pname && strcmp(pname, "mac-io") == 0) {
-				in_macio = 1;
-				break;
-			}
-			parent = parent->parent;
-		}
-		if (in_macio)
-			continue;
-		reg = (unsigned int *) get_property(np, "reg", &l);
-		if (reg == 0 || l < sizeof(struct reg_property))
-			continue;
-		if (((reg[0] >> 8) & 0xff) == dev_fn && ((reg[0] >> 16) & 0xff) == bus)
-			break;
-	}
-	return np;
 }
 
 /*
@@ -1981,6 +1982,21 @@ get_property(struct device_node *np, const char *name, int *lenp)
 			return pp->value;
 		}
 	return 0;
+}
+
+/*
+ * Add a property to a node
+ */
+__openfirmware
+void
+prom_add_property(struct device_node* np, struct property* prop)
+{
+	struct property **next = &np->properties;
+
+	prop->next = NULL;	
+	while (*next)
+		next = &(*next)->next;
+	*next = prop;
 }
 
 #if 0

@@ -20,7 +20,6 @@
  */
 
 #include <linux/config.h>
-#if defined(CONFIG_X25) || defined(CONFIG_X25_MODULE)
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>
@@ -351,4 +350,18 @@ void x25_disconnect(struct sock *sk, int reason, unsigned char cause, unsigned c
 	sk->dead = 1;
 }
 
-#endif
+/*
+ * Clear an own-rx-busy condition and tell the peer about this, provided
+ * that there is a significant amount of free receive buffer space available.
+ */
+void x25_check_rbuf(struct sock *sk)
+{
+	if (atomic_read(&sk->rmem_alloc) < (sk->rcvbuf / 2) &&
+	    (sk->protinfo.x25->condition & X25_COND_OWN_RX_BUSY)) {
+		sk->protinfo.x25->condition &= ~X25_COND_OWN_RX_BUSY;
+		sk->protinfo.x25->condition &= ~X25_COND_ACK_PENDING;
+		sk->protinfo.x25->vl         = sk->protinfo.x25->vr;
+		x25_write_internal(sk, X25_RR);
+		x25_stop_timer(sk);
+	}
+}

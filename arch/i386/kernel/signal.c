@@ -26,8 +26,6 @@
 
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
 
-asmlinkage int sys_wait4(pid_t pid, unsigned long *stat_addr,
-			 int options, unsigned long *ru);
 asmlinkage int FASTCALL(do_signal(struct pt_regs *regs, sigset_t *oldset));
 
 int copy_siginfo_to_user(siginfo_t *to, siginfo_t *from)

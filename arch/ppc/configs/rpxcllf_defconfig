@@ -21,7 +21,6 @@ CONFIG_PPC=y
 # CONFIG_4xx is not set
 # CONFIG_POWER3 is not set
 # CONFIG_POWER4 is not set
-# CONFIG_8260 is not set
 CONFIG_8xx=y
 CONFIG_SERIAL_CONSOLE=y
 # CONFIG_RPXLITE is not set
@@ -32,6 +31,7 @@ CONFIG_RPXCLASSIC=y
 # CONFIG_TQM860 is not set
 # CONFIG_MBX is not set
 # CONFIG_WINCEPT is not set
+CONFIG_PPC601_SYNC_FIX=y
 # CONFIG_ALL_PPC is not set
 # CONFIG_SMP is not set
 CONFIG_MACH_SPECIFIC=y
@@ -43,7 +43,9 @@ CONFIG_MATH_EMULATION=y
 # CONFIG_HIGHMEM is not set
 # CONFIG_MOL is not set
 # CONFIG_ISA is not set
+# CONFIG_EISA is not set
 # CONFIG_SBUS is not set
+# CONFIG_MCA is not set
 # CONFIG_PCI_QSPAN is not set
 # CONFIG_PCI is not set
 CONFIG_NET=y
@@ -182,7 +184,6 @@ CONFIG_NET_ETHERNET=y
 # CONFIG_MACE is not set
 # CONFIG_BMAC is not set
 # CONFIG_GMAC is not set
-# CONFIG_NCR885E is not set
 # CONFIG_OAKNET is not set
 # CONFIG_NET_VENDOR_3COM is not set
 # CONFIG_LANCE is not set
@@ -190,7 +191,6 @@ CONFIG_NET_ETHERNET=y
 # CONFIG_NET_VENDOR_RACAL is not set
 # CONFIG_AT1700 is not set
 # CONFIG_DEPCA is not set
-# CONFIG_HP100 is not set
 # CONFIG_NET_ISA is not set
 # CONFIG_NET_PCI is not set
 # CONFIG_NET_POCKET is not set
@@ -377,8 +377,6 @@ CONFIG_LOCKD=y
 # CONFIG_NCPFS_NFS_NS is not set
 # CONFIG_NCPFS_OS2_NS is not set
 # CONFIG_NCPFS_SMALLDOS is not set
-# CONFIG_NCPFS_MOUNT_SUBDIR is not set
-# CONFIG_NCPFS_NDS_DOMAINS is not set
 # CONFIG_NCPFS_NLS is not set
 # CONFIG_NCPFS_EXTRAS is not set
 
@@ -395,6 +393,7 @@ CONFIG_PARTITION_ADVANCED=y
 # CONFIG_SGI_PARTITION is not set
 # CONFIG_ULTRIX_PARTITION is not set
 # CONFIG_SUN_PARTITION is not set
+# CONFIG_SMB_NLS is not set
 # CONFIG_NLS is not set
 
 #

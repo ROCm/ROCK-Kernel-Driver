@@ -19,7 +19,6 @@
  */
 
 #include <linux/config.h>
-#if defined(CONFIG_X25) || defined(CONFIG_X25_MODULE)
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>
@@ -121,6 +120,11 @@ static void x25_heartbeat_expiry(unsigned long param)
 {
 	struct sock *sk = (struct sock *)param;
 
+        bh_lock_sock(sk);
+        if (sk->lock.users) { /* can currently only occur in state 3 */ 
+		goto restart_heartbeat;
+	}
+
 	switch (sk->protinfo.x25->state) {
 
 		case X25_STATE_0:
@@ -128,7 +132,7 @@ static void x25_heartbeat_expiry(unsigned long param)
 			   is accepted() it isn't 'dead' so doesn't get removed. */
 			if (sk->destroy || (sk->state == TCP_LISTEN && sk->dead)) {
 				x25_destroy_socket(sk);
-				return;
+				goto unlock;
 			}
 			break;
 
@@ -136,29 +140,21 @@ static void x25_heartbeat_expiry(unsigned long param)
 			/*
 			 * Check for the state of the receive buffer.
 			 */
-			if (atomic_read(&sk->rmem_alloc) < (sk->rcvbuf / 2) &&
-			    (sk->protinfo.x25->condition & X25_COND_OWN_RX_BUSY)) {
-				sk->protinfo.x25->condition &= ~X25_COND_OWN_RX_BUSY;
-				sk->protinfo.x25->condition &= ~X25_COND_ACK_PENDING;
-				sk->protinfo.x25->vl         = sk->protinfo.x25->vr;
-				x25_write_internal(sk, X25_RR);
-				x25_stop_timer(sk);
-				break;
-			}
+			x25_check_rbuf(sk);
 			break;
 	}
-
+ restart_heartbeat:
 	x25_start_heartbeat(sk);
+ unlock:
+	bh_unlock_sock(sk);
 }
 
 /*
  *	Timer has expired, it may have been T2, T21, T22, or T23. We can tell
  *	by the state machine state.
  */
-static void x25_timer_expiry(unsigned long param)
+static inline void x25_do_timer_expiry(struct sock * sk)
 {
-	struct sock *sk = (struct sock *)param;
-
 	switch (sk->protinfo.x25->state) {
 
 		case X25_STATE_3:	/* T2 */
@@ -181,4 +177,17 @@ static void x25_timer_expiry(unsigned long param)
 	}
 }
 
-#endif
+static void x25_timer_expiry(unsigned long param)
+{
+	struct sock *sk = (struct sock *)param;
+
+	bh_lock_sock(sk);
+	if (sk->lock.users) { /* can currently only occur in state 3 */
+		if (sk->protinfo.x25->state == X25_STATE_3) {
+			x25_start_t2timer(sk);
+		}
+	} else {
+		x25_do_timer_expiry(sk);
+	}
+	bh_unlock_sock(sk);
+}

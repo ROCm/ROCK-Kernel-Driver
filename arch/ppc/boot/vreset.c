@@ -19,12 +19,16 @@
  */
 
 #include "iso_font.h"
-#include <linux/delay.h>
 
 extern char *vidmem;
 extern int lines, cols;
-/* estimate for delay */
-unsigned long loops_per_sec = 50000000;;
+
+static void mdelay(int ms)
+{
+	for (; ms > 0; --ms)
+		udelay(1000);
+}
+
 /*
  * VGA Register  
  */

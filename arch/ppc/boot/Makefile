@@ -25,20 +25,10 @@ ZSZ = 0
 IOFF = 0
 ISZ = 0
 
-ifeq ($(CONFIG_ALL_PPC),y)
-CONFIG_PREP=y
-endif
-
 ifeq ($(CONFIG_SMP),y)
 TFTPIMAGE=/tftpboot/zImage.prep.smp$(MSIZE)
 else
 TFTPIMAGE=/tftpboot/zImage.prep$(MSIZE)
-endif
-
-ifeq ($(CONFIG_SMP),y)
-TFTPSIMAGE=/tftpboot/sImage.smp
-else
-TFTPSIMAGE=/tftpboot/sImage
 endif
 
 ifeq ($(CONFIG_PPC64BRIDGE),y)
@@ -81,8 +71,8 @@ zvmlinux.initrd: zvmlinux
 		zvmlinux.initrd.tmp $@
 	rm zvmlinux.initrd.tmp
 
-zImage: zvmlinux mkprep sImage
-ifdef CONFIG_PREP
+zImage: zvmlinux mkprep
+ifdef CONFIG_ALL_PPC
 	./mkprep -pbp zvmlinux zImage
 endif
 ifdef CONFIG_APUS
@@ -90,13 +80,8 @@ ifdef CONFIG_APUS
 	gzip $(GZIP_FLAGS) vmapus
 endif
 
-sImage: ../../../vmlinux
-ifdef CONFIG_GEMINI
-	$(OBJCOPY) -I elf32-powerpc -O binary ../../../vmlinux sImage
-endif
-
 zImage.initrd: zvmlinux.initrd mkprep
-ifdef CONFIG_PREP
+ifdef CONFIG_ALL_PPC
 	./mkprep -pbp zvmlinux.initrd zImage.initrd
 endif
 
@@ -128,18 +113,15 @@ mkprep : mkprep.c
 	$(HOSTCC) -o mkprep mkprep.c
 
 znetboot : zImage
-ifdef CONFIG_PREP
+ifdef CONFIG_ALL_PPC
 	cp zImage $(TFTPIMAGE)
-endif
-ifdef CONFIG_GEMINI
-	cp sImage $(TFTPSIMAGE)
 endif
 
 znetboot.initrd : zImage.initrd
 	cp zImage.initrd $(TFTPIMAGE)
 
 clean:
-	rm -f vmlinux* zvmlinux* mkprep zImage* sImage*
+	rm -f vmlinux* zvmlinux* mkprep zImage*
 
 fastdep:
 	$(TOPDIR)/scripts/mkdep *.[Sch] > .depend

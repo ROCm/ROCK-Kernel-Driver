@@ -136,7 +136,7 @@
 
 /* ----------------------------------------------------------------------- */
 
-#undef  SCC_LDELAY	1	/* slow it even a bit more down */
+#undef  SCC_LDELAY		/* slow it even a bit more down */
 #undef  SCC_DONT_CHECK		/* don't look if the SCCs you specified are available */
 
 #define SCC_MAXCHIPS	4       /* number of max. supported chips */
@@ -1776,7 +1776,7 @@ static int scc_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 
 			if (hwcfg.vector_latch) {
 				if (!request_region(Vector_Latch, 1, "scc vector latch"))
-					printk(KERN_WARNING "z8530drv: warning, cannot reserve vector latch port 0x%x\n, disabled.", hwcfg.vector_latch);
+					printk(KERN_WARNING "z8530drv: warning, cannot reserve vector latch port 0x%x\n, disabled.", (unsigned int)hwcfg.vector_latch);
 				else
 					Vector_Latch = hwcfg.vector_latch;
 			}

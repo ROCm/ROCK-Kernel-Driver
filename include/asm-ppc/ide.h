@@ -37,6 +37,8 @@ extern ide_ioreg_t chrp_idedma_regbase; /* one for both channels */
 extern unsigned int chrp_ide_irq;
 extern void chrp_ide_probe(void);
 
+extern void ppc_generic_ide_fix_driveid(struct hd_driveid *id);
+
 struct ide_machdep_calls {
         void        (*insw)(ide_ioreg_t port, void *buf, int ns);
         void        (*outsw)(ide_ioreg_t port, void *buf, int ns);
@@ -90,10 +92,9 @@ static __inline__ int ide_default_irq(ide_ioreg_t base)
 
 static __inline__ ide_ioreg_t ide_default_io_base(int index)
 {
-	if ( ppc_ide_md.default_io_base )
+	if (ppc_ide_md.default_io_base)
 		return ppc_ide_md.default_io_base(index);
-	else
-		return -1;
+	return 0;
 }
 
 static __inline__ void  ide_init_hwif_ports(hw_regs_t *hw,
@@ -124,10 +125,9 @@ static __inline__ void ide_init_default_hwifs(void)
 
 static __inline__ int ide_check_region (ide_ioreg_t from, unsigned int extent)
 {
-	if ( ppc_ide_md.ide_check_region )
+	if (ppc_ide_md.ide_check_region)
 		return ppc_ide_md.ide_check_region(from, extent);
-	else
-		return -1;
+	return 0;
 }
 
 static __inline__ void ide_request_region (ide_ioreg_t from, unsigned int extent, const char *name)
@@ -147,19 +147,6 @@ static __inline__ void ide_fix_driveid (struct hd_driveid *id)
         if ( ppc_ide_md.fix_driveid )
 		ppc_ide_md.fix_driveid(id);
 }
-
-#if 0	/* inb/outb from io.h is OK now -- paulus */
-#undef inb
-#define inb(port)	in_8((unsigned char *)((port) + ppc_ide_md.io_base))
-#undef inb_p
-#define inb_p(port)	inb(port)
-
-#undef outb
-#define outb(val, port)	\
-	out_8((unsigned char *)((port) + ppc_ide_md.io_base), (val) )
-#undef outb_p
-#define outb_p(val, port)	outb(val, port)
-#endif
 
 typedef union {
 	unsigned all			: 8;	/* all of the bits together */

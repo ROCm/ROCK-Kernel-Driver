@@ -2,7 +2,7 @@
 #include <linux/module.h>
 #include <linux/skbuff.h>
 
-#include <linux/netfilter_ipv4/ipt_mark.h>
+#include <linux/netfilter_ipv6/ip6t_mark.h>
 #include <linux/netfilter_ipv6/ip6_tables.h>
 
 static int
@@ -15,7 +15,7 @@ match(const struct sk_buff *skb,
       u_int16_t datalen,
       int *hotdrop)
 {
-	const struct ipt_mark_info *info = matchinfo;
+	const struct ip6t_mark_info *info = matchinfo;
 
 	return ((skb->nfmark & info->mask) == info->mark) ^ info->invert;
 }
@@ -27,7 +27,7 @@ checkentry(const char *tablename,
            unsigned int matchsize,
            unsigned int hook_mask)
 {
-	if (matchsize != IP6T_ALIGN(sizeof(struct ipt_mark_info)))
+	if (matchsize != IP6T_ALIGN(sizeof(struct ip6t_mark_info)))
 		return 0;
 
 	return 1;

@@ -299,7 +299,7 @@ int hpfs_notify_change(struct dentry *dentry, struct iattr *attr)
 {
 	struct inode *inode = dentry->d_inode;
 	int error;
-	if (attr->ia_valid & ATTR_SIZE && attr->ia_size > inode->i_size) return -EPERM;
+	if ((attr->ia_valid & ATTR_SIZE) && attr->ia_size > inode->i_size) return -EINVAL;
 	if (inode->i_sb->s_hpfs_root == inode->i_ino) return -EINVAL;
 	if ((error = inode_change_ok(inode, attr))) return error;
 	inode_setattr(inode, attr);

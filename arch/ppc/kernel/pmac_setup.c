@@ -47,6 +47,7 @@
 #include <linux/cuda.h>
 #include <linux/pmu.h>
 
+#include <asm/processor.h>
 #include <asm/init.h>
 #include <asm/prom.h>
 #include <asm/system.h>
@@ -73,7 +74,8 @@ extern unsigned long pmac_get_rtc_time(void);
 extern int pmac_set_rtc_time(unsigned long nowtime);
 extern void pmac_read_rtc_time(void);
 extern void pmac_calibrate_decr(void);
-extern void pmac_setup_pci_ptrs(void);
+extern void pmac_pcibios_fixup(void);
+extern void pmac_find_bridges(void);
 
 extern int mackbd_setkeycode(unsigned int scancode, unsigned int keycode);
 extern int mackbd_getkeycode(unsigned int scancode);
@@ -99,9 +101,7 @@ extern char pckbd_unexpected_up(unsigned char keycode);
 extern int keyboard_sends_linux_keycodes;
 extern void pmac_nvram_update(void);
 
-extern void *pmac_pci_dev_io_base(unsigned char bus, unsigned char devfn, int physical);
-extern void *pmac_pci_dev_mem_base(unsigned char bus, unsigned char devfn);
-extern int pmac_pci_dev_root_bridge(unsigned char bus, unsigned char devfn);
+extern int pmac_pci_enable_device_hook(struct pci_dev *dev, int initial);
 
 unsigned char drive_info;
 
@@ -119,12 +119,33 @@ extern int pmac_newworld;
 
 extern void zs_kgdb_hook(int tty_num);
 static void ohare_init(void);
-static void init_p2pbridge(void);
 #ifdef CONFIG_BOOTX_TEXT
 void pmac_progress(char *s, unsigned short hex);
 #endif
 
 sys_ctrler_t sys_ctrler = SYS_CTRLER_UNKNOWN;
+
+#ifdef CONFIG_SMP
+volatile static long int core99_l2_cache;
+void core99_init_l2(void)
+{
+	int cpu = smp_processor_id();
+
+	if ( (_get_PVR() >> 16) != 8 && (_get_PVR() >> 16) != 12 )
+		return;
+
+	if (cpu == 0){
+		core99_l2_cache = _get_L2CR();
+		printk("CPU0: L2CR is %lx\n", core99_l2_cache);
+	} else {
+		printk("CPU%d: L2CR was %lx\n", cpu, _get_L2CR());
+		_set_L2CR(0);
+		_set_L2CR(core99_l2_cache);
+		printk("CPU%d: L2CR set to %lx\n", cpu, core99_l2_cache);
+	}
+}
+#endif /* CONFIG_SMP */
+
 
 __pmac
 int
@@ -250,7 +271,7 @@ pmac_setup_arch(void)
 	struct device_node *cpu;
 	int *fp;
 
-	/* Set loops_per_sec to a half-way reasonable value,
+	/* Set loops_per_jiffy to a half-way reasonable value,
 	   for use until calibrate_delay gets called. */
 	cpu = find_type_devices("cpu");
 	if (cpu != 0) {
@@ -263,13 +284,13 @@ pmac_setup_arch(void)
 			case 10:	/* mach V (604ev5) */
 			case 12:	/* G4 */
 			case 20:	/* 620 */
-				loops_per_sec = *fp;
+				loops_per_jiffy = *fp / HZ;
 				break;
 			default:	/* 601, 603, etc. */
-				loops_per_sec = *fp / 2;
+				loops_per_jiffy = *fp / (2*HZ);
 			}
 		} else
-			loops_per_sec = 50000000;
+			loops_per_jiffy = 50000000 / HZ;
 	}
 
 	/* this area has the CPU identification register
@@ -278,8 +299,8 @@ pmac_setup_arch(void)
 	__ioremap(0xffc00000, 0x400000, pgprot_val(PAGE_READONLY));
 	ohare_init();
 
+	/* Lookup PCI hosts */
 	pmac_find_bridges();
-	init_p2pbridge();
 	
 	/* Checks "l2cr-value" property in the registry */
 	if ( (_get_PVR() >> 16) == 8 || (_get_PVR() >> 16) == 12 ) {
@@ -303,6 +324,11 @@ pmac_setup_arch(void)
 			ppc_override_l2cr_value, (ppc_override_l2cr_value & 0x80000000)
 				? "enabled" : "disabled");
 
+#ifdef CONFIG_SMP
+	/* somewhat of a hack */
+	core99_init_l2();
+#endif
+	
 #ifdef CONFIG_KGDB
 	zs_kgdb_hook(0);
 #endif
@@ -328,32 +354,6 @@ pmac_setup_arch(void)
 	else
 #endif
 		ROOT_DEV = to_kdev_t(DEFAULT_ROOT_DEVICE);
-}
-
-/*
- * Tweak the PCI-PCI bridge chip on the blue & white G3s.
- */
-static void __init init_p2pbridge(void)
-{
-	struct device_node *p2pbridge;
-	unsigned char bus, devfn;
-	unsigned short val;
-
-	/* XXX it would be better here to identify the specific
-	   PCI-PCI bridge chip we have. */
-	if ((p2pbridge = find_devices("pci-bridge")) == 0
-	    || p2pbridge->parent == NULL
-	    || strcmp(p2pbridge->parent->name, "pci") != 0)
-		return;
-	if (pci_device_loc(p2pbridge, &bus, &devfn) < 0)
-		return;
-	if (ppc_md.pcibios_read_config_word(bus, devfn, PCI_BRIDGE_CONTROL, &val) < 0) {
-		printk(KERN_ERR "init_p2pbridge: couldn't read bridge control\n");
-		return;
-	}
-	val &= ~PCI_BRIDGE_CTL_MASTER_ABORT;
-	ppc_md.pcibios_write_config_word(bus, devfn, PCI_BRIDGE_CONTROL, val);
-	ppc_md.pcibios_read_config_word(bus, devfn, PCI_BRIDGE_CONTROL, &val);
 }
 
 static void __init ohare_init(void)
@@ -448,7 +448,7 @@ kdev_t __init find_ide_boot(void)
 
 void __init find_boot_device(void)
 {
-#ifdef CONFIG_SCSI
+#if defined(CONFIG_SCSI) && defined(CONFIG_BLK_DEV_SD)
 	if (boot_host != NULL) {
 		boot_dev = sd_find_target(boot_host, boot_target);
 		if (boot_dev != 0)
@@ -493,7 +493,9 @@ pmac_restart(char *cmd)
 	struct adb_request req;
 #endif /* CONFIG_ADB_CUDA */
 
+#ifdef CONFIG_NVRAM
 	pmac_nvram_update();
+#endif
 	
 	switch (sys_ctrler) {
 #ifdef CONFIG_ADB_CUDA
@@ -509,7 +511,7 @@ pmac_restart(char *cmd)
 		pmu_restart();
 		break;
 #endif /* CONFIG_ADB_PMU */		
-	default:
+	default: ;
 	}
 }
 
@@ -520,7 +522,9 @@ pmac_power_off(void)
 	struct adb_request req;
 #endif /* CONFIG_ADB_CUDA */
 
+#ifdef CONFIG_NVRAM
 	pmac_nvram_update();
+#endif
 	
 	switch (sys_ctrler) {
 #ifdef CONFIG_ADB_CUDA
@@ -536,7 +540,7 @@ pmac_power_off(void)
 		pmu_shutdown();
 		break;
 #endif /* CONFIG_ADB_PMU */
-	default:
+	default: ;
 	}
 }
 
@@ -566,17 +570,19 @@ pmac_ide_outsw(ide_ioreg_t port, void *buf, int ns)
 int
 pmac_ide_default_irq(ide_ioreg_t base)
 {
-        return 0;
-}
-
 #if defined(CONFIG_BLK_DEV_IDE) && defined(CONFIG_BLK_DEV_IDE_PMAC)
-extern ide_ioreg_t pmac_ide_get_base(int index);
+	extern int pmac_ide_get_irq(ide_ioreg_t base);
+        return pmac_ide_get_irq(base);
+#else
+	return 0;
 #endif
+}
 
 ide_ioreg_t
 pmac_ide_default_io_base(int index)
 {
 #if defined(CONFIG_BLK_DEV_IDE) && defined(CONFIG_BLK_DEV_IDE_PMAC)
+	extern ide_ioreg_t pmac_ide_get_base(int index);
         return pmac_ide_get_base(index);
 #else
 	return 0;
@@ -586,7 +592,14 @@ pmac_ide_default_io_base(int index)
 int
 pmac_ide_check_region(ide_ioreg_t from, unsigned int extent)
 {
-        return 0;
+	/*
+	 * We only do the check_region if `from' looks like a genuine
+	 * I/O port number.  If it actually refers to a memory-mapped
+	 * register, it should be OK.
+	 */
+	if (from < ~_IO_BASE)
+		return 0;
+	return check_region(from, extent);
 }
 
 void
@@ -594,24 +607,16 @@ pmac_ide_request_region(ide_ioreg_t from,
 			unsigned int extent,
 			const char *name)
 {
+	if (from < ~_IO_BASE)
+		request_region(from, extent, name);
 }
 
 void
 pmac_ide_release_region(ide_ioreg_t from,
 			unsigned int extent)
 {
-}
-
-/* Convert the shorts/longs in hd_driveid from little to big endian;
- * chars are endian independant, of course, but strings need to be flipped.
- * (Despite what it says in drivers/block/ide.h, they come up as little
- * endian...)
- *
- * Changes to linux/hdreg.h may require changes here. */
-void
-pmac_ide_fix_driveid(struct hd_driveid *id)
-{
-        ppc_generic_ide_fix_driveid(id);
+	if (from < ~_IO_BASE)
+		release_region(from, extent);
 }
 
 #if defined(CONFIG_BLK_DEV_IDE) && defined(CONFIG_BLK_DEV_IDE_PMAC)
@@ -632,8 +637,6 @@ void __init
 pmac_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	  unsigned long r6, unsigned long r7)
 {
-	pmac_setup_pci_ptrs();
-
 	/* isa_io_base gets set in pmac_find_bridges */
 	isa_mem_base = PMAC_ISA_MEM_BASE;
 	pci_dram_offset = PMAC_PCI_DRAM_OFFSET;
@@ -646,8 +649,11 @@ pmac_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.get_cpuinfo    = pmac_get_cpuinfo;
 	ppc_md.irq_cannonicalize = NULL;
 	ppc_md.init_IRQ       = pmac_pic_init;
-	ppc_md.get_irq        = pmac_get_irq;
+	ppc_md.get_irq        = pmac_get_irq; /* Changed later on ... */
 	ppc_md.init           = pmac_init2;
+	
+	ppc_md.pcibios_fixup  = pmac_pcibios_fixup;
+	ppc_md.pcibios_enable_device_hook = pmac_pci_enable_device_hook;
 
 	ppc_md.restart        = pmac_restart;
 	ppc_md.power_off      = pmac_power_off;
@@ -658,12 +664,8 @@ pmac_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.get_rtc_time   = pmac_get_rtc_time;
 	ppc_md.calibrate_decr = pmac_calibrate_decr;
 
-	ppc_md.pci_dev_io_base          = pmac_pci_dev_io_base;
-	ppc_md.pci_dev_mem_base         = pmac_pci_dev_mem_base;
-	ppc_md.pci_dev_root_bridge      = pmac_pci_dev_root_bridge;
-
 #ifdef CONFIG_VT
-#ifdef CONFIG_INPUT_ADBHID
+#ifdef CONFIG_INPUT
 	ppc_md.kbd_init_hw       = mac_hid_init_hw;
 	ppc_md.kbd_translate     = mac_hid_kbd_translate;
 	ppc_md.kbd_unexpected_up = mac_hid_kbd_unexpected_up;
@@ -682,35 +684,33 @@ pmac_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	}
 #endif /* CONFIG_MAGIC_SYSRQ */
 #elif defined(CONFIG_ADB_KEYBOARD)
-	ppc_md.kbd_setkeycode    = mackbd_setkeycode;
-	ppc_md.kbd_getkeycode    = mackbd_getkeycode;
-	ppc_md.kbd_translate     = mackbd_translate;
-	ppc_md.kbd_unexpected_up = mackbd_unexpected_up;
-	ppc_md.kbd_leds          = mackbd_leds;
-	ppc_md.kbd_init_hw       = mackbd_init_hw;
+	ppc_md.kbd_setkeycode       = mackbd_setkeycode;
+	ppc_md.kbd_getkeycode       = mackbd_getkeycode;
+	ppc_md.kbd_translate        = mackbd_translate;
+	ppc_md.kbd_unexpected_up    = mackbd_unexpected_up;
+	ppc_md.kbd_leds             = mackbd_leds;
+	ppc_md.kbd_init_hw          = mackbd_init_hw;
 #ifdef CONFIG_MAGIC_SYSRQ
-	ppc_md.ppc_kbd_sysrq_xlate       = mackbd_sysrq_xlate;
+	ppc_md.ppc_kbd_sysrq_xlate  = mackbd_sysrq_xlate;
 	SYSRQ_KEY = 0x69;
 #endif /* CONFIG_MAGIC_SYSRQ */
 #endif /* CONFIG_INPUT_ADBHID/CONFIG_ADB_KEYBOARD */
 #endif /* CONFIG_VT */
 
 #if defined(CONFIG_BLK_DEV_IDE) && defined(CONFIG_BLK_DEV_IDE_PMAC)
-        ppc_ide_md.insw = pmac_ide_insw;
-        ppc_ide_md.outsw = pmac_ide_outsw;
-        ppc_ide_md.default_irq = pmac_ide_default_irq;
-        ppc_ide_md.default_io_base = pmac_ide_default_io_base;
-        ppc_ide_md.ide_check_region = pmac_ide_check_region;
-        ppc_ide_md.ide_request_region = pmac_ide_request_region;
-        ppc_ide_md.ide_release_region = pmac_ide_release_region;
-        ppc_ide_md.fix_driveid = pmac_ide_fix_driveid;
-        ppc_ide_md.ide_init_hwif = pmac_ide_init_hwif_ports;
-
-        ppc_ide_md.io_base = _IO_BASE;	/* actually too early for this :-( */
-#endif
+        ppc_ide_md.insw			= pmac_ide_insw;
+        ppc_ide_md.outsw		= pmac_ide_outsw;
+        ppc_ide_md.default_irq		= pmac_ide_default_irq;
+        ppc_ide_md.default_io_base	= pmac_ide_default_io_base;
+        ppc_ide_md.ide_check_region	= pmac_ide_check_region;
+        ppc_ide_md.ide_request_region	= pmac_ide_request_region;
+        ppc_ide_md.ide_release_region	= pmac_ide_release_region;
+        ppc_ide_md.fix_driveid		= ppc_generic_ide_fix_driveid;
+        ppc_ide_md.ide_init_hwif	= pmac_ide_init_hwif_ports;
+#endif /* CONFIG_BLK_DEV_IDE && CONFIG_BLK_DEV_IDE_PMAC */
 #ifdef CONFIG_BOOTX_TEXT
 	ppc_md.progress = pmac_progress;
-#endif
+#endif /* CONFIG_BOOTX_TEXT */
 	if (ppc_md.progress) ppc_md.progress("pmac_init(): exit", 0);
 	
 }
@@ -727,5 +727,5 @@ pmac_progress(char *s, unsigned short hex)
 	prom_drawstring(s);
 	prom_drawchar('\n');
 }
-#endif CONFIG_BOOTX_TEXT
+#endif /* CONFIG_BOOTX_TEXT */
 

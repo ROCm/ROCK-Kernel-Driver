@@ -1,4 +1,4 @@
-/* $Id: pcikbd.c,v 1.49 2000/07/13 08:06:40 davem Exp $
+/* $Id: pcikbd.c,v 1.50 2001/01/11 15:29:36 davem Exp $
  * pcikbd.c: Ultra/AX PC keyboard support.
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
@@ -746,12 +746,12 @@ static int aux_release(struct inode * inode, struct file * file)
 {
 	unsigned long flags;
 
-	lock_kernel();
 	aux_fasync(-1, file, 0);
-	if (--aux_count)
-		goto out;
 
 	spin_lock_irqsave(&pcikbd_lock, flags);
+
+	if (--aux_count)
+		goto out;
 
 	/* Disable controller ints */
 	aux_write_cmd(AUX_INTS_OFF);
@@ -761,9 +761,8 @@ static int aux_release(struct inode * inode, struct file * file)
 	pcimouse_outb(KBD_CCMD_MOUSE_DISABLE, pcimouse_iobase + KBD_CNTL_REG);
 	poll_aux_status();
 
-	spin_unlock_irqrestore(&pcikbd_lock, flags);
 out:
-	unlock_kernel();
+	spin_unlock_irqrestore(&pcikbd_lock, flags);
 
 	return 0;
 }
@@ -780,10 +779,12 @@ static int aux_open(struct inode * inode, struct file * file)
 	if (!aux_present)
 		return -ENODEV;
 
-	if (aux_count++)
-		return 0;
-
 	spin_lock_irqsave(&pcikbd_lock, flags);
+
+	if (aux_count++) {
+		spin_unlock_irqrestore(&pcikbd_lock, flags);
+		return 0;
+	}
 
 	if (!poll_aux_status()) {
 		aux_count--;

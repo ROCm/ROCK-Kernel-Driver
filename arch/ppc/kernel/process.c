@@ -222,16 +222,17 @@ _switch_to(struct task_struct *prev, struct task_struct *new,
 		giveup_fpu(prev);
 #ifdef CONFIG_ALTIVEC	
 	/*
-	 * If the previous thread 1) has some altivec regs it wants saved
-	 * (has bits in vrsave set) and 2) used altivec in the last quantum
+	 * If the previous thread used altivec in the last quantum
 	 * (thus changing altivec regs) then save them.
+	 * We used to check the VRSAVE register but not all apps
+	 * set it, so we don't rely on it now (and in fact we need
+	 * to save & restore VSCR even if VRSAVE == 0).  -- paulus
 	 *
 	 * On SMP we always save/restore altivec regs just to avoid the
 	 * complexity of changing processors.
 	 *  -- Cort
 	 */
-	if ( (prev->thread.regs && (prev->thread.regs->msr & MSR_VEC)) &&
-	     prev->thread.vrsave )
+	if ((prev->thread.regs && (prev->thread.regs->msr & MSR_VEC)))
 		giveup_altivec(prev);
 #endif /* CONFIG_ALTIVEC */	
 	current_set[smp_processor_id()] = new;
@@ -251,13 +252,15 @@ void show_regs(struct pt_regs * regs)
 {
 	int i;
 
-	printk("NIP: %08lX XER: %08lX LR: %08lX REGS: %p TRAP: %04lx\n",
-	       regs->nip, regs->xer, regs->link, regs,regs->trap);
+	printk("NIP: %08lX XER: %08lX LR: %08lX SP: %08lX REGS: %p TRAP: %04lx\n",
+	       regs->nip, regs->xer, regs->link, regs->gpr[1], regs,regs->trap);
 	printk("MSR: %08lx EE: %01x PR: %01x FP: %01x ME: %01x IR/DR: %01x%01x\n",
 	       regs->msr, regs->msr&MSR_EE ? 1 : 0, regs->msr&MSR_PR ? 1 : 0,
 	       regs->msr & MSR_FP ? 1 : 0,regs->msr&MSR_ME ? 1 : 0,
 	       regs->msr&MSR_IR ? 1 : 0,
 	       regs->msr&MSR_DR ? 1 : 0);
+	if (regs->trap == 0x300 || regs->trap == 0x600)
+		printk("DAR: %08lX, DSISR: %08lX\n", regs->dar, regs->dsisr);
 	printk("TASK = %p[%d] '%s' ",
 	       current, current->pid, current->comm);
 	printk("Last syscall: %ld ", current->thread.last_syscall);
@@ -285,7 +288,7 @@ void show_regs(struct pt_regs * regs)
 			printk("\n");
 		}
 	}
-out:
+out: ;
 }
 
 void exit_thread(void)

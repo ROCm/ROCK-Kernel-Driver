@@ -1,4 +1,4 @@
-/* $Id: dbri.c,v 1.22 2000/10/27 07:01:38 uzi Exp $
+/* $Id: dbri.c,v 1.23 2001/01/08 04:19:16 davem Exp $
  * drivers/sbus/audio/dbri.c
  *
  * Copyright (C) 1997 Rudolf Koenig (rfkoenig@immd4.informatik.uni-erlangen.de)
@@ -61,7 +61,7 @@
 #include <asm/audioio.h>
 #include "dbri.h"
 
-#if defined(DBRI_ISDN) || defined (LINUX_VERSION_CODE) && LINUX_VERSION_CODE > 0x200ff
+#if defined(DBRI_ISDN) && defined (LINUX_VERSION_CODE) && LINUX_VERSION_CODE > 0x200ff
 #include "../../isdn/hisax/hisax.h"
 #include "../../isdn/hisax/isdnl1.h"
 #include "../../isdn/hisax/foreign.h"
@@ -2227,7 +2227,7 @@ void dbri_brecv(int dev, unsigned int chan,
        recv_on_pipe(dbri, 8+chan, buffer, size, callback, callback_arg);
 }
 
-#if defined(DBRI_ISDN) || defined (LINUX_VERSION_CODE) && LINUX_VERSION_CODE > 0x200ff
+#if defined(DBRI_ISDN) && defined (LINUX_VERSION_CODE) && LINUX_VERSION_CODE > 0x200ff
 struct foreign_interface dbri_foreign_interface = {
         dbri_get_irqnum,
         dbri_get_liu_state,

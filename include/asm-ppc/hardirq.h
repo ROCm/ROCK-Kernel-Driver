@@ -47,7 +47,7 @@ typedef struct {
 #include <asm/atomic.h>
 
 extern unsigned char global_irq_holder;
-extern unsigned volatile int global_irq_lock;
+extern unsigned volatile long global_irq_lock;
 extern atomic_t global_irq_count;
 
 static inline void release_irqlock(int cpu)
@@ -66,8 +66,8 @@ static inline void hardirq_enter(int cpu)
 	++local_irq_count(cpu);
 	atomic_inc(&global_irq_count);
 	while (test_bit(0,&global_irq_lock)) {
-		if (smp_processor_id() == global_irq_holder) {
-			printk("uh oh, interrupt while we hold global irq lock!\n");
+		if (cpu == global_irq_holder) {
+			printk("uh oh, interrupt while we hold global irq lock! (CPU %d)\n", cpu);
 #ifdef CONFIG_XMON
 			xmon(0);
 #endif

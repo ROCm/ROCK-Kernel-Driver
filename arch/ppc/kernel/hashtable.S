@@ -56,7 +56,6 @@ hash_page:
 #ifdef CONFIG_PPC64BRIDGE
 	mfmsr	r0
 	clrldi	r0,r0,1		/* make sure it's in 32-bit mode */
-	sync
 	MTMSRD(r0)
 	isync
 #endif
@@ -112,23 +111,31 @@ hash_page:
 #endif
 	tophys(r2,r5)
 	rlwimi	r2,r3,22,20,29		/* insert next 10 bits of address */
-	lwz	r6,0(r2)		/* get linux-style pte */
 	ori	r4,r4,1			/* set _PAGE_PRESENT bit in access */
+	rlwinm	r5,r4,5,24,24		/* _PAGE_RW access -> _PAGE_DIRTY */
+	rlwimi	r5,r4,7,22,22		/* _PAGE_RW -> _PAGE_HWWRITE */
+	ori	r5,r5,0x100		/* set _PAGE_ACCESSED */
+retry:
+	lwz	r6,0(r2)		/* get linux-style pte */
 	andc.	r0,r4,r6		/* check access & ~permission */
 #ifdef CONFIG_SMP
 	bne-	hash_page_out		/* return if access not permitted */
 #else
 	bnelr-
 #endif
+	andc.	r0,r5,r6		/* any bits not yet set? */
+	beq	2f
 
-	ori	r6,r6,0x100		/* set _PAGE_ACCESSED in pte */
-	rlwinm	r5,r4,5,24,24		/* _PAGE_RW access -> _PAGE_DIRTY */
-	rlwimi	r5,r4,7,22,22		/* _PAGE_RW -> _PAGE_HWWRITE */
-	or	r6,r6,r5
-	stw	r6,0(r2)		/* update PTE (accessed/dirty bits) */
+	/* Update the linux PTE atomically */
+	lwarx	r0,0,r2			/* refetch the pte and check */
+	cmpw	0,r0,r6			/* that it hasn't been changed */
+	bne-	retry			/* retry if it has */
+	or	r6,r6,r5		/* set accessed/dirty bits */
+	stwcx.	r6,0,r2			/* attempt to update PTE */
+	bne-	retry			/* retry if someone got there first */
 
 	/* Convert linux-style PTE to low word of PPC-style PTE */
-	rlwinm	r4,r6,32-9,31,31	/* _PAGE_HWWRITE -> PP lsb */
+2:	rlwinm	r4,r6,32-9,31,31	/* _PAGE_HWWRITE -> PP lsb */
 	rlwimi	r6,r6,32-1,31,31	/* _PAGE_USER -> PP (both bits now) */
 	ori	r4,r4,0xe04		/* clear out reserved bits */
 	andc	r6,r6,r4		/* PP=2 or 0, when _PAGE_HWWRITE */
@@ -166,12 +173,16 @@ hash_page_patch_A:
 	rlwimi	r4,r5,32-5,25-Hash_bits,24	/* (VSID & hash_mask) << 7 */
 	rlwinm	r0,r3,32-5,25-Hash_bits,24	/* (PI & hash_mask) << 7 */
 	xor	r4,r4,r0		/* make primary hash */
+	li	r2,8			/* PTEs/group */
 
+#ifndef CONFIG_SMP
+	/* We don't do this for SMP - another cpu could have put in
+	   the appropriate PTE since we took the exception.  -- paulus. */
 	/* See whether it was a PTE not found exception or a
 	   protection violation. */
 	andis.	r0,r20,0x4000
-	li	r2,8			/* PTEs/group */
 	bne	10f			/* no PTE: go look for an empty slot */
+#endif /* CONFIG_SMP */
 	tlbie	r3			/* invalidate TLB entry */
 
 	/* Search the primary PTEG for a PTE whose 1st dword matches r5 */
@@ -263,7 +274,6 @@ found_empty:
 	std	r5,0(r3)
 found_slot:
 	std	r6,8(r3)
-	sync
 
 #else /* CONFIG_SMP */
 /*
@@ -311,12 +321,16 @@ hash_page_patch_A:
 	rlwimi	r4,r5,32-1,26-Hash_bits,25	/* (VSID & hash_mask) << 6 */
 	rlwinm	r0,r3,32-6,26-Hash_bits,25	/* (PI & hash_mask) << 6 */
 	xor	r4,r4,r0		/* make primary hash */
+	li	r2,8			/* PTEs/group */
 
+#ifndef CONFIG_SMP
+	/* We don't do this for SMP - another cpu could have put in
+	   the appropriate PTE since we took the exception.  -- paulus. */
 	/* See whether it was a PTE not found exception or a
 	   protection violation. */
 	andis.	r0,r20,0x4000
-	li	r2,8			/* PTEs/group */
 	bne	10f			/* no PTE: go look for an empty slot */
+#endif /* CONFIG_SMP */
 	tlbie	r3			/* invalidate TLB entry */
 
 	/* Search the primary PTEG for a PTE whose 1st word matches r5 */
@@ -394,7 +408,6 @@ found_empty:
 	stw	r5,0(r3)
 found_slot:
 	stw	r6,4(r3)
-	sync
 
 #else /* CONFIG_SMP */
 /*
@@ -427,6 +440,8 @@ found_slot:
 	stw	r5,0(r3)	/* finally set V bit in PTE */
 #endif /* CONFIG_SMP */
 #endif /* CONFIG_PPC64BRIDGE */
+
+	sync		/* make sure pte updates get to memory */
 
 /*
  * Update the hash table miss count.  We only want misses here
@@ -517,7 +532,7 @@ _GLOBAL(flush_hash_segments)
 	   a hash table miss while we have the hash table locked,
 	   or we'll get a deadlock.  -paulus */
 	mfmsr	r10
-	sync
+	SYNC
 	rlwinm	r0,r10,0,17,15	/* clear bit 16 (MSR_EE) */
 	mtmsr	r0
 	SYNC
@@ -616,7 +631,7 @@ _GLOBAL(flush_hash_page)
 	   a hash table miss while we have the hash table locked,
 	   or we'll get a deadlock.  -paulus */
 	mfmsr	r10
-	sync
+	SYNC
 	rlwinm	r0,r10,0,17,15		/* clear bit 16 (MSR_EE) */
 	mtmsr	r0
 	SYNC
@@ -628,10 +643,14 @@ _GLOBAL(flush_hash_page)
 	oris	r8,r8,9
 10:	lwarx	r7,0,r9
 	cmpi	0,r7,0
-	bne-	10b
+	bne-	11f
 	stwcx.	r8,0,r9
-	bne-	10b
-	eieio
+	beq+	12f
+11:	lwz	r7,0(r9)
+	cmpi	0,r7,0
+	beq	10b
+	b	11b
+12:	eieio
 #endif
 #ifndef CONFIG_PPC64BRIDGE
 	rlwinm	r3,r3,11,1,20		/* put context into vsid */

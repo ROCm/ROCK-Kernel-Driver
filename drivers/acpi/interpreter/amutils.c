@@ -2,12 +2,12 @@
 /******************************************************************************
  *
  * Module Name: amutils - interpreter/scanner utilities
- *              $Revision: 66 $
+ *              $Revision: 68 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -46,12 +46,9 @@ typedef struct internal_search_st
 
 
 /* Used to traverse nested packages when copying*/
+/* TBD: This must be removed! */
 
 INTERNAL_PKG_SEARCH_INFO        copy_level[MAX_PACKAGE_DEPTH];
-
-
-static NATIVE_CHAR          hex[] =
-	{'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
 
 
 /*******************************************************************************
@@ -156,7 +153,7 @@ acpi_aml_truncate_for32bit_table (
 	 */
 
 	if ((!obj_desc) ||
-		(obj_desc->common.type != ACPI_TYPE_NUMBER) ||
+		(obj_desc->common.type != ACPI_TYPE_INTEGER) ||
 		(!walk_state->method_node))
 	{
 		return;
@@ -167,7 +164,7 @@ acpi_aml_truncate_for32bit_table (
 		 * We are running a method that exists in a 32-bit ACPI table.
 		 * Truncate the value to 32 bits by zeroing out the upper 32-bit field
 		 */
-		obj_desc->number.value &= (ACPI_INTEGER) ACPI_UINT32_MAX;
+		obj_desc->integer.value &= (ACPI_INTEGER) ACPI_UINT32_MAX;
 	}
 }
 
@@ -343,10 +340,10 @@ acpi_aml_eisa_id_to_string (
 	out_string[0] = (char) ('@' + ((id >> 26) & 0x1f));
 	out_string[1] = (char) ('@' + ((id >> 21) & 0x1f));
 	out_string[2] = (char) ('@' + ((id >> 16) & 0x1f));
-	out_string[3] = hex[(id >> 12) & 0xf];
-	out_string[4] = hex[(id >> 8) & 0xf];
-	out_string[5] = hex[(id >> 4) & 0xf];
-	out_string[6] = hex[id & 0xf];
+	out_string[3] = acpi_gbl_hex_to_ascii[(id >> 12) & 0xf];
+	out_string[4] = acpi_gbl_hex_to_ascii[(id >> 8) & 0xf];
+	out_string[5] = acpi_gbl_hex_to_ascii[(id >> 4) & 0xf];
+	out_string[6] = acpi_gbl_hex_to_ascii[id & 0xf];
 	out_string[7] = 0;
 
 	return (AE_OK);

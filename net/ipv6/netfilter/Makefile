@@ -19,6 +19,7 @@ obj-$(CONFIG_IP6_NF_MATCH_MARK) += ip6t_mark.o
 obj-$(CONFIG_IP6_NF_MATCH_MAC) += ip6t_mac.o
 obj-$(CONFIG_IP6_NF_MATCH_MULTIPORT) += ip6t_multiport.o
 obj-$(CONFIG_IP6_NF_FILTER) += ip6table_filter.o
+obj-$(CONFIG_IP6_NF_MANGLE) += ip6table_mangle.o
 obj-$(CONFIG_IP6_NF_TARGET_MARK) += ip6t_MARK.o
 
 include $(TOPDIR)/Rules.make

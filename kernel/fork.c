@@ -447,7 +447,7 @@ static int copy_files(unsigned long clone_flags, struct task_struct * tsk)
 	if (size > __FD_SETSIZE) {
 		newf->max_fdset = 0;
 		write_lock(&newf->file_lock);
-		error = expand_fdset(newf, size);
+		error = expand_fdset(newf, size-1);
 		write_unlock(&newf->file_lock);
 		if (error)
 			goto out_release;
@@ -466,7 +466,7 @@ static int copy_files(unsigned long clone_flags, struct task_struct * tsk)
 		read_unlock(&oldf->file_lock);
 		newf->max_fds = 0;
 		write_lock(&newf->file_lock);
-		error = expand_fd_array(newf, open_files);
+		error = expand_fd_array(newf, open_files-1);
 		write_unlock(&newf->file_lock);
 		if (error) 
 			goto out_release;

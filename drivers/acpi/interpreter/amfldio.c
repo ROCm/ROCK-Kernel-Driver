@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: amfldio - Aml Field I/O
- *              $Revision: 32 $
+ *              $Revision: 35 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -132,7 +132,7 @@ acpi_aml_read_field (
 	u32                     this_field_byte_offset;
 	u32                     this_field_datum_offset;
 	u32                     previous_raw_datum;
-	u32                     this_raw_datum;
+	u32                     this_raw_datum = 0;
 	u32                     valid_field_bits;
 	u32                     mask;
 	u32                     merged_datum = 0;
@@ -203,31 +203,45 @@ acpi_aml_read_field (
 
 		while (this_field_datum_offset < datum_length) {
 			/*
-			 * Get the next raw datum, it contains bits of the current
-			 * field datum
+			 * If the field is aligned on a byte boundary, we don't want
+			 * to perform a final read, since this would potentially read
+			 * past the end of the region.
+			 *
+			 * TBD: [Investigate] It may make more sense to just split the aligned
+			 * and non-aligned cases since the aligned case is so very simple,
 			 */
-
-			status = acpi_aml_read_field_data (obj_desc,
-					  this_field_byte_offset + byte_granularity,
-					  bit_granularity, &this_raw_datum);
-			if (ACPI_FAILURE (status)) {
-				goto cleanup;
-			}
-
-			/* Before merging the data, make sure the unused bits are clear */
-
-			switch (byte_granularity)
+			if ((obj_desc->field.bit_offset != 0) ||
+				((obj_desc->field.bit_offset == 0) &&
+				(this_field_datum_offset < (datum_length -1))))
 			{
-			case 1:
-				this_raw_datum &= 0x000000FF;
-				previous_raw_datum &= 0x000000FF;
-				break;
+				/*
+				 * Get the next raw datum, it contains some or all bits
+				 * of the current field datum
+				 */
 
-			case 2:
-				this_raw_datum &= 0x0000FFFF;
-				previous_raw_datum &= 0x0000FFFF;
-				break;
+				status = acpi_aml_read_field_data (obj_desc,
+						  this_field_byte_offset + byte_granularity,
+						  bit_granularity, &this_raw_datum);
+				if (ACPI_FAILURE (status)) {
+					goto cleanup;
+				}
+
+				/* Before merging the data, make sure the unused bits are clear */
+
+				switch (byte_granularity)
+				{
+				case 1:
+					this_raw_datum &= 0x000000FF;
+					previous_raw_datum &= 0x000000FF;
+					break;
+
+				case 2:
+					this_raw_datum &= 0x0000FFFF;
+					previous_raw_datum &= 0x0000FFFF;
+					break;
+				}
 			}
+
 
 			/*
 			 * Put together bits of the two raw data to make a complete

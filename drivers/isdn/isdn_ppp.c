@@ -2310,8 +2310,7 @@ static struct sk_buff *isdn_ppp_decompress(struct sk_buff *skb,struct ippp_struc
   		rsparm.data = rsdata;
   		rsparm.maxdlen = IPPP_RESET_MAXDATABYTES;
   
-		/* !!!HACK,HACK,HACK!!! 2048 is only assumed */
-  		skb_out = dev_alloc_skb(2048);
+  		skb_out = dev_alloc_skb(is->mru + PPP_HDRLEN);
 		len = ipc->decompress(stat, skb, skb_out, &rsparm);
 		kfree_skb(skb);
 		if (len <= 0) {
@@ -2332,14 +2331,9 @@ static struct sk_buff *isdn_ppp_decompress(struct sk_buff *skb,struct ippp_struc
 			kfree_skb(skb_out);
 			return NULL;
 		}
-
-		if (isdn_ppp_skip_ac(ri, skb) < 0) {
-			kfree_skb(skb);
-			return NULL;
-		}
-		*proto = isdn_ppp_strip_proto(skb);
+		*proto = isdn_ppp_strip_proto(skb_out);
 		if (*proto < 0) {
-			kfree_skb(skb);
+			kfree_skb(skb_out);
 			return NULL;
 		}
 		return skb_out;

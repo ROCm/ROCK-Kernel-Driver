@@ -1,4 +1,4 @@
-/* $Id: amd7930.c,v 1.24 2000/01/22 05:10:27 anton Exp $
+/* $Id: amd7930.c,v 1.25 2001/01/08 04:19:16 davem Exp $
  * drivers/sbus/audio/amd7930.c
  *
  * Copyright (C) 1996,1997 Thomas K. Dyas (tdyas@eden.rutgers.edu)
@@ -107,7 +107,7 @@ static __u8  mulaw2bilinear(__u8 data);
 static __u8  linear2mulaw(__u16 data);
 static __u16 mulaw2linear(__u8 data);
 
-#if defined (AMD79C30_ISDN) || defined (LINUX_VERSION_CODE) && LINUX_VERSION_CODE > 0x200ff 
+#if defined (AMD79C30_ISDN) && defined (LINUX_VERSION_CODE) && LINUX_VERSION_CODE > 0x200ff 
 #include "../../isdn/hisax/hisax.h"
 #include "../../isdn/hisax/isdnl1.h"
 #include "../../isdn/hisax/foreign.h"
@@ -1131,7 +1131,7 @@ static int amd7930_ioctl(struct inode * inode, struct file * file,
  *
  */
 
-#if defined (AMD79C30_ISDN) || defined (LINUX_VERSION_CODE) && LINUX_VERSION_CODE > 0x200ff 
+#if defined (AMD79C30_ISDN) && defined (LINUX_VERSION_CODE) && LINUX_VERSION_CODE > 0x200ff 
 static int amd7930_get_irqnum(int dev)
 {
 	struct amd7930_info *info;

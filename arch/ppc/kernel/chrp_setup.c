@@ -30,7 +30,6 @@
 #include <linux/ioport.h>
 #include <linux/console.h>
 #include <linux/pci.h>
-#include <linux/openpic.h>
 #include <linux/version.h>
 #include <linux/adb.h>
 #include <linux/module.h>
@@ -50,21 +49,19 @@
 #include <asm/hydra.h>
 #include <asm/keyboard.h>
 #include <asm/init.h>
-
 #include <asm/time.h>
+
 #include "local_irq.h"
 #include "i8259.h"
 #include "open_pic.h"
 #include "xics.h"
-
-extern volatile unsigned char *chrp_int_ack_special;
 
 unsigned long chrp_get_rtc_time(void);
 int chrp_set_rtc_time(unsigned long nowtime);
 void chrp_calibrate_decr(void);
 long chrp_time_init(void);
 
-void chrp_setup_pci_ptrs(void);
+void chrp_find_bridges(void);
 void chrp_event_scan(void);
 void rtas_display_progress(char *, unsigned short);
 void rtas_indicator_progress(char *, unsigned short);
@@ -92,7 +89,7 @@ kdev_t boot_dev;
 extern PTE *Hash, *Hash_end;
 extern unsigned long Hash_size, Hash_mask;
 extern int probingmem;
-extern unsigned long loops_per_sec;
+extern unsigned long loops_per_jiffy;
 extern int bootx_text_mapped;
 static int max_width;
 
@@ -244,7 +241,7 @@ chrp_setup_arch(void)
 	struct device_node *device;
 
 	/* init to some ~sane value until calibrate_delay() runs */
-	loops_per_sec = 50000000;
+	loops_per_jiffy = 50000000/HZ;
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	/* this is fine for chrp */
@@ -257,6 +254,9 @@ chrp_setup_arch(void)
 		ROOT_DEV = to_kdev_t(0x0802); /* sda2 (sda1 is for the kernel) */
 	printk("Boot arguments: %s\n", cmd_line);
 
+	/* Lookup PCI host bridges */
+	chrp_find_bridges();
+
 #ifndef CONFIG_PPC64BRIDGE
 	/* PCI bridge config space access area -
 	 * appears to be not in devtree on longtrail. */
@@ -266,11 +266,12 @@ chrp_setup_arch(void)
 	 *  -- Geert
 	 */
 	hydra_init();		/* Mac I/O */
+
 #endif /* CONFIG_PPC64BRIDGE */
 
 #ifndef CONFIG_POWER4
 	/* Some IBM machines don't have the hydra -- Cort */
-	if ( !OpenPIC )
+	if ( !OpenPIC_Addr )
 	{
 		unsigned long *opprop;
 
@@ -279,7 +280,7 @@ chrp_setup_arch(void)
 		if (opprop != 0) {
 			printk("OpenPIC addrs: %lx %lx %lx\n",
 			       opprop[0], opprop[1], opprop[2]);
-			OpenPIC = ioremap(opprop[0], sizeof(struct OpenPIC));
+			OpenPIC_Addr = ioremap(opprop[0], 0x40000);
 		}
 	}
 #endif
@@ -292,23 +293,17 @@ chrp_setup_arch(void)
 	conswitchp = &dummy_con;
 #endif
 
-#ifndef CONFIG_PPC64BRIDGE
-	pmac_find_bridges();
-#endif /* CONFIG_PPC64BRIDGE */
-
 	/* Get the event scan rate for the rtas so we know how
 	 * often it expects a heartbeat. -- Cort
 	 */
-	if ( rtas_data )
-	{
+	if ( rtas_data ) {
 		struct property *p;
 		device = find_devices("rtas");
 		for ( p = device->properties;
 		      p && strncmp(p->name, "rtas-event-scan-rate", 20);
 		      p = p->next )
 			/* nothing */ ;
-		if ( p && *(unsigned long *)p->value )
-		{
+		if ( p && *(unsigned long *)p->value ) {
 			ppc_md.heartbeat = chrp_event_scan;
 			ppc_md.heartbeat_reset = (HZ/(*(unsigned long *)p->value)*30)-1;
 			ppc_md.heartbeat_count = 1;
@@ -365,79 +360,44 @@ chrp_irq_cannonicalize(u_int irq)
 	}
 }
 
-int __chrp chrp_get_irq( struct pt_regs *regs )
-{
-        int irq;
-
-        irq = openpic_irq( smp_processor_id() );
-        if (irq == IRQ_8259_CASCADE)
-        {
-                /*
-                 * This magic address generates a PCI IACK cycle.
-                 */
-		if ( chrp_int_ack_special )
-			irq = *chrp_int_ack_special;
-		else
-			irq = i8259_irq( smp_processor_id() );
-		openpic_eoi( smp_processor_id() );
-        }
-        if (irq == OPENPIC_VEC_SPURIOUS)
-                /*
-                 * Spurious interrupts should never be
-                 * acknowledged
-                 */
-		irq = -1;
-	/*
-	 * I would like to openpic_eoi here but there seem to be timing problems
-	 * between the openpic ack and the openpic eoi.
-	 *   -- Cort
-	 */
-	return irq;
-}
-
-void __chrp chrp_post_irq(struct pt_regs* regs, int irq)
-{
-	/*
-	 * If it's an i8259 irq then we've already done the
-	 * openpic irq.  So we just check to make sure the controller
-	 * is an openpic and if it is then eoi
-	 *
-	 * We do it this way since our irq_desc[irq].handler can change
-	 * with RTL and no longer be open_pic -- Cort
-	 */
-	if ( irq >= open_pic_irq_offset)
-		openpic_eoi( smp_processor_id() );
-}
-
 void __init chrp_init_IRQ(void)
 {
 	struct device_node *np;
 	int i;
 	unsigned long *addrp;
+	unsigned char* chrp_int_ack_special = 0;
+	unsigned char init_senses[NR_IRQS - NUM_8259_INTERRUPTS];
+	int nmi_irq = -1;
+#if defined(CONFIG_VT) && defined(CONFIG_ADB_KEYBOARD) && defined(XMON)	
+	struct device_node *kbd;
+#endif
 
 	if (!(np = find_devices("pci"))
 	    || !(addrp = (unsigned long *)
 		 get_property(np, "8259-interrupt-acknowledge", NULL)))
 		printk("Cannot find pci to get ack address\n");
 	else
-		chrp_int_ack_special = (volatile unsigned char *)
-			ioremap(*addrp, 1);
-	open_pic_irq_offset = 16;
-	for ( i = 16 ; i < NR_IRQS ; i++ )
-		irq_desc[i].handler = &open_pic;
-	openpic_init(1);
-	enable_irq(IRQ_8259_CASCADE);
-	for ( i = 0 ; i < 16  ; i++ )
+		chrp_int_ack_special = (unsigned char *)ioremap(*addrp, 1);
+	/* hydra still sets OpenPIC_InitSenses to a static set of values */
+	if (OpenPIC_InitSenses == NULL) {
+		prom_get_irq_senses(init_senses, NUM_8259_INTERRUPTS, NR_IRQS);
+		OpenPIC_InitSenses = init_senses;
+		OpenPIC_NumInitSenses = NR_IRQS - NUM_8259_INTERRUPTS;
+	}
+	openpic_init(1, NUM_8259_INTERRUPTS, chrp_int_ack_special, nmi_irq);
+	for ( i = 0 ; i < NUM_8259_INTERRUPTS  ; i++ )
 		irq_desc[i].handler = &i8259_pic;
 	i8259_init();
-#ifdef CONFIG_XMON
-	request_irq(openpic_to_irq(HYDRA_INT_ADB_NMI),
-		    xmon_irq, 0, "NMI", 0);
-#endif	/* CONFIG_XMON */
-#ifdef CONFIG_SMP
-	request_irq(openpic_to_irq(OPENPIC_VEC_IPI),
-		    openpic_ipi_action, 0, "IPI0", 0);
-#endif	/* CONFIG_SMP */
+#if defined(CONFIG_VT) && defined(CONFIG_ADB_KEYBOARD) && defined(XMON)
+	/* see if there is a keyboard in the device tree
+	   with a parent of type "adb" */
+	for (kbd = find_devices("keyboard"); kbd; kbd = kbd->next)
+		if (kbd->parent && kbd->parent->type
+		    && strcmp(kbd->parent->type, "adb") == 0)
+			break;
+	if (kbd)
+		request_irq( HYDRA_INT_ADB_NMI, xmon_irq, 0, "XMON break", 0);
+#endif
 }
 
 void __init
@@ -556,12 +516,6 @@ chrp_ide_release_region(ide_ioreg_t from,
 }
 
 void __chrp
-chrp_ide_fix_driveid(struct hd_driveid *id)
-{
-        ppc_generic_ide_fix_driveid(id);
-}
-
-void __chrp
 chrp_ide_init_hwif_ports(hw_regs_t *hw, ide_ioreg_t data_port, ide_ioreg_t ctrl_port, int *irq)
 {
 	ide_ioreg_t reg = data_port;
@@ -586,7 +540,6 @@ void __init
 	   chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		     unsigned long r6, unsigned long r7)
 {
-	chrp_setup_pci_ptrs();
 #ifdef CONFIG_BLK_DEV_INITRD
 	/* take care of initrd if we have one */
 	if ( r6 )
@@ -596,10 +549,10 @@ void __init
 	}
 #endif /* CONFIG_BLK_DEV_INITRD */
 
-        /* pci_dram_offset/isa_io_base/isa_mem_base set by setup_pci_ptrs() */
 	ISA_DMA_THRESHOLD = ~0L;
 	DMA_MODE_READ = 0x44;
 	DMA_MODE_WRITE = 0x48;
+	isa_io_base = CHRP_ISA_IO_BASE;		/* default value */
 
 	ppc_md.setup_arch     = chrp_setup_arch;
 	ppc_md.setup_residual = NULL;
@@ -607,8 +560,8 @@ void __init
 	ppc_md.irq_cannonicalize = chrp_irq_cannonicalize;
 #ifndef CONFIG_POWER4
 	ppc_md.init_IRQ       = chrp_init_IRQ;
-	ppc_md.get_irq        = chrp_get_irq;
-	ppc_md.post_irq	      = chrp_post_irq;
+	ppc_md.get_irq        = openpic_get_irq;
+	ppc_md.post_irq	      = NULL;
 #else
 	ppc_md.init_IRQ	      = xics_init_IRQ;
 	ppc_md.get_irq	      = xics_get_irq;
@@ -669,11 +622,12 @@ void __init
         ppc_ide_md.ide_check_region = chrp_ide_check_region;
         ppc_ide_md.ide_request_region = chrp_ide_request_region;
         ppc_ide_md.ide_release_region = chrp_ide_release_region;
-        ppc_ide_md.fix_driveid = chrp_ide_fix_driveid;
+        ppc_ide_md.fix_driveid = ppc_generic_ide_fix_driveid;
         ppc_ide_md.ide_init_hwif = chrp_ide_init_hwif_ports;
 
         ppc_ide_md.io_base = _IO_BASE;
 #endif
+
 	/*
 	 * Print the banner, then scroll down so boot progress
 	 * can be printed.  -- Cort 

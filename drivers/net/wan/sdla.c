@@ -744,7 +744,7 @@ static void sdla_receive(struct net_device *dev)
 	struct buf_entry  *pbuf;
 
 	unsigned long	  flags;
-	int               i, received, success, addr, buf_base, buf_top;
+	int               i=0, received, success, addr, buf_base, buf_top;
 	short             dlci, len, len2, split;
 
 	flp = dev->priv;

@@ -73,6 +73,14 @@ typedef struct ipx_route {
 	struct ipx_route *ir_next;
 }	ipx_route;
 
+#ifdef __KERNEL__
+struct ipx_cb {
+	u8 ipx_tctrl;
+	u32 ipx_dest_net;
+	u32 ipx_source_net;
+	int last_hop_index;
+};
+#endif
 #define IPX_MIN_EPHEMERAL_SOCKET	0x4000
 #define IPX_MAX_EPHEMERAL_SOCKET	0x7fff
 

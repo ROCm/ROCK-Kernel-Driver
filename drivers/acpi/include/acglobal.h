@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Name: acglobal.h - Declarations for global variables
- *       $Revision: 92 $
+ *       $Revision: 96 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -154,7 +154,6 @@ ACPI_EXTERN u8                          acpi_gbl_global_lock_set; /* TBD: [Restr
 ACPI_EXTERN u8                          acpi_gbl_step_to_next_call;
 ACPI_EXTERN u8                          acpi_gbl_acpi_hardware_present;
 
-
 ACPI_EXTERN ACPI_OBJECT_NOTIFY_HANDLER  acpi_gbl_drv_notify;
 ACPI_EXTERN ACPI_OBJECT_NOTIFY_HANDLER  acpi_gbl_sys_notify;
 
@@ -162,7 +161,8 @@ ACPI_EXTERN ACPI_OBJECT_NOTIFY_HANDLER  acpi_gbl_sys_notify;
 extern      u8                          acpi_gbl_shutdown;
 extern      u32                         acpi_gbl_system_flags;
 extern      u32                         acpi_gbl_startup_flags;
-extern      u8                          acpi_gbl_decode_to8bit[];
+extern      u8                          acpi_gbl_decode_to8bit[8];
+extern NATIVE_CHAR                      acpi_gbl_hex_to_ascii[];
 
 
 /*****************************************************************************

@@ -1,7 +1,37 @@
-2000-12-17  Alan Cox <alan@redhat.com>
+2001-01-16  Jeff Garzik  <jgarzik@mandrakesoft.com>
 
-	* merge support for the Davicom's quirks into the main tulip. Patch
-	  by Tobias Ringstrom
+	* tulip_core.c: static vars no longer explicitly
+	initialized to zero.
+	* eeprom.c (tulip_read_eeprom): Make sure to delay between
+	EE_ENB and EE_ENB|EE_SHIFT_CLK.  Merged from becker tulip.c.
+
+2001-01-05  Peter De Schrijver  <p2@mind.be>
+
+	* eeprom.c (tulip_parse_eeprom): Interpret a bit more of 21142
+	extended format type 3 info blocks in a tulip SROM.
+
+2001-01-03  Matti Aarnio  <matti.aarnio@zmailer.org>
+
+	* media.c (tulip_select_media): Support media types 5 and 6
+
+2001-??-??  ??
+
+	* tulip_core.c: Add comment about LanMedia needing
+	a different driver.
+	Enable workarounds for early PCI chipsets.
+	Add IA64 csr0 support, update HPPA csr0 support.
+
+2000-12-17  Alan Cox  <alan@redhat.com>
+
+        * eeprom.c, timer.c, tulip.h, tulip_core.c: Merge support
+	for the Davicom's quirks into the main tulip.
+	Patch by Tobias Ringstrom
+
+2000-11-08  Jim Studt  <jim@federated.com>
+
+	* eeprom.c (tulip_parse_eeprom):  Check array bounds for
+	medianame[] and block_name[] arrays to avoid oops due
+	to bad values returned from hardware.
 
 2000-11-02  Jeff Garzik  <jgarzik@mandrakesoft.com>
 

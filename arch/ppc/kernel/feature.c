@@ -238,12 +238,15 @@ feature_add_controller(struct device_node *controller_device, fbit* bits);
 static struct feature_controller*
 feature_lookup_controller(struct device_node *device);
 
+#ifdef CONFIG_PMAC_PBOOK
 static void heathrow_prepare_for_sleep(struct feature_controller* ctrler);
 static void heathrow_wakeup(struct feature_controller* ctrler);
-static void keylargo_init(void);
-static void uninorth_init(void);
 static void core99_prepare_for_sleep(struct feature_controller* ctrler);
 static void core99_wake_up(struct feature_controller* ctrler);
+#endif /* CONFIG_PMAC_PBOOK */
+
+static void keylargo_init(void);
+static void uninorth_init(void);
 
 /* static variables */
 static struct feature_controller	controllers[MAX_FEATURE_CONTROLLERS];
@@ -255,6 +258,10 @@ static volatile u32*			keylargo_base = NULL;
 static int				uninorth_rev;
 static int				keylargo_rev;
 
+/*
+ * WARNING ! This function is called early in setup_arch, neither the IO base
+ * nor the udelay calibration have been done yet
+ */
 void
 feature_init(void)
 {
@@ -527,14 +534,31 @@ feature_set_usb_power(struct device_node* device, int power)
 void 
 feature_set_firewire_power(struct device_node* device, int power)
 {
+	if (!uninorth_base)
+		return;
+	if (power)
+		UN_BIS(UNI_N_CLOCK_CNTL, UNI_N_CLOCK_CNTL_FW);
+	else
+		UN_BIC(UNI_N_CLOCK_CNTL, UNI_N_CLOCK_CNTL_FW);
+	udelay(20);
 }
+
+#ifdef CONFIG_SMP
+void
+feature_core99_kick_cpu1(void)
+{
+	out_8((volatile u8 *)KL_FCR(KL_GPIO_KICK_CPU1), KL_GPIO_KICK_CPU1_UP);
+	udelay(1);
+	out_8((volatile u8 *)KL_FCR(KL_GPIO_KICK_CPU1), KL_GPIO_KICK_CPU1_DOWN);
+}
+#endif /* CONFIG_SMP */
 
 /* Initialize the Core99 UniNorth host bridge and memory controller
  */
 static void
 uninorth_init(void)
 {
-	struct device_node* gmac;
+	struct device_node* gmac, *fw;
 	unsigned long actrl;
 	
 	/* Set the arbitrer QAck delay according to what Apple does
@@ -564,6 +588,11 @@ uninorth_init(void)
 	}
 	if (gmac)
 		feature_set_gmac_power(gmac, 0);
+
+	/* Kludge (enable FW before PCI probe) */
+	fw = find_devices("firewire");
+	if (fw && device_is_compatible(fw, "pci106b,18"))
+		feature_set_firewire_power(fw, 1);
 }
 
 /* Initialize the Core99 KeyLargo ASIC. Currently, we just make sure
@@ -576,51 +605,6 @@ keylargo_init(void)
 }
 
 #ifdef CONFIG_PMAC_PBOOK
-void
-feature_prepare_for_sleep(void)
-{
-	/* We assume gatwick is second */
-	struct feature_controller* ctrler = &controllers[0];
-
-	if (!ctrler)
-		return;
-	if (controller_count > 1 &&
-		device_is_compatible(ctrler->device, "gatwick"))
-		ctrler = &controllers[1];
-
-	if (ctrler->bits == feature_bits_heathrow ||
-		ctrler->bits == feature_bits_paddington) {
-		heathrow_prepare_for_sleep(ctrler);
-		return;
-	}
-	if (ctrler->bits == feature_bits_keylargo) {
-		core99_prepare_for_sleep(ctrler);
-		return;
-	}
-}
-
-
-void
-feature_wake_up(void)
-{
-	struct feature_controller* ctrler = &controllers[0];
-
-	if (!ctrler)
-		return;
-	if (controller_count > 1 &&
-		device_is_compatible(ctrler->device, "gatwick"))
-		ctrler = &controllers[1];
-	
-	if (ctrler->bits == feature_bits_heathrow ||
-		ctrler->bits == feature_bits_paddington) {
-		heathrow_wakeup(ctrler);
-		return;
-	}
-	if (ctrler->bits == feature_bits_keylargo) {
-		core99_wake_up(ctrler);
-		return;
-	}
-}
 
 static u32 save_fcr[5];
 static u32 save_mbcr;
@@ -657,4 +641,50 @@ core99_wake_up(struct feature_controller* ctrler)
 {
 	/* Not yet implemented */
 }
+
+void
+feature_prepare_for_sleep(void)
+{
+	/* We assume gatwick is second */
+	struct feature_controller* ctrler = &controllers[0];
+
+	if (!ctrler)
+		return;
+	if (controller_count > 1 &&
+		device_is_compatible(ctrler->device, "gatwick"))
+		ctrler = &controllers[1];
+
+	if (ctrler->bits == feature_bits_heathrow ||
+		ctrler->bits == feature_bits_paddington) {
+		heathrow_prepare_for_sleep(ctrler);
+		return;
+	}
+	if (ctrler->bits == feature_bits_keylargo) {
+		core99_prepare_for_sleep(ctrler);
+		return;
+	}
+}
+
+void
+feature_wake_up(void)
+{
+	struct feature_controller* ctrler = &controllers[0];
+
+	if (!ctrler)
+		return;
+	if (controller_count > 1 &&
+		device_is_compatible(ctrler->device, "gatwick"))
+		ctrler = &controllers[1];
+	
+	if (ctrler->bits == feature_bits_heathrow ||
+		ctrler->bits == feature_bits_paddington) {
+		heathrow_wakeup(ctrler);
+		return;
+	}
+	if (ctrler->bits == feature_bits_keylargo) {
+		core99_wake_up(ctrler);
+		return;
+	}
+}
+
 #endif /* CONFIG_PMAC_PBOOK */

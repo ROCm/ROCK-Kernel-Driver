@@ -62,7 +62,7 @@ extern void mackbd_leds(unsigned char leds);
 extern void mackbd_init_hw(void);
 #endif
 
-extern unsigned long loops_per_sec;
+extern unsigned long loops_per_jiffy;
 
 unsigned char __res[sizeof(bd_t)];
 unsigned long empty_zero_page[1024];
@@ -286,10 +286,7 @@ m8260_init(unsigned long r3, unsigned long r4, unsigned long r5,
         ppc_ide_md.outsw = m8xx_ide_outsw;
         ppc_ide_md.default_irq = m8xx_ide_default_irq;
         ppc_ide_md.default_io_base = m8xx_ide_default_io_base;
-        ppc_ide_md.check_region = m8xx_ide_check_region;
-        ppc_ide_md.request_region = m8xx_ide_request_region;
-        ppc_ide_md.release_region = m8xx_ide_release_region;
-        ppc_ide_md.fix_driveid = m8xx_ide_fix_driveid;
+        ppc_ide_md.fix_driveid = ppc_generic_ide_fix_driveid;
         ppc_ide_md.ide_init_hwif = m8xx_ide_init_hwif_ports;
         ppc_ide_md.ide_request_irq = m8xx_ide_request_irq;
 
@@ -297,13 +294,39 @@ m8260_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #endif		
 }
 
-void
+/*
+ * Copied from prom.c so I don't have include all of that crap.
+ *				-- Dan
+ *
+ * prom_init() is called very early on, before the kernel text
+ * and data have been mapped to KERNELBASE.  At this point the code
+ * is running at whatever address it has been loaded at, so
+ * references to extern and static variables must be relocated
+ * explicitly.  The procedure reloc_offset() returns the address
+ * we're currently running at minus the address we were linked at.
+ * (Note that strings count as static variables.)
+ */
+extern unsigned long reloc_offset(void);
+#define PTRRELOC(x)	((typeof(x))((unsigned long)(x) + offset))
+
+__init
+unsigned long
 prom_init(uint r3, uint r4, uint r5, uint r6)
 {
-	/* Nothing to do now, but we are called immediatedly upon
-	 * kernel start up with MMU disabled, so if there is
-	 * anything we need to do......
-	 */
+	unsigned long offset = reloc_offset();
+ 	unsigned long phys;
+	extern char __bss_start, _end;
+
+	/* First zero the BSS -- use memset, some arches don't have
+	 * caches on yet */
+	memset_io(PTRRELOC(&__bss_start),0 , &_end - &__bss_start);
+
+ 	/* Default */
+ 	phys = offset + KERNELBASE;
+
+	/* We are done.
+	*/
+	return phys;
 }
 
 /* Mainly for ksyms.

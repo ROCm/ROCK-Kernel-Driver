@@ -24,12 +24,12 @@ extern void dn_nsp_send_disc(struct sock *sk, unsigned char type,
 				unsigned short reason, int gfp);
 extern void dn_nsp_return_disc(struct sk_buff *skb, unsigned char type,
 				unsigned short reason);
-extern void dn_nsp_send_lnk(struct sock *sk, unsigned short flags);
+extern void dn_nsp_send_link(struct sock *sk, unsigned char lsflags, char fcval);
 extern void dn_nsp_send_conninit(struct sock *sk, unsigned char flags);
 
 extern void dn_nsp_output(struct sock *sk);
 extern int dn_nsp_check_xmit_queue(struct sock *sk, struct sk_buff *skb, struct sk_buff_head *q, unsigned short acknum);
-extern void dn_nsp_queue_xmit(struct sock *sk, struct sk_buff *skb, int oob);
+extern void dn_nsp_queue_xmit(struct sock *sk, struct sk_buff *skb, int gfp, int oob);
 extern unsigned long dn_nsp_persist(struct sock *sk);
 extern int dn_nsp_xmit_timeout(struct sock *sk);
 
@@ -120,6 +120,7 @@ struct  nsp_conn_init_msg
 #define NSP_FC_NONE   0x00            /* Flow Control None    */
 #define NSP_FC_SRC    0x04            /* Seg Req. Count       */
 #define NSP_FC_SCMC   0x08            /* Sess. Control Mess   */
+#define NSP_FC_MASK   0x0c            /* FC type mask         */
 	unsigned char   info            __attribute__((packed));
         unsigned short  segsize         __attribute__((packed));
 };
@@ -178,13 +179,13 @@ static __inline__ int before_or_equal(unsigned short seq1, unsigned short seq2)
 
 static __inline__ void seq_add(unsigned short *seq, unsigned short off)
 {
-        *seq += off;
-        *seq &= 0x0fff;
+        (*seq) += off;
+        (*seq) &= 0x0fff;
 }
 
 static __inline__ int seq_next(unsigned short seq1, unsigned short seq2)
 {
-	return (((seq2&0x0fff) - (seq1&0x0fff)) == 1);
+	return equal(seq1 + 1, seq2);
 }
 
 /*

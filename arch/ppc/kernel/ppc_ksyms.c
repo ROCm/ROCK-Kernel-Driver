@@ -12,6 +12,7 @@
 #include <linux/console.h>
 #include <linux/irq.h>
 #include <linux/pci.h>
+#include <linux/delay.h>
 
 #include <asm/page.h>
 #include <asm/semaphore.h>
@@ -40,6 +41,7 @@
 #include <asm/backlight.h>
 #ifdef CONFIG_SMP
 #include <asm/smplock.h>
+#include <asm/smp.h>
 #endif /* CONFIG_SMP */
 #include <asm/time.h>
 
@@ -53,9 +55,10 @@ extern void MachineCheckException(struct pt_regs *regs);
 extern void AlignmentException(struct pt_regs *regs);
 extern void ProgramCheckException(struct pt_regs *regs);
 extern void SingleStepException(struct pt_regs *regs);
-extern int sys_sigreturn(struct pt_regs *regs);
 extern void do_lost_interrupts(unsigned long);
 extern int do_signal(sigset_t *, struct pt_regs *);
+extern int pmac_newworld;
+extern int sys_sigreturn(struct pt_regs *regs);
 
 long long __ashrdi3(long long, int);
 long long __ashldi3(long long, int);
@@ -98,10 +101,6 @@ EXPORT_SYMBOL(_prep_type);
 EXPORT_SYMBOL(ucSystemType);
 #endif
 #endif
-#ifdef CONFIG_PCI
-EXPORT_SYMBOL(pci_dev_io_base);
-EXPORT_SYMBOL(pci_dev_mem_base);
-#endif
 
 #if !__INLINE_BITOPS
 EXPORT_SYMBOL(set_bit);
@@ -125,6 +124,7 @@ EXPORT_SYMBOL(strlen);
 EXPORT_SYMBOL(strnlen);
 EXPORT_SYMBOL(strcmp);
 EXPORT_SYMBOL(strncmp);
+EXPORT_SYMBOL(strcasecmp);
 
 /* EXPORT_SYMBOL(csum_partial); already in net/netsyms.c */
 EXPORT_SYMBOL(csum_partial_copy_generic);
@@ -202,6 +202,10 @@ EXPORT_SYMBOL(_read_lock);
 EXPORT_SYMBOL(_read_unlock);
 EXPORT_SYMBOL(_write_lock);
 EXPORT_SYMBOL(_write_unlock);
+EXPORT_SYMBOL(smp_call_function);
+EXPORT_SYMBOL(smp_hw_index);
+EXPORT_SYMBOL(smp_num_cpus);
+EXPORT_SYMBOL(synchronize_irq);
 #endif
 
 #ifndef CONFIG_MACH_SPECIFIC
@@ -234,12 +238,14 @@ EXPORT_SYMBOL(pmu_enable_irled);
 #ifdef CONFIG_PMAC_BACKLIGHT
 EXPORT_SYMBOL(get_backlight_level);
 EXPORT_SYMBOL(set_backlight_level);
+EXPORT_SYMBOL(set_backlight_enable);
+EXPORT_SYMBOL(register_backlight_controller);
 #endif /* CONFIG_PMAC_BACKLIGHT */
-#if defined(CONFIG_ALL_PPC)
 EXPORT_SYMBOL_NOVERS(sys_ctrler);
 #ifndef CONFIG_MACH_SPECIFIC
 EXPORT_SYMBOL_NOVERS(have_of);
 #endif /* CONFIG_MACH_SPECIFIC */
+#if defined(CONFIG_ALL_PPC)
 EXPORT_SYMBOL(find_devices);
 EXPORT_SYMBOL(find_type_devices);
 EXPORT_SYMBOL(find_compatible_devices);
@@ -247,18 +253,29 @@ EXPORT_SYMBOL(find_path_device);
 EXPORT_SYMBOL(find_phandle);
 EXPORT_SYMBOL(device_is_compatible);
 EXPORT_SYMBOL(machine_is_compatible);
-EXPORT_SYMBOL(find_pci_device_OFnode);
 EXPORT_SYMBOL(find_all_nodes);
 EXPORT_SYMBOL(get_property);
-EXPORT_SYMBOL(pci_io_base);
-EXPORT_SYMBOL(pci_device_loc);
+EXPORT_SYMBOL(pci_bus_io_base);
+EXPORT_SYMBOL(pci_bus_io_base_phys);
+EXPORT_SYMBOL(pci_bus_mem_base_phys);
+EXPORT_SYMBOL(pci_device_to_OF_node);
+EXPORT_SYMBOL(pci_device_from_OF_node);
+EXPORT_SYMBOL(pci_bus_to_hose);
+EXPORT_SYMBOL(pci_resource_to_bus);
+EXPORT_SYMBOL(pci_phys_to_bus);
+EXPORT_SYMBOL(pci_bus_to_phys);
+EXPORT_SYMBOL(pmac_newworld);
 EXPORT_SYMBOL(feature_set);
 EXPORT_SYMBOL(feature_clear);
 EXPORT_SYMBOL(feature_test);
 EXPORT_SYMBOL(feature_set_gmac_power);
+EXPORT_SYMBOL(feature_set_gmac_phy_reset);
 EXPORT_SYMBOL(feature_set_usb_power);
 EXPORT_SYMBOL(feature_set_firewire_power);
 #endif /* defined(CONFIG_ALL_PPC) */
+#if defined(CONFIG_BOOTX_TEXT)
+EXPORT_SYMBOL(bootx_update_display);
+#endif
 #if defined(CONFIG_SCSI) && defined(CONFIG_ALL_PPC)
 EXPORT_SYMBOL(note_scsi_host);
 #endif
@@ -286,6 +303,7 @@ EXPORT_SYMBOL(abs);
 EXPORT_SYMBOL(screen_info);
 #endif
 
+EXPORT_SYMBOL(__delay);
 EXPORT_SYMBOL(int_control);
 EXPORT_SYMBOL(timer_interrupt_intercept);
 EXPORT_SYMBOL(timer_interrupt);
@@ -300,6 +318,10 @@ EXPORT_SYMBOL(console_lock);
 #ifdef CONFIG_XMON
 EXPORT_SYMBOL(xmon);
 #endif
+EXPORT_SYMBOL(__up);
+EXPORT_SYMBOL(__down);
+EXPORT_SYMBOL(__down_interruptible);
+EXPORT_SYMBOL(__down_trylock);
 EXPORT_SYMBOL(down_read_failed);
 EXPORT_SYMBOL(down_write_failed);
 
@@ -324,6 +346,12 @@ EXPORT_SYMBOL(do_softirq);
 EXPORT_SYMBOL(next_mmu_context);
 EXPORT_SYMBOL(set_context);
 EXPORT_SYMBOL(mmu_context_overflow);
+#if !defined(CONFIG_8xx) && !defined(CONFIG_4xx)
+extern long *intercept_table;
+EXPORT_SYMBOL(intercept_table);
+#endif
+extern long *ret_from_intercept;
+EXPORT_SYMBOL(ret_from_intercept);
 
 #ifdef CONFIG_MOL
 extern ulong mol_interface[];

@@ -12,6 +12,7 @@
 #include <linux/delay.h>
 #include <linux/blk.h>
 #include <linux/ide.h>
+#include <linux/bootmem.h>
 
 #include <asm/init.h>
 #include <asm/residual.h>
@@ -71,12 +72,6 @@ extern void apus_init(unsigned long r3,
                       unsigned long r6,
                       unsigned long r7);
 
-extern void gemini_init(unsigned long r3,
-                      unsigned long r4,
-                      unsigned long r5,
-                      unsigned long r6,
-                      unsigned long r7);
-
 #ifdef CONFIG_XMON
 extern void xmon_map_scc(void);
 #endif
@@ -105,6 +100,10 @@ int have_of = 0;
 #ifdef CONFIG_MAGIC_SYSRQ
 unsigned long SYSRQ_KEY;
 #endif /* CONFIG_MAGIC_SYSRQ */
+
+#ifdef CONFIG_VGA_CONSOLE
+unsigned long vgacon_remap_base;
+#endif
 
 struct machdep_calls ppc_md;
 
@@ -377,9 +376,9 @@ int get_cpuinfo(char *buffer)
 		len += sprintf(len+buffer, "revision\t: %hd.%hd\n", maj, min);
 
 		len += sprintf(buffer+len, "bogomips\t: %lu.%02lu\n",
-			       (CD(loops_per_sec)+2500)/500000,
-			       (CD(loops_per_sec)+2500)/5000 % 100);
-		bogosum += CD(loops_per_sec);
+			       (CD(loops_per_jiffy)+2500)/(500000/HZ),
+			       (CD(loops_per_jiffy)+2500)/(5000/HZ) % 100);
+		bogosum += CD(loops_per_jiffy);
 	}
 
 #ifdef CONFIG_SMP
@@ -549,11 +548,6 @@ identify_machine(unsigned long r3, unsigned long r4, unsigned long r5,
                 apus_init(r3, r4, r5, r6, r7);
 		break;
 #endif
-#ifdef CONFIG_GEMINI
-	case _MACH_gemini:
-		gemini_init(r3, r4, r5, r6, r7);
-		break;
-#endif
 	default:
 		printk("Unknown machine type in identify_machine!\n");
 	}
@@ -673,13 +667,14 @@ __setup("l2cr=", ppc_setup_l2cr);
 void __init ppc_init(void)
 {
 	/* clear the progress line */
-	if ( ppc_md.progress ) ppc_md.progress(" ", 0xffff);
+	if ( ppc_md.progress ) ppc_md.progress("             ", 0xffff);
 	
 	if (ppc_md.init != NULL) {
 		ppc_md.init();
 	}
 }
 
+/* Warning, IO base is not yet inited */
 void __init setup_arch(char **cmdline_p)
 {
 	extern int panic_timeout;
@@ -688,7 +683,7 @@ void __init setup_arch(char **cmdline_p)
 	extern void do_init_bootmem(void);
 
 	/* so udelay does something sensible, assume <= 1000 bogomips */
-	loops_per_sec = 500000000;
+	loops_per_jiffy = 500000000 / HZ;
 
 #ifdef CONFIG_ALL_PPC
 	feature_init();
@@ -743,10 +738,34 @@ void __init setup_arch(char **cmdline_p)
 	ppc_md.setup_arch();
 	if ( ppc_md.progress ) ppc_md.progress("arch: exit", 0x3eab);
 
+#ifdef CONFIG_PCI
+	/* We create the "pci-OF-bus-map" property now so it appear in the
+	 * /proc device tree
+	 */
+	if (have_of) {
+		struct property* of_prop;
+		
+		of_prop = (struct property*)alloc_bootmem(sizeof(struct property) + 256);
+		if (of_prop && find_path_device("/")) {
+			memset(of_prop, -1, sizeof(struct property) + 256);
+			of_prop->name = "pci-OF-bus-map";
+			of_prop->length = 256;
+			of_prop->value = (unsigned char *)&of_prop[1];
+			prom_add_property(find_path_device("/"), of_prop);
+		}
+	}
+#endif /* CONFIG_PCI */
+
 	paging_init();
 	sort_exception_table();
 }
 
+/* Convert the shorts/longs in hd_driveid from little to big endian;
+ * chars are endian independant, of course, but strings need to be flipped.
+ * (Despite what it says in drivers/block/ide.h, they come up as little
+ * endian...)
+ *
+ * Changes to linux/hdreg.h may require changes here. */
 void ppc_generic_ide_fix_driveid(struct hd_driveid *id)
 {
         int i;

@@ -2,12 +2,12 @@
  *
  * Module Name: evevent - Fixed and General Purpose Acpi_event
  *                          handling and dispatch
- *              $Revision: 32 $
+ *              $Revision: 33 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by

@@ -328,13 +328,9 @@ static int ll_merge_requests_fn(request_queue_t *q, struct request *req,
 				struct request *next, int max_segments)
 {
 	int total_segments = req->nr_segments + next->nr_segments;
-	int same_segment;
 
-	same_segment = 0;
-	if (req->bhtail->b_data + req->bhtail->b_size == next->bh->b_data) {
+	if (req->bhtail->b_data + req->bhtail->b_size == next->bh->b_data)
 		total_segments--;
-		same_segment = 1;
-	}
     
 	if (total_segments > max_segments)
 		return 0;

@@ -14,6 +14,10 @@
 #include <asm/bootx.h>
 #include <asm/feature.h>
 #include <asm/processor.h>
+#include <asm/delay.h>
+#ifdef CONFIG_SMP
+#include <asm/bitops.h>
+#endif
 
 static volatile unsigned char *sccc, *sccd;
 unsigned long TXRDY, RXRDY;
@@ -22,10 +26,10 @@ extern void prom_drawchar(char);
 extern void prom_drawstring(const char *str);
 static int xmon_expect(const char *str, unsigned int timeout);
 
-static int console = 0;
-static int use_screen = 1; /* default */
-static int via_modem = 0;
-static int xmon_use_sccb = 0;
+static int console;
+static int use_screen;
+static int via_modem = 1;
+static int xmon_use_sccb;
 static struct device_node *macio_node;
 
 #define TB_SPEED	25000000
@@ -53,28 +57,32 @@ xmon_map_scc(void)
 
 	use_screen = 0;
 	
-	if ( _machine == _MACH_Pmac )
-	{
+	if (_machine == _MACH_Pmac) {
 		struct device_node *np;
 		unsigned long addr;
 #ifdef CONFIG_BOOTX_TEXT
 		extern boot_infos_t *disp_bi;
 
+		/* see if there is a keyboard in the device tree
+		   with a parent of type "adb" */
+		for (np = find_devices("keyboard"); np; np = np->next)
+			if (np->parent && np->parent->type
+			    && strcmp(np->parent->type, "adb") == 0)
+				break;
+
 		/* needs to be hacked if xmon_printk is to be used
  		   from within find_via_pmu() */
 #ifdef CONFIG_ADB_PMU
-		if (!via_modem && disp_bi && find_via_pmu()) {
-			prom_drawstring("xmon uses screen and keyboard\n");
+		if (np != NULL && disp_bi && find_via_pmu())
 			use_screen = 1;
-		}
 #endif
 #ifdef CONFIG_ADB_CUDA
-		if (!via_modem && disp_bi ) {
-			prom_drawstring("xmon uses screen and keyboard\n");
+		if (np != NULL && disp_bi && find_via_cuda())
 			use_screen = 1;
-		}
 #endif
-#endif
+		if (use_screen)
+			prom_drawstring("xmon uses screen and keyboard\n");
+#endif /* CONFIG_BOOTX_TEXT */
 
 #ifdef CHRP_ESCC
 		addr = 0xc1013020;
@@ -92,15 +100,6 @@ xmon_map_scc(void)
 		base = (volatile unsigned char *) ioremap(addr & PAGE_MASK, PAGE_SIZE);
 		sccc = base + (addr & ~PAGE_MASK);
 		sccd = sccc + 0x10;
-	}
-	else if ( _machine & _MACH_gemini )
-	{
-		/* should already be mapped by the kernel boot */
-		sccc = (volatile unsigned char *) 0xffeffb0d;
-		sccd = (volatile unsigned char *) 0xffeffb08;
-		TXRDY = 0x20;
-		RXRDY = 1;
-		console = 1;
 	}
 	else
 	{
@@ -140,12 +139,22 @@ xmon_write(void *handle, void *ptr, int nb)
 	char *p = ptr;
 	int i, c, ct;
 
+#ifdef CONFIG_SMP
+	static unsigned long xmon_write_lock;
+	int lock_wait = 1000000;
+	int locked;
+
+	while ((locked = test_and_set_bit(0, &xmon_write_lock)) != 0)
+		if (--lock_wait == 0)
+			break;
+#endif
+
 #ifdef CONFIG_BOOTX_TEXT
 	if (use_screen) {
 		/* write it on the screen */
 		for (i = 0; i < nb; ++i)
 			prom_drawchar(*p++);
-		return nb;
+		goto out;
 	}
 #endif
 	if (!scc_initialized)
@@ -166,8 +175,15 @@ xmon_write(void *handle, void *ptr, int nb)
 		}
 		buf_access();
 		*sccd = c;
+		eieio();
 	}
-	return i;
+
+ out:
+#ifdef CONFIG_SMP
+	if (!locked)
+		clear_bit(0, &xmon_write_lock);
+#endif
+	return nb;
 }
 
 int xmon_wants_key;

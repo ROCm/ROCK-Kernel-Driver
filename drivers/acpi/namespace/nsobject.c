@@ -2,12 +2,12 @@
  *
  * Module Name: nsobject - Utilities for objects attached to namespace
  *                         table entries
- *              $Revision: 47 $
+ *              $Revision: 49 $
  *
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -205,7 +205,7 @@ acpi_ns_attach_object (
 			case AML_ZERO_OP: case AML_ONES_OP: case AML_ONE_OP:
 			case AML_BYTE_OP: case AML_WORD_OP: case AML_DWORD_OP:
 
-				obj_type = ACPI_TYPE_NUMBER;
+				obj_type = ACPI_TYPE_INTEGER;
 				break;
 
 

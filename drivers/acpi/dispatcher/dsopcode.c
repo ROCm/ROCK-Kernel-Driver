@@ -2,12 +2,12 @@
  *
  * Module Name: dsopcode - Dispatcher Op Region support and handling of
  *                         "control" opcodes
- *              $Revision: 28 $
+ *              $Revision: 30 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -355,7 +355,7 @@ acpi_ds_eval_field_unit_operands (
 	}
 
 
-	offset = (u32) off_desc->number.value;
+	offset = (u32) off_desc->integer.value;
 
 
 	/*
@@ -427,7 +427,7 @@ acpi_ds_eval_field_unit_operands (
 		/* Offset is in bits, count is in bits */
 
 		bit_offset = offset;
-		bit_count = (u16) cnt_desc->number.value;
+		bit_count = (u16) cnt_desc->integer.value;
 		break;
 
 
@@ -586,7 +586,7 @@ acpi_ds_eval_region_operands (
 	 */
 	operand_desc = walk_state->operands[walk_state->num_operands - 1];
 
-	obj_desc->region.length = (u32) operand_desc->number.value;
+	obj_desc->region.length = (u32) operand_desc->integer.value;
 	acpi_cm_remove_reference (operand_desc);
 
 	/*
@@ -595,7 +595,7 @@ acpi_ds_eval_region_operands (
 	 */
 	operand_desc = walk_state->operands[walk_state->num_operands - 2];
 
-	obj_desc->region.address = (ACPI_PHYSICAL_ADDRESS) operand_desc->number.value;
+	obj_desc->region.address = (ACPI_PHYSICAL_ADDRESS) operand_desc->integer.value;
 	acpi_cm_remove_reference (operand_desc);
 
 

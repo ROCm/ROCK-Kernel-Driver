@@ -70,5 +70,24 @@ typedef elf_vrreg_t elf_vrregset_t[ELF_NVRREG];
 
 #define SET_PERSONALITY(ex, ibcs2) set_personality((ibcs2)?PER_SVR4:PER_LINUX)
 
+/*
+ * We need to put in some extra aux table entries to tell glibc what
+ * the cache block size is, so it can use the dcbz instruction safely.
+ */
+#define AT_DCACHEBSIZE		17
+#define AT_ICACHEBSIZE		18
+#define AT_UCACHEBSIZE		19
+
+extern int dcache_bsize;
+extern int icache_bsize;
+extern int ucache_bsize;
+
+#define DLINFO_EXTRA_ITEMS	3
+#define EXTRA_DLINFO		do {			\
+	NEW_AUX_ENT(0, AT_DCACHEBSIZE, dcache_bsize);	\
+	NEW_AUX_ENT(1, AT_ICACHEBSIZE, icache_bsize);	\
+	NEW_AUX_ENT(2, AT_UCACHEBSIZE, ucache_bsize);	\
+} while (0)
+
 #endif /* __KERNEL__ */
 #endif

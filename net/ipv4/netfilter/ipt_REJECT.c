@@ -167,27 +167,9 @@ static unsigned int reject(struct sk_buff **pskb,
 	case IPT_ICMP_HOST_PROHIBITED:
     		icmp_send(*pskb, ICMP_DEST_UNREACH, ICMP_HOST_ANO, 0);
     		break;
-    	case IPT_ICMP_ECHOREPLY: {
-		struct icmphdr *icmph  = (struct icmphdr *)
-			((u_int32_t *)(*pskb)->nh.iph + (*pskb)->nh.iph->ihl);
-		unsigned int datalen = (*pskb)->len - (*pskb)->nh.iph->ihl * 4;
-
-		/* Not non-head frags, or truncated */
-		if (((ntohs((*pskb)->nh.iph->frag_off) & IP_OFFSET) == 0)
-		    && datalen >= 4) {
-			/* Usually I don't like cut & pasting code,
-                           but dammit, my party is starting in 45
-                           mins! --RR */
-			struct icmp_bxm icmp_param;
-
-			icmp_param.icmph=*icmph;
-			icmp_param.icmph.type=ICMP_ECHOREPLY;
-			icmp_param.data_ptr=(icmph+1);
-			icmp_param.data_len=datalen;
-			icmp_reply(&icmp_param, *pskb);
-		}
-	}
-	break;
+    	case IPT_ICMP_ECHOREPLY:
+		printk("REJECT: ECHOREPLY no longer supported.\n");
+		break;
 	case IPT_TCP_RESET:
 		send_reset(*pskb, hooknum == NF_IP_LOCAL_IN);
 		break;

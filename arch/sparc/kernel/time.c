@@ -1,4 +1,4 @@
-/* $Id: time.c,v 1.57 2000/09/16 07:33:45 davem Exp $
+/* $Id: time.c,v 1.58 2001/01/11 15:07:09 davem Exp $
  * linux/arch/sparc/kernel/time.c
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
@@ -44,6 +44,7 @@
 extern rwlock_t xtime_lock;
 
 enum sparc_clock_type sp_clock_typ;
+spinlock_t mostek_lock = SPIN_LOCK_UNLOCKED;
 unsigned long mstk48t02_regs = 0UL;
 static struct mostek48t08 *mstk48t08_regs = 0;
 static int set_rtc_mmss(unsigned long);
@@ -158,11 +159,15 @@ static void __init kick_start_clock(void)
 
 	prom_printf("CLOCK: Clock was stopped. Kick start ");
 
+	spin_lock_irq(&mostek_lock);
+
 	/* Turn on the kick start bit to start the oscillator. */
 	regs->creg |= MSTK_CREG_WRITE;
 	regs->sec &= ~MSTK_STOP;
 	regs->hour |= MSTK_KICK_START;
 	regs->creg &= ~MSTK_CREG_WRITE;
+
+	spin_unlock_irq(&mostek_lock);
 
 	/* Delay to allow the clock oscillator to start. */
 	sec = MSTK_REG_SEC(regs);
@@ -174,6 +179,8 @@ static void __init kick_start_clock(void)
 		sec = regs->sec;
 	}
 	prom_printf("\n");
+
+	spin_lock_irq(&mostek_lock);
 
 	/* Turn off kick start and set a "valid" time and date. */
 	regs->creg |= MSTK_CREG_WRITE;
@@ -187,12 +194,17 @@ static void __init kick_start_clock(void)
 	MSTK_SET_REG_YEAR(regs,1996 - MSTK_YEAR_ZERO);
 	regs->creg &= ~MSTK_CREG_WRITE;
 
+	spin_unlock_irq(&mostek_lock);
+
 	/* Ensure the kick start bit is off. If it isn't, turn it off. */
 	while (regs->hour & MSTK_KICK_START) {
 		prom_printf("CLOCK: Kick start still on!\n");
+
+		spin_lock_irq(&mostek_lock);
 		regs->creg |= MSTK_CREG_WRITE;
 		regs->hour &= ~MSTK_KICK_START;
 		regs->creg &= ~MSTK_CREG_WRITE;
+		spin_unlock_irq(&mostek_lock);
 	}
 
 	prom_printf("CLOCK: Kick start procedure successful.\n");
@@ -204,10 +216,12 @@ static __inline__ int has_low_battery(void)
 	struct mostek48t02 *regs = (struct mostek48t02 *)mstk48t02_regs;
 	unsigned char data1, data2;
 
+	spin_lock_irq(&mostek_lock);
 	data1 = regs->eeprom[0];	/* Read some data. */
 	regs->eeprom[0] = ~data1;	/* Write back the complement. */
 	data2 = regs->eeprom[0];	/* Read back the complement. */
 	regs->eeprom[0] = data1;	/* Restore the original value. */
+	spin_unlock_irq(&mostek_lock);
 
 	return (data1 == data2);	/* Was the write blocked? */
 }
@@ -376,6 +390,7 @@ void __init sbus_time_init(void)
 		prom_printf("Something wrong, clock regs not mapped yet.\n");
 		prom_halt();
 	}		
+	spin_lock_irq(&mostek_lock);
 	mregs->creg |= MSTK_CREG_READ;
 	sec = MSTK_REG_SEC(mregs);
 	min = MSTK_REG_MIN(mregs);
@@ -386,6 +401,7 @@ void __init sbus_time_init(void)
 	xtime.tv_sec = mktime(year, mon, day, hour, min, sec);
 	xtime.tv_usec = 0;
 	mregs->creg &= ~MSTK_CREG_READ;
+	spin_unlock_irq(&mostek_lock);
 #ifdef CONFIG_SUN4
 	} else if(idprom->id_machtype == (SM_SUN4 | SM_4_260) ) {
 		/* initialise the intersil on sun4 */
@@ -520,6 +536,7 @@ static int set_rtc_mmss(unsigned long nowtime)
 {
 	int real_seconds, real_minutes, mostek_minutes;
 	struct mostek48t02 *regs = (struct mostek48t02 *)mstk48t02_regs;
+	unsigned long flags;
 #ifdef CONFIG_SUN4
 	struct intersil *iregs = intersil_clock;
 	int temp;
@@ -557,6 +574,8 @@ static int set_rtc_mmss(unsigned long nowtime)
 		}
 #endif
 	}
+
+	spin_lock_irqsave(&mostek_lock, flags);
 	/* Read the current RTC minutes. */
 	regs->creg |= MSTK_CREG_READ;
 	mostek_minutes = MSTK_REG_MIN(regs);
@@ -579,8 +598,10 @@ static int set_rtc_mmss(unsigned long nowtime)
 		MSTK_SET_REG_SEC(regs,real_seconds);
 		MSTK_SET_REG_MIN(regs,real_minutes);
 		regs->creg &= ~MSTK_CREG_WRITE;
-	} else
+		spin_unlock_irqrestore(&mostek_lock, flags);
+		return 0;
+	} else {
+		spin_unlock_irqrestore(&mostek_lock, flags);
 		return -1;
-
-	return 0;
+	}
 }

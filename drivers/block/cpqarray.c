@@ -376,12 +376,9 @@ static int cpq_merge_requests_fn(request_queue_t *q, struct request *rq,
 				 struct request *nxt, int max_segments)
 {
 	int total_segments = rq->nr_segments + nxt->nr_segments;
-	int same_segment = 0;
 
-	if (rq->bhtail->b_data + rq->bhtail->b_size == nxt->bh->b_data) {
+	if (rq->bhtail->b_data + rq->bhtail->b_size == nxt->bh->b_data)
 		total_segments--;
-		same_segment = 1;
-	}
 
 	if (total_segments > SG_MAX)
 		return 0;
@@ -909,17 +906,12 @@ static void do_ida_request(request_queue_t *q)
 	struct buffer_head *bh;
 	struct request *creq;
 
-	if (!q)
-		BUG();
-	if (!h)
-		BUG();
-
-	if (q->plugged || list_empty(queue_head))
+	if (q->plugged || list_empty(queue_head)) {
+		start_io(h);
 		return;
+	}
 
 	creq = blkdev_entry_next_request(queue_head);
-	if (creq->rq_status != RQ_ACTIVE)
-		BUG();
 	if (creq->nr_segments > SG_MAX)
 		BUG();
 
@@ -927,6 +919,7 @@ static void do_ida_request(request_queue_t *q)
 	{
 		printk(KERN_WARNING "doreq cmd for %d, %x at %p\n",
 				h->ctlr, creq->rq_dev, creq);
+		blkdev_dequeue_request(creq);
 		complete_buffers(creq->bh, 0);
 		start_io(h);
                 return;
@@ -961,11 +954,12 @@ DBGPX(
 			c->req.sg[seg-1].size += bh->b_size;
 			lastdataend += bh->b_size;
 		} else {
+			if (seg == SG_MAX)
+				BUG();
 			c->req.sg[seg].size = bh->b_size;
 			c->req.sg[seg].addr = (__u32)virt_to_bus(bh->b_data);
 			lastdataend = bh->b_data + bh->b_size;
-			if (++seg == SG_MAX)
-				break;
+			seg++;
 		}
 		bh = bh->b_reqnext;
 	}
@@ -978,7 +972,7 @@ DBGPX(	printk("Submitting %d sectors in %d segments\n", sect, seg); );
 	 * is now fully setup and there's nothing left.
          */
 	if (creq->nr_sectors != sect) {
-		printk("ida: %ld sectors remain\n", creq->nr_sectors);
+		printk("ida: %ld != %d sectors\n", creq->nr_sectors, sect);
 		BUG();
 	}
 
@@ -1037,6 +1031,7 @@ static inline void complete_buffers(struct buffer_head *bh, int ok)
 		xbh = bh->b_reqnext;
 		bh->b_reqnext = NULL;
 		
+		blk_finished_io(bh->b_size >> 9);
 		bh->b_end_io(bh, ok);
 
 		bh = xbh;

@@ -2,12 +2,12 @@
 /******************************************************************************
  *
  * Module Name: ammisc - ACPI AML (p-code) execution - specific opcodes
- *              $Revision: 71 $
+ *              $Revision: 73 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -172,7 +172,7 @@ acpi_aml_exec_index (
 	if (obj_desc->common.type == ACPI_TYPE_PACKAGE) {
 		/* Object to be indexed is a Package */
 
-		if (idx_desc->number.value >= obj_desc->package.count) {
+		if (idx_desc->integer.value >= obj_desc->package.count) {
 			status = AE_AML_PACKAGE_LIMIT;
 			goto cleanup;
 		}
@@ -195,7 +195,7 @@ acpi_aml_exec_index (
 			 * we are after.
 			 */
 
-			tmp_desc                      = obj_desc->package.elements[idx_desc->number.value];
+			tmp_desc                      = obj_desc->package.elements[idx_desc->integer.value];
 			ret_desc->reference.op_code   = AML_INDEX_OP;
 			ret_desc->reference.target_type = tmp_desc->common.type;
 			ret_desc->reference.object    = tmp_desc;
@@ -210,13 +210,13 @@ acpi_aml_exec_index (
 		 */
 		ret_desc->reference.op_code   = AML_INDEX_OP;
 		ret_desc->reference.target_type = ACPI_TYPE_PACKAGE;
-		ret_desc->reference.where     = &obj_desc->package.elements[idx_desc->number.value];
+		ret_desc->reference.where     = &obj_desc->package.elements[idx_desc->integer.value];
 	}
 
 	else {
 		/* Object to be indexed is a Buffer */
 
-		if (idx_desc->number.value >= obj_desc->buffer.length) {
+		if (idx_desc->integer.value >= obj_desc->buffer.length) {
 			status = AE_AML_BUFFER_LIMIT;
 			goto cleanup;
 		}
@@ -224,7 +224,7 @@ acpi_aml_exec_index (
 		ret_desc->reference.op_code     = AML_INDEX_OP;
 		ret_desc->reference.target_type = ACPI_TYPE_BUFFER_FIELD;
 		ret_desc->reference.object      = obj_desc;
-		ret_desc->reference.offset      = (u32) idx_desc->number.value;
+		ret_desc->reference.offset      = (u32) idx_desc->integer.value;
 
 		status = acpi_aml_exec_store (ret_desc, res_desc, walk_state);
 	}
@@ -314,20 +314,20 @@ acpi_aml_exec_match (
 
 	/* Validate match comparison sub-opcodes */
 
-	if ((op1_desc->number.value > MAX_MATCH_OPERATOR) ||
-		(op2_desc->number.value > MAX_MATCH_OPERATOR))
+	if ((op1_desc->integer.value > MAX_MATCH_OPERATOR) ||
+		(op2_desc->integer.value > MAX_MATCH_OPERATOR))
 	{
 		status = AE_AML_OPERAND_VALUE;
 		goto cleanup;
 	}
 
-	index = (u32) start_desc->number.value;
+	index = (u32) start_desc->integer.value;
 	if (index >= (u32) pkg_desc->package.count) {
 		status = AE_AML_PACKAGE_LIMIT;
 		goto cleanup;
 	}
 
-	ret_desc = acpi_cm_create_internal_object (ACPI_TYPE_NUMBER);
+	ret_desc = acpi_cm_create_internal_object (ACPI_TYPE_INTEGER);
 	if (!ret_desc) {
 		status = AE_NO_MEMORY;
 		goto cleanup;
@@ -351,7 +351,7 @@ acpi_aml_exec_match (
 		 *      should we examine its value?
 		 */
 		if (!pkg_desc->package.elements[index] ||
-			ACPI_TYPE_NUMBER != pkg_desc->package.elements[index]->common.type)
+			ACPI_TYPE_INTEGER != pkg_desc->package.elements[index]->common.type)
 		{
 			continue;
 		}
@@ -362,7 +362,7 @@ acpi_aml_exec_match (
 		 *      "continue" (proceed to next iteration of enclosing
 		 *          "for" loop) signifies a non-match.
 		 */
-		switch (op1_desc->number.value)
+		switch (op1_desc->integer.value)
 		{
 
 		case MATCH_MTR:   /* always true */
@@ -372,8 +372,8 @@ acpi_aml_exec_match (
 
 		case MATCH_MEQ:   /* true if equal   */
 
-			if (pkg_desc->package.elements[index]->number.value
-				 != V1_desc->number.value)
+			if (pkg_desc->package.elements[index]->integer.value
+				 != V1_desc->integer.value)
 			{
 				continue;
 			}
@@ -382,8 +382,8 @@ acpi_aml_exec_match (
 
 		case MATCH_MLE:   /* true if less than or equal  */
 
-			if (pkg_desc->package.elements[index]->number.value
-				 > V1_desc->number.value)
+			if (pkg_desc->package.elements[index]->integer.value
+				 > V1_desc->integer.value)
 			{
 				continue;
 			}
@@ -392,8 +392,8 @@ acpi_aml_exec_match (
 
 		case MATCH_MLT:   /* true if less than   */
 
-			if (pkg_desc->package.elements[index]->number.value
-				 >= V1_desc->number.value)
+			if (pkg_desc->package.elements[index]->integer.value
+				 >= V1_desc->integer.value)
 			{
 				continue;
 			}
@@ -402,8 +402,8 @@ acpi_aml_exec_match (
 
 		case MATCH_MGE:   /* true if greater than or equal   */
 
-			if (pkg_desc->package.elements[index]->number.value
-				 < V1_desc->number.value)
+			if (pkg_desc->package.elements[index]->integer.value
+				 < V1_desc->integer.value)
 			{
 				continue;
 			}
@@ -412,8 +412,8 @@ acpi_aml_exec_match (
 
 		case MATCH_MGT:   /* true if greater than    */
 
-			if (pkg_desc->package.elements[index]->number.value
-				 <= V1_desc->number.value)
+			if (pkg_desc->package.elements[index]->integer.value
+				 <= V1_desc->integer.value)
 			{
 				continue;
 			}
@@ -426,7 +426,7 @@ acpi_aml_exec_match (
 		}
 
 
-		switch(op2_desc->number.value)
+		switch(op2_desc->integer.value)
 		{
 
 		case MATCH_MTR:
@@ -436,8 +436,8 @@ acpi_aml_exec_match (
 
 		case MATCH_MEQ:
 
-			if (pkg_desc->package.elements[index]->number.value
-				 != V2_desc->number.value)
+			if (pkg_desc->package.elements[index]->integer.value
+				 != V2_desc->integer.value)
 			{
 				continue;
 			}
@@ -446,8 +446,8 @@ acpi_aml_exec_match (
 
 		case MATCH_MLE:
 
-			if (pkg_desc->package.elements[index]->number.value
-				 > V2_desc->number.value)
+			if (pkg_desc->package.elements[index]->integer.value
+				 > V2_desc->integer.value)
 			{
 				continue;
 			}
@@ -456,8 +456,8 @@ acpi_aml_exec_match (
 
 		case MATCH_MLT:
 
-			if (pkg_desc->package.elements[index]->number.value
-				 >= V2_desc->number.value)
+			if (pkg_desc->package.elements[index]->integer.value
+				 >= V2_desc->integer.value)
 			{
 				continue;
 			}
@@ -466,8 +466,8 @@ acpi_aml_exec_match (
 
 		case MATCH_MGE:
 
-			if (pkg_desc->package.elements[index]->number.value
-				 < V2_desc->number.value)
+			if (pkg_desc->package.elements[index]->integer.value
+				 < V2_desc->integer.value)
 			{
 				continue;
 			}
@@ -476,8 +476,8 @@ acpi_aml_exec_match (
 
 		case MATCH_MGT:
 
-			if (pkg_desc->package.elements[index]->number.value
-				 <= V2_desc->number.value)
+			if (pkg_desc->package.elements[index]->integer.value
+				 <= V2_desc->integer.value)
 			{
 				continue;
 			}
@@ -497,7 +497,7 @@ acpi_aml_exec_match (
 
 	/* Match_value is the return value */
 
-	ret_desc->number.value = match_value;
+	ret_desc->integer.value = match_value;
 
 
 cleanup:

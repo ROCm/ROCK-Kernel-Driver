@@ -406,6 +406,7 @@ cmds(struct pt_regs *excp)
 			break;
 		case 'M':
 			print_sysmap();
+			break;
 		case 'S':
 			super_regs();
 			break;
@@ -795,6 +796,8 @@ print_sysmap(void)
 	extern char *sysmap;
 	if ( sysmap )
 		printf("System.map: \n%s", sysmap);
+	else
+		printf("No System.map\n");
 }
 
 void

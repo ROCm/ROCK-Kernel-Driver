@@ -253,7 +253,8 @@ static int __init find_isa_irq_pin(int irq, int type)
  * Find a specific PCI IRQ entry.
  * Not an __init, possibly needed by modules
  */
-static int __init pin_2_irq(int idx, int apic, int pin);
+static int pin_2_irq(int idx, int apic, int pin);
+
 int IO_APIC_get_PCI_irq_vector(int bus, int slot, int pci_pin)
 {
 	int apic, i, best_guess = -1;
@@ -475,7 +476,7 @@ static inline int irq_trigger(int idx)
 	return MPBIOS_trigger(idx);
 }
 
-static int __init pin_2_irq(int idx, int apic, int pin)
+static int pin_2_irq(int idx, int apic, int pin)
 {
 	int irq, i;
 	int bus = mp_irqs[idx].mpc_srcbus;

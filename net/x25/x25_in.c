@@ -23,7 +23,6 @@
  */
 
 #include <linux/config.h>
-#if defined(CONFIG_X25) || defined(CONFIG_X25_MODULE)
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>
@@ -369,5 +368,3 @@ int x25_backlog_rcv(struct sock *sk, struct sk_buff *skb)
 
 	return 0;
 }
-
-#endif

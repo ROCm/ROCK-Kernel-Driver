@@ -2,12 +2,12 @@
 /******************************************************************************
  *
  * Module Name: ammonad - ACPI AML (p-code) execution for monadic operators
- *              $Revision: 88 $
+ *              $Revision: 89 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -180,7 +180,7 @@ acpi_aml_exec_monadic1 (
 
 	case AML_SLEEP_OP:
 
-		acpi_aml_system_do_suspend ((u32) obj_desc->number.value);
+		acpi_aml_system_do_suspend ((u32) obj_desc->integer.value);
 		break;
 
 
@@ -188,7 +188,7 @@ acpi_aml_exec_monadic1 (
 
 	case AML_STALL_OP:
 
-		acpi_aml_system_do_stall ((u32) obj_desc->number.value);
+		acpi_aml_system_do_stall ((u32) obj_desc->integer.value);
 		break;
 
 
@@ -267,7 +267,7 @@ acpi_aml_exec_monadic2_r (
 	case AML_TO_BCD_OP:
 	case AML_COND_REF_OF_OP:
 
-		ret_desc = acpi_cm_create_internal_object (ACPI_TYPE_NUMBER);
+		ret_desc = acpi_cm_create_internal_object (ACPI_TYPE_INTEGER);
 		if (!ret_desc) {
 			status = AE_NO_MEMORY;
 			goto cleanup;
@@ -283,7 +283,7 @@ acpi_aml_exec_monadic2_r (
 
 	case AML_BIT_NOT_OP:
 
-		ret_desc->number.value = ~obj_desc->number.value;
+		ret_desc->integer.value = ~obj_desc->integer.value;
 		break;
 
 
@@ -291,17 +291,17 @@ acpi_aml_exec_monadic2_r (
 
 	case AML_FIND_SET_LEFT_BIT_OP:
 
-		ret_desc->number.value = obj_desc->number.value;
+		ret_desc->integer.value = obj_desc->integer.value;
 
 		/*
 		 * Acpi specification describes Integer type as a little
 		 * endian unsigned value, so this boundry condition is valid.
 		 */
-		for (res_val = 0; ret_desc->number.value && res_val < ACPI_INTEGER_BIT_SIZE; ++res_val) {
-			ret_desc->number.value >>= 1;
+		for (res_val = 0; ret_desc->integer.value && res_val < ACPI_INTEGER_BIT_SIZE; ++res_val) {
+			ret_desc->integer.value >>= 1;
 		}
 
-		ret_desc->number.value = res_val;
+		ret_desc->integer.value = res_val;
 		break;
 
 
@@ -309,19 +309,19 @@ acpi_aml_exec_monadic2_r (
 
 	case AML_FIND_SET_RIGHT_BIT_OP:
 
-		ret_desc->number.value = obj_desc->number.value;
+		ret_desc->integer.value = obj_desc->integer.value;
 
 		/*
 		 * Acpi specification describes Integer type as a little
 		 * endian unsigned value, so this boundry condition is valid.
 		 */
-		for (res_val = 0; ret_desc->number.value && res_val < ACPI_INTEGER_BIT_SIZE; ++res_val) {
-			ret_desc->number.value <<= 1;
+		for (res_val = 0; ret_desc->integer.value && res_val < ACPI_INTEGER_BIT_SIZE; ++res_val) {
+			ret_desc->integer.value <<= 1;
 		}
 
 		/* Since returns must be 1-based, subtract from 33 (65) */
 
-		ret_desc->number.value = res_val == 0 ? 0 : (ACPI_INTEGER_BIT_SIZE + 1) - res_val;
+		ret_desc->integer.value = res_val == 0 ? 0 : (ACPI_INTEGER_BIT_SIZE + 1) - res_val;
 		break;
 
 
@@ -332,11 +332,11 @@ acpi_aml_exec_monadic2_r (
 		/*
 		 * The 64-bit ACPI integer can hold 16 4-bit BCD integers
 		 */
-		ret_desc->number.value = 0;
+		ret_desc->integer.value = 0;
 		for (i = 0; i < ACPI_MAX_BCD_DIGITS; i++) {
 			/* Get one BCD digit */
 
-			digit = (ACPI_INTEGER) ((obj_desc->number.value >> (i * 4)) & 0xF);
+			digit = (ACPI_INTEGER) ((obj_desc->integer.value >> (i * 4)) & 0xF);
 
 			/* Check the range of the digit */
 
@@ -352,7 +352,7 @@ acpi_aml_exec_monadic2_r (
 					digit *= 10;
 				}
 
-				ret_desc->number.value += digit;
+				ret_desc->integer.value += digit;
 			}
 		}
 		break;
@@ -363,16 +363,16 @@ acpi_aml_exec_monadic2_r (
 	case AML_TO_BCD_OP:
 
 
-		if (obj_desc->number.value > ACPI_MAX_BCD_VALUE) {
+		if (obj_desc->integer.value > ACPI_MAX_BCD_VALUE) {
 			status = AE_AML_NUMERIC_OVERFLOW;
 			goto cleanup;
 		}
 
-		ret_desc->number.value = 0;
+		ret_desc->integer.value = 0;
 		for (i = 0; i < ACPI_MAX_BCD_DIGITS; i++) {
 			/* Divide by nth factor of 10 */
 
-			digit = obj_desc->number.value;
+			digit = obj_desc->integer.value;
 			for (j = 0; j < i; j++) {
 				digit /= 10;
 			}
@@ -380,7 +380,7 @@ acpi_aml_exec_monadic2_r (
 			/* Create the BCD digit */
 
 			if (digit > 0) {
-				ret_desc->number.value += (ACPI_MODULO (digit, 10) << (i * 4));
+				ret_desc->integer.value += (ACPI_MODULO (digit, 10) << (i * 4));
 			}
 		}
 		break;
@@ -402,7 +402,7 @@ acpi_aml_exec_monadic2_r (
 			 * return FALSE
 			 */
 
-			ret_desc->number.value = 0;
+			ret_desc->integer.value = 0;
 
 			/*
 			 * Must delete the result descriptor since there is no reference
@@ -424,7 +424,7 @@ acpi_aml_exec_monadic2_r (
 
 		/* The object exists in the namespace, return TRUE */
 
-		ret_desc->number.value = ACPI_INTEGER_MAX;
+		ret_desc->integer.value = ACPI_INTEGER_MAX;
 		goto cleanup;
 		break;
 
@@ -579,13 +579,13 @@ acpi_aml_exec_monadic2 (
 
 	case AML_LNOT_OP:
 
-		ret_desc = acpi_cm_create_internal_object (ACPI_TYPE_NUMBER);
+		ret_desc = acpi_cm_create_internal_object (ACPI_TYPE_INTEGER);
 		if (!ret_desc) {
 			status = AE_NO_MEMORY;
 			goto cleanup;
 		}
 
-		ret_desc->number.value = !obj_desc->number.value;
+		ret_desc->integer.value = !obj_desc->integer.value;
 		break;
 
 
@@ -638,10 +638,10 @@ acpi_aml_exec_monadic2 (
 		/* Do the actual increment or decrement */
 
 		if (AML_INCREMENT_OP == opcode) {
-			ret_desc->number.value++;
+			ret_desc->integer.value++;
 		}
 		else {
-			ret_desc->number.value--;
+			ret_desc->integer.value--;
 		}
 
 		/* Store the result back in the original descriptor */
@@ -672,7 +672,7 @@ acpi_aml_exec_monadic2 (
 
 				/* Constants are of type Number */
 
-				type = ACPI_TYPE_NUMBER;
+				type = ACPI_TYPE_INTEGER;
 				break;
 
 
@@ -733,13 +733,13 @@ acpi_aml_exec_monadic2 (
 
 		/* Allocate a descriptor to hold the type. */
 
-		ret_desc = acpi_cm_create_internal_object (ACPI_TYPE_NUMBER);
+		ret_desc = acpi_cm_create_internal_object (ACPI_TYPE_INTEGER);
 		if (!ret_desc) {
 			status = AE_NO_MEMORY;
 			goto cleanup;
 		}
 
-		ret_desc->number.value = type;
+		ret_desc->integer.value = type;
 		break;
 
 
@@ -793,13 +793,13 @@ acpi_aml_exec_monadic2 (
 		 * object to hold the value
 		 */
 
-		ret_desc = acpi_cm_create_internal_object (ACPI_TYPE_NUMBER);
+		ret_desc = acpi_cm_create_internal_object (ACPI_TYPE_INTEGER);
 		if (!ret_desc) {
 			status = AE_NO_MEMORY;
 			goto cleanup;
 		}
 
-		ret_desc->number.value = value;
+		ret_desc->integer.value = value;
 		break;
 
 
@@ -910,14 +910,14 @@ acpi_aml_exec_monadic2 (
 					 * sub-buffer of the main buffer, it is only a pointer to a
 					 * single element (byte) of the buffer!
 					 */
-					ret_desc = acpi_cm_create_internal_object (ACPI_TYPE_NUMBER);
+					ret_desc = acpi_cm_create_internal_object (ACPI_TYPE_INTEGER);
 					if (!ret_desc) {
 						status = AE_NO_MEMORY;
 						goto cleanup;
 					}
 
 					tmp_desc = obj_desc->reference.object;
-					ret_desc->number.value =
+					ret_desc->integer.value =
 						tmp_desc->buffer.pointer[obj_desc->reference.offset];
 
 					/* TBD: [Investigate] (see below) Don't add an additional

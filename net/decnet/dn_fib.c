@@ -55,7 +55,7 @@ extern int dn_cache_dump(struct sk_buff *skb, struct netlink_callback *cb);
 #endif /* CONFIG_RTNETLINK */
 
 
-static struct dn_fib_info *dn_fib_info_list = NULL;
+static struct dn_fib_info *dn_fib_info_list;
 static rwlock_t dn_fib_info_lock = RW_LOCK_UNLOCKED;
 int dn_fib_info_cnt;
 
@@ -641,15 +641,11 @@ static int decnet_rt_get_info(char *buffer, char **start, off_t offset, int leng
 
         return 0;
 }
-
 #endif /* CONFIG_PROC_FS */
-
 
 void __exit dn_fib_cleanup(void)
 {
-#ifdef CONFIG_PROC_FS
 	proc_net_remove("decnet_route");
-#endif
 
 	dn_fib_table_cleanup();
 	dn_fib_rules_cleanup();

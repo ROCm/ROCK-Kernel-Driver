@@ -1086,6 +1086,7 @@ static inline void complete_buffers( struct buffer_head *bh, int status)
 	{
 		xbh = bh->b_reqnext; 
 		bh->b_reqnext = NULL; 
+		blk_finished_io(bh->b_size >> 9);
 		bh->b_end_io(bh, status);
 		bh = xbh;
 	}

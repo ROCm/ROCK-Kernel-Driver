@@ -17,7 +17,6 @@
  */
 
 #include <linux/config.h>
-#if defined(CONFIG_X25) || defined(CONFIG_X25_MODULE)
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>
@@ -42,9 +41,10 @@
 #include <linux/mm.h>
 #include <linux/interrupt.h>
 #include <linux/notifier.h>
+#include <linux/init.h>
 #include <net/x25.h>
 
-static struct x25_route *x25_route_list = NULL;
+static struct x25_route *x25_route_list /* = NULL initially */;
 
 /*
  *	Add a new route.
@@ -255,12 +255,10 @@ int x25_routes_get_info(char *buffer, char **start, off_t offset, int length)
 	return len;
 } 
 
-#ifdef MODULE
-
 /*
  *	Release all memory associated with X.25 routing structures.
  */
-void x25_route_free(void)
+void __exit x25_route_free(void)
 {
 	struct x25_route *route, *x25_route = x25_route_list;
 
@@ -271,7 +269,3 @@ void x25_route_free(void)
 		x25_remove_route(route);
 	}
 }
-
-#endif
-
-#endif

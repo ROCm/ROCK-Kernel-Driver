@@ -2,12 +2,12 @@
  *
  * Module Name: dswexec - Dispatcher method execution callbacks;
  *                        dispatch to interpreter.
- *              $Revision: 50 $
+ *              $Revision: 54 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -46,7 +46,7 @@
  *
  * RETURN:      Status
  *
- * DESCRIPTION:
+ * DESCRIPTION: Get the result of a predicate evaluation
  *
  ****************************************************************************/
 
@@ -93,22 +93,22 @@ acpi_ds_get_predicate_value (
 	 * be a number
 	 */
 
-	if (obj_desc->common.type != ACPI_TYPE_NUMBER) {
+	if (obj_desc->common.type != ACPI_TYPE_INTEGER) {
 		status = AE_AML_OPERAND_TYPE;
 		goto cleanup;
 	}
 
 
-	/* TBD: 64/32-bit */
+	/* Truncate the predicate to 32-bits if necessary */
 
-	obj_desc->number.value &= (UINT64) 0x00000000FFFFFFFF;
+	acpi_aml_truncate_for32bit_table (obj_desc, walk_state);
 
 	/*
 	 * Save the result of the predicate evaluation on
 	 * the control stack
 	 */
 
-	if (obj_desc->number.value) {
+	if (obj_desc->integer.value) {
 		walk_state->control_state->common.value = TRUE;
 	}
 

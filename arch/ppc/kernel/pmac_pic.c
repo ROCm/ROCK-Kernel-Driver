@@ -4,14 +4,15 @@
 #include <linux/sched.h>
 #include <linux/signal.h>
 #include <linux/pci.h>
-#include <linux/openpic.h>
 
 #include <asm/init.h>
 #include <asm/io.h>
 #include <asm/smp.h>
 #include <asm/prom.h>
 #include <asm/pci-bridge.h>
+
 #include "pmac_pic.h"
+#include "open_pic.h"
 
 /* pmac */struct pmac_irq_hw {
         unsigned int    flag;
@@ -30,15 +31,13 @@ static volatile struct pmac_irq_hw *pmac_irq_hw[4] = {
 
 static int max_irqs;
 static int max_real_irqs;
-static int has_openpic = 0;
+static int pmac_has_openpic;
+
+spinlock_t pmac_pic_lock = SPIN_LOCK_UNLOCKED;
+
 
 #define GATWICK_IRQ_POOL_SIZE        10
 static struct interrupt_info gatwick_int_pool[GATWICK_IRQ_POOL_SIZE];
-
-extern int pmac_pcibios_read_config_word(unsigned char bus, unsigned char dev_fn,
-                                      unsigned char offset, unsigned short *val);
-extern int pmac_pcibios_write_config_word(unsigned char bus, unsigned char dev_fn,
-                                      unsigned char offset, unsigned short val);
 
 /*
  * Mark an irq as "lost".  This is only used on the pmac
@@ -51,48 +50,11 @@ void __pmac __no_use_set_lost(unsigned long irq_nr)
 		atomic_inc(&ppc_n_lost_interrupts);
 }
 
-static void pmac_openpic_mask_irq(unsigned int irq_nr)
-{
-	openpic_disable_irq(irq_nr);
-}
-
-static void pmac_openpic_unmask_irq(unsigned int irq_nr)
-{
-	openpic_enable_irq(irq_nr);
-}
-
-static void pmac_openpic_ack_irq(unsigned int irq_nr)
-{
-	if ((irq_desc[irq_nr].status & IRQ_LEVEL) == 0)
-		openpic_eoi(smp_processor_id());
-	openpic_disable_irq(irq_nr);
-}
-
-static void pmac_openpic_end_irq(unsigned int irq_nr)
-{
-	if ((irq_desc[irq_nr].status & IRQ_LEVEL) != 0)
-		openpic_eoi(smp_processor_id());
-	openpic_enable_irq(irq_nr);
-}
-
-struct hw_interrupt_type pmac_open_pic = {
-	" OpenPIC  ",
-	NULL,
-	NULL,
-	pmac_openpic_unmask_irq,
-	pmac_openpic_mask_irq,
-	/* Theorically, the mask&ack should be NULL for OpenPIC. However, doing
-	 * so shows tons of bogus interrupts coming in.
-	 */
-	pmac_openpic_ack_irq,
-	pmac_openpic_end_irq,
-	NULL
-};
-
 static void __pmac pmac_mask_and_ack_irq(unsigned int irq_nr)
 {
         unsigned long bit = 1UL << (irq_nr & 0x1f);
         int i = irq_nr >> 5;
+        unsigned long flags;
 
         if ((unsigned)irq_nr >= max_irqs)
                 return;
@@ -100,6 +62,7 @@ static void __pmac pmac_mask_and_ack_irq(unsigned int irq_nr)
         clear_bit(irq_nr, ppc_cached_irq_mask);
         if (test_and_clear_bit(irq_nr, ppc_lost_interrupts))
                 atomic_dec(&ppc_n_lost_interrupts);
+	spin_lock_irqsave(&pmac_pic_lock, flags);
         out_le32(&pmac_irq_hw[i]->ack, bit);
         out_le32(&pmac_irq_hw[i]->enable, ppc_cached_irq_mask[i]);
         out_le32(&pmac_irq_hw[i]->ack, bit);
@@ -108,16 +71,19 @@ static void __pmac pmac_mask_and_ack_irq(unsigned int irq_nr)
                    interrupts */
                 mb();
         } while(in_le32(&pmac_irq_hw[i]->flag) & bit);
+	spin_unlock_irqrestore(&pmac_pic_lock, flags);
 }
 
 static void __pmac pmac_set_irq_mask(unsigned int irq_nr)
 {
         unsigned long bit = 1UL << (irq_nr & 0x1f);
         int i = irq_nr >> 5;
+        unsigned long flags;
 
         if ((unsigned)irq_nr >= max_irqs)
                 return;
 
+	spin_lock_irqsave(&pmac_pic_lock, flags);
         /* enable unmasked interrupts */
         out_le32(&pmac_irq_hw[i]->enable, ppc_cached_irq_mask[i]);
 
@@ -137,6 +103,7 @@ static void __pmac pmac_set_irq_mask(unsigned int irq_nr)
             && (ld_le32(&pmac_irq_hw[i]->level) & bit)
             && !(ld_le32(&pmac_irq_hw[i]->flag) & bit))
 		__set_lost((ulong)irq_nr);
+	spin_unlock_irqrestore(&pmac_pic_lock, flags);
 }
 
 static void __pmac pmac_mask_irq(unsigned int irq_nr)
@@ -152,6 +119,15 @@ static void __pmac pmac_unmask_irq(unsigned int irq_nr)
         pmac_set_irq_mask(irq_nr);
 }
 
+static void __pmac pmac_end_irq(unsigned int irq_nr)
+{
+	if (!(irq_desc[irq_nr].status & (IRQ_DISABLED|IRQ_INPROGRESS))) {
+        	set_bit(irq_nr, ppc_cached_irq_mask);
+	        pmac_set_irq_mask(irq_nr);
+	}
+}
+
+
 struct hw_interrupt_type pmac_pic = {
         " PMAC-PIC ",
         NULL,
@@ -159,7 +135,7 @@ struct hw_interrupt_type pmac_pic = {
         pmac_unmask_irq,
         pmac_mask_irq,
         pmac_mask_and_ack_irq,
-        pmac_unmask_irq,
+        pmac_end_irq,
         NULL
 };
 
@@ -170,7 +146,7 @@ struct hw_interrupt_type gatwick_pic = {
 	pmac_unmask_irq,
 	pmac_mask_irq,
 	pmac_mask_and_ack_irq,
-	pmac_unmask_irq,
+	pmac_end_irq,
 	NULL
 };
 
@@ -204,35 +180,22 @@ pmac_get_irq(struct pt_regs *regs)
 	unsigned long bits = 0;
 
 #ifdef CONFIG_SMP
-	void pmac_smp_message_recv(struct pt_regs *);
+	void psurge_smp_message_recv(struct pt_regs *);
 	
-        /* IPI's are a hack on the powersurge -- Cort */
-        if ( smp_processor_id() != 0 )
-        {
-		pmac_smp_message_recv(regs);
+       	/* IPI's are a hack on the powersurge -- Cort */
+       	if ( smp_processor_id() != 0 ) {
+		psurge_smp_message_recv(regs);
 		return -2;	/* ignore, already handled */
         }
 #endif /* CONFIG_SMP */
-
-	if (has_openpic) {
-		irq = openpic_irq(smp_processor_id());
-		if (irq == OPENPIC_VEC_SPURIOUS)
-			/* We get those when doing polled ADB requests,
-			 * using -2 is a temp hack to disable the printk
-			 */
-			irq = -2; /*-1; */
-	}
-	else
-	{
-		for (irq = max_real_irqs; (irq -= 32) >= 0; ) {
-			int i = irq >> 5;
-			bits = ld_le32(&pmac_irq_hw[i]->flag)
-				| ppc_lost_interrupts[i];
-			if (bits == 0)
-				continue;
-			irq += __ilog2(bits);
-			break;
-		}
+	for (irq = max_real_irqs; (irq -= 32) >= 0; ) {
+		int i = irq >> 5;
+		bits = ld_le32(&pmac_irq_hw[i]->flag)
+			| ppc_lost_interrupts[i];
+		if (bits == 0)
+			continue;
+		irq += __ilog2(bits);
+		break;
 	}
 
 	return irq;
@@ -336,11 +299,16 @@ static void __init enable_second_ohare(void)
 	addr = (unsigned long) ioremap(irqctrler->addrs[0].address, 0x40);
 	pmac_irq_hw[1] = (volatile struct pmac_irq_hw *)(addr + 0x20);
 	max_irqs = 64;
-	if (pci_device_loc(irqctrler, &bus, &devfn) == 0) {
-		pmac_pcibios_read_config_word(bus, devfn, PCI_COMMAND, &cmd);
-		cmd |= PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER;
-		cmd &= ~PCI_COMMAND_IO;
-		pmac_pcibios_write_config_word(bus, devfn, PCI_COMMAND, cmd);
+	if (pci_device_from_OF_node(irqctrler, &bus, &devfn) == 0) {
+		struct pci_controller* hose = pci_find_hose_for_OF_device(irqctrler);
+		if (!hose)
+		    printk(KERN_ERR "Can't find PCI hose for OHare2 !\n");
+		else {
+		    early_read_config_word(hose, bus, devfn, PCI_COMMAND, &cmd);
+		    cmd |= PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER;
+	  	    cmd &= ~PCI_COMMAND_IO;
+		    early_write_config_word(hose, bus, devfn, PCI_COMMAND, cmd);
+		}
 	}
 
 	second_irq = irqctrler->intrs[0].line;
@@ -378,20 +346,26 @@ pmac_pic_init(void)
 		printk("PowerMac using OpenPIC irq controller\n");
 		if (irqctrler->n_addrs > 0)
 		{
+			int nmi_irq = -1;
+			unsigned char senses[NR_IRQS];
 #ifdef CONFIG_XMON
 			struct device_node* pswitch;
-#endif /* CONFIG_XMON */	
-			OpenPIC = (volatile struct OpenPIC *)
-				ioremap(irqctrler->addrs[0].address,
-					irqctrler->addrs[0].size);
-			for ( i = 0 ; i < NR_IRQS ; i++ )
-				irq_desc[i].handler = &pmac_open_pic;
-			openpic_init(1);
-			has_openpic = 1;
-#ifdef CONFIG_XMON
+
 			pswitch = find_devices("programmer-switch");
 			if (pswitch && pswitch->n_intrs)
-				request_irq(pswitch->intrs[0].line, xmon_irq, 0,
+				nmi_irq = pswitch->intrs[0].line;
+#endif /* CONFIG_XMON */
+			prom_get_irq_senses(senses, 0, NR_IRQS);
+			OpenPIC_InitSenses = senses;
+			OpenPIC_NumInitSenses = NR_IRQS;
+			ppc_md.get_irq = openpic_get_irq;
+			OpenPIC_Addr = ioremap(irqctrler->addrs[0].address,
+					       irqctrler->addrs[0].size);
+			openpic_init(1, 0, 0, nmi_irq);
+			pmac_has_openpic = 1;
+#ifdef CONFIG_XMON
+			if (nmi_irq >= 0)
+				request_irq(nmi_irq, xmon_irq, 0,
 					    "NMI - XMON", 0);
 #endif	/* CONFIG_XMON */
 			return;

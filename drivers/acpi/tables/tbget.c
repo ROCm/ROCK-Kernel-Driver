@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: tbget - ACPI Table get* routines
- *              $Revision: 40 $
+ *              $Revision: 43 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -243,7 +243,7 @@ acpi_tb_get_all_tables (
 		/* Get the table via the XSDT */
 
 		status = acpi_tb_get_table ((ACPI_PHYSICAL_ADDRESS)
-				 acpi_gbl_XSDT->table_offset_entry[index],
+				 ACPI_GET_ADDRESS (acpi_gbl_XSDT->table_offset_entry[index]),
 				 table_ptr, &table_info);
 
 		/* Ignore a table that failed verification */
@@ -326,7 +326,8 @@ acpi_tb_get_all_tables (
 	 * Get the DSDT (We know that the FADT is valid now)
 	 */
 
-	status = acpi_tb_get_table (acpi_gbl_FADT->Xdsdt, table_ptr, &table_info);
+	status = acpi_tb_get_table ((ACPI_PHYSICAL_ADDRESS) ACPI_GET_ADDRESS (acpi_gbl_FADT->Xdsdt),
+			  table_ptr, &table_info);
 	if (ACPI_FAILURE (status)) {
 		return (status);
 	}
@@ -472,13 +473,14 @@ acpi_tb_get_table_rsdt (
 		/* 0.71 RSDP has 64bit Rsdt address field */
 		physical_address = ((RSDP_DESCRIPTOR_REV071 *)acpi_gbl_RSDP)->rsdt_physical_address;
 #else
-		physical_address = acpi_gbl_RSDP->rsdt_physical_address;
+		physical_address = (ACPI_PHYSICAL_ADDRESS) acpi_gbl_RSDP->rsdt_physical_address;
 #endif
 		table_signature = RSDT_SIG;
 		signature_length = sizeof (RSDT_SIG) -1;
 	}
 	else {
-		physical_address = (ACPI_PHYSICAL_ADDRESS) acpi_gbl_RSDP->xsdt_physical_address;
+		physical_address = (ACPI_PHYSICAL_ADDRESS)
+				   ACPI_GET_ADDRESS (acpi_gbl_RSDP->xsdt_physical_address);
 		table_signature = XSDT_SIG;
 		signature_length = sizeof (XSDT_SIG) -1;
 	}
@@ -586,7 +588,7 @@ acpi_tb_get_table_facs (
 	else {
 		/* Just map the physical memory to our address space */
 
-		status = acpi_tb_map_acpi_table (acpi_gbl_FADT->Xfirmware_ctrl,
+		status = acpi_tb_map_acpi_table ((ACPI_PHYSICAL_ADDRESS) ACPI_GET_ADDRESS (acpi_gbl_FADT->Xfirmware_ctrl),
 				   &size, &table_ptr);
 		if (ACPI_FAILURE(status)) {
 			return (status);

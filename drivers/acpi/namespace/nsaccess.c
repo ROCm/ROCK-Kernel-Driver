@@ -1,12 +1,12 @@
 /*******************************************************************************
  *
  * Module Name: nsaccess - Top-level functions for accessing ACPI namespace
- *              $Revision: 117 $
+ *              $Revision: 119 $
  *
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -117,9 +117,9 @@ acpi_ns_root_initialize (void)
 			switch (init_val->type)
 			{
 
-			case ACPI_TYPE_NUMBER:
+			case ACPI_TYPE_INTEGER:
 
-				obj_desc->number.value =
+				obj_desc->integer.value =
 						(ACPI_INTEGER) STRTOUL (init_val->val, NULL, 10);
 				break;
 
@@ -239,7 +239,7 @@ acpi_ns_lookup (
 	ACPI_NAMESPACE_NODE     **return_node)
 {
 	ACPI_STATUS             status;
-	ACPI_NAMESPACE_NODE      *prefix_node;
+	ACPI_NAMESPACE_NODE     *prefix_node;
 	ACPI_NAMESPACE_NODE     *current_node = NULL;
 	ACPI_NAMESPACE_NODE     *scope_to_push = NULL;
 	ACPI_NAMESPACE_NODE     *this_node = NULL;
@@ -248,8 +248,7 @@ acpi_ns_lookup (
 	u8                      null_name_path = FALSE;
 	OBJECT_TYPE_INTERNAL    type_to_check_for;
 	OBJECT_TYPE_INTERNAL    this_search_type;
-
-	DEBUG_ONLY_MEMBERS      (u32 i)
+	u32                     local_flags = flags & ~NS_ERROR_IF_FOUND;
 
 
 	if (!return_node) {
@@ -437,6 +436,7 @@ acpi_ns_lookup (
 		this_search_type = ACPI_TYPE_ANY;
 		if (!num_segments) {
 			this_search_type = type;
+			local_flags = flags;
 		}
 
 		/* Pluck one ACPI name from the front of the pathname */
@@ -447,7 +447,7 @@ acpi_ns_lookup (
 
 		status = acpi_ns_search_and_enter (simple_name, walk_state,
 				   current_node, interpreter_mode,
-				   this_search_type, flags,
+				   this_search_type, local_flags,
 				   &this_node);
 
 		if (ACPI_FAILURE (status)) {

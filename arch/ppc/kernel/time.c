@@ -67,7 +67,12 @@
 
 #include <asm/time.h>
 
-void smp_local_timer_interrupt(struct pt_regs *);
+#ifdef CONFIG_SMP
+extern void smp_local_timer_interrupt(struct pt_regs *);
+extern int smp_tb_synchronized;
+#endif /* CONFIG_SMP */
+
+extern int do_sys_settimeofday(struct timeval *tv, struct timezone *tz);
 
 /* keep track of when we need to update the rtc */
 time_t last_rtc_update;
@@ -97,6 +102,36 @@ static inline int tb_delta(unsigned *jiffy_stamp) {
 	return delta;
 }
 
+extern unsigned long prof_cpu_mask;
+extern unsigned int * prof_buffer;
+extern unsigned long prof_len;
+extern unsigned long prof_shift;
+extern char _stext;
+
+static inline void ppc_do_profile (unsigned long nip)
+{
+	if (!prof_buffer)
+		return;
+
+	/*
+	 * Only measure the CPUs specified by /proc/irq/prof_cpu_mask.
+	 * (default is all CPUs.)
+	 */
+	if (!((1<<smp_processor_id()) & prof_cpu_mask))
+		return;
+
+	nip -= (unsigned long) &_stext;
+	nip >>= prof_shift;
+	/*
+	 * Don't ignore out-of-bounds EIP values silently,
+	 * put them into the last histogram slot, so if
+	 * present, they will show up as a sharp peak.
+	 */
+	if (nip > prof_len-1)
+		nip = prof_len-1;
+	atomic_inc((atomic_t *)&prof_buffer[nip]);
+}
+
 /*
  * timer_interrupt - gets called when the decrementer overflows,
  * with interrupts disabled.
@@ -110,6 +145,9 @@ int timer_interrupt(struct pt_regs * regs)
 
 	hardirq_enter(cpu);
 	
+	if (!user_mode(regs))
+		ppc_do_profile(instruction_pointer(regs));
+
 	do { 
 		jiffy_stamp += tb_ticks_per_jiffy;
 	  	if (smp_processor_id()) continue;
@@ -151,7 +189,7 @@ int timer_interrupt(struct pt_regs * regs)
 
 #ifdef CONFIG_SMP
 	smp_local_timer_interrupt(regs);
-#endif		
+#endif /* CONFIG_SMP */
 	
 	if (ppc_md.heartbeat && !ppc_md.heartbeat_count--)
 		ppc_md.heartbeat();
@@ -176,7 +214,7 @@ void do_gettimeofday(struct timeval *tv)
 	/* As long as timebases are not in sync, gettimeofday can only
 	 * have jiffy resolution on SMP.
 	 */
-	if (_machine != _MACH_Pmac)
+	if (!smp_tb_synchronized)
 		delta = 0;
 #endif /* CONFIG_SMP */
 	lost_ticks = jiffies - wall_jiffies;

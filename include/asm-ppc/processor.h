@@ -203,6 +203,12 @@
 #define	SPRN_IMISS	0x3D4	/* Instruction TLB Miss Register */
 #define	SPRN_IMMR	0x27E  	/* Internal Memory Map Register */
 #define	SPRN_L2CR	0x3F9	/* Level 2 Cache Control Regsiter */
+#define   L2CR_PIPE_LATEWR   (0x01800000)   /* late-write SRAM */
+#define   L2CR_L2CTL         (0x00100000)   /* RAM control */
+#define   L2CR_INST_DISABLE  (0x00400000)   /* disable for insn's */
+#define   L2CR_L2I           (0x00200000)   /* global invalidate */
+#define   L2CR_L2E           (0x80000000)   /* enable */
+#define   L2CR_L2WT          (0x00080000)   /* write-through */
 #define	SPRN_LR		0x008	/* Link Register */
 #define	SPRN_MMCR0	0x3B8	/* Monitor Mode Control Register 0 */
 #define	SPRN_MMCR1	0x3BC	/* Monitor Mode Control Register 1 */
@@ -233,14 +239,14 @@
 #define	SPRN_SRR1	0x01B	/* Save/Restore Register 1 */
 #define	SPRN_SRR2	0x3DE	/* Save/Restore Register 2 */
 #define	SPRN_SRR3 	0x3DF	/* Save/Restore Register 3 */
-#define	SPRN_TBHI	0x3DC	/* Time Base High */
-#define	SPRN_TBHU	0x3CC	/* Time Base High User-mode */
-#define	SPRN_TBLO	0x3DD	/* Time Base Low */
-#define	SPRN_TBLU	0x3CD	/* Time Base Low User-mode */
-#define	SPRN_TBRL	0x10D	/* Time Base Read Lower Register */
-#define	SPRN_TBRU	0x10C	/* Time Base Read Upper Register */
-#define	SPRN_TBWL	0x11D	/* Time Base Write Lower Register */
-#define	SPRN_TBWU	0x11C	/* Time Base Write Upper Register */
+#define	SPRN_TBRL	0x10C	/* Time Base Read Lower Register (user, R/O) */
+#define	SPRN_TBRU	0x10D	/* Time Base Read Upper Register (user, R/O) */
+#define	SPRN_TBWL	0x11C	/* Time Base Lower Register (supervisor, R/W) */
+#define	SPRN_TBWU	0x11D	/* Time Base Upper Register (supervisor, R/W) */
+#define	SPRN_TBHI	0x3DC	/* Time Base High (4xx) */
+#define	SPRN_TBHU	0x3CC	/* Time Base High User-mode (4xx) */
+#define	SPRN_TBLO	0x3DD	/* Time Base Low (4xx) */
+#define	SPRN_TBLU	0x3CD	/* Time Base Low User-mode (4xx) */
 #define	SPRN_TCR	0x3DA	/* Timer Control Register */
 #define	  TCR_WP(x)		(((x)&0x3)<<30)	/* WDT Period */
 #define	    WP_2_17		0		/* 2^17 clocks */
@@ -262,15 +268,17 @@
 #define	  TCR_FIE		0x00800000	/* FIT Interrupt Enable */
 #define	  TCR_ARE		0x00400000	/* Auto Reload Enable */
 #define	SPRN_THRM1	0x3FC	/* Thermal Management Register 1 */
-#define	  THRM1_TIN		(1<<0)
-#define	  THRM1_TIV		(1<<1)
-#define	  THRM1_THRES		(0x7f<<2)
-#define	  THRM1_TID		(1<<29)
-#define	  THRM1_TIE		(1<<30)
-#define	  THRM1_V		(1<<31)
+/* these bits were defined in inverted endian sense originally, ugh, confusing */
+#define	  THRM1_TIN		(1 << 31)
+#define	  THRM1_TIV		(1 << 30)
+#define	  THRM1_THRES(x)	((x&0x7f)<<23)
+#define   THRM3_SITV(x)		((x&0x3fff)<<1)
+#define	  THRM1_TID		(1<<2)
+#define	  THRM1_TIE		(1<<1)
+#define	  THRM1_V		(1<<0)
 #define	SPRN_THRM2	0x3FD	/* Thermal Management Register 2 */
 #define	SPRN_THRM3	0x3FE	/* Thermal Management Register 3 */
-#define	  THRM3_E		(1<<31)
+#define	  THRM3_E		(1<<0)
 #define	SPRN_TSR	0x3D8	/* Timer Status Register */
 #define	  TSR_ENW		0x80000000	/* Enable Next Watchdog */
 #define	  TSR_WIS		0x40000000	/* WDT Interrupt Status */
@@ -500,8 +508,8 @@
 #define _MACH_fads	0x00000020	/* Motorola FADS board */
 #define _MACH_rpxlite	0x00000040	/* RPCG RPX-Lite 8xx board */
 #define _MACH_bseip	0x00000080	/* Bright Star Engineering ip-Engine */
-#define _MACH_yk	0x00000100	/* Motorola Yellowknife */
-#define _MACH_gemini	0x00000200	/* Synergy Microsystems gemini board */
+#define _MACH_unused0	0x00000100	/* Now free to be used */
+#define _MACH_unused1	0x00000200	/* Now free to be used */
 #define _MACH_classic	0x00000400	/* RPCG RPX-Classic 8xx board */
 #define _MACH_oak	0x00000800	/* IBM "Oak" 403 eval. board */
 #define _MACH_walnut	0x00001000	/* IBM "Walnut" 405GP eval. board */
@@ -509,24 +517,11 @@
 #define _MACH_tqm860	0x00004000	/* TQM860/L */
 #define _MACH_tqm8xxL	0x00008000	/* TQM8xxL */
 
-
 /* see residual.h for these */
 #define _PREP_Motorola 0x01  /* motorola prep */
 #define _PREP_Firm     0x02  /* firmworks prep */
 #define _PREP_IBM      0x00  /* ibm prep */
 #define _PREP_Bull     0x03  /* bull prep */
-#define _PREP_Radstone 0x04  /* Radstone Technology PLC prep */
-
-/*
- * Radstone board types
- */
-#define RS_SYS_TYPE_PPC1   0
-#define RS_SYS_TYPE_PPC2   1
-#define RS_SYS_TYPE_PPC1a  2
-#define RS_SYS_TYPE_PPC2a  3
-#define RS_SYS_TYPE_PPC4   4
-#define RS_SYS_TYPE_PPC4a  5
-#define RS_SYS_TYPE_PPC2ep 6
 
 /* these are arbitrary */
 #define _CHRP_Motorola 0x04  /* motorola chrp, the cobra */
@@ -714,9 +709,6 @@ void _nmask_and_or_msr(unsigned long nmask, unsigned long or_val);
 #define have_of 0
 #elif defined(CONFIG_APUS)
 #define _machine _MACH_apus
-#define have_of 0
-#elif defined(CONFIG_GEMINI)
-#define _machine _MACH_gemini
 #define have_of 0
 #elif defined(CONFIG_8260)
 #define _machine _MACH_8260

@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: cmglobal - Global variables for the ACPI subsystem
- *              $Revision: 112 $
+ *              $Revision: 116 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -95,7 +95,7 @@ PREDEFINED_NAMES            acpi_gbl_pre_defined_names[] =
 	{"_SB_",    INTERNAL_TYPE_DEF_ANY},
 	{"_SI_",    INTERNAL_TYPE_DEF_ANY},
 	{"_TZ_",    INTERNAL_TYPE_DEF_ANY},
-	{"_REV",    ACPI_TYPE_NUMBER, "2"},
+	{"_REV",    ACPI_TYPE_INTEGER, "2"},
 	{"_OS_",    ACPI_TYPE_STRING, ACPI_OS_NAME},
 	{"_GL_",    ACPI_TYPE_MUTEX, "0"},
 
@@ -150,6 +150,13 @@ u8                          acpi_gbl_ns_properties[] =
 	NSP_NORMAL,                 /* 33 Extra            */
 	NSP_NORMAL                  /* 34 Invalid          */
 };
+
+
+/* Hex to ASCII conversion table */
+
+NATIVE_CHAR                 acpi_gbl_hex_to_ascii[] =
+			  {'0','1','2','3','4','5','6','7',
+			  '8','9','A','B','C','D','E','F'};
 
 
 /******************************************************************************

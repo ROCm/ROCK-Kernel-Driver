@@ -1084,6 +1084,9 @@ static int x25_recvmsg(struct socket *sock, struct msghdr *msg, int size, int fl
 	msg->msg_namelen = sizeof(struct sockaddr_x25);
 
 	skb_free_datagram(sk, skb);
+	lock_sock(sk);
+	x25_check_rbuf(sk);
+	release_sock(sk);
 
 	return copied;
 }
@@ -1258,8 +1261,8 @@ static int x25_get_info(char *buffer, char **start, off_t offset, int length)
 } 
 
 struct net_proto_family x25_family_ops = {
-	AF_X25,
-	x25_create
+	family:		AF_X25,
+	create:		x25_create,
 };
 
 static struct proto_ops SOCKOPS_WRAPPED(x25_proto_ops) = {
@@ -1286,18 +1289,13 @@ static struct proto_ops SOCKOPS_WRAPPED(x25_proto_ops) = {
 SOCKOPS_WRAP(x25_proto, AF_X25);
 
 
-static struct packet_type x25_packet_type =
-{
-	0,		/* MUTTER ntohs(ETH_P_X25),*/
-	0,		/* copy */
-	x25_lapb_receive_frame,
-	NULL,
-	NULL,
+static struct packet_type x25_packet_type = {
+	type:		__constant_htons(ETH_P_X25),
+	func:		x25_lapb_receive_frame,
 };
 
 struct notifier_block x25_dev_notifier = {
-	x25_device_event,
-	0
+	notifier_call:	x25_device_event,
 };
 
 void x25_kill_by_neigh(struct x25_neigh *neigh)
@@ -1317,7 +1315,6 @@ static int __init x25_init(void)
 #endif /* MODULE */
 	sock_register(&x25_family_ops);
 
-	x25_packet_type.type = htons(ETH_P_X25);
 	dev_add_pack(&x25_packet_type);
 
 	register_netdevice_notifier(&x25_dev_notifier);

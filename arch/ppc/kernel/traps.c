@@ -65,21 +65,37 @@ int (*debugger_dabr_match)(struct pt_regs *regs);
 void (*debugger_fault_handler)(struct pt_regs *regs);
 #endif
 #endif
+
 /*
  * Trap & Exception support
  */
+
+
+spinlock_t oops_lock = SPIN_LOCK_UNLOCKED;
+
+void die(const char * str, struct pt_regs * fp, long err)
+{
+	console_verbose();
+	spin_lock_irq(&oops_lock);
+	printk("Oops: %s, sig: %ld\n", str, err);
+	show_regs(fp);
+	print_backtrace((unsigned long *)fp->gpr[1]);
+	spin_unlock_irq(&oops_lock);
+	/* do_exit() should take care of panic'ing from an interrupt
+	 * context so we don't handle it here
+	 */
+	do_exit(err);
+}
 
 void
 _exception(int signr, struct pt_regs *regs)
 {
 	if (!user_mode(regs))
 	{
-		show_regs(regs);
 #if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
 		debugger(regs);
 #endif
-		print_backtrace((unsigned long *)regs->gpr[1]);
-		panic("Exception in kernel pc %lx signal %d",regs->nip,signr);
+		die("Exception in kernel mode", regs, signr);
 	}
 	force_sig(signr, current);
 }
@@ -98,7 +114,7 @@ MachineCheckException(struct pt_regs *regs)
 
 #if defined(CONFIG_8xx) && defined(CONFIG_PCI)
 	/* the qspan pci read routines can cause machine checks -- Cort */
-	bad_page_fault(regs, regs->dar);
+	bad_page_fault(regs, regs->dar, SIGBUS);
 	return;
 #endif
 #if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
@@ -151,12 +167,10 @@ MachineCheckException(struct pt_regs *regs)
 	default:
 		printk("Unknown values in msr\n");
 	}
-	show_regs(regs);
 #if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
 	debugger(regs);
 #endif
-	print_backtrace((unsigned long *)regs->gpr[1]);
-	panic("machine check");
+	die("machine check", regs, SIGBUS);
 }
 
 void
@@ -217,13 +231,13 @@ emulate_instruction(struct pt_regs *regs)
 	uint    rd;
 	uint    retval;
 
-	retval = EFAULT;
+	retval = EINVAL;
 
 	if (!user_mode(regs))
 		return retval;
 
 	if (get_user(instword, (uint *)(regs->nip)))
-		return retval;
+		return EFAULT;
 
 	/* Emulate the mfspr rD, PVR.
 	 */
@@ -337,12 +351,10 @@ SoftwareEmulation(struct pt_regs *regs)
 	int errcode;
 
 	if (!user_mode(regs)) {
-		show_regs(regs);
 #if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
 		debugger(regs);
 #endif
-		print_backtrace((unsigned long *)regs->gpr[1]);
-		panic("Kernel Mode Software FPU Emulation");
+		die("Kernel Mode Software FPU Emulation", regs, SIGFPE);
 	}
 
 #ifdef CONFIG_MATH_EMULATION

@@ -1,4 +1,4 @@
-/* $Id: sparc_ksyms.c,v 1.105 2000/12/11 05:24:25 anton Exp $
+/* $Id: sparc_ksyms.c,v 1.106 2001/01/11 15:07:09 davem Exp $
  * arch/sparc/kernel/ksyms.c: Sparc specific ksyms support.
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -154,6 +154,7 @@ EXPORT_SYMBOL(__cpu_logical_map);
 #endif
 
 EXPORT_SYMBOL(udelay);
+EXPORT_SYMBOL(mostek_lock);
 EXPORT_SYMBOL(mstk48t02_regs);
 #if CONFIG_SUN_AUXIO
 EXPORT_SYMBOL(auxio_register);

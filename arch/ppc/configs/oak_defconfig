@@ -12,7 +12,7 @@ CONFIG_EXPERIMENTAL=y
 # Loadable module support
 #
 CONFIG_MODULES=y
-# CONFIG_MODVERSIONS is not set
+CONFIG_MODVERSIONS=y
 CONFIG_KMOD=y
 
 #
@@ -23,10 +23,10 @@ CONFIG_PPC=y
 CONFIG_4xx=y
 # CONFIG_POWER3 is not set
 # CONFIG_POWER4 is not set
-# CONFIG_8260 is not set
 # CONFIG_8xx is not set
 CONFIG_OAK=y
 # CONFIG_WALNUT is not set
+CONFIG_PPC601_SYNC_FIX=y
 # CONFIG_SMP is not set
 CONFIG_MACH_SPECIFIC=y
 # CONFIG_MATH_EMULATION is not set
@@ -37,7 +37,9 @@ CONFIG_MACH_SPECIFIC=y
 # CONFIG_HIGHMEM is not set
 # CONFIG_MOL is not set
 # CONFIG_ISA is not set
+# CONFIG_EISA is not set
 # CONFIG_SBUS is not set
+# CONFIG_MCA is not set
 # CONFIG_PCI is not set
 CONFIG_NET=y
 CONFIG_SYSCTL=y
@@ -171,7 +173,6 @@ CONFIG_NET_ETHERNET=y
 # CONFIG_MACE is not set
 # CONFIG_BMAC is not set
 # CONFIG_GMAC is not set
-# CONFIG_NCR885E is not set
 CONFIG_OAKNET=y
 # CONFIG_NET_VENDOR_3COM is not set
 # CONFIG_LANCE is not set
@@ -179,7 +180,6 @@ CONFIG_OAKNET=y
 # CONFIG_NET_VENDOR_RACAL is not set
 # CONFIG_AT1700 is not set
 # CONFIG_DEPCA is not set
-# CONFIG_HP100 is not set
 # CONFIG_NET_ISA is not set
 # CONFIG_NET_PCI is not set
 # CONFIG_NET_POCKET is not set
@@ -366,8 +366,6 @@ CONFIG_LOCKD=y
 # CONFIG_NCPFS_NFS_NS is not set
 # CONFIG_NCPFS_OS2_NS is not set
 # CONFIG_NCPFS_SMALLDOS is not set
-# CONFIG_NCPFS_MOUNT_SUBDIR is not set
-# CONFIG_NCPFS_NDS_DOMAINS is not set
 # CONFIG_NCPFS_NLS is not set
 # CONFIG_NCPFS_EXTRAS is not set
 
@@ -376,6 +374,7 @@ CONFIG_LOCKD=y
 #
 # CONFIG_PARTITION_ADVANCED is not set
 CONFIG_MSDOS_PARTITION=y
+# CONFIG_SMB_NLS is not set
 # CONFIG_NLS is not set
 
 #

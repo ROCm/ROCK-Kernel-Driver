@@ -1,4 +1,4 @@
-/* $Id: rtc.c,v 1.23 2000/08/29 07:01:55 davem Exp $
+/* $Id: rtc.c,v 1.24 2001/01/11 15:07:09 davem Exp $
  *
  * Linux/SPARC Real Time Clock Driver
  * Copyright (C) 1996 Thomas K. Dyas (tdyas@eden.rutgers.edu)
@@ -31,11 +31,9 @@ static int rtc_busy = 0;
 void get_rtc_time(struct rtc_time *t)
 {
 	unsigned long regs = mstk48t02_regs;
-	unsigned long flags;
 	u8 tmp;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irq(&mostek_lock);
 
 	tmp = mostek_read(regs + MOSTEK_CREG);
 	tmp |= MSTK_CREG_READ;
@@ -52,18 +50,18 @@ void get_rtc_time(struct rtc_time *t)
 	tmp = mostek_read(regs + MOSTEK_CREG);
 	tmp &= ~MSTK_CREG_READ;
 	mostek_write(regs + MOSTEK_CREG, tmp);
-	restore_flags(flags);
+
+	spin_unlock_irq(&mostek_lock);
 }
 
 /* Set the current date and time inthe real time clock. */
 void set_rtc_time(struct rtc_time *t)
 {
 	unsigned long regs = mstk48t02_regs;
-	unsigned long flags;
 	u8 tmp;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irq(&mostek_lock);
+
 	tmp = mostek_read(regs + MOSTEK_CREG);
 	tmp |= MSTK_CREG_WRITE;
 	mostek_write(regs + MOSTEK_CREG, tmp);
@@ -79,7 +77,8 @@ void set_rtc_time(struct rtc_time *t)
 	tmp = mostek_read(regs + MOSTEK_CREG);
 	tmp &= ~MSTK_CREG_WRITE;
 	mostek_write(regs + MOSTEK_CREG, tmp);
-	restore_flags(flags);
+
+	spin_unlock_irq(&mostek_lock);
 }
 
 static long long rtc_lseek(struct file *file, long long offset, int origin)
@@ -121,20 +120,24 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 static int rtc_open(struct inode *inode, struct file *file)
 {
+	int ret;
 
-	if (rtc_busy)
-		return -EBUSY;
+	spin_lock_irq(&mostek_lock);
+	if (rtc_busy) {
+		ret = -EBUSY;
+	} else {
+		rtc_busy = 1;
+		ret = 0;
+	}
+	spin_unlock_irq(&mostek_lock);
 
-	rtc_busy = 1;
-
-	return 0;
+	return ret;
 }
 
 static int rtc_release(struct inode *inode, struct file *file)
 {
-	lock_kernel();
 	rtc_busy = 0;
-	unlock_kernel();
+
 	return 0;
 }
 
@@ -150,11 +153,7 @@ static struct miscdevice rtc_dev = { RTC_MINOR, "rtc", &rtc_fops };
 
 EXPORT_NO_SYMBOLS;
 
-#ifdef MODULE
-int init_module(void)
-#else
-int __init rtc_sun_init(void)
-#endif
+static int __init rtc_sun_init(void)
 {
 	int error;
 
@@ -173,9 +172,10 @@ int __init rtc_sun_init(void)
 	return 0;
 }
 
-#ifdef MODULE
-void cleanup_module(void)
+static void __exit rtc_sun_cleanup(void)
 {
 	misc_deregister(&rtc_dev);
 }
-#endif
+
+module_init(rtc_sun_init);
+module_exit(rtc_sun_cleanup);

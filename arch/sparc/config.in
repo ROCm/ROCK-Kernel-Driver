@@ -1,4 +1,4 @@
-# $Id: config.in,v 1.106 2000/11/17 04:27:52 davem Exp $
+# $Id: config.in,v 1.107 2001/01/06 00:46:44 davem Exp $
 # For a description of the syntax of this configuration file,
 # see Documentation/kbuild/config-language.txt.
 #
@@ -28,6 +28,9 @@ define_bool CONFIG_VT y
 define_bool CONFIG_VT_CONSOLE y
 
 bool 'Symmetric multi-processing support (does not work on sun4/sun4c)' CONFIG_SMP
+
+# Identify this as a Sparc32 build
+define_bool CONFIG_SPARC32 y
 
 # Global things across all Sun machines.
 define_bool CONFIG_ISA n

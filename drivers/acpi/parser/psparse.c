@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: psparse - Parser top level AML parse routines
- *              $Revision: 71 $
+ *              $Revision: 73 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -537,6 +537,10 @@ acpi_ps_parse_loop (
 				 */
 
 				status = acpi_ds_get_predicate_value (walk_state, NULL, TRUE);
+				if (ACPI_FAILURE (status)) {
+					return (status);
+				}
+
 				status = acpi_ps_next_parse_state (walk_state, op, status);
 			}
 

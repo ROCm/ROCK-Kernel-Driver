@@ -35,6 +35,7 @@
  *         Arnaldo C. Melo: use capable, not suser
  *        Steve Whitehouse: Removed unused code. Fix to use sk->allocation
  *                          when required.
+ *       Patrick Caulfield: /proc/net/decnet now has object name/number
  */
 
 
@@ -128,8 +129,6 @@ Version 0.0.6    2.1.110   07-aug-98   Eduardo Marcelo Serrat
 #include <net/dn_fib.h>
 #include <net/dn_neigh.h>
 
-#define MAX(a,b) ((a)>(b)?(a):(b))
-
 static void dn_keepalive(struct sock *sk);
 
 /*
@@ -141,15 +140,15 @@ unsigned char decnet_ether_address[ETH_ALEN] = { 0xAA, 0x00, 0x04, 0x00, 0x00, 0
 
 static struct proto_ops dn_proto_ops;
 rwlock_t dn_hash_lock = RW_LOCK_UNLOCKED;
-static struct sock *dn_sklist = NULL;
-static struct sock *dn_wild_sk = NULL;
+static struct sock *dn_sklist;
+static struct sock *dn_wild_sk;
 
 static int __dn_setsockopt(struct socket *sock, int level, int optname, char *optval, int optlen, int flags);
 static int __dn_getsockopt(struct socket *sock, int level, int optname, char *optval, int *optlen, int flags);
 
 static struct sock **dn_find_list(struct sock *sk)
 {
-	struct dn_scp *scp = &sk->protinfo.dn;
+	struct dn_scp *scp = DN_SK(sk);
 
 	if (scp->addr.sdn_flags & SDF_WILD)
 		return dn_wild_sk ? NULL : &dn_wild_sk;
@@ -159,7 +158,7 @@ static struct sock **dn_find_list(struct sock *sk)
 
 static unsigned short port_alloc(struct sock *sk)
 {
-	struct dn_scp *scp = &sk->protinfo.dn;
+	struct dn_scp *scp = DN_SK(sk);
 static unsigned short port = 0x2000;
 
 	if (port == 0)
@@ -177,12 +176,17 @@ static unsigned short port = 0x2000;
  */
 static int dn_hash_sock(struct sock *sk)
 {
-	struct dn_scp *scp = &sk->protinfo.dn;
+	struct dn_scp *scp = DN_SK(sk);
 	struct sock **skp;
 	int rv = -EUSERS;
 
-	write_lock_bh(&dn_hash_lock);
+	if (sk->next)
+		BUG();
+	if (sk->pprev)
+		BUG();
 
+	write_lock_bh(&dn_hash_lock);
+	
 	if (!scp->addrloc && !port_alloc(sk))
 		goto out;
 
@@ -327,7 +331,7 @@ struct sock *dn_sklist_find_listener(struct sockaddr_dn *addr)
 
 	read_lock(&dn_hash_lock);
 	for(sk = dn_sklist; sk != NULL; sk = sk->next) {
-		struct dn_scp *scp = &sk->protinfo.dn;
+		struct dn_scp *scp = DN_SK(sk);
 		if (sk->state != TCP_LISTEN)
 			continue;
 		if (scp->addr.sdn_objnum) {
@@ -355,13 +359,13 @@ struct sock *dn_sklist_find_listener(struct sockaddr_dn *addr)
 
 struct sock *dn_find_by_skb(struct sk_buff *skb)
 {
-	struct dn_skb_cb *cb = (struct dn_skb_cb *)skb->cb;
+	struct dn_skb_cb *cb = DN_SKB_CB(skb);
 	struct sock *sk;
 	struct dn_scp *scp;
 
 	read_lock(&dn_hash_lock);
 	for(sk = dn_sklist; sk != NULL; sk = sk->next) {
-		scp = &sk->protinfo.dn;
+		scp = DN_SK(sk);
 		if (cb->src != dn_saddr2dn(&scp->peer))
 			continue;
 		if (cb->dst_port != scp->addrloc)
@@ -383,7 +387,7 @@ struct sock *dn_find_by_skb(struct sk_buff *skb)
 
 static void dn_destruct(struct sock *sk)
 {
-	struct dn_scp *scp = &sk->protinfo.dn;
+	struct dn_scp *scp = DN_SK(sk);
 
 	skb_queue_purge(&scp->data_xmit_queue);
 	skb_queue_purge(&scp->other_xmit_queue);
@@ -394,25 +398,26 @@ static void dn_destruct(struct sock *sk)
 	MOD_DEC_USE_COUNT;
 }
 
-struct sock *dn_alloc_sock(struct socket *sock, int flags)
+struct sock *dn_alloc_sock(struct socket *sock, int gfp)
 {
 	struct sock *sk;
 	struct dn_scp *scp;
 
-	if  ((sk = sk_alloc(PF_DECnet, flags, 1)) == NULL) 
+	if  ((sk = sk_alloc(PF_DECnet, gfp, 1)) == NULL) 
 		goto no_sock;
 
 	if (sock) {
 			sock->ops = &dn_proto_ops;
 	}
 	sock_init_data(sock,sk);
-	scp = &sk->protinfo.dn;
+	scp = DN_SK(sk);
 
 	sk->backlog_rcv = dn_nsp_backlog_rcv;
 	sk->destruct    = dn_destruct;
 	sk->no_check    = 1;
 	sk->family      = PF_DECnet;
 	sk->protocol    = 0;
+	sk->allocation  = gfp;
 
 	/* Initialization of DECnet Session Control Port		*/
 	scp->state	= DN_O;		/* Open			*/
@@ -424,13 +429,26 @@ struct sock *dn_alloc_sock(struct socket *sock, int flags)
 	scp->ackrcv_oth = 0;		/* Last oth data ack rec*/
         scp->flowrem_sw = DN_SEND;
 	scp->flowloc_sw = DN_SEND;
+	scp->flowrem_dat = 0;
+	scp->flowrem_oth = 1;
+	scp->flowloc_dat = 0;
+	scp->flowloc_oth = 1;
+	scp->services_rem = 0;
+	scp->services_loc = 1 | NSP_FC_NONE;
+	scp->info_rem = 0;
+	scp->info_loc = 0x03; /* NSP version 4.1 */
+	scp->segsize_rem = 230; /* Default: Updated by remote segsize */
+	scp->segsize_loc = 1450; /* Best guess for ethernet */
+	scp->at_eor = 1;
+	scp->nonagle = 0;
+	scp->multi_ireq = 1;
 	scp->accept_mode = ACC_IMMED;
 	scp->addr.sdn_family    = AF_DECnet;
 	scp->peer.sdn_family    = AF_DECnet;
 	scp->accessdata.acc_accl = 5;
 	memcpy(scp->accessdata.acc_acc, "LINUX", 5);
-	scp->mss = 1460;
 
+	scp->max_window   = NSP_MAX_WINDOW;
 	scp->snd_window   = NSP_MIN_WINDOW;
 	scp->nsp_srtt     = NSP_INITIAL_SRTT;
 	scp->nsp_rttvar   = NSP_INITIAL_RTTVAR;
@@ -464,7 +482,7 @@ no_sock:
  */
 static void dn_keepalive(struct sock *sk)
 {
-	struct dn_scp *scp = &sk->protinfo.dn;
+	struct dn_scp *scp = DN_SK(sk);
 
 	/*
 	 * By checking the other_data transmit queue is empty
@@ -472,7 +490,7 @@ static void dn_keepalive(struct sock *sk)
 	 * many of these keepalive frames.
 	 */
 	if (skb_queue_len(&scp->other_xmit_queue) == 0)
-		dn_nsp_send_lnk(sk, DN_NOCHANGE);
+		dn_nsp_send_link(sk, DN_NOCHANGE, 0);
 }
 
 
@@ -485,7 +503,7 @@ static void dn_keepalive(struct sock *sk)
  */
 int dn_destroy_timer(struct sock *sk)
 {
-	struct dn_scp *scp = &sk->protinfo.dn;
+	struct dn_scp *scp = DN_SK(sk);
 
 	scp->persist = dn_nsp_persist(sk);
 
@@ -527,7 +545,7 @@ int dn_destroy_timer(struct sock *sk)
 
 static void dn_destroy_sock(struct sock *sk)
 {
-	struct dn_scp *scp = &sk->protinfo.dn;
+	struct dn_scp *scp = DN_SK(sk);
 
 	scp->nsp_rxtshift = 0; /* reset back off */
 
@@ -674,7 +692,7 @@ dn_release(struct socket *sock)
 static int dn_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 {
 	struct sock *sk = sock->sk;
-	struct dn_scp *scp = &sk->protinfo.dn;
+	struct dn_scp *scp = DN_SK(sk);
 	struct sockaddr_dn *saddr = (struct sockaddr_dn *)uaddr;
 	struct net_device *dev;
 	int rv;
@@ -722,11 +740,8 @@ static int dn_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	memcpy(&scp->addr, saddr, addr_len);
 	sk->zapped = 0;
 
-	if ((rv = dn_hash_sock(sk)) == 0)
-		goto out;
-
-	sk->zapped = 1;
-out:
+	if ((rv = dn_hash_sock(sk)) != 0)
+		sk->zapped = 1;
 
         return rv;
 }
@@ -735,7 +750,7 @@ out:
 static int dn_auto_bind(struct socket *sock)
 {
 	struct sock *sk = sock->sk;
-	struct dn_scp *scp = &sk->protinfo.dn;
+	struct dn_scp *scp = DN_SK(sk);
 
 	sk->zapped = 0;
 
@@ -769,7 +784,7 @@ static int dn_connect(struct socket *sock, struct sockaddr *uaddr, int addr_len,
 {
 	struct sockaddr_dn *addr = (struct sockaddr_dn *)uaddr;
 	struct sock *sk = sock->sk;
-	struct dn_scp *scp = &sk->protinfo.dn;
+	struct dn_scp *scp = DN_SK(sk);
 	int err = -EISCONN;
 
 	lock_sock(sk);
@@ -788,7 +803,7 @@ static int dn_connect(struct socket *sock, struct sockaddr *uaddr, int addr_len,
 	}
 
 	err = -EINVAL;
-	if (sk->protinfo.dn.state != DN_O)
+	if (DN_SK(sk)->state != DN_O)
 		goto out;
 
 	if (addr_len != sizeof(struct sockaddr_dn))
@@ -812,7 +827,7 @@ static int dn_connect(struct socket *sock, struct sockaddr *uaddr, int addr_len,
 
 	sk->state   = TCP_SYN_SENT;
 	sock->state = SS_CONNECTING;
-	sk->protinfo.dn.state = DN_CI;
+	DN_SK(sk)->state = DN_CI;
 
 	dn_nsp_send_conninit(sk, NSP_CI);
 
@@ -853,7 +868,7 @@ out:
         return err;
 }
 
-static int dn_access_copy(struct sk_buff *skb, struct accessdata_dn *acc)
+static void dn_access_copy(struct sk_buff *skb, struct accessdata_dn *acc)
 {
         unsigned char *ptr = skb->data;
 
@@ -870,10 +885,9 @@ static int dn_access_copy(struct sk_buff *skb, struct accessdata_dn *acc)
 
         skb_pull(skb, acc->acc_accl + acc->acc_passl + acc->acc_userl + 3);
 
-	return 0;
 }
 
-static int dn_user_copy(struct sk_buff *skb, struct optdata_dn *opt)
+static void dn_user_copy(struct sk_buff *skb, struct optdata_dn *opt)
 {
         unsigned char *ptr = skb->data;
         
@@ -882,7 +896,6 @@ static int dn_user_copy(struct sk_buff *skb, struct optdata_dn *opt)
         memcpy(opt->opt_data, ptr, opt->opt_optl);
         skb_pull(skb, opt->opt_optl + 1);
 
-	return 0;
 }
 
 
@@ -910,7 +923,7 @@ static int dn_wait_accept(struct socket *sock, int flags)
                         return -ERESTARTSYS; /* But of course you don't! */
         }
 
-        if ((sk->protinfo.dn.state != DN_RUN) && (sk->protinfo.dn.state != DN_DRC)) {
+        if ((DN_SK(sk)->state != DN_RUN) && (DN_SK(sk)->state != DN_DRC)) {
                 sock->state = SS_UNCONNECTED;
                 return sock_error(sk);
         }
@@ -937,7 +950,7 @@ static int dn_accept(struct socket *sock, struct socket *newsock, int flags)
 		return -EINVAL;
 	}
 
-	if (sk->protinfo.dn.state != DN_O) {
+	if (DN_SK(sk)->state != DN_O) {
 		release_sock(sk);
 		return -EINVAL;
 	}
@@ -967,7 +980,7 @@ static int dn_accept(struct socket *sock, struct socket *newsock, int flags)
                 }
         } while (skb == NULL);
 
-	cb = (struct dn_skb_cb *)skb->cb;
+	cb = DN_SKB_CB(skb);
 
 	if ((newsk = dn_alloc_sock(newsock, sk->allocation)) == NULL) {
 		release_sock(sk);
@@ -980,50 +993,52 @@ static int dn_accept(struct socket *sock, struct socket *newsock, int flags)
 	dst_release(xchg(&newsk->dst_cache, skb->dst));
 	skb->dst = NULL;
 
-        newsk->protinfo.dn.state      = DN_CR;
-	newsk->protinfo.dn.addrrem    = cb->src_port;
-	newsk->protinfo.dn.mss        = cb->segsize;
-	newsk->protinfo.dn.accept_mode = sk->protinfo.dn.accept_mode;
+        DN_SK(newsk)->state        = DN_CR;
+	DN_SK(newsk)->addrrem      = cb->src_port;
+	DN_SK(newsk)->services_rem = cb->services;
+	DN_SK(newsk)->info_rem     = cb->info;
+	DN_SK(newsk)->segsize_rem  = cb->segsize;
+	DN_SK(newsk)->accept_mode  = DN_SK(sk)->accept_mode;
 	
-	if (newsk->protinfo.dn.mss < 230)
-		newsk->protinfo.dn.mss = 230;
+	if (DN_SK(newsk)->segsize_rem < 230)
+		DN_SK(newsk)->segsize_rem = 230;
 
 	newsk->state  = TCP_LISTEN;
 	newsk->zapped = 0;
 
-	memcpy(&newsk->protinfo.dn.addr, &sk->protinfo.dn.addr, sizeof(struct sockaddr_dn));
+	memcpy(&(DN_SK(newsk)->addr), &(DN_SK(sk)->addr), sizeof(struct sockaddr_dn));
 
 	/*
 	 * If we are listening on a wild socket, we don't want
 	 * the newly created socket on the wrong hash queue.
 	 */
-	newsk->protinfo.dn.addr.sdn_flags &= ~SDF_WILD;
+	DN_SK(newsk)->addr.sdn_flags &= ~SDF_WILD;
 
-	skb_pull(skb, dn_username2sockaddr(skb->data, skb->len, &newsk->protinfo.dn.addr, &type));
-	skb_pull(skb, dn_username2sockaddr(skb->data, skb->len, &newsk->protinfo.dn.peer, &type));
-	*(dn_address *)newsk->protinfo.dn.peer.sdn_add.a_addr = cb->src;
-	*(dn_address *)newsk->protinfo.dn.addr.sdn_add.a_addr = cb->dst;
+	skb_pull(skb, dn_username2sockaddr(skb->data, skb->len, &(DN_SK(newsk)->addr), &type));
+	skb_pull(skb, dn_username2sockaddr(skb->data, skb->len, &(DN_SK(newsk)->peer), &type));
+	*(dn_address *)(DN_SK(newsk)->peer.sdn_add.a_addr) = cb->src;
+	*(dn_address *)(DN_SK(newsk)->addr.sdn_add.a_addr) = cb->dst;
 
 	menuver = *skb->data;
 	skb_pull(skb, 1);
 
 	if (menuver & DN_MENUVER_ACC)
-		dn_access_copy(skb, &newsk->protinfo.dn.accessdata);
+		dn_access_copy(skb, &(DN_SK(newsk)->accessdata));
 
 	if (menuver & DN_MENUVER_USR)
-		dn_user_copy(skb, &newsk->protinfo.dn.conndata_in);
+		dn_user_copy(skb, &(DN_SK(newsk)->conndata_in));
 
 	if (menuver & DN_MENUVER_PRX)
-		newsk->protinfo.dn.peer.sdn_flags |= SDF_PROXY;
+		DN_SK(newsk)->peer.sdn_flags |= SDF_PROXY;
 
 	if (menuver & DN_MENUVER_UIC)
-		newsk->protinfo.dn.peer.sdn_flags |= SDF_UICPROXY;
+		DN_SK(newsk)->peer.sdn_flags |= SDF_UICPROXY;
 
 	kfree_skb(skb);
 
-	memcpy(&newsk->protinfo.dn.conndata_out, &sk->protinfo.dn.conndata_out,
+	memcpy(&(DN_SK(newsk)->conndata_out), &(DN_SK(sk)->conndata_out),
 		sizeof(struct optdata_dn));
-	memcpy(&newsk->protinfo.dn.discdata_out, &sk->protinfo.dn.discdata_out,
+	memcpy(&(DN_SK(newsk)->discdata_out), &(DN_SK(sk)->discdata_out),
 		sizeof(struct optdata_dn));
 
 	lock_sock(newsk);
@@ -1031,9 +1046,13 @@ static int dn_accept(struct socket *sock, struct socket *newsock, int flags)
 
 	dn_send_conn_ack(newsk);
 
-	if (newsk->protinfo.dn.accept_mode == ACC_IMMED) {
-		newsk->protinfo.dn.state = DN_CC;
-        	dn_send_conn_conf(newsk, newsk->allocation);
+	/*
+	 * Here we use sk->allocation since although the conn conf is
+	 * for the newsk, the context is the old socket.
+	 */
+	if (DN_SK(newsk)->accept_mode == ACC_IMMED) {
+		DN_SK(newsk)->state = DN_CC;
+        	dn_send_conn_conf(newsk, sk->allocation);
 		err = dn_wait_accept(newsock, flags);
 	}
 
@@ -1046,7 +1065,7 @@ static int dn_getname(struct socket *sock, struct sockaddr *uaddr,int *uaddr_len
 {
 	struct sockaddr_dn *sa = (struct sockaddr_dn *)uaddr;
 	struct sock *sk = sock->sk;
-	struct dn_scp *scp = &sk->protinfo.dn;
+	struct dn_scp *scp = DN_SK(sk);
 
 	*uaddr_len = sizeof(struct sockaddr_dn);
 
@@ -1070,7 +1089,7 @@ static int dn_getname(struct socket *sock, struct sockaddr *uaddr,int *uaddr_len
 static unsigned int dn_poll(struct file *file, struct socket *sock, poll_table  *wait)
 {
 	struct sock *sk = sock->sk;
-	struct dn_scp *scp = &sk->protinfo.dn;
+	struct dn_scp *scp = DN_SK(sk);
 	int mask = datagram_poll(file, sock, wait);
 
 	if (skb_queue_len(&scp->other_receive_queue))
@@ -1082,19 +1101,37 @@ static unsigned int dn_poll(struct file *file, struct socket *sock, poll_table  
 static int dn_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 {
 	struct sock *sk = sock->sk;
-	struct dn_scp *scp = &sk->protinfo.dn;
+	struct dn_scp *scp = DN_SK(sk);
 	int err = -EOPNOTSUPP;
 	unsigned long amount = 0;
 	struct sk_buff *skb;
+	int val;
 
-#if 0
-	struct dn_naddr dnaddr;
-#endif
 	switch(cmd)
 	{
 	case SIOCGIFADDR:
 	case SIOCSIFADDR:
 		return dn_dev_ioctl(cmd, (void *)arg);
+
+	case SIOCATMARK:
+		lock_sock(sk);
+		val = (skb_queue_len(&scp->other_receive_queue) != 0);
+		if (scp->state != DN_RUN)
+			val = -ENOTCONN;
+		release_sock(sk);
+		return val;
+
+#ifdef SIOCATEOR
+	case SIOCATEOR:
+		lock_sock(sk);
+		val = scp->at_eor;
+		if (scp->state != DN_RUN)
+			val = -ENOTCONN;
+		if (sock->type != SOCK_SEQPACKET)
+			val = -EINVAL;
+		release_sock(sk);
+		return val;
+#endif /* SIOCATEOR */
 
 #ifdef CONFIG_DECNET_ROUTER
 	case SIOCADDRT:
@@ -1102,80 +1139,6 @@ static int dn_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		return dn_fib_ioctl(sock, cmd, arg);
 #endif /* CONFIG_DECNET_ROUTER */
 
-#if 0
-	case SIOCSIFADDR:
-		if (!capable(CAP_NET_ADMIN))    return -EPERM;
-
-		if ((err = copy_from_user(devname, ioarg->devname, 5)) != 0)
-			break;
-		if ((err = copy_from_user(addr, ioarg->exec_addr, 6)) != 0)
-			break;
-		if ((dev = dev_get(devname)) == NULL) {
-			err = -ENODEV;
-			break;
-		}
-		if (dev->dn_ptr == NULL) {
-			err = -ENODEV;
-			break;
-		}
-
-		dn_dev_devices_off();
-
-		decnet_default_device = dev;
-		memcpy(decnet_ether_address, addr, ETH_ALEN);
-		decnet_address = dn_htons(dn_eth2dn(decnet_ether_address));
-
-		dn_dev_devices_on();
-
-		break;
-
-	case SIOCGIFADDR:
-		if (decnet_default_device)
-			strcpy(devname, decnet_default_device->name);
-		else
-			memset(devname, 0, 6);
-
-		if ((err = copy_to_user(ioarg->devname, devname, 5)) != 0)
-			break;
-
-		if ((err = copy_to_user(ioarg->exec_addr, decnet_ether_address, 6)) != 0)
-			break;
-
-		break;
-#endif
-
-#if 0
-	case SIOCSNETADDR:
-		if (!capable(CAP_NET_ADMIN)) {
-			err = -EPERM;
-			break;
-		}
-
-		if ((err = copy_from_user(&dnaddr, (void *)arg, sizeof(struct dn_naddr))) != 0)
-			break;
-
-		if (dnaddr.a_len != ETH_ALEN) {
-			err = -EINVAL;
-			break;
-		}
-
-		dn_dev_devices_off();
-
-		memcpy(decnet_ether_address, dnaddr.a_addr, ETH_ALEN);
-		decnet_address = dn_htons(dn_eth2dn(decnet_ether_address));
-
-		dn_dev_devices_on();
-		break;
-
-	case SIOCGNETADDR:
-		dnaddr.a_len = ETH_ALEN;
-		memcpy(dnaddr.a_addr, decnet_ether_address, ETH_ALEN);
-
-		if ((err = copy_to_user((void *)arg, &dnaddr, sizeof(struct dn_naddr))) != 0)
-			break;
-
-		break;
-#endif
 	case OSIOCSNETADDR:
 		if (!capable(CAP_NET_ADMIN)) {
 			err = -EPERM;
@@ -1237,7 +1200,7 @@ static int dn_listen(struct socket *sock, int backlog)
 	if (sk->zapped)
 		goto out;
 
-	if ((sk->protinfo.dn.state != DN_O) || (sk->state == TCP_LISTEN))
+	if ((DN_SK(sk)->state != DN_O) || (sk->state == TCP_LISTEN))
 		goto out;
 
 	sk->max_ack_backlog = backlog;
@@ -1255,7 +1218,7 @@ out:
 static int dn_shutdown(struct socket *sock, int how)
 {
 	struct sock *sk = sock->sk;
-	struct dn_scp *scp = &sk->protinfo.dn;
+	struct dn_scp *scp = DN_SK(sk);
 	int err = -ENOTCONN;
 
 	lock_sock(sk);
@@ -1300,13 +1263,26 @@ static int dn_setsockopt(struct socket *sock, int level, int optname, char *optv
 static int __dn_setsockopt(struct socket *sock, int level,int optname, char *optval, int optlen, int flags) 
 {
 	struct	sock *sk = sock->sk;
-	struct dn_scp *scp = &sk->protinfo.dn;
-	struct optdata_dn opt;
-	struct accessdata_dn acc;
+	struct dn_scp *scp = DN_SK(sk);
+	union {
+		struct optdata_dn opt;
+		struct accessdata_dn acc;
+		int mode;
+		unsigned long win;
+		int val;
+		unsigned char services;
+		unsigned char info;
+	} u;
 	int err;
 
 	if (optlen && !optval)
 		return -EINVAL;
+
+	if (optlen > sizeof(u))
+		return -EINVAL;
+
+	if (copy_from_user(&u, optval, optlen))
+		return -EFAULT;
 
 	switch(optname) {
 		case DSO_CONDATA:
@@ -1318,29 +1294,23 @@ static int __dn_setsockopt(struct socket *sock, int level,int optname, char *opt
 			if (optlen != sizeof(struct optdata_dn))
 				return -EINVAL;
 
-			if (copy_from_user(&opt, optval, optlen))
-				return -EFAULT;
-
-			if (opt.opt_optl > 16)
+			if (u.opt.opt_optl > 16)
 				return -EINVAL;
 
-			memcpy(&scp->conndata_out, &opt, sizeof(struct optdata_dn));
+			memcpy(&scp->conndata_out, &u.opt, optlen);
 			break;
 
 		case DSO_DISDATA:
-	   	        if (sock->state != SS_CONNECTED && sk->protinfo.dn.accept_mode == ACC_IMMED)
+	   	        if (sock->state != SS_CONNECTED && scp->accept_mode == ACC_IMMED)
 				return -ENOTCONN;
 
 			if (optlen != sizeof(struct optdata_dn))
 				return -EINVAL;
 
-			if (copy_from_user(&opt, optval, sizeof(struct optdata_dn)))
-				return -EFAULT;
-
-			if (opt.opt_optl > 16)
+			if (u.opt.opt_optl > 16)
 				return -EINVAL;
 
-			memcpy(&scp->discdata_out, &opt, sizeof(struct optdata_dn));
+			memcpy(&scp->discdata_out, &u.opt, optlen);
 			break;
 
 		case DSO_CONACCESS:
@@ -1352,15 +1322,12 @@ static int __dn_setsockopt(struct socket *sock, int level,int optname, char *opt
 			if (optlen != sizeof(struct accessdata_dn))
 				return -EINVAL;
 
-			if (copy_from_user(&acc, optval, sizeof(struct accessdata_dn)))
-				return -EFAULT;
-
-			if ((acc.acc_accl > DN_MAXACCL) ||
-					(acc.acc_passl > DN_MAXACCL) ||
-					(acc.acc_userl > DN_MAXACCL))
+			if ((u.acc.acc_accl > DN_MAXACCL) ||
+					(u.acc.acc_passl > DN_MAXACCL) ||
+					(u.acc.acc_userl > DN_MAXACCL))
 				return -EINVAL;
 
-			memcpy(&scp->accessdata, &acc, sizeof(struct accessdata_dn));
+			memcpy(&scp->accessdata, &u.acc, optlen);
 			break;
 
 		case DSO_ACCEPTMODE:
@@ -1372,16 +1339,10 @@ static int __dn_setsockopt(struct socket *sock, int level,int optname, char *opt
 			if (optlen != sizeof(int))
 				return -EINVAL;
 
-			{
-				int mode;
+			if ((u.mode != ACC_IMMED) && (u.mode != ACC_DEFER))
+				return -EINVAL;
 
-				if (get_user(mode, optval))
-					return -EFAULT;
-				if ((mode != ACC_IMMED) && (mode != ACC_DEFER))
-					return -EINVAL;
-
-				scp->accept_mode = (unsigned char)mode;
-			}
+			scp->accept_mode = (unsigned char)u.mode;
 			break;
 
 		case DSO_CONACCEPT:
@@ -1411,8 +1372,55 @@ static int __dn_setsockopt(struct socket *sock, int level,int optname, char *opt
 		case DSO_LINKINFO:
 		case DSO_STREAM:
 		case DSO_SEQPACKET:
-
 			return -ENOPROTOOPT;
+
+		case DSO_MAXWINDOW:
+			if (optlen != sizeof(unsigned long))
+				return -EINVAL;
+			if (u.win > NSP_MAX_WINDOW)
+				u.win = NSP_MAX_WINDOW;
+			if (u.win == 0)
+				return -EINVAL;
+			scp->max_window = u.win;
+			if (scp->snd_window > u.win)
+				scp->snd_window = u.win;
+			break;
+
+		case DSO_NODELAY:
+			if (optlen != sizeof(int))
+				return -EINVAL;
+			if (scp->nonagle == 2)
+				return -EINVAL;
+			scp->nonagle = (u.val == 0) ? 0 : 1;
+			/* if (scp->nonagle == 1) { Push pending frames } */
+			break;
+
+		case DSO_CORK:
+			if (optlen != sizeof(int))
+				return -EINVAL;
+			if (scp->nonagle == 1)
+				return -EINVAL;
+			scp->nonagle = (u.val == 0) ? 0 : 2;
+			/* if (scp->nonagle == 0) { Push pending frames } */
+			break;
+
+		case DSO_SERVICES:
+			if (optlen != sizeof(unsigned char))
+				return -EINVAL;
+			if ((u.services & ~NSP_FC_MASK) != 0x01)
+				return -EINVAL;
+			if ((u.services & NSP_FC_MASK) == NSP_FC_MASK)
+				return -EINVAL;
+			scp->services_loc = u.services;
+			break;
+
+		case DSO_INFO:
+			if (optlen != sizeof(unsigned char))
+				return -EINVAL;
+			if (u.info & 0xfc)
+				return -EINVAL;
+			scp->info_loc = u.info;
+			break;
 	}
 
 	return 0;
@@ -1433,44 +1441,40 @@ static int dn_getsockopt(struct socket *sock, int level, int optname, char *optv
 static int __dn_getsockopt(struct socket *sock, int level,int optname, char *optval,int *optlen, int flags)
 {
 	struct	sock *sk = sock->sk;
-	struct dn_scp *scp = &sk->protinfo.dn;
+	struct dn_scp *scp = DN_SK(sk);
 	struct linkinfo_dn link;
-	int mode = scp->accept_mode;
+	int r_len = *optlen;
+	void *r_data = NULL;
+	int val;
 
 	switch(optname) {
 		case DSO_CONDATA:
-			if (*optlen != sizeof(struct optdata_dn))
-				return -EINVAL;
-
-			if (copy_to_user(optval, &scp->conndata_in, sizeof(struct optdata_dn)))
-				return -EFAULT;
+			if (r_len > sizeof(struct optdata_dn))
+				r_len = sizeof(struct optdata_dn);
+			r_data = &scp->conndata_in;
 			break;
 
 		case DSO_DISDATA:
-			if (*optlen != sizeof(struct optdata_dn))
-				return -EINVAL;
-
-			if (copy_to_user(optval, &scp->discdata_in, sizeof(struct optdata_dn)))
-				return -EFAULT;
-
+			if (r_len > sizeof(struct optdata_dn))
+				r_len = sizeof(struct optdata_dn);
+			r_data = &scp->discdata_in;
 			break;
 
 		case DSO_CONACCESS:
-			if (*optlen != sizeof(struct accessdata_dn))
-				return -EINVAL;
-
-			if (copy_to_user(optval, &scp->accessdata, sizeof(struct accessdata_dn)))
-				return -EFAULT;
+			if (r_len > sizeof(struct accessdata_dn))
+				r_len = sizeof(struct accessdata_dn);
+			r_data = &scp->accessdata;
 			break;
 
 		case DSO_ACCEPTMODE:
-			if (put_user(mode, optval))
-				return -EFAULT;
+			if (r_len > sizeof(unsigned char))
+				r_len = sizeof(unsigned char);
+			r_data = &scp->accept_mode;
 			break;
 
 		case DSO_LINKINFO:
-			if (*optlen != sizeof(struct linkinfo_dn))
-				return -EINVAL;
+			if (r_len > sizeof(struct linkinfo_dn))
+				r_len = sizeof(struct linkinfo_dn);
 
 			switch(sock->state) {
 				case SS_CONNECTING:
@@ -1486,10 +1490,8 @@ static int __dn_getsockopt(struct socket *sock, int level,int optname, char *opt
 					link.idn_linkstate = LL_INACTIVE;
 			}
 
-			link.idn_segsize = scp->mss;
-
-			if (copy_to_user(optval, &link, sizeof(struct linkinfo_dn)))
-				return -EFAULT;
+			link.idn_segsize = scp->segsize_rem;
+			r_data = &link;
 			break;
 
 		default:
@@ -1508,6 +1510,45 @@ static int __dn_getsockopt(struct socket *sock, int level,int optname, char *opt
 		case DSO_CONACCEPT:
 		case DSO_CONREJECT:
         		return -ENOPROTOOPT;
+
+		case DSO_MAXWINDOW:
+			if (r_len > sizeof(unsigned long))
+				r_len = sizeof(unsigned long);
+			r_data = &scp->max_window;
+			break;
+
+		case DSO_NODELAY:
+			if (r_len > sizeof(int))
+				r_len = sizeof(int);
+			val = (scp->nonagle == 1);
+			r_data = &val;
+			break;
+
+		case DSO_CORK:
+			if (r_len > sizeof(int))
+				r_len = sizeof(int);
+			val = (scp->nonagle == 2);
+			r_data = &val;
+			break;
+
+		case DSO_SERVICES:
+			if (r_len > sizeof(unsigned char))
+				r_len = sizeof(unsigned char);
+			r_data = &scp->services_rem;
+			break;
+
+		case DSO_INFO:
+			if (r_len > sizeof(unsigned char))
+				r_len = sizeof(unsigned char);
+			r_data = &scp->info_rem;
+			break;
+	}
+
+	if (r_data) {
+		if (copy_to_user(optval, r_data, r_len))
+			return -EFAULT;
+		if (put_user(r_len, optlen))
+			return -EFAULT;
 	}
 
 	return 0;
@@ -1520,7 +1561,7 @@ static int __dn_getsockopt(struct socket *sock, int level,int optname, char *opt
  */
 static int dn_wait_run(struct sock *sk, int flags)
 {
-	struct dn_scp *scp = &sk->protinfo.dn;
+	struct dn_scp *scp = DN_SK(sk);
 	int err = 0;
 
 	switch(scp->state) {
@@ -1572,7 +1613,7 @@ static int dn_data_ready(struct sock *sk, struct sk_buff_head *q, int flags, int
 		return skb_queue_len(q) ? 1 : 0;
 
 	while(skb != (struct sk_buff *)q) {
-		struct dn_skb_cb *cb = (struct dn_skb_cb *)skb->cb;
+		struct dn_skb_cb *cb = DN_SKB_CB(skb);
 		len += skb->len;
 
 		if (cb->nsp_flags & 0x40) {
@@ -1599,7 +1640,7 @@ static int dn_recvmsg(struct socket *sock, struct msghdr *msg, int size,
 	int flags, struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
-	struct dn_scp *scp = &sk->protinfo.dn;
+	struct dn_scp *scp = DN_SK(sk);
 	struct sk_buff_head *queue = &sk->receive_queue;
 	int target = size > 1 ? 1 : 0;
 	int copied = 0;
@@ -1681,7 +1722,7 @@ static int dn_recvmsg(struct socket *sock, struct msghdr *msg, int size,
 
 	for(skb = queue->next; skb != (struct sk_buff *)queue; skb = nskb) {
 		int chunk = skb->len;
-		cb = (struct dn_skb_cb *)skb->cb;
+		cb = DN_SKB_CB(skb);
 
 		if ((chunk + copied) > size)
 			chunk = size - copied;
@@ -1693,7 +1734,7 @@ static int dn_recvmsg(struct socket *sock, struct msghdr *msg, int size,
 		copied += chunk;
 
 		if (!(flags & MSG_PEEK))
-			skb->len -= chunk;
+			skb_pull(skb, chunk);
 
 		eor = cb->nsp_flags & 0x40;
 		nskb = skb->next;
@@ -1707,7 +1748,7 @@ static int dn_recvmsg(struct socket *sock, struct msghdr *msg, int size,
 			 */
 			if ((scp->flowloc_sw == DN_DONTSEND) && !dn_congested(sk)) {
 				scp->flowloc_sw = DN_SEND;
-				dn_nsp_send_lnk(sk, DN_SEND);
+				dn_nsp_send_link(sk, DN_SEND, 0);
 			}
 		}
 
@@ -1727,9 +1768,14 @@ static int dn_recvmsg(struct socket *sock, struct msghdr *msg, int size,
 
 	rv = copied;
 
-	if (eor && (sk->type == SOCK_SEQPACKET))
-		msg->msg_flags |= MSG_EOR;
+	if (!(flags & (MSG_PEEK|MSG_OOB)))
+		scp->at_eor = 0;
 
+	if (eor && (sk->type == SOCK_SEQPACKET)) {
+		msg->msg_flags |= MSG_EOR;
+		if (!(flags & (MSG_PEEK|MSG_OOB)))
+			scp->at_eor = 1;
+	}
 out:
 	if (rv == 0)
 		rv = (flags & MSG_PEEK) ? -sk->err : sock_error(sk);
@@ -1745,16 +1791,31 @@ out:
 }
 
 
+static inline int dn_queue_too_long(struct dn_scp *scp, struct sk_buff_head *queue, int flags)
+{
+	unsigned char fctype = scp->services_rem & NSP_FC_MASK;
+	if (skb_queue_len(queue) >= scp->snd_window)
+		return 1;
+	if (fctype != NSP_FC_NONE) {
+		if (flags & MSG_OOB) {
+			if (scp->flowrem_oth == 0)
+				return 1;
+		} else {
+			if (scp->flowrem_dat == 0)
+				return 1;
+		}
+	}
+	return 0;
+}
+
 static int dn_sendmsg(struct socket *sock, struct msghdr *msg, int size, 
 	   struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
-	struct dn_scp *scp = &sk->protinfo.dn;
-	int mss = scp->mss;
-	int mtu = 230 - 11; /* maximum value thats always safe */
+	struct dn_scp *scp = DN_SK(sk);
+	int mss;
 	struct sk_buff_head *queue = &scp->data_xmit_queue;
 	int flags = msg->msg_flags;
-	unsigned short numseg = 0;
 	int err = 0;
 	int sent = 0;
 	int addr_len = msg->msg_namelen;
@@ -1765,6 +1826,7 @@ static int dn_sendmsg(struct socket *sock, struct msghdr *msg, int size,
 	unsigned char *ptr;
 	unsigned short ack;
 	int len;
+	unsigned char fctype;
 
 	if (flags & ~(MSG_TRYHARD|MSG_OOB|MSG_DONTWAIT|MSG_EOR))
 		return -EOPNOTSUPP;
@@ -1801,16 +1863,19 @@ static int dn_sendmsg(struct socket *sock, struct msghdr *msg, int size,
 	if ((flags & MSG_TRYHARD) && sk->dst_cache)
 		dst_negative_advice(&sk->dst_cache);
 
+	mss = scp->segsize_rem;
+	fctype = scp->services_rem & NSP_FC_MASK;
+
 	if (sk->dst_cache && sk->dst_cache->neighbour) {
 		struct dn_neigh *dn = (struct dn_neigh *)sk->dst_cache->neighbour;
-		if (dn->blksize > 230)
-			mtu = dn->blksize - 11;
+		if (dn->blksize < (mss + 11))
+			mss = dn->blksize - 11;
 	}
 
 	/*
 	 * The only difference between SEQPACKET & STREAM sockets under DECnet
-	 * AFAIK is that SEQPACKET sockets set the MSG_EOR flag for the last
-	 * session control message segment.
+	 * is that SEQPACKET sockets set the MSG_EOR flag for the last
+	 * session control message segment. 
 	 */
 
 	if (flags & MSG_OOB) {
@@ -1821,9 +1886,6 @@ static int dn_sendmsg(struct socket *sock, struct msghdr *msg, int size,
 			goto out;
 		}
 	}
-
-	if (mss < mtu)
-		mtu = mss;
 
 	scp->persist_fxn = dn_nsp_xmit_timeout;
 
@@ -1842,14 +1904,14 @@ static int dn_sendmsg(struct socket *sock, struct msghdr *msg, int size,
 		 */
 		len = size - sent;
 
-		if (len > mtu)
-			len = mtu;
+		if (len > mss)
+			len = mss;
 
 		/*
 		 * Wait for queue size to go down below the window
 		 * size.
 		 */
-		if (skb_queue_len(queue) >= scp->snd_window) {
+		if (dn_queue_too_long(scp, queue, flags)) {
 			if (flags & MSG_DONTWAIT) {
 				err = -EWOULDBLOCK;
 				goto out;
@@ -1857,7 +1919,7 @@ static int dn_sendmsg(struct socket *sock, struct msghdr *msg, int size,
 
 			SOCK_SLEEP_PRE(sk)
 
-			if (skb_queue_len(queue) >= scp->snd_window)
+			if (dn_queue_too_long(scp, queue, flags))
 				schedule();
 
 			SOCK_SLEEP_POST(sk)
@@ -1876,7 +1938,7 @@ static int dn_sendmsg(struct socket *sock, struct msghdr *msg, int size,
 		if (!skb)
 			continue;
 
-		cb = (struct dn_skb_cb *)skb->cb;
+		cb = DN_SKB_CB(skb);
 
 		ptr = skb_put(skb, 9);
 
@@ -1886,26 +1948,34 @@ static int dn_sendmsg(struct socket *sock, struct msghdr *msg, int size,
 		}
 
 		if (flags & MSG_OOB) {
-			cb->segnum = scp->numoth++;
-			scp->numoth &= 0x0fff;
+			cb->segnum = scp->numoth;
+			seq_add(&scp->numoth, 1);
 			msgflg = 0x30;
-			ack = scp->ackxmt_oth | 0x8000;
+			ack = (scp->numoth_rcv & 0x0FFF) | 0x8000;
+			scp->ackxmt_oth = scp->numoth_rcv;
+			if (fctype != NSP_FC_NONE)
+				scp->flowrem_oth--;
 		} else {
-			cb->segnum = scp->numdat++;
-			scp->numdat &= 0x0fff;
+			cb->segnum = scp->numdat;
+			seq_add(&scp->numdat, 1);
 			msgflg = 0x00;
 			if (sock->type == SOCK_STREAM)
 				msgflg = 0x60;
-			if (scp->seg_size == 0)
+			if (scp->seg_total == 0)
 				msgflg |= 0x20;
 
-			scp->seg_size += len;
+			scp->seg_total += len;
 		
 			if (((sent + len) == size) && (flags & MSG_EOR)) {
 				msgflg |= 0x40;
-				scp->seg_size = 0;
+				scp->seg_total = 0;
+				if (fctype == NSP_FC_SCMC)
+					scp->flowrem_dat--;
 			}
-			ack = scp->ackxmt_dat | 0x8000;
+			ack = (scp->numdat_rcv & 0x0FFF) | 0x8000;
+			scp->ackxmt_dat = scp->numdat_rcv;
+			if (fctype == NSP_FC_SRC)
+				scp->flowrem_dat--;
 		}
 
 		*ptr++ = msgflg;
@@ -1918,8 +1988,7 @@ static int dn_sendmsg(struct socket *sock, struct msghdr *msg, int size,
 		*(__u16 *)ptr = dn_htons(cb->segnum);
 
 		sent += len;
-		dn_nsp_queue_xmit(sk, skb, flags & MSG_OOB);
-		numseg++;
+		dn_nsp_queue_xmit(sk, skb, sk->allocation, flags & MSG_OOB);
 		skb = NULL;
 
 		scp->persist = dn_nsp_persist(sk);
@@ -1955,20 +2024,37 @@ static int dn_device_event(struct notifier_block *this, unsigned long event,
 }
 
 static struct notifier_block dn_dev_notifier = {
-	dn_device_event,
-	0
+	notifier_call:	dn_device_event,
 };
 
 extern int dn_route_rcv(struct sk_buff *, struct net_device *, struct packet_type *);
 
-static struct packet_type dn_dix_packet_type = 
-{
-	__constant_htons(ETH_P_DNA_RT),
-	NULL,		/* All devices */
-	dn_route_rcv,
-	(void*)1,
-	NULL,
+static struct packet_type dn_dix_packet_type = {
+	type:		__constant_htons(ETH_P_DNA_RT),
+	dev:		NULL,		/* All devices */
+	func:		dn_route_rcv,
+	data:		(void*)1,
 };
+
+#define IS_NOT_PRINTABLE(x) ((x) < 32 || (x) > 126)
+
+static void dn_printable_object(struct sockaddr_dn *dn, unsigned char *buf)
+{
+	int i;
+    
+	switch (dn->sdn_objnamel) {
+		case 0:
+			sprintf(buf, "%d", dn->sdn_objnum);
+			break;
+		default:
+			for (i = 0; i < dn->sdn_objnamel; i++) {
+				buf[i] = dn->sdn_objname[i];
+				if (IS_NOT_PRINTABLE(buf[i]))
+					buf[i] = '.';
+			}
+			buf[i] = 0;
+    	}
+}
 
 static int dn_get_info(char *buffer, char **start, off_t offset, int length)
 {
@@ -1979,15 +2065,20 @@ static int dn_get_info(char *buffer, char **start, off_t offset, int length)
 	off_t begin = 0;
 	char buf1[DN_ASCBUF_LEN];
 	char buf2[DN_ASCBUF_LEN];
+	char local_object[DN_MAXOBJL+3];
+	char remote_object[DN_MAXOBJL+3];
 
-	len += sprintf(buffer + len, "Local                             Remote\n");
+	len += sprintf(buffer + len, "Local                                              Remote\n");
 
 	read_lock(&dn_hash_lock);
 	for(sk = dn_sklist; sk != NULL; sk = sk->next) {
-		scp = &sk->protinfo.dn;
+		scp = DN_SK(sk);
+
+		dn_printable_object(&scp->addr, local_object);
+		dn_printable_object(&scp->peer, remote_object);
 
 		len += sprintf(buffer + len,
-				"%6s/%04X %04d:%04d %04d:%04d %01d %6s/%04X %04d:%04d %04d:%04d %01d %4s %s\n",
+				"%6s/%04X %04d:%04d %04d:%04d %01d %-16s %6s/%04X %04d:%04d %04d:%04d %01d %-16s %4s %s\n",
 				dn_addr2asc(dn_ntohs(dn_saddr2dn(&scp->addr)), buf1),
 				scp->addrloc,
 				scp->numdat,
@@ -1995,6 +2086,7 @@ static int dn_get_info(char *buffer, char **start, off_t offset, int length)
 				scp->ackxmt_dat,
 				scp->ackxmt_oth,
 				scp->flowloc_sw,
+				local_object,
 				dn_addr2asc(dn_ntohs(dn_saddr2dn(&scp->peer)), buf2),
 				scp->addrrem,
 				scp->numdat_rcv,
@@ -2002,6 +2094,7 @@ static int dn_get_info(char *buffer, char **start, off_t offset, int length)
 				scp->ackrcv_dat,
 				scp->ackrcv_oth,
 				scp->flowrem_sw,
+				remote_object,
 				dn_state2asc(scp->state),
 				((scp->accept_mode == ACC_IMMED) ? "IMMED" : "DEFER"));
 
@@ -2026,8 +2119,8 @@ static int dn_get_info(char *buffer, char **start, off_t offset, int length)
 
 
 static struct net_proto_family	dn_family_ops = {
-	AF_DECnet,
-	dn_create
+	family:		AF_DECnet,
+	create:		dn_create,
 };
 
 static struct proto_ops dn_proto_ops = {
@@ -2067,6 +2160,7 @@ MODULE_PARM(addr, "2i");
 MODULE_PARM_DESC(addr, "The DECnet address of this machine: area,node");
 #endif
 
+static char banner[] __initdata = KERN_INFO "NET4: DECnet for Linux: V.2.4.0-test12s (C) 1995-2000 Linux DECnet Project Team\n";
 
 static int __init decnet_init(void)
 {
@@ -2085,7 +2179,7 @@ static int __init decnet_init(void)
 	dn_dn2eth(decnet_ether_address, dn_ntohs(decnet_address));
 #endif
 
-        printk(KERN_INFO "NET4: DECnet for Linux: V.2.4.0-test10s (C) 1995-2000 Linux DECnet Project Team\n");
+        printk(banner);
 
 	sock_register(&dn_family_ops);
 	dev_add_pack(&dn_dix_packet_type);

@@ -33,6 +33,9 @@
  *              Steve Whitehouse : Real SMP at last :-) Also new netfilter
  *                                 stuff. Look out raw sockets your days
  *                                 are numbered!
+ *              Steve Whitehouse : Added return-to-sender functions. Added
+ *                                 backlog congestion level return codes.
+ *                                 
  */
 
 /******************************************************************************
@@ -109,17 +112,16 @@ static struct timer_list dn_rt_flush_timer = { function: dn_run_flush };
 int decnet_dst_gc_interval = 2;
 
 static struct dst_ops dn_dst_ops = {
-	PF_DECnet,
-	__constant_htons(ETH_P_DNA_RT),
-	128,
-	dn_dst_gc,
-	dn_dst_check,
-	dn_dst_reroute,
-	NULL,
-	dn_dst_negative_advice,
-	dn_dst_link_failure,
-	sizeof(struct dn_route),
-	ATOMIC_INIT(0)
+	family:			PF_DECnet,
+	protocol:		__constant_htons(ETH_P_DNA_RT),
+	gc_thresh:		128,
+	gc:			dn_dst_gc,
+	check:			dn_dst_check,
+	reroute:		dn_dst_reroute,
+	negative_advice:	dn_dst_negative_advice,
+	link_failure:		dn_dst_link_failure,
+	entry_size:		sizeof(struct dn_route),
+	entries:		ATOMIC_INIT(0),
 };
 
 static __inline__ unsigned dn_hash(unsigned short src, unsigned short dst)
@@ -294,21 +296,131 @@ void dn_rt_cache_flush(int delay)
 	spin_unlock_bh(&dn_rt_flush_lock);
 }
 
+/**
+ * dn_return_short - Return a short packet to its sender
+ * @skb: The packet to return
+ *
+ */
+static int dn_return_short(struct sk_buff *skb)
+{
+	struct dn_skb_cb *cb;
+	unsigned char *ptr;
+	dn_address *src;
+	dn_address *dst;
+	dn_address tmp;
 
+	/* Add back headers */
+	skb_push(skb, skb->data - skb->nh.raw);
+
+	if ((skb = skb_unshare(skb, GFP_ATOMIC)) == NULL)
+		return NET_RX_DROP;
+
+	cb = DN_SKB_CB(skb);
+	/* Skip packet length and point to flags */
+	ptr = skb->data + 2;
+	*ptr++ = (cb->rt_flags & ~DN_RT_F_RQR) | DN_RT_F_RTS;
+
+	dst = (dn_address *)ptr;
+	ptr += 2;
+	src = (dn_address *)ptr;
+	ptr += 2;
+	*ptr = 0; /* Zero hop count */
+
+	/* Swap source and destination */
+	tmp  = *src;
+	*src = *dst;
+	*dst = tmp;
+
+	skb->pkt_type = PACKET_OUTGOING;
+	dn_rt_finish_output(skb, NULL);
+	return NET_RX_SUCCESS;
+}
+
+/**
+ * dn_return_long - Return a long packet to its sender
+ * @skb: The long format packet to return
+ *
+ */
+static int dn_return_long(struct sk_buff *skb)
+{
+	struct dn_skb_cb *cb;
+	unsigned char *ptr;
+	unsigned char *src_addr, *dst_addr;
+	unsigned char tmp[ETH_ALEN];
+
+	/* Add back all headers */
+	skb_push(skb, skb->data - skb->nh.raw);
+
+	if ((skb = skb_unshare(skb, GFP_ATOMIC)) == NULL)
+		return NET_RX_DROP;
+
+	cb = DN_SKB_CB(skb);
+	/* Ignore packet length and point to flags */
+	ptr = skb->data + 2;
+
+	/* Skip padding */
+	if (*ptr & DN_RT_F_PF) {
+		char padlen = (*ptr & ~DN_RT_F_PF);
+		ptr += padlen;
+	}
+
+	*ptr++ = (cb->rt_flags & ~DN_RT_F_RQR) | DN_RT_F_RTS;
+	ptr += 2;
+	dst_addr = ptr;
+	ptr += 8;
+	src_addr = ptr;
+	ptr += 6;
+	*ptr = 0; /* Zero hop count */
+
+	/* Swap source and destination */
+	memcpy(tmp, src_addr, ETH_ALEN);
+	memcpy(src_addr, dst_addr, ETH_ALEN);
+	memcpy(dst_addr, tmp, ETH_ALEN);
+
+	skb->pkt_type = PACKET_OUTGOING;
+	dn_rt_finish_output(skb, tmp);
+	return NET_RX_SUCCESS;
+}
+
+/**
+ * dn_route_rx_packet - Try and find a route for an incoming packet
+ * @skb: The packet to find a route for
+ *
+ * Returns: result of input function if route is found, error code otherwise
+ */
 static int dn_route_rx_packet(struct sk_buff *skb)
 {
+	struct dn_skb_cb *cb = DN_SKB_CB(skb);
 	int err;
 
 	if ((err = dn_route_input(skb)) == 0)
 		return skb->dst->input(skb);
 
+	if (decnet_debug_level & 4) {
+		char *devname = skb->dev ? skb->dev->name : "???";
+		struct dn_skb_cb *cb = DN_SKB_CB(skb);
+		printk(KERN_DEBUG
+			"DECnet: dn_route_rx_packet: rt_flags=0x%02x dev=%s len=%d src=0x%04hx dst=0x%04hx err=%d type=%d\n",
+			(int)cb->rt_flags, devname, skb->len, cb->src, cb->dst, 
+			err, skb->pkt_type);
+	}
+
+	if ((skb->pkt_type == PACKET_HOST) && (cb->rt_flags & DN_RT_F_RQR)) {
+		switch(cb->rt_flags & DN_RT_PKT_MSK) {
+			case DN_RT_PKT_SHORT:
+				return dn_return_short(skb);
+			case DN_RT_PKT_LONG:
+				return dn_return_long(skb);
+		}
+	}
+
 	kfree_skb(skb);
-	return err;
+	return NET_RX_DROP;
 }
 
 static int dn_route_rx_long(struct sk_buff *skb)
 {
-	struct dn_skb_cb *cb = (struct dn_skb_cb *)skb->cb;
+	struct dn_skb_cb *cb = DN_SKB_CB(skb);
 	unsigned char *ptr = skb->data;
 
 	if (skb->len < 21) /* 20 for long header, 1 for shortest nsp */
@@ -339,14 +451,14 @@ static int dn_route_rx_long(struct sk_buff *skb)
 
 drop_it:
 	kfree_skb(skb);
-	return 0;
+	return NET_RX_DROP;
 }
 
 
 
 static int dn_route_rx_short(struct sk_buff *skb)
 {
-	struct dn_skb_cb *cb = (struct dn_skb_cb *)skb->cb;
+	struct dn_skb_cb *cb = DN_SKB_CB(skb);
 	unsigned char *ptr = skb->data;
 
 	if (skb->len < 6) /* 5 for short header + 1 for shortest nsp */
@@ -365,29 +477,33 @@ static int dn_route_rx_short(struct sk_buff *skb)
 
 drop_it:
         kfree_skb(skb);
-        return 0;
+        return NET_RX_DROP;
 }
 
 static int dn_route_discard(struct sk_buff *skb)
 {
+	/*
+	 * I know we drop the packet here, but thats considered success in
+	 * this case
+	 */
 	kfree_skb(skb);
-	return 0;
+	return NET_RX_SUCCESS;
 }
 
 static int dn_route_ptp_hello(struct sk_buff *skb)
 {
 	dn_dev_hello(skb);
 	dn_neigh_pointopoint_hello(skb);
-	return 0;
+	return NET_RX_SUCCESS;
 }
 
 int dn_route_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 {
 	struct dn_skb_cb *cb;
 	unsigned char flags = 0;
-	int padlen = 0;
 	__u16 len = dn_ntohs(*(__u16 *)skb->data);
 	struct dn_dev *dn = (struct dn_dev *)dev->dn_ptr;
+	unsigned char padlen = 0;
 
 	if (dn == NULL)
 		goto dump_it;
@@ -404,7 +520,7 @@ int dn_route_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type
 
 	flags = *skb->data;
 
-	cb = (struct dn_skb_cb *)skb->cb;
+	cb = DN_SKB_CB(skb);
 	cb->stamp = jiffies;
 	cb->iif = dev->ifindex;
 
@@ -448,20 +564,16 @@ int dn_route_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type
 
 		switch(flags & DN_RT_CNTL_MSK) {
                 	case DN_RT_PKT_HELO:
-				NF_HOOK(PF_DECnet, NF_DN_HELLO, skb, skb->dev, NULL, dn_route_ptp_hello);
-				goto out;
+				return NF_HOOK(PF_DECnet, NF_DN_HELLO, skb, skb->dev, NULL, dn_route_ptp_hello);
 
                 	case DN_RT_PKT_L1RT:
                 	case DN_RT_PKT_L2RT:
-                                NF_HOOK(PF_DECnet, NF_DN_ROUTE, skb, skb->dev, NULL, dn_route_discard);
-                      		goto out;
+                                return NF_HOOK(PF_DECnet, NF_DN_ROUTE, skb, skb->dev, NULL, dn_route_discard);
                 	case DN_RT_PKT_ERTH:
-				NF_HOOK(PF_DECnet, NF_DN_HELLO, skb, skb->dev, NULL, dn_neigh_router_hello);
-                        	goto out;
+				return NF_HOOK(PF_DECnet, NF_DN_HELLO, skb, skb->dev, NULL, dn_neigh_router_hello);
 
                 	case DN_RT_PKT_EEDH:
-				NF_HOOK(PF_DECnet, NF_DN_HELLO, skb, skb->dev, NULL, dn_neigh_endnode_hello);
-                        	goto out;
+				return NF_HOOK(PF_DECnet, NF_DN_HELLO, skb, skb->dev, NULL, dn_neigh_endnode_hello);
                 }
         } else {
 		if (dn->parms.state != DN_DEV_S_RU)
@@ -480,7 +592,7 @@ int dn_route_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type
 dump_it:
 	kfree_skb(skb);
 out:
-	return 0;
+	return NET_RX_DROP;
 }
 
 static int dn_output(struct sk_buff *skb)
@@ -488,7 +600,7 @@ static int dn_output(struct sk_buff *skb)
 	struct dst_entry *dst = skb->dst;
 	struct dn_route *rt = (struct dn_route *)dst;
 	struct net_device *dev = dst->dev;
-	struct dn_skb_cb *cb = (struct dn_skb_cb *)skb->cb;
+	struct dn_skb_cb *cb = DN_SKB_CB(skb);
 	struct neighbour *neigh;
 
 	int err = -EINVAL;
@@ -524,7 +636,7 @@ error:
 #ifdef CONFIG_DECNET_ROUTER
 static int dn_forward(struct sk_buff *skb)
 {
-	struct dn_skb_cb *cb = (struct dn_skb_cb *)skb->cb;
+	struct dn_skb_cb *cb = DN_SKB_CB(skb);
 	struct dst_entry *dst = skb->dst;
 	struct net_device *dev = skb->dev;
 	struct neighbour *neigh;
@@ -536,7 +648,7 @@ static int dn_forward(struct sk_buff *skb)
 	/*
 	 * Hop count exceeded.
 	 */
-	err = 0;
+	err = NET_RX_DROP;
 	if (++cb->hops > 30)
 		goto drop;
 
@@ -573,7 +685,7 @@ drop:
 static int dn_blackhole(struct sk_buff *skb)
 {
 	kfree_skb(skb);
-	return 0;
+	return NET_RX_DROP;
 }
 
 /*
@@ -583,7 +695,7 @@ static int dn_blackhole(struct sk_buff *skb)
 static int dn_rt_bug(struct sk_buff *skb)
 {
 	if (net_ratelimit()) {
-		struct dn_skb_cb *cb = (struct dn_skb_cb *)skb->cb;
+		struct dn_skb_cb *cb = DN_SKB_CB(skb);
 
 		printk(KERN_DEBUG "dn_rt_bug: skb from:%04x to:%04x\n",
 				cb->src, cb->dst);
@@ -591,7 +703,7 @@ static int dn_rt_bug(struct sk_buff *skb)
 
 	kfree_skb(skb);
 
-	return -EINVAL;
+	return NET_RX_BAD;
 }
 
 static int dn_route_output_slow(struct dst_entry **pprt, dn_address dst, dn_address src, int flags)
@@ -732,7 +844,7 @@ int dn_route_output(struct dst_entry **pprt, dn_address dst, dn_address src, int
 static int dn_route_input_slow(struct sk_buff *skb)
 {
 	struct dn_route *rt = NULL;
-	struct dn_skb_cb *cb = (struct dn_skb_cb *)skb->cb;
+	struct dn_skb_cb *cb = DN_SKB_CB(skb);
 	struct net_device *dev = skb->dev;
 	struct dn_dev *dn_db;
 	struct neighbour *neigh = NULL;
@@ -880,7 +992,7 @@ add_entry:
 int dn_route_input(struct sk_buff *skb)
 {
 	struct dn_route *rt;
-	struct dn_skb_cb *cb = (struct dn_skb_cb *)skb->cb;
+	struct dn_skb_cb *cb = DN_SKB_CB(skb);
 	unsigned hash = dn_hash(cb->src, cb->dst);
 
 	if (skb->dst)
@@ -964,7 +1076,7 @@ int dn_cache_getroute(struct sk_buff *in_skb, struct nlmsghdr *nlh, void *arg)
 	if (skb == NULL)
 		return -ENOBUFS;
 	skb->mac.raw = skb->data;
-	cb = (struct dn_skb_cb *)skb->cb;
+	cb = DN_SKB_CB(skb);
 
 	if (rta[RTA_SRC-1])
 		memcpy(&src, RTA_DATA(rta[RTA_SRC-1]), 2);
@@ -1185,8 +1297,6 @@ void __exit dn_route_cleanup(void)
 	del_timer(&dn_route_timer);
 	dn_run_flush(0);
 
-#ifdef CONFIG_PROC_FS
 	proc_net_remove("decnet_cache");
-#endif /* CONFIG_PROC_FS */
 }
 

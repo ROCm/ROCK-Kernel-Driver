@@ -37,11 +37,20 @@ if [ "$CONFIG_IP_NF_IPTABLES" != "n" ]; then
   fi
 
   if [ "$CONFIG_IP_NF_CONNTRACK" != "n" ]; then
-    dep_tristate '  Full NAT' CONFIG_IP_NF_NAT $CONFIG_IP_NF_IPTABLES 
+    dep_tristate '  Full NAT' CONFIG_IP_NF_NAT $CONFIG_IP_NF_IPTABLES $CONFIG_IP_NF_CONNTRACK
     if [ "$CONFIG_IP_NF_NAT" != "n" ]; then
       define_bool CONFIG_IP_NF_NAT_NEEDED y
       dep_tristate '    MASQUERADE target support' CONFIG_IP_NF_TARGET_MASQUERADE $CONFIG_IP_NF_NAT
       dep_tristate '    REDIRECT target support' CONFIG_IP_NF_TARGET_REDIRECT $CONFIG_IP_NF_NAT
+      # If they want FTP, set to $CONFIG_IP_NF_NAT (m or y), 
+      # or $CONFIG_IP_NF_FTP (m or y), whichever is weaker.  Argh.
+      if [ "$CONFIG_IP_NF_FTP" = "m" ]; then
+        define_tristate CONFIG_IP_NF_NAT_FTP m
+      else
+        if [ "$CONFIG_IP_NF_FTP" = "y" ]; then
+          define_tristate CONFIG_IP_NF_NAT_FTP $CONFIG_IP_NF_NAT
+        fi
+      fi
     fi
   fi
 

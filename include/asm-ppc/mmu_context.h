@@ -56,13 +56,6 @@ extern void mmu_context_overflow(void);
  */
 extern void set_context(int context, void *pgd);
 
-#ifdef CONFIG_8xx
-extern inline void mmu_context_overflow(void)
-{
-	atomic_set(&next_mmu_context, -1);
-}
-#endif
-
 /*
  * Get a new mmu context for task tsk if necessary.
  */

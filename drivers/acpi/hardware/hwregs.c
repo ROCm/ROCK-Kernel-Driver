@@ -3,12 +3,12 @@
  *
  * Module Name: hwregs - Read/write access functions for the various ACPI
  *                       control and status registers.
- *              $Revision: 86 $
+ *              $Revision: 87 $
  *
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -185,9 +185,9 @@ acpi_hw_obtain_sleep_type_register_data (
 	}
 
 	else if (((obj_desc->package.elements[0])->common.type !=
-			 ACPI_TYPE_NUMBER) ||
+			 ACPI_TYPE_INTEGER) ||
 			 ((obj_desc->package.elements[1])->common.type !=
-				ACPI_TYPE_NUMBER))
+				ACPI_TYPE_INTEGER))
 	{
 		/* Must have two  */
 
@@ -199,9 +199,9 @@ acpi_hw_obtain_sleep_type_register_data (
 		/*
 		 *  Valid _Sx_ package size, type, and value
 		 */
-		*slp_typ_a = (u8) (obj_desc->package.elements[0])->number.value;
+		*slp_typ_a = (u8) (obj_desc->package.elements[0])->integer.value;
 
-		*slp_typ_b = (u8) (obj_desc->package.elements[1])->number.value;
+		*slp_typ_b = (u8) (obj_desc->package.elements[1])->integer.value;
 	}
 
 

@@ -149,6 +149,8 @@ __start:
 	mr	r28,r6
 	mr	r27,r7
 	li	r24,0			/* cpu # */
+	/* N.B. prom_init clears the BSS even if it doesn't do
+	 * anything else -- paulus. */
 	bl	prom_init
 
 #ifdef CONFIG_APUS
@@ -159,7 +161,6 @@ __start:
 	bl	fix_mem_constants
 #endif /* CONFIG_APUS */
 
-#ifndef CONFIG_GEMINI
 /* Switch MMU off, clear BATs and flush TLB. At this point, r3 contains
  * the physical address we are running at, returned by prom_init()
  */
@@ -167,7 +168,6 @@ __start:
 __after_mmu_off:
 	bl	clear_bats
 	bl	flush_tlbs
-#endif
 
 #ifndef CONFIG_POWER4
 	/* POWER4 doesn't have BATs */
@@ -290,6 +290,7 @@ label:						\
 	addi	r3,r1,STACK_FRAME_OVERHEAD;	\
 	li	r20,MSR_KERNEL;			\
 	bl	transfer_to_handler; 		\
+i##n:						\
 	.long	hdlr;				\
 	.long	ret_from_except
 
@@ -301,17 +302,13 @@ label:						\
 	addi	r3,r1,STACK_FRAME_OVERHEAD;	\
 	li	r20,MSR_KERNEL;			\
 	bl	transfer_to_handler; 		\
+i##n:						\
 	.long	hdlr;				\
 	.long	ret_from_except
 
 /* System reset */
-#ifdef CONFIG_SMP /* MVME/MTX and gemini start the secondary here */
-#ifdef CONFIG_GEMINI
-	. = 0x100
-	b	__secondary_start_gemini
-#else /* CONFIG_GEMINI */
+#ifdef CONFIG_SMP /* MVME/MTX start the secondary here */
 	STD_EXCEPTION(0x100, Reset, __secondary_start_psurge)
-#endif /* CONFIG_GEMINI */
 #else
 	STD_EXCEPTION(0x100, Reset, UnknownException)
 #endif
@@ -344,6 +341,7 @@ DataAccess:
 	li	r20,MSR_KERNEL
 	rlwimi	r20,r23,0,16,16		/* copy EE bit from saved MSR */
 	bl	transfer_to_handler
+i0x300:
 	.long	do_page_fault
 	.long	ret_from_except
 
@@ -384,6 +382,7 @@ InstructionAccess:
 	li	r20,MSR_KERNEL
 	rlwimi	r20,r23,0,16,16		/* copy EE bit from saved MSR */
 	bl	transfer_to_handler
+i0x400:
 	.long	do_page_fault
 	.long	ret_from_except
 
@@ -429,6 +428,7 @@ Alignment:
 	li	r20,MSR_KERNEL
 	rlwimi	r20,r23,0,16,16		/* copy EE bit from saved MSR */
 	bl	transfer_to_handler
+i0x600:
 	.long	AlignmentException
 	.long	ret_from_except
 
@@ -441,6 +441,7 @@ ProgramCheck:
 	li	r20,MSR_KERNEL
 	rlwimi	r20,r23,0,16,16		/* copy EE bit from saved MSR */
 	bl	transfer_to_handler
+i0x700:
 	.long	ProgramCheckException
 	.long	ret_from_except
 
@@ -452,6 +453,7 @@ FPUnavailable:
 	bne	load_up_fpu		/* if from user, just load it up */
 	li	r20,MSR_KERNEL
 	bl	transfer_to_handler	/* if from kernel, take a trap */
+i0x800:
 	.long	KernelFP
 	.long	ret_from_except
 
@@ -575,7 +577,7 @@ InstructionAddressInvalid:
 	mfmsr	r0		/* Restore "normal" registers */
 	xoris	r0,r0,MSR_TGPR>>16
 	mtcrf	0x80,r3		/* Restore CR0 */
-	sync			/* Some chip revs have problems here... */
+	SYNC			/* Some chip revs have problems here... */
 	mtmsr	r0
 	b	InstructionAccess
 
@@ -646,7 +648,7 @@ DataAddressInvalid:
 	mfmsr	r0		/* Restore "normal" registers */
 	xoris	r0,r0,MSR_TGPR>>16
 	mtcrf	0x80,r3		/* Restore CR0 */
-	sync			/* Some chip revs have problems here... */
+	SYNC			/* Some chip revs have problems here... */
 	mtmsr	r0
 	b	DataAccess
 	
@@ -843,7 +845,7 @@ load_up_fpu:
 #endif /* CONFIG_PPC64BRIDGE */
 	SYNC
 	MTMSRD(r5)			/* enable use of fpu now */
-	SYNC
+	isync
 /*
  * For SMP, we don't do lazy FPU switching because it just gets too
  * horrendously complex, especially when a task switches from one CPU
@@ -929,7 +931,7 @@ load_up_altivec:
 	oris	r5,r5,MSR_VEC@h
 	SYNC
 	mtmsr	r5			/* enable use of AltiVec now */
-	SYNC
+	isync
 /*
  * For SMP, we don't do lazy AltiVec switching because it just gets too
  * horrendously complex, especially when a task switches from one CPU
@@ -1023,7 +1025,7 @@ giveup_altivec:
 	oris	r5,r5,MSR_VEC@h
 	SYNC
 	mtmsr	r5			/* enable use of AltiVec now */
-	SYNC
+	isync
 	cmpi	0,r3,0
 	beqlr-				/* if no previous owner, done */
 	addi	r3,r3,THREAD		/* want THREAD of task */
@@ -1064,7 +1066,7 @@ giveup_fpu:
 	ori	r5,r5,MSR_FP
 	SYNC
 	mtmsr	r5			/* enable use of fpu now */
-	SYNC
+	isync
 	cmpi	0,r3,0
 	beqlr-				/* if no previous owner, done */
 	addi	r3,r3,THREAD	        /* want THREAD of task */
@@ -1163,6 +1165,7 @@ fix_mem_constants:
 	icbi	r0,r14			 /* flush the icache line */
 	cmpw	r12,r13
 	bne     1b
+	isync
 
 /*
  * Map the memory where the exception handlers will
@@ -1208,9 +1211,9 @@ apus_interrupt_entry:
 	
 	mfmsr	20
 	xori	r20,r20,MSR_DR
-	sync
+	SYNC
 	mtmsr	r20
-	sync
+	isync
 
 	lis	r4,APUS_IPL_EMU@h
 
@@ -1243,9 +1246,9 @@ apus_interrupt_entry:
 	
 	mfmsr	r20
 	xori	r20,r20,MSR_DR
-	sync
+	SYNC
 	mtmsr	r20
-	sync
+	isync
 
 	stw	r3,(_CCR+4)(r21);
 
@@ -1263,28 +1266,24 @@ apus_interrupt_entry:
 #endif /* CONFIG_APUS */
 
 #ifdef CONFIG_SMP
-#ifdef CONFIG_GEMINI
-	.globl	__secondary_start_gemini
-__secondary_start_gemini:
-        mfspr   r4,HID0
-        ori     r4,r4,HID0_ICFI
-        li      r3,0
-        ori     r3,r3,HID0_ICE
-        andc    r4,r4,r3
-        mtspr   HID0,r4
-        sync
-        bl      prom_init
-        b       __secondary_start
-#endif /* CONFIG_GEMINI */
-	
 	.globl	__secondary_start_psurge
 __secondary_start_psurge:
 	li	r24,1			/* cpu # */
+	b	__secondary_start_psurge99
+	.globl	__secondary_start_psurge2
+__secondary_start_psurge2:
+	li	r24,2			/* cpu # */
+	b	__secondary_start_psurge99
+	.globl	__secondary_start_psurge3
+__secondary_start_psurge3:
+	li	r24,3			/* cpu # */
+	b	__secondary_start_psurge99
+__secondary_start_psurge99:
 	/* we come in here with IR=0 and DR=1, and DBAT 0
 	   set to map the 0xf0000000 - 0xffffffff region */
 	mfmsr	r0
 	rlwinm	r0,r0,0,28,26		/* clear DR (0x10) */
-	sync
+	SYNC
 	mtmsr	r0
 	isync
 
@@ -1293,7 +1292,7 @@ __secondary_start:
 #ifdef CONFIG_PPC64BRIDGE
 	mfmsr	r0
 	clrldi	r0,r0,1		/* make sure it's in 32-bit mode */
-	sync
+	SYNC
 	MTMSRD(r0)
 	isync
 #else
@@ -1445,21 +1444,6 @@ start_here:
 	li	r3,0
 	mtspr	SPRG2,r3	/* 0 => r1 has kernel sp */
 
-	/* Clear out the BSS */
-	lis	r11,_end@ha
-	addi	r11,r11,_end@l
-	lis	r8,__bss_start@ha
-	addi	r8,r8,__bss_start@l
-	subf	r11,r8,r11
-	addi	r11,r11,3
-	rlwinm.	r11,r11,30,2,31
-	beq	2f
-	addi	r8,r8,-4
-	mtctr	r11
-	li	r0,0
-3:	stwu	r0,4(r8)
-	bdnz	3b
-2:
 	/* stack */
 	addi	r1,r2,TASK_UNION_SIZE
 	li	r0,0
@@ -1504,7 +1488,7 @@ start_here:
 	RFI
 /* Load up the kernel context */
 2:
-	SYNC			/* Force all PTE updates to finish */
+	sync			/* Force all PTE updates to finish */
 	tlbia			/* Clear all TLB entries */
 	sync			/* wait for tlbia/tlbie to finish */
 #ifdef CONFIG_SMP
@@ -1552,7 +1536,6 @@ _GLOBAL(set_context)
  *  -- Cort 
  */
 clear_bats:
-#if !defined(CONFIG_GEMINI)
 	li	r20,0
 	mfspr	r9,PVR
 	rlwinm	r9,r9,16,16,31		/* r9 = 1 for 601, 4 for 604 */
@@ -1576,10 +1559,8 @@ clear_bats:
 	mtspr	IBAT2L,r20
 	mtspr	IBAT3U,r20
 	mtspr	IBAT3L,r20
-#endif /* !defined(CONFIG_GEMINI) */
 	blr
 
-#ifndef CONFIG_GEMINI
 flush_tlbs:
 	lis	r20, 0x40
 1:	addic.	r20, r20, -0x1000
@@ -1598,7 +1579,6 @@ mmu_off:
 	mtspr	SRR1,r3
 	sync
 	RFI
-#endif
 
 #ifndef CONFIG_POWER4	
 /*
@@ -1745,3 +1725,12 @@ swapper_pg_dir:
 	.globl	cmd_line
 cmd_line:
 	.space	512
+
+	.globl intercept_table
+intercept_table:
+	.long 0, i0x100, i0x200, i0x300, i0x400, 0, i0x600, i0x700
+	.long i0x800, 0, 0, 0, 0, i0xd00, 0, 0
+	.long 0, 0, 0, i0x1300, 0, 0, 0, 0
+	.long 0, 0, 0, 0, 0, 0, 0, 0
+	.long 0, 0, 0, 0, 0, 0, 0, 0
+	.long 0, 0, 0, 0, 0, 0, 0, 0

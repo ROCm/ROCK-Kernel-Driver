@@ -4,7 +4,7 @@
  *	Authors:
  *	Lennert Buytenhek		<buytenh@gnu.org>
  *
- *	$Id: br_private.h,v 1.3 2000/05/05 02:17:17 davem Exp $
+ *	$Id: br_private.h,v 1.4 2001/01/19 04:51:48 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -112,8 +112,8 @@ struct net_bridge
 	int				gc_interval;
 };
 
-struct notifier_block br_device_notifier;
-unsigned char bridge_ula[6];
+extern struct notifier_block br_device_notifier;
+extern unsigned char bridge_ula[6];
 
 /* br.c */
 void br_dec_use_count(void);

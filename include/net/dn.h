@@ -9,6 +9,8 @@ typedef unsigned short dn_address;
 #define dn_ntohs(x) le16_to_cpu((unsigned short)(x))
 #define dn_htons(x) cpu_to_le16((unsigned short)(x))
 
+#define DN_SK(sk) (&sk->protinfo.dn)
+
 struct dn_scp                                   /* Session Control Port */
 {
         unsigned char           state;
@@ -44,9 +46,23 @@ struct dn_scp                                   /* Session Control Port */
 #define DN_SEND         2
 #define DN_DONTSEND     1
 #define DN_NOCHANGE     0
+	unsigned short		flowrem_dat;
+	unsigned short		flowrem_oth;
+	unsigned short		flowloc_dat;
+	unsigned short		flowloc_oth;
+	unsigned char		services_rem;
+	unsigned char		services_loc;
+	unsigned char		info_rem;
+	unsigned char		info_loc;
+
+	unsigned short		segsize_rem;
+	unsigned short		segsize_loc;
+
+	unsigned char           at_eor;
+	unsigned char		nonagle;
+	unsigned char		multi_ireq;
 	unsigned char		accept_mode;
-	unsigned short          mss;
-	unsigned long		seg_size; /* Running total of current segment */
+	unsigned long		seg_total; /* Running total of current segment */
 
 	struct optdata_dn     conndata_in;
 	struct optdata_dn     conndata_out;
@@ -80,7 +96,8 @@ struct dn_scp                                   /* Session Control Port */
 	 *               multipliers.
 	 */
 #define NSP_MIN_WINDOW 1
-#define NSP_MAX_WINDOW 512
+#define NSP_MAX_WINDOW (0x07fe)
+	unsigned long max_window;
 	unsigned long snd_window;
 #define NSP_INITIAL_SRTT (HZ)
 	unsigned long nsp_srtt;
@@ -116,6 +133,7 @@ struct dn_scp                                   /* Session Control Port */
 	struct timer_list delack_timer;
 	int delack_pending;
 	void (*delack_fxn)(struct sock *sk);
+
 };
 
 /*
@@ -128,7 +146,7 @@ struct dn_scp                                   /* Session Control Port */
  * segsize : Size of segment
  * segnum : Number, for data, otherdata and linkservice
  * xmit_count : Number of times we've transmitted this skb
- * stamp : Time stamp of first transmission, used in RTT calculations
+ * stamp : Time stamp of most recent transmission, used in RTT calculations
  * iif: Input interface number
  *
  * As a general policy, this structure keeps all addresses in network
@@ -136,6 +154,7 @@ struct dn_scp                                   /* Session Control Port */
  * and src_port are in network order. All else is in host order.
  * 
  */
+#define DN_SKB_CB(skb) ((struct dn_skb_cb *)(skb)->cb)
 struct dn_skb_cb {
 	unsigned short dst;
 	unsigned short src;

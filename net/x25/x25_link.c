@@ -21,7 +21,6 @@
  */
 
 #include <linux/config.h>
-#if defined(CONFIG_X25) || defined(CONFIG_X25_MODULE)
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>
@@ -42,9 +41,10 @@
 #include <linux/fcntl.h>
 #include <linux/mm.h>
 #include <linux/interrupt.h>
+#include <linux/init.h>
 #include <net/x25.h>
 
-static struct x25_neigh *x25_neigh_list = NULL;
+static struct x25_neigh *x25_neigh_list /* = NULL initially */;
 
 static void x25_t20timer_expiry(unsigned long);
 
@@ -422,12 +422,11 @@ int x25_subscr_ioctl(unsigned int cmd, void *arg)
 	return 0;
 }
 
-#ifdef MODULE
 
 /*
  *	Release all memory associated with X.25 neighbour structures.
  */
-void x25_link_free(void)
+void __exit x25_link_free(void)
 {
 	struct x25_neigh *neigh, *x25_neigh = x25_neigh_list;
 
@@ -438,7 +437,3 @@ void x25_link_free(void)
 		x25_remove_neigh(neigh);
 	}
 }
-
-#endif
-
-#endif

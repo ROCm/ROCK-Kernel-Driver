@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: amconfig - Namespace reconfiguration (Load/Unload opcodes)
- *              $Revision: 26 $
+ *              $Revision: 29 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -73,7 +73,8 @@ acpi_aml_exec_load_table (
 	table_header.length = 0;
 	for (i = 0; i < sizeof (ACPI_TABLE_HEADER); i++) {
 		status = acpi_ev_address_space_dispatch (rgn_desc, ADDRESS_SPACE_READ,
-				  i, 8, (u32 *) ((u8 *) &table_header + i));
+				   (ACPI_PHYSICAL_ADDRESS) i, 8,
+				   (u32 *) ((u8 *) &table_header + i));
 		if (ACPI_FAILURE (status)) {
 			return (status);
 		}
@@ -96,7 +97,8 @@ acpi_aml_exec_load_table (
 
 	for (i = 0; i < table_header.length; i++) {
 		status = acpi_ev_address_space_dispatch (rgn_desc, ADDRESS_SPACE_READ,
-				  i, 8, (u32 *) (table_data_ptr + i));
+				   (ACPI_PHYSICAL_ADDRESS)i, 8,
+				   (u32 *) (table_data_ptr + i));
 		if (ACPI_FAILURE (status)) {
 			goto cleanup;
 		}

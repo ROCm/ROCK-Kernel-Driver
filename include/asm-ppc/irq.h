@@ -4,6 +4,7 @@
 
 #include <linux/config.h>
 #include <asm/machdep.h>		/* ppc_md */
+#include <asm/atomic.h>
 
 extern void disable_irq(unsigned int);
 extern void disable_irq_nosync(unsigned int);
@@ -163,9 +164,6 @@ extern irq_node_t *new_irq_node(void);
 #ifndef CONFIG_8260
 
 #define NUM_8259_INTERRUPTS	16
-#define IRQ_8259_CASCADE	16
-#define openpic_to_irq(n)	((n)+NUM_8259_INTERRUPTS)
-#define irq_to_openpic(n)	((n)-NUM_8259_INTERRUPTS)
 
 #else /* CONFIG_8260 */
 
@@ -214,7 +212,10 @@ static __inline__ int irq_cannonicalize(int irq)
 #endif
 
 #define NR_MASK_WORDS	((NR_IRQS + 31) / 32)
-extern unsigned int ppc_lost_interrupts[NR_MASK_WORDS];
+/* pendatic: these are long because they are used with set_bit --RR */
+extern unsigned long ppc_cached_irq_mask[NR_MASK_WORDS];
+extern unsigned long ppc_lost_interrupts[NR_MASK_WORDS];
+extern atomic_t ppc_n_lost_interrupts;
 
 #endif /* _ASM_IRQ_H */
 #endif /* __KERNEL__ */

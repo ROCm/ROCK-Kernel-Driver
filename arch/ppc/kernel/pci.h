@@ -2,47 +2,23 @@
 #ifndef __PPC_KERNEL_PCI_H__
 #define __PPC_KERNEL_PCI_H__
 
+/* Configure those in your xxx_init() or xxx_setup_arch() function */
 extern unsigned long isa_io_base;
 extern unsigned long isa_mem_base;
 extern unsigned long pci_dram_offset;
 
-extern unsigned int  *pci_config_address;
-extern unsigned char *pci_config_data;
+/* Set this to 1 if you want the kernel to re-assign all PCI
+ * bus numbers
+ */
+extern int pci_assign_all_busses;
 
-void fix_intr(struct device_node *node, struct pci_dev *dev);
 
-#if 0
-#define decl_config_access_method(name) 	\
-struct pci_ops name##_pci_ops = { 		\
-	name##_pcibios_read_config_byte,	\
-	name##_pcibios_read_config_word,	\
-	name##_pcibios_read_config_dword,	\
-	name##_pcibios_write_config_byte,	\
-	name##_pcibios_write_config_word,	\
-	name##_pcibios_write_config_dword	\
-}
-#endif
+extern struct pci_controller* pcibios_alloc_controller(void);
+extern struct pci_controller* pci_find_hose_for_OF_device(
+			struct device_node* node);
 
-#define decl_config_access_method(name) \
-extern int name##_pcibios_read_config_byte(unsigned char bus, \
-	unsigned char dev_fn, unsigned char offset, unsigned char *val); \
-extern int name##_pcibios_read_config_word(unsigned char bus, \
-	unsigned char dev_fn, unsigned char offset, unsigned short *val); \
-extern int name##_pcibios_read_config_dword(unsigned char bus, \
-	unsigned char dev_fn, unsigned char offset, unsigned int *val); \
-extern int name##_pcibios_write_config_byte(unsigned char bus, \
-	unsigned char dev_fn, unsigned char offset, unsigned char val); \
-extern int name##_pcibios_write_config_word(unsigned char bus, \
-	unsigned char dev_fn, unsigned char offset, unsigned short val); \
-extern int name##_pcibios_write_config_dword(unsigned char bus, \
-	unsigned char dev_fn, unsigned char offset, unsigned int val)
-
-#define set_config_access_method(name) \
-	ppc_md.pcibios_read_config_byte = name##_pcibios_read_config_byte; \
-	ppc_md.pcibios_read_config_word = name##_pcibios_read_config_word; \
-	ppc_md.pcibios_read_config_dword = name##_pcibios_read_config_dword; \
-	ppc_md.pcibios_write_config_byte = name##_pcibios_write_config_byte; \
-	ppc_md.pcibios_write_config_word = name##_pcibios_write_config_word; \
-	ppc_md.pcibios_write_config_dword = name##_pcibios_write_config_dword
+extern void setup_indirect_pci(struct pci_controller* hose,
+			u32 cfg_addr, u32 cfg_data);
+extern void setup_grackle(struct pci_controller *hose, unsigned io_space_size);
 
 #endif /* __PPC_KERNEL_PCI_H__ */

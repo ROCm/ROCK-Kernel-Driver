@@ -22,7 +22,6 @@
  */
 
 #include <linux/config.h>
-#if defined(CONFIG_X25) || defined(CONFIG_X25_MODULE)
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>
@@ -229,5 +228,3 @@ void x25_enquiry_response(struct sock *sk)
 
 	x25_stop_timer(sk);
 }
-
-#endif

@@ -2,12 +2,12 @@
 /******************************************************************************
  *
  * Module Name: amresolv - AML Interpreter object resolution
- *              $Revision: 78 $
+ *              $Revision: 80 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -118,19 +118,19 @@ acpi_aml_get_field_unit_value (
 		mask = ACPI_UINT32_MAX;
 	}
 
-	result_desc->number.type = (u8) ACPI_TYPE_NUMBER;
+	result_desc->integer.type = (u8) ACPI_TYPE_INTEGER;
 
 	/* Get the 32 bit value at the location */
 
-	MOVE_UNALIGNED32_TO_32 (&result_desc->number.value, location);
+	MOVE_UNALIGNED32_TO_32 (&result_desc->integer.value, location);
 
 	/*
 	 * Shift the 32-bit word containing the field, and mask off the
 	 * resulting value
 	 */
 
-	result_desc->number.value =
-		(result_desc->number.value >> field_desc->field_unit.bit_offset) & mask;
+	result_desc->integer.value =
+		(result_desc->integer.value >> field_desc->field_unit.bit_offset) & mask;
 
 	/* Release global lock if we acquired it earlier */
 
@@ -279,7 +279,7 @@ acpi_aml_resolve_object_to_value (
 			acpi_cm_remove_reference (stack_desc);
 			*stack_ptr = obj_desc;
 
-			if (ACPI_TYPE_NUMBER == obj_desc->common.type) {
+			if (ACPI_TYPE_INTEGER == obj_desc->common.type) {
 				/* Value is a Number */
 
 			}
@@ -311,7 +311,7 @@ acpi_aml_resolve_object_to_value (
 			acpi_cm_remove_reference (stack_desc);
 			*stack_ptr = obj_desc;
 
-			if (ACPI_TYPE_NUMBER == obj_desc->common.type) {
+			if (ACPI_TYPE_INTEGER == obj_desc->common.type) {
 				/* Value is a Number */
 
 			}
@@ -326,22 +326,22 @@ acpi_aml_resolve_object_to_value (
 
 		case AML_ZERO_OP:
 
-			stack_desc->common.type = (u8) ACPI_TYPE_NUMBER;
-			stack_desc->number.value = 0;
+			stack_desc->common.type = (u8) ACPI_TYPE_INTEGER;
+			stack_desc->integer.value = 0;
 			break;
 
 
 		case AML_ONE_OP:
 
-			stack_desc->common.type = (u8) ACPI_TYPE_NUMBER;
-			stack_desc->number.value = 1;
+			stack_desc->common.type = (u8) ACPI_TYPE_INTEGER;
+			stack_desc->integer.value = 1;
 			break;
 
 
 		case AML_ONES_OP:
 
-			stack_desc->common.type = (u8) ACPI_TYPE_NUMBER;
-			stack_desc->number.value = ACPI_INTEGER_MAX;
+			stack_desc->common.type = (u8) ACPI_TYPE_INTEGER;
+			stack_desc->integer.value = ACPI_INTEGER_MAX;
 
 			/* Truncate value if we are executing from a 32-bit ACPI table */
 

@@ -167,7 +167,7 @@ Here are the routines, one by one:
 
 	This interface flushes an entire user address space from
 	the caches.  That is, after running, there will be no cache
-	lines assosciated with 'mm'.
+	lines associated with 'mm'.
 
 	This interface is used to handle whole address space
 	page table operations such as what happens during
@@ -209,7 +209,7 @@ require a whole different set of interfaces to handle properly.
 The biggest problem is that of virtual aliasing in the data cache
 of a processor.
 
-Is your port subsceptible to virtual aliasing in it's D-cache?
+Is your port susceptible to virtual aliasing in it's D-cache?
 Well, if your D-cache is virtually indexed, is larger in size than
 PAGE_SIZE, and does not prevent multiple cache lines for the same
 physical address from existing at once, you have this problem.
@@ -220,6 +220,9 @@ addressed D-cache (or if the size is variable, the largest possible
 size).  This setting will force the SYSv IPC layer to only allow user
 processes to mmap shared memory at address which are a multiple of
 this value.
+
+NOTE: This does not fix shared mmaps, check out the sparc64 port for
+one way to solve this (in particular SPARC_FLAG_MMAPSHARED).
 
 Next, you have two methods to solve the D-cache aliasing issue for all
 other cases.  Please keep in mind that fact that, for a given page
@@ -240,7 +243,7 @@ existing ports should move over to the new mechanism as well.
 	The physical page 'page' is about to be place into the
 	user address space of a process.  If it is possible for
 	stores done recently by the kernel into this physical
-	page, to not be visible to an arbitray mapping in userspace,
+	page, to not be visible to an arbitrary mapping in userspace,
 	you must flush this page from the D-cache.
 
 	If the D-cache is writeback in nature, the dirty data (if
@@ -266,7 +269,7 @@ Here is the new interface:
 
 	For example, a port may temporarily map 'from' and 'to' to
 	kernel virtual addresses during the copy.  The virtual address
-	for these two pages is choosen in such a way that the kernel
+	for these two pages is chosen in such a way that the kernel
 	load/store instructions happen to virtual addresses which are
 	of the same "color" as the user mapping of the page.  Sparc64
 	for example, uses this technique.
@@ -306,7 +309,7 @@ Here is the new interface:
 	simply be defined as a nop on that architecture.
 
         There is a bit set aside in page->flags (PG_arch_1) as
-	"architecture private".  The kernel guarentees that,
+	"architecture private".  The kernel guarantees that,
 	for pagecache pages, it will clear this bit when such
 	a page first enters the pagecache.
 
@@ -323,7 +326,14 @@ Here is the new interface:
 	update_mmu_cache(), a check is made of this flag bit, and if
 	set the flush is done and the flag bit is cleared.
 
-XXX Not documented: flush_icache_page(), need to talk to Paul
-                    Mackerras, David Mosberger-Tang, et al.
-		    to see what the expected semantics of this
-		    interface are.  -DaveM
+  void flush_icache_range(unsigned long start, unsigned long end)
+  	When the kernel stores into addresses that it will execute
+	out of (eg when loading modules), this function is called.
+
+	If the icache does not snoop stores then this routine will need
+	to flush it.
+
+  void flush_icache_page(struct vm_area_struct *vma, struct page *page)
+	All the functionality of flush_icache_page can be implemented in
+	flush_dcache_page and update_mmu_cache. In 2.5 the hope is to
+	remove this interface completely.

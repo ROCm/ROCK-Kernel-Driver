@@ -153,7 +153,7 @@ static int check_crc_flex(unsigned char *cp, int size)
 /* Find a free channel, and link in this `tty' line. */
 static inline struct ax_disp *ax_alloc(void)
 {
-	ax25_ctrl_t *axp;
+	ax25_ctrl_t *axp=NULL;
 	int i;
 
 	for (i = 0; i < ax25_maxdev; i++) {

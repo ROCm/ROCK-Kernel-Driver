@@ -647,25 +647,6 @@ apus_ide_default_io_base(int index)
         return 0;
 }
 
-int
-apus_ide_check_region(ide_ioreg_t from, unsigned int extent)
-{
-        return 0;
-}
-
-void
-apus_ide_request_region(ide_ioreg_t from,
-			unsigned int extent,
-			const char *name)
-{
-}
-
-void
-apus_ide_release_region(ide_ioreg_t from,
-			unsigned int extent)
-{
-}
-
 void
 apus_ide_fix_driveid(struct hd_driveid *id)
 {
@@ -1131,9 +1112,6 @@ void apus_init(unsigned long r3, unsigned long r4, unsigned long r5,
         ppc_ide_md.outsw = apus_ide_outsw;
         ppc_ide_md.default_irq = apus_ide_default_irq;
         ppc_ide_md.default_io_base = apus_ide_default_io_base;
-        ppc_ide_md.ide_check_region = apus_ide_check_region;
-        ppc_ide_md.ide_request_region = apus_ide_request_region;
-        ppc_ide_md.ide_release_region = apus_ide_release_region;
         ppc_ide_md.fix_driveid = apus_ide_fix_driveid;
         ppc_ide_md.ide_init_hwif = apus_ide_init_hwif_ports;
 

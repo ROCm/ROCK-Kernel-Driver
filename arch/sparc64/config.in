@@ -1,4 +1,4 @@
-# $Id: config.in,v 1.125 2000/10/10 01:05:53 davem Exp $
+# $Id: config.in,v 1.130 2001/01/18 04:47:44 davem Exp $
 # For a description of the syntax of this configuration file,
 # see the Configure script.
 #
@@ -25,6 +25,9 @@ define_bool CONFIG_VT y
 define_bool CONFIG_VT_CONSOLE y
 
 bool 'Symmetric multi-processing support' CONFIG_SMP
+
+# Identify this as a Sparc64 build
+define_bool CONFIG_SPARC64 y
 
 # Global things across all Sun machines.
 define_bool CONFIG_HAVE_DEC_LOCK y
@@ -70,6 +73,7 @@ dep_tristate '  Parallel printer support' CONFIG_PRINTER $CONFIG_PARPORT
 if [ "$CONFIG_PCI" = "y" ]; then
    tristate 'SUNW, envctrl support' CONFIG_ENVCTRL
    tristate '7-Segment Display support' CONFIG_DISPLAY7SEG
+   tristate 'CP1XXX Hardware Watchdog support' CONFIG_WATCHDOG_CP1XXX
 fi
 endmenu
 

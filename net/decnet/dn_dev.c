@@ -52,7 +52,7 @@ static unsigned char dn_eco_version[3]    = {0x02,0x00,0x00};
 
 extern struct neigh_table dn_neigh_table;
 
-struct net_device *decnet_default_device = NULL;
+struct net_device *decnet_default_device;
 
 static struct dn_dev *dn_dev_create(struct net_device *dev, int *err);
 static void dn_dev_delete(struct net_device *dev);
@@ -1286,9 +1286,7 @@ void __exit dn_dev_cleanup(void)
 	}
 #endif /* CONFIG_SYSCTL */
 
-#ifdef CONFIG_PROC_FS
 	proc_net_remove("decnet_dev");
-#endif /* CONFIG_PROC_FS */
 
 	dn_dev_devices_off();
 }

@@ -1,4 +1,4 @@
-/* $Id: pci_psycho.c,v 1.17 2000/09/21 06:25:14 anton Exp $
+/* $Id: pci_psycho.c,v 1.18 2001/01/11 16:26:45 davem Exp $
  * pci_psycho.c: PSYCHO/U2P specific PCI controller support.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@caipfs.rutgers.edu)
@@ -619,20 +619,21 @@ static void psycho_check_iommu_error(struct pci_controller_info *p,
 				     unsigned long afar,
 				     enum psycho_error_type type)
 {
+	struct pci_iommu *iommu = p->pbm_A.iommu;
 	unsigned long iommu_tag[16];
 	unsigned long iommu_data[16];
 	unsigned long flags;
 	u64 control;
 	int i;
 
-	spin_lock_irqsave(&p->iommu.lock, flags);
-	control = psycho_read(p->iommu.iommu_control);
+	spin_lock_irqsave(&iommu->lock, flags);
+	control = psycho_read(iommu->iommu_control);
 	if (control & PSYCHO_IOMMU_CTRL_XLTEERR) {
 		char *type_string;
 
 		/* Clear the error encountered bit. */
 		control &= ~PSYCHO_IOMMU_CTRL_XLTEERR;
-		psycho_write(p->iommu.iommu_control, control);
+		psycho_write(iommu->iommu_control, control);
 
 		switch((control & PSYCHO_IOMMU_CTRL_XLTESTAT) >> 25UL) {
 		case 0:
@@ -662,7 +663,7 @@ static void psycho_check_iommu_error(struct pci_controller_info *p,
 		 * get as much diagnostic information to the
 		 * console as we can.
 		 */
-		psycho_write(p->iommu.iommu_control,
+		psycho_write(iommu->iommu_control,
 			     control | PSYCHO_IOMMU_CTRL_DENAB);
 		for (i = 0; i < 16; i++) {
 			unsigned long base = p->controller_regs;
@@ -678,7 +679,7 @@ static void psycho_check_iommu_error(struct pci_controller_info *p,
 		}
 
 		/* Leave diagnostic mode. */
-		psycho_write(p->iommu.iommu_control, control);
+		psycho_write(iommu->iommu_control, control);
 
 		for (i = 0; i < 16; i++) {
 			unsigned long tag, data;
@@ -717,7 +718,7 @@ static void psycho_check_iommu_error(struct pci_controller_info *p,
 		}
 	}
 	__psycho_check_stc_error(p, afsr, afar, type);
-	spin_unlock_irqrestore(&p->iommu.lock, flags);
+	spin_unlock_irqrestore(&iommu->lock, flags);
 }
 
 /* Uncorrectable Errors.  Cause of the error and the address are
@@ -1255,24 +1256,25 @@ static void __init psycho_scan_bus(struct pci_controller_info *p)
 
 static void __init psycho_iommu_init(struct pci_controller_info *p)
 {
+	struct pci_iommu *iommu = p->pbm_A.iommu;
 	unsigned long tsbbase, i;
 	u64 control;
 
 	/* Setup initial software IOMMU state. */
-	spin_lock_init(&p->iommu.lock);
-	p->iommu.iommu_cur_ctx = 0;
+	spin_lock_init(&iommu->lock);
+	iommu->iommu_cur_ctx = 0;
 
 	/* Register addresses. */
-	p->iommu.iommu_control  = p->controller_regs + PSYCHO_IOMMU_CONTROL;
-	p->iommu.iommu_tsbbase  = p->controller_regs + PSYCHO_IOMMU_TSBBASE;
-	p->iommu.iommu_flush    = p->controller_regs + PSYCHO_IOMMU_FLUSH;
+	iommu->iommu_control  = p->controller_regs + PSYCHO_IOMMU_CONTROL;
+	iommu->iommu_tsbbase  = p->controller_regs + PSYCHO_IOMMU_TSBBASE;
+	iommu->iommu_flush    = p->controller_regs + PSYCHO_IOMMU_FLUSH;
 	/* PSYCHO's IOMMU lacks ctx flushing. */
-	p->iommu.iommu_ctxflush = 0;
+	iommu->iommu_ctxflush = 0;
 
 	/* We use the main control register of PSYCHO as the write
 	 * completion register.
 	 */
-	p->iommu.write_complete_reg = p->controller_regs + PSYCHO_CONTROL;
+	iommu->write_complete_reg = p->controller_regs + PSYCHO_CONTROL;
 
 	/*
 	 * Invalidate TLB Entries.
@@ -1298,19 +1300,19 @@ static void __init psycho_iommu_init(struct pci_controller_info *p)
 		prom_printf("PSYCHO_IOMMU: Error, gfp(tsb) failed.\n");
 		prom_halt();
 	}
-	p->iommu.page_table = (iopte_t *)tsbbase;
-	p->iommu.page_table_sz_bits = 17;
-	p->iommu.page_table_map_base = 0xc0000000;
-	p->iommu.dma_addr_mask = 0xffffffff;
+	iommu->page_table = (iopte_t *)tsbbase;
+	iommu->page_table_sz_bits = 17;
+	iommu->page_table_map_base = 0xc0000000;
+	iommu->dma_addr_mask = 0xffffffff;
 	memset((char *)tsbbase, 0, PAGE_SIZE << 7);
 
 	/* We start with no consistent mappings. */
-	p->iommu.lowest_consistent_map =
-		1 << (p->iommu.page_table_sz_bits - PBM_LOGCLUSTERS);
+	iommu->lowest_consistent_map =
+		1 << (iommu->page_table_sz_bits - PBM_LOGCLUSTERS);
 
 	for (i = 0; i < PBM_NCLUSTERS; i++) {
-		p->iommu.alloc_info[i].flush = 0;
-		p->iommu.alloc_info[i].next = 0;
+		iommu->alloc_info[i].flush = 0;
+		iommu->alloc_info[i].next = 0;
 	}
 
 	psycho_write(p->controller_regs + PSYCHO_IOMMU_TSBBASE, __pa(tsbbase));
@@ -1515,6 +1517,7 @@ void __init psycho_init(int node)
 {
 	struct linux_prom64_registers pr_regs[3];
 	struct pci_controller_info *p;
+	struct pci_iommu *iommu;
 	unsigned long flags;
 	u32 upa_portid;
 	int is_pbm_a, err;
@@ -1538,6 +1541,13 @@ void __init psycho_init(int node)
 		prom_halt();
 	}
 	memset(p, 0, sizeof(*p));
+	iommu = kmalloc(sizeof(struct pci_iommu), GFP_ATOMIC);
+	if (!iommu) {
+		prom_printf("PSYCHO: Fatal memory allocation error.\n");
+		prom_halt();
+	}
+	memset(iommu, 0, sizeof(*iommu));
+	p->pbm_A.iommu = p->pbm_B.iommu = iommu;
 
 	spin_lock_irqsave(&pci_controller_lock, flags);
 	p->next = pci_controller_root;

@@ -24,8 +24,8 @@
 #include <linux/mm.h>
 #include <linux/pci.h>
 #include <linux/acpi.h>
+#include <linux/delay.h>
 #include <asm/io.h>
-#include <asm/delay.h>
 #include "acpi.h"
 #include "driver.h"
 

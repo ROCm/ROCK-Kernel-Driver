@@ -1,4 +1,4 @@
-/* $Id: pbm.h,v 1.22 2000/03/25 05:18:30 davem Exp $
+/* $Id: pbm.h,v 1.23 2001/01/11 16:26:45 davem Exp $
  * pbm.h: UltraSparc PCI controller software state.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@redhat.com)
@@ -18,11 +18,12 @@
 
 /* The abstraction used here is that there are PCI controllers,
  * each with one (Sabre) or two (PSYCHO/SCHIZO) PCI bus modules
- * underneath.  Each PCI controller has a single IOMMU shared
- * by the PCI bus modules underneath, and if a streaming buffer
+ * underneath.  Each PCI bus module uses an IOMMU (shared by both
+ * PBMs of a controller, or per-PBM), and if a streaming buffer
  * is present, each PCI bus module has it's own. (ie. the IOMMU
- * is shared between PBMs, the STC is not)  Furthermore, each
- * PCI bus module controls it's own autonomous PCI bus.
+ * might be shared between PBMs, the STC is never shared)
+ * Furthermore, each PCI bus module controls it's own autonomous
+ * PCI bus.
  */
 
 #define PBM_LOGCLUSTERS 3
@@ -150,6 +151,9 @@ struct pci_pbm_info {
 	/* This PBM's streaming buffer. */
 	struct pci_strbuf		stc;
 
+	/* IOMMU state, potentially shared by both PBM segments. */
+	struct pci_iommu		*iommu;
+
 	/* Now things for the actual PCI bus probes. */
 	unsigned int			pci_first_busno;
 	unsigned int			pci_last_busno;
@@ -188,9 +192,6 @@ struct pci_controller_info {
 	struct pci_ops			*pci_ops;
 	unsigned int			pci_first_busno;
 	unsigned int			pci_last_busno;
-
-	/* IOMMU state shared by both PBM segments. */
-	struct pci_iommu		iommu;
 
 	void				*starfire_cookie;
 };

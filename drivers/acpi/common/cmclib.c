@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: cmclib - Local implementation of C library functions
- * $Revision: 28 $
+ * $Revision: 32 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -347,7 +347,7 @@ acpi_cm_memcpy (
 void *
 acpi_cm_memset (
 	void                    *dest,
-	u32                     value,
+	NATIVE_UINT             value,
 	NATIVE_UINT             count)
 {
 	NATIVE_CHAR             *new = (NATIVE_CHAR *) dest;
@@ -522,6 +522,7 @@ static const u8 _acpi_ctype[257] = {
 #define IS_LOWER(c)  (_acpi_ctype[(unsigned char)(c)] & (_ACPI_LO))
 #define IS_DIGIT(c)  (_acpi_ctype[(unsigned char)(c)] & (_ACPI_DI))
 #define IS_SPACE(c)  (_acpi_ctype[(unsigned char)(c)] & (_ACPI_SP))
+#define IS_XDIGIT(c) (_acpi_ctype[(unsigned char)(c)] & (_ACPI_XD))
 
 
 /*******************************************************************************
@@ -658,7 +659,7 @@ u32
 acpi_cm_strtoul (
 	const NATIVE_CHAR       *string,
 	NATIVE_CHAR             **terminator,
-	u32                     base)
+	NATIVE_UINT             base)
 {
 	u32                     converted = 0;
 	u32                     index;

@@ -51,6 +51,11 @@ static unsigned char bridge_ula_lec[] = {0x01, 0x80, 0xc2, 0x00, 0x00};
 #define DPRINTK(format,args...)
 #endif
 
+struct net_bridge_fdb_entry *(*br_fdb_get_hook)(struct net_bridge *br,
+	unsigned char *addr);
+void (*br_fdb_put_hook)(struct net_bridge_fdb_entry *ent);
+
+
 #define DUMP_PACKETS 0 /* 0 = None,
                         * 1 = 30 first bytes
                         * 2 = Whole packet
@@ -853,8 +858,11 @@ static void __exit lane_module_cleanup(void)
                 if (dev_lec[i] != NULL) {
                         priv = (struct lec_priv *)dev_lec[i]->priv;
 #if defined(CONFIG_TR)
-                        unregister_trdev(dev_lec[i]);
+                	if (priv->is_trdev)
+                        	unregister_trdev(dev_lec[i]);
+                	else
 #endif
+                        unregister_netdev(dev_lec[i]);
                         kfree(dev_lec[i]);
                         dev_lec[i] = NULL;
                 }

@@ -17,6 +17,7 @@
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/smp_lock.h>
+#include <linux/spinlock.h>
 #include <linux/timer.h>
 #include <linux/ioport.h>
 #include <linux/major.h>
@@ -432,6 +433,7 @@ static int terminate(unsigned minor)
       return 0;
 }
 
+static spinlock_t bpp_open_lock = SPIN_LOCK_UNLOCKED;
 
 /*
  * Allow only one process to open the device at a time.
@@ -439,13 +441,25 @@ static int terminate(unsigned minor)
 static int bpp_open(struct inode *inode, struct file *f)
 {
       unsigned minor = MINOR(inode->i_rdev);
-      if (minor >= BPP_NO) return -ENODEV;
-      if (! instances[minor].present) return -ENODEV;
-      if (instances[minor].opened) return -EBUSY;
+      int ret;
 
-      instances[minor].opened = 1;
+      spin_lock(&bpp_open_lock);
+      ret = 0;
+      if (minor >= BPP_NO) {
+	      ret = -ENODEV;
+      } else {
+	      if (! instances[minor].present) {
+		      ret = -ENODEV;
+	      } else {
+		      if (instances[minor].opened) 
+			      ret = -EBUSY;
+		      else
+			      instances[minor].opened = 1;
+	      }
+      }
+      spin_unlock(&bpp_open_lock);
 
-      return 0;
+      return ret;
 }
 
 /*
@@ -458,12 +472,14 @@ static int bpp_release(struct inode *inode, struct file *f)
 {
       unsigned minor = MINOR(inode->i_rdev);
 
-      lock_kernel();
+      spin_lock(&bpp_open_lock);
       instances[minor].opened = 0;
 
       if (instances[minor].mode != COMPATIBILITY)
-      terminate(minor);
-      unlock_kernel();
+	      terminate(minor);
+
+      spin_unlock(&bpp_open_lock);
+
       return 0;
 }
 

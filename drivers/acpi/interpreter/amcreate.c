@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: amcreate - Named object creation
- *              $Revision: 51 $
+ *              $Revision: 53 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -353,7 +353,7 @@ acpi_aml_exec_create_mutex (
 		goto cleanup;
 	}
 
-	obj_desc->mutex.sync_level = (u8) sync_desc->number.value;
+	obj_desc->mutex.sync_level = (u8) sync_desc->integer.value;
 
 	/* Obj_desc was on the stack top, and the name is below it */
 

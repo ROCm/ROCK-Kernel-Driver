@@ -1,4 +1,4 @@
-/* $Id: time.c,v 1.32 2000/09/22 23:02:13 davem Exp $
+/* $Id: time.c,v 1.33 2001/01/11 15:07:09 davem Exp $
  * time.c: UltraSparc timer and TOD clock support.
  *
  * Copyright (C) 1997 David S. Miller (davem@caip.rutgers.edu)
@@ -34,7 +34,9 @@
 
 extern rwlock_t xtime_lock;
 
+spinlock_t mostek_lock = SPIN_LOCK_UNLOCKED;
 unsigned long mstk48t02_regs = 0UL;
+
 static unsigned long mstk48t08_regs = 0UL;
 static unsigned long mstk48t59_regs = 0UL;
 
@@ -187,6 +189,8 @@ static void __init kick_start_clock(void)
 
 	prom_printf("CLOCK: Clock was stopped. Kick start ");
 
+	spin_lock_irq(&mostek_lock);
+
 	/* Turn on the kick start bit to start the oscillator. */
 	tmp = mostek_read(regs + MOSTEK_CREG);
 	tmp |= MSTK_CREG_WRITE;
@@ -201,6 +205,8 @@ static void __init kick_start_clock(void)
 	tmp &= ~MSTK_CREG_WRITE;
 	mostek_write(regs + MOSTEK_CREG, tmp);
 
+	spin_unlock_irq(&mostek_lock);
+
 	/* Delay to allow the clock oscillator to start. */
 	sec = MSTK_REG_SEC(regs);
 	for (i = 0; i < 3; i++) {
@@ -211,6 +217,8 @@ static void __init kick_start_clock(void)
 		sec = MSTK_REG_SEC(regs);
 	}
 	prom_printf("\n");
+
+	spin_lock_irq(&mostek_lock);
 
 	/* Turn off kick start and set a "valid" time and date. */
 	tmp = mostek_read(regs + MOSTEK_CREG);
@@ -230,9 +238,14 @@ static void __init kick_start_clock(void)
 	tmp &= ~MSTK_CREG_WRITE;
 	mostek_write(regs + MOSTEK_CREG, tmp);
 
+	spin_unlock_irq(&mostek_lock);
+
 	/* Ensure the kick start bit is off. If it isn't, turn it off. */
 	while (mostek_read(regs + MOSTEK_HOUR) & MSTK_KICK_START) {
 		prom_printf("CLOCK: Kick start still on!\n");
+
+		spin_lock_irq(&mostek_lock);
+
 		tmp = mostek_read(regs + MOSTEK_CREG);
 		tmp |= MSTK_CREG_WRITE;
 		mostek_write(regs + MOSTEK_CREG, tmp);
@@ -244,6 +257,8 @@ static void __init kick_start_clock(void)
 		tmp = mostek_read(regs + MOSTEK_CREG);
 		tmp &= ~MSTK_CREG_WRITE;
 		mostek_write(regs + MOSTEK_CREG, tmp);
+
+		spin_unlock_irq(&mostek_lock);
 	}
 
 	prom_printf("CLOCK: Kick start procedure successful.\n");
@@ -255,10 +270,14 @@ static int __init has_low_battery(void)
 	unsigned long regs = mstk48t02_regs;
 	u8 data1, data2;
 
+	spin_lock_irq(&mostek_lock);
+
 	data1 = mostek_read(regs + MOSTEK_EEPROM);	/* Read some data. */
 	mostek_write(regs + MOSTEK_EEPROM, ~data1);	/* Write back the complement. */
 	data2 = mostek_read(regs + MOSTEK_EEPROM);	/* Read back the complement. */
 	mostek_write(regs + MOSTEK_EEPROM, data1);	/* Restore original value. */
+
+	spin_unlock_irq(&mostek_lock);
 
 	return (data1 == data2);	/* Was the write blocked? */
 }
@@ -278,6 +297,8 @@ static void __init set_system_time(void)
 		prom_halt();
 	}		
 
+	spin_lock_irq(&mostek_lock);
+
 	tmp = mostek_read(mregs + MOSTEK_CREG);
 	tmp |= MSTK_CREG_READ;
 	mostek_write(mregs + MOSTEK_CREG, tmp);
@@ -294,6 +315,8 @@ static void __init set_system_time(void)
 	tmp = mostek_read(mregs + MOSTEK_CREG);
 	tmp &= ~MSTK_CREG_READ;
 	mostek_write(mregs + MOSTEK_CREG, tmp);
+
+	spin_unlock_irq(&mostek_lock);
 }
 
 void __init clock_probe(void)
@@ -512,6 +535,7 @@ static int set_rtc_mmss(unsigned long nowtime)
 {
 	int real_seconds, real_minutes, mostek_minutes;
 	unsigned long regs = mstk48t02_regs;
+	unsigned long flags;
 	u8 tmp;
 
 	/* 
@@ -520,6 +544,8 @@ static int set_rtc_mmss(unsigned long nowtime)
 	 */
 	if (!regs) 
 		return -1;
+
+	spin_lock_irqsave(&mostek_lock, flags);
 
 	/* Read the current RTC minutes. */
 	tmp = mostek_read(regs + MOSTEK_CREG);
@@ -555,8 +581,13 @@ static int set_rtc_mmss(unsigned long nowtime)
 		tmp = mostek_read(regs + MOSTEK_CREG);
 		tmp &= ~MSTK_CREG_WRITE;
 		mostek_write(regs + MOSTEK_CREG, tmp);
-	} else
-		return -1;
 
-	return 0;
+		spin_unlock_irqrestore(&mostek_lock, flags);
+
+		return 0;
+	} else {
+		spin_unlock_irqrestore(&mostek_lock, flags);
+
+		return -1;
+	}
 }

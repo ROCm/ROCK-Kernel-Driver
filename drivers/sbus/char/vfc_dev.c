@@ -22,6 +22,7 @@
 #include <linux/sched.h>
 #include <linux/fs.h>
 #include <linux/smp_lock.h>
+#include <linux/spinlock.h>
 
 #include <asm/openprom.h>
 #include <asm/oplib.h>
@@ -181,17 +182,26 @@ struct vfc_dev *vfc_get_dev_ptr(int instance)
 	return vfc_dev_lst[instance];
 }
 
+static spinlock_t vfc_dev_lock = SPIN_LOCK_UNLOCKED;
+
 static int vfc_open(struct inode *inode, struct file *file) 
 {
 	struct vfc_dev *dev;
 
+	spin_lock(&vfc_dev_lock);
 	dev = vfc_get_dev_ptr(MINOR(inode->i_rdev));
-	if (dev == NULL)
+	if (dev == NULL) {
+		spin_unlock(&vfc_dev_lock);
 		return -ENODEV;
-	if (dev->busy)
+	}
+	if (dev->busy) {
+		spin_unlock(&vfc_dev_lock);
 		return -EBUSY;
+	}
 
 	dev->busy = 1;
+	spin_unlock(&vfc_dev_lock);
+
 	vfc_lock_device(dev);
 	
 	vfc_csr_init(dev);
@@ -209,14 +219,14 @@ static int vfc_release(struct inode *inode,struct file *file)
 {
 	struct vfc_dev *dev;
 
-	lock_kernel();
+	spin_lock(&vfc_dev_lock);
 	dev = vfc_get_dev_ptr(MINOR(inode->i_rdev));
 	if (!dev || !dev->busy) {
-		unlock_kernel();
+		spin_unlock(&vfc_dev_lock);
 		return -EINVAL;
 	}
 	dev->busy = 0;
-	unlock_kernel();
+	spin_unlock(&vfc_dev_lock);
 	return 0;
 }
 
@@ -611,12 +621,10 @@ static int vfc_mmap(struct inode *inode, struct file *file,
 	unsigned int map_size, ret, map_offset;
 	struct vfc_dev *dev;
 	
-	lock_kernel();
 	dev = vfc_get_dev_ptr(MINOR(inode->i_rdev));
-	if(dev == NULL) {
-		unlock_kernel();
+	if(dev == NULL)
 		return -ENODEV;
-	}
+
 	map_size = vma->vm_end - vma->vm_start;
 	if(map_size > sizeof(struct vfc_regs)) 
 		map_size = sizeof(struct vfc_regs);
@@ -626,7 +634,7 @@ static int vfc_mmap(struct inode *inode, struct file *file,
 	map_offset = (unsigned int) (long)dev->phys_regs;
 	ret = io_remap_page_range(vma->vm_start, map_offset, map_size, 
 				  vma->vm_page_prot, dev->which_io);
-	unlock_kernel();
+
 	if(ret)
 		return -EAGAIN;
 

@@ -18,7 +18,6 @@
  */
 
 #include <linux/config.h>
-#if defined(CONFIG_X25) || defined(CONFIG_X25_MODULE)
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>
@@ -249,8 +248,3 @@ void x25_send_frame(struct sk_buff *skb, struct x25_neigh *neigh)
 
 	dev_queue_xmit(skb);
 }
-
-#endif
-
-
-

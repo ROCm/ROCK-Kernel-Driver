@@ -80,14 +80,15 @@ extern struct device_node *find_type_devices(const char *type);
 extern struct device_node *find_path_device(const char *path);
 extern struct device_node *find_compatible_devices(const char *type,
 						   const char *compat);
-extern struct device_node *find_pci_device_OFnode(unsigned char bus,
-	unsigned char dev_fn);
 extern struct device_node *find_phandle(phandle);
 extern struct device_node *find_all_nodes(void);
 extern int device_is_compatible(struct device_node *device, const char *);
 extern int machine_is_compatible(const char *compat);
 extern unsigned char *get_property(struct device_node *node, const char *name,
 				   int *lenp);
+extern void prom_add_property(struct device_node* np, struct property* prop);
+extern void prom_get_irq_senses(unsigned char *, int, int);
+
 extern void print_properties(struct device_node *node);
 extern int call_rtas(const char *service, int nargs, int nret,
 		     unsigned long *outputs, ...);
@@ -96,7 +97,8 @@ extern void prom_drawhex(unsigned long v);
 extern void prom_drawchar(char c);
 
 extern void map_bootx_text(void);
-
+extern void bootx_update_display(unsigned long phys, int width, int height,
+				 int depth, int pitch);
 
 #endif /* _PPC_PROM_H */
 #endif /* __KERNEL__ */

@@ -2,12 +2,12 @@
 /******************************************************************************
  *
  * Module Name: amresop - AML Interpreter operand/object resolution
- *              $Revision: 18 $
+ *              $Revision: 22 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -214,8 +214,13 @@ acpi_aml_resolve_operands (
 		switch (this_arg_type)
 		{
 
-		case ARGI_REFERENCE:   /* Reference */
-		case ARGI_TARGETREF:
+		case ARGI_REFERENCE:            /* References */
+		case ARGI_INTEGER_REF:
+		case ARGI_OBJECT_REF:
+		case ARGI_DEVICE_REF:
+		case ARGI_TARGETREF:            /* TBD: must implement implicit conversion rules before store */
+		case ARGI_FIXED_TARGET:         /* No implicit conversion before store to target */
+		case ARGI_SIMPLE_TARGET:        /* Name, Local, or Arg - no implicit conversion */
 
 			/* Need an operand of type INTERNAL_TYPE_REFERENCE */
 
@@ -283,20 +288,6 @@ acpi_aml_resolve_operands (
 		 * For the simple cases, only one type of resolved object
 		 * is allowed
 		 */
-		case ARGI_NUMBER:   /* Number */
-
-			/* Need an operand of type ACPI_TYPE_NUMBER */
-
-			type_needed = ACPI_TYPE_NUMBER;
-			break;
-
-		case ARGI_BUFFER:
-
-			/* Need an operand of type ACPI_TYPE_BUFFER */
-
-			type_needed = ACPI_TYPE_BUFFER;
-			break;
-
 		case ARGI_MUTEX:
 
 			/* Need an operand of type ACPI_TYPE_MUTEX */
@@ -344,11 +335,69 @@ acpi_aml_resolve_operands (
 		 * The more complex cases allow multiple resolved object types
 		 */
 
+		case ARGI_INTEGER:   /* Number */
+
+			/*
+			 * Need an operand of type ACPI_TYPE_INTEGER,
+			 * But we can implicitly convert from a STRING or BUFFER
+			 */
+			status = acpi_aml_convert_to_integer (stack_ptr, walk_state);
+			if (ACPI_FAILURE (status)) {
+				if (status == AE_TYPE) {
+					return (AE_AML_OPERAND_TYPE);
+				}
+
+				return (status);
+			}
+
+			goto next_operand;
+			break;
+
+
+		case ARGI_BUFFER:
+
+			/*
+			 * Need an operand of type ACPI_TYPE_BUFFER,
+			 * But we can implicitly convert from a STRING or INTEGER
+			 */
+			status = acpi_aml_convert_to_buffer (stack_ptr, walk_state);
+			if (ACPI_FAILURE (status)) {
+				if (status == AE_TYPE) {
+					return (AE_AML_OPERAND_TYPE);
+				}
+
+				return (status);
+			}
+
+			goto next_operand;
+			break;
+
+
 		case ARGI_STRING:
 
-			/* Need an operand of type ACPI_TYPE_STRING or ACPI_TYPE_BUFFER */
+			/*
+			 * Need an operand of type ACPI_TYPE_STRING,
+			 * But we can implicitly convert from a BUFFER or INTEGER
+			 */
+			status = acpi_aml_convert_to_string (stack_ptr, walk_state);
+			if (ACPI_FAILURE (status)) {
+				if (status == AE_TYPE) {
+					return (AE_AML_OPERAND_TYPE);
+				}
 
-			if ((ACPI_TYPE_STRING != (*stack_ptr)->common.type) &&
+				return (status);
+			}
+
+			goto next_operand;
+			break;
+
+
+		case ARGI_COMPUTEDATA:
+
+			/* Need an operand of type INTEGER, STRING or BUFFER */
+
+			if ((ACPI_TYPE_INTEGER != (*stack_ptr)->common.type) &&
+				(ACPI_TYPE_STRING != (*stack_ptr)->common.type) &&
 				(ACPI_TYPE_BUFFER != (*stack_ptr)->common.type))
 			{
 				return (AE_AML_OPERAND_TYPE);

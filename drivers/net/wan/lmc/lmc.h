@@ -30,3 +30,4 @@ static void lmcEventLog( u_int32_t EventNum, u_int32_t arg2, u_int32_t arg3 );
 #endif
 
 #endif
+

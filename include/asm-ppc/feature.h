@@ -86,6 +86,8 @@ extern void	feature_set_usb_power(struct device_node* device, int power);
 
 extern void 	feature_set_firewire_power(struct device_node* device, int power);
 
+extern void	feature_core99_kick_cpu1(void);
+
 /*
  * Sleep related functions. At term, they should be high-priority notifiers
  */

@@ -63,8 +63,6 @@ extern void mackbd_leds(unsigned char leds);
 extern void mackbd_init_hw(void);
 #endif
 
-extern unsigned long loops_per_sec;
-
 unsigned char __res[sizeof(bd_t)];
 unsigned long empty_zero_page[1024];
 
@@ -344,25 +342,6 @@ m8xx_ide_default_io_base(int index)
 }
 
 int
-m8xx_ide_check_region(ide_ioreg_t from, unsigned int extent)
-{
-        return 0;
-}
-
-void
-m8xx_ide_request_region(ide_ioreg_t from,
-			unsigned int extent,
-			const char *name)
-{
-}
-
-void
-m8xx_ide_release_region(ide_ioreg_t from,
-			unsigned int extent)
-{
-}
-
-int
 m8xx_ide_request_irq(unsigned int irq,
 		       void (*handler)(int, void *, struct pt_regs *),
 		       unsigned long flags, 
@@ -374,12 +353,6 @@ m8xx_ide_request_irq(unsigned int irq,
 #else
 	return request_irq(irq, handler, flags, device, dev_id);
 #endif
-}
-
-void
-m8xx_ide_fix_driveid(struct hd_driveid *id)
-{
-        ppc_generic_ide_fix_driveid(id);
 }
 
 /* We can use an external IDE controller or wire the IDE interface to
@@ -515,10 +488,7 @@ m8xx_init(unsigned long r3, unsigned long r4, unsigned long r5,
         ppc_ide_md.outsw = m8xx_ide_outsw;
         ppc_ide_md.default_irq = m8xx_ide_default_irq;
         ppc_ide_md.default_io_base = m8xx_ide_default_io_base;
-        ppc_ide_md.check_region = m8xx_ide_check_region;
-        ppc_ide_md.request_region = m8xx_ide_request_region;
-        ppc_ide_md.release_region = m8xx_ide_release_region;
-        ppc_ide_md.fix_driveid = m8xx_ide_fix_driveid;
+        ppc_ide_md.fix_driveid = ppc_generic_ide_fix_driveid;
         ppc_ide_md.ide_init_hwif = m8xx_ide_init_hwif_ports;
         ppc_ide_md.ide_request_irq = m8xx_ide_request_irq;
 

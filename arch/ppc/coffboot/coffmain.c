@@ -22,11 +22,18 @@ void gunzip(void *, int, unsigned char *, int *);
 #define get_32be(x)	(*(unsigned *)(x))
 
 #define RAM_START	0xc0000000
-#define PROG_START	RAM_START
 #define RAM_END		(RAM_START + 0x800000)	/* only 8M mapped with BATs */
 
+#define PROG_START	RAM_START
+#define PROG_SIZE	0x00400000
+
+#define SCRATCH_SIZE	(128 << 10)
+
 char *avail_ram;
-char *end_avail;
+char *begin_avail, *end_avail;
+char *avail_high;
+unsigned int heap_use;
+unsigned int heap_max;
 
 extern char _start[], _end[];
 extern char image_data[];
@@ -34,6 +41,7 @@ extern int image_len;
 extern char initrd_data[];
 extern int initrd_len;
 
+char heap[SCRATCH_SIZE];
 
 boot(int a1, int a2, void *prom)
 {
@@ -58,16 +66,18 @@ boot(int a1, int a2, void *prom)
     im = image_data;
     len = image_len;
     /* claim 3MB starting at 0 */
-    claim(0, 3 << 20, 0);
+    claim(0, PROG_SIZE, 0);
     dst = (void *) RAM_START;
     if (im[0] == 0x1f && im[1] == 0x8b) {
-	/* claim 512kB for scratch space */
-	avail_ram = claim(0, 512 << 10, 0x10) + RAM_START;
-	end_avail = avail_ram + (512 << 10);
-	printf("avail_ram = %x\n", avail_ram);
+	/* claim some memory for scratch space */
+	begin_avail = avail_high = avail_ram = heap;
+	end_avail = heap + sizeof(heap);
+	printf("heap at 0x%x\n", avail_ram);
 	printf("gunzipping (0x%x <- 0x%x:0x%0x)...", dst, im, im+len);
-	gunzip(dst, 3 << 20, im, &len);
+	gunzip(dst, PROG_SIZE, im, &len);
 	printf("done %u bytes\n", len);
+	printf("%u bytes of heap consumed, max in use %u\n",
+	       avail_high - begin_avail, heap_max);
     } else {
 	memmove(dst, im, len);
     }
@@ -78,9 +88,6 @@ boot(int a1, int a2, void *prom)
     sa = (unsigned long)PROG_START;
     printf("start address = 0x%x\n", sa);
 
-#if 0
-    pause();
-#endif
     (*(void (*)())sa)(a1, a2, prom);
 
     printf("returned?\n");
@@ -114,13 +121,33 @@ void make_bi_recs(unsigned long addr)
 	rec = (struct bi_record *)((unsigned long)rec + rec->size);
 }
 
+struct memchunk {
+    unsigned int size;
+    struct memchunk *next;
+};
+
+static struct memchunk *freechunks;
+
 void *zalloc(void *x, unsigned items, unsigned size)
 {
-    void *p = avail_ram;
+    void *p;
+    struct memchunk **mpp, *mp;
 
     size *= items;
     size = (size + 7) & -8;
+    heap_use += size;
+    if (heap_use > heap_max)
+	heap_max = heap_use;
+    for (mpp = &freechunks; (mp = *mpp) != 0; mpp = &mp->next) {
+	if (mp->size == size) {
+	    *mpp = mp->next;
+	    return mp;
+	}
+    }
+    p = avail_ram;
     avail_ram += size;
+    if (avail_ram > avail_high)
+	avail_high = avail_ram;
     if (avail_ram > end_avail) {
 	printf("oops... out of memory\n");
 	pause();
@@ -130,6 +157,17 @@ void *zalloc(void *x, unsigned items, unsigned size)
 
 void zfree(void *x, void *addr, unsigned nb)
 {
+    struct memchunk *mp = addr;
+
+    nb = (nb + 7) & -8;
+    heap_use -= nb;
+    if (avail_ram == addr + nb) {
+	avail_ram = addr;
+	return;
+    }
+    mp->size = nb;
+    mp->next = freechunks;
+    freechunks = mp;
 }
 
 #define HEAD_CRC	2

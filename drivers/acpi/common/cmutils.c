@@ -1,12 +1,12 @@
 /*******************************************************************************
  *
  * Module Name: cmutils - common utility procedures
- *              $Revision: 21 $
+ *              $Revision: 23 $
  *
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -647,16 +647,16 @@ acpi_cm_resolve_package_references (
 
 		if (sub_object->common.type == INTERNAL_TYPE_REFERENCE) {
 			if (sub_object->reference.op_code == AML_ZERO_OP) {
-				sub_object->common.type = ACPI_TYPE_NUMBER;
-				sub_object->number.value = 0;
+				sub_object->common.type = ACPI_TYPE_INTEGER;
+				sub_object->integer.value = 0;
 			}
 			else if (sub_object->reference.op_code == AML_ONE_OP) {
-				sub_object->common.type = ACPI_TYPE_NUMBER;
-				sub_object->number.value = 1;
+				sub_object->common.type = ACPI_TYPE_INTEGER;
+				sub_object->integer.value = 1;
 			}
 			else if (sub_object->reference.op_code == AML_ONES_OP) {
-				sub_object->common.type = ACPI_TYPE_NUMBER;
-				sub_object->number.value = ACPI_INTEGER_MAX;
+				sub_object->common.type = ACPI_TYPE_INTEGER;
+				sub_object->integer.value = ACPI_INTEGER_MAX;
 			}
 		}
 	}

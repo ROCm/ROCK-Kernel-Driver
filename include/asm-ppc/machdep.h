@@ -10,6 +10,7 @@
 
 struct pt_regs;
 struct pci_bus;	
+struct pci_dev;
 
 struct machdep_calls {
 	void		(*setup_arch)(void);
@@ -45,7 +46,7 @@ struct machdep_calls {
 	unsigned char 	(*nvram_read_val)(int addr);
 	void		(*nvram_write_val)(int addr, unsigned char val);
 
-/* Tons of keyboard stuff. */
+	/* Tons of keyboard stuff. */
 	int		(*kbd_setkeycode)(unsigned int scancode,
 				unsigned int keycode);
 	int		(*kbd_getkeycode)(unsigned int scancode);
@@ -59,25 +60,25 @@ struct machdep_calls {
 	unsigned char 	*ppc_kbd_sysrq_xlate;
 #endif
 
-	/* PCI interfaces */
-	int (*pcibios_read_config_byte)(unsigned char bus,
-		unsigned char dev_fn, unsigned char offset, unsigned char *val);
-	int (*pcibios_read_config_word)(unsigned char bus,
-		unsigned char dev_fn, unsigned char offset, unsigned short *val);
-	int (*pcibios_read_config_dword)(unsigned char bus,
-		unsigned char dev_fn, unsigned char offset, unsigned int *val);
-	int (*pcibios_write_config_byte)(unsigned char bus,
-		unsigned char dev_fn, unsigned char offset, unsigned char val);
-	int (*pcibios_write_config_word)(unsigned char bus, 
-		unsigned char dev_fn, unsigned char offset, unsigned short val);
-	int (*pcibios_write_config_dword)(unsigned char bus,
-		unsigned char dev_fn, unsigned char offset, unsigned int val);
-	void (*pcibios_fixup)(void);
-	void (*pcibios_fixup_bus)(struct pci_bus *);
+	/*
+	 * optional PCI "hooks"
+	 */
 
-	void* (*pci_dev_io_base)(unsigned char bus, unsigned char devfn, int physical);
-	void* (*pci_dev_mem_base)(unsigned char bus, unsigned char devfn);
-	int (*pci_dev_root_bridge)(unsigned char bus, unsigned char devfn);
+	 	/* Called after scanning the bus, before allocating
+	 	 * resources
+	 	 */
+	void (*pcibios_fixup)(void);
+
+		/* Called for each PCI bus in the system
+		 * when it's probed
+		 */
+	void (*pcibios_fixup_bus)(struct pci_bus *);
+	
+		/* Called when pci_enable_device() is called (initial=0) or
+		 * when a device with no assigned resource is found (initial=1).
+		 * Returns 0 to allow assignement/enabling of the device
+		 */
+	int  (*pcibios_enable_device_hook)(struct pci_dev *, int initial);
 
 	/* this is for modules, since _machine can be a define -- Cort */
 	int ppc_machine;

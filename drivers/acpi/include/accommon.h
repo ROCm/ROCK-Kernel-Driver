@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Name: accommon.h -- prototypes for the common (subsystem-wide) procedures
- *       $Revision: 82 $
+ *       $Revision: 86 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -100,6 +100,8 @@ acpi_cm_allocate_owner_id (
  * Cm_clib - Local implementations of C library functions
  */
 
+#ifndef ACPI_USE_SYSTEM_CLIBRARY
+
 NATIVE_UINT
 acpi_cm_strlen (
 	const NATIVE_CHAR       *string);
@@ -141,7 +143,7 @@ u32
 acpi_cm_strtoul (
 	const NATIVE_CHAR       *string,
 	NATIVE_CHAR             **terminator,
-	u32                     base);
+	NATIVE_UINT             base);
 
 NATIVE_CHAR *
 acpi_cm_strstr (
@@ -161,7 +163,7 @@ acpi_cm_memcpy (
 void *
 acpi_cm_memset (
 	void                    *dest,
-	u32                     value,
+	NATIVE_UINT             value,
 	NATIVE_UINT             count);
 
 u32
@@ -172,6 +174,7 @@ u32
 acpi_cm_to_lower (
 	u32                     c);
 
+#endif /* ACPI_USE_SYSTEM_CLIBRARY */
 
 /*
  * Cm_copy - Object construction and conversion interfaces
@@ -297,7 +300,7 @@ function_value_exit (
 	u32                     line_number,
 	u32                     component_id,
 	NATIVE_CHAR             *function_name,
-	NATIVE_UINT             value);
+	ACPI_INTEGER            value);
 
 void
 function_ptr_exit (
@@ -596,7 +599,7 @@ acpi_cm_init_static_object (
 #define acpi_cm_callocate(a)            _cm_callocate(a, _COMPONENT,_THIS_MODULE,__LINE__)
 #define acpi_cm_free(a)                 _cm_free(a,_COMPONENT,_THIS_MODULE,__LINE__)
 
-#ifndef ACPI_DEBUG
+#ifndef ACPI_DEBUG_TRACK_ALLOCATIONS
 
 #define acpi_cm_add_element_to_alloc_list(a,b,c,d,e,f)
 #define acpi_cm_delete_element_from_alloc_list(a,b,c,d)

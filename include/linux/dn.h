@@ -45,7 +45,12 @@
 #define DSO_LINKINFO    7        /* Set/Get link information            */
 #define DSO_STREAM      8        /* Set socket type to stream           */
 #define DSO_SEQPACKET   9        /* Set socket type to sequenced packet */
-#define DSO_MAX         10       /* Maximum option number               */
+#define DSO_MAXWINDOW   11       /* Maximum window size allowed         */
+#define DSO_NODELAY	12       /* Turn off nagle                      */
+#define DSO_CORK        13       /* Wait for more data!                 */
+#define DSO_SERVICES	14       /* NSP Services field                  */
+#define DSO_INFO	15       /* NSP Info field                      */
+#define DSO_MAX         15       /* Maximum option number               */
 
 
 /* LINK States */
@@ -138,5 +143,6 @@ struct dn_addr {
 #define SIOCGNETADDR  _IOR(DECNET_IOCTL_BASE, 0xe1, struct dn_naddr)
 #define OSIOCSNETADDR _IOW(DECNET_IOCTL_BASE, 0xe0, int)
 #define OSIOCGNETADDR _IOR(DECNET_IOCTL_BASE, 0xe1, int)
+/* #define SIOCATEOR _IOR(DECNET_IOCTL_BASE, 0x01, int) */
 
 #endif /* _LINUX_DN_H */

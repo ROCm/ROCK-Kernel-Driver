@@ -60,8 +60,8 @@ acpi_enter_sx_async(void *context)
 	arg_list.pointer = &arg;
 
 	memset(&arg, 0, sizeof(arg));
-	arg.type = ACPI_TYPE_NUMBER;
-	arg.number.value = ctx->state;
+	arg.type = ACPI_TYPE_INTEGER;
+	arg.integer.value = ctx->state;
 
 	acpi_evaluate_object(NULL, "\\_PTS", &arg_list, NULL);
 	
@@ -93,8 +93,8 @@ acpi_enter_sx_async(void *context)
 	arg_list.pointer = &arg;
 
 	memset(&arg, 0, sizeof(arg));
-	arg.type = ACPI_TYPE_NUMBER;
-	arg.number.value = ctx->state;
+	arg.type = ACPI_TYPE_INTEGER;
+	arg.integer.value = ctx->state;
 
 	acpi_evaluate_object(NULL, "\\_WAK", &arg_list, NULL);
 

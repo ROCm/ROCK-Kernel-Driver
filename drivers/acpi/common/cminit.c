@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: cminit - Common ACPI subsystem initialization
- *              $Revision: 91 $
+ *              $Revision: 93 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -35,6 +35,9 @@
 	 MODULE_NAME         ("cminit")
 
 
+#define ACPI_OFFSET(d,o)    ((u32) &(((d *)0)->o))
+#define ACPI_FADT_OFFSET(o) ACPI_OFFSET (FADT_DESCRIPTOR, o)
+
 /*******************************************************************************
  *
  * FUNCTION:    Acpi_cm_fadt_register_error
@@ -53,12 +56,13 @@
 static ACPI_STATUS
 acpi_cm_fadt_register_error (
 	NATIVE_CHAR             *register_name,
-	u32                     value)
+	u32                     value,
+	u32                     offset)
 {
 
 	REPORT_ERROR (
-		("Invalid FADT register value, %s=%X (FADT=%p)\n",
-		register_name, value, acpi_gbl_FADT));
+		("Invalid FADT value %s=%lX at offset %lX FADT=%p\n",
+		register_name, value, offset, acpi_gbl_FADT));
 
 
 	return (AE_BAD_VALUE);
@@ -91,39 +95,42 @@ acpi_cm_validate_fadt (
 
 	if (acpi_gbl_FADT->pm1_evt_len < 4) {
 		status = acpi_cm_fadt_register_error ("PM1_EVT_LEN",
-				  (u32) acpi_gbl_FADT->pm1_evt_len);
+				  (u32) acpi_gbl_FADT->pm1_evt_len,
+				  ACPI_FADT_OFFSET (pm1_evt_len));
 	}
 
 	if (!acpi_gbl_FADT->pm1_cnt_len) {
-		status = acpi_cm_fadt_register_error ("PM1_CNT_LEN",
-				  0);
+		status = acpi_cm_fadt_register_error ("PM1_CNT_LEN", 0,
+				  ACPI_FADT_OFFSET (pm1_cnt_len));
 	}
 
 	if (!ACPI_VALID_ADDRESS (acpi_gbl_FADT->Xpm1a_evt_blk.address)) {
-		status = acpi_cm_fadt_register_error ("PM1a_EVT_BLK",
-				  0);
+		status = acpi_cm_fadt_register_error ("X_PM1a_EVT_BLK", 0,
+				  ACPI_FADT_OFFSET (Xpm1a_evt_blk.address));
 	}
 
 	if (!ACPI_VALID_ADDRESS (acpi_gbl_FADT->Xpm1a_cnt_blk.address)) {
-		status = acpi_cm_fadt_register_error ("PM1a_CNT_BLK",
-				  0);
+		status = acpi_cm_fadt_register_error ("X_PM1a_CNT_BLK", 0,
+				  ACPI_FADT_OFFSET (Xpm1a_cnt_blk.address));
 	}
 
 	if (!ACPI_VALID_ADDRESS (acpi_gbl_FADT->Xpm_tmr_blk.address)) {
-		status = acpi_cm_fadt_register_error ("PM_TMR_BLK",
-				  0);
+		status = acpi_cm_fadt_register_error ("X_PM_TMR_BLK", 0,
+				  ACPI_FADT_OFFSET (Xpm_tmr_blk.address));
 	}
 
 	if ((ACPI_VALID_ADDRESS (acpi_gbl_FADT->Xpm2_cnt_blk.address) &&
 		!acpi_gbl_FADT->pm2_cnt_len))
 	{
 		status = acpi_cm_fadt_register_error ("PM2_CNT_LEN",
-				  (u32) acpi_gbl_FADT->pm2_cnt_len);
+				  (u32) acpi_gbl_FADT->pm2_cnt_len,
+				  ACPI_FADT_OFFSET (pm2_cnt_len));
 	}
 
 	if (acpi_gbl_FADT->pm_tm_len < 4) {
 		status = acpi_cm_fadt_register_error ("PM_TM_LEN",
-				  (u32) acpi_gbl_FADT->pm_tm_len);
+				  (u32) acpi_gbl_FADT->pm_tm_len,
+				  ACPI_FADT_OFFSET (pm_tm_len));
 	}
 
 	/* length of GPE blocks must be a multiple of 2 */
@@ -132,15 +139,17 @@ acpi_cm_validate_fadt (
 	if (ACPI_VALID_ADDRESS (acpi_gbl_FADT->Xgpe0blk.address) &&
 		(acpi_gbl_FADT->gpe0blk_len & 1))
 	{
-		status = acpi_cm_fadt_register_error ("GPE0_BLK_LEN",
-				  (u32) acpi_gbl_FADT->gpe0blk_len);
+		status = acpi_cm_fadt_register_error ("(x)GPE0_BLK_LEN",
+				  (u32) acpi_gbl_FADT->gpe0blk_len,
+				  ACPI_FADT_OFFSET (gpe0blk_len));
 	}
 
 	if (ACPI_VALID_ADDRESS (acpi_gbl_FADT->Xgpe1_blk.address) &&
 		(acpi_gbl_FADT->gpe1_blk_len & 1))
 	{
-		status = acpi_cm_fadt_register_error ("GPE1_BLK_LEN",
-				  (u32) acpi_gbl_FADT->gpe1_blk_len);
+		status = acpi_cm_fadt_register_error ("(x)GPE1_BLK_LEN",
+				  (u32) acpi_gbl_FADT->gpe1_blk_len,
+				  ACPI_FADT_OFFSET (gpe1_blk_len));
 	}
 
 	return (status);

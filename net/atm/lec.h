@@ -16,9 +16,9 @@
 
 #if defined (CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
 #include <linux/if_bridge.h>
-struct net_bridge_fdb_entry *(*br_fdb_get_hook)(struct net_bridge *br,
+extern struct net_bridge_fdb_entry *(*br_fdb_get_hook)(struct net_bridge *br,
                                                 unsigned char *addr);
-void (*br_fdb_put_hook)(struct net_bridge_fdb_entry *ent);
+extern void (*br_fdb_put_hook)(struct net_bridge_fdb_entry *ent);
 #endif /* defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE) */
 
 #define LEC_HEADER_LEN 16

@@ -1,4 +1,4 @@
-/* $Id: mostek.h,v 1.3 1999/08/30 10:14:50 davem Exp $
+/* $Id: mostek.h,v 1.4 2001/01/11 15:07:09 davem Exp $
  * mostek.h:  Describes the various Mostek time of day clock registers.
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
@@ -66,6 +66,7 @@ static __inline__ void mostek_write(unsigned long addr, u8 val)
 #define MOSTEK_MONTH		0x07feUL
 #define MOSTEK_YEAR		0x07ffUL
 
+extern spinlock_t mostek_lock;
 extern unsigned long mstk48t02_regs;
 
 /* Control register values. */

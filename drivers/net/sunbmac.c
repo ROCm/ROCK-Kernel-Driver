@@ -1,11 +1,8 @@
-/* $Id: sunbmac.c,v 1.21 2000/10/22 16:08:38 davem Exp $
+/* $Id: sunbmac.c,v 1.23 2001/01/20 03:36:40 davem Exp $
  * sunbmac.c: Driver for Sparc BigMAC 100baseT ethernet adapters.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@redhat.com)
  */
-
-static char *version =
-        "sunbmac.c:v1.9 11/Sep/99 David S. Miller (davem@redhat.com)\n";
 
 #include <linux/module.h>
 
@@ -40,6 +37,9 @@ static char *version =
 #include <linux/skbuff.h>
 
 #include "sunbmac.h"
+
+static char version[] __initdata =
+        "sunbmac.c:v1.9 11/Sep/99 David S. Miller (davem@redhat.com)\n";
 
 #undef DEBUG_PROBE
 #undef DEBUG_TX
@@ -1051,16 +1051,19 @@ static void bigmac_set_multicast(struct net_device *dev)
 
 static int __init bigmac_ether_init(struct net_device *dev, struct sbus_dev *qec_sdev)
 {
-	static int version_printed = 0;
-	struct bigmac *bp = 0;
+	static int version_printed;
+	struct bigmac *bp;
 	u8 bsizes, bsizes_more;
-	int i, res = ENOMEM;
+	int i;
 
 	/* Get a new device struct for this interface. */
 	dev = init_etherdev(0, sizeof(struct bigmac));
 
 	if (version_printed++ == 0)
 		printk(KERN_INFO "%s", version);
+
+	if (!dev)
+		return -ENOMEM;
 
 	/* Report what we have found to the user. */
 	printk(KERN_INFO "%s: BigMAC 100baseT Ethernet ", dev->name);
@@ -1076,9 +1079,6 @@ static int __init bigmac_ether_init(struct net_device *dev, struct sbus_dev *qec
 	bp->bigmac_sdev = qec_sdev->child;
 
 	spin_lock_init(&bp->lock);
-
-	/* All further failures we find return this. */
-	res = ENODEV;
 
 	/* Verify the registers we expect, are actually there. */
 	if ((bp->bigmac_sdev->num_registers != 3) ||
@@ -1205,28 +1205,25 @@ static int __init bigmac_ether_init(struct net_device *dev, struct sbus_dev *qec
 
 fail_and_cleanup:
 	/* Something went wrong, undo whatever we did so far. */
-	if (bp) {
-		/* Free register mappings if any. */
-		if (bp->gregs)
-			sbus_iounmap(bp->gregs, GLOB_REG_SIZE);
-		if (bp->creg)
-			sbus_iounmap(bp->creg, CREG_REG_SIZE);
-		if (bp->bregs)
-			sbus_iounmap(bp->bregs, BMAC_REG_SIZE);
-		if (bp->tregs)
-			sbus_iounmap(bp->tregs, TCVR_REG_SIZE);
+	/* Free register mappings if any. */
+	if (bp->gregs)
+		sbus_iounmap(bp->gregs, GLOB_REG_SIZE);
+	if (bp->creg)
+		sbus_iounmap(bp->creg, CREG_REG_SIZE);
+	if (bp->bregs)
+		sbus_iounmap(bp->bregs, BMAC_REG_SIZE);
+	if (bp->tregs)
+		sbus_iounmap(bp->tregs, TCVR_REG_SIZE);
 
-		if (bp->bmac_block)
-			sbus_free_consistent(bp->bigmac_sdev,
-					     PAGE_SIZE,
-					     bp->bmac_block,
-					     bp->bblock_dvma);
+	if (bp->bmac_block)
+		sbus_free_consistent(bp->bigmac_sdev,
+				     PAGE_SIZE,
+				     bp->bmac_block,
+				     bp->bblock_dvma);
 
-		/* Free the BigMAC softc. */
-		kfree(bp);
-		dev->priv = 0;
-	}
-	return res;	/* Return error code. */
+	unregister_netdev(dev);
+	kfree(dev);
+	return -ENODEV;
 }
 
 /* QEC can be the parent of either QuadEthernet or

@@ -1,4 +1,4 @@
-/* $Id: flash.c,v 1.20 2000/11/08 04:57:49 davem Exp $
+/* $Id: flash.c,v 1.21 2001/01/11 15:29:36 davem Exp $
  * flash.c: Allow mmap access to the OBP Flash, for OBP updates.
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
@@ -14,6 +14,7 @@
 #include <linux/poll.h>
 #include <linux/init.h>
 #include <linux/smp_lock.h>
+#include <linux/spinlock.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -22,6 +23,7 @@
 #include <asm/sbus.h>
 #include <asm/ebus.h>
 
+static spinlock_t flash_lock = SPIN_LOCK_UNLOCKED;
 static struct {
 	unsigned long read_base;	/* Physical read address */
 	unsigned long write_base;	/* Physical write address */
@@ -38,14 +40,14 @@ flash_mmap(struct file *file, struct vm_area_struct *vma)
 	unsigned long addr;
 	unsigned long size;
 
-	lock_kernel();
+	spin_lock(&flash_lock);
 	if (flash.read_base == flash.write_base) {
 		addr = flash.read_base;
 		size = flash.read_size;
 	} else {
 		if ((vma->vm_flags & VM_READ) &&
 		    (vma->vm_flags & VM_WRITE)) {
-			unlock_kernel();
+			spin_unlock(&flash_lock);
 			return -EINVAL;
 		}
 		if (vma->vm_flags & VM_READ) {
@@ -55,11 +57,11 @@ flash_mmap(struct file *file, struct vm_area_struct *vma)
 			addr = flash.write_base;
 			size = flash.write_size;
 		} else {
-			unlock_kernel();
+			spin_unlock(&flash_lock);
 			return -ENXIO;
 		}
 	}
-	unlock_kernel();
+	spin_unlock(&flash_lock);
 
 	if ((vma->vm_pgoff << PAGE_SHIFT) > size)
 		return -ENXIO;
@@ -127,9 +129,10 @@ flash_open(struct inode *inode, struct file *file)
 static int
 flash_release(struct inode *inode, struct file *file)
 {
-	lock_kernel();
+	spin_lock(&flash_lock);
 	flash.busy = 0;
-	unlock_kernel();
+	spin_unlock(&flash_lock);
+
 	return 0;
 }
 

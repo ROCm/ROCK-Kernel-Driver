@@ -50,7 +50,7 @@
  */
 #define LVX(r,a,b)	.long	(31<<26)+((r)<<21)+((a)<<16)+((b)<<11)+(103<<1)
 #define STVX(r,a,b)	.long	(31<<26)+((r)<<21)+((a)<<16)+((b)<<11)+(231<<1)
-#define MFVSCR(r)	.long	(4<<26)+((r)<<21)+(1540<<1)
+#define MFVSCR(r)	.long	(4<<26)+((r)<<21)+(770<<1)
 #define MTVSCR(r)	.long	(4<<26)+((r)<<11)+(802<<1)
 
 #define SAVE_VR(n,b,base)	li b,THREAD_VR0+(16*(n)); STVX(n,b,base)
@@ -66,9 +66,13 @@
 #define REST_16VR(n,b,base)	REST_8VR(n,b,base); REST_8VR(n+8,b,base) 
 #define REST_32VR(n,b,base)	REST_16VR(n,b,base); REST_16VR(n+16,b,base)
 
+#ifdef CONFIG_PPC601_SYNC_FIX
 #define SYNC \
 	sync; \
 	isync
+#else
+#define	SYNC
+#endif
 
 /*
  * This instruction is not implemented on the PPC 603 or 601; however, on

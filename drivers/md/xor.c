@@ -57,8 +57,7 @@ xor_block(unsigned int count, struct buffer_head **bh_ptr)
 /* Set of all registered templates.  */
 static struct xor_block_template *template_list;
 
-/* The -6*32 shift factor colors the cache.  */
-#define BENCH_SIZE (PAGE_SIZE-6*32)
+#define BENCH_SIZE (PAGE_SIZE)
 
 static void
 do_xor_speed(struct xor_block_template *tmpl, void *b1, void *b2)

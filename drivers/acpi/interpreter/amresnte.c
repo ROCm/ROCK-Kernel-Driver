@@ -2,12 +2,12 @@
 /******************************************************************************
  *
  * Module Name: amresnte - AML Interpreter object resolution
- *              $Revision: 25 $
+ *              $Revision: 27 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -55,7 +55,7 @@
  * can be either a pointer to an actual internal object or a pointer into the
  * AML stream itself.  These types are currently:
  *
- *      ACPI_TYPE_NUMBER
+ *      ACPI_TYPE_INTEGER
  *      ACPI_TYPE_STRING
  *      ACPI_TYPE_BUFFER
  *      ACPI_TYPE_MUTEX
@@ -208,14 +208,14 @@ acpi_aml_resolve_node_to_value (
 		break;
 
 
-	case ACPI_TYPE_NUMBER:
+	case ACPI_TYPE_INTEGER:
 
 		/*
 		 * The Node has an attached internal object, make sure that it's a
 		 * number
 		 */
 
-		if (ACPI_TYPE_NUMBER != val_desc->common.type) {
+		if (ACPI_TYPE_INTEGER != val_desc->common.type) {
 			return (AE_AML_OPERAND_TYPE);
 		}
 
@@ -244,7 +244,7 @@ acpi_aml_resolve_node_to_value (
 			object_type = ACPI_TYPE_BUFFER;
 		}
 		else {
-			object_type = ACPI_TYPE_NUMBER;
+			object_type = ACPI_TYPE_INTEGER;
 		}
 
 		/*
@@ -282,7 +282,7 @@ acpi_aml_resolve_node_to_value (
 				return (status);
 			}
 
-			obj_desc->number.value = temp_val;
+			obj_desc->integer.value = temp_val;
 		}
 
 
@@ -330,12 +330,12 @@ acpi_aml_resolve_node_to_value (
 
 		/* Create an object for the result */
 
-		obj_desc = acpi_cm_create_internal_object (ACPI_TYPE_NUMBER);
+		obj_desc = acpi_cm_create_internal_object (ACPI_TYPE_INTEGER);
 		if (!obj_desc) {
 			return (AE_NO_MEMORY);
 		}
 
-		obj_desc->number.value = temp_val;
+		obj_desc->integer.value = temp_val;
 		break;
 
 
@@ -378,12 +378,12 @@ acpi_aml_resolve_node_to_value (
 
 		/* Create an object for the result */
 
-		obj_desc = acpi_cm_create_internal_object (ACPI_TYPE_NUMBER);
+		obj_desc = acpi_cm_create_internal_object (ACPI_TYPE_INTEGER);
 		if (!obj_desc) {
 			return (AE_NO_MEMORY);
 		}
 
-		obj_desc->number.value = temp_val;
+		obj_desc->integer.value = temp_val;
 		break;
 
 
@@ -477,12 +477,12 @@ acpi_aml_resolve_node_to_value (
 
 		/* Create object for result */
 
-		obj_desc = acpi_cm_create_internal_object (ACPI_TYPE_NUMBER);
+		obj_desc = acpi_cm_create_internal_object (ACPI_TYPE_INTEGER);
 		if (!obj_desc) {
 			return (AE_NO_MEMORY);
 		}
 
-		obj_desc->number.value = temp_val;
+		obj_desc->integer.value = temp_val;
 
 		/* Truncate value if we are executing from a 32-bit ACPI table */
 

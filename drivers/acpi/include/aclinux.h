@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Name: aclinux.h - OS specific defines, etc.
- *       $Revision: 6 $
+ *       $Revision: 7 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -29,6 +29,7 @@
 
 #define ACPI_OS_NAME                "Linux"
 
+#include <linux/config.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
 #include <linux/ctype.h>

@@ -47,24 +47,35 @@ atomic_t zeropage_calls; /* # zero'd pages request that've been made */
 
 int idled(void)
 {
+	int do_power_save = 0;
+
+	/* only sleep on the 603-family/750 processors */
+	switch (_get_PVR() >> 16) {
+	case 3:			/* 603 */
+	case 6:			/* 603e */
+	case 7:			/* 603ev */
+	case 8:			/* 750 */
+	case 12:		/* 7400 */
+		do_power_save = 1;
+	}
+
 	/* endless loop with no priority at all */
 	current->nice = 20;
 	current->counter = -100;
 	init_idle();	
 	for (;;)
 	{
-		__sti();
-		
-		check_pgt_cache();
+		/*if ( !current->need_resched && zero_paged_on )
+			zero_paged();*/
+		if (!current->need_resched && htab_reclaim_on)
+			htab_reclaim();
+		if (do_power_save && !current->need_resched)
+			power_save();
 
-		/*if ( !current->need_resched && zero_paged_on ) zero_paged();*/
-		if ( !current->need_resched && htab_reclaim_on ) htab_reclaim();
-		if ( !current->need_resched ) power_save();
-
-#ifdef CONFIG_SMP
-		if (current->need_resched)
-#endif
+		if (current->need_resched) {
 			schedule();
+			check_pgt_cache();
+		}
 	}
 	return 0;
 }
@@ -278,31 +289,31 @@ void zero_paged(void)
 
 void power_save(void)
 {
-	unsigned long msr, hid0;
-
-	/* only sleep on the 603-family/750 processors */
-	switch (_get_PVR() >> 16) {
-	case 3:			/* 603 */
-	case 6:			/* 603e */
-	case 7:			/* 603ev */
-	case 8:			/* 750 */
-	case 12:		/* 7400 */
-		save_flags(msr);
-		__cli();
-		if (!current->need_resched) {
-			asm("mfspr %0,1008" : "=r" (hid0) :);
-			hid0 &= ~(HID0_NAP | HID0_SLEEP | HID0_DOZE);
-			hid0 |= (powersave_nap? HID0_NAP: HID0_DOZE) | HID0_DPM;
-			asm("mtspr 1008,%0" : : "r" (hid0));
+	unsigned long hid0;
+	/*
+	 * Disable interrupts to prevent a lost wakeup
+	 * when going to sleep.  This is necessary even with
+	 * RTLinux since we are not guaranteed an interrupt
+	 * didn't come in and is waiting for a __sti() before
+	 * emulating one.  This way, we really do hard disable.
+	 * 
+	 * We assume that we're sti-ed when we come in here.  We
+	 * are in the idle loop so if we're cli-ed then it's a bug
+	 * anyway.
+	 *  -- Cort
+	 */
+	_nmask_and_or_msr(MSR_EE, 0);
+	if (!current->need_resched)
+	{
+		asm("mfspr %0,1008" : "=r" (hid0) :);
+		hid0 &= ~(HID0_NAP | HID0_SLEEP | HID0_DOZE);
+		hid0 |= (powersave_nap? HID0_NAP: HID0_DOZE) | HID0_DPM;
+		asm("mtspr 1008,%0" : : "r" (hid0));
 		
-			/* set the POW bit in the MSR, and enable interrupts
-			 * so we wake up sometime! */
-			__sti(); /* this keeps rtl from getting confused -- Cort */
-			_nmask_and_or_msr(0, MSR_POW | MSR_EE);
-		}
-		restore_flags(msr);
-	default:
-		return;
+		/* set the POW bit in the MSR, and enable interrupts
+		 * so we wake up sometime! */
+		_nmask_and_or_msr(0, MSR_POW | MSR_EE);
 	}
+	_nmask_and_or_msr(0, MSR_EE);
 }
 

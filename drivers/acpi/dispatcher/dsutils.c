@@ -1,12 +1,12 @@
 /*******************************************************************************
  *
  * Module Name: dsutils - Dispatcher utilities
- *              $Revision: 50 $
+ *              $Revision: 52 $
  *
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -566,7 +566,7 @@ acpi_ds_map_opcode_to_data_type (
 		case AML_WORD_OP:
 		case AML_DWORD_OP:
 
-			data_type = ACPI_TYPE_NUMBER;
+			data_type = ACPI_TYPE_INTEGER;
 			break;
 
 

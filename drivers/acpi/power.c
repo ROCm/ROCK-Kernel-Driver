@@ -81,12 +81,12 @@ proc_read_ac_adapter_status(char *page, char **start, off_t off,
 	buf.length = sizeof(obj);
 	buf.pointer = &obj;
 	if (!ACPI_SUCCESS(acpi_evaluate_object(ac_handle, "_PSR", NULL, &buf))
-		|| obj.type != ACPI_TYPE_NUMBER) {
+		|| obj.type != ACPI_TYPE_INTEGER) {
 		p += sprintf(p, "Could not read AC status\n");
 		goto end;
 	}
 
-	if (obj.number.value)
+	if (obj.integer.value)
 		p += sprintf(p, "on-line\n");
 	else
 		p += sprintf(p, "off-line\n");

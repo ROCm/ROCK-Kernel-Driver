@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: amdyadic - ACPI AML (p-code) execution for dyadic operators
- *              $Revision: 68 $
+ *              $Revision: 71 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -37,7 +37,174 @@
 	 MODULE_NAME         ("amdyadic")
 
 
-/*****************************************************************************
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_aml_do_concatenate
+ *
+ * PARAMETERS:  *Obj_desc       - Object to be converted.  Must be an
+ *                                Integer, Buffer, or String
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Concatenate two objects OF THE SAME TYPE.
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+acpi_aml_do_concatenate (
+	ACPI_OPERAND_OBJECT     *obj_desc,
+	ACPI_OPERAND_OBJECT     *obj_desc2,
+	ACPI_OPERAND_OBJECT     **actual_ret_desc,
+	ACPI_WALK_STATE         *walk_state)
+{
+	ACPI_STATUS             status;
+	u32                     i;
+	ACPI_INTEGER            this_integer;
+	ACPI_OPERAND_OBJECT     *ret_desc;
+	NATIVE_CHAR             *new_buf;
+	u32                     integer_size = sizeof (ACPI_INTEGER);
+
+
+	/*
+	 * There are three cases to handle:
+	 * 1) Two Integers concatenated to produce a buffer
+	 * 2) Two Strings concatenated to produce a string
+	 * 3) Two Buffers concatenated to produce a buffer
+	 */
+	switch (obj_desc->common.type)
+	{
+	case ACPI_TYPE_INTEGER:
+
+		/* Handle both ACPI 1.0 and ACPI 2.0 Integer widths */
+
+		if (walk_state->method_node->flags & ANOBJ_DATA_WIDTH_32) {
+			/*
+			 * We are running a method that exists in a 32-bit ACPI table.
+			 * Truncate the value to 32 bits by zeroing out the upper
+			 * 32-bit field
+			 */
+			integer_size = sizeof (u32);
+		}
+
+		/* Result of two integers is a buffer */
+
+		ret_desc = acpi_cm_create_internal_object (ACPI_TYPE_BUFFER);
+		if (!ret_desc) {
+			return (AE_NO_MEMORY);
+		}
+
+		/* Need enough space for two integers */
+
+		ret_desc->buffer.length = integer_size * 2;
+		new_buf = acpi_cm_callocate (ret_desc->buffer.length);
+		if (!new_buf) {
+			REPORT_ERROR
+				(("Aml_exec_dyadic2_r/Concat_op: Buffer allocation failure\n"));
+			status = AE_NO_MEMORY;
+			goto cleanup;
+		}
+
+		ret_desc->buffer.pointer = (u8 *) new_buf;
+
+		/* Convert the first integer */
+
+		this_integer = obj_desc->integer.value;
+		for (i = 0; i < integer_size; i++) {
+			new_buf[i] = (u8) this_integer;
+			this_integer >>= 8;
+		}
+
+		/* Convert the second integer */
+
+		this_integer = obj_desc2->integer.value;
+		for (; i < (integer_size * 2); i++) {
+			new_buf[i] = (u8) this_integer;
+			this_integer >>= 8;
+		}
+
+		break;
+
+
+	case ACPI_TYPE_STRING:
+
+		ret_desc = acpi_cm_create_internal_object (ACPI_TYPE_STRING);
+		if (!ret_desc) {
+			return (AE_NO_MEMORY);
+		}
+
+		/* Operand1 is string  */
+
+		new_buf = acpi_cm_allocate (obj_desc->string.length +
+				  obj_desc2->string.length + 1);
+		if (!new_buf) {
+			REPORT_ERROR
+				(("Aml_exec_dyadic2_r/Concat_op: String allocation failure\n"));
+			status = AE_NO_MEMORY;
+			goto cleanup;
+		}
+
+		STRCPY (new_buf, obj_desc->string.pointer);
+		STRCPY (new_buf + obj_desc->string.length,
+				  obj_desc2->string.pointer);
+
+		/* Point the return object to the new string */
+
+		ret_desc->string.pointer = new_buf;
+		ret_desc->string.length = obj_desc->string.length +=
+				  obj_desc2->string.length;
+		break;
+
+
+	case ACPI_TYPE_BUFFER:
+
+		/* Operand1 is a buffer */
+
+		ret_desc = acpi_cm_create_internal_object (ACPI_TYPE_BUFFER);
+		if (!ret_desc) {
+			return (AE_NO_MEMORY);
+		}
+
+		new_buf = acpi_cm_allocate (obj_desc->buffer.length +
+				  obj_desc2->buffer.length);
+		if (!new_buf) {
+			REPORT_ERROR
+				(("Aml_exec_dyadic2_r/Concat_op: Buffer allocation failure\n"));
+			status = AE_NO_MEMORY;
+			goto cleanup;
+		}
+
+		MEMCPY (new_buf, obj_desc->buffer.pointer,
+				  obj_desc->buffer.length);
+		MEMCPY (new_buf + obj_desc->buffer.length, obj_desc2->buffer.pointer,
+				  obj_desc2->buffer.length);
+
+		/*
+		 * Point the return object to the new buffer
+		 */
+
+		ret_desc->buffer.pointer    = (u8 *) new_buf;
+		ret_desc->buffer.length     = obj_desc->buffer.length +
+				 obj_desc2->buffer.length;
+		break;
+
+	default:
+		status = AE_AML_INTERNAL;
+		ret_desc = NULL;
+	}
+
+
+	*actual_ret_desc = ret_desc;
+	return (AE_OK);
+
+
+cleanup:
+
+	acpi_cm_remove_reference (ret_desc);
+	return (status);
+}
+
+
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_aml_exec_dyadic1
  *
@@ -50,7 +217,7 @@
  *
  * ALLOCATION:  Deletes both operands
  *
- ****************************************************************************/
+ ******************************************************************************/
 
 ACPI_STATUS
 acpi_aml_exec_dyadic1 (
@@ -106,7 +273,7 @@ acpi_aml_exec_dyadic1 (
 
 				/* Dispatch the notify to the appropriate handler */
 
-				acpi_ev_notify_dispatch (node, (u32) val_desc->number.value);
+				acpi_ev_notify_dispatch (node, (u32) val_desc->integer.value);
 				break;
 
 			default:
@@ -135,7 +302,7 @@ cleanup:
 }
 
 
-/*****************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_aml_exec_dyadic2_r
  *
@@ -148,7 +315,7 @@ cleanup:
  *
  * ALLOCATION:  Deletes one operand descriptor -- other remains on stack
  *
- ****************************************************************************/
+ ******************************************************************************/
 
 ACPI_STATUS
 acpi_aml_exec_dyadic2_r (
@@ -164,7 +331,6 @@ acpi_aml_exec_dyadic2_r (
 	ACPI_OPERAND_OBJECT     *ret_desc2  = NULL;
 	ACPI_STATUS             status      = AE_OK;
 	u32                     num_operands = 3;
-	NATIVE_CHAR             *new_buf;
 
 
 	/* Resolve all operands */
@@ -201,7 +367,7 @@ acpi_aml_exec_dyadic2_r (
 	case AML_SHIFT_RIGHT_OP:
 	case AML_SUBTRACT_OP:
 
-		ret_desc = acpi_cm_create_internal_object (ACPI_TYPE_NUMBER);
+		ret_desc = acpi_cm_create_internal_object (ACPI_TYPE_INTEGER);
 		if (!ret_desc) {
 			status = AE_NO_MEMORY;
 			goto cleanup;
@@ -222,8 +388,8 @@ acpi_aml_exec_dyadic2_r (
 
 	case AML_ADD_OP:
 
-		ret_desc->number.value = obj_desc->number.value +
-				 obj_desc2->number.value;
+		ret_desc->integer.value = obj_desc->integer.value +
+				 obj_desc2->integer.value;
 		break;
 
 
@@ -231,8 +397,8 @@ acpi_aml_exec_dyadic2_r (
 
 	case AML_BIT_AND_OP:
 
-		ret_desc->number.value = obj_desc->number.value &
-				 obj_desc2->number.value;
+		ret_desc->integer.value = obj_desc->integer.value &
+				 obj_desc2->integer.value;
 		break;
 
 
@@ -240,8 +406,8 @@ acpi_aml_exec_dyadic2_r (
 
 	case AML_BIT_NAND_OP:
 
-		ret_desc->number.value = ~(obj_desc->number.value &
-				   obj_desc2->number.value);
+		ret_desc->integer.value = ~(obj_desc->integer.value &
+				   obj_desc2->integer.value);
 		break;
 
 
@@ -249,8 +415,8 @@ acpi_aml_exec_dyadic2_r (
 
 	case AML_BIT_OR_OP:
 
-		ret_desc->number.value = obj_desc->number.value |
-				 obj_desc2->number.value;
+		ret_desc->integer.value = obj_desc->integer.value |
+				 obj_desc2->integer.value;
 		break;
 
 
@@ -258,8 +424,8 @@ acpi_aml_exec_dyadic2_r (
 
 	case AML_BIT_NOR_OP:
 
-		ret_desc->number.value = ~(obj_desc->number.value |
-				   obj_desc2->number.value);
+		ret_desc->integer.value = ~(obj_desc->integer.value |
+				   obj_desc2->integer.value);
 		break;
 
 
@@ -267,16 +433,16 @@ acpi_aml_exec_dyadic2_r (
 
 	case AML_BIT_XOR_OP:
 
-		ret_desc->number.value = obj_desc->number.value ^
-				 obj_desc2->number.value;
+		ret_desc->integer.value = obj_desc->integer.value ^
+				 obj_desc2->integer.value;
 		break;
 
 
-	/* Def_divide  :=  Divide_op Dividend Divisor Remainder Quotient   */
+	/* Def_divide  :=  Divide_op Dividend Divisor Remainder Quotient */
 
 	case AML_DIVIDE_OP:
 
-		if (!obj_desc2->number.value) {
+		if (!obj_desc2->integer.value) {
 			REPORT_ERROR
 				(("Aml_exec_dyadic2_r/Divide_op: Divide by zero\n"));
 
@@ -284,7 +450,7 @@ acpi_aml_exec_dyadic2_r (
 			goto cleanup;
 		}
 
-		ret_desc2 = acpi_cm_create_internal_object (ACPI_TYPE_NUMBER);
+		ret_desc2 = acpi_cm_create_internal_object (ACPI_TYPE_INTEGER);
 		if (!ret_desc2) {
 			status = AE_NO_MEMORY;
 			goto cleanup;
@@ -292,13 +458,13 @@ acpi_aml_exec_dyadic2_r (
 
 		/* Remainder (modulo) */
 
-		ret_desc->number.value  = ACPI_MODULO (obj_desc->number.value,
-				  obj_desc2->number.value);
+		ret_desc->integer.value  = ACPI_MODULO (obj_desc->integer.value,
+				  obj_desc2->integer.value);
 
 		/* Result (what we used to call the quotient) */
 
-		ret_desc2->number.value = ACPI_DIVIDE (obj_desc->number.value,
-				  obj_desc2->number.value);
+		ret_desc2->integer.value = ACPI_DIVIDE (obj_desc->integer.value,
+				  obj_desc2->integer.value);
 		break;
 
 
@@ -306,8 +472,8 @@ acpi_aml_exec_dyadic2_r (
 
 	case AML_MULTIPLY_OP:
 
-		ret_desc->number.value = obj_desc->number.value *
-				 obj_desc2->number.value;
+		ret_desc->integer.value = obj_desc->integer.value *
+				 obj_desc2->integer.value;
 		break;
 
 
@@ -315,8 +481,8 @@ acpi_aml_exec_dyadic2_r (
 
 	case AML_SHIFT_LEFT_OP:
 
-		ret_desc->number.value = obj_desc->number.value <<
-				 obj_desc2->number.value;
+		ret_desc->integer.value = obj_desc->integer.value <<
+				 obj_desc2->integer.value;
 		break;
 
 
@@ -324,8 +490,8 @@ acpi_aml_exec_dyadic2_r (
 
 	case AML_SHIFT_RIGHT_OP:
 
-		ret_desc->number.value = obj_desc->number.value >>
-				 obj_desc2->number.value;
+		ret_desc->integer.value = obj_desc->integer.value >>
+				 obj_desc2->integer.value;
 		break;
 
 
@@ -333,8 +499,8 @@ acpi_aml_exec_dyadic2_r (
 
 	case AML_SUBTRACT_OP:
 
-		ret_desc->number.value = obj_desc->number.value -
-				 obj_desc2->number.value;
+		ret_desc->integer.value = obj_desc->integer.value -
+				 obj_desc2->integer.value;
 		break;
 
 
@@ -342,79 +508,54 @@ acpi_aml_exec_dyadic2_r (
 
 	case AML_CONCAT_OP:
 
-		if (obj_desc2->common.type != obj_desc->common.type) {
-			status = AE_AML_OPERAND_TYPE;
+
+		/*
+		 * Convert the second operand if necessary.  The first operand
+		 * determines the type of the second operand, (See the Data Types
+		 * section of the ACPI specification.)  Both object types are
+		 * guaranteed to be either Integer/String/Buffer by the operand
+		 * resolution mechanism above.
+		 */
+
+		switch (obj_desc->common.type)
+		{
+		case ACPI_TYPE_INTEGER:
+			status = acpi_aml_convert_to_integer (&obj_desc2, walk_state);
+			break;
+
+		case ACPI_TYPE_STRING:
+			status = acpi_aml_convert_to_string (&obj_desc2, walk_state);
+			break;
+
+		case ACPI_TYPE_BUFFER:
+			status = acpi_aml_convert_to_buffer (&obj_desc2, walk_state);
+			break;
+
+		default:
+			status = AE_AML_INTERNAL;
+		}
+
+		if (ACPI_FAILURE (status)) {
 			goto cleanup;
 		}
 
-		/* Both operands are now known to be the same */
 
-		if (ACPI_TYPE_STRING == obj_desc->common.type) {
-			ret_desc = acpi_cm_create_internal_object (ACPI_TYPE_STRING);
-			if (!ret_desc) {
-				status = AE_NO_MEMORY;
-				goto cleanup;
-			}
-
-			/* Operand1 is string  */
-
-			new_buf = acpi_cm_allocate (obj_desc->string.length +
-					  obj_desc2->string.length + 1);
-			if (!new_buf) {
-				REPORT_ERROR
-					(("Aml_exec_dyadic2_r/Concat_op: String allocation failure\n"));
-				status = AE_NO_MEMORY;
-				goto cleanup;
-			}
-
-			STRCPY (new_buf, obj_desc->string.pointer);
-			STRCPY (new_buf + obj_desc->string.length,
-					  obj_desc2->string.pointer);
-
-			/* Point the return object to the new string */
-
-			ret_desc->string.pointer = new_buf;
-			ret_desc->string.length = obj_desc->string.length +=
-					  obj_desc2->string.length;
-		}
-
-		else {
-			/* Operand1 is not a string ==> must be a buffer */
-
-			ret_desc = acpi_cm_create_internal_object (ACPI_TYPE_BUFFER);
-			if (!ret_desc) {
-				status = AE_NO_MEMORY;
-				goto cleanup;
-			}
-
-			new_buf = acpi_cm_allocate (obj_desc->buffer.length +
-					  obj_desc2->buffer.length);
-			if (!new_buf) {
-				REPORT_ERROR
-					(("Aml_exec_dyadic2_r/Concat_op: Buffer allocation failure\n"));
-				status = AE_NO_MEMORY;
-				goto cleanup;
-			}
-
-			MEMCPY (new_buf, obj_desc->buffer.pointer,
-					  obj_desc->buffer.length);
-			MEMCPY (new_buf + obj_desc->buffer.length, obj_desc2->buffer.pointer,
-					  obj_desc2->buffer.length);
-
-			/*
-			 * Point the return object to the new buffer
-			 */
-
-			ret_desc->buffer.pointer    = (u8 *) new_buf;
-			ret_desc->buffer.length     = obj_desc->buffer.length +
-					 obj_desc2->buffer.length;
+		/*
+		 * Both operands are now known to be the same object type
+		 * (Both are Integer, String, or Buffer), and we can now perform the
+		 * concatenation.
+		 */
+		status = acpi_aml_do_concatenate (obj_desc, obj_desc2, &ret_desc, walk_state);
+		if (ACPI_FAILURE (status)) {
+			goto cleanup;
 		}
 		break;
 
 
 	default:
 
-		REPORT_ERROR (("Acpi_aml_exec_dyadic2_r: Unknown dyadic opcode %X\n", opcode));
+		REPORT_ERROR (("Acpi_aml_exec_dyadic2_r: Unknown dyadic opcode %X\n",
+				opcode));
 		status = AE_AML_BAD_OPCODE;
 		goto cleanup;
 	}
@@ -474,7 +615,7 @@ cleanup:
 }
 
 
-/*****************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_aml_exec_dyadic2_s
  *
@@ -486,7 +627,7 @@ cleanup:
  *
  * ALLOCATION:  Deletes one operand descriptor -- other remains on stack
  *
- ****************************************************************************/
+ ******************************************************************************/
 
 ACPI_STATUS
 acpi_aml_exec_dyadic2_s (
@@ -516,7 +657,7 @@ acpi_aml_exec_dyadic2_s (
 
 	/* Create the internal return object */
 
-	ret_desc = acpi_cm_create_internal_object (ACPI_TYPE_NUMBER);
+	ret_desc = acpi_cm_create_internal_object (ACPI_TYPE_INTEGER);
 	if (!ret_desc) {
 		status = AE_NO_MEMORY;
 		goto cleanup;
@@ -524,7 +665,7 @@ acpi_aml_exec_dyadic2_s (
 
 	/* Default return value is FALSE, operation did not time out */
 
-	ret_desc->number.value = 0;
+	ret_desc->integer.value = 0;
 
 
 	/* Examine the opcode */
@@ -562,7 +703,7 @@ acpi_aml_exec_dyadic2_s (
 	 */
 
 	if (status == AE_TIME) {
-		ret_desc->number.value = ACPI_INTEGER_MAX;  /* TRUE, op timed out */
+		ret_desc->integer.value = ACPI_INTEGER_MAX;  /* TRUE, op timed out */
 		status = AE_OK;
 	}
 
@@ -591,7 +732,7 @@ cleanup:
 }
 
 
-/*****************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_aml_exec_dyadic2
  *
@@ -605,7 +746,7 @@ cleanup:
  * ALLOCATION:  Deletes one operand descriptor -- other remains on stack
  *              containing result value
  *
- ****************************************************************************/
+ ******************************************************************************/
 
 ACPI_STATUS
 acpi_aml_exec_dyadic2 (
@@ -636,7 +777,7 @@ acpi_aml_exec_dyadic2 (
 
 	/* Create the internal return object */
 
-	ret_desc = acpi_cm_create_internal_object (ACPI_TYPE_NUMBER);
+	ret_desc = acpi_cm_create_internal_object (ACPI_TYPE_INTEGER);
 	if (!ret_desc) {
 		status = AE_NO_MEMORY;
 		goto cleanup;
@@ -654,8 +795,8 @@ acpi_aml_exec_dyadic2 (
 
 	case AML_LAND_OP:
 
-		lboolean = (u8) (obj_desc->number.value &&
-				  obj_desc2->number.value);
+		lboolean = (u8) (obj_desc->integer.value &&
+				  obj_desc2->integer.value);
 		break;
 
 
@@ -663,8 +804,8 @@ acpi_aml_exec_dyadic2 (
 
 	case AML_LEQUAL_OP:
 
-		lboolean = (u8) (obj_desc->number.value ==
-				  obj_desc2->number.value);
+		lboolean = (u8) (obj_desc->integer.value ==
+				  obj_desc2->integer.value);
 		break;
 
 
@@ -672,8 +813,8 @@ acpi_aml_exec_dyadic2 (
 
 	case AML_LGREATER_OP:
 
-		lboolean = (u8) (obj_desc->number.value >
-				  obj_desc2->number.value);
+		lboolean = (u8) (obj_desc->integer.value >
+				  obj_desc2->integer.value);
 		break;
 
 
@@ -681,8 +822,8 @@ acpi_aml_exec_dyadic2 (
 
 	case AML_LLESS_OP:
 
-		lboolean = (u8) (obj_desc->number.value <
-				  obj_desc2->number.value);
+		lboolean = (u8) (obj_desc->integer.value <
+				  obj_desc2->integer.value);
 		break;
 
 
@@ -690,8 +831,8 @@ acpi_aml_exec_dyadic2 (
 
 	case AML_LOR_OP:
 
-		lboolean = (u8) (obj_desc->number.value ||
-				  obj_desc2->number.value);
+		lboolean = (u8) (obj_desc->integer.value ||
+				  obj_desc2->integer.value);
 		break;
 
 
@@ -707,10 +848,10 @@ acpi_aml_exec_dyadic2 (
 	/* Set return value to logical TRUE (all ones) or FALSE (zero) */
 
 	if (lboolean) {
-		ret_desc->number.value = ACPI_INTEGER_MAX;
+		ret_desc->integer.value = ACPI_INTEGER_MAX;
 	}
 	else {
-		ret_desc->number.value = 0;
+		ret_desc->integer.value = 0;
 	}
 
 

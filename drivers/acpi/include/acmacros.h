@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Name: acmacros.h - C macros for the entire subsystem.
- *       $Revision: 59 $
+ *       $Revision: 62 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -29,6 +29,14 @@
 /*
  * Data manipulation macros
  */
+
+#ifndef LODWORD
+#define LODWORD(l)                      ((u32)(UINT64)(l))
+#endif
+
+#ifndef HIDWORD
+#define HIDWORD(l)                      ((u32)((((UINT64)(l)) >> 32) & 0xFFFFFFFF))
+#endif
 
 #ifndef LOWORD
 #define LOWORD(l)                       ((u16)(NATIVE_UINT)(l))
@@ -64,10 +72,18 @@
 
 
 #ifdef _IA16
+/*
+ * For 16-bit addresses, we have to assume that the upper 32 bits
+ * are zero.
+ */
 #define ACPI_GET_ADDRESS(a)             ((a).lo)
 #define ACPI_STORE_ADDRESS(a,b)         {(a).hi=0;(a).lo=(b);}
-#define ACPI_VALID_ADDRESS(a)           ((a).hi && (a).lo)
+#define ACPI_VALID_ADDRESS(a)           ((a).hi | (a).lo)
+
 #else
+/*
+ * Full 64-bit address on 32-bit and 64-bit platforms
+ */
 #define ACPI_GET_ADDRESS(a)             (a)
 #define ACPI_STORE_ADDRESS(a,b)         ((a)=(b))
 #define ACPI_VALID_ADDRESS(a)           (a)
@@ -335,7 +351,7 @@
  */
 #define return_VOID                     {function_exit(_THIS_MODULE,__LINE__,_COMPONENT,_proc_name);return;}
 #define return_ACPI_STATUS(s)           {function_status_exit(_THIS_MODULE,__LINE__,_COMPONENT,_proc_name,s);return(s);}
-#define return_VALUE(s)                 {function_value_exit(_THIS_MODULE,__LINE__,_COMPONENT,_proc_name,(NATIVE_UINT)s);return(s);}
+#define return_VALUE(s)                 {function_value_exit(_THIS_MODULE,__LINE__,_COMPONENT,_proc_name,(ACPI_INTEGER)s);return(s);}
 #define return_PTR(s)                   {function_ptr_exit(_THIS_MODULE,__LINE__,_COMPONENT,_proc_name,(u8 *)s);return(s);}
 
 
@@ -346,6 +362,8 @@
 
 #define DEBUG_DEFINE(a)                 a;
 #define DEBUG_ONLY_MEMBERS(a)           a;
+#define _OPCODE_NAMES
+#define _VERBOSE_STRUCTURES
 
 
 /* Stack and buffer dumping */
@@ -458,9 +476,8 @@
  */
 #ifdef _IA16
 #undef DEBUG_ONLY_MEMBERS
+#undef _VERBOSE_STRUCTURES
 #define DEBUG_ONLY_MEMBERS(a)
-#undef OP_INFO_ENTRY
-#define OP_INFO_ENTRY(flags,name,Pargs,Iargs)     {flags,Pargs,Iargs}
 #endif
 
 

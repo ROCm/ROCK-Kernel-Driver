@@ -871,6 +871,12 @@ int ncp_create_new(struct inode *dir, struct dentry *dentry, int mode,
 		goto out;
 
 	error = -EACCES;
+	
+	if (S_ISREG(mode) && 
+	    (server->m.flags & NCP_MOUNT_EXTRAS) && 
+	    (mode & S_IXUGO))
+		attributes |= aSYSTEM;
+	
 	result = ncp_open_create_file_or_subdir(server, dir, __name,
 				OC_MODE_CREATE | OC_MODE_OPEN | OC_MODE_REPLACE,
 				attributes, AR_READ | AR_WRITE, &finfo);

@@ -43,15 +43,15 @@ Steve's quick list of things that need finishing off:
  o Hello messages should be generated for each primary address on each
    interface.
 
- o Add more information into /proc/net/decnet and finalise the format to
-   allow DECnet support in netstat.
-
- o Make sure that returned connect messages are generated when they should
-   be, and that the correct error messages are sent too. 
-
  o Add the routing message grabbing netfilter module [written, tested,
    awaiting merge]
 
  o Add perfect socket hashing - an idea suggested by Paul Koning [part written,
    awaiting debugging and merge]
+
+ o Add session control message flow control
+
+ o Add NSP message flow control
+
+ o DECnet sendpages() function
 

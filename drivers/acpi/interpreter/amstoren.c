@@ -3,12 +3,12 @@
  *
  * Module Name: amstoren - AML Interpreter object store support,
  *                         Store to Node (namespace object)
- *              $Revision: 24 $
+ *              $Revision: 26 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -110,7 +110,7 @@ acpi_aml_store_object_to_node (
 	case INTERNAL_TYPE_BANK_FIELD:
 	case INTERNAL_TYPE_INDEX_FIELD:
 	case ACPI_TYPE_FIELD_UNIT:
-	case ACPI_TYPE_NUMBER:
+	case ACPI_TYPE_INTEGER:
 
 		/*
 		 *  These cases all require only number values or values that
@@ -119,13 +119,13 @@ acpi_aml_store_object_to_node (
 		 *  If value is not a Number, try to resolve it to one.
 		 */
 
-		if (val_desc->common.type != ACPI_TYPE_NUMBER) {
+		if (val_desc->common.type != ACPI_TYPE_INTEGER) {
 			/*
 			 *  Initially not a number, convert
 			 */
 			status = acpi_aml_resolve_to_value (&val_desc, walk_state);
 			if (ACPI_SUCCESS (status) &&
-				(val_desc->common.type != ACPI_TYPE_NUMBER))
+				(val_desc->common.type != ACPI_TYPE_INTEGER))
 			{
 				/*
 				 *  Conversion successful but still not a number
@@ -147,7 +147,7 @@ acpi_aml_store_object_to_node (
 		 *  If value is not a valid type, try to resolve it to one.
 		 */
 
-		if ((val_desc->common.type != ACPI_TYPE_NUMBER) &&
+		if ((val_desc->common.type != ACPI_TYPE_INTEGER) &&
 			(val_desc->common.type != ACPI_TYPE_BUFFER) &&
 			(val_desc->common.type != ACPI_TYPE_STRING))
 		{
@@ -156,7 +156,7 @@ acpi_aml_store_object_to_node (
 			 */
 			status = acpi_aml_resolve_to_value (&val_desc, walk_state);
 			if (ACPI_SUCCESS (status) &&
-				(val_desc->common.type != ACPI_TYPE_NUMBER) &&
+				(val_desc->common.type != ACPI_TYPE_INTEGER) &&
 				(val_desc->common.type != ACPI_TYPE_BUFFER) &&
 				(val_desc->common.type != ACPI_TYPE_STRING))
 			{
@@ -269,9 +269,9 @@ acpi_aml_store_object_to_node (
 
 		switch (val_desc->common.type)
 		{
-		case ACPI_TYPE_NUMBER:
-			buffer = (u8 *) &val_desc->number.value;
-			length = sizeof (val_desc->number.value);
+		case ACPI_TYPE_INTEGER:
+			buffer = (u8 *) &val_desc->integer.value;
+			length = sizeof (val_desc->integer.value);
 			break;
 
 		case ACPI_TYPE_BUFFER:
@@ -299,9 +299,9 @@ acpi_aml_store_object_to_node (
 
 		switch (val_desc->common.type)
 		{
-		case ACPI_TYPE_NUMBER:
-			buffer = (u8 *) &val_desc->number.value;
-			length = sizeof (val_desc->number.value);
+		case ACPI_TYPE_INTEGER:
+			buffer = (u8 *) &val_desc->integer.value;
+			length = sizeof (val_desc->integer.value);
 			break;
 
 		case ACPI_TYPE_BUFFER:
@@ -363,9 +363,9 @@ acpi_aml_store_object_to_node (
 
 		switch (val_desc->common.type)
 		{
-		case ACPI_TYPE_NUMBER:
-			buffer = (u8 *) &val_desc->number.value;
-			length = sizeof (val_desc->number.value);
+		case ACPI_TYPE_INTEGER:
+			buffer = (u8 *) &val_desc->integer.value;
+			length = sizeof (val_desc->integer.value);
 			break;
 
 		case ACPI_TYPE_BUFFER:
@@ -422,8 +422,8 @@ acpi_aml_store_object_to_node (
 
 			status = acpi_aml_access_named_field (ACPI_WRITE,
 					   dest_desc->index_field.data,
-					   &val_desc->number.value,
-					   sizeof (val_desc->number.value));
+					   &val_desc->integer.value,
+					   sizeof (val_desc->integer.value));
 		}
 		break;
 
@@ -485,7 +485,7 @@ acpi_aml_store_object_to_node (
 		 * Shift and mask the new value into position,
 		 * and or it into the buffer.
 		 */
-		new_value |= (val_desc->number.value << dest_desc->field_unit.bit_offset) &
+		new_value |= (val_desc->integer.value << dest_desc->field_unit.bit_offset) &
 				 mask;
 
 		/* Store back the value */
@@ -495,10 +495,10 @@ acpi_aml_store_object_to_node (
 		break;
 
 
-	case ACPI_TYPE_NUMBER:
+	case ACPI_TYPE_INTEGER:
 
 
-		dest_desc->number.value = val_desc->number.value;
+		dest_desc->integer.value = val_desc->integer.value;
 
 		/* Truncate value if we are executing from a 32-bit ACPI table */
 

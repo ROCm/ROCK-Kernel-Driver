@@ -206,6 +206,10 @@
 #define __NR_pciconfig_iobase	200
 #define __NR_multiplexer	201
 #define __NR_getdents64		202
+#define __NR_pivot_root		203
+#define __NR_fcntl64		204
+#define __NR_madvise		205
+#define __NR_mincore		206
 
 #define __NR(n)	#n
 

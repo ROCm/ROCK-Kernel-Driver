@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: dswstate - Dispatcher parse tree walk management routines
- *              $Revision: 36 $
+ *              $Revision: 38 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -33,31 +33,6 @@
 
 #define _COMPONENT          DISPATCHER
 	 MODULE_NAME         ("dswstate")
-
-
-/*******************************************************************************
- *
- * FUNCTION:    Acpi_ds_result_stack_clear
- *
- * PARAMETERS:  Walk_state          - Current Walk state
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Reset this walk's result stack pointers to zero, thus setting
- *              the stack to zero.
- *
- ******************************************************************************/
-
-ACPI_STATUS
-xxx_acpi_ds_result_stack_clear (
-	ACPI_WALK_STATE         *walk_state)
-{
-/*
-	Walk_state->Num_results = 0;
-	Walk_state->Current_result = 0;
-*/
-	return (AE_OK);
-}
 
 
 /*******************************************************************************
@@ -135,7 +110,7 @@ acpi_ds_result_remove (
 	/* Check for a valid result object */
 
 	if (!state->results.obj_desc [index]) {
-		return (AE_AML_NO_OPERAND);
+		return (AE_AML_NO_RETURN_VALUE);
 	}
 
 	/* Remove the object */
@@ -179,7 +154,7 @@ acpi_ds_result_pop (
 
 
 	if (!state->results.num_results) {
-		return (AE_STACK_UNDERFLOW);
+		return (AE_AML_NO_RETURN_VALUE);
 	}
 
 	/* Remove top element */
@@ -198,12 +173,12 @@ acpi_ds_result_pop (
 	}
 
 
-	return (AE_STACK_UNDERFLOW);
+	return (AE_AML_NO_RETURN_VALUE);
 }
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_result_pop
+ * FUNCTION:    Acpi_ds_result_pop_from_bottom
  *
  * PARAMETERS:  Object              - Where to return the popped object
  *              Walk_state          - Current Walk state
@@ -231,7 +206,7 @@ acpi_ds_result_pop_from_bottom (
 
 
 	if (!state->results.num_results) {
-		return (AE_STACK_UNDERFLOW);
+		return (AE_AML_NO_RETURN_VALUE);
 	}
 
 	/* Remove Bottom element */
@@ -250,7 +225,7 @@ acpi_ds_result_pop_from_bottom (
 	/* Check for a valid result object */
 
 	if (!*object) {
-		return (AE_AML_NO_OPERAND);
+		return (AE_AML_NO_RETURN_VALUE);
 	}
 
 
@@ -260,15 +235,14 @@ acpi_ds_result_pop_from_bottom (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_result_pop
+ * FUNCTION:    Acpi_ds_result_push
  *
  * PARAMETERS:  Object              - Where to return the popped object
  *              Walk_state          - Current Walk state
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Pop an object off the bottom of this walk's result stack.  In
- *              other words, this is a FIFO.
+ * DESCRIPTION: Push an object onto the current result stack
  *
  ******************************************************************************/
 
@@ -282,7 +256,7 @@ acpi_ds_result_push (
 
 	state = walk_state->results;
 	if (!state) {
-		return (AE_OK);
+		return (AE_AML_INTERNAL);
 	}
 
 	if (state->results.num_results == OBJ_NUM_OPERANDS) {
@@ -719,6 +693,7 @@ acpi_ds_create_walk_state (
 	ACPI_WALK_LIST          *walk_list)
 {
 	ACPI_WALK_STATE         *walk_state;
+	ACPI_STATUS             status;
 
 
 	acpi_cm_acquire_mutex (ACPI_MTX_CACHES);
@@ -736,7 +711,7 @@ acpi_ds_create_walk_state (
 		acpi_gbl_walk_state_cache_depth--;
 
 		acpi_cm_release_mutex (ACPI_MTX_CACHES);
-   }
+	}
 
 	else {
 		/* The cache is empty, create a new object */
@@ -761,6 +736,14 @@ acpi_ds_create_walk_state (
 #ifndef _ACPI_ASL_COMPILER
 	acpi_ds_method_data_init (walk_state);
 #endif
+
+	/* Create an initial result stack entry */
+
+	status = acpi_ds_result_stack_push (walk_state);
+	if (ACPI_FAILURE (status)) {
+		return (NULL);
+	}
+
 
 	/* Put the new state at the head of the walk list */
 

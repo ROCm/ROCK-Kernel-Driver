@@ -2,12 +2,12 @@
 /******************************************************************************
  *
  * Name: acobject.h - Definition of ACPI_OPERAND_OBJECT  (Internal object only)
- *       $Revision: 75 $
+ *       $Revision: 78 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -113,10 +113,10 @@ typedef struct /* NUMBER - has value */
 
 	ACPI_INTEGER                value;
 
-} ACPI_OBJECT_NUMBER;
+} ACPI_OBJECT_INTEGER;
 
 
-typedef struct /* STRING - has length and pointer */
+typedef struct /* STRING - has length and pointer - Null terminated, ASCII characters only */
 {
 	ACPI_OBJECT_COMMON_HEADER
 
@@ -126,13 +126,11 @@ typedef struct /* STRING - has length and pointer */
 } ACPI_OBJECT_STRING;
 
 
-typedef struct /* BUFFER - has length, sequence, and pointer */
+typedef struct /* BUFFER - has length and pointer - not null terminated */
 {
 	ACPI_OBJECT_COMMON_HEADER
 
 	u32                         length;
-	u32                         sequence;       /* Sequential count of buffers created */
-
 	u8                          *pointer;       /* points to the buffer in allocated space */
 
 } ACPI_OBJECT_BUFFER;
@@ -398,7 +396,7 @@ typedef union acpi_operand_obj
 {
 	ACPI_OBJECT_COMMON          common;
 	ACPI_OBJECT_CACHE_LIST      cache;
-	ACPI_OBJECT_NUMBER          number;
+	ACPI_OBJECT_INTEGER         integer;
 	ACPI_OBJECT_STRING          string;
 	ACPI_OBJECT_BUFFER          buffer;
 	ACPI_OBJECT_PACKAGE         package;

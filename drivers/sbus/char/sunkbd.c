@@ -1521,15 +1521,17 @@ kbd_ioctl (struct inode *i, struct file *f, unsigned int cmd, unsigned long arg)
 static int
 kbd_open (struct inode *i, struct file *f)
 {
+	spin_lock_irq(&kbd_queue_lock);
 	kbd_active++;
 
 	if (kbd_opened)
-		return 0;
+		goto out;
 
 	kbd_opened = fg_console + 1;
 
-	spin_lock_irq(&kbd_queue_lock);
 	kbd_head = kbd_tail = 0;
+
+ out:
 	spin_unlock_irq(&kbd_queue_lock);
 
 	return 0;
@@ -1538,7 +1540,7 @@ kbd_open (struct inode *i, struct file *f)
 static int
 kbd_close (struct inode *i, struct file *f)
 {
-	lock_kernel();
+	spin_lock_irq(&kbd_queue_lock);
 	if (!--kbd_active) {
 		if (kbd_redirected)
 			kbd_table [kbd_redirected-1].kbdmode = VC_XLATE;
@@ -1546,7 +1548,8 @@ kbd_close (struct inode *i, struct file *f)
 		kbd_opened = 0;
 		kbd_fasync (-1, f, 0);
 	}
-	unlock_kernel();
+	spin_unlock_irq(&kbd_queue_lock);
+
 	return 0;
 }
 

@@ -1,4 +1,4 @@
-/* $Id: mostek.h,v 1.12 1999/08/31 18:51:41 davem Exp $
+/* $Id: mostek.h,v 1.13 2001/01/11 15:07:09 davem Exp $
  * mostek.h:  Describes the various Mostek time of day clock registers.
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
@@ -64,6 +64,7 @@ struct mostek48t02 {
 	volatile unsigned char year;	/* Year (0-99) */
 };
 
+extern spinlock_t mostek_lock;
 extern unsigned long mstk48t02_regs;
 
 /* Control register values. */

@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Name: acinterp.h - Interpreter subcomponent prototypes and defines
- *       $Revision: 86 $
+ *       $Revision: 89 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -70,9 +70,28 @@ acpi_aml_execute_method (
 
 
 /*
- * amfield - ACPI AML (p-code) execution - field manipulation
+ * amconvrt - object conversion
  */
 
+ACPI_STATUS
+acpi_aml_convert_to_integer (
+	ACPI_OPERAND_OBJECT     **obj_desc,
+	ACPI_WALK_STATE         *walk_state);
+
+ACPI_STATUS
+acpi_aml_convert_to_buffer (
+	ACPI_OPERAND_OBJECT     **obj_desc,
+	ACPI_WALK_STATE         *walk_state);
+
+ACPI_STATUS
+acpi_aml_convert_to_string (
+	ACPI_OPERAND_OBJECT     **obj_desc,
+	ACPI_WALK_STATE         *walk_state);
+
+
+/*
+ * amfield - ACPI AML (p-code) execution - field manipulation
+ */
 
 ACPI_STATUS
 acpi_aml_read_field (

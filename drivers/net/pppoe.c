@@ -5,23 +5,24 @@
  * PPPoE --- PPP over Ethernet (RFC 2516)
  *
  *
- * Version:    0.6.4
+ * Version:    0.6.5
  *
  * 030700 :     Fixed connect logic to allow for disconnect.
- * 270700 :	Fixed potential SMP problems; we must protect against 
- *		simultaneous invocation of ppp_input 
+ * 270700 :	Fixed potential SMP problems; we must protect against
+ *		simultaneous invocation of ppp_input
  *		and ppp_unregister_channel.
  * 040800 :	Respect reference count mechanisms on net-devices.
  * 200800 :     fix kfree(skb) in pppoe_rcv (acme)
  *		Module reference count is decremented in the right spot now,
- *		guards against sock_put not actually freeing the sk 
+ *		guards against sock_put not actually freeing the sk
  *		in pppoe_release.
  * 051000 :	Initialization cleanup.
  * 111100 :	Fix recvmsg.
+ * 050101 :	Fix PADT procesing.
  *
  * Author:	Michal Ostrowski <mostrows@styx.uwaterloo.ca>
  * Contributors:
- * 		Arnaldo Carvalho de Melo <acme@conectiva.com.br>
+ * 		Arnaldo Carvalho de Melo <acme@xconectiva.com.br>
  *
  * License:
  *		This program is free software; you can redistribute it and/or
@@ -110,7 +111,7 @@ static int hash_item(unsigned long sid, unsigned char *addr)
 		hash ^= sid >> (i*PPPOE_HASH_BITS);
 
 	return hash & ( PPPOE_HASH_SIZE - 1 );
-}	
+}
 
 static struct pppox_opt *item_hash_table[PPPOE_HASH_SIZE] = { 0, };
 
@@ -238,7 +239,7 @@ static int pppoe_device_event(struct notifier_block *this,
 	struct net_device *dev = (struct net_device *) ptr;
 	struct pppox_opt *po = NULL;
 	int hash = 0;
-	
+
 	/* Only look at sockets that are using this specific device. */
 	switch (event) {
 	case NETDEV_CHANGEMTU:
@@ -255,13 +256,13 @@ static int pppoe_device_event(struct notifier_block *this,
 			po = item_hash_table[hash];
 			++hash;
 		}
-	
+
 		while (po && hash < PPPOE_HASH_SIZE){
 			if(po->pppoe_dev == dev){
 				lock_sock(po->sk);
 				if (po->sk->state & (PPPOX_CONNECTED|PPPOX_BOUND)){
 					pppox_unbind_sock(po->sk);
-				
+
 					dev_put(po->pppoe_dev);
 					po->pppoe_dev = NULL;
 
@@ -308,7 +309,7 @@ int pppoe_rcv_core(struct sock *sk, struct sk_buff *skb){
 
 	if (sk->state & PPPOX_BOUND) {
 		skb_pull(skb, sizeof(struct pppoe_hdr));
-		
+
 		ppp_input(&po->chan, skb);
 	} else if( sk->state & PPPOX_RELAY ){
 
@@ -318,7 +319,7 @@ int pppoe_rcv_core(struct sock *sk, struct sk_buff *skb){
 		    !( relay_po->sk->state & PPPOX_CONNECTED ) ){
 			goto abort;
 		}
-		
+
 		skb_pull(skb, sizeof(struct pppoe_hdr));
 		if( !__pppoe_xmit( relay_po->sk , skb) ){
 			goto abort;
@@ -369,7 +370,7 @@ static int pppoe_rcv(struct sk_buff *skb,
 	}else{
 		ret = pppoe_rcv_core(sk, skb);
 	}
-	
+
 	bh_unlock_sock(sk);
 	sock_put(sk);
 	return ret;
@@ -466,9 +467,9 @@ static int pppoe_create(struct socket *sock)
 {
 	int error = 0;
 	struct sock *sk;
-	
+
 	MOD_INC_USE_COUNT;
-	
+
 	sk = sk_alloc(PF_PPPOX, GFP_KERNEL, 1);
 	if (!sk)
 		return -ENOMEM;
@@ -528,7 +529,7 @@ int pppoe_release(struct socket *sock)
 	po = sk->protinfo.pppox;
 	if (po->pppoe_pa.sid)
 		delete_item(po->pppoe_pa.sid, po->pppoe_pa.remote);
-		
+
 	if (po->pppoe_dev)
 	    dev_put(po->pppoe_dev);
 
@@ -945,7 +946,7 @@ int pppoe_proc_info(char *buffer, char **start, off_t offset, int length)
 	off_t begin = 0;
 	int size;
 	int i;
-	
+
 	len += sprintf(buffer,
 		       "Id       Address              Device\n");
 	pos = len;
@@ -1025,9 +1026,10 @@ int __init pppoe_init(void)
  	int err = register_pppox_proto(PX_PROTO_OE, &pppoe_proto);
 
 	if (err == 0) {
-		printk(KERN_INFO "Registered PPPoE v0.6.4\n");
+		printk(KERN_INFO "Registered PPPoE v0.6.5\n");
 
 		dev_add_pack(&pppoes_ptype);
+		dev_add_pack(&pppoed_ptype);
 		register_netdevice_notifier(&pppoe_notifier);
 		proc_net_create("pppoe", 0, pppoe_proc_info);
 	}
@@ -1038,6 +1040,7 @@ void __exit pppoe_exit(void)
 {
 	unregister_pppox_proto(PX_PROTO_OE);
 	dev_remove_pack(&pppoes_ptype);
+	dev_remove_pack(&pppoed_ptype);
 	unregister_netdevice_notifier(&pppoe_notifier);
 	proc_net_remove("pppoe");
 }

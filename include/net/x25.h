@@ -217,6 +217,7 @@ extern void x25_start_t23timer(struct sock *);
 extern void x25_stop_heartbeat(struct sock *);
 extern void x25_stop_timer(struct sock *);
 extern unsigned long x25_display_timer(struct sock *);
+extern void x25_check_rbuf(struct sock *);
 
 /* sysctl_net_x25.c */
 extern void x25_register_sysctl(void);

@@ -882,10 +882,15 @@ ip_ct_gather_frags(struct sk_buff *skb)
 #ifdef CONFIG_NETFILTER_DEBUG
 	unsigned int olddebug = skb->nf_debug;
 #endif
-	if (sk) sock_hold(sk);
+	if (sk) {
+		sock_hold(sk);
+		skb_orphan(skb);
+	}
+
 	local_bh_disable(); 
 	skb = ip_defrag(skb);
-	local_bh_enable(); 
+	local_bh_enable();
+
 	if (!skb) {
 		if (sk) sock_put(sk);
 		return skb;

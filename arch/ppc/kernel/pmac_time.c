@@ -114,7 +114,7 @@ unsigned long pmac_get_rtc_time(void)
 			+ (req.reply[3] << 8) + req.reply[4];
 		return now - RTC_OFFSET;
 #endif /* CONFIG_ADB_PMU */
-	default:
+	default: ;
 	}
 	return 0;
 }
@@ -135,7 +135,7 @@ int pmac_set_rtc_time(unsigned long nowtime)
 			return 0;
 		while (!req.complete)
 			cuda_poll();
-//		if (req.reply_len != 7)
+		if ((req.reply_len != 3) && (req.reply_len != 7))
 			printk(KERN_ERR "pmac_set_rtc_time: got %d byte reply\n",
 			       req.reply_len);
 		return 1;

@@ -11,7 +11,6 @@
 #include <linux/pci.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
-#include <linux/openpic.h>
 
 #include <asm/init.h>
 #include <asm/byteorder.h>
@@ -25,6 +24,7 @@
 #include <asm/machdep.h>
 
 #include "pci.h"
+#include "open_pic.h"
 
 #define MAX_DEVNR 22
 
@@ -38,9 +38,6 @@ unsigned char *Motherboard_routes;
 
 /* Used for Motorola to store system config register */
 static unsigned long	*ProcInfo;
-
-extern int chrp_get_irq(struct pt_regs *);
-extern void chrp_post_irq(struct pt_regs* regs, int);
 
 /* Tables for known hardware */   
 
@@ -534,128 +531,45 @@ static char Nobis_pci_IRQ_routes[] __prepdata = {
 #define CFGPTR(dev) (0x80800000 | (1<<(dev>>3)) | ((dev&7)<<8) | offset)
 #define DEVNO(dev)  (dev>>3)                                  
 
-__prep
-int
-prep_pcibios_read_config_dword (unsigned char bus,
-			   unsigned char dev, unsigned char offset, unsigned int *val)
-{
-	unsigned long _val;                                          
-	unsigned long *ptr;
+#define cfg_read(val, addr, type, op)	*val = op((type)(addr))
+#define cfg_write(val, addr, type, op)	op((type *)(addr), (val))
 
-	if ((bus != 0) || (DEVNO(dev) > MAX_DEVNR))
-	{                   
-		*val = 0xFFFFFFFF;
-		return PCIBIOS_DEVICE_NOT_FOUND;    
-	} else                                                                
-	{
-		ptr = (unsigned long *)CFGPTR(dev);
-		_val = le32_to_cpu(*ptr);
-	}
-	*val = _val;
-	return PCIBIOS_SUCCESSFUL;
+#define cfg_read_bad(val, size)		*val = bad_##size;
+#define cfg_write_bad(val, size)
+
+#define bad_byte	0xff
+#define bad_word	0xffff
+#define bad_dword	0xffffffffU
+
+#define PREP_PCI_OP(rw, size, type, op)					\
+static int __prep							\
+prep_##rw##_config_##size(struct pci_dev *dev, int offset, type val)	\
+{									\
+	if ((dev->bus->number != 0) || (DEVNO(dev->devfn) > MAX_DEVNR))	\
+	{                   						\
+		cfg_##rw##_bad(val, size)				\
+		return PCIBIOS_DEVICE_NOT_FOUND;    			\
+	}								\
+	cfg_##rw(val, CFGPTR(dev->devfn), type, op);			\
+	return PCIBIOS_SUCCESSFUL;					\
 }
 
-__prep
-int
-prep_pcibios_read_config_word (unsigned char bus,
-			  unsigned char dev, unsigned char offset, unsigned short *val)
+PREP_PCI_OP(read, byte, u8 *, in_8)
+PREP_PCI_OP(read, word, u16 *, in_le16)
+PREP_PCI_OP(read, dword, u32 *, in_le32)
+PREP_PCI_OP(write, byte, u8, out_8)
+PREP_PCI_OP(write, word, u16, out_le16)
+PREP_PCI_OP(write, dword, u32, out_le32)
+
+static struct pci_ops prep_pci_ops =
 {
-	unsigned short _val;                                          
-	unsigned short *ptr;
-
-	if ((bus != 0) || (DEVNO(dev) > MAX_DEVNR))
-	{                   
-		*val = 0xFFFF;
-		return PCIBIOS_DEVICE_NOT_FOUND;    
-	} else                                                                
-	{
-		ptr = (unsigned short *)CFGPTR(dev);
-		_val = le16_to_cpu(*ptr);
-	}
-	*val = _val;
-	return PCIBIOS_SUCCESSFUL;
-}
-
-__prep
-int
-prep_pcibios_read_config_byte (unsigned char bus,
-			  unsigned char dev, unsigned char offset, unsigned char *val)
-{
-	unsigned char _val;                                          
-	unsigned char *ptr;
-
-	if ((bus != 0) || (DEVNO(dev) > MAX_DEVNR))
-	{                   
-		*val = 0xFF;
-		return PCIBIOS_DEVICE_NOT_FOUND;    
-	} else                                                                
-	{
-		ptr = (unsigned char *)CFGPTR(dev);
-		_val = *ptr;
-	}
-	*val = _val;
-	return PCIBIOS_SUCCESSFUL;
-}
-
-__prep
-int
-prep_pcibios_write_config_dword (unsigned char bus,
-			    unsigned char dev, unsigned char offset, unsigned int val)
-{
-	unsigned long _val;
-	unsigned long *ptr;
-
-	_val = le32_to_cpu(val);
-	if ((bus != 0) || (DEVNO(dev) > MAX_DEVNR))
-	{
-		return PCIBIOS_DEVICE_NOT_FOUND;
-	} else
-	{
-		ptr = (unsigned long *)CFGPTR(dev);
-		*ptr = _val;
-	}
-	return PCIBIOS_SUCCESSFUL;
-}
-
-__prep
-int
-prep_pcibios_write_config_word (unsigned char bus,
-			   unsigned char dev, unsigned char offset, unsigned short val)
-{
-	unsigned short _val;
-	unsigned short *ptr;
-
-	_val = le16_to_cpu(val);
-	if ((bus != 0) || (DEVNO(dev) > MAX_DEVNR))
-	{
-		return PCIBIOS_DEVICE_NOT_FOUND;
-	} else
-	{
-		ptr = (unsigned short *)CFGPTR(dev);
-		*ptr = _val;
-	}
-	return PCIBIOS_SUCCESSFUL;
-}
-
-__prep
-int
-prep_pcibios_write_config_byte (unsigned char bus,
-			   unsigned char dev, unsigned char offset, unsigned char val)
-{
-	unsigned char _val;
-	unsigned char *ptr;
-
-	_val = val;
-	if ((bus != 0) || (DEVNO(dev) > MAX_DEVNR))
-	{
-		return PCIBIOS_DEVICE_NOT_FOUND;
-	} else
-	{
-		ptr = (unsigned char *)CFGPTR(dev);
-		*ptr = _val;
-	}
-	return PCIBIOS_SUCCESSFUL;
-}
+	prep_read_config_byte,
+	prep_read_config_word,
+	prep_read_config_dword,
+	prep_write_config_byte,
+	prep_write_config_word,
+	prep_write_config_dword
+};
 
 #define MOTOROLA_CPUTYPE_REG	0x800
 #define MOTOROLA_BASETYPE_REG	0x803
@@ -685,7 +599,8 @@ static u_char mvme2600_openpic_initsenses[] __initdata = {
 #define MOT_HAWK_PRESENT	0x2
 
 int prep_keybd_present = 1;
-int MotMPIC = 0;
+int MotMPIC;
+int mot_multi;
 
 int __init raven_init(void)
 {
@@ -695,18 +610,18 @@ int __init raven_init(void)
 
 	/* Check to see if the Raven chip exists. */
 	if ( _prep_type != _PREP_Motorola) {
-		OpenPIC = NULL;
+		OpenPIC_Addr = NULL;
 		return 0;
 	}
 
 	/* Check to see if this board is a type that might have a Raven. */
 	if ((inb(MOTOROLA_CPUTYPE_REG) & 0xF0) != 0xE0) {
-		OpenPIC = NULL;
+		OpenPIC_Addr = NULL;
 		return 0;
 	}
 
 	/* Check the first PCI device to see if it is a Raven. */
-	pcibios_read_config_dword(0, 0, PCI_VENDOR_ID, &devid);
+	early_read_config_dword(0, 0, 0, PCI_VENDOR_ID, &devid);
 
 	switch (devid & 0xffff0000) {
 	case MPIC_RAVEN_ID:
@@ -716,32 +631,36 @@ int __init raven_init(void)
 		MotMPIC = MOT_HAWK_PRESENT;
 		break;
 	default:
-		OpenPIC = NULL;
+		OpenPIC_Addr = NULL;
 		return 0;
 	}
 
 
 	/* Read the memory base register. */
-	pcibios_read_config_dword(0, 0, PCI_BASE_ADDRESS_1, &pci_membase);
+	early_read_config_dword(0, 0, 0, PCI_BASE_ADDRESS_1, &pci_membase);
 
 	if (pci_membase == 0) {
-		OpenPIC = NULL;
+		OpenPIC_Addr = NULL;
 		return 0;
 	}
 
 	/* Map the Raven MPIC registers to virtual memory. */
-	OpenPIC = (struct OpenPIC *)ioremap(pci_membase+0xC0000000, 0x22000);
+	OpenPIC_Addr = ioremap(pci_membase+0xC0000000, 0x22000);
 
 	OpenPIC_InitSenses = mvme2600_openpic_initsenses;
 	OpenPIC_NumInitSenses = sizeof(mvme2600_openpic_initsenses);
 
-	ppc_md.get_irq = chrp_get_irq;
-	ppc_md.post_irq = chrp_post_irq;
+	ppc_md.get_irq = openpic_get_irq;
 	
 	/* If raven is present on Motorola store the system config register
 	 * for later use.
 	 */
 	ProcInfo = (unsigned long *)ioremap(0xfef80400, 4);
+
+	/* Indicate to system if this is a multiprocessor board */
+	if (!(*ProcInfo & MOT_PROC2_BIT)) {
+		mot_multi = 1;
+	}
 
 	/* This is a hack.  If this is a 2300 or 2400 mot board then there is
 	 * no keyboard controller and we have to indicate that.
@@ -898,72 +817,8 @@ unsigned long __init prep_route_pci_interrupts(void)
 		outb(pl_id|CAROLINA_IRQ_EDGE_MASK_HI, 0x04d1);
 		pl_id=inb(0x04d1);
 		/*printk("Hi mask now %#0x\n", pl_id);*/
-	} else if ( _prep_type == _PREP_Radstone )
-	{
-		unsigned char ucElcrM, ucElcrS;
-
-		/*
-		 * Set up edge/level
-		 */
-		switch(ucSystemType)
-		{
-			case RS_SYS_TYPE_PPC1:
-			{
-				if(ucBoardRevMaj<5)
-				{
-					ucElcrS=ELCRS_INT15_LVL;
-				}
-				else
-				{
-					ucElcrS=ELCRS_INT9_LVL |
-					        ELCRS_INT11_LVL |
-					        ELCRS_INT14_LVL |
-					        ELCRS_INT15_LVL;
-				}
-				ucElcrM=ELCRM_INT5_LVL | ELCRM_INT7_LVL;
-				break;
-			}
-
-			case RS_SYS_TYPE_PPC1a:
-			{
-				ucElcrS=ELCRS_INT9_LVL |
-				        ELCRS_INT11_LVL |
-				        ELCRS_INT14_LVL |
-				        ELCRS_INT15_LVL;
-				ucElcrM=ELCRM_INT5_LVL;
-				break;
-			}
-
-			case RS_SYS_TYPE_PPC2:
-			case RS_SYS_TYPE_PPC2a:
-			case RS_SYS_TYPE_PPC2ep:
-			case RS_SYS_TYPE_PPC4:
-			case RS_SYS_TYPE_PPC4a:
-			default:
-			{
-				ucElcrS=ELCRS_INT9_LVL |
-				        ELCRS_INT10_LVL |
-				        ELCRS_INT11_LVL |
-				        ELCRS_INT14_LVL |
-				        ELCRS_INT15_LVL;
-				ucElcrM=ELCRM_INT5_LVL |
-				        ELCRM_INT7_LVL;
-				break;
-			}
-		}
-
-		/*
-		 * Write edge/level selection
-		 */
-		outb(ucElcrS, ISA8259_S_ELCR);
-		outb(ucElcrM, ISA8259_M_ELCR);
-
-		/*
-		 * Radstone boards have PCI interrupts all set up
-		 * so leave well alone
-		 */
-		return 0;
-	} else
+	}
+	else
 	{
 		printk("No known machine pci routing!\n");
 		return -1;
@@ -987,16 +842,10 @@ prep_pcibios_fixup(void)
         extern unsigned char *Motherboard_routes;
         unsigned char i;
 
-        if ( _prep_type == _PREP_Radstone )
-        {
-                printk("Radstone boards require no PCI fixups\n");
-		return;
-        }
-
 	prep_route_pci_interrupts();
 
 	printk("Setting PCI interrupts for a \"%s\"\n", Motherboard_map_name);
-	if (OpenPIC) {
+	if (OpenPIC_Addr) {
 		/* PCI interrupts are controlled by the OpenPIC */
 		pci_for_each_dev(dev) {
 			if (dev->bus->number == 0) {
@@ -1018,7 +867,12 @@ prep_pcibios_fixup(void)
 
 		for ( i = 0 ; i <= 5 ; i++ )
 		{
-		        if ( dev->resource[i].start > 0x10000000 )
+			/*
+			 * Relocate PCI I/O resources if necessary so the
+			 * standard 256MB BAT covers them.
+			 */
+			if ( (pci_resource_flags(dev, i) & IORESOURCE_IO) &&
+				(dev->resource[i].start > 0x10000000) ) 
 		        {
 		                printk("Relocating PCI address %lx -> %lx\n",
 		                       dev->resource[i].start,
@@ -1029,6 +883,8 @@ prep_pcibios_fixup(void)
 		                pci_write_config_dword(dev,
 		                        PCI_BASE_ADDRESS_0+(i*0x4),
 		                       dev->resource[i].start );
+				dev->resource[i].end =
+					(dev->resource[i].end & 0x00FFFFFF) | 0x01000000;
 		        }
 		}
 #if 0
@@ -1043,49 +899,50 @@ prep_pcibios_fixup(void)
 	}
 }
 
-decl_config_access_method(indirect);
-
 void __init
-prep_setup_pci_ptrs(void)
+prep_find_bridges(void)
 {
-	PPC_DEVICE *hostbridge;
+	struct pci_controller* hose;
 
-        printk("PReP architecture\n");
-        if ( _prep_type == _PREP_Radstone )
-        {
-		pci_config_address = (unsigned *)0x80000cf8;
-		pci_config_data = (char *)0x80000cfc;
-		set_config_access_method(indirect);		
-        }
-        else
-        {
-                hostbridge = residual_find_device(PROCESSORDEVICE, NULL,
-		       BridgeController, PCIBridge, -1, 0);
-                if (hostbridge &&
-                    hostbridge->DeviceId.Interface == PCIBridgeIndirect) {
-                        PnP_TAG_PACKET * pkt;
-                        set_config_access_method(indirect);
-                        pkt = PnP_find_large_vendor_packet(
+	hose = pcibios_alloc_controller();
+	if (!hose)
+		return;
+
+	hose->first_busno = 0;
+	hose->last_busno = 0xff;
+	hose->pci_mem_offset = PREP_ISA_MEM_BASE;
+	
+	printk("PReP architecture\n");
+	{
+#ifdef CONFIG_PREP_RESIDUAL	  
+		PPC_DEVICE *hostbridge;
+
+		hostbridge = residual_find_device(PROCESSORDEVICE, NULL,
+			BridgeController, PCIBridge, -1, 0);
+		if (hostbridge &&
+			hostbridge->DeviceId.Interface == PCIBridgeIndirect) {
+			PnP_TAG_PACKET * pkt;
+			pkt = PnP_find_large_vendor_packet(
 				res->DevicePnPHeap+hostbridge->AllocatedOffset,
 				3, 0);
-                        if(pkt)
+			if(pkt)
 			{
 #define p pkt->L4_Pack.L4_Data.L4_PPCPack
-                                pci_config_address= (unsigned *)ld_le32((unsigned *) p.PPCData);
-				pci_config_data= (unsigned char *)ld_le32((unsigned *) (p.PPCData+8));
-                        }
+				setup_indirect_pci(hose, 
+					ld_le32((unsigned *) (p.PPCData)),
+					ld_le32((unsigned *) (p.PPCData+8)));
+			}
 			else
 			{
-                                pci_config_address= (unsigned *) 0x80000cf8;
-                                pci_config_data= (unsigned char *) 0x80000cfc;
-                        }
-                }
+				setup_indirect_pci(hose, 0x80000cf8, 0x80000cfc);
+			}
+		}
 		else
+#endif /* CONFIG_PREP_RESIDUAL */
 		{
-                        set_config_access_method(prep);
-                }
-
-        }
+			hose->ops = &prep_pci_ops;
+		}
+	}
 
 	ppc_md.pcibios_fixup = prep_pcibios_fixup;
 }

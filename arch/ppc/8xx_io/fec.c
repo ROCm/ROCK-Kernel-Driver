@@ -1459,6 +1459,9 @@ int __init fec_enet_init(void)
 	/* Allocate some private information.
 	*/
 	fep = (struct fec_enet_private *)kmalloc(sizeof(*fep), GFP_KERNEL);
+	if (fep == NULL)
+		return -ENOMEM;
+
 	__clear_user(fep,sizeof(*fep));
 
 	/* Create an Ethernet device instance.

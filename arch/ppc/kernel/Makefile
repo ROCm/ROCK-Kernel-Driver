@@ -35,6 +35,7 @@ obj-$(CONFIG_PPC)		:= entry.o traps.o irq.o idle.o time.o misc.o \
 					process.o signal.o bitops.o ptrace.o \
 					ppc_htab.o semaphore.o syscalls.o  \
 					align.o setup.o
+obj-$(CONFIG_MODULES)		+= ppc_ksyms.o
 obj-$(CONFIG_POWER4)		+= xics.o
 obj-$(CONFIG_PCI)		+= pci.o pci-dma.o
 obj-$(CONFIG_KGDB)		+= ppc-stub.o
@@ -62,11 +63,8 @@ obj-$(CONFIG_ALL_PPC)		+= pmac_pic.o pmac_setup.o pmac_time.o prom.o \
 					feature.o pmac_pci.o chrp_setup.o \
 					chrp_time.o chrp_pci.o 	open_pic.o \
 					indirect_pci.o i8259.o prep_pci.o \
-					prep_time.o prep_nvram.o ppc_ksyms.o \
-					prep_setup.o 
+					prep_time.o prep_nvram.o prep_setup.o
 obj-$(CONFIG_PMAC_BACKLIGHT)	+= pmac_backlight.o
-obj-$(CONFIG_GEMINI)		+= gemini_prom.o gemini_pci.o gemini_setup.o \
-					open_pic.o
 obj-$(CONFIG_8260)		+= m8260_setup.o ppc8260_pic.o
 
 

@@ -1082,6 +1082,9 @@ int __init fec_enet_init(void)
 		*/
 		cep = (struct fcc_enet_private *)
 					kmalloc(sizeof(*cep), GFP_KERNEL);
+		if (cep == NULL)
+			return -ENOMEM;
+
 		__clear_user(cep,sizeof(*cep));
 		spin_lock_init(&cep->lock);
 		cep->fip = fip;

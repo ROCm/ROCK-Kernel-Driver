@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: psopcode - Parser opcode information table
- *              $Revision: 24 $
+ *              $Revision: 27 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -44,7 +44,7 @@
 #define _PFX                        0x6D
 #define _UNKNOWN_OPCODE             0x02    /* An example unknown opcode */
 
-#define MAX_EXTENDED_OPCODE         0x87
+#define MAX_EXTENDED_OPCODE         0x88
 #define NUM_EXTENDED_OPCODE         MAX_EXTENDED_OPCODE + 1
 #define MAX_INTERNAL_OPCODE
 #define NUM_INTERNAL_OPCODE         MAX_INTERNAL_OPCODE + 1
@@ -83,9 +83,11 @@
 #define ARGP_WORD_OP                    ARGP_LIST1 (ARGP_WORDDATA)
 #define ARGP_DWORD_OP                   ARGP_LIST1 (ARGP_DWORDDATA)
 #define ARGP_STRING_OP                  ARGP_LIST1 (ARGP_CHARLIST)
+#define ARGP_QWORD_OP                   ARGP_LIST1 (ARGP_QWORDDATA)
 #define ARGP_SCOPE_OP                   ARGP_LIST3 (ARGP_PKGLENGTH,  ARGP_NAME,          ARGP_TERMLIST)
 #define ARGP_BUFFER_OP                  ARGP_LIST3 (ARGP_PKGLENGTH,  ARGP_TERMARG,       ARGP_BYTELIST)
 #define ARGP_PACKAGE_OP                 ARGP_LIST3 (ARGP_PKGLENGTH,  ARGP_BYTEDATA,      ARGP_DATAOBJLIST)
+#define ARGP_VAR_PACKAGE_OP             ARGP_LIST3 (ARGP_PKGLENGTH,  ARGP_BYTEDATA,      ARGP_DATAOBJLIST)
 #define ARGP_METHOD_OP                  ARGP_LIST4 (ARGP_PKGLENGTH,  ARGP_NAME,          ARGP_BYTEDATA,      ARGP_TERMLIST)
 #define ARGP_LOCAL0                     ARG_NONE
 #define ARGP_LOCAL1                     ARG_NONE
@@ -122,6 +124,8 @@
 #define ARGP_FIND_SET_LEFT_BIT_OP       ARGP_LIST2 (ARGP_TERMARG,    ARGP_TARGET)
 #define ARGP_FIND_SET_RIGHT_BIT_OP      ARGP_LIST2 (ARGP_TERMARG,    ARGP_TARGET)
 #define ARGP_DEREF_OF_OP                ARGP_LIST1 (ARGP_TERMARG)
+#define ARGP_CONCAT_RES_OP              ARGP_LIST3 (ARGP_TERMARG,    ARGP_TERMARG,       ARGP_TARGET)
+#define ARGP_MOD_OP                     ARGP_LIST3 (ARGP_TERMARG,    ARGP_TERMARG,       ARGP_TARGET)
 #define ARGP_NOTIFY_OP                  ARGP_LIST2 (ARGP_SUPERNAME,  ARGP_TERMARG)
 #define ARGP_SIZE_OF_OP                 ARGP_LIST1 (ARGP_SUPERNAME)
 #define ARGP_INDEX_OP                   ARGP_LIST3 (ARGP_TERMARG,    ARGP_TERMARG,       ARGP_TARGET)
@@ -131,12 +135,21 @@
 #define ARGP_BYTE_FIELD_OP              ARGP_LIST3 (ARGP_TERMARG,    ARGP_TERMARG,       ARGP_NAME)
 #define ARGP_BIT_FIELD_OP               ARGP_LIST3 (ARGP_TERMARG,    ARGP_TERMARG,       ARGP_NAME)
 #define ARGP_TYPE_OP                    ARGP_LIST1 (ARGP_SUPERNAME)
+#define ARGP_QWORD_FIELD_OP             ARGP_LIST3 (ARGP_TERMARG,    ARGP_TERMARG,       ARGP_NAME)
 #define ARGP_LAND_OP                    ARGP_LIST2 (ARGP_TERMARG,    ARGP_TERMARG)
 #define ARGP_LOR_OP                     ARGP_LIST2 (ARGP_TERMARG,    ARGP_TERMARG)
 #define ARGP_LNOT_OP                    ARGP_LIST1 (ARGP_TERMARG)
 #define ARGP_LEQUAL_OP                  ARGP_LIST2 (ARGP_TERMARG,    ARGP_TERMARG)
 #define ARGP_LGREATER_OP                ARGP_LIST2 (ARGP_TERMARG,    ARGP_TERMARG)
 #define ARGP_LLESS_OP                   ARGP_LIST2 (ARGP_TERMARG,    ARGP_TERMARG)
+#define ARGP_TO_BUFFER_OP               ARGP_LIST2 (ARGP_TERMARG,    ARGP_TARGET)
+#define ARGP_TO_DEC_STR_OP              ARGP_LIST2 (ARGP_TERMARG,    ARGP_TARGET)
+#define ARGP_TO_HEX_STR_OP              ARGP_LIST2 (ARGP_TERMARG,    ARGP_TARGET)
+#define ARGP_TO_INTEGER_OP              ARGP_LIST2 (ARGP_TERMARG,    ARGP_TARGET)
+#define ARGP_TO_STRING_OP               ARGP_LIST3 (ARGP_TERMARG,    ARGP_TERMARG,       ARGP_TARGET)
+#define ARGP_COPY_OP                    ARGP_LIST2 (ARGP_SUPERNAME,  ARGP_SIMPLENAME)
+#define ARGP_MID_OP                     ARGP_LIST4 (ARGP_TERMARG,    ARGP_TERMARG,       ARGP_TERMARG,   ARGP_TARGET)
+#define ARGP_CONTINUE_OP                ARG_NONE
 #define ARGP_IF_OP                      ARGP_LIST3 (ARGP_PKGLENGTH,  ARGP_TERMARG, ARGP_TERMLIST)
 #define ARGP_ELSE_OP                    ARGP_LIST2 (ARGP_PKGLENGTH,  ARGP_TERMLIST)
 #define ARGP_WHILE_OP                   ARGP_LIST3 (ARGP_PKGLENGTH,  ARGP_TERMARG, ARGP_TERMLIST)
@@ -149,6 +162,7 @@
 #define ARGP_EVENT_OP                   ARGP_LIST1 (ARGP_NAME)
 #define ARGP_COND_REF_OF_OP             ARGP_LIST2 (ARGP_SUPERNAME,  ARGP_SUPERNAME)
 #define ARGP_CREATE_FIELD_OP            ARGP_LIST4 (ARGP_TERMARG,    ARGP_TERMARG,       ARGP_TERMARG,   ARGP_NAME)
+#define ARGP_LOAD_TABLE_OP              ARGP_LIST6 (ARGP_TERMARG,    ARGP_TERMARG,       ARGP_TERMARG,   ARGP_TERMARG,  ARGP_TERMARG,   ARGP_TERMARG)
 #define ARGP_LOAD_OP                    ARGP_LIST2 (ARGP_NAMESTRING, ARGP_SUPERNAME)
 #define ARGP_STALL_OP                   ARGP_LIST1 (ARGP_TERMARG)
 #define ARGP_SLEEP_OP                   ARGP_LIST1 (ARGP_TERMARG)
@@ -171,6 +185,7 @@
 #define ARGP_THERMAL_ZONE_OP            ARGP_LIST3 (ARGP_PKGLENGTH,  ARGP_NAME,          ARGP_OBJLIST)
 #define ARGP_INDEX_FIELD_OP             ARGP_LIST5 (ARGP_PKGLENGTH,  ARGP_NAMESTRING,    ARGP_NAMESTRING,ARGP_BYTEDATA,  ARGP_FIELDLIST)
 #define ARGP_BANK_FIELD_OP              ARGP_LIST6 (ARGP_PKGLENGTH,  ARGP_NAMESTRING,    ARGP_NAMESTRING,ARGP_TERMARG,   ARGP_BYTEDATA,  ARGP_FIELDLIST)
+#define ARGP_DATA_REGION_OP             ARGP_LIST4 (ARGP_NAMESTRING, ARGP_TERMARG,       ARGP_TERMARG,   ARGP_TERMARG)
 #define ARGP_LNOTEQUAL_OP               ARGP_LIST2 (ARGP_TERMARG,    ARGP_TERMARG)
 #define ARGP_LLESSEQUAL_OP              ARGP_LIST2 (ARGP_TERMARG,    ARGP_TERMARG)
 #define ARGP_LGREATEREQUAL_OP           ARGP_LIST2 (ARGP_TERMARG,    ARGP_TERMARG)
@@ -187,7 +202,7 @@
  * All AML opcodes and the runtime arguments for each.  Used by the AML interpreter  Each list is compressed
  * into a 32-bit number and stored in the master opcode table at the end of this file.
  *
- * (Used by Acpi_aml_prep_operands procedure)
+ * (Used by Acpi_aml_prep_operands procedure and the ASL Compiler)
  */
 
 #define ARGI_ZERO_OP                    ARG_NONE
@@ -198,9 +213,11 @@
 #define ARGI_WORD_OP                    ARGI_INVALID_OPCODE
 #define ARGI_DWORD_OP                   ARGI_INVALID_OPCODE
 #define ARGI_STRING_OP                  ARGI_INVALID_OPCODE
+#define ARGI_QWORD_OP                   ARGI_INVALID_OPCODE
 #define ARGI_SCOPE_OP                   ARGI_INVALID_OPCODE
 #define ARGI_BUFFER_OP                  ARGI_INVALID_OPCODE
 #define ARGI_PACKAGE_OP                 ARGI_INVALID_OPCODE
+#define ARGI_VAR_PACKAGE_OP             ARGI_INVALID_OPCODE
 #define ARGI_METHOD_OP                  ARGI_INVALID_OPCODE
 #define ARGI_LOCAL0                     ARG_NONE
 #define ARGI_LOCAL1                     ARG_NONE
@@ -218,40 +235,51 @@
 #define ARGI_ARG5                       ARG_NONE
 #define ARGI_ARG6                       ARG_NONE
 #define ARGI_STORE_OP                   ARGI_LIST2 (ARGI_ANYTYPE,    ARGI_TARGETREF)
-#define ARGI_REF_OF_OP                  ARGI_LIST1 (ARGI_REFERENCE)
-#define ARGI_ADD_OP                     ARGI_LIST3 (ARGI_NUMBER,     ARGI_NUMBER,        ARGI_TARGETREF)
-#define ARGI_CONCAT_OP                  ARGI_LIST3 (ARGI_STRING,     ARGI_STRING,        ARGI_TARGETREF)
-#define ARGI_SUBTRACT_OP                ARGI_LIST3 (ARGI_NUMBER,     ARGI_NUMBER,        ARGI_TARGETREF)
-#define ARGI_INCREMENT_OP               ARGI_LIST1 (ARGI_REFERENCE)
-#define ARGI_DECREMENT_OP               ARGI_LIST1 (ARGI_REFERENCE)
-#define ARGI_MULTIPLY_OP                ARGI_LIST3 (ARGI_NUMBER,     ARGI_NUMBER,        ARGI_TARGETREF)
-#define ARGI_DIVIDE_OP                  ARGI_LIST4 (ARGI_NUMBER,     ARGI_NUMBER,        ARGI_TARGETREF,    ARGI_TARGETREF)
-#define ARGI_SHIFT_LEFT_OP              ARGI_LIST3 (ARGI_NUMBER,     ARGI_NUMBER,        ARGI_TARGETREF)
-#define ARGI_SHIFT_RIGHT_OP             ARGI_LIST3 (ARGI_NUMBER,     ARGI_NUMBER,        ARGI_TARGETREF)
-#define ARGI_BIT_AND_OP                 ARGI_LIST3 (ARGI_NUMBER,     ARGI_NUMBER,        ARGI_TARGETREF)
-#define ARGI_BIT_NAND_OP                ARGI_LIST3 (ARGI_NUMBER,     ARGI_NUMBER,        ARGI_TARGETREF)
-#define ARGI_BIT_OR_OP                  ARGI_LIST3 (ARGI_NUMBER,     ARGI_NUMBER,        ARGI_TARGETREF)
-#define ARGI_BIT_NOR_OP                 ARGI_LIST3 (ARGI_NUMBER,     ARGI_NUMBER,        ARGI_TARGETREF)
-#define ARGI_BIT_XOR_OP                 ARGI_LIST3 (ARGI_NUMBER,     ARGI_NUMBER,        ARGI_TARGETREF)
-#define ARGI_BIT_NOT_OP                 ARGI_LIST2 (ARGI_NUMBER,     ARGI_TARGETREF)
-#define ARGI_FIND_SET_LEFT_BIT_OP       ARGI_LIST2 (ARGI_NUMBER,     ARGI_TARGETREF)
-#define ARGI_FIND_SET_RIGHT_BIT_OP      ARGI_LIST2 (ARGI_NUMBER,     ARGI_TARGETREF)
+#define ARGI_REF_OF_OP                  ARGI_LIST1 (ARGI_OBJECT_REF)
+#define ARGI_ADD_OP                     ARGI_LIST3 (ARGI_INTEGER,    ARGI_INTEGER,       ARGI_TARGETREF)
+#define ARGI_CONCAT_OP                  ARGI_LIST3 (ARGI_COMPUTEDATA,ARGI_COMPUTEDATA,   ARGI_TARGETREF)
+#define ARGI_SUBTRACT_OP                ARGI_LIST3 (ARGI_INTEGER,    ARGI_INTEGER,       ARGI_TARGETREF)
+#define ARGI_INCREMENT_OP               ARGI_LIST1 (ARGI_INTEGER_REF)
+#define ARGI_DECREMENT_OP               ARGI_LIST1 (ARGI_INTEGER_REF)
+#define ARGI_MULTIPLY_OP                ARGI_LIST3 (ARGI_INTEGER,    ARGI_INTEGER,       ARGI_TARGETREF)
+#define ARGI_DIVIDE_OP                  ARGI_LIST4 (ARGI_INTEGER,    ARGI_INTEGER,       ARGI_TARGETREF,    ARGI_TARGETREF)
+#define ARGI_SHIFT_LEFT_OP              ARGI_LIST3 (ARGI_INTEGER,    ARGI_INTEGER,       ARGI_TARGETREF)
+#define ARGI_SHIFT_RIGHT_OP             ARGI_LIST3 (ARGI_INTEGER,    ARGI_INTEGER,       ARGI_TARGETREF)
+#define ARGI_BIT_AND_OP                 ARGI_LIST3 (ARGI_INTEGER,    ARGI_INTEGER,       ARGI_TARGETREF)
+#define ARGI_BIT_NAND_OP                ARGI_LIST3 (ARGI_INTEGER,    ARGI_INTEGER,       ARGI_TARGETREF)
+#define ARGI_BIT_OR_OP                  ARGI_LIST3 (ARGI_INTEGER,    ARGI_INTEGER,       ARGI_TARGETREF)
+#define ARGI_BIT_NOR_OP                 ARGI_LIST3 (ARGI_INTEGER,    ARGI_INTEGER,       ARGI_TARGETREF)
+#define ARGI_BIT_XOR_OP                 ARGI_LIST3 (ARGI_INTEGER,    ARGI_INTEGER,       ARGI_TARGETREF)
+#define ARGI_BIT_NOT_OP                 ARGI_LIST2 (ARGI_INTEGER,    ARGI_TARGETREF)
+#define ARGI_FIND_SET_LEFT_BIT_OP       ARGI_LIST2 (ARGI_INTEGER,    ARGI_TARGETREF)
+#define ARGI_FIND_SET_RIGHT_BIT_OP      ARGI_LIST2 (ARGI_INTEGER,    ARGI_TARGETREF)
 #define ARGI_DEREF_OF_OP                ARGI_LIST1 (ARGI_REFERENCE)
-#define ARGI_NOTIFY_OP                  ARGI_LIST2 (ARGI_REFERENCE,  ARGI_NUMBER)
+#define ARGI_CONCAT_RES_OP              ARGI_LIST3 (ARGI_BUFFER,     ARGI_BUFFER,        ARGI_TARGETREF)
+#define ARGI_MOD_OP                     ARGI_LIST3 (ARGI_INTEGER,    ARGI_INTEGER,       ARGI_TARGETREF)
+#define ARGI_NOTIFY_OP                  ARGI_LIST2 (ARGI_DEVICE_REF, ARGI_INTEGER)
 #define ARGI_SIZE_OF_OP                 ARGI_LIST1 (ARGI_DATAOBJECT)
-#define ARGI_INDEX_OP                   ARGI_LIST3 (ARGI_COMPLEXOBJ, ARGI_NUMBER,        ARGI_TARGETREF)
-#define ARGI_MATCH_OP                   ARGI_LIST6 (ARGI_PACKAGE,    ARGI_NUMBER,        ARGI_NUMBER,       ARGI_NUMBER,    ARGI_NUMBER,    ARGI_NUMBER)
-#define ARGI_DWORD_FIELD_OP             ARGI_LIST3 (ARGI_BUFFER,     ARGI_NUMBER,        ARGI_REFERENCE)
-#define ARGI_WORD_FIELD_OP              ARGI_LIST3 (ARGI_BUFFER,     ARGI_NUMBER,        ARGI_REFERENCE)
-#define ARGI_BYTE_FIELD_OP              ARGI_LIST3 (ARGI_BUFFER,     ARGI_NUMBER,        ARGI_REFERENCE)
-#define ARGI_BIT_FIELD_OP               ARGI_LIST3 (ARGI_BUFFER,     ARGI_NUMBER,        ARGI_REFERENCE)
+#define ARGI_INDEX_OP                   ARGI_LIST3 (ARGI_COMPLEXOBJ, ARGI_INTEGER,       ARGI_TARGETREF)
+#define ARGI_MATCH_OP                   ARGI_LIST6 (ARGI_PACKAGE,    ARGI_INTEGER,       ARGI_INTEGER,      ARGI_INTEGER,   ARGI_INTEGER,   ARGI_INTEGER)
+#define ARGI_DWORD_FIELD_OP             ARGI_LIST3 (ARGI_BUFFER,     ARGI_INTEGER,       ARGI_REFERENCE)
+#define ARGI_WORD_FIELD_OP              ARGI_LIST3 (ARGI_BUFFER,     ARGI_INTEGER,       ARGI_REFERENCE)
+#define ARGI_BYTE_FIELD_OP              ARGI_LIST3 (ARGI_BUFFER,     ARGI_INTEGER,       ARGI_REFERENCE)
+#define ARGI_BIT_FIELD_OP               ARGI_LIST3 (ARGI_BUFFER,     ARGI_INTEGER,       ARGI_REFERENCE)
 #define ARGI_TYPE_OP                    ARGI_LIST1 (ARGI_ANYTYPE)
-#define ARGI_LAND_OP                    ARGI_LIST2 (ARGI_NUMBER,     ARGI_NUMBER)
-#define ARGI_LOR_OP                     ARGI_LIST2 (ARGI_NUMBER,     ARGI_NUMBER)
-#define ARGI_LNOT_OP                    ARGI_LIST1 (ARGI_NUMBER)
-#define ARGI_LEQUAL_OP                  ARGI_LIST2 (ARGI_NUMBER,     ARGI_NUMBER)
-#define ARGI_LGREATER_OP                ARGI_LIST2 (ARGI_NUMBER,     ARGI_NUMBER)
-#define ARGI_LLESS_OP                   ARGI_LIST2 (ARGI_NUMBER,     ARGI_NUMBER)
+#define ARGI_QWORD_FIELD_OP             ARGI_LIST3 (ARGI_BUFFER,     ARGI_INTEGER,       ARGI_REFERENCE)
+#define ARGI_LAND_OP                    ARGI_LIST2 (ARGI_INTEGER,    ARGI_INTEGER)
+#define ARGI_LOR_OP                     ARGI_LIST2 (ARGI_INTEGER,    ARGI_INTEGER)
+#define ARGI_LNOT_OP                    ARGI_LIST1 (ARGI_INTEGER)
+#define ARGI_LEQUAL_OP                  ARGI_LIST2 (ARGI_INTEGER,    ARGI_INTEGER)
+#define ARGI_LGREATER_OP                ARGI_LIST2 (ARGI_INTEGER,    ARGI_INTEGER)
+#define ARGI_LLESS_OP                   ARGI_LIST2 (ARGI_INTEGER,    ARGI_INTEGER)
+#define ARGI_TO_BUFFER_OP               ARGI_LIST2 (ARGI_COMPUTEDATA,ARGI_FIXED_TARGET)
+#define ARGI_TO_DEC_STR_OP              ARGI_LIST2 (ARGI_COMPUTEDATA,ARGI_FIXED_TARGET)
+#define ARGI_TO_HEX_STR_OP              ARGI_LIST2 (ARGI_COMPUTEDATA,ARGI_FIXED_TARGET)
+#define ARGI_TO_INTEGER_OP              ARGI_LIST2 (ARGI_COMPUTEDATA,ARGI_FIXED_TARGET)
+#define ARGI_TO_STRING_OP               ARGI_LIST3 (ARGI_BUFFER,     ARGI_INTEGER,       ARGI_FIXED_TARGET)
+#define ARGI_COPY_OP                    ARGI_LIST2 (ARGI_ANYTYPE,    ARGI_SIMPLE_TARGET)
+#define ARGI_MID_OP                     ARGI_LIST4 (ARGI_BUFFERSTRING,ARGI_INTEGER,      ARGI_INTEGER,      ARGI_TARGETREF)
+#define ARGI_CONTINUE_OP                ARGI_INVALID_OPCODE
 #define ARGI_IF_OP                      ARGI_INVALID_OPCODE
 #define ARGI_ELSE_OP                    ARGI_INVALID_OPCODE
 #define ARGI_WHILE_OP                   ARGI_INVALID_OPCODE
@@ -262,23 +290,24 @@
 #define ARGI_ONES_OP                    ARG_NONE
 #define ARGI_MUTEX_OP                   ARGI_INVALID_OPCODE
 #define ARGI_EVENT_OP                   ARGI_INVALID_OPCODE
-#define ARGI_COND_REF_OF_OP             ARGI_LIST2 (ARGI_REFERENCE,  ARGI_TARGETREF)
-#define ARGI_CREATE_FIELD_OP            ARGI_LIST4 (ARGI_BUFFER,     ARGI_NUMBER,        ARGI_NUMBER,       ARGI_REFERENCE)
+#define ARGI_COND_REF_OF_OP             ARGI_LIST2 (ARGI_OBJECT_REF, ARGI_TARGETREF)
+#define ARGI_CREATE_FIELD_OP            ARGI_LIST4 (ARGI_BUFFER,     ARGI_INTEGER,       ARGI_INTEGER,      ARGI_REFERENCE)
+#define ARGI_LOAD_TABLE_OP              ARGI_LIST6 (ARGI_STRING,     ARGI_STRING,        ARGI_STRING,       ARGI_STRING,    ARGI_STRING, ARGI_TARGETREF)
 #define ARGI_LOAD_OP                    ARGI_LIST2 (ARGI_REGION,     ARGI_TARGETREF)
-#define ARGI_STALL_OP                   ARGI_LIST1 (ARGI_NUMBER)
-#define ARGI_SLEEP_OP                   ARGI_LIST1 (ARGI_NUMBER)
-#define ARGI_ACQUIRE_OP                 ARGI_LIST2 (ARGI_MUTEX,      ARGI_NUMBER)
+#define ARGI_STALL_OP                   ARGI_LIST1 (ARGI_INTEGER)
+#define ARGI_SLEEP_OP                   ARGI_LIST1 (ARGI_INTEGER)
+#define ARGI_ACQUIRE_OP                 ARGI_LIST2 (ARGI_MUTEX,      ARGI_INTEGER)
 #define ARGI_SIGNAL_OP                  ARGI_LIST1 (ARGI_EVENT)
-#define ARGI_WAIT_OP                    ARGI_LIST2 (ARGI_EVENT,      ARGI_NUMBER)
+#define ARGI_WAIT_OP                    ARGI_LIST2 (ARGI_EVENT,      ARGI_INTEGER)
 #define ARGI_RESET_OP                   ARGI_LIST1 (ARGI_EVENT)
 #define ARGI_RELEASE_OP                 ARGI_LIST1 (ARGI_MUTEX)
-#define ARGI_FROM_BCD_OP                ARGI_LIST2 (ARGI_NUMBER,     ARGI_TARGETREF)
-#define ARGI_TO_BCD_OP                  ARGI_LIST2 (ARGI_NUMBER,     ARGI_TARGETREF)
+#define ARGI_FROM_BCD_OP                ARGI_LIST2 (ARGI_INTEGER,    ARGI_TARGETREF)
+#define ARGI_TO_BCD_OP                  ARGI_LIST2 (ARGI_INTEGER,    ARGI_FIXED_TARGET)
 #define ARGI_UNLOAD_OP                  ARGI_LIST1 (ARGI_DDBHANDLE)
 #define ARGI_REVISION_OP                ARG_NONE
 #define ARGI_DEBUG_OP                   ARG_NONE
-#define ARGI_FATAL_OP                   ARGI_LIST3 (ARGI_NUMBER,     ARGI_NUMBER,        ARGI_NUMBER)
-#define ARGI_REGION_OP                  ARGI_LIST2 (ARGI_NUMBER,     ARGI_NUMBER)
+#define ARGI_FATAL_OP                   ARGI_LIST3 (ARGI_INTEGER,    ARGI_INTEGER,       ARGI_INTEGER)
+#define ARGI_REGION_OP                  ARGI_LIST2 (ARGI_INTEGER,    ARGI_INTEGER)
 #define ARGI_DEF_FIELD_OP               ARGI_INVALID_OPCODE
 #define ARGI_DEVICE_OP                  ARGI_INVALID_OPCODE
 #define ARGI_PROCESSOR_OP               ARGI_INVALID_OPCODE
@@ -286,6 +315,7 @@
 #define ARGI_THERMAL_ZONE_OP            ARGI_INVALID_OPCODE
 #define ARGI_INDEX_FIELD_OP             ARGI_INVALID_OPCODE
 #define ARGI_BANK_FIELD_OP              ARGI_INVALID_OPCODE
+#define ARGI_DATA_REGION_OP             ARGI_LIST3 (ARGI_STRING,     ARGI_STRING,       ARGI_STRING)
 #define ARGI_LNOTEQUAL_OP               ARGI_INVALID_OPCODE
 #define ARGI_LLESSEQUAL_OP              ARGI_INVALID_OPCODE
 #define ARGI_LGREATEREQUAL_OP           ARGI_INVALID_OPCODE
@@ -307,8 +337,8 @@ static ACPI_OPCODE_INFO    aml_op_info[] =
 {
 /* Index          Opcode                                   Type                   Class                 Has Arguments?   Name                 Parser Args             Interpreter Args */
 
-/*  00 */   /* AML_ZERO_OP */               OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_CONSTANT|        AML_NO_ARGS,  "Zero_op",            ARGP_ZERO_OP,           ARGI_ZERO_OP),
-/*  01 */   /* AML_ONE_OP */                OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_CONSTANT|        AML_NO_ARGS,  "One_op",             ARGP_ONE_OP,            ARGI_ONE_OP),
+/*  00 */   /* AML_ZERO_OP */               OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_CONSTANT|        AML_NO_ARGS,  "Zero",               ARGP_ZERO_OP,           ARGI_ZERO_OP),
+/*  01 */   /* AML_ONE_OP */                OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_CONSTANT|        AML_NO_ARGS,  "One",                ARGP_ONE_OP,            ARGI_ONE_OP),
 /*  02 */   /* AML_ALIAS_OP */              OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_NAMED_OBJECT|    AML_HAS_ARGS, "Alias",              ARGP_ALIAS_OP,          ARGI_ALIAS_OP),
 /*  03 */   /* AML_NAME_OP */               OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_NAMED_OBJECT|    AML_HAS_ARGS, "Name",               ARGP_NAME_OP,           ARGI_NAME_OP),
 /*  04 */   /* AML_BYTE_OP */               OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_LITERAL|         AML_NO_ARGS,  "Byte_const",         ARGP_BYTE_OP,           ARGI_BYTE_OP),
@@ -337,7 +367,7 @@ static ACPI_OPCODE_INFO    aml_op_info[] =
 /*  1_b */  /* AML_STORE_OP */              OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_MONADIC2_r|      AML_HAS_ARGS, "Store",              ARGP_STORE_OP,          ARGI_STORE_OP),
 /*  1_c */  /* AML_REF_OF_OP */             OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_MONADIC2|        AML_HAS_ARGS, "Ref_of",             ARGP_REF_OF_OP,         ARGI_REF_OF_OP),
 /*  1_d */  /* AML_ADD_OP */                OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_DYADIC2_r|       AML_HAS_ARGS, "Add",                ARGP_ADD_OP,            ARGI_ADD_OP),
-/*  1_e */  /* AML_CONCAT_OP */             OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_DYADIC2_r|       AML_HAS_ARGS, "Concat",             ARGP_CONCAT_OP,         ARGI_CONCAT_OP),
+/*  1_e */  /* AML_CONCAT_OP */             OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_DYADIC2_r|       AML_HAS_ARGS, "Concatenate",        ARGP_CONCAT_OP,         ARGI_CONCAT_OP),
 /*  1_f */  /* AML_SUBTRACT_OP */           OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_DYADIC2_r|       AML_HAS_ARGS, "Subtract",           ARGP_SUBTRACT_OP,       ARGI_SUBTRACT_OP),
 /*  20 */   /* AML_INCREMENT_OP */          OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_MONADIC2|        AML_HAS_ARGS, "Increment",          ARGP_INCREMENT_OP,      ARGI_INCREMENT_OP),
 /*  21 */   /* AML_DECREMENT_OP */          OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_MONADIC2|        AML_HAS_ARGS, "Decrement",          ARGP_DECREMENT_OP,      ARGI_DECREMENT_OP),
@@ -376,7 +406,7 @@ static ACPI_OPCODE_INFO    aml_op_info[] =
 /*  42 */   /* AML_RETURN_OP */             OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_CONTROL|         AML_HAS_ARGS, "Return",             ARGP_RETURN_OP,         ARGI_RETURN_OP),
 /*  43 */   /* AML_BREAK_OP */              OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_CONTROL|         AML_NO_ARGS,  "Break",              ARGP_BREAK_OP,          ARGI_BREAK_OP),
 /*  44 */   /* AML_BREAK_POINT_OP */        OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_CONTROL|         AML_NO_ARGS,  "Break_point",        ARGP_BREAK_POINT_OP,    ARGI_BREAK_POINT_OP),
-/*  45 */   /* AML_ONES_OP */               OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_CONSTANT|        AML_NO_ARGS,  "Ones_op",            ARGP_ONES_OP,           ARGI_ONES_OP),
+/*  45 */   /* AML_ONES_OP */               OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_CONSTANT|        AML_NO_ARGS,  "Ones",               ARGP_ONES_OP,           ARGI_ONES_OP),
 
 /* Prefixed opcodes (Two-byte opcodes with a prefix op) */
 
@@ -402,7 +432,7 @@ static ACPI_OPCODE_INFO    aml_op_info[] =
 /*  59 */   /* AML_DEF_FIELD_OP */          OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_NAMED_OBJECT|    AML_HAS_ARGS, "Field",              ARGP_DEF_FIELD_OP,      ARGI_DEF_FIELD_OP),
 /*  5_a */  /* AML_DEVICE_OP */             OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_NAMED_OBJECT|    AML_HAS_ARGS, "Device",             ARGP_DEVICE_OP,         ARGI_DEVICE_OP),
 /*  5_b */  /* AML_PROCESSOR_OP */          OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_NAMED_OBJECT|    AML_HAS_ARGS, "Processor",          ARGP_PROCESSOR_OP,      ARGI_PROCESSOR_OP),
-/*  5_c */  /* AML_POWER_RES_OP */          OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_NAMED_OBJECT|    AML_HAS_ARGS, "Power_res",          ARGP_POWER_RES_OP,      ARGI_POWER_RES_OP),
+/*  5_c */  /* AML_POWER_RES_OP */          OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_NAMED_OBJECT|    AML_HAS_ARGS, "Power_resource",     ARGP_POWER_RES_OP,      ARGI_POWER_RES_OP),
 /*  5_d */  /* AML_THERMAL_ZONE_OP */       OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_NAMED_OBJECT|    AML_HAS_ARGS, "Thermal_zone",       ARGP_THERMAL_ZONE_OP,   ARGI_THERMAL_ZONE_OP),
 /*  5_e */  /* AML_INDEX_FIELD_OP */        OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_NAMED_OBJECT|    AML_HAS_ARGS, "Index_field",        ARGP_INDEX_FIELD_OP,    ARGI_INDEX_FIELD_OP),
 /*  5_f */  /* AML_BANK_FIELD_OP */         OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_NAMED_OBJECT|    AML_HAS_ARGS, "Bank_field",         ARGP_BANK_FIELD_OP,     ARGI_BANK_FIELD_OP),
@@ -423,6 +453,26 @@ static ACPI_OPCODE_INFO    aml_op_info[] =
 /*  6_b */  /* UNKNOWN OPCODES */           OP_INFO_ENTRY (ACPI_OP_TYPE_UNKNOWN | OPTYPE_BOGUS|          AML_HAS_ARGS, "UNKNOWN_OP!",        ARG_NONE,               ARG_NONE),
 /*  6_c */  /* ASCII CHARACTERS */          OP_INFO_ENTRY (ACPI_OP_TYPE_ASCII  | OPTYPE_BOGUS|           AML_HAS_ARGS, "ASCII_ONLY!",        ARG_NONE,               ARG_NONE),
 /*  6_d */  /* PREFIX CHARACTERS */         OP_INFO_ENTRY (ACPI_OP_TYPE_PREFIX | OPTYPE_BOGUS|           AML_HAS_ARGS, "PREFIX_ONLY!",       ARG_NONE,               ARG_NONE),
+
+
+/* ACPI 2.0 (new) opcodes */
+
+/*  6_e */  /* AML_QWORD_OP */              OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_LITERAL|         AML_NO_ARGS,  "Qword_const",        ARGP_QWORD_OP,          ARGI_QWORD_OP),
+/*  6_f */  /* AML_VAR_PACKAGE_OP */        OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_DATA_TERM|       AML_HAS_ARGS, "Var_package",        ARGP_VAR_PACKAGE_OP,    ARGI_VAR_PACKAGE_OP),
+/*  70 */   /* AML_CONCAT_RES_OP */         OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_DYADIC2_r|       AML_HAS_ARGS, "Concat_res",         ARGP_CONCAT_RES_OP,     ARGI_CONCAT_RES_OP),
+/*  71 */   /* AML_MOD_OP */                OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_DYADIC2_r|       AML_HAS_ARGS, "Mod",                ARGP_MOD_OP,            ARGI_MOD_OP),
+/*  72 */   /* AML_QWORD_FIELD_OP */        OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_CREATE_FIELD|    AML_HAS_ARGS, "Create_qWord_field", ARGP_QWORD_FIELD_OP,    ARGI_QWORD_FIELD_OP),
+/*  73 */   /* AML_TO_BUFFER_OP */          OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_MONADIC2_r|      AML_HAS_ARGS, "To_buffer",          ARGP_TO_BUFFER_OP,      ARGI_TO_BUFFER_OP),
+/*  74 */   /* AML_TO_DEC_STR_OP */         OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_MONADIC2_r|      AML_HAS_ARGS, "To_dec_string",      ARGP_TO_DEC_STR_OP,     ARGI_TO_DEC_STR_OP),
+/*  75 */   /* AML_TO_HEX_STR_OP */         OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_MONADIC2_r|      AML_HAS_ARGS, "To_hex_string",      ARGP_TO_HEX_STR_OP,     ARGI_TO_HEX_STR_OP),
+/*  76 */   /* AML_TO_INTEGER_OP */         OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_MONADIC2_r|      AML_HAS_ARGS, "To_integer",         ARGP_TO_INTEGER_OP,     ARGI_TO_INTEGER_OP),
+/*  77 */   /* AML_TO_STRING_OP */          OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_MONADIC2_r|      AML_HAS_ARGS, "To_string",          ARGP_TO_STRING_OP,      ARGI_TO_STRING_OP),
+/*  78 */   /* AML_COPY_OP */               OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_MONADIC2_r|      AML_HAS_ARGS, "Copy",               ARGP_COPY_OP,           ARGI_COPY_OP),
+/*  79 */   /* AML_MID_OP */                OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_MONADIC2_r|      AML_HAS_ARGS, "Mid",                ARGP_MID_OP,            ARGI_MID_OP),
+/*  7_a */  /* AML_CONTINUE_OP */           OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_CONTROL|         AML_NO_ARGS,  "Continue",           ARGP_CONTINUE_OP,       ARGI_CONTINUE_OP),
+/*  7_b */  /* AML_LOAD_TABLE_OP */         OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_MONADIC2_r|      AML_HAS_ARGS, "Load_table",         ARGP_LOAD_TABLE_OP,     ARGI_LOAD_TABLE_OP),
+/*  7_c */  /* AML_DATA_REGION_OP */        OP_INFO_ENTRY (ACPI_OP_TYPE_OPCODE | OPTYPE_MONADIC2_r|      AML_HAS_ARGS, "Data_op_region",     ARGP_DATA_REGION_OP,    ARGI_DATA_REGION_OP),
+
 };
 
 /*
@@ -433,9 +483,10 @@ static ACPI_OPCODE_INFO    aml_op_info[] =
 static u8 aml_short_op_info_index[256] =
 {
 /*              0     1     2     3     4     5     6     7  */
+/*              8     9     A     B     C     D     E     F  */
 /* 0x00 */    0x00, 0x01, _UNK, _UNK, _UNK, _UNK, 0x02, _UNK,
-/* 0x08 */    0x03, _UNK, 0x04, 0x05, 0x06, 0x07, _UNK, _UNK,
-/* 0x10 */    0x08, 0x09, 0x0a, _UNK, 0x0b, _UNK, _UNK, _UNK,
+/* 0x08 */    0x03, _UNK, 0x04, 0x05, 0x06, 0x07, 0x6E, _UNK,
+/* 0x10 */    0x08, 0x09, 0x0a, 0x6F, 0x0b, _UNK, _UNK, _UNK,
 /* 0x18 */    _UNK, _UNK, _UNK, _UNK, _UNK, _UNK, _UNK, _UNK,
 /* 0x20 */    _UNK, _UNK, _UNK, _UNK, _UNK, _UNK, _UNK, _UNK,
 /* 0x28 */    _UNK, _UNK, _UNK, _UNK, _UNK, 0x63, _PFX, _PFX,
@@ -449,10 +500,10 @@ static u8 aml_short_op_info_index[256] =
 /* 0x68 */    0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, _UNK,
 /* 0x70 */    0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21, 0x22,
 /* 0x78 */    0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a,
-/* 0x80 */    0x2b, 0x2c, 0x2d, 0x2e, _UNK, _UNK, 0x2f, 0x30,
-/* 0x88 */    0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, _UNK,
-/* 0x90 */    0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, _UNK, _UNK,
-/* 0x98 */    _UNK, _UNK, _UNK, _UNK, _UNK, _UNK, _UNK, _UNK,
+/* 0x80 */    0x2b, 0x2c, 0x2d, 0x2e, 0x70, 0x71, 0x2f, 0x30,
+/* 0x88 */    0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x72,
+/* 0x90 */    0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x73, 0x74,
+/* 0x98 */    0x75, 0x76, _UNK, _UNK, 0x77, 0x78, 0x79, 0x7A,
 /* 0xA0 */    0x3e, 0x3f, 0x40, 0x41, 0x42, 0x43, 0x60, 0x61,
 /* 0xA8 */    0x62, _UNK, _UNK, _UNK, _UNK, _UNK, _UNK, _UNK,
 /* 0xB0 */    _UNK, _UNK, _UNK, _UNK, _UNK, _UNK, _UNK, _UNK,
@@ -471,10 +522,11 @@ static u8 aml_short_op_info_index[256] =
 static u8 aml_long_op_info_index[NUM_EXTENDED_OPCODE] =
 {
 /*              0     1     2     3     4     5     6     7  */
+/*              8     9     A     B     C     D     E     F  */
 /* 0x00 */    _UNK, 0x46, 0x47, _UNK, _UNK, _UNK, _UNK, _UNK,
 /* 0x08 */    _UNK, _UNK, _UNK, _UNK, _UNK, _UNK, _UNK, _UNK,
 /* 0x10 */    _UNK, _UNK, 0x48, 0x49, _UNK, _UNK, _UNK, _UNK,
-/* 0x18 */    _UNK, _UNK, _UNK, _UNK, _UNK, _UNK, _UNK, _UNK,
+/* 0x18 */    _UNK, _UNK, _UNK, _UNK, _UNK, _UNK, _UNK, 0x7B,
 /* 0x20 */    0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f, 0x50, 0x51,
 /* 0x28 */    0x52, 0x53, 0x54, _UNK, _UNK, _UNK, _UNK, _UNK,
 /* 0x30 */    0x55, 0x56, 0x57, _UNK, _UNK, _UNK, _UNK, _UNK,
@@ -488,11 +540,8 @@ static u8 aml_long_op_info_index[NUM_EXTENDED_OPCODE] =
 /* 0x70 */    _UNK, _UNK, _UNK, _UNK, _UNK, _UNK, _UNK, _UNK,
 /* 0x78 */    _UNK, _UNK, _UNK, _UNK, _UNK, _UNK, _UNK, _UNK,
 /* 0x80 */    0x58, 0x59, 0x5a, 0x5b, 0x5c, 0x5d, 0x5e, 0x5f,
+/* 0x88 */    0x7C,
 };
-
-
-/*              0     1     2     3     4     5     6     7  */
-/* 0x00 */
 
 
 /*******************************************************************************

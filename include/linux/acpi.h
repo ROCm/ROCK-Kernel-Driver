@@ -28,8 +28,6 @@
 #include <linux/wait.h>
 #endif /* __KERNEL__ */
 
-u64 acpi_get_rsdp_ptr(void);
-
 /*
  * System sleep states
  */

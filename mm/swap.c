@@ -30,8 +30,7 @@
  * start background swapping if we fall below freepages.high free
  * pages, and we begin intensive swapping below freepages.low.
  *
- * Actual initialization is done in mm/page_alloc.c or 
- * arch/sparc(64)/mm/init.c.
+ * Actual initialization is done in mm/page_alloc.c
  */
 freepages_t freepages = {
 	0,	/* freepages.min */

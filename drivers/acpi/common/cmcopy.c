@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: cmcopy - Internal to external object translation utilities
- *              $Revision: 61 $
+ *              $Revision: 62 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -118,9 +118,9 @@ acpi_cm_build_external_simple_object (
 		break;
 
 
-	case ACPI_TYPE_NUMBER:
+	case ACPI_TYPE_INTEGER:
 
-		external_obj->number.value= internal_obj->number.value;
+		external_obj->integer.value= internal_obj->integer.value;
 		break;
 
 
@@ -469,11 +469,11 @@ acpi_cm_build_internal_simple_object (
 		break;
 
 
-	case ACPI_TYPE_NUMBER:
+	case ACPI_TYPE_INTEGER:
 		/*
 		 * Number is included in the object itself
 		 */
-		internal_obj->number.value  = external_obj->number.value;
+		internal_obj->integer.value  = external_obj->integer.value;
 		break;
 
 

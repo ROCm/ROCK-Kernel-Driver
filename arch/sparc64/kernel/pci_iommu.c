@@ -1,4 +1,4 @@
-/* $Id: pci_iommu.c,v 1.11 2000/03/10 02:42:15 davem Exp $
+/* $Id: pci_iommu.c,v 1.12 2001/01/11 16:26:45 davem Exp $
  * pci_iommu.c: UltraSparc PCI controller IOM/STC support.
  *
  * Copyright (C) 1999 David S. Miller (davem@redhat.com)
@@ -187,7 +187,7 @@ void *pci_alloc_consistent(struct pci_dev *pdev, size_t size, dma_addr_t *dma_ad
 	memset((char *)first_page, 0, PAGE_SIZE << order);
 
 	pcp = pdev->sysdata;
-	iommu = &pcp->pbm->parent->iommu;
+	iommu = pcp->pbm->iommu;
 
 	spin_lock_irqsave(&iommu->lock, flags);
 	iopte = alloc_consistent_cluster(iommu, size >> PAGE_SHIFT);
@@ -241,7 +241,7 @@ void pci_free_consistent(struct pci_dev *pdev, size_t size, void *cpu, dma_addr_
 
 	npages = PAGE_ALIGN(size) >> PAGE_SHIFT;
 	pcp = pdev->sysdata;
-	iommu = &pcp->pbm->parent->iommu;
+	iommu = pcp->pbm->iommu;
 	iopte = iommu->page_table +
 		((dvma - iommu->page_table_map_base) >> PAGE_SHIFT);
 
@@ -308,7 +308,7 @@ dma_addr_t pci_map_single(struct pci_dev *pdev, void *ptr, size_t sz, int direct
 	unsigned long iopte_protection;
 
 	pcp = pdev->sysdata;
-	iommu = &pcp->pbm->parent->iommu;
+	iommu = pcp->pbm->iommu;
 	strbuf = &pcp->pbm->stc;
 
 	if (direction == PCI_DMA_NONE)
@@ -356,7 +356,7 @@ void pci_unmap_single(struct pci_dev *pdev, dma_addr_t bus_addr, size_t sz, int 
 		BUG();
 
 	pcp = pdev->sysdata;
-	iommu = &pcp->pbm->parent->iommu;
+	iommu = pcp->pbm->iommu;
 	strbuf = &pcp->pbm->stc;
 
 	npages = PAGE_ALIGN(bus_addr + sz) - (bus_addr & PAGE_MASK);
@@ -504,7 +504,7 @@ int pci_map_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelems, int
 	}
 
 	pcp = pdev->sysdata;
-	iommu = &pcp->pbm->parent->iommu;
+	iommu = pcp->pbm->iommu;
 	strbuf = &pcp->pbm->stc;
 	
 	if (direction == PCI_DMA_NONE)
@@ -568,7 +568,7 @@ void pci_unmap_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelems, 
 		BUG();
 
 	pcp = pdev->sysdata;
-	iommu = &pcp->pbm->parent->iommu;
+	iommu = pcp->pbm->iommu;
 	strbuf = &pcp->pbm->stc;
 	
 	bus_addr = sglist->dvma_address & PAGE_MASK;
@@ -639,7 +639,7 @@ void pci_dma_sync_single(struct pci_dev *pdev, dma_addr_t bus_addr, size_t sz, i
 	unsigned long flags, ctx, npages;
 
 	pcp = pdev->sysdata;
-	iommu = &pcp->pbm->parent->iommu;
+	iommu = pcp->pbm->iommu;
 	strbuf = &pcp->pbm->stc;
 
 	if (!strbuf->strbuf_enabled)
@@ -700,7 +700,7 @@ void pci_dma_sync_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelem
 	unsigned long flags, ctx;
 
 	pcp = pdev->sysdata;
-	iommu = &pcp->pbm->parent->iommu;
+	iommu = pcp->pbm->iommu;
 	strbuf = &pcp->pbm->stc;
 
 	if (!strbuf->strbuf_enabled)
@@ -762,7 +762,7 @@ int pci_dma_supported(struct pci_dev *pdev, dma_addr_t device_mask)
 	if (pdev == NULL) {
 		dma_addr_mask = 0xffffffff;
 	} else {
-		struct pci_iommu *iommu = &pcp->pbm->parent->iommu;
+		struct pci_iommu *iommu = pcp->pbm->iommu;
 
 		dma_addr_mask = iommu->dma_addr_mask;
 	}

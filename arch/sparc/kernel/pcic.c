@@ -1,4 +1,4 @@
-/* $Id: pcic.c,v 1.20 2000/12/05 00:56:36 anton Exp $
+/* $Id: pcic.c,v 1.21 2001/01/18 00:23:00 davem Exp $
  * pcic.c: Sparc/PCI controller support
  *
  * Copyright (C) 1998 V. Roganov and G. Raiko
@@ -897,93 +897,6 @@ void pcic_nmi(unsigned int pend, struct pt_regs *regs)
 	regs->pc = regs->npc;
 	regs->npc += 4;
 }
-
-/*
- * XXX  Gleb wrote me that he needs this for X server (only).
- * Since we successfuly use XF86_FBDev, we do not need these anymore.
- *
- *  Following code added to handle extra PCI-related system calls 
- */
-asmlinkage int sys_pciconfig_read(unsigned long bus,
-				  unsigned long dfn,
-				  unsigned long off,
-				  unsigned long len,
-				  unsigned char *buf)
-{
-	unsigned char ubyte;
-	unsigned short ushort;
-	unsigned int uint;
-	int err = 0;
-
-	if(!suser())
-		return -EPERM;
-
-	switch(len) {
-	case 1:
-		pcibios_read_config_byte(bus, dfn, off, &ubyte);
-		put_user(ubyte, (unsigned char *)buf);
-		break;
-	case 2:
-		pcibios_read_config_word(bus, dfn, off, &ushort);
-		put_user(ushort, (unsigned short *)buf);
-		break;
-	case 4:
-		pcibios_read_config_dword(bus, dfn, off, &uint);
-		put_user(uint, (unsigned int *)buf);
-		break;
-
-	default:
-		err = -EINVAL;
-		break;
-	};
-
-	return err;
-}
-
-asmlinkage int sys_pciconfig_write(unsigned long bus,
-				   unsigned long dfn,
-				   unsigned long off,
-				   unsigned long len,
-				   unsigned char *buf)
-{
-	unsigned char ubyte;
-	unsigned short ushort;
-	unsigned int uint;
-	int err = 0;
-
-	if(!suser())
-		return -EPERM;
-
-	switch(len) {
-	case 1:
-		err = get_user(ubyte, (unsigned char *)buf);
-		if(err)
-			break;
-		pcibios_write_config_byte(bus, dfn, off, ubyte);
-		break;
-
-	case 2:
-		err = get_user(ushort, (unsigned short *)buf);
-		if(err)
-			break;
-		pcibios_write_config_byte(bus, dfn, off, ushort);
-		break;
-
-	case 4:
-		err = get_user(uint, (unsigned int *)buf);
-		if(err)
-			break;
-		pcibios_write_config_byte(bus, dfn, off, uint);
-		break;
-
-	default:
-		err = -EINVAL;
-		break;
-
-	};
-
-	return err;
-}			   
 
 static inline unsigned long get_irqmask(int irq_nr)
 {

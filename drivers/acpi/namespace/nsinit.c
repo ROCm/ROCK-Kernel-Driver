@@ -1,12 +1,12 @@
 /******************************************************************************
  *
  * Module Name: nsinit - namespace initialization
- *              $Revision: 9 $
+ *              $Revision: 12 $
  *
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 R. Byron Moore
+ *  Copyright (C) 2000, 2001 R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -239,7 +239,9 @@ acpi_ns_init_one_device (
 
 	status = acpi_cm_execute_STA (node, &flags);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		/* Ignore error and move on to next device */
+
+		return (AE_OK);
 	}
 
 	info->num_STA++;
@@ -260,12 +262,15 @@ acpi_ns_init_one_device (
 	}
 
 	else if (ACPI_FAILURE (status)) {
-		return (status);
+		/* Ignore error and move on to next device */
+
 	}
 
 	else {
+		/* Count of successfull INIs */
+
 		info->num_INI++;
 	}
 
-	return (status);
+	return (AE_OK);
 }

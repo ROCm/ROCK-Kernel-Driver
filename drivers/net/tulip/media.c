@@ -148,7 +148,7 @@ void tulip_select_media(struct net_device *dev, int startup)
 	long ioaddr = dev->base_addr;
 	struct tulip_private *tp = (struct tulip_private *)dev->priv;
 	struct mediatable *mtable = tp->mtable;
-	u32 new_csr6;
+	u32 new_csr6=0;
 	int i;
 
 	if (mtable) {
@@ -265,7 +265,9 @@ void tulip_select_media(struct net_device *dev, int startup)
 		}
 		case 5: case 6: {
 			u16 setup[5];
-			u32 csr13val, csr14val, csr15dir, csr15val;
+
+			new_csr6 = 0; /* FIXME */
+
 			for (i = 0; i < 5; i++)
 				setup[i] = get_u16(&p[i*2 + 1]);
 
