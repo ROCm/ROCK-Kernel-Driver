@@ -1,18 +1,18 @@
+//#define dprintk(x) printk x
 #define dprintk(x)
-/*#define dprintk(x) printk x */
 
+#include "compat.h"
 /*------------------------------------------------------------------------------
  *              D E F I N E S
  *----------------------------------------------------------------------------*/
-
 #define MAXIMUM_NUM_CONTAINERS	31
 #define MAXIMUM_NUM_ADAPTERS	8
 
 #define AAC_NUM_FIB	578
-#define AAC_NUM_IO_FIB	512
+//#define AAC_NUM_IO_FIB	512
+#define AAC_NUM_IO_FIB	100
 
 #define AAC_MAX_TARGET (MAXIMUM_NUM_CONTAINERS+1)
-//#define AAC_MAX_TARGET 	(16)
 #define AAC_MAX_LUN	(8)
 
 /*
@@ -23,6 +23,9 @@
 #define aac_logical_to_phys(x)  (x?x-1:0)
 
 #define AAC_DETAILED_STATUS_INFO
+
+extern int nondasd;
+extern int paemode;
 
 struct diskparm
 {
@@ -79,7 +82,7 @@ struct diskparm
 /*
  *	Host side memory scatter gather list
  *	Used by the adapter for read, write, and readdirplus operations
- *	We have separate 32 and 64 bit version because even
+ *	We have seperate 32 and 64 bit version because even
  *	on 64 bit systems not all cards support the 64 bit version
  */
 struct sgentry {
@@ -237,6 +240,92 @@ enum aac_queue_types {
 };
 
 /*
+ * Implement our own version of these so we have 64 bit compatability
+ * The adapter uses these and can only handle 32 bit addresses
+ */
+
+struct aac_list_head {
+	u32 next;
+	u32 prev;
+};
+
+#define AAC_INIT_LIST_HEAD(ptr) do { \
+	(ptr)->next = (u32)(ulong)(ptr); \
+	(ptr)->prev = (u32)(ulong)(ptr); \
+} while (0)
+/**
+ * aac_list_empty - tests whether a list is empty
+ * @head: the list to test.
+ */
+static __inline__ int aac_list_empty(struct aac_list_head *head)
+{
+	return head->next == ((u32)(ulong)head);
+}
+
+/*
+ * Insert a new entry between two known consecutive entries. 
+ *
+ * This is only for internal list manipulation where we know
+ * the prev/next entries already!
+ */
+static __inline__ void aac_list_add(struct aac_list_head * n,
+	struct aac_list_head * prev,
+	struct aac_list_head * next)
+{
+	next->prev = (u32)(ulong)n;
+	n->next = (u32)(ulong)next;
+	n->prev = (u32)(ulong)prev;
+	prev->next = (u32)(ulong)n;
+}
+
+/**
+ * list_add_tail - add a new entry
+ * @new: new entry to be added
+ * @head: list head to add it before
+ *
+ * Insert a new entry before the specified head.
+ * This is useful for implementing queues.
+ */
+static __inline__ void aac_list_add_tail(struct aac_list_head *n, struct aac_list_head *head)
+{
+	aac_list_add(n, (struct aac_list_head*)(ulong)(head->prev), head);
+}
+
+/*
+ * Delete a list entry by making the prev/next entries
+ * point to each other.
+ *
+ * This is only for internal list manipulation where we know
+ * the prev/next entries already!
+ */
+static __inline__ void __aac_list_del(struct aac_list_head * p,
+				  struct aac_list_head * n)
+{
+	n->prev = (u32)(ulong)p;
+	p->next = (u32)(ulong)n;
+}
+
+/**
+ * aac_list_del - deletes entry from list.
+ * @entry: the element to delete from the list.
+ * Note: list_empty on entry does not return true after this, the entry is in an undefined state.
+ */
+static __inline__ void aac_list_del(struct aac_list_head *entry)
+{
+	__aac_list_del((struct aac_list_head*)(ulong)entry->prev,(struct aac_list_head*)(ulong) entry->next);
+	entry->next = entry->prev = 0;
+}
+
+/**
+ * aac_list_entry - get the struct for this entry
+ * @ptr:	the &struct list_head pointer.
+ * @type:	the type of the struct this is embedded in.
+ * @member:	the name of the list_struct within the struct.
+ */
+#define aac_list_entry(ptr, type, member) \
+	((type *)((char *)(ptr)-(ulong)(&((type *)0)->member)))
+
+/*
  *	Assign type values to the FSA communication data structures
  */
 
@@ -249,11 +338,11 @@ enum aac_queue_types {
 #define		FsaNormal	1
 #define		FsaHigh		2
 
+
 /*
  * Define the FIB. The FIB is the where all the requested data and
  * command information are put to the application on the FSA adapter.
  */
-
 struct aac_fibhdr {
 	u32 XferState;			// Current transfer state for this CCB
 	u16 Command;			// Routing information for the destination
@@ -269,7 +358,8 @@ struct aac_fibhdr {
 		    u32 _ReceiverTimeStart; 	// Timestamp for receipt of fib
 		    u32 _ReceiverTimeDone;	// Timestamp for completion of fib
 		} _s;
-		struct list_head _FibLinks;	// Used to link Adapter Initiated Fibs on the host
+		struct aac_list_head _FibLinks;	// Used to link Adapter Initiated Fibs on the host
+//		struct list_head _FibLinks;	// Used to link Adapter Initiated Fibs on the host
 	} _u;
 };
 
@@ -443,7 +533,7 @@ struct aac_driver_ident
 /*
  *	The adapter interface specs all queues to be located in the same
  *	physically contigous block. The host structure that defines the
- *	commuication queues will assume they are each a separate physically
+ *	commuication queues will assume they are each a seperate physically
  *	contigous memory region that will support them all being one big
  *	contigous block. 
  *	There is a command and response queue for each level and direction of
@@ -451,21 +541,22 @@ struct aac_driver_ident
  */
  
 struct aac_queue {
-	u64		 	logical;		/* This is the address we give the adapter */
-	struct aac_entry	*base;		   	/* This is the system virtual address */
-	struct aac_qhdr 	headers;       		/* A pointer to the producer and consumer queue headers for this queue */
-	u32	 		entries;	   	/* Number of queue entries on this queue */
-	wait_queue_head_t	qfull;		      	/* Event to wait on if the queue is full */
-	wait_queue_head_t	cmdready;	  	/* Indicates there is a Command ready from the adapter on this queue. */
-                                        		/* This is only valid for adapter to host command queues. */                      
-	spinlock_t	 	*lock;		     	/* Spinlock for this queue must take this lock before accessing the lock */
-	spinlock_t		lockdata;		/* Actual lock (used only on one side of the lock) */
-	unsigned long		SavedIrql;      	/* Previous IRQL when the spin lock is taken */
-	u32			padding;		/* Padding - FIXME - can remove I believe */
-	struct list_head 	cmdq;		   	/* A queue of FIBs which need to be prcessed by the FS thread. This is */
+	u64		 	logical;	/*address we give the adapter */
+	struct aac_entry	*base;		/*system virtual address */
+	struct aac_qhdr 	headers;       	/*producer,consumer q headers*/
+	u32	 		entries;	/*Number of queue entries */
+	wait_queue_head_t	qfull;		/*Event to wait on if q full */
+	wait_queue_head_t	cmdready;	/*Cmd ready from the adapter */
+                  /* This is only valid for adapter to host command queues. */ 
+	spinlock_t	 	*lock;		/* Spinlock for this queue must take this lock before accessing the lock */
+	spinlock_t		lockdata;	/* Actual lock (used only on one side of the lock) */
+	u32 			SavedIrql;     	/* Previous IRQL when the spin lock is taken */
+	u32			padding;	/* Padding - FIXME - can remove I believe */
+	struct aac_list_head 	cmdq;	   	/* A queue of FIBs which need to be prcessed by the FS thread. This is */
+//	struct list_head 	cmdq;	   	/* A queue of FIBs which need to be prcessed by the FS thread. This is */
                                 		        /* only valid for command queues which receive entries from the adapter. */
 	struct list_head	pendingq;		/* A queue of outstanding fib's to the adapter. */
-	unsigned long		numpending;		/* Number of entries on outstanding queue. */
+	u32			numpending;		/* Number of entries on outstanding queue. */
 	struct aac_dev *	dev;			/* Back pointer to adapter structure */
 };
 
@@ -629,7 +720,7 @@ struct aac_fib_context {
 	struct semaphore 	wait_sem;	// this is used to wait for the next fib to arrive.
 	int			wait;		// Set to true when thread is in WaitForSingleObject
 	unsigned long		count;		// total number of FIBs on FibList
-	struct list_head	fibs;
+	struct aac_list_head	hw_fib_list;	// this holds hw_fibs which should be 32 bit addresses
 };
 
 struct fsa_scsi_hba {
@@ -639,7 +730,7 @@ struct fsa_scsi_hba {
 	u8		ro[MAXIMUM_NUM_CONTAINERS];
 	u8		locked[MAXIMUM_NUM_CONTAINERS];
 	u8		deleted[MAXIMUM_NUM_CONTAINERS];
-	char		devname[MAXIMUM_NUM_CONTAINERS][8];
+	s32		devno[MAXIMUM_NUM_CONTAINERS];
 };
 
 struct fib {
@@ -650,7 +741,6 @@ struct fib {
 	 *	The Adapter that this I/O is destined for.
 	 */
 	struct aac_dev 		*dev;
-	u64			logicaladdr;	/* 64 bit */
 	/*
 	 *	This is the event the sendfib routine will wait on if the
 	 *	caller did not pass one and this is synch io.
@@ -669,7 +759,8 @@ struct fib {
 	struct list_head	queue;
 
 	void 			*data;
-	struct hw_fib		*fib;		/* Actual shared object */
+	struct hw_fib		*hw_fib;		/* Actual shared object */
+	dma_addr_t		hw_fib_pa;		/* physical address of hw_fib*/
 };
 
 /*
@@ -696,6 +787,7 @@ struct aac_adapter_info
 	u32	biosrev;
 	u32	biosbuild;
 	u32	cluster;
+	u32	clusterchannelmask; 
 	u32	serial[2];
 	u32	battery;
 	u32	options;
@@ -746,13 +838,13 @@ struct aac_dev
 	 */	
 	dma_addr_t		hw_fib_pa;
 	struct hw_fib		*hw_fib_va;
-#if BITS_PER_LONG >= 64
 	ulong			fib_base_va;
-#endif
 	/*
 	 *	Fib Headers
 	 */
-	struct fib		fibs[AAC_NUM_FIB];
+// dmb	struct fib              fibs[AAC_NUM_FIB]; /* Doing it here takes up too much from the scsi pool*/
+	struct fib              *fibs;
+
 	struct fib		*free_fib;
 	struct fib		*timeout_fib;
 	spinlock_t		fib_lock;
@@ -771,6 +863,7 @@ struct aac_dev
 	unsigned long		fsrev;		/* Main driver's revision number */
 	
 	struct aac_init		*init;		/* Holds initialization info to communicate with adapter */
+//	void *			init_pa; 	/* Holds physical address of the init struct */
 	dma_addr_t		init_pa; 	/* Holds physical address of the init struct */
 	
 	struct pci_dev		*pdev;		/* Our PCI interface */
@@ -1148,7 +1241,9 @@ struct aac_mntent {
 	u32			altoid;		// != oid <==> snapshot or broken mirror exists
 };
 
-#define FSCS_READONLY	0x0002	/*	possible result of broken mirror */
+#define FSCS_NOTCLEAN	0x0001  /* fsck is neccessary before mounting */
+#define FSCS_READONLY	0x0002	/* possible result of broken mirror */
+#define FSCS_HIDDEN	0x0004	/* should be ignored - set during a clear */
 
 struct aac_query_mount {
 	u32		command;
@@ -1359,31 +1454,6 @@ struct aac_aifcmd {
 	u8 data[1];		/* Undefined length (from kernel viewpoint) */
 };
 
-static inline u32 fib2addr(struct hw_fib *hw)
-{
-	return (u32)hw;
-}
-
-static inline struct hw_fib *addr2fib(u32 addr)
-{
-	return (struct hw_fib *)addr;
-}
-
-/**
- * 	Convert capacity to cylinders
- *  	accounting for the fact capacity could be a 64 bit value
- *
- */
-static inline u32 cap_to_cyls(sector_t capacity, u32 divisor)
-{
-#ifdef CONFIG_LBD
-	do_div(capacity, divisor);
-#else
-	capacity /= divisor;
-#endif
-	return (u32) capacity;
-}
-
 const char *aac_driverinfo(struct Scsi_Host *);
 struct fib *fib_alloc(struct aac_dev *dev);
 int fib_setup(struct aac_dev *dev);
@@ -1397,7 +1467,7 @@ int aac_consumer_get(struct aac_dev * dev, struct aac_queue * q, struct aac_entr
 int aac_consumer_avail(struct aac_dev * dev, struct aac_queue * q);
 void aac_consumer_free(struct aac_dev * dev, struct aac_queue * q, u32 qnum);
 int fib_complete(struct fib * context);
-#define fib_data(fibctx) ((void *)(fibctx)->fib->data)
+#define fib_data(fibctx) ((void *)(fibctx)->hw_fib->data)
 int aac_detach(struct aac_dev *dev);
 struct aac_dev *aac_init_adapter(struct aac_dev *dev);
 int aac_get_containers(struct aac_dev *dev);

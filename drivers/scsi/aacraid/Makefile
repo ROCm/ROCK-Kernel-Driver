@@ -1,8 +1,11 @@
-# Adaptec aacraid
 
-obj-$(CONFIG_SCSI_AACRAID) := aacraid.o
+EXTRA_CFLAGS	+= -I$(TOPDIR)/drivers/scsi
 
-aacraid-objs	:= linit.o aachba.o commctrl.o comminit.o commsup.o \
+
+O_TARGET	:= aacraid.o
+obj-m		:= $(O_TARGET)
+
+obj-y		:= linit.o aachba.o commctrl.o comminit.o commsup.o \
 		   dpcsup.o rx.o sa.o
 
-EXTRA_CFLAGS	:= -Idrivers/scsi
+include $(TOPDIR)/Rules.make
