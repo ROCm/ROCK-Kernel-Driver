@@ -140,6 +140,36 @@ dbg_qh (const char *label, struct ehci_hcd *ehci, struct ehci_qh *qh)
 	dbg_qtd ("overlay", ehci, (struct ehci_qtd *) &qh->hw_qtd_next);
 }
 
+static void __attribute__((__unused__))
+dbg_itd (const char *label, struct ehci_hcd *ehci, struct ehci_itd *itd) 
+{
+	ehci_dbg (ehci, "%s [%d] itd %p, next %08x, urb %p\n",
+		label, itd->frame, itd, le32_to_cpu(itd->hw_next), itd->urb);
+	ehci_dbg (ehci,
+		"  trans: %08x %08x %08x %08x %08x %08x %08x %08x\n", 
+		le32_to_cpu(itd->hw_transaction[0]),
+		le32_to_cpu(itd->hw_transaction[1]),
+		le32_to_cpu(itd->hw_transaction[2]),
+		le32_to_cpu(itd->hw_transaction[3]),
+		le32_to_cpu(itd->hw_transaction[4]),
+		le32_to_cpu(itd->hw_transaction[5]),
+		le32_to_cpu(itd->hw_transaction[6]),
+		le32_to_cpu(itd->hw_transaction[7]));
+	ehci_dbg (ehci,
+		"  buf:   %08x %08x %08x %08x %08x %08x %08x\n", 
+		le32_to_cpu(itd->hw_bufp[0]),
+		le32_to_cpu(itd->hw_bufp[1]),
+		le32_to_cpu(itd->hw_bufp[2]),
+		le32_to_cpu(itd->hw_bufp[3]),
+		le32_to_cpu(itd->hw_bufp[4]),
+		le32_to_cpu(itd->hw_bufp[5]),
+		le32_to_cpu(itd->hw_bufp[6]));
+	ehci_dbg (ehci, "  index: %d %d %d %d %d %d %d %d\n",
+		itd->index[0], itd->index[1], itd->index[2],
+		itd->index[3], itd->index[4], itd->index[5],
+		itd->index[6], itd->index[7]);
+}
+
 static int __attribute__((__unused__))
 dbg_status_buf (char *buf, unsigned len, char *label, u32 status)
 {

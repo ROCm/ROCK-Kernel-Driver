@@ -67,6 +67,9 @@
  *
  * HISTORY:
  *
+ * 2003-12-29 Rewritten high speed iso transfer support (by Michal Sojka,
+ *	<sojkam@centrum.cz>, updates by DB).
+ *
  * 2002-11-29	Correct handling for hw async_next register.
  * 2002-08-06	Handling for bulk and interrupt transfers is mostly shared;
  *	only scheduling is different, no arbitrary limitations.
@@ -90,7 +93,7 @@
  * 2001-June	Works with usb-storage and NEC EHCI on 2.4
  */
 
-#define DRIVER_VERSION "2003-Jun-13"
+#define DRIVER_VERSION "2003-Dec-29"
 #define DRIVER_AUTHOR "David Brownell"
 #define DRIVER_DESC "USB 2.0 'Enhanced' Host Controller (EHCI) Driver"
 
@@ -901,10 +904,19 @@ rescan:
 	if (!qh)
 		goto done;
 
+	/* endpoints can be iso streams.  for now, we don't
+	 * accelerate iso completions ... so spin a while.
+	 */
+	if (qh->hw_info1 == 0) {
+		ehci_vdbg (ehci, "iso delay\n");
+		goto idle_timeout;
+	}
+
 	if (!HCD_IS_RUNNING (ehci->hcd.state))
 		qh->qh_state = QH_STATE_IDLE;
 	switch (qh->qh_state) {
 	case QH_STATE_UNLINK:		/* wait for hw to finish? */
+idle_timeout:
 		spin_unlock_irqrestore (&ehci->lock, flags);
 		set_current_state (TASK_UNINTERRUPTIBLE);
 		schedule_timeout (1);
