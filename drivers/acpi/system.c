@@ -256,7 +256,8 @@ acpi_system_suspend(
 	acpi_status		status = AE_ERROR;
 	unsigned long		flags = 0;
 
-	save_flags(flags);
+	local_irq_save(flags);
+	local_irq_disable();
 	
 	switch (state)
 	{
@@ -270,7 +271,7 @@ acpi_system_suspend(
 		do_suspend_lowlevel(0);
 		break;
 	}
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 	return status;
 }
