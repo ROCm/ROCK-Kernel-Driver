@@ -616,6 +616,10 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 		goto err_dealloc;
 	}
 
+	if ((rc = register_netdev(dev)) != 0) {
+		goto err_pci;
+	}
+
 	if (((bdp->pdev->device > 0x1030)
 	       && (bdp->pdev->device < 0x103F))
 	    || ((bdp->pdev->device >= 0x1050)
@@ -645,7 +649,7 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 		printk(KERN_ERR "e100: Failed to initialize, instance #%d\n",
 		       e100nics);
 		rc = -ENODEV;
-		goto err_pci;
+		goto err_unregister_netdev;
 	}
 
 	/* Check if checksum is valid */
@@ -655,7 +659,7 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
                 printk(KERN_ERR "e100: Corrupted EEPROM on instance #%d\n",
 		       e100nics);
                 rc = -ENODEV;
-                goto err_pci;
+                goto err_unregister_netdev;
 	}
 	
 	dev->vlan_rx_register = e100_vlan_rx_register;
@@ -678,12 +682,6 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 	e100nics++;
 
 	e100_get_speed_duplex_caps(bdp);
-
-	if ((rc = register_netdev(dev)) != 0) {
-		goto err_pci;
-	}
-        memcpy(bdp->ifname, dev->name, IFNAMSIZ);
-        bdp->ifname[IFNAMSIZ-1] = 0;	
 
 	printk(KERN_NOTICE
 	       "e100: %s: %s\n", 
@@ -709,6 +707,8 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 
 	goto out;
 
+err_unregister_netdev:
+	unregister_netdev(dev);
 err_pci:
 	iounmap(bdp->scb);
 	pci_release_regions(pcid);
