@@ -115,13 +115,14 @@ LOCAL void compress_decompress(UBYTE *,UBYTE *,LONG, UBYTE *, ULONG *);
 /* compress a block of memory, decompress a block of memory, or to identify   */
 /* itself. For more information, see the specification file "compress.h".     */
 
-EXPORT void lzrw3_compress(action,wrk_mem,src_adr,src_len,dst_adr,p_dst_len)
-UWORD     action;      /* Action to be performed.                             */
-UBYTE   *wrk_mem;      /* Address of working memory we can use.               */
-UBYTE   *src_adr;      /* Address of input data.                              */
-LONG     src_len;      /* Length  of input data.                              */
-UBYTE   *dst_adr;      /* Address to put output data.                         */
-void  *p_dst_len;      /* Address of longword for length of output data.      */
+EXPORT void lzrw3_compress(
+	UWORD     action,      /* Action to be performed.		*/
+	UBYTE   *wrk_mem,	/* Address of working memory we can use.*/
+	UBYTE   *src_adr,	/* Address of input data.		*/
+	LONG     src_len,	/* Length  of input data.		*/
+	UBYTE   *dst_adr,	/* Address to put output data.		*/
+	void  *p_dst_len	/* Address of longword for length of output data.*/
+)
 {
  switch (action)
    {
@@ -314,9 +315,7 @@ void  *p_dst_len;      /* Address of longword for length of output data.      */
    (((40543*(((*(PTR))<<8)^((*((PTR)+1))<<4)^(*((PTR)+2))))>>4) & 0xFFF)
 
 /******************************************************************************/
-                            
-LOCAL void compress_compress
-           (p_wrk_mem,p_src_first,src_len,p_dst_first,p_dst_len)
+
 /* Input  : Hand over the required amount of working memory in p_wrk_mem.     */
 /* Input  : Specify input block using p_src_first and src_len.                */
 /* Input  : Point p_dst_first to the start of the output zone (OZ).           */
@@ -326,11 +325,9 @@ LOCAL void compress_compress
 /* Output : Output block in Mem[p_dst_first..p_dst_first+*p_dst_len-1]. May   */
 /* Output : write in OZ=Mem[p_dst_first..p_dst_first+src_len+MAX_CMP_GROUP-1].*/
 /* Output : Upon completion guaranteed *p_dst_len<=src_len+FLAG_BYTES.        */
-UBYTE *p_wrk_mem;
-UBYTE *p_src_first;
-ULONG  src_len;
-UBYTE *p_dst_first;
-LONG  *p_dst_len;
+LOCAL void compress_compress(UBYTE *p_wrk_mem,
+			     UBYTE *p_src_first, ULONG  src_len,
+			     UBYTE *p_dst_first, LONG  *p_dst_len)
 {
  /* p_src and p_dst step through the source and destination blocks.           */
  register UBYTE *p_src = p_src_first;
@@ -366,8 +363,8 @@ LONG  *p_dst_len;
  /* to the hash table entry corresponding to the second youngest literal.     */
  /* Note: p_h1=0=>p_h2=0 because zero values denote absence of a pending      */
  /* literal. The variables are initialized to zero meaning an empty "buffer". */
- UBYTE **p_h1=0;
- UBYTE **p_h2=0;
+ UBYTE **p_h1=NULL;
+ UBYTE **p_h2=NULL;
   
  /* To start, we write the flag bytes. Being optimistic, we set the flag to   */
  /* FLAG_COMPRESS. The remaining flag bytes are zeroed so as to keep the      */
@@ -488,9 +485,9 @@ LONG  *p_dst_len;
           /* upon the arrival of extra context bytes.                         */
           if (p_h1!=0)
             {
-             if (p_h2!=0)
-               {*p_h2=p_ziv-2; p_h2=0;}
-             *p_h1=p_ziv-1; p_h1=0;
+             if (p_h2)
+               {*p_h2=p_ziv-2; p_h2=NULL;}
+             *p_h1=p_ziv-1; p_h1=NULL;
             }
             
           /* In any case, we can update the hash table based on the current   */
@@ -564,8 +561,6 @@ LONG  *p_dst_len;
 
 /******************************************************************************/
 
-LOCAL void compress_decompress
-           (p_wrk_mem,p_src_first,src_len,p_dst_first,p_dst_len)
 /* Input  : Hand over the required amount of working memory in p_wrk_mem.     */
 /* Input  : Specify input block using p_src_first and src_len.                */
 /* Input  : Point p_dst_first to the start of the output zone.                */
@@ -576,11 +571,9 @@ LOCAL void compress_decompress
 /* Output : Length of output block written to *p_dst_len.                     */
 /* Output : Output block in Mem[p_dst_first..p_dst_first+*p_dst_len-1].       */
 /* Output : Writes only  in Mem[p_dst_first..p_dst_first+*p_dst_len-1].       */
-UBYTE *p_wrk_mem;
-UBYTE *p_src_first;
-LONG   src_len;
-UBYTE *p_dst_first;
-ULONG *p_dst_len;
+LOCAL void compress_decompress( UBYTE *p_wrk_mem,
+				UBYTE *p_src_first, LONG   src_len,
+				UBYTE *p_dst_first, ULONG *p_dst_len)
 {
  /* Byte pointers p_src and p_dst scan through the input and output blocks.   */
  register UBYTE *p_src = p_src_first+FLAG_BYTES;

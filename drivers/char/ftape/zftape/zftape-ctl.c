@@ -1319,7 +1319,7 @@ ftmtcmd_error:
 
 /*  IOCTL routine called by kernel-interface code
  */
-int _zft_ioctl(unsigned int command, void * arg)
+int _zft_ioctl(unsigned int command, void __user * arg)
 {
 	int result;
 	union { struct mtop       mtop;

@@ -34,5 +34,5 @@ extern void zft_prevent_flush(void);
 
 /*  hook for the VFS interface 
  */
-extern int _zft_write(const char *buff, int req_len);
+extern int _zft_write(const char __user *buff, int req_len);
 #endif /* _ZFTAPE_WRITE_H */
