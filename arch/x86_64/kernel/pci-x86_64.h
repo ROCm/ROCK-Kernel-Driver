@@ -18,9 +18,11 @@
 #define PCI_NO_SORT		0x0100
 #define PCI_BIOS_SORT		0x0200
 #define PCI_NO_CHECKS		0x0400
+#define PCI_USE_PIRQ_MASK	0x0800
 #define PCI_ASSIGN_ROMS		0x1000
 #define PCI_BIOS_IRQ_SCAN	0x2000
 #define PCI_ASSIGN_ALL_BUSSES	0x4000
+#define PCI_NO_ACPI_ROUTING	0x8000
 
 extern unsigned int pci_probe;
 
@@ -66,6 +68,8 @@ struct irq_routing_table {
 } __attribute__((packed));
 
 extern unsigned int pcibios_irq_mask;
+
+extern int pci_use_acpi_routing;
 
 void pcibios_irq_init(void);
 void pcibios_fixup_irqs(void);

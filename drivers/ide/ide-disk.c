@@ -755,8 +755,6 @@ static void idedisk_pre_reset (ide_drive_t *drive)
 	drive->special.b.recalibrate  = legacy;
 	if (OK_TO_RESET_CONTROLLER)
 		drive->mult_count = 0;
-	if (!drive->keep_settings && !drive->using_dma)
-		drive->mult_req = 0;
 	if (drive->mult_req != drive->mult_count)
 		drive->special.b.set_multmode = 1;
 }
@@ -1231,7 +1229,14 @@ static void idedisk_setup(ide_drive_t *drive)
 			drive->special.b.set_multmode = 1;
 #endif
 	}
-	drive->no_io_32bit = id->dword_io ? 1 : 0;
+
+	/* FIXME: Nowadays there are many chipsets out there which *require* 32
+	 * bit IO. Those will most propably not work properly with drives not
+	 * supporting this. But right now we don't do anything about this. We
+	 * dont' even *warn* the user!
+	 */
+
+	drive->channel->no_io_32bit = id->dword_io ? 1 : 0;
 
 	if (drive->id->cfs_enable_2 & 0x3000)
 		write_cache(drive, (id->cfs_enable_2 & 0x3000));

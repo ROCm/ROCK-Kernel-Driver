@@ -245,7 +245,11 @@
 #define __NR_ia32_lremovexattr	236
 #define __NR_ia32_fremovexattr	237
 #define __NR_ia32_tkill		238
+#define __NR_ia32_sendfile64		239
+#define __NR_ia32_futex		240
+#define __NR_ia32_sched_setaffinity	241
+#define __NR_ia32_sched_getaffinity	242
 
-#define IA32_NR_syscalls 240	/* must be > than biggest syscall! */	
+#define IA32_NR_syscalls 243	/* must be > than biggest syscall! */	
 
 #endif /* _ASM_X86_64_IA32_UNISTD_H_ */

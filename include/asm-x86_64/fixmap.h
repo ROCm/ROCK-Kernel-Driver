@@ -21,11 +21,7 @@
  * Here we define all the compile-time 'special' virtual
  * addresses. The point is to have a constant address at
  * compile time, but to set the physical address only
- * in the boot process. We allocate these special  addresses
- * from the end of virtual memory (0xfffff000) backwards.
- * Also this lets us do fail-safe vmalloc(), we
- * can guarantee that these special addresses and
- * vmalloc()-ed addresses never overlap.
+ * in the boot process.
  *
  * these 'compile-time allocated' memory buffers are
  * fixed-size 4k pages. (or larger if used with an increment
@@ -36,12 +32,6 @@
  * task switches.
  */
 
-/*
- * on UP currently we will have no trace of the fixmap mechanizm,
- * no page table allocations, etc. This might change in the
- * future, say framebuffers for the console driver(s) could be
- * fix-mapped?
- */
 enum fixed_addresses {
 	VSYSCALL_LAST_PAGE,
 	VSYSCALL_FIRST_PAGE = VSYSCALL_LAST_PAGE + ((VSYSCALL_END-VSYSCALL_START) >> PAGE_SHIFT) - 1,
@@ -65,13 +55,7 @@ extern void __set_fixmap (enum fixed_addresses idx,
  */
 #define set_fixmap_nocache(idx, phys) \
 		__set_fixmap(idx, phys, PAGE_KERNEL_NOCACHE)
-/*
- * used by vmalloc.c.
- *
- * Leave one empty page between vmalloc'ed areas and
- * the start of the fixmap, and leave one page empty
- * at the top of mem..
- */
+
 #define FIXADDR_TOP	(VSYSCALL_END-PAGE_SIZE)
 #define FIXADDR_SIZE	(__end_of_fixed_addresses << PAGE_SHIFT)
 #define FIXADDR_START	(FIXADDR_TOP - FIXADDR_SIZE)

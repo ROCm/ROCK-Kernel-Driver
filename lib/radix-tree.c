@@ -24,6 +24,7 @@
 #include <linux/module.h>
 #include <linux/radix-tree.h>
 #include <linux/slab.h>
+#include <linux/string.h>
 
 /*
  * Radix tree node definition.

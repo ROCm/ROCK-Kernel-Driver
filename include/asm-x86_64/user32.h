@@ -14,12 +14,23 @@ struct user_i387_ia32_struct {
 	u32	st_space[20];   /* 8*10 bytes for each FP-reg = 80 bytes */
 };
 
-/*
- * This is the old layout of "struct pt_regs", and
- * is still the layout used by user mode (the new
- * pt_regs doesn't have all registers as the kernel
- * doesn't use the extra segment registers)
- */
+/* FSAVE frame with extensions */
+struct user32_fxsr_struct {
+	unsigned short	cwd;
+	unsigned short	swd;
+	unsigned short	twd;	/* not compatible to 64bit twd */
+	unsigned short	fop;
+	int	fip;
+	int	fcs;
+	int	foo;
+	int	fos;
+	int	mxcsr;
+	int	reserved;
+	int	st_space[32];	/* 8*16 bytes for each FP-reg = 128 bytes */
+	int	xmm_space[32];	/* 8*16 bytes for each XMM-reg = 128 bytes */
+	int	padding[56];
+};
+
 struct user_regs_struct32 {
 	__u32 ebx, ecx, edx, esi, edi, ebp, eax;
 	unsigned short ds, __ds, es, __es;

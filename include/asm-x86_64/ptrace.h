@@ -1,7 +1,7 @@
 #ifndef _X86_64_PTRACE_H
 #define _X86_64_PTRACE_H
 
-#ifdef __ASSEMBLY__
+#if defined(__ASSEMBLY__) || defined(__FRAME_OFFSETS) 
 #define R15 0
 #define R14 8
 #define R13 16
@@ -82,8 +82,8 @@ struct pt_regs {
 #define PTRACE_SETFPXREGS         19
 
 #if defined(__KERNEL__) && !defined(__ASSEMBLY__) 
-#define user_mode(regs) ((regs)->rsp <= PAGE_OFFSET)
-#define instruction_pointer(regs) ((regs)->eip)
+#define user_mode(regs) (!!((regs)->cs & 3))
+#define instruction_pointer(regs) ((regs)->rip)
 extern void show_regs(struct pt_regs *);
 
 enum {

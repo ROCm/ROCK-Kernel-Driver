@@ -757,13 +757,12 @@ asmlinkage void do_spurious_interrupt_bug(struct pt_regs * regs,
  */
 asmlinkage void math_state_restore(struct pt_regs regs)
 {
+	struct task_struct *tsk = current;
 	clts();		/* Allow maths ops (or we recurse) */
 
-	if (current->used_math) {
-		restore_fpu(current);
-	} else {
-		init_fpu();
-	}
+	if (!tsk->used_math)
+		init_fpu(tsk);
+	restore_fpu(tsk);
 	set_thread_flag(TIF_USEDFPU);	/* So we fnsave on switch_to() */
 }
 

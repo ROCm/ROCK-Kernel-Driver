@@ -5,6 +5,8 @@
  * These are used to wrap system calls on x86.
  *
  * See arch/i386/kernel/sys_i386.c for ugly details..
+ *
+ * (on x86-64 only used for 32bit emulation) 
  */
 
 struct ipc_kludge {

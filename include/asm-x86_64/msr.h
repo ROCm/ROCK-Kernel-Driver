@@ -1,5 +1,7 @@
 #ifndef X86_64_MSR_H
 #define X86_64_MSR_H 1
+
+#ifndef __ASSEMBLY__
 /*
  * Access to machine-specific registers (available on 586 and better only)
  * Note: the rd* operations modify the parameters directly (without using
@@ -38,7 +40,7 @@
 		     "   .quad 	2b,3b\n\t"						\
 		     ".previous"							\
 		     : "=a" (ret__)							\
-		     : "c" (msr), "0" ((__u32)val), "d" ((val)>>32), "i" (-EFAULT)); 	\
+		     : "c" (msr), "0" ((__u32)val), "d" ((val)>>32), "i" (-EFAULT));\
 	ret__; })
 
 #define rdtsc(low,high) \
@@ -47,8 +49,16 @@
 #define rdtscl(low) \
      __asm__ __volatile__ ("rdtsc" : "=a" (low) : : "edx")
 
-#define rdtscll(val) \
-     __asm__ __volatile__ ("rdtsc" : "=A" (val))
+#define rdtscll(val) do { \
+     unsigned int a,d; \
+     asm volatile("rdtsc" : "=a" (a), "=d" (d)); \
+     (val) = ((unsigned long)a) | (((unsigned long)d)<<32); \
+} while(0)
+
+#define rdpmc(counter,low,high) \
+     __asm__ __volatile__("rdpmc" \
+			  : "=a" (low), "=d" (high) \
+			  : "c" (counter))
 
 #define write_tsc(val1,val2) wrmsr(0x10, val1, val2)
 
@@ -57,6 +67,7 @@
 			  : "=a" (low), "=d" (high) \
 			  : "c" (counter))
 
+#endif
 
 /* AMD/K8 specific MSRs */ 
 #define MSR_EFER 0xc0000080		/* extended feature register */
@@ -66,8 +77,17 @@
 #define MSR_SYSCALL_MASK 0xc0000084	/* EFLAGS mask for syscall */
 #define MSR_FS_BASE 0xc0000100		/* 64bit GS base */
 #define MSR_GS_BASE 0xc0000101		/* 64bit FS base */
-#define MSR_KERNEL_GS_BASE  0xc0000102	/* SwapGS GS shadow (or USER_GS from kernel view) */ 
+#define MSR_KERNEL_GS_BASE  0xc0000102	/* SwapGS GS shadow (or USER_GS from kernel) */ 
+/* EFER bits: */ 
+#define _EFER_SCE 0  /* SYSCALL/SYSRET */
+#define _EFER_LME 8  /* Long mode enable */
+#define _EFER_LMA 10 /* Long mode active (read-only) */
+#define _EFER_NX 11  /* No execute enable */
 
+#define EFER_SCE (1<<_EFER_SCE)
+#define EFER_LME (1<<EFER_LME)
+#define EFER_LMA (1<<EFER_LMA)
+#define EFER_NX (1<<_EFER_NX)
 
 /* Intel MSRs. Some also available on other CPUs */
 #define MSR_IA32_PLATFORM_ID	0x17
@@ -95,9 +115,23 @@
 #define MSR_IA32_MC0_ADDR      0x402
 #define MSR_IA32_MC0_MISC      0x403
 
-/* K7 MSRs */
+#define MSR_P6_PERFCTR0			0xc1
+#define MSR_P6_PERFCTR1			0xc2
+#define MSR_P6_EVNTSEL0			0x186
+#define MSR_P6_EVNTSEL1			0x187
+
+/* K7/K8 MSRs. Not complete. See the architecture manual for a more complete list. */
 #define MSR_K7_EVNTSEL0            0xC0010000
 #define MSR_K7_PERFCTR0            0xC0010004
+#define MSR_K7_EVNTSEL1            0xC0010001
+#define MSR_K7_PERFCTR1            0xC0010005
+#define MSR_K7_EVNTSEL2            0xC0010002
+#define MSR_K7_PERFCTR2            0xC0010006
+#define MSR_K7_EVNTSEL3            0xC0010003
+#define MSR_K7_PERFCTR3            0xC0010007
+#define MSR_K8_TOP_MEM1		   0xC001001A
+#define MSR_K8_TOP_MEM2		   0xC001001D
+#define MSR_K8_SYSCFG		   0xC0000010	
 
 /* K6 MSRs */
 #define MSR_K6_EFER			0xC0000080
@@ -136,5 +170,12 @@
 #define MSR_IA32_APICBASE_BSP           (1<<8)
 #define MSR_IA32_APICBASE_ENABLE        (1<<11)
 #define MSR_IA32_APICBASE_BASE          (0xfffff<<12)
+
+
+#define MSR_IA32_THERM_CONTROL		0x19a
+#define MSR_IA32_THERM_INTERRUPT	0x19b
+#define MSR_IA32_THERM_STATUS		0x19c
+#define MSR_IA32_MISC_ENABLE		0x1a0
+
 
 #endif

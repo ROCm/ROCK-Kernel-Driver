@@ -3,6 +3,7 @@
 
 #include <linux/config.h>
 #include <linux/pm.h>
+#include <asm/fixmap.h>
 #include <asm/apicdef.h>
 #include <asm/system.h>
 
@@ -20,24 +21,24 @@
  * Basic functions accessing APICs.
  */
 
-static __inline void apic_write(unsigned long reg, unsigned long v)
+static __inline void apic_write(unsigned long reg, unsigned int v)
 {
-	*((volatile unsigned long *)(APIC_BASE+reg)) = v;
+	*((volatile unsigned int *)(APIC_BASE+reg)) = v;
 }
 
-static __inline void apic_write_atomic(unsigned long reg, unsigned long v)
+static __inline void apic_write_atomic(unsigned long reg, unsigned int v)
 {
-	xchg((volatile unsigned long *)(APIC_BASE+reg), v);
+	xchg((volatile unsigned int *)(APIC_BASE+reg), v);
 }
 
-static __inline unsigned long apic_read(unsigned long reg)
+static __inline unsigned int apic_read(unsigned long reg)
 {
-	return *((volatile unsigned long *)(APIC_BASE+reg));
+	return *((volatile unsigned int *)(APIC_BASE+reg));
 }
 
 static __inline__ void apic_wait_icr_idle(void)
 {
-	do { } while ( apic_read( APIC_ICR ) & APIC_ICR_BUSY );
+	while ( apic_read( APIC_ICR ) & APIC_ICR_BUSY );
 }
 
 #ifdef CONFIG_X86_GOOD_APIC
@@ -63,8 +64,8 @@ static inline void ack_APIC_irq(void)
 	apic_write_around(APIC_EOI, 0);
 }
 
-extern int get_maxlvt(void);
-extern void clear_local_APIC(void);
+extern int get_maxlvt (void);
+extern void clear_local_APIC (void);
 extern void connect_bsp_APIC (void);
 extern void disconnect_bsp_APIC (void);
 extern void disable_local_APIC (void);

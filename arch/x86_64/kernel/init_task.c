@@ -7,7 +7,6 @@
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
 #include <asm/desc.h>
-#include <asm/thread_info.h>
 
 static struct fs_struct init_fs = INIT_FS;
 static struct files_struct init_files = INIT_FILES;
@@ -15,7 +14,7 @@ static struct signal_struct init_signals = INIT_SIGNALS;
 struct mm_struct init_mm = INIT_MM(init_mm);
 
 /*
- * Initial thread structure.
+ * Initial task structure.
  *
  * We need to make sure that this is 8192-byte aligned due to the
  * way process stacks are handled. This is done by having a special
@@ -39,4 +38,9 @@ struct task_struct init_task = INIT_TASK(init_task);
  * section. Since TSS's are completely CPU-local, we want them
  * on exact cacheline boundaries, to eliminate cacheline ping-pong.
  */ 
-struct tss_struct init_tss[NR_CPUS] __cacheline_aligned = { [0 ... NR_CPUS-1] = INIT_TSS };
+struct tss_struct init_tss[NR_CPUS] __cacheline_aligned;
+
+
+#define ALIGN_TO_4K __attribute__((section(".data.init_task")))
+
+pgd_t boot_vmalloc_pgt[512]  ALIGN_TO_4K;

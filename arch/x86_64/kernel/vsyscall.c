@@ -12,7 +12,7 @@
  *  vsyscalls. One vsyscall can reserve more than 1 slot to avoid
  *  jumping out of line if necessary.
  *
- *  $Id: vsyscall.c,v 1.4 2001/09/27 17:58:13 ak Exp $
+ *  $Id: vsyscall.c,v 1.9 2002/03/21 13:42:58 ak Exp $
  */
 
 /*
@@ -44,8 +44,19 @@
 #include <asm/fixmap.h>
 #include <asm/errno.h>
 
+
 #define __vsyscall(nr) __attribute__ ((unused,__section__(".vsyscall_" #nr)))
 
+//#define NO_VSYSCALL 1
+
+#ifdef NO_VSYSCALL
+#include <asm/unistd.h>
+
+static int errno __section_vxtime_sequence; 
+
+__syscall2(static inline int,int,gettimeofday,struct timeval *,tv,struct timezone *,tz)
+
+#else
 static inline void timeval_normalize(struct timeval * tv)
 {
 	time_t __sec;
@@ -60,7 +71,7 @@ static inline void timeval_normalize(struct timeval * tv)
 
 long __vxtime_sequence[2] __section_vxtime_sequence;
 
-inline void do_vgettimeofday(struct timeval * tv)
+static inline void do_vgettimeofday(struct timeval * tv)
 {
 	long sequence;
 	unsigned long usec, sec;
@@ -120,18 +131,29 @@ static inline void do_get_tz(struct timezone * tz)
 		rmb();
 	} while (sequence != __vxtime_sequence[0]);
 }
+#endif
 
 static int __vsyscall(0) vgettimeofday(struct timeval * tv, struct timezone * tz)
 {
+#ifdef NO_VSYSCALL
+	return gettimeofday(tv,tz); 
+#else
 	if (tv)
 		do_vgettimeofday(tv);
 	if (tz)
 		do_get_tz(tz);
 	return 0;
+#endif
 }
 
-static time_t __vsyscall(1) vtime(time_t * time)
+static time_t __vsyscall(1) vtime(time_t * t)
 {
+#ifdef NO_VSYSCALL
+	struct timeval tv; 
+	gettimeofday(&tv,NULL); 
+	if (t) *t = tv.tv_sec; 
+	return tv.tv_sec; 
+#else
 	long sequence;
 	time_t __time;
 
@@ -144,9 +166,10 @@ static time_t __vsyscall(1) vtime(time_t * time)
 		rmb();
 	} while (sequence != __vxtime_sequence[0]);
 
-	if (time)
-		*time = __time;
+	if (t)
+		*t = __time;
 	return __time;
+#endif
 }
 
 static long __vsyscall(2) venosys_0(void)
