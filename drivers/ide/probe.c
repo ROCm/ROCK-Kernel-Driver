@@ -307,16 +307,7 @@ byte eighty_ninty_three(struct ata_device *drive)
 		(drive->id->hw_config & 0x6000)) ? 1 : 0);
 }
 
-/*
- * Similar to ide_wait_stat(), except it never calls ata_error internally.
- * This is a kludge to handle the new ide_config_drive_speed() function,
- * and should not otherwise be used anywhere.  Eventually, the tuneproc's
- * should be updated to return ide_startstop_t, in which case we can get
- * rid of this abomination again.  :)   -ml
- *
- * It is gone..........
- *
- * const char *msg == consider adding for verbose errors.
+/* FIXME: Channel lock should be held.
  */
 int ide_config_drive_speed(struct ata_device *drive, byte speed)
 {
@@ -329,12 +320,10 @@ int ide_config_drive_speed(struct ata_device *drive, byte speed)
 	outb(inb(ch->dma_base + 2) & ~(1 << (5 + unit)), ch->dma_base + 2);
 #endif
 
-	/*
-	 * Don't use ide_wait_cmd here - it will attempt to set_geometry and
+	/* Don't use ide_wait_cmd here - it will attempt to set_geometry and
 	 * recalibrate, but for some reason these don't work at this point
 	 * (lost interrupt).
-	 */
-        /*
+         *
          * Select the drive, and issue the SETFEATURES command
          */
 	disable_irq(ch->irq);	/* disable_irq_nosync ?? */
@@ -350,20 +339,7 @@ int ide_config_drive_speed(struct ata_device *drive, byte speed)
 		ata_irq_enable(drive, 1);
 	udelay(1);
 
-	/*
-	 * Wait for drive to become non-BUSY
-	 */
-	if (!ata_status(drive, 0, BUSY_STAT)) {
-		unsigned long flags, timeout;
-		__save_flags(flags);	/* local CPU only */
-		ide__sti();		/* local CPU only -- for jiffies */
-		timeout = jiffies + WAIT_CMD;
-		while (!ata_status(drive, 0, BUSY_STAT)) {
-			if (time_after(jiffies, timeout))
-				break;
-		}
-		__restore_flags(flags); /* local CPU only */
-	}
+	ata_busy_poll(drive, WAIT_CMD);
 
 	/*
 	 * Allow status to settle, then read it again.

@@ -608,7 +608,7 @@ typedef struct {
 /*
  *	idefloppy_end_request is used to finish servicing a request.
  *
- *	For read/write requests, we will call ide_end_request to pass to the
+ *	For read/write requests, we will call ata_end_request to pass to the
  *	next buffer.
  */
 static int idefloppy_end_request(struct ata_device *drive, struct request *rq, int uptodate)
@@ -632,7 +632,7 @@ static int idefloppy_end_request(struct ata_device *drive, struct request *rq, i
 		return 0;
 
 	if (!(rq->flags & REQ_SPECIAL)) {
-		ide_end_request(drive, rq, uptodate);
+		ata_end_request(drive, rq, uptodate);
 		return 0;
 	}
 
@@ -956,9 +956,12 @@ static ide_startstop_t idefloppy_transfer_pc(struct ata_device *drive, struct re
 	ide_startstop_t startstop;
 	idefloppy_floppy_t *floppy = drive->driver_data;
 	idefloppy_ireason_reg_t ireason;
+	int ret;
 
-	if (ide_wait_stat (&startstop, drive, rq, DRQ_STAT, BUSY_STAT, WAIT_READY)) {
+	if (ata_status_poll(drive, DRQ_STAT, BUSY_STAT,
+				WAIT_READY, rq, &startstop)) {
 		printk (KERN_ERR "ide-floppy: Strange, packet command initiated yet DRQ isn't asserted\n");
+
 		return startstop;
 	}
 
@@ -968,18 +971,18 @@ static ide_startstop_t idefloppy_transfer_pc(struct ata_device *drive, struct re
 
 	spin_lock_irqsave(ch->lock, flags);
 	ireason.all=IN_BYTE (IDE_IREASON_REG);
+
 	if (!ireason.b.cod || ireason.b.io) {
-		spin_unlock_irqrestore(ch->lock, flags);
-
 		printk (KERN_ERR "ide-floppy: (IO,CoD) != (0,1) while issuing a packet command\n");
-		return ide_stopped;
+		ret = ide_stopped;
+	} else {
+		ata_set_handler (drive, idefloppy_pc_intr, IDEFLOPPY_WAIT_CMD, NULL);	/* Set the interrupt routine */
+		atapi_write(drive, floppy->pc->c, 12); /* Send the actual packet */
+		ret = ide_started;
 	}
-
-	ata_set_handler (drive, idefloppy_pc_intr, IDEFLOPPY_WAIT_CMD, NULL);	/* Set the interrupt routine */
-	atapi_write(drive, floppy->pc->c, 12); /* Send the actual packet */
 	spin_unlock_irqrestore(ch->lock, flags);
 
-	return ide_started;
+	return ret;
 }
 
 
@@ -1010,39 +1013,43 @@ static ide_startstop_t idefloppy_transfer_pc1(struct ata_device *drive, struct r
 	idefloppy_floppy_t *floppy = drive->driver_data;
 	ide_startstop_t startstop;
 	idefloppy_ireason_reg_t ireason;
+	int ret;
 
-	if (ide_wait_stat(&startstop, drive, rq, DRQ_STAT, BUSY_STAT, WAIT_READY)) {
+	if (ata_status_poll(drive, DRQ_STAT, BUSY_STAT,
+				WAIT_READY, rq, &startstop)) {
 		printk (KERN_ERR "ide-floppy: Strange, packet command initiated yet DRQ isn't asserted\n");
+
 		return startstop;
 	}
+
 	/* FIXME: this locking should encompass the above register
 	 * file access too.
 	 */
 
 	spin_lock_irqsave(ch->lock, flags);
-	ireason.all=IN_BYTE (IDE_IREASON_REG);
+	ireason.all=IN_BYTE(IDE_IREASON_REG);
 	if (!ireason.b.cod || ireason.b.io) {
-		spin_unlock_irqrestore(ch->lock, flags);
-
 		printk (KERN_ERR "ide-floppy: (IO,CoD) != (0,1) while issuing a packet command\n");
-		return ide_stopped;
-	}
+		ret = ide_stopped;
+	} else {
 
-	/*
-	 * The following delay solves a problem with ATAPI Zip 100 drives where
-	 * the Busy flag was apparently being deasserted before the unit was
-	 * ready to receive data. This was happening on a 1200 MHz Athlon
-	 * system. 10/26/01 25msec is too short, 40 and 50msec work well.
-	 * idefloppy_pc_intr will not be actually used until after the packet
-	 * is moved in about 50 msec.
-	 */
-	ata_set_handler(drive,
-			idefloppy_pc_intr,	/* service routine for packet command */
-			floppy->ticks,		/* wait this long before "failing" */
-			idefloppy_transfer_pc2);	/* fail == transfer_pc2 */
+		/*
+		 * The following delay solves a problem with ATAPI Zip 100 drives where
+		 * the Busy flag was apparently being deasserted before the unit was
+		 * ready to receive data. This was happening on a 1200 MHz Athlon
+		 * system. 10/26/01 25msec is too short, 40 and 50msec work well.
+		 * idefloppy_pc_intr will not be actually used until after the packet
+		 * is moved in about 50 msec.
+		 */
+		ata_set_handler(drive,
+				idefloppy_pc_intr,	/* service routine for packet command */
+				floppy->ticks,		/* wait this long before "failing" */
+				idefloppy_transfer_pc2);	/* fail == transfer_pc2 */
+		ret = ide_started;
+	}
 	spin_unlock_irqrestore(ch->lock, flags);
 
-	return ide_started;
+	return ret;
 }
 
 /*

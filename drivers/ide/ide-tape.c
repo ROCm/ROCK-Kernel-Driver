@@ -2196,9 +2196,12 @@ static ide_startstop_t idetape_transfer_pc(struct ata_device *drive, struct requ
 	idetape_ireason_reg_t ireason;
 	int retries = 100;
 	ide_startstop_t startstop;
+	int ret;
 
-	if (ide_wait_stat(&startstop, drive, rq, DRQ_STAT, BUSY_STAT, WAIT_READY)) {
+	if (ata_status_poll(drive, DRQ_STAT, BUSY_STAT,
+				WAIT_READY, rq, &startstop)) {
 		printk (KERN_ERR "ide-tape: Strange, packet command initiated yet DRQ isn't asserted\n");
+
 		return startstop;
 	}
 
@@ -2220,16 +2223,16 @@ static ide_startstop_t idetape_transfer_pc(struct ata_device *drive, struct requ
 	}
 	if (!ireason.b.cod || ireason.b.io) {
 		printk (KERN_ERR "ide-tape: (IO,CoD) != (0,1) while issuing a packet command\n");
-		spin_unlock_irqrestore(ch->lock, flags);
-
-		return ide_stopped;
+		ret = ide_stopped;
+	} else {
+		tape->cmd_start_time = jiffies;
+		ata_set_handler(drive, idetape_pc_intr, IDETAPE_WAIT_CMD, NULL);	/* Set the interrupt routine */
+		atapi_write(drive,pc->c,12);	/* Send the actual packet */
+		ret = ide_started;
 	}
-	tape->cmd_start_time = jiffies;
-	ata_set_handler(drive, idetape_pc_intr, IDETAPE_WAIT_CMD, NULL);	/* Set the interrupt routine */
-	atapi_write(drive,pc->c,12);	/* Send the actual packet */
 	spin_unlock_irqrestore(ch->lock, flags);
 
-	return ide_started;
+	return ret;
 }
 
 static ide_startstop_t idetape_issue_packet_command(struct ata_device *drive,
@@ -2618,7 +2621,7 @@ static ide_startstop_t idetape_do_request(struct ata_device *drive, struct reque
 		 *	We do not support buffer cache originated requests.
 		 */
 		printk (KERN_NOTICE "ide-tape: %s: Unsupported command in request queue (%ld)\n", drive->name, rq->flags);
-		ide_end_request(drive, rq, 0);			/* Let the common code handle it */
+		ata_end_request(drive, rq, 0);			/* Let the common code handle it */
 		return ide_stopped;
 	}
 

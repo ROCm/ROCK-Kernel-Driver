@@ -44,7 +44,17 @@ ide_startstop_t ide_dma_intr(struct ata_device *drive, struct request *rq)
 
 	if (ata_status(drive, DRIVE_READY, drive->bad_wstat | DRQ_STAT)) {
 		if (!dma_stat) {
-			__ide_end_request(drive, rq, 1, rq->nr_sectors);
+			unsigned long flags;
+			struct ata_channel *ch = drive->channel;
+
+			/* FIXME: this locking should encompass the above register
+			 * file access too.
+			 */
+
+			spin_lock_irqsave(ch->lock, flags);
+			__ata_end_request(drive, rq, 1, rq->nr_sectors);
+			spin_unlock_irqrestore(ch->lock, flags);
+
 			return ide_stopped;
 		}
 		printk(KERN_ERR "%s: dma_intr: bad DMA status (dma_stat=%x)\n",

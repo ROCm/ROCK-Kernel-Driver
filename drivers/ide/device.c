@@ -80,7 +80,29 @@ void ata_mask(struct ata_device *drive)
 }
 
 /*
+ * Spin until the drive is no longer busy.
+ *
+ * Not exported, since it's not used within any modules.
+ */
+int ata_busy_poll(struct ata_device *drive, unsigned long timeout)
+{
+	/* spec allows drive 400ns to assert "BUSY" */
+	udelay(1);
+	if (!ata_status(drive, 0, BUSY_STAT)) {
+		timeout += jiffies;
+		while (!ata_status(drive, 0, BUSY_STAT)) {
+			if (time_after(jiffies, timeout))
+				return 1;
+		}
+	}
+
+	return 0;
+}
+
+/*
  * Check the state of the status register.
+ *
+ * FIXME: Channel lock should be held.
  */
 int ata_status(struct ata_device *drive, u8 good, u8 bad)
 {
@@ -92,6 +114,57 @@ int ata_status(struct ata_device *drive, u8 good, u8 bad)
 }
 
 EXPORT_SYMBOL(ata_status);
+
+/*
+ * Busy-wait for the drive status to be not "busy".  Check then the status for
+ * all of the "good" bits and none of the "bad" bits, and if all is okay it
+ * returns 0.  All other cases return 1 after invoking error handler -- caller
+ * should just return.
+ *
+ * This routine should get fixed to not hog the cpu during extra long waits..
+ * That could be done by busy-waiting for the first jiffy or two, and then
+ * setting a timer to wake up at half second intervals thereafter, until
+ * timeout is achieved, before timing out.
+ *
+ * FIXME: Channel lock should be held.
+ */
+
+int ata_status_poll(struct ata_device *drive, u8 good, u8 bad,
+		unsigned long timeout,
+		struct request *rq, ide_startstop_t *startstop)
+{
+	int i;
+
+	/* bail early if we've exceeded max_failures */
+	if (drive->max_failures && (drive->failures > drive->max_failures)) {
+		*startstop = ide_stopped;
+
+		return 1;
+	}
+
+	if (ata_busy_poll(drive, timeout)) {
+		*startstop = ata_error(drive, rq, "status timeout");
+
+		return 1;
+	}
+
+	/*
+	 * Allow status to settle, then read it again.  A few rare drives
+	 * vastly violate the 400ns spec here, so we'll wait up to 10usec for a
+	 * "good" status rather than expensively fail things immediately.  This
+	 * fix courtesy of Matthew Faupel & Niccolo Rigacci.
+	 */
+	for (i = 0; i < 10; i++) {
+		udelay(1);
+		if (ata_status(drive, good, bad))
+			return 0;
+	}
+	*startstop = ata_error(drive, rq, "status error");
+
+	return 1;
+}
+
+EXPORT_SYMBOL(ata_status_poll);
 
 /*
  * Handle the nIEN - negated Interrupt ENable of the drive.
@@ -160,7 +233,7 @@ void ata_out_regfile(struct ata_device *drive, struct hd_drive_task_hdr *rf)
 }
 
 /*
- * Output a complete register file.
+ * Input a complete register file.
  */
 void ata_in_regfile(struct ata_device *drive, struct hd_drive_task_hdr *rf)
 {
