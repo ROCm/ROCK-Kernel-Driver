@@ -634,6 +634,7 @@ static int xfrm_add_policy(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfr
 	struct xfrm_userpolicy_info *p = NLMSG_DATA(nlh);
 	struct xfrm_policy *xp;
 	int err;
+	int excl;
 
 	err = verify_newpolicy_info(p);
 	if (err)
@@ -643,7 +644,8 @@ static int xfrm_add_policy(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfr
 	if (!xp)
 		return err;
 
-	err = xfrm_policy_insert(p->dir, xp, 1);
+	excl = nlh->nlmsg_type == XFRM_MSG_NEWPOLICY;
+	err = xfrm_policy_insert(p->dir, xp, excl);
 	if (err) {
 		kfree(xp);
 		return err;
@@ -803,6 +805,7 @@ static const int xfrm_msg_min[(XFRM_MSG_MAX + 1 - XFRM_MSG_BASE)] = {
 	NLMSG_LENGTH(sizeof(struct xfrm_userspi_info)),	/* ALLOC SPI */
 	NLMSG_LENGTH(sizeof(struct xfrm_user_acquire)),	/* ACQUIRE */
 	NLMSG_LENGTH(sizeof(struct xfrm_user_expire)),	/* EXPIRE */
+	NLMSG_LENGTH(sizeof(struct xfrm_userpolicy_info)),/* UPD POLICY */
 };
 
 static struct xfrm_link {
@@ -822,6 +825,9 @@ static struct xfrm_link {
 		.dump	=	xfrm_dump_policy,
 	},
 	{	.doit	=	xfrm_alloc_userspi	},
+	{},
+	{},
+	{	.doit	=	xfrm_add_policy 	},
 };
 
 static int xfrm_done(struct netlink_callback *cb)

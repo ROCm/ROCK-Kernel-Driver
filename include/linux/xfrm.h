@@ -116,7 +116,9 @@ enum
 #define XFRM_MSG_ACQUIRE	(XFRM_MSG_BASE + 7)
 #define XFRM_MSG_EXPIRE		(XFRM_MSG_BASE + 8)
 
-#define XFRM_MSG_MAX		(XFRM_MSG_EXPIRE+1)
+#define XFRM_MSG_UPDPOLICY	(XFRM_MSG_BASE + 9)
+
+#define XFRM_MSG_MAX		(XFRM_MSG_UPDPOLICY+1)
 
 struct xfrm_user_tmpl {
 	struct xfrm_id		id;
