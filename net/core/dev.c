@@ -1796,45 +1796,49 @@ static int dev_seq_show(struct seq_file *seq, void *v)
 	return 0;
 }
 
-static int dev_proc_stats(char *buffer, char **start, off_t offset,
-			  int length, int *eof, void *data)
+static struct netif_rx_stats *softnet_get_online(loff_t *pos)
 {
-	int i;
-	int len = 0;
+	struct netif_rx_stats *rc = NULL;
 
-	for (i = 0; i < NR_CPUS; i++) {
-		if (!cpu_online(i))
-			continue;
+	while (*pos < NR_CPUS)
+	       	if (cpu_online(*pos)) {
+			rc = &netdev_rx_stat[*pos];
+			break;
+		} else
+			++*pos;
+	return rc;
+}
 
-		len += sprintf(buffer + len, "%08x %08x %08x %08x %08x %08x "
-					     "%08x %08x %08x\n",
-			       netdev_rx_stat[i].total,
-			       netdev_rx_stat[i].dropped,
-			       netdev_rx_stat[i].time_squeeze,
-			       netdev_rx_stat[i].throttled,
-			       netdev_rx_stat[i].fastroute_hit,
-			       netdev_rx_stat[i].fastroute_success,
-			       netdev_rx_stat[i].fastroute_defer,
-			       netdev_rx_stat[i].fastroute_deferred_out,
+static void *softnet_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	return softnet_get_online(pos);
+}
+
+static void *softnet_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	++*pos;
+	return softnet_get_online(pos);
+}
+
+static void softnet_seq_stop(struct seq_file *seq, void *v)
+{
+}
+
+static int softnet_seq_show(struct seq_file *seq, void *v)
+{
+	struct netif_rx_stats *s = v;
+
+	seq_printf(seq, "%08x %08x %08x %08x %08x %08x %08x %08x %08x\n",
+		   s->total, s->dropped, s->time_squeeze, s->throttled,
+		   s->fastroute_hit, s->fastroute_success, s->fastroute_defer,
+		   s->fastroute_deferred_out,
 #if 0
-			       netdev_rx_stat[i].fastroute_latency_reduction
+		   s->fastroute_latency_reduction
 #else
-			       netdev_rx_stat[i].cpu_collision
+		   s->cpu_collision
 #endif
-			       );
-	}
-
-	len -= offset;
-
-	if (len > length)
-		len = length;
-	if (len < 0)
-		len = 0;
-
-	*start = buffer + offset;
-	*eof = 1;
-
-	return len;
+		  );
+	return 0;
 }
 
 static struct seq_operations dev_seq_ops = {
@@ -1856,12 +1860,29 @@ static struct file_operations dev_seq_fops = {
 	.release = seq_release,
 };
 
+static struct seq_operations softnet_seq_ops = {
+	.start = softnet_seq_start,
+	.next  = softnet_seq_next,
+	.stop  = softnet_seq_stop,
+	.show  = softnet_seq_show,
+};
+
+static int softnet_seq_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &softnet_seq_ops);
+}
+
+static struct file_operations softnet_seq_fops = {
+	.open    = softnet_seq_open,
+	.read    = seq_read,
+	.llseek  = seq_lseek,
+	.release = seq_release,
+};
+
 #ifdef WIRELESS_EXT
 extern int wireless_proc_init(void);
-extern int wireless_proc_exit(void);
 #else
 #define wireless_proc_init() 0
-#define wireless_proc_exit()
 #endif
 
 static int __init dev_proc_init(void)
@@ -1873,12 +1894,17 @@ static int __init dev_proc_init(void)
 	if (!p)
 		goto out;
 	p->proc_fops = &dev_seq_fops;
-	if (wireless_proc_init())
+	p = create_proc_entry("softnet_stat", S_IRUGO, proc_net);
+	if (!p)
 		goto out_dev;
-	create_proc_read_entry("net/softnet_stat", 0, 0, dev_proc_stats, NULL);
+	p->proc_fops = &softnet_seq_fops;
+	if (wireless_proc_init())
+		goto out_softnet;
 	rc = 0;
 out:
 	return rc;
+out_softnet:
+	remove_proc_entry("softnet_stat", proc_net);
 out_dev:
 	remove_proc_entry("dev", proc_net);
 	goto out;

@@ -406,11 +406,6 @@ int __init wireless_proc_init(void)
 		rc = -ENOMEM;
 	return rc;
 }
-
-void __init wireless_proc_exit(void)
-{
-	remove_proc_entry("wireless", proc_net);
-}
 #endif	/* CONFIG_PROC_FS */
 
 /************************** IOCTL SUPPORT **************************/
