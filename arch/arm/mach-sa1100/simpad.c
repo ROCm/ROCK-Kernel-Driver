@@ -248,7 +248,7 @@ arch_initcall(simpad_init);
 
 
 MACHINE_START(SIMPAD, "Simpad")
-	MAINTAINER("Juergen Messerer")
+	MAINTAINER("Holger Freyther")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
         BOOT_PARAMS(0xc0000100)
 	MAPIO(simpad_map_io)
