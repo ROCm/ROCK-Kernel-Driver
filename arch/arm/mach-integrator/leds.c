@@ -1,7 +1,7 @@
 /*
  *  linux/arch/arm/mach-integrator/leds.c
  *
- *  Integrator LED control routines
+ *  Integrator/AP and Integrator/CP LED control routines
  *
  *  Copyright (C) 1999 ARM Limited
  *  Copyright (C) 2000 Deep Blue Solutions Ltd
@@ -79,7 +79,7 @@ static void integrator_leds_event(led_event_t ledevt)
 
 static int __init leds_init(void)
 {
-	if (machine_is_integrator())
+	if (machine_is_integrator() || machine_is_cintegrator())
 		leds_event = integrator_leds_event;
 
 	return 0;

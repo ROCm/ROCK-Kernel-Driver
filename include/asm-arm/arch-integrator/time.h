@@ -17,6 +17,7 @@
  */
 #include <asm/system.h>
 #include <asm/leds.h>
+#include <asm/mach-types.h>
 
 /*
  * Where is the timer (VA)?
@@ -31,18 +32,14 @@
  */
 #define TIMER_INTERVAL	(TICKS_PER_uSEC * mSEC_10)
 #if TIMER_INTERVAL >= 0x100000
-#define TIMER_RELOAD	(TIMER_INTERVAL >> 8)		/* Divide by 256 */
-#define TIMER_CTRL	0x88				/* Enable, Clock / 256 */
 #define TICKS2USECS(x)	(256 * (x) / TICKS_PER_uSEC)
 #elif TIMER_INTERVAL >= 0x10000
-#define TIMER_RELOAD	(TIMER_INTERVAL >> 4)		/* Divide by 16 */
-#define TIMER_CTRL	0x84				/* Enable, Clock / 16 */
 #define TICKS2USECS(x)	(16 * (x) / TICKS_PER_uSEC)
 #else
-#define TIMER_RELOAD	(TIMER_INTERVAL)
-#define TIMER_CTRL	0x80				/* Enable */
 #define TICKS2USECS(x)	((x) / TICKS_PER_uSEC)
 #endif
+
+#define TIMER_CTRL_IE	(1 << 5)			/* Interrupt Enable */
 
 /*
  * What does it look like?
@@ -55,6 +52,8 @@ typedef struct TimerStruct {
 } TimerStruct_t;
 
 extern unsigned long (*gettimeoffset)(void);
+
+static unsigned long timer_reload;
 
 /*
  * Returns number of ms since last clock interrupt.  Note that interrupts
@@ -81,13 +80,13 @@ static unsigned long integrator_gettimeoffset(void)
 	/*
 	 * Number of ticks since last interrupt.
 	 */
-	ticks1 = TIMER_RELOAD - ticks2;
+	ticks1 = timer_reload - ticks2;
 
 	/*
 	 * Interrupt pending?  If so, we've reloaded once already.
 	 */
 	if (status & (1 << IRQ_TIMERINT1))
-		ticks1 += TIMER_RELOAD;
+		ticks1 += timer_reload;
 
 	/*
 	 * Convert the ticks to usecs
@@ -121,8 +120,21 @@ void __init time_init(void)
 	volatile TimerStruct_t *timer0 = (volatile TimerStruct_t *)TIMER0_VA_BASE;
 	volatile TimerStruct_t *timer1 = (volatile TimerStruct_t *)TIMER1_VA_BASE;
 	volatile TimerStruct_t *timer2 = (volatile TimerStruct_t *)TIMER2_VA_BASE;
+	unsigned int timer_ctrl = 0x80 | 0x40;	/* periodic */
 
-	timer_irq.handler = integrator_timer_interrupt;
+	if (machine_is_integrator()) {
+		timer_reload = 1000000 * TICKS_PER_uSEC / HZ;
+	} else if (machine_is_cintegrator()) {
+		timer_reload = 1000000 / HZ;
+		timer_ctrl |= TIMER_CTRL_IE;
+	}
+	if (timer_reload > 0x100000) {
+		timer_reload >>= 8;
+		timer_ctrl |= 0x08; /* /256 */
+	} else if (timer_reload > 0x010000) {
+		timer_reload >>= 4;
+		timer_ctrl |= 0x04; /* /16 */
+	}
 
 	/*
 	 * Initialise to a known state (all timers off)
@@ -131,12 +143,14 @@ void __init time_init(void)
 	timer1->TimerControl = 0;
 	timer2->TimerControl = 0;
 
-	timer1->TimerLoad    = TIMER_RELOAD;
-	timer1->TimerControl = TIMER_CTRL | 0x40;	/* periodic */
+	timer1->TimerLoad    = timer_reload;
+	timer1->TimerValue   = timer_reload;
+	timer1->TimerControl = timer_ctrl;
 
 	/* 
 	 * Make irqs happen for the system timer
 	 */
+	timer_irq.handler = integrator_timer_interrupt;
 	setup_irq(IRQ_TIMERINT1, &timer_irq);
 	gettimeoffset = integrator_gettimeoffset;
 }
