@@ -9,11 +9,18 @@
 Original driver (sg.h):
 *       Copyright (C) 1992 Lawrence Foard
 Version 2 and 3 extensions to driver:
-*       Copyright (C) 1998 - 2001 Douglas Gilbert
+*       Copyright (C) 1998 - 2002 Douglas Gilbert
 
-    Version: 3.5.23 (20011231)
+    Version: 3.5.25 (20020425)
     This version is for 2.5 series kernels.
 
+    Changes since 3.5.24 (20020319)
+    	- use Scsi_Request::upper_private_data
+    	- zero buffers for non-root users
+    Changes since 3.5.23 (20011231)
+	- change EACCES to EPERM when O_RDONLY is insufficient
+	- suppress newlines in host string
+	- fix xfer direction, old interface, short reply_len [Travers Carter]
     Changes since 3.1.22 (20011208)
     	- branch sg driver for lk 2.5 series
     	- remove lock_kernel() from sg_close()

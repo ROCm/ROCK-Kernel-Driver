@@ -666,6 +666,8 @@ struct scsi_request {
 	unsigned short sr_sglist_len;	/* size of malloc'd scatter-gather list */
 	unsigned sr_underflow;	/* Return error if less than
 				   this amount is transferred */
+ 	void * upper_private_data;	/* reserved for owner (usually upper
+ 					   level driver) of this request */
 };
 
 /*
