@@ -72,19 +72,19 @@ mmu_context_underflow(void)
 	panic("mmu_context_underflow");
 }
 
-
 /*
  * Set up the context for a new address space.
  */
 static inline int
 init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 {
-	long head, size;
+	long head;
+	unsigned long flags;
 
-	spin_lock( &mmu_context_queue.lock );
+	spin_lock_irqsave(&mmu_context_queue.lock, flags);
 
-	if ( (size = mmu_context_queue.size) <= 0 ) {
-		spin_unlock( &mmu_context_queue.lock );
+	if (mmu_context_queue.size <= 0) {
+		spin_unlock_irqrestore(&mmu_context_queue.lock, flags);
 		return -ENOMEM;
 	}
 
@@ -93,9 +93,9 @@ init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 
 	head = (head < LAST_USER_CONTEXT-1) ? head+1 : 0;
 	mmu_context_queue.head = head;
-	mmu_context_queue.size = size-1;
+	mmu_context_queue.size--;
 
-	spin_unlock( &mmu_context_queue.lock );
+	spin_unlock_irqrestore(&mmu_context_queue.lock, flags);
 
 	return 0;
 }
@@ -106,12 +106,13 @@ init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 static inline void
 destroy_context(struct mm_struct *mm)
 {
-	long index, size = mmu_context_queue.size;
+	long index;
+	unsigned long flags;
 
-	spin_lock( &mmu_context_queue.lock );
+	spin_lock_irqsave(&mmu_context_queue.lock, flags);
 
-	if ( (size = mmu_context_queue.size) >= NUM_USER_CONTEXT ) {
-		spin_unlock( &mmu_context_queue.lock );
+	if (mmu_context_queue.size >= NUM_USER_CONTEXT) {
+		spin_unlock_irqrestore(&mmu_context_queue.lock, flags);
 		mmu_context_underflow();
 	}
 
@@ -125,10 +126,10 @@ destroy_context(struct mm_struct *mm)
 	mmu_context_queue.tail = index;
 #endif
 
-	mmu_context_queue.size = size+1;
+	mmu_context_queue.size++;
 	mmu_context_queue.elements[index] = mm->context;
 
-	spin_unlock( &mmu_context_queue.lock );
+	spin_unlock_irqrestore(&mmu_context_queue.lock, flags);
 }
 
 extern void flush_stab(struct task_struct *tsk, struct mm_struct *mm);
