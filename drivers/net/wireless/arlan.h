@@ -57,12 +57,8 @@ extern int     arlan_command(struct net_device * dev, int command);
  
 #define SIDUNKNOWN -1
 #define radioNodeIdUNKNOWN -1
-#define encryptionKeyUNKNOWN '\0';
 #define irqUNKNOWN 0
-#define memUNKNOWN 0
 #define debugUNKNOWN 0
-#define probeUNKNOWN 1
-#define numDevicesUNKNOWN 1
 #define testMemoryUNKNOWN 1
 #define spreadingCodeUNKNOWN 0
 #define channelNumberUNKNOWN 0
@@ -81,6 +77,8 @@ extern int     arlan_command(struct net_device * dev, int command);
 #else
 	#define ARLAN_DEBUG(a,b) 
 #endif
+
+#define ARLAN_SHMEM_SIZE	0x2000
 
 struct arlan_shmem
 {
