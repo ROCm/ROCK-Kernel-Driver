@@ -5,6 +5,8 @@
 #include <linux/config.h>
 #include <linux/init.h>
 
+#include <asm/setup.h>
+
 #ifdef CONFIG_APUS
 #include <asm-m68k/machdep.h>
 #endif
