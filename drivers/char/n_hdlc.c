@@ -982,3 +982,4 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Paul Fulghum paulkf@microgate.com");
 MODULE_PARM(debuglevel, "i");
 MODULE_PARM(maxframe, "i");
+MODULE_ALIAS_LDISC(N_HDLC);

@@ -1428,4 +1428,4 @@ static int r3964_receive_room(struct tty_struct *tty)
 
 
 MODULE_LICENSE("GPL");
-
+MODULE_ALIAS_LDISC(N_R3964);

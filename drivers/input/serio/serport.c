@@ -24,6 +24,7 @@
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
 MODULE_DESCRIPTION("Input device TTY line discipline");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_LDISC(N_MOUSE);
 
 #define SERPORT_BUSY	1
 

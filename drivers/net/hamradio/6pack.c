@@ -1064,6 +1064,7 @@ static void decode_data(unsigned char inbyte, struct sixpack *sp)
 MODULE_AUTHOR("Andreas Könsgen <ajk@ccac.rwth-aachen.de>");
 MODULE_DESCRIPTION("6pack driver for AX.25");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_LDISC(N_6PACK);
 
 module_init(sixpack_init_driver);
 module_exit(sixpack_exit_driver);
