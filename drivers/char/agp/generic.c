@@ -958,21 +958,15 @@ void agp_enable(u32 mode)
 EXPORT_SYMBOL(agp_enable);
 
 
-#ifdef CONFIG_SMP
 static void ipi_handler(void *null)
 {
 	flush_agp_cache();
 }
-#endif
 
 void global_cache_flush(void)
 {
-#ifdef CONFIG_SMP
 	if (on_each_cpu(ipi_handler, NULL, 1, 1) != 0)
 		panic(PFX "timed out waiting for the other CPUs!\n");
-#else
-	flush_agp_cache();
-#endif
 }
 EXPORT_SYMBOL(global_cache_flush);
 
