@@ -31,8 +31,9 @@
 #include <asm/kdebug.h>
 #include <asm/proto.h>
 
-/* Work around a bug in the mpt-fusion driver. */
+/* Workarounds for specific drivers */
 #define FUSION_WORKAROUND 1 
+#define FLUSH_WORKAROUND 1
 
 dma_addr_t bad_dma_address;
 
@@ -51,7 +52,7 @@ int force_iommu = 1;
 int panic_on_overflow = 0;
 int force_iommu = 0;
 #endif
-int iommu_merge = 1; 
+int iommu_merge = 0; 
 int iommu_sac_force = 0; 
 int iommu_fullflush = 0;
 
@@ -129,7 +130,7 @@ static void free_iommu(unsigned long offset, int size)
 /* 
  * Use global flush state to avoid races with multiple flushers.
  */
-static void __flush_gart(struct pci_dev *dev)
+static void flush_gart(struct pci_dev *dev)
 { 
 	unsigned long flags;
 	int bus = dev ? dev->bus->number : -1;
@@ -138,13 +139,17 @@ static void __flush_gart(struct pci_dev *dev)
 	int i;
 
 	spin_lock_irqsave(&iommu_bitmap_lock, flags);
-	/* recheck flush count inside lock */
-	if (need_flush) { 
+	if (need_flush || iommu_fullflush) { 
 		for (i = 0; northbridges[i]; i++) {
+			u32 w;
 			if (bus >= 0 && !(cpu_isset_const(i, bus_cpumask)))
 				continue;
 			pci_write_config_dword(northbridges[i], 0x9c, 
 					       northbridge_flush_word[i] | 1); 
+			/* Make sure the hardware actually executed the flush. */
+			do { 
+				pci_read_config_dword(northbridges[i], 0x9c, &w);
+			} while (w & 1);
 			flushed++;
 		} 
 		if (!flushed) 
@@ -152,14 +157,6 @@ static void __flush_gart(struct pci_dev *dev)
 		need_flush = 0;
 	} 
 	spin_unlock_irqrestore(&iommu_bitmap_lock, flags);
-} 
-
-static inline void flush_gart(struct pci_dev *dev)
-{ 
-	if (iommu_fullflush)
-		need_flush = 1;
-	if (need_flush)
-		__flush_gart(dev);
 } 
 
 /* 
@@ -180,10 +177,15 @@ void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 	} else {
 		dma_mask = hwdev->consistent_dma_mask; 
 	}
+
 	if (dma_mask == 0) 
 		dma_mask = 0xffffffff; 
 	if (dma_mask < 0xffffffff || no_iommu)
 		gfp |= GFP_DMA;
+
+	/* Kludge to make it bug-to-bug compatible with i386. i386
+	   uses the normal dma_mask for alloc_consistent. */
+	dma_mask &= hwdev->dma_mask;
 
 	memory = (void *)__get_free_pages(gfp, get_order(size));
 	if (memory == NULL) {
@@ -296,10 +298,6 @@ static inline int need_iommu(struct pci_dev *dev, unsigned long addr, size_t siz
 	int mmu = high;
 	if (force_iommu) 
 		mmu = 1; 
-#ifdef FUSION_WORKAROUND
-	if (dev->vendor == PCI_VENDOR_ID_LSI_LOGIC)
-		mmu = 1; 
-#endif		
 	if (no_iommu) { 
 		if (high) 
 			panic("PCI-DMA: high address but no IOMMU.\n"); 
@@ -391,6 +389,16 @@ static int pci_map_sg_nonforce(struct pci_dev *dev, struct scatterlist *sg,
 	return nents;
 }
 
+static void dump_sg(struct scatterlist *sg, int stopat)
+{
+	int k;
+	for (k = 0; k < stopat; k++) 
+		printk(KERN_EMERG "sg[%d] page:%p dma:%lx offset:%u length:%u\n",
+		       k,
+		       sg[k].page, (unsigned long)sg[k].dma_address, sg[k].offset,
+		       sg[k].length); 		
+}			   
+
 /* Map multiple scatterlist entries continuous into the first. */
 static int __pci_map_cont(struct scatterlist *sg, int start, int stopat, 
 		      struct scatterlist *sout, unsigned long pages)
@@ -404,7 +412,9 @@ static int __pci_map_cont(struct scatterlist *sg, int start, int stopat,
 	
 	for (i = start; i < stopat; i++) {
 		struct scatterlist *s = &sg[i];
-		unsigned long start_addr = s->dma_address;
+		unsigned long pages, addr;
+		unsigned long phys_addr = s->dma_address;
+		
 		BUG_ON(i > start && s->offset);
 		if (i == start) {
 			*sout = *s; 
@@ -413,15 +423,23 @@ static int __pci_map_cont(struct scatterlist *sg, int start, int stopat,
 		} else { 
 			sout->length += s->length; 
 		}
-		unsigned long addr = start_addr;
-		while (addr < start_addr + s->length) { 
+
+		addr = phys_addr;
+		pages = to_pages(s->offset, s->length); 
+		while (pages--) { 
 			iommu_gatt_base[iommu_page] = GPTE_ENCODE(addr); 
 			SET_LEAK(iommu_page);
 			addr += PAGE_SIZE;
 			iommu_page++;
 	} 
 	} 
-	BUG_ON(iommu_page - iommu_start != pages);	
+	if (iommu_page - iommu_start != pages) { 
+		printk(KERN_EMERG
+	      "iommu_page:%lx iommu_start:%lx pages:%lu start:%d stopat:%d\n",
+		       iommu_page, iommu_start, pages, start, stopat); 
+		dump_sg(sg, stopat); 	   
+		panic("IOMMU confused"); 
+	} 
 	return 0;
 }
 
@@ -447,7 +465,7 @@ int pci_map_sg(struct pci_dev *dev, struct scatterlist *sg, int nents, int dir)
 	int out;
 	int start;
 	unsigned long pages = 0;
-	int need = 0;
+	int need = 0, nextneed;
 
 	unsigned long size = 0; 
 
@@ -463,13 +481,14 @@ int pci_map_sg(struct pci_dev *dev, struct scatterlist *sg, int nents, int dir)
 		BUG_ON(s->length == 0); 
 
 		size += s->length; 
+		nextneed = need_iommu(dev, addr, s->length); 
 
 		/* Handle the previous not yet processed entries */
 		if (i > start) {
 			struct scatterlist *ps = &sg[i-1];
 			/* Can only merge when the last chunk ends on a page 
-			   boundary. */
-			if (!iommu_merge || !need || (i-1 > start && s->offset) ||
+			   boundary and the new one doesn't have an offset. */
+			if (!iommu_merge || !nextneed || !need || s->offset ||
 			    (ps->offset + ps->length) % PAGE_SIZE) { 
 				if (pci_map_cont(sg, start, i, sg+out, pages, 
 						 need) < 0)
@@ -480,7 +499,7 @@ int pci_map_sg(struct pci_dev *dev, struct scatterlist *sg, int nents, int dir)
 			}
 	}
 
-		need = need_iommu(dev, addr, s->length); 
+		need = nextneed;
 		pages += to_pages(s->offset, s->length);
 	}
 	if (pci_map_cont(sg, start, i, sg+out, pages, need) < 0)
@@ -548,6 +567,19 @@ int pci_dma_supported(struct pci_dev *dev, u64 mask)
 	   The caller just has to use GFP_DMA in this case. */
         if (mask < 0x00ffffff)
                 return 0;
+
+#ifdef FUSION_WORKAROUND
+	if (dev->vendor == PCI_VENDOR_ID_LSI_LOGIC && mask > 0xffffffff) { 
+		force_iommu = 1;
+		iommu_merge = 1; 
+		return 0; 
+	} 
+#endif
+#ifdef FLUSH_WORKAROUND
+	if ((dev->vendor == PCI_VENDOR_ID_3WARE && mask <= 0xffffffff) ||
+	    (dev->vendor == PCI_VENDOR_ID_QLOGIC && force_iommu))
+		iommu_fullflush = 1;
+#endif
 
 	/* Tell the device to use SAC when IOMMU force is on. 
 	   This allows the driver to use cheaper accesses in some cases.
@@ -810,8 +842,10 @@ __init int iommu_setup(char *opt)
 		    no_iommu = 1;
 	    if (!memcmp(p,"force", 5))
 		    force_iommu = 1;
-	    if (!memcmp(p,"noforce", 7))
+	    if (!memcmp(p,"noforce", 7)) { 
+		    iommu_merge = 0;
 		    force_iommu = 0;
+	    }
 	    if (!memcmp(p, "memaper", 7)) { 
 		    fallback_aper_force = 1; 
 		    p += 7; 

@@ -218,8 +218,12 @@ void show_stack(struct task_struct *tsk, unsigned long * rsp)
 	// debugging aid: "show_stack(NULL, NULL);" prints the
 	// back trace for this cpu.
 
-	if(rsp==NULL)
-		rsp=(unsigned long*)&rsp;
+	if (rsp == NULL) { 
+		if (tsk)
+			rsp = (unsigned long *)tsk->thread.rsp;
+		else
+			rsp = (unsigned long *)&rsp;
+	}
 
 	stack = rsp;
 	for(i=0; i < kstack_depth_to_print; i++) {
@@ -341,6 +345,8 @@ void oops_end(void)
 	bust_spinlocks(0); 
 	spin_unlock(&die_lock); 
 	local_irq_enable();	/* make sure back scroll still works */
+	if (panic_on_oops)
+		panic("Oops"); 
 } 
 
 void __die(const char * str, struct pt_regs * regs, long err)
@@ -844,3 +850,11 @@ void __init trap_init(void)
 	cpu_init();
 }
 
+
+/* Actual parsing is done early in setup.c. */
+static int __init oops_dummy(char *s)
+{ 
+	panic_on_oops = 1;
+	return -1; 
+} 
+__setup("oops=", oops_dummy); 

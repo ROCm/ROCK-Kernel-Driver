@@ -237,6 +237,9 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 		}
 #endif
 
+		if (!memcmp(from,"oops=panic", 10))
+			panic_on_oops = 1;
+
 	next_char:
 		c = *(from++);
 		if (!c)

@@ -330,10 +330,10 @@ ia32_sys_call_table:
 	.quad sys32_adjtimex
 	.quad sys32_mprotect		/* 125 */
 	.quad compat_sys_sigprocmask
-	.quad sys32_module_warning	/* create_module */
+	.quad quiet_ni_syscall		/* create_module */
 	.quad sys_init_module
 	.quad sys_delete_module
-	.quad sys32_module_warning	/* 130  get_kernel_syms */
+	.quad quiet_ni_syscall		/* 130  get_kernel_syms */
 	.quad ni_syscall	/* quotactl */ 
 	.quad sys_getpgid
 	.quad sys_fchdir
@@ -396,8 +396,8 @@ ia32_sys_call_table:
 	.quad stub32_vfork            /* 190 */
 	.quad compat_sys_getrlimit
 	.quad sys32_mmap2
-	.quad sys_truncate
-	.quad sys_ftruncate
+	.quad sys32_truncate64
+	.quad sys32_ftruncate64
 	.quad sys32_stat64		/* 195 */
 	.quad sys32_lstat64
 	.quad sys32_fstat64

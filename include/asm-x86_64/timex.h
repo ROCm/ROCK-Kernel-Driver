@@ -60,4 +60,7 @@ extern unsigned int cpu_khz;
 
 extern struct vxtime_data vxtime;
 
+#define ARCH_HAS_TIMEVARS 1
+
+
 #endif

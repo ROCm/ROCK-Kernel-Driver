@@ -49,12 +49,15 @@
 #include <asm/page.h>
 #include <asm/fixmap.h>
 #include <asm/errno.h>
+#include <asm/io.h>
 
 #define __vsyscall(nr) __attribute__ ((unused,__section__(".vsyscall_" #nr)))
 #define force_inline __attribute__((always_inline)) inline
 
 int __sysctl_vsyscall __section_sysctl_vsyscall = 1;
 seqlock_t __xtime_lock __section_xtime_lock = SEQLOCK_UNLOCKED;
+long __time_adjust __section_time_adjust; 
+long __tick_usec __section_tick_usec;
 
 #include <asm/unistd.h>
 
@@ -82,6 +85,22 @@ static force_inline void do_vgettimeofday(struct timeval * tv)
 		usec = (__xtime.tv_nsec / 1000) +
 			(__jiffies - __wall_jiffies) * (1000000 / HZ);
 
+#if 0
+		/*
+		 * If time_adjust is negative then NTP is slowing the clock
+		 * so make sure not to go into next possible interval.
+		 * Better to lose some accuracy than have time go backwards..
+		 */
+		unsigned long lost = __jiffies - __wall_jiffies;
+		if (unlikely(__time_adjust < 0)) {
+			unsigned long max_ntp_tick = __tick_usec - tickadj;
+			usec = min(usec, max_ntp_tick);
+			if (lost)
+				usec += lost * max_ntp_tick;
+		} else if (unlikely(lost))
+			usec += lost * __tick_usec;
+#endif			
+
 		if (__vxtime.mode == VXTIME_TSC) {
 			sync_core();
 			rdtscll(t);
@@ -89,10 +108,8 @@ static force_inline void do_vgettimeofday(struct timeval * tv)
 			usec += ((t - __vxtime.last_tsc) *
 				 __vxtime.tsc_quot) >> 32;
 		} else {
-#if 0
 			usec += ((readl(fix_to_virt(VSYSCALL_HPET) + 0xf0) -
 				  __vxtime.last) * __vxtime.quot) >> 32;
-#endif
 		}
 	} while (read_seqretry(&__xtime_lock, sequence));
 

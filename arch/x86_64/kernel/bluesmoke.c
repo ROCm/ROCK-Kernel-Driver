@@ -26,19 +26,6 @@ static unsigned long mce_cpus;
 static int banks;
 static unsigned long ignored_banks, disabled_banks;
 
-/* Machine Check on everything dubious. This is a good setting
-   for device driver testing. */
-#define K8_DRIVER_DEBUG ((1<<13)-1)
-/* Report RAM errors and Hyper Transport Problems, but ignore Device
-   aborts and GART errors. */
-#define K8_NORMAL_OP    0xff
-
-#ifdef CONFIG_MCE_DEBUG
-static u32 k8_nb_flags __initdata = K8_DRIVER_DEBUG;
-#else
-static u32 k8_nb_flags __initdata = K8_NORMAL_OP;
-#endif
-
 static void generic_machine_check(struct pt_regs * regs, long error_code)
 {
 	int recover=1;
@@ -218,49 +205,42 @@ static void check_k8_nb(int header)
 	printk(KERN_ERR "Northbridge status %08x%08x\n",
 	       statushigh,statuslow); 
 
+	printk(KERN_ERR "    Error %s\n", extendederr[(statuslow >> 16) & 0xf]); 
+
 	errcode = statuslow & 0xffff;	
-	switch (errcode >> 8) { 
-	case 0: 					
+	switch ((statuslow >> 16) & 0xF) { 
+	case 5: 					
 		printk(KERN_ERR "    GART TLB error %s %s\n", 
 		       transaction[(errcode >> 2) & 3], 
 		       cachelevel[errcode & 3]);
 		break;
-	case 1: 
-		if (errcode & (1<<11)) { 
-			printk(KERN_ERR "    bus error %s %s %s %s %s\n",
-			       partproc[(errcode >> 10) & 0x3],
-			       timeout[(errcode >> 9) & 1],
+	case 8:
+		printk(KERN_ERR "    ECC error syndrome %x\n", 
+		       (((statuslow >> 24) & 0xff)  << 8) | ((statushigh >> 15) & 0x7f));		
+		/*FALL THROUGH*/
+	default:
+		printk(KERN_ERR "    bus error %s, %s\n    %s\n    %s, %s\n",
+		       partproc[(errcode >> 9) & 0x3],
+		       timeout[(errcode >> 8) & 1],
 			       memtrans[(errcode >> 4) & 0xf],
 			       memoryio[(errcode >> 2) & 0x3], 
 			       cachelevel[(errcode & 0x3)]); 
-		} else if (errcode & (1<<8)) { 
-			printk(KERN_ERR "    memory error %s %s %s\n",
-			       memtrans[(errcode >> 4) & 0xf],
-			       transaction[(errcode >> 2) & 0x3],
-			       cachelevel[(errcode & 0x3)]);
-		} else {
-			printk(KERN_ERR "    unknown error code %x\n", errcode); 
-		}
-		break;
-	} 
-	if (statushigh & ((1<<14)|(1<<13)))
-		printk(KERN_ERR "    ECC syndrome bits %x\n", 
-		       (((statuslow >> 24) & 0xff)  << 8) | ((statushigh >> 15) & 0x7f));
-	errcode = (statuslow >> 16) & 0xf;
-	printk(KERN_ERR "    extended error %s\n", extendederr[(statuslow >> 16) & 0xf]); 
-	
 	/* should only print when it was a HyperTransport related error. */
 	printk(KERN_ERR "    link number %x\n", (statushigh >> 4) & 3);
+ 		break;
+	} 
 
-	for (i = 0; i < 32; i++) 
+	for (i = 0; i < 32; i++) {
+		if (i == 26 || i == 28) 
+			continue;
 		if (highbits[i] && (statushigh & (1<<i)))
 			printk(KERN_ERR "    %s\n", highbits[i]); 
-
+	}
 	if (statushigh & (1<<26)) { 
 		u32 addrhigh, addrlow; 
 		pci_read_config_dword(nb, 0x54, &addrhigh); 
 		pci_read_config_dword(nb, 0x50, &addrlow); 
-		printk(KERN_ERR "    error address %08x%08x\n", addrhigh,addrlow); 
+		printk(KERN_ERR "    NB error address %08x%08x\n", addrhigh,addrlow); 
 	}
 	statushigh &= ~(1<<31); 
 	pci_write_config_dword(nb, 0x4c, statushigh); 		
@@ -309,9 +289,6 @@ static void k8_machine_check(struct pt_regs * regs, long error_code)
 	wrmsrl(MSR_IA32_MC0_STATUS+4*4, 0); 
 	wrmsrl(MSR_IA32_MCG_STATUS, 0);
        
-	if (regs && (status & (1<<1)))
-		printk(KERN_EMERG "MCE at RIP %lx RSP %lx\n", regs->rip, regs->rsp); 
-
  others:
 	generic_machine_check(regs, error_code); 
 
@@ -369,11 +346,12 @@ static void __init k8_mcheck_init(struct cpuinfo_x86 *c)
 	machine_check_vector = k8_machine_check; 
 	for (i = 0; i < banks; i++) { 
 		u64 val = ((1UL<<i) & disabled_banks) ? 0 : ~0UL; 
-		if (val && i == 4) 
-			val = k8_nb_flags;
 		wrmsrl(MSR_IA32_MC0_CTL+4*i, val);
 		wrmsrl(MSR_IA32_MC0_STATUS+4*i,0); 
 	}
+
+	if (cap & (1<<8))
+		wrmsrl(MSR_IA32_MCG_CTL, 0xffffffffffffffffULL);
 
 	set_in_cr4(X86_CR4_MCE);	   	
 
@@ -471,7 +449,6 @@ static int __init mcheck_disable(char *str)
    mce=nok8 disable k8 specific features
    mce=disable<NUMBER> disable bank NUMBER
    mce=enable<NUMBER> enable bank number
-   mce=device	Enable device driver test reporting in NB
    mce=NUMBER mcheck timer interval number seconds. 
    Can be also comma separated in a single mce= */
 static int __init mcheck_enable(char *str)
@@ -488,8 +465,6 @@ static int __init mcheck_enable(char *str)
 			disabled_banks |= ~(1<<simple_strtol(p+7,NULL,0));
 		else if (!strcmp(p,"nok8"))
 			nok8 = 1;
-		else if (!strcmp(p,"device"))
-			k8_nb_flags = K8_DRIVER_DEBUG;
 	}
 	return 0;
 }

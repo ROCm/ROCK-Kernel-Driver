@@ -16,11 +16,7 @@
 #include "agp.h"
 
 /* Will need to be increased if AMD64 ever goes >8-way. */
-#ifdef CONFIG_SMP
 #define MAX_HAMMER_GARTS   8
-#else
-#define MAX_HAMMER_GARTS   1
-#endif
 
 /* PTE bits. */
 #define GPTE_VALID	1
@@ -354,21 +350,21 @@ static __devinit int cache_nbs (struct pci_dev *pdev, u32 cap_ptr)
 	/* cache pci_devs of northbridges. */
 	while ((loop_dev = pci_find_device(PCI_VENDOR_ID_AMD, 0x1103, loop_dev)) 
 			!= NULL) {
+		if (i == MAX_HAMMER_GARTS) { 
+			printk(KERN_ERR PFX "Too many northbridges for AGP\n");
+			return -1;
+		}
 		if (fix_northbridge(loop_dev, pdev, cap_ptr) < 0) { 
-			printk(KERN_INFO PFX "No usable aperture found.\n");
+			printk(KERN_ERR PFX "No usable aperture found.\n");
 #ifdef __x86_64__ 
 			/* should port this to i386 */
-			printk(KERN_INFO PFX "Consider rebooting with iommu=memaper=2 to get a good aperture.\n");
+			printk(KERN_ERR PFX "Consider rebooting with iommu=memaper=2 to get a good aperture.\n");
 #endif 
 			return -1;  
 		}
 		hammers[i++] = loop_dev;
-		nr_garts = i;
-		if (i == MAX_HAMMER_GARTS) { 
-			printk(KERN_INFO PFX "Too many northbridges for AGP\n");
-			return -1;
-		}
 	}
+		nr_garts = i;
 	return i == 0 ? -1 : 0;
 }
 
@@ -387,7 +383,7 @@ static void __devinit amd8151_init(struct pci_dev *pdev, struct agp_bridge_data 
 	case 0x12: revstring="B1"; break;
 	case 0x13: revstring="B2"; break;
 	default:   revstring="??"; break;
-	}
+		}
 
 	printk (KERN_INFO PFX "Detected AMD 8151 AGP Bridge rev %s\n", revstring);
 
@@ -465,7 +461,7 @@ static int __devinit nforce3_agp_init(struct pci_dev *pdev)
 	pci_write_config_dword(dev1, NVIDIA_X86_64_1_APLIMIT2, aplimit);
 
 	return 0;
-} 
+}
 
 static int __devinit agp_amd64_probe(struct pci_dev *pdev,
 				     const struct pci_device_id *ent)

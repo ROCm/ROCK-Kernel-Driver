@@ -62,7 +62,13 @@ SECTIONS
   .sysctl_vsyscall : AT ((LOADADDR(.sys_tz) + SIZEOF(.sys_tz) + 15) & ~(15)) { *(.sysctl_vsyscall) }
   sysctl_vsyscall = LOADADDR(.sysctl_vsyscall);
   . = ALIGN(16);
-  .jiffies : AT ((LOADADDR(.sysctl_vsyscall) + SIZEOF(.sysctl_vsyscall) + 15) & ~(15)) { *(.jiffies) }
+  .time_adjust : AT ((LOADADDR(.sysctl_vsyscall) + SIZEOF(.sysctl_vsyscall) + 16) & ~(15)) { *(.time_adjust) }
+  time_adjust = LOADADDR(.time_adjust);
+  . = ALIGN(16);
+  .tick_usec : AT ((LOADADDR(.time_adjust) + SIZEOF(.time_adjust) + 16) & ~(15)) { *(.tick_usec) }
+  tick_usec = LOADADDR(.tick_usec);	
+  . = ALIGN(16);
+  .jiffies : AT ((LOADADDR(.tick_usec) + SIZEOF(.tick_usec) + 16) & ~(15)) { *(.jiffies) }
   jiffies = LOADADDR(.jiffies);
   . = ALIGN(16);
   .xtime : AT ((LOADADDR(.jiffies) + SIZEOF(.jiffies) + 15) & ~(15)) { *(.xtime) }

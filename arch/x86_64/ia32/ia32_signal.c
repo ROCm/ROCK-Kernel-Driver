@@ -51,10 +51,10 @@ static int ia32_copy_siginfo_to_user(siginfo_t32 *to, siginfo_t *from)
 		return -EFAULT;
 
 	/* If you change siginfo_t structure, please make sure that
-	   this code is fixed accordingly.
-	   It should never copy any pad contained in the structure
-	   to avoid security leaks, but must copy the generic
-	   3 ints plus the relevant union member.  */
+		   this code is fixed accordingly.
+		   It should never copy any pad contained in the structure
+		   to avoid security leaks, but must copy the generic
+		   3 ints plus the relevant union member.  */
 	
 	if (from->si_code < 0) {
 		err = __put_user(from->si_signo, &to->si_signo);
@@ -172,6 +172,9 @@ static int
 ia32_restore_sigcontext(struct pt_regs *regs, struct sigcontext_ia32 *sc, unsigned int *peax)
 {
 	unsigned int err = 0;
+	
+	/* Always make any pending restarted system calls return -EINTR */
+	current_thread_info()->restart_block.fn = do_no_restart_syscall;
 	
 #if DEBUG_SIG
 	printk("SIG restore_sigcontext: sc=%p err(%x) eip(%x) cs(%x) flg(%x)\n",

@@ -505,6 +505,7 @@ config FRAME_POINTER
 	 Normally you should say N.
 
 config IOMMU_DEBUG
+       depends on GART_IOMMU && DEBUG_KERNEL
        bool "Force IOMMU to on" 
        help
          Force the IOMMU to on even when you have less than 4GB of memory and add 
@@ -519,13 +520,6 @@ config IOMMU_LEAK
          Add a simple leak tracer to the IOMMU code. This is useful when you
 	 are debugging a buggy device driver that leaks IOMMU mappings.
        
-config MCE_DEBUG
-       bool "K8 Machine check debugging mode"
-       default y 
-       help
-         Turn on all Machine Check debugging for device driver problems.	  
-	 This can cause panics, but is useful to find device driver problems.
-
 #config X86_REMOTE_DEBUG
 #       bool "kgdb debugging stub"
 

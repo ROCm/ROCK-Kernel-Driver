@@ -436,7 +436,18 @@ repeat:
 /*
  * Timekeeping variables
  */
+
+/* 
+ * Any variables used in low level gettimeofday must be declared
+ * inside ARCH_HAS_TIMEVARS. This is requires for x86-64 who
+ * can run gettimeofday in user context in a vsyscall. The variables
+ * must be mapped in a special way in the low level architecture code
+ * then. -AK
+ */ 
+
+#ifndef ARCH_HAS_TIMEVARS
 unsigned long tick_usec = TICK_USEC; 		/* USER_HZ period (usec) */
+#endif
 unsigned long tick_nsec = TICK_NSEC;		/* ACTHZ period (nsec) */
 
 /* 
@@ -451,10 +462,6 @@ struct timespec xtime __attribute__ ((aligned (16)));
 struct timespec wall_to_monotonic __attribute__ ((aligned (16)));
 
 EXPORT_SYMBOL(xtime);
-
-/* Don't completely fail for HZ > 500.  */
-int tickadj = 500/HZ ? : 1;		/* microsecs */
-
 
 /*
  * phase-lock loop variables
@@ -473,7 +480,9 @@ long time_freq = (((NSEC_PER_SEC + HZ/2) % HZ - HZ/2) << SHIFT_USEC) / NSEC_PER_
 					/* frequency offset (scaled ppm)*/
 long time_adj;				/* tick adjust (scaled 1 / HZ)	*/
 long time_reftime;			/* time at last adjustment (s)	*/
+#ifndef ARCH_HAS_TIMEVARS
 long time_adjust;
+#endif
 long time_next_adjust;
 
 /*

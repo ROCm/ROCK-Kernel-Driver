@@ -15,6 +15,8 @@ enum vsyscall_num {
 
 #ifdef __KERNEL__
 
+/* FIXME: put all this into a single section */ 
+
 #define __section_vxtime __attribute__ ((unused, __section__ (".vxtime"), aligned(16)))
 #define __section_wall_jiffies __attribute__ ((unused, __section__ (".wall_jiffies"), aligned(16)))
 #define __section_jiffies __attribute__ ((unused, __section__ (".jiffies"), aligned(16)))
@@ -22,6 +24,8 @@ enum vsyscall_num {
 #define __section_sysctl_vsyscall __attribute__ ((unused, __section__ (".sysctl_vsyscall"), aligned(16)))
 #define __section_xtime __attribute__ ((unused, __section__ (".xtime"), aligned(16)))
 #define __section_xtime_lock __attribute__ ((unused, __section__ (".xtime_lock"), aligned(L1_CACHE_BYTES)))
+#define __section_time_adjust __attribute__ ((unused, __section__ (".time_adjust"), aligned(16)))
+#define __section_tick_usec __attribute__ ((unused, __section__ (".tick_usec"), aligned(16)))
 
 #define VXTIME_TSC	1
 #define VXTIME_HPET	2
@@ -46,6 +50,8 @@ extern volatile unsigned long __jiffies;
 extern unsigned long __wall_jiffies;
 extern struct timezone __sys_tz;
 extern seqlock_t __xtime_lock;
+extern long __time_adjust;
+extern long __tick_usec;
 
 /* kernel space (writeable) */
 extern struct vxtime_data vxtime;
@@ -53,6 +59,8 @@ extern unsigned long wall_jiffies;
 extern struct timezone sys_tz;
 extern int sysctl_vsyscall;
 extern seqlock_t xtime_lock;
+extern long time_adjust;
+extern unsigned long tick_usec;
 
 #define ARCH_HAVE_XTIME_LOCK 1
 
