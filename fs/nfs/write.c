@@ -242,7 +242,7 @@ nfs_writepage(struct page *page, struct writeback_control *wbc)
 	offset = i_size & (PAGE_CACHE_SIZE-1);
 
 	/* OK, are we completely out? */
-	err = -EIO;
+	err = 0; /* potential race with truncate - ignore */
 	if (page->index >= end_index+1 || !offset)
 		goto out;
 do_it:

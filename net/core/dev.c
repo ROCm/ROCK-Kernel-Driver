@@ -187,7 +187,6 @@ int netdev_fastroute_obstacles;
 
 extern int netdev_sysfs_init(void);
 extern int netdev_register_sysfs(struct net_device *);
-extern void netdev_unregister_sysfs(struct net_device *);
 
 
 /*******************************************************************************
@@ -1837,8 +1836,7 @@ static int dev_ifconf(char *arg)
  *	This is invoked by the /proc filesystem handler to display a device
  *	in detail.
  */
-static __inline__ struct net_device *dev_get_idx(struct seq_file *seq,
-						 loff_t pos)
+static __inline__ struct net_device *dev_get_idx(loff_t pos)
 {
 	struct net_device *dev;
 	loff_t i;
@@ -1851,7 +1849,7 @@ static __inline__ struct net_device *dev_get_idx(struct seq_file *seq,
 void *dev_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	read_lock(&dev_base_lock);
-	return *pos ? dev_get_idx(seq, *pos - 1) : (void *)1;
+	return *pos ? dev_get_idx(*pos - 1) : (void *)1;
 }
 
 void *dev_seq_next(struct seq_file *seq, void *v, loff_t *pos)
@@ -2343,14 +2341,18 @@ static int dev_ifsioc(struct ifreq *ifr, unsigned int cmd)
 		case SIOCSIFNAME:
 			if (dev->flags & IFF_UP)
 				return -EBUSY;
+			ifr->ifr_newname[IFNAMSIZ-1] = '\0';
 			if (__dev_get_by_name(ifr->ifr_newname))
 				return -EEXIST;
-			memcpy(dev->name, ifr->ifr_newname, IFNAMSIZ);
-			dev->name[IFNAMSIZ - 1] = 0;
-			strlcpy(dev->class_dev.class_id, dev->name, BUS_ID_SIZE);
-			notifier_call_chain(&netdev_chain,
-					    NETDEV_CHANGENAME, dev);
-			return 0;
+			err = class_device_rename(&dev->class_dev, 
+						  ifr->ifr_newname);
+			if (!err) {
+				strlcpy(dev->name, ifr->ifr_newname, IFNAMSIZ);
+
+				notifier_call_chain(&netdev_chain,
+						    NETDEV_CHANGENAME, dev);
+			}
+			return err;
 
 		/*
 		 *	Unknown or private ioctl
@@ -2365,7 +2367,6 @@ static int dev_ifsioc(struct ifreq *ifr, unsigned int cmd)
 			    cmd == SIOCBONDSLAVEINFOQUERY ||
 			    cmd == SIOCBONDINFOQUERY ||
 			    cmd == SIOCBONDCHANGEACTIVE ||
-			    cmd == SIOCETHTOOL ||
 			    cmd == SIOCGMIIPHY ||
 			    cmd == SIOCGMIIREG ||
 			    cmd == SIOCSMIIREG ||
@@ -2462,13 +2463,26 @@ int dev_ioctl(unsigned int cmd, void *arg)
 			}
 			return ret;
 
+		case SIOCETHTOOL:
+			dev_load(ifr.ifr_name);
+			rtnl_lock();
+			ret = dev_ethtool(&ifr);
+			rtnl_unlock();
+			if (!ret) {
+				if (colon)
+					*colon = ':';
+				if (copy_to_user(arg, &ifr,
+						 sizeof(struct ifreq)))
+					ret = -EFAULT;
+			}
+			return ret;
+
 		/*
 		 *	These ioctl calls:
 		 *	- require superuser power.
 		 *	- require strict serialization.
 		 *	- return a value
 		 */
-		case SIOCETHTOOL:
 		case SIOCGMIIPHY:
 		case SIOCGMIIREG:
 			if (!capable(CAP_NET_ADMIN))
@@ -2628,7 +2642,7 @@ int register_netdevice(struct net_device *dev)
 	ASSERT_RTNL();
 
 	/* When net_device's are persistent, this will be fatal. */
-	WARN_ON(dev->reg_state != NETREG_UNINITIALIZED);
+	BUG_ON(dev->reg_state != NETREG_UNINITIALIZED);
 
 	spin_lock_init(&dev->queue_lock);
 	spin_lock_init(&dev->xmit_lock);
@@ -2706,38 +2720,17 @@ out_err:
 	goto out;
 }
 
-/**
- *	netdev_finish_unregister - complete unregistration
- *	@dev: device
+/*
+ * netdev_wait_allrefs - wait until all references are gone.
  *
- *	Destroy and free a dead device. A value of zero is returned on
- *	success.
+ * This is called when unregistering network devices.
+ *
+ * Any protocol or device that holds a reference should register
+ * for netdevice notification, and cleanup and put back the
+ * reference if they receive an UNREGISTER event.
+ * We can get stuck here if buggy protocols don't correctly
+ * call dev_put. 
  */
-static int netdev_finish_unregister(struct net_device *dev)
-{
-	BUG_TRAP(!dev->ip_ptr);
-	BUG_TRAP(!dev->ip6_ptr);
-	BUG_TRAP(!dev->dn_ptr);
-
-	if (dev->reg_state != NETREG_UNREGISTERED) {
-		printk(KERN_ERR "Freeing alive device %p, %s\n",
-		       dev, dev->name);
-		return 0;
-	}
-#ifdef NET_REFCNT_DEBUG
-	printk(KERN_DEBUG "netdev_finish_unregister: %s%s.\n", dev->name,
-	       (dev->destructor != NULL)?"":", old style");
-#endif
-
-	/* It must be the very last action, after this 'dev' may point
-	 * to freed up memory.
-	 */
-	if (dev->destructor)
-		dev->destructor(dev);
-
-	return 0;
-}
-
 static void netdev_wait_allrefs(struct net_device *dev)
 {
 	unsigned long rebroadcast_time, warning_time;
@@ -2794,6 +2787,8 @@ static void netdev_wait_allrefs(struct net_device *dev)
  *	unregister_netdevice(y2);
  *      ...
  *	rtnl_unlock();
+ *	free_netdev(y1);
+ *	free_netdev(y2);
  *
  * We are invoked by rtnl_unlock() after it drops the semaphore.
  * This allows us to deal with problems:
@@ -2833,13 +2828,23 @@ void netdev_run_todo(void)
 			break;
 
 		case NETREG_UNREGISTERING:
-			netdev_unregister_sysfs(dev);
+			class_device_del(&dev->class_dev);
 			dev->reg_state = NETREG_UNREGISTERED;
 
 			netdev_wait_allrefs(dev);
+
+			/* paranoia */
 			BUG_ON(atomic_read(&dev->refcnt));
-				
-			netdev_finish_unregister(dev);
+			BUG_TRAP(!dev->ip_ptr);
+			BUG_TRAP(!dev->ip6_ptr);
+			BUG_TRAP(!dev->dn_ptr);
+
+
+			/* It must be the very last action, 
+			 * after this 'dev' may point to freed up memory.
+			 */
+			if (dev->destructor)
+				dev->destructor(dev);
 			break;
 
 		default:
@@ -2852,6 +2857,29 @@ void netdev_run_todo(void)
 	up(&net_todo_run_mutex);
 }
 
+/**
+ *	free_netdev - free network device
+ *	@dev: device
+ *
+ *	This function does the last stage of destroying an allocated device 
+ * 	interface. The reference to the device object is released.  
+ *	If this is the last reference then it will be freed.
+ */
+void free_netdev(struct net_device *dev)
+{
+	/*  Compatiablity with error handling in drivers */
+	if (dev->reg_state == NETREG_UNINITIALIZED) {
+		kfree(dev);
+		return;
+	}
+
+	BUG_ON(dev->reg_state != NETREG_UNREGISTERED);
+	dev->reg_state = NETREG_RELEASED;
+
+	/* will free via class release */
+	class_device_put(&dev->class_dev);
+}
+ 
 /* Synchronize with packet receive processing. */
 void synchronize_net(void) 
 {

@@ -33,19 +33,7 @@
 
 #include "8390.h"
 
-#define NE_BASE		(dev->base_addr)
-#define NE_CMD		(0x00*2)
-
-#define NE_EN0_ISR      (0x07*2)
 #define NE_EN0_DCFG     (0x0e*2)
-
-#define NE_EN0_RSARLO   (0x08*2)
-#define NE_EN0_RSARHI   (0x09*2)
-#define NE_EN0_RCNTLO   (0x0a*2)
-#define NE_EN0_RXCR     (0x0c*2)
-#define NE_EN0_TXCR     (0x0d*2)
-#define NE_EN0_RCNTHI   (0x0b*2)
-#define NE_EN0_IMR      (0x0f*2)
 
 #define NESM_START_PG   0x0    /* First page of TX buffer */
 #define NESM_STOP_PG    0x40    /* Last page +1 of RX ring */
@@ -56,12 +44,10 @@
 
 #define WORDSWAP(a)     ((((a)>>8)&0xff) | ((a)<<8))
 
-#ifdef MODULE
 static struct net_device *root_hydra_dev;
-#endif
 
 static int __init hydra_probe(void);
-static int hydra_init(unsigned long board);
+static int __init hydra_init(unsigned long board);
 static int hydra_open(struct net_device *dev);
 static int hydra_close(struct net_device *dev);
 static void hydra_reset_8390(struct net_device *dev);
@@ -96,11 +82,11 @@ static int __init hydra_probe(void)
     return err;
 }
 
-int __init hydra_init(unsigned long board)
+static int __init hydra_init(unsigned long board)
 {
     struct net_device *dev;
     unsigned long ioaddr = board+HYDRA_NIC_BASE;
-    const char *name = NULL;
+    const char name[] = "NE2000";
     int start_page, stop_page;
     int j;
 
@@ -135,8 +121,6 @@ int __init hydra_init(unsigned long board)
 	printk("Unable to get memory for dev->priv.\n");
 	return -ENOMEM;
     }
-
-    name = "NE2000";
 
     printk("%s: hydra at 0x%08lx, address %02x:%02x:%02x:%02x:%02x:%02x (hydra.c " HYDRA_VERSION ")\n", dev->name, ZTWO_PADDR(board),
 	dev->dev_addr[0], dev->dev_addr[1], dev->dev_addr[2],
@@ -235,7 +219,6 @@ static void hydra_block_output(struct net_device *dev, int count,
 
 static void __exit hydra_cleanup(void)
 {
-#ifdef MODULE
     struct net_device *dev, *next;
 
     while ((dev = root_hydra_dev)) {
@@ -243,10 +226,9 @@ static void __exit hydra_cleanup(void)
 	unregister_netdev(dev);
 	free_irq(IRQ_AMIGA_PORTS, dev);
 	release_mem_region(ZTWO_PADDR(dev->base_addr)-HYDRA_NIC_BASE, 0x10000);
-	kfree(dev);
+	free_netdev(dev);
 	root_hydra_dev = next;
     }
-#endif
 }
 
 module_init(hydra_probe);

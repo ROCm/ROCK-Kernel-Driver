@@ -1021,7 +1021,7 @@ static irqreturn_t snd_azf3328_interrupt(int irq, void *dev_id, struct pt_regs *
 {
 	azf3328_t *chip = snd_magic_cast(azf3328_t, dev_id, return IRQ_NONE);
 	unsigned int status, which;
-	static unsigned long count = 0;
+	static unsigned long count;
 
 	status  = inw(chip->codec_port+IDX_IO_IRQSTATUS);
 
@@ -1347,38 +1347,38 @@ static int __devinit snd_azf3328_create(snd_card_t * card,
 
 	chip->codec_port = pci_resource_start(pci, 0);
 	if ((chip->res_codec_port = request_region(chip->codec_port, 0x80, "Aztech AZF3328 I/O")) == NULL) {
-		snd_azf3328_free(chip);
 		snd_printk("unable to grab I/O port at 0x%lx-0x%lx\n", chip->codec_port, chip->codec_port + 0x80 - 1);
+		snd_azf3328_free(chip);
 		return -EBUSY;
 	}
 	chip->io2_port = pci_resource_start(pci, 1);
 	if ((chip->res_io2_port = request_region(chip->io2_port, 0x08, "Aztech AZF3328 I/O 2")) == NULL) {
-		snd_azf3328_free(chip);
 		snd_printk("unable to grab I/O 2 port at 0x%lx-0x%lx\n", chip->io2_port, chip->io2_port + 0x08 - 1);
+		snd_azf3328_free(chip);
 		return -EBUSY;
 	}
 	chip->mpu_port = pci_resource_start(pci, 2);
 	if ((chip->res_mpu_port = request_region(chip->mpu_port, 0x04, "Aztech AZF3328 MPU401")) == NULL) {
-		snd_azf3328_free(chip);
 		snd_printk("unable to grab MPU401 port at 0x%lx-0x%lx\n", chip->mpu_port, chip->mpu_port + 0x04 - 1);
+		snd_azf3328_free(chip);
 		return -EBUSY;
 	}
 	chip->synth_port = pci_resource_start(pci, 3);
 	if ((chip->res_synth_port = request_region(chip->synth_port, 0x08, "Aztech AZF3328 OPL3")) == NULL) {
-		snd_azf3328_free(chip);
 		snd_printk("unable to grab OPL3 port at 0x%lx-0x%lx\n", chip->synth_port, chip->synth_port + 0x08 - 1);
+		snd_azf3328_free(chip);
 		return -EBUSY;
 	}
 	chip->mixer_port = pci_resource_start(pci, 4);
 	if ((chip->res_mixer_port = request_region(chip->mixer_port, 0x40, "Aztech AZF3328 Mixer")) == NULL) {
-		snd_azf3328_free(chip);
                 snd_printk("unable to grab mixer port at 0x%lx-0x%lx\n", chip->mixer_port, chip->mixer_port + 0x40 - 1);
+		snd_azf3328_free(chip);
 		return -EBUSY;
 	}
 
 	if (request_irq(pci->irq, snd_azf3328_interrupt, SA_INTERRUPT|SA_SHIRQ, card->shortname, (void *)chip)) {
-		snd_azf3328_free(chip);
 		snd_printk("unable to grab IRQ %d\n", pci->irq);
+		snd_azf3328_free(chip);
 		return -EBUSY;
 	}
 	chip->irq = pci->irq;
@@ -1499,8 +1499,8 @@ static int __devinit snd_azf3328_probe(struct pci_dev *pci,
 	if ((err = snd_mpu401_uart_new( card, 0, MPU401_HW_MPU401,
 				        chip->mpu_port, 1, pci->irq, 0,
 				        &chip->rmidi)) < 0) {
-		snd_card_free(card);
 		snd_printk("azf3328: no MPU-401 device at 0x%lx?\n", chip->mpu_port);
+		snd_card_free(card);
 		return err;
 	}
 

@@ -147,6 +147,33 @@ struct pci_iommu_arena
 	unsigned int align_entry;
 };
 
+#if defined(CONFIG_ALPHA_SRM) && \
+    (defined(CONFIG_ALPHA_CIA) || defined(CONFIG_ALPHA_LCA))
+# define NEED_SRM_SAVE_RESTORE
+#else
+# undef NEED_SRM_SAVE_RESTORE
+#endif
+
+#if defined(CONFIG_ALPHA_GENERIC) || defined(NEED_SRM_SAVE_RESTORE)
+# define ALPHA_RESTORE_SRM_SETUP
+#else
+# undef ALPHA_RESTORE_SRM_SETUP
+#endif
+
+#ifdef ALPHA_RESTORE_SRM_SETUP
+/* Store PCI device configuration left by SRM here. */
+struct pdev_srm_saved_conf
+{
+	struct pdev_srm_saved_conf *next;
+	struct pci_dev *dev;
+	u32 regs[16];
+};
+
+extern void pci_restore_srm_config(void);
+#else
+#define pdev_save_srm_config(dev)	do {} while (0)
+#define pci_restore_srm_config()	do {} while (0)
+#endif
 
 /* The hose list.  */
 extern struct pci_controller *hose_head, **hose_tail;

@@ -156,12 +156,13 @@ struct usb_serial {
 	struct usb_interface *		interface;
 	unsigned char			minor;
 	unsigned char			num_ports;
+	unsigned char			num_port_pointers;
 	char				num_interrupt_in;
 	char				num_bulk_in;
 	char				num_bulk_out;
 	__u16				vendor;
 	__u16				product;
-	struct usb_serial_port		port[MAX_NUM_PORTS];
+	struct usb_serial_port *	port[MAX_NUM_PORTS];
 	struct kobject			kobj;
 	void *				private;
 };

@@ -51,9 +51,10 @@
 #include <linux/compat.h>
 #include <linux/vfs.h>
 
+#include <asm/intrinsics.h>
+#include <asm/semaphore.h>
 #include <asm/types.h>
 #include <asm/uaccess.h>
-#include <asm/semaphore.h>
 
 #include "ia32priv.h"
 
@@ -2192,7 +2193,7 @@ sys32_iopl (int level)
 	if (level != 3)
 		return(-EINVAL);
 	/* Trying to gain more privileges? */
-	asm volatile ("mov %0=ar.eflag ;;" : "=r"(old));
+	old = ia64_getreg(_IA64_REG_AR_EFLAG);
 	if ((unsigned int) level > ((old >> 12) & 3)) {
 		if (!capable(CAP_SYS_RAWIO))
 			return -EPERM;
@@ -2216,7 +2217,7 @@ sys32_iopl (int level)
 
 	if (addr >= 0) {
 		old = (old & ~0x3000) | (level << 12);
-		asm volatile ("mov ar.eflag=%0;;" :: "r"(old));
+		ia64_setreg(_IA64_REG_AR_EFLAG, old);
 	}
 
 	fput(file);

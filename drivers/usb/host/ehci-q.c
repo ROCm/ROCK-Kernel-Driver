@@ -794,6 +794,10 @@ static struct ehci_qh *qh_append_tds (
 					qh->hw_info1 = cpu_to_le32 (info);
 				}
 			}
+
+                        /* usb_reset_device() briefly reverts to address 0 */
+                        if (usb_pipedevice (urb->pipe) == 0)
+                                qh->hw_info1 &= cpu_to_le32(~0x7f);
 		}
 
 		/* usb_clear_halt() means qh data toggle gets reset */

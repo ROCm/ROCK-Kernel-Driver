@@ -57,6 +57,7 @@
  *
  * ??  - ??
  * 2.4 - Add support for ycbcr textures (no new ioctls)
+ * 2.5 - Add FLIP ioctl, disable FULLSCREEN.
  */
 #define DRIVER_IOCTLS							    \
    [DRM_IOCTL_NR(DRM_IOCTL_DMA)]             = { r128_cce_buffers,  1, 0 }, \

@@ -241,7 +241,7 @@ static int sb_pnp_probe(struct pnp_card_link *card, const struct pnp_card_device
 	memset(scc, 0, sizeof(struct sb_card_config));
 
 	printk(KERN_INFO "sb: PnP: Found Card Named = \"%s\", Card PnP id = " \
-	       "%s, Device PnP id = %s\n", dev->dev.name, card_id->id,
+	       "%s, Device PnP id = %s\n", card->card->name, card_id->id,
 	       dev->id->id);
 
 	scc->card_id = card_id->id;

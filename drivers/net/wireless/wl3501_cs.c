@@ -2342,19 +2342,7 @@ static struct pcmcia_driver wl3501_driver = {
 
 static int __init wl3501_init_module(void)
 {
-	servinfo_t serv;
-
-	dprintk(0, ": loading");
-	CardServices(GetCardServicesInfo, &serv);
-	if (serv.Revision != CS_RELEASE_CODE) {
-		printk(KERN_NOTICE
-		       "wl3501_cs: Card Services release does not match!\n"
-		       "Compiled with 0x%x, but current is 0x%lx\n",
-		       CS_RELEASE_CODE, (unsigned long)serv.Revision);
-		/* return -1; */
-	}
-	pcmcia_register_driver(&wl3501_driver);
-	return 0;
+	return pcmcia_register_driver(&wl3501_driver);
 }
 
 static void __exit wl3501_exit_module(void)

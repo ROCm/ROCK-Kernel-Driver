@@ -2121,7 +2121,7 @@ static void __exit scc_cleanup_driver(void)
 	if (Nchips == 0)
 	{
 		unregister_netdev(SCC_Info[0].dev);
-		kfree(SCC_Info[0].dev);
+		free_netdev(SCC_Info[0].dev);
 	}
 
 	/* Guard against chip prattle */
@@ -2153,7 +2153,7 @@ static void __exit scc_cleanup_driver(void)
 		if (scc->dev)
 		{
 			unregister_netdev(scc->dev);
-			kfree(scc->dev);
+			free_netdev(scc->dev);
 		}
 	}
 	

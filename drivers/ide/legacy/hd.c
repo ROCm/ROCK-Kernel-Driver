@@ -715,7 +715,7 @@ static int __init hd_init(void)
 
 	hd_queue = blk_init_queue(do_hd_request, &hd_lock);
 	if (!hd_queue) {
-		unegister_blkdev(MAJOR_NR,"hd");
+		unregister_blkdev(MAJOR_NR,"hd");
 		return -ENOMEM;
 	}
 

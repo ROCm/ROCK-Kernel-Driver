@@ -253,7 +253,7 @@ static void __devexit rr_remove_one (struct pci_dev *pdev)
 				    rr->tx_ring_dma);
 		unregister_netdev(dev);
 		iounmap(rr->regs);
-		kfree(dev);
+		free_netdev(dev);
 		pci_release_regions(pdev);
 		pci_disable_device(pdev);
 		pci_set_drvdata(pdev, NULL);
@@ -1641,13 +1641,13 @@ static int rr_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 		spin_lock_irqsave(&rrpriv->lock, flags);
 		i = rr_read_eeprom(rrpriv, 0, image, EEPROM_BYTES);
+		spin_unlock_irqrestore(&rrpriv->lock, flags);
 		if (i != EEPROM_BYTES){
 			printk(KERN_ERR "%s: Error reading EEPROM\n",
 			       dev->name);
 			error = -EFAULT;
 			goto gf_out;
 		}
-		spin_unlock_irqrestore(&rrpriv->lock, flags);
 		error = copy_to_user(rq->ifr_data, image, EEPROM_BYTES);
 		if (error)
 			error = -EFAULT;

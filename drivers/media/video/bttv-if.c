@@ -315,7 +315,7 @@ int __devinit init_bttv_i2c(struct bttv *btv)
 	memcpy(&btv->i2c_client, &bttv_i2c_client_template,
 	       sizeof(struct i2c_client));
 
-	sprintf(btv->i2c_adap.dev.name, "bt848 #%d", btv->nr);
+	sprintf(btv->i2c_adap.name, "bt848 #%d", btv->nr);
 	btv->i2c_adap.dev.parent = &btv->dev->dev;
 
         btv->i2c_algo.data = btv;

@@ -8,7 +8,30 @@
 #include <linux/fs.h>
 #include <linux/list.h>
 #include <linux/highmem.h>
+#include <linux/pagemap.h>
 #include <asm/uaccess.h>
+#include <linux/gfp.h>
+
+/*
+ * Bits in mapping->flags.  The lower __GFP_BITS_SHIFT bits are the page
+ * allocation mode flags.
+ */
+#define	AS_EIO		(__GFP_BITS_SHIFT + 0)	/* IO error on async write */
+#define AS_ENOSPC	(__GFP_BITS_SHIFT + 1)	/* ENOSPC on async write */
+
+static inline int mapping_gfp_mask(struct address_space * mapping)
+{
+	return mapping->flags & __GFP_BITS_MASK;
+}
+
+/*
+ * This is non-atomic.  Only to be used before the mapping is activated.
+ * Probably needs a barrier...
+ */
+static inline void mapping_set_gfp_mask(struct address_space *m, int mask)
+{
+	m->flags = (m->flags & ~__GFP_BITS_MASK) | mask;
+}
 
 /*
  * The page cache can done in larger chunks than
@@ -29,12 +52,12 @@ void release_pages(struct page **pages, int nr, int cold);
 
 static inline struct page *page_cache_alloc(struct address_space *x)
 {
-	return alloc_pages(x->gfp_mask, 0);
+	return alloc_pages(mapping_gfp_mask(x), 0);
 }
 
 static inline struct page *page_cache_alloc_cold(struct address_space *x)
 {
-	return alloc_pages(x->gfp_mask|__GFP_COLD, 0);
+	return alloc_pages(mapping_gfp_mask(x)|__GFP_COLD, 0);
 }
 
 typedef int filler_t(void *, struct page *);
@@ -56,7 +79,7 @@ extern unsigned int find_get_pages(struct address_space *mapping,
  */
 static inline struct page *grab_cache_page(struct address_space *mapping, unsigned long index)
 {
-	return find_or_create_page(mapping, index, mapping->gfp_mask);
+	return find_or_create_page(mapping, index, mapping_gfp_mask(mapping));
 }
 
 extern struct page * grab_cache_page_nowait(struct address_space *mapping,

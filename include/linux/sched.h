@@ -12,6 +12,7 @@
 #include <linux/jiffies.h>
 #include <linux/rbtree.h>
 #include <linux/thread_info.h>
+#include <linux/cpumask.h>
 
 #include <asm/system.h>
 #include <asm/semaphore.h>
@@ -49,7 +50,7 @@ struct exec_domain;
 #define CLONE_SETTLS	0x00080000	/* create a new TLS for the child */
 #define CLONE_PARENT_SETTID	0x00100000	/* set the TID in the parent */
 #define CLONE_CHILD_CLEARTID	0x00200000	/* clear the TID in the child */
-#define CLONE_DETACHED		0x00400000	/* parent wants no child-exit signal */
+#define CLONE_DETACHED		0x00400000	/* Not used - CLONE_THREAD implies detached uniquely */
 #define CLONE_UNTRACED		0x00800000	/* set if the tracing process can't force CLONE_PTRACE on this clone */
 #define CLONE_CHILD_SETTID	0x01000000	/* set the TID in the child */
 #define CLONE_STOPPED		0x02000000	/* Start in stopped state */
@@ -203,7 +204,7 @@ struct mm_struct {
 	unsigned long arg_start, arg_end, env_start, env_end;
 	unsigned long rss, total_vm, locked_vm;
 	unsigned long def_flags;
-	unsigned long cpu_vm_mask;
+	cpumask_t cpu_vm_mask;
 	unsigned long swap_address;
 
 	unsigned dumpable:1;
@@ -342,7 +343,7 @@ struct task_struct {
 	unsigned long last_run;
 
 	unsigned long policy;
-	unsigned long cpus_allowed;
+	cpumask_t cpus_allowed;
 	unsigned int time_slice, first_time_slice;
 
 	struct list_head tasks;
@@ -489,9 +490,9 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_SYNCWRITE	0x00200000	/* I am doing a sync write */
 
 #ifdef CONFIG_SMP
-extern int set_cpus_allowed(task_t *p, unsigned long new_mask);
+extern int set_cpus_allowed(task_t *p, cpumask_t new_mask);
 #else
-static inline int set_cpus_allowed(task_t *p, unsigned long new_mask)
+static inline int set_cpus_allowed(task_t *p, cpumask_t new_mask)
 {
 	return 0;
 }
@@ -637,6 +638,8 @@ static inline void mmdrop(struct mm_struct * mm)
 
 /* mmput gets rid of the mappings and all user-space */
 extern void mmput(struct mm_struct *);
+/* Grab a reference to the mm if its not already going away */
+extern struct mm_struct *mmgrab(struct mm_struct *);
 /* Remove the current tasks stale references to the old mm_struct */
 extern void mm_release(struct task_struct *, struct mm_struct *);
 
@@ -744,7 +747,7 @@ static inline struct mm_struct * get_task_mm(struct task_struct * task)
 	task_lock(task);
 	mm = task->mm;
 	if (mm)
-		atomic_inc(&mm->mm_users);
+		mm = mmgrab(mm);
 	task_unlock(task);
 
 	return mm;

@@ -30,7 +30,7 @@ endif
 head-y			:= head.o
 obj-$(CONFIG_DEBUG_LL)	+= debug.o
 
-extra-y := $(head-y) init_task.o
+extra-y := $(head-y) init_task.o vmlinux.lds.s
 
 # Spell out some dependencies that `make dep' doesn't spot
 $(obj)/entry-armv.o: 	$(obj)/entry-header.S include/asm-arm/constants.h

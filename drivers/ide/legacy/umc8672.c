@@ -207,7 +207,7 @@ MODULE_AUTHOR("Wolfram Podien");
 MODULE_DESCRIPTION("Support for UMC 8672 IDE chipset");
 MODULE_LICENSE("GPL");
 
-int __init umc8672_mod_init(void)
+static int __init umc8672_mod_init(void)
 {
 	if (probe_umc8672())
 		return -ENODEV;
@@ -220,7 +220,7 @@ int __init umc8672_mod_init(void)
 }
 module_init(umc8672_mod_init);
 
-void __init umc8672_mod_exit(void)
+static void __exit umc8672_mod_exit(void)
 {
         umc8672_release();
 }

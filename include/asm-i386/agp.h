@@ -2,6 +2,7 @@
 #define AGP_H 1
 
 #include <asm/pgtable.h>
+#include <asm/cacheflush.h>
 
 /* 
  * Functions to keep the agpgart mappings coherent with the MMU.

@@ -270,7 +270,7 @@ static __inline__ int variable_test_bit(int nr, const volatile unsigned long * a
  * Returns the bit-number of the first zero bit, not the number of the byte
  * containing a bit.
  */
-static __inline__ int find_first_zero_bit(unsigned long * addr, unsigned size)
+static __inline__ int find_first_zero_bit(const unsigned long *addr, unsigned size)
 {
 	int d0, d1, d2;
 	int res;
@@ -302,7 +302,7 @@ static __inline__ int find_first_zero_bit(unsigned long * addr, unsigned size)
  * Returns the bit-number of the first set bit, not the number of the byte
  * containing a bit.
  */
-static __inline__ int find_first_bit(unsigned long * addr, unsigned size)
+static __inline__ int find_first_bit(const unsigned long *addr, unsigned size)
 {
 	int d0, d1;
 	int res;
@@ -328,7 +328,7 @@ static __inline__ int find_first_bit(unsigned long * addr, unsigned size)
  * @offset: The bitnumber to start searching at
  * @size: The maximum size to search
  */
-static __inline__ int find_next_zero_bit(unsigned long * addr, int size, int offset)
+static __inline__ int find_next_zero_bit(const unsigned long *addr, int size, int offset)
 {
 	unsigned long * p = ((unsigned long *) addr) + (offset >> 5);
 	int set = 0, bit = offset & 31, res;
@@ -361,9 +361,9 @@ static __inline__ int find_next_zero_bit(unsigned long * addr, int size, int off
  * @offset: The bitnumber to start searching at
  * @size: The maximum size to search
  */
-static __inline__ int find_next_bit(unsigned long *addr, int size, int offset)
+static __inline__ int find_next_bit(const unsigned long *addr, int size, int offset)
 {
-	unsigned long * p = addr + (offset >> 5);
+	const unsigned long *p = addr + (offset >> 5);
 	int set = 0, bit = offset & 31, res;
 
 	if (bit) {
@@ -430,7 +430,7 @@ static __inline__ unsigned long __ffs(unsigned long word)
  * unlikely to be set. It's guaranteed that at least one of the 140
  * bits is cleared.
  */
-static inline int sched_find_first_bit(unsigned long *b)
+static inline int sched_find_first_bit(const unsigned long *b)
 {
 	if (unlikely(b[0]))
 		return __ffs(b[0]);

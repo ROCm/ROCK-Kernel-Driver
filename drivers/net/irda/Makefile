@@ -5,8 +5,7 @@
 # Rewritten to use lists instead of if-statements.
 #
 
-# Old SIR drivers (irtty is broken)
-obj-$(CONFIG_IRTTY_OLD)		+= irtty.o
+# Old SIR drivers 
 obj-$(CONFIG_IRPORT_SIR)	+= 		irport.o
 # FIR drivers
 obj-$(CONFIG_USB_IRDA)		+= irda-usb.o

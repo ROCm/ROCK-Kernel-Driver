@@ -76,13 +76,14 @@ cifs_open(struct inode *inode, struct file *file)
 	    	FreeXid(xid);
 		return rc;
 	    } else {
-		cERROR(1,("could not find file instance for new file %p ",file));
+		if(file->f_flags & O_EXCL)
+			cERROR(1,("could not find file instance for new file %p ",file));
 	    }
 	}
 
 	full_path = build_path_from_dentry(file->f_dentry);
 
-	cFYI(1, (" inode = 0x%p file flags are %x for %s", inode, file->f_flags,full_path));
+	cFYI(1, (" inode = 0x%p file flags are 0x%x for %s", inode, file->f_flags,full_path));
 	if ((file->f_flags & O_ACCMODE) == O_RDONLY)
 		desiredAccess = GENERIC_READ;
 	else if ((file->f_flags & O_ACCMODE) == O_WRONLY)
@@ -500,10 +501,17 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 	write_data = kmap(page);
 	write_data += from;
 
-	if((to > PAGE_CACHE_SIZE) || (from > to) || (offset > mapping->host->i_size)) {
+	if((to > PAGE_CACHE_SIZE) || (from > to)) {
 		kunmap(page);
 		FreeXid(xid);
 		return -EIO;
+	}
+
+	/* racing with truncate? */
+	if(offset > mapping->host->i_size) {
+		kunmap(page);
+		FreeXid(xid);
+		return 0; /* don't care */
 	}
 
 	/* check to make sure that we are not extending the file */
@@ -1114,9 +1122,6 @@ construct_dentry(struct qstr *qstring, struct file *file,
 	}
 
 	tmp_dentry->d_time = jiffies;
-	(*ptmp_inode)->i_blksize =
-	    (pTcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE) & 0xFFFFFE00;
-	cFYI(1, ("i_blksize = %ld", (*ptmp_inode)->i_blksize));
 	*pnew_dentry = tmp_dentry;
 }
 

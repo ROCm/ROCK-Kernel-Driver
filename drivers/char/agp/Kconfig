@@ -43,6 +43,16 @@ config AGP_ALI
 	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
 	  use GLX or DRI.  If unsure, say N.
 
+config AGP_ATI
+	tristate "ATI chipset support"
+	depends on AGP && X86 && !X86_64
+	---help---
+      This option gives you AGP support for the GLX component of
+      XFree86 4.x on the ATI RadeonIGP family of chipsets.
+
+      You should say Y here if you use XFree86 3.3.6 or 4.x and want to
+      use GLX or DRI.  If unsure, say N.
+
 config AGP_AMD
 	tristate "AMD Irongate, 761, and 762 chipset support"
 	depends on AGP && X86 && !X86_64
@@ -53,19 +63,15 @@ config AGP_AMD
 	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
 	  use GLX or DRI.  If unsure, say N.
 
-# RED-PEN this option is misnamed, it's not 8151 specific
 config AGP_AMD_8151
 	tristate "AMD Opteron/Athlon64 on-CPU GART support"
 	depends on AGP && X86
 	default GART_IOMMU
 	help
 	  This option gives you AGP support for the GLX component of
-	  XFree86 4.x using the on-CPU northbridge of the AMD Athlon64/Opteron CPUs.
-	  You still need an external AGP bridge like the AMD 8151, VIA
-          K8T400M, SiS755. It may also support other AGP bridges when loaded
-	  with agp_try_unsupported=1.
+	  XFree86 4.x using the on-CPU AGP bridge of the AMD Athlon64/Opteron CPUs.
 	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
-	  use GLX or DRI.  If unsure, say Y
+	  use GLX or DRI.  If unsure, say N
 
 config AGP_INTEL
 	tristate "Intel 440LX/BX/GX, I8xx and E7x05 chipset support"

@@ -8,6 +8,7 @@
 #include <asm/msr.h>
 #include <asm/system.h>
 #include <asm/cpufeature.h>
+#include <asm/tlbflush.h>
 #include "mtrr.h"
 
 struct mtrr_state {
@@ -241,18 +242,20 @@ static void prepare_set(void)
 	   more invasive changes to the way the kernel boots  */
 	spin_lock(&set_atomicity_lock);
 
+	/*  Enter the no-fill (CD=1, NW=0) cache mode and flush caches. */
+	cr0 = read_cr0() | 0x40000000;	/* set CD flag */
+	wbinvd();
+	write_cr0(cr0);
+	wbinvd();
+
 	/*  Save value of CR4 and clear Page Global Enable (bit 7)  */
 	if ( cpu_has_pge ) {
 		cr4 = read_cr4();
 		write_cr4(cr4 & (unsigned char) ~(1 << 7));
 	}
 
-	/*  Disable and flush caches. Note that wbinvd flushes the TLBs as
-	    a side-effect  */
-	cr0 = read_cr0() | 0x40000000;
-	wbinvd();
-	write_cr0(cr0);
-	wbinvd();
+	/* Flush all TLBs via a mov %cr3, %reg; mov %reg, %cr3 */
+	__flush_tlb();
 
 	/*  Save MTRR state */
 	rdmsr(MTRRdefType_MSR, deftype_lo, deftype_hi);
@@ -265,6 +268,7 @@ static void post_set(void)
 {
 	/*  Flush caches and TLBs  */
 	wbinvd();
+	__flush_tlb();
 
 	/* Intel (P6) standard MTRRs */
 	wrmsr(MTRRdefType_MSR, deftype_lo, deftype_hi);

@@ -468,17 +468,17 @@ static struct sclp_register sclp_state_change_event = {
  * SCLP quiesce event handler
  */
 #ifdef CONFIG_SMP
-static volatile unsigned long cpu_quiesce_map;
+static cpumask_t cpu_quiesce_map;
 
 static void
 do_load_quiesce_psw(void * __unused)
 {
 	psw_t quiesce_psw;
 
-	clear_bit(smp_processor_id(), &cpu_quiesce_map);
+	cpu_clear(smp_processor_id(), cpu_quiesce_map);
 	if (smp_processor_id() == 0) {
 		/* Wait for all other cpus to enter do_load_quiesce_psw */
-		while (cpu_quiesce_map != 0);
+		while (!cpus_empty(cpu_quiesce_map));
 		/* Quiesce the last cpu with the special psw */
 		quiesce_psw.mask = PSW_BASE_BITS | PSW_MASK_WAIT;
 		quiesce_psw.addr = 0xfff;

@@ -81,24 +81,24 @@ extern int      gus_irq, gus_dma;
 extern int      gus_pnp_flag;
 extern int      gus_no_wave_dma;
 static int      gus_dma2 = -1;
-static int      dual_dma_mode = 0;
-static long     gus_mem_size = 0;
-static long     free_mem_ptr = 0;
-static int      gus_busy = 0;
-static int      gus_no_dma = 0;
-static int      nr_voices = 0;
-static int      gus_devnum = 0;
+static int      dual_dma_mode;
+static long     gus_mem_size;
+static long     free_mem_ptr;
+static int      gus_busy;
+static int      gus_no_dma;
+static int      nr_voices;
+static int      gus_devnum;
 static int      volume_base, volume_scale, volume_method;
 static int      gus_recmask = SOUND_MASK_MIC;
-static int      recording_active = 0;
-static int      only_read_access = 0;
-static int      only_8_bits = 0;
+static int      recording_active;
+static int      only_read_access;
+static int      only_8_bits;
 
 int             iw_mode = 0;
 int             gus_wave_volume = 60;
 int             gus_pcm_volume = 80;
 int             have_gus_max = 0;
-static int      gus_line_vol = 100, gus_mic_vol = 0;
+static int      gus_line_vol = 100, gus_mic_vol;
 static unsigned char mix_image = 0x00;
 
 int             gus_timer_enabled = 0;
@@ -108,7 +108,7 @@ int             gus_timer_enabled = 0;
  * at the same time. The active_device specifies the active driver
  */
 
-static int      active_device = 0;
+static int      active_device;
 
 #define GUS_DEV_WAVE		1	/* Wave table synth */
 #define GUS_DEV_PCM_DONE	2	/* PCM device, transfer done */
@@ -133,7 +133,7 @@ static int      pcm_datasize[MAX_PCM_BUFFERS];
 static volatile int pcm_head, pcm_tail, pcm_qlen;
 static volatile int pcm_active;
 static volatile int dma_active;
-static int      pcm_opened = 0;
+static int      pcm_opened;
 static int      pcm_current_dev;
 static int      pcm_current_block;
 static unsigned long pcm_current_buf;
@@ -168,11 +168,11 @@ static int      freq_div_table[] =
 	19293			/* 32 */
 };
 
-static struct patch_info *samples = NULL;
+static struct patch_info *samples;
 static long     sample_ptrs[MAX_SAMPLE + 1];
 static int      sample_map[32];
 static int      free_sample;
-static int      mixer_type = 0;
+static int      mixer_type;
 
 
 static int      patch_table[MAX_PATCH];
@@ -3034,7 +3034,7 @@ void __init gus_wave_init(struct address_info *hw_config)
 
 	gus_initialize();
 	
-	if ((gus_mem_size > 0) & !gus_no_wave_dma)
+	if ((gus_mem_size > 0) && !gus_no_wave_dma)
 	{
 		hw_config->slots[4] = -1;
 		if ((gus_devnum = sound_install_audiodrv(AUDIO_DRIVER_VERSION,
@@ -3350,7 +3350,7 @@ void guswave_dma_irq(void)
  */
 
 static volatile int select_addr, data_addr;
-static volatile int curr_timer = 0;
+static volatile int curr_timer;
 
 void gus_timer_command(unsigned int addr, unsigned int val)
 {

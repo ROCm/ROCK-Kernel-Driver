@@ -26,7 +26,7 @@ static void hash_key(struct crypto_tfm *tfm, u8 *key, unsigned int keylen)
 	struct scatterlist tmp;
 	
 	tmp.page = virt_to_page(key);
-	tmp.offset = ((long)key & ~PAGE_MASK);
+	tmp.offset = offset_in_page(key);
 	tmp.length = keylen;
 	crypto_digest_digest(tfm, &tmp, 1, key);
 		
@@ -71,7 +71,7 @@ void crypto_hmac_init(struct crypto_tfm *tfm, u8 *key, unsigned int *keylen)
 		ipad[i] ^= 0x36;
 
 	tmp.page = virt_to_page(ipad);
-	tmp.offset = ((long)ipad & ~PAGE_MASK);
+	tmp.offset = offset_in_page(ipad);
 	tmp.length = crypto_tfm_alg_blocksize(tfm);
 	
 	crypto_digest_init(tfm);
@@ -105,14 +105,14 @@ void crypto_hmac_final(struct crypto_tfm *tfm, u8 *key,
 		opad[i] ^= 0x5c;
 
 	tmp.page = virt_to_page(opad);
-	tmp.offset = ((long)opad & ~PAGE_MASK);
+	tmp.offset = offset_in_page(opad);
 	tmp.length = crypto_tfm_alg_blocksize(tfm);
 
 	crypto_digest_init(tfm);
 	crypto_digest_update(tfm, &tmp, 1);
 	
 	tmp.page = virt_to_page(out);
-	tmp.offset = ((long)out & ~PAGE_MASK);
+	tmp.offset = offset_in_page(out);
 	tmp.length = crypto_tfm_alg_digestsize(tfm);
 	
 	crypto_digest_update(tfm, &tmp, 1);

@@ -85,7 +85,10 @@ running once the system is up.
 			See also Documentation/scsi/ncr53c7xx.txt.
 
 	acpi=		[HW,ACPI] Advanced Configuration and Power Interface 
-			Format: off[,<...>]
+			Format: { force | off | ht }
+			force -- enables ACPI for systems with default off
+			off -- disabled ACPI for systems with default on
+			ht -- run only enough ACPI to enable Hyper Threading
 			See also Documentation/pm.txt.
  
 	ad1816=		[HW,OSS]
@@ -436,6 +439,8 @@ running once the system is up.
 
 	l2cr=		[PPC]
 
+	lapic		[IA-32,APIC] Enable the local APIC even if BIOS disabled it.
+
 	lasi=		[HW,SCSI] PARISC LASI driver for the 53c700 chip
 			Format: addr:<io>,irq:<irq>
 
@@ -613,8 +618,6 @@ running once the system is up.
 			instruction doesn't work correctly and not to
 			use it.
 
-	noht		[SMP,IA-32] Disables P4 Xeon(tm) HyperThreading.
-
 	noirqdebug	[IA-32] Disables the code which attempts to detect and
 			disable unhandled interrupt sources.
 
@@ -624,6 +627,8 @@ running once the system is up.
 			initial RAM disk.
 
 	nointroute	[IA-64]
+
+	nolapic		[IA-32,APIC] Do not enable or use the local APIC.
 
 	nomce		[IA-32] Machine Check Exception
 

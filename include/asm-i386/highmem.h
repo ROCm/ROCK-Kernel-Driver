@@ -22,6 +22,7 @@
 
 #include <linux/config.h>
 #include <linux/interrupt.h>
+#include <linux/threads.h>
 #include <asm/kmap_types.h>
 #include <asm/tlbflush.h>
 
@@ -39,7 +40,11 @@ extern void kmap_init(void);
  * easily, subsequent pte tables have to be allocated in one physical
  * chunk of RAM.
  */
+#if NR_CPUS <= 32
 #define PKMAP_BASE (0xff800000UL)
+#else
+#define PKMAP_BASE (0xff600000UL)
+#endif
 #ifdef CONFIG_X86_PAE
 #define LAST_PKMAP 512
 #else

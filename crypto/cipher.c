@@ -345,7 +345,6 @@ int crypto_init_cipher_flags(struct crypto_tfm *tfm, u32 flags)
 int crypto_init_cipher_ops(struct crypto_tfm *tfm)
 {
 	int ret = 0;
-	struct crypto_alg *alg = tfm->__crt_alg;
 	struct cipher_tfm *ops = &tfm->crt_cipher;
 
 	ops->cit_setkey = setkey;
@@ -381,8 +380,7 @@ int crypto_init_cipher_ops(struct crypto_tfm *tfm)
 		BUG();
 	}
 	
-	if (alg->cra_cipher.cia_ivsize &&
-	    ops->cit_mode != CRYPTO_TFM_MODE_ECB) {
+	if (ops->cit_mode == CRYPTO_TFM_MODE_CBC) {
 	    	
 	    	switch (crypto_tfm_alg_blocksize(tfm)) {
 	    	case 8:
@@ -401,7 +399,8 @@ int crypto_init_cipher_ops(struct crypto_tfm *tfm)
 	    		goto out;
 	    	}
 	    	
-	    	ops->cit_iv = kmalloc(alg->cra_cipher.cia_ivsize, GFP_KERNEL);
+		ops->cit_ivsize = crypto_tfm_alg_blocksize(tfm);
+	    	ops->cit_iv = kmalloc(ops->cit_ivsize, GFP_KERNEL);
 		if (ops->cit_iv == NULL)
 			ret = -ENOMEM;
 	}

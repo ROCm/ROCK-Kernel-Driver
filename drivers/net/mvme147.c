@@ -199,7 +199,7 @@ void cleanup_module(void)
 		lp = root_m147lance_dev->next_module;
 		unregister_netdev(root_lance_dev->dev);
 		free_pages(lp->ram, 3);
-		kfree(root_lance_dev->dev);
+		free_netdev(root_lance_dev->dev);
 		root_lance_dev = lp;
 	}
 }

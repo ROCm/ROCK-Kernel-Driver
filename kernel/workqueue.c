@@ -176,7 +176,7 @@ static int worker_thread(void *__startup)
 	cwq->thread = current;
 
 	set_user_nice(current, -10);
-	set_cpus_allowed(current, 1UL << cpu);
+	set_cpus_allowed(current, cpumask_of_cpu(cpu));
 
 	complete(&startup->done);
 

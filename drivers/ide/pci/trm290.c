@@ -309,7 +309,7 @@ void __init init_hwif_trm290 (ide_hwif_t *hwif)
 	u8 reg = 0;
 	struct pci_dev *dev = hwif->pci_dev;
 
-	hwif->addressing = 1;
+	hwif->no_lba48 = 1;
 	hwif->chipset = ide_trm290;
 	cfgbase = pci_resource_start(dev, 4);
 	if ((dev->class & 5) && cfgbase) {

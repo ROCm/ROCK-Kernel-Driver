@@ -242,14 +242,14 @@ static struct pci_driver maestro_pci_driver;
 #define M_DEBUG 1
 
 #ifdef M_DEBUG
-static int debug=0;
+static int debug;
 #define M_printk(args...) {if (debug) printk(args);}
 #else
 #define M_printk(x)
 #endif
 
 /* we try to setup 2^(dsps_order) /dev/dsp devices */
-static int dsps_order=0;
+static int dsps_order;
 /* whether or not we mess around with power management */
 static int use_pm=2; /* set to 1 for force */
 /* clocking for broken hardware - a few laptops seem to use a 50Khz clock

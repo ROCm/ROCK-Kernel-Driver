@@ -59,8 +59,8 @@ sys_call_table:
 /*190*/	.long sys_init_module, sys_personality, sparc_remap_file_pages, sys_epoll_create, sys_epoll_ctl
 /*195*/	.long sys_epoll_wait, sys_nis_syscall, sys_getppid, sparc_sigaction, sys_sgetmask
 /*200*/	.long sys_ssetmask, sys_sigsuspend, sys_newlstat, sys_uselib, old_readdir
-/*205*/	.long sys_readahead, sys_socketcall, sys_syslog, sys_lookup_dcookie, sys_nis_syscall
-/*210*/	.long sys_nis_syscall, sys_nis_syscall, sys_waitpid, sys_swapoff, sys_sysinfo
+/*205*/	.long sys_readahead, sys_socketcall, sys_syslog, sys_lookup_dcookie, sys_fadvise64
+/*210*/	.long sys_fadvise64_64, sys_tgkill, sys_waitpid, sys_swapoff, sys_sysinfo
 /*215*/	.long sys_ipc, sys_sigreturn, sys_clone, sys_nis_syscall, sys_adjtimex
 /*220*/	.long sys_sigprocmask, sys_ni_syscall, sys_delete_module, sys_ni_syscall, sys_getpgid
 /*225*/	.long sys_bdflush, sys_sysfs, sys_nis_syscall, sys_setfsuid16, sys_setfsgid16
@@ -70,7 +70,9 @@ sys_call_table:
 /*240*/	.long sys_munlockall, sys_sched_setparam, sys_sched_getparam, sys_sched_setscheduler, sys_sched_getscheduler
 /*245*/	.long sys_sched_yield, sys_sched_get_priority_max, sys_sched_get_priority_min, sys_sched_rr_get_interval, sys_nanosleep
 /*250*/	.long sparc_mremap, sys_sysctl, sys_getsid, sys_fdatasync, sys_nfsservctl
-/*255*/	.long sys_nis_syscall, sys_nis_syscall
+/*255*/	.long sys_nis_syscall, sys_clock_settime, sys_clock_gettime, sys_clock_getres, sys_clock_nanosleep
+/*260*/	.long sys_sched_getaffinity, sys_sched_setaffinity, sys_timer_settime, sys_timer_gettime, sys_timer_getoverrun
+/*261*/	.long sys_timer_delete, sys_nis_syscall
 
 #ifdef CONFIG_SUNOS_EMUL
 	/* Now the SunOS syscall table. */
@@ -165,5 +167,10 @@ sunos_sys_table:
 	.long sunos_nosys, sunos_nosys
 /*250*/	.long sunos_nosys, sunos_nosys, sunos_nosys
 	.long sunos_nosys, sunos_nosys, sunos_nosys
+	.long sunos_nosys, sunos_nosys, sunos_nosys
+	.long sunos_nosys
+/*260*/	.long sunos_nosys, sunos_nosys, sunos_nosys
+	.long sunos_nosys, sunos_nosys, sunos_nosys
+	.long sunos_nosys
 
 #endif

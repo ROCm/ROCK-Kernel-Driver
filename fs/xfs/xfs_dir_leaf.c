@@ -560,14 +560,7 @@ xfs_dir_shortform_getdents(xfs_inode_t *dp, uio_t *uio, int *eofp,
 		 */
 		if (sbp->seqno == 0 || sbp == sbuf)
 			lastresid = uio->uio_resid;
-		/*
-		 * NOTE! Linux "filldir" semantics require that the
-		 *	 offset "cookie" be for this entry, not the
-		 *	 next; all the actual shuffling to make it
-		 *	 "look right" to the user is done in filldir.
-		 */
-		XFS_PUT_COOKIE(p.cook, mp, 0, sbp->seqno, sbp->hash);
-
+		XFS_PUT_COOKIE(p.cook, mp, 0, sbp[1].seqno, sbp[1].hash);
 #if XFS_BIG_FILESYSTEMS
 		p.ino = sbp->ino + mp->m_inoadd;
 #else
@@ -575,9 +568,7 @@ xfs_dir_shortform_getdents(xfs_inode_t *dp, uio_t *uio, int *eofp,
 #endif
 		p.name = sbp->name;
 		p.namelen = sbp->namelen;
-
 		retval = p.put(&p);
-
 		if (!p.done) {
 			uio->uio_offset =
 				XFS_DA_MAKE_COOKIE(mp, 0, 0, sbp->hash);
@@ -586,20 +577,12 @@ xfs_dir_shortform_getdents(xfs_inode_t *dp, uio_t *uio, int *eofp,
 			xfs_dir_trace_g_du("sf: E-O-B", dp, uio);
 			return retval;
 		}
-
 		sbp++;
 	}
-
 	kmem_free(sbuf, sbsize);
-
-	XFS_PUT_COOKIE(p.cook, mp, 0, 0, XFS_DA_MAXHASH);
-
 	uio->uio_offset = p.cook.o;
-
 	*eofp = 1;
-
 	xfs_dir_trace_g_du("sf: E-O-F", dp, uio);
-
 	return 0;
 }
 
@@ -2070,16 +2053,6 @@ xfs_dir_leaf_getdents_int(
 			return XFS_ERROR(EFSCORRUPTED);
 		}
 
-		thishash = INT_GET(entry->hashval, ARCH_CONVERT);
-
-		/*
-		 * NOTE! Linux "filldir" semantics require that the
-		 *	 offset "cookie" be for this entry, not the
-		 *	 next; all the actual shuffling to make it
-		 *	 "look right" to the user is done in filldir.
-		 */
-		XFS_PUT_COOKIE(p.cook, mp, bno, entno, thishash);
-
 		xfs_dir_trace_g_duc("leaf: middle cookie  ",
 						   dp, uio, p.cook.o);
 
@@ -2090,17 +2063,19 @@ xfs_dir_leaf_getdents_int(
 				nextentno = entno + 1;
 			else
 				nextentno = 0;
+			XFS_PUT_COOKIE(p.cook, mp, bno, nextentno, nexthash);
+			xfs_dir_trace_g_duc("leaf: middle cookie  ",
+						   dp, uio, p.cook.o);
 
-		} else if (INT_GET(leaf->hdr.info.forw, ARCH_CONVERT)) {
+		} else if ((thishash = INT_GET(leaf->hdr.info.forw,
+							ARCH_CONVERT))) {
 			xfs_dabuf_t *bp2;
 			xfs_dir_leafblock_t *leaf2;
 
 			ASSERT(nextda != -1);
 
-			retval = xfs_da_read_buf(dp->i_transp, dp,
-						 INT_GET(leaf->hdr.info.forw,
-						 ARCH_CONVERT), nextda,
-						 &bp2, XFS_DATA_FORK);
+			retval = xfs_da_read_buf(dp->i_transp, dp, thishash,
+						 nextda, &bp2, XFS_DATA_FORK);
 			if (retval)
 				return(retval);
 
@@ -2124,13 +2099,13 @@ xfs_dir_leaf_getdents_int(
 			nexthash = INT_GET(leaf2->entries[0].hashval,
 								ARCH_CONVERT);
 			nextentno = -1;
-
+			XFS_PUT_COOKIE(p.cook, mp, thishash, 0, nexthash);
 			xfs_da_brelse(dp->i_transp, bp2);
 			xfs_dir_trace_g_duc("leaf: next blk cookie",
 						   dp, uio, p.cook.o);
 		} else {
 			nextentno = -1;
-			nexthash  = XFS_DA_MAXHASH;
+			XFS_PUT_COOKIE(p.cook, mp, 0, 0, XFS_DA_MAXHASH);
 		}
 
 		/*
@@ -2147,7 +2122,8 @@ xfs_dir_leaf_getdents_int(
 		 * provided is big enough to handle it (see pv763517).
 		 */
 #if (BITS_PER_LONG == 32)
-		if (INT_GET(entry->hashval, ARCH_CONVERT) != lasthash) {
+		if ((thishash = INT_GET(entry->hashval, ARCH_CONVERT))
+								!= lasthash) {
 			XFS_PUT_COOKIE(lastoffset, mp, bno, entno, thishash);
 			lastresid = uio->uio_resid;
 			lasthash = thishash;
@@ -2156,6 +2132,7 @@ xfs_dir_leaf_getdents_int(
 						   dp, uio, p.cook.o);
 		}
 #else
+		thishash = INT_GET(entry->hashval, ARCH_CONVERT);
 		XFS_PUT_COOKIE(lastoffset, mp, bno, entno, thishash);
 		lastresid = uio->uio_resid;
 #endif /* BITS_PER_LONG == 32 */
@@ -2186,8 +2163,6 @@ xfs_dir_leaf_getdents_int(
 			return(retval);
 		}
 	}
-
-	XFS_PUT_COOKIE(p.cook, mp, 0, 0, nexthash);
 
 	uio->uio_offset = p.cook.o;
 

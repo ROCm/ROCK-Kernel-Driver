@@ -57,20 +57,10 @@
 #define SYM_CONF_DMA_ADDRESSING_MODE 2
 #endif
 
-#define LinuxVersionCode(v, p, s) (((v)<<16)+((p)<<8)+(s))
-#include <linux/version.h>
-#if	LINUX_VERSION_CODE < LinuxVersionCode(2, 2, 0)
-#error	"This driver requires a kernel version not lower than 2.2.0"
-#endif
-
 #include <asm/dma.h>
 #include <asm/io.h>
 #include <asm/system.h>
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,3,17)
 #include <linux/spinlock.h>
-#else
-#include <asm/spinlock.h>
-#endif
 #include <linux/delay.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
@@ -91,28 +81,10 @@
 #endif
 #include <linux/init.h>
 
-#ifndef	__init
-#define	__init
-#endif
-#ifndef	__initdata
-#define	__initdata
-#endif
-
 #include "../scsi.h"
 #include "../hosts.h"
 
 #include <linux/types.h>
-
-/*
- *  Define BITS_PER_LONG for earlier linux versions.
- */
-#ifndef	BITS_PER_LONG
-#if (~0UL) == 0xffffffffUL
-#define	BITS_PER_LONG	32
-#else
-#define	BITS_PER_LONG	64
-#endif
-#endif
 
 typedef	u_long	vm_offset_t;
 
@@ -139,9 +111,7 @@ typedef	u_long	vm_offset_t;
 /*
  * Configuration addendum for Linux.
  */
-#if	LINUX_VERSION_CODE >= LinuxVersionCode(2,3,47)
 #define	SYM_LINUX_DYNAMIC_DMA_MAPPING
-#endif
 
 #define	SYM_CONF_TIMER_INTERVAL		((HZ+1)/2)
 
@@ -472,9 +442,6 @@ struct sym_shcb {
 	u_long		lasttime;
 	u_long		settle_time;	/* Resetting the SCSI BUS	*/
 	u_char		settle_time_valid;
-#if LINUX_VERSION_CODE < LinuxVersionCode(2, 4, 0)
-	u_char		release_stage;	/* Synchronisation on release	*/
-#endif
 };
 
 /*
@@ -647,9 +614,7 @@ static __inline void sym_set_cam_result_ok(hcb_p np, ccb_p cp, int resid)
 {
 	Scsi_Cmnd *cmd = cp->cam_ccb;
 
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,3,99)
 	cmd->resid = resid;
-#endif
 	cmd->result = (((DID_OK) << 16) + ((cp->ssss_status) & 0x7f));
 }
 void sym_set_cam_result_error(hcb_p np, ccb_p cp, int resid);

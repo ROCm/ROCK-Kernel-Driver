@@ -22,9 +22,9 @@
 #include "gus.h"
 #include "gus_hw.h"
 
-static int      midi_busy = 0, input_opened = 0;
+static int      midi_busy, input_opened;
 static int      my_dev;
-static int      output_used = 0;
+static int      output_used;
 static volatile unsigned char gus_midi_control;
 static void     (*midi_input_intr) (int dev, unsigned char data);
 

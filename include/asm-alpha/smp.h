@@ -3,6 +3,7 @@
 
 #include <linux/config.h>
 #include <linux/threads.h>
+#include <linux/cpumask.h>
 #include <linux/bitops.h>
 #include <asm/pal.h>
 
@@ -44,27 +45,12 @@ extern struct cpuinfo_alpha cpu_data[NR_CPUS];
 #define hard_smp_processor_id()	__hard_smp_processor_id()
 #define smp_processor_id()	(current_thread_info()->cpu)
 
-extern unsigned long cpu_present_mask;
-extern volatile unsigned long cpu_online_map;
+extern cpumask_t cpu_present_mask;
+extern cpumask_t long cpu_online_map;
 extern int smp_num_cpus;
 
-#define cpu_possible(cpu)	(cpu_present_mask & (1UL << (cpu)))
-#define cpu_online(cpu)		(cpu_online_map & (1UL << (cpu)))
-
-static inline int
-num_online_cpus(void)
-{
-	return hweight64(cpu_online_map);
-}
-
-extern inline int
-any_online_cpu(unsigned int mask)
-{
-        if (mask & cpu_online_map)
-                return __ffs(mask & cpu_online_map);
-
-        return -1;
-}
+#define cpu_possible(cpu)	cpu_isset(cpu, cpu_present_mask)
+#define cpu_online(cpu)		cpu_isset(cpu, cpu_online_map)
 
 extern int smp_call_function_on_cpu(void (*func) (void *info), void *info,int retry, int wait, unsigned long cpu);
 

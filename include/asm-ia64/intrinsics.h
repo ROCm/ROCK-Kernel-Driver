@@ -8,7 +8,16 @@
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
+#ifndef __ASSEMBLY__
 #include <linux/config.h>
+
+/* include compiler specific intrinsics */
+#include <asm/ia64regs.h>
+#ifdef __INTEL_COMPILER
+# include <asm/intel_intrin.h>
+#else
+# include <asm/gcc_intrin.h>
+#endif
 
 /*
  * Force an unresolved reference if someone tries to use
@@ -21,13 +30,11 @@ extern unsigned long __bad_increment_for_ia64_fetch_and_add (void);
 ({										\
 	switch (sz) {								\
 	      case 4:								\
-		__asm__ __volatile__ ("fetchadd4."sem" %0=[%1],%2"		\
-				      : "=r"(tmp) : "r"(v), "i"(n) : "memory");	\
+	        tmp = ia64_fetchadd4_##sem((unsigned int *) v, n);		\
 		break;								\
 										\
 	      case 8:								\
-		__asm__ __volatile__ ("fetchadd8."sem" %0=[%1],%2"		\
-				      : "=r"(tmp) : "r"(v), "i"(n) : "memory");	\
+	        tmp = ia64_fetchadd8_##sem((unsigned long *) v, n);		\
 		break;								\
 										\
 	      default:								\
@@ -61,43 +68,39 @@ extern unsigned long __bad_increment_for_ia64_fetch_and_add (void);
 	(__typeof__(*(v))) (_tmp);	/* return old value */				\
 })
 
-#define ia64_fetch_and_add(i,v)	(ia64_fetchadd(i, v, "rel") + (i)) /* return new value */
+#define ia64_fetch_and_add(i,v)	(ia64_fetchadd(i, v, rel) + (i)) /* return new value */
 
 /*
  * This function doesn't exist, so you'll get a linker error if
  * something tries to do an invalid xchg().
  */
-extern void __xchg_called_with_bad_pointer (void);
+extern void ia64_xchg_called_with_bad_pointer (void);
 
-static __inline__ unsigned long
-__xchg (unsigned long x, volatile void *ptr, int size)
-{
-	unsigned long result;
-
-	switch (size) {
-	      case 1:
-		__asm__ __volatile ("xchg1 %0=[%1],%2" : "=r" (result)
-				    : "r" (ptr), "r" (x) : "memory");
-		return result;
-
-	      case 2:
-		__asm__ __volatile ("xchg2 %0=[%1],%2" : "=r" (result)
-				    : "r" (ptr), "r" (x) : "memory");
-		return result;
-
-	      case 4:
-		__asm__ __volatile ("xchg4 %0=[%1],%2" : "=r" (result)
-				    : "r" (ptr), "r" (x) : "memory");
-		return result;
-
-	      case 8:
-		__asm__ __volatile ("xchg8 %0=[%1],%2" : "=r" (result)
-				    : "r" (ptr), "r" (x) : "memory");
-		return result;
-	}
-	__xchg_called_with_bad_pointer();
-	return x;
-}
+#define __xchg(x,ptr,size)						\
+({									\
+	unsigned long __xchg_result;					\
+									\
+	switch (size) {							\
+	      case 1:							\
+		__xchg_result = ia64_xchg1((__u8 *)ptr, x);		\
+		break;							\
+									\
+	      case 2:							\
+		__xchg_result = ia64_xchg2((__u16 *)ptr, x);		\
+		break;							\
+									\
+	      case 4:							\
+		__xchg_result = ia64_xchg4((__u32 *)ptr, x);		\
+		break;							\
+									\
+	      case 8:							\
+		__xchg_result = ia64_xchg8((__u64 *)ptr, x);		\
+		break;							\
+	      default:							\
+		ia64_xchg_called_with_bad_pointer();			\
+	}								\
+	__xchg_result;							\
+})
 
 #define xchg(ptr,x)							     \
   ((__typeof__(*(ptr))) __xchg ((unsigned long) (x), (ptr), sizeof(*(ptr))))
@@ -114,12 +117,10 @@ __xchg (unsigned long x, volatile void *ptr, int size)
  * This function doesn't exist, so you'll get a linker error
  * if something tries to do an invalid cmpxchg().
  */
-extern long __cmpxchg_called_with_bad_pointer(void);
+extern long ia64_cmpxchg_called_with_bad_pointer (void);
 
 #define ia64_cmpxchg(sem,ptr,old,new,size)						\
 ({											\
-	__typeof__(ptr) _p_ = (ptr);							\
-	__typeof__(new) _n_ = (new);							\
 	__u64 _o_, _r_;									\
 											\
 	switch (size) {									\
@@ -129,37 +130,32 @@ extern long __cmpxchg_called_with_bad_pointer(void);
 	      case 8: _o_ = (__u64) (long) (old); break;				\
 	      default: break;								\
 	}										\
-	__asm__ __volatile__ ("mov ar.ccv=%0;;" :: "rO"(_o_));				\
 	switch (size) {									\
 	      case 1:									\
-		__asm__ __volatile__ ("cmpxchg1."sem" %0=[%1],%2,ar.ccv"		\
-				      : "=r"(_r_) : "r"(_p_), "r"(_n_) : "memory");	\
+	      	_r_ = ia64_cmpxchg1_##sem((__u8 *) ptr, new, _o_);			\
 		break;									\
 											\
 	      case 2:									\
-		__asm__ __volatile__ ("cmpxchg2."sem" %0=[%1],%2,ar.ccv"		\
-				      : "=r"(_r_) : "r"(_p_), "r"(_n_) : "memory");	\
+	       _r_ = ia64_cmpxchg2_##sem((__u16 *) ptr, new, _o_);			\
 		break;									\
 											\
 	      case 4:									\
-		__asm__ __volatile__ ("cmpxchg4."sem" %0=[%1],%2,ar.ccv"		\
-				      : "=r"(_r_) : "r"(_p_), "r"(_n_) : "memory");	\
+	      	_r_ = ia64_cmpxchg4_##sem((__u32 *) ptr, new, _o_);			\
 		break;									\
 											\
 	      case 8:									\
-		__asm__ __volatile__ ("cmpxchg8."sem" %0=[%1],%2,ar.ccv"		\
-				      : "=r"(_r_) : "r"(_p_), "r"(_n_) : "memory");	\
+		_r_ = ia64_cmpxchg8_##sem((__u64 *) ptr, new, _o_);			\
 		break;									\
 											\
 	      default:									\
-		_r_ = __cmpxchg_called_with_bad_pointer();				\
+		_r_ = ia64_cmpxchg_called_with_bad_pointer();				\
 		break;									\
 	}										\
 	(__typeof__(old)) _r_;								\
 })
 
-#define cmpxchg_acq(ptr,o,n)	ia64_cmpxchg("acq", (ptr), (o), (n), sizeof(*(ptr)))
-#define cmpxchg_rel(ptr,o,n)	ia64_cmpxchg("rel", (ptr), (o), (n), sizeof(*(ptr)))
+#define cmpxchg_acq(ptr,o,n)	ia64_cmpxchg(acq, (ptr), (o), (n), sizeof(*(ptr)))
+#define cmpxchg_rel(ptr,o,n)	ia64_cmpxchg(rel, (ptr), (o), (n), sizeof(*(ptr)))
 
 /* for compatibility with other platforms: */
 #define cmpxchg(ptr,o,n)	cmpxchg_acq(ptr,o,n)
@@ -171,7 +167,7 @@ extern long __cmpxchg_called_with_bad_pointer(void);
 	if (_cmpxchg_bugcheck_count-- <= 0) {					\
 		void *ip;							\
 		extern int printk(const char *fmt, ...);			\
-		asm ("mov %0=ip" : "=r"(ip));					\
+		ip = ia64_getreg(_IA64_REG_IP);					\
 		printk("CMPXCHG_BUGCHECK: stuck at %p on word %p\n", ip, (v));	\
 		break;								\
 	}									\
@@ -181,4 +177,5 @@ extern long __cmpxchg_called_with_bad_pointer(void);
 # define CMPXCHG_BUGCHECK(v)
 #endif /* !CONFIG_IA64_DEBUG_CMPXCHG */
 
+#endif
 #endif /* _ASM_IA64_INTRINSICS_H */

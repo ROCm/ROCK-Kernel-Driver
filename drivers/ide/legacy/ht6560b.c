@@ -330,7 +330,7 @@ void ht6560b_release (void)
 	release_region(HT_CONFIG_PORT, 1);
 }
 
-int __init ht6560b_mod_init(void)
+static int __init ht6560b_mod_init(void)
 {
 	int t;
 
@@ -391,7 +391,7 @@ MODULE_DESCRIPTION("HT-6560B EIDE-controller support");
 MODULE_LICENSE("GPL");
 
 #ifdef MODULE
-void __init ht6560b_mod_exit(void)
+static void __exit ht6560b_mod_exit(void)
 {
         ht6560b_release();
 }

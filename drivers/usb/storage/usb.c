@@ -921,9 +921,14 @@ static int storage_probe(struct usb_interface *intf,
 	if (us->protocol == US_PR_EUSB_SDDR09 ||
 			us->protocol == US_PR_DPCM_USB) {
 		/* set the configuration -- STALL is an acceptable response here */
-		result = usb_set_configuration(us->pusb_dev, 1);
+		if (us->pusb_dev->actconfig->desc.bConfigurationValue != 1) {
+			US_DEBUGP("active config #%d != 1 ??\n", us->pusb_dev
+				->actconfig->desc.bConfigurationValue);
+			goto BadDevice;
+		}
+		result = usb_reset_configuration(us->pusb_dev);
 
-		US_DEBUGP("Result from usb_set_configuration is %d\n", result);
+		US_DEBUGP("Result of usb_reset_configuration is %d\n", result);
 		if (result == -EPIPE) {
 			US_DEBUGP("-- stall on control interface\n");
 		} else if (result != 0) {
@@ -978,15 +983,8 @@ BadDevice:
 static void storage_disconnect(struct usb_interface *intf)
 {
 	struct us_data *us = usb_get_intfdata(intf);
-	struct scsi_device *sdev;
 
 	US_DEBUGP("storage_disconnect() called\n");
-
-	/* Set devices offline -- need host lock for this */
-	scsi_lock(us->host);
-	list_for_each_entry(sdev, &us->host->my_devices, siblings)
-		sdev->online = 0;
-	scsi_unlock(us->host);
 
 	/* Prevent new USB transfers and stop the current command */
 	set_bit(US_FLIDX_DISCONNECTING, &us->flags);
@@ -995,12 +993,7 @@ static void storage_disconnect(struct usb_interface *intf)
 	/* Dissociate from the USB device */
 	dissociate_dev(us);
 
-	/* Begin the SCSI host removal sequence */
-	if (scsi_remove_host(us->host)) {
-		US_DEBUGP("-- SCSI refused to remove the host\n");
-		BUG();
-		return;
-	}
+	scsi_remove_host(us->host);
 
 	/* TODO: somehow, wait for the device to
 	 * be 'idle' (tasklet completion) */

@@ -39,4 +39,4 @@ static union {
 	.thread_info =	INIT_THREAD_INFO(init_task_mem.s.task)
 }};
 
-asm (".global init_task; init_task = init_task_mem");
+extern struct task_struct init_task __attribute__ ((alias("init_task_mem")));

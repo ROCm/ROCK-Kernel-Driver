@@ -132,9 +132,9 @@ static int __init arcrimi_found(struct net_device *dev)
 	u_long first_mirror, last_mirror, shmem;
 	int mirror_size;
 
-	/* reserve the irq */  {
-		if (request_irq(dev->irq, &arcnet_interrupt, 0, "arcnet (RIM I)", dev))
-			BUGMSG(D_NORMAL, "Can't get IRQ %d!\n", dev->irq);
+	/* reserve the irq */
+	if (request_irq(dev->irq, &arcnet_interrupt, 0, "arcnet (RIM I)", dev)) {
+		BUGMSG(D_NORMAL, "Can't get IRQ %d!\n", dev->irq);
 		return -ENODEV;
 	}
 
@@ -345,7 +345,7 @@ void cleanup_module(void)
 	iounmap(lp->mem_start);
 	release_mem_region(dev->mem_start, dev->mem_end - dev->mem_start + 1);
 	kfree(dev->priv);
-	kfree(dev);
+	free_netdev(dev);
 }
 
 #else

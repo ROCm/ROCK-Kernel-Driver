@@ -489,7 +489,7 @@ repeat_lock_task:
 			 */
 			if (unlikely(sync && !task_running(rq, p) &&
 				(task_cpu(p) != smp_processor_id()) &&
-				(p->cpus_allowed & (1UL << smp_processor_id())))) {
+				cpu_isset(smp_processor_id(), p->cpus_allowed))) {
 
 				set_task_cpu(p, smp_processor_id());
 				task_rq_unlock(rq, &flags);
@@ -613,12 +613,29 @@ static inline void finish_task_switch(task_t *prev)
 {
 	runqueue_t *rq = this_rq();
 	struct mm_struct *mm = rq->prev_mm;
+	int drop_task_ref;
 
 	rq->prev_mm = NULL;
+
+	/*
+	 * A task struct has one reference for the use as "current".
+	 * If a task dies, then it sets TASK_ZOMBIE in tsk->state and calls
+	 * schedule one last time. The schedule call will never return,
+	 * and the scheduled task must drop that reference.
+	 * The test for TASK_ZOMBIE must occur while the runqueue locks are
+	 * still held, otherwise prev could be scheduled on another cpu, die
+	 * there before we look at prev->state, and then the reference would
+	 * be dropped twice.
+	 * 		Manfred Spraul <manfred@colorfullife.com>
+	 */
+	drop_task_ref = 0;
+	if (unlikely(prev->state & (TASK_DEAD | TASK_ZOMBIE)))
+		drop_task_ref = 1;
+
 	finish_arch_switch(rq, prev);
 	if (mm)
 		mmdrop(mm);
-	if (prev->state & (TASK_DEAD | TASK_ZOMBIE))
+	if (drop_task_ref)
 		put_task_struct(prev);
 }
 
@@ -758,13 +775,13 @@ static inline void double_rq_unlock(runqueue_t *rq1, runqueue_t *rq2)
  */
 static void sched_migrate_task(task_t *p, int dest_cpu)
 {
-	unsigned long old_mask;
+	cpumask_t old_mask;
 
 	old_mask = p->cpus_allowed;
-	if (!(old_mask & (1UL << dest_cpu)))
+	if (!cpu_isset(dest_cpu, old_mask))
 		return;
 	/* force the process onto the specified CPU */
-	set_cpus_allowed(p, 1UL << dest_cpu);
+	set_cpus_allowed(p, cpumask_of_cpu(dest_cpu));
 
 	/* restore the cpus allowed mask */
 	set_cpus_allowed(p, old_mask);
@@ -777,7 +794,7 @@ static void sched_migrate_task(task_t *p, int dest_cpu)
 static int sched_best_cpu(struct task_struct *p)
 {
 	int i, minload, load, best_cpu, node = 0;
-	unsigned long cpumask;
+	cpumask_t cpumask;
 
 	best_cpu = task_cpu(p);
 	if (cpu_rq(best_cpu)->nr_running <= 2)
@@ -801,7 +818,7 @@ static int sched_best_cpu(struct task_struct *p)
 	minload = 10000000;
 	cpumask = node_to_cpumask(node);
 	for (i = 0; i < NR_CPUS; ++i) {
-		if (!(cpumask & (1UL << i)))
+		if (!cpu_isset(i, cpumask))
 			continue;
 		if (cpu_rq(i)->nr_running < minload) {
 			best_cpu = i;
@@ -888,7 +905,7 @@ static inline unsigned int double_lock_balance(runqueue_t *this_rq,
 /*
  * find_busiest_queue - find the busiest runqueue among the cpus in cpumask.
  */
-static inline runqueue_t *find_busiest_queue(runqueue_t *this_rq, int this_cpu, int idle, int *imbalance, unsigned long cpumask)
+static inline runqueue_t *find_busiest_queue(runqueue_t *this_rq, int this_cpu, int idle, int *imbalance, cpumask_t cpumask)
 {
 	int nr_running, load, max_load, i;
 	runqueue_t *busiest, *rq_src;
@@ -923,7 +940,7 @@ static inline runqueue_t *find_busiest_queue(runqueue_t *this_rq, int this_cpu, 
 	busiest = NULL;
 	max_load = 1;
 	for (i = 0; i < NR_CPUS; i++) {
-		if (!((1UL << i) & cpumask))
+		if (!cpu_isset(i, cpumask))
 			continue;
 
 		rq_src = cpu_rq(i);
@@ -995,7 +1012,7 @@ static inline void pull_task(runqueue_t *src_rq, prio_array_t *src_array, task_t
  * We call this with the current runqueue locked,
  * irqs disabled.
  */
-static void load_balance(runqueue_t *this_rq, int idle, unsigned long cpumask)
+static void load_balance(runqueue_t *this_rq, int idle, cpumask_t cpumask)
 {
 	int imbalance, idx, this_cpu = smp_processor_id();
 	runqueue_t *busiest;
@@ -1049,7 +1066,7 @@ skip_queue:
 #define CAN_MIGRATE_TASK(p,rq,this_cpu)					\
 	((!idle || (jiffies - (p)->last_run > cache_decay_ticks)) &&	\
 		!task_running(rq, p) &&					\
-			((p)->cpus_allowed & (1UL << (this_cpu))))
+			cpu_isset(this_cpu, (p)->cpus_allowed))
 
 	curr = curr->prev;
 
@@ -1092,10 +1109,10 @@ out:
 static void balance_node(runqueue_t *this_rq, int idle, int this_cpu)
 {
 	int node = find_busiest_node(cpu_to_node(this_cpu));
-	unsigned long cpumask, this_cpumask = 1UL << this_cpu;
 
 	if (node >= 0) {
-		cpumask = node_to_cpumask(node) | this_cpumask;
+		cpumask_t cpumask = node_to_cpumask(node);
+		cpu_set(this_cpu, cpumask);
 		spin_lock(&this_rq->lock);
 		load_balance(this_rq, idle, cpumask);
 		spin_unlock(&this_rq->lock);
@@ -1184,11 +1201,17 @@ void scheduler_tick(int user_ticks, int sys_ticks)
 	if (rcu_pending(cpu))
 		rcu_check_callbacks(cpu, user_ticks);
 
+	/* note: this timer irq context must be accounted for as well */
+	if (hardirq_count() - HARDIRQ_OFFSET) {
+		cpustat->irq += sys_ticks;
+		sys_ticks = 0;
+	} else if (softirq_count()) {
+		cpustat->softirq += sys_ticks;
+		sys_ticks = 0;
+	}
+
 	if (p == rq->idle) {
-		/* note: this timer irq context must be accounted for as well */
-		if (irq_count() - HARDIRQ_OFFSET >= SOFTIRQ_OFFSET)
-			cpustat->system += sys_ticks;
-		else if (atomic_read(&rq->nr_iowait) > 0)
+		if (atomic_read(&rq->nr_iowait) > 0)
 			cpustat->iowait += sys_ticks;
 		else
 			cpustat->idle += sys_ticks;
@@ -1900,7 +1923,7 @@ out_unlock:
 asmlinkage long sys_sched_setaffinity(pid_t pid, unsigned int len,
 				      unsigned long __user *user_mask_ptr)
 {
-	unsigned long new_mask;
+	cpumask_t new_mask;
 	int retval;
 	task_t *p;
 
@@ -1948,7 +1971,7 @@ asmlinkage long sys_sched_getaffinity(pid_t pid, unsigned int len,
 				      unsigned long __user *user_mask_ptr)
 {
 	unsigned int real_len;
-	unsigned long mask;
+	cpumask_t mask;
 	int retval;
 	task_t *p;
 
@@ -1964,7 +1987,7 @@ asmlinkage long sys_sched_getaffinity(pid_t pid, unsigned int len,
 		goto out_unlock;
 
 	retval = 0;
-	mask = p->cpus_allowed & cpu_online_map;
+	cpus_and(mask, p->cpus_allowed, cpu_online_map);
 
 out_unlock:
 	read_unlock(&tasklist_lock);
@@ -2294,7 +2317,7 @@ typedef struct {
  * task must not exit() & deallocate itself prematurely.  The
  * call is not atomic; no spinlocks may be held.
  */
-int set_cpus_allowed(task_t *p, unsigned long new_mask)
+int set_cpus_allowed(task_t *p, cpumask_t new_mask)
 {
 	unsigned long flags;
 	migration_req_t req;
@@ -2309,7 +2332,7 @@ int set_cpus_allowed(task_t *p, unsigned long new_mask)
 	 * Can the task run on the task's current CPU? If not then
 	 * migrate the thread off to a proper CPU.
 	 */
-	if (new_mask & (1UL << task_cpu(p))) {
+	if (cpu_isset(task_cpu(p), new_mask)) {
 		task_rq_unlock(rq, &flags);
 		return 0;
 	}
@@ -2379,7 +2402,7 @@ static int migration_thread(void * data)
 	 * migration thread on this CPU, guaranteed (we're started
 	 * serially).
 	 */
-	set_cpus_allowed(current, 1UL << cpu);
+	set_cpus_allowed(current, cpumask_of_cpu(cpu));
 
 	ret = setscheduler(0, SCHED_FIFO, &param);
 

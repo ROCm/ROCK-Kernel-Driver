@@ -378,7 +378,7 @@ marvel_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 		       PCI_SLOT(dev->devfn), 
 		       PCI_FUNC(dev->devfn),
 		       hose->index,
-		       dev->dev.name);
+		       pci_pretty_name (dev));
 		printk("  %d message(s) from 0x%04x\n", 
 		       1 << ((msg_ctl & PCI_MSI_FLAGS_QSIZE) >> 4),
 		       msg_dat);

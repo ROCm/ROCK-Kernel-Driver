@@ -83,12 +83,6 @@ static const char *task_state[] = {
 
 static void irda_task_timer_expired(void *data);
 
-#ifdef CONFIG_PROC_FS
-int irda_device_proc_read(char *buf, char **start, off_t offset, int len,
-			  int unused);
-
-#endif /* CONFIG_PROC_FS */
-
 int __init irda_device_init( void)
 {
 	dongles = hashbin_new(HB_LOCK);
@@ -372,25 +366,18 @@ static void irda_task_timer_expired(void *data)
 	irda_task_kick(task);
 }
 
-static void irda_device_destructor(struct net_device *dev)
-{
-	kfree(dev);
-}
-
 /*
  * Function irda_device_setup (dev)
  *
  *    This function should be used by low level device drivers in a similar way
  *    as ether_setup() is used by normal network device drivers
  */
-int irda_device_setup(struct net_device *dev)
+void irda_device_setup(struct net_device *dev)
 {
-	ASSERT(dev != NULL, return -1;);
-
         dev->hard_header_len = 0;
         dev->addr_len        = 0;
 
-	dev->destructor      = irda_device_destructor;
+	dev->destructor      = free_netdev;
 
         dev->type            = ARPHRD_IRDA;
         dev->tx_queue_len    = 8; /* Window size + 1 s-frame */
@@ -399,7 +386,6 @@ int irda_device_setup(struct net_device *dev)
 
 	dev->mtu = 2048;
 	dev->flags = IFF_NOARP;
-	return 0;
 }
 
 /*

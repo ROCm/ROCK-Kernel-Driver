@@ -738,7 +738,6 @@ int isp2x00_detect(Scsi_Host_Template * tmpt)
 
 			if (!hostdata->res){
 			        printk("qlogicfc%d : could not allocate memory for request and response queue.\n", hosts);
-				pci_free_consistent(pdev, RES_SIZE + REQ_SIZE, hostdata->res, busaddr);
 			        scsi_unregister(host);
 				continue;
 			}
@@ -1283,8 +1282,7 @@ int isp2x00_queuecommand(Scsi_Cmnd * Cmnd, void (*done) (Scsi_Cmnd *))
 		}
 	} else if (Cmnd->request_bufflen && Cmnd->sc_data_direction != PCI_DMA_NONE) {
 		struct page *page = virt_to_page(Cmnd->request_buffer);
-		unsigned long offset = ((unsigned long)Cmnd->request_buffer &
-					~PAGE_MASK);
+		unsigned long offset = offset_in_page(Cmnd->request_buffer);
 		dma_addr_t busaddr = pci_map_page(hostdata->pci_dev,
 						  page, offset,
 						  Cmnd->request_bufflen,
@@ -1927,8 +1925,7 @@ static int isp2x00_reset_hardware(struct Scsi_Host *host)
 	 */
 	busaddr = pci_map_page(hostdata->pci_dev,
 			       virt_to_page(&hostdata->control_block),
-			       ((unsigned long) &hostdata->control_block &
-				~PAGE_MASK),
+			       offset_in_page(&hostdata->control_block),
 			       sizeof(hostdata->control_block),
 			       PCI_DMA_BIDIRECTIONAL);
 
@@ -2235,6 +2232,5 @@ static Scsi_Host_Template driver_template = {
         .sg_tablesize           = QLOGICFC_MAX_SG(QLOGICFC_REQ_QUEUE_LEN),
 	.cmd_per_lun		= QLOGICFC_CMD_PER_LUN,
         .use_clustering         = ENABLE_CLUSTERING,
-	.highmem_io		= 1,
 };
 #include "scsi_module.c"

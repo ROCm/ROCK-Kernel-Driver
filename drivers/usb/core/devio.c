@@ -762,9 +762,7 @@ static int proc_setconfig(struct dev_state *ps, void __user *arg)
 
 	if (get_user(u, (unsigned int __user *)arg))
 		return -EFAULT;
-	if (usb_set_configuration(ps->dev, u) < 0)
-		return -EINVAL;
-	return 0;
+	return usb_set_configuration(ps->dev, u);
 }
 
 static int proc_submiturb(struct dev_state *ps, void __user *arg)

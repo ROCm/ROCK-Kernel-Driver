@@ -308,6 +308,8 @@ static int sd_init_command(struct scsi_cmnd * SCpnt)
 		SCpnt->cmnd[4] = (unsigned char) this_count;
 		SCpnt->cmnd[5] = 0;
 	}
+	SCpnt->request_bufflen = SCpnt->bufflen =
+			this_count * sdp->sector_size;
 
 	/*
 	 * We shouldn't disconnect in the middle of a sector, so with a dumb
@@ -651,9 +653,11 @@ static void sd_rw_intr(struct scsi_cmnd * SCpnt)
 
 	/* An error occurred */
 	if (driver_byte(result) != 0 && 	/* An error occurred */
-	    SCpnt->sense_buffer[0] == 0xF0) {	/* Sense data is valid */
+	    (SCpnt->sense_buffer[0] & 0x7f) == 0x70) { /* Sense current */
 		switch (SCpnt->sense_buffer[2]) {
 		case MEDIUM_ERROR:
+			if (!(SCpnt->sense_buffer[0] & 0x80))
+				break;
 			error_sector = (SCpnt->sense_buffer[3] << 24) |
 			(SCpnt->sense_buffer[4] << 16) |
 			(SCpnt->sense_buffer[5] << 8) |
@@ -696,7 +700,7 @@ static void sd_rw_intr(struct scsi_cmnd * SCpnt)
 			 * hard error.
 			 */
 			print_sense("sd", SCpnt);
-			result = 0;
+			SCpnt->result = 0;
 			SCpnt->sense_buffer[0] = 0x0;
 			good_sectors = this_count;
 			break;
@@ -1351,9 +1355,13 @@ static int sd_remove(struct device *dev)
 static void sd_shutdown(struct device *dev)
 {
 	struct scsi_device *sdp = to_scsi_device(dev);
-	struct scsi_disk *sdkp = dev_get_drvdata(dev);
+       struct scsi_disk *sdkp;
 	struct scsi_request *sreq;
 	int retries, res;
+
+       sdkp = dev_get_drvdata(dev);
+       if (!sdkp)
+               return;         /* this can happen */
 
 	if (!sdp->online || !sdkp->WCE)
 		return;

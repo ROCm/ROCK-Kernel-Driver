@@ -22,6 +22,7 @@
 #endif
 
 static int force_probe = EISA_FORCE_PROBE_DEFAULT;
+static void virtual_eisa_release (struct device *);
 
 /* The default EISA device parent (virtual root device).
  * Now use a platform device, since that's the obvious choice. */
@@ -30,7 +31,7 @@ static struct platform_device eisa_root_dev = {
 	.name = "eisa",
 	.id   = 0,
 	.dev  = {
-		.name = "Virtual EISA Bridge",
+		.release = virtual_eisa_release,
 	},
 };
 
@@ -41,6 +42,11 @@ static struct eisa_root_device eisa_bus_root = {
 	.slots	       = EISA_MAX_SLOTS,
 	.dma_mask      = 0xffffffff,
 };
+
+static void virtual_eisa_release (struct device *dev)
+{
+	/* nothing really to do here */
+}
 
 static int virtual_eisa_root_init (void)
 {

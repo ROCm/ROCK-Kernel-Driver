@@ -252,13 +252,13 @@ int __devinit st5481_setup_usb(struct st5481_adapter *adapter)
 	
 	DBG(1,"");
 	
-	if ((status = usb_set_configuration (dev,dev->config[0].desc.bConfigurationValue)) < 0) {
-		WARN("set_configuration failed,status=%d",status);
+	if ((status = usb_reset_configuration (dev)) < 0) {
+		WARN("reset_configuration failed,status=%d",status);
 		return status;
 	}
 
 	
-	altsetting = &(dev->config->interface[0].altsetting[3]);	
+	altsetting = &(dev->config->interface[0]->altsetting[3]);	
 
 	// Check if the config is sane
 	if ( altsetting->desc.bNumEndpoints != 7 ) {

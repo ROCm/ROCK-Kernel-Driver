@@ -724,7 +724,7 @@ static void __init init_mmio_iops_siimage (ide_hwif_t *hwif)
 	}
 
 #ifdef SIIMAGE_BUFFERED_TASKFILE
-        hwif->addressing = 1;
+	hwif->no_lba48 = 1;
 #endif /* SIIMAGE_BUFFERED_TASKFILE */
 	hwif->irq			= hw.irq;
 	hwif->hwif_data			= pci_get_drvdata(hwif->pci_dev);

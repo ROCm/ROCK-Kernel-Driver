@@ -2,6 +2,10 @@
  * APIC driver for the IBM "Summit" chipset.
  */
 #define APIC_DEFINITION 1
+#include <linux/config.h>
+#include <linux/threads.h>
+#include <linux/cpumask.h>
+#include <asm/mpspec.h>
 #include <asm/genapic.h>
 #include <asm/fixmap.h>
 #include <asm/apicdef.h>

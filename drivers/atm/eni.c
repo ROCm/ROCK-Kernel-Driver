@@ -2019,8 +2019,7 @@ static int eni_change_qos(struct atm_vcc *vcc,struct atm_qos *qos,int flgs)
 	 * segmentation buffer descriptors of this VCC.
 	 */
 	tasklet_disable(&eni_dev->task);
-	for (skb = eni_dev->tx_queue.next; skb !=
-	    (struct sk_buff *) &eni_dev->tx_queue; skb = skb->next) {
+	skb_queue_walk(&eni_dev->tx_queue, skb) {
 		unsigned long dsc;
 
 		if (ATM_SKB(skb)->vcc != vcc) continue;
@@ -2122,15 +2121,6 @@ backlogged++;
 	tasklet_schedule(&ENI_DEV(vcc->dev)->task);
 	return 0;
 }
-
-
-static int eni_sg_send(struct atm_vcc *vcc,unsigned long start,
-    unsigned long size)
-{
-	return vcc->qos.aal == ATM_AAL5 && !((start | size) & 3);
-		/* don't tolerate misalignment */
-}
-
 
 static void eni_phy_put(struct atm_dev *dev,unsigned char value,
     unsigned long addr)
@@ -2270,7 +2260,6 @@ static const struct atmdev_ops ops = {
 	.getsockopt	= eni_getsockopt,
 	.setsockopt	= eni_setsockopt,
 	.send		= eni_send,
-	.sg_send	= eni_sg_send,
 	.phy_put	= eni_phy_put,
 	.phy_get	= eni_phy_get,
 	.change_qos	= eni_change_qos,

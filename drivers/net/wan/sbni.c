@@ -277,7 +277,7 @@ sbni_pci_probe( struct net_device  *dev )
 		pci_irq_line = pdev->irq;
 
 		/* Avoid already found cards from previous calls */
-		if( !pci_request_region( pci_ioaddr, SBNI_IO_EXTENT, dev->name ) ) {
+		if( !request_region( pci_ioaddr, SBNI_IO_EXTENT, dev->name ) ) {
 			pci_read_config_word( pdev, PCI_SUBSYSTEM_ID, &subsys );
 			if( subsys != 2  ||	/* Dual adapter is present */
 			    check_region( pci_ioaddr += 4, SBNI_IO_EXTENT ) )
@@ -1287,8 +1287,9 @@ sbni_ioctl( struct net_device  *dev,  struct ifreq  *ifr,  int  cmd )
 		error = verify_area( VERIFY_WRITE, ifr->ifr_data,
 				     sizeof(struct sbni_in_stats) );
 		if( !error )
-			copy_to_user( ifr->ifr_data, &nl->in_stats,
-				      sizeof(struct sbni_in_stats) );
+			if (copy_to_user( ifr->ifr_data, &nl->in_stats,
+				      sizeof(struct sbni_in_stats) ))
+				return -EFAULT;
 		break;
 
 	case  SIOCDEVRESINSTATS :
@@ -1307,7 +1308,8 @@ sbni_ioctl( struct net_device  *dev,  struct ifreq  *ifr,  int  cmd )
 		error = verify_area( VERIFY_WRITE, ifr->ifr_data,
 				     sizeof flags );
 		if( !error )
-			copy_to_user( ifr->ifr_data, &flags, sizeof flags );
+			if (copy_to_user( ifr->ifr_data, &flags, sizeof flags ))
+				return -EFAULT;
 		break;
 
 	case  SIOCDEVSHWSTATE :
@@ -1339,7 +1341,8 @@ sbni_ioctl( struct net_device  *dev,  struct ifreq  *ifr,  int  cmd )
 					  sizeof slave_name )) != 0 )
 			return  error;
 
-		copy_from_user( slave_name, ifr->ifr_data, sizeof slave_name );
+		if (copy_from_user( slave_name, ifr->ifr_data, sizeof slave_name ))
+			return -EFAULT;
 		slave_dev = dev_get_by_name( slave_name );
 		if( !slave_dev  ||  !(slave_dev->flags & IFF_UP) ) {
 			printk( KERN_ERR "%s: trying to enslave non-active "
@@ -1504,7 +1507,7 @@ cleanup_module( void )
 			unregister_netdev( dev );
 			release_region( dev->base_addr, SBNI_IO_EXTENT );
 			kfree( dev->priv );
-			kfree( dev );
+			free_netdev( dev );
 		}
 }
 

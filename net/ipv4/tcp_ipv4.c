@@ -1884,6 +1884,7 @@ static int tcp_v4_reselect_saddr(struct sock *sk)
 
 	__sk_dst_set(sk, &rt->u.dst);
 	tcp_v4_setup_caps(sk, &rt->u.dst);
+	tcp_sk(sk)->ext2_header_len = rt->u.dst.header_len;
 
 	new_saddr = rt->rt_src;
 
@@ -1943,6 +1944,7 @@ int tcp_v4_rebuild_header(struct sock *sk)
 	if (!err) {
 		__sk_dst_set(sk, &rt->u.dst);
 		tcp_v4_setup_caps(sk, &rt->u.dst);
+		tcp_sk(sk)->ext2_header_len = rt->u.dst.header_len;
 		return 0;
 	}
 

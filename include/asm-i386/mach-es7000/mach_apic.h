@@ -11,12 +11,12 @@ static inline int apic_id_registered(void)
 	        return (1);
 }
 
-static inline unsigned long target_cpus(void)
+static inline cpumask_t target_cpus(void)
 { 
 #if defined CONFIG_ES7000_CLUSTERED_APIC
-	return (0xff);
+	return CPU_MASK_ALL;
 #else
-	return (bios_cpu_apicid[smp_processor_id()]);
+	return cpumask_of_cpu(bios_cpu_apicid[smp_processor_id()]);
 #endif
 }
 #define TARGET_CPUS	(target_cpus())
@@ -40,13 +40,13 @@ static inline unsigned long target_cpus(void)
 
 #define APIC_BROADCAST_ID	(0xff)
 
-static inline unsigned long check_apicid_used(unsigned long bitmap, int apicid) 
+static inline unsigned long check_apicid_used(physid_mask_t bitmap, int apicid)
 { 
 	return 0;
 } 
 static inline unsigned long check_apicid_present(int bit) 
 {
-	return (phys_cpu_present_map & (1 << bit));
+	return physid_isset(bit, phys_cpu_present_map);
 }
 
 #define apicid_cluster(apicid) (apicid & 0xF0)
@@ -88,7 +88,7 @@ static inline void clustered_apic_check(void)
 	int apic = bios_cpu_apicid[smp_processor_id()];
 	printk("Enabling APIC mode:  %s.  Using %d I/O APICs, target cpus %lx\n",
 		(apic_version[apic] == 0x14) ? 
-		"Physical Cluster" : "Logical Cluster", nr_ioapics, TARGET_CPUS);
+		"Physical Cluster" : "Logical Cluster", nr_ioapics, cpus_coerce(TARGET_CPUS));
 }
 
 static inline int multi_timer_check(int apic, int irq)
@@ -106,24 +106,31 @@ static inline int cpu_present_to_apicid(int mps_cpu)
 {
 	if (!mps_cpu)
 		return boot_cpu_physical_apicid;
-	else
+	else if (mps_cpu < NR_CPUS)
 		return (int) bios_cpu_apicid[mps_cpu];
+	else
+		return BAD_APICID;
 }
 
-static inline unsigned long apicid_to_cpu_present(int phys_apicid)
+static inline physid_mask_t apicid_to_cpu_present(int phys_apicid)
 {
-	static int cpu = 0;
-	return (1ul << cpu++);
+	static int id = 0;
+	physid_mask_t mask;
+	mask = physid_mask_of_physid(id);
+	++id;
+	return mask;
 }
 
-extern volatile u8 cpu_2_logical_apicid[];
+extern u8 cpu_2_logical_apicid[];
 /* Mapping from cpu number to logical apicid */
 static inline int cpu_to_logical_apicid(int cpu)
 {
+       if (cpu >= NR_CPUS)
+	       return BAD_APICID;
        return (int)cpu_2_logical_apicid[cpu];
 }
 
-static inline int mpc_apic_id(struct mpc_config_processor *m, int quad)
+static inline int mpc_apic_id(struct mpc_config_processor *m, struct mpc_config_translation *unused)
 {
 	printk("Processor #%d %ld:%ld APIC version %d\n",
 	        m->mpc_apicid,
@@ -133,10 +140,10 @@ static inline int mpc_apic_id(struct mpc_config_processor *m, int quad)
 	return (m->mpc_apicid);
 }
 
-static inline ulong ioapic_phys_id_map(ulong phys_map)
+static inline physid_mask_t ioapic_phys_id_map(physid_mask_t phys_map)
 {
 	/* For clustered we don't have a good way to do this yet - hack */
-	return (0xff);
+	return physids_promote(0xff);
 }
 
 
@@ -151,32 +158,30 @@ static inline int check_phys_apicid_present(int cpu_physical_apicid)
 	return (1);
 }
 
-static inline unsigned int cpu_mask_to_apicid (unsigned long cpumask)
+static inline unsigned int cpu_mask_to_apicid(cpumask_const_t cpumask)
 {
 	int num_bits_set;
 	int cpus_found = 0;
 	int cpu;
 	int apicid;	
 
-	if (cpumask == TARGET_CPUS)
-		return cpumask;
-	num_bits_set = hweight32(cpumask); 
+	num_bits_set = cpus_weight_const(cpumask);
 	/* Return id to all */
-	if (num_bits_set == 32)
-		return TARGET_CPUS;
+	if (num_bits_set == NR_CPUS)
+		return 0xFF;
 	/* 
 	 * The cpus in the mask must all be on the apic cluster.  If are not 
 	 * on the same apicid cluster return default value of TARGET_CPUS. 
 	 */
-	cpu = ffs(cpumask)-1;
+	cpu = first_cpu_const(cpumask);
 	apicid = cpu_to_logical_apicid(cpu);
 	while (cpus_found < num_bits_set) {
-		if (cpumask & (1 << cpu)) {
+		if (cpu_isset_const(cpu, cpumask)) {
 			int new_apicid = cpu_to_logical_apicid(cpu);
 			if (apicid_cluster(apicid) != 
 					apicid_cluster(new_apicid)){
 				printk ("%s: Not a valid mask!\n",__FUNCTION__);
-				return TARGET_CPUS;
+				return 0xFF;
 			}
 			apicid = new_apicid;
 			cpus_found++;

@@ -31,6 +31,7 @@
 #include <asm/io.h>
 #include <mach_mpparse.h>
 
+#ifdef CONFIG_NUMA
 static void __init setup_pci_node_map_for_wpeg(int wpeg_num, struct rio_table_hdr *rth, 
 		struct scal_detail **scal_nodes, struct rio_detail **rio_nodes){
 	int twst_num = 0, node = 0, first_bus = 0;
@@ -93,15 +94,21 @@ static void __init setup_pci_node_map_for_wpeg(int wpeg_num, struct rio_table_hd
 		mp_bus_id_to_node[bus] = node;
 }
 
-static void __init build_detail_arrays(struct rio_table_hdr *rth,
+static int __init build_detail_arrays(struct rio_table_hdr *rth,
 		struct scal_detail **sd, struct rio_detail **rd){
 	unsigned long ptr;
 	int i, scal_detail_size, rio_detail_size;
 
+	if ((rth->num_scal_dev > MAX_NUMNODES) ||
+	    (rth->num_rio_dev > MAX_NUMNODES * 2)){
+		printk("%s: MAX_NUMNODES too low!  Defined as %d, but system has %d nodes.\n", __FUNCTION__, MAX_NUMNODES, rth->num_scal_dev);
+		return 1;
+	}
+
 	switch (rth->version){
 	default:
 		printk("%s: Bad Rio Grande Table Version: %d\n", __FUNCTION__, rth->version);
-		/* Fall through to default to version 2 spec */
+		return 1;
 	case 2:
 		scal_detail_size = 11;
 		rio_detail_size = 13;
@@ -119,6 +126,8 @@ static void __init build_detail_arrays(struct rio_table_hdr *rth,
 	ptr += scal_detail_size * rth->num_scal_dev;
 	for(i = 0; i < rth->num_rio_dev; i++)
 		rd[i] = (struct rio_detail *)(ptr + (rio_detail_size * i));
+
+	return 0;
 }
 
 void __init setup_summit(void)
@@ -152,11 +161,12 @@ void __init setup_summit(void)
 		return;
 	}
 
-	/* Deal with the ugly version 2/3 pointer arithmetic */
-	build_detail_arrays(rio_table_hdr, scal_devs, rio_devs);
+	if (build_detail_arrays(rio_table_hdr, scal_devs, rio_devs))
+		return;
 
 	for(i = 0; i < rio_table_hdr->num_rio_dev; i++)
 		if (is_WPEG(rio_devs[i]->type))
 			/* It's a Winnipeg, it's got PCI Busses */
 			setup_pci_node_map_for_wpeg(i, rio_table_hdr, scal_devs, rio_devs);
 }
+#endif /* CONFIG_NUMA */

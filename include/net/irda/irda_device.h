@@ -209,7 +209,7 @@ void irda_device_cleanup(void);
  * We declare them here to avoid the driver pulling a whole bunch stack
  * headers they don't really need - Jean II */
 struct irlap_cb *irlap_open(struct net_device *dev, struct qos_info *qos,
-			    char *	hw_name);
+			    const char *hw_name);
 void irlap_close(struct irlap_cb *self);
 
 /* Interface to be uses by IrLAP */
@@ -222,7 +222,7 @@ int  irda_device_txqueue_empty(struct net_device *dev);
 int  irda_device_set_raw_mode(struct net_device* self, int status);
 int  irda_device_set_dtr_rts(struct net_device *dev, int dtr, int rts);
 int  irda_device_change_speed(struct net_device *dev, __u32 speed);
-int  irda_device_setup(struct net_device *dev);
+void irda_device_setup(struct net_device *dev);
 
 /* Dongle interface */
 void irda_device_unregister_dongle(struct dongle_reg *dongle);

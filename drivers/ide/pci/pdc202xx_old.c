@@ -750,7 +750,7 @@ static void __init init_hwif_pdc202xx (ide_hwif_t *hwif)
 	hwif->quirkproc = &pdc202xx_quirkproc;
 
 	if (hwif->pci_dev->device == PCI_DEVICE_ID_PROMISE_20265)
-		hwif->addressing = (hwif->channel) ? 0 : 1;
+		hwif->no_lba48 = (hwif->channel) ? 0 : 1;
 
 	if (hwif->pci_dev->device != PCI_DEVICE_ID_PROMISE_20246) {
 		hwif->busproc   = &pdc202xx_tristate;

@@ -81,8 +81,7 @@ static void __devinit joydump_connect(struct gameport *gameport, struct gameport
 	t = 0;
 	i = 1;
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 
 	u = gameport_read(gameport);
 
@@ -103,7 +102,7 @@ static void __devinit joydump_connect(struct gameport *gameport, struct gameport
 		t++;
 	}
 
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 /*
  * Dump data.

@@ -144,34 +144,67 @@ static void internal_add_timer(tvec_base_t *base, struct timer_list *timer)
 	list_add_tail(&timer->entry, vec);
 }
 
-/***
- * add_timer - start a timer
- * @timer: the timer to be added
- *
- * The kernel will do a ->function(->data) callback from the
- * timer interrupt at the ->expired point in the future. The
- * current time is 'jiffies'.
- *
- * The timer's ->expired, ->function (and if the handler uses it, ->data)
- * fields must be set prior calling this function.
- *
- * Timers with an ->expired field in the past will be executed in the next
- * timer tick. It's illegal to add an already pending timer.
- */
-void add_timer(struct timer_list *timer)
+int __mod_timer(struct timer_list *timer, unsigned long expires)
 {
-	tvec_base_t *base = &get_cpu_var(tvec_bases);
-  	unsigned long flags;
-  
-  	BUG_ON(timer_pending(timer) || !timer->function);
+	tvec_base_t *old_base, *new_base;
+	unsigned long flags;
+	int ret = 0;
+
+	BUG_ON(!timer->function);
 
 	check_timer(timer);
 
-	spin_lock_irqsave(&base->lock, flags);
-	internal_add_timer(base, timer);
-	timer->base = base;
-	spin_unlock_irqrestore(&base->lock, flags);
-	put_cpu_var(tvec_bases);
+	spin_lock_irqsave(&timer->lock, flags);
+	new_base = &__get_cpu_var(tvec_bases);
+repeat:
+	old_base = timer->base;
+
+	/*
+	 * Prevent deadlocks via ordering by old_base < new_base.
+	 */
+	if (old_base && (new_base != old_base)) {
+		if (old_base < new_base) {
+			spin_lock(&new_base->lock);
+			spin_lock(&old_base->lock);
+		} else {
+			spin_lock(&old_base->lock);
+			spin_lock(&new_base->lock);
+		}
+		/*
+		 * The timer base might have been cancelled while we were
+		 * trying to take the lock(s):
+		 */
+		if (timer->base != old_base) {
+			spin_unlock(&new_base->lock);
+			spin_unlock(&old_base->lock);
+			goto repeat;
+		}
+	} else {
+		spin_lock(&new_base->lock);
+		if (timer->base != old_base) {
+			spin_unlock(&new_base->lock);
+			goto repeat;
+		}
+	}
+
+	/*
+	 * Delete the previous timeout (if there was any), and install
+	 * the new one:
+	 */
+	if (old_base) {
+		list_del(&timer->entry);
+		ret = 1;
+	}
+	timer->expires = expires;
+	internal_add_timer(new_base, timer);
+	timer->base = new_base;
+
+	if (old_base && (new_base != old_base))
+		spin_unlock(&old_base->lock);
+	spin_unlock(&new_base->lock);
+	spin_unlock_irqrestore(&timer->lock, flags);
+
+	return ret;
 }
 
 /***
@@ -179,7 +212,7 @@ void add_timer(struct timer_list *timer)
  * @timer: the timer to be added
  * @cpu: the CPU to start it on
  *
- * This is not very scalable on SMP.
+ * This is not very scalable on SMP. Double adds are not possible.
  */
 void add_timer_on(struct timer_list *timer, int cpu)
 {
@@ -217,10 +250,6 @@ void add_timer_on(struct timer_list *timer, int cpu)
  */
 int mod_timer(struct timer_list *timer, unsigned long expires)
 {
-	tvec_base_t *old_base, *new_base;
-	unsigned long flags;
-	int ret = 0;
-
 	BUG_ON(!timer->function);
 
 	check_timer(timer);
@@ -233,52 +262,7 @@ int mod_timer(struct timer_list *timer, unsigned long expires)
 	if (timer->expires == expires && timer_pending(timer))
 		return 1;
 
-	spin_lock_irqsave(&timer->lock, flags);
-	new_base = &__get_cpu_var(tvec_bases);
-repeat:
-	old_base = timer->base;
-
-	/*
-	 * Prevent deadlocks via ordering by old_base < new_base.
-	 */
-	if (old_base && (new_base != old_base)) {
-		if (old_base < new_base) {
-			spin_lock(&new_base->lock);
-			spin_lock(&old_base->lock);
-		} else {
-			spin_lock(&old_base->lock);
-			spin_lock(&new_base->lock);
-		}
-		/*
-		 * The timer base might have been cancelled while we were
-		 * trying to take the lock(s):
-		 */
-		if (timer->base != old_base) {
-			spin_unlock(&new_base->lock);
-			spin_unlock(&old_base->lock);
-			goto repeat;
-		}
-	} else
-		spin_lock(&new_base->lock);
-
-	/*
-	 * Delete the previous timeout (if there was any), and install
-	 * the new one:
-	 */
-	if (old_base) {
-		list_del(&timer->entry);
-		ret = 1;
-	}
-	timer->expires = expires;
-	internal_add_timer(new_base, timer);
-	timer->base = new_base;
-
-	if (old_base && (new_base != old_base))
-		spin_unlock(&old_base->lock);
-	spin_unlock(&new_base->lock);
-	spin_unlock_irqrestore(&timer->lock, flags);
-
-	return ret;
+	return __mod_timer(timer, expires);
 }
 
 /***
@@ -605,6 +589,15 @@ static void second_overflow(void)
 	time_adj -= (-time_adj >> 2) + (-time_adj >> 5);
     else
 	time_adj += (time_adj >> 2) + (time_adj >> 5);
+#endif
+#if HZ == 1000
+    /* Compensate for (HZ==1000) != (1 << SHIFT_HZ).
+     * Add 1.5625% and 0.78125% to get 1023.4375; => only 0.05% error (p. 14)
+     */
+    if (time_adj < 0)
+	time_adj -= (-time_adj >> 6) + (-time_adj >> 7);
+    else
+	time_adj += (time_adj >> 6) + (time_adj >> 7);
 #endif
 }
 

@@ -315,7 +315,7 @@ int __devinit xl_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	dev->irq=pdev->irq;
 	dev->base_addr=pci_resource_start(pdev,0) ; 
 	dev->init=NULL ; /* Must be null with new api, otherwise get called twice */
-	xl_priv->xl_card_name = (char *)pdev->dev.name ; 
+	xl_priv->xl_card_name = pci_name(pdev);
 	xl_priv->xl_mmio=ioremap(pci_resource_start(pdev,1), XL_IO_SPACE);
 	xl_priv->pdev = pdev ; 
 		
@@ -1787,7 +1787,7 @@ static void __devexit xl_remove_one (struct pci_dev *pdev)
 	iounmap(xl_priv->xl_mmio) ; 
 	pci_release_regions(pdev) ; 
 	pci_set_drvdata(pdev,NULL) ; 
-	kfree(dev);
+	free_netdev(dev);
 	return ; 
 }
 

@@ -2048,8 +2048,8 @@ static int reiserfs_write_full_page(struct page *page, struct writeback_control 
         last_offset = inode->i_size & (PAGE_CACHE_SIZE - 1) ;
 	/* no file contents in this page */
 	if (page->index >= end_index + 1 || !last_offset) {
-	    error =  -EIO ;
-	    goto fail ;
+	    error = 0 ;
+	    goto done ;
 	}
 	kaddr = kmap_atomic(page, KM_USER0);
 	memset(kaddr + last_offset, 0, PAGE_CACHE_SIZE-last_offset) ;
@@ -2236,6 +2236,10 @@ void sd_attrs_to_i_attrs( __u16 sd_attrs, struct inode *inode )
 			inode -> i_flags |= S_IMMUTABLE;
 		else
 			inode -> i_flags &= ~S_IMMUTABLE;
+		if( sd_attrs & REISERFS_APPEND_FL )
+			inode -> i_flags |= S_APPEND;
+		else
+			inode -> i_flags &= ~S_APPEND;
 		if( sd_attrs & REISERFS_NOATIME_FL )
 			inode -> i_flags |= S_NOATIME;
 		else

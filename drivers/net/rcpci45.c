@@ -146,7 +146,7 @@ rcpci45_remove_one (struct pci_dev *pdev)
 			     pDpa->msgbuf_dma);
 	if (pDpa->pPab)
 		kfree (pDpa->pPab);
-	kfree (dev);
+	free_netdev (dev);
 	pci_set_drvdata (pdev, NULL);
 }
 

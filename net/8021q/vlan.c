@@ -358,7 +358,7 @@ static void vlan_setup(struct net_device *new_dev)
 	new_dev->stop = vlan_dev_stop;
 	new_dev->set_mac_address = vlan_dev_set_mac_address;
 	new_dev->set_multicast_list = vlan_dev_set_multicast_list;
-	new_dev->destructor = (void (*)(struct net_device *)) kfree;
+	new_dev->destructor = free_netdev;
 }
 
 /*  Attach a VLAN device to a mac address (ie Ethernet Card).
@@ -547,7 +547,9 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 	    
 	grp->vlan_devices[VLAN_ID] = new_dev;
 
-	vlan_proc_add_dev(new_dev); /* create it's proc entry */
+	if (vlan_proc_add_dev(new_dev)<0)/* create it's proc entry */
+            	printk(KERN_WARNING "VLAN: failed to add proc entry for %s\n",
+					                 new_dev->name);
 
 	if (real_dev->features & NETIF_F_HW_VLAN_FILTER)
 		real_dev->vlan_rx_add_vid(real_dev, VLAN_ID);

@@ -96,7 +96,7 @@ typedef struct parport_info_t {
 static dev_link_t *parport_attach(void);
 static void parport_detach(dev_link_t *);
 static void parport_config(dev_link_t *link);
-static void parport_cs_release(u_long arg);
+static void parport_cs_release(dev_link_t *);
 static int parport_event(event_t event, int priority,
 			 event_callback_args_t *args);
 
@@ -126,9 +126,6 @@ static dev_link_t *parport_attach(void)
     memset(info, 0, sizeof(*info));
     link = &info->link; link->priv = info;
 
-    init_timer(&link->release);
-    link->release.function = &parport_cs_release;
-    link->release.data = (u_long)link;
     link->io.Attributes1 = IO_DATA_PATH_WIDTH_8;
     link->io.Attributes2 = IO_DATA_PATH_WIDTH_8;
     link->irq.Attributes = IRQ_TYPE_EXCLUSIVE;
@@ -186,9 +183,8 @@ static void parport_detach(dev_link_t *link)
     if (*linkp == NULL)
 	return;
 
-    del_timer(&link->release);
     if (link->state & DEV_CONFIG)
-	parport_cs_release((u_long)link);
+	parport_cs_release(link);
     
     if (link->handle) {
 	ret = CardServices(DeregisterClient, link->handle);
@@ -308,7 +304,7 @@ void parport_config(dev_link_t *link)
 cs_failed:
     cs_error(link->handle, last_fn, last_ret);
 failed:
-    parport_cs_release((u_long)link);
+    parport_cs_release(link);
     link->state &= ~DEV_CONFIG_PENDING;
 
 } /* parport_config */
@@ -321,9 +317,8 @@ failed:
     
 ======================================================================*/
 
-void parport_cs_release(u_long arg)
+void parport_cs_release(dev_link_t *link)
 {
-    dev_link_t *link = (dev_link_t *)arg;
     parport_info_t *info = link->priv;
     
     DEBUG(0, "parport_release(0x%p)\n", link);
@@ -366,7 +361,7 @@ int parport_event(event_t event, int priority,
     case CS_EVENT_CARD_REMOVAL:
 	link->state &= ~DEV_PRESENT;
 	if (link->state & DEV_CONFIG)
-	    mod_timer(&link->release, jiffies + HZ/20);
+		parport_cs_release(link);
 	break;
     case CS_EVENT_CARD_INSERTION:
 	link->state |= DEV_PRESENT | DEV_CONFIG_PENDING;

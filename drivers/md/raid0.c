@@ -113,6 +113,8 @@ static int create_strip_zones (mddev_t *mddev)
 			goto abort;
 		}
 		zone->dev[j] = rdev1;
+		blk_queue_stack_limits(mddev->queue,
+				       rdev1->bdev->bd_disk->queue);
 		if (!smallest || (rdev1->size <smallest->size))
 			smallest = rdev1;
 		cnt++;
@@ -293,7 +295,6 @@ static int raid0_run (mddev_t *mddev)
 		conf->hash_spacing++;
 	}
 
-	blk_queue_max_sectors(mddev->queue, mddev->chunk_size >> 9);
 	blk_queue_merge_bvec(mddev->queue, raid0_mergeable_bvec);
 	return 0;
 

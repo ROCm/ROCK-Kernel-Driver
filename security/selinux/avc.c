@@ -16,6 +16,7 @@
 #include <linux/slab.h>
 #include <linux/fs.h>
 #include <linux/dcache.h>
+#include <linux/init.h>
 #include <linux/skbuff.h>
 #include <net/sock.h>
 #include <linux/un.h>
@@ -506,6 +507,7 @@ void avc_audit(u32 ssid, u32 tsid,
 	struct inode *inode = NULL;
 	char *p;
 	u32 denied, audited;
+	unsigned long flags;
 
 	denied = requested & ~avd->allowed;
 	if (denied) {
@@ -524,7 +526,7 @@ void avc_audit(u32 ssid, u32 tsid,
 		return;
 
 	/* prevent overlapping printks */
-	spin_lock_irq(&avc_log_lock);
+	spin_lock_irqsave(&avc_log_lock,flags);
 
 	printk("%s\n", avc_level_string);
 	printk("%savc:  %s ", avc_level_string, denied ? "denied" : "granted");
@@ -673,7 +675,7 @@ void avc_audit(u32 ssid, u32 tsid,
 	avc_dump_query(ssid, tsid, tclass);
 	printk("\n");
 
-	spin_unlock_irq(&avc_log_lock);
+	spin_unlock_irqrestore(&avc_log_lock,flags);
 }
 
 /**

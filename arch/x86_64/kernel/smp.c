@@ -92,8 +92,9 @@ void send_IPI_self(int vector)
 	__send_IPI_shortcut(APIC_DEST_SELF, vector);
 }
 
-static inline void send_IPI_mask(int mask, int vector)
+static inline void send_IPI_mask(cpumask_t cpumask, int vector)
 {
+	unsigned long mask = cpus_coerce(cpumask);
 	unsigned long cfg;
 	unsigned long flags;
 
@@ -133,7 +134,7 @@ static inline void send_IPI_mask(int mask, int vector)
  *	Optimizations Manfred Spraul <manfred@colorfullife.com>
  */
 
-static volatile unsigned long flush_cpumask;
+static cpumask_t flush_cpumask;
 static struct mm_struct * flush_mm;
 static unsigned long flush_va;
 static spinlock_t tlbstate_lock = SPIN_LOCK_UNLOCKED;
@@ -203,7 +204,7 @@ asmlinkage void smp_invalidate_interrupt (void)
 
 	cpu = get_cpu();
 
-	if (!test_bit(cpu, &flush_cpumask))
+	if (!cpu_isset(cpu, flush_cpumask))
 		goto out;
 		/* 
 		 * This was a BUG() but until someone can quote me the
@@ -224,15 +225,16 @@ asmlinkage void smp_invalidate_interrupt (void)
 			leave_mm(cpu);
 	}
 	ack_APIC_irq();
-	clear_bit(cpu, &flush_cpumask);
+	cpu_clear(cpu, flush_cpumask);
 
 out:
 	put_cpu_no_resched();
 }
 
-static void flush_tlb_others (unsigned long cpumask, struct mm_struct *mm,
+static void flush_tlb_others(cpumask_t cpumask, struct mm_struct *mm,
 						unsigned long va)
 {
+	cpumask_t tmp;
 	/*
 	 * A couple of (to be removed) sanity checks:
 	 *
@@ -240,12 +242,10 @@ static void flush_tlb_others (unsigned long cpumask, struct mm_struct *mm,
 	 * - current CPU must not be in mask
 	 * - mask must exist :)
 	 */
-	if (!cpumask)
-		BUG();
-	if ((cpumask & cpu_online_map) != cpumask)
-		BUG();
-	if (cpumask & (1 << smp_processor_id()))
-		BUG();
+	BUG_ON(cpus_empty(cpumask));
+	cpus_and(tmp, cpumask, cpu_online_map);
+	BUG_ON(!cpus_equal(tmp, cpumask));
+	BUG_ON(cpu_isset(smp_processor_id(), cpumask));
 	if (!mm)
 		BUG();
 
@@ -259,15 +259,16 @@ static void flush_tlb_others (unsigned long cpumask, struct mm_struct *mm,
 	
 	flush_mm = mm;
 	flush_va = va;
-	atomic_set_mask(cpumask, &flush_cpumask);
+	cpus_or(flush_cpumask, cpumask, flush_cpumask);
+
 	/*
 	 * We have to send the IPI only to
 	 * CPUs affected.
 	 */
 	send_IPI_mask(cpumask, INVALIDATE_TLB_VECTOR);
 
-	while (flush_cpumask)
-		/* nothing. lockup detection does not belong here */;
+	while (!cpus_empty(flush_cpumask))
+		mb();	/* nothing. lockup detection does not belong here */;
 
 	flush_mm = NULL;
 	flush_va = 0;
@@ -277,23 +278,25 @@ static void flush_tlb_others (unsigned long cpumask, struct mm_struct *mm,
 void flush_tlb_current_task(void)
 {
 	struct mm_struct *mm = current->mm;
-	unsigned long cpu_mask;
+	cpumask_t cpu_mask;
 
 	preempt_disable();
-	cpu_mask = mm->cpu_vm_mask & ~(1UL << smp_processor_id());
+	cpu_mask = mm->cpu_vm_mask;
+	cpu_clear(smp_processor_id(), cpu_mask);
 
 	local_flush_tlb();
-	if (cpu_mask)
+	if (!cpus_empty(cpu_mask))
 		flush_tlb_others(cpu_mask, mm, FLUSH_ALL);
 	preempt_enable();
 }
 
 void flush_tlb_mm (struct mm_struct * mm)
 {
-	unsigned long cpu_mask;
+	cpumask_t cpu_mask;
 
 	preempt_disable();
-	cpu_mask = mm->cpu_vm_mask & ~(1UL << smp_processor_id());
+	cpu_mask = mm->cpu_vm_mask;
+	cpu_clear(smp_processor_id(), cpu_mask);
 
 	if (current->active_mm == mm) {
 		if (current->mm)
@@ -301,7 +304,7 @@ void flush_tlb_mm (struct mm_struct * mm)
 		else
 			leave_mm(smp_processor_id());
 	}
-	if (cpu_mask)
+	if (!cpus_empty(cpu_mask))
 		flush_tlb_others(cpu_mask, mm, FLUSH_ALL);
 
 	preempt_enable();
@@ -310,10 +313,11 @@ void flush_tlb_mm (struct mm_struct * mm)
 void flush_tlb_page(struct vm_area_struct * vma, unsigned long va)
 {
 	struct mm_struct *mm = vma->vm_mm;
-	unsigned long cpu_mask;
+	cpumask_t cpu_mask;
 
 	preempt_disable();
-	cpu_mask = mm->cpu_vm_mask & ~(1UL << smp_processor_id());
+	cpu_mask = mm->cpu_vm_mask;
+	cpu_clear(smp_processor_id(), cpu_mask);
 
 	if (current->active_mm == mm) {
 		if(current->mm)
@@ -322,7 +326,7 @@ void flush_tlb_page(struct vm_area_struct * vma, unsigned long va)
 		 	leave_mm(smp_processor_id());
 	}
 
-	if (cpu_mask)
+	if (!cpus_empty(cpu_mask))
 		flush_tlb_others(cpu_mask, mm, va);
 
 	preempt_enable();
@@ -355,7 +359,7 @@ void smp_kdb_stop(void)
 
 void smp_send_reschedule(int cpu)
 {
-	send_IPI_mask(1 << cpu, RESCHEDULE_VECTOR);
+	send_IPI_mask(cpumask_of_cpu(cpu), RESCHEDULE_VECTOR);
 }
 
 /*
@@ -430,7 +434,7 @@ void smp_stop_cpu(void)
 	/*
 	 * Remove this CPU:
 	 */
-	clear_bit(smp_processor_id(), &cpu_online_map);
+	cpu_clear(smp_processor_id(), cpu_online_map);
 	local_irq_disable();
 	disable_local_APIC();
 	local_irq_enable(); 
@@ -491,8 +495,8 @@ int slow_smp_processor_id(void)
 	unsigned long sp = (unsigned long)&stack_location; 
 	int offset = 0, cpu;
 
-	for (offset = 0; (cpu_online_map >> offset); offset = cpu + 1) { 
-		cpu = ffz(~(cpu_online_map >> offset));
+	for (offset = 0; next_cpu(offset, cpu_online_map) < NR_CPUS; offset = cpu + 1) {
+		cpu = next_cpu(offset, cpu_online_map);
 
 		if (sp >= (u64)cpu_pda[cpu].irqstackptr - IRQSTACKSIZE && 
 		    sp <= (u64)cpu_pda[cpu].irqstackptr)

@@ -1133,7 +1133,7 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	_prom->cpu = (int)(unsigned long)getprop_rval;
 	_xPaca[_prom->cpu].active = 1;
 #ifdef CONFIG_SMP
-	RELOC(cpu_online_map) = 1UL << _prom->cpu;
+	cpu_set(_prom->cpu, RELOC(cpu_online_map));
 #endif
 	RELOC(boot_cpuid) = _prom->cpu;
 

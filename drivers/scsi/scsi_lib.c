@@ -318,7 +318,8 @@ void scsi_device_unbusy(struct scsi_device *sdev)
 
 	spin_lock_irqsave(shost->host_lock, flags);
 	shost->host_busy--;
-	if (unlikely(shost->in_recovery && shost->host_failed))
+	if (unlikely(test_bit(SHOST_RECOVERY, &shost->shost_state) &&
+		     shost->host_failed))
 		scsi_eh_wakeup(shost);
 	spin_unlock(shost->host_lock);
 	spin_lock(&sdev->sdev_lock);
@@ -501,14 +502,22 @@ static struct scsi_cmnd *scsi_end_request(struct scsi_cmnd *cmd, int uptodate,
 	 * to queue the remainder of them.
 	 */
 	if (end_that_request_first(req, uptodate, sectors)) {
-		if (requeue) {
-			/*
-			 * Bleah.  Leftovers again.  Stick the leftovers in
-			 * the front of the queue, and goose the queue again.
-			 */
-			scsi_requeue_command(q, cmd);
+		int leftover = req->hard_nr_sectors - sectors;
+
+		/* kill remainder if no retrys */
+		if (!uptodate && blk_noretry_request(req))
+			end_that_request_first(req, 0, leftover);
+		else {
+			if (requeue)
+				/*
+				 * Bleah.  Leftovers again.  Stick the
+				 * leftovers in the front of the
+				 * queue, and goose the queue again.
+				 */
+				scsi_requeue_command(q, cmd);
+
+			return cmd;
 		}
-		return cmd;
 	}
 
 	add_disk_randomness(req->rq_disk);
@@ -1066,7 +1075,7 @@ static inline int scsi_host_queue_ready(struct request_queue *q,
 				   struct Scsi_Host *shost,
 				   struct scsi_device *sdev)
 {
-	if (shost->in_recovery)
+	if (test_bit(SHOST_RECOVERY, &shost->shost_state))
 		return 0;
 	if (shost->host_busy == 0 && shost->host_blocked) {
 		/*
@@ -1207,21 +1216,20 @@ static void scsi_request_fn(struct request_queue *q)
 
 u64 scsi_calculate_bounce_limit(struct Scsi_Host *shost)
 {
-	if (shost->highmem_io) {
-		struct device *host_dev = scsi_get_device(shost);
+	struct device *host_dev;
 
-		if (PCI_DMA_BUS_IS_PHYS && host_dev && host_dev->dma_mask)
-			return *host_dev->dma_mask;
-
-		/*
-		 * Platforms with virtual-DMA translation
- 		 * hardware have no practical limit.
-		 */
-		return BLK_BOUNCE_ANY;
-	} else if (shost->unchecked_isa_dma)
+	if (shost->unchecked_isa_dma)
 		return BLK_BOUNCE_ISA;
 
-	return BLK_BOUNCE_HIGH;
+	host_dev = scsi_get_device(shost);
+	if (PCI_DMA_BUS_IS_PHYS && host_dev && host_dev->dma_mask)
+		return *host_dev->dma_mask;
+
+	/*
+	 * Platforms with virtual-DMA translation
+	 * hardware have no practical limit.
+	 */
+	return BLK_BOUNCE_ANY;
 }
 
 struct request_queue *scsi_alloc_queue(struct scsi_device *sdev)
@@ -1239,6 +1247,7 @@ struct request_queue *scsi_alloc_queue(struct scsi_device *sdev)
 	blk_queue_max_phys_segments(q, MAX_PHYS_SEGMENTS);
 	blk_queue_max_sectors(q, shost->max_sectors);
 	blk_queue_bounce_limit(q, scsi_calculate_bounce_limit(shost));
+	blk_queue_segment_boundary(q, shost->dma_boundary);
 
 	if (!shost->use_clustering)
 		clear_bit(QUEUE_FLAG_CLUSTER, &q->queue_flags);

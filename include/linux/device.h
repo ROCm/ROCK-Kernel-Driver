@@ -19,6 +19,7 @@
 #include <linux/types.h>
 #include <linux/ioport.h>
 #include <linux/module.h>
+#include <linux/pm.h>
 #include <asm/semaphore.h>
 #include <asm/atomic.h>
 
@@ -41,13 +42,6 @@ enum {
 	RESUME_ENABLE,
 };
 
-enum device_state {
-	DEVICE_UNINITIALIZED	= 0,
-	DEVICE_INITIALIZED	= 1,
-	DEVICE_REGISTERED	= 2,
-	DEVICE_GONE		= 3,
-};
-
 struct device;
 struct device_driver;
 struct class;
@@ -64,8 +58,9 @@ struct bus_type {
 	struct device * (*add)	(struct device * parent, char * bus_id);
 	int		(*hotplug) (struct device *dev, char **envp, 
 				    int num_envp, char *buffer, int buffer_size);
+	int		(*suspend)(struct device * dev, u32 state);
+	int		(*resume)(struct device * dev);
 };
-
 
 extern int bus_register(struct bus_type * bus);
 extern void bus_unregister(struct bus_type * bus);
@@ -182,8 +177,8 @@ struct class_attribute class_attr_##_name = { 			\
 	.store	= _store,					\
 };
 
-extern int class_create_file(struct class *, struct class_attribute *);
-extern void class_remove_file(struct class *, struct class_attribute *);
+extern int class_create_file(struct class *, const struct class_attribute *);
+extern void class_remove_file(struct class *, const struct class_attribute *);
 
 
 struct class_device {
@@ -234,8 +229,10 @@ struct class_device_attribute class_device_attr_##_name = { 	\
 	.store	= _store,					\
 };
 
-extern int class_device_create_file(struct class_device *, struct class_device_attribute *);
-extern void class_device_remove_file(struct class_device *, struct class_device_attribute *);
+extern int class_device_create_file(struct class_device *, 
+				    const struct class_device_attribute *);
+extern void class_device_remove_file(struct class_device *, 
+				     const struct class_device_attribute *);
 
 
 struct class_interface {
@@ -258,7 +255,6 @@ struct device {
 	struct device 	* parent;
 
 	struct kobject kobj;
-	char	name[DEVICE_NAME_SIZE];	/* descriptive ascii string */
 	char	bus_id[BUS_ID_SIZE];	/* position on parent bus */
 
 	struct bus_type	* bus;		/* type of bus device is on */
@@ -267,13 +263,16 @@ struct device {
 	void		*driver_data;	/* data private to the driver */
 	void		*platform_data;	/* Platform specific data (e.g. ACPI,
 					   BIOS data relevant to device) */
-
+	struct dev_pm_info	power;
 	u32		power_state;	/* Current operating state. In
 					   ACPI-speak, this is D0-D3, D0
 					   being fully functional, and D3
 					   being off. */
 
 	unsigned char *saved_state;	/* saved device state */
+	u32		detach_state;	/* State to enter when device is
+					   detached from its driver. */
+
 	u64		*dma_mask;	/* dma mask (if dma'able device) */
 
 	void	(*release)(struct device * dev);
@@ -374,8 +373,6 @@ extern struct bus_type platform_bus_type;
 extern struct device legacy_bus;
 
 /* drivers/base/power.c */
-extern int device_suspend(u32 state, u32 level);
-extern void device_resume(u32 level);
 extern void device_shutdown(void);
 
 

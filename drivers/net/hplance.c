@@ -239,7 +239,7 @@ void cleanup_module(void)
                 lp = root_hplance_dev->next_module;
                 dio_unconfig_board(lp->scode);
                 unregister_netdev(root_lance_dev->dev);
-                kfree(root_lance_dev->dev);
+                free_netdev(root_lance_dev->dev);
                 root_lance_dev = lp;
         }
 }

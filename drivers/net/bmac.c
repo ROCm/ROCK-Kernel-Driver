@@ -1720,7 +1720,7 @@ static void __exit bmac_cleanup (void)
 		free_irq(bp->tx_dma_intr, dev);
 		free_irq(bp->rx_dma_intr, dev);
 
-		kfree(dev);
+		free_netdev(dev);
 	} while (bmac_devs != NULL);
 }
 

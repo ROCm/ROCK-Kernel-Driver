@@ -9,3 +9,4 @@ obj-y			:= core.o time.o
 obj-$(CONFIG_LEDS)	+= leds.o
 obj-$(CONFIG_PCI)	+= pci_v3.o pci.o
 obj-$(CONFIG_CPU_FREQ_INTEGRATOR)	+= cpu.o
+obj-$(CONFIG_INTEGRATOR_IMPD1)		+= impd1.o

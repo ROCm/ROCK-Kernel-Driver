@@ -83,6 +83,7 @@ config UNIX
 
 config NET_KEY
 	tristate "PF_KEY sockets"
+	select XFRM
 	---help---
 	  PF_KEYv2 socket family, compatible to KAME ones.
 	  They are required if you are going to use IPsec tools ported
@@ -661,6 +662,7 @@ menu "Network testing"
 
 config NET_PKTGEN
 	tristate "Packet Generator (USE WITH CAUTION)"
+	depends on PROC_FS
 	---help---
 	  This module will inject preconfigured packets, at a configurable
 	  rate, out of a given interface.  It is used for network interface

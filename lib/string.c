@@ -87,13 +87,12 @@ char * strncpy(char * dest,const char *src,size_t count)
 {
 	char *tmp = dest;
 
-	while (count && (*dest++ = *src++) != '\0')
-		count--;
 	while (count) {
-		*dest++ = 0;
+		if ((*tmp = *src) != 0) src++;
+		tmp++;
 		count--;
 	}
-	return tmp;
+	return dest;
 }
 #endif
 

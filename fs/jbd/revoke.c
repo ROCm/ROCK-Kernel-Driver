@@ -438,7 +438,7 @@ int journal_cancel_revoke(handle_t *handle, struct journal_head *jh)
 		record = find_revoke_record(journal, bh->b_blocknr);
 		if (record) {
 			jbd_debug(4, "cancelled existing revoke on "
-				  "blocknr %llu\n", (u64)bh->b_blocknr);
+				  "blocknr %llu\n", (unsigned long long)bh->b_blocknr);
 			spin_lock(&journal->j_revoke_lock);
 			list_del(&record->hash);
 			spin_unlock(&journal->j_revoke_lock);

@@ -921,7 +921,7 @@ static void __devexit ether3_remove(struct expansion_card *ec)
 
 	unregister_netdev(dev);
 	release_region(dev->base_addr, 128);
-	kfree(dev);
+	free_netdev(dev);
 }
 
 static const struct ecard_id ether3_ids[] = {

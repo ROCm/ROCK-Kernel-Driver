@@ -106,7 +106,11 @@ static int agp_find_max(void)
 {
 	long memory, index, result;
 
-	memory = (num_physpages << PAGE_SHIFT) >> 20;
+#if PAGE_SHIFT < 20
+	memory = num_physpages >> (20 - PAGE_SHIFT);
+#else
+	memory = num_physpages << (PAGE_SHIFT - 20);
+#endif
 	index = 1;
 
 	while ((memory > maxes_table[index].mem) && (index < 8))
@@ -297,12 +301,9 @@ void agp_remove_bridge(struct agp_bridge_data *bridge)
 }
 EXPORT_SYMBOL_GPL(agp_remove_bridge);
 
-int agp_off;
-EXPORT_SYMBOL(agp_off);
 
 static int __init agp_init(void)
 {
-	if (!agp_off) 
 	printk(KERN_INFO "Linux agpgart interface v%d.%d (c) Dave Jones\n",
 	       AGPGART_VERSION_MAJOR, AGPGART_VERSION_MINOR);
 	return 0;
@@ -312,13 +313,6 @@ void __exit agp_exit(void)
 {
 }
 
-static __init int agp_setup(char *s)
-{
-	if (!strcmp(s,"off"))
-		agp_off = 1;
-	return 1;	
-}
-__setup("agp=", agp_setup);
 
 MODULE_AUTHOR("Dave Jones <davej@codemonkey.org.uk>");
 MODULE_DESCRIPTION("AGP GART driver");

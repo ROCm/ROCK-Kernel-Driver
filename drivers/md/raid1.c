@@ -678,6 +678,8 @@ static int raid1_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 	for (mirror=0; mirror < mddev->raid_disks; mirror++)
 		if ( !(p=conf->mirrors+mirror)->rdev) {
 			p->rdev = rdev;
+			blk_queue_stack_limits(mddev->queue,
+					       rdev->bdev->bd_disk->queue);
 			p->head_position = 0;
 			rdev->raid_disk = mirror;
 			found = 1;
@@ -1076,6 +1078,8 @@ static int run(mddev_t *mddev)
 		disk = conf->mirrors + disk_idx;
 
 		disk->rdev = rdev;
+		blk_queue_stack_limits(mddev->queue,
+				       rdev->bdev->bd_disk->queue);
 		disk->head_position = 0;
 		if (!rdev->faulty && rdev->in_sync)
 			conf->working_disks++;

@@ -289,7 +289,7 @@ static void __devexit orinoco_pci_remove_one(struct pci_dev *pdev)
 		iounmap((unsigned char *) priv->hw.iobase);
 
 	pci_set_drvdata(pdev, NULL);
-	kfree(dev);
+	free_netdev(dev);
 
 	pci_disable_device(pdev);
 }

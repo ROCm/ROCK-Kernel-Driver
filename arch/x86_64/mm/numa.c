@@ -161,7 +161,6 @@ unsigned long __init numa_free_all_bootmem(void)
 	int i;
 	unsigned long pages = 0;
 	for_all_nodes(i) {
-		printk("freeing node %d\n", i);
 		pages += free_all_bootmem_node(NODE_DATA(i));
 	}
 	return pages;

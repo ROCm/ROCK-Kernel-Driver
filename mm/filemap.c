@@ -60,16 +60,25 @@
  *      ->swap_list_lock
  *        ->swap_device_lock	(exclusive_swap_page, others)
  *          ->mapping->page_lock
+ *
  *  ->mmap_sem
  *    ->i_shared_sem		(various places)
+ *
+ *  ->mmap_sem
+ *    ->lock_page		(access_process_vm)
+ *
+ *  ->mmap_sem
+ *    ->i_sem			(msync)
  *
  *  ->inode_lock
  *    ->sb_lock			(fs/fs-writeback.c)
  *    ->mapping->page_lock	(__sync_single_inode)
+ *
  *  ->page_table_lock
  *    ->swap_device_lock	(try_to_unmap_one)
  *    ->private_lock		(try_to_unmap_one)
  *    ->page_lock		(try_to_unmap_one)
+ *    ->zone.lru_lock		(follow_page->mark_page_accessed)
  */
 
 /*
@@ -197,6 +206,13 @@ restart:
 		spin_lock(&mapping->page_lock);
 	}
 	spin_unlock(&mapping->page_lock);
+
+	/* Check for outstanding write errors */
+	if (test_and_clear_bit(AS_ENOSPC, &mapping->flags))
+		ret = -ENOSPC;
+	if (test_and_clear_bit(AS_EIO, &mapping->flags))
+		ret = -EIO;
+
 	return ret;
 }
 
@@ -518,7 +534,7 @@ grab_cache_page_nowait(struct address_space *mapping, unsigned long index)
 		page_cache_release(page);
 		return NULL;
 	}
-	gfp_mask = mapping->gfp_mask & ~__GFP_FS;
+	gfp_mask = mapping_gfp_mask(mapping) & ~__GFP_FS;
 	page = alloc_pages(gfp_mask, 0);
 	if (page && add_to_page_cache_lru(page, mapping, index, gfp_mask)) {
 		page_cache_release(page);

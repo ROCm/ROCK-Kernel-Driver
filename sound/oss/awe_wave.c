@@ -21,12 +21,18 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+/*
+ * Changelog:
+ * Aug 18, 2003, Adam Belay <ambx1@neo.rr.com>
+ * - detection code rewrite
+ */
+
 #include <linux/awe_voice.h>
 #include <linux/config.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/string.h>
-#include <linux/isapnp.h>
+#include <linux/pnp.h>
 
 #include "sound_config.h"
 
@@ -99,9 +105,9 @@ struct _awe_sample_list {
 };
 
 /* sample and information table */
-static int current_sf_id = 0;	/* current number of fonts */
-static int locked_sf_id = 0;	/* locked position */
-static sf_list *sfhead = NULL, *sftail = NULL;	/* linked-lists */
+static int current_sf_id;	/* current number of fonts */
+static int locked_sf_id;	/* locked position */
+static sf_list *sfhead, *sftail;	/* linked-lists */
 
 #define awe_free_mem_ptr() (sftail ? sftail->mem_ptr : 0)
 #define awe_free_info() (sftail ? sftail->num_info : 0)
@@ -203,10 +209,10 @@ static awe_chan_info channels[AWE_MAX_CHANNELS];
 
 int io = AWE_DEFAULT_BASE_ADDR; /* Emu8000 base address */
 int memsize = AWE_DEFAULT_MEM_SIZE; /* memory size in Kbytes */
-#ifdef __ISAPNP__
+#ifdef CONFIG_PNP
 static int isapnp = -1;
 #else
-static int isapnp = 0;
+static int isapnp;
 #endif
 
 MODULE_AUTHOR("Takashi Iwai <iwai@ww.uni-erlangen.de>");
@@ -226,15 +232,15 @@ static int awe_mem_start = AWE_DRAM_OFFSET;
 /* maximum channels for playing */
 static int awe_max_voices = AWE_MAX_VOICES;
 
-static int patch_opened = 0;		/* sample already loaded? */
+static int patch_opened;		/* sample already loaded? */
 
 static char atten_relative = FALSE;
-static short atten_offset = 0;
+static short atten_offset;
 
 static int awe_present = FALSE;		/* awe device present? */
 static int awe_busy = FALSE;		/* awe device opened? */
 
-static int my_dev = -1;			
+static int my_dev = -1;
 
 #define DEFAULT_DRUM_FLAGS	((1 << 9) | (1 << 25))
 #define IS_DRUM_CHANNEL(c)	(drum_flags & (1 << (c)))
@@ -246,7 +252,7 @@ static int playing_mode = AWE_PLAY_INDIRECT;
 #define SINGLE_LAYER_MODE()	(playing_mode == AWE_PLAY_INDIRECT || playing_mode == AWE_PLAY_DIRECT)
 #define MULTI_LAYER_MODE()	(playing_mode == AWE_PLAY_MULTI || playing_mode == AWE_PLAY_MULTI2)
 
-static int current_alloc_time = 0;	/* voice allocation index for channel mode */
+static int current_alloc_time;  	/* voice allocation index for channel mode */
 
 static struct synth_info awe_info = {
 	"AWE32 Synth",		/* name */
@@ -280,8 +286,6 @@ static unsigned int awe_peek_dw(unsigned short cmd, unsigned short port);
 static void awe_wait(unsigned short delay);
 
 /* initialize emu8000 chip */
-static int _attach_awe(void);
-static void _unload_awe(void);
 static void awe_initialize(void);
 
 /* set voice parameters */
@@ -517,64 +521,6 @@ static struct synth_operations awe_operations =
 	.setup_voice	= awe_setup_voice
 };
 
-
-/*
- * General attach / unload interface
- */
-
-static int __init _attach_awe(void)
-{
-	if (awe_present) return 0; /* for OSS38.. called twice? */
-
-	/* check presence of AWE32 card */
-	if (! awe_detect()) {
-		printk(KERN_ERR "AWE32: not detected\n");
-		return 0;
-	}
-
-	/* reserve I/O ports for awedrv */
-	if (! awe_request_region()) {
-		printk(KERN_ERR "AWE32: I/O area already used.\n");
-		return 0;
-	}
-
-	/* set buffers to NULL */
-	sfhead = sftail = NULL;
-
-	my_dev = sound_alloc_synthdev();
-	if (my_dev == -1) {
-		printk(KERN_ERR "AWE32 Error: too many synthesizers\n");
-		awe_release_region();
-		return 0;
-	}
-
-	voice_alloc = &awe_operations.alloc;
-	voice_alloc->max_voice = awe_max_voices;
-	synth_devs[my_dev] = &awe_operations;
-
-#ifdef CONFIG_AWE32_MIXER
-	attach_mixer();
-#endif
-#ifdef CONFIG_AWE32_MIDIEMU
-	attach_midiemu();
-#endif
-
-	/* clear all samples */
-	awe_reset_samples();
-
-	/* initialize AWE32 hardware */
-	awe_initialize();
-
-	sprintf(awe_info.name, "AWE32-%s (RAM%dk)",
-		AWEDRV_VERSION, memsize/1024);
-	printk(KERN_INFO "<SoundBlaster EMU8000 (RAM%dk)>\n", memsize/1024);
-
-	awe_present = TRUE;
-
-	return 1;
-}
-
-
 static void free_tables(void)
 {
 	if (sftail) {
@@ -586,25 +532,6 @@ static void free_tables(void)
 	}
 	sfhead = sftail = NULL;
 }
-
-
-static void __exit _unload_awe(void)
-{
-	if (awe_present) {
-		awe_reset_samples();
-		awe_release_region();
-		free_tables();
-#ifdef CONFIG_AWE32_MIXER
-		unload_mixer();
-#endif
-#ifdef CONFIG_AWE32_MIDIEMU
-		unload_midiemu();
-#endif
-		sound_unload_synthdev(my_dev);
-		awe_present = FALSE;
-	}
-}
-
 
 /*
  * clear sample tables 
@@ -633,22 +560,6 @@ static int port_setuped = FALSE;
 static int awe_cur_cmd = -1;
 #define awe_set_cmd(cmd) \
 if (awe_cur_cmd != cmd) { outw(cmd, awe_ports[Pointer]); awe_cur_cmd = cmd; }
-
-/* store values to i/o port array */
-static void setup_ports(int port1, int port2, int port3)
-{
-	awe_ports[0] = port1;
-	if (port2 == 0)
-		port2 = port1 + 0x400;
-	awe_ports[1] = port2;
-	awe_ports[2] = port2 + 2;
-	if (port3 == 0)
-		port3 = port1 + 0x800;
-	awe_ports[3] = port3;
-	awe_ports[4] = port3 + 2;
-
-	port_setuped = TRUE;
-}
 
 /* write 16bit data */
 static void
@@ -731,90 +642,6 @@ static void awe_wait(unsigned short delay)
 
 /* write a word data */
 #define awe_write_dram(c)	awe_poke(AWE_SMLD, c)
-
-
-/*
- * port request
- *  0x620-623, 0xA20-A23, 0xE20-E23
- */
-
-static int __init
-awe_request_region(void)
-{
-	if (! port_setuped) 
-		return 0;
-	if (! request_region(awe_ports[0], 4, "sound driver (AWE32)"))
-		return 0;
-	if (! request_region(awe_ports[1], 4, "sound driver (AWE32)")) 
-		goto err_out;
-	if (! request_region(awe_ports[3], 4, "sound driver (AWE32)"))
-		goto err_out1;
-	return 1;
-err_out1:
-	release_region(awe_ports[1], 4);	  
-err_out:
-	release_region(awe_ports[0], 4);	  
-	return 0;
-}
-
-static void
-awe_release_region(void)
-{
-	if (! port_setuped) return;
-	release_region(awe_ports[0], 4);
-	release_region(awe_ports[1], 4);
-	release_region(awe_ports[3], 4);
-}
-
-
-/*
- * initialization of AWE driver
- */
-
-static void
-awe_initialize(void)
-{
-	DEBUG(0,printk("AWE32: initializing..\n"));
-
-	/* initialize hardware configuration */
-	awe_poke(AWE_HWCF1, 0x0059);
-	awe_poke(AWE_HWCF2, 0x0020);
-
-	/* disable audio; this seems to reduce a clicking noise a bit.. */
-	awe_poke(AWE_HWCF3, 0);
-
-	/* initialize audio channels */
-	awe_init_audio();
-
-	/* initialize DMA */
-	awe_init_dma();
-
-	/* initialize init array */
-	awe_init_array();
-
-	/* check DRAM memory size */
-	awe_check_dram();
-
-	/* initialize the FM section of the AWE32 */
-	awe_init_fm();
-
-	/* set up voice envelopes */
-	awe_tweak();
-
-	/* enable audio */
-	awe_poke(AWE_HWCF3, 0x0004);
-
-	/* set default values */
-	awe_init_ctrl_parms(TRUE);
-
-	/* set equalizer */
-	awe_update_equalizer();
-
-	/* set reverb & chorus modes */
-	awe_update_reverb_mode();
-	awe_update_chorus_mode();
-}
-
 
 /*
  * AWE32 voice parameters
@@ -4754,122 +4581,6 @@ awe_close_dram(void)
 
 
 /*
- * detect presence of AWE32 and check memory size
- */
-
-/* detect emu8000 chip on the specified address; from VV's guide */
-
-static int __init
-awe_detect_base(int addr)
-{
-	setup_ports(addr, 0, 0);
-	if ((awe_peek(AWE_U1) & 0x000F) != 0x000C)
-		return 0;
-	if ((awe_peek(AWE_HWCF1) & 0x007E) != 0x0058)
-		return 0;
-	if ((awe_peek(AWE_HWCF2) & 0x0003) != 0x0003)
-		return 0;
-        DEBUG(0,printk("AWE32 found at %x\n", addr));
-	return 1;
-}
-	
-#ifdef __ISAPNP__
-static struct {
-	unsigned short card_vendor, card_device;
-	unsigned short vendor;
-	unsigned short function;
-	char *name;
-} isapnp_awe_list[] __initdata = {
-	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
-		ISAPNP_VENDOR('C','T','L'), ISAPNP_FUNCTION(0x0021),
-		"AWE32 WaveTable" },
-	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
-		ISAPNP_VENDOR('C','T','L'), ISAPNP_FUNCTION(0x0022),
-		"AWE64 WaveTable" },
-	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
-		ISAPNP_VENDOR('C','T','L'), ISAPNP_FUNCTION(0x0023),
-		"AWE64 Gold WaveTable" },
-	{0}
-};
-
-MODULE_DEVICE_TABLE(isapnp, isapnp_awe_list);
-
-static struct pci_dev *idev = NULL;
-
-static int __init awe_probe_isapnp(int *port)
-{
-	int i;
-
-	for (i = 0; isapnp_awe_list[i].vendor != 0; i++) {
-		while ((idev = isapnp_find_dev(NULL,
-		                               isapnp_awe_list[i].vendor,
-		                               isapnp_awe_list[i].function,
-		                               idev))) {
-			if (idev->prepare(idev) < 0)
-				continue;
-			if (idev->activate(idev) < 0 ||
-			    !idev->resource[0].start) {
-				idev->deactivate(idev);
-				idev->deactivate(idev);
-				continue;
-			}
-			*port = idev->resource[0].start;
-			break;
-		}
-		if (!idev)
-			continue;
-		printk(KERN_INFO "ISAPnP reports %s at i/o %#x\n",
-		       isapnp_awe_list[i].name, *port);
-		return 0;
-	}
-	return -ENODEV;
-}
-
-static void __exit awe_deactivate_isapnp(void)
-{
-#if 1
-	if (idev) {
-		idev->deactivate(idev);
-		idev = NULL;
-	}
-#endif
-}
-
-#endif
-
-static int __init
-awe_detect(void)
-{
-	int base;
-
-#ifdef __ISAPNP__
-	if (isapnp) {
-		if (awe_probe_isapnp(&io) < 0) {
-			printk(KERN_ERR "AWE32: No ISAPnP cards found\n");
-			if (isapnp != -1)
-			  return 0;
-		} else {
-			setup_ports(io, 0, 0);
-			return 1;
-		}
-	}
-#endif /* isapnp */
-
-	if (io) /* use default i/o port value */
-		setup_ports(io, 0, 0);
-	else { /* probe it */
-		for (base = 0x620; base <= 0x680; base += 0x20)
-			if (awe_detect_base(base))
-				return 1;
-		DEBUG(0,printk("AWE32 not found\n"));
-		return 0;
-	}
-
-	return 1;
-}
-
-
-/*
  * check dram size on AWE board
  */
 
@@ -5271,10 +4982,10 @@ static void __exit unload_midiemu(void)
 static int midi_opened = FALSE;
 
 static int midi_mode;
-static int coarsetune = 0, finetune = 0;
+static int coarsetune, finetune;
 
 static int xg_mapping = TRUE;
-static int xg_bankmode = 0;
+static int xg_bankmode;
 
 /* effect sensitivity */
 
@@ -6121,22 +5832,296 @@ static int xg_control_change(MidiStatus *st, int cmd, int val)
 
 /*----------------------------------------------------------------*/
 
+
+/*
+ * initialization of AWE driver
+ */
+
+static void
+awe_initialize(void)
+{
+	DEBUG(0,printk("AWE32: initializing..\n"));
+
+	/* initialize hardware configuration */
+	awe_poke(AWE_HWCF1, 0x0059);
+	awe_poke(AWE_HWCF2, 0x0020);
+
+	/* disable audio; this seems to reduce a clicking noise a bit.. */
+	awe_poke(AWE_HWCF3, 0);
+
+	/* initialize audio channels */
+	awe_init_audio();
+
+	/* initialize DMA */
+	awe_init_dma();
+
+	/* initialize init array */
+	awe_init_array();
+
+	/* check DRAM memory size */
+	awe_check_dram();
+
+	/* initialize the FM section of the AWE32 */
+	awe_init_fm();
+
+	/* set up voice envelopes */
+	awe_tweak();
+
+	/* enable audio */
+	awe_poke(AWE_HWCF3, 0x0004);
+
+	/* set default values */
+	awe_init_ctrl_parms(TRUE);
+
+	/* set equalizer */
+	awe_update_equalizer();
+
+	/* set reverb & chorus modes */
+	awe_update_reverb_mode();
+	awe_update_chorus_mode();
+}
+
+
+/*
+ * Core Device Management Functions
+ */
+
+/* store values to i/o port array */
+static void setup_ports(int port1, int port2, int port3)
+{
+	awe_ports[0] = port1;
+	if (port2 == 0)
+		port2 = port1 + 0x400;
+	awe_ports[1] = port2;
+	awe_ports[2] = port2 + 2;
+	if (port3 == 0)
+		port3 = port1 + 0x800;
+	awe_ports[3] = port3;
+	awe_ports[4] = port3 + 2;
+
+	port_setuped = TRUE;
+}
+
+/*
+ * port request
+ *  0x620-623, 0xA20-A23, 0xE20-E23
+ */
+
+static int
+awe_request_region(void)
+{
+	if (! port_setuped)
+		return 0;
+	if (! request_region(awe_ports[0], 4, "sound driver (AWE32)"))
+		return 0;
+	if (! request_region(awe_ports[1], 4, "sound driver (AWE32)"))
+		goto err_out;
+	if (! request_region(awe_ports[3], 4, "sound driver (AWE32)"))
+		goto err_out1;
+	return 1;
+err_out1:
+	release_region(awe_ports[1], 4);
+err_out:
+	release_region(awe_ports[0], 4);
+	return 0;
+}
+
+static void
+awe_release_region(void)
+{
+	if (! port_setuped) return;
+	release_region(awe_ports[0], 4);
+	release_region(awe_ports[1], 4);
+	release_region(awe_ports[3], 4);
+}
+
+static int awe_attach_device(void)
+{
+	if (awe_present) return 0; /* for OSS38.. called twice? */
+
+	/* reserve I/O ports for awedrv */
+	if (! awe_request_region()) {
+		printk(KERN_ERR "AWE32: I/O area already used.\n");
+		return 0;
+	}
+
+	/* set buffers to NULL */
+	sfhead = sftail = NULL;
+
+	my_dev = sound_alloc_synthdev();
+	if (my_dev == -1) {
+		printk(KERN_ERR "AWE32 Error: too many synthesizers\n");
+		awe_release_region();
+		return 0;
+	}
+
+	voice_alloc = &awe_operations.alloc;
+	voice_alloc->max_voice = awe_max_voices;
+	synth_devs[my_dev] = &awe_operations;
+
+#ifdef CONFIG_AWE32_MIXER
+	attach_mixer();
+#endif
+#ifdef CONFIG_AWE32_MIDIEMU
+	attach_midiemu();
+#endif
+
+	/* clear all samples */
+	awe_reset_samples();
+
+	/* initialize AWE32 hardware */
+	awe_initialize();
+
+	sprintf(awe_info.name, "AWE32-%s (RAM%dk)",
+		AWEDRV_VERSION, memsize/1024);
+	printk(KERN_INFO "<SoundBlaster EMU8000 (RAM%dk)>\n", memsize/1024);
+
+	awe_present = TRUE;
+
+	return 1;
+}
+
+static void awe_dettach_device(void)
+{
+	if (awe_present) {
+		awe_reset_samples();
+		awe_release_region();
+		free_tables();
+#ifdef CONFIG_AWE32_MIXER
+		unload_mixer();
+#endif
+#ifdef CONFIG_AWE32_MIDIEMU
+		unload_midiemu();
+#endif
+		sound_unload_synthdev(my_dev);
+		awe_present = FALSE;
+	}
+}
+
+
+/*
+ * Legacy device Probing
+ */
+
+/* detect emu8000 chip on the specified address; from VV's guide */
+
+static int __init
+awe_detect_base(int addr)
+{
+	setup_ports(addr, 0, 0);
+	if ((awe_peek(AWE_U1) & 0x000F) != 0x000C)
+		return 0;
+	if ((awe_peek(AWE_HWCF1) & 0x007E) != 0x0058)
+		return 0;
+	if ((awe_peek(AWE_HWCF2) & 0x0003) != 0x0003)
+		return 0;
+        DEBUG(0,printk("AWE32 found at %x\n", addr));
+	return 1;
+}
+
+static int __init awe_detect_legacy_devices(void)
+{
+	int base;
+	for (base = 0x620; base <= 0x680; base += 0x20)
+		if (awe_detect_base(base)) {
+			awe_attach_device();
+			return 1;
+			}
+	DEBUG(0,printk("AWE32 Legacy detection failed\n"));
+	return 0;
+}
+
+
+/*
+ * PnP device Probing
+ */
+
+static struct pnp_device_id awe_pnp_ids[] = {
+	{.id = "CTL0021", .driver_data = 0}, /* AWE32 WaveTable */
+	{.id = "CTL0022", .driver_data = 0}, /* AWE64 WaveTable */
+	{.id = "CTL0023", .driver_data = 0}, /* AWE64 Gold WaveTable */
+	{ } /* terminator */
+};
+
+MODULE_DEVICE_TABLE(pnp, awe_pnp_ids);
+
+static int awe_pnp_probe(struct pnp_dev *dev, const struct pnp_device_id *dev_id)
+{
+	int io1, io2, io3;
+
+	if (awe_present) {
+		printk(KERN_ERR "AWE32: This driver only supports one AWE32 device, skipping.\n");
+	}
+
+	if (!pnp_port_valid(dev,0) ||
+	    !pnp_port_valid(dev,1) ||
+	    !pnp_port_valid(dev,2)) {
+		printk(KERN_ERR "AWE32: The PnP device does not have the required resources.\n");
+		return -EINVAL;
+	}
+	io1 = pnp_port_start(dev,0);
+	io2 = pnp_port_start(dev,1);
+	io3 = pnp_port_start(dev,2);
+	printk(KERN_INFO "AWE32: A PnP Wave Table was detected at IO's %#x,%#x,%#x\n.",
+	       io1, io2, io3);
+	setup_ports(io1, io2, io3);
+
+	awe_attach_device();
+	return 0;
+}
+
+static void awe_pnp_remove(struct pnp_dev *dev)
+{
+	awe_dettach_device();
+}
+
+static struct pnp_driver awe_pnp_driver = {
+	.name		= "AWE32",
+	.id_table	= awe_pnp_ids,
+	.probe		= awe_pnp_probe,
+	.remove		= awe_pnp_remove,
+};
+
+static int __init awe_detect_pnp_devices(void)
+{
+	int ret;
+
+	ret = pnp_register_driver(&awe_pnp_driver);
+	if (ret<0)
+		printk(KERN_ERR "AWE32: PnP support is unavailable.\n");
+	return ret;
+}
+
+
 /*
  * device / lowlevel (module) interface
  */
 
+static int __init
+awe_detect(void)
+{
+	printk(KERN_INFO "AWE32: Probing for WaveTable...\n");
+	if (isapnp) {
+		if (awe_detect_pnp_devices()>=0)
+			return 1;
+	} else
+		printk(KERN_INFO "AWE32: Skipping PnP detection.\n");
+
+	if (awe_detect_legacy_devices())
+		return 1;
+
+	return 0;
+}
+
 int __init attach_awe(void)
 {
-	return _attach_awe() ? 0 : -ENODEV;
+	return awe_detect() ? 0 : -ENODEV;
 }
 
 void __exit unload_awe(void)
 {
-	_unload_awe();
-#ifdef __ISAPNP__
-	if (isapnp)
-		awe_deactivate_isapnp();
-#endif /* isapnp */
+	pnp_unregister_driver(&awe_pnp_driver);
+	awe_dettach_device();
 }
 
 

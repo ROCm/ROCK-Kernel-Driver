@@ -60,7 +60,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	int fpu_exception;
 
 #ifdef CONFIG_SMP
-	if (!(cpu_online_map & (1<<n)))
+	if (!cpu_online(n))
 		return 0;
 #endif
 	seq_printf(m, "processor\t: %d\n"

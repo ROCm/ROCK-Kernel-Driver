@@ -3,11 +3,15 @@
  * 
  * Generic x86 APIC driver probe layer.
  */  
+#include <linux/config.h>
+#include <linux/threads.h>
+#include <linux/cpumask.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
 #include <linux/ctype.h>
 #include <linux/init.h>
 #include <asm/fixmap.h>
+#include <asm/mpspec.h>
 #include <asm/apicdef.h>
 #include <asm/genapic.h>
 

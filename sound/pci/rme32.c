@@ -1926,7 +1926,7 @@ static void snd_rme32_card_free(snd_card_t * card)
 static int __devinit
 snd_rme32_probe(struct pci_dev *pci, const struct pci_device_id *pci_id)
 {
-	static int dev = 0;
+	static int dev;
 	rme32_t *rme32;
 	snd_card_t *card;
 	int err;

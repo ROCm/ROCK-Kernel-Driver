@@ -5942,14 +5942,7 @@ int sym_hcb_attach(hcb_p np, struct sym_fw *fw)
 	 */
 	return 0;
 
-	/*
-	 *  We have failed.
-	 *  We will try to free all the resources we have 
-	 *  allocated, but if we are a boot device, this 
-	 *  will not help that much.;)
-	 */
 attach_failed:
-		sym_hcb_free(np);
 	return -ENXIO;
 }
 

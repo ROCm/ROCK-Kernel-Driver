@@ -37,6 +37,8 @@
 static int video_nr = -1;
 MODULE_PARM(video_nr, "i");
 
+#warning please convert me from procfs to sysfs
+#define USES_PROC_FS 0
 /*
  * Local prototypes.
  */
@@ -777,7 +779,7 @@ int usbvideo_register(
 	const struct usb_device_id *id_table)
 {
 	struct usbvideo *cams;
-	int i, base_size;
+	int i, base_size, result;
 
 	/* Check parameters for sanity */
 	if ((num_cams <= 0) || (pCams == NULL) || (cbTbl == NULL)) {
@@ -846,9 +848,13 @@ int usbvideo_register(
 			up->user_size = num_cams * num_extra;
 			up->user_data = (char *) kmalloc(up->user_size, GFP_KERNEL);
 			if (up->user_data == NULL) {
-				up->user_size = 0;
 				err("%s: Failed to allocate user_data (%d. bytes)",
 				    __FUNCTION__, up->user_size);
+				while (i) {
+					up = &cams->cam[--i];
+					kfree(up->user_data);
+				}
+				kfree(cams);
 				return -ENOMEM;
 			}
 			dbg("%s: Allocated cams[%d].user_data=$%p (%d. bytes)",
@@ -878,9 +884,16 @@ int usbvideo_register(
 	 * If the handle is not yet updated then the probe() will fail.
 	 */
 	*pCams = cams;
-	usb_register(&cams->usbdrv);
+	result = usb_register(&cams->usbdrv);
+	if (result) {
+		for (i = 0; i < num_cams; i++) {
+			struct uvd *up = &cams->cam[i];
+			kfree(up->user_data);
+		}
+		kfree(cams);
+	}
 
-	return 0;
+	return result;
 }
 
 EXPORT_SYMBOL(usbvideo_register);

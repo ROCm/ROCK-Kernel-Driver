@@ -21,21 +21,21 @@
 
 #include "midi_ctrl.h"
 
-static int      sequencer_ok = 0;
+static int      sequencer_ok;
 static struct sound_timer_operations *tmr;
 static int      tmr_no = -1;	/* Currently selected timer */
 static int      pending_timer = -1;	/* For timer change operation */
 extern unsigned long seq_time;
 
-static int      obsolete_api_used = 0;
+static int      obsolete_api_used;
 static spinlock_t lock=SPIN_LOCK_UNLOCKED;
 
 /*
  * Local counts for number of synth and MIDI devices. These are initialized
  * by the sequencer_open.
  */
-static int      max_mididev = 0;
-static int      max_synthdev = 0;
+static int      max_mididev;
+static int      max_synthdev;
 
 /*
  * The seq_mode gives the operating mode of the sequencer:
@@ -50,15 +50,11 @@ static int      seq_mode = SEQ_1;
 static DECLARE_WAIT_QUEUE_HEAD(seq_sleeper);
 static DECLARE_WAIT_QUEUE_HEAD(midi_sleeper);
 
-static int      midi_opened[MAX_MIDI_DEV] = {
-	0
-};
+static int      midi_opened[MAX_MIDI_DEV];
 
-static int      midi_written[MAX_MIDI_DEV] = {
-	0
-};
+static int      midi_written[MAX_MIDI_DEV];
 
-static unsigned long prev_input_time = 0;
+static unsigned long prev_input_time;
 static int      prev_event_time;
 
 #include "tuning.h"
@@ -66,13 +62,13 @@ static int      prev_event_time;
 #define EV_SZ	8
 #define IEV_SZ	8
 
-static unsigned char *queue = NULL;
-static unsigned char *iqueue = NULL;
+static unsigned char *queue;
+static unsigned char *iqueue;
 
-static volatile int qhead = 0, qtail = 0, qlen = 0;
-static volatile int iqhead = 0, iqtail = 0, iqlen = 0;
-static volatile int seq_playing = 0;
-static volatile int sequencer_busy = 0;
+static volatile int qhead, qtail, qlen;
+static volatile int iqhead, iqtail, iqlen;
+static volatile int seq_playing;
+static volatile int sequencer_busy;
 static int      output_threshold;
 static long     pre_event_timeout;
 static unsigned synth_open_mask;

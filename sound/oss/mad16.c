@@ -54,7 +54,7 @@ static int      mad16_conf;
 static int      mad16_cdsel;
 static struct gameport gameport;
 static spinlock_t lock=SPIN_LOCK_UNLOCKED;
-static int      already_initialized = 0;
+static int      already_initialized;
 
 #define C928	1
 #define MOZART	2
@@ -93,8 +93,8 @@ static int      board_type = C928;
 
 static int     *mad16_osp;
 static int	c931_detected;	/* minor differences from C930 */
-static char	c924pnp = 0;	/* "     "           "    C924 */
-static int	debug = 0;	/* debugging output */
+static char	c924pnp;	/* "     "           "    C924 */
+static int	debug;  	/* debugging output */
 
 #ifdef DDB
 #undef DDB
@@ -686,7 +686,7 @@ static void __init attach_mad16(struct address_info *hw_config)
 
 static int __init probe_mad16_mpu(struct address_info *hw_config)
 {
-	static int mpu_attached = 0;
+	static int mpu_attached;
 	unsigned char tmp;
 
 	if (!already_initialized)	/* The MSS port must be initialized first */

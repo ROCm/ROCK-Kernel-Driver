@@ -613,8 +613,7 @@ extern unsigned int cheetah_deferred_trap_vector[], cheetah_deferred_trap_vector
 void __init cheetah_ecache_flush_init(void)
 {
 	unsigned long largest_size, smallest_linesize, order, ver;
-	char type[16];
-	int node, i;
+	int node, i, instance;
 
 	/* Scan all cpu device tree nodes, note two values:
 	 * 1) largest E-cache size
@@ -622,21 +621,21 @@ void __init cheetah_ecache_flush_init(void)
 	 */
 	largest_size = 0UL;
 	smallest_linesize = ~0UL;
-	node = prom_getchild(prom_root_node);
-	while ((node = prom_getsibling(node)) != 0) {
-		prom_getstring(node, "device_type", type, sizeof(type));
-		if (!strcmp(type, "cpu")) {
-			unsigned long val;
 
-			val = prom_getintdefault(node, "ecache-size",
-						 (2 * 1024 * 1024));
-			if (val > largest_size)
-				largest_size = val;
-			val = prom_getintdefault(node, "ecache-line-size", 64);
-			if (val < smallest_linesize)
-				smallest_linesize = val;
-		}
+	instance = 0;
+	while (!cpu_find_by_instance(instance, &node, NULL)) {
+		unsigned long val;
+
+		val = prom_getintdefault(node, "ecache-size",
+					 (2 * 1024 * 1024));
+		if (val > largest_size)
+			largest_size = val;
+		val = prom_getintdefault(node, "ecache-line-size", 64);
+		if (val < smallest_linesize)
+			smallest_linesize = val;
+		instance++;
 	}
+
 	if (largest_size == 0UL || smallest_linesize == ~0UL) {
 		prom_printf("cheetah_ecache_flush_init: Cannot probe cpu E-cache "
 			    "parameters.\n");

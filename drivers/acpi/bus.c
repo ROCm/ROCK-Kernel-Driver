@@ -691,7 +691,7 @@ static int __init acpi_init (void)
 	acpi_set_debug(ACPI_DEBUG_LOW);
 
 	if (acpi_disabled) {
-		printk(KERN_INFO PREFIX "Disabled via command line (acpi=off)\n");
+		printk(KERN_INFO PREFIX "Interpreter disabled.\n");
 		return -ENODEV;
 	}
 

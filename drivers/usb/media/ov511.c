@@ -38,16 +38,14 @@
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/init.h>
-#include <linux/fs.h>
 #include <linux/vmalloc.h>
 #include <linux/slab.h>
-#include <linux/proc_fs.h>
 #include <linux/ctype.h>
 #include <linux/pagemap.h>
-#include <asm/io.h>
 #include <asm/semaphore.h>
 #include <asm/processor.h>
 #include <linux/mm.h>
+#include <linux/device.h>
 
 #if defined (__i386__)
 	#include <asm/cpufeature.h>
@@ -295,7 +293,6 @@ static struct symbolic_list brglist[] = {
 	{ -1, NULL }
 };
 
-#if defined(CONFIG_VIDEO_PROC_FS)
 static struct symbolic_list senlist[] = {
 	{ SEN_OV76BE,	"OV76BE" },
 	{ SEN_OV7610,	"OV7610" },
@@ -311,7 +308,6 @@ static struct symbolic_list senlist[] = {
 	{ SEN_SAA7111A,	"SAA7111A" },
 	{ -1, NULL }
 };
-#endif
 
 /* URB error codes: */
 static struct symbolic_list urb_errlist[] = {
@@ -380,270 +376,6 @@ rvfree(void *mem, unsigned long size)
 	}
 	vfree(mem);
 }
-
-/**********************************************************************
- * /proc interface
- * Based on the CPiA driver version 0.7.4 -claudio
- **********************************************************************/
-
-#if defined(CONFIG_VIDEO_PROC_FS)
-
-static struct proc_dir_entry *ov511_proc_entry = NULL;
-extern struct proc_dir_entry *video_proc_entry;
-
-/* Prototypes */
-static void ov51x_clear_snapshot(struct usb_ov511 *);
-static int sensor_get_picture(struct usb_ov511 *, struct video_picture *);
-static int sensor_get_exposure(struct usb_ov511 *, unsigned char *);
-static int ov51x_check_snapshot(struct usb_ov511 *);
-static int ov51x_control_ioctl(struct inode *, struct file *, unsigned int,
-			       unsigned long);
-
-static struct file_operations ov511_control_fops = {
-	.owner =	THIS_MODULE,
-	.ioctl =	ov51x_control_ioctl,
-};
-
-#define YES_NO(x) ((x) ? "yes" : "no")
-
-/* /proc/video/ov511/<minor#>/info */
-static int
-ov511_read_proc_info(char *page, char **start, off_t off, int count, int *eof,
-		     void *data)
-{
-	char *out = page;
-	int i, len;
-	struct usb_ov511 *ov = data;
-	struct video_picture p;
-	unsigned char exp;
-
-	if (!ov || !ov->dev)
-		return -ENODEV;
-
-	sensor_get_picture(ov, &p);
-	sensor_get_exposure(ov, &exp);
-
-	/* IMPORTANT: This output MUST be kept under PAGE_SIZE
-	 *            or we need to get more sophisticated. */
-
-	out += sprintf(out, "driver_version  : %s\n", DRIVER_VERSION);
-	out += sprintf(out, "custom_id       : %d\n", ov->customid);
-	out += sprintf(out, "model           : %s\n", ov->desc);
-	out += sprintf(out, "streaming       : %s\n", YES_NO(ov->streaming));
-	out += sprintf(out, "grabbing        : %s\n", YES_NO(ov->grabbing));
-	out += sprintf(out, "compress        : %s\n", YES_NO(ov->compress));
-	out += sprintf(out, "subcapture      : %s\n", YES_NO(ov->sub_flag));
-	out += sprintf(out, "sub_size        : %d %d %d %d\n",
-		       ov->subx, ov->suby, ov->subw, ov->subh);
-	out += sprintf(out, "brightness      : %d\n", p.brightness >> 8);
-	out += sprintf(out, "colour          : %d\n", p.colour >> 8);
-	out += sprintf(out, "contrast        : %d\n", p.contrast >> 8);
-	out += sprintf(out, "hue             : %d\n", p.hue >> 8);
-	out += sprintf(out, "exposure        : %d\n", exp);
-	out += sprintf(out, "num_frames      : %d\n", OV511_NUMFRAMES);
-	for (i = 0; i < OV511_NUMFRAMES; i++) {
-		out += sprintf(out, "frame           : %d\n", i);
-		out += sprintf(out, "  depth         : %d\n",
-			       ov->frame[i].depth);
-		out += sprintf(out, "  size          : %d %d\n",
-			       ov->frame[i].width, ov->frame[i].height);
-		out += sprintf(out, "  format        : %s\n",
-			       symbolic(v4l1_plist, ov->frame[i].format));
-		out += sprintf(out, "  data_buffer   : 0x%p\n",
-			       ov->frame[i].data);
-	}
-	out += sprintf(out, "snap_enabled    : %s\n", YES_NO(ov->snap_enabled));
-	out += sprintf(out, "bridge          : %s\n",
-		       symbolic(brglist, ov->bridge));
-	out += sprintf(out, "sensor          : %s\n",
-		       symbolic(senlist, ov->sensor));
-	out += sprintf(out, "packet_size     : %d\n", ov->packet_size);
-	out += sprintf(out, "framebuffer     : 0x%p\n", ov->fbuf);
-	out += sprintf(out, "packet_numbering: %d\n", ov->packet_numbering);
-	out += sprintf(out, "topology        : %s\n", ov->usb_path);
-
-	len = out - page;
-	len -= off;
-	if (len < count) {
-		*eof = 1;
-		if (len <= 0)
-			return 0;
-	} else
-		len = count;
-
-	*start = page + off;
-
-	return len;
-}
-
-/* /proc/video/ov511/<minor#>/button
- *
- * When the camera's button is pressed, the output of this will change from a
- * 0 to a 1 (ASCII). It will retain this value until it is read, after which
- * it will reset to zero.
- *
- * SECURITY NOTE: Since reading this file can change the state of the snapshot
- * status, it is important for applications that open it to keep it locked
- * against access by other processes, using flock() or a similar mechanism. No
- * locking is provided by this driver.
- */
-static int
-ov511_read_proc_button(char *page, char **start, off_t off, int count, int *eof,
-		       void *data)
-{
-	char *out = page;
-	int len, status;
-	struct usb_ov511 *ov = data;
-
-	if (!ov || !ov->dev)
-		return -ENODEV;
-
-	status = ov51x_check_snapshot(ov);
-	out += sprintf(out, "%d", status);
-
-	if (status)
-		ov51x_clear_snapshot(ov);
-
-	len = out - page;
-	len -= off;
-	if (len < count) {
-		*eof = 1;
-		if (len <= 0)
-			return 0;
-	} else {
-		len = count;
-	}
-
-	*start = page + off;
-
-	return len;
-}
-
-static void
-create_proc_ov511_cam(struct usb_ov511 *ov)
-{
-	char dirname[10];
-
-	if (!ov511_proc_entry || !ov)
-		return;
-
-	/* Create per-device directory */
-	snprintf(dirname, 10, "%d", ov->vdev.minor);
-	PDEBUG(4, "creating /proc/video/ov511/%s/", dirname);
-	ov->proc_devdir = create_proc_entry(dirname, S_IFDIR, ov511_proc_entry);
-	if (!ov->proc_devdir)
-		return;
-	ov->proc_devdir->owner = THIS_MODULE;
-
-	/* Create "info" entry (human readable device information) */
-	PDEBUG(4, "creating /proc/video/ov511/%s/info", dirname);
-	ov->proc_info = create_proc_read_entry("info", S_IFREG|S_IRUGO|S_IWUSR,
-		ov->proc_devdir, ov511_read_proc_info, ov);
-	if (!ov->proc_info)
-		return;
-	ov->proc_info->owner = THIS_MODULE;
-
-	/* Don't create it if old snapshot mode on (would cause race cond.) */
-	if (!snapshot) {
-		/* Create "button" entry (snapshot button status) */
-		PDEBUG(4, "creating /proc/video/ov511/%s/button", dirname);
-		ov->proc_button = create_proc_read_entry("button",
-			S_IFREG|S_IRUGO|S_IWUSR, ov->proc_devdir,
-			ov511_read_proc_button, ov);
-		if (!ov->proc_button)
-			return;
-		ov->proc_button->owner = THIS_MODULE;
-	}
-
-	/* Create "control" entry (ioctl() interface) */
-	PDEBUG(4, "creating /proc/video/ov511/%s/control", dirname);
-	lock_kernel();
-	ov->proc_control = create_proc_entry("control",	S_IFREG|S_IRUGO|S_IWUSR,
-		ov->proc_devdir);
-	if (!ov->proc_control) {
-		unlock_kernel();
-		return;
-	}
-	ov->proc_control->owner = THIS_MODULE;
-	ov->proc_control->data = ov;
-	ov->proc_control->proc_fops = &ov511_control_fops;
-	unlock_kernel();
-}
-
-static void
-destroy_proc_ov511_cam(struct usb_ov511 *ov)
-{
-	char dirname[10];
-
-	if (!ov || !ov->proc_devdir)
-		return;
-
-	snprintf(dirname, 10, "%d", ov->vdev.minor);
-
-	/* Destroy "control" entry */
-	if (ov->proc_control) {
-		PDEBUG(4, "destroying /proc/video/ov511/%s/control", dirname);
-		remove_proc_entry("control", ov->proc_devdir);
-		ov->proc_control = NULL;
-	}
-
-	/* Destroy "button" entry */
-	if (ov->proc_button) {
-		PDEBUG(4, "destroying /proc/video/ov511/%s/button", dirname);
-		remove_proc_entry("button", ov->proc_devdir);
-		ov->proc_button = NULL;
-	}
-
-	/* Destroy "info" entry */
-	if (ov->proc_info) {
-		PDEBUG(4, "destroying /proc/video/ov511/%s/info", dirname);
-		remove_proc_entry("info", ov->proc_devdir);
-		ov->proc_info = NULL;
-	}
-
-	/* Destroy per-device directory */
-	PDEBUG(4, "destroying /proc/video/ov511/%s/", dirname);
-	remove_proc_entry(dirname, ov511_proc_entry);
-	ov->proc_devdir = NULL;
-}
-
-static void
-proc_ov511_create(void)
-{
-	/* No current standard here. Alan prefers /proc/video/ as it keeps
-	 * /proc "less cluttered than /proc/randomcardifoundintheshed/"
-	 * -claudio
-	 */
-	if (video_proc_entry == NULL) {
-		err("Error: /proc/video/ does not exist");
-		return;
-	}
-
-	ov511_proc_entry = create_proc_entry("ov511", S_IFDIR,
-					     video_proc_entry);
-
-	if (ov511_proc_entry)
-		ov511_proc_entry->owner = THIS_MODULE;
-	else
-		err("Unable to create /proc/video/ov511");
-}
-
-static void
-proc_ov511_destroy(void)
-{
-	PDEBUG(3, "removing /proc/video/ov511");
-
-	if (ov511_proc_entry == NULL)
-		return;
-
-	remove_proc_entry("ov511", video_proc_entry);
-}
-#else
-static inline void create_proc_ov511_cam(struct usb_ov511 *ov) { }
-static inline void destroy_proc_ov511_cam(struct usb_ov511 *ov) { }
-static inline void proc_ov511_create(void) { }
-static inline void proc_ov511_destroy(void) { }
-#endif /* #ifdef CONFIG_VIDEO_PROC_FS */
 
 /**********************************************************************
  *
@@ -1399,7 +1131,7 @@ ov51x_clear_snapshot(struct usb_ov511 *ov)
 	}
 }
 
-#if defined(CONFIG_VIDEO_PROC_FS)
+#if 0
 /* Checks the status of the snapshot button. Returns 1 if it was pressed since
  * it was last cleared, and zero in all other cases (including errors) */
 static int
@@ -2098,7 +1830,7 @@ sensor_get_picture(struct usb_ov511 *ov, struct video_picture *p)
 	return 0;
 }
 
-#if defined(CONFIG_VIDEO_PROC_FS)
+#if 0
 // FIXME: Exposure range is only 0x00-0x7f in interlace mode
 /* Sets current exposure for sensor. This only has an effect if auto-exposure
  * is off */
@@ -2143,6 +1875,7 @@ out:
 
 	return rc;
 }
+#endif
 
 /* Gets current exposure level from sensor, regardless of whether it is under
  * manual control. */
@@ -2180,7 +1913,6 @@ sensor_get_exposure(struct usb_ov511 *ov, unsigned char *val)
 
 	return 0;
 }
-#endif /* CONFIG_VIDEO_PROC_FS */
 
 /* Turns on or off the LED. Only has an effect with OV511+/OV518(+) */
 static void
@@ -4309,7 +4041,7 @@ static int
 ov51x_v4l1_open(struct inode *inode, struct file *file)
 {
 	struct video_device *vdev = video_devdata(file);
-	struct usb_ov511 *ov = vdev->priv;
+	struct usb_ov511 *ov = video_get_drvdata(vdev);
 	int err, i;
 
 	PDEBUG(4, "opening");
@@ -4366,7 +4098,7 @@ static int
 ov51x_v4l1_close(struct inode *inode, struct file *file)
 {
 	struct video_device *vdev = file->private_data;
-	struct usb_ov511 *ov = vdev->priv;
+	struct usb_ov511 *ov = video_get_drvdata(vdev);
 
 	PDEBUG(4, "ov511_close");
 
@@ -4408,7 +4140,7 @@ ov51x_v4l1_ioctl_internal(struct inode *inode, struct file *file,
 			  unsigned int cmd, void *arg)
 {
 	struct video_device *vdev = file->private_data;
-	struct usb_ov511 *ov = vdev->priv;
+	struct usb_ov511 *ov = video_get_drvdata(vdev);
 	PDEBUG(5, "IOCtl: 0x%X", cmd);
 
 	if (!ov->dev)
@@ -4809,7 +4541,7 @@ redo:
 
 		memset(vu, 0, sizeof(struct video_unit));
 
-		vu->video = ov->vdev.minor;
+		vu->video = ov->vdev->minor;
 		vu->vbi = VIDEO_NO_UNIT;
 		vu->radio = VIDEO_NO_UNIT;
 		vu->audio = VIDEO_NO_UNIT;
@@ -4848,7 +4580,7 @@ ov51x_v4l1_ioctl(struct inode *inode, struct file *file,
 		 unsigned int cmd, unsigned long arg)
 {
 	struct video_device *vdev = file->private_data;
-	struct usb_ov511 *ov = vdev->priv;
+	struct usb_ov511 *ov = video_get_drvdata(vdev);
 	int rc;
 
 	if (down_interruptible(&ov->lock))
@@ -4866,7 +4598,7 @@ ov51x_v4l1_read(struct file *file, char *buf, size_t cnt, loff_t *ppos)
 	struct video_device *vdev = file->private_data;
 	int noblock = file->f_flags&O_NONBLOCK;
 	unsigned long count = cnt;
-	struct usb_ov511 *ov = vdev->priv;
+	struct usb_ov511 *ov = video_get_drvdata(vdev);
 	int i, rc = 0, frmx = -1;
 	struct ov511_frame *frame;
 
@@ -5020,7 +4752,7 @@ ov51x_v4l1_mmap(struct file *file, struct vm_area_struct *vma)
 	struct video_device *vdev = file->private_data;
 	unsigned long start = vma->vm_start;
 	unsigned long size  = vma->vm_end - vma->vm_start;
-	struct usb_ov511 *ov = vdev->priv;
+	struct usb_ov511 *ov = video_get_drvdata(vdev);
 	unsigned long page, pos;
 
 	if (ov->dev == NULL)
@@ -5072,226 +4804,9 @@ static struct video_device vdev_template = {
 	.type =		VID_TYPE_CAPTURE,
 	.hardware =	VID_HARDWARE_OV511,
 	.fops =		&ov511_fops,
+	.release =	video_device_release,
+	.minor =	-1,
 };
-
-#if defined(CONFIG_VIDEO_PROC_FS)
-static int
-ov51x_control_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
-		    unsigned long ularg)
-{
-	struct proc_dir_entry *pde = PDE(inode);
-	struct usb_ov511 *ov;
-	void *arg = (void *) ularg;
-	int rc = 0;
-
-	if (!pde)
-		return -ENOENT;
-
-	ov = pde->data;
-	if (!ov)
-		return -ENODEV;
-
-	if (!ov->dev)
-		return -EIO;
-
-	/* Should we pass through standard V4L IOCTLs? */
-
-	switch (cmd) {
-	case OV511IOC_GINTVER:
-	{
-		int ver = OV511_INTERFACE_VER;
-
-		PDEBUG(4, "Get interface version: %d", ver);
-		if (copy_to_user(arg, &ver, sizeof(ver)))
-			rc = -EFAULT;
-		break;
-	}
-	case OV511IOC_GUSHORT:
-	{
-		struct ov511_ushort_opt opt;
-
-		if (copy_from_user(&opt, arg, sizeof(opt))) {
-			rc = -EFAULT;
-			break;
-		}
-
-		switch (opt.optnum) {
-		case OV511_USOPT_BRIGHT:
-			rc = sensor_get_brightness(ov, &(opt.val));
-			break;
-		case OV511_USOPT_SAT:
-			rc = sensor_get_saturation(ov, &(opt.val));
-			break;
-		case OV511_USOPT_HUE:
-			rc = sensor_get_hue(ov, &(opt.val));
-			break;
-		case OV511_USOPT_CONTRAST:
-			rc = sensor_get_contrast(ov, &(opt.val));
-			break;
-		default:
-			err("Invalid get short option number");
-			rc = -EINVAL;
-		}
-
-		if (rc < 0)
-			break;
-		if (copy_to_user(arg, &opt, sizeof(opt)))
-			rc = -EFAULT;
-		break;
-	}
-	case OV511IOC_SUSHORT:
-	{
-		struct ov511_ushort_opt opt;
-
-		if (copy_from_user(&opt, arg, sizeof(opt))) {
-			rc = -EFAULT;
-			break;
-		}
-
-		switch (opt.optnum) {
-		case OV511_USOPT_BRIGHT:
-			rc = sensor_set_brightness(ov, opt.val);
-			break;
-		case OV511_USOPT_SAT:
-			rc = sensor_set_saturation(ov, opt.val);
-			break;
-		case OV511_USOPT_HUE:
-			rc = sensor_set_hue(ov, opt.val);
-			break;
-		case OV511_USOPT_CONTRAST:
-			rc = sensor_set_contrast(ov, opt.val);
-			break;
-		default:
-			err("Invalid set short option number");
-			rc = -EINVAL;
-		}
-
-		break;
-	}
-	case OV511IOC_GUINT:
-	{
-		struct ov511_uint_opt opt;
-
-		if (copy_from_user(&opt, arg, sizeof(opt))) {
-			rc = -EFAULT;
-			break;
-		}
-
-		switch (opt.optnum) {
-		case OV511_UIOPT_POWER_FREQ:
-			opt.val = ov->lightfreq;
-			break;
-		case OV511_UIOPT_BFILTER:
-			opt.val = ov->bandfilt;
-			break;
-		case OV511_UIOPT_LED:
-			opt.val = ov->led_policy;
-			break;
-		case OV511_UIOPT_DEBUG:
-			opt.val = debug;
-			break;
-		case OV511_UIOPT_COMPRESS:
-			opt.val = ov->compress;
-			break;
-		default:
-			err("Invalid get int option number");
-			rc = -EINVAL;
-		}
-
-		if (rc < 0)
-			break;
-		if (copy_to_user(arg, &opt, sizeof(opt)))
-			rc = -EFAULT;
-
-		break;
-	}
-	case OV511IOC_SUINT:
-	{
-		struct ov511_uint_opt opt;
-
-		if (copy_from_user(&opt, arg, sizeof(opt))) {
-			rc = -EFAULT;
-			break;
-		}
-
-		switch (opt.optnum) {
-		case OV511_UIOPT_POWER_FREQ:
-			rc = sensor_set_light_freq(ov, opt.val);
-			break;
-		case OV511_UIOPT_BFILTER:
-			rc = sensor_set_banding_filter(ov, opt.val);
-			break;
-		case OV511_UIOPT_LED:
-			if (opt.val <= 2) {
-				ov->led_policy = opt.val;
-				if (ov->led_policy == LED_OFF)
-					ov51x_led_control(ov, 0);
-				else if (ov->led_policy == LED_ON)
-					ov51x_led_control(ov, 1);
-			} else
-				rc = -EINVAL;
-			break;
-		case OV511_UIOPT_DEBUG:
-			if (opt.val <= 5)
-				debug = opt.val;
-			else
-				rc = -EINVAL;
-			break;
-		case OV511_UIOPT_COMPRESS:
-			ov->compress = opt.val;
-			if (ov->compress) {
-				if (ov->bclass == BCL_OV511)
-					ov511_init_compression(ov);
-				else if (ov->bclass == BCL_OV518)
-					ov518_init_compression(ov);
-			}
-			break;
-		default:
-			err("Invalid get int option number");
-			rc = -EINVAL;
-		}
-
-		break;
-	}
-	case OV511IOC_WI2C:
-	{
-		struct ov511_i2c_struct w;
-
-		if (copy_from_user(&w, arg, sizeof(w))) {
-			rc = -EFAULT;
-			break;
-		}
-
-		rc = i2c_w_slave(ov, w.slave, w.reg, w.value, w.mask);
-		break;
-	}
-	case OV511IOC_RI2C:
-	{
-		struct ov511_i2c_struct r;
-
-		if (copy_from_user(&r, arg, sizeof(r))) {
-			rc = -EFAULT;
-			break;
-		}
-
-		rc = i2c_r_slave(ov, r.slave, r.reg);
-		if (rc < 0)
-			break;
-
-		r.value = rc;
-
-		if (copy_to_user(arg, &r, sizeof(r)))
-			rc = -EFAULT;
-
-		break;
-	}
-	default:
-		rc = -EINVAL;
-	} /* end switch */
-
-	return rc;
-}
-#endif
 
 /****************************************************************************
  *
@@ -6162,9 +5677,118 @@ error:
 }
 
 /****************************************************************************
- *
+ *  sysfs
+ ***************************************************************************/
+
+static inline struct usb_ov511 *cd_to_ov(struct class_device *cd)
+{
+	struct video_device *vdev = to_video_device(cd);
+	return video_get_drvdata(vdev);
+}
+
+static ssize_t show_custom_id(struct class_device *cd, char *buf)
+{
+	struct usb_ov511 *ov = cd_to_ov(cd);
+	return sprintf(buf, "%d\n", ov->customid);
+} 
+static CLASS_DEVICE_ATTR(custom_id, S_IRUGO, show_custom_id, NULL);
+
+static ssize_t show_model(struct class_device *cd, char *buf)
+{
+	struct usb_ov511 *ov = cd_to_ov(cd);
+	return sprintf(buf, "%s\n", ov->desc);
+} 
+static CLASS_DEVICE_ATTR(model, S_IRUGO, show_model, NULL);
+
+static ssize_t show_bridge(struct class_device *cd, char *buf)
+{
+	struct usb_ov511 *ov = cd_to_ov(cd);
+	return sprintf(buf, "%s\n", symbolic(brglist, ov->bridge));
+} 
+static CLASS_DEVICE_ATTR(bridge, S_IRUGO, show_bridge, NULL);
+
+static ssize_t show_sensor(struct class_device *cd, char *buf)
+{
+	struct usb_ov511 *ov = cd_to_ov(cd);
+	return sprintf(buf, "%s\n", symbolic(senlist, ov->sensor));
+} 
+static CLASS_DEVICE_ATTR(sensor, S_IRUGO, show_sensor, NULL);
+
+static ssize_t show_brightness(struct class_device *cd, char *buf)
+{
+	struct usb_ov511 *ov = cd_to_ov(cd);
+	unsigned short x;
+
+	if (!ov->dev)
+		return -ENODEV;
+	sensor_get_brightness(ov, &x);
+	return sprintf(buf, "%d\n", x >> 8);
+} 
+static CLASS_DEVICE_ATTR(brightness, S_IRUGO, show_brightness, NULL);
+
+static ssize_t show_saturation(struct class_device *cd, char *buf)
+{
+	struct usb_ov511 *ov = cd_to_ov(cd);
+	unsigned short x;
+
+	if (!ov->dev)
+		return -ENODEV;
+	sensor_get_saturation(ov, &x);
+	return sprintf(buf, "%d\n", x >> 8);
+} 
+static CLASS_DEVICE_ATTR(saturation, S_IRUGO, show_saturation, NULL);
+
+static ssize_t show_contrast(struct class_device *cd, char *buf)
+{
+	struct usb_ov511 *ov = cd_to_ov(cd);
+	unsigned short x;
+
+	if (!ov->dev)
+		return -ENODEV;
+	sensor_get_contrast(ov, &x);
+	return sprintf(buf, "%d\n", x >> 8);
+} 
+static CLASS_DEVICE_ATTR(contrast, S_IRUGO, show_contrast, NULL);
+
+static ssize_t show_hue(struct class_device *cd, char *buf)
+{
+	struct usb_ov511 *ov = cd_to_ov(cd);
+	unsigned short x;
+
+	if (!ov->dev)
+		return -ENODEV;
+	sensor_get_hue(ov, &x);
+	return sprintf(buf, "%d\n", x >> 8);
+} 
+static CLASS_DEVICE_ATTR(hue, S_IRUGO, show_hue, NULL);
+
+static ssize_t show_exposure(struct class_device *cd, char *buf)
+{
+	struct usb_ov511 *ov = cd_to_ov(cd);
+	unsigned char exp;
+
+	if (!ov->dev)
+		return -ENODEV;
+	sensor_get_exposure(ov, &exp);
+	return sprintf(buf, "%d\n", exp >> 8);
+} 
+static CLASS_DEVICE_ATTR(exposure, S_IRUGO, show_exposure, NULL);
+
+static void ov_create_sysfs(struct video_device *vdev)
+{
+	video_device_create_file(vdev, &class_device_attr_custom_id);
+	video_device_create_file(vdev, &class_device_attr_model);
+	video_device_create_file(vdev, &class_device_attr_bridge);
+	video_device_create_file(vdev, &class_device_attr_sensor);
+	video_device_create_file(vdev, &class_device_attr_brightness);
+	video_device_create_file(vdev, &class_device_attr_saturation);
+	video_device_create_file(vdev, &class_device_attr_contrast);
+	video_device_create_file(vdev, &class_device_attr_hue);
+	video_device_create_file(vdev, &class_device_attr_exposure);
+}
+
+/****************************************************************************
  *  USB routines
- *
  ***************************************************************************/
 
 static int
@@ -6174,7 +5798,6 @@ ov51x_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	struct usb_interface_descriptor *idesc;
 	struct usb_ov511 *ov;
 	int i;
-	int registered = 0;
 
 	PDEBUG(1, "probing for device...");
 
@@ -6234,7 +5857,7 @@ ov51x_probe(struct usb_interface *intf, const struct usb_device_id *id)
 		break;
 	default:
 		err("Unknown product ID 0x%04x", dev->descriptor.idProduct);
-		goto error_dealloc;
+		goto error;
 	}
 
 	info("USB %s video device found", symbolic(brglist, ov->bridge));
@@ -6251,7 +5874,7 @@ ov51x_probe(struct usb_interface *intf, const struct usb_device_id *id)
 
 	if (usb_make_path(dev, ov->usb_path, OV511_USB_PATH_LEN) < 0) {
 		err("usb_make_path error");
-		goto error_dealloc;
+		goto error;
 	}
 
 	/* Allocate control transfer buffer. */
@@ -6293,38 +5916,47 @@ ov51x_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	}
 #endif
 
-	memcpy(&ov->vdev, &vdev_template, sizeof(vdev_template));
-	ov->vdev.priv = ov;
+	ov->vdev = video_device_alloc();
+	if (!ov->vdev)
+		goto error;
+
+	memcpy(ov->vdev, &vdev_template, sizeof(*ov->vdev));
+	ov->vdev->dev = &dev->dev;
+	video_set_drvdata(ov->vdev, ov);
 
 	for (i = 0; i < OV511_MAX_UNIT_VIDEO; i++) {
 		/* Minor 0 cannot be specified; assume user wants autodetect */
 		if (unit_video[i] == 0)
 			break;
 
-		if (video_register_device(&ov->vdev, VFL_TYPE_GRABBER,
+		if (video_register_device(ov->vdev, VFL_TYPE_GRABBER,
 			unit_video[i]) >= 0) {
-			registered = 1;
 			break;
 		}
 	}
 
 	/* Use the next available one */
-	if (!registered &&
-	    video_register_device(&ov->vdev, VFL_TYPE_GRABBER, -1) < 0) {
+	if ((ov->vdev->minor == -1) &&
+	    video_register_device(ov->vdev, VFL_TYPE_GRABBER, -1) < 0) {
 		err("video_register_device failed");
 		goto error;
 	}
 
 	info("Device at %s registered to minor %d", ov->usb_path,
-	     ov->vdev.minor);
+	     ov->vdev->minor);
 
-	create_proc_ov511_cam(ov);
-
-	usb_set_intfdata (intf, ov);
+	usb_set_intfdata(intf, ov);
+	ov_create_sysfs(ov->vdev);
 	return 0;
 
 error:
-	destroy_proc_ov511_cam(ov);
+	if (ov->vdev) {
+		if (-1 == ov->vdev->minor)
+			video_device_release(ov->vdev);
+		else
+			video_unregister_device(ov->vdev);
+		ov->vdev = NULL;
+	}
 
 	if (ov->cbuf) {
 		down(&ov->cbuf_lock);
@@ -6333,7 +5965,6 @@ error:
 		up(&ov->cbuf_lock);
 	}
 
-error_dealloc:
 	if (ov) {
 		kfree(ov);
 		ov = NULL;
@@ -6347,7 +5978,7 @@ error_out:
 static void
 ov51x_disconnect(struct usb_interface *intf)
 {
-	struct usb_ov511 *ov = usb_get_intfdata (intf);
+	struct usb_ov511 *ov = usb_get_intfdata(intf);
 	int n;
 
 	PDEBUG(3, "");
@@ -6357,9 +5988,8 @@ ov51x_disconnect(struct usb_interface *intf)
 	if (!ov)
 		return;
 
-	video_unregister_device(&ov->vdev);
-	if (ov->user)
-		PDEBUG(3, "Device open...deferring video_unregister_device");
+	if (ov->vdev)
+		video_unregister_device(ov->vdev);
 
 	for (n = 0; n < OV511_NUMFRAMES; n++)
 		ov->frame[n].grabstate = FRAME_ERROR;
@@ -6374,8 +6004,6 @@ ov51x_disconnect(struct usb_interface *intf)
 
 	ov->streaming = 0;
 	ov51x_unlink_isoc(ov);
-
-        destroy_proc_ov511_cam(ov);
 
 	ov->dev = NULL;
 
@@ -6487,7 +6115,6 @@ ov511_deregister_decomp_module(int ov518, int mmx)
 static int __init
 usb_ov511_init(void)
 {
-        proc_ov511_create();
 
 	if (usb_register(&ov511_driver) < 0)
 		return -1;
@@ -6503,7 +6130,6 @@ usb_ov511_exit(void)
 	usb_deregister(&ov511_driver);
 	info("driver deregistered");
 
-        proc_ov511_destroy();
 }
 
 module_init(usb_ov511_init);

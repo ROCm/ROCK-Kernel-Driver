@@ -129,15 +129,16 @@ static void free_iommu(unsigned long offset, int size)
 static void __flush_gart(struct pci_dev *dev)
 { 
 	unsigned long flags;
-	int bus = dev ? dev->bus->number : -1; 
+	int bus = dev ? dev->bus->number : -1;
+	cpumask_const_t bus_cpumask = pcibus_to_cpumask(bus);
 	int flushed = 0;
 	int i;
 
 	spin_lock_irqsave(&iommu_bitmap_lock, flags);
 	/* recheck flush count inside lock */
 	if (need_flush) { 
-		for (i = 0; northbridges[i]; i++) { 
-			if (bus >= 0 && !(pcibus_to_cpumask(bus) & (1UL << i))) 
+		for (i = 0; northbridges[i]; i++) {
+			if (bus >= 0 && !(cpu_isset_const(i, bus_cpumask)))
 				continue;
 			pci_write_config_dword(northbridges[i], 0x9c, 
 					       northbridge_flush_word[i] | 1); 
@@ -269,7 +270,7 @@ static void iommu_full(struct pci_dev *dev, size_t size, int dir)
 	
 	printk(KERN_ERR 
   "PCI-DMA: Out of IOMMU space for %lu bytes at device %s[%s]\n",
-	       size, dev ? dev->dev.name : "?", dev ? dev->slot_name : "?");
+	       size, dev ? pci_pretty_name(dev) : "", dev ? dev->slot_name : "?");
 
 	if (size > PAGE_SIZE*EMERGENCY_PAGES) {
 		if (dir == PCI_DMA_FROMDEVICE || dir == PCI_DMA_BIDIRECTIONAL)

@@ -89,6 +89,7 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 
 /* public flags for file_system_type */
 #define FS_REQUIRES_DEV 1 
+#define FS_REVAL_DOT	16384	/* Check the paths ".", ".." for staleness */
 #define FS_ODD_RENAME	32768	/* Temporary stuff; will go away as soon
 				  * as nfs_rename() will be cleaned up
 				  */
@@ -327,7 +328,7 @@ struct address_space {
 	struct semaphore	i_shared_sem;	/* protect both above lists */
 	atomic_t		truncate_count;	/* Cover race condition with truncate */
 	unsigned long		dirtied_when;	/* jiffies of first page dirtying */
-	int			gfp_mask;	/* how to allocate the pages */
+	unsigned long		flags;		/* error bits/gfp mask */
 	struct backing_dev_info *backing_dev_info; /* device readahead, etc */
 	spinlock_t		private_lock;	/* for use by the address_space */
 	struct list_head	private_list;	/* ditto */

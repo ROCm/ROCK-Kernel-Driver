@@ -42,6 +42,9 @@ struct eisa_device {
 	struct resource       res[EISA_MAX_RESOURCES];
 	u64                   dma_mask;
 	struct device         dev; /* generic device */
+#ifdef CONFIG_EISA_NAMES
+	char		      pretty_name[DEVICE_NAME_SIZE];
+#endif
 };
 
 #define to_eisa_device(n) container_of(n, struct eisa_device, dev)

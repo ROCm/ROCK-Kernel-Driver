@@ -123,10 +123,9 @@ struct usb_interface {
 	struct usb_driver *driver;	/* driver */
 	int minor;			/* minor number this interface is bound to */
 	struct device dev;		/* interface specific device info */
-	struct class_device class_dev;
+	struct class_device *class_dev;
 };
 #define	to_usb_interface(d) container_of(d, struct usb_interface, dev)
-#define class_dev_to_usb_interface(d) container_of(d, struct usb_interface, class_dev)
 #define	interface_to_usbdev(intf) \
 	container_of(intf->dev.parent, struct usb_device, dev)
 
@@ -290,7 +289,7 @@ extern struct usb_device *usb_find_device(u16 vendor_id, u16 product_id);
 extern int usb_get_current_frame_number (struct usb_device *usb_dev);
 
 /* used these for multi-interface device registration */
-extern void usb_driver_claim_interface(struct usb_driver *driver,
+extern int usb_driver_claim_interface(struct usb_driver *driver,
 			struct usb_interface *iface, void* priv);
 extern int usb_interface_claimed(struct usb_interface *iface);
 extern void usb_driver_release_interface(struct usb_driver *driver,
@@ -869,6 +868,7 @@ extern int usb_string(struct usb_device *dev, int index,
 
 /* wrappers that also update important state inside usbcore */
 extern int usb_clear_halt(struct usb_device *dev, int pipe);
+extern int usb_reset_configuration(struct usb_device *dev);
 extern int usb_set_configuration(struct usb_device *dev, int configuration);
 extern int usb_set_interface(struct usb_device *dev, int ifnum, int alternate);
 

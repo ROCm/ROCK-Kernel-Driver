@@ -456,11 +456,8 @@ asmlinkage long sys_reboot(int magic1, int magic2, unsigned int cmd, void __user
 
 #ifdef CONFIG_SOFTWARE_SUSPEND
 	case LINUX_REBOOT_CMD_SW_SUSPEND:
-		if (!software_suspend_enabled) {
-			unlock_kernel();
-			return -EAGAIN;
-		}		
-		software_suspend();
+		if (!pm_suspend(PM_SUSPEND_DISK))
+			break;
 		do_exit(0);
 		break;
 #endif
@@ -1399,7 +1396,15 @@ asmlinkage long sys_prctl(int option, unsigned long arg2, unsigned long arg3,
 		case PR_GET_FPEXC:
 			error = GET_FPEXC_CTL(current, arg2);
 			break;
-
+		case PR_GET_TIMING:
+			error = PR_TIMING_STATISTICAL;
+			break;
+		case PR_SET_TIMING:
+			if (arg2 == PR_TIMING_STATISTICAL)
+				error = 0;
+			else
+				error = -EINVAL;
+			break;
 
 		case PR_GET_KEEPCAPS:
 			if (current->keep_capabilities)

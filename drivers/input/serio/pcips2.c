@@ -153,7 +153,7 @@ static int __devinit pcips2_probe(struct pci_dev *dev, const struct pci_device_i
 	ps2if->io.write		= pcips2_write;
 	ps2if->io.open		= pcips2_open;
 	ps2if->io.close		= pcips2_close;
-	ps2if->io.name		= dev->dev.name;
+	ps2if->io.name		= pci_name(dev);
 	ps2if->io.phys		= dev->dev.bus_id;
 	ps2if->io.driver	= ps2if;
 	ps2if->dev		= dev;

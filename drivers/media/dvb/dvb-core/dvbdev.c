@@ -299,14 +299,14 @@ int dvb_unregister_adapter(struct dvb_adapter *adap)
 
 static int __init init_dvbdev(void)
 {
+	int retval;
 	devfs_mk_dir("dvb");
 
-	if(register_chrdev(DVB_MAJOR,"DVB", &dvb_device_fops)) {
+	retval = register_chrdev(DVB_MAJOR,"DVB", &dvb_device_fops);
+	if (retval)
 		printk("video_dev: unable to get major %d\n", DVB_MAJOR);
-		return -EIO;
-	}
 
-	return 0;
+	return retval;
 }
 
 

@@ -206,7 +206,31 @@ config BLK_DEV_IDECD
 	  say M here and read <file:Documentation/modules.txt>.  The module
 	  will be called ide-cd.
 
-#dep_tristate '  Include IDE/ATAPI TAPE support' CONFIG_BLK_DEV_IDETAPE $CONFIG_BLK_DEV_IDE
+config BLK_DEV_IDETAPE
+	tristate "Include IDE/ATAPI TAPE support (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+	help
+	  If you have an IDE tape drive using the ATAPI protocol, say Y.
+	  ATAPI is a newer protocol used by IDE tape and CD-ROM drives,
+	  similar to the SCSI protocol.  If you have an SCSI tape drive
+	  however, you can say N here.
+
+	  You should also say Y if you have an OnStream DI-30 tape drive; this
+	  will not work with the SCSI protocol, until there is support for the
+	  SC-30 and SC-50 versions.
+
+	  If you say Y here, the tape drive will be identified at boot time
+	  along with other IDE devices, as "hdb" or "hdc", or something
+	  similar, and will be mapped to a character device such as "ht0"
+	  (check the boot messages with dmesg).  Be sure to consult the
+	  <file:drivers/ide/ide-tape.c> and <file:Documentation/ide.txt> files
+	  for usage information.
+
+	  If you want to compile the driver as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt>.  The module
+	  will be called ide-tape.o.
+
 config BLK_DEV_IDEFLOPPY
 	tristate "Include IDE/ATAPI FLOPPY support"
 	---help---

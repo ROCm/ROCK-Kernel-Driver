@@ -10,10 +10,6 @@
 
 AFLAGS_vmlinux.lds.o += -Usparc
 
-# If the solaris /bin/sh wasn't so broken, I wouldn't need the following
-# line...
-SHELL  =/bin/bash
-
 CC		:= $(shell if gcc -m64 -S -o /dev/null -xc /dev/null >/dev/null 2>&1; then echo gcc; else echo sparc64-linux-gcc; fi )
 
 NEW_GCC := $(shell if $(CC) -m64 -mcmodel=medlow -S -o /dev/null -xc /dev/null >/dev/null 2>&1; then echo y; else echo n; fi; )

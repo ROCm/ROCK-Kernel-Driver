@@ -32,6 +32,7 @@
 #include <linux/console.h>
 #include <linux/spinlock.h>
 #include <linux/slab.h>
+#include <linux/delay.h>
 #include <linux/init.h>
 
 #include <asm/io.h>

@@ -20,6 +20,7 @@
 #include <asm/semaphore.h>
 
 #include "base.h"
+#include "power/power.h"
 
 int (*platform_notify)(struct device * dev) = NULL;
 int (*platform_notify_remove)(struct device * dev) = NULL;
@@ -77,6 +78,12 @@ static void device_release(struct kobject * kobj)
 	struct device * dev = to_dev(kobj);
 	if (dev->release)
 		dev->release(dev);
+	else {
+		printk(KERN_ERR "Device '%s' does not have a release() function, "
+			"it is broken and must be fixed.\n",
+			dev->bus_id);
+		WARN_ON(1);
+	}
 }
 
 static struct kobj_type ktype_device = {
@@ -210,8 +217,7 @@ int device_add(struct device *dev)
 
 	parent = get_device(dev->parent);
 
-	pr_debug("DEV: registering device: ID = '%s', name = %s\n",
-		 dev->bus_id, dev->name);
+	pr_debug("DEV: registering device: ID = '%s'\n", dev->bus_id);
 
 	/* first, register with generic layer. */
 	strlcpy(dev->kobj.name,dev->bus_id,KOBJ_NAME_LEN);
@@ -229,6 +235,8 @@ int device_add(struct device *dev)
 	up_write(&devices_subsys.rwsem);
 
 	bus_add_device(dev);
+
+	device_pm_add(dev);
 
 	/* notify platform of device entry */
 	if (platform_notify)
@@ -304,6 +312,8 @@ void device_del(struct device * dev)
 {
 	struct device * parent = dev->parent;
 
+	device_pm_remove(dev);
+
 	down_write(&devices_subsys.rwsem);
 	if (parent)
 		list_del_init(&dev->node);
@@ -337,8 +347,7 @@ void device_del(struct device * dev)
  */
 void device_unregister(struct device * dev)
 {
-	pr_debug("DEV: Unregistering device. ID = '%s', name = '%s'\n",
-		 dev->bus_id,dev->name);
+	pr_debug("DEV: Unregistering device. ID = '%s'\n", dev->bus_id);
 	device_del(dev);
 	put_device(dev);
 }

@@ -146,7 +146,7 @@ asmlinkage void start_secondary(void)
 	cpu_data[cpu].udelay_val = loops_per_jiffy;
 	prom_smp_finish();
 	printk("Slave cpu booted successfully\n");
-	CPUMASK_SETB(cpu_online_map, cpu);
+	cpu_set(cpu, cpu_online_map);
 	atomic_inc(&cpus_booted);
 	cpu_idle();
 }
@@ -249,7 +249,7 @@ static void stop_this_cpu(void *dummy)
 	/*
 	 * Remove this CPU:
 	 */
-	clear_bit(smp_processor_id(), &cpu_online_map);
+	cpu_clear(smp_processor_id(), cpu_online_map);
 	local_irq_enable();	/* May need to service _machine_restart IPI */
 	for (;;);		/* Wait if available. */
 }

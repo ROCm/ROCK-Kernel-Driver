@@ -15,6 +15,7 @@
 
 #include <linux/cache.h>
 #include <linux/spinlock.h>
+#include <linux/cpumask.h>
 
 #include <asm/irq.h>
 #include <asm/ptrace.h>
@@ -44,7 +45,7 @@ struct hw_interrupt_type {
 	void (*disable)(unsigned int irq);
 	void (*ack)(unsigned int irq);
 	void (*end)(unsigned int irq);
-	void (*set_affinity)(unsigned int irq, unsigned long mask);
+	void (*set_affinity)(unsigned int irq, cpumask_t dest);
 };
 
 typedef struct hw_interrupt_type  hw_irq_controller;

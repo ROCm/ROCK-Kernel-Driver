@@ -274,7 +274,7 @@ unmask_irq (unsigned int irq)
 
 
 static void
-iosapic_set_affinity (unsigned int irq, unsigned long mask)
+iosapic_set_affinity (unsigned int irq, cpumask_t mask)
 {
 #ifdef CONFIG_SMP
 	unsigned long flags;
@@ -287,12 +287,10 @@ iosapic_set_affinity (unsigned int irq, unsigned long mask)
 	irq &= (~IA64_IRQ_REDIRECTED);
 	vec = irq_to_vector(irq);
 
-	mask &= cpu_online_map;
-
-	if (!mask || vec >= IA64_NUM_VECTORS)
+	if (cpus_empty(mask) || vec >= IA64_NUM_VECTORS)
 		return;
 
-	dest = cpu_physical_id(ffz(~mask));
+	dest = cpu_physical_id(first_cpu(mask));
 
 	rte_index = iosapic_intr_info[vec].rte_index;
 	addr = iosapic_intr_info[vec].addr;
@@ -497,7 +495,7 @@ iosapic_register_intr (unsigned int gsi,
 		       unsigned long polarity, unsigned long trigger)
 {
 	int vector;
-	unsigned int dest = (ia64_get_lid() >> 16) & 0xffff;
+	unsigned int dest = (ia64_getreg(_IA64_REG_CR_LID) >> 16) & 0xffff;
 
 	vector = gsi_to_vector(gsi);
 	if (vector < 0)
@@ -574,7 +572,7 @@ iosapic_override_isa_irq (unsigned int isa_irq, unsigned int gsi,
 			  unsigned long trigger)
 {
 	int vector;
-	unsigned int dest = (ia64_get_lid() >> 16) & 0xffff;
+	unsigned int dest = (ia64_getreg(_IA64_REG_CR_LID) >> 16) & 0xffff;
 
 	vector = isa_irq_to_vector(isa_irq);
 
@@ -668,11 +666,11 @@ iosapic_enable_intr (unsigned int vector)
 		 * Direct the interrupt vector to the current cpu, platform redirection
 		 * will distribute them.
 		 */
-		dest = (ia64_get_lid() >> 16) & 0xffff;
+		dest = (ia64_getreg(_IA64_REG_CR_LID) >> 16) & 0xffff;
 	}
 #else
 	/* direct the interrupt vector to the running cpu id */
-	dest = (ia64_get_lid() >> 16) & 0xffff;
+	dest = (ia64_getreg(_IA64_REG_CR_LID) >> 16) & 0xffff;
 #endif
 	set_rte(vector, dest);
 

@@ -123,9 +123,9 @@ static int cyberjack_startup (struct usb_serial *serial)
 	priv->rdtodo = 0;
 	priv->wrfilled = 0;
 	priv->wrsent = 0;
-	usb_set_serial_port_data(serial->port, priv);
+	usb_set_serial_port_data(serial->port[0], priv);
 
-	init_waitqueue_head(&serial->port->write_wait);
+	init_waitqueue_head(&serial->port[0]->write_wait);
 
 	return( 0 );
 }
@@ -138,8 +138,8 @@ static void cyberjack_shutdown (struct usb_serial *serial)
 
 	for (i=0; i < serial->num_ports; ++i) {
 		/* My special items, the standard routines free my urbs */
-		kfree(usb_get_serial_port_data(&serial->port[i]));
-		usb_set_serial_port_data(&serial->port[i], NULL);
+		kfree(usb_get_serial_port_data(serial->port[i]));
+		usb_set_serial_port_data(serial->port[i], NULL);
 	}
 }
 	

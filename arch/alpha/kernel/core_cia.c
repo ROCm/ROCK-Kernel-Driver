@@ -47,15 +47,6 @@
 
 #define vip	volatile int  *
 
-/* Save CIA configuration data as the console had it set up.  */
-
-struct 
-{
-	unsigned int w_base;
-	unsigned int w_mask;
-	unsigned int t_base;
-} saved_config[4] __attribute((common));
-
 /*
  * Given a bus, device, and function number, compute resulting
  * configuration space address.  It is therefore not safe to have
@@ -567,6 +558,77 @@ failed:
 	goto exit;
 }
 
+#if defined(ALPHA_RESTORE_SRM_SETUP)
+/* Save CIA configuration data as the console had it set up.  */
+struct 
+{
+    unsigned int hae_mem;
+    unsigned int hae_io;
+    unsigned int pci_dac_offset;
+    unsigned int err_mask;
+    unsigned int cia_ctrl;
+    unsigned int cia_cnfg;
+    struct {
+	unsigned int w_base;
+	unsigned int w_mask;
+	unsigned int t_base;
+    } window[4];
+} saved_config __attribute((common));
+
+void
+cia_save_srm_settings(int is_pyxis)
+{
+	int i;
+
+	/* Save some important registers. */
+	saved_config.err_mask       = *(vip)CIA_IOC_ERR_MASK;
+	saved_config.cia_ctrl       = *(vip)CIA_IOC_CIA_CTRL;
+	saved_config.hae_mem        = *(vip)CIA_IOC_HAE_MEM;
+	saved_config.hae_io         = *(vip)CIA_IOC_HAE_IO;
+	saved_config.pci_dac_offset = *(vip)CIA_IOC_PCI_W_DAC;
+
+	if (is_pyxis)
+	    saved_config.cia_cnfg   = *(vip)CIA_IOC_CIA_CNFG;
+	else
+	    saved_config.cia_cnfg   = 0;
+
+	/* Save DMA windows configuration. */
+	for (i = 0; i < 4; i++) {
+	    saved_config.window[i].w_base = *(vip)CIA_IOC_PCI_Wn_BASE(i);
+	    saved_config.window[i].w_mask = *(vip)CIA_IOC_PCI_Wn_MASK(i);
+	    saved_config.window[i].t_base = *(vip)CIA_IOC_PCI_Tn_BASE(i);
+	}
+	mb();
+}
+
+void
+cia_restore_srm_settings(void)
+{
+	int i;
+
+	for (i = 0; i < 4; i++) {
+	    *(vip)CIA_IOC_PCI_Wn_BASE(i) = saved_config.window[i].w_base;
+	    *(vip)CIA_IOC_PCI_Wn_MASK(i) = saved_config.window[i].w_mask;
+	    *(vip)CIA_IOC_PCI_Tn_BASE(i) = saved_config.window[i].t_base;
+	}
+
+	*(vip)CIA_IOC_HAE_MEM   = saved_config.hae_mem;
+	*(vip)CIA_IOC_HAE_IO    = saved_config.hae_io;
+	*(vip)CIA_IOC_PCI_W_DAC = saved_config.pci_dac_offset;	
+	*(vip)CIA_IOC_ERR_MASK  = saved_config.err_mask;
+	*(vip)CIA_IOC_CIA_CTRL  = saved_config.cia_ctrl;
+
+	if (saved_config.cia_cnfg) /* Must be pyxis. */
+	    *(vip)CIA_IOC_CIA_CNFG  = saved_config.cia_cnfg;
+
+	mb();
+}
+#else /* ALPHA_RESTORE_SRM_SETUP */
+#define cia_save_srm_settings(p)	do {} while (0)
+#define cia_restore_srm_settings()	do {} while (0)
+#endif /* ALPHA_RESTORE_SRM_SETUP */
+
+
 static void __init
 do_init_arch(int is_pyxis)
 {
@@ -576,6 +638,9 @@ do_init_arch(int is_pyxis)
 	cia_rev = *(vip)CIA_IOC_CIA_REV & CIA_REV_MASK;
 	printk("pci: cia revision %d%s\n",
 	       cia_rev, is_pyxis ? " (pyxis)" : "");
+
+	if (alpha_using_srm)
+		cia_save_srm_settings(is_pyxis);
 
 	/* Set up error reporting.  */
 	temp = *(vip)CIA_IOC_ERR_MASK;
@@ -645,24 +710,6 @@ do_init_arch(int is_pyxis)
 		hose->sparse_io_base = 0;
 		hose->dense_io_base = CIA_BW_IO - IDENT_ADDR;
 	}
-
-	/* Save CIA configuration data as the console had it set up.  */
-
-	saved_config[0].w_base = *(vip)CIA_IOC_PCI_W0_BASE;
-	saved_config[0].w_mask = *(vip)CIA_IOC_PCI_W0_MASK;
-	saved_config[0].t_base = *(vip)CIA_IOC_PCI_T0_BASE;
-
-	saved_config[1].w_base = *(vip)CIA_IOC_PCI_W1_BASE;
-	saved_config[1].w_mask = *(vip)CIA_IOC_PCI_W1_MASK;
-	saved_config[1].t_base = *(vip)CIA_IOC_PCI_T1_BASE;
-
-	saved_config[2].w_base = *(vip)CIA_IOC_PCI_W2_BASE;
-	saved_config[2].w_mask = *(vip)CIA_IOC_PCI_W2_MASK;
-	saved_config[2].t_base = *(vip)CIA_IOC_PCI_T2_BASE;
-
-	saved_config[3].w_base = *(vip)CIA_IOC_PCI_W3_BASE;
-	saved_config[3].w_mask = *(vip)CIA_IOC_PCI_W3_MASK;
-	saved_config[3].t_base = *(vip)CIA_IOC_PCI_T3_BASE;
 
 	/*
 	 * Set up the PCI to main memory translation windows.
@@ -761,21 +808,8 @@ pyxis_init_arch(void)
 void
 cia_kill_arch(int mode)
 {
-	*(vip)CIA_IOC_PCI_W0_BASE = saved_config[0].w_base;
-	*(vip)CIA_IOC_PCI_W0_MASK = saved_config[0].w_mask;
-	*(vip)CIA_IOC_PCI_T0_BASE = saved_config[0].t_base;
-
-	*(vip)CIA_IOC_PCI_W1_BASE = saved_config[1].w_base;
-	*(vip)CIA_IOC_PCI_W1_MASK = saved_config[1].w_mask;
-	*(vip)CIA_IOC_PCI_T1_BASE = saved_config[1].t_base;
-
-	*(vip)CIA_IOC_PCI_W2_BASE = saved_config[2].w_base;
-	*(vip)CIA_IOC_PCI_W2_MASK = saved_config[2].w_mask;
-	*(vip)CIA_IOC_PCI_T2_BASE = saved_config[2].t_base;
-
-	*(vip)CIA_IOC_PCI_W3_BASE = saved_config[3].w_base;
-	*(vip)CIA_IOC_PCI_W3_MASK = saved_config[3].w_mask;
-	*(vip)CIA_IOC_PCI_T3_BASE = saved_config[3].t_base;
+	if (alpha_using_srm)
+		cia_restore_srm_settings();
 }
 
 void __init
@@ -1065,7 +1099,8 @@ cia_decode_parity_error(struct el_CIA_sysdata_mcheck *cia)
 	printk(KERN_CRIT "  Command: %s, Parity bit: %d\n", cmd, par);
 	printk(KERN_CRIT "  Address: %#010lx, Mask: %#lx\n", addr, mask);
 }
-#endif
+#endif /* CONFIG_VERBOSE_MCHECK */
+
 
 static int
 cia_decode_mchk(unsigned long la_ptr)
@@ -1080,6 +1115,9 @@ cia_decode_mchk(unsigned long la_ptr)
 		return 0;
 
 #ifdef CONFIG_VERBOSE_MCHECK
+	if (!alpha_verbose_mcheck)
+		return 1;
+
 	switch (ffs(cia->cia_err & 0xfff) - 1) {
 	case 0: /* CIA_ERR_COR_ERR */
 		cia_decode_ecc_error(cia, "Corrected ECC error");
@@ -1152,7 +1190,7 @@ cia_decode_mchk(unsigned long la_ptr)
 	if (cia->cia_err & CIA_ERR_LOST_IOA_TIMEOUT)
 		printk(KERN_CRIT "CIA lost machine check: "
 		       "I/O timeout\n");
-#endif
+#endif /* CONFIG_VERBOSE_MCHECK */
 
 	return 1;
 }

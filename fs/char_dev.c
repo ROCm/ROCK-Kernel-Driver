@@ -456,9 +456,7 @@ void cdev_init(struct cdev *cdev, struct file_operations *fops)
 
 static struct kobject *base_probe(dev_t dev, int *part, void *data)
 {
-	char name[30];
-	sprintf(name, "char-major-%d", MAJOR(dev));
-	request_module(name);
+	request_module("char-major-%d", MAJOR(dev));
 	return NULL;
 }
 

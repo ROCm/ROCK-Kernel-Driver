@@ -170,15 +170,29 @@ static void buffer_io_error(struct buffer_head *bh)
  * Default synchronous end-of-IO handler..  Just mark it up-to-date and
  * unlock the buffer. This is what ll_rw_block uses too.
  */
-void end_buffer_io_sync(struct buffer_head *bh, int uptodate)
+void end_buffer_read_sync(struct buffer_head *bh, int uptodate)
 {
 	if (uptodate) {
 		set_buffer_uptodate(bh);
 	} else {
-		/*
-		 * This happens, due to failed READA attempts.
-		 * buffer_io_error(bh);
-		 */
+		/* This happens, due to failed READA attempts. */
+		clear_buffer_uptodate(bh);
+	}
+	unlock_buffer(bh);
+	put_bh(bh);
+}
+
+void end_buffer_write_sync(struct buffer_head *bh, int uptodate)
+{
+	char b[BDEVNAME_SIZE];
+
+	if (uptodate) {
+		set_buffer_uptodate(bh);
+	} else {
+		buffer_io_error(bh);
+		printk(KERN_WARNING "lost page write due to I/O error on %s\n",
+		       bdevname(bh->b_bdev, b));
+		set_buffer_write_io_error(bh);
 		clear_buffer_uptodate(bh);
 	}
 	unlock_buffer(bh);
@@ -550,6 +564,7 @@ still_busy:
  */
 void end_buffer_async_write(struct buffer_head *bh, int uptodate)
 {
+	char b[BDEVNAME_SIZE];
 	static spinlock_t page_uptodate_lock = SPIN_LOCK_UNLOCKED;
 	unsigned long flags;
 	struct buffer_head *tmp;
@@ -562,6 +577,9 @@ void end_buffer_async_write(struct buffer_head *bh, int uptodate)
 		set_buffer_uptodate(bh);
 	} else {
 		buffer_io_error(bh);
+		printk(KERN_WARNING "lost page write due to I/O error on %s\n",
+		       bdevname(bh->b_bdev, b));
+		set_bit(AS_EIO, &page->mapping->flags);
 		clear_buffer_uptodate(bh);
 		SetPageError(page);
 	}
@@ -1288,7 +1306,7 @@ static struct buffer_head *__bread_slow(struct buffer_head *bh)
 		if (buffer_dirty(bh))
 			buffer_error();
 		get_bh(bh);
-		bh->b_end_io = end_buffer_io_sync;
+		bh->b_end_io = end_buffer_read_sync;
 		submit_bh(READ, bh);
 		wait_on_buffer(bh);
 		if (buffer_uptodate(bh))
@@ -2592,7 +2610,7 @@ int block_write_full_page(struct page *page, get_block_t *get_block,
 		 */
 		block_invalidatepage(page, 0);
 		unlock_page(page);
-		return -EIO;
+		return 0; /* don't care */
 	}
 
 	/*
@@ -2646,8 +2664,10 @@ int submit_bh(int rw, struct buffer_head * bh)
 		buffer_error();
 	if (rw == READ && buffer_dirty(bh))
 		buffer_error();
-				
-	set_buffer_req(bh);
+
+	/* Only clear out a write error when rewriting */
+	if (test_set_buffer_req(bh) && rw == WRITE)
+		clear_buffer_write_io_error(bh);
 
 	/*
 	 * from here on down, it's all bio -- do the initial mapping,
@@ -2707,13 +2727,14 @@ void ll_rw_block(int rw, int nr, struct buffer_head *bhs[])
 			continue;
 
 		get_bh(bh);
-		bh->b_end_io = end_buffer_io_sync;
 		if (rw == WRITE) {
+			bh->b_end_io = end_buffer_write_sync;
 			if (test_clear_buffer_dirty(bh)) {
 				submit_bh(WRITE, bh);
 				continue;
 			}
 		} else {
+			bh->b_end_io = end_buffer_read_sync;
 			if (!buffer_uptodate(bh)) {
 				submit_bh(rw, bh);
 				continue;
@@ -2734,7 +2755,7 @@ void sync_dirty_buffer(struct buffer_head *bh)
 	lock_buffer(bh);
 	if (test_clear_buffer_dirty(bh)) {
 		get_bh(bh);
-		bh->b_end_io = end_buffer_io_sync;
+		bh->b_end_io = end_buffer_write_sync;
 		submit_bh(WRITE, bh);
 		wait_on_buffer(bh);
 	} else {
@@ -2793,6 +2814,8 @@ drop_buffers(struct page *page, struct buffer_head **buffers_to_free)
 	bh = head;
 	do {
 		check_ttfb_buffer(page, bh);
+		if (buffer_write_io_error(bh))
+			set_bit(AS_EIO, &page->mapping->flags);
 		if (buffer_busy(bh))
 			goto failed;
 		if (!buffer_uptodate(bh) && !buffer_req(bh))

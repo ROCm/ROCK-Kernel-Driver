@@ -2112,7 +2112,7 @@ static u32 tw_map_scsi_single_data(struct pci_dev *pdev, Scsi_Cmnd *cmd)
 	if (cmd->request_bufflen == 0)
 		return 0;
 
-	mapping = pci_map_page(pdev, virt_to_page(cmd->request_buffer), ((unsigned long)cmd->request_buffer & ~PAGE_MASK), cmd->request_bufflen, dma_dir);
+	mapping = pci_map_page(pdev, virt_to_page(cmd->request_buffer), offset_in_page(cmd->request_buffer), cmd->request_bufflen, dma_dir);
 
 	if (mapping == 0) {
 		printk(KERN_WARNING "3w-xxxx: tw_map_scsi_single_data(): pci_map_page() failed.\n");
@@ -3451,7 +3451,6 @@ static Scsi_Host_Template driver_template = {
 	.cmd_per_lun		= TW_MAX_CMDS_PER_LUN,	
 	.use_clustering		= ENABLE_CLUSTERING,
 	.emulated		= 1,
-	.highmem_io		= 1,
 };
 #include "scsi_module.c"
 

@@ -16,6 +16,7 @@
 #include <linux/init.h>
 #include <linux/threads.h>
 #include <linux/kernel.h>
+#include <linux/cpumask.h>
 
 #include <asm/bitops.h>
 #include <asm/io.h>
@@ -37,8 +38,8 @@ extern struct smp_boot_data {
 
 extern char no_int_routing __initdata;
 
-extern unsigned long phys_cpu_present_map;
-extern volatile unsigned long cpu_online_map;
+extern cpumask_t phys_cpu_present_map;
+extern cpumask_t cpu_online_map;
 extern unsigned long ipi_base_addr;
 extern unsigned char smp_int_redirect;
 
@@ -47,22 +48,7 @@ extern volatile int ia64_cpu_to_sapicid[];
 
 extern unsigned long ap_wakeup_vector;
 
-#define cpu_possible(cpu)	(phys_cpu_present_map & (1UL << (cpu)))
-#define cpu_online(cpu)		(cpu_online_map & (1UL << (cpu)))
-
-static inline unsigned int
-num_online_cpus (void)
-{
-	return hweight64(cpu_online_map);
-}
-
-static inline unsigned int
-any_online_cpu (unsigned int mask)
-{
-	if (mask & cpu_online_map)
-		return __ffs(mask & cpu_online_map);
-	return NR_CPUS;
-}
+#define cpu_possible(cpu)	cpu_isset(cpu, phys_cpu_present_map)
 
 /*
  * Function to map hard smp processor id to logical id.  Slow, so don't use this in
@@ -120,7 +106,7 @@ hard_smp_processor_id (void)
 		unsigned long bits;
 	} lid;
 
-	lid.bits = ia64_get_lid();
+	lid.bits = ia64_getreg(_IA64_REG_CR_LID);
 	return lid.f.id << 8 | lid.f.eid;
 }
 

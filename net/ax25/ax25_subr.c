@@ -158,10 +158,10 @@ void ax25_send_control(ax25_cb *ax25, int frametype, int poll_bit, int type)
 	struct sk_buff *skb;
 	unsigned char  *dptr;
 
-	if ((skb = alloc_skb(AX25_BPQ_HEADER_LEN + ax25_addr_size(ax25->digipeat) + 2, GFP_ATOMIC)) == NULL)
+	if ((skb = alloc_skb(ax25->ax25_dev->dev->hard_header_len + 2, GFP_ATOMIC)) == NULL)
 		return;
 
-	skb_reserve(skb, AX25_BPQ_HEADER_LEN + ax25_addr_size(ax25->digipeat));
+	skb_reserve(skb, ax25->ax25_dev->dev->hard_header_len);
 
 	skb->nh.raw = skb->data;
 
@@ -202,10 +202,10 @@ void ax25_return_dm(struct net_device *dev, ax25_address *src, ax25_address *des
 	if (dev == NULL)
 		return;
 
-	if ((skb = alloc_skb(AX25_BPQ_HEADER_LEN + ax25_addr_size(digi) + 1, GFP_ATOMIC)) == NULL)
+	if ((skb = alloc_skb(dev->hard_header_len + 1, GFP_ATOMIC)) == NULL)
 		return;	/* Next SABM will get DM'd */
 
-	skb_reserve(skb, AX25_BPQ_HEADER_LEN + ax25_addr_size(digi));
+	skb_reserve(skb, dev->hard_header_len);
 	skb->nh.raw = skb->data;
 
 	ax25_digi_invert(digi, &retdigi);
@@ -282,6 +282,7 @@ void ax25_disconnect(ax25_cb *ax25, int reason)
 	ax25_link_failed(ax25, reason);
 
 	if (ax25->sk != NULL) {
+		bh_lock_sock(ax25->sk);
 		ax25->sk->sk_state     = TCP_CLOSE;
 		ax25->sk->sk_err       = reason;
 		ax25->sk->sk_shutdown |= SEND_SHUTDOWN;
@@ -289,5 +290,6 @@ void ax25_disconnect(ax25_cb *ax25, int reason)
 			ax25->sk->sk_state_change(ax25->sk);
 			sock_set_flag(ax25->sk, SOCK_DEAD);
 		}
+		bh_unlock_sock(ax25->sk);
 	}
 }

@@ -51,6 +51,8 @@
  *  Revision history
  *    02.08.2001  Initial release
  *    06.22.2001  Added I2S support
+ *    07.30.2003  Removed initialisation to zero for static variables
+ *		   (spdif[NR_DEVICE], i2s_fmt[NR_DEVICE], and devindex)
  */
 #include <linux/version.h>
 #include <linux/module.h>
@@ -1003,11 +1005,11 @@ static int it8172_ioctl_mixdev(struct inode *inode, struct file *file,
 }
 
 static /*const*/ struct file_operations it8172_mixer_fops = {
-	owner:	THIS_MODULE,
-	llseek:	it8172_llseek,
-	ioctl:	it8172_ioctl_mixdev,
-	open:	it8172_open_mixdev,
-	release:	it8172_release_mixdev,
+	.owner		= THIS_MODULE,
+	.llseek		= it8172_llseek,
+	.ioctl		= it8172_ioctl_mixdev,
+	.open		= it8172_open_mixdev,
+	.release	= it8172_release_mixdev,
 };
 
 /* --------------------------------------------------------------------- */
@@ -1872,15 +1874,15 @@ static int it8172_release(struct inode *inode, struct file *file)
 }
 
 static /*const*/ struct file_operations it8172_audio_fops = {
-	owner:	THIS_MODULE,
-	llseek:	it8172_llseek,
-	read:	it8172_read,
-	write:	it8172_write,
-	poll:	it8172_poll,
-	ioctl:	it8172_ioctl,
-	mmap:	it8172_mmap,
-	open:	it8172_open,
-	release:	it8172_release,
+	.owner		= THIS_MODULE,
+	.llseek		= it8172_llseek,
+	.read		= it8172_read,
+	.write		= it8172_write,
+	.poll		= it8172_poll,
+	.ioctl		= it8172_ioctl,
+	.mmap		= it8172_mmap,
+	.open		= it8172_open,
+	.release	= it8172_release,
 };
 
 
@@ -1952,10 +1954,10 @@ static int proc_it8172_dump (char *buf, char **start, off_t fpos,
 /* maximum number of devices; only used for command line params */
 #define NR_DEVICE 5
 
-static int spdif[NR_DEVICE] = { 0, };
-static int i2s_fmt[NR_DEVICE] = { 0, };
+static int spdif[NR_DEVICE];
+static int i2s_fmt[NR_DEVICE];
 
-static unsigned int devindex = 0;
+static unsigned int devindex;
 
 MODULE_PARM(spdif, "1-" __MODULE_STRING(NR_DEVICE) "i");
 MODULE_PARM_DESC(spdif, "if 1 the S/PDIF digital output is enabled");

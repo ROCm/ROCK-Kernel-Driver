@@ -16,7 +16,6 @@
 #include <linux/ptrace.h>
 #include <linux/slab.h>
 #include <linux/string.h>
-#include <linux/timer.h>
 #include <linux/tty.h>
 #include <linux/serial.h>
 #include <linux/major.h>
@@ -64,7 +63,7 @@ MODULE_PARM(irq_list, "1-10i");
 */
 
 static void avmcs_config(dev_link_t *link);
-static void avmcs_release(u_long arg);
+static void avmcs_release(dev_link_t *link);
 static int avmcs_event(event_t event, int priority,
 			  event_callback_args_t *args);
 
@@ -142,8 +141,6 @@ static dev_link_t *avmcs_attach(void)
     if (!link)
         goto err;
     memset(link, 0, sizeof(struct dev_link_t));
-    link->release.function = &avmcs_release;
-    link->release.data = (u_long)link;
 
     /* The io structure describes IO port mapping */
     link->io.NumPorts1 = 16;
@@ -403,7 +400,7 @@ found_port:
     link->state &= ~DEV_CONFIG_PENDING;
     /* If any step failed, release any partially configured state */
     if (i != 0) {
-	avmcs_release((u_long)link);
+	avmcs_release(link);
 	return;
     }
 
@@ -417,7 +414,7 @@ found_port:
     if ((i = (*addcard)(link->io.BasePort1, link->irq.AssignedIRQ)) < 0) {
         printk(KERN_ERR "avm_cs: failed to add AVM-%s-Controller at i/o %#x, irq %d\n",
 		dev->node.dev_name, link->io.BasePort1, link->irq.AssignedIRQ);
-	avmcs_release((u_long)link);
+	avmcs_release(link);
 	return;
     }
     dev->node.minor = i;
@@ -432,10 +429,8 @@ found_port:
     
 ======================================================================*/
 
-static void avmcs_release(u_long arg)
+static void avmcs_release(dev_link_t *link)
 {
-    dev_link_t *link = (dev_link_t *)arg;
-
     /*
        If the device is currently in use, we won't release until it
        is actually closed.
@@ -483,10 +478,8 @@ static int avmcs_event(event_t event, int priority,
     switch (event) {
     case CS_EVENT_CARD_REMOVAL:
 	link->state &= ~DEV_PRESENT;
-	if (link->state & DEV_CONFIG) {
-	    link->release.expires = jiffies + (HZ/20);
-	    add_timer(&link->release);
-	}
+	if (link->state & DEV_CONFIG)
+		avmcs_release(link);
 	break;
     case CS_EVENT_CARD_INSERTION:
 	link->state |= DEV_PRESENT | DEV_CONFIG_PENDING;
@@ -531,7 +524,7 @@ static void __exit avmcs_exit(void)
 	/* XXX: this really needs to move into generic code.. */
 	while (dev_list != NULL) {
 		if (dev_list->state & DEV_CONFIG)
-			avmcs_release((u_long)dev_list);
+			avmcs_release(dev_list);
 		avmcs_detach(dev_list);
 	}
 }

@@ -74,9 +74,9 @@ static void CS_OUT(unsigned char a)
 #define CS_OUT3(a, b, c)	{CS_OUT(a);CS_OUT(b);CS_OUT(c);}
 
 static int __initdata bss       = 0;
-static int mpu_base = 0, mpu_irq = 0;
-static int synth_base = 0, synth_irq = 0;
-static int mpu_detected = 0;
+static int mpu_base, mpu_irq;
+static int synth_base, synth_irq;
+static int mpu_detected;
 
 int probe_cs4232_mpu(struct address_info *hw_config)
 {

@@ -395,14 +395,6 @@ struct hd_geometry {
       unsigned long start;
 };
 
-/* BIG GEOMETRY - dying, used only by HDIO_GETGEO_BIG_RAW */
-struct hd_big_geometry {
-	unsigned char heads;
-	unsigned char sectors;
-	unsigned int cylinders;
-	unsigned long start;
-};
-
 /* hd/ide ctl's that pass (arg) ptrs to user space are numbered 0x030n/0x031n */
 #define HDIO_GETGEO		0x0301	/* get device geometry */
 #define HDIO_GET_UNMASKINTR	0x0302	/* get current unmask setting */
@@ -456,7 +448,7 @@ enum {
 
 /* hd/ide ctl's that pass (arg) ptrs to user space are numbered 0x033n/0x033n */
 /* 0x330 is reserved - used to be HDIO_GETGEO_BIG */
-#define HDIO_GETGEO_BIG_RAW	0x0331	/* */
+/* 0x331 is reserved - used to be HDIO_GETGEO_BIG_RAW */
 
 #define HDIO_SET_IDE_SCSI      0x0338
 #define HDIO_SET_SCSI_IDE      0x0339

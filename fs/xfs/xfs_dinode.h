@@ -72,7 +72,8 @@ typedef struct xfs_dinode_core
 	__uint32_t	di_gid;		/* owner's group id */
 	__uint32_t	di_nlink;	/* number of links to file */
 	__uint16_t	di_projid;	/* owner's project id */
-	__uint8_t	di_pad[10];	/* unused, zeroed space */
+	__uint8_t	di_pad[8];	/* unused, zeroed space */
+	__uint16_t	di_flushiter;	/* incremented on flush */
 	xfs_timestamp_t	di_atime;	/* time last accessed */
 	xfs_timestamp_t	di_mtime;	/* time last modified */
 	xfs_timestamp_t	di_ctime;	/* time created/inode modified */
@@ -88,6 +89,8 @@ typedef struct xfs_dinode_core
 	__uint16_t	di_flags;	/* random flags, XFS_DIFLAG_... */
 	__uint32_t	di_gen;		/* generation number */
 } xfs_dinode_core_t;
+
+#define DI_MAX_FLUSH 0xffff
 
 typedef struct xfs_dinode
 {

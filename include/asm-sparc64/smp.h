@@ -14,50 +14,14 @@
 
 #ifndef __ASSEMBLY__
 
+#include <linux/cpumask.h>
 #include <linux/cache.h>
-
-/* PROM provided per-processor information we need
- * to start them all up.
- */
-
-struct prom_cpuinfo {
-	int prom_node;
-	int mid;
-};
-
-extern int linux_num_cpus;	/* number of CPUs probed  */
-extern struct prom_cpuinfo linux_cpus[NR_CPUS];
-extern unsigned int prom_cpu_nodes[NR_CPUS];
 
 #endif /* !(__ASSEMBLY__) */
 
 #ifdef CONFIG_SMP
 
 #ifndef __ASSEMBLY__
-
-/* Per processor Sparc parameters we need. */
-
-/* Keep this a multiple of 64-bytes for cache reasons. */
-typedef struct {
-	/* Dcache line 1 */
-	unsigned int	__pad0;		/* bh_count moved to irq_stat for consistency. KAO */
-	unsigned int	multiplier;
-	unsigned int	counter;
-	unsigned int	idle_volume;
-	unsigned long	clock_tick;	/* %tick's per second */
-	unsigned long	udelay_val;
-
-	/* Dcache line 2 */
-	unsigned int	pgcache_size;
-	unsigned int	pgdcache_size;
-	unsigned long	*pte_cache[2];
-	unsigned long	*pgd_cache;
-
-	/* Dcache lines 3 and 4 */
-	unsigned int	irq_worklists[16];
-} ____cacheline_aligned cpuinfo_sparc;
-
-extern cpuinfo_sparc cpu_data[NR_CPUS];
 
 /*
  *	Private routines/data
@@ -68,24 +32,13 @@ extern cpuinfo_sparc cpu_data[NR_CPUS];
 
 extern unsigned char boot_cpu_id;
 
-extern unsigned long phys_cpu_present_map;
-#define cpu_possible(cpu)	(phys_cpu_present_map & (1UL << (cpu)))
+extern cpumask_t phys_cpu_present_map;
+#define cpu_possible(cpu)	cpu_isset(cpu, phys_cpu_present_map)
 
-extern unsigned long cpu_online_map;
-#define cpu_online(cpu)		(cpu_online_map & (1UL << (cpu)))
-
-extern atomic_t sparc64_num_cpus_online;
-#define num_online_cpus()	(atomic_read(&sparc64_num_cpus_online))
+#define cpu_online(cpu)		cpu_isset(cpu, cpu_online_map)
 
 extern atomic_t sparc64_num_cpus_possible;
 #define num_possible_cpus()	(atomic_read(&sparc64_num_cpus_possible))
-
-static inline unsigned int any_online_cpu(unsigned long mask)
-{
-	if ((mask &= cpu_online_map) != 0UL)
-		return __ffs(mask);
-	return NR_CPUS;
-}
 
 /*
  *	General functions that each host system must provide.
@@ -120,29 +73,11 @@ static __inline__ int hard_smp_processor_id(void)
 
 #define smp_processor_id() (current_thread_info()->cpu)
 
-/* This needn't do anything as we do not sleep the cpu
- * inside of the idler task, so an interrupt is not needed
- * to get a clean fast response.
- *
- * XXX Reverify this assumption... -DaveM
- *
- * Addendum: We do want it to do something for the signal
- *           delivery case, we detect that by just seeing
- *           if we are trying to send this to an idler or not.
- */
-static __inline__ void smp_send_reschedule(int cpu)
-{
-	extern void smp_receive_signal(int);
-	if (cpu_data[cpu].idle_volume == 0)
-		smp_receive_signal(cpu);
-}
-
-/* This is a nop as well because we capture all other cpus
- * anyways when making the PROM active.
- */
-static __inline__ void smp_send_stop(void) { }
-
 #endif /* !(__ASSEMBLY__) */
+
+#else
+
+#define num_possible_cpus()	(1)
 
 #endif /* !(CONFIG_SMP) */
 

@@ -150,7 +150,7 @@ static char *valid_interrupts = valid_interrupts_new;
 #ifdef REVEAL_SPEA
 static char old_hardware = 1;
 #else
-static char old_hardware = 0;
+static char old_hardware;
 #endif
 
 static void sleep(unsigned howlong)
@@ -402,7 +402,7 @@ static int sscape_download_boot(struct sscape_info *devc, unsigned char *block, 
 	unsigned long flags;
 	unsigned char temp;
 	volatile int done, timeout_val;
-	static unsigned char codec_dma_bits = 0;
+	static unsigned char codec_dma_bits;
 
 	if (flag & CPF_FIRST)
 	{
@@ -595,8 +595,8 @@ static coproc_operations sscape_coproc_operations =
 	&adev_info
 };
 
-static int sscape_detected = 0;
-static int sscape_is_pnp   = 0;
+static int sscape_detected;
+static int sscape_is_pnp;
 
 void __init attach_sscape(struct address_info *hw_config)
 {

@@ -35,6 +35,7 @@ static int leo_blank(int, struct fb_info *);
 static int leo_mmap(struct fb_info *, struct file *, struct vm_area_struct *);
 static int leo_ioctl(struct inode *, struct file *, unsigned int,
 		     unsigned long, struct fb_info *);
+static int leo_pan_display(struct fb_var_screeninfo *, struct fb_info *);
 
 /*
  *  Frame buffer operations
@@ -44,6 +45,7 @@ static struct fb_ops leo_ops = {
 	.owner			= THIS_MODULE,
 	.fb_setcolreg		= leo_setcolreg,
 	.fb_blank		= leo_blank,
+	.fb_pan_display		= leo_pan_display,
 	.fb_fillrect		= cfb_fillrect,
 	.fb_copyarea		= cfb_copyarea,
 	.fb_imageblit		= cfb_imageblit,
@@ -408,15 +410,14 @@ static void leo_init_wids(struct fb_info *info)
 
 }
 
-static void leo_init_hw(struct fb_info *info)
+static void leo_switch_from_graph(struct fb_info *info)
 {
 	struct leo_par *par = (struct leo_par *) info->par;
 	struct leo_ld *ss = (struct leo_ld *) par->ld_ss0;
+	unsigned long flags;
 	u32 val;
 
-	val = sbus_readl(&par->ld_ss1->ss1_misc);
-	val |= LEO_SS1_MISC_ENABLE;
-	sbus_writel(val, &par->ld_ss1->ss1_misc);
+	spin_lock_irqsave(&par->lock, flags);
 
 	par->extent = ((info->var.xres - 1) |
 		       ((info->var.yres - 1) << 16));
@@ -437,6 +438,32 @@ static void leo_init_hw(struct fb_info *info)
 	do {
 		val = sbus_readl(&par->lc_ss0_usr->csr);
 	} while (val & 0x20000000);
+
+	spin_unlock_irqrestore(&par->lock, flags);
+}
+
+static int leo_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
+{
+	/* We just use this to catch switches out of
+	 * graphics mode.
+	 */
+	leo_switch_from_graph(info);
+
+	if (var->xoffset || var->yoffset || var->vmode)
+		return -EINVAL;
+	return 0;
+}
+
+static void leo_init_hw(struct fb_info *info)
+{
+	struct leo_par *par = (struct leo_par *) info->par;
+	u32 val;
+
+	val = sbus_readl(&par->ld_ss1->ss1_misc);
+	val |= LEO_SS1_MISC_ENABLE;
+	sbus_writel(val, &par->ld_ss1->ss1_misc);
+
+	leo_switch_from_graph(info);
 }
 
 static void leo_fixup_var_rgb(struct fb_var_screeninfo *var)

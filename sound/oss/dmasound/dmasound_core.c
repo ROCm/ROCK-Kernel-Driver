@@ -215,12 +215,12 @@ MODULE_LICENSE("GPL");
 static int sq_unit = -1;
 static int mixer_unit = -1;
 static int state_unit = -1;
-static int irq_installed = 0;
+static int irq_installed;
 #endif /* MODULE */
 
 /* control over who can modify resources shared between play/record */
-static mode_t shared_resource_owner = 0 ;
-static int shared_resources_initialised = 0 ;
+static mode_t shared_resource_owner;
+static int shared_resources_initialised;
 
     /*
      *  Mid level stuff

@@ -20,12 +20,14 @@
  * POSIX_FADV_WILLNEED could set PG_Referenced, and POSIX_FADV_NOREUSE could
  * deactivate the pages and clear PG_Referenced.
  */
-long sys_fadvise64(int fd, loff_t offset, size_t len, int advice)
+long sys_fadvise64_64(int fd, loff_t offset, loff_t len, int advice)
 {
 	struct file *file = fget(fd);
 	struct inode *inode;
 	struct address_space *mapping;
 	struct backing_dev_info *bdi;
+	pgoff_t start_index;
+	pgoff_t end_index;
 	int ret = 0;
 
 	if (!file)
@@ -65,8 +67,10 @@ long sys_fadvise64(int fd, loff_t offset, size_t len, int advice)
 	case POSIX_FADV_DONTNEED:
 		if (!bdi_write_congested(mapping->backing_dev_info))
 			filemap_flush(mapping);
-		invalidate_mapping_pages(mapping, offset >> PAGE_CACHE_SHIFT,
-				(len >> PAGE_CACHE_SHIFT) + 1);
+		start_index = offset >> PAGE_CACHE_SHIFT;
+		end_index = (offset + len + PAGE_CACHE_SIZE - 1) >>
+						PAGE_CACHE_SHIFT;
+		invalidate_mapping_pages(mapping, start_index, end_index);
 		break;
 	default:
 		ret = -EINVAL;
@@ -75,3 +79,9 @@ out:
 	fput(file);
 	return ret;
 }
+
+long sys_fadvise64(int fd, loff_t offset, size_t len, int advice)
+{
+	return sys_fadvise64_64(fd, offset, len, advice);
+}
+

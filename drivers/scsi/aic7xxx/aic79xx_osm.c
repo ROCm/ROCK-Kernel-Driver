@@ -1681,33 +1681,9 @@ Scsi_Host_Template aic79xx_driver_template = {
 	.this_id		= -1,
 	.cmd_per_lun		= 2,
 	.use_clustering		= ENABLE_CLUSTERING,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,7)
-	/*
-	 * We can only map 16MB per-SG
-	 * so create a sector limit of
-	 * "16MB" in 2K sectors.
-	 */
-	.max_sectors		= 8192,
-#endif
-#if defined CONFIG_HIGHIO || LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,10)
-/* Assume RedHat Distribution with its different HIGHIO conventions. */
-	.can_dma_32		= 1,
-	.single_sg_okay		= 1,
-#else
-	.highmem_io		= 1,
-#endif
-#endif
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 	.slave_alloc		= ahd_linux_slave_alloc,
 	.slave_configure	= ahd_linux_slave_configure,
 	.slave_destroy		= ahd_linux_slave_destroy,
-#else
-	.detect			= ahd_linux_detect,
-	.release		= ahd_linux_release,
-	.select_queue_depths	= ahd_linux_select_queue_depth,
-	.use_new_eh_code	= 1,
-#endif
 };
 
 /**************************** Tasklet Handler *********************************/

@@ -36,6 +36,7 @@
 #include <asm/starfire.h>
 #include <asm/uaccess.h>
 #include <asm/cache.h>
+#include <asm/cpudata.h>
 
 #ifdef CONFIG_SMP
 static void distribute_irqs(void);
@@ -56,12 +57,18 @@ static void distribute_irqs(void);
 
 struct ino_bucket ivector_table[NUM_IVECS] __attribute__ ((aligned (SMP_CACHE_BYTES)));
 
-#ifndef CONFIG_SMP
-unsigned int __up_workvec[16] __attribute__ ((aligned (SMP_CACHE_BYTES)));
-#define irq_work(__cpu, __pil)	&(__up_workvec[(void)(__cpu), (__pil)])
-#else
-#define irq_work(__cpu, __pil)	&(cpu_data[(__cpu)].irq_worklists[(__pil)])
-#endif
+/* This has to be in the main kernel image, it cannot be
+ * turned into per-cpu data.  The reason is that the main
+ * kernel image is locked into the TLB and this structure
+ * is accessed from the vectored interrupt trap handler.  If
+ * access to this structure takes a TLB miss it could cause
+ * the 5-level sparc v9 trap stack to overflow.
+ */
+struct irq_work_struct {
+	unsigned int	irq_worklists[16];
+};
+struct irq_work_struct __irq_work[NR_CPUS];
+#define irq_work(__cpu, __pil)	&(__irq_work[(__cpu)].irq_worklists[(__pil)])
 
 #ifdef CONFIG_PCI
 /* This is a table of physical addresses used to deal with IBF_DMA_SYNC.
@@ -109,6 +116,10 @@ static void register_irq_proc (unsigned int irq);
 	else \
 		action->flags |= __irq_ino(irq) << 48;
 #define get_ino_in_irqaction(action)	(action->flags >> 48)
+
+#if NR_CPUS > 64
+#error irqaction embedded smp affinity does not work with > 64 cpus, FIXME
+#endif
 
 #define put_smpaff_in_irqaction(action, smpaff)	(action)->mask = (smpaff)
 #define get_smpaff_in_irqaction(action) 	((action)->mask)
@@ -670,11 +681,11 @@ static inline void redirect_intr(int cpu, struct ino_bucket *bp)
 	 *    Just Do It.
 	 */
 	struct irqaction *ap = bp->irq_info;
-	unsigned long cpu_mask = get_smpaff_in_irqaction(ap);
+	cpumask_t cpu_mask = get_smpaff_in_irqaction(ap);
 	unsigned int buddy, ticks;
 
-	cpu_mask &= cpu_online_map;
-	if (cpu_mask == 0)
+	cpus_and(cpu_mask, cpu_mask, cpu_online_map);
+	if (cpus_empty(cpu_mask))
 		cpu_mask = cpu_online_map;
 
 	if (this_is_starfire != 0 ||
@@ -689,7 +700,7 @@ static inline void redirect_intr(int cpu, struct ino_bucket *bp)
 		buddy = 0;
 
 	ticks = 0;
-	while ((cpu_mask & (1UL << buddy)) == 0) {
+	while (!cpu_isset(buddy, cpu_mask)) {
 		if (++buddy >= NR_CPUS)
 			buddy = 0;
 		if (++ticks > NR_CPUS) {
@@ -702,7 +713,7 @@ static inline void redirect_intr(int cpu, struct ino_bucket *bp)
 		goto out;
 
 	/* Voo-doo programming. */
-	if (cpu_data[buddy].idle_volume < FORWARD_VOLUME)
+	if (cpu_data(buddy).idle_volume < FORWARD_VOLUME)
 		goto out;
 
 	/* This just so happens to be correct on Cheetah
@@ -1079,15 +1090,30 @@ void enable_prom_timer(void)
 	prom_timers->count0 = 0;
 }
 
+void init_irqwork_curcpu(void)
+{
+	register struct irq_work_struct *workp asm("o2");
+	unsigned long tmp;
+
+	memset(__irq_work + smp_processor_id(), 0, sizeof(*workp));
+
+	/* Set interrupt globals.  */
+	workp = &__irq_work[smp_processor_id()];
+	__asm__ __volatile__(
+	"rdpr	%%pstate, %0\n\t"
+	"wrpr	%0, %1, %%pstate\n\t"
+	"mov	%2, %%g6\n\t"
+	"wrpr	%0, 0x0, %%pstate\n\t"
+	: "=&r" (tmp)
+	: "i" (PSTATE_IG | PSTATE_IE), "r" (workp));
+}
+
 /* Only invoked on boot processor. */
 void __init init_IRQ(void)
 {
 	map_prom_timers();
 	kill_prom_timer();
 	memset(&ivector_table[0], 0, sizeof(ivector_table));
-#ifndef CONFIG_SMP
-	memset(&__up_workvec[0], 0, sizeof(__up_workvec));
-#endif
 
 	/* We need to clear any IRQ's pending in the soft interrupt
 	 * registers, a spurious one could be left around from the

@@ -70,9 +70,10 @@ typedef union {
  *	Our list of ports/irq's for different boards.
  */
 
-/* Such a description is OK ? */
-#define DEPEND_HEADER(target) <asm/target/ide.h> 
-#include DEPEND_HEADER(TARGET)
+/* machine depend header include */
+#define H8300_IDE_DEFINE
+#include <asm/machine-depend.h>
+#undef  H8300_IDE_DEFINE
 
 /****************************************************************************/
 

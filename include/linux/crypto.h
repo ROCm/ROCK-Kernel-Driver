@@ -65,7 +65,6 @@ struct scatterlist;
 struct cipher_alg {
 	unsigned int cia_min_keysize;
 	unsigned int cia_max_keysize;
-	unsigned int cia_ivsize;
 	int (*cia_setkey)(void *ctx, const u8 *key,
 	                  unsigned int keylen, u32 *flags);
 	void (*cia_encrypt)(void *ctx, u8 *dst, const u8 *src);
@@ -128,6 +127,7 @@ struct crypto_tfm;
 
 struct cipher_tfm {
 	void *cit_iv;
+	unsigned int cit_ivsize;
 	u32 cit_mode;
 	int (*cit_setkey)(struct crypto_tfm *tfm,
 	                  const u8 *key, unsigned int keylen);
@@ -237,7 +237,7 @@ static inline unsigned int crypto_tfm_alg_max_keysize(struct crypto_tfm *tfm)
 static inline unsigned int crypto_tfm_alg_ivsize(struct crypto_tfm *tfm)
 {
 	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_CIPHER);
-	return tfm->__crt_alg->cra_cipher.cia_ivsize;
+	return tfm->crt_cipher.cit_ivsize;
 }
 
 static inline unsigned int crypto_tfm_alg_blocksize(struct crypto_tfm *tfm)

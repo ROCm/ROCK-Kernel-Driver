@@ -99,10 +99,10 @@ struct as_data {
 	sector_t last_sector[2];	/* last REQ_SYNC & REQ_ASYNC sectors */
 	struct list_head *dispatch;	/* driver dispatch queue */
 	struct list_head *hash;		/* request hash */
-	unsigned long hash_valid_count;	/* barrier hash count */
 	unsigned long current_batch_expires;
 	unsigned long last_check_fifo[2];
-	int changed_batch;
+	int changed_batch;		/* 1: waiting for old batch to end */
+	int new_batch;			/* 1: waiting on first read complete */
 	int batch_data_dir;		/* current batch REQ_SYNC / REQ_ASYNC */
 	int write_batch_count;		/* max # of reqs in a write batch */
 	int current_write_count;	/* how many requests left this batch */
@@ -153,7 +153,7 @@ struct as_rq {
 	 * request hash, key is the ending offset (for back merge lookup)
 	 */
 	struct list_head hash;
-	unsigned long hash_valid_count;
+	unsigned int on_hash;
 
 	/*
 	 * expire fifo
@@ -161,7 +161,7 @@ struct as_rq {
 	struct list_head fifo;
 	unsigned long expires;
 
-	int is_sync;
+	unsigned int is_sync;
 	enum arq_state state; /* debug only */
 };
 
@@ -238,23 +238,16 @@ static const int as_hash_shift = 6;
 #define AS_HASH_ENTRIES		(1 << as_hash_shift)
 #define rq_hash_key(rq)		((rq)->sector + (rq)->nr_sectors)
 #define list_entry_hash(ptr)	list_entry((ptr), struct as_rq, hash)
-#define ON_HASH(arq)		(arq)->hash_valid_count
-
-#define AS_INVALIDATE_HASH(ad)				\
-	do {						\
-		if (!++(ad)->hash_valid_count)		\
-			(ad)->hash_valid_count = 1;	\
-	} while (0)
 
 static inline void __as_del_arq_hash(struct as_rq *arq)
 {
-	arq->hash_valid_count = 0;
+	arq->on_hash = 0;
 	list_del_init(&arq->hash);
 }
 
 static inline void as_del_arq_hash(struct as_rq *arq)
 {
-	if (ON_HASH(arq))
+	if (arq->on_hash)
 		__as_del_arq_hash(arq);
 }
 
@@ -270,9 +263,9 @@ static void as_add_arq_hash(struct as_data *ad, struct as_rq *arq)
 {
 	struct request *rq = arq->request;
 
-	BUG_ON(ON_HASH(arq));
+	BUG_ON(arq->on_hash);
 
-	arq->hash_valid_count = ad->hash_valid_count;
+	arq->on_hash = 1;
 	list_add(&arq->hash, &ad->hash[AS_HASH_FN(rq_hash_key(rq))]);
 }
 
@@ -284,7 +277,7 @@ static inline void as_hot_arq_hash(struct as_data *ad, struct as_rq *arq)
 	struct request *rq = arq->request;
 	struct list_head *head = &ad->hash[AS_HASH_FN(rq_hash_key(rq))];
 
-	if (!ON_HASH(arq)) {
+	if (!arq->on_hash) {
 		WARN_ON(1);
 		return;
 	}
@@ -306,10 +299,9 @@ static struct request *as_find_arq_hash(struct as_data *ad, sector_t offset)
 
 		next = entry->next;
 
-		BUG_ON(!ON_HASH(arq));
+		BUG_ON(!arq->on_hash);
 
-		if (!rq_mergeable(__rq)
-		    || arq->hash_valid_count != ad->hash_valid_count) {
+		if (!rq_mergeable(__rq)) {
 			__as_del_arq_hash(arq);
 			continue;
 		}
@@ -919,8 +911,13 @@ static void as_completed_request(request_queue_t *q, struct request *rq)
 		return;
 
 	if (ad->changed_batch && ad->nr_dispatched == 1) {
+		WARN_ON(ad->batch_data_dir == arq->is_sync);
+
 		kblockd_schedule_work(&ad->antic_work);
-		ad->changed_batch = 2;
+		ad->changed_batch = 0;
+
+		if (ad->batch_data_dir == REQ_SYNC)
+			ad->new_batch = 1;
 	}
 	ad->nr_dispatched--;
 
@@ -929,12 +926,12 @@ static void as_completed_request(request_queue_t *q, struct request *rq)
 	 * actually serviced. This should help devices with big TCQ windows
 	 * and writeback caches
 	 */
-	if (ad->batch_data_dir == REQ_SYNC && ad->changed_batch
-			&& ad->batch_data_dir == arq->is_sync) {
+	if (ad->new_batch && ad->batch_data_dir == arq->is_sync) {
+		WARN_ON(ad->batch_data_dir != REQ_SYNC);
 		update_write_batch(ad);
 		ad->current_batch_expires = jiffies +
 				ad->batch_expire[REQ_SYNC];
-		ad->changed_batch = 0;
+		ad->new_batch = 0;
 	}
 
 	if (!arq->io_context)
@@ -1079,7 +1076,7 @@ static int as_fifo_expired(struct as_data *ad, int adir)
  */
 static inline int as_batch_expired(struct as_data *ad)
 {
-	if (ad->changed_batch)
+	if (ad->changed_batch || ad->new_batch)
 		return 0;
 
 	if (ad->batch_data_dir == REQ_SYNC)
@@ -1159,7 +1156,7 @@ static int as_dispatch_request(struct as_data *ad)
 	if (!(reads || writes)
 		|| ad->antic_status == ANTIC_WAIT_REQ
 		|| ad->antic_status == ANTIC_WAIT_NEXT
-		|| ad->changed_batch == 1)
+		|| ad->changed_batch)
 		return 0;
 
 	if (!(reads && writes && as_batch_expired(ad)) ) {
@@ -1201,8 +1198,10 @@ static int as_dispatch_request(struct as_data *ad)
 			 */
 			goto dispatch_writes;
 
- 		if (ad->batch_data_dir == REQ_ASYNC)
+ 		if (ad->batch_data_dir == REQ_ASYNC) {
+			WARN_ON(ad->new_batch);
  			ad->changed_batch = 1;
+		}
 		ad->batch_data_dir = REQ_SYNC;
 		arq = list_entry_fifo(ad->fifo_list[ad->batch_data_dir].next);
 		ad->last_check_fifo[ad->batch_data_dir] = jiffies;
@@ -1217,8 +1216,16 @@ static int as_dispatch_request(struct as_data *ad)
 dispatch_writes:
 		BUG_ON(RB_EMPTY(&ad->sort_list[REQ_ASYNC]));
 
- 		if (ad->batch_data_dir == REQ_SYNC)
+ 		if (ad->batch_data_dir == REQ_SYNC) {
  			ad->changed_batch = 1;
+
+			/*
+			 * new_batch might be 1 when the queue runs out of
+			 * reads. A subsequent submission of a write might
+			 * cause a change of batch before the read is finished.
+			 */
+			ad->new_batch = 0;
+		}
 		ad->batch_data_dir = REQ_ASYNC;
 		ad->current_write_count = ad->write_batch_count;
 		ad->write_batch_idled = 0;
@@ -1241,14 +1248,19 @@ fifo_expired:
 	}
 
 	if (ad->changed_batch) {
-		if (ad->changed_batch == 1 && ad->nr_dispatched)
+		WARN_ON(ad->new_batch);
+
+		if (ad->nr_dispatched)
 			return 0;
-		if (ad->batch_data_dir == REQ_ASYNC) {
+
+		if (ad->batch_data_dir == REQ_ASYNC)
 			ad->current_batch_expires = jiffies +
 					ad->batch_expire[REQ_ASYNC];
-			ad->changed_batch = 0;
-		} else
-			ad->changed_batch = 2;
+		else
+			ad->new_batch = 1;
+
+		ad->changed_batch = 0;
+
 		arq->request->flags |= REQ_SOFTBARRIER;
 	}
 
@@ -1307,12 +1319,28 @@ static void as_add_request(struct as_data *ad, struct as_rq *arq)
 }
 
 /*
- * FIXME: HACK for AS requeue problems
+ * requeue the request. The request has not been completed, nor is it a
+ * new request, so don't touch accounting.
  */
 static void as_requeue_request(request_queue_t *q, struct request *rq)
 {
-	elv_completed_request(q, rq);
-	__elv_add_request(q, rq, 0, 0);
+	struct as_data *ad = q->elevator.elevator_data;
+	struct as_rq *arq = RQ_DATA(rq);
+
+	if (arq) {
+		arq->state = AS_RQ_DISPATCHED;
+		if (arq->io_context && arq->io_context->aic)
+			atomic_inc(&arq->io_context->aic->nr_dispatched);
+	} else
+		WARN_ON(blk_fs_request(rq)
+				&& (!(rq->flags & REQ_HARDBARRIER)) );
+
+	list_add_tail(&rq->queuelist, ad->dispatch);
+
+	/* Stop anticipating - let this request get through */
+	as_antic_stop(ad);
+
+	return;
 }
 
 static void
@@ -1323,7 +1351,6 @@ as_insert_request(request_queue_t *q, struct request *rq,
 	struct as_rq *arq = RQ_DATA(rq);
 
 	if (unlikely(rq->flags & REQ_HARDBARRIER)) {
-		AS_INVALIDATE_HASH(ad);
 		q->last_merge = NULL;
 
 		while (ad->next_arq[REQ_SYNC])
@@ -1573,7 +1600,7 @@ static int as_set_request(request_queue_t *q, struct request *rq, int gfp_mask)
 		arq->state = AS_RQ_NEW;
 		arq->io_context = NULL;
 		INIT_LIST_HEAD(&arq->hash);
-		arq->hash_valid_count = 0;
+		arq->on_hash = 0;
 		INIT_LIST_HEAD(&arq->fifo);
 		rq->elevator_private = arq;
 		return 0;
@@ -1662,7 +1689,6 @@ static int as_init(request_queue_t *q, elevator_t *e)
 	ad->dispatch = &q->queue_head;
 	ad->fifo_expire[REQ_SYNC] = default_read_expire;
 	ad->fifo_expire[REQ_ASYNC] = default_write_expire;
-	ad->hash_valid_count = 1;
 	ad->antic_expire = default_antic_expire;
 	ad->batch_expire[REQ_SYNC] = default_read_batch_expire;
 	ad->batch_expire[REQ_ASYNC] = default_write_batch_expire;

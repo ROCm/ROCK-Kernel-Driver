@@ -648,7 +648,6 @@ static void hwif_register (ide_hwif_t *hwif)
 {
 	/* register with global device tree */
 	strlcpy(hwif->gendev.bus_id,hwif->name,BUS_ID_SIZE);
-	snprintf(hwif->gendev.name,DEVICE_NAME_SIZE,"IDE Controller");
 	hwif->gendev.driver_data = hwif;
 	if (hwif->pci_dev)
 		hwif->gendev.parent = &hwif->pci_dev->dev;
@@ -930,7 +929,7 @@ static int ide_init_queue(ide_drive_t *drive)
 	blk_queue_segment_boundary(q, 0xffff);
 
 	if (!hwif->rqsize)
-		hwif->rqsize = hwif->addressing ? 256 : 65536;
+		hwif->rqsize = hwif->no_lba48 ? 256 : 65536;
 	if (hwif->rqsize < max_sectors)
 		max_sectors = hwif->rqsize;
 	blk_queue_max_sectors(q, max_sectors);
@@ -1217,8 +1216,6 @@ static void init_gendisk (ide_hwif_t *hwif)
 		ide_add_generic_settings(drive);
 		snprintf(drive->gendev.bus_id,BUS_ID_SIZE,"%u.%u",
 			 hwif->index,unit);
-		snprintf(drive->gendev.name,DEVICE_NAME_SIZE,
-			 "%s","IDE Drive");
 		drive->gendev.parent = &hwif->gendev;
 		drive->gendev.bus = &ide_bus_type;
 		drive->gendev.driver_data = drive;

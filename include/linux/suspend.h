@@ -8,11 +8,7 @@
 #include <linux/notifier.h>
 #include <linux/config.h>
 #include <linux/init.h>
-
-extern unsigned char software_suspend_enabled;
-
-#define NORESUME	 1
-#define RESUME_SPECIFIED 2
+#include <linux/pm.h>
 
 #ifdef CONFIG_SOFTWARE_SUSPEND
 /* page backup entry */
@@ -49,22 +45,8 @@ extern int shrink_mem(void);
 /* mm/page_alloc.c */
 extern void drain_local_pages(void);
 
-/* kernel/suspend.c */
-extern void software_suspend(void);
-extern void software_resume(void);
-
-extern int register_suspend_notifier(struct notifier_block *);
-extern int unregister_suspend_notifier(struct notifier_block *);
-
 extern unsigned int nr_copy_pages __nosavedata;
 extern suspend_pagedir_t *pagedir_nosave __nosavedata;
-
-/* Communication between kernel/suspend.c and arch/i386/suspend.c */
-
-extern void do_magic_resume_1(void);
-extern void do_magic_resume_2(void);
-extern void do_magic_suspend_1(void);
-extern void do_magic_suspend_2(void);
 
 /* Communication between acpi and arch/i386/suspend.c */
 
@@ -72,33 +54,18 @@ extern void do_suspend_lowlevel(int resume);
 extern void do_suspend_lowlevel_s4bios(int resume);
 
 #else	/* CONFIG_SOFTWARE_SUSPEND */
-static inline void software_suspend(void)
+static inline int software_suspend(void)
 {
+	return -EPERM;
 }
-#define software_resume()		do { } while(0)
-#define register_suspend_notifier(a)	do { } while(0)
-#define unregister_suspend_notifier(a)	do { } while(0)
 #endif	/* CONFIG_SOFTWARE_SUSPEND */
 
 
 #ifdef CONFIG_PM
 extern void refrigerator(unsigned long);
-extern int freeze_processes(void);
-extern void thaw_processes(void);
-
-extern int pm_prepare_console(void);
-extern void pm_restore_console(void);
 
 #else
 static inline void refrigerator(unsigned long flag)
-{
-
-}
-static inline int freeze_processes(void)
-{
-	return 0;
-}
-static inline void thaw_processes(void)
 {
 
 }

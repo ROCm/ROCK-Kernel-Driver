@@ -226,6 +226,7 @@ static struct pci_device_id tulip_pci_tbl[] = {
 	{ 0x1737, 0xAB09, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET },
 	{ 0x17B3, 0xAB08, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET },
  	{ 0x10b9, 0x5261, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DM910X },	/* ALi 1563 integrated ethernet */
+	{ 0x10b7, 0x9300, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET }, /* 3Com 3CSOHO100B-TX */
 	{ } /* terminate list */
 };
 MODULE_DEVICE_TABLE(pci, tulip_pci_tbl);
@@ -1779,7 +1780,7 @@ static void __devexit tulip_remove_one (struct pci_dev *pdev)
 #ifndef USE_IO_OPS
 	iounmap((void *)dev->base_addr);
 #endif
-	kfree (dev);
+	free_netdev (dev);
 	pci_release_regions (pdev);
 	pci_set_drvdata (pdev, NULL);
 

@@ -75,7 +75,6 @@
 #include <linux/delay.h>	/* for mdelay */
 #include <linux/interrupt.h>	/* needed for in_interrupt() proto */
 #include <linux/reboot.h>	/* notifier code */
-#include <linux/nmi.h>
 #include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"
 
@@ -476,8 +475,6 @@ mptscsih_AddSGE(MPT_SCSI_HOST *hd, Scsi_Cmnd *SCpnt,
 			       (struct scatterlist *) SCpnt->request_buffer,
 			       SCpnt->use_sg,
 			       scsi_to_pci_dma_dir(SCpnt->sc_data_direction));
-		if (sges_left == 0) 
-			return FAILED;
 	} else if (SCpnt->request_bufflen) {
 		dma_addr_t	 buf_dma_addr;
 		scPrivate	*my_priv;
@@ -1461,7 +1458,6 @@ mptscsih_detect(Scsi_Host_Template *tpnt)
 				sh->max_lun = MPT_LAST_LUN + 1;
 
 				sh->max_sectors = MPT_SCSI_MAX_SECTORS;
-				sh->highmem_io = 1;
 				sh->this_id = this->pfacts[portnum].PortSCSIID;
 
 				/* Required entry.
@@ -3078,7 +3074,6 @@ mptscsih_tm_pending_wait(MPT_SCSI_HOST * hd)
 			break;
 		}
 		spin_unlock_irqrestore(&hd->ioc->FreeQlock, flags);
-		touch_nmi_watchdog(); 
 		mdelay(250);
 	} while (--loop_count);
 

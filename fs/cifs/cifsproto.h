@@ -170,6 +170,8 @@ extern int CIFSSMBDelFile(const int xid, struct cifsTconInfo *tcon,
 extern int CIFSSMBRename(const int xid, struct cifsTconInfo *tcon,
 			const char *fromName, const char *toName,
 			const struct nls_table *nls_codepage);
+extern int CIFSSMBRenameOpenFile(const int xid,struct cifsTconInfo *pTcon,
+			int netfid, char * target_name, const struct nls_table *nls_codepage);
 extern int CIFSCreateHardLink(const int xid,
 			struct cifsTconInfo *tcon,
 			const char *fromName, const char *toName,

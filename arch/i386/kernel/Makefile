@@ -2,7 +2,7 @@
 # Makefile for the linux kernel.
 #
 
-extra-y := head.o init_task.o
+extra-y := head.o init_task.o vmlinux.lds.s
 
 obj-y	:= process.o semaphore.o signal.o entry.o traps.o irq.o vm86.o \
 		ptrace.o i8259.o ioport.o ldt.o setup.o time.o sys_i386.o \
@@ -11,7 +11,7 @@ obj-y	:= process.o semaphore.o signal.o entry.o traps.o irq.o vm86.o \
 
 obj-y				+= cpu/
 obj-y				+= timers/
-obj-$(CONFIG_ACPI)		+= acpi/
+obj-$(CONFIG_ACPI_BOOT)		+= acpi/
 obj-$(CONFIG_X86_BIOS_REBOOT)	+= reboot.o
 obj-$(CONFIG_MCA)		+= mca.o
 obj-$(CONFIG_X86_MSR)		+= msr.o

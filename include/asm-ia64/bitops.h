@@ -292,7 +292,7 @@ ffz (unsigned long x)
 {
 	unsigned long result;
 
-	__asm__ ("popcnt %0=%1" : "=r" (result) : "r" (x & (~x - 1)));
+	result = ia64_popcnt(x & (~x - 1));
 	return result;
 }
 
@@ -307,7 +307,7 @@ __ffs (unsigned long x)
 {
 	unsigned long result;
 
-	__asm__ ("popcnt %0=%1" : "=r" (result) : "r" ((x - 1) & ~x));
+	result = ia64_popcnt((x-1) & ~x);
 	return result;
 }
 
@@ -323,7 +323,7 @@ ia64_fls (unsigned long x)
 	long double d = x;
 	long exp;
 
-	__asm__ ("getf.exp %0=%1" : "=r"(exp) : "f"(d));
+	exp = ia64_getf_exp(d);
 	return exp - 0xffff;
 }
 
@@ -349,7 +349,7 @@ static __inline__ unsigned long
 hweight64 (unsigned long x)
 {
 	unsigned long result;
-	__asm__ ("popcnt %0=%1" : "=r" (result) : "r" (x));
+	result = ia64_popcnt(x);
 	return result;
 }
 
@@ -409,7 +409,7 @@ found_middle:
  * Find next bit in a bitmap reasonably efficiently..
  */
 static inline int
-find_next_bit (void *addr, unsigned long size, unsigned long offset)
+find_next_bit(const void *addr, unsigned long size, unsigned long offset)
 {
 	unsigned long *p = ((unsigned long *) addr) + (offset >> 6);
 	unsigned long result = offset & ~63UL;

@@ -517,7 +517,7 @@ adfspart_check_EESOX(struct parsed_partitions *state, struct block_device *bdev)
 	const unsigned char *data;
 	unsigned char buffer[256];
 	struct eesox_part *p;
-	u32 start = 0;
+	sector_t start = 0;
 	int i, slot = 1;
 
 	data = read_dev_sector(bdev, 7, &sect);
@@ -533,22 +533,22 @@ adfspart_check_EESOX(struct parsed_partitions *state, struct block_device *bdev)
 	put_dev_sector(sect);
 
 	for (i = 0, p = (struct eesox_part *)buffer; i < 8; i++, p++) {
-		u32 next;
+		sector_t next;
 
 		if (memcmp(p->magic, "Eesox", 6))
 			break;
 
-		next = le32_to_cpu(p->start) + first_sector;
+		next = le32_to_cpu(p->start);
 		if (i)
 			put_partition(state, slot++, start, next - start);
 		start = next;
 	}
 
 	if (i != 0) {
-		unsigned long size;
+		sector_t size;
 
-		size = hd->part[minor(to_kdev_t(bdev->bd_dev))].nr_sects;
-		add_gd_partition(hd, minor++, start, size - start);
+		size = get_capacity(bdev->bd_disk);
+		put_partition(state, slot++, start, size - start);
 		printk("\n");
 	}
 

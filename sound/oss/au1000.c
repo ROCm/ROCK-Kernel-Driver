@@ -911,11 +911,11 @@ static int au1000_ioctl_mixdev(struct inode *inode, struct file *file,
 }
 
 static /*const */ struct file_operations au1000_mixer_fops = {
-	owner:THIS_MODULE,
-	llseek:au1000_llseek,
-	ioctl:au1000_ioctl_mixdev,
-	open:au1000_open_mixdev,
-	release:au1000_release_mixdev,
+	.owner		= THIS_MODULE,
+	.llseek		= au1000_llseek,
+	.ioctl		= au1000_ioctl_mixdev,
+	.open		= au1000_open_mixdev,
+	.release	= au1000_release_mixdev,
 };
 
 /* --------------------------------------------------------------------- */
@@ -1940,15 +1940,15 @@ static int au1000_release(struct inode *inode, struct file *file)
 }
 
 static /*const */ struct file_operations au1000_audio_fops = {
-	owner:		THIS_MODULE,
-	llseek:		au1000_llseek,
-	read:		au1000_read,
-	write:		au1000_write,
-	poll:		au1000_poll,
-	ioctl:		au1000_ioctl,
-	mmap:		au1000_mmap,
-	open:		au1000_open,
-	release:	au1000_release,
+	.owner		= THIS_MODULE,
+	.llseek		= au1000_llseek,
+	.read		= au1000_read,
+	.write		= au1000_write,
+	.poll		= au1000_poll,
+	.ioctl		= au1000_ioctl,
+	.mmap		= au1000_mmap,
+	.open		= au1000_open,
+	.release	= au1000_release,
 };
 
 

@@ -214,7 +214,6 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 	if (q->unplug_delay == 0)
 		q->unplug_delay = 1;
 
-	init_timer(&q->unplug_timer);
 	INIT_WORK(&q->unplug_work, blk_unplug_work, q);
 
 	q->unplug_timer.function = blk_unplug_timeout;
@@ -367,6 +366,20 @@ void blk_queue_max_segment_size(request_queue_t *q, unsigned int max_size)
 void blk_queue_hardsect_size(request_queue_t *q, unsigned short size)
 {
 	q->hardsect_size = size;
+}
+
+/**
+ * blk_queue_stack_limits - inherit underlying queue limits for stacked drivers
+ * @t:	the stacking driver (top)
+ * @b:  the underlying device (bottom)
+ **/
+void blk_queue_stack_limits(request_queue_t *t, request_queue_t *b)
+{
+	t->max_sectors = min(t->max_sectors,b->max_sectors);
+	t->max_phys_segments = min(t->max_phys_segments,b->max_phys_segments);
+	t->max_hw_segments = min(t->max_hw_segments,b->max_hw_segments);
+	t->max_segment_size = min(t->max_segment_size,b->max_segment_size);
+	t->hardsect_size = max(t->hardsect_size,b->hardsect_size);
 }
 
 /**
@@ -1218,11 +1231,14 @@ static elevator_t *chosen_elevator =
 	&iosched_as;
 #elif defined(CONFIG_IOSCHED_DEADLINE)
 	&iosched_deadline;
-#else
+#elif defined(CONFIG_IOSCHED_NOOP)
 	&elevator_noop;
+#else
+	NULL;
+#error "You must have at least 1 I/O scheduler selected"
 #endif
 
-#if defined(CONFIG_IOSCHED_AS) || defined(CONFIG_IOSCHED_DEADLINE)
+#if defined(CONFIG_IOSCHED_AS) || defined(CONFIG_IOSCHED_DEADLINE) || defined (CONFIG_IOSCHED_NOOP)
 static int __init elevator_setup(char *str)
 {
 #ifdef CONFIG_IOSCHED_DEADLINE
@@ -1233,11 +1249,15 @@ static int __init elevator_setup(char *str)
 	if (!strcmp(str, "as"))
 		chosen_elevator = &iosched_as;
 #endif
+#ifdef CONFIG_IOSCHED_NOOP
+	if (!strcmp(str, "noop"))
+		chosen_elevator = &elevator_noop;
+#endif
 	return 1;
 }
 
 __setup("elevator=", elevator_setup);
-#endif /* CONFIG_IOSCHED_AS || CONFIG_IOSCHED_DEADLINE */
+#endif /* CONFIG_IOSCHED_AS || CONFIG_IOSCHED_DEADLINE || CONFIG_IOSCHED_NOOP */
 
 request_queue_t *blk_alloc_queue(int gfp_mask)
 {
@@ -1247,6 +1267,7 @@ request_queue_t *blk_alloc_queue(int gfp_mask)
 		return NULL;
 
 	memset(q, 0, sizeof(*q));
+	init_timer(&q->unplug_timer);
 	atomic_set(&q->refcnt, 1);
 	return q;
 }
@@ -2804,6 +2825,7 @@ EXPORT_SYMBOL(blk_queue_max_phys_segments);
 EXPORT_SYMBOL(blk_queue_max_hw_segments);
 EXPORT_SYMBOL(blk_queue_max_segment_size);
 EXPORT_SYMBOL(blk_queue_hardsect_size);
+EXPORT_SYMBOL(blk_queue_stack_limits);
 EXPORT_SYMBOL(blk_queue_segment_boundary);
 EXPORT_SYMBOL(blk_queue_dma_alignment);
 EXPORT_SYMBOL(blk_rq_map_sg);

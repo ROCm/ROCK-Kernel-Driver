@@ -63,6 +63,8 @@ solaris_reg:
 	 mov		%i4, %o4
 
 linux_syscall_for_solaris:
+	sethi		%hi(sys_call_table32), %l6
+	or		%l6, %lo(sys_call_table32), %l6
 	sll		%l3, 2, %l4
 	ba,pt		%xcc, 10f
 	 lduw		[%l6 + %l4], %l3
@@ -77,6 +79,7 @@ entry64_personality_patch:
 	bg,pn		%icc, solaris_unimplemented
 	 srl		%g1, 0, %g1
 	sethi		%hi(solaris_sys_table), %l7
+	or		%l7, %lo(solaris_sys_table), %l7
 	brz,pn		%g1, solaris_sucks
 	 mov		%i4, %o4
 	sll		%g1, 2, %l4
@@ -88,7 +91,7 @@ entry64_personality_patch:
 	ldx		[%g6 + TI_FLAGS], %l5
 	cmp		%l3, NR_SYSCALLS
 	bleu,a,pn	%xcc, linux_syscall_for_solaris
-	 sethi		%hi(sys_call_table32), %l6
+	 nop
 	andcc		%l3, 1, %g0
 	bne,a,pn	%icc, 10f
 	 add		%sp, PTREGS_OFF, %o0

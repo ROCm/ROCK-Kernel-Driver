@@ -200,3 +200,18 @@ enum MCA_AdapterStatus mca_device_status(struct mca_device *mca_dev)
 {
 	return mca_dev->status;
 }
+EXPORT_SYMBOL(mca_device_status);
+
+/**
+ *	mca_device_set_name - set the name of the device
+ *	@mca_device:	device to set the name of
+ *	@name:		name to set
+ */
+void mca_device_set_name(struct mca_device *mca_dev, const char *name)
+{
+	if(!mca_dev)
+		return;
+
+	strlcpy(mca_dev->name, name, sizeof(mca_dev->name));
+}
+EXPORT_SYMBOL(mca_device_set_name);

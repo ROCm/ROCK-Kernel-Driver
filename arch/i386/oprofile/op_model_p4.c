@@ -355,8 +355,8 @@ static struct p4_event_binding p4_events[NUM_EVENTS] = {
 #define ESCR_SET_OS_1(escr, os) ((escr) |= (((os) & 1) << 1))
 #define ESCR_SET_EVENT_SELECT(escr, sel) ((escr) |= (((sel) & 0x3f) << 25))
 #define ESCR_SET_EVENT_MASK(escr, mask) ((escr) |= (((mask) & 0xffff) << 9))
-#define ESCR_READ(escr,high,ev,i) do {rdmsr(ev->bindings[(i)].escr_address, (escr), (high));} while (0);
-#define ESCR_WRITE(escr,high,ev,i) do {wrmsr(ev->bindings[(i)].escr_address, (escr), (high));} while (0);
+#define ESCR_READ(escr,high,ev,i) do {rdmsr(ev->bindings[(i)].escr_address, (escr), (high));} while (0)
+#define ESCR_WRITE(escr,high,ev,i) do {wrmsr(ev->bindings[(i)].escr_address, (escr), (high));} while (0)
 
 #define CCCR_RESERVED_BITS 0x38030FFF
 #define CCCR_CLEAR(cccr) ((cccr) &= CCCR_RESERVED_BITS)
@@ -366,13 +366,13 @@ static struct p4_event_binding p4_events[NUM_EVENTS] = {
 #define CCCR_SET_PMI_OVF_1(cccr) ((cccr) |= (1<<27))
 #define CCCR_SET_ENABLE(cccr) ((cccr) |= (1<<12))
 #define CCCR_SET_DISABLE(cccr) ((cccr) &= ~(1<<12))
-#define CCCR_READ(low, high, i) do {rdmsr (p4_counters[(i)].cccr_address, (low), (high));} while (0);
-#define CCCR_WRITE(low, high, i) do {wrmsr (p4_counters[(i)].cccr_address, (low), (high));} while (0);
+#define CCCR_READ(low, high, i) do {rdmsr(p4_counters[(i)].cccr_address, (low), (high));} while (0)
+#define CCCR_WRITE(low, high, i) do {wrmsr(p4_counters[(i)].cccr_address, (low), (high));} while (0)
 #define CCCR_OVF_P(cccr) ((cccr) & (1U<<31))
 #define CCCR_CLEAR_OVF(cccr) ((cccr) &= (~(1U<<31)))
 
-#define CTR_READ(l,h,i) do {rdmsr(p4_counters[(i)].counter_address, (l), (h));} while (0);
-#define CTR_WRITE(l,i) do {wrmsr(p4_counters[(i)].counter_address, -(u32)(l), -1);} while (0);
+#define CTR_READ(l,h,i) do {rdmsr(p4_counters[(i)].counter_address, (l), (h));} while (0)
+#define CTR_WRITE(l,i) do {wrmsr(p4_counters[(i)].counter_address, -(u32)(l), -1);} while (0)
 #define CTR_OVERFLOW_P(ctr) (!((ctr) & 0x80000000))
 
 
@@ -410,7 +410,7 @@ static void p4_fill_in_addresses(struct op_msrs * const msrs)
 
 	/* the counter registers we pay attention to */
 	for (i = 0; i < num_counters; ++i) {
-		msrs->counters.addrs[i] = 
+		msrs->counters[i].addr = 
 			p4_counters[VIRT_CTR(stag, i)].counter_address;
 	}
 
@@ -419,42 +419,42 @@ static void p4_fill_in_addresses(struct op_msrs * const msrs)
 	/* 18 CCCR registers */
 	for (i = 0, addr = MSR_P4_BPU_CCCR0 + stag;
 	     addr <= MSR_P4_IQ_CCCR5; ++i, addr += addr_increment()) {
-		msrs->controls.addrs[i] = addr;
+		msrs->controls[i].addr = addr;
 	}
 	
 	/* 43 ESCR registers in three discontiguous group */
 	for (addr = MSR_P4_BSU_ESCR0 + stag;
 	     addr <= MSR_P4_SSU_ESCR0; ++i, addr += addr_increment()) { 
-		msrs->controls.addrs[i] = addr;
+		msrs->controls[i].addr = addr;
 	}
 	
 	for (addr = MSR_P4_MS_ESCR0 + stag;
 	     addr <= MSR_P4_TC_ESCR1; ++i, addr += addr_increment()) { 
-		msrs->controls.addrs[i] = addr;
+		msrs->controls[i].addr = addr;
 	}
 	
 	for (addr = MSR_P4_IX_ESCR0 + stag;
 	     addr <= MSR_P4_CRU_ESCR3; ++i, addr += addr_increment()) { 
-		msrs->controls.addrs[i] = addr;
+		msrs->controls[i].addr = addr;
 	}
 
 	/* there are 2 remaining non-contiguously located ESCRs */
 
 	if (num_counters == NUM_COUNTERS_NON_HT) {		
 		/* standard non-HT CPUs handle both remaining ESCRs*/
-		msrs->controls.addrs[i++] = MSR_P4_CRU_ESCR5;
-		msrs->controls.addrs[i++] = MSR_P4_CRU_ESCR4;
+		msrs->controls[i++].addr = MSR_P4_CRU_ESCR5;
+		msrs->controls[i++].addr = MSR_P4_CRU_ESCR4;
 
 	} else if (stag == 0) {
 		/* HT CPUs give the first remainder to the even thread, as
 		   the 32nd control register */
-		msrs->controls.addrs[i++] = MSR_P4_CRU_ESCR4;
+		msrs->controls[i++].addr = MSR_P4_CRU_ESCR4;
 
 	} else {
 		/* and two copies of the second to the odd thread,
 		   for the 22st and 23nd control registers */
-		msrs->controls.addrs[i++] = MSR_P4_CRU_ESCR5;
-		msrs->controls.addrs[i++] = MSR_P4_CRU_ESCR5;
+		msrs->controls[i++].addr = MSR_P4_CRU_ESCR5;
+		msrs->controls[i++].addr = MSR_P4_CRU_ESCR5;
 	}
 }
 

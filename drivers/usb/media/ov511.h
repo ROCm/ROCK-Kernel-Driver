@@ -321,35 +321,6 @@ enum {
 	RAWFMT_GBR422,
 };
 
-/* Unsigned short option numbers */
-enum {
-	OV511_USOPT_INVALID,
-	OV511_USOPT_BRIGHT,
-	OV511_USOPT_SAT,
-	OV511_USOPT_HUE,
-	OV511_USOPT_CONTRAST,
-};
-
-/* Unsigned int option numbers */
-enum {
-	OV511_UIOPT_INVALID,
-	OV511_UIOPT_POWER_FREQ,
-	OV511_UIOPT_BFILTER,
-	OV511_UIOPT_LED,
-	OV511_UIOPT_DEBUG,
-	OV511_UIOPT_COMPRESS,
-};
-
-struct ov511_ushort_opt {
-	int optnum;		/* Specific option number */
-	unsigned short val;
-};
-
-struct ov511_uint_opt {
-	int optnum;		/* Specific option number */
-	unsigned int val;
-};
-
 struct ov511_i2c_struct {
 	unsigned char slave; /* Write slave ID (read ID - 1) */
 	unsigned char reg;   /* Index of register */
@@ -358,15 +329,6 @@ struct ov511_i2c_struct {
 };
 
 /* ioctls */
-#define OV511IOC_GINTVER  _IOR('v', BASE_VIDIOCPRIVATE + 0, int)
-#define OV511IOC_GUSHORT _IOWR('v', BASE_VIDIOCPRIVATE + 1, \
-			       struct ov511_ushort_opt)
-#define OV511IOC_SUSHORT  _IOW('v', BASE_VIDIOCPRIVATE + 2, \
-			       struct ov511_ushort_opt)
-#define OV511IOC_GUINT   _IOWR('v', BASE_VIDIOCPRIVATE + 3, \
-			       struct ov511_uint_opt)
-#define OV511IOC_SUINT    _IOW('v', BASE_VIDIOCPRIVATE + 4, \
-			       struct ov511_uint_opt)
 #define OV511IOC_WI2C     _IOW('v', BASE_VIDIOCPRIVATE + 5, \
 			       struct ov511_i2c_struct)
 #define OV511IOC_RI2C    _IOWR('v', BASE_VIDIOCPRIVATE + 6, \
@@ -445,9 +407,7 @@ struct ov51x_decomp_ops {
 };
 
 struct usb_ov511 {
-	struct video_device vdev;
-
-	/* Device structure */
+	struct video_device *vdev;
 	struct usb_device *dev;
 
 	int customid;
@@ -514,12 +474,6 @@ struct usb_ov511 {
 	int packet_numbering;	/* Is ISO frame numbering enabled? */
 
 	struct semaphore param_lock;	/* params lock for this camera */
-
-	/* /proc entries, relative to /proc/video/ov511/ */
-	struct proc_dir_entry *proc_devdir;   /* Per-device proc directory */
-	struct proc_dir_entry *proc_info;     /* <minor#>/info entry */
-	struct proc_dir_entry *proc_button;   /* <minor#>/button entry */
-	struct proc_dir_entry *proc_control;  /* <minor#>/control entry */
 
 	/* Framebuffer/sbuf management */
 	int buf_state;

@@ -943,7 +943,7 @@ static void __exit atp_cleanup_module(void) {
 		next_dev = ((struct net_local *)root_atp_dev->priv)->next_module;
 		unregister_netdev(root_atp_dev);
 		/* No need to release_region(), since we never snarf it. */
-		kfree(root_atp_dev);
+		free_netdev(root_atp_dev);
 		root_atp_dev = next_dev;
 	}
 }

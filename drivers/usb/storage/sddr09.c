@@ -1127,7 +1127,7 @@ sddr09_read_map(struct us_data *us) {
 		char *vaddr = kmalloc(alloc_req, GFP_NOIO);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,3)
 		sg[i].page = virt_to_page(vaddr);
-		sg[i].offset = ((unsigned long)vaddr & ~PAGE_MASK);
+		sg[i].offset = offset_in_page(vaddr);
 #else
 		sg[i].address = vaddr;
 #endif

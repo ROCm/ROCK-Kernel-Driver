@@ -18,6 +18,7 @@
 #include <linux/hash.h>
 #include <linux/swap.h>
 #include <linux/security.h>
+#include <linux/pagemap.h>
 #include <linux/cdev.h>
 
 /*
@@ -141,7 +142,8 @@ static struct inode *alloc_inode(struct super_block *sb)
 
 		mapping->a_ops = &empty_aops;
  		mapping->host = inode;
-		mapping->gfp_mask = GFP_HIGHUSER;
+		mapping->flags = 0;
+		mapping_set_gfp_mask(mapping, GFP_HIGHUSER);
 		mapping->dirtied_when = 0;
 		mapping->assoc_mapping = NULL;
 		mapping->backing_dev_info = &default_backing_dev_info;
@@ -1148,8 +1150,13 @@ void update_atime(struct inode *inode)
 
 void inode_update_time(struct inode *inode, int ctime_too)
 {
-	struct timespec now = current_kernel_time();
+	struct timespec now;
 	int sync_it = 0;
+
+	if (IS_RDONLY(inode))
+		return;
+
+	now = current_kernel_time();
 
 	if (inode_times_differ(inode, &inode->i_mtime, &now))
 		sync_it = 1;

@@ -1110,10 +1110,10 @@ static int __ipv6_regen_rndid(struct inet6_dev *idev)
 	struct scatterlist sg[2];
 
 	sg[0].page = virt_to_page(idev->entropy);
-	sg[0].offset = ((long) idev->entropy & ~PAGE_MASK);
+	sg[0].offset = offset_in_page(idev->entropy);
 	sg[0].length = 8;
 	sg[1].page = virt_to_page(eui64);
-	sg[1].offset = ((long) eui64 & ~PAGE_MASK);
+	sg[1].offset = offset_in_page(eui64);
 	sg[1].length = 8;
 
 	dev = idev->dev;
@@ -2443,6 +2443,7 @@ static int inet6_fill_ifaddr(struct sk_buff *skb, struct inet6_ifaddr *ifa,
 	unsigned char	 *b = skb->tail;
 
 	nlh = NLMSG_PUT(skb, pid, seq, event, sizeof(*ifm));
+	if (pid) nlh->nlmsg_flags |= NLM_F_MULTI;
 	ifm = NLMSG_DATA(nlh);
 	ifm->ifa_family = AF_INET6;
 	ifm->ifa_prefixlen = ifa->prefix_len;
@@ -2593,6 +2594,53 @@ int addrconf_sysctl_forward(ctl_table *ctl, int write, struct file * filp,
         return ret;
 }
 
+static int addrconf_sysctl_forward_strategy(ctl_table *table, 
+					    int *name, int nlen,
+					    void *oldval, size_t *oldlenp,
+					    void *newval, size_t newlen,
+					    void **context)
+{
+	int *valp = table->data;
+	int new;
+
+	if (!newval || !newlen)
+		return 0;
+	if (newlen != sizeof(int))
+		return -EINVAL;
+	if (get_user(new, (int *)newval))
+		return -EFAULT;
+	if (new == *valp)
+		return 0;
+	if (oldval && oldlenp) {
+		size_t len;
+		if (get_user(len, oldlenp))
+			return -EFAULT;
+		if (len) {
+			if (len > table->maxlen)
+				len = table->maxlen;
+			if (copy_to_user(oldval, valp, len))
+				return -EFAULT;
+			if (put_user(len, oldlenp))
+				return -EFAULT;
+		}
+	}
+
+	if (valp != &ipv6_devconf_dflt.forwarding) {
+		struct inet6_dev *idev;
+		if (valp != &ipv6_devconf.forwarding) {
+			idev = (struct inet6_dev *)table->extra1;
+			if (unlikely(idev == NULL))
+				return -ENODEV;
+		} else
+			idev = NULL;
+		*valp = new;
+		addrconf_forward_change(idev);
+	} else
+		*valp = new;
+
+	return 1;
+}
+
 static struct addrconf_sysctl_table
 {
 	struct ctl_table_header *sysctl_header;
@@ -2611,6 +2659,7 @@ static struct addrconf_sysctl_table
 			.maxlen		=	sizeof(int),
 			.mode		=	0644,
          		.proc_handler	=	&addrconf_sysctl_forward,
+			.strategy	=	&addrconf_sysctl_forward_strategy,
 		},
 		{
 			.ctl_name	=	NET_IPV6_HOP_LIMIT,

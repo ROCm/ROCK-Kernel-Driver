@@ -423,7 +423,7 @@ void ip6ip6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 
 		if (teli && teli == info - 2) {
 			tel = (struct ipv6_tlv_tnl_enc_lim *) &skb->data[teli];
-			if (tel->encap_limit <= 1) {
+			if (tel->encap_limit == 0) {
 				if (net_ratelimit())
 					printk(KERN_WARNING
 					       "%s: Too small encapsulation "
@@ -621,6 +621,14 @@ merge_options(struct sock *sk, __u8 encap_limit,
 	return opt;
 }
 
+static int 
+ip6ip6_getfrag(void *from, char *to, int offset, int len, int odd, 
+		struct sk_buff *skb)
+{
+	memcpy(to, (char *) from + offset, len);
+	return 0;
+}
+
 /**
  * ip6ip6_tnl_addr_conflict - compare packet addresses to tunnel's own
  *   @t: the outgoing tunnel device
@@ -661,7 +669,7 @@ int ip6ip6_tnl_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct ipv6hdr *ipv6h = skb->nh.ipv6h;
 	struct ipv6_txoptions *orig_opt = NULL;
 	struct ipv6_txoptions *opt = NULL;
-	__u8 encap_limit = 0;
+	int encap_limit = -1;
 	__u16 offset;
 	struct flowi fl;
 	struct ip6_flowlabel *fl_lbl = NULL;
@@ -684,7 +692,7 @@ int ip6ip6_tnl_xmit(struct sk_buff *skb, struct net_device *dev)
 	if ((offset = parse_tlv_tnl_enc_lim(skb, skb->nh.raw)) > 0) {
 		struct ipv6_tlv_tnl_enc_lim *tel;
 		tel = (struct ipv6_tlv_tnl_enc_lim *) &skb->nh.raw[offset];
-		if (tel->encap_limit <= 1) {
+		if (tel->encap_limit == 0) {
 			icmpv6_send(skb, ICMPV6_PARAMPROB,
 				    ICMPV6_HDR_FIELD, offset + 2, skb->dev);
 			goto tx_err;
@@ -707,7 +715,7 @@ int ip6ip6_tnl_xmit(struct sk_buff *skb, struct net_device *dev)
 		if (fl_lbl)
 			orig_opt = fl_lbl->opt;
 	}
-	if (encap_limit > 0) {
+	if (encap_limit >= 0) {
 		if (!(opt = merge_options(sk, encap_limit, orig_opt))) {
 			goto tx_err_free_fl_lbl;
 		}
@@ -755,9 +763,9 @@ int ip6ip6_tnl_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 	if (skb->len > mtu) {
 		icmpv6_send(skb, ICMPV6_PKT_TOOBIG, 0, mtu, dev);
-		goto tx_err_opt_release;
+		goto tx_err_dst_release;
 	}
-	err = ip6_append_data(sk, ip_generic_getfrag, skb->nh.raw, skb->len, 0,
+	err = ip6_append_data(sk, ip6ip6_getfrag, skb->nh.raw, skb->len, 0,
 			      t->parms.hop_limit, opt, &fl, 
 			      (struct rt6_info *)dst, MSG_DONTWAIT);
 
@@ -785,7 +793,6 @@ int ip6ip6_tnl_xmit(struct sk_buff *skb, struct net_device *dev)
 	return 0;
 tx_err_dst_release:
 	dst_release(dst);
-tx_err_opt_release:
 	if (opt && opt != orig_opt)
 		sock_kfree_s(sk, opt, opt->tot_len);
 tx_err_free_fl_lbl:

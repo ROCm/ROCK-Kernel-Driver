@@ -8,6 +8,7 @@
 #include <linux/interrupt.h>
 #include <linux/mc146818rtc.h>
 #include <asm/uaccess.h>
+#include <asm/apic.h>
 #include "mach_reboot.h"
 
 /*
@@ -15,7 +16,6 @@
  */
 void (*pm_power_off)(void);
 
-static long no_idt[2];
 static int reboot_mode;
 int reboot_thru_bios;
 
@@ -86,7 +86,9 @@ static struct
 	unsigned long long * base __attribute__ ((packed));
 }
 real_mode_gdt = { sizeof (real_mode_gdt_entries) - 1, real_mode_gdt_entries },
-real_mode_idt = { 0x3ff, 0 };
+real_mode_idt = { 0x3ff, 0 },
+no_idt = { 0, 0 };
+
 
 /* This is 16-bit protected mode code to disable paging and the cache,
    switch to real mode and jump to the BIOS reset code.
@@ -226,7 +228,7 @@ void machine_restart(char * __unused)
 		   if its not, default to the BSP */
 		if ((reboot_cpu == -1) ||  
 		      (reboot_cpu > (NR_CPUS -1))  || 
-		      !(phys_cpu_present_map & (1<<cpuid))) 
+		      !physid_isset(cpuid, phys_cpu_present_map))
 			reboot_cpu = boot_cpu_physical_apicid;
 
 		reboot_smp = 0;  /* use this as a flag to only go through this once*/
@@ -249,6 +251,14 @@ void machine_restart(char * __unused)
 	 * other OSs see a clean IRQ state.
 	 */
 	smp_send_stop();
+#elif CONFIG_X86_LOCAL_APIC
+	if (cpu_has_apic) {
+		local_irq_disable();
+		disable_local_APIC();
+		local_irq_enable();
+	}
+#endif
+#ifdef CONFIG_X86_IO_APIC
 	disable_IO_APIC();
 #endif
 

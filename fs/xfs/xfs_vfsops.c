@@ -1506,7 +1506,7 @@ xfs_syncsub(
 		xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 		error = xfs_trans_commit(tp, 0, NULL);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
-		xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE);
+		xfs_log_force(mp, (xfs_lsn_t)0, log_flags);
 	}
 
 	/*

@@ -778,6 +778,17 @@ void ide_unregister (unsigned int index)
 	/* More messed up locking ... */
 	spin_unlock_irq(&ide_lock);
 	device_unregister(&hwif->gendev);
+
+	/*
+	 * Remove us from the kernel's knowledge
+	 */
+	blk_unregister_region(MKDEV(hwif->major, 0), MAX_DRIVES<<PARTN_BITS);
+	for (i = 0; i < MAX_DRIVES; i++) {
+		struct gendisk *disk = hwif->drives[i].disk;
+		hwif->drives[i].disk = NULL;
+		put_disk(disk);
+	}
+	unregister_blkdev(hwif->major, hwif->name);
 	spin_lock_irq(&ide_lock);
 
 #if !defined(CONFIG_DMA_NONPCI)
@@ -793,21 +804,11 @@ void ide_unregister (unsigned int index)
 		hwif->dma_prdtable = 0;
 	}
 #endif /* !(CONFIG_DMA_NONPCI) */
-
-	/*
-	 * Remove us from the kernel's knowledge
-	 */
-	blk_unregister_region(MKDEV(hwif->major, 0), MAX_DRIVES<<PARTN_BITS);
-	for (i = 0; i < MAX_DRIVES; i++) {
-		struct gendisk *disk = hwif->drives[i].disk;
-		hwif->drives[i].disk = NULL;
-		put_disk(disk);
-	}
-	unregister_blkdev(hwif->major, hwif->name);
-
 	old_hwif			= *hwif;
 	init_hwif_data(index);	/* restore hwif data to pristine status */
 	hwif->hwgroup			= old_hwif.hwgroup;
+
+	hwif->gendev.parent		= old_hwif.gendev.parent;
 
 	hwif->proc			= old_hwif.proc;
 
@@ -904,7 +905,7 @@ void ide_unregister (unsigned int index)
 
 	hwif->mmio			= old_hwif.mmio;
 	hwif->rqsize			= old_hwif.rqsize;
-	hwif->addressing		= old_hwif.addressing;
+	hwif->no_lba48			= old_hwif.no_lba48;
 #ifndef CONFIG_BLK_DEV_IDECS
 	hwif->irq			= old_hwif.irq;
 #endif /* CONFIG_BLK_DEV_IDECS */
@@ -1533,15 +1534,12 @@ int ata_attach(ide_drive_t *drive)
 
 EXPORT_SYMBOL(ata_attach);
 
-int generic_ide_suspend(struct device *dev, u32 state, u32 level)
+static int generic_ide_suspend(struct device *dev, u32 state)
 {
 	ide_drive_t *drive = dev->driver_data;
 	struct request rq;
 	struct request_pm_state rqpm;
 	ide_task_t args;
-
-	if (level == dev->power_state || level != SUSPEND_SAVE_STATE)
-		return 0;
 
 	memset(&rq, 0, sizeof(rq));
 	memset(&rqpm, 0, sizeof(rqpm));
@@ -1555,17 +1553,12 @@ int generic_ide_suspend(struct device *dev, u32 state, u32 level)
 	return ide_do_drive_cmd(drive, &rq, ide_wait);
 }
 
-EXPORT_SYMBOL(generic_ide_suspend);
-
-int generic_ide_resume(struct device *dev, u32 level)
+static int generic_ide_resume(struct device *dev)
 {
 	ide_drive_t *drive = dev->driver_data;
 	struct request rq;
 	struct request_pm_state rqpm;
 	ide_task_t args;
-
-	if (level == dev->power_state || level != RESUME_RESTORE_STATE)
-		return 0;
 
 	memset(&rq, 0, sizeof(rq));
 	memset(&rqpm, 0, sizeof(rqpm));
@@ -1578,8 +1571,6 @@ int generic_ide_resume(struct device *dev, u32 level)
 
 	return ide_do_drive_cmd(drive, &rq, ide_head_wait);
 }
-
-EXPORT_SYMBOL(generic_ide_resume);
 
 int generic_ide_ioctl(struct block_device *bdev, unsigned int cmd,
 			unsigned long arg)
@@ -1614,18 +1605,6 @@ int generic_ide_ioctl(struct block_device *bdev, unsigned int cmd,
 			if (put_user(drive->bios_head, (u8 *) &loc->heads)) return -EFAULT;
 			if (put_user(drive->bios_sect, (u8 *) &loc->sectors)) return -EFAULT;
 			if (put_user(bios_cyl, (u16 *) &loc->cylinders)) return -EFAULT;
-			if (put_user((unsigned)get_start_sect(bdev),
-				(unsigned long *) &loc->start)) return -EFAULT;
-			return 0;
-		}
-
-		case HDIO_GETGEO_BIG_RAW:
-		{
-			struct hd_big_geometry *loc = (struct hd_big_geometry *) arg;
-			if (!loc || (drive->media != ide_disk && drive->media != ide_floppy)) return -EINVAL;
-			if (put_user(drive->head, (u8 *) &loc->heads)) return -EFAULT;
-			if (put_user(drive->sect, (u8 *) &loc->sectors)) return -EFAULT;
-			if (put_user(drive->cyl, (unsigned int *) &loc->cylinders)) return -EFAULT;
 			if (put_user((unsigned)get_start_sect(bdev),
 				(unsigned long *) &loc->start)) return -EFAULT;
 			return 0;
@@ -2605,6 +2584,8 @@ EXPORT_SYMBOL(ide_probe);
 
 struct bus_type ide_bus_type = {
 	.name		= "ide",
+	.suspend	= generic_ide_suspend,
+	.resume		= generic_ide_resume,
 };
 
 /*

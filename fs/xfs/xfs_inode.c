@@ -825,6 +825,8 @@ xfs_xlate_dinode_core(
 			sizeof(buf_core->di_pad));
 	}
 
+	INT_XLATE(buf_core->di_flushiter, mem_core->di_flushiter, dir, arch);
+
 	INT_XLATE(buf_core->di_atime.t_sec, mem_core->di_atime.t_sec,
 			dir, arch);
 	INT_XLATE(buf_core->di_atime.t_nsec, mem_core->di_atime.t_nsec,
@@ -956,6 +958,7 @@ xfs_iread(
 		ip->i_d.di_magic = INT_GET(dip->di_core.di_magic, ARCH_CONVERT);
 		ip->i_d.di_version = INT_GET(dip->di_core.di_version, ARCH_CONVERT);
 		ip->i_d.di_gen = INT_GET(dip->di_core.di_gen, ARCH_CONVERT);
+		ip->i_d.di_flushiter = INT_GET(dip->di_core.di_flushiter, ARCH_CONVERT);
 		/*
 		 * Make sure to pull in the mode here as well in
 		 * case the inode is released without being used.
@@ -3233,6 +3236,13 @@ xfs_iflush_int(
 		goto corrupt_out;
 	}
 	/*
+	 * bump the flush iteration count, used to detect flushes which
+	 * postdate a log record during recovery.
+	 */
+
+	ip->i_d.di_flushiter++;
+
+	/*
 	 * Copy the dirty parts of the inode into the on-disk
 	 * inode.  We always copy out the core of the inode,
 	 * because if the inode is dirty at all the core must
@@ -3240,6 +3250,10 @@ xfs_iflush_int(
 	 */
 	xfs_xlate_dinode_core((xfs_caddr_t)&(dip->di_core), &(ip->i_d),
 		-1, ARCH_CONVERT);
+
+	/* Wrap, we never let the log put out DI_MAX_FLUSH */
+	if (ip->i_d.di_flushiter == DI_MAX_FLUSH)
+		ip->i_d.di_flushiter = 0;
 
 	/*
 	 * If this is really an old format inode and the superblock version

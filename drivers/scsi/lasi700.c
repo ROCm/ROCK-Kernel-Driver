@@ -86,14 +86,10 @@ lasi700_driver_callback(struct parisc_device *dev)
 	struct NCR_700_Host_Parameters *hostdata;
 	struct Scsi_Host *host;
 
-	snprintf(dev->dev.name, sizeof(dev->dev.name), "%s",
-		 (dev->id.sversion == LASI_700_SVERSION) ?
-		  "lasi700" : "lasi710");
-
 	hostdata = kmalloc(sizeof(*hostdata), GFP_KERNEL);
 	if (!hostdata) {
 		printk(KERN_ERR "%s: Failed to allocate host data\n",
-		       dev->dev.name);
+		       dev->dev.bus_id);
 		return 1;
 	}
 	memset(hostdata, 0, sizeof(struct NCR_700_Host_Parameters));
@@ -121,9 +117,9 @@ lasi700_driver_callback(struct parisc_device *dev)
 
 	host->irq = dev->irq;
 	if (request_irq(dev->irq, NCR_700_intr, SA_SHIRQ,
-				dev->dev.name, host)) {
+				dev->dev.bus_id, host)) {
 		printk(KERN_ERR "%s: irq problem, detaching\n",
-		       dev->dev.name);
+		       dev->dev.bus_id);
 		goto out_put_host;
 	}
 

@@ -360,7 +360,7 @@ void __init qd_setup (int unit, int base, int config, unsigned int data0, unsign
  *
  * called to unsetup an ata channel : back to default values, unlinks tuning
  */
-void __init qd_unsetup (int unit)
+static void __exit qd_unsetup (int unit)
 {
 	ide_hwif_t *hwif = &ide_hwifs[unit];
 	u8 config = hwif->config_data;
@@ -495,7 +495,7 @@ MODULE_AUTHOR("Samuel Thibault");
 MODULE_DESCRIPTION("support of qd65xx vlb ide chipset");
 MODULE_LICENSE("GPL");
 
-int __init qd65xx_mod_init(void)
+static int __init qd65xx_mod_init(void)
 {
 	if (qd_probe(0x30)) qd_probe(0xb0);
 	if (ide_hwifs[0].chipset != ide_qd65xx &&
@@ -505,7 +505,7 @@ int __init qd65xx_mod_init(void)
 }
 module_init(qd65xx_mod_init);
 
-void __init qd65xx_mod_exit(void)
+static void __exit qd65xx_mod_exit(void)
 {
 	qd_unsetup(0);
 	qd_unsetup(1);

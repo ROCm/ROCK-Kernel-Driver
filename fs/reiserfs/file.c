@@ -555,7 +555,6 @@ void reiserfs_unprepare_pages(struct page **prepared_pages, /* list of locked pa
 	struct page *page = prepared_pages[i];
 
 	try_to_free_buffers(page);
-	kunmap(page);
 	unlock_page(page);
 	page_cache_release(page);
     }

@@ -8,8 +8,6 @@
 #include <linux/agp_backend.h>
 #include "agp.h"
 
-static int agp_try_unsupported __initdata = 0;
-
 struct serverworks_page_map {
 	unsigned long *real;
 	unsigned long *remapped;
@@ -268,6 +266,10 @@ static int serverworks_configure(void)
 	pci_read_config_dword(agp_bridge->dev, serverworks_private.mm_addr_ofs, &temp);
 	temp = (temp & PCI_BASE_ADDRESS_MEM_MASK);
 	serverworks_private.registers = (volatile u8 *) ioremap(temp, 4096);
+	if (!serverworks_private.registers) {
+		printk (KERN_ERR PFX "Unable to ioremap() memory.\n");
+		return -ENOMEM;
+	}
 
 	OUTREG8(serverworks_private.registers, SVWRKS_GART_CACHE, 0x0a);
 
@@ -446,8 +448,8 @@ static int __init agp_serverworks_probe(struct pci_dev *pdev,
 	bridge_dev = pci_find_slot((unsigned int)pdev->bus->number,
 			PCI_DEVFN(0, 1));
 	if (!bridge_dev) {
-		printk(KERN_INFO PFX "agpgart: Detected a Serverworks "
-		       "Chipset, but could not find the secondary device.\n");
+		printk(KERN_INFO PFX "Detected a Serverworks chipset "
+		       "but could not find the secondary device.\n");
 		return -ENODEV;
 	}
 
@@ -457,9 +459,9 @@ static int __init agp_serverworks_probe(struct pci_dev *pdev,
 	case 0x0007:
 		break;
 	default:
-		if (!agp_try_unsupported)
-			return -ENODEV;
-		break;
+		printk(KERN_ERR PFX "Unsupported Serverworks chipset "
+				"(device id: %04x)\n", pdev->device);
+		return -ENODEV;
 	}
 
 	serverworks_private.svrwrks_dev = bridge_dev;
@@ -542,6 +544,5 @@ static void __exit agp_serverworks_cleanup(void)
 module_init(agp_serverworks_init);
 module_exit(agp_serverworks_cleanup);
 
-MODULE_PARM(agp_try_unsupported, "1i");
 MODULE_LICENSE("GPL and additional rights");
 

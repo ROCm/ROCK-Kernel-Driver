@@ -157,9 +157,7 @@ struct ip_vs_scheduler *ip_vs_scheduler_get(const char *sched_name)
 	 *  If scheduler not found, load the module and search again
 	 */
 	if (sched == NULL) {
-		char module_name[IP_VS_SCHEDNAME_MAXLEN+8];
-		sprintf(module_name,"ip_vs_%s", sched_name);
-		request_module(module_name);
+		request_module("ip_vs_%s", sched_name);
 		sched = ip_vs_sched_getbyname(sched_name);
 	}
 

@@ -557,9 +557,9 @@ t2_machine_check(unsigned long vector, unsigned long la_ptr,
 		 struct pt_regs * regs)
 {
 	int cpu = smp_processor_id();
-#if DEBUG_MCHECK > 0
+#ifdef CONFIG_VERBOSE_MCHECK
 	struct el_common *mchk_header = (struct el_common *)la_ptr;
-#endif /* DEBUG_MCHECK */
+#endif
 
 	/* Clear the error before any reporting.  */
 	mb();
@@ -580,39 +580,45 @@ t2_machine_check(unsigned long vector, unsigned long la_ptr,
 		 *
 		 * Just dismiss it for now on this CPU...
 		 */
-#if DEBUG_MCHECK > 0
-		printk("t2_machine_check(cpu%d): any_expected 0x%x -"
-                       " (assumed) spurious -"
-                       " code 0x%x\n", cpu, t2_mcheck_any_expected,
-                       (unsigned int)mchk_header->code);
-#endif /* DEBUG_MCHECK */
+#ifdef CONFIG_VERBOSE_MCHECK
+		if (alpha_verbose_mcheck > 1) {
+			printk("t2_machine_check(cpu%d): any_expected 0x%x -"
+			       " (assumed) spurious -"
+			       " code 0x%x\n", cpu, t2_mcheck_any_expected,
+			       (unsigned int)mchk_header->code);
+		}
+#endif
 		return;
 	}
 
 	if (!mcheck_expected(cpu) && !t2_mcheck_any_expected) {
 		if (t2_mcheck_last_taken & (1 << cpu)) {
-#if DEBUG_MCHECK > 0
+#ifdef CONFIG_VERBOSE_MCHECK
+		    if (alpha_verbose_mcheck > 1) {
 			printk("t2_machine_check(cpu%d): last_taken 0x%x - "
 			       "unexpected mcheck - code 0x%x\n",
 			       cpu, t2_mcheck_last_taken,
 			       (unsigned int)mchk_header->code);
-#endif /* DEBUG_MCHECK */
-			t2_mcheck_last_taken = 0;
-			mb();
-			return;
+		    }
+#endif
+		    t2_mcheck_last_taken = 0;
+		    mb();
+		    return;
 		} else {
 			t2_mcheck_last_taken = 0;
 			mb();
 		}
 	}
 
-#if DEBUG_MCHECK > 0
-	printk("%s t2_mcheck(cpu%d): last_taken 0x%x - "
-	       "any_expected 0x%x - code 0x%x\n",
-	       (mcheck_expected(cpu) ? "EX" : "UN"), cpu,
-	       t2_mcheck_last_taken, t2_mcheck_any_expected,
-	       (unsigned int)mchk_header->code);
-#endif /* DEBUG_MCHECK */
+#ifdef CONFIG_VERBOSE_MCHECK
+	if (alpha_verbose_mcheck > 1) {
+		printk("%s t2_mcheck(cpu%d): last_taken 0x%x - "
+		       "any_expected 0x%x - code 0x%x\n",
+		       (mcheck_expected(cpu) ? "EX" : "UN"), cpu,
+		       t2_mcheck_last_taken, t2_mcheck_any_expected,
+		       (unsigned int)mchk_header->code);
+	}
+#endif
 
 	process_mcheck_info(vector, la_ptr, regs, "T2", mcheck_expected(cpu));
 }

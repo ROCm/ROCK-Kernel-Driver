@@ -27,6 +27,9 @@
  * Tested with Linux 1.2.13, ..., 2.2.20, ..., 2.4.20                   *
  *                                                                      *
  * $Log: gdth.c,v $
+ * Revision 1.63  2003/07/12 14:01:00  Daniele Bellucci <bellucda@tiscali.it>
+ * Minor cleanups in gdth_ioctl.
+ *
  * Revision 1.62  2003/02/27 15:01:59  achim
  * Dynamic DMA mapping implemented
  * New (character device) IOCTL interface added
@@ -5433,14 +5436,16 @@ static int gdth_ioctl(struct inode *inode, struct file *filep,
       case GDTIOCTL_CTRCNT:
       { 
         int cnt = gdth_ctr_count;
-        put_user(cnt, (int *)arg);
+        if (put_user(cnt, (int *)arg))
+		return -EFAULT;
         break;
       }
 
       case GDTIOCTL_DRVERS:
       { 
         int ver = (GDTH_VERSION<<8) | GDTH_SUBVERSION;
-        put_user(ver, (int *)arg);
+        if (put_user(ver, (int *)arg))
+		return -EFAULT;
         break;
       }
       
@@ -5451,7 +5456,8 @@ static int gdth_ioctl(struct inode *inode, struct file *filep,
         osv.version = (unchar)(LINUX_VERSION_CODE >> 16);
         osv.subversion = (unchar)(LINUX_VERSION_CODE >> 8);
         osv.revision = (ushort)(LINUX_VERSION_CODE & 0xff);
-        copy_to_user((char *)arg, &osv, sizeof(gdth_ioctl_osvers));
+        if (copy_to_user((char *)arg, &osv, sizeof(gdth_ioctl_osvers)))
+		return -EFAULT;
         break;
       }
 

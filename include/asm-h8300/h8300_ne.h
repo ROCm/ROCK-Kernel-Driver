@@ -11,9 +11,9 @@
 #define	h8300ne_h
 /****************************************************************************/
 
-/* Such a description is OK ? */
-#define DEPEND_HEADER(target) <asm/target/ne.h> 
-#include DEPEND_HEADER(TARGET)
+#define H8300_NE_DEFINE
+#include <asm/machine-depend.h>
+#undef  H8300_NE_DEFINE
 
 /****************************************************************************/
 #endif	/* h8300ne_h */

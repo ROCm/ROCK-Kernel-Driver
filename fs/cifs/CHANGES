@@ -1,3 +1,14 @@
+Version 0.89
+------------
+Fix oops on write to dead tcp session. Remove error log write for case when file open
+O_CREAT but not O_EXCL
+
+Version 0.88
+------------
+Fix non-POSIX behavior on rename of open file and delete of open file by taking 
+advantage of trans2 SetFileInfo rename facility if available on target server.
+Retry on ENOSPC and EAGAIN socket errors.
+
 Version 0.87
 ------------
 Fix oops on big endian readdir.  Set blksize to be even power of two (2**blkbits) to fix

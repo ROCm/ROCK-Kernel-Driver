@@ -193,7 +193,7 @@ static void reg_vif_setup(struct net_device *dev)
 	dev->flags		= IFF_NOARP;
 	dev->hard_start_xmit	= reg_vif_xmit;
 	dev->get_stats		= reg_vif_get_stats;
-	dev->destructor		= (void (*)(struct net_device *)) kfree;
+	dev->destructor		= free_netdev;
 }
 
 static struct net_device *ipmr_reg_vif(void)

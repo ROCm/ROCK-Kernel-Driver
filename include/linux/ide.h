@@ -766,8 +766,7 @@ typedef struct ide_drive_s {
 	unsigned int	failures;	/* current failure count */
 	unsigned int	max_failures;	/* maximum allowed failure count */
 
-	u32		capacity;	/* total number of sectors */
-	u64		capacity48;	/* total number of sectors */
+	u64		capacity64;	/* total number of sectors */
 
 	int		last_lun;	/* last logical unit */
 	int		forced_lun;	/* if hdxlun was given at boot */
@@ -1008,7 +1007,6 @@ typedef struct hwif_s {
 
 	int		mmio;		/* hosts iomio (0), mmio (1) or custom (2) select */
 	int		rqsize;		/* max sectors per request */
-	int		addressing;	/* hosts addressing */
 	int		irq;		/* our irq number */
 	int		initializing;	/* set while initializing self */
 
@@ -1037,6 +1035,7 @@ typedef struct hwif_s {
 	unsigned	reset      : 1;	/* reset after probe */
 	unsigned	autodma    : 1;	/* auto-attempt using DMA at boot */
 	unsigned	udma_four  : 1;	/* 1=ATA-66 capable, 0=default */
+	unsigned	no_lba48   : 1; /* 1 = cannot do LBA48 */
 	unsigned	no_dsc     : 1;	/* 0 default, 1 dsc_overlap disabled */
 	unsigned	auto_poll  : 1; /* supports nop auto-poll */
 
@@ -1242,8 +1241,6 @@ typedef struct ide_driver_s {
 #define DRIVER(drive)		((drive)->driver)
 
 extern int generic_ide_ioctl(struct block_device *, unsigned, unsigned long);
-extern int generic_ide_suspend(struct device *dev, u32 state, u32 level);
-extern int generic_ide_resume(struct device *dev, u32 level);
 
 /*
  * IDE modules.

@@ -240,7 +240,7 @@ static int want_ipaddr(char **_value, const char *option, struct in_addr *addr)
  * - this function has been shamelessly adapted from the ext3 fs which shamelessly adapted it from
  *   the msdos fs
  */
-static int afs_super_parse_options(struct afs_super_info *as, char *options, char **devname)
+static int afs_super_parse_options(struct afs_super_info *as, char *options, const char ** devname)
 {
 	char *key, *value;
 	int ret;
@@ -314,6 +314,11 @@ static int afs_super_parse_options(struct afs_super_info *as, char *options, cha
 	return ret;
 } /* end afs_super_parse_options() */
 
+struct fill_super_options {
+	const char *dev_name;
+	void *options;
+};
+
 /*****************************************************************************/
 /*
  * fill in the superblock
@@ -324,8 +329,9 @@ static int afs_fill_super(struct super_block *sb, void *_data, int silent)
 	struct dentry *root = NULL;
 	struct inode *inode = NULL;
 	afs_fid_t fid;
-	void **data = _data;
-	char *options, *devname;
+	struct fill_super_options *data = _data;
+	const char *devname;
+	char *options;
 	int ret;
 
 	_enter("");
@@ -334,8 +340,8 @@ static int afs_fill_super(struct super_block *sb, void *_data, int silent)
 		_leave(" = -EINVAL");
 		return -EINVAL;
 	}
-	devname = data[0];
-	options = data[1];
+	devname = data->dev_name;
+	options = data->options;
 	if (options)
 		options[PAGE_SIZE-1] = 0;
 
@@ -413,7 +419,7 @@ afs_get_sb(struct file_system_type *fs_type, int flags,
 	   const char *dev_name, void *options)
 {
 	struct super_block *sb;
-	void *data[2] = { dev_name, options };
+	struct fill_super_options data = { dev_name, options };
 	int ret;
 
 	_enter(",,%s,%p",dev_name,options);
@@ -426,7 +432,7 @@ afs_get_sb(struct file_system_type *fs_type, int flags,
 	}
 
 	/* allocate a deviceless superblock */
-	sb = get_sb_nodev(fs_type,flags,data,afs_fill_super);
+	sb = get_sb_nodev(fs_type, flags, &data, afs_fill_super);
 	if (IS_ERR(sb)) {
 		afscm_stop();
 		return sb;

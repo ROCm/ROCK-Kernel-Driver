@@ -288,7 +288,12 @@ void __init cpu_init (void)
 		estacks += EXCEPTION_STKSZ;
 	}
 
-	t->io_map_base = INVALID_IO_BITMAP_OFFSET;
+	t->io_bitmap_base = INVALID_IO_BITMAP_OFFSET;
+	/*
+	 * This is required because the CPU will access up to
+	 * 8 bits beyond the end of the IO permission bitmap.
+	 */
+	t->io_bitmap[IO_BITMAP_LONGS] = ~0UL;
 
 	atomic_inc(&init_mm.mm_count);
 	me->active_mm = &init_mm;

@@ -463,7 +463,9 @@ out:	return ret;
  */
 static inline u32 rt_score(struct rtable *rt)
 {
-	u32 score = rt->u.dst.__use;
+	u32 score = jiffies - rt->u.dst.lastuse;
+
+	score = ~score & ~(3<<30);
 
 	if (rt_valuable(rt))
 		score |= (1<<31);
@@ -805,8 +807,7 @@ restart:
 		 * The second limit is less certain. At the moment it allows
 		 * only 2 entries per bucket. We will see.
 		 */
-		if (chain_length > ip_rt_gc_elasticity ||
-		    (chain_length > 1 && !(min_score & (1<<31)))) {
+		if (chain_length > ip_rt_gc_elasticity) {
 			*candp = cand->u.rt_next;
 			rt_free(cand);
 		}
@@ -2785,8 +2786,10 @@ int __init ip_rt_init(void)
 	create_proc_read_entry("net/rt_acct", 0, 0, ip_rt_acct_read, NULL);
 #endif
 #endif
+#ifdef CONFIG_XFRM
 	xfrm_init();
 	xfrm4_init();
+#endif
 out:
 	return rc;
 out_enomem:

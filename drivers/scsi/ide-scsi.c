@@ -761,8 +761,8 @@ static inline struct bio *idescsi_dma_bio(ide_drive_t *drive, idescsi_pc_t *pc)
 		printk ("ide-scsi: %s: building DMA table for a single buffer (%dkB)\n", drive->name, pc->request_transfer >> 10);
 #endif /* IDESCSI_DEBUG_LOG */
 		bh->bi_io_vec[0].bv_page = virt_to_page(pc->scsi_cmd->request_buffer);
+		bh->bi_io_vec[0].bv_offset = offset_in_page(pc->scsi_cmd->request_buffer);
 		bh->bi_io_vec[0].bv_len = pc->request_transfer;
-		bh->bi_io_vec[0].bv_offset = (unsigned long) pc->scsi_cmd->request_buffer & ~PAGE_MASK;
 		bh->bi_size = pc->request_transfer;
 	}
 	return first_bh;
@@ -872,7 +872,7 @@ static int idescsi_abort (Scsi_Cmnd *cmd)
 			continue;
 		}
 		/* no, but is it queued in the ide subsystem? */
-		if (elv_queue_empty(&drive->queue)) {
+		if (elv_queue_empty(drive->queue)) {
 			spin_unlock_irqrestore(&ide_lock, flags);
 			return SUCCESS;
 		}
@@ -899,7 +899,7 @@ static int idescsi_reset (Scsi_Cmnd *cmd)
 		schedule_timeout(1);
 	}
 	/* now nuke the drive queue */
-	while ((req = elv_next_request(&drive->queue))) {
+	while ((req = elv_next_request(drive->queue))) {
 		blkdev_dequeue_request(req);
 		end_that_request_last(req);
 	}
@@ -948,7 +948,6 @@ static Scsi_Host_Template idescsi_template = {
 };
 
 static struct device     idescsi_primary = {
-	.name		= "Ide-scsi Parent",
 	.bus_id		= "ide-scsi",
 };
 static struct bus_type   idescsi_emu_bus = {

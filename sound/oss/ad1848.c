@@ -180,12 +180,12 @@ static struct {
 
 #ifdef CONFIG_PNP
 static int isapnp	= 1;
-static int isapnpjump	= 0;
-static int reverse	= 0;
+static int isapnpjump;
+static int reverse;
 
-static int audio_activated = 0;
+static int audio_activated;
 #else
-static int isapnp	= 0;
+static int isapnp;
 #endif
 
 
@@ -2717,7 +2717,7 @@ void unload_ms_sound(struct address_info *hw_config)
  * Timer stuff (for /dev/music).
  */
 
-static unsigned int current_interval = 0;
+static unsigned int current_interval;
 
 static unsigned int ad1848_tmr_start(int dev, unsigned int usecs)
 {
@@ -2971,8 +2971,10 @@ static struct isapnp_device_id id_table[] __devinitdata = {
 		ISAPNP_VENDOR('C','S','C'), ISAPNP_FUNCTION(0x0000), 0 },
         {       ISAPNP_ANY_ID, ISAPNP_ANY_ID,
 		ISAPNP_VENDOR('C','S','C'), ISAPNP_FUNCTION(0x0100), 0 },
+	/* The main driver for this card is opl3sa2
         {       ISAPNP_ANY_ID, ISAPNP_ANY_ID,
 		ISAPNP_VENDOR('Y','M','H'), ISAPNP_FUNCTION(0x0021), 0 },
+	*/
 	{	ISAPNP_VENDOR('G','R','V'), ISAPNP_DEVICE(0x0001),
 		ISAPNP_VENDOR('G','R','V'), ISAPNP_FUNCTION(0x0000), 0 },
 	{0}
@@ -3025,7 +3027,7 @@ static struct pnp_dev *ad1848_init_generic(struct pnp_card *bus, struct address_
 
 static int __init ad1848_isapnp_init(struct address_info *hw_config, struct pnp_card *bus, int slot)
 {
-	char *busname = bus->dev.name[0] ? bus->dev.name : ad1848_isapnp_list[slot].name;
+	char *busname = bus->name[0] ? bus->name : ad1848_isapnp_list[slot].name;
 
 	/* Initialize this baby. */
 

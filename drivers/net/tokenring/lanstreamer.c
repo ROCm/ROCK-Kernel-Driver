@@ -433,7 +433,7 @@ static void __devexit streamer_remove_one(struct pci_dev *pdev)
 	/* shouldn't we do iounmap here? */
 	release_region(pci_resource_start(pdev, 0), pci_resource_len(pdev,0));
 	release_mem_region(pci_resource_start(pdev, 1), pci_resource_len(pdev,1));
-	kfree(dev);
+	free_netdev(dev);
 	pci_set_drvdata(pdev, NULL);
 }
 

@@ -1002,8 +1002,9 @@ static void sbp2_remove_device(struct scsi_id_instance_data *scsi_id)
 	sbp2scsi_complete_all_commands(scsi_id, DID_NO_CONNECT);
 
 	/* Remove it from the scsi layer now */
-	if (sdev && scsi_remove_device(sdev))
-		SBP2_ERR("scsi_remove_device failed");
+	if (sdev) {
+		scsi_remove_device(sdev);
+	}
 
 	sbp2util_remove_command_orb_pool(scsi_id);
 
@@ -2890,7 +2891,6 @@ static Scsi_Host_Template scsi_driver_template = {
 	.cmd_per_lun =			SBP2_MAX_CMDS_PER_LUN,
 	.can_queue = 			SBP2_MAX_SCSI_QUEUE,
 	.emulated =			1,
-	.highmem_io =			1,
 };
 
 static int sbp2_module_init(void)

@@ -852,9 +852,7 @@ char *lprint_command(unsigned char *cmd, char *pos, char *buffer, int len);
 static
 char *lprint_opcode(int opcode, char *pos, char *buffer, int length);
 
-#ifndef NCR5380_proc_info
 static
-#endif
 int NCR5380_proc_info(struct Scsi_Host *instance, char *buffer, char **start, off_t offset, int length, int inout)
 {
 	char *pos = buffer;

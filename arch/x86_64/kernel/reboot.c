@@ -110,7 +110,7 @@ static void smp_halt(void)
 	}
 
 	/* Wait for all other CPUs to have run smp_stop_cpu */
-	while (cpu_online_map) 
+	while (!cpus_empty(cpu_online_map))
 		rep_nop(); 
 }
 #endif

@@ -2073,7 +2073,8 @@ ppp_ccp_peek(struct ppp *ppp, struct sk_buff *skb, int inbound)
 	case CCP_CONFACK:
 		if ((ppp->flags & (SC_CCP_OPEN | SC_CCP_UP)) != SC_CCP_OPEN)
 			break;
-		if (!pskb_may_pull(skb, len = CCP_LENGTH(dp)) + 2)
+		len = CCP_LENGTH(dp);
+		if (!pskb_may_pull(skb, len + 2))
 			return;		/* too short */
 		dp += CCP_HDRLEN;
 		len -= CCP_HDRLEN;
@@ -2255,11 +2256,6 @@ ppp_get_stats(struct ppp *ppp, struct ppp_stats *st)
  * and for initialization.
  */
 
-static void ppp_device_destructor(struct net_device *dev)
-{
-	kfree(dev);
-}
-
 /*
  * Create a new ppp interface unit.  Fails if it can't allocate memory
  * or if there is already a unit with the requested number.
@@ -2308,7 +2304,7 @@ ppp_create_interface(int unit, int *retp)
 	dev->init = ppp_net_init;
 	sprintf(dev->name, "ppp%d", unit);
 	dev->priv = ppp;
-	dev->destructor = ppp_device_destructor;
+	dev->destructor = free_netdev;
 
 	rtnl_lock();
 	ret = register_netdevice(dev);

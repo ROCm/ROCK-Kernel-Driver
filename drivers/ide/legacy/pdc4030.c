@@ -227,7 +227,7 @@ int __init setup_pdc4030(ide_hwif_t *hwif)
 	hwif2->mate	= hwif;
 	hwif2->channel	= 1;
 	hwif->rqsize	= hwif2->rqsize = 127;
-	hwif->addressing = hwif2->addressing = 1;
+	hwif->no_lba48 = hwif2->no_lba48 = 1;
 	hwif->selectproc = hwif2->selectproc = &promise_selectproc;
 	hwif->serialized = hwif2->serialized = 1;
 	/* DC4030 hosted drives need their own identify... */
@@ -326,7 +326,7 @@ int ide_probe_for_pdc4030(void)
 #endif
 }
 
-void __init release_pdc4030(ide_hwif_t *hwif, ide_hwif_t *mate)
+static void __exit release_pdc4030(ide_hwif_t *hwif, ide_hwif_t *mate)
 {
 	hwif->chipset = ide_unknown;
 	hwif->selectproc = NULL;
@@ -369,7 +369,7 @@ MODULE_AUTHOR("Peter Denison");
 MODULE_DESCRIPTION("Support of Promise 4030 VLB series IDE chipsets");
 MODULE_LICENSE("GPL");
 
-int __init pdc4030_mod_init(void)
+static int __init pdc4030_mod_init(void)
 {
 	if (enable_promise_support == 0)
 		enable_promise_support = 1;
@@ -380,7 +380,7 @@ int __init pdc4030_mod_init(void)
 }
 module_init(pdc4030_mod_init);
 
-void __init pdc4030_mod_exit(void)
+static void __exit pdc4030_mod_exit(void)
 {
 	unsigned int    index;
 	ide_hwif_t      *hwif;

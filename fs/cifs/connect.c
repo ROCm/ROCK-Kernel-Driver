@@ -102,7 +102,7 @@ cifs_reconnect(struct TCP_Server_Info *server)
 	}
 	list_for_each(tmp, &GlobalTreeConnectionList) {
 		tcon = list_entry(tmp, struct cifsTconInfo, cifsConnectionList);
-		if(tcon->ses->server == server) {
+		if((tcon) && (tcon->ses) && (tcon->ses->server == server)) {
 			tcon->tidStatus = CifsNeedReconnect;
 		}
 	}
@@ -233,9 +233,9 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 				    (checkSMBhdr
 				     (smb_buffer, smb_buffer->Mid))) {
 					cERROR(1,
-					       (KERN_ERR
-						"Invalid size or format for SMB found with length %d and pdu_lenght %d",
+					    ("Invalid size or format for SMB found with length %d and pdu_lenght %d",
 						length, pdu_length));
+					cifs_dump_mem("Received Data is: ",temp,sizeof(struct smb_hdr));
 					/* BB fix by finding next smb signature - and reading off data until next smb ? BB */
 
 					/* BB add reconnect here */
@@ -728,6 +728,7 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
 			*csocket = NULL;
 			return rc;
 	    } else {
+		/* BB other socket options to set KEEPALIVE, timeouts? NODELAY? */
 			cFYI(1,("Socket created"));
 		}
 	}
@@ -783,6 +784,7 @@ ipv6_connect(struct sockaddr_in6 *psin_server, struct socket **csocket)
 				(struct sockaddr *) psin_server,
 				sizeof (struct sockaddr_in6),0);
 		if (rc >= 0) {
+                /* BB other socket options to set KEEPALIVE, timeouts? NODELAY? */
 			return rc;
 		}
 	}

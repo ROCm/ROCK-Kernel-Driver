@@ -89,7 +89,6 @@ static struct crypto_alg cipher_null = {
 	.cra_u			=	{ .cipher = {
 	.cia_min_keysize	=	NULL_KEY_SIZE,
 	.cia_max_keysize	=	NULL_KEY_SIZE,
-	.cia_ivsize		=	0,
 	.cia_setkey		= 	null_setkey,
 	.cia_encrypt		=	null_encrypt,
 	.cia_decrypt		=	null_decrypt } }

@@ -165,9 +165,9 @@ int parse_args(const char *name,
 	}
 
 STANDARD_PARAM_DEF(short, short, "%hi", long, simple_strtol);
-STANDARD_PARAM_DEF(ushort, unsigned short, "%hu", long, simple_strtol);
+STANDARD_PARAM_DEF(ushort, unsigned short, "%hu", unsigned long, simple_strtoul);
 STANDARD_PARAM_DEF(int, int, "%i", long, simple_strtol);
-STANDARD_PARAM_DEF(uint, unsigned int, "%u", long, simple_strtol);
+STANDARD_PARAM_DEF(uint, unsigned int, "%u", unsigned long, simple_strtoul);
 STANDARD_PARAM_DEF(long, long, "%li", long, simple_strtol);
 STANDARD_PARAM_DEF(ulong, unsigned long, "%lu", unsigned long, simple_strtoul);
 

@@ -25,9 +25,6 @@
 #define NVIDIA_3_APBASE		0x50
 #define NVIDIA_3_APLIMIT	0x54
 
-
-static int agp_try_unsupported __initdata = 0;
-
 static struct _nvidia_private {
 	struct pci_dev *dev_1;
 	struct pci_dev *dev_2;
@@ -279,9 +276,8 @@ static int __init agp_nvidia_probe(struct pci_dev *pdev,
 		pci_find_slot((unsigned int)pdev->bus->number, PCI_DEVFN(30, 0));
 	
 	if (!nvidia_private.dev_1 || !nvidia_private.dev_2 || !nvidia_private.dev_3) {
-		printk(KERN_INFO PFX "agpgart: Detected an NVIDIA "
-			"nForce/nForce2 chipset, but could not find "
-			"the secondary devices.\n");
+		printk(KERN_INFO PFX "Detected an NVIDIA nForce/nForce2 "
+			"chipset, but could not find the secondary devices.\n");
 		return -ENODEV;
 	}
 
@@ -299,17 +295,9 @@ static int __init agp_nvidia_probe(struct pci_dev *pdev,
 		nvidia_private.wbc_mask = 0x80000000;
 		break;
 	default:
-		if (!agp_try_unsupported) {
-			printk(KERN_ERR PFX
-			    "Unsupported NVIDIA chipset (device id: %04x),"
-			    " you might want to try agp_try_unsupported=1.\n",
+		printk(KERN_ERR PFX "Unsupported NVIDIA chipset (device id: %04x)\n",
 			    pdev->device);
-			return -ENODEV;
-		}
-		printk(KERN_WARNING PFX
-		    "Trying generic NVIDIA routines for device id: %04x\n",
-		    pdev->device);
-		break;
+		return -ENODEV;
 	}
 
 	bridge = agp_alloc_bridge();
@@ -372,7 +360,6 @@ static void __exit agp_nvidia_cleanup(void)
 module_init(agp_nvidia_init);
 module_exit(agp_nvidia_cleanup);
 
-MODULE_PARM(agp_try_unsupported, "1i");
 MODULE_LICENSE("GPL and additional rights");
 MODULE_AUTHOR("NVIDIA Corporation");
 

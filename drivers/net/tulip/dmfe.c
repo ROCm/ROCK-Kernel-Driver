@@ -478,7 +478,7 @@ static void __devexit dmfe_remove_one (struct pci_dev *pdev)
 					db->buf_pool_ptr, db->buf_pool_dma_ptr);
 		unregister_netdev(dev);
 		pci_release_regions(pdev);
-		kfree(dev);	/* free board information */
+		free_netdev(dev);	/* free board information */
 		pci_set_drvdata(pdev, NULL);
 	}
 

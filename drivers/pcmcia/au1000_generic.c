@@ -136,7 +136,6 @@ static spinlock_t pcmcia_lock = SPIN_LOCK_UNLOCKED;
 
 static int __init au1000_pcmcia_driver_init(void)
 {
-	servinfo_t info;
 	struct pcmcia_init pcmcia_init;
 	struct pcmcia_state state;
 	unsigned int i;
@@ -147,13 +146,6 @@ static int __init au1000_pcmcia_driver_init(void)
 	printk(KERN_ERR "Au1x00 PCMCIA 36 bit IO support not enabled\n");
 	return -1;
 #endif
-
-	CardServices(GetCardServicesInfo, &info);
-
-	if(info.Revision!=CS_RELEASE_CODE){
-		printk(KERN_ERR "Card Services release codes do not match\n");
-		return -1;
-	}
 
 #if defined(CONFIG_MIPS_PB1000) || defined(CONFIG_MIPS_PB1100) || defined(CONFIG_MIPS_PB1500)
 	pcmcia_low_level=&pb1x00_pcmcia_ops;

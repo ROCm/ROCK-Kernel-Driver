@@ -78,12 +78,6 @@ L:	linux-tr@linuxtr.net
 W:	http://www.linuxtr.net
 S:	Maintained
 
-3C501 NETWORK DRIVER
-P:	Alan Cox
-M:	alan@the.3c501.cabal.tm
-L:	linux-net@vger.kernel.org
-S:	Maintained for 2.2 only
-
 3C505 NETWORK DRIVER
 P:	Philip Blundell
 M:	Philip.Blundell@pobox.com
@@ -369,6 +363,13 @@ L:	linux-scsi@vger.kernel.org
 W:	http://www.dandelion.com/Linux/
 S:	Maintained
 
+COMMON INTERNET FILE SYSTEM (CIFS)
+P:	Steve French
+M:	sfrench@samba.org
+L:	samba-technical@lists.samba.org
+W:	http://us1.samba.org/samba/Linux_CIFS_client.html
+S:	Supported	
+
 CIRRUS LOGIC GENERIC FBDEV DRIVER
 P:	Jeff Garzik
 M:	jgarzik@pobox.com
@@ -443,10 +444,8 @@ M:	hpa@zytor.com
 S:	Maintained
 
 CRAMFS FILESYSTEM
-P:	Daniel Quinlan
-M:	quinlan@transmeta.com
-W:	http://sourceforge.net/projects/cramfs/
-S:	Maintained
+W:     http://sourceforge.net/projects/cramfs/
+S:     Orphan
 
 CREDITS FILE
 P:	John A. Martin
@@ -715,6 +714,12 @@ S:	Maintained
 FILESYSTEMS (VFS and infrastructure)
 P:	Alexander Viro
 M:	viro@math.psu.edu
+S:	Maintained
+
+FIRMWARE LOADER (request_firmware)
+P:	Manuel Estrada Sainz
+M:	ranty@debian.org
+L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
 FPU EMULATOR
@@ -1342,7 +1347,7 @@ M:	Andreas Mohr <100.30936@germany.net>
 L:	linux-net@vger.kernel.org
 S:	Maintained
 
-NINJA SCSI-3 / NINJA SCSI-32Bi PCMCIA SCSI HOST ADAPTER DRIVER
+NINJA SCSI-3 / NINJA SCSI-32Bi (16bit/CardBus) PCMCIA SCSI HOST ADAPTER DRIVER
 P:	YOKOTA Hiroshi
 M:	yokota@netlab.is.tsukuba.ac.jp
 W:	http://www.netlab.is.tsukuba.ac.jp/~yokota/izumi/ninja/
@@ -1636,13 +1641,13 @@ S:	Maintained
 
 SCSI SUBSYSTEM
 P:	James E.J. Bottomley
-M:	James.Bottomley@HansenPartnership.com
+M:	James.Bottomley@SteelEye.com
 L:	linux-scsi@vger.kernel.org
 S:	Maintained
 
 SCSI TAPE DRIVER
 P:	Kai Mäkisara
-M:	Kai.Makisara@metla.fi
+M:	Kai.Makisara@kolumbus.fi
 L:	linux-scsi@vger.kernel.org
 S:	Maintained
 
@@ -1656,6 +1661,16 @@ SCx200 CPU SUPPORT
 P:	Christer Weinigel
 M:	christer@weinigel.se
 W:	http://www.weinigel.se
+S:	Supported
+
+SELINUX SECURITY MODULE
+P:	Stephen Smalley
+M:	sds@epoch.ncsc.mil
+P:	James Morris
+M:	jmorris@redhat.com
+L:	linux-kernel@vger.kernel.org (kernel issues)
+L: 	selinux@tycho.nsa.gov (general discussion)
+W:	http://www.nsa.gov/selinux
 S:	Supported
 
 SGI VISUAL WORKSTATION 320 AND 540
@@ -2154,6 +2169,12 @@ W:	http://www.ic.nec.co.jp/micro/uclinux/eng/
 W:	http://www.ee.nec.de/uclinux/
 S:	Supported
 
+UCLINUX FOR RENESAS H8/300
+P:	Yoshinori Sato
+M:	ysato@users.sourceforge.jp
+W:	http://uclinux-h8.sourceforge.jp/
+S:	Supported
+
 USB DIAMOND RIO500 DRIVER
 P:	Cesar Miquel
 M:	miquel@df.uba.ar
@@ -2229,12 +2250,6 @@ M:	zaitcev@yahoo.com
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
-Z85230 SYNCHRONOUS DRIVER
-P:	Alan Cox
-M:	alan@redhat.com
-W:	http://roadrunner.swansea.linux.org.uk/synchronous.shtml
-S:	Maintained for 2.2 only
-
 Z8530 DRIVER FOR AX.25
 P:	Joerg Reuter
 M:	jreuter@yaina.de
@@ -2247,6 +2262,13 @@ ZF MACHZ WATCHDOG
 P:	Fernando Fuganti
 M:	fuganti@netbank.com.br
 W:	http://cvs.conectiva.com.br/drivers/ZFL-watchdog/
+S:	Maintained
+
+ZR36067 VIDEO FOR LINUX DRIVER
+P:	Ronald Bultje
+M:	R.S.Bultje@pharm.uu.nl
+L:	mjpeg-users@lists.sourceforge.net
+W:	http://mjpeg.sourceforge.net/driver-zoran/
 S:	Maintained
 
 ZR36120 VIDEO FOR LINUX DRIVER

@@ -180,7 +180,7 @@ MODULE_PARM(cs_debuglevel, "i");
 static unsigned long cs_debugmask=CS_INIT | CS_ERROR;	/* use CS_DBGOUT with various mask values */
 MODULE_PARM(cs_debugmask, "i");
 #endif
-static unsigned long hercules_egpio_disable=0;  /* if non-zero set all EGPIO to 0 */
+static unsigned long hercules_egpio_disable;  /* if non-zero set all EGPIO to 0 */
 MODULE_PARM(hercules_egpio_disable, "i");
 static unsigned long initdelay=700;  /* PM delay in millisecs */
 MODULE_PARM(initdelay, "i");

@@ -377,6 +377,7 @@ int hash_page(unsigned long ea, unsigned long access, unsigned long trap)
 	int ret;
 	int user_region = 0;
 	int local = 0;
+	cpumask_t tmp;
 
 	/* Check for invalid addresses. */
 	if (!IS_VALID_EA(ea))
@@ -431,7 +432,8 @@ int hash_page(unsigned long ea, unsigned long access, unsigned long trap)
 	 */
 	spin_lock(&mm->page_table_lock);
 
-	if (user_region && (mm->cpu_vm_mask == (1 << smp_processor_id())))
+	tmp = cpumask_of_cpu(smp_processor_id());
+	if (user_region && cpus_equal(mm->cpu_vm_mask, tmp))
 		local = 1;
 
 	ptep = find_linux_pte(pgdir, ea);

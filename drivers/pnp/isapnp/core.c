@@ -743,7 +743,7 @@ static int __init isapnp_create_device(struct pnp_card *card,
 			size = 0;
 			break;
 		case _LTAG_ANSISTR:
-			isapnp_parse_name(dev->dev.name, sizeof(dev->dev.name), &size);
+			isapnp_parse_name(dev->name, sizeof(dev->name), &size);
 			break;
 		case _LTAG_UNICODESTR:
 			/* silently ignore */
@@ -808,7 +808,7 @@ static void __init isapnp_parse_resource_map(struct pnp_card *card)
 		case _STAG_VENDOR:
 			break;
 		case _LTAG_ANSISTR:
-			isapnp_parse_name(card->dev.name, sizeof(card->dev.name), &size);
+			isapnp_parse_name(card->name, sizeof(card->name), &size);
 			break;
 		case _LTAG_UNICODESTR:
 			/* silently ignore */
@@ -1144,11 +1144,11 @@ int __init isapnp_init(void)
 	protocol_for_each_card(&isapnp_protocol,card) {
 		cards++;
 		if (isapnp_verbose) {
-			printk(KERN_INFO "isapnp: Card '%s'\n", card->dev.name[0]?card->dev.name:"Unknown");
+			printk(KERN_INFO "isapnp: Card '%s'\n", card->name[0]?card->name:"Unknown");
 			if (isapnp_verbose < 2)
 				continue;
 			card_for_each_dev(card,dev) {
-				printk(KERN_INFO "isapnp:   Device '%s'\n", dev->dev.name[0]?dev->dev.name:"Unknown");
+				printk(KERN_INFO "isapnp:   Device '%s'\n", dev->name[0]?dev->name:"Unknown");
 			}
 		}
 	}

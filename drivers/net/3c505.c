@@ -449,18 +449,18 @@ static int send_pcb(struct net_device *dev, pcb_struct * pcb)
 		case ASF_PCB_ACK:
 			adapter->send_pcb_semaphore = 0;
 			return TRUE;
-			break;
+
 		case ASF_PCB_NAK:
 #ifdef ELP_DEBUG
 			printk(KERN_DEBUG "%s: send_pcb got NAK\n", dev->name);
 #endif
 			goto abort;
-			break;
 		}
 	}
 
 	if (elp_debug >= 1)
 		printk(KERN_DEBUG "%s: timeout waiting for PCB acknowledge (status %02x)\n", dev->name, inb_status(dev->base_addr));
+	goto abort;
 
       sti_abort:
 	spin_unlock_irqrestore(&adapter->lock, flags);

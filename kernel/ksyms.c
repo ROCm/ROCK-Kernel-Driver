@@ -180,7 +180,8 @@ EXPORT_SYMBOL(d_splice_alias);
 EXPORT_SYMBOL(d_lookup);
 EXPORT_SYMBOL(d_path);
 EXPORT_SYMBOL(mark_buffer_dirty);
-EXPORT_SYMBOL(end_buffer_io_sync);
+EXPORT_SYMBOL(end_buffer_read_sync);
+EXPORT_SYMBOL(end_buffer_write_sync);
 EXPORT_SYMBOL(end_buffer_async_write);
 EXPORT_SYMBOL(__mark_inode_dirty);
 EXPORT_SYMBOL(get_empty_filp);
@@ -405,8 +406,6 @@ EXPORT_SYMBOL(proc_doulongvec_ms_jiffies_minmax);
 EXPORT_SYMBOL(proc_doulongvec_minmax);
 
 /* interrupt handling */
-EXPORT_SYMBOL(add_timer);
-EXPORT_SYMBOL(del_timer);
 EXPORT_SYMBOL(request_irq);
 EXPORT_SYMBOL(free_irq);
 
@@ -433,7 +432,9 @@ EXPORT_SYMBOL(probe_irq_off);
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(del_timer_sync);
 #endif
+EXPORT_SYMBOL(del_timer);
 EXPORT_SYMBOL(mod_timer);
+EXPORT_SYMBOL(__mod_timer);
 
 #ifdef HAVE_DISABLE_HLT
 EXPORT_SYMBOL(disable_hlt);

@@ -39,7 +39,7 @@ static int get_mca_info_helper(struct mca_device *mca_dev, char *page, int len)
 	for(j=0; j<8; j++)
 		len += sprintf(page+len, "%02x ",
 			       mca_dev ? mca_dev->pos[j] : 0xff);
-	len += sprintf(page+len, " %s\n", mca_dev ? mca_dev->dev.name : "");
+	len += sprintf(page+len, " %s\n", mca_dev ? mca_dev->name : "");
 	return len;
 }
 
@@ -108,12 +108,12 @@ static int mca_default_procfn(char* buf, struct mca_device *mca_dev)
 	} else if(slot == MCA_MOTHERBOARD) {
 		len += sprintf(buf+len, "Motherboard\n");
 	}
-	if(mca_dev->dev.name[0]) {
+	if (mca_dev->name[0]) {
 
 		/* Drivers might register a name without /proc handler... */
 
 		len += sprintf(buf+len, "Adapter Name: %s\n",
-			       mca_dev->dev.name);
+			       mca_dev->name);
 	} else {
 		len += sprintf(buf+len, "Adapter Name: Unknown\n");
 	}

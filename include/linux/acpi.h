@@ -37,7 +37,7 @@
 #include <asm/acpi.h>
 
 
-#ifdef CONFIG_ACPI
+#ifdef CONFIG_ACPI_BOOT
 
 enum acpi_irq_model_id {
 	ACPI_IRQ_MODEL_PIC = 0,
@@ -369,11 +369,16 @@ void acpi_numa_arch_fixup(void);
 
 extern int acpi_mp_config;
 
-#else
+#else	/*!CONFIG_ACPI_BOOT*/
 
 #define acpi_mp_config	0
 
-#endif
+static inline int acpi_boot_init(void)
+{
+	return 0;
+}
+
+#endif 	/*!CONFIG_ACPI_BOOT*/
 
 
 #ifdef CONFIG_ACPI_PCI
@@ -422,6 +427,13 @@ int ec_write(u8 addr, u8 val);
 #ifdef CONFIG_ACPI
 
 int acpi_blacklisted(void);
+
+#else
+
+static inline int acpi_blacklisted(void)
+{
+	return 0;
+}
 
 #endif /*CONFIG_ACPI*/
 

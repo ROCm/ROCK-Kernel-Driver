@@ -107,8 +107,6 @@ static struct esp_pio_buffer *free_pio_buf;
 static char serial_name[] __initdata = "ESP serial driver";
 static char serial_version[] __initdata = "2.2";
 
-static DECLARE_TASK_QUEUE(tq_esp);
-
 static struct tty_driver *esp_driver;
 
 /* serial subtype definitions */
@@ -272,9 +270,9 @@ static _INLINE_ void rs_sched_event(struct esp_struct *info,
 				  int event)
 {
 	info->event |= 1 << event;
-	queue_task(&info->tqueue, &tq_esp);
-	mark_bh(ESP_BH);
+	schedule_work(&info->tqueue);
 }
+
 static _INLINE_ struct esp_pio_buffer *get_pio_buffer(void)
 {
 	struct esp_pio_buffer *buf;
@@ -368,7 +366,7 @@ static _INLINE_ void receive_chars_pio(struct esp_struct *info, int num_bytes)
 		}
 	}
 
-	queue_task(&tty->flip.tqueue, &tq_timer);
+	schedule_delayed_work(&tty->flip.work, 1);
 
 	info->stat_flags &= ~ESP_STAT_RX_TIMEOUT;
 	release_pio_buffer(pio_buf);
@@ -443,7 +441,7 @@ static _INLINE_ void receive_chars_dma_done(struct esp_struct *info,
 
 		tty->flip.flag_buf_ptr++;
 		
-		queue_task(&tty->flip.tqueue, &tq_timer);
+		schedule_delayed_work(&tty->flip.work, 1);
 	}
 
 	if (dma_bytes != num_bytes) {
@@ -636,7 +634,7 @@ static _INLINE_ void check_modem_status(struct esp_struct *info)
 #ifdef SERIAL_DEBUG_OPEN
 			printk("scheduling hangup...");
 #endif
-			schedule_task(&info->tqueue_hangup);
+			schedule_work(&info->tqueue_hangup);
 		}
 	}
 }
@@ -753,20 +751,6 @@ static irqreturn_t rs_interrupt_single(int irq, void *dev_id,
  * Here ends the serial interrupt routines.
  * -------------------------------------------------------------------
  */
-
-/*
- * This routine is used to handle the "bottom half" processing for the
- * serial driver, known also the "software interrupt" processing.
- * This processing is done at the kernel interrupt level, after the
- * rs_interrupt() has returned, BUT WITH INTERRUPTS TURNED ON.  This
- * is where time-consuming activities which can not be done in the
- * interrupt driver proper are done; the interrupt driver schedules
- * them using rs_sched_event(), and they get done here.
- */
-static void do_serial_bh(void)
-{
-	run_task_queue(&tq_esp);
-}
 
 static void do_softint(void *private_)
 {
@@ -2477,8 +2461,6 @@ int __init espserial_init(void)
 	if (!esp_driver)
 		return -ENOMEM;
 	
-	init_bh(ESP_BH, do_serial_bh);
-
 	for (i = 0; i < NR_PRIMARY; i++) {
 		if (irq[i] != 0) {
 			if ((irq[i] < 2) || (irq[i] > 15) || (irq[i] == 6) ||
@@ -2568,10 +2550,8 @@ int __init espserial_init(void)
 		info->magic = ESP_MAGIC;
 		info->close_delay = 5*HZ/10;
 		info->closing_wait = 30*HZ;
-		info->tqueue.routine = do_softint;
-		info->tqueue.data = info;
-		info->tqueue_hangup.routine = do_serial_hangup;
-		info->tqueue_hangup.data = info;
+		INIT_WORK(&info->tqueue, do_softint, info);
+		INIT_WORK(&info->tqueue_hangup, do_serial_hangup, info);
 		info->config.rx_timeout = rx_timeout;
 		info->config.flow_on = flow_on;
 		info->config.flow_off = flow_off;
@@ -2640,7 +2620,6 @@ static void __exit espserial_exit(void)
 	/* printk("Unloading %s: version %s\n", serial_name, serial_version); */
 	save_flags(flags);
 	cli();
-	remove_bh(ESP_BH);
 	if ((e1 = tty_unregister_driver(esp_driver)))
 		printk("SERIAL: failed to unregister serial driver (%d)\n",
 		       e1);

@@ -33,13 +33,13 @@
 
 #ifdef SB_OK
 #include "sb.h"
-static int sb_initialized = 0;
+static int sb_initialized;
 #endif
 
-static int kilroy_was_here = 0;	/* Don't detect twice */
-static int mpu_initialized = 0;
+static int kilroy_was_here;	/* Don't detect twice */
+static int mpu_initialized;
 static spinlock_t lock=SPIN_LOCK_UNLOCKED;
-static int *opl3sa_osp = NULL;
+static int *opl3sa_osp;
 
 static unsigned char opl3sa_read(int addr)
 {

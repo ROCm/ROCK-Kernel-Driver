@@ -115,10 +115,8 @@ static inline void free_one_pgd(struct mmu_gather *tlb, pgd_t * dir)
 	}
 	pmd = pmd_offset(dir, 0);
 	pgd_clear(dir);
-	for (j = 0; j < PTRS_PER_PMD ; j++) {
-		prefetchw(pmd + j + PREFETCH_STRIDE/sizeof(*pmd));
+	for (j = 0; j < PTRS_PER_PMD ; j++)
 		free_one_pmd(tlb, pmd+j);
-	}
 	pmd_free_tlb(tlb, pmd);
 }
 
@@ -649,8 +647,12 @@ follow_page(struct mm_struct *mm, unsigned long address, int write)
 	if (pte_present(pte)) {
 		if (!write || (pte_write(pte) && pte_dirty(pte))) {
 			pfn = pte_pfn(pte);
-			if (pfn_valid(pfn))
-				return pfn_to_page(pfn);
+			if (pfn_valid(pfn)) {
+				struct page *page = pfn_to_page(pfn);
+
+				mark_page_accessed(page);
+				return page;
+			}
 		}
 	}
 

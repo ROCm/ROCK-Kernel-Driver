@@ -83,11 +83,11 @@ static int ad1980_probe(struct ac97_codec *codec, struct ac97_driver *driver)
 	
  
 static struct ac97_driver ad1980_driver = {
-	codec_id: 0x41445370,
-	codec_mask: 0xFFFFFFFF,
-	name: "AD1980 example",
-	probe:	ad1980_probe,
-	remove: __devexit_p(ad1980_remove),
+	.codec_id	= 0x41445370,
+	.codec_mask	= 0xFFFFFFFF,
+	.name		= "AD1980 example",
+	.probe		= ad1980_probe,
+	.remove		= __devexit_p(ad1980_remove),
 };
 
 /**

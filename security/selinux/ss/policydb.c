@@ -1301,6 +1301,8 @@ int policydb_read(struct policydb *p, void *fp)
 				if (!buf)
 					goto bad;
 				c->v.behavior = le32_to_cpu(buf[0]);
+				if (c->v.behavior > SECURITY_FS_USE_NONE)
+					goto bad;
 				len = le32_to_cpu(buf[1]);
 				buf = next_entry(fp, len);
 				if (!buf)

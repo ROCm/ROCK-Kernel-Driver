@@ -279,6 +279,7 @@ static struct xfrm_state *ipcomp_tunnel_create(struct xfrm_state *x)
 	t->props.family = AF_INET;
 	t->props.mode = 1;
 	t->props.saddr.a4 = x->props.saddr.a4;
+	t->props.flags = x->props.flags;
 	
 	t->type = xfrm_get_type(IPPROTO_IPIP, t->props.family);
 	if (t->type == NULL)
@@ -335,6 +336,8 @@ static void ipcomp_free_data(struct ipcomp_data *ipcd)
 static void ipcomp_destroy(struct xfrm_state *x)
 {
 	struct ipcomp_data *ipcd = x->data;
+	if (!ipcd)
+		return;
 	ipcomp_free_data(ipcd);
 	kfree(ipcd);
 }
@@ -353,7 +356,6 @@ static int ipcomp_init_state(struct xfrm_state *x, void *args)
 	x->props.header_len = sizeof(struct ip_comp_hdr);
 	if (x->props.mode)
 		x->props.header_len += sizeof(struct iphdr);
-	x->data = ipcd;
 
 	ipcd->scratch = kmalloc(IPCOMP_SCRATCH_SIZE, GFP_KERNEL);
 	if (!ipcd->scratch)
@@ -372,6 +374,7 @@ static int ipcomp_init_state(struct xfrm_state *x, void *args)
 	calg_desc = xfrm_calg_get_byname(x->calg->alg_name);
 	BUG_ON(!calg_desc);
 	ipcd->threshold = calg_desc->uinfo.comp.threshold;
+	x->data = ipcd;
 	err = 0;
 out:
 	return err;

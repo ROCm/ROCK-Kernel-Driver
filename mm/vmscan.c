@@ -236,6 +236,31 @@ static int may_write_to_queue(struct backing_dev_info *bdi)
 }
 
 /*
+ * We detected a synchronous write error writing a page out.  Probably
+ * -ENOSPC.  We need to propagate that into the address_space for a subsequent
+ * fsync(), msync() or close().
+ *
+ * The tricky part is that after writepage we cannot touch the mapping: nothing
+ * prevents it from being freed up.  But we have a ref on the page and once
+ * that page is locked, the mapping is pinned.
+ *
+ * We're allowed to run sleeping lock_page() here because we know the caller has
+ * __GFP_FS.
+ */
+static void handle_write_error(struct address_space *mapping,
+				struct page *page, int error)
+{
+	lock_page(page);
+	if (page->mapping == mapping) {
+		if (error == -ENOSPC)
+			set_bit(AS_ENOSPC, &mapping->flags);
+		else
+			set_bit(AS_EIO, &mapping->flags);
+	}
+	unlock_page(page);
+}
+
+/*
  * shrink_list returns the number of reclaimed pages
  */
 static int
@@ -254,6 +279,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 	while (!list_empty(page_list)) {
 		struct page *page;
 		int may_enter_fs;
+		int referenced;
 
 		page = list_entry(page_list->prev, struct page, lru);
 		list_del(&page->lru);
@@ -273,7 +299,8 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 			goto keep_locked;
 
 		pte_chain_lock(page);
-		if (page_referenced(page) && page_mapping_inuse(page)) {
+		referenced = page_referenced(page);
+		if (referenced && page_mapping_inuse(page)) {
 			/* In active use or really unfreeable.  Activate it. */
 			pte_chain_unlock(page);
 			goto activate_locked;
@@ -333,6 +360,8 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 		 * See swapfile.c:page_queue_congested().
 		 */
 		if (PageDirty(page)) {
+			if (referenced)
+				goto keep_locked;
 			if (!is_page_cache_freeable(page))
 				goto keep_locked;
 			if (!mapping)
@@ -358,7 +387,8 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 
 				SetPageReclaim(page);
 				res = mapping->a_ops->writepage(page, &wbc);
-
+				if (res < 0)
+					handle_write_error(mapping, page, res);
 				if (res == WRITEPAGE_ACTIVATE) {
 					ClearPageReclaim(page);
 					goto activate_locked;
@@ -991,11 +1021,11 @@ int kswapd(void *p)
 	struct reclaim_state reclaim_state = {
 		.reclaimed_slab = 0,
 	};
-	unsigned long cpumask;
+	cpumask_t cpumask;
 
 	daemonize("kswapd%d", pgdat->node_id);
 	cpumask = node_to_cpumask(pgdat->node_id);
-	if (cpumask)
+	if (!cpus_empty(cpumask))
 		set_cpus_allowed(tsk, cpumask);
 	current->reclaim_state = &reclaim_state;
 
@@ -1038,7 +1068,7 @@ void wakeup_kswapd(struct zone *zone)
 	wake_up_interruptible(&zone->zone_pgdat->kswapd_wait);
 }
 
-#ifdef CONFIG_SOFTWARE_SUSPEND
+#ifdef CONFIG_PM
 /*
  * Try to free `nr_pages' of memory, system-wide.  Returns the number of freed
  * pages.

@@ -330,21 +330,11 @@ ipv4_connected:
 		ipv6_addr_copy(&fl.fl6_dst, rt0->addr);
 	}
 
-	dst = ip6_route_output(sk, &fl);
-
-	if ((err = dst->error) != 0) {
-		dst_release(dst);
+	err = ip6_dst_lookup(sk, &dst, &fl);
+	if (err)
 		goto out;
-	}
 
-	/* get the source address used in the appropriate device */
-
-	err = ipv6_get_saddr(dst, daddr, &fl.fl6_src);
-
-	if (err) {
-		dst_release(dst);
-		goto out;
-	}
+	/* source address lookup done in ip6_dst_lookup */
 
 	if (ipv6_addr_any(&np->saddr))
 		ipv6_addr_copy(&np->saddr, &fl.fl6_src);
@@ -811,8 +801,10 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 		 * The socket lock must be held while it's corked.
 		 */
 		lock_sock(sk);
-		if (likely(up->pending))
+		if (likely(up->pending)) {
+			dst = NULL;
 			goto do_append_data;
+		}
 		release_sock(sk);
 	}
 	ulen += sizeof(struct udphdr);
@@ -968,9 +960,10 @@ do_append_data:
 	else if (!corkreq)
 		err = udp_v6_push_pending_frames(sk, up);
 
-	ip6_dst_store(sk, dst,
-		      !ipv6_addr_cmp(&fl.fl6_dst, &np->daddr) ?
-		      &np->daddr : NULL);
+	if (dst)
+		ip6_dst_store(sk, dst,
+			      !ipv6_addr_cmp(&fl.fl6_dst, &np->daddr) ?
+			      &np->daddr : NULL);
 	if (err > 0)
 		err = np->recverr ? net_xmit_errno(err) : 0;
 	release_sock(sk);

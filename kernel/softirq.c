@@ -322,9 +322,8 @@ static int ksoftirqd(void * __bind_cpu)
 	current->flags |= PF_IOTHREAD;
 
 	/* Migrate to the right CPU */
-	set_cpus_allowed(current, 1UL << cpu);
-	if (smp_processor_id() != cpu)
-		BUG();
+	set_cpus_allowed(current, cpumask_of_cpu(cpu));
+	BUG_ON(smp_processor_id() != cpu);
 
 	__set_current_state(TASK_INTERRUPTIBLE);
 	mb();

@@ -643,7 +643,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 
 
 #ifdef CONFIG_SMP
-	if (!(cpu_online_map & (1<<(c-cpu_data))))
+	if (!cpu_online(c-cpu_data))
 		return 0;
 #endif
 

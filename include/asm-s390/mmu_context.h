@@ -42,7 +42,7 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
                              : : "m" (pgd) );
 #endif /* __s390x__ */
         }
-	set_bit(smp_processor_id(), &next->cpu_vm_mask);
+	cpu_set(smp_processor_id(), next->cpu_vm_mask);
 }
 
 #define deactivate_mm(tsk,mm)	do { } while (0)

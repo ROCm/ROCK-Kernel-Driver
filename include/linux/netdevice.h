@@ -43,9 +43,15 @@
 
 struct divert_blk;
 struct vlan_group;
+struct ethtool_ops;
+
+					/* source back-compat hook */
+#define SET_ETHTOOL_OPS(netdev,ops) \
+	( (netdev)->ethtool_ops = (ops) )
 
 #define HAVE_ALLOC_NETDEV		/* feature macro: alloc_xxxdev
 					   functions are available. */
+#define HAVE_FREE_NETDEV
 
 #define NET_XMIT_SUCCESS	0
 #define NET_XMIT_DROP		1	/* skb dropped			*/
@@ -300,6 +306,8 @@ struct net_device
 	 * See <net/iw_handler.h> for details. Jean II */
 	struct iw_handler_def *	wireless_handlers;
 
+	struct ethtool_ops *ethtool_ops;
+
 	/*
 	 * This marks the end of the "visible" part of the structure. All
 	 * fields hereafter are internal to the system, and may change at
@@ -377,6 +385,7 @@ struct net_device
 	       NETREG_REGISTERED,	/* completed register todo */
 	       NETREG_UNREGISTERING,	/* called unregister_netdevice */
 	       NETREG_UNREGISTERED,	/* completed unregister todo */
+	       NETREG_RELEASED,		/* called free_netdev */
 	} reg_state;
 
 	/* Net device features */
@@ -463,9 +472,6 @@ struct net_device
 
 	/* class/net/name entry */
 	struct class_device	class_dev;
-
-	/* statistics sub-directory */
-	struct kobject		stats_kobj;
 };
 
 #define SET_MODULE_OWNER(dev) do { } while (0)
@@ -484,7 +490,6 @@ struct packet_type
 	void			*data;	/* Private to the packet type		*/
 	struct list_head	list;
 };
-
 
 #include <linux/interrupt.h>
 #include <linux/notifier.h>
@@ -513,6 +518,7 @@ extern int		dev_close(struct net_device *dev);
 extern int		dev_queue_xmit(struct sk_buff *skb);
 extern int		register_netdevice(struct net_device *dev);
 extern int		unregister_netdevice(struct net_device *dev);
+extern void		free_netdev(struct net_device *dev);
 extern void		synchronize_net(void);
 extern int 		register_netdevice_notifier(struct notifier_block *nb);
 extern int		unregister_netdevice_notifier(struct notifier_block *nb);
@@ -633,6 +639,7 @@ extern int		netif_rx(struct sk_buff *skb);
 #define HAVE_NETIF_RECEIVE_SKB 1
 extern int		netif_receive_skb(struct sk_buff *skb);
 extern int		dev_ioctl(unsigned int cmd, void *);
+extern int		dev_ethtool(struct ifreq *);
 extern unsigned		dev_get_flags(const struct net_device *);
 extern int		dev_change_flags(struct net_device *, unsigned);
 extern int		dev_set_mtu(struct net_device *, int);

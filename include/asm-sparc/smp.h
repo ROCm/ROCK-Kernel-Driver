@@ -8,6 +8,7 @@
 
 #include <linux/config.h>
 #include <linux/threads.h>
+#include <linux/cpumask.h>
 #include <asm/head.h>
 #include <asm/btfixup.h>
 

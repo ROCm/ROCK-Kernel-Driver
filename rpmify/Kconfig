@@ -8,10 +8,6 @@ config SUSE_KERNEL
 	bool
 	default y
 
-config PROC_CONFIG
-	bool
-	default y
-
 config CFGNAME
 	string "Configuration name"
 	default ""

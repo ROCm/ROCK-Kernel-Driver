@@ -37,24 +37,24 @@ static unsigned char sb_dma_bits[] = {
  */
 
 int      	pas_translate_code = 0;
-static int      pas_intr_mask = 0;
-static int      pas_irq = 0;
-static int      pas_sb_base = 0;
+static int      pas_intr_mask;
+static int      pas_irq;
+static int      pas_sb_base;
 spinlock_t	pas_lock=SPIN_LOCK_UNLOCKED;
 #ifndef CONFIG_PAS_JOYSTICK
-static int	joystick = 0;
+static int	joystick;
 #else
 static int 	joystick = 1;
 #endif
 #ifdef SYMPHONY_PAS
 static int 	symphony = 1;
 #else
-static int 	symphony = 0;
+static int 	symphony;
 #endif
 #ifdef BROKEN_BUS_CLOCK
 static int	broken_bus_clock = 1;
 #else
-static int	broken_bus_clock = 0;
+static int	broken_bus_clock;
 #endif
 
 static struct address_info cfg;
