@@ -309,44 +309,6 @@ static int proc_info (struct Scsi_Host *hostptr, char *buffer, char **start, off
  * Sysfs interface
  ***********************************************************************/
 
-/* Output routine for the sysfs info file */
-static ssize_t show_info(struct device *dev, char *buffer)
-{
-	char *pos = buffer;
-	const int length = PAGE_SIZE;
-
-	struct scsi_device *sdev = to_scsi_device(dev);
-	struct us_data *us = (struct us_data*)sdev->host->hostdata[0];
-
-	/* print the controller name */
-	SPRINTF("   Host scsi%d: usb-storage\n", sdev->host->host_no);
-
-	/* print product, vendor, and serial number strings */
-	SPRINTF("       Vendor: %s\n", us->vendor);
-	SPRINTF("      Product: %s\n", us->product);
-	SPRINTF("Serial Number: %s\n", us->serial);
-
-	/* show the protocol and transport */
-	SPRINTF("     Protocol: %s\n", us->protocol_name);
-	SPRINTF("    Transport: %s\n", us->transport_name);
-
-	/* show the device flags */
-	if (pos < buffer + length) {
-		pos += sprintf(pos, "       Quirks:");
-
-		DO_FLAG(SINGLE_LUN);
-		DO_FLAG(SCM_MULT_TARG);
-		DO_FLAG(FIX_INQUIRY);
-		DO_FLAG(FIX_CAPACITY);
-
-		*(pos++) = '\n';
-	}
-
-	return (pos - buffer);
-}
-
-static DEVICE_ATTR(info, S_IRUGO, show_info, NULL);
-
 /* Output routine for the sysfs max_sectors file */
 static ssize_t show_max_sectors(struct device *dev, char *buf)
 {
@@ -373,7 +335,6 @@ static DEVICE_ATTR(max_sectors, S_IRUGO | S_IWUSR, show_max_sectors,
 		store_max_sectors);
 
 static struct device_attribute *sysfs_device_attr_list[] = {
-		&dev_attr_info,
 		&dev_attr_max_sectors,
 		NULL,
 		};

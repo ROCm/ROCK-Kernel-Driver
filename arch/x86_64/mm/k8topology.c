@@ -75,7 +75,7 @@ int __init k8_scan_nodes(unsigned long start, unsigned long end)
 			continue;
 		} 
 		if (nodeid >= numnodes) { 
-			printk("Ignoring excess node %d (%x:%x)\n", nodeid, 
+			printk("Ignoring excess node %d (%lx:%lx)\n", nodeid,
 			       base, limit); 
 			continue;
 		} 
