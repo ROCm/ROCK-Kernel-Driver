@@ -213,9 +213,6 @@ extern char empty_zero_page[PAGE_SIZE];
 #define _PAGE_RO        0x200          /* HW read-only                     */
 #define _PAGE_INVALID   0x400          /* HW invalid                       */
 
-/* Software bits in the page table entry */
-#define _PAGE_ISCLEAN   0x002
-
 /* Mask and four different kinds of invalid pages. */
 #define _PAGE_INVALID_MASK	0x601
 #define _PAGE_INVALID_EMPTY	0x400
@@ -283,12 +280,12 @@ extern char empty_zero_page[PAGE_SIZE];
  * No mapping available
  */
 #define PAGE_NONE_SHARED  __pgprot(_PAGE_INVALID_NONE)
-#define PAGE_NONE_PRIVATE __pgprot(_PAGE_INVALID_NONE|_PAGE_ISCLEAN)
+#define PAGE_NONE_PRIVATE __pgprot(_PAGE_INVALID_NONE)
 #define PAGE_RO_SHARED	  __pgprot(_PAGE_RO)
-#define PAGE_RO_PRIVATE	  __pgprot(_PAGE_RO|_PAGE_ISCLEAN)
-#define PAGE_COPY	  __pgprot(_PAGE_RO|_PAGE_ISCLEAN)
+#define PAGE_RO_PRIVATE	  __pgprot(_PAGE_RO)
+#define PAGE_COPY	  __pgprot(_PAGE_RO)
 #define PAGE_SHARED	  __pgprot(0)
-#define PAGE_KERNEL	  __pgprot(_PAGE_ISCLEAN)
+#define PAGE_KERNEL	  __pgprot(0)
 
 /*
  * The S390 can't do page protection for execute, and considers that the
@@ -403,20 +400,20 @@ extern inline int pte_write(pte_t pte)
 
 extern inline int pte_dirty(pte_t pte)
 {
-	int skey;
-
-	if (pte_val(pte) & _PAGE_ISCLEAN)
-		return 0;
-	asm volatile ("iske %0,%1" : "=d" (skey) : "a" (pte_val(pte)));
-	return skey & _PAGE_CHANGED;
+	/* A pte is neither clean nor dirty on s/390. The dirty bit
+	 * is in the storage key. See page_test_and_clear_dirty for
+	 * details.
+	 */
+	return 0;
 }
 
 extern inline int pte_young(pte_t pte)
 {
-	int skey;
-
-	asm volatile ("iske %0,%1" : "=d" (skey) : "a" (pte_val(pte)));
-	return skey & _PAGE_REFERENCED;
+	/* A pte is neither young nor old on s/390. The young bit
+	 * is in the storage key. See page_test_and_clear_young for
+	 * details.
+	 */
+	return 0;
 }
 
 /*
@@ -461,8 +458,8 @@ extern inline void pte_clear(pte_t *ptep)
  */
 extern inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 {
-	pte_val(pte) &= PAGE_MASK | _PAGE_ISCLEAN;
-	pte_val(pte) |= pgprot_val(newprot) & ~_PAGE_ISCLEAN;
+	pte_val(pte) &= PAGE_MASK;
+	pte_val(pte) |= pgprot_val(newprot);
 	return pte;
 }
 
@@ -476,7 +473,7 @@ extern inline pte_t pte_wrprotect(pte_t pte)
 
 extern inline pte_t pte_mkwrite(pte_t pte) 
 {
-	pte_val(pte) &= ~(_PAGE_RO | _PAGE_ISCLEAN);
+	pte_val(pte) &= ~_PAGE_RO;
 	return pte;
 }
 
@@ -516,13 +513,7 @@ extern inline pte_t pte_mkyoung(pte_t pte)
 
 static inline int ptep_test_and_clear_young(pte_t *ptep)
 {
-	int ccode;
-
-	asm volatile ("rrbe 0,%1\n\t"
-		      "ipm  %0\n\t"
-		      "srl  %0,28\n\t" 
-                      : "=d" (ccode) : "a" (pte_val(*ptep)) : "cc" );
-	return ccode & 2;
+	return 0;
 }
 
 static inline int
@@ -535,18 +526,7 @@ ptep_clear_flush_young(struct vm_area_struct *vma,
 
 static inline int ptep_test_and_clear_dirty(pte_t *ptep)
 {
-	int skey;
-
-	if (pte_val(*ptep) & _PAGE_ISCLEAN)
-		return 0;
-	asm volatile ("iske %0,%1" : "=d" (skey) : "a" (*ptep));
-	if ((skey & _PAGE_CHANGED) == 0)
-		return 0;
-	/* We can't clear the changed bit atomically. For now we
-         * clear (!) the page referenced bit. */
-	asm volatile ("sske %0,%1" 
-	              : : "d" (0), "a" (*ptep));
-	return 1;
+	return 0;
 }
 
 static inline int
@@ -601,6 +581,42 @@ ptep_establish(struct vm_area_struct *vma,
 	ptep_clear_flush(vma, address, ptep);
 	set_pte(ptep, entry);
 }
+
+/*
+ * Test and clear dirty bit in storage key.
+ * We can't clear the changed bit atomically. This is a potential
+ * race against modification of the referenced bit. This function
+ * should therefore only be called if it is not mapped in any
+ * address space.
+ */
+#define page_test_and_clear_dirty(page)					  \
+({									  \
+	struct page *__page = (page);					  \
+	unsigned long __physpage = __pa((__page-mem_map) << PAGE_SHIFT);  \
+	int __skey;							  \
+	asm volatile ("iske %0,%1" : "=d" (__skey) : "a" (__physpage));   \
+	if (__skey & _PAGE_CHANGED) {					  \
+		asm volatile ("sske %0,%1"				  \
+			      : : "d" (__skey & ~_PAGE_CHANGED),	  \
+			          "a" (__physpage));			  \
+	}								  \
+	(__skey & _PAGE_CHANGED);					  \
+})
+
+/*
+ * Test and clear referenced bit in storage key.
+ */
+#define page_test_and_clear_young(page)					  \
+({									  \
+	struct page *__page = (page);					  \
+	unsigned long __physpage = __pa((__page-mem_map) << PAGE_SHIFT);  \
+	int __ccode;							  \
+	asm volatile ("rrbe 0,%1\n\t"					  \
+		      "ipm  %0\n\t"					  \
+		      "srl  %0,28\n\t" 					  \
+                      : "=d" (__ccode) : "a" (__physpage) : "cc" );	  \
+	(__ccode & 2);							  \
+})
 
 /*
  * Conversion functions: convert a page and protection to a page entry,
@@ -782,6 +798,8 @@ typedef pte_t *pte_addr_t;
 #define __HAVE_ARCH_PTEP_SET_WRPROTECT
 #define __HAVE_ARCH_PTEP_MKDIRTY
 #define __HAVE_ARCH_PTE_SAME
+#define __HAVE_ARCH_PAGE_TEST_AND_CLEAR_DIRTY
+#define __HAVE_ARCH_PAGE_TEST_AND_CLEAR_YOUNG
 #include <asm-generic/pgtable.h>
 
 #endif /* _S390_PAGE_H */

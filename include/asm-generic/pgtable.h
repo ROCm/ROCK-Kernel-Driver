@@ -97,4 +97,12 @@ static inline void ptep_mkdirty(pte_t *ptep)
 #define pte_same(A,B)	(pte_val(A) == pte_val(B))
 #endif
 
+#ifndef __HAVE_ARCH_PAGE_TEST_AND_CLEAR_DIRTY
+#define page_test_and_clear_dirty(page) (0)
+#endif
+
+#ifndef __HAVE_ARCH_PAGE_TEST_AND_CLEAR_YOUNG
+#define page_test_and_clear_young(page) (0)
+#endif
+
 #endif /* _ASM_GENERIC_PGTABLE_H */

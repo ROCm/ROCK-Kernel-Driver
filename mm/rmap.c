@@ -117,6 +117,9 @@ int page_referenced(struct page * page)
 	struct pte_chain *pc;
 	int referenced = 0;
 
+	if (page_test_and_clear_young(page))
+		mark_page_accessed(page);
+
 	if (TestClearPageReferenced(page))
 		referenced++;
 
@@ -271,6 +274,8 @@ void page_remove_rmap(struct page *page, pte_t *ptep)
 		}
 	}
 out:
+	if (page->pte.direct == 0 && page_test_and_clear_dirty(page))
+		set_page_dirty(page);
 	if (!page_mapped(page))
 		dec_page_state(nr_mapped);
 out_unlock:
@@ -360,7 +365,6 @@ static int try_to_unmap_one(struct page * page, pte_addr_t paddr)
 		set_page_dirty(page);
 
 	mm->rss--;
-	page_cache_release(page);
 	ret = SWAP_SUCCESS;
 
 out_unlock:
@@ -399,6 +403,9 @@ int try_to_unmap(struct page * page)
 	if (PageDirect(page)) {
 		ret = try_to_unmap_one(page, page->pte.direct);
 		if (ret == SWAP_SUCCESS) {
+			if (page_test_and_clear_dirty(page))
+				set_page_dirty(page);
+			page_cache_release(page);
 			page->pte.direct = 0;
 			ClearPageDirect(page);
 		}
@@ -439,6 +446,10 @@ int try_to_unmap(struct page * page)
 				} else {
 					start->next_and_idx++;
 				}
+				if (page->pte.direct == 0 &&
+				    page_test_and_clear_dirty(page))
+					set_page_dirty(page);
+				page_cache_release(page);
 				break;
 			case SWAP_AGAIN:
 				/* Skip this pte, remembering status. */
