@@ -41,7 +41,7 @@ config MACH_RX3715
 	help
 	  Say Y here if you are using the HP iPAQ rx3715.
 
-	  See http://www.handhelds.org/projects/rx3715.html for more
+	  See <http://www.handhelds.org/projects/rx3715.html> for more
 	  information on this project
 
 endmenu
@@ -77,7 +77,7 @@ config S3C2410_DMA_DEBUG
 	  to the kernel log, at priority KERN_DEBUG.
 
 	  Note, it is easy to create and fill the log buffer in a small
-	  amount of time, as well as using an significant percantage of
+	  amount of time, as well as using an significant percentage of
 	  the CPU time doing so.
 
 
@@ -115,9 +115,9 @@ config S3C2410_LOWLEVEL_UART_PORT
 	  Choice of which UART port to use for the low-level messages,
 	  such as the `Uncompressing...` at start time. The value of
 	  this configuration should be between zero and two. The port
-	  must have been initalised by the boot-loader before use.
+	  must have been initialised by the boot-loader before use.
 
 	  Note, this does not affect the port used by the debug messages,
-	  which is a seperate configuration.
+	  which is a separate configuration.
 
 endif

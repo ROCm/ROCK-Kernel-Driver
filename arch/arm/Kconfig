@@ -131,7 +131,7 @@ config ARCH_L7200
 	  <http://www.linkupsys.com/>
 
 	  If you have any questions or comments about the Linux kernel port
-	  to this board, send e-mail to sjhill@cotw.com.
+	  to this board, send e-mail to <sjhill@cotw.com>.
 
 config ARCH_PXA
 	bool "PXA2xx-based"
@@ -149,7 +149,7 @@ config ARCH_S3C2410
 	bool "Samsung S3C2410"
 	help
 	  Samsung S3C2410X CPU based systems, such as the Simtec Electronics
-	  BAST (http://www.simtec.co.uk/products/EB110ITX/), the IPAQ 1940 or
+	  BAST (<http://www.simtec.co.uk/products/EB110ITX/>), the IPAQ 1940 or
 	  the Samsung SMDK2410 development board (and derviatives).
 
 config ARCH_SHARK

@@ -48,7 +48,7 @@ config IP_NF_CT_PROTO_SCTP
 	  be able to do state tracking on SCTP connections.
 
 	  If you want to compile it as a module, say M here and read
-	  Documentation/modules.txt.  If unsure, say `N'.
+	  <file:Documentation/modules.txt>.  If unsure, say `N'.
 
 config IP_NF_FTP
 	tristate "FTP protocol support"
@@ -313,7 +313,7 @@ config IP_NF_MATCH_ADDRTYPE
 	  eg. UNICAST, LOCAL, BROADCAST, ...
 	
 	  If you want to compile it as a module, say M here and read
-	  Documentation/modules.txt.  If unsure, say `N'.
+	  <file:Documentation/modules.txt>.  If unsure, say `N'.
 
 config IP_NF_MATCH_REALM
 	tristate  'realm match support'
@@ -321,13 +321,13 @@ config IP_NF_MATCH_REALM
 	select NET_CLS_ROUTE
 	help
 	  This option adds a `realm' match, which allows you to use the realm
-	  key from the routing subsytem inside iptables.
+	  key from the routing subsystem inside iptables.
 	
 	  This match pretty much resembles the CONFIG_NET_CLS_ROUTE4 option 
 	  in tc world.
 	
 	  If you want to compile it as a module, say M here and read
-	  Documentation/modules.txt.  If unsure, say `N'.
+	  <file:Documentation/modules.txt>.  If unsure, say `N'.
 
 config IP_NF_MATCH_SCTP
 	tristate  'SCTP protocol match support'
@@ -338,7 +338,7 @@ config IP_NF_MATCH_SCTP
 	  and SCTP chunk types.
 
 	  If you want to compile it as a module, say M here and read
-	  Documentation/modules.txt.  If unsure, say `N'.
+	  <file:Documentation/modules.txt>.  If unsure, say `N'.
 
 config IP_NF_MATCH_COMMENT
 	tristate  'comment match support'
@@ -348,7 +348,7 @@ config IP_NF_MATCH_COMMENT
 	  comments in your iptables ruleset.
 
 	  If you want to compile it as a module, say M here and read
-	  Documentation/modules.txt.  If unsure, say `N'.
+	  <file:Documentation/modules.txt>.  If unsure, say `N'.
 
 config IP_NF_MATCH_CONNMARK
 	tristate  'Connection mark match support'
@@ -358,7 +358,7 @@ config IP_NF_MATCH_CONNMARK
 	  connection mark value previously set for the session by `CONNMARK'. 
 	
 	  If you want to compile it as a module, say M here and read
-	  Documentation/modules.txt.  The module will be called
+	  <file:Documentation/modules.txt>.  The module will be called
 	  ipt_connmark.o.  If unsure, say `N'.
 
 config IP_NF_MATCH_HASHLIMIT
@@ -625,7 +625,7 @@ config IP_NF_TARGET_CONNMARK
 	  affects the connection mark value rather than the packet mark value.
 	
 	  If you want to compile it as a module, say M here and read
-	  Documentation/modules.txt.  The module will be called
+	  <file:Documentation/modules.txt>.  The module will be called
 	  ipt_CONNMARK.o.  If unsure, say `N'.
 
 config IP_NF_TARGET_CLUSTERIP
@@ -649,7 +649,6 @@ config IP_NF_RAW
 	
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  If unsure, say `N'.
-	  help
 
 config IP_NF_TARGET_NOTRACK
 	tristate  'NOTRACK target support'

@@ -110,7 +110,7 @@ config ARCNET_RIM_I
 	  This is yet another chipset driver for the COM90xx cards, but this
 	  time only using memory-mapped mode, and no IO ports at all. This
 	  driver is completely untested, so if you have one of these cards,
-	  please mail dwmw2@infradead.org, especially if it works!
+	  please mail <dwmw2@infradead.org>, especially if it works!
 
 	  To compile this driver as a module, choose M here and read
 	  <file:Documentation/networking/net-modules.txt>.  The module will

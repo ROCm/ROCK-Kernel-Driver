@@ -90,7 +90,7 @@ config NET
 	should consider updating your networking tools too because changes
 	in the kernel and the tools often go hand in hand. The tools are
 	contained in the package net-tools, the location and version number
-	of which are given in Documentation/Changes.
+	of which are given in <file:Documentation/Changes>.
 
 	For a general introduction to Linux networking, it is highly
 	recommended to read the NET-HOWTO, available from
@@ -130,7 +130,7 @@ config HPPFS
 	by removing or changing anything in /proc which gives away the
 	identity of a UML.
 
-	See http://user-mode-linux.sf.net/hppfs.html for more information.
+	See <http://user-mode-linux.sf.net/hppfs.html> for more information.
 
 	You only need this if you are setting up a UML honeypot.  Otherwise,
 	it is safe to say 'N' here.

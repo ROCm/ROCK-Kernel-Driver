@@ -170,7 +170,7 @@ config CISS_SCSI_TAPE
 	help
 	  When enabled (Y), this option allows SCSI tape drives and SCSI medium
 	  changers (tape robots) to be accessed via a Compaq 5xxx array 
-	  controller.  (See Documentation/cciss.txt for more details.)
+	  controller.  (See <file:Documentation/cciss.txt> for more details.)
 
 	  "SCSI support" and "SCSI tape support" must also be enabled for this 
 	  option to work.
@@ -196,7 +196,7 @@ config BLK_DEV_UMEM
 	---help---
 	  Saying Y here will include support for the MM5415 family of
 	  battery backed (Non-volatile) RAM cards.
-	  http://www.umem.com/
+	  <http://www.umem.com/>
 
 	  The cards appear as block devices that can be partitioned into
 	  as many as 15 partitions.

@@ -836,7 +836,7 @@ config FB_SIS
 	depends on FB && PCI
 	help
 	  This is the frame buffer device driver for the SiS 300, 315 and
-	  330 series VGA chipsets. Specs available at http://www.sis.com
+	  330 series VGA chipsets. Specs available at <http://www.sis.com>
 
 	  To compile this driver as a module, choose M here; the module
 	  will be called sisfb.
@@ -905,7 +905,7 @@ config FB_VOODOO1
 
 	  WARNING: Do not use any application that uses the 3D engine
 	  (namely glide) while using this driver.
-	  Please read the file Documentation/fb/README-sstfb.txt for supported
+	  Please read the <file:Documentation/fb/README-sstfb.txt> for supported
 	  options and other important info  support.
 
 config FB_TRIDENT
@@ -1080,7 +1080,7 @@ config FB_PXA_PARAMETERS
 	  single model of flatpanel then you can safely leave this
 	  option disabled.
 
-	  Documentation/fb/pxafb.txt describes the available parameters.
+	  <file:Documentation/fb/pxafb.txt> describes the available parameters.
 
 config FB_VIRTUAL
 	tristate "Virtual Frame Buffer support (ONLY FOR TESTING!)"

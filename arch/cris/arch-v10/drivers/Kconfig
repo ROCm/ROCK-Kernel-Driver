@@ -557,7 +557,7 @@ config ETRAX_IDE
 	select DMA_NONPCI
 	help
 	  Enable this to get support for ATA/IDE.
-	  You can't use parallell ports or SCSI ports
+	  You can't use paralell ports or SCSI ports
 	  at the same time.
 
 

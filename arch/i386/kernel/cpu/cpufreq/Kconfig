@@ -175,7 +175,7 @@ config X86_CPUFREQ_NFORCE2
 	depends on CPU_FREQ && EXPERIMENTAL
 	help
 	  This adds the CPUFreq driver for FSB changing on nVidia nForce2
-	  plattforms.
+	  platforms.
 
 	  For details, take a look at <file:Documentation/cpu-freq/>.
 

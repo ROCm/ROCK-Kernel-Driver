@@ -34,7 +34,7 @@ config SECURITY_SELINUX_BOOTPARAM_VALUE
 	  'selinux', which allows SELinux to be disabled at boot.  If this
 	  option is set to 0 (zero), the SELinux kernel parameter will
 	  default to 0, disabling SELinux at bootup.  If this option is
-	  set to 1 (one), the SELinux kernel paramater will default to 1,
+	  set to 1 (one), the SELinux kernel parameter will default to 1,
 	  enabling SELinux at bootup.
 
 	  If you are unsure how to answer this question, answer 1.

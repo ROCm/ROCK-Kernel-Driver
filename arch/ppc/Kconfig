@@ -326,7 +326,7 @@ config RPXLITE
 
 	  HERMES:
 	  Hermes-Pro ISDN/LAN router with integrated 8 x hub
-	  Manufacturer: Multidata Gesellschaft für Datentechnik und Informatik
+	  Manufacturer: Multidata Gesellschaft fur Datentechnik und Informatik
 	  <http://www.multidata.de/>
 	  Date of Release: 2000 (?)
 	  End of life: -

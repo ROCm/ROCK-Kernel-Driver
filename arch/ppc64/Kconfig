@@ -92,7 +92,7 @@ config PPC_MAPLE
 	default n
 	help
           This option enables support for the Maple 970FX Evaluation Board.
-	  For more informations, refer to http://www.970eval.com
+	  For more informations, refer to <http://www.970eval.com>
 
 config PPC
 	bool
