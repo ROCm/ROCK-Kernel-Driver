@@ -90,6 +90,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/smp_lock.h>
+#include <linux/device.h>
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -2271,12 +2272,19 @@ static struct tty_driver dev_console_driver;
 extern int vty_init(void);
 #endif
 
+struct device_class tty_devclass = {
+	.name	= "tty",
+};
+EXPORT_SYMBOL(tty_devclass);
+
 /*
  * Ok, now we can initialize the rest of the tty devices and can count
  * on memory allocations, interrupts etc..
  */
 void __init tty_init(void)
 {
+	devclass_register(&tty_devclass);
+
 	/*
 	 * dev_tty_driver and dev_console_driver are actually magic
 	 * devices which get redirected at open time.  Nevertheless,
