@@ -294,7 +294,9 @@ int svc_export_parse(struct cache_detail *cd, char *mesg, int mlen)
 
 	/* client */
 	len = qword_get(&mesg, buf, PAGE_SIZE);
-	if (len <= 0) return -EINVAL;
+	err = -EINVAL;
+	if (len <= 0) goto out;
+
 	err = -ENOENT;
 	dom = auth_domain_find(buf);
 	if (!dom)
