@@ -413,46 +413,46 @@ static int rose_setsockopt(struct socket *sock, int level, int optname,
 		return -EFAULT;
 
 	switch (optname) {
-		case ROSE_DEFER:
-			rose->defer = opt ? 1 : 0;
-			return 0;
+	case ROSE_DEFER:
+		rose->defer = opt ? 1 : 0;
+		return 0;
 
-		case ROSE_T1:
-			if (opt < 1)
-				return -EINVAL;
-			rose->t1 = opt * HZ;
-			return 0;
+	case ROSE_T1:
+		if (opt < 1)
+			return -EINVAL;
+		rose->t1 = opt * HZ;
+		return 0;
 
-		case ROSE_T2:
-			if (opt < 1)
-				return -EINVAL;
-			rose->t2 = opt * HZ;
-			return 0;
+	case ROSE_T2:
+		if (opt < 1)
+			return -EINVAL;
+		rose->t2 = opt * HZ;
+		return 0;
 
-		case ROSE_T3:
-			if (opt < 1)
-				return -EINVAL;
-			rose->t3 = opt * HZ;
-			return 0;
+	case ROSE_T3:
+		if (opt < 1)
+			return -EINVAL;
+		rose->t3 = opt * HZ;
+		return 0;
 
-		case ROSE_HOLDBACK:
-			if (opt < 1)
-				return -EINVAL;
-			rose->hb = opt * HZ;
-			return 0;
+	case ROSE_HOLDBACK:
+		if (opt < 1)
+			return -EINVAL;
+		rose->hb = opt * HZ;
+		return 0;
 
-		case ROSE_IDLE:
-			if (opt < 0)
-				return -EINVAL;
-			rose->idle = opt * 60 * HZ;
-			return 0;
+	case ROSE_IDLE:
+		if (opt < 0)
+			return -EINVAL;
+		rose->idle = opt * 60 * HZ;
+		return 0;
 
-		case ROSE_QBITINCL:
-			rose->qbitincl = opt ? 1 : 0;
-			return 0;
+	case ROSE_QBITINCL:
+		rose->qbitincl = opt ? 1 : 0;
+		return 0;
 
-		default:
-			return -ENOPROTOOPT;
+	default:
+		return -ENOPROTOOPT;
 	}
 }
 
@@ -474,36 +474,36 @@ static int rose_getsockopt(struct socket *sock, int level, int optname,
 		return -EINVAL;
 
 	switch (optname) {
-		case ROSE_DEFER:
-			val = rose->defer;
-			break;
+	case ROSE_DEFER:
+		val = rose->defer;
+		break;
 
-		case ROSE_T1:
-			val = rose->t1 / HZ;
-			break;
+	case ROSE_T1:
+		val = rose->t1 / HZ;
+		break;
 
-		case ROSE_T2:
-			val = rose->t2 / HZ;
-			break;
+	case ROSE_T2:
+		val = rose->t2 / HZ;
+		break;
 
-		case ROSE_T3:
-			val = rose->t3 / HZ;
-			break;
+	case ROSE_T3:
+		val = rose->t3 / HZ;
+		break;
 
-		case ROSE_HOLDBACK:
-			val = rose->hb / HZ;
-			break;
+	case ROSE_HOLDBACK:
+		val = rose->hb / HZ;
+		break;
 
-		case ROSE_IDLE:
-			val = rose->idle / (60 * HZ);
-			break;
+	case ROSE_IDLE:
+		val = rose->idle / (60 * HZ);
+		break;
 
-		case ROSE_QBITINCL:
-			val = rose->qbitincl;
-			break;
+	case ROSE_QBITINCL:
+		val = rose->qbitincl;
+		break;
 
-		default:
-			return -ENOPROTOOPT;
+	default:
+		return -ENOPROTOOPT;
 	}
 
 	len = min_t(unsigned int, len, sizeof(int));
@@ -629,36 +629,35 @@ static int rose_release(struct socket *sock)
 	rose = rose_sk(sk);
 
 	switch (rose->state) {
+	case ROSE_STATE_0:
+		rose_disconnect(sk, 0, -1, -1);
+		rose_destroy_socket(sk);
+		break;
 
-		case ROSE_STATE_0:
-			rose_disconnect(sk, 0, -1, -1);
-			rose_destroy_socket(sk);
-			break;
+	case ROSE_STATE_2:
+		rose->neighbour->use--;
+		rose_disconnect(sk, 0, -1, -1);
+		rose_destroy_socket(sk);
+		break;
 
-		case ROSE_STATE_2:
-			rose->neighbour->use--;
-			rose_disconnect(sk, 0, -1, -1);
-			rose_destroy_socket(sk);
-			break;
+	case ROSE_STATE_1:
+	case ROSE_STATE_3:
+	case ROSE_STATE_4:
+	case ROSE_STATE_5:
+		rose_clear_queues(sk);
+		rose_stop_idletimer(sk);
+		rose_write_internal(sk, ROSE_CLEAR_REQUEST);
+		rose_start_t3timer(sk);
+		rose->state  = ROSE_STATE_2;
+		sk->state    = TCP_CLOSE;
+		sk->shutdown |= SEND_SHUTDOWN;
+		sk->state_change(sk);
+		sk->dead     = 1;
+		sk->destroy  = 1;
+		break;
 
-		case ROSE_STATE_1:
-		case ROSE_STATE_3:
-		case ROSE_STATE_4:
-		case ROSE_STATE_5:
-			rose_clear_queues(sk);
-			rose_stop_idletimer(sk);
-			rose_write_internal(sk, ROSE_CLEAR_REQUEST);
-			rose_start_t3timer(sk);
-			rose->state  = ROSE_STATE_2;
-			sk->state    = TCP_CLOSE;
-			sk->shutdown |= SEND_SHUTDOWN;
-			sk->state_change(sk);
-			sk->dead     = 1;
-			sk->destroy  = 1;
-			break;
-
-		default:
-			break;
+	default:
+		break;
 	}
 
 	sock->sk = NULL;
@@ -1268,96 +1267,96 @@ static int rose_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	rose_cb *rose = rose_sk(sk);
 
 	switch (cmd) {
-		case TIOCOUTQ: {
-			long amount;
-			amount = sk->sndbuf - atomic_read(&sk->wmem_alloc);
-			if (amount < 0)
-				amount = 0;
-			return put_user(amount, (unsigned int *)arg);
-		}
-
-		case TIOCINQ: {
-			struct sk_buff *skb;
-			long amount = 0L;
-			/* These two are safe on a single CPU system as only user tasks fiddle here */
-			if ((skb = skb_peek(&sk->receive_queue)) != NULL)
-				amount = skb->len;
-			return put_user(amount, (unsigned int *)arg);
-		}
-
-		case SIOCGSTAMP:
-			if (sk != NULL) {
-				if (sk->stamp.tv_sec == 0)
-					return -ENOENT;
-				return copy_to_user((void *)arg, &sk->stamp, sizeof(struct timeval)) ? -EFAULT : 0;
-			}
-			return -EINVAL;
-
-		case SIOCGIFADDR:
-		case SIOCSIFADDR:
-		case SIOCGIFDSTADDR:
-		case SIOCSIFDSTADDR:
-		case SIOCGIFBRDADDR:
-		case SIOCSIFBRDADDR:
-		case SIOCGIFNETMASK:
-		case SIOCSIFNETMASK:
-		case SIOCGIFMETRIC:
-		case SIOCSIFMETRIC:
-			return -EINVAL;
-
-		case SIOCADDRT:
-		case SIOCDELRT:
-		case SIOCRSCLRRT:
-			if (!capable(CAP_NET_ADMIN)) return -EPERM;
-			return rose_rt_ioctl(cmd, (void *)arg);
-
-		case SIOCRSGCAUSE: {
-			struct rose_cause_struct rose_cause;
-			rose_cause.cause      = rose->cause;
-			rose_cause.diagnostic = rose->diagnostic;
-			return copy_to_user((void *)arg, &rose_cause, sizeof(struct rose_cause_struct)) ? -EFAULT : 0;
-		}
-
-		case SIOCRSSCAUSE: {
-			struct rose_cause_struct rose_cause;
-			if (copy_from_user(&rose_cause, (void *)arg, sizeof(struct rose_cause_struct)))
-				return -EFAULT;
-			rose->cause      = rose_cause.cause;
-			rose->diagnostic = rose_cause.diagnostic;
-			return 0;
-		}
-
-		case SIOCRSSL2CALL:
-			if (!capable(CAP_NET_ADMIN)) return -EPERM;
-			if (ax25cmp(&rose_callsign, &null_ax25_address) != 0)
-				ax25_listen_release(&rose_callsign, NULL);
-			if (copy_from_user(&rose_callsign, (void *)arg, sizeof(ax25_address)))
-				return -EFAULT;
-			if (ax25cmp(&rose_callsign, &null_ax25_address) != 0)
-				ax25_listen_register(&rose_callsign, NULL);
-			return 0;
-
-		case SIOCRSGL2CALL:
-			return copy_to_user((void *)arg, &rose_callsign, sizeof(ax25_address)) ? -EFAULT : 0;
-
-		case SIOCRSACCEPT:
-			if (rose->state == ROSE_STATE_5) {
-				rose_write_internal(sk, ROSE_CALL_ACCEPTED);
-				rose_start_idletimer(sk);
-				rose->condition = 0x00;
-				rose->vs        = 0;
-				rose->va        = 0;
-				rose->vr        = 0;
-				rose->vl        = 0;
-				rose->state     = ROSE_STATE_3;
-			}
-			return 0;
-
-		default:
-			return dev_ioctl(cmd, (void *)arg);
+	case TIOCOUTQ: {
+		long amount;
+		amount = sk->sndbuf - atomic_read(&sk->wmem_alloc);
+		if (amount < 0)
+			amount = 0;
+		return put_user(amount, (unsigned int *)arg);
 	}
 
-	/*NOTREACHED*/
+	case TIOCINQ: {
+		struct sk_buff *skb;
+		long amount = 0L;
+		/* These two are safe on a single CPU system as only user tasks fiddle here */
+		if ((skb = skb_peek(&sk->receive_queue)) != NULL)
+			amount = skb->len;
+		return put_user(amount, (unsigned int *)arg);
+	}
+
+	case SIOCGSTAMP:
+		if (sk != NULL) {
+			if (sk->stamp.tv_sec == 0)
+				return -ENOENT;
+			return copy_to_user((void *)arg, &sk->stamp, sizeof(struct timeval)) ? -EFAULT : 0;
+		}
+		return -EINVAL;
+
+	case SIOCGIFADDR:
+	case SIOCSIFADDR:
+	case SIOCGIFDSTADDR:
+	case SIOCSIFDSTADDR:
+	case SIOCGIFBRDADDR:
+	case SIOCSIFBRDADDR:
+	case SIOCGIFNETMASK:
+	case SIOCSIFNETMASK:
+	case SIOCGIFMETRIC:
+	case SIOCSIFMETRIC:
+		return -EINVAL;
+
+	case SIOCADDRT:
+	case SIOCDELRT:
+	case SIOCRSCLRRT:
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
+		return rose_rt_ioctl(cmd, (void *)arg);
+
+	case SIOCRSGCAUSE: {
+		struct rose_cause_struct rose_cause;
+		rose_cause.cause      = rose->cause;
+		rose_cause.diagnostic = rose->diagnostic;
+		return copy_to_user((void *)arg, &rose_cause, sizeof(struct rose_cause_struct)) ? -EFAULT : 0;
+	}
+
+	case SIOCRSSCAUSE: {
+		struct rose_cause_struct rose_cause;
+		if (copy_from_user(&rose_cause, (void *)arg, sizeof(struct rose_cause_struct)))
+			return -EFAULT;
+		rose->cause      = rose_cause.cause;
+		rose->diagnostic = rose_cause.diagnostic;
+		return 0;
+	}
+
+	case SIOCRSSL2CALL:
+		if (!capable(CAP_NET_ADMIN)) return -EPERM;
+		if (ax25cmp(&rose_callsign, &null_ax25_address) != 0)
+			ax25_listen_release(&rose_callsign, NULL);
+		if (copy_from_user(&rose_callsign, (void *)arg, sizeof(ax25_address)))
+			return -EFAULT;
+		if (ax25cmp(&rose_callsign, &null_ax25_address) != 0)
+			ax25_listen_register(&rose_callsign, NULL);
+		return 0;
+
+	case SIOCRSGL2CALL:
+		return copy_to_user((void *)arg, &rose_callsign, sizeof(ax25_address)) ? -EFAULT : 0;
+
+	case SIOCRSACCEPT:
+		if (rose->state == ROSE_STATE_5) {
+			rose_write_internal(sk, ROSE_CALL_ACCEPTED);
+			rose_start_idletimer(sk);
+			rose->condition = 0x00;
+			rose->vs        = 0;
+			rose->va        = 0;
+			rose->vr        = 0;
+			rose->vl        = 0;
+			rose->state     = ROSE_STATE_3;
+		}
+		return 0;
+
+	default:
+		return dev_ioctl(cmd, (void *)arg);
+	}
+
 	return 0;
 }
 

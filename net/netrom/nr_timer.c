@@ -136,29 +136,28 @@ static void nr_heartbeat_expiry(unsigned long param)
 	nr_cb *nr = nr_sk(sk);
 
 	switch (nr->state) {
+	case NR_STATE_0:
+		/* Magic here: If we listen() and a new link dies before it
+		   is accepted() it isn't 'dead' so doesn't get removed. */
+		if (sk->destroy || (sk->state == TCP_LISTEN && sk->dead)) {
+			nr_destroy_socket(sk);
+			return;
+		}
+		break;
 
-		case NR_STATE_0:
-			/* Magic here: If we listen() and a new link dies before it
-			   is accepted() it isn't 'dead' so doesn't get removed. */
-			if (sk->destroy || (sk->state == TCP_LISTEN && sk->dead)) {
-				nr_destroy_socket(sk);
-				return;
-			}
+	case NR_STATE_3:
+		/*
+		 * Check for the state of the receive buffer.
+		 */
+		if (atomic_read(&sk->rmem_alloc) < (sk->rcvbuf / 2) &&
+		    (nr->condition & NR_COND_OWN_RX_BUSY)) {
+			nr->condition &= ~NR_COND_OWN_RX_BUSY;
+			nr->condition &= ~NR_COND_ACK_PENDING;
+			nr->vl         = nr->vr;
+			nr_write_internal(sk, NR_INFOACK);
 			break;
-
-		case NR_STATE_3:
-			/*
-			 * Check for the state of the receive buffer.
-			 */
-			if (atomic_read(&sk->rmem_alloc) < (sk->rcvbuf / 2) &&
-			    (nr->condition & NR_COND_OWN_RX_BUSY)) {
-				nr->condition &= ~NR_COND_OWN_RX_BUSY;
-				nr->condition &= ~NR_COND_ACK_PENDING;
-				nr->vl         = nr->vr;
-				nr_write_internal(sk, NR_INFOACK);
-				break;
-			}
-			break;
+		}
+		break;
 	}
 
 	nr_start_heartbeat(sk);
@@ -213,36 +212,35 @@ static void nr_t1timer_expiry(unsigned long param)
 	nr_cb *nr = nr_sk(sk);
 
 	switch (nr->state) {
+	case NR_STATE_1:
+		if (nr->n2count == nr->n2) {
+			nr_disconnect(sk, ETIMEDOUT);
+			return;
+		} else {
+			nr->n2count++;
+			nr_write_internal(sk, NR_CONNREQ);
+		}
+		break;
 
-		case NR_STATE_1:
-			if (nr->n2count == nr->n2) {
-				nr_disconnect(sk, ETIMEDOUT);
-				return;
-			} else {
-				nr->n2count++;
-				nr_write_internal(sk, NR_CONNREQ);
-			}
-			break;
+	case NR_STATE_2:
+		if (nr->n2count == nr->n2) {
+			nr_disconnect(sk, ETIMEDOUT);
+			return;
+		} else {
+			nr->n2count++;
+			nr_write_internal(sk, NR_DISCREQ);
+		}
+		break;
 
-		case NR_STATE_2:
-			if (nr->n2count == nr->n2) {
-				nr_disconnect(sk, ETIMEDOUT);
-				return;
-			} else {
-				nr->n2count++;
-				nr_write_internal(sk, NR_DISCREQ);
-			}
-			break;
-
-		case NR_STATE_3:
-			if (nr->n2count == nr->n2) {
-				nr_disconnect(sk, ETIMEDOUT);
-				return;
-			} else {
-				nr->n2count++;
-				nr_requeue_frames(sk);
-			}
-			break;
+	case NR_STATE_3:
+		if (nr->n2count == nr->n2) {
+			nr_disconnect(sk, ETIMEDOUT);
+			return;
+		} else {
+			nr->n2count++;
+			nr_requeue_frames(sk);
+		}
+		break;
 	}
 
 	nr_start_t1timer(sk);

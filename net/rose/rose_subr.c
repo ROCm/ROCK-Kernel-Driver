@@ -110,16 +110,16 @@ void rose_write_internal(struct sock *sk, int frametype)
 	len = AX25_BPQ_HEADER_LEN + AX25_MAX_HEADER_LEN + ROSE_MIN_LEN + 1;
 
 	switch (frametype) {
-		case ROSE_CALL_REQUEST:
-			len   += 1 + ROSE_ADDR_LEN + ROSE_ADDR_LEN;
-			faclen = rose_create_facilities(buffer, rose);
-			len   += faclen;
-			break;
-		case ROSE_CALL_ACCEPTED:
-		case ROSE_CLEAR_REQUEST:
-		case ROSE_RESET_REQUEST:
-			len   += 2;
-			break;
+	case ROSE_CALL_REQUEST:
+		len   += 1 + ROSE_ADDR_LEN + ROSE_ADDR_LEN;
+		faclen = rose_create_facilities(buffer, rose);
+		len   += faclen;
+		break;
+	case ROSE_CALL_ACCEPTED:
+	case ROSE_CLEAR_REQUEST:
+	case ROSE_RESET_REQUEST:
+		len   += 2;
+		break;
 	}
 
 	if ((skb = alloc_skb(len, GFP_ATOMIC)) == NULL)
@@ -136,63 +136,62 @@ void rose_write_internal(struct sock *sk, int frametype)
 	lci2 = (rose->lci >> 0) & 0xFF;
 
 	switch (frametype) {
+	case ROSE_CALL_REQUEST:
+		*dptr++ = ROSE_GFI | lci1;
+		*dptr++ = lci2;
+		*dptr++ = frametype;
+		*dptr++ = 0xAA;
+		memcpy(dptr, &rose->dest_addr,  ROSE_ADDR_LEN);
+		dptr   += ROSE_ADDR_LEN;
+		memcpy(dptr, &rose->source_addr, ROSE_ADDR_LEN);
+		dptr   += ROSE_ADDR_LEN;
+		memcpy(dptr, buffer, faclen);
+		dptr   += faclen;
+		break;
 
-		case ROSE_CALL_REQUEST:
-			*dptr++ = ROSE_GFI | lci1;
-			*dptr++ = lci2;
-			*dptr++ = frametype;
-			*dptr++ = 0xAA;
-			memcpy(dptr, &rose->dest_addr,  ROSE_ADDR_LEN);
-			dptr   += ROSE_ADDR_LEN;
-			memcpy(dptr, &rose->source_addr, ROSE_ADDR_LEN);
-			dptr   += ROSE_ADDR_LEN;
-			memcpy(dptr, buffer, faclen);
-			dptr   += faclen;
-			break;
+	case ROSE_CALL_ACCEPTED:
+		*dptr++ = ROSE_GFI | lci1;
+		*dptr++ = lci2;
+		*dptr++ = frametype;
+		*dptr++ = 0x00;		/* Address length */
+		*dptr++ = 0;		/* Facilities length */
+		break;
 
-		case ROSE_CALL_ACCEPTED:
-			*dptr++ = ROSE_GFI | lci1;
-			*dptr++ = lci2;
-			*dptr++ = frametype;
-			*dptr++ = 0x00;		/* Address length */
-			*dptr++ = 0;		/* Facilities length */
-			break;
+	case ROSE_CLEAR_REQUEST:
+		*dptr++ = ROSE_GFI | lci1;
+		*dptr++ = lci2;
+		*dptr++ = frametype;
+		*dptr++ = rose->cause;
+		*dptr++ = rose->diagnostic;
+		break;
 
-		case ROSE_CLEAR_REQUEST:
-			*dptr++ = ROSE_GFI | lci1;
-			*dptr++ = lci2;
-			*dptr++ = frametype;
-			*dptr++ = rose->cause;
-			*dptr++ = rose->diagnostic;
-			break;
+	case ROSE_RESET_REQUEST:
+		*dptr++ = ROSE_GFI | lci1;
+		*dptr++ = lci2;
+		*dptr++ = frametype;
+		*dptr++ = ROSE_DTE_ORIGINATED;
+		*dptr++ = 0;
+		break;
 
-		case ROSE_RESET_REQUEST:
-			*dptr++ = ROSE_GFI | lci1;
-			*dptr++ = lci2;
-			*dptr++ = frametype;
-			*dptr++ = ROSE_DTE_ORIGINATED;
-			*dptr++ = 0;
-			break;
+	case ROSE_RR:
+	case ROSE_RNR:
+		*dptr++ = ROSE_GFI | lci1;
+		*dptr++ = lci2;
+		*dptr   = frametype;
+		*dptr++ |= (rose->vr << 5) & 0xE0;
+		break;
 
-		case ROSE_RR:
-		case ROSE_RNR:
-			*dptr++ = ROSE_GFI | lci1;
-			*dptr++ = lci2;
-			*dptr   = frametype;
-			*dptr++ |= (rose->vr << 5) & 0xE0;
-			break;
+	case ROSE_CLEAR_CONFIRMATION:
+	case ROSE_RESET_CONFIRMATION:
+		*dptr++ = ROSE_GFI | lci1;
+		*dptr++ = lci2;
+		*dptr++  = frametype;
+		break;
 
-		case ROSE_CLEAR_CONFIRMATION:
-		case ROSE_RESET_CONFIRMATION:
-			*dptr++ = ROSE_GFI | lci1;
-			*dptr++ = lci2;
-			*dptr++  = frametype;
-			break;
-
-		default:
-			printk(KERN_ERR "ROSE: rose_write_internal - invalid frametype %02X\n", frametype);
-			kfree_skb(skb);
-			return;
+	default:
+		printk(KERN_ERR "ROSE: rose_write_internal - invalid frametype %02X\n", frametype);
+		kfree_skb(skb);
+		return;
 	}
 
 	rose_transmit_link(skb, rose->neighbour);
@@ -207,15 +206,15 @@ int rose_decode(struct sk_buff *skb, int *ns, int *nr, int *q, int *d, int *m)
 	*ns = *nr = *q = *d = *m = 0;
 
 	switch (frame[2]) {
-		case ROSE_CALL_REQUEST:
-		case ROSE_CALL_ACCEPTED:
-		case ROSE_CLEAR_REQUEST:
-		case ROSE_CLEAR_CONFIRMATION:
-		case ROSE_RESET_REQUEST:
-		case ROSE_RESET_CONFIRMATION:
-			return frame[2];
-		default:
-			break;
+	case ROSE_CALL_REQUEST:
+	case ROSE_CALL_ACCEPTED:
+	case ROSE_CLEAR_REQUEST:
+	case ROSE_CLEAR_CONFIRMATION:
+	case ROSE_RESET_REQUEST:
+	case ROSE_RESET_CONFIRMATION:
+		return frame[2];
+	default:
+		break;
 	}
 
 	if ((frame[2] & 0x1F) == ROSE_RR  ||
@@ -244,61 +243,61 @@ static int rose_parse_national(unsigned char *p, struct rose_facilities_struct *
 
 	do {
 		switch (*p & 0xC0) {
-			case 0x00:
-				p   += 2;
-				n   += 2;
-				len -= 2;
-				break;
+		case 0x00:
+			p   += 2;
+			n   += 2;
+			len -= 2;
+			break;
 
-			case 0x40:
-				if (*p == FAC_NATIONAL_RAND)
-					facilities->rand = ((p[1] << 8) & 0xFF00) + ((p[2] << 0) & 0x00FF);
-				p   += 3;
-				n   += 3;
-				len -= 3;
-				break;
+		case 0x40:
+			if (*p == FAC_NATIONAL_RAND)
+				facilities->rand = ((p[1] << 8) & 0xFF00) + ((p[2] << 0) & 0x00FF);
+			p   += 3;
+			n   += 3;
+			len -= 3;
+			break;
 
-			case 0x80:
-				p   += 4;
-				n   += 4;
-				len -= 4;
-				break;
+		case 0x80:
+			p   += 4;
+			n   += 4;
+			len -= 4;
+			break;
 
-			case 0xC0:
-				l = p[1];
-				if (*p == FAC_NATIONAL_DEST_DIGI) {
-					if (!fac_national_digis_received) {
-						memcpy(&facilities->source_digis[0], p + 2, AX25_ADDR_LEN);
-						facilities->source_ndigis = 1;
-					}
+		case 0xC0:
+			l = p[1];
+			if (*p == FAC_NATIONAL_DEST_DIGI) {
+				if (!fac_national_digis_received) {
+					memcpy(&facilities->source_digis[0], p + 2, AX25_ADDR_LEN);
+					facilities->source_ndigis = 1;
 				}
-				else if (*p == FAC_NATIONAL_SRC_DIGI) {
-					if (!fac_national_digis_received) {
-						memcpy(&facilities->dest_digis[0], p + 2, AX25_ADDR_LEN);
-						facilities->dest_ndigis = 1;
-					}
+			}
+			else if (*p == FAC_NATIONAL_SRC_DIGI) {
+				if (!fac_national_digis_received) {
+					memcpy(&facilities->dest_digis[0], p + 2, AX25_ADDR_LEN);
+					facilities->dest_ndigis = 1;
 				}
-				else if (*p == FAC_NATIONAL_FAIL_CALL) {
-					memcpy(&facilities->fail_call, p + 2, AX25_ADDR_LEN);
+			}
+			else if (*p == FAC_NATIONAL_FAIL_CALL) {
+				memcpy(&facilities->fail_call, p + 2, AX25_ADDR_LEN);
+			}
+			else if (*p == FAC_NATIONAL_FAIL_ADD) {
+				memcpy(&facilities->fail_addr, p + 3, ROSE_ADDR_LEN);
+			}
+			else if (*p == FAC_NATIONAL_DIGIS) {
+				fac_national_digis_received = 1;
+				facilities->source_ndigis = 0;
+				facilities->dest_ndigis   = 0;
+				for (pt = p + 2, lg = 0 ; lg < l ; pt += AX25_ADDR_LEN, lg += AX25_ADDR_LEN) {
+					if (pt[6] & AX25_HBIT)
+						memcpy(&facilities->dest_digis[facilities->dest_ndigis++], pt, AX25_ADDR_LEN);
+					else
+						memcpy(&facilities->source_digis[facilities->source_ndigis++], pt, AX25_ADDR_LEN);
 				}
-				else if (*p == FAC_NATIONAL_FAIL_ADD) {
-					memcpy(&facilities->fail_addr, p + 3, ROSE_ADDR_LEN);
-				}
-				else if (*p == FAC_NATIONAL_DIGIS) {
-					fac_national_digis_received = 1;
-					facilities->source_ndigis = 0;
-					facilities->dest_ndigis   = 0;
-					for (pt = p + 2, lg = 0 ; lg < l ; pt += AX25_ADDR_LEN, lg += AX25_ADDR_LEN) {
-						if (pt[6] & AX25_HBIT)
-							memcpy(&facilities->dest_digis[facilities->dest_ndigis++], pt, AX25_ADDR_LEN);
-						else
-							memcpy(&facilities->source_digis[facilities->source_ndigis++], pt, AX25_ADDR_LEN);
-					}
-				}
-				p   += l + 2;
-				n   += l + 2;
-				len -= l + 2;
-				break;
+			}
+			p   += l + 2;
+			n   += l + 2;
+			len -= l + 2;
+			break;
 		}
 	} while (*p != 0x00 && len > 0);
 
@@ -312,49 +311,50 @@ static int rose_parse_ccitt(unsigned char *p, struct rose_facilities_struct *fac
 
 	do {
 		switch (*p & 0xC0) {
-			case 0x00:
-				p   += 2;
-				n   += 2;
-				len -= 2;
-				break;
+		case 0x00:
+			p   += 2;
+			n   += 2;
+			len -= 2;
+			break;
 
-			case 0x40:
-				p   += 3;
-				n   += 3;
-				len -= 3;
-				break;
+		case 0x40:
+			p   += 3;
+			n   += 3;
+			len -= 3;
+			break;
 
-			case 0x80:
-				p   += 4;
-				n   += 4;
-				len -= 4;
-				break;
+		case 0x80:
+			p   += 4;
+			n   += 4;
+			len -= 4;
+			break;
 
-			case 0xC0:
-				l = p[1];
-				if (*p == FAC_CCITT_DEST_NSAP) {
-					memcpy(&facilities->source_addr, p + 7, ROSE_ADDR_LEN);
-					memcpy(callsign, p + 12,   l - 10);
-					callsign[l - 10] = '\0';
-					facilities->source_call = *asc2ax(callsign);
-				}
-				if (*p == FAC_CCITT_SRC_NSAP) {
-					memcpy(&facilities->dest_addr, p + 7, ROSE_ADDR_LEN);
-					memcpy(callsign, p + 12, l - 10);
-					callsign[l - 10] = '\0';
-					facilities->dest_call = *asc2ax(callsign);
-				}
-				p   += l + 2;
-				n   += l + 2;
-				len -= l + 2;
-				break;
+		case 0xC0:
+			l = p[1];
+			if (*p == FAC_CCITT_DEST_NSAP) {
+				memcpy(&facilities->source_addr, p + 7, ROSE_ADDR_LEN);
+				memcpy(callsign, p + 12,   l - 10);
+				callsign[l - 10] = '\0';
+				facilities->source_call = *asc2ax(callsign);
+			}
+			if (*p == FAC_CCITT_SRC_NSAP) {
+				memcpy(&facilities->dest_addr, p + 7, ROSE_ADDR_LEN);
+				memcpy(callsign, p + 12, l - 10);
+				callsign[l - 10] = '\0';
+				facilities->dest_call = *asc2ax(callsign);
+			}
+			p   += l + 2;
+			n   += l + 2;
+			len -= l + 2;
+			break;
 		}
 	} while (*p != 0x00 && len > 0);
 
 	return n;
 }
 
-int rose_parse_facilities(unsigned char *p, struct rose_facilities_struct *facilities)
+int rose_parse_facilities(unsigned char *p,
+	struct rose_facilities_struct *facilities)
 {
 	int facilities_len, len;
 
@@ -369,26 +369,26 @@ int rose_parse_facilities(unsigned char *p, struct rose_facilities_struct *facil
 			p++;
 
 			switch (*p) {
-				case FAC_NATIONAL:		/* National */
-					len = rose_parse_national(p + 1, facilities, facilities_len - 1);
-					facilities_len -= len + 1;
-					p += len + 1;
-					break;
+			case FAC_NATIONAL:		/* National */
+				len = rose_parse_national(p + 1, facilities, facilities_len - 1);
+				facilities_len -= len + 1;
+				p += len + 1;
+				break;
 
-				case FAC_CCITT:		/* CCITT */
-					len = rose_parse_ccitt(p + 1, facilities, facilities_len - 1);
-					facilities_len -= len + 1;
-					p += len + 1;
-					break;
+			case FAC_CCITT:		/* CCITT */
+				len = rose_parse_ccitt(p + 1, facilities, facilities_len - 1);
+				facilities_len -= len + 1;
+				p += len + 1;
+				break;
 
-				default:
-					printk(KERN_DEBUG "ROSE: rose_parse_facilities - unknown facilities family %02X\n", *p);
-					facilities_len--;
-					p++;
-					break;
+			default:
+				printk(KERN_DEBUG "ROSE: rose_parse_facilities - unknown facilities family %02X\n", *p);
+				facilities_len--;
+				p++;
+				break;
 			}
-		}
-		else break;	/* Error in facilities format */
+		} else
+			break;	/* Error in facilities format */
 	}
 
 	return 1;

@@ -131,30 +131,29 @@ static void rose_heartbeat_expiry(unsigned long param)
 	rose_cb *rose = rose_sk(sk);
 
 	switch (rose->state) {
+	case ROSE_STATE_0:
+		/* Magic here: If we listen() and a new link dies before it
+		   is accepted() it isn't 'dead' so doesn't get removed. */
+		if (sk->destroy || (sk->state == TCP_LISTEN && sk->dead)) {
+			rose_destroy_socket(sk);
+			return;
+		}
+		break;
 
-		case ROSE_STATE_0:
-			/* Magic here: If we listen() and a new link dies before it
-			   is accepted() it isn't 'dead' so doesn't get removed. */
-			if (sk->destroy || (sk->state == TCP_LISTEN && sk->dead)) {
-				rose_destroy_socket(sk);
-				return;
-			}
+	case ROSE_STATE_3:
+		/*
+		 * Check for the state of the receive buffer.
+		 */
+		if (atomic_read(&sk->rmem_alloc) < (sk->rcvbuf / 2) &&
+		    (rose->condition & ROSE_COND_OWN_RX_BUSY)) {
+			rose->condition &= ~ROSE_COND_OWN_RX_BUSY;
+			rose->condition &= ~ROSE_COND_ACK_PENDING;
+			rose->vl         = rose->vr;
+			rose_write_internal(sk, ROSE_RR);
+			rose_stop_timer(sk);	/* HB */
 			break;
-
-		case ROSE_STATE_3:
-			/*
-			 * Check for the state of the receive buffer.
-			 */
-			if (atomic_read(&sk->rmem_alloc) < (sk->rcvbuf / 2) &&
-			    (rose->condition & ROSE_COND_OWN_RX_BUSY)) {
-				rose->condition &= ~ROSE_COND_OWN_RX_BUSY;
-				rose->condition &= ~ROSE_COND_ACK_PENDING;
-				rose->vl         = rose->vr;
-				rose_write_internal(sk, ROSE_RR);
-				rose_stop_timer(sk);	/* HB */
-				break;
-			}
-			break;
+		}
+		break;
 	}
 
 	rose_start_heartbeat(sk);
@@ -166,25 +165,24 @@ static void rose_timer_expiry(unsigned long param)
 	rose_cb *rose = rose_sk(sk);
 
 	switch (rose->state) {
+	case ROSE_STATE_1:	/* T1 */
+	case ROSE_STATE_4:	/* T2 */
+		rose_write_internal(sk, ROSE_CLEAR_REQUEST);
+		rose->state = ROSE_STATE_2;
+		rose_start_t3timer(sk);
+		break;
 
-		case ROSE_STATE_1:	/* T1 */
-		case ROSE_STATE_4:	/* T2 */
-			rose_write_internal(sk, ROSE_CLEAR_REQUEST);
-			rose->state = ROSE_STATE_2;
-			rose_start_t3timer(sk);
-			break;
+	case ROSE_STATE_2:	/* T3 */
+		rose->neighbour->use--;
+		rose_disconnect(sk, ETIMEDOUT, -1, -1);
+		break;
 
-		case ROSE_STATE_2:	/* T3 */
-			rose->neighbour->use--;
-			rose_disconnect(sk, ETIMEDOUT, -1, -1);
-			break;
-
-		case ROSE_STATE_3:	/* HB */
-			if (rose->condition & ROSE_COND_ACK_PENDING) {
-				rose->condition &= ~ROSE_COND_ACK_PENDING;
-				rose_enquiry_response(sk);
-			}
-			break;
+	case ROSE_STATE_3:	/* HB */
+		if (rose->condition & ROSE_COND_ACK_PENDING) {
+			rose->condition &= ~ROSE_COND_ACK_PENDING;
+			rose_enquiry_response(sk);
+		}
+		break;
 	}
 }
 

@@ -71,36 +71,36 @@ static int nr_queue_rx_frame(struct sock *sk, struct sk_buff *skb, int more)
  * The handling of the timer(s) is in file nr_timer.c.
  * Handling of state 0 and connection release is in netrom.c.
  */
-static int nr_state1_machine(struct sock *sk, struct sk_buff *skb, int frametype)
+static int nr_state1_machine(struct sock *sk, struct sk_buff *skb,
+	int frametype)
 {
 	switch (frametype) {
+	case NR_CONNACK: {
+		nr_cb *nr = nr_sk(sk);
 
-		case NR_CONNACK: {
-			nr_cb *nr = nr_sk(sk);
+		nr_stop_t1timer(sk);
+		nr_start_idletimer(sk);
+		nr->your_index = skb->data[17];
+		nr->your_id    = skb->data[18];
+		nr->vs	       = 0;
+		nr->va	       = 0;
+		nr->vr	       = 0;
+		nr->vl	       = 0;
+		nr->state      = NR_STATE_3;
+		nr->n2count    = 0;
+		nr->window     = skb->data[20];
+		sk->state      = TCP_ESTABLISHED;
+		if (!sk->dead)
+			sk->state_change(sk);
+		break;
+	}
 
-			nr_stop_t1timer(sk);
-			nr_start_idletimer(sk);
-			nr->your_index = skb->data[17];
-			nr->your_id    = skb->data[18];
-			nr->vs	       = 0;
-			nr->va	       = 0;
-			nr->vr	       = 0;
-			nr->vl	       = 0;
-			nr->state      = NR_STATE_3;
-			nr->n2count    = 0;
-			nr->window     = skb->data[20];
-			sk->state      = TCP_ESTABLISHED;
-			if (!sk->dead)
-				sk->state_change(sk);
-			break;
-		}
+	case NR_CONNACK | NR_CHOKE_FLAG:
+		nr_disconnect(sk, ECONNREFUSED);
+		break;
 
-		case NR_CONNACK | NR_CHOKE_FLAG:
-			nr_disconnect(sk, ECONNREFUSED);
-			break;
-
-		default:
-			break;
+	default:
+		break;
 	}
 
 	return 0;
@@ -111,23 +111,23 @@ static int nr_state1_machine(struct sock *sk, struct sk_buff *skb, int frametype
  * The handling of the timer(s) is in file nr_timer.c
  * Handling of state 0 and connection release is in netrom.c.
  */
-static int nr_state2_machine(struct sock *sk, struct sk_buff *skb, int frametype)
+static int nr_state2_machine(struct sock *sk, struct sk_buff *skb,
+	int frametype)
 {
 	switch (frametype) {
+	case NR_CONNACK | NR_CHOKE_FLAG:
+		nr_disconnect(sk, ECONNRESET);
+		break;
 
-		case NR_CONNACK | NR_CHOKE_FLAG:
-			nr_disconnect(sk, ECONNRESET);
-			break;
+	case NR_DISCREQ:
+		nr_write_internal(sk, NR_DISCACK);
 
-		case NR_DISCREQ:
-			nr_write_internal(sk, NR_DISCACK);
+	case NR_DISCACK:
+		nr_disconnect(sk, 0);
+		break;
 
-		case NR_DISCACK:
-			nr_disconnect(sk, 0);
-			break;
-
-		default:
-			break;
+	default:
+		break;
 	}
 
 	return 0;
@@ -151,35 +151,62 @@ static int nr_state3_machine(struct sock *sk, struct sk_buff *skb, int frametype
 	ns = skb->data[17];
 
 	switch (frametype) {
+	case NR_CONNREQ:
+		nr_write_internal(sk, NR_CONNACK);
+		break;
 
-		case NR_CONNREQ:
-			nr_write_internal(sk, NR_CONNACK);
+	case NR_DISCREQ:
+		nr_write_internal(sk, NR_DISCACK);
+		nr_disconnect(sk, 0);
+		break;
+
+	case NR_CONNACK | NR_CHOKE_FLAG:
+	case NR_DISCACK:
+		nr_disconnect(sk, ECONNRESET);
+		break;
+
+	case NR_INFOACK:
+	case NR_INFOACK | NR_CHOKE_FLAG:
+	case NR_INFOACK | NR_NAK_FLAG:
+	case NR_INFOACK | NR_NAK_FLAG | NR_CHOKE_FLAG:
+		if (frametype & NR_CHOKE_FLAG) {
+			nrom->condition |= NR_COND_PEER_RX_BUSY;
+			nr_start_t4timer(sk);
+		} else {
+			nrom->condition &= ~NR_COND_PEER_RX_BUSY;
+			nr_stop_t4timer(sk);
+		}
+		if (!nr_validate_nr(sk, nr)) {
 			break;
-
-		case NR_DISCREQ:
-			nr_write_internal(sk, NR_DISCACK);
-			nr_disconnect(sk, 0);
-			break;
-
-		case NR_CONNACK | NR_CHOKE_FLAG:
-		case NR_DISCACK:
-			nr_disconnect(sk, ECONNRESET);
-			break;
-
-		case NR_INFOACK:
-		case NR_INFOACK | NR_CHOKE_FLAG:
-		case NR_INFOACK | NR_NAK_FLAG:
-		case NR_INFOACK | NR_NAK_FLAG | NR_CHOKE_FLAG:
-			if (frametype & NR_CHOKE_FLAG) {
-				nrom->condition |= NR_COND_PEER_RX_BUSY;
-				nr_start_t4timer(sk);
+		}
+		if (frametype & NR_NAK_FLAG) {
+			nr_frames_acked(sk, nr);
+			nr_send_nak_frame(sk);
+		} else {
+			if (nrom->condition & NR_COND_PEER_RX_BUSY) {
+				nr_frames_acked(sk, nr);
 			} else {
-				nrom->condition &= ~NR_COND_PEER_RX_BUSY;
-				nr_stop_t4timer(sk);
+				nr_check_iframes_acked(sk, nr);
 			}
-			if (!nr_validate_nr(sk, nr)) {
-				break;
-			}
+		}
+		break;
+
+	case NR_INFO:
+	case NR_INFO | NR_NAK_FLAG:
+	case NR_INFO | NR_CHOKE_FLAG:
+	case NR_INFO | NR_MORE_FLAG:
+	case NR_INFO | NR_NAK_FLAG | NR_CHOKE_FLAG:
+	case NR_INFO | NR_CHOKE_FLAG | NR_MORE_FLAG:
+	case NR_INFO | NR_NAK_FLAG | NR_MORE_FLAG:
+	case NR_INFO | NR_NAK_FLAG | NR_CHOKE_FLAG | NR_MORE_FLAG:
+		if (frametype & NR_CHOKE_FLAG) {
+			nrom->condition |= NR_COND_PEER_RX_BUSY;
+			nr_start_t4timer(sk);
+		} else {
+			nrom->condition &= ~NR_COND_PEER_RX_BUSY;
+			nr_stop_t4timer(sk);
+		}
+		if (nr_validate_nr(sk, nr)) {
 			if (frametype & NR_NAK_FLAG) {
 				nr_frames_acked(sk, nr);
 				nr_send_nak_frame(sk);
@@ -190,76 +217,48 @@ static int nr_state3_machine(struct sock *sk, struct sk_buff *skb, int frametype
 					nr_check_iframes_acked(sk, nr);
 				}
 			}
+		}
+		queued = 1;
+		skb_queue_head(&nrom->reseq_queue, skb);
+		if (nrom->condition & NR_COND_OWN_RX_BUSY)
 			break;
-
-		case NR_INFO:
-		case NR_INFO | NR_NAK_FLAG:
-		case NR_INFO | NR_CHOKE_FLAG:
-		case NR_INFO | NR_MORE_FLAG:
-		case NR_INFO | NR_NAK_FLAG | NR_CHOKE_FLAG:
-		case NR_INFO | NR_CHOKE_FLAG | NR_MORE_FLAG:
-		case NR_INFO | NR_NAK_FLAG | NR_MORE_FLAG:
-		case NR_INFO | NR_NAK_FLAG | NR_CHOKE_FLAG | NR_MORE_FLAG:
-			if (frametype & NR_CHOKE_FLAG) {
-				nrom->condition |= NR_COND_PEER_RX_BUSY;
-				nr_start_t4timer(sk);
-			} else {
-				nrom->condition &= ~NR_COND_PEER_RX_BUSY;
-				nr_stop_t4timer(sk);
-			}
-			if (nr_validate_nr(sk, nr)) {
-				if (frametype & NR_NAK_FLAG) {
-					nr_frames_acked(sk, nr);
-					nr_send_nak_frame(sk);
-				} else {
-					if (nrom->condition & NR_COND_PEER_RX_BUSY) {
-						nr_frames_acked(sk, nr);
+		skb_queue_head_init(&temp_queue);
+		do {
+			save_vr = nrom->vr;
+			while ((skbn = skb_dequeue(&nrom->reseq_queue)) != NULL) {
+				ns = skbn->data[17];
+				if (ns == nrom->vr) {
+					if (nr_queue_rx_frame(sk, skbn, frametype & NR_MORE_FLAG) == 0) {
+						nrom->vr = (nrom->vr + 1) % NR_MODULUS;
 					} else {
-						nr_check_iframes_acked(sk, nr);
-					}
-				}
-			}
-			queued = 1;
-			skb_queue_head(&nrom->reseq_queue, skb);
-			if (nrom->condition & NR_COND_OWN_RX_BUSY)
-				break;
-			skb_queue_head_init(&temp_queue);
-			do {
-				save_vr = nrom->vr;
-				while ((skbn = skb_dequeue(&nrom->reseq_queue)) != NULL) {
-					ns = skbn->data[17];
-					if (ns == nrom->vr) {
-						if (nr_queue_rx_frame(sk, skbn, frametype & NR_MORE_FLAG) == 0) {
-							nrom->vr = (nrom->vr + 1) % NR_MODULUS;
-						} else {
-							nrom->condition |= NR_COND_OWN_RX_BUSY;
-							skb_queue_tail(&temp_queue, skbn);
-						}
-					} else if (nr_in_rx_window(sk, ns)) {
+						nrom->condition |= NR_COND_OWN_RX_BUSY;
 						skb_queue_tail(&temp_queue, skbn);
-					} else {
-						kfree_skb(skbn);
 					}
-				}
-				while ((skbn = skb_dequeue(&temp_queue)) != NULL) {
-					skb_queue_tail(&nrom->reseq_queue, skbn);
-				}
-			} while (save_vr != nrom->vr);
-			/*
-			 * Window is full, ack it immediately.
-			 */
-			if (((nrom->vl + nrom->window) % NR_MODULUS) == nrom->vr) {
-				nr_enquiry_response(sk);
-			} else {
-				if (!(nrom->condition & NR_COND_ACK_PENDING)) {
-					nrom->condition |= NR_COND_ACK_PENDING;
-					nr_start_t2timer(sk);
+				} else if (nr_in_rx_window(sk, ns)) {
+					skb_queue_tail(&temp_queue, skbn);
+				} else {
+					kfree_skb(skbn);
 				}
 			}
-			break;
+			while ((skbn = skb_dequeue(&temp_queue)) != NULL) {
+				skb_queue_tail(&nrom->reseq_queue, skbn);
+			}
+		} while (save_vr != nrom->vr);
+		/*
+		 * Window is full, ack it immediately.
+		 */
+		if (((nrom->vl + nrom->window) % NR_MODULUS) == nrom->vr) {
+			nr_enquiry_response(sk);
+		} else {
+			if (!(nrom->condition & NR_COND_ACK_PENDING)) {
+				nrom->condition |= NR_COND_ACK_PENDING;
+				nr_start_t2timer(sk);
+			}
+		}
+		break;
 
-		default:
-			break;
+	default:
+		break;
 	}
 
 	return queued;
@@ -277,15 +276,15 @@ int nr_process_rx_frame(struct sock *sk, struct sk_buff *skb)
 	frametype = skb->data[19];
 
 	switch (nr->state) {
-		case NR_STATE_1:
-			queued = nr_state1_machine(sk, skb, frametype);
-			break;
-		case NR_STATE_2:
-			queued = nr_state2_machine(sk, skb, frametype);
-			break;
-		case NR_STATE_3:
-			queued = nr_state3_machine(sk, skb, frametype);
-			break;
+	case NR_STATE_1:
+		queued = nr_state1_machine(sk, skb, frametype);
+		break;
+	case NR_STATE_2:
+		queued = nr_state2_machine(sk, skb, frametype);
+		break;
+	case NR_STATE_3:
+		queued = nr_state3_machine(sk, skb, frametype);
+		break;
 	}
 
 	nr_kick(sk);

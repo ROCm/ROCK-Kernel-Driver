@@ -334,38 +334,38 @@ static int nr_setsockopt(struct socket *sock, int level, int optname,
 		return -EFAULT;
 
 	switch (optname) {
-		case NETROM_T1:
-			if (opt < 1)
-				return -EINVAL;
-			nr->t1 = opt * HZ;
-			return 0;
+	case NETROM_T1:
+		if (opt < 1)
+			return -EINVAL;
+		nr->t1 = opt * HZ;
+		return 0;
 
-		case NETROM_T2:
-			if (opt < 1)
-				return -EINVAL;
-			nr->t2 = opt * HZ;
-			return 0;
+	case NETROM_T2:
+		if (opt < 1)
+			return -EINVAL;
+		nr->t2 = opt * HZ;
+		return 0;
 
-		case NETROM_N2:
-			if (opt < 1 || opt > 31)
-				return -EINVAL;
-			nr->n2 = opt;
-			return 0;
+	case NETROM_N2:
+		if (opt < 1 || opt > 31)
+			return -EINVAL;
+		nr->n2 = opt;
+		return 0;
 
-		case NETROM_T4:
-			if (opt < 1)
-				return -EINVAL;
-			nr->t4 = opt * HZ;
-			return 0;
+	case NETROM_T4:
+		if (opt < 1)
+			return -EINVAL;
+		nr->t4 = opt * HZ;
+		return 0;
 
-		case NETROM_IDLE:
-			if (opt < 0)
-				return -EINVAL;
-			nr->idle = opt * 60 * HZ;
-			return 0;
+	case NETROM_IDLE:
+		if (opt < 0)
+			return -EINVAL;
+		nr->idle = opt * 60 * HZ;
+		return 0;
 
-		default:
-			return -ENOPROTOOPT;
+	default:
+		return -ENOPROTOOPT;
 	}
 }
 
@@ -387,28 +387,28 @@ static int nr_getsockopt(struct socket *sock, int level, int optname,
 		return -EINVAL;
 		
 	switch (optname) {
-		case NETROM_T1:
-			val = nr->t1 / HZ;
-			break;
+	case NETROM_T1:
+		val = nr->t1 / HZ;
+		break;
 
-		case NETROM_T2:
-			val = nr->t2 / HZ;
-			break;
+	case NETROM_T2:
+		val = nr->t2 / HZ;
+		break;
 
-		case NETROM_N2:
-			val = nr->n2;
-			break;
+	case NETROM_N2:
+		val = nr->n2;
+		break;
 
-		case NETROM_T4:
-			val = nr->t4 / HZ;
-			break;
+	case NETROM_T4:
+		val = nr->t4 / HZ;
+		break;
 
-		case NETROM_IDLE:
-			val = nr->idle / (60 * HZ);
-			break;
+	case NETROM_IDLE:
+		val = nr->idle / (60 * HZ);
+		break;
 
-		default:
-			return -ENOPROTOOPT;
+	default:
+		return -ENOPROTOOPT;
 	}
 
 	len = min_t(unsigned int, len, sizeof(int));
@@ -533,34 +533,33 @@ static int nr_release(struct socket *sock)
 	nr = nr_sk(sk);
 
 	switch (nr->state) {
+	case NR_STATE_0:
+	case NR_STATE_1:
+	case NR_STATE_2:
+		nr_disconnect(sk, 0);
+		nr_destroy_socket(sk);
+		break;
 
-		case NR_STATE_0:
-		case NR_STATE_1:
-		case NR_STATE_2:
-			nr_disconnect(sk, 0);
-			nr_destroy_socket(sk);
-			break;
+	case NR_STATE_3:
+		nr_clear_queues(sk);
+		nr->n2count = 0;
+		nr_write_internal(sk, NR_DISCREQ);
+		nr_start_t1timer(sk);
+		nr_stop_t2timer(sk);
+		nr_stop_t4timer(sk);
+		nr_stop_idletimer(sk);
+		nr->state    = NR_STATE_2;
+		sk->state    = TCP_CLOSE;
+		sk->shutdown |= SEND_SHUTDOWN;
+		sk->state_change(sk);
+		sk->dead     = 1;
+		sk->destroy  = 1;
+		sk->socket   = NULL;
+		break;
 
-		case NR_STATE_3:
-			nr_clear_queues(sk);
-			nr->n2count = 0;
-			nr_write_internal(sk, NR_DISCREQ);
-			nr_start_t1timer(sk);
-			nr_stop_t2timer(sk);
-			nr_stop_t4timer(sk);
-			nr_stop_idletimer(sk);
-			nr->state    = NR_STATE_2;
-			sk->state    = TCP_CLOSE;
-			sk->shutdown |= SEND_SHUTDOWN;
-			sk->state_change(sk);
-			sk->dead     = 1;
-			sk->destroy  = 1;
-			sk->socket   = NULL;
-			break;
-
-		default:
-			sk->socket = NULL;
-			break;
+	default:
+		sk->socket = NULL;
+		break;
 	}
 
 	sock->sk   = NULL;	
@@ -1113,54 +1112,53 @@ static int nr_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	struct sock *sk = sock->sk;
 
 	switch (cmd) {
-		case TIOCOUTQ: {
-			long amount;
-			amount = sk->sndbuf - atomic_read(&sk->wmem_alloc);
-			if (amount < 0)
-				amount = 0;
-			return put_user(amount, (int *)arg);
-		}
-
-		case TIOCINQ: {
-			struct sk_buff *skb;
-			long amount = 0L;
-			/* These two are safe on a single CPU system as only user tasks fiddle here */
-			if ((skb = skb_peek(&sk->receive_queue)) != NULL)
-				amount = skb->len;
-			return put_user(amount, (int *)arg);
-		}
-
-		case SIOCGSTAMP:
-			if (sk != NULL) {
-				if (sk->stamp.tv_sec == 0)
-					return -ENOENT;
-				return copy_to_user((void *)arg, &sk->stamp, sizeof(struct timeval)) ? -EFAULT : 0;
-			}
-			return -EINVAL;
-
-		case SIOCGIFADDR:
-		case SIOCSIFADDR:
-		case SIOCGIFDSTADDR:
-		case SIOCSIFDSTADDR:
-		case SIOCGIFBRDADDR:
-		case SIOCSIFBRDADDR:
-		case SIOCGIFNETMASK:
-		case SIOCSIFNETMASK:
-		case SIOCGIFMETRIC:
-		case SIOCSIFMETRIC:
-			return -EINVAL;
-
-		case SIOCADDRT:
-		case SIOCDELRT:
-		case SIOCNRDECOBS:
-			if (!capable(CAP_NET_ADMIN)) return -EPERM;
-			return nr_rt_ioctl(cmd, (void *)arg);
-
- 		default:
-			return dev_ioctl(cmd, (void *)arg);
+	case TIOCOUTQ: {
+		long amount;
+		amount = sk->sndbuf - atomic_read(&sk->wmem_alloc);
+		if (amount < 0)
+			amount = 0;
+		return put_user(amount, (int *)arg);
 	}
 
-	/*NOTREACHED*/
+	case TIOCINQ: {
+		struct sk_buff *skb;
+		long amount = 0L;
+		/* These two are safe on a single CPU system as only user tasks fiddle here */
+		if ((skb = skb_peek(&sk->receive_queue)) != NULL)
+			amount = skb->len;
+		return put_user(amount, (int *)arg);
+	}
+
+	case SIOCGSTAMP:
+		if (sk != NULL) {
+			if (sk->stamp.tv_sec == 0)
+				return -ENOENT;
+			return copy_to_user((void *)arg, &sk->stamp, sizeof(struct timeval)) ? -EFAULT : 0;
+		}
+		return -EINVAL;
+
+	case SIOCGIFADDR:
+	case SIOCSIFADDR:
+	case SIOCGIFDSTADDR:
+	case SIOCSIFDSTADDR:
+	case SIOCGIFBRDADDR:
+	case SIOCSIFBRDADDR:
+	case SIOCGIFNETMASK:
+	case SIOCSIFNETMASK:
+	case SIOCGIFMETRIC:
+	case SIOCSIFMETRIC:
+		return -EINVAL;
+
+	case SIOCADDRT:
+	case SIOCDELRT:
+	case SIOCNRDECOBS:
+		if (!capable(CAP_NET_ADMIN)) return -EPERM;
+		return nr_rt_ioctl(cmd, (void *)arg);
+
+	default:
+		return dev_ioctl(cmd, (void *)arg);
+	}
+
 	return 0;
 }
 

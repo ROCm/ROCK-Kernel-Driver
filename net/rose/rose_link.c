@@ -134,25 +134,25 @@ void rose_link_rx_restart(struct sk_buff *skb, struct rose_neigh *neigh, unsigne
 	struct sk_buff *skbn;
 
 	switch (frametype) {
-		case ROSE_RESTART_REQUEST:
-			rose_stop_t0timer(neigh);
-			neigh->restarted = 1;
-			neigh->dce_mode  = (skb->data[3] == ROSE_DTE_ORIGINATED);
-			rose_transmit_restart_confirmation(neigh);
-			break;
+	case ROSE_RESTART_REQUEST:
+		rose_stop_t0timer(neigh);
+		neigh->restarted = 1;
+		neigh->dce_mode  = (skb->data[3] == ROSE_DTE_ORIGINATED);
+		rose_transmit_restart_confirmation(neigh);
+		break;
 
-		case ROSE_RESTART_CONFIRMATION:
-			rose_stop_t0timer(neigh);
-			neigh->restarted = 1;
-			break;
+	case ROSE_RESTART_CONFIRMATION:
+		rose_stop_t0timer(neigh);
+		neigh->restarted = 1;
+		break;
 
-		case ROSE_DIAGNOSTIC:
-			printk(KERN_WARNING "ROSE: received diagnostic #%d - %02X %02X %02X\n", skb->data[3], skb->data[4], skb->data[5], skb->data[6]);
-			break;
+	case ROSE_DIAGNOSTIC:
+		printk(KERN_WARNING "ROSE: received diagnostic #%d - %02X %02X %02X\n", skb->data[3], skb->data[4], skb->data[5], skb->data[6]);
+		break;
 
-		default:
-			printk(KERN_WARNING "ROSE: received unknown %02X with LCI 000\n", frametype);
-			break;
+	default:
+		printk(KERN_WARNING "ROSE: received unknown %02X with LCI 000\n", frametype);
+		break;
 	}
 
 	if (neigh->restarted) {

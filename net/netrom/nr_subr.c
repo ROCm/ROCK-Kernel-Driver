@@ -130,19 +130,19 @@ void nr_write_internal(struct sock *sk, int frametype)
 	len = AX25_BPQ_HEADER_LEN + AX25_MAX_HEADER_LEN + NR_NETWORK_LEN + NR_TRANSPORT_LEN;
 
 	switch (frametype & 0x0F) {
-		case NR_CONNREQ:
-			len += 17;
-			break;
-		case NR_CONNACK:
-			len += (nr->bpqext) ? 2 : 1;
-			break;
-		case NR_DISCREQ:
-		case NR_DISCACK:
-		case NR_INFOACK:
-			break;
-		default:
-			printk(KERN_ERR "NET/ROM: nr_write_internal - invalid frame type %d\n", frametype);
-			return;
+	case NR_CONNREQ:
+		len += 17;
+		break;
+	case NR_CONNACK:
+		len += (nr->bpqext) ? 2 : 1;
+		break;
+	case NR_DISCREQ:
+	case NR_DISCACK:
+	case NR_INFOACK:
+		break;
+	default:
+		printk(KERN_ERR "NET/ROM: nr_write_internal - invalid frame type %d\n", frametype);
+		return;
 	}
 
 	if ((skb = alloc_skb(len, GFP_ATOMIC)) == NULL)
@@ -156,55 +156,54 @@ void nr_write_internal(struct sock *sk, int frametype)
 	dptr = skb_put(skb, skb_tailroom(skb));
 
 	switch (frametype & 0x0F) {
+	case NR_CONNREQ:
+		timeout  = nr->t1 / HZ;
+		*dptr++  = nr->my_index;
+		*dptr++  = nr->my_id;
+		*dptr++  = 0;
+		*dptr++  = 0;
+		*dptr++  = frametype;
+		*dptr++  = nr->window;
+		memcpy(dptr, &nr->user_addr, AX25_ADDR_LEN);
+		dptr[6] &= ~AX25_CBIT;
+		dptr[6] &= ~AX25_EBIT;
+		dptr[6] |= AX25_SSSID_SPARE;
+		dptr    += AX25_ADDR_LEN;
+		memcpy(dptr, &nr->source_addr, AX25_ADDR_LEN);
+		dptr[6] &= ~AX25_CBIT;
+		dptr[6] &= ~AX25_EBIT;
+		dptr[6] |= AX25_SSSID_SPARE;
+		dptr    += AX25_ADDR_LEN;
+		*dptr++  = timeout % 256;
+		*dptr++  = timeout / 256;
+		break;
 
-		case NR_CONNREQ:
-			timeout  = nr->t1 / HZ;
-			*dptr++  = nr->my_index;
-			*dptr++  = nr->my_id;
-			*dptr++  = 0;
-			*dptr++  = 0;
-			*dptr++  = frametype;
-			*dptr++  = nr->window;
-			memcpy(dptr, &nr->user_addr, AX25_ADDR_LEN);
-			dptr[6] &= ~AX25_CBIT;
-			dptr[6] &= ~AX25_EBIT;
-			dptr[6] |= AX25_SSSID_SPARE;
-			dptr    += AX25_ADDR_LEN;
-			memcpy(dptr, &nr->source_addr, AX25_ADDR_LEN);
-			dptr[6] &= ~AX25_CBIT;
-			dptr[6] &= ~AX25_EBIT;
-			dptr[6] |= AX25_SSSID_SPARE;
-			dptr    += AX25_ADDR_LEN;
-			*dptr++  = timeout % 256;
-			*dptr++  = timeout / 256;
-			break;
+	case NR_CONNACK:
+		*dptr++ = nr->your_index;
+		*dptr++ = nr->your_id;
+		*dptr++ = nr->my_index;
+		*dptr++ = nr->my_id;
+		*dptr++ = frametype;
+		*dptr++ = nr->window;
+		if (nr->bpqext) *dptr++ = sysctl_netrom_network_ttl_initialiser;
+		break;
 
-		case NR_CONNACK:
-			*dptr++ = nr->your_index;
-			*dptr++ = nr->your_id;
-			*dptr++ = nr->my_index;
-			*dptr++ = nr->my_id;
-			*dptr++ = frametype;
-			*dptr++ = nr->window;
-			if (nr->bpqext) *dptr++ = sysctl_netrom_network_ttl_initialiser;
-			break;
+	case NR_DISCREQ:
+	case NR_DISCACK:
+		*dptr++ = nr->your_index;
+		*dptr++ = nr->your_id;
+		*dptr++ = 0;
+		*dptr++ = 0;
+		*dptr++ = frametype;
+		break;
 
-		case NR_DISCREQ:
-		case NR_DISCACK:
-			*dptr++ = nr->your_index;
-			*dptr++ = nr->your_id;
-			*dptr++ = 0;
-			*dptr++ = 0;
-			*dptr++ = frametype;
-			break;
-
-		case NR_INFOACK:
-			*dptr++ = nr->your_index;
-			*dptr++ = nr->your_id;
-			*dptr++ = 0;
-			*dptr++ = nr->vr;
-			*dptr++ = frametype;
-			break;
+	case NR_INFOACK:
+		*dptr++ = nr->your_index;
+		*dptr++ = nr->your_id;
+		*dptr++ = 0;
+		*dptr++ = nr->vr;
+		*dptr++ = frametype;
+		break;
 	}
 
 	nr_transmit_buffer(sk, skb);

@@ -191,40 +191,49 @@ static int nr_add_node(ax25_address *nr, const char *mnemonic, ax25_address *ax2
 
 	/* Now re-sort the routes in quality order */
 	switch (nr_node->count) {
-		case 3:
-			if (nr_node->routes[1].quality > nr_node->routes[0].quality) {
-				switch (nr_node->which) {
-					case 0:  nr_node->which = 1; break;
-					case 1:  nr_node->which = 0; break;
-					default: break;
-				}
-				nr_route           = nr_node->routes[0];
-				nr_node->routes[0] = nr_node->routes[1];
-				nr_node->routes[1] = nr_route;
+	case 3:
+		if (nr_node->routes[1].quality > nr_node->routes[0].quality) {
+			switch (nr_node->which) {
+				case 0:  nr_node->which = 1; break;
+				case 1:  nr_node->which = 0; break;
+				default: break;
 			}
-			if (nr_node->routes[2].quality > nr_node->routes[1].quality) {
-				switch (nr_node->which) {
-					case 1:  nr_node->which = 2; break;
-					case 2:  nr_node->which = 1; break;
-					default: break;
-				}
-				nr_route           = nr_node->routes[1];
-				nr_node->routes[1] = nr_node->routes[2];
-				nr_node->routes[2] = nr_route;
+			nr_route           = nr_node->routes[0];
+			nr_node->routes[0] = nr_node->routes[1];
+			nr_node->routes[1] = nr_route;
+		}
+		if (nr_node->routes[2].quality > nr_node->routes[1].quality) {
+			switch (nr_node->which) {
+			case 1:  nr_node->which = 2;
+				break;
+
+			case 2:  nr_node->which = 1;
+				break;
+
+			default:
+				break;
 			}
-		case 2:
-			if (nr_node->routes[1].quality > nr_node->routes[0].quality) {
-				switch (nr_node->which) {
-					case 0:  nr_node->which = 1; break;
-					case 1:  nr_node->which = 0; break;
-					default: break;
-				}
-				nr_route           = nr_node->routes[0];
-				nr_node->routes[0] = nr_node->routes[1];
-				nr_node->routes[1] = nr_route;
+			nr_route           = nr_node->routes[1];
+			nr_node->routes[1] = nr_node->routes[2];
+			nr_node->routes[2] = nr_route;
+		}
+	case 2:
+		if (nr_node->routes[1].quality > nr_node->routes[0].quality) {
+			switch (nr_node->which) {
+			case 0:  nr_node->which = 1;
+				break;
+
+			case 1:  nr_node->which = 0;
+				break;
+
+			default: break;
 			}
-		case 1:
-			break;
+			nr_route           = nr_node->routes[0];
+			nr_node->routes[0] = nr_node->routes[1];
+			nr_node->routes[1] = nr_route;
+			}
+	case 1:
+		break;
 	}
 
 	for (i = 0; i < nr_node->count; i++) {
@@ -332,12 +341,12 @@ static int nr_del_node(ax25_address *callsign, ax25_address *neighbour, struct n
 				nr_remove_node(nr_node);
 			} else {
 				switch (i) {
-					case 0:
-						nr_node->routes[0] = nr_node->routes[1];
-					case 1:
-						nr_node->routes[1] = nr_node->routes[2];
-					case 2:
-						break;
+				case 0:
+					nr_node->routes[0] = nr_node->routes[1];
+				case 1:
+					nr_node->routes[1] = nr_node->routes[2];
+				case 2:
+					break;
 				}
 			}
 
@@ -435,7 +444,6 @@ static int nr_dec_obs(void)
 
 		for (i = 0; i < s->count; i++) {
 			switch (s->routes[i].obs_count) {
-
 			case 0:		/* A locked entry */
 				break;
 
@@ -498,12 +506,12 @@ void nr_rt_device_down(struct net_device *dev)
 						t->count--;
 
 						switch (i) {
-							case 0:
-								t->routes[0] = t->routes[1];
-							case 1:
-								t->routes[1] = t->routes[2];
-							case 2:
-								break;
+						case 0:
+							t->routes[0] = t->routes[1];
+						case 1:
+							t->routes[1] = t->routes[2];
+						case 2:
+							break;
 						}
 					}
 				}
@@ -600,51 +608,50 @@ int nr_rt_ioctl(unsigned int cmd, void *arg)
 	struct net_device *dev;
 
 	switch (cmd) {
-
-		case SIOCADDRT:
-			if (copy_from_user(&nr_route, arg, sizeof(struct nr_route_struct)))
-				return -EFAULT;
-			if ((dev = nr_ax25_dev_get(nr_route.device)) == NULL)
-				return -EINVAL;
-			if (nr_route.ndigis < 0 || nr_route.ndigis > AX25_MAX_DIGIS)
-				return -EINVAL;
-			switch (nr_route.type) {
-				case NETROM_NODE:
-					return nr_add_node(&nr_route.callsign,
-						nr_route.mnemonic,
-						&nr_route.neighbour,
-						nr_call_to_digi(nr_route.ndigis, nr_route.digipeaters),
-						dev, nr_route.quality,
-						nr_route.obs_count);
-				case NETROM_NEIGH:
-					return nr_add_neigh(&nr_route.callsign,
-						nr_call_to_digi(nr_route.ndigis, nr_route.digipeaters),
-						dev, nr_route.quality);
-				default:
-					return -EINVAL;
-			}
-
-		case SIOCDELRT:
-			if (copy_from_user(&nr_route, arg, sizeof(struct nr_route_struct)))
-				return -EFAULT;
-			if ((dev = nr_ax25_dev_get(nr_route.device)) == NULL)
-				return -EINVAL;
-			switch (nr_route.type) {
-				case NETROM_NODE:
-					return nr_del_node(&nr_route.callsign,
-						&nr_route.neighbour, dev);
-				case NETROM_NEIGH:
-					return nr_del_neigh(&nr_route.callsign,
-						dev, nr_route.quality);
-				default:
-					return -EINVAL;
-			}
-
-		case SIOCNRDECOBS:
-			return nr_dec_obs();
-
+	case SIOCADDRT:
+		if (copy_from_user(&nr_route, arg, sizeof(struct nr_route_struct)))
+			return -EFAULT;
+		if ((dev = nr_ax25_dev_get(nr_route.device)) == NULL)
+			return -EINVAL;
+		if (nr_route.ndigis < 0 || nr_route.ndigis > AX25_MAX_DIGIS)
+			return -EINVAL;
+		switch (nr_route.type) {
+		case NETROM_NODE:
+			return nr_add_node(&nr_route.callsign,
+				nr_route.mnemonic,
+				&nr_route.neighbour,
+				nr_call_to_digi(nr_route.ndigis, nr_route.digipeaters),
+				dev, nr_route.quality,
+				nr_route.obs_count);
+		case NETROM_NEIGH:
+			return nr_add_neigh(&nr_route.callsign,
+				nr_call_to_digi(nr_route.ndigis, nr_route.digipeaters),
+				dev, nr_route.quality);
 		default:
 			return -EINVAL;
+		}
+
+	case SIOCDELRT:
+		if (copy_from_user(&nr_route, arg, sizeof(struct nr_route_struct)))
+			return -EFAULT;
+		if ((dev = nr_ax25_dev_get(nr_route.device)) == NULL)
+			return -EINVAL;
+		switch (nr_route.type) {
+		case NETROM_NODE:
+			return nr_del_node(&nr_route.callsign,
+				&nr_route.neighbour, dev);
+		case NETROM_NEIGH:
+			return nr_del_neigh(&nr_route.callsign,
+				dev, nr_route.quality);
+		default:
+			return -EINVAL;
+		}
+
+	case SIOCNRDECOBS:
+		return nr_dec_obs();
+
+	default:
+		return -EINVAL;
 	}
 
 	return 0;
