@@ -21,8 +21,7 @@
 static long compat_nanosleep_restart(struct restart_block *restart)
 {
 	unsigned long expire = restart->arg0, now = jiffies;
-	struct timespec *rmtp = (struct timespec *) restart->arg1;
-	long ret;
+	struct compat_timespec *rmtp;
 
 	/* Did it expire while we handled signals? */
 	if (!time_after(expire, now))
@@ -30,22 +29,22 @@ static long compat_nanosleep_restart(struct restart_block *restart)
 
 	current->state = TASK_INTERRUPTIBLE;
 	expire = schedule_timeout(expire - now);
+	if (expire == 0)
+		return 0;
 
-	ret = 0;
-	if (expire) {
+	rmtp = (struct compat_timespec *)restart->arg1;
+	if (rmtp) {
 		struct compat_timespec ct;
 		struct timespec t;
 
 		jiffies_to_timespec(expire, &t);
 		ct.tv_sec = t.tv_sec;
 		ct.tv_nsec = t.tv_nsec;
-
-		ret = -ERESTART_RESTARTBLOCK;
 		if (copy_to_user(rmtp, &ct, sizeof(ct)))
-			ret = -EFAULT;
-		/* The 'restart' block is already filled in */
+			return -EFAULT;
 	}
-	return ret;
+	/* The 'restart' block is already filled in */
+	return -ERESTART_RESTARTBLOCK;
 }
 
 asmlinkage long compat_sys_nanosleep(struct compat_timespec *rqtp,
@@ -53,8 +52,8 @@ asmlinkage long compat_sys_nanosleep(struct compat_timespec *rqtp,
 {
 	struct compat_timespec ct;
 	struct timespec t;
+	struct restart_block *restart;
 	unsigned long expire;
-	s32 ret;
 
 	if (copy_from_user(&ct, rqtp, sizeof(ct)))
 		return -EFAULT;
@@ -67,25 +66,21 @@ asmlinkage long compat_sys_nanosleep(struct compat_timespec *rqtp,
 	expire = timespec_to_jiffies(&t) + (t.tv_sec || t.tv_nsec);
 	current->state = TASK_INTERRUPTIBLE;
 	expire = schedule_timeout(expire);
+	if (expire == 0)
+		return 0;
 
-	ret = 0;
-	if (expire) {
-		struct restart_block *restart;
-
+	if (rmtp) {
 		jiffies_to_timespec(expire, &t);
 		ct.tv_sec = t.tv_sec;
 		ct.tv_nsec = t.tv_nsec;
-
 		if (copy_to_user(rmtp, &ct, sizeof(ct)))
 			return -EFAULT;
-
-		restart = &current_thread_info()->restart_block;
-		restart->fn = compat_nanosleep_restart;
-		restart->arg0 = jiffies + expire;
-		restart->arg1 = (unsigned long) rmtp;
-		ret = -ERESTART_RESTARTBLOCK;
 	}
-	return ret;
+	restart = &current_thread_info()->restart_block;
+	restart->fn = compat_nanosleep_restart;
+	restart->arg0 = jiffies + expire;
+	restart->arg1 = (unsigned long) rmtp;
+	return -ERESTART_RESTARTBLOCK;
 }
 
 /*
