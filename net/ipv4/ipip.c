@@ -484,6 +484,7 @@ static int ipip_rcv(struct sk_buff *skb)
 			return 0;
 		}
 		if (!xfrm4_policy_check(NULL, XFRM_POLICY_IN, skb)) {
+			read_unlock(&ipip_lock);
 			kfree_skb(skb);
 			return 0;
 		}
