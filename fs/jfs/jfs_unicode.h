@@ -106,9 +106,9 @@ static inline wchar_t *UniStrncpy_le(wchar_t * ucs1, const wchar_t * ucs2,
 /*
  * UniToupper:  Convert a unicode character to upper case
  */
-static inline wchar_t UniToupper(register wchar_t uc)
+static inline wchar_t UniToupper(wchar_t uc)
 {
-	register UNICASERANGE *rp;
+	UNICASERANGE *rp;
 
 	if (uc < sizeof(UniUpperTable)) {	/* Latin characters */
 		return uc + UniUpperTable[uc];	/* Use base tables */
@@ -129,9 +129,9 @@ static inline wchar_t UniToupper(register wchar_t uc)
 /*
  * UniStrupr:  Upper case a unicode string
  */
-static inline wchar_t *UniStrupr(register wchar_t * upin)
+static inline wchar_t *UniStrupr(wchar_t * upin)
 {
-	register wchar_t *up;
+	wchar_t *up;
 
 	up = upin;
 	while (*up) {		/* For all characters */
