@@ -38,7 +38,7 @@ MODULE_LICENSE("GPL");
 static int atkbd_set = 2;
 module_param_named(set, atkbd_set, int, 0);
 MODULE_PARM_DESC(set, "Select keyboard code set (2 = default, 3, 4)");
-#if defined(__i386__) || defined (__x86_64__)
+#if defined(__i386__) || defined(__x86_64__) || defined(__hppa__)
 static int atkbd_reset;
 #else
 static int atkbd_reset = 1;
@@ -57,15 +57,19 @@ MODULE_PARM_DESC(softrepeat, "Use software keyboard repeat");
  * are loadable via an userland utility.
  */
 
+#if defined(__hppa__)
+#include "hpps2atkbd.h"
+#else
+
 static unsigned char atkbd_set2_keycode[512] = {
 
 	  0, 67, 65, 63, 61, 59, 60, 88,  0, 68, 66, 64, 62, 15, 41,117,
-	  0, 56, 42,182, 29, 16,  2,  0,  0,  0, 44, 31, 30, 17,  3,  0,
-	  0, 46, 45, 32, 18,  5,  4,186,  0, 57, 47, 33, 20, 19,  6, 85,
-	  0, 49, 48, 35, 34, 21,  7, 89,  0,  0, 50, 36, 22,  8,  9, 90,
+	  0, 56, 42, 93, 29, 16,  2,  0,  0,  0, 44, 31, 30, 17,  3,  0,
+	  0, 46, 45, 32, 18,  5,  4, 95,  0, 57, 47, 33, 20, 19,  6,183,
+	  0, 49, 48, 35, 34, 21,  7,184,  0,  0, 50, 36, 22,  8,  9,185,
 	  0, 51, 37, 23, 24, 11, 10,  0,  0, 52, 53, 38, 39, 25, 12,  0,
-	  0,181, 40,  0, 26, 13,  0,  0, 58, 54, 28, 27,  0, 43,  0,194,
-	  0, 86,193,192,184,  0, 14,185,  0, 79,182, 75, 71,124,  0,  0,
+	  0, 89, 40,  0, 26, 13,  0,  0, 58, 54, 28, 27,  0, 43,  0, 85,
+	  0, 86, 91, 90, 92,  0, 14, 94,  0, 79,124, 75, 71,121,  0,  0,
 	 82, 83, 80, 76, 77, 72,  1, 69, 87, 78, 81, 74, 55, 73, 70, 99,
 
 	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
@@ -80,6 +84,8 @@ static unsigned char atkbd_set2_keycode[512] = {
 	  0,  0,  0, 65, 99,
 };
 
+#endif
+
 static unsigned char atkbd_set3_keycode[512] = {
 
 	  0,  0,  0,  0,  0,  0,  0, 59,  1,138,128,129,130, 15, 41, 60,
@@ -87,11 +93,11 @@ static unsigned char atkbd_set3_keycode[512] = {
 	134, 46, 45, 32, 18,  5,  4, 63,135, 57, 47, 33, 20, 19,  6, 64,
 	136, 49, 48, 35, 34, 21,  7, 65,137,100, 50, 36, 22,  8,  9, 66,
 	125, 51, 37, 23, 24, 11, 10, 67,126, 52, 53, 38, 39, 25, 12, 68,
-	113,114, 40, 84, 26, 13, 87, 99, 97, 54, 28, 27, 43, 84, 88, 70,
+	113,114, 40, 43, 26, 13, 87, 99, 97, 54, 28, 27, 43, 43, 88, 70,
 	108,105,119,103,111,107, 14,110,  0, 79,106, 75, 71,109,102,104,
-	 82, 83, 80, 76, 77, 72, 69, 98,  0, 96, 81,  0, 78, 73, 55, 85,
+	 82, 83, 80, 76, 77, 72, 69, 98,  0, 96, 81,  0, 78, 73, 55,183,
 
-	 89, 90, 91, 92, 74,185,184,182,  0,  0,  0,125,126,127,112,  0,
+	184,185,186,187, 74, 94, 92, 93,  0,  0,  0,125,126,127,112,  0,
 	  0,139,150,163,165,115,152,150,166,140,160,154,113,114,167,168,
 	148,149,147,140
 };
@@ -246,10 +252,10 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 			atkbd->release = 1;
 			goto out;
 		case ATKBD_RET_HANGUEL:
-			atkbd_report_key(&atkbd->dev, regs, KEY_LANG1, 3);
+			atkbd_report_key(&atkbd->dev, regs, KEY_HANGUEL, 3);
 			goto out;
 		case ATKBD_RET_HANJA:
-			atkbd_report_key(&atkbd->dev, regs, KEY_LANG2, 3);
+			atkbd_report_key(&atkbd->dev, regs, KEY_HANJA, 3);
 			goto out;
 		case ATKBD_RET_ERR:
 			printk(KERN_WARNING "atkbd.c: Keyboard on %s reports too many keys pressed.\n", serio->phys);
@@ -272,6 +278,11 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 				atkbd->release ? "released" : "pressed",
 				atkbd->translated ? "translated" : "raw", 
 				atkbd->set, code, serio->phys);
+			if (atkbd->translated && atkbd->set == 2 && code == 0x7a)
+				printk(KERN_WARNING "atkbd.c: This is an XFree86 bug. It shouldn't access"
+					" hardware directly.\n");
+			else
+				printk(KERN_WARNING "atkbd.c: Use 'setkeycodes %s%02x <keycode>' to make it known.\n",						code & 0x80 ? "e0" : "", code & 0x7f);
 			break;
 		default:
 			value = atkbd->release ? 0 :
@@ -338,6 +349,10 @@ static int atkbd_command(struct atkbd *atkbd, unsigned char *param, int command)
 
 	if (command == ATKBD_CMD_RESET_BAT)
 		timeout = 2000000; /* 2 sec */
+
+	if (receive && param)
+		for (i = 0; i < receive; i++)
+			atkbd->cmdbuf[(receive - 1) - i] = param[i];
 	
 	if (command & 0xff)
 		if (atkbd_sendbyte(atkbd, command & 0xff))
@@ -390,7 +405,7 @@ static int atkbd_event(struct input_dev *dev, unsigned int type, unsigned int co
 		 133, 149, 167, 182, 200, 217, 232, 250, 270, 303, 333, 370, 400, 435, 470, 500 };
 	const short delay[4] =
 		{ 250, 500, 750, 1000 };
-	char param[2];
+	unsigned char param[2];
 	int i, j;
 
 	if (!atkbd->write)
@@ -400,9 +415,9 @@ static int atkbd_event(struct input_dev *dev, unsigned int type, unsigned int co
 
 		case EV_LED:
 
-			*param = (test_bit(LED_SCROLLL, dev->led) ? 1 : 0)
-			       | (test_bit(LED_NUML,    dev->led) ? 2 : 0)
-			       | (test_bit(LED_CAPSL,   dev->led) ? 4 : 0);
+			param[0] = (test_bit(LED_SCROLLL, dev->led) ? 1 : 0)
+			         | (test_bit(LED_NUML,    dev->led) ? 2 : 0)
+			         | (test_bit(LED_CAPSL,   dev->led) ? 4 : 0);
 		        atkbd_command(atkbd, param, ATKBD_CMD_SETLEDS);
 
 			if (atkbd->set == 4) {
@@ -461,6 +476,7 @@ static int atkbd_probe(struct atkbd *atkbd)
  * should make sure we don't try to set the LEDs on it.
  */
 
+	param[0] = param[1] = 0xa5;	/* initialize with invalid values */
 	if (atkbd_command(atkbd, param, ATKBD_CMD_GETID)) {
 
 /*
@@ -479,6 +495,11 @@ static int atkbd_probe(struct atkbd *atkbd)
 		return -1;
 	atkbd->id = (param[0] << 8) | param[1];
 
+	if (atkbd->id == 0xaca1 && atkbd->translated) {
+		printk(KERN_ERR "atkbd.c: NCD terminal keyboards are only supported on non-translating\n");
+		printk(KERN_ERR "atkbd.c: controllers. Use i8042.direct=1 to disable translation.\n");
+		return -1;
+	}
 
 	return 0;
 }
@@ -662,6 +683,7 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 
 		if (atkbd_probe(atkbd)) {
 			serio_close(serio);
+			serio->private = NULL;
 			kfree(atkbd);
 			return;
 		}
