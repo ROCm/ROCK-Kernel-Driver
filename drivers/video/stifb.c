@@ -111,7 +111,7 @@ struct stifb_info {
 	int deviceSpecificConfig;
 };
 
-static int stifb_force_bpp[MAX_STI_ROMS] = {0, };
+static int __initdata stifb_force_bpp[MAX_STI_ROMS];
 
 /* ------------------- chipset specific functions -------------------------- */
 
@@ -487,8 +487,7 @@ rattlerSetupPlanes(struct stifb_info *fb)
 	SETUP_HW(fb);
 	WRITE_BYTE(1, fb, REG_16b1);
 
-	/* XXX: replace by fb_setmem(), smem_start or screen_base ? */
-	memset_io(fb->info.fix.smem_start, 0xff,
+	fb_memset(fb->info.fix.smem_start, 0xff,
 		fb->info.var.yres*fb->info.fix.line_length);
     
 	CRX24_SET_OVLY_MASK(fb);
@@ -882,6 +881,82 @@ SETUP_HCRX(struct stifb_info *fb)
 
 /* ------------------- driver specific functions --------------------------- */
 
+#define TMPBUFLEN 2048
+
+static ssize_t
+stifb_read(struct file *file, char *buf, size_t count, loff_t *ppos)
+{
+	unsigned long p = *ppos;
+	struct inode *inode = file->f_dentry->d_inode;
+	int fbidx = minor(inode->i_rdev);
+	struct fb_info *info = registered_fb[fbidx];
+	char tmpbuf[TMPBUFLEN];
+
+	if (!info || ! info->screen_base)
+		return -ENODEV;
+
+	if (p >= info->fix.smem_len)
+	    return 0;
+	if (count >= info->fix.smem_len)
+	    count = info->fix.smem_len;
+	if (count + p > info->fix.smem_len)
+		count = info->fix.smem_len - p;
+	if (count > sizeof(tmpbuf))
+		count = sizeof(tmpbuf);
+	if (count) {
+	    char *base_addr;
+
+	    base_addr = info->screen_base;
+	    memcpy_fromio(&tmpbuf, base_addr+p, count);
+	    count -= copy_to_user(buf, &tmpbuf, count);
+	    if (!count)
+		return -EFAULT;
+	    *ppos += count;
+	}
+	return count;
+}
+
+static ssize_t
+stifb_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
+{
+	struct inode *inode = file->f_dentry->d_inode;
+	int fbidx = minor(inode->i_rdev);
+	struct fb_info *info = registered_fb[fbidx];
+	unsigned long p = *ppos;
+	size_t c;
+	int err;
+	char tmpbuf[TMPBUFLEN];
+
+	if (!info || !info->screen_base)
+		return -ENODEV;
+
+	if (p > info->fix.smem_len)
+	    return -ENOSPC;
+	if (count >= info->fix.smem_len)
+	    count = info->fix.smem_len;
+	err = 0;
+	if (count + p > info->fix.smem_len) {
+	    count = info->fix.smem_len - p;
+	    err = -ENOSPC;
+	}
+
+	p += (unsigned long)info->screen_base;
+	c = count;
+	while (c) {
+	    int len = c > sizeof(tmpbuf) ? sizeof(tmpbuf) : c;
+	    err = -EFAULT;
+	    if (copy_from_user(&tmpbuf, buf, len))
+		    break;
+	    memcpy_toio(p, &tmpbuf, len);
+	    c -= len;
+	    p += len;
+	    buf += len;
+	    *ppos += len;
+	}
+	if (count-c)
+		return (count-c);
+	return err;
+}
 
 static int
 stifb_setcolreg(u_int regno, u_int red, u_int green,
@@ -1018,11 +1093,12 @@ stifb_init_display(struct stifb_info *fb)
 	SETUP_FB(fb);
 }
 
-
 /* ------------ Interfaces to hardware functions ------------ */
 
 static struct fb_ops stifb_ops = {
 	.owner		= THIS_MODULE,
+	.fb_read	= stifb_read,
+	.fb_write	= stifb_write,
 	.fb_setcolreg	= stifb_setcolreg,
 	.fb_blank	= stifb_blank,
 	.fb_fillrect	= cfb_fillrect,
@@ -1166,6 +1242,11 @@ stifb_init_fb(struct sti_struct *sti, int force_bpp)
 	fix->line_length = (fb->sti->glob_cfg->total_x * bpp) / 8;
 	if (!fix->line_length)
 		fix->line_length = 2048; /* default */
+	
+	/* limit fbsize to max visible screen size */
+	if (fix->smem_len > yres*fix->line_length)
+		fix->smem_len = yres*fix->line_length;
+	
 	fix->accel = FB_ACCEL_NONE;
 
 	switch (bpp) {
@@ -1206,7 +1287,7 @@ stifb_init_fb(struct sti_struct *sti, int force_bpp)
 	fb_alloc_cmap(&info->cmap, 256, 0);
 	stifb_init_display(fb);
 
-	if (!request_mem_region(fix->smem_start, fix->smem_len, "stifb")) {
+	if (!request_mem_region(fix->smem_start, fix->smem_len, "stifb fb")) {
 		printk(KERN_ERR "stifb: cannot reserve fb region 0x%04lx-0x%04lx\n",
 				fix->smem_start, fix->smem_start+fix->smem_len);
 		goto out_err1;
@@ -1252,15 +1333,11 @@ stifb_init(void)
 	struct sti_struct *sti;
 	int i;
 	
-	if (sti_init_roms() == NULL)
-		return -ENXIO; /* no STI cards available */
-
-	for (i = 0; i < MAX_STI_ROMS; i++) {
+	for (i = 1; i < MAX_STI_ROMS; i++) {
 		sti = sti_get_rom(i);
-		if (sti)
-			stifb_init_fb(sti, stifb_force_bpp[i]);
-		else
+		if (!sti)
 			break;
+		stifb_init_fb(sti, stifb_force_bpp[i]);
 	}
 	return 0;
 }
@@ -1275,7 +1352,7 @@ stifb_cleanup(void)
 	struct sti_struct *sti;
 	int i;
 	
-	for (i = 0; i < MAX_STI_ROMS; i++) {
+	for (i = 1; i < MAX_STI_ROMS; i++) {
 		sti = sti_get_rom(i);
 		if (!sti)
 			break;

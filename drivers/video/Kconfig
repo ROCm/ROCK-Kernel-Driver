@@ -295,7 +295,7 @@ config FB_VGA16
 	  vga16fb.o.
 
 config FB_STI
-	bool "HP STI frame buffer device support"
+	tristate "HP STI frame buffer device support"
 	depends on FB && PARISC
 	default y
 	---help---

@@ -3,14 +3,13 @@
  *	core code for console driver using HP's STI firmware
  *
  *	Copyright (C) 2000 Philipp Rumpf <prumpf@tux.org>
- *	Portions Copyright (C) 2001-2002 Helge Deller <deller@gmx.de>
- *	Portions Copyright (C) 2001-2002 Thomas Bogendoerfer <tsbogend@alpha.franken.de>
+ *	Copyright (C) 2001-2003 Helge Deller <deller@gmx.de>
+ *	Copyright (C) 2001-2002 Thomas Bogendoerfer <tsbogend@alpha.franken.de>
  * 
  * TODO:
  * - call STI in virtual mode rather than in real mode
  * - screen blanking with state_mgmt() in text mode STI ? 
  * - try to make it work on m68k hp workstations ;)
- * - clean up the cache flushing functions
  * 
  */
 
@@ -25,10 +24,12 @@
 
 #include <asm/pgalloc.h>
 #include <asm/hardware.h>
+#include <asm/parisc-device.h>
+#include <asm/cacheflush.h>
 
 #include "../sticore.h"
 
-#define STI_DRIVERVERSION "0.9"
+#define STI_DRIVERVERSION "Version 0.9a"
 
 struct sti_struct *default_sti;
 
@@ -73,8 +74,8 @@ sti_init_graph(struct sti_struct *sti)
 {
 	struct sti_init_inptr_ext inptr_ext = { 0, };
 	struct sti_init_inptr inptr = {
-		3,	/* # of text planes (3 is maximum for STI) */ 
-		STI_PTR(&inptr_ext)
+		.text_planes	= 3, /* # of text planes (max 3 for STI) */
+		.ext_ptr	= STI_PTR(&inptr_ext)
 	};
 	struct sti_init_outptr outptr = { 0, };
 	unsigned long flags;
@@ -103,7 +104,7 @@ static const struct sti_conf_flags default_conf_flags = {
 void
 sti_inq_conf(struct sti_struct *sti)
 {
-	struct sti_conf_inptr inptr = { 0 };
+	struct sti_conf_inptr inptr = { 0, };
 	unsigned long flags;
 	s32 ret;
 
@@ -126,9 +127,12 @@ void
 sti_putc(struct sti_struct *sti, int c, int y, int x)
 {
 	struct sti_font_inptr inptr = {
-		STI_PTR(sti->font->raw),
-		c_index(sti, c), c_fg(sti, c), c_bg(sti, c),
-		x * sti->font_width, y * sti->font_height, 0
+		.font_start_addr= STI_PTR(sti->font->raw),
+		.index		= c_index(sti, c),
+		.fg_color	= c_fg(sti, c),
+		.bg_color	= c_bg(sti, c),
+		.dest_x		= x * sti->font_width,
+		.dest_y		= y * sti->font_height,
 	};
 	struct sti_font_outptr outptr = { 0, };
 	s32 ret;
@@ -153,11 +157,14 @@ sti_set(struct sti_struct *sti, int src_y, int src_x,
 	int height, int width, u8 color)
 {
 	struct sti_blkmv_inptr inptr = {
-		color, color,
-		src_x, src_y ,
-		src_x, src_y ,
-		width, height,
-		0
+		.fg_color	= color,
+		.bg_color	= color,
+		.src_x		= src_x,
+		.src_y		= src_y,
+		.dest_x		= src_x,
+		.dest_y		= src_y,
+		.width		= width,
+		.height		= height,
 	};
 	struct sti_blkmv_outptr outptr = { 0, };
 	s32 ret;
@@ -176,11 +183,14 @@ sti_clear(struct sti_struct *sti, int src_y, int src_x,
 	  int height, int width, int c)
 {
 	struct sti_blkmv_inptr inptr = {
-		c_fg(sti, c), c_bg(sti, c),
-		src_x * sti->font_width, src_y * sti->font_height,
-		src_x * sti->font_width, src_y * sti->font_height,
-		width * sti->font_width, height* sti->font_height,
-		0
+		.fg_color	= c_fg(sti, c),
+		.bg_color	= c_bg(sti, c),
+		.src_x		= src_x * sti->font_width,
+		.src_y		= src_y * sti->font_height,
+		.dest_x		= src_x * sti->font_width,
+		.dest_y		= src_y * sti->font_height,
+		.width		= width * sti->font_width,
+		.height		= height* sti->font_height,
 	};
 	struct sti_blkmv_outptr outptr = { 0, };
 	s32 ret;
@@ -195,7 +205,7 @@ sti_clear(struct sti_struct *sti, int src_y, int src_x,
 }
 
 static const struct sti_blkmv_flags default_blkmv_flags = {
-	.wait	= STI_WAIT, 
+	.wait = STI_WAIT, 
 };
 
 void
@@ -203,11 +213,12 @@ sti_bmove(struct sti_struct *sti, int src_y, int src_x,
 	  int dst_y, int dst_x, int height, int width)
 {
 	struct sti_blkmv_inptr inptr = {
-		0, 0,
-		src_x * sti->font_width, src_y * sti->font_height,
-		dst_x * sti->font_width, dst_y * sti->font_height,
-		width * sti->font_width, height* sti->font_height,
-		0
+		.src_x		= src_x * sti->font_width,
+		.src_y		= src_y * sti->font_height,
+		.dest_x		= dst_x * sti->font_width,
+		.dest_y		= dst_y * sti->font_height,
+		.width		= width * sti->font_width,
+		.height		= height* sti->font_height,
 	};
 	struct sti_blkmv_outptr outptr = { 0, };
 	s32 ret;
@@ -221,6 +232,14 @@ sti_bmove(struct sti_struct *sti, int src_y, int src_x,
 	} while (ret == 1);
 }
 
+
+/* FIXME: Do we have another solution for this ? */
+static void sti_flush(unsigned long from, unsigned long len)
+{
+	flush_data_cache();
+	flush_kernel_dcache_range(from, len);
+	flush_icache_range(from, from+len);
+}
 
 void __init
 sti_rom_copy(unsigned long base, unsigned long count, void *dest)
@@ -242,7 +261,7 @@ sti_rom_copy(unsigned long base, unsigned long count, void *dest)
 		dest++;
 	}
 
-	sti_flush(dest_start, dest_len); /* XXX */
+	sti_flush(dest_start, dest_len);
 }
 
 
@@ -250,8 +269,8 @@ sti_rom_copy(unsigned long base, unsigned long count, void *dest)
 
 static char default_sti_path[21];
 
-static int __init 
-sti_setup(char *str)
+#ifndef MODULE
+static int __init sti_setup(char *str)
 {
 	if (str)
 		strncpy (default_sti_path, str, sizeof (default_sti_path));
@@ -266,6 +285,7 @@ sti_setup(char *str)
  *	STI screen.
  */
 __setup("sti=", sti_setup);
+#endif
 
 
 
@@ -273,7 +293,7 @@ static char __initdata	*font_name[MAX_STI_ROMS] = { "VGA8x16", };
 static int __initdata	font_index[MAX_STI_ROMS], 
 			font_height[MAX_STI_ROMS],
 			font_width[MAX_STI_ROMS];
-
+#ifndef MODULE
 static int __init sti_font_setup(char *str)
 {
 	char *x;
@@ -323,10 +343,11 @@ static int __init sti_font_setup(char *str)
  *		found, sticon will use the default 8x8 font.
  */
 __setup("sti_font=", sti_font_setup);
+#endif
 
 
 	
-void __init
+static void __init
 sti_dump_globcfg(struct sti_glob_cfg *glob_cfg, unsigned int sti_mem_request)
 {
 	struct sti_glob_cfg_ext *cfg;
@@ -366,7 +387,7 @@ sti_dump_globcfg(struct sti_glob_cfg *glob_cfg, unsigned int sti_mem_request)
 		cfg->sti_mem_addr, sti_mem_request));
 }
 
-void __init
+static void __init
 sti_dump_outptr(struct sti_struct *sti)
 {
 	DPRINTK((KERN_INFO
@@ -380,7 +401,7 @@ sti_dump_outptr(struct sti_struct *sti)
 		 sti->outptr.attributes));
 }
 
-int __init
+static int __init
 sti_init_glob_cfg(struct sti_struct *sti,
 	    unsigned long rom_address, unsigned long hpa)
 {
@@ -399,8 +420,13 @@ sti_init_glob_cfg(struct sti_struct *sti,
 	save_addr = kmalloc(save_addr_size, GFP_KERNEL);
 	sti_mem_addr = kmalloc(sti->sti_mem_request, GFP_KERNEL);
 
-	if (!(glob_cfg && glob_cfg_ext && save_addr && sti_mem_addr))
+	if (!(glob_cfg && glob_cfg_ext && save_addr && sti_mem_addr)) {
+		kfree(glob_cfg);
+		kfree(glob_cfg_ext);
+		kfree(save_addr);
+		kfree(sti_mem_addr);
 		return -ENOMEM;
+	}
 
 	memset(glob_cfg, 0, sizeof(*glob_cfg));
 	memset(glob_cfg_ext, 0, sizeof(*glob_cfg_ext));
@@ -659,10 +685,10 @@ sti_bmode_rom_copy(unsigned long base, unsigned long count, void *dest)
 		base += 4;
 		dest++;
 	}
-	sti_flush(dest_start, dest_len); /* XXX */
+	sti_flush(dest_start, dest_len);
 }
 
-struct sti_rom * __init
+static struct sti_rom * __init
 sti_get_bmode_rom (unsigned long address)
 {
 	struct sti_rom *raw;
@@ -889,7 +915,7 @@ out_err:
 	return NULL;
 }
 
-static void __init sticore_check_for_default_sti (struct sti_struct *sti, char *path)
+static void __init sticore_check_for_default_sti(struct sti_struct *sti, char *path)
 {
 	if (strcmp (path, default_sti_path) == 0)
 		default_sti = sti;
@@ -1002,58 +1028,53 @@ static struct parisc_device_id sti_pa_tbl[] = {
 	{ 0, }
 };
 
-struct parisc_driver pa_sti_driver = {
+static struct parisc_driver pa_sti_driver = {
 	.name		= "sti (native)",
 	.id_table	= sti_pa_tbl,
 	.probe		= sticore_pa_init,
 };
 
-struct sti_struct * __init sti_init_roms(void)
+
+/*
+ * sti_init_roms() - detects all STI ROMs and stores them in sti_roms[]
+ */
+
+static int sticore_initialized;
+
+static void __init sti_init_roms(void)
 {
-	static int initialized;
+	if (sticore_initialized)
+		return;
 
-	if (initialized)
-		goto out;
+	sticore_initialized = 1;
 
-	printk(KERN_INFO "STI GSC/PCI graphics driver version %s\n",
-			STI_DRIVERVERSION);
+	printk(KERN_INFO "STI GSC/PCI core graphics driver "
+			STI_DRIVERVERSION "\n");
 
 	/* Register drivers for native & PCI cards */
 	register_parisc_driver(&pa_sti_driver);
-	pci_module_init (&pci_sti_driver);
+	pci_module_init(&pci_sti_driver);
 
 	/* if we didn't find the given default sti, take the first one */
 	if (!default_sti)
 		default_sti = sti_roms[0];
 
-out:
-	/* return default STI if available */
-	if (num_sti_roms && default_sti && default_sti->init_graph) {
-		initialized = 1;
-		return default_sti;
-	}
-	return NULL;
 }
 
 /*
  * index = 0 gives default sti
  * index > 0 gives other stis in detection order
  */
-struct sti_struct * __init sti_get_rom(int index)
+struct sti_struct * sti_get_rom(unsigned int index)
 {
-	int i;
-	
+	if (!sticore_initialized)
+		sti_init_roms();
+
 	if (index == 0)
 		return default_sti;
 
-	i = -1;
-	while (index > 0) {
-		i++;
-		if (i > num_sti_roms)
-			return NULL;
-		if (sti_roms[i] == default_sti)
-			continue;
-		index--;
-	}
-	return sti_roms[i];
+	if (index > num_sti_roms)
+		return NULL;
+
+	return sti_roms[index-1];
 }

@@ -43,6 +43,7 @@
 #include <linux/vt_kern.h>
 #include <linux/kd.h>
 #include <linux/selection.h>
+#include <linux/module.h>
 
 #include <asm/io.h>
 
@@ -52,17 +53,16 @@
 #define BLANK 0
 static int vga_is_gfx;
 
+/* this is the sti_struct used for this console */
+static struct sti_struct *sticon_sti;
 
 /* Software scrollback */
-
 static unsigned long softback_buf, softback_curr;
 static unsigned long softback_in;
 static unsigned long /* softback_top, */ softback_end;
 static int softback_lines;
 
-
 /* software cursor */
-
 static int cursor_drawn;
 #define CURSOR_DRAW_DELAY		(1)
 #define DEFAULT_CURSOR_BLINK_RATE	(20)
@@ -74,7 +74,6 @@ static inline void cursor_undrawn(void)
     vbl_cursor_cnt = 0;
     cursor_drawn = 0;
 }
-
 
 static const char *__init sticon_startup(void)
 {
@@ -108,7 +107,7 @@ static void sticon_putc(struct vc_data *conp, int c, int ypos, int xpos)
     }
 #endif
 
-    sti_putc(default_sti, c, ypos, xpos);
+    sti_putc(sticon_sti, c, ypos, xpos);
 
     if (redraw_cursor)
 	    vbl_cursor_cnt = CURSOR_DRAW_DELAY;
@@ -135,7 +134,7 @@ static void sticon_putcs(struct vc_data *conp, const unsigned short *s,
 #endif
 
     while (count--) {
-	sti_putc(default_sti, scr_readw(s++), ypos, xpos++);
+	sti_putc(sticon_sti, scr_readw(s++), ypos, xpos++);
     }
 
     if (redraw_cursor)
@@ -149,7 +148,7 @@ static void sticon_cursor(struct vc_data *conp, int mode)
     car1 = conp->vc_screenbuf[conp->vc_x + conp->vc_y * conp->vc_cols];
     switch (mode) {
     case CM_ERASE:
-	sti_putc(default_sti, car1, conp->vc_y, conp->vc_x);
+	sti_putc(sticon_sti, car1, conp->vc_y, conp->vc_x);
 	break;
     case CM_MOVE:
     case CM_DRAW:
@@ -159,7 +158,7 @@ static void sticon_cursor(struct vc_data *conp, int mode)
 	case CUR_LOWER_HALF:
 	case CUR_TWO_THIRDS:
 	case CUR_BLOCK:
-	    sti_putc(default_sti, (car1 & 255) + (0 << 8) + (7 << 11),
+	    sti_putc(sticon_sti, (car1 & 255) + (0 << 8) + (7 << 11),
 		     conp->vc_y, conp->vc_x);
 	    break;
 	}
@@ -167,10 +166,9 @@ static void sticon_cursor(struct vc_data *conp, int mode)
     }
 }
 
-static int
-sticon_scroll(struct vc_data *conp, int t, int b, int dir, int count)
+static int sticon_scroll(struct vc_data *conp, int t, int b, int dir, int count)
 {
-    struct sti_struct *sti = default_sti;
+    struct sti_struct *sti = sticon_sti;
 
     if (vga_is_gfx)
         return 0;
@@ -192,9 +190,8 @@ sticon_scroll(struct vc_data *conp, int t, int b, int dir, int count)
     return 0;
 }
 
-static void
-sticon_bmove(struct vc_data *conp, int sy, int sx, int dy, int dx,
-	     int height, int width)
+static void sticon_bmove(struct vc_data *conp, int sy, int sx, 
+	int dy, int dx, int height, int width)
 {
     if (!width || !height)
 	    return;
@@ -206,12 +203,12 @@ sticon_bmove(struct vc_data *conp, int sy, int sx, int dy, int dx,
 		sticon_cursor(p, CM_ERASE /*|CM_SOFTBACK*/);
 #endif
 
-    sti_bmove(default_sti, sy, sx, dy, dx, height, width);
+    sti_bmove(sticon_sti, sy, sx, dy, dx, height, width);
 }
 
 static void sticon_init(struct vc_data *c, int init)
 {
-    struct sti_struct *sti = default_sti;
+    struct sti_struct *sti = sticon_sti;
     int vc_cols, vc_rows;
 
     sti_set(sti, 0, 0, sti_onscreen_y(sti), sti_onscreen_x(sti), 0);
@@ -240,7 +237,7 @@ static void sticon_clear(struct vc_data *conp, int sy, int sx, int height,
     if (!height || !width)
 	return;
 
-    sti_clear(default_sti, sy, sx, height, width, conp->vc_video_erase_char);
+    sti_clear(sticon_sti, sy, sx, height, width, conp->vc_video_erase_char);
 }
 
 static int sticon_switch(struct vc_data *conp)
@@ -265,10 +262,10 @@ static int sticon_blank(struct vc_data *c, int blank)
 	if (vga_is_gfx)
 		return 0;
 	sticon_set_origin(c);
-	sti_clear(default_sti, 0,0, c->vc_rows, c->vc_cols, BLANK);
+	sti_clear(sticon_sti, 0,0, c->vc_rows, c->vc_cols, BLANK);
 	return 1;
     case -1:		/* Entering graphic mode */
-	sti_clear(default_sti, 0,0, c->vc_rows, c->vc_cols, BLANK);
+	sti_clear(sticon_sti, 0,0, c->vc_rows, c->vc_cols, BLANK);
 	vga_is_gfx = 1;
 	return 1;
     }
@@ -344,7 +341,7 @@ static u8 sticon_build_attr(struct vc_data *conp, u8 color, u8 intens,
     return attr;
 }
 
-void sticon_invert_region(struct vc_data *conp, u16 *p, int count)
+static void sticon_invert_region(struct vc_data *conp, u16 *p, int count)
 {
     int col = 1; /* vga_can_do_color; */
 
@@ -360,11 +357,11 @@ void sticon_invert_region(struct vc_data *conp, u16 *p, int count)
     }
 }
 
-void sticon_save_screen(struct vc_data *conp)
+static void sticon_save_screen(struct vc_data *conp)
 {
 }
 
-struct consw sti_con = {
+static struct consw sti_con = {
 	.con_startup		= sticon_startup,
 	.con_init		= sticon_init,
 	.con_deinit		= sticon_deinit,
@@ -391,14 +388,20 @@ struct consw sti_con = {
 
 int __init sticonsole_init(void)
 {
-    if (sti_init_roms()) {
-	if (conswitchp == &dummy_con) {
-        	printk(KERN_INFO "sticon: Initializing STI text console.\n");
-		take_over_console(&sti_con, 0, MAX_NR_CONSOLES - 1, 1);
-	}
-	return 0;
-    } else
+    /* already initialized ? */
+    if (sticon_sti)
+	 return 0;
+
+    sticon_sti = sti_get_rom(0);
+    if (!sticon_sti)
 	return -ENODEV;
+
+    if (conswitchp == &dummy_con) {
+	printk(KERN_INFO "sticon: Initializing STI text console.\n");
+	take_over_console(&sti_con, 0, MAX_NR_CONSOLES - 1, 1);
+    }
+    return 0;
 }
 
 module_init(sticonsole_init);
+MODULE_LICENSE("GPL");

@@ -377,7 +377,7 @@ static int sst_calc_pll(const int freq, int *freq_out, struct pll_timing *t)
 static void sstfb_clear_screen(struct fb_info *info)
 {
 	/* clear screen */
-	memset_io(info->screen_base, 0, info->fix.smem_len);
+	fb_memset(info->screen_base, 0, info->fix.smem_len);
 }
 
 
@@ -1708,7 +1708,7 @@ MODULE_DESCRIPTION("FBDev driver for 3dfx Voodoo Graphics and Voodoo2 based vide
 MODULE_LICENSE("GPL");
 
 MODULE_PARM(mem, "i");
-MODULE_PARM_DESC(mem, "Size of frame buffer memory in MiB (1, 2, 4 MB, default=autodetect)");
+MODULE_PARM_DESC(mem, "Size of frame buffer memory in MB (1, 2, 4 MB, default=autodetect)");
 MODULE_PARM(vgapass, "i");
 MODULE_PARM_DESC(vgapass, "Enable VGA PassThrough mode (0 or 1) (default=0)");
 MODULE_PARM(clipping , "i");

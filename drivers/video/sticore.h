@@ -72,27 +72,6 @@ static inline int STI_CALL( unsigned long func,
 #define sti_font_x(sti) (PTR_STI(sti->font)->width)
 #define sti_font_y(sti) (PTR_STI(sti->font)->height)
 
-#ifndef offsetof
-#define offsetof(TYPE, MEMBER) ((unsigned long) &((TYPE *)0)->MEMBER)
-#endif
-
-extern struct sti_struct *sti_init_roms(void);
-
-/* XXX: this probably should not be here, but we rely on STI being
-   initialized early and independently of stifb at the moment, so
-   there's no other way for stifb to find it. */
-extern struct sti_struct *default_sti;
-
-int  sti_init_graph(struct sti_struct *sti);
-void sti_inq_conf(struct sti_struct *sti);
-void sti_putc(struct sti_struct *sti, int c, int y, int x);
-void sti_set(struct sti_struct *sti, int src_y, int src_x,
-	     int height, int width, u8 color);
-void sti_clear(struct sti_struct *sti, int src_y, int src_x,
-	       int height, int width, int c);
-void sti_bmove(struct sti_struct *sti, int src_y, int src_x,
-	       int dst_y, int dst_x, int height, int width);
-
 
 /* STI function configuration structs */
 
@@ -170,7 +149,7 @@ struct sti_init_inptr_ext {
 
 struct sti_init_inptr {
 	s32 text_planes;	/* number of planes to use for text */
-	u32 ext_ptr;		 /* pointer to extended init_graph inptr data structure*/
+	u32 ext_ptr;		/* pointer to extended init_graph inptr data structure*/
 };
 
 
@@ -382,27 +361,20 @@ struct sti_struct {
 };
 
 
+/* sticore interface functions */
 
-/* helper functions */
-struct sti_struct *sti_init_roms(void);
-struct sti_struct *sti_get_rom(int);
-void sti_rom_copy(unsigned long base, unsigned long count, void *dest);
-struct sti_cooked_font *sti_select_font(struct sti_cooked_rom *rom,
-	    int (*search_font_fnc) (struct sti_cooked_rom *,int,int) );
+struct sti_struct *sti_get_rom(unsigned int index); /* 0: default sti */
 
-int sti_read_rom(int wordmode, struct sti_struct *sti,
-	    unsigned long address);
+/* functions to call the STI ROM directly */
 
-
-/* FIXME: Do we have another solution for this ? */
-#include <linux/kernel.h>
-#include <linux/slab.h>
-#include <asm/cacheflush.h>
-static inline void sti_flush(unsigned long from, unsigned long len)
-{
-	flush_data_cache();
-	flush_kernel_dcache_range(from, len);
-	flush_icache_range(from, from+len);
-}
+int  sti_init_graph(struct sti_struct *sti);
+void sti_inq_conf(struct sti_struct *sti);
+void sti_putc(struct sti_struct *sti, int c, int y, int x);
+void sti_set(struct sti_struct *sti, int src_y, int src_x,
+	     int height, int width, u8 color);
+void sti_clear(struct sti_struct *sti, int src_y, int src_x,
+	       int height, int width, int c);
+void sti_bmove(struct sti_struct *sti, int src_y, int src_x,
+	       int dst_y, int dst_x, int height, int width);
 
 #endif	/* STICORE_H */
