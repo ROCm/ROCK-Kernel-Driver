@@ -53,18 +53,14 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for Sun CS4231 soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for Sun CS4231 soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable Sun CS4231 soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 MODULE_AUTHOR("Jaroslav Kysela, Derrick J. Brashear and David S. Miller");
 MODULE_DESCRIPTION("Sun CS4231");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{Sun,CS4231}}");
+MODULE_SUPPORTED_DEVICE("{{Sun,CS4231}}");
 
 typedef struct snd_cs4231 {
 	spinlock_t		lock;
@@ -112,7 +108,6 @@ typedef struct snd_cs4231 {
 	unsigned int		regs_size;
 	struct snd_cs4231	*next;
 } cs4231_t;
-#define chip_t cs4231_t
 
 static cs4231_t *cs4231_list;
 
@@ -1232,7 +1227,7 @@ static void snd_cs4231_generic_interrupt(cs4231_t *chip)
 #ifdef SBUS_SUPPORT
 static irqreturn_t snd_cs4231_sbus_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	cs4231_t *chip = snd_magic_cast(cs4231_t, dev_id, return);
+	cs4231_t *chip = dev_id;
 	u32 csr;
 
 	csr = sbus_readl(chip->port + APCCSR);
@@ -1256,7 +1251,7 @@ static irqreturn_t snd_cs4231_sbus_interrupt(int irq, void *dev_id, struct pt_re
 #ifdef EBUS_SUPPORT
 static void snd_cs4231_ebus_play_callback(struct ebus_dma_info *p, int event, void *cookie)
 {
-	cs4231_t *chip = snd_magic_cast(cs4231_t, cookie, return);
+	cs4231_t *chip = cookie;
 
 	if (chip->image[CS4231_IFACE_CTRL] & CS4231_PLAYBACK_ENABLE) {
 		snd_pcm_period_elapsed(chip->playback_substream);
@@ -1267,7 +1262,7 @@ static void snd_cs4231_ebus_play_callback(struct ebus_dma_info *p, int event, vo
 
 static void snd_cs4231_ebus_capture_callback(struct ebus_dma_info *p, int event, void *cookie)
 {
-	cs4231_t *chip = snd_magic_cast(cs4231_t, cookie, return);
+	cs4231_t *chip = cookie;
 
 	if (chip->image[CS4231_IFACE_CTRL] & CS4231_RECORD_ENABLE) {
 		snd_pcm_period_elapsed(chip->capture_substream);
@@ -1547,7 +1542,7 @@ static snd_pcm_ops_t snd_cs4231_capture_ops = {
 
 static void snd_cs4231_pcm_free(snd_pcm_t *pcm)
 {
-	cs4231_t *chip = snd_magic_cast(cs4231_t, pcm->private_data, return);
+	cs4231_t *chip = pcm->private_data;
 	chip->pcm = NULL;
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
@@ -1592,7 +1587,7 @@ int snd_cs4231_pcm(cs4231_t *chip)
 
 static void snd_cs4231_timer_free(snd_timer_t *timer)
 {
-	cs4231_t *chip = snd_magic_cast(cs4231_t, timer->private_data, return);
+	cs4231_t *chip = timer->private_data;
 	chip->timer = NULL;
 }
 
@@ -1821,8 +1816,6 @@ int snd_cs4231_put_double(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontr
 	return change;
 }
 
-#define CS4231_CONTROLS (sizeof(snd_cs4231_controls)/sizeof(snd_kcontrol_new_t))
-
 #define CS4231_SINGLE(xname, xindex, reg, shift, mask, invert) \
 { .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
   .info = snd_cs4231_info_single, \
@@ -1875,7 +1868,7 @@ int snd_cs4231_mixer(cs4231_t *chip)
 
 	strcpy(card->mixername, chip->pcm->name);
 
-	for (idx = 0; idx < CS4231_CONTROLS; idx++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_cs4231_controls); idx++) {
 		if ((err = snd_ctl_add(card,
 				       snd_ctl_new1(&snd_cs4231_controls[idx],
 						    chip))) < 0)
@@ -1950,14 +1943,14 @@ static int snd_cs4231_sbus_free(cs4231_t *chip)
 	if (chip->timer)
 		snd_device_free(chip->card, chip->timer);
 
-	snd_magic_kfree(chip);
+	kfree(chip);
 
 	return 0;
 }
 
 static int snd_cs4231_sbus_dev_free(snd_device_t *device)
 {
-	cs4231_t *cp = snd_magic_cast(cs4231_t, device->device_data, return -ENXIO);
+	cs4231_t *cp = device->device_data;
 
 	return snd_cs4231_sbus_free(cp);
 }
@@ -1975,7 +1968,7 @@ static int __init snd_cs4231_sbus_create(snd_card_t *card,
 	int err;
 
 	*rchip = NULL;
-	chip = snd_magic_kcalloc(cs4231_t, 0, GFP_KERNEL);
+	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (chip == NULL)
 		return -ENOMEM;
 
@@ -2064,14 +2057,14 @@ static int snd_cs4231_ebus_free(cs4231_t *chip)
 	if (chip->timer)
 		snd_device_free(chip->card, chip->timer);
 
-	snd_magic_kfree(chip);
+	kfree(chip);
 
 	return 0;
 }
 
 static int snd_cs4231_ebus_dev_free(snd_device_t *device)
 {
-	cs4231_t *cp = snd_magic_cast(cs4231_t, device->device_data, return -ENXIO);
+	cs4231_t *cp = device->device_data;
 
 	return snd_cs4231_ebus_free(cp);
 }
@@ -2089,7 +2082,7 @@ static int __init snd_cs4231_ebus_create(snd_card_t *card,
 	int err;
 
 	*rchip = NULL;
-	chip = snd_magic_kcalloc(cs4231_t, 0, GFP_KERNEL);
+	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (chip == NULL)
 		return -ENOMEM;
 

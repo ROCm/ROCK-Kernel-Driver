@@ -57,7 +57,7 @@ static snd_seq_oss_callback_t oss_callback = {
 static int snd_opl3_oss_event_input(snd_seq_event_t *ev, int direct,
 				    void *private_data, int atomic, int hop)
 {
-	opl3_t *opl3 = snd_magic_cast(opl3_t, private_data, return -EINVAL);
+	opl3_t *opl3 = private_data;
 
 	if (ev->type != SNDRV_SEQ_EVENT_OSS)
 		snd_midi_process_event(&opl3_ops, ev, opl3->oss_chset);
@@ -68,7 +68,7 @@ static int snd_opl3_oss_event_input(snd_seq_event_t *ev, int direct,
 
 static void snd_opl3_oss_free_port(void *private_data)
 {
-	opl3_t *opl3 = snd_magic_cast(opl3_t, private_data, return);
+	opl3_t *opl3 = private_data;
 
 	snd_midi_channel_free_set(opl3->oss_chset);
 }
@@ -156,7 +156,7 @@ void snd_opl3_free_seq_oss(opl3_t *opl3)
 /* open OSS sequencer */
 static int snd_opl3_open_seq_oss(snd_seq_oss_arg_t *arg, void *closure)
 {
-	opl3_t *opl3 = snd_magic_cast(opl3_t, closure, return -EINVAL);
+	opl3_t *opl3 = closure;
 	int err;
 
 	snd_assert(arg != NULL, return -ENXIO);
@@ -182,7 +182,7 @@ static int snd_opl3_close_seq_oss(snd_seq_oss_arg_t *arg)
 	opl3_t *opl3;
 
 	snd_assert(arg != NULL, return -ENXIO);
-	opl3 = snd_magic_cast(opl3_t, arg->private_data, return -EINVAL);
+	opl3 = arg->private_data;
 
 	snd_opl3_synth_cleanup(opl3);
 
@@ -213,7 +213,7 @@ static int snd_opl3_load_patch_seq_oss(snd_seq_oss_arg_t *arg, int format,
 	int err = -EINVAL;
 
 	snd_assert(arg != NULL, return -ENXIO);
-	opl3 = snd_magic_cast(opl3_t, arg->private_data, return -EINVAL);
+	opl3 = arg->private_data;
 
 	if ((format == FM_PATCH) || (format == OPL3_PATCH)) {
 		struct sbi_instrument sbi;
@@ -241,7 +241,7 @@ static int snd_opl3_load_patch_seq_oss(snd_seq_oss_arg_t *arg, int format,
 		}
 
 		size = sizeof(*put) + sizeof(fm_xinstrument_t);
-		put = (snd_seq_instr_header_t *)snd_kcalloc(size, GFP_KERNEL);
+		put = kcalloc(1, size, GFP_KERNEL);
 		if (put == NULL)
 			return -ENOMEM;
 		/* build header */
@@ -325,7 +325,7 @@ static int snd_opl3_ioctl_seq_oss(snd_seq_oss_arg_t *arg, unsigned int cmd,
 	opl3_t *opl3;
 
 	snd_assert(arg != NULL, return -ENXIO);
-	opl3 = snd_magic_cast(opl3_t, arg->private_data, return -EINVAL);
+	opl3 = arg->private_data;
 	switch (cmd) {
 		case SNDCTL_FM_LOAD_INSTR:
 			snd_printk("OPL3: Obsolete ioctl(SNDCTL_FM_LOAD_INSTR) used. Fix the program.\n");
@@ -350,7 +350,7 @@ static int snd_opl3_reset_seq_oss(snd_seq_oss_arg_t *arg)
 	opl3_t *opl3;
 
 	snd_assert(arg != NULL, return -ENXIO);
-	opl3 = snd_magic_cast(opl3_t, arg->private_data, return -EINVAL);
+	opl3 = arg->private_data;
 
 	return 0;
 }

@@ -22,8 +22,6 @@
 #include "emux_voice.h"
 #include <sound/asoundef.h>
 
-#define NELEM(arr) (sizeof(arr)/sizeof((arr)[0]))
-
 /*
  * conversion from NRPN/control parameters to Emu8000 raw parameters
  */
@@ -214,8 +212,6 @@ static nrpn_conv_table awe_effects[] =
 	{26, EMUX_FX_REVERB,		fx_reverb},
 };
 
-static int num_awe_effects = NELEM(awe_effects);
-
 
 /*
  * GS(SC88) NRPN effects; still experimental
@@ -281,8 +277,6 @@ static nrpn_conv_table gs_effects[] =
 	{10, EMUX_FX_LFO1_DELAY, gs_vib_delay},
 };
 
-static int num_gs_effects = NELEM(gs_effects);
-
 
 /*
  * NRPN events
@@ -292,7 +286,7 @@ snd_emux_nrpn(void *p, snd_midi_channel_t *chan, snd_midi_channel_set_t *chset)
 {
 	snd_emux_port_t *port;
 
-	port = snd_magic_cast(snd_emux_port_t, p, return);
+	port = p;
 	snd_assert(port != NULL, return);
 	snd_assert(chan != NULL, return);
 
@@ -305,7 +299,7 @@ snd_emux_nrpn(void *p, snd_midi_channel_t *chan, snd_midi_channel_set_t *chset)
 			chan->control[MIDI_CTL_LSB_DATA_ENTRY]; 
 		val -= 8192;
 		send_converted_effect
-			(awe_effects, num_awe_effects,
+			(awe_effects, ARRAY_SIZE(awe_effects),
 			 port, chan, chan->control[MIDI_CTL_NONREG_PARM_NUM_LSB],
 			 val, EMUX_FX_FLAG_SET);
 		return;
@@ -318,7 +312,7 @@ snd_emux_nrpn(void *p, snd_midi_channel_t *chan, snd_midi_channel_set_t *chset)
 		/* only MSB is valid */
 		val = chan->control[MIDI_CTL_MSB_DATA_ENTRY];
 		send_converted_effect
-			(gs_effects, num_gs_effects,
+			(gs_effects, ARRAY_SIZE(gs_effects),
 			 port, chan, chan->control[MIDI_CTL_NONREG_PARM_NUM_LSB],
 			 val, EMUX_FX_FLAG_ADD);
 		return;
@@ -362,12 +356,10 @@ static nrpn_conv_table xg_effects[] =
 	{73, EMUX_FX_ENV2_ATTACK, xg_attack},
 };
 
-static int num_xg_effects = NELEM(xg_effects);
-
 int
 snd_emux_xg_control(snd_emux_port_t *port, snd_midi_channel_t *chan, int param)
 {
-	return send_converted_effect(xg_effects, num_xg_effects,
+	return send_converted_effect(xg_effects, ARRAY_SIZE(xg_effects),
 				     port, chan, param,
 				     chan->control[param],
 				     EMUX_FX_FLAG_ADD);
@@ -382,7 +374,7 @@ snd_emux_sysex(void *p, unsigned char *buf, int len, int parsed, snd_midi_channe
 	snd_emux_port_t *port;
 	snd_emux_t *emu;
 
-	port = snd_magic_cast(snd_emux_port_t, p, return);
+	port = p;
 	snd_assert(port != NULL, return);
 	snd_assert(chset != NULL, return);
 	emu = port->emu;

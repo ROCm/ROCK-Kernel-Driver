@@ -128,7 +128,7 @@ static int __devinit revo_init(ice1712_t *ice)
 	switch (ice->eeprom.subvendor) {
 	case VT1724_SUBDEVICE_REVOLUTION71:
 		ice->num_total_dacs = 8;
-		ice->num_total_adcs = 4;
+		ice->num_total_adcs = 2;
 		break;
 	default:
 		snd_BUG();
@@ -136,7 +136,7 @@ static int __devinit revo_init(ice1712_t *ice)
 	}
 
 	/* second stage of initialization, analog parts and others */
-	ak = ice->akm = snd_kcalloc(sizeof(akm4xxx_t) * 2, GFP_KERNEL);
+	ak = ice->akm = kcalloc(2, sizeof(akm4xxx_t), GFP_KERNEL);
 	if (! ak)
 		return -ENOMEM;
 	ice->akm_codecs = 2;

@@ -63,8 +63,6 @@
 MODULE_AUTHOR("Takashi Iwai <tiwai@suse.de>");
 MODULE_DESCRIPTION("ALSA sequencer MIDI-through client");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_SUPPORTED_DEVICE("sound");
 
 static int ports = 1;
 static int duplex = 0;
@@ -95,7 +93,7 @@ dummy_unuse(void *private_data, snd_seq_port_subscribe_t *info)
 	int i;
 	snd_seq_event_t ev;
 
-	p = snd_magic_cast(snd_seq_dummy_port_t, private_data, return -EINVAL);
+	p = private_data;
 	memset(&ev, 0, sizeof(ev));
 	if (p->duplex)
 		ev.source.port = p->connect;
@@ -122,18 +120,11 @@ dummy_input(snd_seq_event_t *ev, int direct, void *private_data, int atomic, int
 	snd_seq_dummy_port_t *p;
 	snd_seq_event_t tmpev;
 
-	p = snd_magic_cast(snd_seq_dummy_port_t, private_data, return -EINVAL);
+	p = private_data;
 	if (ev->source.client == SNDRV_SEQ_CLIENT_SYSTEM ||
 	    ev->type == SNDRV_SEQ_EVENT_KERNEL_ERROR)
 		return 0; /* ignore system messages */
-	/* save the original sender */
-	tmpev.type = SNDRV_SEQ_EVENT_KERNEL_QUOTE;
-	tmpev.flags = (ev->flags & ~SNDRV_SEQ_EVENT_LENGTH_MASK)
-		| SNDRV_SEQ_EVENT_LENGTH_FIXED;
-	tmpev.tag = ev->tag;
-	tmpev.time = ev->time;
-	tmpev.data.quote.origin = ev->source;
-	tmpev.data.quote.event = ev;
+	tmpev = *ev;
 	if (p->duplex)
 		tmpev.source.port = p->connect;
 	else
@@ -150,8 +141,8 @@ dummy_free(void *private_data)
 {
 	snd_seq_dummy_port_t *p;
 
-	p = snd_magic_cast(snd_seq_dummy_port_t, private_data, return);
-	snd_magic_kfree(p);
+	p = private_data;
+	kfree(p);
 }
 
 /*
@@ -164,7 +155,7 @@ create_port(int idx, int type)
 	snd_seq_port_callback_t pcb;
 	snd_seq_dummy_port_t *rec;
 
-	if ((rec = snd_magic_kcalloc(snd_seq_dummy_port_t, 0, GFP_KERNEL)) == NULL)
+	if ((rec = kcalloc(1, sizeof(*rec), GFP_KERNEL)) == NULL)
 		return NULL;
 
 	rec->client = my_client;
@@ -190,7 +181,7 @@ create_port(int idx, int type)
 	pcb.private_data = rec;
 	pinfo.kernel = &pcb;
 	if (snd_seq_kernel_client_ctl(my_client, SNDRV_SEQ_IOCTL_CREATE_PORT, &pinfo) < 0) {
-		snd_magic_kfree(rec);
+		kfree(rec);
 		return NULL;
 	}
 	rec->port = pinfo.addr.port;

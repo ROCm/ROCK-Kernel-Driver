@@ -45,7 +45,7 @@
 /* send SDA and SCL */
 static void ewx_i2c_setlines(snd_i2c_bus_t *bus, int clk, int data)
 {
-	ice1712_t *ice = snd_magic_cast(ice1712_t, bus->private_data, return);
+	ice1712_t *ice = bus->private_data;
 	unsigned char tmp = 0;
 	if (clk)
 		tmp |= ICE1712_EWX2496_SERIAL_CLOCK;
@@ -57,13 +57,13 @@ static void ewx_i2c_setlines(snd_i2c_bus_t *bus, int clk, int data)
 
 static int ewx_i2c_getclock(snd_i2c_bus_t *bus)
 {
-	ice1712_t *ice = snd_magic_cast(ice1712_t, bus->private_data, return -EIO);
+	ice1712_t *ice = bus->private_data;
 	return snd_ice1712_read(ice, ICE1712_IREG_GPIO_DATA) & ICE1712_EWX2496_SERIAL_CLOCK ? 1 : 0;
 }
 
 static int ewx_i2c_getdata(snd_i2c_bus_t *bus, int ack)
 {
-	ice1712_t *ice = snd_magic_cast(ice1712_t, bus->private_data, return -EIO);
+	ice1712_t *ice = bus->private_data;
 	int bit;
 	/* set RW pin to low */
 	snd_ice1712_write(ice, ICE1712_IREG_GPIO_WRITE_MASK, ~ICE1712_EWX2496_RW);
@@ -80,7 +80,7 @@ static int ewx_i2c_getdata(snd_i2c_bus_t *bus, int ack)
 
 static void ewx_i2c_start(snd_i2c_bus_t *bus)
 {
-	ice1712_t *ice = snd_magic_cast(ice1712_t, bus->private_data, return);
+	ice1712_t *ice = bus->private_data;
 	unsigned char mask;
 
 	snd_ice1712_save_gpio_status(ice);
@@ -99,13 +99,13 @@ static void ewx_i2c_start(snd_i2c_bus_t *bus)
 
 static void ewx_i2c_stop(snd_i2c_bus_t *bus)
 {
-	ice1712_t *ice = snd_magic_cast(ice1712_t, bus->private_data, return);
+	ice1712_t *ice = bus->private_data;
 	snd_ice1712_restore_gpio_status(ice);
 }
 
 static void ewx_i2c_direction(snd_i2c_bus_t *bus, int clock, int data)
 {
-	ice1712_t *ice = snd_magic_cast(ice1712_t, bus->private_data, return);
+	ice1712_t *ice = bus->private_data;
 	unsigned char mask = 0;
 
 	if (clock)
@@ -223,6 +223,7 @@ static void snd_ice1712_ews_cs8404_spdif_write(ice1712_t *ice, unsigned char bit
 	switch (ice->eeprom.subvendor) {
 	case ICE1712_SUBDEVICE_EWS88MT:
 	case ICE1712_SUBDEVICE_EWS88MT_NEW:
+	case ICE1712_SUBDEVICE_PHASE88:
 		snd_runtime_check(snd_i2c_sendbytes(ice->cs8404, &bits, 1) == 1, goto _error);
 		break;
 	case ICE1712_SUBDEVICE_EWS88D:
@@ -410,6 +411,7 @@ static int __devinit snd_ice1712_ews_init(ice1712_t *ice)
 		break;	
 	case ICE1712_SUBDEVICE_EWS88MT:
 	case ICE1712_SUBDEVICE_EWS88MT_NEW:
+	case ICE1712_SUBDEVICE_PHASE88:
 		ice->num_total_dacs = 8;
 		ice->num_total_adcs = 8;
 		break;
@@ -440,6 +442,7 @@ static int __devinit snd_ice1712_ews_init(ice1712_t *ice)
 		break;
 	case ICE1712_SUBDEVICE_EWS88MT:
 	case ICE1712_SUBDEVICE_EWS88MT_NEW:
+	case ICE1712_SUBDEVICE_PHASE88:
 		if ((err = snd_i2c_device_create(ice->i2c, "CS8404", ICE1712_EWS88MT_CS8404_ADDR, &ice->cs8404)) < 0)
 			return err;
 		if ((err = snd_i2c_device_create(ice->i2c, "PCF8574 (1st)", ICE1712_EWS88MT_INPUT_ADDR, &ice->i2cdevs[0])) < 0)
@@ -470,6 +473,7 @@ static int __devinit snd_ice1712_ews_init(ice1712_t *ice)
 		break;
 	case ICE1712_SUBDEVICE_EWS88MT:
 	case ICE1712_SUBDEVICE_EWS88MT_NEW:
+	case ICE1712_SUBDEVICE_PHASE88:
 	case ICE1712_SUBDEVICE_EWS88D:
 		/* set up CS8404 */
 		ice->spdif.ops.open = ews88_open_spdif;
@@ -498,6 +502,7 @@ static int __devinit snd_ice1712_ews_init(ice1712_t *ice)
 	switch (ice->eeprom.subvendor) {
 	case ICE1712_SUBDEVICE_EWS88MT:
 	case ICE1712_SUBDEVICE_EWS88MT_NEW:
+	case ICE1712_SUBDEVICE_PHASE88:
 		err = snd_ice1712_akm4xxx_init(ak, &akm_ews88mt, &akm_ews88mt_priv, ice);
 		break;
 	case ICE1712_SUBDEVICE_EWX2496:
@@ -924,6 +929,7 @@ static int __devinit snd_ice1712_ews_add_controls(ice1712_t *ice)
 	case ICE1712_SUBDEVICE_EWX2496:
 	case ICE1712_SUBDEVICE_EWS88MT:
 	case ICE1712_SUBDEVICE_EWS88MT_NEW:
+	case ICE1712_SUBDEVICE_PHASE88:
 	case ICE1712_SUBDEVICE_DMX6FIRE:
 		err = snd_ice1712_akm4xxx_build_controls(ice);
 		if (err < 0)
@@ -942,6 +948,7 @@ static int __devinit snd_ice1712_ews_add_controls(ice1712_t *ice)
 		break;
 	case ICE1712_SUBDEVICE_EWS88MT:
 	case ICE1712_SUBDEVICE_EWS88MT_NEW:
+	case ICE1712_SUBDEVICE_PHASE88:
 		err = snd_ctl_add(ice->card, snd_ctl_new1(&snd_ice1712_ews88mt_input_sense, ice));
 		if (err < 0)
 			return err;
@@ -988,6 +995,13 @@ struct snd_ice1712_card_info snd_ice1712_ews_cards[] __devinitdata = {
 		.subvendor = ICE1712_SUBDEVICE_EWS88MT_NEW,
 		.name = "TerraTec EWS88MT",
 		.model = "ews88mt_new",
+		.chip_init = snd_ice1712_ews_init,
+		.build_controls = snd_ice1712_ews_add_controls,
+	},
+	{
+		.subvendor = ICE1712_SUBDEVICE_PHASE88,
+		.name = "TerraTec Phase88",
+		.model = "phase88",
 		.chip_init = snd_ice1712_ews_init,
 		.build_controls = snd_ice1712_ews_add_controls,
 	},

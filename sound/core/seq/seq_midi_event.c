@@ -118,7 +118,7 @@ int snd_midi_event_new(int bufsize, snd_midi_event_t **rdev)
 	snd_midi_event_t *dev;
 
 	*rdev = NULL;
-	dev = (snd_midi_event_t *)snd_kcalloc(sizeof(snd_midi_event_t), GFP_KERNEL);
+	dev = kcalloc(1, sizeof(*dev), GFP_KERNEL);
 	if (dev == NULL)
 		return -ENOMEM;
 	if (bufsize > 0) {

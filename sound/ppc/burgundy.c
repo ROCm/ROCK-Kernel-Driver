@@ -28,8 +28,6 @@
 #include "pmac.h"
 #include "burgundy.h"
 
-#define chip_t pmac_t
-
 
 /* Waits for busy flag to clear */
 inline static void
@@ -324,8 +322,6 @@ BURGUNDY_OUTPUT_SWITCH("Headphone Playback Switch", 0, BURGUNDY_OUTPUT_LEFT, BUR
 static snd_kcontrol_new_t snd_pmac_burgundy_speaker_sw __initdata = 
 BURGUNDY_OUTPUT_SWITCH("PC Speaker Playback Switch", 0, BURGUNDY_OUTPUT_INTERN, 0, 0);
 
-#define num_controls(ary) (sizeof(ary) / sizeof(snd_kcontrol_new_t))
-
 
 #ifdef PMAC_SUPPORT_AUTOMUTE
 /*
@@ -420,7 +416,7 @@ int __init snd_pmac_burgundy_init(pmac_t *chip)
 	 */
 	strcpy(chip->card->mixername, "PowerMac Burgundy");
 
-	for (i = 0; i < num_controls(snd_pmac_burgundy_mixers); i++) {
+	for (i = 0; i < ARRAY_SIZE(snd_pmac_burgundy_mixers); i++) {
 		if ((err = snd_ctl_add(chip->card, snd_ctl_new1(&snd_pmac_burgundy_mixers[i], chip))) < 0)
 			return err;
 	}

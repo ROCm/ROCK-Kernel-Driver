@@ -211,11 +211,13 @@ int snd_card_set_dev_pm_callback(snd_card_t *card, int type,
 				 void *private_data);
 #define snd_card_set_isa_pm_callback(card,suspend,resume,data) \
 	snd_card_set_dev_pm_callback(card, PM_ISA_DEV, suspend, resume, data)
+#ifdef CONFIG_PCI
 #ifndef SND_PCI_PM_CALLBACKS
 int snd_card_pci_suspend(struct pci_dev *dev, u32 state);
 int snd_card_pci_resume(struct pci_dev *dev);
 #define SND_PCI_PM_CALLBACKS \
 	.suspend = snd_card_pci_suspend,  .resume = snd_card_pci_resume
+#endif
 #endif
 #else
 #define snd_power_lock(card)		do { (void)(card); } while (0)
@@ -223,10 +225,12 @@ int snd_card_pci_resume(struct pci_dev *dev);
 static inline int snd_power_wait(snd_card_t *card, unsigned int state, struct file *file) { return 0; }
 #define snd_power_get_state(card)	SNDRV_CTL_POWER_D0
 #define snd_power_change_state(card, state)	do { (void)(card); } while (0)
-#define snd_card_set_pm_callback(card,suspend,resume,data) -EINVAL
-#define snd_card_set_dev_pm_callback(card,suspend,resume,data) -EINVAL
-#define snd_card_set_isa_pm_callback(card,suspend,resume,data) -EINVAL
+#define snd_card_set_pm_callback(card,suspend,resume,data)
+#define snd_card_set_dev_pm_callback(card,suspend,resume,data)
+#define snd_card_set_isa_pm_callback(card,suspend,resume,data)
+#ifdef CONFIG_PCI
 #define SND_PCI_PM_CALLBACKS
+#endif
 #endif
 
 /* device.c */
@@ -268,7 +272,7 @@ int snd_oss_init_module(void);
 #else
 #define snd_minor_info_oss_init() /*NOP*/
 #define snd_minor_info_oss_done() /*NOP*/
-#define snd_oss_init_module() /*NOP*/
+#define snd_oss_init_module() 0
 #endif
 
 /* memory.c */
@@ -279,10 +283,12 @@ void snd_memory_done(void);
 int snd_memory_info_init(void);
 int snd_memory_info_done(void);
 void *snd_hidden_kmalloc(size_t size, int flags);
+void *snd_hidden_kcalloc(size_t n, size_t size, int flags);
 void snd_hidden_kfree(const void *obj);
 void *snd_hidden_vmalloc(unsigned long size);
 void snd_hidden_vfree(void *obj);
 #define kmalloc(size, flags) snd_hidden_kmalloc(size, flags)
+#define kcalloc(n, size, flags) snd_hidden_kcalloc(n, size, flags)
 #define kfree(obj) snd_hidden_kfree(obj)
 #define vmalloc(size) snd_hidden_vmalloc(size)
 #define vfree(obj) snd_hidden_vfree(obj)
@@ -300,7 +306,6 @@ void snd_hidden_vfree(void *obj);
 #define kfree_nocheck(obj) kfree(obj)
 #define vfree_nocheck(obj) vfree(obj)
 #endif
-void *snd_kcalloc(size_t size, int flags);
 char *snd_kmalloc_strdup(const char *string, int flags);
 int copy_to_user_fromio(void __user *dst, unsigned long src, size_t count);
 int copy_from_user_toio(unsigned long dst, const void __user *src, size_t count);
@@ -411,7 +416,7 @@ void snd_verbose_printd(const char *file, int line, const char *format, ...)
  * not checked.
  */
 #define snd_assert(expr, args...) do {\
-	if (!(expr)) {\
+	if (unlikely(!(expr))) {				\
 		snd_printk("BUG? (%s) (called from %p)\n", __ASTRING__(expr), __builtin_return_address(0));\
 		args;\
 	}\
@@ -427,7 +432,7 @@ void snd_verbose_printd(const char *file, int line, const char *format, ...)
  * CONFIG_SND_DEBUG is not set but without any error messages.
  */
 #define snd_runtime_check(expr, args...) do {\
-	if (!(expr)) {\
+	if (unlikely(!(expr))) {				\
 		snd_printk("ERROR (%s) (called from %p)\n", __ASTRING__(expr), __builtin_return_address(0));\
 		args;\
 	}\

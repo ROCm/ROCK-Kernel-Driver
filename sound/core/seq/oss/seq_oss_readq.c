@@ -45,12 +45,12 @@ snd_seq_oss_readq_new(seq_oss_devinfo_t *dp, int maxlen)
 {
 	seq_oss_readq_t *q;
 
-	if ((q = snd_kcalloc(sizeof(*q), GFP_KERNEL)) == NULL) {
+	if ((q = kcalloc(1, sizeof(*q), GFP_KERNEL)) == NULL) {
 		snd_printk(KERN_ERR "can't malloc read queue\n");
 		return NULL;
 	}
 
-	if ((q->q = snd_kcalloc(sizeof(evrec_t) * maxlen, GFP_KERNEL)) == NULL) {
+	if ((q->q = kcalloc(maxlen, sizeof(evrec_t), GFP_KERNEL)) == NULL) {
 		snd_printk(KERN_ERR "can't malloc read queue buffer\n");
 		kfree(q);
 		return NULL;
@@ -74,7 +74,6 @@ void
 snd_seq_oss_readq_delete(seq_oss_readq_t *q)
 {
 	if (q) {
-		snd_seq_oss_readq_clear(q);	/* to be sure */
 		if (q->q)
 			kfree(q->q);
 		kfree(q);
@@ -106,9 +105,9 @@ snd_seq_oss_readq_puts(seq_oss_readq_t *q, int dev, unsigned char *data, int len
 	evrec_t rec;
 	int result;
 
+	memset(&rec, 0, sizeof(rec));
 	rec.c[0] = SEQ_MIDIPUTC;
 	rec.c[2] = dev;
-	rec.c[3] = 0;
 
 	while (len-- > 0) {
 		rec.c[1] = *data++;
@@ -134,7 +133,7 @@ snd_seq_oss_readq_put_event(seq_oss_readq_t *q, evrec_t *ev)
 		return -ENOMEM;
 	}
 
-	memcpy(&q->q[q->tail], ev, ev_length(ev));
+	memcpy(&q->q[q->tail], ev, sizeof(*ev));
 	q->tail = (q->tail + 1) % q->maxlen;
 	q->qlen++;
 
@@ -150,50 +149,37 @@ snd_seq_oss_readq_put_event(seq_oss_readq_t *q, evrec_t *ev)
 
 /*
  * pop queue
+ * caller must hold lock
  */
-evrec_t *
-snd_seq_oss_readq_pick(seq_oss_readq_t *q, int blocking, unsigned long *rflags)
+int
+snd_seq_oss_readq_pick(seq_oss_readq_t *q, evrec_t *rec)
 {
-	evrec_t *p;
-
-	spin_lock_irqsave(&q->lock, *rflags);
-	if (q->qlen == 0) {
-		if (blocking) {
-			spin_unlock(&q->lock);
-			interruptible_sleep_on_timeout(&q->midi_sleep,
-						       q->pre_event_timeout);
-			spin_lock(&q->lock);
-		}
-		if (q->qlen == 0) {
-			spin_unlock_irqrestore(&q->lock, *rflags);
-			return NULL;
-		}
-	}
-	p = q->q + q->head;
-
-	return p;
+	if (q->qlen == 0)
+		return -EAGAIN;
+	memcpy(rec, &q->q[q->head], sizeof(*rec));
+	return 0;
 }
 
 /*
- * unlock queue
+ * sleep until ready
  */
 void
-snd_seq_oss_readq_unlock(seq_oss_readq_t *q, unsigned long flags)
+snd_seq_oss_readq_wait(seq_oss_readq_t *q)
 {
-	spin_unlock_irqrestore(&q->lock, flags);
+	interruptible_sleep_on_timeout(&q->midi_sleep, q->pre_event_timeout);
 }
 
 /*
- * drain one record and unlock queue
+ * drain one record
+ * caller must hold lock
  */
 void
-snd_seq_oss_readq_free(seq_oss_readq_t *q, unsigned long flags)
+snd_seq_oss_readq_free(seq_oss_readq_t *q)
 {
 	if (q->qlen > 0) {
 		q->head = (q->head + 1) % q->maxlen;
 		q->qlen--;
 	}
-	spin_unlock_irqrestore(&q->lock, flags);
 }
 
 /*
@@ -215,6 +201,7 @@ snd_seq_oss_readq_put_timestamp(seq_oss_readq_t *q, unsigned long curt, int seq_
 {
 	if (curt != q->input_time) {
 		evrec_t rec;
+		memset(&rec, 0, sizeof(rec));
 		switch (seq_mode) {
 		case SNDRV_SEQ_OSS_MODE_SYNTH:
 			rec.echo = (curt << 8) | SEQ_WAIT;

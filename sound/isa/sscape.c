@@ -36,8 +36,6 @@
 
 #include <sound/sscape_ioctl.h>
 
-#define chip_t cs4231_t
-
 
 MODULE_AUTHOR("Chris Rankin");
 MODULE_DESCRIPTION("ENSONIQ SoundScape PnP driver");
@@ -53,27 +51,21 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index number for SoundScape soundcard");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "Description for SoundScape card");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 
 module_param_array(port, long, boot_devs, 0444);
 MODULE_PARM_DESC(port, "Port # for SoundScape driver.");
-MODULE_PARM_SYNTAX(port, SNDRV_ENABLED);
 
 module_param_array(irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(irq, "IRQ # for SoundScape driver.");
-MODULE_PARM_SYNTAX(irq, SNDRV_IRQ_DESC);
 
 module_param_array(mpu_irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(mpu_irq, "MPU401 IRQ # for SoundScape driver.");
-MODULE_PARM_SYNTAX(mpu_irq, SNDRV_IRQ_DESC);
 
 module_param_array(dma, int, boot_devs, 0444);
 MODULE_PARM_DESC(dma, "DMA # for SoundScape driver.");
-MODULE_PARM_SYNTAX(dma, SNDRV_DMA8_DESC);
   
 #ifdef CONFIG_PNP
 static struct pnp_card_device_id sscape_pnpids[] = {
@@ -177,11 +169,8 @@ static inline struct soundscape *get_hwdep_soundscape(snd_hwdep_t * hw)
 static struct snd_dma_buffer *get_dmabuf(struct snd_dma_buffer *buf, unsigned long size)
 {
 	if (buf) {
-		struct snd_dma_device dev;
-		memset(&dev, 0, sizeof(dev));
-		dev.type = SNDRV_DMA_TYPE_DEV;
-		dev.dev = snd_dma_isa_data();
-		if (snd_dma_alloc_pages_fallback(&dev, size, buf) < 0) {
+		if (snd_dma_alloc_pages_fallback(SNDRV_DMA_TYPE_DEV, snd_dma_isa_data(),
+						 size, buf) < 0) {
 			snd_printk(KERN_ERR "sscape: Failed to allocate %lu bytes for DMA\n", size);
 			return NULL;
 		}
@@ -195,13 +184,8 @@ static struct snd_dma_buffer *get_dmabuf(struct snd_dma_buffer *buf, unsigned lo
  */
 static void free_dmabuf(struct snd_dma_buffer *buf)
 {
-	if (buf && buf->area) {
-		struct snd_dma_device dev;
-		memset(&dev, 0, sizeof(dev));
-		dev.type = SNDRV_DMA_TYPE_DEV;
-		dev.dev = snd_dma_isa_data();
-		snd_dma_free_pages(&dev, buf);
-	}
+	if (buf && buf->area)
+		snd_dma_free_pages(buf);
 }
 
 

@@ -104,7 +104,7 @@ snd_emux_hwdep_misc_mode(snd_emux_t *emu, void __user *arg)
 static int
 snd_emux_hwdep_ioctl(snd_hwdep_t * hw, struct file *file, unsigned int cmd, unsigned long arg)
 {
-	snd_emux_t *emu = snd_magic_cast(snd_emux_t, hw->private_data, return -ENXIO);
+	snd_emux_t *emu = hw->private_data;
 
 	switch (cmd) {
 	case SNDRV_EMUX_IOCTL_VERSION:

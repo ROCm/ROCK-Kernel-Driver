@@ -345,8 +345,6 @@ send_array(emu8000_t *emu, unsigned short *data, int size)
 		EMU8000_INIT4_WRITE(emu, i, *p);
 }
 
-#define NELEM(arr) (sizeof(arr)/sizeof((arr)[0]))
-
 
 /*
  * Send initialization arrays to start up, this just follows the
@@ -355,18 +353,18 @@ send_array(emu8000_t *emu, unsigned short *data, int size)
 static void __init
 init_arrays(emu8000_t *emu)
 {
-	send_array(emu, init1, NELEM(init1)/4);
+	send_array(emu, init1, ARRAY_SIZE(init1)/4);
 
 	set_current_state(TASK_INTERRUPTIBLE);
 	schedule_timeout((HZ * (44099 + 1024)) / 44100); /* wait for 1024 clocks */
-	send_array(emu, init2, NELEM(init2)/4);
-	send_array(emu, init3, NELEM(init3)/4);
+	send_array(emu, init2, ARRAY_SIZE(init2)/4);
+	send_array(emu, init3, ARRAY_SIZE(init3)/4);
 
 	EMU8000_HWCF4_WRITE(emu, 0);
 	EMU8000_HWCF5_WRITE(emu, 0x83);
 	EMU8000_HWCF6_WRITE(emu, 0x8000);
 
-	send_array(emu, init4, NELEM(init4)/4);
+	send_array(emu, init4, ARRAY_SIZE(init4)/4);
 }
 
 
@@ -821,8 +819,6 @@ snd_emu8000_update_reverb_mode(emu8000_t *emu)
  * mixer interface
  *----------------------------------------------------------------*/
 
-#define chip_t	emu8000_t
-
 /*
  * bass/treble
  */
@@ -1070,7 +1066,7 @@ static int snd_emu8000_free(emu8000_t *hw)
 		release_resource(hw->res_port3);
 		kfree_nocheck(hw->res_port3);
 	}
-	snd_magic_kfree(hw);
+	kfree(hw);
 	return 0;
 }
 
@@ -1078,7 +1074,7 @@ static int snd_emu8000_free(emu8000_t *hw)
  */
 static int snd_emu8000_dev_free(snd_device_t *device)
 {
-	emu8000_t *hw = snd_magic_cast(emu8000_t, device->device_data, return -ENXIO);
+	emu8000_t *hw = device->device_data;
 	return snd_emu8000_free(hw);
 }
 
@@ -1101,7 +1097,7 @@ snd_emu8000_new(snd_card_t *card, int index, long port, int seq_ports, snd_seq_d
 	if (seq_ports <= 0)
 		return 0;
 
-	hw = snd_magic_kcalloc(emu8000_t, 0, GFP_KERNEL);
+	hw = kcalloc(1, sizeof(*hw), GFP_KERNEL);
 	if (hw == NULL)
 		return -ENOMEM;
 	spin_lock_init(&hw->reg_lock);

@@ -294,13 +294,9 @@ struct _snd_ice1712 {
 	int irq;
 
 	unsigned long port;
-	struct resource *res_port;
 	unsigned long ddma_port;
-	struct resource *res_ddma_port;
 	unsigned long dmapath_port;
-	struct resource *res_dmapath_port;
 	unsigned long profi_port;
-	struct resource *res_profi_port;
 
 	struct pci_dev *pci;
 	snd_card_t *card;
@@ -367,8 +363,6 @@ struct _snd_ice1712 {
 	} gpio;
 	struct semaphore gpio_mutex;
 };
-
-#define chip_t ice1712_t
 
 
 /*

@@ -108,7 +108,7 @@ snd_emux_open_seq_oss(snd_seq_oss_arg_t *arg, void *closure)
 	snd_seq_port_callback_t callback;
 	char tmpname[64];
 
-	emu = snd_magic_cast(snd_emux_t, closure, return -EINVAL);
+	emu = closure;
 	snd_assert(arg != NULL && emu != NULL, return -ENXIO);
 
 	down(&emu->register_mutex);
@@ -179,7 +179,7 @@ snd_emux_close_seq_oss(snd_seq_oss_arg_t *arg)
 	snd_emux_port_t *p;
 
 	snd_assert(arg != NULL, return -ENXIO);
-	p = snd_magic_cast(snd_emux_port_t, arg->private_data, return -EINVAL);
+	p = arg->private_data;
 	snd_assert(p != NULL, return -ENXIO);
 
 	emu = p->emu;
@@ -208,7 +208,7 @@ snd_emux_load_patch_seq_oss(snd_seq_oss_arg_t *arg, int format,
 	int rc;
 
 	snd_assert(arg != NULL, return -ENXIO);
-	p = snd_magic_cast(snd_emux_port_t, arg->private_data, return -EINVAL);
+	p = arg->private_data;
 	snd_assert(p != NULL, return -ENXIO);
 
 	emu = p->emu;
@@ -248,7 +248,7 @@ snd_emux_ioctl_seq_oss(snd_seq_oss_arg_t *arg, unsigned int cmd, unsigned long i
 	snd_emux_t *emu;
 
 	snd_assert(arg != NULL, return -ENXIO);
-	p = snd_magic_cast(snd_emux_port_t, arg->private_data, return -EINVAL);
+	p = arg->private_data;
 	snd_assert(p != NULL, return -ENXIO);
 
 	emu = p->emu;
@@ -278,7 +278,7 @@ snd_emux_reset_seq_oss(snd_seq_oss_arg_t *arg)
 	snd_emux_port_t *p;
 
 	snd_assert(arg != NULL, return -ENXIO);
-	p = snd_magic_cast(snd_emux_port_t, arg->private_data, return -EINVAL);
+	p = arg->private_data;
 	snd_assert(p != NULL, return -ENXIO);
 	snd_emux_reset_port(p);
 	return 0;
@@ -296,7 +296,7 @@ snd_emux_event_oss_input(snd_seq_event_t *ev, int direct, void *private_data,
 	snd_emux_port_t *p;
 	unsigned char cmd, *data;
 
-	p = snd_magic_cast(snd_emux_port_t, private_data, return -EINVAL);
+	p = private_data;
 	snd_assert(p != NULL, return -EINVAL);
 	emu = p->emu;
 	snd_assert(emu != NULL, return -EINVAL);
@@ -339,9 +339,11 @@ emuspec_control(snd_emux_t *emu, snd_emux_port_t *port, int cmd,
 	p2 = *(short *) &event[6];
 
 	switch (cmd) {
+#if 0 /* don't do this atomically */
 	case _EMUX_OSS_REMOVE_LAST_SAMPLES:
 		snd_soundfont_remove_unlocked(emu->sflist);
 		break;
+#endif
 	case _EMUX_OSS_SEND_EFFECT:
 		if (chan)
 			snd_emux_send_effect_oss(port, chan, p1, p2);

@@ -93,7 +93,7 @@ snd_emu10k1_synth_get_voice(emu10k1_t *hw)
 	unsigned long flags;
 	int i;
 
-	emu = snd_magic_cast(snd_emux_t, hw->synth, return -EINVAL);
+	emu = hw->synth;
 
 	spin_lock_irqsave(&emu->voice_lock, flags);
 	lookup_voices(emu, hw, best, 1); /* no OFF voices */
@@ -128,7 +128,7 @@ release_voice(snd_emux_voice_t *vp)
 	int dcysusv;
 	emu10k1_t *hw;
 	
-	hw = snd_magic_cast(emu10k1_t, vp->hw, return);
+	hw = vp->hw;
 	dcysusv = 0x8000 | (unsigned char)vp->reg.parm.modrelease;
 	snd_emu10k1_ptr_write(hw, DCYSUSM, vp->ch, dcysusv);
 	dcysusv = 0x8000 | (unsigned char)vp->reg.parm.volrelease | DCYSUSV_CHANNELENABLE_MASK;
@@ -145,7 +145,7 @@ terminate_voice(snd_emux_voice_t *vp)
 	emu10k1_t *hw;
 	
 	snd_assert(vp, return);
-	hw = snd_magic_cast(emu10k1_t, vp->hw, return);
+	hw = vp->hw;
 	snd_emu10k1_ptr_write(hw, DCYSUSV, vp->ch, 0x807f | DCYSUSV_CHANNELENABLE_MASK);
 	if (vp->block) {
 		emu10k1_memblk_t *emem;
@@ -163,7 +163,7 @@ free_voice(snd_emux_voice_t *vp)
 {
 	emu10k1_t *hw;
 	
-	hw = snd_magic_cast(emu10k1_t, vp->hw, return);
+	hw = vp->hw;
 	if (vp->ch >= 0) {
 		snd_emu10k1_ptr_write(hw, IFATN, vp->ch, 0xff00);
 		snd_emu10k1_ptr_write(hw, DCYSUSV, vp->ch, 0x807f | DCYSUSV_CHANNELENABLE_MASK);
@@ -185,7 +185,7 @@ update_voice(snd_emux_voice_t *vp, int update)
 {
 	emu10k1_t *hw;
 	
-	hw = snd_magic_cast(emu10k1_t, vp->hw, return);
+	hw = vp->hw;
 	if (update & SNDRV_EMUX_UPDATE_VOLUME)
 		snd_emu10k1_ptr_write(hw, IFATN_ATTENUATION, vp->ch, vp->avol);
 	if (update & SNDRV_EMUX_UPDATE_PITCH)
@@ -282,7 +282,7 @@ get_voice(snd_emux_t *emu, snd_emux_port_t *port)
 	best_voice_t best[V_END];
 	int i;
 
-	hw = snd_magic_cast(emu10k1_t, emu->hw, return NULL);
+	hw = emu->hw;
 
 	lookup_voices(emu, hw, best, 0);
 	for (i = 0; i < V_END; i++) {
@@ -317,7 +317,7 @@ start_voice(snd_emux_voice_t *vp)
 	emu10k1_t *hw;
 	emu10k1_memblk_t *emem;
 	
-	hw = snd_magic_cast(emu10k1_t, vp->hw, return -EINVAL);
+	hw = vp->hw;
 	ch = vp->ch;
 	snd_assert(ch >= 0, return -EINVAL);
 	chan = vp->chan;
@@ -469,7 +469,7 @@ trigger_voice(snd_emux_voice_t *vp)
 	emu10k1_t *hw;
 	emu10k1_memblk_t *emem;
 	
-	hw = snd_magic_cast(emu10k1_t, vp->hw, return);
+	hw = vp->hw;
 
 	emem = (emu10k1_memblk_t *)vp->block;
 	if (! emem || emem->mapped_page < 0)
