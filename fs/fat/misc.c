@@ -150,7 +150,7 @@ int fat_add_cluster(struct inode *inode)
 		mark_inode_dirty(inode);
 	}
 	if (new_fclus != (inode->i_blocks >> (cluster_bits - 9))) {
-		fat_fs_panic(sb, "clusters badly computed (%d != %ld)",
+		fat_fs_panic(sb, "clusters badly computed (%d != %lu)",
 			new_fclus, inode->i_blocks >> (cluster_bits - 9));
 		fat_cache_inval_inode(inode);
 	}
