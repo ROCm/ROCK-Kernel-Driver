@@ -54,6 +54,7 @@ SECTIONS
   __con_initcall_start = .;
   .con_initcall.init : { *(.con_initcall.init) }
   __con_initcall_end = .;
+  SECURITY_INIT
   . = ALIGN(4096);	/* Align double page for init_task_union */
   __init_end = .;
 

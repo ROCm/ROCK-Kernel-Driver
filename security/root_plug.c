@@ -135,7 +135,7 @@ static void __exit rootplug_exit (void)
 	printk (KERN_INFO "Root Plug module removed\n");
 }
 
-module_init (rootplug_init);
+security_initcall (rootplug_init);
 module_exit (rootplug_exit);
 
 MODULE_DESCRIPTION("Root Plug sample LSM module, written for Linux Journal article");

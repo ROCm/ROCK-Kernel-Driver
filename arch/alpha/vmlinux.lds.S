@@ -74,6 +74,9 @@ SECTIONS
 	__con_initcall_end = .;
   }
 
+  . = ALIGN(8);
+  SECURITY_INIT
+
   . = ALIGN(64);
   __per_cpu_start = .;
   .data.percpu : { *(.data.percpu) }
