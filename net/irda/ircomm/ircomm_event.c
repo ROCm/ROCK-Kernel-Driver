@@ -109,9 +109,7 @@ static int ircomm_state_idle(struct ircomm_cb *self, IRCOMM_EVENT event,
 	default:
 		IRDA_DEBUG(4, "%s(), unknown event: %s\n", __FUNCTION__ ,
 			   ircomm_event[event]);
-		if (skb)
-			dev_kfree_skb(skb);
-		return -EINVAL;
+		ret = -EINVAL;
 	}
 	return ret;
 }
@@ -141,8 +139,6 @@ static int ircomm_state_waiti(struct ircomm_cb *self, IRCOMM_EVENT event,
 	default:
 		IRDA_DEBUG(0, "%s(), unknown event: %s\n", __FUNCTION__ ,
 			   ircomm_event[event]);
-		if (skb)
-			dev_kfree_skb(skb);
 		ret = -EINVAL;
 	}
 	return ret;
@@ -176,8 +172,6 @@ static int ircomm_state_waitr(struct ircomm_cb *self, IRCOMM_EVENT event,
 	default:
 		IRDA_DEBUG(0, "%s(), unknown event = %s\n", __FUNCTION__ ,
 			   ircomm_event[event]);
-		if (skb)
-			dev_kfree_skb(skb);
 		ret = -EINVAL;
 	}
 	return ret;
@@ -220,8 +214,6 @@ static int ircomm_state_conn(struct ircomm_cb *self, IRCOMM_EVENT event,
 	default:
 		IRDA_DEBUG(0, "%s(), unknown event = %s\n", __FUNCTION__ ,
 			   ircomm_event[event]);
-		if (skb)
-			dev_kfree_skb(skb);
 		ret = -EINVAL;
 	}
 	return ret;

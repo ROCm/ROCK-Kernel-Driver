@@ -151,6 +151,13 @@ static int irda_thread(void *startup)
 
 	while (irda_rq_queue.thread != NULL) {
 
+		/* We use TASK_INTERRUPTIBLE, rather than
+		 * TASK_UNINTERRUPTIBLE.  Andrew Morton made this
+		 * change ; he told me that it is safe, because "signal
+		 * blocking is now handled in daemonize()", he added
+		 * that the problem is that "uninterruptible sleep
+		 * contributes to load average", making user worry.
+		 * Jean II */
 		set_task_state(current, TASK_INTERRUPTIBLE);
 		add_wait_queue(&irda_rq_queue.kick, &wait);
 		if (list_empty(&irda_rq_queue.request_list))

@@ -10,7 +10,7 @@
  * Modified by:   Dag Brattli <dagb@cs.uit.no>
  *
  *     Copyright (c) 1998-1999 Dag Brattli, All Rights Reserved.
- *     Copyright (c) 2000-2001 Jean Tourrilhes <jt@hpl.hp.com>
+ *     Copyright (c) 2000-2003 Jean Tourrilhes <jt@hpl.hp.com>
  *
  *     This program is free software; you can redistribute it and/or
  *     modify it under the terms of the GNU General Public License as
@@ -244,7 +244,6 @@ void irlap_connect_indication(struct irlap_cb *self, struct sk_buff *skb)
 
 	irlap_init_qos_capabilities(self, NULL); /* No user QoS! */
 
-	skb_get(skb); /*LEVEL4*/
 	irlmp_link_connect_indication(self->notify.instance, self->saddr,
 				      self->daddr, &self->qos_tx, skb);
 }
@@ -255,12 +254,11 @@ void irlap_connect_indication(struct irlap_cb *self, struct sk_buff *skb)
  *    Service user has accepted incoming connection
  *
  */
-void irlap_connect_response(struct irlap_cb *self, struct sk_buff *skb)
+void irlap_connect_response(struct irlap_cb *self, struct sk_buff *userdata)
 {
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__);
 
-	irlap_do_event(self, CONNECT_RESPONSE, skb, NULL);
-	kfree_skb(skb);
+	irlap_do_event(self, CONNECT_RESPONSE, userdata, NULL);
 }
 
 /*
@@ -305,7 +303,6 @@ void irlap_connect_confirm(struct irlap_cb *self, struct sk_buff *skb)
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == LAP_MAGIC, return;);
 
-	skb_get(skb); /*LEVEL4*/
 	irlmp_link_connect_confirm(self->notify.instance, &self->qos_tx, skb);
 }
 
@@ -322,7 +319,6 @@ void irlap_data_indication(struct irlap_cb *self, struct sk_buff *skb,
 	/* Hide LAP header from IrLMP layer */
 	skb_pull(skb, LAP_ADDR_HEADER+LAP_CTRL_HEADER);
 
-	skb_get(skb); /*LEVEL4*/
 	irlmp_link_data_indication(self->notify.instance, skb, unreliable);
 }
 
@@ -353,6 +349,9 @@ void irlap_data_request(struct irlap_cb *self, struct sk_buff *skb,
 		skb->data[1] = UI_FRAME;
 	else
 		skb->data[1] = I_FRAME;
+
+	/* Don't forget to refcount it - see irlmp_connect_request(). */
+	skb_get(skb);
 
 	/* Add at the end of the queue (keep ordering) - Jean II */
 	skb_queue_tail(&self->txq, skb);
@@ -392,6 +391,8 @@ void irlap_unitdata_request(struct irlap_cb *self, struct sk_buff *skb)
 	skb->data[0] = CBROADCAST;
 	skb->data[1] = UI_FRAME;
 
+	/* Don't need to refcount, see irlmp_connless_data_request() */
+
 	skb_queue_tail(&self->txq_ultra, skb);
 
 	irlap_do_event(self, SEND_UI_FRAME, NULL, NULL);
@@ -416,7 +417,6 @@ void irlap_unitdata_indication(struct irlap_cb *self, struct sk_buff *skb)
 	/* Hide LAP header from IrLMP layer */
 	skb_pull(skb, LAP_ADDR_HEADER+LAP_CTRL_HEADER);
 
-	skb_get(skb); /*LEVEL4*/
 	irlmp_link_unitdata_indication(self->notify.instance, skb);
 }
 #endif /* CONFIG_IRDA_ULTRA */
