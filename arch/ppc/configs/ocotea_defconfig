@@ -4,12 +4,15 @@
 CONFIG_MMU=y
 CONFIG_RWSEM_XCHGADD_ALGORITHM=y
 CONFIG_HAVE_DEC_LOCK=y
+CONFIG_PPC=y
+CONFIG_PPC32=y
 
 #
 # Code maturity level options
 #
 CONFIG_EXPERIMENTAL=y
 CONFIG_CLEAN_COMPILE=y
+# CONFIG_STANDALONE is not set
 CONFIG_BROKEN_ON_SMP=y
 
 #
@@ -40,16 +43,17 @@ CONFIG_OBSOLETE_MODPARM=y
 CONFIG_KMOD=y
 
 #
-# Platform support
+# Processor
 #
-CONFIG_PPC=y
-CONFIG_PPC32=y
 # CONFIG_6xx is not set
 # CONFIG_40x is not set
 CONFIG_44x=y
 # CONFIG_POWER3 is not set
+# CONFIG_POWER4 is not set
 # CONFIG_8xx is not set
 CONFIG_PTE_64BIT=y
+# CONFIG_MATH_EMULATION is not set
+# CONFIG_CPU_FREQ is not set
 CONFIG_4xx=y
 
 #
@@ -65,21 +69,25 @@ CONFIG_IBM_OCP=y
 CONFIG_IBM_EMAC4=y
 # CONFIG_PM is not set
 CONFIG_NOT_COHERENT_CACHE=y
-# CONFIG_SMP is not set
-# CONFIG_PREEMPT is not set
-# CONFIG_MATH_EMULATION is not set
-# CONFIG_CPU_FREQ is not set
 
 #
-# General setup
+# Platform options
 #
-# CONFIG_HIGHMEM is not set
-CONFIG_PCI=y
-CONFIG_PCI_DOMAINS=y
 # CONFIG_PC_KEYBOARD is not set
+# CONFIG_SMP is not set
+# CONFIG_PREEMPT is not set
+# CONFIG_HIGHMEM is not set
 CONFIG_KERNEL_ELF=y
 CONFIG_BINFMT_ELF=y
 # CONFIG_BINFMT_MISC is not set
+CONFIG_CMDLINE_BOOL=y
+CONFIG_CMDLINE="ip=on console=ttyS0,115200"
+
+#
+# Bus options
+#
+CONFIG_PCI=y
+CONFIG_PCI_DOMAINS=y
 # CONFIG_PCI_LEGACY_PROC is not set
 # CONFIG_PCI_NAMES is not set
 # CONFIG_HOTPLUG is not set
@@ -88,8 +96,6 @@ CONFIG_BINFMT_ELF=y
 # Parallel port support
 #
 # CONFIG_PARPORT is not set
-CONFIG_CMDLINE_BOOL=y
-CONFIG_CMDLINE="ip=on console=ttyS0,115200"
 
 #
 # Advanced setup
@@ -122,7 +128,6 @@ CONFIG_BOOT_LOAD=0x01000000
 #
 # Block devices
 #
-# CONFIG_BLK_DEV_FD is not set
 # CONFIG_BLK_CPQ_DA is not set
 # CONFIG_BLK_CPQ_CISS_DA is not set
 # CONFIG_BLK_DEV_DAC960 is not set
@@ -218,7 +223,9 @@ CONFIG_IPV6_SCTP__=y
 # CONFIG_IP_SCTP is not set
 # CONFIG_ATM is not set
 # CONFIG_VLAN_8021Q is not set
-# CONFIG_LLC is not set
+# CONFIG_LLC2 is not set
+# CONFIG_IPX is not set
+# CONFIG_ATALK is not set
 # CONFIG_X25 is not set
 # CONFIG_LAPB is not set
 # CONFIG_NET_DIVERT is not set
@@ -293,8 +300,9 @@ CONFIG_NET_ETHERNET=y
 # CONFIG_NET_RADIO is not set
 
 #
-# Token Ring devices (depends on LLC=y)
+# Token Ring devices
 #
+# CONFIG_TR is not set
 # CONFIG_RCPCI is not set
 # CONFIG_SHAPER is not set
 
@@ -312,6 +320,11 @@ CONFIG_NET_ETHERNET=y
 # IrDA (infrared) support
 #
 # CONFIG_IRDA is not set
+
+#
+# Bluetooth support
+#
+# CONFIG_BT is not set
 
 #
 # ISDN subsystem
@@ -352,7 +365,11 @@ CONFIG_INPUT_MOUSEDEV_SCREEN_Y=768
 #
 # CONFIG_GAMEPORT is not set
 CONFIG_SOUND_GAMEPORT=y
-# CONFIG_SERIO is not set
+CONFIG_SERIO=y
+# CONFIG_SERIO_I8042 is not set
+# CONFIG_SERIO_SERPORT is not set
+# CONFIG_SERIO_CT82C710 is not set
+# CONFIG_SERIO_PCIPS2 is not set
 
 #
 # Input Device Drivers
@@ -380,6 +397,7 @@ CONFIG_HW_CONSOLE=y
 #
 CONFIG_SERIAL_8250=y
 CONFIG_SERIAL_8250_CONSOLE=y
+CONFIG_SERIAL_8250_NR_UARTS=4
 CONFIG_SERIAL_8250_EXTENDED=y
 CONFIG_SERIAL_8250_MANY_PORTS=y
 CONFIG_SERIAL_8250_SHARE_IRQ=y
@@ -401,7 +419,11 @@ CONFIG_UNIX98_PTY_COUNT=256
 # CONFIG_I2C is not set
 
 #
-# I2C Hardware Sensors Mainboard support
+# I2C Algorithms
+#
+
+#
+# I2C Hardware Bus support
 #
 
 #
@@ -437,7 +459,6 @@ CONFIG_UNIX98_PTY_COUNT=256
 # CONFIG_AGP is not set
 # CONFIG_DRM is not set
 # CONFIG_RAW_DRIVER is not set
-# CONFIG_HANGCHECK_TIMER is not set
 
 #
 # Multimedia devices
@@ -480,10 +501,12 @@ CONFIG_UNIX98_PTY_COUNT=256
 # Pseudo filesystems
 #
 CONFIG_PROC_FS=y
+CONFIG_PROC_KCORE=y
 # CONFIG_DEVFS_FS is not set
 CONFIG_DEVPTS_FS=y
 # CONFIG_DEVPTS_FS_XATTR is not set
 # CONFIG_TMPFS is not set
+# CONFIG_HUGETLB_PAGE is not set
 CONFIG_RAMFS=y
 
 #
@@ -537,11 +560,6 @@ CONFIG_MSDOS_PARTITION=y
 #
 # CONFIG_USB is not set
 # CONFIG_USB_GADGET is not set
-
-#
-# Bluetooth support
-#
-# CONFIG_BT is not set
 
 #
 # Library routines
