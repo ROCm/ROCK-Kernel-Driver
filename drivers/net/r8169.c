@@ -1119,7 +1119,7 @@ rtl8169_init_board(struct pci_dev *pdev, struct net_device **dev_out,
 
 	SET_MODULE_OWNER(dev);
 	SET_NETDEV_DEV(dev, &pdev->dev);
-	tp = dev->priv;
+	tp = netdev_priv(dev);
 
 	// enable device (incl. PCI PM wakeup and hotplug setup)
 	rc = pci_enable_device(pdev);
@@ -1270,7 +1270,7 @@ rtl8169_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (rc)
 		return rc;
 
-	tp = dev->priv;
+	tp = netdev_priv(dev);
 	assert(ioaddr != NULL);
 
 	if (RTL_R8(PHYstatus) & TBI_Enable) {
