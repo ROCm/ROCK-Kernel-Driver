@@ -2092,21 +2092,27 @@ static void tb_buffer_sanity_check (struct super_block * p_s_sb,
   if (p_s_bh) {
     if (atomic_read (&(p_s_bh->b_count)) <= 0) {
 
-      reiserfs_panic (p_s_sb, "tb_buffer_sanity_check(): negative or zero reference counter for buffer %s[%d] (%b)\n", descr, level, p_s_bh);
+      reiserfs_panic (p_s_sb, "jmacd-1: tb_buffer_sanity_check(): negative or zero reference counter for buffer %s[%d] (%b)\n", descr, level, p_s_bh);
     }
 
     if ( ! buffer_uptodate (p_s_bh) ) {
-      reiserfs_panic (p_s_sb, "tb_buffer_sanity_check(): buffer is not up to date %s[%d] (%b)\n", descr, level, p_s_bh);
+      reiserfs_panic (p_s_sb, "jmacd-2: tb_buffer_sanity_check(): buffer is not up to date %s[%d] (%b)\n", descr, level, p_s_bh);
     }
 
     if ( ! B_IS_IN_TREE (p_s_bh) ) {
-      reiserfs_panic (p_s_sb, "tb_buffer_sanity_check(): buffer is not in tree %s[%d] (%b)\n", descr, level, p_s_bh);
+      reiserfs_panic (p_s_sb, "jmacd-3: tb_buffer_sanity_check(): buffer is not in tree %s[%d] (%b)\n", descr, level, p_s_bh);
     }
 
-    if (p_s_bh->b_bdev != p_s_sb->s_bdev || 
-	p_s_bh->b_size != p_s_sb->s_blocksize ||
-	p_s_bh->b_blocknr > SB_BLOCK_COUNT(p_s_sb)) {
-      reiserfs_panic (p_s_sb, "tb_buffer_sanity_check(): check failed for buffer %s[%d] (%b)\n", descr, level, p_s_bh);
+    if (p_s_bh->b_bdev != p_s_sb->s_bdev) {
+	reiserfs_panic (p_s_sb, "jmacd-4: tb_buffer_sanity_check(): buffer has wrong device %s[%d] (%b)\n", descr, level, p_s_bh);
+    }
+
+    if (p_s_bh->b_size != p_s_sb->s_blocksize) {
+	reiserfs_panic (p_s_sb, "jmacd-5: tb_buffer_sanity_check(): buffer has wrong blocksize %s[%d] (%b)\n", descr, level, p_s_bh);
+    }
+
+    if (p_s_bh->b_blocknr > SB_BLOCK_COUNT(p_s_sb)) {
+	reiserfs_panic (p_s_sb, "jmacd-6: tb_buffer_sanity_check(): buffer block number too high %s[%d] (%b)\n", descr, level, p_s_bh);
     }
   }
 }
