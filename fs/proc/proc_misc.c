@@ -252,6 +252,18 @@ static struct file_operations proc_cpuinfo_operations = {
 	.release	= seq_release,
 };
 
+extern struct seq_operations vmstat_op;
+static int vmstat_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &vmstat_op);
+}
+static struct file_operations proc_vmstat_file_operations = {
+	open:		vmstat_open,
+	read:		seq_read,
+	llseek:		seq_lseek,
+	release:	seq_release,
+};
+
 #ifdef CONFIG_PROC_HARDWARE
 static int hardware_read_proc(char *page, char **start, off_t off,
 				 int count, int *eof, void *data)
@@ -359,16 +371,8 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 				   + kstat.per_cpu_nice[i] \
 				   + kstat.per_cpu_system[i])));
 	}
-	len += sprintf(page + len,
-		"page %u %u\n"
-		"swap %u %u\n"
-		"intr %u",
-			kstat.pgpgin >> 1,
-			kstat.pgpgout >> 1,
-			kstat.pswpin,
-			kstat.pswpout,
-			sum
-	);
+	len += sprintf(page + len, "intr %u", sum);
+
 #if !defined(CONFIG_ARCH_S390)
 	for (i = 0 ; i < NR_IRQS ; i++)
 		len += sprintf(page + len, " %u", kstat_irqs(i));
@@ -395,29 +399,9 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 	}
 
 	len += sprintf(page + len,
-		"\npageallocs %u\n"
-		"pagefrees %u\n"
-		"pageactiv %u\n"
-		"pagedeact %u\n"
-		"pagefault %u\n"
-		"majorfault %u\n"
-		"pagescan %u\n"
-		"pagesteal %u\n"
-		"pageoutrun %u\n"
-		"allocstall %u\n"
-		"ctxt %lu\n"
+		"\nctxt %lu\n"
 		"btime %lu\n"
 		"processes %lu\n",
-		kstat.pgalloc,
-		kstat.pgfree,
-		kstat.pgactivate,
-		kstat.pgdeactivate,
-		kstat.pgfault,
-		kstat.pgmajfault,
-		kstat.pgscan,
-		kstat.pgsteal,
-		kstat.pageoutrun,
-		kstat.allocstall,
 		nr_context_switches(),
 		xtime.tv_sec - jif / HZ,
 		total_forks);
@@ -646,6 +630,7 @@ void __init proc_misc_init(void)
 	create_seq_entry("interrupts", 0, &proc_interrupts_operations);
 	create_seq_entry("slabinfo",S_IWUSR|S_IRUGO,&proc_slabinfo_operations);
 	create_seq_entry("buddyinfo",S_IRUGO, &fragmentation_file_operations);
+	create_seq_entry("vmstat",S_IRUGO, &proc_vmstat_file_operations);
 #ifdef CONFIG_MODULES
 	create_seq_entry("modules", 0, &proc_modules_operations);
 	create_seq_entry("ksyms", 0, &proc_ksyms_operations);

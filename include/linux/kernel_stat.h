@@ -24,13 +24,6 @@ struct kernel_stat {
 	unsigned int dk_drive_wio[DK_MAX_MAJOR][DK_MAX_DISK];
 	unsigned int dk_drive_rblk[DK_MAX_MAJOR][DK_MAX_DISK];
 	unsigned int dk_drive_wblk[DK_MAX_MAJOR][DK_MAX_DISK];
-	unsigned int pgpgin, pgpgout;
-	unsigned int pswpin, pswpout;
-	unsigned int pgalloc, pgfree;
-	unsigned int pgactivate, pgdeactivate;
-	unsigned int pgfault, pgmajfault;
-	unsigned int pgscan, pgsteal;
-	unsigned int pageoutrun, allocstall;
 #if !defined(CONFIG_ARCH_S390)
 	unsigned int irqs[NR_CPUS][NR_IRQS];
 #endif

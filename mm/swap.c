@@ -38,7 +38,7 @@ void activate_page(struct page *page)
 		del_page_from_inactive_list(zone, page);
 		SetPageActive(page);
 		add_page_to_active_list(zone, page);
-		KERNEL_STAT_INC(pgactivate);
+		inc_page_state(pgactivate);
 	}
 	spin_unlock_irq(&zone->lru_lock);
 }

@@ -70,7 +70,8 @@
 #define PG_direct		16	/* ->pte_chain points directly at pte */
 
 /*
- * Global page accounting.  One instance per CPU.
+ * Global page accounting.  One instance per CPU.  Only unsigned longs are
+ * allowed.
  */
 extern struct page_state {
 	unsigned long nr_dirty;
@@ -80,9 +81,30 @@ extern struct page_state {
 	unsigned long nr_reverse_maps;
 	unsigned long nr_mapped;
 	unsigned long nr_slab;
+#define GET_PAGE_STATE_LAST nr_slab
+
+	/*
+	 * The below are zeroed by get_page_state().  Use get_full_page_state()
+	 * to add up all these.
+	 */
+	unsigned long pgpgin;
+	unsigned long pgpgout;
+	unsigned long pswpin;
+	unsigned long pswpout;
+	unsigned long pgalloc;
+	unsigned long pgfree;
+	unsigned long pgactivate;
+	unsigned long pgdeactivate;
+	unsigned long pgfault;
+	unsigned long pgmajfault;
+	unsigned long pgscan;
+	unsigned long pgsteal;
+	unsigned long pageoutrun;
+	unsigned long allocstall;
 } ____cacheline_aligned_in_smp page_states[NR_CPUS];
 
 extern void get_page_state(struct page_state *ret);
+extern void get_full_page_state(struct page_state *ret);
 
 #define mod_page_state(member, delta)					\
 	do {								\

@@ -13,7 +13,7 @@
  */
 
 #include <linux/config.h>
-#include <linux/kernel_stat.h>
+#include <linux/stddef.h>
 #include <linux/mm.h>
 #include <linux/swap.h>
 #include <linux/interrupt.h>
@@ -24,6 +24,7 @@
 #include <linux/suspend.h>
 #include <linux/pagevec.h>
 #include <linux/blkdev.h>
+#include <linux/slab.h>
 
 unsigned long totalram_pages;
 unsigned long totalhigh_pages;
@@ -86,7 +87,7 @@ void __free_pages_ok (struct page *page, unsigned int order)
 	struct page *base;
 	struct zone *zone;
 
-	KERNEL_STAT_ADD(pgfree, 1<<order);
+	mod_page_state(pgfree, 1<<order);
 
 	BUG_ON(PageLRU(page));
 	BUG_ON(PagePrivate(page));
@@ -324,7 +325,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	if (gfp_mask & __GFP_WAIT)
 		might_sleep();
 
-	KERNEL_STAT_ADD(pgalloc, 1<<order);
+	mod_page_state(pgalloc, 1<<order);
 
 	zones = zonelist->zones;  /* the list of zones suitable for gfp_mask */
 	classzone = zones[0]; 
@@ -397,7 +398,7 @@ nopage:
 	if (!(gfp_mask & __GFP_WAIT))
 		goto nopage;
 
-	KERNEL_STAT_INC(allocstall);
+	inc_page_state(allocstall);
 	page = balance_classzone(classzone, gfp_mask, order, &freed);
 	if (page)
 		return page;
@@ -555,26 +556,37 @@ unsigned int nr_free_highpages (void)
 struct page_state page_states[NR_CPUS] __cacheline_aligned;
 EXPORT_SYMBOL(page_states);
 
-void get_page_state(struct page_state *ret)
+void __get_page_state(struct page_state *ret, int nr)
 {
-	int pcpu;
+	int cpu;
 
 	memset(ret, 0, sizeof(*ret));
-	for (pcpu = 0; pcpu < NR_CPUS; pcpu++) {
-		struct page_state *ps;
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+		unsigned long *in, *out, off;
 
-		if (!cpu_online(pcpu))
+		if (!cpu_online(cpu))
 			continue;
 
-		ps = &page_states[pcpu];
-		ret->nr_dirty += ps->nr_dirty;
-		ret->nr_writeback += ps->nr_writeback;
-		ret->nr_pagecache += ps->nr_pagecache;
-		ret->nr_page_table_pages += ps->nr_page_table_pages;
-		ret->nr_reverse_maps += ps->nr_reverse_maps;
-		ret->nr_mapped += ps->nr_mapped;
-		ret->nr_slab += ps->nr_slab;
+		in = (unsigned long *)(page_states + cpu);
+		out = (unsigned long *)ret;
+		for (off = 0; off < nr; off++)
+			*out++ += *in++;
 	}
+}
+
+void get_page_state(struct page_state *ret)
+{
+	int nr;
+
+	nr = offsetof(struct page_state, GET_PAGE_STATE_LAST);
+	nr /= sizeof(unsigned long);
+
+	__get_page_state(ret, nr + 1);
+}
+
+void get_full_page_state(struct page_state *ret)
+{
+	__get_page_state(ret, sizeof(*ret) / sizeof(unsigned long));
 }
 
 void get_zone_counts(unsigned long *active, unsigned long *inactive)
@@ -1046,6 +1058,76 @@ struct seq_operations fragmentation_op = {
 	.next	= frag_next,
 	.stop	= frag_stop,
 	.show	= frag_show,
+};
+
+static char *vmstat_text[] = {
+	"nr_dirty",
+	"nr_writeback",
+	"nr_pagecache",
+	"nr_page_table_pages",
+	"nr_reverse_maps",
+	"nr_mapped",
+	"nr_slab",
+
+	"pgpgin",
+	"pgpgout",
+	"pswpin",
+	"pswpout",
+	"pgalloc",
+	"pgfree",
+	"pgactivate",
+	"pgdeactivate",
+	"pgfault",
+	"pgmajfault",
+	"pgscan",
+	"pgsteal",
+	"pageoutrun",
+	"allocstall",
+};
+
+static void *vmstat_start(struct seq_file *m, loff_t *pos)
+{
+	struct page_state *ps;
+
+	if (*pos >= ARRAY_SIZE(vmstat_text))
+		return NULL;
+
+	ps = kmalloc(sizeof(*ps), GFP_KERNEL);
+	m->private = ps;
+	if (!ps)
+		return ERR_PTR(-ENOMEM);
+	get_full_page_state(ps);
+	return (unsigned long *)ps + *pos;
+}
+
+static void *vmstat_next(struct seq_file *m, void *arg, loff_t *pos)
+{
+	(*pos)++;
+	if (*pos >= ARRAY_SIZE(vmstat_text))
+		return NULL;
+	return (unsigned long *)m->private + *pos;
+}
+
+static int vmstat_show(struct seq_file *m, void *arg)
+{
+	unsigned long *l = arg;
+	unsigned long off = l - (unsigned long *)m->private;
+
+	seq_printf(m, "%s %lu\n", vmstat_text[off], *l);
+	return 0;
+}
+
+static void vmstat_stop(struct seq_file *m, void *arg)
+{
+	kfree(m->private);
+	m->private = NULL;
+}
+
+struct seq_operations vmstat_op = {
+	.start	= vmstat_start,
+	.next	= vmstat_next,
+	.stop	= vmstat_stop,
+	.show	= vmstat_show,
 };
 
 #endif /* CONFIG_PROC_FS */

@@ -31,7 +31,7 @@ al español de este documento en varios formatos.
 Eine deutsche Version dieser Datei finden Sie unter
 <http://www.stefan-winter.de/Changes-2.4.0.txt>.
 
-Last updated: January 22, 2002
+Last updated: October 1st, 2002
 
 Chris Ricker (kaboom@gatech.edu or chris.ricker@genetics.utah.edu).
 
@@ -60,7 +60,8 @@ o  xfsprogs               2.1.0                   # xfs_db -V
 o  pcmcia-cs              3.1.21                  # cardmgr -V
 o  PPP                    2.4.0                   # pppd --version
 o  isdn4k-utils           3.1pre1                 # isdnctrl 2>&1|grep version
-			  
+o  procps                 2.0.9                   # ps --version
+
 Kernel compilation
 ==================
 
@@ -80,9 +81,7 @@ almost certainly bugs (mainly, but not exclusively, in the kernel) that
 will need to be fixed in order to use these compilers. In any case, using
 pgcc instead of plain gcc is just asking for trouble.
 
-Note that gcc 2.7.2.3 and  gcc 2.91.66 (egcs-1.1.2) are no longer supported
-kernel compilers. The kernel no longer works around bugs in these versions,
-and, in fact, will refuse to be compiled with it.
+gcc 2.91.66 (egcs-1.1.2) continues to be supported for SPARC64 requirements.
 
 The Red Hat gcc 2.96 compiler subtree can also be used to build this tree.
 You should ensure you use gcc-2.96-74 or later. gcc-2.96-54 will not build

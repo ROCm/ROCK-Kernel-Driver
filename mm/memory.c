@@ -1216,7 +1216,7 @@ static int do_swap_page(struct mm_struct * mm,
 
 		/* Had to read the page from swap area: Major fault */
 		ret = VM_FAULT_MAJOR;
-		KERNEL_STAT_INC(pgmajfault);
+		inc_page_state(pgmajfault);
 	}
 
 	mark_page_accessed(page);
@@ -1461,7 +1461,7 @@ int handle_mm_fault(struct mm_struct *mm, struct vm_area_struct * vma,
 	current->state = TASK_RUNNING;
 	pgd = pgd_offset(mm, address);
 
-	KERNEL_STAT_INC(pgfault);
+	inc_page_state(pgfault);
 	/*
 	 * We need the page table lock to synchronize with kswapd
 	 * and the SMP-safe atomic PTE updates.

@@ -1098,7 +1098,7 @@ no_cached_page:
 	return NULL;
 
 page_not_uptodate:
-	KERNEL_STAT_INC(pgmajfault);
+	inc_page_state(pgmajfault);
 	lock_page(page);
 
 	/* Did it get unhashed while we waited for it? */

@@ -1856,21 +1856,14 @@ int submit_bio(int rw, struct bio *bio)
 {
 	int count = bio_sectors(bio);
 
-	/*
-	 * do some validity checks...
-	 */
 	BUG_ON(!bio->bi_end_io);
-
 	BIO_BUG_ON(!bio->bi_size);
 	BIO_BUG_ON(!bio->bi_io_vec);
-
 	bio->bi_rw = rw;
-
 	if (rw & WRITE)
-		kstat.pgpgout += count;
+		mod_page_state(pgpgout, count);
 	else
-		kstat.pgpgin += count;
-
+		mod_page_state(pgpgin, count);
 	generic_make_request(bio);
 	return 1;
 }
