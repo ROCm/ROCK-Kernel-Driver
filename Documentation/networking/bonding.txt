@@ -503,7 +503,7 @@ The main limitations are :
 Resources and links
 ===================
 
-Current developement on this driver is posted to:
+Current development on this driver is posted to:
  - http://www.sourceforge.net/projects/bonding/
 
 Donald Becker's Ethernet Drivers and diag programs may be found at :

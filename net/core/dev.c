@@ -445,7 +445,7 @@ struct net_device *dev_get_by_name(const char *name)
 
 /* 
    Return value is changed to int to prevent illegal usage in future.
-   It is still legal to use to check for device existance.
+   It is still legal to use to check for device existence.
 
    User should understand, that the result returned by this function
    is meaningless, if it was not issued under rtnl semaphore.

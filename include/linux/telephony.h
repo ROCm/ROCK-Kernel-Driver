@@ -228,8 +228,8 @@ struct phone_codec_data
 * indicate the current state of the hookswitch.  The pstn_ring bit
 * indicates that the DAA on a LineJACK card has detected ring voltage on
 * the PSTN port.  The caller_id bit indicates that caller_id data has been
-* recieved and is available.  The pstn_wink bit indicates that the DAA on
-* the LineJACK has recieved a wink from the telco switch.  The f0, f1, f2
+* received and is available.  The pstn_wink bit indicates that the DAA on
+* the LineJACK has received a wink from the telco switch.  The f0, f1, f2
 * and f3 bits indicate that the filter has been triggered by detecting the
 * frequency programmed into that filter.
 *

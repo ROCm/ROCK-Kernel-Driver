@@ -612,7 +612,7 @@ void usb_stor_transfer(Scsi_Cmnd *srb, struct us_data* us)
 /* Invoke the transport and basic error-handling/recovery methods
  *
  * This is used by the protocol layers to actually send the message to
- * the device and recieve the response.
+ * the device and receive the response.
  */
 void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 {
@@ -798,7 +798,7 @@ void usb_stor_CBI_irq(struct urb *urb)
 {
 	struct us_data *us = (struct us_data *)urb->context;
 
-	US_DEBUGP("USB IRQ recieved for device on host %d\n", us->host_no);
+	US_DEBUGP("USB IRQ received for device on host %d\n", us->host_no);
 	US_DEBUGP("-- IRQ data length is %d\n", urb->actual_length);
 	US_DEBUGP("-- IRQ state is %d\n", urb->status);
 	US_DEBUGP("-- Interrupt Status (0x%x, 0x%x)\n",

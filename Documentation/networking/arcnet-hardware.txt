@@ -2256,7 +2256,7 @@ function, and the 8th switch is used to select "compatible" or "enhanced".
 When I got my two cards, one of them had this switch set to "enhanced". That
 card didn't work at all, it wasn't even recognized by the driver. The other
 card had this switch set to "compatible" and it behaved absolutely normally. I
-guess that the switch on one of the cards, must have been changed accidently
+guess that the switch on one of the cards, must have been changed accidentally
 when the card was taken out of its former host. The question remains
 unanswered, what is the purpose of the "enhanced" position?
 
