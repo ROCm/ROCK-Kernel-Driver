@@ -45,7 +45,6 @@
 #include <linux/inet.h>
 #include <linux/netdevice.h>
 #include <linux/icmpv6.h>
-#include <linux/brlock.h>
 #include <linux/smp_lock.h>
 
 #include <net/ip.h>
@@ -102,7 +101,8 @@ kmem_cache_t *raw6_sk_cachep;
 /* The inetsw table contains everything that inet_create needs to
  * build a new socket.
  */
-struct list_head inetsw6[SOCK_MAX];
+static struct list_head inetsw6[SOCK_MAX];
+static spinlock_t inetsw6_lock = SPIN_LOCK_UNLOCKED;
 
 static void inet6_sock_destruct(struct sock *sk)
 {
@@ -162,8 +162,8 @@ static int inet6_create(struct socket *sock, int protocol)
 
 	/* Look for the requested type/protocol pair. */
 	answer = NULL;
-	br_read_lock_bh(BR_NETPROTO_LOCK);
-	list_for_each(p, &inetsw6[sock->type]) {
+	rcu_read_lock();
+	list_for_each_rcu(p, &inetsw6[sock->type]) {
 		answer = list_entry(p, struct inet_protosw, list);
 
 		/* Check the non-wild match. */
@@ -181,7 +181,6 @@ static int inet6_create(struct socket *sock, int protocol)
 		}
 		answer = NULL;
 	}
-	br_read_unlock_bh(BR_NETPROTO_LOCK);
 
 	if (!answer)
 		goto free_and_badtype;
@@ -198,6 +197,7 @@ static int inet6_create(struct socket *sock, int protocol)
 	sk->no_check = answer->no_check;
 	if (INET_PROTOSW_REUSE & answer->flags)
 		sk->reuse = 1;
+	rcu_read_unlock();
 
 	inet = inet_sk(sk);
 
@@ -260,12 +260,15 @@ static int inet6_create(struct socket *sock, int protocol)
 	return 0;
 
 free_and_badtype:
+	rcu_read_unlock();
 	sk_free(sk);
 	return -ESOCKTNOSUPPORT;
 free_and_badperm:
+	rcu_read_unlock();
 	sk_free(sk);
 	return -EPERM;
 free_and_noproto:
+	rcu_read_unlock();
 	sk_free(sk);
 	return -EPROTONOSUPPORT;
 do_oom:
@@ -574,7 +577,7 @@ inet6_register_protosw(struct inet_protosw *p)
 	int protocol = p->protocol;
 	struct list_head *last_perm;
 
-	br_write_lock_bh(BR_NETPROTO_LOCK);
+	spin_lock_bh(&inetsw6_lock);
 
 	if (p->type > SOCK_MAX)
 		goto out_illegal;
@@ -603,9 +606,9 @@ inet6_register_protosw(struct inet_protosw *p)
 	 * non-permanent entry.  This means that when we remove this entry, the 
 	 * system automatically returns to the old behavior.
 	 */
-	list_add(&p->list, last_perm);
+	list_add_rcu(&p->list, last_perm);
 out:
-	br_write_unlock_bh(BR_NETPROTO_LOCK);
+	spin_unlock_bh(&inetsw6_lock);
 	return;
 
 out_permanent:
@@ -623,7 +626,17 @@ out_illegal:
 void
 inet6_unregister_protosw(struct inet_protosw *p)
 {
-	inet_unregister_protosw(p);
+	if (INET_PROTOSW_PERMANENT & p->flags) {
+		printk(KERN_ERR
+		       "Attempt to unregister permanent protocol %d.\n",
+		       p->protocol);
+	} else {
+		spin_lock_bh(&inetsw6_lock);
+		list_del_rcu(&p->list);
+		spin_unlock_bh(&inetsw6_lock);
+
+		synchronize_kernel();
+	}
 }
 
 int
