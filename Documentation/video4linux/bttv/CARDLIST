@@ -7,13 +7,13 @@ bttv.o
   card=5 - Diamond DTV2000
   card=6 - AVerMedia TVPhone
   card=7 - MATRIX-Vision MV-Delta
-  card=8 - Fly Video II (Bt848)
-  card=9 - TurboTV
+  card=8 - FlyVideo II (Bt848) LR26
+  card=9 - IXMicro TurboTV
   card=10 - Hauppauge (bt878)
   card=11 - MIRO PCTV pro
   card=12 - ADS Technologies Channel Surfer TV
   card=13 - AVerMedia TVCapture 98
-  card=14 - Aimslab VHX
+  card=14 - Aimslab Video Highway Xtreme (VHX)
   card=15 - Zoltrix TV-Max
   card=16 - Pixelview PlayTV (bt878)
   card=17 - Leadtek WinView 601
@@ -21,7 +21,7 @@ bttv.o
   card=19 - LifeView FlyKit w/o Tuner
   card=20 - CEI Raffles Card
   card=21 - Lucky Star Image World ConferenceTV
-  card=22 - Phoebe Tv Master + FM
+  card=22 - Phoebe Tv Master + FM (CPH050)
   card=23 - Modular Technology MM205 PCTV, bt878
   card=24 - [many vendors] CPH05X/06X (bt878)
   card=25 - Terratec/Vobis TV-Boostar
@@ -54,12 +54,12 @@ bttv.o
   card=52 - Pinnacle PCTV Studio Pro
   card=53 - Typhoon TView RDS + FM Stereo / KNC1 TV Station RDS
   card=54 - Lifetec LT 9415 TV (LR90 Rev.F)
-  card=55 - BESTBUY Easy TV
+  card=55 - BESTBUY Easy TV (CPH031)
   card=56 - FlyVideo '98/FM
-  card=57 - GrandTec 'Grand Video Capture'
-  card=58 - Phoebe TV Master Only (No FM)
-  card=59 - TV Capturer
-  card=60 - MM100PCTV
+  card=57 - GrandTec 'Grand Video Capture' (Bt848)
+  card=58 - Phoebe TV Master Only (No FM) CPH060
+  card=59 - TV Capturer (CPH03X)
+  card=60 - Modular Technology MM100PCTV
   card=61 - AG Electronics GMV1
   card=62 - BESTBUY Easy TV (bt878)
   card=63 - ATI TV-Wonder
@@ -72,6 +72,12 @@ bttv.o
   card=70 - PV-BT878P+
   card=71 - Flyvideo 98EZ (capture only)
   card=72 - Prolink PV-BT878P+9B (PlayTV Pro rev.9B FM+NICAM)
+  card=73 - Sensoray 311
+  card=74 - RemoteVision MX (RV605)
+  card=75 - Powercolor MTV878/ MTV878R/ MTV878F
+  card=76 - Canopus WinDVR PCI (COMPAQ Presario 3524JP, 5112JP)
+  card=77 - GrandTec Multi Capture Card (Bt878)
+  card=78 - AOPEN VA1000
 
 tuner.o
   type=0 - Temic PAL (4002 FH5)
@@ -94,7 +100,7 @@ tuner.o
   type=17 - Philips NTSC_M (MK2)
   type=18 - Temic PAL_I (4066 FY5)
   type=19 - Temic PAL* auto (4006 FN5)
-  type=20 - Temic PAL (4009 FR5)
+  type=20 - Temic PAL_BG (4009 FR5) or PAL_I (4069 FR5)
   type=21 - Temic NTSC (4039 FR5)
   type=22 - Temic PAL/SECAM multi (4046 FM5)
   type=23 - Philips PAL_DK

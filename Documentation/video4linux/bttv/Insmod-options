@@ -28,7 +28,7 @@ bttv.o
 				default is 0 (off).
 		irq_debug=0/1	irq handler debug messages.
 				default is 0 (off).
-		gbuffers=2-64	number of capture buffers for mmap'ed capture.
+		gbuffers=2-32	number of capture buffers for mmap'ed capture.
 				default is 2.
 		gbufsize=	size of capture buffers. default and
 				maximum value is 0x208000 (~2MB)
@@ -38,6 +38,13 @@ bttv.o
 				push used by bttv.  bttv will disable overlay
 				by default on this hardware to avoid crashes.
 				With this insmod option you can override this.
+		automute=0/1	Automatically mutes the sound if there is
+				no TV signal, on by default.  You might try
+				to disable this if you have bad input signal
+				quality which leading to unwanted sound
+				dropouts.
+		chroma_agc=0/1	AGC of chroma signal, off by default.
+		adc_crush=0/1	Luminance ADC crush, on by default.
 
 		bttv_gpio=0/1
 		gpiomask=
@@ -89,6 +96,8 @@ tvaudio.o
 	insmod args for tda9874a:
 		tda9874a_SIF=1/2	select sound IF input pin (1 or 2)
 					(default is pin 1)
+		tda9874a_AMSEL=0/1	auto-mute select for NICAM (default=0)
+					Please read note 3 below!
 		tda9874a_STD=n		select TV sound standard (0..8):
 					0 - A2, B/G
 					1 - A2, M (Korea)
@@ -100,11 +109,20 @@ tvaudio.o
 					7 - NICAM, D/K (default)
 					8 - NICAM, L
 
-	Note: tda9874a is very similar to tda9874 (without 'A'-suffix), but
-	this driver will not work for the latter device (will not load).
-	Note: tda9874a and tda9875 (which is supported separately by
+	Note 1: tda9874a supports both tda9874h (old) and tda9874a (new) chips.
+	Note 2: tda9874h/a and tda9875 (which is supported separately by
 	tda9875.o) use the same i2c address so both modules should not be
 	used at the same time.
+	Note 3: Using tda9874a_AMSEL option depends on your TV card design!
+		AMSEL=0: auto-mute will switch between NICAM sound
+			 and the sound on 1st carrier (i.e. FM mono or AM).
+		AMSEL=1: auto-mute will switch between NICAM sound
+			 and the analog mono input (MONOIN pin).
+	If tda9874a decoder on your card has MONOIN pin not connected, then
+	use only tda9874_AMSEL=0 or don't specify this option at all.
+	For example:
+	  card=65 (FlyVideo 2000S) - set AMSEL=1 or AMSEL=0
+	  card=72 (Prolink PV-BT878P rev.9B) - set AMSEL=0 only
 
 msp3400.o
 	The driver for the msp34xx sound processor chips. If you have a
