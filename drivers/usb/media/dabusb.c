@@ -800,7 +800,7 @@ static void dabusb_disconnect (struct usb_interface *intf)
 }
 
 static struct usb_device_id dabusb_ids [] = {
-	{ USB_DEVICE(0x0547, 0x2131) },
+	// { USB_DEVICE(0x0547, 0x2131) },	/* An2131 chip, no boot ROM */
 	{ USB_DEVICE(0x0547, 0x9999) },
 	{ }						/* Terminating entry */
 };
