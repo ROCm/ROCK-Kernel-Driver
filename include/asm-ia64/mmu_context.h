@@ -54,10 +54,10 @@ enter_lazy_tlb (struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
 static inline void
 delayed_tlb_flush (void)
 {
-	extern void __flush_tlb_all (void);
+	extern void local_flush_tlb_all (void);
 
 	if (unlikely(__get_cpu_var(ia64_need_tlb_flush))) {
-		__flush_tlb_all();
+		local_flush_tlb_all();
 		__get_cpu_var(ia64_need_tlb_flush) = 0;
 	}
 }

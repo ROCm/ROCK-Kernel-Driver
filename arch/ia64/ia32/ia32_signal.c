@@ -165,10 +165,10 @@ copy_siginfo_to_user32 (siginfo_t32 *to, siginfo_t *from)
  *    sw         ar.fsr(0:15)
  *    tag        ar.fsr(16:31)               with odd numbered bits not used
  *                                           (read returns 0, writes ignored)
- *    ipoff      ar.fir(0:31)   RO
- *    cssel      ar.fir(32:47)  RO
- *    dataoff    ar.fdr(0:31)   RO
- *    datasel    ar.fdr(32:47)  RO
+ *    ipoff      ar.fir(0:31)
+ *    cssel      ar.fir(32:47)
+ *    dataoff    ar.fdr(0:31)
+ *    datasel    ar.fdr(32:47)
  *
  *    _st[(0+TOS)%8]   f8
  *    _st[(1+TOS)%8]   f9                    (f8, f9 from ptregs)
@@ -328,7 +328,7 @@ restore_ia32_fpstate_live (struct _fpstate_ia32 *save)
 	unsigned long num64, mxcsr;
 	struct _fpreg_ia32 *fpregp;
 	char buf[32];
-	unsigned long fsr, fcr;
+	unsigned long fsr, fcr, fir, fdr;
 	int fp_tos, fr8_st_map;
 
 	if (!access_ok(VERIFY_READ, save, sizeof(*save)))
@@ -345,6 +345,8 @@ restore_ia32_fpstate_live (struct _fpstate_ia32 *save)
 	 */
 	asm volatile ( "mov %0=ar.fsr;" : "=r"(fsr));
 	asm volatile ( "mov %0=ar.fcr;" : "=r"(fcr));
+	asm volatile ( "mov %0=ar.fir;" : "=r"(fir));
+	asm volatile ( "mov %0=ar.fdr;" : "=r"(fdr));
 
 	__get_user(mxcsr, (unsigned int *)&save->mxcsr);
 	/* setting bits 0..5 8..12 with cw and 39..47 from mxcsr */
@@ -355,14 +357,34 @@ restore_ia32_fpstate_live (struct _fpstate_ia32 *save)
 
 	/* setting bits 0..31 with sw and tag and 32..37 from mxcsr */
 	__get_user(lo, (unsigned int *)&save->sw);
+	/* set bits 15,7 (fsw.b, fsw.es) to reflect the current error status */
+	if ( !(lo & 0x7f) )
+		lo &= (~0x8080);
 	__get_user(hi, (unsigned int *)&save->tag);
 	num64 = mxcsr & 0x3f;
 	num64 = (num64 << 16) | (hi & 0xffff);
 	num64 = (num64 << 16) | (lo & 0xffff);
 	fsr = (fsr & (~0x3fffffffff)) | num64;
 
+	/* setting bits 0..47 with cssel and ipoff */
+	__get_user(lo, (unsigned int *)&save->ipoff);
+	__get_user(hi, (unsigned int *)&save->cssel);
+	num64 = hi & 0xffff;
+	num64 = (num64 << 32) | lo;
+	fir = (fir & (~0xffffffffffff)) | num64;
+
+	/* setting bits 0..47 with datasel and dataoff */
+	__get_user(lo, (unsigned int *)&save->dataoff);
+	__get_user(hi, (unsigned int *)&save->datasel);
+	num64 = hi & 0xffff;
+	num64 = (num64 << 32) | lo;
+	fdr = (fdr & (~0xffffffffffff)) | num64;
+
 	asm volatile ( "mov ar.fsr=%0;" :: "r"(fsr));
 	asm volatile ( "mov ar.fcr=%0;" :: "r"(fcr));
+	asm volatile ( "mov ar.fir=%0;" :: "r"(fir));
+	asm volatile ( "mov ar.fdr=%0;" :: "r"(fdr));
+
 	/*
 	 * restore f8, f9 onto pt_regs
 	 * restore f10..f15 onto live registers

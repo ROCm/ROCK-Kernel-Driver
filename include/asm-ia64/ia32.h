@@ -130,6 +130,44 @@ struct sigcontext_ia32 {
        unsigned int cr2;
 };
 
+/* user.h */
+/*
+ * IA32 (Pentium III/4) FXSR, SSE support
+ *
+ * Provide support for the GDB 5.0+ PTRACE_{GET|SET}FPXREGS requests for
+ * interacting with the FXSR-format floating point environment.  Floating
+ * point data can be accessed in the regular format in the usual manner,
+ * and both the standard and SIMD floating point data can be accessed via
+ * the new ptrace requests.  In either case, changes to the FPU environment
+ * will be reflected in the task's state as expected.
+ */
+struct ia32_user_i387_struct {
+	int	cwd;
+	int	swd;
+	int	twd;
+	int	fip;
+	int	fcs;
+	int	foo;
+	int	fos;
+	int	st_space[20];	/* 8*10 bytes for each FP-reg = 80 bytes */
+};
+
+struct ia32_user_fxsr_struct {
+	unsigned short	cwd;
+	unsigned short	swd;
+	unsigned short	twd;
+	unsigned short	fop;
+	int	fip;
+	int	fcs;
+	int	foo;
+	int	fos;
+	int	mxcsr;
+	int	reserved;
+	int	st_space[32];	/* 8*16 bytes for each FP-reg = 128 bytes */
+	int	xmm_space[32];	/* 8*16 bytes for each XMM-reg = 128 bytes */
+	int	padding[56];
+};
+
 /* signal.h */
 #define _IA32_NSIG	       64
 #define _IA32_NSIG_BPW	       32
@@ -462,6 +500,8 @@ typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
 #define IA32_PTRACE_SETREGS	13
 #define IA32_PTRACE_GETFPREGS	14
 #define IA32_PTRACE_SETFPREGS	15
+#define IA32_PTRACE_GETFPXREGS	18
+#define IA32_PTRACE_SETFPXREGS	19
 
 #define ia32_start_thread(regs,new_ip,new_sp) do {				\
 	set_fs(USER_DS);							\

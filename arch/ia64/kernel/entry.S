@@ -1160,7 +1160,7 @@ sys_call_table:
 	data8 sys_mlock
 	data8 sys_mlockall
 	data8 sys_mprotect			// 1155
-	data8 sys_mremap
+	data8 ia64_mremap
 	data8 sys_msync
 	data8 sys_munlock
 	data8 sys_munlockall

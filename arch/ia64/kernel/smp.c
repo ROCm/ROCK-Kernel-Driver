@@ -206,8 +206,20 @@ smp_send_reschedule_all (void)
 void
 smp_flush_tlb_all (void)
 {
-	smp_call_function((void (*)(void *))__flush_tlb_all, 0, 1, 1);
-	__flush_tlb_all();
+	smp_call_function((void (*)(void *))local_flush_tlb_all, 0, 1, 1);
+	local_flush_tlb_all();
+}
+
+void
+smp_flush_tlb_mm (struct mm_struct *mm)
+{
+	local_flush_tlb_mm(mm);
+
+	/* this happens for the common case of a single-threaded fork():  */
+	if (likely(mm == current->active_mm && atomic_read(&mm->mm_users) == 1))
+		return;
+
+	smp_call_function((void (*)(void *))local_flush_tlb_mm, mm, 1, 1);
 }
 
 /*
