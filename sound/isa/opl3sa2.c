@@ -752,6 +752,7 @@ static int __devinit snd_opl3sa2_probe(int dev,
 		err = -ENOMEM;
 		goto __error;
 	}
+	spin_lock_init(&chip->reg_lock);
 	chip->irq = -1;
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops)) < 0)
 		goto __error;
