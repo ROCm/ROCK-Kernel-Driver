@@ -379,24 +379,29 @@ int usb_submit_urb(struct urb *urb, int mem_flags)
  * usb_unlink_urb - abort/cancel a transfer request for an endpoint
  * @urb: pointer to urb describing a previously submitted request
  *
- * This routine cancels an in-progress request.  The requests's
- * completion handler will be called with a status code indicating
- * that the request has been canceled, and that control of the URB
- * has been returned to that device driver.
+ * This routine cancels an in-progress request.  URBs complete only
+ * once per submission, and may be canceled only once per submission.
+ * Successful cancelation means the requests's completion handler will
+ * be called with a status code indicating that the request has been
+ * canceled (rather than any other code) and will quickly be removed
+ * from host controller data structures.
  *
  * When the URB_ASYNC_UNLINK transfer flag for the URB is clear, this
  * request is synchronous.  Success is indicated by returning zero,
- * at which time the urb will have been unlinked,
- * and the completion function will see status -ENOENT.  Failure is
- * indicated by any other return value.  This mode may not be used
+ * at which time the urb will have been unlinked and its completion
+ * handler will have been called with urb->status -ENOENT.  Failure is
+ * indicated by any other return value.
+ *
+ * The synchronous cancelation mode may not be used
  * when unlinking an urb from an interrupt context, such as a bottom
- * half or a completion handler,
+ * half or a completion handler; or when holding a spinlock; or in
+ * other cases when the caller can't schedule().
  *
  * When the URB_ASYNC_UNLINK transfer flag for the URB is set, this
  * request is asynchronous.  Success is indicated by returning -EINPROGRESS,
- * at which time the urb will normally not have been unlinked,
- * and the completion function will see status -ECONNRESET.  Failure is
- * indicated by any other return value.
+ * at which time the urb will normally not have been unlinked.
+ * The completion function will see urb->status -ECONNRESET.  Failure
+ * is indicated by any other return value.
  */
 int usb_unlink_urb(struct urb *urb)
 {
