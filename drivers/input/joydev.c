@@ -445,7 +445,9 @@ static struct input_handle *joydev_connect(struct input_handler *handler, struct
 	}
 
 	joydev_table[minor] = joydev;
-	input_register_minor("js%d", minor, JOYDEV_MINOR_BASE);
+	
+	devfs_mk_cdev(MKDEV(INPUT_MAJOR, JOYDEV_MINOR_BASE + minor),
+			S_IFCHR|S_IRUGO|S_IWUSR, "js%d", minor);
 
 	return &joydev->handle;
 }
