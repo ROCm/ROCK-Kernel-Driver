@@ -391,31 +391,6 @@ static void cs461x_clear_serial_FIFOs(struct cs_card *card, int type);
 static int cs46xx_suspend_tbl(struct pci_dev *pcidev, u32 state);
 static int cs46xx_resume_tbl(struct pci_dev *pcidev);
 
-static inline unsigned ld2(unsigned int x)
-{
-	unsigned r = 0;
-	
-	if (x >= 0x10000) {
-		x >>= 16;
-		r += 16;
-	}
-	if (x >= 0x100) {
-		x >>= 8;
-		r += 8;
-	}
-	if (x >= 0x10) {
-		x >>= 4;
-		r += 4;
-	}
-	if (x >= 4) {
-		x >>= 2;
-		r += 2;
-	}
-	if (x >= 2)
-		r++;
-	return r;
-}
-
 #if CSDEBUG
 
 /* DEBUG ROUTINES */

@@ -1162,15 +1162,6 @@ static inline void enable_dac_unlocked(struct cm_state *s)
 		enable_adc(s);
 }
 
-static inline void enable_dac(struct cm_state *s)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&s->lock, flags);
-	enable_dac_unlocked(s);
-	spin_unlock_irqrestore(&s->lock, flags);
-}
-
 static inline void stop_adc_unlocked(struct cm_state *s)
 {
 	if (s->enable & ENADC) {

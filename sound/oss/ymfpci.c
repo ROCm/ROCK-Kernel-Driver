@@ -124,11 +124,6 @@ MODULE_DEVICE_TABLE(pci, ymf_id_tbl);
  *  common I/O routines
  */
 
-static inline u8 ymfpci_readb(ymfpci_t *codec, u32 offset)
-{
-	return readb(codec->reg_area_virt + offset);
-}
-
 static inline void ymfpci_writeb(ymfpci_t *codec, u32 offset, u8 val)
 {
 	writeb(val, codec->reg_area_virt + offset);
