@@ -422,7 +422,6 @@ retry:
 		vp = LINVFS_GET_VP(inode);
 		if (inode->i_state & I_NEW) {
 inode_allocate:
-			XFS_STATS_INC(xfsstats.vn_alloc);
 			vn_initialize(inode);
 			error = xfs_iget_core(vp, mp, tp, ino,
 							lock_flags, ipp, bno);
