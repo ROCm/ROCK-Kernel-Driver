@@ -250,7 +250,7 @@ int i2c_del_driver(struct i2c_driver *driver)
 					continue;
 				DEB2(printk(KERN_DEBUG "i2c-core.o: "
 					    "detaching client %s:\n",
-					    client->dev.name));
+					    client->name));
 				if ((res = driver->detach_client(client))) {
 					dev_err(&adap->dev, "while "
 						"unregistering driver "
@@ -352,7 +352,7 @@ int i2c_detach_client(struct i2c_client *client)
 		if (res) {
 			printk(KERN_ERR
 			       "i2c-core.o: client_unregister [%s] failed, "
-			       "client not detached", client->dev.name);
+			       "client not detached", client->name);
 			goto out;
 		}
 	}

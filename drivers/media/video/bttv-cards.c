@@ -3469,7 +3469,7 @@ void __devinit bttv_check_chipset(void)
 
 	/* print which chipset we have */
 	while ((dev = pci_find_class(PCI_CLASS_BRIDGE_HOST << 8,dev)))
-		printk(KERN_INFO "bttv: Host bridge is %s\n",dev->dev.name);
+		printk(KERN_INFO "bttv: Host bridge is %s\n",pci_name(dev));
 
 	/* print warnings about any quirks found */
 	if (triton1)

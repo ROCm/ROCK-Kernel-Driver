@@ -150,7 +150,7 @@ static int bt819_init(struct i2c_client *client)
 
 /* ----------------------------------------------------------------------- */
 
-static int bt819_attach(struct i2c_adapter *adap, int addr , unsigned long flags, int kind)
+static int bt819_attach(struct i2c_adapter *adap, int addr, int kind)
 {
 	int i;
 	struct bt819 *decoder;
@@ -172,7 +172,7 @@ static int bt819_attach(struct i2c_adapter *adap, int addr , unsigned long flags
 	}
 
 	memset(decoder, 0, sizeof(struct bt819));
-	strlcpy(client->dev.name, "bt819", DEVICE_NAME_SIZE);
+	strlcpy(client->name, "bt819", DEVICE_NAME_SIZE);
 	i2c_set_clientdata(client, decoder);
 	decoder->client = client;
 	decoder->addr = addr;
@@ -188,10 +188,10 @@ static int bt819_attach(struct i2c_adapter *adap, int addr , unsigned long flags
 	i = bt819_init(client);
 	if (i < 0) {
 		printk(KERN_ERR "%s: bt819_attach: init status %d\n",
-		       decoder->client->dev.name, i);
+		       decoder->client->name, i);
 	} else {
 		printk(KERN_INFO "%s: bt819_attach: chip version %x\n",
-		       decoder->client->dev.name, i2c_smbus_read_byte_data(client,
+		       decoder->client->name, i2c_smbus_read_byte_data(client,
 						      0x17) & 0x0f);
 	}
 	init_MUTEX(&decoder->lock);
@@ -270,7 +270,7 @@ static int bt819_command(struct i2c_client *client, unsigned int cmd, void *arg)
 			*iarg = res;
 
 			DEBUG(printk(KERN_INFO "%s-bt819: get status %x\n",
-				     decoder->client->dev.name, *iarg));
+				     decoder->client->name, *iarg));
 		}
 		break;
 
@@ -280,7 +280,7 @@ static int bt819_command(struct i2c_client *client, unsigned int cmd, void *arg)
 			struct timing *timing;
 
 			DEBUG(printk(KERN_INFO "%s-bt819: set norm %x\n",
-				     decoder->client->dev.name, *iarg));
+				     decoder->client->name, *iarg));
 
 			if (*iarg == VIDEO_MODE_NTSC) {
 				bt819_setbit(decoder, 0x01, 0, 1);
@@ -321,7 +321,7 @@ static int bt819_command(struct i2c_client *client, unsigned int cmd, void *arg)
 			int *iarg = arg;
 
 			DEBUG(printk(KERN_INFO "%s-bt819: set input %x\n",
-				     decoder->client->dev.name, *iarg));
+				     decoder->client->name, *iarg));
 
 			if (*iarg < 0 || *iarg > 7) {
 				return -EINVAL;
@@ -346,7 +346,7 @@ static int bt819_command(struct i2c_client *client, unsigned int cmd, void *arg)
 			int *iarg = arg;
 
 			DEBUG(printk(KERN_INFO "%s-bt819: set output %x\n",
-				     decoder->client->dev.name, *iarg));
+				     decoder->client->name, *iarg));
 
 			/* not much choice of outputs */
 			if (*iarg != 0) {
@@ -362,7 +362,7 @@ static int bt819_command(struct i2c_client *client, unsigned int cmd, void *arg)
 
 			DEBUG(printk
 			      (KERN_INFO "%s-bt819: enable output %x\n",
-			       decoder->client->dev.name, *iarg));
+			       decoder->client->name, *iarg));
 
 			if (decoder->enable != enable) {
 				decoder->enable = enable;
@@ -383,7 +383,7 @@ static int bt819_command(struct i2c_client *client, unsigned int cmd, void *arg)
 			DEBUG(printk
 			      (KERN_INFO
 			       "%s-bt819: set picture brightness %d contrast %d colour %d\n",
-			       decoder->client->dev.name, pic->brightness,
+			       decoder->client->name, pic->brightness,
 			       pic->contrast, pic->colour));
 
 
@@ -452,9 +452,7 @@ static struct i2c_driver i2c_driver_bt819 = {
 static struct i2c_client client_template = {
 	.id = -1,
 	.driver = &i2c_driver_bt819,
-	.dev = {
-		.name = "bt819_client",
-	},
+	.name = "bt819_client",
 };
 
 static int bt819_setup(void)

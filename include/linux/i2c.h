@@ -166,6 +166,7 @@ struct i2c_client {
 					/* to the client		*/
 	struct device dev;		/* the device structure		*/
 	struct list_head list;
+	char name[DEVICE_NAME_SIZE];
 };
 #define to_i2c_client(d) container_of(d, struct i2c_client, dev)
 
@@ -179,11 +180,11 @@ static inline void i2c_set_clientdata (struct i2c_client *dev, void *data)
 	dev_set_drvdata (&dev->dev, data);
 }
 
-#define I2C_DEVNAME(str)   .dev = { .name = str }
+#define I2C_DEVNAME(str)	.name = str
 
 static inline char *i2c_clientname(struct i2c_client *c)
 {
-	return c->dev.name;
+	return &c->name[0];
 }
 
 /*
@@ -251,6 +252,7 @@ struct i2c_adapter {
 	int nr;
 	struct list_head clients;
 	struct list_head list;
+	char name[DEVICE_NAME_SIZE];
 };
 #define to_i2c_adapter(d) container_of(d, struct i2c_adapter, dev)
 

@@ -112,7 +112,7 @@ static int tea6420_detect(struct i2c_adapter *adapter, int address, int kind)
 	}
 	
 	/* fill client structure */
-	sprintf(client->dev.name,"tea6420 (0x%02x)", address);
+	sprintf(client->name,"tea6420 (0x%02x)", address);
 	client->id = tea6420_id++;
 	client->flags = 0;
 	client->addr = address;
@@ -135,7 +135,7 @@ static int tea6420_detect(struct i2c_adapter *adapter, int address, int kind)
 		printk("tea6420.o: could not initialize chipset. continuing anyway.\n");
 	}
 	
-	printk("tea6420.o: detected @ 0x%02x on adapter %s\n",2*address,&client->adapter->dev.name[0]);
+	printk("tea6420.o: detected @ 0x%02x on adapter %s\n",2*address,&client->adapter->name[0]);
 
 	return 0;
 }
@@ -144,7 +144,7 @@ static int tea6420_attach(struct i2c_adapter *adapter)
 {
 	/* let's see whether this is a know adapter we can attach to */
 	if( adapter->id != I2C_ALGO_SAA7146 ) {
-		dprintk("tea6420.o: refusing to probe on unknown adapter [name='%s',id=0x%x]\n",adapter->dev.name,adapter->id);
+		dprintk("tea6420.o: refusing to probe on unknown adapter [name='%s',id=0x%x]\n",adapter->name,adapter->id);
 		return -ENODEV;
 	}
 
