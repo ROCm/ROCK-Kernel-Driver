@@ -19,17 +19,7 @@
 #include <asm/msr.h>
 #include "speedstep-lib.h"
 
-
-/* DEBUG
- *   Define it if you want verbose debug output, e.g. for bug reporting
- */
-//#define SPEEDSTEP_DEBUG
-
-#ifdef SPEEDSTEP_DEBUG
-#define dprintk(msg...) printk(msg)
-#else
-#define dprintk(msg...) do { } while(0)
-#endif
+#define dprintk(msg...) cpufreq_debug_printk(CPUFREQ_DEBUG_DRIVER, "speedstep-lib", msg)
 
 #ifdef CONFIG_X86_SPEEDSTEP_RELAXED_CAP_CHECK
 static int relaxed_check = 0;
@@ -83,7 +73,7 @@ static unsigned int pentium3_get_frequency (unsigned int processor)
 
 	/* read MSR 0x2a - we only need the low 32 bits */
 	rdmsr(MSR_IA32_EBL_CR_POWERON, msr_lo, msr_tmp);
-	dprintk(KERN_DEBUG "speedstep-lib: P3 - MSR_IA32_EBL_CR_POWERON: 0x%x 0x%x\n", msr_lo, msr_tmp);
+	dprintk("P3 - MSR_IA32_EBL_CR_POWERON: 0x%x 0x%x\n", msr_lo, msr_tmp);
 	msr_tmp = msr_lo;
 
 	/* decode the FSB */
@@ -96,9 +86,10 @@ static unsigned int pentium3_get_frequency (unsigned int processor)
 	}
 
 	/* decode the multiplier */
-	if (processor == SPEEDSTEP_PROCESSOR_PIII_C_EARLY)
+	if (processor == SPEEDSTEP_PROCESSOR_PIII_C_EARLY) {
+		dprintk("workaround for early PIIIs\n");
 		msr_lo &= 0x03c00000;
-	else
+	} else
 		msr_lo &= 0x0bc00000;
 	msr_lo >>= 22;
 	while (msr_lo != msr_decode_mult[j].bitmap) {
@@ -106,6 +97,8 @@ static unsigned int pentium3_get_frequency (unsigned int processor)
 			return 0;
 		j++;
 	}
+
+	dprintk("speed is %u\n", (msr_decode_mult[j].ratio * msr_decode_fsb[i].value * 100));
 
 	return (msr_decode_mult[j].ratio * msr_decode_fsb[i].value * 100);
 }
@@ -116,7 +109,7 @@ static unsigned int pentiumM_get_frequency(void)
 	u32     msr_lo, msr_tmp;
 
 	rdmsr(MSR_IA32_EBL_CR_POWERON, msr_lo, msr_tmp);
-	dprintk(KERN_DEBUG "speedstep-lib: PM - MSR_IA32_EBL_CR_POWERON: 0x%x 0x%x\n", msr_lo, msr_tmp);
+	dprintk("PM - MSR_IA32_EBL_CR_POWERON: 0x%x 0x%x\n", msr_lo, msr_tmp);
 
 	/* see table B-2 of 24547212.pdf */
 	if (msr_lo & 0x00040000) {
@@ -125,7 +118,7 @@ static unsigned int pentiumM_get_frequency(void)
 	}
 
 	msr_tmp = (msr_lo >> 22) & 0x1f;
-	dprintk(KERN_DEBUG "speedstep-lib: bits 22-26 are 0x%x\n", msr_tmp);
+	dprintk("bits 22-26 are 0x%x, speed is %u\n", msr_tmp, (msr_tmp * 100 * 1000));
 
 	return (msr_tmp * 100 * 1000);
 }
@@ -139,7 +132,7 @@ static unsigned int pentium4_get_frequency(void)
 
 	rdmsr(0x2c, msr_lo, msr_hi);
 
-	dprintk(KERN_DEBUG "speedstep-lib: P4 - MSR_EBC_FREQUENCY_ID: 0x%x 0x%x\n", msr_lo, msr_hi);
+	dprintk("P4 - MSR_EBC_FREQUENCY_ID: 0x%x 0x%x\n", msr_lo, msr_hi);
 
 	/* decode the FSB: see IA-32 Intel (C) Architecture Software 
 	 * Developer's Manual, Volume 3: System Prgramming Guide,
@@ -169,7 +162,7 @@ static unsigned int pentium4_get_frequency(void)
 	/* Multiplier. */
 	mult = msr_lo >> 24;
 
-	dprintk(KERN_DEBUG "speedstep-lib: P4 - FSB %u kHz; Multiplier %u\n", fsb, mult);
+	dprintk("P4 - FSB %u kHz; Multiplier %u; Speed %u kHz\n", fsb, mult, (fsb * mult));
 
 	return (fsb * mult);
 }
@@ -204,6 +197,8 @@ unsigned int speedstep_detect_processor (void)
 	struct cpuinfo_x86 *c = cpu_data;
 	u32			ebx, msr_lo, msr_hi;
 
+	dprintk("x86: %x, model: %x\n", c->x86, c->x86_model);
+
 	if ((c->x86_vendor != X86_VENDOR_INTEL) || 
 	    ((c->x86 != 6) && (c->x86 != 0xF)))
 		return 0;
@@ -217,7 +212,7 @@ unsigned int speedstep_detect_processor (void)
 		ebx = cpuid_ebx(0x00000001);
 		ebx &= 0x000000FF;
 
-		dprintk(KERN_INFO "ebx value is %x, x86_mask is %x\n", ebx, c->x86_mask);
+		dprintk("ebx value is %x, x86_mask is %x\n", ebx, c->x86_mask);
 
 		switch (c->x86_mask) {
 		case 4: 
@@ -269,6 +264,7 @@ unsigned int speedstep_detect_processor (void)
 		/* cpuid_ebx(1) is 0x04 for desktop PIII, 
 		                   0x06 for mobile PIII-M */
 		ebx = cpuid_ebx(0x00000001);
+		dprintk("ebx is %x\n", ebx);
 
 		ebx &= 0x000000FF;
 
@@ -286,7 +282,7 @@ unsigned int speedstep_detect_processor (void)
 		/* all mobile PIII Coppermines have FSB 100 MHz
 		 * ==> sort out a few desktop PIIIs. */
 		rdmsr(MSR_IA32_EBL_CR_POWERON, msr_lo, msr_hi);
-		dprintk(KERN_DEBUG "cpufreq: Coppermine: MSR_IA32_EBL_CR_POWERON is 0x%x, 0x%x\n", msr_lo, msr_hi);
+		dprintk("Coppermine: MSR_IA32_EBL_CR_POWERON is 0x%x, 0x%x\n", msr_lo, msr_hi);
 		msr_lo &= 0x00c0000;
 		if (msr_lo != 0x0080000)
 			return 0;
@@ -298,11 +294,12 @@ unsigned int speedstep_detect_processor (void)
 		 * bit 56 or 57 is set
 		 */
 		rdmsr(MSR_IA32_PLATFORM_ID, msr_lo, msr_hi);
-		dprintk(KERN_DEBUG "cpufreq: Coppermine: MSR_IA32_PLATFORM ID is 0x%x, 0x%x\n", msr_lo, msr_hi);
+		dprintk("Coppermine: MSR_IA32_PLATFORM ID is 0x%x, 0x%x\n", msr_lo, msr_hi);
 		if ((msr_hi & (1<<18)) && (relaxed_check ? 1 : (msr_hi & (3<<24)))) {
-			if (c->x86_mask == 0x01)
+			if (c->x86_mask == 0x01) {
+				dprintk("early PIII version\n");
 				return SPEEDSTEP_PROCESSOR_PIII_C_EARLY;
-			else
+			} else
 				return SPEEDSTEP_PROCESSOR_PIII_C;
 		}
 
@@ -329,10 +326,14 @@ unsigned int speedstep_get_freqs(unsigned int processor,
 	if ((!processor) || (!low_speed) || (!high_speed) || (!set_state))
 		return -EINVAL;
 
+	dprintk("trying to determine both speeds\n");
+
 	/* get current speed */
 	prev_speed = speedstep_get_processor_frequency(processor);
 	if (!prev_speed)
 		return -EIO;
+
+	dprintk("previous seped is %u\n", prev_speed);
 	
 	local_irq_save(flags);
 
@@ -344,6 +345,8 @@ unsigned int speedstep_get_freqs(unsigned int processor,
 		goto out;
 	}
 
+	dprintk("low seped is %u\n", *low_speed);
+
 	/* switch to high state */
 	set_state(SPEEDSTEP_HIGH);
 	*high_speed = speedstep_get_processor_frequency(processor);
@@ -351,6 +354,8 @@ unsigned int speedstep_get_freqs(unsigned int processor,
 		ret = -EIO;
 		goto out;
 	}
+
+	dprintk("high seped is %u\n", *high_speed);
 
 	if (*low_speed == *high_speed) {
 		ret = -ENODEV;
