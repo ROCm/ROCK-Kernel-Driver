@@ -121,7 +121,7 @@ static inline void uhci_set_next_interrupt(struct uhci *uhci)
 	unsigned long flags;
 
 	spin_lock_irqsave(&uhci->frame_list_lock, flags);
-	uhci->skel_term_td->status |= TD_CTRL_IOC_BIT;
+	uhci->skel_term_td->status |= TD_CTRL_IOC;
 	spin_unlock_irqrestore(&uhci->frame_list_lock, flags);
 }
 
@@ -130,7 +130,7 @@ static inline void uhci_clear_next_interrupt(struct uhci *uhci)
 	unsigned long flags;
 
 	spin_lock_irqsave(&uhci->frame_list_lock, flags);
-	uhci->skel_term_td->status &= ~TD_CTRL_IOC_BIT;
+	uhci->skel_term_td->status &= ~TD_CTRL_IOC;
 	spin_unlock_irqrestore(&uhci->frame_list_lock, flags);
 }
 
@@ -860,7 +860,7 @@ static int uhci_submit_control(struct urb *urb)
 			return -ENOMEM;
 
 		/* Alternate Data0/1 (start with Data1) */
-		destination ^= 1 << TD_TOKEN_TOGGLE;
+		destination ^= TD_TOKEN_TOGGLE;
 	
 		uhci_add_td_to_urb(urb, td);
 		uhci_fill_td(td, status, destination | ((pktsze - 1) << 21),
@@ -887,7 +887,7 @@ static int uhci_submit_control(struct urb *urb)
 	else
 		destination |= USB_PID_OUT;
 
-	destination |= 1 << TD_TOKEN_TOGGLE;		/* End in Data1 */
+	destination |= TD_TOKEN_TOGGLE;		/* End in Data1 */
 
 	status &= ~TD_CTRL_SPD;
 
@@ -1094,7 +1094,7 @@ static int uhci_submit_interrupt(struct urb *urb)
 	if (!td)
 		return -ENOMEM;
 
-	destination |= (usb_gettoggle(urb->dev, usb_pipeendpoint(urb->pipe), usb_pipeout(urb->pipe)) << TD_TOKEN_TOGGLE);
+	destination |= (usb_gettoggle(urb->dev, usb_pipeendpoint(urb->pipe), usb_pipeout(urb->pipe)) << TD_TOKEN_TOGGLE_SHIFT);
 	destination |= ((urb->transfer_buffer_length - 1) << 21);
 
 	usb_dotoggle(urb->dev, usb_pipeendpoint(urb->pipe), usb_pipeout(urb->pipe));
@@ -1187,8 +1187,8 @@ static void uhci_reset_interrupt(struct urb *urb)
 	td = list_entry(urbp->td_list.next, struct uhci_td, list);
 
 	td->status = (td->status & 0x2F000000) | TD_CTRL_ACTIVE | TD_CTRL_IOC;
-	td->info &= ~(1 << TD_TOKEN_TOGGLE);
-	td->info |= (usb_gettoggle(urb->dev, usb_pipeendpoint(urb->pipe), usb_pipeout(urb->pipe)) << TD_TOKEN_TOGGLE);
+	td->info &= ~TD_TOKEN_TOGGLE;
+	td->info |= (usb_gettoggle(urb->dev, usb_pipeendpoint(urb->pipe), usb_pipeout(urb->pipe)) << TD_TOKEN_TOGGLE_SHIFT);
 	usb_dotoggle(urb->dev, usb_pipeendpoint(urb->pipe), usb_pipeout(urb->pipe));
 
 out:
@@ -1244,7 +1244,7 @@ static int uhci_submit_bulk(struct urb *urb, struct urb *eurb)
 		uhci_fill_td(td, status, destination |
 			(((pktsze - 1) & UHCI_NULL_DATA_SIZE) << 21) |
 			(usb_gettoggle(urb->dev, usb_pipeendpoint(urb->pipe),
-			 usb_pipeout(urb->pipe)) << TD_TOKEN_TOGGLE),
+			 usb_pipeout(urb->pipe)) << TD_TOKEN_TOGGLE_SHIFT),
 			data);
 
 		data += pktsze;
@@ -1272,7 +1272,7 @@ static int uhci_submit_bulk(struct urb *urb, struct urb *eurb)
 		uhci_fill_td(td, status, destination |
 			(UHCI_NULL_DATA_SIZE << 21) |
 			(usb_gettoggle(urb->dev, usb_pipeendpoint(urb->pipe),
-			 usb_pipeout(urb->pipe)) << TD_TOKEN_TOGGLE),
+			 usb_pipeout(urb->pipe)) << TD_TOKEN_TOGGLE_SHIFT),
 			data);
 
 		usb_dotoggle(urb->dev, usb_pipeendpoint(urb->pipe),

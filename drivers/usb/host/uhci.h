@@ -100,7 +100,6 @@ struct uhci_qh {
 #define TD_CTRL_C_ERR_SHIFT	27
 #define TD_CTRL_LS		(1 << 26)	/* Low Speed Device */
 #define TD_CTRL_IOS		(1 << 25)	/* Isochronous Select */
-#define TD_CTRL_IOC_BIT		24
 #define TD_CTRL_IOC		(1 << 24)	/* Interrupt on Complete */
 #define TD_CTRL_ACTIVE		(1 << 23)	/* TD Active */
 #define TD_CTRL_STALLED		(1 << 22)	/* TD Stalled */
@@ -120,7 +119,8 @@ struct uhci_qh {
 /*
  * for TD <info>: (a.k.a. Token)
  */
-#define TD_TOKEN_TOGGLE		19
+#define TD_TOKEN_TOGGLE_SHIFT	19
+#define TD_TOKEN_TOGGLE		(1 << 19)
 #define TD_TOKEN_PID_MASK	0xFF
 #define TD_TOKEN_EXPLEN_MASK	0x7FF		/* expected length, encoded as n - 1 */
 
