@@ -302,7 +302,7 @@ lec_send_packet(struct sk_buff *skb, struct net_device *dev)
 #endif
         min_frame_size = LEC_MINIMUM_8023_SIZE;
         if (skb->len < min_frame_size) {
-                if (skb->truesize < min_frame_size) {
+                if ((skb->len + skb_tailroom(skb)) < min_frame_size) {
                         skb2 = skb_copy_expand(skb, 0,
                             min_frame_size - skb->truesize, GFP_ATOMIC);
                                 dev_kfree_skb(skb);
