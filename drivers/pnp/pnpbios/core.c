@@ -60,6 +60,7 @@
 #include <linux/completion.h>
 #include <linux/spinlock.h>
 #include <linux/dmi.h>
+#include <linux/delay.h>
 
 #include <asm/page.h>
 #include <asm/desc.h>
@@ -177,8 +178,7 @@ static int pnp_dock_thread(void * unused)
 		/*
 		 * Poll every 2 seconds
 		 */
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(HZ*2);
+		msleep_interruptible(2000);
 		if(signal_pending(current))
 			break;
 
