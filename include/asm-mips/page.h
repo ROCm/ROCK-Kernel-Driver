@@ -78,6 +78,9 @@ extern __inline__ int get_order(unsigned long size)
 #define virt_to_page(kaddr)	(mem_map + (__pa(kaddr) >> PAGE_SHIFT))
 #define VALID_PAGE(page)	((page - mem_map) < max_mapnr)
 
+#define VM_DATA_DEFAULT_FLAGS	(VM_READ | VM_WRITE | VM_EXEC | \
+				 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)
+
 #endif /* defined (__KERNEL__) */
 
 #endif /* __ASM_PAGE_H */

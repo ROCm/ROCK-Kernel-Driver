@@ -73,6 +73,9 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 #define VALID_PAGE(page)	((page - mem_map) < max_mapnr)
 #endif
 
+#define VM_DATA_DEFAULT_FLAGS	(VM_READ | VM_WRITE | VM_EXEC | \
+				 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)
+
 #endif /* defined (__KERNEL__) */
 
 #endif /* _ASM_PAGE_H */

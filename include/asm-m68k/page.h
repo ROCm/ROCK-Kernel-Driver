@@ -181,6 +181,9 @@ static inline void *__va(unsigned long x)
 
 #endif /* __ASSEMBLY__ */
 
+#define VM_DATA_DEFAULT_FLAGS	(VM_READ | VM_WRITE | VM_EXEC | \
+				 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)
+
 #endif /* __KERNEL__ */
 
 #endif /* _M68K_PAGE_H */

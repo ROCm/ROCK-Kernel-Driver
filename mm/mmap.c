@@ -1046,10 +1046,7 @@ unsigned long do_brk(unsigned long addr, unsigned long len)
 	if (!vm_enough_memory(len >> PAGE_SHIFT))
 		return -ENOMEM;
 
-	flags = calc_vm_flags(PROT_READ|PROT_WRITE|PROT_EXEC,
-				MAP_FIXED|MAP_PRIVATE) | mm->def_flags;
-
-	flags |= VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC;
+	flags = VM_DATA_DEFAULT_FLAGS | mm->def_flags;
 
 	/* Can we just expand an old anonymous mapping? */
 	if (rb_parent && vma_merge(mm, prev, rb_parent, addr, addr + len, flags))

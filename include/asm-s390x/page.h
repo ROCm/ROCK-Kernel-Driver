@@ -117,6 +117,9 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 #define virt_to_page(kaddr)	(mem_map + (__pa(kaddr) >> PAGE_SHIFT))
 #define VALID_PAGE(page)	((page - mem_map) < max_mapnr)
 
+#define VM_DATA_DEFAULT_FLAGS	(VM_READ | VM_WRITE | VM_EXEC | \
+				 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)
+
 #endif                                 /* __KERNEL__                       */
 
 #endif                                 /* _S390_PAGE_H                     */

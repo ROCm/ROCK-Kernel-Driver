@@ -106,6 +106,9 @@ static inline int get_order(unsigned long size)
 #define VALID_PAGE(page)	((page - mem_map) < max_mapnr)
 #endif
 
+#define VM_DATA_DEFAULT_FLAGS	(VM_READ | VM_WRITE | VM_EXEC | \
+				 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)
+
 #endif
 
 #endif

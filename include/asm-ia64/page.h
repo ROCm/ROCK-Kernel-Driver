@@ -148,6 +148,11 @@ get_order (unsigned long size)
 # define __pgprot(x)	(x)
 #endif /* !STRICT_MM_TYPECHECKS */
 
-#define PAGE_OFFSET		0xe000000000000000
+#define PAGE_OFFSET			0xe000000000000000
+
+#define VM_DATA_DEFAULT_FLAGS		(VM_READ | VM_WRITE |					\
+					 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC |		\
+					 (((current->thread.flags & IA64_THREAD_XSTACK) != 0)	\
+					  ? VM_EXEC : 0))
 
 #endif /* _ASM_IA64_PAGE_H */

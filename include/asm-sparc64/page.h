@@ -153,6 +153,9 @@ extern __inline__ int get_order(unsigned long size)
 
 #endif /* !(__ASSEMBLY__) */
 
+#define VM_DATA_DEFAULT_FLAGS	(VM_READ | VM_WRITE | VM_EXEC | \
+				 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)
+
 #endif /* !(__KERNEL__) */
 
 #endif /* !(_SPARC64_PAGE_H) */
