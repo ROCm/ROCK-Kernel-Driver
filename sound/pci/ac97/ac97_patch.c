@@ -648,7 +648,7 @@ int patch_sigmatel_stac9758(ac97_t * ac97)
 		/* VARIOUS */ 0x0040
 	};
 	static unsigned short m675_regs[4] = {
-		/* OUTSEL */ 0x9040, /* CL:FR, SR:FR, LO:DS, LI:FR, MI:DS */
+		/* OUTSEL */ 0xfc70, /* CL:MX, SR:MX, LO:DS, LI:MX, MI:DS */
 		/* IOMISC */ 0x2102, /* HP amp on */
 		/* INSEL */ 0x0203, /* LI:LI, MI:FR */
 		/* VARIOUS */ 0x0041 /* stereo mic */
