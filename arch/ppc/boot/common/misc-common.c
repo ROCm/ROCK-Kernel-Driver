@@ -52,7 +52,6 @@ extern char _end[];
 void puts(const char *);
 void putc(const char c);
 void puthex(unsigned long val);
-void _bcopy(char *src, char *dst, int len);
 void gunzip(void *, int, unsigned char *, int *);
 static int _cvt(unsigned long val, char *buf, long radix, char *digits);
 

@@ -216,12 +216,6 @@ _GLOBAL(memset)
 	bdnz	8b
 	blr
 
-_GLOBAL(bcopy)
-	mr	r6,r3
-	mr	r3,r4
-	mr	r4,r6
-	b	memcpy
-
 /*
  * This version uses dcbz on the complete cache lines in the
  * destination area to reduce memory traffic.  This requires that

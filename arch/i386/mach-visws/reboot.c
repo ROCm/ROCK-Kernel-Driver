@@ -8,9 +8,6 @@
 
 void (*pm_power_off)(void);
 
-int reboot_thru_bios;
-int reboot_smp;
-
 void machine_restart(char * __unused)
 {
 #ifdef CONFIG_SMP

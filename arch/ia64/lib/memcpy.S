@@ -15,22 +15,6 @@
  */
 #include <asm/asmmacro.h>
 
-GLOBAL_ENTRY(bcopy)
-	.regstk 3,0,0,0
-	mov r8=in0
-	mov in0=in1
-	;;
-	mov in1=r8
-	// gas doesn't handle control flow across procedures, so it doesn't
-	// realize that a stop bit is needed before the "alloc" instruction
-	// below
-{
-	nop.m 0
-	nop.f 0
-	nop.i 0
-}	;;
-END(bcopy)
-	// FALL THROUGH
 GLOBAL_ENTRY(memcpy)
 
 #	define MEM_LAT	21		/* latency to memory */

@@ -357,21 +357,6 @@ void *memcpy(void *dest, const void *src, size_t n)
 EXPORT_SYMBOL(memcpy);
 
 /**
- * bcopy - Copy one area of memory to another
- * @src: Where to copy from
- * @dest: Where to copy to
- * @n: The size of the area.
- *
- * Note that this is the same as memcpy(), with the arguments reversed.
- * memcpy() is the standard, bcopy() is a legacy BSD function.
- */
-void bcopy(const void *srcp, void *destp, size_t n)
-{
-	__builtin_memcpy(destp, srcp, n);
-}
-EXPORT_SYMBOL(bcopy);
-
-/**
  * memset - Fill a region of memory with the given value
  * @s: Pointer to the start of the area.
  * @c: The byte to fill the area with
