@@ -7,9 +7,10 @@
 #include <linux/kernel.h>
 #include <linux/config.h>
 #include <linux/smp.h>
+#include <linux/thread_info.h>
+
 #include <asm/processor.h> 
 #include <asm/system.h>
-#include <asm/thread_info.h>
 
 #include "mce.h"
 
