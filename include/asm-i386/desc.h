@@ -6,6 +6,9 @@
 
 #ifndef __ASSEMBLY__
 
+#include <linux/preempt.h>
+#include <linux/smp.h>
+
 #include <asm/mmu.h>
 
 extern struct desc_struct cpu_gdt_table[NR_CPUS][GDT_ENTRIES];

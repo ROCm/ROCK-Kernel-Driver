@@ -634,7 +634,7 @@ static int __init snd_opl3sa2_isapnp(int dev, opl3sa2_t *chip)
 	chip->dev = pnp_request_card_device(card, id->devs[0].id, NULL);
 	pdev = chip->dev;
 	if (!pdev){
-		snd_printdd("isapnp OPL3-SA: a card was found but it did not contain the needed devices\n",);
+		snd_printdd("isapnp OPL3-SA: a card was found but it did not contain the needed devices\n");
 		return -ENODEV;
 	}
 	sb_port[dev] = pdev->resource[0].start;

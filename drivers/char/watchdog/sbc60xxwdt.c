@@ -345,7 +345,7 @@ err_out_region2:
 	release_region(WDT_START,1);
 err_out_region1:
 	release_region(WDT_STOP,1);
-err_out:
+/* err_out: */
 	return rc;
 }
 

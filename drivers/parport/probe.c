@@ -7,6 +7,7 @@
 
 #include <linux/parport.h>
 #include <linux/ctype.h>
+#include <linux/string.h>
 #include <asm/uaccess.h>
 
 static struct {

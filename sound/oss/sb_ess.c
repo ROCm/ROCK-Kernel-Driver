@@ -186,6 +186,7 @@
  */
 
 #include <linux/delay.h>
+#include <linux/interrupt.h>
 #include <linux/spinlock.h>
 
 #include "sound_config.h"

@@ -503,7 +503,7 @@ static int setup (wan_device_t* wandev, wandev_conf_t* conf)
 		}
 
 	}else{
-		printk(KERN_INFO "%s: Card Configured %i or Piggybacking %i!\n",
+		printk(KERN_INFO "%s: Card Configured %lu or Piggybacking %i!\n",
 			wandev->name,card->configured,card->wandev.piggyback);
 	} 
 

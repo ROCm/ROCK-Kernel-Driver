@@ -24,6 +24,8 @@
 #include <linux/time.h>
 #include <linux/string.h>
 #include <linux/wait.h>
+#include <linux/sched.h>
+#include <asm/current.h>
 #include <asm/uaccess.h>
 
 /* #define DEBUG */

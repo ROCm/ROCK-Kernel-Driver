@@ -33,7 +33,7 @@ typedef struct {
 	atomic_t command;
 	atomic_t disconnect;
 	atomic_t driver_busy;
-	unsigned char common_critical;
+	long common_critical;
 	struct timer_list *tx_timer;
 	struct sock *sk;		/* Wanpipe Sock bind's here */ 
 	int   (*func) (struct sk_buff *, netdevice_t *, 

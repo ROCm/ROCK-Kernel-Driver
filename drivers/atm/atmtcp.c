@@ -315,15 +315,9 @@ static struct atmdev_ops atmtcp_c_dev_ops = {
 
 
 static struct atm_dev atmtcp_control_dev = {
-	&atmtcp_c_dev_ops,
-	NULL,		/* no PHY */
-	"atmtcp",	/* type */
-	999,		/* dummy device number */
-	NULL,NULL,	/* pretend not to have any VCCs */
-	NULL,NULL,	/* no data */
-	{ 0 },		/* no flags */
-	NULL,		/* no local address */
-	{ 0 }		/* no ESI, no statistics */
+	.ops		= &atmtcp_c_dev_ops,
+	.type		= "atmtcp",
+	.number		= 999,
 };
 
 
