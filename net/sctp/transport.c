@@ -155,6 +155,16 @@ void sctp_transport_free(struct sctp_transport *transport)
 	if (del_timer(&transport->hb_timer))
 		sctp_transport_put(transport);
 
+	/* Delete the T3_rtx timer if it's active.
+	 * There is no point in not doing this now and letting
+	 * structure hang around in memory since we know
+	 * the tranport is going away.
+	 */
+	if (timer_pending(&transport->T3_rtx_timer) &&
+	    del_timer(&transport->T3_rtx_timer))
+		sctp_transport_put(transport);
+
+
 	sctp_transport_put(transport);
 }
 
