@@ -145,6 +145,10 @@ struct agp_bridge_driver sis_driver = {
 static struct agp_device_ids sis_agp_device_ids[] __devinitdata =
 {
 	{
+		.device_id	= PCI_DEVICE_ID_SI_5591_AGP,
+		.chipset_name	= "5591",
+	},
+	{
 		.device_id	= PCI_DEVICE_ID_SI_530,
 		.chipset_name	= "530",
 	},
