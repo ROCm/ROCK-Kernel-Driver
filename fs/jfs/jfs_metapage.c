@@ -295,12 +295,12 @@ static int direct_bmap(struct address_space *mapping, long block)
 }
 
 struct address_space_operations direct_aops = {
-	readpage:	direct_readpage,
-	writepage:	direct_writepage,
-	sync_page:	block_sync_page,
-	prepare_write:	direct_prepare_write,
-	commit_write:	generic_commit_write,
-	bmap:		direct_bmap,
+	.readpage	= direct_readpage,
+	.writepage	= direct_writepage,
+	.sync_page	= block_sync_page,
+	.prepare_write	= direct_prepare_write,
+	.commit_write	= generic_commit_write,
+	.bmap		= direct_bmap,
 };
 
 metapage_t *__get_metapage(struct inode *inode,
