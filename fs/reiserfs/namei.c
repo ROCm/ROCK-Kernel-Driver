@@ -344,8 +344,6 @@ static struct dentry * reiserfs_lookup (struct inode * dir, struct dentry * dent
     struct reiserfs_dir_entry de;
     INITIALIZE_PATH (path_to_entry);
 
-    reiserfs_check_lock_depth("lookup") ;
-
     if (dentry->d_name.len > REISERFS_MAX_NAME_LEN (dir->i_sb->s_blocksize))
 	return ERR_PTR(-ENAMETOOLONG);
 
