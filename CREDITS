@@ -46,13 +46,11 @@ D: Various kernel patches
 S: United Kingdom
 
 N: Werner Almesberger
-E: werner.almesberger@epfl.ch
+E: werner@almesberger.net
+W: http://www.almesberger.net/
 D: dosfs, LILO, some fd features, ATM, various other hacks here and there
-S: Ecole Polytechnique Federale de Lausanne
-S: DSC ICA
-S: INN (Ecublens)
-S: CH-1015 Lausanne
-S: Switzerland
+S: Buenos Aires
+S: Argentina
 
 N: Tim Alpaerts
 E: tim_alpaerts@toyota-motor-europe.com
