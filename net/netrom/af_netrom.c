@@ -72,7 +72,7 @@ static struct sock *nr_alloc_sock(void)
 	if (!sk)
 		goto out;
 
-	nr = nr_sk(sk) = kmalloc(sizeof(*nr), GFP_ATOMIC);
+	nr = sk->sk_protinfo = kmalloc(sizeof(*nr), GFP_ATOMIC);
 	if (!nr)
 		goto frees;
 
