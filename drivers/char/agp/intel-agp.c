@@ -195,7 +195,6 @@ static agp_memory *intel_i810_alloc_by_type(size_t pg_count, int type)
 		new->page_count = pg_count;
 		new->num_scratch_pages = 0;
 		vfree(new->memory);
-		MOD_INC_USE_COUNT;
 		return new;
 	}
 	if(type == AGP_PHYS_MEMORY) {
@@ -212,7 +211,6 @@ static agp_memory *intel_i810_alloc_by_type(size_t pg_count, int type)
 		if (new == NULL)
 			return NULL;
 
-		MOD_INC_USE_COUNT;
 		addr = agp_bridge.agp_alloc_page();
 
 		if (addr == NULL) {
@@ -238,7 +236,6 @@ static void intel_i810_free_by_type(agp_memory * curr)
 		vfree(curr->memory);
 	}
 	kfree(curr);
-	MOD_DEC_USE_COUNT;
 }
 
 static unsigned long intel_i810_mask_memory(unsigned long addr, int type)
@@ -507,7 +504,6 @@ static agp_memory *intel_i830_alloc_by_type(size_t pg_count,int type)
 
 		if (nw == NULL) return(NULL);
 
-		MOD_INC_USE_COUNT;
 		addr = agp_bridge.agp_alloc_page();
 		if (addr == NULL) {
 			/* free this structure */
@@ -1429,11 +1425,15 @@ static int __init agp_find_supported_device(struct pci_dev *dev)
 	return agp_lookup_host_bridge(dev);
 }
 
+static struct agp_driver intel_agp_driver = {
+	.owner = THIS_MODULE,
+};
 
 static int __init agp_intel_probe (struct pci_dev *dev, const struct pci_device_id *ent)
 {
 	if (agp_find_supported_device(dev) == 0) {
-		agp_register_driver(dev);
+		intel_agp_driver.dev = dev;	
+		agp_register_driver(&intel_agp_driver);
 		return 0;
 	}
 	return -ENODEV;	
@@ -1479,7 +1479,7 @@ int __init agp_intel_init(void)
 
 static void __exit agp_intel_cleanup(void)
 {
-	agp_unregister_driver();
+	agp_unregister_driver(&intel_agp_driver);
 	pci_unregister_driver(&agp_intel_pci_driver);
 }
 

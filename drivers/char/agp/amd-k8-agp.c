@@ -408,6 +408,9 @@ static int __init amd_8151_setup (struct pci_dev *pdev)
 	return 0;
 }
 
+static struct agp_driver amd_k8_agp_driver = {
+	.owner = THIS_MODULE,
+};
 
 static int __init agp_amdk8_probe (struct pci_dev *dev, const struct pci_device_id *ent)
 {
@@ -423,7 +426,8 @@ static int __init agp_amdk8_probe (struct pci_dev *dev, const struct pci_device_
 	/* Fill in the mode register */
 	pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx+PCI_AGP_STATUS, &agp_bridge.mode);
 	amd_8151_setup(dev);
-	agp_register_driver(dev);
+	amd_k8_agp_driver.dev = dev;
+	agp_register_driver(&amd_k8_agp_driver);
 	return 0;
 }
 
@@ -463,7 +467,7 @@ int __init agp_amdk8_init(void)
 
 static void __exit agp_amdk8_cleanup(void)
 {
-	agp_unregister_driver();
+	agp_unregister_driver(&amd_k8_agp_driver);
 	pci_unregister_driver(&agp_amdk8_pci_driver);
 }
 

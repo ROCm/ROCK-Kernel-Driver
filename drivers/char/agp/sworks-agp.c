@@ -525,11 +525,15 @@ static int __init agp_find_supported_device(struct pci_dev *dev)
 	return -ENODEV;
 }
 
+static struct agp_driver serverworks_agp_driver = {
+	.owner = THIS_MODULE,
+};
 
 static int __init agp_serverworks_probe (struct pci_dev *dev, const struct pci_device_id *ent)
 {
 	if (agp_find_supported_device(dev) == 0) {
-		agp_register_driver(dev);
+		serverworks_agp_driver.dev = dev;
+		agp_register_driver(&serverworks_agp_driver);
 		return 0;
 	}
 	return -ENODEV;	
@@ -568,7 +572,7 @@ static int __init agp_serverworks_init(void)
 
 static void __exit agp_serverworks_cleanup(void)
 {
-	agp_unregister_driver();
+	agp_unregister_driver(&serverworks_agp_driver);
 	pci_unregister_driver(&agp_serverworks_pci_driver);
 }
 
