@@ -399,15 +399,19 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4, type5 arg5, type6 arg6
 /*
  * System call prototypes.
  */
-extern pid_t setsid(void);
-extern int write(int fd, const char *buf, off_t count);
-extern int read(int fd, char *buf, off_t count);
-extern off_t lseek(int fd, off_t offset, int count);
-extern int dup(int fd);
-extern int execve(const char *file, char **argv, char **envp);
-extern int open(const char *file, int flag, int mode);
-extern int close(int fd);
-extern pid_t waitpid(pid_t pid, int *wait_stat, int options);
+static inline _syscall3(int, execve, __const__ char *, file, char **, argv,
+			char **,envp)
+static inline _syscall3(int, open, __const__ char *, file, int, flag, int, mode)
+static inline _syscall1(int, close, int, fd)
+static inline _syscall1(int, dup, int, fd)
+static inline _syscall3(int, read, int, fd, char *, buf , off_t, count)
+static inline _syscall3(int, write, int, fd, __const__ char *, buf, off_t,
+			count)
+static inline _syscall0(pid_t, setsid)
+static inline _syscall3(off_t, lseek, int, fd, off_t, offset, int, count)
+static inline _syscall3(pid_t, waitpid, pid_t, pid, int *, wait_stat, int,
+			options)
+
 #endif /* __KERNEL_SYSCALLS__ */
 
 asmlinkage unsigned long sys_mmap(unsigned long addr, size_t len,
