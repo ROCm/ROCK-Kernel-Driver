@@ -1665,37 +1665,15 @@ static int uhci_urb_dequeue(struct usb_hcd *hcd, struct urb *urb)
 
 	uhci_unlink_generic(uhci, urb);
 
-	if (urb->transfer_flags & USB_ASYNC_UNLINK) {
-		urbp->status = urb->status = -ECONNABORTED;
+	spin_lock(&uhci->urb_remove_list_lock);
 
-		spin_lock(&uhci->urb_remove_list_lock);
+	/* If we're the first, set the next interrupt bit */
+	if (list_empty(&uhci->urb_remove_list))
+		uhci_set_next_interrupt(uhci);
+	list_add(&urbp->urb_list, &uhci->urb_remove_list);
 
-		/* If we're the first, set the next interrupt bit */
-		if (list_empty(&uhci->urb_remove_list))
-			uhci_set_next_interrupt(uhci);
-			
-		list_add(&urbp->urb_list, &uhci->urb_remove_list);
-
-		spin_unlock(&uhci->urb_remove_list_lock);
-
-		spin_unlock_irqrestore(&uhci->urb_list_lock, flags);
-	} else {
-		urb->status = -ENOENT;
-
-		spin_unlock_irqrestore(&uhci->urb_list_lock, flags);
-
-		if (in_interrupt()) {	/* wait at least 1 frame */
-			static int errorcount = 10;
-
-			if (errorcount--)
-				dbg("uhci_urb_dequeue called from interrupt for urb %p", urb);
-			udelay(1000);
-		} else
-			schedule_timeout(1+1*HZ/1000); 
-
-		uhci_finish_urb(hcd, urb);
-	}
-
+	spin_unlock(&uhci->urb_remove_list_lock);
+	spin_unlock_irqrestore(&uhci->urb_list_lock, flags);
 	return 0;
 }
 
@@ -1788,7 +1766,7 @@ static void stall_callback(unsigned long ptr)
 
 		tmp = tmp->next;
 
-		u->transfer_flags |= USB_ASYNC_UNLINK | USB_TIMEOUT_KILLED;
+		u->transfer_flags |= USB_TIMEOUT_KILLED;
 		uhci_urb_dequeue(hcd, u);
 	}
 
