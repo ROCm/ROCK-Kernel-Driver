@@ -1582,7 +1582,7 @@ static struct ac97_quirk ac97_quirks[] = {
 
 static int __devinit snd_via82xx_mixer_new(via82xx_t *chip, int ac97_quirk)
 {
-	ac97_t ac97;
+	ac97_template_t ac97;
 	int err;
 	static ac97_bus_ops_t ops = {
 		.write = snd_via82xx_codec_write,

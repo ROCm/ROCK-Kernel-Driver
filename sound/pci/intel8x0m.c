@@ -880,7 +880,8 @@ static void snd_intel8x0_mixer_free_ac97(ac97_t *ac97)
 static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 {
 	ac97_bus_t *pbus;
-	ac97_t ac97, *x97;
+	ac97_template_t ac97;
+	ac97_t *x97;
 	int err;
 	unsigned int glob_sta = 0;
 	static ac97_bus_ops_t ops = {

@@ -2030,7 +2030,7 @@ static int __devinit
 snd_es1968_mixer(es1968_t *chip)
 {
 	ac97_bus_t *pbus;
-	ac97_t ac97;
+	ac97_template_t ac97;
 	snd_ctl_elem_id_t id;
 	int err;
 	static ac97_bus_ops_t ops = {

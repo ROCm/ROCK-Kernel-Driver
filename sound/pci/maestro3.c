@@ -1976,7 +1976,7 @@ static void snd_m3_ac97_reset(m3_t *chip)
 static int __devinit snd_m3_mixer(m3_t *chip)
 {
 	ac97_bus_t *pbus;
-	ac97_t ac97;
+	ac97_template_t ac97;
 	int err;
 	static ac97_bus_ops_t ops = {
 		.write = snd_m3_ac97_write,

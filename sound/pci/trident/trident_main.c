@@ -2959,7 +2959,7 @@ static int snd_trident_pcm_mixer_free(trident_t *trident, snd_trident_voice_t *v
 
 static int __devinit snd_trident_mixer(trident_t * trident, int pcm_spdif_device)
 {
-	ac97_t _ac97;
+	ac97_template_t _ac97;
 	snd_card_t * card = trident->card;
 	snd_kcontrol_t *kctl;
 	snd_ctl_elem_value_t *uctl;

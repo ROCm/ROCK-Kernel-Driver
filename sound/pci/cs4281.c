@@ -1133,7 +1133,7 @@ static void snd_cs4281_mixer_free_ac97(ac97_t *ac97)
 static int __devinit snd_cs4281_mixer(cs4281_t * chip)
 {
 	snd_card_t *card = chip->card;
-	ac97_t ac97;
+	ac97_template_t ac97;
 	int err;
 	static ac97_bus_ops_t ops = {
 		.write = snd_cs4281_ac97_write,

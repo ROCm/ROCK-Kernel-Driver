@@ -1185,7 +1185,7 @@ static void snd_fm801_mixer_free_ac97(ac97_t *ac97)
 
 static int __devinit snd_fm801_mixer(fm801_t *chip)
 {
-	ac97_t ac97;
+	ac97_template_t ac97;
 	unsigned int i;
 	int err;
 	static ac97_bus_ops_t ops = {

@@ -1868,7 +1868,7 @@ static void snd_ali_mixer_free_ac97(ac97_t *ac97)
 
 static int __devinit snd_ali_mixer(ali_t * codec)
 {
-	ac97_t ac97;
+	ac97_template_t ac97;
 	unsigned int idx;
 	int err;
 	static ac97_bus_ops_t ops = {

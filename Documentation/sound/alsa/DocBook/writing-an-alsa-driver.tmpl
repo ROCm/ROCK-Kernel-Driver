@@ -3843,7 +3843,7 @@ struct _snd_pcm_runtime {
   static int snd_mychip_ac97(mychip_t *chip)
   {
           ac97_bus_t *bus;
-          ac97_t ac97;
+          ac97_template_t ac97;
           int err;
           static ac97_bus_ops_t ops = {
                   .write = snd_mychip_ac97_write,
@@ -3887,13 +3887,13 @@ struct _snd_pcm_runtime {
       </para>
 
       <para>
-      And then call <function>snd_ac97_mixer()</function> with an <type>ac97_t</type>
+      And then call <function>snd_ac97_mixer()</function> with an <type>ac97_template_t</type>
       record together with the bus pointer created above.
 
         <informalexample>
           <programlisting>
 <![CDATA[
-  ac97_t ac97;
+  ac97_template_t ac97;
   int err;
 
   memset(&ac97, 0, sizeof(ac97));

@@ -1350,7 +1350,7 @@ static irqreturn_t snd_atiixp_interrupt(int irq, void *dev_id, struct pt_regs *r
 static int __devinit snd_atiixp_mixer_new(atiixp_t *chip, int clock)
 {
 	ac97_bus_t *pbus;
-	ac97_t ac97;
+	ac97_template_t ac97;
 	int i, err;
 	int codec_count;
 	static ac97_bus_ops_t ops = {

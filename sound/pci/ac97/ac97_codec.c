@@ -1799,25 +1799,23 @@ int snd_ac97_bus(snd_card_t *card, int num, ac97_bus_ops_t *ops,
 /**
  * snd_ac97_mixer - create an Codec97 component
  * @bus: the AC97 bus which codec is attached to
- * @_ac97: the template of ac97, including index, callbacks and
+ * @template: the template of ac97, including index, callbacks and
  *         the private data.
  * @rac97: the pointer to store the new ac97 instance.
  *
  * Creates an Codec97 component.  An ac97_t instance is newly
- * allocated and initialized from the template (_ac97).  The codec
+ * allocated and initialized from the template.  The codec
  * is then initialized by the standard procedure.
  *
- * The template must include the valid callbacks (at least read and
- * write), the codec number (num) and address (addr), and the private
- * data (private_data).  The other callbacks, wait and reset, are not
- * mandatory.
+ * The template must include the codec number (num) and address (addr),
+ * and the private data (private_data).
  * 
  * The ac97 instance is registered as a low-level device, so you don't
  * have to release it manually.
  *
  * Returns zero if successful, or a negative error code on failure.
  */
-int snd_ac97_mixer(ac97_bus_t * bus, ac97_t * _ac97, ac97_t ** rac97)
+int snd_ac97_mixer(ac97_bus_t *bus, ac97_template_t *template, ac97_t **rac97)
 {
 	int err;
 	ac97_t *ac97;
@@ -1831,14 +1829,21 @@ int snd_ac97_mixer(ac97_bus_t * bus, ac97_t * _ac97, ac97_t ** rac97)
 
 	snd_assert(rac97 != NULL, return -EINVAL);
 	*rac97 = NULL;
-	snd_assert(bus != NULL && _ac97 != NULL, return -EINVAL);
-	snd_assert(_ac97->num < 4 && bus->codec[_ac97->num] == NULL, return -EINVAL);
+	snd_assert(bus != NULL && template != NULL, return -EINVAL);
+	snd_assert(template->num < 4 && bus->codec[template->num] == NULL, return -EINVAL);
 	card = bus->card;
-	ac97 = kmalloc(sizeof(*ac97), GFP_KERNEL);
+	ac97 = kcalloc(1, sizeof(*ac97), GFP_KERNEL);
 	if (ac97 == NULL)
 		return -ENOMEM;
-	*ac97 = *_ac97;
+	ac97->private_data = template->private_data;
+	ac97->private_free = template->private_free;
 	ac97->bus = bus;
+	ac97->pci = template->pci;
+	ac97->num = template->num;
+	ac97->addr = template->addr;
+	ac97->scaps = template->scaps;
+	ac97->limited_regs = template->limited_regs;
+	memcpy(ac97->reg_accessed, template->reg_accessed, sizeof(ac97->reg_accessed));
 	bus->codec[ac97->num] = ac97;
 	spin_lock_init(&ac97->reg_lock);
 	init_MUTEX(&ac97->mutex);

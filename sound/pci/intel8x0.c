@@ -637,6 +637,21 @@ static unsigned short snd_intel8x0_codec_read(ac97_t *ac97,
 	return res;
 }
 
+static void snd_intel8x0_codec_read_test(intel8x0_t *chip, unsigned int codec)
+{
+	unsigned int tmp;
+
+	spin_lock(&chip->ac97_lock);
+	if (snd_intel8x0_codec_semaphore(chip, codec) >= 0) {
+		iagetword(chip, codec * 0x80);
+		if ((tmp = igetdword(chip, ICHREG(GLOB_STA))) & ICH_RCS) {
+			/* reset RCS and preserve other R/WC bits */
+			iputdword(chip, ICHREG(GLOB_STA), tmp & ~(ICH_SRI|ICH_PRI|ICH_TRI|ICH_GSCI));
+		}
+	}
+	spin_unlock(&chip->ac97_lock);
+}
+
 /*
  * access to AC97 for Ali5455
  */
@@ -1832,7 +1847,7 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock, int ac97_quirk)
 {
 	ac97_bus_t *pbus;
-	ac97_t ac97, *x97;
+	ac97_template_t ac97;
 	int err;
 	unsigned int i, codecs;
 	unsigned int glob_sta = 0;
@@ -1879,11 +1894,9 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock, int ac
 				codecs++;
 			chip->in_sdin_init = 1;
 			for (i = 0; i < codecs; i++) {
-				ac97.num = i;
-				snd_intel8x0_codec_read(&ac97, 0);
+				snd_intel8x0_codec_read_test(chip, i);
 				chip->ac97_sdin[i] = igetbyte(chip, ICHREG(SDM)) & ICH_LDI_MASK;
 			}
-			ac97.num = 0;
 			chip->in_sdin_init = 0;
 		} else {
 			codecs = glob_sta & ICH_SCR ? 2 : 1;
@@ -1915,14 +1928,13 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock, int ac
 	ac97.pci = chip->pci;
 	for (i = 0; i < codecs; i++) {
 		ac97.num = i;
-		if ((err = snd_ac97_mixer(pbus, &ac97, &x97)) < 0) {
+		if ((err = snd_ac97_mixer(pbus, &ac97, &chip->ac97[i])) < 0) {
 			if (err != -EACCES)
 				snd_printk(KERN_ERR "Unable to initialize codec #%d\n", i);
 			if (i == 0)
 				goto __err;
 			continue;
 		}
-		chip->ac97[i] = x97;
 	}
 	/* tune up the primary codec */
 	snd_ac97_tune_hardware(chip->ac97[0], ac97_quirks, ac97_quirk);

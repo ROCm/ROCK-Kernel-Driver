@@ -1719,7 +1719,7 @@ static void snd_ymfpci_mixer_free_ac97(ac97_t *ac97)
 
 int __devinit snd_ymfpci_mixer(ymfpci_t *chip, int rear_switch)
 {
-	ac97_t ac97;
+	ac97_template_t ac97;
 	snd_kcontrol_t *kctl;
 	unsigned int idx;
 	int err;

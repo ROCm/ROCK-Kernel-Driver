@@ -1512,7 +1512,7 @@ static void snd_ice1712_mixer_free_ac97(ac97_t *ac97)
 static int __devinit snd_ice1712_ac97_mixer(ice1712_t * ice)
 {
 	int err, bus_num = 0;
-	ac97_t ac97;
+	ac97_template_t ac97;
 	ac97_bus_t *pbus;
 	static ac97_bus_ops_t con_ops = {
 		.write = snd_ice1712_ac97_write,

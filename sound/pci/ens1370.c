@@ -1578,7 +1578,7 @@ static int snd_ensoniq_1371_mixer(ensoniq_t * ensoniq)
 {
 	snd_card_t *card = ensoniq->card;
 	ac97_bus_t *pbus;
-	ac97_t ac97;
+	ac97_template_t ac97;
 	int err, idx;
 	static ac97_bus_ops_t ops = {
 		.write = snd_es1371_codec_write,

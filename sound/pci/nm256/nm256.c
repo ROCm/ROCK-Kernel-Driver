@@ -1186,7 +1186,7 @@ static int __devinit
 snd_nm256_mixer(nm256_t *chip)
 {
 	ac97_bus_t *pbus;
-	ac97_t ac97;
+	ac97_template_t ac97;
 	int i, err;
 	static ac97_bus_ops_t ops = {
 		.reset = snd_nm256_ac97_reset,

@@ -511,7 +511,7 @@ int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 
 	if (!emu->no_ac97) {
 		ac97_bus_t *pbus;
-		ac97_t ac97;
+		ac97_template_t ac97;
 		static ac97_bus_ops_t ops = {
 			.write = snd_emu10k1_ac97_write,
 			.read = snd_emu10k1_ac97_read,

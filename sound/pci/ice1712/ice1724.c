@@ -1171,7 +1171,7 @@ static int __devinit snd_vt1724_ac97_mixer(ice1712_t * ice)
 
 	if (! (ice->eeprom.data[ICE_EEP2_ACLINK] & VT1724_CFG_PRO_I2S)) {
 		ac97_bus_t *pbus;
-		ac97_t ac97;
+		ac97_template_t ac97;
 		static ac97_bus_ops_t ops = {
 			.write = snd_vt1724_ac97_write,
 			.read = snd_vt1724_ac97_read,
