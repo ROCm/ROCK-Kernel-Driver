@@ -183,8 +183,6 @@ void fastcall raise_softirq(unsigned int nr)
 	local_irq_restore(flags);
 }
 
-EXPORT_SYMBOL(raise_softirq);
-
 void open_softirq(int nr, void (*action)(struct softirq_action*), void *data)
 {
 	softirq_vec[nr].data = data;
