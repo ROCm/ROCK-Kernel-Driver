@@ -23,6 +23,8 @@
 /* This is the kernel's entry point into the floating point emulator.
 It is called from the kernel with code similar to this:
 
+	sub	r4, r5, #4
+	ldrt	r0, [r4]			@ r0  = instruction
 	adrsvc	al, r9, ret_from_exception	@ r9  = normal FP return
 	adrsvc	al, lr, fpundefinstr		@ lr  = undefined instr return
 
@@ -74,8 +76,6 @@ nwfpe_enter:
 	mov sl, sp
 
         ldr r5, [sp, #60]	 	@ get contents of PC;
-	sub r8, r5, #4
-.Lx2:	ldrt r0, [r8]			@ get actual instruction into r0
 emulate:
 	bl EmulateAll			@ emulate the instruction
    	cmp r0, #0			@ was emulation successful
@@ -116,5 +116,4 @@ next:
 	.section __ex_table,"a"
 	.align	3
 	.long	.Lx1, .Lfix
-	.long	.Lx2, .Lfix
 	.previous
