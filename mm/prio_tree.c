@@ -530,6 +530,7 @@ repeat:
 /*
  * Add a new vma known to map the same set of pages as the old vma:
  * useful for fork's dup_mmap as well as vma_prio_tree_insert below.
+ * Note that it just happens to work correctly on i_mmap_nonlinear too.
  */
 void vma_prio_tree_add(struct vm_area_struct *vma, struct vm_area_struct *old)
 {

@@ -1116,8 +1116,6 @@ static void unmap_mapping_range_list(struct prio_tree_root *root,
 
 	while ((vma = vma_prio_tree_next(vma, root, &iter,
 			details->first_index, details->last_index)) != NULL) {
-		if (unlikely(vma->vm_flags & VM_NONLINEAR))
-			continue;
 		vba = vma->vm_pgoff;
 		vea = vba + ((vma->vm_end - vma->vm_start) >> PAGE_SHIFT) - 1;
 		/* Assume for now that PAGE_CACHE_SHIFT == PAGE_SHIFT */
@@ -1130,22 +1128,6 @@ static void unmap_mapping_range_list(struct prio_tree_root *root,
 		zap_page_range(vma,
 			((zba - vba) << PAGE_SHIFT) + vma->vm_start,
 			(zea - zba + 1) << PAGE_SHIFT, details);
-	}
-}
-
-static void unmap_nonlinear_range_list(struct prio_tree_root *root,
-				       struct zap_details *details)
-{
-	struct vm_area_struct *vma = NULL;
-	struct prio_tree_iter iter;
-
-	while ((vma = vma_prio_tree_next(vma, root, &iter,
-						0, ULONG_MAX)) != NULL) {
-		if (!(vma->vm_flags & VM_NONLINEAR))
-			continue;
-		details->nonlinear_vma = vma;
-		zap_page_range(vma, vma->vm_start,
-				vma->vm_end - vma->vm_start, details);
 	}
 }
 
@@ -1198,11 +1180,18 @@ void unmap_mapping_range(struct address_space *mapping,
 	/* Don't waste time to check mapping on fully shared vmas */
 	details.check_mapping = NULL;
 
-	if (unlikely(!prio_tree_empty(&mapping->i_mmap_shared))) {
+	if (unlikely(!prio_tree_empty(&mapping->i_mmap_shared)))
 		unmap_mapping_range_list(&mapping->i_mmap_shared, &details);
-		unmap_nonlinear_range_list(&mapping->i_mmap_shared, &details);
-	}
 
+	if (unlikely(!list_empty(&mapping->i_mmap_nonlinear))) {
+		struct vm_area_struct *vma;
+		list_for_each_entry(vma, &mapping->i_mmap_nonlinear,
+						shared.vm_set.list) {
+			details.nonlinear_vma = vma;
+			zap_page_range(vma, vma->vm_start,
+				vma->vm_end - vma->vm_start, &details);
+		}
+	}
 	spin_unlock(&mapping->i_mmap_lock);
 }
 EXPORT_SYMBOL(unmap_mapping_range);

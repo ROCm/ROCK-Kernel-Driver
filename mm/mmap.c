@@ -72,7 +72,9 @@ static inline void __remove_shared_vm_struct(struct vm_area_struct *vma,
 	if (vma->vm_flags & VM_DENYWRITE)
 		atomic_inc(&file->f_dentry->d_inode->i_writecount);
 
-	if (vma->vm_flags & VM_SHARED)
+	if (unlikely(vma->vm_flags & VM_NONLINEAR))
+		list_del_init(&vma->shared.vm_set.list);
+	else if (vma->vm_flags & VM_SHARED)
 		vma_prio_tree_remove(vma, &mapping->i_mmap_shared);
 	else
 		vma_prio_tree_remove(vma, &mapping->i_mmap);
@@ -262,7 +264,10 @@ static inline void __vma_link_file(struct vm_area_struct *vma)
 		if (vma->vm_flags & VM_DENYWRITE)
 			atomic_dec(&file->f_dentry->d_inode->i_writecount);
 
-		if (vma->vm_flags & VM_SHARED)
+		if (unlikely(vma->vm_flags & VM_NONLINEAR))
+			list_add_tail(&vma->shared.vm_set.list,
+					&mapping->i_mmap_nonlinear);
+		else if (vma->vm_flags & VM_SHARED)
 			vma_prio_tree_insert(vma, &mapping->i_mmap_shared);
 		else
 			vma_prio_tree_insert(vma, &mapping->i_mmap);
@@ -339,10 +344,10 @@ void vma_adjust(struct vm_area_struct *vma, unsigned long start,
 
 	if (file) {
 		mapping = file->f_mapping;
-		if (vma->vm_flags & VM_SHARED)
-			root = &mapping->i_mmap_shared;
-		else
+		if (!(vma->vm_flags & VM_SHARED))
 			root = &mapping->i_mmap;
+		else if (!(vma->vm_flags & VM_NONLINEAR))
+			root = &mapping->i_mmap_shared;
 		spin_lock(&mapping->i_mmap_lock);
 	}
 	spin_lock(&mm->page_table_lock);

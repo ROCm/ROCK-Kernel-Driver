@@ -335,10 +335,6 @@ static inline int page_referenced_file(struct page *page)
 
 	while ((vma = vma_prio_tree_next(vma, &mapping->i_mmap_shared,
 					&iter, pgoff, pgoff)) != NULL) {
-		if (unlikely(vma->vm_flags & VM_NONLINEAR)) {
-			failed++;
-			continue;
-		}
 		if (vma->vm_flags & (VM_LOCKED|VM_RESERVED)) {
 			referenced++;
 			goto out;
@@ -352,8 +348,8 @@ static inline int page_referenced_file(struct page *page)
 		}
 	}
 
-	/* Hmm, but what of the nonlinears which pgoff,pgoff skipped? */
-	WARN_ON(!failed);
+	if (list_empty(&mapping->i_mmap_nonlinear))
+		WARN_ON(!failed);
 out:
 	spin_unlock(&mapping->i_mmap_lock);
 	return referenced;
@@ -757,8 +753,6 @@ static inline int try_to_unmap_file(struct page *page)
 
 	while ((vma = vma_prio_tree_next(vma, &mapping->i_mmap_shared,
 					&iter, pgoff, pgoff)) != NULL) {
-		if (unlikely(vma->vm_flags & VM_NONLINEAR))
-			continue;
 		if (vma->vm_mm->rss) {
 			address = vma_address(vma, pgoff);
 			ret = try_to_unmap_one(page,
@@ -768,10 +762,12 @@ static inline int try_to_unmap_file(struct page *page)
 		}
 	}
 
-	while ((vma = vma_prio_tree_next(vma, &mapping->i_mmap_shared,
-					&iter, 0, ULONG_MAX)) != NULL) {
-		if (VM_NONLINEAR != (vma->vm_flags &
-		     (VM_NONLINEAR|VM_LOCKED|VM_RESERVED)))
+	if (list_empty(&mapping->i_mmap_nonlinear))
+		goto out;
+
+	list_for_each_entry(vma, &mapping->i_mmap_nonlinear,
+						shared.vm_set.list) {
+		if (vma->vm_flags & (VM_LOCKED|VM_RESERVED))
 			continue;
 		cursor = (unsigned long) vma->vm_private_data;
 		if (cursor > max_nl_cursor)
@@ -799,10 +795,9 @@ static inline int try_to_unmap_file(struct page *page)
 		max_nl_cursor = CLUSTER_SIZE;
 
 	do {
-		while ((vma = vma_prio_tree_next(vma, &mapping->i_mmap_shared,
-					&iter, 0, ULONG_MAX)) != NULL) {
-			if (VM_NONLINEAR != (vma->vm_flags &
-		    	     (VM_NONLINEAR|VM_LOCKED|VM_RESERVED)))
+		list_for_each_entry(vma, &mapping->i_mmap_nonlinear,
+						shared.vm_set.list) {
+			if (vma->vm_flags & (VM_LOCKED|VM_RESERVED))
 				continue;
 			cursor = (unsigned long) vma->vm_private_data;
 			while (vma->vm_mm->rss &&
@@ -831,11 +826,9 @@ static inline int try_to_unmap_file(struct page *page)
 	 * in locked vmas).  Reset cursor on all unreserved nonlinear
 	 * vmas, now forgetting on which ones it had fallen behind.
 	 */
-	vma = NULL;	/* it is already, but above loop might change */
-	while ((vma = vma_prio_tree_next(vma, &mapping->i_mmap_shared,
-					&iter, 0, ULONG_MAX)) != NULL) {
-		if ((vma->vm_flags & (VM_NONLINEAR|VM_RESERVED)) ==
-				VM_NONLINEAR)
+	list_for_each_entry(vma, &mapping->i_mmap_nonlinear,
+						shared.vm_set.list) {
+		if (!(vma->vm_flags & VM_RESERVED))
 			vma->vm_private_data = 0;
 	}
 relock:
