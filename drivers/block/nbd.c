@@ -52,14 +52,9 @@
 #include <asm/types.h>
 
 #define MAJOR_NR NBD_MAJOR
-#define DEVICE_NR(device) (minor(device))
 #include <linux/nbd.h>
 
 #define LO_MAGIC 0x68797548
-
-static int nbd_blksizes[MAX_NBD];
-static int nbd_blksize_bits[MAX_NBD];
-static u64 nbd_bytesizes[MAX_NBD];
 
 static struct nbd_device nbd_dev[MAX_NBD];
 static devfs_handle_t devfs_handle;
@@ -77,11 +72,8 @@ static int requests_out;
 
 static int nbd_open(struct inode *inode, struct file *file)
 {
-	int dev = minor(inode->i_rdev);
-	if (dev >= MAX_NBD)
-		return -ENODEV;
-
-	nbd_dev[dev].refcnt++;
+	struct nbd_device *lo = inode->i_bdev->bd_disk->private_data;
+	lo->refcnt++;
 	return 0;
 }
 
@@ -270,7 +262,7 @@ void nbd_do_it(struct nbd_device *lo)
 			goto out;
 		}
 #ifdef PARANOIA
-		if (lo != &nbd_dev[minor(req->rq_dev)]) {
+		if (lo != req->rq_disk->private_data) {
 			printk(KERN_ALERT "NBD: request corrupted!\n");
 			continue;
 		}
@@ -320,29 +312,19 @@ void nbd_clear_que(struct nbd_device *lo)
  */
 
 #undef FAIL
-#define FAIL( s ) { printk( KERN_ERR "NBD, minor %d: " s "\n", dev ); goto error_out; }
+#define FAIL( s ) { printk( KERN_ERR "%s: " s "\n", req->rq_disk->disk_name ); goto error_out; }
 
 static void do_nbd_request(request_queue_t * q)
 {
-	struct request *req;
-	int dev = 0;
-	struct nbd_device *lo;
 
-	while (!blk_queue_empty(QUEUE)) {
-		req = CURRENT;
-#ifdef PARANOIA
-		if (!req)
-			FAIL("queue not empty but no request?");
-#endif
-		dev = minor(req->rq_dev);
-#ifdef PARANOIA
-		if (dev >= MAX_NBD)
-			FAIL("Minor too big.");		/* Probably can not happen */
-#endif
+	while (!blk_queue_empty(q)) {
+		struct request *req = elv_next_request(q);
+		struct nbd_device *lo;
+
 		if (!(req->flags & REQ_CMD))
 			goto error_out;
 
-		lo = &nbd_dev[dev];
+		lo = req->rq_disk->private_data;
 		if (!lo->file)
 			FAIL("Request when not-ready.");
 		nbd_cmd(req) = NBD_CMD_READ;
@@ -382,8 +364,7 @@ static void do_nbd_request(request_queue_t * q)
 static int nbd_ioctl(struct inode *inode, struct file *file,
 		     unsigned int cmd, unsigned long arg)
 {
-	int dev = minor(inode->i_rdev);
-	struct nbd_device *lo = &nbd_dev[dev];
+	struct nbd_device *lo = inode->i_bdev->bd_disk->private_data;
 	int error, temp;
 	struct request sreq ;
 
@@ -436,23 +417,23 @@ static int nbd_ioctl(struct inode *inode, struct file *file,
 	case NBD_SET_BLKSIZE:
 		if ((arg & (arg-1)) || (arg < 512) || (arg > PAGE_SIZE))
 			return -EINVAL;
-		nbd_blksizes[dev] = arg;
+		lo->blksize = arg;
 		temp = arg >> 9;
-		nbd_blksize_bits[dev] = 9;
+		lo->blksize_bits = 9;
 		while (temp > 1) {
-			nbd_blksize_bits[dev]++;
+			lo->blksize_bits++;
 			temp >>= 1;
 		}
-		nbd_bytesizes[dev] &= ~(nbd_blksizes[dev]-1); 
-		set_capacity(lo->disk, nbd_bytesizes[dev] >> 9);
+		lo->bytesize &= ~(lo->blksize-1); 
+		set_capacity(lo->disk, lo->bytesize >> 9);
 		return 0;
 	case NBD_SET_SIZE:
-		nbd_bytesizes[dev] = arg & ~(nbd_blksizes[dev]-1); 
-		set_capacity(lo->disk, nbd_bytesizes[dev] >> 9);
+		lo->bytesize = arg & ~(lo->blksize-1); 
+		set_capacity(lo->disk, lo->bytesize >> 9);
 		return 0;
 	case NBD_SET_SIZE_BLOCKS:
-		nbd_bytesizes[dev] = ((u64) arg) << nbd_blksize_bits[dev]; 
-		set_capacity(lo->disk, nbd_bytesizes[dev] >> 9);
+		lo->bytesize = ((u64) arg) << lo->blksize_bits;
+		set_capacity(lo->disk, lo->bytesize >> 9);
 		return 0;
 	case NBD_DO_IT:
 		if (!lo->file)
@@ -464,8 +445,9 @@ static int nbd_ioctl(struct inode *inode, struct file *file,
 		return 0;
 #ifdef PARANOIA
 	case NBD_PRINT_DEBUG:
-		printk(KERN_INFO "NBD device %d: next = %p, prev = %p. Global: in %d, out %d\n",
-		       dev, lo->queue_head.next, lo->queue_head.prev, requests_in, requests_out);
+		printk(KERN_INFO "%s: next = %p, prev = %p. Global: in %d, out %d\n",
+		       inode->i_bdev->bd_disk->disk_name, lo->queue_head.next,
+		       lo->queue_head.prev, requests_in, requests_out);
 		return 0;
 #endif
 	}
@@ -474,8 +456,7 @@ static int nbd_ioctl(struct inode *inode, struct file *file,
 
 static int nbd_release(struct inode *inode, struct file *file)
 {
-	int dev = minor(inode->i_rdev);
-	struct nbd_device *lo = &nbd_dev[dev];
+	struct nbd_device *lo = inode->i_bdev->bd_disk->private_data;
 	if (lo->refcnt <= 0)
 		printk(KERN_ALERT "nbd_release: refcount(%d) <= 0\n", lo->refcnt);
 	lo->refcnt--;
@@ -495,6 +476,8 @@ static struct block_device_operations nbd_fops =
  * And here should be modules and kernel interface 
  *  (Just smiley confuses emacs :-)
  */
+
+static struct request_queue nbd_queue;
 
 static int __init nbd_init(void)
 {
@@ -522,7 +505,7 @@ static int __init nbd_init(void)
 #ifdef MODULE
 	printk("nbd: registered device at major %d\n", MAJOR_NR);
 #endif
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_nbd_request, &nbd_lock);
+	blk_init_queue(&nbd_queue, do_nbd_request, &nbd_lock);
 	for (i = 0; i < MAX_NBD; i++) {
 		struct gendisk *disk = nbd_dev[i].disk;
 		nbd_dev[i].refcnt = 0;
@@ -532,12 +515,13 @@ static int __init nbd_init(void)
 		spin_lock_init(&nbd_dev[i].queue_lock);
 		INIT_LIST_HEAD(&nbd_dev[i].queue_head);
 		init_MUTEX(&nbd_dev[i].tx_lock);
-		nbd_blksizes[i] = 1024;
-		nbd_blksize_bits[i] = 10;
-		nbd_bytesizes[i] = 0x7ffffc00; /* 2GB */
+		nbd_dev[i].blksize = 1024;
+		nbd_dev[i].blksize_bits = 10;
+		nbd_dev[i].bytesize = 0x7ffffc00; /* 2GB */
 		disk->major = MAJOR_NR;
 		disk->first_minor = i;
 		disk->fops = &nbd_fops;
+		disk->private_data = &nbd_dev[i];
 		sprintf(disk->disk_name, "nbd%d", i);
 		set_capacity(disk, 0x3ffffe);
 		add_disk(disk);
@@ -563,7 +547,7 @@ static void __exit nbd_cleanup(void)
 		put_disk(nbd_dev[i].disk);
 	}
 	devfs_unregister (devfs_handle);
-	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	blk_cleanup_queue(&nbd_queue);
 
 	if (unregister_blkdev(MAJOR_NR, "nbd") != 0)
 		printk("nbd: cleanup_module failed\n");

@@ -74,12 +74,15 @@ struct nbd_device {
 #define NBD_READ_ONLY 0x0001
 #define NBD_WRITE_NOCHK 0x0002
 	struct socket * sock;
-	struct file * file; 		/* If == NULL, device is not ready, yet	*/
-	int magic;			/* FIXME: not if debugging is off	*/
+	struct file * file; 	/* If == NULL, device is not ready, yet	*/
+	int magic;		/* FIXME: not if debugging is off	*/
 	spinlock_t queue_lock;
-	struct list_head queue_head;	/* Requests are added here...			*/
+	struct list_head queue_head;/* Requests are added here...	*/
 	struct semaphore tx_lock;
 	struct gendisk *disk;
+	int blksize;
+	int blksize_bits;
+	u64 bytesize;
 };
 #endif
 
