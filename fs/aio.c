@@ -476,7 +476,7 @@ static void aio_fput_routine(void *data)
 /* __aio_put_req
  *	Returns true if this put was the last user of the request.
  */
-static inline int __aio_put_req(struct kioctx *ctx, struct kiocb *req)
+static int __aio_put_req(struct kioctx *ctx, struct kiocb *req)
 {
 	dprintk(KERN_DEBUG "aio_put(%p): f_count=%d\n",
 		req, atomic_read(&req->ki_filp->f_count));
@@ -523,7 +523,7 @@ int aio_put_req(struct kiocb *req)
 /*	Lookup an ioctx id.  ioctx_list is lockless for reads.
  *	FIXME: this is O(n) and is only suitable for development.
  */
-static inline struct kioctx *lookup_ioctx(unsigned long ctx_id)
+static struct kioctx *lookup_ioctx(unsigned long ctx_id)
 {
 	struct kioctx *ioctx;
 	struct mm_struct *mm;
