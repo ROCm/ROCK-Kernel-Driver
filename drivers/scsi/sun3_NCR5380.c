@@ -1217,7 +1217,7 @@ static void NCR5380_dma_complete( struct Scsi_Host *instance )
 	       HOSTNO, NCR5380_read(BUS_AND_STATUS_REG),
 	       NCR5380_read(STATUS_REG));
 
-    if((sun3scsi_dma_finish(hostdata->connected->request.cmd))) {
+    if((sun3scsi_dma_finish(hostdata->connected->request->cmd))) {
 	    printk("scsi%d: overrun in UDC counter -- not prepared to deal with this!\n", HOSTNO);
 	    printk("please e-mail sammy@oh.verio.com with a description of how this\n");
 	    printk("error was produced.\n");
@@ -2016,9 +2016,9 @@ static void NCR5380_information_transfer (struct Scsi_Host *instance)
 		if((count > SUN3_DMA_MINSIZE) && (sun3_dma_setup_done
 						  != cmd))
 		{
-			if((cmd->request.cmd == 0) || (cmd->request.cmd == 1)) {
+			if((cmd->request->cmd == 0) || (cmd->request->cmd == 1)) {
 				sun3scsi_dma_setup(d, count,
-						   cmd->request.cmd);
+						   cmd->request->cmd);
 				sun3_dma_setup_done = cmd;
 			}
 		}
@@ -2628,7 +2628,7 @@ static void NCR5380_reselect (struct Scsi_Host *instance)
 						  != tmp))
 		{
 			sun3scsi_dma_setup(d, count,
-					   tmp->request.cmd);
+					   tmp->request->cmd);
 			sun3_dma_setup_done = tmp;
 		}
 #endif

@@ -54,6 +54,7 @@ static void scan_scsis_target(unsigned int channel, unsigned int dev,
 		char *scsi_result);
 static int find_lun0_scsi_level(unsigned int channel, unsigned int dev,
 				struct Scsi_Host *shpnt);
+static void scsi_load_identifier(Scsi_Device *SDpnt, Scsi_Request * SRpnt);
 
 struct dev_info {
 	const char *vendor;
@@ -287,6 +288,31 @@ static int scsilun_to_int(ScsiLun *scsilun_pnt)
 	return lun;
 }
 #endif
+
+/* Driverfs file content handlers */
+static ssize_t scsi_device_type_read(struct device *driverfs_dev, char *page, 
+	size_t count, loff_t off)
+{
+	struct scsi_device *SDpnt = list_entry(driverfs_dev,
+		struct scsi_device, sdev_driverfs_dev);
+
+	if ((SDpnt->type <= MAX_SCSI_DEVICE_CODE) && 
+		(scsi_device_types[(int)SDpnt->type] != NULL))
+		return off ? 0 : 
+			sprintf(page, "%s\n", 
+				scsi_device_types[(int)SDpnt->type]);
+	else
+		return off ? 0 : sprintf(page, "UNKNOWN\n");
+
+	return 0;
+}
+
+static struct driver_file_entry scsi_device_type_file = {
+	name: "type",
+	mode: S_IRUGO,
+	show: scsi_device_type_read,
+};
+/* end content handlers */
 
 static void print_inquiry(unsigned char *data)
 {
@@ -785,6 +811,22 @@ static int scan_scsis_single(unsigned int channel, unsigned int dev,
 	SDpnt->type = (type & 0x1f);
 
 	print_inquiry(scsi_result);
+
+	/* interrogate scsi target to provide device identifier */
+	scsi_load_identifier(SDpnt, SRpnt);
+
+	/* create driverfs files */
+	sprintf(SDpnt->sdev_driverfs_dev.bus_id,"%d:%d:%d:%d",
+		SDpnt->host->host_no, SDpnt->channel, SDpnt->id, SDpnt->lun);
+	
+	SDpnt->sdev_driverfs_dev.parent = &SDpnt->host->host_driverfs_dev;
+	SDpnt->sdev_driverfs_dev.bus = &scsi_driverfs_bus_type;
+
+	device_register(&SDpnt->sdev_driverfs_dev); 
+
+	/* Create driverfs file entries */
+	device_create_file(&SDpnt->sdev_driverfs_dev, 
+			&scsi_device_type_file);
 
         sprintf (devname, "host%d/bus%d/target%d/lun%d",
                  SDpnt->host->host_no, SDpnt->channel, SDpnt->id, SDpnt->lun);
@@ -1305,4 +1347,375 @@ static int find_lun0_scsi_level(unsigned int channel, unsigned int dev,
 	}
 	/* haven't found lun0, should send INQUIRY but take easy route */
 	return res;
+}
+
+#define SCSI_UID_DEV_ID  'U'
+#define SCSI_UID_SER_NUM 'S'
+#define SCSI_UID_UNKNOWN 'Z'
+
+unsigned char *scsi_get_evpd_page(Scsi_Device *SDpnt, Scsi_Request * SRpnt)
+{
+	unsigned char *evpd_page = NULL;
+	unsigned char *scsi_cmd = NULL;
+	int lun = SDpnt->lun;
+	int scsi_level = SDpnt->scsi_level;
+
+	evpd_page = kmalloc(255, 
+		(SDpnt->host->unchecked_isa_dma ? GFP_DMA : GFP_ATOMIC));
+	if (!evpd_page)
+		return NULL;
+
+	scsi_cmd = kmalloc(MAX_COMMAND_SIZE, GFP_ATOMIC);
+	if (!scsi_cmd) {
+		kfree(evpd_page);
+		return NULL;
+	}
+
+	/* Use vital product pages to determine serial number */
+	/* Try Supported vital product data pages 0x00 first */
+	scsi_cmd[0] = INQUIRY;
+	if ((lun > 0) && (scsi_level <= SCSI_2))
+		scsi_cmd[1] = ((lun << 5) & 0xe0) | 0x01;
+	else
+		scsi_cmd[1] = 0x01;	/* SCSI_3 and higher, don't touch */
+	scsi_cmd[2] = 0x00;
+	scsi_cmd[3] = 0;
+	scsi_cmd[4] = 255;
+	scsi_cmd[5] = 0;
+	SRpnt->sr_cmd_len = 0;
+	SRpnt->sr_sense_buffer[0] = 0;
+	SRpnt->sr_sense_buffer[2] = 0;
+	SRpnt->sr_data_direction = SCSI_DATA_READ;
+	scsi_wait_req(SRpnt, (void *) scsi_cmd, (void *) evpd_page,
+			255, SCSI_TIMEOUT+4*HZ, 3);
+
+	if (SRpnt->sr_result) {
+		kfree(scsi_cmd);
+		kfree(evpd_page);
+		return NULL;
+	}
+
+	/* check to see if response was truncated */
+	if (evpd_page[3] > 255) {
+		int max_lgth = evpd_page[3] + 4;
+
+		kfree(evpd_page);
+		evpd_page = kmalloc(max_lgth, (SDpnt->host->unchecked_isa_dma ? 
+			GFP_DMA : GFP_ATOMIC));
+		if (!evpd_page) {
+			kfree(scsi_cmd);
+			return NULL;
+		}
+		memset(scsi_cmd, 0, MAX_COMMAND_SIZE);
+		scsi_cmd[0] = INQUIRY;
+		if ((lun > 0) && (scsi_level <= SCSI_2))
+			scsi_cmd[1] = ((lun << 5) & 0xe0) | 0x01;
+		else
+			scsi_cmd[1] = 0x01; /* SCSI_3 and higher, don't touch */
+		scsi_cmd[2] = 0x00;
+		scsi_cmd[3] = 0;
+		scsi_cmd[4] = max_lgth;
+		scsi_cmd[5] = 0;
+		SRpnt->sr_cmd_len = 0;
+		SRpnt->sr_sense_buffer[0] = 0;
+		SRpnt->sr_sense_buffer[2] = 0;
+		SRpnt->sr_data_direction = SCSI_DATA_READ;
+		scsi_wait_req(SRpnt, (void *) scsi_cmd, (void *) evpd_page,
+			max_lgth, SCSI_TIMEOUT+4*HZ, 3);
+		if (SRpnt->sr_result) {
+			kfree(scsi_cmd);
+			kfree(evpd_page);
+			return NULL;
+		}
+	}
+	kfree(scsi_cmd);
+	/* some ill behaved devices return the std inquiry here rather than
+		the evpd data. snoop the data to verify */
+	if (evpd_page[3] > 16) {
+		/* if vend id appears in the evpd page assume evpd is invalid */
+		if (!strncmp(&evpd_page[8], SDpnt->vendor, 8)) {
+			kfree(evpd_page);
+			return NULL;
+		}
+	}
+	return evpd_page;
+}
+
+int scsi_get_deviceid(Scsi_Device *SDpnt,Scsi_Request * SRpnt)
+{
+	unsigned char *id_page = NULL;
+	unsigned char *scsi_cmd = NULL;
+	int scnt, i, j, idtype;
+	char * id = SDpnt->sdev_driverfs_dev.name;
+	int lun = SDpnt->lun;
+	int scsi_level = SDpnt->scsi_level;
+
+	id_page = kmalloc(255, 
+		(SDpnt->host->unchecked_isa_dma ? GFP_DMA : GFP_ATOMIC)); 
+	if (!id_page)
+		return 0;
+
+	scsi_cmd = kmalloc(MAX_COMMAND_SIZE, GFP_ATOMIC);
+	if (!scsi_cmd)
+		goto leave;
+
+	/* Use vital product pages to determine serial number */
+	/* Try Supported vital product data pages 0x00 first */
+	scsi_cmd[0] = INQUIRY;
+	if ((lun > 0) && (scsi_level <= SCSI_2))
+		scsi_cmd[1] = ((lun << 5) & 0xe0) | 0x01;
+	else
+		scsi_cmd[1] = 0x01;	/* SCSI_3 and higher, don't touch */
+	scsi_cmd[2] = 0x83;
+	scsi_cmd[3] = 0;
+	scsi_cmd[4] = 255;
+	scsi_cmd[5] = 0;
+	SRpnt->sr_cmd_len = 0;
+	SRpnt->sr_sense_buffer[0] = 0;
+	SRpnt->sr_sense_buffer[2] = 0;
+	SRpnt->sr_data_direction = SCSI_DATA_READ;
+	scsi_wait_req(SRpnt, (void *) scsi_cmd, (void *) id_page,
+			255, SCSI_TIMEOUT+4*HZ, 3);
+	if (SRpnt->sr_result) {
+		kfree(scsi_cmd);
+		goto leave;
+	}
+
+	/* check to see if response was truncated */
+	if (id_page[3] > 255) {
+		int max_lgth = id_page[3] + 4;
+
+		kfree(id_page);
+		id_page = kmalloc(max_lgth,
+			(SDpnt->host->unchecked_isa_dma ? 
+			GFP_DMA : GFP_ATOMIC)); 
+		if (!id_page) {
+			kfree(scsi_cmd);
+			return 0;
+		}
+		memset(scsi_cmd, 0, MAX_COMMAND_SIZE);
+		scsi_cmd[0] = INQUIRY;
+		if ((lun > 0) && (scsi_level <= SCSI_2))
+			scsi_cmd[1] = ((lun << 5) & 0xe0) | 0x01;
+		else
+			scsi_cmd[1] = 0x01; /* SCSI_3 and higher, don't touch */
+		scsi_cmd[2] = 0x83;
+		scsi_cmd[3] = 0;
+		scsi_cmd[4] = max_lgth;
+		scsi_cmd[5] = 0;
+		SRpnt->sr_cmd_len = 0;
+		SRpnt->sr_sense_buffer[0] = 0;
+		SRpnt->sr_sense_buffer[2] = 0;
+		SRpnt->sr_data_direction = SCSI_DATA_READ;
+		scsi_wait_req(SRpnt, (void *) scsi_cmd, (void *) id_page,
+				max_lgth, SCSI_TIMEOUT+4*HZ, 3);
+		if (SRpnt->sr_result) {
+			kfree(scsi_cmd);
+			goto leave;
+		}
+	}
+	kfree(scsi_cmd);
+
+	idtype = 3;
+	while (idtype > 0) {
+		for(scnt = 4; scnt <= id_page[3] + 3; 
+		    scnt += id_page[scnt + 3] + 4) {
+			if ((id_page[scnt + 1] & 0x0f) != idtype) {
+				continue;
+			}
+			if ((id_page[scnt] & 0x0f) == 2) {  
+				for(i = scnt + 4, j = 1;
+				    i < scnt + 4 + id_page[scnt + 3]; 
+				    i++) {
+					if (id_page[i] > 0x20) {
+						if (j == DEVICE_NAME_SIZE) {
+							memset(id, 0, 
+							    DEVICE_NAME_SIZE);
+							break;
+						}
+						id[j++] = id_page[i];
+					}
+				}
+			} else if ((id_page[scnt] & 0x0f) == 1) {
+				static const char hex_str[]="0123456789abcdef";
+				for(i = scnt + 4, j = 1;
+				    i < scnt + 4 + id_page[scnt + 3]; 
+				    i++) {
+					if ((j + 1) == DEVICE_NAME_SIZE) {
+						memset(id, 0, DEVICE_NAME_SIZE);
+						break;
+					}
+					id[j++] = hex_str[(id_page[i] & 0xf0) >>
+								4];
+					id[j++] = hex_str[id_page[i] & 0x0f];
+				}
+			}
+			if (id[1] != 0) goto leave;
+		}
+		idtype--;
+	}
+ leave:
+	kfree(id_page);
+	if (id[1] != 0) {
+		id[0] = SCSI_UID_DEV_ID;
+		return 1;
+	}
+	return 0;
+}
+
+int scsi_get_serialnumber(Scsi_Device *SDpnt, Scsi_Request * SRpnt)
+{
+	unsigned char *serialnumber_page = NULL;
+	unsigned char *scsi_cmd = NULL;
+	int lun = SDpnt->lun;
+	int scsi_level = SDpnt->scsi_level;
+	int i, j;
+
+	serialnumber_page = kmalloc(255, (SDpnt->host->unchecked_isa_dma ? 
+			GFP_DMA : GFP_ATOMIC));
+	if (!serialnumber_page)
+		return 0;
+
+	scsi_cmd = kmalloc(MAX_COMMAND_SIZE, GFP_ATOMIC);
+	if (!scsi_cmd)
+		goto leave;
+
+	/* Use vital product pages to determine serial number */
+	/* Try Supported vital product data pages 0x00 first */
+	scsi_cmd[0] = INQUIRY;
+	if ((lun > 0) && (scsi_level <= SCSI_2))
+		scsi_cmd[1] = ((lun << 5) & 0xe0) | 0x01;
+	else	
+		scsi_cmd[1] = 0x01;	/* SCSI_3 and higher, don't touch */
+	scsi_cmd[2] = 0x80;
+	scsi_cmd[3] = 0;
+	scsi_cmd[4] = 255;
+	scsi_cmd[5] = 0;
+	SRpnt->sr_cmd_len = 0;
+	SRpnt->sr_sense_buffer[0] = 0;
+	SRpnt->sr_sense_buffer[2] = 0;
+	SRpnt->sr_data_direction = SCSI_DATA_READ;
+	scsi_wait_req(SRpnt, (void *) scsi_cmd, (void *) serialnumber_page,
+			255, SCSI_TIMEOUT+4*HZ, 3);
+
+	if (SRpnt->sr_result) {
+		kfree(scsi_cmd);
+		goto leave;
+	}
+	/* check to see if response was truncated */
+	if (serialnumber_page[3] > 255) {
+		int max_lgth = serialnumber_page[3] + 4;
+
+		kfree(serialnumber_page);
+		serialnumber_page = kmalloc(max_lgth, 
+			(SDpnt->host->unchecked_isa_dma ? 
+			GFP_DMA : GFP_ATOMIC));
+		if (!serialnumber_page) {
+			kfree(scsi_cmd);
+			return 0;
+		}
+		memset(scsi_cmd, 0, MAX_COMMAND_SIZE);
+		scsi_cmd[0] = INQUIRY;
+		if ((lun > 0) && (scsi_level <= SCSI_2))
+			scsi_cmd[1] = ((lun << 5) & 0xe0) | 0x01;
+		else
+			scsi_cmd[1] = 0x01; /* SCSI_3 and higher, don't touch */
+		scsi_cmd[2] = 0x80;
+		scsi_cmd[3] = 0;
+		scsi_cmd[4] = max_lgth;
+		scsi_cmd[5] = 0;
+		SRpnt->sr_cmd_len = 0;
+		SRpnt->sr_sense_buffer[0] = 0;
+		SRpnt->sr_sense_buffer[2] = 0;
+		SRpnt->sr_data_direction = SCSI_DATA_READ;
+		scsi_wait_req(SRpnt, (void *) scsi_cmd, 
+				(void *) serialnumber_page,
+				max_lgth, SCSI_TIMEOUT+4*HZ, 3);
+		if (SRpnt->sr_result) {
+			kfree(scsi_cmd);
+			goto leave;
+		}
+	}
+	kfree(scsi_cmd);
+
+	SDpnt->sdev_driverfs_dev.name[0] = SCSI_UID_SER_NUM;
+	for(i = 0, j = 1; i < serialnumber_page[3]; i++) {
+		if (serialnumber_page[4 + i] > 0x20)
+			SDpnt->sdev_driverfs_dev.name[j++] = 
+				serialnumber_page[4 + i];
+	}
+	for(i = 0, j = strlen(SDpnt->sdev_driverfs_dev.name); i < 8; i++) {
+		if (SDpnt->vendor[i] > 0x20) {
+			SDpnt->sdev_driverfs_dev.name[j++] = SDpnt->vendor[i];
+		}
+	}
+	kfree(serialnumber_page);
+	return 1;
+ leave:
+	memset(SDpnt->sdev_driverfs_dev.name, 0, DEVICE_NAME_SIZE);
+	kfree(serialnumber_page);
+	return 0;
+}
+
+int scsi_get_default_name(Scsi_Device *SDpnt)
+{
+	int i, j;
+
+	SDpnt->sdev_driverfs_dev.name[0] = SCSI_UID_UNKNOWN;
+	for(i = 0, j = 1; i < 8; i++) {
+		if (SDpnt->vendor[i] > 0x20) {
+			SDpnt->sdev_driverfs_dev.name[j++] = 
+				SDpnt->vendor[i];
+		}
+	}
+	for(i = 0, j = strlen(SDpnt->sdev_driverfs_dev.name); 
+	    i < 16; i++) {
+		if (SDpnt->model[i] > 0x20) {
+			SDpnt->sdev_driverfs_dev.name[j++] = 
+				SDpnt->model[i];
+		}
+	}
+	for(i = 0, j = strlen(SDpnt->sdev_driverfs_dev.name); i < 4; i++) {
+		if (SDpnt->rev[i] > 0x20) {
+			SDpnt->sdev_driverfs_dev.name[j++] = SDpnt->rev[i];
+		}
+	}	
+	return 1;
+}
+
+
+static void scsi_load_identifier(Scsi_Device *SDpnt, Scsi_Request * SRpnt)
+{
+	unsigned char *evpd_page = NULL;
+	int cnt;
+
+	memset(SDpnt->sdev_driverfs_dev.name, 0, DEVICE_NAME_SIZE);
+	evpd_page = scsi_get_evpd_page(SDpnt, SRpnt);
+	if (!evpd_page) {
+		/* try to obtain serial number anyway */
+		if (!scsi_get_serialnumber(SDpnt, SRpnt))
+			goto leave;
+		goto leave;
+	}
+
+	for(cnt = 4; cnt <= evpd_page[3] + 3; cnt++) {
+		if (evpd_page[cnt] == 0x83) {
+			if (scsi_get_deviceid(SDpnt, SRpnt))
+				goto leave;
+		}
+	}
+
+	for(cnt = 4; cnt <= evpd_page[3] + 3; cnt++) {
+		if (evpd_page[cnt] == 0x80) {
+			if (scsi_get_serialnumber(SDpnt, SRpnt))
+				goto leave;
+		}
+	}
+
+leave:
+	if (SDpnt->sdev_driverfs_dev.name[0] == 0)
+		scsi_get_default_name(SDpnt);
+
+	if (evpd_page) kfree(evpd_page);
+	return;
 }

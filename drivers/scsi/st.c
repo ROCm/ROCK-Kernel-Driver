@@ -229,7 +229,7 @@ static int st_chk_result(Scsi_Tape *STp, Scsi_Request * SRpnt)
 		scode = 0;
 	}
 
-	dev = TAPE_NR(SRpnt->sr_request.rq_dev);
+	dev = TAPE_NR(SRpnt->sr_request->rq_dev);
         DEB(
         if (debugging) {
                 printk(ST_DEB_MSG "st%d: Error: %x, cmd: %x %x %x %x %x %x Len: %d\n",
@@ -306,7 +306,7 @@ static void st_sleep_done(Scsi_Cmnd * SCpnt)
 	int remainder;
 	Scsi_Tape *STp;
 
-	st_nbr = TAPE_NR(SCpnt->request.rq_dev);
+	st_nbr = TAPE_NR(SCpnt->request->rq_dev);
 	read_lock(&st_dev_arr_lock);
 	STp = scsi_tapes[st_nbr];
 	read_unlock(&st_dev_arr_lock);
@@ -328,11 +328,11 @@ static void st_sleep_done(Scsi_Cmnd * SCpnt)
 			(STp->buffer)->midlevel_result = INT_MAX;	/* OK */
 	} else
 		(STp->buffer)->midlevel_result = SCpnt->result;
-	SCpnt->request.rq_status = RQ_SCSI_DONE;
+	SCpnt->request->rq_status = RQ_SCSI_DONE;
 	(STp->buffer)->last_SRpnt = SCpnt->sc_request;
 	DEB( STp->write_pending = 0; )
 
-	complete(SCpnt->request.waiting);
+	complete(SCpnt->request->waiting);
 }
 
 
@@ -371,16 +371,16 @@ static Scsi_Request *
 		bp = (STp->buffer)->b_data;
 	SRpnt->sr_data_direction = direction;
 	SRpnt->sr_cmd_len = 0;
-	SRpnt->sr_request.waiting = &(STp->wait);
-	SRpnt->sr_request.rq_status = RQ_SCSI_BUSY;
-	SRpnt->sr_request.rq_dev = STp->devt;
+	SRpnt->sr_request->waiting = &(STp->wait);
+	SRpnt->sr_request->rq_status = RQ_SCSI_BUSY;
+	SRpnt->sr_request->rq_dev = STp->devt;
 
 	scsi_do_req(SRpnt, (void *) cmd, bp, bytes,
 		    st_sleep_done, timeout, retries);
 
 	if (do_wait) {
-		wait_for_completion(SRpnt->sr_request.waiting);
-		SRpnt->sr_request.waiting = NULL;
+		wait_for_completion(SRpnt->sr_request->waiting);
+		SRpnt->sr_request->waiting = NULL;
 		(STp->buffer)->syscall_result = st_chk_result(STp, SRpnt);
 	}
 	return SRpnt;
@@ -403,7 +403,7 @@ static void write_behind_check(Scsi_Tape * STp)
         ) /* end DEB */
 
 	wait_for_completion(&(STp->wait));
-	(STp->buffer)->last_SRpnt->sr_request.waiting = NULL;
+	(STp->buffer)->last_SRpnt->sr_request->waiting = NULL;
 
 	(STp->buffer)->syscall_result = st_chk_result(STp, (STp->buffer)->last_SRpnt);
 	scsi_release_request((STp->buffer)->last_SRpnt);
@@ -3531,6 +3531,31 @@ __setup("st=", st_setup);
 
 #endif
 
+/* Driverfs file support */
+static ssize_t st_device_kdev_read(struct device *driverfs_dev, 
+				   char *page, size_t count, loff_t off)
+{
+	kdev_t kdev; 
+	kdev.value=(int)driverfs_dev->driver_data;
+	return off ? 0 : sprintf(page, "%x\n",kdev.value);
+}
+static struct driver_file_entry st_device_kdev_file = {
+	name: "kdev",
+	mode: S_IRUGO,
+	show: st_device_kdev_read,
+};
+
+static ssize_t st_device_type_read(struct device *driverfs_dev, 
+				   char *page, size_t count, loff_t off) 
+{
+	return off ? 0 : sprintf (page, "CHR\n");
+}
+static struct driver_file_entry st_device_type_file = {
+	name: "type",
+	mode: S_IRUGO,
+	show: st_device_type_read,
+};
+
 
 static struct file_operations st_fops =
 {
@@ -3632,6 +3657,18 @@ static int st_attach(Scsi_Device * SDp)
 
 	    /*  Rewind entry  */
 	    sprintf (name, "mt%s", formats[mode]);
+	    sprintf(tpnt->driverfs_dev_r[mode].bus_id, "%s:%s", 
+		    SDp->sdev_driverfs_dev.name, name);
+	    sprintf(tpnt->driverfs_dev_r[mode].name, "%s%s", 
+		    SDp->sdev_driverfs_dev.name, name);
+	    tpnt->driverfs_dev_r[mode].parent = &SDp->sdev_driverfs_dev;
+	    tpnt->driverfs_dev_r[mode].bus = &scsi_driverfs_bus_type;
+	    tpnt->driverfs_dev_r[mode].driver_data =
+			(void *)__mkdev(MAJOR_NR, i + (mode << 5));
+	    device_register(&tpnt->driverfs_dev_r[mode]);
+	    device_create_file(&tpnt->driverfs_dev_r[mode], 
+			       &st_device_type_file);
+	    device_create_file(&tpnt->driverfs_dev_r[mode], &st_device_kdev_file);
 	    tpnt->de_r[mode] =
 		devfs_register (SDp->de, name, DEVFS_FL_DEFAULT,
 				MAJOR_NR, i + (mode << 5),
@@ -3639,6 +3676,19 @@ static int st_attach(Scsi_Device * SDp)
 				&st_fops, NULL);
 	    /*  No-rewind entry  */
 	    sprintf (name, "mt%sn", formats[mode]);
+	    sprintf(tpnt->driverfs_dev_n[mode].bus_id, "%s:%s", 
+		    SDp->sdev_driverfs_dev.name, name);
+	    sprintf(tpnt->driverfs_dev_n[mode].name, "%s%s", 
+		    SDp->sdev_driverfs_dev.name, name);
+	    tpnt->driverfs_dev_n[mode].parent= &SDp->sdev_driverfs_dev;
+	    tpnt->driverfs_dev_n[mode].bus = &scsi_driverfs_bus_type;
+	    tpnt->driverfs_dev_n[mode].driver_data =
+			(void *)__mkdev(MAJOR_NR, i + (mode << 5) + 128);
+	    device_register(&tpnt->driverfs_dev_n[mode]);
+	    device_create_file(&tpnt->driverfs_dev_n[mode], 
+			&st_device_type_file);
+	    device_create_file(&tpnt->driverfs_dev_n[mode], 
+			&st_device_kdev_file);
 	    tpnt->de_n[mode] =
 		devfs_register (SDp->de, name, DEVFS_FL_DEFAULT,
 				MAJOR_NR, i + (mode << 5) + 128,
@@ -3738,8 +3788,18 @@ static void st_detach(Scsi_Device * SDp)
 			for (mode = 0; mode < ST_NBR_MODES; ++mode) {
 				devfs_unregister (tpnt->de_r[mode]);
 				tpnt->de_r[mode] = NULL;
+				device_remove_file(&tpnt->driverfs_dev_r[mode],
+						   st_device_type_file.name);
+				device_remove_file(&tpnt->driverfs_dev_r[mode],
+						   st_device_kdev_file.name);
+				put_device(&tpnt->driverfs_dev_r[mode]);
 				devfs_unregister (tpnt->de_n[mode]);
 				tpnt->de_n[mode] = NULL;
+				device_remove_file(&tpnt->driverfs_dev_n[mode],
+						   st_device_type_file.name);
+				device_remove_file(&tpnt->driverfs_dev_n[mode],
+						   st_device_kdev_file.name);
+				put_device(&tpnt->driverfs_dev_n[mode]);
 			}
 			if (tpnt->buffer) {
 				tpnt->buffer->orig_sg_segs = 0;
@@ -3770,8 +3830,16 @@ static int __init init_st(void)
 		verstr, st_fixed_buffer_size, st_write_threshold,
 		st_max_sg_segs);
 
-	if (devfs_register_chrdev(SCSI_TAPE_MAJOR, "st", &st_fops) >= 0)
-		return scsi_register_device(&st_template);
+	if (devfs_register_chrdev(SCSI_TAPE_MAJOR, "st", &st_fops) >= 0) {
+		if (scsi_register_device(&st_template) == 0) {
+			st_template.scsi_driverfs_driver.name = 
+				(char *)st_template.tag;
+			st_template.scsi_driverfs_driver.bus = 
+				&scsi_driverfs_bus_type;
+			driver_register(&st_template.scsi_driverfs_driver);
+			return 0;
+		}
+	}
 
 	printk(KERN_ERR "Unable to get major %d for SCSI tapes\n", MAJOR_NR);
 	return 1;
@@ -3790,6 +3858,7 @@ static void __exit exit_st(void)
 		kfree(scsi_tapes);
 	}
 	st_template.dev_max = 0;
+	remove_driver(&st_template.scsi_driverfs_driver);
 	printk(KERN_INFO "st: Unloaded.\n");
 }
 

@@ -130,7 +130,12 @@ static int ramfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int d
 
 static int ramfs_mkdir(struct inode * dir, struct dentry * dentry, int mode)
 {
-	return ramfs_mknod(dir, dentry, mode | S_IFDIR, 0);
+	int retval = ramfs_mknod(dir, dentry, mode | S_IFDIR, 0);
+	if (!retval) {
+		dir->i_nlink++;
+		dentry->d_inode->i_nlink++;
+	}
+	return retval;
 }
 
 static int ramfs_create(struct inode *dir, struct dentry *dentry, int mode)
@@ -186,24 +191,29 @@ static int ramfs_empty(struct dentry *dentry)
 }
 
 /*
- * This works for both directories and regular files.
- * (non-directories will always have empty subdirs)
+ * Unlink a ramfs entry
  */
 static int ramfs_unlink(struct inode * dir, struct dentry *dentry)
+{
+	struct inode *inode = dentry->d_inode;
+
+	inode->i_nlink--;
+	dput(dentry);			/* Undo the count from "create" - this does all the work */
+	return 0;
+}
+
+static int ramfs_rmdir(struct inode * dir, struct dentry *dentry)
 {
 	int retval = -ENOTEMPTY;
 
 	if (ramfs_empty(dentry)) {
-		struct inode *inode = dentry->d_inode;
-
-		inode->i_nlink--;
-		dput(dentry);			/* Undo the count from "create" - this does all the work */
+		dentry->d_inode->i_nlink--;
+		ramfs_unlink(dir, dentry);
+		dir->i_nlink--;
 		retval = 0;
 	}
 	return retval;
 }
-
-#define ramfs_rmdir ramfs_unlink
 
 /*
  * The VFS layer already does all the dentry stuff for rename,
@@ -220,6 +230,10 @@ static int ramfs_rename(struct inode * old_dir, struct dentry *old_dentry, struc
 		if (inode) {
 			inode->i_nlink--;
 			dput(new_dentry);
+		}
+		if (S_ISDIR(old_dentry->d_inode->i_mode)) {
+			old_dir->i_nlink--;
+			new_dir->i_nlink++;
 		}
 		error = 0;
 	}
