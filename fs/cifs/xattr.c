@@ -55,6 +55,7 @@ ssize_t cifs_listxattr(struct dentry * direntry, char * ea_data, size_t ea_size)
 	struct cifsTconInfo *pTcon;
 	struct super_block * sb;
 	char * full_path;
+
 	if(direntry == NULL)
 		return -EIO;
 	if(direntry->d_inode == NULL)
@@ -74,13 +75,14 @@ ssize_t cifs_listxattr(struct dentry * direntry, char * ea_data, size_t ea_size)
 		FreeXid(xid);
 		return -ENOMEM;
 	}
-	/* return dosattributes as pseudo xattr */
+	/* return dos attributes as pseudo xattr */
 	/* return alt name if available as pseudo attr */
 
 	/* if proc/fs/cifs/streamstoxattr is set then
 		search server for EAs or streams to 
 		returns as xattrs */
-	rc = CIFSSMBQAllEAs(xid,pTcon,full_path,ea_data,ea_size,cifs_sb->local_nls);
+	rc = CIFSSMBQAllEAs(xid,pTcon,full_path,ea_data,ea_size,
+				cifs_sb->local_nls);
 	FreeXid(xid);
 #endif
 	return rc;
