@@ -114,9 +114,10 @@ extern void get_full_page_state(struct page_state *ret);
 
 #define mod_page_state(member, delta)					\
 	do {								\
-		int cpu = get_cpu();					\
-		per_cpu(page_states, cpu).member += (delta);		\
-		put_cpu();						\
+		unsigned long flags;					\
+		local_irq_save(flags);					\
+		__get_cpu_var(page_states).member += (delta);		\
+		local_irq_restore(flags);				\
 	} while (0)
 
 #define inc_page_state(member)	mod_page_state(member, 1UL)
