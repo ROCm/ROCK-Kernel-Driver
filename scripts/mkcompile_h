@@ -3,13 +3,20 @@ ARCH=$2
 SMP=$3
 CC=$4
 
+if [ -r ../.version ]; then
+  VERSION=`cat ../.version`
+else
+  VERSION=0
+  echo 0 > ../.version
+fi
+
 # Generate a temporary compile.h
 
-( echo /\* This file is auto generated, version `cat ../.version` \*/
+( echo /\* This file is auto generated, version $VERSION \*/
 
   echo \#define UTS_MACHINE \"$ARCH\"
 
-  echo -n \#define UTS_VERSION \"\#`cat ../.version`
+  echo -n \#define UTS_VERSION \"\#$VERSION
   if [ -n "$SMP" ] ; then echo -n " SMP"; fi
   echo ' '`date`'"'
 
