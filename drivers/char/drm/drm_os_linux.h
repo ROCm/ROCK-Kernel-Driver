@@ -96,9 +96,6 @@ static __inline__ int mtrr_del (int reg, unsigned long base,
 	__copy_to_user(arg1, arg2, arg3)
 #define DRM_GET_USER_UNCHECKED(val, uaddr)		\
 	__get_user(val, uaddr)
-#define DRM_PUT_USER_UNCHECKED(uaddr, val)		\
-	__put_user(val, uaddr)
-
 
 #define DRM_GET_PRIV_WITH_RETURN(_priv, _filp) _priv = _filp->private_data
 
