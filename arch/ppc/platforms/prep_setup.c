@@ -958,6 +958,16 @@ prep_irq_canonicalize(u_int irq)
 	}
 }
 
+static int __init
+prep_request_cascade(void)
+{
+	if (OpenPIC_Addr != NULL)
+		/* We have a cascade on OpenPIC IRQ 0, Linux IRQ 16 */
+		openpic_hookup_cascade(NUM_8259_INTERRUPTS, "82c59 cascade",
+				return 0;
+}
+arch_initcall(prep_request_cascade);
+
 static void __init
 prep_init_IRQ(void)
 {
@@ -966,9 +976,6 @@ prep_init_IRQ(void)
 
 	if (OpenPIC_Addr != NULL) {
 		openpic_init(NUM_8259_INTERRUPTS);
-		/* We have a cascade on OpenPIC IRQ 0, Linux IRQ 16 */
-		openpic_hookup_cascade(NUM_8259_INTERRUPTS, "82c59 cascade",
-				       i8259_irq);
 	}
 	for ( i = 0 ; i < NUM_8259_INTERRUPTS ; i++ )
 		irq_desc[i].handler = &i8259_pic;

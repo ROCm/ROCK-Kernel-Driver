@@ -52,7 +52,8 @@ obj-$(CONFIG_MCPN765)		+= todc_time.o indirect_pci.o pci_auto.o \
 obj-$(CONFIG_MENF1)		+= todc_time.o i8259.o mpc10x_common.o \
 					pci_auto.o indirect_pci.o
 obj-$(CONFIG_MVME5100)		+= open_pic.o todc_time.o indirect_pci.o \
-					i8259.o pci_auto.o hawk_common.o
+					pci_auto.o hawk_common.o
+obj-$(CONFIG_MVME5100_IPMC761_PRESENT)	+= i8259.o
 obj-$(CONFIG_OCOTEA)		+= indirect_pci.o pci_auto.o todc_time.o
 obj-$(CONFIG_PAL4)		+= cpc700_pic.o
 obj-$(CONFIG_PCORE)		+= todc_time.o i8259.o pci_auto.o
