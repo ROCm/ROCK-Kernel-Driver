@@ -746,30 +746,31 @@ int ppc32_select(u32 n, u32* inp, u32* outp, u32* exp, u32 tvp_x)
 
 int cp_compat_stat(struct kstat *stat, struct compat_stat *statbuf)
 {
-	int err;
+	long err;
 
 	if (stat->size > MAX_NON_LFS || !new_valid_dev(stat->dev) ||
 	    !new_valid_dev(stat->rdev))
 		return -EOVERFLOW;
 
-	err  = put_user(new_encode_dev(stat->dev), &statbuf->st_dev);
-	err |= put_user(stat->ino, &statbuf->st_ino);
-	err |= put_user(stat->mode, &statbuf->st_mode);
-	err |= put_user(stat->nlink, &statbuf->st_nlink);
-	err |= put_user(stat->uid, &statbuf->st_uid);
-	err |= put_user(stat->gid, &statbuf->st_gid);
-	err |= put_user(new_encode_dev(stat->rdev), &statbuf->st_rdev);
-	err |= put_user(stat->size, &statbuf->st_size);
-	err |= put_user(stat->atime.tv_sec, &statbuf->st_atime);
-	err |= put_user(0, &statbuf->__unused1);
-	err |= put_user(stat->mtime.tv_sec, &statbuf->st_mtime);
-	err |= put_user(0, &statbuf->__unused2);
-	err |= put_user(stat->ctime.tv_sec, &statbuf->st_ctime);
-	err |= put_user(0, &statbuf->__unused3);
-	err |= put_user(stat->blksize, &statbuf->st_blksize);
-	err |= put_user(stat->blocks, &statbuf->st_blocks);
-	err |= put_user(0, &statbuf->__unused4[0]);
-	err |= put_user(0, &statbuf->__unused4[1]);
+	err  = verify_area(VERIFY_WRITE, statbuf, sizeof(*statbuf));
+	err |= __put_user(new_encode_dev(stat->dev), &statbuf->st_dev);
+	err |= __put_user(stat->ino, &statbuf->st_ino);
+	err |= __put_user(stat->mode, &statbuf->st_mode);
+	err |= __put_user(stat->nlink, &statbuf->st_nlink);
+	err |= __put_user(stat->uid, &statbuf->st_uid);
+	err |= __put_user(stat->gid, &statbuf->st_gid);
+	err |= __put_user(new_encode_dev(stat->rdev), &statbuf->st_rdev);
+	err |= __put_user(stat->size, &statbuf->st_size);
+	err |= __put_user(stat->atime.tv_sec, &statbuf->st_atime);
+	err |= __put_user(stat->atime.tv_nsec, &statbuf->st_atime_nsec);
+	err |= __put_user(stat->mtime.tv_sec, &statbuf->st_mtime);
+	err |= __put_user(stat->mtime.tv_nsec, &statbuf->st_mtime_nsec);
+	err |= __put_user(stat->ctime.tv_sec, &statbuf->st_ctime);
+	err |= __put_user(stat->ctime.tv_nsec, &statbuf->st_ctime_nsec);
+	err |= __put_user(stat->blksize, &statbuf->st_blksize);
+	err |= __put_user(stat->blocks, &statbuf->st_blocks);
+	err |= __put_user(0, &statbuf->__unused4[0]);
+	err |= __put_user(0, &statbuf->__unused4[1]);
 
 	return err;
 }
