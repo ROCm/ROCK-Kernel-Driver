@@ -229,15 +229,19 @@ static void run_fsm(void)
 			phase = do_pd_io_start;
 		}
 
-		if (!pd_claimed) {
-			pd_claimed = 1;
-			if (!pi_schedule_claimed(pi_current, run_fsm))
-				return;
+		switch (pd_claimed) {
+			case 0: 
+				pd_claimed = 1;
+				if (!pi_schedule_claimed(pi_current, run_fsm))
+					return;
+			case 1:
+				pd_claimed = 2;
+				pi_current->proto->connect(pi_current);
 		}
 
 		switch(res = phase()) {
 			case Ok: case Fail:
-				pi_unclaim(pi_current);
+				pi_disconnect(pi_current);
 				pd_claimed = 0;
 				phase = NULL;
 				spin_lock_irqsave(&pd_lock, saved_flags);
@@ -252,7 +256,7 @@ static void run_fsm(void)
 				ps_set_intr();
 				return;
 			case Wait:
-				pi_unclaim(pi_current);
+				pi_disconnect(pi_current);
 				pd_claimed = 0;
 		}
 	}
@@ -840,9 +844,7 @@ static enum action do_pd_io_start(void)
 
 static enum action do_pd_read_start(void)
 {
-	pi_current->proto->connect(pi_current);
 	if (pd_wait_for(pd_current, STAT_READY, "do_pd_read") & STAT_ERR) {
-		pi_current->proto->disconnect(pi_current);
 		if (pd_retries < PD_MAX_RETRIES) {
 			pd_retries++;
 			return Wait;
@@ -862,7 +864,6 @@ static enum action do_pd_read_drq(void)
 
 	while (1) {
 		if (pd_wait_for(pd_current, STAT_DRQ, "do_pd_read_drq") & STAT_ERR) {
-			pi_current->proto->disconnect(pi_current);
 			if (pd_retries < PD_MAX_RETRIES) {
 				pd_retries++;
 				phase = do_pd_read_start;
@@ -874,15 +875,12 @@ static enum action do_pd_read_drq(void)
 		if (pd_next_buf())
 			break;
 	}
-	pi_current->proto->disconnect(pi_current);
 	return Ok;
 }
 
 static enum action do_pd_write_start(void)
 {
-	pi_current->proto->connect(pi_current);
 	if (pd_wait_for(pd_current, STAT_READY, "do_pd_write") & STAT_ERR) {
-		pi_current->proto->disconnect(pi_current);
 		if (pd_retries < PD_MAX_RETRIES) {
 			pd_retries++;
 			return Wait;
@@ -892,7 +890,6 @@ static enum action do_pd_write_start(void)
 	pd_ide_command(pd_current, IDE_WRITE, pd_block, pd_run);
 	while (1) {
 		if (pd_wait_for(pd_current, STAT_DRQ, "do_pd_write_drq") & STAT_ERR) {
-			pi_current->proto->disconnect(pi_current);
 			if (pd_retries < PD_MAX_RETRIES) {
 				pd_retries++;
 				return Wait;
@@ -914,7 +911,6 @@ static enum action do_pd_write_done(void)
 		return Hold;
 
 	if (pd_wait_for(pd_current, STAT_READY, "do_pd_write_done") & STAT_ERR) {
-		pi_current->proto->disconnect(pi_current);
 		if (pd_retries < PD_MAX_RETRIES) {
 			pd_retries++;
 			phase = do_pd_write_start;
@@ -922,7 +918,6 @@ static enum action do_pd_write_done(void)
 		}
 		return Fail;
 	}
-	pi_current->proto->disconnect(pi_current);
 	return Ok;
 }
 
