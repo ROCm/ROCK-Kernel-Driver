@@ -97,7 +97,7 @@ static LIST_HEAD(apm_user_list);
  */
 static DECLARE_WAIT_QUEUE_HEAD(kapmd_wait);
 static DECLARE_COMPLETION(kapmd_exit);
-static spinlock_t kapmd_queue_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(kapmd_queue_lock);
 static struct apm_queue kapmd_queue;
 
 

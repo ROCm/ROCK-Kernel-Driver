@@ -200,7 +200,7 @@ void show_stack(struct task_struct *tsk, unsigned long *sp)
 	barrier();
 }
 
-spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(die_lock);
 
 /*
  * This function is protected against re-entrancy.
@@ -241,7 +241,7 @@ void die_if_kernel(const char *str, struct pt_regs *regs, int err)
 }
 
 static LIST_HEAD(undef_hook);
-static spinlock_t undef_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(undef_lock);
 
 void register_undef_hook(struct undef_hook *hook)
 {

@@ -22,7 +22,7 @@
 
 static LIST_HEAD(clocks);
 static DECLARE_MUTEX(clocks_sem);
-static spinlock_t clockfw_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(clockfw_lock);
 static void propagate_rate(struct clk *  clk);
 /* MPU virtual clock functions */
 static int select_table_rate(unsigned long rate);

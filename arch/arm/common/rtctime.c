@@ -28,7 +28,7 @@ static struct fasync_struct *rtc_async_queue;
 /*
  * rtc_lock protects rtc_irq_data
  */
-static spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(rtc_lock);
 static unsigned long rtc_irq_data;
 
 /*

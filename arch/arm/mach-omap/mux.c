@@ -40,7 +40,7 @@
 int __init_or_module
 omap_cfg_reg(const reg_cfg_t reg_cfg)
 {
-	static spinlock_t mux_spin_lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(mux_spin_lock);
 
 	unsigned long flags;
 	reg_cfg_set *cfg;
