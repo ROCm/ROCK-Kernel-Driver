@@ -429,7 +429,7 @@ ENTRY(__switch_to)
 
 		__INIT
 /*
- * Vector stubs.  NOTE that we only align 'vector_IRQ' to a cache line boundary,
+ * Vector stubs.  NOTE that we only align 'vector_irq' to a cache line boundary,
  * and we rely on each stub being exactly 48 (1.5 cache lines) in size.  This
  * means that we only ever load two cache lines for this code, or one if we're
  * lucky.  We also copy this code to 0x200 so that we can use branches in the
@@ -441,7 +441,7 @@ __stubs_start:
  * Interrupt dispatcher
  * Enter in IRQ mode, spsr = SVC/USR CPSR, lr = SVC/USR PC
  */
-vector_IRQ:	@
+vector_irq:	@
 		@ save mode specific registers
 		@
 		ldr	r13, .LCsirq
@@ -484,7 +484,7 @@ vector_IRQ:	@
  * Data abort dispatcher - dispatches it to the correct handler for the processor mode
  * Enter in ABT mode, spsr = USR CPSR, lr = USR PC
  */
-vector_data:	@
+vector_dabt:	@
 		@ save mode specific registers
 		@
 		ldr	r13, .LCsabt
@@ -527,7 +527,7 @@ vector_data:	@
  * Prefetch abort dispatcher - dispatches it to the correct handler for the processor mode
  * Enter in ABT mode, spsr = USR CPSR, lr = USR PC
  */
-vector_prefetch:
+vector_pabt:
 		@
 		@ save mode specific registers
 		@
@@ -571,7 +571,7 @@ vector_prefetch:
  * Undef instr entry dispatcher - dispatches it to the correct handler for the processor mode
  * Enter in UND mode, spsr = SVC/USR CPSR, lr = SVC/USR PC
  */
-vector_undefinstr:
+vector_und:
 		@
 		@ save mode specific registers
 		@
@@ -620,7 +620,7 @@ vector_undefinstr:
  * other mode than FIQ...  Ok you can switch to another mode, but you can't
  * get out of that mode without clobbering one register.
  */
-vector_FIQ:	disable_fiq
+vector_fiq:	disable_fiq
 		subs	pc, lr, #4
 
 /*=============================================================================
@@ -650,13 +650,13 @@ __stubs_end:
 		.equ	__real_stubs_start, .LCvectors + 0x200
 
 .LCvectors:	swi	SYS_ERROR0
-		b	__real_stubs_start + (vector_undefinstr - __stubs_start)
+		b	__real_stubs_start + (vector_und - __stubs_start)
 		ldr	pc, __real_stubs_start + (.LCvswi - __stubs_start)
-		b	__real_stubs_start + (vector_prefetch - __stubs_start)
-		b	__real_stubs_start + (vector_data - __stubs_start)
+		b	__real_stubs_start + (vector_pabt - __stubs_start)
+		b	__real_stubs_start + (vector_dabt - __stubs_start)
 		b	__real_stubs_start + (vector_addrexcptn - __stubs_start)
-		b	__real_stubs_start + (vector_IRQ - __stubs_start)
-		b	__real_stubs_start + (vector_FIQ - __stubs_start)
+		b	__real_stubs_start + (vector_irq - __stubs_start)
+		b	__real_stubs_start + (vector_fiq - __stubs_start)
 
 ENTRY(__trap_init)
 		stmfd	sp!, {r4 - r6, lr}
