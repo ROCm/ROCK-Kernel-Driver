@@ -783,7 +783,7 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs *regs)
 				/* Restart the system call the same way as
 				   if the process were not traced.  */
 				struct k_sigaction *ka =
-					&current->sig->action[signr-1];
+					&current->sighand->action[signr-1];
 				int has_handler =
 					(ka->sa.sa_handler != SIG_IGN &&
 					 ka->sa.sa_handler != SIG_DFL);
@@ -819,7 +819,7 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs *regs)
 			}
 		}
 
-		ka = &current->sig->action[signr-1];
+		ka = &current->sighand->action[signr-1];
 		if (ka->sa.sa_handler == SIG_IGN) {
 			if (signr != SIGCHLD)
 				continue;
@@ -848,8 +848,7 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs *regs)
 			case SIGSTOP:
 				current->state = TASK_STOPPED;
 				current->exit_code = signr;
-				if (!(current->parent->sig->action[SIGCHLD-1]
-				      .sa.sa_flags & SA_NOCLDSTOP))
+				if (!(current->parent->sighand->action[SIGCHLD-1].sa.sa_flags & SA_NOCLDSTOP))
 					notify_parent(current, SIGCHLD);
 				schedule();
 				continue;
