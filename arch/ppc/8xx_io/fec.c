@@ -22,14 +22,11 @@
  *
  * Make use of MII for PHY control configurable.
  * Some fixes.
- * Copyright (c) 2000 Wolfgang Denk, DENX Software Engineering.
+ * Copyright (c) 2000-2002 Wolfgang Denk, DENX Software Engineering.
+ *
+ * Support for AMD AM79C874 added.
+ * Thomas Lange, thomas@corelatus.com
  */
-
-/* List of PHYs we wish to support.
-*/
-#undef	CONFIG_FEC_LXT970
-#define	CONFIG_FEC_LXT971
-#undef	CONFIG_FEC_QS6612
 
 #include <linux/config.h>
 #include <linux/kernel.h>
@@ -1137,9 +1134,74 @@ static phy_info_t phy_info_qs6612 = {
 	},
 };
 
-
 #endif /* CONFIG_FEC_QS6612 */
 
+/* ------------------------------------------------------------------------- */
+/* The Advanced Micro Devices AM79C874 is used on the ICU862		     */
+
+#ifdef CONFIG_FEC_AM79C874
+
+/* register definitions for the 79C874 */
+
+#define MII_AM79C874_MFR	16  /* Miscellaneous Features Register      */
+#define MII_AM79C874_ICSR	17  /* Interrupt Control/Status Register    */
+#define MII_AM79C874_DR		18  /* Diagnostic Register		    */
+#define MII_AM79C874_PMLR	19  /* Power Management & Loopback Register */
+#define MII_AM79C874_MCR	21  /* Mode Control Register		    */
+#define MII_AM79C874_DC		23  /* Disconnect Counter		    */
+#define MII_AM79C874_REC	24  /* Receiver Error Counter		    */
+
+static void mii_parse_amd79c874_dr(uint mii_reg, struct net_device *dev, uint data)
+{
+	volatile struct fec_enet_private *fep = dev->priv;
+	uint s = fep->phy_status;
+
+	s &= ~(PHY_STAT_SPMASK);
+
+	/* Register 18: Bit 10 is data rate, 11 is Duplex */
+	switch ((mii_reg >> 10) & 3) {
+	case 0:	s |= PHY_STAT_10HDX;	break;
+	case 1:	s |= PHY_STAT_100HDX;	break;
+	case 2:	s |= PHY_STAT_10FDX;	break;
+	case 3:	s |= PHY_STAT_100FDX;	break;
+	}
+
+	fep->phy_status = s;
+}
+
+static phy_info_t phy_info_amd79c874 = {
+	0x00022561,
+	"AM79C874",
+
+	(const phy_cmd_t []) {  /* config */
+//		{ mk_mii_write(MII_REG_ANAR, 0x021), NULL }, /* 10  Mbps, HD */
+		{ mk_mii_read(MII_REG_CR), mii_parse_cr },
+		{ mk_mii_read(MII_REG_ANAR), mii_parse_anar },
+		{ mk_mii_end, }
+	},
+	(const phy_cmd_t []) {  /* startup - enable interrupts */
+		{ mk_mii_write(MII_AM79C874_ICSR, 0xff00), NULL },
+		{ mk_mii_write(MII_REG_CR, 0x1200), NULL }, /* autonegotiate */
+		{ mk_mii_end, }
+	},
+	(const phy_cmd_t []) { /* ack_int */
+		/* find out the current status */
+
+		{ mk_mii_read(MII_REG_SR), mii_parse_sr },
+		{ mk_mii_read(MII_AM79C874_DR), mii_parse_amd79c874_dr },
+
+		/* we only need to read ICSR to acknowledge */
+
+		{ mk_mii_read(MII_AM79C874_ICSR), NULL },
+		{ mk_mii_end, }
+	},
+	(const phy_cmd_t []) {  /* shutdown - disable interrupts */
+		{ mk_mii_write(MII_AM79C874_ICSR, 0x0000), NULL },
+		{ mk_mii_end, }
+	},
+};
+
+#endif /* CONFIG_FEC_AM79C874 */
 
 static phy_info_t *phy_info[] = {
 
@@ -1153,7 +1215,11 @@ static phy_info_t *phy_info[] = {
 
 #ifdef CONFIG_FEC_QS6612
 	&phy_info_qs6612,
-#endif /* CONFIG_FEC_LXT971 */
+#endif /* CONFIG_FEC_QS6612 */
+
+#ifdef CONFIG_FEC_AM79C874
+	&phy_info_amd79c874,
+#endif /* CONFIG_FEC_AM79C874 */
 
 	NULL
 };

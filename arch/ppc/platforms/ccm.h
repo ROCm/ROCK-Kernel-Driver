@@ -1,7 +1,7 @@
 /*
  * Siemens Card Controller Module specific definitions
  * 
- * Copyright (c) 2001 Wolfgang Denk (wd@denx.de)
+ * Copyright (C) 2001-2002 Wolfgang Denk (wd@denx.de)
  */
 
 #ifndef __MACH_CCM_H
@@ -17,9 +17,9 @@
 #define	IMAP_ADDR     CCM_IMMR_BASE	/* physical base address of IMMR area	*/
 #define IMAP_SIZE     CCM_IMAP_SIZE	/* mapped size of IMMR area		*/
 
-#define	FEC_INTERRUPT	15		/* = SIU_LEVEL7				*/
-#define	DEC_INTERRUPT	13		/* = SIU_LEVEL6				*/
-#define	CPM_INTERRUPT	11		/* = SIU_LEVEL5 (was: SIU_LEVEL2)	*/
+#define	FEC_INTERRUPT	13		/* = SIU_LEVEL6				*/
+#define	DEC_INTERRUPT	11		/* = SIU_LEVEL5				*/
+#define	CPM_INTERRUPT	 9		/* = SIU_LEVEL4				*/
 
 /* We don't use the 8259.
 */

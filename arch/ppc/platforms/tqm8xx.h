@@ -1,7 +1,7 @@
 /*
  * TQM8xx(L) board specific definitions
  * 
- * Copyright (c) 1999,2000,2001 Wolfgang Denk (wd@denx.de)
+ * Copyright (c) 1999-2002 Wolfgang Denk (wd@denx.de)
  */
 
 #ifdef __KERNEL__
@@ -26,7 +26,27 @@
  */
 #define PCMCIA_MEM_SIZE		( 64 << 20 )
 
-#define	MAX_HWIFS	1	/* overwrite default in include/asm-ppc/ide.h */
+#ifndef CONFIG_KUP4K
+# define	MAX_HWIFS	1	/* overwrite default in include/asm-ppc/ide.h	*/
+
+#else	/* CONFIG_KUP4K */
+
+# define	MAX_HWIFS	2	/* overwrite default in include/asm-ppc/ide.h	*/
+# ifndef __ASSEMBLY__
+# include <asm/8xx_immap.h>
+static __inline__ void ide_led(int on)
+{
+	volatile immap_t	*immap = (immap_t *)IMAP_ADDR;
+
+	if (on) {
+		immap->im_ioport.iop_padat &= ~0x80;
+	} else {
+		immap->im_ioport.iop_padat |= 0x80;
+	}
+}
+# endif	/* __ASSEMBLY__ */
+# define IDE_LED(x) ide_led((x))
+#endif	/* CONFIG_KUP4K */
 
 /*
  * Definitions for IDE0 Interface
@@ -43,8 +63,18 @@
 #define IDE0_CONTROL_REG_OFFSET		0x0106
 #define IDE0_IRQ_REG_OFFSET		0x000A	/* not used */
 
-#define	IDE0_INTERRUPT			13
+/* define IO_BASE for PCMCIA */
+#define _IO_BASE 0x80000000
+#define _IO_BASE_SIZE  (64<<10)
 
+#define	FEC_INTERRUPT		 9	/* = SIU_LEVEL4			*/
+#define PHY_INTERRUPT		12	/* = IRQ6			*/
+#define	IDE0_INTERRUPT		13
+
+#ifdef CONFIG_IDE
+#define ide_request_irq(irq,hand,flg,dev,id)    \
+        request_8xxirq((irq),(hand),(flg),(dev),(id))
+#endif
 
 /*-----------------------------------------------------------------------
  * CPM Ethernet through SCCx.
