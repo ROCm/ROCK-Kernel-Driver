@@ -230,9 +230,10 @@ static int __devinit olympic_probe(struct pci_dev *pdev, const struct pci_device
 	dev->irq=pdev->irq;
 	dev->base_addr=pci_resource_start(pdev, 0);
 	dev->init=NULL; /* Must be NULL otherwise we get called twice */
-	olympic_priv->olympic_card_name = (char *)pdev->dev.name ; 
+	olympic_priv->olympic_card_name = pci_name(pdev);
 	olympic_priv->olympic_mmio = ioremap(pci_resource_start(pdev,1),256);
 	olympic_priv->olympic_lap = ioremap(pci_resource_start(pdev,2),2048);
+#warning check ioremap return value
 	olympic_priv->pdev = pdev ; 
 				
 	if ((pkt_buf_sz[card_no] < 100) || (pkt_buf_sz[card_no] > 18000) )
