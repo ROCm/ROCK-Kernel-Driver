@@ -334,6 +334,11 @@ extern struct i2c_client *i2c_get_client(int driver_id, int adapter_id,
 extern int i2c_use_client(struct i2c_client *);
 extern int i2c_release_client(struct i2c_client *);
 
+/* call the i2c_client->command() of all attached clients with
+ * the given arguments */
+extern void i2c_clients_command(struct i2c_adapter *adap,
+				unsigned int cmd, void *arg);
+
 /* returns -EBUSY if address has been taken, 0 if not. Note that the only
    other place at which this is called is within i2c_attach_client; so
    you can cheat by simply not registering. Not recommended, of course! */

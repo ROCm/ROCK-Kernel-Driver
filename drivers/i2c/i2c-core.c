@@ -411,6 +411,27 @@ int i2c_release_client(struct i2c_client *client)
 	return 0;
 }
 
+void i2c_clients_command(struct i2c_adapter *adap, unsigned int cmd, void *arg)
+{
+	struct list_head  *item;
+	struct i2c_client *client;
+
+	down(&adap->clist_lock);
+	list_for_each(item,&adap->clients) {
+		client = list_entry(item, struct i2c_client, list);
+		if (!try_module_get(client->driver->owner))
+			continue;
+		if (NULL != client->driver->command) {
+			up(&adap->clist_lock);
+			client->driver->command(client,cmd,arg);
+			down(&adap->clist_lock);
+		}
+		module_put(client->driver->owner);
+       }
+       up(&adap->clist_lock);
+}
+
+
 /* match always succeeds, as we want the probe() to tell if we really accept this match */
 static int i2c_device_match(struct device *dev, struct device_driver *drv)
 {
@@ -1183,6 +1204,7 @@ EXPORT_SYMBOL(i2c_attach_client);
 EXPORT_SYMBOL(i2c_detach_client);
 EXPORT_SYMBOL(i2c_use_client);
 EXPORT_SYMBOL(i2c_release_client);
+EXPORT_SYMBOL(i2c_clients_command);
 EXPORT_SYMBOL(i2c_check_addr);
 
 EXPORT_SYMBOL(i2c_master_send);
