@@ -179,7 +179,7 @@ int crypto_register_alg(struct crypto_alg *alg)
 	
 	if (crypto_alg_blocksize_check(alg)) {
 		printk(KERN_WARNING "%s: blocksize %Zd exceeds max. "
-		       "size %Zd\n", __FUNCTION__, alg->cra_blocksize,
+		       "size %d\n", __FUNCTION__, alg->cra_blocksize,
 		       CRYPTO_MAX_CIPHER_BLOCK_SIZE);
 		ret = -EINVAL;
 	}

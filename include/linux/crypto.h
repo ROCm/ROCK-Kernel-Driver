@@ -16,6 +16,10 @@
 #ifndef _LINUX_CRYPTO_H
 #define _LINUX_CRYPTO_H
 
+#include <linux/module.h>
+#include <linux/types.h>
+#include <linux/list.h>
+
 /*
  * Algorithm masks and types.
  */
