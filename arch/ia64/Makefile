@@ -42,8 +42,11 @@ core-$(CONFIG_IA64_DIG) 	+= arch/$(ARCH)/dig/
 core-$(CONFIG_IA64_GENERIC) 	+= arch/$(ARCH)/dig/ arch/$(ARCH)/hp/common/ arch/$(ARCH)/hp/zx1/ \
 				   arch/$(ARCH)/hp/sim/
 core-$(CONFIG_IA64_HP_ZX1)	+= arch/$(ARCH)/dig/
-core-$(CONFIG_IA64_SGI_SN)	+= arch/$(ARCH)/sn/kernel arch/$(ARCH)/sn/io \
-				   arch/$(ARCH)/sn/fakeprom
+core-$(CONFIG_IA64_SGI_SN)	+= arch/$(ARCH)/sn/kernel/ \
+				   arch/$(ARCH)/sn/io/ \
+				   arch/$(ARCH)/sn/io/sn2/ \
+				   arch/$(ARCH)/sn/io/sn2/pcibr/ \
+				   arch/$(ARCH)/sn/kernel/sn2/
 drivers-$(CONFIG_PCI)		+= arch/$(ARCH)/pci/
 drivers-$(CONFIG_IA64_HP_SIM)	+= arch/$(ARCH)/hp/sim/
 drivers-$(CONFIG_IA64_HP_ZX1)	+= arch/$(ARCH)/hp/common/ arch/$(ARCH)/hp/zx1/

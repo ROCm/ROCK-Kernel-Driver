@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2000-2001 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
 
 #include <linux/config.h>
@@ -113,7 +113,8 @@ typedef struct {
  * PORTING NOTE: revisit this statement. On hardware we put mbase at 0 and
  * the rest of the tables have to start at 1MB to skip PROM tables.
  */
-#define THREADPRIVATE(t)	((threadprivate_t*)(((long)mbase)+1024*1024+t*((sizeof(threadprivate_t)+511)/512*512)))
+#define THREADPRIVATESZ()	((sizeof(threadprivate_t)+511)/512*512)
+#define THREADPRIVATE(t)	((threadprivate_t*)(((long)mbase)+4096+t*THREADPRIVATESZ()))
 
 #define k_capture		mbase->sk_capture
 #define k_go			mbase->sk_go
@@ -797,27 +798,31 @@ set_thread_state(int cpuid, int state)
 	k_threadprivate[cpuid]->threadstate = state;
 }
 
+#define MINBLK	(16*1024*1024)
 static int
 build_mem_map(unsigned long start, unsigned long end, void *arg)
 {
-	long	lstart;
+	long	lstart, lend;
 	long	align = 8*MB;
-
-	/*
-	 * HACK - skip the kernel on the first node 
-	 */
 
 	printk ("LLSC memmap: start 0x%lx, end 0x%lx, (0x%lx - 0x%lx)\n", 
 		start, end, (long) virt_to_page(start), (long) virt_to_page(end-PAGE_SIZE));
 
-	if (memmapx >= MAPCHUNKS)
+	if (memmapx >= MAPCHUNKS || (end-start) < MINBLK)
 		return 0;
-	while (end > start && (PageReserved(virt_to_page(end-PAGE_SIZE)) || virt_to_page(end-PAGE_SIZE)->count.counter > 0))
-		end -= PAGE_SIZE;
 
-	lstart = end;
-	while (lstart > start && (!PageReserved(virt_to_page(lstart-PAGE_SIZE)) && virt_to_page(lstart-PAGE_SIZE)->count.counter == 0))
+	/*
+	 * Start in the middle of the range & find the first non-free page in both directions
+	 * from the midpoint. This is likely to be the bigest free block.
+	 */
+	lend = lstart = start + (end-start)/2;
+	while (lend < end && !PageReserved(virt_to_page(lend)) && virt_to_page(lend)->count.counter == 0)
+		lend += PAGE_SIZE;
+	lend -= PAGE_SIZE;
+
+	while (lstart >= start && !PageReserved(virt_to_page(lstart)) && virt_to_page(lstart)->count.counter == 0)
 		lstart -= PAGE_SIZE;
+	lstart += PAGE_SIZE;
 
 	lstart = (lstart + align -1) /align * align;
 	end = end / align * align;
@@ -834,7 +839,7 @@ build_mem_map(unsigned long start, unsigned long end, void *arg)
 void int_test(void);
 
 int
-llsc_main (int cpuid, long mbasex)
+llsc_main (int cpuid)
 {
 	int		i, cpu, is_master, repeatcnt=0;
 	unsigned int	preverr=0, errs=0, pass=0;
@@ -856,10 +861,11 @@ llsc_main (int cpuid, long mbasex)
 
 
 	if (is_master) {
+		mbase = (control_t*) __get_free_pages(GFP_KERNEL, get_order(4096+THREADPRIVATESZ()*LLSC_MAXCPUS));
+		printk("LLSC: mbase 0x%lx\n", (long)mbase);
 		print_params();
 		if(!IS_RUNNING_ON_SIMULATOR())
 			spin(10);
-		mbase = (control_t*)mbasex;
 		k_currentpass = 0;
 		k_go = ST_IDLE;
 		k_passes = DEF_PASSES;
@@ -882,6 +888,7 @@ llsc_main (int cpuid, long mbasex)
 			memset(k_threadprivate[i], 0, sizeof(*k_threadprivate[i]));
 			init_private[i] = i;
 		}
+		mb();
 		initialized = 1;
 	} else {
 		while (initialized == 0)
@@ -1005,15 +1012,14 @@ int_test() {
 
 	printk("Testing cross interrupts\n");
 	
-	while (control_cpu != NR_CPUS) {
-		if (mycpu == control_cpu) {
-			for (cpu=0; cpu<NR_CPUS; cpu++) {
-				if (!cpu_online(cpu)) continue;
-				printk("Sending interrupt from %d to %d\n", mycpu, cpu);
+	while (control_cpu != smp_num_cpus) {
+		if (mycpu == cpu_logical_map(control_cpu)) {
+			for (cpu=0; cpu<smp_num_cpus; cpu++) {
+				printk("Sending interrupt from %d to %d\n", mycpu, cpu_logical_map(cpu));
 				udelay(IS_RUNNING_ON_SIMULATOR ? 10000 : 400000);
-				smp_send_reschedule(cpu);
+				smp_send_reschedule(cpu_logical_map(cpu));
 				udelay(IS_RUNNING_ON_SIMULATOR ? 10000 : 400000);
-				smp_send_reschedule(cpu);
+				smp_send_reschedule(cpu_logical_map(cpu));
 				udelay(IS_RUNNING_ON_SIMULATOR ? 10000 : 400000);
 			}
 			control_cpu++;
@@ -1022,10 +1028,10 @@ int_test() {
 
 	zzzprint_resched = 1;
 
-	if (mycpu == NR_CPUS-1) {
+	if (mycpu == cpu_logical_map(smp_num_cpus-1)) {
 		printk("\nTight loop of cpu %d sending ints to cpu 0 (every 100 us)\n", mycpu);
 		udelay(IS_RUNNING_ON_SIMULATOR ? 1000 : 1000000);
-		local_irq_disable();
+		__cli();
 		while (1) {
 			smp_send_reschedule(0);
 			udelay(100);

@@ -103,7 +103,7 @@ typedef signed short cnodeid_t;
  * absent. Each node consists of a number of possibly contiguous chunks.
  */
 #define SN2_CHUNKSHIFT			25			/* 32 MB */
-#define SN2_CHUNKSIZE			(1UL << SN2_CHUNKSHIFT)
+#define PLAT_CHUNKSIZE			(1UL << SN2_CHUNKSHIFT)
 #define PLAT_CHUNKNUM(addr)		({unsigned long _p=(unsigned long)(addr);		\
 						(((_p&SN2_NODE_MASK)>>2) | 			\
 						(_p&SN2_NODE_OFFSET_MASK)) >>SN2_CHUNKSHIFT;})
@@ -141,8 +141,8 @@ typedef signed short cnodeid_t;
  * This macro takes an address of the end of previous allocation, rounds it to a page boundary & 
  * changes the node number.
  */
-#define PLAT_BOOTMEM_ALLOC_GOAL(cnode,kaddr)	SN2_KADDR(PLAT_PXM_TO_PHYS_NODE_NUMBER(nid_to_pxm_map[cnodeid]),       \
-						 (SN2_NODE_OFFSET(kaddr) + PAGE_SIZE - 1) >> PAGE_SHIFT << PAGE_SHIFT)
+#define PLAT_BOOTMEM_ALLOC_GOAL(cnode,kaddr)	__pa(SN2_KADDR(PLAT_PXM_TO_PHYS_NODE_NUMBER(nid_to_pxm_map[cnode]),	       \
+						 (SN2_NODE_OFFSET(kaddr) + PAGE_SIZE - 1) >> PAGE_SHIFT << PAGE_SHIFT))
 
 
 

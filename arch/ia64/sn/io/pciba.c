@@ -210,31 +210,31 @@ static void dump_allocations(struct list_head * dalp);
 
 /* file operations for each type of node */
 static struct file_operations rom_fops = {
-	.owner =	THIS_MODULE,
-	.mmap =		rom_mmap,
-	.open =		generic_open,
-	.release =	rom_release
+	owner:		THIS_MODULE,
+	mmap:		rom_mmap,
+	open:		generic_open,
+	release:	rom_release
 };
  
 
 static struct file_operations base_fops = {
-	.owner =	THIS_MODULE,
-	.mmap =		base_mmap,
-	.open =		generic_open
+	owner:		THIS_MODULE,
+	mmap:		base_mmap,
+	open:		generic_open
 };
 
 
 static struct file_operations config_fops = {
-	.owner =	THIS_MODULE,
-	.ioctl =	config_ioctl,
-	.open =		generic_open
+	owner:		THIS_MODULE,
+	ioctl:		config_ioctl,
+	open:		generic_open
 };	
 
 static struct file_operations dma_fops = {
-	.owner =	THIS_MODULE,
-	.ioctl =	dma_ioctl,
-	.mmap =		dma_mmap,
-	.open =		generic_open
+	owner:		THIS_MODULE,
+	ioctl:		dma_ioctl,
+	mmap:		dma_mmap,
+	open:		generic_open
 };	
 
 
@@ -285,45 +285,6 @@ free_nodes(void)
 static devfs_handle_t pciba_devfs_handle;
 
 
-#if !defined(CONFIG_IA64_SGI_SN1)
-
-static status __init
-register_with_devfs(void)
-{
-	struct pci_dev * dev;
-	devfs_handle_t device_dir_handle;
-	char devfs_path[40];
-
-	TRACE();
-
-	pciba_devfs_handle = devfs_mk_dir(NULL, "pci", NULL);
-	if (pciba_devfs_handle == NULL)
-		return failure;
-
-	/* FIXME: don't forget /dev/pci/mem & /dev/pci/io */
-
-	pci_for_each_dev(dev) {
-		sprintf(devfs_path, "%02x/%02x.%x",
-			dev->bus->number,
-			PCI_SLOT(dev->devfn),
-			PCI_FUNC(dev->devfn));
-    
-		device_dir_handle =
-			devfs_mk_dir(pciba_devfs_handle, devfs_path, NULL);
-		if (device_dir_handle == NULL)
-			return failure;
-
-		if (register_pci_device(device_dir_handle, dev) == failure) {
-			devfs_unregister(pciba_devfs_handle);
-			return failure;
-		}
-	}
-
-	return success;
-}
-
-#else
-
 extern devfs_handle_t
 devfn_to_vertex(unsigned char busnum, unsigned int devfn);
 
@@ -351,9 +312,6 @@ register_with_devfs(void)
 
 	return success;
 }
-
-#endif /* CONFIG_IA64_SGI_SN1 */
-
 
 static void __exit
 unregister_with_devfs(void)

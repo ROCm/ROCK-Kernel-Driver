@@ -1,5 +1,5 @@
 #
-# ia64/platform/sn/sn1/Makefile
+# arch/ia64/sn/kernel/sn2/Makefile
 #
 # Copyright (C) 1999,2001-2002 Silicon Graphics, Inc. All rights reserved.
 #
@@ -32,9 +32,14 @@
 # http://oss.sgi.com/projects/GenInfo/NoticeExplan
 #
 
-obj-y := cache.o iomv.o sn2_smp.o
 
 EXTRA_CFLAGS    := -DLITTLE_ENDIAN
 
-include $(TOPDIR)/Rules.make
+.S.s:
+	$(CPP) $(AFLAGS) $(AFLAGS_KERNEL) -o $*.s $<
+.S.o:
+	$(CC) $(AFLAGS) $(AFLAGS_KERNEL) -c -o $*.o $<
 
+obj-y          = cache.o iomv.o ptc_deadlock.o sn2_smp.o sn_proc_fs.o
+
+include $(TOPDIR)/Rules.make

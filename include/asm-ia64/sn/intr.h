@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000-2001 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
 #ifndef _ASM_IA64_SN_INTR_H
 #define _ASM_IA64_SN_INTR_H
@@ -16,5 +16,9 @@
 #elif defined(CONFIG_IA64_SGI_SN2)
 #include <asm/sn/sn2/intr.h>
 #endif
+
+extern void sn_send_IPI_phys(long, int, int);
+
+#define CPU_VECTOR_TO_IRQ(cpuid,vector) ((cpuid) << 8 | (vector))
 
 #endif /* _ASM_IA64_SN_INTR_H */

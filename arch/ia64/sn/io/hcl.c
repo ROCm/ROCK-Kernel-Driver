@@ -6,7 +6,7 @@
  *
  *  hcl - SGI's Hardware Graph compatibility layer.
  *
- * Copyright (C) 1992 - 1997, 2000-2001 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
 
 #include <linux/types.h>
@@ -155,7 +155,7 @@ int __init init_hcl(void)
 	/*
 	 * Create the hwgraph_root on devfs.
 	 */
-	rv = hwgraph_path_add(NULL, "hw", &hwgraph_root);
+	rv = hwgraph_path_add(NULL, EDGE_LBL_HW, &hwgraph_root);
 	if (rv)
 		printk ("WARNING: init_hcl: Failed to create hwgraph_root. Error = %d.\n", rv);
 
@@ -183,9 +183,9 @@ int __init init_hcl(void)
 	/*
 	 * Create the directory that links Linux bus numbers to our Xwidget.
 	 */
-	rv = hwgraph_path_add(hwgraph_root, "linux/busnum", &linux_busnum);
+	rv = hwgraph_path_add(hwgraph_root, EDGE_LBL_LINUX_BUS, &linux_busnum);
 	if (linux_busnum == NULL) {
-		panic("HCL: Unable to create hw/linux/busnum\n");
+		panic("HCL: Unable to create %s\n", EDGE_LBL_LINUX_BUS);
 		return(0);
 	}
 
@@ -673,9 +673,8 @@ hwgraph_edge_get(devfs_handle_t from, char *name, devfs_handle_t *toptr)
 		 * Call devfs to get the devfs entry.
 		 */
 		namelen = (int) strlen(name);
-		target_handle = devfs_get_handle(from, name, 0, 0,
+		target_handle = devfs_get_handle (from, name, 0, 0,
 					0, 1); /* Yes traverse symbolic links */
-		devfs_put(target_handle); /* Assume we're the owner */
 		if (target_handle == NULL)
 			return(-1);
 		else
@@ -959,7 +958,6 @@ hwgraph_path_lookup(	devfs_handle_t start_vertex_handle,
 					0,			/* minor */
 					0,			/* char | block */
 					1);			/* traverse symlinks */
-	devfs_put(*vertex_handle_ptr); /* Assume we're the owner */
 	if (*vertex_handle_ptr == NULL)
 		return(-1);
 	else
@@ -967,23 +965,22 @@ hwgraph_path_lookup(	devfs_handle_t start_vertex_handle,
 }
 
 /*
- * hwgraph_traverse - Find and return the devfs handle starting from dir.
+ * hwgraph_traverse - Find and return the devfs handle starting from de.
  *
  */
 graph_error_t
-hwgraph_traverse(devfs_handle_t dir, char *path, devfs_handle_t *found)
+hwgraph_traverse(devfs_handle_t de, char *path, devfs_handle_t *found)
 {
 	/* 
 	 * get the directory entry (path should end in a directory)
 	 */
 
-	*found = devfs_get_handle(dir,	/* start dir */
+	*found = devfs_get_handle(de,	/* start dir */
 			    path,	/* path */
 			    0,		/* major */
 			    0,		/* minor */
 			    0,		/* char | block */
 			    1);		/* traverse symlinks */
-	devfs_put(*found); /* Assume we're the owner */
 	if (*found == NULL)
 		return(GRAPH_NOT_FOUND);
 	else
@@ -997,16 +994,12 @@ hwgraph_traverse(devfs_handle_t dir, char *path, devfs_handle_t *found)
 devfs_handle_t
 hwgraph_path_to_vertex(char *path)
 {
-	devfs_handle_t de;
-
-	de = devfs_get_handle(NULL,	/* start dir */
+	return(devfs_get_handle(NULL,	/* start dir */
 			path,		/* path */
 		    	0,		/* major */
 		    	0,		/* minor */
 		    	0,		/* char | block */
-		    	1);
-	devfs_put(de); /* Assume we're the owner */
-	return(de);
+		    	1));		/* traverse symlinks */
 }
 
 /*
@@ -1024,40 +1017,32 @@ hwgraph_path_to_dev(char *path)
 
 /*
  * hwgraph_block_device_get - return the handle of the block device file.
- *	The assumption here is that dir is a directory.
+ *	The assumption here is that de is a directory.
 */
 devfs_handle_t
-hwgraph_block_device_get(devfs_handle_t dir)
+hwgraph_block_device_get(devfs_handle_t de)
 {
-	devfs_handle_t de;
-
-	de = devfs_get_handle(dir,		/* start dir */
+	return(devfs_get_handle(de,		/* start dir */
 			"block",		/* path */
 		    	0,			/* major */
 		    	0,			/* minor */
 		    	DEVFS_SPECIAL_BLK,	/* char | block */
-		    	1);			/* traverse symlinks */
-	devfs_put(de); /* Assume we're the owner */
-	return(de);
+		    	1));			/* traverse symlinks */
 }
 
 /*
  * hwgraph_char_device_get - return the handle of the char device file.
- *      The assumption here is that dir is a directory.
+ *      The assumption here is that de is a directory.
 */
 devfs_handle_t
-hwgraph_char_device_get(devfs_handle_t dir)
+hwgraph_char_device_get(devfs_handle_t de)
 {
-	devfs_handle_t de;
-
-	de = devfs_get_handle(dir,		/* start dir */
+	return(devfs_get_handle(de,		/* start dir */
 			"char",			/* path */
 		    	0,			/* major */
 		    	0,			/* minor */
 		    	DEVFS_SPECIAL_CHR,	/* char | block */
-		    	1);			/* traverse symlinks */
-	devfs_put(de); /* Assume we're the owner */
-	return(de);
+		    	1));			/* traverse symlinks */
 }
 
 /*
