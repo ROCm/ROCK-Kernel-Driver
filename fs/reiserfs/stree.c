@@ -102,7 +102,7 @@ inline int  comp_short_keys (const struct key * le_key,
   int n_key_length = REISERFS_SHORT_KEY_LEN;
 
   p_s_le_u32 = (__u32 *)le_key;
-  p_s_cpu_u32 = (__u32 *)cpu_key;
+  p_s_cpu_u32 = (__u32 *)&cpu_key->on_disk_key;
   for( ; n_key_length--; ++p_s_le_u32, ++p_s_cpu_u32 ) {
     if ( le32_to_cpu (*p_s_le_u32) < *p_s_cpu_u32 )
       return -1;

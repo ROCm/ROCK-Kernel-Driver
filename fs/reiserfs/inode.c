@@ -506,7 +506,7 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 			struct buffer_head * bh_result, int create)
 {
     int repeat, retval;
-    b_blocknr_t allocated_block_nr = 0;// b_blocknr_t is unsigned long
+    b_blocknr_t allocated_block_nr = 0;// b_blocknr_t is (unsigned) 32 bit int
     INITIALIZE_PATH(path);
     int pos_in_item;
     struct cpu_key key;

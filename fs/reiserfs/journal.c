@@ -507,7 +507,7 @@ int dump_journal_writers(void) {
 */
 int reiserfs_in_journal(struct super_block *p_s_sb,
                         int bmap_nr, int bit_nr, int search_all, 
-			unsigned long *next_zero_bit) {
+			b_blocknr_t *next_zero_bit) {
   struct reiserfs_journal_cnode *cn ;
   struct reiserfs_list_bitmap *jb ;
   int i ;
@@ -761,7 +761,7 @@ reiserfs_panic(s, "journal-539: flush_commit_list: BAD count(%d) > orig_commit_l
 */
 static struct reiserfs_journal_list *find_newer_jl_for_cn(struct reiserfs_journal_cnode *cn) {
   struct super_block *sb = cn->sb;
-  unsigned long blocknr = cn->blocknr ;
+  b_blocknr_t blocknr = cn->blocknr ;
 
   cn = cn->hprev ;
   while(cn) {
@@ -791,7 +791,7 @@ static void remove_all_from_journal_list(struct super_block *p_s_sb, struct reis
   while(cn) {
     if (cn->blocknr != 0) {
       if (debug) {
-        printk("block %lu, bh is %d, state %ld\n", cn->blocknr, cn->bh ? 1: 0, 
+        printk("block %u, bh is %d, state %ld\n", cn->blocknr, cn->bh ? 1: 0,
 	        cn->state) ;
       }
       cn->state = 0 ;
@@ -1105,7 +1105,7 @@ static int kupdate_one_transaction(struct super_block *s,
 {
     struct reiserfs_journal_list *pjl ; /* previous list for this cn */
     struct reiserfs_journal_cnode *cn, *walk_cn ;
-    unsigned long blocknr ;
+    b_blocknr_t blocknr ;
     int run = 0 ;
     int orig_trans_id = jl->j_trans_id ;
     struct buffer_head *saved_bh ; 
@@ -2421,7 +2421,7 @@ int journal_end(struct reiserfs_transaction_handle *th, struct super_block *p_s_
 **
 ** returns 1 if it cleaned and relsed the buffer. 0 otherwise
 */
-static int remove_from_transaction(struct super_block *p_s_sb, unsigned long blocknr, int already_cleaned) {
+static int remove_from_transaction(struct super_block *p_s_sb, b_blocknr_t blocknr, int already_cleaned) {
   struct buffer_head *bh ;
   struct reiserfs_journal_cnode *cn ;
   int ret = 0;
@@ -2474,7 +2474,7 @@ static int remove_from_transaction(struct super_block *p_s_sb, unsigned long blo
 */
 static int can_dirty(struct reiserfs_journal_cnode *cn) {
   struct super_block *sb = cn->sb;
-  unsigned long blocknr = cn->blocknr  ;
+  b_blocknr_t blocknr = cn->blocknr  ;
   struct reiserfs_journal_cnode *cur = cn->hprev ;
   int can_dirty = 1 ;
   
@@ -2710,7 +2710,7 @@ static int check_journal_end(struct reiserfs_transaction_handle *th, struct supe
 **
 ** Then remove it from the current transaction, decrementing any counters and filing it on the clean list.
 */
-int journal_mark_freed(struct reiserfs_transaction_handle *th, struct super_block *p_s_sb, unsigned long blocknr) {
+int journal_mark_freed(struct reiserfs_transaction_handle *th, struct super_block *p_s_sb, b_blocknr_t blocknr) {
   struct reiserfs_journal_cnode *cn = NULL ;
   struct buffer_head *bh = NULL ;
   struct reiserfs_list_bitmap *jb = NULL ;
@@ -2719,7 +2719,7 @@ int journal_mark_freed(struct reiserfs_transaction_handle *th, struct super_bloc
   if (reiserfs_dont_log(th->t_super)) {
     bh = sb_find_get_block(p_s_sb, blocknr) ;
     if (bh && buffer_dirty (bh)) {
-      printk ("journal_mark_freed(dont_log): dirty buffer on hash list: %lx %ld\n", bh->b_state, blocknr);
+      printk ("journal_mark_freed(dont_log): dirty buffer on hash list: %lx %d\n", bh->b_state, blocknr);
       BUG ();
     }
     brelse (bh);
