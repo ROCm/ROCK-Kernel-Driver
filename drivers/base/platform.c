@@ -141,11 +141,13 @@ int platform_device_register(struct platform_device * pdev)
 		if (r->name == NULL)
 			r->name = pdev->dev.bus_id;
 
-		p = NULL;
-		if (r->flags & IORESOURCE_MEM)
-			p = &iomem_resource;
-		else if (r->flags & IORESOURCE_IO)
-			p = &ioport_resource;
+		p = r->parent;
+		if (!p) {
+			if (r->flags & IORESOURCE_MEM)
+				p = &iomem_resource;
+			else if (r->flags & IORESOURCE_IO)
+				p = &ioport_resource;
+		}
 
 		if (p && request_resource(p, r)) {
 			printk(KERN_ERR
