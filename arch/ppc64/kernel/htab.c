@@ -257,8 +257,6 @@ int __hash_page(unsigned long ea, unsigned long access, unsigned long vsid,
 		slot = (hash & htab_data.htab_hash_mask) * HPTES_PER_GROUP;
 		slot += (pte_val(old_pte) & _PAGE_GROUP_IX) >> 12;
 
-		udbg_printf("updatepp cpu %d ea %lx vsid should be %lx\n", smp_processor_id(), ea, vsid);
-
 		/* XXX fix large pte flag */
 		if (ppc_md.hpte_updatepp(slot, newpp, va, 0) == -1)
 			pte_val(old_pte) &= ~_PAGE_HPTEFLAGS;

@@ -51,6 +51,7 @@
 #define H_R_XLATE		(1UL<<(63-25))	/* include a valid logical page num in the pte if the valid bit is set */
 #define H_READ_4		(1UL<<(63-26))	/* Return 4 PTEs */
 #define H_AVPN			(1UL<<(63-32))	/* An avpn is provided as a sanity test */
+#define H_ANDCOND		(1UL<<(63-33))
 #define H_ICACHE_INVALIDATE	(1UL<<(63-40))	/* icbi, etc.  (ignored for IO pages) */
 #define H_ICACHE_SYNCHRONIZE	(1UL<<(63-41))	/* dcbst, icbi, etc (ignored for IO pages */
 #define H_ZERO_PAGE		(1UL<<(63-48))	/* zero the page before mapping (ignored for IO pages) */
@@ -577,21 +578,21 @@ void pSeries_lpar_make_pte(HPTE *htab, unsigned long va, unsigned long pa,
 	/* I-cache synchronize = 0               */
 	/* Exact = 0 - modify any entry in group */
 	flags = 0;
+
 	lpar_rc =  plpar_pte_enter(flags, slot, local_hpte.dw0.dword0,
 				   local_hpte.dw1.dword1, &dummy1, &dummy2);
 
-#if 0
+	if (lpar_rc == H_PTEG_Full) {
+		while(1)
+			;
+	}
+
 	/*
 	 * NOTE: we explicitly do not check return status here because it is
 	 * "normal" for early boot code to map io regions for which a partition
 	 * has no access.  However, we will die if we actually fault on these
 	 * "permission denied" pages.
 	 */
-	if (lpar_rc != H_Success) {
-		udbg_printf("flags=%lx, slot=%lx, dword0=%lx, dword1=%lx, rc=%d\n", flags, slot, local_hpte.dw0.dword0,local_hpte.dw1.dword1, lpar_rc);
-		BUG();
-	}
-#endif
 }
 
 static long pSeries_lpar_insert_hpte(unsigned long hpte_group,
@@ -650,14 +651,8 @@ static long pSeries_lpar_insert_hpte(unsigned long hpte_group,
 	if (lpar_rc == H_PTEG_Full)
 		return -1;
 
-	if (lpar_rc != H_Success) {    
-		udbg_printf("error on pte enter lpar rc = %ld\n",lpar_rc);
-		udbg_printf("ent: s=%lx, dw0=%lx, dw1=%lx\n", slot,
-			    lhpte.dw0.dword0, lhpte.dw1.dword1);
-
-		PPCDBG_ENTER_DEBUGGER();
-		panic("error on pte enter");
-	}
+	if (lpar_rc != H_Success)
+		panic("Bad return code from pte enter rc = %lx\n", lpar_rc);
 
 	return slot;
 }
@@ -666,11 +661,36 @@ static spinlock_t pSeries_lpar_tlbie_lock = SPIN_LOCK_UNLOCKED;
 
 static long pSeries_lpar_remove_hpte(unsigned long hpte_group)
 {
-	/* XXX take spinlock */
-	panic("pSeries_lpar_remove_hpte");
+	unsigned long slot_offset;
+	unsigned long lpar_rc;
+	int i;
+	unsigned long dummy1, dummy2;
+
+	/* pick a random slot to start at */
+	slot_offset = mftb() & 0x7;
+
+	for (i = 0; i < HPTES_PER_GROUP; i++) {
+
+		/* dont remove a bolted entry */
+		lpar_rc = plpar_pte_remove(H_ANDCOND, hpte_group + slot_offset,
+					   (0x1UL << 4), &dummy1, &dummy2);
+
+		if (lpar_rc == H_Success)
+			return i;
+
+		if (lpar_rc != H_Not_Found)
+			panic("Bad return code from pte remove rc = %lx\n",
+			      lpar_rc);
+
+		slot_offset++;
+		slot_offset &= 0x7;
+	}
+
+	return -1;
 }
 
-/* NOTE: for updatepp ops we are fortunate that the linux "newpp" bits and
+/*
+ * NOTE: for updatepp ops we are fortunate that the linux "newpp" bits and
  * the low 3 bits of flags happen to line up.  So no transform is needed.
  * We can probably optimize here and assume the high bits of newpp are
  * already zero.  For now I am paranoid.
@@ -692,11 +712,8 @@ static long pSeries_lpar_hpte_updatepp(unsigned long slot, unsigned long newpp,
 		return -1;
 	}
 
-	if (lpar_rc != H_Success) {
-		udbg_printf("bad return code from pte protect rc = %lx\n",
-			    lpar_rc);
-		for (;;);
-	}
+	if (lpar_rc != H_Success)
+		panic("bad return code from pte protect rc = %lx\n", lpar_rc);
 
 	return 0;
 }
@@ -715,11 +732,8 @@ static unsigned long pSeries_lpar_hpte_getword0(unsigned long slot)
 	
 	lpar_rc = plpar_pte_read(flags, slot, &dword0, &dummy_word1);
 
-	if (lpar_rc != H_Success) {
-		udbg_printf("error on pte read in get_hpte0 rc = %lx\n",
-			    lpar_rc);
-		for (;;);
-	}
+	if (lpar_rc != H_Success)
+		panic("Error on pte read in get_hpte0 rc = %lx\n", lpar_rc);
 
 	return dword0;
 }
@@ -771,15 +785,14 @@ static void pSeries_lpar_hpte_updateboltedpp(unsigned long newpp,
 
 	slot = pSeries_lpar_hpte_find(vpn);
 	if (slot == -1)
-		panic("count not find page to bolt\n");
+		panic("updateboltedpp: Could not find page to bolt\n");
 
 	flags = newpp & 3;
 	lpar_rc = plpar_pte_protect(flags, slot, 0);
 
-	if (lpar_rc != H_Success) {
-		udbg_printf("bad return code from pte bolted protect rc = %lx\n", lpar_rc); 
-		for (;;);
-	}
+	if (lpar_rc != H_Success)
+		panic("Bad return code from pte bolted protect rc = %lx\n",
+		      lpar_rc); 
 }
 
 static void pSeries_lpar_hpte_invalidate(unsigned long slot, unsigned long va,
@@ -787,7 +800,6 @@ static void pSeries_lpar_hpte_invalidate(unsigned long slot, unsigned long va,
 {
 	unsigned long vpn, avpn;
 	unsigned long lpar_rc;
-	unsigned long flags;
 	unsigned long dummy1, dummy2;
 
 	if (large)
@@ -805,11 +817,8 @@ static void pSeries_lpar_hpte_invalidate(unsigned long slot, unsigned long va,
 		return;
 	}
 
-	if (lpar_rc != H_Success) {
-		udbg_printf("bad return code from invalidate rc = %lx\n",
-			    lpar_rc); 
-		for (;;);
-	}
+	if (lpar_rc != H_Success)
+		panic("Bad return code from invalidate rc = %lx\n", lpar_rc);
 }
 
 /*
