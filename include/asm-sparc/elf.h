@@ -32,11 +32,9 @@ do {	unsigned long *dest = &(__elf_regs[0]);		\
 	memcpy(&dest[0], &src->u_regs[0],		\
 	       sizeof(unsigned long) * 16);		\
 	/* Don't try this at home kids... */		\
-	set_fs(USER_DS);				\
 	sp = (unsigned long *) src->u_regs[14];		\
 	copy_from_user(&dest[16], sp,			\
 		       sizeof(unsigned long) * 16);	\
-	set_fs(KERNEL_DS);				\
 	dest[32] = src->psr;				\
 	dest[33] = src->pc;				\
 	dest[34] = src->npc;				\
@@ -56,6 +54,9 @@ typedef struct {
 	unsigned char	pr_en;
 	unsigned int	pr_q[64];
 } elf_fpregset_t;
+
+#define ELF_CORE_COPY_TASK_REGS(__tsk, __elf_regs)	\
+	({ ELF_CORE_COPY_REGS((*(__elf_regs)), (__tsk)->thread_info->kregs); 1; })
 
 /*
  * This is used to ensure we don't load something for the wrong architecture.

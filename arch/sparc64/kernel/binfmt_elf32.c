@@ -32,12 +32,10 @@ do {	unsigned int *dest = &(__elf_regs[0]);		\
 	for(i = 0; i < 16; i++)				\
 		dest[i] = (unsigned int) src->u_regs[i];\
 	/* Don't try this at home kids... */		\
-	set_fs(USER_DS);				\
 	sp = (unsigned int *) (src->u_regs[14] &	\
 		0x00000000fffffffc);			\
 	for(i = 0; i < 16; i++)				\
 		__get_user(dest[i+16], &sp[i]);		\
-	set_fs(KERNEL_DS);				\
 	dest[32] = tstate_to_psr(src->tstate);		\
 	dest[33] = (unsigned int) src->tpc;		\
 	dest[34] = (unsigned int) src->tnpc;		\
