@@ -11,7 +11,7 @@
 #define EFS_DIRBSIZE		(1 << EFS_DIRBSIZE_BITS)
 
 struct efs_dentry {
-	unsigned int	inode;
+	__be32		inode;
 	unsigned char	namelen;
 	char		name[3];
 };
@@ -23,7 +23,7 @@ struct efs_dentry {
 #define EFS_DIRBLK_MAGIC	0xbeef	/* moo */
 
 struct efs_dir {
-	unsigned short	magic;
+	__be16	magic;
 	unsigned char	firstused;
 	unsigned char	slots;
 
