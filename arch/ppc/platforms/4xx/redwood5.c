@@ -9,9 +9,6 @@
  *    Description:
  *    	IBM redwood5 eval board file
  *
- *      History:  12/29/2001 - Armin
- *    	initail release
- *
  */
 
 #include <linux/config.h>
@@ -21,12 +18,12 @@
 #include <asm/machdep.h>
 
 void __init
-board_setup_arch(void)
+redwood5_setup_arch(void)
 {
+	bd_t *bip = &__res;
 
-	bd_t *bip = (bd_t *)__res;
+	ppc4xx_setup_arch();
 
-#define CONFIG_DEBUG_BRINGUP
 #ifdef CONFIG_DEBUG_BRINGUP
 	printk("\n");
 	printk("machine\t: %s\n", PPC4xx_MACHINE_NAME);
@@ -53,10 +50,11 @@ board_setup_arch(void)
 }
 
 void __init
-board_io_mapping(void)
+redwood5_map_io(void)
 {
 	int i;
 
+	ppc4xx_map_io();
 	for (i = 0; i < 16; i++) {
 	 unsigned long v, p;
 
@@ -72,11 +70,11 @@ board_io_mapping(void)
 }
 
 void __init
-board_setup_irq(void)
+platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
+	      unsigned long r6, unsigned long r7)
 {
-}
+	ppc4xx_init(r3, r4, r5, r6, r7);
 
-void __init
-board_init(void)
-{
+	ppc_md.setup_arch = redwood5_setup_arch;
+	ppc_md.setup_io_mappings = redwood5_map_io;
 }

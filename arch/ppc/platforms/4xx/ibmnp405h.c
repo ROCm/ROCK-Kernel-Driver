@@ -28,51 +28,28 @@
  *  with this program; if not, write  to the Free Software Foundation, Inc.,
  *  675 Mass Ave, Cambridge, MA 02139, USA.
  *
- *      History: 01/02/2002 - armin
- *		initial release
- *
  */
 
 #include <linux/config.h>
 #include <linux/init.h>
-#include <linux/smp.h>
-#include <linux/threads.h>
-#include <linux/param.h>
-#include <linux/string.h>
+#include <asm/ocp.h>
 #include <platforms/4xx/ibmnp405h.h>
 
-const struct NS16550* COM_PORTS[] =
-{
-  (struct NS16550*) UART0_IO_BASE,
-  (struct NS16550*) UART1_IO_BASE,
-};
 
-const struct pcil0_regs* PCIL0[]=
-{
-	(struct pcil0_regs*)	PCIL0_BASE,
-};
-
-
-const struct iic_regs* IIC_ADDR[]=
-{
-	(struct iic_regs*) IIC0_BASE,
-};
-
-
-const struct gpio_regs* GPIO_ADDR[] =
-{
-	(struct gpio_regs*)	GPIO0_BASE,
-};
-
-const struct emac_regs* EMAC_ADDR[]=
-{
-	(struct emac_regs*) EMAC0_BASE,
-	(struct emac_regs*) EMAC1_BASE,
-	(struct emac_regs*) EMAC2_BASE,
-	(struct emac_regs*) EMAC3_BASE
-};
-
-const struct zmii_regs* ZMII_ADDR[]=
-{
-	(zmii_t*)	ZMII0_BASE,
+struct ocp_def core_ocp[] = {
+//	{OCP_VENDOR_IBM, OCP_FUNC_PLB, 0x0, OCP_IRQ_NA, OCP_CPM_NA},
+	{OCP_VENDOR_IBM, OCP_FUNC_OPB, OPB_BASE_START, OCP_IRQ_NA, OCP_CPM_NA},
+	{OCP_VENDOR_IBM, OCP_FUNC_16550, UART0_IO_BASE, UART0_INT,IBM_CPM_UART0},
+	{OCP_VENDOR_IBM, OCP_FUNC_16550, UART1_IO_BASE, UART1_INT, IBM_CPM_UART1},
+	{OCP_VENDOR_IBM, OCP_FUNC_IIC, IIC0_BASE, IIC0_IRQ, IBM_CPM_IIC0},
+	{OCP_VENDOR_IBM, OCP_FUNC_GPIO, GPIO0_BASE, OCP_IRQ_NA, IBM_CPM_GPIO0},
+	{OCP_VENDOR_IBM, OCP_FUNC_EMAC, EMAC0_BASE, BL_MAC_ETH0, IBM_CPM_EMAC0},
+	{OCP_VENDOR_IBM, OCP_FUNC_EMAC, EMAC0_BASE, BL_MAC_ETH0, IBM_CPM_EMAC0},
+	{OCP_VENDOR_IBM, OCP_FUNC_EMAC, EMAC1_BASE, BL_MAC_ETH1, IBM_CPM_EMAC1},
+	{OCP_VENDOR_IBM, OCP_FUNC_EMAC, EMAC2_BASE, BL_MAC_ETH2, IBM_CPM_EMAC2},
+	{OCP_VENDOR_IBM, OCP_FUNC_EMAC, EMAC3_BASE, BL_MAC_ETH3, IBM_CPM_EMAC3},
+	{OCP_VENDOR_IBM, OCP_FUNC_PHY, ZMII0_BASE, OCP_IRQ_NA, OCP_CPM_NA},
+//	{OCP_VENDOR_IBM, OCP_FUNC_EXT, EBIU_BASE_START, OCP_IRQ_NA,IBM_CPM_EBC},
+//	{OCP_VENDOR_IBM, OCP_FUNC_PCI, PCIL0_BASE, OCP_IRQ_NA, IBM_CPM_PCI},
+	{OCP_VENDOR_INVALID, OCP_FUNC_INVALID, 0x0, OCP_IRQ_NA, OCP_CPM_NA},
 };

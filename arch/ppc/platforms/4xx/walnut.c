@@ -1,8 +1,8 @@
 /*
  *
- *    Copyrigh t(c) 1999-2000 Grant Erickson <grant@lcse.umn.edu>
+ *    Copyright(c) 1999-2000 Grant Erickson <grant@lcse.umn.edu>
  *
- *    Copyright 2000-2001 MontaVista Software Inc.
+ *    Copyright 2000-2002 MontaVista Software Inc.
  *      Completed implementation.
  *      Author: MontaVista Software, Inc.  <source@mvista.com>
  *
@@ -13,13 +13,6 @@
  *      IBM PowerPC 4xx based boards. Adapted from original
  *      code by Gary Thomas, Cort Dougan <cort@fsmlabs.com>, and Dan Malek
  *      <dan@net4x.com>.
- *
- *      History: 11/09/2001 - armin
- *      added board_init to add in additional instuctions needed during platfrom_init
- *
- *      01/22/2002 - Armin
- *      converted pci to ocp
- *
  *
  */
 #include <linux/config.h>
@@ -39,13 +32,8 @@
 #include <asm/page.h>
 #include <asm/time.h>
 #include <asm/io.h>
-#include <platforms/4xx/ibm_ocp.h>
-
-#ifdef CONFIG_PPC_RTC
+#include <asm/ibm_ocp_pci.h>
 #include <asm/todc.h>
-#endif
-
-#include "walnut.h"
 
 #undef DEBUG
 
@@ -82,14 +70,17 @@ ppc405_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 };
 
 void __init
-board_setup_arch(void)
+walnut_setup_arch(void)
 {
+
 	void *fpga_brdc;
 	unsigned char fpga_brdc_data;
 	void *fpga_enable;
 	void *fpga_polarity;
 	void *fpga_status;
 	void *fpga_trigger;
+
+	ppc4xx_setup_arch();
 
 	kb_data = ioremap(WALNUT_PS2_BASE, 8);
 	if (!kb_data) {
@@ -123,20 +114,19 @@ board_setup_arch(void)
 
 	writeb(0x3, fpga_trigger);
 
-#ifdef CONFIG_PPC_RTC
 	/* RTC step for the walnut */
 	walnut_rtc_base = (void *) WALNUT_RTC_VADDR;
 	TODC_INIT(TODC_TYPE_DS1743, walnut_rtc_base, walnut_rtc_base,
 		  walnut_rtc_base, 8);
-#endif				/* CONFIG_PPC_RTC */
+	/* Identify the system */
+	printk("IBM Walnut port (C) 2000-2002 MontaVista Software, Inc. (source@mvista.com)\n");
 }
 
 void __init
-bios_fixup(struct pci_controller *hose, void *pcil0_base)
+bios_fixup(struct pci_controller *hose, struct pcil0_regs *pcip)
 {
-
+#ifdef CONFIG_PCI
 	unsigned int bar_response, bar;
-	struct pcil0_regs *pcip;
 	/*
 	 * Expected PCI mapping:
 	 *
@@ -155,7 +145,6 @@ bios_fixup(struct pci_controller *hose, void *pcil0_base)
 
 #ifdef DEBUG
 	int i;
-	pcip = (struct pcil0_regs *) pcil0_base;
 
 	printk("ioremap PCLIO_BASE = 0x%x\n", pcip);
 	printk("PCI bridge regs before fixup \n");
@@ -170,8 +159,6 @@ bios_fixup(struct pci_controller *hose, void *pcil0_base)
 	printk(" ptm2ms\t0x%x\n", in_le32(&(pcip->ptm2ms)));
 	printk(" ptm2la\t0x%x\n", in_le32(&(pcip->ptm2la)));
 
-#else
-	pcip = (struct pcil0_regs *) pcil0_base;
 #endif
 
 	/* added for IBM boot rom version 1.15 bios bar changes  -AK */
@@ -233,24 +220,27 @@ bios_fixup(struct pci_controller *hose, void *pcil0_base)
 	printk(" ptm2la\t0x%x\n", in_le32(&(pcip->ptm2la)));
 
 #endif
+#endif
 }
 
 void __init
-board_io_mapping(void)
+walnut_map_io(void)
 {
+	ppc4xx_map_io();
 	io_block_mapping(WALNUT_RTC_VADDR,
 			 WALNUT_RTC_PADDR, WALNUT_RTC_SIZE, _PAGE_IO);
 }
 
 void __init
-board_setup_irq(void)
+platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
+	      unsigned long r6, unsigned long r7)
 {
-}
+	ppc4xx_init(r3, r4, r5, r6, r7);
 
-void __init
-board_init(void)
-{
-#ifdef CONFIG_PPC_RTC
+	ppc_md.setup_arch = walnut_setup_arch;
+	ppc_md.setup_io_mappings = walnut_map_io;
+
+#ifdef CONFIG_GEN_RTC
 	ppc_md.time_init = todc_time_init;
 	ppc_md.set_rtc_time = todc_set_rtc_time;
 	ppc_md.get_rtc_time = todc_get_rtc_time;

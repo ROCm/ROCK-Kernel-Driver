@@ -1,12 +1,14 @@
 /*
+ * ibm_ocp_pci.h
  *
- *    Copyright 2000-2001 MontaVista Software Inc.
- *      Completed implementation.
- *	Current maintainer
+ *	This was derived from the ibm_ocp.h 
+ *
+ * 	Current Maintainer
  *      Armin Kuster akuster@mvista.com
+ *      AUg, 2002 
  *
- *    Module name: ibmstb3.c
  *
+ * Copyright 2001-2002 MontaVista Softare Inc.
  *
  * This program is free software; you can redistribute  it and/or modify it
  *  under  the terms of  the GNU General  Public License as published by the
@@ -27,19 +29,28 @@
  *  You should have received a copy of the  GNU General Public License along
  *  with this program; if not, write  to the Free Software Foundation, Inc.,
  *  675 Mass Ave, Cambridge, MA 02139, USA.
- *
  */
 
-#include <linux/config.h>
-#include "ibmstb3.h"
-#include <asm/ocp.h>
+#ifdef __KERNEL__
+#ifndef __ASM_IBM_OCP_PCI_H__
+#define __ASM_IBM_OCP_PCI_H__
 
-struct ocp_def core_ocp[] = {
-	{UART, UART0_IO_BASE, UART0_INT, IBM_CPM_UART0},
-	{IIC, IIC0_BASE, IIC0_IRQ, IBM_CPM_IIC0},
-	{IIC, IIC1_BASE, IIC1_IRQ, IBM_CPM_IIC1},
-	{GPIO, GPIO0_BASE, OCP_IRQ_NA, IBM_CPM_GPIO0},
-	{OPB, OPB0_BASE, OCP_IRQ_NA, OCP_CPM_NA},
-	{OCP_NULL_TYPE, 0x0, OCP_IRQ_NA, OCP_CPM_NA},
+/* PCI 32 */
 
+struct pmm_regs {
+	u32 la;
+	u32 ma;
+	u32 pcila;
+	u32 pciha;
 };
+
+typedef struct pcil0_regs {
+	struct pmm_regs pmm[3];
+	u32 ptm1ms;
+	u32 ptm1la;
+	u32 ptm2ms;
+	u32 ptm2la;
+} pci0_t;
+
+#endif				/* __ASM_IBM_OCP_PCI_H__ */
+#endif				/* __KERNEL__ */
