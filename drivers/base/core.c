@@ -134,7 +134,7 @@ static int do_driver_unbind(struct device * dev, void * data)
 
 void driver_unbind(struct device_driver * drv)
 {
-//	driver_for_each_dev(drv,drv,do_driver_unbind);
+	driver_for_each_dev(drv,drv,do_driver_unbind);
 }
 
 /**
