@@ -1253,8 +1253,8 @@ static int __devinit snd_azf3328_pcm(azf3328_t *chip, int device)
 	strcpy(pcm->name, chip->card->shortname);
 	chip->pcm = pcm;
 
-	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
-					      chip->pci, 64*1024, 64*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+					      snd_dma_pci_data(chip->pci), 64*1024, 64*1024);
 
 	snd_azf3328_dbgcallleave();
 	return 0;

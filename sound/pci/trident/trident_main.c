@@ -1009,8 +1009,6 @@ static int snd_trident_capture_prepare(snd_pcm_substream_t * substream)
 	snd_trident_voice_t *voice = (snd_trident_voice_t *) runtime->private_data;
 	unsigned int val, ESO_bytes;
 
-	snd_assert(substream->dma_device.type == SNDRV_DMA_TYPE_PCI, return -EIO);
-
 	spin_lock(&trident->reg_lock);
 
 	// Initilize the channel and set channel Mode
@@ -2189,10 +2187,15 @@ int __devinit snd_trident_pcm(trident_t * trident, int device, snd_pcm_t ** rpcm
 	if (trident->tlb.entries) {
 		snd_pcm_substream_t *substream;
 		for (substream = pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream; substream; substream = substream->next)
-			snd_pcm_lib_preallocate_pages(substream, SNDRV_DMA_TYPE_PCI_SG, trident->pci, 64*1024, 128*1024);
-		snd_pcm_lib_preallocate_pages(pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream, SNDRV_DMA_TYPE_PCI, trident->pci, 64*1024, 128*1024);
+			snd_pcm_lib_preallocate_pages(substream, SNDRV_DMA_TYPE_DEV_SG,
+						      snd_dma_pci_data(trident->pci),
+						      64*1024, 128*1024);
+		snd_pcm_lib_preallocate_pages(pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream,
+					      SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(trident->pci),
+					      64*1024, 128*1024);
 	} else {
-		snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI, trident->pci, 64*1024, 128*1024);
+		snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+						      snd_dma_pci_data(trident->pci), 64*1024, 128*1024);
 	}
 
 	if (rpcm)
@@ -2246,9 +2249,11 @@ int __devinit snd_trident_foldback_pcm(trident_t * trident, int device, snd_pcm_
 	trident->foldback = foldback;
 
 	if (trident->tlb.entries)
-		snd_pcm_lib_preallocate_pages_for_all(foldback, SNDRV_DMA_TYPE_PCI_SG, trident->pci, 0, 128*1024);
+		snd_pcm_lib_preallocate_pages_for_all(foldback, SNDRV_DMA_TYPE_DEV_SG,
+						      snd_dma_pci_data(trident->pci), 0, 128*1024);
 	else
-		snd_pcm_lib_preallocate_pages_for_all(foldback, SNDRV_DMA_TYPE_PCI, trident->pci, 64*1024, 128*1024);
+		snd_pcm_lib_preallocate_pages_for_all(foldback, SNDRV_DMA_TYPE_DEV,
+						      snd_dma_pci_data(trident->pci), 64*1024, 128*1024);
 
 	if (rpcm)
 		*rpcm = foldback;
@@ -2287,7 +2292,7 @@ int __devinit snd_trident_spdif_pcm(trident_t * trident, int device, snd_pcm_t *
 	strcpy(spdif->name, "Trident 4DWave IEC958");
 	trident->spdif = spdif;
 
-	snd_pcm_lib_preallocate_pages_for_all(spdif, SNDRV_DMA_TYPE_PCI, trident->pci, 64*1024, 128*1024);
+	snd_pcm_lib_preallocate_pages_for_all(spdif, SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(trident->pci), 64*1024, 128*1024);
 
 	if (rpcm)
 		*rpcm = spdif;
@@ -3584,8 +3589,8 @@ int __devinit snd_trident_create(snd_card_t * card,
 	trident->irq = pci->irq;
 
 	memset(&trident->dma_dev, 0, sizeof(trident->dma_dev));
-	trident->dma_dev.type = SNDRV_DMA_TYPE_PCI;
-	trident->dma_dev.dev.pci = pci;
+	trident->dma_dev.type = SNDRV_DMA_TYPE_DEV;
+	trident->dma_dev.dev = snd_dma_pci_data(pci);
 
 	/* allocate 16k-aligned TLB for NX cards */
 	trident->tlb.entries = NULL;

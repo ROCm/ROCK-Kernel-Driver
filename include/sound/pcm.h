@@ -904,12 +904,10 @@ void snd_pcm_timer_done(snd_pcm_substream_t * substream);
  *  Memory
  */
 
-#define snd_pcm_dma_flags(x) ((void *)(unsigned long)(x))
-
 int snd_pcm_lib_preallocate_free(snd_pcm_substream_t *substream);
 int snd_pcm_lib_preallocate_free_for_all(snd_pcm_t *pcm);
 int snd_pcm_lib_preallocate_pages(snd_pcm_substream_t *substream,
-				  int type, void *data,
+				  int type, struct device *data,
 				  size_t size, size_t max);
 int snd_pcm_lib_preallocate_pages_for_all(snd_pcm_t *pcm,
 					  int type, void *data,

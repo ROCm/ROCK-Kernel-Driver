@@ -569,8 +569,8 @@ static void *snd_hammerfall_get_buffer(struct pci_dev *pci, size_t size, dma_add
 	struct snd_dma_buffer dmbuf;
 
 	memset(&pdev, 0, sizeof(pdev));
-	pdev.type = SNDRV_DMA_TYPE_PCI;
-	pdev.dev.pci = pci;
+	pdev.type = SNDRV_DMA_TYPE_DEV;
+	pdev.dev = snd_dma_pci_data(pci);
 	pdev.id = capture;
 	dmbuf.bytes = 0;
 	if (! snd_dma_get_reserved(&pdev, &dmbuf)) {
@@ -587,8 +587,8 @@ static void snd_hammerfall_free_buffer(struct pci_dev *pci, size_t size, void *p
 	struct snd_dma_device pdev;
 
 	memset(&pdev, 0, sizeof(pdev));
-	pdev.type = SNDRV_DMA_TYPE_PCI;
-	pdev.dev.pci = pci;
+	pdev.type = SNDRV_DMA_TYPE_DEV;
+	pdev.dev = snd_dma_pci_data(pci);
 	pdev.id = capture;
 	snd_dma_free_reserved(&pdev);
 }

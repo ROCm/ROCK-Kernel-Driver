@@ -1720,7 +1720,7 @@ snd_rme96_create(rme96_t *rme96)
 
 	snd_pcm_lib_preallocate_pages_for_all(rme96->spdif_pcm,
 					      SNDRV_DMA_TYPE_CONTINUOUS,
-					      snd_pcm_dma_flags(GFP_KERNEL),
+					      snd_dma_continuous_data(GFP_KERNEL),
 					      RME96_BUFFER_SIZE,
 					      RME96_BUFFER_SIZE);
 
@@ -1744,7 +1744,7 @@ snd_rme96_create(rme96_t *rme96)
 
 		snd_pcm_lib_preallocate_pages_for_all(rme96->adat_pcm,
 						      SNDRV_DMA_TYPE_CONTINUOUS,
-						      snd_pcm_dma_flags(GFP_KERNEL),
+						      snd_dma_continuous_data(GFP_KERNEL),
 						      RME96_BUFFER_SIZE,
 						      RME96_BUFFER_SIZE);
 	}

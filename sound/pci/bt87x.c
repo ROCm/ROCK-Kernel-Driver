@@ -197,8 +197,8 @@ static int snd_bt87x_create_risc(bt87x_t *chip, snd_pcm_substream_t *substream,
 
 	if (chip->dma_risc.area == NULL) {
 		memset(&chip->dma_dev, 0, sizeof(chip->dma_dev));
-		chip->dma_dev.type = SNDRV_DMA_TYPE_PCI;
-		chip->dma_dev.dev.pci = chip->pci;
+		chip->dma_dev.type = SNDRV_DMA_TYPE_DEV;
+		chip->dma_dev.dev = snd_dma_pci_data(chip->pci);
 		if (snd_dma_alloc_pages(&chip->dma_dev, PAGE_ALIGN(MAX_RISC_SIZE), &chip->dma_risc) < 0)
 			return -ENOMEM;
 	}
@@ -682,8 +682,8 @@ static int __devinit snd_bt87x_pcm(bt87x_t *chip, int device, char *name)
 	strcpy(pcm->name, name);
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_bt87x_pcm_ops);
 	return snd_pcm_lib_preallocate_pages_for_all(pcm,
-							SNDRV_DMA_TYPE_PCI_SG,
-							chip->pci,
+						     SNDRV_DMA_TYPE_DEV_SG,
+						     snd_dma_pci_data(chip->pci),
 							128 * 1024,
 							(255 * 4092 + 1023) & ~1023);
 }

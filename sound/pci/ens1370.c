@@ -1250,8 +1250,8 @@ static int __devinit snd_ensoniq_pcm(ensoniq_t * ensoniq, int device, snd_pcm_t 
 #endif
 	ensoniq->pcm1 = pcm;
 
-	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
-					      ensoniq->pci, 64*1024, 128*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+					      snd_dma_pci_data(ensoniq->pci), 64*1024, 128*1024);
 
 	if (rpcm)
 		*rpcm = pcm;
@@ -1295,8 +1295,8 @@ static int __devinit snd_ensoniq_pcm2(ensoniq_t * ensoniq, int device, snd_pcm_t
 #endif
 	ensoniq->pcm2 = pcm;
 
-	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
-					      ensoniq->pci, 64*1024, 128*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+					      snd_dma_pci_data(ensoniq->pci), 64*1024, 128*1024);
 
 	if (rpcm)
 		*rpcm = pcm;
@@ -1914,8 +1914,8 @@ static int __devinit snd_ensoniq_create(snd_card_t * card,
 	ensoniq->irq = pci->irq;
 #ifdef CHIP1370
 	memset(&ensoniq->dma_dev, 0, sizeof(ensoniq->dma_dev));
-	ensoniq->dma_dev.type = SNDRV_DMA_TYPE_PCI;
-	ensoniq->dma_dev.dev.pci = pci;
+	ensoniq->dma_dev.type = SNDRV_DMA_TYPE_DEV;
+	ensoniq->dma_dev.dev = snd_dma_pci_data(pci);
 	if (snd_dma_alloc_pages(&ensoniq->dma_dev, 16, &ensoniq->dma_bug) < 0) {
 		snd_printk("unable to allocate space for phantom area - dma_bug\n");
 		snd_ensoniq_free(ensoniq);

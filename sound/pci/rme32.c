@@ -1379,7 +1379,7 @@ static int __devinit snd_rme32_create(rme32_t * rme32)
 
 	snd_pcm_lib_preallocate_pages_for_all(rme32->spdif_pcm,
 					      SNDRV_DMA_TYPE_CONTINUOUS,
-					      snd_pcm_dma_flags(GFP_KERNEL),
+					      snd_dma_continuous_data(GFP_KERNEL),
 					      RME32_BUFFER_SIZE,
 					      RME32_BUFFER_SIZE);
 
@@ -1407,7 +1407,7 @@ static int __devinit snd_rme32_create(rme32_t * rme32)
 
 		snd_pcm_lib_preallocate_pages_for_all(rme32->adat_pcm, 
 						      SNDRV_DMA_TYPE_CONTINUOUS,
-						      snd_pcm_dma_flags(GFP_KERNEL),
+						      snd_dma_continuous_data(GFP_KERNEL),
 						      RME32_BUFFER_SIZE, 
 						      RME32_BUFFER_SIZE);
 	}

@@ -241,18 +241,11 @@ static inline void setup_pcm_id(snd_pcm_substream_t *subs)
  * Returns zero if successful, or a negative error code on failure.
  */
 int snd_pcm_lib_preallocate_pages(snd_pcm_substream_t *substream,
-				  int type, void *data,
+				  int type, struct device *data,
 				  size_t size, size_t max)
 {
-	switch (type) {
-	case SNDRV_DMA_TYPE_ISA:
-		if ((unsigned long)data == 0)
-			data = snd_pcm_dma_flags(GFP_DMA|GFP_ATOMIC);
-	default:
-		substream->dma_device.type = type;
-		substream->dma_device.dev.data = data;
-		break;
-	}
+	substream->dma_device.type = type;
+	substream->dma_device.dev = data;
 	setup_pcm_id(substream);
 	return snd_pcm_lib_preallocate_pages1(substream, size, max);
 }
