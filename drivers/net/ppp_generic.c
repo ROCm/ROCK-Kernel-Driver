@@ -682,8 +682,10 @@ static int ppp_ioctl(struct inode *inode, struct file *file,
 			if (code == 0)
 				break;
 			err = -EFAULT;
-			if (copy_from_user(code, uprog.filter, len))
+			if (copy_from_user(code, uprog.filter, len)) {
+				kfree(code);
 				break;
+			}
 			err = sk_chk_filter(code, uprog.len);
 			if (err) {
 				kfree(code);
