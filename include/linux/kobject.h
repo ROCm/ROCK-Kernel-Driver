@@ -20,6 +20,7 @@ struct kobject {
 	struct list_head	entry;
 	struct kobject		* parent;
 	struct subsystem	* subsys;
+	struct kset		* kset;
 	struct kobj_type	* ktype;
 	struct dentry		* dentry;
 };
@@ -43,12 +44,57 @@ struct kobj_type {
 	struct attribute	** default_attrs;
 };
 
-struct subsystem {
-	struct kobject		kobj;
+
+/**
+ *	kset - a set of kobjects of a specific type, belonging
+ *	to a specific subsystem.
+ *
+ *	All kobjects of a kset should be embedded in an identical 
+ *	type. This type may have a descriptor, which the kset points
+ *	to. This allows there to exist sets of objects of the same
+ *	type in different subsystems.
+ *
+ *	A subsystem does not have to be a list of only one type 
+ *	of object; multiple ksets can belong to one subsystem. All 
+ *	ksets of a subsystem share the subsystem's lock.
+ *
+ */
+struct kset {
+	struct subsystem	* subsys;
+	struct kobj_type	* ktype;
 	struct list_head	list;
-	struct rw_semaphore	rwsem;
-	struct subsystem	* parent;
+	struct kobject		kobj;
 };
+
+
+extern void kset_init(struct kset * k);
+extern int kset_add(struct kset * k);
+extern int kset_register(struct kset * k);
+extern void kset_unregister(struct kset * k);
+
+static inline struct kset * to_kset(struct kobject * kobj)
+{
+	return container_of(kobj,struct kset,kobj);
+}
+
+static inline struct kset * kset_get(struct kset * k)
+{
+	return k ? to_kset(kobject_get(&k->kobj)) : NULL;
+}
+
+static inline void kset_put(struct kset * k)
+{
+	kobject_put(&k->kobj);
+}
+
+
+struct subsystem {
+	struct kset		kset;
+	struct kobject		kobj;
+	struct rw_semaphore	rwsem;
+};
+
+
 
 extern void subsystem_init(struct subsystem *);
 extern int subsystem_register(struct subsystem *);
@@ -56,12 +102,12 @@ extern void subsystem_unregister(struct subsystem *);
 
 static inline struct subsystem * subsys_get(struct subsystem * s)
 {
-	return s ? container_of(kobject_get(&s->kobj),struct subsystem,kobj) : NULL;
+	return s ? container_of(kset_get(&s->kset),struct subsystem,kset) : NULL;
 }
 
 static inline void subsys_put(struct subsystem * s)
 {
-	kobject_put(&s->kobj);
+	kset_put(&s->kset);
 }
 
 struct subsys_attribute {
@@ -72,5 +118,6 @@ struct subsys_attribute {
 
 extern int subsys_create_file(struct subsystem * , struct subsys_attribute *);
 extern void subsys_remove_file(struct subsystem * , struct subsys_attribute *);
+
 
 #endif /* _KOBJECT_H_ */

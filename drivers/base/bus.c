@@ -435,7 +435,6 @@ int bus_add_driver(struct device_driver * drv)
 {
 	struct bus_type * bus = get_bus(drv->bus);
 	if (bus) {
-		down_write(&bus->subsys.rwsem);
 		pr_debug("bus %s: add driver %s\n",bus->name,drv->name);
 
 		strncpy(drv->kobj.name,drv->name,KOBJ_NAME_LEN);
@@ -443,6 +442,7 @@ int bus_add_driver(struct device_driver * drv)
 		drv->kobj.subsys = &bus->drivers;
 		kobject_register(&drv->kobj);
 
+		down_write(&bus->subsys.rwsem);
 		devclass_add_driver(drv);
 		driver_attach(drv);
 		up_write(&bus->subsys.rwsem);
@@ -467,8 +467,8 @@ void bus_remove_driver(struct device_driver * drv)
 		pr_debug("bus %s: remove driver %s\n",drv->bus->name,drv->name);
 		driver_detach(drv);
 		devclass_remove_driver(drv);
-		kobject_unregister(&drv->kobj);
 		up_write(&drv->bus->subsys.rwsem);
+		kobject_unregister(&drv->kobj);
 		put_bus(drv->bus);
 	}
 }
@@ -499,12 +499,12 @@ int bus_register(struct bus_type * bus)
 	subsystem_register(&bus->subsys);
 
 	snprintf(bus->devices.kobj.name,KOBJ_NAME_LEN,"devices");
-	bus->devices.parent = &bus->subsys;
-	subsystem_register(&bus->devices);
+	bus->devices.subsys = &bus->subsys;
+	kset_register(&bus->devices);
 
 	snprintf(bus->drivers.kobj.name,KOBJ_NAME_LEN,"drivers");
-	bus->drivers.parent = &bus->subsys;
-	subsystem_register(&bus->drivers);
+	bus->drivers.subsys = &bus->subsys;
+	kset_register(&bus->drivers);
 
 	pr_debug("bus type '%s' registered\n",bus->name);
 	return 0;
@@ -521,8 +521,8 @@ int bus_register(struct bus_type * bus)
 void bus_unregister(struct bus_type * bus)
 {
 	pr_debug("bus %s: unregistering\n",bus->name);
-	subsystem_unregister(&bus->drivers);
-	subsystem_unregister(&bus->devices);
+	kset_unregister(&bus->drivers);
+	kset_unregister(&bus->devices);
 	subsystem_unregister(&bus->subsys);
 }
 

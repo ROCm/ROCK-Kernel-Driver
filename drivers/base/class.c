@@ -86,7 +86,7 @@ int devclass_create_file(struct device_class * cls, struct devclass_attribute * 
 {
 	int error;
 	if (cls) {
-		error = sysfs_create_file(&cls->subsys.kobj,&attr->attr);
+		error = sysfs_create_file(&cls->subsys.kset.kobj,&attr->attr);
 	} else
 		error = -EINVAL;
 	return error;
@@ -95,7 +95,7 @@ int devclass_create_file(struct device_class * cls, struct devclass_attribute * 
 void devclass_remove_file(struct device_class * cls, struct devclass_attribute * attr)
 {
 	if (cls)
-		sysfs_remove_file(&cls->subsys.kobj,&attr->attr);
+		sysfs_remove_file(&cls->subsys.kset.kobj,&attr->attr);
 }
 
 
@@ -234,12 +234,12 @@ int devclass_register(struct device_class * cls)
 	subsystem_register(&cls->subsys);
 
 	snprintf(cls->devices.kobj.name,KOBJ_NAME_LEN,"devices");
-	cls->devices.parent = &cls->subsys;
-	subsystem_register(&cls->devices);
+	cls->devices.subsys = &cls->subsys;
+	kset_register(&cls->devices);
 
 	snprintf(cls->drivers.kobj.name,KOBJ_NAME_LEN,"drivers");
-	cls->drivers.parent = &cls->subsys;
-	subsystem_register(&cls->drivers);
+	cls->drivers.subsys = &cls->subsys;
+	kset_register(&cls->drivers);
 
 	return 0;
 }
@@ -247,8 +247,8 @@ int devclass_register(struct device_class * cls)
 void devclass_unregister(struct device_class * cls)
 {
 	pr_debug("device class '%s': unregistering\n",cls->name);
-	subsystem_unregister(&cls->drivers);
-	subsystem_unregister(&cls->devices);
+	kset_unregister(&cls->drivers);
+	kset_unregister(&cls->devices);
 	subsystem_unregister(&cls->subsys);
 }
 

@@ -66,8 +66,8 @@ struct bus_type {
 	char			* name;
 
 	struct subsystem	subsys;
-	struct subsystem	drivers;
-	struct subsystem	devices;
+	struct kset		drivers;
+	struct kset		devices;
 
 	int		(*match)(struct device * dev, struct device_driver * drv);
 	struct device * (*add)	(struct device * parent, char * bus_id);
@@ -162,8 +162,8 @@ struct device_class {
 	u32			devnum;
 
 	struct subsystem	subsys;
-	struct subsystem	devices;
-	struct subsystem	drivers;
+	struct kset		devices;
+	struct kset		drivers;
 
 	int	(*add_device)(struct device *);
 	void	(*remove_device)(struct device *);

@@ -12,7 +12,7 @@ static struct subsystem firmware_subsys = {
 
 int firmware_register(struct subsystem * s)
 {
-	s->parent = &firmware_subsys;
+	s->kobj.kset = &firmware_subsys.kset;
 	return subsystem_register(s);
 }
 

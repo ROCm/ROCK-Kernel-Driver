@@ -62,7 +62,7 @@ void kobject_init(struct kobject * kobj)
 {
 	atomic_set(&kobj->refcount,1);
 	INIT_LIST_HEAD(&kobj->entry);
-	kobj->subsys = subsys_get(kobj->subsys);
+	kobj->kset = kset_get(kobj->kset);
 }
 
 /**
@@ -73,7 +73,6 @@ void kobject_init(struct kobject * kobj)
 int kobject_add(struct kobject * kobj)
 {
 	int error = 0;
-	struct subsystem * s = kobj->subsys;
 	struct kobject * parent;
 
 	if (!(kobj = kobject_get(kobj)))
@@ -81,19 +80,24 @@ int kobject_add(struct kobject * kobj)
 
 	parent = kobject_get(kobj->parent);
 
-	pr_debug("kobject %s: registering. parent: %s, subsys: %s\n",
+	pr_debug("kobject %s: registering. parent: %s, set: %s\n",
 		 kobj->name, parent ? parent->name : "<NULL>", 
-		 kobj->subsys ? kobj->subsys->kobj.name : "<NULL>" );
+		 kobj->kset ? kobj->kset->kobj.name : "<NULL>" );
 
-	if (s) {
-		down_write(&s->rwsem);
+	if (kobj->subsys) {
+		if (!kobj->kset)
+			kobj->kset = &kobj->subsys->kset;
+	}
+
+	if (kobj->kset) {
+		down_write(&kobj->kset->subsys->rwsem);
 		if (parent) 
 			list_add_tail(&kobj->entry,&parent->entry);
 		else {
-			list_add_tail(&kobj->entry,&s->list);
-			kobj->parent = kobject_get(&s->kobj);
+			list_add_tail(&kobj->entry,&kobj->kset->list);
+			kobj->parent = kobject_get(&kobj->kset->kobj);
 		}
-		up_write(&s->rwsem);
+		up_write(&kobj->kset->subsys->rwsem);
 	}
 	error = create_dir(kobj);
 	if (error && parent)
@@ -127,10 +131,10 @@ int kobject_register(struct kobject * kobj)
 void kobject_del(struct kobject * kobj)
 {
 	sysfs_remove_dir(kobj);
-	if (kobj->subsys) {
-		down_write(&kobj->subsys->rwsem);
+	if (kobj->kset) {
+		down_write(&kobj->kset->subsys->rwsem);
 		list_del_init(&kobj->entry);
-		up_write(&kobj->subsys->rwsem);
+		up_write(&kobj->kset->subsys->rwsem);
 	}
 	if (kobj->parent) 
 		kobject_put(kobj->parent);
@@ -174,17 +178,13 @@ struct kobject * kobject_get(struct kobject * kobj)
 void kobject_cleanup(struct kobject * kobj)
 {
 	struct kobj_type * t = kobj->ktype;
-	struct subsystem * s = kobj->subsys;
+	struct kset * s = kobj->kset;
 
 	pr_debug("kobject %s: cleaning up\n",kobj->name);
-	if (s) {
-		down_write(&s->rwsem);
-		list_del_init(&kobj->entry);
-		up_write(&s->rwsem);
-		subsys_put(s);
-	}
 	if (t && t->release)
 		t->release(kobj);
+	if (s)
+		kset_put(s);
 }
 
 /**
@@ -203,32 +203,98 @@ void kobject_put(struct kobject * kobj)
 }
 
 
+/**
+ *	kset_init - initialize a kset for use
+ *	@k:	kset 
+ */
+
+void kset_init(struct kset * k)
+{
+	kobject_init(&k->kobj);
+	INIT_LIST_HEAD(&k->list);
+}
+
+
+/**
+ *	kset_add - add a kset object to the hierarchy.
+ *	@k:	kset.
+ *
+ *	Simply, this adds the kset's embedded kobject to the 
+ *	hierarchy. 
+ *	We also try to make sure that the kset's embedded kobject
+ *	has a parent before it is added. We only care if the embedded
+ *	kobject is not part of a kset itself, since kobject_add()
+ *	assigns a parent in that case. 
+ *	If that is the case, and the kset has a controlling subsystem,
+ *	then we set the kset's parent to be said subsystem. 
+ */
+
+int kset_add(struct kset * k)
+{
+	if (!k->kobj.parent && !k->kobj.kset && k->subsys)
+		k->kobj.parent = &k->subsys->kset.kobj;
+
+	return kobject_add(&k->kobj);
+}
+
+
+/**
+ *	kset_register - initialize and add a kset.
+ *	@k:	kset.
+ */
+
+int kset_register(struct kset * k)
+{
+	kset_init(k);
+	return kset_add(k);
+}
+
+
+/**
+ *	kset_unregister - remove a kset.
+ *	@k:	kset.
+ */
+
+void kset_unregister(struct kset * k)
+{
+	kobject_unregister(&k->kobj);
+}
+
+
 void subsystem_init(struct subsystem * s)
 {
-	kobject_init(&s->kobj);
+	memcpy(&s->kset.kobj,&s->kobj,sizeof(struct kobject));
 	init_rwsem(&s->rwsem);
-	INIT_LIST_HEAD(&s->list);
+	kset_init(&s->kset);
 }
 
 /**
  *	subsystem_register - register a subsystem.
  *	@s:	the subsystem we're registering.
+ *
+ *	Once we register the subsystem, we want to make sure that 
+ *	the kset points back to this subsystem for correct usage of 
+ *	the rwsem. 
  */
 
 int subsystem_register(struct subsystem * s)
 {
+	int error;
+
 	subsystem_init(s);
-	if (s->parent)
-		s->kobj.parent = &s->parent->kobj;
-	pr_debug("subsystem %s: registering, parent: %s\n",
-		 s->kobj.name,s->parent ? s->parent->kobj.name : "<none>");
-	return kobject_add(&s->kobj);
+	pr_debug("subsystem %s: registering\n",s->kobj.name);
+
+	if (!(error = kset_add(&s->kset))) {
+		if (!s->kset.subsys)
+			s->kset.subsys = s;
+	}
+	return error;
 }
 
 void subsystem_unregister(struct subsystem * s)
 {
 	pr_debug("subsystem %s: unregistering\n",s->kobj.name);
-	kobject_unregister(&s->kobj);
+	kset_unregister(&s->kset);
 }
 
 

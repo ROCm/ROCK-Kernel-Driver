@@ -38,7 +38,7 @@ int device_suspend(u32 state, u32 level)
 	printk(KERN_EMERG "Suspending devices\n");
 
 	down_write(&device_subsys.rwsem);
-	list_for_each(node,&device_subsys.list) {
+	list_for_each(node,&device_subsys.kset.list) {
 		struct device * dev = to_dev(node);
 		if (dev->driver && dev->driver->suspend) {
 			pr_debug("suspending device %s\n",dev->name);
@@ -64,7 +64,7 @@ void device_resume(u32 level)
 	struct list_head * node;
 
 	down_write(&device_subsys.rwsem);
-	list_for_each_prev(node,&device_subsys.list) {
+	list_for_each_prev(node,&device_subsys.kset.list) {
 		struct device * dev = to_dev(node);
 		if (dev->driver && dev->driver->resume) {
 			pr_debug("resuming device %s\n",dev->name);
@@ -86,7 +86,7 @@ void device_shutdown(void)
 	printk(KERN_EMERG "Shutting down devices\n");
 
 	down_write(&device_subsys.rwsem);
-	list_for_each(entry,&device_subsys.list) {
+	list_for_each(entry,&device_subsys.kset.list) {
 		struct device * dev = to_dev(entry);
 		if (dev->driver && dev->driver->shutdown) {
 			pr_debug("shutting down %s\n",dev->name);

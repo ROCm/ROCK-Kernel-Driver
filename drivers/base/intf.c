@@ -25,7 +25,7 @@ static int intf_dev_link(struct intf_data * data)
 {
 	char	name[16];
 	snprintf(name,16,"%d",data->intf_num);
-	return sysfs_create_link(&data->intf->subsys.kobj,&data->dev->kobj,name);
+	return sysfs_create_link(&data->intf->subsys.kset.kobj,&data->dev->kobj,name);
 }
 
 /**
@@ -38,7 +38,7 @@ static void intf_dev_unlink(struct intf_data * data)
 {
 	char	name[16];
 	snprintf(name,16,"%d",data->intf_num);
-	sysfs_remove_link(&data->intf->subsys.kobj,name);
+	sysfs_remove_link(&data->intf->subsys.kset.kobj,name);
 }
 
 
@@ -192,7 +192,7 @@ static void del_intf(struct device_interface * intf)
 	struct list_head * entry;
 
 	down_write(&intf->devclass->subsys.rwsem);
-	list_for_each(entry,&intf->subsys.list) {
+	list_for_each(entry,&intf->subsys.kset.list) {
 		struct intf_data * data = to_data(entry);
 		del(data);
 	}
@@ -241,7 +241,7 @@ int interface_add_dev(struct device * dev)
 
 	pr_debug("interfaces: adding device %s\n",dev->name);
 
-	list_for_each(node,&cls->subsys.list) {
+	list_for_each(node,&cls->subsys.kset.list) {
 		struct device_interface * intf = to_intf(node);
 		add(intf,dev);
 	}
