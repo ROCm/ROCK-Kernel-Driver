@@ -309,6 +309,9 @@ el2_probe1(struct net_device *dev, int ioaddr)
     dev->open = &el2_open;
     dev->stop = &el2_close;
     dev->ethtool_ops = &netdev_ethtool_ops;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+    dev->poll_controller = ei_poll;
+#endif
 
     if (dev->mem_start)
 	printk("%s: %s - %dkB RAM, 8kB shared mem window at %#6lx-%#6lx.\n",

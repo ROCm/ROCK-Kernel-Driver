@@ -210,6 +210,9 @@ static int __init hpp_probe1(struct net_device *dev, int ioaddr)
 
 	dev->open = &hpp_open;
 	dev->stop = &hpp_close;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller = ei_poll;
+#endif
 
 	ei_status.name = name;
 	ei_status.word16 = 0;		/* Agggghhhhh! Debug time: 2 days! */

@@ -336,6 +336,9 @@ int __init ultramca_probe(struct device *gen_dev)
 
 	dev->open = &ultramca_open;
 	dev->stop = &ultramca_close_card;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller = ei_poll;
+#endif
 
 	NS8390_init(dev, 0);
 

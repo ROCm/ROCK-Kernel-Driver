@@ -213,6 +213,9 @@ static int __init oaknet_init(void)
 
 	dev->open = oaknet_open;
 	dev->stop = oaknet_close;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller = ei_poll;
+#endif
 
 	NS8390_init(dev, FALSE);
 

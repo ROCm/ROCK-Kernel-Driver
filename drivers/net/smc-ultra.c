@@ -281,6 +281,9 @@ static int __init ultra_probe1(struct net_device *dev, int ioaddr)
 	ei_status.reset_8390 = &ultra_reset_8390;
 	dev->open = &ultra_open;
 	dev->stop = &ultra_close_card;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller = ei_poll;
+#endif
 	NS8390_init(dev, 0);
 
 	return 0;

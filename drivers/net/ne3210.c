@@ -211,6 +211,9 @@ static int __init ne3210_eisa_probe (struct device *device)
 
 	dev->open = &ne3210_open;
 	dev->stop = &ne3210_close;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller = ei_poll;
+#endif
 	dev->if_port = ifmap_val[port_index];
 
 	if ((retval = register_netdev (dev)))

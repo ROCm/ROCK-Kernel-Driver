@@ -305,6 +305,9 @@ static int __init wd_probe1(struct net_device *dev, int ioaddr)
 	ei_status.get_8390_hdr = &wd_get_8390_hdr;
 	dev->open = &wd_open;
 	dev->stop = &wd_close;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller = ei_poll;
+#endif
 	NS8390_init(dev, 0);
 
 #if 1
