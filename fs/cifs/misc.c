@@ -1,7 +1,7 @@
 /*
  *   fs/cifs/misc.c
  *
- *   Copyright (c) International Business Machines  Corp., 2002
+ *   Copyright (c) International Business Machines  Corp., 2002,2003
  *   Author(s): Steve French (sfrench@us.ibm.com)
  *
  *   This library is free software; you can redistribute it and/or modify
@@ -213,7 +213,7 @@ header_assemble(struct smb_hdr *buffer, char smb_command /* command */ ,
 	buffer->Command = smb_command;
 	buffer->Flags = 0x00;	/* case sensitive */
 	buffer->Flags2 = SMBFLG2_KNOWS_LONG_NAMES;
-	tmp = cpu_to_le32(current->pid);
+	tmp = cpu_to_le32(current->tgid);
 	buffer->Pid = tmp & 0xFFFF;
 	tmp >>= 16;
 	buffer->PidHigh = tmp & 0xFFFF;

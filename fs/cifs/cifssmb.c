@@ -1,7 +1,7 @@
 /*
  *   fs/cifs/cifssmb.c
  *
- *   Copyright (c) International Business Machines  Corp., 2002
+ *   Copyright (C) International Business Machines  Corp., 2002,2003
  *   Author(s): Steve French (sfrench@us.ibm.com)
  *
  *   Contains the routines for constructing the SMB PDUs themselves
@@ -656,7 +656,7 @@ CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 	pSMB->AndXCommand = 0xFF;	/* none */
 	pSMB->Fid = smb_file_id; /* netfid stays le */
 
-	pSMB->Locks[0].Pid = cpu_to_le16(current->pid);
+	pSMB->Locks[0].Pid = cpu_to_le16(current->tgid);
 	pSMB->Locks[0].Length = cpu_to_le64(len);
 	pSMB->Locks[0].Offset = cpu_to_le64(offset);
 	pSMB->ByteCount = sizeof (LOCKING_ANDX_RANGE);

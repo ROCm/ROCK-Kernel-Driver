@@ -3,7 +3,7 @@
  *
  *   vfs operations that deal with dentries
  * 
- *   Copyright (c) International Business Machines  Corp., 2002
+ *   Copyright (C) International Business Machines  Corp., 2002,2003
  *   Author(s): Steve French (sfrench@us.ibm.com)
  *
  *   This library is free software; you can redistribute it and/or modify
@@ -216,7 +216,7 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 				memset((char *)pCifsFile, 0,
 				       sizeof (struct cifsFileInfo));
 				pCifsFile->netfid = fileHandle;
-				pCifsFile->pid = current->pid;
+				pCifsFile->pid = current->tgid;
 				pCifsFile->pInode = newinode;
 				/* pCifsFile->pfile = file; */ /* put in at open time */
 				write_lock(&GlobalSMBSeslock);

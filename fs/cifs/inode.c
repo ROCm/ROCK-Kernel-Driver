@@ -1,7 +1,7 @@
 /*
  *   fs/cifs/inode.c
  *
- *   Copyright (c) International Business Machines  Corp., 2002
+ *   Copyright (C) International Business Machines  Corp., 2002,2003
  *   Author(s): Steve French (sfrench@us.ibm.com)
  *
  *   This library is free software; you can redistribute it and/or modify
@@ -345,6 +345,8 @@ cifs_unlink(struct inode *inode, struct dentry *direntry)
 
 	if (!rc) {
 		direntry->d_inode->i_nlink--;
+	} else if (rc == -ENOENT) {
+		d_drop(direntry);
 	} else if (rc == -ETXTBSY) {
 		int oplock = FALSE;
 		__u16 netfid;
