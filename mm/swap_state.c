@@ -75,8 +75,7 @@ int add_to_swap_cache(struct page *page, swp_entry_t entry)
 		INC_CACHE_INFO(noent_race);
 		return -ENOENT;
 	}
-
-	error = add_to_page_cache_unique(page, &swapper_space, entry.val);
+	error = add_to_page_cache(page, &swapper_space, entry.val);
 	if (error != 0) {
 		swap_free(entry);
 		if (error == -EEXIST)

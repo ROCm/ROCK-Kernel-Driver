@@ -43,7 +43,7 @@ read_pages(struct file *file, struct address_space *mapping,
 	for (page_idx = 0; page_idx < nr_pages; page_idx++) {
 		struct page *page = list_entry(pages->prev, struct page, list);
 		list_del(&page->list);
-		if (!add_to_page_cache_unique(page, mapping, page->index))
+		if (!add_to_page_cache(page, mapping, page->index))
 			mapping->a_ops->readpage(file, page);
 		page_cache_release(page);
 	}
