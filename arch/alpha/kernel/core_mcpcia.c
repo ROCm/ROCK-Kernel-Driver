@@ -185,7 +185,7 @@ mk_conf_addr(struct pci_bus *pbus, unsigned int devfn, int where,
 	/* Type 1 configuration cycle for *ALL* busses.  */
 	*type1 = 1;
 
-	if (bus == hose->first_busno)
+	if (hose->bus == pbus)
 		bus = 0;
 	addr = (bus << 16) | (devfn << 8) | (where);
 	addr <<= 5; /* swizzle for SPARSE */
