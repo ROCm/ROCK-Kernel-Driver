@@ -224,8 +224,10 @@ void scsi_release_request(Scsi_Request * req)
 {
 	if( req->sr_command != NULL )
 	{
+    		request_queue_t *q = req->sr_device->request_queue;
 		scsi_put_command(req->sr_command);
 		req->sr_command = NULL;
+		scsi_queue_next_request(q, NULL);
 	}
 
 	kfree(req);
