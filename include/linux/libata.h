@@ -137,11 +137,6 @@ enum {
 	PORT_UNKNOWN		= 0,
 	PORT_ENABLED		= 1,
 	PORT_DISABLED		= 2,
-
-	/* ata_qc_cb_t flags - note uses above ATA_QCFLAG_xxx namespace,
-	 * but not numberspace
-	 */
-	ATA_QCFLAG_TIMEOUT	= (1 << 0),
 };
 
 enum pio_task_states {

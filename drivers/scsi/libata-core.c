@@ -2142,6 +2142,7 @@ static void ata_pio_task(void *_data)
 
 static void ata_qc_timeout(struct ata_queued_cmd *qc)
 {
+	struct ata_port *ap = qc->ap;
 	u8 host_stat = 0, drv_stat;
 
 	DPRINTK("ENTER\n");
@@ -2181,7 +2182,6 @@ static void ata_qc_timeout(struct ata_queued_cmd *qc)
 		break;
 	}
 
-out:
 	DPRINTK("EXIT\n");
 }
 
@@ -2206,7 +2206,6 @@ out:
 
 void ata_eng_timeout(struct ata_port *ap)
 {
-	u8 host_stat = 0, drv_stat;
 	struct ata_queued_cmd *qc;
 
 	DPRINTK("ENTER\n");
@@ -2317,7 +2316,7 @@ void ata_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat)
 		qc->scsidone(cmd);
 	}
 
-	qc->flags &= ~ATA_QCFLAG_ACTIVE;
+	qc->flags = 0;
 	tag = qc->tag;
 	if (likely(ata_tag_valid(tag))) {
 		if (tag == ap->active_tag)
