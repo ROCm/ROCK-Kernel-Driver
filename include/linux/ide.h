@@ -1146,23 +1146,23 @@ extern struct block_device_operations ide_fops[];
  */
 extern int ideprobe_init(void);
 #ifdef CONFIG_BLK_DEV_IDEDISK
-extern int idedisk_init (void);
+extern int idedisk_init(void);
 #endif
 #ifdef CONFIG_BLK_DEV_IDECD
-extern int ide_cdrom_init (void);
+extern int ide_cdrom_init(void);
 #endif
 #ifdef CONFIG_BLK_DEV_IDETAPE
-extern int idetape_init (void);
+extern int idetape_init(void);
 #endif
 #ifdef CONFIG_BLK_DEV_IDEFLOPPY
-extern int idefloppy_init (void);
+extern int idefloppy_init(void);
 #endif
 #ifdef CONFIG_BLK_DEV_IDESCSI
-extern int idescsi_init (void);
+extern int idescsi_init(void);
 #endif
 
-extern int ide_register_subdriver(struct ata_device *, struct ata_operations *);
-extern int ide_unregister_subdriver(struct ata_device *drive);
+extern int ata_register_device(struct ata_device *, struct ata_operations *);
+extern int ata_unregister_device(struct ata_device *drive);
 extern int ata_revalidate(kdev_t i_rdev);
 extern void ide_driver_module(void);
 

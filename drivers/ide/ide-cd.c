@@ -2915,7 +2915,7 @@ int ide_cdrom_cleanup(struct ata_device *drive)
 	struct cdrom_info *info = drive->driver_data;
 	struct cdrom_device_info *devinfo = &info->devinfo;
 
-	if (ide_unregister_subdriver (drive))
+	if (ata_unregister_device(drive))
 		return 1;
 	if (info->buffer != NULL)
 		kfree(info->buffer);
@@ -2974,7 +2974,7 @@ static void ide_cdrom_attach(struct ata_device *drive)
 		printk(KERN_ERR "%s: Can't allocate a cdrom structure\n", drive->name);
 		return;
 	}
-	if (ide_register_subdriver (drive, &ide_cdrom_driver)) {
+	if (ata_register_device(drive, &ide_cdrom_driver)) {
 		printk(KERN_ERR "%s: Failed to register the driver with ide.c\n", drive->name);
 		kfree (info);
 		return;

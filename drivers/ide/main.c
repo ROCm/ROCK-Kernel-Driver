@@ -365,7 +365,7 @@ void ide_unregister(struct ata_channel *ch)
 				if (ata_ops(drive)->cleanup(drive))
 					goto abort;
 			} else
-				ide_unregister_subdriver(drive);
+				ata_unregister_device(drive);
 		}
 	}
 	ch->present = 0;
@@ -1037,10 +1037,7 @@ done:
 
 /****************************************************************************/
 
-/*
- * This is in fact registering a device not a driver.
- */
-int ide_register_subdriver(struct ata_device *drive, struct ata_operations *driver)
+int ata_register_device(struct ata_device *drive, struct ata_operations *driver)
 {
 	unsigned long flags;
 
@@ -1052,12 +1049,9 @@ int ide_register_subdriver(struct ata_device *drive, struct ata_operations *driv
 		return 1;
 	}
 
-	/* FIXME: This will be pushed to the drivers! Thus allowing us to
-	 * save one parameter here and to separate this out.
-	 */
 	drive->driver = driver;
-
 	spin_unlock_irqrestore(&ide_lock, flags);
+
 	/* Default autotune or requested autotune */
 	if (drive->autotune != 2) {
 		struct ata_channel *ch = drive->channel;
@@ -1071,11 +1065,13 @@ int ide_register_subdriver(struct ata_device *drive, struct ata_operations *driv
 			 *   PARANOIA!!!
 			 */
 
+			spin_lock_irqsave(ch->lock, flags);
 			udma_enable(drive, 0, 0);
 			ch->udma_setup(drive, ch->modes_map);
 #ifdef CONFIG_BLK_DEV_IDE_TCQ_DEFAULT
 			udma_tcq_enable(drive, 1);
 #endif
+			spin_unlock_irqrestore(ch->lock, flags);
 		}
 
 		/* Only CD-ROMs and tape drives support DSC overlap.  But only
@@ -1103,13 +1099,8 @@ int ide_register_subdriver(struct ata_device *drive, struct ata_operations *driv
  *
  * FIXME: Check whatever we maybe don't call it twice!.
  */
-int ide_unregister_subdriver(struct ata_device *drive)
+int ata_unregister_device(struct ata_device *drive)
 {
-#if 0
-	if (__MOD_IN_USE(ata_ops(drive)->owner))
-		return 1;
-#endif
-
 	if (drive->usage || drive->busy || !ata_ops(drive))
 		return 1;
 
@@ -1181,8 +1172,8 @@ EXPORT_SYMBOL(ide_lock);
 
 devfs_handle_t ide_devfs_handle;
 
-EXPORT_SYMBOL(ide_register_subdriver);
-EXPORT_SYMBOL(ide_unregister_subdriver);
+EXPORT_SYMBOL(ata_register_device);
+EXPORT_SYMBOL(ata_unregister_device);
 EXPORT_SYMBOL(ata_revalidate);
 EXPORT_SYMBOL(ide_register_hw);
 EXPORT_SYMBOL(ide_unregister);
