@@ -15,7 +15,8 @@ ifeq ($(CONFIG_4xx),y)
 obj-$(CONFIG_4xx)		+= ppc4xx_pic.o
 obj-$(CONFIG_40x)		+= ppc4xx_setup.o
 obj-$(CONFIG_GEN_RTC)		+= todc_time.o
-obj-$(CONFIG_KGDB)		+= ppc4xx_kgdb.o
+obj-$(CONFIG_PPC4xx_DMA)	+= ppc4xx_dma.o
+obj-$(CONFIG_PPC4xx_EDMA)	+= ppc4xx_sgdma.o
 ifeq ($(CONFIG_40x),y)
 obj-$(CONFIG_KGDB)		+= ppc4xx_kgdb.o
 obj-$(CONFIG_PCI)		+= indirect_pci.o pci_auto.o ppc405_pci.o
