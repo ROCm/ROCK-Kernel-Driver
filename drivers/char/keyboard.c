@@ -131,39 +131,44 @@ static struct ledptr {
 int getkeycode(unsigned int scancode)
 {
 	struct input_handle *handle;
-	unsigned int keycode;
+	struct input_dev *dev = NULL;
 
 	for (handle = kbd_handler.handle; handle; handle = handle->hnext) 
-		if (handle->dev->keycodesize) break;
+		if (handle->dev->keycodesize) { dev = handle->dev; break; }
 
-	if (!handle->dev->keycodesize)
+	if (!dev)
 		return -ENODEV;
 
-	switch (handle->dev->keycodesize) {
-		case 1: keycode = *(u8*)(handle->dev->keycode + scancode); break;
-		case 2: keycode = *(u16*)(handle->dev->keycode + scancode * 2); break;
-		case 4: keycode = *(u32*)(handle->dev->keycode + scancode * 4); break;
-		default: return -EINVAL;
-	}
+	if (scancode < 0 || scancode >= dev->keycodemax)
+		return -EINVAL;
 
-	return keycode;
+	return INPUT_KEYCODE(dev, scancode);
 }
 
 int setkeycode(unsigned int scancode, unsigned int keycode)
 {
 	struct input_handle *handle;
+	struct input_dev *dev = NULL;
+	int i, oldkey;
 
 	for (handle = kbd_handler.handle; handle; handle = handle->hnext) 
-		if (handle->dev->keycodesize) break;
+		if (handle->dev->keycodesize) { dev = handle->dev; break; }
 
-	if (!handle->dev->keycodesize)
+	if (!dev)
 		return -ENODEV;
 
-	switch (handle->dev->keycodesize) {
-		case 1: *(u8*)(handle->dev->keycode + scancode) = keycode; break;
-		case 2: *(u16*)(handle->dev->keycode + scancode * 2) = keycode; break;
-		case 4: *(u32*)(handle->dev->keycode + scancode * 4) = keycode; break;
-	}
+	if (scancode < 0 || scancode >= dev->keycodemax)
+		return -EINVAL;
+
+	oldkey = INPUT_KEYCODE(dev, scancode);
+	INPUT_KEYCODE(dev, scancode) = keycode;
+
+	for (i = 0; i < dev->keycodemax; i++)
+		if(INPUT_KEYCODE(dev, scancode) == oldkey)
+			break;
+	if (i == dev->keycodemax)
+		clear_bit(oldkey, dev->keybit);
+	set_bit(keycode, dev->keybit);
 	
 	return 0;
 }
