@@ -38,9 +38,7 @@
 #include "pci_hotplug.h"
 
 
-#define SLOT_MAGIC	0x67267322
 struct slot {
-	u32 magic;
 	u8 number;
 	struct hotplug_slot *hotplug_slot;
 	struct list_head slot_list;
@@ -97,49 +95,11 @@ static struct hotplug_slot_ops skel_hotplug_slot_ops = {
 	.get_adapter_status =	get_adapter_status,
 };
 
-
-/* Inline functions to check the sanity of a pointer that is passed to us */
-static inline int slot_paranoia_check (struct slot *slot, const char *function)
-{
-	if (!slot) {
-		dbg("%s - slot == NULL", function);
-		return -1;
-	}
-	if (slot->magic != SLOT_MAGIC) {
-		dbg("%s - bad magic number for slot", function);
-		return -1;
-	}
-	if (!slot->hotplug_slot) {
-		dbg("%s - slot->hotplug_slot == NULL!", function);
-		return -1;
-	}
-	return 0;
-}
-
-static inline struct slot *get_slot (struct hotplug_slot *hotplug_slot, const char *function)
-{ 
-	struct slot *slot;
-
-	if (!hotplug_slot) {
-		dbg("%s - hotplug_slot == NULL\n", function);
-		return NULL;
-	}
-
-	slot = (struct slot *)hotplug_slot->private;
-	if (slot_paranoia_check (slot, function))
-                return NULL;
-	return slot;
-}               
-
-
 static int enable_slot (struct hotplug_slot *hotplug_slot)
 {
-	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
+	struct slot *slot = hotplug_slot->private;
 	int retval = 0;
-	
-	if (slot == NULL)
-		return -ENODEV;
-	
+
 	dbg ("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	/*
@@ -152,12 +112,9 @@ static int enable_slot (struct hotplug_slot *hotplug_slot)
 
 static int disable_slot (struct hotplug_slot *hotplug_slot)
 {
-	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
+	struct slot *slot = hotplug_slot->private;
 	int retval = 0;
-	
-	if (slot == NULL)
-		return -ENODEV;
-	
+
 	dbg ("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	/*
@@ -169,12 +126,9 @@ static int disable_slot (struct hotplug_slot *hotplug_slot)
 
 static int set_attention_status (struct hotplug_slot *hotplug_slot, u8 status)
 {
-	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
+	struct slot *slot = hotplug_slot->private;
 	int retval = 0;
-	
-	if (slot == NULL)
-		return -ENODEV;
-	
+
 	dbg ("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	switch (status) {
@@ -197,12 +151,9 @@ static int set_attention_status (struct hotplug_slot *hotplug_slot, u8 status)
 
 static int hardware_test (struct hotplug_slot *hotplug_slot, u32 value)
 {
-	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
+	struct slot *slot = hotplug_slot->private;
 	int retval = 0;
-	
-	if (slot == NULL)
-		return -ENODEV;
-	
+
 	dbg ("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	err ("No hardware tests are defined for this driver");
@@ -215,12 +166,9 @@ static int hardware_test (struct hotplug_slot *hotplug_slot, u32 value)
 
 static int get_power_status (struct hotplug_slot *hotplug_slot, u8 *value)
 {
-	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
+	struct slot *slot = hotplug_slot->private;
 	int retval = 0;
-	
-	if (slot == NULL)
-		return -ENODEV;
-	
+
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	/*
@@ -233,12 +181,9 @@ static int get_power_status (struct hotplug_slot *hotplug_slot, u8 *value)
 
 static int get_attention_status (struct hotplug_slot *hotplug_slot, u8 *value)
 {
-	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
+	struct slot *slot = hotplug_slot->private;
 	int retval = 0;
-	
-	if (slot == NULL)
-		return -ENODEV;
-	
+
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	/*
@@ -251,12 +196,9 @@ static int get_attention_status (struct hotplug_slot *hotplug_slot, u8 *value)
 
 static int get_latch_status (struct hotplug_slot *hotplug_slot, u8 *value)
 {
-	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
+	struct slot *slot = hotplug_slot->private;
 	int retval = 0;
-	
-	if (slot == NULL)
-		return -ENODEV;
-	
+
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	/*
@@ -269,12 +211,9 @@ static int get_latch_status (struct hotplug_slot *hotplug_slot, u8 *value)
 
 static int get_adapter_status (struct hotplug_slot *hotplug_slot, u8 *value)
 {
-	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
+	struct slot *slot = hotplug_slot->private;
 	int retval = 0;
-	
-	if (slot == NULL)
-		return -ENODEV;
-	
+
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	/*
@@ -287,11 +226,8 @@ static int get_adapter_status (struct hotplug_slot *hotplug_slot, u8 *value)
 
 static void release_slots(struct hotplug_slot *hotplug_slot)
 {
-	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
+	struct slot *slot = hotplug_slot->private;
 	int retval = 0;
-
-	if (slot == NULL)
-		return -ENODEV;
 
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 	kfree(slot->hotplug_slot->info);
@@ -355,7 +291,6 @@ static int init_slots (void)
 		}
 		hotplug_slot->name = name;
 
-		slot->magic = SLOT_MAGIC;
 		slot->number = i;
 
 		hotplug_slot->private = slot;
