@@ -235,7 +235,7 @@ store_new_id(struct device_driver * driver, const char * buf, size_t count)
 		driver_data : 0UL;
 
 	spin_lock(&pdrv->dynids.lock);
-	list_add(&pdrv->dynids.list, &dynid->node);
+	list_add_tail(&pdrv->dynids.list, &dynid->node);
 	spin_unlock(&pdrv->dynids.lock);
 
 	bus = get_bus(pdrv->driver.bus);
