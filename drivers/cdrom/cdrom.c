@@ -725,7 +725,7 @@ static int cdrom_media_erasable(struct cdrom_device_info *cdi)
 	disc_information di;
 
 	if (cdrom_get_disc_info(cdi, &di))
-		return 0;
+		return -1;
 
 	return di.erasable;
 }
@@ -735,7 +735,16 @@ static int cdrom_media_erasable(struct cdrom_device_info *cdi)
  */
 static int cdrom_dvdram_open_write(struct cdrom_device_info *cdi)
 {
-	return !cdrom_media_erasable(cdi);
+	int ret = cdrom_media_erasable(cdi);
+
+	/*
+	 * allow writable open if media info read worked and media is
+	 * erasable, _or_ if it fails since not all drives support it
+	 */
+	if (!ret)
+		return 1;
+
+	return 0;
 }
 
 static int cdrom_mrw_open_write(struct cdrom_device_info *cdi)
