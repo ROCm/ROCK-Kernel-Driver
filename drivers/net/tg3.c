@@ -1245,9 +1245,13 @@ static int tg3_setup_copper_phy(struct tg3 *tp)
 	u8 current_duplex;
 	int i, err;
 
+	tw32(MAC_EVENT, 0);
+
 	tw32(MAC_STATUS,
 	     (MAC_STATUS_SYNC_CHANGED |
-	      MAC_STATUS_CFG_CHANGED));
+	      MAC_STATUS_CFG_CHANGED |
+	      MAC_STATUS_MI_COMPLETION |
+	      MAC_STATUS_LNKSTATE_CHANGED));
 	tr32(MAC_STATUS);
 	udelay(40);
 
