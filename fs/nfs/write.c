@@ -61,7 +61,6 @@
 #include <linux/nfs_page.h>
 #include <asm/uaccess.h>
 #include <linux/smp_lock.h>
-#include <linux/mempool.h>
 
 #include "delegation.h"
 
@@ -83,47 +82,15 @@ static int nfs_wait_on_write_congestion(struct address_space *, int);
 static int nfs_wait_on_requests(struct inode *, unsigned long, unsigned int);
 
 static kmem_cache_t *nfs_wdata_cachep;
-static mempool_t *nfs_wdata_mempool;
-static mempool_t *nfs_commit_mempool;
+mempool_t *nfs_wdata_mempool;
+mempool_t *nfs_commit_mempool;
 
 static DECLARE_WAIT_QUEUE_HEAD(nfs_write_congestion);
 
-static __inline__ struct nfs_write_data *nfs_writedata_alloc(void)
-{
-	struct nfs_write_data	*p;
-	p = (struct nfs_write_data *)mempool_alloc(nfs_wdata_mempool, SLAB_NOFS);
-	if (p) {
-		memset(p, 0, sizeof(*p));
-		INIT_LIST_HEAD(&p->pages);
-	}
-	return p;
-}
-
-static __inline__ void nfs_writedata_free(struct nfs_write_data *p)
-{
-	mempool_free(p, nfs_wdata_mempool);
-}
-
-static void nfs_writedata_release(struct rpc_task *task)
+void nfs_writedata_release(struct rpc_task *task)
 {
 	struct nfs_write_data	*wdata = (struct nfs_write_data *)task->tk_calldata;
 	nfs_writedata_free(wdata);
-}
-
-static __inline__ struct nfs_write_data *nfs_commit_alloc(void)
-{
-	struct nfs_write_data	*p;
-	p = (struct nfs_write_data *)mempool_alloc(nfs_commit_mempool, SLAB_NOFS);
-	if (p) {
-		memset(p, 0, sizeof(*p));
-		INIT_LIST_HEAD(&p->pages);
-	}
-	return p;
-}
-
-static __inline__ void nfs_commit_free(struct nfs_write_data *p)
-{
-	mempool_free(p, nfs_commit_mempool);
 }
 
 /* Adjust the file length if we're writing beyond the end */
