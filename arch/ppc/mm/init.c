@@ -472,11 +472,23 @@ void __init mem_init(void)
 	if (agp_special_page)
 		printk(KERN_INFO "AGP special page: 0x%08lx\n", agp_special_page);
 #endif /* defined(CONFIG_ALL_PPC) */
+
 #ifdef CONFIG_PPC_ISERIES
-
 	create_virtual_bus_tce_table();
-
 #endif /* CONFIG_PPC_ISERIES */
+
+	/* Make sure all our pagetable pages have page->mapping
+	   and page->index set correctly. */
+	for (addr = KERNELBASE; addr != 0; addr += PGDIR_SIZE) {
+		struct page *pg;
+		pmd_t *pmd = pmd_offset(pgd_offset_k(addr), addr);
+		if (pmd_present(*pmd)) {
+			pg = pmd_page(*pmd);
+			pg->mapping = (void *) &init_mm;
+			pg->index = addr;
+		}
+	}
+
 	mem_init_done = 1;
 }
 
@@ -556,28 +568,17 @@ void flush_dcache_page(struct page *page)
 	clear_bit(PG_arch_1, &page->flags);
 }
 
-void flush_icache_page(struct vm_area_struct *vma, struct page *page)
-{
-	unsigned long phys;
-
-	if (page->mapping && !PageReserved(page)
-	    && !test_bit(PG_arch_1, &page->flags)) {
-		phys = page_to_pfn(page) << PAGE_SHIFT;
-		__flush_dcache_icache_phys(phys);
-		set_bit(PG_arch_1, &page->flags);
-	}
-}
-
 void clear_user_page(void *page, unsigned long vaddr, struct page *pg)
 {
 	clear_page(page);
+	clear_bit(PG_arch_1, &pg->flags);
 }
 
 void copy_user_page(void *vto, void *vfrom, unsigned long vaddr,
 		    struct page *pg)
 {
 	copy_page(vto, vfrom);
-	__flush_dcache_icache(vto);
+	clear_bit(PG_arch_1, &pg->flags);
 }
 
 void flush_icache_user_range(struct vm_area_struct *vma, struct page *page,
@@ -588,4 +589,39 @@ void flush_icache_user_range(struct vm_area_struct *vma, struct page *page,
 	maddr = (unsigned long) kmap(page) + (addr & ~PAGE_MASK);
 	flush_icache_range(maddr, maddr + len);
 	kunmap(page);
+}
+
+/*
+ * This is called at the end of handling a user page fault, when the
+ * fault has been handled by updating a PTE in the linux page tables.
+ * We use it to preload an HPTE into the hash table corresponding to
+ * the updated linux PTE.
+ */
+void update_mmu_cache(struct vm_area_struct *vma, unsigned long address,
+		      pte_t pte)
+{
+	/* handle i-cache coherency */
+	unsigned long pfn = pte_pfn(pte);
+
+	if (pfn_valid(pfn)) {
+		struct page *page = pfn_to_page(pfn);
+		if (!PageReserved(page)
+		    && !test_bit(PG_arch_1, &page->flags)) {
+			__flush_dcache_icache((void *) address);
+			set_bit(PG_arch_1, &page->flags);
+		}
+	}
+
+#ifdef CONFIG_PPC_STD_MMU
+	/* We only want HPTEs for linux PTEs that have _PAGE_ACCESSED set */
+	if (Hash != 0 && pte_young(pte)) {
+		struct mm_struct *mm;
+		pmd_t *pmd;
+
+		mm = (address < TASK_SIZE)? vma->vm_mm: &init_mm;
+		pmd = pmd_offset(pgd_offset(mm, address), address);
+		if (!pmd_none(*pmd))
+			add_hash_page(mm->context, address, pmd_val(*pmd));
+	}
+#endif
 }
