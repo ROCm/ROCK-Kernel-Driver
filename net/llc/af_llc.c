@@ -389,9 +389,9 @@ out:
  *	@flags: Operational flags specified by the user.
  *
  *	Connect to a remote llc2 mac + sap. The caller must specify the
- *	destination mac and address to connect to. If the user previously
- *	called bind(2) with a smac the user does not need to specify the source
- *	address and mac.
+ *	destination mac and address to connect to. If the user hasn't previously
+ *	called bind(2) with a smac the address of the first interface of the
+ *	specified arp type will be used.
  *	This function will autobind if user did not previously call bind.
  *	Returns: 0 upon success, negative otherwise.
  */
@@ -419,9 +419,7 @@ static int llc_ui_connect(struct socket *sock, struct sockaddr *uaddr,
 	}
 	if (!llc->dev) {
 		rc = -ENODEV;
-		rtnl_lock();
-		dev = dev_getbyhwaddr(addr->sllc_arphrd, addr->sllc_smac);
-		rtnl_unlock();
+		dev = dev_getfirstbyhwtype(addr->sllc_arphrd);
 		if (!dev)
 			goto out;
 		llc->dev = dev;
@@ -770,10 +768,8 @@ static int llc_ui_sendmsg(struct kiocb *iocb, struct socket *sock,
 			goto release;
 	}
 	if (!llc->dev) {
-		rtnl_lock();
-		dev = dev_getbyhwaddr(addr->sllc_arphrd, addr->sllc_smac);
-		rtnl_unlock();
-		rc = -ENETUNREACH;
+		rc = -ENODEV;
+		dev = dev_getfirstbyhwtype(addr->sllc_arphrd);
 		if (!dev)
 			goto release;
 	} else
