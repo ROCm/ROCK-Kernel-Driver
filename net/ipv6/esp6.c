@@ -254,7 +254,7 @@ error_nolock:
 	return err;
 }
 
-int esp6_input(struct xfrm_state *x, struct sk_buff *skb)
+int esp6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_buff *skb)
 {
 	struct ipv6hdr *iph;
 	struct ipv6_esp_hdr *esph;

@@ -8,6 +8,8 @@
  * 		IPv6 support
  * 	YOSHIFUJI Hideaki @USAGI
  * 		Split up af-specific functions
+ *	Derek Atkins <derek@ihtfp.com>
+ *		Add UDP Encapsulation
  * 	
  */
 
@@ -155,6 +157,8 @@ void __xfrm_state_destroy(struct xfrm_state *x)
 		kfree(x->ealg);
 	if (x->calg)
 		kfree(x->calg);
+	if (x->encap_alg)
+		kfree(x->encap_alg);
 	if (x->type)
 		xfrm_put_type(x->type);
 	kfree(x);
@@ -625,6 +629,22 @@ int km_query(struct xfrm_state *x, struct xfrm_tmpl *t, struct xfrm_policy *pol)
 	read_lock(&xfrm_km_lock);
 	list_for_each_entry(km, &xfrm_km_list, list) {
 		err = km->acquire(x, t, pol, XFRM_POLICY_OUT);
+		if (!err)
+			break;
+	}
+	read_unlock(&xfrm_km_lock);
+	return err;
+}
+
+int km_new_mapping(struct xfrm_state *x, xfrm_address_t *ipaddr, u16 sport)
+{
+	int err = -EINVAL;
+	struct xfrm_mgr *km;
+
+	read_lock(&xfrm_km_lock);
+	list_for_each_entry(km, &xfrm_km_list, list) {
+		if (km->new_mapping)
+			err = km->new_mapping(x, ipaddr, sport);
 		if (!err)
 			break;
 	}

@@ -14,7 +14,7 @@ void __secpath_destroy(struct sec_path *sp)
 {
 	int i;
 	for (i = 0; i < sp->len; i++)
-		xfrm_state_put(sp->xvec[i]);
+		xfrm_state_put(sp->x[i].xvec);
 	kmem_cache_free(sp->pool, sp);
 }
 
