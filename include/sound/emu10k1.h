@@ -1334,7 +1334,7 @@ typedef struct {
 	char name[128];
 
 	DECLARE_BITMAP(gpr_valid, 0x200); /* bitmask of valid initializers */
-	u_int32_t __user *gpr_map;	/* initializers */
+	u_int32_t __user *gpr_map;	  /* initializers */
 
 	unsigned int gpr_add_control_count; /* count of GPR controls to add/replace */
 	emu10k1_fx8010_control_gpr_t __user *gpr_add_controls; /* GPR controls to add/replace */
@@ -1347,8 +1347,8 @@ typedef struct {
 	emu10k1_fx8010_control_gpr_t __user *gpr_list_controls; /* listed GPR controls */
 
 	DECLARE_BITMAP(tram_valid, 0x100); /* bitmask of valid initializers */
-	unsigned int __user *tram_data_map[0x100]; /* data initializers */
-	unsigned int __user *tram_addr_map[0x100]; /* map initializers */
+	u_int32_t __user *tram_data_map;  /* data initializers */
+	u_int32_t __user *tram_addr_map;  /* map initializers */
 
 	DECLARE_BITMAP(code_valid, 1024); /* bitmask of valid instructions */
 	u_int32_t __user *code;		  /* one instruction - 64 bits */
