@@ -34,10 +34,8 @@ static void vxpocket_config(dev_link_t *link);
 static int vxpocket_event(event_t event, int priority, event_callback_args_t *args);
 
 
-static void vxpocket_release(u_long arg)
+static void vxpocket_release(dev_link_t *link)
 {
-	dev_link_t *link = (dev_link_t *)arg;
-	
 	if (link->state & DEV_CONFIG) {
 		/* release cs resources */
 		CardServices(ReleaseConfiguration, link->handle);
@@ -56,7 +54,7 @@ static int snd_vxpocket_free(vx_core_t *chip)
 	struct snd_vxp_entry *hw;
 	dev_link_t *link = &vxp->link;
 
-	vxpocket_release((u_long)link);
+	vxpocket_release(link);
 
 	/* Break the link with Card Services */
 	if (link->handle)
@@ -148,9 +146,6 @@ dev_link_t *snd_vxpocket_attach(struct snd_vxp_entry *hw)
 	link->irq.Handler = &snd_vx_irq_handler;
 	link->irq.Instance = chip;
 
-	link->release.function = &vxpocket_release;
-	link->release.data = (u_long)link;
-
 	link->conf.Attributes = CONF_ENABLE_IRQ;
 	link->conf.Vcc = 50;
 	link->conf.IntType = INT_MEMORY_AND_IO;
@@ -228,8 +223,6 @@ static int snd_vxpocket_assign_resources(vx_core_t *chip, int port, int irq)
 void snd_vxpocket_detach(struct snd_vxp_entry *hw, dev_link_t *link)
 {
 	vx_core_t *chip = snd_magic_cast(vx_core_t, link->priv, return);
-
-	del_timer(&link->release);
 
 	snd_printdd(KERN_DEBUG "vxpocket_detach called\n");
 	/* Remove the interface data from the linked list */
@@ -326,7 +319,6 @@ static int vxpocket_event(event_t event, int priority, event_callback_args_t *ar
 		snd_printdd(KERN_DEBUG "CARD_REMOVAL..\n");
 		link->state &= ~DEV_PRESENT;
 		if (link->state & DEV_CONFIG) {
-			mod_timer(&link->release, jiffies + HZ/20);
 			chip->chip_status |= VX_STAT_IS_STALE;
 		}
 		break;
