@@ -429,6 +429,9 @@ static int __init qd_probe(int base)
 
 		qd_setup(hwif, base, config, QD6500_DEF_DATA, QD6500_DEF_DATA,
 			 &qd6500_tune_drive);
+
+		create_proc_ide_interfaces();
+
 		return 1;
 	}
 
@@ -459,6 +462,8 @@ static int __init qd_probe(int base)
 				 &qd6580_tune_drive);
 			qd_write_reg(QD_DEF_CONTR,QD_CONTROL_PORT);
 
+			create_proc_ide_interfaces();
+
 			return 1;
 		} else {
 			ide_hwif_t *mate;
@@ -476,6 +481,8 @@ static int __init qd_probe(int base)
 				 QD6580_DEF_DATA2, QD6580_DEF_DATA2,
 				 &qd6580_tune_drive);
 			qd_write_reg(QD_DEF_CONTR,QD_CONTROL_PORT);
+
+			create_proc_ide_interfaces();
 
 			return 0; /* no other qd65xx possible */
 		}
