@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#189 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#192 $
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -1295,7 +1295,7 @@ Scsi_Host_Template aic7xxx_driver_template = {
 	.max_sectors		= 8192,
 #endif
 #if defined CONFIG_HIGHIO || LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,18)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,10)
 /* Assume RedHat Distribution with its different HIGHIO conventions. */
 	.can_dma_32		= 1,
 	.single_sg_okay		= 1,
@@ -1889,7 +1889,8 @@ ahc_linux_register_host(struct ahc_softc *ahc, Scsi_Host_Template *template)
 	 * negotiation will occur for the first command, and DV
 	 * will comence should that first command be successful.
 	 */
-	for (target = 0; target < host->max_id*host->max_channel+1; target++) {
+	for (target = 0;
+	     target < host->max_id * (host->max_channel + 1); target++) {
 		u_int channel;
 
 		channel = 0;
@@ -2344,7 +2345,7 @@ ahc_linux_start_dv(struct ahc_softc *ahc)
 
 	/*
 	 * Freeze the simq and signal ahc_linux_queue to not let any
-	 * more commands through
+	 * more commands through.
 	 */
 	if ((ahc->platform_data->flags & AHC_DV_ACTIVE) == 0) {
 #ifdef AHC_DEBUG
@@ -2554,6 +2555,7 @@ ahc_linux_dv_target(struct ahc_softc *ahc, u_int target_offset)
 		}
 		case AHC_DV_STATE_TUR:
 		case AHC_DV_STATE_BUSY:
+			timeout = 5 * HZ;
 			ahc_linux_dv_tur(ahc, cmd, &devinfo);
 			break;
 		case AHC_DV_STATE_REBD:

@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.c#119 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.c#121 $
  *
  * $FreeBSD$
  */
@@ -4796,7 +4796,9 @@ ahc_init(struct ahc_softc *ahc)
 	/* DMA tag for mapping buffers into device visible space. */
 	if (ahc_dma_tag_create(ahc, ahc->parent_dmat, /*alignment*/1,
 			       /*boundary*/BUS_SPACE_MAXADDR_32BIT + 1,
-			       /*lowaddr*/BUS_SPACE_MAXADDR,
+			       /*lowaddr*/ahc->flags & AHC_39BIT_ADDRESSING
+					? (bus_addr_t)0x7FFFFFFFFFULL
+					: BUS_SPACE_MAXADDR_32BIT,
 			       /*highaddr*/BUS_SPACE_MAXADDR,
 			       /*filter*/NULL, /*filterarg*/NULL,
 			       /*maxsize*/(AHC_NSEG - 1) * PAGE_SIZE,
@@ -6302,9 +6304,9 @@ static int
 ahc_loadseq(struct ahc_softc *ahc)
 {
 	struct	cs cs_table[num_critical_sections];
-	struct	patch *cur_patch;
 	u_int	begin_set[num_critical_sections];
 	u_int	end_set[num_critical_sections];
+	struct	patch *cur_patch;
 	u_int	cs_count;
 	u_int	cur_cs;
 	u_int	i;

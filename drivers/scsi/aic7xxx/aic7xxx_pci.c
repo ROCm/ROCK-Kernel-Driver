@@ -39,7 +39,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic7xxx_pci.c#60 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx_pci.c#61 $
  *
  * $FreeBSD$
  */
@@ -1007,7 +1007,7 @@ ahc_pci_config(struct ahc_softc *ahc, struct ahc_pci_identity *entry)
 	ahc->bus_softc.pci_softc.devconfig =
 	    ahc_pci_read_config(ahc->dev_softc, DEVCONFIG, /*bytes*/4);
 	ahc->bus_softc.pci_softc.command =
-		ahc_pci_read_config(ahc->dev_softc, PCIR_COMMAND, /*bytes*/1);
+	    ahc_pci_read_config(ahc->dev_softc, PCIR_COMMAND, /*bytes*/1);
 	ahc->bus_softc.pci_softc.csize_lattime =
 	    ahc_pci_read_config(ahc->dev_softc, CSIZE_LATTIME, /*bytes*/1);
 	ahc->bus_softc.pci_softc.dscommand0 = ahc_inb(ahc, DSCOMMAND0);
