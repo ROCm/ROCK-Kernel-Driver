@@ -177,6 +177,8 @@ static struct pci_device_id tg3_pci_tbl[] = {
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5788,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5789,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5901,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5901_2,
@@ -194,6 +196,10 @@ static struct pci_device_id tg3_pci_tbl[] = {
 	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5751,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5750M,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5751M,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5751F,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_SYSKONNECT, PCI_DEVICE_ID_SYSKONNECT_9DXX,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
@@ -7574,7 +7580,9 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	     tp->pdev->vendor == PCI_VENDOR_ID_BROADCOM &&
 	     (tp->pdev->device == PCI_DEVICE_ID_TIGON3_5901 ||
 	      tp->pdev->device == PCI_DEVICE_ID_TIGON3_5901_2 ||
-	      tp->pdev->device == PCI_DEVICE_ID_TIGON3_5705F)))
+	      tp->pdev->device == PCI_DEVICE_ID_TIGON3_5705F)) ||
+	    (tp->pdev->vendor == PCI_VENDOR_ID_BROADCOM &&
+	     tp->pdev->device == PCI_DEVICE_ID_TIGON3_5751F))
 		tp->tg3_flags |= TG3_FLAG_10_100_ONLY;
 
 	err = tg3_phy_probe(tp);
@@ -8454,6 +8462,8 @@ static int tg3_resume(struct pci_dev *pdev)
 
 	if (!netif_running(dev))
 		return 0;
+
+	pci_restore_state(tp->pdev, tp->pci_cfg_state);
 
 	err = tg3_set_power_state(tp, 0);
 	if (err)
