@@ -27,7 +27,6 @@
 #include <linux/blkpg.h>
 #include <linux/cdrom.h>
 #include <linux/dm-ioctl.h>
-#include <linux/elevator.h>
 #include <linux/file.h>
 #include <linux/fs.h>
 #include <linux/hdreg.h>

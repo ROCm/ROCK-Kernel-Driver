@@ -22,7 +22,6 @@ endif
 
 ifdef CONFIG_ARCH_S390X
 LDFLAGS		:= -m elf64_s390
-MODFLAGS	+= -fpic -D__PIC__
 CFLAGS		+= -m64
 AFLAGS		+= -m64
 UTS_MACHINE	:= s390x
