@@ -1958,6 +1958,8 @@ static void __init serial8250_isa_init_ports(void)
 		 */
 		up->mcr_mask = ~ALPHA_KLUDGE_MCR;
 		up->mcr_force = ALPHA_KLUDGE_MCR;
+
+		up->port.ops = &serial8250_pops;
 	}
 
 	for (i = 0, up = serial8250_ports; i < ARRAY_SIZE(old_serial_port);
@@ -1970,7 +1972,6 @@ static void __init serial8250_isa_init_ports(void)
 		up->port.membase  = old_serial_port[i].iomem_base;
 		up->port.iotype   = old_serial_port[i].io_type;
 		up->port.regshift = old_serial_port[i].iomem_reg_shift;
-		up->port.ops      = &serial8250_pops;
 		if (share_irqs)
 			up->port.flags |= UPF_SHARE_IRQ;
 	}
@@ -1986,7 +1987,6 @@ serial8250_register_ports(struct uart_driver *drv, struct device *dev)
 	for (i = 0; i < UART_NR; i++) {
 		struct uart_8250_port *up = &serial8250_ports[i];
 
-		up->port.ops = &serial8250_pops;
 		up->port.dev = dev;
 		uart_add_one_port(drv, &up->port);
 	}
@@ -2088,7 +2088,7 @@ static int __init serial8250_console_setup(struct console *co, char *options)
 	if (co->index >= UART_NR)
 		co->index = 0;
 	port = &serial8250_ports[co->index].port;
-	if (!port->ops)
+	if (!port->iobase && !port->membase)
 		return -ENODEV;
 
 	if (options)
