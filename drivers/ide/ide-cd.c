@@ -2563,26 +2563,26 @@ void ide_cdrom_release_real (struct cdrom_device_info *cdi)
  * Device initialization.
  */
 static struct cdrom_device_ops ide_cdrom_dops = {
-	open:			ide_cdrom_open_real,
-	release:		ide_cdrom_release_real,
-	drive_status:		ide_cdrom_drive_status,
-	media_changed:		ide_cdrom_check_media_change_real,
-	tray_move:		ide_cdrom_tray_move,
-	lock_door:		ide_cdrom_lock_door,
-	select_speed:		ide_cdrom_select_speed,
-	get_last_session:	ide_cdrom_get_last_session,
-	get_mcn:		ide_cdrom_get_mcn,
-	reset:			ide_cdrom_reset,
-	audio_ioctl:		ide_cdrom_audio_ioctl,
-	dev_ioctl:		ide_cdrom_dev_ioctl,
-	capability:		CDC_CLOSE_TRAY | CDC_OPEN_TRAY | CDC_LOCK |
+	.open			= ide_cdrom_open_real,
+	.release		= ide_cdrom_release_real,
+	.drive_status		= ide_cdrom_drive_status,
+	.media_changed		= ide_cdrom_check_media_change_real,
+	.tray_move		= ide_cdrom_tray_move,
+	.lock_door		= ide_cdrom_lock_door,
+	.select_speed		= ide_cdrom_select_speed,
+	.get_last_session	= ide_cdrom_get_last_session,
+	.get_mcn		= ide_cdrom_get_mcn,
+	.reset			= ide_cdrom_reset,
+	.audio_ioctl		= ide_cdrom_audio_ioctl,
+	.dev_ioctl		= ide_cdrom_dev_ioctl,
+	.capability		= CDC_CLOSE_TRAY | CDC_OPEN_TRAY | CDC_LOCK |
 				CDC_SELECT_SPEED | CDC_SELECT_DISC |
 				CDC_MULTI_SESSION | CDC_MCN |
 				CDC_MEDIA_CHANGED | CDC_PLAY_AUDIO | CDC_RESET |
 				CDC_IOCTLS | CDC_DRIVE_STATUS | CDC_CD_R |
 				CDC_CD_RW | CDC_DVD | CDC_DVD_R| CDC_DVD_RAM |
 				CDC_GENERIC_PACKET,
-	generic_packet:		ide_cdrom_packet,
+	.generic_packet		= ide_cdrom_packet,
 };
 
 static int ide_cdrom_register (ide_drive_t *drive, int nslots)
@@ -3048,39 +3048,39 @@ int ide_cdrom_cleanup(ide_drive_t *drive)
 static int ide_cdrom_attach (ide_drive_t *drive);
 
 static ide_driver_t ide_cdrom_driver = {
-	owner:			THIS_MODULE,
-	name:			"ide-cdrom",
-	version:		IDECD_VERSION,
-	media:			ide_cdrom,
-	busy:			0,
+	.owner			= THIS_MODULE,
+	.name			= "ide-cdrom",
+	.version		= IDECD_VERSION,
+	.media			= ide_cdrom,
+	.busy			= 0,
 #ifdef CONFIG_IDEDMA_ONLYDISK
-	supports_dma:		0,
+	.supports_dma		= 0,
 #else
-	supports_dma:		1,
+	.supports_dma		= 1,
 #endif
-	supports_dsc_overlap:	1,
-	cleanup:		ide_cdrom_cleanup,
-	standby:		NULL,
-	suspend:		NULL,
-	resume:			NULL,
-	flushcache:		NULL,
-	do_request:		ide_do_rw_cdrom,
-	end_request:		NULL,
-	sense:			ide_cdrom_dump_status,
-	error:			ide_cdrom_error,
-	ioctl:			ide_cdrom_ioctl,
-	open:			ide_cdrom_open,
-	release:		ide_cdrom_release,
-	media_change:		ide_cdrom_check_media_change,
-	revalidate:		ide_cdrom_revalidate,
-	pre_reset:		NULL,
-	capacity:		ide_cdrom_capacity,
-	special:		NULL,
-	proc:			NULL,
-	attach:			ide_cdrom_attach,
-	ata_prebuilder:		NULL,
-	atapi_prebuilder:	NULL,
-	drives:			LIST_HEAD_INIT(ide_cdrom_driver.drives),
+	.supports_dsc_overlap	= 1,
+	.cleanup		= ide_cdrom_cleanup,
+	.standby		= NULL,
+	.suspend		= NULL,
+	.resume			= NULL,
+	.flushcache		= NULL,
+	.do_request		= ide_do_rw_cdrom,
+	.end_request		= NULL,
+	.sense			= ide_cdrom_dump_status,
+	.error			= ide_cdrom_error,
+	.ioctl			= ide_cdrom_ioctl,
+	.open			= ide_cdrom_open,
+	.release		= ide_cdrom_release,
+	.media_change		= ide_cdrom_check_media_change,
+	.revalidate		= ide_cdrom_revalidate,
+	.pre_reset		= NULL,
+	.capacity		= ide_cdrom_capacity,
+	.special		= NULL,
+	.proc			= NULL,
+	.attach			= ide_cdrom_attach,
+	.ata_prebuilder		= NULL,
+	.atapi_prebuilder	= NULL,
+	.drives			= LIST_HEAD_INIT(ide_cdrom_driver.drives),
 };
 
 /* options */

@@ -1689,10 +1689,10 @@ static int show_driver(struct seq_file *m, void *v)
 	return 0;
 }
 struct seq_operations ide_drivers_op = {
-	start:	m_start,
-	next:	m_next,
-	stop:	m_stop,
-	show:	show_driver
+	.start	= m_start,
+	.next	= m_next,
+	.stop	= m_stop,
+	.show	= show_driver
 };
 
 #ifdef CONFIG_PROC_FS
@@ -3446,12 +3446,12 @@ void ide_unregister_driver(ide_driver_t *driver)
 EXPORT_SYMBOL(ide_unregister_driver);
 
 struct block_device_operations ide_fops[] = {{
-	owner:			THIS_MODULE,
-	open:			ide_open,
-	release:		ide_release,
-	ioctl:			ide_ioctl,
-	check_media_change:	ide_check_media_change,
-	revalidate:		ide_revalidate_disk
+	.owner			= THIS_MODULE,
+	.open			= ide_open,
+	.release		= ide_release,
+	.ioctl			= ide_ioctl,
+	.check_media_change	= ide_check_media_change,
+	.revalidate		= ide_revalidate_disk
 }};
 
 EXPORT_SYMBOL(ide_fops);

@@ -851,10 +851,10 @@ static int ide_drivers_open(struct inode *inode, struct file *file)
 	return seq_open(file, &ide_drivers_op);
 }
 static struct file_operations ide_drivers_operations = {
-	open:		ide_drivers_open,
-	read:		seq_read,
-	llseek:		seq_lseek,
-	release:	seq_release,
+	.open		= ide_drivers_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
 };
 
 void proc_ide_create(void)
