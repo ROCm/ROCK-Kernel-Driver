@@ -18,17 +18,21 @@
  * IRQs.
  */
 
-#define I8042_KBD_IRQ CONFIG_I8042_KBD_IRQ 
-#define I8042_AUX_IRQ CONFIG_I8042_AUX_IRQ
+#ifdef __alpha__
+#define I8042_KBD_IRQ	1
+#define I8042_AUX_IRQ	(RTC_PORT(0) == 0x170 ? 9 : 12)	/* Jensen is special */
+#else
+#define I8042_KBD_IRQ	1
+#define I8042_AUX_IRQ	12
+#endif
 
 /*
  * Register numbers.
  */
 
-#define I8042_COMMAND_REG	CONFIG_I8042_REG_BASE + 4	
-#define I8042_STATUS_REG	CONFIG_I8042_REG_BASE + 4	
-#define I8042_DATA_REG		CONFIG_I8042_REG_BASE	
-
+#define I8042_COMMAND_REG	0x64	
+#define I8042_STATUS_REG	0x64	
+#define I8042_DATA_REG		0x60
 
 static inline int i8042_read_data(void)
 {
