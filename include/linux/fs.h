@@ -400,6 +400,8 @@ struct block_device {
 	const struct block_device_operations *bd_op;
 	struct semaphore	bd_sem;	/* open/close mutex */
 	struct list_head	bd_inodes;
+	void *			bd_holder;
+	int			bd_holders;
 };
 
 struct inode {
@@ -1069,6 +1071,8 @@ extern struct file_operations def_fifo_fops;
 extern int ioctl_by_bdev(struct block_device *, unsigned, unsigned long);
 extern int blkdev_get(struct block_device *, mode_t, unsigned, int);
 extern int blkdev_put(struct block_device *, int);
+extern int bd_claim(struct block_device *, void *);
+extern void bd_release(struct block_device *);
 
 /* fs/devices.c */
 extern const struct block_device_operations *get_blkfops(unsigned int);
@@ -1480,15 +1484,6 @@ extern int vfs_fstat(unsigned int, struct kstat *);
 extern struct file_system_type *get_fs_type(const char *name);
 extern struct super_block *get_super(kdev_t);
 extern void drop_super(struct super_block *sb);
-static inline int is_mounted(kdev_t dev)
-{
-	struct super_block *sb = get_super(dev);
-	if (sb) {
-		drop_super(sb);
-		return 1;
-	}
-	return 0;
-}
 extern kdev_t ROOT_DEV;
 extern char root_device_name[];
 

@@ -1105,7 +1105,7 @@ static int i2ob_ioctl(struct inode *inode, struct file *file,
 		case BLKROSET:
 		case BLKROGET:
 		case BLKPG:
-			return blk_ioctl(inode->i_rdev, cmd, arg);
+			return blk_ioctl(inode->i_bdev, cmd, arg);
 			
 		default:
 			return -EINVAL;

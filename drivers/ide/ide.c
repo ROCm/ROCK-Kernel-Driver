@@ -2842,7 +2842,7 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 		case BLKELVSET:
 		case BLKBSZGET:
 		case BLKBSZSET:
-			return blk_ioctl(inode->i_rdev, cmd, arg);
+			return blk_ioctl(inode->i_bdev, cmd, arg);
 
 		/*
 		 * uniform packet command handling

@@ -1144,7 +1144,7 @@ static int ftl_ioctl(struct inode *inode, struct file *file,
     case BLKROSET:
     case BLKROGET:
     case BLKFLSBUF:
-	ret = blk_ioctl(inode->i_rdev, cmd, arg);
+	ret = blk_ioctl(inode->i_bdev, cmd, arg);
 	break;
     default:
 	ret = -EINVAL;

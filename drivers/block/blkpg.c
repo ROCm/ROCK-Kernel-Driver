@@ -34,7 +34,6 @@
 #include <linux/blk.h>			/* for set_device_ro() */
 #include <linux/blkpg.h>
 #include <linux/genhd.h>
-#include <linux/swap.h>			/* for is_swap_partition() */
 #include <linux/module.h>               /* for EXPORT_SYMBOL */
 
 #include <asm/uaccess.h>
@@ -63,12 +62,13 @@
  *                 or has the same number as an existing one
  *          0: all OK.
  */
-int add_partition(kdev_t dev, struct blkpg_partition *p)
+int add_partition(struct block_device *bdev, struct blkpg_partition *p)
 {
 	struct gendisk *g;
 	long long ppstart, pplength;
 	long pstart, plength;
 	int i, drive, first_minor, end_minor, minor;
+	kdev_t dev = to_kdev_t(bdev->bd_dev);
 
 	/* convert bytes to sectors, check for fit in a hd_struct */
 	ppstart = (p->start >> 9);
@@ -126,11 +126,14 @@ int add_partition(kdev_t dev, struct blkpg_partition *p)
  *
  * Note that the dev argument refers to the entire disk, not the partition.
  */
-int del_partition(kdev_t dev, struct blkpg_partition *p)
+int del_partition(struct block_device *bdev, struct blkpg_partition *p)
 {
+	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	struct gendisk *g;
 	kdev_t devp;
+	struct block_device *bdevp;
 	int drive, first_minor, minor;
+	int holder;
 
 	/* find the drive major */
 	g = get_gendisk(dev);
@@ -153,22 +156,29 @@ int del_partition(kdev_t dev, struct blkpg_partition *p)
 
 	/* partition in use? Incomplete check for now. */
 	devp = mk_kdev(major(dev), minor);
-	if (is_mounted(devp) || is_swap_partition(devp))
+	bdevp = bdget(kdev_t_to_nr(devp));
+	if (!bdevp)
+		return -ENOMEM;
+	if (bd_claim(bdevp, &holder) < 0) {
+		bdput(bdevp);
 		return -EBUSY;
+	}
 
 	/* all seems OK */
-	fsync_dev(devp);
-	invalidate_buffers(devp);
+	fsync_bdev(bdevp);
+	invalidate_bdev(bdevp, 0);
 
 	g->part[minor].start_sect = 0;
 	g->part[minor].nr_sects = 0;
 	if (g->sizes)
 		g->sizes[minor] = 0;
+	bd_release(bdevp);
+	bdput(bdevp);
 
 	return 0;
 }
 
-int blkpg_ioctl(kdev_t dev, struct blkpg_ioctl_arg *arg)
+int blkpg_ioctl(struct block_device *bdev, struct blkpg_ioctl_arg *arg)
 {
 	struct blkpg_ioctl_arg a;
 	struct blkpg_partition p;
@@ -188,9 +198,9 @@ int blkpg_ioctl(kdev_t dev, struct blkpg_ioctl_arg *arg)
 			if (!capable(CAP_SYS_ADMIN))
 				return -EACCES;
 			if (a.op == BLKPG_ADD_PARTITION)
-				return add_partition(dev, &p);
+				return add_partition(bdev, &p);
 			else
-				return del_partition(dev, &p);
+				return del_partition(bdev, &p);
 		default:
 			return -EINVAL;
 	}
@@ -200,16 +210,15 @@ int blkpg_ioctl(kdev_t dev, struct blkpg_ioctl_arg *arg)
  * Common ioctl's for block devices
  */
 extern int block_ioctl(kdev_t dev, unsigned int cmd, unsigned long arg);
-int blk_ioctl(kdev_t dev, unsigned int cmd, unsigned long arg)
+int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 {
 	request_queue_t *q;
 	struct gendisk *g;
 	u64 ullval = 0;
 	int intval;
 	unsigned short usval;
-
-	if (kdev_none(dev))
-		return -EINVAL;
+	kdev_t dev = to_kdev_t(bdev->bd_dev);
+	int holder;
 
 	intval = block_ioctl(dev, cmd, arg);
 	if (intval != -ENOTTY)
@@ -265,7 +274,7 @@ int blk_ioctl(kdev_t dev, unsigned int cmd, unsigned long arg)
 #endif
 
 		case BLKPG:
-			return blkpg_ioctl(dev, (struct blkpg_ioctl_arg *) arg);
+			return blkpg_ioctl(bdev, (struct blkpg_ioctl_arg *) arg);
 			
 		/*
 		 * deprecated, use the /proc/iosched interface instead
@@ -290,9 +299,10 @@ int blk_ioctl(kdev_t dev, unsigned int cmd, unsigned long arg)
 			if (intval > PAGE_SIZE || intval < 512 ||
 			    (intval & (intval - 1)))
 				return -EINVAL;
-			if (is_mounted(dev) || is_swap_partition(dev))
+			if (bd_claim(bdev, &holder) < 0)
 				return -EBUSY;
 			set_blocksize(dev, intval);
+			bd_release(bdev);
 			return 0;
 
 		default:
