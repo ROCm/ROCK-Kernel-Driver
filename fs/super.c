@@ -317,6 +317,7 @@ void sync_supers(void)
 {
 	struct super_block * sb;
 restart:
+	cond_resched();
 	spin_lock(&sb_lock);
 	sb = sb_entry(super_blocks.next);
 	while (sb != sb_entry(&super_blocks))
