@@ -31,25 +31,25 @@
 
 #include "longhaul.h"
 
-#define DEBUG
-
-#ifdef DEBUG
-#define dprintk(msg...) printk(msg)
-#else
-#define dprintk(msg...) do { } while(0)
-#endif
-
 #define PFX "longhaul: "
 
 static unsigned int numscales=16, numvscales;
+static unsigned int fsb;
 static int minvid, maxvid;
 static int can_scale_voltage;
 static int vrmrev;
 
-
 /* Module parameters */
 static int dont_scale_voltage;
-static unsigned int fsb;
+static int debug;
+static int debug;
+
+static void dprintk(const char *msg, ...)
+{
+	if (debug == 1)
+		printk(msg);
+}
+
 
 #define __hlt()     __asm__ __volatile__("hlt": : :"memory")
 
@@ -119,8 +119,7 @@ static void longhaul_setstate (unsigned int clock_ratio_index)
 
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 
-//	dprintk (KERN_INFO PFX "FSB:%d Mult:%d.%dx\n", fsb,
-//				mult/10, mult%10);
+	dprintk (KERN_INFO PFX "FSB:%d Mult:%d.%dx\n", fsb, mult/10, mult%10);
 
 	switch (longhaul_version) {
 	case 1:
@@ -581,6 +580,9 @@ static void __exit longhaul_exit (void)
 
 module_param (dont_scale_voltage, int, 0644);
 MODULE_PARM_DESC(dont_scale_voltage, "Don't scale voltage of processor");
+
+module_param (debug, int, 0644);
+MODULE_PARM_DESC(debug, "Dump debugging information.");
 
 MODULE_AUTHOR ("Dave Jones <davej@codemonkey.org.uk>");
 MODULE_DESCRIPTION ("Longhaul driver for VIA Cyrix processors.");
