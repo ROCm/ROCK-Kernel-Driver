@@ -713,9 +713,8 @@ efi_partition(struct gendisk *hd, struct block_device *bdev,
 	      unsigned long first_sector, int first_part_minor)
 {
 
-	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	int hardblocksize = bdev_hardsect_size(bdev);
-	int orig_blksize_size = block_size(dev);
+	int orig_blksize_size = block_size(bdev);
 	int rc = 0;
 
 	/* Need to change the block size that the block layer uses */

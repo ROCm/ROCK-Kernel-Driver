@@ -920,7 +920,7 @@ asmlinkage long sys_swapon(const char * specialfile, int swap_flags)
 			bdev = NULL;
 			goto bad_swap;
 		}
-		p->old_block_size = block_size(to_kdev_t(bdev->bd_dev));
+		p->old_block_size = block_size(bdev);
 		error = set_blocksize(swap_file->f_dentry->d_inode->i_bdev,
 				      PAGE_SIZE);
 		if (error < 0)

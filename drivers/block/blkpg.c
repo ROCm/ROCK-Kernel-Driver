@@ -304,7 +304,7 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 
 		case BLKBSZGET:
 			/* get the logical block size (cf. BLKSSZGET) */
-			intval = block_size(dev);
+			intval = block_size(bdev);
 			return put_user(intval, (int *) arg);
 
 		case BLKBSZSET:

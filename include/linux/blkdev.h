@@ -372,9 +372,10 @@ extern inline unsigned int blksize_bits(unsigned int size)
 	return bits;
 }
 
-extern inline unsigned int block_size(kdev_t dev)
+extern inline unsigned int block_size(struct block_device *bdev)
 {
 	int retval = BLOCK_SIZE;
+	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	int major = major(dev);
 
 	if (blksize_size[major]) {

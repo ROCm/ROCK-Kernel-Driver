@@ -41,7 +41,7 @@ unsigned char *scsi_bios_ptable(kdev_t dev)
 		err = blkdev_get(bdev, FMODE_READ, 0, BDEV_FILE);
 		if (err)
 			goto fail;
-		bh = __bread(bdev, 0, block_size(rdev));
+		bh = __bread(bdev, 0, block_size(bdev));
 		if (!bh)
 			goto fail2;
 		memcpy(res, bh->b_data + 0x1be, 66);

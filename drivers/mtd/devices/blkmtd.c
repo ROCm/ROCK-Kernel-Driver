@@ -1137,7 +1137,7 @@ static int __init init_blkmtd(void)
   DEBUG(1, "blkmtd: devname = %s\n", bdevname(bdev));
   blocksize = BLOCK_SIZE;
 
-  blocksize = bs ? bs : block_size(rdev);
+  blocksize = bs ? bs : block_size(bdev);
   i = blocksize;
   blocksize_bits = 0;
   while(i != 1) {

@@ -25,13 +25,13 @@
 
 #define MAX_BUF_PER_PAGE (PAGE_CACHE_SIZE / 512)
 
-static unsigned long max_block(kdev_t dev)
+static unsigned long max_block(struct block_device *bdev)
 {
 	unsigned int retval = ~0U;
-	loff_t sz = blkdev_size_in_bytes(dev);
+	loff_t sz = bdev->bd_inode->i_size;
 
 	if (sz) {
-		unsigned int size = block_size(dev);
+		unsigned int size = block_size(bdev);
 		unsigned int sizebits = blksize_bits(size);
 		retval = (sz >> sizebits);
 	}
@@ -112,7 +112,7 @@ int sb_min_blocksize(struct super_block *sb, int size)
 
 static int blkdev_get_block(struct inode * inode, sector_t iblock, struct buffer_head * bh, int create)
 {
-	if (iblock >= max_block(inode->i_rdev))
+	if (iblock >= max_block(inode->i_bdev))
 		return -EIO;
 
 	bh->b_bdev = inode->i_bdev;
@@ -617,7 +617,7 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 	}
 	bdev->bd_openers++;
 	bdev->bd_inode->i_size = blkdev_size(dev);
-	bdev->bd_inode->i_blkbits = blksize_bits(block_size(dev));
+	bdev->bd_inode->i_blkbits = blksize_bits(block_size(bdev));
 	unlock_kernel();
 	up(&bdev->bd_sem);
 	return 0;
