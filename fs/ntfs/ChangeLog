@@ -9,20 +9,22 @@ ToDo:
 	  read() will fail when s_maxbytes is reached? -> Investigate this.
 	- Implement/allow non-resident index bitmaps in dir.c::ntfs_readdir()
 	  and then also consider initialized_size w.r.t. the bitmaps, etc.
-	- vcn_to_lcn() should somehow return the correct pointer within the
-	  ->run_list so we can get at the lcns for the following vcns, this is
-	  strictly a speed optimization. Obviously need to keep the ->run_list
-	  locked or RACE. load_attribute_list() already performs such an
-	  optimization so use the same optimization where desired.
 	- Consider if ntfs_file_read_compressed_block() shouldn't be coping
 	  with initialized_size < data_size. I don't think it can happen but
 	  it requires more careful consideration.
-	- CLEANUP: Modularising code in aops.c a bit, e.g. a-la get_block(),
-	  will be cleaner and make code reuse easier.
-	- Modify ntfs_read_locked_inode() to return an error code and update
-	  callers, i.e. ntfs_iget(), to pass that error code up instead of just
-	  using -EIO.
 	- Enable NFS exporting of NTFS.
+
+2.0.17 - Cleanups and optimizations - shrinking the ToDo list.
+
+	- Modify fs/ntfs/inode.c::ntfs_read_locked_inode() to return an error
+	  code and update callers, i.e. ntfs_iget(), to pass that error code
+	  up instead of just using -EIO.
+	- Modifications to super.c to ensure that both mount and remount
+	  cannot set any write related options when the driver is compiled
+	  read-only.
+	- Optimize block resolution in fs/ntfs/aops.c::ntfs_read_block() to
+	  cache the current run list element. This should improve performance
+	  when reading very large and/or very fragmented data.
 
 2.0.16 - Convert access to $MFT/$BITMAP to attribute inode API.
 

@@ -964,7 +964,7 @@ int map_run_list(ntfs_inode *ni, VCN vcn)
 	}
 
 	down_write(&ni->run_list.lock);
-	/* Make sure someone else didn't do the work while we were spinning. */
+	/* Make sure someone else didn't do the work while we were sleeping. */
 	if (likely(vcn_to_lcn(ni->run_list.rl, vcn) <= LCN_RL_NOT_MAPPED)) {
 		run_list_element *rl;
 

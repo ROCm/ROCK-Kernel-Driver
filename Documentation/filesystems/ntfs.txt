@@ -247,6 +247,8 @@ ChangeLog
 
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.0.17:
+	- Cleanups and optimizations.
 2.0.16:
 	- Fix stupid bug introduced in 2.0.15 in new attribute inode API.
 	- Big internal cleanup replacing the mftbmp access hacks by using the

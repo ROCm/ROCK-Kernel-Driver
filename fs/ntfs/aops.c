@@ -162,6 +162,7 @@ static int ntfs_read_block(struct page *page)
 	LCN lcn;
 	ntfs_inode *ni;
 	ntfs_volume *vol;
+	run_list_element *rl;
 	struct buffer_head *bh, *head, *arr[MAX_BUF_PER_PAGE];
 	sector_t iblock, lblock, zblock;
 	unsigned int blocksize, blocks, vcn_ofs;
@@ -192,6 +193,7 @@ static int ntfs_read_block(struct page *page)
 #endif
 
 	/* Loop through all the buffers in the page. */
+	rl = NULL;
 	nr = i = 0;
 	do {
 		if (unlikely(buffer_uptodate(bh)))
@@ -210,11 +212,18 @@ static int ntfs_read_block(struct page *page)
 					vol->cluster_size_bits;
 			vcn_ofs = ((VCN)iblock << blocksize_bits) &
 					vol->cluster_size_mask;
-retry_remap:
-			/* Convert the vcn to the corresponding lcn. */
-			down_read(&ni->run_list.lock);
-			lcn = vcn_to_lcn(ni->run_list.rl, vcn);
-			up_read(&ni->run_list.lock);
+			if (!rl) {
+lock_retry_remap:
+				down_read(&ni->run_list.lock);
+				rl = ni->run_list.rl;
+			}
+			if (likely(rl != NULL)) {
+				/* Seek to element containing target vcn. */
+				while (rl->length && rl[1].vcn <= vcn)
+					rl++;
+				lcn = vcn_to_lcn(rl, vcn);
+			} else
+				lcn = (LCN)LCN_RL_NOT_MAPPED;
 			/* Successful remap. */
 			if (lcn >= 0) {
 				/* Setup buffer head to correct block. */
@@ -235,8 +244,14 @@ retry_remap:
 			/* If first try and run list unmapped, map and retry. */
 			if (!is_retry && lcn == LCN_RL_NOT_MAPPED) {
 				is_retry = TRUE;
+				/*
+				 * Attempt to map run list, dropping lock for
+				 * the duration.
+				 */
+				up_read(&ni->run_list.lock);
 				if (!map_run_list(ni, vcn))
-					goto retry_remap;
+					goto lock_retry_remap;
+				rl = NULL;
 			}
 			/* Hard error, zero out region. */
 			SetPageError(page);
@@ -260,6 +275,10 @@ handle_zblock:
 		kunmap(page);
 		set_buffer_uptodate(bh);
 	} while (i++, iblock++, (bh = bh->b_this_page) != head);
+
+	/* Release the lock if we took it. */
+	if (rl)
+		up_read(&ni->run_list.lock);
 
 	/* Check we have at least one buffer ready for i/o. */
 	if (nr) {

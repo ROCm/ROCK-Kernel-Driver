@@ -323,6 +323,11 @@ static int ntfs_remount(struct super_block *sb, int *flags, char *opt)
 
 	if (!parse_options(vol, opt))
 		return -EINVAL;
+
+#ifndef NTFS_RW
+	*flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
+#endif
+
 	return 0;
 }
 
@@ -789,9 +794,6 @@ static BOOL load_system_files(ntfs_volume *vol)
 		ntfs_error(sb, "Failed to load $MFT/$BITMAP attribute.");
 		return FALSE;
 	}
-	// FIXME: If mounting read-only, it would be ok to ignore errors when
-	// loading the mftbmp but we then need to make sure nobody remounts the
-	// volume read-write...
 
 	/* Get mft mirror inode. */
 	vol->mftmirr_ino = ntfs_iget(sb, FILE_MFTMirr);
@@ -858,8 +860,8 @@ get_ctx_vol_failed:
 			le16_to_cpu(ctx->attr->_ARA(value_offset)));
 	/* Some bounds checks. */
 	if ((u8*)vi < (u8*)ctx->attr || (u8*)vi +
-			le32_to_cpu(ctx->attr->_ARA(value_length)) > (u8*)ctx->attr +
-			le32_to_cpu(ctx->attr->length))
+			le32_to_cpu(ctx->attr->_ARA(value_length)) >
+			(u8*)ctx->attr + le32_to_cpu(ctx->attr->length))
 		goto err_put_vol;
 	/* Setup volume flags and version. */
 	vol->vol_flags = vi->flags;
@@ -1306,6 +1308,9 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	int result;
 
 	ntfs_debug("Entering.");
+#ifndef NTFS_RW
+	sb->s_flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
+#endif
 	/* Allocate a new ntfs_volume and place it in sb->u.generic_sbp. */
 	sb->u.generic_sbp = kmalloc(sizeof(ntfs_volume), GFP_NOFS);
 	vol = NTFS_SB(sb);
@@ -1345,9 +1350,6 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	/* Important to get the mount options dealt with now. */
 	if (!parse_options(vol, (char*)opt))
 		goto err_out_now;
-
-	/* We are just a read-only fs at the moment. */
-	sb->s_flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
 
 	/*
 	 * TODO: Fail safety check. In the future we should really be able to
@@ -1623,7 +1625,7 @@ static int __init init_ntfs_fs(void)
 
 	/* This may be ugly but it results in pretty output so who cares. (-8 */
 	printk(KERN_INFO "NTFS driver " NTFS_VERSION " [Flags: R/"
-#ifdef CONFIG_NTFS_RW
+#ifdef NTFS_RW
 			"W"
 #else
 			"O"
