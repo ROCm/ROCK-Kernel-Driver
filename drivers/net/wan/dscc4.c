@@ -1385,6 +1385,8 @@ static irqreturn_t dscc4_irq(int irq, void *token, struct pt_regs *ptregs)
 		handled = 0;
 		goto out;
 	}
+	if (debug > 3)
+		printk(KERN_DEBUG "%s: GSTAR = 0x%08x\n", DRV_NAME, state);
 	writel(state, ioaddr + GSTAR);
 
 	if (state & Arf) {
@@ -1431,6 +1433,9 @@ try:
 	cur = dpriv->iqtx_current%IRQ_RING_SIZE;
 	state = dpriv->iqtx[cur];
 	if (!state) {
+		if (debug > 4)
+			printk(KERN_DEBUG "%s: Tx ISR = 0x%08x\n", dev->name,
+			       state);
 		if ((debug > 1) && (loop > 1))
 			printk(KERN_DEBUG "%s: Tx irq loop=%d\n", dev->name, loop);
 		if (loop && netif_queue_stopped(dev))
@@ -1554,7 +1559,8 @@ try:
 				goto try;
 		}
 		if (state & Cd) {
-			printk(KERN_INFO "%s: CD transition\n", dev->name);
+			if (debug > 0)
+				printk(KERN_INFO "%s: CD transition\n", dev->name);
 			if (!(state &= ~Cd)) /* DEBUG */
 				goto try;
 		}
@@ -1596,6 +1602,9 @@ try:
 	if (!(state & SccEvt)){
 		struct RxFD *rx_fd;
 
+		if (debug > 4)
+			printk(KERN_DEBUG "%s: Rx ISR = 0x%08x\n", dev->name,
+			       state);
 		state &= 0x00ffffff;
 		if (state & Err) { /* Hold or reset */
 			printk(KERN_DEBUG "%s: Rx ERR\n", dev->name);
