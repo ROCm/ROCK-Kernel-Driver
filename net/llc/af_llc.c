@@ -569,6 +569,13 @@ static int llc_ui_wait_for_data(struct sock *sk, int timeout)
 		rc = -EAGAIN;
 		if (!timeout)
 			break;
+		/*
+		 * Well, if we have backlog, try to process it now.
+		 */
+                if (sk->backlog.tail) {
+			release_sock(sk);
+			lock_sock(sk);
+		}
 		rc = 0;
 		if (skb_queue_empty(&sk->receive_queue)) {
 			release_sock(sk);

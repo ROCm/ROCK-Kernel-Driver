@@ -26,7 +26,6 @@
 #include <net/llc_c_ac.h>
 #include <net/llc_c_st.h>
 #include <net/llc_main.h>
-#include <net/llc_mac.h>
 
 /**
  *	llc_sap_open - open interface to the upper layers.
