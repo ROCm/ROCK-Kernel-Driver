@@ -39,6 +39,24 @@ static struct llc_conn_state_trans *llc_qualify_conn_ev(struct sock *sk,
 /* Offset table on connection states transition diagram */
 static int llc_offset_table[NBR_CONN_STATES][NBR_CONN_EV];
 
+static void llc_save_primitive(struct sock *sk, struct sk_buff* skb,
+			       u8 ua, u8 test, u8 xid)
+{
+	struct llc_opt *llc = llc_sk(sk);
+	struct sockaddr_llc *addr = llc_ui_skb_cb(skb);
+
+       /* save primitive for use by the user. */
+	addr->sllc_family = sk->family;
+	addr->sllc_arphrd = skb->dev->type;
+	addr->sllc_test   = test;
+	addr->sllc_xid    = xid;
+	addr->sllc_ua     = ua;
+	addr->sllc_dsap   = llc->sap->laddr.lsap;
+	memcpy(addr->sllc_dmac, llc->laddr.mac, IFHWADDRLEN);
+	addr->sllc_ssap	  = llc->daddr.lsap;
+	memcpy(addr->sllc_smac, llc->daddr.mac, IFHWADDRLEN);
+}
+
 /**
  *	llc_conn_state_process - sends event to connection state machine
  *	@sk: connection
@@ -56,6 +74,7 @@ int llc_conn_state_process(struct sock *sk, struct sk_buff *skb)
 	struct llc_opt *llc = llc_sk(sk);
 	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 	u8 flag = ev->flag;
+	u8 status = ev->status;
 	struct llc_prim_if_block *ind_prim = ev->ind_prim;
 	struct llc_prim_if_block *cfm_prim = ev->cfm_prim;
 
@@ -77,6 +96,7 @@ int llc_conn_state_process(struct sock *sk, struct sk_buff *skb)
 		 */
 		switch (flag) {
 		case LLC_DATA_PRIM + 1:
+			llc_save_primitive(sk, skb, 0, 0, 0);
 			if (sock_queue_rcv_skb(sk, skb)) {
 				/*
 				 * FIXME: have to sync the LLC state
@@ -130,7 +150,7 @@ int llc_conn_state_process(struct sock *sk, struct sk_buff *skb)
 	case LLC_CONN_PRIM + 1:
 		if (sk->type != SOCK_STREAM || sk->state != TCP_SYN_SENT)
 			goto out_kfree_skb;
-		if (ev->status) {
+		if (status) {
 			sk->socket->state = SS_UNCONNECTED;
 			sk->state         = TCP_CLOSE;
 		} else {

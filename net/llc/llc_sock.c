@@ -396,10 +396,11 @@ static int llc_ui_release(struct socket *sock)
 		llc->laddr.lsap, llc->daddr.lsap);
 	if (!llc_send_disc(sk))
 		llc_ui_wait_for_disc(sk, sk->rcvtimeo);
-	llc_sap_unassign_sock(llc->sap, sk);
 	release_sock(sk);
-	llc_ui_remove_socket(sk);
-
+	if (!sk->zapped) {
+		llc_sap_unassign_sock(llc->sap, sk);
+		llc_ui_remove_socket(sk);
+	}
 	if (llc->sap && list_empty(&llc->sap->sk_list.list))
 		llc_sap_close(llc->sap);
 	sock_put(sk);
@@ -514,7 +515,8 @@ static int llc_ui_autobind(struct socket *sock, struct sockaddr_llc *addr)
 		}
 	}
 	llc->laddr.lsap = addr->sllc_ssap;
-	memcpy(llc->laddr.mac, llc->dev->dev_addr, IFHWADDRLEN);
+	if (llc->dev)
+		memcpy(llc->laddr.mac, llc->dev->dev_addr, IFHWADDRLEN);
 	llc->daddr.lsap = addr->sllc_dsap;
 	memcpy(llc->daddr.mac, addr->sllc_dmac, IFHWADDRLEN);
 	memcpy(&llc->addr, addr, sizeof(llc->addr));

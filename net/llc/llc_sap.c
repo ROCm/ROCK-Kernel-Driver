@@ -205,7 +205,7 @@ static struct llc_sap_state_trans *llc_find_sap_trans(struct llc_sap *sap,
 	/* search thru events for this state until list exhausted or until
 	 * its obvious the event is not valid for the current state
 	 */
-	for (next_trans = curr_state->transitions; next_trans [i]->ev; i++)
+	for (next_trans = curr_state->transitions; next_trans[i]->ev; i++)
 		if (!next_trans[i]->ev(sap, skb)) {
 			/* got event match; return it */
 			rc = next_trans[i];

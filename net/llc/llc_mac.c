@@ -102,16 +102,20 @@ int llc_rcv(struct sk_buff *skb, struct net_device *dev,
 	fix_up_incoming_skb(skb);
 	pdu = llc_pdu_sn_hdr(skb);
 	if (!pdu->dsap) { /* NULL DSAP, refer to station */
+		dprintk("%s: calling llc_station_rcv!\n", __FUNCTION__);
 		llc_station_rcv(skb);
 		goto out;
 	}
 	sap = llc_sap_find(pdu->dsap);
-	if (!sap) /* unknown SAP */
+	if (!sap) {/* unknown SAP */
+		dprintk("%s: llc_sap_find(%02X) failed!\n", __FUNCTION__, pdu->dsap);
 		goto drop;
+	}
 	llc_decode_pdu_type(skb, &dest);
-	if (dest == LLC_DEST_SAP) /* type 1 services */
+	if (dest == LLC_DEST_SAP) { /* type 1 services */
+		dprintk("%s: calling llc_sap_rcv!\n", __FUNCTION__);
 		llc_sap_rcv(sap, skb);
-	else if (dest == LLC_DEST_CONN) {
+	} else if (dest == LLC_DEST_CONN) {
 		struct llc_addr saddr, daddr;
 		struct sock *sk;
 		int rc;
