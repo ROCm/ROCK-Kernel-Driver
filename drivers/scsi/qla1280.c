@@ -459,6 +459,35 @@ static int qla1280_mem_alloc(struct scsi_qla_host *ha);
 static void qla12160_get_target_parameters(struct scsi_qla_host *,
 					   uint32_t, uint32_t, uint32_t);
 
+/* convert scsi data direction to request_t control flags
+ */
+static inline uint16_t
+qla1280_data_direction(struct scsi_cmnd *cmnd)
+{
+	uint16_t flags = 0;
+
+	switch(cmnd->sc_data_direction) {
+
+	case SCSI_DATA_NONE:
+		flags = 0;
+		break;
+
+	case SCSI_DATA_READ:
+		flags = BIT_5;
+		break;
+
+	case SCSI_DATA_WRITE:
+		flags = BIT_6;
+		break;
+
+	case SCSI_DATA_UNKNOWN:
+	default:
+		flags = BIT_5 | BIT_6;
+		break;
+	}
+	return flags;
+}
+		
 #if QL1280_LUN_SUPPORT
 static void qla1280_enable_lun(struct scsi_qla_host *, int, int);
 #endif
@@ -3911,21 +3940,17 @@ qla1280_64bit_start_scsi(struct scsi_qla_host *ha, srb_t * sp)
 			memcpy(pkt->scsi_cdb, &(CMD_CDBP(cmd)), CMD_CDBLEN(cmd));
 			/* dprintk(1, "Build packet for command[0]=0x%x\n",pkt->scsi_cdb[0]); */
 
+			/* Set transfer direction. */
+			sp->dir = qla1280_data_direction(cmd);
+			pkt->control_flags |= cpu_to_le16(sp->dir);
+			
+			/* Set total data segment count. */
+			pkt->dseg_count = cpu_to_le16(seg_cnt);
+
 			/*
 			 * Load data segments.
 			 */
 			if (seg_cnt) {	/* If data transfer. */
-				/* Set transfer direction. */
-				if ((cmd->data_cmnd[0] == WRITE_6))
-					pkt->control_flags |= cpu_to_le16(BIT_6);
-				else
-					pkt->control_flags |= cpu_to_le16(BIT_5 | BIT_6);
-
-				sp->dir = le16_to_cpu(pkt->control_flags) & (BIT_5 | BIT_6);
-
-				/* Set total data segment count. */
-				pkt->dseg_count = cpu_to_le16(seg_cnt);
-
 				/* Setup packet address segment pointer. */
 				dword_ptr = (u32 *)&pkt->dseg_0_address;
 
@@ -4224,28 +4249,17 @@ qla1280_32bit_start_scsi(struct scsi_qla_host *ha, srb_t * sp)
 			memcpy(pkt->scsi_cdb, &(CMD_CDBP(cmd)), CMD_CDBLEN(cmd));
 
 			/*dprintk(1, "Build packet for command[0]=0x%x\n",pkt->scsi_cdb[0]); */
+			/* Set transfer direction. */
+			sp->dir = qla1280_data_direction(cmd);
+			pkt->control_flags |= cpu_to_le16(sp->dir);
+			
+			/* Set total data segment count. */
+			pkt->dseg_count = cpu_to_le16(seg_cnt);
+
 			/*
 			 * Load data segments.
 			 */
 			if (seg_cnt) {
-				/* Set transfer direction (READ and WRITE) */
-				/* Linux doesn't tell us                   */
-				/*
-				 * For block devices, cmd->request->cmd has the operation
-				 * For character devices, this isn't always set properly, so
-				 * we need to check data_cmnd[0].  This catches the conditions
-				 * for st.c, but not sg. Generic commands are pass down to us.
-				 */
-				if ((cmd->data_cmnd[0] == WRITE_6))
-					pkt->control_flags |= cpu_to_le16(BIT_6);
-				else
-					pkt->control_flags |= cpu_to_le16(BIT_5 | BIT_6);
-
-				sp->dir = le16_to_cpu(pkt->control_flags) & (BIT_5 | BIT_6);
-
-				/* Set total data segment count. */
-				pkt->dseg_count = cpu_to_le16(seg_cnt);
-
 				/* Setup packet address segment pointer. */
 				dword_ptr = &pkt->dseg_0_address;
 
