@@ -340,8 +340,6 @@ _pagebuf_get_pages(
 	int			page_count,
 	page_buf_flags_t	flags)
 {
-	int			gpf_mask = pb_to_gfp(flags);
-
 	/* Make sure that we have a page list */
 	if (pb->pb_pages == NULL) {
 		pb->pb_offset = page_buf_poff(pb->pb_file_offset);
@@ -349,8 +347,8 @@ _pagebuf_get_pages(
 		if (page_count <= PB_PAGES) {
 			pb->pb_pages = pb->pb_page_array;
 		} else {
-			pb->pb_pages = kmalloc(sizeof(struct page *) *
-					page_count, gpf_mask);
+			pb->pb_pages = kmem_alloc(sizeof(struct page *) *
+					page_count, pb_to_km(flags));
 			if (pb->pb_pages == NULL)
 				return -ENOMEM;
 		}
@@ -461,32 +459,12 @@ _pagebuf_lookup_pages(
 	loff_t			next_buffer_offset;
 	unsigned long		page_count, pi, index;
 	struct page		*page;
-	int			gfp_mask, retry_count = 5, rval = 0;
-	int			all_mapped, good_pages, nbytes;
+	int			gfp_mask = pb_to_gfp(flags);
+	int			all_mapped, good_pages, nbytes, rval, retries;
 	unsigned int		blocksize, sectorshift;
 	size_t			size, offset;
 
-
-	/* For pagebufs where we want to map an address, do not use
-	 * highmem pages - so that we do not need to use kmap resources
-	 * to access the data.
-	 *
-	 * For pages where the caller has indicated there may be resource
-	 * contention (e.g. called from a transaction) do not flush
-	 * delalloc pages to obtain memory.
-	 */
-
-	if (flags & PBF_READ_AHEAD) {
-		gfp_mask = GFP_READAHEAD;
-		retry_count = 0;
-	} else if (flags & PBF_DONT_BLOCK) {
-		gfp_mask = GFP_NOFS;
-	} else {
-		gfp_mask = GFP_KERNEL;
-	}
-
 	next_buffer_offset = pb->pb_file_offset + pb->pb_buffer_length;
-
 	good_pages = page_count = (page_buf_btoc(next_buffer_offset) -
 				   page_buf_btoct(pb->pb_file_offset));
 
@@ -517,19 +495,28 @@ _pagebuf_lookup_pages(
 	index = (pb->pb_file_offset - pb->pb_offset) >> PAGE_CACHE_SHIFT;
 	for (all_mapped = 1; pi < page_count; pi++, index++) {
 		if (pb->pb_pages[pi] == 0) {
+			retries = 0;
 		      retry:
 			page = find_or_create_page(aspace, index, gfp_mask);
 			if (!page) {
-				if (--retry_count > 0) {
-					PB_STATS_INC(pb_page_retries);
-					pagebuf_daemon_wakeup();
-					current->state = TASK_UNINTERRUPTIBLE;
-					schedule_timeout(10);
-					goto retry;
+				if (flags & PBF_READ_AHEAD)
+					return -ENOMEM;
+				/*
+				 * This could deadlock.  But until all the
+				 * XFS lowlevel code is revamped to handle
+				 * buffer allocation failures we can't do
+				 * much.
+				 */
+				if (!(++retries % 100)) {
+					printk(KERN_ERR
+					       "possibly deadlocking in %s\n",
+					       __FUNCTION__);
 				}
-				rval = -ENOMEM;
-				all_mapped = 0;
-				continue;
+				PB_STATS_INC(pb_page_retries);
+				pagebuf_daemon_wakeup();
+				current->state = TASK_UNINTERRUPTIBLE;
+				schedule_timeout(10);
+				goto retry;
 			}
 			PB_STATS_INC(pb_page_found);
 			mark_page_accessed(page);
