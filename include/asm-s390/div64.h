@@ -43,13 +43,7 @@
 })
 
 #else /* __s390x__ */
-
-#define do_div(n,base) ({ \
-int __res; \
-__res = ((unsigned long) n) % (unsigned) base; \
-n = ((unsigned long) n) / (unsigned) base; \
-__res; })
-
+#include <asm-generic/div64.h>
 #endif /* __s390x__ */
 
 #endif

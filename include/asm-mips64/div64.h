@@ -27,23 +27,6 @@
 	(res) = __quot; \
 	__mod; })
 
-/*
- * Hey, we're already 64-bit, no
- * need to play games..
- */
-#define do_div(n, base) ({ \
-	unsigned long __quot; \
-	unsigned int __mod; \
-	unsigned long __div; \
-	unsigned int __base; \
-	\
-	__div = (n); \
-	__base = (base); \
-	\
-	__mod = __div % __base; \
-	__quot = __div / __base; \
-	\
-	(n) = __quot; \
-	__mod; })
+#include <asm-generic.h>
 
 #endif /* _ASM_DIV64_H */
