@@ -1606,6 +1606,7 @@ again:
 			req->biotail = bio;
 			req->nr_sectors = req->hard_nr_sectors += nr_sectors;
 			drive_stat_acct(req, nr_sectors, 0);
+			elv_merged_request(q, req);
 			attempt_back_merge(q, req);
 			goto out;
 
@@ -1629,6 +1630,7 @@ again:
 			req->sector = req->hard_sector = sector;
 			req->nr_sectors = req->hard_nr_sectors += nr_sectors;
 			drive_stat_acct(req, nr_sectors, 0);
+			elv_merged_request(q, req);
 			attempt_front_merge(q, req);
 			goto out;
 
