@@ -4565,6 +4565,13 @@ static int tg3_reset_hw(struct tg3 *tp)
 		tw32(TG3PCI_PCISTATE, val);
 	}
 
+	if (GET_CHIP_REV(tp->pci_chip_rev_id) == CHIPREV_5704_BX) {
+		/* Enable some hw fixes.  */
+		val = tr32(TG3PCI_MSI_DATA);
+		val |= (1 << 26) | (1 << 28) | (1 << 29);
+		tw32(TG3PCI_MSI_DATA, val);
+	}
+
 	/* Descriptor ring init may make accesses to the
 	 * NIC SRAM area to setup the TX descriptors, so we
 	 * can only do this after the hardware has been
@@ -5884,7 +5891,7 @@ static int tg3_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 
 	if (tp->phy_id == PHY_ID_SERDES) {
 		/* These are the only valid advertisement bits allowed.  */
-		if (cmd->autoned == AUTONEG_ENABLE &&
+		if (cmd->autoneg == AUTONEG_ENABLE &&
 		    (cmd->advertising & ~(ADVERTISED_1000baseT_Half |
 					  ADVERTISED_1000baseT_Full |
 					  ADVERTISED_Autoneg |
