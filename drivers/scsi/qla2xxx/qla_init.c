@@ -941,7 +941,8 @@ qla2x00_fw_ready(scsi_qla_host_t *ha)
 			rval = QLA_FUNCTION_FAILED;
 
 			if (atomic_read(&ha->loop_down_timer) &&
-			    fw_state >= FSTATE_LOSS_OF_SYNC) {
+			    (fw_state >= FSTATE_LOSS_OF_SYNC ||
+				fw_state == FSTATE_WAIT_AL_PA)) {
 				/* Loop down. Timeout on min_wait for states
 				 * other than Wait for Login. 
 				 */	
@@ -2339,11 +2340,11 @@ qla2x00_configure_fabric(scsi_qla_host_t *ha)
 		qla2x00_login_fabric(ha, SIMPLE_NAME_SERVER, 0xff, 0xff, 0xfc,
 		    mb, BIT_1 | BIT_0);
 		if (mb[0] != MBS_COMMAND_COMPLETE) {
-			qla_printk(KERN_INFO, ha,
+			DEBUG2(qla_printk(KERN_INFO, ha,
 			    "Failed SNS login: loop_id=%x mb[0]=%x mb[1]=%x "
 			    "mb[2]=%x mb[6]=%x mb[7]=%x\n", SIMPLE_NAME_SERVER,
-			    mb[0], mb[1], mb[2], mb[6], mb[7]);
-			return (QLA_FUNCTION_FAILED);
+			    mb[0], mb[1], mb[2], mb[6], mb[7]));
+			return (QLA_SUCCESS);
 		}
 
 		if (test_and_clear_bit(REGISTER_FC4_NEEDED, &ha->dpc_flags)) {
