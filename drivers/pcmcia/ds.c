@@ -71,8 +71,6 @@ MODULE_LICENSE("Dual MPL/GPL");
 #ifdef PCMCIA_DEBUG
 INT_MODULE_PARM(pc_debug, PCMCIA_DEBUG);
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
-static const char *version =
-"ds.c 1.112 2001/10/13 00:08:28 (David Hinds)";
 #else
 #define DEBUG(n, args...)
 #endif
@@ -397,7 +395,7 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
     if (!s)
 	    return -EINVAL;
 
-    DEBUG(2, "bind_request(%d, '%s')\n", i,
+    DEBUG(2, "bind_request(%d, '%s')\n", s->socket_no,
 	  (char *)bind_info->dev_info);
     driver = get_pcmcia_driver(&bind_info->dev_info);
     if (!driver)
@@ -524,7 +522,7 @@ static int unbind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 {
     socket_bind_t **b, *c;
 
-    DEBUG(2, "unbind_request(%d, '%s')\n", i,
+    DEBUG(2, "unbind_request(%d, '%s')\n", s->socket_no,
 	  (char *)bind_info->dev_info);
     for (b = &s->bind; *b; b = &(*b)->next)
 	if ((strcmp((char *)(*b)->driver->drv.name,
