@@ -249,6 +249,13 @@ static int mmci_pio_read(struct mmci_host *host, struct request *req, u32 status
 		status = readl(base + MMCISTATUS);
 	} while (1);
 
+	/*
+	 * If we're nearing the end of the read, switch to
+	 * "any data available" mode.
+	 */
+	if (host->size < MCI_FIFOSIZE)
+		writel(MCI_RXDATAAVLBLMASK, base + MMCIMASK1);
+
 	return ret;
 }
 
