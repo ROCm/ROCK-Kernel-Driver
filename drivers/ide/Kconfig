@@ -438,17 +438,13 @@ config WDC_ALI15X3
 	  SAY N!
 
 config BLK_DEV_AMD74XX
-	tristate "AMD Viper support"
+	tristate "AMD and nVidia IDE support"
 	depends on BLK_DEV_IDEDMA_PCI
 	help
 	  This driver adds explicit support for AMD-7xx and AMD-8111 chips
 	  and also for the nVidia nForce chip.  This allows the kernel to
 	  change PIO, DMA and UDMA speeds and to configure the chip to
 	  optimum performance.
-
-config AMD74XX_OVERRIDE
-	bool "AMD Viper ATA-66 Override"
-	depends on BLK_DEV_AMD74XX
 
 config BLK_DEV_CMD64X
 	tristate "CMD64{3|6|8|9} chipset support"
@@ -556,10 +552,6 @@ config BLK_DEV_IT8172
 	  Technology Express, Inc. ITE8172 SBC.  Vendor page at
 	  <http://www.ite.com.tw/ia/brief_it8172bsp.htm>; picture of the
 	  board at <http://www.mvista.com/allies/semiconductor/ite.html>.
-
-config BLK_DEV_NFORCE
-	tristate "nVidia NFORCE support"
-	depends on BLK_DEV_IDEDMA_PCI
 
 config BLK_DEV_NS87415
 	tristate "NS87415 chipset support"
