@@ -958,7 +958,7 @@ xtSplitUp(tid_t tid,
 
 	/* is inode xtree root extension/inline EA area free ? */
 	if ((sp->header.flag & BT_ROOT) && (!S_ISDIR(ip->i_mode)) &&
-	    (sp->header.maxentry < cpu_to_le16(XTROOTMAXSLOT)) &&
+	    (le16_to_cpu(sp->header.maxentry) < XTROOTMAXSLOT) &&
 	    (JFS_IP(ip)->mode2 & INLINEEA)) {
 		sp->header.maxentry = cpu_to_le16(XTROOTMAXSLOT);
 		JFS_IP(ip)->mode2 &= ~INLINEEA;
