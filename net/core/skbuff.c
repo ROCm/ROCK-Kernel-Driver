@@ -1091,6 +1091,165 @@ void skb_copy_and_csum_dev(const struct sk_buff *skb, u8 *to)
 	}
 }
 
+/**
+ *	skb_dequeue - remove from the head of the queue
+ *	@list: list to dequeue from
+ *
+ *	Remove the head of the list. The list lock is taken so the function
+ *	may be used safely with other locking list functions. The head item is
+ *	returned or %NULL if the list is empty.
+ */
+
+struct sk_buff *skb_dequeue(struct sk_buff_head *list)
+{
+	unsigned long flags;
+	struct sk_buff *result;
+
+	spin_lock_irqsave(&list->lock, flags);
+	result = __skb_dequeue(list);
+	spin_unlock_irqrestore(&list->lock, flags);
+	return result;
+}
+
+/**
+ *	skb_dequeue_tail - remove from the tail of the queue
+ *	@list: list to dequeue from
+ *
+ *	Remove the tail of the list. The list lock is taken so the function
+ *	may be used safely with other locking list functions. The tail item is
+ *	returned or %NULL if the list is empty.
+ */
+struct sk_buff *skb_dequeue_tail(struct sk_buff_head *list)
+{
+	unsigned long flags;
+	struct sk_buff *result;
+
+	spin_lock_irqsave(&list->lock, flags);
+	result = __skb_dequeue_tail(list);
+	spin_unlock_irqrestore(&list->lock, flags);
+	return result;
+}
+
+/**
+ *	skb_queue_purge - empty a list
+ *	@list: list to empty
+ *
+ *	Delete all buffers on an &sk_buff list. Each buffer is removed from
+ *	the list and one reference dropped. This function takes the list
+ *	lock and is atomic with respect to other list locking functions.
+ */
+void skb_queue_purge(struct sk_buff_head *list)
+{
+	struct sk_buff *skb;
+	while ((skb = skb_dequeue(list)) != NULL)
+		kfree_skb(skb);
+}
+
+/**
+ *	skb_queue_head - queue a buffer at the list head
+ *	@list: list to use
+ *	@newsk: buffer to queue
+ *
+ *	Queue a buffer at the start of the list. This function takes the
+ *	list lock and can be used safely with other locking &sk_buff functions
+ *	safely.
+ *
+ *	A buffer cannot be placed on two lists at the same time.
+ */
+void skb_queue_head(struct sk_buff_head *list, struct sk_buff *newsk)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&list->lock, flags);
+	__skb_queue_head(list, newsk);
+	spin_unlock_irqrestore(&list->lock, flags);
+}
+
+/**
+ *	skb_queue_tail - queue a buffer at the list tail
+ *	@list: list to use
+ *	@newsk: buffer to queue
+ *
+ *	Queue a buffer at the tail of the list. This function takes the
+ *	list lock and can be used safely with other locking &sk_buff functions
+ *	safely.
+ *
+ *	A buffer cannot be placed on two lists at the same time.
+ */
+void skb_queue_tail(struct sk_buff_head *list, struct sk_buff *newsk)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&list->lock, flags);
+	__skb_queue_tail(list, newsk);
+	spin_unlock_irqrestore(&list->lock, flags);
+}
+/**
+ *	skb_unlink	-	remove a buffer from a list
+ *	@skb: buffer to remove
+ *
+ *	Place a packet after a given packet in a list. The list locks are taken
+ *	and this function is atomic with respect to other list locked calls
+ *
+ *	Works even without knowing the list it is sitting on, which can be
+ *	handy at times. It also means that THE LIST MUST EXIST when you
+ *	unlink. Thus a list must have its contents unlinked before it is
+ *	destroyed.
+ */
+void skb_unlink(struct sk_buff *skb)
+{
+	struct sk_buff_head *list = skb->list;
+
+	if (list) {
+		unsigned long flags;
+
+		spin_lock_irqsave(&list->lock, flags);
+		if (skb->list == list)
+			__skb_unlink(skb, skb->list);
+		spin_unlock_irqrestore(&list->lock, flags);
+	}
+}
+
+
+/**
+ *	skb_append	-	append a buffer
+ *	@old: buffer to insert after
+ *	@newsk: buffer to insert
+ *
+ *	Place a packet after a given packet in a list. The list locks are taken
+ *	and this function is atomic with respect to other list locked calls.
+ *	A buffer cannot be placed on two lists at the same time.
+ */
+
+void skb_append(struct sk_buff *old, struct sk_buff *newsk)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&old->list->lock, flags);
+	__skb_append(old, newsk);
+	spin_unlock_irqrestore(&old->list->lock, flags);
+}
+
+
+/**
+ *	skb_insert	-	insert a buffer
+ *	@old: buffer to insert before
+ *	@newsk: buffer to insert
+ *
+ *	Place a packet before a given packet in a list. The list locks are taken
+ *	and this function is atomic with respect to other list locked calls
+ *	A buffer cannot be placed on two lists at the same time.
+ */
+
+void skb_insert(struct sk_buff *old, struct sk_buff *newsk)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&old->list->lock, flags);
+	__skb_insert(newsk, old->prev, old, old->list);
+	spin_unlock_irqrestore(&old->list->lock, flags);
+}
+
 #if 0
 /*
  * 	Tune the memory allocator for a new MTU size.
@@ -1133,3 +1292,11 @@ EXPORT_SYMBOL(skb_over_panic);
 EXPORT_SYMBOL(skb_pad);
 EXPORT_SYMBOL(skb_realloc_headroom);
 EXPORT_SYMBOL(skb_under_panic);
+EXPORT_SYMBOL(skb_dequeue);
+EXPORT_SYMBOL(skb_dequeue_tail);
+EXPORT_SYMBOL(skb_insert);
+EXPORT_SYMBOL(skb_queue_purge);
+EXPORT_SYMBOL(skb_queue_head);
+EXPORT_SYMBOL(skb_queue_tail);
+EXPORT_SYMBOL(skb_unlink);
+EXPORT_SYMBOL(skb_append);

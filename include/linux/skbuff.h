@@ -511,6 +511,7 @@ static inline void skb_queue_head_init(struct sk_buff_head *list)
  *
  *	A buffer cannot be placed on two lists at the same time.
  */
+extern void skb_queue_head(struct sk_buff_head *list, struct sk_buff *newsk);
 static inline void __skb_queue_head(struct sk_buff_head *list,
 				    struct sk_buff *newsk)
 {
@@ -525,28 +526,6 @@ static inline void __skb_queue_head(struct sk_buff_head *list,
 	next->prev  = prev->next = newsk;
 }
 
-
-/**
- *	skb_queue_head - queue a buffer at the list head
- *	@list: list to use
- *	@newsk: buffer to queue
- *
- *	Queue a buffer at the start of the list. This function takes the
- *	list lock and can be used safely with other locking &sk_buff functions
- *	safely.
- *
- *	A buffer cannot be placed on two lists at the same time.
- */
-static inline void skb_queue_head(struct sk_buff_head *list,
-				  struct sk_buff *newsk)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&list->lock, flags);
-	__skb_queue_head(list, newsk);
-	spin_unlock_irqrestore(&list->lock, flags);
-}
-
 /**
  *	__skb_queue_tail - queue a buffer at the list tail
  *	@list: list to use
@@ -557,6 +536,7 @@ static inline void skb_queue_head(struct sk_buff_head *list,
  *
  *	A buffer cannot be placed on two lists at the same time.
  */
+extern void skb_queue_tail(struct sk_buff_head *list, struct sk_buff *newsk);
 static inline void __skb_queue_tail(struct sk_buff_head *list,
 				   struct sk_buff *newsk)
 {
@@ -571,26 +551,6 @@ static inline void __skb_queue_tail(struct sk_buff_head *list,
 	next->prev  = prev->next = newsk;
 }
 
-/**
- *	skb_queue_tail - queue a buffer at the list tail
- *	@list: list to use
- *	@newsk: buffer to queue
- *
- *	Queue a buffer at the tail of the list. This function takes the
- *	list lock and can be used safely with other locking &sk_buff functions
- *	safely.
- *
- *	A buffer cannot be placed on two lists at the same time.
- */
-static inline void skb_queue_tail(struct sk_buff_head *list,
-				  struct sk_buff *newsk)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&list->lock, flags);
-	__skb_queue_tail(list, newsk);
-	spin_unlock_irqrestore(&list->lock, flags);
-}
 
 /**
  *	__skb_dequeue - remove from the head of the queue
@@ -600,6 +560,7 @@ static inline void skb_queue_tail(struct sk_buff_head *list,
  *	so must be used with appropriate locks held only. The head item is
  *	returned or %NULL if the list is empty.
  */
+extern struct sk_buff *skb_dequeue(struct sk_buff_head *list);
 static inline struct sk_buff *__skb_dequeue(struct sk_buff_head *list)
 {
 	struct sk_buff *next, *prev, *result;
@@ -619,30 +580,11 @@ static inline struct sk_buff *__skb_dequeue(struct sk_buff_head *list)
 	return result;
 }
 
-/**
- *	skb_dequeue - remove from the head of the queue
- *	@list: list to dequeue from
- *
- *	Remove the head of the list. The list lock is taken so the function
- *	may be used safely with other locking list functions. The head item is
- *	returned or %NULL if the list is empty.
- */
-
-static inline struct sk_buff *skb_dequeue(struct sk_buff_head *list)
-{
-	unsigned long flags;
-	struct sk_buff *result;
-
-	spin_lock_irqsave(&list->lock, flags);
-	result = __skb_dequeue(list);
-	spin_unlock_irqrestore(&list->lock, flags);
-	return result;
-}
 
 /*
  *	Insert a packet on a list.
  */
-
+extern void        skb_insert(struct sk_buff *old, struct sk_buff *newsk);
 static inline void __skb_insert(struct sk_buff *newsk,
 				struct sk_buff *prev, struct sk_buff *next,
 				struct sk_buff_head *list)
@@ -654,58 +596,20 @@ static inline void __skb_insert(struct sk_buff *newsk,
 	list->qlen++;
 }
 
-/**
- *	skb_insert	-	insert a buffer
- *	@old: buffer to insert before
- *	@newsk: buffer to insert
- *
- *	Place a packet before a given packet in a list. The list locks are taken
- *	and this function is atomic with respect to other list locked calls
- *	A buffer cannot be placed on two lists at the same time.
- */
-
-static inline void skb_insert(struct sk_buff *old, struct sk_buff *newsk)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&old->list->lock, flags);
-	__skb_insert(newsk, old->prev, old, old->list);
-	spin_unlock_irqrestore(&old->list->lock, flags);
-}
-
 /*
  *	Place a packet after a given packet in a list.
  */
-
+extern void	   skb_append(struct sk_buff *old, struct sk_buff *newsk);
 static inline void __skb_append(struct sk_buff *old, struct sk_buff *newsk)
 {
 	__skb_insert(newsk, old, old->next, old->list);
-}
-
-/**
- *	skb_append	-	append a buffer
- *	@old: buffer to insert after
- *	@newsk: buffer to insert
- *
- *	Place a packet after a given packet in a list. The list locks are taken
- *	and this function is atomic with respect to other list locked calls.
- *	A buffer cannot be placed on two lists at the same time.
- */
-
-
-static inline void skb_append(struct sk_buff *old, struct sk_buff *newsk)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&old->list->lock, flags);
-	__skb_append(old, newsk);
-	spin_unlock_irqrestore(&old->list->lock, flags);
 }
 
 /*
  * remove sk_buff from list. _Must_ be called atomically, and with
  * the list known..
  */
+extern void	   skb_unlink(struct sk_buff *skb);
 static inline void __skb_unlink(struct sk_buff *skb, struct sk_buff_head *list)
 {
 	struct sk_buff *next, *prev;
@@ -719,31 +623,6 @@ static inline void __skb_unlink(struct sk_buff *skb, struct sk_buff_head *list)
 	prev->next = next;
 }
 
-/**
- *	skb_unlink	-	remove a buffer from a list
- *	@skb: buffer to remove
- *
- *	Place a packet after a given packet in a list. The list locks are taken
- *	and this function is atomic with respect to other list locked calls
- *
- *	Works even without knowing the list it is sitting on, which can be
- *	handy at times. It also means that THE LIST MUST EXIST when you
- *	unlink. Thus a list must have its contents unlinked before it is
- *	destroyed.
- */
-static inline void skb_unlink(struct sk_buff *skb)
-{
-	struct sk_buff_head *list = skb->list;
-
-	if (list) {
-		unsigned long flags;
-
-		spin_lock_irqsave(&list->lock, flags);
-		if (skb->list == list)
-			__skb_unlink(skb, skb->list);
-		spin_unlock_irqrestore(&list->lock, flags);
-	}
-}
 
 /* XXX: more streamlined implementation */
 
@@ -755,6 +634,7 @@ static inline void skb_unlink(struct sk_buff *skb)
  *	so must be used with appropriate locks held only. The tail item is
  *	returned or %NULL if the list is empty.
  */
+extern struct sk_buff *skb_dequeue_tail(struct sk_buff_head *list);
 static inline struct sk_buff *__skb_dequeue_tail(struct sk_buff_head *list)
 {
 	struct sk_buff *skb = skb_peek_tail(list);
@@ -763,24 +643,6 @@ static inline struct sk_buff *__skb_dequeue_tail(struct sk_buff_head *list)
 	return skb;
 }
 
-/**
- *	skb_dequeue_tail - remove from the tail of the queue
- *	@list: list to dequeue from
- *
- *	Remove the tail of the list. The list lock is taken so the function
- *	may be used safely with other locking list functions. The tail item is
- *	returned or %NULL if the list is empty.
- */
-static inline struct sk_buff *skb_dequeue_tail(struct sk_buff_head *list)
-{
-	unsigned long flags;
-	struct sk_buff *result;
-
-	spin_lock_irqsave(&list->lock, flags);
-	result = __skb_dequeue_tail(list);
-	spin_unlock_irqrestore(&list->lock, flags);
-	return result;
-}
 
 static inline int skb_is_nonlinear(const struct sk_buff *skb)
 {
@@ -1012,21 +874,6 @@ static inline void skb_orphan(struct sk_buff *skb)
 }
 
 /**
- *	skb_queue_purge - empty a list
- *	@list: list to empty
- *
- *	Delete all buffers on an &sk_buff list. Each buffer is removed from
- *	the list and one reference dropped. This function takes the list
- *	lock and is atomic with respect to other list locking functions.
- */
-static inline void skb_queue_purge(struct sk_buff_head *list)
-{
-	struct sk_buff *skb;
-	while ((skb = skb_dequeue(list)) != NULL)
-		kfree_skb(skb);
-}
-
-/**
  *	__skb_queue_purge - empty a list
  *	@list: list to empty
  *
@@ -1034,6 +881,7 @@ static inline void skb_queue_purge(struct sk_buff_head *list)
  *	the list and one reference dropped. This function does not take the
  *	list lock and the caller must hold the relevant locks to use it.
  */
+extern void skb_queue_purge(struct sk_buff_head *list);
 static inline void __skb_queue_purge(struct sk_buff_head *list)
 {
 	struct sk_buff *skb;
