@@ -585,7 +585,7 @@ static void yenta_open_bh(void * data)
 	/* It's OK to overwrite this now */
 	INIT_WORK(&socket->tq_task, yenta_bh, socket);
 
-	if (!socket->cb_irq || request_irq(socket->cb_irq, yenta_interrupt, SA_SHIRQ, socket->dev->name, socket)) {
+	if (!socket->cb_irq || request_irq(socket->cb_irq, yenta_interrupt, SA_SHIRQ, socket->dev->dev.name, socket)) {
 		/* No IRQ or request_irq failed. Poll */
 		socket->cb_irq = 0; /* But zero is a valid IRQ number. */
 		socket->poll_timer.function = yenta_interrupt_wrapper;
