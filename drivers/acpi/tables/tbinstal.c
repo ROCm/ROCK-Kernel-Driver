@@ -271,22 +271,40 @@ acpi_tb_init_table_descriptor (
 		if (list_head->next) {
 			return_ACPI_STATUS (AE_ALREADY_EXISTS);
 		}
+
+		table_desc->next = list_head->next;
+		list_head->next = table_desc;
+
+		if (table_desc->next) {
+			table_desc->next->prev = table_desc;
+		}
+
+		list_head->count++;
 	}
+	else {
+		/*
+		 * Link the new table in to the list of tables of this type.
+		 * Insert at the end of the list, order IS IMPORTANT.
+		 *
+		 * table_desc->Prev & Next are already NULL from calloc()
+		 */
+		list_head->count++;
 
-	/*
-	 * Link the new table in to the list of tables of this type.
-	 * Just insert at the start of the list, order unimportant.
-	 *
-	 * table_desc->Prev is already NULL from calloc()
-	 */
-	table_desc->next = list_head->next;
-	list_head->next = table_desc;
+		if (!list_head->next) {
+			list_head->next = table_desc;
+		}
+		else {
+			table_desc->next = list_head->next;
 
-	if (table_desc->next) {
-		table_desc->next->prev = table_desc;
+			while (table_desc->next->next) {
+				table_desc->next = table_desc->next->next;
+			}
+
+			table_desc->next->next = table_desc;
+			table_desc->prev = table_desc->next;
+			table_desc->next = NULL;
+		}
 	}
-
-	list_head->count++;
 
 	/* Finish initialization of the table descriptor */
 
