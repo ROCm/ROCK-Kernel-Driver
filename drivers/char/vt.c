@@ -1183,7 +1183,7 @@ static void csi_m(int currcons)
 	update_attr(currcons);
 }
 
-static void respond_string(const char * p, struct tty_struct * tty)
+static void respond_string(const char *p, struct tty_struct *tty)
 {
 	while (*p) {
 		tty_insert_flip_char(tty, *p, 0);
@@ -1192,7 +1192,7 @@ static void respond_string(const char * p, struct tty_struct * tty)
 	con_schedule_flip(tty);
 }
 
-static void cursor_report(int currcons, struct tty_struct * tty)
+static void cursor_report(int currcons, struct tty_struct *tty)
 {
 	char buf[40];
 
@@ -1200,7 +1200,7 @@ static void cursor_report(int currcons, struct tty_struct * tty)
 	respond_string(buf, tty);
 }
 
-static inline void status_report(struct tty_struct * tty)
+static inline void status_report(struct tty_struct *tty)
 {
 	respond_string("\033[0n", tty);	/* Terminal ok */
 }
@@ -1210,7 +1210,7 @@ static inline void respond_ID(struct tty_struct * tty)
 	respond_string(VT102ID, tty);
 }
 
-void mouse_report(struct tty_struct * tty, int butt, int mrx, int mry)
+void mouse_report(struct tty_struct *tty, int butt, int mrx, int mry)
 {
 	char buf[8];
 
@@ -1868,7 +1868,7 @@ char con_buf[PAGE_SIZE];
 DECLARE_MUTEX(con_buf_sem);
 
 /* acquires console_sem */
-static int do_con_write(struct tty_struct * tty, int from_user,
+static int do_con_write(struct tty_struct *tty, int from_user,
 			const unsigned char *buf, int count)
 {
 #ifdef VT_BUF_VRAM_ONLY
@@ -1894,7 +1894,7 @@ static int do_con_write(struct tty_struct * tty, int from_user,
 	might_sleep();
 
 	acquire_console_sem();
-	vt = (struct vt_struct *)tty->driver_data;
+	vt = tty->driver_data;
 	if (vt == NULL) {
 		printk(KERN_ERR "vt: argh, driver_data is NULL !\n");
 		release_console_sem();
@@ -1942,7 +1942,7 @@ again:
 
 	acquire_console_sem();
 
-	vt = (struct vt_struct *)tty->driver_data;
+	vt = tty->driver_data;
 	if (vt == NULL) {
 		printk(KERN_ERR "vt: argh, driver_data _became_ NULL !\n");
 		release_console_sem();
@@ -2103,7 +2103,8 @@ static void console_callback(void *ignored)
 	acquire_console_sem();
 
 	if (want_console >= 0) {
-		if (want_console != fg_console && vc_cons_allocated(want_console)) {
+		if (want_console != fg_console &&
+		    vc_cons_allocated(want_console)) {
 			hide_cursor(fg_console);
 			change_console(want_console);
 			/* we only changed when the console had already
@@ -2147,7 +2148,7 @@ struct tty_driver *console_driver;
  * The console must be locked when we get here.
  */
 
-void vt_console_print(struct console *co, const char * b, unsigned count)
+void vt_console_print(struct console *co, const char *b, unsigned count)
 {
 	int currcons = fg_console;
 	unsigned char c;
@@ -2352,10 +2353,10 @@ int tioclinux(struct tty_struct *tty, unsigned long arg)
 }
 
 /*
- *	/dev/ttyN handling
+ * /dev/ttyN handling
  */
 
-static int con_write(struct tty_struct * tty, int from_user,
+static int con_write(struct tty_struct *tty, int from_user,
 		     const unsigned char *buf, int count)
 {
 	int	retval;
@@ -2370,7 +2371,7 @@ static int con_write(struct tty_struct * tty, int from_user,
 static void con_put_char(struct tty_struct *tty, unsigned char ch)
 {
 	if (in_interrupt())
-		return;		/* n_r3964 calls put_char() from interrupt context */
+		return;	/* n_r3964 calls put_char() from interrupt context */
 	pm_access(pm_con);
 	do_con_write(tty, 0, &ch, 1);
 }
@@ -2398,7 +2399,7 @@ static void con_throttle(struct tty_struct *tty)
 
 static void con_unthrottle(struct tty_struct *tty)
 {
-	struct vt_struct *vt = (struct vt_struct *) tty->driver_data;
+	struct vt_struct *vt = tty->driver_data;
 
 	wake_up_interruptible(&vt->paste_wait);
 }
@@ -2444,7 +2445,7 @@ static void con_flush_chars(struct tty_struct *tty)
 	
 	/* if we race with con_close(), vt may be null */
 	acquire_console_sem();
-	vt = (struct vt_struct *)tty->driver_data;
+	vt = tty->driver_data;
 	if (vt)
 		set_cursor(vt->vc_num);
 	release_console_sem();
@@ -2498,7 +2499,8 @@ static void con_close(struct tty_struct *tty, struct file *filp)
 	release_console_sem();
 }
 
-static void vc_init(unsigned int currcons, unsigned int rows, unsigned int cols, int do_clear)
+static void vc_init(unsigned int currcons, unsigned int rows,
+			unsigned int cols, int do_clear)
 {
 	int j, k ;
 
