@@ -500,10 +500,6 @@ ENTRY(coprocessor_segment_overrun)
 	pushl $do_coprocessor_segment_overrun
 	jmp error_code
 
-ENTRY(double_fault)
-	pushl $do_double_fault
-	jmp error_code
-
 ENTRY(invalid_TSS)
 	pushl $do_invalid_TSS
 	jmp error_code

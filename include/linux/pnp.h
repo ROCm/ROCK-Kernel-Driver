@@ -438,10 +438,10 @@ static inline int pnp_register_driver(struct pnp_driver *drv) { return -ENODEV; 
 static inline void pnp_unregister_driver(struct pnp_driver *drv) { ; }
 
 /* support */
-static inline int pnp_is_active(struct pnp_dev * dev) { return -ENODEV; )
+static inline int pnp_is_active(struct pnp_dev * dev) { return -ENODEV; }
 static inline unsigned char * pnp_parse_current_resources(unsigned char * p, unsigned char * end, struct pnp_resource_table * res) { return NULL; }
 static inline unsigned char * pnp_parse_possible_resources(unsigned char * p, unsigned char * end, struct pnp_dev * dev) { return NULL; }
-static inline unsigned char * pnp_write_resources(unsigned char * p, unsigned char * end, struct pnp_resource_table * res) { return NULL; )
+static inline unsigned char * pnp_write_resources(unsigned char * p, unsigned char * end, struct pnp_resource_table * res) { return NULL; }
 
 #endif /* CONFIG_PNP */
 

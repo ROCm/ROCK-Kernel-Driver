@@ -49,6 +49,7 @@
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
+#include <asm/unaligned.h>
 
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/hci_core.h>
@@ -68,14 +69,17 @@ static struct hci_sec_filter hci_sec_filter = {
 	{ 0xd9fe, 0x0 },
 	/* Commands */
 	{
+		{ 0x0 },
 		/* OGF_LINK_CTL */
-		{ 0x2a000002, 0x0, 0x0, 0x0 },
+		{ 0x2a000002, 0x0, 0x0, 0x0  },
 		/* OGF_LINK_POLICY */
-		{ 0x1200, 0x0, 0x0, 0x0     },
+		{ 0x1200, 0x0, 0x0, 0x0      },
 		/* OGF_HOST_CTL */
-		{ 0x80100000, 0xa, 0x0, 0x0 },
+		{ 0x80100000, 0x2a, 0x0, 0x0 },
 		/* OGF_INFO_PARAM */
-		{ 0x22a, 0x0, 0x0, 0x0      }
+		{ 0x22a, 0x0, 0x0, 0x0       },
+		/* OGF_STATUS_PARAM */
+		{ 0x2e, 0x0, 0x0, 0x0        }
 	}
 };
 
@@ -388,25 +392,37 @@ static int hci_sock_sendmsg(struct kiocb *iocb, struct socket *sock, struct msgh
 
 	skb->pkt_type = *((unsigned char *) skb->data);
 	skb_pull(skb, 1);
-
-	if (!capable(CAP_NET_RAW)) {
-		err = -EPERM;
-
-		if (skb->pkt_type == HCI_COMMAND_PKT) {
-			u16 opcode = __le16_to_cpu(*(__u16 *)skb->data);
-			u16 ogf = hci_opcode_ogf(opcode) - 1;
-			u16 ocf = hci_opcode_ocf(opcode) & HCI_FLT_OCF_BITS;
-
-			if (ogf > HCI_SFLT_MAX_OGF ||
-					!test_bit(ocf, hci_sec_filter.ocf_mask[ogf]))
-				goto drop;
-		} else
-			goto drop;
-	}
-		
-	/* Send frame to HCI core */
 	skb->dev = (void *) hdev;
-	hci_send_raw(skb);
+
+	if (skb->pkt_type == HCI_COMMAND_PKT) {
+		u16 opcode = __le16_to_cpu(get_unaligned((u16 *)skb->data));
+		u16 ogf = hci_opcode_ogf(opcode);
+		u16 ocf = hci_opcode_ocf(opcode);
+
+		if (((ogf > HCI_SFLT_MAX_OGF) || 
+				!test_bit(ocf & HCI_FLT_OCF_BITS, hci_sec_filter.ocf_mask[ogf])) &&
+		    			!capable(CAP_NET_RAW)) {
+			err = -EPERM;
+			goto drop;
+		}
+
+		if (test_bit(HCI_RAW, &hdev->flags) || (ogf == OGF_VENDOR_CMD)) {
+			skb_queue_tail(&hdev->raw_q, skb);
+			hci_sched_tx(hdev);
+		} else {
+			skb_queue_tail(&hdev->cmd_q, skb);
+			hci_sched_cmd(hdev);
+		}
+	} else {
+		if (!capable(CAP_NET_RAW)) {
+			err = -EPERM;
+			goto drop;
+		}
+
+		skb_queue_tail(&hdev->raw_q, skb);
+		hci_sched_tx(hdev);
+	}
+
 	err = len;
 
 done:
@@ -625,7 +641,7 @@ struct notifier_block hci_sock_nblock = {
 	.notifier_call = hci_sock_dev_event
 };
 
-int hci_sock_init(void)
+int __init hci_sock_init(void)
 {
 	if (bt_sock_register(BTPROTO_HCI, &hci_sock_family_ops)) {
 		BT_ERR("HCI socket registration failed");
@@ -639,7 +655,7 @@ int hci_sock_init(void)
 	return 0;
 }
 
-int hci_sock_cleanup(void)
+int __exit hci_sock_cleanup(void)
 {
 	if (bt_sock_unregister(BTPROTO_HCI))
 		BT_ERR("HCI socket unregistration failed");

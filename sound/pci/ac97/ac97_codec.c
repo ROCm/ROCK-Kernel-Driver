@@ -2475,7 +2475,6 @@ static int swap_headphone(ac97_t *ac97, int remove_master)
 int snd_ac97_tune_hardware(ac97_t *ac97, struct pci_dev *pci, struct ac97_quirk *quirk)
 {
 	unsigned short vendor, device;
-	struct ac97_quirk *q;
 
 	pci_read_config_word(pci, PCI_SUBSYSTEM_VENDOR_ID, &vendor);
 	pci_read_config_word(pci, PCI_SUBSYSTEM_ID, &device);
