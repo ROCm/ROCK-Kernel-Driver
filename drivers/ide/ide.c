@@ -796,9 +796,7 @@ void ide_unregister(unsigned int index)
 		DRIVER(drive)->cleanup(drive);
 	}
 
-#ifdef CONFIG_PROC_FS
-	destroy_proc_ide_drives(hwif);
-#endif
+	destroy_proc_ide_interface(hwif);
 
 	hwgroup = hwif->hwgroup;
 	/*

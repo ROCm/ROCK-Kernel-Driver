@@ -1045,8 +1045,8 @@ extern struct proc_dir_entry *proc_ide_root;
 
 extern void proc_ide_create(void);
 extern void proc_ide_destroy(void);
-extern void destroy_proc_ide_drives(ide_hwif_t *);
 extern void create_proc_ide_interfaces(void);
+void destroy_proc_ide_interface(ide_hwif_t *);
 extern void ide_add_proc_entries(struct proc_dir_entry *, ide_proc_entry_t *, void *);
 extern void ide_remove_proc_entries(struct proc_dir_entry *, ide_proc_entry_t *);
 read_proc_t proc_ide_read_capacity;
@@ -1073,6 +1073,7 @@ void ide_pci_create_host_proc(const char *, get_info_t *);
 }
 #else
 static inline void create_proc_ide_interfaces(void) { ; }
+static inline void destroy_proc_ide_interface(ide_hwif_t *hwif) { ; }
 #define PROC_IDE_READ_RETURN(page,start,off,count,eof,len) return 0;
 #endif
 
