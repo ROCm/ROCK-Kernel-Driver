@@ -45,7 +45,8 @@ static int pnp_assign_port(struct pnp_dev *dev, struct pnp_port *rule, int idx)
 	flags = &dev->res.port_resource[idx].flags;
 
 	/* set the initial values */
-	*flags = *flags | rule->flags | IORESOURCE_IO;
+	*flags |= rule->flags | IORESOURCE_IO;
+	*flags &=  ~IORESOURCE_UNSET;
 
 	if (!rule->size) {
 		*flags |= IORESOURCE_DISABLED;
@@ -87,7 +88,8 @@ static int pnp_assign_mem(struct pnp_dev *dev, struct pnp_mem *rule, int idx)
 	flags = &dev->res.mem_resource[idx].flags;
 
 	/* set the initial values */
-	*flags = *flags | rule->flags | IORESOURCE_MEM;
+	*flags |= rule->flags | IORESOURCE_MEM;
+	*flags &=  ~IORESOURCE_UNSET;
 
 	/* convert pnp flags to standard Linux flags */
 	if (!(rule->flags & IORESOURCE_MEM_WRITEABLE))
@@ -145,7 +147,8 @@ static int pnp_assign_irq(struct pnp_dev * dev, struct pnp_irq *rule, int idx)
 	flags = &dev->res.irq_resource[idx].flags;
 
 	/* set the initial values */
-	*flags = *flags | rule->flags | IORESOURCE_IRQ;
+	*flags |= rule->flags | IORESOURCE_IRQ;
+	*flags &=  ~IORESOURCE_UNSET;
 
 	if (!rule->map) {
 		*flags |= IORESOURCE_DISABLED;
@@ -190,7 +193,8 @@ static int pnp_assign_dma(struct pnp_dev *dev, struct pnp_dma *rule, int idx)
 	flags = &dev->res.dma_resource[idx].flags;
 
 	/* set the initial values */
-	*flags = *flags | rule->flags | IORESOURCE_DMA;
+	*flags |= rule->flags | IORESOURCE_DMA;
+	*flags &=  ~IORESOURCE_UNSET;
 
 	if (!rule->map) {
 		*flags |= IORESOURCE_DISABLED;
@@ -219,25 +223,25 @@ void pnp_init_resource_table(struct pnp_resource_table *table)
 		table->irq_resource[idx].name = NULL;
 		table->irq_resource[idx].start = -1;
 		table->irq_resource[idx].end = -1;
-		table->irq_resource[idx].flags = IORESOURCE_AUTO;
+		table->irq_resource[idx].flags = IORESOURCE_AUTO | IORESOURCE_UNSET;
 	}
 	for (idx = 0; idx < PNP_MAX_DMA; idx++) {
 		table->dma_resource[idx].name = NULL;
 		table->dma_resource[idx].start = -1;
 		table->dma_resource[idx].end = -1;
-		table->dma_resource[idx].flags = IORESOURCE_AUTO;
+		table->dma_resource[idx].flags = IORESOURCE_AUTO | IORESOURCE_UNSET;
 	}
 	for (idx = 0; idx < PNP_MAX_PORT; idx++) {
 		table->port_resource[idx].name = NULL;
 		table->port_resource[idx].start = 0;
 		table->port_resource[idx].end = 0;
-		table->port_resource[idx].flags = IORESOURCE_AUTO;
+		table->port_resource[idx].flags = IORESOURCE_AUTO | IORESOURCE_UNSET;
 	}
 	for (idx = 0; idx < PNP_MAX_MEM; idx++) {
 		table->mem_resource[idx].name = NULL;
 		table->mem_resource[idx].start = 0;
 		table->mem_resource[idx].end = 0;
-		table->mem_resource[idx].flags = IORESOURCE_AUTO;
+		table->mem_resource[idx].flags = IORESOURCE_AUTO | IORESOURCE_UNSET;
 	}
 }
 
@@ -254,28 +258,28 @@ static void pnp_clean_resource_table(struct pnp_resource_table * res)
 			continue;
 		res->irq_resource[idx].start = -1;
 		res->irq_resource[idx].end = -1;
-		res->irq_resource[idx].flags = IORESOURCE_AUTO;
+		res->irq_resource[idx].flags = IORESOURCE_AUTO | IORESOURCE_UNSET;
 	}
 	for (idx = 0; idx < PNP_MAX_DMA; idx++) {
 		if (!(res->dma_resource[idx].flags & IORESOURCE_AUTO))
 			continue;
 		res->dma_resource[idx].start = -1;
 		res->dma_resource[idx].end = -1;
-		res->dma_resource[idx].flags = IORESOURCE_AUTO;
+		res->dma_resource[idx].flags = IORESOURCE_AUTO | IORESOURCE_UNSET;
 	}
 	for (idx = 0; idx < PNP_MAX_PORT; idx++) {
 		if (!(res->port_resource[idx].flags & IORESOURCE_AUTO))
 			continue;
 		res->port_resource[idx].start = 0;
 		res->port_resource[idx].end = 0;
-		res->port_resource[idx].flags = IORESOURCE_AUTO;
+		res->port_resource[idx].flags = IORESOURCE_AUTO | IORESOURCE_UNSET;
 	}
 	for (idx = 0; idx < PNP_MAX_MEM; idx++) {
 		if (!(res->mem_resource[idx].flags & IORESOURCE_AUTO))
 			continue;
 		res->mem_resource[idx].start = 0;
 		res->mem_resource[idx].end = 0;
-		res->mem_resource[idx].flags = IORESOURCE_AUTO;
+		res->mem_resource[idx].flags = IORESOURCE_AUTO | IORESOURCE_UNSET;
 	}
 }
 
