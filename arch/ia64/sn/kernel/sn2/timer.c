@@ -2,6 +2,8 @@
  * linux/arch/ia64/sn/kernel/sn2/timer.c
  *
  * Copyright (C) 2003 Silicon Graphics, Inc.
+ * Copyright (C) 2003 Hewlett-Packard Co
+ *	David Mosberger <davidm@hpl.hp.com>: updated for new timer-interpolation infrastructure
  */
 
 #include <linux/init.h>
@@ -20,26 +22,36 @@
 extern unsigned long sn_rtc_cycles_per_second;
 static volatile unsigned long last_wall_rtc;
 
+static unsigned long rtc_offset;	/* updated only when xtime write-lock is held! */
 static long rtc_nsecs_per_cycle;
 static long rtc_per_timer_tick;
 
 static unsigned long
 getoffset(void)
 {
-	return (long) (GET_RTC_COUNTER() - last_wall_rtc)*rtc_nsecs_per_cycle;
+	return rtc_offset + (GET_RTC_COUNTER() - last_wall_rtc)*rtc_nsecs_per_cycle;
 }
 
 
 static void
 update(long delta_nsec)
 {
-	last_wall_rtc = GET_RTC_COUNTER();
+	unsigned long rtc_counter = GET_RTC_COUNTER();
+	unsigned long offset = rtc_offset + (rtc_counter - last_wall_rtc)*rtc_nsecs_per_cycle;
+
+	/* Be careful about signed/unsigned comparisons here: */
+	if (delta_nsec < 0 || (unsigned long) delta_nsec < offset)
+		rtc_offset = offset - delta_nsec;
+	else
+		rtc_offset = 0;
+	last_wall_rtc = rtc_counter;
 }
 
 
 static void
 reset(void)
 {
+	rtc_offset = 0;
 	last_wall_rtc = GET_RTC_COUNTER();
 }
 

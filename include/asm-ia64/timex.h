@@ -2,7 +2,7 @@
 #define _ASM_IA64_TIMEX_H
 
 /*
- * Copyright (C) 1998-2001 Hewlett-Packard Co
+ * Copyright (C) 1998-2001, 2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 /*
@@ -24,9 +24,5 @@ get_cycles (void)
 	__asm__ __volatile__ ("mov %0=ar.itc" : "=r"(ret));
 	return ret;
 }
-
-extern unsigned long (*gettimeoffset)(void);
-extern void ia64_reset_wall_time (void);
-extern void ia64_update_wall_time (long delta_nsec);
 
 #endif /* _ASM_IA64_TIMEX_H */
