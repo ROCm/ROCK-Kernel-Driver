@@ -436,30 +436,6 @@ int khvcd(void *unused)
 	}
 }
 
-static int hvc_tiocmget(struct tty_struct *tty, struct file *file)
-{
-	struct hvc_struct *hp = tty->driver_data;
-	int ret = -EIO;
-
-	if (!file || !tty_hung_up_p(file)) {
-		ret = hvc_arch_tiocmget(hp->index);
-	}
-	return ret;
-}
-
-static int hvc_tiocmset(struct tty_struct *tty, struct file *file,
-	unsigned int set, unsigned int clear)
-{
-	struct hvc_struct *hp = tty->driver_data;
-	int ret = -EIO;
-
-	if (!file || !tty_hung_up_p(file)) {
-		ret = hvc_arch_tiocmset(hp->index, set, clear);
-	}
-
-	return ret;
-}
-
 static struct tty_operations hvc_ops = {
 	.open = hvc_open,
 	.close = hvc_close,
@@ -468,8 +444,6 @@ static struct tty_operations hvc_ops = {
 	.unthrottle = hvc_unthrottle,
 	.write_room = hvc_write_room,
 	.chars_in_buffer = hvc_chars_in_buffer,
-	.tiocmget = hvc_tiocmget,
-	.tiocmset = hvc_tiocmset,
 };
 
 int __init hvc_init(void)
