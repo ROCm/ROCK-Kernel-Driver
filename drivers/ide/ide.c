@@ -1820,7 +1820,7 @@ extern int ht6560b_init(void);
 #endif
 #ifdef CONFIG_BLK_DEV_QD65XX
 static int __initdata probe_qd65xx;
-extern void init_qd65xx(void);
+extern int qd65xx_init(void);
 #endif
 
 static int __initdata is_chipset_set[MAX_HWIFS];
@@ -2617,7 +2617,7 @@ int __init ide_init (void)
 #endif
 #ifdef CONFIG_BLK_DEV_QD65XX
 	if (probe_qd65xx)
-		init_qd65xx();
+		(void)qd65xx_init();
 #endif
 
 	initializing = 1;
