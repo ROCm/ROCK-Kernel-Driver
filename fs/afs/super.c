@@ -35,14 +35,6 @@ struct afs_mount_params {
 	struct afs_volume	*volume;
 };
 
-static inline char *strdup(const char *s)
-{
-	char *ns = kmalloc(strlen(s) + 1, GFP_KERNEL);
-	if (ns)
-		strcpy(ns, s);
-	return ns;
-}
-
 static void afs_i_init_once(void *foo, kmem_cache_t *cachep,
 			    unsigned long flags);
 
