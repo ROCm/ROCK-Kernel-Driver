@@ -42,7 +42,7 @@ static struct fb_fix_screeninfo q40fb_fix __initdata = {
 	type:		FB_TYPE_PACKED_PIXELS,
 	visual:		FB_VISUAL_TRUECOLOR,
 	line_length:	1024*2,
-	accel_flags:	FB_ACCEL_NONE,
+	accel:		FB_ACCEL_NONE,
 };
 
 static struct fb_var_screeninfo q40fb_var __initdata = {
@@ -95,9 +95,9 @@ static int q40fb_setcolreg(unsigned regno, unsigned red, unsigned green,
     blue>>=10;
 
     if (regno < 16) {
-	info->pseudo_palette[regno] = ((red & 31) <<6) |
-	                              ((green & 31) << 11) |
-	                         	(blue & 63);
+	((u16 *)info->pseudo_palette)[regno] = ((red & 31) <<6) |
+					       ((green & 31) << 11) |
+					       (blue & 63);
     }
     return 0;
 }

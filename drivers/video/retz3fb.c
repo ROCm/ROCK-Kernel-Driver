@@ -1274,8 +1274,6 @@ static int retz3fb_set_var(struct fb_var_screeninfo *var, int con,
 static int retz3fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			    struct fb_info *info)
 {
-	struct retz3_fb_info *zinfo = retz3info(info);
-
 	if (con == info->currcon) /* current console? */
 		return(fb_get_cmap(cmap, kspc, retz3_getcolreg, info));
 	else if (fb_display[con].cmap.len) /* non default colormap? */
@@ -1446,8 +1444,6 @@ int __init retz3fb_init(void)
 
 static int z3fb_switch(int con, struct fb_info *info)
 {
-	struct retz3_fb_info *zinfo = retz3info(info);
-
 	/* Do we have to save the colormap? */
 	if (fb_display[info->currcon].cmap.len)
 		fb_get_cmap(&fb_display[info->currcon].cmap, 1,

@@ -2593,6 +2593,35 @@ atafb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	return -EINVAL;
 }
 
+/* (un)blank/poweroff
+ * 0 = unblank
+ * 1 = blank
+ * 2 = suspend vsync
+ * 3 = suspend hsync
+ * 4 = off
+ */
+static int 
+atafb_blank(int blank, struct fb_info *info)
+{
+	unsigned short black[16];
+	struct fb_cmap cmap;
+	if (fbhw->blank && !fbhw->blank(blank))
+		return 1;
+	if (blank) {
+		memset(black, 0, 16*sizeof(unsigned short));
+		cmap.red=black;
+		cmap.green=black;
+		cmap.blue=black;
+		cmap.transp=NULL;
+		cmap.start=0;
+		cmap.len=16;
+		fb_set_cmap(&cmap, 1, info);
+	}
+	else
+		do_install_cmap(info->currcon, info);
+	return 0;
+}
+
 static struct fb_ops atafb_ops = {
 	owner:		THIS_MODULE,
 	fb_get_fix:	atafb_get_fix,
@@ -2660,35 +2689,6 @@ atafb_switch(int con, struct fb_info *info)
 	return 0;
 }
 
-/* (un)blank/poweroff
- * 0 = unblank
- * 1 = blank
- * 2 = suspend vsync
- * 3 = suspend hsync
- * 4 = off
- */
-static int 
-atafb_blank(int blank, struct fb_info *info)
-{
-	unsigned short black[16];
-	struct fb_cmap cmap;
-	if (fbhw->blank && !fbhw->blank(blank))
-		return 1;
-	if (blank) {
-		memset(black, 0, 16*sizeof(unsigned short));
-		cmap.red=black;
-		cmap.green=black;
-		cmap.blue=black;
-		cmap.transp=NULL;
-		cmap.start=0;
-		cmap.len=16;
-		fb_set_cmap(&cmap, 1, info);
-	}
-	else
-		do_install_cmap(info->currcon, info);
-	return 0;
-}
-
 int __init atafb_init(void)
 {
 	int pad;
@@ -2702,21 +2702,21 @@ int __init atafb_init(void)
 #ifdef ATAFB_EXT
 		if (external_addr) {
 			fbhw = &ext_switch;
-			fb_info.fb_setcolreg = &ext_setcolreg;
+			atafb_ops.fb_setcolreg = &ext_setcolreg;
 			break;
 		}
 #endif
 #ifdef ATAFB_TT
 		if (ATARIHW_PRESENT(TT_SHIFTER)) {
 			fbhw = &tt_switch;
-			fb_info.fb_setcolreg = &tt_setcolreg;
+			atafb_ops.fb_setcolreg = &tt_setcolreg;
 			break;
 		}
 #endif
 #ifdef ATAFB_FALCON
 		if (ATARIHW_PRESENT(VIDEL_SHIFTER)) {
 			fbhw = &falcon_switch;
-			fb_info.fb_setcolreg = &falcon_setcolreg;
+			atafb_ops.fb_setcolreg = &falcon_setcolreg;
 			request_irq(IRQ_AUTO_4, falcon_vbl_switcher, IRQ_TYPE_PRIO,
 			            "framebuffer/modeswitch", falcon_vbl_switcher);
 			break;
@@ -2726,11 +2726,11 @@ int __init atafb_init(void)
 		if (ATARIHW_PRESENT(STND_SHIFTER) ||
 		    ATARIHW_PRESENT(EXTD_SHIFTER)) {
 			fbhw = &st_switch;
-			fb_info.fb_setcolreg = &stste_setcolreg;
+			atafb_ops.fb_setcolreg = &stste_setcolreg;
 			break;
 		}
 		fbhw = &st_switch;
-		fb_info.fb_setcolreg = &stste_setcolreg;
+		atafb_ops.fb_setcolreg = &stste_setcolreg;
 		printk("Cannot determine video hardware; defaulting to ST(e)\n");
 #else /* ATAFB_STE */
 		/* no default driver included */
@@ -2824,24 +2824,230 @@ int __init atafb_init(void)
 	return 0;
 }
 
+
+#ifdef ATAFB_EXT
+static void __init atafb_setup_ext(char *spec)
+{
+	int		xres, xres_virtual, yres, depth, planes;
+	unsigned long addr, len;
+	char *p;
+
+	/* Format is: <xres>;<yres>;<depth>;<plane organ.>;
+	 *            <screen mem addr>
+	 *	      [;<screen mem length>[;<vgaiobase>[;<bits-per-col>[;<colorreg-type>
+	 *	      [;<xres-virtual>]]]]]
+	 *
+	 * 09/23/97	Juergen
+	 * <xres_virtual>:	hardware's x-resolution (f.e. ProMST)
+	 *
+	 * Even xres_virtual is available, we neither support panning nor hw-scrolling!
+	 */
+	if (!(p = strsep(&spec, ";")) || !*p)
+	    return;
+	xres_virtual = xres = simple_strtoul(p, NULL, 10);
+	if (xres <= 0)
+	    return;
+
+	if (!(p = strsep(&spec, ";")) || !*p)
+	    return;
+	yres = simple_strtoul(p, NULL, 10);
+	if (yres <= 0)
+	    return;
+
+	if (!(p = strsep(&spec, ";")) || !*p)
+	    return;
+	depth = simple_strtoul(p, NULL, 10);
+	if (depth != 1 && depth != 2 && depth != 4 && depth != 8 &&
+		depth != 16 && depth != 24)
+	    return;
+
+	if (!(p = strsep(&spec, ";")) || !*p)
+	    return;
+	if (*p == 'i')
+		planes = FB_TYPE_INTERLEAVED_PLANES;
+	else if (*p == 'p')
+		planes = FB_TYPE_PACKED_PIXELS;
+	else if (*p == 'n')
+		planes = FB_TYPE_PLANES;
+	else if (*p == 't')
+		planes = -1; /* true color */
+	else
+		return;
+
+
+	if (!(p = strsep(&spec, ";")) || !*p)
+		return;
+	addr = simple_strtoul(p, NULL, 0);
+
+	if (!(p = strsep(&spec, ";")) || !*p)
+		len = xres*yres*depth/8;
+	else
+		len = simple_strtoul(p, NULL, 0);
+
+	if ((p = strsep(&spec, ";")) && *p) {
+		external_vgaiobase=simple_strtoul(p, NULL, 0);
+	}
+
+	if ((p = strsep(&spec, ";")) && *p) {
+		external_bitspercol = simple_strtoul(p, NULL, 0);
+		if (external_bitspercol > 8)
+			external_bitspercol = 8;
+		else if (external_bitspercol < 1)
+			external_bitspercol = 1;
+	}
+
+	if ((p = strsep(&spec, ";")) && *p) {
+		if (!strcmp(p, "vga"))
+			external_card_type = IS_VGA;
+		if (!strcmp(p, "mv300"))
+			external_card_type = IS_MV300;
+	}
+
+	if ((p = strsep(&spec, ";")) && *p) {
+		xres_virtual = simple_strtoul(p, NULL, 10);
+		if (xres_virtual < xres)
+			xres_virtual = xres;
+		if (xres_virtual*yres*depth/8 > len)
+			len=xres_virtual*yres*depth/8;
+	}
+
+	external_xres  = xres;
+	external_xres_virtual  = xres_virtual;
+	external_yres  = yres;
+	external_depth = depth;
+	external_pmode = planes;
+	external_addr  = (void *)addr;
+	external_len   = len;
+
+	if (external_card_type == IS_MV300)
+	  switch (external_depth) {
+	    case 1:
+	      MV300_reg = MV300_reg_1bit;
+	      break;
+	    case 4:
+	      MV300_reg = MV300_reg_4bit;
+	      break;
+	    case 8:
+	      MV300_reg = MV300_reg_8bit;
+	      break;
+	    }
+}
+#endif /* ATAFB_EXT */
+
+
+static void __init atafb_setup_int(char *spec)
+{
+	/* Format to config extended internal video hardware like OverScan:
+	"internal:<xres>;<yres>;<xres_max>;<yres_max>;<offset>"
+	Explanation:
+	<xres>: x-resolution 
+	<yres>: y-resolution
+	The following are only needed if you have an overscan which
+	needs a black border:
+	<xres_max>: max. length of a line in pixels your OverScan hardware would allow
+	<yres_max>: max. number of lines your OverScan hardware would allow
+	<offset>: Offset from physical beginning to visible beginning
+		  of screen in bytes
+	*/
+	int xres;
+	char *p;
+
+	if (!(p = strsep(&spec, ";")) || !*p)
+		return;
+	xres = simple_strtoul(p, NULL, 10);
+	if (!(p = strsep(&spec, ";")) || !*p)
+		return;
+	sttt_xres=xres;
+	tt_yres=st_yres=simple_strtoul(p, NULL, 10);
+	if ((p=strsep(&spec, ";")) && *p) {
+		sttt_xres_virtual=simple_strtoul(p, NULL, 10);
+	}
+	if ((p=strsep(&spec, ";")) && *p) {
+		sttt_yres_virtual=simple_strtoul(p, NULL, 0);
+	}
+	if ((p=strsep(&spec, ";")) && *p) {
+		ovsc_offset=simple_strtoul(p, NULL, 0);
+	}
+
+	if (ovsc_offset || (sttt_yres_virtual != st_yres))
+		use_hwscroll=0;
+}
+
+
+#ifdef ATAFB_FALCON
+static void __init atafb_setup_mcap(char *spec)
+{
+	char *p;
+	int vmin, vmax, hmin, hmax;
+
+	/* Format for monitor capabilities is: <Vmin>;<Vmax>;<Hmin>;<Hmax>
+	 * <V*> vertical freq. in Hz
+	 * <H*> horizontal freq. in kHz
+	 */
+	if (!(p = strsep(&spec, ";")) || !*p)
+		return;
+	vmin = simple_strtoul(p, NULL, 10);
+	if (vmin <= 0)
+		return;
+	if (!(p = strsep(&spec, ";")) || !*p)
+		return;
+	vmax = simple_strtoul(p, NULL, 10);
+	if (vmax <= 0 || vmax <= vmin)
+		return;
+	if (!(p = strsep(&spec, ";")) || !*p)
+		return;
+	hmin = 1000 * simple_strtoul(p, NULL, 10);
+	if (hmin <= 0)
+		return;
+	if (!(p = strsep(&spec, "")) || !*p)
+		return;
+	hmax = 1000 * simple_strtoul(p, NULL, 10);
+	if (hmax <= 0 || hmax <= hmin)
+		return;
+
+	fb_info.monspecs.vfmin = vmin;
+	fb_info.monspecs.vfmax = vmax;
+	fb_info.monspecs.hfmin = hmin;
+	fb_info.monspecs.hfmax = hmax;
+}
+#endif /* ATAFB_FALCON */
+
+
+static void __init atafb_setup_user(char *spec)
+{
+	/* Format of user defined video mode is: <xres>;<yres>;<depth>
+	 */
+	char *p;
+	int xres, yres, depth, temp;
+
+	if (!(p = strsep(&spec, ";")) || !*p)
+		return;
+	xres = simple_strtoul(p, NULL, 10);
+	if (!(p = strsep(&spec, ";")) || !*p)
+		return;
+	yres = simple_strtoul(p, NULL, 10);
+	if (!(p = strsep(&spec, "")) || !*p)
+		return;
+	depth = simple_strtoul(p, NULL, 10);
+	if ((temp=get_video_mode("user0"))) {
+		default_par=temp;
+		atafb_predefined[default_par-1].xres = xres;
+		atafb_predefined[default_par-1].yres = yres;
+		atafb_predefined[default_par-1].bits_per_pixel = depth;
+	}
+}
+
 int __init atafb_setup( char *options )
 {
     char *this_opt;
     int temp;
-    char ext_str[80], int_str[100];
-    char mcap_spec[80];
-    char user_mode[80];
 
-	ext_str[0]          =
-	int_str[0]          =
-	mcap_spec[0]        =
-	user_mode[0]        =
-	fb_info.fontname[0] = '\0';
+    fb_info.fontname[0] = '\0';
 
     if (!options || !*options)
 		return 0;
     
-    while ((this_opt = strsep(options, ",")) != NULL) {	 
+    while ((this_opt = strsep(&options, ",")) != NULL) {	 
 	if (!*this_opt) continue;
 	if ((temp=get_video_mode(this_opt)))
 		default_par=temp;
@@ -2862,10 +3068,10 @@ int __init atafb_setup( char *options )
 		external_card_type = IS_MV300;
 	}
 	else if (!strncmp(this_opt,"external:",9))
-		strcpy(ext_str, this_opt+9);
+		atafb_setup_ext(this_opt+9);
 #endif
 	else if (!strncmp(this_opt,"internal:",9))
-		strcpy(int_str, this_opt+9);
+		atafb_setup_int(this_opt+9);
 #ifdef ATAFB_FALCON
 	else if (!strncmp(this_opt, "eclock:", 7)) {
 		fext.f = simple_strtoul(this_opt+7, NULL, 10);
@@ -2874,208 +3080,14 @@ int __init atafb_setup( char *options )
 		fext.f *= 1000;
 	}
 	else if (!strncmp(this_opt, "monitorcap:", 11))
-		strcpy(mcap_spec, this_opt+11);
+		atafb_setup_mcap(this_opt+11);
 #endif
 	else if (!strcmp(this_opt, "keep"))
 		DontCalcRes = 1;
 	else if (!strncmp(this_opt, "R", 1))
-		strcpy(user_mode, this_opt+1);
+		atafb_setup_user(this_opt+1);
     }
-
-    if (*int_str) {
-	/* Format to config extended internal video hardware like OverScan:
-	"internal:<xres>;<yres>;<xres_max>;<yres_max>;<offset>"
-	Explanation:
-	<xres>: x-resolution 
-	<yres>: y-resolution
-	The following are only needed if you have an overscan which
-	needs a black border:
-	<xres_max>: max. length of a line in pixels your OverScan hardware would allow
-	<yres_max>: max. number of lines your OverScan hardware would allow
-	<offset>: Offset from physical beginning to visible beginning
-		  of screen in bytes
-	*/
-	int xres;
-	char *p;
-
-	if (!(p = strsep(&int_str, ";")) || !*p) goto int_invalid;
-	xres = simple_strtoul(p, NULL, 10);
-	if (!(p = strsep(&int_str, ";")) || !*p) goto int_invalid;
-	sttt_xres=xres;
-	tt_yres=st_yres=simple_strtoul(p, NULL, 10);
-	if ((p=strsep(&int_str, ";")) && *p) {
-		sttt_xres_virtual=simple_strtoul(p, NULL, 10);
-	}
-	if ((p=strsep(&int_str, ";")) && *p) {
-		sttt_yres_virtual=simple_strtoul(p, NULL, 0);
-	}
-	if ((p=strsep(&int_str, ";")) && *p) {
-		ovsc_offset=simple_strtoul(p, NULL, 0);
-	}
-
-	if (ovsc_offset || (sttt_yres_virtual != st_yres))
-		use_hwscroll=0;
-      int_invalid:
-	;
-    }
-
-#ifdef ATAFB_EXT
-    if (*ext_str) {
-	int		xres, xres_virtual, yres, depth, planes;
-	unsigned long addr, len;
-	char *p;
-
-	/* Format is: <xres>;<yres>;<depth>;<plane organ.>;
-	 *            <screen mem addr>
-	 *	      [;<screen mem length>[;<vgaiobase>[;<bits-per-col>[;<colorreg-type>
-	 *	      [;<xres-virtual>]]]]]
-	 *
-	 * 09/23/97	Juergen
-	 * <xres_virtual>:	hardware's x-resolution (f.e. ProMST)
-	 *
-	 * Even xres_virtual is available, we neither support panning nor hw-scrolling!
-	 */
-	if (!(p = strsep(&ext_str, ";")) || !*p) goto ext_invalid;
-	xres_virtual = xres = simple_strtoul(p, NULL, 10);
-	if (xres <= 0) goto ext_invalid;
-
-	if (!(p = strsep(&ext_str, ";")) || !*p) goto ext_invalid;
-	yres = simple_strtoul(p, NULL, 10);
-	if (yres <= 0) goto ext_invalid;
-
-	if (!(p = strsep(&ext_str, ";")) || !*p) goto ext_invalid;
-	depth = simple_strtoul(p, NULL, 10);
-	if (depth != 1 && depth != 2 && depth != 4 && depth != 8 &&
-		depth != 16 && depth != 24) goto ext_invalid;
-
-	if (!(p = strsep(&ext_str, ";")) || !*p) goto ext_invalid;
-	if (*p == 'i')
-		planes = FB_TYPE_INTERLEAVED_PLANES;
-	else if (*p == 'p')
-		planes = FB_TYPE_PACKED_PIXELS;
-	else if (*p == 'n')
-		planes = FB_TYPE_PLANES;
-	else if (*p == 't')
-		planes = -1; /* true color */
-	else
-		goto ext_invalid;
-
-
-	if (!(p = strsep(&ext_str, ";")) || !*p) goto ext_invalid;
-	addr = simple_strtoul(p, NULL, 0);
-
-	if (!(p = strsep(&ext_str, ";")) || !*p)
-		len = xres*yres*depth/8;
-	else
-		len = simple_strtoul(p, NULL, 0);
-
-	if ((p = strsep(&ext_str, ";")) && *p) {
-		external_vgaiobase=simple_strtoul(p, NULL, 0);
-	}
-
-	if ((p = strsep(&ext_str, ";")) && *p) {
-		external_bitspercol = simple_strtoul(p, NULL, 0);
-		if (external_bitspercol > 8)
-			external_bitspercol = 8;
-		else if (external_bitspercol < 1)
-			external_bitspercol = 1;
-	}
-	
-	if ((p = strsep(&ext_str, ";")) && *p) {
-		if (!strcmp(p, "vga"))
-			external_card_type = IS_VGA;
-		if (!strcmp(p, "mv300"))
-			external_card_type = IS_MV300;
-	}
-
-	if ((p = strsep(&ext_str, ";")) && *p) {
-		xres_virtual = simple_strtoul(p, NULL, 10);
-		if (xres_virtual < xres)
-			xres_virtual = xres;
-		if (xres_virtual*yres*depth/8 > len)
-			len=xres_virtual*yres*depth/8;
-	}
-
-	external_xres  = xres;
-	external_xres_virtual  = xres_virtual;
-	external_yres  = yres;
-	external_depth = depth;
-	external_pmode = planes;
-	external_addr  = (void *)addr;
-	external_len   = len;
-		
-	if (external_card_type == IS_MV300)
-	  switch (external_depth) {
-	    case 1:
-	      MV300_reg = MV300_reg_1bit;
-	      break;
-	    case 4:
-	      MV300_reg = MV300_reg_4bit;
-	      break;
-	    case 8:
-	      MV300_reg = MV300_reg_8bit;
-	      break;
-	    }
-
-      ext_invalid:
-	;
-    }
-#endif /* ATAFB_EXT */
-
-#ifdef ATAFB_FALCON
-    if (*mcap_spec) {
-	char *p;
-	int vmin, vmax, hmin, hmax;
-
-	/* Format for monitor capabilities is: <Vmin>;<Vmax>;<Hmin>;<Hmax>
-	 * <V*> vertical freq. in Hz
-	 * <H*> horizontal freq. in kHz
-	 */
-	if (!(p = strsep(&mcap_spec, ";")) || !*p) goto cap_invalid;
-	vmin = simple_strtoul(p, NULL, 10);
-	if (vmin <= 0) goto cap_invalid;
-	if (!(p = strsep(&mcap_spec, ";")) || !*p) goto cap_invalid;
-	vmax = simple_strtoul(p, NULL, 10);
-	if (vmax <= 0 || vmax <= vmin) goto cap_invalid;
-	if (!(p = strsep(&mcap_spec, ";")) || !*p) goto cap_invalid;
-	hmin = 1000 * simple_strtoul(p, NULL, 10);
-	if (hmin <= 0) goto cap_invalid;
-	if (!(p = strsep(&mcap_spec, "")) || !*p) goto cap_invalid;
-	hmax = 1000 * simple_strtoul(p, NULL, 10);
-	if (hmax <= 0 || hmax <= hmin) goto cap_invalid;
-
-	fb_info.monspecs.vfmin = vmin;
-	fb_info.monspecs.vfmax = vmax;
-	fb_info.monspecs.hfmin = hmin;
-	fb_info.monspecs.hfmax = hmax;
-      cap_invalid:
-	;
-    }
-#endif
-
-	if (*user_mode) {
-		/* Format of user defined video mode is: <xres>;<yres>;<depth>
-		 */
-		char *p;
-		int xres, yres, depth, temp;
-
-		if (!(p = strsep(&user_mode, ";")) || !*p) goto user_invalid;
-		xres = simple_strtoul(p, NULL, 10);
-		if (!(p = strsep(&user_mode, ";")) || !*p) goto user_invalid;
-		yres = simple_strtoul(p, NULL, 10);
-		if (!(p = strsep(&user_mode, "")) || !*p) goto user_invalid;
-		depth = simple_strtoul(p, NULL, 10);
-		if ((temp=get_video_mode("user0"))) {
-			default_par=temp;
-			atafb_predefined[default_par-1].xres = xres;
-			atafb_predefined[default_par-1].yres = yres;
-			atafb_predefined[default_par-1].bits_per_pixel = depth;
-		}
-
-	  user_invalid:
-		;
-	}
-	return 0;
+    return 0;
 }
 
 #ifdef MODULE
