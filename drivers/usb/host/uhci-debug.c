@@ -418,7 +418,7 @@ static int uhci_sprint_schedule(struct uhci_hcd *uhci, char *buf, int len)
 {
 	unsigned long flags;
 	char *out = buf;
-	int i;
+	int i, j;
 	struct uhci_qh *qh;
 	struct uhci_td *td;
 	struct list_head *tmp, *head;
@@ -473,10 +473,11 @@ static int uhci_sprint_schedule(struct uhci_hcd *uhci, char *buf, int len)
 			continue;
 		}
 
+		j = (i < 7) ? 7 : i+1;		/* Next skeleton */
 		if (list_empty(&qh->list)) {
 			if (i < UHCI_NUM_SKELQH - 1) {
 				if (qh->link !=
-				    (cpu_to_le32(uhci->skelqh[i + 1]->dma_handle) | UHCI_PTR_QH)) {
+				    (cpu_to_le32(uhci->skelqh[j]->dma_handle) | UHCI_PTR_QH)) {
 					show_qh_name();
 					out += sprintf(out, "    skeleton QH not linked to next skeleton QH!\n");
 				}
@@ -500,7 +501,7 @@ static int uhci_sprint_schedule(struct uhci_hcd *uhci, char *buf, int len)
 
 		if (i < UHCI_NUM_SKELQH - 1) {
 			if (qh->link !=
-			    (cpu_to_le32(uhci->skelqh[i + 1]->dma_handle) | UHCI_PTR_QH))
+			    (cpu_to_le32(uhci->skelqh[j]->dma_handle) | UHCI_PTR_QH))
 				out += sprintf(out, "    last QH not linked to next skeleton!\n");
 		}
 	}
