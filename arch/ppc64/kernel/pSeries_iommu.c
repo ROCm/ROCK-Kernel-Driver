@@ -90,7 +90,7 @@ static void tce_free_pSeries(struct iommu_table *tbl, long index, long npages)
 
 static void iommu_buses_init(void)
 {
-	struct pci_controller* phb;
+	struct pci_controller *phb, *tmp;
 	struct device_node *dn, *first_dn;
 	int num_slots, num_slots_ilog2;
 	int first_phb = 1;
@@ -106,10 +106,10 @@ static void iommu_buses_init(void)
 	else
 		tcetable_ilog2 = 22;
 
-	/* XXX Should we be using pci_root_buses instead?  -ojn 
+	/* XXX Should we be using pci_root_buses instead?  -ojn
 	 */
 
-	for (phb=hose_head; phb; phb=phb->next) {
+	list_for_each_entry_safe(phb, tmp, &hose_list, list_node) {
 		first_dn = ((struct device_node *)phb->arch_data)->child;
 
 		/* Carve 2GB into the largest dma_window_size possible */

@@ -67,7 +67,7 @@ nlm_lookup_file(struct svc_rqst *rqstp, struct nlm_file **result,
 	down(&nlm_file_sema);
 
 	for (file = nlm_files[hash]; file; file = file->f_next)
-		if (!memcmp(&file->f_handle, f, sizeof(*f)))
+		if (!nfs_compare_fh(&file->f_handle, f))
 			goto found;
 
 	dprintk("lockd: creating file for (%08x %08x %08x %08x %08x %08x)\n",

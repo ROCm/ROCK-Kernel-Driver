@@ -343,15 +343,18 @@ static int enable_surveillance(int timeout)
 {
 	int error;
 
-	error = rtas_call(rtas_token("set-indicator"), 3, 1, NULL,
-			  SURVEILLANCE_TOKEN, 0, timeout);
+	error = rtas_set_indicator(SURVEILLANCE_TOKEN, 0, timeout);
 
-	if (error) {
-		printk(KERN_ERR "rtasd: could not enable surveillance\n");
-		return -1;
+	if (error == 0)
+		return 0;
+
+	if (error == RTAS_NO_SUCH_INDICATOR) {
+		printk(KERN_INFO "rtasd: surveillance not supported\n");
+		return 0;
 	}
 
-	return 0;
+	printk(KERN_ERR "rtasd: could not update surveillance\n");
+	return -1;
 }
 
 static int get_eventscan_parms(void)

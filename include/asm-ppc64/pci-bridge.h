@@ -33,9 +33,9 @@ enum phb_types {
 struct pci_controller {
 	char what[8];                     /* Eye catcher      */
 	enum phb_types type;              /* Type of hardware */
-	struct pci_controller *next;
 	struct pci_bus *bus;
 	void *arch_data;
+	struct list_head list_node;
 
 	int first_busno;
 	int last_busno;

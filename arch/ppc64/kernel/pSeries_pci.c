@@ -729,9 +729,9 @@ EXPORT_SYMBOL(remap_bus_range);
 
 static void phbs_fixup_io(void)
 {
-	struct pci_controller *hose;
+	struct pci_controller *hose, *tmp;
 
-	for (hose=hose_head;hose;hose=hose->next) 
+	list_for_each_entry_safe(hose, tmp, &hose_list, list_node)
 		remap_bus_range(hose->bus);
 }
 
@@ -764,8 +764,8 @@ struct pci_controller*
 pci_find_hose_for_OF_device(struct device_node *node)
 {
 	while (node) {
-		struct pci_controller *hose;
-		for (hose=hose_head;hose;hose=hose->next)
+		struct pci_controller *hose, *tmp;
+		list_for_each_entry_safe(hose, tmp, &hose_list, list_node)
 			if (hose->arch_data == node)
 				return hose;
 		node=node->parent;

@@ -135,7 +135,7 @@ destroy_context(struct mm_struct *mm)
 	spin_unlock_irqrestore(&mmu_context_queue.lock, flags);
 }
 
-extern void flush_stab(struct task_struct *tsk, struct mm_struct *mm);
+extern void switch_stab(struct task_struct *tsk, struct mm_struct *mm);
 extern void switch_slb(struct task_struct *tsk, struct mm_struct *mm);
 
 /*
@@ -163,7 +163,7 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 	if (cur_cpu_spec->cpu_features & CPU_FTR_SLB)
 		switch_slb(tsk, next);
 	else
-		flush_stab(tsk, next);
+		switch_stab(tsk, next);
 }
 
 #define deactivate_mm(tsk,mm)	do { } while (0)

@@ -23,6 +23,7 @@
 #include <linux/bootmem.h>
 #include <linux/module.h>
 #include <linux/mm.h>
+#include <linux/list.h>
 
 #include <asm/processor.h>
 #include <asm/io.h>
@@ -57,8 +58,7 @@ unsigned long pci_io_base;
 
 void iSeries_pcibios_init(void);
 
-struct pci_controller *hose_head;
-struct pci_controller **hose_tail = &hose_head;
+LIST_HEAD(hose_list);
 
 struct pci_dma_ops pci_dma_ops;
 EXPORT_SYMBOL(pci_dma_ops);
@@ -221,9 +221,9 @@ pci_alloc_pci_controller(enum phb_types controller_type)
 		memcpy(hose->what,model,7);
         hose->type = controller_type;
         hose->global_number = global_phb_number++;
-        
-        *hose_tail = hose;
-        hose_tail = &hose->next;
+
+	list_add_tail(&hose->list_node, &hose_list);
+
         return hose;
 }
 
@@ -263,7 +263,7 @@ static void __init pcibios_claim_of_setup(void)
 
 static int __init pcibios_init(void)
 {
-	struct pci_controller *hose;
+	struct pci_controller *hose, *tmp;
 	struct pci_bus *bus;
 
 #ifdef CONFIG_PPC_ISERIES
@@ -274,7 +274,7 @@ static int __init pcibios_init(void)
 	printk("PCI: Probing PCI hardware\n");
 
 	/* Scan all of the recorded PCI controllers.  */
-	for (hose = hose_head; hose; hose = hose->next) {
+	list_for_each_entry_safe(hose, tmp, &hose_list, list_node) {
 		hose->last_busno = 0xff;
 		bus = pci_scan_bus(hose->first_busno, hose->ops,
 				   hose->arch_data);
