@@ -124,27 +124,6 @@ extern const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE];
 #define SCSI_2          3
 #define SCSI_3          4
 
-/*
- *  Every SCSI command starts with a one byte OP-code.
- *  The next byte's high three bits are the LUN of the
- *  device.  Any multi-byte quantities are stored high byte
- *  first, and may have a 5 bit MSB in the same byte
- *  as the LUN.
- */
-
-/*
- *  As the scsi do command functions are intelligent, and may need to
- *  redo a command, we need to keep track of the last command
- *  executed on each one.
- */
-
-#define WAS_RESET       0x01
-#define WAS_TIMEDOUT    0x02
-#define WAS_SENSE       0x04
-#define IS_RESETTING    0x08
-#define IS_ABORTING     0x10
-#define ASKED_FOR_SENSE 0x20
-#define SYNC_RESET      0x40
 
 struct Scsi_Host;
 struct scsi_cmnd;

@@ -497,7 +497,6 @@ void scsi_init_cmd_from_req(struct scsi_cmnd *cmd, struct scsi_request *sreq)
 	cmd->serial_number_at_timeout = 0;
 	cmd->bufflen = sreq->sr_bufflen;
 	cmd->buffer = sreq->sr_buffer;
-	cmd->flags = 0;
 	cmd->retries = 0;
 	cmd->allowed = sreq->sr_allowed;
 	cmd->done = sreq->sr_done;

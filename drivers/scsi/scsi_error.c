@@ -323,17 +323,6 @@ static int scsi_eh_completed_normally(struct scsi_cmnd *scmd)
 	 * that would indicate what we need to do.
 	 */
 	if (host_byte(scmd->result) == DID_RESET) {
-		if (scmd->flags & IS_RESETTING) {
-			/*
-			 * ok, this is normal.  we don't know whether in fact
-			 * the command in question really needs to be rerun
-			 * or not - if this was the original data command then
-			 * the answer is yes, otherwise we just flag it as
-			 * SUCCESS.
-			 */
-			scmd->flags &= ~IS_RESETTING;
-			return NEEDS_RETRY;
-		}
 		/*
 		 * rats.  we are already in the error handler, so we now
 		 * get to try and figure out what to do next.  if the sense
@@ -1217,14 +1206,6 @@ int scsi_decide_disposition(struct scsi_cmnd *scmd)
 			return FAILED;
 		}
 	case DID_RESET:
-		/*
-		 * in the normal case where we haven't initiated a reset,
-		 * this is a failure.
-		 */
-		if (scmd->flags & IS_RESETTING) {
-			scmd->flags &= ~IS_RESETTING;
-			goto maybe_retry;
-		}
 		return SUCCESS;
 	default:
 		return FAILED;
