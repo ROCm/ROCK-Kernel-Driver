@@ -303,10 +303,10 @@ static void longhaul_setstate (unsigned int clock_ratio_index)
 	union msr_longhaul longhaul;
 	union msr_bcr2 bcr2;
 
-	if (clock_ratio[clock_ratio_index] == -1)
+	mult = clock_ratio[clock_ratio_index];
+	if (mult == -1)
 		return;
 
-	mult = clock_ratio[clock_ratio_index];
 	speed = calc_speed (mult, fsb);
 	if ((speed > highest_speed) || (speed < lowest_speed))
 		return;
@@ -450,12 +450,14 @@ static int __init longhaul_get_ranges (void)
 	if(!longhaul_table)
 		return -ENOMEM;
 
-	for (j=0; (j<numscales); j++) {
-		if (clock_ratio[j] == -1)
+	for (j=0; j < numscales; j++) {
+		unsigned int ratio;
+		ratio = clock_ratio[j];
+		if (ratio == -1)
 			continue;
-		if (((unsigned int)clock_ratio[j] > maxmult) || ((unsigned int)clock_ratio[j] < minmult))
+		if (ratio > maxmult || ratio < minmult)
 			continue;
-		longhaul_table[k].frequency = calc_speed (clock_ratio[j], fsb);
+		longhaul_table[k].frequency = calc_speed (ratio, fsb);
 		longhaul_table[k].index	= (j << 8);
 		k++;
 	}
