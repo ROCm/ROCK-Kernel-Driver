@@ -211,7 +211,7 @@ nfsd(struct svc_rqst *rqstp)
 		svc_process(serv, rqstp);
 
 		/* Unlock export hash tables */
-		exp_unlock();
+		exp_readunlock();
 		update_thread_usage(nfsd_busy);
 		nfsd_busy--;
 	}

@@ -20,6 +20,7 @@
 #include <linux/stat.h>
 #include <linux/in.h>
 #include <linux/seq_file.h>
+#include <linux/rwsem.h>
 
 #include <linux/sunrpc/svc.h>
 #include <linux/nfsd/nfsd.h>
@@ -60,10 +61,6 @@ struct svc_clnthash {
 static struct svc_clnthash *	clnt_hash[CLIENT_HASHMAX];
 static svc_client *		clients;
 
-static int			hash_lock;
-static int			want_lock;
-static int			hash_count;
-static DECLARE_WAIT_QUEUE_HEAD(	hash_wait );
 
 /*
  * Find the client's export entry matching xdev/xino.
@@ -163,6 +160,39 @@ static void exp_change_parents(svc_client *clp, svc_export *old, svc_export *new
 }
 
 /*
+ * Hashtable locking. Write locks are placed only by user processes
+ * wanting to modify export information.
+ * Write locking only done in this file.  Read locking
+ * needed externally.
+ */
+
+static DECLARE_RWSEM(hash_sem);
+
+void
+exp_readlock(void)
+{
+	down_read(&hash_sem);
+}
+
+static inline void
+exp_writelock(void)
+{
+	down_write(&hash_sem);
+}
+
+void
+exp_readunlock(void)
+{
+	up_read(&hash_sem);
+}
+
+static inline void
+exp_writeunlock(void)
+{
+	up_write(&hash_sem);
+}
+
+/*
  * Export a file system.
  */
 int
@@ -189,11 +219,9 @@ exp_export(struct nfsctl_export *nxp)
 	ino = nxp->ex_ino;
 
 	/* Try to lock the export table for update */
-	if ((err = exp_writelock()) < 0)
-		goto out;
+	exp_writelock();
 
 	/* Look up client info */
-	err = -EINVAL;
 	if (!(clp = exp_getclientbyname(nxp->ex_client)))
 		goto out_unlock;
 
@@ -278,7 +306,7 @@ exp_export(struct nfsctl_export *nxp)
 
 	/* Unlock hashtable */
 out_unlock:
-	exp_unlock();
+	exp_writeunlock();
 out:
 	return err;
 
@@ -345,8 +373,7 @@ exp_unexport(struct nfsctl_export *nxp)
 	if (!exp_verify_string(nxp->ex_client, NFSCLNT_IDMAX))
 		return -EINVAL;
 
-	if ((err = exp_writelock()) < 0)
-		goto out;
+	exp_writelock();
 
 	err = -EINVAL;
 	clp = exp_getclientbyname(nxp->ex_client);
@@ -361,8 +388,7 @@ exp_unexport(struct nfsctl_export *nxp)
 		}
 	}
 
-	exp_unlock();
-out:
+	exp_writeunlock();
 	return err;
 }
 
@@ -415,58 +441,6 @@ out:
 	return err;
 }
 
-/*
- * Hashtable locking. Write locks are placed only by user processes
- * wanting to modify export information.
- */
-void
-exp_readlock(void)
-{
-	while (hash_lock || want_lock)
-		sleep_on(&hash_wait);
-	hash_count++;
-}
-
-int
-exp_writelock(void)
-{
-	/* fast track */
-	if (!hash_count && !hash_lock) {
-	lock_it:
-		hash_lock = 1;
-		return 0;
-	}
-
-	clear_thread_flag(TIF_SIGPENDING);
-	want_lock++;
-	while (hash_count || hash_lock) {
-		interruptible_sleep_on(&hash_wait);
-		if (signal_pending(current))
-			break;
-	}
-	want_lock--;
-
-	/* restore the task's signals */
-	spin_lock_irq(&current->sigmask_lock);
-	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
-
-	if (!hash_count && !hash_lock)
-		goto lock_it;
-	return -EINTR;
-}
-
-void
-exp_unlock(void)
-{
-	if (!hash_count && !hash_lock)
-		printk(KERN_WARNING "exp_unlock: not locked!\n");
-	if (hash_count)
-		hash_count--;
-	else
-		hash_lock = 0;
-	wake_up(&hash_wait);
-}
 
 /*
  * Find a valid client given an inet address. We always move the most
@@ -572,7 +546,7 @@ static void *e_next(struct seq_file *m, void *p, loff_t *pos)
 
 static void e_stop(struct seq_file *m, void *p)
 {
-	exp_unlock();
+	exp_readunlock();
 }
 
 struct flags {
@@ -688,8 +662,7 @@ exp_addclient(struct nfsctl_client *ncp)
 		goto out;
 
 	/* Lock the hashtable */
-	if ((err = exp_writelock()) < 0)
-		goto out;
+	exp_writelock();
 
 	/* First check if this is a change request for a client. */
 	for (clp = clients; clp; clp = clp->cl_next)
@@ -754,7 +727,7 @@ exp_addclient(struct nfsctl_client *ncp)
 	err = 0;
 
 out_unlock:
-	exp_unlock();
+	exp_writeunlock();
 out:
 	return err;
 }
@@ -773,10 +746,8 @@ exp_delclient(struct nfsctl_client *ncp)
 		goto out;
 
 	/* Lock the hashtable */
-	if ((err = exp_writelock()) < 0)
-		goto out;
+	exp_writelock();
 
-	err = -EINVAL;
 	for (clpp = &clients; (clp = *clpp); clpp = &(clp->cl_next))
 		if (!strcmp(ncp->cl_ident, clp->cl_ident))
 			break;
@@ -787,7 +758,7 @@ exp_delclient(struct nfsctl_client *ncp)
 		err = 0;
 	}
 
-	exp_unlock();
+	exp_writeunlock();
 out:
 	return err;
 }
@@ -893,16 +864,14 @@ nfsd_export_shutdown(void)
 
 	dprintk("nfsd: shutting down export module.\n");
 
-	if (exp_writelock() < 0) {
-		printk(KERN_WARNING "Weird: hashtable locked in exp_shutdown");
-		return;
-	}
+	exp_writelock();
+
 	for (i = 0; i < CLIENT_HASHMAX; i++) {
 		while (clnt_hash[i])
 			exp_freeclient(clnt_hash[i]->h_client);
 	}
 	clients = NULL; /* we may be restarted before the module unloads */
 	
-	exp_unlock();
+	exp_writeunlock();
 	dprintk("nfsd: export shutdown complete.\n");
 }

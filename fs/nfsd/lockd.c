@@ -62,7 +62,7 @@ nlm_fclose(struct file *filp)
 
 struct nlmsvc_binding		nfsd_nlm_ops = {
 	exp_readlock,		/* lock export table for reading */
-	exp_unlock,		/* unlock export table */
+	exp_readunlock,		/* unlock export table */
 	exp_getclient,		/* look up NFS client */
 	nlm_fopen,		/* open file for locking */
 	nlm_fclose,		/* close file */

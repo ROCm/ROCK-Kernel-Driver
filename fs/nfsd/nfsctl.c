@@ -121,7 +121,7 @@ nfsctl_getfs(struct nfsctl_fsparm *data, struct knfsd_fh *res)
 		err = -EPERM;
 	else
 		err = exp_rootfh(clp, data->gd_path, res, data->gd_maxlen);
-	exp_unlock();
+	exp_readunlock();
 	return err;
 }
 
@@ -144,7 +144,7 @@ nfsctl_getfd(struct nfsctl_fdparm *data, __u8 *res)
 		err = -EPERM;
 	else
 		err = exp_rootfh(clp, data->gd_path, &fh, NFS_FHSIZE);
-	exp_unlock();
+	exp_readunlock();
 
 	if (err == 0) {
 		if (fh.fh_size > NFS_FHSIZE)
