@@ -29,8 +29,8 @@
 #include <linux/types.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
-#include "acpi_bus.h"
-#include "acpi_drivers.h"
+#include <acpi/acpi_bus.h>
+#include <acpi/acpi_drivers.h>
 
 
 #define ACPI_AC_COMPONENT		0x00020000
