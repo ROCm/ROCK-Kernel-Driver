@@ -75,8 +75,8 @@ typedef unsigned int   U032;
  */
 #include <asm/io.h>
 
-#define NV_WR08(p,i,d)  (__raw_writeb((d), (void __iomem *)(p) + (i)))
-#define NV_RD08(p,i)    (__raw_readb((void __iomem *)(p) + (i)))
+#define NV_WR08(p,i,d)  (writeb((d), (void __iomem *)(p) + (i)))
+#define NV_RD08(p,i)    (readb((void __iomem *)(p) + (i)))
 #define NV_WR16(p,i,d)  (__raw_writew((d), (void __iomem *)(p) + (i)))
 #define NV_RD16(p,i)    (__raw_readw((void __iomem *)(p) + (i)))
 #define NV_WR32(p,i,d)  (__raw_writel((d), (void __iomem *)(p) + (i)))
