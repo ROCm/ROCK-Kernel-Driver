@@ -455,30 +455,51 @@ static int rename_ctl(snd_card_t *card, const char *src, const char *dst)
 
 int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 {
-	ac97_t ac97;
 	int err, pcm;
 	snd_kcontrol_t *kctl;
 	snd_card_t *card = emu->card;
 
 	if (!emu->no_ac97) {
+		ac97_bus_t bus, *pbus;
+		ac97_t ac97;
+
+		memset(&bus, 0, sizeof(bus));
+		bus.write = snd_emu10k1_ac97_write;
+		bus.read = snd_emu10k1_ac97_read;
+		if ((err = snd_ac97_bus(emu->card, &bus, &pbus)) < 0)
+			return err;
+		
 		memset(&ac97, 0, sizeof(ac97));
-		ac97.write = snd_emu10k1_ac97_write;
-		ac97.read = snd_emu10k1_ac97_read;
 		ac97.private_data = emu;
 		ac97.private_free = snd_emu10k1_mixer_free_ac97;
-		if ((err = snd_ac97_mixer(emu->card, &ac97, &emu->ac97)) < 0)
+		if ((err = snd_ac97_mixer(pbus, &ac97, &emu->ac97)) < 0)
 			return err;
-		if (emu->audigy && emu->revision == 4) {
-			/* Master/PCM controls on ac97 of Audigy2 has no effect */
-			/* FIXME: keep master volume/switch to be sure.
-			 * once after we check that they play really no roles,
-			 * they shall be removed.
-			 */
-			rename_ctl(card, "Master Playback Switch", "AC97 Master Playback Switch");
-			rename_ctl(card, "Master Playback Volume", "AC97 Master Playback Volume");
+		if (emu->audigy) {
+			/* Master/PCM controls on ac97 of Audigy has no effect */
 			/* pcm controls are removed */
 			remove_ctl(card, "PCM Playback Switch");
 			remove_ctl(card, "PCM Playback Volume");
+			remove_ctl(card, "Master Mono Playback Switch");
+			remove_ctl(card, "Master Mono Playback Volume");
+			remove_ctl(card, "Master Playback Switch");
+			remove_ctl(card, "Master Playback Volume");
+			remove_ctl(card, "PCM Out Path & Mute");
+			remove_ctl(card, "Mono Output Select");
+			
+			/* set master volume to 0 dB */
+			snd_ac97_write(emu->ac97, AC97_MASTER, 0x0202);
+			/* set capture source to mic */
+			snd_ac97_write(emu->ac97, AC97_REC_SEL, 0x0000);
+			
+			/* remove unused AC97 capture controls */
+			remove_ctl(card, "Capture Source");
+			remove_ctl(card, "Capture Switch");
+			remove_ctl(card, "Capture Volume");
+			remove_ctl(card, "Mic Select");
+			remove_ctl(card, "Video Playback Switch");
+			remove_ctl(card, "Video Playback Volume");
+			remove_ctl(card, "Mic Playback Switch");
+			remove_ctl(card, "Mic Playback Volume");
 		}
 	} else {
 		if (emu->APS)
@@ -489,12 +510,12 @@ int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 			strcpy(emu->card->mixername, "Emu10k1");
 	}
 
-	if (emu->audigy && emu->revision == 4) {
-		/* Audigy2 and Audigy2 EX */
+	if (emu->audigy) {
 		/* use the conventional names */
 		rename_ctl(card, "Wave Playback Volume", "PCM Playback Volume");
-		rename_ctl(card, "Wave Playback Volume", "PCM Capture Volume");
+		/* rename_ctl(card, "Wave Capture Volume", "PCM Capture Volume"); */
 		rename_ctl(card, "Wave Master Playback Volume", "Master Playback Volume");
+		rename_ctl(card, "AMic Playback Volume", "Mic Playback Volume");
 	}
 
 	if ((kctl = emu->ctl_send_routing = snd_ctl_new1(&snd_emu10k1_send_routing_control, emu)) == NULL)
@@ -536,6 +557,11 @@ int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 			return -ENOMEM;
 		if ((err = snd_ctl_add(card, kctl)))
 			return err;
+		if ((kctl = ctl_find(card, SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT))) != NULL) {
+			/* already defined by ac97, remove it */
+			/* FIXME: or do we need both controls? */
+			remove_ctl(card, SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT));
+		}
 		if ((kctl = snd_ctl_new1(&snd_emu10k1_spdif_control, emu)) == NULL)
 			return -ENOMEM;
 		if ((err = snd_ctl_add(card, kctl)))

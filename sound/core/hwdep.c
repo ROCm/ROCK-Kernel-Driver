@@ -214,7 +214,7 @@ static int snd_hwdep_dsp_load(snd_hwdep_t *hw, snd_hwdep_dsp_image_t *_info)
 	snd_hwdep_dsp_image_t info;
 	int err;
 	
-	if (! hw->ops.dsp_load || ! hw->ops.dsp_status)
+	if (! hw->ops.dsp_load)
 		return -ENXIO;
 	memset(&info, 0, sizeof(info));
 	if (copy_from_user(&info, _info, sizeof(info)))
@@ -487,7 +487,6 @@ static int __init alsa_hwdep_init(void)
 
 	memset(snd_hwdep_devices, 0, sizeof(snd_hwdep_devices));
 	if ((entry = snd_info_create_module_entry(THIS_MODULE, "hwdep", NULL)) != NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
 		entry->c.text.read_size = 512;
 		entry->c.text.read = snd_hwdep_proc_read;
 		if (snd_info_register(entry) < 0) {

@@ -45,7 +45,7 @@
   snd-seq-client-62 as "off".  This will help modprobe.
 
   The number of ports to be created can be specified via the module
-  paramter "ports".  For example, to create four ports, add the
+  parameter "ports".  For example, to create four ports, add the
   following option in /etc/modules.conf:
 
 	option snd-seq-dummy ports=4

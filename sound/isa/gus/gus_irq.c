@@ -136,7 +136,7 @@ void snd_gus_irq_profile_init(snd_gus_card_t *gus)
 	snd_info_entry_t *entry;
 
 	if (! snd_card_proc_new(gus->card, "gusirq", &entry))
-		snd_info_set_text_ops(entry, gus, snd_gus_irq_info_read);
+		snd_info_set_text_ops(entry, gus, 1024, snd_gus_irq_info_read);
 }
 
 #endif

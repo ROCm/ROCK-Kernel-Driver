@@ -611,6 +611,10 @@ static int vx_pcm_playback_open(snd_pcm_substream_t *subs)
 	runtime->hw.period_bytes_min = chip->ibl.size;
 	runtime->private_data = pipe;
 
+	/* align to 4 bytes (otherwise will be problematic when 24bit is used) */ 
+	snd_pcm_hw_constraint_step(runtime, 0, SNDRV_PCM_HW_PARAM_BUFFER_BYTES, 4);
+	snd_pcm_hw_constraint_step(runtime, 0, SNDRV_PCM_HW_PARAM_PERIOD_BYTES, 4);
+
 	return 0;
 }
 
@@ -1014,6 +1018,10 @@ static int vx_pcm_capture_open(snd_pcm_substream_t *subs)
 	runtime->hw = vx_pcm_capture_hw;
 	runtime->hw.period_bytes_min = chip->ibl.size;
 	runtime->private_data = pipe;
+
+	/* align to 4 bytes (otherwise will be problematic when 24bit is used) */ 
+	snd_pcm_hw_constraint_step(runtime, 0, SNDRV_PCM_HW_PARAM_BUFFER_BYTES, 4);
+	snd_pcm_hw_constraint_step(runtime, 0, SNDRV_PCM_HW_PARAM_PERIOD_BYTES, 4);
 
 	return 0;
 }

@@ -47,7 +47,7 @@ typedef struct {
 	snd_timer_id_t		alsa_id;	/* ALSA's timer ID */
 	snd_timer_instance_t	*timeri;	/* timer instance */
 	unsigned int		ticks;
-	unsigned long		preferred_resolution; /* timer resolution */
+	unsigned long		preferred_resolution; /* timer resolution, ticks/sec */
 
 	unsigned int skew;
 	unsigned int skew_base;

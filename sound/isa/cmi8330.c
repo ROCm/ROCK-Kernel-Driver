@@ -658,11 +658,11 @@ static int __init alsa_card_cmi8330_setup(char *str)
 	       get_option(&str,&index[nr_dev]) == 2 &&
 	       get_id(&str,&id[nr_dev]) == 2 &&
 	       get_option(&str,&pnp) == 2 &&
-	       get_option(&str,(int *)&sbport[nr_dev]) == 2 &&
+	       get_option_long(&str,&sbport[nr_dev]) == 2 &&
 	       get_option(&str,&sbirq[nr_dev]) == 2 &&
 	       get_option(&str,&sbdma8[nr_dev]) == 2 &&
 	       get_option(&str,&sbdma16[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&wssport[nr_dev]) == 2 &&
+	       get_option_long(&str,&wssport[nr_dev]) == 2 &&
 	       get_option(&str,&wssirq[nr_dev]) == 2 &&
 	       get_option(&str,&wssdma[nr_dev]) == 2);
 #ifdef CONFIG_PNP
