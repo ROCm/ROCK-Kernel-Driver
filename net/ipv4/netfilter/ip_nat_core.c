@@ -68,6 +68,7 @@ hash_by_src(const struct ip_conntrack_manip *manip, u_int16_t proto)
 static void ip_nat_cleanup_conntrack(struct ip_conntrack *conn)
 {
 	struct ip_nat_info *info = &conn->nat.info;
+	unsigned int hs, hp;
 
 	if (!info->initialized)
 		return;
@@ -75,21 +76,18 @@ static void ip_nat_cleanup_conntrack(struct ip_conntrack *conn)
 	IP_NF_ASSERT(info->bysource.conntrack);
 	IP_NF_ASSERT(info->byipsproto.conntrack);
 
-	WRITE_LOCK(&ip_nat_lock);
-	LIST_DELETE(&bysource[hash_by_src(&conn->tuplehash[IP_CT_DIR_ORIGINAL]
-					  .tuple.src,
-					  conn->tuplehash[IP_CT_DIR_ORIGINAL]
-					  .tuple.dst.protonum)],
-		    &info->bysource);
+	hs = hash_by_src(&conn->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src,
+	                 conn->tuplehash[IP_CT_DIR_ORIGINAL]
+	                 .tuple.dst.protonum);
 
-	LIST_DELETE(&byipsproto
-		    [hash_by_ipsproto(conn->tuplehash[IP_CT_DIR_REPLY]
-				      .tuple.src.ip,
-				      conn->tuplehash[IP_CT_DIR_REPLY]
-				      .tuple.dst.ip,
-				      conn->tuplehash[IP_CT_DIR_REPLY]
-				      .tuple.dst.protonum)],
-		    &info->byipsproto);
+	hp = hash_by_ipsproto(conn->tuplehash[IP_CT_DIR_REPLY].tuple.src.ip,
+	                      conn->tuplehash[IP_CT_DIR_REPLY].tuple.dst.ip,
+	                      conn->tuplehash[IP_CT_DIR_REPLY]
+	                      .tuple.dst.protonum);
+
+	WRITE_LOCK(&ip_nat_lock);
+	LIST_DELETE(&bysource[hs], &info->bysource);
+	LIST_DELETE(&byipsproto[hp], &info->byipsproto);
 	WRITE_UNLOCK(&ip_nat_lock);
 }
 
@@ -246,11 +244,12 @@ count_maps(u_int32_t src, u_int32_t dst, u_int16_t protonum,
 	   const struct ip_conntrack *conntrack)
 {
 	unsigned int score = 0;
+	unsigned int h;
 
 	MUST_BE_READ_LOCKED(&ip_nat_lock);
-	LIST_FIND(&byipsproto[hash_by_ipsproto(src, dst, protonum)],
-		  fake_cmp, struct ip_nat_hash *, src, dst, protonum, &score,
-		  conntrack);
+	h = hash_by_ipsproto(src, dst, protonum);
+	LIST_FIND(&byipsproto[h], fake_cmp, struct ip_nat_hash *,
+	          src, dst, protonum, &score, conntrack);
 
 	return score;
 }
