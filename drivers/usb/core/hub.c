@@ -1405,6 +1405,19 @@ hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port)
 			default: 		speed = "?";	break;
 			}; speed;}),
 			udev->devnum);
+
+	/* Set up TT records, if needed  */
+	if (hdev->tt) {
+		udev->tt = hdev->tt;
+		udev->ttport = hdev->ttport;
+	} else if (udev->speed != USB_SPEED_HIGH
+			&& hdev->speed == USB_SPEED_HIGH) {
+		struct usb_hub *hub;
+
+		hub = usb_get_intfdata(hdev->actconfig->interface[0]);
+		udev->tt = &hub->tt;
+		udev->ttport = port + 1;
+	}
  
 	/* Why interleave GET_DESCRIPTOR and SET_ADDRESS this way?
 	 * Because device hardware and firmware is sometimes buggy in
@@ -1614,16 +1627,6 @@ static void hub_port_connect_change(struct usb_hub *hub, int port,
 		status = hub_port_init(hdev, udev, port);
 		if (status < 0)
 			goto loop;
-
-		/* Set up TT records, if needed  */
-		if (hdev->tt) {
-			udev->tt = hdev->tt;
-			udev->ttport = hdev->ttport;
-		} else if (udev->speed != USB_SPEED_HIGH
-				&& hdev->speed == USB_SPEED_HIGH) {
-			udev->tt = &hub->tt;
-			udev->ttport = port + 1;
-		}
 
 		/* consecutive bus-powered hubs aren't reliable; they can
 		 * violate the voltage drop budget.  if the new child has
