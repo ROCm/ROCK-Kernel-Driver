@@ -34,6 +34,15 @@ ToDo/Notes:
 	- Update ->truncate (fs/ntfs/inode.c::ntfs_truncate()) to check if the
 	  inode size has changed and to only output an error if so.
 	- Rename fs/ntfs/attrib.h::attribute_value_length() to ntfs_attr_size().
+	- Add le{16,32,64} as well as sle{16,32,64} data types to
+	  fs/ntfs/types.h.
+	- Change ntfschar to be le16 instead of u16 in fs/ntfs/types.h.
+	- Add le versions of VCN, LCN, and LSN called leVCN, leLCN, and leLSN,
+	  respectively, to fs/ntfs/types.h.
+	- Update endianness conversion macros in fs/ntfs/endian.h to use the
+	  new types as appropriate.
+	- Do proper type casting when using sle64_to_cpup() in fs/ntfs/dir.c
+	  and index.c.
 
 2.1.18 - Fix scheduling latencies at mount time as well as an endianness bug.
 
