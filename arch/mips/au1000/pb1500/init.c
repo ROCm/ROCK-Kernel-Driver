@@ -1,7 +1,7 @@
 /*
  *
  * BRIEF MODULE DESCRIPTION
- *	PB1000 board setup
+ *	PB1500 board setup
  *
  * Copyright 2001 MontaVista Software Inc.
  * Author: MontaVista Software, Inc.
@@ -44,7 +44,7 @@ extern char *prom_getenv(char *envname);
 
 const char *get_system_type(void)
 {
-	return "Alchemy Pb1000";
+	return "Alchemy Pb1500";
 }
 
 int __init prom_init(int argc, char **argv, char **envp, int *prom_vec)
@@ -57,7 +57,7 @@ int __init prom_init(int argc, char **argv, char **envp, int *prom_vec)
 	prom_envp = envp;
 
 	mips_machgroup = MACH_GROUP_ALCHEMY;
-	mips_machtype = MACH_PB1000;
+	mips_machtype = MACH_PB1500;
 
 	prom_init_cmdline();
 	memsize_str = prom_getenv("memsize");

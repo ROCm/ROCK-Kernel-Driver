@@ -1,11 +1,13 @@
 /*
+ * FILE NAME au1000_gpio.h
  *
  * BRIEF MODULE DESCRIPTION
- *	PB1000 board setup
+ *	API to Alchemy Au1000 GPIO device.
+ *
+ *  Author: MontaVista Software, Inc.  <source@mvista.com>
+ *          Steve Longerbeam <stevel@mvista.com>
  *
  * Copyright 2001 MontaVista Software Inc.
- * Author: MontaVista Software, Inc.
- *         	ppopov@mvista.com or source@mvista.com
  *
  *  This program is free software; you can redistribute  it and/or modify it
  *  under  the terms of  the GNU General  Public License as published by the
@@ -27,45 +29,28 @@
  *  with this program; if not, write  to the Free Software Foundation, Inc.,
  *  675 Mass Ave, Cambridge, MA 02139, USA.
  */
-#include <linux/init.h>
-#include <linux/mm.h>
-#include <linux/sched.h>
-#include <linux/bootmem.h>
-#include <asm/addrspace.h>
-#include <asm/bootinfo.h>
-#include <linux/string.h>
-#include <linux/kernel.h>
-#include <linux/sched.h>
 
-int prom_argc;
-char **prom_argv, **prom_envp;
-extern void  __init prom_init_cmdline(void);
-extern char *prom_getenv(char *envname);
+#ifndef __AU1000_GPIO_H
+#define __AU1000_GPIO_H
 
-const char *get_system_type(void)
-{
-	return "Alchemy Pb1000";
-}
+#include <linux/ioctl.h>
 
-int __init prom_init(int argc, char **argv, char **envp, int *prom_vec)
-{
-	unsigned char *memsize_str;
-	unsigned long memsize;
+#define AU1000GPIO_IOC_MAGIC 'A'
 
-	prom_argc = argc;
-	prom_argv = argv;
-	prom_envp = envp;
+#define AU1000GPIO_IN		_IOR (AU1000GPIO_IOC_MAGIC, 0, int)
+#define AU1000GPIO_SET		_IOW (AU1000GPIO_IOC_MAGIC, 1, int)
+#define AU1000GPIO_CLEAR	_IOW (AU1000GPIO_IOC_MAGIC, 2, int)
+#define AU1000GPIO_OUT		_IOW (AU1000GPIO_IOC_MAGIC, 3, int)
+#define AU1000GPIO_TRISTATE	_IOW (AU1000GPIO_IOC_MAGIC, 4, int)
+#define AU1000GPIO_AVAIL_MASK	_IOR (AU1000GPIO_IOC_MAGIC, 5, int)
 
-	mips_machgroup = MACH_GROUP_ALCHEMY;
-	mips_machtype = MACH_PB1000;
+#ifdef __KERNEL__
+extern u32 get_au1000_avail_gpio_mask(void);
+extern int au1000gpio_tristate(u32 data);
+extern int au1000gpio_in(u32 *data);
+extern int au1000gpio_set(u32 data);
+extern int au1000gpio_clear(u32 data);
+extern int au1000gpio_out(u32 data);
+#endif
 
-	prom_init_cmdline();
-	memsize_str = prom_getenv("memsize");
-	if (!memsize_str) {
-		memsize = 0x04000000;
-	} else {
-		memsize = simple_strtol(memsize_str, NULL, 0);
-	}
-	add_memory_region(0, memsize, BOOT_MEM_RAM);
-	return 0;
-}
+#endif

@@ -1,9 +1,9 @@
 #
-#  Copyright 2000 MontaVista Software Inc.
+#  Copyright 2000,2001 MontaVista Software Inc.
 #  Author: MontaVista Software, Inc.
 #     	ppopov@mvista.com or source@mvista.com
 #
-# Makefile for the Alchemy Semiconductor PB1000 board.
+# Makefile for the Alchemy Semiconductor Pb1100 board.
 #
 # Note! Dependencies are done automagically by 'make dep', which also
 # removes any old dependencies. DON'T put your own dependencies here
@@ -12,6 +12,6 @@
 
 USE_STANDARD_AS_RULE := true
 
-O_TARGET := pb1000.o
+O_TARGET := pb1100.o
 
 obj-y := init.o setup.o

@@ -1,9 +1,9 @@
 /*
  *
  * BRIEF MODULE DESCRIPTION
- *	PB1000 board setup
+ *	Pb1100 board setup
  *
- * Copyright 2001 MontaVista Software Inc.
+ * Copyright 2002 MontaVista Software Inc.
  * Author: MontaVista Software, Inc.
  *         	ppopov@mvista.com or source@mvista.com
  *
@@ -27,12 +27,14 @@
  *  with this program; if not, write  to the Free Software Foundation, Inc.,
  *  675 Mass Ave, Cambridge, MA 02139, USA.
  */
+
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/sched.h>
 #include <linux/bootmem.h>
 #include <asm/addrspace.h>
 #include <asm/bootinfo.h>
+#include <linux/config.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -44,7 +46,7 @@ extern char *prom_getenv(char *envname);
 
 const char *get_system_type(void)
 {
-	return "Alchemy Pb1000";
+	return "Alchemy Pb1100";
 }
 
 int __init prom_init(int argc, char **argv, char **envp, int *prom_vec)
@@ -57,7 +59,7 @@ int __init prom_init(int argc, char **argv, char **envp, int *prom_vec)
 	prom_envp = envp;
 
 	mips_machgroup = MACH_GROUP_ALCHEMY;
-	mips_machtype = MACH_PB1000;
+	mips_machtype = MACH_PB1100;
 
 	prom_init_cmdline();
 	memsize_str = prom_getenv("memsize");
