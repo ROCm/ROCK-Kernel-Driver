@@ -45,6 +45,7 @@
 #include <linux/list.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
+#include <linux/init.h>
 #include <scsi/scsicam.h>
 
 #include "scsi.h"
