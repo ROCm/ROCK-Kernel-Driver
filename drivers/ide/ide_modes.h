@@ -201,7 +201,7 @@ byte ide_get_best_pio_mode (ide_drive_t *drive, byte mode_wanted, byte max_mode,
 		}
 
 #if 0
-		if (drive->id->major_rev_num & 0x0004) printf("ATA-2 ");
+		if (drive->id->major_rev_num & 0x0004) printk("ATA-2 ");
 #endif
 
 		/*

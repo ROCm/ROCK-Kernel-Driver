@@ -1164,6 +1164,29 @@ CONFIG_BLK_DEV_MAC_IDE
   devices (hard disks, CD-ROM drives, etc.) that are connected to the
   builtin IDE interface.
 
+MPC8xx IDE support
+CONFIG_BLK_DEV_MPC8xx_IDE
+  This option provides support for IDE on Motorola MPC8xx Systems.
+  Please see 'Type of MPC8xx IDE interface' for details.
+
+  If unsure, say N.
+
+Type of MPC8xx IDE interface
+CONFIG_IDE_8xx_PCCARD
+  Select how the IDE devices are connected to the MPC8xx system:
+
+  8xx_PCCARD uses the 8xx internal PCMCIA interface in combination
+             with a PC Card (e.g. ARGOSY portable Hard Disk Adapter),
+             ATA PC Card HDDs or ATA PC Flash Cards (example: TQM8xxL
+             systems)
+
+  8xx_DIRECT is used for directly connected IDE devices using the 8xx
+             internal PCMCIA interface (example: IVMS8 systems)
+
+  EXT_DIRECT is used for IDE devices directly connected to the 8xx
+             bus using some glue logic, but _not_ the 8xx internal
+             PCMCIA interface (example: IDIF860 systems)
+
 ICS IDE interface support
 CONFIG_BLK_DEV_IDE_ICSIDE
   On Acorn systems, say Y here if you wish to use the ICS IDE

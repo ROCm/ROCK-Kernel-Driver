@@ -1,4 +1,4 @@
-/* $Id: ethernet.c,v 1.17 2001/06/11 12:43:46 olof Exp $
+/* $Id: ethernet.c,v 1.18 2001/10/03 14:40:43 jonashg Exp $
  *
  * e100net.c: A network driver for the ETRAX 100LX network controller.
  *
@@ -7,6 +7,9 @@
  * The outline of this driver comes from skeleton.c.
  *
  * $Log: ethernet.c,v $
+ * Revision 1.18  2001/10/03 14:40:43  jonashg
+ * Update rx_bytes counter.
+ *
  * Revision 1.17  2001/06/11 12:43:46  olof
  * Modified defines for network LED behavior
  *
@@ -833,6 +836,7 @@ e100_rx(struct net_device *dev)
 	}
 
 	length += myNextRxDesc->hw_len; /* use hw_len for the last descr */
+	((struct net_local *)dev->priv)->stats.rx_bytes += length;
 
 #ifdef ETHDEBUG
 	printk("Got a packet of length %d:\n", length);

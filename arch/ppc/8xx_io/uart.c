@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.uart.c 1.14 06/27/01 14:49:55 trini
+ * BK Id: SCCS/s.uart.c 1.16 09/14/01 18:01:17 trini
  */
 /*
  *  UART driver for MPC860 CPM SCC or SMC
@@ -43,7 +43,7 @@
 #include <asm/uaccess.h>
 #include <asm/8xx_immap.h>
 #include <asm/mpc8xx.h>
-#include "commproc.h"
+#include <asm/commproc.h>
 #ifdef CONFIG_MAGIC_SYSRQ
 #include <linux/sysrq.h>
 #endif

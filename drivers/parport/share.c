@@ -42,10 +42,10 @@ unsigned long parport_default_timeslice = PARPORT_DEFAULT_TIMESLICE;
 int parport_default_spintime =  DEFAULT_SPIN_TIME;
 
 static struct parport *portlist = NULL, *portlist_tail = NULL;
-spinlock_t parportlist_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t parportlist_lock = SPIN_LOCK_UNLOCKED;
 
 static struct parport_driver *driver_chain = NULL;
-spinlock_t driverlist_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t driverlist_lock = SPIN_LOCK_UNLOCKED;
 
 /* What you can do to a port that's gone away.. */
 static void dead_write_lines (struct parport *p, unsigned char b){}

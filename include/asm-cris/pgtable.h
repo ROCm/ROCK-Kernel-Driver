@@ -3,6 +3,9 @@
  * HISTORY:
  *
  * $Log: pgtable.h,v $
+ * Revision 1.12  2001/08/11 00:28:00  bjornw
+ * PAGE_CHG_MASK and PAGE_NONE had somewhat untraditional values
+ *
  * Revision 1.11  2001/04/04 14:38:36  bjornw
  * Removed bad_pagetable handling and the _kernel functions
  *
@@ -215,9 +218,9 @@ static inline void flush_tlb(void)
 #define __WRITEABLE     (_PAGE_WRITE | _PAGE_SILENT_WRITE | _PAGE_MODIFIED)
 
 #define _PAGE_TABLE     (_PAGE_PRESENT | __READABLE | __WRITEABLE)
-#define _PAGE_CHG_MASK  (PAGE_MASK | _PAGE_ACCESSED | _PAGE_SILENT_WRITE)
+#define _PAGE_CHG_MASK  (PAGE_MASK | _PAGE_ACCESSED | _PAGE_MODIFIED)
 
-#define PAGE_NONE       __pgprot(_PAGE_PRESENT | __READABLE)
+#define PAGE_NONE       __pgprot(_PAGE_PRESENT | _PAGE_ACCESSED)
 #define PAGE_SHARED     __pgprot(_PAGE_PRESENT | __READABLE | _PAGE_WRITE | \
 				 _PAGE_ACCESSED)
 #define PAGE_COPY       __pgprot(_PAGE_PRESENT | __READABLE)  // | _PAGE_COW

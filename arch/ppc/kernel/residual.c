@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.residual.c 1.11 09/08/01 15:47:42 paulus
+ * BK Id: SCCS/s.residual.c 1.13 09/11/01 16:54:34 trini
  */
 /*
  * Code to deal with the PReP residual data.
@@ -248,7 +248,7 @@ unsigned char * PnP_INTERFACES[] __initdata = {
 
 static const unsigned char __init *PnP_SUB_TYPE_STR(unsigned char BaseType, 
 					     unsigned char SubType) {
-	const unsigned char ** s=PnP_SUB_TYPES;
+	unsigned char ** s=PnP_SUB_TYPES;
 	while (*s && !((*s)[0]==BaseType 
 		       && (*s)[1]==SubType)) s++;
 	if (*s) return *s+2;
@@ -258,7 +258,7 @@ static const unsigned char __init *PnP_SUB_TYPE_STR(unsigned char BaseType,
 static const unsigned char __init *PnP_INTERFACE_STR(unsigned char BaseType, 
 					      unsigned char SubType,
 					      unsigned char Interface) {
-	const unsigned char ** s=PnP_INTERFACES;
+	unsigned char ** s=PnP_INTERFACES;
 	while (*s && !((*s)[0]==BaseType 
 		       && (*s)[1]==SubType 
 		       && (*s)[2]==Interface)) s++;

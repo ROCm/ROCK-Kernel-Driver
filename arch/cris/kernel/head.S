@@ -1,4 +1,4 @@
-/* $Id: head.S,v 1.36 2001/06/29 12:39:31 pkj Exp $
+/* $Id: head.S,v 1.40 2001/10/03 14:59:57 pkj Exp $
  * 
  * Head of the kernel - alter with care
  *
@@ -7,6 +7,18 @@
  * Authors:	Bjorn Wesen (bjornw@axis.com)
  * 
  * $Log: head.S,v $
+ * Revision 1.40  2001/10/03 14:59:57  pkj
+ * Added support for resetting the Bluetooth hardware.
+ *
+ * Revision 1.39  2001/10/01 14:45:03  bjornw
+ * Removed underscores and added register prefixes
+ *
+ * Revision 1.38  2001/09/21 07:14:11  jonashg
+ * Made root filesystem (cramfs) use mtdblock driver when booting from flash.
+ *
+ * Revision 1.37  2001/09/11 13:44:29  orjanf
+ * Decouple usage of serial ports for debug and kgdb.
+ *
  * Revision 1.36  2001/06/29 12:39:31  pkj
  * Added support for mirroring the first flash to just below the
  * second one, to make them look consecutive to cramfs.
@@ -144,11 +156,11 @@
 		
 	;; exported symbols
 		
-	.globl	_etrax_irv
-	.globl	_romfs_start
-	.globl	_romfs_length
-	.globl	_romfs_in_flash
-	.globl  _swapper_pg_dir
+	.globl	etrax_irv
+	.globl	romfs_start
+	.globl	romfs_length
+	.globl	romfs_in_flash
+	.globl  swapper_pg_dir
 					
 	.text
 
@@ -184,13 +196,13 @@
  	move.d	  IO_FIELD (R_MMU_KBASE_HI, base_c, 4)		\
 		| IO_FIELD (R_MMU_KBASE_HI, base_b, 0xb)	\
 		| IO_FIELD (R_MMU_KBASE_HI, base_9, 9)		\
-		| IO_FIELD (R_MMU_KBASE_HI, base_8, 8), r0
-	move.d	r0, [R_MMU_KBASE_HI]
+		| IO_FIELD (R_MMU_KBASE_HI, base_8, 8), $r0
+	move.d	$r0, [R_MMU_KBASE_HI]
 
 	; temporary map of 0x40->0x40 and 0x60->0x40 
  	move.d	  IO_FIELD (R_MMU_KBASE_LO, base_6, 4)		\
-		| IO_FIELD (R_MMU_KBASE_LO, base_4, 4), r0
-	move.d	r0, [R_MMU_KBASE_LO]
+		| IO_FIELD (R_MMU_KBASE_LO, base_4, 4), $r0
+	move.d	$r0, [R_MMU_KBASE_LO]
 
 	; mmu enable, segs e,c,b,a,6,5,4,0 segment mapped
  	move.d	  IO_STATE (R_MMU_CONFIG, mmu_enable, enable)	\
@@ -212,18 +224,18 @@
 		| IO_STATE (R_MMU_CONFIG, seg_3, page)		\
 		| IO_STATE (R_MMU_CONFIG, seg_2, page)		\
 		| IO_STATE (R_MMU_CONFIG, seg_1, page)		\
-		| IO_STATE (R_MMU_CONFIG, seg_0, seg), r0
-	move.d	r0, [R_MMU_CONFIG]
+		| IO_STATE (R_MMU_CONFIG, seg_0, seg), $r0
+	move.d	$r0, [R_MMU_CONFIG]
 #else
 	; kseg mappings
  	move.d	  IO_FIELD (R_MMU_KBASE_HI, base_e, 8)		\
 		| IO_FIELD (R_MMU_KBASE_HI, base_c, 4)		\
-		| IO_FIELD (R_MMU_KBASE_HI, base_b, 0xb), r0
-	move.d	r0, [R_MMU_KBASE_HI]
+		| IO_FIELD (R_MMU_KBASE_HI, base_b, 0xb), $r0
+	move.d	$r0, [R_MMU_KBASE_HI]
 
 	; temporary map of 0x40->0x40 and 0x00->0x00 
-	move.d	  IO_FIELD (R_MMU_KBASE_LO, base_4, 4), r0
-	move.d	r0, [R_MMU_KBASE_LO]
+	move.d	  IO_FIELD (R_MMU_KBASE_LO, base_4, 4), $r0
+	move.d	$r0, [R_MMU_KBASE_LO]
 
 	; mmu enable, segs f,e,c,b,4,0 segment mapped
  	move.d	  IO_STATE (R_MMU_CONFIG, mmu_enable, enable)	\
@@ -245,8 +257,8 @@
 		| IO_STATE (R_MMU_CONFIG, seg_3, page)		\
 		| IO_STATE (R_MMU_CONFIG, seg_2, page)		\
 		| IO_STATE (R_MMU_CONFIG, seg_1, page)		\
-		| IO_STATE (R_MMU_CONFIG, seg_0, seg), r0
-	move.d	r0, [R_MMU_CONFIG]
+		| IO_STATE (R_MMU_CONFIG, seg_0, seg), $r0
+	move.d	$r0, [R_MMU_CONFIG]
 #endif
 
 	;; Now we need to sort out the segments and their locations in RAM or
@@ -270,31 +282,31 @@
 	
 	;; Check if we start from DRAM or FLASH by testing PC
 	
-	move.d	pc,r0
-	and.d	0x7fffffff,r0	; get rid of the non-cache bit
-	cmp.d	0x10000,r0	; arbitrary... just something above this code
-	blo	inflash0
+	move.d	$pc,$r0
+	and.d	0x7fffffff,$r0	; get rid of the non-cache bit
+	cmp.d	0x10000,$r0	; arbitrary... just something above this code
+	blo	_inflash0
 	nop
 
-	jump	inram		; enter cached ram
+	jump	_inram		; enter cached ram
 
 	;; Jumpgate for branches.
-inflash0:
-	jump	inflash
+_inflash0:
+	jump	_inflash
 
 	;; Put this in a suitable section where we can reclaim storage
 	;; after init.
 	.section ".text.init"
-inflash:
+_inflash:
 	;; We need to initialze DRAM registers before we start using the DRAM
 
-	cmp.d	RAM_INIT_MAGIC, r8	; Already initialized?
-	beq	dram_init_finished
+	cmp.d	RAM_INIT_MAGIC, $r8	; Already initialized?
+	beq	_dram_init_finished
 	nop
 	
 #include "../lib/dram_init.S"
 
-dram_init_finished:		
+_dram_init_finished:		
 	;; Copy text+data to DRAM
 	;; This is fragile - the calculation of r4 as the image size depends
 	;; on that the labels below actually are the first and last positions
@@ -307,14 +319,14 @@ dram_init_finished:
 	;; and when run with compression, the kernel is actually unpacked to
 	;; DRAM and we never get here in the first place :))
 	
-	moveq	0, r0			; source
-	move.d	_text_start, r1		; destination
-	move.d	__vmlinux_end, r2	; end destination
-	move.d	r2, r4
-	sub.d	r1, r4			; r4=__vmlinux_end in flash, used below
-1:	move.w	[r0+], r3
-	move.w	r3, [r1+]
-	cmp.d	r2, r1
+	moveq	0, $r0			; source
+	move.d	text_start, $r1		; destination
+	move.d	__vmlinux_end, $r2	; end destination
+	move.d	$r2, $r4
+	sub.d	$r1, $r4		; r4=__vmlinux_end in flash, used below
+1:	move.w	[$r0+], $r3
+	move.w	$r3, [$r1+]
+	cmp.d	$r2, $r1
 	blo	1b
 	nop
 
@@ -322,33 +334,33 @@ dram_init_finished:
 	;; There might be none, but that does not matter because
 	;; we don't do anything than read some bytes here.
 
-	moveq	0, r0
-	move.d	r0, [_romfs_length] ; default if there is no cramfs
+	moveq	0, $r0
+	move.d	$r0, [romfs_length] ; default if there is no cramfs
 
-	move.d  [r4], r0	; cramfs_super.magic
-	cmp.d	CRAMFS_MAGIC, r0
+	move.d  [$r4], $r0	; cramfs_super.magic
+	cmp.d	CRAMFS_MAGIC, $r0
 	bne	1f
 	nop
-	move.d	[r4 + 4], r0	; cramfs_super.size
-	move.d	r0, [_romfs_length]
+	move.d	[$r4 + 4], $r0	; cramfs_super.size
+	move.d	$r0, [romfs_length]
 #ifdef CONFIG_CRIS_LOW_MAP
-	add.d   0x50000000, r4	; add flash start in virtual memory (cached)
+	add.d   0x50000000, $r4	; add flash start in virtual memory (cached)
 #else
-	add.d   0xf0000000, r4	; add flash start in virtual memory (cached)
+	add.d   0xf0000000, $r4	; add flash start in virtual memory (cached)
 #endif
-	move.d	r4, [_romfs_start]
+	move.d	$r4, [romfs_start]
 1:	
-	moveq	1, r0
-	move.d	r0, [_romfs_in_flash]
+	moveq	1, $r0
+	move.d	$r0, [romfs_in_flash]
 		
-	jump	start_it	; enter code, cached this time
+	jump	_start_it	; enter code, cached this time
 
-inram:
+_inram:
 	;; Move the ROM fs to after BSS end. This assumes that the cramfs
 	;; second longword contains the length of the cramfs
 	
-	moveq	0, r0
-	move.d	r0, [_romfs_length] ; default if there is no cramfs
+	moveq	0, $r0
+	move.d	$r0, [romfs_length] ; default if there is no cramfs
 	
 	;; The kernel could have been unpacked to DRAM by the loader, but
 	;; the cramfs image could still be in the Flash directly after the
@@ -360,120 +372,117 @@ inram:
 	;;  garbage but we do sanity checks on it, the chance that it points
 	;;  to a cramfs magic is small.. )
 	
-	cmp.d	0x0ffffff8, r9
-	bhs	no_romfs_in_flash	; r9 points outside the flash area
+	cmp.d	0x0ffffff8, $r9
+	bhs	_no_romfs_in_flash	; r9 points outside the flash area
 	nop
-	move.d	[r9], r0	; cramfs_super.magic
-	cmp.d	CRAMFS_MAGIC, r0
-	bne	no_romfs_in_flash
+	move.d	[$r9], $r0	; cramfs_super.magic
+	cmp.d	CRAMFS_MAGIC, $r0
+	bne	_no_romfs_in_flash
 	nop
-	move.d	[r9+4], r0	; cramfs_super.length
-	move.d	r0, [_romfs_length]
+	move.d	[$r9+4], $r0	; cramfs_super.length
+	move.d	$r0, [romfs_length]
 #ifdef CONFIG_CRIS_LOW_MAP
-	add.d   0x50000000, r9	; add flash start in virtual memory (cached)
+	add.d   0x50000000, $r9	; add flash start in virtual memory (cached)
 #else
-	add.d   0xf0000000, r9	; add flash start in virtual memory (cached)
+	add.d   0xf0000000, $r9	; add flash start in virtual memory (cached)
 #endif
-#ifdef CONFIG_ETRAX_FLASH_MIRRORING_FOR_CRAMFS
-	add.d   MEM_CSE1_START-CONFIG_ETRAX_FLASH_SIZE*0x100000, r9   ; move flash start to upper mirror
-#endif
-	move.d	r9, [_romfs_start]
+	move.d	$r9, [romfs_start]
 
-	moveq	1, r0
-	move.d	r0, [_romfs_in_flash]
+	moveq	1, $r0
+	move.d	$r0, [romfs_in_flash]
 	
-	jump	start_it	; enter code, cached this time
+	jump	_start_it	; enter code, cached this time
 
-no_romfs_in_flash:
+_no_romfs_in_flash:
 	;; Check if there is a cramfs (magic value).
 	;; Notice that we check for cramfs magic value - which is
 	;; the "rom fs" we'll possibly use in 2.4 if not JFFS (which does
 	;; not need this mechanism anyway)
 	
-	move.d	__vmlinux_end, r0 ; the image will be after the vmlinux end address
-	move.d	[r0], r1	; cramfs assumes same endian on host/target
-	cmp.d	CRAMFS_MAGIC, r1; magic value in cramfs superblock
+	move.d	__vmlinux_end, $r0; the image will be after the vmlinux end address
+	move.d	[$r0], $r1	; cramfs assumes same endian on host/target
+	cmp.d	CRAMFS_MAGIC, $r1; magic value in cramfs superblock
 	bne	1f
 	nop
 
 	;; Ok. What is its size ? 
 	
-	move.d	[r0 + 4], r2	; cramfs_super.size (again, no need to swapwb)
+	move.d	[$r0 + 4], $r2	; cramfs_super.size (again, no need to swapwb)
 
 	;; We want to copy it to the end of the BSS
 
-	move.d	_end, r1
+	move.d	_end, $r1
 
 	;; Remember values so cramfs and setup can find this info
 
-	move.d	r1, [_romfs_start]	; new romfs location
-	move.d	r2, [_romfs_length]
+	move.d	$r1, [romfs_start]	; new romfs location
+	move.d	$r2, [romfs_length]
 
 	;; We need to copy it backwards, since they can be overlapping
 
-	add.d	r2, r0
-	add.d	r2, r1
+	add.d	$r2, $r0
+	add.d	$r2, $r1
 		
 	;; Go ahead. Make my loop.
 
-	lsrq	1, r2		; size is in bytes, we copy words
+	lsrq	1, $r2		; size is in bytes, we copy words
 
-1:	move.w	[r0=r0-2],r3
-	move.w	r3,[r1=r1-2]
-	subq	1, r2
+1:	move.w	[$r0=$r0-2],$r3
+	move.w	$r3,[$r1=$r1-2]
+	subq	1, $r2
 	bne	1b
 	nop
 	
 	;; Dont worry that the BSS is tainted. It will be cleared later.
 
-	moveq	0, r0
-	move.d	r0, [_romfs_in_flash]
+	moveq	0, $r0
+	move.d	$r0, [romfs_in_flash]
 
-	jump	start_it	; better skip the additional cramfs check below
+	jump	_start_it	; better skip the additional cramfs check below
 	
-start_it:
+_start_it:
 	;; the kernel stack is overlayed with the task structure for each
 	;; task. thus the initial kernel stack is in the same page as the
 	;; init_task (but starts in the top of the page, size 8192)
-	move.d	_init_task_union + 8192,sp
-	move.d	_ibr_start,r0	; this symbol is set by the linker script 
-	move	r0,ibr
-	move.d	r0,[_etrax_irv]	; set the interrupt base register and pointer
+	move.d	init_task_union + 8192, $sp
+	move.d	ibr_start,$r0	; this symbol is set by the linker script 
+	move	$r0,$ibr
+	move.d	$r0,[etrax_irv]	; set the interrupt base register and pointer
 
 	;; Clear BSS region, from _bss_start to _end
 
-	move.d	__bss_start, r0
-	move.d	_end, r1
-1:	clear.d	[r0+]
-	cmp.d	r1, r0
+	move.d	__bss_start, $r0
+	move.d	_end, $r1
+1:	clear.d	[$r0+]
+	cmp.d	$r1, $r0
 	blo	1b
 	nop
 	
 #ifdef CONFIG_BLK_DEV_ETRAXIDE
 	;; disable ATA before enabling it in genconfig below
-	moveq	0,r0
-	move.d	r0,[R_ATA_CTRL_DATA]
-	move.d	r0,[R_ATA_TRANSFER_CNT]
-	move.d	r0,[R_ATA_CONFIG]
+	moveq	0,$r0
+	move.d	$r0,[R_ATA_CTRL_DATA]
+	move.d	$r0,[R_ATA_TRANSFER_CNT]
+	move.d	$r0,[R_ATA_CONFIG]
 #if 0
-	move.d	R_PORT_G_DATA,r1
-	move.d	r0,[r1]; assert ATA bus-reset
+	move.d	R_PORT_G_DATA, $r1
+	move.d	$r0, [$r1]; assert ATA bus-reset
 	nop
 	nop
 	nop
 	nop
 	nop
 	nop
-	move.d	0x08000000,r0
-	move.d	r0,[r1]
+	move.d	0x08000000,$r0
+	move.d	$r0,[$r1]
 #endif
 #endif
 
 #ifdef CONFIG_JULIETTE
 	;; configure external DMA channel 0 before enabling it in genconfig
 	
-	moveq	0,r0
-	move.d	r0,[R_EXT_DMA_0_ADDR]
+	moveq	0,$r0
+	move.d	$r0,[R_EXT_DMA_0_ADDR]
 	; cnt enable, word size, output, stop, size 0
 	move.d	  IO_STATE (R_EXT_DMA_0_CMD, cnt, enable)	\
 		| IO_STATE (R_EXT_DMA_0_CMD, rqpol, ahigh)	\
@@ -482,168 +491,216 @@ start_it:
 		| IO_STATE (R_EXT_DMA_0_CMD, wid, word)		\
 		| IO_STATE (R_EXT_DMA_0_CMD, dir, output)	\
 		| IO_STATE (R_EXT_DMA_0_CMD, run, stop)		\
-		| IO_FIELD (R_EXT_DMA_0_CMD, trf_count, 0),r0
-	move.d	r0,[R_EXT_DMA_0_CMD]
+		| IO_FIELD (R_EXT_DMA_0_CMD, trf_count, 0),$r0
+	move.d	$r0,[R_EXT_DMA_0_CMD]
 
 	;; reset dma4 and wait for completion
 	
-	moveq	IO_STATE (R_DMA_CH4_CMD, cmd, reset),r0
-	move.b	r0,[R_DMA_CH4_CMD]
-w4u:	move.b	[R_DMA_CH4_CMD],r0
-	and.b	IO_MASK (R_DMA_CH4_CMD, cmd),r0
-	cmp.b	IO_STATE (R_DMA_CH4_CMD, cmd, reset),r0
-	beq	w4u
+	moveq	IO_STATE (R_DMA_CH4_CMD, cmd, reset),$r0
+	move.b	$r0,[R_DMA_CH4_CMD]
+1:	move.b	[R_DMA_CH4_CMD],$r0
+	and.b	IO_MASK (R_DMA_CH4_CMD, cmd),$r0
+	cmp.b	IO_STATE (R_DMA_CH4_CMD, cmd, reset),$r0
+	beq	1b
 	nop
 
 	;; reset dma5 and wait for completion
 	
-	moveq	IO_STATE (R_DMA_CH5_CMD, cmd, reset),r0
-	move.b	r0,[R_DMA_CH5_CMD]
-w5u:	move.b	[R_DMA_CH5_CMD],r0
-	and.b	IO_MASK (R_DMA_CH5_CMD, cmd),r0
-	cmp.b	IO_STATE (R_DMA_CH5_CMD, cmd, reset),r0
-	beq	w5u
+	moveq	IO_STATE (R_DMA_CH5_CMD, cmd, reset),$r0
+	move.b	$r0,[R_DMA_CH5_CMD]
+1:	move.b	[R_DMA_CH5_CMD],$r0
+	and.b	IO_MASK (R_DMA_CH5_CMD, cmd),$r0
+	cmp.b	IO_STATE (R_DMA_CH5_CMD, cmd, reset),$r0
+	beq	1b
 	nop
 #endif	
 			
 	;; Etrax product HW genconfig setup
 
-	moveq	0,r0
-#if !defined(CONFIG_ETRAX_KGDB) && !defined(CONFIG_DMA_MEMCPY)
-	; DMA channels 6 and 7 to ser0, kgdb doesnt want DMA
+	moveq	0,$r0
+#if (!defined(CONFIG_ETRAX_KGDB) || !defined(CONFIG_ETRAX_DEBUG_PORT0)) \
+	&& !defined(CONFIG_DMA_MEMCPY)
+	; DMA channels 6 and 7 to se$r0, kgdb doesnt want DMA
 	or.d	  IO_STATE (R_GEN_CONFIG, dma7, serial0)	\
-		| IO_STATE (R_GEN_CONFIG, dma6, serial0),r0
+		| IO_STATE (R_GEN_CONFIG, dma6, serial0),$r0
 #endif
-#if !defined(CONFIG_ETRAX_KGDB) || !defined(CONFIG_ETRAX_DEBUG_PORT1)	
+#if !defined(CONFIG_ETRAX_KGDB) || !defined(CONFIG_ETRAX_DEBUG_PORT1)
+	; DMA channels 8 and 9 to ser1, kgdb doesnt want DMA
 	or.d	  IO_STATE (R_GEN_CONFIG, dma9, serial1)	\
-		| IO_STATE (R_GEN_CONFIG, dma8, serial1),r0
+		| IO_STATE (R_GEN_CONFIG, dma8, serial1),$r0
 #endif	
 #ifdef CONFIG_DMA_MEMCPY
 	; 6/7 memory-memory DMA
 	or.d	  IO_STATE (R_GEN_CONFIG, dma7, intdma6)	\
-		| IO_STATE (R_GEN_CONFIG, dma6, intdma7),r0
+		| IO_STATE (R_GEN_CONFIG, dma6, intdma7),$r0
 #endif
 #ifdef CONFIG_ETRAX_SERIAL_PORT2
-	; DMA channels 2 and 3 to serport 2, port 2 enabled
+	; Enable serial port 2
+	or.w	IO_STATE (R_GEN_CONFIG, ser2, select),$r0
+#if !defined(CONFIG_ETRAX_KGDB) || !defined(CONFIG_ETRAX_DEBUG_PORT2)
+	; DMA channels 2 and 3 to ser2, kgdb doesnt want DMA
 	or.d	  IO_STATE (R_GEN_CONFIG, dma3, serial2)	\
-		| IO_STATE (R_GEN_CONFIG, dma2, serial2)	\
-		| IO_STATE (R_GEN_CONFIG, ser2, select),r0
+		| IO_STATE (R_GEN_CONFIG, dma2, serial2),$r0
+#endif
 #endif
 #if defined(CONFIG_ETRAX_SERIAL_PORT3) || defined(CONFIG_ETRAX_SYNCHRONOUS_SERIAL_PORT1)
-	; DMA channels 4 and 5 to serport 3, port 3 enabled
+	; Enable serial port 3
+	or.w	IO_STATE (R_GEN_CONFIG, ser3, select),$r0
+#if !defined(CONFIG_ETRAX_KGDB) || !defined(CONFIG_ETRAX_DEBUG_PORT3)
+	; DMA channels 4 and 5 to ser3, kgdb doesnt want DMA
 	or.d	  IO_STATE (R_GEN_CONFIG, dma5, serial3)	\
-		| IO_STATE (R_GEN_CONFIG, dma4, serial3)	\
-		| IO_STATE (R_GEN_CONFIG, ser3, select),r0
-#endif	
+		| IO_STATE (R_GEN_CONFIG, dma4, serial3),$r0
+#endif
+#endif
 #if defined(CONFIG_ETRAX_PARALLEL_PORT0) || defined(CONFIG_ETRAX_ETHERNET_LPSLAVE)
 	; parport 0 enabled using DMA 2/3
-	or.w	IO_STATE (R_GEN_CONFIG, par0, select),r0
+	or.w	IO_STATE (R_GEN_CONFIG, pa$r0, select),$r0
 #endif
 #if defined(CONFIG_ETRAX_PARALLEL_PORT1) || defined(CONFIG_ETRAX_ETHERNET_LPSLAVE)
 	; parport 1 enabled using DMA 4/5
-	or.w	IO_STATE (R_GEN_CONFIG, par1, select),r0
+	or.w	IO_STATE (R_GEN_CONFIG, par1, select),$r0
 #endif
 #ifdef CONFIG_ETRAX_IDE
 	; DMA channels 2 and 3 to ATA, ATA enabled
 	or.d	  IO_STATE (R_GEN_CONFIG, dma3, ata)	\
 		| IO_STATE (R_GEN_CONFIG, dma2, ata)	\
-		| IO_STATE (R_GEN_CONFIG, ata, select),r0
+		| IO_STATE (R_GEN_CONFIG, ata, select),$r0
 #endif
 	
 #ifdef CONFIG_ETRAX_USB_HOST_PORT1
 	; Set the USB port 1 enable bit
-	or.d	IO_STATE (R_GEN_CONFIG, usb1, select),r0
+	or.d	IO_STATE (R_GEN_CONFIG, usb1, select),$r0
 #endif
 #ifdef CONFIG_ETRAX_USB_HOST_PORT2
 	; Set the USB port 2 enable bit
-	or.d	IO_STATE (R_GEN_CONFIG, usb2, select),r0
+	or.d	IO_STATE (R_GEN_CONFIG, usb2, select),$r0
 #endif
 #ifdef CONFIG_ETRAX_USB_HOST
 	; Connect DMA channels 8 and 9 to USB
 	and.d	(~(IO_MASK (R_GEN_CONFIG, dma9)		\
 		   | IO_MASK (R_GEN_CONFIG, dma8)))	\
 		| IO_STATE (R_GEN_CONFIG, dma9, usb)	\
-		| IO_STATE (R_GEN_CONFIG, dma8, usb),r0
+		| IO_STATE (R_GEN_CONFIG, dma8, usb),$r0
 #endif
 	
 #ifdef CONFIG_JULIETTE
 	; DMA channels 4 and 5 to EXTDMA0, for Juliette
 	or.d	  IO_STATE (R_GEN_CONFIG, dma5, extdma0)	\
-		| IO_STATE (R_GEN_CONFIG, dma4, extdma0),r0
+		| IO_STATE (R_GEN_CONFIG, dma4, extdma0),$r0
 #endif
-	move.d	r0,[_genconfig_shadow] ; init a shadow register of R_GEN_CONFIG
+
+#if defined(CONFIG_BLUETOOTH) && (defined(CONFIG_BLUETOOTH_RESET_G10) || defined(CONFIG_BLUETOOTH_RESET_G11))
+	or.d	  IO_STATE (R_GEN_CONFIG, g8_15dir, out),$r0
+#endif
+
+	move.d	$r0,[genconfig_shadow] ; init a shadow register of R_GEN_CONFIG
 
 #ifndef CONFIG_SVINTO_SIM
-	move.d	r0,[R_GEN_CONFIG]
+	move.d	$r0,[R_GEN_CONFIG]
 
 #if 0
-	moveq	4,r0
-	move.b	r0,[R_DMA_CH6_CMD]	; reset (ser0 dma out)
-	move.b	r0,[R_DMA_CH7_CMD]	; reset (ser0 dma in)
-w61:	move.b	[R_DMA_CH6_CMD],r0	; wait for reset cycle to finish
-	and.b	7,r0
-	cmp.b	4,r0
-	beq	w61
+	moveq	4,$r0
+	move.b	$r0,[R_DMA_CH6_CMD]	; reset (ser0 dma out)
+	move.b	$r0,[R_DMA_CH7_CMD]	; reset (ser0 dma in)
+1:	move.b	[R_DMA_CH6_CMD],$r0	; wait for reset cycle to finish
+	and.b	7,$r0
+	cmp.b	4,$r0
+	beq	1b
 	nop
-w71:	move.b	[R_DMA_CH7_CMD],r0	; wait for reset cycle to finish
-	and.b	7,r0
-	cmp.b	4,r0
-	beq	w71
+1:	move.b	[R_DMA_CH7_CMD],$r0	; wait for reset cycle to finish
+	and.b	7,$r0
+	cmp.b	4,$r0
+	beq	1b
 	nop
 #endif
 	
-	moveq	IO_STATE (R_DMA_CH8_CMD, cmd, reset),r0
-	move.b	r0,[R_DMA_CH8_CMD]	; reset (ser1 dma out)
-	move.b	r0,[R_DMA_CH9_CMD]	; reset (ser1 dma in)
-w81:	move.b	[R_DMA_CH8_CMD],r0	; wait for reset cycle to finish
-	and.b	IO_MASK (R_DMA_CH8_CMD, cmd),r0
-	cmp.b	IO_STATE (R_DMA_CH8_CMD, cmd, reset),r0
-	beq	w81
+	moveq	IO_STATE (R_DMA_CH8_CMD, cmd, reset),$r0
+	move.b	$r0,[R_DMA_CH8_CMD]	; reset (ser1 dma out)
+	move.b	$r0,[R_DMA_CH9_CMD]	; reset (ser1 dma in)
+1:	move.b	[R_DMA_CH8_CMD],$r0	; wait for reset cycle to finish
+	andq	IO_MASK (R_DMA_CH8_CMD, cmd),$r0
+	cmpq	IO_STATE (R_DMA_CH8_CMD, cmd, reset),$r0
+	beq	1b
 	nop
-w91:	move.b	[R_DMA_CH9_CMD],r0	; wait for reset cycle to finish
-	and.b	IO_MASK (R_DMA_CH9_CMD, cmd),r0
-	cmp.b	IO_STATE (R_DMA_CH9_CMD, cmd, reset),r0
-	beq	w91
+1:	move.b	[R_DMA_CH9_CMD],$r0	; wait for reset cycle to finish
+	andq	IO_MASK (R_DMA_CH9_CMD, cmd),$r0
+	cmpq	IO_STATE (R_DMA_CH9_CMD, cmd, reset),$r0
+	beq	1b
 	nop
 
 	;; setup port PA and PB default initial directions and data
 	;; including their shadow registers
 		
-	move.b	CONFIG_ETRAX_DEF_R_PORT_PA_DIR,r0
-	move.b	r0,[_port_pa_dir_shadow]
-	move.b	r0,[R_PORT_PA_DIR]
-	move.b	CONFIG_ETRAX_DEF_R_PORT_PA_DATA,r0
-	move.b	r0,[_port_pa_data_shadow]
-	move.b	r0,[R_PORT_PA_DATA]
+	move.b	CONFIG_ETRAX_DEF_R_PORT_PA_DIR,$r0
+#if defined(CONFIG_BLUETOOTH) && defined(CONFIG_BLUETOOTH_RESET_PA7)
+	or.b	IO_STATE (R_PORT_PA_DIR, dir7, output),$r0
+#endif
+	move.b	$r0,[port_pa_dir_shadow]
+	move.b	$r0,[R_PORT_PA_DIR]
+	move.b	CONFIG_ETRAX_DEF_R_PORT_PA_DATA,$r0
+#if defined(CONFIG_BLUETOOTH) && defined(CONFIG_BLUETOOTH_RESET_PA7)
+#if defined(CONFIG_BLUETOOTH_RESET_ACTIVE_HIGH)
+	and.b	~(1 << 7),$r0
+#else
+	or.b	(1 << 7),$r0
+#endif
+#endif
+	move.b	$r0,[port_pa_data_shadow]
+	move.b	$r0,[R_PORT_PA_DATA]
 	
-	move.b	CONFIG_ETRAX_DEF_R_PORT_PB_CONFIG,r0
-	move.b	r0,[_port_pb_config_shadow]
-	move.b	r0,[R_PORT_PB_CONFIG]
-	move.b	CONFIG_ETRAX_DEF_R_PORT_PB_DIR,r0
-	move.b	r0,[_port_pb_dir_shadow]
-	move.b	r0,[R_PORT_PB_DIR]
-	move.b	CONFIG_ETRAX_DEF_R_PORT_PB_DATA,r0
-	move.b	r0,[_port_pb_data_shadow]
-	move.b	r0,[R_PORT_PB_DATA]
-	move.d  0, r0
-	move.d  r0,[_port_pb_i2c_shadow]
-	move.d  r0, [R_PORT_PB_I2C]
+	move.b	CONFIG_ETRAX_DEF_R_PORT_PB_CONFIG,$r0
+	move.b	$r0,[port_pb_config_shadow]
+	move.b	$r0,[R_PORT_PB_CONFIG]
+	move.b	CONFIG_ETRAX_DEF_R_PORT_PB_DIR,$r0
+#if defined(CONFIG_BLUETOOTH) && defined(CONFIG_BLUETOOTH_RESET_PB5)
+	or.b	IO_STATE (R_PORT_PB_DIR, dir5, output),$r0
+#endif
+	move.b	$r0,[port_pb_dir_shadow]
+	move.b	$r0,[R_PORT_PB_DIR]
+	move.b	CONFIG_ETRAX_DEF_R_PORT_PB_DATA,$r0
+#if defined(CONFIG_BLUETOOTH) && defined(CONFIG_BLUETOOTH_RESET_PB5)
+#if defined(CONFIG_BLUETOOTH_RESET_ACTIVE_HIGH)
+	and.b	~(1 << 5),$r0
+#else
+	or.b	(1 << 5),$r0
+#endif
+#endif
+	move.b	$r0,[port_pb_data_shadow]
+	move.b	$r0,[R_PORT_PB_DATA]
 
-	moveq	0,r0
-	move.d	r0,[_port_g_data_shadow]
-	move.d	r0,[R_PORT_G_DATA]
+	moveq   0, $r0
+	move.d  $r0,[port_pb_i2c_shadow]
+	move.d  $r0, [R_PORT_PB_I2C]
+
+	moveq	0,$r0
+#if defined(CONFIG_BLUETOOTH) && defined(CONFIG_BLUETOOTH_RESET_G10)
+#if defined(CONFIG_BLUETOOTH_RESET_ACTIVE_HIGH)
+	and.d	~(1 << 10),$r0
+#else
+	or.d	(1 << 10),$r0
+#endif
+#endif
+#if defined(CONFIG_BLUETOOTH) && defined(CONFIG_BLUETOOTH_RESET_G11)
+#if defined(CONFIG_BLUETOOTH_RESET_ACTIVE_HIGH)
+	and.d	~(1 << 11),$r0
+#else
+	or.d	(1 << 11),$r0
+#endif
+#endif
+	move.d	$r0,[port_g_data_shadow]
+	move.d	$r0,[R_PORT_G_DATA]
 	
 	;; setup the serial port 0 at 115200 baud for debug purposes
 	
 	moveq	  IO_STATE (R_SERIAL0_XOFF, tx_stop, enable)		\
 		| IO_STATE (R_SERIAL0_XOFF, auto_xoff, disable)		\
-		| IO_FIELD (R_SERIAL0_XOFF, xoff_char, 0),r0
-	move.d	r0,[R_SERIAL0_XOFF] 
+		| IO_FIELD (R_SERIAL0_XOFF, xoff_char, 0),$r0
+	move.d	$r0,[R_SERIAL0_XOFF] 
 
 	; 115.2kbaud for both transmit and receive
 	move.b	  IO_STATE (R_SERIAL0_BAUD, tr_baud, c115k2Hz)		\
-		| IO_STATE (R_SERIAL0_BAUD, rec_baud, c115k2Hz),r0
-	move.b	r0,[R_SERIAL0_BAUD]
+		| IO_STATE (R_SERIAL0_BAUD, rec_baud, c115k2Hz),$r0
+	move.b	$r0,[R_SERIAL0_BAUD]
 
 	; Set up and enable the serial0 receiver.
 	move.b	  IO_STATE (R_SERIAL0_REC_CTRL, dma_err, stop)		\
@@ -653,8 +710,8 @@ w91:	move.b	[R_DMA_CH9_CMD],r0	; wait for reset cycle to finish
 		| IO_STATE (R_SERIAL0_REC_CTRL, rec_stick_par, normal)	\
 		| IO_STATE (R_SERIAL0_REC_CTRL, rec_par, even)		\
 		| IO_STATE (R_SERIAL0_REC_CTRL, rec_par_en, disable)	\
-		| IO_STATE (R_SERIAL0_REC_CTRL, rec_bitnr, rec_8bit),r0
-	move.b	r0,[R_SERIAL0_REC_CTRL] 
+		| IO_STATE (R_SERIAL0_REC_CTRL, rec_bitnr, rec_8bit),$r0
+	move.b	$r0,[R_SERIAL0_REC_CTRL] 
 	
 	; Set up and enable the serial0 transmitter.
 	move.b	  IO_FIELD (R_SERIAL0_TR_CTRL, txd, 0)			\
@@ -664,20 +721,20 @@ w91:	move.b	[R_DMA_CH9_CMD],r0	; wait for reset cycle to finish
 		| IO_STATE (R_SERIAL0_TR_CTRL, tr_stick_par, normal)	\
 		| IO_STATE (R_SERIAL0_TR_CTRL, tr_par, even)		\
 		| IO_STATE (R_SERIAL0_TR_CTRL, tr_par_en, disable)	\
-		| IO_STATE (R_SERIAL0_TR_CTRL, tr_bitnr, tr_8bit),r0
-	move.b	r0,[R_SERIAL0_TR_CTRL]
+		| IO_STATE (R_SERIAL0_TR_CTRL, tr_bitnr, tr_8bit),$r0
+	move.b	$r0,[R_SERIAL0_TR_CTRL]
 
 	;; setup the serial port 1 at 115200 baud for debug purposes
 	
 	moveq	  IO_STATE (R_SERIAL1_XOFF, tx_stop, enable)		\
 		| IO_STATE (R_SERIAL1_XOFF, auto_xoff, disable)		\
-		| IO_FIELD (R_SERIAL1_XOFF, xoff_char, 0),r0
-	move.d	r0,[R_SERIAL1_XOFF] 
+		| IO_FIELD (R_SERIAL1_XOFF, xoff_char, 0),$r0
+	move.d	$r0,[R_SERIAL1_XOFF] 
 
 	; 115.2kbaud for both transmit and receive
 	move.b	  IO_STATE (R_SERIAL1_BAUD, tr_baud, c115k2Hz)		\
-		| IO_STATE (R_SERIAL1_BAUD, rec_baud, c115k2Hz),r0
-	move.b	r0,[R_SERIAL1_BAUD]
+		| IO_STATE (R_SERIAL1_BAUD, rec_baud, c115k2Hz),$r0
+	move.b	$r0,[R_SERIAL1_BAUD]
 
 	; Set up and enable the serial1 receiver.
 	move.b	  IO_STATE (R_SERIAL1_REC_CTRL, dma_err, stop)		\
@@ -687,8 +744,8 @@ w91:	move.b	[R_DMA_CH9_CMD],r0	; wait for reset cycle to finish
 		| IO_STATE (R_SERIAL1_REC_CTRL, rec_stick_par, normal)	\
 		| IO_STATE (R_SERIAL1_REC_CTRL, rec_par, even)		\
 		| IO_STATE (R_SERIAL1_REC_CTRL, rec_par_en, disable)	\
-		| IO_STATE (R_SERIAL1_REC_CTRL, rec_bitnr, rec_8bit),r0
-	move.b	r0,[R_SERIAL1_REC_CTRL] 
+		| IO_STATE (R_SERIAL1_REC_CTRL, rec_bitnr, rec_8bit),$r0
+	move.b	$r0,[R_SERIAL1_REC_CTRL] 
 	
 	; Set up and enable the serial1 transmitter.
 	move.b	  IO_FIELD (R_SERIAL1_TR_CTRL, txd, 0)			\
@@ -698,8 +755,8 @@ w91:	move.b	[R_DMA_CH9_CMD],r0	; wait for reset cycle to finish
 		| IO_STATE (R_SERIAL1_TR_CTRL, tr_stick_par, normal)	\
 		| IO_STATE (R_SERIAL1_TR_CTRL, tr_par, even)		\
 		| IO_STATE (R_SERIAL1_TR_CTRL, tr_par_en, disable)	\
-		| IO_STATE (R_SERIAL1_TR_CTRL, tr_bitnr, tr_8bit),r0
-	move.b	r0,[R_SERIAL1_TR_CTRL]
+		| IO_STATE (R_SERIAL1_TR_CTRL, tr_bitnr, tr_8bit),$r0
+	move.b	$r0,[R_SERIAL1_TR_CTRL]
 
 	
 #ifdef CONFIG_ETRAX_SERIAL_PORT3	
@@ -707,13 +764,13 @@ w91:	move.b	[R_DMA_CH9_CMD],r0	; wait for reset cycle to finish
 	
 	moveq	  IO_STATE (R_SERIAL3_XOFF, tx_stop, enable)		\
 		| IO_STATE (R_SERIAL3_XOFF, auto_xoff, disable)		\
-		| IO_FIELD (R_SERIAL3_XOFF, xoff_char, 0),r0
-	move.d	r0,[R_SERIAL3_XOFF] 
+		| IO_FIELD (R_SERIAL3_XOFF, xoff_char, 0),$r0
+	move.d	$r0,[R_SERIAL3_XOFF] 
 
 	; 115.2kbaud for both transmit and receive
 	move.b	  IO_STATE (R_SERIAL3_BAUD, tr_baud, c115k2Hz)		\
-		| IO_STATE (R_SERIAL3_BAUD, rec_baud, c115k2Hz),r0
-	move.b	r0,[R_SERIAL3_BAUD]
+		| IO_STATE (R_SERIAL3_BAUD, rec_baud, c115k2Hz),$r0
+	move.b	$r0,[R_SERIAL3_BAUD]
 
 	; Set up and enable the serial3 receiver.
 	move.b	  IO_STATE (R_SERIAL3_REC_CTRL, dma_err, stop)		\
@@ -723,8 +780,8 @@ w91:	move.b	[R_DMA_CH9_CMD],r0	; wait for reset cycle to finish
 		| IO_STATE (R_SERIAL3_REC_CTRL, rec_stick_par, normal)	\
 		| IO_STATE (R_SERIAL3_REC_CTRL, rec_par, even)		\
 		| IO_STATE (R_SERIAL3_REC_CTRL, rec_par_en, disable)	\
-		| IO_STATE (R_SERIAL3_REC_CTRL, rec_bitnr, rec_8bit),r0
-	move.b	r0,[R_SERIAL3_REC_CTRL] 
+		| IO_STATE (R_SERIAL3_REC_CTRL, rec_bitnr, rec_8bit),$r0
+	move.b	$r0,[R_SERIAL3_REC_CTRL] 
 	
 	; Set up and enable the serial3 transmitter.
 	move.b	  IO_FIELD (R_SERIAL3_TR_CTRL, txd, 0)			\
@@ -734,31 +791,31 @@ w91:	move.b	[R_DMA_CH9_CMD],r0	; wait for reset cycle to finish
 		| IO_STATE (R_SERIAL3_TR_CTRL, tr_stick_par, normal)	\
 		| IO_STATE (R_SERIAL3_TR_CTRL, tr_par, even)		\
 		| IO_STATE (R_SERIAL3_TR_CTRL, tr_par_en, disable)	\
-		| IO_STATE (R_SERIAL3_TR_CTRL, tr_bitnr, tr_8bit),r0
-	move.b	r0,[R_SERIAL3_TR_CTRL]
+		| IO_STATE (R_SERIAL3_TR_CTRL, tr_bitnr, tr_8bit),$r0
+	move.b	$r0,[R_SERIAL3_TR_CTRL]
 #endif
 	
 #endif /* CONFIG_SVINTO_SIM */
 
-	jump	_start_kernel	; jump into the C-function _start_kernel in init/main.c
+	jump	start_kernel	; jump into the C-function start_kernel in init/main.c
 		
 	.data
-_etrax_irv:	
+etrax_irv:	
 	.dword	0
-_romfs_start:
+romfs_start:
 	.dword	0
-_romfs_length:
+romfs_length:
 	.dword	0
-_romfs_in_flash:
+romfs_in_flash:
 	.dword	0
 	
 	;; put some special pages at the beginning of the kernel aligned
 	;; to page boundaries - the kernel cannot start until after this
 
 #ifdef CONFIG_CRIS_LOW_MAP
-_swapper_pg_dir = 0x60002000
+swapper_pg_dir = 0x60002000
 #else	
-_swapper_pg_dir = 0xc0002000
+swapper_pg_dir = 0xc0002000
 #endif
 
 	.section ".data.init"

@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.7 2001/07/05 01:11:48 hp Exp $
+# $Id: Makefile,v 1.8 2001/10/01 14:44:07 bjornw Exp $
 #
 # Makefile for the linux kernel.
 #
@@ -20,6 +20,7 @@ obj-y   := process.o signal.o entry.o traps.o irq.o \
            ptrace.o setup.o time.o sys_cris.o shadows.o \
 	   debugport.o semaphore.o
 
+obj-$(CONFIG_MODULES)    += ksyms.o
 obj-$(CONFIG_ETRAX_KGDB) += kgdb.o
 
 # This dependency isn't caught by mkdep.  See entry.S.

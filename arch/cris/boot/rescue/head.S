@@ -1,4 +1,4 @@
-/* $Id: head.S,v 1.7 2001/04/18 12:05:07 bjornw Exp $
+/* $Id: head.S,v 1.8 2001/10/03 17:15:15 bjornw Exp $
  * 
  * Rescue code, made to reside at the beginning of the
  * flash-memory. when it starts, it checks a partition
@@ -134,12 +134,12 @@ in_cache:
 	;; change 1's to 0's without erasing the sector, it is possible to add new
 	;; code after this and altering the jumptarget in an upgrade.
 
-jtcd:	move.d	[jumptarget], r0
-	cmp.d	0xffffffff, r0
+jtcd:	move.d	[jumptarget], $r0
+	cmp.d	0xffffffff, $r0
 	beq	no_newjump
 	nop
 	
-	jump	[r0]
+	jump	[$r0]
 
 jumptarget:	
 	.dword	0xffffffff	; can be overwritten later to insert new code
@@ -151,69 +151,69 @@ no_newjump:
 	;; we now should go through the checksum-table and check the listed
 	;; partitions for errors.
 	
-	move.d	PTABLE_START, r3
-	move.d	[r3], r0
-	cmp.d	NOP_DI, r0	; make sure the nop/di is there...
+	move.d	PTABLE_START, $r3
+	move.d	[$r3], $r0
+	cmp.d	NOP_DI, $r0	; make sure the nop/di is there...
 	bne	do_rescue
 	nop
 	
 	;; skip the code transparency block (10 bytes).
 
-	addq	10, r3
+	addq	10, $r3
 	
 	;; check for correct magic
 	
-	move.w	[r3+], r0
-	cmp.w	PTABLE_MAGIC, r0
+	move.w	[$r3+], $r0
+	cmp.w	PTABLE_MAGIC, $r0
 	bne	do_rescue	; didn't recognize - trig rescue
 	nop
 
 	;; check for correct ptable checksum
 
-	movu.w	[r3+], r2	; ptable length
-	move.d	r2, r8		; save for later, length of total ptable
-	addq	28, r8		; account for the rest
-	move.d	[r3+], r4	; ptable checksum
-	move.d	r3, r1
+	movu.w	[$r3+], $r2	; ptable length
+	move.d	$r2, $r8	; save for later, length of total ptable
+	addq	28, $r8		; account for the rest
+	move.d	[$r3+], $r4	; ptable checksum
+	move.d	$r3, $r1
 	jsr	checksum	; r1 source, r2 length, returns in r0
 
-	cmp.d	r0, r4
+	cmp.d	$r0, $r4
 	bne	do_rescue	; didn't match - trig rescue
 	nop
 	
 	;; ptable is ok. validate each entry.
 
-	moveq	-1, r7
+	moveq	-1, $r7
 	
-ploop:	move.d	[r3+], r1	; partition offset (from ptable start)
+ploop:	move.d	[$r3+], $r1	; partition offset (from ptable start)
 	bne	notfirst	; check if its the partition containing ptable
 	nop			; yes..
-	move.d	r8, r1		; for its checksum check, skip the ptable
-	move.d	[r3+], r2	; partition length
-	sub.d	r8, r2		; minus the ptable length
+	move.d	$r8, $r1	; for its checksum check, skip the ptable
+	move.d	[$r3+], $r2	; partition length
+	sub.d	$r8, $r2	; minus the ptable length
 	ba	bosse
 	nop
 notfirst:	
-	cmp.d	-1, r1		; the end of the ptable ?
+	cmp.d	-1, $r1		; the end of the ptable ?
 	beq	flash_ok	;   if so, the flash is validated
-	move.d	[r3+], r2	; partition length
-bosse:	move.d	[r3+], r5	; checksum
-	move.d	[r3+], r4	; type and flags
-	addq	16, r3		; skip the reserved bytes
-	btstq	16, r4		; check ro flag
+	move.d	[$r3+], $r2	; partition length
+bosse:	move.d	[$r3+], $r5	; checksum
+	move.d	[$r3+], $r4	; type and flags
+	addq	16, $r3		; skip the reserved bytes
+	btstq	16, $r4		; check ro flag
 	bpl	ploop		;   rw partition, skip validation
 	nop
-	btstq	17, r4		; check bootable flag
+	btstq	17, $r4		; check bootable flag
 	bpl	1f
 	nop
-	move.d	r1, r7		; remember boot partition offset
+	move.d	$r1, $r7	; remember boot partition offset
 1:	
 
-	add.d	PTABLE_START, r1
+	add.d	PTABLE_START, $r1
 	
 	jsr	checksum	; checksum the partition
 	
-	cmp.d	r0, r5
+	cmp.d	$r0, $r5
 	beq	ploop		; checksums matched, go to next entry
 	nop
 
@@ -223,92 +223,92 @@ do_rescue:
 	;; setup port PA and PB default initial directions and data
 	;; (so we can flash LEDs, and so that DTR and others are set)
 	
-	move.b	CONFIG_ETRAX_DEF_R_PORT_PA_DIR, r0
-	move.b	r0, [R_PORT_PA_DIR]
-	move.b	CONFIG_ETRAX_DEF_R_PORT_PA_DATA, r0
-	move.b	r0, [R_PORT_PA_DATA]
+	move.b	CONFIG_ETRAX_DEF_R_PORT_PA_DIR, $r0
+	move.b	$r0, [R_PORT_PA_DIR]
+	move.b	CONFIG_ETRAX_DEF_R_PORT_PA_DATA, $r0
+	move.b	$r0, [R_PORT_PA_DATA]
 	
-	move.b	CONFIG_ETRAX_DEF_R_PORT_PB_DIR, r0
-	move.b	r0, [R_PORT_PB_DIR]
-	move.b	CONFIG_ETRAX_DEF_R_PORT_PB_DATA, r0
-	move.b	r0, [R_PORT_PB_DATA]
+	move.b	CONFIG_ETRAX_DEF_R_PORT_PB_DIR, $r0
+	move.b	$r0, [R_PORT_PB_DIR]
+	move.b	CONFIG_ETRAX_DEF_R_PORT_PB_DATA, $r0
+	move.b	$r0, [R_PORT_PB_DATA]
 
 	;; setup the serial port at 115200 baud
 	
-	moveq	0, r0
-	move.d	r0, [SERXOFF] 
+	moveq	0, $r0
+	move.d	$r0, [SERXOFF] 
 
-	move.b	0x99, r0
-	move.b	r0, [SERBAUD]		; 115.2kbaud for both transmit and receive
+	move.b	0x99, $r0
+	move.b	$r0, [SERBAUD]		; 115.2kbaud for both transmit and receive
 
-	move.b	0x40, r0		; rec enable
-	move.b	r0, [SERRECC] 
+	move.b	0x40, $r0		; rec enable
+	move.b	$r0, [SERRECC] 
 
-	moveq	0, r1		; "timer" to clock out a LED red flash
-	move.d	CODE_START, r3	; destination counter
-	movu.w	CODE_LENGTH, r4	; length
+	moveq	0, $r1		; "timer" to clock out a LED red flash
+	move.d	CODE_START, $r3	; destination counter
+	movu.w	CODE_LENGTH, $r4; length
 	
 wait_ser:
-	addq	1, r1
+	addq	1, $r1
 #ifndef CONFIG_ETRAX_NO_LEDS
 #ifdef CONFIG_ETRAX_PA_LEDS
-	move.b	CONFIG_ETRAX_DEF_R_PORT_PA_DATA, r2
+	move.b	CONFIG_ETRAX_DEF_R_PORT_PA_DATA, $r2
 #endif
 #ifdef CONFIG_ETRAX_PB_LEDS
-	move.b	CONFIG_ETRAX_DEF_R_PORT_PB_DATA, r2
+	move.b	CONFIG_ETRAX_DEF_R_PORT_PB_DATA, $r2
 #endif
-	move.d	(1 << CONFIG_ETRAX_LED1R) | (1 << CONFIG_ETRAX_LED2R), r0
-	btstq	16, r1
+	move.d	(1 << CONFIG_ETRAX_LED1R) | (1 << CONFIG_ETRAX_LED2R), $r0
+	btstq	16, $r1
 	bpl	1f
 	nop
-	or.d	r0, r2		; set bit
+	or.d	$r0, $r2	; set bit
 	ba	2f
 	nop
-1:	not	r0		; clear bit
-	and.d	r0, r2
+1:	not	$r0		; clear bit
+	and.d	$r0, $r2
 2:	
 #ifdef CONFIG_ETRAX_PA_LEDS
-	move.b	r2, [R_PORT_PA_DATA]	
+	move.b	$r2, [R_PORT_PA_DATA]	
 #endif	
 #ifdef CONFIG_ETRAX_PB_LEDS
-	move.b	r2, [R_PORT_PB_DATA]	
+	move.b	$r2, [R_PORT_PB_DATA]	
 #endif
 #ifdef CONFIG_ETRAX_90000000_LEDS
-	move.b	r2, [0x90000000]
+	move.b	$r2, [0x90000000]
 #endif
 #endif
 	
 	;; check if we got something on the serial port
 	
-	move.b	[SERSTAT], r0
-	btstq	0, r0		; data_avail
+	move.b	[SERSTAT], $r0
+	btstq	0, $r0		; data_avail
 	bpl	wait_ser
 	nop
 
 	;; got something - copy the byte and loop
 
-	move.b	[SERRDAT], r0
-	move.b	r0, [r3+]
+	move.b	[SERRDAT], $r0
+	move.b	$r0, [$r3+]
 	
-	subq	1, r4		; decrease length
+	subq	1, $r4		; decrease length
 	bne	wait_ser
 	nop
 
 	;; jump into downloaded code
 
-	move.d	RAM_INIT_MAGIC, r8	; Tell next product that DRAM is initialized
+	move.d	RAM_INIT_MAGIC, $r8	; Tell next product that DRAM is initialized
 	jump	CODE_START
 
 flash_ok:
 	;; check r7, which contains either -1 or the partition to boot from
 
-	cmp.d	-1, r7
+	cmp.d	-1, $r7
 	bne	1f
 	nop
-	move.d	PTABLE_START, r7; otherwise use the ptable start
+	move.d	PTABLE_START, $r7; otherwise use the ptable start
 1:
-	move.d	RAM_INIT_MAGIC, r8	; Tell next product that DRAM is initialized
-	jump	r7		; boot!
+	move.d	RAM_INIT_MAGIC, $r8	; Tell next product that DRAM is initialized
+	jump	$r7		; boot!
 
 
 	;; Helper subroutines
@@ -318,9 +318,9 @@ flash_ok:
 	;; r2 - length in bytes
 	;; result will be in r0
 checksum:
-	moveq	0, r0
-1:	addu.b	[r1+], r0
-	subq	1, r2
+	moveq	0, $r0
+1:	addu.b	[$r1+], $r0
+	subq	1, $r2
 	bne	1b
 	nop
 	ret

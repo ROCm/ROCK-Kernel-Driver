@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.m8xx_tty.c 1.8 05/18/01 07:54:04 patch
+ * BK Id: SCCS/s.m8xx_tty.c 1.10 09/14/01 19:30:13 trini
  */
 
 
@@ -17,7 +17,7 @@
 #include <linux/types.h>
 #include <asm/uaccess.h>
 #include <asm/mpc8xx.h>
-#include "../../8xx_io/commproc.h"
+#include <asm/commproc.h>
 
 #ifdef CONFIG_MBX
 #define MBX_CSR1	((volatile u_char *)0xfa100000)

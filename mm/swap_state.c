@@ -82,7 +82,7 @@ int add_to_swap_cache(struct page *page, swp_entry_t entry)
 		INC_CACHE_INFO(exist_race);
 		return -EEXIST;
 	}
-	page->flags |= (1 << PG_uptodate);
+	SetPageUptodate(page);
 	if (!PageLocked(page))
 		BUG();
 	if (!PageSwapCache(page))

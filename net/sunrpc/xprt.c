@@ -1401,12 +1401,6 @@ xprt_release(struct rpc_task *task)
 
 	dprintk("RPC: %4d release request %p\n", task->tk_pid, req);
 
-	/* remove slot from queue of pending */
-	if (task->tk_rpcwait) {
-		printk("RPC: task of released request still queued!\n");
-		rpc_remove_wait_queue(task);
-	}
-
 	spin_lock_bh(&xprt->xprt_lock);
 	req->rq_next = xprt->free;
 	xprt->free   = req;

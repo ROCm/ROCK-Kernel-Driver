@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.ppc_ksyms.c 1.51 08/24/01 17:05:47 paulus
+ * BK Id: SCCS/s.ppc_ksyms.c 1.55 10/02/01 12:33:42 trini
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -52,7 +52,7 @@
 #include <asm/btext.h>
 
 #ifdef  CONFIG_8xx
-#include "../8xx_io/commproc.h"
+#include <asm/commproc.h>
 #endif
 
 /* Tell string.h we don't want memcpy etc. as cpp defines */
@@ -73,8 +73,10 @@ long long __ashrdi3(long long, int);
 long long __ashldi3(long long, int);
 long long __lshrdi3(long long, int);
 int abs(int);
-extern unsigned long ret_to_user_hook;
 
+extern unsigned char __res[];
+
+extern unsigned long ret_to_user_hook;
 extern unsigned long mm_ptov (unsigned long paddr);
 
 EXPORT_SYMBOL(clear_page);
@@ -338,6 +340,7 @@ EXPORT_SYMBOL(debugger_fault_handler);
 #endif
 
 #ifdef  CONFIG_8xx
+EXPORT_SYMBOL(__res);
 EXPORT_SYMBOL(request_8xxirq);
 EXPORT_SYMBOL(cpm_install_handler);
 EXPORT_SYMBOL(cpm_free_handler);

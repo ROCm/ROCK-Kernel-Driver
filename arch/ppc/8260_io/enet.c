@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.enet.c 1.6 05/17/01 18:14:19 cort
+ * BK Id: SCCS/s.enet.c 1.9 09/14/01 18:01:16 trini
  */
 /*
  * Ethernet driver for Motorola MPC8260.
@@ -13,7 +13,7 @@
  * This version of the driver is somewhat selectable for the different
  * processor/board combinations.  It works for the boards I know about
  * now, and should be easily modified to include others.  Some of the
- * configuration information is contained in "commproc.h" and the
+ * configuration information is contained in <asm/commproc.h> and the
  * remainder is here.
  *
  * Buffer descriptors are kept in the CPM dual port RAM, and the frame

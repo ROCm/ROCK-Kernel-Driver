@@ -1,4 +1,4 @@
-# BK Id: SCCS/s.Makefile 1.24 08/01/01 13:25:40 trini
+# BK Id: SCCS/s.Makefile 1.26 09/25/01 07:54:40 trini
 #
 # arch/ppc/boot/Makefile
 #
@@ -44,7 +44,7 @@ misc.o: misc.c
 	$(CC) $(CFLAGS) -DINITRD_OFFSET=0 -DINITRD_SIZE=0 -DZIMAGE_OFFSET=0 \
 		-DZIMAGE_SIZE=0 -c -o $@ $*.c
 
-zvmlinux.initrd: zvmlinux ../images/vmlinux.gz
+zvmlinux.initrd: $(obj-y) $(LIBS) ../images/vmlinux.gz
 	$(LD) $(ZLINKFLAGS) -o $@.tmp $(obj-y) $(LIBS)
 	$(OBJCOPY) $(OBJCOPY_ARGS) -R .comment \
 		--add-section=initrd=../images/ramdisk.image.gz \

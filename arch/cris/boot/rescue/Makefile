@@ -4,9 +4,9 @@
 ifndef TOPDIR
 TOPDIR = ../../../..
 endif
-CC = gcc-cris -I $(TOPDIR)/include
+CC = gcc-cris -mlinux -I $(TOPDIR)/include
 CFLAGS = -O2
-LD = ld-cris
+LD = gcc-cris -mlinux -nostdlib
 OBJCOPY = objcopy-cris
 
 all: rescue.bin testrescue.bin kimagerescue.bin
@@ -48,3 +48,7 @@ clean:
 	rm -f *.o *.bin
 
 fastdep:
+
+modules:
+
+modules-install:

@@ -188,7 +188,7 @@ int main(int argc, const char * argv [])
      * So by having an initial \n, strstr will find exact matches.
      */
 
-    fp_find = popen("find * -type f -print", "r");
+    fp_find = popen("find * -type f -name \"*.h\" -print", "r");
     if (fp_find == 0)
 	ERROR_EXIT( "find" );
 

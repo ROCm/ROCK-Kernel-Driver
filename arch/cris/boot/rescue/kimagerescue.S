@@ -1,4 +1,4 @@
-/* $Id: kimagerescue.S,v 1.4 2001/04/18 12:04:46 bjornw Exp $
+/* $Id: kimagerescue.S,v 1.5 2001/10/03 17:15:15 bjornw Exp $
  * 
  * Rescue code to be prepended on a kimage and copied to the
  * rescue serial port.
@@ -56,15 +56,15 @@
 	;; setup port PA and PB default initial directions and data
 	;; (so we can flash LEDs, and so that DTR and others are set)
 	
-	move.b	CONFIG_ETRAX_DEF_R_PORT_PA_DIR, r0
-	move.b	r0, [R_PORT_PA_DIR]
-	move.b	CONFIG_ETRAX_DEF_R_PORT_PA_DATA, r0
-	move.b	r0, [R_PORT_PA_DATA]
+	move.b	CONFIG_ETRAX_DEF_R_PORT_PA_DIR, $r0
+	move.b	$r0, [R_PORT_PA_DIR]
+	move.b	CONFIG_ETRAX_DEF_R_PORT_PA_DATA, $r0
+	move.b	$r0, [R_PORT_PA_DATA]
 	
-	move.b	CONFIG_ETRAX_DEF_R_PORT_PB_DIR, r0
-	move.b	r0, [R_PORT_PB_DIR]
-	move.b	CONFIG_ETRAX_DEF_R_PORT_PB_DATA, r0
-	move.b	r0, [R_PORT_PB_DATA]
+	move.b	CONFIG_ETRAX_DEF_R_PORT_PB_DIR, $r0
+	move.b	$r0, [R_PORT_PB_DIR]
+	move.b	CONFIG_ETRAX_DEF_R_PORT_PB_DATA, $r0
+	move.b	$r0, [R_PORT_PB_DATA]
 	
 	;; We need to setup the bus registers before we start using the DRAM
 #include "../../lib/dram_init.S"
@@ -74,68 +74,68 @@
 	;; We assume 8 MB is the minimum DRAM in an eLinux
 	;; product and put the sp at the top for now.
 
-	move.d	0x40800000, sp
+	move.d	0x40800000, $sp
 	
 	;; setup the serial port at 115200 baud
 	
-	moveq	0, r0
-	move.d	r0, [SERXOFF] 
+	moveq	0, $r0
+	move.d	$r0, [SERXOFF] 
 
-	move.b	0x99, r0
-	move.b	r0, [SERBAUD]		; 115.2kbaud for both transmit and receive
+	move.b	0x99, $r0
+	move.b	$r0, [SERBAUD]		; 115.2kbaud for both transmit and receive
 
-	move.b	0x40, r0		; rec enable
-	move.b	r0, [SERRECC] 
+	move.b	0x40, $r0		; rec enable
+	move.b	$r0, [SERRECC] 
 
 
-	moveq	0, r1		; "timer" to clock out a LED red flash
-	move.d	CODE_START, r3	; destination counter
-	move.d	CODE_LENGTH, r4	; length
-	move.d	TIMEOUT_VALUE, r5	; "timeout" until jump
+	moveq	0, $r1		; "timer" to clock out a LED red flash
+	move.d	CODE_START, $r3	; destination counter
+	move.d	CODE_LENGTH, $r4	; length
+	move.d	TIMEOUT_VALUE, $r5	; "timeout" until jump
 
 wait_ser:
-	addq	1, r1
-	subq	1, r5		; decrease timeout
+	addq	1, $r1
+	subq	1, $r5		; decrease timeout
 	beq	jump_start	; timed out
 	nop
 #ifndef CONFIG_ETRAX_NO_LEDS
 #ifdef CONFIG_ETRAX_PA_LEDS
-	move.b	CONFIG_ETRAX_DEF_R_PORT_PA_DATA, r2
+	move.b	CONFIG_ETRAX_DEF_R_PORT_PA_DATA, $r2
 #endif
 #ifdef CONFIG_ETRAX_PB_LEDS
-	move.b	CONFIG_ETRAX_DEF_R_PORT_PB_DATA, r2
+	move.b	CONFIG_ETRAX_DEF_R_PORT_PB_DATA, $r2
 #endif
-	move.d	(1 << CONFIG_ETRAX_LED1R) | (1 << CONFIG_ETRAX_LED2R), r0
-	btstq	16, r1
+	move.d	(1 << CONFIG_ETRAX_LED1R) | (1 << CONFIG_ETRAX_LED2R), $r0
+	btstq	16, $r1
 	bpl	1f
 	nop
-	or.d	r0, r2		; set bit
+	or.d	$r0, $r2		; set bit
 	ba	2f
 	nop
-1:	not	r0		; clear bit
-	and.d	r0, r2
+1:	not	$r0		; clear bit
+	and.d	$r0, $r2
 2:	
 #ifdef CONFIG_ETRAX_PA_LEDS
-	move.b	r2, [R_PORT_PA_DATA]
+	move.b	$r2, [R_PORT_PA_DATA]
 #endif	
 #ifdef CONFIG_ETRAX_PB_LEDS
-	move.b	r2, [R_PORT_PB_DATA]
+	move.b	$r2, [R_PORT_PB_DATA]
 #endif
 #endif
 		
 	;; check if we got something on the serial port
 	
-	move.b	[SERSTAT], r0
-	btstq	0, r0		; data_avail
+	move.b	[SERSTAT], $r0
+	btstq	0, $r0		; data_avail
 	bpl	wait_ser
 	nop
 
 	;; got something - copy the byte and loop
 
-	move.b	[SERRDAT], r0
-	move.b	r0, [r3+]
-	move.d	TIMEOUT_VALUE, r5	; reset "timeout"
-	subq	1, r4		; decrease length
+	move.b	[SERRDAT], $r0
+	move.b	$r0, [$r3+]
+	move.d	TIMEOUT_VALUE, $r5	; reset "timeout"
+	subq	1, $r4		; decrease length
 	bne	wait_ser
 	nop
 jump_start:

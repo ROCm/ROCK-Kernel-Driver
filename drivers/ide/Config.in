@@ -124,6 +124,16 @@ if [ "$CONFIG_BLK_DEV_IDE" != "n" ]; then
       if [ "$CONFIG_Q40" = "y" ]; then
 	 dep_bool '  Q40/Q60 IDE interface support' CONFIG_BLK_DEV_Q40IDE $CONFIG_Q40
       fi
+      if [ "$CONFIG_8xx" = "y" ]; then
+         dep_bool '  MPC8xx IDE support' CONFIG_BLK_DEV_MPC8xx_IDE $CONFIG_8xx
+      fi
+
+      if [ "$CONFIG_BLK_DEV_MPC8xx_IDE" = "y" ]; then
+         choice 'Type of MPC8xx IDE interface'		\
+		"8xx_PCCARD	CONFIG_IDE_8xx_PCCARD	\
+		 8xx_DIRECT	CONFIG_IDE_8xx_DIRECT	\
+		 EXT_DIRECT	CONFIG_IDE_EXT_DIRECT"	8xx_PCCARD
+      fi
 
       bool '  Other IDE chipset support' CONFIG_IDE_CHIPSETS
       if [ "$CONFIG_IDE_CHIPSETS" = "y" ]; then
@@ -182,7 +192,8 @@ if [ "$CONFIG_IDE_CHIPSETS" = "y" -o \
      "$CONFIG_BLK_DEV_SIS5513" = "y" -o \
      "$CONFIG_BLK_DEV_SLC90E66" = "y" -o \
      "$CONFIG_BLK_DEV_SL82C105" = "y" -o \
-     "$CONFIG_BLK_DEV_VIA82CXXX" = "y" ]; then
+     "$CONFIG_BLK_DEV_VIA82CXXX" = "y" -o \
+     "$CONFIG_BLK_DEV_MPC8xx_IDE" = "y" ]; then
    define_bool CONFIG_BLK_DEV_IDE_MODES y
 else
    define_bool CONFIG_BLK_DEV_IDE_MODES n

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.xmon.c 1.14 06/28/01 15:50:17 paulus
+ * BK Id: SCCS/s.xmon.c 1.16 09/22/01 15:25:10 trini
  */
 /*
  * Routines providing a simple monitor for use on the PowerMac.
@@ -813,10 +813,12 @@ super_regs()
 		printf("sprg0-3 = %x %x %x %x\n", get_sprg0(), get_sprg1(),
 		       get_sprg2(), get_sprg3());
 		printf("srr0 = %x, srr1 = %x\n", get_srr0(), get_srr1());
+#ifdef CONFIG_PPC_STD_MMU
 		printf("sr0-15 =");
 		for (i = 0; i < 16; ++i)
 			printf(" %x", get_sr(i));
 		printf("\n");
+#endif
 		asm("mr %0,1" : "=r" (i) :);
 		printf("sp = %x ", i);
 		asm("mr %0,2" : "=r" (i) :);

@@ -102,24 +102,18 @@ static int reiserfs_readdir (struct file * filp, void * dirent, filldir_t filldi
 	ih = de.de_ih;
 	store_ih (&tmp_ih, ih);
 		
-#ifdef CONFIG_REISERFS_CHECK
 	/* we must have found item, that is item of this directory, */
-	if (COMP_SHORT_KEYS (&(ih->ih_key), &pos_key))
-	    reiserfs_panic (inode->i_sb, "vs-9000: reiserfs_readdir: "
-			    "found item %h does not match to dir we readdir %k",
-			    ih, &pos_key);
-      
-	if (item_num > B_NR_ITEMS (bh) - 1)
-	    reiserfs_panic (inode->i_sb, "vs-9005: reiserfs_readdir: "
-			    "item_num == %d, item amount == %d",
-			    item_num, B_NR_ITEMS (bh));
+	RFALSE( COMP_SHORT_KEYS (&(ih->ih_key), &pos_key),
+		"vs-9000: found item %h does not match to dir we readdir %k",
+		ih, &pos_key);
+	RFALSE( item_num > B_NR_ITEMS (bh) - 1,
+		"vs-9005 item_num == %d, item amount == %d", 
+		item_num, B_NR_ITEMS (bh));
       
 	/* and entry must be not more than number of entries in the item */
-	if (I_ENTRY_COUNT (ih) < entry_num)
-	    reiserfs_panic (inode->i_sb, "vs-9010: reiserfs_readdir: "
-			    "entry number is too big %d (%d)",
-			    entry_num, I_ENTRY_COUNT (ih));
-#endif	/* CONFIG_REISERFS_CHECK */
+	RFALSE( I_ENTRY_COUNT (ih) < entry_num,
+		"vs-9010: entry number is too big %d (%d)", 
+		entry_num, I_ENTRY_COUNT (ih));
 
 	if (search_res == POSITION_FOUND || entry_num < I_ENTRY_COUNT (ih)) {
 	    /* go through all entries in the directory item beginning from the entry, that has been found */

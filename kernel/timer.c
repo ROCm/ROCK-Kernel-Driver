@@ -794,6 +794,12 @@ asmlinkage long sys_getegid(void)
 
 #endif
 
+/* Thread ID - the internal kernel "pid" */
+asmlinkage long sys_gettid(void)
+{
+	return current->pid;
+}
+
 asmlinkage long sys_nanosleep(struct timespec *rqtp, struct timespec *rmtp)
 {
 	struct timespec t;

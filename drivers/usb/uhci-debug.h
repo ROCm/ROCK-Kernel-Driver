@@ -372,7 +372,9 @@ static int uhci_sprint_schedule(struct uhci *uhci, char *buf, int len)
 				if (td->link != td->dma_handle)
 					out += sprintf(out, "    skel_term_td does not link to self\n");
 
-				out += uhci_show_td(td, out, len - (out - buf), 4);
+				/* Don't show it twice */
+				if (debug <= 1)
+					out += uhci_show_td(td, out, len - (out - buf), 4);
 			}
 
 			continue;

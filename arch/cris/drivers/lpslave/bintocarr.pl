@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-# $Id: bintocarr.pl,v 1.3 2001/06/08 08:46:50 olof Exp $
+# $Id: bintocarr.pl,v 1.4 2001/08/08 08:18:13 bjarne Exp $
 # Copy of mkjulbin.pl made by Olof
 # convert a binary stdin to a C-file containing a char array of the input
 # first argument is the symbol name
@@ -7,7 +7,8 @@
 $symbol = shift @ARGV;
 
 print "#include <linux/init.h>\n\n";
-print "unsigned char $symbol", "[] __initdata = {\n";
+#print "unsigned char $symbol", "[] __initdata = {\n";
+print "unsigned char $symbol", "[]  = {\n";
 
 my $char;
 

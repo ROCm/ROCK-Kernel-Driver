@@ -19,6 +19,10 @@
 
 #include <asm/system.h>
 
+/* We use generic_ffs so get it; include guards resolve the possible
+   mutually inclusion.  */
+#include <linux/bitops.h>
+
 /*
  * Some hacks to defeat gcc over-optimizations..
  */
@@ -215,33 +219,62 @@ static __inline__ int test_bit(int nr, const void *addr)
  */
 
 /*
- * ffz = Find First Zero in word. Undefined if no zero exists,
- * so code should check against ~0UL first..
+ * Helper functions for the core of the ff[sz] functions, wrapping the
+ * syntactically awkward asms.  The asms compute the number of leading
+ * zeroes of a bits-in-byte and byte-in-word and word-in-dword-swapped
+ * number.  They differ in that the first function also inverts all bits
+ * in the input.
  */
-static __inline__ unsigned long ffz(unsigned long word)
+static __inline__ unsigned long cris_swapnwbrlz(unsigned long w)
 {
-	unsigned long result = 0;
-	
-	while(word & 1) {
-		result++;
-		word >>= 1;
-	}
-	return result;
+	/* Let's just say we return the result in the same register as the
+	   input.  Saying we clobber the input but can return the result
+	   in another register:
+	   !  __asm__ ("swapnwbr %2\n\tlz %2,%0"
+	   !	      : "=r,r" (res), "=r,X" (dummy) : "1,0" (w));
+	   confuses gcc (sched.c, gcc from cris-dist-1.14).  */
+
+	unsigned long res;
+	__asm__ ("swapnwbr %0 \n\t"
+		 "lz %0,%0"
+		 : "=r" (res) : "0" (w));
+	return res;
+}
+
+static __inline__ unsigned long cris_swapwbrlz(unsigned long w)
+{
+	unsigned res;
+	__asm__ ("swapwbr %0 \n\t"
+		 "lz %0,%0"
+		 : "=r" (res)
+		 : "0" (w));
+	return res;
 }
 
 /*
- * Find first one in word. Undefined if no one exists,
- * so code should check against 0UL first..
+ * ffz = Find First Zero in word. Undefined if no zero exists,
+ * so code should check against ~0UL first..
  */
-static __inline__ unsigned long find_first_one(unsigned long word)
+static __inline__ unsigned long ffz(unsigned long w)
 {
-	unsigned long result = 0;
-	
-	while(!(word & 1)) {
-		result++;
-		word >>= 1;
-	}
-	return result;
+	/* The generic_ffs function is used to avoid the asm when the
+	   argument is a constant.  */
+	return __builtin_constant_p (w)
+		? (~w ? (unsigned long) generic_ffs ((int) ~w) - 1 : 32)
+		: cris_swapnwbrlz (w);
+}
+
+/*
+ * Somewhat like ffz but the equivalent of generic_ffs: in contrast to
+ * ffz we return the first one-bit *plus one*.
+ */
+static __inline__ unsigned long ffs(unsigned long w)
+{
+	/* The generic_ffs function is used to avoid the asm when the
+	   argument is a constant.  */
+	return __builtin_constant_p (w)
+		? (unsigned long) generic_ffs ((int) w)
+		: w ? cris_swapwbrlz (w) + 1 : 0;
 }
 
 /**

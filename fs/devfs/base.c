@@ -545,6 +545,9 @@
     20010919   Richard Gooch <rgooch@atnf.csiro.au>
 	       Set inode->i_mapping->a_ops for block nodes in <get_vfs_inode>.
   v0.116
+    20010927   Richard Gooch <rgooch@atnf.csiro.au>
+	       Went back to global rwsem for symlinks (refcount scheme no good)
+  v0.117
 */
 #include <linux/types.h>
 #include <linux/errno.h>
@@ -577,7 +580,7 @@
 #include <asm/bitops.h>
 #include <asm/atomic.h>
 
-#define DEVFS_VERSION            "0.116 (20010919)"
+#define DEVFS_VERSION            "0.117 (20010927)"
 
 #define DEVFS_NAME "devfs"
 
@@ -659,8 +662,6 @@ struct fcb_type  /*  File, char, block type  */
 
 struct symlink_type
 {
-    atomic_t refcount;           /*  When this drops to zero, it's unused    */
-    rwlock_t lock;               /*  Lock around the registered flag         */
     unsigned int length;         /*  Not including the NULL-termimator       */
     char *linkname;              /*  This is NULL-terminated                 */
 };
@@ -750,6 +751,8 @@ static unsigned int boot_options = OPTION_MOUNT;
 static unsigned int boot_options = OPTION_NONE;
 #endif
 
+static DECLARE_RWSEM (symlink_rwsem);
+
 /*  Forward function declarations  */
 static struct devfs_entry *search_for_entry (struct devfs_entry *dir,
 					     const char *name,
@@ -807,19 +810,12 @@ static struct devfs_entry *search_for_entry_in_dir (struct devfs_entry *parent,
     if (curr == NULL) return NULL;
     if (!S_ISLNK (curr->mode) || !traverse_symlink) return curr;
     /*  Need to follow the link: this is a stack chomper  */
-    read_lock (&curr->u.symlink.lock);
-    if (!curr->registered)
-    {
-	read_unlock (&curr->u.symlink.lock);
-	return NULL;
-    }
-    atomic_inc (&curr->u.symlink.refcount);
-    read_unlock (&curr->u.symlink.lock);
-    retval = search_for_entry (parent, curr->u.symlink.linkname,
-			       curr->u.symlink.length, FALSE, FALSE, NULL,
-			       TRUE);
-    if ( atomic_dec_and_test (&curr->u.symlink.refcount) )
-	kfree (curr->u.symlink.linkname);
+    down_read (&symlink_rwsem);
+    retval = curr->registered ?
+	search_for_entry (parent, curr->u.symlink.linkname,
+			  curr->u.symlink.length, FALSE, FALSE, NULL,
+			  TRUE) : NULL;
+    up_read (&symlink_rwsem);
     return retval;
 }   /*  End Function search_for_entry_in_dir  */
 
@@ -1436,11 +1432,11 @@ static void unregister (struct devfs_entry *de)
     }
     if (S_ISLNK (de->mode) && de->registered)
     {
-	write_lock (&de->u.symlink.lock);
 	de->registered = FALSE;
-	write_unlock (&de->u.symlink.lock);
-	if ( atomic_dec_and_test (&de->u.symlink.refcount) )
-	    kfree (de->u.symlink.linkname);
+	down_write (&symlink_rwsem);
+	if (de->u.symlink.linkname) kfree (de->u.symlink.linkname);
+	de->u.symlink.linkname = NULL;
+	up_write (&symlink_rwsem);
 	return;
     }
     if ( S_ISFIFO (de->mode) )
@@ -1520,8 +1516,10 @@ static int devfs_do_symlink (devfs_handle_t dir, const char *name,
 	kfree (newlink);
 	return -ENOMEM;
     }
+    down_write (&symlink_rwsem);
     if (de->registered)
     {
+	up_write (&symlink_rwsem);
 	kfree (newlink);
 	printk ("%s: devfs_do_symlink(%s): entry already exists\n",
 		DEVFS_NAME, name);
@@ -1532,9 +1530,8 @@ static int devfs_do_symlink (devfs_handle_t dir, const char *name,
     de->hide = (flags & DEVFS_FL_HIDE) ? TRUE : FALSE;
     de->u.symlink.linkname = newlink;
     de->u.symlink.length = linklength;
-    atomic_set (&de->u.symlink.refcount, 1);
-    rwlock_init (&de->u.symlink.lock);
     de->registered = TRUE;
+    up_write (&symlink_rwsem);
     if (handle != NULL) *handle = de;
     return 0;
 }   /*  End Function devfs_do_symlink  */
@@ -2818,16 +2815,15 @@ static int devfs_unlink (struct inode *dir, struct dentry *dentry)
     if (de == NULL) return -ENOENT;
     devfsd_notify_one (de, DEVFSD_NOTIFY_DELETE, inode->i_mode,
 		       inode->i_uid, inode->i_gid, dir->i_sb->u.generic_sbp);
+    de->registered = FALSE;
+    de->hide = TRUE;
     if ( S_ISLNK (de->mode) )
     {
-	write_lock (&de->u.symlink.lock);
-	de->registered = FALSE;
-	write_unlock (&de->u.symlink.lock);
-	if ( atomic_dec_and_test (&de->u.symlink.refcount) )
-	    kfree (de->u.symlink.linkname);
+	down_write (&symlink_rwsem);
+	if (de->u.symlink.linkname) kfree (de->u.symlink.linkname);
+	de->u.symlink.linkname = NULL;
+	up_write (&symlink_rwsem);
     }
-    else de->registered = FALSE;
-    de->hide = TRUE;
     free_dentries (de);
     return 0;
 }   /*  End Function devfs_unlink  */
@@ -3029,17 +3025,10 @@ static int devfs_readlink (struct dentry *dentry, char *buffer, int buflen)
 
     de = get_devfs_entry_from_vfs_inode (dentry->d_inode, TRUE);
     if (!de) return -ENODEV;
-    read_lock (&de->u.symlink.lock);
-    if (!de->registered)
-    {
-	read_unlock (&de->u.symlink.lock);
-	return -ENODEV;
-    }
-    atomic_inc (&de->u.symlink.refcount);
-    read_unlock (&de->u.symlink.lock);
-    err = vfs_readlink (dentry, buffer, buflen, de->u.symlink.linkname);
-    if ( atomic_dec_and_test (&de->u.symlink.refcount) )
-	kfree (de->u.symlink.linkname);
+    down_read (&symlink_rwsem);
+    err = de->registered ? vfs_readlink (dentry, buffer, buflen,
+					 de->u.symlink.linkname) : -ENODEV;
+    up_read (&symlink_rwsem);
     return err;
 }   /*  End Function devfs_readlink  */
 
@@ -3050,17 +3039,10 @@ static int devfs_follow_link (struct dentry *dentry, struct nameidata *nd)
 
     de = get_devfs_entry_from_vfs_inode (dentry->d_inode, TRUE);
     if (!de) return -ENODEV;
-    read_lock (&de->u.symlink.lock);
-    if (!de->registered)
-    {
-	read_unlock (&de->u.symlink.lock);
-	return -ENODEV;
-    }
-    atomic_inc (&de->u.symlink.refcount);
-    read_unlock (&de->u.symlink.lock);
-    err = vfs_follow_link (nd, de->u.symlink.linkname);
-    if ( atomic_dec_and_test (&de->u.symlink.refcount) )
-	kfree (de->u.symlink.linkname);
+    down_read (&symlink_rwsem);
+    err = de->registered ? vfs_follow_link (nd,
+					    de->u.symlink.linkname) : -ENODEV;
+    up_read (&symlink_rwsem);
     return err;
 }   /*  End Function devfs_follow_link  */
 

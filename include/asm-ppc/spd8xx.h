@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.spd8xx.h 1.5 05/17/01 18:14:25 cort
+ * BK Id: SCCS/s.spd8xx.h 1.6 09/14/01 17:37:56 trini
  */
 /*
  * A collection of structures, addresses, and values associated with
@@ -100,9 +100,5 @@ typedef struct bd_info {
 /* We don't use the 8259.
 */
 #define NR_8259_INTS	0
-
-/* Generic 8xx type
-*/
-#define _MACH_8xx (_MACH_spd8xx)
 
 #endif	/* __MACH_SPD8xx_DEFS */

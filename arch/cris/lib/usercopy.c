@@ -95,8 +95,8 @@ __copy_user (void *pdst, const void *psrc, unsigned long pn)
 	;;
 	;; Save the registers we'll use in the movem process
 	;; on the stack.
-	subq	11*4,sp
-	movem	r10,[sp]
+	subq	11*4,$sp
+	movem	$r10,[$sp]
 
 	;; Now we've got this:
 	;; r11 - src
@@ -104,7 +104,7 @@ __copy_user (void *pdst, const void *psrc, unsigned long pn)
 	;; r12 - n
 
 	;; Update n for the first loop
-	subq	44,r12
+	subq	44,$r12
 
 ; Since the noted PC of a faulting instruction in a delay-slot of a taken
 ; branch, is that of the branch target, we actually point at the from-movem
@@ -113,15 +113,15 @@ __copy_user (void *pdst, const void *psrc, unsigned long pn)
 ; after *that* movem.
 
 0:
-	movem	[r11+],r10
-	subq   44,r12
+	movem	[$r11+],$r10
+	subq   44,$r12
 	bge	0b
-	movem	r10,[r13+]
+	movem	$r10,[$r13+]
 1:
-	addq   44,r12  ;; compensate for last loop underflowing n
+	addq   44,$r12  ;; compensate for last loop underflowing n
 
 	;; Restore registers from stack
-	movem [sp+],r10
+	movem [$sp+],$r10
 2:
 	.section .fixup,\"ax\"
 
@@ -130,14 +130,14 @@ __copy_user (void *pdst, const void *psrc, unsigned long pn)
 ; performance penalty for sany use; the program will segfault soon enough.
 
 3:
-	move.d [sp],r10
-	addq 44,r10
-	move.d r10,[sp]
+	move.d [$sp],$r10
+	addq 44,$r10
+	move.d $r10,[$sp]
 	jump 0b
 4:
-	movem [sp+],r10
-	addq 44,r10
-	addq 44,r12
+	movem [$sp+],$r10
+	addq 44,$r10
+	addq 44,$r12
 	jump 2b
 
 	.previous
@@ -255,8 +255,8 @@ __copy_user_zeroing (void *pdst, const void *psrc, unsigned long pn)
 	;;
 	;; Save the registers we'll use in the movem process
 	;; on the stack.
-	subq	11*4,sp
-	movem	r10,[sp]
+	subq	11*4,$sp
+	movem	$r10,[$sp]
 
 	;; Now we've got this:
 	;; r11 - src
@@ -264,18 +264,18 @@ __copy_user_zeroing (void *pdst, const void *psrc, unsigned long pn)
 	;; r12 - n
 
 	;; Update n for the first loop
-	subq	44,r12
+	subq	44,$r12
 0:
-	movem	[r11+],r10
+	movem	[$r11+],$r10
 1:
-	subq   44,r12
+	subq   44,$r12
 	bge	0b
-	movem	r10,[r13+]
+	movem	$r10,[$r13+]
 
-	addq   44,r12  ;; compensate for last loop underflowing n
+	addq   44,$r12  ;; compensate for last loop underflowing n
 8:
 	;; Restore registers from stack
-	movem [sp+],r10
+	movem [$sp+],$r10
 
 	.section .fixup,\"ax\"
 
@@ -287,57 +287,57 @@ __copy_user_zeroing (void *pdst, const void *psrc, unsigned long pn)
 ;; the SIZE bytes at PAGE after the first fault.
 
 3:
-	move.d [sp],r10
+	move.d [$sp],$r10
 
 ;; Number of remaining bytes, cleared but not copied, is r12 + 44.
 
-	add.d r12,r10
-	addq 44,r10
+	add.d $r12,$r10
+	addq 44,$r10
 
-	move.d r10,[sp]
-	clear.d r0
-	clear.d r1
-	clear.d r2
-	clear.d r3
-	clear.d r4
-	clear.d r5
-	clear.d r6
-	clear.d r7
-	clear.d r8
-	clear.d r9
-	clear.d r10
+	move.d $r10,[$sp]
+	clear.d $r0
+	clear.d $r1
+	clear.d $r2
+	clear.d $r3
+	clear.d $r4
+	clear.d $r5
+	clear.d $r6
+	clear.d $r7
+	clear.d $r8
+	clear.d $r9
+	clear.d $r10
 
 ;; Perform clear similar to the copy-loop.
 
 4:
-	subq 44,r12
+	subq 44,$r12
 	bge 4b
-	movem r10,[r13+]
+	movem $r10,[$r13+]
 
 ;; Clear by four for the remaining multiples.
 
-	addq 40,r12
+	addq 40,$r12
 	bmi 6f
 	nop
 5:
-	subq 4,r12
+	subq 4,$r12
 	bpl 5b
-	clear.d [r13+]
+	clear.d [$r13+]
 6:
-	addq 4,r12
+	addq 4,$r12
 	beq 7f
 	nop
 
-	subq 1,r12
+	subq 1,$r12
 	beq 7f
-	clear.b [r13+]
+	clear.b [$r13+]
 
-	subq 1,r12
+	subq 1,$r12
 	beq 7f
-	clear.b [r13+]
+	clear.b [$r13+]
 
-	clear.d r12
-	clear.b [r13+]
+	clear.d $r12
+	clear.b [$r13+]
 7:
 	jump 8b
 
@@ -451,50 +451,50 @@ __do_clear_user (void *pto, unsigned long pn)
 	;; Save the registers we'll clobber in the movem process
 	;; on the stack.  Don't mention them to gcc, it will only be
 	;; upset.
-	subq	11*4,sp
-	movem	r10,[sp]
+	subq	11*4,$sp
+	movem	$r10,[$sp]
 
-	clear.d r0
-	clear.d r1
-	clear.d r2
-	clear.d r3
-	clear.d r4
-	clear.d r5
-	clear.d r6
-	clear.d r7
-	clear.d r8
-	clear.d r9
-	clear.d r10
-	clear.d r11
+	clear.d $r0
+	clear.d $r1
+	clear.d $r2
+	clear.d $r3
+	clear.d $r4
+	clear.d $r5
+	clear.d $r6
+	clear.d $r7
+	clear.d $r8
+	clear.d $r9
+	clear.d $r10
+	clear.d $r11
 
 	;; Now we've got this:
 	;; r13 - dst
 	;; r12 - n
 
 	;; Update n for the first loop
-	subq	12*4,r12
+	subq	12*4,$r12
 0:
-	subq   12*4,r12
+	subq   12*4,$r12
 	bge	0b
-	movem	r11,[r13+]
+	movem	$r11,[$r13+]
 1:
-	addq   12*4,r12	 ;; compensate for last loop underflowing n
+	addq   12*4,$r12        ;; compensate for last loop underflowing n
 
 	;; Restore registers from stack
-	movem [sp+],r10
+	movem [$sp+],$r10
 2:
 	.section .fixup,\"ax\"
 3:
-	move.d [sp],r10
-	addq 12*4,r10
-	move.d r10,[sp]
-	clear.d r10
+	move.d [$sp],$r10
+	addq 12*4,$r10
+	move.d $r10,[$sp]
+	clear.d $r10
 	jump 0b
 
 4:
-	movem [sp+],r10
-	addq 12*4,r10
-	addq 12*4,r12
+	movem [$sp+],$r10
+	addq 12*4,$r10
+	addq 12*4,$r12
 	jump 2b
 
 	.previous

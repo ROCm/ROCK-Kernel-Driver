@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2001 Axis Communications AB.
  *
- * $Id: usb-host.c,v 1.9 2001/05/09 12:54:12 johana Exp $
+ * $Id: usb-host.c,v 1.11 2001/09/26 11:52:16 bjornw Exp $
  *
  */
 
@@ -34,7 +34,7 @@
 #define ETRAX_USB_RX_IRQ USB_DMA_RX_IRQ_NBR
 #define ETRAX_USB_TX_IRQ USB_DMA_TX_IRQ_NBR
 
-static const char *usb_hcd_version = "$Revision: 1.9 $";
+static const char *usb_hcd_version = "$Revision: 1.11 $";
 
 #undef KERN_DEBUG
 #define KERN_DEBUG ""
@@ -792,6 +792,8 @@ static void etrax_usb_setup_epid(char epid, char devnum, char endpoint, char pac
 	cli();
 	
 	if (test_bit(epid, (void *)&ep_usage_bitmask)) {
+		restore_flags(flags);
+
 		warn("Trying to setup used epid %d", epid);
 		DBFEXIT;
 		return;
@@ -828,12 +830,16 @@ static void etrax_usb_free_epid(char epid)
 
 	save_flags(flags);
 	cli();
+
 	*R_USB_EPT_INDEX = IO_FIELD(R_USB_EPT_INDEX, value, epid);
 	nop();
-	while (*R_USB_EPT_DATA & IO_MASK(R_USB_EPT_DATA, hold))printk("+");
+	while (*R_USB_EPT_DATA & IO_MASK(R_USB_EPT_DATA, hold))
+		printk("+");
 	*R_USB_EPT_DATA = 0;
 	clear_bit(epid, (void *)&ep_usage_bitmask);
+
 	restore_flags(flags);
+
 	dbg_ep("epid: %d freed", epid);
 	
 	DBFEXIT;
@@ -861,6 +867,8 @@ static int etrax_usb_lookup_epid(unsigned char devnum, char endpoint, char slow,
 			    (IO_EXTRACT(R_USB_EPT_DATA, ep, data) == endpoint) &&
 			    (IO_EXTRACT(R_USB_EPT_DATA, low_speed, data) == slow) &&
 			    (IO_EXTRACT(R_USB_EPT_DATA, max_len, data) == maxp)) {
+				restore_flags(flags);
+	
 				dbg_ep("Found ep_id %d for devnum %d, endpoint %d",
 				       i, devnum, endpoint);
 				DBFEXIT;
@@ -1337,6 +1345,7 @@ static int etrax_usb_do_ctrl_hw_add(urb_t *urb, char epid, char maxlen)
 	TxCtrlEPList[epid].sub = virt_to_phys(sb_desc_1);
 	TxCtrlEPList[epid].hw_len = 0;
 	TxCtrlEPList[epid].command |= IO_STATE(USB_EP_command, enable, yes);
+
 	restore_flags(flags);
 
 	dump_ep_desc(&TxCtrlEPList[epid]);
@@ -1775,8 +1784,10 @@ static void etrax_usb_hc_intr_bottom_half(void *data)
 
 		save_flags(flags);
 		cli();
+
 		*R_USB_EPT_INDEX = IO_FIELD(R_USB_EPT_INDEX, value, epid); nop();
 		r_usb_ept_data = *R_USB_EPT_DATA;
+
 		restore_flags(flags);
 
 		if (r_usb_ept_data & IO_MASK(R_USB_EPT_DATA, hold)) {

@@ -8,13 +8,13 @@ SECTIONS
 {
 	.text :
 	{
-		_stext = . ;
+		stext = . ;
 		*(.text)
-		_etext = . ;
+		etext = . ;
 	} > flash
 	.data :
 	{
 		*(.data)
-		_edata = . ;
+		edata = . ;
 	} > flash
 }

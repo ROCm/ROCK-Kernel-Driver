@@ -548,17 +548,17 @@ smb_errno(struct smb_sb_info *server)
 			return -EDEADLK;
 		case ERRfilexists:
 			return -EEXIST;
-		case ERRinvalidparam:
+		case ERROR_INVALID_PARAMETER:
 			return -EINVAL;
-		case ERRdiskfull:
+		case ERROR_DISK_FULL:
 			return -ENOSPC;
-		case ERRinvalidname:
+		case ERROR_INVALID_NAME:
 			return -ENOENT;
-		case ERRdirnotempty:
+		case ERROR_DIR_NOT_EMPTY:
 			return -ENOTEMPTY;
-		case ERRnotlocked:
+		case ERROR_NOT_LOCKED:
                        return -ENOLCK;
-		case ERRexists:
+		case ERROR_ALREADY_EXISTS:
 			return -EEXIST;
 		default:
 			class = "ERRDOS";
@@ -603,6 +603,8 @@ smb_errno(struct smb_sb_info *server)
 			return -ETXTBSY;
 		case ERRlock:
 			return -EDEADLK;
+		case ERRdiskfull:
+			return -ENOSPC;
 		default:
 			class = "ERRHRD";
 			goto err_unknown;

@@ -45,7 +45,11 @@ struct e100_serial {
 	u8           rx_ctrl; /* shadow for R_SERIALx_REC_CTRL */
 	u8           tx_ctrl; /* shadow for R_SERIALx_TR_CTRL */
 	u8           iseteop; /* bit number for R_SET_EOP for the input dma */
+	int          enabled;    /* Set to 1 if the port is enabled in HW config */
+  
+  
 /* end of fields defined in rs_table[] in .c-file */
+	int          uses_dma; /* Set to 1 if DMA should be used */
 	unsigned char           fifo_didmagic; /* a fifo eop has been forced */
 
 	struct etrax_dma_descr tr_descr, rec_descr;

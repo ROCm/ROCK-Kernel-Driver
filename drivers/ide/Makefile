@@ -10,7 +10,7 @@
 
 O_TARGET := idedriver.o
 
-export-objs		:= ide.o ide-features.o
+export-objs		:= ide.o ide-features.o ataraid.o
 list-multi		:= ide-mod.o ide-probe-mod.o
 
 obj-y		:=
@@ -65,6 +65,7 @@ ide-obj-$(CONFIG_BLK_DEV_SL82C105)	+= sl82c105.o
 ide-obj-$(CONFIG_BLK_DEV_TRM290)	+= trm290.o
 ide-obj-$(CONFIG_BLK_DEV_UMC8672)	+= umc8672.o
 ide-obj-$(CONFIG_BLK_DEV_VIA82CXXX)	+= via82cxxx.o
+ide-obj-$(CONFIG_BLK_DEV_MPC8xx_IDE)	+= ide-m8xx.o
 
 # The virtualised raid layers MUST come after the ide itself or bad stuff
 # will happen.

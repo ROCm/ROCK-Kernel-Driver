@@ -171,7 +171,7 @@ struct cpu_spec	cpu_specs[] = {
 	__setup_cpu_7450
     },
     {	/* 82xx (8240, 8245, 8260 are all 603e cores) */
-	0xffff0000, 0x00810000, "82xx",
+	0x7fff0000, 0x00810000, "82xx",
 	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB,
 	COMMON_PPC,
 	32, 32,
@@ -231,7 +231,7 @@ struct cpu_spec	cpu_specs[] = {
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB,
     	PPC_FEATURE_32 | PPC_FEATURE_HAS_MMU,
  	16, 16,
-	0, __setup_cpu_8xx
+	__setup_cpu_8xx	/* Empty */
     },
 #endif /* CONFIG_8xx */
 #ifdef CONFIG_4xx

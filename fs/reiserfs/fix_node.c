@@ -65,19 +65,14 @@ static inline int old_item_num (int new_num, int affected_item_num, int mode)
 
   if (mode == M_INSERT) {
 
-#ifdef CONFIG_REISERFS_CHECK
-    if (new_num == 0)
-      reiserfs_panic (0,"vs-8005: old_item_num: for INSERT mode and item number of inserted item");
-#endif
+    RFALSE( new_num == 0, 
+	    "vs-8005: for INSERT mode and item number of inserted item");
 
     return new_num - 1;
   }
 
-#ifdef CONFIG_REISERFS_CHECK
-  if (mode != M_DELETE)
-      reiserfs_panic (0, "vs-8010: old_item_num: mode must be M_DELETE (mode = \'%c\'", mode);
-#endif
-
+  RFALSE( mode != M_DELETE,
+	  "vs-8010: old_item_num: mode must be M_DELETE (mode = \'%c\'", mode);
   /* delete mode */
   return new_num + 1;
 }
@@ -156,37 +151,14 @@ static void create_virtual_node (struct tree_balance * tb, int h)
     if (vn->vn_mode == M_INSERT) {
 	struct virtual_item * vi = vn->vn_vi + vn->vn_affected_item_num;
       
-#ifdef CONFIG_REISERFS_CHECK
-	if (vn->vn_ins_ih == 0)
-	    reiserfs_panic (0, "vs-8040: create_virtual_node: item header of inserted item is not specified");
-#endif
-
+	RFALSE( vn->vn_ins_ih == 0,
+		"vs-8040: item header of inserted item is not specified");
 	vi->vi_item_len = tb->insert_size[0];
 	vi->vi_ih = vn->vn_ins_ih;
 	vi->vi_item = vn->vn_data;
 	vi->vi_uarea = vn->vn_free_ptr;
 	
 	op_create_vi (vn, vi, 0/*not pasted or cut*/, tb->insert_size [0]);
-#if 0
-	switch (type/*le_key_k_type (ih_version (vn->vn_ins_ih), &(vn->vn_ins_ih->ih_key))*/) {
-	case TYPE_STAT_DATA:
-	    vn->vn_vi[vn->vn_affected_item_num].vi_type |= VI_TYPE_STAT_DATA;
-	    break;
-	case TYPE_DIRECT:
-	    vn->vn_vi[vn->vn_affected_item_num].vi_type |= VI_TYPE_DIRECT;
-	    break;
-	case TYPE_INDIRECT:
-	    vn->vn_vi[vn->vn_affected_item_num].vi_type |= VI_TYPE_INDIRECT;
-	    break;
-	default:
-	    /* inseted item is directory (it must be item with "." and "..") */
-	    vn->vn_vi[vn->vn_affected_item_num].vi_type |= 
-	    	(VI_TYPE_DIRECTORY | VI_TYPE_FIRST_DIRECTORY_ITEM | VI_TYPE_INSERTED_DIRECTORY_ITEM);
-      
-	    /* this directory item can not be split, so do not set sizes of entries */
-	    break;
-	}
-#endif
     }
   
     /* set right merge flag we take right delimiting key and check whether it is a mergeable item */
@@ -227,10 +199,7 @@ static void check_left (struct tree_balance * tb, int h, int cur_free)
     struct virtual_item * vi;
     int d_size, ih_size;
 
-#ifdef CONFIG_REISERFS_CHECK
-    if (cur_free < 0)
-	reiserfs_panic (0, "vs-8050: check_left: cur_free (%d) < 0", cur_free);
-#endif
+    RFALSE( cur_free < 0, "vs-8050: cur_free (%d) < 0", cur_free);
 
     /* internal level */
     if (h > 0) {	
@@ -247,19 +216,15 @@ static void check_left (struct tree_balance * tb, int h, int cur_free)
 	return;
     }
 
-#ifdef CONFIG_REISERFS_CHECK
-    if (!PATH_H_PPARENT (tb->tb_path, 0))
-	reiserfs_panic (0, "vs-8055: check_left: parent does not exist or invalid");
-#endif
+    RFALSE( !PATH_H_PPARENT (tb->tb_path, 0),
+	    "vs-8055: parent does not exist or invalid");
 
     vi = vn->vn_vi;
     if ((unsigned int)cur_free >= (vn->vn_size - ((vi->vi_type & VI_TYPE_LEFT_MERGEABLE) ? IH_SIZE : 0))) {
 	/* all contents of S[0] fits into L[0] */
 
-#ifdef CONFIG_REISERFS_CHECK
-	if (vn->vn_mode == M_INSERT || vn->vn_mode == M_PASTE)
-	    reiserfs_panic (0, "vs-8055: check_left: invalid mode or balance condition failed");
-#endif
+	RFALSE( vn->vn_mode == M_INSERT || vn->vn_mode == M_PASTE,
+		"vs-8055: invalid mode or balance condition failed");
 
 	tb->lnum[0] = vn->vn_nr_item;
 	tb->lbytes = -1;
@@ -313,10 +278,7 @@ static void check_right (struct tree_balance * tb, int h, int cur_free)
     struct virtual_item * vi;
     int d_size, ih_size;
 
-#ifdef CONFIG_REISERFS_CHECK
-    if (cur_free < 0)
-	reiserfs_panic (tb->tb_sb, "vs-8070: check_right: cur_free < 0");
-#endif
+    RFALSE( cur_free < 0, "vs-8070: cur_free < 0");
     
     /* internal level */
     if (h > 0) {
@@ -333,19 +295,15 @@ static void check_right (struct tree_balance * tb, int h, int cur_free)
 	return;
     }
   
-#ifdef CONFIG_REISERFS_CHECK
-    if (!PATH_H_PPARENT (tb->tb_path, 0))
-	reiserfs_panic (tb->tb_sb, "vs-8075: check_right: parent does not exist or invalid");
-#endif
+    RFALSE( !PATH_H_PPARENT (tb->tb_path, 0),
+	    "vs-8075: parent does not exist or invalid");
   
     vi = vn->vn_vi + vn->vn_nr_item - 1;
     if ((unsigned int)cur_free >= (vn->vn_size - ((vi->vi_type & VI_TYPE_RIGHT_MERGEABLE) ? IH_SIZE : 0))) {
 	/* all contents of S[0] fits into R[0] */
 	
-#ifdef CONFIG_REISERFS_CHECK
-	if (vn->vn_mode == M_INSERT || vn->vn_mode == M_PASTE)
-	    reiserfs_panic (tb->tb_sb, "vs-8080: check_right: invalid mode or balance condition failed");
-#endif
+	RFALSE( vn->vn_mode == M_INSERT || vn->vn_mode == M_PASTE,
+		"vs-8080: invalid mode or balance condition failed");
 
 	tb->rnum[h] = vn->vn_nr_item;
 	tb->rbytes = -1;
@@ -422,14 +380,12 @@ static int get_num_ver (int mode, struct tree_balance * tb, int h,
     split_item_positions[0] = -1;
     split_item_positions[1] = -1;
 
-#ifdef CONFIG_REISERFS_CHECK
     /* We only create additional nodes if we are in insert or paste mode
        or we are in replace mode at the internal level. If h is 0 and
        the mode is M_REPLACE then in fix_nodes we change the mode to
        paste or insert before we get here in the code.  */
-    if ( tb->insert_size[h] < 0  || (mode != M_INSERT && mode != M_PASTE))
-	reiserfs_panic (0, "vs-8100: get_num_ver: insert_size < 0 in overflow");
-#endif
+    RFALSE( tb->insert_size[h] < 0  || (mode != M_INSERT && mode != M_PASTE),
+	    "vs-8100: insert_size < 0 in overflow");
 
     max_node_size = MAX_CHILD_SIZE (PATH_H_PBUFFER (tb->tb_path, h));
 
@@ -469,11 +425,7 @@ static int get_num_ver (int mode, struct tree_balance * tb, int h,
 	struct virtual_item * vi = vn->vn_vi + i;
 	int skip_from_end = ((i == end_item) ? end_bytes : 0);
 
-#ifdef CONFIG_REISERFS_CHECK
-	if (needed_nodes > 3) {
-	    reiserfs_panic (tb->tb_sb, "vs-8105: get_num_ver: too many nodes are needed");
-	}
-#endif
+	RFALSE( needed_nodes > 3, "vs-8105: too many nodes are needed");
 
 	/* get size of current item */
 	current_item_size = vi->vi_item_len;
@@ -495,12 +447,10 @@ static int get_num_ver (int mode, struct tree_balance * tb, int h,
 	if (current_item_size > max_node_size) {
 	    /* virtual item length is longer, than max size of item in
                a node. It is impossible for direct item */
-#ifdef CONFIG_REISERFS_CHECK
-	    if (is_direct_le_ih (vi->vi_ih))
-		reiserfs_panic (tb->tb_sb, "vs-8110: get_num_ver: "
-				"direct item length is %d. It can not be longer than %d", 
-				current_item_size, max_node_size);
-#endif
+	    RFALSE( is_direct_le_ih (vi->vi_ih),
+		    "vs-8110: "
+		    "direct item length is %d. It can not be longer than %d",
+		    current_item_size, max_node_size);
 	    /* we will try to split it */
 	    flow = 1;
 	}
@@ -691,10 +641,8 @@ static int are_leaves_removable (struct tree_balance * tb, int lfree, int rfree)
 	/* there was only one item and it will be deleted */
 	struct item_head * ih;
     
-#ifdef CONFIG_REISERFS_CHECK
-    if (B_NR_ITEMS (S0) != 1)
-      reiserfs_panic (0, "vs-8125: are_leaves_removable: item number must be 1: it is %d", B_NR_ITEMS(S0));
-#endif
+    RFALSE( B_NR_ITEMS (S0) != 1,
+	    "vs-8125: item number must be 1: it is %d", B_NR_ITEMS(S0));
 
     ih = B_N_PITEM_HEAD (S0, 0);
     if (tb->CFR[0] && !comp_short_le_keys (&(ih->ih_key), B_N_PDELIM_KEY (tb->CFR[0], tb->rkey[0])))
@@ -708,13 +656,11 @@ static int are_leaves_removable (struct tree_balance * tb, int lfree, int rfree)
 	       we can save ih_size */
 	    ih_size = IH_SIZE;
 	    
-#ifdef CONFIG_REISERFS_CHECK
 	    /* we might check that left neighbor exists and is of the
 	       same directory */
-	    if (le_key_k_offset (ih_version (ih), &(ih->ih_key)) == DOT_OFFSET)
-		reiserfs_panic (tb->tb_sb, "vs-8130: are_leaves_removable: "
-				"first directory item can not be removed until directory is not empty");
-#endif
+	    RFALSE( le_key_k_offset 
+		    (ih_version (ih), &(ih->ih_key)) == DOT_OFFSET,
+		    "vs-8130: first directory item can not be removed until directory is not empty");
       }
     
   }
@@ -852,10 +798,8 @@ static int  get_empty_nodes(
   for ( p_n_blocknr = a_n_blocknrs, n_counter = 0; n_counter < n_amount_needed;
 	p_n_blocknr++, n_counter++ ) { 
 
-#ifdef CONFIG_REISERFS_CHECK
-    if ( ! *p_n_blocknr )
-      reiserfs_panic(p_s_sb, "PAP-8135: get_empty_nodes: reiserfs_new_blocknrs failed when got new blocks");
-#endif
+    RFALSE( ! *p_n_blocknr,
+	    "PAP-8135: reiserfs_new_blocknrs failed when got new blocks");
 
     p_s_new_bh = reiserfs_getblk(p_s_sb->s_dev, *p_n_blocknr, p_s_sb->s_blocksize);
     if (atomic_read (&(p_s_new_bh->b_count)) > 1) {
@@ -873,15 +817,13 @@ static int  get_empty_nodes(
 	wait_buffer_until_released (p_s_new_bh);
       }
     }
-#ifdef CONFIG_REISERFS_CHECK
-    if (atomic_read (&(p_s_new_bh->b_count)) != 1 || buffer_dirty (p_s_new_bh)) {
-      if (atomic_read(&(p_s_new_bh->b_count)) > 2 || 
-          !(buffer_journaled(p_s_new_bh) || buffer_journal_dirty(p_s_new_bh))) {
-	reiserfs_panic(p_s_sb,"PAP-8140: get_empty_nodes: not free or dirty buffer %b for the new block",
-		     p_s_new_bh);
-      }
-    }
-#endif
+    RFALSE( (atomic_read (&(p_s_new_bh->b_count)) != 1 || 
+	     buffer_dirty (p_s_new_bh)) && 
+	    (atomic_read(&(p_s_new_bh->b_count)) > 2 || 
+	     !(buffer_journaled(p_s_new_bh) || 
+	       buffer_journal_dirty(p_s_new_bh))),
+	    "PAP-8140: not free or dirty buffer %b for the new block", 
+	    p_s_new_bh);
     
     /* Put empty buffers into the array. */
     if (p_s_tb->FEB[p_s_tb->cur_blknum])
@@ -958,13 +900,13 @@ static int  is_left_neighbor_in_cache(
   /* Calculate father of the node to be balanced. */
   p_s_father = PATH_H_PBUFFER(p_s_tb->tb_path, n_h + 1);
 
-#ifdef CONFIG_REISERFS_CHECK
-  if ( ! p_s_father || ! B_IS_IN_TREE (p_s_father) || ! B_IS_IN_TREE (p_s_tb->FL[n_h]) ||
-       ! buffer_uptodate (p_s_father) || ! buffer_uptodate (p_s_tb->FL[n_h]) ) {
-    reiserfs_panic (p_s_sb, "vs-8165: is_left_neighbor_in_cache: F[h] (%b) or FL[h] (%b) is invalid",
-		    p_s_father, p_s_tb->FL[n_h]);
-  }
-#endif
+  RFALSE( ! p_s_father || 
+	  ! B_IS_IN_TREE (p_s_father) || 
+	  ! B_IS_IN_TREE (p_s_tb->FL[n_h]) ||
+	  ! buffer_uptodate (p_s_father) || 
+	  ! buffer_uptodate (p_s_tb->FL[n_h]),
+	  "vs-8165: F[h] (%b) or FL[h] (%b) is invalid", 
+	  p_s_father, p_s_tb->FL[n_h]);
 
 
   /* Get position of the pointer to the left neighbor into the left father. */
@@ -975,12 +917,8 @@ static int  is_left_neighbor_in_cache(
   /* Look for the left neighbor in the cache. */
   if ( (left = get_hash_table(p_s_sb->s_dev, n_left_neighbor_blocknr, p_s_sb->s_blocksize)) ) {
 
-#ifdef CONFIG_REISERFS_CHECK
-    if ( buffer_uptodate (left) && ! B_IS_IN_TREE(left) ) {
-      reiserfs_panic(p_s_sb, "vs-8170: is_left_neighbor_in_cache: left neighbor (%b %z) is not in the tree",
-		     left, left);
-    }
-#endif
+    RFALSE( buffer_uptodate (left) && ! B_IS_IN_TREE(left),
+	    "vs-8170: left neighbor (%b %z) is not in the tree", left, left);
     put_bh(left) ;
     return 1;
   }
@@ -997,28 +935,6 @@ static void decrement_key (struct cpu_key * p_s_key)
 {
     // call item specific function for this key
     item_ops[cpu_key_k_type (p_s_key)]->decrement_key (p_s_key);
-    
-
-#if 0 /* this works wrong when key is key of second part of tail: it
-         sets key to be of indirect type. It looks like it makes no
-         harm but it is unclear */
-
-  unsigned long * p_n_key_field = (unsigned long *)p_s_key + REISERFS_FULL_KEY_LEN - 1;
-  int		  n_counter;
-
-  for( n_counter = 0; n_counter < REISERFS_FULL_KEY_LEN; n_counter++, p_n_key_field-- ) {
-      if ( *p_n_key_field ) {
-	  (*p_n_key_field)--;
-	  break;
-      }
-  }
-#ifdef CONFIG_REISERFS_CHECK
-  if ( n_counter == REISERFS_FULL_KEY_LEN )
-      reiserfs_panic(NULL, "PAP-8175: decrement_key: zero key");
-#endif
-
-#endif /*0*/
-
 }
 
 
@@ -1052,10 +968,8 @@ static int  get_far_parent (struct tree_balance *   p_s_tb,
 
     n_counter = n_path_offset;
 
-#ifdef CONFIG_REISERFS_CHECK
-    if ( n_counter < FIRST_PATH_ELEMENT_OFFSET )
-	reiserfs_panic(p_s_tb->tb_sb, "PAP-8180: get_far_parent: invalid path length");
-#endif
+    RFALSE( n_counter < FIRST_PATH_ELEMENT_OFFSET,
+	    "PAP-8180: invalid path length");
 
   
     for ( ; n_counter > FIRST_PATH_ELEMENT_OFFSET; n_counter--  )  {
@@ -1091,11 +1005,9 @@ static int  get_far_parent (struct tree_balance *   p_s_tb,
 	return REPEAT_SEARCH;
     }
 
-#ifdef CONFIG_REISERFS_CHECK
-    if ( B_LEVEL (*pp_s_com_father) <= DISK_LEAF_NODE_LEVEL ) {
-	reiserfs_panic(p_s_tb->tb_sb, "PAP-8185: get_far_parent: (%b %z) level too small", *pp_s_com_father, *pp_s_com_father);
-    }
-#endif
+    RFALSE( B_LEVEL (*pp_s_com_father) <= DISK_LEAF_NODE_LEVEL,
+	    "PAP-8185: (%b %z) level too small", 
+	    *pp_s_com_father, *pp_s_com_father);
 
     /* Check whether the common parent is locked. */
 
@@ -1130,15 +1042,10 @@ static int  get_far_parent (struct tree_balance *   p_s_tb,
 
     *pp_s_father = PATH_PLAST_BUFFER(&s_path_to_neighbor_father);
 
-#ifdef CONFIG_REISERFS_CHECK
-    if ( B_LEVEL (*pp_s_father) != n_h + 1 ) {
-	reiserfs_panic(p_s_tb->tb_sb, "PAP-8190: get_far_parent: (%b %z) level too small", *pp_s_father, *pp_s_father);
-    }
-  
-    if ( s_path_to_neighbor_father.path_length < FIRST_PATH_ELEMENT_OFFSET )
-	reiserfs_panic(0, "PAP-8192: get_far_parent: path length is too small");
-
-#endif
+    RFALSE( B_LEVEL (*pp_s_father) != n_h + 1,
+	    "PAP-8190: (%b %z) level too small", *pp_s_father, *pp_s_father);
+    RFALSE( s_path_to_neighbor_father.path_length < FIRST_PATH_ELEMENT_OFFSET,
+	    "PAP-8192: path length is too small");
 
     s_path_to_neighbor_father.path_length--;
     decrement_counters_in_path(&s_path_to_neighbor_father);
@@ -1198,11 +1105,9 @@ static int  get_parents (struct tree_balance * p_s_tb, int n_h)
     decrement_bcount(p_s_tb->CFL[n_h]);
     p_s_tb->CFL[n_h] = p_s_curcf; /* New initialization of CFL[n_h]. */
 
-#ifdef CONFIG_REISERFS_CHECK
-    if ((p_s_curf && !B_IS_IN_TREE (p_s_curf)) || (p_s_curcf && !B_IS_IN_TREE (p_s_curcf))) {
-	reiserfs_panic (p_s_tb->tb_sb, "PAP-8195: get_parents: FL (%b) or CFL (%b) is invalid", p_s_curf, p_s_curcf);
-    }
-#endif
+    RFALSE( (p_s_curf && !B_IS_IN_TREE (p_s_curf)) || 
+	    (p_s_curcf && !B_IS_IN_TREE (p_s_curcf)),
+	    "PAP-8195: FL (%b) or CFL (%b) is invalid", p_s_curf, p_s_curcf);
 
 /* Get parent FR[n_h] of R[n_h]. */
 
@@ -1237,10 +1142,10 @@ static int  get_parents (struct tree_balance * p_s_tb, int n_h)
 			B_PRIGHT_DELIM_KEY (PATH_H_PBUFFER(p_s_path, n_h)), B_N_PDELIM_KEY (p_s_tb->CFR[n_h], p_s_tb->rkey[n_h]));
     }
 #endif
-    if ((p_s_curf && !B_IS_IN_TREE (p_s_curf)) || (p_s_curcf && !B_IS_IN_TREE (p_s_curcf))) {
-	reiserfs_panic (p_s_tb->tb_sb, "PAP-8205: get_parents: FR (%b) or CFR (%b) is invalid", p_s_curf, p_s_curcf);
-    }
 #endif
+    RFALSE( (p_s_curf && !B_IS_IN_TREE (p_s_curf)) || 
+	    (p_s_curcf && !B_IS_IN_TREE (p_s_curcf)),
+	    "PAP-8205: FR (%b) or CFR (%b) is invalid", p_s_curf, p_s_curcf);
 
     return CARRY_ON;
 }
@@ -1400,15 +1305,14 @@ static int ip_check_balance (struct tree_balance * tb, int h)
 	return CARRY_ON;
     }
 
-#ifdef CONFIG_REISERFS_CHECK
     /* this checks balance condition, that any two neighboring nodes can not fit in one node */
-    if ( h && ( tb->lnum[h] >= vn->vn_nr_item + 1 || tb->rnum[h] >= vn->vn_nr_item + 1) )
-	reiserfs_panic (tb->tb_sb, "vs-8220: ip_check_balance: tree is not balanced on internal level");
-
-    if ( ! h && ((tb->lnum[h] >= vn->vn_nr_item && (tb->lbytes == -1)) ||
-		 (tb->rnum[h] >= vn->vn_nr_item && (tb->rbytes == -1)) ))
-	reiserfs_panic(tb->tb_sb, "vs-8225: ip_check_balance: tree is not balanced on leaf level");
-#endif
+    RFALSE( h && 
+	    ( tb->lnum[h] >= vn->vn_nr_item + 1 || 
+	      tb->rnum[h] >= vn->vn_nr_item + 1),
+	    "vs-8220: tree is not balanced on internal level");
+    RFALSE( ! h && ((tb->lnum[h] >= vn->vn_nr_item && (tb->lbytes == -1)) ||
+		    (tb->rnum[h] >= vn->vn_nr_item && (tb->rbytes == -1)) ),
+	    "vs-8225: tree is not balanced on leaf level");
 
     /* all contents of S[0] can be moved into its neighbors
        S[0] will be removed after balancing. */
@@ -1553,10 +1457,11 @@ static int ip_check_balance (struct tree_balance * tb, int h)
 	/* we can win TWO or ONE nodes by shifting in both directions */
 	if (lrnver < lnver && lrnver < rnver)
 	{
-#ifdef CONFIG_REISERFS_CHECK
-	    if (h && (tb->lnum[h] != 1 || tb->rnum[h] != 1 || lrnver != 1 || rnver != 2 || lnver != 2 || h != 1))
-		reiserfs_panic (0, "vs-8230: check_balance: bad h");
-#endif
+	    RFALSE( h && 
+		    (tb->lnum[h] != 1 || 
+		     tb->rnum[h] != 1 || 
+		     lrnver != 1 || rnver != 2 || lnver != 2 || h != 1),
+		    "vs-8230: bad h");
 	    if (lrset == LR_SHIFT_FLOW)
 		set_parameters (tb, h, tb->lnum[h], tb->rnum[h], lrnver, snum012 + lrset,
 				tb->lbytes, tb->rbytes);
@@ -1757,10 +1662,7 @@ static int dc_check_balance_internal (struct tree_balance * tb, int h)
     }
 
   /* For internal nodes try to borrow item from a neighbor */
-#ifdef CONFIG_REISERFS_CHECK
-  if (!tb->FL[h] && !tb->FR[h])
-    reiserfs_panic (0, "vs-8235: dc_check_balance_internal: trying to borrow for root");
-#endif
+  RFALSE( !tb->FL[h] && !tb->FR[h], "vs-8235: trying to borrow for root");
 
   /* Borrow one or two items from caching neighbor */
   if (is_left_neighbor_in_cache (tb,h) || !tb->FR[h])
@@ -1818,10 +1720,8 @@ static int dc_check_balance_leaf (struct tree_balance * tb, int h)
   if ( ! F0 )
     {  /* S[0] is the root now. */
 
-#ifdef CONFIG_REISERFS_CHECK
-      if ( -levbytes >= maxsize - B_FREE_SPACE (S0) )
-	reiserfs_panic (tb->tb_sb, "vs-8240: dc_check_balance_leaf: attempt to create empty buffer tree");
-#endif
+      RFALSE( -levbytes >= maxsize - B_FREE_SPACE (S0),
+	      "vs-8240: attempt to create empty buffer tree");
 
       set_parameters (tb, h, 0, 0, 1, NULL, -1, -1);
       return NO_BALANCING_NEEDED;
@@ -1853,10 +1753,7 @@ static int dc_check_balance_leaf (struct tree_balance * tb, int h)
 	((tb->rnum[0] - ((tb->rbytes == -1) ? 0 : 1)) < vn->vn_nr_item) || /* S can not be merged with R */
 	!tb->FR[h]) {
       
-#ifdef CONFIG_REISERFS_CHECK
-      if (!tb->FL[h])
-	reiserfs_panic (0, "vs-8245: dc_check_balance_leaf: FL[h] must exist");
-#endif
+      RFALSE( !tb->FL[h], "vs-8245: dc_check_balance_leaf: FL[h] must exist");
 
       /* set parameter to merge S[0] with its left neighbor */
       set_parameters (tb, h, -1, 0, 0, NULL, -1, -1);
@@ -1896,11 +1793,7 @@ static int dc_check_balance_leaf (struct tree_balance * tb, int h)
  */
 static int dc_check_balance (struct tree_balance * tb, int h)
 {
-
-#ifdef CONFIG_REISERFS_CHECK
- if ( ! (PATH_H_PBUFFER (tb->tb_path, h)) )
-   reiserfs_panic(tb->tb_sb, "vs-8250: dc_check_balance: S is not initialized");
-#endif
+ RFALSE( ! (PATH_H_PBUFFER (tb->tb_path, h)), "vs-8250: S is not initialized");
 
  if ( h )
    return dc_check_balance_internal (tb, h);
@@ -1947,10 +1840,8 @@ static int check_balance (int mode,
   vn->vn_ins_ih = ins_ih;
   vn->vn_data = data;
 
-#ifdef CONFIG_REISERFS_CHECK
-  if (mode == M_INSERT && !vn->vn_ins_ih)
-    reiserfs_panic (0, "vs-8255: check_balance: ins_ih can not be 0 in insert mode");
-#endif
+  RFALSE( mode == M_INSERT && !vn->vn_ins_ih,
+	  "vs-8255: ins_ih can not be 0 in insert mode");
 
  if ( tb->insert_size[h] > 0 )
    /* Calculate balance parameters when size of node is increasing. */
@@ -1975,10 +1866,8 @@ static int  get_direct_parent(
     /* We are in the root or in the new root. */
     if ( n_path_offset <= FIRST_PATH_ELEMENT_OFFSET ) {
 	
-#ifdef CONFIG_REISERFS_CHECK
-	if ( n_path_offset < FIRST_PATH_ELEMENT_OFFSET - 1 )
-	    reiserfs_panic(p_s_tb->tb_sb, "PAP-8260: get_direct_parent: illegal offset in the path");
-#endif
+	RFALSE( n_path_offset < FIRST_PATH_ELEMENT_OFFSET - 1,
+		"PAP-8260: illegal offset in the path");
 
 	if ( PATH_OFFSET_PBUFFER(p_s_path, FIRST_PATH_ELEMENT_OFFSET)->b_blocknr ==
 	     SB_ROOT_BLOCK (p_s_tb->tb_sb) ) {
@@ -2031,10 +1920,9 @@ static int  get_neighbors(
 	/* We need left neighbor to balance S[n_h]. */
 	p_s_bh = PATH_OFFSET_PBUFFER(p_s_tb->tb_path, n_path_offset);
 	
-#ifdef CONFIG_REISERFS_CHECK
-	if ( p_s_bh == p_s_tb->FL[n_h] && ! PATH_OFFSET_POSITION(p_s_tb->tb_path, n_path_offset) )
-	    reiserfs_panic (p_s_tb->tb_sb, "PAP-8270: get_neighbors: invalid position in the parent");
-#endif
+	RFALSE( p_s_bh == p_s_tb->FL[n_h] && 
+		! PATH_OFFSET_POSITION(p_s_tb->tb_path, n_path_offset),
+		"PAP-8270: invalid position in the parent");
 
 	n_child_position = ( p_s_bh == p_s_tb->FL[n_h] ) ? p_s_tb->lkey[n_h] : B_NR_ITEMS (p_s_tb->FL[n_h]);
 	n_son_number = B_N_CHILD_NUM(p_s_tb->FL[n_h], n_child_position);
@@ -2046,16 +1934,14 @@ static int  get_neighbors(
 	    return REPEAT_SEARCH;
 	}
 	
-#ifdef CONFIG_REISERFS_CHECK
-	if ( ! B_IS_IN_TREE(p_s_tb->FL[n_h]) || n_child_position > B_NR_ITEMS(p_s_tb->FL[n_h]) ||
-	     B_N_CHILD_NUM(p_s_tb->FL[n_h], n_child_position) != p_s_bh->b_blocknr )
-	    reiserfs_panic (p_s_tb->tb_sb, "PAP-8275: get_neighbors: invalid parent");
-	if ( ! B_IS_IN_TREE(p_s_bh) )
-	    reiserfs_panic (p_s_tb->tb_sb, "PAP-8280: get_neighbors: invalid child");
-
-	if (! n_h && B_FREE_SPACE (p_s_bh) != MAX_CHILD_SIZE (p_s_bh) - B_N_CHILD (p_s_tb->FL[0],n_child_position)->dc_size)
-	    reiserfs_panic (p_s_tb->tb_sb, "PAP-8290: get_neighbors: invalid child size of left neighbor");
-#endif
+	RFALSE( ! B_IS_IN_TREE(p_s_tb->FL[n_h]) || 
+		n_child_position > B_NR_ITEMS(p_s_tb->FL[n_h]) ||
+		B_N_CHILD_NUM(p_s_tb->FL[n_h], n_child_position) != 
+		p_s_bh->b_blocknr, "PAP-8275: invalid parent");
+	RFALSE( ! B_IS_IN_TREE(p_s_bh), "PAP-8280: invalid child");
+	RFALSE( ! n_h && 
+		B_FREE_SPACE (p_s_bh) != MAX_CHILD_SIZE (p_s_bh) - B_N_CHILD (p_s_tb->FL[0],n_child_position)->dc_size,
+		"PAP-8290: invalid child size of left neighbor");
 
 	decrement_bcount(p_s_tb->L[n_h]);
 	p_s_tb->L[n_h] = p_s_bh;
@@ -2065,10 +1951,9 @@ static int  get_neighbors(
     if ( p_s_tb->rnum[n_h] ) { /* We need right neighbor to balance S[n_path_offset]. */
 	p_s_bh = PATH_OFFSET_PBUFFER(p_s_tb->tb_path, n_path_offset);
 	
-#ifdef CONFIG_REISERFS_CHECK
-	if ( p_s_bh == p_s_tb->FR[n_h] && PATH_OFFSET_POSITION(p_s_tb->tb_path, n_path_offset) >= B_NR_ITEMS(p_s_bh) )
-	    reiserfs_panic (p_s_tb->tb_sb, "PAP-8295: get_neighbors: invalid position in the parent");
-#endif
+	RFALSE( p_s_bh == p_s_tb->FR[n_h] && 
+		PATH_OFFSET_POSITION(p_s_tb->tb_path, n_path_offset) >= B_NR_ITEMS(p_s_bh),
+		"PAP-8295: invalid position in the parent");
 
 	n_child_position = ( p_s_bh == p_s_tb->FR[n_h] ) ? p_s_tb->rkey[n_h] + 1 : 0;
 	n_son_number = B_N_CHILD_NUM(p_s_tb->FR[n_h], n_child_position);
@@ -2082,12 +1967,10 @@ static int  get_neighbors(
 	decrement_bcount(p_s_tb->R[n_h]);
 	p_s_tb->R[n_h] = p_s_bh;
 
-#ifdef CONFIG_REISERFS_CHECK
-	if (! n_h && B_FREE_SPACE (p_s_bh) != MAX_CHILD_SIZE (p_s_bh) - B_N_CHILD (p_s_tb->FR[0],n_child_position)->dc_size) {
-	    reiserfs_panic (p_s_tb->tb_sb, "PAP-8300: get_neighbors: invalid child size of right neighbor (%d != %d - %d)",
-			    B_FREE_SPACE (p_s_bh), MAX_CHILD_SIZE (p_s_bh), B_N_CHILD (p_s_tb->FR[0],n_child_position)->dc_size);
-	}
-#endif
+	RFALSE( ! n_h && B_FREE_SPACE (p_s_bh) != MAX_CHILD_SIZE (p_s_bh) - B_N_CHILD (p_s_tb->FR[0],n_child_position)->dc_size,
+		"PAP-8300: invalid child size of right neighbor (%d != %d - %d)",
+		B_FREE_SPACE (p_s_bh), MAX_CHILD_SIZE (p_s_bh), 
+		B_N_CHILD (p_s_tb->FR[0],n_child_position)->dc_size);
 	
     }
     return CARRY_ON;
@@ -2236,6 +2119,11 @@ static void tb_buffer_sanity_check (struct super_block * p_s_sb,
     }
   }
 }
+#else
+static void tb_buffer_sanity_check (struct super_block * p_s_sb,
+				    struct buffer_head * p_s_bh, 
+				    const char *descr, int level)
+{;}
 #endif
 
 static void clear_all_dirty_bits(struct super_block *s, 
@@ -2282,27 +2170,21 @@ static int wait_tb_buffers_until_unlocked (struct tree_balance * p_s_tb)
 	    if (p_s_tb->lnum[i] ) {
 
 		if ( p_s_tb->L[i] ) {
-#ifdef CONFIG_REISERFS_CHECK
 		    tb_buffer_sanity_check (p_s_tb->tb_sb, p_s_tb->L[i], "L", i);
-#endif
 		    clear_all_dirty_bits(p_s_tb->tb_sb, p_s_tb->L[i]) ;
 		    if ( buffer_locked (p_s_tb->L[i]) )
 			locked = p_s_tb->L[i];
 		}
 
 		if ( !locked && p_s_tb->FL[i] ) {
-#ifdef CONFIG_REISERFS_CHECK
 		    tb_buffer_sanity_check (p_s_tb->tb_sb, p_s_tb->FL[i], "FL", i);
-#endif
 		    clear_all_dirty_bits(p_s_tb->tb_sb, p_s_tb->FL[i]) ;
 		    if ( buffer_locked (p_s_tb->FL[i]) )
 			locked = p_s_tb->FL[i];
 		}
 
 		if ( !locked && p_s_tb->CFL[i] ) {
-#ifdef CONFIG_REISERFS_CHECK
 		    tb_buffer_sanity_check (p_s_tb->tb_sb, p_s_tb->CFL[i], "CFL", i);
-#endif
 		    clear_all_dirty_bits(p_s_tb->tb_sb, p_s_tb->CFL[i]) ;
 		    if ( buffer_locked (p_s_tb->CFL[i]) )
 			locked = p_s_tb->CFL[i];
@@ -2313,9 +2195,7 @@ static int wait_tb_buffers_until_unlocked (struct tree_balance * p_s_tb)
 	    if ( !locked && (p_s_tb->rnum[i]) ) {
 
 		if ( p_s_tb->R[i] ) {
-#ifdef CONFIG_REISERFS_CHECK
 		    tb_buffer_sanity_check (p_s_tb->tb_sb, p_s_tb->R[i], "R", i);
-#endif
 		    clear_all_dirty_bits(p_s_tb->tb_sb, p_s_tb->R[i]) ;
 		    if ( buffer_locked (p_s_tb->R[i]) )
 			locked = p_s_tb->R[i];
@@ -2323,18 +2203,14 @@ static int wait_tb_buffers_until_unlocked (struct tree_balance * p_s_tb)
 
        
 		if ( !locked && p_s_tb->FR[i] ) {
-#ifdef CONFIG_REISERFS_CHECK
 		    tb_buffer_sanity_check (p_s_tb->tb_sb, p_s_tb->FR[i], "FR", i);
-#endif
 		    clear_all_dirty_bits(p_s_tb->tb_sb, p_s_tb->FR[i]) ;
 		    if ( buffer_locked (p_s_tb->FR[i]) )
 			locked = p_s_tb->FR[i];
 		}
 
 		if ( !locked && p_s_tb->CFR[i] ) {
-#ifdef CONFIG_REISERFS_CHECK
 		    tb_buffer_sanity_check (p_s_tb->tb_sb, p_s_tb->CFR[i], "CFR", i);
-#endif
 		    clear_all_dirty_bits(p_s_tb->tb_sb, p_s_tb->CFR[i]) ;
 		    if ( buffer_locked (p_s_tb->CFR[i]) )
 			locked = p_s_tb->CFR[i];
@@ -2536,10 +2412,8 @@ int fix_nodes (int n_op_mode,
 	    /* We have a positive insert size but no nodes exist on this
 	       level, this means that we are creating a new root. */
 
-#ifdef CONFIG_REISERFS_CHECK
-	    if ( p_s_tb->blknum[n_h] != 1 )
-		reiserfs_panic(p_s_tb->tb_sb,"PAP-8350: fix_nodes: creating new empty root");
-#endif /* CONFIG_REISERFS_CHECK */
+	    RFALSE( p_s_tb->blknum[n_h] != 1,
+		    "PAP-8350: creating new empty root");
 
 	    if ( n_h < MAX_HEIGHT - 1 )
 		p_s_tb->insert_size[n_h + 1] = 0;
@@ -2552,10 +2426,8 @@ int fix_nodes (int n_op_mode,
 		       and a new node (S[n_h+1]) will be created to
 		       become the root node.  */
 	  
-#ifdef CONFIG_REISERFS_CHECK
-		    if ( n_h == MAX_HEIGHT - 1 )
-			reiserfs_panic(p_s_tb->tb_sb, "PAP-8355: fix_nodes: attempt to create too high of a tree");
-#endif /* CONFIG_REISERFS_CHECK */
+		    RFALSE( n_h == MAX_HEIGHT - 1,
+			    "PAP-8355: attempt to create too high of a tree");
 
 		    p_s_tb->insert_size[n_h + 1] = (DC_SIZE + KEY_SIZE) * (p_s_tb->blknum[n_h] - 1) + DC_SIZE;
 		}

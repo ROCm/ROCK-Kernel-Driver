@@ -10,16 +10,16 @@
 #ifdef CONFIG_SVINTO_SIM
   /* Let's use the ucsim interface since it lets us do write(2, ...) */
 #define SIMCOUT(s,len)							\
-  asm ("moveq 4,r1	\n\t"						\
-       "moveq 2,r10	\n\t"						\
-       "move.d %0,r11	\n\t"						\
-       "move.d %1,r12	\n\t"						\
-       "push irp	\n\t"						\
-       "move 0f,irp	\n\t"						\
+  asm ("moveq 4,$r9	\n\t"						\
+       "moveq 2,$r10	\n\t"						\
+       "move.d %0,$r11	\n\t"						\
+       "move.d %1,$r12	\n\t"						\
+       "push $irp	\n\t"						\
+       "move 0f,$irp	\n\t"						\
        "jump -6809	\n"						\
        "0:		\n\t"						\
-       "pop irp"							\
-       : : "rm" (s), "rm" (len) : "r1","r10","r11","r12","memory")
+       "pop $irp"							\
+       : : "rm" (s), "rm" (len) : "r9","r10","r11","r12","memory")
 #define TRACE_ON() __extension__ \
  ({ int _Foofoo; __asm__ volatile ("bmod [%0],%0" : "=r" (_Foofoo) : "0" \
 			       (255)); _Foofoo; })

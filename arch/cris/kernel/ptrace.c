@@ -8,6 +8,9 @@
  * Authors:   Bjorn Wesen
  *
  * $Log: ptrace.c,v $
+ * Revision 1.7  2001/09/26 11:53:49  bjornw
+ * PTRACE_DETACH works more simple in 2.4.10
+ *
  * Revision 1.6  2001/07/25 16:08:47  bjornw
  * PTRACE_ATTACH bulk moved into arch-independant code in 2.4.7
  *
@@ -89,7 +92,7 @@ static inline int put_reg(struct task_struct *task, unsigned int regno,
  */
 void ptrace_disable(struct task_struct *child)
 {
-	/* Todo - pending singlesteps? */
+       /* Todo - pending singlesteps? */
 }
 
 /* Note that this implementation of ptrace behaves differently from vanilla

@@ -23,15 +23,17 @@ fi
 
 bool 'Serial-port support' CONFIG_ETRAX_SERIAL
 if [ "$CONFIG_ETRAX_SERIAL" = "y" ]; then
-  comment '  Port 0 is always enabled'
-  bool '  Ser0 DTR, RI, DSR, CD on PB' CONFIG_ETRAX_SER0_DTR_RI_DSR_CD_ON_PB
-  if [ "$CONFIG_ETRAX_SER0_DTR_RI_DSR_CD_ON_PB" = "y" ]; then
-    int '    Ser0 DTR on PB bit' CONFIG_ETRAX_SER0_DTR_ON_PB_BIT 4
-    int '    Ser0 RI  on PB bit' CONFIG_ETRAX_SER0_RI_ON_PB_BIT 5
-    int '    Ser0 DSR on PB bit' CONFIG_ETRAX_SER0_DSR_ON_PB_BIT 6
-    int '    Ser0 CD  on PB bit' CONFIG_ETRAX_SER0_CD_ON_PB_BIT 7
+  bool '  Serial port 0 enabled' CONFIG_ETRAX_SERIAL_PORT0
+  if [ "$CONFIG_ETRAX_SERIAL_PORT0" = "y" ]; then
+    bool '  Ser0 DTR, RI, DSR, CD on PB' CONFIG_ETRAX_SER0_DTR_RI_DSR_CD_ON_PB
+    if [ "$CONFIG_ETRAX_SER0_DTR_RI_DSR_CD_ON_PB" = "y" ]; then
+      int '    Ser0 DTR on PB bit' CONFIG_ETRAX_SER0_DTR_ON_PB_BIT 4
+      int '    Ser0 RI  on PB bit' CONFIG_ETRAX_SER0_RI_ON_PB_BIT 5
+      int '    Ser0 DSR on PB bit' CONFIG_ETRAX_SER0_DSR_ON_PB_BIT 6
+      int '    Ser0 CD  on PB bit' CONFIG_ETRAX_SER0_CD_ON_PB_BIT 7
+    fi
   fi
- 
+
   bool '  Serial port 1 enabled' CONFIG_ETRAX_SERIAL_PORT1
   if [ "$CONFIG_ETRAX_SERIAL_PORT1" = "y" ]; then
     bool '  Ser1 DTR, RI, DSR, CD on PB' CONFIG_ETRAX_SER1_DTR_RI_DSR_CD_ON_PB
@@ -137,6 +139,7 @@ if [ "$CONFIG_ETRAX_AXISFLASHMAP" = "y" ]; then
 
 	define_bool CONFIG_MTD_CHAR y
 	define_bool CONFIG_MTD_BLOCK y
+	define_bool CONFIG_MTD_PARTITIONS y
 fi
 
 bool 'I2C support' CONFIG_ETRAX_I2C

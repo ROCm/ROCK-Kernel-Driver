@@ -1,5 +1,3 @@
-/* $Id: system.h,v 1.4 2001/03/20 19:46:00 bjornw Exp $ */
-
 #ifndef __ASM_CRIS_SYSTEM_H
 #define __ASM_CRIS_SYSTEM_H
 
@@ -16,22 +14,30 @@ extern struct task_struct *resume(struct task_struct *prev, struct task_struct *
 #define switch_to(prev,next,last) last = resume(prev,next, \
 					 (int)&((struct task_struct *)0)->thread)
 
+/* read the CPU version register */
+
+static inline unsigned long rdvr(void) { 
+	unsigned long vr;
+	__asm__ volatile ("move $vr,%0" : "=rm" (vr));
+	return vr;
+}
+
 /* read/write the user-mode stackpointer */
 
-extern inline unsigned long rdusp(void) {
+static inline unsigned long rdusp(void) {
 	unsigned long usp;
-	__asm__ __volatile__("move usp,%0" : "=rm" (usp));
+	__asm__ __volatile__("move $usp,%0" : "=rm" (usp));
 	return usp;
 }
 
 #define wrusp(usp) \
-	__asm__ __volatile__("move %0,usp" : /* no outputs */ : "rm" (usp))
+	__asm__ __volatile__("move %0,$usp" : /* no outputs */ : "rm" (usp))
 
 /* read the current stackpointer */
 
-extern inline unsigned long rdsp(void) {
+static inline unsigned long rdsp(void) {
 	unsigned long sp;
-	__asm__ __volatile__("move.d sp,%0" : "=rm" (sp));
+	__asm__ __volatile__("move.d $sp,%0" : "=rm" (sp));
 	return sp;
 }
 
@@ -51,18 +57,18 @@ struct __xchg_dummy { unsigned long a[100]; };
 #if 0
 /* use these and an oscilloscope to see the fraction of time we're running with IRQ's disabled */
 /* it assumes the LED's are on port 0x90000000 of course. */
-#define sti() __asm__ __volatile__ ( "ei\n\tpush r0\n\tmoveq 0,r0\n\tmove.d r0,[0x90000000]\n\tpop r0" );
-#define cli() __asm__ __volatile__ ( "di\n\tpush r0\n\tmove.d 0x40000,r0\n\tmove.d r0,[0x90000000]\n\tpop r0");
-#define save_flags(x) __asm__ __volatile__ ("move ccr,%0" : "=rm" (x) : : "memory");
-#define restore_flags(x) __asm__ __volatile__ ("move %0,ccr\n\tbtstq 5,%0\n\tbpl 1f\n\tnop\n\tpush r0\n\tmoveq 0,r0\n\tmove.d r0,[0x90000000]\n\tpop r0\n1:\n" : : "r" (x) : "memory");
+#define sti() __asm__ __volatile__ ( "ei\n\tpush $r0\n\tmoveq 0,$r0\n\tmove.d $r0,[0x90000000]\n\tpop $r0" );
+#define cli() __asm__ __volatile__ ( "di\n\tpush $r0\n\tmove.d 0x40000,$r0\n\tmove.d $r0,[0x90000000]\n\tpop $r0");
+#define save_flags(x) __asm__ __volatile__ ("move $ccr,%0" : "=rm" (x) : : "memory");
+#define restore_flags(x) __asm__ __volatile__ ("move %0,$ccr\n\tbtstq 5,%0\n\tbpl 1f\n\tnop\n\tpush $r0\n\tmoveq 0,$r0\n\tmove.d $r0,[0x90000000]\n\tpop $r0\n1:\n" : : "r" (x) : "memory");
 #else
 #define __cli() __asm__ __volatile__ ( "di");
 #define __sti() __asm__ __volatile__ ( "ei" );
-#define __save_flags(x) __asm__ __volatile__ ("move ccr,%0" : "=rm" (x) : : "memory");
-#define __restore_flags(x) __asm__ __volatile__ ("move %0,ccr" : : "rm" (x) : "memory");
+#define __save_flags(x) __asm__ __volatile__ ("move $ccr,%0" : "=rm" (x) : : "memory");
+#define __restore_flags(x) __asm__ __volatile__ ("move %0,$ccr" : : "rm" (x) : "memory");
 
 /* For spinlocks etc */
-#define local_irq_save(x) __asm__ __volatile__ ("move ccr,%0\n\tdi" : "=rm" (x) : : "memory"); 
+#define local_irq_save(x) __asm__ __volatile__ ("move $ccr,%0\n\tdi" : "=rm" (x) : : "memory"); 
 #define local_irq_restore(x) restore_flags(x)
 
 #define local_irq_disable()  cli()

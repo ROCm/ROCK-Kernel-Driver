@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.walnut.h 1.7 05/17/01 18:14:26 cort
+ * BK Id: SCCS/s.walnut.h 1.10 09/14/01 17:37:56 trini
  */
 /*
  *
@@ -27,10 +27,7 @@
 #ifndef	__WALNUT_H__
 #define	__WALNUT_H__
 
-
-#ifdef __cplusplus
-extern "C" {
-#endif
+#ifndef __ASSEMBLY__
 /*
  * Data structure defining board information maintained by the boot
  * ROM on IBM's "Walnut" evaluation board. An effort has been made to
@@ -49,19 +46,13 @@ typedef struct board_info {
 	unsigned int	 bi_pci_busfreq;	/* PCI Bus speed, in Hz */
 } bd_t;
 
+#endif /* !__ASSEMBLY__ */
+
 /* Memory map for the IBM "Walnut" 405GP evaluation board.
  * Generic 4xx plus RTC.
  */
 #define WALNUT_RTC_ADDR		((uint)0xf0001000)
 #define WALNUT_RTC_SIZE		((uint)4*1024)
-
-#ifdef __cplusplus
-}
-#endif
-
-/* Generic 4xx type
-*/
-#define _MACH_4xx (_MACH_walnut)
 
 #endif /* __WALNUT_H__ */
 #endif /* __KERNEL__ */

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.enet.c 1.10 05/17/01 18:14:20 cort
+ * BK Id: SCCS/s.enet.c 1.15 09/14/01 18:01:16 trini
  */
 /*
  * Ethernet driver for Motorola MPC8xx.
@@ -11,7 +11,7 @@
  * This version of the driver is somewhat selectable for the different
  * processor/board combinations.  It works for the boards I know about
  * now, and should be easily modified to include others.  Some of the
- * configuration information is contained in "commproc.h" and the
+ * configuration information is contained in <asm/commproc.h> and the
  * remainder is here.
  *
  * Buffer descriptors are kept in the CPM dual port RAM, and the frame
@@ -47,7 +47,7 @@
 #include <asm/mpc8xx.h>
 #include <asm/bitops.h>
 #include <asm/uaccess.h>
-#include "commproc.h"
+#include <asm/commproc.h>
 
 /*
  *				Theory of Operation
@@ -83,7 +83,7 @@
  * programming documents for details unique to your board.
  *
  * For the TQM8xx(L) modules, there is no control register interface.
- * All functions are directly controlled using I/O pins.  See commproc.h.
+ * All functions are directly controlled using I/O pins.  See <asm/commproc.h>.
  */
 
 /* The transmitter timeout

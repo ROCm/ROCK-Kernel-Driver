@@ -109,11 +109,9 @@ static int get_new_buffer_near_blocknr(
   *pp_s_new_bh = reiserfs_getblk(p_s_sb->s_dev, n_new_blocknumber, p_s_sb->s_blocksize);
   if ( buffer_uptodate(*pp_s_new_bh) ) {
 
-#ifdef CONFIG_REISERFS_CHECK
-    if ( buffer_dirty(*pp_s_new_bh) || (*pp_s_new_bh)->b_dev == NODEV ) {
-      reiserfs_panic(p_s_sb, "PAP-14080: get_new_buffer: invalid uptodate buffer %b for the new block", *pp_s_new_bh);
-    }
-#endif
+    RFALSE( buffer_dirty(*pp_s_new_bh) || (*pp_s_new_bh)->b_dev == NODEV,
+	    "PAP-14080: invalid uptodate buffer %b for the new block", 
+	    *pp_s_new_bh);
 
     /* Free path buffers to prevent deadlock. */
     /* It is possible that this process has the buffer, which this function is getting, already in
@@ -158,12 +156,9 @@ static int get_new_buffer_near_blocknr(
   else {
     ;
 
-#ifdef CONFIG_REISERFS_CHECK
-    if (atomic_read (&((*pp_s_new_bh)->b_count)) != 1) {
-      reiserfs_panic(p_s_sb,"PAP-14100: get_new_buffer: not uptodate buffer %b for the new block has b_count more than one",
-		     *pp_s_new_bh);
-    }
-#endif
+    RFALSE( atomic_read (&((*pp_s_new_bh)->b_count)) != 1,
+	    "PAP-14100: not uptodate buffer %b for the new block has b_count more than one",
+	    *pp_s_new_bh);
 
   }
   return (n_ret_value | n_repeat);
@@ -310,12 +305,10 @@ int get_new_buffer(
     n_repeat |= SCHEDULE_OCCURRED;
   }
 
-#ifdef CONFIG_REISERFS_CHECK
-  if ( atomic_read (&((*pp_s_new_bh)->b_count)) != 1 || buffer_dirty (*pp_s_new_bh)) {
-    reiserfs_panic(p_s_sb,"PAP-14100: get_new_buffer: not free or dirty buffer %b for the new block",
-		   *pp_s_new_bh);
-  }
-#endif
+  RFALSE( atomic_read (&((*pp_s_new_bh)->b_count)) != 1 || 
+	  buffer_dirty (*pp_s_new_bh),
+	  "PAP-14100: not free or dirty buffer %b for the new block", 
+	  *pp_s_new_bh);
 
   return n_repeat;
 }

@@ -102,8 +102,8 @@ void *memcpy(void *pdst,
         ;;
 	;; Save the registers we'll use in the movem process
 	;; on the stack.
-	subq 	11*4,sp
-	movem	r10,[sp]
+	subq 	11*4,$sp
+	movem	$r10,[$sp]
 
         ;; Now we've got this:
 	;; r11 - src
@@ -111,17 +111,17 @@ void *memcpy(void *pdst,
 	;; r12 - n
 	
         ;; Update n for the first loop
-        subq    44,r12
+        subq    44,$r12
 0:
-	movem	[r11+],r10
-        subq   44,r12
+	movem	[$r11+],$r10
+        subq   44,$r12
         bge     0b
-	movem	r10,[r13+]
+	movem	$r10,[$r13+]
 
-        addq   44,r12  ;; compensate for last loop underflowing n
+        addq   44,$r12  ;; compensate for last loop underflowing n
 
 	;; Restore registers from stack
-        movem [sp+],r10" 
+        movem [$sp+],$r10" 
 
      /* Outputs */ : "=r" (dst), "=r" (src), "=r" (n) 
      /* Inputs */ : "0" (dst), "1" (src), "2" (n));

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.time.c 1.21 08/20/01 22:08:08 paulus
+ * BK Id: SCCS/s.time.c 1.26 10/05/01 08:29:42 trini
  */
 /*
  * Common time routines among all ppc machines.
@@ -200,10 +200,10 @@ int timer_interrupt(struct pt_regs * regs)
 #ifdef CONFIG_SMP
 	smp_local_timer_interrupt(regs);
 #endif /* CONFIG_SMP */
-	
+
 	if (ppc_md.heartbeat && !ppc_md.heartbeat_count--)
 		ppc_md.heartbeat();
-	
+
 	hardirq_exit(cpu);
 
 	if (softirq_pending(cpu))
@@ -235,7 +235,7 @@ void do_gettimeofday(struct timeval *tv)
 	read_unlock_irqrestore(&xtime_lock, flags);
 
 	usec += mulhwu(tb_to_us, tb_ticks_per_jiffy * lost_ticks + delta);
-	while (usec > 1000000) {
+	while (usec >= 1000000) {
 	  	sec++;
 		usec -= 1000000;
 	}

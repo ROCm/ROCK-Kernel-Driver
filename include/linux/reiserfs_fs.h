@@ -17,6 +17,7 @@
 #ifdef __KERNEL__
 #include <linux/slab.h>
 #include <linux/tqueue.h>
+#include <asm/hardirq.h>
 #endif
 
 /*
@@ -97,6 +98,21 @@
 ** messages.
 */
 #define REISERFS_DEBUG_CODE 5 /* extra messages to help find/debug errors */ 
+
+/* assertions handling */
+
+/** always check a condition and panic if it's false. */
+#define RASSERT( cond, format, args... )					\
+if( !( cond ) ) 								\
+  reiserfs_panic( 0, "reiserfs[%i]: assertion " #cond " failed at "		\
+		  __FILE__ ":%i:" __FUNCTION__ ": " format "\n",		\
+		  in_interrupt() ? -1 : current -> pid, __LINE__ , ##args )
+
+#if defined( CONFIG_REISERFS_CHECK )
+#define RFALSE( cond, format, args... ) RASSERT( !( cond ), format, ##args )
+#else
+#define RFALSE( cond, format, args... ) do {;} while( 0 )
+#endif
 
 /*
  * Disk Data Structures

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.fec.c 1.12 05/18/01 07:54:04 patch
+ * BK Id: SCCS/s.fec.c 1.18 09/22/01 09:12:32 trini
  */
 /*
  * Fast Ethernet Controller (FEC) driver for Motorola MPC8xx.
@@ -60,7 +60,7 @@
 #include <asm/irq.h>
 #include <asm/bitops.h>
 #include <asm/uaccess.h>
-#include "commproc.h"
+#include <asm/commproc.h>
 
 #ifdef	CONFIG_USE_MDIO
 /* Forward declarations of some structures to support different PHYs
@@ -412,8 +412,10 @@ fec_enet_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		bdp++;
 	}
 
-	if (bdp->cbd_sc & BD_ENET_TX_READY)
+	if (bdp->cbd_sc & BD_ENET_TX_READY) {
 		netif_stop_queue(dev);
+		fep->tx_full = 1;
+	}
 
 	fep->cur_tx = (cbd_t *)bdp;
 

@@ -68,23 +68,6 @@ int is_reusable (struct super_block * s, unsigned long block, int bit_value)
 
 #endif /* CONFIG_REISERFS_CHECK */
 
-#if 0
-/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
-int is_used (struct super_block * s, unsigned long block)
-{
-    int i, j;
-
-    i = block / (s->s_blocksize << 3);
-    j = block % (s->s_blocksize << 3);
-    if (reiserfs_test_le_bit(j, SB_AP_BITMAP (s)[i]->b_data))
-	return 1;
-    return 0;
-  
-}
-/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
-#endif
-
-
 /* get address of corresponding bit (bitmap block number and offset in it) */
 static inline void get_bit_address (struct super_block * s, unsigned long block, int * bmap_nr, int * offset)
 {
@@ -109,13 +92,8 @@ void reiserfs_free_block (struct reiserfs_transaction_handle *th, unsigned long 
     struct buffer_head ** apbh;
     int nr, offset;
 
-#ifdef CONFIG_REISERFS_CHECK
-    if (!s)
-	reiserfs_panic (s, "vs-4060: reiserfs_free_block: trying to free block on nonexistent device");
-
-    if (is_reusable (s, block, 1) == 0)
-	reiserfs_panic (s, "vs-4070: reiserfs_free_block: can not free such block");
-#endif
+  RFALSE(!s, "vs-4060: trying to free block on nonexistent device");
+  RFALSE(is_reusable (s, block, 1) == 0, "vs-4070: can not free such block");
 
   rs = SB_DISK_SUPER_BLOCK (s);
   sbh = SB_BUFFER_WITH_SB (s);
@@ -317,17 +295,12 @@ static int do_reiserfs_new_blocknrs (struct reiserfs_transaction_handle *th,
 	   priority 0 */
 	return NO_DISK_SPACE;
 
-#ifdef CONFIG_REISERFS_CHECK
-    if (!s)
-	reiserfs_panic (s, "vs-4090: reiserfs_new_blocknrs: trying to get new block from nonexistent device");
-    
-    if (search_start == MAX_B_NUM)
-	reiserfs_panic (s, "vs-4100: reiserfs_new_blocknrs: we are optimizing location based on "
-			"the bogus location of a temp buffer (%lu).", search_start);
-    
-    if (amount_needed < 1 || amount_needed > 2) 
-	reiserfs_panic (s, "vs-4110: reiserfs_new_blocknrs: amount_needed parameter incorrect (%d)", amount_needed);
-#endif /* CONFIG_REISERFS_CHECK */
+  RFALSE( !s, "vs-4090: trying to get new block from nonexistent device");
+  RFALSE( search_start == MAX_B_NUM,
+	  "vs-4100: we are optimizing location based on "
+	  "the bogus location of a temp buffer (%lu).", search_start);
+  RFALSE( amount_needed < 1 || amount_needed > 2,
+	  "vs-4110: amount_needed parameter incorrect (%d)", amount_needed);
 
   /* We continue the while loop if another process snatches our found
    * free block from us after we find it but before we successfully
@@ -337,10 +310,8 @@ static int do_reiserfs_new_blocknrs (struct reiserfs_transaction_handle *th,
   while (amount_needed--) {
     /* skip over any blocknrs already gotten last time. */
     if (*(free_blocknrs) != 0) {
-#ifdef CONFIG_REISERFS_CHECK
-      if (is_reusable (s, *free_blocknrs, 1) == 0)
-	reiserfs_panic(s, "vs-4120: reiserfs_new_blocknrs: bad blocknr on free_blocknrs list");
-#endif /* CONFIG_REISERFS_CHECK */
+      RFALSE( is_reusable (s, *free_blocknrs, 1) == 0, 
+	      "vs-4120: bad blocknr on free_blocknrs list");
       free_blocknrs++;
       continue;
     }
@@ -414,10 +385,9 @@ free_and_return:
 
     reiserfs_prepare_for_journal(s, SB_AP_BITMAP(s)[i], 1) ;
 
-#ifdef CONFIG_REISERFS_CHECK
-    if (buffer_locked (SB_AP_BITMAP (s)[i]) || is_reusable (s, search_start, 0) == 0)
-	reiserfs_panic (s, "vs-4140: reiserfs_new_blocknrs: bitmap block is locked or bad block number found");
-#endif
+    RFALSE( buffer_locked (SB_AP_BITMAP (s)[i]) || 
+	    is_reusable (s, search_start, 0) == 0,
+	    "vs-4140: bitmap block is locked or bad block number found");
 
     /* if this bit was already set, we've scheduled, and someone else
     ** has allocated it.  loop around and try again

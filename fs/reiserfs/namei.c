@@ -245,10 +245,8 @@ static int linear_search_in_dir_item (struct cpu_key * key, struct reiserfs_dir_
 	i --;
     }
 
-#ifdef CONFIG_REISERFS_CHECK
-    if (de->de_deh != B_I_DEH (de->de_bh, de->de_ih))
-	reiserfs_panic (0, "vs-7010: linear_search_in_dir_item: array of entry headers not found");
-#endif /* CONFIG_REISERFS_CHECK */
+    RFALSE( de->de_deh != B_I_DEH (de->de_bh, de->de_ih),
+	    "vs-7010: array of entry headers not found");
 
     deh += i;
 
@@ -290,11 +288,8 @@ static int linear_search_in_dir_item (struct cpu_key * key, struct reiserfs_dir_
 	// so, this is a bug
 	return NAME_NOT_FOUND;
 
-#ifdef CONFIG_REISERFS_CHECK
-    if (de->de_item_num)
-	reiserfs_panic (0, "vs-7015: linear_search_in_dir_item: "
-			"two diritems of the same directory in one node?");
-#endif /* CONFIG_REISERFS_CHECK */
+    RFALSE( de->de_item_num,
+	    "vs-7015: two diritems of the same directory in one node?");
 
     return GOTO_PREVIOUS_ITEM;
 }
@@ -1149,14 +1144,9 @@ int reiserfs_rename (struct inode * old_dir, struct dentry *old_dentry,
 	    continue;
 	}
 
-#ifdef CONFIG_REISERFS_CHECK
-	if (S_ISDIR(old_inode->i_mode) && 
-	    (!entry_points_to_object ("..", 2, &dot_dot_de, old_dir) || 
-	     !reiserfs_buffer_prepared(dot_dot_de.de_bh))) {
-	    // this should be not changed
-	    BUG ();
-	}
-#endif	
+	RFALSE( S_ISDIR(old_inode->i_mode) && 
+		(!entry_points_to_object ("..", 2, &dot_dot_de, old_dir) || 
+		 !reiserfs_buffer_prepared(dot_dot_de.de_bh)), "" );
 
 	break;
     }

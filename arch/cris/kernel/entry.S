@@ -1,4 +1,4 @@
-/* $Id: entry.S,v 1.31 2001/07/25 16:07:42 bjornw Exp $
+/* $Id: entry.S,v 1.34 2001/10/01 14:45:03 bjornw Exp $
  *
  *  linux/arch/cris/entry.S
  *
@@ -7,6 +7,15 @@
  *  Authors:	Bjorn Wesen (bjornw@axis.com)
  *
  *  $Log: entry.S,v $
+ *  Revision 1.34  2001/10/01 14:45:03  bjornw
+ *  Removed underscores and added register prefixes
+ *
+ *  Revision 1.33  2001/08/21 13:48:01  jonashg
+ *  Added fix by HP to avoid oops when doing a hard_reset_now.
+ *
+ *  Revision 1.32  2001/08/14 04:32:02  hp
+ *  In _resume, add comment why R9 is saved; don't sound like it's call-saved.
+ *
  *  Revision 1.31  2001/07/25 16:07:42  bjornw
  *  softirq_active/mask -> softirq_pending only
  *
@@ -166,22 +175,22 @@
 	
 	;; functions exported from this file
 	
-	.globl _system_call
-	.globl _ret_from_intr
-	.globl _ret_from_sys_call
-	.globl _resume
-	.globl _multiple_interrupt
-	.globl _hwbreakpoint
-	.globl _IRQ1_interrupt
-	.globl _timer_interrupt
-	.globl _timer_shortcut
-	.globl _spurious_interrupt
-	.globl _hw_bp_trigs
-	.globl _mmu_bus_fault
-	.globl _do_sigtrap
-	.globl _gdb_handle_breakpoint
+	.globl system_call
+	.globl ret_from_intr
+	.globl ret_from_sys_call
+	.globl resume
+	.globl multiple_interrupt
+	.globl hwbreakpoint
+	.globl IRQ1_interrupt
+	.globl timer_interrupt
+	.globl timer_shortcut
+	.globl spurious_interrupt
+	.globl hw_bp_trigs
+	.globl mmu_bus_fault
+	.globl do_sigtrap
+	.globl gdb_handle_breakpoint
 			
-	.globl _sys_call_table
+	.globl sys_call_table
 	
 	;; Get values and offsets into various structs.  The file isn't
 	;; suitable for consumption by the preprocessor, so don't use
@@ -196,38 +205,38 @@ PT_TRACESYS_BIT	  = 1
 	
 	;; handle software irqs
 				
-handle_softirq:
-	move.d	r9,r1
-	jsr	_do_softirq		; call the C routine for softirq handling
-	move.d	r1,r9
+_handle_softirq:
+	move.d	$r9, $r1
+	jsr	do_softirq	; call the C routine for softirq handling
+	move.d	$r1, $r9
 
 	;; fall-through
 	
-_ret_from_intr:
+ret_from_intr:
 	;; check for resched only if we're going back to user-mode
 
-	move	ccr, r0
-	btstq	8, r0		; U-flag
-	bpl	Rexit		; go back directly
+	move	$ccr, $r0
+	btstq	8, $r0		; U-flag
+	bpl	_Rexit		; go back directly
 	nop
-	ba	ret_with_reschedule  ; go back but check schedule and signals first 
+	ba	_ret_with_reschedule  ; go back but check schedule and signals first 
 	nop
 
-reschedule:
+_reschedule:
 	;; keep r9 intact
-	move.d	r9,r1
-	jsr	_schedule
-	ba	_ret_from_sys_call
-	move.d	r1,r9
+	move.d	$r9, $r1
+	jsr	schedule
+	ba	ret_from_sys_call
+	move.d	$r1, $r9
 
 	;; return but call do_signal first
-signal_return:
+_signal_return:
 	ei			; we can get here from an interrupt
-	move.d	r9,r10		; do_signals syscall/irq param
-	moveq	0,r11		; oldset param - 0 in this case
-	move.d	sp,r12		; another argument to do_signal (the regs param)
-	jsr	_do_signal	; arch/cris/kernel/signal.c
-	ba	Rexit
+	move.d	$r9, $r10	; do_signals syscall/irq param
+	moveq	0, $r11		; oldset param - 0 in this case
+	move.d	$sp, $r12	; another argument to do_signal (the regs param)
+	jsr	do_signal	; arch/cris/kernel/signal.c
+	ba	_Rexit
 	nop
 	
 	;; The system_call is called by a BREAK instruction, which works like
@@ -246,112 +255,114 @@ signal_return:
 	;; really designed so that the fast-path does not force cache-loading of non-used
 	;; instructions. Only the non-common cases cause the outlined code to run..
 
-_system_call:
+system_call:
 	;; stack-frame similar to the irq heads, which is reversed in ret_from_sys_call
-	move	brp,[sp=sp-16]	; instruction pointer and room for a fake SBFS frame
-	push	srp
-	push	dccr
-	push	mof
-	subq	14*4,sp		; make room for r0-r13
-	movem	r13,[sp]	; push r0-r13
-	push	r10		; push orig_r10
-	clear.d [sp=sp-4]	; frametype == 0, normal stackframe
+	move	$brp,[$sp=$sp-16]; instruction pointer and room for a fake SBFS frame
+	push	$srp
+	push	$dccr
+	push	$mof
+	subq	14*4, $sp		; make room for r0-r13
+	movem	$r13, [$sp]	; push r0-r13
+	push	$r10		; push orig_r10
+	clear.d [$sp=$sp-4]	; frametype == 0, normal stackframe
 	
-	movs.w	-ENOSYS,r0
-	move.d	r0,[sp+LR10]	; put the default return value in r10 in the frame
+	movs.w	-ENOSYS, $r0
+	move.d	$r0, [$sp+LR10]	; put the default return value in r10 in the frame
 
 	;; check if this process is syscall-traced
 
-	movs.w	-8192,r0	; THREAD_SIZE == 8192
-	and.d	sp,r0
+	movs.w	-8192, $r0	; THREAD_SIZE == 8192
+	and.d	$sp, $r0
 	
-	move.d	[r0+LTASK_PTRACE],r0
-	btstq	PT_TRACESYS_BIT, r0
-	bmi	tracesys
+	move.d	[$r0+LTASK_PTRACE], $r0
+	btstq	PT_TRACESYS_BIT, $r0
+	bmi	_tracesys
 	nop	
 
 	;; check for sanity in the requested syscall number
 	
-	cmpu.w	NR_syscalls,r9	
-	bcc	_ret_from_sys_call
-	lslq	2,r9		;  multiply by 4, in the delay slot
+	cmpu.w	NR_syscalls, $r9	
+	bcc	ret_from_sys_call
+	lslq	2, $r9		;  multiply by 4, in the delay slot
 
 	;; as a bonus 7th parameter, we give the location on the stack
 	;; of the register structure itself. some syscalls need this.
 
-	push	sp
+	push	$sp
 	
 	;; the parameter carrying registers r10, r11, r12 and 13 are intact.
 	;; the fifth and sixth parameters (if any) was in mof and srp 
 	;; respectively, and we need to put them on the stack.
 
-	push	srp
-	push	mof
+	push	$srp
+	push	$mof
 	
-	jsr	[r9+_sys_call_table]	; actually do the system call
-	addq	3*4,sp			; pop the mof, srp and regs parameters
-	move.d	r10,[sp+LR10]		; save the return value
+	jsr	[$r9+sys_call_table]	; actually do the system call
+	addq	3*4, $sp		; pop the mof, srp and regs parameters
+	move.d	$r10, [$sp+LR10]	; save the return value
 
-	moveq	1,r9		; "parameter" to ret_from_sys_call to show it was a sys call
+	moveq	1, $r9		; "parameter" to ret_from_sys_call to show it was a sys call
 	
 	;; fall through into ret_from_sys_call to return
 	
-_ret_from_sys_call:
+ret_from_sys_call:
 	;; r9 is a parameter - if 1, we came from a syscall, if 0, from an irq
 		
 	;; check if any bottom halves need service
 	
-	test.d	[_irq_stat]	       ; softirq_pending
-	bne	handle_softirq
+	test.d	[irq_stat]	       ; softirq_pending
+	bne	_handle_softirq
 	nop
 
-ret_with_reschedule:
+_ret_with_reschedule:
 	;; first get the current task-struct pointer (see top for defs)
 
-	move.d	sp, r0
-	and.d	-8192, r0	; THREAD_SIZE == 8192
+	move.d	$sp, $r0
+	and.d	-8192, $r0	; THREAD_SIZE == 8192
 	
 	;; see if we want to reschedule into another process
 	
-	test.d	[r0+LTASK_NEEDRESCHED]
-	bne	reschedule
+	test.d	[$r0+LTASK_NEEDRESCHED]
+	bne	_reschedule
 	nop
 
 	;; see if we need to run signal checks (important that r9 is intact here)
 
-	test.d	[r0+LTASK_SIGPENDING]
-	bne	signal_return
+	test.d	[$r0+LTASK_SIGPENDING]
+	bne	_signal_return
 	nop
 	
-Rexit:
+_Rexit:
 	;; this epilogue MUST match the prologues in multiple_interrupt, irq.h and ptregs.h
-	pop	r10		; frametype
-	bne	RBFexit		; was not CRIS_FRAME_NORMAL, handle otherwise
-	addq	4,sp		; skip orig_r10, in delayslot
-	movem	[sp+],r13	; registers r0-r13
-	pop	mof		; multiply overflow register 
-	pop	dccr		; condition codes
-	pop	srp		; subroutine return pointer
+	pop	$r10		; frametype
+	bne	_RBFexit	; was not CRIS_FRAME_NORMAL, handle otherwise
+	addq	4, $sp		; skip orig_r10, in delayslot
+	movem	[$sp+], $r13	; registers r0-r13
+	pop	$mof		; multiply overflow register 
+	pop	$dccr		; condition codes
+	pop	$srp		; subroutine return pointer
 	;; now we have a 4-word SBFS frame which we do not want to restore
 	;; using RBF since it was not stacked with SBFS. instead we would like to
 	;; just get the PC value to restart it with, and skip the rest of
 	;; the frame.
-	move	[sp=sp+16], p8	; pop the SBFS frame from the sp
-	jmpu	[sp-16]		; return through the irp field in the sbfs frame
+	;; Also notice that it's important to use instructions here that
+	;; keep the interrupts disabled (since we've already popped DCCR)
+	move	[$sp=$sp+16], $p8; pop the SBFS frame from the sp
+	jmpu	[$sp-16]	; return through the irp field in the sbfs frame
 
-RBFexit:
-	movem	[sp+],r13	; registers r0-r13, in delay slot
-	pop	mof		; multiply overflow register 
-	pop	dccr		; condition codes
-	pop	srp		; subroutine return pointer
-	rbf	[sp+]		; return by popping the CPU status
+_RBFexit:
+	movem	[$sp+], $r13	; registers r0-r13, in delay slot
+	pop	$mof		; multiply overflow register 
+	pop	$dccr		; condition codes
+	pop	$srp		; subroutine return pointer
+	rbf	[$sp+]		; return by popping the CPU status
 
-tracesys:
+_tracesys:
 	;; this first invocation of syscall_trace _requires_ that
 	;; LR10 in the frame contains -ENOSYS (as is set in the beginning
 	;; of system_call).
 
-	jsr	_syscall_trace
+	jsr	syscall_trace
 
 	;; now we should more or less do the same things as in the system_call
 	;; but since our argument regs got clobbered during syscall_trace and
@@ -360,176 +371,187 @@ tracesys:
 
 	;; check for sanity in the requested syscall number
 
-	move.d	[sp+LR9], r9
-	movs.w	-ENOSYS, r10
-	cmpu.w	NR_syscalls,r9	
+	move.d	[$sp+LR9], $r9
+	movs.w	-ENOSYS, $r10
+	cmpu.w	NR_syscalls, $r9	
 	bcc	1f
-	lslq	2,r9		;  multiply by 4, in the delay slot
+	lslq	2, $r9		;  multiply by 4, in the delay slot
 
 	;; read the system call vector entry into r9
 	
-	move.d	[r9+_sys_call_table],r9
+	move.d	[$r9+sys_call_table], $r9
 
 	;; restore r10, r11, r12, r13, mof and srp into the needed registers
 
-	move.d	[sp+LORIG_R10], r10  ; LR10 is already filled with -ENOSYS.
-	move.d	[sp+LR11],      r11
-	move.d	[sp+LR12],      r12
-	move.d	[sp+LR13],      r13
-	move	[sp+LMOF],      mof
-	move	[sp+LSRP],      srp
+	move.d	[$sp+LORIG_R10], $r10  ; LR10 is already filled with -ENOSYS.
+	move.d	[$sp+LR11],      $r11
+	move.d	[$sp+LR12],      $r12
+	move.d	[$sp+LR13],      $r13
+	move	[$sp+LMOF],      $mof
+	move	[$sp+LSRP],      $srp
 
 	;; as a bonus 7th parameter, we give the location on the stack
 	;; of the register structure itself. some syscalls need this.
 
-	push	sp
+	push	$sp
 	
 	;; the fifth and sixth parameters needs to be put on the stack for
 	;; the system call to find them
 
-	push	srp
-	push	mof
+	push	$srp
+	push	$mof
 
-	jsr	r9		; actually call the system-call
-	addq	3*4,sp		; pop the srp, mof and regs parameters
+	jsr	$r9		; actually call the system-call
+	addq	3*4, $sp	; pop the srp, mof and regs parameters
 
-1:	move.d	r10,[sp+LR10]	; save the return value
+1:	move.d	$r10, [$sp+LR10]; save the return value
 
 	;; second call of syscall_trace, to let it grab the results
 		
-	jsr	_syscall_trace
+	jsr	syscall_trace
 
-	moveq	1,r9		; "parameter" to ret_from_sys_call to show it was a sys call
-	ba	_ret_from_sys_call
+	moveq	1, $r9		; "parameter" to ret_from_sys_call to show it was a sys call
+	ba	ret_from_sys_call
 	nop
 		
-	;; _resume performs the actual task-switching, by switching stack pointers
+	;; resume performs the actual task-switching, by switching stack pointers
 	;; input arguments: r10 = prev, r11 = next, r12 = thread offset in task struct
 	;; returns old current in r10
 	;;
 	;; TODO:  see the i386 version. The switch_to which calls resume in our version
 	;;        could really be an inline asm of this.
 
-_resume:	
-	push	srp		         ; we keep the old/new PC on the stack 
-	add.d	r12, r10		 ; r10 = current tasks tss
-	move	dccr, [r10+LTHREAD_DCCR] ; save irq enable state
+resume:	
+	push	$srp		         ; we keep the old/new PC on the stack 
+	add.d	$r12, $r10		 ; r10 = current tasks tss
+	move	$dccr, [$r10+LTHREAD_DCCR] ; save irq enable state
 	di
 
-	move	usp, [r10+LTHREAD_USP]	 ; save user-mode stackpointer
+	move	$usp, [$r10+LTHREAD_USP] ; save user-mode stackpointer
 	
-	subq	10*4, sp
-	movem	r9, [sp]		 ; save non-scratch registers
+	;; See copy_thread for the reason why register R9 is saved.
+	subq	10*4, $sp
+	movem	$r9, [$sp]		 ; save non-scratch registers and R9.
 	
-	move.d	sp, [r10+LTHREAD_KSP]	 ; save the kernel stack pointer for the old task
-	move.d	sp, r10			 ; return last running task in r10
-	and.d   -8192, r10	         ; get task ptr from stackpointer
-	add.d	r12, r11		 ; find the new tasks tss
-	move.d	[r11+LTHREAD_KSP], sp	 ; switch into the new stackframe by restoring kernel sp
+	move.d	$sp, [$r10+LTHREAD_KSP]	 ; save the kernel stack pointer for the old task
+	move.d	$sp, $r10		 ; return last running task in r10
+	and.d   -8192, $r10	         ; get task ptr from stackpointer
+	add.d	$r12, $r11		 ; find the new tasks tss
+	move.d	[$r11+LTHREAD_KSP], $sp	 ; switch into the new stackframe by restoring kernel sp
 
-	movem	[sp+], r9		 ; restore non-scratch registers
+	movem	[$sp+], $r9		 ; restore non-scratch registers and R9.
 
-	move	[r11+LTHREAD_USP], usp	 ; restore user-mode stackpointer
+	move	[$r11+LTHREAD_USP], $usp ; restore user-mode stackpointer
 	
-	move	[r11+LTHREAD_DCCR], dccr ; restore irq enable status
-	jump	[sp+]		         ; restore PC
+	move	[$r11+LTHREAD_DCCR], $dccr ; restore irq enable status
+	jump	[$sp+]		         ; restore PC
 
 	;; This is the MMU bus fault handler.
 	;; It needs to stack the CPU status and overall is different
 	;; from the other interrupt handlers.
 
-_mmu_bus_fault:	
-	sbfs	[sp=sp-16]	; push the internal CPU status
+mmu_bus_fault:	
+	sbfs	[$sp=$sp-16]	; push the internal CPU status
 	;; the first longword in the sbfs frame was the interrupted PC
 	;; which fits nicely with the "IRP" slot in pt_regs normally used to
 	;; contain the return address. used by Oops to print kernel errors..
-	push	srp		; make a stackframe similar to pt_regs
-	push	dccr
-	push	mof
+	push	$srp		; make a stackframe similar to pt_regs
+	push	$dccr
+	push	$mof
 	di
-	subq	14*4, sp
-	movem	r13, [sp]
-	push	r10		; dummy orig_r10
-	moveq	1, r10
-	push	r10		; frametype == 1, BUSFAULT frame type
+	subq	14*4, $sp
+	movem	$r13, [$sp]
+	push	$r10		; dummy orig_r10
+	moveq	1, $r10
+	push	$r10		; frametype == 1, BUSFAULT frame type
 
-	moveq	0, r9		; busfault is equivalent to an irq
+	moveq	0, $r9		; busfault is equivalent to an irq
 		
-	move.d	sp, r10		; pt_regs argument to handle_mmu_bus_fault
+	move.d	$sp, $r10	; pt_regs argument to handle_mmu_bus_fault
 		
-	jsr	_handle_mmu_bus_fault  ; in arch/cris/mm/fault.c
+	jsr	handle_mmu_bus_fault  ; in arch/cris/mm/fault.c
 
 	;; now we need to return through the normal path, we cannot just
 	;; do the RBFexit since we might have killed off the running
 	;; process due to a SEGV, scheduled due to a page blocking or
 	;; whatever.
 
-	ba	_ret_from_intr
+	ba	ret_from_intr
 	nop
 		
 	;; special handlers for breakpoint and NMI
 #if 0			
-_hwbreakpoint:
-	push	dccr
+hwbreakpoint:
+	push	$dccr
 	di
-	push	r10
-	push	r11
-	push	r12
-	push	r13
+	push	$r10
+	push	$r11
+	push	$r12
+	push	$r13
 	clearf	b
-	move	brp,r11
-	move.d	[_hw_bp_msg],r10
-	jsr	_printk
+	move	$brp,$r11
+	move.d	[hw_bp_msg],$r10
+	jsr	printk
 	setf	b
-	pop	r13
-	pop	r12
-	pop	r11
-	pop	r10
-	pop	dccr
+	pop	$r13
+	pop	$r12
+	pop	$r11
+	pop	$r10
+	pop	$dccr
 	retb
 	nop
 #else
-_hwbreakpoint:
-	push	dccr
+hwbreakpoint:
+	push	$dccr
 	di
 #if 1
-	push	r10
-	push	r11
-	move.d	[_hw_bp_trig_ptr],r10
-	move.d	[r10],r11
-	cmp.d	42,r11
-	beq	nobp
+	push	$r10
+	push	$r11
+	move.d	[hw_bp_trig_ptr],$r10
+	move.d	[$r10],$r11
+	cmp.d	42,$r11
+	beq	1f
 	nop
-	move	brp,r11
-	move.d	r11,[r10+]
-	move.d	r10,[_hw_bp_trig_ptr]
-nobp:	pop	r11
-	pop	r10
+	move	$brp,$r11
+	move.d	$r11,[$r10+]
+	move.d	$r10,[hw_bp_trig_ptr]
+1:	pop	$r11
+	pop	$r10
 #endif
-	pop	dccr
+	pop	$dccr
 	retb
 	nop
 #endif
 	
-_IRQ1_interrupt:
+IRQ1_interrupt:
 
 #if defined(CONFIG_ETRAX_WATCHDOG) && !defined(CONFIG_SVINTO_SIM)
 ;; If we receive a watchdog interrupt while it is not expected, then set
 ;; up a canonical frame and dump register contents before dying.
 
 	;; this prologue MUST match the one in irq.h and the struct in ptregs.h!!!
-	move	brp,[sp=sp-16]	; instruction pointer and room for a fake SBFS frame
-	push	srp
-	push	dccr
-	push	mof
+	move	$brp,[$sp=$sp-16]; instruction pointer and room for a fake SBFS frame
+	push	$srp
+	push	$dccr
+	push	$mof
 	di
-	subq	14*4,sp
-	movem	r13,[sp]
-	push	r10		; push orig_r10
-	clear.d [sp=sp-4]	; frametype == 0, normal frame
+	subq	14*4, $sp
+	movem	$r13, [$sp]
+	push	$r10		; push orig_r10
+	clear.d [$sp=$sp-4]	; frametype == 0, normal frame
 
 ;; We don't check that we actually were bit by the watchdog as opposed to
 ;; an external NMI, since there is currently no handler for external NMI.
+
+;; Check if we're waiting for reset to happen, as signalled by
+;; hard_reset_now setting cause_of_death to a magic value.  If so, just
+;; get stuck until reset happens.
+	.comm	cause_of_death, 4	;; Don't declare this anywhere.
+	move.d	[cause_of_death], $r10
+	cmp.d	0xbedead, $r10
+_killed_by_death:
+	beq	_killed_by_death
+	nop
 
 ;; We'll see this in ksymoops dumps.
 Watchdog_bite:
@@ -540,134 +562,134 @@ Watchdog_bite:
 ;; Change the watchdog key to an arbitrary 3-bit value and restart the
 ;; watchdog.
 #define WD_INIT 2
-	moveq	  IO_FIELD (R_WATCHDOG, key, WD_INIT), r10
-	move.d	R_WATCHDOG, r11
+	moveq	  IO_FIELD (R_WATCHDOG, key, WD_INIT), $r10
+	move.d	R_WATCHDOG, $r11
 
-	move.d	r10,[r11]
+	move.d	$r10, [$r11]
 	moveq	  IO_FIELD (R_WATCHDOG, key,				\
 			    IO_EXTRACT (R_WATCHDOG, key,		\
 					IO_MASK (R_WATCHDOG, key))	\
 			    ^ WD_INIT)					\
-		| IO_STATE (R_WATCHDOG, enable, start),r10
-	move.d	r10,[r11]
+		| IO_STATE (R_WATCHDOG, enable, start), $r10
+	move.d	$r10, [$r11]
 
 ;; Note that we don't do "setf m" here (or after two necessary NOPs),
 ;; since *not* doing that saves us from re-entrancy checks.  We don't want
 ;; to get here again due to possible subsequent NMIs; we want the watchdog
 ;; to reset us.
 
-	move.d	watchdogmsg,r10
-	jsr	_printk
+	move.d	_watchdogmsg,$r10
+	jsr	printk
 
-	move.d	sp,r10
-	jsr	_show_registers
+	move.d	$sp, $r10
+	jsr	show_registers
 
 ;; This nop is here so we see the "Watchdog_bite" label in ksymoops dumps
-;; rather than "_spurious_interrupt".
+;; rather than "spurious_interrupt".
 	nop
-;; At this point we drop down into _spurious_interrupt, which will do a
+;; At this point we drop down into spurious_interrupt, which will do a
 ;; hard reset.
 
 	.section .rodata,"a"
-watchdogmsg:
+_watchdogmsg:
 	.ascii	"Oops: bitten by watchdog\n\0"
 	.previous
 
 #endif /* CONFIG_ETRAX_WATCHDOG and not CONFIG_SVINTO_SIM */
 
-_spurious_interrupt:	
+spurious_interrupt:	
 	di
-	jump _hard_reset_now
+	jump hard_reset_now
 
 	;; this handles the case when multiple interrupts arrive at the same time
 	;; we jump to the first set interrupt bit in a priority fashion
 	;; the hardware will call the unserved interrupts after the handler finishes
 	
-_multiple_interrupt:
+multiple_interrupt:
 	;; this prologue MUST match the one in irq.h and the struct in ptregs.h!!!
-	move	irp,[sp=sp-16]	; instruction pointer and room for a fake SBFS frame
-	push	srp
-	push	dccr
-	push	mof
+	move	$irp,[$sp=$sp-16]; instruction pointer and room for a fake SBFS frame
+	push	$srp
+	push	$dccr
+	push	$mof
 	di
-	subq	14*4,sp
-	movem	r13,[sp]
-	push	r10		; push orig_r10
-	clear.d [sp=sp-4]	; frametype == 0, normal frame
+	subq	14*4, $sp
+	movem	$r13, [$sp]
+	push	$r10		; push orig_r10
+	clear.d [$sp=$sp-4]	; frametype == 0, normal frame
 	
-	move.d	_irq_shortcuts + 8,r1
-	moveq	2,r2		; first bit we care about is the timer0 irq
-	move.d	[R_VECT_MASK_RD],r0	; read the irq bits that triggered the multiple irq
-multloop:	
-	btst	r2,r0		; check for the irq given by bit r2
-	bmi	do_shortcut	; actually do the shortcut
+	move.d	irq_shortcuts + 8, $r1
+	moveq	2, $r2		; first bit we care about is the timer0 irq
+	move.d	[R_VECT_MASK_RD], $r0; read the irq bits that triggered the multiple irq
+1:	
+	btst	$r2, $r0	; check for the irq given by bit r2
+	bmi	_do_shortcut	; actually do the shortcut
 	nop
-	addq	1,r2		; next vector bit
-	addq	4,r1		; next vector
-	cmp.b	32,r2
-	bne	multloop	; process all irq's up to and including number 31
+	addq	1, $r2		; next vector bit
+	addq	4, $r1		; next vector
+	cmp.b	32, $r2
+	bne	1b	; process all irq's up to and including number 31
 	nop
 	
 	;; strange, we didn't get any set vector bits.. oh well, just return
 	
-	ba	Rexit
+	ba	_Rexit
 	nop
 
-do_shortcut:
-	test.d	[r1]
-	beq	Rexit
+_do_shortcut:
+	test.d	[$r1]
+	beq	_Rexit
 	nop
-	jump	[r1]		; jump to the irq handlers shortcut
+	jump	[$r1]		; jump to the irq handlers shortcut
 
-_do_sigtrap:
+do_sigtrap:
 	;; 
 	;; SIGTRAP the process that executed the break instruction.
 	;; Make a frame that Rexit in entry.S expects.
 	;;
-	move	brp,[sp=sp-16]		; Push BRP while faking a cpu status record.
-	push	srp			; Push subroutine return pointer.
-	push	dccr			; Push condition codes.
-	push	mof			; Push multiply overflow reg.
+	move	$brp, [$sp=$sp-16]	; Push BRP while faking a cpu status record.
+	push	$srp			; Push subroutine return pointer.
+	push	$dccr			; Push condition codes.
+	push	$mof			; Push multiply overflow reg.
 	di				; Need to disable irq's at this point.
-	subq	14*4,sp			; Make room for r0-r13.
-	movem	r13,[sp]		; Push the r0-r13 registers.
-	push	r10			; Push orig_r10.
-	clear.d	[sp=sp-4]		; Frametype - this is a normal stackframe.
+	subq	14*4, $sp		; Make room for r0-r13.
+	movem	$r13, [$sp]		; Push the r0-r13 registers.
+	push	$r10			; Push orig_r10.
+	clear.d	[$sp=$sp-4]		; Frametype - this is a normal stackframe.
 
-	movs.w	-8192,r9		; THREAD_SIZE == 8192
-	and.d	sp,r9
-	move.d	[r9+LTASK_PID],r10	; current->pid as arg1.
-	moveq	5,r11			; SIGTRAP as arg2.
-	jsr	_sys_kill       
-	jump	_ret_from_intr		; Use the return routine for interrupts.
+	movs.w	-8192,$r9		; THREAD_SIZE == 8192
+	and.d	$sp, $r9
+	move.d	[$r9+LTASK_PID], $r10	; current->pid as arg1.
+	moveq	5, $r11			; SIGTRAP as arg2.
+	jsr	sys_kill       
+	jump	ret_from_intr		; Use the return routine for interrupts.
 
-_gdb_handle_breakpoint:	
-	push	dccr
-	push	r0
+gdb_handle_breakpoint:	
+	push	$dccr
+	push	$r0
 #ifdef CONFIG_ETRAX_KGDB
-	move	dccr,r0			; U-flag not affected by previous insns. 
-	btstq	8,r0			; Test the U-flag.
+	move	$dccr, $r0		; U-flag not affected by previous insns. 
+	btstq	8, $r0			; Test the U-flag.
 	bmi	_ugdb_handle_breakpoint	; Go to user mode debugging. 
 	nop				; Empty delay slot (cannot pop r0 here). 
-	pop	r0			; Restore r0.
-	ba	_kgdb_handle_breakpoint	; Go to kernel debugging. 
-	pop	dccr			; Restore dccr in delay slot.
+	pop	$r0			; Restore r0.
+	ba	kgdb_handle_breakpoint	; Go to kernel debugging. 
+	pop	$dccr			; Restore dccr in delay slot.
 #endif
 	
 _ugdb_handle_breakpoint:	
-	move	brp,r0			; Use r0 temporarily for calculation.
-	subq	2,r0			; Set to address of previous instruction.
-	move	r0,brp
-	pop	r0			; Restore r0. 
-	ba	_do_sigtrap		; SIGTRAP the offending process. 
-	pop	dccr			; Restore dccr in delay slot.
+	move	$brp, $r0		; Use r0 temporarily for calculation.
+	subq	2, $r0			; Set to address of previous instruction.
+	move	$r0, $brp
+	pop	$r0			; Restore r0. 
+	ba	do_sigtrap		; SIGTRAP the offending process. 
+	pop	$dccr			; Restore dccr in delay slot.
 	
 	.data
 
-_hw_bp_trigs:
+hw_bp_trigs:
 	.space 64*4
-_hw_bp_trig_ptr:
-	.dword _hw_bp_trigs
+hw_bp_trig_ptr:
+	.dword hw_bp_trigs
 
 /*
  * This is the mechanism for creating a new kernel thread.
@@ -686,47 +708,47 @@ _hw_bp_trig_ptr:
 /*                   r10                r11         r12  */
 
 	.text
-	.global _kernel_thread
-_kernel_thread:
+	.global kernel_thread
+kernel_thread:
 
 	/* Save ARG for later.  */
-	move.d r11,r13
+	move.d $r11, $r13
 
 	/* r11 is argument 2 to clone, the flags */
-	move.d r12,r11
-	or.w	LCLONE_VM,r11
+	move.d  $r12, $r11
+	or.w	LCLONE_VM, $r11
 
 	/* Save FN for later.  */
-	move.d	r10,r12
+	move.d	$r10, $r12
 
 	/* r9 contains syscall number, to sys_clone */
-	movu.w	__NR_clone,r9
+	movu.w	__NR_clone, $r9
 
 	/* r10 is argument 1 to clone */
-	clear.d	r10
+	clear.d	$r10
 	
 	/* call sys_clone, this will fork */
 	break	13
 
 	/* parent or child? child returns 0 here. */
-	test.d	r10
+	test.d	$r10
 
 	/* jump if parent */
 	bne	1f
 	nop              /* delay slot */
 
 	/* set argument to function to call */
-	move.d	r13,r10
+	move.d	$r13, $r10
 
 	/* call specified function */
-	jsr	r12
+	jsr	$r12
 	/* If we ever return from the function, something bad has happened.  */
 
 	/* r9 is sys_exit syscall number */
-	movu.w	__NR_exit,r9
+	movu.w	__NR_exit, $r9
 
 	/* Give a really bad exit-value */
-	moveq	-1,r10
+	moveq	-1, $r10
 
 	/* call sys_exit, killing the child */
 	break	13
@@ -734,16 +756,8 @@ _kernel_thread:
 	ret
 	nop              /* delay slot */
 
-
-/* The file include/linux/linkage.h is wrong for compiling the
-   Linux/CRIS kernel.  We currently have C symbols in the kernel (only
-   the kernel) prefixed with _, hence, we need to redefine SYMBOL_NAME.  */
-
-#undef SYMBOL_NAME
-#define SYMBOL_NAME(X) _##X
-
 	.section .rodata,"a"
-_sys_call_table:	
+sys_call_table:	
 	.long SYMBOL_NAME(sys_ni_syscall)	/* 0  -  old "setup()" system call*/
 	.long SYMBOL_NAME(sys_exit)
 	.long SYMBOL_NAME(sys_fork)

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.m8xx_setup.c 1.29 08/30/01 09:01:04 trini
+ * BK Id: SCCS/s.m8xx_setup.c 1.32 09/27/01 09:01:12 trini
  *
  *  linux/arch/ppc/kernel/setup.c
  *
@@ -32,8 +32,6 @@
 #include <linux/init.h>
 #include <linux/blk.h>
 #include <linux/ioport.h>
-#include <asm/mpc8xx.h>  /* Before ide.h to avoid warning: `MAX_HWIFS' redefined */
-#include <linux/ide.h>
 #include <linux/bootmem.h>
 
 #include <asm/mmu.h>
@@ -41,7 +39,7 @@
 #include <asm/residual.h>
 #include <asm/io.h>
 #include <asm/pgtable.h>
-#include <asm/ide.h>
+#include <asm/mpc8xx.h>
 #include <asm/8xx_immap.h>
 #include <asm/machdep.h>
 
@@ -49,67 +47,12 @@
 #include "ppc8xx_pic.h"
 
 static int m8xx_set_rtc_time(unsigned long time);
-unsigned long m8xx_get_rtc_time(void);
+static unsigned long m8xx_get_rtc_time(void);
 void m8xx_calibrate_decr(void);
 
 unsigned char __res[sizeof(bd_t)];
-#if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 
-#ifdef	CONFIG_BLK_DEV_MPC8xx_IDE
-#include "../../../drivers/ide/ide_modes.h"
-
-static void m8xx_ide_tuneproc(ide_drive_t *drive, byte pio);
-
-typedef	struct ide_ioport_desc {
-	unsigned long	base_off;		/* Offset to PCMCIA memory */
-	ide_ioreg_t	reg_off[IDE_NR_PORTS];	/* controller reg. offsets */
-	int		irq;			/* IRQ	*/
-} ide_ioport_desc_t;
-
-ide_ioport_desc_t ioport_dsc[MAX_HWIFS] = {
-#ifdef IDE0_BASE_OFFSET
-	{ IDE0_BASE_OFFSET,
-	    {
-		IDE0_DATA_REG_OFFSET,
-		IDE0_ERROR_REG_OFFSET,
-		IDE0_NSECTOR_REG_OFFSET,
-		IDE0_SECTOR_REG_OFFSET,
-		IDE0_LCYL_REG_OFFSET,
-		IDE0_HCYL_REG_OFFSET,
-		IDE0_SELECT_REG_OFFSET,
-		IDE0_STATUS_REG_OFFSET,
-		IDE0_CONTROL_REG_OFFSET,
-		IDE0_IRQ_REG_OFFSET,
-	    },
-	    IDE0_INTERRUPT,
-	},
-# ifdef IDE1_BASE_OFFSET
-	{ IDE1_BASE_OFFSET,
-	    {
-		IDE1_DATA_REG_OFFSET,
-		IDE1_ERROR_REG_OFFSET,
-		IDE1_NSECTOR_REG_OFFSET,
-		IDE1_SECTOR_REG_OFFSET,
-		IDE1_LCYL_REG_OFFSET,
-		IDE1_HCYL_REG_OFFSET,
-		IDE1_SELECT_REG_OFFSET,
-		IDE1_STATUS_REG_OFFSET,
-		IDE1_CONTROL_REG_OFFSET,
-		IDE1_IRQ_REG_OFFSET,
-	    },
-	    IDE1_INTERRUPT,
-	},
-# endif /* IDE1_BASE_OFFSET */
-#endif	/* IDE0_BASE_OFFSET */
-};
-
-ide_pio_timings_t ide_pio_clocks[6];
-
-/* Make clock cycles and always round up */
-#define PCMCIA_MK_CLKS( t, T ) (( (t) * ((T)/1000000) + 999U ) / 1000U )
-
-#endif	/* CONFIG_BLK_DEV_MPC8xx_IDE */
-#endif	/* CONFIG_BLK_DEV_IDE || CONFIG_BLK_DEV_IDE_MODULE */
+extern void m8xx_ide_init();
 
 #ifdef CONFIG_BLK_DEV_RAM
 extern int rd_doload;		/* 1 = load ramdisk, 0 = don't load */
@@ -306,8 +249,8 @@ m8xx_setup_residual(char *buffer)
 
 	bp = (bd_t *)__res;
 			
-	len += sprintf(len+buffer,"clock\t\t: %dMHz\n"
-		       "bus clock\t: %dMHz\n",
+	len += sprintf(len+buffer,"clock\t\t: %ldMHz\n"
+		       "bus clock\t: %ldMHz\n",
 		       bp->bi_intfreq / 1000000,
 		       bp->bi_busfreq / 1000000);
 
@@ -344,214 +287,6 @@ m8xx_init_IRQ(void)
         enable_irq(ISA_BRIDGE_INT);
 #endif
 }
-
-#if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
-
-/*
- * IDE stuff.
- */
-#ifdef CONFIG_BLK_DEV_MPC8xx_IDE
-static void ide_interrupt_handler (void *dev)
-{
-}
-#endif
-
-static int
-m8xx_ide_default_irq(ide_ioreg_t base)
-{
-#ifdef CONFIG_BLK_DEV_MPC8xx_IDE
-	if (base >= MAX_HWIFS)
-		return 0;
-	
-	return (ioport_dsc[base].irq);
-#else
-        return 9;
-#endif
-}
-
-static ide_ioreg_t
-m8xx_ide_default_io_base(int index)
-{
-        return index;
-}
-
-static int
-m8xx_ide_request_irq(unsigned int irq,
-		       void (*handler)(int, void *, struct pt_regs *),
-		       unsigned long flags, 
-		       const char *device,
-		       void *dev_id)
-{
-	return request_8xxirq(irq, handler, flags, device, dev_id);
-}
-
-/* We can use an external IDE controller
- * or wire the IDE interface to the internal PCMCIA controller.
- *
- * See include/linux/ide.h for definition of hw_regs_t (p, base)
- */
-static void
-m8xx_ide_init_hwif_ports(hw_regs_t *hw, ide_ioreg_t data_port, 
-		ide_ioreg_t ctrl_port, int *irq)
-{
-	int i;
-#ifdef CONFIG_BLK_DEV_MPC8xx_IDE
-	ide_ioreg_t *p = hw->io_ports;
-	volatile pcmconf8xx_t	*pcmp;
-
-	static unsigned long pcmcia_base = 0;
-	unsigned long base;
-#endif
-
-#ifdef CONFIG_BLK_DEV_MPC8xx_IDE
-	*p = 0;
-	if (irq)
-		*irq = 0;
-
-	pcmp = (pcmconf8xx_t *)(&(((immap_t *)IMAP_ADDR)->im_pcmcia));
-
-	if (!pcmcia_base) {
-		/* relies PCMCIA registers being set up by firmware */
-		pcmcia_base = (unsigned long) ioremap(PCMCIA_MEM_ADDR,
-						      PCMCIA_MEM_SIZE);
-
-		/* Compute clock cycles for PIO timings */
-		for (i=0; i<6; ++i) {
-			bd_t	*binfo = (bd_t *)__res;
-
-			ide_pio_clocks[i].hold_time   =
-				PCMCIA_MK_CLKS (ide_pio_timings[i].hold_time,
-						binfo->bi_busfreq);
-			ide_pio_clocks[i].setup_time  =
-				PCMCIA_MK_CLKS (ide_pio_timings[i].setup_time,
-						binfo->bi_busfreq);
-			ide_pio_clocks[i].active_time =
-				PCMCIA_MK_CLKS (ide_pio_timings[i].active_time,
-						binfo->bi_busfreq);
-			ide_pio_clocks[i].cycle_time  =
-				PCMCIA_MK_CLKS (ide_pio_timings[i].cycle_time,
-						binfo->bi_busfreq);
-#if 0
-			printk ("PIO mode %d timings: %d/%d/%d => %d/%d/%d\n",
-				i,
-				ide_pio_clocks[i].setup_time,
-				ide_pio_clocks[i].active_time,
-				ide_pio_clocks[i].hold_time,
-				ide_pio_clocks[i].cycle_time,
-				ide_pio_timings[i].setup_time,
-				ide_pio_timings[i].active_time,
-				ide_pio_timings[i].hold_time,
-				ide_pio_timings[i].cycle_time);
-#endif
-		}
-	}
-
-	if (data_port >= MAX_HWIFS)
-		return;
-
-	base = pcmcia_base + ioport_dsc[data_port].base_off;
-
-# if (!defined(CONFIG_SPD823TS) && !defined(CONFIG_IVMS8))
-	/* SPD823TS and IVMS8 have a direct connection */
-	if (pcmp->pcmc_pipr & 0x18000000)
-		return;		/* No card in slot */
-# endif	/* CONFIG_SPD823TS, CONFIG_IVMS8 */
-
-	for (i = 0; i < IDE_NR_PORTS; ++i) {
-		*p++ = base + ioport_dsc[data_port].reg_off[i] - _IO_BASE;
-	}
-
-	if (irq) {
-	    *irq = ioport_dsc[data_port].irq;
-	}
-
-	/* register routine to tune PIO mode */
-	ide_hwifs[data_port].tuneproc = m8xx_ide_tuneproc;
-
-	/* Enable Harddisk Interrupt,
-	 * and make it edge sensitive
-	 */
-	hw->ack_intr = (ide_ack_intr_t *)ide_interrupt_handler;
-	((immap_t *)IMAP_ADDR)->im_siu_conf.sc_siel |=
-					(0x80000000 >> ioport_dsc[data_port].irq);
-
-#else	/* ! CONFIG_BLK_DEV_MPC8xx_IDE */
-	
-	/* Just a regular IDE drive on some I/O port.
-	*/
-	if (data_port == 0)
-		return;
-
-	for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; ++i)
-		hw->io_ports[i] = data_port + i - IDE_DATA_OFFSET;
-
-	hw->io_ports[IDE_CONTROL_OFFSET] = ctrl_port;
-        return;
-
-#endif	/* CONFIG_BLK_DEV_MPC8xx_IDE */
-}
-
-#ifdef CONFIG_BLK_DEV_MPC8xx_IDE
-
-/* PCMCIA Timing */
-#ifndef	PCMCIA_SHT
-#define PCMCIA_SHT(t)	((t & 0x0F)<<16)	/* Strobe Hold  Time 	*/
-#define PCMCIA_SST(t)	((t & 0x0F)<<12)	/* Strobe Setup Time	*/
-#define PCMCIA_SL(t) ((t==32) ? 0 : ((t & 0x1F)<<7)) /* Strobe Length	*/
-#endif
-
-/* Calculate PIO timings */
-static void
-m8xx_ide_tuneproc(ide_drive_t *drive, byte pio)
-{
-	volatile pcmconf8xx_t	*pcmp;
-	ide_pio_data_t d;
-	ulong timing, mask, reg;
-
-	pio = ide_get_best_pio_mode(drive, pio, 4, &d);
-
-#if 1
-	printk("%s[%d] %s: best PIO mode: %d\n",
-		__FILE__,__LINE__,__FUNCTION__, pio);
-#endif
-	pcmp = (pcmconf8xx_t *)(&(((immap_t *)IMAP_ADDR)->im_pcmcia));
-
-	mask = ~(PCMCIA_SHT(0xFF) | PCMCIA_SST(0xFF) | PCMCIA_SL(0xFF));
-
-	timing  = PCMCIA_SHT(ide_pio_clocks[pio].hold_time  )
-		| PCMCIA_SST(ide_pio_clocks[pio].setup_time )
-		| PCMCIA_SL (ide_pio_clocks[pio].active_time)
-		;
-
-#if 1
-	printk ("Setting timing bits 0x%08lx in PCMCIA controller\n", timing);
-#endif
-	if ((reg = pcmp->pcmc_por0 & mask) != 0)
-		pcmp->pcmc_por0 = reg | timing;
-
-	if ((reg = pcmp->pcmc_por1 & mask) != 0)
-		pcmp->pcmc_por1 = reg | timing;
-
-	if ((reg = pcmp->pcmc_por2 & mask) != 0)
-		pcmp->pcmc_por2 = reg | timing;
-
-	if ((reg = pcmp->pcmc_por3 & mask) != 0)
-		pcmp->pcmc_por3 = reg | timing;
-
-	if ((reg = pcmp->pcmc_por4 & mask) != 0)
-		pcmp->pcmc_por4 = reg | timing;
-
-	if ((reg = pcmp->pcmc_por5 & mask) != 0)
-		pcmp->pcmc_por5 = reg | timing;
-
-	if ((reg = pcmp->pcmc_por6 & mask) != 0)
-		pcmp->pcmc_por6 = reg | timing;
-
-	if ((reg = pcmp->pcmc_por7 & mask) != 0)
-		pcmp->pcmc_por7 = reg | timing;
-}
-#endif	/* CONFIG_BLK_DEV_MPC8xx_IDE */
-#endif	/* CONFIG_BLK_DEV_IDE || CONFIG_BLK_DEV_IDE_MODULE */
 
 /* -------------------------------------------------------------------- */
 
@@ -669,8 +404,6 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #endif
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
-        ppc_ide_md.default_irq = m8xx_ide_default_irq;
-        ppc_ide_md.default_io_base = m8xx_ide_default_io_base;
-        ppc_ide_md.ide_init_hwif = m8xx_ide_init_hwif_ports;
+	m8xx_ide_init();
 #endif		
 }

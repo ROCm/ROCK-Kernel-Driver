@@ -2410,7 +2410,7 @@ static void suspend_hc(struct uhci *uhci)
 {
 	unsigned int io_addr = uhci->io_addr;
 
-	dbg("suspend_hc");
+	dbg("%x: suspend_hc", io_addr);
 
 	outw(USBCMD_EGSM, io_addr + USBCMD);
 
@@ -2422,7 +2422,7 @@ static void wakeup_hc(struct uhci *uhci)
 	unsigned int io_addr = uhci->io_addr;
 	unsigned int status;
 
-	dbg("wakeup_hc");
+	dbg("%x: wakeup_hc", io_addr);
 
 	outw(0, io_addr + USBCMD);
 	
@@ -2564,7 +2564,7 @@ static void release_uhci(struct uhci *uhci)
  *  - The fourth queue is the bandwidth reclamation queue, which loops back
  *    to the high speed control queue.
  */
-static int alloc_uhci(struct pci_dev *dev, int irq, unsigned int io_addr, unsigned int io_size)
+static int alloc_uhci(struct pci_dev *dev, unsigned int io_addr, unsigned int io_size)
 {
 	struct uhci *uhci;
 	int retval = -EBUSY;
@@ -2602,9 +2602,9 @@ static int alloc_uhci(struct pci_dev *dev, int irq, unsigned int io_addr, unsign
 	pci_set_master(dev);
 
 #ifndef __sparc__
-	sprintf(buf, "%d", irq);
+	sprintf(buf, "%d", dev->irq);
 #else
-	bufp = __irq_itoa(irq);
+	bufp = __irq_itoa(dev->irq);
 #endif
 	printk(KERN_INFO __FILE__ ": USB UHCI at I/O 0x%x, IRQ %s\n",
 		io_addr, bufp);
@@ -2828,13 +2828,13 @@ static int alloc_uhci(struct pci_dev *dev, int irq, unsigned int io_addr, unsign
 
 	start_hc(uhci);
 
-	if (request_irq(irq, uhci_interrupt, SA_SHIRQ, "usb-uhci", uhci))
+	if (request_irq(dev->irq, uhci_interrupt, SA_SHIRQ, "usb-uhci", uhci))
 		goto err_request_irq;
 
-	uhci->irq = irq;
+	uhci->irq = dev->irq;
 
 	/* disable legacy emulation */
-	pci_write_config_word(uhci->dev, USBLEGSUP, 0);
+	pci_write_config_word(uhci->dev, USBLEGSUP, USBLEGSUP_DEFAULT);
 
 	usb_connect(uhci->rh.dev);
 
@@ -2925,7 +2925,7 @@ static int __devinit uhci_pci_probe(struct pci_dev *dev, const struct pci_device
 		if (!(pci_resource_flags(dev, i) & IORESOURCE_IO))
 			continue;
 
-		return alloc_uhci(dev, dev->irq, io_addr, io_size);
+		return alloc_uhci(dev, io_addr, io_size);
 	}
 
 	return -ENODEV;
@@ -2958,7 +2958,7 @@ static void __devexit uhci_pci_remove(struct pci_dev *dev)
 #ifdef CONFIG_PM
 static int uhci_pci_suspend(struct pci_dev *dev, u32 state)
 {
-	reset_hc((struct uhci *) dev->driver_data);
+	suspend_hc((struct uhci *) dev->driver_data);
 	return 0;
 }
 

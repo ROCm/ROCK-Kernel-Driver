@@ -1755,3 +1755,7 @@ Changes for patch v192
 - Ported to kernel 2.4.10-pre11
 
 - Set inode->i_mapping->a_ops for block nodes in <get_vfs_inode>
+===============================================================================
+Changes for patch v193
+
+- Went back to global rwsem for symlinks (refcount scheme no good)

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.commproc.h 1.13 06/15/01 13:00:20 paulus
+ * BK Id: SCCS/s.commproc.h 1.16 09/27/01 12:41:09 trini
  */
 
 /*
@@ -706,7 +706,7 @@ typedef struct scc_uart {
 #define SCU_PMSR_RPM		((ushort)0x000c)
 #define SCU_PMSR_REVP		((ushort)0x0008)
 #define SCU_PMSR_TPM		((ushort)0x0003)
-#define SCU_PMSR_TEVP		((ushort)0x0003)
+#define SCU_PMSR_TEVP		((ushort)0x0002)
 
 /* CPM Transparent mode SCC.
  */

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.iic.c 1.8 05/18/01 07:54:04 patch
+ * BK Id: SCCS/s.iic.c 1.10 09/14/01 19:30:13 trini
  */
 
 /* Minimal support functions to read configuration from IIC EEPROMS
@@ -9,7 +9,7 @@
 #include <linux/types.h>
 #include <asm/uaccess.h>
 #include <asm/mpc8xx.h>
-#include "../../8xx_io/commproc.h"
+#include <asm/commproc.h>
 
 
 /* IIC functions.

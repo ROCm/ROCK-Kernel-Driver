@@ -14,6 +14,15 @@ bool 'Prompt for development and/or incomplete code/drivers' CONFIG_EXPERIMENTAL
 endmenu
 
 mainmenu_option next_comment
+comment 'Loadable module support'
+bool 'Enable loadable module support' CONFIG_MODULES
+if [ "$CONFIG_MODULES" = "y" ]; then
+   bool '  Set version information on all module symbols' CONFIG_MODVERSIONS
+   bool '  Kernel module loader' CONFIG_KMOD
+fi
+endmenu
+
+mainmenu_option next_comment
 comment 'General setup'
 
 bool 'Networking support' CONFIG_NET
@@ -49,10 +58,8 @@ fi
 int 'DRAM size (dec, in MB)' CONFIG_ETRAX_DRAM_SIZE 8
 
 int 'Buswidth of flash in bytes' CONFIG_ETRAX_FLASH_BUSWIDTH 2
-bool 'Use flash mirroring (for cramfs)' CONFIG_ETRAX_FLASH_MIRRORING_FOR_CRAMFS
-if [ "$CONFIG_ETRAX_FLASH_MIRRORING_FOR_CRAMFS" = "y" ]; then
-	int '  Individual flash chip size (in MB)' CONFIG_ETRAX_FLASH_SIZE 2
-fi
+
+string 'Root device name' CONFIG_ETRAX_ROOT_DEVICE "/dev/mtdblock3"
 
 choice 'Product LED port' \
 	"Port-PA-LEDs	CONFIG_ETRAX_PA_LEDS	\

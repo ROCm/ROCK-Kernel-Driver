@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.process.c 1.27 08/28/01 22:01:21 paulus
+ * BK Id: SCCS/s.process.c 1.31 10/02/01 09:51:41 paulus
  */
 /*
  *  linux/arch/ppc/kernel/process.c
@@ -226,8 +226,10 @@ _switch_to(struct task_struct *prev, struct task_struct *new,
 	if ((prev->thread.regs && (prev->thread.regs->msr & MSR_VEC)))
 		giveup_altivec(prev);
 #endif /* CONFIG_ALTIVEC */	
-	current_set[smp_processor_id()] = new;
 #endif /* CONFIG_SMP */
+
+	current_set[smp_processor_id()] = new;
+
 	/* Avoid the trap.  On smp this this never happens since
 	 * we don't set last_task_used_altivec -- Cort
 	 */

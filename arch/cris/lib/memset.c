@@ -56,12 +56,12 @@ void *memset(void *pdst,
 
   /* Ugh.  This is fragile at best.  Check with newer GCC releases, if
      they compile cascaded "x |= x << 8" sanely! */
-  __asm__("movu.b %0,r13\n\t"
-          "lslq 8,r13\n\t"
-	  "move.b %0,r13\n\t"
-	  "move.d r13,%0\n\t"
-	  "lslq 16,r13\n\t"
-	  "or.d r13,%0"
+  __asm__("movu.b %0,$r13\n\t"
+          "lslq 8,$r13\n\t"
+	  "move.b %0,$r13\n\t"
+	  "move.d $r13,%0\n\t"
+	  "lslq 16,$r13\n\t"
+	  "or.d $r13,%0"
           : "=r" (lc) : "0" (lc) : "r13");
 
   {
@@ -118,36 +118,36 @@ void *memset(void *pdst,
 	;; Save the registers we'll clobber in the movem process
 	;; on the stack.  Don't mention them to gcc, it will only be
 	;; upset.
-	subq 	11*4,sp
-        movem   r10,[sp]
+	subq 	11*4,$sp
+        movem   $r10,[$sp]
 
-        move.d  r11,r0
-        move.d  r11,r1
-        move.d  r11,r2
-        move.d  r11,r3
-        move.d  r11,r4
-        move.d  r11,r5
-        move.d  r11,r6
-        move.d  r11,r7
-        move.d  r11,r8
-        move.d  r11,r9
-        move.d  r11,r10
+        move.d  $r11,$r0
+        move.d  $r11,$r1
+        move.d  $r11,$r2
+        move.d  $r11,$r3
+        move.d  $r11,$r4
+        move.d  $r11,$r5
+        move.d  $r11,$r6
+        move.d  $r11,$r7
+        move.d  $r11,$r8
+        move.d  $r11,$r9
+        move.d  $r11,$r10
 
         ;; Now we've got this:
 	;; r13 - dst
 	;; r12 - n
 	
         ;; Update n for the first loop
-        subq    12*4,r12
+        subq    12*4,$r12
 0:
-        subq   12*4,r12
+        subq   12*4,$r12
         bge     0b
-	movem	r11,[r13+]
+	movem	$r11,[$r13+]
 
-        addq   12*4,r12  ;; compensate for last loop underflowing n
+        addq   12*4,$r12  ;; compensate for last loop underflowing n
 
 	;; Restore registers from stack
-        movem [sp+],r10" 
+        movem [$sp+],$r10" 
 
      /* Outputs */ : "=r" (dst), "=r" (n)
      /* Inputs */ : "0" (dst), "1" (n), "r" (lc));

@@ -372,6 +372,10 @@ rebalance:
 		return NULL;
 	}
 
+	/* Atomic allocations - we can't balance anything */
+	if (!(gfp_mask & __GFP_WAIT))
+		return NULL;
+
 	page = balance_classzone(classzone, gfp_mask, order, &freed);
 	if (page)
 		return page;
@@ -388,6 +392,10 @@ rebalance:
 				return page;
 		}
 	}
+
+	/* Don't let big-order allocations loop */
+	if (order)
+		return NULL;
 
 	/* Yield for kswapd, and try again */
 	current->policy |= SCHED_YIELD;

@@ -11,6 +11,12 @@
  * partition split defined below.
  *
  * $Log: axisflashmap.c,v $
+ * Revision 1.14  2001/09/21 07:14:10  jonashg
+ * Made root filesystem (cramfs) use mtdblock driver when booting from flash.
+ *
+ * Revision 1.13  2001/08/15 13:57:35  jonashg
+ * Entire MTD updated to the linux 2.4.7 version.
+ *
  * Revision 1.12  2001/06/11 09:50:30  jonashg
  * Oops, 2MB is 0x200000 bytes.
  *
@@ -83,6 +89,8 @@
  */
 
 #define WINDOW_SIZE  (128 * 1024 * 1024)
+
+extern unsigned long romfs_start, romfs_length, romfs_in_flash; /* From head.S */
 
 /* 
  * Map driver
@@ -229,11 +237,11 @@ init_axis_flash(void)
 	printk(KERN_NOTICE "Axis flash mapping: %x at %x\n",
 	       WINDOW_SIZE, FLASH_CACHED_ADDR);
 
-	mymtd = (struct mtd_info *)do_cfi_probe(&axis_map);
+	mymtd = (struct mtd_info *)do_map_probe("cfi", &axis_map);
 
 #ifdef CONFIG_MTD_AMDSTD
 	if (!mymtd) {
-		mymtd = (struct mtd_info *)do_amd_flash_probe(&axis_map);
+		mymtd = (struct mtd_info *)do_map_probe("amd_flash", &axis_map);
 	}
 #endif
 
@@ -310,11 +318,23 @@ init_axis_flash(void)
 		use_default_ptable = !ptable_ok;
 	}
 
-	if(use_default_ptable) {
+	if (use_default_ptable) {
 		printk(" Using default partition table\n");
 		return add_mtd_partitions(mymtd, axis_default_partitions,
 					  NUM_DEFAULT_PARTITIONS);
 	} else {
+		if (romfs_in_flash) {
+			axis_partitions[pidx].name = "romfs";
+			axis_partitions[pidx].size = romfs_length;
+			axis_partitions[pidx].offset = romfs_start -
+						       FLASH_CACHED_ADDR;
+			axis_partitions[pidx].mask_flags |= MTD_WRITEABLE;
+
+			printk(" Adding readonly partition for romfs image:\n");
+			printk(pmsg, pidx, axis_partitions[pidx].offset,
+			       axis_partitions[pidx].size);
+			pidx++;
+		}
 		return add_mtd_partitions(mymtd, axis_partitions, pidx);
 	}		
 }

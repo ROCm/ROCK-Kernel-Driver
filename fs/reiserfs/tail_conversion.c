@@ -92,12 +92,9 @@ int direct2indirect (struct reiserfs_transaction_handle *th, struct inode * inod
 	    reiserfs_panic (sb, "PAP-14050: direct2indirect: "
 			    "direct item (%k) not found", &end_key);
 	p_le_ih = PATH_PITEM_HEAD (path);
-#ifdef CONFIG_REISERFS_CHECK
-	if (!is_direct_le_ih (p_le_ih))
-	    reiserfs_panic (sb, "vs-14055: direct2indirect: "
-			    "direct item expected(%k), found %h", 
-				&end_key, p_le_ih);
-#endif
+	RFALSE( !is_direct_le_ih (p_le_ih),
+		"vs-14055: direct item expected(%k), found %h", 
+		&end_key, p_le_ih);
 	tail_size = (le_ih_k_offset (p_le_ih) & (n_blk_size - 1))
 	    + ih_item_len(p_le_ih) - 1;
 

@@ -139,7 +139,6 @@ drop_pte:
 	}
 
 	/* No swap space left */
-	swap_list_unlock();
 	set_pte(page_table, pte);
 	UnlockPage(page);
 	return 0;

@@ -738,6 +738,7 @@ CONFIG_USB_STORAGE=y
 # CONFIG_USB_MDC800 is not set
 # CONFIG_USB_SCANNER is not set
 # CONFIG_USB_MICROTEK is not set
+# CONFIG_USB_HPUSBSCSI is not set
 
 #
 # USB Multimedia devices

@@ -39,19 +39,20 @@
 #define ERRbadshare 32          /* Share mode on file conflict with open mode */
 #define ERRlock 33              /* Lock request conflicts with existing lock */
 #define ERRfilexists 80         /* File in operation already exists */
-#define ERRinvalidparam 87      /* ERROR_INVALID_PARAMETER */
-#define ERRdiskfull 112         /* ERROR_DISK_FULL */
-#define ERRinvalidname 123      /* ERROR_INVALID_NAME */
-#define ERRdirnotempty 145      /* ERROR_DIR_NOT_EMPTY */
-#define ERRnotlocked 158        /* ERROR_NOT_LOCKED */
-#define ERRexists 183           /* ERROR_ALREADY_EXISTS, see also 80 */
 #define ERRbadpipe 230          /* Named pipe invalid */
 #define ERRpipebusy 231         /* All instances of pipe are busy */
 #define ERRpipeclosing 232      /* named pipe close in progress */
 #define ERRnotconnected 233     /* No process on other end of named pipe */
 #define ERRmoredata 234         /* More data to be returned */
-#define ERROR_EAS_DIDNT_FIT 275 /* Extended attributes didn't fit */
-#define ERROR_EAS_NOT_SUPPORTED 282 /* Extended attributes not supported */
+
+#define ERROR_INVALID_PARAMETER	 87
+#define ERROR_DISK_FULL		112
+#define ERROR_INVALID_NAME	123
+#define ERROR_DIR_NOT_EMPTY	145
+#define ERROR_NOT_LOCKED	158
+#define ERROR_ALREADY_EXISTS	183  /* see also 80 ? */
+#define ERROR_EAS_DIDNT_FIT	275 /* Extended attributes didn't fit */
+#define ERROR_EAS_NOT_SUPPORTED	282 /* Extended attributes not supported */
 
 /* Error codes for the ERRSRV class */
 

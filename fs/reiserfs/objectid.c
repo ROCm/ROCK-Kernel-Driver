@@ -26,6 +26,9 @@ static void check_objectid_map (struct super_block * s, __u32 * map)
     // FIXME: add something else here
 }
 
+#else
+static void check_objectid_map (struct super_block * s, __u32 * map)
+{;}
 #endif
 
 
@@ -53,9 +56,7 @@ __u32 reiserfs_get_unused_objectid (struct reiserfs_transaction_handle *th)
     __u32 unused_objectid;
 
 
-#ifdef CONFIG_REISERFS_CHECK
     check_objectid_map (s, map);
-#endif
 
     reiserfs_prepare_for_journal(s, SB_BUFFER_WITH_SB(s), 1) ;
                                 /* comment needed -Hans */
@@ -101,9 +102,7 @@ void reiserfs_release_objectid (struct reiserfs_transaction_handle *th,
     int i = 0;
 
     //return;
-#ifdef CONFIG_REISERFS_CHECK
     check_objectid_map (s, map);
-#endif
 
     reiserfs_prepare_for_journal(s, SB_BUFFER_WITH_SB(s), 1) ;
     journal_mark_dirty(th, s, SB_BUFFER_WITH_SB (s)); 
@@ -129,13 +128,10 @@ void reiserfs_release_objectid (struct reiserfs_transaction_handle *th,
 		//disk_sb->s_oid_cursize -= 2;
 		rs->s_oid_cursize = cpu_to_le16 (le16_to_cpu (rs->s_oid_cursize) - 2);
 
-#ifdef CONFIG_REISERFS_CHECK
-		if (le16_to_cpu (rs->s_oid_cursize) < 2 || 
-		    le16_to_cpu (rs->s_oid_cursize) > le16_to_cpu (rs->s_oid_maxsize))
-		    reiserfs_panic (s, "vs-15005: reiserfs_release_objectid: "
-				    "objectid map corrupted cur_size == %d (max == %d)",
-				    le16_to_cpu (rs->s_oid_cursize), le16_to_cpu (rs->s_oid_maxsize));
-#endif
+		RFALSE( le16_to_cpu (rs->s_oid_cursize) < 2 || 
+			le16_to_cpu (rs->s_oid_cursize) > le16_to_cpu (rs->s_oid_maxsize),
+			"vs-15005: objectid map corrupted cur_size == %d (max == %d)",
+			le16_to_cpu (rs->s_oid_cursize), le16_to_cpu (rs->s_oid_maxsize));
 	    }
 	    return;
 	}

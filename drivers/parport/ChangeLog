@@ -1,3 +1,23 @@
+2001-10-08  David C. Hansen  <haveblue@us.ibm.com>
+
+	* share.c: Make driverlist_lock and parportlist_lock static.
+
+2001-10-08  Philip Blundell  <philb@gnu.org>
+
+	* parport_pc.c: New modular parameter verbose_logging.
+	Make port->modes indicate the modes that we are prepared to use,
+	rather than the modes that are available.
+
+2001-10-07  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc.c (parport_pc_probe_port): Fix memory leak spotted by
+	Kipp Cannon.
+
+2001-10-07  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_serial.c: Remove NetMos support, since it causes problems
+	for some people.
+
 2001-08-30  Tim Waugh  <twaugh@redhat.com>
 
 	* parport_serial.c (parport_serial_pci_probe): Clean-up on partial

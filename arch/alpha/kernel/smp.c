@@ -171,13 +171,6 @@ smp_callin(void)
 	/* Set interrupt vector.  */
 	wrent(entInt, 0);
 
-	/* Setup the scheduler for this processor.  */
-	init_idle();
-
-	/* ??? This should be in init_idle.  */
-	atomic_inc(&init_mm.mm_count);
-	current->active_mm = &init_mm;
-
 	/* Get our local ticker going. */
 	smp_setup_percpu_timer(cpuid);
 
@@ -207,6 +200,12 @@ smp_callin(void)
 	DBGS(("smp_callin: commencing CPU %d current %p\n",
 	      cpuid, current));
 
+	/* Setup the scheduler for this processor.  */
+	init_idle();
+
+	/* ??? This should be in init_idle.  */
+	atomic_inc(&init_mm.mm_count);
+	current->active_mm = &init_mm;
 	/* Do nothing.  */
 	cpu_idle();
 }

@@ -1,4 +1,3 @@
-/* $Id: checksum.h,v 1.4 2001/06/28 03:58:36 hp Exp $ */
 /* TODO: csum_tcpudp_magic could be speeded up, and csum_fold as well */
 
 #ifndef _CRIS_CHECKSUM_H

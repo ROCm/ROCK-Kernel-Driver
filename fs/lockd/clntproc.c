@@ -18,6 +18,7 @@
 #include <linux/lockd/sm_inter.h>
 
 #define NLMDBG_FACILITY		NLMDBG_CLIENT
+#define NLMCLNT_GRACE_WAIT	(5*HZ)
 
 static int	nlmclnt_test(struct nlm_rqst *, struct file_lock *);
 static int	nlmclnt_lock(struct nlm_rqst *, struct file_lock *);
@@ -557,19 +558,22 @@ nlmclnt_unlock_callback(struct rpc_task *task)
 
 	if (task->tk_status < 0) {
 		dprintk("lockd: unlock failed (err = %d)\n", -task->tk_status);
+		goto retry_rebind;
+	}
+	if (status == NLM_LCK_DENIED_GRACE_PERIOD) {
+		rpc_delay(task, NLMCLNT_GRACE_WAIT);
 		goto retry_unlock;
 	}
-	if (status != NLM_LCK_GRANTED
-	 && status != NLM_LCK_DENIED_GRACE_PERIOD) {
-		printk("lockd: unexpected unlock status: %d\n", status);
-	}
+	if (status != NLM_LCK_GRANTED)
+		printk(KERN_WARNING "lockd: unexpected unlock status: %d\n", status);
 
 die:
 	nlm_release_host(req->a_host);
 	kfree(req);
 	return;
- retry_unlock:
+ retry_rebind:
 	nlm_rebind_host(req->a_host);
+ retry_unlock:
 	rpc_restart_call(task);
 }
 

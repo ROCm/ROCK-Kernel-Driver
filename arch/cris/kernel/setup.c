@@ -1,4 +1,4 @@
-/* $Id: setup.c,v 1.18 2001/06/28 04:47:16 hp Exp $
+/* $Id: setup.c,v 1.21 2001/10/01 14:45:35 bjornw Exp $
  *
  *  linux/arch/cris/kernel/setup.c
  *
@@ -166,7 +166,17 @@ setup_arch(char **cmdline_p)
 	   saving anything that might be there.  */
 
 	*cmdline_p = command_line;
-	strcpy(command_line, "root=/dev/rom"); /* use the appended romdisk as root */
+
+	if (romfs_in_flash) {
+		strncpy(command_line, "root=", COMMAND_LINE_SIZE);
+		strncpy(command_line+5, CONFIG_ETRAX_ROOT_DEVICE,
+			COMMAND_LINE_SIZE-5);
+
+		/* Save command line copy for /proc/cmdline */
+
+		memcpy(saved_command_line, command_line, COMMAND_LINE_SIZE);
+		saved_command_line[COMMAND_LINE_SIZE-1] = '\0';
+	}
 
 	/* give credit for the CRIS port */
 
@@ -213,15 +223,10 @@ static struct cpu_info {
 int get_cpuinfo(char *buffer)
 {
 	int revision;
-#ifndef CONFIG_SVINTO_SIM
-	unsigned char tmp;
 
-	__asm__ volatile ("move vr,%0" : "=rm" (tmp));
-	revision = tmp;
-#else
-        /* Fake a revision for the simulator */
-	revision = 7;
-#endif
+	/* read the version register in the CPU and print some stuff */
+
+	revision = rdvr();
 
 	return sprintf(buffer,
 		       "cpu\t\t: CRIS\n"

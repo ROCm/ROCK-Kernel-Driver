@@ -2004,12 +2004,8 @@ static int do_journal_begin_r(struct reiserfs_transaction_handle *th, struct sup
   int old_trans_id  ;
 
   reiserfs_check_lock_depth("journal_begin") ;
-#ifdef CONFIG_REISERFS_CHECK
-  if (p_s_sb->s_flags & MS_RDONLY) {
-    printk("clm-2078: calling journal_begin on readonly FS\n") ;
-    BUG() ;
-  }
-#endif
+  RFALSE( p_s_sb->s_flags & MS_RDONLY, 
+	  "clm-2078: calling journal_begin on readonly FS") ;
 
   if (reiserfs_dont_log(p_s_sb)) {
     th->t_super = p_s_sb ; /* others will check this for the don't log flag */
@@ -2641,12 +2637,8 @@ void reiserfs_prepare_for_journal(struct super_block *p_s_sb,
     }
     set_bit(BH_JPrepared, &bh->b_state) ;
     if (wait) {
-#ifdef CONFIG_REISERFS_CHECK
-      if (buffer_locked(bh) && cur_tb != NULL) {
-	printk("reiserfs_prepare_for_journal, waiting while do_balance was running\n") ;
-        BUG() ;
-      }
-#endif
+      RFALSE( buffer_locked(bh) && cur_tb != NULL,
+	      "waiting while do_balance was running\n") ;
       wait_on_buffer(bh) ;
     }
     retry_count++ ;

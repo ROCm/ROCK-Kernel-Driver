@@ -1,4 +1,4 @@
-/* $Id: testrescue.S,v 1.2 2001/04/18 12:05:07 bjornw Exp $
+/* $Id: testrescue.S,v 1.3 2001/10/03 17:15:15 bjornw Exp $
  *
  * Simple testcode to download by the rescue block.
  * Just lits some LEDs to show it was downloaded correctly.
@@ -13,10 +13,10 @@
 
 	nop
 	nop
-	moveq	-1, r2
-	move.b	r2, [R_PORT_PA_DIR]
-	moveq	0, r2
-	move.b	r2, [R_PORT_PA_DATA]	
+	moveq	-1, $r2
+	move.b	$r2, [R_PORT_PA_DIR]
+	moveq	0, $r2
+	move.b	$r2, [R_PORT_PA_DATA]	
 
 endless:
 	nop

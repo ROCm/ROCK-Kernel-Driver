@@ -3,9 +3,6 @@
  *
  * Copyright (c) 2000, 2001 Axis Communications AB
  *
- * Authors:   Bjorn Wesen (bjornw@axis.com)
- *
- * $Id: irq.h,v 1.13 2001/07/06 18:52:08 hp Exp $
  */
 
 #ifndef _ASM_IRQ_H
@@ -101,25 +98,25 @@ void set_break_vector(int n, irqvectptr addr);
 /* SAVE_ALL saves registers so they match pt_regs */
 
 #define SAVE_ALL \
-  "move irp,[sp=sp-16]\n\t" /* push instruction pointer and fake SBFS struct */ \
-  "push srp\n\t"       /* push subroutine return pointer */ \
-  "push dccr\n\t"      /* push condition codes */ \
-  "push mof\n\t"       /* push multiply overflow reg */ \
+  "move $irp,[$sp=$sp-16]\n\t" /* push instruction pointer and fake SBFS struct */ \
+  "push $srp\n\t"       /* push subroutine return pointer */ \
+  "push $dccr\n\t"      /* push condition codes */ \
+  "push $mof\n\t"       /* push multiply overflow reg */ \
   "di\n\t"             /* need to disable irq's at this point */\
-  "subq 14*4,sp\n\t"   /* make room for r0-r13 */ \
-  "movem r13,[sp]\n\t" /* push the r0-r13 registers */ \
-  "push r10\n\t"       /* push orig_r10 */ \
-  "clear.d [sp=sp-4]\n\t"  /* frametype - this is a normal stackframe */
+  "subq 14*4,$sp\n\t"   /* make room for r0-r13 */ \
+  "movem $r13,[$sp]\n\t" /* push the r0-r13 registers */ \
+  "push $r10\n\t"       /* push orig_r10 */ \
+  "clear.d [$sp=$sp-4]\n\t"  /* frametype - this is a normal stackframe */
 
   /* BLOCK_IRQ and UNBLOCK_IRQ do the same as mask_irq and unmask_irq in irq.c */
 
 #define BLOCK_IRQ(mask,nr) \
-  "move.d " #mask ",r0\n\t" \
-  "move.d r0,[0xb00000d8]\n\t" 
+  "move.d " #mask ",$r0\n\t" \
+  "move.d $r0,[0xb00000d8]\n\t" 
   
 #define UNBLOCK_IRQ(mask) \
-  "move.d " #mask ",r0\n\t" \
-  "move.d r0,[0xb00000dc]\n\t" 
+  "move.d " #mask ",$r0\n\t" \
+  "move.d $r0,[0xb00000dc]\n\t" 
 
 #define IRQ_NAME2(nr) nr##_interrupt(void)
 #define IRQ_NAME(nr) IRQ_NAME2(IRQ##nr)
@@ -137,20 +134,20 @@ void sIRQ_NAME(nr); \
 void BAD_IRQ_NAME(nr); \
 __asm__ ( \
           ".text\n\t" \
-          "_IRQ" #nr "_interrupt:\n\t" \
+          "IRQ" #nr "_interrupt:\n\t" \
 	  SAVE_ALL \
-	  "_sIRQ" #nr "_interrupt:\n\t" /* shortcut for the multiple irq handler */ \
+	  "sIRQ" #nr "_interrupt:\n\t" /* shortcut for the multiple irq handler */ \
 	  BLOCK_IRQ(mask,nr) /* this must be done to prevent irq loops when we ei later */ \
-	  "moveq "#nr",r10\n\t" \
-	  "move.d sp,r11\n\t" \
-	  "jsr _do_IRQ\n\t" /* irq.c, r10 and r11 are arguments */ \
+	  "moveq "#nr",$r10\n\t" \
+	  "move.d $sp,$r11\n\t" \
+	  "jsr do_IRQ\n\t" /* irq.c, r10 and r11 are arguments */ \
 	  UNBLOCK_IRQ(mask) \
-	  "moveq 0,r9\n\t" /* make ret_from_intr realise we came from an irq */ \
-	  "jump _ret_from_intr\n\t" \
-          "_bad_IRQ" #nr "_interrupt:\n\t" \
-	  "push r0\n\t" \
+	  "moveq 0,$r9\n\t" /* make ret_from_intr realise we came from an irq */ \
+	  "jump ret_from_intr\n\t" \
+          "bad_IRQ" #nr "_interrupt:\n\t" \
+	  "push $r0\n\t" \
 	  BLOCK_IRQ(mask,nr) \
-	  "pop r0\n\t" \
+	  "pop $r0\n\t" \
           "reti\n\t" \
           "nop\n");
 

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.oak.h 1.7 05/17/01 18:14:25 cort
+ * BK Id: SCCS/s.oak.h 1.10 09/14/01 17:37:56 trini
  */
 /*
  *
@@ -19,11 +19,6 @@
 #define	__OAK_H__
 
 #include <asm/irq.h>
-
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 #define _IO_BASE	0
 #define _ISA_MEM_BASE	0
@@ -48,6 +43,7 @@ extern "C" {
 #define	OAKNET_INT		AIC_INT27
 #define	OAKSERIAL_INT		AIC_INT28
 
+#ifndef __ASSEMBLY__
 /*
  * Data structure defining board information maintained by the boot
  * ROM on IBM's "Oak" evaluation board. An effort has been made to
@@ -64,15 +60,6 @@ typedef struct board_info {
 	unsigned int	 bi_busfreq;		/* Bus speed, in Hz */
 } bd_t;
 
-
-#ifdef __cplusplus
-}
-#endif
-
-/* Generic 4xx type
-*/
-#define _MACH_4xx (_MACH_oak)
-
-
+#endif /* !__ASSEMBLY__ */
 #endif /* __OAK_H__ */
 #endif /* __KERNEL__ */

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.m8260_setup.c 1.24 08/20/01 15:25:16 paulus
+ * BK Id: SCCS/s.m8260_setup.c 1.26 09/22/01 11:33:22 trini
  */
 /*
  *  linux/arch/ppc/kernel/setup.c
@@ -270,13 +270,6 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #ifdef CONFIG_MAGIC_SYSRQ
 	ppc_md.kbd_sysrq_xlate	 = NULL;
 #endif
-
-#if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
-        ppc_ide_md.default_irq = m8xx_ide_default_irq;
-        ppc_ide_md.default_io_base = m8xx_ide_default_io_base;
-        ppc_ide_md.ide_init_hwif = m8xx_ide_init_hwif_ports;
-        ppc_ide_md.ide_request_irq = m8xx_ide_request_irq;
-#endif		
 }
 
 /* Mainly for ksyms.

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.ide.h 1.13 08/20/01 15:25:16 paulus
+ * BK Id: SCCS/s.ide.h 1.16 09/28/01 07:54:24 trini
  */
 /*
  *  linux/include/asm-ppc/ide.h
@@ -17,6 +17,7 @@
 
 #include <linux/sched.h>
 #include <asm/processor.h>
+#include <asm/mpc8xx.h>
 
 #ifndef MAX_HWIFS
 #define MAX_HWIFS	8
@@ -138,8 +139,9 @@ typedef union {
 
 /*
  * The following are not needed for the non-m68k ports
+ * unless direct IDE on 8xx
  */
-#ifdef CONFIG_APUS
+#if (defined CONFIG_APUS || defined CONFIG_BLK_DEV_MPC8xx_IDE )
 #define ide_ack_intr(hwif) (hwif->hw.ack_intr ? hwif->hw.ack_intr(hwif) : 1)
 #else
 #define ide_ack_intr(hwif)		(1)

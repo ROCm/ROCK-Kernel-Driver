@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.commproc.c 1.11 06/15/01 13:00:20 paulus
+ * BK Id: SCCS/s.commproc.c 1.13 09/14/01 18:01:16 trini
  */
 
 /*
@@ -36,7 +36,7 @@
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/8xx_immap.h>
-#include "commproc.h"
+#include <asm/commproc.h>
 
 static	uint	dp_alloc_base;	/* Starting offset in DP ram */
 static	uint	dp_alloc_top;	/* Max offset + 1 */

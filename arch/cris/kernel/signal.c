@@ -64,6 +64,7 @@ int copy_siginfo_to_user(siginfo_t *to, siginfo_t *from)
 		err |= __put_user(from->si_pid, &to->si_pid);
 		switch (from->si_code >> 16) {
 		case __SI_FAULT >> 16:
+                        err |= __put_user(from->si_addr, &to->si_addr);
 			break;
 		case __SI_CHLD >> 16:
 			err |= __put_user(from->si_utime, &to->si_utime);
@@ -347,6 +348,11 @@ setup_sigcontext(struct sigcontext *sc, struct pt_regs *regs, unsigned long mask
 
 	err |= __copy_to_user(sc, regs, sizeof(struct pt_regs));
 
+        /* Set the frametype to CRIS_FRAME_NORMAL for the execution of
+           the signal handler. The frametype will be restored to its previous
+           value in restore_sigcontext. */
+        regs->frametype = CRIS_FRAME_NORMAL;
+
 	/* then some other stuff */
 
 	err |= __put_user(mask, &sc->oldmask);
@@ -476,10 +482,10 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	} else {
 		/* trampoline - the desired return ip is the retcode itself */
 		return_ip = (unsigned long)&frame->retcode;
-		/* This is movu.w __NR_sigreturn, r9; break 13; */
-		err |= __put_user(0x9c5f,         (short *)(frame->retcode+0));
-		err |= __put_user(__NR_sigreturn, (short *)(frame->retcode+2));
-		err |= __put_user(0xe93d,         (short *)(frame->retcode+4));
+		/* This is movu.w __NR_rt_sigreturn, r9; break 13; */
+		err |= __put_user(0x9c5f,            (short *)(frame->retcode+0));
+		err |= __put_user(__NR_rt_sigreturn, (short *)(frame->retcode+2));
+		err |= __put_user(0xe93d,            (short *)(frame->retcode+4));
 	}
 
 	if (err)
@@ -492,6 +498,8 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	regs->irp = (unsigned long) ka->sa.sa_handler;  /* what we enter NOW   */
 	regs->srp = return_ip;                          /* what we enter LATER */
 	regs->r10 = sig;                                /* first argument is signo */
+        regs->r11 = (unsigned long) &frame->info;       /* second argument is (siginfo_t *) */
+        regs->r12 = 0;                                  /* third argument is unused */
 
 	/* actually move the usp to reflect the stacked frame */
 

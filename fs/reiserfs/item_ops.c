@@ -489,10 +489,8 @@ static inline int old_entry_num (int is_affected, int virtual_entry_num, int pos
     if (mode == M_CUT)
 	return virtual_entry_num + 1;
 
-#ifdef CONFIG_REISERFS_CHECK  
-    if (mode != M_PASTE || virtual_entry_num == 0)
-	reiserfs_panic (0, "vs-8015: old_entry_num: mode must be M_PASTE (mode = \'%c\'", mode);
-#endif
+    RFALSE( mode != M_PASTE || virtual_entry_num == 0,
+	    "vs-8015: old_entry_num: mode must be M_PASTE (mode = \'%c\'", mode);
     
     return virtual_entry_num - 1;
 }

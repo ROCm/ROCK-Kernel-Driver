@@ -1,4 +1,4 @@
-/* $Id: process.c,v 1.16 2001/06/21 02:00:40 hp Exp $
+/* $Id: process.c,v 1.20 2001/10/03 08:21:39 jonashg Exp $
  * 
  *  linux/arch/cris/kernel/process.c
  *
@@ -8,6 +8,18 @@
  *  Authors:   Bjorn Wesen (bjornw@axis.com)
  *
  *  $Log: process.c,v $
+ *  Revision 1.20  2001/10/03 08:21:39  jonashg
+ *  cause_of_death does not exist if CONFIG_SVINTO_SIM is defined.
+ *
+ *  Revision 1.19  2001/09/26 11:52:54  bjornw
+ *  INIT_MMAP is gone in 2.4.10
+ *
+ *  Revision 1.18  2001/08/21 21:43:51  hp
+ *  Move last watchdog fix inside #ifdef CONFIG_ETRAX_WATCHDOG
+ *
+ *  Revision 1.17  2001/08/21 13:48:01  jonashg
+ *  Added fix by HP to avoid oops when doing a hard_reset_now.
+ *
  *  Revision 1.16  2001/06/21 02:00:40  hp
  *  	* entry.S: Include asm/unistd.h.
  *  	(_sys_call_table): Use section .rodata, not .data.
@@ -118,10 +130,20 @@ int cpu_idle(void *unused)
 
 void hard_reset_now (void)
 {
+	/*
+	 * Don't declare this variable elsewhere.  We don't want any other
+	 * code to know about it than the watchdog handler in entry.S and
+	 * this code, implementing hard reset through the watchdog.
+	 */
+	extern int cause_of_death;
+
 	printk("*** HARD RESET ***\n");
 	cli();
 
-#ifndef CONFIG_ETRAX_WATCHDOG
+#if defined(CONFIG_ETRAX_WATCHDOG) && !defined(CONFIG_SVINTO_SIM)
+	cause_of_death = 0xbedead;
+
+#else
 	/* Since we dont plan to keep on reseting the watchdog,
 	   the key can be arbitrary hence three */
 	*R_WATCHDOG = IO_FIELD(R_WATCHDOG, key, 3) |

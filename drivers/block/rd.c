@@ -276,7 +276,6 @@ static int rd_blkdev_pagecache_IO(int rw, struct buffer_head * sbh, int minor)
 			if (!Page_Uptodate(page)) {
 				memset(kmap(page), 0, PAGE_CACHE_SIZE);
 				kunmap(page);
-				flush_dcache_page(page);
 				SetPageUptodate(page);
 			}
 
@@ -301,8 +300,11 @@ static int rd_blkdev_pagecache_IO(int rw, struct buffer_head * sbh, int minor)
 		kunmap(page);
 		bh_kunmap(sbh);
 
-		if (rw != READ)
+		if (rw == READ) {
+			flush_dcache_page(page);
+		} else {
 			SetPageDirty(page);
+		}
 		if (unlock)
 			UnlockPage(page);
 		__free_page(page);

@@ -1,4 +1,4 @@
-/* $Id: serial.c,v 1.13 2001/05/09 12:40:31 johana Exp $
+/* $Id: serial.c,v 1.18 2001/09/24 09:27:22 pkj Exp $
  *
  * Serial port driver for the ETRAX 100LX chip
  *
@@ -7,6 +7,30 @@
  *      Many, many authors. Based once upon a time on serial.c for 16x50.
  *
  * $Log: serial.c,v $
+ * Revision 1.18  2001/09/24 09:27:22  pkj
+ * Completed ext_baud_table[] in cflag_to_baud() and cflag_to_etrax_baud().
+ *
+ * Revision 1.17  2001/08/24 11:32:49  ronny
+ * More fixes for the CONFIG_ETRAX_SERIAL_PORT0 define.
+ *
+ * Revision 1.16  2001/08/24 07:56:22  ronny
+ * Added config ifdefs around ser0 irq requests.
+ *
+ * Revision 1.15  2001/08/16 09:10:31  bjarne
+ * serial.c - corrected the initialization of rs_table, the wrong defines
+ *            where used.
+ *            Corrected a test in timed_flush_handler.
+ *            Changed configured to enabled.
+ * serial.h - Changed configured to enabled.
+ *
+ * Revision 1.14  2001/08/15 07:31:23  bjarne
+ * Introduced two new members to the e100_serial struct.
+ * configured - Will be set to 1 if the port has been configured in .config
+ * uses_dma   - Should be set to 1 if the port uses DMA. Currently it is set to 1
+ *              when a port is opened. This is used to limit the DMA interrupt
+ *              routines to only manipulate DMA channels actually used by the
+ *              serial driver.
+ *
  * Revision 1.13  2001/05/09 12:40:31  johana
  * Use DMA_NBR and IRQ_NBR defines from dma.h and irq.h
  *
@@ -202,7 +226,7 @@
  *
  */
 
-static char *serial_version = "$Revision: 1.13 $";
+static char *serial_version = "$Revision: 1.18 $";
 
 #include <linux/config.h>
 #include <linux/version.h>
@@ -333,28 +357,52 @@ static struct e100_serial rs_table[] = {
 	  R_DMA_CH6_STATUS, R_DMA_CH6_HWSW,
 	  R_DMA_CH7_CLR_INTR, R_DMA_CH7_FIRST, R_DMA_CH7_CMD,
 	  R_DMA_CH7_STATUS, R_DMA_CH7_HWSW,
-	  STD_FLAGS, DEF_RX, DEF_TX, 2 },  /* ttyS0 */
+	  STD_FLAGS, DEF_RX, DEF_TX, 2,
+#ifdef CONFIG_ETRAX_SERIAL_PORT0
+          1
+#else
+          0
+#endif
+},  /* ttyS0 */
 #ifndef CONFIG_SVINTO_SIM
 	{ DEF_BAUD, (unsigned char *)R_SERIAL1_CTRL, 1U << 16, /* uses DMA 8 and 9 */
 	  R_DMA_CH8_CLR_INTR, R_DMA_CH8_FIRST, R_DMA_CH8_CMD,
 	  R_DMA_CH8_STATUS, R_DMA_CH8_HWSW,
 	  R_DMA_CH9_CLR_INTR, R_DMA_CH9_FIRST, R_DMA_CH9_CMD,
 	  R_DMA_CH9_STATUS, R_DMA_CH9_HWSW,
-	  STD_FLAGS, DEF_RX, DEF_TX, 3 },  /* ttyS1 */
+	  STD_FLAGS, DEF_RX, DEF_TX, 3 ,
+#ifdef CONFIG_ETRAX_SERIAL_PORT1
+          1
+#else
+          0
+#endif
+},  /* ttyS1 */
 
 	{ DEF_BAUD, (unsigned char *)R_SERIAL2_CTRL, 1U << 4,  /* uses DMA 2 and 3 */
 	  R_DMA_CH2_CLR_INTR, R_DMA_CH2_FIRST, R_DMA_CH2_CMD,
 	  R_DMA_CH2_STATUS, R_DMA_CH2_HWSW,
 	  R_DMA_CH3_CLR_INTR, R_DMA_CH3_FIRST, R_DMA_CH3_CMD,
 	  R_DMA_CH3_STATUS, R_DMA_CH3_HWSW,
-	  STD_FLAGS, DEF_RX, DEF_TX, 0 },  /* ttyS2 */
+	  STD_FLAGS, DEF_RX, DEF_TX, 0,
+#ifdef CONFIG_ETRAX_SERIAL_PORT2
+          1
+#else
+          0
+#endif
+ },  /* ttyS2 */
 
 	{ DEF_BAUD, (unsigned char *)R_SERIAL3_CTRL, 1U << 8,  /* uses DMA 4 and 5 */
 	  R_DMA_CH4_CLR_INTR, R_DMA_CH4_FIRST, R_DMA_CH4_CMD,
 	  R_DMA_CH4_STATUS, R_DMA_CH4_HWSW,
 	  R_DMA_CH5_CLR_INTR, R_DMA_CH5_FIRST, R_DMA_CH5_CMD,
 	  R_DMA_CH5_STATUS, R_DMA_CH5_HWSW,
-	  STD_FLAGS, DEF_RX, DEF_TX, 1 }   /* ttyS3 */
+	  STD_FLAGS, DEF_RX, DEF_TX, 1,
+#ifdef CONFIG_ETRAX_SERIAL_PORT3
+          1
+#else
+          0
+#endif
+ }   /* ttyS3 */
 #endif
 };
 
@@ -544,11 +592,12 @@ cflag_to_baud(unsigned int cflag)
 	static int baud_table[] = {
 		0, 50, 75, 110, 134, 150, 200, 300, 600, 1200, 1800, 2400,
 		4800, 9600, 19200, 38400 };
-	
+
 	static int ext_baud_table[] = {
-		0, 57600, 115200, 230400, 460800, 921600, 1843200, 6250000 };
-	
-	if(cflag & CBAUDEX)
+		0, 57600, 115200, 230400, 460800, 921600, 1843200, 6250000,
+                0, 0, 0, 0, 0, 0, 0, 0 };
+
+	if (cflag & CBAUDEX)
 		return ext_baud_table[(cflag & CBAUD) & ~CBAUDEX];
 	else 
 		return baud_table[cflag & CBAUD];
@@ -560,19 +609,19 @@ static unsigned char
 cflag_to_etrax_baud(unsigned int cflag)
 {
 	char retval;
-	
+
 	static char baud_table[] = {
 		-1, -1, -1, -1, -1, -1, -1, 0, 1, 2, -1, 3, 4, 5, 6, 7 };
-	
+
 	static char ext_baud_table[] = {
-		-1, 8, 9, 10, 11, 12, 13, 14 };
-	
-	if(cflag & CBAUDEX)
+		-1, 8, 9, 10, 11, 12, 13, 14, -1, -1, -1, -1, -1, -1, -1, -1 };
+
+	if (cflag & CBAUDEX)
 		retval = ext_baud_table[(cflag & CBAUD) & ~CBAUDEX];
 	else 
 		retval = baud_table[cflag & CBAUD];
-	
-	if(retval < 0) {
+
+	if (retval < 0) {
 		printk("serdriver tried setting invalid baud rate, flags %x.\n", cflag);
 		retval = 5; /* choose default 9600 instead */
 	}
@@ -1266,6 +1315,8 @@ tr_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	
 	for(i = 0; i < NR_PORTS; i++) {
 		info = rs_table + i;
+		if (!info->uses_dma) 
+			continue; 
 		/* check for dma_descr (dont need to check for dma_eop in output dma for serial */
 		if(ireg & info->irq) {  
 			/* we can send a new dma bunch. make it so. */
@@ -1303,6 +1354,8 @@ rec_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	
 	for(i = 0; i < NR_PORTS; i++) {
 		info = rs_table + i;
+		if (!info->uses_dma) 
+			continue; 
 		/* check for both dma_eop and dma_descr for the input dma channel */
 		if(ireg & ((info->irq << 2) | (info->irq << 3))) {
 			/* we have received something */
@@ -1340,7 +1393,7 @@ timed_flush_handler(unsigned long ptr)
 	
 	for(i = 0; i < NR_PORTS; i++) {
 		info = rs_table + i;
-		if(!(info->flags & ASYNC_INITIALIZED))
+		if(!info->enabled || !(info->flags & ASYNC_INITIALIZED))
 			continue;
 
 		/* istatusadr (bit 6-0) hold number of bytes in fifo 
@@ -1394,8 +1447,9 @@ ser_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	unsigned char rstat;
 
 	for(i = 0; i < NR_PORTS; i++) {
-
 		info = rs_table + i;
+		if (!info->uses_dma) 
+			continue; 
 		rstat = info->port[REG_STATUS];
 		
 		if(*R_IRQ_MASK1_RD & (1U << (8+2*info->line))) { /* This line caused the irq */
@@ -1553,6 +1607,7 @@ startup(struct e100_serial * info)
 	 * Reset the DMA channels and make sure their interrupts are cleared
 	 */
 	
+	info->uses_dma = 1;
 	*info->icmdadr = IO_STATE(R_DMA_CH6_CMD, cmd, reset);
 	*info->ocmdadr = IO_STATE(R_DMA_CH6_CMD, cmd, reset);
 
@@ -2753,23 +2808,11 @@ rs_open(struct tty_struct *tty, struct file * filp)
 	if (line < 0 || line >= NR_PORTS)
 		return -ENODEV;
 
-	/* dont allow opening ports that are not enabled in the HW config */
-#ifndef CONFIG_ETRAX_SERIAL_PORT1
-	if (line == 1)
-		return -ENODEV;
-#endif
-#ifndef CONFIG_ETRAX_SERIAL_PORT2
-	if (line == 2)
-		return -ENODEV;
-#endif
-#ifndef CONFIG_ETRAX_SERIAL_PORT3
-	if (line == 3)
-		return -ENODEV;
-#endif
-
 	/* find the corresponding e100_serial struct in the table */
 
 	info = rs_table + line;
+	/* dont allow the opening of ports that are not enabled in the HW config */
+	if (!info->enabled) return -ENODEV; 
   
 #ifdef SERIAL_DEBUG_OPEN
 	printk("[%d] rs_open %s%d, count = %d\n", current->pid,
@@ -2911,6 +2954,8 @@ int rs_read_proc(char *page, char **start, off_t off, int count,
 	len += sprintf(page, "serinfo:1.0 driver:%s\n",
 		       serial_version);
 	for (i = 0; i < NR_PORTS && len < 4000; i++) {
+		if (!rs_table[i].enabled) 
+			continue; 
 		l = line_info(page + len, &rs_table[i]);
 		len += l;
 		if (len+begin > off+count)
@@ -3022,6 +3067,7 @@ rs_init(void)
 	/* do some initializing for the separate ports */
   
 	for (i = 0, info = rs_table; i < NR_PORTS; i++,info++) {
+		info->uses_dma = 0;   
 		info->line = i;
 		info->tty = 0;
 		info->type = PORT_ETRAX;
@@ -3043,18 +3089,21 @@ rs_init(void)
 		init_waitqueue_head(&info->close_wait);
 		info->xmit.buf = 0;
 		info->xmit.tail = info->xmit.head = 0;
-
-		printk(KERN_INFO "%s%d at 0x%x is a builtin UART with DMA\n",
-		       serial_driver.name, info->line, (unsigned int)info->port);
+		if (info->enabled) {
+			printk(KERN_INFO "%s%d at 0x%x is a builtin UART with DMA\n",
+			       serial_driver.name, info->line, (unsigned int)info->port);
+		}
 	}
 
 #ifndef CONFIG_SVINTO_SIM
 	/* Not needed in simulator.  May only complicate stuff. */
 	/* hook the irq's for DMA channel 6 and 7, serial output and input, and some more... */
+#ifdef CONFIG_ETRAX_SERIAL_PORT0
 	if(request_irq(SER0_DMA_TX_IRQ_NBR, tr_interrupt, SA_INTERRUPT, "serial 0 dma tr", NULL))
 		panic("irq22");
 	if(request_irq(SER0_DMA_RX_IRQ_NBR, rec_interrupt, SA_INTERRUPT, "serial 0 dma rec", NULL))
 		panic("irq23");
+#endif
 #ifdef SERIAL_HANDLE_EARLY_ERRORS
 	if(request_irq(SERIAL_IRQ_NBR, ser_interrupt, SA_INTERRUPT, "serial ", NULL))
 		panic("irq8");

@@ -12,13 +12,14 @@
 
 #include <linux/config.h>
 #include <asm/system.h>
+#include <asm/page.h>
 #include <asm/ptrace.h>
 
 /*
  * Default implementation of macro that returns current
  * instruction pointer ("program counter").
  */
-#define current_text_addr() ({void *pc; __asm__ ("move.d pc,%0" : "=rm" (pc)); pc; })
+#define current_text_addr() ({void *pc; __asm__ ("move.d $pc,%0" : "=rm" (pc)); pc; })
 
 /* CRIS has no problems with write protection */
 
