@@ -98,7 +98,7 @@ static inline int nf_hook_input_cond(struct sk_buff *skb)
 }
 
 static inline int
-nf_xfrm_local_done(struct sk_buff *skb, struct inet_protocol *ipprot)
+nf_xfrm_local_done(struct sk_buff *skb, struct net_protocol *ipprot)
 {
 	return skb->sp && !skb->sp->decap_done
 	       && (!ipprot || !ipprot->xfrm_prot);
@@ -119,7 +119,7 @@ static inline int nf_hook_input_cond(struct sk_buff *skb)
 }
 
 static inline int
-nf_xfrm_local_done(struct sk_buff *skb, struct inet_protocol *ipprot)
+nf_xfrm_local_done(struct sk_buff *skb, struct net_protocol *ipprot)
 {
 	return 0;
 }
