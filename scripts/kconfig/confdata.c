@@ -256,23 +256,45 @@ int conf_write(const char *name)
 	FILE *out, *out_h;
 	struct symbol *sym;
 	struct menu *menu;
-	char oldname[128];
+	const char *basename;
+	char dirname[128], tmpname[128], newname[128];
 	int type, l;
 	const char *str;
 
-	out = fopen(".tmpconfig", "w");
+	dirname[0] = 0;
+	if (name && name[0]) {
+		char *slash = strrchr(name, '/');
+		if (slash) {
+			int size = slash - name + 1;
+			memcpy(dirname, name, size);
+			dirname[size] = 0;
+			if (slash[1])
+				basename = slash + 1;
+			else
+				basename = conf_def_filename;
+		} else
+			basename = name;
+	} else
+		basename = conf_def_filename;
+
+	sprintf(newname, "%s.tmpconfig.%d", dirname, getpid());
+	out = fopen(newname, "w");
 	if (!out)
 		return 1;
-	out_h = fopen(".tmpconfig.h", "w");
-	if (!out_h)
-		return 1;
+	out_h = NULL;
+	if (!name) {
+		out_h = fopen(".tmpconfig.h", "w");
+		if (!out_h)
+			return 1;
+	}
 	fprintf(out, "#\n"
 		     "# Automatically generated make config: don't edit\n"
 		     "#\n");
-	fprintf(out_h, "/*\n"
-		       " * Automatically generated C config: don't edit\n"
-		       " */\n"
-		       "#define AUTOCONF_INCLUDED\n");
+	if (out_h)
+		fprintf(out_h, "/*\n"
+			       " * Automatically generated C config: don't edit\n"
+			       " */\n"
+			       "#define AUTOCONF_INCLUDED\n");
 
 	if (!sym_change_count)
 		sym_clear_all_valid();
@@ -288,10 +310,11 @@ int conf_write(const char *name)
 				     "#\n"
 				     "# %s\n"
 				     "#\n", str);
-			fprintf(out_h, "\n"
-				       "/*\n"
-				       " * %s\n"
-				       " */\n", str);
+			if (out_h)
+				fprintf(out_h, "\n"
+					       "/*\n"
+					       " * %s\n"
+					       " */\n", str);
 		} else if (!(sym->flags & SYMBOL_CHOICE)) {
 			sym_calc_value(sym);
 			if (!(sym->flags & SYMBOL_WRITE))
@@ -309,15 +332,18 @@ int conf_write(const char *name)
 				switch (sym_get_tristate_value(sym)) {
 				case no:
 					fprintf(out, "# CONFIG_%s is not set\n", sym->name);
-					fprintf(out_h, "#undef CONFIG_%s\n", sym->name);
+					if (out_h)
+						fprintf(out_h, "#undef CONFIG_%s\n", sym->name);
 					break;
 				case mod:
 					fprintf(out, "CONFIG_%s=m\n", sym->name);
-					fprintf(out_h, "#define CONFIG_%s_MODULE 1\n", sym->name);
+					if (out_h)
+						fprintf(out_h, "#define CONFIG_%s_MODULE 1\n", sym->name);
 					break;
 				case yes:
 					fprintf(out, "CONFIG_%s=y\n", sym->name);
-					fprintf(out_h, "#define CONFIG_%s 1\n", sym->name);
+					if (out_h)
+						fprintf(out_h, "#define CONFIG_%s 1\n", sym->name);
 					break;
 				}
 				break;
@@ -325,34 +351,40 @@ int conf_write(const char *name)
 				// fix me
 				str = sym_get_string_value(sym);
 				fprintf(out, "CONFIG_%s=\"", sym->name);
-				fprintf(out_h, "#define CONFIG_%s \"", sym->name);
+				if (out_h)
+					fprintf(out_h, "#define CONFIG_%s \"", sym->name);
 				do {
 					l = strcspn(str, "\"\\");
 					if (l) {
 						fwrite(str, l, 1, out);
-						fwrite(str, l, 1, out_h);
+						if (out_h)
+							fwrite(str, l, 1, out_h);
 					}
 					str += l;
 					while (*str == '\\' || *str == '"') {
 						fprintf(out, "\\%c", *str);
-						fprintf(out_h, "\\%c", *str);
+						if (out_h)
+							fprintf(out_h, "\\%c", *str);
 						str++;
 					}
 				} while (*str);
 				fputs("\"\n", out);
-				fputs("\"\n", out_h);
+				if (out_h)
+					fputs("\"\n", out_h);
 				break;
 			case S_HEX:
 				str = sym_get_string_value(sym);
 				if (str[0] != '0' || (str[1] != 'x' && str[1] != 'X')) {
 					fprintf(out, "CONFIG_%s=%s\n", sym->name, str);
-					fprintf(out_h, "#define CONFIG_%s 0x%s\n", sym->name, str);
+					if (out_h)
+						fprintf(out_h, "#define CONFIG_%s 0x%s\n", sym->name, str);
 					break;
 				}
 			case S_INT:
 				str = sym_get_string_value(sym);
 				fprintf(out, "CONFIG_%s=%s\n", sym->name, str);
-				fprintf(out_h, "#define CONFIG_%s %s\n", sym->name, str);
+				if (out_h)
+					fprintf(out_h, "#define CONFIG_%s %s\n", sym->name, str);
 				break;
 			}
 		}
@@ -372,18 +404,18 @@ int conf_write(const char *name)
 		}
 	}
 	fclose(out);
-	fclose(out_h);
-
-	if (!name) {
+	if (out_h) {
+		fclose(out_h);
 		rename(".tmpconfig.h", "include/linux/autoconf.h");
-		name = conf_def_filename;
-		file_write_dep(NULL);
-	} else
-		unlink(".tmpconfig.h");
-
-	sprintf(oldname, "%s.old", name);
-	rename(name, oldname);
-	if (rename(".tmpconfig", name))
+	}
+	if (!name || basename != conf_def_filename) {
+		if (!name)
+			name = conf_def_filename;
+		sprintf(tmpname, "%s.old", name);
+		rename(name, tmpname);
+	}
+	sprintf(tmpname, "%s%s", dirname, basename);
+	if (rename(newname, tmpname))
 		return 1;
 
 	sym_change_count = 0;
