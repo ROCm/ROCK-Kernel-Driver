@@ -333,7 +333,7 @@ acpi_pci_bind_root (
 		return_VALUE(-ENOMEM);
 	memset(pathname, 0, ACPI_PATHNAME_MAX);
 
-	buffer.length = sizeof(pathname);
+	buffer.length = ACPI_PATHNAME_MAX;
 	buffer.pointer = pathname;
 
 	if (!device || !id || !bus){

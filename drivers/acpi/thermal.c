@@ -917,7 +917,7 @@ acpi_thermal_write_trip_points (
 	if(!active)
 		return_VALUE(-ENOMEM);
 
-	if (!tz || (count > sizeof(limit_string) - 1)) {
+	if (!tz || (count > ACPI_THERMAL_MAX_LIMIT_STR_LEN - 1)) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid argument\n"));
 		count = -EINVAL;
 		goto end;
