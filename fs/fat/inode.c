@@ -255,8 +255,6 @@ static int fat_show_options(struct seq_file *m, struct vfsmount *mnt)
 	}
 	if (opts->name_check != 'n')
 		seq_printf(m, ",check=%c", opts->name_check);
-	if (opts->conversion != 'b')
-		seq_printf(m, ",conv=%c", opts->conversion);
 	if (opts->quiet)
 		seq_puts(m, ",quiet");
 	if (opts->showexec)
@@ -299,7 +297,6 @@ static int parse_options(char *options, int is_vfat, int *debug,
 	else
 		opts->shortname = 0;
 	opts->name_check = 'n';
-	opts->conversion = 'b';
 	opts->quiet = opts->showexec = opts->sys_immutable = opts->dotsOK =  0;
 	opts->utf8 = opts->unicode_xlate = 0;
 	opts->numtail = 1;
@@ -326,15 +323,8 @@ static int parse_options(char *options, int is_vfat, int *debug,
 			else ret = 0;
 		}
 		else if (!strcmp(this_char,"conv") && value) {
-			if (value[0] && !value[1] && strchr("bta",*value))
-				opts->conversion = *value;
-			else if (!strcmp(value,"binary"))
-				opts->conversion = 'b';
-			else if (!strcmp(value,"text"))
-				opts->conversion = 't';
-			else if (!strcmp(value,"auto"))
-				opts->conversion = 'a';
-			else ret = 0;
+			printk("FAT: conv option is obsolete, "
+			       "not supported now\n");
 		}
 		else if (!strcmp(this_char,"nocase")) {
 			if (!is_vfat)

@@ -17,18 +17,6 @@
 #endif
 #define Printk(x)	printk x
 
-/* Well-known binary file extensions - of course there are many more */
-
-static char ascii_extensions[] =
-  "TXT" "ME " "HTM" "1ST" "LOG" "   " 	/* text files */
-  "C  " "H  " "CPP" "LIS" "PAS" "FOR"  /* programming languages */
-  "F  " "MAK" "INC" "BAS" 		/* programming languages */
-  "BAT" "SH "				/* program code :) */
-  "INI"					/* config files */
-  "PBM" "PGM" "DXF"			/* graphics */
-  "TEX";				/* TeX */
-
-
 /*
  * fat_fs_panic reports a severe file system problem and sets the file system
  * read-only. The file system can be made writable again by remounting it.
@@ -53,32 +41,6 @@ void fat_fs_panic(struct super_block *s, const char *fmt, ...)
 	       "    %s\n", s->s_id, panic_msg);
 	if (not_ro)
 		printk("    File system has been set read-only\n");
-}
-
-
-/*
- * fat_is_binary selects optional text conversion based on the conversion mode
- * and the extension part of the file name.
- */
-
-int fat_is_binary(char conversion,char *extension)
-{
-	char *walk;
-
-	switch (conversion) {
-		case 'b':
-			return 1;
-		case 't':
-			return 0;
-		case 'a':
-			for (walk = ascii_extensions; *walk; walk += 3)
-				if (!strncmp(extension,walk,3)) return 0;
-			return 1;	/* default binary conversion */
-		default:
-			printk("Invalid conversion mode - defaulting to "
-			    "binary.\n");
-			return 1;
-	}
 }
 
 void lock_fat(struct super_block *sb)
