@@ -31,8 +31,8 @@
 #include <linux/init.h>
 
 #include "bttv.h"
-#include "audiochip.h"
-#include "id.h"
+#include <media/audiochip.h>
+#include <media/id.h>
 
 MODULE_PARM(debug,"i");
 MODULE_LICENSE("GPL");

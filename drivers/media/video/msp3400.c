@@ -56,7 +56,7 @@
 #define __KERNEL_SYSCALLS__
 #include <linux/unistd.h>
 
-#include "audiochip.h"
+#include <media/audiochip.h>
 #include "msp3400.h"
 
 /* Addresses to scan */

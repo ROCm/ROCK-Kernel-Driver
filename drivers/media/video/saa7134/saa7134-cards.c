@@ -24,7 +24,6 @@
 
 #include "saa7134-reg.h"
 #include "saa7134.h"
-#include "tuner.h"
 
 /* commly used strings */
 static char name_mute[]    = "mute";

@@ -29,9 +29,10 @@
 #include <linux/init.h>
 #include <linux/smp_lock.h>
 
-#include "audiochip.h"
+#include <media/audiochip.h>
+#include <media/id.h>
+
 #include "tvaudio.h"
-#include "id.h"
 
 
 /* ---------------------------------------------------------------------- */

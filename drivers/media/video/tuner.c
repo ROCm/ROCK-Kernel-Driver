@@ -12,8 +12,8 @@
 #include <linux/videodev.h>
 #include <linux/init.h>
 
-#include "tuner.h"
-#include "audiochip.h"
+#include <media/tuner.h>
+#include <media/audiochip.h>
 
 /* Addresses to scan */
 static unsigned short normal_i2c[] = {I2C_CLIENT_END};

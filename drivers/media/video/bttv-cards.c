@@ -36,7 +36,6 @@
 #include <asm/io.h>
 
 #include "bttvp.h"
-#include "tuner.h"
 #include "bt832.h"
 
 /* fwd decl */
