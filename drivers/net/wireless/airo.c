@@ -1021,6 +1021,8 @@ struct airo_info {
 #define FLAG_UPDATE_MULTI 0x40
 #define FLAG_UPDATE_UNI   0x80
 #define FLAG_802_11    0x200
+#define FLAG_PENDING_XMIT   0x400
+#define FLAG_PENDING_XMIT11 0x800
 	int (*bap_read)(struct airo_info*, u16 *pu16Dst, int bytelen,
 			int whichbap);
 	unsigned short *flash;
@@ -1345,6 +1347,7 @@ static void airo_do_xmit(struct net_device *dev) {
 	u32 *fids = priv->fids;
 
 	if (down_trylock(&priv->sem) != 0) {
+		priv->flags |= FLAG_PENDING_XMIT;
 		netif_stop_queue(dev);
 		priv->xmit.task.func = (void (*)(void *))airo_do_xmit;
 		priv->xmit.task.data = (void *)dev;
@@ -1353,6 +1356,7 @@ static void airo_do_xmit(struct net_device *dev) {
 	}
 	status = transmit_802_3_packet (priv, fids[fid], skb->data);
 	up(&priv->sem);
+	priv->flags &= ~FLAG_PENDING_XMIT;
 
 	i = 0;
 	if ( status == SUCCESS ) {
@@ -1364,14 +1368,12 @@ static void airo_do_xmit(struct net_device *dev) {
 	}
 	if (i < MAX_FIDS / 2)
 		netif_wake_queue(dev);
-	else
-		netif_stop_queue(dev);
 	dev_kfree_skb(skb);
 }
 
 static int airo_start_xmit(struct sk_buff *skb, struct net_device *dev) {
 	s16 len;
-	int i;
+	int i, j;
 	struct airo_info *priv = dev->priv;
 	u32 *fids = priv->fids;
 
@@ -1382,19 +1384,23 @@ static int airo_start_xmit(struct sk_buff *skb, struct net_device *dev) {
 
 	/* Find a vacant FID */
 	for( i = 0; i < MAX_FIDS / 2 && (fids[i] & 0xffff0000); i++ );
+	for( j = i + 1; j < MAX_FIDS / 2 && (fids[j] & 0xffff0000); j++ );
 
-	if ( i == MAX_FIDS / 2 ) {
-		priv->stats.tx_fifo_errors++;
-		dev_kfree_skb(skb);
-	} else {
-		/* check min length*/
-		len = ETH_ZLEN < skb->len ? skb->len : ETH_ZLEN;
-	        /* Mark fid as used & save length for later */
-		fids[i] |= (len << 16);
-		priv->xmit.skb = skb;
-		priv->xmit.fid = i;
-		airo_do_xmit(dev);
+	if ( j >= MAX_FIDS / 2 ) {
+		netif_stop_queue(dev);
+
+		if (i == MAX_FIDS / 2) {
+			priv->stats.tx_fifo_errors++;
+			return 1;
+		}
 	}
+	/* check min length*/
+	len = ETH_ZLEN < skb->len ? skb->len : ETH_ZLEN;
+        /* Mark fid as used & save length for later */
+	fids[i] |= (len << 16);
+	priv->xmit.skb = skb;
+	priv->xmit.fid = i;
+	airo_do_xmit(dev);
 	return 0;
 }
 
@@ -1407,6 +1413,7 @@ static void airo_do_xmit11(struct net_device *dev) {
 	u32 *fids = priv->fids;
 
 	if (down_trylock(&priv->sem) != 0) {
+		priv->flags |= FLAG_PENDING_XMIT11;
 		netif_stop_queue(dev);
 		priv->xmit11.task.func = (void (*)(void *))airo_do_xmit11;
 		priv->xmit11.task.data = (void *)dev;
@@ -1415,6 +1422,7 @@ static void airo_do_xmit11(struct net_device *dev) {
 	}
 	status = transmit_802_11_packet (priv, fids[fid], skb->data);
 	up(&priv->sem);
+	priv->flags &= ~FLAG_PENDING_XMIT11;
 
 	i = MAX_FIDS / 2;
 	if ( status == SUCCESS ) {
@@ -1426,14 +1434,12 @@ static void airo_do_xmit11(struct net_device *dev) {
 	}
 	if (i < MAX_FIDS)
 		netif_wake_queue(dev);
-	else
-		netif_stop_queue(dev);
 	dev_kfree_skb(skb);
 }
 
 static int airo_start_xmit11(struct sk_buff *skb, struct net_device *dev) {
 	s16 len;
-	int i;
+	int i, j;
 	struct airo_info *priv = dev->priv;
 	u32 *fids = priv->fids;
 
@@ -1444,19 +1450,23 @@ static int airo_start_xmit11(struct sk_buff *skb, struct net_device *dev) {
 
 	/* Find a vacant FID */
 	for( i = MAX_FIDS / 2; i < MAX_FIDS && (fids[i] & 0xffff0000); i++ );
+	for( j = i + 1; j < MAX_FIDS && (fids[j] & 0xffff0000); j++ );
 
-	if ( i == MAX_FIDS ) {
-		priv->stats.tx_fifo_errors++;
-		dev_kfree_skb(skb);
-	} else {
-		/* check min length*/
-		len = ETH_ZLEN < skb->len ? skb->len : ETH_ZLEN;
-	        /* Mark fid as used & save length for later */
-		fids[i] |= (len << 16);
-		priv->xmit11.skb = skb;
-		priv->xmit11.fid = i;
-		airo_do_xmit11(dev);
+	if ( j >= MAX_FIDS ) {
+		netif_stop_queue(dev);
+
+		if (i == MAX_FIDS) {
+			priv->stats.tx_fifo_errors++;
+			return 1;
+		}
 	}
+	/* check min length*/
+	len = ETH_ZLEN < skb->len ? skb->len : ETH_ZLEN;
+        /* Mark fid as used & save length for later */
+	fids[i] |= (len << 16);
+	priv->xmit11.skb = skb;
+	priv->xmit11.fid = i;
+	airo_do_xmit11(dev);
 	return 0;
 }
 
@@ -2188,7 +2198,13 @@ static irqreturn_t airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs)
 				OUT4500( apriv, EVACK, status & (EV_TX | EV_TXEXC));
 				/* Set up to be used again */
 				apriv->fids[index] &= 0xffff;
-				netif_wake_queue(dev);
+				if (index < MAX_FIDS / 2) {
+					if (!(apriv->flags & FLAG_PENDING_XMIT))
+						netif_wake_queue(dev);
+				} else {
+					if (!(apriv->flags & FLAG_PENDING_XMIT11))
+						netif_wake_queue(apriv->wifidev);
+				}
 			} else {
 				OUT4500( apriv, EVACK, status & (EV_TX | EV_TXEXC));
 				printk( KERN_ERR "airo: Unallocated FID was used to xmit\n" );
