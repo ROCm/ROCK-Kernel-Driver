@@ -423,7 +423,7 @@ int esp_output(struct sk_buff *skb)
 				goto error;
 		}
 		skb_to_sgvec(skb, sg, esph->enc_data+esp->conf.ivlen-skb->data, clen);
-		crypto_cipher_encrypt(tfm, sg, nfrags);
+		crypto_cipher_encrypt(tfm, sg, sg, clen);
 		if (unlikely(sg != sgbuf))
 			kfree(sg);
 	} while (0);
@@ -520,7 +520,7 @@ int esp_input(struct xfrm_state *x, struct sk_buff *skb)
 				goto out;
 		}
 		skb_to_sgvec(skb, sg, 8+esp->conf.ivlen, elen);
-		crypto_cipher_decrypt(esp->conf.tfm, sg, nfrags);
+		crypto_cipher_decrypt(esp->conf.tfm, sg, sg, elen);
 		if (unlikely(sg != sgbuf))
 			kfree(sg);
 
