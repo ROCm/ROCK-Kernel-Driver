@@ -17,6 +17,7 @@
 #include <linux/input.h>
 #include <linux/serio.h>
 #include <linux/init.h>
+#include <linux/pm.h>
 #include "psmouse.h"
 #include "synaptics.h"
 #include "logips2pp.h"
@@ -512,6 +513,30 @@ static void psmouse_disconnect(struct serio *serio)
 }
 
 /*
+ * Reinitialize mouse hardware after software suspend.
+ */
+
+static int psmouse_pm_callback(struct pm_dev *dev, pm_request_t request, void *data)
+{
+	struct psmouse *psmouse = dev->data;
+	struct serio_dev *ser_dev = psmouse->serio->dev;
+
+	synaptics_disconnect(psmouse);
+
+	/* We need to reopen the serio port to reinitialize the i8042 controller */
+	serio_close(psmouse->serio);
+	serio_open(psmouse->serio, ser_dev);
+
+	/* Probe and re-initialize the mouse */
+	psmouse_probe(psmouse);
+	psmouse_initialize(psmouse);
+	synaptics_pt_init(psmouse);
+	psmouse_activate(psmouse);
+
+	return 0;
+}
+
+/*
  * psmouse_connect() is a callback from the serio module when
  * an unhandled serio port is found.
  */
@@ -519,6 +544,7 @@ static void psmouse_disconnect(struct serio *serio)
 static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 {
 	struct psmouse *psmouse;
+	struct pm_dev *pmdev;
 	
 	if ((serio->type & SERIO_TYPE) != SERIO_8042 &&
 	    (serio->type & SERIO_TYPE) != SERIO_PS_PSTHRU)
@@ -551,6 +577,12 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 		return;
 	}
 	
+	pmdev = pm_register(PM_SYS_DEV, PM_SYS_UNKNOWN, psmouse_pm_callback);
+	if (pmdev) {
+		psmouse->dev.pm_dev = pmdev;
+		pmdev->data = psmouse;
+	}
+
 	sprintf(psmouse->devname, "%s %s %s",
 		psmouse_protocols[psmouse->type], psmouse->vendor, psmouse->name);
 	sprintf(psmouse->phys, "%s/input0",
