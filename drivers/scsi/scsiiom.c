@@ -1283,46 +1283,6 @@ dc390_Reselect( PACB pACB )
     DC390_write8 (ScsiCmd, MSG_ACCEPTED_CMD);	/* ;to release the /ACK signal */
 }
 
-
-static void 
-dc390_remove_dev (PACB pACB, PDCB pDCB)
-{
-   PDCB pPrevDCB = pACB->pLinkDCB;
-
-   if (pDCB->GoingSRBCnt > 1)
-     {
-	DCBDEBUG(printk (KERN_INFO "DC390: Driver won't free DCB (ID %i, LUN %i): 0x%08x because of SRBCnt %i\n",\
-		pDCB->TargetID, pDCB->TargetLUN, (int)pDCB, pDCB->GoingSRBCnt));
-	return;
-     }
-   pACB->DCBmap[pDCB->TargetID] &= ~(1 << pDCB->TargetLUN);
-   
-   // The first one
-   if (pDCB == pACB->pLinkDCB) 
-   {
-	// The last one
-	if (pACB->pLastDCB == pDCB) {
-		pDCB->pNextDCB = 0; pACB->pLastDCB = 0;
-	}
-	pACB->pLinkDCB = pDCB->pNextDCB;
-   }
-   else
-   {
-	while (pPrevDCB->pNextDCB != pDCB) pPrevDCB = pPrevDCB->pNextDCB;
-	pPrevDCB->pNextDCB = pDCB->pNextDCB;
-	if (pDCB == pACB->pLastDCB) pACB->pLastDCB = pPrevDCB;
-   }
-
-   DCBDEBUG(printk (KERN_INFO "DC390: Driver about to free DCB (ID %i, LUN %i): %p\n",\
-	   pDCB->TargetID, pDCB->TargetLUN, pDCB));
-   if (pDCB == pACB->pActiveDCB) pACB->pActiveDCB = 0;
-   if (pDCB == pACB->pLinkDCB) pACB->pLinkDCB = pDCB->pNextDCB;
-   if (pDCB == pACB->pDCBRunRobin) pACB->pDCBRunRobin = pDCB->pNextDCB;
-   kfree (pDCB); 
-   pACB->DCBCnt--;
-}
-
-
 static UCHAR __inline__
 dc390_tagq_blacklist (char* name)
 {
