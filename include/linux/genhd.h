@@ -83,8 +83,6 @@ struct gendisk {
 	int major;			/* major number of driver */
 	int first_minor;
 	int minors;
-	int minor_shift;		/* number of times minor is shifted to
-					   get real minor */
 	char disk_name[16];		/* name of major driver */
 	struct hd_struct **part;	/* [indexed by minor] */
 	struct block_device_operations *fops;
