@@ -67,29 +67,62 @@ __und_invalid:
 	ldmia	r2, {r2 - r4}			@ get pc, cpsr
 	add	r5, sp, #S_SP
 	mov	r1, lr
-	stmia	r5, {r0 - r4}			@ save sp_SVC, lr_SVC, pc, cpsr, old_ro
+
+	@
+	@ We are now ready to fill in the remaining blanks on the stack:
+	@
+	@  r0 - sp_svc
+	@  r1 - lr_svc
+	@  r2 - lr_<exception>, already fixed up for correct return/restart
+	@  r3 - spsr_<exception>
+	@  r4 - orig_r0 (see pt_regs definition in ptrace.h)
+	@
+	stmia	r5, {r0 - r4}
 	.endm
 
 	.align	5
 __dabt_svc:
 	svc_entry abt
-	mrs	r9, cpsr			@ Enable interrupts if they were
+
+	@
+	@ get ready to re-enable interrupts if appropriate
+	@
+	mrs	r9, cpsr
 	tst	r3, #PSR_I_BIT
-	biceq	r9, r9, #PSR_I_BIT		@ previously
-/*
- * This routine must not corrupt r9
- */
+	biceq	r9, r9, #PSR_I_BIT
+
+	@
+	@ Call the processor-specific abort handler:
+	@
+	@  r2 - aborted context pc
+	@  r3 - aborted context cpsr
+	@
+	@ The abort handler must return the aborted address in r0, and
+	@ the fault status register in r1.  r9 must be preserved.
+	@
 #ifdef MULTI_ABORT
-	ldr	r4, .LCprocfns			@ pass r2, r3 to
-	mov	lr, pc				@ processor code
-	ldr	pc, [r4]			@ call processor specific code
+	ldr	r4, .LCprocfns
+	mov	lr, pc
+	ldr	pc, [r4]
 #else
 	bl	CPU_ABORT_HANDLER
 #endif
+
+	@
+	@ set desired IRQ state, then call main handler
+	@
 	msr	cpsr_c, r9
 	mov	r2, sp
 	bl	do_DataAbort
+
+	@
+	@ IRQs off again before pulling preserved data off the stack
+	@
 	disable_irq r0
+
+	@
+	@ restore SPSR and restart the instruction
+	@
 	ldr	r0, [sp, #S_PSR]
 	msr	spsr_cxsf, r0
 	ldmia	sp, {r0 - pc}^			@ load r0 - pc, cpsr
@@ -150,14 +183,28 @@ svc_preempt:
 __und_svc:
 	svc_entry und
 
-	ldr	r0, [r2, #-4]			@ r0 = instruction
-	adrsvc	al, r9, 1f			@ r9 = normal FP return
-	bl	call_fpe			@ lr = undefined instr return
+	@
+	@ call emulation code, which returns using r9 if it has emulated
+	@ the instruction, or the more conventional lr if we are to treat
+	@ this as a real undefined instruction
+	@
+	@  r0 - instruction
+	@
+	ldr	r0, [r2, #-4]
+	adrsvc	al, r9, 1f
+	bl	call_fpe
 
 	mov	r0, sp				@ struct pt_regs *regs
 	bl	do_undefinstr
 
+	@
+	@ IRQs off again before pulling preserved data off the stack
+	@
 1:	disable_irq r0
+
+	@
+	@ restore SPSR and restart the instruction
+	@
 	ldr	lr, [sp, #S_PSR]		@ Get SVC cpsr
 	msr	spsr_cxsf, lr
 	ldmia	sp, {r0 - pc}^			@ Restore SVC registers
@@ -165,14 +212,33 @@ __und_svc:
 	.align	5
 __pabt_svc:
 	svc_entry abt
-	mrs	r9, cpsr			@ Enable interrupts if they were
+
+	@
+	@ re-enable interrupts if appropriate
+	@
+	mrs	r9, cpsr
 	tst	r3, #PSR_I_BIT
-	biceq	r9, r9, #PSR_I_BIT		@ previously
+	biceq	r9, r9, #PSR_I_BIT
 	msr	cpsr_c, r9
+
+	@
+	@ set args, then call main handler
+	@
+	@  r0 - address of faulting instruction
+	@  r1 - pointer to registers on stack
+	@
 	mov	r0, r2				@ address (pc)
 	mov	r1, sp				@ regs
 	bl	do_PrefetchAbort		@ call abort handler
+
+	@
+	@ IRQs off again before pulling preserved data off the stack
+	@
 	disable_irq r0
+
+	@
+	@ restore SPSR and restart the instruction
+	@
 	ldr	r0, [sp, #S_PSR]
 	msr	spsr_cxsf, r0
 	ldmia	sp, {r0 - pc}^			@ load r0 - pc, cpsr
@@ -204,7 +270,17 @@ __pabt_svc:
 	ldr	r7, .LC\sym
 	add	r5, sp, #S_PC
 	ldmia	r7, {r2 - r4}			@ Get USR pc, cpsr
-	stmia	r5, {r2 - r4}			@ Save USR pc, cpsr, old_r0
+
+	@
+	@ We are now ready to fill in the remaining blanks on the stack:
+	@
+	@  r2 - lr_<exception>, already fixed up for correct return/restart
+	@  r3 - spsr_<exception>
+	@  r4 - orig_r0 (see pt_regs definition in ptrace.h)
+	@
+	@ Also, separately save sp_usr and lr_usr
+	@
+	stmia	r5, {r2 - r4}
 	stmdb	r5, {sp, lr}^
 	.endm
 
@@ -213,14 +289,28 @@ __dabt_usr:
 	usr_entry abt
 	alignment_trap r7, r0, __temp_abt
 	zero_fp
+
+	@
+	@ Call the processor-specific abort handler:
+	@
+	@  r2 - aborted context pc
+	@  r3 - aborted context cpsr
+	@
+	@ The abort handler must return the aborted address in r0, and
+	@ the fault status register in r1.
+	@
 #ifdef MULTI_ABORT
-	ldr	r4, .LCprocfns			@ pass r2, r3 to
-	mov	lr, pc				@ processor code
-	ldr	pc, [r4]			@ call processor specific code
+	ldr	r4, .LCprocfns
+	mov	lr, pc
+	ldr	pc, [r4]
 #else
 	bl	CPU_ABORT_HANDLER
 #endif
-	enable_irq r2				@ Enable interrupts
+
+	@
+	@ IRQs on, then call the main handler
+	@
+	enable_irq r2
 	mov	r2, sp
 	adrsvc	al, lr, ret_from_exception
 	b	do_DataAbort
@@ -265,9 +355,20 @@ __und_usr:
 	tst	r3, #PSR_T_BIT			@ Thumb mode?
 	bne	fpundefinstr			@ ignore FP
 	sub	r4, r2, #4
-1:	ldrt	r0, [r4]			@ r0  = instruction
-	adrsvc	al, r9, ret_from_exception	@ r9  = normal FP return
-	adrsvc	al, lr, fpundefinstr		@ lr  = undefined instr return
+
+	@
+	@ fall through to the emulation code, which returns using r9 if
+	@ it has emulated the instruction, or the more conventional lr
+	@ if we are to treat this as a real undefined instruction
+	@
+	@  r0 - instruction
+	@
+1:	ldrt	r0, [r4]
+	adrsvc	al, r9, ret_from_exception
+	adrsvc	al, lr, fpundefinstr
+	@
+	@ fallthrough to call_fpe
+	@
 
 /*
  * The out of line fixup for the ldrt above.
