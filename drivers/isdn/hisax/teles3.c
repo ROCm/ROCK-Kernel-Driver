@@ -300,39 +300,36 @@ setup_teles3(struct IsdnCard *card)
 	cs->hw.teles3.hscxfifo[0] = cs->hw.teles3.hscx[0] + 0x3e;
 	cs->hw.teles3.hscxfifo[1] = cs->hw.teles3.hscx[1] + 0x3e;
 	if (cs->typ == ISDN_CTYPE_TELESPCMCIA) {
-		if (check_region((cs->hw.teles3.hscx[1]), 96 )) {
+		if (!request_region(cs->hw.teles3.hscx[1], 96, "HiSax Teles PCMCIA")) {
 			printk(KERN_WARNING
 			       "HiSax: %s ports %x-%x already in use\n",
 			       CardType[cs->typ],
 			       cs->hw.teles3.hscx[1],
 			       cs->hw.teles3.hscx[1] + 96);
 			return (0);
-		} else
-			request_region(cs->hw.teles3.hscx[1], 96, "HiSax Teles PCMCIA");
+		}
 	} else {
 		if (cs->hw.teles3.cfg_reg) {
 			if (cs->typ == ISDN_CTYPE_COMPAQ_ISA) {
-				if (check_region((cs->hw.teles3.cfg_reg), 1)) {
+				if (!request_region(cs->hw.teles3.cfg_reg, 1, "teles3 cfg")) {
 					printk(KERN_WARNING
 						"HiSax: %s config port %x already in use\n",
 						CardType[card->typ],
 						cs->hw.teles3.cfg_reg);
 					return (0);
-				} else
-					request_region(cs->hw.teles3.cfg_reg, 1, "teles3 cfg");
+				}
 			} else {
-				if (check_region((cs->hw.teles3.cfg_reg), 8)) {
+				if (!request_region(cs->hw.teles3.cfg_reg, 8, "teles3 cfg")) {
 					printk(KERN_WARNING
 					       "HiSax: %s config port %x-%x already in use\n",
 					       CardType[card->typ],
 					       cs->hw.teles3.cfg_reg,
 						cs->hw.teles3.cfg_reg + 8);
 					return (0);
-				} else
-					request_region(cs->hw.teles3.cfg_reg, 8, "teles3 cfg");
+				}
 			}
 		}
-		if (check_region((cs->hw.teles3.isac + 32), 32)) {
+		if (!request_region(cs->hw.teles3.isac + 32, 32, "HiSax isac")) {
 			printk(KERN_WARNING
 			   "HiSax: %s isac ports %x-%x already in use\n",
 			       CardType[cs->typ],
@@ -346,9 +343,8 @@ setup_teles3(struct IsdnCard *card)
 				}
 			}
 			return (0);
-		} else
-			request_region(cs->hw.teles3.isac + 32, 32, "HiSax isac");
-		if (check_region((cs->hw.teles3.hscx[0] + 32), 32)) {
+		}
+		if (!request_region(cs->hw.teles3.hscx[0] + 32, 32, "HiSax hscx A")) {
 			printk(KERN_WARNING
 			 "HiSax: %s hscx A ports %x-%x already in use\n",
 			       CardType[cs->typ],
@@ -363,9 +359,8 @@ setup_teles3(struct IsdnCard *card)
 			}
 			release_ioregs(cs, 1);
 			return (0);
-		} else
-			request_region(cs->hw.teles3.hscx[0] + 32, 32, "HiSax hscx A");
-		if (check_region((cs->hw.teles3.hscx[1] + 32), 32)) {
+		}
+		if (!request_region(cs->hw.teles3.hscx[1] + 32, 32, "HiSax hscx B")) {
 			printk(KERN_WARNING
 			 "HiSax: %s hscx B ports %x-%x already in use\n",
 			       CardType[cs->typ],
@@ -380,8 +375,7 @@ setup_teles3(struct IsdnCard *card)
 			}
 			release_ioregs(cs, 3);
 			return (0);
-		} else
-			request_region(cs->hw.teles3.hscx[1] + 32, 32, "HiSax hscx B");
+		}
 	}
 	if ((cs->hw.teles3.cfg_reg) && (cs->typ != ISDN_CTYPE_COMPAQ_ISA)) {
 		if ((val = bytein(cs->hw.teles3.cfg_reg + 0)) != 0x51) {
