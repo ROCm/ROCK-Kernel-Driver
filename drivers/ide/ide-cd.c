@@ -2160,7 +2160,7 @@ static int cdrom_eject(ide_drive_t *drive, int ejectflag,
 		       struct request_sense *sense)
 {
 	struct request req;
-	char loej = 0;
+	char loej = 0x02;
 
 	if (CDROM_CONFIG_FLAGS(drive)->no_eject && !ejectflag)
 		return -EDRIVE_CANT_DO_THIS;
@@ -2172,8 +2172,8 @@ static int cdrom_eject(ide_drive_t *drive, int ejectflag,
 	cdrom_prepare_request(&req);
 
 	/* only tell drive to close tray if open, if it can do that */
-	if (ejectflag && CDROM_CONFIG_FLAGS(drive)->close_tray)
-		loej = 0x02;
+	if (ejectflag && !CDROM_CONFIG_FLAGS(drive)->close_tray)
+		loej = 0;
 
 	req.sense = sense;
 	req.cmd[0] = GPCMD_START_STOP_UNIT;
