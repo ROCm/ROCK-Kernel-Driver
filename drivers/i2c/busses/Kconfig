@@ -164,16 +164,6 @@ config I2C_NFORCE2
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-nforce2.
 
-config I2C_PHILIPSPAR
-	tristate "Philips style parallel port adapter"
-	depends on I2C && PARPORT
-	select I2C_ALGOBIT
-	help
-	  This supports parallel-port I2C adapters made by Philips.
-
-	  This support is also available as a module.  If so, the module 
-	  will be called i2c-philips-par.
-
 config I2C_PARPORT
 	tristate "Parallel port adapter"
 	depends on I2C && PARPORT
@@ -342,17 +332,6 @@ config I2C_SIS96X
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-sis96x.
-
-config I2C_VELLEMAN
-	tristate "Velleman K8000 adapter"
-	depends on I2C
-	select I2C_ALGOBIT
-	help
-	  This supports the Velleman K8000 parallel-port I2C adapter.  Say Y
-	  if you own such an adapter.
-
-	  This support is also available as a module.  If so, the module 
-	  will be called i2c-velleman.
 
 config I2C_VIA
 	tristate "VIA 82C586B"
