@@ -2583,9 +2583,13 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
  * Only hub drivers (including virtual root hub drivers for host
  * controllers) should ever call this.
  */
+#define NEW_DEVICE_RETRYS	2
+#define SET_ADDRESS_RETRYS	2
 int usb_new_device(struct usb_device *dev)
 {
 	int err;
+	int i;
+	int j;
 
 	/* USB v1.1 5.5.3 */
 	/* We read the first 8 bytes from the device descriptor to get to */
@@ -2594,18 +2598,30 @@ int usb_new_device(struct usb_device *dev)
 	dev->epmaxpacketin [0] = 8;
 	dev->epmaxpacketout[0] = 8;
 
-	err = usb_set_address(dev);
-	if (err < 0) {
-		err("USB device not accepting new address=%d (error=%d)",
-			dev->devnum, err);
-		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
-		dev->devnum = -1;
-		return 1;
+	for (i = 0; i < NEW_DEVICE_RETRYS; ++i) {
+
+		for (j = 0; j < SET_ADDRESS_RETRYS; ++j) {
+			err = usb_set_address(dev);
+			if (err >= 0)
+				break;
+			wait_ms(200);
+		}
+		if (err < 0) {
+			err("USB device not accepting new address=%d (error=%d)",
+				dev->devnum, err);
+			clear_bit(dev->devnum, dev->bus->devmap.devicemap);
+			dev->devnum = -1;
+			return 1;
+		}
+
+		wait_ms(10);	/* Let the SET_ADDRESS settle */
+
+		err = usb_get_descriptor(dev, USB_DT_DEVICE, 0, &dev->descriptor, 8);
+		if (err >= 8)
+			break;
+		wait_ms(100);
 	}
 
-	wait_ms(10);	/* Let the SET_ADDRESS settle */
-
-	err = usb_get_descriptor(dev, USB_DT_DEVICE, 0, &dev->descriptor, 8);
 	if (err < 8) {
 		if (err < 0)
 			err("USB device not responding, giving up (error=%d)", err);
