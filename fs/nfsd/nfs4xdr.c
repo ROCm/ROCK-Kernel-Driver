@@ -1588,7 +1588,18 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 		WRITE32(stat.mtime.tv_sec);
 		WRITE32(stat.mtime.tv_nsec);
 	}
+	if (bmval1 & FATTR4_WORD1_MOUNTED_ON_FILEID) {
+		struct dentry *mnt_pnt, *mnt_root;
 
+		if ((buflen -= 8) < 0)
+                	goto out_resource;
+		mnt_root = exp->ex_mnt->mnt_root;
+		if (mnt_root->d_inode == dentry->d_inode) {
+			mnt_pnt = exp->ex_mnt->mnt_mountpoint;
+			WRITE64((u64) mnt_pnt->d_inode->i_ino);
+		} else
+                	WRITE64((u64) stat.ino);
+	}
 	*attrlenp = htonl((char *)p - (char *)attrlenp - 4);
 	*countp = p - buffer;
 	status = nfs_ok;
