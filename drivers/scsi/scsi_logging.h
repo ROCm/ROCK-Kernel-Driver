@@ -37,9 +37,9 @@
 #define SCSI_LOG_HLCOMPLETE_BITS          3
 #define SCSI_LOG_IOCTL_BITS               3
 
+extern unsigned int scsi_logging_level;
 
 #ifdef CONFIG_SCSI_LOGGING
-extern unsigned int scsi_logging_level;
 #define SCSI_CHECK_LOGGING(SHIFT, BITS, LEVEL, CMD)		\
 {								\
         unsigned int mask = (1 << (BITS)) - 1;			\
@@ -75,7 +75,5 @@ extern unsigned int scsi_logging_level;
         SCSI_CHECK_LOGGING(SCSI_LOG_HLCOMPLETE_SHIFT, SCSI_LOG_HLCOMPLETE_BITS, LEVEL,CMD);
 #define SCSI_LOG_IOCTL(LEVEL,CMD)  \
         SCSI_CHECK_LOGGING(SCSI_LOG_IOCTL_SHIFT, SCSI_LOG_IOCTL_BITS, LEVEL,CMD);
-
-extern unsigned int scsi_logging_level;
 
 #endif /* _SCSI_LOGGING_H */
