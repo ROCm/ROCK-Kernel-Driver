@@ -27,7 +27,7 @@
 
 #define DbgDelay(secs) { int wait_time; printk( " DbgDelay %ds ", secs); \
                          for( wait_time=jiffies + (secs*HZ); \
-		         wait_time > jiffies ;) ; }
+		         time_before(jiffies, wait_time) ;) ; }
 
 #define CPQFCTS_DRIVER_VER(maj,min,submin) ((maj<<16)|(min<<8)|(submin))
 // don't forget to also change MODULE_DESCRIPTION in cpqfcTSinit.c

@@ -251,7 +251,7 @@ static void
 fore200e_spin(int msecs)
 {
     unsigned long timeout = jiffies + MSECS(msecs);
-    while (jiffies < timeout);
+    while (time_before(jiffies, timeout));
 }
 
 
@@ -266,7 +266,7 @@ fore200e_poll(struct fore200e* fore200e, volatile u32* addr, u32 val, int msecs)
 	if ((ok = (*addr == val)) || (*addr & STATUS_ERROR))
 	    break;
 
-    } while (jiffies < timeout);
+    } while (time_before(jiffies, timeout));
 
 #if 1
     if (!ok) {
@@ -289,7 +289,7 @@ fore200e_io_poll(struct fore200e* fore200e, volatile u32* addr, u32 val, int mse
 	if ((ok = (fore200e->bus->read(addr) == val)))
 	    break;
 
-    } while (jiffies < timeout);
+    } while (time_before(jiffies, timeout));
 
 #if 1
     if (!ok) {
@@ -2416,7 +2416,7 @@ fore200e_monitor_getc(struct fore200e* fore200e)
     unsigned long      timeout = jiffies + MSECS(50);
     int                c;
 
-    while (jiffies < timeout) {
+    while (time_before(jiffies, timeout)) {
 
 	c = (int) fore200e->bus->read(&monitor->soft_uart.recv);
 
