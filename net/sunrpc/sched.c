@@ -554,21 +554,28 @@ __rpc_execute(struct rpc_task *task)
 			if (current->pid == rpciod_pid)
 				printk(KERN_ERR "RPC: rpciod waiting on sync task!\n");
 
-			__wait_event(task->tk_wait, !RPC_IS_SLEEPING(task));
-			dprintk("RPC: %4d sync task resuming\n", task->tk_pid);
+			if (!task->tk_client->cl_intr) {
+				__wait_event(task->tk_wait, !RPC_IS_SLEEPING(task));
+			} else {
+				__wait_event_interruptible(task->tk_wait,
+					       	!RPC_IS_SLEEPING(task), status);
 
-			/*
-			 * When a sync task receives a signal, it exits with
-			 * -ERESTARTSYS. In order to catch any callbacks that
-			 * clean up after sleeping on some queue, we don't
-			 * break the loop here, but go around once more.
-			 */
-			if (task->tk_client->cl_intr && signalled()) {
-				dprintk("RPC: %4d got signal\n", task->tk_pid);
-				task->tk_flags |= RPC_TASK_KILLED;
-				rpc_exit(task, -ERESTARTSYS);
-				rpc_wake_up_task(task);
+				/*
+				 * When a sync task receives a signal, it exits with
+				 * -ERESTARTSYS. In order to catch any callbacks that
+				 * clean up after sleeping on some queue, we don't
+				 * break the outer loop here, but go around once more.
+				 */
+				if (status == -ERESTARTSYS) {
+					dprintk("RPC: %4d got signal\n", task->tk_pid);
+					task->tk_flags |= RPC_TASK_KILLED;
+					rpc_exit(task, -ERESTARTSYS);
+					rpc_wake_up_task(task);
+					break;
+				}
 			}
+
+			dprintk("RPC: %4d sync task resuming\n", task->tk_pid);
 		}
 	}
 

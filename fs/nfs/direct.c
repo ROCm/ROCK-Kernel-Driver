@@ -429,9 +429,7 @@ nfs_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 	if (!is_sync_kiocb(iocb))
 		goto out;
 
-	result = nfs_revalidate_inode(NFS_SERVER(inode), inode);
-	if (result < 0)
-		goto out;
+	up(&inode->i_sem);
 
 	switch (rw) {
 	case READ:
@@ -451,6 +449,8 @@ nfs_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 	default:
 		break;
 	}
+
+	down(&inode->i_sem);
 
 out:
 	dprintk("NFS: direct_IO result=%d\n", result);

@@ -276,9 +276,6 @@ nfs_scan_list(struct list_head *head, struct list_head *dst,
 
 		req = nfs_list_entry(pos);
 
-		if (file && req->wb_file != file)
-			continue;
-
 		if (req->wb_index < idx_start)
 			continue;
 		if (req->wb_index > idx_end)

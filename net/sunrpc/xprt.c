@@ -320,8 +320,8 @@ xprt_adjust_cwnd(struct rpc_xprt *xprt, int result)
 		/* The (cwnd >> 1) term makes sure
 		 * the result gets rounded properly. */
 		cwnd += (RPC_CWNDSCALE * RPC_CWNDSCALE + (cwnd >> 1)) / cwnd;
-		if (cwnd > RPC_MAXCWND)
-			cwnd = RPC_MAXCWND;
+		if (cwnd > RPC_MAXCWND(xprt))
+			cwnd = RPC_MAXCWND(xprt);
 		__xprt_lock_write_next(xprt);
 	} else if (result == -ETIMEDOUT) {
 		cwnd >>= 1;
@@ -1373,6 +1373,9 @@ xprt_set_timeout(struct rpc_timeout *to, unsigned int retr, unsigned long incr)
 	to->to_exponential = 0;
 }
 
+unsigned int xprt_udp_slot_table_entries = RPC_DEF_SLOT_TABLE;
+unsigned int xprt_tcp_slot_table_entries = RPC_DEF_SLOT_TABLE << 2;
+
 /*
  * Initialize an RPC client
  */
@@ -1380,21 +1383,28 @@ static struct rpc_xprt *
 xprt_setup(int proto, struct sockaddr_in *ap, struct rpc_timeout *to)
 {
 	struct rpc_xprt	*xprt;
+	unsigned int entries, xprt_size;
 	struct rpc_rqst	*req;
 	int		i;
 
 	dprintk("RPC:      setting up %s transport...\n",
 				proto == IPPROTO_UDP? "UDP" : "TCP");
 
-	if ((xprt = kmalloc(sizeof(struct rpc_xprt), GFP_KERNEL)) == NULL)
+	entries = (proto == IPPROTO_TCP)?
+		xprt_tcp_slot_table_entries : xprt_udp_slot_table_entries;
+	xprt_size = sizeof(struct rpc_xprt) + sizeof(struct rpc_rqst) * entries;
+
+	if ((xprt = kmalloc(xprt_size, GFP_KERNEL)) == NULL)
 		return NULL;
-	memset(xprt, 0, sizeof(*xprt)); /* Nnnngh! */
+	memset(xprt, 0, xprt_size);
+	xprt->free = (struct rpc_rqst *)(xprt + 1);
+	xprt->max_reqs = entries;
 
 	xprt->addr = *ap;
 	xprt->prot = proto;
 	xprt->stream = (proto == IPPROTO_TCP)? 1 : 0;
 	if (xprt->stream) {
-		xprt->cwnd = RPC_MAXCWND;
+		xprt->cwnd = RPC_MAXCWND(xprt);
 		xprt->nocong = 1;
 	} else
 		xprt->cwnd = RPC_INITCWND;
@@ -1417,16 +1427,18 @@ xprt_setup(int proto, struct sockaddr_in *ap, struct rpc_timeout *to)
 	INIT_RPC_WAITQ(&xprt->backlog, "xprt_backlog");
 
 	/* initialize free list */
-	for (i = 0, req = xprt->slot; i < RPC_MAXREQS-1; i++, req++)
+	entries--;
+	req = xprt->free;
+	for (i = 0; i < entries; i++, req++)
 		req->rq_next = req + 1;
 	req->rq_next = NULL;
-	xprt->free = xprt->slot;
 
 	/* Check whether we want to use a reserved port */
 	xprt->resvport = capable(CAP_NET_BIND_SERVICE) ? 1 : 0;
 
-	dprintk("RPC:      created transport %p\n", xprt);
-	
+	dprintk("RPC:      created transport %p with %u slots\n", xprt,
+			xprt->max_reqs);
+
 	return xprt;
 }
 
@@ -1507,11 +1519,11 @@ xprt_sock_setbufsize(struct rpc_xprt *xprt)
 		return;
 	if (xprt->rcvsize) {
 		sk->sk_userlocks |= SOCK_RCVBUF_LOCK;
-		sk->sk_rcvbuf = xprt->rcvsize * RPC_MAXCONG * 2;
+		sk->sk_rcvbuf = xprt->rcvsize * xprt->max_reqs *  2;
 	}
 	if (xprt->sndsize) {
 		sk->sk_userlocks |= SOCK_SNDBUF_LOCK;
-		sk->sk_sndbuf = xprt->sndsize * RPC_MAXCONG * 2;
+		sk->sk_sndbuf = xprt->sndsize * xprt->max_reqs * 2;
 		sk->sk_write_space(sk);
 	}
 }

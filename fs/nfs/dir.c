@@ -1269,6 +1269,7 @@ go_ahead:
 
 	nfs_zap_caches(new_dir);
 	nfs_zap_caches(old_dir);
+	NFS_CACHEINV(old_inode);
 	error = NFS_PROTO(old_dir)->rename(old_dir, &old_dentry->d_name,
 					   new_dir, &new_dentry->d_name);
 out:

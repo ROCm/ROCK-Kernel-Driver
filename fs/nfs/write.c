@@ -441,8 +441,6 @@ nfs_wait_on_requests(struct inode *inode, struct file *file, unsigned long idx_s
 			break;
 
 		next = req->wb_index + 1;
-		if (file && req->wb_file != file)
-			continue;
 		if (!NFS_WBACK_BUSY(req))
 			continue;
 
