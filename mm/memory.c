@@ -1475,9 +1475,10 @@ int make_pages_present(unsigned long addr, unsigned long end)
 /* 
  * Map a vmalloc()-space virtual address to the physical page.
  */
-struct page * vmalloc_to_page(pgd_t *pgd, unsigned long addr)
+struct page * vmalloc_to_page(unsigned long addr)
 {
 	struct page *page = NULL;
+	pgd_t *pgd = pgd_offset_k(addr);
 	pmd_t *pmd;
 	pte_t *ptep, pte;
   
