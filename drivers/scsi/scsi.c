@@ -226,6 +226,8 @@ void  scsi_initialize_queue(Scsi_Device * SDpnt, struct Scsi_Host * SHpnt)
 
 	if (!SHpnt->use_clustering)
 		clear_bit(QUEUE_FLAG_CLUSTER, &q->queue_flags);
+
+        blk_queue_prep_rq(q, scsi_prep_fn);
 }
 
 #ifdef MODULE
@@ -1958,17 +1960,6 @@ out:
 }
 #endif
 
-void scsi_detect_device(struct scsi_device *sdev)
-{
-	struct Scsi_Device_Template *sdt;
-
-	down_read(&scsi_devicelist_mutex);
-	for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
-		if (sdt->detect)
-			(*sdt->detect)(sdev);
-	up_read(&scsi_devicelist_mutex);
-}
-
 int scsi_attach_device(struct scsi_device *sdev)
 {
 	struct Scsi_Device_Template *sdt;
@@ -2089,22 +2080,6 @@ int scsi_register_device(struct Scsi_Device_Template *tpnt)
 
 	driver_register(&tpnt->scsi_driverfs_driver);
 
-	/*
-	 * First scan the devices that we know about, and see if we notice them.
-	 */
-
-	for (shpnt = scsi_host_get_next(NULL); shpnt;
-	     shpnt = scsi_host_get_next(shpnt)) {
-		for (SDpnt = shpnt->host_queue; SDpnt;
-		     SDpnt = SDpnt->next) {
-			if (tpnt->detect)
-				(*tpnt->detect) (SDpnt);
-		}
-	}
-
-	/*
-	 * Now actually connect the devices to the new driver.
-	 */
 	for (shpnt = scsi_host_get_next(NULL); shpnt;
 	     shpnt = scsi_host_get_next(shpnt)) {
 		for (SDpnt = shpnt->host_queue; SDpnt;

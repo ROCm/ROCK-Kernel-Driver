@@ -455,6 +455,7 @@ extern int scsi_insert_special_cmd(Scsi_Cmnd * SCpnt, int);
 extern void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 			       int block_sectors);
 extern void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt);
+extern int scsi_prep_fn(struct request_queue *q, struct request *req);
 extern void scsi_request_fn(request_queue_t * q);
 extern int scsi_starvation_completion(Scsi_Device * SDpnt);
 
@@ -480,7 +481,6 @@ extern void scsi_do_cmd(Scsi_Cmnd *, const void *cmnd,
 			int timeout, int retries);
 extern int scsi_dev_init(void);
 extern int scsi_mlqueue_insert(struct scsi_cmnd *, int);
-extern void scsi_detect_device(struct scsi_device *);
 extern int scsi_attach_device(struct scsi_device *);
 extern void scsi_detach_device(struct scsi_device *);
 
