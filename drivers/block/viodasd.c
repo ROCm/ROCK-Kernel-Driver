@@ -742,7 +742,7 @@ static ssize_t probe_disks(struct device_driver *drv, const char *buf,
 	}
 	return count;
 }
-static DRIVER_ATTR(probe, S_IWUSR, NULL, probe_disks)
+static DRIVER_ATTR(probe, S_IWUSR, NULL, probe_disks);
 
 static struct vio_driver viodasd_driver = {
 	.name = "viodasd"
