@@ -39,7 +39,7 @@
 
 #define PFX "powernow-k8: "
 #define BFX PFX "BIOS error: "
-#define VERSION "version 1.00.08a"
+#define VERSION "version 1.00.08b"
 #include "powernow-k8.h"
 
 /* serialize freq changes  */
