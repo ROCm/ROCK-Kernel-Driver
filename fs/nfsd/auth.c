@@ -15,35 +15,21 @@
 int nfsd_setuser(struct svc_rqst *rqstp, struct svc_export *exp)
 {
 	struct svc_cred	*cred = &rqstp->rq_cred;
-	struct group_info *group_info;
-	int ngroups;
 	int i;
 	int ret;
-
-	ngroups = 0;
-	if (!(exp->ex_flags & NFSEXP_ALLSQUASH)) {
-		for (i = 0; i < SVC_CRED_NGROUPS; i++) {
-			if (cred->cr_groups[i] == (gid_t)NOGROUP)
-				break;
-			ngroups++;
-		}
-	}
-	group_info = groups_alloc(ngroups);
-	if (group_info == NULL)
-		return -ENOMEM;
 
 	if (exp->ex_flags & NFSEXP_ALLSQUASH) {
 		cred->cr_uid = exp->ex_anon_uid;
 		cred->cr_gid = exp->ex_anon_gid;
-		cred->cr_groups[0] = NOGROUP;
+		cred->cr_group_info->ngroups = 0;
 	} else if (exp->ex_flags & NFSEXP_ROOTSQUASH) {
 		if (!cred->cr_uid)
 			cred->cr_uid = exp->ex_anon_uid;
 		if (!cred->cr_gid)
 			cred->cr_gid = exp->ex_anon_gid;
-		for (i = 0; i < SVC_CRED_NGROUPS; i++)
-			if (!cred->cr_groups[i])
-				cred->cr_groups[i] = exp->ex_anon_gid;
+		for (i = 0; i < cred->cr_group_info->ngroups; i++)
+			if (!GROUP_AT(cred->cr_group_info, i))
+				GROUP_AT(cred->cr_group_info, i) = exp->ex_anon_gid;
 	}
 
 	if (cred->cr_uid != (uid_t) -1)
@@ -55,23 +41,12 @@ int nfsd_setuser(struct svc_rqst *rqstp, struct svc_export *exp)
 	else
 		current->fsgid = exp->ex_anon_gid;
 
-	for (i = 0; i < SVC_CRED_NGROUPS; i++) {
-		gid_t group = cred->cr_groups[i];
-		if (group == (gid_t) NOGROUP)
-			break;
-		GROUP_AT(group_info, i) = group;
+	ret = set_current_groups(cred->cr_group_info);
+	if ((cred->cr_uid)) {
+		cap_t(current->cap_effective) &= ~CAP_NFSD_MASK;
+	} else {
+		cap_t(current->cap_effective) |= (CAP_NFSD_MASK &
+						  current->cap_permitted);
 	}
-
-	ret = set_current_groups(group_info);
-	if (ret == 0) {
-		if ((cred->cr_uid)) {
-			cap_t(current->cap_effective) &= ~CAP_NFSD_MASK;
-		} else {
-			cap_t(current->cap_effective) |= (CAP_NFSD_MASK &
-							current->cap_permitted);
-		}
-	}
-	put_group_info(group_info);
-
 	return ret;
 }

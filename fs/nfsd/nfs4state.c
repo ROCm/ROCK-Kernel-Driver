@@ -193,6 +193,8 @@ alloc_client(struct xdr_netobj name)
 static inline void
 free_client(struct nfs4_client *clp)
 {
+	if (clp->cl_cred.cr_group_info)
+		put_group_info(clp->cl_cred.cr_group_info);
 	kfree(clp->cl_name.data);
 	kfree(clp);
 }
@@ -240,12 +242,11 @@ copy_clid(struct nfs4_client *target, struct nfs4_client *source) {
 
 static void
 copy_cred(struct svc_cred *target, struct svc_cred *source) {
-	int i;
 
 	target->cr_uid = source->cr_uid;
 	target->cr_gid = source->cr_gid;
-	for(i = 0; i < SVC_CRED_NGROUPS; i++)
-		target->cr_groups[i] = source->cr_groups[i];
+	target->cr_group_info = source->cr_group_info;
+	get_group_info(target->cr_group_info);
 }
 
 static int

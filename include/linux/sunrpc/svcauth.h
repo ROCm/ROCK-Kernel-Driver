@@ -20,7 +20,7 @@
 struct svc_cred {
 	uid_t			cr_uid;
 	gid_t			cr_gid;
-	gid_t			cr_groups[SVC_CRED_NGROUPS];
+	struct group_info	*cr_group_info;
 };
 
 struct svc_rqst;		/* forward decl */
