@@ -525,7 +525,7 @@ get_out:
  * (AGP 3.0 devices are required to operate as AGP 2.0 devices 
  * when not using 3.0 electricals.
  */
-int agp_generic_agp_3_0_enable(u32 mode)
+void agp_generic_agp_3_0_enable(u32 mode)
 {
 	u32 ncapid, major, minor, agp_3_0;
 
@@ -541,12 +541,9 @@ int agp_generic_agp_3_0_enable(u32 mode)
 		/* 
 		 * Check to see if we are operating in 3.0 mode 
 		 */
-		if((agp_3_0 >> 3) & 0x1) {
+		if((agp_3_0 >> 3) & 0x1)
 			agp_3_0_node_enable(mode, minor);
-			return TRUE;
-		}
 	}
-	return FALSE;
 }
 
 EXPORT_SYMBOL(agp_generic_agp_3_0_enable);
