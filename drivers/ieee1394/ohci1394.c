@@ -31,9 +31,9 @@
  *
  * Things implemented, but still in test phase:
  * . Iso Transmit
+ * . Async Stream Packets Transmit (Receive done via Iso interface)
  * 
  * Things not implemented:
- * . Async Stream Packets
  * . DMA error recovery
  *
  * Known bugs:
@@ -160,7 +160,7 @@ printk(level "%s: " fmt "\n" , OHCI1394_DRIVER_NAME , ## args)
 printk(level "%s_%d: " fmt "\n" , OHCI1394_DRIVER_NAME, card , ## args)
 
 static char version[] __devinitdata =
-	"$Rev: 762 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 801 $ Ben Collins <bcollins@debian.org>";
 
 /* Module Parameters */
 MODULE_PARM(phys_dma,"i");
@@ -649,18 +649,31 @@ static void insert_packet(struct ti_ohci *ohci,
                 } else {
                         d->prg_cpu[idx]->data[0] = packet->speed_code<<16 |
                                 (packet->header[0] & 0xFFFF);
-                        d->prg_cpu[idx]->data[1] =
-                                (packet->header[1] & 0xFFFF) | 
-                                (packet->header[0] & 0xFFFF0000);
-                        d->prg_cpu[idx]->data[2] = packet->header[2];
-                        d->prg_cpu[idx]->data[3] = packet->header[3];
+
+			if (packet->tcode == TCODE_ISO_DATA) {
+				/* Sending an async stream packet */
+				d->prg_cpu[idx]->data[1] = packet->header[0] & 0xFFFF0000;
+			} else {
+				/* Sending a normal async request or response */
+				d->prg_cpu[idx]->data[1] =
+					(packet->header[1] & 0xFFFF) | 
+					(packet->header[0] & 0xFFFF0000);
+				d->prg_cpu[idx]->data[2] = packet->header[2];
+				d->prg_cpu[idx]->data[3] = packet->header[3];
+			}
 			packet_swab(d->prg_cpu[idx]->data, packet->tcode);
                 }
 
                 if (packet->data_size) { /* block transmit */
-                        d->prg_cpu[idx]->begin.control =
-                                cpu_to_le32(DMA_CTL_OUTPUT_MORE |
-					    DMA_CTL_IMMEDIATE | 0x10);
+			if (packet->tcode == TCODE_STREAM_DATA){
+				d->prg_cpu[idx]->begin.control =
+					cpu_to_le32(DMA_CTL_OUTPUT_MORE |
+						    DMA_CTL_IMMEDIATE | 0x8);
+			} else {
+				d->prg_cpu[idx]->begin.control =
+					cpu_to_le32(DMA_CTL_OUTPUT_MORE |
+						    DMA_CTL_IMMEDIATE | 0x10);
+			}
                         d->prg_cpu[idx]->end.control =
                                 cpu_to_le32(DMA_CTL_OUTPUT_LAST |
 					    DMA_CTL_IRQ | 
@@ -830,7 +843,7 @@ static int ohci_transmit(struct hpsb_host *host, struct hpsb_packet *packet)
 	/* Decide whether we have an iso, a request, or a response packet */
 	if (packet->type == hpsb_raw)
 		d = &ohci->at_req_context;
-	else if (packet->tcode == TCODE_ISO_DATA) {
+	else if ((packet->tcode == TCODE_ISO_DATA) && (packet->type == hpsb_iso)) {
 		/* The legacy IT DMA context is initialized on first
 		 * use.  However, the alloc cannot be run from
 		 * interrupt context, so we bail out if that is the
@@ -856,7 +869,7 @@ static int ohci_transmit(struct hpsb_host *host, struct hpsb_packet *packet)
 		}
 		
 		d = &ohci->it_legacy_context;
-	} else if (packet->tcode & 0x02)
+	} else if ((packet->tcode & 0x02) && (packet->tcode != TCODE_ISO_DATA))
 		d = &ohci->at_resp_context;
 	else 
 		d = &ohci->at_req_context;
@@ -1295,6 +1308,8 @@ static void ohci_iso_recv_program(struct hpsb_iso *iso)
 	u32 *prev_branch = NULL;
 
 	for (blk = 0; blk < recv->nblocks; blk++) {
+		u32 control;
+
 		/* the DMA descriptor */
 		struct dma_cmd *cmd = &recv->block[blk];
 
@@ -1305,29 +1320,29 @@ static void ohci_iso_recv_program(struct hpsb_iso *iso)
 		unsigned long buf_offset = blk * recv->buf_stride;
 
 		if (recv->dma_mode == BUFFER_FILL_MODE) {
-			cmd->control = 2 << 28; /* INPUT_MORE */
+			control = 2 << 28; /* INPUT_MORE */
 		} else {
-			cmd->control = 3 << 28; /* INPUT_LAST */
+			control = 3 << 28; /* INPUT_LAST */
 		}
 
-		cmd->control |= 8 << 24; /* s = 1, update xferStatus and resCount */
+		control |= 8 << 24; /* s = 1, update xferStatus and resCount */
 
 		/* interrupt on last block, and at intervals */
 		if (blk == recv->nblocks-1 || (blk % recv->block_irq_interval) == 0) {
-			cmd->control |= 3 << 20; /* want interrupt */
+			control |= 3 << 20; /* want interrupt */
 		}
 
-		cmd->control |= 3 << 18; /* enable branch to address */
-		cmd->control |= recv->buf_stride;
+		control |= 3 << 18; /* enable branch to address */
+		control |= recv->buf_stride;
 
-		cmd->address = dma_region_offset_to_bus(&iso->data_buf, buf_offset);
+		cmd->control = cpu_to_le32(control);
+		cmd->address = cpu_to_le32(dma_region_offset_to_bus(&iso->data_buf, buf_offset));
 		cmd->branchAddress = 0; /* filled in on next loop */
-		cmd->status = recv->buf_stride;
+		cmd->status = cpu_to_le32(recv->buf_stride);
 
 		/* link the previous descriptor to this one */
 		if (prev_branch) {
-			*prev_branch = dma_prog_region_offset_to_bus(&recv->prog, prog_offset);
-			*prev_branch |= 1; /* set Z=1 */
+			*prev_branch = cpu_to_le32(dma_prog_region_offset_to_bus(&recv->prog, prog_offset) | 1);
 		}
 
 		prev_branch = &cmd->branchAddress;
@@ -1485,18 +1500,18 @@ static void ohci_iso_recv_release_block(struct ohci_iso_recv *recv, int block)
 	/* 'next' becomes the new end of the DMA chain,
 	   so disable branch and enable interrupt */
 	next->branchAddress = 0;
-	next->control |= 3 << 20;
+	next->control |= cpu_to_le32(3 << 20);
 
 	/* link prev to next */	
-	prev->branchAddress = dma_prog_region_offset_to_bus(&recv->prog,
-							    sizeof(struct dma_cmd) * next_i)
-		| 1; /* Z=1 */
+	prev->branchAddress = cpu_to_le32(dma_prog_region_offset_to_bus(&recv->prog,
+									sizeof(struct dma_cmd) * next_i)
+					  | 1); /* Z=1 */
 
 	/* disable interrupt on previous DMA descriptor, except at intervals */
 	if((prev_i % recv->block_irq_interval) == 0) {
-		prev->control |= 3 << 20; /* enable interrupt */
+		prev->control |= cpu_to_le32(3 << 20); /* enable interrupt */
 	} else {
-		prev->control &= ~(3<<20); /* disable interrupt */
+		prev->control &= cpu_to_le32(~(3<<20)); /* disable interrupt */
 	}
 	wmb();
 
@@ -1720,8 +1735,8 @@ static void ohci_iso_recv_packetperbuf_task(unsigned long data)
 		struct dma_cmd *il = ((struct dma_cmd*) recv->prog.kvirt) + iso->pkt_dma;
 
 		/* check the DMA descriptor for new writes to xferStatus */
-		u16 xferstatus = il->status >> 16;
-		u16 rescount = il->status & 0xFFFF;
+		u16 xferstatus = le32_to_cpu(il->status) >> 16;
+		u16 rescount = le32_to_cpu(il->status) & 0xFFFF;
 
 		unsigned char event = xferstatus & 0x1F;
 
@@ -1903,7 +1918,7 @@ static void ohci_iso_xmit_task(unsigned long data)
 		struct iso_xmit_cmd *cmd = dma_region_i(&xmit->prog, struct iso_xmit_cmd, iso->pkt_dma);
 		
 		/* check for new writes to xferStatus */
-		u16 xferstatus = cmd->output_last.status >> 16;
+		u16 xferstatus = le32_to_cpu(cmd->output_last.status) >> 16;
 		u8  event = xferstatus & 0x1F;
 
 		if(!event) {
@@ -1919,7 +1934,7 @@ static void ohci_iso_xmit_task(unsigned long data)
 		wake = 1;
 		
 		/* parse cycle */
-		cycle = cmd->output_last.status & 0x1FFF;
+		cycle = le32_to_cpu(cmd->output_last.status) & 0x1FFF;
 
 		/* tell the subsystem the packet has gone out */
 		hpsb_iso_packet_sent(iso, cycle, event != 0x11);
@@ -1972,7 +1987,7 @@ static int ohci_iso_xmit_queue(struct hpsb_iso *iso, struct hpsb_iso_packet_info
 
 	/* set up the OUTPUT_MORE_IMMEDIATE descriptor */
 	memset(next, 0, sizeof(struct iso_xmit_cmd));
-	next->output_more_immediate.control = 0x02000008;
+	next->output_more_immediate.control = cpu_to_le32(0x02000008);
 
 	/* ISO packet header is embedded in the OUTPUT_MORE_IMMEDIATE */
 
@@ -1990,28 +2005,28 @@ static int ohci_iso_xmit_queue(struct hpsb_iso *iso, struct hpsb_iso_packet_info
 	next->iso_hdr[7] = len >> 8;
 
 	/* set up the OUTPUT_LAST */
-	next->output_last.control = 1 << 28;
-	next->output_last.control |= 1 << 27; /* update timeStamp */
-	next->output_last.control |= 3 << 20; /* want interrupt */
-	next->output_last.control |= 3 << 18; /* enable branch */
-	next->output_last.control |= len;
+	next->output_last.control = cpu_to_le32(1 << 28);
+	next->output_last.control |= cpu_to_le32(1 << 27); /* update timeStamp */
+	next->output_last.control |= cpu_to_le32(3 << 20); /* want interrupt */
+	next->output_last.control |= cpu_to_le32(3 << 18); /* enable branch */
+	next->output_last.control |= cpu_to_le32(len);
 
 	/* payload bus address */
-	next->output_last.address = dma_region_offset_to_bus(&iso->data_buf, offset);
+	next->output_last.address = cpu_to_le32(dma_region_offset_to_bus(&iso->data_buf, offset));
 
 	/* leave branchAddress at zero for now */
 
 	/* re-write the previous DMA descriptor to chain to this one */
 
 	/* set prev branch address to point to next (Z=3) */
-	prev->output_last.branchAddress =
-		dma_prog_region_offset_to_bus(&xmit->prog, sizeof(struct iso_xmit_cmd) * next_i) | 3;
+	prev->output_last.branchAddress = cpu_to_le32(
+		dma_prog_region_offset_to_bus(&xmit->prog, sizeof(struct iso_xmit_cmd) * next_i) | 3);
 
 	/* disable interrupt, unless required by the IRQ interval */
 	if(prev_i % iso->irq_interval) {
-		prev->output_last.control &= ~(3 << 20); /* no interrupt */
+		prev->output_last.control &= cpu_to_le32(~(3 << 20)); /* no interrupt */
 	} else {
-		prev->output_last.control |= 3 << 20; /* enable interrupt */
+		prev->output_last.control |= cpu_to_le32(3 << 20); /* enable interrupt */
 	}
 
 	wmb();
@@ -3473,10 +3488,10 @@ static void ohci1394_pci_remove(struct pci_dev *pdev)
 
 static struct pci_device_id ohci1394_pci_tbl[] __devinitdata = {
 	{
-		.class = 		PCI_CLASS_FIREWIRE_OHCI,
-		.class_mask = 	0x00ffffff,
-		.vendor =		PCI_ANY_ID,
-		.device =		PCI_ANY_ID,
+		.class = 	PCI_CLASS_FIREWIRE_OHCI,
+		.class_mask = 	~0,
+		.vendor =	PCI_ANY_ID,
+		.device =	PCI_ANY_ID,
 		.subvendor =	PCI_ANY_ID,
 		.subdevice =	PCI_ANY_ID,
 	},

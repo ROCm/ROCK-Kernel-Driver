@@ -65,6 +65,7 @@
 #include "ieee1394_transactions.h"
 #include "ieee1394.h"
 #include "highlevel.h"
+#include "iso.h"
 #include "eth1394.h"
 
 #define ETH1394_PRINT_G(level, fmt, args...) \
@@ -77,7 +78,7 @@
 	printk(KERN_ERR fmt, ## args)
 
 static char version[] __devinitdata =
-	"$Rev: 770 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 801 $ Ben Collins <bcollins@debian.org>";
 
 /* Our ieee1394 highlevel driver */
 #define ETHER1394_DRIVER_NAME "ether1394"
@@ -100,6 +101,9 @@ static int hdr_type_len[] = {
 MODULE_AUTHOR("Ben Collins (bcollins@debian.org)");
 MODULE_DESCRIPTION("IEEE 1394 IPv4 Driver (IPv4-over-1394 as per RFC 2734)");
 MODULE_LICENSE("GPL");
+
+static void ether1394_iso(struct hpsb_iso *iso);
+
 
 /* Find our host_info struct for a given host pointer. Must be called
  * under spinlock.  */
@@ -178,15 +182,26 @@ static void ether1394_tx_timeout (struct net_device *dev)
  * XXX: This is where we need to create a list of skb's for fragmented
  * packets.  */
 static inline void ether1394_encapsulate (struct sk_buff *skb, struct net_device *dev,
-			    int proto)
+                                          int proto, struct packet_task *ptask)
 {
 	union eth1394_hdr *hdr =
 		(union eth1394_hdr *)skb_push (skb, hdr_type_len[ETH1394_HDR_LF_UF]);
 
+	hdr->words.word1 = 0;
 	hdr->common.lf = ETH1394_HDR_LF_UF;
 	hdr->words.word1 = htons(hdr->words.word1);
 	hdr->uf.ether_type = proto;
 
+	/* Set the transmission type for the packet.  Right now only ARP
+	 * packets are sent via GASP.  IP broadcast and IP multicast are not
+	 * yet supported properly, they too should use GASP. */
+	switch(proto) {
+	case __constant_htons(ETH_P_ARP):
+		ptask->tx_type = ETH1394_GASP;
+		break;
+	default:
+		ptask->tx_type = ETH1394_WRREQ;
+	}
 	return;
 }
 
@@ -199,7 +214,7 @@ static inline void ether1394_arp_to_1394arp (struct sk_buff *skb, struct net_dev
 {
 	struct eth1394_priv *priv =
 		(struct eth1394_priv *)(dev->priv);
-	u16 phy_id = priv->host->node_id & NODE_MASK;
+	u16 phy_id = NODEID_TO_NODE(priv->host->node_id);
 
 	unsigned char *arp_ptr = (unsigned char *)skb->data;
 	struct eth1394_arp *arp1394 = (struct eth1394_arp *)skb->data;
@@ -279,7 +294,8 @@ static void ether1394_reset_priv (struct net_device *dev, int set_mtu)
 {
 	unsigned long flags;
 	struct eth1394_priv *priv = (struct eth1394_priv *)dev->priv;
-	int phy_id = priv->host->node_id & NODE_MASK;
+	int phy_id = NODEID_TO_NODE(priv->host->node_id);
+	struct hpsb_host *host = priv->host;
 
 	spin_lock_irqsave (&priv->lock, flags);
 
@@ -289,20 +305,23 @@ static void ether1394_reset_priv (struct net_device *dev, int set_mtu)
 	memset (priv->fifo_hi, 0, sizeof (priv->fifo_hi));
 	memset (priv->fifo_lo, 0, sizeof (priv->fifo_lo));
 
+	priv->bc_state = ETHER1394_BC_CHECK;
+
 	/* Register our limits now */
-	ether1394_register_limits (phy_id, (be32_to_cpu(priv->host->csr.rom[2]) >> 12) & 0xf,
-				   priv->host->speed_map[(phy_id << 6) + phy_id],
-				   (u64)(((u64)be32_to_cpu(priv->host->csr.rom[3]) << 32) |
-				   be32_to_cpu(priv->host->csr.rom[4])),
+	ether1394_register_limits (phy_id, (be32_to_cpu(host->csr.rom[2]) >> 12) & 0xf,
+				   host->speed_map[(phy_id << 6) + phy_id],
+				   (u64)(((u64)be32_to_cpu(host->csr.rom[3]) << 32) |
+				   be32_to_cpu(host->csr.rom[4])),
 				   ETHER1394_REGION_ADDR >> 32,
 				   ETHER1394_REGION_ADDR & 0xffffffff, priv);
 
 	/* We'll use our max_rec as the default mtu */
 	if (set_mtu)
-		dev->mtu = (1 << (priv->max_rec[phy_id] + 1)) - sizeof (union eth1394_hdr);
+		dev->mtu = (1 << (priv->max_rec[phy_id] + 1)) - /* mtu = max_rec - */
+			(sizeof (union eth1394_hdr) + 8);	/* (hdr + GASP) */
 
 	/* Set our hardware address while we're at it */
-	*(nodeid_t *)dev->dev_addr = htons (priv->host->node_id);
+	*(nodeid_t *)dev->dev_addr = htons (host->node_id);
 
 	spin_unlock_irqrestore (&priv->lock, flags);
 }
@@ -383,6 +402,15 @@ static void ether1394_add_host (struct hpsb_host *host)
 	list_add_tail (&hi->list, &host_info_list);
 	spin_unlock_irq (&host_info_lock);
 
+	/* Ignore validity in hopes that it will be set in the future.  It'll
+	 * check it on transmit. */
+	priv->broadcast_channel = host->csr.broadcast_channel & 0x3f;
+
+	priv->iso = hpsb_iso_recv_init(host, 8 * 4096, 8, priv->broadcast_channel,
+				       1, ether1394_iso);
+	if (priv->iso == NULL) {
+		priv->bc_state = ETHER1394_BC_CLOSED;
+	}
 	return;
 
 out:
@@ -396,11 +424,14 @@ out:
 /* Remove a card from our list */
 static void ether1394_remove_host (struct hpsb_host *host)
 {
+	struct eth1394_priv *priv;
 	struct host_info *hi;
 
 	spin_lock_irq (&host_info_lock);
 	hi = find_host_info (host);
 	if (hi != NULL) {
+		priv = (struct eth1394_priv *)hi->dev->priv;
+		priv->bc_state = ETHER1394_BC_CLOSED;
 		unregister_netdev (hi->dev);
 		kfree (hi->dev);
 		list_del (&hi->list);
@@ -480,7 +511,7 @@ static inline unsigned short ether1394_parse_encap (struct sk_buff *skb, struct 
 	 * about the sending machine.  */
 	if (hdr->uf.ether_type == __constant_htons (ETH_P_ARP)) {
 		unsigned long flags;
-		u16 phy_id = srcid & NODE_MASK;
+		u16 phy_id = NODEID_TO_NODE(srcid);
 		struct eth1394_priv *priv =
 			(struct eth1394_priv *)dev->priv;
 		struct eth1394_arp arp1394;
@@ -591,6 +622,104 @@ bad_proto:
 	return RCODE_COMPLETE;
 }
 
+static void ether1394_iso(struct hpsb_iso *iso)
+{
+	struct sk_buff *skb;
+	quadlet_t *data;
+	char *buf;
+	int flags;
+	struct net_device *dev = ether1394_find_dev(iso->host);
+	struct eth1394_priv *priv;
+	unsigned int len;
+	u32 specifier_id;
+	u16 source_id;
+	int i;
+	int nready;
+
+	if (dev == NULL) {
+		ETH1394_PRINT_G (KERN_ERR, "Could not find net device for host %s\n",
+				 iso->host->driver->name);
+		return;
+	}
+
+	nready = hpsb_iso_n_ready(iso);
+	for(i = 0; i < nready; i++) {
+		struct hpsb_iso_packet_info *info = &iso->infos[iso->first_packet + i];
+		data = (quadlet_t*) (iso->data_buf.kvirt + info->offset);
+
+		/* skip over GASP header */
+		buf = (char *)data + 8;
+		len = info->len - 8;
+
+		specifier_id = (((be32_to_cpu(data[0]) & 0xffff) << 8) |
+				((be32_to_cpu(data[1]) & 0xff000000) >> 24));
+		source_id = be32_to_cpu(data[0]) >> 16;
+
+		priv = (struct eth1394_priv *)dev->priv;
+
+		if (info->channel != priv->broadcast_channel ||
+		    specifier_id != ETHER1394_GASP_SPECIFIER_ID) {
+			/* This packet is not for us */
+			continue;
+		}
+
+		/* A packet has been received by the ieee1394 bus. Build an skbuff
+		 * around it so we can pass it to the high level network layer. */
+		skb = dev_alloc_skb (len + dev->hard_header_len + 15);
+		if (!skb) {
+			HPSB_PRINT (KERN_ERR, "ether1394 rx: low on mem\n");
+			priv->stats.rx_dropped++;
+			break;
+		}
+
+		skb_reserve(skb, (dev->hard_header_len + 15) & ~15);
+
+		memcpy (skb_put (skb, len), buf, len);
+
+		/* Write metadata, and then pass to the receive level */
+		skb->dev = dev;
+		skb->ip_summed = CHECKSUM_UNNECESSARY;	/* don't check it */
+
+		/* Parse the encapsulation header. This actually does the job of
+		 * converting to an ethernet frame header, aswell as arp
+		 * conversion if needed. ARP conversion is easier in this
+		 * direction, since we are using ethernet as our backend.  */
+		skb->protocol = ether1394_parse_encap (skb, dev, source_id,
+						       LOCAL_BUS | ALL_NODES);
+
+		spin_lock_irqsave (&priv->lock, flags);
+		if (!skb->protocol) {
+			priv->stats.rx_errors++;
+			priv->stats.rx_dropped++;
+			dev_kfree_skb_any(skb);
+			goto bad_proto;
+		}
+
+		netif_stop_queue(dev);
+		if (netif_rx (skb) == NET_RX_DROP) {
+			priv->stats.rx_errors++;
+			priv->stats.rx_dropped++;
+			goto bad_proto;
+		}
+
+		/* Statistics */
+		priv->stats.rx_packets++;
+		priv->stats.rx_bytes += skb->len;
+
+	bad_proto:
+		spin_unlock_irqrestore (&priv->lock, flags);
+	}
+
+	hpsb_iso_recv_release_packets(iso, i);
+
+	netif_start_queue(dev);
+	
+	dev->last_rx = jiffies;
+
+	return;
+}
+
+
 /* This function is our scheduled write */
 static void hpsb_write_sched (void *__ptask)
 {
@@ -598,13 +727,26 @@ static void hpsb_write_sched (void *__ptask)
 	struct sk_buff *skb = ptask->skb;
 	struct net_device *dev = ptask->skb->dev;
 	struct eth1394_priv *priv = (struct eth1394_priv *)dev->priv;
-        unsigned long flags;
+	unsigned long flags;
+	int status;
+ 
+	if (ptask->tx_type == ETH1394_GASP) {
+		status  = hpsb_send_gasp(priv->host, priv->broadcast_channel,
+					 get_hpsb_generation(priv->host),
+					 (quadlet_t *)skb->data, skb->len,
+					 ETHER1394_GASP_SPECIFIER_ID,
+					 ETHER1394_GASP_VERSION);
+	} else {
+		status = hpsb_write(priv->host, ptask->dest_node,
+				    get_hpsb_generation(priv->host),
+				    ptask->addr, (quadlet_t *)skb->data,
+				    skb->len);
+	}
+
 
 	/* Statistics */
 	spin_lock_irqsave (&priv->lock, flags);
-	if (!hpsb_write(priv->host, ptask->dest_node,
-			get_hpsb_generation(priv->host),
-			ptask->addr, (quadlet_t *)skb->data, skb->len)) {
+	if (!status) {
 		priv->stats.tx_bytes += skb->len;
 		priv->stats.tx_packets++;
 	} else {
@@ -636,6 +778,67 @@ static int ether1394_tx (struct sk_buff *skb, struct net_device *dev)
 	struct packet_task *ptask = NULL;
 	int ret = 0;
 
+	spin_lock_irqsave (&priv->lock, flags);
+	if (priv->bc_state == ETHER1394_BC_CLOSED) {
+		ETH1394_PRINT(KERN_ERR, dev->name,
+			      "Cannot send packet, no broadcast channel available.");
+		ret = -EAGAIN;
+		goto fail;
+	}
+
+	/* First time sending?  Need a broadcast channel for ARP and for
+	 * listening on */
+	if (priv->bc_state == ETHER1394_BC_CHECK) {
+		quadlet_t bc;
+
+		/* Get the local copy of the broadcast channel and check its
+		 * validity (the IRM should validate it for us) */
+
+		bc = priv->host->csr.broadcast_channel;
+
+		if ((bc & 0xc0000000) != 0xc0000000) {
+			/* broadcast channel not validated yet */
+			ETH1394_PRINT(KERN_WARNING, dev->name,
+				      "Error BROADCAST_CHANNEL register valid "
+				      "bit not set, can't send IP traffic\n");
+			hpsb_iso_shutdown(priv->iso);
+			priv->bc_state = ETHER1394_BC_CLOSED;
+			ret = -EAGAIN;
+			spin_unlock_irqrestore (&priv->lock, flags);
+			goto fail;
+		}
+		if (priv->broadcast_channel != (bc & 0x3f)) {
+			/* This really shouldn't be possible, but just in case
+			 * the IEEE 1394 spec changes regarding broadcast
+			 * channels in the future. */
+			hpsb_iso_shutdown(priv->iso);
+
+			priv->broadcast_channel = bc & 0x3f;
+			ETH1394_PRINT(KERN_WARNING, dev->name,
+				      "Changing to broadcast channel %d...\n",
+				      priv->broadcast_channel);
+
+			priv->iso = hpsb_iso_recv_init(priv->host, 8 * 4096,
+						       8, priv->broadcast_channel,
+						       1, ether1394_iso);
+			if (priv->iso == NULL) {
+				ret = -EAGAIN;
+				goto fail;
+			}
+		}
+		if (hpsb_iso_recv_start(priv->iso, -1, (1 << 3), -1) < 0) {
+			ETH1394_PRINT(KERN_ERR, dev->name,
+				      "Could not start async reception\n");
+			hpsb_iso_shutdown(priv->iso);
+			priv->bc_state = ETHER1394_BC_CLOSED;
+			ret = -EAGAIN;
+			spin_unlock_irqrestore (&priv->lock, flags);
+			goto fail;
+		}
+		priv->bc_state = ETHER1394_BC_OPENED;
+	}
+	spin_unlock_irqrestore (&priv->lock, flags);
+
 	if ((skb = skb_share_check (skb, kmflags)) == NULL) {
 		ret = -ENOMEM;
 		goto fail;
@@ -654,8 +857,14 @@ static int ether1394_tx (struct sk_buff *skb, struct net_device *dev)
 	if (proto == __constant_htons (ETH_P_ARP))
 		ether1394_arp_to_1394arp (skb, dev);
 
+	ptask = kmem_cache_alloc(packet_task_cache, kmflags);
+	if (ptask == NULL) {
+		ret = -ENOMEM;
+		goto fail;
+	}
+
 	/* Now add our encapsulation header */
-	ether1394_encapsulate (skb, dev, proto);
+	ether1394_encapsulate (skb, dev, proto, ptask);
 
 	/* TODO: The above encapsulate function needs to recognize when a
 	 * packet needs to be split for a specified node. It should create
@@ -667,18 +876,12 @@ static int ether1394_tx (struct sk_buff *skb, struct net_device *dev)
 	 * need this hack.  */
 
 	spin_lock_irqsave (&priv->lock, flags);
-	addr = (u64)priv->fifo_hi[dest_node & NODE_MASK] << 32 |
-		priv->fifo_lo[dest_node & NODE_MASK];
+	addr = (u64)priv->fifo_hi[NODEID_TO_NODE(dest_node)] << 32 |
+		priv->fifo_lo[NODEID_TO_NODE(dest_node)];
 	spin_unlock_irqrestore (&priv->lock, flags);
 
 	if (!addr)
 		addr = ETHER1394_REGION_ADDR;
-
-	ptask = kmem_cache_alloc(packet_task_cache, kmflags);
-	if (ptask == NULL) {
-		ret = -ENOMEM;
-		goto fail;
-	}
 
 	ptask->skb = skb;
 	ptask->addr = addr;
@@ -702,7 +905,7 @@ fail:
 		netif_wake_queue (dev);
 	spin_unlock_irqrestore (&priv->lock, flags);
 
-	return ret;
+	return 0;  /* returning non-zero causes serious problems */
 }
 
 /* Function for incoming 1394 packets */
@@ -738,6 +941,19 @@ static int __init ether1394_init_module (void)
 
 static void __exit ether1394_exit_module (void)
 {
+	struct list_head *lh;
+	struct host_info *hi;
+	struct eth1394_priv *priv;
+
+	lh = host_info_list.next;
+	while (lh != &host_info_list) {
+		hi = list_entry (lh, struct host_info, list);
+		priv = (struct eth1394_priv*)hi->dev->priv;
+		if (priv->bc_state != ETHER1394_BC_CLOSED) {
+			hpsb_iso_shutdown(priv->iso);
+		}
+		lh = lh->next;
+	}
 	hpsb_unregister_highlevel (hl_handle);
 	kmem_cache_destroy(packet_task_cache);
 }
