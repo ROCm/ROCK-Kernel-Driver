@@ -4112,9 +4112,9 @@ qla2x00_abort_isp(scsi_qla_host_t *ha)
 		    "Performing ISP error recovery - ha= %p.\n", ha);
 		qla2x00_reset_chip(ha);
 
+		atomic_set(&ha->loop_down_timer, LOOP_DOWN_TIME);
 		if (atomic_read(&ha->loop_state) != LOOP_DOWN) {
 			atomic_set(&ha->loop_state, LOOP_DOWN);
-			atomic_set(&ha->loop_down_timer, LOOP_DOWN_TIME);
 			qla2x00_mark_all_devices_lost(ha);
 		} else {
 			if (!atomic_read(&ha->loop_down_timer))
@@ -4131,23 +4131,27 @@ qla2x00_abort_isp(scsi_qla_host_t *ha)
 				if (ha->actthreads)
 					ha->actthreads--;
 				sp->lun_queue->out_cnt--;
-				sp->flags = 0;
 
 				/*
 				 * Set the cmd host_byte status depending on
 				 * whether the scsi_error_handler is
 				 * active or not.
  				 */
-				if (ha->host->eh_active != EH_ACTIVE) {
-					sp->cmd->result = DID_BUS_BUSY << 16;
+				if (sp->flags & SRB_TAPE) {
+					sp->cmd->result = DID_NO_CONNECT << 16;
 				} else {
-					sp->cmd->result = DID_RESET << 16;
+					if (ha->host->eh_active != EH_ACTIVE)
+						sp->cmd->result =
+						    DID_BUS_BUSY << 16;
+					else
+						sp->cmd->result =
+						    DID_RESET << 16;
 				}
+				sp->flags = 0;
 				sp->cmd->host_scribble = (unsigned char *)NULL;
 				add_to_done_queue(ha, sp);
 			}
 		}
-
 		spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 		qla2x00_nvram_config(ha);

@@ -3609,6 +3609,8 @@ qla2x00_timer(scsi_qla_host_t *ha)
 	os_lun_t *lq;
 	os_tgt_t *tq;
 	int		start_dpc = 0;
+	int		index;
+	srb_t		*sp;
 
 	/*
 	 * We try and restart any request in the retry queue every second.
@@ -3712,7 +3714,6 @@ qla2x00_timer(scsi_qla_host_t *ha)
 	if (atomic_read(&ha->loop_down_timer) > 0 &&
 	    !(test_bit(ABORT_ISP_ACTIVE, &ha->dpc_flags)) && ha->flags.online) {
 
-		/* dg 10/30 if (atomic_read(&ha->loop_down_timer) == LOOP_DOWN_TIME) { */
 		if (atomic_read(&ha->loop_down_timer) ==
 		    ha->loop_down_abort_time) {
 
@@ -3722,6 +3723,22 @@ qla2x00_timer(scsi_qla_host_t *ha)
 
 			if (!IS_QLA2100(ha) && ha->link_down_timeout)
 				atomic_set(&ha->loop_state, LOOP_DEAD); 
+
+			/* Schedule an ISP abort to return any tape commands. */
+			spin_lock_irqsave(&ha->hardware_lock, cpu_flags);
+			for (index = 1; index < MAX_OUTSTANDING_COMMANDS;
+			    index++) {
+				sp = ha->outstanding_cmds[index];
+				if (!sp)
+					continue;
+				if (!(sp->fclun->fcport->flags &
+				    FCF_TAPE_PRESENT))
+					continue;
+
+				set_bit(ISP_ABORT_NEEDED, &ha->dpc_flags);
+				break;
+			}
+			spin_unlock_irqrestore(&ha->hardware_lock, cpu_flags);
 
 			set_bit(ABORT_QUEUES_NEEDED, &ha->dpc_flags);
 			start_dpc++;
