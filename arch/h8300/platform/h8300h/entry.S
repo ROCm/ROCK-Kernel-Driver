@@ -109,12 +109,10 @@
 .globl SYMBOL_NAME(system_call)
 .globl SYMBOL_NAME(ret_from_exception)
 .globl SYMBOL_NAME(ret_from_fork)
-.globl SYMBOL_NAME(ret_from_signal)
 .globl SYMBOL_NAME(ret_from_interrupt)
 .globl SYMBOL_NAME(interrupt_redirect_table)
 .globl SYMBOL_NAME(sw_ksp),SYMBOL_NAME(sw_usp)
 .globl SYMBOL_NAME(resume)
-.globl SYMBOL_NAME(syscall_trampoline)
 .globl SYMBOL_NAME(interrupt_redirect_table)
 .globl SYMBOL_NAME(interrupt_entry)
 .globl SYMBOL_NAME(system_call)
@@ -173,7 +171,7 @@ SYMBOL_NAME_LABEL(interrupt_entry)
 	beq	1f
 	jsr	@SYMBOL_NAME(do_softirq)
 1:
-	jmp	@SYMBOL_NAME(ret_from_exception)
+	jmp	@SYMBOL_NAME(ret_from_interrupt)
 	
 SYMBOL_NAME_LABEL(system_call)
 	subs	#4,sp				/* dummy LVEC */
@@ -205,11 +203,11 @@ SYMBOL_NAME_LABEL(system_call)
 	mov.l	@(LER2:16,sp),er1
 	mov.l	@(LER3:16,sp),er2
 	jsr	@er4
-	mov.l	er0,@(LER0,sp)			/* save the return value */
+	mov.l	er0,@(LER0:16,sp)		/* save the return value */
 #if defined(CONFIG_SYSCALL_PRINT)
 	jsr	@SYMBOL_NAME(syscall_print)
 #endif
-	jmp	@SYMBOL_NAME(ret_from_exception)
+	bra	SYMBOL_NAME(ret_from_exception):8
 1:
 	jsr	SYMBOL_NAME(syscall_trace)
 	mov.l	@(LER1:16,sp),er0
@@ -218,43 +216,65 @@ SYMBOL_NAME_LABEL(system_call)
 	jsr	@er4
 	mov.l	er0,@(LER0:16,sp)		/* save the return value */
 	jsr	@SYMBOL_NAME(syscall_trace)
+	bra	SYMBOL_NAME(ret_from_exception):8
 
-SYMBOL_NAME_LABEL(ret_from_signal)
+SYMBOL_NAME_LABEL(ret_from_fork)
+	mov.l	er2,er0
+	jsr	@SYMBOL_NAME(schedule_tail)
+	bra	SYMBOL_NAME(ret_from_exception):8
+
+SYMBOL_NAME_LABEL(reschedule)
+	/* save top of frame */
+	mov.l	sp,er0
+	jsr	@SYMBOL_NAME(set_esp0)
+	jsr	@SYMBOL_NAME(schedule)
 
 SYMBOL_NAME_LABEL(ret_from_exception)
+#if defined(CONFIG_PREEMPT)
+	orc	#0x80,ccr
+#endif
+SYMBOL_NAME_LABEL(ret_from_interrupt)
 	mov.b	@(LCCR+1:16,sp),r0l
 	btst	#4,r0l			/* check if returning to kernel */
-	bne	3f			/* if so, skip resched, signals */
+	bne	done:8			/* if so, skip resched, signals */
 	andc	#0x7f,ccr
-	mov.l	sp,er2
-	and.w	#0xe000,r2
-	mov.l	@(TI_FLAGS:16,er2),er1
+	mov.l	sp,er4
+	and.w	#0xe000,r4
+	mov.l	@(TI_FLAGS:16,er4),er1
 	and.l	#_TIF_WORK_MASK,er1
-	beq	3f
+	beq	done:8
 1:
-	mov.l	@(TI_FLAGS:16,er2),er1
+	mov.l	@(TI_FLAGS:16,er4),er1
 	btst	#TIF_NEED_RESCHED,r1l
 	bne	SYMBOL_NAME(reschedule):16
 	mov.l	sp,er1
 	subs	#4,er1			/* adjust retpc */
 	mov.l	er2,er0
 	jsr	@SYMBOL_NAME(do_signal)
-3:	 
+#if defined(CONFIG_PREEMPT)
+	bra	done:8			/* userspace thoru */
+3:
+	btst	#4,r0l
+	beq	done:8			/* userspace thoru */
+4:
+	mov.l	@(TI_PRE_COUNT:16,er4),er1
+	bne	done:8
+	mov.l	@(TI_FLAGS:16,er4),er1
+	btst	#TIF_NEED_RESCHED,r1l
+	beq	done:8
+	mov.b	r0l,r0l
+	bpl	done:8			/* interrupt off (exception path?) */
+	mov.l	#PREEMPT_ACTIVE,er1
+	mov.l	er1,@(TI_PRE_COUNT:16,er4)
+	andc	#0x7f,ccr
+	jsr	@SYMBOL_NAME(schedule)
+	sub.l	er1,er1
+	mov.l	er1,@(TI_PRE_COUNT:16,er4)
+	orc	#0x80,ccr
+	bra	4b:8
+#endif
+done:
 	RESTORE_ALL			/* Does RTE */
-
-SYMBOL_NAME_LABEL(reschedule)
-	/* save top of frame */
-	mov.l	sp,er0
-	jsr	@SYMBOL_NAME(set_esp0)
-
-	mov.l	#SYMBOL_NAME(ret_from_exception),er0
-	mov.l	er0,@-sp
-	jmp	@SYMBOL_NAME(schedule)
-
-SYMBOL_NAME_LABEL(ret_from_fork)
-	mov.l	er2,er0
-	jsr	@SYMBOL_NAME(schedule_tail)
-	jmp	@SYMBOL_NAME(ret_from_exception)	
 
 SYMBOL_NAME_LABEL(resume)
 	/*
@@ -305,11 +325,6 @@ SYMBOL_NAME_LABEL(trace_break)
 	mov.l	er1,er0
 	jsr	@SYMBOL_NAME(trace_trap)
 	jmp	@SYMBOL_NAME(ret_from_exception)	
-
-SYMBOL_NAME_LABEL(syscall_trampoline)
-	mov.l	er0,er6
-	mov.l	sp,er0
-	jmp	@er6
 
 	.section	.bss
 SYMBOL_NAME_LABEL(sw_ksp)
