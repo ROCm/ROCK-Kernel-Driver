@@ -107,7 +107,7 @@ static int cuda_reset_adb_bus(void);
 
 static int cuda_init_via(void);
 static void cuda_start(void);
-static void cuda_interrupt(int irq, void *arg, struct pt_regs *regs);
+static irqreturn_t cuda_interrupt(int irq, void *arg, struct pt_regs *regs);
 static void cuda_input(unsigned char *buf, int nb, struct pt_regs *regs);
 void cuda_poll(void);
 static int cuda_write(struct adb_request *req);
@@ -441,7 +441,7 @@ cuda_poll()
     local_irq_restore(flags);
 }
 
-static void
+static irqreturn_t
 cuda_interrupt(int irq, void *arg, struct pt_regs *regs)
 {
     int status;
@@ -457,7 +457,7 @@ cuda_interrupt(int irq, void *arg, struct pt_regs *regs)
     out_8(&via[IFR], virq);   
     if ((virq & SR_INT) == 0) {
         spin_unlock(&cuda_lock);
-	return;
+	return IRQ_NONE;
     }
     
     status = (~in_8(&via[B]) & (TIP|TREQ)) | (in_8(&via[ACR]) & SR_OUT);
@@ -595,6 +595,7 @@ cuda_interrupt(int irq, void *arg, struct pt_regs *regs)
     }
     if (ibuf_len)
 	cuda_input(ibuf, ibuf_len, regs);
+    return IRQ_HANDLED;
 }
 
 static void
