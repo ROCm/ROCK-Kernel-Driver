@@ -104,8 +104,6 @@ MODULE_LICENSE("Dual BSD/GPL");
 MODULE_AUTHOR("Rusty Russell <rusty@rustcorp.com.au>");
 MODULE_DESCRIPTION("ipchains backwards compatibility layer");
 
-unsigned int ip_ct_log_invalid;
-
 /* Understanding locking in this code: (thanks to Alan Cox for using
  * little words to explain this to me). -- PR
  *

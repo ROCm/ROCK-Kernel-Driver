@@ -28,8 +28,6 @@ struct notifier_block;
 
 static struct firewall_ops *fwops;
 
-unsigned int ip_ct_log_invalid;
-
 #ifdef CONFIG_IP_VS
 /* From ip_vs_core.c */
 extern unsigned int
