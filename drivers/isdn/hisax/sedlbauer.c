@@ -689,15 +689,13 @@ ready:
 	 * here, it would fail.
 	 */
 	if (cs->hw.sedl.bus != SEDL_BUS_PCMCIA &&
-		check_region((cs->hw.sedl.cfg_reg), bytecnt)) {
+	    (!request_region((cs->hw.sedl.cfg_reg), bytecnt, "sedlbauer isdn"))) {
 		printk(KERN_WARNING
 			"HiSax: %s config port %x-%x already in use\n",
 			CardType[card->typ],
 			cs->hw.sedl.cfg_reg,
 			cs->hw.sedl.cfg_reg + bytecnt);
 			return (0);
-	} else {
-		request_region(cs->hw.sedl.cfg_reg, bytecnt, "sedlbauer isdn");
 	}
 
 	printk(KERN_INFO
