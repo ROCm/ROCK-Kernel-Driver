@@ -29,8 +29,6 @@
 
 #undef	DEBUG
 
-extern spinlock_t tty_termios_lock;
-
 /*
  * Internal flag options for termios setting behavior
  */
@@ -101,7 +99,6 @@ static void change_termios(struct tty_struct * tty, struct termios * new_termios
 	int canon_change;
 	struct termios old_termios = *tty->termios;
 	struct tty_ldisc *ld;
-	unsigned long flags;
 	
 	/*
 	 *	Perform the actual termios internal changes under lock.
@@ -110,7 +107,7 @@ static void change_termios(struct tty_struct * tty, struct termios * new_termios
 
 	/* FIXME: we need to decide on some locking/ordering semantics
 	   for the set_termios notification eventually */
-	spin_lock_irqsave(&tty_termios_lock, flags);
+	down(&tty->termios_sem);
 
 	*tty->termios = *new_termios;
 	unset_locked_termios(tty->termios, &old_termios, tty->termios_locked);
@@ -145,13 +142,6 @@ static void change_termios(struct tty_struct * tty, struct termios * new_termios
 			wake_up_interruptible(&tty->link->read_wait);
 		}
 	}
-
-	/*
-	 * Fixme! We should really try to protect the driver and ldisc
-	 * termios usage too. But they need to be able to sleep, so
-	 * the global termios spinlock is not the right thing.
-	 */
-	spin_unlock_irqrestore(&tty_termios_lock, flags);
 	   
 	if (tty->driver->set_termios)
 		(*tty->driver->set_termios)(tty, &old_termios);
@@ -162,6 +152,7 @@ static void change_termios(struct tty_struct * tty, struct termios * new_termios
 			(ld->set_termios)(tty, &old_termios);
 		tty_ldisc_deref(ld);
 	}
+	up(&tty->termios_sem);
 }
 
 static int set_termios(struct tty_struct * tty, void __user *arg, int opt)
@@ -255,15 +246,14 @@ static int get_sgflags(struct tty_struct * tty)
 static int get_sgttyb(struct tty_struct * tty, struct sgttyb __user * sgttyb)
 {
 	struct sgttyb tmp;
-	unsigned long flags;
 
-	spin_lock_irqsave(&tty_termios_lock, flags);
+	down(&tty->termios_sem);
 	tmp.sg_ispeed = 0;
 	tmp.sg_ospeed = 0;
 	tmp.sg_erase = tty->termios->c_cc[VERASE];
 	tmp.sg_kill = tty->termios->c_cc[VKILL];
 	tmp.sg_flags = get_sgflags(tty);
-	spin_unlock_irqrestore(&tty_termios_lock, flags);
+	up(&tty->termios_sem);
 	
 	return copy_to_user(sgttyb, &tmp, sizeof(tmp)) ? -EFAULT : 0;
 }
@@ -299,7 +289,6 @@ static int set_sgttyb(struct tty_struct * tty, struct sgttyb __user * sgttyb)
 	int retval;
 	struct sgttyb tmp;
 	struct termios termios;
-	unsigned long flags;
 
 	retval = tty_check_change(tty);
 	if (retval)
@@ -307,13 +296,13 @@ static int set_sgttyb(struct tty_struct * tty, struct sgttyb __user * sgttyb)
 	
 	if (copy_from_user(&tmp, sgttyb, sizeof(tmp)))
 		return -EFAULT;
-		
-	spin_lock_irqsave(&tty_termios_lock, flags);
+
+	down(&tty->termios_sem);		
 	termios =  *tty->termios;
 	termios.c_cc[VERASE] = tmp.sg_erase;
 	termios.c_cc[VKILL] = tmp.sg_kill;
 	set_sgflags(&termios, tmp.sg_flags);
-	spin_unlock_irqrestore(&tty_termios_lock, flags);
+	up(&tty->termios_sem);
 	change_termios(tty, &termios);
 	return 0;
 }
@@ -405,7 +394,6 @@ int n_tty_ioctl(struct tty_struct * tty, struct file * file,
 	void __user *p = (void __user *)arg;
 	int retval;
 	struct tty_ldisc *ld;
-	unsigned long flags;
 
 	if (tty->driver->type == TTY_DRIVER_TYPE_PTY &&
 	    tty->driver->subtype == PTY_TYPE_MASTER)
@@ -549,11 +537,11 @@ int n_tty_ioctl(struct tty_struct * tty, struct file * file,
 		case TIOCSSOFTCAR:
 			if (get_user(arg, (unsigned int __user *) arg))
 				return -EFAULT;
-			spin_lock_irqsave(&tty_termios_lock, flags);
+			down(&tty->termios_sem);
 			tty->termios->c_cflag =
 				((tty->termios->c_cflag & ~CLOCAL) |
 				 (arg ? CLOCAL : 0));
-			spin_unlock_irqrestore(&tty_termios_lock, flags);
+			up(&tty->termios_sem);
 			return 0;
 		default:
 			return -ENOIOCTLCMD;

@@ -21,7 +21,7 @@ ToDo/Notes:
 	- Enable the code for setting the NT4 compatibility flag when we start
 	  making NTFS 1.2 specific modifications.
 
-2.1.20-WIP
+2.1.21-WIP
 
 	- Implement extent mft record deallocation
 	  fs/ntfs/mft.c::ntfs_extent_mft_record_free().
@@ -44,7 +44,18 @@ ToDo/Notes:
 	  fs/ntfs/attrib.[hc]::ntfs_attr_set() and switch
 	  fs/ntfs/logfile.c::ntfs_empty_logfile() to using it.
 	- Remove unnecessary casts from LCN_* constants.
-	- Implement fs/ntfs/runlist.c::ntfs_rl_truncate().
+	- Implement fs/ntfs/runlist.c::ntfs_rl_truncate_nolock().
+
+2.1.20 - Fix two stupid bugs introduced in 2.1.18 release.
+
+	- Fix stupid bug in fs/ntfs/attrib.c::ntfs_attr_reinit_search_ctx()
+	  where we did not clear ctx->al_entry but it was still set due to
+	  changes in ntfs_attr_lookup() and ntfs_external_attr_find() in
+	  particular.
+	- Fix another stupid bug in fs/ntfs/attrib.c::ntfs_external_attr_find()
+	  where we forgot to unmap the extent mft record when we had finished
+	  enumerating an attribute which caused a bug check to trigger when the
+	  VFS calls ->clear_inode.
 
 2.1.19 - Many cleanups, improvements, and a minor bug fix.
 
