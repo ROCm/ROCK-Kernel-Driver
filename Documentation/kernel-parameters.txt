@@ -1025,10 +1025,6 @@ running once the system is up.
 			New name for the ramdisk parameter.
 			See Documentation/ramdisk.txt.
 
-	ramdisk_start=	[RAM] Starting block of RAM disk image (so you can
-			place it after the kernel image on a boot floppy).
-			See Documentation/ramdisk.txt.
-
 	reboot=		[BUGS=IA-32,BUGS=ARM,BUGS=IA-64] Rebooting mode
 			Format: <reboot_mode>[,<reboot_mode2>[,...]]
 			See arch/*/kernel/reboot.c.
