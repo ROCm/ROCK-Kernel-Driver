@@ -2836,7 +2836,7 @@ static struct console sercons = {
 };
 
 
-static void __init serial167_console_init(void)
+static int __init serial167_console_init(void)
 {
 	if (vme_brdtype == VME_TYPE_MVME166 ||
 			vme_brdtype == VME_TYPE_MVME167 ||
@@ -2844,6 +2844,7 @@ static void __init serial167_console_init(void)
 		mvme167_serial_console_setup(0);
 		register_console(&sercons);
 	}
+	return 0;
 }
 console_initcall(serial167_console_init);
 

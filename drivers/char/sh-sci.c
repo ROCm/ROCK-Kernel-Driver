@@ -1275,7 +1275,7 @@ static struct console sercons = {
 extern void sh_console_unregister (void);
 #endif
 
-static void __init sci_console_init(void)
+static int __init sci_console_init(void)
 {
 	register_console(&sercons);
 #ifdef CONFIG_SH_EARLY_PRINTK
@@ -1284,6 +1284,7 @@ static void __init sci_console_init(void)
 	 */
 	sh_console_unregister();
 #endif
+	return 0;
 }
 console_initcall(sci_console_init);
 

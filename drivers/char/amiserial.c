@@ -2305,9 +2305,10 @@ static struct console sercons = {
 /*
  *	Register console.
  */
-static void __init amiserial_console_init(void)
+static int __init amiserial_console_init(void)
 {
 	register_console(&sercons);
+	return 0;
 }
 console_initcall(amiserial_console_init);
 #endif
