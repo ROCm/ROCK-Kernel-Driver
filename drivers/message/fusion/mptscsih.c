@@ -241,7 +241,7 @@ static int	ScsiScanDvCtx = -1; /* Used only for bus scan and dv */
 /*
  * Domain Validation task structure
  */
-static spinlock_t dvtaskQ_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(dvtaskQ_lock);
 static int dvtaskQ_active = 0;
 static int dvtaskQ_release = 0;
 static struct work_struct	mptscsih_dvTask;

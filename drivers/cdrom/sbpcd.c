@@ -461,7 +461,7 @@ static int sbpcd[] =
 /*
  * Protects access to global structures etc.
  */
-static spinlock_t sbpcd_lock __cacheline_aligned = SPIN_LOCK_UNLOCKED;
+static  __cacheline_aligned DEFINE_SPINLOCK(sbpcd_lock);
 static struct request_queue *sbpcd_queue;
 
 MODULE_PARM(sbpcd, "2i");

@@ -36,7 +36,7 @@ diag210(struct diag210 * addr)
 	 * use a static data area to be sure
 	 */
 	static struct diag210 diag210_tmp;
-	static spinlock_t diag210_lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(diag210_lock);
 	unsigned long flags;
 	int ccode;
 

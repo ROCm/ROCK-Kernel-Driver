@@ -208,7 +208,7 @@ static int soc_common_pcmcia_suspend(struct pcmcia_socket *sock)
 	return ret;
 }
 
-static spinlock_t status_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(status_lock);
 
 static void soc_common_check_status(struct soc_pcmcia_socket *skt)
 {

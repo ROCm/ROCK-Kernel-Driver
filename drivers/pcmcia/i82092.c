@@ -200,7 +200,7 @@ static void __devexit i82092aa_pci_remove(struct pci_dev *dev)
 	leave("i82092aa_pci_remove");
 }
 
-static spinlock_t port_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(port_lock);
 
 /* basic value read/write functions */
 

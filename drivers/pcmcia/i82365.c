@@ -186,7 +186,7 @@ static struct i82365_socket socket[8] = {
 #define I365_MASK	0xdeb8	/* irq 15,14,12,11,10,9,7,5,4,3 */
 
 static int grab_irq;
-static spinlock_t isa_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(isa_lock);
 #define ISA_LOCK(n, f) spin_lock_irqsave(&isa_lock, f)
 #define ISA_UNLOCK(n, f) spin_unlock_irqrestore(&isa_lock, f)
 
@@ -233,7 +233,7 @@ static pcic_t pcic[] = {
 
 /*====================================================================*/
 
-static spinlock_t bus_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(bus_lock);
 
 static u_char i365_get(u_short sock, u_short reg)
 {

@@ -42,11 +42,11 @@ unsigned long parport_default_timeslice = PARPORT_DEFAULT_TIMESLICE;
 int parport_default_spintime =  DEFAULT_SPIN_TIME;
 
 static LIST_HEAD(portlist);
-static spinlock_t parportlist_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(parportlist_lock);
 
 /* list of all allocated ports, sorted by ->number */
 static LIST_HEAD(all_ports);
-static spinlock_t full_list_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(full_list_lock);
 
 static LIST_HEAD(drivers);
 

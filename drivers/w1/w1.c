@@ -52,7 +52,7 @@ module_param_named(timeout, w1_timeout, int, 0);
 module_param_named(max_slave_count, w1_max_slave_count, int, 0);
 module_param_named(slave_ttl, w1_max_slave_ttl, int, 0);
 
-spinlock_t w1_mlock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(w1_mlock);
 LIST_HEAD(w1_masters);
 
 static pid_t control_thread;

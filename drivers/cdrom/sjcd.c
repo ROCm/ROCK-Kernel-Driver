@@ -107,7 +107,7 @@ static volatile unsigned char sjcd_completion_status = 0;
 static volatile unsigned char sjcd_completion_error = 0;
 static unsigned short sjcd_command_is_in_progress = 0;
 static unsigned short sjcd_error_reported = 0;
-static spinlock_t sjcd_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(sjcd_lock);
 
 static int sjcd_open_count;
 

@@ -1522,7 +1522,7 @@ static struct kobject *floppy_find(dev_t dev, int *part, void *data)
 
 int fd1772_init(void)
 {
-	static spinlock_t lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(lock);
 	int i, err = -ENOMEM;
 
 	if (!machine_is_archimedes())

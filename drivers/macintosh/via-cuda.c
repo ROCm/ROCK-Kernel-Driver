@@ -33,7 +33,7 @@
 #include <linux/init.h>
 
 static volatile unsigned char __iomem *via;
-static spinlock_t cuda_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(cuda_lock);
 
 #ifdef CONFIG_MAC
 #define CUDA_IRQ IRQ_MAC_ADB

@@ -43,7 +43,7 @@
 ACPI_MODULE_NAME		("pci_irq")
 
 struct acpi_prt_list		acpi_prt;
-spinlock_t acpi_prt_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(acpi_prt_lock);
 
 /* --------------------------------------------------------------------------
                          PCI IRQ Routing Table (PRT) Support

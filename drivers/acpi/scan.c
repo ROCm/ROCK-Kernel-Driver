@@ -24,7 +24,7 @@ extern struct acpi_device		*acpi_root;
 #define ACPI_BUS_DEVICE_NAME		"System Bus"
 
 static LIST_HEAD(acpi_device_list);
-spinlock_t acpi_device_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(acpi_device_lock);
 LIST_HEAD(acpi_wakeup_device_list);
 
 static void acpi_device_release(struct kobject * kobj)

@@ -302,7 +302,7 @@ struct cm206_struct {
 
 static struct cm206_struct *cd;	/* the main memory structure */
 static struct request_queue *cm206_queue;
-static spinlock_t cm206_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(cm206_lock);
 
 /* First, we define some polling functions. These are actually
    only being used in the initialization. */

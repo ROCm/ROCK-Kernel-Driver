@@ -304,7 +304,7 @@ struct slow_subchannel {
 };
 
 static LIST_HEAD(slow_subchannels_head);
-static spinlock_t slow_subchannel_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(slow_subchannel_lock);
 
 static void
 css_trigger_slow_path(void)
