@@ -522,8 +522,8 @@ static irqreturn_t rtc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 
-static struct irqaction irq0  = { timer_interrupt, SA_INTERRUPT, 0, "timer", NULL, NULL};
-static struct irqaction irq1  = { rtc_interrupt, SA_INTERRUPT, 0, "rtc", NULL, NULL};
+static struct irqaction irq0  = { timer_interrupt, SA_INTERRUPT, CPU_MASK_NONE, "timer", NULL, NULL};
+static struct irqaction irq1  = { rtc_interrupt, SA_INTERRUPT, CPU_MASK_NONE, "rtc", NULL, NULL};
 
 void __init time_init(void)
 {
