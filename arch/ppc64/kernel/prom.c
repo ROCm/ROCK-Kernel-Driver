@@ -1340,7 +1340,7 @@ smt_setup(void)
 		}
 
 		if (!found) {
-			my_smt_snooze_delay = 30000; /* default value */
+			my_smt_snooze_delay = 0; /* default value */
 		}
 	} else {
 		my_smt_snooze_delay = 0; /* default value */
