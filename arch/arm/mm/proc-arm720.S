@@ -38,18 +38,11 @@
 #include <asm/hardware.h>
 
 /*
- * Function: arm720_check_bugs (void)
- *	   : arm720_proc_init (void)
+ * Function: arm720_proc_init (void)
  *	   : arm720_proc_fin (void)
  *
  * Notes   : This processor does not require these
  */
-ENTRY(cpu_arm720_check_bugs)
-		mrs	ip, cpsr
-		bic	ip, ip, #PSR_F_BIT
-		msr	cpsr, ip
-		mov	pc, lr
-
 ENTRY(cpu_arm720_dcache_clean_area)
 ENTRY(cpu_arm720_proc_init)
 		mov	pc, lr
@@ -156,7 +149,6 @@ __arm720_setup:	mov	r0, #0
 		.type	arm720_processor_functions, #object
 ENTRY(arm720_processor_functions)
 		.word	v4t_late_abort
-		.word	cpu_arm720_check_bugs
 		.word	cpu_arm720_proc_init
 		.word	cpu_arm720_proc_fin
 		.word	cpu_arm720_reset

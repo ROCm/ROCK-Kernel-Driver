@@ -19,8 +19,6 @@ struct task_struct;
  * relies on it.
  */
 extern struct processor {
-	/* check for any bugs */
-	void (*_check_bugs)(void);
 	/* Set up any processor specifics */
 	void (*_proc_init)(void);
 	/* Disable any processor specifics */
@@ -36,7 +34,6 @@ extern const struct processor arm2_processor_functions;
 extern const struct processor arm250_processor_functions;
 extern const struct processor arm3_processor_functions;
 
-#define cpu_check_bugs()			processor._check_bugs()
 #define cpu_proc_init()				processor._proc_init()
 #define cpu_proc_fin()				processor._proc_fin()
 #define cpu_do_idle()				do { } while (0)

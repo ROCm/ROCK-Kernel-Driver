@@ -188,20 +188,6 @@ Ldata_lateldrpostreg:
 		addeq	r7, r0, r2
 		b	Ldata_saver7
 
-/*
- * Function: arm6_7_check_bugs (void)
- *	   : arm6_7_proc_init (void)
- *	   : arm6_7_proc_fin (void)
- *
- * Notes   : This processor does not require these
- */
-ENTRY(cpu_arm6_check_bugs)
-ENTRY(cpu_arm7_check_bugs)
-		mrs	ip, cpsr
-		bic	ip, ip, #PSR_F_BIT
-		msr	cpsr, ip
-		mov	pc, lr
-
 ENTRY(cpu_arm6_proc_init)
 ENTRY(cpu_arm7_proc_init)
 		mov	pc, lr
@@ -313,7 +299,6 @@ __arm7_setup:	mov	r0, #0
 		.type	arm6_processor_functions, #object
 ENTRY(arm6_processor_functions)
 		.word	cpu_arm6_data_abort
-		.word	cpu_arm6_check_bugs
 		.word	cpu_arm6_proc_init
 		.word	cpu_arm6_proc_fin
 		.word	cpu_arm6_reset
@@ -346,7 +331,6 @@ ENTRY(arm6_processor_functions)
 		.type	arm7_processor_functions, #object
 ENTRY(arm7_processor_functions)
 		.word	cpu_arm7_data_abort
-		.word	cpu_arm7_check_bugs
 		.word	cpu_arm7_proc_init
 		.word	cpu_arm7_proc_fin
 		.word	cpu_arm7_reset

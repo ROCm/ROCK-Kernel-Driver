@@ -54,15 +54,6 @@ flush_base:
 	.long	FLUSH_BASE
 	.text
 
-/*
- * cpu_sa1100_check_bugs()
- */
-ENTRY(cpu_sa1100_check_bugs)
-	mrs	ip, cpsr
-	bic	ip, ip, #PSR_F_BIT
-	msr	cpsr, ip
-	mov	pc, lr
-
 	__INIT
 
 /*
@@ -251,7 +242,6 @@ __sa1100_setup:
 	.type	sa1100_processor_functions, #object
 ENTRY(sa1100_processor_functions)
 	.word	v4_early_abort
-	.word	cpu_sa1100_check_bugs
 	.word	cpu_sa1100_proc_init
 	.word	cpu_sa1100_proc_fin
 	.word	cpu_sa1100_reset

@@ -50,15 +50,6 @@
 
 	.text
 /*
- * cpu_arm926_check_bugs()
- */
-ENTRY(cpu_arm926_check_bugs)
-	mrs	ip, cpsr
-	bic	ip, ip, #PSR_F_BIT
-	msr	cpsr, ip
-	mov	pc, lr
-
-/*
  * cpu_arm926_proc_init()
  */
 ENTRY(cpu_arm926_proc_init)
@@ -445,7 +436,6 @@ __arm926_setup:
 	.type	arm926_processor_functions, #object
 arm926_processor_functions:
 	.word	v5tej_early_abort
-	.word	cpu_arm926_check_bugs
 	.word	cpu_arm926_proc_init
 	.word	cpu_arm926_proc_fin
 	.word	cpu_arm926_reset

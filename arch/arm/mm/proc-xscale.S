@@ -108,15 +108,6 @@ clean_addr:	.word	CLEAN_ADDR
 	.text
 
 /*
- * cpu_xscale_check_bugs()
- */
-ENTRY(cpu_xscale_check_bugs)
-	mrs	ip, cpsr
-	bic	ip, ip, #PSR_F_BIT
-	msr	cpsr, ip
-	mov	pc, lr
-
-/*
  * cpu_xscale_proc_init()
  *
  * Nothing too exciting at the moment
@@ -621,7 +612,6 @@ __xscale_setup:
 	.type	xscale_processor_functions, #object
 ENTRY(xscale_processor_functions)
 	.word	xscale_abort
-	.word	cpu_xscale_check_bugs
 	.word	cpu_xscale_proc_init
 	.word	cpu_xscale_proc_fin
 	.word	cpu_xscale_reset

@@ -24,10 +24,6 @@ extern struct processor {
 	 */
 	void (*_data_abort)(unsigned long pc);
 	/*
-	 * check for any bugs
-	 */
-	void (*_check_bugs)(void);
-	/*
 	 * Set up any processor specifics
 	 */
 	void (*_proc_init)(void);
@@ -62,7 +58,6 @@ extern struct processor {
 	void (*set_pte)(pte_t *ptep, pte_t pte);
 } processor;
 
-#define cpu_check_bugs()		processor._check_bugs()
 #define cpu_proc_init()			processor._proc_init()
 #define cpu_proc_fin()			processor._proc_fin()
 #define cpu_reset(addr)			processor.reset(addr)

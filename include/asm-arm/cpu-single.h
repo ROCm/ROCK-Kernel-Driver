@@ -22,7 +22,6 @@
  * function pointers for this lot.  Otherwise, we can optimise the
  * table away.
  */
-#define cpu_check_bugs			__cpu_fn(CPU_NAME,_check_bugs)
 #define cpu_proc_init			__cpu_fn(CPU_NAME,_proc_init)
 #define cpu_proc_fin			__cpu_fn(CPU_NAME,_proc_fin)
 #define cpu_reset			__cpu_fn(CPU_NAME,_reset)
@@ -39,7 +38,6 @@
 struct mm_struct;
 
 /* declare all the functions as extern */
-extern void cpu_check_bugs(void);
 extern void cpu_proc_init(void);
 extern void cpu_proc_fin(void);
 extern int cpu_do_idle(void);

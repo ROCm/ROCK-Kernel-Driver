@@ -273,9 +273,6 @@ _arm2_xchg_4:	mov	r2, pc
 _arm3_xchg_4:	swp	r0, r0, [r1]
 		movs	pc, lr
 
-_arm2_3_check_bugs:
-		bics	pc, lr, #0x04000000		@ Clear FIQ disable bit
-
 cpu_arm2_name:
 		.asciz	"ARM 2"
 cpu_arm250_name:
@@ -290,7 +287,6 @@ cpu_arm3_name:
  */
 		.globl	arm2_processor_functions
 arm2_processor_functions:
-		.word	_arm2_3_check_bugs
 		.word	_arm2_proc_init
 		.word	_arm2_proc_fin
 		.word	_arm2_set_pgd
@@ -299,7 +295,6 @@ arm2_processor_functions:
 
 		.globl	arm250_processor_functions
 arm250_processor_functions:
-		.word	_arm2_3_check_bugs
 		.word	_arm2_proc_init
 		.word	_arm2_proc_fin
 		.word	_arm2_set_pgd
@@ -308,7 +303,6 @@ arm250_processor_functions:
 
 		.globl	arm3_processor_functions
 arm3_processor_functions:
-		.word	_arm2_3_check_bugs
 		.word	_arm3_proc_init
 		.word	_arm3_proc_fin
 		.word	_arm3_set_pgd

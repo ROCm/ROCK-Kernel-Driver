@@ -43,15 +43,6 @@ flush_base:
 	.text
 
 /*
- * cpu_sa110_check_bugs()
- */
-ENTRY(cpu_sa110_check_bugs)
-	mrs	ip, cpsr
-	bic	ip, ip, #PSR_F_BIT
-	msr	cpsr, ip
-	mov	pc, lr
-
-/*
  * cpu_sa110_proc_init()
  */
 ENTRY(cpu_sa110_proc_init)
@@ -222,7 +213,6 @@ __sa110_setup:
 	.type	sa110_processor_functions, #object
 ENTRY(sa110_processor_functions)
 	.word	v4_early_abort
-	.word	cpu_sa110_check_bugs
 	.word	cpu_sa110_proc_init
 	.word	cpu_sa110_proc_fin
 	.word	cpu_sa110_reset
