@@ -5,6 +5,7 @@
  *  Swap reorganised 29.12.95, Stephen Tweedie
  */
 
+#include <linux/config.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/kernel_stat.h>
@@ -15,6 +16,7 @@
 #include <linux/shm.h>
 #include <linux/blkdev.h>
 #include <linux/buffer_head.h>
+#include <linux/seq_file.h>
 
 #include <asm/pgtable.h>
 #include <linux/swapops.h>
@@ -1041,45 +1043,91 @@ out:
 	return err;
 }
 
-int get_swaparea_info(char *buf)
+#ifdef CONFIG_PROC_FS
+/* iterator */
+static void *swap_start(struct seq_file *swap, loff_t *pos)
 {
-	char * page = (char *) __get_free_page(GFP_KERNEL);
 	struct swap_info_struct *ptr = swap_info;
-	int i, len;
+	int i;
+	loff_t l = *pos;
+	char * page = (char *) __get_free_page(GFP_KERNEL);
+
+	swap->private = page;	/* save for swap_show */
+	swap_list_lock();
 
 	if (!page)
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 
-	len = sprintf(buf, "Filename\t\t\t\tType\t\tSize\tUsed\tPriority\n");
-	for (i = 0 ; i < nr_swapfiles ; i++, ptr++) {
-		int j, usedswap;
-		struct file *file;
-		char *path;
-
+	for (i = 0; i < nr_swapfiles; i++, ptr++) {
 		if (!(ptr->flags & SWP_USED) || !ptr->swap_map)
 			continue;
-
-		file = ptr->swap_file;
-		path = d_path(file->f_dentry, file->f_vfsmnt, page, PAGE_SIZE);
-		for (j = 0,usedswap = 0; j < ptr->max; ++j)
-			switch (ptr->swap_map[j]) {
-				case SWAP_MAP_BAD:
-				case 0:
-					continue;
-				default:
-					usedswap++;
-			}
-		len += sprintf(buf + len, "%-39s %s\t%d\t%d\t%d\n",
-			       path,
-			       S_ISBLK(file->f_dentry->d_inode->i_mode) ?
-					"partition" : "file\t",
-			       ptr->pages << (PAGE_SHIFT - 10),
-			       usedswap << (PAGE_SHIFT - 10),
-			       ptr->prio);
+		if (!l--)
+			return ptr;
 	}
-	free_page((unsigned long) page);
-	return len;
+
+	return NULL;
 }
+
+static void *swap_next(struct seq_file *swap, void *v, loff_t *pos)
+{
+	struct swap_info_struct *ptr = v;
+	void *endptr = (void *) swap_info + nr_swapfiles * sizeof(struct swap_info_struct);
+
+	for (++ptr; ptr < (struct swap_info_struct *) endptr; ptr++) {
+		if (!(ptr->flags & SWP_USED) || !ptr->swap_map)
+			continue;
+		++*pos;
+		return ptr;
+	}
+
+	return NULL;
+}
+
+static void swap_stop(struct seq_file *swap, void *v)
+{
+	swap_list_unlock();
+	free_page((unsigned long) swap->private);
+	swap->private = NULL;
+}
+
+static int swap_show(struct seq_file *swap, void *v)
+{
+	struct swap_info_struct *ptr = v;
+	int j, usedswap;
+	struct file *file;
+	char *path;
+
+	if (v == swap_info)
+		seq_puts(swap, "Filename\t\t\t\tType\t\tSize\tUsed\tPriority\n");
+
+	file = ptr->swap_file;
+	path = d_path(file->f_dentry, file->f_vfsmnt, swap->private, PAGE_SIZE);
+
+	for (j = 0, usedswap = 0; j < ptr->max; ++j)
+		switch (ptr->swap_map[j]) {
+			case SWAP_MAP_BAD:
+			case 0:
+				continue;
+			default:
+				usedswap++;
+		}
+	seq_printf(swap, "%-39s %s\t%d\t%d\t%d\n",
+		       path,
+		       S_ISBLK(file->f_dentry->d_inode->i_mode) ?
+				"partition" : "file\t",
+		       ptr->pages << (PAGE_SHIFT - 10),
+		       usedswap << (PAGE_SHIFT - 10),
+		       ptr->prio);
+	return 0;
+}
+
+struct seq_operations swaps_op = {
+	.start =	swap_start,
+	.next =		swap_next,
+	.stop =		swap_stop,
+	.show =		swap_show
+};
+#endif /* CONFIG_PROC_FS */
 
 /*
  * Written 01/25/92 by Simmule Turner, heavily changed by Linus.
