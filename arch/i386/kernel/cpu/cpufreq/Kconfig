@@ -4,18 +4,6 @@
 
 menu "CPU Frequency scaling"
 
-config CPU_FREQ
-	bool "CPU Frequency scaling"
-	help
-	  Clock scaling allows you to change the clock speed of CPUs on the
-	  fly. This is a nice method to save battery power on notebooks,
-	  because the lower the clock speed, the less power the CPU consumes.
-
-	  For more information, take a look at <file:Documentation/cpu-freq/>
-	  or at <http://www.codemonkey.org.uk/projects/cpufreq/>
-
-	  If in doubt, say N.
-
 source "drivers/cpufreq/Kconfig"
 
 config CPU_FREQ_TABLE

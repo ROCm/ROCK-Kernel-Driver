@@ -135,16 +135,7 @@ config NR_CPUS
 	depends on SMP
 	default "32"
 
-config CPU_FREQ
-	bool "CPU Frequency scaling"
-	help
-	  Clock scaling allows you to change the clock speed of CPUs on the
-	  fly.  Currently there are only sparc64 drivers for UltraSPARC-III
-	  and UltraSPARC-IIe processors.
-
-	  For details, take a look at <file:Documentation/cpu-freq>.
-
-	  If in doubt, say N.
+source "drivers/cpufreq/Kconfig"
 
 config CPU_FREQ_TABLE
        tristate "CPU frequency table helpers"
@@ -175,8 +166,6 @@ config US2E_FREQ
 	  For details, take a look at <file:Documentation/cpu-freq>.
 
 	  If in doubt, say N.
-
-source "drivers/cpufreq/Kconfig"
 
 # Identify this as a Sparc64 build
 config SPARC64
