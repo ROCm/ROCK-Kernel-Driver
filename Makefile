@@ -92,32 +92,6 @@ CFLAGS := $(CPPFLAGS) -Wall -Wstrict-prototypes -Wno-trigraphs -O2 \
 	  -fomit-frame-pointer -fno-strict-aliasing -fno-common
 AFLAGS := -D__ASSEMBLY__ $(CPPFLAGS)
 
-#
-# ROOT_DEV specifies the default root-device when making the image.
-# This can be either FLOPPY, CURRENT, /dev/xxxx or empty, in which case
-# the default of FLOPPY is used by 'build'.
-# This is i386 specific.
-#
-
-export ROOT_DEV = CURRENT
-
-#
-# If you want to preset the SVGA mode, uncomment the next line and
-# set SVGA_MODE to whatever number you want.
-# Set it to -DSVGA_MODE=NORMAL_VGA if you just want the EGA/VGA mode.
-# The number is the same as you would ordinarily press at bootup.
-# This is i386 specific.
-#
-
-export SVGA_MODE = -DSVGA_MODE=NORMAL_VGA
-
-#
-# If you want the RAM disk device, define this to be the size in blocks.
-# This is i386 specific.
-#
-
-#export RAMDISK = -DRAMDISK=512
-
 CORE_FILES	=kernel/kernel.o mm/mm.o fs/fs.o ipc/ipc.o
 NETWORKS	=net/network.o
 
