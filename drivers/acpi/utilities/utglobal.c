@@ -731,7 +731,9 @@ acpi_ut_init_globals (
 
 	/* GPE support */
 
-	acpi_gbl_gpe_block_list_head        = NULL;
+	acpi_gbl_gpe_xrupt_list_head        = NULL;
+	acpi_gbl_gpe_fadt_blocks[0]         = NULL;
+	acpi_gbl_gpe_fadt_blocks[1]         = NULL;
 
 	/* Global notify handlers */
 

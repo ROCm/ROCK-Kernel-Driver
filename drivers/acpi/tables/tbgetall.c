@@ -228,7 +228,7 @@ acpi_tb_get_required_tables (
 	 * any SSDTs.
 	 */
 	for (i = 0; i < acpi_gbl_rsdt_table_count; i++) {
-		/* Get the table addresss from the common internal XSDT */
+		/* Get the table address from the common internal XSDT */
 
 		address.pointer.value = acpi_gbl_XSDT->table_offset_entry[i];
 

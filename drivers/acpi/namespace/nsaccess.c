@@ -73,6 +73,7 @@ acpi_ns_root_initialize (void)
 	const struct acpi_predefined_names *init_val = NULL;
 	struct acpi_namespace_node          *new_node;
 	union acpi_operand_object           *obj_desc;
+	acpi_string                         val = NULL;
 
 
 	ACPI_FUNCTION_TRACE ("ns_root_initialize");
@@ -119,9 +120,7 @@ acpi_ns_root_initialize (void)
 		 * initial value, create the initial value.
 		 */
 		if (init_val->val) {
-			acpi_string val;
-
-			status = acpi_os_predefined_override(init_val, &val);
+			status = acpi_os_predefined_override (init_val, &val);
 			if (ACPI_FAILURE (status)) {
 				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not override predefined %s\n",
 					init_val->name));
