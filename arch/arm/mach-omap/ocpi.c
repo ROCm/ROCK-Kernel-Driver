@@ -59,8 +59,8 @@ int ocpi_enable(void)
 
 	/* Make sure there's clock for OCPI */
 
-#ifdef CONFIG_ARCH_OMAP1610
-        if (cpu_is_omap1610()) {
+#if defined(CONFIG_ARCH_OMAP1610) || defined(CONFIG_ARCH_OMAP1710)
+        if (cpu_is_omap1610() || cpu_is_omap1710()) {
 		val = omap_readl(OMAP1610_ARM_IDLECT3);
 		val |= EN_OCPI_CK;
 		val &= ~IDLOCPI_ARM;
