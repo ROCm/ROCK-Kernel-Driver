@@ -59,7 +59,7 @@ static int __init adsbitsy_init(void)
 	/*
 	 * Enable PWM control for LCD
 	 */
-	SKPCR |= SKPCR_PWMCLKEN;
+	sa1111_enable_device(SKPCR_PWMCLKEN);
 	SKPWM0 = 0x7F;				// VEE
 	SKPEN0 = 1;
 	SKPWM1 = 0x01;				// Backlight

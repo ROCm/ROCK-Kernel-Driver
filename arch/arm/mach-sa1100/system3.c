@@ -309,7 +309,7 @@ static void system3_lcd_on(void)
 	PTCTRL0_set( PT_CTRL0_LCD_EN );
 
 	/* brightness / contrast */
-	SKPCR |= SKPCR_PWMCLKEN;
+	sa1111_enable_device(SKPCR_PWMCLKEN);
 	PB_DDR = 0xFFFFFFFF;
 	SKPEN0 = 1;
 	SKPEN1 = 1;
@@ -325,7 +325,7 @@ static void system3_lcd_off(void)
 	PTCTRL0_clear( PT_CTRL0_LCD_EN );
 	SKPEN0 = 0;
 	SKPEN1 = 0;
-	SKPCR &= ~SKPCR_PWMCLKEN;
+	sa1111_disable_device(SKPCR_PWMCLKEN);
 }
 
 /**
