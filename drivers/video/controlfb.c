@@ -1238,7 +1238,7 @@ static void control_cfb16_revc(struct display *p, int xx, int yy)
     u8 *dest;
     int bytes = p->next_line, rows;
 
-    dest = p->info.screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p)*2;
+    dest = p->fb_info->screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p)*2;
     for (rows = fontheight(p); rows--; dest += bytes) {
        switch (fontwidth(p)) {
        case 16:
@@ -1261,7 +1261,7 @@ static void control_cfb32_revc(struct display *p, int xx, int yy)
     u8 *dest;
     int bytes = p->next_line, rows;
 
-    dest = p->info.screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p) * 4;
+    dest = p->fb_info->screen_base + yy * fontheight(p) * bytes + xx * fontwidth(p) * 4;
     for (rows = fontheight(p); rows--; dest += bytes) {
        switch (fontwidth(p)) {
        case 16:

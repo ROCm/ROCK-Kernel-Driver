@@ -1908,7 +1908,7 @@ imsttfb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 			p->ramdac = TVP;
 			break;
 		default:
-			printk(KERN_INFO "imsttfb: Device 0x%lx unknown, "
+			printk(KERN_INFO "imsttfb: Device 0x%x unknown, "
 					 "contact maintainer.\n", pdev->device);
 			return -ENODEV;
 	}

@@ -312,7 +312,7 @@ static void chips_set_bitdepth(struct fb_info_chips *p, struct display* disp, in
 	struct fb_var_screeninfo* var = &p->var;
 	
 	if (bpp == 16) {
-		if (con == info->currcon) {
+		if (con == p->info.currcon) {
 			write_cr(0x13, 200);		// Set line length (doublewords)
 			write_xr(0x81, 0x14);		// 15 bit (555) color mode
 			write_xr(0x82, 0x00);		// Disable palettes
@@ -334,7 +334,7 @@ static void chips_set_bitdepth(struct fb_info_chips *p, struct display* disp, in
 		disp->dispsw = &fbcon_dummy;
 #endif
 	} else if (bpp == 8) {
-		if (con == info->currcon) {
+		if (con == p->info.currcon) {
 			write_cr(0x13, 100);		// Set line length (doublewords)
 			write_xr(0x81, 0x12);		// 8 bit color mode
 			write_xr(0x82, 0x08);		// Graphics gamma enable
