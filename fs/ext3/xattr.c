@@ -267,8 +267,8 @@ ext3_xattr_list(struct inode *inode, char *buffer, size_t buffer_size)
 {
 	struct buffer_head *bh = NULL;
 	struct ext3_xattr_entry *entry;
-	size_t total_size = 0;
-	char *buf, *end;
+	char *end;
+	size_t rest = buffer_size;
 	int error;
 
 	ea_idebug(inode, "buffer=%p, buffer_size=%ld",
@@ -295,36 +295,39 @@ bad_block:	ext3_error(inode->i_sb, "ext3_xattr_list",
 		goto cleanup;
 	}
 
-	if (ext3_xattr_cache_insert(bh))
-		ea_idebug(inode, "cache insert failed");
-
-	/* list the attribute names */
-	buf = buffer;
-	for (entry = FIRST_ENTRY(bh); !IS_LAST_ENTRY(entry);
-	     entry = EXT3_XATTR_NEXT(entry)) {
-		struct xattr_handler *handler;
+	/* check the on-disk data structure */
+	entry = FIRST_ENTRY(bh);
+	while (!IS_LAST_ENTRY(entry)) {
 		struct ext3_xattr_entry *next = EXT3_XATTR_NEXT(entry);
 
 		if ((char *)next >= end)
 			goto bad_block;
+		entry = next;
+	}
+	if (ext3_xattr_cache_insert(bh))
+		ea_idebug(inode, "cache insert failed");
 
-		handler = ext3_xattr_handler(entry->e_name_index);
+	/* list the attribute names */
+	for (entry = FIRST_ENTRY(bh); !IS_LAST_ENTRY(entry);
+	     entry = EXT3_XATTR_NEXT(entry)) {
+		struct xattr_handler *handler =
+			ext3_xattr_handler(entry->e_name_index);
+
 		if (handler) {
-			size_t size = handler->list(inode, buf, buffer_size,
+			size_t size = handler->list(inode, buffer, rest,
 						    entry->e_name,
 						    entry->e_name_len);
-			if (buf) {
-				if (size > buffer_size) {
+			if (buffer) {
+				if (size > rest) {
 					error = -ERANGE;
 					goto cleanup;
 				}
-				buf += size;
-				buffer_size -= size;
+				buffer += size;
 			}
-			total_size += size;
+			rest -= size;
 		}
 	}
-	error = total_size;
+	error = buffer_size - rest;  /* total size */
 
 cleanup:
 	brelse(bh);

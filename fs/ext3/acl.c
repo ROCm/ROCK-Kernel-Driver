@@ -423,7 +423,7 @@ ext3_xattr_list_acl_access(struct inode *inode, char *list, size_t list_len,
 
 	if (!test_opt(inode->i_sb, POSIX_ACL))
 		return 0;
-	if (list && (size <= list_len))
+	if (list && size <= list_len)
 		memcpy(list, XATTR_NAME_ACL_ACCESS, size);
 	return size;
 }
@@ -436,7 +436,7 @@ ext3_xattr_list_acl_default(struct inode *inode, char *list, size_t list_len,
 
 	if (!test_opt(inode->i_sb, POSIX_ACL))
 		return 0;
-	if (list && (size <= list_len))
+	if (list && size <= list_len)
 		memcpy(list, XATTR_NAME_ACL_DEFAULT, size);
 	return size;
 }

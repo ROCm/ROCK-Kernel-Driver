@@ -352,7 +352,8 @@ sys_fremovexattr(int fd, char __user *name)
 }
 
 
-static const char *strcmp_prefix(const char *a, const char *a_prefix)
+static const char *
+strcmp_prefix(const char *a, const char *a_prefix)
 {
 	while (*a_prefix && *a == *a_prefix) {
 		a++;

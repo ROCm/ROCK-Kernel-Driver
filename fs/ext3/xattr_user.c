@@ -25,7 +25,7 @@ ext3_xattr_user_list(struct inode *inode, char *list, size_t list_size,
 	if (!test_opt(inode->i_sb, XATTR_USER))
 		return 0;
 
-	if (list && (total_len <= list_size)) {
+	if (list && total_len <= list_size) {
 		memcpy(list, XATTR_USER_PREFIX, prefix_len);
 		memcpy(list+prefix_len, name, name_len);
 		list[prefix_len + name_len] = '\0';

@@ -24,7 +24,7 @@ ext2_xattr_trusted_list(struct inode *inode, char *list, size_t list_size,
 	if (!capable(CAP_SYS_ADMIN))
 		return 0;
 
-	if (list && (total_len <= list_size)) {
+	if (list && total_len <= list_size) {
 		memcpy(list, XATTR_TRUSTED_PREFIX, prefix_len);
 		memcpy(list+prefix_len, name, name_len);
 		list[prefix_len + name_len] = '\0';
