@@ -121,8 +121,10 @@ include/asm-$(ARCH)/asm_offsets.h: arch/$(ARCH)/kernel/asm-offsets.s
 archclean:
 	$(Q)$(MAKE) -f scripts/Makefile.clean obj=$(boot)
 
-CLEAN_FILES += include/asm-$(ARCH)/offset.h.tmp \
-	       include/asm-$(ARCH)/offset.h
+archmrproper:
+
+CLEAN_FILES += include/asm-$(ARCH)/asm_offsets.h.tmp \
+	       include/asm-$(ARCH)/asm_offsets.h
 
 define archhelp
   echo '* boot		- Compressed kernel image (arch/alpha/boot/vmlinux.gz)'
