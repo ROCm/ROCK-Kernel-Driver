@@ -731,8 +731,10 @@ void __init prepare_namespace(void)
 	if (mount_initrd) {
 		if (initrd_load())
 			goto out;
-	} else if (is_floppy && rd_doload && rd_load_disk(0))
+	}
+	if (is_floppy && rd_doload && rd_load_disk(0))
 		ROOT_DEV = Root_RAM0;
+
 	mount_root();
 out:
 	umount_devfs("/dev");
