@@ -59,7 +59,7 @@ config VT_CONSOLE
 
 config HW_CONSOLE
 	bool
-	depends on VT && !S390 && !UM
+	depends on VT && !S390 && !USERMODE
 	default y
 
 config SERIAL_NONSTANDARD
