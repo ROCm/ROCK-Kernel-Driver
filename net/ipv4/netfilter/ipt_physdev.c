@@ -9,7 +9,7 @@
 #define NOMATCH 0
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Bart De Schuymer <bdschuy@pandora.be>");
+MODULE_AUTHOR("Bart De Schuymer <bdschuym@pandora.be>");
 MODULE_DESCRIPTION("iptables bridge physical device match module");
 
 static int
