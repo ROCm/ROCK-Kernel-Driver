@@ -1875,84 +1875,72 @@ static void uart_change_pm(struct uart_state *state, int pm_state)
 	state->pm_state = pm_state;
 }
 
-int uart_suspend_port(struct uart_driver *drv, struct uart_port *port, u32 level)
+int uart_suspend_port(struct uart_driver *drv, struct uart_port *port)
 {
 	struct uart_state *state = drv->state + port->line;
 
 	down(&state->sem);
 
-	switch (level) {
-	case SUSPEND_SAVE_STATE:
-		if (state->info && state->info->flags & UIF_INITIALIZED) {
-			struct uart_ops *ops = port->ops;
+	if (state->info && state->info->flags & UIF_INITIALIZED) {
+		struct uart_ops *ops = port->ops;
 
-			spin_lock_irq(&port->lock);
-			ops->stop_tx(port, 0);
-			ops->set_mctrl(port, 0);
-			ops->stop_rx(port);
-			spin_unlock_irq(&port->lock);
+		spin_lock_irq(&port->lock);
+		ops->stop_tx(port, 0);
+		ops->set_mctrl(port, 0);
+		ops->stop_rx(port);
+		spin_unlock_irq(&port->lock);
 
-			/*
-			 * Wait for the transmitter to empty.
-			 */
-			while (!ops->tx_empty(port)) {
-				set_current_state(TASK_UNINTERRUPTIBLE);
-				schedule_timeout(10*HZ/1000);
-			}
-			set_current_state(TASK_RUNNING);
-
-			ops->shutdown(port);
-		}
-		break;
-
-	case SUSPEND_POWER_DOWN:
 		/*
-		 * Disable the console device before suspending.
+		 * Wait for the transmitter to empty.
 		 */
-		if (uart_console(port))
-			port->cons->flags &= ~CON_ENABLED;
+		while (!ops->tx_empty(port)) {
+			set_current_state(TASK_UNINTERRUPTIBLE);
+			schedule_timeout(10*HZ/1000);
+		}
+		set_current_state(TASK_RUNNING);
 
-		uart_change_pm(state, 3);
-		break;
+		ops->shutdown(port);
 	}
+
+	/*
+	 * Disable the console device before suspending.
+	 */
+	if (uart_console(port))
+		port->cons->flags &= ~CON_ENABLED;
+
+	uart_change_pm(state, 3);
 
 	up(&state->sem);
 
 	return 0;
 }
 
-int uart_resume_port(struct uart_driver *drv, struct uart_port *port, u32 level)
+int uart_resume_port(struct uart_driver *drv, struct uart_port *port)
 {
 	struct uart_state *state = drv->state + port->line;
 
 	down(&state->sem);
 
-	switch (level) {
-	case RESUME_POWER_ON:
-		uart_change_pm(state, 0);
+	uart_change_pm(state, 0);
 
-		/*
-		 * Re-enable the console device after suspending.
-		 */
-		if (uart_console(port)) {
-			uart_change_speed(state, NULL);
-			port->cons->flags |= CON_ENABLED;
-		}
-		break;
+	/*
+	 * Re-enable the console device after suspending.
+	 */
+	if (uart_console(port)) {
+		uart_change_speed(state, NULL);
+		port->cons->flags |= CON_ENABLED;
+	}
 
-	case RESUME_RESTORE_STATE:
-		if (state->info && state->info->flags & UIF_INITIALIZED) {
-			struct uart_ops *ops = port->ops;
+	if (state->info && state->info->flags & UIF_INITIALIZED) {
+		struct uart_ops *ops = port->ops;
 
-			ops->set_mctrl(port, 0);
-			ops->startup(port);
-			uart_change_speed(state, NULL);
-			spin_lock_irq(&port->lock);
-			ops->set_mctrl(port, port->mctrl);
-			ops->start_tx(port, 0);
-			spin_unlock_irq(&port->lock);
-		}
-		break;
+		ops->set_mctrl(port, 0);
+		ops->startup(port);
+		uart_change_speed(state, NULL);
+		spin_lock_irq(&port->lock);
+		ops->set_mctrl(port, port->mctrl);
+		ops->start_tx(port, 0);
+		spin_unlock_irq(&port->lock);
 	}
 
 	up(&state->sem);
