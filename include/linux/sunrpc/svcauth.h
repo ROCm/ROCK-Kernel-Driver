@@ -11,6 +11,7 @@
 
 #ifdef __KERNEL__
 
+#include <linux/string.h>
 #include <linux/sunrpc/msg_prot.h>
 #include <linux/sunrpc/cache.h>
 #include <linux/string.h>

@@ -361,7 +361,7 @@ void kernel_mna_trap_fault(struct pt_regs *regs, unsigned int insn) __asm__ ("ke
 void kernel_mna_trap_fault(struct pt_regs *regs, unsigned int insn)
 {
 	unsigned long g2 = regs->u_regs [UREG_G2];
-	unsigned long fixup = search_exception_table (regs->tpc, &g2);
+	unsigned long fixup = search_extables_range(regs->tpc, &g2);
 
 	if (!fixup) {
 		unsigned long address = compute_effective_address(regs, insn, ((insn >> 25) & 0x1f));

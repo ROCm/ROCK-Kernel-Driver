@@ -149,17 +149,17 @@ void data_access_exception (struct pt_regs *regs,
 
 	if (regs->tstate & TSTATE_PRIV) {
 		/* Test if this comes from uaccess places. */
-		const struct exception_table_entry *entry;
+		unsigned long fixup;
 		unsigned long g2 = regs->u_regs[UREG_G2];
 
-		if ((entry = search_extables_range(regs->tpc, &g2))) {
+		if ((fixup = search_extables_range(regs->tpc, &g2))) {
 			/* Ouch, somebody is trying ugly VM hole tricks on us... */
 #ifdef DEBUG_EXCEPTIONS
 			printk("Exception: PC<%016lx> faddr<UNKNOWN>\n", regs->tpc);
 			printk("EX_TABLE: insn<%016lx> fixup<%016lx> "
-			       "g2<%016lx>\n", regs->tpc, entry->fixup, g2);
+			       "g2<%016lx>\n", regs->tpc, fixup, g2);
 #endif
-			regs->tpc = entry->fixup;
+			regs->tpc = fixup;
 			regs->tnpc = regs->tpc + 4;
 			regs->u_regs[UREG_G2] = g2;
 			return;
@@ -1390,8 +1390,8 @@ void cheetah_deferred_handler(struct pt_regs *regs, unsigned long afsr, unsigned
 				/* Only perform fixup if we still have a
 				 * recoverable condition.
 				 */
-				if (entry && recoverable) {
-					regs->tpc = entry->fixup;
+				if (recoverable) {
+					regs->tpc = fixup;
 					regs->tnpc = regs->tpc + 4;
 					regs->u_regs[UREG_G2] = g2;
 				}

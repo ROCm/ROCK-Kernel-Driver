@@ -31,7 +31,7 @@ search_extable(const struct exception_table_entry *start,
 	 */
 
 	/* 1. Try to find an exact match. */
-	for (walk = start; walk <= end; walk++) {
+	for (walk = start; walk <= last; walk++) {
 		if (walk->fixup == 0) {
 			/* A range entry, skip both parts. */
 			walk++;
@@ -43,7 +43,7 @@ search_extable(const struct exception_table_entry *start,
 	}
 
 	/* 2. Try to find a range match. */
-	for (walk = start; walk <= (end - 1); walk++) {
+	for (walk = start; walk <= (last - 1); walk++) {
 		if (walk->fixup)
 			continue;
 
