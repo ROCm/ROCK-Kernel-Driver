@@ -31,19 +31,14 @@
  * machines for me to debug the driver on.
  */
 
-#ifndef __hppa__
-#error "lasi700 only compiles on hppa architecture"
-#endif
-
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/stat.h>
 #include <linux/mm.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/sched.h>
-#include <linux/version.h>
-#include <linux/config.h>
 #include <linux/ioport.h>
 #include <linux/dma-mapping.h>
 
@@ -54,65 +49,27 @@
 #include <asm/parisc-device.h>
 #include <asm/delay.h>
 
-#include <linux/module.h>
-
 #include "scsi.h"
 #include "hosts.h"
 
 #include "lasi700.h"
 #include "53c700.h"
 
-#ifdef MODULE
-
-char *lasi700;			/* command line from insmod */
-
 MODULE_AUTHOR("James Bottomley");
 MODULE_DESCRIPTION("lasi700 SCSI Driver");
 MODULE_LICENSE("GPL");
-MODULE_PARM(lasi700, "s");
 
-#endif
-
-#ifdef MODULE
-#define ARG_SEP ' '
-#else
-#define ARG_SEP ','
-#endif
-
-static unsigned long __initdata opt_base;
-static int __initdata opt_irq;
-
-static int __init
-param_setup(char *string)
-{
-	char *pos = string, *next;
-
-	while(pos != NULL && (next = strchr(pos, ':')) != NULL) {
-		int val = (int)simple_strtoul(++next, NULL, 0);
-		
-		if(!strncmp(pos, "addr:", 5))
-			opt_base = val;
-		else if(!strncmp(pos, "irq:", 4))
-			opt_irq = val;
-
-		if((pos = strchr(pos, ARG_SEP)) != NULL)
-			pos++;
-	}
-	return 1;
-}
-
-#ifndef MODULE
-__setup("lasi700=", param_setup);
-#endif
-
-static Scsi_Host_Template __initdata *host_tpnt = NULL;
-static int __initdata host_count = 0;
 static struct parisc_device_id lasi700_scsi_tbl[] = {
 	LASI700_ID_TABLE,
 	LASI710_ID_TABLE,
 	{ 0 }
 };
 
+static Scsi_Host_Template lasi700_template = {
+	.name		= "LASI SCSI 53c700",
+	.proc_name	= "lasi700",
+	.this_id	= 7,
+};
 MODULE_DEVICE_TABLE(parisc, lasi700_scsi_tbl);
 
 static struct parisc_driver lasi700_driver = {
@@ -122,50 +79,36 @@ static struct parisc_driver lasi700_driver = {
 };
 
 static int __init
-lasi700_detect(Scsi_Host_Template *tpnt)
-{
-	host_tpnt = tpnt;
-
-#ifdef MODULE
-	if(lasi700)
-		param_setup(lasi700);
-#endif
-
-	register_parisc_driver(&lasi700_driver);
-
-	return (host_count != 0);
-}
-
-static int __init
 lasi700_driver_callback(struct parisc_device *dev)
 {
 	unsigned long base = dev->hpa + LASI_SCSI_CORE_OFFSET;
-	char *driver_name;
+	struct NCR_700_Host_Parameters *hostdata;
 	struct Scsi_Host *host;
-	struct NCR_700_Host_Parameters *hostdata =
-		kmalloc(sizeof(struct NCR_700_Host_Parameters),
-			GFP_KERNEL);
-	if(dev->id.sversion == LASI_700_SVERSION) {
-		driver_name = "lasi700";
-	} else {
-		driver_name = "lasi710";
-	}
-	snprintf(dev->dev.name, sizeof(dev->dev.name), "%s", driver_name);
-	if(hostdata == NULL) {
+
+	snprintf(dev->dev.name, sizeof(dev->dev.name), "%s",
+		 (dev->id.sversion == LASI_700_SVERSION) ?
+		  "lasi700" : "lasi710");
+
+	hostdata = kmalloc(sizeof(*hostdata), GFP_KERNEL);
+	if (!hostdata) {
 		printk(KERN_ERR "%s: Failed to allocate host data\n",
-		       driver_name);
+		       dev->dev.name);
 		return 1;
 	}
 	memset(hostdata, 0, sizeof(struct NCR_700_Host_Parameters));
-	if(request_mem_region(base, 64, driver_name) == NULL) {
+
+	if (!request_mem_region(base, 64, dev->dev.name)) {
 		printk(KERN_ERR "%s: Failed to claim memory region\n",
-		       driver_name);
-		kfree(hostdata);
-		return 1;
+		       dev->dev.name);
+		goto out_kfree;
 	}
+
+	hostdata->dev = &dev->dev;
+	dma_set_mask(&dev->dev, 0xffffffffUL);
 	hostdata->base = base;
 	hostdata->differential = 0;
-	if(dev->id.sversion == LASI_700_SVERSION) {
+
+	if (dev->id.sversion == LASI_700_SVERSION) {
 		hostdata->clock = LASI700_CLOCK;
 		hostdata->force_le_on_be = 1;
 	} else {
@@ -174,26 +117,32 @@ lasi700_driver_callback(struct parisc_device *dev)
 		hostdata->chip710 = 1;
 		hostdata->dmode_extra = DMODE_FC2;
 	}
-	hostdata->dev = &dev->dev;
-	dma_set_mask(&dev->dev, 0xffffffffUL);
-	if((host = NCR_700_detect(host_tpnt, hostdata)) == NULL) {
-		kfree(hostdata);
-		release_mem_region(host->base, 64);
-		return 1;
-	}
-	scsi_set_device(host, &dev->dev);
+
+	host = NCR_700_detect(&lasi700_template, hostdata);
+	if (!host)
+		goto out_release_mem_region;
+
 	host->irq = dev->irq;
-	if(request_irq(dev->irq, NCR_700_intr, SA_SHIRQ, driver_name, host)) {
+	if (request_irq(dev->irq, NCR_700_intr, SA_SHIRQ,
+				dev->dev.name, host)) {
 		printk(KERN_ERR "%s: irq problem, detaching\n",
-		       driver_name);
-		scsi_host_put(host);
-		NCR_700_release(host);
-		return 1;
+		       dev->dev.name);
+		goto out_put_host;
 	}
-	host_count++;
+
+	scsi_add_host(host, &dev->dev);
 	return 0;
+
+ out_put_host:
+	scsi_host_put(host);
+ out_release_mem_region:
+	release_mem_region(base, 64);
+ out_kfree:
+	kfree(hostdata);
+	return 1;
 }
 
+#if 0
 static int
 lasi700_release(struct Scsi_Host *host)
 {
@@ -207,12 +156,12 @@ lasi700_release(struct Scsi_Host *host)
 	unregister_parisc_driver(&lasi700_driver);
 	return 1;
 }
+#endif
 
-static Scsi_Host_Template driver_template = {
-	.name		= "LASI SCSI 53c700",
-	.proc_name	= "lasi700",
-	.detect		= lasi700_detect,
-	.release	= lasi700_release,
-	.this_id	= 7,
-};
-#include "scsi_module.c"
+static int __init
+lasi700_init(void)
+{
+	return register_parisc_driver(&lasi700_driver);
+}
+
+module_init(lasi700_init);
