@@ -190,6 +190,7 @@ EXPORT_SYMBOL(tlb_type);
 EXPORT_SYMBOL(get_fb_unmapped_area);
 EXPORT_SYMBOL(flush_icache_range);
 EXPORT_SYMBOL(flush_dcache_page);
+EXPORT_SYMBOL(__flush_dcache_range);
 
 EXPORT_SYMBOL(mostek_lock);
 EXPORT_SYMBOL(mstk48t02_regs);
