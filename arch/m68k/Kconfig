@@ -647,9 +647,7 @@ source "drivers/block/Kconfig"
 
 source "drivers/md/Kconfig"
 
-if MAC
 source "drivers/input/Kconfig"
-endif
 
 
 menu "ATA/ATAPI/MFM/RLL device support"
@@ -1798,51 +1796,6 @@ config NVRAM
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
 	  The module will be called nvram.o. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
-
-config AMIGAMOUSE
-	tristate "Amiga mouse support"
-	depends on AMIGA
-	help
-	  If you want to be able to use an Amiga mouse in Linux, say Y.
-
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module is called amigamouse.o. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
-
-config BUSMOUSE
-	bool
-	depends on SUN3X_ZS || ATARI && VT && ATARIMOUSE || AMIGA && AMIGAMOUSE
-	default y
-	---help---
-	  Say Y here if your machine has a bus mouse as opposed to a serial
-	  mouse. Most people have a regular serial MouseSystem or
-	  Microsoft mouse (made by Logitech) that plugs into a COM port
-	  (rectangular with 9 or 25 pins). These people say N here. 
-
-	  If you have a laptop, you either have to check the documentation or
-	  experiment a bit to find out whether the trackball is a serial mouse
-	  or not; it's best to say Y here for you.
-
-	  This is the generic bus mouse driver code. If you have a bus mouse,
-	  you will have to say Y here and also to the specific driver for your
-	  mouse below.
-
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called busmouse.o. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
-
-config ATARIMOUSE
-	tristate "Atari mouse support"
-	depends on ATARI && VT
-	help
-	  If you want to be able to use an Atari mouse in Linux, say Y.
-
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module is called atarimouse.o. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config ATARI_MFPSER

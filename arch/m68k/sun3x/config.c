@@ -24,21 +24,6 @@ volatile char *clock_va;
 extern volatile unsigned char *sun3_intreg;
 
 
-int __init sun3x_keyb_init(void)
-{
-	return 0;
-}
-
-int sun3x_kbdrate(struct kbd_repeat *r)
-{
-	return 0;
-}
-
-void sun3x_kbd_leds(unsigned int i)
-{
-
-}
-
 void sun3_leds(unsigned int i)
 {
 
@@ -60,12 +45,6 @@ void __init config_sun3x(void)
 
 	mach_get_irq_list	 = show_sun3_interrupts;
 	mach_max_dma_address = 0xffffffff; /* we can DMA anywhere, whee */
-
-#ifdef CONFIG_VT
-	mach_keyb_init       = sun3x_keyb_init;
-	mach_kbdrate         = sun3x_kbdrate;
-	mach_kbd_leds        = sun3x_kbd_leds;
-#endif
 
 	mach_default_handler = &sun3_default_handler;
 	mach_sched_init      = sun3x_sched_init;

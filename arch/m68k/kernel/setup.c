@@ -537,11 +537,6 @@ void __init floppy_setup(char *str, int *ints)
 
 #endif
 
-/* for "kbd-reset" cmdline param */
-void __init kbd_reset_setup(char *str, int *ints)
-{
-}
-
 void check_bugs(void)
 {
 #ifndef CONFIG_M68KFPU_EMU

@@ -181,11 +181,6 @@ int mvme147_set_clock_mmss (unsigned long nowtime)
 	return 0;
 }
 
-int mvme147_keyb_init (void)
-{
-	return 0;
-}
-
 /*-------------------  Serial console stuff ------------------------*/
 
 static void scc_delay (void)
