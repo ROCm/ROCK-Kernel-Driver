@@ -172,10 +172,14 @@ sa1111_irq_handler(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 {
 	unsigned int stat0, stat1, i;
 
-	desc->chip->ack(irq);
-
 	stat0 = INTSTATCLR0;
 	stat1 = INTSTATCLR1;
+
+	INTSTATCLR0 = stat0;
+
+	desc->chip->ack(irq);
+
+	INTSTATCLR1 = stat1;
 
 	if (stat0 == 0 && stat1 == 0) {
 		do_bad_IRQ(irq, desc, regs);
@@ -197,9 +201,8 @@ sa1111_irq_handler(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 #define SA1111_IRQMASK_LO(x)	(1 << (x - IRQ_SA1111_START))
 #define SA1111_IRQMASK_HI(x)	(1 << (x - IRQ_SA1111_START - 32))
 
-static void sa1111_ack_lowirq(unsigned int irq)
+static void sa1111_ack_irq(unsigned int irq)
 {
-	INTSTATCLR0 = SA1111_IRQMASK_LO(irq);
 }
 
 static void sa1111_mask_lowirq(unsigned int irq)
@@ -255,17 +258,12 @@ static int sa1111_type_lowirq(unsigned int irq, unsigned int flags)
 }
 
 static struct irqchip sa1111_low_chip = {
-	.ack		= sa1111_ack_lowirq,
+	.ack		= sa1111_ack_irq,
 	.mask		= sa1111_mask_lowirq,
 	.unmask		= sa1111_unmask_lowirq,
 	.rerun		= sa1111_rerun_lowirq,
 	.type		= sa1111_type_lowirq,
 };
-
-static void sa1111_ack_highirq(unsigned int irq)
-{
-	INTSTATCLR1 = SA1111_IRQMASK_HI(irq);
-}
 
 static void sa1111_mask_highirq(unsigned int irq)
 {
@@ -320,7 +318,7 @@ static int sa1111_type_highirq(unsigned int irq, unsigned int flags)
 }
 
 static struct irqchip sa1111_high_chip = {
-	.ack		= sa1111_ack_highirq,
+	.ack		= sa1111_ack_irq,
 	.mask		= sa1111_mask_highirq,
 	.unmask		= sa1111_unmask_highirq,
 	.rerun		= sa1111_rerun_highirq,
