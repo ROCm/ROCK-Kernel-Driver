@@ -1232,8 +1232,8 @@ spinlock_t last_nsec_offset_lock = SPIN_LOCK_UNLOCKED;
 #endif
 
 struct time_interpolator *time_interpolator;
-struct time_interpolator *time_interpolator_list;
-spinlock_t time_interpolator_lock = SPIN_LOCK_UNLOCKED;
+static struct time_interpolator *time_interpolator_list;
+static spinlock_t time_interpolator_lock = SPIN_LOCK_UNLOCKED;
 
 static inline int
 is_better_time_interpolator(struct time_interpolator *new)

@@ -28,10 +28,10 @@
 #include <linux/pagevec.h>
 #include <linux/backing-dev.h>
 #include <linux/rmap-locking.h>
+#include <linux/topology.h>
 
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
-#include <asm/topology.h>
 #include <asm/div64.h>
 
 #include <linux/swapops.h>

@@ -61,6 +61,8 @@ typedef struct {
 	hw_irq_controller *handler;
 	struct irqaction *action;	/* IRQ action list */
 	unsigned int depth;		/* nested irq disables */
+	unsigned int irq_count;		/* For detecting broken interrupts */
+	unsigned int irqs_unhandled;
 	spinlock_t lock;
 } ____cacheline_aligned irq_desc_t;
 

@@ -779,7 +779,7 @@ static int sched_best_cpu(struct task_struct *p)
 		return best_cpu;
 
 	minload = 10000000;
-	for (i = 0; i < numnodes; i++) {
+	for_each_node_with_cpus(i) {
 		load = atomic_read(&node_nr_running[i]);
 		if (load < minload) {
 			minload = load;

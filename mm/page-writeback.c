@@ -220,7 +220,6 @@ void balance_dirty_pages_ratelimited(struct address_space *mapping)
 	}
 	put_cpu();
 }
-EXPORT_SYMBOL_GPL(balance_dirty_pages_ratelimited);
 
 /*
  * writeback at least _min_pages, and keep writing until the amount of dirty

@@ -271,6 +271,8 @@ void sym_calc_value(struct symbol *sym)
 		if (sym_get_type(sym) == S_BOOLEAN) {
 			if (newval.tri == mod)
 				newval.tri = yes;
+			if (sym->visible == mod)
+				sym->visible = yes;
 			if (sym->rev_dep.tri == mod)
 				sym->rev_dep.tri = yes;
 		}

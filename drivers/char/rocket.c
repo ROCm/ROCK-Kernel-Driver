@@ -2650,6 +2650,7 @@ int __init rp_init(void)
 	memset(&rocket_driver, 0, sizeof (struct tty_driver));
 	rocket_driver.magic = TTY_DRIVER_MAGIC;
 	rocket_driver.flags = TTY_DRIVER_NO_DEVFS;
+	rocket_driver.devfs_name = "tts/R";
 	rocket_driver.name = "ttyR";
 	rocket_driver.driver_name = "Comtrol RocketPort";
 	rocket_driver.major = TTY_ROCKET_MAJOR;

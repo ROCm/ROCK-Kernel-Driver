@@ -2359,11 +2359,8 @@ scrn[1] = '\0';
     memset(&cy_serial_driver, 0, sizeof(struct tty_driver));
     cy_serial_driver.magic = TTY_DRIVER_MAGIC;
     cy_serial_driver.owner = THIS_MODULE;
-#ifdef CONFIG_DEVFS_FS
-    cy_serial_driver.name = "tts/";
-#else
+    cy_serial_driver.devfs_name = "tts/";
     cy_serial_driver.name = "ttyS";
-#endif
     cy_serial_driver.major = TTY_MAJOR;
     cy_serial_driver.minor_start = 64;
     cy_serial_driver.num = NR_PORTS;

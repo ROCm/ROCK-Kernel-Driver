@@ -21,6 +21,7 @@ extern struct pglist_data node_data[];
 extern int numa_cpu_lookup_table[];
 extern int numa_memory_lookup_table[];
 extern unsigned long numa_cpumask_lookup_table[];
+extern int nr_cpus_in_node[];
 
 #define MAX_MEMORY (1UL << 41)
 /* 256MB regions */

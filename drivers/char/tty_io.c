@@ -2082,17 +2082,6 @@ static void tty_default_put_char(struct tty_struct *tty, unsigned char ch)
 	tty->driver->write(tty, 0, &ch, 1);
 }
 
-#ifdef CONFIG_DEVFS_FS
-static void tty_unregister_devfs(struct tty_driver *driver, int index)
-{
-	char path[64];
-	tty_line_name(driver, index, path);
-	devfs_remove(path);
-}
-#else
-# define tty_unregister_devfs(driver, index)	do { } while (0)
-#endif /* CONFIG_DEVFS_FS */
-
 struct tty_dev {
 	struct list_head node;
 	dev_t dev;
@@ -2124,7 +2113,6 @@ static CLASS_DEVICE_ATTR(dev, S_IRUGO, show_dev, NULL);
 static void tty_add_class_device(char *name, dev_t dev, struct device *device)
 {
 	struct tty_dev *tty_dev = NULL;
-	char *temp;
 	int retval;
 
 	tty_dev = kmalloc(sizeof(*tty_dev), GFP_KERNEL);
@@ -2132,16 +2120,9 @@ static void tty_add_class_device(char *name, dev_t dev, struct device *device)
 		return;
 	memset(tty_dev, 0x00, sizeof(*tty_dev));
 
-	/* stupid '/' in tty name strings... */
-	temp = strrchr(name, '/');
-	if (temp && (temp[1] != 0x00))
-		++temp;
-	else
-		temp = name;
-
 	tty_dev->class_dev.dev = device;
 	tty_dev->class_dev.class = &tty_class;
-	snprintf(tty_dev->class_dev.class_id, BUS_ID_SIZE, "%s", temp);
+	snprintf(tty_dev->class_dev.class_id, BUS_ID_SIZE, "%s", name);
 	retval = class_device_register(&tty_dev->class_dev);
 	if (retval)
 		goto error;
@@ -2195,7 +2176,6 @@ void tty_register_device(struct tty_driver *driver, unsigned index,
 			 struct device *device)
 {
 	dev_t dev = MKDEV(driver->major, driver->minor_start) + index;
-	char name[64];
 
 	if (index >= driver->num) {
 		printk(KERN_ERR "Attempt to register invalid tty line number "
@@ -2203,16 +2183,16 @@ void tty_register_device(struct tty_driver *driver, unsigned index,
 		return;
 	}
 
-	tty_line_name(driver, index, name);
-	devfs_mk_cdev(dev, S_IFCHR | S_IRUSR | S_IWUSR, name);
-
-	/* stupid console driver devfs names... change vc/X into ttyX */
-	if (driver->type == TTY_DRIVER_TYPE_CONSOLE)
-		sprintf(name, "tty%d", MINOR(dev));
+	devfs_mk_cdev(dev, S_IFCHR | S_IRUSR | S_IWUSR,
+			"%s%d", driver->devfs_name, index + driver->name_base);
 
 	/* we don't care about the ptys */
-	if (driver->type != TTY_DRIVER_TYPE_PTY)
-		tty_add_class_device (name, dev, device);
+	/* how nice to hide this behind some crappy interface.. */
+	if (driver->type != TTY_DRIVER_TYPE_PTY) {
+		char name[64];
+		tty_line_name(driver, index, name);
+		tty_add_class_device(name, dev, device);
+	}
 }
 
 /**
@@ -2225,7 +2205,7 @@ void tty_register_device(struct tty_driver *driver, unsigned index,
  */
 void tty_unregister_device(struct tty_driver *driver, unsigned index)
 {
-	tty_unregister_devfs(driver, index);
+	devfs_remove("%s%d", driver->devfs_name, index + driver->name_base);
 	tty_remove_class_device(MKDEV(driver->major, driver->minor_start) + index);
 }
 

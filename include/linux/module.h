@@ -247,6 +247,9 @@ struct module
 	char *strtab;
 #endif
 
+	/* Per-cpu data. */
+	void *percpu;
+
 	/* The command line arguments (may be mangled).  People like
 	   keeping pointers to this stuff */
 	char *args;

@@ -557,7 +557,24 @@ static ssize_t mem_write(struct file * file, const char * buf,
 }
 #endif
 
+static loff_t mem_lseek(struct file * file, loff_t offset, int orig)
+{
+	switch (orig) {
+	case 0:
+		file->f_pos = offset;
+		break;
+	case 1:
+		file->f_pos += offset;
+		break;
+	default:
+		return -EINVAL;
+	}
+	force_successful_syscall_return();
+	return file->f_pos;
+}
+
 static struct file_operations proc_mem_operations = {
+	.llseek		= mem_lseek,
 	.read		= mem_read,
 	.write		= mem_write,
 	.open		= mem_open,
