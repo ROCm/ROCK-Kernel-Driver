@@ -353,9 +353,6 @@ extern struct semaphore usb_bus_list_lock;
 extern void usb_bus_get (struct usb_bus *bus);
 extern void usb_bus_put (struct usb_bus *bus);
 
-extern struct usb_interface *usb_ifnum_to_if (struct usb_device *dev,
-	unsigned ifnum);
-
 extern int usb_find_interface_driver (struct usb_device *dev,
 	struct usb_interface *interface);
 
