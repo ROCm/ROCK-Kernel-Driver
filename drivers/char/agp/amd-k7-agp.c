@@ -271,12 +271,6 @@ static void amd_irongate_tlbflush(agp_memory * temp)
 	OUTREG32(amd_irongate_private.registers, AMD_TLBFLUSH, 0x00000001);
 }
 
-static unsigned long amd_irongate_mask_memory(unsigned long addr, int type)
-{
-	/* Only type 0 is supported by the irongate */
-
-	return addr | agp_bridge->driver->masks[0].mask;
-}
 
 static int amd_insert_memory(agp_memory * mem,
 			     off_t pg_start, int type)
@@ -312,7 +306,7 @@ static int amd_insert_memory(agp_memory * mem,
 		addr = (j * PAGE_SIZE) + agp_bridge->gart_bus_addr;
 		cur_gatt = GET_GATT(addr);
 		cur_gatt[GET_GATT_OFF(addr)] =
-			amd_irongate_mask_memory(mem->memory[i], mem->type);
+			agp_generic_mask_memory(mem->memory[i], mem->type);
 	}
 	amd_irongate_tlbflush(mem);
 	return 0;
@@ -352,12 +346,11 @@ static struct aper_size_info_lvl2 amd_irongate_sizes[7] =
 
 static struct gatt_mask amd_irongate_masks[] =
 {
-	{.mask = 0x00000001, .type = 0}
+	{.mask = 1, .type = 0}
 };
 
 struct agp_bridge_driver amd_irongate_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= amd_irongate_masks,
 	.aperture_sizes		= amd_irongate_sizes,
 	.size_type		= LVL2_APER_SIZE,
 	.num_aperture_sizes	= 7,
@@ -365,7 +358,8 @@ struct agp_bridge_driver amd_irongate_driver = {
 	.fetch_size		= amd_irongate_fetch_size,
 	.cleanup		= amd_irongate_cleanup,
 	.tlb_flush		= amd_irongate_tlbflush,
-	.mask_memory		= amd_irongate_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= amd_irongate_masks,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= amd_create_gatt_table,

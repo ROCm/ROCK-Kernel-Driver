@@ -908,3 +908,13 @@ void global_cache_flush(void)
 }
 EXPORT_SYMBOL(global_cache_flush);
 
+unsigned long agp_generic_mask_memory(unsigned long addr, int type)
+{
+	/* memory type is ignored in the generic routine */
+	if (agp_bridge->driver->masks)
+		return addr | agp_bridge->driver->masks[0].mask;
+	else
+		return addr;
+}
+EXPORT_SYMBOL(agp_generic_mask_memory);
+

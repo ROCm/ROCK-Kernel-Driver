@@ -140,12 +140,6 @@ static void nvidia_cleanup(void)
 }
 
 
-static unsigned long nvidia_mask_memory(unsigned long addr, int type)
-{
-	/* Memory type is ignored */
-	return addr | agp_bridge->driver->masks[0].mask;
-}
-
 #if 0
 extern int agp_memory_reserved;
 
@@ -238,13 +232,12 @@ static struct aper_size_info_8 nvidia_generic_sizes[5] =
 
 static struct gatt_mask nvidia_generic_masks[] =
 {
-	{0x00000001, 0}
+	{ .mask = 1, .type = 0}
 };
 
 
 struct agp_bridge_driver nvidia_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= nvidia_generic_masks,
 	.aperture_sizes		= nvidia_generic_sizes,
 	.size_type		= U8_APER_SIZE,
 	.num_aperture_sizes	= 5,
@@ -252,7 +245,8 @@ struct agp_bridge_driver nvidia_driver = {
 	.fetch_size		= nvidia_fetch_size,
 	.cleanup		= nvidia_cleanup,
 	.tlb_flush		= nvidia_tlbflush,
-	.mask_memory		= nvidia_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= nvidia_generic_masks,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,

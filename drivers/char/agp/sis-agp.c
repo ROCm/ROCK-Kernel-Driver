@@ -63,13 +63,6 @@ static void sis_cleanup(void)
 			      (previous_size->size_value & ~(0x03)));
 }
 
-static unsigned long sis_mask_memory(unsigned long addr, int type)
-{
-	/* Memory type is ignored */
-
-	return addr | agp_bridge->driver->masks[0].mask;
-}
-
 static struct aper_size_info_8 sis_generic_sizes[7] =
 {
 	{256, 65536, 6, 99},
@@ -81,14 +74,8 @@ static struct aper_size_info_8 sis_generic_sizes[7] =
 	{4, 1024, 0, 3}
 };
 
-static struct gatt_mask sis_generic_masks[] =
-{
-	{.mask = 0x00000000, .type = 0}
-};
-
 struct agp_bridge_driver sis_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= sis_generic_masks,
 	.aperture_sizes 	= sis_generic_sizes,
 	.size_type		= U8_APER_SIZE,
 	.num_aperture_sizes	= 7,
@@ -96,7 +83,8 @@ struct agp_bridge_driver sis_driver = {
 	.fetch_size		= sis_fetch_size,
 	.cleanup		= sis_cleanup,
 	.tlb_flush		= sis_tlbflush,
-	.mask_memory		= sis_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= NULL,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,

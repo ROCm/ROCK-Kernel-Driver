@@ -897,12 +897,6 @@ static int intel_7505_configure(void)
 	return 0;
 }
 
-static unsigned long intel_mask_memory(unsigned long addr, int type)
-{
-	/* Memory type is ignored */
-	return addr | agp_bridge->driver->masks[0].mask;
-}
-
 /* Setup function */
 static struct gatt_mask intel_generic_masks[] =
 {
@@ -947,7 +941,6 @@ static struct aper_size_info_8 intel_830mp_sizes[4] =
 
 struct agp_bridge_driver intel_generic_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= intel_generic_masks,
 	.aperture_sizes		= intel_generic_sizes,
 	.size_type		= U16_APER_SIZE,
 	.num_aperture_sizes	= 7,
@@ -955,7 +948,8 @@ struct agp_bridge_driver intel_generic_driver = {
 	.fetch_size		= intel_fetch_size,
 	.cleanup		= intel_cleanup,
 	.tlb_flush		= intel_tlbflush,
-	.mask_memory		= intel_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= NULL,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,
@@ -970,7 +964,6 @@ struct agp_bridge_driver intel_generic_driver = {
 
 struct agp_bridge_driver intel_810_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= intel_i810_masks,
 	.aperture_sizes		= intel_i810_sizes,
 	.size_type		= FIXED_APER_SIZE,
 	.num_aperture_sizes	= 2,
@@ -980,6 +973,7 @@ struct agp_bridge_driver intel_810_driver = {
 	.cleanup		= intel_i810_cleanup,
 	.tlb_flush		= intel_i810_tlbflush,
 	.mask_memory		= intel_i810_mask_memory,
+	.masks			= intel_i810_masks,
 	.agp_enable		= intel_i810_agp_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,
@@ -995,7 +989,6 @@ struct agp_bridge_driver intel_810_driver = {
 
 struct agp_bridge_driver intel_815_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= intel_generic_masks,
 	.aperture_sizes		= intel_815_sizes,
 	.size_type		= U8_APER_SIZE,
 	.num_aperture_sizes	= 2,
@@ -1003,7 +996,8 @@ struct agp_bridge_driver intel_815_driver = {
 	.fetch_size		= intel_815_fetch_size,
 	.cleanup		= intel_8xx_cleanup,
 	.tlb_flush		= intel_8xx_tlbflush,
-	.mask_memory		= intel_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= intel_generic_masks,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,
@@ -1018,7 +1012,6 @@ struct agp_bridge_driver intel_815_driver = {
 
 struct agp_bridge_driver intel_830_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= intel_i810_masks,
 	.aperture_sizes		= intel_i830_sizes,
 	.size_type		= FIXED_APER_SIZE,
 	.num_aperture_sizes 	= 2,
@@ -1028,6 +1021,7 @@ struct agp_bridge_driver intel_830_driver = {
 	.cleanup		= intel_i830_cleanup,
 	.tlb_flush		= intel_i810_tlbflush,
 	.mask_memory		= intel_i810_mask_memory,
+	.masks			= intel_i810_masks,
 	.agp_enable		= intel_i810_agp_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= intel_i830_create_gatt_table,
@@ -1043,7 +1037,6 @@ struct agp_bridge_driver intel_830_driver = {
 
 struct agp_bridge_driver intel_820_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= intel_generic_masks,
 	.aperture_sizes		= intel_8xx_sizes,
 	.size_type		= U8_APER_SIZE,
 	.num_aperture_sizes	= 7,
@@ -1051,7 +1044,8 @@ struct agp_bridge_driver intel_820_driver = {
 	.fetch_size		= intel_8xx_fetch_size,
 	.cleanup		= intel_820_cleanup,
 	.tlb_flush		= intel_820_tlbflush,
-	.mask_memory		= intel_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= intel_generic_masks,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,
@@ -1066,7 +1060,6 @@ struct agp_bridge_driver intel_820_driver = {
 
 struct agp_bridge_driver intel_830mp_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= intel_generic_masks,
 	.aperture_sizes		= intel_830mp_sizes,
 	.size_type		= U8_APER_SIZE,
 	.num_aperture_sizes	= 4,
@@ -1074,7 +1067,8 @@ struct agp_bridge_driver intel_830mp_driver = {
 	.fetch_size		= intel_8xx_fetch_size,
 	.cleanup		= intel_8xx_cleanup,
 	.tlb_flush		= intel_8xx_tlbflush,
-	.mask_memory		= intel_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= intel_generic_masks,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,
@@ -1089,7 +1083,6 @@ struct agp_bridge_driver intel_830mp_driver = {
 
 struct agp_bridge_driver intel_840_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= intel_generic_masks,
 	.aperture_sizes		= intel_8xx_sizes,
 	.size_type		= U8_APER_SIZE,
 	.num_aperture_sizes	= 7,
@@ -1097,7 +1090,8 @@ struct agp_bridge_driver intel_840_driver = {
 	.fetch_size		= intel_8xx_fetch_size,
 	.cleanup		= intel_8xx_cleanup,
 	.tlb_flush		= intel_8xx_tlbflush,
-	.mask_memory		= intel_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= intel_generic_masks,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,
@@ -1112,7 +1106,6 @@ struct agp_bridge_driver intel_840_driver = {
 
 struct agp_bridge_driver intel_845_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= intel_generic_masks,
 	.aperture_sizes		= intel_8xx_sizes,
 	.size_type		= U8_APER_SIZE,
 	.num_aperture_sizes	= 7,
@@ -1120,7 +1113,8 @@ struct agp_bridge_driver intel_845_driver = {
 	.fetch_size		= intel_8xx_fetch_size,
 	.cleanup		= intel_8xx_cleanup,
 	.tlb_flush		= intel_8xx_tlbflush,
-	.mask_memory		= intel_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= intel_generic_masks,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,
@@ -1135,7 +1129,6 @@ struct agp_bridge_driver intel_845_driver = {
 
 struct agp_bridge_driver intel_850_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= intel_generic_masks,
 	.aperture_sizes		= intel_8xx_sizes,
 	.size_type		= U8_APER_SIZE,
 	.num_aperture_sizes	= 7,
@@ -1143,7 +1136,8 @@ struct agp_bridge_driver intel_850_driver = {
 	.fetch_size		= intel_8xx_fetch_size,
 	.cleanup		= intel_8xx_cleanup,
 	.tlb_flush		= intel_8xx_tlbflush,
-	.mask_memory		= intel_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= intel_generic_masks,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,
@@ -1158,7 +1152,6 @@ struct agp_bridge_driver intel_850_driver = {
 
 struct agp_bridge_driver intel_860_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= intel_generic_masks,
 	.aperture_sizes		= intel_8xx_sizes,
 	.size_type		= U8_APER_SIZE,
 	.num_aperture_sizes	= 7,
@@ -1166,7 +1159,8 @@ struct agp_bridge_driver intel_860_driver = {
 	.fetch_size		= intel_8xx_fetch_size,
 	.cleanup		= intel_8xx_cleanup,
 	.tlb_flush		= intel_8xx_tlbflush,
-	.mask_memory		= intel_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= intel_generic_masks,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,
@@ -1181,7 +1175,6 @@ struct agp_bridge_driver intel_860_driver = {
 
 struct agp_bridge_driver intel_7505_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= intel_generic_masks,
 	.aperture_sizes		= intel_8xx_sizes,
 	.size_type		= U8_APER_SIZE,
 	.num_aperture_sizes	= 7,
@@ -1189,7 +1182,8 @@ struct agp_bridge_driver intel_7505_driver = {
 	.fetch_size		= intel_8xx_fetch_size,
 	.cleanup		= intel_8xx_cleanup,
 	.tlb_flush		= intel_8xx_tlbflush,
-	.mask_memory		= intel_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= intel_generic_masks,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,

@@ -212,20 +212,13 @@ static void amd_8151_cleanup(void)
 }
 
 
-static unsigned long amd_8151_mask_memory(unsigned long addr, int type)
-{
-	return addr | agp_bridge->driver->masks[0].mask;
-}
-
-
 static struct gatt_mask amd_8151_masks[] =
 {
-	{.mask = 0x00000001, .type = 0}
+	{ .mask = 1, .type = 0 }
 };
 
 struct agp_bridge_driver amd_8151_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= amd_8151_masks,
 	.aperture_sizes		= amd_8151_sizes,
 	.size_type		= U32_APER_SIZE,
 	.num_aperture_sizes	= 7,
@@ -233,7 +226,8 @@ struct agp_bridge_driver amd_8151_driver = {
 	.fetch_size		= amd_x86_64_fetch_size,
 	.cleanup		= amd_8151_cleanup,
 	.tlb_flush		= amd_x86_64_tlbflush,
-	.mask_memory		= amd_8151_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= amd_8151_masks,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,

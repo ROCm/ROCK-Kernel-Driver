@@ -89,11 +89,6 @@ static int uninorth_configure(void)
 	return 0;
 }
 
-static unsigned long uninorth_mask_memory(unsigned long addr, int type)
-{
-	return addr;/* | agp_bridge->driver->masks[0].mask;*/
-}
-
 static int uninorth_insert_memory(agp_memory * mem, off_t pg_start, int type)
 {
 	int i, j, num_entries;
@@ -250,10 +245,6 @@ void null_cache_flush(void)
 }
 
 /* Setup function */
-static struct gatt_mask uninorth_masks[] =
-{
-	{0x00000000, 0}
-};
 
 static struct aper_size_info_32 uninorth_sizes[7] =
 {
@@ -270,7 +261,6 @@ static struct aper_size_info_32 uninorth_sizes[7] =
 
 struct agp_bridge_driver uninorth_agp_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= uninorth_masks,
 	.aperture_sizes		= (void *)uninorth_sizes,
 	.size_type		= U32_APER_SIZE,
 	.num_aperture_sizes	= 4,
@@ -278,7 +268,8 @@ struct agp_bridge_driver uninorth_agp_driver = {
 	.fetch_size		= uninorth_fetch_size,
 	.cleanup		= uninorth_cleanup,
 	.tlb_flush		= uninorth_tlbflush,
-	.mask_memory		= uninorth_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= NULL,
 	.cache_flush		= null_cache_flush,
 	.agp_enable		= uninorth_agp_enable,
 	.create_gatt_table	= uninorth_create_gatt_table,
