@@ -239,6 +239,11 @@ int hpsb_packet_success(struct hpsb_packet *packet)
                         return -EAGAIN;
                 }
 
+        case ACK_ADDRESS_ERROR:
+                return -EINVAL;
+
+        case ACK_TARDY:
+        case ACK_CONFLICT_ERROR:
         case ACKX_NONE:
         case ACKX_SEND_ERROR:
         case ACKX_ABORTED:
