@@ -20,7 +20,16 @@
 
 static spinlock_t limit_lock = SPIN_LOCK_UNLOCKED;
 
-#define CREDITS_PER_JIFFY 128
+#define MAX_CPJ (0xFFFFFFFF / (HZ*60*60*24))
+
+#define _POW2_BELOW2(x) ((x)|((x)>>1))
+#define _POW2_BELOW4(x) (_POW2_BELOW2(x)|_POW2_BELOW2((x)>>2))
+#define _POW2_BELOW8(x) (_POW2_BELOW4(x)|_POW2_BELOW4((x)>>4))
+#define _POW2_BELOW16(x) (_POW2_BELOW8(x)|_POW2_BELOW8((x)>>8))
+#define _POW2_BELOW32(x) (_POW2_BELOW16(x)|_POW2_BELOW16((x)>>16))
+#define POW2_BELOW32(x) ((_POW2_BELOW32(x)>>1) + 1)
+
+#define CREDITS_PER_JIFFY POW2_BELOW32(MAX_CPJ)
 
 static int ebt_limit_match(const struct sk_buff *skb,
    const struct net_device *in, const struct net_device *out,
@@ -68,7 +77,7 @@ static int ebt_limit_check(const char *tablename, unsigned int hookmask,
 	/* Check for overflow. */
 	if (info->burst == 0 ||
 	    user2credits(info->avg * info->burst) < user2credits(info->avg)) {
-		printk("Overflow in ebt_limit: %u/%u\n",
+		printk("Overflow in ebt_limit, try lower: %u/%u\n",
 			info->avg, info->burst);
 		return -EINVAL;
 	}
