@@ -34,9 +34,8 @@ obj-y    += err_ev7.o err_titan.o err_marvel.o
 endif
 
 obj-y	 += irq_pyxis.o irq_i8259.o irq_srm.o
-
+obj-y	 += err_ev6.o
 obj-y	 += es1888.o smc37c669.o smc37c93x.o ns87312.o gct.o
-
 obj-y    += srmcons.o
 
 else
@@ -71,13 +70,12 @@ obj-$(CONFIG_ALPHA_PC164)	+= sys_cabriolet.o irq_i8259.o irq_srm.o \
 				   smc37c93x.o
 obj-$(CONFIG_ALPHA_DP264)	+= sys_dp264.o irq_i8259.o es1888.o smc37c669.o
 obj-$(CONFIG_ALPHA_SHARK)	+= sys_dp264.o irq_i8259.o es1888.o smc37c669.o
-obj-$(CONFIG_ALPHA_TITAN)	+= sys_titan.o irq_i8259.o smc37c669.o \
-				   err_titan.o
+obj-$(CONFIG_ALPHA_TITAN)	+= sys_titan.o irq_i8259.o smc37c669.o
 obj-$(CONFIG_ALPHA_EB64P)	+= sys_eb64p.o irq_i8259.o
 obj-$(CONFIG_ALPHA_EB66)	+= sys_eb64p.o irq_i8259.o
 obj-$(CONFIG_ALPHA_EIGER)	+= sys_eiger.o irq_i8259.o
 obj-$(CONFIG_ALPHA_JENSEN)	+= sys_jensen.o pci-noop.o irq_i8259.o
-obj-$(CONFIG_ALPHA_MARVEL)	+= sys_marvel.o err_marvel.o
+obj-$(CONFIG_ALPHA_MARVEL)	+= sys_marvel.o 
 obj-$(CONFIG_ALPHA_MIATA)	+= sys_miata.o irq_pyxis.o irq_i8259.o \
 				   es1888.o smc37c669.o
 obj-$(CONFIG_ALPHA_MIKASA)	+= sys_mikasa.o irq_i8259.o irq_srm.o
@@ -97,5 +95,10 @@ obj-$(CONFIG_ALPHA_SX164)	+= sys_sx164.o irq_pyxis.o irq_i8259.o \
 				   irq_srm.o smc37c669.o
 obj-$(CONFIG_ALPHA_TAKARA)	+= sys_takara.o irq_i8259.o ns87312.o
 obj-$(CONFIG_ALPHA_WILDFIRE)	+= sys_wildfire.o irq_i8259.o
+
+# Error support
+obj-$(CONFIG_ALPHA_MARVEL)	+= err_ev7.o err_marvel.o
+obj-$(CONFIG_ALPHA_NAUTILUS)	+= err_ev6.o
+obj-$(CONFIG_ALPHA_TITAN)	+= err_ev6.o err_titan.o
 
 endif # GENERIC
