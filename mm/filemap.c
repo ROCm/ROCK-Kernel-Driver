@@ -177,8 +177,13 @@ static inline void truncate_partial_page(struct page *page, unsigned partial)
 static void truncate_complete_page(struct page *page)
 {
 	/* Leave it on the LRU if it gets converted into anonymous buffers */
-	if (!PagePrivate(page) || do_invalidatepage(page, 0))
+	if (!PagePrivate(page) || do_invalidatepage(page, 0)) {
 		lru_cache_del(page);
+	} else {
+		if (current->flags & PF_INVALIDATE)
+			printk("%s: buffer heads were leaked\n",
+				current->comm);
+	}
 	ClearPageDirty(page);
 	ClearPageUptodate(page);
 	remove_inode_page(page);

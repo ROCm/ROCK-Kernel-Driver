@@ -467,7 +467,9 @@ void invalidate_bdev(struct block_device *bdev, int destroy_dirty_buffers)
 	 * We really want to use invalidate_inode_pages2() for
 	 * that, but not until that's cleaned up.
 	 */
+	current->flags |= PF_INVALIDATE;
 	invalidate_inode_pages(bdev->bd_inode);
+	current->flags &= ~PF_INVALIDATE;
 }
 
 void __invalidate_buffers(kdev_t dev, int destroy_dirty_buffers)
