@@ -257,6 +257,22 @@ static int mprotect_fixup(struct vm_area_struct * vma, struct vm_area_struct ** 
 		*pprev = vma;
 		return 0;
 	}
+
+	/*
+	 * If we make a private mapping writable we increase our commit;
+	 * but (without finer accounting) cannot reduce our commit if we
+	 * make it unwritable again.
+	 *
+	 * FIXME? We haven't defined a VM_NORESERVE flag, so mprotecting
+	 * a MAP_NORESERVE private mapping to writable will now reserve.
+	 */
+	if ((newflags & VM_WRITE) &&
+	    !(vma->vm_flags & (VM_ACCOUNT|VM_WRITE|VM_SHARED))) {
+		charged = (end - start) >> PAGE_SHIFT;
+		if (!vm_enough_memory(charged))
+			return -ENOMEM;
+		newflags |= VM_ACCOUNT;
+	}
 	newprot = protection_map[newflags & 0xf];
 	if (start == vma->vm_start) {
 		if (end == vma->vm_end)
@@ -267,19 +283,10 @@ static int mprotect_fixup(struct vm_area_struct * vma, struct vm_area_struct ** 
 		error = mprotect_fixup_end(vma, pprev, start, newflags, newprot);
 	else
 		error = mprotect_fixup_middle(vma, pprev, start, end, newflags, newprot);
-
 	if (error) {
-		if (newflags & PROT_WRITE)
-			vm_unacct_memory(charged);
+		vm_unacct_memory(charged);
 		return error;
 	}
-
-	/*
-	 * Delayed accounting for reduction of memory use - done last to
-	 * avoid allocation races
-	 */
-	if (charged && !(newflags & PROT_WRITE))
-		vm_unacct_memory(charged);
 	change_protection(vma, start, end, newprot);
 	return 0;
 }

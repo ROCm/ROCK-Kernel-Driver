@@ -527,16 +527,14 @@ munmap_back:
 	    > current->rlim[RLIMIT_AS].rlim_cur)
 		return -ENOMEM;
 
-	if (sysctl_overcommit_memory > 1)
-		flags &= ~MAP_NORESERVE;
-
-	/* Private writable mapping? Check memory availability.. */
-	if ((((vm_flags & (VM_SHARED | VM_WRITE)) == VM_WRITE) ||
-			(file == NULL)) && !(flags & MAP_NORESERVE)) {
-		charged = len >> PAGE_SHIFT;
-		if (!vm_enough_memory(charged))
-			return -ENOMEM;
-		vm_flags |= VM_ACCOUNT;
+	if (!(flags & MAP_NORESERVE) || sysctl_overcommit_memory > 1) {
+		if ((vm_flags & (VM_SHARED|VM_WRITE)) == VM_WRITE) {
+			/* Private writable mapping: check memory availability */
+			charged = len >> PAGE_SHIFT;
+			if (!vm_enough_memory(charged))
+				return -ENOMEM;
+			vm_flags |= VM_ACCOUNT;
+		}
 	}
 
 	/* Can we just expand an old anonymous mapping? */
@@ -579,7 +577,7 @@ munmap_back:
 		error = file->f_op->mmap(file, vma);
 		if (error)
 			goto unmap_and_free_vma;
-	} else if (flags & MAP_SHARED) {
+	} else if (vm_flags & VM_SHARED) {
 		error = shmem_zero_setup(vma);
 		if (error)
 			goto free_vma;
