@@ -181,6 +181,8 @@ acpi_ps_append_arg (
 }
 
 
+#ifdef ACPI_FUTURE_USAGE
+
 /*******************************************************************************
  *
  * FUNCTION:    acpi_ps_get_child
@@ -192,7 +194,6 @@ acpi_ps_append_arg (
  * DESCRIPTION: Get op's children or NULL if none
  *
  ******************************************************************************/
-
 union acpi_parse_object *
 acpi_ps_get_child (
 	union acpi_parse_object         *op)
@@ -322,4 +323,5 @@ acpi_ps_get_depth_next (
 	return (next);
 }
 
+#endif  /*  ACPI_FUTURE_USAGE  */
 

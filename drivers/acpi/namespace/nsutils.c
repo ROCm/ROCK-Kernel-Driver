@@ -961,7 +961,7 @@ cleanup:
  *              (which "should not happen").
  *
  ******************************************************************************/
-
+#ifdef ACPI_FUTURE_USAGE
 acpi_name
 acpi_ns_find_parent_name (
 	struct acpi_namespace_node      *child_node)
@@ -994,6 +994,7 @@ acpi_ns_find_parent_name (
 
 	return_VALUE (ACPI_UNKNOWN_NAME);
 }
+#endif
 
 
 /*******************************************************************************

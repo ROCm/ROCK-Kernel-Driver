@@ -62,7 +62,7 @@
  *              return a pointer to that table descriptor.
  *
  ******************************************************************************/
-
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_tb_handle_to_object (
 	u16                             table_id,
@@ -90,6 +90,7 @@ acpi_tb_handle_to_object (
 	ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "table_id=%X does not exist\n", table_id));
 	return (AE_BAD_PARAMETER);
 }
+#endif  /*  ACPI_FUTURE_USAGE  */
 
 
 /*******************************************************************************

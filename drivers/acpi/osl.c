@@ -211,6 +211,7 @@ acpi_os_unmap_memory(void __iomem *virt, acpi_size size)
 	iounmap(virt);
 }
 
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_os_get_physical_address(void *virt, acpi_physical_address *phys)
 {
@@ -221,6 +222,7 @@ acpi_os_get_physical_address(void *virt, acpi_physical_address *phys)
 
 	return AE_OK;
 }
+#endif
 
 #define ACPI_MAX_OVERRIDE_LEN 100
 
@@ -989,6 +991,7 @@ acpi_os_signal_semaphore(
 }
 EXPORT_SYMBOL(acpi_os_signal_semaphore);
 
+#ifdef ACPI_FUTURE_USAGE
 u32
 acpi_os_get_line(char *buffer)
 {
@@ -1007,6 +1010,7 @@ acpi_os_get_line(char *buffer)
 
 	return 0;
 }
+#endif  /*  ACPI_FUTURE_USAGE  */
 
 /* Assumes no unreadable holes inbetween */
 u8
@@ -1019,6 +1023,7 @@ acpi_os_readable(void *ptr, acpi_size len)
 	return 1;
 }
 
+#ifdef ACPI_FUTURE_USAGE
 u8
 acpi_os_writable(void *ptr, acpi_size len)
 {
@@ -1026,6 +1031,7 @@ acpi_os_writable(void *ptr, acpi_size len)
 	   The later may be difficult at early boot when kmap doesn't work yet. */
 	return 1;
 }
+#endif
 
 u32
 acpi_os_get_thread_id (void)

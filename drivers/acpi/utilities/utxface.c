@@ -343,6 +343,8 @@ acpi_terminate (void)
 }
 
 
+#ifdef ACPI_FUTURE_USAGE
+
 /*****************************************************************************
  *
  * FUNCTION:    acpi_subsystem_status
@@ -490,6 +492,8 @@ acpi_install_initialization_handler (
 	acpi_gbl_init_handler = handler;
 	return AE_OK;
 }
+
+#endif  /*  ACPI_FUTURE_USAGE  */
 
 
 /*****************************************************************************

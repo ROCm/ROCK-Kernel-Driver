@@ -267,6 +267,7 @@ acpi_ps_is_prefix_char (
 /*
  * Get op's name (4-byte name segment) or 0 if unnamed
  */
+#ifdef ACPI_FUTURE_USAGE
 u32
 acpi_ps_get_name (
 	union acpi_parse_object         *op)
@@ -283,6 +284,7 @@ acpi_ps_get_name (
 
 	return (op->named.name);
 }
+#endif  /*  ACPI_FUTURE_USAGE  */
 
 
 /*

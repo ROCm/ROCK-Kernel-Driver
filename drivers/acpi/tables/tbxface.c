@@ -138,6 +138,8 @@ error_exit:
 }
 
 
+#ifdef ACPI_FUTURE_USAGE
+
 /*******************************************************************************
  *
  * FUNCTION:    acpi_load_table
@@ -343,6 +345,8 @@ acpi_get_table_header (
 	return_ACPI_STATUS (status);
 }
 
+
+#endif  /*  ACPI_FUTURE_USAGE  */
 
 /*******************************************************************************
  *

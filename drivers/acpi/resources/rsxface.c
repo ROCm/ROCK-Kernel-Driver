@@ -180,7 +180,7 @@ EXPORT_SYMBOL(acpi_get_current_resources);
  *              and the value of ret_buffer is undefined.
  *
  ******************************************************************************/
-
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_get_possible_resources (
 	acpi_handle                     device_handle,
@@ -211,6 +211,7 @@ acpi_get_possible_resources (
 	return_ACPI_STATUS (status);
 }
 EXPORT_SYMBOL(acpi_get_possible_resources);
+#endif  /*  ACPI_FUTURE_USAGE  */
 
 
 /*******************************************************************************
