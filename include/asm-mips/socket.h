@@ -68,4 +68,31 @@ To add: #define SO_REUSEPORT 0x0200	/* Allow local address and port reuse.  */
 
 #define SO_PEERSEC		30
 
+/** sock_type - Socket types
+ *
+ * Please notice that for binary compat reasons MIPS has to
+ * override the enum sock_type in include/linux/net.h, so
+ * we define ARCH_HAS_SOCKET_TYPES here.
+ *
+ * @SOCK_DGRAM - datagram (conn.less) socket
+ * @SOCK_STREAM - stream (connection) socket
+ * @SOCK_RAW - raw socket
+ * @SOCK_RDM - reliably-delivered message
+ * @SOCK_SEQPACKET - sequential packet socket 
+ * @SOCK_PACKET - linux specific way of getting packets at the dev level.
+ *		  For writing rarp and other similar things on the user level.
+ */
+enum sock_type {
+	SOCK_DGRAM	= 1,
+	SOCK_STREAM	= 2,
+	SOCK_RAW	= 3,
+	SOCK_RDM	= 4,
+	SOCK_SEQPACKET	= 5,
+	SOCK_PACKET	= 10,
+};
+
+#define SOCK_MAX (SOCK_PACKET + 1)
+
+#define ARCH_HAS_SOCKET_TYPES
+
 #endif /* _ASM_SOCKET_H */
