@@ -68,8 +68,8 @@ void show_mem(void)
 
 	for_each_pgdat(pgdat) {
                for (i = 0; i < pgdat->node_spanned_pages; ++i) {
-                       page = pgdat->node_mem_map + i;
-		total++;
+			page = pfn_to_page(pgdat->node_start_pfn + i);
+			total++;
                        if (PageReserved(page))
 			reserved++;
                        else if (PageSwapCache(page))
@@ -437,7 +437,7 @@ void __init mem_init(void)
 		/*
 		 * Only count reserved RAM pages
 		 */
-		if (page_is_ram(tmp) && PageReserved(mem_map+tmp))
+		if (page_is_ram(tmp) && PageReserved(pfn_to_page(tmp)))
 			reservedpages++;
 #endif
 
