@@ -1548,7 +1548,7 @@ void __journal_unfile_buffer(struct journal_head *jh)
 	__blist_del_buffer(list, jh);
 	jh->b_jlist = BJ_None;
 	if (test_and_clear_bit(BH_JBDDirty, &jh2bh(jh)->b_state))
-		set_buffer_dirty(jh2bh(jh));
+		mark_buffer_dirty(jh2bh(jh));	/* Expose it to the VM */
 }
 
 void journal_unfile_buffer(struct journal_head *jh)
