@@ -70,4 +70,11 @@ arch/ppc64/kernel/asm-offsets.s: include/asm include/linux/version.h \
 include/asm-ppc64/offsets.h: arch/ppc64/kernel/asm-offsets.s
 	$(call filechk,gen-asm-offsets)
 
+define archhelp
+  echo  '* zImage	- Compressed kernel image (arch/$(ARCH)/boot/zImage)'
+  echo  '  zImage.initrd- Compressed kernel image with initrd attached,
+  echo  '		   sourced from arch/$(ARCH)/boot/ramdisk.image.gz'
+  echo  '		   (arch/$(ARCH)/boot/zImage.initrd)'
+endef
+
 CLEAN_FILES += include/asm-ppc64/offsets.h
