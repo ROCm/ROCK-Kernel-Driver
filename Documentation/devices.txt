@@ -2046,6 +2046,21 @@ Your cooperation is appreciated.
 		  1 = /dev/gpib1	Second GPIB bus
 		    ...
 
+160 block       Carmel 8-port SATA Disks on First Controller
+		  0 = /dev/carmel/0     SATA disk 0 whole disk
+		  1 = /dev/carmel/0p1   SATA disk 0 partition 1
+		    ...
+		 31 = /dev/carmel/0p31  SATA disk 0 partition 31
+
+		 32 = /dev/carmel/1     SATA disk 1 whole disk
+		 64 = /dev/carmel/2     SATA disk 2 whole disk
+		    ...
+		224 = /dev/carmel/7     SATA disk 7 whole disk
+
+		Partitions are handled in the same way as for IDE
+		disks (see major number 3) except that the limit on
+		partitions is 31.
+
 161 char	IrCOMM devices (IrDA serial/parallel emulation)
 		  0 = /dev/ircomm0	First IrCOMM device
 		  1 = /dev/ircomm1	Second IrCOMM device
@@ -2053,6 +2068,21 @@ Your cooperation is appreciated.
 		 16 = /dev/irlpt0	First IrLPT device
 		 17 = /dev/irlpt1	Second IrLPT device
 		    ...
+
+161 block       Carmel 8-port SATA Disks on Second Controller
+		  0 = /dev/carmel/8     SATA disk 8 whole disk
+		  1 = /dev/carmel/8p1   SATA disk 8 partition 1
+		    ...
+		 31 = /dev/carmel/8p31  SATA disk 8 partition 31
+
+		 32 = /dev/carmel/9     SATA disk 9 whole disk
+		 64 = /dev/carmel/10    SATA disk 10 whole disk
+		    ...
+		224 = /dev/carmel/15    SATA disk 15 whole disk
+
+		Partitions are handled in the same way as for IDE
+		disks (see major number 3) except that the limit on
+		partitions is 31. 
 
 162 char	Raw block device interface
 		  0 = /dev/rawctl	Raw I/O control device
