@@ -1258,7 +1258,7 @@ out:
 
 int fastcall wake_up_process(task_t * p)
 {
-	return try_to_wake_up(p, TASK_STOPPED |
+	return try_to_wake_up(p, TASK_STOPPED | TASK_TRACED |
 		       		 TASK_INTERRUPTIBLE | TASK_UNINTERRUPTIBLE, 0);
 }
 
@@ -3679,7 +3679,7 @@ static void show_task(task_t * p)
 	task_t *relative;
 	unsigned state;
 	unsigned long free = 0;
-	static const char *stat_nam[] = { "R", "S", "D", "T", "Z", "W" };
+	static const char *stat_nam[] = { "R", "S", "D", "T", "t", "Z", "X" };
 
 	printk("%-13.13s ", p->comm);
 	state = p->state ? __ffs(p->state) + 1 : 0;

@@ -287,7 +287,8 @@ static int proc_root_link(struct inode *inode, struct dentry **dentry, struct vf
 #define MAY_PTRACE(task) \
 	(task == current || \
 	(task->parent == current && \
-	(task->ptrace & PT_PTRACED) &&  task->state == TASK_STOPPED && \
+	(task->ptrace & PT_PTRACED) && \
+	 (task->state == TASK_STOPPED || task->state == TASK_TRACED) && \
 	 security_ptrace(current,task) == 0))
 
 static int may_ptrace_attach(struct task_struct *task)

@@ -55,6 +55,15 @@ void __ptrace_unlink(task_t *child)
 	REMOVE_LINKS(child);
 	child->parent = child->real_parent;
 	SET_LINKS(child);
+
+	if (child->state == TASK_TRACED) {
+		/*
+		 * Turn a tracing stop into a normal stop now,
+		 * since with no tracer there would be no way
+		 * to wake it up with SIGCONT or SIGKILL.
+		 */
+		child->state = TASK_STOPPED;
+	}
 }
 
 /*
@@ -62,20 +71,28 @@ void __ptrace_unlink(task_t *child)
  */
 int ptrace_check_attach(struct task_struct *child, int kill)
 {
-	if (!(child->ptrace & PT_PTRACED))
-		return -ESRCH;
+	int ret = -ESRCH;
 
-	if (child->parent != current)
-		return -ESRCH;
+	/*
+	 * We take the read lock around doing both checks to close a
+	 * possible race where someone else was tracing our child and
+	 * detached between these two checks.  After this locked check,
+	 * we are sure that this is our traced child and that can only
+	 * be changed by us so it's not changing right after this.
+	 */
+	read_lock(&tasklist_lock);
+	if ((child->ptrace & PT_PTRACED) && child->parent == current)
+		ret = 0;
+	read_unlock(&tasklist_lock);
 
-	if (!kill) {
-		if (child->state != TASK_STOPPED)
+	if (!ret && !kill) {
+		if (child->state != TASK_TRACED)
 			return -ESRCH;
 		wait_task_inactive(child);
 	}
 
 	/* All systems go.. */
-	return 0;
+	return ret;
 }
 
 int ptrace_attach(struct task_struct *task)
@@ -281,15 +298,13 @@ static int ptrace_setoptions(struct task_struct *child, long data)
 
 static int ptrace_getsiginfo(struct task_struct *child, siginfo_t __user * data)
 {
-	if (child->last_siginfo == NULL)
-		return -EINVAL;
+	BUG_ON(child->last_siginfo == NULL);
 	return copy_siginfo_to_user(data, child->last_siginfo);
 }
 
 static int ptrace_setsiginfo(struct task_struct *child, siginfo_t __user * data)
 {
-	if (child->last_siginfo == NULL)
-		return -EINVAL;
+	BUG_ON(child->last_siginfo == NULL);
 	if (copy_from_user(child->last_siginfo, data, sizeof (siginfo_t)) != 0)
 		return -EFAULT;
 	return 0;
@@ -322,24 +337,3 @@ int ptrace_request(struct task_struct *child, long request,
 
 	return ret;
 }
-
-void ptrace_notify(int exit_code)
-{
-	BUG_ON (!(current->ptrace & PT_PTRACED));
-
-	/* Let the debugger run.  */
-	current->exit_code = exit_code;
-	set_current_state(TASK_STOPPED);
-	notify_parent(current, SIGCHLD);
-	schedule();
-
-	/*
-	 * Signals sent while we were stopped might set TIF_SIGPENDING.
-	 */
-
-	spin_lock_irq(&current->sighand->siglock);
-	recalc_sigpending();
-	spin_unlock_irq(&current->sighand->siglock);
-}
-
-EXPORT_SYMBOL(ptrace_notify);
