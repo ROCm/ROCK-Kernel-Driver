@@ -423,6 +423,9 @@ static int attach_adapter (struct i2c_adapter *adapter)
 
 	dprintk ("%s\n", __FUNCTION__);
 
+	if (0 == strncmp(adapter->name,"cx88",4))
+		return -ENODEV;
+
 	if (i2c_transfer(adapter, msg, 2) != 2)
 		return -ENODEV;
 
