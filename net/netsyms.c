@@ -20,7 +20,6 @@
 #include <net/snmp.h>
 #include <net/checksum.h>
 #include <linux/etherdevice.h>
-#include <net/route.h>
 #ifdef CONFIG_HIPPI
 #include <linux/hippidevice.h>
 #endif
@@ -35,7 +34,6 @@
 #include <net/inet_common.h>
 #include <linux/inet.h>
 #include <linux/mroute.h>
-#include <linux/igmp.h>
 #if defined(CONFIG_INET_AH) || defined(CONFIG_INET_AH_MODULE) || defined(CONFIG_INET6_AH) || defined(CONFIG_INET6_AH_MODULE)
 #include <net/ah.h>
 #endif
@@ -75,9 +73,6 @@ EXPORT_SYMBOL(icmp_err_convert);
 EXPORT_SYMBOL(ip_options_compile);
 EXPORT_SYMBOL(ip_options_undo);
 EXPORT_SYMBOL(in_aton);
-EXPORT_SYMBOL(ip_mc_inc_group);
-EXPORT_SYMBOL(ip_mc_dec_group);
-EXPORT_SYMBOL(ip_mc_join_group);
 EXPORT_SYMBOL(inet_addr_type); 
 EXPORT_SYMBOL(ip_dev_find);
 EXPORT_SYMBOL(ip_defrag);
