@@ -142,7 +142,7 @@ void huge_pagevec_release(struct pagevec *pvec)
 	int i;
 
 	for (i = 0; i < pagevec_count(pvec); ++i)
-		huge_page_release(pvec->pages[i]);
+		put_page(pvec->pages[i]);
 
 	pagevec_reinit(pvec);
 }
@@ -152,7 +152,7 @@ void truncate_huge_page(struct page *page)
 	clear_page_dirty(page);
 	ClearPageUptodate(page);
 	remove_from_page_cache(page);
-	huge_page_release(page);
+	put_page(page);
 }
 
 void truncate_hugepages(struct address_space *mapping, loff_t lstart)

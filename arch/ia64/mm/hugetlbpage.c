@@ -248,7 +248,7 @@ void unmap_hugepage_range(struct vm_area_struct *vma, unsigned long start, unsig
 		if (pte_none(*pte))
 			continue;
 		page = pte_page(*pte);
-		huge_page_release(page);
+		put_page(page);
 		pte_clear(pte);
 	}
 	mm->rss -= (end - start) >> PAGE_SHIFT;

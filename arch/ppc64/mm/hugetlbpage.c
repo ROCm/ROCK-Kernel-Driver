@@ -394,7 +394,7 @@ void unmap_hugepage_range(struct vm_area_struct *vma,
 			flush_hash_hugepage(mm->context, addr,
 					    pte, local);
 
-		huge_page_release(page);
+		put_page(page);
 	}
 
 	mm->rss -= (end - start) >> PAGE_SHIFT;

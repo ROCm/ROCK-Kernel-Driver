@@ -78,18 +78,10 @@ struct page *alloc_huge_page(void)
 	free_huge_pages--;
 	spin_unlock(&hugetlb_lock);
 	set_page_count(page, 1);
-	page->lru.prev = (void *)free_huge_page;
+	page[1].mapping = (void *)free_huge_page;
 	for (i = 0; i < (HPAGE_SIZE/PAGE_SIZE); ++i)
 		clear_highpage(&page[i]);
 	return page;
-}
-
-void huge_page_release(struct page *page)
-{
-	if (!put_page_testzero(page))
-		return;
-
-	free_huge_page(page);
 }
 
 static int __init hugetlb_init(void)
