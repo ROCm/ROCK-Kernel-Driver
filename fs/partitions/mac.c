@@ -12,7 +12,7 @@
 #include "mac.h"
 
 #ifdef CONFIG_ALL_PPC
-extern void note_bootable_part(kdev_t dev, int part, int goodness);
+extern void note_bootable_part(dev_t dev, int part, int goodness);
 #endif
 
 /*
@@ -121,8 +121,7 @@ int mac_partition(struct parsed_partitions *state, struct block_device *bdev)
 	}
 #ifdef CONFIG_ALL_PPC
 	if (found_root_goodness)
-		note_bootable_part(to_kdev_t(bdev->bd_dev),
-					found_root, found_root_goodness);
+		note_bootable_part(bdev->bd_dev, found_root, found_root_goodness);
 #endif
 
 	put_dev_sector(sect);

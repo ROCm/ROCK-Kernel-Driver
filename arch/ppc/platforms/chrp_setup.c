@@ -67,7 +67,7 @@ void btext_progress(char *, unsigned short);
 extern unsigned long pmac_find_end_of_memory(void);
 extern int of_show_percpuinfo(struct seq_file *, int);
 
-extern kdev_t boot_dev;
+extern dev_t boot_dev;
 
 extern PTE *Hash, *Hash_end;
 extern unsigned long Hash_size, Hash_mask;
