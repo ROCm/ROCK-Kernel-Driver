@@ -62,14 +62,16 @@ extern unsigned long *ia32_gdt;
 struct page *
 ia32_install_shared_page (struct vm_area_struct *vma, unsigned long address, int no_share)
 {
-	struct page *pg = ia32_shared_page[(address - vma->vm_start)/PAGE_SIZE];
+#	define NUM_SHARED_PAGES	(PAGE_SIZE > IA32_PAGE_SIZE ? 1 : 2)
+	struct page *pg = ia32_shared_page[NUM_SHARED__PAGES * smp_processor_id()
+					   + (address - vma->vm_start)/PAGE_SIZE];
 
 	get_page(pg);
 	return pg;
 }
 
 static struct vm_operations_struct ia32_shared_page_vm_ops = {
-	.nopage =ia32_install_shared_page
+	.nopage = ia32_install_shared_page
 };
 
 void

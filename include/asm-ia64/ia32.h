@@ -9,9 +9,11 @@
 #ifdef CONFIG_IA32_SUPPORT
 
 extern void ia32_cpu_init (void);
+extern void ia32_boot_gdt_init (void);
 extern void ia32_gdt_init (void);
 extern int ia32_exception (struct pt_regs *regs, unsigned long isr);
 extern int ia32_intercept (struct pt_regs *regs, unsigned long isr);
+extern int ia32_clone_tls (struct task_struct *child, struct pt_regs *childregs);
 
 #endif /* !CONFIG_IA32_SUPPORT */
 

@@ -82,7 +82,7 @@ read_default_ldt (void * ptr, unsigned long bytecount)
 static int
 write_ldt (void * ptr, unsigned long bytecount, int oldmode)
 {
-	struct ia32_modify_ldt_ldt_s ldt_info;
+	struct ia32_user_desc ldt_info;
 	__u64 entry;
 	int ret;
 
