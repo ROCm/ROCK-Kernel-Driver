@@ -21,6 +21,12 @@
 #include <asm/pci-bridge.h>
 #include <asm/machdep.h>
 
+#ifdef CONFIG_PPC_INDIRECT_PCI_BE
+#define PCI_CFG_OUT out_be32
+#else
+#define PCI_CFG_OUT out_le32
+#endif
+
 static int
 indirect_read_config(struct pci_bus *bus, unsigned int devfn, int offset,
 		     int len, u32 *val)
@@ -37,15 +43,9 @@ indirect_read_config(struct pci_bus *bus, unsigned int devfn, int offset,
 		if (bus->number != hose->first_busno)
 			cfg_type = 1;
 
-#ifdef CONFIG_PPC_INDIRECT_PCI_BE
-	out_be32(hose->cfg_addr, 					 
+	PCI_CFG_OUT(hose->cfg_addr, 					 
 		 (0x80000000 | ((dev->bus->number - hose->bus_offset) << 16) 
 		  | (dev->devfn << 8) | ((offset & 0xfc) | cfg_type)));	
-#else
-	out_le32(hose->cfg_addr, 					 
-		 (0x80000000 | ((dev->bus->number - hose->bus_offset) << 16) 
-		  | (dev->devfn << 8) | ((offset & 0xfc) | cfg_type)));	
-#endif
 
 	/*
 	 * Note: the caller has already checked that offset is
@@ -82,15 +82,9 @@ indirect_write_config(struct pci_bus *bus, unsigned int devfn, int offset,
 		if (bus->number != hose->first_busno)
 			cfg_type = 1;
 
-#ifdef CONFIG_PPC_INDIRECT_PCI_BE
-	out_be32(hose->cfg_addr, 					 
+	PCI_CFG_OUT(hose->cfg_addr, 					 
 		 (0x80000000 | ((dev->bus->number - hose->bus_offset) << 16) 
 		  | (dev->devfn << 8) | ((offset & 0xfc) | cfg_type)));	
-#else
-	out_le32(hose->cfg_addr, 					 
-		 (0x80000000 | ((dev->bus->number - hose->bus_offset) << 16) 
-		  | (dev->devfn << 8) | ((offset & 0xfc) | cfg_type)));	
-#endif
 
 	/*
 	 * Note: the caller has already checked that offset is
