@@ -29,6 +29,13 @@
 #include <asm/arch/hardware.h>
 
 /*
+ * ISA I/O bus memory addresses are 1:1 with the physical address.
+ */
+#define isa_virt_to_bus virt_to_phys
+#define isa_page_to_bus page_to_phys
+#define isa_bus_to_virt phys_to_virt
+
+/*
  * Generic IO read/write.  These perform native-endian accesses.  Note
  * that some architectures will want to re-define __raw_{read,write}w.
  */
