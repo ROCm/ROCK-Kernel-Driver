@@ -2039,8 +2039,15 @@ NCR_700_init(void)
 	return 0;
 }
 
+/* NULL exit routine to keep modutils happy */
+STATIC void __exit
+NCR_700_exit(void)
+{
+}
+
 EXPORT_SYMBOL(NCR_700_detect);
 EXPORT_SYMBOL(NCR_700_release);
 EXPORT_SYMBOL(NCR_700_intr);
 
 module_init(NCR_700_init);
+module_exit(NCR_700_exit);
