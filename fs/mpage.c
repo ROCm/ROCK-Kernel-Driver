@@ -650,32 +650,31 @@ retry:
 			if (wbc->sync_mode != WB_SYNC_NONE)
 				wait_on_page_writeback(page);
 
-			if (page->mapping == mapping && !PageWriteback(page) &&
-						clear_page_dirty_for_io(page)) {
-				if (writepage) {
-					ret = (*writepage)(page, wbc);
-					if (ret) {
-						if (ret == -ENOSPC)
-							set_bit(AS_ENOSPC,
-							  &mapping->flags);
-						else
-							set_bit(AS_EIO,
-							  &mapping->flags);
-					}
-				} else {
-					bio = mpage_writepage(bio, page,
-						get_block, &last_block_in_bio,
-						&ret, wbc);
-				}
-				if (ret || (--(wbc->nr_to_write) <= 0))
-					done = 1;
-				if (wbc->nonblocking &&
-						bdi_write_congested(bdi)) {
-					wbc->encountered_congestion = 1;
-					done = 1;
+			if (page->mapping != mapping || PageWriteback(page) ||
+					!clear_page_dirty_for_io(page)) {
+				unlock_page(page);
+				continue;
+			}
+
+			if (writepage) {
+				ret = (*writepage)(page, wbc);
+				if (ret) {
+					if (ret == -ENOSPC)
+						set_bit(AS_ENOSPC,
+							&mapping->flags);
+					else
+						set_bit(AS_EIO,
+							&mapping->flags);
 				}
 			} else {
-				unlock_page(page);
+				bio = mpage_writepage(bio, page, get_block,
+						&last_block_in_bio, &ret, wbc);
+			}
+			if (ret || (--(wbc->nr_to_write) <= 0))
+				done = 1;
+			if (wbc->nonblocking && bdi_write_congested(bdi)) {
+				wbc->encountered_congestion = 1;
+				done = 1;
 			}
 		}
 		pagevec_release(&pvec);
