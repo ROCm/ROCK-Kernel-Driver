@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#156 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#157 $
  *
  * $FreeBSD$
  */
@@ -6050,7 +6050,7 @@ ahd_chip_init(struct ahd_softc *ahd)
 	} else {
 		ahd_outb(ahd, OPTIONMODE, AUTOACKEN|BUSFREEREV|AUTO_MSGOUT_DE);
 	}
-	ahd_outb(ahd, SCSCHKN, CURRFIFODEF|WIDERESEN);
+	ahd_outb(ahd, SCSCHKN, CURRFIFODEF|WIDERESEN|SHVALIDSTDIS);
 	if ((ahd->chip & AHD_BUS_MASK) == AHD_PCIX)
 		/*
 		 * Do not issue a target abort when a split completion
