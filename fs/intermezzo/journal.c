@@ -106,7 +106,8 @@ static int presto_do_truncate(struct presto_file_set *fset,
         lock_kernel();
         
         if (size_check != inode->i_size) { 
-                fs_up(&inode->i_sem); 
+                unlock_kernel();
+                fs_up(&inode->i_sem);
                 EXIT;
                 return -EALREADY; 
         }

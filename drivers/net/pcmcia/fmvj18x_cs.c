@@ -1,5 +1,5 @@
 /*======================================================================
-    fmvj18x_cs.c 2.2 2001/01/07
+    fmvj18x_cs.c 2.6 2001/09/17
 
     A fmvj18x (and its compatibles) PCMCIA client driver
 
@@ -23,8 +23,9 @@
     
     The author may be reached as becker@scyld.com, or C/O
     Scyld Computing Corporation
-    410 Severn Ave., Suite 210, Annapolis MD 21403
-    
+    410 Severn Ave., Suite 210
+    Annapolis MD 21403
+   
 ======================================================================*/
 
 #include <linux/module.h>
@@ -54,40 +55,27 @@
 #include <pcmcia/ciscode.h>
 #include <pcmcia/ds.h>
 
-/*
-   All the PCMCIA modules use PCMCIA_DEBUG to control debugging.  If
-   you do not define PCMCIA_DEBUG at all, all the debug code will be
-   left out.  If you compile with PCMCIA_DEBUG=0, the debug code will
-   be present but disabled -- but it can then be enabled for specific
-   modules at load time with a 'pc_debug=#' option to insmod.
-*/
-#ifdef PCMCIA_DEBUG
-static int pc_debug = PCMCIA_DEBUG;
-MODULE_PARM(pc_debug, "i");
-#define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
-#else
-#define DEBUG(n, args...)
-#endif
+/*====================================================================*/
+
+/* Module parameters */
+#define INT_MODULE_PARM(n, v) static int n = v; MODULE_PARM(n, "i")
 
 /* Bit map of interrupts to choose from */
 /* This means pick from 15, 14, 12, 11, 10, 9, 7, 5, 4, and 3 */
-static u_int irq_mask = 0xdeb8;
+INT_MODULE_PARM(irq_mask, 0xdeb8);
 static int irq_list[4] = { -1 };
+MODULE_PARM(irq_list, "1-4i");
 
 /* SRAM configuration */
 /* 0:4KB*2 TX buffer   else:8KB*2 TX buffer */
-static int sram_config;
+INT_MODULE_PARM(sram_config, 0);
 
-MODULE_PARM(irq_mask, "i");
-MODULE_PARM(irq_list, "1-4i");
-MODULE_PARM(sram_config, "i");
-
-/*====================================================================*/
-/* 
-   driver version infomation 
- */
 #ifdef PCMCIA_DEBUG
-static char *version = "fmvj18x_cs.c 2.2 2001/01/07";
+INT_MODULE_PARM(pc_debug, PCMCIA_DEBUG);
+#define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
+static char *version = "fmvj18x_cs.c 2.6 2001/09/17";
+#else
+#define DEBUG(n, args...)
 #endif
 
 /*====================================================================*/
@@ -454,7 +442,9 @@ static void fmvj18x_config(dev_link_t *link)
 	    break;
 	case MANFID_FUJITSU:
 	    if (le16_to_cpu(buf[1]) == PRODID_FUJITSU_MBH10302)
-		cardtype = MBH10302;
+                /* RATOC REX-5588/9822/4886's PRODID are 0004(=MBH10302),
+                   but these are MBH10304 based card. */ 
+		cardtype = MBH10304;
 	    else if (le16_to_cpu(buf[1]) == PRODID_FUJITSU_MBH10304)
 		cardtype = MBH10304;
 	    else
@@ -476,7 +466,7 @@ static void fmvj18x_config(dev_link_t *link)
 		cardtype = XXX10304;    /* MBH10304 with buggy CIS */
 	        link->conf.ConfigIndex = 0x20;
 	    } else {
-		cardtype = MBH10302;
+		cardtype = MBH10302;    /* NextCom NC5310, etc. */
 		link->conf.ConfigIndex = 1;
 	    }
 	    break;
@@ -518,17 +508,17 @@ req_irq:
 
     ioaddr = dev->base_addr;
 
-    /* Power On chip and select bank 0 */
-    if(cardtype == UNGERMANN)
-	outb(BANK_0U, ioaddr + CONFIG_1);
-    else
-	outb(BANK_0, ioaddr + CONFIG_1);
-
     /* Reset controller */
     if( sram_config == 0 ) 
 	outb(CONFIG0_RST, ioaddr + CONFIG_0);
     else
 	outb(CONFIG0_RST_1, ioaddr + CONFIG_0);
+
+    /* Power On chip and select bank 0 */
+    if(cardtype == UNGERMANN)
+	outb(BANK_0U, ioaddr + CONFIG_1);
+    else
+	outb(BANK_0, ioaddr + CONFIG_1);
     
     /* Set hardware address */
     switch (cardtype) {
@@ -937,17 +927,17 @@ static void fjn_reset(struct net_device *dev)
 
     DEBUG(4, "fjn_reset(%s) called.\n",dev->name);
 
+    /* Reset controller */
+    if( sram_config == 0 ) 
+	outb(CONFIG0_RST, ioaddr + CONFIG_0);
+    else
+	outb(CONFIG0_RST_1, ioaddr + CONFIG_0);
+
     /* Power On chip and select bank 0 */
     if( lp->cardtype == UNGERMANN)
 	outb(BANK_0U, ioaddr + CONFIG_1);
     else
 	outb(BANK_0, ioaddr + CONFIG_1);
-
-    /* Reset buffers */
-    if( sram_config == 0 ) 
-	outb(CONFIG0_RST, ioaddr + CONFIG_0);
-    else
-	outb(CONFIG0_RST_1, ioaddr + CONFIG_0);
 
     /* Set Tx modes */
     outb(D_TX_MODE, ioaddr + TX_MODE);
@@ -975,7 +965,7 @@ static void fjn_reset(struct net_device *dev)
 	outb(BANK_2, ioaddr + CONFIG_1);
 
     /* set 16col ctrl bits */
-    if( lp->cardtype == TDK ) 
+    if( lp->cardtype == TDK || lp->cardtype == CONTEC) 
         outb(TDK_AUTO_MODE, ioaddr + COL_CTRL);
     else
         outb(AUTO_MODE, ioaddr + COL_CTRL);
@@ -1257,4 +1247,3 @@ static void set_rx_mode(struct net_device *dev)
     }
     restore_flags(flags);
 }
-MODULE_LICENSE("GPL");

@@ -539,6 +539,15 @@ static void __remove_from_queues(struct buffer_head *bh)
 	__remove_from_lru_list(bh);
 }
 
+static void remove_from_queues(struct buffer_head *bh)
+{
+	spin_lock(&lru_list_lock);
+	write_lock(&hash_table_lock);
+	__remove_from_queues(bh);
+	write_unlock(&hash_table_lock);	
+	spin_unlock(&lru_list_lock);
+}
+
 struct buffer_head * get_hash_table(kdev_t dev, int block, int size)
 {
 	struct buffer_head *bh, **p = &hash(dev, block);
@@ -1352,6 +1361,7 @@ static void discard_buffer(struct buffer_head * bh)
 		clear_bit(BH_Mapped, &bh->b_state);
 		clear_bit(BH_Req, &bh->b_state);
 		clear_bit(BH_New, &bh->b_state);
+		remove_from_queues(bh);
 		unlock_buffer(bh);
 	}
 }

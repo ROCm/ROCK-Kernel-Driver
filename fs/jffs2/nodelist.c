@@ -31,7 +31,7 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: nodelist.c,v 1.29 2001/09/19 00:06:35 dwmw2 Exp $
+ * $Id: nodelist.c,v 1.30 2001/11/14 10:35:21 dwmw2 Exp $
  *
  */
 
@@ -41,26 +41,6 @@
 #include <linux/mtd/mtd.h>
 #include "nodelist.h"
 
-#if 0
-/**
- *	jffs2_add_raw_node_ref - Add a jffs2_raw_node_ref to the cached
- *				node list for the filesystem
- *	@sb: Pointer to filesystem information structure
- *	@ref: New node to add
- *
- *	Adds a new node reference to the filesystem\'s node cache, which
- *	is the only permanent storage required for the filesystem.
- */
-void jffs2_add_raw_node_ref(struct jffs2_sb_info *c, struct jffs2_raw_node_ref *ref)
-{
-	/* Sort the list, hash it or do _something_ useful with it */
-	spin_lock(&c->nodelist_lock);
-	ref->next = c->nodelist;
-	c->nodelist = ref;
-	spin_unlock(&c->nodelist_lock);
-	return 0;
-}
-#endif
 void jffs2_add_fd_to_list(struct jffs2_sb_info *c, struct jffs2_full_dirent *new, struct jffs2_full_dirent **list)
 {
 	struct jffs2_full_dirent **prev = list;
@@ -92,7 +72,7 @@ void jffs2_add_fd_to_list(struct jffs2_sb_info *c, struct jffs2_full_dirent *new
 	D1(while(*list) {
 		printk(KERN_DEBUG "Dirent \"%s\" (hash 0x%08x, ino #%u\n", (*list)->name, (*list)->nhash, (*list)->ino);
 		list = &(*list)->next;
-	})
+	});
 }
 
 /* Put a new tmp_dnode_info into the list, keeping the list in 

@@ -88,6 +88,13 @@ CONFIG_CARDBUS=y
 # CONFIG_I82092 is not set
 # CONFIG_I82365 is not set
 # CONFIG_TCIC is not set
+
+#
+# PCI Hotplug Support
+#
+# CONFIG_HOTPLUG_PCI is not set
+# CONFIG_HOTPLUG_PCI_COMPAQ is not set
+# CONFIG_HOTPLUG_PCI_COMPAQ_NVRAM is not set
 CONFIG_SYSVIPC=y
 # CONFIG_BSD_PROCESS_ACCT is not set
 CONFIG_SYSCTL=y

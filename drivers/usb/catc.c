@@ -330,7 +330,7 @@ static int catc_hard_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 
 	catc->tx_ptr = (((catc->tx_ptr - 1) >> 6) + 1) << 6;
 	tx_buf = catc->tx_buf[catc->tx_idx] + catc->tx_ptr;
-	*((u16*)tx_buf) = cpu_to_le16p(&skb->len);
+	*((u16*)tx_buf) = cpu_to_le16((u16)skb->len);
 	memcpy(tx_buf + 2, skb->data, skb->len);
 	catc->tx_ptr += skb->len + 2;
 

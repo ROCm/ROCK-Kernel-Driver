@@ -753,7 +753,6 @@ void __init print_IO_APIC(void)
 	printk(KERN_DEBUG ".......     : PRQ implemented: %X\n", reg_01.PRQ);
 	printk(KERN_DEBUG ".......     : IO APIC version: %04X\n", reg_01.version);
 	if (	(reg_01.version != 0x01) && /* 82489DX IO-APICs */
-		(reg_01.version != 0x02) && /* 82801BA IO-APICs (ICH2) */
 		(reg_01.version != 0x10) && /* oldest IO-APICs */
 		(reg_01.version != 0x11) && /* Pentium/Pro IO-APICs */
 		(reg_01.version != 0x13) && /* Xeon IO-APICs */

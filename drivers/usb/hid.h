@@ -363,7 +363,7 @@ void hidinput_disconnect(struct hid_device *);
 
 #endif
 
-#define IS_INPUT_APPLICATION(a) ((a >= 0x00010000) && (a <= 0x00010008))
+#define IS_INPUT_APPLICATION(a) (((a >= 0x00010000) && (a <= 0x00010008)) || (a == 0x00010080) || ( a == 0x000c0001))
 
 int hid_open(struct hid_device *);
 void hid_close(struct hid_device *);

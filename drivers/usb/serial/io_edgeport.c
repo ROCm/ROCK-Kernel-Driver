@@ -1018,6 +1018,7 @@ static int edge_open (struct usb_serial_port *port, struct file * filp)
 			/* Like to use FILL_INT_URB, but we don't know wMaxPacketSize or bInterval, something to change for 2.5... */
 			edge_serial->interrupt_read_urb->complete = edge_interrupt_callback;
 			edge_serial->interrupt_read_urb->context = edge_serial;
+			edge_serial->interrupt_read_urb->dev = serial->dev;
 			/* FILL_INT_URB(edge_serial->interrupt_read_urb, serial->dev, 
 				     usb_rcvintpipe (serial->dev, edge_serial->interrupt_in_endpoint),
 				     edge_serial->interrupt_in_buffer, edge_serial->interrupt_in_endpoint.wMaxPacketSize,
@@ -1028,8 +1029,9 @@ static int edge_open (struct usb_serial_port *port, struct file * filp)
 			/* Like to use FILL_BULK_URB, but we don't know wMaxPacketSize or bInterval, something to change for 2.5... */
 			edge_serial->read_urb->complete = edge_bulk_in_callback;
 			edge_serial->read_urb->context = edge_serial;
+			edge_serial->read_urb->dev = serial->dev;
 			/* FILL_BULK_URB(edge_serial->read_urb, serial->dev, 
-				      usb_rcvbulkpipe (serial->dev, edge_serial->bulk_in_endpoint),
+				      usb_rcvbulkpipe (serial->dev, port->bulk_in_endpointAddress),
 				      edge_serial->bulk_in_buffer, edge_serial->bulk_in_endpoint->wMaxPacketSize,
 				      edge_bulk_in_callback, edge_serial);
 			*/
@@ -1399,7 +1401,6 @@ static void send_more_port_data(struct edgeport_serial *edge_serial, struct edge
 	struct urb	*urb;
 	unsigned char	*buffer;
 	int		status;
-	unsigned long	flags;
 	int		count;
 	int		bytesleft;
 	int		firsthalf;
@@ -1407,13 +1408,9 @@ static void send_more_port_data(struct edgeport_serial *edge_serial, struct edge
 
 	dbg(__FUNCTION__"(%d)", edge_port->port->number);
 
-	/* find our next free urb */	// ICK!!! FIXME!!!
-	save_flags(flags); cli();
-
 	if (edge_port->write_in_progress ||
 	    !edge_port->open             ||
 	    (fifo->count == 0)) {
-		restore_flags(flags);
 		dbg(__FUNCTION__"(%d) EXIT - fifo %d, PendingWrite = %d", edge_port->port->number, fifo->count, edge_port->write_in_progress);
 		return;
 	}
@@ -1426,14 +1423,12 @@ static void send_more_port_data(struct edgeport_serial *edge_serial, struct edge
 	//	it's better to wait for more credits so we can do a larger
 	//	write.
 	if (edge_port->txCredits < EDGE_FW_GET_TX_CREDITS_SEND_THRESHOLD(edge_port->maxTxCredits)) {
-		restore_flags(flags);
 		dbg(__FUNCTION__"(%d) Not enough credit - fifo %d TxCredit %d", edge_port->port->number, fifo->count, edge_port->txCredits );
 		return;
 	}
 
 	// lock this write
 	edge_port->write_in_progress = TRUE;
-	restore_flags(flags);
 
 	// get a pointer to the write_urb
 	urb = edge_port->write_urb;
@@ -1833,7 +1828,6 @@ static int edge_ioctl (struct usb_serial_port *port, struct file *file, unsigned
 	struct async_icount cnow;
 	struct async_icount cprev;
 	struct serial_icounter_struct icount;
-	unsigned long flags;
 
 
 	dbg(__FUNCTION__" - port %d, cmd = 0x%x", port->number, cmd);
@@ -1844,14 +1838,6 @@ static int edge_ioctl (struct usb_serial_port *port, struct file *file, unsigned
 			dbg(__FUNCTION__" (%d) TIOCINQ",  port->number);
 			return get_number_bytes_avail(edge_port, (unsigned int *) arg);
 			break;
-
-//		case TCGETS:		
-//			dbg(__FUNCTION__" (%d) TCGETS",  port->number);
-//			break;
-
-//		case TCSETS:		
-//			dbg(__FUNCTION__" (%d) TCSETS",  port->number);
-//			break;
 
 		case TIOCSERGETLSR:
 			dbg(__FUNCTION__" (%d) TIOCSERGETLSR",  port->number);
@@ -1878,17 +1864,13 @@ static int edge_ioctl (struct usb_serial_port *port, struct file *file, unsigned
 
 		case TIOCMIWAIT:
 			dbg(__FUNCTION__" (%d) TIOCMIWAIT",  port->number);
-			save_flags(flags); cli();
 			cprev = edge_port->icount;
-			restore_flags(flags);
 			while (1) {
 				interruptible_sleep_on(&edge_port->delta_msr_wait);
 				/* see if a signal did it */
 				if (signal_pending(current))
 					return -ERESTARTSYS;
-				save_flags(flags); cli();
-				cnow = edge_port->icount; /* atomic copy */
-				restore_flags(flags);
+				cnow = edge_port->icount;
 				if (cnow.rng == cprev.rng && cnow.dsr == cprev.dsr &&
 				    cnow.dcd == cprev.dcd && cnow.cts == cprev.cts)
 					return -EIO; /* no change => error */
@@ -1904,9 +1886,7 @@ static int edge_ioctl (struct usb_serial_port *port, struct file *file, unsigned
 			break;
 
 		case TIOCGICOUNT:
-			save_flags(flags); cli();
 			cnow = edge_port->icount;
-			restore_flags(flags);
 			icount.cts = cnow.cts;
 			icount.dsr = cnow.dsr;
 			icount.rng = cnow.rng;
@@ -3054,22 +3034,10 @@ static void edge_shutdown (struct usb_serial *serial)
  ****************************************************************************/
 int __init edgeport_init(void)
 {
-	usb_serial_register (&edgeport_4_device);
-	usb_serial_register (&rapidport_4_device);
-	usb_serial_register (&edgeport_4t_device);
-	usb_serial_register (&edgeport_2_device);
-	usb_serial_register (&edgeport_4i_device);
-	usb_serial_register (&edgeport_2i_device);
-	usb_serial_register (&edgeport_prl_device);
-	usb_serial_register (&edgeport_421_device);
-	usb_serial_register (&edgeport_21_device);
-	usb_serial_register (&edgeport_8dual_device);
-	usb_serial_register (&edgeport_8_device);
-	usb_serial_register (&edgeport_2din_device);
-	usb_serial_register (&edgeport_4din_device);
-	usb_serial_register (&edgeport_16dual_device);
-	usb_serial_register (&edgeport_compat_id_device);
-	usb_serial_register (&edgeport_8i_device);
+	usb_serial_register (&edgeport_1port_device);
+	usb_serial_register (&edgeport_2port_device);
+	usb_serial_register (&edgeport_4port_device);
+	usb_serial_register (&edgeport_8port_device);
 	info(DRIVER_DESC " " DRIVER_VERSION);
 	return 0;
 }
@@ -3082,22 +3050,10 @@ int __init edgeport_init(void)
  ****************************************************************************/
 void __exit edgeport_exit (void)
 {
-	usb_serial_deregister (&edgeport_4_device);
-	usb_serial_deregister (&rapidport_4_device);
-	usb_serial_deregister (&edgeport_4t_device);
-	usb_serial_deregister (&edgeport_2_device);
-	usb_serial_deregister (&edgeport_4i_device);
-	usb_serial_deregister (&edgeport_2i_device);
-	usb_serial_deregister (&edgeport_prl_device);
-	usb_serial_deregister (&edgeport_421_device);
-	usb_serial_deregister (&edgeport_21_device);
-	usb_serial_deregister (&edgeport_8dual_device);
-	usb_serial_deregister (&edgeport_8_device);
-	usb_serial_deregister (&edgeport_2din_device);
-	usb_serial_deregister (&edgeport_4din_device);
-	usb_serial_deregister (&edgeport_16dual_device);
-	usb_serial_deregister (&edgeport_compat_id_device);
-	usb_serial_deregister (&edgeport_8i_device);
+	usb_serial_deregister (&edgeport_1port_device);
+	usb_serial_deregister (&edgeport_2port_device);
+	usb_serial_deregister (&edgeport_4port_device);
+	usb_serial_deregister (&edgeport_8port_device);
 }
 
 module_init(edgeport_init);

@@ -67,8 +67,9 @@ void smp_callin(void);
 void smp_boot_cpus(void);
 void smp_store_cpu_info(int);
 
-int smp_bogo_info(char *buf);
-int smp_info(char *buf);
+struct seq_file;
+void smp_bogo_info(struct seq_file *);
+void smp_info(struct seq_file *);
 
 BTFIXUPDEF_CALL(void, smp_cross_call, smpfunc_t, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long)
 BTFIXUPDEF_CALL(void, smp_message_pass, int, int, unsigned long, int)

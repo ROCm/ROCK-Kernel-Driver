@@ -1,4 +1,4 @@
-/*  $Id: init.c,v 1.199 2001/10/25 18:48:03 davem Exp $
+/*  $Id: init.c,v 1.202 2001/11/13 00:49:28 davem Exp $
  *  arch/sparc64/mm/init.c
  *
  *  Copyright (C) 1996-1999 David S. Miller (davem@caip.rutgers.edu)
@@ -16,6 +16,9 @@
 #include <linux/blk.h>
 #include <linux/swap.h>
 #include <linux/swapctl.h>
+#include <linux/pagemap.h>
+#include <linux/fs.h>
+#include <linux/seq_file.h>
 
 #include <asm/head.h>
 #include <asm/system.h>
@@ -249,27 +252,23 @@ void show_mem(void)
 	show_buffers();
 }
 
-int mmu_info(char *buf)
+void mmu_info(struct seq_file *m)
 {
-	int len;
-
 	if (tlb_type == cheetah)
-		len = sprintf(buf, "MMU Type\t: Cheetah\n");
+		seq_printf(m, "MMU Type\t: Cheetah\n");
 	else if (tlb_type == spitfire)
-		len = sprintf(buf, "MMU Type\t: Spitfire\n");
+		seq_printf(m, "MMU Type\t: Spitfire\n");
 	else
-		len = sprintf(buf, "MMU Type\t: ???\n");
+		seq_printf(m, "MMU Type\t: ???\n");
 
 #ifdef DCFLUSH_DEBUG
-	len += sprintf(buf + len, "DCPageFlushes\t: %d\n",
-		       atomic_read(&dcpage_flushes));
+	seq_printf(m, "DCPageFlushes\t: %d\n",
+		   atomic_read(&dcpage_flushes));
 #ifdef CONFIG_SMP
-	len += sprintf(buf + len, "DCPageFlushesXC\t: %d\n",
-		       atomic_read(&dcpage_flushes_xcall));
+	seq_printf(m, "DCPageFlushesXC\t: %d\n",
+		   atomic_read(&dcpage_flushes_xcall));
 #endif /* CONFIG_SMP */
 #endif /* DCFLUSH_DEBUG */
-
-	return len;
 }
 
 struct linux_prom_translation {
@@ -1400,7 +1399,7 @@ void __init paging_init(void)
 	if (second_alias_page)
 		spitfire_flush_dtlb_nucleus_page(second_alias_page);
 
-	flush_tlb_all();
+	__flush_tlb_all();
 
 	{
 		unsigned long zones_size[MAX_NR_ZONES];

@@ -52,9 +52,8 @@ static int presto_dentry_revalidate(struct dentry *de, int flag)
 static void presto_d_release(struct dentry *dentry)
 {
         if (!presto_d2d(dentry)) {
-                printk("VERY BAD: dentry: %p\n", dentry);
-                if (dentry->d_inode)
-                        printk("    inode: %ld\n", dentry->d_inode->i_ino);
+                /* This should really only happen in the case of a dentry
+                 * with no inode. */
                 return;
         }
 
@@ -78,14 +77,18 @@ struct dentry_operations presto_dentry_ops =
 void presto_set_dd(struct dentry * dentry)
 {
         ENTRY;
+        if (dentry == NULL)
+                BUG();
+
         if (dentry->d_fsdata) {
                 printk("VERY BAD: dentry: %p\n", dentry);
                 if (dentry->d_inode)
                         printk("    inode: %ld\n", dentry->d_inode->i_ino);
+                EXIT;
                 return;
         }
 
-        if (! dentry->d_inode) {
+        if (dentry->d_inode == NULL) {
                 dentry->d_fsdata = kmem_cache_alloc(presto_dentry_slab,
                                                     SLAB_KERNEL);
                 memset(dentry->d_fsdata, 0, sizeof(struct presto_dentry_data));
@@ -125,7 +128,7 @@ void presto_init_ddata_cache(void)
         presto_dentry_slab =
                 kmem_cache_create("presto_cache",
                                   sizeof(struct presto_dentry_data), 0,
-                                  SLAB_HWCACHE_ALIGN|SLAB_POISON, NULL,
+                                  SLAB_HWCACHE_ALIGN, NULL,
                                   NULL);
         EXIT;
 }

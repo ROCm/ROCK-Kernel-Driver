@@ -1,4 +1,4 @@
-/*  $Id: process.c,v 1.156 2001/10/02 02:22:26 davem Exp $
+/*  $Id: process.c,v 1.157 2001/11/13 00:57:05 davem Exp $
  *  linux/arch/sparc/kernel/process.c
  *
  *  Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
@@ -455,11 +455,7 @@ clone_stackframe(struct sparc_stackf *dst, struct sparc_stackf *src)
  *       allocate the task_struct and kernel stack in
  *       do_fork().
  */
-#ifdef CONFIG_SMP
-extern void ret_from_smpfork(void);
-#else
-extern void ret_from_syscall(void);
-#endif
+extern void ret_from_fork(void);
 
 int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 		unsigned long unused,
@@ -493,13 +489,8 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 	copy_regwin(new_stack, (((struct reg_window *) regs) - 1));
 
 	p->thread.ksp = (unsigned long) new_stack;
-#ifdef CONFIG_SMP
-	p->thread.kpc = (((unsigned long) ret_from_smpfork) - 0x8);
-	p->thread.kpsr = current->thread.fork_kpsr | PSR_PIL;
-#else
-	p->thread.kpc = (((unsigned long) ret_from_syscall) - 0x8);
+	p->thread.kpc = (((unsigned long) ret_from_fork) - 0x8);
 	p->thread.kpsr = current->thread.fork_kpsr;
-#endif
 	p->thread.kwim = current->thread.fork_kwim;
 
 	/* This is used for sun4c only */

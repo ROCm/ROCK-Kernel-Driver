@@ -437,7 +437,6 @@ static int ftdi_sio_write (struct usb_serial_port *port, int from_user,
 	struct usb_serial *serial = port->serial;
 	struct ftdi_private *priv = (struct ftdi_private *)port->private;
 	unsigned char *first_byte = port->write_urb->transfer_buffer;
-	unsigned char dbug_byte;
 	int data_offset ;
 	int result;
 	

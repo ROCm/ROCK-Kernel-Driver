@@ -7,8 +7,14 @@
  */
 
 struct scatterlist {
-	char *address;		/* location data is to be transferred to */
-	void *page;		/* stupid: SCSI code insists on a member of this name... */
+	/* This will disappear in 2.5.x: */
+	char *address;		/* location data is to be transferred to, NULL for highmem page */
+	char *orig_address;	/* for use by swiotlb */
+
+	/* These two are only valid if ADDRESS member of this struct is NULL.  */
+	struct page *page;
+	unsigned int offset;
+
 	unsigned int length;	/* buffer length */
 };
 

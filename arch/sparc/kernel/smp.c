@@ -16,6 +16,8 @@
 #include <linux/init.h>
 #include <linux/spinlock.h>
 #include <linux/mm.h>
+#include <linux/fs.h>
+#include <linux/seq_file.h>
 
 #include <asm/ptrace.h>
 #include <asm/atomic.h>
@@ -276,25 +278,26 @@ int setup_profiling_timer(unsigned int multiplier)
 	return 0;
 }
 
-int smp_bogo_info(char *buf)
+void smp_bogo_info(struct seq_file *m)
 {
-	int len = 0, i;
+	int i;
 	
-	for (i = 0; i < NR_CPUS; i++)
+	for (i = 0; i < NR_CPUS; i++) {
 		if (cpu_present_map & (1 << i))
-			len += sprintf(buf + len, "Cpu%dBogo\t: %lu.%02lu\n", 
-					i,
-					cpu_data[i].udelay_val/(500000/HZ),
-					(cpu_data[i].udelay_val/(5000/HZ))%100);
-	return len;
+			seq_printf(m,
+				   "Cpu%dBogo\t: %lu.%02lu\n", 
+				   i,
+				   cpu_data[i].udelay_val/(500000/HZ),
+				   (cpu_data[i].udelay_val/(5000/HZ))%100);
+	}
 }
 
-int smp_info(char *buf)
+void smp_info(struct seq_file *m)
 {
-	int len = 0, i;
+	int i;
 	
-	for (i = 0; i < NR_CPUS; i++)
+	for (i = 0; i < NR_CPUS; i++) {
 		if (cpu_present_map & (1 << i))
-			len += sprintf(buf + len, "CPU%d\t\t: online\n", i);
-	return len;
+			seq_printf(m, "CPU%d\t\t: online\n", i);
+	}
 }

@@ -1,4 +1,4 @@
-/* $Id: ultra.S,v 1.67 2001/10/23 14:28:20 davem Exp $
+/* $Id: ultra.S,v 1.68 2001/11/09 14:59:19 davem Exp $
  * ultra.S: Don't expand these all over the place...
  *
  * Copyright (C) 1997, 2000 David S. Miller (davem@redhat.com)
@@ -316,9 +316,9 @@ flush_dcpage_cheetah:
 	sethi		%hi(PAGE_SIZE), %o4
 1:	subcc		%o4, (1 << 5), %o4
 	stxa		%g0, [%o0 + %o4] ASI_DCACHE_INVALIDATE
-	membar		#Sync
 	bne,pt		%icc, 1b
 	 nop
+	membar		#Sync
 	/* I-cache flush never needed on Cheetah, see callers. */
 	retl
 	 nop
@@ -509,9 +509,9 @@ xcall_flush_dcache_page_cheetah: /* %g1 == physical page address */
 	sethi		%hi(PAGE_SIZE), %g3
 1:	subcc		%g3, (1 << 5), %g3
 	stxa		%g0, [%g1 + %g3] ASI_DCACHE_INVALIDATE
-	membar		#Sync
 	bne,pt		%icc, 1b
 	 nop
+	membar		#Sync
 	retry
 	nop
 

@@ -1091,15 +1091,6 @@ flush_icache_page(struct vm_area_struct *vma, struct page *page)
 	}
 }
 
-int
-smp_info(char *buffer)
-{
-	return sprintf(buffer,
-		       "cpus active\t\t: %d\n"
-		       "cpu active mask\t\t: %016lx\n",
-		       smp_num_cpus, cpu_present_mask);
-}
-
 #if DEBUG_SPINLOCK
 void
 spin_unlock(spinlock_t * lock)

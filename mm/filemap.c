@@ -2916,8 +2916,10 @@ unlock:
 
 	/* For now, when the user asks for O_SYNC, we'll actually
 	 * provide O_DSYNC. */
-	if ((status >= 0) && (file->f_flags & O_SYNC))
-		status = generic_osync_inode(inode, OSYNC_METADATA|OSYNC_DATA);
+	if (status >= 0) {
+		if ((file->f_flags & O_SYNC) || IS_SYNC(inode))
+			status = generic_osync_inode(inode, OSYNC_METADATA|OSYNC_DATA);
+	}
 	
 	err = written ? written : status;
 out:

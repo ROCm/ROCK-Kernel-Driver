@@ -3942,7 +3942,6 @@ static int __init trident_probe(struct pci_dev *pci_dev, const struct pci_device
 {
 	unsigned long iobase;
 	struct trident_card *card;
-	dma_addr_t mask;
 	u8 bits;
 	u8 revision;
 	int i = 0;

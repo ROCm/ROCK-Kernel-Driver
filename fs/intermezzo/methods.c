@@ -163,7 +163,8 @@ void filter_setup_journal_ops(struct filter_fs *ops, char *cache_type)
 
         if ( strlen(cache_type) == strlen("xfs") &&
              memcmp(cache_type, "xfs", strlen("xfs")) == 0 ) {
-#if defined(CONFIG_XFS_FS) || defined (CONFIG_XFS_FS_MODULE)
+#if 0
+                //#if defined(CONFIG_XFS_FS) || defined (CONFIG_XFS_FS_MODULE)
                 ops->o_trops = &presto_xfs_journal_ops;
 #else
                 ops->o_trops = NULL;

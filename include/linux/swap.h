@@ -170,8 +170,6 @@ do {						\
 		BUG();				\
 	if (PageActive(page))			\
 		BUG();				\
-	if (page_count(page) == 0)		\
-		BUG();				\
 } while (0)
 
 #define add_page_to_active_list(page)		\
@@ -201,20 +199,6 @@ do {						\
 	list_del(&(page)->lru);			\
 	nr_inactive_pages--;			\
 } while (0)
-
-/*
- * Ugly ugly ugly HACK to make sure the inactive lists
- * don't fill up with unfreeable ramdisk pages. We really
- * want to fix the ramdisk driver to mark its pages as
- * unfreeable instead of using dirty buffer magic, but the
- * next code-change time is when 2.5 is forked...
- */
-#ifndef _LINUX_KDEV_T_H
-#include <linux/kdev_t.h>
-#endif
-#ifndef _LINUX_MAJOR_H
-#include <linux/major.h>
-#endif
 
 extern spinlock_t swaplock;
 

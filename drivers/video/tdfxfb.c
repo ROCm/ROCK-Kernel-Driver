@@ -2086,7 +2086,9 @@ void tdfxfb_setup(char *options,
   if(!options || !*options)
     return;
 
-  while(this_opt = strsep(&options, ",")) {
+  while((this_opt = strsep(&options, ",")) != NULL) {
+    if(!*this_opt)
+      continue;
     if(!strcmp(this_opt, "inverse")) {
       inverse = 1;
       fb_invert_cmaps();

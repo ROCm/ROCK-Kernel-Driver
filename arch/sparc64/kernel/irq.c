@@ -1,4 +1,4 @@
-/* $Id: irq.c,v 1.101 2001/06/04 06:50:18 ecd Exp $
+/* $Id: irq.c,v 1.109 2001/11/12 22:22:37 davem Exp $
  * irq.c: UltraSparc IRQ handling/init/registry.
  *
  * Copyright (C) 1997  David S. Miller  (davem@caip.rutgers.edu)
@@ -14,9 +14,10 @@
 #include <linux/mm.h>
 #include <linux/interrupt.h>
 #include <linux/slab.h>
-#include <linux/random.h> /* XXX ADD add_foo_randomness() calls... -DaveM */
+#include <linux/random.h>
 #include <linux/init.h>
 #include <linux/delay.h>
+#include <linux/proc_fs.h>
 
 #include <asm/ptrace.h>
 #include <asm/processor.h>
@@ -32,10 +33,7 @@
 #include <asm/hardirq.h>
 #include <asm/softirq.h>
 #include <asm/starfire.h>
-
-/* Internal flag, should not be visible elsewhere at all. */
-#define SA_IMAP_MASKED		0x100
-#define SA_DMA_SYNC		0x200
+#include <asm/uaccess.h>
 
 #ifdef CONFIG_SMP
 static void distribute_irqs(void);
@@ -64,7 +62,7 @@ unsigned int __up_workvec[16] __attribute__ ((aligned (64)));
 #endif
 
 #ifdef CONFIG_PCI
-/* This is a table of physical addresses used to deal with SA_DMA_SYNC.
+/* This is a table of physical addresses used to deal with IBF_DMA_SYNC.
  * It is used for PCI only to synchronize DMA transfers with IRQ delivery
  * for devices behind busses other than APB on Sabre systems.
  *
@@ -89,6 +87,23 @@ struct irqaction *irq_action[NR_IRQS+1] = {
 	  NULL, NULL, NULL, NULL, NULL, NULL , NULL, NULL
 };
 
+static void register_irq_proc (unsigned int irq);
+
+/*
+ * Upper 2b of irqaction->flags holds the ino.
+ * irqaction->mask holds the smp affinity information.
+ */
+#define put_ino_in_irqaction(action, irq) \
+	action->flags &= 0xffffffffffffUL; \
+	if (__bucket(irq) == &pil0_dummy_bucket) \
+		action->flags |= 0xdeadUL << 48;  \
+	else \
+		action->flags |= __irq_ino(irq) << 48;
+#define get_ino_in_irqaction(action)	(action->flags >> 48)
+
+#define put_smpaff_in_irqaction(action, smpaff)	(action)->mask = (smpaff)
+#define get_smpaff_in_irqaction(action) 	((action)->mask)
+
 int get_irq_list(char *buf)
 {
 	int i, len = 0;
@@ -108,13 +123,11 @@ int get_irq_list(char *buf)
 			len += sprintf(buf + len, "%10u ",
 				       kstat.irqs[cpu_logical_map(j)][i]);
 #endif
-		len += sprintf(buf + len, "%c %s",
-			       (action->flags & SA_INTERRUPT) ? '+' : ' ',
-			       action->name);
+		len += sprintf(buf + len, " %s:%lx", action->name, \
+						get_ino_in_irqaction(action));
 		for(action = action->next; action; action = action->next) {
-			len += sprintf(buf+len, ",%s %s",
-				       (action->flags & SA_INTERRUPT) ? " +" : "",
-				       action->name);
+			len += sprintf(buf+len, ", %s:%lx", action->name, \
+						get_ino_in_irqaction(action));
 		}
 		len += sprintf(buf + len, "\n");
 	}
@@ -286,23 +299,18 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
 	if(!handler)
 	    return -EINVAL;
 
-	if (!bucket->pil)
-		irqflags &= ~SA_IMAP_MASKED;
-	else {
-		irqflags |= SA_IMAP_MASKED;
-		if (bucket->flags & IBF_PCI) {
-			/*
-			 * PCI IRQs should never use SA_INTERRUPT.
-			 */
-			irqflags &= ~(SA_INTERRUPT);
-
-			/*
-			 * Check wether we _should_ use DMA Write Sync
-			 * (for devices behind bridges behind APB). 
-			 */
-			if (bucket->flags & IBF_DMA_SYNC)
-				irqflags |= SA_DMA_SYNC;
-		}
+	if ((bucket != &pil0_dummy_bucket) && (irqflags & SA_SAMPLE_RANDOM)) {
+		/*
+	 	 * This function might sleep, we want to call it first,
+	 	 * outside of the atomic block. In SA_STATIC_ALLOC case,
+		 * random driver's kmalloc will fail, but it is safe.
+		 * If already initialized, random driver will not reinit.
+	 	 * Yes, this might clear the entropy pool if the wrong
+	 	 * driver is attempted to be loaded, without actually
+	 	 * installing a new handler, but is this really a problem,
+	 	 * only the sysadmin is able to do this.
+	 	 */
+		rand_initialize_irq(irq);
 	}
 
 	save_and_cli(flags);
@@ -316,12 +324,6 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
 			restore_flags(flags);
 			return -EBUSY;
 		}
-		if((action->flags & SA_INTERRUPT) ^ (irqflags & SA_INTERRUPT)) {
-			printk("Attempt to mix fast and slow interrupts on IRQ%d "
-			       "denied\n", bucket->pil);
-			restore_flags(flags);
-			return -EBUSY;
-		}   
 		action = NULL;		/* Or else! */
 	}
 
@@ -344,7 +346,7 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
 		return -ENOMEM;
 	}
 
-	if ((irqflags & SA_IMAP_MASKED) == 0) {
+	if (bucket == &pil0_dummy_bucket) {
 		bucket->irq_info = action;
 		bucket->flags |= IBF_ACTIVE;
 	} else {
@@ -405,12 +407,13 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
 			bucket->pending = 0;
 	}
 
-	action->mask = (unsigned long) bucket;
 	action->handler = handler;
 	action->flags = irqflags;
 	action->name = name;
 	action->next = NULL;
 	action->dev_id = dev_id;
+	put_ino_in_irqaction(action, irq);
+	put_smpaff_in_irqaction(action, 0);
 
 	if(tmp)
 		tmp->next = action;
@@ -425,6 +428,8 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
 		set_softint(1 << bucket->pil);
 	}
 	restore_flags(flags);
+	if ((bucket != &pil0_dummy_bucket) && (!(irqflags & SA_STATIC_ALLOC)))
+		register_irq_proc(__irq_ino(irq));
 
 #ifdef CONFIG_SMP
 	distribute_irqs();
@@ -492,7 +497,7 @@ void free_irq(unsigned int irq, void *dev_id)
 	else
 		*(bucket->pil + irq_action) = action->next;
 
-	if(action->flags & SA_IMAP_MASKED) {
+	if (bucket != &pil0_dummy_bucket) {
 		unsigned long imap = bucket->imap;
 		void **vector, *orig;
 		int ent;
@@ -716,35 +721,79 @@ void catch_disabled_ivec(struct pt_regs *regs)
 /* Tune this... */
 #define FORWARD_VOLUME		12
 
-void handler_irq(int irq, struct pt_regs *regs)
-{
-	struct ino_bucket *bp, *nbp;
-	int cpu = smp_processor_id();
 #ifdef CONFIG_SMP
-	int should_forward = (this_is_starfire == 0	&&
-			      irq < 10			&&
-			      current->pid != 0);
-	unsigned int buddy = 0;
+
+static inline void redirect_intr(int cpu, struct ino_bucket *bp)
+{
+	/* Ok, here is what is going on:
+	 * 1) Retargeting IRQs on Starfire is very
+	 *    expensive so just forget about it on them.
+	 * 2) Moving around very high priority interrupts
+	 *    is a losing game.
+	 * 3) If the current cpu is idle, interrupts are
+	 *    useful work, so keep them here.  But do not
+	 *    pass to our neighbour if he is not very idle.
+	 * 4) If sysadmin explicitly asks for directed intrs,
+	 *    Just Do It.
+	 */
+	struct irqaction *ap = bp->irq_info;
+	unsigned long cpu_mask = get_smpaff_in_irqaction(ap);
+	unsigned int buddy, ticks;
+
+	if (cpu_mask == 0)
+		cpu_mask = ~0UL;
+
+	if (this_is_starfire != 0 ||
+	    bp->pil >= 10 || current->pid == 0)
+		goto out;
 
 	/* 'cpu' is the MID (ie. UPAID), calculate the MID
 	 * of our buddy.
 	 */
-	if (should_forward != 0) {
-		buddy = cpu_number_map(cpu) + 1;
+	buddy = cpu_number_map(cpu) + 1;
+	if (buddy >= NR_CPUS ||
+	    cpu_logical_map(buddy) == -1)
+		buddy = 0;
+
+	ticks = 0;
+	while ((cpu_mask & (1UL << buddy)) == 0) {
+		buddy++;
 		if (buddy >= NR_CPUS ||
-		    (buddy = cpu_logical_map(buddy)) == -1)
+		    cpu_logical_map(buddy) == -1)
 			buddy = cpu_logical_map(0);
-
-		/* Voo-doo programming. */
-		if (cpu_data[buddy].idle_volume < FORWARD_VOLUME)
-			should_forward = 0;
-
-		/* This just so happens to be correct on Cheetah
-		 * at the moment.
-		 */
-		buddy <<= 26;
+		if (++ticks > NR_CPUS) {
+			put_smpaff_in_irqaction(ap, 0);
+			goto out;
+		}
 	}
+
+	if (buddy == cpu_number_map(cpu))
+		goto out;
+
+	buddy = cpu_logical_map(buddy);
+
+	/* Voo-doo programming. */
+	if (cpu_data[buddy].idle_volume < FORWARD_VOLUME)
+		goto out;
+
+	/* This just so happens to be correct on Cheetah
+	 * at the moment.
+	 */
+	buddy <<= 26;
+
+	/* Push it to our buddy. */
+	upa_writel(buddy | IMAP_VALID, bp->imap);
+
+out:
+	return;
+}
+
 #endif
+
+void handler_irq(int irq, struct pt_regs *regs)
+{
+	struct ino_bucket *bp, *nbp;
+	int cpu = smp_processor_id();
 
 #ifndef CONFIG_SMP
 	/*
@@ -765,6 +814,8 @@ void handler_irq(int irq, struct pt_regs *regs)
 		clear_softint(clr_mask);
 	}
 #else
+	int should_forward = 1;
+
 	clear_softint(1 << irq);
 #endif
 
@@ -781,6 +832,7 @@ void handler_irq(int irq, struct pt_regs *regs)
 #endif
 	for ( ; bp != NULL; bp = nbp) {
 		unsigned char flags = bp->flags;
+		unsigned char random = 0;
 
 		nbp = __bucket(bp->irq_chain);
 		bp->irq_chain = 0;
@@ -795,34 +847,30 @@ void handler_irq(int irq, struct pt_regs *regs)
 			if ((flags & IBF_MULTI) == 0) {
 				struct irqaction *ap = bp->irq_info;
 				ap->handler(__irq(bp), ap->dev_id, regs);
+				random |= ap->flags & SA_SAMPLE_RANDOM;
 			} else {
 				void **vector = (void **)bp->irq_info;
 				int ent;
 				for (ent = 0; ent < 4; ent++) {
 					struct irqaction *ap = vector[ent];
-					if (ap != NULL)
+					if (ap != NULL) {
 						ap->handler(__irq(bp), ap->dev_id, regs);
+						random |= ap->flags & SA_SAMPLE_RANDOM;
+					}
 				}
 			}
 			/* Only the dummy bucket lacks IMAP/ICLR. */
 			if (bp->pil != 0) {
 #ifdef CONFIG_SMP
-				/* Ok, here is what is going on:
-				 * 1) Retargeting IRQs on Starfire is very
-				 *    expensive so just forget about it on them.
-				 * 2) Moving around very high priority interrupts
-				 *    is a losing game.
-				 * 3) If the current cpu is idle, interrupts are
-				 *    useful work, so keep them here.  But do not
-				 *    pass to our neighbour if he is not very idle.
-				 */
-				if (should_forward != 0) {
-					/* Push it to our buddy. */
+				if (should_forward) {
+					redirect_intr(cpu, bp);
 					should_forward = 0;
-					upa_writel(buddy | IMAP_VALID, bp->imap);
 				}
 #endif
 				upa_writel(ICLR_IDLE, bp->iclr);
+				/* Test and add entropy */
+				if (random)
+					add_interrupt_randomness(irq);
 			}
 		} else
 			bp->pending = 1;
@@ -843,7 +891,7 @@ void sparc_floppy_irq(int irq, void *dev_cookie, struct pt_regs *regs)
 	kstat.irqs[cpu][irq]++;
 
 	*(irq_work(cpu, irq)) = 0;
-	bucket = (struct ino_bucket *)action->mask;
+	bucket = get_ino_in_irqaction(action) + ivector_table;
 
 	floppy_interrupt(irq, dev_cookie, regs);
 	upa_writel(ICLR_IDLE, bucket->iclr);
@@ -896,10 +944,6 @@ int request_fast_irq(unsigned int irq,
 		return -EINVAL;
 	}	
 	
-	/* Only IMAP style interrupts can be registered as fast. */
-	if(bucket->pil == 0)
-		return -EINVAL;
-
 	if(!handler)
 		return -EINVAL;
 
@@ -918,6 +962,10 @@ int request_fast_irq(unsigned int irq,
 		return -EBUSY;
 	}
 
+	/*
+	 * We do not check for SA_SAMPLE_RANDOM in this path. Neither do we
+	 * support smp intr affinity in this path.
+	 */
 	save_and_cli(flags);
 	if(irqflags & SA_STATIC_ALLOC) {
 		if(static_irq_count < MAX_STATIC_ALLOC)
@@ -938,12 +986,13 @@ int request_fast_irq(unsigned int irq,
 	bucket->irq_info = action;
 	bucket->flags |= IBF_ACTIVE;
 
-	action->mask = (unsigned long) bucket;
 	action->handler = handler;
-	action->flags = irqflags | SA_IMAP_MASKED;
+	action->flags = irqflags;
 	action->dev_id = NULL;
 	action->name = name;
 	action->next = NULL;
+	put_ino_in_irqaction(action, irq);
+	put_smpaff_in_irqaction(action, 0);
 
 	*(bucket->pil + irq_action) = action;
 	enable_irq(irq);
@@ -993,7 +1042,7 @@ void init_timers(void (*cfunc)(int, void *, struct pt_regs *),
 #endif
 
 	/* Register IRQ handler. */
-	err = request_irq(build_irq(0, 0, 0UL, 0UL), cfunc, (SA_INTERRUPT | SA_STATIC_ALLOC),
+	err = request_irq(build_irq(0, 0, 0UL, 0UL), cfunc, SA_STATIC_ALLOC,
 			  "timer", NULL);
 
 	if(err) {
@@ -1079,13 +1128,9 @@ void init_timers(void (*cfunc)(int, void *, struct pt_regs *),
 #ifdef CONFIG_SMP
 static int retarget_one_irq(struct irqaction *p, int goal_cpu)
 {
-	struct ino_bucket *bucket = __bucket(p->mask);
+	struct ino_bucket *bucket = get_ino_in_irqaction(p) + ivector_table;
 	unsigned long imap = bucket->imap;
 	unsigned int tid;
-
-	/* Never change this, it causes problems on Ex000 systems. */
-	if (bucket->pil == 12)
-		return goal_cpu;
 
 	if (tlb_type == cheetah) {
 		tid = __cpu_logical_map[goal_cpu] << 26;
@@ -1114,11 +1159,16 @@ static void distribute_irqs(void)
 
 	save_and_cli(flags);
 	cpu = 0;
-	for(level = 0; level < NR_IRQS; level++) {
+
+	/*
+	 * Skip the timer at [0], and very rare error/power intrs at [15].
+	 * Also level [12], it causes problems on Ex000 systems.
+	 */
+	for(level = 1; level < NR_IRQS; level++) {
 		struct irqaction *p = irq_action[level];
+		if (level == 12) continue;
 		while(p) {
-			if(p->flags & SA_IMAP_MASKED)
-				cpu = retarget_one_irq(p, cpu);
+			cpu = retarget_one_irq(p, cpu);
 			p = p->next;
 		}
 	}
@@ -1228,7 +1278,173 @@ void __init init_IRQ(void)
 			     : "g1");
 }
 
-void init_irq_proc(void)
+static struct proc_dir_entry * root_irq_dir;
+static struct proc_dir_entry * irq_dir [NUM_IVECS];
+
+#ifdef CONFIG_SMP
+
+#define HEX_DIGITS 16
+
+static unsigned int parse_hex_value (const char *buffer,
+		unsigned long count, unsigned long *ret)
 {
-	/* For now, nothing... */
+	unsigned char hexnum [HEX_DIGITS];
+	unsigned long value;
+	int i;
+
+	if (!count)
+		return -EINVAL;
+	if (count > HEX_DIGITS)
+		count = HEX_DIGITS;
+	if (copy_from_user(hexnum, buffer, count))
+		return -EFAULT;
+
+	/*
+	 * Parse the first 8 characters as a hex string, any non-hex char
+	 * is end-of-string. '00e1', 'e1', '00E1', 'E1' are all the same.
+	 */
+	value = 0;
+
+	for (i = 0; i < count; i++) {
+		unsigned int c = hexnum[i];
+
+		switch (c) {
+			case '0' ... '9': c -= '0'; break;
+			case 'a' ... 'f': c -= 'a'-10; break;
+			case 'A' ... 'F': c -= 'A'-10; break;
+		default:
+			goto out;
+		}
+		value = (value << 4) | c;
+	}
+out:
+	*ret = value;
+	return 0;
 }
+
+static unsigned long hw_to_logical(unsigned long mask)
+{
+	unsigned long new_mask = 0UL;
+	int i;
+
+	for (i = 0; i < NR_CPUS; i++) {
+		if (mask & (1UL << i)) {
+			int logical = cpu_number_map(i);
+
+			new_mask |= (1UL << logical);
+		}
+	}
+
+	return new_mask;
+}
+
+static unsigned long logical_to_hw(unsigned long mask)
+{
+	unsigned long new_mask = 0UL;
+	int i;
+
+	for (i = 0; i < NR_CPUS; i++) {
+		if (mask & (1UL << i)) {
+			int hw = cpu_logical_map(i);
+
+			new_mask |= (1UL << hw);
+		}
+	}
+
+	return new_mask;
+}
+
+static int irq_affinity_read_proc (char *page, char **start, off_t off,
+			int count, int *eof, void *data)
+{
+	struct ino_bucket *bp = ivector_table + (long)data;
+	struct irqaction *ap = bp->irq_info;
+	unsigned long mask = get_smpaff_in_irqaction(ap);
+
+	mask = logical_to_hw(mask);
+
+	if (count < HEX_DIGITS+1)
+		return -EINVAL;
+	return sprintf (page, "%016lx\n", mask == 0 ? ~0UL : mask);
+}
+
+static inline void set_intr_affinity(int irq, unsigned long hw_aff)
+{
+	struct ino_bucket *bp = ivector_table + irq;
+	unsigned long aff = hw_to_logical(hw_aff);
+
+	/*
+	 * Users specify affinity in terms of cpu ids, which is what
+	 * is displayed via /proc/cpuinfo. As soon as we do this, 
+	 * handler_irq() might see and take action.
+	 */
+	put_smpaff_in_irqaction((struct irqaction *)bp->irq_info, aff);
+
+	/* Migration is simply done by the next cpu to service this
+	 * interrupt.
+	 */
+}
+
+static int irq_affinity_write_proc (struct file *file, const char *buffer,
+					unsigned long count, void *data)
+{
+	int irq = (long) data, full_count = count, err;
+	unsigned long new_value;
+
+	err = parse_hex_value(buffer, count, &new_value);
+
+	/*
+	 * Do not allow disabling IRQs completely - it's a too easy
+	 * way to make the system unusable accidentally :-) At least
+	 * one online CPU still has to be targeted.
+	 */
+	new_value &= cpu_online_map;
+	if (!new_value)
+		return -EINVAL;
+
+	set_intr_affinity(irq, new_value);
+
+	return full_count;
+}
+
+#endif
+
+#define MAX_NAMELEN 10
+
+static void register_irq_proc (unsigned int irq)
+{
+	char name [MAX_NAMELEN];
+
+	if (!root_irq_dir || irq_dir[irq])
+		return;
+
+	memset(name, 0, MAX_NAMELEN);
+	sprintf(name, "%x", irq);
+
+	/* create /proc/irq/1234 */
+	irq_dir[irq] = proc_mkdir(name, root_irq_dir);
+
+#ifdef CONFIG_SMP
+	/* XXX SMP affinity not supported on starfire yet. */
+	if (this_is_starfire == 0) {
+		struct proc_dir_entry *entry;
+
+		/* create /proc/irq/1234/smp_affinity */
+		entry = create_proc_entry("smp_affinity", 0600, irq_dir[irq]);
+
+		if (entry) {
+			entry->nlink = 1;
+			entry->data = (void *)(long)irq;
+			entry->read_proc = irq_affinity_read_proc;
+			entry->write_proc = irq_affinity_write_proc;
+		}
+	}
+#endif
+}
+
+void init_irq_proc (void)
+{
+	/* create /proc/irq */
+	root_irq_dir = proc_mkdir("irq", 0);
+}
+

@@ -1,4 +1,4 @@
-/* $Id: entry.S,v 1.169 2001/01/25 21:47:20 davem Exp $
+/* $Id: entry.S,v 1.170 2001/11/13 00:57:05 davem Exp $
  * arch/sparc/kernel/entry.S:  Sparc trap low-level entry points.
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
@@ -1461,21 +1461,12 @@ linux_syscall_trace:
 	b	2f
 	 mov	%i4, %o4
 
-	.globl	C_LABEL(ret_from_syscall)
-C_LABEL(ret_from_syscall):
-	b	C_LABEL(ret_sys_call)
-	 ld	[%sp + REGWIN_SZ + PT_I0], %o0
-
-#ifdef CONFIG_SMP
-	.globl	C_LABEL(ret_from_smpfork)
-C_LABEL(ret_from_smpfork):
-	wr	%l0, PSR_ET, %psr
-	WRITE_PAUSE
+	.globl	C_LABEL(ret_from_fork)
+C_LABEL(ret_from_fork):
 	call	schedule_tail
 	 mov	%g3, %o0
 	b	C_LABEL(ret_sys_call)
 	 ld	[%sp + REGWIN_SZ + PT_I0], %o0
-#endif
 
 	/* Linux native and SunOS system calls enter here... */
 	.align	4

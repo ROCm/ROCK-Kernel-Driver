@@ -433,6 +433,8 @@ static int shmem_writepage(struct page * page)
 	index = page->index;
 	inode = mapping->host;
 	info = SHMEM_I(inode);
+	if (info->locked)
+		return fail_writepage(page);
 getswap:
 	swap = get_swap_page();
 	if (!swap.val)
@@ -579,8 +581,6 @@ repeat:
 
 	/* We have the page */
 	SetPageUptodate(page);
-	if (info->locked)
-		page_cache_get(page);
 	return page;
 no_space:
 	spin_unlock (&sbinfo->stat_lock);
@@ -639,26 +639,9 @@ void shmem_lock(struct file * file, int lock)
 {
 	struct inode * inode = file->f_dentry->d_inode;
 	struct shmem_inode_info * info = SHMEM_I(inode);
-	struct page * page;
-	unsigned long idx, size;
 
 	down(&info->sem);
-	if (info->locked == lock) 
-		goto out;
 	info->locked = lock;
-	size = (inode->i_size + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
-	for (idx = 0; idx < size; idx++) {
-		page = find_lock_page(inode->i_mapping, idx);
-		if (!page)
-			continue;
-		if (!lock) {
-			/* release the extra count and our reference */
-			page_cache_release(page);
-			page_cache_release(page);
-		}
-		UnlockPage(page);
-	}
-out:
 	up(&info->sem);
 }
 

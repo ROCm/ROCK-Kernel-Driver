@@ -1,4 +1,4 @@
-/*  $Id: setup.c,v 1.70 2001/10/25 18:48:03 davem Exp $
+/*  $Id: setup.c,v 1.71 2001/11/13 00:49:28 davem Exp $
  *  linux/arch/sparc64/kernel/setup.c
  *
  *  Copyright (C) 1995,1996  David S. Miller (davem@caip.rutgers.edu)
@@ -20,6 +20,7 @@
 #include <linux/delay.h>
 #include <linux/config.h>
 #include <linux/fs.h>
+#include <linux/seq_file.h>
 #include <linux/kdev_t.h>
 #include <linux/major.h>
 #include <linux/string.h>
@@ -606,54 +607,77 @@ asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int on)
 extern char *sparc_cpu_type[];
 extern char *sparc_fpu_type[];
 
-extern int smp_info(char *);
-extern int smp_bogo(char *);
-extern int mmu_info(char *);
+extern void smp_info(struct seq_file *);
+extern void smp_bogo(struct seq_file *);
+extern void mmu_info(struct seq_file *);
 
 #ifndef CONFIG_SMP
 unsigned long up_clock_tick;
 #endif
 
-int get_cpuinfo(char *buffer)
+static int show_cpuinfo(struct seq_file *m, void *__unused)
 {
-	int cpuid=smp_processor_id();
-	int len;
+	int cpuid = smp_processor_id();
 
-	len = sprintf(buffer, 
-	    "cpu\t\t: %s\n"
-            "fpu\t\t: %s\n"
-            "promlib\t\t: Version 3 Revision %d\n"
-            "prom\t\t: %d.%d.%d\n"
-            "type\t\t: sun4u\n"
-	    "ncpus probed\t: %d\n"
-	    "ncpus active\t: %d\n"
+	seq_printf(m, 
+		   "cpu\t\t: %s\n"
+		   "fpu\t\t: %s\n"
+		   "promlib\t\t: Version 3 Revision %d\n"
+		   "prom\t\t: %d.%d.%d\n"
+		   "type\t\t: sun4u\n"
+		   "ncpus probed\t: %d\n"
+		   "ncpus active\t: %d\n"
 #ifndef CONFIG_SMP
-            "Cpu0Bogo\t: %lu.%02lu\n"
-	    "Cpu0ClkTck\t: %016lx\n"
+		   "Cpu0Bogo\t: %lu.%02lu\n"
+		   "Cpu0ClkTck\t: %016lx\n"
 #endif
-	    ,
-            sparc_cpu_type[cpuid],
-            sparc_fpu_type[cpuid],
-            prom_rev, prom_prev >> 16, (prom_prev >> 8) & 0xff, prom_prev & 0xff,
-	    linux_num_cpus, smp_num_cpus
+		   ,
+		   sparc_cpu_type[cpuid],
+		   sparc_fpu_type[cpuid],
+		   prom_rev,
+		   prom_prev >> 16,
+		   (prom_prev >> 8) & 0xff,
+		   prom_prev & 0xff,
+		   linux_num_cpus,
+		   smp_num_cpus
 #ifndef CONFIG_SMP
-	    , loops_per_jiffy/(500000/HZ), (loops_per_jiffy/(5000/HZ)) % 100,
-	    up_clock_tick
+		   , loops_per_jiffy/(500000/HZ),
+		   (loops_per_jiffy/(5000/HZ)) % 100,
+		   up_clock_tick
 #endif
-	    );
+		);
 #ifdef CONFIG_SMP
-	len += smp_bogo(buffer + len);
+	smp_bogo(m);
 #endif
-	len += mmu_info(buffer + len);
+	mmu_info(m);
 #ifdef CONFIG_SMP
-	len += smp_info(buffer + len);
+	smp_info(m);
 #endif
-#undef ZS_LOG
-#ifdef ZS_LOG
-	{
-		extern int zs_dumplog(char *);
-		len += zs_dumplog(buffer + len);
-	}
-#endif
-	return len;
+	return 0;
 }
+
+static void *c_start(struct seq_file *m, loff_t *pos)
+{
+	/* The pointer we are returning is arbitrary,
+	 * it just has to be non-NULL and not IS_ERR
+	 * in the success case.
+	 */
+	return *pos == 0 ? &c_start : NULL;
+}
+
+static void *c_next(struct seq_file *m, void *v, loff_t *pos)
+{
+	++*pos;
+	return c_start(m, pos);
+}
+
+static void c_stop(struct seq_file *m, void *v)
+{
+}
+
+struct seq_operations cpuinfo_op = {
+	start:	c_start,
+	next:	c_next,
+	stop:	c_stop,
+	show:	show_cpuinfo,
+};

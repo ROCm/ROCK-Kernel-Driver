@@ -64,10 +64,10 @@ if [ "$CONFIG_FB" = "y" ]; then
       fi
    fi
    if [ "$CONFIG_PPC" = "y" ]; then
-      bool '  Open Firmware frame buffer device support' CONFIG_FB_OF
-      bool '  Apple "control" display support' CONFIG_FB_CONTROL
-      bool '  Apple "platinum" display support' CONFIG_FB_PLATINUM
-      bool '  Apple "valkyrie" display support' CONFIG_FB_VALKYRIE
+      dep_bool '  Open Firmware frame buffer device support' CONFIG_FB_OF $CONFIG_ALL_PPC
+      dep_bool '  Apple "control" display support' CONFIG_FB_CONTROL $CONFIG_ALL_PPC
+      dep_bool '  Apple "platinum" display support' CONFIG_FB_PLATINUM $CONFIG_ALL_PPC
+      dep_bool '  Apple "valkyrie" display support' CONFIG_FB_VALKYRIE $CONFIG_ALL_PPC
       bool '  Chips 65550 display support' CONFIG_FB_CT65550
       bool '  IMS Twin Turbo display support' CONFIG_FB_IMSTT
       bool '  S3 Trio display support' CONFIG_FB_S3TRIO

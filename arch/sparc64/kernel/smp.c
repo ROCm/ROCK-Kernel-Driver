@@ -15,6 +15,8 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
+#include <linux/fs.h>
+#include <linux/seq_file.h>
 
 #include <asm/head.h>
 #include <asm/ptrace.h>
@@ -68,31 +70,30 @@ static int __init maxcpus(char *str)
 
 __setup("maxcpus=", maxcpus);
 
-int smp_info(char *buf)
+void smp_info(struct seq_file *m)
 {
-	int len = 7, i;
+	int i;
 	
-	strcpy(buf, "State:\n");
-	for (i = 0; i < NR_CPUS; i++)
+	seq_printf(m, "State:\n");
+	for (i = 0; i < NR_CPUS; i++) {
 		if (cpu_present_map & (1UL << i))
-			len += sprintf(buf + len,
-					"CPU%d:\t\tonline\n", i);
-	return len;
+			seq_printf(m,
+				   "CPU%d:\t\tonline\n", i);
+	}
 }
 
-int smp_bogo(char *buf)
+void smp_bogo(struct seq_file *m)
 {
-	int len = 0, i;
+	int i;
 	
 	for (i = 0; i < NR_CPUS; i++)
 		if (cpu_present_map & (1UL << i))
-			len += sprintf(buf + len,
-				       "Cpu%dBogo\t: %lu.%02lu\n"
-				       "Cpu%dClkTck\t: %016lx\n",
-				       i, cpu_data[i].udelay_val / (500000/HZ),
-				       (cpu_data[i].udelay_val / (5000/HZ)) % 100,
-				       i, cpu_data[i].clock_tick);
-	return len;
+			seq_printf(m,
+				   "Cpu%dBogo\t: %lu.%02lu\n"
+				   "Cpu%dClkTck\t: %016lx\n",
+				   i, cpu_data[i].udelay_val / (500000/HZ),
+				   (cpu_data[i].udelay_val / (5000/HZ)) % 100,
+				   i, cpu_data[i].clock_tick);
 }
 
 void __init smp_store_cpu_info(int id)
@@ -559,19 +560,30 @@ int smp_call_function(void (*func)(void *info), void *info,
 
 	smp_cross_call(&xcall_call_function,
 		       0, (u64) &data, 0);
-	if (wait) {
-		while (atomic_read(&data.finished) != cpus)
-			barrier();
-	}
+	/* 
+	 * Wait for other cpus to complete function or at
+	 * least snap the call data.
+	 */
+	while (atomic_read(&data.finished) != cpus)
+		barrier();
 
 	return 0;
 }
 
 void smp_call_function_client(struct call_data_struct *call_data)
 {
-	call_data->func(call_data->info);
-	if (call_data->wait)
+	void (*func) (void *info) = call_data->func;
+	void *info = call_data->info;
+
+	if (call_data->wait) {
+		/* let initiator proceed only after completion */
+		func(info);
 		atomic_inc(&call_data->finished);
+	} else {
+		/* let initiator proceed after getting data */
+		atomic_inc(&call_data->finished);
+		func(info);
+	}
 }
 
 extern unsigned long xcall_flush_tlb_page;

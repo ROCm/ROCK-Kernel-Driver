@@ -61,22 +61,19 @@ static int ext3_open_file (struct inode * inode, struct file * filp)
 static ssize_t
 ext3_file_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 {
-	int ret;
 	struct inode *inode = file->f_dentry->d_inode;
 
-	ret = generic_file_write(file, buf, count, ppos);
-	if ((ret >= 0) && IS_SYNC(inode)) {
-		if (file->f_flags & O_SYNC) {
-			/*
-			 * generic_osync_inode() has already done the sync
-			 */
-		} else {
-			int ret2 = ext3_force_commit(inode->i_sb);
-			if (ret2)
-				ret = ret2;
-		}
-	}
-	return ret;
+	/*
+	 * Nasty: if the file is subject to synchronous writes then we need
+	 * to force generic_osync_inode() to call ext3_write_inode().
+	 * We do that by marking the inode dirty.  This adds much more
+	 * computational expense than we need, but we're going to sync
+	 * anyway.
+	 */
+	if (IS_SYNC(inode) || (file->f_flags & O_SYNC))
+		mark_inode_dirty(inode);
+
+	return generic_file_write(file, buf, count, ppos);
 }
 
 struct file_operations ext3_file_operations = {

@@ -51,9 +51,11 @@ static int	ahc_linux_pci_dev_probe(struct pci_dev *pdev,
 					const struct pci_device_id *ent);
 static int	ahc_linux_pci_reserve_io_region(struct ahc_softc *ahc,
 						u_long *base);
+#ifdef MMAPIO
 static int	ahc_linux_pci_reserve_mem_region(struct ahc_softc *ahc,
 						 u_long *bus_addr,
 						 uint8_t **maddr);
+#endif /* MMAPIO */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 static void	ahc_linux_pci_dev_remove(struct pci_dev *pdev);
 
@@ -236,6 +238,7 @@ ahc_linux_pci_reserve_io_region(struct ahc_softc *ahc, u_long *base)
 	return (0);
 }
 
+#ifdef MMAPIO
 static int
 ahc_linux_pci_reserve_mem_region(struct ahc_softc *ahc,
 				 u_long *bus_addr,
@@ -274,6 +277,7 @@ ahc_linux_pci_reserve_mem_region(struct ahc_softc *ahc,
 		error = ENOMEM;
 	return (error);
 }
+#endif /* MMAPIO */
 
 int
 ahc_pci_map_registers(struct ahc_softc *ahc)

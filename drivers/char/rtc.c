@@ -79,8 +79,10 @@
 #endif
 
 static unsigned long rtc_port;
-static int rtc_irq;
+static int rtc_irq = PCI_IRQ_NONE;
 #endif
+
+static int rtc_has_irq = 1;
 
 /*
  *	We sponge a minor off of the misc major. No need slurping
@@ -198,6 +200,9 @@ static ssize_t rtc_read(struct file *file, char *buf,
 	unsigned long data;
 	ssize_t retval;
 	
+	if (rtc_has_irq == 0)
+		return -EIO;
+
 	if (count < sizeof(unsigned long))
 		return -EINVAL;
 
@@ -243,6 +248,22 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		     unsigned long arg)
 {
 	struct rtc_time wtime; 
+
+#if RTC_IRQ
+	if (rtc_has_irq == 0) {
+		switch (cmd) {
+		case RTC_AIE_OFF:
+		case RTC_AIE_ON:
+		case RTC_PIE_OFF:
+		case RTC_PIE_ON:
+		case RTC_UIE_OFF:
+		case RTC_UIE_ON:
+		case RTC_IRQP_READ:
+		case RTC_IRQP_SET:
+			return -EINVAL;
+		};
+	}
+#endif
 
 	switch (cmd) {
 #if RTC_IRQ
@@ -412,15 +433,18 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			yrs = 73;
 		}
 #endif
+		/* These limits and adjustments are independant of
+		 * whether the chip is in binary mode or not.
+		 */
+		if (yrs > 169) {
+			spin_unlock_irq(&rtc_lock);
+			return -EINVAL;
+		}
+		if (yrs >= 100)
+			yrs -= 100;
+
 		if (!(CMOS_READ(RTC_CONTROL) & RTC_DM_BINARY)
 		    || RTC_ALWAYS_BCD) {
-			if (yrs > 169) {
-				spin_unlock_irq(&rtc_lock);
-				return -EINVAL;
-			}
-			if (yrs >= 100)
-				yrs -= 100;
-
 			BIN_TO_BCD(sec);
 			BIN_TO_BCD(min);
 			BIN_TO_BCD(hrs);
@@ -550,12 +574,15 @@ static int rtc_fasync (int fd, struct file *filp, int on)
 static int rtc_release(struct inode *inode, struct file *file)
 {
 #if RTC_IRQ
+	unsigned char tmp;
+
+	if (rtc_has_irq == 0)
+		goto no_irq;
+
 	/*
 	 * Turn off all interrupts once the device is no longer
 	 * in use, and clear the data.
 	 */
-
-	unsigned char tmp;
 
 	spin_lock_irq(&rtc_lock);
 	tmp = CMOS_READ(RTC_CONTROL);
@@ -574,6 +601,7 @@ static int rtc_release(struct inode *inode, struct file *file)
 	if (file->f_flags & FASYNC) {
 		rtc_fasync (-1, file, 0);
 	}
+no_irq:
 #endif
 
 	spin_lock_irq (&rtc_lock);
@@ -591,6 +619,9 @@ static int rtc_release(struct inode *inode, struct file *file)
 static unsigned int rtc_poll(struct file *file, poll_table *wait)
 {
 	unsigned long l;
+
+	if (rtc_has_irq == 0)
+		return 0;
 
 	poll_wait(file, &rtc_wait, wait);
 
@@ -669,12 +700,17 @@ static int __init rtc_init(void)
 	return -EIO;
 
 found:
+	if (rtc_irq == PCI_IRQ_NONE) {
+		rtc_has_irq = 0;
+		goto no_irq;
+	}
+
 	/*
 	 * XXX Interrupt pin #7 in Espresso is shared between RTC and
 	 * PCI Slot 2 INTA# (and some INTx# in Slot 1). SA_INTERRUPT here
 	 * is asking for trouble with add-on boards. Change to SA_SHIRQ.
 	 */
-	if(request_irq(rtc_irq, rtc_interrupt, SA_INTERRUPT, "rtc", (void *)&rtc_port)) {
+	if (request_irq(rtc_irq, rtc_interrupt, SA_INTERRUPT, "rtc", (void *)&rtc_port)) {
 		/*
 		 * Standard way for sparc to print irq's is to use
 		 * __irq_itoa(). I think for EBus it's ok to use %d.
@@ -682,6 +718,7 @@ found:
 		printk(KERN_ERR "rtc: cannot register IRQ %d\n", rtc_irq);
 		return -EIO;
 	}
+no_irq:
 #else
 	if (check_region (RTC_PORT (0), RTC_IO_EXTENT))
 	{
@@ -768,11 +805,13 @@ static void __exit rtc_exit (void)
 	misc_deregister(&rtc_dev);
 
 #ifdef __sparc__
-	free_irq (rtc_irq, &rtc_port);
+	if (rtc_has_irq)
+		free_irq (rtc_irq, &rtc_port);
 #else
 	release_region (RTC_PORT (0), RTC_IO_EXTENT);
 #if RTC_IRQ
-	free_irq (RTC_IRQ, NULL);
+	if (rtc_has_irq)
+		free_irq (RTC_IRQ, NULL);
 #endif
 #endif /* __sparc__ */
 }

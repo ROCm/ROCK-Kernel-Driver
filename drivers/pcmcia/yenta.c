@@ -673,12 +673,18 @@ static int yenta_init(pci_socket_t *socket)
 {
 	yenta_config_init(socket);
 	yenta_clear_maps(socket);
+
+	/* Re-enable interrupts */
+	cb_writel(socket, CB_SOCKET_MASK, CB_CDMASK);
 	return 0;
 }
 
 static int yenta_suspend(pci_socket_t *socket)
 {
 	yenta_set_socket(socket, &dead_socket);
+
+	/* Disable interrupts */
+	cb_writel(socket, CB_SOCKET_MASK, 0x0);
 
 	/*
 	 * This does not work currently. The controller

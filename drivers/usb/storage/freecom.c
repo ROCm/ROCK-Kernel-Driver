@@ -208,6 +208,7 @@ freecom_ide_write (struct us_data *us, int reg, int value)
 }
 #endif
 
+#if 0 /* Unused at this time */
 /* Read a value from an ide register. */
 static int
 freecom_ide_read (struct us_data *us, int reg, int *value)
@@ -268,6 +269,7 @@ freecom_ide_read (struct us_data *us, int reg, int *value)
 
         return USB_STOR_TRANSPORT_GOOD;
 }
+#endif
 
 static int
 freecom_readdata (Scsi_Cmnd *srb, struct us_data *us,

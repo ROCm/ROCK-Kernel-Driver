@@ -1,4 +1,4 @@
-/* $Id: ebus.c,v 1.17 2001/08/06 13:12:57 davem Exp $
+/* $Id: ebus.c,v 1.18 2001/11/08 04:41:33 davem Exp $
  * ebus.c: PCI to EBus bridge device.
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
@@ -113,6 +113,9 @@ void __init fill_ebus_child(int node, struct linux_prom_registers *preg,
 		dev->resource[i].start = dev->parent->resource[regs[i]].start; /* XXX resource */
 	}
 
+	for (i = 0; i < PROMINTR_MAX; i++)
+		dev->irqs[i] = PCI_IRQ_NONE;
+
 	if ((dev->irqs[0] = ebus_blacklist_irq(dev->prom_name)) != 0) {
 		dev->num_irqs = 1;
 	} else if ((len = prom_getproperty(node, "interrupts",
@@ -204,6 +207,9 @@ void __init fill_ebus_device(int node, struct linux_ebus_device *dev)
 		}
 		dev->resource[i].start = baseaddr;	/* XXX Unaligned */
 	}
+
+	for (i = 0; i < PROMINTR_MAX; i++)
+		dev->irqs[i] = PCI_IRQ_NONE;
 
 	if ((dev->irqs[0] = ebus_blacklist_irq(dev->prom_name)) != 0) {
 		dev->num_irqs = 1;

@@ -317,7 +317,7 @@ static const char __module_using_checksums[] __attribute__((section(".modinfo"))
  * const, other exit data may be writable.
  */
 #define MODULE_GENERIC_TABLE(gtype,name) \
-static struct gtype##_id * __module_##gtype##_table \
+static const struct gtype##_id * __module_##gtype##_table \
   __attribute__ ((unused, __section__(".data.exit"))) = name
 
 #ifndef __GENKSYMS__

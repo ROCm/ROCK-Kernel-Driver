@@ -170,6 +170,8 @@ void __init setup_serial_acpi(void *tablep)
 		serial_req.irq = 0;
 	}
 	else {
+		serial_req.flags = ASYNC_SKIP_TEST | ASYNC_BOOT_AUTOCONF | 
+					ASYNC_AUTO_IRQ;
 		if (acpi_ser_p->int_type & 
 			(ACPI_SERIAL_INT_APIC | ACPI_SERIAL_INT_SAPIC)) {
 			serial_req.irq = global_sys_irq;
@@ -177,9 +179,16 @@ void __init setup_serial_acpi(void *tablep)
 		else if (acpi_ser_p->int_type & ACPI_SERIAL_INT_PCAT) {
 			serial_req.irq = acpi_ser_p->irq;
 		}
+		else {
+			/*
+			 * IRQ type not being set would mean UART will
+			 * run in polling mode. Do not probe for IRQ in
+			 * that case.
+			 */
+			serial_req.flags = ASYNC_SKIP_TEST|ASYNC_BOOT_AUTOCONF;
+		}
 	}
 
-	serial_req.flags = ASYNC_SKIP_TEST | ASYNC_BOOT_AUTOCONF | ASYNC_AUTO_IRQ;
 	serial_req.xmit_fifo_size = serial_req.custom_divisor = 0;
 	serial_req.close_delay = serial_req.hub6 = serial_req.closing_wait = 0;
 	serial_req.iomem_reg_shift = 0;

@@ -42,6 +42,7 @@ if [ "$CONFIG_PCI" = "y" ]; then
    fi
    tristate 'IDT 77252 (NICStAR II)' CONFIG_ATM_IDT77252
    if [ "$CONFIG_ATM_IDT77252" != "n" ]; then
+      bool '  Enable debugging messages' CONFIG_ATM_IDT77252_DEBUG
       bool '  Receive ALL cells in raw queue' CONFIG_ATM_IDT77252_RCV_ALL
       define_bool CONFIG_ATM_IDT77252_USE_SUNI y
    fi

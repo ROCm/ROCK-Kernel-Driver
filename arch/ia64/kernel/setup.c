@@ -2,12 +2,13 @@
  * Architecture-specific setup.
  *
  * Copyright (C) 1998-2001 Hewlett-Packard Co
- * Copyright (C) 1998-2001 David Mosberger-Tang <davidm@hpl.hp.com>
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  * Copyright (C) 1998, 1999, 2001 Stephane Eranian <eranian@hpl.hp.com>
  * Copyright (C) 2000, Rohit Seth <rohit.seth@intel.com>
  * Copyright (C) 1999 VA Linux Systems
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
  *
+ * 11/12/01 D.Mosberger Convert get_cpuinfo() to seq_file based show_cpuinfo().
  * 04/04/00 D.Mosberger renamed cpu_initialized to cpu_online_map
  * 03/31/00 R.Seth	cpu_initialized and current->processor fixes
  * 02/04/00 D.Mosberger	some more get_cpuinfo fixes...
@@ -23,6 +24,7 @@
 #include <linux/kernel.h>
 #include <linux/reboot.h>
 #include <linux/sched.h>
+#include <linux/seq_file.h>
 #include <linux/string.h>
 #include <linux/threads.h>
 #include <linux/console.h>
@@ -364,60 +366,88 @@ setup_arch (char **cmdline_p)
 /*
  * Display cpu info for all cpu's.
  */
-int
-get_cpuinfo (char *buffer)
+static int
+show_cpuinfo (struct seq_file *m, void *v)
 {
 #ifdef CONFIG_SMP
 #	define lpj	c->loops_per_jiffy
 #else
 #	define lpj	loops_per_jiffy
 #endif
-	char family[32], features[128], *cp, *p = buffer;
-	struct cpuinfo_ia64 *c;
-	unsigned long mask, cpu;
+	char family[32], features[128], *cp;
+	struct cpuinfo_ia64 *c = v;
+	unsigned long mask, cpu = c - cpu_data(0);
 
-	for (cpu = 0; cpu < smp_num_cpus; ++cpu) {
-		c = cpu_data(cpu);
-		mask = c->features;
+#ifdef CONFIG_SMP
+	if (!(cpu_online_map & (1 << cpu)))
+		return 0;
+#endif
 
-		switch (c->family) {
-		      case 0x07:	memcpy(family, "Itanium", 8); break;
-		      case 0x1f:	memcpy(family, "McKinley", 9); break;
-		      default:		sprintf(family, "%u", c->family); break;
-		}
+	mask = c->features;
 
-		/* build the feature string: */
-		memcpy(features, " standard", 10);
-		cp = features;
-		if (mask & 1) {
-			strcpy(cp, " branchlong");
-			cp = strchr(cp, '\0');
-			mask &= ~1UL;
-		}
-		if (mask)
-			sprintf(cp, " 0x%lx", mask);
-
-		p += sprintf(p,
-			     "processor  : %lu\n"
-			     "vendor     : %s\n"
-			     "arch       : IA-64\n"
-			     "family     : %s\n"
-			     "model      : %u\n"
-			     "revision   : %u\n"
-			     "archrev    : %u\n"
-			     "features   :%s\n"	/* don't change this---it _is_ right! */
-			     "cpu number : %lu\n"
-			     "cpu regs   : %u\n"
-			     "cpu MHz    : %lu.%06lu\n"
-			     "itc MHz    : %lu.%06lu\n"
-			     "BogoMIPS   : %lu.%02lu\n\n",
-			     cpu, c->vendor, family, c->model, c->revision, c->archrev, features,
-			     c->ppn, c->number, c->proc_freq / 1000000, c->proc_freq % 1000000,
-			     c->itc_freq / 1000000, c->itc_freq % 1000000,
-			     lpj*HZ/500000, (lpj*HZ/5000) % 100);
+	switch (c->family) {
+	      case 0x07:	memcpy(family, "Itanium", 8); break;
+	      case 0x1f:	memcpy(family, "McKinley", 9); break;
+	      default:		sprintf(family, "%u", c->family); break;
 	}
-	return p - buffer;
+
+	/* build the feature string: */
+	memcpy(features, " standard", 10);
+	cp = features;
+	if (mask & 1) {
+		strcpy(cp, " branchlong");
+		cp = strchr(cp, '\0');
+		mask &= ~1UL;
+	}
+	if (mask)
+		sprintf(cp, " 0x%lx", mask);
+
+	seq_printf(m,
+		   "processor  : %lu\n"
+		   "vendor     : %s\n"
+		   "arch       : IA-64\n"
+		   "family     : %s\n"
+		   "model      : %u\n"
+		   "revision   : %u\n"
+		   "archrev    : %u\n"
+		   "features   :%s\n"	/* don't change this---it _is_ right! */
+		   "cpu number : %lu\n"
+		   "cpu regs   : %u\n"
+		   "cpu MHz    : %lu.%06lu\n"
+		   "itc MHz    : %lu.%06lu\n"
+		   "BogoMIPS   : %lu.%02lu\n\n",
+		   cpu, c->vendor, family, c->model, c->revision, c->archrev,
+		   features, c->ppn, c->number,
+		   c->proc_freq / 1000000, c->proc_freq % 1000000,
+		   c->itc_freq / 1000000, c->itc_freq % 1000000,
+		   lpj*HZ/500000, (lpj*HZ/5000) % 100);
+	return 0;
 }
+
+static void *
+c_start (struct seq_file *m, loff_t *pos)
+{
+	return *pos < NR_CPUS ? cpu_data(*pos) : NULL;
+}
+
+static void *
+c_next (struct seq_file *m, void *v, loff_t *pos)
+{
+	++*pos;
+	return c_start(m, pos);
+}
+
+static void
+c_stop (struct seq_file *m, void *v)
+{
+}
+
+struct seq_operations cpuinfo_op = {
+	start:	c_start,
+	next:	c_next,
+	stop:	c_stop,
+	show:	show_cpuinfo
+};
 
 void
 identify_cpu (struct cpuinfo_ia64 *c)

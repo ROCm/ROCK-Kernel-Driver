@@ -1528,7 +1528,7 @@ acornfb_setup(char *options)
 
 	acornfb_init_fbinfo();
 
-	while (opt = strsep(&options, ",")) {
+	while ((opt = strsep(&options, ",")) != NULL) {
 		if (!*opt)
 			continue;
 

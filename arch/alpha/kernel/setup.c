@@ -30,6 +30,7 @@
 #include <linux/ioport.h>
 #include <linux/bootmem.h>
 #include <linux/pci.h>
+#include <linux/seq_file.h>
 
 #ifdef CONFIG_BLK_DEV_INITRD
 #include <linux/blk.h>
@@ -1043,10 +1044,8 @@ get_nr_processors(struct percpu_struct *cpubase, unsigned long num)
 }
 
 
-/*
- * BUFFER is PAGE_SIZE bytes long.
- */
-int get_cpuinfo(char *buffer)
+static int
+show_cpuinfo(struct seq_file *f, void *slot)
 {
 	extern struct unaligned_stat {
 		unsigned long count, va, pc;
@@ -1058,14 +1057,15 @@ int get_cpuinfo(char *buffer)
 		"EV68CX", "EV7", "EV79", "EV69"
 	};
 
-	struct percpu_struct *cpu;
+	struct percpu_struct *cpu = slot;
 	unsigned int cpu_index;
 	char *cpu_name;
 	char *systype_name;
 	char *sysvariation_name;
-	int len, nr_processors;
+	int nr_processors;
 
-	cpu = (struct percpu_struct*)((char*)hwrpb + hwrpb->processor_offset);
+	if (!cpu)
+		return 1;
 	cpu_index = (unsigned) (cpu->type - 1);
 	cpu_name = "Unknown";
 	if (cpu_index < N(cpu_names))
@@ -1076,8 +1076,7 @@ int get_cpuinfo(char *buffer)
 
 	nr_processors = get_nr_processors(cpu, hwrpb->nr_processors);
 
-	len = sprintf(buffer,
-		      "cpu\t\t\t: Alpha\n"
+	seq_printf(f, "cpu\t\t\t: Alpha\n"
 		      "cpu model\t\t: %s\n"
 		      "cpu variation\t\t: %ld\n"
 		      "cpu revision\t\t: %ld\n"
@@ -1114,11 +1113,41 @@ int get_cpuinfo(char *buffer)
 		       platform_string(), nr_processors);
 
 #ifdef CONFIG_SMP
-	len += smp_info(buffer+len);
+	seq_printf(f, "cpus active\t\t: %d\n"
+		      "cpu active mask\t\t: %016lx\n",
+		       smp_num_cpus, cpu_present_mask);
 #endif
 
-	return len;
+	return 0;
 }
+
+/*
+ * We show only CPU #0 info.
+ */
+static void *
+c_start(struct seq_file *f, loff_t *pos)
+{
+	return *pos ? NULL : (char *)hwrpb + hwrpb->processor_offset;
+}
+
+static void *
+c_next(struct seq_file *f, void *v, loff_t *pos)
+{
+	return NULL;
+}
+
+static void
+c_stop(struct seq_file *f, void *v)
+{
+}
+
+struct seq_operations cpuinfo_op = {
+	start:	c_start,
+	next:	c_next,
+	stop:	c_stop,
+	show:	show_cpuinfo,
+};
+
 
 static int alpha_panic_event(struct notifier_block *this,
 			     unsigned long event,

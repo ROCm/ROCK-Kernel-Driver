@@ -100,9 +100,7 @@ static struct pdcraid raid[16];
 static int pdcraid_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
 	unsigned int minor;
-   	unsigned long sectors,*larg;
-
-	
+   	unsigned long sectors;
 
 	if (!inode || !inode->i_rdev) 
 		return -EINVAL;
@@ -283,10 +281,6 @@ static int pdcraid0_make_request (request_queue_t *q, int rw, struct buffer_head
 	 * Let the main block layer submit the IO and resolve recursion:
 	 */
 	return 1;
-
- outerr:
-	buffer_IO_error(bh);
-	return 0;
 }
 
 static int pdcraid1_write_request(request_queue_t *q, int rw, struct buffer_head * bh)
@@ -551,8 +545,7 @@ static void __init fill_cutoff(int device)
 			   
 static __init int pdcraid_init_one(int device,int raidlevel)
 {
-	request_queue_t *q;
-	int i,count;
+	int i, count;
 
 	for (i=0; i<14; i++)
 		probedisk(i, device, raidlevel);
@@ -583,10 +576,9 @@ static __init int pdcraid_init_one(int device,int raidlevel)
 
 static __init int pdcraid_init(void)
 {
-	int i,retval,device,count=0;
+	int retval, device, count = 0;
 
 	do {
-	
 		cookie = 0;
 		device=ataraid_get_device(&pdcraid0_ops);
 		if (device<0)

@@ -1,8 +1,8 @@
 /******************************************************************* 
- * ident "$Id: idt77252.c,v 1.1 2001/11/05 21:52:22 ecd Exp $"
+ * ident "$Id: idt77252.c,v 1.2 2001/11/11 08:13:54 ecd Exp $"
  *
  * $Author: ecd $
- * $Date: 2001/11/05 21:52:22 $
+ * $Date: 2001/11/11 08:13:54 $
  *
  * Copyright (c) 2000 ATecoM GmbH 
  *
@@ -30,7 +30,7 @@
  *
  *******************************************************************/
 static char const rcsid[] =
-"$Id: idt77252.c,v 1.1 2001/11/05 21:52:22 ecd Exp $";
+"$Id: idt77252.c,v 1.2 2001/11/11 08:13:54 ecd Exp $";
 
 
 #include <linux/module.h>
@@ -57,8 +57,6 @@ static char const rcsid[] =
 #endif /* CONFIG_ATM_IDT77252_USE_SUNI */
 
 
-#define DEBUG 1
-
 #include "idt77252.h"
 #include "idt77252_tables.h"
 
@@ -72,10 +70,9 @@ static unsigned int vpibits = 1;
  * Debug HACKs.
  */
 #define DEBUG_MODULE 1
-#undef DEBUG_RAW_CELLS
 #undef HAVE_EEPROM	/* does not work, yet. */
 
-#ifdef DEBUG
+#ifdef CONFIG_ATM_IDT77252_DEBUG
 static unsigned long debug = DBG_GENERAL;
 #endif
 
@@ -144,21 +141,15 @@ static void idt77252_softint(void *dev_id);
 
 static struct atmdev_ops idt77252_ops =
 {
-	idt77252_dev_close,	/* dev_close */
-	idt77252_open,		/* open */
-	idt77252_close,		/* close */
-	NULL,			/* ioctl */
-	NULL,			/* getsockopt */
-	NULL,			/* setsockopt */
-	idt77252_send,		/* send */
-	NULL,			/* sg_send */
-	idt77252_send_oam,	/* send_oam */
-	idt77252_phy_put,
-	idt77252_phy_get,
-	NULL,			/* feedback */
-	idt77252_change_qos,
-	NULL,			/* free_rx_skb */
-	idt77252_proc_read	/* proc_read */
+	dev_close:	idt77252_dev_close,
+	open:		idt77252_open,
+	close:		idt77252_close,
+	send:		idt77252_send,
+	send_oam:	idt77252_send_oam,
+	phy_put:	idt77252_phy_put,
+	phy_get:	idt77252_phy_get,
+	change_qos:	idt77252_change_qos,
+	proc_read:	idt77252_proc_read
 };
 
 static struct idt77252_dev *idt77252_chain = NULL;
@@ -540,7 +531,7 @@ idt77252_eeprom_init(struct idt77252_dev *card)
 #endif /* HAVE_EEPROM */
 
 
-#ifdef DEBUG
+#ifdef CONFIG_ATM_IDT77252_DEBUG
 static void
 dump_tct(struct idt77252_dev *card, int index)
 {
@@ -1130,7 +1121,7 @@ dequeue_rx(struct idt77252_dev *card, struct rsq_entry *rsqe)
 	if (!rpp->count++)
 		rpp->first = skb;
 	*rpp->last = skb;
-	rpp->last = &IDT77252_PRV_NEXT(skb);
+	rpp->last = &skb->next;
 
 	if (stat & SAR_RSQE_EPDU) {
 		unsigned char *l1l2;
@@ -1177,7 +1168,7 @@ dequeue_rx(struct idt77252_dev *card, struct rsq_entry *rsqe)
 			for (i = 0; i < rpp->count; i++) {
 				memcpy(skb_put(skb, sb->len),
 				       sb->data, sb->len);
-				sb = IDT77252_PRV_NEXT(sb);
+				sb = sb->next;
 			}
 
 			recycle_rx_pool_skb(card, rpp);
@@ -1191,6 +1182,8 @@ dequeue_rx(struct idt77252_dev *card, struct rsq_entry *rsqe)
 
 			return;
 		}
+
+		skb->next = NULL;
 		flush_rx_pool(card, rpp);
 
 		if (!atm_charge(vcc, skb->truesize)) {
@@ -1284,45 +1277,40 @@ idt77252_rx_raw(struct idt77252_dev *card)
 		vci = (header & ATM_HDR_VCI_MASK) >> ATM_HDR_VCI_SHIFT;
 		pti = (header & ATM_HDR_PTI_MASK) >> ATM_HDR_PTI_SHIFT;
 
-#ifdef DEBUG_RAW_CELLS
-{
-		int i;
+#ifdef CONFIG_ATM_IDT77252_DEBUG
+		if (debug & DBG_RAW_CELL) {
+			int i;
 
-		printk("%s: raw cell %x.%02x.%04x.%x.%x\n",
-		       card->name, (header >> 28) & 0x000f,
-		       (header >> 20) & 0x00ff,
-		       (header >>  4) & 0xffff,
-		       (header >>  1) & 0x0007,
-		       (header >>  0) & 0x0001);
-		for (i = 16; i < 64; i++)
-			printk(" %02x", queue->data[i]);
-		printk("\n");
-}
+			printk("%s: raw cell %x.%02x.%04x.%x.%x\n",
+			       card->name, (header >> 28) & 0x000f,
+			       (header >> 20) & 0x00ff,
+			       (header >>  4) & 0xffff,
+			       (header >>  1) & 0x0007,
+			       (header >>  0) & 0x0001);
+			for (i = 16; i < 64; i++)
+				printk(" %02x", queue->data[i]);
+			printk("\n");
+		}
 #endif
+
 		if (vpi >= (1<<card->vpibits) || vci >= (1<<card->vcibits)) {
-#ifdef DEBUG_RAW_CELLS
-			printk("%s: SDU received for out-of-range vc %u.%u\n",
-			       card->name, vpi, vci);
-#endif
+			RPRINTK("%s: SDU received for out-of-range vc %u.%u\n",
+				card->name, vpi, vci);
 			goto drop;
 		}
 
 		vc = card->vcs[VPCI2VC(card, vpi, vci)];
 		if (!vc || !test_bit(VCF_RX, &vc->flags)) {
-#ifdef DEBUG_RAW_CELLS
-			printk("%s: SDU received on non RX vc %u.%u\n",
-			       card->name, vpi, vci);
-#endif
+			RPRINTK("%s: SDU received on non RX vc %u.%u\n",
+				card->name, vpi, vci);
 			goto drop;
 		}
 
 		vcc = vc->rx_vcc;
 
 		if (vcc->qos.aal != ATM_AAL0) {
-#ifdef DEBUG_RAW_CELLS
-			printk("%s: raw cell for non AAL0 vc %u.%u\n",
+			RPRINTK("%s: raw cell for non AAL0 vc %u.%u\n",
 				card->name, vpi, vci);
-#endif
 			atomic_inc(&vcc->stats->rx_drop);
 			goto drop;
 		}
@@ -1939,7 +1927,8 @@ recycle_rx_pool_skb(struct idt77252_dev *card, struct rx_pool *rpp)
 
 	skb = rpp->first;
 	for (i = 0; i < rpp->count; i++) {
-		next = IDT77252_PRV_NEXT(skb);
+		next = skb->next;
+		skb->next = NULL;
 		recycle_rx_skb(card, skb);
 		skb = next;
 	}
@@ -2705,31 +2694,31 @@ idt77252_proc_read(struct atm_dev *dev, loff_t * pos, char *page)
 	if (!left--)
 		return sprintf(page, "IDT77252 Interrupts:\n");
 	if (!left--)
-		return sprintf(page, "TSIF:  %u\n", card->irqstat[15]);
+		return sprintf(page, "TSIF:  %lu\n", card->irqstat[15]);
 	if (!left--)
-		return sprintf(page, "TXICP: %u\n", card->irqstat[14]);
+		return sprintf(page, "TXICP: %lu\n", card->irqstat[14]);
 	if (!left--)
-		return sprintf(page, "TSQF:  %u\n", card->irqstat[12]);
+		return sprintf(page, "TSQF:  %lu\n", card->irqstat[12]);
 	if (!left--)
-		return sprintf(page, "TMROF: %u\n", card->irqstat[11]);
+		return sprintf(page, "TMROF: %lu\n", card->irqstat[11]);
 	if (!left--)
-		return sprintf(page, "PHYI:  %u\n", card->irqstat[10]);
+		return sprintf(page, "PHYI:  %lu\n", card->irqstat[10]);
 	if (!left--)
-		return sprintf(page, "FBQ3A: %u\n", card->irqstat[8]);
+		return sprintf(page, "FBQ3A: %lu\n", card->irqstat[8]);
 	if (!left--)
-		return sprintf(page, "FBQ2A: %u\n", card->irqstat[7]);
+		return sprintf(page, "FBQ2A: %lu\n", card->irqstat[7]);
 	if (!left--)
-		return sprintf(page, "RSQF:  %u\n", card->irqstat[6]);
+		return sprintf(page, "RSQF:  %lu\n", card->irqstat[6]);
 	if (!left--)
-		return sprintf(page, "EPDU:  %u\n", card->irqstat[5]);
+		return sprintf(page, "EPDU:  %lu\n", card->irqstat[5]);
 	if (!left--)
-		return sprintf(page, "RAWCF: %u\n", card->irqstat[4]);
+		return sprintf(page, "RAWCF: %lu\n", card->irqstat[4]);
 	if (!left--)
-		return sprintf(page, "FBQ1A: %u\n", card->irqstat[3]);
+		return sprintf(page, "FBQ1A: %lu\n", card->irqstat[3]);
 	if (!left--)
-		return sprintf(page, "FBQ0A: %u\n", card->irqstat[2]);
+		return sprintf(page, "FBQ0A: %lu\n", card->irqstat[2]);
 	if (!left--)
-		return sprintf(page, "RSQAF: %u\n", card->irqstat[1]);
+		return sprintf(page, "RSQAF: %lu\n", card->irqstat[1]);
 	if (!left--)
 		return sprintf(page, "IDT77252 Transmit Connection Table:\n");
 
@@ -2846,7 +2835,7 @@ idt77252_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 	if (stat & SAR_STAT_TXICP) {	/* Incomplete CS-PDU has  */
 		INTPRINTK("%s: TXICP\n", card->name);
 		card->irqstat[14]++;
-#ifdef DEBUG
+#ifdef CONFIG_ATM_IDT77252_DEBUG
 		idt77252_tx_dump(card);
 #endif
 	}
@@ -3220,7 +3209,7 @@ deinit_card(struct idt77252_dev *card)
 }
 
 
-static int
+static int __devinit
 init_sram(struct idt77252_dev *card)
 {
 	int i;
@@ -3369,7 +3358,7 @@ init_sram(struct idt77252_dev *card)
 	return 0;
 }
 
-static int
+static int __devinit
 init_card(struct atm_dev *dev)
 {
 	struct idt77252_dev *card = dev->dev_data;
@@ -3652,8 +3641,8 @@ init_card(struct atm_dev *dev)
 /*****************************************************************************/
 
 
-static int
-preset_idt77252(struct idt77252_dev *card)
+static int __devinit
+idt77252_preset(struct idt77252_dev *card)
 {
 	u16 pci_command;
 
@@ -3694,7 +3683,7 @@ preset_idt77252(struct idt77252_dev *card)
 }
 
 
-unsigned long
+static unsigned long __devinit
 probe_sram(struct idt77252_dev *card)
 {
 	u32 data, addr;
@@ -3716,179 +3705,175 @@ probe_sram(struct idt77252_dev *card)
 	return addr * sizeof(u32);
 }
 
-int
-idt77252_probe(void)
+static int __devinit
+idt77252_init_one(struct pci_dev *pcidev, const struct pci_device_id *id)
 {
-	struct idt77252_dev **last, *card;
-	struct pci_dev *pcidev = NULL;
+	static struct idt77252_dev **last = &idt77252_chain;
+	static int index = 0;
+
+	unsigned long membase, srambase;
+	struct idt77252_dev *card;
 	struct atm_dev *dev;
 	ushort revision = 0;
-	int i, index = 0;
+	int i;
 
-	last = &idt77252_chain;
 
-	if (!pci_present()) {
-		printk(KERN_NOTICE "idt77252: no PCI subsystem found.\n");
+	if (pci_read_config_word(pcidev, PCI_REVISION_ID, &revision)) {
+		printk("idt77252-%d: can't read PCI_REVISION_ID\n", index);
 		return -ENODEV;
 	}
 
-	while ((pcidev = pci_find_device(PCI_VENDOR_ID_IDT,
-					 PCI_DEVICE_ID_IDT_IDT77252,
-					 pcidev))) {
-		unsigned long membase, srambase;
+	card = kmalloc(sizeof(struct idt77252_dev), GFP_KERNEL);
+	if (!card) {
+		printk("idt77252-%d: can't allocate private data\n", index);
+		return -ENOMEM;
+	}
+	memset(card, 0, sizeof(struct idt77252_dev));
 
-		if (pci_read_config_word(pcidev, PCI_REVISION_ID, &revision)) {
-			printk("idt77252-%d: can't read PCI_REVISION_ID\n",
-			       index);
-			continue;
-		}
-		card = kmalloc(sizeof(struct idt77252_dev), GFP_KERNEL);
-		if (!card) {
-			printk("idt77252-%d: can't allocate private data\n",
-			       index);
-			continue;
-		}
-		memset(card, 0, sizeof(struct idt77252_dev));
+	card->revision = revision;
+	card->index = index;
+	card->pcidev = pcidev;
+	sprintf(card->name, "idt77252-%d", card->index);
 
-		card->revision = revision;
-		card->index = index;
-		card->pcidev = pcidev;
-		sprintf(card->name, "idt77252-%d", card->index);
+	card->tqueue.routine = idt77252_softint;
+	card->tqueue.data = (void *)card;
 
-		card->tqueue.routine = idt77252_softint;
-		card->tqueue.data = (void *)card;
+	membase = pci_resource_start(pcidev, 1);
+	srambase = pci_resource_start(pcidev, 2);
 
-		membase = pci_resource_start(pcidev, 1);
-		srambase = pci_resource_start(pcidev, 2);
+	init_MUTEX(&card->mutex);
+	spin_lock_init(&card->cmd_lock);
+	spin_lock_init(&card->tst_lock);
 
-		init_MUTEX(&card->mutex);
-		spin_lock_init(&card->cmd_lock);
-		spin_lock_init(&card->tst_lock);
+	card->tst_timer.data = (unsigned long)card;
+	card->tst_timer.function = tst_timer;
+	init_timer(&card->tst_timer);
 
-		card->tst_timer.data = (unsigned long)card;
-		card->tst_timer.function = tst_timer;
-		init_timer(&card->tst_timer);
-
-		/* Do the I/O remapping... */
-		card->membase = (unsigned long) ioremap(membase, 1024);
-		if (!card->membase) {
-			printk("%s: can't ioremap() membase\n", card->name);
-			kfree(card);
-			continue;
-		}
-
-		if (preset_idt77252(card)) {
-			printk("%s: preset failed\n", card->name);
-			iounmap((void *) card->membase);
-			kfree(card);
-			continue;
-		}
-
-		dev = atm_dev_register("idt77252", &idt77252_ops, -1, 0);
-		if (!dev) {
-			printk("%s: can't register atm device\n", card->name);
-			iounmap((void *) card->membase);
-			kfree(card);
-			continue;
-		}
-		dev->dev_data = card;
-		card->atmdev = dev;
-
-#ifdef	CONFIG_ATM_IDT77252_USE_SUNI
-		suni_init(dev);
-		if (!dev->phy) {
-			printk("%s: can't init SUNI\n", card->name);
-			deinit_card(card);
-			kfree(card);
-			continue;
-		}
-#endif	/* CONFIG_ATM_IDT77252_USE_SUNI */
-
-		card->sramsize = probe_sram(card);
-
-		for (i = 0; i < 4; i++) {
-			card->fbq[i] = (unsigned long)
-			    ioremap(srambase | 0x200000 | (i << 18), 4);
-			if (!card->fbq[i]) {
-				printk("%s: can't ioremap() FBQ%d\n",
-				       card->name, i);
-				deinit_card(card);
-				kfree(card);
-				goto next;
-			}
-		}
-
-		printk("%s: ABR SAR (Rev %c): MEM %08lx SRAM %08lx [%u KB]\n",
-		       card->name, ((revision > 1) && (revision < 25)) ?
-		       'A' + revision - 1 : '?',
-		       membase, srambase, card->sramsize / 1024);
-
-		if (init_card(dev)) {
-			printk("%s: init_card failed\n", card->name);
-
-			deinit_card(card);
-			kfree(card);
-			continue;
-		}
-		dev->ci_range.vpi_bits = card->vpibits;
-		dev->ci_range.vci_bits = card->vcibits;
-		dev->link_rate = card->link_pcr;
-
-		if (dev->phy->start)
-			dev->phy->start(dev);
-
-		if (idt77252_dev_open(card)) {
-			printk("%s: dev_open failed\n", card->name);
-
-			if (dev->phy->stop)
-				dev->phy->stop(dev);
-			deinit_card(card);
-			kfree(card);
-			continue;
-		}
-
-		*last = card;
-		last = &card->next;
-		index++;
-	next:
+	/* Do the I/O remapping... */
+	card->membase = (unsigned long) ioremap(membase, 1024);
+	if (!card->membase) {
+		printk("%s: can't ioremap() membase\n", card->name);
+		kfree(card);
+		return -EIO;
 	}
 
-	return index;
-}
-
-#ifdef MODULE
-
-MODULE_PARM(vpibits, "i");
-MODULE_AUTHOR("Eddie C. Dost <ecd@atecom.com>");
-MODULE_DESCRIPTION("IDT77252 ABR SAR Driver");
-#ifdef DEBUG
-MODULE_PARM(debug, "i");
-#endif
-
-int
-init_module(void)
-{
-	int	v;
-
-	printk("idt77252 init_module: %s at %p\n", __FUNCTION__, init_module);
-
-	/*
-	 * this modification is somewhat silly, as atmdev_init.c doesn't
-	 * check for EIO, it only accumulates the return value in the sum
-	 * of atm adaptors found.
-	 */
-	v = idt77252_probe();
-	if (v < 0)
+	if (idt77252_preset(card)) {
+		printk("%s: preset failed\n", card->name);
+		iounmap((void *) card->membase);
+		kfree(card);
 		return -EIO;
+	}
+
+	dev = atm_dev_register("idt77252", &idt77252_ops, -1, 0);
+	if (!dev) {
+		printk("%s: can't register atm device\n", card->name);
+		iounmap((void *) card->membase);
+		kfree(card);
+		return -EIO;
+	}
+	dev->dev_data = card;
+	card->atmdev = dev;
+
+#ifdef	CONFIG_ATM_IDT77252_USE_SUNI
+	suni_init(dev);
+	if (!dev->phy) {
+		printk("%s: can't init SUNI\n", card->name);
+		deinit_card(card);
+		kfree(card);
+		return -EIO;
+	}
+#endif	/* CONFIG_ATM_IDT77252_USE_SUNI */
+
+	card->sramsize = probe_sram(card);
+
+	for (i = 0; i < 4; i++) {
+		card->fbq[i] = (unsigned long)
+			    ioremap(srambase | 0x200000 | (i << 18), 4);
+		if (!card->fbq[i]) {
+			printk("%s: can't ioremap() FBQ%d\n", card->name, i);
+			deinit_card(card);
+			kfree(card);
+			return -EIO;
+		}
+	}
+
+	printk("%s: ABR SAR (Rev %c): MEM %08lx SRAM %08lx [%u KB]\n",
+	       card->name, ((revision > 1) && (revision < 25)) ?
+	       'A' + revision - 1 : '?', membase, srambase,
+	       card->sramsize / 1024);
+
+	if (init_card(dev)) {
+		printk("%s: init_card failed\n", card->name);
+		deinit_card(card);
+		kfree(card);
+		return -EIO;
+	}
+
+	dev->ci_range.vpi_bits = card->vpibits;
+	dev->ci_range.vci_bits = card->vcibits;
+	dev->link_rate = card->link_pcr;
+
+	if (dev->phy->start)
+		dev->phy->start(dev);
+
+	if (idt77252_dev_open(card)) {
+		printk("%s: dev_open failed\n", card->name);
+
+		if (dev->phy->stop)
+			dev->phy->stop(dev);
+		deinit_card(card);
+		kfree(card);
+		return -EIO;
+	}
+
+	*last = card;
+	last = &card->next;
+	index++;
 
 	return 0;
 }
 
-void
-cleanup_module(void)
+static struct pci_device_id idt77252_pci_tbl[] __devinitdata =
+{
+	{ PCI_VENDOR_ID_IDT, PCI_DEVICE_ID_IDT_IDT77252,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	{ 0, }
+};
+
+static struct pci_driver idt77252_driver = {
+	name:		"idt77252",
+	id_table:	idt77252_pci_tbl,
+	probe:		idt77252_init_one,
+};
+
+static int __init idt77252_init(void)
+{
+	struct sk_buff *skb;
+
+	printk("%s: at %p\n", __FUNCTION__, idt77252_init);
+
+	if (sizeof(skb->cb) < sizeof(struct atm_skb_data) +
+			      sizeof(struct idt77252_skb_prv)) {
+		printk(KERN_ERR "%s: skb->cb is too small (%lu < %lu)\n",
+		       __FUNCTION__, (unsigned long) sizeof(skb->cb),
+		       (unsigned long) sizeof(struct atm_skb_data) +
+				       sizeof(struct idt77252_skb_prv));
+		return -EIO;
+	}
+
+	if (pci_register_driver(&idt77252_driver) > 0)
+		return 0;
+
+	pci_unregister_driver(&idt77252_driver);
+	return -ENODEV;
+}
+
+static void __exit idt77252_exit(void)
 {
 	struct idt77252_dev *card;
 	struct atm_dev *dev;
+
+	pci_unregister_driver(&idt77252_driver);
 
 	while (idt77252_chain) {
 		card = idt77252_chain;
@@ -3904,17 +3889,18 @@ cleanup_module(void)
 	DIPRINTK("idt77252: finished cleanup-module().\n");
 }
 
-#else
+module_init(idt77252_init);
+module_exit(idt77252_exit);
 
-int __init idt77252_detect(void)
-{
-	int	v;
+EXPORT_NO_SYMBOLS;
+MODULE_LICENSE("GPL");
 
-	v = idt77252_probe();
-	if (v < 0)
-		return -EIO;
-	else
-		return v;
-}
+MODULE_PARM(vpibits, "i");
+MODULE_PARM_DESC(vpibits, "number of VPI bits supported (0, 1, or 2)");
+#ifdef CONFIG_ATM_IDT77252_DEBUG
+MODULE_PARM(debug, "i");
+MODULE_PARM_DESC(debug,   "debug bitmap, see drivers/atm/idt77252.h");
+#endif
 
-#endif	/* MODULE */
+MODULE_AUTHOR("Eddie C. Dost <ecd@atecom.com>");
+MODULE_DESCRIPTION("IDT77252 ABR SAR Driver");

@@ -270,11 +270,15 @@ CONFIG_AUTOFS_FS=m
 CONFIG_AUTOFS4_FS=m
 # CONFIG_REISERFS_FS is not set
 # CONFIG_REISERFS_CHECK is not set
+# CONFIG_REISERFS_PROC_INFO is not set
 # CONFIG_ADFS_FS is not set
 # CONFIG_ADFS_FS_RW is not set
 CONFIG_AFFS_FS=m
 # CONFIG_HFS_FS is not set
 # CONFIG_BFS_FS is not set
+CONFIG_EXT3_FS=m
+CONFIG_JBD=m
+# CONFIG_JBD_DEBUG is not set
 CONFIG_FAT_FS=m
 CONFIG_MSDOS_FS=m
 # CONFIG_UMSDOS_FS is not set
@@ -287,6 +291,7 @@ CONFIG_EFS_FS=m
 # CONFIG_RAMFS is not set
 CONFIG_ISO9660_FS=m
 # CONFIG_JOLIET is not set
+# CONFIG_ZISOFS is not set
 CONFIG_MINIX_FS=m
 # CONFIG_VXFS_FS is not set
 # CONFIG_NTFS_FS is not set
@@ -311,6 +316,7 @@ CONFIG_UFS_FS=m
 # Network File Systems
 #
 CONFIG_CODA_FS=m
+CONFIG_INTERMEZZO_FS=m
 CONFIG_NFS_FS=y
 # CONFIG_NFS_V3 is not set
 # CONFIG_ROOT_NFS is not set
@@ -329,6 +335,8 @@ CONFIG_SMB_FS=m
 # CONFIG_NCPFS_SMALLDOS is not set
 # CONFIG_NCPFS_NLS is not set
 # CONFIG_NCPFS_EXTRAS is not set
+# CONFIG_ZISOFS_FS is not set
+# CONFIG_ZLIB_FS_INFLATE is not set
 
 #
 # Partition Types

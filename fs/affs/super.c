@@ -270,7 +270,6 @@ affs_read_super(struct super_block *sb, void *data, int silent)
 	size = (BLOCK_SIZE / 512) * blocks;
 	pr_debug("AFFS: initial blksize=%d, blocks=%d\n", 512, blocks);
 
-#warning
 	affs_set_blocksize(sb, PAGE_SIZE);
 	/* Try to find root block. Its location depends on the block size. */
 

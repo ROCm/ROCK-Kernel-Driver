@@ -1659,7 +1659,7 @@ bmac_proc_info(char *buffer, char **start, off_t offset, int length)
 MODULE_AUTHOR("Randy Gobbel/Paul Mackerras");
 MODULE_DESCRIPTION("PowerMac BMAC ethernet driver.");
 MODULE_LICENSE("GPL");
-
+EXPORT_NO_SYMBOLS;
 
 static void __exit bmac_cleanup (void)
 {

@@ -1,5 +1,5 @@
 /*
- * $Id: io.h,v 1.28 2000/09/17 05:12:00 davem Exp $
+ * $Id: io.h,v 1.29 2001/11/10 09:28:34 davem Exp $
  */
 #ifndef __SPARC_IO_H
 #define __SPARC_IO_H
@@ -14,64 +14,78 @@
 #define virt_to_bus virt_to_phys
 #define bus_to_virt phys_to_virt
 
-extern __inline__ unsigned  flip_dword (unsigned d) {
+static __inline__ u32 flip_dword (u32 d)
+{
 	return ((d&0xff)<<24) | (((d>>8)&0xff)<<16) | (((d>>16)&0xff)<<8)| ((d>>24)&0xff);
 }
 
-extern __inline__ unsigned short flip_word (unsigned short d) {
+static __inline__ u16 flip_word (u16 d)
+{
 	return ((d&0xff) << 8) | ((d>>8)&0xff);
 }
 
 /*
  * Memory mapped I/O to PCI
  */
-extern __inline__ unsigned long readb(unsigned long addr) {
-	return *(volatile unsigned char*)addr;
+static __inline__ u8 readb(unsigned long addr)
+{
+	return *(volatile u8 *)addr;
 }
 
-extern __inline__ unsigned long readw(unsigned long addr) {
-	return flip_word(*(volatile unsigned short*)addr);
+static __inline__ u16 readw(unsigned long addr)
+{
+	return flip_word(*(volatile u16 *)addr);
 }
 
-extern __inline__ unsigned long readl(unsigned long addr) {
-	return flip_dword(*(volatile unsigned long*)addr);
+static __inline__ u32 readl(unsigned long addr)
+{
+	return flip_dword(*(volatile u32 *)addr);
 }
 
-extern __inline__ void writeb(unsigned char b, unsigned long addr) {
-	*(volatile unsigned char*)addr = b;
+static __inline__ void writeb(u8 b, unsigned long addr)
+{
+	*(volatile u8 *)addr = b;
 }
 
-extern __inline__ void writew(unsigned short b, unsigned long addr) {
-	*(volatile unsigned short*)addr = flip_word(b);
+static __inline__ void writew(u16 b, unsigned long addr)
+{
+	*(volatile u16 *)addr = flip_word(b);
 }
 
-extern __inline__ void writel(unsigned int b, unsigned long addr) {
-	*(volatile unsigned long*)addr = flip_dword(b);
+static __inline__ void writel(u32 b, unsigned long addr)
+{
+	*(volatile u32 *)addr = flip_dword(b);
 }
 
 /* Now the 'raw' versions. */
-extern __inline__ unsigned long __raw_readb(unsigned long addr) {
-	return *(volatile unsigned char*)addr;
+static __inline__ u8 __raw_readb(unsigned long addr)
+{
+	return *(volatile u8 *)addr;
 }
 
-extern __inline__ unsigned long __raw_readw(unsigned long addr) {
-	return *(volatile unsigned short*)addr;
+static __inline__ u16 __raw_readw(unsigned long addr)
+{
+	return *(volatile u16 *)addr;
 }
 
-extern __inline__ unsigned long __raw_readl(unsigned long addr) {
-	return *(volatile unsigned long*)addr;
+static __inline__ u32 __raw_readl(unsigned long addr)
+{
+	return *(volatile u32 *)addr;
 }
 
-extern __inline__ void __raw_writeb(unsigned char b, unsigned long addr) {
-	*(volatile unsigned char*)addr = b;
+static __inline__ void __raw_writeb(u8 b, unsigned long addr)
+{
+	*(volatile u8 *)addr = b;
 }
 
-extern __inline__ void __raw_writew(unsigned short b, unsigned long addr) {
-	*(volatile unsigned short*)addr = b;
+static __inline__ void __raw_writew(u16 b, unsigned long addr)
+{
+	*(volatile u16 *)addr = b;
 }
 
-extern __inline__ void __raw_writel(unsigned int b, unsigned long addr) {
-	*(volatile unsigned long*)addr = b;
+static __inline__ void __raw_writel(u32 b, unsigned long addr)
+{
+	*(volatile u32 *)addr = b;
 }
 
 /*
@@ -118,37 +132,43 @@ extern void insl(unsigned long addr, void *dst, unsigned long count);
  * SBus has only one, memory mapped, I/O space.
  * We do not need to flip bytes for SBus of course.
  */
-extern __inline__ unsigned int _sbus_readb(unsigned long addr) {
-	return *(volatile unsigned char*)addr;
+static __inline__ u8 _sbus_readb(unsigned long addr)
+{
+	return *(volatile u8 *)addr;
 }
 
-extern __inline__ unsigned int _sbus_readw(unsigned long addr) {
-	return *(volatile unsigned short*)addr;
+static __inline__ u16 _sbus_readw(unsigned long addr)
+{
+	return *(volatile u16 *)addr;
 }
 
-extern __inline__ unsigned int _sbus_readl(unsigned long addr) {
-	return *(volatile unsigned long*)addr;
+static __inline__ u32 _sbus_readl(unsigned long addr)
+{
+	return *(volatile u32 *)addr;
 }
 
-extern __inline__ void _sbus_writeb(unsigned char b, unsigned long addr) {
-	*(volatile unsigned char*)addr = b;
+static __inline__ void _sbus_writeb(u8 b, unsigned long addr)
+{
+	*(volatile u8 *)addr = b;
 }
 
-extern __inline__ void _sbus_writew(unsigned short b, unsigned long addr) {
-	*(volatile unsigned short*)addr = b;
+static __inline__ void _sbus_writew(u16 b, unsigned long addr)
+{
+	*(volatile u16 *)addr = b;
 }
 
-extern __inline__ void _sbus_writel(unsigned int b, unsigned long addr) {
-	*(volatile unsigned long*)addr = b;
+static __inline__ void _sbus_writel(u32 b, unsigned long addr)
+{
+	*(volatile u32 *)addr = b;
 }
 
 /*
  * The only reason for #define's is to hide casts to unsigned long.
  * XXX Rewrite drivers without structures for registers.
  */
-#define sbus_readb(a)	_sbus_readb((unsigned long)(a))
-#define sbus_readw(a)	_sbus_readw((unsigned long)(a))
-#define sbus_readl(a)	_sbus_readl((unsigned long)(a))
+#define sbus_readb(a)		_sbus_readb((unsigned long)(a))
+#define sbus_readw(a)		_sbus_readw((unsigned long)(a))
+#define sbus_readl(a)		_sbus_readl((unsigned long)(a))
 #define sbus_writeb(v, a)	_sbus_writeb(v, (unsigned long)(a))
 #define sbus_writew(v, a)	_sbus_writew(v, (unsigned long)(a))
 #define sbus_writel(v, a)	_sbus_writel(v, (unsigned long)(a))

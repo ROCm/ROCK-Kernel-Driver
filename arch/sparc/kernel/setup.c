@@ -1,4 +1,4 @@
-/*  $Id: setup.c,v 1.125 2001/09/20 00:35:30 davem Exp $
+/*  $Id: setup.c,v 1.126 2001/11/13 00:49:27 davem Exp $
  *  linux/arch/sparc/kernel/setup.c
  *
  *  Copyright (C) 1995  David S. Miller (davem@caip.rutgers.edu)
@@ -20,6 +20,7 @@
 #include <linux/delay.h>
 #include <linux/config.h>
 #include <linux/fs.h>
+#include <linux/seq_file.h>
 #include <linux/kdev_t.h>
 #include <linux/major.h>
 #include <linux/string.h>
@@ -455,42 +456,72 @@ asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int on)
 	return -EIO;
 }
 
-/* BUFFER is PAGE_SIZE bytes long. */
-
 extern char *sparc_cpu_type[];
 extern char *sparc_fpu_type[];
 
-int get_cpuinfo(char *buffer)
+static int show_cpuinfo(struct seq_file *m, void *__unused)
 {
-	int cpuid=hard_smp_processor_id();
-	int len;
+	int cpuid = hard_smp_processor_id();
 
-	len = sprintf(buffer, "cpu\t\t: %s\n"
-            "fpu\t\t: %s\n"
-            "promlib\t\t: Version %d Revision %d\n"
-            "prom\t\t: %d.%d\n"
-            "type\t\t: %s\n"
-	    "ncpus probed\t: %d\n"
-	    "ncpus active\t: %d\n"
+	seq_printf(m,
+		   "cpu\t\t: %s\n"
+		   "fpu\t\t: %s\n"
+		   "promlib\t\t: Version %d Revision %d\n"
+		   "prom\t\t: %d.%d\n"
+		   "type\t\t: %s\n"
+		   "ncpus probed\t: %d\n"
+		   "ncpus active\t: %d\n"
 #ifndef CONFIG_SMP
-            "BogoMips\t: %lu.%02lu\n"
+		   "BogoMips\t: %lu.%02lu\n"
 #endif
-	    ,
-	    sparc_cpu_type[cpuid] ? : "undetermined",
-	    sparc_fpu_type[cpuid] ? : "undetermined",
-            romvec->pv_romvers, prom_rev, romvec->pv_printrev >> 16, (short)romvec->pv_printrev,
-            &cputypval,
-	    linux_num_cpus, smp_num_cpus
+		   ,
+		   sparc_cpu_type[cpuid] ? : "undetermined",
+		   sparc_fpu_type[cpuid] ? : "undetermined",
+		   romvec->pv_romvers,
+		   prom_rev,
+		   romvec->pv_printrev >> 16,
+		   (short) romvec->pv_printrev,
+		   &cputypval,
+		   linux_num_cpus,
+		   smp_num_cpus
 #ifndef CONFIG_SMP
-	    , loops_per_jiffy/(500000/HZ), (loops_per_jiffy/(5000/HZ)) % 100
+		   , loops_per_jiffy/(500000/HZ),
+		   (loops_per_jiffy/(5000/HZ)) % 100
 #endif
-	    );
+		);
+
 #ifdef CONFIG_SMP
-	len += smp_bogo_info(buffer + len);
+	smp_bogo_info(m);
 #endif
-	len += mmu_info(buffer + len);
+	mmu_info(m);
 #ifdef CONFIG_SMP
-	len += smp_info(buffer + len);
+	smp_info(m);
 #endif
-	return len;
+	return 0;
 }
+
+static void *c_start(struct seq_file *m, loff_t *pos)
+{
+	/* The pointer we are returning is arbitrary,
+	 * it just has to be non-NULL and not IS_ERR
+	 * in the success case.
+	 */
+	return *pos == 0 ? &c_start : NULL;
+}
+
+static void *c_next(struct seq_file *m, void *v, loff_t *pos)
+{
+	++*pos;
+	return c_start(m, pos);
+}
+
+static void c_stop(struct seq_file *m, void *v)
+{
+}
+
+struct seq_operations cpuinfo_op = {
+	start:	c_start,
+	next:	c_next,
+	stop:	c_stop,
+	show:	show_cpuinfo,
+};

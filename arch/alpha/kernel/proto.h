@@ -91,7 +91,6 @@ extern void unregister_srm_console(void);
 
 /* smp.c */
 extern void setup_smp(void);
-extern int smp_info(char *buffer);
 extern void handle_ipi(struct pt_regs *);
 extern void smp_percpu_timer_interrupt(struct pt_regs *);
 

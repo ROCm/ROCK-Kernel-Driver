@@ -1,5 +1,5 @@
 /*
- *  $Id: ipconfig.c,v 1.40 2001/10/30 03:08:02 davem Exp $
+ *  $Id: ipconfig.c,v 1.42 2001/11/10 07:23:12 davem Exp $
  *
  *  Automatic Configuration of IP -- use DHCP, BOOTP, RARP, or
  *  user-supplied information to configure own IP address and routes.
@@ -639,7 +639,7 @@ static inline void ic_bootp_cleanup(void)
 /*
  *  Send DHCP/BOOTP request to single interface.
  */
-static void __init ic_bootp_send_if(struct ic_device *d, u32 jiffies)
+static void __init ic_bootp_send_if(struct ic_device *d, unsigned long jiffies_diff)
 {
 	struct net_device *dev = d->dev;
 	struct sk_buff *skb;
@@ -686,7 +686,7 @@ static void __init ic_bootp_send_if(struct ic_device *d, u32 jiffies)
 	b->your_ip = INADDR_NONE;
 	b->server_ip = INADDR_NONE;
 	memcpy(b->hw_addr, dev->dev_addr, dev->addr_len);
-	b->secs = htons(jiffies / HZ);
+	b->secs = htons(jiffies_diff / HZ);
 	b->xid = d->xid;
 
 	/* add DHCP options or BOOTP extensions */
@@ -1009,7 +1009,7 @@ static int __init ic_dynamic(void)
 #endif
 
 		jiff = jiffies + (d->next ? CONF_INTER_TIMEOUT : timeout);
-		while (jiffies < jiff && !ic_got_reply) {
+		while (time_before(jiffies, jiff) && !ic_got_reply) {
 			barrier();
 			cpu_relax();
 		}
@@ -1124,7 +1124,7 @@ static int __init ip_auto_config(void)
  try_try_again:
 	/* Give hardware a chance to settle */
 	jiff = jiffies + CONF_PRE_OPEN;
-	while (jiffies < jiff)
+	while (time_before(jiffies, jiff))
 		;
 
 	/* Setup all network devices */
@@ -1133,7 +1133,7 @@ static int __init ip_auto_config(void)
 
 	/* Give drivers a chance to settle */
 	jiff = jiffies + CONF_POST_OPEN;
-	while (jiffies < jiff)
+	while (time_before(jiffies, jiff))
 			;
 
 	/*

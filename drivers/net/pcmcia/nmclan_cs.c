@@ -385,32 +385,31 @@ static char *if_names[]={
     "Auto", "10baseT", "BNC",
 };
 
-#ifdef PCMCIA_DEBUG
-static int pc_debug = PCMCIA_DEBUG;
-MODULE_PARM(pc_debug, "i");
-#define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
-#else
-#define DEBUG(n, args...)
-#endif
-
 /* ----------------------------------------------------------------------------
 Parameters
 	These are the parameters that can be set during loading with
 	'insmod'.
 ---------------------------------------------------------------------------- */
 
-/* 0=auto, 1=10baseT, 2 = 10base2, default=auto */
-static int if_port;
-
-/* Bit map of interrupts to choose from */
-static u_int irq_mask = 0xdeb8;
-static int irq_list[4] = { -1 };
-
-MODULE_PARM(if_port, "i");
-MODULE_PARM(irq_mask, "i");
-MODULE_PARM(irq_list, "1-4i");
+MODULE_DESCRIPTION("New Media PCMCIA ethernet driver");
 MODULE_LICENSE("GPL");
 
+#define INT_MODULE_PARM(n, v) static int n = v; MODULE_PARM(n, "i")
+
+static int irq_list[4] = { -1 };
+MODULE_PARM(irq_list, "1-4i");
+
+/* 0=auto, 1=10baseT, 2 = 10base2, default=auto */
+INT_MODULE_PARM(if_port, 0);
+/* Bit map of interrupts to choose from */
+INT_MODULE_PARM(irq_mask, 0xdeb8);
+
+#ifdef PCMCIA_DEBUG
+INT_MODULE_PARM(pc_debug, PCMCIA_DEBUG);
+#define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
+#else
+#define DEBUG(n, args...)
+#endif
 
 /* ----------------------------------------------------------------------------
 Function Prototypes
@@ -1290,9 +1289,10 @@ static int mace_rx(struct net_device *dev, unsigned char RxCnt)
 	skb->protocol = eth_type_trans(skb, dev);
 	
 	netif_rx(skb); /* Send the packet to the upper (protocol) layers. */
+
 	dev->last_rx = jiffies;
 	lp->linux_stats.rx_packets++;
-	lp->linux_stats.rx_bytes += pkt_len;
+	lp->linux_stats.rx_bytes += skb->len;
 	outb(0xFF, ioaddr + AM2150_RCV_NEXT); /* skip to next frame */
 	continue;
       } else {

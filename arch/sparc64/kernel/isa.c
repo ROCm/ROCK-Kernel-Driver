@@ -74,7 +74,7 @@ static void __init isa_dev_get_irq(struct isa_device *isa_dev)
 	irq_prop = prom_getintdefault(isa_dev->prom_node,
 				      "interrupts", -1);
 	if (irq_prop <= 0) {
-		isa_dev->irq = 0;
+		isa_dev->irq = PCI_IRQ_NONE;
 	} else {
 		int i;
 
@@ -85,7 +85,7 @@ static void __init isa_dev_get_irq(struct isa_device *isa_dev)
 				int ino = grover_irq_table[i].pci_ino;
 
 				if (ino == 0) {
-					isa_dev->irq = 0;
+					isa_dev->irq = PCI_IRQ_NONE;
 				} else {
 					pbm = isa_dev->bus->parent;
 					pcic = pbm->parent;

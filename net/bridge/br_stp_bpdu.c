@@ -5,7 +5,7 @@
  *	Authors:
  *	Lennert Buytenhek		<buytenh@gnu.org>
  *
- *	$Id: br_stp_bpdu.c,v 1.2 2000/02/21 15:51:34 davem Exp $
+ *	$Id: br_stp_bpdu.c,v 1.3 2001/11/10 02:35:25 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -14,6 +14,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/if_ether.h>
 #include <linux/if_bridge.h>
 #include "br_private.h"
 #include "br_private_stp.h"
@@ -42,6 +43,7 @@ static void br_send_bpdu(struct net_bridge_port *p, unsigned char *data, int len
 	}
 
 	skb->dev = dev;
+	skb->protocol = htons(ETH_P_802_2);
 	skb->mac.raw = skb_put(skb, size);
 	memcpy(skb->mac.raw, bridge_ula, ETH_ALEN);
 	memcpy(skb->mac.raw+ETH_ALEN, dev->dev_addr, ETH_ALEN);

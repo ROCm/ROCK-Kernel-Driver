@@ -1,4 +1,4 @@
-/* $Id: ioctl32.c,v 1.131 2001/11/07 01:13:23 davem Exp $
+/* $Id: ioctl32.c,v 1.132 2001/11/07 05:56:19 davem Exp $
  * ioctl32.c: Conversion between 32bit and 64bit native ioctls.
  *
  * Copyright (C) 1997-2000  Jakub Jelinek  (jakub@redhat.com)
@@ -457,6 +457,7 @@ struct ifconf32 {
         __kernel_caddr_t32  ifcbuf;
 };
 
+#ifdef CONFIG_NET
 static int dev_ifname32(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	struct net_device *dev;
@@ -475,6 +476,7 @@ static int dev_ifname32(unsigned int fd, unsigned int cmd, unsigned long arg)
 	err = copy_to_user((struct ifreq32 *)arg, &ifr32, sizeof(struct ifreq32));
 	return (err ? -EFAULT : 0);
 }
+#endif
 
 static inline int dev_ifconf(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
@@ -565,9 +567,25 @@ static int ethtool_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 	}
 	switch (ethcmd) {
 	case ETHTOOL_GDRVINFO:	len = sizeof(struct ethtool_drvinfo); break;
+	case ETHTOOL_GMSGLVL:
+	case ETHTOOL_SMSGLVL:
+	case ETHTOOL_GLINK:
+	case ETHTOOL_NWAY_RST:	len = sizeof(struct ethtool_value); break;
+	case ETHTOOL_GREGS: {
+		struct ethtool_regs *regaddr = (struct ethtool_regs *)A(data);
+		/* darned variable size arguments */
+		if (get_user(len, (u32 *)&regaddr->len)) {
+			err = -EFAULT;
+			goto out;
+		}
+		len += sizeof(struct ethtool_regs);
+		break;
+	}
 	case ETHTOOL_GSET:
-	case ETHTOOL_SSET:
-	default:		len = sizeof(struct ethtool_cmd); break;
+	case ETHTOOL_SSET:	len = sizeof(struct ethtool_cmd); break;
+	default:
+		err = -EOPNOTSUPP;
+		goto out;
 	}
 
 	if (copy_from_user(ifr.ifr_data, (char *)A(data), len)) {
@@ -4508,7 +4526,9 @@ COMPATIBLE_IOCTL(NBD_DISCONNECT)
 /* And these ioctls need translation */
 HANDLE_IOCTL(MEMREADOOB32, mtd_rw_oob)
 HANDLE_IOCTL(MEMWRITEOOB32, mtd_rw_oob)
+#ifdef CONFIG_NET
 HANDLE_IOCTL(SIOCGIFNAME, dev_ifname32)
+#endif
 HANDLE_IOCTL(SIOCGIFCONF, dev_ifconf)
 HANDLE_IOCTL(SIOCGIFFLAGS, dev_ifsioc)
 HANDLE_IOCTL(SIOCSIFFLAGS, dev_ifsioc)

@@ -374,9 +374,9 @@ static int kaweth_download_firmware(struct kaweth_device *kaweth,
 	kaweth_dbg("High: %i, Low:%i", kaweth->firmware_buf[3],
 		   kaweth->firmware_buf[2]);
 
-	kaweth_dbg("Downloading firmware at %x to kaweth device at %x", 
-	    (int)data, 
-	    (int)kaweth);
+	kaweth_dbg("Downloading firmware at %p to kaweth device at %p", 
+	    data, 
+	    kaweth);
 	kaweth_dbg("Firmware length: %d", data_len);
 
 	return kaweth_control(kaweth,
@@ -480,7 +480,7 @@ static void kaweth_usb_receive(struct urb *urb)
 	int count = urb->actual_length;
 	int count2 = urb->transfer_buffer_length;
 			
-	__u16 pkt_len = le16_to_cpup(kaweth->rx_buf);
+	__u16 pkt_len = le16_to_cpup((u16 *)kaweth->rx_buf);
 
 	struct sk_buff *skb;
 

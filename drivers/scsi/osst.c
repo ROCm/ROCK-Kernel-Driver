@@ -1382,7 +1382,7 @@ static int osst_reposition_and_retry(OS_Scsi_Tape * STp, Scsi_Request ** aSRpnt,
 	unsigned char	cmd[MAX_COMMAND_SIZE];
 	Scsi_Request  * SRpnt;
 	int		dev       = TAPE_NR(STp->devt);
-	int		expected  __attribute__ ((__unused__));
+	int		expected  = 0;
 	int		attempts  = 1000 / skip;
 	int		flag      = 1;
 	long		startwait = jiffies;

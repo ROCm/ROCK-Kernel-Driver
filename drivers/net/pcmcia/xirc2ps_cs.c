@@ -5,6 +5,11 @@
  * This driver supports various Xircom CreditCard Ethernet adapters
  * including the CE2, CE IIps, RE-10, CEM28, CEM33, CE33, CEM56,
  * CE3-100, CE3B, RE-100, REM10BT, and REM56G-100.
+ *
+ * 2000-09-24 <psheer@icon.co.za> The Xircom CE3B-100 may not
+ * autodetect the media properly. In this case use the
+ * if_port=1 (for 10BaseT) or if_port=4 (for 100BaseT) options
+ * to force the media type.
  * 
  * Written originally by Werner Koch based on David Hinds' skeleton of the
  * PCMCIA driver.
@@ -246,7 +251,10 @@ static char *version =
 #define XIR_CBE     14	/* (prodid 1) cardbus ethernet: not supported */
 /*====================================================================*/
 
-/* Parameters that can be set with 'insmod' */
+/* Module parameters */
+
+MODULE_DESCRIPTION("Xircom PCMCIA ethernet driver");
+MODULE_LICENSE("Dual MPL/GPL");
 
 #define INT_MODULE_PARM(n, v) static int n = v; MODULE_PARM(n, "i")
 
@@ -381,7 +389,6 @@ static void do_reset(struct net_device *dev, int full);
 static int init_mii(struct net_device *dev);
 static void do_powerdown(struct net_device *dev);
 static int do_stop(struct net_device *dev);
-
 
 /*=============== Helper functions =========================*/
 static void
@@ -1441,7 +1448,7 @@ xirc2ps_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	    lp->stats.rx_fifo_errors++; /* okay ? */
 	    DEBUG(3, "%s: Alignment error\n", dev->name);
 	}
-	
+
 	/* clear the received/dropped/error packet */
 	PutWord(XIRCREG0_DO, 0x8000); /* issue cmd: skip_rx_packet */
 
@@ -1926,6 +1933,12 @@ init_mii(struct net_device *dev)
     unsigned control, status, linkpartner;
     int i;
 
+    if (if_port == 4 || if_port == 1) { /* force 100BaseT or 10BaseT */
+	dev->if_port = if_port;
+	local->probe_port = 0;
+	return 1;
+    }
+
     status = mii_rd(ioaddr,  0, 1);
     if ((status & 0xff00) != 0x7800)
 	return 0; /* No MII */
@@ -2090,4 +2103,3 @@ static int __init setup_xirc2ps_cs(char *str)
 
 __setup("xirc2ps_cs=", setup_xirc2ps_cs);
 #endif
-MODULE_LICENSE("GPL");

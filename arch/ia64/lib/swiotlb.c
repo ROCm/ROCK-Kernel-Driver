@@ -27,6 +27,10 @@
 #define ALIGN(val, align) ((unsigned long)	\
 	(((unsigned long) (val) + ((align) - 1)) & ~((align) - 1)))
 
+#define SG_ENT_VIRT_ADDRESS(sg)	((sg)->address ? (sg)->address			\
+				 : page_address((sg)->page) + (sg)->offset)
+#define SG_ENT_PHYS_ADDRESS(SG)	virt_to_phys(SG_ENT_VIRT_ADDRESS(SG))
+
 /*
  * log of the size of each IO TLB slab.  The number of slabs is command line controllable.
  */
@@ -392,15 +396,20 @@ swiotlb_sync_single (struct pci_dev *hwdev, dma_addr_t pci_addr, size_t size, in
 int
 swiotlb_map_sg (struct pci_dev *hwdev, struct scatterlist *sg, int nelems, int direction)
 {
+	void *addr;
 	int i;
 
 	if (direction == PCI_DMA_NONE)
 		BUG();
 
 	for (i = 0; i < nelems; i++, sg++) {
-		sg->page = sg->address;
-		if ((virt_to_phys(sg->address) & ~hwdev->dma_mask) != 0) {
-			sg->address = map_single(hwdev, sg->address, sg->length, direction);
+		sg->orig_address = SG_ENT_VIRT_ADDRESS(sg);
+		if ((SG_ENT_PHYS_ADDRESS(sg) & ~hwdev->dma_mask) != 0) {
+			addr = map_single(hwdev, sg->address, sg->length, direction);
+			if (sg->address)
+				sg->address = addr;
+			else
+				sg->page = virt_to_page(addr);
 		}
 	}
 	return nelems;
@@ -419,9 +428,12 @@ swiotlb_unmap_sg (struct pci_dev *hwdev, struct scatterlist *sg, int nelems, int
 		BUG();
 
 	for (i = 0; i < nelems; i++, sg++)
-		if (sg->page != sg->address) {
-			unmap_single(hwdev, sg->address, sg->length, direction);
-			sg->address = sg->page;
+		if (sg->orig_address != SG_ENT_VIRT_ADDRESS(sg)) {
+			unmap_single(hwdev, SG_ENT_VIRT_ADDRESS(sg), sg->length, direction);
+			if (sg->address)
+				sg->address = sg->orig_address;
+			else
+				sg->page = virt_to_page(sg->orig_address);
 		} else if (direction == PCI_DMA_FROMDEVICE)
 			mark_clean(sg->address, sg->length);
 }
@@ -442,14 +454,14 @@ swiotlb_sync_sg (struct pci_dev *hwdev, struct scatterlist *sg, int nelems, int 
 		BUG();
 
 	for (i = 0; i < nelems; i++, sg++)
-		if (sg->page != sg->address)
-			sync_single(hwdev, sg->address, sg->length, direction);
+		if (sg->orig_address != SG_ENT_VIRT_ADDRESS(sg))
+			sync_single(hwdev, SG_ENT_VIRT_ADDRESS(sg), sg->length, direction);
 }
 
 unsigned long
 swiotlb_dma_address (struct scatterlist *sg)
 {
-	return virt_to_phys(sg->address);
+	return SG_ENT_PHYS_ADDRESS(sg);
 }
 
 EXPORT_SYMBOL(swiotlb_init);

@@ -322,9 +322,9 @@ static int bluetooth_ctrl_msg (struct usb_bluetooth *bluetooth, int request, int
 
 	dr->requesttype = BLUETOOTH_CONTROL_REQUEST_TYPE;
 	dr->request = request;
-	dr->value = cpu_to_le16p(&value);
-	dr->index = cpu_to_le16p(&bluetooth->control_out_bInterfaceNum);
-	dr->length = cpu_to_le16p(&len);
+	dr->value = cpu_to_le16((u16) value);
+	dr->index = cpu_to_le16((u16) bluetooth->control_out_bInterfaceNum);
+	dr->length = cpu_to_le16((u16) len);
 	
 	FILL_CONTROL_URB (urb, bluetooth->dev, usb_sndctrlpipe(bluetooth->dev, 0),
 			  (unsigned char*)dr, urb->transfer_buffer, len, bluetooth_ctrl_callback, bluetooth);

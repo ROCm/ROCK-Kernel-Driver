@@ -642,7 +642,9 @@ int __init radeonfb_setup (char *options)
         if (!options || !*options)
                 return 0;
  
-	while (this_opt = strsep (&options, ",")) {
+	while ((this_opt = strsep (&options, ",")) != NULL) {
+		if (!*this_opt)
+			continue;
                 if (!strncmp (this_opt, "font:", 5)) {
                         char *p;
                         int i;

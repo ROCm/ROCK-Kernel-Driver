@@ -24,7 +24,7 @@
 #include <linux/intermezzo_kml.h>
 #include <linux/intermezzo_journal.h>
 
-#if defined(CONFIG_XFS_FS)
+#if 0
 
 /* XFS has journalling, but these functions do nothing yet... */
 

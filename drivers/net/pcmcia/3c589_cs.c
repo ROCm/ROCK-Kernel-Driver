@@ -4,7 +4,7 @@
     
     Copyright (C) 1999 David A. Hinds -- dahinds@users.sourceforge.net
 
-    3c589_cs.c 1.156 2001/02/07 00:19:41
+    3c589_cs.c 1.162 2001/10/13 00:08:50
 
     The network driver code is based on Donald Becker's 3c589 code:
     
@@ -112,30 +112,32 @@ struct el3_private {
 
 static char *if_names[] = { "auto", "10baseT", "10base2", "AUI" };
 
+/*====================================================================*/
+
+/* Module parameters */
+
+MODULE_AUTHOR("David Hinds <dahinds@users.sourceforge.net>");
+MODULE_DESCRIPTION("3Com 3c589 series PCMCIA ethernet driver");
+MODULE_LICENSE("GPL");
+
+#define INT_MODULE_PARM(n, v) static int n = v; MODULE_PARM(n, "i")
+
+/* Special hook for setting if_port when module is loaded */
+INT_MODULE_PARM(if_port, 0);
+
+/* Bit map of interrupts to choose from */
+INT_MODULE_PARM(irq_mask, 0xdeb8);
+static int irq_list[4] = { -1 };
+MODULE_PARM(irq_list, "1-4i");
+
 #ifdef PCMCIA_DEBUG
-static int pc_debug = PCMCIA_DEBUG;
-MODULE_PARM(pc_debug, "i");
+INT_MODULE_PARM(pc_debug, PCMCIA_DEBUG);
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
 static char *version =
-"3c589_cs.c 1.156 2001/02/07 00:19:41 (David Hinds)";
+"3c589_cs.c 1.162 2001/10/13 00:08:50 (David Hinds)";
 #else
 #define DEBUG(n, args...)
 #endif
-
-/*====================================================================*/
-
-/* Parameters that can be set with 'insmod' */
-
-/* Special hook for setting if_port when module is loaded */
-static int if_port;
-
-/* Bit map of interrupts to choose from */
-static u_int irq_mask = 0xdeb8;
-static int irq_list[4] = { -1 };
-
-MODULE_PARM(if_port, "i");
-MODULE_PARM(irq_mask, "i");
-MODULE_PARM(irq_list, "1-4i");
 
 /*====================================================================*/
 
@@ -986,12 +988,10 @@ static int el3_rx(struct net_device *dev)
 		  pkt_len, rx_status);
 	    if (skb != NULL) {
 		skb->dev = dev;
-		
 		skb_reserve(skb, 2);
 		insl(ioaddr+RX_FIFO, skb_put(skb, pkt_len),
 			(pkt_len+3)>>2);
 		skb->protocol = eth_type_trans(skb, dev);
-		
 		netif_rx(skb);
 		dev->last_rx = jiffies;
 		lp->stats.rx_packets++;
@@ -1097,4 +1097,3 @@ static void __exit exit_3c589_cs(void)
 
 module_init(init_3c589_cs);
 module_exit(exit_3c589_cs);
-MODULE_LICENSE("GPL");

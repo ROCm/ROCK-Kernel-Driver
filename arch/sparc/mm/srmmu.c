@@ -1,4 +1,4 @@
-/* $Id: srmmu.c,v 1.232 2001/10/30 04:54:22 davem Exp $
+/* $Id: srmmu.c,v 1.233 2001/11/13 00:49:27 davem Exp $
  * srmmu.c:  SRMMU specific routines for memory management.
  *
  * Copyright (C) 1995 David S. Miller  (davem@caip.rutgers.edu)
@@ -18,6 +18,8 @@
 #include <linux/blk.h>
 #include <linux/spinlock.h>
 #include <linux/bootmem.h>
+#include <linux/fs.h>
+#include <linux/seq_file.h>
 
 #include <asm/page.h>
 #include <asm/pgalloc.h>
@@ -1209,18 +1211,17 @@ void __init srmmu_paging_init(void)
 	}
 }
 
-static int srmmu_mmu_info(char *buf)
+static void srmmu_mmu_info(struct seq_file *m)
 {
-	return sprintf(buf, 
-		"MMU type\t: %s\n"
-		"contexts\t: %d\n"
-		"nocache total\t: %ld\n"
-		"nocache used\t: %d\n"
-		, srmmu_name,
-		num_contexts,
-		SRMMU_NOCACHE_SIZE,
-		(srmmu_nocache_used << SRMMU_NOCACHE_BITMAP_SHIFT)
-	);
+	seq_printf(m, 
+		   "MMU type\t: %s\n"
+		   "contexts\t: %d\n"
+		   "nocache total\t: %ld\n"
+		   "nocache used\t: %d\n",
+		   srmmu_name,
+		   num_contexts,
+		   SRMMU_NOCACHE_SIZE,
+		   (srmmu_nocache_used << SRMMU_NOCACHE_BITMAP_SHIFT));
 }
 
 static void srmmu_update_mmu_cache(struct vm_area_struct * vma, unsigned long address, pte_t pte)

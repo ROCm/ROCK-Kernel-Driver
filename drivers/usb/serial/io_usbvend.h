@@ -90,6 +90,7 @@
 #define ION_DEVICE_ID_EDGEPORT_16_DUAL_CPU	0x012	// Half of an Edgeport/16 (the kind with 2 EP/8s)
 #define ION_DEVICE_ID_EDGEPORT_COMPATIBLE	0x013	// Edgeport Compatible, for NCR, Axiohm etc. testing
 #define ION_DEVICE_ID_EDGEPORT_8I		0x014	// Edgeport/8 RS422 (single-CPU)
+#define ION_DEVICE_ID_MT4X56USB			0x1403	// OEM device
 
 // These IDs are used by the Edgeport.exe program for uninstalling.
 // 

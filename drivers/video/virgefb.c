@@ -1085,7 +1085,9 @@ int __init virgefb_setup(char *options)
 	if (!options || !*options)
 		return 0;
 
-	while (this_opt = strsep(&options, ",")) {
+	while ((this_opt = strsep(&options, ",")) != NULL) {
+		if (!*this_opt)
+			continue;
 		if (!strcmp(this_opt, "inverse")) {
 			Cyberfb_inverse = 1;
 			fb_invert_cmaps();
@@ -1099,6 +1101,7 @@ int __init virgefb_setup(char *options)
 		}
 		else
 			get_video_mode(this_opt);
+	}
 
 	DPRINTK("default mode: xres=%d, yres=%d, bpp=%d\n",virgefb_default.xres,
                                                            virgefb_default.yres,

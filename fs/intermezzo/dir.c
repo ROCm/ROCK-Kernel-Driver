@@ -163,13 +163,20 @@ struct dentry *presto_ilookup(struct inode *dir, struct dentry *dentry,
                 return ERR_PTR(-EPERM);
         }
         inode = iget(dir->i_sb, ino);
-        if (!inode || !inode->i_nlink || is_bad_inode(inode)) {
+        if (!inode || is_bad_inode(inode)) {
                 CDEBUG(D_PIOCTL, "fatal: invalid inode %ld (%s).\n",
                        ino, inode ? inode->i_nlink ? "bad inode" :
                        "no links" : "NULL");
                 error = -ENOENT;
                 EXIT;
                 goto cleanup_iput;
+        } else if (inode->i_nlink == 0) {
+                /* This is quite evil, but we have little choice.  If we were
+                 * to iput() again with i_nlink == 0, delete_inode would get
+                 * called again, which ext3 really Does Not Like. */
+                atomic_dec(&inode->i_count);
+                EXIT;
+                return ERR_PTR(-ENOENT);
         }
 
         /* We need to make sure we have the right inode (by checking the
@@ -185,6 +192,8 @@ struct dentry *presto_ilookup(struct inode *dir, struct dentry *dentry,
         }
 
         d_instantiate(dentry, inode);
+        dentry->d_flags |= DCACHE_NFSD_DISCONNECTED; /* NFS hack */
+
         EXIT;
         return NULL;
 

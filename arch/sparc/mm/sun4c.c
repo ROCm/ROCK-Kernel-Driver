@@ -1,4 +1,4 @@
-/* $Id: sun4c.c,v 1.208 2001/10/30 04:54:22 davem Exp $
+/* $Id: sun4c.c,v 1.210 2001/11/13 03:27:47 davem Exp $
  * sun4c.c: Doing in software what should be done in hardware.
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -16,6 +16,8 @@
 #include <linux/init.h>
 #include <linux/bootmem.h>
 #include <linux/highmem.h>
+#include <linux/fs.h>
+#include <linux/seq_file.h>
 
 #include <asm/scatterlist.h>
 #include <asm/page.h>
@@ -2043,40 +2045,37 @@ static void sun4c_destroy_context_sw(struct mm_struct *mm)
 	}
 }
 
-static int sun4c_mmu_info(char *buf)
+static void sun4c_mmu_info(struct seq_file *m)
 {
 	int used_user_entries, i;
-	int len;
 
 	used_user_entries = 0;
 	for (i = 0; i < num_contexts; i++)
 		used_user_entries += sun4c_context_ring[i].num_entries;
 
-	len = sprintf(buf, 
-		"vacsize\t\t: %d bytes\n"
-		"vachwflush\t: %s\n"
-		"vaclinesize\t: %d bytes\n"
-		"mmuctxs\t\t: %d\n"
-		"mmupsegs\t: %d\n"
-		"kernelpsegs\t: %d\n"
-		"kfreepsegs\t: %d\n"
-		"usedpsegs\t: %d\n"
-		"ufreepsegs\t: %d\n"
-		"user_taken\t: %d\n"
-		"max_taken\t: %d\n",
-		sun4c_vacinfo.num_bytes,
-		(sun4c_vacinfo.do_hwflushes ? "yes" : "no"),
-		sun4c_vacinfo.linesize,
-		num_contexts,
-		(invalid_segment + 1),
-		sun4c_kernel_ring.num_entries,
-		sun4c_kfree_ring.num_entries,
-		used_user_entries,
-		sun4c_ufree_ring.num_entries,
-		sun4c_user_taken_entries,
-		max_user_taken_entries);
-
-	return len;
+	seq_printf(m, 
+		   "vacsize\t\t: %d bytes\n"
+		   "vachwflush\t: %s\n"
+		   "vaclinesize\t: %d bytes\n"
+		   "mmuctxs\t\t: %d\n"
+		   "mmupsegs\t: %d\n"
+		   "kernelpsegs\t: %d\n"
+		   "kfreepsegs\t: %d\n"
+		   "usedpsegs\t: %d\n"
+		   "ufreepsegs\t: %d\n"
+		   "user_taken\t: %d\n"
+		   "max_taken\t: %d\n",
+		   sun4c_vacinfo.num_bytes,
+		   (sun4c_vacinfo.do_hwflushes ? "yes" : "no"),
+		   sun4c_vacinfo.linesize,
+		   num_contexts,
+		   (invalid_segment + 1),
+		   sun4c_kernel_ring.num_entries,
+		   sun4c_kfree_ring.num_entries,
+		   used_user_entries,
+		   sun4c_ufree_ring.num_entries,
+		   sun4c_user_taken_entries,
+		   max_user_taken_entries);
 }
 
 /* Nothing below here should touch the mmu hardware nor the mmu_entry
@@ -2100,7 +2099,6 @@ static int sun4c_pte_present(pte_t pte)
 }
 static void sun4c_pte_clear(pte_t *ptep)	{ *ptep = __pte(0); }
 
-static int sun4c_pmd_none(pmd_t pmd)		{ return !pmd_val(pmd); }
 static int sun4c_pmd_bad(pmd_t pmd)
 {
 	return (((pmd_val(pmd) & ~PAGE_MASK) != PGD_TABLE) ||

@@ -1,8 +1,8 @@
 /******************************************************************* 
- * ident "$Id: idt77252.h,v 1.1 2001/11/05 21:52:22 ecd Exp $"
+ * ident "$Id: idt77252.h,v 1.2 2001/11/11 08:13:54 ecd Exp $"
  *
  * $Author: ecd $
- * $Date: 2001/11/05 21:52:22 $
+ * $Date: 2001/11/11 08:13:54 $
  *
  * Copyright (c) 2000 ATecoM GmbH 
  *
@@ -52,6 +52,7 @@
 /*                                                                           */
 /*****************************************************************************/
 
+#define DBG_RAW_CELL	0x00000400
 #define DBG_TINY	0x00000200
 #define DBG_GENERAL     0x00000100
 #define DBG_XGENERAL    0x00000080
@@ -63,7 +64,7 @@
 #define DBG_RX_DATA     0x00000002
 #define DBG_TX_DATA     0x00000001
 
-#ifdef DEBUG
+#ifdef CONFIG_ATM_IDT77252_DEBUG
 
 #define CPRINTK(args...)   do { if (debug & DBG_CLOSE_CONN) printk(args); } while(0)
 #define OPRINTK(args...)   do { if (debug & DBG_OPEN_CONN)  printk(args); } while(0)
@@ -75,6 +76,7 @@
 #define XPRINTK(args...)   do { if (debug & DBG_XGENERAL)   printk(args); } while(0)
 #define DPRINTK(args...)   do { if (debug & DBG_GENERAL)    printk(args); } while(0)
 #define NPRINTK(args...)   do { if (debug & DBG_TINY)	    printk(args); } while(0)
+#define RPRINTK(args...)   do { if (debug & DBG_RAW_CELL)   printk(args); } while(0)
 
 #else
 
@@ -88,6 +90,7 @@
 #define XPRINTK(args...)	do { } while(0)
 #define DPRINTK(args...)	do { } while(0)
 #define NPRINTK(args...)	do { } while(0)
+#define RPRINTK(args...)	do { } while(0)
 
 #endif
 
@@ -785,26 +788,17 @@ struct idt77252_dev
 
 
 struct idt77252_skb_prv {
-	struct scqe		tbd;	/* Transmit Buffer Descriptor */
-	u32			pool;	/* sb_pool index */
-	dma_addr_t		paddr;	/* DMA handle */
-	void			*vaddr;	/* DMA virtual address */
-	unsigned int		size;	/* DMA buffer size */
-	struct sk_buff		*next;	/* next PDU buffer */
+	struct scqe	tbd;	/* Transmit Buffer Descriptor */
+	dma_addr_t	paddr;	/* DMA handle */
+	u32		pool;	/* sb_pool handle */
 };
 
 #define IDT77252_PRV_TBD(skb)	\
 	(((struct idt77252_skb_prv *)(ATM_SKB(skb)+1))->tbd)
-#define IDT77252_PRV_POOL(skb)	\
-	(((struct idt77252_skb_prv *)(ATM_SKB(skb)+1))->pool)
 #define IDT77252_PRV_PADDR(skb)	\
 	(((struct idt77252_skb_prv *)(ATM_SKB(skb)+1))->paddr)
-#define IDT77252_PRV_VADDR(skb)	\
-	(((struct idt77252_skb_prv *)(ATM_SKB(skb)+1))->vaddr)
-#define IDT77252_PRV_SIZE(skb)	\
-	(((struct idt77252_skb_prv *)(ATM_SKB(skb)+1))->size)
-#define IDT77252_PRV_NEXT(skb)	\
-	(((struct idt77252_skb_prv *)(ATM_SKB(skb)+1))->next)
+#define IDT77252_PRV_POOL(skb)	\
+	(((struct idt77252_skb_prv *)(ATM_SKB(skb)+1))->pool)
 
 /*****************************************************************************/
 /*                                                                           */

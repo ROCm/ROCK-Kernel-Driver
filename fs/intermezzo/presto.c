@@ -1035,6 +1035,7 @@ int presto_clear_all_fsetroots(char *path)
                 goto put_out;
         }
 
+	error = 0;
         cache = fset->fset_cache;
         cache->cache_flags &= ~CACHE_FSETROOT_SET;
 

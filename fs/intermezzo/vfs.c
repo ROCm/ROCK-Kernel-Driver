@@ -162,6 +162,9 @@ static inline int presto_do_expect(struct lento_vfs_context *info, struct inode 
         return 1;
 }
 
+
+/* XXX fixme: this should not fail, all these dentries are in memory
+   when _we_ call this */
 int presto_settime(struct presto_file_set *fset, 
                    struct dentry *dentry, 
                    struct lento_vfs_context *ctx, 
@@ -194,8 +197,7 @@ int presto_settime(struct presto_file_set *fset,
 
         error = -EPERM;
         iops = filter_c2cdiops(fset->fset_cache->cache_filter); 
-        if (!iops &&
-            !iops->setattr) {
+        if (!iops) { 
                 EXIT;
                 return error;
         }
@@ -203,7 +205,7 @@ int presto_settime(struct presto_file_set *fset,
         if (iops->setattr != NULL)
                 error = iops->setattr(dentry, &iattr);
         else {
-		error = 0; // we suppose no error, Arthur
+		error = 0;
                 inode_setattr(dentry->d_inode, &iattr);
 	}
         EXIT;
@@ -389,64 +391,6 @@ exit_lock:
 exit:
         unlock_kernel();
         return error;
-}
-
-int presto_do_statfs (struct presto_file_set *fset, 
-                      struct statfs * buf)
-{
-        struct super_operations *sops;
-        struct super_block *sb;
-        int result;
-        ENTRY;
-
-        if ( !fset ) {
-                EXIT;
-                return -EINVAL;
-        }
-        if ( !fset->fset_cache ) {
-                EXIT;
-                return -EINVAL;
-        }
-        if ( !fset->fset_cache->cache_filter ) {
-                EXIT;
-                return -EINVAL;
-        }
-
-        sops = filter_c2csops(fset->fset_cache->cache_filter);
-        if ( ! sops ) {
-                EXIT;
-                return -EINVAL;
-        }
-        if ( ! fset->fset_cache->cache_mtde ) {
-                EXIT;
-                return -EINVAL;
-        }
-
-        if ( ! fset->fset_cache->cache_mtde->d_inode ) {
-                EXIT;
-                return -EINVAL;
-        }
-
-        if ( ! fset->fset_cache->cache_mtde->d_inode->i_sb ) {
-                EXIT;
-                return -EINVAL;
-        }
-        sb = fset->fset_cache->cache_mtde->d_inode->i_sb;
-
-        if (sops->statfs) {
-                mm_segment_t old_fs = get_fs();
-                memset(buf, 0, sizeof(struct statfs));
-                set_fs(get_ds());
-                lock_kernel();
-                result = sops->statfs(sb, buf);
-                unlock_kernel();
-                set_fs(old_fs);
-        } else {
-                result = -EINVAL;
-        }
-
-        EXIT;
-        return result;
 }
 
 int presto_do_create(struct presto_file_set *fset, struct dentry *dir,
@@ -1333,14 +1277,14 @@ int presto_do_rmdir(struct presto_file_set *fset, struct dentry *dir,
         dput(dentry);
 
         presto_debug_fail_blkdev(fset, PRESTO_OP_RMDIR | 0x10);
-        if ( do_kml )
+        if ( !error && do_kml )
                 error = presto_journal_rmdir(&rec, fset, dir, &tgt_dir_ver,
                                              &old_dir_ver,
                                              dentry->d_name.len,
                                              dentry->d_name.name);
 
         presto_debug_fail_blkdev(fset, PRESTO_OP_RMDIR | 0x20);
-        if ( do_expect ) 
+        if ( !error && do_expect ) 
                 error = presto_write_last_rcvd(&rec, fset, info);
 
         presto_debug_fail_blkdev(fset, PRESTO_OP_RMDIR | 0x30);
