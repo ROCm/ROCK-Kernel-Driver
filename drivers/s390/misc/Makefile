@@ -2,7 +2,6 @@
 # S/390 miscellaneous devices
 #
 
-obj-$(CONFIG_CHANDEV) += chandev.o
-export-objs += chandev.o
+# placeholder for stuff to come...
 
 include $(TOPDIR)/Rules.make
