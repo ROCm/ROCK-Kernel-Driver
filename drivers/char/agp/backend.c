@@ -46,6 +46,7 @@
 
 struct agp_bridge_data agp_bridge_dummy = { .type = NOT_SUPPORTED };
 struct agp_bridge_data *agp_bridge = &agp_bridge_dummy;
+EXPORT_SYMBOL(agp_bridge);
 
 int agp_backend_acquire(void)
 {

@@ -34,24 +34,6 @@ extern struct agp_bridge_data *agp_bridge;
 
 #define PFX "agpgart: "
 
-#ifdef CONFIG_SMP
-static void ipi_handler(void *null)
-{
-	flush_agp_cache();
-}
-
-static void __attribute__((unused)) global_cache_flush(void)
-{
-	if (on_each_cpu(ipi_handler, NULL, 1, 1) != 0)
-		panic(PFX "timed out waiting for the other CPUs!\n");
-}
-#else
-static void global_cache_flush(void)
-{
-	flush_agp_cache();
-}
-#endif	/* !CONFIG_SMP */
-
 enum aper_size_type {
 	U8_APER_SIZE,
 	U16_APER_SIZE,
@@ -411,6 +393,7 @@ int agp_unregister_driver(struct agp_driver *drv);
 u32 agp_collect_device_status(u32 mode, u32 command);
 void agp_device_command(u32 command, int agp_v3);
 int agp_3_0_node_enable(u32 mode, u32 minor);
+void global_cache_flush(void);
 
 /* Standard agp registers */
 #define AGPSTAT			0x4

@@ -1,6 +1,6 @@
 /*
  * AGPGART driver.
- * Copyright (C) 2002 Dave Jones.
+ * Copyright (C) 2002-2003 Dave Jones.
  * Copyright (C) 1999 Jeff Hartmann.
  * Copyright (C) 1999 Precision Insight, Inc.
  * Copyright (C) 1999 Xi Graphics, Inc.
@@ -48,13 +48,14 @@ int agp_memory_reserved;
 
 void agp_free_key(int key)
 {
-
 	if (key < 0)
 		return;
 
 	if (key < MAXKEY)
 		clear_bit(key, agp_bridge->key_list);
 }
+EXPORT_SYMBOL(agp_free_key);
+
 
 static int agp_get_key(void)
 {
@@ -67,6 +68,7 @@ static int agp_get_key(void)
 	}
 	return -1;
 }
+
 
 agp_memory *agp_create_memory(int scratch_pages)
 {
@@ -94,6 +96,8 @@ agp_memory *agp_create_memory(int scratch_pages)
 	new->num_scratch_pages = scratch_pages;
 	return new;
 }
+EXPORT_SYMBOL(agp_create_memory);
+
 
 void agp_free_memory(agp_memory * curr)
 {
@@ -118,8 +122,10 @@ void agp_free_memory(agp_memory * curr)
 	vfree(curr->memory);
 	kfree(curr);
 }
+EXPORT_SYMBOL(agp_free_memory);
 
 #define ENTRIES_PER_PAGE		(PAGE_SIZE / sizeof(unsigned long))
+
 
 agp_memory *agp_allocate_memory(size_t page_count, u32 type)
 {
@@ -160,8 +166,11 @@ agp_memory *agp_allocate_memory(size_t page_count, u32 type)
 
 	return new;
 }
+EXPORT_SYMBOL(agp_allocate_memory);
+
 
 /* End - Generic routines for handling agp_memory structures */
+
 
 static int agp_return_size(void)
 {
@@ -197,6 +206,7 @@ static int agp_return_size(void)
 	return current_size;
 }
 
+
 int agp_num_entries(void)
 {
 	int num_entries;
@@ -230,9 +240,10 @@ int agp_num_entries(void)
 		num_entries = 0;
 	return num_entries;
 }
+EXPORT_SYMBOL_GPL(agp_num_entries);
+
 
 /* Routine to copy over information structure */
-
 int agp_copy_info(agp_kern_info * info)
 {
 	memset(info, 0, sizeof(agp_kern_info));
@@ -254,8 +265,11 @@ int agp_copy_info(agp_kern_info * info)
 	info->page_mask = ~0UL;
 	return 0;
 }
+EXPORT_SYMBOL(agp_copy_info);
+
 
 /* End - Routine to copy over information structure */
+
 
 /*
  * Routines for handling swapping of agp_memory into the GATT -
@@ -284,6 +298,8 @@ int agp_bind_memory(agp_memory * curr, off_t pg_start)
 	curr->pg_start = pg_start;
 	return 0;
 }
+EXPORT_SYMBOL(agp_bind_memory);
+
 
 int agp_unbind_memory(agp_memory * curr)
 {
@@ -304,6 +320,7 @@ int agp_unbind_memory(agp_memory * curr)
 	curr->pg_start = 0;
 	return 0;
 }
+EXPORT_SYMBOL(agp_unbind_memory);
 
 /* End - Routines for handling swapping of agp_memory into the GATT */
 
@@ -364,6 +381,8 @@ u32 agp_collect_device_status(u32 mode, u32 command)
 
 	return command;
 }
+EXPORT_SYMBOL(agp_collect_device_status);
+
 
 void agp_device_command(u32 command, int agp_v3)
 {
@@ -384,6 +403,8 @@ void agp_device_command(u32 command, int agp_v3)
 		pci_write_config_dword(device, agp + PCI_AGP_COMMAND, command);
 	}
 }
+EXPORT_SYMBOL(agp_device_command);
+
 
 void agp_generic_enable(u32 mode)
 {
@@ -418,6 +439,8 @@ void agp_generic_enable(u32 mode)
 		       agp_bridge->capndx + PCI_AGP_COMMAND, command);
 	agp_device_command(command, 0);
 }
+EXPORT_SYMBOL(agp_generic_enable);
+
 
 int agp_generic_create_gatt_table(void)
 {
@@ -535,16 +558,22 @@ int agp_generic_create_gatt_table(void)
 
 	return 0;
 }
+EXPORT_SYMBOL(agp_generic_create_gatt_table);
+
 
 int agp_generic_suspend(void)
 {
 	return 0;
 }
+EXPORT_SYMBOL(agp_generic_suspend);
+
 
 void agp_generic_resume(void)
 {
 	return;
 }
+EXPORT_SYMBOL(agp_generic_resume);
+
 
 int agp_generic_free_gatt_table(void)
 {
@@ -592,6 +621,8 @@ int agp_generic_free_gatt_table(void)
 	free_pages((unsigned long) agp_bridge->gatt_table_real, page_order);
 	return 0;
 }
+EXPORT_SYMBOL(agp_generic_free_gatt_table);
+
 
 int agp_generic_insert_memory(agp_memory * mem, off_t pg_start, int type)
 {
@@ -657,6 +688,8 @@ int agp_generic_insert_memory(agp_memory * mem, off_t pg_start, int type)
 	agp_bridge->tlb_flush(mem);
 	return 0;
 }
+EXPORT_SYMBOL(agp_generic_insert_memory);
+
 
 int agp_generic_remove_memory(agp_memory * mem, off_t pg_start, int type)
 {
@@ -676,11 +709,15 @@ int agp_generic_remove_memory(agp_memory * mem, off_t pg_start, int type)
 	agp_bridge->tlb_flush(mem);
 	return 0;
 }
+EXPORT_SYMBOL(agp_generic_remove_memory);
+
 
 agp_memory *agp_generic_alloc_by_type(size_t page_count, int type)
 {
 	return NULL;
 }
+EXPORT_SYMBOL(agp_generic_alloc_by_type);
+
 
 void agp_generic_free_by_type(agp_memory * curr)
 {
@@ -690,6 +727,8 @@ void agp_generic_free_by_type(agp_memory * curr)
 	agp_free_key(curr->key);
 	kfree(curr);
 }
+EXPORT_SYMBOL(agp_generic_free_by_type);
+
 
 /* 
  * Basic Page Allocation Routines -
@@ -715,6 +754,8 @@ void *agp_generic_alloc_page(void)
 	atomic_inc(&agp_bridge->current_memory_agp);
 	return page_address(page);
 }
+EXPORT_SYMBOL(agp_generic_alloc_page);
+
 
 void agp_generic_destroy_page(void *addr)
 {
@@ -730,6 +771,7 @@ void agp_generic_destroy_page(void *addr)
 	free_page((unsigned long)addr);
 	atomic_dec(&agp_bridge->current_memory_agp);
 }
+EXPORT_SYMBOL(agp_generic_destroy_page);
 
 /* End Basic Page Allocation Routines */
 
@@ -739,32 +781,23 @@ void agp_enable(u32 mode)
 		return;
 	agp_bridge->agp_enable(mode);
 }
-
-EXPORT_SYMBOL(agp_free_memory);
-EXPORT_SYMBOL(agp_allocate_memory);
-EXPORT_SYMBOL(agp_copy_info);
-EXPORT_SYMBOL(agp_create_memory);
-EXPORT_SYMBOL(agp_bind_memory);
-EXPORT_SYMBOL(agp_unbind_memory);
-EXPORT_SYMBOL(agp_free_key);
 EXPORT_SYMBOL(agp_enable);
-EXPORT_SYMBOL(agp_bridge);
 
-EXPORT_SYMBOL(agp_generic_alloc_page);
-EXPORT_SYMBOL(agp_generic_destroy_page);
-EXPORT_SYMBOL(agp_generic_suspend);
-EXPORT_SYMBOL(agp_generic_resume);
-EXPORT_SYMBOL(agp_generic_enable);
-EXPORT_SYMBOL(agp_generic_create_gatt_table);
-EXPORT_SYMBOL(agp_generic_free_gatt_table);
-EXPORT_SYMBOL(agp_generic_insert_memory);
-EXPORT_SYMBOL(agp_generic_remove_memory);
-EXPORT_SYMBOL(agp_generic_alloc_by_type);
-EXPORT_SYMBOL(agp_generic_free_by_type);
+#ifdef CONFIG_SMP
+static void ipi_handler(void *null)
+{
+	flush_agp_cache();
+}
+#endif
+
+void global_cache_flush(void)
+{
+#ifdef CONFIG_SMP
+	if (on_each_cpu(ipi_handler, NULL, 1, 1) != 0)
+		panic(PFX "timed out waiting for the other CPUs!\n");
+#else
+	flush_agp_cache();
+#endif
+}
 EXPORT_SYMBOL(global_cache_flush);
-
-EXPORT_SYMBOL(agp_device_command);
-EXPORT_SYMBOL(agp_collect_device_status);
-
-EXPORT_SYMBOL_GPL(agp_num_entries);
 
