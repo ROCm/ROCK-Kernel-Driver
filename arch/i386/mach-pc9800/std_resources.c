@@ -1,11 +1,11 @@
 /*
- *  include/asm-i386/mach-pc9800/mach_resources.h
- *
  *  Machine specific resource allocation for PC-9800.
  *  Written by Osamu Tomita <tomita@cinet.co.jp>
  */
-#ifndef _MACH_RESOURCES_H
-#define _MACH_RESOURCES_H
+
+#include <linux/ioport.h>
+#include <asm/io.h>
+#include <asm/std_resources.h>
 
 static char str_pic1[] = "pic1";
 static char str_dma[] = "dma";
@@ -120,15 +120,13 @@ static struct resource rom_resources[MAXROMS] = {
 	{ "System ROM", 0xe8000, 0xfffff, IORESOURCE_BUSY }
 };
 
-static inline void probe_video_rom(int roms)
-{
-	/* PC-9800 has no video ROM */
-}
-
-static inline void probe_extension_roms(int roms)
+void __init probe_roms(void)
 {
 	int i;
 	__u8 *xrom_id;
+	int roms = 1;
+
+	request_resource(&iomem_resource, rom_resources+0);
 
 	xrom_id = (__u8 *) isa_bus_to_virt(PC9800SCA_XROM_ID + 0x10);
 
@@ -151,7 +149,7 @@ static inline void probe_extension_roms(int roms)
 	}
 }
 
-static inline void request_graphics_resource(void)
+void __init request_graphics_resource(void)
 {
 	int i;
 
@@ -188,4 +186,10 @@ static inline void request_graphics_resource(void)
 	}
 }
 
-#endif /* !_MACH_RESOURCES_H */
+void __init request_standard_io_resources(void)
+{
+	int i;
+
+	for (i = 0; i < STANDARD_IO_RESOURCES; i++)
+		request_resource(&ioport_resource, standard_io_resources+i);
+}

@@ -1,13 +1,13 @@
 /*
- *  include/asm-i386/mach-default/mach_resources.h
- *
  *  Machine specific resource allocation for generic.
  *  Split out from setup.c by Osamu Tomita <tomita@cinet.co.jp>
  */
-#ifndef _MACH_RESOURCES_H
-#define _MACH_RESOURCES_H
 
-struct resource standard_io_resources[] = {
+#include <linux/ioport.h>
+#include <asm/io.h>
+#include <asm/std_resources.h>
+
+static struct resource standard_io_resources[] = {
 	{ "dma1", 0x00, 0x1f, IORESOURCE_BUSY },
 	{ "pic1", 0x20, 0x21, IORESOURCE_BUSY },
 	{ "timer", 0x40, 0x5f, IORESOURCE_BUSY },
@@ -31,11 +31,13 @@ static struct resource rom_resources[MAXROMS] = {
 
 #define romsignature(x) (*(unsigned short *)(x) == 0xaa55)
 
-static inline void probe_video_rom(int roms)
+void __init probe_roms(void)
 {
 	unsigned long base;
 	unsigned char *romstart;
+	int roms = 1;
 
+	request_resource(&iomem_resource, rom_resources+0);
 
 	/* Video ROM is standard at C000:0000 - C7FF:0000, check signature */
 	for (base = 0xC0000; base < 0xE0000; base += 2048) {
@@ -46,12 +48,6 @@ static inline void probe_video_rom(int roms)
 		roms++;
 		break;
 	}
-}
-
-static inline void probe_extension_roms(int roms)
-{
-	unsigned long base;
-	unsigned char *romstart;
 
 	/* Extension roms at C800:0000 - DFFF:0000 */
 	for (base = 0xC8000; base < 0xE0000; base += 2048) {
@@ -98,9 +94,15 @@ static inline void probe_extension_roms(int roms)
 	}
 }
 
-static inline void request_graphics_resource(void)
+void __init request_graphics_resource(void)
 {
 	request_resource(&iomem_resource, &vram_resource);
 }
 
-#endif /* !_MACH_RESOURCES_H */
+void __init request_standard_io_resources(void)
+{
+	int i;
+
+	for (i = 0; i < STANDARD_IO_RESOURCES; i++)
+		request_resource(&ioport_resource, standard_io_resources+i);
+}
