@@ -251,7 +251,9 @@ void __init setup_arch(char **cmdline_p)
 #endif
 
 #ifdef CONFIG_DISCONTIGMEM
-	numnodes = 2;
+	nodes_clear(node_online_map);
+	node_set_online(0);
+	node_set_online(1);
 #endif	/* CONFIG_DISCONTIGMEM */
 
 	init_mm.start_code = (unsigned long) _text;
