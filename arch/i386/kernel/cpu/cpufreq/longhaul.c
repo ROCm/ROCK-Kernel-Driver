@@ -1,5 +1,5 @@
 /*
- *  (C) 2001-2003  Dave Jones. <davej@codemonkey.org.uk>
+ *  (C) 2001-2004  Dave Jones. <davej@codemonkey.org.uk>
  *  (C) 2002  Padraig Brady. <padraig@antefacto.com>
  *
  *  Licensed under the terms of the GNU GPL License version 2.
