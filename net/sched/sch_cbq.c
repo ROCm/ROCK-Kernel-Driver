@@ -1746,15 +1746,18 @@ static void cbq_destroy_filters(struct cbq_class *cl)
 	}
 }
 
-static void cbq_destroy_class(struct cbq_class *cl)
+static void cbq_destroy_class(struct Qdisc *sch, struct cbq_class *cl)
 {
+	struct cbq_sched_data *q = qdisc_priv(sch);
+
 	cbq_destroy_filters(cl);
 	qdisc_destroy(cl->q);
 	qdisc_put_rtab(cl->R_tab);
 #ifdef CONFIG_NET_ESTIMATOR
 	qdisc_kill_estimator(&cl->stats);
 #endif
-	kfree(cl);
+	if (cl != &q->link)
+		kfree(cl);
 }
 
 static void
@@ -1777,8 +1780,7 @@ cbq_destroy(struct Qdisc* sch)
 
 		for (cl = q->classes[h]; cl; cl = next) {
 			next = cl->next;
-			if (cl != &q->link)
-				cbq_destroy_class(cl);
+			cbq_destroy_class(sch, cl);
 		}
 	}
 
@@ -1799,7 +1801,7 @@ static void cbq_put(struct Qdisc *sch, unsigned long arg)
 		spin_unlock_bh(&sch->dev->queue_lock);
 #endif
 
-		cbq_destroy_class(cl);
+		cbq_destroy_class(sch, cl);
 	}
 }
 
@@ -2035,7 +2037,7 @@ static int cbq_delete(struct Qdisc *sch, unsigned long arg)
 	sch_tree_unlock(sch);
 
 	if (--cl->refcnt == 0)
-		cbq_destroy_class(cl);
+		cbq_destroy_class(sch, cl);
 
 	return 0;
 }
