@@ -140,8 +140,12 @@ static unsigned int ipt_dnat_target(struct sk_buff **pskb,
 	struct ip_conntrack *ct;
 	enum ip_conntrack_info ctinfo;
 
+#ifdef CONFIG_IP_NF_NAT_LOCAL
 	IP_NF_ASSERT(hooknum == NF_IP_PRE_ROUTING
 		     || hooknum == NF_IP_LOCAL_OUT);
+#else
+	IP_NF_ASSERT(hooknum == NF_IP_PRE_ROUTING);
+#endif
 
 	ct = ip_conntrack_get(*pskb, &ctinfo);
 
@@ -210,7 +214,7 @@ static int ipt_dnat_checkentry(const char *tablename,
 
 	/* Only allow these for NAT. */
 	if (strcmp(tablename, "nat") != 0) {
-		DEBUGP("SNAT: wrong table %s\n", tablename);
+		DEBUGP("DNAT: wrong table %s\n", tablename);
 		return 0;
 	}
 
@@ -218,6 +222,14 @@ static int ipt_dnat_checkentry(const char *tablename,
 		DEBUGP("DNAT: hook mask 0x%x bad\n", hook_mask);
 		return 0;
 	}
+	
+#ifndef CONFIG_IP_NF_NAT_LOCAL
+	if (hook_mask & (1 << NF_IP_LOCAL_OUT)) {
+		DEBUGP("DNAT: CONFIG_IP_NF_NAT_LOCAL not enabled\n");
+		return 0;
+	}
+#endif
+
 	return 1;
 }
 

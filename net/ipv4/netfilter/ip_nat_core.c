@@ -314,6 +314,7 @@ find_best_ips_proto(struct ip_conntrack_tuple *tuple,
 			 * do_extra_mangle last time. */
 			*other_ipp = saved_ip;
 
+#ifdef CONFIG_IP_NF_NAT_LOCAL
 			if (hooknum == NF_IP_LOCAL_OUT
 			    && *var_ipp != orig_dstip
 			    && !do_extra_mangle(*var_ipp, other_ipp)) {
@@ -324,6 +325,7 @@ find_best_ips_proto(struct ip_conntrack_tuple *tuple,
 				 * anyway. */
 				continue;
 			}
+#endif
 
 			/* Count how many others map onto this. */
 			score = count_maps(tuple->src.ip, tuple->dst.ip,
@@ -367,11 +369,13 @@ find_best_ips_proto_fast(struct ip_conntrack_tuple *tuple,
 		else {
 			/* Only do extra mangle when required (breaks
                            socket binding) */
+#ifdef CONFIG_IP_NF_NAT_LOCAL
 			if (tuple->dst.ip != mr->range[0].min_ip
 			    && hooknum == NF_IP_LOCAL_OUT
 			    && !do_extra_mangle(mr->range[0].min_ip,
 						&tuple->src.ip))
 				return NULL;
+#endif
 			tuple->dst.ip = mr->range[0].min_ip;
 		}
 	}
@@ -494,7 +498,10 @@ helper_cmp(const struct ip_nat_helper *helper,
 static unsigned int opposite_hook[NF_IP_NUMHOOKS]
 = { [NF_IP_PRE_ROUTING] = NF_IP_POST_ROUTING,
     [NF_IP_POST_ROUTING] = NF_IP_PRE_ROUTING,
-    [NF_IP_LOCAL_OUT] = NF_IP_POST_ROUTING
+#ifdef CONFIG_IP_NF_NAT_LOCAL
+    [NF_IP_LOCAL_OUT] = NF_IP_LOCAL_IN,
+    [NF_IP_LOCAL_IN] = NF_IP_LOCAL_OUT,
+#endif
 };
 
 unsigned int
