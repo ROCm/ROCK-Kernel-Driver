@@ -600,7 +600,7 @@ static int cpufreq_resume(struct sys_device * sysdev)
 	if (!cpu_policy)
 		return -EINVAL;
 
-	if (!cpufreq_driver->flags & CPUFREQ_CONST_LOOPS) {
+	if (!(cpufreq_driver->flags & CPUFREQ_CONST_LOOPS)) {
 		unsigned int cur_freq = 0;
 
 		if (cpufreq_driver->get)
