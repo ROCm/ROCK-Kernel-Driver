@@ -913,13 +913,8 @@ linvfs_get_block_core(
 	ssize_t			size;
 	loff_t			offset = (loff_t)iblock << inode->i_blkbits;
 
-	/* If we are doing writes at the end of the file,
-	 * allocate in chunks
-	 */
 	if (blocks)
 		size = blocks << inode->i_blkbits;
-	else if (create && (offset >= i_size_read(inode)))
-		size = 1 << XFS_WRITE_IO_LOG;
 	else
 		size = 1 << inode->i_blkbits;
 
