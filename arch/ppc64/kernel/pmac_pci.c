@@ -504,7 +504,7 @@ static void __init pmac_process_bridge_OF_ranges(struct pci_controller *hose,
 	dt_ranges = (unsigned int *) get_property(dev, "ranges", &rlen);
 	if (!dt_ranges)
 		return;
-	/*	lc_ranges = (unsigned int *) alloc_bootmem(rlen);*/
+	/*	lc_ranges = alloc_bootmem(rlen);*/
 	lc_ranges = static_lc_ranges;
 	if (!lc_ranges)
 		return; /* what can we do here ? */
@@ -614,7 +614,7 @@ static int __init add_bridge(struct device_node *dev)
        			       dev->full_name);
        	}
 
-	hose = (struct pci_controller *)alloc_bootmem(sizeof(struct pci_controller));
+	hose = alloc_bootmem(sizeof(struct pci_controller));
 	if (hose == NULL)
 		return -ENOMEM;
        	pci_setup_pci_controller(hose);
@@ -623,8 +623,8 @@ static int __init add_bridge(struct device_node *dev)
        	hose->first_busno = bus_range ? bus_range[0] : 0;
        	hose->last_busno = bus_range ? bus_range[1] : 0xff;
 
-	of_prop = (struct property *)alloc_bootmem(sizeof(struct property) +
-			sizeof(hose->global_number));        
+	of_prop = alloc_bootmem(sizeof(struct property) +
+				sizeof(hose->global_number));
 	if (of_prop) {
 		memset(of_prop, 0, sizeof(struct property));
 		of_prop->name = "linux,pci-domain";

@@ -308,12 +308,12 @@ static struct pci_controller * __init alloc_phb(struct device_node *dev,
 	struct pci_controller *phb;
 	struct property *of_prop;
 
-	phb = (struct pci_controller *)alloc_bootmem(sizeof(struct pci_controller));
+	phb = alloc_bootmem(sizeof(struct pci_controller));
 	if (phb == NULL)
 		return NULL;
 
-	of_prop = (struct property *)alloc_bootmem(sizeof(struct property) +
-			sizeof(phb->global_number));
+	of_prop = alloc_bootmem(sizeof(struct property) +
+				sizeof(phb->global_number));
 	if (!of_prop)
 		return NULL;
 
