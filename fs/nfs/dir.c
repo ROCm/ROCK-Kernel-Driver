@@ -249,6 +249,24 @@ int readdir_search_pagecache(nfs_readdir_descriptor_t *desc)
 	return res;
 }
 
+static unsigned int nfs_type2dtype[] = {
+	DT_UNKNOWN,
+	DT_REG,
+	DT_DIR,
+	DT_BLK,
+	DT_CHR,
+	DT_LNK,
+	DT_SOCK,
+	DT_UNKNOWN,
+	DT_FIFO
+};
+
+static inline
+unsigned int nfs_type_to_d_type(enum nfs_ftype type)
+{
+	return nfs_type2dtype[type];
+}
+
 /*
  * Once we've found the start of the dirent within a page: fill 'er up...
  */
@@ -265,11 +283,17 @@ int nfs_do_filldir(nfs_readdir_descriptor_t *desc, void *dirent,
 	dfprintk(VFS, "NFS: nfs_do_filldir() filling starting @ cookie %Lu\n", (long long)desc->target);
 
 	for(;;) {
+		unsigned d_type = DT_UNKNOWN;
 		/* Note: entry->prev_cookie contains the cookie for
 		 *	 retrieving the current dirent on the server */
 		fileid = nfs_fileid_to_ino_t(entry->ino);
+
+		/* Use readdirplus info */
+		if (desc->plus && (entry->fattr->valid & NFS_ATTR_FATTR))
+			d_type = nfs_type_to_d_type(entry->fattr->type);
+
 		res = filldir(dirent, entry->name, entry->len, 
-			      entry->prev_cookie, fileid, DT_UNKNOWN);
+			      entry->prev_cookie, fileid, d_type);
 		if (res < 0)
 			break;
 		file->f_pos = desc->target = entry->cookie;
