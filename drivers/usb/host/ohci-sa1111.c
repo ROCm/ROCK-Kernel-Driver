@@ -413,7 +413,7 @@ static int __init ohci_hcd_sa1111_init (void)
 
 static void __exit ohci_hcd_sa1111_cleanup (void)
 {
-	remove_driver(&ohci_hcd_sa1111_driver.drv);
+	driver_unregister(&ohci_hcd_sa1111_driver.drv);
 }
 
 module_init (ohci_hcd_sa1111_init);

@@ -856,7 +856,7 @@ static void __exit exit_sr(void)
 		kfree(scsi_CDs);
 
 	sr_template.dev_max = 0;
-	remove_driver(&sr_template.scsi_driverfs_driver);
+	driver_unregister(&sr_template.scsi_driverfs_driver);
 }
 
 module_init(init_sr);
