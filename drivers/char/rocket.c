@@ -1330,7 +1330,7 @@ static char *rp_tty_name(struct tty_struct *tty, char *buf)
 {
 	if (tty)
 		sprintf(buf, "%s%d", tty->driver.name,
-			MINOR(tty->device) - tty->driver.minor_start +
+			minor(tty->device) - tty->driver.minor_start +
 			tty->driver.name_base);
 	else
 		strcpy(buf, "NULL tty");
@@ -1794,6 +1794,10 @@ int __init register_PCI(int i, unsigned int bus, unsigned int device_fn)
 		str = "8-port Modem";
 		max_num_aiops = 1;
 		break;
+	case 0x8:
+		str = "mysterious 8 port";
+		max_num_aiops = 1;
+		break;
 	default:
 		str = "(unknown/unsupported)";
 		max_num_aiops = 0;
@@ -1870,6 +1874,10 @@ static int __init init_PCI(int boards_found)
 				count++;
 		if(!pcibios_find_device(PCI_VENDOR_ID_RP,
 			PCI_DEVICE_ID_RP8M, i, &bus, &device_fn)) 
+			if(register_PCI(count+boards_found, bus, device_fn))
+				count++;
+		if(!pcibios_find_device(PCI_VENDOR_ID_RP,
+			0x8, i, &bus, &device_fn)) 
 			if(register_PCI(count+boards_found, bus, device_fn))
 				count++;
 	}
@@ -2072,6 +2080,7 @@ int __init rp_init(void)
 	if (retval < 0) {
 		printk("Couldn't install Rocketport callout driver "
 		       "(error %d)\n", -retval);
+		release_region(controller, 4);
 		return -1;
 	}
 
@@ -2079,6 +2088,7 @@ int __init rp_init(void)
 	if (retval < 0) {
 		printk("Couldn't install tty Rocketport driver "
 		       "(error %d)\n", -retval);
+		release_region(controller, 4);
 		return -1;
 	}
 #ifdef ROCKET_DEBUG_OPEN
