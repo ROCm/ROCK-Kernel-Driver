@@ -85,7 +85,7 @@ static int pc_debug = PCMCIA_DEBUG;
 module_param(pc_debug, int, 0);
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
 static char *version =
-"sym53c500_cs.c 0.9a 2004/05/04 (Bob Tracy)";
+"sym53c500_cs.c 0.9b 2004/05/10 (Bob Tracy)";
 #else
 #define DEBUG(n, args...)
 #endif
@@ -668,22 +668,6 @@ SYM53C500_biosparm(struct scsi_device *disk,
 }
 
 static ssize_t
-SYM53C500_show_irq(struct class_device *cdev, char *buf)
-{
-	struct Scsi_Host *SHp = class_to_shost(cdev);
-
-	return snprintf(buf, 4, "%d\n", SHp->irq);
-}
-
-static ssize_t
-SYM53C500_show_ioport(struct class_device *cdev, char *buf)
-{
-	struct Scsi_Host *SHp = class_to_shost(cdev);
-
-	return snprintf(buf, 8, "0x%lx\n", SHp->io_port);
-}
-
-static ssize_t
 SYM53C500_show_pio(struct class_device *cdev, char *buf)
 {
 	struct Scsi_Host *SHp = class_to_shost(cdev);
@@ -714,22 +698,6 @@ SYM53C500_store_pio(struct class_device *cdev, const char *buf, size_t count)
 *  SCSI HBA device attributes we want to
 *  make available via sysfs.
 */
-static struct class_device_attribute SYM53C500_irq_attr = {
-	.attr = {
-		.name = "irq",
-		.mode = S_IRUGO,
-	},
-	.show = SYM53C500_show_irq,
-};
-
-static struct class_device_attribute SYM53C500_ioport_attr = {
-	.attr = {
-		.name = "ioport",
-		.mode = S_IRUGO,
-	},
-	.show = SYM53C500_show_ioport,
-};
-
 static struct class_device_attribute SYM53C500_pio_attr = {
 	.attr = {
 		.name = "fast_pio",
@@ -740,8 +708,6 @@ static struct class_device_attribute SYM53C500_pio_attr = {
 };
 
 static struct class_device_attribute *SYM53C500_shost_attrs[] = {
-	&SYM53C500_irq_attr,
-	&SYM53C500_ioport_attr,
 	&SYM53C500_pio_attr,
 	NULL,
 };
