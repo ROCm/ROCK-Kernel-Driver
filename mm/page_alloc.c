@@ -461,7 +461,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	/* here we're in the low on memory slow path */
 
 rebalance:
-	if (current->flags & (PF_MEMALLOC | PF_MEMDIE)) {
+	if ((current->flags & (PF_MEMALLOC | PF_MEMDIE)) && !in_interrupt()) {
 		/* go through the zonelist yet again, ignoring mins */
 		for (i = 0; zones[i] != NULL; i++) {
 			struct zone *z = zones[i];
@@ -470,13 +470,6 @@ rebalance:
 			if (page)
 				return page;
 		}
-nopage:
-		if (!(current->flags & PF_NOWARN)) {
-			printk("%s: page allocation failure."
-				" order:%d, mode:0x%x\n",
-				current->comm, order, gfp_mask);
-		}
-		return NULL;
 	}
 
 	/* Atomic allocations - we can't balance anything */
@@ -502,13 +495,21 @@ nopage:
 		}
 	}
 
-	/* Don't let big-order allocations loop */
-	if (order > 3)
-		goto nopage;
+	/*
+	 * Don't let big-order allocations loop.  Yield for kswapd, try again.
+	 */
+	if (order <= 3) {
+		yield();
+		goto rebalance;
+	}
 
-	/* Yield for kswapd, and try again */
-	yield();
-	goto rebalance;
+nopage:
+	if (!(current->flags & PF_NOWARN)) {
+		printk("%s: page allocation failure."
+			" order:%d, mode:0x%x\n",
+			current->comm, order, gfp_mask);
+	}
+	return NULL;
 }
 
 /*
