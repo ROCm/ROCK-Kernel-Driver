@@ -32,6 +32,8 @@
 #include <linux/sysctl.h>
 #include <linux/cpu.h>
 
+#include <asm/tlbflush.h>
+
 DECLARE_BITMAP(node_online_map, MAX_NUMNODES);
 DECLARE_BITMAP(memblk_online_map, MAX_NR_MEMBLKS);
 struct pglist_data *pgdat_list;
@@ -265,6 +267,7 @@ void __free_pages_ok(struct page *page, unsigned int order)
 	mod_page_state(pgfree, 1 << order);
 	free_pages_check(__FUNCTION__, page);
 	list_add(&page->list, &list);
+	kernel_map_pages(page, 1<<order, 0);
 	free_pages_bulk(page_zone(page), 1, &list, order);
 }
 
@@ -440,6 +443,7 @@ static void free_hot_cold_page(struct page *page, int cold)
 	struct per_cpu_pages *pcp;
 	unsigned long flags;
 
+	kernel_map_pages(page, 1, 0);
 	inc_page_state(pgfree);
 	free_pages_check(__FUNCTION__, page);
 	pcp = &zone->pageset[get_cpu()].pcp[cold];
@@ -556,7 +560,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 				(!wait && z->free_pages >= z->pages_high)) {
 			page = buffered_rmqueue(z, order, cold);
 			if (page)
-				return page;
+		       		goto got_pg;
 		}
 		min += z->pages_low * sysctl_lower_zone_protection;
 	}
@@ -579,7 +583,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 				(!wait && z->free_pages >= z->pages_high)) {
 			page = buffered_rmqueue(z, order, cold);
 			if (page)
-				return page;
+				goto got_pg;
 		}
 		min += local_min * sysctl_lower_zone_protection;
 	}
@@ -594,7 +598,7 @@ rebalance:
 
 			page = buffered_rmqueue(z, order, cold);
 			if (page)
-				return page;
+				goto got_pg;
 		}
 		goto nopage;
 	}
@@ -622,7 +626,7 @@ rebalance:
 				(!wait && z->free_pages >= z->pages_high)) {
 			page = buffered_rmqueue(z, order, cold);
 			if (page)
-				return page;
+				goto got_pg;
 		}
 		min += z->pages_low * sysctl_lower_zone_protection;
 	}
@@ -653,6 +657,9 @@ nopage:
 			current->comm, order, gfp_mask);
 	}
 	return NULL;
+got_pg:
+	kernel_map_pages(page, 1 << order, 1);
+	return page;
 }
 
 /*

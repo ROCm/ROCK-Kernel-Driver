@@ -609,5 +609,13 @@ extern struct page * follow_page(struct mm_struct *mm, unsigned long address,
 		int write);
 extern int remap_page_range(struct vm_area_struct *vma, unsigned long from,
 		unsigned long to, unsigned long size, pgprot_t prot);
+
+#ifndef CONFIG_DEBUG_PAGEALLOC
+static inline void
+kernel_map_pages(struct page *page, int numpages, int enable)
+{
+}
+#endif
+
 #endif /* __KERNEL__ */
 #endif /* _LINUX_MM_H */

@@ -114,6 +114,8 @@ extern kmem_cache_t	*signal_cachep;
 extern kmem_cache_t	*sighand_cachep;
 extern kmem_cache_t	*bio_cachep;
 
+void ptrinfo(unsigned long addr);
+
 #endif	/* __KERNEL__ */
 
 #endif	/* _LINUX_SLAB_H */
