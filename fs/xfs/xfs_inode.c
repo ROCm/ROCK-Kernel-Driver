@@ -1714,7 +1714,7 @@ xfs_igrow_start(
 	 * and any blocks between the old and new file sizes.
 	 */
 	error = xfs_zero_eof(XFS_ITOV(ip), &ip->i_iocore, new_size, isize,
-				new_size, NULL);
+				new_size);
 	return error;
 }
 

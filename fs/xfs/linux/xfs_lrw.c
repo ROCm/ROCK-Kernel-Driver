@@ -44,9 +44,9 @@
 #define XFS_STRAT_WRITE_IMAPS	2
 
 STATIC int xfs_iomap_read(xfs_iocore_t *, loff_t, size_t, int, pb_bmap_t *,
-			int *, struct pm *);
+			int *);
 STATIC int xfs_iomap_write(xfs_iocore_t *, loff_t, size_t, pb_bmap_t *,
-			int *, int, struct pm *);
+			int *, int);
 STATIC int xfs_iomap_write_delay(xfs_iocore_t *, loff_t, size_t, pb_bmap_t *,
 			int *, int, int);
 STATIC int xfs_iomap_write_direct(xfs_iocore_t *, loff_t, size_t, pb_bmap_t *,
@@ -233,8 +233,7 @@ xfs_zero_last_block(
 	xfs_iocore_t	*io,
 	xfs_off_t	offset,
 	xfs_fsize_t	isize,
-	xfs_fsize_t	end_size,
-	struct pm	*pmp)
+	xfs_fsize_t	end_size)
 {
 	xfs_fileoff_t	last_fsb;
 	xfs_mount_t	*mp;
@@ -313,8 +312,7 @@ xfs_zero_eof(
 	xfs_iocore_t	*io,
 	xfs_off_t	offset,		/* starting I/O offset */
 	xfs_fsize_t	isize,		/* current inode size */
-	xfs_fsize_t	end_size,	/* terminal inode size */
-	struct pm	*pmp)
+	xfs_fsize_t	end_size)	/* terminal inode size */
 {
 	struct inode	*ip = LINVFS_GET_IP(vp);
 	xfs_fileoff_t	start_zero_fsb;
@@ -340,7 +338,7 @@ xfs_zero_eof(
 	 * First handle zeroing the block on which isize resides.
 	 * We only zero a part of that block so it is handled specially.
 	 */
-	error = xfs_zero_last_block(ip, io, offset, isize, end_size, pmp);
+	error = xfs_zero_last_block(ip, io, offset, isize, end_size);
 	if (error) {
 		ASSERT(ismrlocked(io->io_lock, MR_UPDATE));
 		ASSERT(ismrlocked(io->io_iolock, MR_UPDATE));
@@ -596,7 +594,7 @@ start:
 
 	if (!direct && (*offset > isize && isize)) {
 		error = xfs_zero_eof(BHV_TO_VNODE(bdp), io, *offset,
-			isize, *offset + size, NULL);
+			isize, *offset + size);
 		if (error) {
 			xfs_iunlock(xip, XFS_ILOCK_EXCL|iolock);
 			return(-error);
@@ -790,7 +788,7 @@ xfs_bmap(bhv_desc_t	*bdp,
 	if (flags & PBF_READ) {
 		lockmode = xfs_ilock_map_shared(ip);
 		error = xfs_iomap_read(&ip->i_iocore, offset, count,
-				 XFS_BMAPI_ENTIRE, pbmapp, npbmaps, NULL);
+				 XFS_BMAPI_ENTIRE, pbmapp, npbmaps);
 		xfs_iunlock_map_shared(ip, lockmode);
 	} else { /* PBF_WRITE */
 		ASSERT(flags & PBF_WRITE);
@@ -812,7 +810,7 @@ xfs_bmap(bhv_desc_t	*bdp,
 		}
 retry:
 		error = xfs_iomap_write(&ip->i_iocore, offset, count,
-					pbmapp, npbmaps, flags, NULL);
+					pbmapp, npbmaps, flags);
 		/* xfs_iomap_write unlocks/locks/unlocks */
 
 		if (error == ENOSPC) {
@@ -1145,8 +1143,7 @@ xfs_iomap_read(
 	size_t		count,
 	int		flags,
 	pb_bmap_t	*pbmapp,
-	int		*npbmaps,
-	struct pm	*pmp)
+	int		*npbmaps)
 {
 	xfs_fileoff_t	offset_fsb;
 	xfs_fileoff_t	end_fsb;
@@ -1199,8 +1196,7 @@ xfs_iomap_write(
 	size_t		count,
 	pb_bmap_t	*pbmapp,
 	int		*npbmaps,
-	int		ioflag,
-	struct pm	*pmp)
+	int		ioflag)
 {
 	int		maps;
 	int		error = 0;
@@ -1217,7 +1213,7 @@ xfs_iomap_write(
 	 */
 
 	found = 0;
-	error = xfs_iomap_read(io, offset, count, flags, pbmapp, npbmaps, NULL);
+	error = xfs_iomap_read(io, offset, count, flags, pbmapp, npbmaps);
 	if (error)
 		goto out;
 

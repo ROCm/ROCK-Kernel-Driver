@@ -45,7 +45,7 @@ extern int xfsbdstrat (struct xfs_mount *, struct xfs_buf *);
 extern int xfs_bdstrat_cb (struct xfs_buf *);
 
 extern int xfs_zero_eof (vnode_t *, struct xfs_iocore *, xfs_off_t,
-				xfs_fsize_t, xfs_fsize_t, struct pm *);
+				xfs_fsize_t, xfs_fsize_t);
 extern ssize_t xfs_read (
 	struct bhv_desc		*bdp,
 	struct file		*filp,

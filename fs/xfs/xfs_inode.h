@@ -98,7 +98,6 @@ struct xfs_inode_log_item;
 struct xfs_mount;
 struct xfs_trans;
 struct xfs_dquot;
-struct pm;
 
 
 /*

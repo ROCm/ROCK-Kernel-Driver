@@ -362,7 +362,7 @@ xfs_inval_cached_pages(
 		XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
 		isize = XFS_SIZE(mp, io);
 		if (offset > isize) {
-			xfs_zero_eof(vp, io, offset, isize, offset, NULL);
+			xfs_zero_eof(vp, io, offset, isize, offset);
 		}
 		XFS_IUNLOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
 	}
