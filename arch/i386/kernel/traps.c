@@ -216,7 +216,7 @@ void show_registers(struct pt_regs *regs)
 		ss = regs->xss & 0xffff;
 	}
 	print_modules();
-	printk("CPU:    %d\nEIP:    %04x:[<%08lx>]    %s\nEFLAGS: %08lx"
+	printk("CPU:    %d\nEIP:    %04x:[<%08lx>]    %s VLI\nEFLAGS: %08lx"
 			"   (%s) \n",
 		smp_processor_id(), 0xffff & regs->xcs, regs->eip,
 		print_tainted(), regs->eflags, UTS_RELEASE);
@@ -234,23 +234,25 @@ void show_registers(struct pt_regs *regs)
 	 * time of the fault..
 	 */
 	if (in_kernel) {
+		u8 *eip;
 
 		printk("\nStack: ");
 		show_stack(NULL, (unsigned long*)esp);
 
 		printk("Code: ");
-		if(regs->eip < PAGE_OFFSET)
-			goto bad;
 
-		for(i=0;i<20;i++)
-		{
+		eip = (u8 *)regs->eip - 43;
+		for (i = 0; i < 64; i++, eip++) {
 			unsigned char c;
-			if(__get_user(c, &((unsigned char*)regs->eip)[i])) {
-bad:
+
+			if (eip < (u8 *)PAGE_OFFSET || __get_user(c, eip)) {
 				printk(" Bad EIP value.");
 				break;
 			}
-			printk("%02x ", c);
+			if (eip == (u8 *)regs->eip)
+				printk("<%02x> ", c);
+			else
+				printk("%02x ", c);
 		}
 	}
 	printk("\n");
