@@ -87,6 +87,7 @@ struct acpi_device;
 #endif
 
 static snd_card_t *snd_mpu401_legacy_cards[SNDRV_CARDS] = SNDRV_DEFAULT_PTR;
+static int cards;
 
 #ifdef USE_ACPI_PNP
 
@@ -206,6 +207,7 @@ static int __devinit snd_card_mpu401_probe(int dev, struct acpi_device *device)
 	else
 #endif
 		snd_mpu401_legacy_cards[dev] = card;
+	++cards;
 	return 0;
 }
 
@@ -259,15 +261,11 @@ static struct acpi_driver snd_mpu401_acpi_driver = {
 
 static int __init alsa_card_mpu401_init(void)
 {
-	int dev, cards;
+	int dev;
 
 #ifdef USE_ACPI_PNP
-	cards = acpi_bus_register_driver(&snd_mpu401_acpi_driver);
-	if (cards >= 0)
+	if (acpi_bus_register_driver(&snd_mpu401_acpi_driver) >= 0)
 		acpi_driver_registered = 1;
-	else
-#else
-		cards = 0;
 #endif
 	for (dev = 0; dev < SNDRV_CARDS; dev++) {
 		if (!enable[dev])
@@ -276,8 +274,7 @@ static int __init alsa_card_mpu401_init(void)
 		if (acpipnp[dev] && acpi_driver_registered)
 			continue;
 #endif
-		if (snd_card_mpu401_probe(dev, NULL) >= 0)
-			cards++;
+		snd_card_mpu401_probe(dev, NULL);
 	}
 	if (!cards) {
 #ifdef MODULE
