@@ -37,7 +37,7 @@
 #include "mga_drm.h"
 #include "mga_drv.h"
 
-static drm_ioctl_desc_t mga_ioctls[] = {
+drm_ioctl_desc_t mga_ioctls[] = {
 	[DRM_IOCTL_NR(DRM_MGA_INIT)]    = { mga_dma_init,    1, 1 },
 	[DRM_IOCTL_NR(DRM_MGA_FLUSH)]   = { mga_dma_flush,   1, 0 },
 	[DRM_IOCTL_NR(DRM_MGA_RESET)]   = { mga_dma_reset,   1, 0 },
