@@ -2582,10 +2582,8 @@ static int sctp_getsockopt_peer_addrs_num(struct sock *sk, int len,
 	list_for_each(pos, &asoc->peer.transport_addr_list) {
 		cnt ++;
 	}
-	if (copy_to_user(optval, &cnt, sizeof(int)))
-		return -EFAULT;
 
-	return 0;
+	return cnt;
 }
 
 static int sctp_getsockopt_peer_addrs(struct sock *sk, int len,
@@ -2666,10 +2664,8 @@ static int sctp_getsockopt_local_addrs_num(struct sock *sk, int len,
 	list_for_each(pos, &bp->address_list) {
 		cnt ++;
 	}
-	if (copy_to_user(optval, &cnt, sizeof(int)))
-		return -EFAULT;
 
-	return 0;
+	return cnt;
 }
 
 static int sctp_getsockopt_local_addrs(struct sock *sk, int len,
