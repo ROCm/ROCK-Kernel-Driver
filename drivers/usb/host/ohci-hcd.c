@@ -17,6 +17,7 @@
  *
  * History:
  * 
+ * 2004/02/04 use generic dma_* functions instead of pci_* (dsaxena@plexity.net)
  * 2003/02/24 show registers in sysfs (Kevin Brosius)
  *
  * 2002/09/03 get rid of ed hashtables, rework periodic scheduling and
@@ -96,6 +97,8 @@
 #include <linux/interrupt.h>  /* for in_interrupt () */
 #include <linux/usb.h>
 #include "../core/hcd.h"
+#include <linux/dma-mapping.h> 
+#include <linux/dmapool.h>    /* needed by ohci-mem.c when no PCI */
 
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -642,8 +645,9 @@ static void ohci_stop (struct usb_hcd *hcd)
 	remove_debug_files (ohci);
 	ohci_mem_cleanup (ohci);
 	if (ohci->hcca) {
-		pci_free_consistent (ohci->hcd.pdev, sizeof *ohci->hcca,
-					ohci->hcca, ohci->hcca_dma);
+		dma_free_coherent (ohci->hcd.self.controller, 
+				sizeof *ohci->hcca, 
+				ohci->hcca, ohci->hcca_dma);
 		ohci->hcca = NULL;
 		ohci->hcca_dma = 0;
 	}

@@ -361,8 +361,8 @@ struct ohci_hcd {
 	/*
 	 * memory management for queue data structures
 	 */
-	struct pci_pool		*td_cache;
-	struct pci_pool		*ed_cache;
+	struct dma_pool		*td_cache;
+	struct dma_pool		*ed_cache;
 	struct td		*td_hash [TD_HASH_SIZE];
 
 	/*
@@ -391,13 +391,13 @@ struct ohci_hcd {
 #endif	/* DEBUG */
 
 #define ohci_dbg(ohci, fmt, args...) \
-	dev_dbg ((ohci)->hcd.controller , fmt , ## args )
+	dev_dbg ((ohci)->hcd.self.controller , fmt , ## args )
 #define ohci_err(ohci, fmt, args...) \
-	dev_err ((ohci)->hcd.controller , fmt , ## args )
+	dev_err ((ohci)->hcd.self.controller , fmt , ## args )
 #define ohci_info(ohci, fmt, args...) \
-	dev_info ((ohci)->hcd.controller , fmt , ## args )
+	dev_info ((ohci)->hcd.self.controller , fmt , ## args )
 #define ohci_warn(ohci, fmt, args...) \
-	dev_warn ((ohci)->hcd.controller , fmt , ## args )
+	dev_warn ((ohci)->hcd.self.controller , fmt , ## args )
 
 #ifdef OHCI_VERBOSE_DEBUG
 #	define ohci_vdbg ohci_dbg

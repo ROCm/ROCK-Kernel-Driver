@@ -19,13 +19,13 @@
 /* this file is part of ehci-hcd.c */
 
 #define ehci_dbg(ehci, fmt, args...) \
-	dev_dbg ((ehci)->hcd.controller , fmt , ## args )
+	dev_dbg ((ehci)->hcd.self.controller , fmt , ## args )
 #define ehci_err(ehci, fmt, args...) \
-	dev_err ((ehci)->hcd.controller , fmt , ## args )
+	dev_err ((ehci)->hcd.self.controller , fmt , ## args )
 #define ehci_info(ehci, fmt, args...) \
-	dev_info ((ehci)->hcd.controller , fmt , ## args )
+	dev_info ((ehci)->hcd.self.controller , fmt , ## args )
 #define ehci_warn(ehci, fmt, args...) \
-	dev_warn ((ehci)->hcd.controller , fmt , ## args )
+	dev_warn ((ehci)->hcd.self.controller , fmt , ## args )
 
 #ifdef EHCI_VERBOSE_DEBUG
 #	define vdbg dbg
@@ -367,7 +367,7 @@ static void qh_lines (
 			scratch, cpu_to_le32p (&qh->hw_info2),
 			cpu_to_le32p (&qh->hw_token), mark,
 			(__constant_cpu_to_le32 (QTD_TOGGLE) & qh->hw_token)
-				? "data0" : "data1",
+				? "data1" : "data0",
 			(cpu_to_le32p (&qh->hw_alt_next) >> 1) & 0x0f);
 	size -= temp;
 	next += temp;
@@ -625,7 +625,7 @@ show_registers (struct class_device *class_dev, char *buf)
 	i = HC_VERSION(readl (&ehci->caps->hc_capbase));
 	temp = scnprintf (next, size,
 		"PCI device %s\nEHCI %x.%02x, hcd state %d (driver " DRIVER_VERSION ")\n",
-		pci_name(hcd->pdev),
+		pci_name(to_pci_dev(hcd->self.controller)),
 		i >> 8, i & 0x0ff, ehci->hcd.state);
 	size -= temp;
 	next += temp;

@@ -213,9 +213,8 @@ static void sg_clean (struct usb_sg_request *io)
 static void sg_complete (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_sg_request	*io = (struct usb_sg_request *) urb->context;
-	unsigned long		flags;
 
-	spin_lock_irqsave (&io->lock, flags);
+	spin_lock (&io->lock);
 
 	/* In 2.5 we require hcds' endpoint queues not to progress after fault
 	 * reports, until the completion callback (this!) returns.  That lets
@@ -269,7 +268,7 @@ static void sg_complete (struct urb *urb, struct pt_regs *regs)
 	if (!io->count)
 		complete (&io->complete);
 
-	spin_unlock_irqrestore (&io->lock, flags);
+	spin_unlock (&io->lock);
 }
 
 
@@ -441,12 +440,11 @@ nomem:
  */
 void usb_sg_wait (struct usb_sg_request *io)
 {
-	int		i;
-	unsigned long	flags;
+	int		i, entries = io->entries;
 
 	/* queue the urbs.  */
-	spin_lock_irqsave (&io->lock, flags);
-	for (i = 0; i < io->entries && !io->status; i++) {
+	spin_lock_irq (&io->lock);
+	for (i = 0; i < entries && !io->status; i++) {
 		int	retval;
 
 		io->urbs [i]->dev = io->dev;
@@ -455,7 +453,7 @@ void usb_sg_wait (struct usb_sg_request *io)
 		/* after we submit, let completions or cancelations fire;
 		 * we handshake using io->status.
 		 */
-		spin_unlock_irqrestore (&io->lock, flags);
+		spin_unlock_irq (&io->lock);
 		switch (retval) {
 			/* maybe we retrying will recover */
 		case -ENXIO:	// hc didn't queue this one
@@ -479,17 +477,25 @@ void usb_sg_wait (struct usb_sg_request *io)
 
 			/* fail any uncompleted urbs */
 		default:
+			spin_lock_irq (&io->lock);
+			io->count -= entries - i;
+			if (io->status == -EINPROGRESS)
+				io->status = retval;
+			if (io->count == 0)
+				complete (&io->complete);
+			spin_unlock_irq (&io->lock);
+
 			io->urbs [i]->dev = 0;
 			io->urbs [i]->status = retval;
 			dev_dbg (&io->dev->dev, "%s, submit --> %d\n",
 				__FUNCTION__, retval);
 			usb_sg_cancel (io);
 		}
-		spin_lock_irqsave (&io->lock, flags);
+		spin_lock_irq (&io->lock);
 		if (retval && io->status == -ECONNRESET)
 			io->status = retval;
 	}
-	spin_unlock_irqrestore (&io->lock, flags);
+	spin_unlock_irq (&io->lock);
 
 	/* OK, yes, this could be packaged as non-blocking.
 	 * So could the submit loop above ... but it's easier to
