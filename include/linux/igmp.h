@@ -16,6 +16,8 @@
 #ifndef _LINUX_IGMP_H
 #define _LINUX_IGMP_H
 
+#include <asm/byteorder.h>
+
 /*
  *	IGMP protocol structures
  */
