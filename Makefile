@@ -681,15 +681,6 @@ CLEAN_FILES += \
 	drivers/zorro/devlist.h drivers/zorro/gen-devlist \
 	sound/oss/bin2hex sound/oss/hex2hex \
 	drivers/atm/fore200e_mkfirm drivers/atm/{pca,sba}*{.bin,.bin1,.bin2} \
-	drivers/scsi/aic7xxx/aic7xxx_seq.h \
-	drivers/scsi/aic7xxx/aic7xxx_reg.h \
-	drivers/scsi/aic7xxx/aicasm/aicasm_gram.c \
-	drivers/scsi/aic7xxx/aicasm/aicasm_scan.c \
-	drivers/scsi/aic7xxx/aicasm/y.tab.h \
-	drivers/scsi/aic7xxx/aicasm/aicasm \
-	drivers/scsi/53c700_d.h drivers/scsi/sim710_d.h \
-	drivers/scsi/53c7xx_d.h drivers/scsi/53c7xx_u.h \
-	drivers/scsi/53c8xx_d.h drivers/scsi/53c8xx_u.h \
 	net/802/cl2llc.c net/802/transit/pdutr.h net/802/transit/timertr.h \
 	net/802/pseudo/pseudocode.h \
 	net/khttpd/make_times_h net/khttpd/times.h \
