@@ -5581,6 +5581,7 @@ static int idetape_chrdev_open (struct inode *inode, struct file *filp)
 		return -ENXIO;
 	drive = idetape_chrdevs[i].drive;
 	tape = drive->driver_data;
+	filp->private_data = drive;
 
 	if (test_and_set_bit(IDETAPE_BUSY, &tape->flags))
 		return -EBUSY;
