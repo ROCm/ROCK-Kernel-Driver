@@ -360,7 +360,7 @@ static int usb_stor_control_thread(void * __us)
 		}
 
 		else if (us->srb->device->lun > us->max_lun) {
-			US_DEBUGP("Bad LUN (%d/%d)\n",
+			US_DEBUGP("Bad LUN (%d:%d)\n",
 				  us->srb->device->id, us->srb->device->lun);
 			us->srb->result = DID_BAD_TARGET << 16;
 		}
@@ -475,8 +475,6 @@ static int usb_stor_allocate_urbs(struct us_data *ss)
  */
 static void usb_stor_deallocate_urbs(struct us_data *ss)
 {
-	int result;
-
 	/* free the scatter-gather request block */
 	if (ss->current_sg) {
 		kfree(ss->current_sg);
@@ -486,8 +484,6 @@ static void usb_stor_deallocate_urbs(struct us_data *ss)
 	/* free up the main URB for this device */
 	if (ss->current_urb) {
 		US_DEBUGP("-- releasing main URB\n");
-		result = usb_unlink_urb(ss->current_urb);
-		US_DEBUGP("-- usb_unlink_urb() returned %d\n", result);
 		usb_free_urb(ss->current_urb);
 		ss->current_urb = NULL;
 	}
