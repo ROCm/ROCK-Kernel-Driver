@@ -1,9 +1,9 @@
 /******************************************************************************
  *
  * Name:	lm80.h	
- * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.3 $
- * Date:	$Date: 1999/11/22 13:41:19 $
+ * Project:	Gigabit Ethernet Adapters, Common Modules
+ * Version:	$Revision: 1.6 $
+ * Date:	$Date: 2003/05/13 17:26:52 $
  * Purpose:	Contains all defines for the LM80 Chip
  *		(National Semiconductor).
  *
@@ -11,8 +11,8 @@
 
 /******************************************************************************
  *
- *	(C)Copyright 1998,1999 SysKonnect,
- *	a business unit of Schneider & Koch & Co. Datensysteme GmbH.
+ *	(C)Copyright 1998-2002 SysKonnect.
+ *	(C)Copyright 2002-2003 Marvell.
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -27,6 +27,16 @@
  *
  * History:
  *	$Log: lm80.h,v $
+ *	Revision 1.6  2003/05/13 17:26:52  mkarl
+ *	Editorial changes.
+ *	
+ *	Revision 1.5  2003/03/31 07:15:18  mkarl
+ *	Corrected Copyright.
+ *	Editorial changes.
+ *	
+ *	Revision 1.4  2002/04/25 11:04:10  rschmidt
+ *	Editorial changes
+ *	
  *	Revision 1.3  1999/11/22 13:41:19  cgoos
  *	Changed license header to GPL.
  *	
@@ -53,23 +63,23 @@ extern "C" {
  *
  * All registers are 8 bit wide
  */
-#define	LM80_CFG		0x00	/* Configuration Register */
-#define	LM80_ISRC_1		0x01	/* Interrupt Status Register 1 */
-#define LM80_ISRC_2		0x02	/* Interrupt Status Register 2 */
-#define LM80_IMSK_1		0x03	/* Interrupt Mask Register 1 */
-#define LM80_IMSK_2		0x04	/* Interrupt Mask Register 2 */
+#define LM80_CFG			0x00	/* Configuration Register */
+#define LM80_ISRC_1			0x01	/* Interrupt Status Register 1 */
+#define LM80_ISRC_2			0x02	/* Interrupt Status Register 2 */
+#define LM80_IMSK_1			0x03	/* Interrupt Mask Register 1 */
+#define LM80_IMSK_2			0x04	/* Interrupt Mask Register 2 */
 #define LM80_FAN_CTRL		0x05	/* Fan Devisor/RST#/OS# Register */
 #define LM80_TEMP_CTRL		0x06	/* OS# Config, Temp Res. Reg */
 	/* 0x07 - 0x1f reserved	*/
 	/* current values */
-#define LM80_VT0_IN		0x20	/* current Voltage 0 value */
-#define LM80_VT1_IN		0x21	/* current Voltage 1 value */
-#define LM80_VT2_IN		0x22	/* current Voltage 2 value */
-#define LM80_VT3_IN		0x23	/* current Voltage 3 value */
-#define LM80_VT4_IN		0x24	/* current Voltage 4 value */
-#define LM80_VT5_IN		0x25	/* current Voltage 5 value */
-#define LM80_VT6_IN		0x26	/* current Voltage 6 value */
-#define LM80_TEMP_IN		0x27	/* current temperature value */
+#define LM80_VT0_IN			0x20	/* current Voltage 0 value */
+#define LM80_VT1_IN			0x21	/* current Voltage 1 value */
+#define LM80_VT2_IN			0x22	/* current Voltage 2 value */
+#define LM80_VT3_IN			0x23	/* current Voltage 3 value */
+#define LM80_VT4_IN			0x24	/* current Voltage 4 value */
+#define LM80_VT5_IN			0x25	/* current Voltage 5 value */
+#define LM80_VT6_IN			0x26	/* current Voltage 6 value */
+#define LM80_TEMP_IN		0x27	/* current Temperature value */
 #define LM80_FAN1_IN		0x28	/* current Fan 1 count */
 #define LM80_FAN2_IN		0x29	/* current Fan 2 count */
 	/* limit values */
@@ -91,8 +101,8 @@ extern "C" {
 #define LM80_THOT_LIM_LO	0x39	/* hot temperature limit (low) */
 #define LM80_TOS_LIM_UP		0x3a	/* OS temperature limit (high) */
 #define LM80_TOS_LIM_LO		0x3b	/* OS temperature limit (low) */
-#define	LM80_FAN1_COUNT_LIM	0x3c	/* Fan 1 count limit (high) */
-#define	LM80_FAN2_COUNT_LIM	0x3d	/* Fan 2 count limit (low) */
+#define LM80_FAN1_COUNT_LIM	0x3c	/* Fan 1 count limit (high) */
+#define LM80_FAN2_COUNT_LIM	0x3d	/* Fan 2 count limit (low) */
 	/* 0x3e - 0x3f reserved	*/
 
 /*
@@ -111,23 +121,23 @@ extern "C" {
 
 /*	LM80_ISRC_1		Interrupt Status Register 1 */
 /*	LM80_IMSK_1		Interrupt Mask Register 1 */
-#define LM80_IS_VT0		(1<<0)	/* limit exceeded for Voltage 0 */
-#define LM80_IS_VT1		(1<<1)	/* limit exceeded for Voltage 1 */
-#define LM80_IS_VT2		(1<<2)	/* limit exceeded for Voltage 2 */
-#define LM80_IS_VT3		(1<<3)	/* limit exceeded for Voltage 3 */
-#define LM80_IS_VT4		(1<<4)	/* limit exceeded for Voltage 4 */
-#define LM80_IS_VT5		(1<<5)	/* limit exceeded for Voltage 5 */
-#define LM80_IS_VT6		(1<<6)	/* limit exceeded for Voltage 6 */
+#define LM80_IS_VT0			(1<<0)	/* limit exceeded for Voltage 0 */
+#define LM80_IS_VT1			(1<<1)	/* limit exceeded for Voltage 1 */
+#define LM80_IS_VT2			(1<<2)	/* limit exceeded for Voltage 2 */
+#define LM80_IS_VT3			(1<<3)	/* limit exceeded for Voltage 3 */
+#define LM80_IS_VT4			(1<<4)	/* limit exceeded for Voltage 4 */
+#define LM80_IS_VT5			(1<<5)	/* limit exceeded for Voltage 5 */
+#define LM80_IS_VT6			(1<<6)	/* limit exceeded for Voltage 6 */
 #define LM80_IS_INT_IN		(1<<7)	/* state of INT_IN# */
 
 /*	LM80_ISRC_2		Interrupt Status Register 2 */
 /*	LM80_IMSK_2		Interrupt Mask Register 2 */
-#define	LM80_IS_TEMP		(1<<0)	/* HOT temperature limit exceeded */
-#define LM80_IS_BTI		(1<<1)	/* state of BTI# pin */
+#define LM80_IS_TEMP		(1<<0)	/* HOT temperature limit exceeded */
+#define LM80_IS_BTI			(1<<1)	/* state of BTI# pin */
 #define LM80_IS_FAN1		(1<<2)	/* count limit exceeded for Fan 1 */
 #define LM80_IS_FAN2		(1<<3)	/* count limit exceeded for Fan 2 */
-#define LM80_IS_CI		(1<<4)	/* Chassis Intrusion occurred */
-#define LM80_IS_OS		(1<<5)	/* OS temperature limit exceeded */
+#define LM80_IS_CI			(1<<4)	/* Chassis Intrusion occured */
+#define LM80_IS_OS			(1<<5)	/* OS temperature limit exceeded */
 	/* bit 6 and 7 are reserved in LM80_ISRC_2 */
 #define LM80_IS_HT_IRQ_MD	(1<<6)	/* Hot temperature interrupt mode */
 #define LM80_IS_OT_IRQ_MD	(1<<7)	/* OS temperature interrupt mode */
@@ -141,7 +151,7 @@ extern "C" {
 #define LM80_FAN_RST_ENA	(1<<7)	/* sets RST_OUT#/OS# pins in RST mode */
 
 /*	LM80_TEMP_CTRL		OS# Config, Temp Res. Reg */
-#define	LM80_TEMP_OS_STAT	(1<<0)	/* mirrors the state of RST_OUT#/OS# */
+#define LM80_TEMP_OS_STAT	(1<<0)	/* mirrors the state of RST_OUT#/OS# */
 #define LM80_TEMP_OS_POL	(1<<1)	/* select OS# polarity */
 #define LM80_TEMP_OS_MODE	(1<<2)	/* selects Interrupt mode */
 #define LM80_TEMP_RES		(1<<3)	/* selects 9 or 11 bit temp resulution*/
@@ -181,7 +191,7 @@ extern "C" {
 /*	LM80_FAN2_COUNT_LIM	Fan 2 count limit (low) */
 	/* 0x3e - 0x3f reserved	*/
 
-#define LM80_ADDR	0x28	/* LM80 default addr */
+#define LM80_ADDR		0x28	/* LM80 default addr */
 
 /* typedefs *******************************************************************/
 

@@ -1,32 +1,23 @@
 /******************************************************************************
  *
  * Name:	sktimer.c
- * Project:	PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.11 $
- * Date:	$Date: 1998/12/17 13:24:13 $
+ * Project:	Gigabit Ethernet Adapters, Schedule-Modul
+ * Version:	$Revision: 1.13 $
+ * Date:	$Date: 2003/05/13 18:01:01 $
  * Purpose:	High level timer functions.
  *
  ******************************************************************************/
 
 /******************************************************************************
  *
- *	(C)Copyright 1989-1998 SysKonnect,
- *	a business unit of Schneider & Koch & Co. Datensysteme GmbH.
- *	All Rights Reserved
+ *	(C)Copyright 1998-2002 SysKonnect GmbH.
+ *	(C)Copyright 2002-2003 Marvell.
  *
- *	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF SYSKONNECT
- *	The copyright notice above does not evidence any
- *	actual or intended publication of such source code.
+ *	This program is free software; you can redistribute it and/or modify
+ *	it under the terms of the GNU General Public License as published by
+ *	the Free Software Foundation; either version 2 of the License, or
+ *	(at your option) any later version.
  *
- *	This Module contains Proprietary Information of SysKonnect
- *	and should be treated as Confidential.
- *
- *	The information in this file is provided for the exclusive use of
- *	the licensees of SysKonnect.
- *	Such users have the right to use, modify, and incorporate this code
- *	into products for purposes authorized by the license agreement
- *	provided they include this notice and the associated copyright notice
- *	with any such product.
  *	The information in this file is provided "AS IS" without warranty.
  *
  ******************************************************************************/
@@ -36,6 +27,12 @@
  * History:
  *
  *	$Log: sktimer.c,v $
+ *	Revision 1.13  2003/05/13 18:01:01  mkarl
+ *	Editorial changes.
+ *	
+ *	Revision 1.12  1999/11/22 13:38:51  cgoos
+ *	Changed license header to GPL.
+ *	
  *	Revision 1.11  1998/12/17 13:24:13  gklug
  *	fix: restart problem: do NOT destroy timer queue if init 1 is done
  *	
@@ -81,8 +78,10 @@
 /*
 	Event queue and dispatcher
 */
+#if (defined(DEBUG) || ((!defined(LINT)) && (!defined(SK_SLIM))))
 static const char SysKonnectFileId[] =
-	"$Header: /usr56/projects/ge/schedule/sktimer.c,v 1.11 1998/12/17 13:24:13 gklug Exp $" ;
+	"$Header: /usr56/projects/ge/schedule/sktimer.c,v 1.13 2003/05/13 18:01:01 mkarl Exp $" ;
+#endif
 
 #include "h/skdrv1st.h"		/* Driver Specific Definitions */
 #include "h/skdrv2nd.h"		/* Adapter Control- and Driver specific Def. */
