@@ -7536,6 +7536,14 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	udelay(50);
 	tg3_nvram_init(tp);
 
+	/* Always use host TXDs, it performs better in particular
+	 * with multi-frag packets.  The tests below are kept here
+	 * as documentation should we change this decision again
+	 * in the future.
+	 */
+	tp->tg3_flags |= TG3_FLAG_HOST_TXDS;
+
+#if 0
 	/* Determine if TX descriptors will reside in
 	 * main memory or in the chip SRAM.
 	 */
@@ -7543,6 +7551,7 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705 ||
 	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750)
 		tp->tg3_flags |= TG3_FLAG_HOST_TXDS;
+#endif
 
 	grc_misc_cfg = tr32(GRC_MISC_CFG);
 	grc_misc_cfg &= GRC_MISC_CFG_BOARD_ID_MASK;
