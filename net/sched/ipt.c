@@ -31,6 +31,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/proc_fs.h>
+#include <linux/kmod.h>
 #include <net/sock.h>
 #include <net/pkt_sched.h>
 #include <linux/tc_act/tc_ipt.h>
@@ -60,32 +61,23 @@ init_targ(struct tcf_ipt *p)
 	struct ipt_target *target;
 	int ret = 0;
 	struct ipt_entry_target *t = p->t;
-	target = __ipt_find_target_lock(t->u.user.name, &ret);
 
+	target = ipt_find_target(t->u.user.name, t->u.user.revision);
 	if (!target) {
 		printk("init_targ: Failed to find %s\n", t->u.user.name);
 		return -1;
 	}
 
 	DPRINTK("init_targ: found %s\n", target->name);
-	/* we really need proper ref counting
-	 seems to be only needed for modules?? Talk to laforge */
-/*      if (target->me)
-              __MOD_INC_USE_COUNT(target->me);
-*/
 	t->u.kernel.target = target;
-
-	__ipt_mutex_up();
 
 	if (t->u.kernel.target->checkentry
 	    && !t->u.kernel.target->checkentry(p->tname, NULL, t->data,
 					       t->u.target_size
 					       - sizeof (*t), p->hook)) {
-/*              if (t->u.kernel.target->me)
-	      __MOD_DEC_USE_COUNT(t->u.kernel.target->me);
-*/
 		DPRINTK("ip_tables: check failed for `%s'.\n",
 			t->u.kernel.target->name);
+		module_put(t->u.kernel.target->me);
 		ret = -EINVAL;
 	}
 
@@ -235,8 +227,12 @@ tcf_ipt_cleanup(struct tc_action *a, int bind)
 {
 	struct tcf_ipt *p;
 	p = PRIV(a,ipt);
-	if (NULL != p)
+	if (NULL != p) {
+		struct ipt_entry_target *t = p->t;
+		if (t && t->u.kernel.target)
+			module_put(t->u.kernel.target->me);
 		return tcf_hash_release(p, bind);
+	}
 	return 0;
 }
 

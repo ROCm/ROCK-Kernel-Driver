@@ -430,62 +430,63 @@ static inline struct ipt_table *find_table_lock(const char *name)
 	return NULL;
 }
 
-/* Find match, grabs mutex & ref.  Returns ERR_PTR() on error. */
-static inline struct ipt_match *find_match_lock(const char *name, u8 revision)
+/* Find match, grabs ref.  Returns ERR_PTR() on error. */
+static inline struct ipt_match *find_match(const char *name, u8 revision)
 {
 	struct ipt_match *m;
-	int found = 0;
+	int err = 0;
 
 	if (down_interruptible(&ipt_mutex) != 0)
 		return ERR_PTR(-EINTR);
 
 	list_for_each_entry(m, &ipt_match, list) {
 		if (strcmp(m->name, name) == 0) {
-			found = 1;
 			if (m->revision == revision) {
-				if (!try_module_get(m->me))
-					found = 0;
-				else
+				if (try_module_get(m->me)) {
+					up(&ipt_mutex);
 					return m;
-			}
+				}
+			} else
+				err = -EPROTOTYPE; /* Found something. */
 		}
 	}
 	up(&ipt_mutex);
-
-	/* Not found at all?  NULL so try_then_request_module loads module. */
-	if (!found)
-		return NULL;
-
-	return ERR_PTR(-EPROTOTYPE);
+	return ERR_PTR(err);
 }
 
-/* Find target, grabs mutex & ref.  Returns ERR_PTR() on error. */
-static inline struct ipt_target *find_target_lock(const char *name, u8 revision)
+/* Find target, grabs ref.  Returns ERR_PTR() on error. */
+static inline struct ipt_target *find_target(const char *name, u8 revision)
 {
 	struct ipt_target *t;
-	int found = 0;
+	int err = 0;
 
 	if (down_interruptible(&ipt_mutex) != 0)
 		return ERR_PTR(-EINTR);
 
 	list_for_each_entry(t, &ipt_target, list) {
 		if (strcmp(t->name, name) == 0) {
-			found = 1;
 			if (t->revision == revision) {
-				if (!try_module_get(t->me))
-					found = 0;
-				else
+				if (try_module_get(t->me)) {
+					up(&ipt_mutex);
 					return t;
-			}
+				}
+			} else
+				err = -EPROTOTYPE; /* Found something. */
 		}
 	}
 	up(&ipt_mutex);
+	return ERR_PTR(err);
+}
 
-	/* Not found at all?  NULL so try_then_request_module loads module. */
-	if (!found)
+struct ipt_target *ipt_find_target(const char *name, u8 revision)
+{
+	struct ipt_target *target;
+
+	target = try_then_request_module(find_target(name, revision),
+					 "ipt_%s", name);
+	if (IS_ERR(target) || !target)
 		return NULL;
-
-	return ERR_PTR(-EPROTOTYPE);
+	return target;
 }
 
 static int match_revfn(const char *name, u8 revision, int *bestp)
@@ -708,15 +709,14 @@ check_match(struct ipt_entry_match *m,
 {
 	struct ipt_match *match;
 
-	match = try_then_request_module(find_match_lock(m->u.user.name,
-							m->u.user.revision),
+	match = try_then_request_module(find_match(m->u.user.name,
+						   m->u.user.revision),
 					"ipt_%s", m->u.user.name);
 	if (IS_ERR(match) || !match) {
 		duprintf("check_match: `%s' not found\n", m->u.user.name);
 		return match ? PTR_ERR(match) : -ENOENT;
 	}
 	m->u.kernel.match = match;
-	up(&ipt_mutex);
 
 	if (m->u.kernel.match->checkentry
 	    && !m->u.kernel.match->checkentry(name, ip, m->data,
@@ -754,8 +754,8 @@ check_entry(struct ipt_entry *e, const char *name, unsigned int size,
 		goto cleanup_matches;
 
 	t = ipt_get_target(e);
-	target = try_then_request_module(find_target_lock(t->u.user.name,
-							  t->u.user.revision),
+	target = try_then_request_module(find_target(t->u.user.name,
+						     t->u.user.revision),
 					 "ipt_%s", t->u.user.name);
 	if (IS_ERR(target) || !target) {
 		duprintf("check_entry: `%s' not found\n", t->u.user.name);
@@ -763,7 +763,6 @@ check_entry(struct ipt_entry *e, const char *name, unsigned int size,
 		goto cleanup_matches;
 	}
 	t->u.kernel.target = target;
-	up(&ipt_mutex);
 
 	if (t->u.kernel.target == &ipt_standard_target) {
 		if (!standard_check(t, size)) {
@@ -1959,6 +1958,7 @@ EXPORT_SYMBOL(ipt_unregister_match);
 EXPORT_SYMBOL(ipt_do_table);
 EXPORT_SYMBOL(ipt_register_target);
 EXPORT_SYMBOL(ipt_unregister_target);
+EXPORT_SYMBOL(ipt_find_target);
 
 module_init(init);
 module_exit(fini);

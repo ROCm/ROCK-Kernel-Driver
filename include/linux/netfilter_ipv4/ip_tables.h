@@ -456,6 +456,9 @@ struct ipt_table
 	struct module *me;
 };
 
+/* net/sched/ipt.c: Gimme access to your targets!  Gets target->me. */
+extern struct ipt_target *ipt_find_target(const char *name, u8 revision);
+
 extern int ipt_register_table(struct ipt_table *table);
 extern void ipt_unregister_table(struct ipt_table *table);
 extern unsigned int ipt_do_table(struct sk_buff **pskb,
