@@ -2,6 +2,7 @@
 #define _LINUX_FB_H
 
 #include <linux/tty.h>
+#include <linux/workqueue.h>
 #include <asm/types.h>
 #include <asm/io.h>
 
@@ -406,8 +407,9 @@ struct fb_info {
    struct fb_fix_screeninfo fix;        /* Current fix */
    struct fb_monspecs monspecs;         /* Current Monitor specs */
    struct fb_cursor cursor;		/* Current cursor */	
-   struct fb_cmap cmap;                 /* Current cmap */
+   struct work_struct queue;		/* Framebuffer event queue */
    struct fb_pixmap pixmap;	        /* Current pixmap */
+   struct fb_cmap cmap;                 /* Current cmap */
    struct fb_ops *fbops;
    char *screen_base;                   /* Virtual address */
    struct vc_data *display_fg;		/* Console visible on this display */

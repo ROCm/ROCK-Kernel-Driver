@@ -172,8 +172,9 @@ static int fbcon_scrolldelta(struct vc_data *vc, int lines);
  *  Internal routines
  */
 static void fbcon_set_display(struct vc_data *vc, int init, int logo);
+static void accel_cursor(struct vc_data *vc, struct fb_info *info, 
+			 struct fb_cursor *cursor, int yy);
 static __inline__ int real_y(struct display *p, int ypos);
-static void fb_vbl_handler(int irq, void *dummy, struct pt_regs *fp);
 static __inline__ void updatescrollmode(struct display *p, struct vc_data *vc);
 static __inline__ void ywrap_up(struct vc_data *vc, int count);
 static __inline__ void ywrap_down(struct vc_data *vc, int count);
@@ -194,6 +195,34 @@ static void fb_vbl_detect(int irq, void *dummy, struct pt_regs *fp)
 }
 #endif
 
+static void fb_callback(void *private)
+{
+	struct fb_info *info = (struct fb_info *) private;
+	struct display *p = &fb_display[fg_console];
+	struct vc_data *vc = vc_cons[fg_console].d;
+	struct fb_cursor cursor;
+
+	if (!info || !cursor_on)
+		return;
+
+	if (vbl_cursor_cnt && --vbl_cursor_cnt == 0) {
+		cursor.set = 0;
+
+		if (!cursor_drawn)
+			cursor.set = FB_CUR_SETCUR;
+		accel_cursor(vc, info, &cursor, real_y(p, vc->vc_y));
+		cursor_drawn ^= 1;
+		vbl_cursor_cnt = cursor_blink_rate; 
+	}
+}
+
+static void fb_vbl_handler(int irq, void *dev_id, struct pt_regs *fp)
+{
+	struct fb_info *info = dev_id;
+
+	schedule_work(&info->queue);	
+}
+	
 static void cursor_timer_handler(unsigned long dev_addr);
 
 static struct timer_list cursor_timer =
@@ -203,7 +232,7 @@ static void cursor_timer_handler(unsigned long dev_addr)
 {
 	struct fb_info *info = (struct fb_info *) dev_addr;
 	
-	fb_vbl_handler(0, info, NULL);
+	schedule_work(&info->queue);	
 	cursor_timer.expires = jiffies + HZ / 50;
 	add_timer(&cursor_timer);
 }
@@ -290,14 +319,14 @@ static void putcs_unaligned(struct vc_data *vc, struct fb_info *info,
 			    const unsigned short *s)
 {
 	unsigned short charmask = vc->vc_hi_font_mask ? 0x1ff : 0xff;
-	unsigned int width = (vc->vc_font.width + 7)/8;
+	unsigned int width = (vc->vc_font.width + 7) >> 3;
 	unsigned int cellsize = vc->vc_font.height * width;
 	unsigned int maxcnt = info->pixmap.size/cellsize;
 	unsigned int shift_low = 0, mod = vc->vc_font.width % 8;
 	unsigned int shift_high = 8, size, pitch, cnt, k;
 	unsigned int buf_align = info->pixmap.buf_align - 1;
 	unsigned int scan_align = info->pixmap.scan_align - 1;
-	unsigned int idx = vc->vc_font.width/8;
+	unsigned int idx = vc->vc_font.width >> 3;
 	u8 mask, *src, *dst, *dst0;
 
 	while (count) {
@@ -307,7 +336,7 @@ static void putcs_unaligned(struct vc_data *vc, struct fb_info *info,
 			cnt = k = count;
 
 		image->width = vc->vc_font.width * cnt;
-		pitch = (image->width + 7)/8 + scan_align;
+		pitch = ((image->width + 7) >> 3) + scan_align;
 		pitch &= ~scan_align;
 		size = pitch * vc->vc_font.height + buf_align;
 		size &= ~buf_align;
@@ -338,7 +367,7 @@ static void putcs_aligned(struct vc_data *vc, struct fb_info *info,
 			  const unsigned short *s)
 {
 	unsigned short charmask = vc->vc_hi_font_mask ? 0x1ff : 0xff;
-	unsigned int width = vc->vc_font.width/8;
+	unsigned int width = vc->vc_font.width >> 3;
 	unsigned int cellsize = vc->vc_font.height * width;
 	unsigned int maxcnt = info->pixmap.size/cellsize;
 	unsigned int scan_align = info->pixmap.scan_align - 1;
@@ -411,7 +440,7 @@ static void accel_putc(struct vc_data *vc, struct fb_info *info,
                       int c, int ypos, int xpos)
 {
 	unsigned short charmask = vc->vc_hi_font_mask ? 0x1ff : 0xff;
-	unsigned int width = (vc->vc_font.width + 7)/8;
+	unsigned int width = (vc->vc_font.width + 7) >> 3;
 	unsigned int scan_align = info->pixmap.scan_align - 1;
 	unsigned int buf_align = info->pixmap.buf_align - 1;
 	int bgshift = (vc->vc_hi_font_mask) ? 13 : 12;
@@ -559,6 +588,15 @@ static const char *fbcon_startup(void)
 
 	vc = (struct vc_data *) kmalloc(sizeof(struct vc_data), GFP_ATOMIC); 
 
+	if (!vc) {
+		if (softback_buf)
+			kfree((void *) softback_buf);
+		return NULL;
+	}
+
+	/* Initialize the work queue */
+	INIT_WORK(&info->queue, fb_callback, info);
+	
 	/* Setup default font */
 	vc->vc_font.data = font->data;
 	vc->vc_font.width = font->width;
@@ -956,8 +994,8 @@ static void fbcon_putcs(struct vc_data *vc, const unsigned short *s,
 	accel_putcs(vc, info, s, count, real_y(p, ypos), xpos);
 }
 
-void accel_cursor(struct vc_data *vc, struct fb_info *info, struct fb_cursor *cursor,
-		  int yy)
+static void accel_cursor(struct vc_data *vc, struct fb_info *info,
+			 struct fb_cursor *cursor, int yy)
 {
 	unsigned short charmask = vc->vc_hi_font_mask ? 0x1ff : 0xff;
 	int bgshift = (vc->vc_hi_font_mask) ? 13 : 12;
@@ -985,8 +1023,16 @@ void accel_cursor(struct vc_data *vc, struct fb_info *info, struct fb_cursor *cu
 
 	size = ((width + 7) >> 3) * height;
 
-	data = kmalloc(size, GFP_ATOMIC);
-	mask = kmalloc(size, GFP_ATOMIC);
+	data = kmalloc(size, GFP_KERNEL);
+		
+	if (!data) return; 	
+
+	mask = kmalloc(size, GFP_KERNEL);
+
+	if (!mask) {
+		kfree(data);
+		return;	
+	}
 	
 	if (cursor->set & FB_CUR_SETSIZE) {
 		memset(data, 0xff, size);
@@ -1101,27 +1147,6 @@ static void fbcon_cursor(struct vc_data *vc, int mode)
 	}
 }
 
-static void fb_vbl_handler(int irq, void *dev_id, struct pt_regs *fp)
-{
-	struct fb_info *info = dev_id;
-	struct display *p = &fb_display[fg_console];
-	struct vc_data *vc = vc_cons[fg_console].d;
-	struct fb_cursor cursor;
-	
-	if (!cursor_on)
-		return;
-
-	if (vbl_cursor_cnt && --vbl_cursor_cnt == 0) {
-		cursor.set = 0;
-
-		if (!cursor_drawn)
-			cursor.set = FB_CUR_SETCUR;
-		accel_cursor(vc, info, &cursor, real_y(p, vc->vc_y));
-		cursor_drawn ^= 1;
-		vbl_cursor_cnt = cursor_blink_rate; 
-	}
-}	
-	
 static int scrollback_phys_max = 0;
 static int scrollback_max = 0;
 static int scrollback_current = 0;
