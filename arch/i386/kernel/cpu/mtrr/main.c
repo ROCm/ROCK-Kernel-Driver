@@ -36,7 +36,6 @@
 #include <linux/pci.h>
 #include <linux/smp.h>
 
-#define MTRR_NEED_STRINGS
 #include <asm/mtrr.h>
 
 #include <asm/uaccess.h>
@@ -54,6 +53,7 @@ static DECLARE_MUTEX(main_lock);
 u32 size_or_mask, size_and_mask;
 
 static struct mtrr_ops * mtrr_ops[X86_VENDOR_NUM] = {};
+
 struct mtrr_ops * mtrr_if = NULL;
 
 __initdata char *mtrr_if_name[] = {
@@ -125,14 +125,6 @@ static void init_table(void)
 	}
 	for (i = 0; i < max; i++)
 		usage_table[i] = 1;
-#ifdef USERSPACE_INTERFACE
-	if ((ascii_buffer = kmalloc(max * LINE_SIZE, GFP_KERNEL)) == NULL) {
-		printk("mtrr: could not allocate\n");
-		return;
-	}
-	ascii_buf_bytes = 0;
-	compute_ascii();
-#endif
 }
 
 struct set_mtrr_data {
@@ -163,7 +155,7 @@ static void ipi_handler(void *info)
 	}
 
 	/*  The master has cleared me to execute  */
-	if (data->smp_reg != ~0UL) 
+	if (data->smp_reg != ~0U) 
 		mtrr_if->set(data->smp_reg, data->smp_base, 
 			     data->smp_size, data->smp_type);
 	else
@@ -253,7 +245,7 @@ static void set_mtrr(unsigned int reg, unsigned long base,
 	 * to replicate across all the APs. 
 	 * If we're doing that @reg is set to something special...
 	 */
-	if (reg != ~0UL) 
+	if (reg != ~0U) 
 		mtrr_if->set(reg,base,size,type);
 
 	/* wait for the others */
@@ -306,7 +298,8 @@ int mtrr_add_page(unsigned long base, unsigned long size,
 {
 	int i;
 	mtrr_type ltype;
-	unsigned long lbase, lsize;
+	unsigned long lbase;
+	unsigned int lsize;
 	int error;
 
 	if (!mtrr_if)
@@ -346,7 +339,7 @@ int mtrr_add_page(unsigned long base, unsigned long size,
 		if ((base < lbase) || (base + size > lbase + lsize)) {
 			printk(KERN_WARNING
 			       "mtrr: 0x%lx000,0x%lx000 overlaps existing"
-			       " 0x%lx000,0x%lx000\n", base, size, lbase,
+			       " 0x%lx000,0x%x000\n", base, size, lbase,
 			       lsize);
 			goto out;
 		}
@@ -361,7 +354,6 @@ int mtrr_add_page(unsigned long base, unsigned long size,
 		}
 		if (increment)
 			++usage_table[i];
-		compute_ascii();
 		error = i;
 		goto out;
 	}
@@ -370,7 +362,6 @@ int mtrr_add_page(unsigned long base, unsigned long size,
 	if (i >= 0) {
 		set_mtrr(i, base, size, type);
 		usage_table[i] = 1;
-		compute_ascii();
 	} else
 		printk("mtrr: no more MTRRs available\n");
 	error = i;
@@ -447,7 +438,8 @@ int mtrr_del_page(int reg, unsigned long base, unsigned long size)
 {
 	int i, max;
 	mtrr_type ltype;
-	unsigned long lbase, lsize;
+	unsigned long lbase;
+	unsigned int lsize;
 	int error = -EINVAL;
 
 	if (!mtrr_if)
@@ -491,7 +483,6 @@ int mtrr_del_page(int reg, unsigned long base, unsigned long size)
 	}
 	if (--usage_table[reg] < 1)
 		set_mtrr(reg, 0, 0, 0);
-	compute_ascii();
 	error = reg;
  out:
 	up(&main_lock);
@@ -547,7 +538,7 @@ static void init_other_cpus(void)
 		get_mtrr_state();
 
 	/* bring up the other processors */
-	set_mtrr(~0UL,0,0,0);
+	set_mtrr(~0U,0,0,0);
 
 	if (use_intel()) {
 		finalize_mtrr_state();
@@ -583,7 +574,7 @@ static int __init mtrr_init(void)
 			   query the width (in bits) of the physical
 			   addressable memory on the Hammer family.
 			 */
-			if (boot_cpu_data.x86 == 7
+			if (boot_cpu_data.x86 >= 7 
 			    && (cpuid_eax(0x80000000) >= 0x80000008)) {
 				u32 phys_addr;
 				phys_addr = cpuid_eax(0x80000008) & 0xff;
@@ -642,6 +633,17 @@ static int __init mtrr_init(void)
 	}
 	return mtrr_if ? -ENXIO : 0;
 }
+
+char *mtrr_strings[MTRR_NUM_TYPES] =
+{
+    "uncachable",               /* 0 */
+    "write-combining",          /* 1 */
+    "?",                        /* 2 */
+    "?",                        /* 3 */
+    "write-through",            /* 4 */
+    "write-protect",            /* 5 */
+    "write-back",               /* 6 */
+};
 
 core_initcall(mtrr_init);
 

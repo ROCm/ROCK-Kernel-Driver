@@ -3,27 +3,27 @@
 #include <linux/devfs_fs_kernel.h>
 #include <linux/ctype.h>
 #include <linux/module.h>
+#include <linux/seq_file.h>
 #include <asm/uaccess.h>
 
-/* What kind of fucking hack is this? */
-#define MTRR_NEED_STRINGS
+#define LINE_SIZE 80
 
 #include <asm/mtrr.h>
 #include "mtrr.h"
 
-static char *ascii_buffer;
-static unsigned int ascii_buf_bytes;
-
+/* RED-PEN: this is accessed without any locking */
 extern unsigned int *usage_table;
 
-#define LINE_SIZE      80
+static int mtrr_seq_show(struct seq_file *seq, void *offset);
+
+#define FILE_FCOUNT(f) (((struct seq_file *)((f)->private_data))->private)
 
 static int
 mtrr_file_add(unsigned long base, unsigned long size,
 	      unsigned int type, char increment, struct file *file, int page)
 {
 	int reg, max;
-	unsigned int *fcount = file->private_data;
+	unsigned int *fcount = FILE_FCOUNT(file); 
 
 	max = num_var_ranges;
 	if (fcount == NULL) {
@@ -33,7 +33,7 @@ mtrr_file_add(unsigned long base, unsigned long size,
 			return -ENOMEM;
 		}
 		memset(fcount, 0, max * sizeof *fcount);
-		file->private_data = fcount;
+		FILE_FCOUNT(file) = fcount;
 	}
 	if (!page) {
 		if ((base & (PAGE_SIZE - 1)) || (size & (PAGE_SIZE - 1))) {
@@ -79,19 +79,7 @@ mtrr_file_del(unsigned long base, unsigned long size,
 	return reg;
 }
 
-static ssize_t
-mtrr_read(struct file *file, char *buf, size_t len, loff_t * ppos)
-{
-	if (*ppos >= ascii_buf_bytes)
-		return 0;
-	if (*ppos + len > ascii_buf_bytes)
-		len = ascii_buf_bytes - *ppos;
-	if (copy_to_user(buf, ascii_buffer + *ppos, len))
-		return -EFAULT;
-	*ppos += len;
-	return len;
-}
-
+/* RED-PEN: seq_file can seek now. this is ignored. */
 static ssize_t
 mtrr_write(struct file *file, const char *buf, size_t len, loff_t * ppos)
 /*  Format of control line:
@@ -149,7 +137,7 @@ mtrr_write(struct file *file, const char *buf, size_t len, loff_t * ppos)
 	ptr += 5;
 	for (; isspace(*ptr); ++ptr) ;
 	for (i = 0; i < MTRR_NUM_TYPES; ++i) {
-//		if (strcmp(ptr, mtrr_strings[i]))
+		if (strcmp(ptr, mtrr_strings[i]))
 			continue;
 		base >>= PAGE_SHIFT;
 		size >>= PAGE_SHIFT;
@@ -172,6 +160,8 @@ mtrr_ioctl(struct inode *inode, struct file *file,
 	mtrr_type type;
 	struct mtrr_sentry sentry;
 	struct mtrr_gentry gentry;
+
+	printk("mtrr_ioctl %d\n", cmd);
 
 	switch (cmd) {
 	default:
@@ -291,10 +281,9 @@ static int
 mtrr_close(struct inode *ino, struct file *file)
 {
 	int i, max;
-	unsigned int *fcount = file->private_data;
+	unsigned int *fcount = FILE_FCOUNT(file);
 
-	if (fcount == NULL)
-		return 0;
+	if (fcount != NULL) {
 	max = num_var_ranges;
 	for (i = 0; i < max; ++i) {
 		while (fcount[i] > 0) {
@@ -304,13 +293,26 @@ mtrr_close(struct inode *ino, struct file *file)
 		}
 	}
 	kfree(fcount);
-	file->private_data = NULL;
-	return 0;
+		FILE_FCOUNT(file) = NULL;
+	}
+	return single_release(ino, file);
+}
+
+static int mtrr_open(struct inode *inode, struct file *file)
+{
+	if (!mtrr_if) 
+		return -EIO;
+	if (!mtrr_if->get) 
+		return -ENXIO; 
+	return single_open(file, mtrr_seq_show, NULL);
 }
 
 static struct file_operations mtrr_fops = {
 	.owner   = THIS_MODULE,
-	.read    = mtrr_read,
+	.open	 = mtrr_open, 
+	.read    = seq_read,
+	.llseek  = seq_lseek,
+	.release = single_release,
 	.write   = mtrr_write,
 	.ioctl   = mtrr_ioctl,
 	.release = mtrr_close,
@@ -329,14 +331,15 @@ char * attrib_to_str(int x)
 	return (x <= 6) ? mtrr_strings[x] : "?";
 }
 
-void compute_ascii(void)
+static int mtrr_seq_show(struct seq_file *seq, void *offset)
 {
 	char factor;
-	int i, max;
+	int i, max, len;
 	mtrr_type type;
-	unsigned long base, size;
+	unsigned long base;
+	unsigned int size;
 
-	ascii_buf_bytes = 0;
+	len = 0;
 	max = num_var_ranges;
 	for (i = 0; i < max; i++) {
 		mtrr_if->get(i, &base, &size, &type);
@@ -351,32 +354,19 @@ void compute_ascii(void)
 				factor = 'M';
 				size >>= 20 - PAGE_SHIFT;
 			}
-			sprintf
-			    (ascii_buffer + ascii_buf_bytes,
-			     "reg%02i: base=0x%05lx000 (%4liMB), size=%4li%cB: %s, count=%d\n",
+			/* RED-PEN: base can be > 32bit */ 
+			len += seq_printf(seq, 
+				   "reg%02i: base=0x%05lx000 (%4liMB), size=%4i%cB: %s, count=%d\n",
 			     i, base, base >> (20 - PAGE_SHIFT), size, factor,
 			     attrib_to_str(type), usage_table[i]);
-			ascii_buf_bytes +=
-			    strlen(ascii_buffer + ascii_buf_bytes);
 		}
 	}
-	devfs_set_file_size(devfs_handle, ascii_buf_bytes);
-#  ifdef CONFIG_PROC_FS
-	if (proc_root_mtrr)
-		proc_root_mtrr->size = ascii_buf_bytes;
-#  endif			/*  CONFIG_PROC_FS  */
+	devfs_set_file_size(devfs_handle, len);	
+	return 0;
 }
 
 static int __init mtrr_if_init(void)
 {
-	int max = num_var_ranges;
-
-	if ((ascii_buffer = kmalloc(max * LINE_SIZE, GFP_KERNEL)) == NULL) {
-		printk("mtrr: could not allocate\n");
-		return -ENOMEM;
-	}
-	ascii_buf_bytes = 0;
-	compute_ascii();
 #ifdef CONFIG_PROC_FS
 	proc_root_mtrr =
 	    create_proc_entry("mtrr", S_IWUSR | S_IRUGO, &proc_root);

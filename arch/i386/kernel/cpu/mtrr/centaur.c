@@ -26,7 +26,8 @@ centaur_get_free_region(unsigned long base, unsigned long size)
 {
 	int i, max;
 	mtrr_type ltype;
-	unsigned long lbase, lsize;
+	unsigned long lbase;
+	unsigned int lsize;
 
 	max = num_var_ranges;
 	for (i = 0; i < max; ++i) {
@@ -48,7 +49,7 @@ mtrr_centaur_report_mcr(int mcr, u32 lo, u32 hi)
 
 static void
 centaur_get_mcr(unsigned int reg, unsigned long *base,
-		unsigned long *size, mtrr_type * type)
+		unsigned int *size, mtrr_type * type)
 {
 	*base = centaur_mcr[reg].high >> PAGE_SHIFT;
 	*size = -(centaur_mcr[reg].low & 0xfffff000) >> PAGE_SHIFT;

@@ -9,7 +9,7 @@ int arr3_protected;
 
 static void
 cyrix_get_arr(unsigned int reg, unsigned long *base,
-	      unsigned long *size, mtrr_type * type)
+	      unsigned int *size, mtrr_type * type)
 {
 	unsigned long flags;
 	unsigned char arr, ccr3, rcr, shift;
@@ -86,7 +86,8 @@ cyrix_get_free_region(unsigned long base, unsigned long size)
 {
 	int i;
 	mtrr_type ltype;
-	unsigned long lbase, lsize;
+	unsigned long lbase;
+	unsigned int  lsize;
 
 	/* If we are to set up a region >32M then look at ARR7 immediately */
 	if (size > 0x2000) {
@@ -213,7 +214,7 @@ static void cyrix_set_arr(unsigned int reg, unsigned long base,
 
 typedef struct {
 	unsigned long base;
-	unsigned long size;
+	unsigned int size;
 	mtrr_type type;
 } arr_state_t;
 

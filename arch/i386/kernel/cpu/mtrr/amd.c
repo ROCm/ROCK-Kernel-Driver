@@ -7,7 +7,7 @@
 
 static void
 amd_get_mtrr(unsigned int reg, unsigned long *base,
-	     unsigned long *size, mtrr_type * type)
+	     unsigned int *size, mtrr_type * type)
 {
 	unsigned long low, high;
 

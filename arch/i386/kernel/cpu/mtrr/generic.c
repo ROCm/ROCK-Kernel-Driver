@@ -1,3 +1,5 @@
+/* This only handles 32bit MTRR on 32bit hosts. This is strictly wrong
+   because MTRRs can span upto 40 bits (36bits on most modern x86) */ 
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/mm.h>
@@ -30,7 +32,7 @@ get_mtrr_var_range(unsigned int index, struct mtrr_var_range *vr)
 static void __init
 get_fixed_ranges(mtrr_type * frs)
 {
-	unsigned long *p = (unsigned long *) frs;
+	unsigned int *p = (unsigned int *) frs;
 	int i;
 
 	rdmsr(MTRRfix64K_00000_MSR, p[0], p[1]);
@@ -46,7 +48,7 @@ void get_mtrr_state(void)
 {
 	unsigned int i;
 	struct mtrr_var_range *vrs;
-	unsigned long lo, dummy;
+	unsigned lo, dummy;
 
 	if (!mtrr_state.var_ranges) {
 		mtrr_state.var_ranges = kmalloc(num_var_ranges * sizeof (struct mtrr_var_range), 
@@ -102,7 +104,8 @@ int generic_get_free_region(unsigned long base, unsigned long size)
 {
 	int i, max;
 	mtrr_type ltype;
-	unsigned long lbase, lsize;
+	unsigned long lbase;
+	unsigned lsize;
 
 	max = num_var_ranges;
 	for (i = 0; i < max; ++i) {
@@ -113,11 +116,10 @@ int generic_get_free_region(unsigned long base, unsigned long size)
 	return -ENOSPC;
 }
 
-
 void generic_get_mtrr(unsigned int reg, unsigned long *base,
-		      unsigned long *size, mtrr_type * type)
+		      unsigned int *size, mtrr_type * type)
 {
-	unsigned long mask_lo, mask_hi, base_lo, base_hi;
+	unsigned int mask_lo, mask_hi, base_lo, base_hi;
 
 	rdmsr(MTRRphysMask_MSR(reg), mask_lo, mask_hi);
 	if ((mask_lo & 0x800) == 0) {
@@ -143,10 +145,10 @@ void generic_get_mtrr(unsigned int reg, unsigned long *base,
 
 static int __init set_fixed_ranges(mtrr_type * frs)
 {
-	unsigned long *p = (unsigned long *) frs;
+	unsigned int *p = (unsigned int *) frs;
 	int changed = FALSE;
 	int i;
-	unsigned long lo, hi;
+	unsigned int lo, hi;
 
 	rdmsr(MTRRfix64K_00000_MSR, lo, hi);
 	if (p[0] != lo || p[1] != hi) {
@@ -228,13 +230,13 @@ static unsigned long set_mtrr_state(u32 deftype_lo, u32 deftype_hi)
 }
 
 
-static u32 cr4 = 0;
+static unsigned long cr4 = 0;
 static u32 deftype_lo, deftype_hi;
 static spinlock_t set_atomicity_lock = SPIN_LOCK_UNLOCKED;
 
 static void prepare_set(void)
 {
-	u32 cr0;
+	unsigned long cr0;
 
 	/*  Note that this is not ideal, since the cache is only flushed/disabled
 	   for this CPU while the MTRRs are changed, but changing this requires
