@@ -66,3 +66,27 @@
 extern void ISACVersion(struct IsdnCardState *cs, char *s);
 extern void initisac(struct IsdnCardState *cs);
 extern void isac_interrupt(struct IsdnCardState *cs, u_char val);
+
+static inline u8
+isac_read_reg(struct IsdnCardState *cs, u8 addr)
+{
+	return cs->readisac(cs, addr);
+}
+
+static inline void
+isac_write_reg(struct IsdnCardState *cs, u8 addr, u8 val)
+{
+	cs->writeisac(cs, addr, val);
+}
+
+static inline void
+isac_read_fifo(struct IsdnCardState *cs, u8 *p, int len)
+{
+	return cs->readisacfifo(cs, p, len);
+}
+
+static inline void
+isac_write_fifo(struct IsdnCardState *cs, u8 *p, int len)
+{
+	return cs->writeisacfifo(cs, p, len);
+}

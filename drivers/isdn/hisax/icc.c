@@ -25,6 +25,30 @@
 #define ARCOFI_USE 0
 static spinlock_t icc_lock = SPIN_LOCK_UNLOCKED;
 
+static inline u8
+icc_read_reg(struct IsdnCardState *cs, u8 addr)
+{
+	return cs->readisac(cs, addr);
+}
+
+static inline void
+icc_write_reg(struct IsdnCardState *cs, u8 addr, u8 val)
+{
+	cs->writeisac(cs, addr, val);
+}
+
+static inline void
+icc_read_fifo(struct IsdnCardState *cs, u8 *p, int len)
+{
+	return cs->readisacfifo(cs, p, len);
+}
+
+static inline void
+icc_write_fifo(struct IsdnCardState *cs, u8 *p, int len)
+{
+	return cs->writeisacfifo(cs, p, len);
+}
+
 static char *ICCVer[] __initdata =
 {"2070 A1/A3", "2070 B1", "2070 B2/B3", "2070 V2.4"};
 
@@ -33,7 +57,7 @@ ICCVersion(struct IsdnCardState *cs, char *s)
 {
 	int val;
 
-	val = cs->readisac(cs, ICC_RBCH);
+	val = icc_read_reg(cs, ICC_RBCH);
 	printk(KERN_INFO "%s ICC version (%x): %s\n", s, val, ICCVer[(val >> 5) & 3]);
 }
 
@@ -42,7 +66,7 @@ ph_command(struct IsdnCardState *cs, unsigned int command)
 {
 	if (cs->debug & L1_DEB_ISAC)
 		debugl1(cs, "ph_command %x", command);
-	cs->writeisac(cs, ICC_CIX0, (command << 2) | 3);
+	icc_write_reg(cs, ICC_CIX0, (command << 2) | 3);
 }
 
 
@@ -123,15 +147,15 @@ icc_empty_fifo(struct IsdnCardState *cs, int count)
 		if (cs->debug & L1_DEB_WARN)
 			debugl1(cs, "icc_empty_fifo overrun %d",
 				cs->rcvidx + count);
-		cs->writeisac(cs, ICC_CMDR, 0x80);
+		icc_write_reg(cs, ICC_CMDR, 0x80);
 		cs->rcvidx = 0;
 		return;
 	}
 	ptr = cs->rcvbuf + cs->rcvidx;
 	cs->rcvidx += count;
 	spin_lock_irqsave(&icc_lock, flags);
-	cs->readisacfifo(cs, ptr, count);
-	cs->writeisac(cs, ICC_CMDR, 0x80);
+	icc_read_fifo(cs, ptr, count);
+	icc_write_reg(cs, ICC_CMDR, 0x80);
 	spin_unlock_irqrestore(&icc_lock, flags);
 	if (cs->debug & L1_DEB_ISAC_FIFO) {
 		char *t = cs->dlog;
@@ -154,8 +178,8 @@ icc_fill_fifo(struct IsdnCardState *cs)
 		return;
 
 	spin_lock_irqsave(&icc_lock, flags);
-	cs->writeisacfifo(cs, p, count);
-	cs->writeisac(cs, ICC_CMDR, more ? 0x8 : 0xa);
+	icc_write_fifo(cs, p, count);
+	icc_write_reg(cs, ICC_CMDR, more ? 0x8 : 0xa);
 	if (test_and_set_bit(FLG_DBUSY_TIMER, &cs->HW_Flags)) {
 		debugl1(cs, "icc_fill_fifo dbusytimer running");
 		del_timer(&cs->dbusytimer);
@@ -177,7 +201,7 @@ icc_interrupt(struct IsdnCardState *cs, u_char val)
 	if (cs->debug & L1_DEB_ISAC)
 		debugl1(cs, "ICC interrupt %x", val);
 	if (val & 0x80) {	/* RME */
-		exval = cs->readisac(cs, ICC_RSTA);
+		exval = icc_read_reg(cs, ICC_RSTA);
 		if ((exval & 0x70) != 0x20) {
 			if (exval & 0x40) {
 				if (cs->debug & L1_DEB_WARN)
@@ -193,9 +217,9 @@ icc_interrupt(struct IsdnCardState *cs, u_char val)
 				cs->err_crc++;
 #endif
 			}
-			cs->writeisac(cs, ICC_CMDR, 0x80);
+			icc_write_reg(cs, ICC_CMDR, 0x80);
 		} else {
-			count = cs->readisac(cs, ICC_RBCL) & 0x1f;
+			count = icc_read_reg(cs, ICC_RBCL) & 0x1f;
 			if (count == 0)
 				count = 32;
 			icc_empty_fifo(cs, count);
@@ -226,7 +250,7 @@ icc_interrupt(struct IsdnCardState *cs, u_char val)
 		xmit_xpr_d(cs);
 	}
 	if (val & 0x04) {	/* CISQ */
-		exval = cs->readisac(cs, ICC_CIR0);
+		exval = icc_read_reg(cs, ICC_CIR0);
 		if (cs->debug & L1_DEB_ISAC)
 			debugl1(cs, "ICC CIR0 %02X", exval );
 		if (exval & 2) {
@@ -236,7 +260,7 @@ icc_interrupt(struct IsdnCardState *cs, u_char val)
 			sched_d_event(cs, D_L1STATECHANGE);
 		}
 		if (exval & 1) {
-			exval = cs->readisac(cs, ICC_CIR1);
+			exval = icc_read_reg(cs, ICC_CIR1);
 			if (cs->debug & L1_DEB_ISAC)
 				debugl1(cs, "ICC CIR1 %02X", exval );
 		}
@@ -247,7 +271,7 @@ icc_interrupt(struct IsdnCardState *cs, u_char val)
 			debugl1(cs, "ICC SIN interrupt");
 	}
 	if (val & 0x01) {	/* EXI */
-		exval = cs->readisac(cs, ICC_EXIR);
+		exval = icc_read_reg(cs, ICC_EXIR);
 		if (cs->debug & L1_DEB_WARN)
 			debugl1(cs, "ICC EXIR %02x", exval);
 		if (exval & 0x80) {  /* XMR */
@@ -258,7 +282,7 @@ icc_interrupt(struct IsdnCardState *cs, u_char val)
 			xmit_xdu_d(cs, NULL);
 		}
 		if (exval & 0x04) {  /* MOS */
-			v1 = cs->readisac(cs, ICC_MOSR);
+			v1 = icc_read_reg(cs, ICC_MOSR);
 			if (cs->debug & L1_DEB_MONITOR)
 				debugl1(cs, "ICC MOSR %02x", v1);
 #if ARCOFI_USE
@@ -269,7 +293,7 @@ icc_interrupt(struct IsdnCardState *cs, u_char val)
 							debugl1(cs, "ICC MON RX out of memory!");
 						cs->dc.icc.mocr &= 0xf0;
 						cs->dc.icc.mocr |= 0x0a;
-						cs->writeisac(cs, ICC_MOCR, cs->dc.icc.mocr);
+						icc_write_reg(cs, ICC_MOCR, cs->dc.icc.mocr);
 						goto afterMONR0;
 					} else
 						cs->dc.icc.mon_rxp = 0;
@@ -277,18 +301,18 @@ icc_interrupt(struct IsdnCardState *cs, u_char val)
 				if (cs->dc.icc.mon_rxp >= MAX_MON_FRAME) {
 					cs->dc.icc.mocr &= 0xf0;
 					cs->dc.icc.mocr |= 0x0a;
-					cs->writeisac(cs, ICC_MOCR, cs->dc.icc.mocr);
+					icc_write_reg(cs, ICC_MOCR, cs->dc.icc.mocr);
 					cs->dc.icc.mon_rxp = 0;
 					if (cs->debug & L1_DEB_WARN)
 						debugl1(cs, "ICC MON RX overflow!");
 					goto afterMONR0;
 				}
-				cs->dc.icc.mon_rx[cs->dc.icc.mon_rxp++] = cs->readisac(cs, ICC_MOR0);
+				cs->dc.icc.mon_rx[cs->dc.icc.mon_rxp++] = icc_read_reg(cs, ICC_MOR0);
 				if (cs->debug & L1_DEB_MONITOR)
 					debugl1(cs, "ICC MOR0 %02x", cs->dc.icc.mon_rx[cs->dc.icc.mon_rxp -1]);
 				if (cs->dc.icc.mon_rxp == 1) {
 					cs->dc.icc.mocr |= 0x04;
-					cs->writeisac(cs, ICC_MOCR, cs->dc.icc.mocr);
+					icc_write_reg(cs, ICC_MOCR, cs->dc.icc.mocr);
 				}
 			}
 		      afterMONR0:
@@ -299,7 +323,7 @@ icc_interrupt(struct IsdnCardState *cs, u_char val)
 							debugl1(cs, "ICC MON RX out of memory!");
 						cs->dc.icc.mocr &= 0x0f;
 						cs->dc.icc.mocr |= 0xa0;
-						cs->writeisac(cs, ICC_MOCR, cs->dc.icc.mocr);
+						icc_write_reg(cs, ICC_MOCR, cs->dc.icc.mocr);
 						goto afterMONR1;
 					} else
 						cs->dc.icc.mon_rxp = 0;
@@ -307,31 +331,31 @@ icc_interrupt(struct IsdnCardState *cs, u_char val)
 				if (cs->dc.icc.mon_rxp >= MAX_MON_FRAME) {
 					cs->dc.icc.mocr &= 0x0f;
 					cs->dc.icc.mocr |= 0xa0;
-					cs->writeisac(cs, ICC_MOCR, cs->dc.icc.mocr);
+					icc_write_reg(cs, ICC_MOCR, cs->dc.icc.mocr);
 					cs->dc.icc.mon_rxp = 0;
 					if (cs->debug & L1_DEB_WARN)
 						debugl1(cs, "ICC MON RX overflow!");
 					goto afterMONR1;
 				}
-				cs->dc.icc.mon_rx[cs->dc.icc.mon_rxp++] = cs->readisac(cs, ICC_MOR1);
+				cs->dc.icc.mon_rx[cs->dc.icc.mon_rxp++] = icc_read_reg(cs, ICC_MOR1);
 				if (cs->debug & L1_DEB_MONITOR)
 					debugl1(cs, "ICC MOR1 %02x", cs->dc.icc.mon_rx[cs->dc.icc.mon_rxp -1]);
 				cs->dc.icc.mocr |= 0x40;
-				cs->writeisac(cs, ICC_MOCR, cs->dc.icc.mocr);
+				icc_write_reg(cs, ICC_MOCR, cs->dc.icc.mocr);
 			}
 		      afterMONR1:
 			if (v1 & 0x04) {
 				cs->dc.icc.mocr &= 0xf0;
-				cs->writeisac(cs, ICC_MOCR, cs->dc.icc.mocr);
+				icc_write_reg(cs, ICC_MOCR, cs->dc.icc.mocr);
 				cs->dc.icc.mocr |= 0x0a;
-				cs->writeisac(cs, ICC_MOCR, cs->dc.icc.mocr);
+				icc_write_reg(cs, ICC_MOCR, cs->dc.icc.mocr);
 				sched_d_event(cs, D_RX_MON0);
 			}
 			if (v1 & 0x40) {
 				cs->dc.icc.mocr &= 0x0f;
-				cs->writeisac(cs, ICC_MOCR, cs->dc.icc.mocr);
+				icc_write_reg(cs, ICC_MOCR, cs->dc.icc.mocr);
 				cs->dc.icc.mocr |= 0xa0;
-				cs->writeisac(cs, ICC_MOCR, cs->dc.icc.mocr);
+				icc_write_reg(cs, ICC_MOCR, cs->dc.icc.mocr);
 				sched_d_event(cs, D_RX_MON1);
 			}
 			if (v1 & 0x02) {
@@ -339,9 +363,9 @@ icc_interrupt(struct IsdnCardState *cs, u_char val)
 					(cs->dc.icc.mon_txp >= cs->dc.icc.mon_txc) && 
 					!(v1 & 0x08))) {
 					cs->dc.icc.mocr &= 0xf0;
-					cs->writeisac(cs, ICC_MOCR, cs->dc.icc.mocr);
+					icc_write_reg(cs, ICC_MOCR, cs->dc.icc.mocr);
 					cs->dc.icc.mocr |= 0x0a;
-					cs->writeisac(cs, ICC_MOCR, cs->dc.icc.mocr);
+					icc_write_reg(cs, ICC_MOCR, cs->dc.icc.mocr);
 					if (cs->dc.icc.mon_txc &&
 						(cs->dc.icc.mon_txp >= cs->dc.icc.mon_txc))
 						sched_d_event(cs, D_TX_MON0);
@@ -351,7 +375,7 @@ icc_interrupt(struct IsdnCardState *cs, u_char val)
 					sched_d_event(cs, D_TX_MON0);
 					goto AfterMOX0;
 				}
-				cs->writeisac(cs, ICC_MOX0,
+				icc_write_reg(cs, ICC_MOX0,
 					cs->dc.icc.mon_tx[cs->dc.icc.mon_txp++]);
 				if (cs->debug & L1_DEB_MONITOR)
 					debugl1(cs, "ICC %02x -> MOX0", cs->dc.icc.mon_tx[cs->dc.icc.mon_txp -1]);
@@ -362,9 +386,9 @@ icc_interrupt(struct IsdnCardState *cs, u_char val)
 					(cs->dc.icc.mon_txp >= cs->dc.icc.mon_txc) && 
 					!(v1 & 0x80))) {
 					cs->dc.icc.mocr &= 0x0f;
-					cs->writeisac(cs, ICC_MOCR, cs->dc.icc.mocr);
+					icc_write_reg(cs, ICC_MOCR, cs->dc.icc.mocr);
 					cs->dc.icc.mocr |= 0xa0;
-					cs->writeisac(cs, ICC_MOCR, cs->dc.icc.mocr);
+					icc_write_reg(cs, ICC_MOCR, cs->dc.icc.mocr);
 					if (cs->dc.icc.mon_txc &&
 						(cs->dc.icc.mon_txp >= cs->dc.icc.mon_txc))
 						sched_d_event(cs, D_TX_MON1);
@@ -374,7 +398,7 @@ icc_interrupt(struct IsdnCardState *cs, u_char val)
 					sched_d_event(cs, D_TX_MON1);
 					goto AfterMOX1;
 				}
-				cs->writeisac(cs, ICC_MOX1,
+				icc_write_reg(cs, ICC_MOX1,
 					cs->dc.icc.mon_tx[cs->dc.icc.mon_txp++]);
 				if (cs->debug & L1_DEB_MONITOR)
 					debugl1(cs, "ICC %02x -> MOX1", cs->dc.icc.mon_tx[cs->dc.icc.mon_txp -1]);
@@ -427,19 +451,19 @@ ICC_l1hw(struct PStack *st, int pr, void *arg)
 			if (test_bit(HW_IOM1, &cs->HW_Flags)) {
 				/* IOM 1 Mode */
 				if (!val) {
-					cs->writeisac(cs, ICC_SPCR, 0xa);
-					cs->writeisac(cs, ICC_ADF1, 0x2);
+					icc_write_reg(cs, ICC_SPCR, 0xa);
+					icc_write_reg(cs, ICC_ADF1, 0x2);
 				} else {
-					cs->writeisac(cs, ICC_SPCR, val);
-					cs->writeisac(cs, ICC_ADF1, 0xa);
+					icc_write_reg(cs, ICC_SPCR, val);
+					icc_write_reg(cs, ICC_ADF1, 0xa);
 				}
 			} else {
 				/* IOM 2 Mode */
-				cs->writeisac(cs, ICC_SPCR, val);
+				icc_write_reg(cs, ICC_SPCR, val);
 				if (val)
-					cs->writeisac(cs, ICC_ADF1, 0x8);
+					icc_write_reg(cs, ICC_ADF1, 0x8);
 				else
-					cs->writeisac(cs, ICC_ADF1, 0x0);
+					icc_write_reg(cs, ICC_ADF1, 0x0);
 			}
 			break;
 		case (HW_DEACTIVATE | RESPONSE):
@@ -486,8 +510,8 @@ dbusy_timer_handler(struct IsdnCardState *cs)
 	int	rbch, star;
 
 	if (test_bit(FLG_DBUSY_TIMER, &cs->HW_Flags)) {
-		rbch = cs->readisac(cs, ICC_RBCH);
-		star = cs->readisac(cs, ICC_STAR);
+		rbch = icc_read_reg(cs, ICC_RBCH);
+		star = icc_read_reg(cs, ICC_STAR);
 		if (cs->debug) 
 			debugl1(cs, "D-Channel Busy RBCH %02x STAR %02x",
 				rbch, star);
@@ -509,7 +533,7 @@ dbusy_timer_handler(struct IsdnCardState *cs)
 				printk(KERN_WARNING "HiSax: ICC D-Channel Busy no skb\n");
 				debugl1(cs, "D-Channel Busy no skb");
 			}
-			cs->writeisac(cs, ICC_CMDR, 0x01); /* Transmitter reset */
+			icc_write_reg(cs, ICC_CMDR, 0x01); /* Transmitter reset */
 			cs->irq_func(cs->irq, cs, NULL);
 		}
 	}
@@ -530,46 +554,46 @@ initicc(struct IsdnCardState *cs)
 	cs->dbusytimer.data = (long) cs;
 	init_timer(&cs->dbusytimer);
 
-	val = cs->readisac(cs, ICC_STAR);
+	val = icc_read_reg(cs, ICC_STAR);
 	debugl1(cs, "ICC STAR %x", val);
-	val = cs->readisac(cs, ICC_MODE);
+	val = icc_read_reg(cs, ICC_MODE);
 	debugl1(cs, "ICC MODE %x", val);
-	val = cs->readisac(cs, ICC_ADF2);
+	val = icc_read_reg(cs, ICC_ADF2);
 	debugl1(cs, "ICC ADF2 %x", val);
-	val = cs->readisac(cs, ICC_ISTA);
+	val = icc_read_reg(cs, ICC_ISTA);
 	debugl1(cs, "ICC ISTA %x", val);
 	if (val & 0x01) {
-		eval = cs->readisac(cs, ICC_EXIR);
+		eval = icc_read_reg(cs, ICC_EXIR);
 		debugl1(cs, "ICC EXIR %x", eval);
 	}
-	val = cs->readisac(cs, ICC_CIR0);
+	val = icc_read_reg(cs, ICC_CIR0);
 	debugl1(cs, "ICC CIR0 %x", val);
 	cs->dc.icc.ph_state = (val >> 2) & 0xf;
 	sched_d_event(cs, D_L1STATECHANGE);
 	/* Disable all IRQ */
-	cs->writeisac(cs, ICC_MASK, 0xFF);
+	icc_write_reg(cs, ICC_MASK, 0xFF);
 
   	cs->dc.icc.mocr = 0xaa;
 	if (test_bit(HW_IOM1, &cs->HW_Flags)) {
 		/* IOM 1 Mode */
-		cs->writeisac(cs, ICC_ADF2, 0x0);
-		cs->writeisac(cs, ICC_SPCR, 0xa);
-		cs->writeisac(cs, ICC_ADF1, 0x2);
-		cs->writeisac(cs, ICC_STCR, 0x70);
-		cs->writeisac(cs, ICC_MODE, 0xc9);
+		icc_write_reg(cs, ICC_ADF2, 0x0);
+		icc_write_reg(cs, ICC_SPCR, 0xa);
+		icc_write_reg(cs, ICC_ADF1, 0x2);
+		icc_write_reg(cs, ICC_STCR, 0x70);
+		icc_write_reg(cs, ICC_MODE, 0xc9);
 	} else {
 		/* IOM 2 Mode */
 		if (!cs->dc.icc.adf2)
 			cs->dc.icc.adf2 = 0x80;
-		cs->writeisac(cs, ICC_ADF2, cs->dc.icc.adf2);
-		cs->writeisac(cs, ICC_SQXR, 0xa0);
-		cs->writeisac(cs, ICC_SPCR, 0x20);
-		cs->writeisac(cs, ICC_STCR, 0x70);
-		cs->writeisac(cs, ICC_MODE, 0xca);
-		cs->writeisac(cs, ICC_TIMR, 0x00);
-		cs->writeisac(cs, ICC_ADF1, 0x20);
+		icc_write_reg(cs, ICC_ADF2, cs->dc.icc.adf2);
+		icc_write_reg(cs, ICC_SQXR, 0xa0);
+		icc_write_reg(cs, ICC_SPCR, 0x20);
+		icc_write_reg(cs, ICC_STCR, 0x70);
+		icc_write_reg(cs, ICC_MODE, 0xca);
+		icc_write_reg(cs, ICC_TIMR, 0x00);
+		icc_write_reg(cs, ICC_ADF1, 0x20);
 	}
 	ph_command(cs, ICC_CMD_RES);
-	cs->writeisac(cs, ICC_MASK, 0x0);
+	icc_write_reg(cs, ICC_MASK, 0x0);
 	ph_command(cs, ICC_CMD_DI);
 }

@@ -43,11 +43,11 @@ send_arcofi(struct IsdnCardState *cs) {
 	}
 	cs->dc.isac.mocr &= 0x0f;
 	cs->dc.isac.mocr |= 0xa0;
-	cs->writeisac(cs, ISAC_MOCR, cs->dc.isac.mocr);
-	val = cs->readisac(cs, ISAC_MOSR);
-	cs->writeisac(cs, ISAC_MOX1, cs->dc.isac.mon_tx[cs->dc.isac.mon_txp++]);
+	isac_write_reg(cs, ISAC_MOCR, cs->dc.isac.mocr);
+	val = isac_read_reg(cs, ISAC_MOSR);
+	isac_write_reg(cs, ISAC_MOX1, cs->dc.isac.mon_tx[cs->dc.isac.mon_txp++]);
 	cs->dc.isac.mocr |= 0x10;
-	cs->writeisac(cs, ISAC_MOCR, cs->dc.isac.mocr);
+	isac_write_reg(cs, ISAC_MOCR, cs->dc.isac.mocr);
 }
 
 int
