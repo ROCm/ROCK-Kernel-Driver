@@ -1337,7 +1337,7 @@ int pcmcia_get_status(client_handle_t handle, cs_status_t *status)
     } else
 	c = CONFIG(handle);
     if ((c != NULL) && (c->state & CONFIG_LOCKED) &&
-	(c->IntType & INT_MEMORY_AND_IO)) {
+	(c->IntType & (INT_MEMORY_AND_IO | INT_ZOOMED_VIDEO))) {
 	u_char reg;
 	if (c->Present & PRESENT_PIN_REPLACE) {
 	    read_cis_mem(s, 1, (c->ConfigBase+CISREG_PRR)>>1, 1, &reg);
@@ -1748,6 +1748,8 @@ int pcmcia_request_configuration(client_handle_t handle,
     c->Attributes = req->Attributes;
     if (req->IntType & INT_MEMORY_AND_IO)
 	s->socket.flags |= SS_IOCARD;
+    if (req->IntType & INT_ZOOMED_VIDEO)
+	s->socket.flags |= SS_ZVCARD | SS_IOCARD;
     if (req->Attributes & CONF_ENABLE_DMA)
 	s->socket.flags |= SS_DMA_MODE;
     if (req->Attributes & CONF_ENABLE_SPKR)
