@@ -539,6 +539,8 @@ static int idescsi_cleanup (ide_drive_t *drive)
 	return 0;
 }
 
+static int idescsi_reinit(ide_drive_t *drive);
+
 /*
  *	IDE subdriver functions, registered with ide.c
  */
@@ -549,6 +551,7 @@ static ide_driver_t idescsi_driver = {
 	busy:			0,
 	supports_dma:		1,
 	supports_dsc_overlap:	0,
+	reinit:			idescsi_reinit,
 	cleanup:		idescsi_cleanup,
 	standby:		NULL,
 	flushcache:		NULL,
@@ -573,15 +576,39 @@ static ide_module_t idescsi_module = {
 	NULL
 };
 
+static int idescsi_reinit(ide_drive_t *drive)
+{
+	idescsi_scsi_t *scsi;
+	int id;
+
+	MOD_INC_USE_COUNT;
+
+	if ((scsi = (idescsi_scsi_t *) kmalloc (sizeof (idescsi_scsi_t), GFP_KERNEL)) == NULL) {
+		printk (KERN_ERR "ide-scsi: %s: Can't allocate a scsi structure\n", drive->name);
+		MOD_DEC_USE_COUNT;
+		return 1;
+	}
+	if (ide_register_subdriver (drive, &idescsi_driver, IDE_SUBDRIVER_VERSION)) {
+		printk (KERN_ERR "ide-scsi: %s: Failed to register the driver with ide.c\n", drive->name);
+		kfree (scsi);
+		MOD_DEC_USE_COUNT;
+		return 1;
+	}
+	for (id = 0; id < MAX_HWIFS * MAX_DRIVES && idescsi_drives[id]; id++)
+		;
+	idescsi_setup (drive, scsi, id);
+	MOD_DEC_USE_COUNT;
+	return 0;
+}
+
 /*
  *	idescsi_init will register the driver for each scsi.
  */
 int idescsi_init (void)
 {
 	ide_drive_t *drive;
-	idescsi_scsi_t *scsi;
 	byte media[] = {TYPE_DISK, TYPE_TAPE, TYPE_PROCESSOR, TYPE_WORM, TYPE_ROM, TYPE_SCANNER, TYPE_MOD, 255};
-	int i, failed, id;
+	int i, failed;
 
 	if (idescsi_initialized)
 		return 0;
@@ -592,18 +619,8 @@ int idescsi_init (void)
 	for (i = 0; media[i] != 255; i++) {
 		failed = 0;
 		while ((drive = ide_scan_devices (media[i], idescsi_driver.name, NULL, failed++)) != NULL) {
-
-			if ((scsi = (idescsi_scsi_t *) kmalloc (sizeof (idescsi_scsi_t), GFP_KERNEL)) == NULL) {
-				printk (KERN_ERR "ide-scsi: %s: Can't allocate a scsi structure\n", drive->name);
+			if (idescsi_reinit(drive))
 				continue;
-			}
-			if (ide_register_subdriver (drive, &idescsi_driver, IDE_SUBDRIVER_VERSION)) {
-				printk (KERN_ERR "ide-scsi: %s: Failed to register the driver with ide.c\n", drive->name);
-				kfree (scsi);
-				continue;
-			}
-			for (id = 0; id < MAX_HWIFS * MAX_DRIVES && idescsi_drives[id]; id++);
-				idescsi_setup (drive, scsi, id);
 			failed--;
 		}
 	}

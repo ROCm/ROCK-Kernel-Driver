@@ -1682,14 +1682,13 @@ static ide_module_t idedisk_module = {
 
 MODULE_DESCRIPTION("ATA DISK Driver");
 
-int idedisk_reinit (ide_drive_t *drive)
+int idedisk_reinit(ide_drive_t *drive)
 {
-	int failed = 0;
-
 	MOD_INC_USE_COUNT;
 
 	if (ide_register_subdriver (drive, &idedisk_driver, IDE_SUBDRIVER_VERSION)) {
 		printk (KERN_ERR "ide-disk: %s: Failed to register the driver with ide.c\n", drive->name);
+		MOD_DEC_USE_COUNT;
 		return 1;
 	}
 	DRIVER(drive)->busy++;
@@ -1699,12 +1698,10 @@ int idedisk_reinit (ide_drive_t *drive)
 			drive->name, drive->head);
 		(void) idedisk_cleanup(drive);
 		DRIVER(drive)->busy--;
+		MOD_DEC_USE_COUNT;
 		return 1;
 	}
 	DRIVER(drive)->busy--;
-	failed--;
-
-	ide_register_module(&idedisk_module);
 	MOD_DEC_USE_COUNT;
 	return 0;
 }
@@ -1736,19 +1733,8 @@ int idedisk_init (void)
 	
 	MOD_INC_USE_COUNT;
 	while ((drive = ide_scan_devices (ide_disk, idedisk_driver.name, NULL, failed++)) != NULL) {
-		if (ide_register_subdriver (drive, &idedisk_driver, IDE_SUBDRIVER_VERSION)) {
-			printk (KERN_ERR "ide-disk: %s: Failed to register the driver with ide.c\n", drive->name);
+		if (idedisk_reinit(drive))
 			continue;
-		}
-		DRIVER(drive)->busy++;
-		idedisk_setup(drive);
-		if ((!drive->head || drive->head > 16) && !drive->select.b.lba) {
-			printk(KERN_ERR "%s: INVALID GEOMETRY: %d PHYSICAL HEADS?\n", drive->name, drive->head);
-			(void) idedisk_cleanup(drive);
-			DRIVER(drive)->busy--;
-			continue;
-		}
-		DRIVER(drive)->busy--;
 		failed--;
 	}
 	ide_register_module(&idedisk_module);

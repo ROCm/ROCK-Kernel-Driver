@@ -3101,17 +3101,18 @@ MODULE_DESCRIPTION("ATAPI CD-ROM Driver");
 int ide_cdrom_reinit (ide_drive_t *drive)
 {
 	struct cdrom_info *info;
-	int failed = 0;
 
 	MOD_INC_USE_COUNT;
 	info = (struct cdrom_info *) kmalloc (sizeof (struct cdrom_info), GFP_KERNEL);
 	if (info == NULL) {
 		printk ("%s: Can't allocate a cdrom structure\n", drive->name);
+		MOD_DEC_USE_COUNT;
 		return 1;
 	}
 	if (ide_register_subdriver (drive, &ide_cdrom_driver, IDE_SUBDRIVER_VERSION)) {
 		printk ("%s: Failed to register the driver with ide.c\n", drive->name);
 		kfree (info);
+		MOD_DEC_USE_COUNT;
 		return 1;
 	}
 	memset (info, 0, sizeof (struct cdrom_info));
@@ -3121,12 +3122,10 @@ int ide_cdrom_reinit (ide_drive_t *drive)
 		DRIVER(drive)->busy--;
 		if (ide_cdrom_cleanup (drive))
 			printk ("%s: ide_cdrom_cleanup failed in ide_cdrom_init\n", drive->name);
+		MOD_DEC_USE_COUNT;
 		return 1;
 	}
 	DRIVER(drive)->busy--;
-	failed--;
-
-	ide_register_module(&ide_cdrom_module);
 	MOD_DEC_USE_COUNT;
 	return 0;
 }
@@ -3147,7 +3146,6 @@ static void __exit ide_cdrom_exit(void)
 int ide_cdrom_init(void)
 {
 	ide_drive_t *drive;
-	struct cdrom_info *info;
 	int failed = 0;
 
 	MOD_INC_USE_COUNT;
@@ -3163,26 +3161,8 @@ int ide_cdrom_init(void)
 			printk("ide-cd: passing drive %s to ide-scsi emulation.\n", drive->name);
 			continue;
 		}
-		info = (struct cdrom_info *) kmalloc (sizeof (struct cdrom_info), GFP_KERNEL);
-		if (info == NULL) {
-			printk ("%s: Can't allocate a cdrom structure\n", drive->name);
+		if (ide_cdrom_reinit(drive))
 			continue;
-		}
-		if (ide_register_subdriver (drive, &ide_cdrom_driver, IDE_SUBDRIVER_VERSION)) {
-			printk ("%s: Failed to register the driver with ide.c\n", drive->name);
-			kfree (info);
-			continue;
-		}
-		memset (info, 0, sizeof (struct cdrom_info));
-		drive->driver_data = info;
-		DRIVER(drive)->busy++;
-		if (ide_cdrom_setup (drive)) {
-			DRIVER(drive)->busy--;
-			if (ide_cdrom_cleanup (drive))
-				printk ("%s: ide_cdrom_cleanup failed in ide_cdrom_init\n", drive->name);
-			continue;
-		}
-		DRIVER(drive)->busy--;
 		failed--;
 	}
 	ide_register_module(&ide_cdrom_module);

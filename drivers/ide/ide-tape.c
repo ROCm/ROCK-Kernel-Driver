@@ -6367,89 +6367,53 @@ static struct file_operations idetape_fops = {
 
 int idetape_reinit (ide_drive_t *drive)
 {
-#if 0
 	idetape_tape_t *tape;
-	int minor, failed = 0, supported = 0;
-/* DRIVER(drive)->busy++; */
+	int minor;
+
 	MOD_INC_USE_COUNT;
-#if ONSTREAM_DEBUG
-        printk(KERN_INFO "ide-tape: MOD_INC_USE_COUNT in idetape_init\n");
-#endif
-	if (!idetape_chrdev_present)
-		for (minor = 0; minor < MAX_HWIFS * MAX_DRIVES; minor++ )
-			idetape_chrdevs[minor].drive = NULL;
-
-	if ((drive = ide_scan_devices(ide_tape, idetape_driver.name, NULL, failed++)) == NULL) {
-		ide_register_module(&idetape_module);
+	if (!idetape_identify_device (drive, drive->id)) {
+		printk(KERN_ERR "ide-tape: %s: not supported by this version of ide-tape\n", drive->name);
 		MOD_DEC_USE_COUNT;
-#if ONSTREAM_DEBUG
-		printk(KERN_INFO "ide-tape: MOD_DEC_USE_COUNT in idetape_init\n");
-#endif
-		return 0;
+		return 1;
 	}
-	if (!idetape_chrdev_present &&
-	    register_chrdev(IDETAPE_MAJOR, "ht", &idetape_fops)) {
-		printk(KERN_ERR "ide-tape: Failed to register character device interface\n");
+	if (drive->scsi) {
+		if (strstr(drive->id->model, "OnStream DI-")) {
+			printk("ide-tape: ide-scsi emulation is not supported for %s.\n", drive->id->model);
+		} else {
+			printk("ide-tape: passing drive %s to ide-scsi emulation.\n", drive->name);
+			MOD_DEC_USE_COUNT;
+			return 1;
+		}
+	}
+	tape = (idetape_tape_t *) kmalloc (sizeof (idetape_tape_t), GFP_KERNEL);
+	if (tape == NULL) {
+		printk(KERN_ERR "ide-tape: %s: Can't allocate a tape structure\n", drive->name);
 		MOD_DEC_USE_COUNT;
-#if ONSTREAM_DEBUG
-		printk(KERN_INFO "ide-tape: MOD_DEC_USE_COUNT in idetape_init\n");
-#endif
-		return -EBUSY;
+		return 1;
 	}
-	do {
-		if (!idetape_identify_device(drive, drive->id)) {
-			printk(KERN_ERR "ide-tape: %s: not supported by this version of ide-tape\n", drive->name);
-			continue;
-		}
-		if (drive->scsi) {
-			if (strstr(drive->id->model, "OnStream DI-30")) {
-				printk("ide-tape: ide-scsi emulation is not supported for %s.\n", drive->id->model);
-			} else {
-				printk("ide-tape: passing drive %s to ide-scsi emulation.\n", drive->name);
-				continue;
-			}
-		}
-		tape = (idetape_tape_t *) kmalloc (sizeof (idetape_tape_t), GFP_KERNEL);
-		if (tape == NULL) {
-			printk(KERN_ERR "ide-tape: %s: Can't allocate a tape structure\n", drive->name);
-			continue;
-		}
-		if (ide_register_subdriver (drive, &idetape_driver, IDE_SUBDRIVER_VERSION)) {
-			printk(KERN_ERR "ide-tape: %s: Failed to register the driver with ide.c\n", drive->name);
-			kfree(tape);
-			continue;
-		}
-		for (minor = 0; idetape_chrdevs[minor].drive != NULL; minor++);
-		idetape_setup(drive, tape, minor);
-		idetape_chrdevs[minor].drive = drive;
-		tape->de_r =
-		    devfs_register (drive->de, "mt", DEVFS_FL_DEFAULT,
-				    HWIF(drive)->major, minor,
-				    S_IFCHR | S_IRUGO | S_IWUGO,
-				    &idetape_fops, NULL);
-		tape->de_n =
-		    devfs_register (drive->de, "mtn", DEVFS_FL_DEFAULT,
-				    HWIF(drive)->major, minor + 128,
-				    S_IFCHR | S_IRUGO | S_IWUGO,
-				    &idetape_fops, NULL);
-		devfs_register_tape(tape->de_r);
-		supported++;
-		failed--;
-	} while ((drive = ide_scan_devices(ide_tape, idetape_driver.name, NULL, failed++)) != NULL);
-	if (!idetape_chrdev_present && !supported) {
-		devfs_unregister_chrdev(IDETAPE_MAJOR, "ht");
-	} else
-		idetape_chrdev_present = 1;
-	ide_register_module(&idetape_module);
+	if (ide_register_subdriver (drive, &idetape_driver, IDE_SUBDRIVER_VERSION)) {
+		printk(KERN_ERR "ide-tape: %s: Failed to register the driver with ide.c\n", drive->name);
+		kfree(tape);
+		MOD_DEC_USE_COUNT;
+		return 1;
+	}
+	for (minor = 0; idetape_chrdevs[minor].drive != NULL; minor++)
+		;
+	idetape_setup(drive, tape, minor);
+	idetape_chrdevs[minor].drive = drive;
+	tape->de_r =
+	    devfs_register (drive->de, "mt", DEVFS_FL_DEFAULT,
+			    HWIF(drive)->major, minor,
+			    S_IFCHR | S_IRUGO | S_IWUGO,
+			    &idetape_fops, NULL);
+	tape->de_n =
+	    devfs_register (drive->de, "mtn", DEVFS_FL_DEFAULT,
+			    HWIF(drive)->major, minor + 128,
+			    S_IFCHR | S_IRUGO | S_IWUGO,
+			    &idetape_fops, NULL);
+	devfs_register_tape(tape->de_r);
 	MOD_DEC_USE_COUNT;
-#if ONSTREAM_DEBUG
-	printk(KERN_INFO "ide-tape: MOD_DEC_USE_COUNT in idetape_init\n");
-#endif
-
 	return 0;
-#else
-	return 1;
-#endif
 }
 
 MODULE_DESCRIPTION("ATAPI Streaming TAPE Driver");
@@ -6474,83 +6438,31 @@ static void __exit idetape_exit (void)
 int idetape_init (void)
 {
 	ide_drive_t *drive;
-	idetape_tape_t *tape;
 	int minor, failed = 0, supported = 0;
 /* DRIVER(drive)->busy++; */
 	MOD_INC_USE_COUNT;
-#if ONSTREAM_DEBUG
-        printk(KERN_INFO "ide-tape: MOD_INC_USE_COUNT in idetape_init\n");
-#endif
-	if (!idetape_chrdev_present)
-		for (minor = 0; minor < MAX_HWIFS * MAX_DRIVES; minor++ )
+	if (!idetape_chrdev_present) {
+		if (register_chrdev(IDETAPE_MAJOR, "ht", &idetape_fops)) {
+			printk(KERN_ERR "ide-tape: Failed to register character device interface\n");
+			MOD_DEC_USE_COUNT;
+			return -EBUSY;
+		}
+		for (minor = 0; minor < MAX_HWIFS * MAX_DRIVES; minor++)
 			idetape_chrdevs[minor].drive = NULL;
+	}
 
-	if ((drive = ide_scan_devices(ide_tape, idetape_driver.name, NULL, failed++)) == NULL) {
-		ide_register_module(&idetape_module);
-		MOD_DEC_USE_COUNT;
-#if ONSTREAM_DEBUG
-		printk(KERN_INFO "ide-tape: MOD_DEC_USE_COUNT in idetape_init\n");
-#endif
-		return 0;
-	}
-	if (!idetape_chrdev_present &&
-	    register_chrdev(IDETAPE_MAJOR, "ht", &idetape_fops)) {
-		printk(KERN_ERR "ide-tape: Failed to register character device interface\n");
-		MOD_DEC_USE_COUNT;
-#if ONSTREAM_DEBUG
-		printk(KERN_INFO "ide-tape: MOD_DEC_USE_COUNT in idetape_init\n");
-#endif
-		return -EBUSY;
-	}
-	do {
-		if (!idetape_identify_device (drive, drive->id)) {
-			printk(KERN_ERR "ide-tape: %s: not supported by this version of ide-tape\n", drive->name);
+	while ((drive = ide_scan_devices(ide_tape, idetape_driver.name, NULL, failed++))) {
+		if (idetape_reinit(drive))
 			continue;
-		}
-		if (drive->scsi) {
-			if (strstr(drive->id->model, "OnStream DI-")) {
-				printk("ide-tape: ide-scsi emulation is not supported for %s.\n", drive->id->model);
-			} else {
-				printk("ide-tape: passing drive %s to ide-scsi emulation.\n", drive->name);
-				continue;
-			}
-		}
-		tape = (idetape_tape_t *) kmalloc (sizeof (idetape_tape_t), GFP_KERNEL);
-		if (tape == NULL) {
-			printk(KERN_ERR "ide-tape: %s: Can't allocate a tape structure\n", drive->name);
-			continue;
-		}
-		if (ide_register_subdriver (drive, &idetape_driver, IDE_SUBDRIVER_VERSION)) {
-			printk(KERN_ERR "ide-tape: %s: Failed to register the driver with ide.c\n", drive->name);
-			kfree(tape);
-			continue;
-		}
-		for (minor = 0; idetape_chrdevs[minor].drive != NULL; minor++);
-		idetape_setup(drive, tape, minor);
-		idetape_chrdevs[minor].drive = drive;
-		tape->de_r =
-		    devfs_register (drive->de, "mt", DEVFS_FL_DEFAULT,
-				    HWIF(drive)->major, minor,
-				    S_IFCHR | S_IRUGO | S_IWUGO,
-				    &idetape_fops, NULL);
-		tape->de_n =
-		    devfs_register (drive->de, "mtn", DEVFS_FL_DEFAULT,
-				    HWIF(drive)->major, minor + 128,
-				    S_IFCHR | S_IRUGO | S_IWUGO,
-				    &idetape_fops, NULL);
-		devfs_register_tape(tape->de_r);
 		supported++;
 		failed--;
-	} while ((drive = ide_scan_devices(ide_tape, idetape_driver.name, NULL, failed++)) != NULL);
+	}
 	if (!idetape_chrdev_present && !supported) {
 		unregister_chrdev(IDETAPE_MAJOR, "ht");
 	} else
 		idetape_chrdev_present = 1;
 	ide_register_module(&idetape_module);
 	MOD_DEC_USE_COUNT;
-#if ONSTREAM_DEBUG
-	printk(KERN_INFO "ide-tape: MOD_DEC_USE_COUNT in idetape_init\n");
-#endif
 	return 0;
 }
 

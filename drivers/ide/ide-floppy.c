@@ -2194,33 +2194,31 @@ static ide_module_t idefloppy_module = {
 int idefloppy_reinit (ide_drive_t *drive)
 {
 	idefloppy_floppy_t *floppy;
-	int failed = 0;
-
 	MOD_INC_USE_COUNT;
-	while ((drive = ide_scan_devices (ide_floppy, idefloppy_driver.name, NULL, failed++)) != NULL) {
-		if (!idefloppy_identify_device (drive, drive->id)) {
-			printk (KERN_ERR "ide-floppy: %s: not supported by this version of ide-floppy\n", drive->name);
-			continue;
-		}
-		if (drive->scsi) {
-			printk("ide-floppy: passing drive %s to ide-scsi emulation.\n", drive->name);
-			continue;
-		}
-		if ((floppy = (idefloppy_floppy_t *) kmalloc (sizeof (idefloppy_floppy_t), GFP_KERNEL)) == NULL) {
-			printk (KERN_ERR "ide-floppy: %s: Can't allocate a floppy structure\n", drive->name);
-			continue;
-		}
-		if (ide_register_subdriver (drive, &idefloppy_driver, IDE_SUBDRIVER_VERSION)) {
-			printk (KERN_ERR "ide-floppy: %s: Failed to register the driver with ide.c\n", drive->name);
-			kfree (floppy);
-			continue;
-		}
-		DRIVER(drive)->busy++;
-		idefloppy_setup (drive, floppy);
-		DRIVER(drive)->busy--;
-		failed--;
+	if (!idefloppy_identify_device (drive, drive->id)) {
+		printk (KERN_ERR "ide-floppy: %s: not supported by this version of ide-floppy\n", drive->name);
+		MOD_DEC_USE_COUNT;
+		return 1;
 	}
-	ide_register_module(&idefloppy_module);
+	if (drive->scsi) {
+		printk("ide-floppy: passing drive %s to ide-scsi emulation.\n", drive->name);
+		MOD_DEC_USE_COUNT;
+		return 1;
+	}
+	if ((floppy = (idefloppy_floppy_t *) kmalloc (sizeof (idefloppy_floppy_t), GFP_KERNEL)) == NULL) {
+		printk (KERN_ERR "ide-floppy: %s: Can't allocate a floppy structure\n", drive->name);
+		MOD_DEC_USE_COUNT;
+		return 1;
+	}
+	if (ide_register_subdriver (drive, &idefloppy_driver, IDE_SUBDRIVER_VERSION)) {
+		printk (KERN_ERR "ide-floppy: %s: Failed to register the driver with ide.c\n", drive->name);
+		kfree (floppy);
+		MOD_DEC_USE_COUNT;
+		return 1;
+	}
+	DRIVER(drive)->busy++;
+	idefloppy_setup (drive, floppy);
+	DRIVER(drive)->busy--;
 	MOD_DEC_USE_COUNT;
 	return 0;
 }
@@ -2253,32 +2251,13 @@ static void __exit idefloppy_exit (void)
 int idefloppy_init (void)
 {
 	ide_drive_t *drive;
-	idefloppy_floppy_t *floppy;
 	int failed = 0;
 
 	printk("ide-floppy driver " IDEFLOPPY_VERSION "\n");
 	MOD_INC_USE_COUNT;
 	while ((drive = ide_scan_devices (ide_floppy, idefloppy_driver.name, NULL, failed++)) != NULL) {
-		if (!idefloppy_identify_device (drive, drive->id)) {
-			printk (KERN_ERR "ide-floppy: %s: not supported by this version of ide-floppy\n", drive->name);
+		if (idefloppy_reinit(drive))
 			continue;
-		}
-		if (drive->scsi) {
-			printk("ide-floppy: passing drive %s to ide-scsi emulation.\n", drive->name);
-			continue;
-		}
-		if ((floppy = (idefloppy_floppy_t *) kmalloc (sizeof (idefloppy_floppy_t), GFP_KERNEL)) == NULL) {
-			printk (KERN_ERR "ide-floppy: %s: Can't allocate a floppy structure\n", drive->name);
-			continue;
-		}
-		if (ide_register_subdriver (drive, &idefloppy_driver, IDE_SUBDRIVER_VERSION)) {
-			printk (KERN_ERR "ide-floppy: %s: Failed to register the driver with ide.c\n", drive->name);
-			kfree (floppy);
-			continue;
-		}
-		DRIVER(drive)->busy++;
-		idefloppy_setup (drive, floppy);
-		DRIVER(drive)->busy--;
 		failed--;
 	}
 	ide_register_module(&idefloppy_module);
