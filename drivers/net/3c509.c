@@ -1655,7 +1655,7 @@ static int __init el3_init_module(void)
 	}
 
 #ifdef CONFIG_EISA
-	if (eisa_driver_register (&el3_eisa_driver) < 0) {
+	if (eisa_driver_register (&el3_eisa_driver) <= 0) {
 		eisa_driver_unregister (&el3_eisa_driver);
 	}
 #endif
