@@ -30,14 +30,14 @@
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
 #ifdef CONFIG_KDB
-#include <asm/kdb.h>
+#include <linux/kdb.h>
 #endif
 
 /*
  * Literals
  */
-#define IPR_DRIVER_VERSION "2.0.0-8"
-#define IPR_DRIVER_DATE "(March 17, 2004)"
+#define IPR_DRIVER_VERSION "2.0.3"
+#define IPR_DRIVER_DATE "(April 14, 2004)"
 
 /*
  * IPR_DBG_TRACE: Setting this to 1 will turn on some general function tracing
@@ -70,6 +70,8 @@
 #define IPR_SUBS_DEV_ID_2780	0x0264
 #define IPR_SUBS_DEV_ID_5702	0x0266
 #define IPR_SUBS_DEV_ID_5703	0x0278
+#define IPR_SUBS_DEV_ID_572E  0x02D3
+#define IPR_SUBS_DEV_ID_573D  0x02D4
 
 #define IPR_NAME				"ipr"
 
@@ -78,15 +80,6 @@
  */
 #define IPR_RC_JOB_CONTINUE		1
 #define IPR_RC_JOB_RETURN		2
-
-/* FIXME - these should exist on all architectures */
-#ifndef pci_dma_error
-#if defined(CONFIG_PPC64)
-#define pci_dma_error(x) ((x) == ((dma_addr_t)-1))
-#else
-#define pci_dma_error(x) (0)
-#endif
-#endif
 
 /*
  * IOASCs
@@ -167,10 +160,8 @@
 /*
  * Timeouts
  */
-#define IPR_TIMEOUT_MULTIPLIER		2
-#define IPR_MAX_SECOND_RADIX_TIMEOUT	0x3fff
-#define IPR_TIMEOUT_MINUTE_RADIX		0x4000
 #define IPR_SHUTDOWN_TIMEOUT			(10 * 60 * HZ)
+#define IPR_VSET_RW_TIMEOUT			(2 * 60 * HZ)
 #define IPR_ABBREV_SHUTDOWN_TIMEOUT		(10 * HZ)
 #define IPR_DEVICE_RESET_TIMEOUT		(30 * HZ)
 #define IPR_CANCEL_ALL_TIMEOUT		(30 * HZ)
@@ -178,7 +169,7 @@
 #define IPR_INTERNAL_TIMEOUT			(30 * HZ)
 #define IPR_WRITE_BUFFER_TIMEOUT		(10 * 60 * HZ)
 #define IPR_SET_SUP_DEVICE_TIMEOUT		(2 * 60 * HZ)
-#define IPR_REQUEST_SENSE_TIMEOUT		(30 * HZ)
+#define IPR_REQUEST_SENSE_TIMEOUT		(10 * HZ)
 #define IPR_OPERATIONAL_TIMEOUT		(5 * 60 * HZ)
 #define IPR_WAIT_FOR_RESET_TIMEOUT		(2 * HZ)
 #define IPR_CHECK_FOR_RESET_TIMEOUT		(HZ / 10)
@@ -945,6 +936,7 @@ struct ipr_cmnd {
 		unsigned long time_left;
 		unsigned long scratch;
 		struct ipr_resource_entry *res;
+		struct ipr_cmnd *sibling;
 	};
 
 	struct ipr_ioa_cfg *ioa_cfg;
@@ -1066,8 +1058,8 @@ struct ipr_ucode_image_header {
 #endif
 
 #define ipr_breakpoint_data KERN_ERR IPR_NAME\
-": %s: %s: Line: %d ipr_cfg: %p\n", __FILE__, \
-__FUNCTION__, __LINE__, ipr_cfg
+": %s: %s: Line: %d ioa_cfg: %p\n", __FILE__, \
+__FUNCTION__, __LINE__, ioa_cfg
 
 #if defined(CONFIG_KDB) && !defined(CONFIG_PPC_ISERIES)
 #define ipr_breakpoint {printk(ipr_breakpoint_data); KDB_ENTER();}
@@ -1096,15 +1088,38 @@ __FUNCTION__, __LINE__, ipr_cfg
 /*
  * Error logging macros
  */
-#define ipr_err(...) printk(KERN_ERR IPR_NAME ": "__VA_ARGS__)
-#define ipr_info(...) printk(KERN_INFO IPR_NAME ": "__VA_ARGS__)
-#define ipr_crit(...) printk(KERN_CRIT IPR_NAME ": "__VA_ARGS__)
-#define ipr_warn(...) printk(KERN_WARNING IPR_NAME": "__VA_ARGS__)
-#define ipr_dbg(...) IPR_DBG_CMD(printk(KERN_INFO IPR_NAME ": "__VA_ARGS__))
+#ifdef CONFIG_EVLOG
+#include <linux/evlog.h>
+#define ipr_printk(level, fmt, ...) \
+    do { \
+       printk(level IPR_NAME ": " fmt, ##__VA_ARGS__); \
+       evl_printk(IPR_NAME, 0, (level[1]-'0'), IPR_NAME ": " fmt, ##__VA_ARGS__);\
+    } while (0)
+#else
+#define ipr_printk(level, fmt, ...) \
+       printk(level IPR_NAME ": " fmt, ##__VA_ARGS__)
+#endif
 
+#define ipr_err(...) ipr_printk(KERN_ERR , ##__VA_ARGS__)
+#define ipr_info(...) ipr_printk(KERN_INFO , ##__VA_ARGS__)
+#define ipr_crit(...) ipr_printk(KERN_CRIT , ##__VA_ARGS__)
+#define ipr_warn(...) ipr_printk(KERN_WARN , ##__VA_ARGS__)
+#define ipr_dbg(...) IPR_DBG_CMD(ipr_printk(KERN_INFO , ##__VA_ARGS__))
+
+#ifdef CONFIG_EVLOG
+#define ipr_sdev_printk(level, sdev, fmt, ...) \
+    do { \
+       printk(level IPR_NAME ": %d:%d:%d:%d: " fmt, sdev->host->host_no, \
+               sdev->channel, sdev->id, sdev->lun, ##__VA_ARGS__); \
+       evl_printk(IPR_NAME, 0, (level[1]-'0'), IPR_NAME ": %d:%d:%d:%d: " fmt, \
+               sdev->host->host_no, \
+               sdev->channel, sdev->id, sdev->lun, ##__VA_ARGS__); \
+    } while (0)
+#else
 #define ipr_sdev_printk(level, sdev, fmt, ...) \
 	printk(level IPR_NAME ": %d:%d:%d:%d: " fmt, sdev->host->host_no, \
 		sdev->channel, sdev->id, sdev->lun, ##__VA_ARGS__)
+#endif
 
 #define ipr_sdev_err(sdev, fmt, ...) \
 	ipr_sdev_printk(KERN_ERR, sdev, fmt, ##__VA_ARGS__)
@@ -1115,9 +1130,20 @@ __FUNCTION__, __LINE__, ipr_cfg
 #define ipr_sdev_dbg(sdev, fmt, ...) \
 	IPR_DBG_CMD(ipr_sdev_printk(KERN_INFO, sdev, fmt, ##__VA_ARGS__))
 
+#ifdef CONFIG_EVLOG
+#define ipr_res_printk(level, ioa_cfg, res, fmt, ...) \
+    do { \
+       printk(level IPR_NAME ": %d:%d:%d:%d: " fmt, ioa_cfg->host->host_no, \
+               res.bus, res.target, res.lun, ##__VA_ARGS__); \
+       evl_printk(IPR_NAME, 0, (level[1]-'0'), IPR_NAME ": %d:%d:%d:%d: " fmt, \
+               ioa_cfg->host->host_no, \
+               res.bus, res.target, res.lun, ##__VA_ARGS__); \
+    } while (0)
+#else
 #define ipr_res_printk(level, ioa_cfg, res, fmt, ...) \
 	printk(level IPR_NAME ": %d:%d:%d:%d: " fmt, ioa_cfg->host->host_no, \
 		res.bus, res.target, res.lun, ##__VA_ARGS__)
+#endif
 
 #define ipr_res_err(ioa_cfg, res, fmt, ...) \
 	ipr_res_printk(KERN_ERR, ioa_cfg, res, fmt, ##__VA_ARGS__)
