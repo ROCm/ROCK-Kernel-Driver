@@ -38,7 +38,7 @@
 #include <linux/libata.h>
 
 #define DRV_NAME	"sata_sis"
-#define DRV_VERSION	"0.10"
+#define DRV_VERSION	"0.5"
 
 enum {
 	sis_180			= 0,
@@ -128,6 +128,7 @@ MODULE_AUTHOR("Uwe Koziolek");
 MODULE_DESCRIPTION("low-level driver for Silicon Integratad Systems SATA controller");
 MODULE_LICENSE("GPL");
 MODULE_DEVICE_TABLE(pci, sis_pci_tbl);
+MODULE_VERSION(DRV_VERSION);
 
 static unsigned int get_scr_cfg_addr(unsigned int port_no, unsigned int sc_reg)
 {
@@ -140,22 +141,24 @@ static unsigned int get_scr_cfg_addr(unsigned int port_no, unsigned int sc_reg)
 
 static u32 sis_scr_cfg_read (struct ata_port *ap, unsigned int sc_reg)
 {
+	struct pci_dev *pdev = to_pci_dev(ap->host_set->dev);
 	unsigned int cfg_addr = get_scr_cfg_addr(ap->port_no, sc_reg);
 	u32 val;
 
 	if (sc_reg == SCR_ERROR) /* doesn't exist in PCI cfg space */
 		return 0xffffffff;
-	pci_read_config_dword(ap->host_set->pdev, cfg_addr, &val);
+	pci_read_config_dword(pdev, cfg_addr, &val);
 	return val;
 }
 
 static void sis_scr_cfg_write (struct ata_port *ap, unsigned int scr, u32 val)
 {
+	struct pci_dev *pdev = to_pci_dev(ap->host_set->dev);
 	unsigned int cfg_addr = get_scr_cfg_addr(ap->port_no, scr);
 
 	if (scr == SCR_ERROR) /* doesn't exist in PCI cfg space */
 		return;
-	pci_write_config_dword(ap->host_set->pdev, cfg_addr, val);
+	pci_write_config_dword(pdev, cfg_addr, val);
 }
 
 static u32 sis_scr_read (struct ata_port *ap, unsigned int sc_reg)
