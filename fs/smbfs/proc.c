@@ -1628,11 +1628,21 @@ smb_proc_readdir_short(struct file *filp, void *dirent, filldir_t filldir,
 			result = smb_simple_encode_path(server, &p, dir, &mask);
 			if (result < 0)
 				goto unlock_return;
+			if (p + 3 > (char*)server->packet+server->packet_size) {
+				result = -ENAMETOOLONG;
+				goto unlock_return;
+			}
 			*p++ = 5;
 			WSET(p, 0, 0);
 			p += 2;
 			first = 0;
 		} else {
+			if (p + 5 + SMB_STATUS_SIZE >
+			    (char*)server->packet + server->packet_size) {
+				result = -ENAMETOOLONG;
+				goto unlock_return;
+			}
+				
 			*p++ = 4;
 			*p++ = 0;
 			*p++ = 5;
@@ -2355,6 +2365,10 @@ smb_proc_setattr_core(struct smb_sb_info *server, struct dentry *dentry,
 	result = smb_simple_encode_path(server, &p, dentry, NULL);
 	if (result < 0)
 		goto out;
+	if (p + 2 > (char *)server->packet + server->packet_size) {
+		result = -ENAMETOOLONG;
+		goto out;
+	}
 	*p++ = 4;
 	*p++ = 0;
 	smb_setup_bcc(server, p);
