@@ -29,6 +29,7 @@ static inline void prio_tree_iter_init(struct prio_tree_iter *iter,
 	iter->root = root;
 	iter->r_index = r_index;
 	iter->h_index = h_index;
+	iter->cur = NULL;
 }
 
 #define INIT_PRIO_TREE_ROOT(ptr)	\

@@ -457,6 +457,9 @@ static struct prio_tree_node *prio_tree_next(struct prio_tree_iter *iter)
 {
 	unsigned long r_index, h_index;
 
+	if (iter->cur == NULL)
+		return prio_tree_first(iter);
+
 repeat:
 	while (prio_tree_left(iter, &r_index, &h_index))
 		if (overlap(iter, r_index, h_index))
@@ -620,7 +623,7 @@ struct vm_area_struct *vma_prio_tree_next(struct vm_area_struct *vma,
 		/*
 		 * First call is with NULL vma
 		 */
-		ptr = prio_tree_first(iter);
+		ptr = prio_tree_next(iter);
 		if (ptr) {
 			next = prio_tree_entry(ptr, struct vm_area_struct,
 						shared.prio_tree_node);
