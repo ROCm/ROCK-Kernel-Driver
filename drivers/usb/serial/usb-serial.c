@@ -1257,6 +1257,7 @@ void usb_serial_disconnect(struct usb_interface *interface)
 
 struct tty_driver usb_serial_tty_driver = {
 	.magic =		TTY_DRIVER_MAGIC,
+	.owner =		THIS_MODULE,
 	.driver_name =		"usbserial",
 #ifndef CONFIG_DEVFS_FS
 	.name =			"ttyUSB",

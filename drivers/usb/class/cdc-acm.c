@@ -320,8 +320,6 @@ static int acm_tty_open(struct tty_struct *tty, struct file *filp)
 	tty->driver_data = acm;
 	acm->tty = tty;
 
-	MOD_INC_USE_COUNT;
-
         lock_kernel();
 
 	if (acm->used++) {
@@ -369,7 +367,6 @@ static void acm_tty_close(struct tty_struct *tty, struct file *filp)
 			kfree(acm);
 		}
 	}
-	MOD_DEC_USE_COUNT;
 }
 
 static int acm_tty_write(struct tty_struct *tty, int from_user, const unsigned char *buf, int count)
@@ -724,6 +721,7 @@ static struct termios *acm_tty_termios_locked[ACM_TTY_MINORS];
 
 static struct tty_driver acm_tty_driver = {
 	.magic =		TTY_DRIVER_MAGIC,
+	.owner =		THIS_MODULE,
 	.driver_name =		"acm",
 	.name =			"usb/acm/%d",
 	.major =		ACM_TTY_MAJOR,
