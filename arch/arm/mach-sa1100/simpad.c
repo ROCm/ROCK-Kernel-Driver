@@ -20,7 +20,6 @@
 #include <asm/mach/map.h>
 #include <asm/mach/serial_sa1100.h>
 #include <asm/arch/simpad.h>
-#include <asm/arch/registry.h>
 
 #include <linux/serial_core.h>
 #include <linux/ioport.h>
@@ -218,7 +217,7 @@ static void simpad_power_off(void)
 
 static int __init simpad_init(void)
 {
-	set_power_off_handler( simpad_power_off );
+	pm_power_off = simpad_power_off;
 	return 0;
 }
 
