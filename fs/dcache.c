@@ -1451,19 +1451,24 @@ out:
 int is_subdir(struct dentry * new_dentry, struct dentry * old_dentry)
 {
 	int result;
+	unsigned long seq;
 
 	result = 0;
-	for (;;) {
-		if (new_dentry != old_dentry) {
-			struct dentry * parent = new_dentry->d_parent;
-			if (parent == new_dentry)
-				break;
-			new_dentry = parent;
-			continue;
+        do {
+		seq = read_seqbegin(&rename_lock);
+		for (;;) {
+			if (new_dentry != old_dentry) {
+				struct dentry * parent = new_dentry->d_parent;
+				if (parent == new_dentry)
+					break;
+				new_dentry = parent;
+				continue;
+			}
+			result = 1;
+			break;
 		}
-		result = 1;
-		break;
-	}
+	} while (read_seqretry(&rename_lock, seq));
+
 	return result;
 }
 

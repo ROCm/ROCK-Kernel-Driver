@@ -307,20 +307,22 @@ static int proc_check_root(struct inode *inode)
 	base = dget(current->fs->root);
 	read_unlock(&current->fs->lock);
 
-	spin_lock(&dcache_lock);
+	spin_lock(&vfsmount_lock);
 	de = root;
 	mnt = vfsmnt;
 
 	while (vfsmnt != our_vfsmnt) {
-		if (vfsmnt == vfsmnt->mnt_parent)
+		if (vfsmnt == vfsmnt->mnt_parent) {
+			spin_unlock(&vfsmount_lock);
 			goto out;
+		}
 		de = vfsmnt->mnt_mountpoint;
 		vfsmnt = vfsmnt->mnt_parent;
 	}
+	spin_unlock(&vfsmount_lock);
 
 	if (!is_subdir(de, base))
 		goto out;
-	spin_unlock(&dcache_lock);
 
 exit:
 	dput(base);
@@ -329,7 +331,6 @@ exit:
 	mntput(mnt);
 	return res;
 out:
-	spin_unlock(&dcache_lock);
 	res = -EACCES;
 	goto exit;
 }
