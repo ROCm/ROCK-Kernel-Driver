@@ -190,6 +190,7 @@ export MODVERDIR := .tmp_versions
 
 # The temporary file to save gcc -MD generated dependencies must not
 # contain a comma
+comma := ,
 depfile = $(subst $(comma),_,$(@D)/.$(@F).d)
 
 noconfig_targets := xconfig menuconfig config oldconfig randconfig \
@@ -324,7 +325,7 @@ define rule_vmlinux__
 	set -e;								\
 	$(if $(filter .tmp_kallsyms%,$^),,				\
 	  echo '  GEN     .version';					\
-	  . $(src)/scripts/mkversion > .tmp_version;			\
+	  . $(srctree)/scripts/mkversion > .tmp_version;		\
 	  mv -f .tmp_version .version;					\
 	  $(MAKE) $(build)=init;					\
 	)
@@ -740,7 +741,7 @@ tags: FORCE
 #	If you do a make spec before packing the tarball you can rpm -ta it
 
 spec:
-	. scripts/mkspec >kernel.spec
+	. $(srctree)/scripts/mkspec >kernel.spec
 
 #	Build a tar ball, generate an rpm from it and pack the result
 #	There are two bits of magic here
@@ -813,11 +814,6 @@ checkconfig:
 	find * $(RCS_FIND_IGNORE) \
 		-name '*.[hcS]' -type f -print | sort \
 		| xargs $(PERL) -w scripts/checkconfig.pl
-
-checkhelp:
-	find * $(RCS_FIND_IGNORE) \
-		-name [cC]onfig.in -print | sort \
-		| xargs $(PERL) -w scripts/checkhelp.pl
 
 checkincludes:
 	find * $(RCS_FIND_IGNORE) \
