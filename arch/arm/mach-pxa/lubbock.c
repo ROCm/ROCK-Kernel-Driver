@@ -119,19 +119,6 @@ static int __init lubbock_init(void)
 
 __initcall(lubbock_init);
 
-static void __init
-fixup_lubbock(struct machine_desc *desc, struct tag *tags,
-		char **cmdline, struct meminfo *mi)
-{
-	SET_BANK (0, 0xa0000000, 64*1024*1024);
-	mi->nr_banks      = 1;
-#if 0
-	setup_ramdisk (1, 0, 0, 8192);
-	setup_initrd (__phys_to_virt(0xa1000000), 4*1024*1024);
-	ROOT_DEV = MKDEV(RAMDISK_MAJOR,0);
-#endif
-}
-
 static struct map_desc lubbock_io_desc[] __initdata = {
  /* virtual     physical    length      domain     r  w  c  b */
   { 0xf0000000, 0x08000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* CPLD */
@@ -160,7 +147,6 @@ static void __init lubbock_map_io(void)
 MACHINE_START(LUBBOCK, "Intel DBPXA250 Development Platform")
 	MAINTAINER("MontaVista Software Inc.")
 	BOOT_MEM(0xa0000000, 0x40000000, 0xfc000000)
-	FIXUP(fixup_lubbock)
 	MAPIO(lubbock_map_io)
 	INITIRQ(lubbock_init_irq)
 MACHINE_END

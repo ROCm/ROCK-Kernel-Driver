@@ -139,7 +139,7 @@ CONFIG_BINFMT_ELF=y
 # CONFIG_PM is not set
 # CONFIG_APM is not set
 # CONFIG_ARTHUR is not set
-CONFIG_CMDLINE="ip=off"
+CONFIG_CMDLINE="ip=off mem=32M root=/dev/ram ramdisk=8192 initrd=0xc0800000,4M"
 # CONFIG_PFS168_CMDLINE is not set
 # CONFIG_LEDS is not set
 CONFIG_ALIGNMENT_TRAP=y

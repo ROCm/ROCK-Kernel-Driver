@@ -50,9 +50,7 @@ static struct kmi_info integrator_mouse __initdata = {
 };
 #endif
 
-static void __init
-integrator_fixup(struct machine_desc *desc, struct tag *tags,
-		 char **cmdline, struct meminfo *mi)
+static int __init integrator_init(void)
 {
 #ifdef CONFIG_KMI_KEYB
 	register_kmi(&integrator_keyboard);
@@ -60,11 +58,12 @@ integrator_fixup(struct machine_desc *desc, struct tag *tags,
 #endif
 }
 
+__initcall(integrator_init);
+
 MACHINE_START(INTEGRATOR, "ARM-Integrator")
 	MAINTAINER("ARM Ltd/Deep Blue Solutions Ltd")
 	BOOT_MEM(0x00000000, 0x16000000, 0xf1600000)
 	BOOT_PARAMS(0x00000100)
-	FIXUP(integrator_fixup)
 	MAPIO(integrator_map_io)
 	INITIRQ(integrator_init_irq)
 MACHINE_END

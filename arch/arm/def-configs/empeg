@@ -56,7 +56,7 @@ CONFIG_BINFMT_ELF=y
 # CONFIG_BINFMT_MISC is not set
 # CONFIG_ARTHUR is not set
 # CONFIG_PARPORT is not set
-CONFIG_CMDLINE=""
+CONFIG_CMDLINE="mem=4M@0xc0000000 mem=4M@0xc8000000 root=/dev/hda1 initrd=0xd00b0000,320K"
 
 #
 # Plug and Play support

@@ -162,60 +162,12 @@ static void __init
 fixup_assabet(struct machine_desc *desc, struct tag *tags,
 	      char **cmdline, struct meminfo *mi)
 {
-	struct tag *t = tags;
-
 	/* This must be done before any call to machine_has_neponset() */
 	map_sa1100_gpio_regs();
 	get_assabet_scr();
 
 	if (machine_has_neponset())
 		printk("Neponset expansion board detected\n");
-
-	if (t->hdr.tag != ATAG_CORE) {
-		t->hdr.tag = ATAG_CORE;
-		t->hdr.size = tag_size(tag_core);
-		t->u.core.flags = 0;
-		t->u.core.pagesize = PAGE_SIZE;
-		t->u.core.rootdev = RAMDISK_MAJOR << 8 | 0;
-		t = tag_next(t);
-
-		t->hdr.tag = ATAG_MEM;
-		t->hdr.size = tag_size(tag_mem32);
-		t->u.mem.start = 0xc0000000;
-		t->u.mem.size  = 32 * 1024 * 1024;
-		t = tag_next(t);
-
-
-		/*
-		 * Note that Neponset RAM is slower...
-		 * and still untested.
-		 * This would be a candidate for
-		 * _real_ NUMA support.
-		 */
-		if (machine_has_neponset() && 0) {
-			t->hdr.tag = ATAG_MEM;
-			t->hdr.size = tag_size(tag_mem32);
-			t->u.mem.start = 0xd0000000;
-			t->u.mem.size  = 32 * 1024 * 1024;
-			t = tag_next(t);
-		}
-
-		t->hdr.tag = ATAG_RAMDISK;
-		t->hdr.size = tag_size(tag_ramdisk);
-		t->u.ramdisk.flags = 1;
-		t->u.ramdisk.size = 8192;
-		t->u.ramdisk.start = 0;
-		t = tag_next(t);
-
-		t->hdr.tag = ATAG_INITRD;
-		t->hdr.size = tag_size(tag_initrd);
-		t->u.initrd.start = 0xc0800000;
-		t->u.initrd.size = 3 * 1024 * 1024;
-		t = tag_next(t);
-
-		t->hdr.tag = ATAG_NONE;
-		t->hdr.size = 0;
-	}
 }
 
 

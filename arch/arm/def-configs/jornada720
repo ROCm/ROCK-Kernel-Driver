@@ -158,7 +158,7 @@ CONFIG_BINFMT_ELF=y
 CONFIG_PM=y
 # CONFIG_APM is not set
 # CONFIG_ARTHUR is not set
-CONFIG_CMDLINE="keepinitrd"
+CONFIG_CMDLINE="keepinitrd mem=32M"
 # CONFIG_LEDS is not set
 CONFIG_ALIGNMENT_TRAP=y
 

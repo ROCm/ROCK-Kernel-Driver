@@ -15,18 +15,6 @@
 
 #include "generic.h"
 
-
-static void __init
-fixup_itsy(struct machine_desc *desc, struct tag *tags,
-	   char **cmdline, struct meminfo *mi)
-{
-	SET_BANK( 0, 0xc0000000, 16*1024*1024 );
-	SET_BANK( 1, 0xc8000000, 16*1024*1024 );
-	SET_BANK( 2, 0xd0000000, 16*1024*1024 );
-	SET_BANK( 3, 0xd8000000, 16*1024*1024 );
-	mi->nr_banks = 4;
-}
-
 /* BRADFIXME The egpio addresses aren't verifiably correct. (i.e. they're most
    likely wrong. */
 static struct map_desc itsy_io_desc[] __initdata = {
@@ -49,7 +37,6 @@ static void __init itsy_map_io(void)
 MACHINE_START(ITSY, "Compaq Itsy")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
 	BOOT_PARAMS(0xc0000100)
-	FIXUP(fixup_itsy)
 	MAPIO(itsy_map_io)
 	INITIRQ(sa1100_init_irq)
 MACHINE_END

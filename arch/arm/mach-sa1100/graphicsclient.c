@@ -120,23 +120,6 @@ static void __init graphicsclient_init_irq(void)
 }
 
 
-/*
- * Initialization fixup
- */
-
-static void __init
-fixup_graphicsclient(struct machine_desc *desc, struct tag *tags,
-		     char **cmdline, struct meminfo *mi)
-{
-	SET_BANK( 0, 0xc0000000, 16*1024*1024 );
-	SET_BANK( 1, 0xc8000000, 16*1024*1024 );
-	mi->nr_banks = 2;
-
-	ROOT_DEV = mk_kdev(RAMDISK_MAJOR,0);
-	setup_ramdisk( 1, 0, 0, 8192 );
-	setup_initrd( __phys_to_virt(0xc0800000), 4*1024*1024 );
-}
-
 static struct map_desc graphicsclient_io_desc[] __initdata = {
  /* virtual     physical    length      domain     r  w  c  b */
   { 0xf0000000, 0x10000000, 0x00400000, DOMAIN_IO, 0, 1, 0, 0 }, /* CPLD */
@@ -216,7 +199,6 @@ static void __init graphicsclient_map_io(void)
 
 MACHINE_START(GRAPHICSCLIENT, "ADS GraphicsClient")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
-	FIXUP(fixup_graphicsclient)
 	MAPIO(graphicsclient_map_io)
 	INITIRQ(graphicsclient_init_irq)
 MACHINE_END
