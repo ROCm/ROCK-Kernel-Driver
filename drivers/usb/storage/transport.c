@@ -572,36 +572,37 @@ int usb_stor_transfer_partial(struct us_data *us, char *buf, int length)
 	if (result == -EPIPE) {
 		US_DEBUGP("clearing endpoint halt for pipe 0x%x\n", pipe);
 		if (usb_stor_clear_halt(us, pipe) < 0)
-			return US_BULK_TRANSFER_FAILED;
+			return USB_STOR_XFER_ERROR;
+		return USB_STOR_XFER_STALLED;
 	}
 
 	/* did we abort this command? */
 	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 		US_DEBUGP("usb_stor_transfer_partial(): transfer aborted\n");
-		return US_BULK_TRANSFER_ABORTED;
-	}
-
-	/* did we send all the data? */
-	if (partial == length) {
-		US_DEBUGP("usb_stor_transfer_partial(): transfer complete\n");
-		return US_BULK_TRANSFER_GOOD;
+		return USB_STOR_XFER_ABORTED;
 	}
 
 	/* NAK - that means we've retried a few times already */
 	if (result == -ETIMEDOUT) {
 		US_DEBUGP("usb_stor_transfer_partial(): device NAKed\n");
-		return US_BULK_TRANSFER_FAILED;
+		return USB_STOR_XFER_ERROR;
 	}
 
 	/* the catch-all error case */
 	if (result) {
 		US_DEBUGP("usb_stor_transfer_partial(): unknown error\n");
-		return US_BULK_TRANSFER_FAILED;
+		return USB_STOR_XFER_ERROR;
+	}
+
+	/* did we send all the data? */
+	if (partial == length) {
+		US_DEBUGP("usb_stor_transfer_partial(): transfer complete\n");
+		return USB_STOR_XFER_GOOD;
 	}
 
 	/* no error code, so we must have transferred some data, 
 	 * just not all of it */
-	return US_BULK_TRANSFER_SHORT;
+	return USB_STOR_XFER_SHORT;
 }
 
 /*
@@ -739,7 +740,7 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 	 * Also, if we have a short transfer on a command that can't have
 	 * a short transfer, we're going to do this.
 	 */
-	if ((srb->result == US_BULK_TRANSFER_SHORT) &&
+	if ((srb->result == USB_STOR_XFER_SHORT) &&
 	    !((srb->cmnd[0] == REQUEST_SENSE) ||
 	      (srb->cmnd[0] == INQUIRY) ||
 	      (srb->cmnd[0] == MODE_SENSE) ||
@@ -995,13 +996,13 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 	/* did we abort this command? */
 	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 		US_DEBUGP("usb_stor_control_msg(): transfer aborted\n");
-		return US_BULK_TRANSFER_ABORTED;
+		return USB_STOR_TRANSPORT_ABORTED;
 	}
 
 	/* a stall indicates a protocol error */
 	if (result == -EPIPE) {
 		US_DEBUGP("-- Stall on control pipe\n");
-		return USB_STOR_TRANSPORT_FAILED;
+		return USB_STOR_TRANSPORT_ERROR;
 	}
 
 	if (result < 0) {
@@ -1017,13 +1018,13 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 		US_DEBUGP("CBI data stage result is 0x%x\n", result);
 
 		/* report any errors */
-		if (result == US_BULK_TRANSFER_ABORTED) {
+		if (result == USB_STOR_XFER_ABORTED) {
 			clear_bit(US_FLIDX_IP_WANTED, &us->flags);
 			return USB_STOR_TRANSPORT_ABORTED;
 		}
-		if (result == US_BULK_TRANSFER_FAILED) {
+		if (result == USB_STOR_XFER_ERROR) {
 			clear_bit(US_FLIDX_IP_WANTED, &us->flags);
-			return USB_STOR_TRANSPORT_FAILED;
+			return USB_STOR_TRANSPORT_ERROR;
 		}
 	}
 
@@ -1103,13 +1104,13 @@ int usb_stor_CB_transport(Scsi_Cmnd *srb, struct us_data *us)
 		/* did we abort this command? */
 		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 			US_DEBUGP("usb_stor_CB_transport(): transfer aborted\n");
-			return US_BULK_TRANSFER_ABORTED;
+			return USB_STOR_TRANSPORT_ABORTED;
 		}
 
 		/* a stall indicates a protocol error */
 		if (result == -EPIPE) {
 			US_DEBUGP("-- Stall on control pipe\n");
-			return USB_STOR_TRANSPORT_FAILED;
+			return USB_STOR_TRANSPORT_ERROR;
 		}
 
 		/* Uh oh... serious problem here */
@@ -1124,11 +1125,11 @@ int usb_stor_CB_transport(Scsi_Cmnd *srb, struct us_data *us)
 		US_DEBUGP("CB data stage result is 0x%x\n", result);
 
 		/* report any errors */
-		if (result == US_BULK_TRANSFER_ABORTED) {
+		if (result == USB_STOR_XFER_ABORTED) {
 			return USB_STOR_TRANSPORT_ABORTED;
 		}
-		if (result == US_BULK_TRANSFER_FAILED) {
-			return USB_STOR_TRANSPORT_FAILED;
+		if (result == USB_STOR_XFER_ERROR) {
+			return USB_STOR_TRANSPORT_ERROR;
 		}
 	}
 
@@ -1207,7 +1208,7 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 	/* did we abort this command? */
 	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 		US_DEBUGP("usb_stor_Bulk_transport(): transfer aborted\n");
-		return US_BULK_TRANSFER_ABORTED;
+		return USB_STOR_TRANSPORT_ABORTED;
 	}
 
 	/* if we stall, we need to clear it before we go on */
@@ -1218,7 +1219,7 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 		/* did we abort this command? */
 		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 			US_DEBUGP("usb_stor_Bulk_transport(): transfer aborted\n");
-			return US_BULK_TRANSFER_ABORTED;
+			return USB_STOR_TRANSPORT_ABORTED;
 		}
 		if (result < 0)
 			return USB_STOR_TRANSPORT_ERROR;
@@ -1237,7 +1238,7 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 			US_DEBUGP("Bulk data transfer result 0x%x\n", result);
 
 			/* if it was aborted, we need to indicate that */
-			if (result == US_BULK_TRANSFER_ABORTED)
+			if (result == USB_STOR_XFER_ABORTED)
 				return USB_STOR_TRANSPORT_ABORTED;
 		}
 	}
@@ -1257,7 +1258,7 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 	/* did we abort this command? */
 	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 		US_DEBUGP("usb_stor_Bulk_transport(): transfer aborted\n");
-		return US_BULK_TRANSFER_ABORTED;
+		return USB_STOR_TRANSPORT_ABORTED;
 	}
 
 	/* did the attempt to read the CSW fail? */
@@ -1268,7 +1269,7 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 		/* did we abort this command? */
 		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 			US_DEBUGP("usb_stor_Bulk_transport(): transfer aborted\n");
-			return US_BULK_TRANSFER_ABORTED;
+			return USB_STOR_TRANSPORT_ABORTED;
 		}
 		if (result < 0)
 			return USB_STOR_TRANSPORT_ERROR;
@@ -1281,7 +1282,7 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 		/* did we abort this command? */
 		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 			US_DEBUGP("usb_stor_Bulk_transport(): transfer aborted\n");
-			return US_BULK_TRANSFER_ABORTED;
+			return USB_STOR_TRANSPORT_ABORTED;
 		}
 
 		/* if it fails again, we need a reset and return an error*/
@@ -1292,7 +1293,7 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 			/* did we abort this command? */
 			if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 				US_DEBUGP("usb_stor_Bulk_transport(): transfer aborted\n");
-				return US_BULK_TRANSFER_ABORTED;
+				return USB_STOR_TRANSPORT_ABORTED;
 			}
 			return USB_STOR_TRANSPORT_ERROR;
 		}

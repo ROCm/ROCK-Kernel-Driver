@@ -1142,6 +1142,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 		struct usb_interface_descriptor *desc = interface->altsetting;
 
 		interface->dev.parent = &dev->dev;
+		interface->dev.driver = NULL;
 		interface->dev.bus = &usb_bus_type;
 		sprintf (&interface->dev.bus_id[0], "%d-%s:%d",
 			 dev->bus->busnum, dev->devpath,

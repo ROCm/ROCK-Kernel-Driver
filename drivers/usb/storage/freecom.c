@@ -197,7 +197,7 @@ freecom_readdata (Scsi_Cmnd *srb, struct us_data *us,
 		/* has the current command been aborted? */
 		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 			US_DEBUGP("freecom_readdata(): transfer aborted\n");
-			return US_BULK_TRANSFER_ABORTED;
+			return USB_STOR_TRANSPORT_ABORTED;
 		}
 
                 return USB_STOR_TRANSPORT_ERROR;
@@ -238,7 +238,7 @@ freecom_writedata (Scsi_Cmnd *srb, struct us_data *us,
 		/* has the current command been aborted? */
 		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 			US_DEBUGP("freecom_writedata(): transfer aborted\n");
-			return US_BULK_TRANSFER_ABORTED;
+			return USB_STOR_TRANSPORT_ABORTED;
 		}
 
                 return USB_STOR_TRANSPORT_ERROR;
@@ -301,7 +301,7 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
 		/* we canceled this transfer */
 		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 			US_DEBUGP("freecom_transport(): transfer aborted\n");
-			return US_BULK_TRANSFER_ABORTED;
+			return USB_STOR_TRANSPORT_ABORTED;
 		}
 
                 return USB_STOR_TRANSPORT_ERROR;
@@ -316,7 +316,7 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
 	/* we canceled this transfer */
 	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 		US_DEBUGP("freecom_transport(): transfer aborted\n");
-		return US_BULK_TRANSFER_ABORTED;
+		return USB_STOR_TRANSPORT_ABORTED;
 	}
 
         US_DEBUG(pdump ((void *) fst, partial));
@@ -354,7 +354,7 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
 			/* we canceled this transfer */
 			if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 				US_DEBUGP("freecom_transport(): transfer aborted\n");
-				return US_BULK_TRANSFER_ABORTED;
+				return USB_STOR_TRANSPORT_ABORTED;
 			}
 
 			return USB_STOR_TRANSPORT_ERROR;
@@ -369,7 +369,7 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
 		/* we canceled this transfer */
 		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 			US_DEBUGP("freecom_transport(): transfer aborted\n");
-			return US_BULK_TRANSFER_ABORTED;
+			return USB_STOR_TRANSPORT_ABORTED;
 		}
 
 		US_DEBUG(pdump ((void *) fst, partial));
@@ -430,7 +430,7 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
                         US_DEBUGP ("freecom_transport: transfer aborted\n");
-                        return US_BULK_TRANSFER_ABORTED;
+                        return USB_STOR_TRANSPORT_ABORTED;
                 }
                 if (partial != 4 || result != 0)
                         return USB_STOR_TRANSPORT_ERROR;
@@ -459,7 +459,7 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
                         US_DEBUGP ("freecom_transport: transfer aborted\n");
-                        return US_BULK_TRANSFER_ABORTED;
+                        return USB_STOR_TRANSPORT_ABORTED;
                 }
                 if (partial != 4 || result != 0)
                         return USB_STOR_TRANSPORT_ERROR;

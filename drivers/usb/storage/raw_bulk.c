@@ -61,7 +61,7 @@ usb_storage_send_control(struct us_data *us,
 	/* did we abort this command? */
 	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 		US_DEBUGP("usb_stor_send_control(): transfer aborted\n");
-		return US_BULK_TRANSFER_ABORTED;
+		return USB_STOR_TRANSPORT_ABORTED;
 	}
 
 	// Check the return code for the command.
@@ -70,7 +70,7 @@ usb_storage_send_control(struct us_data *us,
 		/* a stall indicates a protocol error */
 		if (result == -EPIPE) {
 			US_DEBUGP("-- Stall on control pipe\n");
-			return USB_STOR_TRANSPORT_FAILED;
+			return USB_STOR_TRANSPORT_ERROR;
 		}
 
 		/* Uh oh... serious problem here */
@@ -100,14 +100,14 @@ usb_storage_raw_bulk(struct us_data *us, int direction, unsigned char *data,
 			  " pipe 0x%x, stalled at %d bytes\n",
 			  pipe, *act_len);
 		if (usb_stor_clear_halt(us, pipe) < 0)
-			return US_BULK_TRANSFER_FAILED;
-		/* return US_BULK_TRANSFER_SHORT; */
+			return USB_STOR_XFER_ERROR;
+		return USB_STOR_XFER_STALLED;
 	}
 
 	/* did we abort this command? */
 	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 		US_DEBUGP("usb_storage_raw_bulk(): transfer aborted\n");
-		return US_BULK_TRANSFER_ABORTED;
+		return USB_STOR_XFER_ABORTED;
 	}
 
 	if (result) {
@@ -122,13 +122,13 @@ usb_storage_raw_bulk(struct us_data *us, int direction, unsigned char *data,
 			US_DEBUGP("raw_bulk(): unknown error %d\n",
 				  result);
 
-		return US_BULK_TRANSFER_FAILED;
+		return USB_STOR_XFER_ERROR;
 	}
 
 	if (*act_len != len) {
 		US_DEBUGP("Warning: Transferred only %d of %d bytes\n",
 			  *act_len, len);
-		return US_BULK_TRANSFER_SHORT;
+		return USB_STOR_XFER_SHORT;
 	}
 
 #if 0
@@ -137,7 +137,7 @@ usb_storage_raw_bulk(struct us_data *us, int direction, unsigned char *data,
 		  *act_len, len);
 #endif
 
-	return US_BULK_TRANSFER_GOOD;
+	return USB_STOR_XFER_GOOD;
 }
 
 int
@@ -145,14 +145,14 @@ usb_storage_bulk_transport(struct us_data *us, int direction,
 			   unsigned char *data, unsigned int len,
 			   int use_sg) {
 
-	int result = USB_STOR_TRANSPORT_GOOD;
+	int result = USB_STOR_XFER_ERROR;
 	int transferred = 0;
 	int i;
 	struct scatterlist *sg;
 	unsigned int act_len;
 
 	if (len == 0)
-		return USB_STOR_TRANSPORT_GOOD;
+		return USB_STOR_XFER_GOOD;
 
 #if DEBUG_PRCT
 
@@ -196,7 +196,7 @@ usb_storage_bulk_transport(struct us_data *us, int direction,
 
 			result = usb_storage_raw_bulk(us, direction,
 						      buf, length, &act_len);
-			if (result != US_BULK_TRANSFER_GOOD)
+			if (result != USB_STOR_XFER_GOOD)
 				break;
 			transferred += length;
 		}

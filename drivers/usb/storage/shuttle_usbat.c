@@ -153,7 +153,8 @@ int usbat_read_block(struct us_data *us,
 
 	result = usb_storage_bulk_transport(us, SCSI_DATA_READ, content, len, use_sg);
 
-	return result;
+	return (result == USB_STOR_XFER_GOOD ?
+			USB_STOR_TRANSPORT_GOOD : USB_STOR_TRANSPORT_ERROR);
 }
 
 /*
@@ -234,8 +235,8 @@ int usbat_write_block(struct us_data *us,
 
 	result = usb_storage_bulk_transport(us, SCSI_DATA_WRITE, content, len, use_sg);
 
-	if (result != USB_STOR_TRANSPORT_GOOD)
-		return result;
+	if (result != USB_STOR_XFER_GOOD)
+		return USB_STOR_TRANSPORT_ERROR;
 
 	return usbat_wait_not_busy(us, minutes);
 }
@@ -309,8 +310,8 @@ int usbat_rw_block_test(struct us_data *us,
 				SCSI_DATA_WRITE, 
 				data, num_registers*2, 0);
 
-			if (result!=USB_STOR_TRANSPORT_GOOD)
-				return result;
+			if (result!=USB_STOR_XFER_GOOD)
+				return USB_STOR_TRANSPORT_ERROR;
 
 		}
 
@@ -341,7 +342,8 @@ int usbat_rw_block_test(struct us_data *us,
 		 * transferred.
 		 */
 
-		if (result == US_BULK_TRANSFER_SHORT) {
+		if (result == USB_STOR_XFER_SHORT ||
+				result == USB_STOR_XFER_STALLED) {
 
 			/*
 			 * If we're reading and we stalled, then clear
@@ -373,8 +375,8 @@ int usbat_rw_block_test(struct us_data *us,
 			US_DEBUGP("Redoing %s\n",
 			  direction==SCSI_DATA_WRITE ? "write" : "read");
 
-		} else if (result != US_BULK_TRANSFER_GOOD)
-			return result;
+		} else if (result != USB_STOR_XFER_GOOD)
+			return USB_STOR_TRANSPORT_ERROR;
 		else
 			return usbat_wait_not_busy(us, minutes);
 
@@ -425,8 +427,8 @@ int usbat_multiple_write(struct us_data *us,
 	result = usb_storage_bulk_transport(us,
 		SCSI_DATA_WRITE, data, num_registers*2, 0);
 
-	if (result != USB_STOR_TRANSPORT_GOOD)
-		return result;
+	if (result != USB_STOR_XFER_GOOD)
+		return USB_STOR_TRANSPORT_ERROR;
 
 	return usbat_wait_not_busy(us, 0);
 }

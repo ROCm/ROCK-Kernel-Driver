@@ -101,16 +101,16 @@ static int sddr55_status(struct us_data *us)
 	US_DEBUGP("Result for send_command in status %d\n",
 		result);
 
-	if (result != US_BULK_TRANSFER_GOOD) {
+	if (result != USB_STOR_XFER_GOOD) {
 		set_sense_info (4, 0, 0);	/* hardware error */
-		return result;
+		return USB_STOR_TRANSPORT_ERROR;
 	}
 
 	result = sddr55_bulk_transport(us,
 		SCSI_DATA_READ, status,	4);
 
 	/* expect to get short transfer if no card fitted */
-	if (result == US_BULK_TRANSFER_SHORT) {
+	if (result == USB_STOR_XFER_SHORT || result == USB_STOR_XFER_STALLED) {
 		/* had a short transfer, no card inserted, free map memory */
 		if (info->lba_to_pba)
 			kfree(info->lba_to_pba);
@@ -123,12 +123,12 @@ static int sddr55_status(struct us_data *us)
 		info->force_read_only = 0;
 
 		set_sense_info (2, 0x3a, 0);	/* not ready, medium not present */
-		return result;
+		return USB_STOR_TRANSPORT_FAILED;
 	}
 
-	if (result != US_BULK_TRANSFER_GOOD) {
+	if (result != USB_STOR_XFER_GOOD) {
 		set_sense_info (4, 0, 0);	/* hardware error */
-		return result;
+		return USB_STOR_TRANSPORT_FAILED;
 	}
 	
 	/* check write protect status */
@@ -138,11 +138,12 @@ static int sddr55_status(struct us_data *us)
 	result = sddr55_bulk_transport(us,
 		SCSI_DATA_READ, status,	2);
 
-	if (result != US_BULK_TRANSFER_GOOD) {
+	if (result != USB_STOR_XFER_GOOD) {
 		set_sense_info (4, 0, 0);	/* hardware error */
 	}
 
-	return result;
+	return (result == USB_STOR_XFER_GOOD ?
+			USB_STOR_TRANSPORT_GOOD : USB_STOR_TRANSPORT_FAILED);
 }
 
 
@@ -214,23 +215,29 @@ static int sddr55_read_data(struct us_data *us,
 			US_DEBUGP("Result for send_command in read_data %d\n",
 				result);
 
-			if (result != US_BULK_TRANSFER_GOOD)
+			if (result != USB_STOR_XFER_GOOD) {
+				result = USB_STOR_TRANSPORT_ERROR;
 				goto leave;
+			}
 
 			/* read data */
 			result = sddr55_bulk_transport(us,
 				SCSI_DATA_READ, ptr,
 				pages<<info->pageshift);
 
-			if (result != US_BULK_TRANSFER_GOOD)
+			if (result != USB_STOR_XFER_GOOD) {
+				result = USB_STOR_TRANSPORT_ERROR;
 				goto leave;
+			}
 
 			/* now read status */
 			result = sddr55_bulk_transport(us,
 				SCSI_DATA_READ, status, 2);
 
-			if (result != US_BULK_TRANSFER_GOOD)
+			if (result != USB_STOR_XFER_GOOD) {
+				result = USB_STOR_TRANSPORT_ERROR;
 				goto leave;
+			}
 
 			/* check status for error */
 			if (status[0] == 0xff && status[1] == 0x4) {
@@ -247,6 +254,7 @@ static int sddr55_read_data(struct us_data *us,
 	}
 
 	us_copy_to_sgbuf_all(buffer, len, content, use_sg);
+	result = USB_STOR_TRANSPORT_GOOD;
 
 leave:
 	if (use_sg)
@@ -374,12 +382,13 @@ static int sddr55_write_data(struct us_data *us,
 		result = sddr55_bulk_transport(us,
 			SCSI_DATA_WRITE, command, 8);
 
-		if (result != US_BULK_TRANSFER_GOOD) {
+		if (result != USB_STOR_XFER_GOOD) {
 			US_DEBUGP("Result for send_command in write_data %d\n",
 			result);
 
 			/* set_sense_info is superfluous here? */
 			set_sense_info (3, 0x3, 0);/* peripheral write error */
+			result = USB_STOR_TRANSPORT_FAILED;
 			goto leave;
 		}
 
@@ -388,24 +397,26 @@ static int sddr55_write_data(struct us_data *us,
 			SCSI_DATA_WRITE, ptr,
 			pages<<info->pageshift);
 
-		if (result != US_BULK_TRANSFER_GOOD) {
+		if (result != USB_STOR_XFER_GOOD) {
 			US_DEBUGP("Result for send_data in write_data %d\n",
 				  result);
 
 			/* set_sense_info is superfluous here? */
 			set_sense_info (3, 0x3, 0);/* peripheral write error */
+			result = USB_STOR_TRANSPORT_FAILED;
 			goto leave;
 		}
 
 		/* now read status */
 		result = sddr55_bulk_transport(us, SCSI_DATA_READ, status, 6);
 
-		if (result != US_BULK_TRANSFER_GOOD) {
+		if (result != USB_STOR_XFER_GOOD) {
 			US_DEBUGP("Result for get_status in write_data %d\n",
 				  result);
 
 			/* set_sense_info is superfluous here? */
 			set_sense_info (3, 0x3, 0);/* peripheral write error */
+			result = USB_STOR_TRANSPORT_FAILED;
 			goto leave;
 		}
 
@@ -446,6 +457,7 @@ static int sddr55_write_data(struct us_data *us,
 		sectors -= pages >> info->smallpageshift;
 		ptr += (pages << info->pageshift);
 	}
+	result = USB_STOR_TRANSPORT_GOOD;
 
  leave:
 	if (use_sg)
@@ -468,14 +480,14 @@ static int sddr55_read_deviceID(struct us_data *us,
 	US_DEBUGP("Result of send_control for device ID is %d\n",
 		result);
 
-	if (result != US_BULK_TRANSFER_GOOD)
-		return result;
+	if (result != USB_STOR_XFER_GOOD)
+		return USB_STOR_TRANSPORT_ERROR;
 
 	result = sddr55_bulk_transport(us,
 		SCSI_DATA_READ, content, 4);
 
-	if (result != US_BULK_TRANSFER_GOOD)
-		return result;
+	if (result != USB_STOR_XFER_GOOD)
+		return USB_STOR_TRANSPORT_ERROR;
 
 	*manufacturerID = content[0];
 	*deviceID = content[1];
@@ -485,7 +497,7 @@ static int sddr55_read_deviceID(struct us_data *us,
 			SCSI_DATA_READ, content, 2);
 	}
 
-	return result;
+	return USB_STOR_TRANSPORT_GOOD;
 }
 
 
@@ -510,7 +522,7 @@ static unsigned long sddr55_get_capacity(struct us_data *us) {
 	US_DEBUGP("Result of read_deviceID is %d\n",
 		result);
 
-	if (result != US_BULK_TRANSFER_GOOD)
+	if (result != USB_STOR_XFER_GOOD)
 		return 0;
 
 	US_DEBUGP("Device ID = %02X\n", deviceID);
@@ -603,21 +615,21 @@ static int sddr55_read_map(struct us_data *us) {
 
 	result = sddr55_bulk_transport(us, SCSI_DATA_WRITE, command, 8);
 
-	if ( result != US_BULK_TRANSFER_GOOD) {
+	if ( result != USB_STOR_XFER_GOOD) {
 		kfree (buffer);
 		return -1;
 	}
 
 	result = sddr55_bulk_transport(us, SCSI_DATA_READ, buffer, numblocks * 2);
 
-	if ( result != US_BULK_TRANSFER_GOOD) {
+	if ( result != USB_STOR_XFER_GOOD) {
 		kfree (buffer);
 		return -1;
 	}
 
 	result = sddr55_bulk_transport(us, SCSI_DATA_READ, command, 2);
 
-	if ( result != US_BULK_TRANSFER_GOOD) {
+	if ( result != USB_STOR_XFER_GOOD) {
 		kfree (buffer);
 		return -1;
 	}
