@@ -21,7 +21,8 @@
 #include <linux/netfilter_bridge.h>
 #include "br_private.h"
 
-static inline int should_deliver(struct net_bridge_port *p, struct sk_buff *skb)
+static inline int should_deliver(const struct net_bridge_port *p, 
+				 const struct sk_buff *skb)
 {
 	if (skb->dev == p->dev ||
 	    p->state != BR_STATE_FORWARDING)
@@ -52,7 +53,7 @@ int br_forward_finish(struct sk_buff *skb)
 	return 0;
 }
 
-static void __br_deliver(struct net_bridge_port *to, struct sk_buff *skb)
+static void __br_deliver(const struct net_bridge_port *to, struct sk_buff *skb)
 {
 	skb->dev = to->dev;
 #ifdef CONFIG_NETFILTER_DEBUG
@@ -62,7 +63,7 @@ static void __br_deliver(struct net_bridge_port *to, struct sk_buff *skb)
 			br_forward_finish);
 }
 
-static void __br_forward(struct net_bridge_port *to, struct sk_buff *skb)
+static void __br_forward(const struct net_bridge_port *to, struct sk_buff *skb)
 {
 	struct net_device *indev;
 
@@ -73,8 +74,8 @@ static void __br_forward(struct net_bridge_port *to, struct sk_buff *skb)
 			br_forward_finish);
 }
 
-/* called under bridge lock */
-void br_deliver(struct net_bridge_port *to, struct sk_buff *skb)
+/* called with rcu_read_lock */
+void br_deliver(const struct net_bridge_port *to, struct sk_buff *skb)
 {
 	if (should_deliver(to, skb)) {
 		__br_deliver(to, skb);
@@ -84,8 +85,8 @@ void br_deliver(struct net_bridge_port *to, struct sk_buff *skb)
 	kfree_skb(skb);
 }
 
-/* called under bridge lock */
-void br_forward(struct net_bridge_port *to, struct sk_buff *skb)
+/* called with rcu_read_lock */
+void br_forward(const struct net_bridge_port *to, struct sk_buff *skb)
 {
 	if (should_deliver(to, skb)) {
 		__br_forward(to, skb);
@@ -97,7 +98,8 @@ void br_forward(struct net_bridge_port *to, struct sk_buff *skb)
 
 /* called under bridge lock */
 static void br_flood(struct net_bridge *br, struct sk_buff *skb, int clone,
-	void (*__packet_hook)(struct net_bridge_port *p, struct sk_buff *skb))
+	void (*__packet_hook)(const struct net_bridge_port *p, 
+			      struct sk_buff *skb))
 {
 	struct net_bridge_port *p;
 	struct net_bridge_port *prev;
@@ -115,7 +117,7 @@ static void br_flood(struct net_bridge *br, struct sk_buff *skb, int clone,
 
 	prev = NULL;
 
-	list_for_each_entry(p, &br->port_list, list) {
+	list_for_each_entry_rcu(p, &br->port_list, list) {
 		if (should_deliver(p, skb)) {
 			if (prev != NULL) {
 				struct sk_buff *skb2;
@@ -141,7 +143,8 @@ static void br_flood(struct net_bridge *br, struct sk_buff *skb, int clone,
 	kfree_skb(skb);
 }
 
-/* called under bridge lock */
+
+/* called with rcu_read_lock */
 void br_flood_deliver(struct net_bridge *br, struct sk_buff *skb, int clone)
 {
 	br_flood(br, skb, clone, __br_deliver);

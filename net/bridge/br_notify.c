@@ -41,10 +41,10 @@ static int br_device_event(struct notifier_block *unused, unsigned long event, v
 	switch (event) 
 	{
 	case NETDEV_CHANGEADDR:
-		write_lock_bh(&br->lock);
+		spin_lock_bh(&br->lock);
 		br_fdb_changeaddr(p, dev->dev_addr);
 		br_stp_recalculate_bridge_id(br);
-		write_unlock_bh(&br->lock);
+		spin_unlock_bh(&br->lock);
 		break;
 
 	case NETDEV_GOING_DOWN:
@@ -53,17 +53,17 @@ static int br_device_event(struct notifier_block *unused, unsigned long event, v
 
 	case NETDEV_DOWN:
 		if (br->dev.flags & IFF_UP) {
-			write_lock_bh(&br->lock);
+			spin_lock_bh(&br->lock);
 			br_stp_disable_port(p);
-			write_unlock_bh(&br->lock);
+			spin_unlock_bh(&br->lock);
 		}
 		break;
 
 	case NETDEV_UP:
 		if (!(br->dev.flags & IFF_UP)) {
-			write_lock_bh(&br->lock);
+			spin_lock_bh(&br->lock);
 			br_stp_enable_port(p);
-			write_unlock_bh(&br->lock);
+			spin_unlock_bh(&br->lock);
 		}
 		break;
 

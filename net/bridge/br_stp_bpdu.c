@@ -143,7 +143,7 @@ void br_stp_handle_bpdu(struct sk_buff *skb)
 	p = skb->dev->br_port;
 	br = p->br;
 
-	write_lock_bh(&br->lock);
+	spin_lock_bh(&br->lock);
 	if (p->state == BR_STATE_DISABLED 
 	    || !(br->dev.flags & IFF_UP)
 	    || !br->stp_enabled 
@@ -192,5 +192,5 @@ void br_stp_handle_bpdu(struct sk_buff *skb)
 		goto out;
 	}
  out:
-	write_unlock_bh(&br->lock);
+	spin_unlock_bh(&br->lock);
 }

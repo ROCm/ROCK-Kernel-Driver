@@ -169,10 +169,10 @@ void br_tick(unsigned long __data)
 {
 	struct net_bridge *br = (struct net_bridge *)__data;
 
-	read_lock(&br->lock);
-	br_check_timers(br);
-	read_unlock(&br->lock);
-
+	if (spin_trylock_bh(&br->lock)) {
+		br_check_timers(br);
+		spin_unlock_bh(&br->lock);
+	}
 	br->tick.expires = jiffies + 1;
 	add_timer(&br->tick);
 }

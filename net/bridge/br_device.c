@@ -74,27 +74,20 @@ static int __br_dev_xmit(struct sk_buff *skb, struct net_device *dev)
 
 int br_dev_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct net_bridge *br;
 	int ret;
 
-	br = dev->priv;
-	read_lock(&br->lock);
+	rcu_read_lock();
 	ret = __br_dev_xmit(skb, dev);
-	read_unlock(&br->lock);
+	rcu_read_unlock();
 
 	return ret;
 }
 
 static int br_dev_open(struct net_device *dev)
 {
-	struct net_bridge *br;
-
 	netif_start_queue(dev);
 
-	br = dev->priv;
-	write_lock(&br->lock);
-	br_stp_enable_bridge(br);
-	write_unlock(&br->lock);
+	br_stp_enable_bridge(dev->priv);
 
 	return 0;
 }
