@@ -1153,10 +1153,8 @@ static int firm_send_command (struct usb_serial_port *port, __u8 command, __u8 *
 	}
 
 	/* wait for the command to complete */
-	timeout = COMMAND_TIMEOUT;
-	while (timeout && (command_info->command_finished == FALSE)) {
-		timeout = interruptible_sleep_on_timeout (&command_info->wait_command, timeout);
-	}
+	wait_event_interruptible_timeout(command_info->wait_command, 
+		(command_info->command_finished != FALSE), COMMAND_TIMEOUT);
 
 	spin_lock_irqsave(&command_info->lock, flags);
 
