@@ -939,11 +939,6 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_BOARD_NAME, "CUR-DLS"),
 			NO_MATCH, NO_MATCH }},
 
-	{ force_acpi_ht, "ASUS A7V", {
-			MATCH(DMI_BOARD_VENDOR, "ASUSTeK Computer INC"),
-			MATCH(DMI_BOARD_NAME, "<A7V>"),
-			MATCH(DMI_BIOS_VERSION, "ASUS A7V ACPI BIOS Revision 1011"), NO_MATCH }},
-
 	{ force_acpi_ht, "ABIT i440BX-W83977", {
 			MATCH(DMI_BOARD_VENDOR, "ABIT <http://www.abit.com>"),
 			MATCH(DMI_BOARD_NAME, "i440BX-W83977 (BP6)"),
@@ -978,7 +973,10 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 	{ disable_acpi_pci, "ASUS A7V", {
 			MATCH(DMI_BOARD_VENDOR, "ASUSTeK Computer INC"),
 			MATCH(DMI_BOARD_NAME, "<A7V>"),
-			MATCH(DMI_BIOS_VERSION, "ASUS A7V ACPI BIOS Revision 1007"), NO_MATCH }},
+			/* newer BIOS, Revision 1011, does work */
+			MATCH(DMI_BIOS_VERSION, "ASUS A7V ACPI BIOS Revision 1007"),
+			NO_MATCH }},
+
 #endif
 
 	{ NULL, }

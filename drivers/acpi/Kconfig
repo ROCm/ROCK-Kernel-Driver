@@ -3,34 +3,14 @@
 #
 
 menu "ACPI (Advanced Configuration and Power Interface) Support"
-
-config ACPI_HT
-	bool "ACPI Processor Enumeration for HT"
-	depends on X86
-	default y
-	---help---
-	  ACPI enumerates both logical (a.k.a. Hyper-Threaded -- HT)
-	  and physical processors.  It is designed to obsolete several older
-	  specifications, including the MultiProcessor Specification (MPS),
-	  which supported only physical processors.
-
-	  CONFIG_ACPI_HT includes the minimal ACPI boot-time code
-	  necessary to enumerate logical processors and enable HT.
-
-	  CONFIG_ACPI includes CONFIG_ACPI_HT, plus IO APIC enumeration,
-	  and the hooks to run the ACPI AML interpreter for run-time events.
-
-	  When CONFIG_ACPI is selected, the command-line option "acpi=ht"
-	  is available to run just the ACPI boot-time code -- just as if
-	  only CONFIG_ACPI_HT were selected.
-
-	  Note that "acpi=off" can be used to disable all ACPI code in the kernel.
-
-config ACPI
-	bool "Full ACPI Support"
 	depends on !X86_VISWS
 	depends on !IA64_HP_SIM
-	depends on IA64 || (X86 || ACPI_HT)
+	depends on IA64 || X86
+
+config ACPI
+	bool "ACPI Support"
+	depends on IA64 || X86
+
 	default y
 	---help---
 	  Advanced Configuration and Power Interface (ACPI) support for 
@@ -60,14 +40,47 @@ config ACPI
 	  available at:
 	  <http://www.acpi.info>
 
+config ACPI_HT_ONLY
+	bool "Restrict ACPI to minimum boot code to enable HT"
+	depends on X86
+	depends on ACPI
+	depends on SMP
+	default n
+	---help---
+	  ACPI enumerates both logical (a.k.a. Hyper-Threaded -- HT)
+	  and physical processors.  It is designed to obsolete several older
+	  specifications, including the MultiProcessor Specification (MPS),
+	  which supported only physical processors.
+
+	  CONFIG_ACPI_HT_ONLY includes just the minimal ACPI boot-time code
+	  necessary to enumerate logical processors and enable HT.
+
+	  CONFIG_ACPI includes this, plus IO APIC enumeration,
+	  and the hooks to run the ACPI AML interpreter for run-time events.
+
+	  When CONFIG_ACPI is selected, the command-line option "acpi=ht"
+	  is available to run just the ACPI boot-time code -- just as if
+	  only CONFIG_ACPI_HT_ONLY were selected.
+
+	  Note that "acpi=off" can be used to disable all ACPI code in the kernel.
+
+
 config ACPI_BOOT
 	bool
-	depends on ACPI || ACPI_HT
+	depends on ACPI
+	default y
+
+config ACPI_INTERPRETER
+	bool
+	depends on ACPI
+	depends on !IA64_SGI_SN
+	depends on !ACPI_HT_ONLY
 	default y
 
 config ACPI_SLEEP
 	bool "Sleep States (EXPERIMENTAL)"
 	depends on X86 && ACPI
+	depends on ACPI_INTERPRETER
 	depends on EXPERIMENTAL && PM
 	default y
 	---help---
@@ -93,7 +106,8 @@ config ACPI_SLEEP_PROC_FS
 
 config ACPI_AC
 	tristate "AC Adapter"
-	depends on X86 && ACPI
+	depends on X86
+	depends on ACPI_INTERPRETER
 	default m
 	help
 	  This driver adds support for the AC Adapter object, which indicates
@@ -102,7 +116,8 @@ config ACPI_AC
 
 config ACPI_BATTERY
 	tristate "Battery"
-	depends on X86 && ACPI
+	depends on X86
+	depends on ACPI_INTERPRETER
 	default m
 	help
 	  This driver adds support for battery information through
@@ -111,7 +126,7 @@ config ACPI_BATTERY
 
 config ACPI_BUTTON
 	tristate "Button"
-	depends on ACPI
+	depends on ACPI_INTERPRETER
 	depends on !IA64_SGI_SN
 	default m
 	help
@@ -123,7 +138,7 @@ config ACPI_BUTTON
 
 config ACPI_FAN
 	tristate "Fan"
-	depends on ACPI
+	depends on ACPI_INTERPRETER
 	depends on !IA64_SGI_SN
 	default m
 	help
@@ -132,7 +147,7 @@ config ACPI_FAN
 
 config ACPI_PROCESSOR
 	tristate "Processor"
-	depends on ACPI
+	depends on ACPI_INTERPRETER
 	depends on !IA64_SGI_SN
 	default m
 	help
@@ -152,14 +167,15 @@ config ACPI_THERMAL
 
 config ACPI_NUMA
 	bool "NUMA support"
-	depends on ACPI
+	depends on ACPI_INTERPRETER
 	depends on NUMA
 	depends on !X86_64
 	default y if IA64_GENERIC || IA64_SGI_SN2
 
 config ACPI_ASUS
         tristate "ASUS/Medion Laptop Extras"
-        depends on X86 && ACPI
+	depends on X86
+	depends on ACPI_INTERPRETER
 	default m
         ---help---
           This driver provides support for extra features of ACPI-compatible
@@ -185,7 +201,8 @@ config ACPI_ASUS
           
 config ACPI_TOSHIBA
 	tristate "Toshiba Laptop Extras"
-	depends on X86 && ACPI
+	depends on X86
+	depends on ACPI_INTERPRETER
 	default m
 	---help---
 	  This driver adds support for access to certain system settings
@@ -212,7 +229,7 @@ config ACPI_TOSHIBA
 
 config ACPI_DEBUG
 	bool "Debug Statements"
-	depends on ACPI
+	depends on ACPI_INTERPRETER
 	depends on !IA64_SGI_SN
 	default n
 	help
@@ -222,19 +239,14 @@ config ACPI_DEBUG
 
 config ACPI_BUS
 	bool
-	depends on ACPI
-	depends on !IA64_SGI_SN
-	default y
-
-config ACPI_INTERPRETER
-	bool
-	depends on ACPI
+	depends on ACPI_INTERPRETER
 	depends on !IA64_SGI_SN
 	default y
 
 config ACPI_EC
 	bool
-	depends on X86 && ACPI
+	depends on X86
+	depends on ACPI_INTERPRETER
 	default y
 	help
 	  This driver is required on some systems for the proper operation of
@@ -243,19 +255,19 @@ config ACPI_EC
 
 config ACPI_POWER
 	bool
-	depends on ACPI
+	depends on ACPI_INTERPRETER
 	depends on !IA64_SGI_SN
 	default y
 
 config ACPI_PCI
 	bool
-	depends on ACPI
+	depends on ACPI_INTERPRETER
 	depends on !IA64_SGI_SN
 	default PCI
 
 config ACPI_SYSTEM
 	bool
-	depends on ACPI
+	depends on ACPI_INTERPRETER
 	depends on !IA64_SGI_SN
 	default y
 	help
@@ -264,7 +276,7 @@ config ACPI_SYSTEM
 
 config ACPI_EFI
 	bool
-	depends on ACPI
+	depends on ACPI_INTERPRETER
 	depends on IA64
 	default y
 
