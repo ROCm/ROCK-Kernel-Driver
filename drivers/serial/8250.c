@@ -93,13 +93,15 @@ unsigned int share_irqs = SERIAL8250_SHARE_IRQS;
 #ifdef CONFIG_SERIAL_8250_MULTIPORT
 #define CONFIG_SERIAL_MULTIPORT 1
 #endif
+#ifdef CONFIG_SERIAL_8250_MANY_PORTS
+#define CONFIG_SERIAL_MANY_PORTS 1
+#endif
 
 /*
  * HUB6 is always on.  This will be removed once the header
  * files have been cleaned.
  */
 #define CONFIG_HUB6 1
-#define CONFIG_SERIAL_MANY_PORTS 1
 
 #include <asm/serial.h>
 
@@ -2094,6 +2096,28 @@ void serial8250_get_irq_map(unsigned int *map)
 	}
 }
 
+/**
+ *	serial8250_suspend_port - suspend one serial port
+ *	@line: serial line number
+ *
+ *	Suspend one serial port.
+ */
+void serial8250_suspend_port(int line, u32 level)
+{
+	uart_suspend_port(&serial8250_reg, &serial8250_ports[line].port, level);
+}
+
+/**
+ *	serial8250_resume_port - resume one serial port
+ *	@line: serial line number
+ *
+ *	Resume one serial port.
+ */
+void serial8250_resume_port(int line, u32 level)
+{
+	uart_resume_port(&serial8250_reg, &serial8250_ports[line].port, level);
+}
+
 static int __init serial8250_init(void)
 {
 	int ret, i;
@@ -2127,6 +2151,8 @@ module_exit(serial8250_exit);
 EXPORT_SYMBOL(register_serial);
 EXPORT_SYMBOL(unregister_serial);
 EXPORT_SYMBOL(serial8250_get_irq_map);
+EXPORT_SYMBOL(serial8250_suspend_port);
+EXPORT_SYMBOL(serial8250_resume_port);
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Generic 8250/16x50 serial driver $Revision: 1.90 $");
