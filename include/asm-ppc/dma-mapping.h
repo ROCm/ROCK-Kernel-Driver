@@ -184,4 +184,10 @@ static inline void dma_cache_sync(void *vaddr, size_t size,
 {
 	consistent_sync(vaddr, size, (int)direction);
 }
+
+static inline int dma_mapping_error(dma_addr_t dma_addr)
+{
+	return 0;
+}
+
 #endif				/* __ASM_PPC_DMA_MAPPING_H */

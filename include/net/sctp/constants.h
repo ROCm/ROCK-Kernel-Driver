@@ -231,11 +231,6 @@ const char *sctp_pname(const sctp_subtype_t);	/* primitives */
 /* This is a table of printable names of sctp_state_t's.  */
 extern const char *sctp_state_tbl[], *sctp_evttype_tbl[], *sctp_status_tbl[];
 
-/* SCTP reachability state for each address */
-#define SCTP_ADDR_NOHB			4
-#define SCTP_ADDR_REACHABLE		2
-#define SCTP_ADDR_NOT_REACHABLE		1
-
 /* Maximum chunk length considering padding requirements. */
 enum { SCTP_MAX_CHUNK_LEN = ((1<<16) - sizeof(__u32)) };
 

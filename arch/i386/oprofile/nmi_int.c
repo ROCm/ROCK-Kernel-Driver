@@ -183,7 +183,10 @@ static int nmi_setup(void)
 	 * without actually triggering any NMIs as this will
 	 * break the core code horrifically.
 	 */
-	disable_lapic_nmi_watchdog();
+	if (reserve_lapic_nmi() < 0) {
+		free_msrs();
+		return -EBUSY;
+	}
 	/* We need to serialize save and setup for HT because the subset
 	 * of msrs are distinct for save and setup operations
 	 */
@@ -241,7 +244,7 @@ static void nmi_shutdown(void)
 	nmi_enabled = 0;
 	on_each_cpu(nmi_cpu_shutdown, NULL, 0, 1);
 	unset_nmi_callback();
-	enable_lapic_nmi_watchdog();
+	release_lapic_nmi();
 	free_msrs();
 }
 

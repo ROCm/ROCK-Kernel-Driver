@@ -323,6 +323,17 @@ struct cpu_spec	cpu_specs[] = {
 	32, 32,
 	__setup_cpu_745x
     },
+    {	/* 7447A */
+    	0xffff0000, 0x80030000, "7447A",
+	CPU_FTR_COMMON |
+    	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_CAN_NAP |
+	CPU_FTR_L2CR | CPU_FTR_ALTIVEC_COMP |
+	CPU_FTR_HPTE_TABLE | CPU_FTR_SPEC7450 | CPU_FTR_NAP_DISABLE_L2_PR |
+	CPU_FTR_HAS_HIGH_BATS,
+	COMMON_PPC | PPC_FEATURE_ALTIVEC_COMP,
+	32, 32,
+	__setup_cpu_745x
+    },
     {	/* 82xx (8240, 8245, 8260 are all 603e cores) */
 	0x7fff0000, 0x00810000, "82xx",
 	CPU_FTR_COMMON |

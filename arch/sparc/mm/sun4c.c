@@ -1863,6 +1863,23 @@ pte_t *sun4c_pte_offset_kernel(pmd_t * dir, unsigned long address)
 			((address >> PAGE_SHIFT) & (SUN4C_PTRS_PER_PTE - 1));
 }
 
+static unsigned long sun4c_swp_type(swp_entry_t entry)
+{
+	return (entry.val & SUN4C_SWP_TYPE_MASK);
+}
+
+static unsigned long sun4c_swp_offset(swp_entry_t entry)
+{
+	return (entry.val >> SUN4C_SWP_OFF_SHIFT) & SUN4C_SWP_OFF_MASK;
+}
+
+static swp_entry_t sun4c_swp_entry(unsigned long type, unsigned long offset)
+{
+	return (swp_entry_t) {
+		  (offset & SUN4C_SWP_OFF_MASK) << SUN4C_SWP_OFF_SHIFT
+		| (type & SUN4C_SWP_TYPE_MASK) };
+}
+
 static void sun4c_free_pte_slow(pte_t *pte)
 {
 	free_page((unsigned long)pte);
@@ -2241,6 +2258,10 @@ void __init ld_mmu_sun4c(void)
 
 	BTFIXUPSET_CALL(sparc_mapiorange, sun4c_mapiorange, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(sparc_unmapiorange, sun4c_unmapiorange, BTFIXUPCALL_NORM);
+
+	BTFIXUPSET_CALL(__swp_type, sun4c_swp_type, BTFIXUPCALL_NORM);
+	BTFIXUPSET_CALL(__swp_offset, sun4c_swp_offset, BTFIXUPCALL_NORM);
+	BTFIXUPSET_CALL(__swp_entry, sun4c_swp_entry, BTFIXUPCALL_NORM);
 
 	BTFIXUPSET_CALL(alloc_thread_info, sun4c_alloc_thread_info, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(free_thread_info, sun4c_free_thread_info, BTFIXUPCALL_NORM);

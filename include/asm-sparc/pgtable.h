@@ -11,6 +11,7 @@
 
 #include <linux/config.h>
 #include <linux/spinlock.h>
+#include <linux/swap.h>
 #include <asm/types.h>
 #ifdef CONFIG_SUN4
 #include <asm/pgtsun4.h>
@@ -401,9 +402,14 @@ BTFIXUPDEF_CALL(void, sparc_unmapiorange, unsigned long, unsigned int)
 extern int invalid_segment;
 
 /* Encode and de-code a swap entry */
-#define __swp_type(x)			(((x).val >> 2) & 0x7f)
-#define __swp_offset(x)			(((x).val >> 9) & 0x3ffff)
-#define __swp_entry(type,offset)	((swp_entry_t) { (((type) & 0x7f) << 2) | (((offset) & 0x3ffff) << 9) })
+BTFIXUPDEF_CALL(unsigned long, __swp_type, swp_entry_t)
+BTFIXUPDEF_CALL(unsigned long, __swp_offset, swp_entry_t)
+BTFIXUPDEF_CALL(swp_entry_t, __swp_entry, unsigned long, unsigned long)
+
+#define __swp_type(__x)			BTFIXUP_CALL(__swp_type)(__x)
+#define __swp_offset(__x)		BTFIXUP_CALL(__swp_offset)(__x)
+#define __swp_entry(__type,__off)	BTFIXUP_CALL(__swp_entry)(__type,__off)
+
 #define __pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) })
 #define __swp_entry_to_pte(x)		((pte_t) { (x).val })
 

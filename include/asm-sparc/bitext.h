@@ -15,6 +15,8 @@ struct bit_map {
 	int size;
 	int used;
 	int last_off;
+	int last_size;
+	int first_free;
 };
 
 extern int bit_map_string_get(struct bit_map *t, int len, int align);

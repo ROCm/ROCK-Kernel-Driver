@@ -137,7 +137,8 @@ move_one_page(struct vm_area_struct *vma, unsigned long old_addr,
 				error = -ENOMEM;
 			pte_unmap_nested(src);
 		}
-		pte_unmap(dst);
+		if (dst)
+			pte_unmap(dst);
 	}
 	spin_unlock(&mm->page_table_lock);
 	pte_chain_free(pte_chain);

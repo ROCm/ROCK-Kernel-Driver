@@ -240,12 +240,6 @@ int filemap_write_and_wait(struct address_space *mapping)
 }
 
 /*
- * This adds a page to the page cache, starting out as locked, unreferenced,
- * not uptodate and with no errors.
- *
- * This function is used for two things: adding newly allocated pagecache
- * pages and for moving existing anon pages into swapcache.
- *
  * This function is used to add newly allocated pagecache pages:
  * the page is new, so we can just run SetPageLocked() against it.
  * The other page state flags were set by rmqueue().

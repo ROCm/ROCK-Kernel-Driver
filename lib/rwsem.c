@@ -65,10 +65,11 @@ static inline struct rw_semaphore *__rwsem_do_wake(struct rw_semaphore *sem, int
 		goto readers_only;
 
 	list_del(&waiter->list);
-	mb();
 	tsk = waiter->task;
+	mb();
 	waiter->task = NULL;
 	wake_up_process(tsk);
+	put_task_struct(tsk);
 	goto out;
 
 	/* don't want to wake any writers */
@@ -102,10 +103,11 @@ static inline struct rw_semaphore *__rwsem_do_wake(struct rw_semaphore *sem, int
 	for (; loop>0; loop--) {
 		waiter = list_entry(next,struct rwsem_waiter,list);
 		next = waiter->list.next;
-		mb();
 		tsk = waiter->task;
+		mb();
 		waiter->task = NULL;
 		wake_up_process(tsk);
+		put_task_struct(tsk);
 	}
 
 	sem->wait_list.next = next;
@@ -137,6 +139,7 @@ static inline struct rw_semaphore *rwsem_down_failed_common(struct rw_semaphore 
 	/* set up my own style of waitqueue */
 	spin_lock(&sem->wait_lock);
 	waiter->task = tsk;
+	get_task_struct(tsk);
 
 	list_add_tail(&waiter->list,&sem->wait_list);
 
