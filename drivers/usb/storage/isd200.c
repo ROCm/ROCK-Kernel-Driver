@@ -130,7 +130,6 @@
 #define ISD200_TRANSPORT_GOOD       0   /* Transport good, command good     */
 #define ISD200_TRANSPORT_FAILED     1   /* Transport good, command failed   */
 #define ISD200_TRANSPORT_ERROR      2   /* Transport bad (i.e. device dead) */
-#define ISD200_TRANSPORT_ABORTED    3   /* Transport aborted                */
 #define ISD200_TRANSPORT_SHORT      4   /* Transport short                  */
 
 /* driver action codes */
@@ -436,11 +435,6 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
 	result = usb_stor_bulk_transfer_buf(us, us->send_bulk_pipe,
 				(char *) &bcb, US_BULK_CB_WRAP_LEN, NULL);
         US_DEBUGP("Bulk command transfer result=%d\n", result);
-    
-	/* did we abort this command? */
-	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
-		return ISD200_TRANSPORT_ABORTED;
-	}
 	if (result != USB_STOR_XFER_GOOD)  
                 return ISD200_TRANSPORT_ERROR;
     
@@ -451,10 +445,6 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
 		result = usb_stor_bulk_transfer_srb(us, pipe, srb,
 					transfer_length);
 		US_DEBUGP("Bulk data transfer result 0x%x\n", result);
-
-		/* if it was aborted, we need to indicate that */
-		if (result == USB_STOR_XFER_ABORTED)
-			return ISD200_TRANSPORT_ABORTED;
 		if (result == USB_STOR_XFER_ERROR)
 			return ISD200_TRANSPORT_ERROR;
         }
@@ -468,11 +458,6 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
 	result = usb_stor_bulk_transfer_buf(us, us->recv_bulk_pipe,
 				(char *) &bcs, US_BULK_CS_WRAP_LEN, NULL);
 
-	/* did we abort this command? */
-	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
-		return ISD200_TRANSPORT_ABORTED;
-	}
-
         /* did the attempt to read the CSW fail? */
 	if (result == USB_STOR_XFER_STALLED) {
            
@@ -480,11 +465,6 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
                 US_DEBUGP("Attempting to get CSW (2nd try)...\n");
 		result = usb_stor_bulk_transfer_buf(us, us->recv_bulk_pipe,
 				(char *) &bcs, US_BULK_CS_WRAP_LEN, NULL);
-
-                /* if the command was aborted, indicate that */
-		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
-			return ISD200_TRANSPORT_ABORTED;
-		}
         }
     
         /* if we still have a failure at this point, we're in trouble */
@@ -686,14 +666,6 @@ void isd200_invoke_transport( struct us_data *us,
 	case ISD200_TRANSPORT_GOOD:
 		/* Indicate a good result */
 		srb->result = GOOD << 1;
-		break;
-
-	case ISD200_TRANSPORT_ABORTED:
-		/* if the command gets aborted by the higher layers, we need to
-		 * short-circuit all other processing
-		 */
-		US_DEBUGP("-- transport indicates command was aborted\n");
-		srb->result = DID_ABORT << 16;
 		break;
 
 	case ISD200_TRANSPORT_FAILED:
