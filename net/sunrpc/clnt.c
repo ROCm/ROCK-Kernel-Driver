@@ -970,14 +970,16 @@ call_verify(struct rpc_task *task)
 				(unsigned int)task->tk_client->cl_prog,
 				(unsigned int)task->tk_client->cl_vers,
 				task->tk_client->cl_server);
-		goto out_eio;
+		rpc_exit(task, -ENOSYS);
+		return NULL;
 	case RPC_PROC_UNAVAIL:
 		printk(KERN_WARNING "RPC: call_verify: proc %p unsupported by program %u, version %u on server %s\n",
 				task->tk_msg.rpc_proc,
 				task->tk_client->cl_prog,
 				task->tk_client->cl_vers,
 				task->tk_client->cl_server);
-		goto out_eio;
+		rpc_exit(task, -ENOSYS);
+		return NULL;
 	case RPC_GARBAGE_ARGS:
 		break;			/* retry */
 	default:
