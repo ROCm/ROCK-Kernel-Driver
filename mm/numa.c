@@ -40,18 +40,7 @@ void __init free_area_init_node(int nid, pg_data_t *pgdat, struct page *pmap,
 	mem_map = contig_page_data.node_mem_map;
 }
 
-#endif /* !CONFIG_DISCONTIGMEM */
-
-struct page * alloc_pages_node(int nid, unsigned int gfp_mask, unsigned int order)
-{
-#ifdef CONFIG_NUMA
-	return __alloc_pages(gfp_mask, order, NODE_DATA(nid)->node_zonelists + (gfp_mask & GFP_ZONEMASK));
-#else
-	return alloc_pages(gfp_mask, order);
-#endif
-}
-
-#ifdef CONFIG_DISCONTIGMEM
+#else /* CONFIG_DISCONTIGMEM */
 
 #define LONG_ALIGN(x) (((x)+(sizeof(long))-1)&~((sizeof(long))-1))
 

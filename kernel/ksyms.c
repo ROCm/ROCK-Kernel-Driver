@@ -90,7 +90,6 @@ EXPORT_SYMBOL(exit_mm);
 
 /* internal kernel memory management */
 EXPORT_SYMBOL(__alloc_pages);
-EXPORT_SYMBOL(alloc_pages_node);
 EXPORT_SYMBOL(__get_free_pages);
 EXPORT_SYMBOL(get_zeroed_page);
 EXPORT_SYMBOL(__page_cache_release);
