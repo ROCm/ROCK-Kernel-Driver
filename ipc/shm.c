@@ -700,24 +700,18 @@ out:
 asmlinkage long sys_shmdt (char *shmaddr)
 {
 	struct mm_struct *mm = current->mm;
-	struct vm_area_struct *vma;
-	unsigned long address = (unsigned long)shmaddr;
+	struct vm_area_struct *shmd, *shmdnext;
 	int retval = -EINVAL;
 
 	down_write(&mm->mmap_sem);
-	vma = find_vma(mm, address);
-	if (!vma)
-		goto out;
-	if (vma->vm_start != address)
-		goto out;
-	
-	/* ->vm_pgoff is always 0, see do_mmap() in sys_shmat() */
-	retval = 0;
-	if (vma->vm_ops == &shm_vm_ops || (vma->vm_flags & VM_HUGETLB))
-		do_munmap(mm, vma->vm_start, vma->vm_end - vma->vm_start);
-	else
-		retval = -EINVAL;
-out:
+	for (shmd = mm->mmap; shmd; shmd = shmdnext) {
+		shmdnext = shmd->vm_next;
+		if ((shmd->vm_ops == &shm_vm_ops || (shmd->vm_flags & VM_HUGETLB))
+		    && shmd->vm_start - (shmd->vm_pgoff << PAGE_SHIFT) == (ulong) shmaddr) {
+			do_munmap(mm, shmd->vm_start, shmd->vm_end - shmd->vm_start);
+			retval = 0;
+		}
+	}
 	up_write(&mm->mmap_sem);
 	return retval;
 }
