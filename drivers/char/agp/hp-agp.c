@@ -1,29 +1,5 @@
 /*
- * AGPGART module version 0.99
- * Copyright (C) 1999 Jeff Hartmann
- * Copyright (C) 1999 Precision Insight, Inc.
- * Copyright (C) 1999 Xi Graphics, Inc.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included
- * in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
- * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
- * JEFF HARTMANN, OR ANY OTHER CONTRIBUTORS BE LIABLE FOR ANY CLAIM, 
- * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR 
- * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE 
- * OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- *
- * TODO: 
- * - Allocate more than order 0 pages to avoid too much linear map splitting.
+ * HP AGPGART routines. 
  */
 
 #include <linux/module.h>
@@ -31,7 +7,6 @@
 #include <linux/init.h>
 #include <linux/agp_backend.h>
 #include "agp.h"
-#include "hp.h"
 
 #ifndef log2
 #define log2(x)		ffz(~(x))
@@ -174,15 +149,13 @@ static int __init hp_zx1_ioc_init(void)
 
 	for (i = 0; i < PCI_NUM_RESOURCES; i++) {
 		if (pci_resource_flags(ioc, i) == IORESOURCE_MEM) {
-			hp->registers = (u8 *) ioremap(pci_resource_start(ioc,
-									    i),
+			hp->registers = (u8 *) ioremap(pci_resource_start(ioc, i),
 						    pci_resource_len(ioc, i));
 			break;
 		}
 	}
 	if (!hp->registers) {
 		printk(KERN_ERR PFX "Detected HP ZX1 AGP bridge but no CSRs\n");
-
 		return -ENODEV;
 	}
 
@@ -386,9 +359,72 @@ int __init hp_zx1_setup (struct pci_dev *pdev)
 	agp_bridge.agp_alloc_page = agp_generic_alloc_page;
 	agp_bridge.agp_destroy_page = agp_generic_destroy_page;
 	agp_bridge.cant_use_aperture = 1;
-
 	return hp_zx1_ioc_init();
-
-	(void) pdev; /* unused */
 }
 
+static int __init agp_find_supported_device(struct pci_dev *dev)
+{
+	agp_bridge.dev = dev;
+
+	/* ZX1 LBAs can be either PCI or AGP bridges */
+	if (pci_find_capability(dev, PCI_CAP_ID_AGP)) {
+		printk(KERN_INFO PFX "Detected HP ZX1 AGP chipset at %s\n",
+			dev->slot_name);
+		agp_bridge.type = HP_ZX1;
+		agp_bridge.dev = dev;
+		return hp_zx1_setup(dev);
+	}
+	return -ENODEV;
+}
+
+
+static int agp_hp_probe (struct pci_dev *dev, const struct pci_device_id *ent)
+{
+	if (agp_find_supported_device(dev) == 0) {
+		agp_register_driver(dev);
+		return 0;
+	}
+	return -ENODEV;	
+}
+
+static struct pci_device_id agp_hp_pci_table[] __initdata = {
+	{
+	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
+	.class_mask	= ~0,
+	.vendor_id	= PCI_VENDOR_ID_HP,
+	.device		= PCI_DEVICE_ID_HP_ZX1_LBA,
+	.subvendor	= PCI_ANY_ID,
+	.subdevice	= PCI_ANY_ID,
+	},
+	{ }
+};
+
+MODULE_DEVICE_TABLE(pci, agp_pci_table);
+
+static struct pci_driver agp_hp_pci_driver = {
+	.name		= "agpgart-hp",
+	.id_table	= agp_hp_pci_table,
+	.probe		= agp_hp_probe,
+};
+
+static int __init agp_hp_init(void)
+{
+	int ret_val;
+
+	ret_val = pci_module_init(&agp_hp_pci_driver);
+	if (ret_val)
+		agp_bridge.type = NOT_SUPPORTED;
+
+	return ret_val;
+}
+
+static void __exit agp_hp_cleanup(void)
+{
+	agp_unregister_driver();
+	pci_unregister_driver(&agp_pci_driver);
+}
+
+module_init(agp_hp_init);
+module_exit(agp_hp_cleanup);
+
+MODULE_LICENSE("GPL and additional rights");

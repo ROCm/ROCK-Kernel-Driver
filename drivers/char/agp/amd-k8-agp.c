@@ -13,7 +13,6 @@
 #include <linux/init.h>
 #include <linux/agp_backend.h>
 #include "agp.h"
-#include "k8-agp.h"
 
 extern int agp_memory_reserved;
 extern __u32 *agp_gatt_table; 
@@ -162,7 +161,7 @@ static void inline flush_x86_64_tlb(struct pci_dev *dev)
 }
 
 
-void amd_x86_64_tlbflush(agp_memory * temp)
+static void amd_x86_64_tlbflush(agp_memory * temp)
 {
 	struct pci_dev *dev;
 
@@ -179,7 +178,7 @@ void amd_x86_64_tlbflush(agp_memory * temp)
  * In a multiprocessor x86-64 system, this function gets
  * called once for each CPU.
  */
-u64 amd_x86_64_configure (struct pci_dev *hammer, u64 gatt_table)
+static u64 amd_x86_64_configure (struct pci_dev *hammer, u64 gatt_table)
 {
 	u64 aperturebase;
 	u32 tmp;
@@ -445,7 +444,7 @@ static void agp_x86_64_agp_enable(u32 mode)
 }
 
 
-int __init amd_8151_setup (struct pci_dev *pdev)
+static int __init amd_8151_setup (struct pci_dev *pdev)
 {
 	agp_bridge.masks = amd_8151_masks;
 	agp_bridge.num_of_masks = 1;
@@ -472,6 +471,60 @@ int __init amd_8151_setup (struct pci_dev *pdev)
 	agp_bridge.suspend = agp_generic_suspend;
 	agp_bridge.resume = agp_generic_resume;
 	agp_bridge.cant_use_aperture = 0;
-
 	return 0;
 }
+
+
+static int agp_amdk8_probe (struct pci_dev *dev, const struct pci_device_id *ent)
+{
+	if (pci_find_capability(dev, PCI_CAP_ID_AGP)==0)
+		return -ENODEV;
+
+	amd_8151_setup(dev);
+	agp_register_driver(dev);
+	return 0;
+}
+
+static struct pci_device_id agp_amdk8_pci_table[] __initdata = {
+	{
+	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
+	.class_mask	= ~0,
+	.vendor		= PCI_VENDOR_ID_AMD,
+	.device		= PCI_DEVICE_ID_AMD_8151_0,
+	.subvendor	= PCI_ANY_ID,
+	.subdevice	= PCI_ANY_ID,
+	},
+	{ }
+};
+
+MODULE_DEVICE_TABLE(pci, agp_amdk8_pci_table);
+
+static struct pci_driver agp_amdk8_pci_driver = {
+	.name		= "agpgart-amd-k8",
+	.id_table	= agp_amdk8_pci_table,
+	.probe		= agp_amdk8_probe,
+};
+
+static int __init agp_amdk8_init(void)
+{
+	int ret_val;
+
+	ret_val = pci_module_init(&agp_amdk8_pci_driver);
+	if (ret_val)
+		agp_bridge.type = NOT_SUPPORTED;
+
+	return ret_val;
+}
+
+static void __exit agp_amdk8_cleanup(void)
+{
+	agp_unregister_driver();
+	pci_unregister_driver(&agp_amdk8_pci_driver);
+}
+
+module_init(agp_amdk8_init);
+module_exit(agp_amdk8_cleanup);
+
+MODULE_AUTHOR("Dave Jones <davej@codemonkey.org.uk>");
+MODULE_LICENSE("GPL and additional rights");
+

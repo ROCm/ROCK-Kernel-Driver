@@ -1,38 +1,15 @@
 /*
- * AGPGART module version 0.99
- * Copyright (C) 1999 Jeff Hartmann
- * Copyright (C) 1999 Precision Insight, Inc.
- * Copyright (C) 1999 Xi Graphics, Inc.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included
- * in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
- * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
- * JEFF HARTMANN, OR ANY OTHER CONTRIBUTORS BE LIABLE FOR ANY CLAIM, 
- * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR 
- * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE 
- * OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- *
- * TODO: 
- * - Allocate more than order 0 pages to avoid too much linear map splitting.
+ * ALi AGPGART routines.
  */
-#include <linux/config.h>
+
 #include <linux/types.h>
-#include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/agp_backend.h>
 #include "agp.h"
-#include "ali.h"
+
+static int agp_try_unsupported __initdata = 0;
 
 static int ali_fetch_size(void)
 {
@@ -97,21 +74,8 @@ static int ali_configure(void)
 	pci_write_config_dword(agp_bridge.dev, ALI_ATTBASE, temp);
 
 	/* tlb control */
-
-	/*
-	 *	Question: Jeff, ALi's patch deletes this:
-	 *
-	 *	pci_read_config_dword(agp_bridge.dev, ALI_TLBCTRL, &temp);
-	 *	pci_write_config_dword(agp_bridge.dev, ALI_TLBCTRL,
-	 *			       ((temp & 0xffffff00) | 0x00000010));
-	 *
-	 *	and replaces it with the following, which seems to duplicate the
-	 *	next couple of lines below it. I suspect this was an oversight,
-	 *	but you might want to check up on this?
-	 */
-	
-	pci_read_config_dword(agp_bridge.dev, ALI_APBASE, &temp);
-	agp_bridge.gart_bus_addr = (temp & PCI_BASE_ADDRESS_MEM_MASK);
+	pci_read_config_dword(agp_bridge.dev, ALI_TLBCTRL, &temp);
+	pci_write_config_dword(agp_bridge.dev, ALI_TLBCTRL, ((temp & 0xffffff00) | 0x00000010));
 
 	/* address to map to */
 	pci_read_config_dword(agp_bridge.dev, ALI_APBASE, &temp);
@@ -258,9 +222,180 @@ int __init ali_generic_setup (struct pci_dev *pdev)
 	agp_bridge.suspend = agp_generic_suspend;
 	agp_bridge.resume = agp_generic_resume;
 	agp_bridge.cant_use_aperture = 0;
-
 	return 0;
-	
-	(void) pdev; /* unused */
 }
+
+struct agp_device_ids ali_agp_device_ids[] __initdata =
+{
+	{
+		.device_id	= PCI_DEVICE_ID_AL_M1541,
+		.chipset	= ALI_M1541,
+		.chipset_name	= "M1541",
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_AL_M1621,
+		.chipset	= ALI_M1621,
+		.chipset_name	= "M1621",
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_AL_M1631,
+		.chipset	= ALI_M1631,
+		.chipset_name	= "M1631",
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_AL_M1632,
+		.chipset	= ALI_M1632,
+		.chipset_name	= "M1632",
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_AL_M1641,
+		.chipset	= ALI_M1641,
+		.chipset_name	= "M1641",
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_AL_M1644,
+		.chipset	= ALI_M1644,
+		.chipset_name	= "M1644",
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_AL_M1647,
+		.chipset	= ALI_M1647,
+		.chipset_name	= "M1647",
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_AL_M1651,
+		.chipset	= ALI_M1651,
+		.chipset_name	= "M1651",
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_AL_M1671,
+		.chipset	= ALI_M1671,
+		.chipset_name	= "M1671",
+	},
+	{ }, /* dummy final entry, always present */
+};
+
+/* scan table above for supported devices */
+static int __init agp_lookup_host_bridge (struct pci_dev *pdev)
+{
+	int j=0;
+	struct agp_device_ids *devs;
+	
+	devs = ali_agp_device_ids;
+
+	while (devs[j].chipset_name != NULL) {
+		if (pdev->device == devs[j].device_id) {
+			if (pdev->device == PCI_DEVICE_ID_AL_M1621) {
+				u8 hidden_1621_id;
+
+				pci_read_config_byte(pdev, 0xFB, &hidden_1621_id);
+				switch (hidden_1621_id) {
+				case 0x31:
+					devs[j].chipset_name="M1631";
+					break;
+				case 0x32:
+					devs[j].chipset_name="M1632";
+					break;
+				case 0x41:
+					devs[j].chipset_name="M1641";
+					break;
+				case 0x43:
+					break;
+				case 0x47:
+					devs[j].chipset_name="M1647";
+					break;
+				case 0x51:
+					devs[j].chipset_name="M1651";
+					break;
+				default:
+					break;
+				}
+			}
+
+			printk (KERN_INFO PFX "Detected ALi %s chipset\n",
+				devs[j].chipset_name);
+			agp_bridge.type = devs[j].chipset;
+
+			if (devs[j].chipset_setup != NULL)
+				return devs[j].chipset_setup(pdev);
+			else
+				return ali_generic_setup(pdev);
+		}
+		j++;
+	}
+
+	/* try init anyway, if user requests it */
+	if (agp_try_unsupported) {
+		printk(KERN_WARNING PFX "Trying generic ALi routines"
+		       " for device id: %04x\n", pdev->device);
+		agp_bridge.type = ALI_GENERIC;
+		return ali_generic_setup(pdev);
+	}
+
+	printk(KERN_ERR PFX "Unsupported ALi chipset (device id: %04x),"
+		" you might want to try agp_try_unsupported=1.\n", pdev->device);
+	return -ENODEV;
+}
+
+
+
+
+static int agp_ali_probe (struct pci_dev *dev, const struct pci_device_id *ent)
+{
+	if (pci_find_capability(dev, PCI_CAP_ID_AGP)==0)
+		return -ENODEV;
+
+	agp_bridge.dev = dev;
+
+	/* probe for known chipsets */
+	if (agp_lookup_host_bridge (dev) != -ENODEV ) {
+		agp_register_driver(dev);
+		return 0;
+	}
+	return -ENODEV;	
+}
+
+static struct pci_device_id agp_ali_pci_table[] __initdata = {
+	{
+	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
+	.class_mask	= ~0,
+	.vendor		= PCI_VENDOR_ID_AL,
+	.device		= PCI_ANY_ID,
+	.subvendor	= PCI_ANY_ID,
+	.subdevice	= PCI_ANY_ID,
+	},
+	{ }
+};
+
+MODULE_DEVICE_TABLE(pci, agp_ali_pci_table);
+
+static struct pci_driver agp_ali_pci_driver = {
+	.name		= "agpgart-ali",
+	.id_table	= agp_ali_pci_table,
+	.probe		= agp_ali_probe,
+};
+
+static int __init agp_ali_init(void)
+{
+	int ret_val;
+
+	ret_val = pci_module_init(&agp_ali_pci_driver);
+	if (ret_val)
+		agp_bridge.type = NOT_SUPPORTED;
+
+	return ret_val;
+}
+
+static void __exit agp_ali_cleanup(void)
+{
+	agp_unregister_driver();
+	pci_unregister_driver(&agp_ali_pci_driver);
+}
+
+module_init(agp_ali_init);
+module_exit(agp_ali_cleanup);
+
+MODULE_PARM(agp_try_unsupported, "1i");
+MODULE_AUTHOR("Dave Jones <davej@codemonkey.org.uk>");
+MODULE_LICENSE("GPL and additional rights");
 

@@ -47,6 +47,7 @@ void agp_generic_resume(void);
 void agp_free_key(int key);
 
 /* chipset specific init routines. */
+/*
 int __init ali_generic_setup (struct pci_dev *pdev);
 int __init amd_irongate_setup (struct pci_dev *pdev);
 int __init amd_8151_setup (struct pci_dev *pdev);
@@ -65,10 +66,12 @@ int __init intel_860_setup (struct pci_dev *pdev);
 int __init serverworks_setup (struct pci_dev *pdev);
 int __init sis_generic_setup (struct pci_dev *pdev);
 int __init via_generic_setup (struct pci_dev *pdev);
+*/
 
-#define AGPGART_MODULE_NAME	"agpgart"
-#define PFX			AGPGART_MODULE_NAME ": "
+#define PFX "agpgart: "
 
+int agp_register_driver (struct pci_dev *dev);
+int agp_unregister_driver(void);
 
 #ifdef CONFIG_SMP
 static void ipi_handler(void *null)

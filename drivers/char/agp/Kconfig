@@ -39,13 +39,13 @@ config AGP_INTEL
 	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
 	  use GLX or DRI.  If unsure, say N.
 
-config AGP_I810
-	bool "Intel I810/I815/I830M (on-board) support"
-	depends on AGP
-	help
-	  This option gives you AGP support for the Xserver on the Intel 810
-	  815 and 830m chipset boards for their on-board integrated graphics. This
-	  is required to do any useful video modes with these boards.
+#config AGP_I810
+#	bool "Intel I810/I815/I830M (on-board) support"
+#	depends on AGP
+#	help
+#	  This option gives you AGP support for the Xserver on the Intel 810
+#	  815 and 830m chipset boards for their on-board integrated graphics. This
+#	  is required to do any useful video modes with these boards.
 
 config AGP_VIA
 	bool "VIA chipset support"

@@ -1,29 +1,5 @@
 /*
- * AGPGART module version 0.99
- * Copyright (C) 1999 Jeff Hartmann
- * Copyright (C) 1999 Precision Insight, Inc.
- * Copyright (C) 1999 Xi Graphics, Inc.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included
- * in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
- * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
- * JEFF HARTMANN, OR ANY OTHER CONTRIBUTORS BE LIABLE FOR ANY CLAIM, 
- * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR 
- * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE 
- * OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- *
- * TODO: 
- * - Allocate more than order 0 pages to avoid too much linear map splitting.
+ * AMD K7 AGPGART routines.
  */
 
 #include <linux/module.h>
@@ -31,7 +7,8 @@
 #include <linux/init.h>
 #include <linux/agp_backend.h>
 #include "agp.h"
-#include "amd.h"
+
+static int agp_try_unsupported __initdata = 0;
 
 struct amd_page_map {
 	unsigned long *real;
@@ -401,9 +378,128 @@ int __init amd_irongate_setup (struct pci_dev *pdev)
 	agp_bridge.suspend = agp_generic_suspend;
 	agp_bridge.resume = agp_generic_resume;
 	agp_bridge.cant_use_aperture = 0;
-
 	return 0;
-	
-	(void) pdev; /* unused */
 }
+
+struct agp_device_ids amd_agp_device_ids[] __initdata =
+{
+	{
+		.device_id	= PCI_DEVICE_ID_AMD_FE_GATE_7006,
+		.chipset	= AMD_IRONGATE,
+		.chipset_name	= "Irongate",
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_AMD_FE_GATE_700E,
+		.chipset	= AMD_761,
+		.chipset_name	= "761",
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_AMD_FE_GATE_700C,
+		.chipset	= AMD_762,
+		.chipset_name	= "760MP",
+	},
+	{ }, /* dummy final entry, always present */
+};
+
+
+/* scan table above for supported devices */
+static int __init agp_lookup_host_bridge (struct pci_dev *pdev)
+{
+	int j=0;
+	struct agp_device_ids *devs;
+	
+	devs = amd_agp_device_ids;
+
+	while (devs[j].chipset_name != NULL) {
+		if (pdev->device == devs[j].device_id) {
+			printk (KERN_INFO PFX "Detected AMD %s chipset\n", devs[j].chipset_name);
+			agp_bridge.type = devs[j].chipset;
+
+			if (devs[j].chipset_setup != NULL)
+				return devs[j].chipset_setup(pdev);
+			else
+				return amd_irongate_setup(pdev);
+		}
+		j++;
+	}
+
+	/* try init anyway, if user requests it */
+	if (agp_try_unsupported) {
+		printk(KERN_WARNING PFX "Trying generic AMD routines"
+		       " for device id: %04x\n", pdev->device);
+		agp_bridge.type = AMD_GENERIC;
+		return amd_irongate_setup(pdev);
+	}
+
+	printk(KERN_ERR PFX "Unsupported AMD chipset (device id: %04x),"
+		" you might want to try agp_try_unsupported=1.\n", pdev->device);
+	return -ENODEV;
+}
+
+
+/* Supported Device Scanning routine */
+
+static int __init agp_find_supported_device(struct pci_dev *dev)
+{
+	agp_bridge.dev = dev;
+
+	if (pci_find_capability(dev, PCI_CAP_ID_AGP)==0)
+		return -ENODEV;
+
+	/* probe for known chipsets */
+	return agp_lookup_host_bridge (dev);
+}
+
+
+static int agp_amdk7_probe (struct pci_dev *dev, const struct pci_device_id *ent)
+{
+	if (agp_find_supported_device(dev) == 0) {
+		agp_register_driver(dev);
+		return 0;
+	}
+	return -ENODEV;	
+}
+
+static struct pci_device_id agp_amdk7_pci_table[] __initdata = {
+	{
+	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
+	.class_mask	= ~0,
+	.vendor		= PCI_VENDOR_ID_AMD,
+	.device		= PCI_ANY_ID,
+	.subvendor	= PCI_ANY_ID,
+	.subdevice	= PCI_ANY_ID,
+	},
+	{ }
+};
+
+MODULE_DEVICE_TABLE(pci, agp_amdk7_pci_table);
+
+static struct pci_driver agp_amdk7_pci_driver = {
+	.name		= "agpgart-amdk7",
+	.id_table	= agp_amdk7_pci_table,
+	.probe		= agp_amdk7_probe,
+};
+
+static int __init agp_amdk7_init(void)
+{
+	int ret_val;
+
+	ret_val = pci_module_init(&agp_amdk7_pci_driver);
+	if (ret_val)
+		agp_bridge.type = NOT_SUPPORTED;
+
+	return ret_val;
+}
+
+static void __exit agp_amdk7_cleanup(void)
+{
+	agp_unregister_driver();
+	pci_unregister_driver(&agp_amdk7_pci_driver);
+}
+
+module_init(agp_amdk7_init);
+module_exit(agp_amdk7_cleanup);
+
+MODULE_PARM(agp_try_unsupported, "1i");
+MODULE_LICENSE("GPL and additional rights");
 

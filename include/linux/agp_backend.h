@@ -35,9 +35,6 @@
 #define FALSE 0
 #endif
 
-#define AGPGART_VERSION_MAJOR 0
-#define AGPGART_VERSION_MINOR 99
-
 enum chipset_type {
 	NOT_SUPPORTED,
 	INTEL_GENERIC,
