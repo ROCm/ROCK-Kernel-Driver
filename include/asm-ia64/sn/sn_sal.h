@@ -474,6 +474,52 @@ ia64_sn_pod_mode(void)
 	return isrv.v0;
 }
 
+/**
+ * ia64_sn_probe_mem - read from memory safely
+ * @addr: address to probe
+ * @size: number bytes to read (1,2,4,8)
+ * @data_ptr: address to store value read by probe (-1 returned if probe fails)
+ *
+ * Call into the SAL to do a memory read.  If the read generates a machine
+ * check, this routine will recover gracefully and return -1 to the caller.
+ * @addr is usually a kernel virtual address in uncached space (i.e. the
+ * address starts with 0xc), but if called in physical mode, @addr should
+ * be a physical address.
+ *
+ * Return values:
+ *  0 - probe successful
+ *  1 - probe failed (generated MCA)
+ *  2 - Bad arg
+ * <0 - PAL error
+ */
+static inline u64
+ia64_sn_probe_mem(long addr, long size, void *data_ptr)
+{
+	struct ia64_sal_retval isrv;
+
+	SAL_CALL(isrv, SN_SAL_PROBE, addr, size, 0, 0, 0, 0, 0);
+
+	if (data_ptr) {
+		switch (size) {
+		case 1:
+			*((u8*)data_ptr) = (u8)isrv.v0;
+			break;
+		case 2:
+			*((u16*)data_ptr) = (u16)isrv.v0;
+			break;
+		case 4:
+			*((u32*)data_ptr) = (u32)isrv.v0;
+			break;
+		case 8:
+			*((u64*)data_ptr) = (u64)isrv.v0;
+			break;
+		default:
+			isrv.status = 2;
+		}
+	}
+	return isrv.status;
+}
+
 /*
  * Retrieve the system serial number as an ASCII string.
  */
