@@ -277,6 +277,7 @@ static inline u8 DIV_TO_REG(long val)
    data is pointed to by w83627hf_list[NR]->data. The structure itself is
    dynamically allocated, at the same time when a new client is allocated. */
 struct w83627hf_data {
+	struct i2c_client client;
 	struct semaphore lock;
 	enum chips type;
 
@@ -659,34 +660,37 @@ show_fan_div_reg(struct device *dev, char *buf, int nr)
 		       (long) DIV_FROM_REG(data->fan_div[nr - 1]));
 }
 
+/* Note: we save and restore the fan minimum here, because its value is
+   determined in part by the fan divisor.  This follows the principle of
+   least suprise; the user doesn't expect the fan minimum to change just
+   because the divisor changed. */
 static ssize_t
 store_fan_div_reg(struct device *dev, const char *buf, size_t count, int nr)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct w83627hf_data *data = i2c_get_clientdata(client);
-	u32 val, old, old2, old3 = 0;
+	unsigned long min;
+	u8 reg;
 
-	val = simple_strtoul(buf, NULL, 10);
-	old = w83627hf_read_value(client, W83781D_REG_VID_FANDIV);
-	old3 = w83627hf_read_value(client, W83781D_REG_VBAT);
-	data->fan_div[nr - 1] = DIV_TO_REG(val);
+	/* Save fan_min */
+	min = FAN_FROM_REG(data->fan_min[nr],
+			   DIV_FROM_REG(data->fan_div[nr]));
 
-	if (nr >= 3 && data->type != w83697hf) {
-		old2 = w83627hf_read_value(client, W83781D_REG_PIN);
-		old2 = (old2 & 0x3f) | ((data->fan_div[2] & 0x03) << 6);
-		w83627hf_write_value(client, W83781D_REG_PIN, old2);
-		old3 = (old3 & 0x7f) | ((data->fan_div[2] & 0x04) << 5);
-	}
-	if (nr >= 2) {
-		old = (old & 0x3f) | ((data->fan_div[1] & 0x03) << 6);
-		old3 = (old3 & 0xbf) | ((data->fan_div[1] & 0x04) << 4);
-	}
-	if (nr >= 1) {
-		old = (old & 0xcf) | ((data->fan_div[0] & 0x03) << 4);
-		w83627hf_write_value(client, W83781D_REG_VID_FANDIV, old);
-		old3 = (old3 & 0xdf) | ((data->fan_div[0] & 0x04) << 3);
-		w83627hf_write_value(client, W83781D_REG_VBAT, old3);
-	}
+	data->fan_div[nr] = DIV_TO_REG(simple_strtoul(buf, NULL, 10));
+
+	reg = (w83627hf_read_value(client, nr==2 ? W83781D_REG_PIN : W83781D_REG_VID_FANDIV)
+	       & (nr==0 ? 0xcf : 0x3f))
+	    | ((data->fan_div[nr] & 0x03) << (nr==0 ? 4 : 6));
+	w83627hf_write_value(client, nr==2 ? W83781D_REG_PIN : W83781D_REG_VID_FANDIV, reg);
+
+	reg = (w83627hf_read_value(client, W83781D_REG_VBAT)
+	       & ~(1 << (5 + nr)))
+	    | ((data->fan_div[nr] & 0x04) << (3 + nr));
+	w83627hf_write_value(client, W83781D_REG_VBAT, reg);
+
+	/* Restore fan_min */
+	data->fan_min[nr] = FAN_TO_REG(min, DIV_FROM_REG(data->fan_div[nr]));
+	w83627hf_write_value(client, W83781D_REG_FAN_MIN(nr+1), data->fan_min[nr]);
 
 	return count;
 }
@@ -700,7 +704,7 @@ static ssize_t \
 store_regs_fan_div_##offset (struct device *dev, \
 			    const char *buf, size_t count) \
 { \
-	return store_fan_div_reg(dev, buf, count, offset); \
+	return store_fan_div_reg(dev, buf, count, offset - 1); \
 } \
 static DEVICE_ATTR(fan##offset##_div, S_IRUGO | S_IWUSR, \
 		  show_regs_fan_div_##offset, store_regs_fan_div_##offset)
@@ -938,17 +942,13 @@ int w83627hf_detect(struct i2c_adapter *adapter, int address,
 	   client structure, even though we cannot fill it completely yet.
 	   But it allows us to access w83627hf_{read,write}_value. */
 
-	if (!(new_client = kmalloc(sizeof(struct i2c_client) +
-				   sizeof(struct w83627hf_data),
-				   GFP_KERNEL))) {
+	if (!(data = kmalloc(sizeof(struct w83627hf_data), GFP_KERNEL))) {
 		err = -ENOMEM;
 		goto ERROR1;
 	}
+	memset(data, 0, sizeof(struct w83627hf_data));
 
-	memset(new_client, 0x00, sizeof (struct i2c_client) +
-	       sizeof (struct w83627hf_data));
-
-	data = (struct w83627hf_data *) (new_client + 1);
+	new_client = &data->client;
 	i2c_set_clientdata(new_client, data);
 	new_client->addr = address;
 	init_MUTEX(&data->lock);
@@ -981,6 +981,11 @@ int w83627hf_detect(struct i2c_adapter *adapter, int address,
 
 	/* Initialize the chip */
 	w83627hf_init_client(new_client);
+
+	/* A few vars need to be filled upon startup */
+	data->fan_min[0] = w83627hf_read_value(new_client, W83781D_REG_FAN_MIN(1));
+	data->fan_min[1] = w83627hf_read_value(new_client, W83781D_REG_FAN_MIN(2));
+	data->fan_min[2] = w83627hf_read_value(new_client, W83781D_REG_FAN_MIN(3));
 
 	/* Register sysfs hooks */
 	device_create_file_in(new_client, 0);
@@ -1034,7 +1039,7 @@ int w83627hf_detect(struct i2c_adapter *adapter, int address,
 	return 0;
 
       ERROR2:
-	kfree(new_client);
+	kfree(data);
       ERROR1:
 	release_region(address, WINB_EXTENT);
       ERROR0:
@@ -1052,7 +1057,7 @@ static int w83627hf_detach_client(struct i2c_client *client)
 	}
 
 	release_region(client->addr, WINB_EXTENT);
-	kfree(client);
+	kfree(i2c_get_clientdata(client));
 
 	return 0;
 }
