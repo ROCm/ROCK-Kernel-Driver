@@ -14,7 +14,7 @@
 #include <linux/config.h>
 
 /*
- *	Get address specific defines for the 5282.
+ *	Get address specific defines for the 5270/5271 and 5280/5282.
  */
 #define	MCFPIT_BASE1		0x00150000	/* Base address of TIMER1 */
 #define	MCFPIT_BASE2		0x00160000	/* Base address of TIMER2 */
