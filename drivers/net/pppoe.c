@@ -644,8 +644,10 @@ int pppoe_connect(struct socket *sock, struct sockaddr *uservaddr,
 	release_sock(sk);
 	return error;
 err_put:
-	dev_put(po->pppoe_dev);
-	po->pppoe_dev = NULL;
+	if (po->pppoe_dev) {
+		dev_put(po->pppoe_dev);
+		po->pppoe_dev = NULL;
+	}
 	goto end;
 }
 
