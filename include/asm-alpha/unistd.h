@@ -593,13 +593,7 @@ static inline long read(int fd, char * buf, size_t nr)
 	return sys_read(fd, buf, nr);
 }
 
-extern int __kernel_execve(char *, char **, char **, struct pt_regs *);
-static inline long execve(char * file, char ** argvp, char ** envp)
-{
-	struct pt_regs regs;
-	memset(&regs, 0, sizeof(regs));
-	return __kernel_execve(file, argvp, envp, &regs);
-}
+extern long execve(char *, char **, char **);
 
 extern long sys_setsid(void);
 static inline long setsid(void)
