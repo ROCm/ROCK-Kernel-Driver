@@ -2234,7 +2234,7 @@ static int cciss_pci_init(ctlr_info_t *c, struct pci_dev *pdev)
 #endif /* CCISS_DEBUG */
 	if (cfg_base_addr_index == -1) {
 		printk(KERN_WARNING "cciss: Cannot find cfg_base_addr_index\n");
-		release_io_mem(hba[i]);
+		release_io_mem(c);
 		return -1;
 	}
 
