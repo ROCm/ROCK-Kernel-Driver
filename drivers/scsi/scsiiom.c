@@ -15,7 +15,7 @@ dc390_freetag (struct dc390_dcb* pDCB, struct dc390_srb* pSRB)
 }
 
 
-static u8
+static int
 dc390_StartSCSI( struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_srb* pSRB )
 {
     u8 cmd; u8  disc_allowed, try_sync_nego;
@@ -1150,10 +1150,7 @@ dc390_Disconnect( struct dc390_acb* pACB )
     pACB->pActiveDCB = 0;
     pSRB->ScsiPhase = SCSI_NOP0;
     if( pSRB->SRBState & SRB_UNEXPECT_RESEL )
-    {
 	pSRB->SRBState = 0;
-	dc390_Waiting_process ( pACB );
-    }
     else if( pSRB->SRBState & SRB_ABORT_SENT )
     {
 	pDCB->TagMask = 0;
@@ -1168,31 +1165,16 @@ dc390_Disconnect( struct dc390_acb* pACB )
 	    pSRB = psrb;
 	}
 	pDCB->pGoingSRB = 0;
-	dc390_Waiting_process (pACB);
     }
     else
     {
 	if( (pSRB->SRBState & (SRB_START_+SRB_MSGOUT)) ||
 	   !(pSRB->SRBState & (SRB_DISCONNECT+SRB_COMPLETED)) )
 	{	/* Selection time out */
-	    if( !(1/*pACB->scan_devices*/) )
-	    {
-		pSRB->SRBState = SRB_READY;
-		dc390_freetag (pDCB, pSRB);
-		dc390_Going_to_Waiting (pDCB, pSRB);
-		dc390_waiting_timer (pACB, HZ/5);
-	    }
-	    else
-	    {
 		pSRB->TargetStatus = SCSI_STAT_SEL_TIMEOUT;
 		goto  disc1;
-	    }
 	}
-	else if( pSRB->SRBState & SRB_DISCONNECT )
-	{
-	    dc390_Waiting_process ( pACB );
-	}
-	else if( pSRB->SRBState & SRB_COMPLETED )
+	else if (!(pSRB->SRBState & SRB_DISCONNECT) && (pSRB->SRBState & SRB_COMPLETED))
 	{
 disc1:
 	    dc390_freetag (pDCB, pSRB);
@@ -1221,10 +1203,13 @@ dc390_Reselect( struct dc390_acb* pACB )
 	pSRB = pDCB->pActiveSRB;
 	if( !( pACB->scan_devices ) )
 	{
-	    pSRB->SRBState = SRB_READY;
-	    dc390_freetag (pDCB, pSRB);
-	    dc390_Going_to_Waiting ( pDCB, pSRB);
-	    dc390_waiting_timer (pACB, HZ/5);
+	    struct scsi_cmnd *pcmd = pSRB->pcmd;
+	    pcmd->resid = pcmd->request_bufflen;
+	    SET_RES_DID(pcmd->result, DID_SOFT_ERROR);
+	    dc390_Going_remove(pDCB, pSRB);
+	    dc390_Free_insert(pACB, pSRB);
+	    pcmd->scsi_done (pcmd);
+	    DEBUG0(printk(KERN_DEBUG"DC390: Return SRB %p to free\n", pSRB));
 	}
     }
     /* Get ID */
@@ -1291,7 +1276,7 @@ dc390_Reselect( struct dc390_acb* pACB )
     DC390_write8 (ScsiCmd, MSG_ACCEPTED_CMD);	/* ;to release the /ACK signal */
 }
 
-static void __inline__
+static int __inline__
 dc390_RequestSense(struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_srb* pSRB)
 {
 	struct scsi_cmnd *pcmd;
@@ -1313,21 +1298,17 @@ dc390_RequestSense(struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_
 
 	pSRB->TotalXferredLen = 0;
 	pSRB->SGToBeXferLen = 0;
-	if (dc390_StartSCSI(pACB, pDCB, pSRB)) {
-		dc390_Going_to_Waiting(pDCB, pSRB);
-		dc390_waiting_timer(pACB, HZ/5);
-	}
+	return dc390_StartSCSI(pACB, pDCB, pSRB);
 }
 
 
 static void
 dc390_SRBdone( struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_srb* pSRB )
 {
-    u8  bval, status, i;
+    u8  bval, status;
     struct scsi_cmnd *pcmd;
     PSCSI_INQDATA  ptr;
     struct scatterlist *ptr2;
-    unsigned long  swlval;
 
     pcmd = pSRB->pcmd;
     /* KG: Moved pci_unmap here */
@@ -1350,58 +1331,34 @@ dc390_SRBdone( struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_srb*
 
 	//pcmd->result = MK_RES(DRIVER_SENSE,DID_OK,0,status);
 	if (status == (CHECK_CONDITION << 1))
-	{
-	    pcmd->result = MK_RES_LNX(0,DID_BAD_TARGET,0,/*CHECK_CONDITION*/0);
-	    goto ckc_e;
-	}
-	if(pSRB->RetryCnt == 0)
-	{
-	    //(u32)(pSRB->pcmd->cmnd[0]) = pSRB->Segment0[0];
-	    pSRB->TotalXferredLen = pSRB->SavedTotXLen;
-	    if( (pSRB->TotalXferredLen) &&
-		(pSRB->TotalXferredLen >= pcmd->underflow) )
-		  SET_RES_DID(pcmd->result,DID_OK)
-	    else
-		  pcmd->result = MK_RES_LNX(DRIVER_SENSE,DID_OK,0,CHECK_CONDITION);
-		  REMOVABLEDEBUG(printk(KERN_INFO "Cmd=%02x,Result=%08x,XferL=%08x\n",pSRB->pcmd->cmnd[0],\
-			(u32) pcmd->result, (u32) pSRB->TotalXferredLen));
-	    goto ckc_e;
-	}
+	    pcmd->result = MK_RES_LNX(0, DID_BAD_TARGET, 0, /*CHECK_CONDITION*/0);
 	else /* Retry */
 	{
-	    pSRB->RetryCnt--;
-	    pSRB->AdaptStatus = 0;
-	    pSRB->TargetStatus = 0;
-	    /* Don't retry on TEST_UNIT_READY */
 	    if( pSRB->pcmd->cmnd[0] == TEST_UNIT_READY /* || pSRB->pcmd->cmnd[0] == START_STOP */)
 	    {
+		/* Don't retry on TEST_UNIT_READY */
 		pcmd->result = MK_RES_LNX(DRIVER_SENSE,DID_OK,0,CHECK_CONDITION);
 		REMOVABLEDEBUG(printk(KERN_INFO "Cmd=%02x, Result=%08x, XferL=%08x\n",pSRB->pcmd->cmnd[0],\
 		       (u32) pcmd->result, (u32) pSRB->TotalXferredLen));
-		goto ckc_e;
+	    } else {
+		SET_RES_DRV(pcmd->result, DRIVER_SENSE);
+		pcmd->use_sg = pSRB->SavedSGCount;
+		//pSRB->ScsiCmdLen	 = (u8) (pSRB->Segment1[0] >> 8);
+		DEBUG0 (printk ("DC390: RETRY pid %li (%02x), target %02i-%02i\n", pcmd->pid, pcmd->cmnd[0], pcmd->device->id, pcmd->device->lun));
+		pSRB->TotalXferredLen = 0;
+		SET_RES_DID(pcmd->result, DID_SOFT_ERROR);
 	    }
-	    SET_RES_DRV(pcmd->result,DRIVER_SENSE);
-	    pcmd->use_sg	 = pSRB->SavedSGCount;
-	    //pSRB->ScsiCmdLen	 = (u8) (pSRB->Segment1[0] >> 8);
-	    DEBUG0 (printk ("DC390: RETRY pid %li (%02x), target %02i-%02i\n", pcmd->pid, pcmd->cmnd[0], pcmd->device->id, pcmd->device->lun));
-	    pSRB->SGIndex = 0;
-	    pSRB->TotalXferredLen = 0;
-	    pSRB->SGToBeXferLen = 0;
-
-	    if( dc390_StartSCSI( pACB, pDCB, pSRB ) ) {
-		dc390_Going_to_Waiting ( pDCB, pSRB );
-		dc390_waiting_timer (pACB, HZ/5);
-	    }
-	    return;
 	}
+	goto cmd_done;
     }
     if( status )
     {
 	if( status_byte(status) == CHECK_CONDITION )
 	{
-	    REMOVABLEDEBUG(printk (KERN_INFO "DC390: Check_Condition (Cmd %02x, Id %02x, LUN %02x)\n",\
-		    pcmd->cmnd[0], pDCB->TargetID, pDCB->TargetLUN));
-	    if( (pSRB->SGIndex < pSRB->SGcount) && (pSRB->SGcount) && (pSRB->SGToBeXferLen) )
+#ifdef DC390_REMOVABLEDEBUG
+	    printk(KERN_INFO "DC390: Check_Condition (Cmd %02x, Id %02x, LUN %02x)\n",
+		   pcmd->cmnd[0], pDCB->TargetID, pDCB->TargetLUN);
+	    if ((pSRB->SGIndex < pSRB->SGcount) && (pSRB->SGcount) && (pSRB->SGToBeXferLen))
 	    {
 		bval = pSRB->SGcount;
 		swlval = 0;
@@ -1411,10 +1368,13 @@ dc390_SRBdone( struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_srb*
 		    swlval += sg_dma_len(ptr2);
 		    ptr2++;
 		}
-		REMOVABLEDEBUG(printk(KERN_INFO "XferredLen=%08x,NotXferLen=%08x\n",\
-			(u32) pSRB->TotalXferredLen, (u32) swlval));
+		printk(KERN_INFO "XferredLen=%08x,NotXferLen=%08x\n", (u32) pSRB->TotalXferredLen, (u32) swlval);
 	    }
-	    dc390_RequestSense( pACB, pDCB, pSRB );
+#endif
+	    if (dc390_RequestSense(pACB, pDCB, pSRB)) {
+		SET_RES_DID(pcmd->result, DID_ERROR);
+		goto cmd_done;
+	    }
 	    return;
 	}
 	else if( status_byte(status) == QUEUE_FULL )
@@ -1422,12 +1382,10 @@ dc390_SRBdone( struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_srb*
 	    bval = (u8) pDCB->GoingSRBCnt;
 	    bval--;
 	    pDCB->MaxCommand = bval;
-	    dc390_freetag (pDCB, pSRB);
-	    dc390_Going_to_Waiting ( pDCB, pSRB );
-	    dc390_waiting_timer (pACB, HZ/5);
-	    pSRB->AdaptStatus = 0;
-	    pSRB->TargetStatus = 0;
-	    return;
+	    pcmd->use_sg = pSRB->SavedSGCount;
+	    DEBUG0 (printk ("DC390: RETRY pid %li (%02x), target %02i-%02i\n", pcmd->pid, pcmd->cmnd[0], pcmd->device->id, pcmd->device->lun));
+	    pSRB->TotalXferredLen = 0;
+	    SET_RES_DID(pcmd->result, DID_SOFT_ERROR);
 	}
 	else if(status == SCSI_STAT_SEL_TIMEOUT)
 	{
@@ -1446,28 +1404,9 @@ dc390_SRBdone( struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_srb*
 	}
 	else
 	{   /* Another error */
-	    pSRB->AdaptStatus = 0;
-	    if( pSRB->RetryCnt )
-	    {	/* Retry */
-		//printk ("DC390: retry\n");
-		pSRB->RetryCnt--;
-		pSRB->TargetStatus = 0;
-		pSRB->SGIndex = 0;
-		pSRB->TotalXferredLen = 0;
-		pSRB->SGToBeXferLen = 0;
-		if( dc390_StartSCSI( pACB, pDCB, pSRB ) ) {
-		    dc390_Going_to_Waiting ( pDCB, pSRB );
-		    dc390_waiting_timer (pACB, HZ/5);
-		}
-      		return;
-	    }
-	    else
-	    {	/* Report error */
-	      //pcmd->result = MK_RES(0, DID_ERROR, pSRB->EndMessage, status);
-	      SET_RES_DID(pcmd->result,DID_ERROR);
-	      SET_RES_MSG(pcmd->result,pSRB->EndMessage);
-	      SET_RES_TARGET(pcmd->result,status);
-	    }
+	    pSRB->TotalXferredLen = 0;
+	    SET_RES_DID(pcmd->result, DID_SOFT_ERROR);
+	    goto cmd_done;
 	}
     }
     else
@@ -1500,13 +1439,7 @@ dc390_SRBdone( struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_srb*
 	(ptr->Vers & 0x07) >= 2)
 	    pDCB->Inquiry7 = ptr->Flags;
 
-ckc_e:
-    if (pcmd->cmnd[0] == INQUIRY && 
-	(pcmd->result == (DID_OK << 16) || status_byte(pcmd->result) & CHECK_CONDITION) &&
-	(ptr->DevType & SCSI_DEVTYPE) != TYPE_NODEV)
-	/* device found: add */ 
-	pDCB->DevType = ptr->DevType & SCSI_DEVTYPE;
-
+cmd_done:
     pcmd->resid = pcmd->request_bufflen - pSRB->TotalXferredLen;
 
     dc390_Going_remove (pDCB, pSRB);
@@ -1516,7 +1449,6 @@ ckc_e:
     DEBUG0(printk (KERN_DEBUG "DC390: SRBdone: done pid %li\n", pcmd->pid));
     pcmd->scsi_done (pcmd);
 
-    dc390_Waiting_process (pACB);
     return;
 }
 
@@ -1572,7 +1504,6 @@ dc390_ScsiRstDetect( struct dc390_acb* pACB )
     printk ("DC390: Rst_Detect: laststat = %08x\n", dc390_laststatus);
     //DEBUG0(printk(KERN_INFO "RST_DETECT,"));
 
-    if (timer_pending (&pACB->Waiting_Timer)) del_timer (&pACB->Waiting_Timer);
     DC390_write8 (DMA_Cmd, DMA_IDLE_CMD);
     /* Unlock before ? */
     /* delay half a second */
@@ -1593,7 +1524,6 @@ dc390_ScsiRstDetect( struct dc390_acb* pACB )
 	//dc390_RecoverSRB( pACB );
 	pACB->pActiveDCB = NULL;
 	pACB->ACBFlag = 0;
-	dc390_Waiting_process( pACB );
     }
     return;
 }

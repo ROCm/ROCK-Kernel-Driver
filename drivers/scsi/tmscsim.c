@@ -252,7 +252,7 @@
 
 #include "tmscsim.h"
 
-static u8 dc390_StartSCSI( struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_srb* pSRB );
+static int dc390_StartSCSI( struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_srb* pSRB );
 static void dc390_DataOut_0( struct dc390_acb* pACB, struct dc390_srb* pSRB, u8 *psstatus);
 static void dc390_DataIn_0( struct dc390_acb* pACB, struct dc390_srb* pSRB, u8 *psstatus);
 static void dc390_Command_0( struct dc390_acb* pACB, struct dc390_srb* pSRB, u8 *psstatus);
@@ -365,20 +365,6 @@ static struct dc390_dcb __inline__ *dc390_findDCB ( struct dc390_acb* pACB, u8 i
    return pDCB;
 }
 
-/* Queueing philosphy:
- * There are a couple of lists:
- * - Query: Contains the Scsi Commands not yet turned into SRBs (per ACB)
- *   (Note: For new EH, it is unnecessary!)
- * - Waiting: Contains a list of SRBs not yet sent (per DCB)
- * - Free: List of free SRB slots
- * 
- * If there are no waiting commands for the DCB, the new one is sent to the bus
- * otherwise the oldest one is taken from the Waiting list and the new one is 
- * queued to the Waiting List
- * 
- * Lists are managed using two pointers and eventually a counter
- */
-
 /* Insert SRB oin top of free list */
 static __inline__ void dc390_Free_insert (struct dc390_acb* pACB, struct dc390_srb* pSRB)
 {
@@ -386,19 +372,6 @@ static __inline__ void dc390_Free_insert (struct dc390_acb* pACB, struct dc390_s
     pSRB->pNextSRB = pACB->pFreeSRB;
     pACB->pFreeSRB = pSRB;
 }
-
-
-/* Inserts a SRB to the top of the Waiting list */
-static __inline__ void dc390_Waiting_insert ( struct dc390_dcb* pDCB, struct dc390_srb* pSRB )
-{
-    DEBUG0(printk ("DC390: Insert pSRB %p cmd %li to Waiting\n", pSRB, pSRB->pcmd->pid));
-    pSRB->pNextSRB = pDCB->pWaitingSRB;
-    if (!pDCB->pWaitingSRB)
-	pDCB->pWaitLast = pSRB;
-    pDCB->pWaitingSRB = pSRB;
-    pDCB->WaitSRBCnt++;
-}
-
 
 static __inline__ void dc390_Going_append (struct dc390_dcb* pDCB, struct dc390_srb* pSRB)
 {
@@ -432,91 +405,6 @@ static __inline__ void dc390_Going_remove (struct dc390_dcb* pDCB, struct dc390_
 	  pDCB->pGoingLast = psrb;
      }
    pDCB->GoingSRBCnt--;
-}
-
-/* Moves SRB from Going list to the top of Waiting list */
-static void dc390_Going_to_Waiting ( struct dc390_dcb* pDCB, struct dc390_srb* pSRB )
-{
-    DEBUG0(printk(KERN_INFO "DC390: Going_to_Waiting (SRB %p) pid = %li\n", pSRB, pSRB->pcmd->pid));
-    /* Remove SRB from Going */
-    dc390_Going_remove (pDCB, pSRB);
-    /* Insert on top of Waiting */
-    dc390_Waiting_insert (pDCB, pSRB);
-    /* Tag Mask must be freed elsewhere ! (KG, 99/06/18) */
-}
-
-/* Moves first SRB from Waiting list to Going list */
-static __inline__ void dc390_Waiting_to_Going ( struct dc390_dcb* pDCB, struct dc390_srb* pSRB )
-{	
-	/* Remove from waiting list */
-	DEBUG0(printk("DC390: Remove SRB %p from head of Waiting\n", pSRB));
-	pDCB->pWaitingSRB = pSRB->pNextSRB;
-	if( !pDCB->pWaitingSRB ) pDCB->pWaitLast = NULL;
-	pDCB->WaitSRBCnt--;
-	dc390_Going_append (pDCB, pSRB);
-}
-
-static void DC390_waiting_timed_out (unsigned long ptr);
-/* Sets the timer to wake us up */
-static void dc390_waiting_timer (struct dc390_acb* pACB, unsigned long to)
-{
-	if (timer_pending (&pACB->Waiting_Timer)) return;
-	init_timer (&pACB->Waiting_Timer);
-	pACB->Waiting_Timer.function = DC390_waiting_timed_out;
-	pACB->Waiting_Timer.data = (unsigned long)pACB;
-	if (time_before (jiffies + to, pACB->pScsiHost->last_reset))
-		pACB->Waiting_Timer.expires = pACB->pScsiHost->last_reset + 1;
-	else
-		pACB->Waiting_Timer.expires = jiffies + to + 1;
-	add_timer (&pACB->Waiting_Timer);
-}
-
-
-/* Send the next command from the waiting list to the bus */
-static void dc390_Waiting_process ( struct dc390_acb* pACB )
-{
-    struct dc390_dcb *ptr, *ptr1;
-    struct dc390_srb *pSRB;
-
-    if( (pACB->pActiveDCB) || (pACB->ACBFlag & (RESET_DETECT+RESET_DONE+RESET_DEV) ) )
-	return;
-    if (timer_pending (&pACB->Waiting_Timer)) del_timer (&pACB->Waiting_Timer);
-    ptr = pACB->pDCBRunRobin;
-    if( !ptr )
-      {
-	ptr = pACB->pLinkDCB;
-	pACB->pDCBRunRobin = ptr;
-      }
-    ptr1 = ptr;
-    if (!ptr1) return;
-    do 
-      {
-	pACB->pDCBRunRobin = ptr1->pNextDCB;
-	if( !( pSRB = ptr1->pWaitingSRB ) ||
-	    ( ptr1->MaxCommand <= ptr1->GoingSRBCnt ))
-	  ptr1 = ptr1->pNextDCB;
-	else
-	  {
-	    /* Try to send to the bus */
-	    if( !dc390_StartSCSI(pACB, ptr1, pSRB) )
-	      dc390_Waiting_to_Going (ptr1, pSRB);
-	    else
-	      dc390_waiting_timer (pACB, HZ/5);
-	    break;
-	  }
-      } while (ptr1 != ptr);
-    return;
-}
-
-/* Wake up waiting queue */
-static void DC390_waiting_timed_out (unsigned long ptr)
-{
-	struct dc390_acb* pACB = (struct dc390_acb*)ptr;
-	unsigned long iflags;
-	DEBUG0(printk ("DC390: Debug: Waiting queue woken up by timer!\n"));
-	spin_lock_irqsave(pACB->pScsiHost->host_lock, iflags);
-	dc390_Waiting_process (pACB);
-	spin_unlock_irqrestore(pACB->pScsiHost->host_lock, iflags);
 }
 
 static struct scatterlist* dc390_sg_build_single(struct scatterlist *sg, void *addr, unsigned int length)
@@ -602,8 +490,6 @@ static int DC390_queuecommand(struct scsi_cmnd *cmd,
 	struct dc390_dcb *dcb = sdev->hostdata;
 	struct dc390_srb *srb;
 
-	if (dcb->pWaitingSRB)
-		goto device_busy;
 	if (dcb->MaxCommand <= dcb->GoingSRBCnt)
 		goto device_busy;
 	if (acb->pActiveDCB)
@@ -629,10 +515,7 @@ static int DC390_queuecommand(struct scsi_cmnd *cmd,
 	srb->AdaptStatus = 0;
 	srb->TargetStatus = 0;
 	srb->MsgCnt = 0;
-	if (dcb->DevType == TYPE_TAPE)
-		srb->RetryCnt = 0;
-	else
-		srb->RetryCnt = 1;
+
 	srb->SRBStatus = 0;
 	srb->SRBFlag = 0;
 	srb->SRBState = 0;
@@ -644,21 +527,18 @@ static int DC390_queuecommand(struct scsi_cmnd *cmd,
 	srb->TagNumber = SCSI_NO_TAG;
 
 	if (dc390_StartSCSI(acb, dcb, srb)) {
-		dc390_Waiting_insert(dcb, srb);
-		dc390_waiting_timer(acb, HZ/5);
-		goto done;
+		dc390_Free_insert(acb, srb);
+		goto host_busy;
 	}
 
 	dc390_Going_append(dcb, srb);
- done:
+
 	return 0;
 
  host_busy:
-	dc390_Waiting_process(acb);
 	return SCSI_MLQUEUE_HOST_BUSY;
 
  device_busy:
-	dc390_Waiting_process(acb);
 	return SCSI_MLQUEUE_DEVICE_BUSY;
 }
 
@@ -712,45 +592,14 @@ static int DC390_abort(struct scsi_cmnd *cmd)
 {
 	struct dc390_acb *pACB = (struct dc390_acb*) cmd->device->host->hostdata;
 	struct dc390_dcb *pDCB = (struct dc390_dcb*) cmd->device->hostdata;
-	struct dc390_srb *pSRB, *psrb;
 
 	printk("DC390: Abort command (pid %li, Device %02i-%02i)\n",
 	       cmd->pid, cmd->device->id, cmd->device->lun);
 
-	pSRB = pDCB->pWaitingSRB;
-	if (!pSRB)
-		goto on_going;
-
-	/* Now scan Waiting queue */
-	if (pSRB->pcmd != cmd) {
-		psrb = pSRB;
-		if (!(psrb->pNextSRB))
-			goto on_going;
-
-		while (psrb->pNextSRB->pcmd != cmd) {
-			psrb = psrb->pNextSRB;
-			if (!(psrb->pNextSRB) || psrb == pSRB)
-				goto on_going;
-		}
-
-		pSRB = psrb->pNextSRB;
-		psrb->pNextSRB = pSRB->pNextSRB;
-		if (pSRB == pDCB->pWaitLast)
-			pDCB->pWaitLast = psrb;
-	} else
-		pDCB->pWaitingSRB = pSRB->pNextSRB;
-
-	dc390_Free_insert(pACB, pSRB);
-	pDCB->WaitSRBCnt--;
-	INIT_LIST_HEAD((struct list_head*)&cmd->SCp);
-
-	return SUCCESS;
-
-on_going:
 	/* abort() is too stupid for already sent commands at the moment. 
 	 * If it's called we are in trouble anyway, so let's dump some info 
 	 * into the syslog at least. (KG, 98/08/20,99/06/20) */
-	dc390_dumpinfo(pACB, pDCB, pSRB);
+	dc390_dumpinfo(pACB, pDCB, NULL);
 
 	pDCB->DCBFlag |= ABORT_DEV_;
 	printk(KERN_INFO "DC390: Aborted pid %li\n", cmd->pid);
@@ -787,8 +636,6 @@ static int DC390_bus_reset (struct scsi_cmnd *cmd)
 	struct dc390_acb*    pACB = (struct dc390_acb*) cmd->device->host->hostdata;
 	u8   bval;
 
-	del_timer (&pACB->Waiting_Timer);
-
 	bval = DC390_read8(CtrlReg1) | DIS_INT_ON_SCSI_RST;
 	DC390_write8(CtrlReg1, bval);	/* disable IRQ on bus reset */
 
@@ -810,8 +657,6 @@ static int DC390_bus_reset (struct scsi_cmnd *cmd)
 
 	bval = DC390_read8(CtrlReg1) & ~DIS_INT_ON_SCSI_RST;
 	DC390_write8(CtrlReg1, bval);	/* re-enable interrupt */
-
-	dc390_Waiting_process(pACB);
 
 	return SUCCESS;
 }
@@ -1295,7 +1140,6 @@ static int __devinit dc390_probe_one(struct pci_dev *pdev,
 	pACB->sel_timeout = SEL_TIMEOUT;
 	pACB->glitch_cfg = EATER_25NS;
 	pACB->pdev = pdev;
-	init_timer(&pACB->Waiting_Timer);
 
 	if (!request_region(io_port, shost->n_io_port, "tmscsim")) {
 		printk(KERN_ERR "DC390: register IO ports error!\n");
@@ -1356,8 +1200,6 @@ static void __devexit dc390_remove_one(struct pci_dev *dev)
 	if (pACB->Gmode2 & RST_SCSI_BUS)
 		dc390_ResetSCSIBus(pACB);
 	spin_unlock_irqrestore(scsi_host->host_lock, iflags);
-
-	del_timer_sync(&pACB->Waiting_Timer);
 
 	free_irq(scsi_host->irq, pACB);
 	release_region(scsi_host->io_port, scsi_host->n_io_port);
