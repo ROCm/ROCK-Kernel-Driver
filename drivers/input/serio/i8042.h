@@ -104,7 +104,7 @@
 #ifdef DEBUG
 static unsigned long i8042_start;
 #define dbg_init() do { i8042_start = jiffies; } while (0);
-#define dbg(format, arg...) printk(KERN_DEBUG __FILE__ ": " format "[%d]\n" ,\
+#define dbg(format, arg...) printk(KERN_DEBUG __FILE__ ": " format " [%d]\n" ,\
 	 ## arg, (int) (jiffies - i8042_start))
 #else
 #define dbg_init() do { } while (0);
