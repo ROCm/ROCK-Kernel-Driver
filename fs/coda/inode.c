@@ -8,7 +8,6 @@
  * Copyright (C) Carnegie Mellon University
  */
 
-#define __NO_VERSION__
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
@@ -47,8 +46,6 @@ static struct inode *coda_alloc_inode(struct super_block *sb)
 	memset(&ei->c_fid, 0, sizeof(struct ViceFid));
 	ei->c_flags = 0;
 	INIT_LIST_HEAD(&ei->c_cilist);
-	ei->c_container = NULL;
-	ei->c_contcount = 0;
 	memset(&ei->c_cached_cred, 0, sizeof(struct coda_cred));
 	ei->c_cached_perm = 0;
 	return &ei->vfs_inode;
@@ -88,11 +85,11 @@ void coda_destroy_inodecache(void)
 /* exported operations */
 struct super_operations coda_super_operations =
 {
-	alloc_inode:	coda_alloc_inode,
-	destroy_inode:	coda_destroy_inode,
-	clear_inode:	coda_clear_inode,
-	put_super:	coda_put_super,
-	statfs:		coda_statfs,
+	.alloc_inode	= coda_alloc_inode,
+	.destroy_inode	= coda_destroy_inode,
+	.clear_inode	= coda_clear_inode,
+	.put_super	= coda_put_super,
+	.statfs		= coda_statfs,
 };
 
 static int get_device_index(struct coda_mount_data *data)
@@ -230,10 +227,7 @@ static void coda_clear_inode(struct inode *inode)
 {
 	struct coda_inode_info *cii = ITOC(inode);
 
-	if (cii->c_container) BUG();
-	
-        list_del_init(&cii->c_cilist);
-	inode->i_mapping = &inode->i_data;
+	list_del_init(&cii->c_cilist);
 	coda_cache_clear_inode(inode);
 }
 
@@ -248,16 +242,16 @@ int coda_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat
 int coda_setattr(struct dentry *de, struct iattr *iattr)
 {
 	struct inode *inode = de->d_inode;
-        struct coda_vattr vattr;
-        int error;
-	
+	struct coda_vattr vattr;
+	int error;
+
 	lock_kernel();
 	
-        memset(&vattr, 0, sizeof(vattr)); 
+	memset(&vattr, 0, sizeof(vattr)); 
 
 	inode->i_ctime = CURRENT_TIME;
-        coda_iattr_to_vattr(iattr, &vattr);
-        vattr.va_type = C_VNON; /* cannot set type */
+	coda_iattr_to_vattr(iattr, &vattr);
+	vattr.va_type = C_VNON; /* cannot set type */
 
 	/* Venus is responsible for truncating the container-file!!! */
 	error = venus_setattr(inode->i_sb, coda_i2f(inode), &vattr);
@@ -273,9 +267,9 @@ int coda_setattr(struct dentry *de, struct iattr *iattr)
 }
 
 struct inode_operations coda_file_inode_operations = {
-	permission:	coda_permission,
-	getattr:	coda_getattr,
-	setattr:	coda_setattr,
+	.permission	= coda_permission,
+	.getattr	= coda_getattr,
+	.setattr	= coda_setattr,
 };
 
 static int coda_statfs(struct super_block *sb, struct statfs *buf)
@@ -314,8 +308,9 @@ static struct super_block *coda_get_sb(struct file_system_type *fs_type,
 }
 
 struct file_system_type coda_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"coda",
-	get_sb:		coda_get_sb,
-	kill_sb:	kill_anon_super,
+	.owner		= THIS_MODULE,
+	.name		= "coda",
+	.get_sb		= coda_get_sb,
+	.kill_sb	= kill_anon_super,
 };
+

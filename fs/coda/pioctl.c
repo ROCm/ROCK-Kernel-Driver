@@ -14,7 +14,6 @@
 #include <linux/stat.h>
 #include <linux/errno.h>
 #include <linux/string.h>
-#define __NO_VERSION__
 #include <linux/namei.h>
 #include <linux/module.h>
 #include <asm/uaccess.h>
@@ -32,13 +31,13 @@ static int coda_pioctl(struct inode * inode, struct file * filp,
 /* exported from this file */
 struct inode_operations coda_ioctl_inode_operations =
 {
-	permission:	coda_ioctl_permission,
-	setattr:	coda_setattr,
+	.permission	= coda_ioctl_permission,
+	.setattr	= coda_setattr,
 };
 
 struct file_operations coda_ioctl_operations = {
-	owner:		THIS_MODULE,
-	ioctl:		coda_pioctl,
+	.owner		= THIS_MODULE,
+	.ioctl		= coda_pioctl,
 };
 
 /* the coda pioctl inode ops */

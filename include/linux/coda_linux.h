@@ -21,6 +21,7 @@
 #include <linux/wait.h>		
 #include <linux/types.h>
 #include <linux/fs.h>
+#include <linux/coda_fs_i.h>
 
 /* operations */
 extern struct inode_operations coda_dir_inode_operations;
@@ -45,7 +46,6 @@ int coda_setattr(struct dentry *, struct iattr *);
 int coda_isnullfid(ViceFid *fid);
 
 /* global variables */
-extern int coda_access_cache;
 extern int coda_fake_statfs;
 
 /* this file:  heloers */
@@ -53,7 +53,6 @@ static __inline__ struct ViceFid *coda_i2f(struct inode *);
 static __inline__ char *coda_i2s(struct inode *);
 static __inline__ void coda_flag_inode(struct inode *, int flag);
 char *coda_f2s(ViceFid *f);
-char *coda_f2s2(ViceFid *f);
 int coda_isroot(struct inode *i);
 int coda_iscontrol(const char *name, size_t length);
 

@@ -29,21 +29,7 @@ int coda_fake_statfs;
 char * coda_f2s(ViceFid *f)
 {
 	static char s[60];
-	if ( f ) {
-		sprintf(s, "(%-#lx,%-#lx,%-#lx)", 
-			 f->Volume, f->Vnode, f->Unique);
-	}
-	return s;
-}
-
-/* print another fid */
-char * coda_f2s2(ViceFid *f)
-{
-	static char s[60];
-	if ( f ) {
-		sprintf(s, "(%-#lx,%-#lx,%-#lx)", 
-			 f->Volume, f->Vnode, f->Unique);
-	}
+	sprintf(s, "(%-#lx.%-#lx.%-#lx)", f->Volume, f->Vnode, f->Unique);
 	return s;
 }
 

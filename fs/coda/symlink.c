@@ -51,5 +51,5 @@ fail:
 }
 
 struct address_space_operations coda_symlink_aops = {
-	readpage:	coda_symlink_filler
+	.readpage	= coda_symlink_filler,
 };
