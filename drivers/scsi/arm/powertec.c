@@ -25,8 +25,8 @@
 #include <asm/irq.h>
 #include <asm/pgtable.h>
 
-#include "../../scsi/scsi.h"
-#include "../../scsi/hosts.h"
+#include "../scsi.h"
+#include "../hosts.h"
 #include "fas216.h"
 #include "scsi.h"
 
@@ -242,10 +242,10 @@ powertecscsi_set_proc_info(struct Scsi_Host *host, char *buffer, int length)
 int powertecscsi_proc_info(char *buffer, char **start, off_t offset,
 			    int length, int host_no, int inout)
 {
-	int pos, begin;
 	struct Scsi_Host *host;
 	struct powertec_info *info;
-	Scsi_Device *scd;
+	char *p = buffer;
+	int pos;
 
 	host = scsi_host_hn_get(host_no);
 	if (!host)
@@ -256,29 +256,16 @@ int powertecscsi_proc_info(char *buffer, char **start, off_t offset,
 
 	info = (struct powertec_info *)host->hostdata;
 
-	begin = 0;
-	pos = sprintf(buffer, "PowerTec SCSI driver v%s\n", VERSION);
-	pos += fas216_print_host(&info->info, buffer + pos);
-	pos += sprintf(buffer + pos, "Term    : o%s\n",
+	p += sprintf(p, "PowerTec SCSI driver v%s\n", VERSION);
+	p += fas216_print_host(&info->info, p);
+	p += sprintf(p, "Term    : o%s\n",
 			info->term_ctl ? "n" : "ff");
 
-	pos += fas216_print_stats(&info->info, buffer + pos);
+	p += fas216_print_stats(&info->info, p);
+	p += fas216_print_devices(&info->info, p);
 
-	pos += sprintf(buffer+pos, "\nAttached devices:\n");
-
-	list_for_each_entry(scd, &host->my_devices, siblings) {
-		pos += fas216_print_device(&info->info, scd, buffer + pos);
-
-		if (pos + begin < offset) {
-			begin += pos;
-			pos = 0;
-		}
-		if (pos + begin > offset + length)
-			break;
-	}
-
-	*start = buffer + (offset - begin);
-	pos -= offset - begin;
+	*start = buffer + offset;
+	pos = p - buffer - offset;
 	if (pos > length)
 		pos = length;
 

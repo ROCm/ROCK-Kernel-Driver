@@ -298,7 +298,6 @@ typedef struct acornscsi_hostdata {
 
 	unsigned short	last_message;		/* last message to be sent		*/
 	unsigned char	disconnectable:1;	/* this command can be disconnected	*/
-	unsigned char	interrupt:1;		/* interrupt active			*/
     } scsi;
 
     /* statistics information */

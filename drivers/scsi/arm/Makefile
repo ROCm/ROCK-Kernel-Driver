@@ -1,5 +1,5 @@
 #
-# Makefile for drivers/acorn/scsi
+# Makefile for drivers/scsi/arm
 #
 
 acornscsi_mod-objs	:= acornscsi.o acornscsi-io.o

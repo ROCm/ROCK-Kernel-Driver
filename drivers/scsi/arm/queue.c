@@ -23,7 +23,7 @@
 #include <linux/list.h>
 #include <linux/init.h>
 
-#include "../../scsi/scsi.h"
+#include "../scsi.h"
 
 #define DEBUG
 
