@@ -340,8 +340,15 @@ CONFIG_PREP_RESIDUAL
   other useful pieces of information.  Sometimes this information is
   not present or incorrect.
 
-  Unless you expect to boot on a PReP system, there is not need to
+  Unless you expect to boot on a PReP system, there is no need to
   select Y.
+
+PReP residual data available in /proc/residual
+CONFIG_PROC_PREPRESIDUAL
+  Enabling this option will create a /proc/residual file which allows
+  you to get at the residual data on PReP systems.  You will need a tool
+  (lsresidual) to parse it.  If you aren't on a PReP system, you don't
+  want this.
 
 CONFIG_ADB
   Apple Desktop Bus (ADB) support is for support of devices which

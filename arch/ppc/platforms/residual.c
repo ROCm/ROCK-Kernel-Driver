@@ -876,3 +876,38 @@ PnP_TAG_PACKET __init *PnP_find_large_vendor_packet(unsigned char *p,
 	};
 	return 0; /* not found */
 }
+
+#ifdef CONFIG_PROC_PREPRESIDUAL
+static int proc_prep_residual_read(char * buf, char ** start, off_t off,
+		int count, int *eof, void *data)
+{
+	int n;
+
+	n = res->ResidualLength - off;
+	if (n < 0) {
+		*eof = 1;
+		n = 0;
+	}
+	else {
+		if (n > count)
+			n = count;
+		else
+			*eof = 1;
+
+		memcpy(buf, (char *)res + off, n);
+		*start = buf;
+	}
+
+	return n;
+}
+
+void __init
+proc_prep_residual_init(void)
+{
+	if (res->ResidualLength)
+		create_proc_read_entry("residual", S_IRUGO, NULL,
+					proc_prep_residual_read, NULL);
+}
+
+__initcall(proc_prep_residual_init);
+#endif
