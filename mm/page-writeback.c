@@ -92,6 +92,8 @@ int block_dump;
  */
 int laptop_mode;
 
+EXPORT_SYMBOL(laptop_mode);
+
 /* End of sysctl-exported parameters */
 
 
