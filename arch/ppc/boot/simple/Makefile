@@ -47,19 +47,17 @@ endif
 ifeq ($(CONFIG_EBONY),y)
 ZIMAGE				:= zImage-TREE
 ZIMAGEINITRD			:= zImage.initrd-TREE
-EXTRA				:= direct.o
 END				:= ebony
 ENTRYPOINT			:= 0x01000000
 TFTPIMAGE			:= /tftpboot/zImage.$(END)
 endif
 ifeq ($(CONFIG_EV64260),y)
-EXTRA				:= direct.o misc-ev64260.o
+EXTRA				:= misc-ev64260.o
 TFTPIMAGE			:= /tftpboot/zImage.ev64260
 endif
 ifeq ($(CONFIG_GEMINI),y)
 ZIMAGE				:= zImage-STRIPELF
 ZIMAGEINITRD			:= zImage.initrd-STRIPELF
-EXTRA				:= direct.o
 END				:= gemini
 TFTPIMAGE			:= /tftpboot/zImage.$(END)
 endif
@@ -78,16 +76,12 @@ endif
 ifeq ($(CONFIG_MCPN765)$(CONFIG_MVME5100)$(CONFIG_PRPMC750)$(CONFIG_PRPMC800)$(CONFIG_LOPEC)$(CONFIG_PPLUS),y)
 ZIMAGE				:= zImage-PPLUS
 ZIMAGEINITRD			:= zImage.initrd-PPLUS
-EXTRA				:= direct.o
 TFTPIMAGE			:= /tftpboot/zImage.pplus
 ZNETBOOT			:= zImage.pplus
 ZNETBOOTRD			:= zImage.initrd.pplus
 endif
 ifeq ($(CONFIG_PPLUS),y)
 EXTRA				:= legacy.o
-endif
-ifeq ($(CONFIG_PAL4),y)
-EXTRA				:= direct.o
 endif
 ifeq ($(CONFIG_PCORE)$(CONFIG_POWERPMC250),y)
 ZIMAGE				:= zImage-STRIPELF
@@ -96,18 +90,12 @@ EXTRA				:= chrpmap.o
 END				:= pcore
 TFTPIMAGE			:= /tftpboot/zImage.$(END)
 endif
-# The PowerPMC 250 needs the dummy serial_fixups()
-ifeq ($(CONFIG_POWERPMC250),y)
-EXTRA				:= direct.o
-endif
 ifeq ($(CONFIG_SANDPOINT),y)
-EXTRA				:= direct.o
 TFTPIMAGE			:= /tftpboot/zImage.sandpoint
 endif
 ifeq ($(CONFIG_SPRUCE),y)
 ZIMAGE				:= zImage-TREE
 ZIMAGEINITRD			:= zImage.initrd-TREE
-EXTRA				:= direct.o
 END				:= spruce
 ENTRYPOINT			:= 0x00800000
 MISC				:= misc-spruce.o
@@ -116,7 +104,6 @@ endif
 ifeq ($(CONFIG_ZX4500),y)
 ZIMAGE				:= zImage-STRIPELF
 ZIMAGEINITRD			:= zImage.initrd-STRIPELF
-EXTRA				:= direct.o
 END				:= zx4500
 TFTPIMAGE			:= /tftpboot/zImage.$(END)
 endif

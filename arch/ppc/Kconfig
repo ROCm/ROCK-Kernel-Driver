@@ -473,6 +473,10 @@ config PRPMC800
 
 config SANDPOINT
 	bool "Motorola-Sandpoint"
+	help
+	  Select SANDPOINT if configuring for a Motorola Sandpoint X3
+	  or X3(b).
+	  X3 (any flavor).
 
 config ADIR
 	bool "SBS-Adirondack"
@@ -500,6 +504,11 @@ config PPC_CHRP
 	depends on PPC_MULTIPLATFORM
 	default y
 
+config PPC_GEN550
+	bool
+	depends on SANDPOINT
+	default y
+
 config PPC_PMAC
 	bool
 	depends on PPC_MULTIPLATFORM
@@ -515,10 +524,6 @@ config PPC_OF
 	depends on PPC_PMAC || PPC_CHRP
 	default y
 
-config SANDPOINT_X3
-	bool "Sandpoint X3"
-	depends on SANDPOINT
-
 config FORCE
 	bool
 	depends on 6xx && !8260 && (PCORE || POWERPMC250)
@@ -526,7 +531,7 @@ config FORCE
 
 config EPIC_SERIAL_MODE
 	bool
-	depends on 6xx && !8260 && (LOPEC || SANDPOINT_X3)
+	depends on 6xx && !8260 && (LOPEC || SANDPOINT)
 	default y
 
 config WILLOW

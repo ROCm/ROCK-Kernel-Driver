@@ -619,6 +619,8 @@ void __init setup_arch(char **cmdline_p)
 	if (strstr(cmd_line, "nokgdb"))
 		printk("kgdb default breakpoint deactivated on command line\n");
 	else {
+		if (ppc_md.progress)
+			ppc_md.progress("setup_arch: kgdb breakpoint", 0x4000);
 		printk("kgdb default breakpoint activated\n");
 		breakpoint();
 	}
