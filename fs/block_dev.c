@@ -696,7 +696,7 @@ int blkdev_put(struct block_device *bdev, int kind)
 		switch (kind) {
 		case BDEV_FILE:
 		case BDEV_FS:
-			sync_blockdev(bd_inode->i_bdev);
+			sync_blockdev(bdev);
 			break;
 		}
 		kill_bdev(bdev);
