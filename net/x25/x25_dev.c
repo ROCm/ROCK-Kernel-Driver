@@ -100,9 +100,14 @@ static int x25_receive_data(struct sk_buff *skb, struct x25_neigh *nb)
 int x25_lapb_receive_frame(struct sk_buff *skb, struct net_device *dev,
 			   struct packet_type *ptype)
 {
+	struct sk_buff *nskb;
 	struct x25_neigh *nb;
 
-	skb->sk = NULL;
+	nskb = skb_copy(skb, GFP_ATOMIC);
+	if (!nskb)
+		goto drop;
+	kfree_skb(skb);
+	skb = nskb;
 
 	/*
 	 * Packet received from unrecognised device, throw it away.
