@@ -7,12 +7,6 @@
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
-.S.o:
-	$(CC) $(AFLAGS) -traditional -c $< -o $*.o
-
-all: mach-generic.o
-
-O_TARGET 	:= mach-generic.o
 EXTRA_CFLAGS	+= -I../kernel
 export-objs     := 
 
