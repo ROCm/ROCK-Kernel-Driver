@@ -351,22 +351,20 @@ SK_U32 AllocFlag;
 DEV_NET		*pNet;
 SK_AC		*pAC;
 
-	if (dev->priv) {
-		pNet = (DEV_NET*) dev->priv;
-		pAC = pNet->pAC;
-		AllocFlag = pAC->AllocFlag;
-		if (pAC->PciDev) {
-			pci_release_regions(pAC->PciDev);
-		}
-		if (AllocFlag & SK_ALLOC_IRQ) {
-			free_irq(dev->irq, dev);
-		}
-		if (pAC->IoBase) {
-			iounmap(pAC->IoBase);
-		}
-		if (pAC->pDescrMem) {
-			BoardFreeMem(pAC);
-		}
+	pNet = netdev_priv(dev);
+	pAC = pNet->pAC;
+	AllocFlag = pAC->AllocFlag;
+	if (pAC->PciDev) {
+		pci_release_regions(pAC->PciDev);
+	}
+	if (AllocFlag & SK_ALLOC_IRQ) {
+		free_irq(dev->irq, dev);
+	}
+	if (pAC->IoBase) {
+		iounmap(pAC->IoBase);
+	}
+	if (pAC->pDescrMem) {
+		BoardFreeMem(pAC);
 	}
 	
 } /* FreeResources */
@@ -895,7 +893,7 @@ DEV_NET		*pNet;
 SK_AC		*pAC;
 SK_U32		IntSrc;		/* interrupts source register contents */	
 
-	pNet = (DEV_NET*) dev->priv;
+	pNet = netdev_priv(dev);
 	pAC = pNet->pAC;
 	
 	/*
@@ -1044,7 +1042,7 @@ DEV_NET		*pNet;
 SK_AC		*pAC;
 SK_U32		IntSrc;		/* interrupts source register contents */	
 
-	pNet = (DEV_NET*) dev->priv;
+	pNet = netdev_priv(dev);
 	pAC = pNet->pAC;
 	
 	/*
@@ -1160,7 +1158,7 @@ struct SK_NET_DEVICE	*dev)
 	int				i;
 	SK_EVPARA		EvPara;		/* an event parameter union */
 
-	pNet = (DEV_NET*) dev->priv;
+	pNet = netdev_priv(dev);
 	pAC = pNet->pAC;
 	
 	SK_DBG_MSG(NULL, SK_DBGMOD_DRV, SK_DBGCAT_DRV_ENTRY,
@@ -1281,7 +1279,7 @@ struct SK_NET_DEVICE	*dev)
 	SK_DBG_MSG(NULL, SK_DBGMOD_DRV, SK_DBGCAT_DRV_ENTRY,
 		("SkGeClose: pAC=0x%lX ", (unsigned long)pAC));
 
-	pNet = (DEV_NET*) dev->priv;
+	pNet = netdev_priv(dev);
 	pAC = pNet->pAC;
 
 #ifdef SK_DIAG_SUPPORT
@@ -1292,7 +1290,7 @@ struct SK_NET_DEVICE	*dev)
 			** by operator interaction must not be started up 
 			** again when the DIAG has finished. 
 			*/
-			newPtrNet = (DEV_NET *) pAC->dev[0]->priv;
+			newPtrNet = netdev_priv(pAC->dev[0]);
 			if (newPtrNet == pNet) {
 				pAC->WasIfUp[0] = SK_FALSE;
 			} else {
@@ -1402,7 +1400,7 @@ DEV_NET		*pNet;
 SK_AC		*pAC;
 int			Rc;	/* return code of XmitFrame */
 
-	pNet = (DEV_NET*) dev->priv;
+	pNet = netdev_priv(dev);
 	pAC = pNet->pAC;
 
 	if ((!skb_shinfo(skb)->nr_frags) ||
@@ -2498,7 +2496,7 @@ unsigned long	Flags;
 static int SkGeSetMacAddr(struct SK_NET_DEVICE *dev, void *p)
 {
 
-DEV_NET *pNet = (DEV_NET*) dev->priv;
+DEV_NET *pNet = netdev_priv(dev);
 SK_AC	*pAC = pNet->pAC;
 
 struct sockaddr	*addr = p;
@@ -2555,7 +2553,7 @@ unsigned long		Flags;
 	SK_DBG_MSG(NULL, SK_DBGMOD_DRV, SK_DBGCAT_DRV_ENTRY,
 		("SkGeSetRxMode starts now... "));
 
-	pNet = (DEV_NET*) dev->priv;
+	pNet = netdev_priv(dev);
 	pAC = pNet->pAC;
 	if (pAC->RlmtNets == 1)
 		PortIdx = pAC->ActivePort;
@@ -2627,7 +2625,7 @@ SK_EVPARA 	EvPara;
 	SK_DBG_MSG(NULL, SK_DBGMOD_DRV, SK_DBGCAT_DRV_ENTRY,
 		("SkGeChangeMtu starts now...\n"));
 
-	pNet = (DEV_NET*) dev->priv;
+	pNet = netdev_priv(dev);
 	pAC  = pNet->pAC;
 
 	if ((NewMtu < 68) || (NewMtu > SK_JUMBO_MTU)) {
@@ -2649,7 +2647,7 @@ SK_EVPARA 	EvPara;
 #endif
 
 	pNet->Mtu = NewMtu;
-	pOtherNet = (DEV_NET*)pAC->dev[1 - pNet->NetNr]->priv;
+	pOtherNet = netdev_priv(pAC->dev[1 - pNet->NetNr]);
 	if ((pOtherNet->Mtu>1500) && (NewMtu<=1500) && (pOtherNet->Up==1)) {
 		return(0);
 	}
@@ -2855,7 +2853,7 @@ SK_EVPARA 	EvPara;
  */
 static struct net_device_stats *SkGeStats(struct SK_NET_DEVICE *dev)
 {
-DEV_NET *pNet = (DEV_NET*) dev->priv;
+DEV_NET *pNet = netdev_priv(dev);
 SK_AC	*pAC = pNet->pAC;
 SK_PNMI_STRUCT_DATA *pPnmiStruct;       /* structure for all Pnmi-Data */
 SK_PNMI_STAT    *pPnmiStat;             /* pointer to virtual XMAC stat. data */
@@ -2953,7 +2951,7 @@ int		HeaderLength = sizeof(SK_U32) + sizeof(SK_U32);
 	SK_DBG_MSG(NULL, SK_DBGMOD_DRV, SK_DBGCAT_DRV_ENTRY,
 		("SkGeIoctl starts now...\n"));
 
-	pNet = (DEV_NET*) dev->priv;
+	pNet = netdev_priv(dev);
 	pAC = pNet->pAC;
 	
 	if(copy_from_user(&Ioctl, rq->ifr_data, sizeof(SK_GE_IOCTL))) {
@@ -4539,11 +4537,8 @@ char	ClassStr[80];
 int SkDrvEnterDiagMode(
 SK_AC   *pAc)   /* pointer to adapter context */
 {
-	SK_AC   *pAC  = NULL;
-	DEV_NET *pNet = NULL;
-
-	pNet = (DEV_NET *) pAc->dev[0]->priv;
-	pAC = pNet->pAC;
+	DEV_NET *pNet = netdev_priv(pAc->dev[0]);
+	SK_AC   *pAC  = pNet->pAC;
 
 	SK_MEMCPY(&(pAc->PnmiBackup), &(pAc->PnmiStruct), 
 			sizeof(SK_PNMI_STRUCT_DATA));
@@ -4558,8 +4553,8 @@ SK_AC   *pAc)   /* pointer to adapter context */
 		} else {
 			pAC->WasIfUp[0] = SK_FALSE;
 		}
-		if (pNet != (DEV_NET *) pAc->dev[1]->priv) {
-			pNet = (DEV_NET *) pAc->dev[1]->priv;
+		if (pNet != netdev_priv(pAC->dev[1])) {
+			pNet = netdev_priv(pAC->dev[1]);
 			if (pNet->Up) {
 				pAC->WasIfUp[1] = SK_TRUE;
 				pAC->DiagFlowCtrl = SK_TRUE; /* for SkGeClose */
@@ -4902,7 +4897,7 @@ static int __devinit skge_probe_one(struct pci_dev *pdev,
 		goto out_disable_device;
 	}
 
-	pNet = dev->priv;
+	pNet = netdev_priv(dev);
 	pNet->pAC = kmalloc(sizeof(SK_AC), GFP_KERNEL);
 	if (!pNet->pAC) {
 		printk(KERN_ERR "Unable to allocate adapter "
@@ -4995,7 +4990,7 @@ static int __devinit skge_probe_one(struct pci_dev *pdev,
 		}
 
 		pAC->dev[1]   = dev;
-		pNet          = dev->priv;
+		pNet          = netdev_priv(dev);
 		pNet->PortNr  = 1;
 		pNet->NetNr   = 1;
 		pNet->pAC     = pAC;
@@ -5062,7 +5057,7 @@ static int __devinit skge_probe_one(struct pci_dev *pdev,
 static void __devexit skge_remove_one(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	DEV_NET *pNet = (DEV_NET *) dev->priv;
+	DEV_NET *pNet = netdev_priv(dev);
 	SK_AC *pAC = pNet->pAC;
 	struct net_device *otherdev = pAC->dev[1];
 
