@@ -197,7 +197,7 @@ asmlinkage unsigned long sys_brk(unsigned long brk)
 
 	/* Always allow shrinking brk. */
 	if (brk <= mm->brk) {
-		if (!do_munmap(mm, newbrk, oldbrk-newbrk, 1))
+		if (!do_munmap(mm, newbrk, oldbrk-newbrk))
 			goto set_brk;
 		goto out;
 	}
@@ -517,7 +517,7 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 munmap_back:
 	vma = find_vma_prepare(mm, addr, &prev, &rb_link, &rb_parent);
 	if (vma && vma->vm_start < addr + len) {
-		if (do_munmap(mm, addr, len, 1))
+		if (do_munmap(mm, addr, len))
 			return -ENOMEM;
 		goto munmap_back;
 	}
@@ -945,8 +945,7 @@ static void unmap_region(struct mm_struct *mm,
 	struct vm_area_struct *mpnt,
 	struct vm_area_struct *prev,
 	unsigned long start,
-	unsigned long end,
-	int acct)
+	unsigned long end)
 {
 	mmu_gather_t *tlb;
 
@@ -960,7 +959,7 @@ static void unmap_region(struct mm_struct *mm,
 
 		unmap_page_range(tlb, mpnt, from, to);
 
-		if (acct && (mpnt->vm_flags & VM_ACCOUNT)) {
+		if (mpnt->vm_flags & VM_ACCOUNT) {
 			len = to - from;
 			vm_unacct_memory(len >> PAGE_SHIFT);
 		}
@@ -1041,7 +1040,7 @@ static int splitvma(struct mm_struct *mm, struct vm_area_struct *mpnt, unsigned 
  * work.  This now handles partial unmappings.
  * Jeremy Fitzhardine <jeremy@sw.oz.au>
  */
-int do_munmap(struct mm_struct *mm, unsigned long start, size_t len, int acct)
+int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 {
 	unsigned long end;
 	struct vm_area_struct *mpnt, *prev, *last;
@@ -1085,7 +1084,7 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len, int acct)
 	 */
 	spin_lock(&mm->page_table_lock);
 	mpnt = touched_by_munmap(mm, mpnt, prev, end);
-	unmap_region(mm, mpnt, prev, start, end, acct);
+	unmap_region(mm, mpnt, prev, start, end);
 	spin_unlock(&mm->page_table_lock);
 
 	/* Fix up all other VM information */
@@ -1100,7 +1099,7 @@ asmlinkage long sys_munmap(unsigned long addr, size_t len)
 	struct mm_struct *mm = current->mm;
 
 	down_write(&mm->mmap_sem);
-	ret = do_munmap(mm, addr, len, 1);
+	ret = do_munmap(mm, addr, len);
 	up_write(&mm->mmap_sem);
 	return ret;
 }
@@ -1137,7 +1136,7 @@ unsigned long do_brk(unsigned long addr, unsigned long len)
  munmap_back:
 	vma = find_vma_prepare(mm, addr, &prev, &rb_link, &rb_parent);
 	if (vma && vma->vm_start < addr + len) {
-		if (do_munmap(mm, addr, len, 1))
+		if (do_munmap(mm, addr, len))
 			return -ENOMEM;
 		goto munmap_back;
 	}

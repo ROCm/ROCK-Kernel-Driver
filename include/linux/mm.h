@@ -430,7 +430,7 @@ out:
 	return ret;
 }
 
-extern int do_munmap(struct mm_struct *, unsigned long, size_t, int);
+extern int do_munmap(struct mm_struct *, unsigned long, size_t);
 
 extern unsigned long do_brk(unsigned long, unsigned long);
 

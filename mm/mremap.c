@@ -150,6 +150,7 @@ static inline unsigned long move_vma(struct vm_area_struct * vma,
 	struct mm_struct * mm = vma->vm_mm;
 	struct vm_area_struct * new_vma, * next, * prev;
 	int allocated_vma;
+	int split = 0;
 
 	new_vma = NULL;
 	next = find_vma_prev(mm, new_addr, &prev);
@@ -210,11 +211,26 @@ static inline unsigned long move_vma(struct vm_area_struct * vma,
 				new_vma->vm_ops->open(new_vma);
 			insert_vm_struct(current->mm, new_vma);
 		}
-		/*
-		 * The old VMA has been accounted for,
-		 * don't double account
-		 */
-		do_munmap(current->mm, addr, old_len, 0);
+
+		/* Conceal VM_ACCOUNT so old reservation is not undone */
+		if (vma->vm_flags & VM_ACCOUNT) {
+			vma->vm_flags &= ~VM_ACCOUNT;
+			if (addr > vma->vm_start) {
+				if (addr + old_len < vma->vm_end)
+					split = 1;
+			} else if (addr + old_len == vma->vm_end)
+				vma = NULL;	/* it will be removed */
+		} else
+			vma = NULL;		/* nothing more to do */
+
+		do_munmap(current->mm, addr, old_len);
+
+		/* Restore VM_ACCOUNT if one or two pieces of vma left */
+		if (vma) {
+			vma->vm_flags |= VM_ACCOUNT;
+			if (split)
+				vma->vm_next->vm_flags |= VM_ACCOUNT;
+		}
 		current->mm->total_vm += new_len >> PAGE_SHIFT;
 		if (new_vma->vm_flags & VM_LOCKED) {
 			current->mm->locked_vm += new_len >> PAGE_SHIFT;
@@ -272,7 +288,7 @@ unsigned long do_mremap(unsigned long addr,
 		if ((addr <= new_addr) && (addr+old_len) > new_addr)
 			goto out;
 
-		do_munmap(current->mm, new_addr, new_len, 1);
+		do_munmap(current->mm, new_addr, new_len);
 	}
 
 	/*
@@ -282,9 +298,10 @@ unsigned long do_mremap(unsigned long addr,
 	 */
 	ret = addr;
 	if (old_len >= new_len) {
-		do_munmap(current->mm, addr+new_len, old_len - new_len, 1);
+		do_munmap(current->mm, addr+new_len, old_len - new_len);
 		if (!(flags & MREMAP_FIXED) || (new_addr == addr))
 			goto out;
+		old_len = new_len;
 	}
 
 	/*
