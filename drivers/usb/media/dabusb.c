@@ -721,7 +721,7 @@ static struct usb_class_driver dabusb_class = {
 
 
 /* --------------------------------------------------------------------- */
-static int dabusb_probe (struct usb_interface *intf, 
+static int dabusb_probe (struct usb_interface *intf,
 			 const struct usb_device_id *id)
 {
 	struct usb_device *usbdev = interface_to_usbdev(intf);
@@ -738,9 +738,7 @@ static int dabusb_probe (struct usb_interface *intf,
 	if (intf->altsetting->desc.bInterfaceNumber != _DABUSB_IF && usbdev->descriptor.idProduct == 0x9999)
 		return -ENODEV;
 
-	retval = usb_register_dev(intf, &dabusb_class);
-	if (retval)
-		return -ENOMEM;
+
 
 	s = &dabusb[intf->minor];
 
@@ -766,8 +764,15 @@ static int dabusb_probe (struct usb_interface *intf,
 		}
 	}
 	dbg("bound to interface: %d", ifnum);
-	up (&s->mutex);
 	usb_set_intfdata (intf, s);
+	up (&s->mutex);
+
+	retval = usb_register_dev(intf, &dabusb_class);
+	if (retval) {
+		usb_set_intfdata (intf, NULL);
+		return -ENOMEM;
+	}
+
 	return 0;
 
       reject:
