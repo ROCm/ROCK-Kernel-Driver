@@ -1364,8 +1364,9 @@ pfm_write_pmcs(struct task_struct *task, pfm_context_t *ctx, void *arg, int coun
 	pfarg_reg_t tmp, *req = (pfarg_reg_t *)arg;
 	unsigned long value, reset_pmds;
 	unsigned int cnum, reg_flags, flags;
-	int i;
-	int ret = -EINVAL;
+	int is_monitor, is_counting;
+	int i, ret = -EINVAL;
+#define PFM_CHECK_PMC_PM(x, y, z) ((x)->ctx_fl_system ^ PMC_PM(y, z))
 
 	/* we don't quite support this right now */
 	if (task != current) return -EINVAL;
@@ -1384,6 +1385,9 @@ pfm_write_pmcs(struct task_struct *task, pfm_context_t *ctx, void *arg, int coun
 		reset_pmds = tmp.reg_reset_pmds[0];
 		flags      = 0;
 
+		is_counting = PMC_IS_COUNTING(cnum);
+		is_monitor  = PMC_IS_MONITOR(cnum);
+
 		/* 
 		 * we reject all non implemented PMC as well
 		 * as attempts to modify PMC[0-3] which are used
@@ -1394,21 +1398,19 @@ pfm_write_pmcs(struct task_struct *task, pfm_context_t *ctx, void *arg, int coun
 			goto error;
 		}
 		/*
-		 * A PMC used to configure monitors must be:
-		 * 	- system-wide session: privileged monitor
-		 * 	- per-task : user monitor
-		 * any other configuration is rejected.
+		 * If the PMC is a monitor, then if the value is not the default:
+		 * 	- system-wide session: PMCx.pm=1 (privileged monitor)
+		 * 	- per-task           : PMCx.pm=0 (user monitor)
 		 */
-		if (PMC_IS_MONITOR(cnum) || PMC_IS_COUNTING(cnum)) {
-			DBprintk(("pmc[%u].pm=%ld\n", cnum, PMC_PM(cnum, value))); 
-
-			if (ctx->ctx_fl_system ^ PMC_PM(cnum, value)) {
-				DBprintk(("pmc_pm=%ld fl_system=%d\n", PMC_PM(cnum, value), ctx->ctx_fl_system));
-				goto error;
-			}
+		if ((is_monitor || is_counting) && value != PMC_DFL_VAL(i) && PFM_CHECK_PMC_PM(ctx, cnum, value)) {
+			DBprintk(("pmc%u pmc_pm=%ld fl_system=%d\n", 
+				cnum, 
+				PMC_PM(cnum, value), 
+				ctx->ctx_fl_system));
+			goto error;
 		}
 
-		if (PMC_IS_COUNTING(cnum)) {
+		if (is_counting) {
 			pfm_monitor_t *p = (pfm_monitor_t *)&value;
 			/*
 		 	 * enforce generation of overflow interrupt. Necessary on all
@@ -1471,7 +1473,7 @@ pfm_write_pmcs(struct task_struct *task, pfm_context_t *ctx, void *arg, int coun
 		 */
 		ctx->ctx_soft_pmds[cnum].flags = flags;
 
-		if (PMC_IS_COUNTING(cnum)) {
+		if (is_counting) {
 			ctx->ctx_soft_pmds[cnum].reset_pmds[0] = reset_pmds;
 
 			/* mark all PMDS to be accessed as used */
