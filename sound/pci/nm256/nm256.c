@@ -1532,6 +1532,21 @@ __error:
 }
 
 
+struct nm256_quirk {
+	unsigned short vendor;
+	unsigned short device;
+	int type;
+};
+
+#define NM_BLACKLISTED	1
+
+static struct nm256_quirk nm256_quirks[] __devinitdata = {
+	/* HP omnibook 4150 has cs4232 codec internally */
+	{ .vendor = 0x103c, .device = 0x0007, .type = NM_BLACKLISTED },
+	{ } /* terminator */
+};
+
+
 static int __devinit snd_nm256_probe(struct pci_dev *pci,
 				     const struct pci_device_id *pci_id)
 {
@@ -1540,6 +1555,8 @@ static int __devinit snd_nm256_probe(struct pci_dev *pci,
 	nm256_t *chip;
 	int err;
 	unsigned int xbuffer_top;
+	struct nm256_quirk *q;
+	u16 subsystem_vendor, subsystem_device;
 
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
@@ -1549,6 +1566,18 @@ static int __devinit snd_nm256_probe(struct pci_dev *pci,
 	if (!enable[dev]) {
 		dev++;
 		return -ENOENT;
+	}
+
+	pci_read_config_word(pci, PCI_SUBSYSTEM_VENDOR_ID, &subsystem_vendor);
+	pci_read_config_word(pci, PCI_SUBSYSTEM_ID, &subsystem_device);
+
+	for (q = nm256_quirks; q->vendor; q++) {
+		if (q->vendor == subsystem_vendor && q->device == subsystem_device) {
+			if (q->type == NM_BLACKLISTED) {
+				printk(KERN_INFO "nm256: The device is blacklisted.  Loading stopped\n");
+				return -ENODEV;
+			}
+		}
 	}
 
 	card = snd_card_new(index[dev], id[dev], THIS_MODULE, 0);
