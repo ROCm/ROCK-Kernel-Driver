@@ -906,12 +906,12 @@ void ide_pin_hwgroup(ide_drive_t *drive)
 
 	spin_lock_irq(&ide_lock);
 	do {
-		if (!hwgroup->busy && !drive->blocked)
+		if (!hwgroup->busy && !drive->blocked && !drive->doing_barrier)
 			break;
 		spin_unlock_irq(&ide_lock);
 		schedule_timeout(HZ/100);
 		spin_lock_irq(&ide_lock);
-	} while (hwgroup->busy || drive->blocked);
+	} while (hwgroup->busy || drive->blocked || drive->doing_barrier);
 
 	/*
 	 * we've now secured exclusive access to this hwgroup

@@ -69,10 +69,9 @@ static __inline__ int atomic_inc_return(volatile atomic_t * v)
 {
 	return __CS_LOOP(v, 1, "ar");
 }
-
 static __inline__ int atomic_inc_and_test(volatile atomic_t * v)
 {
-	return __CS_LOOP(v, 1, "ar") != 0;
+	return __CS_LOOP(v, 1, "ar") == 0;
 }
 static __inline__ void atomic_dec(volatile atomic_t * v)
 {

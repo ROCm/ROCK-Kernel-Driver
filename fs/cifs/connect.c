@@ -916,7 +916,7 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket,
 		} else {
 		/* BB other socket options to set KEEPALIVE, NODELAY? */
 			cFYI(1,("Socket created"));
-			(*csocket)->sk->sk_allocation = GFP_NOFS;
+			(*csocket)->sk->sk_allocation = GFP_NOFS; 
 		}
 	}
 
@@ -1023,7 +1023,7 @@ ipv6_connect(struct sockaddr_in6 *psin_server, struct socket **csocket)
 		} else {
 		/* BB other socket options to set KEEPALIVE, NODELAY? */
 			 cFYI(1,("ipv6 Socket created"));
-			 (*csocket)->sk->sk_allocation = GFP_NOFS;
+                        (*csocket)->sk->sk_allocation = GFP_NOFS;
 		}
 	}
 
