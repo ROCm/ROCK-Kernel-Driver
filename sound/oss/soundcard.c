@@ -535,8 +535,8 @@ static const struct {
 static int dmabuf;
 static int dmabug;
 
-MODULE_PARM(dmabuf, "i");
-MODULE_PARM(dmabug, "i");
+module_param(dmabuf, int, 0444);
+module_param(dmabug, int, 0444);
 
 static int __init oss_init(void)
 {
