@@ -787,28 +787,6 @@ pagebuf_get(				/* allocate a buffer		*/
 }
 
 /*
- * Create a pagebuf and populate it with pages from the address
- * space of the passed in inode.
- */
-page_buf_t *
-pagebuf_lookup(
-	struct pb_target	*target,
-	struct inode		*inode,
-	loff_t			ioff,
-	size_t			isize,
-	page_buf_flags_t	flags)
-{
-	page_buf_t		*pb = NULL;
-
-	flags |= _PBF_PRIVATE_BH;
-	pb = pagebuf_allocate(flags);
-	if (pb) {
-		_pagebuf_initialize(pb, target, ioff, isize, flags);
-	}
-	return pb;
-}
-
-/*
  * If we are not low on memory then do the readahead in a deadlock
  * safe manner.
  */
@@ -905,7 +883,7 @@ pagebuf_associate_memory(
 	pb->pb_locked = 0;
 
 	pb->pb_count_desired = pb->pb_buffer_length = len;
-	pb->pb_flags |= PBF_MAPPED | _PBF_PRIVATE_BH;
+	pb->pb_flags |= PBF_MAPPED;
 
 	return 0;
 }

@@ -109,7 +109,6 @@ typedef enum page_buf_flags_e {		/* pb_flags values */
 
 	/* flags used only internally */
 	_PBF_LOCKABLE = (1 << 19), /* page_buf_t may be locked		   */
-	_PBF_PRIVATE_BH = (1 << 20), /* do not use public buffer heads	   */
 	_PBF_ALL_PAGES_MAPPED = (1 << 21),
 				/* all pages in rage are mapped		   */
 	_PBF_ADDR_ALLOCATED = (1 << 22),
@@ -250,14 +249,6 @@ extern page_buf_t *pagebuf_get(		/* allocate a buffer		*/
 		size_t,			/* length of range		*/
 		page_buf_flags_t);	/* PBF_LOCK, PBF_READ,		*/
 					/* PBF_ASYNC			*/	
-
-extern page_buf_t *pagebuf_lookup(
-		struct pb_target *,
-		struct inode *,
-		loff_t,			/* starting offset of range	*/
-		size_t,			/* length of range		*/
-		page_buf_flags_t);	/* PBF_READ, PBF_WRITE,		*/
-					/* PBF_FORCEIO, _PBF_LOCKABLE	*/
 
 extern page_buf_t *pagebuf_get_empty(	/* allocate pagebuf struct with */
 					/*  no memory or disk address	*/
