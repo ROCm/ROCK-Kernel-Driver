@@ -41,10 +41,10 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
-static int stdma_locked = 0;			/* the semaphore */
+static int stdma_locked;			/* the semaphore */
 						/* int func to be called */
-static irqreturn_t (*stdma_isr)(int, void *, struct pt_regs *) = NULL;
-static void *stdma_isr_data = NULL;		/* data passed to isr */
+static irqreturn_t (*stdma_isr)(int, void *, struct pt_regs *);
+static void *stdma_isr_data;			/* data passed to isr */
 static DECLARE_WAIT_QUEUE_HEAD(stdma_wait);	/* wait queue for ST-DMA */
 
 

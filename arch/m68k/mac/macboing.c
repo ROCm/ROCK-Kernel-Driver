@@ -15,7 +15,7 @@
 #include <asm/macintosh.h>
 #include <asm/mac_asc.h>
 
-static int mac_asc_inited = 0;
+static int mac_asc_inited;
 /*
  * dumb triangular wave table
  */
@@ -39,7 +39,7 @@ static volatile __u8* mac_asc_regs = ( void* )0x50F14000;
  * sample rate; is this a good default value? 
  */
 static unsigned long mac_asc_samplespersec = 11050;  
-static int mac_bell_duration = 0;
+static int mac_bell_duration;
 static unsigned long mac_bell_phase; /* 0..2*Pi -> 0..0x800 (wavetable size) */
 static unsigned long mac_bell_phasepersample;
 
@@ -51,7 +51,7 @@ static void mac_nosound( unsigned long );
 static void mac_quadra_start_bell( unsigned int, unsigned int, unsigned int );
 static void mac_quadra_ring_bell( unsigned long );
 static void mac_av_start_bell( unsigned int, unsigned int, unsigned int );
-static void ( *mac_special_bell )( unsigned int, unsigned int, unsigned int ) = NULL;
+static void ( *mac_special_bell )( unsigned int, unsigned int, unsigned int );
 
 /*
  * our timer to start/continue/stop the bell

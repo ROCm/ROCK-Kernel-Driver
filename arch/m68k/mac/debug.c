@@ -151,10 +151,10 @@ struct mac_SCC
 # define scc (*((volatile struct mac_SCC*)mac_bi_data.sccbase))
 
 /* Flag that serial port is already initialized and used */
-int mac_SCC_init_done = 0;
+int mac_SCC_init_done;
 /* Can be set somewhere, if a SCC master reset has already be done and should
  * not be repeated; used by kgdb */
-int mac_SCC_reset_done = 0;
+int mac_SCC_reset_done;
 
 static int scc_port = -1;
 

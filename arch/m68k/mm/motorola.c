@@ -40,7 +40,7 @@
  * For 68020/030 this is 0.
  * For 68040, this is _PAGE_CACHE040 (cachable, copyback)
  */
-unsigned long mm_cachebits = 0;
+unsigned long mm_cachebits;
 EXPORT_SYMBOL(mm_cachebits);
 #endif
 

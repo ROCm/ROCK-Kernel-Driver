@@ -52,7 +52,7 @@ static inline void free_io_area(void *addr)
 
 #define IO_SIZE		(256*1024)
 
-static struct vm_struct *iolist = NULL;
+static struct vm_struct *iolist;
 
 static struct vm_struct *get_io_area(unsigned long size)
 {

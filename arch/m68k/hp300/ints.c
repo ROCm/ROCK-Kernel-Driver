@@ -37,7 +37,7 @@
  */
 
 /* we start with no entries in any list */
-static irq_node_t *hp300_irq_list[HP300_NUM_IRQS] = { [0 ... HP300_NUM_IRQS-1] = NULL };
+static irq_node_t *hp300_irq_list[HP300_NUM_IRQS];
 
 static spinlock_t irqlist_lock;
 
@@ -58,8 +58,13 @@ static irqreturn_t hp300_int_handler(int irq, void *dev_id, struct pt_regs *fp)
 }
 
 irqreturn_t (*hp300_default_handler[SYS_IRQS])(int, void *, struct pt_regs *) = {
-	hp300_int_handler, hp300_int_handler, hp300_int_handler, hp300_int_handler,
-	hp300_int_handler, hp300_int_handler, hp300_int_handler, NULL
+	[0] = hp300_int_handler,
+	[1] = hp300_int_handler,
+	[2] = hp300_int_handler,
+	[3] = hp300_int_handler,
+	[4] = hp300_int_handler,
+	[5] = hp300_int_handler,
+	[6] = hp300_int_handler,
 };
 
 /* dev_id had better be unique to each handler because it's the only way we have

@@ -17,7 +17,7 @@
 #include <asm/system.h>
 #include <asm/amigahw.h>
 
-static unsigned short *snd_data = NULL;
+static unsigned short *snd_data;
 static const signed char sine_data[] = {
 	0,  39,  75,  103,  121,  127,  121,  103,  75,  39,
 	0, -39, -75, -103, -121, -127, -121, -103, -75, -39
