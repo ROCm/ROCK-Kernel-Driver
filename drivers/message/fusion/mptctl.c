@@ -102,6 +102,9 @@
 #define my_VERSION	MPT_LINUX_VERSION_COMMON
 #define MYNAM		"mptctl"
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,62)
+EXPORT_NO_SYMBOLS;
+#endif
 MODULE_AUTHOR(MODULEAUTHOR);
 MODULE_DESCRIPTION(my_NAME);
 MODULE_LICENSE("GPL");
@@ -135,7 +138,7 @@ static int mptctl_eventreport (unsigned long arg);
 static int mptctl_replace_fw (unsigned long arg);
 
 static int mptctl_do_reset(unsigned long arg);
-static int mptctl_hp_hostinfo(unsigned long arg);
+static int mptctl_hp_hostinfo(unsigned long arg, unsigned int cmd);
 static int mptctl_hp_targetinfo(unsigned long arg);
 
 /*
@@ -658,25 +661,19 @@ mptctl_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned 
 
 	dctlprintk((MYIOC_s_INFO_FMT ": mptctl_ioctl()\n", iocp->name));
 
-	switch(cmd) {
-	case MPTFWDOWNLOAD:
+	if (cmd == MPTFWDOWNLOAD)
 		ret = mptctl_fw_download(arg);
-		break;
-	case MPTCOMMAND:
+	else if (cmd == MPTCOMMAND)
 		ret = mptctl_mpt_command(arg);
-		break;
-	case MPTHARDRESET:
+	else if (cmd == MPTHARDRESET)
 		ret = mptctl_do_reset(arg);
-		break;
-	case HP_GETHOSTINFO:
-		ret = mptctl_hp_hostinfo(arg);
-		break;
-	case HP_GETTARGETINFO:
+	else if ((cmd & ~IOCSIZE_MASK) == (HP_GETHOSTINFO & ~IOCSIZE_MASK))
+		ret = mptctl_hp_hostinfo(arg, _IOC_SIZE(cmd));
+	else if (cmd == HP_GETTARGETINFO)
 		ret = mptctl_hp_targetinfo(arg);
-		break;
-	default:
+	else
 		ret = -EINVAL;
-	}
+
 
 	up(&mptctl_syscall_sem_ioc[iocp->id]);
 
@@ -873,7 +870,7 @@ mptctl_do_fw_download(int ioc, char *ufwbuf, size_t fwlen)
 	 *	96		8
 	 *	64		4
 	 */
-	maxfrags = (iocp->req_sz - sizeof(MPIHeader_t) - sizeof(FWDownloadTCSGE_t)) 
+	maxfrags = (iocp->req_sz - sizeof(MPIHeader_t) - sizeof(FWDownloadTCSGE_t))
 			/ (sizeof(dma_addr_t) + sizeof(u32));
 	if (numfrags > maxfrags) {
 		ret = -EMLINK;
@@ -1227,10 +1224,16 @@ mptctl_getiocinfo (unsigned long arg, unsigned int data_size)
 	u8			revision;
 
 	dctlprintk((": mptctl_getiocinfo called.\n"));
-	if (data_size == sizeof(struct mpt_ioctl_iocinfo))
-		cim_rev = 1;
-	else if (data_size == (sizeof(struct mpt_ioctl_iocinfo) - sizeof(struct mpt_ioctl_pci_info)))
+	/* Add of PCI INFO results in unaligned access for
+	 * IA64 and Sparc. Reset long to int. Return no PCI
+	 * data for obsolete format.
+	 */
+	if (data_size == sizeof(struct mpt_ioctl_iocinfo_rev0))
 		cim_rev = 0;
+	else if (data_size == sizeof(struct mpt_ioctl_iocinfo))
+		cim_rev = 1;
+	else if (data_size == (sizeof(struct mpt_ioctl_iocinfo_rev0)+12))
+		cim_rev = 0;	/* obsolete */
 	else
 		return -EFAULT;
 
@@ -1414,7 +1417,7 @@ mptctl_gettargetinfo (unsigned long arg)
 
 	/* Get number of devices
          */
-	if ( (sh = ioc->sh) != NULL) {
+	if ((sh = ioc->sh) != NULL) {
 
 		max_id = sh->max_id - 1;
 		hd = (MPT_SCSI_HOST *) sh->hostdata;
@@ -1437,9 +1440,8 @@ mptctl_gettargetinfo (unsigned long arg)
 
 							pdata++;
 
-							if (maxWordsLeft <= 0) {
+							if (maxWordsLeft <= 0)
 								break;
-							}
 						}
 					}
 				}
@@ -1712,7 +1714,7 @@ mptctl_replace_fw (unsigned long arg)
 	/* Allocate memory for the new FW image
 	 */
 	newFwSize = karg.newImageSize;
-	fwmem = mpt_alloc_fw_memory(ioc, newFwSize, &num_frags, &alloc_sz); 
+	fwmem = mpt_alloc_fw_memory(ioc, newFwSize, &num_frags, &alloc_sz);
 	if (fwmem == NULL)
 		return -ENOMEM;
 
@@ -1732,7 +1734,7 @@ mptctl_replace_fw (unsigned long arg)
 	}
 
 
-	/* Free the old FW image 
+	/* Free the old FW image
 	 */
 	if (ioc->cached_fw) {
 		mpt_free_fw_memory(ioc, 0);
@@ -1905,6 +1907,7 @@ mptctl_do_mpt_command (struct mpt_ioctl_command karg, char *mfPtr, int local)
 	case MPI_FUNCTION_FW_UPLOAD:
 	case MPI_FUNCTION_SCSI_ENCLOSURE_PROCESSOR:
 	case MPI_FUNCTION_FW_DOWNLOAD:
+	case MPI_FUNCTION_FC_PRIMITIVE_SEND:
 		break;
 
 	case MPI_FUNCTION_SCSI_IO_REQUEST:
@@ -2032,7 +2035,7 @@ mptctl_do_mpt_command (struct mpt_ioctl_command karg, char *mfPtr, int local)
 		break;
 
 	case MPI_FUNCTION_SCSI_TASK_MGMT:
-		{ 
+		{
 			MPT_SCSI_HOST *hd = NULL;
 			if ((ioc->sh == NULL) || ((hd = (MPT_SCSI_HOST *)ioc->sh->hostdata) == NULL)) {
 				printk(KERN_ERR "%s@%d::mptctl_do_mpt_command - "
@@ -2065,7 +2068,7 @@ mptctl_do_mpt_command (struct mpt_ioctl_command karg, char *mfPtr, int local)
 			}
 
 			if ((pInit->Flags != 0) || (pInit->MaxDevices != ioc->facts.MaxDevices) ||
-				(pInit->MaxBuses != ioc->facts.MaxBuses) || 
+				(pInit->MaxBuses != ioc->facts.MaxBuses) ||
 				(pInit->ReplyFrameSize != cpu_to_le16(ioc->reply_sz)) ||
 				(pInit->HostMfaHighAddr != high_addr) ||
 				(pInit->SenseBufferHighAddr != sense_high)) {
@@ -2097,7 +2100,6 @@ mptctl_do_mpt_command (struct mpt_ioctl_command karg, char *mfPtr, int local)
 			MPI_FUNCTION_FC_LINK_SRVC_BUF_POST
 			MPI_FUNCTION_FC_LINK_SRVC_RSP
 			MPI_FUNCTION_FC_ABORT
-			MPI_FUNCTION_FC_PRIMITIVE_SEND
 			MPI_FUNCTION_LAN_SEND
 			MPI_FUNCTION_LAN_RECEIVE
 		 	MPI_FUNCTION_LAN_RESET
@@ -2395,7 +2397,7 @@ done_free_mem:
  *		-ENOMEM if memory allocation error
  */
 static int
-mptctl_hp_hostinfo(unsigned long arg)
+mptctl_hp_hostinfo(unsigned long arg, unsigned int data_size)
 {
 	hp_host_info_t	*uarg = (hp_host_info_t *) arg;
 	MPT_ADAPTER		*ioc;
@@ -2406,9 +2408,18 @@ mptctl_hp_hostinfo(unsigned long arg)
 	CONFIGPARMS		cfg;
 	ConfigPageHeader_t	hdr;
 	int			iocnum;
-	int			rc;
+	int			rc, cim_rev;
 
 	dctlprintk((": mptctl_hp_hostinfo called.\n"));
+	/* Reset long to int. Should affect IA64 and SPARC only
+	 */
+	if (data_size == sizeof(hp_host_info_t))
+		cim_rev = 1;
+	else if (data_size == (sizeof(hp_host_info_t) + 12))
+		cim_rev = 0;	/* obsolete */
+	else
+		return -EFAULT;
+
 	if (copy_from_user(&karg, uarg, sizeof(hp_host_info_t))) {
 		printk(KERN_ERR "%s@%d::mptctl_hp_host_info - "
 			"Unable to read in hp_host_info struct @ %p\n",
@@ -2438,7 +2449,7 @@ mptctl_hp_hostinfo(unsigned long arg)
 	karg.bus = pdev->bus->number;
 
 	/* Save the SCSI host no. if
-	 * SCSI driver loaded 
+	 * SCSI driver loaded
 	 */
 	if (ioc->sh != NULL)
 		karg.host_no = ioc->sh->host_no;
@@ -2526,7 +2537,7 @@ mptctl_hp_hostinfo(unsigned long arg)
 	if (ioc->sh != NULL) {
 		MPT_SCSI_HOST *hd =  (MPT_SCSI_HOST *)ioc->sh->hostdata;
 
-		if (hd) {
+		if (hd && (cim_rev == 1)) {
 			karg.hard_resets = hd->hard_resets;
 			karg.soft_resets = hd->soft_resets;
 			karg.timeouts = hd->timeouts;
@@ -2620,7 +2631,7 @@ mptctl_hp_targetinfo(unsigned long arg)
 
 		if ((rc = mpt_config(ioc, &cfg)) == 0) {
 			np = le32_to_cpu(pg0_alloc->NegotiatedParameters);
-			karg.negotiated_width = np & MPI_SCSIDEVPAGE0_NP_WIDE ? 
+			karg.negotiated_width = np & MPI_SCSIDEVPAGE0_NP_WIDE ?
 					HP_BUS_WIDTH_16 : HP_BUS_WIDTH_8;
 
 			if (np & MPI_SCSIDEVPAGE0_NP_NEG_SYNC_OFFSET_MASK) {
@@ -2699,7 +2710,7 @@ mptctl_hp_targetinfo(unsigned long arg)
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,51)
-#define	owner_THIS_MODULE  owner:		THIS_MODULE,
+#define	owner_THIS_MODULE  .owner = THIS_MODULE,
 #else
 #define	owner_THIS_MODULE
 #endif
@@ -2885,6 +2896,8 @@ int __init mptctl_init(void)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0)		/*{*/
 	err = register_ioctl32_conversion(MPTIOCINFO, NULL);
 	if (++where && err) goto out_fail;
+	err = register_ioctl32_conversion(MPTIOCINFO1, NULL);
+	if (++where && err) goto out_fail;
 	err = register_ioctl32_conversion(MPTTARGETINFO, NULL);
 	if (++where && err) goto out_fail;
 	err = register_ioctl32_conversion(MPTTEST, NULL);
@@ -2945,6 +2958,7 @@ out_fail:
 	printk(KERN_ERR MYNAM ": ERROR: Failed to register ioctl32_conversion!"
 			" (%d:err=%d)\n", where, err);
 	unregister_ioctl32_conversion(MPTIOCINFO);
+	unregister_ioctl32_conversion(MPTIOCINFO1);
 	unregister_ioctl32_conversion(MPTTARGETINFO);
 	unregister_ioctl32_conversion(MPTTEST);
 	unregister_ioctl32_conversion(MPTEVENTQUERY);
