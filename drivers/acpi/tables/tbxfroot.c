@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2003, R. Byron Moore
+ * Copyright (C) 2000 - 2004, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -241,11 +241,11 @@ acpi_get_firmware_table (
 		/* Get the next table pointer, handle RSDT vs. XSDT */
 
 		if (acpi_gbl_RSDP->revision < 2) {
-			address.pointer.value = ((RSDT_DESCRIPTOR *) rsdt_info.pointer)->table_offset_entry[i];
+			address.pointer.value = (ACPI_CAST_PTR (RSDT_DESCRIPTOR, rsdt_info.pointer))->table_offset_entry[i];
 		}
 		else {
 			address.pointer.value =
-				((XSDT_DESCRIPTOR *) rsdt_info.pointer)->table_offset_entry[i];
+				(ACPI_CAST_PTR (XSDT_DESCRIPTOR, rsdt_info.pointer))->table_offset_entry[i];
 		}
 
 		/* Get the table header */

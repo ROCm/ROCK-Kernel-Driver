@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2003, R. Byron Moore
+ * Copyright (C) 2000 - 2004, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -304,16 +304,20 @@ acpi_ut_valid_acpi_name (
 	u32                             name)
 {
 	char                            *name_ptr = (char *) &name;
-	u32                             i;
+	char                            character;
+	acpi_native_uint                i;
 
 
 	ACPI_FUNCTION_ENTRY ();
 
 
 	for (i = 0; i < ACPI_NAME_SIZE; i++) {
-		if (!((name_ptr[i] == '_') ||
-			  (name_ptr[i] >= 'A' && name_ptr[i] <= 'Z') ||
-			  (name_ptr[i] >= '0' && name_ptr[i] <= '9'))) {
+		character = *name_ptr;
+		name_ptr++;
+
+		if (!((character == '_') ||
+			  (character >= 'A' && character <= 'Z') ||
+			  (character >= '0' && character <= '9'))) {
 			return (FALSE);
 		}
 	}

@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2003, R. Byron Moore
+ * Copyright (C) 2000 - 2004, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -52,7 +52,7 @@
 
 #define ACPI_NUM_DEFAULT_SPACES     4
 
-u8                              acpi_gbl_default_address_spaces[ACPI_NUM_DEFAULT_SPACES] = {
+static u8                   acpi_gbl_default_address_spaces[ACPI_NUM_DEFAULT_SPACES] = {
 			 ACPI_ADR_SPACE_SYSTEM_MEMORY,
 			 ACPI_ADR_SPACE_SYSTEM_IO,
 			 ACPI_ADR_SPACE_PCI_CONFIG,
@@ -697,9 +697,6 @@ acpi_ev_reg_run (
 	union acpi_operand_object       *obj_desc;
 	struct acpi_namespace_node      *node;
 	acpi_status                     status;
-
-
-	ACPI_FUNCTION_NAME ("ev_reg_run");
 
 
 	handler_obj = (union acpi_operand_object   *) context;
