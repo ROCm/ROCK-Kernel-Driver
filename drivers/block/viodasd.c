@@ -166,41 +166,59 @@ struct viodasd_device {
 	u16		bytes_per_sector;
 	u64		size;
 	int		read_only;
+	int		open_mode;
+	/* 0 = none, 1 = read/only, 2 = read write */
+	int		open_count;
 	spinlock_t	q_lock;
 	struct gendisk	*disk;
 } viodasd_devices[MAX_DISKNO];
 
 /*
- * External open entry point.
+ * Call the Hypervisor - this is just a convenience function
  */
-static int viodasd_open(struct inode *ino, struct file *fil)
+static inline HvLpEvent_Rc call_hv(struct viodasd_device *d,
+		enum vioblocksubtype cmd, int ack, u16 flags,
+		void *token, u64 arg1, u64 arg2, u64 arg3)
 {
-	struct viodasd_device *d = ino->i_bdev->bd_disk->private_data;
+	return HvCallEvent_signalLpEventFast(viopath_hostLp,
+			HvLpEvent_Type_VirtualIo,
+			viomajorsubtype_blockio | cmd,
+			ack, HvLpEvent_AckType_ImmediateAck,
+			viopath_sourceinst(viopath_hostLp),
+			viopath_targetinst(viopath_hostLp),
+			(u64)token, VIOVERSION << 16,
+			((u64)DEVICE_NO(d) << 48) | ((u64)flags << 32),
+			arg1, arg2, arg3);
+}
+
+static int internal_open(struct viodasd_device *d, u16 flags)
+{
 	HvLpEvent_Rc hvrc;
 	struct viodasd_waitevent we;
-	u16 flags = 0;
+	int ret = 0;
 
-	if (d->read_only) {
-		if ((fil != NULL) && (fil->f_mode & FMODE_WRITE))
-			return -EROFS;
-		flags = vioblockflags_ro;
+	if ((d->open_mode == 2) || ((d->open_mode == 1) && flags))
+		/* Already opened as we expect or better */
+		goto out;
+
+	if (d->open_mode == 1) {
+		/*
+		 * disk was opened ro and now we want rw,
+		 * so we close it and reopen it rw.
+		 */
+		hvrc = call_hv(d, vioblockclose, HvLpEvent_AckInd_NoAck,
+				vioblockflags_ro, 0, 0, 0, 0);
 	}
-
+retry:
 	init_completion(&we.com);
 
 	/* Send the open event to OS/400 */
-	hvrc = HvCallEvent_signalLpEventFast(viopath_hostLp,
-			HvLpEvent_Type_VirtualIo,
-			viomajorsubtype_blockio | vioblockopen,
-			HvLpEvent_AckInd_DoAck, HvLpEvent_AckType_ImmediateAck,
-			viopath_sourceinst(viopath_hostLp),
-			viopath_targetinst(viopath_hostLp),
-			(u64)(unsigned long)&we, VIOVERSION << 16,
-			((u64)DEVICE_NO(d) << 48) | ((u64)flags << 32),
-			0, 0, 0);
+	hvrc = call_hv(d, vioblockopen, HvLpEvent_AckInd_DoAck, flags,
+			&we, 0, 0, 0);
 	if (hvrc != 0) {
 		printk(VIOD_KERN_WARNING "HV open failed %d\n", (int)hvrc);
-		return -EIO;
+		ret = -EIO;
+		goto out;
 	}
 
 	wait_for_completion(&we.com);
@@ -213,10 +231,43 @@ static int viodasd_open(struct inode *ino, struct file *fil)
 		printk(VIOD_KERN_WARNING
 				"bad rc opening disk: %d:0x%04x (%s)\n",
 				(int)we.rc, we.sub_result, err->msg);
-		return -EIO;
+		if ((flags == 0) && (d->open_mode == 1)) {
+			/*
+			 * If we had it open ro and we failed to open
+			 * it rw, then try to reopen it ro again since
+			 * we closed it above.
+			 */
+			flags = vioblockflags_ro;
+			goto retry;
+		}
+		ret = -EIO;
+		goto out;
 	}
+	d->open_mode = flags ? 1 : 2;
 
-	return 0;
+out:
+	return ret;
+}
+
+/*
+ * External open entry point.
+ */
+static int viodasd_open(struct inode *ino, struct file *fil)
+{
+	struct viodasd_device *d = ino->i_bdev->bd_disk->private_data;
+	u16 flags = 0;
+	int ret;
+
+	if (d->read_only) {
+		if ((fil != NULL) && (fil->f_mode & FMODE_WRITE))
+			return -EROFS;
+		flags = vioblockflags_ro;
+	} else if ((fil != NULL) && !(fil->f_mode & FMODE_WRITE))
+		flags = vioblockflags_ro;
+	ret = internal_open(d, flags);
+	if (ret == 0)
+		d->open_count++;
+	return ret;
 }
 
 /*
@@ -226,20 +277,19 @@ static int viodasd_release(struct inode *ino, struct file *fil)
 {
 	struct viodasd_device *d = ino->i_bdev->bd_disk->private_data;
 	HvLpEvent_Rc hvrc;
+	u16 flags = 0;
 
+	if (d->open_mode == 1)
+		flags = vioblockflags_ro;
+	if (d->open_count-- > 1)
+		return 0;
 	/* Send the event to OS/400.  We DON'T expect a response */
-	hvrc = HvCallEvent_signalLpEventFast(viopath_hostLp,
-			HvLpEvent_Type_VirtualIo,
-			viomajorsubtype_blockio | vioblockclose,
-			HvLpEvent_AckInd_NoAck, HvLpEvent_AckType_ImmediateAck,
-			viopath_sourceinst(viopath_hostLp),
-			viopath_targetinst(viopath_hostLp),
-			0, VIOVERSION << 16,
-			((u64)DEVICE_NO(d) << 48) /* | ((u64)flags << 32) */,
-			0, 0, 0);
+	hvrc = call_hv(d, vioblockclose, HvLpEvent_AckInd_NoAck, flags,
+			0, 0, 0, 0);
 	if (hvrc != 0)
 		printk(VIOD_KERN_WARNING "HV close call failed %d\n",
 				(int)hvrc);
+	d->open_mode = 0;
 	return 0;
 }
 
@@ -317,47 +367,60 @@ static int send_request(struct request *req)
 	u64 start;
 	int direction;
 	int nsg;
-	u16 viocmd;
+	enum vioblocksubtype viocmd;
 	HvLpEvent_Rc hvrc;
 	struct vioblocklpevent *bevent;
 	struct scatterlist sg[VIOMAXBLOCKDMA];
 	int sgindex;
-	int statindex;
 	struct viodasd_device *d;
 	unsigned long flags;
 
+	d = req->rq_disk->private_data;
 	start = (u64)req->sector << 9;
 
 	if (rq_data_dir(req) == READ) {
 		direction = DMA_FROM_DEVICE;
-		viocmd = viomajorsubtype_blockio | vioblockread;
-		statindex = 0;
+		viocmd = vioblockread;
 	} else {
 		direction = DMA_TO_DEVICE;
-		viocmd = viomajorsubtype_blockio | vioblockwrite;
-		statindex = 1;
+		viocmd = vioblockwrite;
+		if (d->open_mode == 1) {
+			int err;
+			/*
+			 * This is an attempt to write to a disk opened
+			 * read-only - typically replaying a journal or
+			 * after a remount r/w.
+			 * Attempt to get read-write access to the disk.
+			 */
+			err = internal_open(d, 0);
+			if (err != 0) {
+				printk(VIOD_KERN_WARNING
+						"cannot get r/w access\n");
+				return -1;
+			}
+		}
 	}
-
-        d = req->rq_disk->private_data;
 
 	/* Now build the scatter-gather list */
 	nsg = blk_rq_map_sg(req->q, req, sg);
+	if (nsg == 0) {
+		printk(VIOD_KERN_WARNING
+				"error setting up scatter/gather list\n");
+		return -1;
+	}
 	nsg = dma_map_sg(iSeries_vio_dev, sg, nsg, direction);
+	if (nsg == 0) {
+		printk(VIOD_KERN_WARNING "error mapping scatter/gather list\n");
+		return -1;
+	}
 
 	spin_lock_irqsave(&viodasd_spinlock, flags);
 	num_req_outstanding++;
 
 	/* This optimization handles a single DMA block */
 	if (nsg == 1)
-		hvrc = HvCallEvent_signalLpEventFast(viopath_hostLp,
-				HvLpEvent_Type_VirtualIo, viocmd,
-				HvLpEvent_AckInd_DoAck,
-				HvLpEvent_AckType_ImmediateAck,
-				viopath_sourceinst(viopath_hostLp),
-				viopath_targetinst(viopath_hostLp),
-				(u64)(unsigned long)req, VIOVERSION << 16,
-				((u64)DEVICE_NO(d) << 48), start,
-				((u64)sg_dma_address(&sg[0])) << 32,
+		hvrc = call_hv(d, viocmd, HvLpEvent_AckInd_DoAck, 0, req,
+				start, ((u64)sg_dma_address(&sg[0])) << 32,
 				sg_dma_len(&sg[0]));
 	else {
 		bevent = (struct vioblocklpevent *)
@@ -379,7 +442,7 @@ static int send_request(struct request *req)
 		bevent->event.xFlags.xAckInd = HvLpEvent_AckInd_DoAck;
 		bevent->event.xFlags.xAckType = HvLpEvent_AckType_ImmediateAck;
 		bevent->event.xType = HvLpEvent_Type_VirtualIo;
-		bevent->event.xSubtype = viocmd;
+		bevent->event.xSubtype = viomajorsubtype_blockio | viocmd;
 		bevent->event.xSourceLp = HvLpConfig_getLpIndex();
 		bevent->event.xTargetLp = viopath_hostLp;
 		bevent->event.xSizeMinus1 =
@@ -472,15 +535,8 @@ retry:
 	init_completion(&we.com);
 
 	/* Send the open event to OS/400 */
-	hvrc = HvCallEvent_signalLpEventFast(viopath_hostLp,
-			HvLpEvent_Type_VirtualIo,
-			viomajorsubtype_blockio | vioblockopen,
-			HvLpEvent_AckInd_DoAck, HvLpEvent_AckType_ImmediateAck,
-			viopath_sourceinst(viopath_hostLp),
-			viopath_targetinst(viopath_hostLp),
-			(u64)(unsigned long)&we, VIOVERSION << 16,
-			((u64)dev_no << 48) | ((u64)flags<< 32),
-			0, 0, 0);
+	hvrc = call_hv(d, vioblockopen, HvLpEvent_AckInd_DoAck, flags,
+			&we, 0, 0, 0);
 	if (hvrc != 0) {
 		printk(VIOD_KERN_WARNING "bad rc on HV open %d\n", (int)hvrc);
 		return;
@@ -495,6 +551,7 @@ retry:
 		flags = vioblockflags_ro;
 		goto retry;
 	}
+	d->read_only = (flags != 0);
 	if (we.max_disk > (MAX_DISKNO - 1)) {
 		static int warned;
 
@@ -508,15 +565,8 @@ retry:
 	}
 
 	/* Send the close event to OS/400.  We DON'T expect a response */
-	hvrc = HvCallEvent_signalLpEventFast(viopath_hostLp,
-			HvLpEvent_Type_VirtualIo,
-			viomajorsubtype_blockio | vioblockclose,
-			HvLpEvent_AckInd_NoAck, HvLpEvent_AckType_ImmediateAck,
-			viopath_sourceinst(viopath_hostLp),
-			viopath_targetinst(viopath_hostLp),
-			0, VIOVERSION << 16,
-			((u64)dev_no << 48) | ((u64)flags << 32),
-			0, 0, 0);
+	hvrc = call_hv(d, vioblockclose, HvLpEvent_AckInd_NoAck, flags,
+			0, 0, 0, 0);
 	if (hvrc != 0) {
 		printk(VIOD_KERN_WARNING
 		       "bad rc sending event to OS/400 %d\n", (int)hvrc);
@@ -701,8 +751,6 @@ static void handle_block_event(struct HvLpEvent *event)
 			const struct open_data *data = &bevent->u.open_data;
 			struct viodasd_device *device =
 				&viodasd_devices[bevent->disk];
-			device->read_only =
-				bevent->flags & vioblockflags_ro;
 			device->size = data->disk_size;
 			device->cylinders = data->cylinders;
 			device->tracks = data->tracks;

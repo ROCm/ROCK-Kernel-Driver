@@ -249,6 +249,21 @@ static unsigned char udbg_getcLP(void)
 	}
 }
 
+static int dummy_getc_poll(void)
+{
+	return -1;
+}
+                                                                                
+static unsigned char dummy_getc(void)
+{
+	return 0;
+}
+                                                                                
+static void dummy_putc(unsigned char c)
+{
+	return;
+}
+
 /* returns 0 if couldn't find or use /chosen/stdout as console */
 static int find_udbg_vterm(void)
 {
@@ -301,6 +316,12 @@ static int find_udbg_vterm(void)
 
 out:
 	of_node_put(stdout_node);
+
+	if (!found) {
+		ppc_md.udbg_putc = dummy_putc;
+		ppc_md.udbg_getc = dummy_getc;
+		ppc_md.udbg_getc_poll = dummy_getc_poll;
+	}
 	return found;
 }
 
