@@ -56,24 +56,6 @@ static inline int pa_to_nid(unsigned long pa)
 #define node_size(nid)		(NODE_DATA(nid)->node_size)
 #define node_localnr(pfn, nid)	((pfn) - NODE_DATA(nid)->node_start_pfn)
 
-#ifdef CONFIG_NUMA
-
-static inline int __cpu_to_node(int cpu)
-{
-	int node;
-
-	node = numa_cpu_lookup_table[cpu];
-
-#ifdef DEBUG_NUMA
-	if (node == -1)
-		BUG();
-#endif
-
-	return node;
-}
-
-#endif /* CONFIG_NUMA */
-
 /*
  * Following are macros that each numa implmentation must define.
  */

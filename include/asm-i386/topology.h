@@ -37,9 +37,9 @@
 /* Returns the number of the node containing MemBlk 'memblk' */
 #define __memblk_to_node(memblk) (memblk)
 
-/* Returns the number of the node containing Node 'nid'.  This architecture is flat, 
+/* Returns the number of the node containing Node 'node'.  This architecture is flat, 
    so it is a pretty simple function! */
-#define __parent_node(nid) (nid)
+#define __parent_node(node) (node)
 
 /* Returns the number of the first CPU on Node 'node'.
  * This should be changed to a set of cached values
@@ -55,7 +55,8 @@ static inline int __node_to_first_cpu(int node)
 			/* if yes, return it to caller */
 			return cpu;
 
-	return 0;
+	BUG(); /* couldn't find a cpu on given node */
+	return -1;
 }
 
 /* Returns a bitmask of CPUs on Node 'node'.
@@ -66,6 +67,9 @@ static inline unsigned long __node_to_cpu_mask(int node)
 {
 	int i, cpu, logical_apicid = node << 4;
 	unsigned long mask = 0UL;
+
+	if (sizeof(unsigned long) * 8 < NR_CPUS)
+		BUG();
 
 	for(i = 1; i < 16; i <<= 1)
 		/* check to see if the cpu is in the system */

@@ -14,9 +14,6 @@
 #include <asm/numaq.h>
 #else
 #define pfn_to_nid(pfn)		(0)
-#ifdef CONFIG_NUMA
-#define _cpu_to_node(cpu) 0
-#endif /* CONFIG_NUMA */
 #endif /* CONFIG_X86_NUMAQ */
 
 extern struct pglist_data *node_data[];
