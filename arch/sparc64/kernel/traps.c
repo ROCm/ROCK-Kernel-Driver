@@ -1575,6 +1575,9 @@ void show_trace_raw(struct thread_info *tp, unsigned long ksp)
 	struct reg_window *rw;
 	int count = 0;
 
+	if (tp == current_thread_info())
+		flushw_all();
+
 	fp = ksp + STACK_BIAS;
 	thread_base = (unsigned long) tp;
 	do {
@@ -1595,6 +1598,15 @@ void show_trace_task(struct task_struct *tsk)
 	if (tsk)
 		show_trace_raw(tsk->thread_info,
 			       tsk->thread_info->ksp);
+}
+
+void dump_stack(void)
+{
+	unsigned long ksp;
+
+	__asm__ __volatile__("mov	%%fp, %0"
+			     : "=r" (ksp));
+	show_trace_raw(current_thread_info(), ksp);
 }
 
 void die_if_kernel(char *str, struct pt_regs *regs)

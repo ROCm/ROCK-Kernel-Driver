@@ -470,6 +470,54 @@ int pci_assign_resource(struct pci_dev *pdev, int resource)
 	return err;
 }
 
+/* Sort resources by alignment */
+void pdev_sort_resources(struct pci_dev *dev, struct resource_list *head)
+{
+	int i;
+
+	for (i = 0; i < PCI_NUM_RESOURCES; i++) {
+		struct resource *r;
+		struct resource_list *list, *tmp;
+		unsigned long r_align;
+
+		r = &dev->resource[i];
+		r_align = r->end - r->start;
+		
+		if (!(r->flags) || r->parent)
+			continue;
+		if (!r_align) {
+			printk(KERN_WARNING "PCI: Ignore bogus resource %d "
+					    "[%lx:%lx] of %s\n",
+					    i, r->start, r->end, dev->dev.name);
+			continue;
+		}
+		r_align = (i < PCI_BRIDGE_RESOURCES) ? r_align + 1 : r->start;
+		for (list = head; ; list = list->next) {
+			unsigned long align = 0;
+			struct resource_list *ln = list->next;
+			int idx;
+
+			if (ln) {
+				idx = ln->res - &ln->dev->resource[0];
+				align = (idx < PCI_BRIDGE_RESOURCES) ?
+					ln->res->end - ln->res->start + 1 :
+					ln->res->start;
+			}
+			if (r_align > align) {
+				tmp = kmalloc(sizeof(*tmp), GFP_KERNEL);
+				if (!tmp)
+					panic("pdev_sort_resources(): "
+					      "kmalloc() failed!\n");
+				tmp->next = ln;
+				tmp->res = r;
+				tmp->dev = dev;
+				list->next = tmp;
+				break;
+			}
+		}
+	}
+}
+
 void pcibios_update_irq(struct pci_dev *pdev, int irq)
 {
 }
@@ -482,6 +530,27 @@ void pcibios_align_resource(void *data, struct resource *res,
 int pcibios_enable_device(struct pci_dev *pdev, int mask)
 {
 	return 0;
+}
+
+void pcibios_resource_to_bus(struct pci_dev *pdev, struct pci_bus_region *region,
+			     struct resource *res)
+{
+	struct pci_pbm_info *pbm = pci_bus2pbm[pdev->bus->number];
+	struct resource zero_res, *root;
+
+	zero_res.start = 0;
+	zero_res.end = 0;
+	zero_res.flags = res->flags;
+
+	if (res->flags & IORESOURCE_IO)
+		root = &pbm->io_space;
+	else
+		root = &pbm->mem_space;
+
+	pbm->parent->resource_adjust(pdev, &zero_res, root);
+
+	region->start = res->start - zero_res.start;
+	region->end = res->end - zero_res.start;
 }
 
 char * __init pcibios_setup(char *str)
