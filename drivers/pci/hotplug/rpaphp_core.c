@@ -77,15 +77,6 @@ struct hotplug_slot_ops rpaphp_hotplug_slot_ops = {
 	.get_cur_bus_speed = get_cur_bus_speed,
 };
 
-static inline struct slot *get_slot (struct hotplug_slot *hotplug_slot, const char *function)
-{
-	if (!hotplug_slot) {
-		dbg("%s - hotplug_slot == NULL\n", function);
-		return NULL;
-	}
-	return (struct slot *)hotplug_slot->private;
-}
-
 static int rpaphp_get_attention_status(struct slot *slot)
 {
 	return slot->hotplug_slot->info->attention_status;
@@ -100,11 +91,8 @@ static int rpaphp_get_attention_status(struct slot *slot)
  */
 static int set_attention_status(struct hotplug_slot *hotplug_slot, u8 value)
 {
-	int retval = 0;
-	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
-
-	if (slot == NULL)
-		return -ENODEV;
+	int retval;
+	struct slot *slot = (struct slot *)hotplug_slot->private;
 
 	down(&rpaphp_sem);
 	switch (value) {
@@ -136,10 +124,7 @@ static int set_attention_status(struct hotplug_slot *hotplug_slot, u8 value)
 static int get_power_status(struct hotplug_slot *hotplug_slot, u8 * value)
 {
 	int retval;
-	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
-
-	if (slot == NULL)
-		return -ENODEV;
+	struct slot *slot = (struct slot *)hotplug_slot->private;
 
 	down(&rpaphp_sem);
 	retval = rpaphp_get_power_status(slot, value);
@@ -155,10 +140,7 @@ static int get_power_status(struct hotplug_slot *hotplug_slot, u8 * value)
 static int get_attention_status(struct hotplug_slot *hotplug_slot, u8 * value)
 {
 	int retval = 0;
-	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
-
-	if (slot == NULL)
-		return -ENODEV;
+	struct slot *slot = (struct slot *)hotplug_slot->private;
 
 	down(&rpaphp_sem);
 	*value = rpaphp_get_attention_status(slot);
@@ -168,11 +150,9 @@ static int get_attention_status(struct hotplug_slot *hotplug_slot, u8 * value)
 
 static int get_adapter_status(struct hotplug_slot *hotplug_slot, u8 * value)
 {
-	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
+	struct slot *slot = (struct slot *)hotplug_slot->private;
 	int retval = 0;
 
-	if (slot == NULL)
-		return -ENODEV;
 	down(&rpaphp_sem);
 	/*  have to go through this */
 	switch (slot->dev_type) {
@@ -191,10 +171,7 @@ static int get_adapter_status(struct hotplug_slot *hotplug_slot, u8 * value)
 
 static int get_max_bus_speed(struct hotplug_slot *hotplug_slot, enum pci_bus_speed *value)
 {
-	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
-
-	if (slot == NULL)
-		return -ENODEV;
+	struct slot *slot = (struct slot *)hotplug_slot->private;
 
 	down(&rpaphp_sem);
 	switch (slot->type) {

@@ -58,13 +58,10 @@ void rpaphp_sysfs_remove_attr_location (struct hotplug_slot *slot)
 	sysfs_remove_file(&slot->kobj, &hotplug_slot_attr_location.attr);
 }
 
-/* free up the memory user by a slot */
+/* free up the memory used by a slot */
 static void rpaphp_release_slot(struct hotplug_slot *hotplug_slot)
 {
-	struct slot *slot = hotplug_slot? (struct slot *) hotplug_slot->private:NULL;
-
-	if (slot == NULL)
-		return;
+	struct slot *slot = (struct slot *) hotplug_slot->private;
 
 	dealloc_slot_struct(slot);
 }
