@@ -65,7 +65,7 @@
 #include <asm/pgtable.h>
 #include <asm/io.h>
 
-extern int sys_sync(void);
+extern long sys_sync(void);
 
 unsigned char software_suspend_enabled = 0;
 
