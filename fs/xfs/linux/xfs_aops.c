@@ -37,9 +37,37 @@
 #include <linux/iobuf.h>
 
 
-STATIC int linvfs_pb_bmap(struct inode *, loff_t, ssize_t,
-			  struct page_buf_bmap_s *, int);
 STATIC int delalloc_convert(struct inode *, struct page *, int, int);
+
+STATIC int
+map_blocks(
+	struct inode		*inode,
+	loff_t			offset,
+	ssize_t			count,
+	page_buf_bmap_t		*pbmapp,
+	int			flags)
+{
+	vnode_t			*vp = LINVFS_GET_VP(inode);
+	int			error, nmaps = 1;
+
+retry:
+	if (flags & PBF_FILE_ALLOCATE) {
+		VOP_STRATEGY(vp, offset, count, flags, NULL,
+				pbmapp, &nmaps, error);
+	} else {
+		VOP_BMAP(vp, offset, count, flags, NULL,
+				pbmapp, &nmaps, error);
+	}
+	if (flags & PBF_WRITE) {
+		if (unlikely((flags & PBF_DIRECT) && nmaps &&
+		    (pbmapp->pbm_flags & PBMF_DELAY))) {
+			flags = PBF_WRITE | PBF_FILE_ALLOCATE;
+			goto retry;
+		}
+		VMODIFY(vp);
+	}
+	return -error;
+}
 
 /*
  * match_offset_to_mapping
@@ -461,7 +489,7 @@ delalloc_convert(
 
 		if (buffer_delay(bh)) {
 			if (!mp) {
-				err = linvfs_pb_bmap(inode, offset, len, &map,
+				err = map_blocks(inode, offset, len, &map,
 						PBF_WRITE|PBF_FILE_ALLOCATE);
 				if (err)
 					goto error;
@@ -487,7 +515,7 @@ delalloc_convert(
 			if (!mp) {
 				size = probe_unmapped_cluster(inode, page,
 								bh, head);
-				err = linvfs_pb_bmap(inode, offset, size, &map,
+				err = map_blocks(inode, offset, size, &map,
 						PBF_WRITE|PBF_DIRECT);
 				if (err)
 					goto error;
@@ -662,36 +690,6 @@ linvfs_direct_IO(
 }
 
 STATIC int
-linvfs_pb_bmap(
-	struct inode		*inode,
-	loff_t			offset,
-	ssize_t			count,
-	page_buf_bmap_t		*pbmapp,
-	int			flags)
-{
-	vnode_t			*vp = LINVFS_GET_VP(inode);
-	int			error, nmaps = 1;
-
-retry:
-	if (flags & PBF_FILE_ALLOCATE) {
-		VOP_STRATEGY(vp, offset, count, flags, NULL,
-				pbmapp, &nmaps, error);
-	} else {
-		VOP_BMAP(vp, offset, count, flags, NULL,
-				pbmapp, &nmaps, error);
-	}
-	if (flags & PBF_WRITE) {
-		if (unlikely((flags & PBF_DIRECT) && nmaps &&
-		    (pbmapp->pbm_flags & PBMF_DELAY))) {
-			flags = PBF_WRITE | PBF_FILE_ALLOCATE;
-			goto retry;
-		}
-		VMODIFY(vp);
-	}
-	return -error;
-}
-
-STATIC int
 linvfs_bmap(
 	struct address_space	*mapping,
 	long			block)
@@ -714,7 +712,7 @@ linvfs_bmap(
 }
 
 STATIC int
-linvfs_read_full_page(
+linvfs_readpage(
 	struct file		*unused,
 	struct page		*page)
 {
@@ -759,7 +757,7 @@ count_page_state(
 }
 
 STATIC int
-linvfs_write_full_page(
+linvfs_writepage(
 	struct page		*page)
 {
 	int			error;
@@ -801,118 +799,6 @@ linvfs_prepare_write(
 	}
 }
 
-#if 0
-/* Keeping this for now as an example of a better way of
- * doing O_DIRECT for XFS - the generic path has more
- * overhead than we want.
- */
-
-/*
- * Initiate I/O on a kiobuf of user memory
- */
-STATIC int
-linvfs_direct_IO(
-	int			rw,
-	struct inode		*inode,
-	struct kiobuf		*iobuf,
-	unsigned long		blocknr,
-	int			blocksize)
-{
-	struct page		**maplist;
-	size_t			page_offset;
-	page_buf_t		*pb;
-	page_buf_bmap_t		map;
-	int			error = 0;
-	int			pb_flags, map_flags, pg_index = 0;
-	size_t			length, total;
-	loff_t			offset;
-	size_t			map_size, size;
-
-	total = length = iobuf->length;
-	offset = blocknr;
-	offset <<= inode->i_blkbits;
-
-	maplist = iobuf->maplist;
-	page_offset = iobuf->offset;
-
-	map_flags = (rw ? PBF_WRITE : PBF_READ) | PBF_DIRECT;
-	pb_flags = (rw ? PBF_WRITE : PBF_READ) | PBF_FORCEIO | _PBF_LOCKABLE;
-	while (length) {
-		error = linvfs_pb_bmap(inode, offset, length, &map, map_flags);
-		if (error)
-			break;
-
-		map_size = map.pbm_bsize - map.pbm_delta;
-		size = min(map_size, length);
-		if (map.pbm_flags & PBMF_HOLE) {
-			size_t	zero_len = size;
-
-			if (rw == WRITE)
-				break;
-
-			/* Need to zero it all */
-			while (zero_len) {
-				struct page	*page;
-				size_t		pg_len;
-
-				pg_len = min((size_t)
-						(PAGE_CACHE_SIZE - page_offset),
-						zero_len);
-
-				page = maplist[pg_index];
-
-				memset(kmap(page) + page_offset, 0, pg_len);
-				flush_dcache_page(page);
-				kunmap(page);
-
-				zero_len -= pg_len;
-				if ((pg_len + page_offset) == PAGE_CACHE_SIZE) {
-					pg_index++;
-					page_offset = 0;
-				} else {
-					page_offset = (page_offset + pg_len) &
-							~PAGE_CACHE_MASK;
-				}
-			}
-		} else {
-			int	pg_count;
-
-			pg_count = (size + page_offset + PAGE_CACHE_SIZE - 1)
-					>> PAGE_CACHE_SHIFT;
-			if ((pb = pagebuf_lookup(map.pbm_target, inode, offset,
-						size, pb_flags)) == NULL) {
-				error = -ENOMEM;
-				break;
-			}
-			/* Need to hook up pagebuf to kiobuf pages */
-			pb->pb_pages = &maplist[pg_index];
-			pb->pb_offset = page_offset;
-			pb->pb_page_count = pg_count;
-
-			pb->pb_bn = map.pbm_bn + (map.pbm_delta >> 9);
-			error = pagebuf_iostart(pb, pb_flags);
-			pb->pb_flags &= ~_PBF_LOCKABLE;
-			pagebuf_rele(pb);
-			if (error != 0) {
-				if (error > 0)
-					error = -error;
-				break;
-			}
-
-			page_offset = (page_offset + size) & ~PAGE_CACHE_MASK;
-			if (page_offset)
-				pg_count--;
-			pg_index += pg_count;
-		}
-
-		offset += size;
-		length -= size;
-	}
-
-	return (error ? error : (int)(total - length));
-}
-#endif
-
 /*
  * This gets a page into cleanable state - page locked on entry
  * kept locked on exit. If the page is marked dirty we should
@@ -945,9 +831,9 @@ linvfs_release_page(
 
 
 struct address_space_operations linvfs_aops = {
-	.readpage		= linvfs_read_full_page,
+	.readpage		= linvfs_readpage,
 	.readpages		= linvfs_readpages,
-	.writepage		= linvfs_write_full_page,
+	.writepage		= linvfs_writepage,
 	.sync_page		= block_sync_page,
 	.releasepage		= linvfs_release_page,
 	.prepare_write		= linvfs_prepare_write,
