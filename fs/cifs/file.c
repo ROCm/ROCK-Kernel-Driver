@@ -45,6 +45,7 @@ cifs_open(struct inode *inode, struct file *file)
 	struct cifsTconInfo *pTcon;
 	struct cifsFileInfo *pCifsFile;
 	struct cifsInodeInfo *pCifsInode;
+	struct list_head * tmp;
 	char *full_path = NULL;
 	int desiredAccess = 0x20197;
 	int disposition = FILE_OPEN;
@@ -54,6 +55,29 @@ cifs_open(struct inode *inode, struct file *file)
 
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
+
+	if (file->f_flags & O_CREAT) {
+	    /* search inode for this file and fill in file->private_data = */
+	    pCifsInode = CIFS_I(file->f_dentry->d_inode);
+	    read_lock(&GlobalSMBSeslock);
+	    list_for_each(tmp, &pCifsInode->openFileList) {            
+		pCifsFile = list_entry(tmp,struct cifsFileInfo, flist);           
+		if((pCifsFile->pfile == NULL)&& (pCifsFile->pid = current->pid)){		
+		    /* set mode ?? */
+		    pCifsFile->pfile = file; /* needed for writepage */
+		    file->private_data = pCifsFile;
+		    break;
+		}
+	    }
+	    read_unlock(&GlobalSMBSeslock);
+	    if(file->private_data != NULL) {
+		rc = 0;
+	    	FreeXid(xid);
+		return rc;
+	    } else {
+		cERROR(1,("could not find file instance for new file %p ",file));
+	    }
+	}
 
 	full_path = build_path_from_dentry(file->f_dentry);
 
@@ -86,20 +110,21 @@ cifs_open(struct inode *inode, struct file *file)
 	if (file->f_flags & O_CREAT)
 		disposition = FILE_OVERWRITE;
 
-    /* BB first check if file has batch oplock (or oplock ?) */
-
-	/* BB finish adding in oplock support BB */
 	if (oplockEnabled)
 		oplock = REQ_OPLOCK;
 	else
 		oplock = FALSE;
 
 	/* BB pass O_SYNC flag through on file attributes .. BB */
+
+	/* BB add code to refresh inode by passing in file_info buf on open 
+	   and calling get_inode_info with returned buf (at least 
+	   helps non-Unix server case */
 	rc = CIFSSMBOpen(xid, pTcon, full_path, disposition, desiredAccess,
-			CREATE_NOT_DIR, &netfid, &oplock, cifs_sb->local_nls);
+			CREATE_NOT_DIR, &netfid, &oplock, NULL, cifs_sb->local_nls);
 	if (rc) {
 		cFYI(1, ("cifs_open returned 0x%x ", rc));
-		cFYI(1, ("oplock: %d ", oplock));
+		cFYI(1, ("oplock: %d ", oplock));	
 	} else {
 		file->private_data =
 		    kmalloc(sizeof (struct cifsFileInfo), GFP_KERNEL);
@@ -110,6 +135,7 @@ cifs_open(struct inode *inode, struct file *file)
 			pCifsFile->netfid = netfid;
 			pCifsFile->pid = current->pid;
 			pCifsFile->pfile = file; /* needed for writepage */
+			pCifsFile->pInode = inode;
 			write_lock(&file->f_owner.lock);
 			write_lock(&GlobalSMBSeslock);
 			list_add(&pCifsFile->tlist,&pTcon->openFileList);
@@ -1248,7 +1274,7 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 					pfindDataUnix->FileName, 
 					cifsFile->resume_name_length);
 			}
-			for (i = 2; i < findParms.SearchCount + 2; i++) {
+			for (i = 2; i < (unsigned int)findParms.SearchCount + 2; i++) {
 				if (UnixSearch == FALSE) {
 					pfindData->FileNameLength =
 					  le32_to_cpu(pfindData->FileNameLength);

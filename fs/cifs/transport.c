@@ -101,10 +101,10 @@ DeleteMidQEntry(struct mid_q_entry *midEntry)
 }
 
 struct oplock_q_entry *
-AllocOplockQEntry(struct file * file, struct cifsTconInfo * tcon)
+AllocOplockQEntry(struct inode * pinode, __u16 fid, struct cifsTconInfo * tcon)
 {
 	struct oplock_q_entry *temp;
-	if ((file == NULL) || (tcon == NULL)) {
+	if ((pinode== NULL) || (tcon == NULL)) {
 		cERROR(1, ("Null parms passed to AllocOplockQEntry"));
 		return NULL;
 	}
@@ -113,8 +113,9 @@ AllocOplockQEntry(struct file * file, struct cifsTconInfo * tcon)
 	if (temp == NULL)
 		return temp;
 	else {
-		temp->file_to_flush = file;
+		temp->pinode = pinode;
 		temp->tcon = tcon;
+		temp->netfid = fid;
 		write_lock(&GlobalMid_Lock);
 		list_add_tail(&temp->qhead, &GlobalOplock_Q);
 		write_unlock(&GlobalMid_Lock);

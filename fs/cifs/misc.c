@@ -390,12 +390,12 @@ is_valid_oplock_break(struct smb_hdr *buf)
 					read_unlock(&GlobalSMBSeslock);
 					cFYI(1,("Matching file id, processing oplock break"));
 					pCifsInode = 
-						CIFS_I(netfile->pfile->f_dentry->d_inode);
+						CIFS_I(netfile->pInode);
 					pCifsInode->clientCanCacheAll = FALSE;
 					if(pSMB->OplockLevel == 0)
 						pCifsInode->clientCanCacheRead = FALSE;
 					pCifsInode->oplockPending = TRUE;
-					AllocOplockQEntry(netfile->pfile, tcon);
+					AllocOplockQEntry(netfile->pInode, netfile->netfid, tcon);
 					cFYI(1,("about to wake up oplock thd"));
 					wake_up_process(oplockThread);               
 					return TRUE;

@@ -47,12 +47,12 @@ extern struct file_system_type cifs_fs_type;
 int cifsFYI = 0;
 int cifsERROR = 1;
 int traceSMB = 0;
-unsigned int oplockEnabled = 0;
+unsigned int oplockEnabled = 1;
 unsigned int lookupCacheEnabled = 1;
 unsigned int multiuser_mount = 0;
 unsigned int extended_security = 0;
 unsigned int ntlmv2_support = 0;
-unsigned int sign_CIFS_PDUs = 0;
+unsigned int sign_CIFS_PDUs = 1;
 unsigned int CIFSMaximumBufferSize = CIFS_MAX_MSGSIZE;
 struct task_struct * oplockThread = NULL;
 
@@ -439,7 +439,6 @@ static int cifs_oplock_thread(void * dummyarg)
 	struct list_head * tmp;
 	struct list_head * tmp1;
 	struct oplock_q_entry * oplock_item;
-	struct file * pfile;
 	struct cifsTconInfo *pTcon;
 	int rc;
 
@@ -457,23 +456,19 @@ static int cifs_oplock_thread(void * dummyarg)
 							       qhead);
 			if(oplock_item) {
 				pTcon = oplock_item->tcon;
-				pfile = oplock_item->file_to_flush;
-				cFYI(1,("process item on queue"));/* BB remove */
 				DeleteOplockQEntry(oplock_item);
 				write_unlock(&GlobalMid_Lock);
-				rc = filemap_fdatawrite(pfile->f_dentry->d_inode->i_mapping);
+				rc = filemap_fdatawrite(oplock_item->pinode->i_mapping);
 				if(rc)
-					CIFS_I(pfile->f_dentry->d_inode)->write_behind_rc 
+					CIFS_I(oplock_item->pinode)->write_behind_rc 
 						= rc;
-				cFYI(1,("Oplock flush file %p rc %d",pfile,rc));
-				if(pfile->private_data) {
-					rc = CIFSSMBLock(0, pTcon, 
-						((struct cifsFileInfo *) pfile->private_data)->netfid,
-						0 /* len */ , 0 /* offset */, 0, 
-						0, LOCKING_ANDX_OPLOCK_RELEASE,
-						0 /* wait flag */);
-					cFYI(1,("Oplock release rc = %d ",rc));
-				}
+				cFYI(1,("Oplock flush inode %p rc %d",oplock_item->pinode,rc));
+				rc = CIFSSMBLock(0, pTcon, 
+					oplock_item->netfid,
+					0 /* len */ , 0 /* offset */, 0, 
+					0, LOCKING_ANDX_OPLOCK_RELEASE,
+					0 /* wait flag */);
+				cFYI(1,("Oplock release rc = %d ",rc));
 				write_lock(&GlobalMid_Lock);
 			} else
 				break;

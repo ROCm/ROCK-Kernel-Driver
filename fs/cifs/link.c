@@ -160,7 +160,7 @@ cifs_symlink(struct inode *inode, struct dentry *direntry, const char *symname)
 			rc = cifs_get_inode_info_unix(&newinode, full_path,
 						      inode->i_sb);
 		else
-			rc = cifs_get_inode_info(&newinode, full_path,
+			rc = cifs_get_inode_info(&newinode, full_path, NULL,
 						 inode->i_sb);
 
 		if (rc != 0) {
@@ -221,7 +221,7 @@ cifs_readlink(struct dentry *direntry, char *pBuffer, int buflen)
 				cifs_sb->local_nls);
 	else {
 		rc = CIFSSMBOpen(xid, pTcon, full_path, FILE_OPEN, GENERIC_READ,
-				OPEN_REPARSE_POINT,&fid, &oplock, cifs_sb->local_nls);
+				OPEN_REPARSE_POINT,&fid, &oplock, NULL, cifs_sb->local_nls);
 		if(!rc) {
 			rc = CIFSSMBQueryReparseLinkInfo(xid, pTcon, full_path,
 				tmpbuffer,

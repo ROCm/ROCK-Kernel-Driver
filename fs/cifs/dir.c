@@ -131,7 +131,10 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
 	char *full_path = NULL;
+	FILE_ALL_INFO * buf = NULL;
 	struct inode *newinode = NULL;
+	struct cifsFileInfo * pCifsFile = NULL;
+	struct cifsInodeInfo * pCifsInode;
 
 	xid = GetXid();
 
@@ -140,10 +143,9 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 
 	full_path = build_path_from_dentry(direntry);
 
-
 	if(nd) { 
 		cFYI(1,("In create nd flags = 0x%x for %s",nd->flags,full_path));
-                cFYI(1,("Intent flags: 0x%x", nd->intent.open.flags));
+
 		if ((nd->intent.open.flags & O_ACCMODE) == O_RDONLY)
                 	desiredAccess = GENERIC_READ;
 		else if ((nd->intent.open.flags & O_ACCMODE) == O_WRONLY)
@@ -152,12 +154,14 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 			desiredAccess = GENERIC_ALL;
 	}
 
+	/* BB add processing to set equivalent of mode - e.g. via CreateX with ACLs */
+	if (!oplockEnabled)
+		oplock = REQ_OPLOCK;
 
-	/* BB add processing for setting the equivalent of mode - e.g. via CreateX with ACLs */
-
+	buf = kmalloc(sizeof(FILE_ALL_INFO),GFP_KERNEL);
 	rc = CIFSSMBOpen(xid, pTcon, full_path, FILE_OVERWRITE_IF,
 			 desiredAccess, CREATE_NOT_DIR,
-			 &fileHandle, &oplock, cifs_sb->local_nls);
+			 &fileHandle, &oplock, buf, cifs_sb->local_nls);
 	if (rc) {
 		cFYI(1, ("cifs_create returned 0x%x ", rc));
 	} else {
@@ -166,28 +170,55 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 						      inode->i_sb);
 		else
 			rc = cifs_get_inode_info(&newinode, full_path,
-						 inode->i_sb);
+						 buf, inode->i_sb);
 
 		if (rc != 0) {
 			cFYI(1,("Create worked but get_inode_info failed with rc = %d",
 			      rc));
-			/* close handle */
 		} else {
 			direntry->d_op = &cifs_dentry_ops;
 			d_instantiate(direntry, newinode);
 		}
-		/* BB check oplock state before deciding to call following */
-/*        if(*oplock)
-            save off handle in inode and dontdoclose */
         
-		CIFSSMBClose(xid, pTcon, fileHandle);	
-        /* BB In the future chain close with the NTCreateX to narrow window */
-        
-        if(newinode)
-            newinode->i_mode = mode;
-	}
+		if(newinode) {
+		    newinode->i_mode = mode;
+		    pCifsFile = (struct cifsFileInfo *)
+			kmalloc(sizeof (struct cifsFileInfo), GFP_KERNEL);
+		
+			if (pCifsFile) {
+				memset((char *)pCifsFile, 0,
+				       sizeof (struct cifsFileInfo));
+				pCifsFile->netfid = fileHandle;
+				pCifsFile->pid = current->pid;
+				pCifsFile->pInode = newinode;
+				/* pCifsFile->pfile = file; */ /* put in at open time */
+				write_lock(&GlobalSMBSeslock);
+				list_add(&pCifsFile->tlist,&pTcon->openFileList);
+				pCifsInode = CIFS_I(newinode);
+				if(pCifsInode->openFileList.next)
+					list_add(&pCifsFile->flist,&pCifsInode->openFileList);
+				write_unlock(&GlobalSMBSeslock);
+				if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)                
+					CIFSSMBUnixSetPerms(xid, pTcon, full_path, inode->i_mode,
+						(__u64)-1, 
+						(__u64)-1,
+						0 /* dev */,
+						cifs_sb->local_nls);
+				else { /* BB implement via Windows security descriptors */
+			/* eg CIFSSMBWinSetPerms(xid,pTcon,full_path,mode,-1,-1,local_nls);*/
+			/* in the meantime could set r/o dos attribute when perms are eg:
+					mode & 0222 == 0 */
+				}
+			}			
+		}
+
+
+	} 
+
+	if (buf)
+	    kfree(buf);
 	if (full_path)
-		kfree(full_path);
+	    kfree(full_path);
 	FreeXid(xid);
 
 	return rc;
@@ -261,17 +292,11 @@ cifs_lookup(struct inode *parent_dir_inode, struct dentry *direntry, struct name
 	cFYI(1,
 	     (" Full path: %s inode = 0x%p", full_path, direntry->d_inode));
 
-        if(nd) { /* BB remove begin */
-                cFYI(1,("In lookup nd flags = 0x%x",nd->flags));
-                cFYI(1,("Intent flags: 0x%x", nd->intent.open.flags));
-	}
-/* BB remove end BB */
-
 	if (pTcon->ses->capabilities & CAP_UNIX)
 		rc = cifs_get_inode_info_unix(&newInode, full_path,
 					      parent_dir_inode->i_sb);
 	else
-		rc = cifs_get_inode_info(&newInode, full_path,
+		rc = cifs_get_inode_info(&newInode, full_path, NULL,
 					 parent_dir_inode->i_sb);
 
 	if ((rc == 0) && (newInode != NULL)) {
@@ -327,12 +352,6 @@ cifs_d_revalidate(struct dentry *direntry, struct nameidata *nd)
 	int isValid = 1;
 
 /*	lock_kernel(); *//* surely we do not want to lock the kernel for a whole network round trip which could take seconds */
-
-        if(nd) {  /* BB remove begin */
-                cFYI(1,("In d_revalidate nd flags = 0x%x",nd->flags));
-		cFYI(1,("Intent flags: 0x%x", nd->intent.open.flags));
-	}
-/* BB remove end BB */
 
 	if (direntry->d_inode) {
 		if (cifs_revalidate(direntry)) {
