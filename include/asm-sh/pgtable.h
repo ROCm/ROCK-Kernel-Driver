@@ -3,7 +3,7 @@
 
 /*
  * Copyright (C) 1999 Niibe Yutaka
- * Copyright (C) 2002, 2003 Paul Mundt
+ * Copyright (C) 2002, 2003, 2004 Paul Mundt
  */
 
 #include <linux/config.h>
@@ -16,6 +16,7 @@
 #ifndef __ASSEMBLY__
 #include <asm/processor.h>
 #include <asm/addrspace.h>
+#include <asm/fixmap.h>
 #include <linux/threads.h>
 
 extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
@@ -51,7 +52,7 @@ extern unsigned long empty_zero_page[1024];
  * Currently only 4-enty (16kB) is used (see arch/sh/mm/cache.c)
  */
 #define VMALLOC_START	(P3SEG+0x00100000)
-#define VMALLOC_END	P4SEG
+#define VMALLOC_END	(FIXADDR_START-2*PAGE_SIZE)
 
 #define	_PAGE_WT	0x001  /* WT-bit on SH-4, 0 on SH-3 */
 #define _PAGE_HW_SHARED	0x002  /* SH-bit  : page is shared among processes */
