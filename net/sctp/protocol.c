@@ -721,7 +721,7 @@ static void sctp_inet_event_msgname(struct sctp_ulpevent *event, char *msgname,
 	if (msgname) {
 		struct sctp_association *asoc;
 
-		asoc = event->sndrcvinfo.sinfo_assoc_id;
+		asoc = event->asoc;
 		sctp_inet_msgname(msgname, addr_len);
 		sin = (struct sockaddr_in *)msgname;
 		sinfrom = &asoc->peer.primary_addr.v4;

@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
+ * (C) Copyright IBM Corp. 2002, 2004
  * Copyright (c) 2001 Nokia, Inc.
  * Copyright (c) 2001 La Monte H.P. Yarroll
- * Copyright (c) 2002-2003 International Business Machines, Corp.
  * Copyright (c) 2002-2003 Intel Corp.
  *
  * This file is part of the SCTP kernel reference Implementation
@@ -698,7 +698,7 @@ static void sctp_inet6_event_msgname(struct sctp_ulpevent *event,
 		union sctp_addr *addr;
 		struct sctp_association *asoc;
 
-		asoc = event->sndrcvinfo.sinfo_assoc_id;
+		asoc = event->asoc;
 		sctp_inet6_msgname(msgname, addrlen);
 		sin6 = (struct sockaddr_in6 *)msgname;
 		sin6->sin6_port = htons(asoc->peer.port);
