@@ -1275,8 +1275,6 @@ static int __init agp_intel_probe(struct pci_dev *pdev,
 	u8 cap_ptr = 0;
 
 	cap_ptr = pci_find_capability(pdev, PCI_CAP_ID_AGP);
-	if (!cap_ptr)
-		return -ENODEV;
 
 	bridge = agp_alloc_bridge();
 	if (!bridge)
@@ -1417,9 +1415,11 @@ static int __init agp_intel_probe(struct pci_dev *pdev,
 	printk(KERN_INFO PFX "Detected an Intel %s Chipset.\n", name);
 
 	/* Fill in the mode register */
-	pci_read_config_dword(pdev,
-			bridge->capndx+PCI_AGP_STATUS,
-			&bridge->mode);
+	if (cap_ptr) {
+		pci_read_config_dword(pdev,
+				bridge->capndx+PCI_AGP_STATUS,
+				&bridge->mode);
+	}
 
 	pci_set_drvdata(pdev, bridge);
 	return agp_add_bridge(bridge);
