@@ -151,6 +151,7 @@ EXPORT_SYMBOL_GPL(unset_nmi_callback);
 #undef strcmp 
 #undef strcpy 
 #undef strcat
+#undef memcmp
 
 extern void * memset(void *,int,__kernel_size_t);
 extern size_t strlen(const char *);
@@ -161,6 +162,7 @@ extern void *memchr(const void *s, int c, size_t n);
 extern void * memcpy(void *,const void *,__kernel_size_t);
 extern void * __memcpy(void *,const void *,__kernel_size_t);
 extern char * strcat(char *, const char *);
+extern int memcmp(const void * cs,const void * ct,size_t count);
 
 EXPORT_SYMBOL_NOVERS(memset);
 EXPORT_SYMBOL_NOVERS(strlen);
@@ -178,6 +180,7 @@ EXPORT_SYMBOL_NOVERS(strnlen);
 EXPORT_SYMBOL_NOVERS(memscan);
 EXPORT_SYMBOL_NOVERS(memcpy);
 EXPORT_SYMBOL_NOVERS(__memcpy);
+EXPORT_SYMBOL_NOVERS(memcmp);
 
 /* syscall export needed for misdesigned sound drivers. */
 EXPORT_SYMBOL(sys_read);
