@@ -637,7 +637,7 @@ static int aha1740_probe (struct device *dev)
 
 	eisa_set_drvdata (edev, shpnt);
 	scsi_add_host (shpnt, dev); /* XXX handle failure */
-	scsi_scan_host (shpnt)
+	scsi_scan_host (shpnt);
 	return 0;
 
  err_unmap:
