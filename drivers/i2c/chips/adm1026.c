@@ -914,7 +914,7 @@ fan_offset(7);
 fan_offset(8);
 
 /* Adjust fan_min to account for new fan divisor */
-void fixup_fan_min(struct device *dev, int fan, int old_div)
+static void fixup_fan_min(struct device *dev, int fan, int old_div)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adm1026_data *data = i2c_get_clientdata(client);
