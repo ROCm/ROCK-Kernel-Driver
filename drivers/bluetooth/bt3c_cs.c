@@ -361,7 +361,7 @@ static irqreturn_t bt3c_interrupt(int irq, void *dev_inst, struct pt_regs *regs)
 	unsigned int iobase;
 	int iir;
 
-	if (!info) {
+	if (!info || !info->hdev) {
 		BT_ERR("Call of irq %d for unknown device", irq);
 		return IRQ_NONE;
 	}
@@ -522,18 +522,7 @@ int bt3c_open(bt3c_info_t *info)
 	info->rx_count = 0;
 	info->rx_skb = NULL;
 
-	/* Load firmware */
-
-	if ((err = bt3c_firmware_load(info)) < 0)
-		return err;
-
-	/* Timeout before it is safe to send the first HCI packet */
-
-	set_current_state(TASK_INTERRUPTIBLE);
-	schedule_timeout(HZ);
-
-
-	/* Initialize and register HCI device */
+	/* Initialize HCI device */
 	hdev = hci_alloc_dev();
 	if (!hdev) {
 		BT_ERR("Can't allocate HCI device");
@@ -545,15 +534,26 @@ int bt3c_open(bt3c_info_t *info)
 	hdev->type = HCI_PCCARD;
 	hdev->driver_data = info;
 
-	hdev->open = bt3c_hci_open;
-	hdev->close = bt3c_hci_close;
-	hdev->flush = bt3c_hci_flush;
-	hdev->send = bt3c_hci_send_frame;
+	hdev->open     = bt3c_hci_open;
+	hdev->close    = bt3c_hci_close;
+	hdev->flush    = bt3c_hci_flush;
+	hdev->send     = bt3c_hci_send_frame;
 	hdev->destruct = bt3c_hci_destruct;
-	hdev->ioctl = bt3c_hci_ioctl;
+	hdev->ioctl    = bt3c_hci_ioctl;
 
 	hdev->owner = THIS_MODULE;
-	
+
+	/* Load firmware */
+
+	if ((err = bt3c_firmware_load(info)) < 0)
+		return err;
+
+	/* Timeout before it is safe to send the first HCI packet */
+
+	set_current_state(TASK_INTERRUPTIBLE);
+	schedule_timeout(HZ);
+
+	/* Register HCI device */
 	if (hci_register_dev(hdev) < 0) {
 		BT_ERR("Can't register HCI device");
 		hci_free_dev(hdev);

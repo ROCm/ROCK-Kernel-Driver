@@ -505,13 +505,13 @@ static irqreturn_t bluecard_interrupt(int irq, void *dev_inst, struct pt_regs *r
 	unsigned int iobase;
 	unsigned char reg;
 
-	if (!info) {
+	if (!info || !info->hdev) {
 		BT_ERR("Call of irq %d for unknown device", irq);
 		return IRQ_NONE;
 	}
 
 	if (!test_bit(CARD_READY, &(info->hw_state)))
-		return IRQ_NONE;
+		return IRQ_HANDLED;
 
 	iobase = info->link.io.BasePort1;
 
@@ -725,6 +725,27 @@ int bluecard_open(bluecard_info_t *info)
 	info->rx_count = 0;
 	info->rx_skb = NULL;
 
+	/* Initialize HCI device */
+	hdev = hci_alloc_dev();
+	if (!hdev) {
+		BT_ERR("Can't allocate HCI device");
+		return -ENOMEM;
+	}
+
+	info->hdev = hdev;
+
+	hdev->type = HCI_PCCARD;
+	hdev->driver_data = info;
+
+	hdev->open     = bluecard_hci_open;
+	hdev->close    = bluecard_hci_close;
+	hdev->flush    = bluecard_hci_flush;
+	hdev->send     = bluecard_hci_send_frame;
+	hdev->destruct = bluecard_hci_destruct;
+	hdev->ioctl    = bluecard_hci_ioctl;
+
+	hdev->owner = THIS_MODULE;
+
 	id = inb(iobase + 0x30);
 
 	if ((id & 0x0f) == 0x02)
@@ -776,28 +797,7 @@ int bluecard_open(bluecard_info_t *info)
 	set_current_state(TASK_INTERRUPTIBLE);
 	schedule_timeout((HZ * 5) / 4);		// or set it to 3/2
 
-
-	/* Initialize and register HCI device */
-	hdev = hci_alloc_dev();
-	if (!hdev) {
-		BT_ERR("Can't allocate HCI device");
-		return -ENOMEM;
-	}
-
-	info->hdev = hdev;
-
-	hdev->type = HCI_PCCARD;
-	hdev->driver_data = info;
-
-	hdev->open = bluecard_hci_open;
-	hdev->close = bluecard_hci_close;
-	hdev->flush = bluecard_hci_flush;
-	hdev->send = bluecard_hci_send_frame;
-	hdev->destruct = bluecard_hci_destruct;
-	hdev->ioctl = bluecard_hci_ioctl;
-
-	hdev->owner = THIS_MODULE;
-	
+	/* Register HCI device */
 	if (hci_register_dev(hdev) < 0) {
 		BT_ERR("Can't register HCI device");
 		hci_free_dev(hdev);
