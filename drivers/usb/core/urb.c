@@ -77,7 +77,7 @@ struct urb *usb_alloc_urb(int iso_packets, int mem_flags)
 
 /**
  * usb_free_urb - frees the memory used by a urb when all users of it are finished
- * @urb: pointer to the urb to free
+ * @urb: pointer to the urb to free, may be NULL
  *
  * Must be called when a user of a urb is finished with it.  When the last user
  * of the urb calls this function, the memory of the urb is freed.
@@ -93,7 +93,7 @@ void usb_free_urb(struct urb *urb)
 
 /**
  * usb_get_urb - increments the reference count of the urb
- * @urb: pointer to the urb to modify
+ * @urb: pointer to the urb to modify, may be NULL
  *
  * This must be  called whenever a urb is transferred from a device driver to a
  * host controller driver.  This allows proper reference counting to happen
@@ -398,7 +398,8 @@ int usb_submit_urb(struct urb *urb, int mem_flags)
 
 /**
  * usb_unlink_urb - abort/cancel a transfer request for an endpoint
- * @urb: pointer to urb describing a previously submitted request
+ * @urb: pointer to urb describing a previously submitted request,
+ *	may be NULL
  *
  * This routine cancels an in-progress request.  URBs complete only
  * once per submission, and may be canceled only once per submission.
@@ -454,6 +455,8 @@ int usb_submit_urb(struct urb *urb, int mem_flags)
  */
 int usb_unlink_urb(struct urb *urb)
 {
+	if (!urb)
+		return -EINVAL;
 	if (!(urb->transfer_flags & URB_ASYNC_UNLINK)) {
 		usb_kill_urb(urb);
 		return 0;
@@ -465,7 +468,8 @@ int usb_unlink_urb(struct urb *urb)
 
 /**
  * usb_kill_urb - cancel a transfer request and wait for it to finish
- * @urb: pointer to URB describing a previously submitted request
+ * @urb: pointer to URB describing a previously submitted request,
+ *	may be NULL
  *
  * This routine cancels an in-progress request.  It is guaranteed that
  * upon return all completion handlers will have finished and the URB
@@ -484,7 +488,7 @@ int usb_unlink_urb(struct urb *urb)
  */
 void usb_kill_urb(struct urb *urb)
 {
-	if (!(urb->dev && urb->dev->bus && urb->dev->bus->op))
+	if (!(urb && urb->dev && urb->dev->bus && urb->dev->bus->op))
 		return;
 	spin_lock_irq(&urb->lock);
 	++urb->reject;
