@@ -284,10 +284,10 @@ xip2_readpages(struct file *file, struct address_space *mapping,
 
 	pagevec_init(&lru_pvec, 0);
 	for (page_idx = 0; page_idx < nr_pages; page_idx++) {
-		struct page *page = list_entry (pages->prev, struct page, list);
+		struct page *page = list_entry (pages->prev, struct page, lru);
 		
 		prefetchw(&page->flags);
-		list_del (&page->list);
+		list_del (&page->lru);
 		if (!add_to_page_cache(page, mapping,
 					page->index, GFP_KERNEL)) {
 
@@ -301,6 +301,7 @@ xip2_readpages(struct file *file, struct address_space *mapping,
 			page_cache_release(page);
 		}
 	}
+	pagevec_lru_add(&lru_pvec);
 	return 0;
 }
 
