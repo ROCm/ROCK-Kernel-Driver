@@ -2444,7 +2444,7 @@ void submit_bio(int rw, struct bio *bio)
 
 	if (unlikely(block_dump)) {
 		char b[BDEVNAME_SIZE];
-		printk("%s(%d): %s block %Lu on %s\n",
+		printk(KERN_DEBUG "%s(%d): %s block %Lu on %s\n",
 			current->comm, current->pid,
 			(rw & WRITE) ? "WRITE" : "READ",
 			(unsigned long long)bio->bi_sector,
