@@ -1,7 +1,7 @@
 /*
     NetWinder Floating Point Emulator
     (c) Rebel.COM, 1998,1999
-    (c) Philip Blundell, 1999
+    (c) Philip Blundell, 1999, 2001
 
     Direct questions, comments to Scott Bambrough <scottb@netwinder.org>
 
@@ -21,14 +21,14 @@
 */
 
 #include "fpa11.h"
-#include "milieu.h"
-#include "softfloat.h"
 #include "fpopcode.h"
 #include "fpa11.inl"
 #include "fpmodule.h"
 #include "fpmodule.inl"
 
+#ifdef CONFIG_FPE_NWFPE_XP
 extern flag floatx80_is_nan(floatx80);
+#endif
 extern flag float64_is_nan(float64);
 extern flag float32_is_nan(float32);
 
@@ -41,23 +41,22 @@ static unsigned int PerformComparison(const unsigned int opcode);
 
 unsigned int EmulateCPRT(const unsigned int opcode)
 {
-	unsigned int nRc = 1;
 
 	if (opcode & 0x800000) {
-		/* This is some variant of a comparison (PerformComparison will
-		   sort out which one).  Since most of the other CPRT
-		   instructions are oddball cases of some sort or other it makes
-		   sense to pull this out into a fast path.  */
+		/* This is some variant of a comparison (PerformComparison
+		   will sort out which one).  Since most of the other CPRT
+		   instructions are oddball cases of some sort or other it
+		   makes sense to pull this out into a fast path.  */
 		return PerformComparison(opcode);
 	}
 
 	/* Hint to GCC that we'd like a jump table rather than a load of CMPs */
 	switch ((opcode & 0x700000) >> 20) {
 	case FLT_CODE >> 20:
-		nRc = PerformFLT(opcode);
+		return PerformFLT(opcode);
 		break;
 	case FIX_CODE >> 20:
-		nRc = PerformFIX(opcode);
+		return PerformFIX(opcode);
 		break;
 
 	case WFS_CODE >> 20:
@@ -67,28 +66,18 @@ unsigned int EmulateCPRT(const unsigned int opcode)
 		writeRegister(getRd(opcode), readFPSR());
 		break;
 
-#if 0		/* We currently have no use for the FPCR, so there's no point
-				   in emulating it. */
-	case WFC_CODE >> 20:
-		writeFPCR(readRegister(getRd(opcode)));
-	case RFC_CODE >> 20:
-		writeRegister(getRd(opcode), readFPCR());
-		break;
-#endif
-
 	default:
-		nRc = 0;
+		return 0;
 	}
 
-	return nRc;
+	return 1;
 }
 
 unsigned int PerformFLT(const unsigned int opcode)
 {
 	FPA11 *fpa11 = GET_FPA11();
-
-	unsigned int nRc = 1;
 	SetRoundingMode(opcode);
+	SetRoundingPrecision(opcode);
 
 	switch (opcode & MASK_ROUNDING_PRECISION) {
 	case ROUND_SINGLE:
@@ -105,24 +94,25 @@ unsigned int PerformFLT(const unsigned int opcode)
 		}
 		break;
 
+#ifdef CONFIG_FPE_NWFPE_XP
 	case ROUND_EXTENDED:
 		{
 			fpa11->fType[getFn(opcode)] = typeExtended;
 			fpa11->fpreg[getFn(opcode)].fExtended = int32_to_floatx80(readRegister(getRd(opcode)));
 		}
 		break;
+#endif
 
 	default:
-		nRc = 0;
+		return 0;
 	}
 
-	return nRc;
+	return 1;
 }
 
 unsigned int PerformFIX(const unsigned int opcode)
 {
 	FPA11 *fpa11 = GET_FPA11();
-	unsigned int nRc = 1;
 	unsigned int Fn = getFm(opcode);
 
 	SetRoundingMode(opcode);
@@ -140,39 +130,18 @@ unsigned int PerformFIX(const unsigned int opcode)
 		}
 		break;
 
+#ifdef CONFIG_FPE_NWFPE_XP
 	case typeExtended:
 		{
 			writeRegister(getRd(opcode), floatx80_to_int32(fpa11->fpreg[Fn].fExtended));
 		}
 		break;
+#endif
 
 	default:
-		nRc = 0;
+		return 0;
 	}
 
-	return nRc;
-}
-
-static unsigned int __inline__ PerformComparisonOperation(floatx80 Fn, floatx80 Fm)
-{
-	unsigned int flags = 0;
-
-	/* test for less than condition */
-	if (floatx80_lt(Fn, Fm)) {
-		flags |= CC_NEGATIVE;
-	}
-
-	/* test for equal condition */
-	if (floatx80_eq(Fn, Fm)) {
-		flags |= CC_ZERO;
-	}
-
-	/* test for greater than or equal condition */
-	if (floatx80_lt(Fm, Fn)) {
-		flags |= CC_CARRY;
-	}
-
-	writeConditionCodes(flags);
 	return 1;
 }
 
@@ -180,14 +149,13 @@ static unsigned int __inline__ PerformComparisonOperation(floatx80 Fn, floatx80 
 static unsigned int PerformComparison(const unsigned int opcode)
 {
 	FPA11 *fpa11 = GET_FPA11();
-	unsigned int Fn, Fm;
-	floatx80 rFn, rFm;
+	unsigned int Fn = getFn(opcode), Fm = getFm(opcode);
 	int e_flag = opcode & 0x400000;	/* 1 if CxFE */
 	int n_flag = opcode & 0x200000;	/* 1 if CNxx */
 	unsigned int flags = 0;
 
-	Fn = getFn(opcode);
-	Fm = getFm(opcode);
+#ifdef CONFIG_FPE_NWFPE_XP
+	floatx80 rFn, rFm;
 
 	/* Check for unordered condition and convert all operands to 80-bit
 	   format.
@@ -254,11 +222,131 @@ static unsigned int PerformComparison(const unsigned int opcode)
 		}
 	}
 
-	if (n_flag) {
+	if (n_flag)
 		rFm.high ^= 0x8000;
+
+	/* test for less than condition */
+	if (floatx80_lt(rFn, rFm))
+		flags |= CC_NEGATIVE;
+
+	/* test for equal condition */
+	if (floatx80_eq(rFn, rFm))
+		flags |= CC_ZERO;
+
+	/* test for greater than or equal condition */
+	if (floatx80_lt(rFm, rFn))
+		flags |= CC_CARRY;
+
+#else
+	if (CONSTANT_FM(opcode)) {
+		/* Fm is a constant.  Do the comparison in whatever precision
+		   Fn happens to be stored in.  */
+		if (fpa11->fType[Fn] == typeSingle) {
+			float32 rFm = getSingleConstant(Fm);
+			float32 rFn = fpa11->fpreg[Fn].fSingle;
+
+			if (float32_is_nan(rFn))
+				goto unordered;
+
+			if (n_flag)
+				rFm ^= 0x80000000;
+
+			/* test for less than condition */
+			if (float32_lt_nocheck(rFn, rFm))
+				flags |= CC_NEGATIVE;
+
+			/* test for equal condition */
+			if (float32_eq_nocheck(rFn, rFm))
+				flags |= CC_ZERO;
+
+			/* test for greater than or equal condition */
+			if (float32_lt_nocheck(rFm, rFn))
+				flags |= CC_CARRY;
+		} else {
+			float64 rFm = getDoubleConstant(Fm);
+			float64 rFn = fpa11->fpreg[Fn].fDouble;
+
+			if (float64_is_nan(rFn))
+				goto unordered;
+
+			if (n_flag)
+				rFm ^= 0x8000000000000000ULL;
+
+			/* test for less than condition */
+			if (float64_lt_nocheck(rFn, rFm))
+				flags |= CC_NEGATIVE;
+
+			/* test for equal condition */
+			if (float64_eq_nocheck(rFn, rFm))
+				flags |= CC_ZERO;
+
+			/* test for greater than or equal condition */
+			if (float64_lt_nocheck(rFm, rFn))
+				flags |= CC_CARRY;
+		}
+	} else {
+		/* Both operands are in registers.  */
+		if (fpa11->fType[Fn] == typeSingle
+		    && fpa11->fType[Fm] == typeSingle) {
+			float32 rFm = fpa11->fpreg[Fm].fSingle;
+			float32 rFn = fpa11->fpreg[Fn].fSingle;
+
+			if (float32_is_nan(rFn)
+			    || float32_is_nan(rFm))
+				goto unordered;
+
+			if (n_flag)
+				rFm ^= 0x80000000;
+
+			/* test for less than condition */
+			if (float32_lt_nocheck(rFn, rFm))
+				flags |= CC_NEGATIVE;
+
+			/* test for equal condition */
+			if (float32_eq_nocheck(rFn, rFm))
+				flags |= CC_ZERO;
+
+			/* test for greater than or equal condition */
+			if (float32_lt_nocheck(rFm, rFn))
+				flags |= CC_CARRY;
+		} else {
+			/* Promote 32-bit operand to 64 bits.  */
+			float64 rFm, rFn;
+
+			rFm = (fpa11->fType[Fm] == typeSingle) ?
+			    float32_to_float64(fpa11->fpreg[Fm].fSingle)
+			    : fpa11->fpreg[Fm].fDouble;
+
+			rFn = (fpa11->fType[Fn] == typeSingle) ?
+			    float32_to_float64(fpa11->fpreg[Fn].fSingle)
+			    : fpa11->fpreg[Fn].fDouble;
+
+			if (float64_is_nan(rFn)
+			    || float64_is_nan(rFm))
+				goto unordered;
+
+			if (n_flag)
+				rFm ^= 0x8000000000000000ULL;
+
+			/* test for less than condition */
+			if (float64_lt_nocheck(rFn, rFm))
+				flags |= CC_NEGATIVE;
+
+			/* test for equal condition */
+			if (float64_eq_nocheck(rFn, rFm))
+				flags |= CC_ZERO;
+
+			/* test for greater than or equal condition */
+			if (float64_lt_nocheck(rFm, rFn))
+				flags |= CC_CARRY;
+		}
 	}
 
-	return PerformComparisonOperation(rFn, rFm);
+#endif
+
+	writeConditionCodes(flags);
+
+	return 1;
 
       unordered:
 	/* ?? The FPA data sheet is pretty vague about this, in particular

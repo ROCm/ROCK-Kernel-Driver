@@ -42,11 +42,17 @@
 #include "fpa11.inl"
 
 /* kernel symbols required for signal handling */
+#ifdef CONFIG_FPE_NWFPE_XP
+#define NWFPE_BITS "extended"
+#else
+#define NWFPE_BITS "double"
+#endif
+
 #ifdef MODULE
 void fp_send_sig(unsigned long sig, struct task_struct *p, int priv);
 #if LINUX_VERSION_CODE > 0x20115
 MODULE_AUTHOR("Scott Bambrough <scottb@rebel.com>");
-MODULE_DESCRIPTION("NWFPE floating point emulator");
+MODULE_DESCRIPTION("NWFPE floating point emulator (" NWFPE_BITS " precision)");
 #endif
 
 #else
@@ -85,8 +91,8 @@ static int __init fpe_init(void)
 		return 0;
 
 	/* Display title, version and copyright information. */
-	printk(KERN_WARNING "NetWinder Floating Point Emulator V0.95 "
-			    "(c) 1998-1999 Rebel.com\n");
+	printk(KERN_WARNING "NetWinder Floating Point Emulator V0.97 ("
+	       NWFPE_BITS " precision)\n");
 
 	/* Save pointer to the old FP handler and then patch ourselves in */
 	orig_fp_enter = kern_fp_enter;

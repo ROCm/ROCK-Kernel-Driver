@@ -37,6 +37,7 @@ register unsigned int *user_registers asm("sl");
 
 /* includes */
 #include "fpsr.h"		/* FP control and status register definitions */
+#include "milieu.h"
 #include "softfloat.h"
 
 #define		typeNone		0x00
@@ -48,9 +49,13 @@ register unsigned int *user_registers asm("sl");
  * This must be no more and no less than 12 bytes.
  */
 typedef union tagFPREG {
-	floatx80 fExtended;
-	float64 fDouble;
 	float32 fSingle;
+	float64 fDouble;
+#ifdef CONFIG_FPE_NWFPE_XP
+	floatx80 fExtended;
+#else
+	int padding[3];
+#endif
 } FPREG;
 
 /*

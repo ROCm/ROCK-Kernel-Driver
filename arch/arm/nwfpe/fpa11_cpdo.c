@@ -1,6 +1,7 @@
 /*
     NetWinder Floating Point Emulator
     (c) Rebel.COM, 1998,1999
+    (c) Philip Blundell, 2001
 
     Direct questions, comments to Scott Bambrough <scottb@netwinder.org>
 
@@ -66,9 +67,11 @@ unsigned int EmulateCPDO(const unsigned int opcode)
 	case typeDouble:
 		nRc = DoubleCPDO(opcode, rFd);
 		break;
+#ifdef CONFIG_FPE_NWFPE_XP
 	case typeExtended:
 		nRc = ExtendedCPDO(opcode, rFd);
 		break;
+#endif
 	default:
 		nRc = 0;
 	}
@@ -83,6 +86,7 @@ unsigned int EmulateCPDO(const unsigned int opcode)
 
 		fpa11->fType[getFd(opcode)] = nDest;
 
+#ifdef CONFIG_FPE_NWFPE_XP
 		if (nDest != nType) {
 			switch (nDest) {
 			case typeSingle:
@@ -113,6 +117,14 @@ unsigned int EmulateCPDO(const unsigned int opcode)
 				break;
 			}
 		}
+#else
+		if (nDest != nType) {
+			if (nDest == typeSingle)
+				rFd->fSingle = float64_to_float32(rFd->fDouble);
+			else
+				rFd->fDouble = float32_to_float64(rFd->fSingle);
+		}
+#endif
 	}
 
 	return nRc;

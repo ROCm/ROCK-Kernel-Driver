@@ -26,6 +26,7 @@
 #include "fpmodule.h"
 #include "fpmodule.inl"
 
+#ifdef CONFIG_FPE_NWFPE_XP
 const floatx80 floatx80Constant[] = {
 	{0x0000, 0x0000000000000000ULL},	/* extended 0.0 */
 	{0x3fff, 0x8000000000000000ULL},	/* extended 1.0 */
@@ -36,6 +37,7 @@ const floatx80 floatx80Constant[] = {
 	{0x3ffe, 0x8000000000000000ULL},	/* extended 0.5 */
 	{0x4002, 0xa000000000000000ULL}		/* extended 10.0 */
 };
+#endif
 
 const float64 float64Constant[] = {
 	0x0000000000000000ULL,	/* double 0.0 */

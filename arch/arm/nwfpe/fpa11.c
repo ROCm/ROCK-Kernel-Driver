@@ -1,6 +1,7 @@
 /*
     NetWinder Floating Point Emulator
     (c) Rebel.COM, 1998,1999
+    (c) Philip Blundell, 2001
 
     Direct questions, comments to Scott Bambrough <scottb@netwinder.org>
 
@@ -73,6 +74,7 @@ void SetRoundingMode(const unsigned int opcode)
 
 void SetRoundingPrecision(const unsigned int opcode)
 {
+#ifdef CONFIG_FPE_NWFPE_XP
 	switch (opcode & MASK_ROUNDING_PRECISION) {
 	case ROUND_SINGLE:
 		floatx80_rounding_precision = 32;
@@ -89,6 +91,7 @@ void SetRoundingPrecision(const unsigned int opcode)
 	default:
 		floatx80_rounding_precision = 80;
 	}
+#endif
 }
 
 void nwfpe_init(union fp_state *fp)

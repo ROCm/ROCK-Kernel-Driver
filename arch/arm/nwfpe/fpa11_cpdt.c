@@ -1,7 +1,7 @@
 /*
     NetWinder Floating Point Emulator
     (c) Rebel.com, 1998-1999
-    (c) Philip Blundell, 1998
+    (c) Philip Blundell, 1998, 2001
 
     Direct questions, comments to Scott Bambrough <scottb@netwinder.org>
 
@@ -45,6 +45,7 @@ static inline void loadDouble(const unsigned int Fn, const unsigned int *pMem)
 	get_user(p[1], &pMem[0]);	/* sign & exponent */
 }
 
+#ifdef CONFIG_FPE_NWFPE_XP
 static inline void loadExtended(const unsigned int Fn, const unsigned int *pMem)
 {
 	FPA11 *fpa11 = GET_FPA11();
@@ -55,6 +56,7 @@ static inline void loadExtended(const unsigned int Fn, const unsigned int *pMem)
 	get_user(p[1], &pMem[2]);	/* ls bits */
 	get_user(p[2], &pMem[1]);	/* ms bits */
 }
+#endif
 
 static inline void loadMultiple(const unsigned int Fn, const unsigned int *pMem)
 {
@@ -76,6 +78,7 @@ static inline void loadMultiple(const unsigned int Fn, const unsigned int *pMem)
 		}
 		break;
 
+#ifdef CONFIG_FPE_NWFPE_XP
 	case typeExtended:
 		{
 			get_user(p[1], &pMem[2]);
@@ -83,6 +86,7 @@ static inline void loadMultiple(const unsigned int Fn, const unsigned int *pMem)
 			p[0] = (x & 0x80003fff);
 		}
 		break;
+#endif
 	}
 }
 
@@ -99,9 +103,11 @@ static inline void storeSingle(const unsigned int Fn, unsigned int *pMem)
 		val.f = float64_to_float32(fpa11->fpreg[Fn].fDouble);
 		break;
 
+#ifdef CONFIG_FPE_NWFPE_XP
 	case typeExtended:
 		val.f = floatx80_to_float32(fpa11->fpreg[Fn].fExtended);
 		break;
+#endif
 
 	default:
 		val.f = fpa11->fpreg[Fn].fSingle;
@@ -123,9 +129,11 @@ static inline void storeDouble(const unsigned int Fn, unsigned int *pMem)
 		val.f = float32_to_float64(fpa11->fpreg[Fn].fSingle);
 		break;
 
+#ifdef CONFIG_FPE_NWFPE_XP
 	case typeExtended:
 		val.f = floatx80_to_float64(fpa11->fpreg[Fn].fExtended);
 		break;
+#endif
 
 	default:
 		val.f = fpa11->fpreg[Fn].fDouble;
@@ -135,6 +143,7 @@ static inline void storeDouble(const unsigned int Fn, unsigned int *pMem)
 	put_user(val.i[0], &pMem[1]);	/* lsw */
 }
 
+#ifdef CONFIG_FPE_NWFPE_XP
 static inline void storeExtended(const unsigned int Fn, unsigned int *pMem)
 {
 	FPA11 *fpa11 = GET_FPA11();
@@ -160,6 +169,7 @@ static inline void storeExtended(const unsigned int Fn, unsigned int *pMem)
 	put_user(val.i[1], &pMem[2]);
 	put_user(val.i[2], &pMem[1]);	/* msw */
 }
+#endif
 
 static inline void storeMultiple(const unsigned int Fn, unsigned int *pMem)
 {
@@ -179,6 +189,7 @@ static inline void storeMultiple(const unsigned int Fn, unsigned int *pMem)
 		}
 		break;
 
+#ifdef CONFIG_FPE_NWFPE_XP
 	case typeExtended:
 		{
 			put_user(p[2], &pMem[1]);	/* msw */
@@ -186,6 +197,7 @@ static inline void storeMultiple(const unsigned int Fn, unsigned int *pMem)
 			put_user((p[0] & 0x80003fff) | (nType << 14), &pMem[0]);
 		}
 		break;
+#endif
 	}
 }
 
@@ -218,9 +230,11 @@ unsigned int PerformLDF(const unsigned int opcode)
 	case TRANSFER_DOUBLE:
 		loadDouble(getFd(opcode), pAddress);
 		break;
+#ifdef CONFIG_FPE_NWFPE_XP
 	case TRANSFER_EXTENDED:
 		loadExtended(getFd(opcode), pAddress);
 		break;
+#endif
 	default:
 		nRc = 0;
 	}
@@ -261,9 +275,11 @@ unsigned int PerformSTF(const unsigned int opcode)
 	case TRANSFER_DOUBLE:
 		storeDouble(getFd(opcode), pAddress);
 		break;
+#ifdef CONFIG_FPE_NWFPE_XP
 	case TRANSFER_EXTENDED:
 		storeExtended(getFd(opcode), pAddress);
 		break;
+#endif
 	default:
 		nRc = 0;
 	}

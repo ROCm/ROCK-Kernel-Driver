@@ -10,7 +10,11 @@ obj-$(CONFIG_FPE_NWFPE)	+= nwfpe.o
 
 nwfpe-objs		:= fpa11.o fpa11_cpdo.o fpa11_cpdt.o fpa11_cprt.o \
 			   fpmodule.o fpopcode.o softfloat.o \
-			   single_cpdo.o double_cpdo.o extended_cpdo.o
+			   single_cpdo.o double_cpdo.o
+
+ifeq ($(CONFIG_FPE_NWFPE_XP),y)
+nwfpe-objs		+= extended_cpdo.o
+endif
 
 ifeq ($(CONFIG_CPU_26),y)
 nwfpe-objs		+= entry26.o
