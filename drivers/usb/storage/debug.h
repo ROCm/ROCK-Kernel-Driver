@@ -4,7 +4,7 @@
  * $Id: debug.h,v 1.6 2001/01/12 23:51:04 mdharm Exp $
  *
  * Current development and maintenance by:
- *   (c) 1999, 2000 Matthew Dharm (mdharm-usb@one-eyed-alien.net)
+ *   (c) 1999-2002 Matthew Dharm (mdharm-usb@one-eyed-alien.net)
  *
  * Initial work by:
  *   (c) 1999 Michael Gee (michael@linuxspecific.com)

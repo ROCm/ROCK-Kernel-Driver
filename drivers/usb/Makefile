@@ -6,10 +6,10 @@
 mod-subdirs	:= serial
 
 obj-$(CONFIG_USB)		+= core/
-
 obj-$(CONFIG_USB_EHCI_HCD)	+= host/
 obj-$(CONFIG_USB_OHCI_HCD)	+= host/
 obj-$(CONFIG_USB_OHCI)		+= host/
+obj-$(CONFIG_USB_SL811HS)	+= host/
 obj-$(CONFIG_USB_UHCI_ALT)	+= host/
 obj-$(CONFIG_USB_UHCI_HCD_ALT)	+= host/
 obj-$(CONFIG_USB_UHCI_HCD)	+= host/

@@ -4,7 +4,7 @@
  * $Id: scsiglue.c,v 1.26 2002/04/22 03:39:43 mdharm Exp $
  *
  * Current development and maintenance by:
- *   (c) 1999, 2000 Matthew Dharm (mdharm-usb@one-eyed-alien.net)
+ *   (c) 1999-2002 Matthew Dharm (mdharm-usb@one-eyed-alien.net)
  *
  * Developed with the assistance of:
  *   (c) 2000 David L. Brown, Jr. (usb-storage@davidb.org)
@@ -56,9 +56,6 @@
  */
 
 #define US_ACT_COMMAND		1
-#define US_ACT_DEVICE_RESET	2
-#define US_ACT_BUS_RESET	3
-#define US_ACT_HOST_RESET	4
 #define US_ACT_EXIT		5
 
 /***********************************************************************

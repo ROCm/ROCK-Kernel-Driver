@@ -89,3 +89,13 @@ CONFIG_USB_OHCI
   inserted in and removed from the running kernel whenever you want).
   The module will be called usb-ohci.o. If you want to compile it
   as a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_SL811HS
+  Say Y here if you have a SL811HS USB host controller in your system.
+
+  If you do not know what this is, please say N.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called hc_sl811.o. If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.

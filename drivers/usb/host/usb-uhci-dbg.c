@@ -5,7 +5,7 @@
     Georg Acher      +    Deti Fliegl    +    Thomas Sailer
     georg@acher.org      deti@fliegl.de   sailer@ife.ee.ethz.ch
   
-    $Id: usb-uhci-dbg.c,v 1.1 2002/05/14 20:36:57 acher Exp $
+    $Id: usb-uhci-dbg.c,v 1.2 2002/05/21 21:40:16 acher Exp $
 */
 
 #ifdef DEBUG
@@ -105,7 +105,7 @@ static void __attribute__((__unused__)) uhci_show_sc (int port, unsigned short s
 
 void uhci_show_status (struct uhci_hcd *uhci)
 {
-	unsigned int io_addr = (int)uhci->hcd.regs;
+	unsigned long io_addr = (unsigned long)uhci->hcd.regs;
 	unsigned short usbcmd, usbstat, usbint, usbfrnum;
 	unsigned int flbaseadd;
 	unsigned char sof;
