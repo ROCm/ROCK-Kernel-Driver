@@ -549,12 +549,15 @@ nfsd_sync_dir(struct dentry *dp)
  * Obtain the readahead parameters for the file
  * specified by (dev, ino).
  */
+static spinlock_t ra_lock = SPIN_LOCK_UNLOCKED;
+
 static inline struct raparms *
 nfsd_get_raparms(kdev_t dev, ino_t ino)
 {
 	struct raparms	*ra, **rap, **frap = NULL;
 	int depth = 0;
-	
+
+	spin_lock(&ra_lock);
 	for (rap = &raparm_cache; (ra = *rap); rap = &ra->p_next) {
 		if (ra->p_ino == ino && kdev_same(ra->p_dev, dev))
 			goto found;
@@ -563,8 +566,10 @@ nfsd_get_raparms(kdev_t dev, ino_t ino)
 			frap = rap;
 	}
 	depth = nfsdstats.ra_size*11/10;
-	if (!frap)
+	if (!frap) {	
+		spin_unlock(&ra_lock);
 		return NULL;
+	}
 	rap = frap;
 	ra = *frap;
 	ra->p_dev = dev;
@@ -582,6 +587,7 @@ found:
 	}
 	ra->p_count++;
 	nfsdstats.ra_depth[depth*10/nfsdstats.ra_size]++;
+	spin_unlock(&ra_lock);
 	return ra;
 }
 
