@@ -436,7 +436,8 @@ include/linux/modversions.h: scripts/fixdep prepare FORCE
 	@( echo "#ifndef _LINUX_MODVERSIONS_H";\
 	   echo "#define _LINUX_MODVERSIONS_H"; \
 	   echo "#include <linux/modsetver.h>"; \
-	   for f in `cd .tmp_export-objs; find modules -name SCCS -prune -o -name BitKeeper -prune -o -name \*.ver -print | sort`; do \
+	   cd .tmp_export-objs >/dev/null; \
+	   for f in `find modules -name \*.ver -print | sort`; do \
 	     echo "#include <linux/$${f}>"; \
 	   done; \
 	   echo "#endif"; \
