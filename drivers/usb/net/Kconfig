@@ -73,11 +73,12 @@ config USB_PEGASUS
 	select MII
 	---help---
 	  Say Y here if you know you have Pegasus or Pegasus-II based adapter.
-	  If in doubt then look at linux/drivers/usb/pegasus.h for the complete
-	  list of supported devices.
+	  If in doubt then look at <file:drivers/usb/net/pegasus.h> for the
+	  complete list of supported devices.
+
 	  If your particular adapter is not in the list and you are _sure_ it
-	  is Pegasus or Pegasus II based then send me (petkan@users.sourceforge.net)
-	  vendor and device IDs.
+	  is Pegasus or Pegasus II based then send me
+	  <petkan@users.sourceforge.net> vendor and device IDs.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called pegasus.
@@ -87,8 +88,8 @@ config USB_RTL8150
 	depends on USB && NET && EXPERIMENTAL
 	help
 	  Say Y here if you have RTL8150 based usb-ethernet adapter.
-	  Send me (petkan@users.sourceforge.net) any comments you may have.
-	  You can also check for updates at http://pegasus2.sourceforge.net/
+	  Send me <petkan@users.sourceforge.net> any comments you may have.
+	  You can also check for updates at <http://pegasus2.sourceforge.net/>.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called rtl8150.
