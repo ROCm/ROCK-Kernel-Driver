@@ -52,7 +52,6 @@
 #include <pcmcia/cs_types.h>
 #include <pcmcia/cs.h>
 #include <pcmcia/ss.h>
-#include <pcmcia/bus_ops.h>
 
 #include <asm/hardware.h>
 #include <asm/io.h>
@@ -567,31 +566,6 @@ sa1100_pcmcia_set_socket(unsigned int sock, socket_state_t *state)
 }  /* sa1100_pcmcia_set_socket() */
 
 
-/* sa1100_pcmcia_get_io_map()
- * ^^^^^^^^^^^^^^^^^^^^^^^^^^
- * Implements the get_io_map() operation for the in-kernel PCMCIA
- * service (formerly SS_GetIOMap in Card Services). Just returns an
- * I/O map descriptor which was assigned earlier by a set_io_map().
- *
- * Returns: 0 on success, -1 if the map index was out of range
- */
-static int
-sa1100_pcmcia_get_io_map(unsigned int sock, struct pccard_io_map *map)
-{
-  struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
-  int ret = -1;
-
-  DEBUG(2, "%s() for sock %u\n", __FUNCTION__, sock);
-
-  if (map->map < MAX_IO_WIN) {
-    *map = skt->io_map[map->map];
-    ret = 0;
-  }
-
-  return ret;
-}
-
-
 /* sa1100_pcmcia_set_io_map()
  * ^^^^^^^^^^^^^^^^^^^^^^^^^^
  * Implements the set_io_map() operation for the in-kernel PCMCIA
@@ -644,32 +618,6 @@ sa1100_pcmcia_set_io_map(unsigned int sock, struct pccard_io_map *map)
 
   return 0;
 }  /* sa1100_pcmcia_set_io_map() */
-
-
-/* sa1100_pcmcia_get_mem_map()
- * ^^^^^^^^^^^^^^^^^^^^^^^^^^^
- * Implements the get_mem_map() operation for the in-kernel PCMCIA
- * service (formerly SS_GetMemMap in Card Services). Just returns a
- *  memory map descriptor which was assigned earlier by a
- *  set_mem_map() request.
- *
- * Returns: 0 on success, -1 if the map index was out of range
- */
-static int
-sa1100_pcmcia_get_mem_map(unsigned int sock, struct pccard_mem_map *map)
-{
-  struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
-  int ret = -1;
-
-  DEBUG(2, "%s() for sock %u\n", __FUNCTION__, sock);
-
-  if (map->map < MAX_WIN) {
-    *map = skt->pc_mem_map[map->map];
-    ret = 0;
-  }
-
-  return ret;
-}
 
 
 /* sa1100_pcmcia_set_mem_map()
@@ -841,9 +789,7 @@ static struct pccard_operations sa1100_pcmcia_operations = {
   .get_status		= sa1100_pcmcia_get_status,
   .get_socket		= sa1100_pcmcia_get_socket,
   .set_socket		= sa1100_pcmcia_set_socket,
-  .get_io_map		= sa1100_pcmcia_get_io_map,
   .set_io_map		= sa1100_pcmcia_set_io_map,
-  .get_mem_map		= sa1100_pcmcia_get_mem_map,
   .set_mem_map		= sa1100_pcmcia_set_mem_map,
 #ifdef CONFIG_PROC_FS
   .proc_setup		= sa1100_pcmcia_proc_setup

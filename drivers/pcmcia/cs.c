@@ -59,7 +59,6 @@
 #include <pcmcia/bulkmem.h>
 #include <pcmcia/cistpl.h>
 #include <pcmcia/cisreg.h>
-#include <pcmcia/bus_ops.h>
 #include "cs_internal.h"
 
 #ifdef CONFIG_PCI
@@ -622,8 +621,10 @@ static void unreset_socket(socket_info_t *s)
 		send_event(s, CS_EVENT_PM_RESUME, CS_EVENT_PRI_LOW);
 	} else if (s->state & SOCKET_SETUP_PENDING) {
 #ifdef CONFIG_CARDBUS
-	    if (s->state & SOCKET_CARDBUS)
+	    if (s->state & SOCKET_CARDBUS) {
 		cb_alloc(s);
+		s->state |= SOCKET_CARDBUS_CONFIG;
+	    }
 #endif
 	    send_event(s, CS_EVENT_CARD_INSERTION, CS_EVENT_PRI_LOW);
 	    s->state &= ~SOCKET_SETUP_PENDING;
@@ -1077,7 +1078,7 @@ int pcmcia_get_configuration_info(client_handle_t handle,
 	config->Vcc = s->socket.Vcc;
 	config->Vpp1 = config->Vpp2 = s->socket.Vpp;
 	config->Option = s->cap.cb_dev->subordinate->number;
-	if (s->cb_config) {
+	if (s->state & SOCKET_CARDBUS_CONFIG) {
 	    config->Attributes = CONF_VALID_CLIENT;
 	    config->IntType = INT_CARDBUS;
 	    config->AssignedIRQ = s->irq.AssignedIRQ;
@@ -1473,7 +1474,6 @@ int pcmcia_register_client(client_handle_t *handle, client_reg_t *req)
     client->event_handler = req->event_handler;
     client->event_callback_args = req->event_callback_args;
     client->event_callback_args.client_handle = client;
-    client->event_callback_args.bus = s->cap.bus;
 
     if (s->state & SOCKET_CARDBUS)
 	client->state |= CLIENT_CARDBUS;
@@ -1522,11 +1522,8 @@ int pcmcia_release_configuration(client_handle_t handle)
     s = SOCKET(handle);
     
 #ifdef CONFIG_CARDBUS
-    if (handle->state & CLIENT_CARDBUS) {
-	cb_disable(s);
-	s->lock_count = 0;
+    if (handle->state & CLIENT_CARDBUS)
 	return CS_SUCCESS;
-    }
 #endif
     
     if (!(handle->state & CLIENT_STALE)) {
@@ -1573,9 +1570,8 @@ int pcmcia_release_io(client_handle_t handle, io_req_t *req)
     s = SOCKET(handle);
     
 #ifdef CONFIG_CARDBUS
-    if (handle->state & CLIENT_CARDBUS) {
+    if (handle->state & CLIENT_CARDBUS)
 	return CS_SUCCESS;
-    }
 #endif
     
     if (!(handle->state & CLIENT_STALE)) {
@@ -1622,10 +1618,10 @@ int pcmcia_release_irq(client_handle_t handle, irq_req_t *req)
     }
     
     if (req->Attributes & IRQ_HANDLE_PRESENT) {
-	bus_free_irq(s->cap.bus, req->AssignedIRQ, req->Instance);
+	free_irq(req->AssignedIRQ, req->Instance);
     }
 
-#ifdef CONFIG_ISA
+#ifdef CONFIG_PCMCIA_PROBE
     if (req->AssignedIRQ != s->cap.pci_irq)
 	undo_irq(req->Attributes, req->AssignedIRQ);
 #endif
@@ -1678,16 +1674,8 @@ int pcmcia_request_configuration(client_handle_t handle,
 	return CS_NO_CARD;
     
 #ifdef CONFIG_CARDBUS
-    if (handle->state & CLIENT_CARDBUS) {
-	if (!(req->IntType & INT_CARDBUS))
-	    return CS_UNSUPPORTED_MODE;
-	if (s->lock_count != 0)
-	    return CS_CONFIGURATION_LOCKED;
-	cb_enable(s);
-	handle->state |= CLIENT_CONFIG_LOCKED;
-	s->lock_count++;
-	return CS_SUCCESS;
-    }
+    if (handle->state & CLIENT_CARDBUS)
+	return CS_UNSUPPORTED_MODE;
 #endif
     
     if (req->IntType & INT_CARDBUS)
@@ -1887,7 +1875,7 @@ int pcmcia_request_irq(client_handle_t handle, irq_req_t *req)
     if (!s->cap.irq_mask) {
 	irq = s->cap.pci_irq;
 	ret = (irq) ? 0 : CS_IN_USE;
-#ifdef CONFIG_ISA
+#ifdef CONFIG_PCMCIA_PROBE
     } else if (s->irq.AssignedIRQ != 0) {
 	/* If the interrupt is already assigned, it must match */
 	irq = s->irq.AssignedIRQ;
@@ -1917,7 +1905,7 @@ int pcmcia_request_irq(client_handle_t handle, irq_req_t *req)
     if (ret != 0) return ret;
 
     if (req->Attributes & IRQ_HANDLE_PRESENT) {
-	if (bus_request_irq(s->cap.bus, irq, req->Handler,
+	if (request_irq(irq, req->Handler,
 			    ((req->Attributes & IRQ_TYPE_DYNAMIC_SHARING) || 
 			     (s->functions > 1) ||
 			     (irq == s->cap.pci_irq)) ? SA_SHIRQ : 0,
