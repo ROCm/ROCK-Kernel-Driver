@@ -771,7 +771,7 @@ static int b44_rx(struct b44 *bp, int budget)
 
 static int b44_poll(struct net_device *netdev, int *budget)
 {
-	struct b44 *bp = netdev->priv;
+	struct b44 *bp = netdev_priv(netdev);
 	int done;
 
 	spin_lock_irq(&bp->lock);
@@ -821,7 +821,7 @@ static int b44_poll(struct net_device *netdev, int *budget)
 static irqreturn_t b44_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_id;
-	struct b44 *bp = dev->priv;
+	struct b44 *bp = netdev_priv(dev);
 	unsigned long flags;
 	u32 istat, imask;
 	int handled = 0;
@@ -858,7 +858,7 @@ static irqreturn_t b44_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 static void b44_tx_timeout(struct net_device *dev)
 {
-	struct b44 *bp = dev->priv;
+	struct b44 *bp = netdev_priv(dev);
 
 	printk(KERN_ERR PFX "%s: transmit timed out, resetting\n",
 	       dev->name);
@@ -878,7 +878,7 @@ static void b44_tx_timeout(struct net_device *dev)
 
 static int b44_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct b44 *bp = dev->priv;
+	struct b44 *bp = netdev_priv(dev);
 	dma_addr_t mapping;
 	u32 len, entry, ctrl;
 
@@ -932,7 +932,7 @@ static int b44_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 static int b44_change_mtu(struct net_device *dev, int new_mtu)
 {
-	struct b44 *bp = dev->priv;
+	struct b44 *bp = netdev_priv(dev);
 
 	if (new_mtu < B44_MIN_MTU || new_mtu > B44_MAX_MTU)
 		return -EINVAL;
@@ -1161,7 +1161,7 @@ static void __b44_set_mac_addr(struct b44 *bp)
 
 static int b44_set_mac_addr(struct net_device *dev, void *p)
 {
-	struct b44 *bp = dev->priv;
+	struct b44 *bp = netdev_priv(dev);
 	struct sockaddr *addr = p;
 
 	if (netif_running(dev))
@@ -1216,7 +1216,7 @@ static void b44_init_hw(struct b44 *bp)
 
 static int b44_open(struct net_device *dev)
 {
-	struct b44 *bp = dev->priv;
+	struct b44 *bp = netdev_priv(dev);
 	int err;
 
 	err = b44_alloc_consistent(bp);
@@ -1264,7 +1264,7 @@ err_out_free:
 
 static int b44_close(struct net_device *dev)
 {
-	struct b44 *bp = dev->priv;
+	struct b44 *bp = netdev_priv(dev);
 
 	netif_stop_queue(dev);
 
@@ -1291,7 +1291,7 @@ static int b44_close(struct net_device *dev)
 
 static struct net_device_stats *b44_get_stats(struct net_device *dev)
 {
-	struct b44 *bp = dev->priv;
+	struct b44 *bp = netdev_priv(dev);
 	struct net_device_stats *nstat = &bp->stats;
 	struct b44_hw_stats *hwstat = &bp->hw_stats;
 
@@ -1342,7 +1342,7 @@ static void __b44_load_mcast(struct b44 *bp, struct net_device *dev)
 
 static void __b44_set_rx_mode(struct net_device *dev)
 {
-	struct b44 *bp = dev->priv;
+	struct b44 *bp = netdev_priv(dev);
 	u32 val;
 
 	val = br32(B44_RXCONFIG);
@@ -1366,7 +1366,7 @@ static void __b44_set_rx_mode(struct net_device *dev)
 
 static void b44_set_rx_mode(struct net_device *dev)
 {
-	struct b44 *bp = dev->priv;
+	struct b44 *bp = netdev_priv(dev);
 
 	spin_lock_irq(&bp->lock);
 	__b44_set_rx_mode(dev);
@@ -1604,7 +1604,7 @@ static struct ethtool_ops b44_ethtool_ops = {
 static int b44_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	struct mii_ioctl_data __user *data = (struct mii_ioctl_data __user *)&ifr->ifr_data;
-	struct b44 *bp = dev->priv;
+	struct b44 *bp = netdev_priv(dev);
 	int err;
 
 	switch (cmd) {
@@ -1747,7 +1747,7 @@ static int __devinit b44_init_one(struct pci_dev *pdev,
 	/* No interesting netdevice features in this card... */
 	dev->features |= 0;
 
-	bp = dev->priv;
+	bp = netdev_priv(dev);
 	bp->pdev = pdev;
 	bp->dev = dev;
 	if (b44_debug >= 0)
@@ -1835,8 +1835,10 @@ static void __devexit b44_remove_one(struct pci_dev *pdev)
 	struct net_device *dev = pci_get_drvdata(pdev);
 
 	if (dev) {
+		struct b44 *bp = netdev_priv(dev);
+
 		unregister_netdev(dev);
-		iounmap((void *) ((struct b44 *)(dev->priv))->regs);
+		iounmap((void *) bp->regs);
 		free_netdev(dev);
 		pci_release_regions(pdev);
 		pci_disable_device(pdev);
