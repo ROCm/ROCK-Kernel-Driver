@@ -1129,21 +1129,40 @@ static void print_eth(unsigned char *add, char *str)
 	printk(" %02X%02X, %s\n", add[12], add[13], str);
 }
 
-int __init i82596_probe(struct net_device *dev)
+static int io = 0x300;
+static int irq = 10;
+
+struct net_device * __init i82596_probe(int unit)
 {
+	struct net_device *dev;
 	int i;
 	struct i596_private *lp;
 	char eth_addr[8];
 	static int probed;
+	int err;
 
 	if (probed)
-		return -ENODEV;
+		return ERR_PTR(-ENODEV);
 	probed++;
+
+	dev = alloc_etherdev(0);
+	if (!dev)
+		return ERR_PTR(-ENOMEM);
+
+	if (unit >= 0) {
+		sprintf(dev->name, "eth%d", unit);
+		netdev_boot_setup_check(dev);
+	} else {
+		dev->base_addr = io;
+		dev->irq = irq;
+	}
+
 #ifdef ENABLE_MVME16x_NET
 	if (MACH_IS_MVME16x) {
 		if (mvme16x_config & MVME16x_CONFIG_NO_ETHERNET) {
 			printk(KERN_NOTICE "Ethernet probe disabled - chip not present\n");
-			return -ENODEV;
+			err = -ENODEV;
+			goto out;
 		}
 		memcpy(eth_addr, (void *) 0xfffc1f2c, 6);	/* YUCK! Get addr from NOVRAM */
 		dev->base_addr = MVME_I596_BASE;
@@ -1174,7 +1193,8 @@ int __init i82596_probe(struct net_device *dev)
 
 		if (!request_region(ioaddr, I596_TOTAL_SIZE, dev->name)) {
 			printk(KERN_ERR "82596: IO address 0x%04x in use\n", ioaddr);
-			return -EBUSY;
+			err = -EBUSY;
+			goto out;
 		}
 
 		for (i = 0; i < 8; i++) {
@@ -1190,8 +1210,8 @@ int __init i82596_probe(struct net_device *dev)
 
 		if ((checksum % 0x100) || 
 		    (memcmp(eth_addr, "\x00\x00\x49", 3) != 0)) {
-			release_region(ioaddr, I596_TOTAL_SIZE);
-			return -ENODEV;
+			err = -ENODEV;
+			goto out1;
 		}
 
 		dev->base_addr = ioaddr;
@@ -1200,13 +1220,10 @@ int __init i82596_probe(struct net_device *dev)
 #endif
 	dev->mem_start = (int)__get_free_pages(GFP_ATOMIC, 0);
 	if (!dev->mem_start) {
-#ifdef ENABLE_APRICOT
-		release_region(dev->base_addr, I596_TOTAL_SIZE);
-#endif
-		return -ENOMEM;
+		err = -ENOMEM;
+		goto out1;
 	}
 
-	ether_setup(dev);
 	DEB(DEB_PROBE,printk(KERN_INFO "%s: 82596 at %#3lx,", dev->name, dev->base_addr));
 
 	for (i = 0; i < 6; i++)
@@ -1244,7 +1261,26 @@ int __init i82596_probe(struct net_device *dev)
 	lp->scb.rfd = I596_NULL;
 	lp->lock = SPIN_LOCK_UNLOCKED;
 
-	return 0;
+	err = register_netdev(dev);
+	if (err)
+		goto out2;
+	return dev;
+out2:
+#ifdef __mc68000__
+	/* XXX This assumes default cache mode to be IOMAP_FULL_CACHING,
+	 * XXX which may be invalid (CONFIG_060_WRITETHROUGH)
+	 */
+	kernel_set_cachemode((void *)(dev->mem_start), 4096,
+			IOMAP_FULL_CACHING);
+#endif
+	free_page ((u32)(dev->mem_start));
+out1:
+#ifdef ENABLE_APRICOT
+	release_region(dev->base_addr, I596_TOTAL_SIZE);
+#endif
+out:
+	free_netdev(dev);
+	return ERR_PTR(err);
 }
 
 static irqreturn_t i596_interrupt(int irq, void *dev_id, struct pt_regs *regs)
@@ -1532,11 +1568,9 @@ static void set_multicast_list(struct net_device *dev)
 }
 
 #ifdef MODULE
-static struct net_device dev_82596 = { .init = i82596_probe };
+static struct net_device *dev_82596;
 
 #ifdef ENABLE_APRICOT
-static int io = 0x300;
-static int irq = 10;
 MODULE_PARM(irq, "i");
 MODULE_PARM_DESC(irq, "Apricot IRQ number");
 #endif
@@ -1547,34 +1581,31 @@ static int debug = -1;
 
 int init_module(void)
 {
-#ifdef ENABLE_APRICOT
-	dev_82596.base_addr = io;
-	dev_82596.irq = irq;
-#endif
 	if (debug >= 0)
 		i596_debug = debug;
-	if (register_netdev(&dev_82596) != 0)
-		return -EIO;
+	dev_82596 = i82596_probe(-1);
+	if (IS_ERR(dev_82596))
+		return PTR_ERR(dev_82596);
 	return 0;
 }
 
 void cleanup_module(void)
 {
-	unregister_netdev(&dev_82596);
+	unregister_netdev(dev_82596);
 #ifdef __mc68000__
 	/* XXX This assumes default cache mode to be IOMAP_FULL_CACHING,
 	 * XXX which may be invalid (CONFIG_060_WRITETHROUGH)
 	 */
 
-	kernel_set_cachemode((void *)(dev_82596.mem_start), 4096,
+	kernel_set_cachemode((void *)(dev_82596->mem_start), 4096,
 			IOMAP_FULL_CACHING);
 #endif
-	free_page ((u32)(dev_82596.mem_start));
-	dev_82596.priv = NULL;
+	free_page ((u32)(dev_82596->mem_start));
 #ifdef ENABLE_APRICOT
 	/* If we don't do this, we can't re-insmod it later. */
-	release_region(dev_82596.base_addr, I596_TOTAL_SIZE);
+	release_region(dev_82596->base_addr, I596_TOTAL_SIZE);
 #endif
+	free_netdev(dev_82596);
 }
 
 #endif				/* MODULE */

@@ -55,7 +55,7 @@ extern int at1500_probe(struct net_device *);
 extern int at1700_probe(struct net_device *);
 extern int fmv18x_probe(struct net_device *);
 extern int eth16i_probe(struct net_device *);
-extern int i82596_probe(struct net_device *);
+extern struct net_device *i82596_probe(int unit);
 extern int ewrk3_probe(struct net_device *);
 extern struct net_device *el1_probe(int unit);
 extern struct net_device *wavelan_probe(int unit);
@@ -259,13 +259,13 @@ static struct devprobe isa_probes[] __initdata = {
 #ifdef CONFIG_EWRK3             /* DEC EtherWORKS 3 */
     	{ewrk3_probe, 0},
 #endif
-#if defined(CONFIG_APRICOT) || defined(CONFIG_MVME16x_NET) || defined(CONFIG_BVME6000_NET)	/* Intel I82596 */
-	{i82596_probe, 0},
-#endif
 	{NULL, 0},
 };
 
 static struct devprobe2 isa_probes2[] __initdata = {
+#if defined(CONFIG_APRICOT) || defined(CONFIG_MVME16x_NET) || defined(CONFIG_BVME6000_NET)	/* Intel I82596 */
+	{i82596_probe, 0},
+#endif
 #ifdef CONFIG_EL1		/* 3c501 */
 	{el1_probe, 0},
 #endif
