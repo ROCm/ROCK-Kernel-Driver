@@ -128,11 +128,18 @@ static void hub_irq(struct urb *urb, struct pt_regs *regs)
 	struct usb_hub *hub = (struct usb_hub *)urb->context;
 	int status;
 
+	spin_lock(&hub_event_lock);
+	hub->urb_active = 0;
+	if (hub->urb_complete) {	/* disconnect or rmmod */
+		complete(hub->urb_complete);
+		goto done;
+	}
+
 	switch (urb->status) {
 	case -ENOENT:		/* synchronous unlink */
 	case -ECONNRESET:	/* async unlink */
 	case -ESHUTDOWN:	/* hardware going away */
-		return;
+		goto done;
 
 	default:		/* presumably an error */
 		/* Cause a hub reset after 10 consecutive errors */
@@ -150,18 +157,20 @@ static void hub_irq(struct urb *urb, struct pt_regs *regs)
 	hub->nerrors = 0;
 
 	/* Something happened, let khubd figure it out */
-	spin_lock(&hub_event_lock);
 	if (list_empty(&hub->event_list)) {
 		list_add(&hub->event_list, &hub_event_list);
 		wake_up(&khubd_wait);
 	}
-	spin_unlock(&hub_event_lock);
 
 resubmit:
 	if ((status = usb_submit_urb (hub->urb, GFP_ATOMIC)) != 0
 			/* ENODEV means we raced disconnect() */
 			&& status != -ENODEV)
 		dev_err (&hub->intf->dev, "resubmit --> %d\n", urb->status);
+	if (status == 0)
+		hub->urb_active = 1;
+done:
+	spin_unlock(&hub_event_lock);
 }
 
 /* USB 2.0 spec Section 11.24.2.3 */
@@ -466,7 +475,8 @@ static int hub_configure(struct usb_hub *hub,
 		message = "couldn't submit status urb";
 		goto fail;
 	}
-		
+	hub->urb_active = 1;
+
 	/* Wake up khubd */
 	wake_up(&khubd_wait);
 
@@ -484,6 +494,7 @@ fail:
 static void hub_disconnect(struct usb_interface *intf)
 {
 	struct usb_hub *hub = usb_get_intfdata (intf);
+	DECLARE_COMPLETION(urb_complete);
 	unsigned long flags;
 
 	if (!hub)
@@ -491,6 +502,7 @@ static void hub_disconnect(struct usb_interface *intf)
 
 	usb_set_intfdata (intf, NULL);
 	spin_lock_irqsave(&hub_event_lock, flags);
+	hub->urb_complete = &urb_complete;
 
 	/* Delete it and then reset it */
 	list_del_init(&hub->event_list);
@@ -507,6 +519,8 @@ static void hub_disconnect(struct usb_interface *intf)
 
 	if (hub->urb) {
 		usb_unlink_urb(hub->urb);
+		if (hub->urb_active)
+			wait_for_completion(&urb_complete);
 		usb_free_urb(hub->urb);
 		hub->urb = NULL;
 	}
