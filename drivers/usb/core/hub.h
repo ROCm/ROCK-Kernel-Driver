@@ -188,8 +188,6 @@ extern void usb_hub_tt_clear_buffer (struct usb_device *dev, int pipe);
 struct usb_hub {
 	struct usb_interface	*intf;		/* the "real" device */
 	struct urb		*urb;		/* for interrupt polling pipe */
-	struct completion	*urb_complete;	/* wait for urb to end */
-	unsigned int		urb_active:1;
 
 	/* buffer for urb ... 1 bit each for hub and children, rounded up */
 	char			(*buffer)[(USB_MAXCHILDREN + 1 + 7) / 8];
