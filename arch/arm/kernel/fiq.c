@@ -46,19 +46,7 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 
-#define FIQ_VECTOR (vectors_base() + 0x1c)
-
 static unsigned long no_fiq_insn;
-
-static inline void unprotect_page_0(void)
-{
-	modify_domain(DOMAIN_USER, DOMAIN_MANAGER);
-}
-
-static inline void protect_page_0(void)
-{
-	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
-}
 
 /* Default reacquire function
  * - we always relinquish FIQ control
@@ -66,12 +54,8 @@ static inline void protect_page_0(void)
  */
 static int fiq_def_op(void *ref, int relinquish)
 {
-	if (!relinquish) {
-		unprotect_page_0();
-		*(unsigned long *)FIQ_VECTOR = no_fiq_insn;
-		protect_page_0();
-		flush_icache_range(FIQ_VECTOR, FIQ_VECTOR + 4);
-	}
+	if (!relinquish)
+		set_fiq_handler(&no_fiq_insn, sizeof(no_fiq_insn));
 
 	return 0;
 }
@@ -93,12 +77,10 @@ int show_fiq_list(struct seq_file *p, void *v)
 
 void set_fiq_handler(void *start, unsigned int length)
 {
-	unprotect_page_0();
-
-	memcpy((void *)FIQ_VECTOR, start, length);
-
-	protect_page_0();
-	flush_icache_range(FIQ_VECTOR, FIQ_VECTOR + length);
+	memcpy((void *)0xffff001c, start, length);
+	flush_icache_range(0xffff001c, 0xffff001c + length);
+	if (!vectors_high())
+		flush_icache_range(0x1c, 0x1c + length);
 }
 
 /*
@@ -198,6 +180,5 @@ EXPORT_SYMBOL(disable_fiq);
 
 void __init init_FIQ(void)
 {
-	no_fiq_insn = *(unsigned long *)FIQ_VECTOR;
-	set_fs(get_fs());
+	no_fiq_insn = *(unsigned long *)0xffff001c;
 }

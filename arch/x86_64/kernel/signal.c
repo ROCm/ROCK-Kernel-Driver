@@ -357,7 +357,7 @@ handle_signal(unsigned long sig, siginfo_t *info, struct k_sigaction *ka,
 #endif
 
 	/* Are we from a system call? */
-	if (regs->orig_rax >= 0) {
+	if ((long)regs->orig_rax >= 0) {
 		/* If so, check system call restarting.. */
 		switch (regs->rax) {
 		        case -ERESTART_RESTARTBLOCK:
@@ -442,7 +442,7 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 
  no_signal:
 	/* Did we come from a system call? */
-	if (regs->orig_rax >= 0) {
+	if ((long)regs->orig_rax >= 0) {
 		/* Restart the system call - no handlers present */
 		long res = regs->rax;
 		if (res == -ERESTARTNOHAND ||

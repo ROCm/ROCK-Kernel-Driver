@@ -663,10 +663,9 @@ static void __devexit aac_remove_one(struct pci_dev *pdev)
 	
 	kfree(aac->fibs);
 	
+	list_del(&aac->entry);
 	scsi_host_put(shost);
 	pci_disable_device(pdev);
-
-	list_del(&aac->entry);
 }
 
 static struct pci_driver aac_pci_driver = {

@@ -1121,7 +1121,7 @@ static inline void stop_urb(struct urb *urb)
 {
 	if (urb && urb->status == -EINPROGRESS) {
 		urb->transfer_flags &= ~URB_ASYNC_UNLINK;
-		usb_unlink_urb(urb);
+		usb_kill_urb(urb);
 	}
 }
 

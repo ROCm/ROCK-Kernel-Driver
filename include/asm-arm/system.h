@@ -128,9 +128,9 @@ extern unsigned long cr_alignment;	/* defined in entry-armv.S */
 extern unsigned int user_debug;
 
 #if __LINUX_ARM_ARCH__ >= 4
-#define vectors_base()	((cr_alignment & CR_V) ? 0xffff0000 : 0)
+#define vectors_high()	(cr_alignment & CR_V)
 #else
-#define vectors_base()	(0)
+#define vectors_high()	(0)
 #endif
 
 #define mb() __asm__ __volatile__ ("" : : : "memory")
