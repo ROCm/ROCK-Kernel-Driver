@@ -1473,7 +1473,7 @@ sys_call_table:
 	data8 sys_clock_nanosleep
 	data8 sys_fstatfs64
 	data8 sys_statfs64
-	data8 sys_fadvise64_64
+	data8 ia64_ni_syscall
 	data8 ia64_ni_syscall			// 1260
 	data8 ia64_ni_syscall
 	data8 ia64_ni_syscall
