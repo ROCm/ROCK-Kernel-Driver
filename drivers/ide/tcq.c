@@ -175,13 +175,8 @@ static void ata_tcq_irq_timeout(unsigned long data)
 		tcq_invalidate_queue(drive);
 }
 
-static void set_irq(struct ata_device *drive, ata_handler_t *handler)
+static void __set_irq(struct ata_channel *ch, ata_handler_t *handler)
 {
-	struct ata_channel *ch = drive->channel;
-	unsigned long flags;
-
-	spin_lock_irqsave(ch->lock, flags);
-
 	/*
 	 * always just bump the timer for now, the timeout handling will
 	 * have to be changed to be per-command
@@ -194,7 +189,15 @@ static void set_irq(struct ata_device *drive, ata_handler_t *handler)
 	ch->timer.data = (unsigned long) ch->drive;
 	mod_timer(&ch->timer, jiffies + 5 * HZ);
 	ch->handler = handler;
+}
 
+static void set_irq(struct ata_device *drive, ata_handler_t *handler)
+{
+	struct ata_channel *ch = drive->channel;
+	unsigned long flags;
+
+	spin_lock_irqsave(ch->lock, flags);
+	__set_irq(ch, handler);
 	spin_unlock_irqrestore(ch->lock, flags);
 }
 
@@ -230,8 +233,10 @@ static ide_startstop_t udma_tcq_start(struct ata_device *drive, struct request *
  */
 static ide_startstop_t service(struct ata_device *drive, struct request *rq)
 {
-	u8 feat;
-	u8 stat;
+	struct ata_channel *ch = drive->channel;
+	ide_startstop_t ret;
+	unsigned long flags;
+	u8 feat, stat;
 	int tag;
 
 	TCQ_PRINTK("%s: started service\n", drive->name);
@@ -291,9 +296,12 @@ static ide_startstop_t service(struct ata_device *drive, struct request *rq)
 
 	TCQ_PRINTK("%s: stat %x, feat %x\n", __FUNCTION__, stat, feat);
 
+	spin_lock_irqsave(ch->lock, flags);
+
 	rq = blk_queue_find_tag(&drive->queue, tag);
 	if (!rq) {
 		printk(KERN_ERR"%s: missing request for tag %d\n", __FUNCTION__, tag);
+		spin_unlock_irqrestore(ch->lock, flags);
 		return ide_stopped;
 	}
 
@@ -304,7 +312,10 @@ static ide_startstop_t service(struct ata_device *drive, struct request *rq)
 	 * interrupt to indicate end of transfer, release is not allowed
 	 */
 	TCQ_PRINTK("%s: starting command %x\n", __FUNCTION__, stat);
-	return udma_tcq_start(drive, rq);
+
+	ret = udma_tcq_start(drive, rq);
+	spin_unlock_irqrestore(ch->lock, flags);
+	return ret;
 }
 
 static ide_startstop_t check_service(struct ata_device *drive, struct request *rq)
@@ -538,7 +549,7 @@ static ide_startstop_t udma_tcq_start(struct ata_device *drive, struct request *
 	if (ata_start_dma(drive, rq))
 		return ide_stopped;
 
-	set_irq(drive, ide_dmaq_intr);
+	__set_irq(ch, ide_dmaq_intr);
 	udma_start(drive, rq);
 
 	return ide_started;
@@ -590,7 +601,7 @@ ide_startstop_t udma_tcq_init(struct ata_device *drive, struct request *rq)
 	if ((feat = GET_FEAT()) & NSEC_REL) {
 		drive->immed_rel++;
 		drive->rq = NULL;
-		set_irq(drive, ide_dmaq_intr);
+		__set_irq(drive->channel, ide_dmaq_intr);
 
 		TCQ_PRINTK("REL in queued_start\n");
 
