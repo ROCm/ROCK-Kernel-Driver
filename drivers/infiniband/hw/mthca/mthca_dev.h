@@ -40,7 +40,6 @@
 #include <linux/pci.h>
 #include <linux/dma-mapping.h>
 #include <asm/semaphore.h>
-#include <asm/scatterlist.h>
 
 #include "mthca_provider.h"
 #include "mthca_doorbell.h"
@@ -214,7 +213,7 @@ struct mthca_dev {
 			u64 clr_int_base;
 			u64 eq_arm_base;
 			u64 eq_set_ci_base;
-			struct scatterlist *mem;
+			struct mthca_icm *icm;
 			u16 fw_pages;
 		}        arbel;
 	}                fw;

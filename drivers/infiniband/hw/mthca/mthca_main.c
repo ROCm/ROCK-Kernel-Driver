@@ -48,6 +48,7 @@
 #include "mthca_config_reg.h"
 #include "mthca_cmd.h"
 #include "mthca_profile.h"
+#include "mthca_memfree.h"
 
 MODULE_AUTHOR("Roland Dreier");
 MODULE_DESCRIPTION("Mellanox InfiniBand HCA low-level driver");
@@ -259,75 +260,26 @@ static int __devinit mthca_load_fw(struct mthca_dev *mdev)
 {
 	u8 status;
 	int err;
-	int num_ent, num_sg, fw_pages, cur_order;
-	int i;
 
 	/* FIXME: use HCA-attached memory for FW if present */
 
-	mdev->fw.arbel.mem = kmalloc(sizeof *mdev->fw.arbel.mem *
-				     mdev->fw.arbel.fw_pages,
-				     GFP_KERNEL);
-	if (!mdev->fw.arbel.mem) {
+	mdev->fw.arbel.icm =
+		mthca_alloc_icm(mdev, mdev->fw.arbel.fw_pages,
+				GFP_HIGHUSER | __GFP_NOWARN);
+	if (!mdev->fw.arbel.icm) {
 		mthca_err(mdev, "Couldn't allocate FW area, aborting.\n");
 		return -ENOMEM;
 	}
 
-	memset(mdev->fw.arbel.mem, 0,
-	       sizeof *mdev->fw.arbel.mem * mdev->fw.arbel.fw_pages);
-
-	fw_pages = mdev->fw.arbel.fw_pages;
-	num_ent = 0;
-
-	/*
-	 * We allocate in as big chunks as we can, up to a maximum of
-	 * 256 KB per chunk.
-	 */
-	cur_order = get_order(1 << 18);
-
-	while (fw_pages > 0) {
-		while (1 << cur_order > fw_pages)
-			--cur_order;
-
-		/*
-		 * We allocate with GFP_HIGHUSER because only the
-		 * firmware is going to touch these pages, so there's
-		 * no need for a kernel virtual address.  We use
-		 * __GFP_NOWARN because we'll deal with any allocation
-		 * failures ourselves.
-		 */
-		mdev->fw.arbel.mem[num_ent].page   = alloc_pages(GFP_HIGHUSER | __GFP_NOWARN,
-								 cur_order);
-		mdev->fw.arbel.mem[num_ent].length = PAGE_SIZE << cur_order;
-		if (!mdev->fw.arbel.mem[num_ent].page) {
-			--cur_order;
-			if (cur_order < 0) {
-				mthca_err(mdev, "Couldn't allocate FW area, aborting.\n");
-				err = -ENOMEM;
-				goto err_free;
-			}
-		} else {
-			++num_ent;
-			fw_pages -= 1 << cur_order;
-		}
-	}
-
-	num_sg = pci_map_sg(mdev->pdev, mdev->fw.arbel.mem, num_ent,
-			    PCI_DMA_BIDIRECTIONAL);
-	if (num_sg <= 0) {
-		mthca_err(mdev, "Couldn't allocate FW area, aborting.\n");
-		err = -ENOMEM;
-		goto err_free;
-	}
-
-	err = mthca_MAP_FA(mdev, num_sg, mdev->fw.arbel.mem, &status);
+	err = mthca_MAP_FA(mdev, mdev->fw.arbel.icm, &status);
 	if (err) {
 		mthca_err(mdev, "MAP_FA command failed, aborting.\n");
-		goto err_unmap;
+		goto err_free;
 	}
 	if (status) {
 		mthca_err(mdev, "MAP_FA returned status 0x%02x, aborting.\n", status);
 		err = -EINVAL;
-		goto err_unmap;
+		goto err_free;
 	}
 	err = mthca_RUN_FW(mdev, &status);
 	if (err) {
@@ -345,15 +297,8 @@ static int __devinit mthca_load_fw(struct mthca_dev *mdev)
 err_unmap_fa:
 	mthca_UNMAP_FA(mdev, &status);
 
-err_unmap:
-	pci_unmap_sg(mdev->pdev, mdev->fw.arbel.mem,
-		   mdev->fw.arbel.fw_pages, PCI_DMA_BIDIRECTIONAL);
 err_free:
-	for (i = 0; i < mdev->fw.arbel.fw_pages; ++i)
-		if (mdev->fw.arbel.mem[i].page)
-			__free_pages(mdev->fw.arbel.mem[i].page,
-				     get_order(mdev->fw.arbel.mem[i].length));
-	kfree(mdev->fw.arbel.mem);
+	mthca_free_icm(mdev, mdev->fw.arbel.icm);
 	return err;
 }
 
@@ -397,12 +342,16 @@ static int __devinit mthca_init_arbel(struct mthca_dev *mdev)
 	err = mthca_dev_lim(mdev, &dev_lim);
 	if (err) {
 		mthca_err(mdev, "QUERY_DEV_LIM command failed, aborting.\n");
-		goto err_out_disable;
+		goto err_out_stop_fw;
 	}
 
 	mthca_warn(mdev, "Sorry, native MT25208 mode support is not done, "
 		   "aborting.\n");
 	err = -ENODEV;
+
+err_out_stop_fw:
+	mthca_UNMAP_FA(mdev, &status);
+	mthca_free_icm(mdev, mdev->fw.arbel.icm);
 
 err_out_disable:
 	if (!(mdev->mthca_flags & MTHCA_FLAG_NO_LAM))
@@ -610,21 +559,12 @@ static int __devinit mthca_enable_msi_x(struct mthca_dev *mdev)
 static void mthca_close_hca(struct mthca_dev *mdev)
 {
 	u8 status;
-	int i;
 
 	mthca_CLOSE_HCA(mdev, 0, &status);
 
 	if (mdev->hca_type == ARBEL_NATIVE) {
 		mthca_UNMAP_FA(mdev, &status);
-
-		pci_unmap_sg(mdev->pdev, mdev->fw.arbel.mem,
-			     mdev->fw.arbel.fw_pages, PCI_DMA_BIDIRECTIONAL);
-
-		for (i = 0; i < mdev->fw.arbel.fw_pages; ++i)
-			if (mdev->fw.arbel.mem[i].page)
-				__free_pages(mdev->fw.arbel.mem[i].page,
-					     get_order(mdev->fw.arbel.mem[i].length));
-		kfree(mdev->fw.arbel.mem);
+		mthca_free_icm(mdev, mdev->fw.arbel.icm);
 
 		if (!(mdev->mthca_flags & MTHCA_FLAG_NO_LAM))
 			mthca_DISABLE_LAM(mdev, &status);

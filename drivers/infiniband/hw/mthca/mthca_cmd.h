@@ -219,8 +219,7 @@ void mthca_cmd_event(struct mthca_dev *dev, u16 token,
 
 int mthca_SYS_EN(struct mthca_dev *dev, u8 *status);
 int mthca_SYS_DIS(struct mthca_dev *dev, u8 *status);
-int mthca_MAP_FA(struct mthca_dev *dev, int count,
-		 struct scatterlist *sglist, u8 *status);
+int mthca_MAP_FA(struct mthca_dev *dev, struct mthca_icm *icm, u8 *status);
 int mthca_UNMAP_FA(struct mthca_dev *dev, u8 *status);
 int mthca_RUN_FW(struct mthca_dev *dev, u8 *status);
 int mthca_QUERY_FW(struct mthca_dev *dev, u8 *status);
