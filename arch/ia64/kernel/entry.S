@@ -508,7 +508,7 @@ GLOBAL_ENTRY(ia64_trace_syscall)
 	;;
  	stf.spill [r16]=f10
  	stf.spill [r17]=f11
-	br.call.sptk.many rp=syscall_trace // give parent a chance to catch syscall args
+	br.call.sptk.many rp=syscall_trace_enter // give parent a chance to catch syscall args
 	adds r16=PT(F6)+16,sp
 	adds r17=PT(F7)+16,sp
 	;;
@@ -548,7 +548,7 @@ GLOBAL_ENTRY(ia64_trace_syscall)
 .strace_save_retval:
 .mem.offset 0,0; st8.spill [r2]=r8		// store return value in slot for r8
 .mem.offset 8,0; st8.spill [r3]=r10		// clear error indication in slot for r10
-	br.call.sptk.many rp=syscall_trace // give parent a chance to catch return value
+	br.call.sptk.many rp=syscall_trace_leave // give parent a chance to catch return value
 .ret3:	br.cond.sptk ia64_leave_syscall
 
 strace_error:
@@ -575,7 +575,7 @@ GLOBAL_ENTRY(ia64_strace_leave_kernel)
 	 */
 	nop.m 0
 	nop.i 0
-	br.call.sptk.many rp=syscall_trace // give parent a chance to catch return value
+	br.call.sptk.many rp=syscall_trace_leave // give parent a chance to catch return value
 }
 .ret4:	br.cond.sptk ia64_leave_kernel
 END(ia64_strace_leave_kernel)
@@ -601,7 +601,9 @@ GLOBAL_ENTRY(ia64_ret_from_clone)
 	ld4 r2=[r2]
 	;;
 	mov r8=0
-	tbit.nz p6,p0=r2,TIF_SYSCALL_TRACE
+	and r2=_TIF_SYSCALL_TRACEAUDIT,r2
+	;;
+	cmp.ne p6,p0=r2,r0
 (p6)	br.cond.spnt .strace_check_retval
 	;;					// added stop bits to prevent r8 dependency
 END(ia64_ret_from_clone)

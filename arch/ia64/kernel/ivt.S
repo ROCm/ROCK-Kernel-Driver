@@ -752,7 +752,9 @@ ENTRY(break_fault)
 	;;
 	ld4 r2=[r2]				// r2 = current_thread_info()->flags
 	;;
-	tbit.z p8,p0=r2,TIF_SYSCALL_TRACE
+	and r2=_TIF_SYSCALL_TRACEAUDIT,r2	// mask trace or audit
+	;;
+	cmp.eq p8,p0=r2,r0
 	mov b6=r20
 	;;
 (p8)	br.call.sptk.many b6=b6			// ignore this return addr
@@ -1573,10 +1575,11 @@ ENTRY(dispatch_to_ia32_handler)
 	ld4 r2=[r2]		// r2 = current_thread_info()->flags
 	;;
 	ld8 r16=[r16]
-	tbit.z p8,p0=r2,TIF_SYSCALL_TRACE
+	and r2=_TIF_SYSCALL_TRACEAUDIT,r2	// mask trace or audit
 	;;
 	mov b6=r16
 	movl r15=ia32_ret_from_syscall
+	cmp.eq p8,p0=r2,r0
 	;;
 	mov rp=r15
 (p8)	br.call.sptk.many b6=b6
