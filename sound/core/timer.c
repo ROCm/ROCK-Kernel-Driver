@@ -35,13 +35,19 @@
 #include <linux/kerneld.h>
 #endif
 
-int snd_timer_limit = 1;
+#if !defined(CONFIG_SND_RTCTIMER) && !defined(CONFIG_SND_RTCTIMER_MODULE)
+#define DEFAULT_TIMER_LIMIT 1
+#else
+#define DEFAULT_TIMER_LIMIT 2
+#endif
+
+int snd_timer_limit = DEFAULT_TIMER_LIMIT;
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>, Takashi Iwai <tiwai@suse.de>");
 MODULE_DESCRIPTION("ALSA timer interface");
 MODULE_LICENSE("GPL");
 MODULE_CLASSES("{sound}");
 MODULE_PARM(snd_timer_limit, "i");
-MODULE_PARM_DESC(snd_timer_limit, "Maximum global timers in system. (1 by default)");
+MODULE_PARM_DESC(snd_timer_limit, "Maximum global timers in system.");
 
 typedef struct {
 	snd_timer_instance_t *timeri;
@@ -146,10 +152,14 @@ static void snd_timer_request(snd_timer_id_t *tid)
 	
 	switch (tid->dev_class) {
 	case SNDRV_TIMER_CLASS_GLOBAL:
+		if (tid->device >= snd_timer_limit)
+			return;
 		sprintf(str, "snd-timer-%i", tid->device);
 		break;
 	case SNDRV_TIMER_CLASS_CARD:
 	case SNDRV_TIMER_CLASS_PCM:
+		if (tid->card >= snd_ecards_limit)
+			return;
 		sprintf(str, "snd-card-%i", tid->card);
 		break;
 	default:
@@ -876,7 +886,7 @@ static void snd_timer_proc_read(snd_info_entry_t *entry,
 		}
 		snd_iprintf(buffer, "%s :", timer->name);
 		if (timer->hw.resolution)
-			snd_iprintf(buffer, " %lu.%luus (%lu ticks)", timer->hw.resolution / 1000, timer->hw.resolution % 1000, timer->hw.ticks);
+			snd_iprintf(buffer, " %lu.%03luus (%lu ticks)", timer->hw.resolution / 1000, timer->hw.resolution % 1000, timer->hw.ticks);
 		if (timer->hw.flags & SNDRV_TIMER_HW_SLAVE)
 			snd_iprintf(buffer, " SLAVE");
 		snd_iprintf(buffer, "\n");

@@ -29,7 +29,7 @@ dep_tristate 'Turtle Beach Maui,Tropez,Tropez+ (Wavefront)' CONFIG_SND_WAVEFRONT
 dep_tristate 'Avance Logic ALS100/ALS120' CONFIG_SND_ALS100 $CONFIG_SND $CONFIG_ISAPNP
 dep_tristate 'Aztech Systems AZT2320' CONFIG_SND_AZT2320 $CONFIG_SND $CONFIG_ISAPNP
 dep_tristate 'C-Media CMI8330' CONFIG_SND_CMI8330 $CONFIG_SND
-dep_tristate 'Diamond Technologies DT-0197H' CONFIG_SND_DT0197H $CONFIG_SND $CONFIG_ISAPNP
+dep_tristate 'Diamond Technologies DT-019X, Avance Logic ALS-007' CONFIG_SND_DT019X $CONFIG_SND $CONFIG_ISAPNP
 dep_tristate 'Yamaha OPL3-SA2/SA3' CONFIG_SND_OPL3SA2 $CONFIG_SND
 dep_tristate 'Aztech Sound Galaxy' CONFIG_SND_SGALAXY $CONFIG_SND
 

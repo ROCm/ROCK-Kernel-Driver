@@ -48,7 +48,7 @@ MODULE_LICENSE("GPL");
 MODULE_CLASSES("{sound}");
 MODULE_SUPPORTED_DEVICE("sound");
 
-MODULE_PARM(snd_seq_client_load, "i");
+MODULE_PARM(snd_seq_client_load, "1-64i");
 MODULE_PARM_DESC(snd_seq_client_load, "The numbers of global (system) clients to load through kmod.");
 MODULE_PARM(snd_seq_default_timer_class, "i");
 MODULE_PARM_DESC(snd_seq_default_timer_class, "The default timer class.");

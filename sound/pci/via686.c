@@ -165,12 +165,11 @@ typedef struct {
 static int build_via_table(viadev_t *dev, snd_pcm_substream_t *substream,
 			   struct pci_dev *pci)
 {
-	int i, pages, size;
+	int i, size;
 	struct snd_sg_buf *sgbuf = snd_magic_cast(snd_pcm_sgbuf_t, substream->dma_private, return -EINVAL);
 
 	if (dev->table) {
-		pages = snd_pcm_sgbuf_pages(dev->tbl_entries * 8);
-		snd_free_pci_pages(pci, pages << PAGE_SHIFT, dev->table, dev->table_addr);
+		snd_free_pci_pages(pci, PAGE_ALIGN(dev->tbl_entries * 8), dev->table, dev->table_addr);
 		dev->table = NULL;
 	}
 
@@ -187,8 +186,7 @@ static int build_via_table(viadev_t *dev, snd_pcm_substream_t *substream,
 	/* the start of each lists must be aligned to 8 bytes,
 	 * but the kernel pages are much bigger, so we don't care
 	 */
-	pages = snd_pcm_sgbuf_pages(dev->tbl_entries * 8);
-	dev->table = (u32*)snd_malloc_pci_pages(pci, pages << PAGE_SHIFT, &dev->table_addr);
+	dev->table = (u32*)snd_malloc_pci_pages(pci, PAGE_ALIGN(dev->tbl_entries * 8), &dev->table_addr);
 	if (! dev->table)
 		return -ENOMEM;
 
@@ -214,7 +212,7 @@ static void clean_via_table(viadev_t *dev, snd_pcm_substream_t *substream,
 			    struct pci_dev *pci)
 {
 	if (dev->table) {
-		snd_free_pci_pages(pci, snd_pcm_sgbuf_pages(dev->tbl_entries * 8) << PAGE_SHIFT, dev->table, dev->table_addr);
+		snd_free_pci_pages(pci, PAGE_ALIGN(dev->tbl_entries * 8), dev->table, dev->table_addr);
 		dev->table = NULL;
 	}
 }
