@@ -1,17 +1,17 @@
 /*
  * SyncLink Multiprotocol Serial Adapter Driver
  *
- * $Id: synclink.h,v 3.5 2001/03/26 17:04:36 ez Exp $
+ * $Id: synclink.h,v 3.6 2002/02/20 21:58:20 paulkf Exp $
  *
  * Copyright (C) 1998-2000 by Microgate Corporation
- * 
- * Redistribution of this file is permitted under 
+ *
+ * Redistribution of this file is permitted under
  * the terms of the GNU Public License (GPL)
  */
 
 #ifndef _SYNCLINK_H_
 #define _SYNCLINK_H_
-#define SYNCLINK_H_VERSION 3.5
+#define SYNCLINK_H_VERSION 3.6
 
 #define BOOLEAN int
 #define TRUE 1
@@ -128,13 +128,18 @@
 #define MGSL_BUS_TYPE_EISA	2
 #define MGSL_BUS_TYPE_PCI	5
 
+#define MGSL_INTERFACE_DISABLE  0
+#define MGSL_INTERFACE_RS232    1
+#define MGSL_INTERFACE_V35      2
+#define MGSL_INTERFACE_RS422    3
+
 typedef struct _MGSL_PARAMS
 {
 	/* Common */
 
 	unsigned long	mode;		/* Asynchronous or HDLC */
 	unsigned char	loopback;	/* internal loopback mode */
-	
+
 	/* HDLC Only */
 
 	unsigned short	flags;
@@ -247,6 +252,8 @@ struct mgsl_icount {
  * MGSL_IOCGSTATS	return current statistics
  * MGSL_IOCWAITEVENT	wait for specified event to occur
  * MGSL_LOOPTXDONE	transmit in HDLC LoopMode done
+ * MGSL_IOCSIF          set the serial interface type
+ * MGSL_IOCGIF          get the serial interface type
  */
 #define MGSL_MAGIC_IOC	'm'
 #define MGSL_IOCSPARAMS		_IOW(MGSL_MAGIC_IOC,0,struct _MGSL_PARAMS)
@@ -260,5 +267,7 @@ struct mgsl_icount {
 #define MGSL_IOCWAITEVENT	_IOWR(MGSL_MAGIC_IOC,8,int)
 #define MGSL_IOCCLRMODCOUNT	_IO(MGSL_MAGIC_IOC,15)
 #define MGSL_IOCLOOPTXDONE	_IO(MGSL_MAGIC_IOC,9)
+#define MGSL_IOCSIF		_IO(MGSL_MAGIC_IOC,10)
+#define MGSL_IOCGIF		_IO(MGSL_MAGIC_IOC,11)
 
 #endif /* _SYNCLINK_H_ */
