@@ -1157,6 +1157,7 @@ static int cdc_bind (struct usbnet *dev, struct usb_interface *intf)
 
 	status = get_ethernet_addr (dev, info->ether);
 	if (status < 0) {
+		usb_set_intfdata(info->data, NULL);
 		usb_driver_release_interface (&usbnet_driver, info->data);
 		return status;
 	}
