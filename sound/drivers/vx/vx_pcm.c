@@ -48,6 +48,7 @@
 #include <sound/driver.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
+#include <linux/delay.h>
 #include <sound/core.h>
 #include <sound/asoundef.h>
 #include <sound/pcm.h>
@@ -381,7 +382,7 @@ static int vx_send_irqa(vx_core_t *chip)
  */
 static int vx_toggle_pipe(vx_core_t *chip, vx_pipe_t *pipe, int state)
 {
-	int err, i, cur_state, delay;
+	int err, i, cur_state;
 
 	/* Check the pipe is not already in the requested state */
 	if (vx_get_pipe_state(chip, pipe, &cur_state) < 0)
