@@ -65,6 +65,8 @@ extern unsigned char acpi_kbd_controller_present;
 
 unsigned long sn_rtc_cycles_per_second;   
 
+EXPORT_SYMBOL(sn_rtc_cycles_per_second);
+
 partid_t sn_partid = -1;
 EXPORT_SYMBOL(sn_partid);
 char sn_system_serial_number_string[128];
