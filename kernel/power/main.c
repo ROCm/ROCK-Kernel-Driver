@@ -169,6 +169,21 @@ static int enter_state(u32 state)
 	return error;
 }
 
+/*
+ * This is main interface to the outside world. It needs to be
+ * called from process context.
+ */
+int software_suspend(void)
+{
+	int error;
+
+	if (down_trylock(&pm_sem))
+		return -EBUSY;
+	error = pm_suspend_disk();
+	up(&pm_sem);
+	return error;
+}
+
 
 /**
  *	pm_suspend - Externally visible function for suspending system.
