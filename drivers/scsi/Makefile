@@ -116,7 +116,7 @@ obj-$(CONFIG_SCSI_ATA_PIIX)	+= libata.o ata_piix.o
 obj-$(CONFIG_SCSI_SATA_PROMISE)	+= libata.o sata_promise.o
 obj-$(CONFIG_SCSI_SATA_SIL)	+= libata.o sata_sil.o
 obj-$(CONFIG_SCSI_SATA_VIA)	+= libata.o sata_via.o
-obj-$(CONFIG_SCSI_IBMVSCSI)	+= ibmvscsic.o
+obj-$(CONFIG_SCSI_IBMVSCSI)	+= ibmvscsi/
 
 obj-$(CONFIG_ARM)		+= arm/
 
@@ -153,12 +153,6 @@ NCR_Q720_mod-objs	:= NCR_Q720.o ncr53c8xx.o
 cpqfc-objs	:= cpqfcTSinit.o cpqfcTScontrol.o cpqfcTSi2c.o \
 		   cpqfcTSworker.o cpqfcTStrigger.o
 libata-objs	:= libata-core.o libata-scsi.o
-
-ifeq ($(CONFIG_PPC_ISERIES),y)
-  ibmvscsic-objs	:= ibmvscsi.o iSeries_vscsi.o
-else
-  ibmvscsic-objs	:= ibmvscsi.o rpa_vscsi.o
-endif
 
 # Files generated that shall be removed upon make clean
 clean-files :=	53c7xx_d.h 53c700_d.h	\

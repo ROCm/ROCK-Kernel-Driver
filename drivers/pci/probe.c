@@ -53,8 +53,12 @@ postcore_initcall(pcibus_class_init);
 static ssize_t pci_bus_show_cpuaffinity(struct class_device *class_dev, char *buf)
 {
 	cpumask_t cpumask = pcibus_to_cpumask((to_pci_bus(class_dev))->number);
+	int ret;
 
-	return sprintf(buf, "%lx\n", (unsigned long)cpumask);
+	ret = cpumask_snprintf(buf, PAGE_SIZE, cpumask);
+	if (ret < PAGE_SIZE)
+		buf[ret++] = '\n';
+	return ret;
 }
 static CLASS_DEVICE_ATTR(cpuaffinity, S_IRUGO, pci_bus_show_cpuaffinity, NULL);
 

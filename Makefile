@@ -1,7 +1,8 @@
 VERSION = 2
 PATCHLEVEL = 6
-SUBLEVEL = 1
+SUBLEVEL = 2
 EXTRAVERSION = -$(CONFIG_RELEASE)-$(CONFIG_CFGNAME)
+NAME=Feisty Dunnart
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"

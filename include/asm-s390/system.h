@@ -36,7 +36,7 @@ static inline void save_fp_regs(s390_fp_regs *fpregs)
 		"   std   2,24(%1)\n"
 		"   std   4,40(%1)\n"
 		"   std   6,56(%1)"
-		: "=m" (*fpregs) : "a" (fpregs) : "memory" );
+		: "=m" (*fpregs) : "a" (fpregs), "m" (*fpregs) : "memory" );
 	if (!MACHINE_HAS_IEEE)
 		return;
 	asm volatile(
@@ -53,7 +53,7 @@ static inline void save_fp_regs(s390_fp_regs *fpregs)
 		"   std   13,112(%1)\n"
 		"   std   14,120(%1)\n"
 		"   std   15,128(%1)\n"
-		: "=m" (*fpregs) : "a" (fpregs) : "memory" );
+		: "=m" (*fpregs) : "a" (fpregs), "m" (*fpregs) : "memory" );
 }
 
 static inline void restore_fp_regs(s390_fp_regs *fpregs)
@@ -115,7 +115,7 @@ static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
 			"    jl  0b\n"
 			: "=&d" (old), "=m" (*(int *) addr)
 			: "d" (x << shift), "d" (~(255 << shift)), "a" (addr),
-			  "m" (*(int *) addr) : "cc", "0" );
+			  "m" (*(int *) addr) : "memory", "cc", "0" );
 		x = old >> shift;
 		break;
 	case 2:
@@ -129,9 +129,9 @@ static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
 			"    or  0,%2\n"
 			"    cs  %0,0,0(%4)\n"
 			"    jl  0b\n"
-			: "=&d" (old), "=m" (*(int *) addr) 
+			: "=&d" (old), "=m" (*(int *) addr)
 			: "d" (x << shift), "d" (~(65535 << shift)), "a" (addr),
-			  "m" (*(int *) addr) : "cc", "0" );
+			  "m" (*(int *) addr) : "memory", "cc", "0" );
 		x = old >> shift;
 		break;
 	case 4:
@@ -141,7 +141,7 @@ static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
 			"    jl  0b\n"
 			: "=&d" (old), "=m" (*(int *) ptr)
 			: "d" (x), "a" (ptr), "m" (*(int *) ptr)
-			: "memory", "cc", "0" );
+			: "memory", "cc" );
 		x = old;
 		break;
 #ifdef __s390x__
@@ -152,7 +152,7 @@ static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
 			"    jl  0b\n"
 			: "=&d" (old), "=m" (*(long *) ptr)
 			: "d" (x), "a" (ptr), "m" (*(long *) ptr)
-			: "memory", "cc", "0" );
+			: "memory", "cc" );
 		x = old;
 		break;
 #endif /* __s390x__ */
@@ -184,57 +184,55 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
 		shift = (3 ^ (addr & 3)) << 3;
 		addr ^= addr & 3;
 		asm volatile(
-			"    l   %0,0(%5)\n"
-			"0:  nr  %0,%6\n"
+			"    l   %0,0(%4)\n"
+			"0:  nr  %0,%5\n"
                         "    lr  %1,%0\n"
-			"    or  %0,%3\n"
-			"    or  %1,%4\n"
-			"    cs  %0,%1,0(%5)\n"
+			"    or  %0,%2\n"
+			"    or  %1,%3\n"
+			"    cs  %0,%1,0(%4)\n"
 			"    jnl 1f\n"
 			"    xr  %1,%0\n"
-			"    nr  %1,%6\n"
+			"    nr  %1,%5\n"
 			"    jnz 0b\n"
 			"1:"
-			: "=&d" (prev), "=&d" (tmp), "=m" (*(int *) addr)
+			: "=&d" (prev), "=&d" (tmp)
 			: "d" (old << shift), "d" (new << shift), "a" (ptr),
-			  "d" (~(255 << shift)), "m" (*(int *) addr)
-			: "cc" );
+			  "d" (~(255 << shift))
+			: "memory", "cc" );
 		return prev >> shift;
 	case 2:
 		addr = (unsigned long) ptr;
 		shift = (2 ^ (addr & 2)) << 3;
 		addr ^= addr & 2;
 		asm volatile(
-			"    l   %0,0(%5)\n"
-			"0:  nr  %0,%6\n"
+			"    l   %0,0(%4)\n"
+			"0:  nr  %0,%5\n"
                         "    lr  %1,%0\n"
-			"    or  %0,%3\n"
-			"    or  %1,%4\n"
-			"    cs  %0,%1,0(%5)\n"
+			"    or  %0,%2\n"
+			"    or  %1,%3\n"
+			"    cs  %0,%1,0(%4)\n"
 			"    jnl 1f\n"
 			"    xr  %1,%0\n"
-			"    nr  %1,%6\n"
+			"    nr  %1,%5\n"
 			"    jnz 0b\n"
 			"1:"
-			: "=&d" (prev), "=&d" (tmp), "=m" (*(int *) addr)
+			: "=&d" (prev), "=&d" (tmp)
 			: "d" (old << shift), "d" (new << shift), "a" (ptr),
-			  "d" (~(65535 << shift)), "m" (*(int *) addr)
-			: "cc" );
+			  "d" (~(65535 << shift))
+			: "memory", "cc" );
 		return prev >> shift;
 	case 4:
 		asm volatile (
-			"    cs  %0,%3,0(%4)\n"
-			: "=&d" (prev), "=m" (*(int *) ptr)
-			: "0" (old), "d" (new), "a" (ptr), "m" (*(int *) ptr)
-			: "cc" );
+			"    cs  %0,%2,0(%3)\n"
+			: "=&d" (prev) : "0" (old), "d" (new), "a" (ptr)
+			: "memory", "cc" );
 		return prev;
 #ifdef __s390x__
 	case 8:
 		asm volatile (
-			"    csg %0,%3,0(%4)\n"
-			: "=&d" (prev), "=m" (*(long *) ptr)
-			: "0" (old), "d" (new), "a" (ptr), "m" (*(long *) ptr)
-			: "cc" );
+			"    csg %0,%2,0(%3)\n"
+			: "=&d" (prev) : "0" (old), "d" (new), "a" (ptr)
+			: "memory", "cc" );
 		return prev;
 #endif /* __s390x__ */
         }
@@ -272,7 +270,8 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
 #define local_irq_enable() ({ \
         unsigned long  __dummy; \
         __asm__ __volatile__ ( \
-                "stosm 0(%1),0x03" : "=m" (__dummy) : "a" (&__dummy) ); \
+                "stosm 0(%1),0x03" \
+		: "=m" (__dummy) : "a" (&__dummy) : "memory" ); \
         })
 
 #define local_irq_disable() ({ \
@@ -283,10 +282,10 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
         })
 
 #define local_save_flags(x) \
-        __asm__ __volatile__("stosm 0(%1),0" : "=m" (x) : "a" (&x) )
+        __asm__ __volatile__("stosm 0(%1),0" : "=m" (x) : "a" (&x), "m" (x) )
 
 #define local_irq_restore(x) \
-        __asm__ __volatile__("ssm   0(%1)" : : "m" (x), "a" (&x) )
+        __asm__ __volatile__("ssm   0(%0)" : : "a" (&x), "m" (x) : "memory")
 
 #define irqs_disabled()			\
 ({					\
@@ -305,8 +304,7 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
 		"   bras  1,0f\n" \
                 "   lctlg 0,0,0(%0)\n" \
 		"0: ex    %1,0(1)" \
-		: : "a" (&array), "a" (((low)<<4)+(high)), \
-		    "m" (*(&array)) : "1" ); \
+		: : "a" (&array), "a" (((low)<<4)+(high)) : "1" ); \
 	})
 
 #define __ctl_store(array, low, high) ({ \
@@ -314,8 +312,7 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
 		"   bras  1,0f\n" \
 		"   stctg 0,0,0(%1)\n" \
 		"0: ex    %2,0(1)" \
-		: "=m" (*(&array)) \
-		: "a" (&array), "a" (((low)<<4)+(high)) : "1" ); \
+		: "=m" (array) : "a" (&array), "a" (((low)<<4)+(high)) : "1" ); \
 	})
 
 #define __ctl_set_bit(cr, bit) ({ \
@@ -362,8 +359,7 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
 		"   bras  1,0f\n" \
                 "   lctl 0,0,0(%0)\n" \
 		"0: ex    %1,0(1)" \
-		: : "a" (&array), "a" (((low)<<4)+(high)), \
-		    "m" (*(&array)) : "1" ); \
+		: : "a" (&array), "a" (((low)<<4)+(high)) : "1" ); \
 	})
 
 #define __ctl_store(array, low, high) ({ \
@@ -371,8 +367,7 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
 		"   bras  1,0f\n" \
 		"   stctl 0,0,0(%1)\n" \
 		"0: ex    %2,0(1)" \
-		: "=m" (*(&array)) \
-		: "a" (&array), "a" (((low)<<4)+(high)): "1" ); \
+		: "=m" (array) : "a" (&array), "a" (((low)<<4)+(high)): "1" ); \
 	})
 
 #define __ctl_set_bit(cr, bit) ({ \

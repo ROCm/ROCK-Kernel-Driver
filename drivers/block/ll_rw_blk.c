@@ -145,6 +145,8 @@ void blk_queue_activity_fn(request_queue_t *q, activity_fn *fn, void *data)
 	q->activity_data = data;
 }
 
+EXPORT_SYMBOL(blk_queue_activity_fn);
+
 /**
  * blk_queue_prep_rq - set a prepare_request function for queue
  * @q:		queue

@@ -149,9 +149,9 @@ static int __init vio_bus_init(void)
 		return 1;
 	}
 	memset(vio_bus_device, 0, sizeof(struct vio_dev));
-	strcpy(vio_bus_device->device.bus_id, "vdevice");
+	strcpy(vio_bus_device->dev.bus_id, "vdevice");
 
-	err = device_register(&vio_bus_device->device);
+	err = device_register(&vio_bus_device->dev);
 	if (err) {
 		printk(KERN_WARNING "%s: device_register returned %i\n", __FUNCTION__,
 			err);
@@ -248,16 +248,16 @@ struct vio_dev * __devinit vio_register_device(struct device_node *of_node)
 	}
 
 	/* init generic 'struct device' fields: */
-	viodev->device.parent = &vio_bus_device->device;
-	viodev->device.bus = &vio_bus_type;
-	snprintf(viodev->device.bus_id, BUS_ID_SIZE, "%s@%lx",
+	viodev->dev.parent = &vio_bus_device->dev;
+	viodev->dev.bus = &vio_bus_type;
+	snprintf(viodev->dev.bus_id, BUS_ID_SIZE, "%s@%lx",
 		of_node->name, viodev->unit_address);
-	viodev->device.release = vio_dev_release;
+	viodev->dev.release = vio_dev_release;
 
 	/* register with generic device framework */
-	if (device_register(&viodev->device)) {
+	if (device_register(&viodev->dev)) {
 		printk(KERN_ERR "%s: failed to register device %s\n", __FUNCTION__,
-			viodev->device.bus_id);
+			viodev->dev.bus_id);
 		/* XXX free TCE table */
 		kfree(viodev);
 		return NULL;
@@ -270,7 +270,7 @@ EXPORT_SYMBOL(vio_register_device);
 void __devinit vio_unregister_device(struct vio_dev *viodev)
 {
 	DBGENTER();
-	device_unregister(&viodev->device);
+	device_unregister(&viodev->dev);
 }
 EXPORT_SYMBOL(vio_unregister_device);
 

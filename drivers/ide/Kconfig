@@ -296,6 +296,12 @@ config IDE_TASKFILE_IO
 
 comment "IDE chipset support/bugfixes"
 
+config IDE_GENERIC
+	tristate "generic/default IDE chipset support"
+	default y
+	help
+	  If unsure, say Y.
+
 config BLK_DEV_CMD640
 	bool "CMD640 chipset bugfix/support"
 	depends on X86

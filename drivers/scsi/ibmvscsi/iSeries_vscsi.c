@@ -38,7 +38,7 @@
 extern struct dma_dev *iSeries_vio_dev;
 static void ibmvscsi_handle_event(struct HvLpEvent *lpevt);
 static int open_event_path(void);
-
+struct ibmvscsi_host_data *single_host_data = NULL; 
 
 /* ------------------------------------------------------------
  * Routines for managing the command/response queue
@@ -64,6 +64,7 @@ struct VIOSRP_CRQ *crq_queue_next_crq(struct crq_queue *queue)
  */
 int ibmvscsi_send_crq(struct ibmvscsi_host_data *hostdata, u64 word1, u64 word2)
 {
+	single_host_data = hostdata;
 	return HvCallEvent_signalLpEventFast(
 		viopath_hostLp,
 		HvLpEvent_Type_VirtualIo,
@@ -87,9 +88,16 @@ static void ibmvscsi_handle_event(struct HvLpEvent *lpevt)
 {
 	struct VIOSRPLpEvent *evt = (struct VIOSRPLpEvent *)lpevt;
 
-	if(!evt)
+	if(!evt) {
+		printk(KERN_ERR "ibmvscsi: received null event\n");
 		return;
+	}
 
+	if (single_host_data == NULL) {
+		printk(KERN_ERR "ibmvscsi: received event, no adapter present\n");
+		return;
+	}
+	
 	ibmvscsi_handle_crq(&evt->crq, single_host_data);
 }
 
@@ -125,8 +133,6 @@ int ibmvscsi_detect(Scsi_Host_Template * host_template)
 {
 	struct dma_dev *dma_dev;
 
-	ibmvscsi_host_count = 0;
-
 	if(!open_event_path()) {
 		printk("ibmvscsi: couldn't open vio event path\n");
 		return 0;
@@ -138,29 +144,36 @@ int ibmvscsi_detect(Scsi_Host_Template * host_template)
 		return 0;
 	}
 
-	add_host(dma_dev, host_template);
+	single_host_data = ibmvscsi_probe_generic(dma_dev, NULL);
 
-	return ibmvscsi_host_count;
+	return 1;
 }
 
+int ibmvscsi_release(struct Scsi_Host *host)
+{
+	struct ibmvscsi_host_data *hostdata = *(struct ibmvscsi_host_data **)&host->hostdata;
+	/* send an SRP_I_LOGOUT */
+	printk("ibmvscsi: release called\n");
+
+	ibmvscsi_remove_generic(hostdata);
+	single_host_data = NULL;
+
+	vio_clearHandler(viomajorsubtype_scsi);
+	viopath_close(viopath_hostLp, viomajorsubtype_scsi,
+		IBMVSCSI_MAX_REQUESTS);
+	return 0;
+}
 /* ------------------------------------------------------------
  * Routines to complete Linux SCSI Host support
  */
 
-void close_path(void)
-{
-	vio_clearHandler(viomajorsubtype_scsi);
-	viopath_close(viopath_hostLp, viomajorsubtype_scsi,
-		IBMVSCSI_MAX_REQUESTS);
-}
-
-int ibmvscsi_enable_interrupts(void* dma_dev)
+int ibmvscsi_enable_interrupts(struct dma_dev *dev)
 {
 	/*we're not disabling interrupt in iSeries*/
 	return 0;
 }
 
-int ibmvscsi_disable_interrupts(void* dma_dev)
+int ibmvscsi_disable_interrupts(struct dma_dev *dev)
 {
 	/*we're not disabling interrupt in iSeries*/
 	return 0;
@@ -170,7 +183,7 @@ int ibmvscsi_disable_interrupts(void* dma_dev)
  * iSeries_vscsi_init: - Init function for module
  *
 */
-static int __devinit iSeries_vscsi_init(void)
+int __init ibmvscsi_module_init(void)
 {
 	printk(KERN_DEBUG "Loading iSeries_vscsi module\n");
 	inter_module_register("vscsi_ref", THIS_MODULE, NULL);
@@ -181,11 +194,9 @@ static int __devinit iSeries_vscsi_init(void)
  * iSeries_vscsi_exit: - Exit function for module
  *
 */
-static void __devexit iSeries_vscsi_exit(void)
+void __exit ibmvscsi_module_exit(void)
 {
 	printk(KERN_DEBUG "Unloading iSeries_vscsi module\n");
 	inter_module_unregister("vscsi_ref");
 }
 
-module_init(iSeries_vscsi_init);
-module_exit(iSeries_vscsi_exit);

@@ -143,9 +143,9 @@ static struct pci_dev *dlpar_pci_add_bus(struct device_node *dn)
 	struct pci_controller *hose = dn->phb;
 	struct pci_dev *dev = NULL;
 
-	/* Scan phb bus for devices, adding new ones to bus->devices */
-	if (!pci_scan_slot(hose->bus, dn->devfn)) {
-		printk(KERN_ERR "%s: found no devices on bus\n", __FUNCTION__);
+	/* Scan phb bus for EADS device, adding new one to bus->devices */
+	if (!pci_scan_single_device(hose->bus, dn->devfn)) {
+		printk(KERN_ERR "%s: found no device on bus\n", __FUNCTION__);
 		return NULL;
 	}
 

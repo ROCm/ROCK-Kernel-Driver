@@ -27,6 +27,7 @@ typedef struct {
 #define ATOMIC_INIT(i)  { (i) }
 
 #ifdef __KERNEL__
+
 #define __CS_LOOP(ptr, op_val, op_string) ({				\
 	typeof(ptr->counter) old_val, new_val;				\
         __asm__ __volatile__("   l     %0,0(%3)\n"			\
@@ -38,7 +39,7 @@ typedef struct {
 			       "=m" (((atomic_t *)(ptr))->counter)	\
 			     : "a" (ptr), "d" (op_val),			\
 			       "m" (((atomic_t *)(ptr))->counter)	\
-			     : "cc" );					\
+			     : "cc", "memory" );			\
 	new_val;							\
 })
 #define atomic_read(v)          ((v)->counter)
@@ -108,8 +109,10 @@ typedef struct {
                              "   csg   %0,%1,0(%3)\n"			\
                              "   jl    0b"				\
                              : "=&d" (old_val), "=&d" (new_val),	\
-			       "+m" (((atomic_t *)(ptr))->counter)	\
-			     : "a" (ptr), "d" (op_val) : "cc" );	\
+			       "=m" (((atomic_t *)(ptr))->counter)	\
+			     : "a" (ptr), "d" (op_val),			\
+			       "m" (((atomic_t *)(ptr))->counter)	\
+			     : "cc", "memory" );			\
 	new_val;							\
 })
 #define atomic64_read(v)          ((v)->counter)
@@ -184,9 +187,9 @@ atomic_compare_and_swap(int expected_oldval,int new_val,atomic_t *v)
                 "  ipm  %0\n"
                 "  srl  %0,28\n"
                 "0:"
-                : "=&d" (retval), "+m" (v->counter)
-                : "a" (v), "d" (expected_oldval) , "d" (new_val)
-                : "cc" );
+                : "=&d" (retval), "=m" (v->counter)
+                : "a" (v), "d" (expected_oldval) , "d" (new_val),
+		  "m" (v->counter) : "cc", "memory" );
         return retval;
 }
 

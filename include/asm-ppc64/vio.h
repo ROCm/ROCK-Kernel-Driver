@@ -98,12 +98,12 @@ struct vio_dev {
 	struct TceTable *tce_table;     /* vio_map_* uses this */
 	unsigned int irq;
 
-	struct device device;
+	struct device dev;
 };
 
 static inline struct vio_dev *to_vio_dev(struct device *dev)
 {
-	return container_of(dev, struct vio_dev, device);
+	return container_of(dev, struct vio_dev, dev);
 }
 
 #endif /* _PHYP_H */

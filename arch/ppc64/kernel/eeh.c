@@ -50,6 +50,8 @@ static int eeh_implemented;
 static char *eeh_opts;
 static int eeh_opts_last;
 
+unsigned char	slot_err_buf[RTAS_ERROR_LOG_MAX];
+
 pte_t *find_linux_pte(pgd_t *pgdir, unsigned long va);	/* from htab.c */
 static int eeh_check_opts_config(struct device_node *dn,
 				 int class_code, int vendor_id, int device_id,
@@ -117,7 +119,6 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 				dn->eeh_config_addr, BUID_HI(dn->phb->buid), 
 				BUID_LO(dn->phb->buid));
 		if (ret == 0 && rets[1] == 1 && rets[0] >= 2) {
-			unsigned char	slot_err_buf[RTAS_ERROR_LOG_MAX];
 			unsigned long	slot_err_ret;
 
 			memset(slot_err_buf, 0, RTAS_ERROR_LOG_MAX);

@@ -66,7 +66,7 @@ extern struct task_struct *last_task_used_math;
 
 #else /* __s390x__ */
 
-# define TASK_SIZE		(0x20000000000UL)
+# define TASK_SIZE		(0x40000000000UL)
 # define TASK31_SIZE		(0x80000000UL)
 # define TASK_UNMAPPED_BASE	(test_thread_flag(TIF_31BIT) ? \
 					(TASK31_SIZE / 2) : (TASK_SIZE / 2))
@@ -249,7 +249,7 @@ static inline void enabled_wait(void)
 static inline void disabled_wait(unsigned long code)
 {
         char psw_buffer[2*sizeof(psw_t)];
-        char ctl_buf[4];
+        unsigned long ctl_buf;
         psw_t *dw_psw = (psw_t *)(((unsigned long) &psw_buffer+sizeof(psw_t)-1)
                                   & -sizeof(psw_t));
 
@@ -273,13 +273,13 @@ static inline void disabled_wait(unsigned long code)
                       "    std   6,0x178\n"    /* store f6 */
                       "    stm   0,15,0x180\n" /* store general registers */
                       "    stctl 0,15,0x1c0\n" /* store control registers */
-                      "    oi    0(%2),0x10\n" /* fake protection bit */
+                      "    oi    0x1c0,0x10\n" /* fake protection bit */
                       "    lpsw 0(%1)"
                       : "=m" (ctl_buf)
-		      : "a" (dw_psw), "a" (&ctl_buf), "m" (*dw_psw) : "cc" );
+		      : "a" (dw_psw), "a" (&ctl_buf), "m" (dw_psw) : "cc" );
 #else /* __s390x__ */
         asm volatile ("    stctg 0,0,0(%2)\n"
-                      "    ni    4(%1),0xef\n" /* switch off protection */
+                      "    ni    4(%2),0xef\n" /* switch off protection */
                       "    lctlg 0,0,0(%2)\n"
                       "    lghi  1,0x1000\n"
                       "    stpt  0x328(1)\n"      /* store timer */
@@ -307,9 +307,9 @@ static inline void disabled_wait(unsigned long code)
                       "    stctg 0,15,0x380(1)\n" /* store control registers */
                       "    oi    0x384(1),0x10\n" /* fake protection bit */
                       "    lpswe 0(%1)"
-                      : "=m" (ctl_buf) 
-		      : "a" (dw_psw), "a" (&ctl_buf), "m" (*dw_psw)
-		      : "cc", "0", "1");
+                      : "=m" (ctl_buf)
+		      : "a" (dw_psw), "a" (&ctl_buf),
+		        "m" (dw_psw) : "cc", "0", "1");
 #endif /* __s390x__ */
 }
 

@@ -68,8 +68,8 @@ static inline void * memchr(const void * cs,int c,size_t count)
                           "   slgr  %0,%0\n"
 #endif /* __s390x__ */
                           "1:"
-                          : "=&a" (ptr) : "a" (cs), "d" (c), "d" (count),
-                            "m" (*(char *) cs) : "cc", "0", "1" );
+                          : "=&a" (ptr) : "a" (cs), "d" (c), "d" (count)
+                          : "cc", "0", "1" );
     return ptr;
 }
 
@@ -87,8 +87,8 @@ static __inline__ char *strcpy(char *dest, const char *src)
                           "0: mvst  %0,%1\n"
                           "   jo    0b"
 #endif /* __s390x__ */
-                          : "+&a" (dest), "+&a" (src), "=m" (*dest)
-			  : "m" (*src) : "cc", "memory", "0" );
+                          : "+&a" (dest), "+&a" (src) :
+                          : "cc", "memory", "0" );
     return tmp;
 }
 
@@ -112,7 +112,7 @@ static __inline__ size_t strlen(const char *s)
                           "   lgr   %0,0\n"
                           "   sgr   %0,%1"
 #endif /* __s390x__ */
-                          : "=&a" (len) : "a" (s), "m" (*s)
+                          : "=&a" (len) : "a" (s) 
                           : "cc", "0" );
     return len;
 }
@@ -139,8 +139,8 @@ static __inline__ char *strcat(char *dest, const char *src)
                           "1: mvst  %0,%1\n"
                           "   jo    1b"
 #endif /* __s390x__ */
-                          : "+&a" (dest), "+&a" (src), "=m" (*dest)
-			  : "m" (*src) : "cc", "memory", "0" );
+                          : "+&a" (dest), "+&a" (src) :
+                          : "cc", "memory", "0" );
     return tmp;
 }
 

@@ -95,9 +95,9 @@ static inline int down_trylock(struct semaphore * sem)
 		"   cs   %0,%1,0(%3)\n"
 		"   jl   0b\n"
 		"1:"
-		: "=&d" (old_val), "=&d" (new_val),
-		  "+m" (sem->count.counter)
-		: "a" (&sem->count.counter) : "cc" );
+		: "=&d" (old_val), "=&d" (new_val), "=m" (sem->count.counter)
+		: "a" (&sem->count.counter), "m" (sem->count.counter)
+		: "cc", "memory" );
 	return old_val <= 0;
 }
 

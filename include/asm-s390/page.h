@@ -30,8 +30,7 @@ static inline void clear_page(void *page)
 	rp.subreg.odd = (unsigned long) 4096;
         asm volatile ("   slr  1,1\n"
 		      "   mvcl %0,0"
-		      : "+&a" (rp) : "m" (*(char *) page) 
-		      : "memory", "cc", "1" );
+		      : "+&a" (rp) : : "memory", "cc", "1" );
 }
 
 static inline void copy_page(void *to, void *from)
@@ -39,8 +38,7 @@ static inline void copy_page(void *to, void *from)
         if (MACHINE_HAS_MVPG)
 		asm volatile ("   sr   0,0\n"
 			      "   mvpg %0,%1"
-			      : : "a" (to), "a" (from),
-			          "m" (*(char *) to), "m" (*(char *) from)
+			      : : "a" ((void *)(to)), "a" ((void *)(from))
 			      : "memory", "cc", "0" );
 	else
 		asm volatile ("   mvc  0(256,%0),0(%1)\n"
@@ -59,8 +57,7 @@ static inline void copy_page(void *to, void *from)
 			      "   mvc  3328(256,%0),3328(%1)\n"
 			      "   mvc  3584(256,%0),3584(%1)\n"
 			      "   mvc  3840(256,%0),3840(%1)\n"
-			      : : "a"(to), "a"(from),
-			          "m" (*(char *) to), "m" (*(char *) from)
+			      : : "a"((void *)(to)),"a"((void *)(from)) 
 			      : "memory" );
 }
 
@@ -72,7 +69,7 @@ static inline void clear_page(void *page)
                       "   lghi 3,4096\n"
                       "   slgr 1,1\n"
                       "   mvcl 2,0"
-                      : : "a" ((void *) (page)), "m" (*(char *) page)
+                      : : "a" ((void *) (page))
 		      : "memory", "cc", "1", "2", "3" );
 }
 
@@ -81,8 +78,7 @@ static inline void copy_page(void *to, void *from)
         if (MACHINE_HAS_MVPG)
 		asm volatile ("   sgr  0,0\n"
 			      "   mvpg %0,%1"
-			      : : "a" (to), "a" (from),
-			          "m" (*(char *) to), "m" (*(char *) from)
+			      : : "a" ((void *)(to)), "a" ((void *)(from))
 			      : "memory", "cc", "0" );
 	else
 		asm volatile ("   mvc  0(256,%0),0(%1)\n"
@@ -101,8 +97,7 @@ static inline void copy_page(void *to, void *from)
 			      "   mvc  3328(256,%0),3328(%1)\n"
 			      "   mvc  3584(256,%0),3584(%1)\n"
 			      "   mvc  3840(256,%0),3840(%1)\n"
-			      : : "a" (to), "a"(from),
-			          "m" (*(char *) to), "m" (*(char *) from)
+			      : : "a"((void *)(to)),"a"((void *)(from)) 
 			      : "memory" );
 }
 
