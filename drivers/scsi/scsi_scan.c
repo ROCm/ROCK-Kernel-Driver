@@ -271,8 +271,7 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 			goto out_cleanup_slave;
 	}
 
-	if (get_device(&sdev->host->shost_gendev) == NULL ||
-	    scsi_sysfs_device_initialize(sdev) != 0)
+	if (scsi_sysfs_device_initialize(sdev) != 0)
 		goto out_cleanup_slave;
 
 
