@@ -70,6 +70,8 @@ ToDo/Notes:
 	  error handling code path that resulted in a BUG() due to trying to
 	  unmap an extent mft record when the mapping of it had failed and it
 	  thus was not mapped.  (Thanks to Ken MacFerrin for the bug report.)
+	- Drop the runlist lock after the vcn has been read in
+	  fs/ntfs/lcnalloc.c::__ntfs_cluster_free().
 
 2.1.21 - Fix some races and bugs, rewrite mft write code, add mft allocator.
 

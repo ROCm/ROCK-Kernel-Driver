@@ -903,8 +903,8 @@ s64 __ntfs_cluster_free(struct inode *vi, const VCN start_vcn, s64 count,
 			 * Attempt to map runlist, dropping runlist lock for
 			 * the duration.
 			 */
-			up_read(&ni->runlist.lock);
 			vcn = rl->vcn;
+			up_read(&ni->runlist.lock);
 			err = ntfs_map_runlist(ni, vcn);
 			if (err) {
 				if (!is_rollback)
