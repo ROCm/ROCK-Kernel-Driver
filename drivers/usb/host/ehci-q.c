@@ -736,6 +736,8 @@ static void qh_link_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 	}
 	qh->qh_state = QH_STATE_LINKED;
 	/* qtd completions reported later by interrupt */
+
+	ehci->async_idle = 0;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -1004,16 +1006,18 @@ rescan:
 			}
 
 			/* unlink idle entries, reducing HC PCI usage as
-			 * well as HCD schedule-scanning costs
+			 * well as HCD schedule-scanning costs.  removing
+			 * the last qh is deferred, since it's costly.
 			 */
 			if (list_empty (&qh->qtd_list) && !ehci->reclaim) {
 				if (qh->qh_next.qh != qh) {
 					// dbg ("irq/empty");
 					start_unlink_async (ehci, qh);
-				} else {
-					// FIXME:  arrange to stop
-					// after it's been idle a while.
-					// stop/restart isn't free...
+				} else if (!timer_pending (&ehci->watchdog)) {
+					/* can't use IAA for last entry */
+					ehci->async_idle = 1;
+					mod_timer (&ehci->watchdog,
+						jiffies + EHCI_ASYNC_JIFFIES);
 				}
 			}
 			qh = qh->qh_next.qh;

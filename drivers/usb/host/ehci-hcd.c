@@ -111,6 +111,7 @@
 #define	EHCI_TUNE_MULT_TT	1
 
 #define EHCI_WATCHDOG_JIFFIES	(HZ/100)	/* arbitrary; ~10 msec */
+#define EHCI_ASYNC_JIFFIES	(HZ/3)		/* async idle timeout */
 
 /* Initial IRQ latency:  lower than default */
 static int log2_irq_thresh = 0;		// 0 to 6
@@ -247,9 +248,14 @@ static void ehci_watchdog (unsigned long param)
 	struct ehci_hcd		*ehci = (struct ehci_hcd *) param;
 	unsigned long		flags;
 
-	/* guard against lost IAA, which wedges everything */
 	spin_lock_irqsave (&ehci->lock, flags);
+	/* guard against lost IAA, which wedges everything */
 	ehci_irq (&ehci->hcd);
+ 	/* unlink the last qh after it's idled a while */
+ 	if (ehci->async_idle) {
+ 		start_unlink_async (ehci, ehci->async);
+ 		ehci->async_idle = 0;
+	}
 	spin_unlock_irqrestore (&ehci->lock, flags);
 }
 
