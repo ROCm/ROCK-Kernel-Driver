@@ -90,6 +90,7 @@ static inline void down(struct semaphore * sem)
 #if WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
+	might_sleep();
 
 	count = &(sem->count);
 	__asm__ __volatile__(
@@ -117,6 +118,7 @@ static inline int down_interruptible(struct semaphore * sem)
 #if WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
+	might_sleep();
 
 	count = &(sem->count);
 	__asm__ __volatile__(

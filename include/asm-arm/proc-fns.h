@@ -21,11 +21,6 @@
 #undef MULTI_CPU
 #undef CPU_NAME
 
-#ifdef CONFIG_CPU_26
-# define CPU_INCLUDE_NAME "asm/cpu-multi26.h"
-# define MULTI_CPU
-#endif
-
 /*
  * CPU_NAME - the prefix for CPU related functions
  */

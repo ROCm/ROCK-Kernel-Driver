@@ -187,7 +187,6 @@ __setup("hpet=", hpet_setup);
 #include <linux/rtc.h>
 
 extern irqreturn_t rtc_interrupt(int irq, void *dev_id, struct pt_regs *regs);
-extern void get_rtc_time(struct rtc_time *rtc_tm);
 
 #define DEFAULT_RTC_INT_FREQ 	64
 #define RTC_NUM_INTS 		1
@@ -354,7 +353,7 @@ irqreturn_t hpet_rtc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	hpet_rtc_timer_reinit();
 
 	if (UIE_on | AIE_on) {
-		get_rtc_time(&curr_time);
+		rtc_get_rtc_time(&curr_time);
 	}
 	if (UIE_on) {
 		if (curr_time.tm_sec != prev_update_sec) {

@@ -145,7 +145,7 @@ write_fifo(struct IsdnCardState *cs, struct sk_buff *skb, u8 fifo, int trans_max
 	  count = z2 - z1;
 	  if (count <= 0)
 	    count += fifo_size; /* free bytes */
-	  if (count < skb->len+1) return(0); /* no room */
+	  if (count < (int)(skb->len+1)) return(0); /* no room */
 	  count = fifo_size - count; /* bytes still not send */
 	  if (count > 2 * trans_max) return(0); /* delay too long */
 	  count = skb->len;
@@ -182,7 +182,7 @@ write_fifo(struct IsdnCardState *cs, struct sk_buff *skb, u8 fifo, int trans_max
 	if (cs->debug & L1_DEB_ISAC_FIFO)
 	  debugl1(cs, "hfcsx_write_fifo %d count(%ld/%d)",
 		  fifo, skb->len, count);
-	if (count < skb->len) {
+	if (count < (int)skb->len) {
 	  if (cs->debug & L1_DEB_ISAC_FIFO)
 	    debugl1(cs, "hfcsx_write_fifo %d no fifo mem", fifo);
 	  return(0);

@@ -483,7 +483,7 @@ static void rh_report_status (unsigned long ptr)
 {
 	struct urb	*urb;
 	struct usb_hcd	*hcd;
-	int		length;
+	int		length = 0;
 	unsigned long	flags;
 
 	urb = (struct urb *) ptr;
@@ -499,7 +499,9 @@ static void rh_report_status (unsigned long ptr)
 		return;
 	}
 
-	length = hcd->driver->hub_status_data (hcd, urb->transfer_buffer);
+	if (!HCD_IS_SUSPENDED (hcd->state))
+		length = hcd->driver->hub_status_data (
+					hcd, urb->transfer_buffer);
 
 	/* complete the status urb, or retrigger the timer */
 	spin_lock (&hcd_data_lock);
@@ -1097,6 +1099,8 @@ done:
 static int hcd_get_frame_number (struct usb_device *udev)
 {
 	struct usb_hcd	*hcd = (struct usb_hcd *)udev->bus->hcpriv;
+	if (!HCD_IS_RUNNING (hcd->state))
+		return -ESHUTDOWN;
 	return hcd->driver->get_frame_number (hcd);
 }
 
@@ -1193,6 +1197,12 @@ static int hcd_unlink_urb (struct urb *urb)
 		goto done;
 	}
 
+	/* running ~= hc unlink handshake works (irq, timer, etc)
+	 * halted ~= no unlink handshake is needed
+	 * suspended, resuming == should never happen
+	 */
+	WARN_ON (!HCD_IS_RUNNING (hcd->state) && hcd->state != USB_STATE_HALT);
+
 	if (!urb->hcpriv) {
 		retval = -EINVAL;
 		goto done;
@@ -1206,6 +1216,17 @@ static int hcd_unlink_urb (struct urb *urb)
 	if (urb->status != -EINPROGRESS) {
 		retval = -EBUSY;
 		goto done;
+	}
+
+	/* PCI IRQ setup can easily be broken so that USB controllers
+	 * never get completion IRQs ... maybe even the ones we need to
+	 * finish unlinking the initial failed usb_set_address().
+	 */
+	if (!hcd->saw_irq) {
+		dev_warn (hcd->controller, "Unlink after no-IRQ?  "
+			"Different ACPI or APIC settings may help."
+			"\n");
+		hcd->saw_irq = 1;
 	}
 
 	/* maybe set up to block until the urb's completion fires.  the
@@ -1286,6 +1307,8 @@ static void hcd_endpoint_disable (struct usb_device *udev, int endpoint)
 
 	dev = udev->hcpriv;
 	hcd = udev->bus->hcpriv;
+
+	WARN_ON (!HCD_IS_RUNNING (hcd->state) && hcd->state != USB_STATE_HALT);
 
 	local_irq_disable ();
 
@@ -1483,6 +1506,7 @@ irqreturn_t usb_hcd_irq (int irq, void *__hcd, struct pt_regs * r)
 	if (unlikely (hcd->state == USB_STATE_HALT))	/* irq sharing? */
 		return IRQ_NONE;
 
+	hcd->saw_irq = 1;
 	hcd->driver->irq (hcd, r);
 	if (hcd->state != start && hcd->state == USB_STATE_HALT)
 		usb_hc_died (hcd);

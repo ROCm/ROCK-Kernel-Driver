@@ -1391,10 +1391,10 @@ next:
 		if (pmu_battery_count)
 			query_battery_state();
 		pmu_pass_intr(data, len);
-	} else
+	} else {
 	       pmu_pass_intr(data, len);
-
 #endif /* CONFIG_PMAC_PBOOK */
+	}
 	goto next;
 }
 

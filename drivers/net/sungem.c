@@ -2416,13 +2416,6 @@ static int gem_nway_reset(struct net_device *dev)
 	return 0;
 }
 
-static u32 gem_get_link(struct net_device *dev)
-{
-	struct gem *gp = dev->priv;
-
-	return (gp->lstate == link_up);
-}
-
 static u32 gem_get_msglevel(struct net_device *dev)
 {
 	struct gem *gp = dev->priv;
@@ -2441,7 +2434,6 @@ static struct ethtool_ops gem_ethtool_ops = {
 	.get_settings		= gem_get_settings,
 	.set_settings		= gem_set_settings,
 	.nway_reset		= gem_nway_reset,
-	.get_link		= gem_get_link,
 	.get_msglevel		= gem_get_msglevel,
 	.set_msglevel		= gem_set_msglevel,
 };
@@ -2630,7 +2622,7 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 		if (err) {
 			printk(KERN_ERR PFX "No usable DMA configuration, "
 			       "aborting.\n");
-			return err;
+			goto err_disable_device;
 		}
 		pci_using_dac = 0;
 	}
@@ -2641,20 +2633,23 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	if ((pci_resource_flags(pdev, 0) & IORESOURCE_IO) != 0) {
 		printk(KERN_ERR PFX "Cannot find proper PCI device "
 		       "base address, aborting.\n");
-		return -ENODEV;
+		err = -ENODEV;
+		goto err_disable_device;
 	}
 
 	dev = alloc_etherdev(sizeof(*gp));
 	if (!dev) {
 		printk(KERN_ERR PFX "Etherdev alloc failed, aborting.\n");
-		return -ENOMEM;
+		err = -ENOMEM;
+		goto err_disable_device;
 	}
 	SET_MODULE_OWNER(dev);
 	SET_NETDEV_DEV(dev, &pdev->dev);
 
 	gp = dev->priv;
 
-	if (pci_request_regions(pdev, dev->name)) {
+	err = pci_request_regions(pdev, dev->name);
+	if (err) {
 		printk(KERN_ERR PFX "Cannot obtain PCI resources, "
 		       "aborting.\n");
 		goto err_out_free_netdev;
@@ -2688,6 +2683,7 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	if (gp->regs == 0UL) {
 		printk(KERN_ERR PFX "Cannot map device registers, "
 		       "aborting.\n");
+		err = -EIO;
 		goto err_out_free_res;
 	}
 
@@ -2711,8 +2707,10 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	/* By default, we start with autoneg */
 	gp->want_autoneg = 1;
 	
-	if (gem_check_invariants(gp))
+	if (gem_check_invariants(gp)) {
+		err = -ENODEV;
 		goto err_out_iounmap;
+	}
 
 	/* It is guaranteed that the returned buffer will be at least
 	 * PAGE_SIZE aligned.
@@ -2723,6 +2721,7 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	if (!gp->init_block) {
 		printk(KERN_ERR PFX "Cannot allocate init block, "
 		       "aborting.\n");
+		err = -ENOMEM;
 		goto err_out_iounmap;
 	}
 
@@ -2735,6 +2734,7 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	if (register_netdev(dev)) {
 		printk(KERN_ERR PFX "Cannot register net device, "
 		       "aborting.\n");
+		err = -ENOMEM;
 		goto err_out_free_consistent;
 	}
 
@@ -2804,9 +2804,10 @@ err_out_free_res:
 	pci_release_regions(pdev);
 
 err_out_free_netdev:
-	kfree(dev);
-
-	return -ENODEV;
+	free_netdev(dev);
+err_disable_device:
+	pci_disable_device(pdev);
+	return err;
 
 }
 

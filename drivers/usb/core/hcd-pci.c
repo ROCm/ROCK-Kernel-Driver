@@ -139,6 +139,7 @@ clean_2:
 			return retval;
 		}
 	}
+	// hcd zeroed everything
 	hcd->regs = base;
 	hcd->region = region;
 
@@ -165,6 +166,7 @@ clean_3:
 		dev_err (hcd->controller, "can't reset\n");
 		goto clean_3;
 	}
+	hcd->state = USB_STATE_HALT;
 
 	pci_set_master (dev);
 #ifndef __sparc__
@@ -230,7 +232,8 @@ void usb_hcd_pci_remove (struct pci_dev *dev)
 		BUG ();
 
 	hub = hcd->self.root_hub;
-	hcd->state = USB_STATE_QUIESCING;
+	if (HCD_IS_RUNNING (hcd->state))
+		hcd->state = USB_STATE_QUIESCING;
 
 	dev_dbg (hcd->controller, "roothub graceful disconnect\n");
 	usb_disconnect (&hub);
@@ -287,8 +290,8 @@ int usb_hcd_pci_suspend (struct pci_dev *dev, u32 state)
 		pci_save_state (dev, hcd->pci_state);
 
 		/* driver may want to disable DMA etc */
+		hcd->state = USB_STATE_QUIESCING;
 		retval = hcd->driver->suspend (hcd, state);
-		hcd->state = USB_STATE_SUSPENDED;
 	}
 
  	pci_set_power_state (dev, state);

@@ -354,15 +354,23 @@ static int usb_dsbr100_close(struct inode *inode, struct file *file)
 
 static int __init dsbr100_init(void)
 {
+	int retval;
 	usb_dsbr100_radio.priv = NULL;
-	usb_register(&usb_dsbr100_driver);
-	if (video_register_device(&usb_dsbr100_radio, VFL_TYPE_RADIO,
-		radio_nr)==-1) {	
+	retval = usb_register(&usb_dsbr100_driver);
+	if (retval)
+		goto failed_usb_register;
+	retval = video_register_device(&usb_dsbr100_radio, VFL_TYPE_RADIO,
+				       radio_nr);
+	if (retval) {	
 		warn("Couldn't register video device");
-		return -EINVAL;
+		goto failed_video_register;
 	}
 	info(DRIVER_VERSION ":" DRIVER_DESC);
 	return 0;
+failed_video_register:
+	usb_deregister(&usb_dsbr100_driver);
+failed_usb_register:
+	return retval;
 }
 
 static void __exit dsbr100_exit(void)

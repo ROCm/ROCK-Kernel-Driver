@@ -1512,7 +1512,7 @@ out_stop:
 out_res:
 	pci_release_regions(pdev);
 out_free:
-	kfree(dev);
+	free_netdev(dev);
 	return err;
 }
 

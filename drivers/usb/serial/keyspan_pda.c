@@ -1,9 +1,9 @@
 /*
  * USB Keyspan PDA / Xircom / Entregra Converter driver
  *
- * Copyright (c) 1999 - 2001 Greg Kroah-Hartman	<greg@kroah.com>
- * Copyright (c) 1999, 2000 Brian Warner	<warner@lothar.com>
- * Copyright (c) 2000 Al Borchers		<borchers@steinerpoint.com>
+ * Copyright (C) 1999 - 2001 Greg Kroah-Hartman	<greg@kroah.com>
+ * Copyright (C) 1999, 2000 Brian Warner	<warner@lothar.com>
+ * Copyright (C) 2000 Al Borchers		<borchers@steinerpoint.com>
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -876,16 +876,39 @@ static struct usb_serial_device_type keyspan_pda_device = {
 
 static int __init keyspan_pda_init (void)
 {
-	usb_serial_register (&keyspan_pda_device);
+	int retval;
+	retval = usb_serial_register(&keyspan_pda_device);
+	if (retval)
+		goto failed_pda_register;
 #ifdef KEYSPAN
-	usb_serial_register (&keyspan_pda_fake_device);
+	retval = usb_serial_register(&keyspan_pda_fake_device);
+	if (retval)
+		goto failed_pda_fake_register;
 #endif
 #ifdef XIRCOM
-	usb_serial_register (&xircom_pgs_fake_device);
+	retval = usb_serial_register(&xircom_pgs_fake_device);
+	if (retval)
+		goto failed_xircom_register;
 #endif
-	usb_register (&keyspan_pda_driver);
+	retval = usb_register(&keyspan_pda_driver);
+	if (retval)
+		goto failed_usb_register;
 	info(DRIVER_DESC " " DRIVER_VERSION);
 	return 0;
+failed_usb_register:	
+#ifdef XIRCOM
+	usb_serial_deregister(&xircom_pgs_fake_device);
+failed_xircom_register:
+#endif /* XIRCOM */
+#ifdef KEYSPAN
+	usb_serial_deregister(&keyspan_pda_fake_device);
+#endif
+#ifdef KEYSPAN
+failed_pda_fake_register:
+#endif
+	usb_serial_deregister(&keyspan_pda_device);
+failed_pda_register:
+	return retval;
 }
 
 

@@ -751,17 +751,17 @@ setup_diva(struct IsdnCard *card)
 					card->para[1] = pnp_port_start(pd, 0);
 					card->para[0] = pnp_irq(pd, 0);
 					if (pdev->function == ISAPNP_FUNCTION(0xA1)) {
-						if (diva_ipac_isa_probe(cs->card, cs))
+						if (diva_ipac_isa_probe(card->cs, card))
 							return 0;
 						return 1;
 					} else {
-						if (diva_isac_isa_probe(cs->card, cs))
+						if (diva_isac_isa_probe(card->cs, card))
 							return 0;
 						return 1;
-					} else {
-						printk(KERN_ERR "Diva PnP: PnP error card found, no device\n");
-						return(0);
 					}
+				} else {
+					printk(KERN_ERR "Diva PnP: PnP error card found, no device\n");
+					return(0);
 				}
 				pdev++;
 				pnp_c=NULL;

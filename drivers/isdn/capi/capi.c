@@ -412,7 +412,7 @@ gen_data_b3_resp_for(struct capiminor *mp, struct sk_buff *skb)
 static int handle_recv_skb(struct capiminor *mp, struct sk_buff *skb)
 {
 	struct sk_buff *nskb;
-	unsigned int datalen;
+	int datalen;
 	u16 errcode, datahandle;
 
 	datalen = skb->len - CAPIMSG_LEN(skb->data);
@@ -552,12 +552,12 @@ static void capi_recv_message(struct capi20_appl *ap, struct sk_buff *skb)
 	struct capincci *np;
 	u32 ncci;
 
-	if (CAPIMSG_COMMAND(skb->data) == CAPI_CONNECT_B3_CONF) {
+	if (CAPIMSG_CMD(skb->data) == CAPI_CONNECT_B3_CONF) {
 		u16 info = CAPIMSG_U16(skb->data, 12); // Info field
 		if (info == 0)
 			capincci_alloc(cdev, CAPIMSG_NCCI(skb->data));
 	}
-	if (CAPIMSG_COMMAND(skb->data) == CAPI_CONNECT_B3_IND) {
+	if (CAPIMSG_CMD(skb->data) == CAPI_CONNECT_B3_IND) {
 		capincci_alloc(cdev, CAPIMSG_NCCI(skb->data));
 	}
 	if (CAPIMSG_COMMAND(skb->data) != CAPI_DATA_B3) {
@@ -688,7 +688,7 @@ capi_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	}
 	mlen = CAPIMSG_LEN(skb->data);
 	if (CAPIMSG_CMD(skb->data) == CAPI_DATA_B3_REQ) {
-		if (mlen + CAPIMSG_DATALEN(skb->data) != count) {
+		if ((size_t)(mlen + CAPIMSG_DATALEN(skb->data)) != count) {
 			kfree_skb(skb);
 			return -EINVAL;
 		}
@@ -700,7 +700,7 @@ capi_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	}
 	CAPIMSG_SETAPPID(skb->data, cdev->ap.applid);
 
-	if (CAPIMSG_COMMAND(skb->data) == CAPI_DISCONNECT_B3_RESP) {
+	if (CAPIMSG_CMD(skb->data) == CAPI_DISCONNECT_B3_RESP) {
 		capincci_free(cdev, CAPIMSG_NCCI(skb->data));
 			
 	}

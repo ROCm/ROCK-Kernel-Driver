@@ -1854,7 +1854,6 @@ static ide_driver_t idefloppy_driver = {
 	.version		= IDEFLOPPY_VERSION,
 	.media			= ide_floppy,
 	.busy			= 0,
-	.supports_dma		= 1,
 	.supports_dsc_overlap	= 0,
 	.cleanup		= idefloppy_cleanup,
 	.do_request		= idefloppy_do_request,

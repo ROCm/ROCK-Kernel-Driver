@@ -140,6 +140,7 @@ static void  change_level( struct net_device * );
 static void  timeout_change_level( struct net_device * );
 static u32   calc_crc32( u32, u8 *, u32 );
 static struct sk_buff *  get_rx_buf( struct net_device * );
+static int  sbni_init( struct net_device * );
 
 #ifdef CONFIG_SBNI_MULTILINE
 static int  enslave( struct net_device *, struct net_device * );
@@ -205,23 +206,44 @@ sbni_isa_probe( struct net_device  *dev )
 	}
 }
 
-
-int __init
-sbni_probe( struct net_device  *dev )
+static void __init sbni_devsetup(struct net_device *dev)
 {
-	int  i;
+	ether_setup( dev );
+	dev->init 		= &sbni_init;
+	dev->open		= &sbni_open;
+	dev->stop		= &sbni_close;
+	dev->hard_start_xmit	= &sbni_start_xmit;
+	dev->get_stats		= &sbni_get_stats;
+	dev->set_multicast_list	= &set_multicast_list;
+	dev->do_ioctl		= &sbni_ioctl;
 
+	SET_MODULE_OWNER( dev );
+}
+
+int __init sbni_probe(void)
+{
+	struct net_device *dev;
 	static unsigned  version_printed __initdata = 0;
+
 	if( version_printed++ == 0 )
 		printk( KERN_INFO "%s", version );
 
-	if( !dev ) {	/* simple sanity check */
-		printk( KERN_ERR "sbni: NULL device!\n" );
-		return  -ENODEV;
+	dev = alloc_netdev(sizeof(struct net_local), "sbni%d", sbni_devsetup);
+	if (!dev)
+		return -ENOMEM;
+
+	netdev_boot_setup_check(dev);
+
+	if (register_netdev(dev)) {
+		kfree(dev);
+		return -ENODEV;
 	}
+	return 0;
+}
 
-	SET_MODULE_OWNER( dev );
-
+static int __init sbni_init(struct net_device *dev)
+{
+	int  i;
 	if( dev->base_addr )
 		return  sbni_isa_probe( dev );
 	/* otherwise we have to perform search our adapter */
@@ -338,7 +360,7 @@ sbni_probe1( struct net_device  *dev,  unsigned long  ioaddr,  int  irq )
 	dev->base_addr = ioaddr;
 
 	/* Allocate dev->priv and fill in sbni-specific dev fields. */
-	nl = (struct net_local *) kmalloc(sizeof(struct net_local), GFP_KERNEL);
+	nl = dev->priv;
 	if( !nl ) {
 		printk( KERN_ERR "%s: unable to get memory!\n", dev->name );
 		release_region( ioaddr, SBNI_IO_EXTENT );
@@ -389,14 +411,6 @@ sbni_probe1( struct net_device  *dev,  unsigned long  ioaddr,  int  irq )
 	nl->link   = NULL;
 #endif
    
-	dev->open		= &sbni_open;
-	dev->stop		= &sbni_close;
-	dev->hard_start_xmit	= &sbni_start_xmit;
-	dev->get_stats		= &sbni_get_stats;
-	dev->set_multicast_list	= &set_multicast_list;
-	dev->do_ioctl		= &sbni_ioctl;
-	ether_setup( dev );
-
 	sbni_cards[ num++ ] = dev;
 	return  dev;
 }
@@ -1478,15 +1492,15 @@ init_module( void )
 	struct net_device  *dev;
 
 	while( num < SBNI_MAX_NUM_CARDS ) {
-		if( !(dev = kmalloc(sizeof(struct net_device), GFP_KERNEL)) ){
+		dev = alloc_netdev(sizeof(struct net_local), 
+				   "sbni%d", sbni_devsetup);
+		if( !dev) {
 			printk( KERN_ERR "sbni: unable to allocate device!\n" );
 			return  -ENOMEM;
 		}
 
-		memset( dev, 0, sizeof(struct net_device) );
 		sprintf( dev->name, "sbni%d", num );
 
-		dev->init = sbni_probe;
 		if( register_netdev( dev ) ) {
 			kfree( dev );
 			break;
@@ -1506,7 +1520,6 @@ cleanup_module( void )
 		if( (dev = sbni_cards[ num ]) != NULL ) {
 			unregister_netdev( dev );
 			release_region( dev->base_addr, SBNI_IO_EXTENT );
-			kfree( dev->priv );
 			free_netdev( dev );
 		}
 }

@@ -574,3 +574,4 @@ module_exit(hci_uart_cleanup);
 MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>");
 MODULE_DESCRIPTION("Bluetooth HCI UART driver ver " VERSION);
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_LDISC(N_HCI);

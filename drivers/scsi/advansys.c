@@ -6362,8 +6362,8 @@ advansys_slave_configure(Scsi_Device *device)
     } else {
 	scsi_adjust_queue_depth(device, 0, device->host->cmd_per_lun);
     }
-    ASC_DBG3(1, "advansys_slave_configure: shp 0x%lx, id %d, depth %d\n",
-            (ulong) shp, device->id, device->queue_depth);
+    ASC_DBG4(1, "advansys_slave_configure: device 0x%lx, boardp 0x%lx, id %d, depth %d\n",
+            (ulong) device, (ulong) boardp, device->id, device->queue_depth);
     return 0;
 }
 
@@ -9354,8 +9354,8 @@ asc_prt_scsi_host(struct Scsi_Host *s)
 
     printk("Scsi_Host at addr 0x%lx\n", (ulong) s);
     printk(
-" next 0x%lx, host_busy %u, host_no %d, last_reset %d,\n",
-        (ulong) s->next, s->host_busy, s->host_no,
+" host_busy %u, host_no %d, last_reset %d,\n",
+        s->host_busy, s->host_no,
         (unsigned) s->last_reset);
 
 #if ASC_LINUX_KERNEL24
@@ -9399,8 +9399,8 @@ asc_prt_scsi_cmnd(Scsi_Cmnd *s)
 
     printk(
 " host 0x%lx, device 0x%lx, target %u, lun %u, channel %u,\n",
-        (ulong) s->host, (ulong) s->device, s->target, s->lun,
-        s->channel);
+        (ulong) s->device->host, (ulong) s->device, s->device->id, s->device->lun,
+        s->device->channel);
 
     asc_prt_hex(" CDB", s->cmnd, s->cmd_len);
 

@@ -3,11 +3,14 @@ config SECURITY_SELINUX
 	depends on SECURITY
 	default n
 	help
-	  This enables NSA Security-Enhanced Linux (SELinux).
+	  This selects NSA Security-Enhanced Linux (SELinux).
 	  You will also need a policy configuration and a labeled filesystem.
 	  You can obtain the policy compiler (checkpolicy), the utility for
 	  labeling filesystems (setfiles), and an example policy configuration
 	  from http://www.nsa.gov/selinux.
+	  SELinux needs to be explicitly enabled on the kernel command line with
+	  selinux=1.  If you specify selinux=0 or do not use this parameter,
+	  SELinux will not be enabled.
 	  If you are unsure how to answer this question, answer N.
 
 config SECURITY_SELINUX_DEVELOP

@@ -1794,7 +1794,7 @@ static void *rfcomm_seq_next(struct seq_file *seq, void *e, loff_t *pos)
 	if (p->next != &s->dlcs)
 		return p->next;
 
-	for (p = s->list.next; p != &session_list; p = p->next) {
+	list_for_each(p, &session_list) {
 		s = list_entry(p, struct rfcomm_session, list);
 		__list_for_each(pp, &s->dlcs) {
 			seq->private = s;

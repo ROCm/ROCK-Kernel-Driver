@@ -410,6 +410,7 @@ static irqreturn_t i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			/* work around hardware that doubles key releases */
 			if (index == i8042_last_release) {
 				dbg("i8042 skipped double release (%d)\n", index);
+				i8042_last_e0 = 0;
 				continue;
 			}
 			if (index == 0xaa || index == 0xb6)
@@ -581,6 +582,7 @@ void i8042_controller_cleanup(void)
 static int __init i8042_check_mux(struct i8042_values *values)
 {
 	unsigned char param;
+	static int i8042_check_mux_cookie;
 	int i;
 
 /*
@@ -588,9 +590,9 @@ static int __init i8042_check_mux(struct i8042_values *values)
  */
 
 	if (request_irq(values->irq, i8042_interrupt, SA_SHIRQ,
-				"i8042", i8042_request_irq_cookie))
+				"i8042", &i8042_check_mux_cookie))
                 return -1;
-	free_irq(values->irq, i8042_request_irq_cookie);
+	free_irq(values->irq, &i8042_check_mux_cookie);
 
 /*
  * Get rid of bytes in the queue.
@@ -653,6 +655,7 @@ static int __init i8042_check_mux(struct i8042_values *values)
 static int __init i8042_check_aux(struct i8042_values *values)
 {
 	unsigned char param;
+	static int i8042_check_aux_cookie;
 
 /*
  * Check if AUX irq is available. If it isn't, then there is no point
@@ -660,9 +663,9 @@ static int __init i8042_check_aux(struct i8042_values *values)
  */
 
 	if (request_irq(values->irq, i8042_interrupt, SA_SHIRQ,
-				"i8042", i8042_request_irq_cookie))
+				"i8042", &i8042_check_aux_cookie))
                 return -1;
-	free_irq(values->irq, i8042_request_irq_cookie);
+	free_irq(values->irq, &i8042_check_aux_cookie);
 
 /*
  * Get rid of bytes in the queue.

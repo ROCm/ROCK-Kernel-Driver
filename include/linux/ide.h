@@ -1218,7 +1218,6 @@ typedef struct ide_driver_s {
 	const char			*version;
 	u8				media;
 	unsigned busy			: 1;
-	unsigned supports_dma		: 1;
 	unsigned supports_dsc_overlap	: 1;
 	int		(*cleanup)(ide_drive_t *);
 	int		(*shutdown)(ide_drive_t *);

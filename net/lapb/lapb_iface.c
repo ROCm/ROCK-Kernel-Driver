@@ -435,11 +435,8 @@ EXPORT_SYMBOL(lapb_disconnect_request);
 EXPORT_SYMBOL(lapb_data_request);
 EXPORT_SYMBOL(lapb_data_received);
 
-static char banner[] __initdata = KERN_INFO "NET4: LAPB for Linux. Version 0.01 for NET4.0\n";
-
 static int __init lapb_init(void)
 {
-	printk(banner);
 	return 0;
 }
 

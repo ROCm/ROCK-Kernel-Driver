@@ -1758,7 +1758,7 @@ HiSax_command(isdn_ctrl * ic)
 		/* protocol specific io commands */
 		case (ISDN_CMD_PROT_IO):
 			for (st = csta->stlist; st; st = st->next)
-				if (st->protocol == (ic->arg & 0xFF))
+				if ((u_int)st->protocol == (ic->arg & 0xFF))
 					return(st->l3.l4l3_proto(st, ic));
 			return(-EINVAL);
 			break;

@@ -1328,6 +1328,7 @@ void hid_init_reports(struct hid_device *hid)
 #define USB_DEVICE_ID_ATEN_CS124U      0x2202
 #define USB_DEVICE_ID_ATEN_2PORTKVM    0x2204
 #define USB_DEVICE_ID_ATEN_4PORTKVM    0x2205
+#define USB_DEVICE_ID_ATEN_4PORTKVMC   0x2208
 
 #define USB_VENDOR_ID_TOPMAX           0x0663
 #define USB_DEVICE_ID_TOPMAX_COBRAPAD  0x0103
@@ -1386,6 +1387,7 @@ struct hid_blacklist {
 	{ USB_VENDOR_ID_ATEN, USB_DEVICE_ID_ATEN_CS124U, HID_QUIRK_NOGET },
 	{ USB_VENDOR_ID_ATEN, USB_DEVICE_ID_ATEN_2PORTKVM, HID_QUIRK_NOGET },
 	{ USB_VENDOR_ID_ATEN, USB_DEVICE_ID_ATEN_4PORTKVM, HID_QUIRK_NOGET },
+	{ USB_VENDOR_ID_ATEN, USB_DEVICE_ID_ATEN_4PORTKVMC, HID_QUIRK_NOGET },
 	{ USB_VENDOR_ID_MGE, USB_DEVICE_ID_MGE_UPS, HID_QUIRK_HIDDEV },
 	{ USB_VENDOR_ID_MGE, USB_DEVICE_ID_MGE_UPS1, HID_QUIRK_HIDDEV },
 	{ USB_VENDOR_ID_TOPMAX, USB_DEVICE_ID_TOPMAX_COBRAPAD, HID_QUIRK_BADPAD },
@@ -1691,11 +1693,20 @@ static struct usb_driver hid_driver = {
 
 static int __init hid_init(void)
 {
-	hiddev_init();
-	usb_register(&hid_driver);
+	int retval;
+	retval = hiddev_init();
+	if (retval)
+		goto hiddev_init_fail;
+	retval = usb_register(&hid_driver);
+	if (retval)
+		goto usb_register_fail;
 	info(DRIVER_VERSION ":" DRIVER_DESC);
 
 	return 0;
+usb_register_fail:
+	hiddev_exit();
+hiddev_init_fail:
+	return retval;
 }
 
 static void __exit hid_exit(void)

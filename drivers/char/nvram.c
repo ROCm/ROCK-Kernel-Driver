@@ -923,3 +923,4 @@ EXPORT_SYMBOL(__nvram_check_checksum);
 EXPORT_SYMBOL(nvram_check_checksum);
 EXPORT_SYMBOL(__nvram_set_checksum);
 EXPORT_SYMBOL(nvram_set_checksum);
+MODULE_ALIAS_MISCDEV(NVRAM_MINOR);

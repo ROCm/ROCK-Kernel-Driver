@@ -41,6 +41,12 @@
 #define SONY_CLIE_NX60_ID		0x00DA
 #define SONY_CLIE_NZ90V_ID		0x00E9
 
+#define SAMSUNG_VENDOR_ID		0x04E8
+#define SAMSUNG_SCH_I330_ID		0x8001
+
+#define GARMIN_VENDOR_ID		0x091E
+#define GARMIN_IQUE_3600_ID		0x0004
+
 /****************************************************************************
  * Handspring Visor Vendor specific request codes (bRequest values)
  * A big thank you to Handspring for providing the following information.

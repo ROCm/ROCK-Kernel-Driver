@@ -2455,7 +2455,7 @@ error_out_remap:
 error_out_regions:
 	pci_release_regions(pdev);
 error_out_dev:
-	kfree(dev);
+	free_netdev(dev);
 error_out:
 	return err;
 }

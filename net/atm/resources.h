@@ -24,6 +24,18 @@ int atm_dev_ioctl(unsigned int cmd, unsigned long arg);
 int atm_proc_dev_register(struct atm_dev *dev);
 void atm_proc_dev_deregister(struct atm_dev *dev);
 
-#endif
+#else
+
+static inline int atm_proc_dev_register(struct atm_dev *dev)
+{
+	return 0;
+}
+
+static inline void atm_proc_dev_deregister(struct atm_dev *dev)
+{
+	/* nothing */
+}
+
+#endif /* CONFIG_PROC_FS */
 
 #endif

@@ -3,7 +3,7 @@
 #
 
 menu "PCMCIA SCSI adapter support"
-	depends on SCSI!=n && PCMCIA!=n
+	depends on SCSI!=n && PCMCIA!=n && MODULES
 
 config PCMCIA_AHA152X
 	tristate "Adaptec AHA152X PCMCIA support"

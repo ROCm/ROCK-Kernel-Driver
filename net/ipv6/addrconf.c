@@ -57,7 +57,6 @@
 #include <linux/delay.h>
 #include <linux/notifier.h>
 
-#include <linux/proc_fs.h>
 #include <net/sock.h>
 #include <net/snmp.h>
 

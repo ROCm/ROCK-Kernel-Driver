@@ -503,7 +503,7 @@ static int __devinit sis900_probe (struct pci_dev *pci_dev, const struct pci_dev
  	pci_set_drvdata(pci_dev, NULL);
 	pci_release_regions(pci_dev);
  err_out:
-	kfree(net_dev);
+	free_netdev(net_dev);
 	return ret;
 }
 

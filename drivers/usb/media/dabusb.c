@@ -29,7 +29,6 @@
 
 #include <linux/module.h>
 #include <linux/socket.h>
-#include <linux/miscdevice.h>
 #include <linux/list.h>
 #include <linux/vmalloc.h>
 #include <linux/slab.h>
@@ -819,6 +818,7 @@ static struct usb_driver dabusb_driver = {
 
 static int __init dabusb_init (void)
 {
+	int retval;
 	unsigned u;
 
 	/* initialize struct */
@@ -836,14 +836,16 @@ static int __init dabusb_init (void)
 	}
 
 	/* register misc device */
-	if (usb_register(&dabusb_driver))
-		return -1;
+	retval = usb_register(&dabusb_driver);
+	if (retval)
+		goto out;
 
 	dbg("dabusb_init: driver registered");
 
 	info(DRIVER_VERSION ":" DRIVER_DESC);
 
-	return 0;
+out:
+	return retval;
 }
 
 static void __exit dabusb_cleanup (void)

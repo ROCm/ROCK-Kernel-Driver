@@ -1590,12 +1590,12 @@ static void netdev_get_drvinfo(struct net_device *dev,
 
 static u32 netdev_get_msglevel(struct net_device *dev)
 {
-	return debug;
+	return corkscrew_debug;
 }
 
 static void netdev_set_msglevel(struct net_device *dev, u32 level)
 {
-	debug = level;
+	corkscrew_debug = level;
 }
 
 static struct ethtool_ops netdev_ethtool_ops = {

@@ -249,8 +249,8 @@ static void
 hfc_fill_fifo(struct BCState *bcs)
 {
 	struct IsdnCardState *cs = bcs->cs;
-	int idx, fcnt;
-	int count;
+	int fcnt;
+	u_int idx, count;
 	int z1, z2;
 	u8 cip;
 

@@ -2447,11 +2447,8 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 	if( i < 0 ) 
 		return (-1);
 	if (cciss_pci_init(hba[i], pdev) != 0)
-	{
-		release_io_mem(hba[i]);
-		free_hba(i);
-		return (-1);
-	}
+		goto clean1;
+
 	sprintf(hba[i]->devname, "cciss%d", i);
 	hba[i]->ctlr = i;
 	hba[i]->pdev = pdev;
@@ -2463,28 +2460,23 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 		printk("cciss: not using DAC cycles\n");
 	else {
 		printk("cciss: no suitable DMA available\n");
-		free_hba(i);
-		return -ENODEV;
+		goto clean1;
 	}
 
 	if (register_blkdev(COMPAQ_CISS_MAJOR+i, hba[i]->devname)) {
-		release_io_mem(hba[i]);
-		free_hba(i);
-		return -1;
+		printk(KERN_ERR "cciss: Unable to register device %s\n",
+				hba[i]->devname);
+		goto clean1;
 	}
 
 	/* make sure the board interrupts are off */
 	hba[i]->access.set_intr_mask(hba[i], CCISS_INTR_OFF);
 	if( request_irq(hba[i]->intr, do_cciss_intr, 
 		SA_INTERRUPT | SA_SHIRQ | SA_SAMPLE_RANDOM, 
-			hba[i]->devname, hba[i]))
-	{
-		printk(KERN_ERR "ciss: Unable to get irq %d for %s\n",
+			hba[i]->devname, hba[i])) {
+		printk(KERN_ERR "cciss: Unable to get irq %d for %s\n",
 			hba[i]->intr, hba[i]->devname);
-		unregister_blkdev( COMPAQ_CISS_MAJOR+i, hba[i]->devname);
-		release_io_mem(hba[i]);
-		free_hba(i);
-		return(-1);
+		goto clean2;
 	}
 	hba[i]->cmd_pool_bits = kmalloc(((NR_CMDS+BITS_PER_LONG-1)/BITS_PER_LONG)*sizeof(unsigned long), GFP_KERNEL);
 	hba[i]->cmd_pool = (CommandList_struct *)pci_alloc_consistent(
@@ -2495,35 +2487,15 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 		&(hba[i]->errinfo_pool_dhandle));
 	if((hba[i]->cmd_pool_bits == NULL) 
 		|| (hba[i]->cmd_pool == NULL)
-		|| (hba[i]->errinfo_pool == NULL))
-        {
-err_all:
-		if(hba[i]->cmd_pool_bits)
-                	kfree(hba[i]->cmd_pool_bits);
-                if(hba[i]->cmd_pool)
-                	pci_free_consistent(hba[i]->pdev,  
-				NR_CMDS * sizeof(CommandList_struct), 
-				hba[i]->cmd_pool, hba[i]->cmd_pool_dhandle);	
-		if(hba[i]->errinfo_pool)
-			pci_free_consistent(hba[i]->pdev,
-				NR_CMDS * sizeof( ErrorInfo_struct),
-				hba[i]->errinfo_pool, 
-				hba[i]->errinfo_pool_dhandle);
-                free_irq(hba[i]->intr, hba[i]);
-                unregister_blkdev(COMPAQ_CISS_MAJOR+i, hba[i]->devname);
-		release_io_mem(hba[i]);
-		free_hba(i);
+		|| (hba[i]->errinfo_pool == NULL)) {
                 printk( KERN_ERR "cciss: out of memory");
-		return(-1);
+		goto clean4;
 	}
 
-	/*
-	 * someone needs to clean up this failure handling mess
-	 */
 	spin_lock_init(&hba[i]->lock);
 	q = blk_init_queue(do_cciss_request, &hba[i]->lock);
 	if (!q)
-		goto err_all;
+		goto clean4;
 
 	hba[i]->queue = q;
 	q->queuedata = hba[i];
@@ -2576,6 +2548,26 @@ err_all:
 		add_disk(disk);
 	}
 	return(1);
+
+clean4:
+	if(hba[i]->cmd_pool_bits)
+               	kfree(hba[i]->cmd_pool_bits);
+	if(hba[i]->cmd_pool)
+		pci_free_consistent(hba[i]->pdev,
+			NR_CMDS * sizeof(CommandList_struct),
+			hba[i]->cmd_pool, hba[i]->cmd_pool_dhandle);
+	if(hba[i]->errinfo_pool)
+		pci_free_consistent(hba[i]->pdev,
+			NR_CMDS * sizeof( ErrorInfo_struct),
+			hba[i]->errinfo_pool,
+			hba[i]->errinfo_pool_dhandle);
+	free_irq(hba[i]->intr, hba[i]);
+clean2:
+	unregister_blkdev(COMPAQ_CISS_MAJOR+i, hba[i]->devname);
+clean1:
+	release_io_mem(hba[i]);
+	free_hba(i);
+	return(-1);
 }
 
 static void __devexit cciss_remove_one (struct pci_dev *pdev)

@@ -34,8 +34,8 @@ struct cachepolicy {
 };
 
 static struct cachepolicy cache_policies[] __initdata = {
-	{ "uncached",		CR1_W|CR1_C,	PMD_SECT_UNCACHED },
-	{ "buffered",		CR1_C,		PMD_SECT_BUFFERED },
+	{ "uncached",		CR_W|CR_C,	PMD_SECT_UNCACHED },
+	{ "buffered",		CR_C,		PMD_SECT_BUFFERED },
 	{ "writethrough",	0,		PMD_SECT_WT       },
 #ifndef CONFIG_CPU_DCACHE_WRITETHROUGH
 	{ "writeback",		0,		PMD_SECT_WB       },
@@ -102,8 +102,8 @@ __early_param("ecc=", early_ecc);
 
 static int __init noalign_setup(char *__unused)
 {
-	cr_alignment &= ~CR1_A;
-	cr_no_alignment &= ~CR1_A;
+	cr_alignment &= ~CR_A;
+	cr_no_alignment &= ~CR_A;
 	set_cr(cr_alignment);
 	return 1;
 }

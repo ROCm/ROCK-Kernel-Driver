@@ -74,8 +74,6 @@ struct scsi_device {
 	unsigned wdtr:1;	/* Device supports WDTR messages */
 	unsigned ppr:1;		/* Device supports PPR messages */
 	unsigned tagged_supported:1;	/* Supports SCSI-II tagged queuing */
-	unsigned tagged_queue:1;/* This is going away!!!!  Look at simple_tags
-				   instead!!!  Please fix your driver now!! */
 	unsigned simple_tags:1;	/* simple queue tag messages are enabled */
 	unsigned ordered_tags:1;/* ordered queue tag messages are enabled */
 	unsigned single_lun:1;	/* Indicates we should only allow I/O to

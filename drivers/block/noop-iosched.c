@@ -17,17 +17,15 @@
 /*
  * See if we can find a request that this buffer can be coalesced with.
  */
-int elevator_noop_merge(request_queue_t *q, struct list_head **insert,
+int elevator_noop_merge(request_queue_t *q, struct request **req,
 			struct bio *bio)
 {
 	struct list_head *entry = &q->queue_head;
 	struct request *__rq;
 	int ret;
 
-	if ((ret = elv_try_last_merge(q, bio))) {
-		*insert = q->last_merge;
+	if ((ret = elv_try_last_merge(q, bio)))
 		return ret;
-	}
 
 	while ((entry = entry->prev) != &q->queue_head) {
 		__rq = list_entry_rq(entry);
@@ -41,8 +39,8 @@ int elevator_noop_merge(request_queue_t *q, struct list_head **insert,
 			continue;
 
 		if ((ret = elv_try_merge(__rq, bio))) {
-			*insert = &__rq->queuelist;
-			q->last_merge = &__rq->queuelist;
+			*req = __rq;
+			q->last_merge = __rq;
 			return ret;
 		}
 	}
@@ -57,8 +55,13 @@ void elevator_noop_merge_requests(request_queue_t *q, struct request *req,
 }
 
 void elevator_noop_add_request(request_queue_t *q, struct request *rq,
-			       struct list_head *insert_here)
+			       int where)
 {
+	struct list_head *insert = q->queue_head.prev;
+
+	if (where == ELEVATOR_INSERT_FRONT)
+		insert = &q->queue_head;
+
 	list_add_tail(&rq->queuelist, &q->queue_head);
 
 	/*
@@ -67,7 +70,7 @@ void elevator_noop_add_request(request_queue_t *q, struct request *rq,
 	if (rq->flags & REQ_HARDBARRIER)
 		q->last_merge = NULL;
 	else if (!q->last_merge)
-		q->last_merge = &rq->queuelist;
+		q->last_merge = rq;
 }
 
 struct request *elevator_noop_next_request(request_queue_t *q)

@@ -2080,4 +2080,4 @@ MODULE_PARM_DESC(idle_period,
 MODULE_PARM(smp, "i");
 MODULE_PARM_DESC(smp,
 	"Set this to enable APM use on an SMP platform. Use with caution on older systems");
-
+MODULE_ALIAS_MISCDEV(APM_MINOR_DEV);

@@ -1,6 +1,7 @@
-/* Copyright (c) 1999-2000 Cisco, Inc.
+/* SCTP kernel reference Implementation
+ * (C) Copyright IBM Corp. 2001, 2003
+ * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001-2003 International Business Machines, Corp.
  * Copyright (c) 2001-2003 Intel Corp.
  * Copyright (c) 2001-2002 Nokia, Inc.
  * Copyright (c) 2001 La Monte H.P. Yarroll
@@ -50,6 +51,7 @@
  *    Ardelle Fan	    <ardelle.fan@intel.com>
  *    Ryan Layer	    <rmlayer@us.ibm.com>
  *    Anup Pemmaiah         <pemmaiah@cc.usu.edu>
+ *    Kevin Gao             <kevin.gao@intel.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -93,8 +95,8 @@ static int sctp_wait_for_connect(struct sctp_association *, long *timeo_p);
 static int sctp_wait_for_accept(struct sock *sk, long timeo);
 static void sctp_wait_for_close(struct sock *sk, long timeo);
 static inline int sctp_verify_addr(struct sock *, union sctp_addr *, int);
-static int sctp_bindx_add(struct sock *, struct sockaddr_storage *, int);
-static int sctp_bindx_rem(struct sock *, struct sockaddr_storage *, int);
+static int sctp_bindx_add(struct sock *, struct sockaddr *, int);
+static int sctp_bindx_rem(struct sock *, struct sockaddr *, int);
 static int sctp_do_bind(struct sock *, union sctp_addr *, int);
 static int sctp_autobind(struct sock *sk);
 static void sctp_sock_migrate(struct sock *, struct sock *,
@@ -170,10 +172,7 @@ struct sctp_transport *sctp_addr_id2transport(struct sock *sk,
  *   sd      - the socket descriptor returned by socket().
  *   addr    - the address structure (struct sockaddr_in or struct
  *             sockaddr_in6 [RFC 2553]),
- *   addrlen - the size of the address structure.
- *
- * The caller should use struct sockaddr_storage described in RFC 2553
- * to represent addr for portability reason.
+ *   addr_len - the size of the address structure.
  */
 int sctp_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 {
@@ -298,112 +297,6 @@ SCTP_STATIC int sctp_do_bind(struct sock *sk, union sctp_addr *addr, int len)
 	return ret;
 }
 
-/* API 8.1 sctp_bindx()
- *
- * The syntax of sctp_bindx() is,
- *
- *   ret = sctp_bindx(int sd,
- *                    struct sockaddr_storage *addrs,
- * 		      int addrcnt,
- * 		      int flags);
- *
- * If sd is an IPv4 socket, the addresses passed must be IPv4 addresses.
- * If the sd is an IPv6 socket, the addresses passed can either be IPv4
- * or IPv6 addresses.
- *
- * A single address may be specified as INADDR_ANY or IPV6_ADDR_ANY, see
- * section 3.1.2 for this usage.
- *
- * addrs is a pointer to an array of one or more socket addresses.  Each
- * address is contained in a struct sockaddr_storage, so each address is
- * fixed length. The caller specifies the number of addresses in the
- * array with addrcnt.
- *
- * On success, sctp_bindx() returns 0. On failure, sctp_bindx() returns -1,
- * and sets errno to the appropriate error code. [ Editor's note: need
- * to fill in all error code? ]
- *
- * For SCTP, the port given in each socket address must be the same, or
- * sctp_bindx() will fail, setting errno to EINVAL .
- *
- * The flags parameter is formed from the bitwise OR of zero or
- * more of the following currently defined flags:
- *
- *     SCTP_BINDX_ADD_ADDR
- *     SCTP_BINDX_REM_ADDR
- *
- * SCTP_BIND_ADD_ADDR directs SCTP to add the given addresses to the
- * association, and SCTP_BIND_REM_ADDR directs SCTP to remove the given
- * addresses from the association. The two flags are mutually exclusive;
- * if both are given, sctp_bindx() will fail with EINVAL.  A caller may not
- * remove all addresses from an association; sctp_bindx() will reject such
- * an attempt with EINVAL.
- *
- * An application can use sctp_bindx(SCTP_BINDX_ADD_ADDR) to associate
- * additional addresses with an endpoint after calling bind().  Or use
- * sctp_bindx(SCTP_BINDX_REM_ADDR) to remove some addresses a listening
- * socket is associated with so that no new association accepted will be
- * associated with those addresses.
- *
- * SCTP_BIND_ADD_ADDR is defined as 0, so that it becomes the default
- * behavior for sctp_bindx() when no flags are given.
- *
- * Adding and removing addresses from a connected association is optional
- * functionality. Implementations that do not support this functionality
- * should return EOPNOTSUPP.
- *
- * NOTE: This could be integrated into sctp_setsockopt_bindx(),
- * but keeping it this way makes it easier if sometime sys_bindx is
- * added.
- */
-
-/* Unprotected by locks. Call only with socket lock sk->sk_lock held! See
- * sctp_bindx() for a lock-protected call.
- */
-
-static int __sctp_bindx(struct sock *sk, struct sockaddr_storage *addrs,
-			int addrcnt, int flags)
-{
-	int retval = 0;
-
-	SCTP_DEBUG_PRINTK("__sctp_bindx(sk: %p, addrs: %p, addrcnt: %d, "
-			  "flags: %s)\n", sk, addrs, addrcnt,
-			  (SCTP_BINDX_ADD_ADDR == flags) ? "ADD" :
-			  ((SCTP_BINDX_REM_ADDR == flags) ? "REM" : "BOGUS"));
-
-	switch (flags) {
-	case SCTP_BINDX_ADD_ADDR:
-		retval = sctp_bindx_add(sk, addrs, addrcnt);
-		break;
-
-	case SCTP_BINDX_REM_ADDR:
-		retval = sctp_bindx_rem(sk, addrs, addrcnt);
-		break;
-
-	default:
-		retval = -EINVAL;
-		break;
-        };
-
-	return retval;
-}
-
-/* BINDX with locks.
- *
- * NOTE: Currently unused at all ...
- */
-int sctp_bindx(struct sock *sk, struct sockaddr_storage *addrs, int addrcnt,
-	       int flags)
-{
-	int retval;
-
-	sctp_lock_sock(sk);
-	retval = __sctp_bindx(sk, addrs, addrcnt, flags);
-	sctp_release_sock(sk);
-
-	return retval;
-}
-
 /* Add a list of addresses as bind addresses to local endpoint or
  * association.
  *
@@ -414,41 +307,39 @@ int sctp_bindx(struct sock *sk, struct sockaddr_storage *addrs, int addrcnt,
  * If any of them fails, then the operation will be reversed and the
  * ones that were added will be removed.
  *
- * Only __sctp_bindx() is supposed to call this function.
+ * Only sctp_setsockopt_bindx() is supposed to call this function.
  */
-int sctp_bindx_add(struct sock *sk, struct sockaddr_storage *addrs, int addrcnt)
+int sctp_bindx_add(struct sock *sk, struct sockaddr *addrs, int addrcnt)
 {
 	int cnt;
 	int retval = 0;
-	int addr_len;
+	void *addr_buf;
+	struct sockaddr *sa_addr;
+	struct sctp_af *af;
 
 	SCTP_DEBUG_PRINTK("sctp_bindx_add (sk: %p, addrs: %p, addrcnt: %d)\n",
 			  sk, addrs, addrcnt);
 
+	addr_buf = addrs;
 	for (cnt = 0; cnt < addrcnt; cnt++) {
 		/* The list may contain either IPv4 or IPv6 address;
 		 * determine the address length for walking thru the list.
 		 */
-		switch (((struct sockaddr *)&addrs[cnt])->sa_family) {
-		case AF_INET:
-			addr_len = sizeof(struct sockaddr_in);
-			break;
-
-		case AF_INET6:
-			addr_len = sizeof(struct sockaddr_in6);
-			break;
-
-		default:
+		sa_addr = (struct sockaddr *)addr_buf;
+		af = sctp_get_af_specific(sa_addr->sa_family);
+		if (!af) {
 			retval = -EINVAL;
 			goto err_bindx_add;
-		};
+		}
 
-		retval = sctp_do_bind(sk, (union sctp_addr *)&addrs[cnt],
-				      addr_len);
+		retval = sctp_do_bind(sk, (union sctp_addr *)sa_addr, 
+				      af->sockaddr_len);
+
+		addr_buf += af->sockaddr_len;
 
 err_bindx_add:
 		if (retval < 0) {
-			/* Failed. Cleanup the ones that has been added */
+			/* Failed. Cleanup the ones that have been added */
 			if (cnt > 0)
 				sctp_bindx_rem(sk, addrs, cnt);
 			return retval;
@@ -471,9 +362,9 @@ err_bindx_add:
  * At least one address has to be left; if only one address is
  * available, the operation will return -EBUSY.
  *
- * Only __sctp_bindx() is supposed to call this function.
+ * Only sctp_setsockopt_bindx() is supposed to call this function.
  */
-int sctp_bindx_rem(struct sock *sk, struct sockaddr_storage *addrs, int addrcnt)
+int sctp_bindx_rem(struct sock *sk, struct sockaddr *addrs, int addrcnt)
 {
 	struct sctp_opt *sp = sctp_sk(sk);
 	struct sctp_endpoint *ep = sp->ep;
@@ -481,50 +372,41 @@ int sctp_bindx_rem(struct sock *sk, struct sockaddr_storage *addrs, int addrcnt)
 	struct sctp_bind_addr *bp = &ep->base.bind_addr;
 	int retval = 0;
 	union sctp_addr saveaddr;
+	void *addr_buf;
+	struct sockaddr *sa_addr;
+	struct sctp_af *af;
 
 	SCTP_DEBUG_PRINTK("sctp_bindx_rem (sk: %p, addrs: %p, addrcnt: %d)\n",
 			  sk, addrs, addrcnt);
 
+	addr_buf = addrs;
 	for (cnt = 0; cnt < addrcnt; cnt++) {
-		/* If there is only one bind address, there is nothing more
-		 * to be removed (we need at least one address here).
+		/* If the bind address list is empty or if there is only one
+		 * bind address, there is nothing more to be removed (we need
+		 * at least one address here).
 		 */
-		if (list_empty(&bp->address_list)) {
+		if (list_empty(&bp->address_list) ||
+		    (sctp_list_single_entry(&bp->address_list))) {
 			retval = -EBUSY;
 			goto err_bindx_rem;
 		}
 
 		/* The list may contain either IPv4 or IPv6 address;
-		 * determine the address length for walking thru the list.
+		 * determine the address length to copy the address to
+		 * saveaddr. 
 		 */
-		switch (((struct sockaddr *)&addrs[cnt])->sa_family) {
-		case AF_INET:
-			saveaddr = *((union sctp_addr *)
-				     &addrs[cnt]);
-			saveaddr.v4.sin_port = ntohs(saveaddr.v4.sin_port);
-			/* Verify the port.  */
-			if (saveaddr.v4.sin_port != bp->port) {
-				retval = -EINVAL;
-				goto err_bindx_rem;
-			}
-			break;
-
-		case AF_INET6:
-			saveaddr = *((union sctp_addr *)
-				     &addrs[cnt]);
-			saveaddr.v6.sin6_port =
-				ntohs(saveaddr.v6.sin6_port);
-			/* verify the port */
-			if (saveaddr.v6.sin6_port != bp->port) {
-				retval = -EINVAL;
-				goto err_bindx_rem;
-			}
-			break;
-
-		default:
+		sa_addr = (struct sockaddr *)addr_buf;
+		af = sctp_get_af_specific(sa_addr->sa_family);
+		if (!af) {
 			retval = -EINVAL;
 			goto err_bindx_rem;
-		};
+		}
+		memcpy(&saveaddr, sa_addr, af->sockaddr_len); 
+		saveaddr.v4.sin_port = ntohs(saveaddr.v4.sin_port);
+		if (saveaddr.v4.sin_port != bp->port) {
+			retval = -EINVAL;
+			goto err_bindx_rem;
+		}
 
 		/* FIXME - There is probably a need to check if sk->sk_saddr and
 		 * sk->sk_rcv_addr are currently set to one of the addresses to
@@ -541,6 +423,7 @@ int sctp_bindx_rem(struct sock *sk, struct sockaddr_storage *addrs, int addrcnt)
 		sctp_write_unlock(&ep->base.addr_lock);
 		sctp_local_bh_enable();
 
+		addr_buf += af->sockaddr_len;
 err_bindx_rem:
 		if (retval < 0) {
 			/* Failed. Add the ones that has been removed back */
@@ -553,18 +436,62 @@ err_bindx_rem:
 	return retval;
 }
 
-/* Helper for tunneling sys_bindx() requests through sctp_setsockopt()
+/* Helper for tunneling sctp_bindx() requests through sctp_setsockopt()
+ *
+ * API 8.1
+ * int sctp_bindx(int sd, struct sockaddr *addrs, int addrcnt,
+ *                int flags);
+ *
+ * If sd is an IPv4 socket, the addresses passed must be IPv4 addresses.
+ * If the sd is an IPv6 socket, the addresses passed can either be IPv4
+ * or IPv6 addresses.
+ *
+ * A single address may be specified as INADDR_ANY or IN6ADDR_ANY, see
+ * Section 3.1.2 for this usage.
+ *
+ * addrs is a pointer to an array of one or more socket addresses. Each
+ * address is contained in its appropriate structure (i.e. struct
+ * sockaddr_in or struct sockaddr_in6) the family of the address type
+ * must be used to distengish the address length (note that this
+ * representation is termed a "packed array" of addresses). The caller
+ * specifies the number of addresses in the array with addrcnt.
+ *
+ * On success, sctp_bindx() returns 0. On failure, sctp_bindx() returns
+ * -1, and sets errno to the appropriate error code.
+ *
+ * For SCTP, the port given in each socket address must be the same, or
+ * sctp_bindx() will fail, setting errno to EINVAL.
+ *
+ * The flags parameter is formed from the bitwise OR of zero or more of
+ * the following currently defined flags:
+ *
+ * SCTP_BINDX_ADD_ADDR
+ *
+ * SCTP_BINDX_REM_ADDR
+ *
+ * SCTP_BINDX_ADD_ADDR directs SCTP to add the given addresses to the
+ * association, and SCTP_BINDX_REM_ADDR directs SCTP to remove the given
+ * addresses from the association. The two flags are mutually exclusive;
+ * if both are given, sctp_bindx() will fail with EINVAL. A caller may
+ * not remove all addresses from an association; sctp_bindx() will
+ * reject such an attempt with EINVAL.
+ *
+ * An application can use sctp_bindx(SCTP_BINDX_ADD_ADDR) to associate
+ * additional addresses with an endpoint after calling bind().  Or use
+ * sctp_bindx(SCTP_BINDX_REM_ADDR) to remove some addresses a listening
+ * socket is associated with so that no new association accepted will be
+ * associated with those addresses. If the endpoint supports dynamic
+ * address a SCTP_BINDX_REM_ADDR or SCTP_BINDX_ADD_ADDR may cause a
+ * endpoint to send the appropriate message to the peer to change the
+ * peers address lists.
+ *
+ * Adding and removing addresses from a connected association is
+ * optional functionality. Implementations that do not support this
+ * functionality should return EOPNOTSUPP.
  *
  * Basically do nothing but copying the addresses from user to kernel
- * land and invoking sctp_bindx on the sk. This is used for tunneling
- * the sctp_bindx() [sys_bindx()] request through sctp_setsockopt()
- * from userspace.
- *
- * Note I don't use move_addr_to_kernel(): the reason is we would be
- * iterating over an array of struct sockaddr_storage passing always
- * what we know is a good size (sizeof (struct sock...)), so it is
- * pointless. Instead check the whole area for read access and copy
- * it.
+ * land and invoking either sctp_bindx_add() or sctp_bindx_rem() on the sk.
+ * This is used for tunneling the sctp_bindx() request through sctp_setsockopt() * from userspace.
  *
  * We don't use copy_from_user() for optimization: we first do the
  * sanity checks (buffer size -fast- and access check-healthy
@@ -584,38 +511,70 @@ err_bindx_rem:
  *
  * Returns 0 if ok, <0 errno code on error.
  */
-SCTP_STATIC int sctp_setsockopt_bindx(struct sock* sk,
-				      struct sockaddr_storage *addrs,
-				      int addrssize, int op)
+SCTP_STATIC int sctp_setsockopt_bindx(struct sock* sk, struct sockaddr *addrs,
+				      int addrs_size, int op)
 {
-	struct sockaddr_storage *kaddrs;
+	struct sockaddr *kaddrs;
 	int err;
-	size_t addrcnt;
+	int addrcnt = 0;
+	int walk_size = 0;
+	struct sockaddr *sa_addr;
+	void *addr_buf;
+	struct sctp_af *af;
 
-	SCTP_DEBUG_PRINTK("sctp_do_setsocktopt_bindx: sk %p addrs %p"
-			  " addrssize %d opt %d\n", sk, addrs, addrssize, op);
+	SCTP_DEBUG_PRINTK("sctp_setsocktopt_bindx: sk %p addrs %p"
+			  " addrs_size %d opt %d\n", sk, addrs, addrs_size, op);
 
-	/* Do we have an integer number of structs sockaddr_storage?  */
-	if (unlikely(addrssize <= 0 ||
-		     addrssize % sizeof(struct sockaddr_storage) != 0))
+	if (unlikely(addrs_size <= 0))
 		return -EINVAL;
 
 	/* Check the user passed a healthy pointer.  */
-	if (unlikely(!access_ok(VERIFY_READ, addrs, addrssize)))
+	if (unlikely(!access_ok(VERIFY_READ, addrs, addrs_size)))
 		return -EFAULT;
 
 	/* Alloc space for the address array in kernel memory.  */
-	kaddrs = (struct sockaddr_storage *) kmalloc(addrssize, GFP_KERNEL);
+	kaddrs = (struct sockaddr *)kmalloc(addrs_size, GFP_KERNEL);
 	if (unlikely(!kaddrs))
 		return -ENOMEM;
 
-	if (copy_from_user(kaddrs, addrs, addrssize)) {
+	if (__copy_from_user(kaddrs, addrs, addrs_size)) {
 		kfree(kaddrs);
 		return -EFAULT;
 	}
 
-	addrcnt = addrssize / sizeof(struct sockaddr_storage);
-	err = __sctp_bindx(sk, kaddrs, addrcnt, op);   /* Do the work. */
+	/* Walk through the addrs buffer and count the number of addresses. */ 
+	addr_buf = kaddrs;
+	while (walk_size < addrs_size) {
+		sa_addr = (struct sockaddr *)addr_buf;
+		af = sctp_get_af_specific(sa_addr->sa_family);
+
+		/* If the address family is not supported or if this address
+		 * causes the address buffer to overflow return EINVAL.
+		 */ 
+		if (!af || (walk_size + af->sockaddr_len) > addrs_size) {
+			kfree(kaddrs);
+			return -EINVAL;
+		}
+		addrcnt++;
+		addr_buf += af->sockaddr_len;
+		walk_size += af->sockaddr_len;
+	}
+
+	/* Do the work. */
+	switch (op) {
+	case SCTP_BINDX_ADD_ADDR:
+		err = sctp_bindx_add(sk, kaddrs, addrcnt);
+		break;
+
+	case SCTP_BINDX_REM_ADDR:
+		err = sctp_bindx_rem(sk, kaddrs, addrcnt);
+		break;
+
+	default:
+		err = -EINVAL;
+		break;
+        };
+
 	kfree(kaddrs);
 
 	return err;
@@ -1476,7 +1435,7 @@ static int sctp_setsockopt_initmsg(struct sock *sk, char *optval, int optlen)
 }
 
 /*
- * 7.1.14 Set default send parameters (SET_DEFAULT_SEND_PARAM)
+ * 7.1.14 Set default send parameters (SCTP_DEFAULT_SEND_PARAM)
  *
  *   Applications that wish to use the sendto() system call may wish to
  *   specify a default set of parameters that would normally be supplied
@@ -1522,7 +1481,7 @@ static int sctp_setsockopt_default_send_param(struct sock *sk,
 	return 0;
 }
 
-/* 7.1.10 Set Peer Primary Address (SCTP_PRIMARY_ADDR)
+/* 7.1.10 Set Primary Address (SCTP_PRIMARY_ADDR)
  *
  * Requests that the local SCTP stack use the enclosed peer address as
  * the association primary.  The enclosed address must be one of the
@@ -1727,6 +1686,62 @@ static int sctp_setsockopt_maxseg(struct sock *sk, char *optval, int optlen)
 	return 0;
 }
 
+
+/*
+ *  7.1.9 Set Peer Primary Address (SCTP_SET_PEER_PRIMARY_ADDR)
+ *
+ *   Requests that the peer mark the enclosed address as the association
+ *   primary. The enclosed address must be one of the association's
+ *   locally bound addresses. The following structure is used to make a
+ *   set primary request:
+ */
+static int sctp_setsockopt_peer_primary_addr(struct sock *sk, char *optval,
+					     int optlen)
+{
+	struct sctp_opt		*sp;
+	struct sctp_endpoint	*ep;
+	struct sctp_association	*asoc = NULL;
+	struct sctp_setpeerprim	prim;
+	struct sctp_chunk	*chunk;
+	int 			err;
+
+	sp = sctp_sk(sk);
+	ep = sp->ep;
+
+	if (optlen != sizeof(struct sctp_setpeerprim))
+		return -EINVAL;
+
+	if (copy_from_user(&prim, optval, optlen))
+		return -EFAULT;
+
+	asoc = sctp_id2assoc(sk, prim.sspp_assoc_id);
+	if (!asoc) 
+		return -EINVAL;
+
+	if (!sctp_state(asoc, ESTABLISHED))
+		return -ENOTCONN;
+
+	if (!sctp_assoc_lookup_laddr(asoc, (union sctp_addr *)&prim.sspp_addr))
+		return -EADDRNOTAVAIL;
+
+	/* Create an ASCONF chunk with SET_PRIMARY parameter	*/
+	chunk = sctp_make_asconf_set_prim(asoc,
+					  (union sctp_addr *)&prim.sspp_addr);
+	if (!chunk)
+		return -ENOMEM;
+
+	err = sctp_primitive_ASCONF(asoc, chunk);
+	if (err) {
+		sctp_chunk_free(chunk);
+		return err;
+	}
+
+	SCTP_DEBUG_PRINTK("We set peer primary addr primitively.\n");
+
+	return 0;
+}
+
+
 /* API 6.2 setsockopt(), getsockopt()
  *
  * Applications use setsockopt() and getsockopt() to set or retrieve
@@ -1771,16 +1786,14 @@ SCTP_STATIC int sctp_setsockopt(struct sock *sk, int level, int optname,
 	switch (optname) {
 	case SCTP_SOCKOPT_BINDX_ADD:
 		/* 'optlen' is the size of the addresses buffer. */
-		retval = sctp_setsockopt_bindx(sk, (struct sockaddr_storage *)
-					       optval, optlen,
-					       SCTP_BINDX_ADD_ADDR);
+		retval = sctp_setsockopt_bindx(sk, (struct sockaddr *)optval,
+					       optlen, SCTP_BINDX_ADD_ADDR);
 		break;
 
 	case SCTP_SOCKOPT_BINDX_REM:
 		/* 'optlen' is the size of the addresses buffer. */
-		retval = sctp_setsockopt_bindx(sk, (struct sockaddr_storage *)
-					       optval, optlen,
-					       SCTP_BINDX_REM_ADDR);
+		retval = sctp_setsockopt_bindx(sk, (struct sockaddr *)optval,
+					       optlen, SCTP_BINDX_REM_ADDR);
 		break;
 
 	case SCTP_DISABLE_FRAGMENTS:
@@ -1808,6 +1821,9 @@ SCTP_STATIC int sctp_setsockopt(struct sock *sk, int level, int optname,
 		break;
 	case SCTP_PRIMARY_ADDR:
 		retval = sctp_setsockopt_primary_addr(sk, optval, optlen);
+		break;
+	case SCTP_SET_PEER_PRIMARY_ADDR:
+		retval = sctp_setsockopt_peer_primary_addr(sk, optval, optlen);
 		break;
 	case SCTP_NODELAY:
 		retval = sctp_setsockopt_nodelay(sk, optval, optlen);
@@ -2056,9 +2072,8 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 		return -ESOCKTNOSUPPORT;
 	}
 
-	/* FIXME:  The next draft (04) of the SCTP Sockets Extensions
-	 * should include a socket option for manipulating these
-	 * message parameters (and a few others).
+	/* Initialize default send parameters. These parameters can be
+	 * modified with the SCTP_DEFAULT_SEND_PARAM socket option.
 	 */
 	sp->default_stream = 0;
 	sp->default_ppid = 0;
@@ -2077,7 +2092,6 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 
 	/* Initialize default RTO related parameters.  These parameters can
 	 * be modified for with the SCTP_RTOINFO socket option.
-	 * FIXME: These are not used yet.
 	 */
 	sp->rtoinfo.srto_initial = (sctp_rto_initial / HZ) * 1000;
 	sp->rtoinfo.srto_max     = (sctp_rto_max / HZ) * 1000;
@@ -2093,15 +2107,10 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 	sp->assocparams.sasoc_cookie_life = (sctp_valid_cookie_life / HZ)
 					* 1000;
 
-	/* Initialize default event subscriptions.
-	 * the struct sock is initialized to zero, so only
-	 * enable the events needed.  By default, UDP-style
-	 * sockets enable io and association change notifications.
+	/* Initialize default event subscriptions. By default, all the
+	 * options are off. 
 	 */
-	if (sctp_style(sk, UDP)) {
-		sp->subscribe.sctp_data_io_event     = 1;
-		sp->subscribe.sctp_association_event = 1;
-	}
+	memset(&sp->subscribe, 0, sizeof(struct sctp_event_subscribe));
 
 	/* Default Peer Address Parameters.  These defaults can
 	 * be modified via SCTP_PEER_ADDR_PARAMS
@@ -2552,7 +2561,7 @@ static int sctp_getsockopt_initmsg(struct sock *sk, int len, char *optval, int *
 }
 
 static int sctp_getsockopt_peer_addrs_num(struct sock *sk, int len,
-					char *optval, int *optlen)
+					  char *optval, int *optlen)
 {
 	sctp_assoc_t id;
 	struct sctp_association *asoc;
@@ -2565,9 +2574,7 @@ static int sctp_getsockopt_peer_addrs_num(struct sock *sk, int len,
 	if (copy_from_user(&id, optval, sizeof(sctp_assoc_t)))
 		return -EFAULT;
 
-	/*
-	 *  For UDP-style sockets, id specifies the association to query.
-	 */
+	/* For UDP-style sockets, id specifies the association to query.  */
 	asoc = sctp_id2assoc(sk, id);
 	if (!asoc)
 		return -EINVAL;
@@ -2582,16 +2589,17 @@ static int sctp_getsockopt_peer_addrs_num(struct sock *sk, int len,
 }
 
 static int sctp_getsockopt_peer_addrs(struct sock *sk, int len,
-				char *optval, int *optlen)
+				      char *optval, int *optlen)
 {
 	struct sctp_association *asoc;
 	struct list_head *pos;
 	int cnt = 0;
 	struct sctp_getaddrs getaddrs;
 	struct sctp_transport *from;
-	struct sockaddr_storage *to;
+	void *to;
 	union sctp_addr temp;
 	struct sctp_opt *sp = sctp_sk(sk);
+	int addrlen;
 
 	if (len != sizeof(struct sctp_getaddrs))
 		return -EINVAL;
@@ -2600,21 +2608,21 @@ static int sctp_getsockopt_peer_addrs(struct sock *sk, int len,
 		return -EFAULT;
 
 	if (getaddrs.addr_num <= 0) return -EINVAL;
-	/*
-	 *  For UDP-style sockets, id specifies the association to query.
-	 */
+
+	/* For UDP-style sockets, id specifies the association to query.  */
 	asoc = sctp_id2assoc(sk, getaddrs.assoc_id);
 	if (!asoc)
 		return -EINVAL;
 
-	to = getaddrs.addrs;
+	to = (void *)getaddrs.addrs;
 	list_for_each(pos, &asoc->peer.transport_addr_list) {
 		from = list_entry(pos, struct sctp_transport, transports);
 		memcpy(&temp, &from->ipaddr, sizeof(temp));
 		sctp_get_pf_specific(sk->sk_family)->addr_v4map(sp, &temp);
-		if (copy_to_user(to, &temp, sizeof(temp)))
+		addrlen = sctp_get_af_specific(sk->sk_family)->sockaddr_len;
+		if (copy_to_user(to, &temp, addrlen))
 			return -EFAULT;
-		to ++;
+		to += addrlen ;
 		cnt ++;
 		if (cnt >= getaddrs.addr_num) break;
 	}
@@ -2673,9 +2681,10 @@ static int sctp_getsockopt_local_addrs(struct sock *sk, int len,
 	int cnt = 0;
 	struct sctp_getaddrs getaddrs;
 	struct sctp_sockaddr_entry *from;
-	struct sockaddr_storage *to;
+	void *to;
 	union sctp_addr temp;
 	struct sctp_opt *sp = sctp_sk(sk);
+	int addrlen;
 
 	if (len != sizeof(struct sctp_getaddrs))
 		return -EINVAL;
@@ -2699,16 +2708,17 @@ static int sctp_getsockopt_local_addrs(struct sock *sk, int len,
 		bp = &asoc->base.bind_addr;
 	}
 
-	to = getaddrs.addrs;
+	to = (void *)getaddrs.addrs;
 	list_for_each(pos, &bp->address_list) {
 		from = list_entry(pos,
 				struct sctp_sockaddr_entry,
 				list);
 		memcpy(&temp, &from->a, sizeof(temp));
 		sctp_get_pf_specific(sk->sk_family)->addr_v4map(sp, &temp);
-		if (copy_to_user(to, &temp, sizeof(temp)))
+		addrlen = sctp_get_af_specific(temp.sa.sa_family)->sockaddr_len;
+		if (copy_to_user(to, &temp, addrlen))
 			return -EFAULT;
-		to ++;
+		to += addrlen;
 		cnt ++;
 		if (cnt >= getaddrs.addr_num) break;
 	}
@@ -2759,7 +2769,7 @@ static int sctp_getsockopt_primary_addr(struct sock *sk, int len,
 
 /*
  *
- * 7.1.14 Set default send parameters (SET_DEFAULT_SEND_PARAM)
+ * 7.1.14 Set default send parameters (SCTP_DEFAULT_SEND_PARAM)
  *
  *   Applications that wish to use the sendto() system call may wish to
  *   specify a default set of parameters that would normally be supplied
@@ -3331,9 +3341,19 @@ SCTP_STATIC int sctp_seqpacket_listen(struct sock *sk, int backlog)
 	if (!sctp_style(sk, UDP))
 		return -EINVAL;
 
+	/* If backlog is zero, disable listening. */
+	if (!backlog) {
+		if (sctp_sstate(sk, CLOSED))
+			return 0;
+		
+		sctp_unhash_endpoint(ep);
+		sk->sk_state = SCTP_SS_CLOSED;
+	}
+
+	/* Return if we are already listening. */
 	if (sctp_sstate(sk, LISTENING))
 		return 0;
-
+		
 	/*
 	 * If a bind() or sctp_bindx() is not called prior to a listen()
 	 * call that allows new associations to be accepted, the system
@@ -3363,6 +3383,15 @@ SCTP_STATIC int sctp_stream_listen(struct sock *sk, int backlog)
 {
 	struct sctp_opt *sp = sctp_sk(sk);
 	struct sctp_endpoint *ep = sp->ep;
+
+	/* If backlog is zero, disable listening. */
+	if (!backlog) {
+		if (sctp_sstate(sk, CLOSED))
+			return 0;
+		
+		sctp_unhash_endpoint(ep);
+		sk->sk_state = SCTP_SS_CLOSED;
+	}
 
 	if (sctp_sstate(sk, LISTENING))
 		return 0;

@@ -108,3 +108,6 @@ static void __exit acpi_serial_exit(void)
 
 module_init(acpi_serial_init);
 module_exit(acpi_serial_exit);
+
+MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("Generic 8250/16x50 ACPI serial driver");

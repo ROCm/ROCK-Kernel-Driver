@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
+ * (C) Copyright IBM Corp. 2001, 2003
  * Copyright (c) Cisco 1999,2000
  * Copyright (c) Motorola 1999,2000,2001
- * Copyright (c) International Business Machines Corp., 2001,2002
  * Copyright (c) La Monte H.P. Yarroll 2001
  *
  * This file is part of the SCTP kernel reference implementation.
@@ -223,6 +223,8 @@ union sctp_params sctp_bind_addrs_to_raw(const struct sctp_bind_addr *bp,
 	int len;
 	struct sctp_sockaddr_entry *addr;
 	struct list_head *pos;
+	struct sctp_af *af;
+
 	addrparms_len = 0;
 	len = 0;
 
@@ -247,7 +249,8 @@ union sctp_params sctp_bind_addrs_to_raw(const struct sctp_bind_addr *bp,
 
 	list_for_each(pos, &bp->address_list) {
 		addr = list_entry(pos, struct sctp_sockaddr_entry, list);
-		len = sockaddr2sctp_addr(&addr->a, &rawaddr);
+		af = sctp_get_af_specific(addr->a.v4.sin_family);
+		len = af->to_addr_param(&addr->a, &rawaddr);
 		memcpy(addrparms.v, &rawaddr, len);
 		addrparms.v += len;
 		addrparms_len += len;
@@ -270,34 +273,31 @@ int sctp_raw_to_bind_addrs(struct sctp_bind_addr *bp, __u8 *raw_addr_list,
 	union sctp_addr addr;
 	int retval = 0;
 	int len;
+	struct sctp_af *af;
 
 	/* Convert the raw address to standard address format */
 	while (addrs_len) {
 		param = (struct sctp_paramhdr *)raw_addr_list;
 		rawaddr = (union sctp_addr_param *)raw_addr_list;
 
-		switch (param->type) {
-		case SCTP_PARAM_IPV4_ADDRESS:
-		case SCTP_PARAM_IPV6_ADDRESS:
-			sctp_param2sockaddr(&addr, rawaddr, port, 0);
-			retval = sctp_add_bind_addr(bp, &addr, gfp);
-			if (retval) {
-				/* Can't finish building the list, clean up. */
-				sctp_bind_addr_clean(bp);
-				break;;
-			}
-			len = ntohs(param->length);
-			addrs_len -= len;
-			raw_addr_list += len;
-			break;
-		default:
-			/* Corrupted raw addr list! */
+		af = sctp_get_af_specific(param_type2af(param->type));
+		if (unlikely(!af)) {
 			retval = -EINVAL;
 			sctp_bind_addr_clean(bp);
 			break;
 		}
-		if (retval)
-			break;
+
+		af->from_addr_param(&addr, rawaddr, port, 0);
+		retval = sctp_add_bind_addr(bp, &addr, gfp);
+		if (retval) {
+			/* Can't finish building the list, clean up. */
+			sctp_bind_addr_clean(bp);
+			break;;
+		}
+
+		len = ntohs(param->length);
+		addrs_len -= len;
+		raw_addr_list += len;
 	}
 
 	return retval;

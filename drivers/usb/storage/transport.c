@@ -942,11 +942,11 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 	memcpy(bcb->CDB, srb->cmnd, bcb->Length);
 
 	/* send it to out endpoint */
-	US_DEBUGP("Bulk command S 0x%x T 0x%x Trg %d LUN %d L %d F %d CL %d\n",
+	US_DEBUGP("Bulk Command S 0x%x T 0x%x L %d F %d Trg %d LUN %d CL %d\n",
 			le32_to_cpu(bcb->Signature), bcb->Tag,
+			le32_to_cpu(bcb->DataTransferLength), bcb->Flags,
 			(bcb->Lun >> 4), (bcb->Lun & 0x0F), 
-			le32_to_cpu(bcb->DataTransferLength),
-			bcb->Flags, bcb->Length);
+			bcb->Length);
 	result = usb_stor_bulk_transfer_buf(us, us->send_bulk_pipe,
 				bcb, US_BULK_CB_WRAP_LEN, NULL);
 	US_DEBUGP("Bulk command transfer result=%d\n", result);
@@ -999,7 +999,7 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 		return USB_STOR_TRANSPORT_ERROR;
 
 	/* check bulk status */
-	US_DEBUGP("Bulk status Sig 0x%x T 0x%x R %d Stat 0x%x\n",
+	US_DEBUGP("Bulk Status S 0x%x T 0x%x R %d Stat 0x%x\n",
 			le32_to_cpu(bcs->Signature), bcs->Tag, 
 			bcs->Residue, bcs->Status);
 	if ((bcs->Signature != cpu_to_le32(US_BULK_CS_SIGN) &&

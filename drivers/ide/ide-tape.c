@@ -6316,7 +6316,6 @@ static ide_driver_t idetape_driver = {
 	.version		= IDETAPE_VERSION,
 	.media			= ide_tape,
 	.busy			= 1,
-	.supports_dma		= 1,
 	.supports_dsc_overlap 	= 1,
 	.cleanup		= idetape_cleanup,
 	.do_request		= idetape_do_request,

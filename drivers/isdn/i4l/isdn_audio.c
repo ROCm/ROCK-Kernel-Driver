@@ -517,7 +517,6 @@ isdn_audio_eval_dtmf(modem_info * info)
 	dtmf_state *s;
 	int silence;
 	int i;
-	unsigned long flags;
 	int grp[2];
 	char what;
 	char *p;
@@ -551,7 +550,7 @@ isdn_audio_eval_dtmf(modem_info * info)
 			*p++ = 0x10;
 			*p = what;
 			skb_trim(skb, 2);
-			if (skb_headroom(skb) < sizeof(isdn_audio_skb)) {
+			if ((size_t)skb_headroom(skb) < sizeof(isdnaudio_header)) {
 				printk(KERN_WARNING
 				       "isdn_audio: insufficient skb_headroom, dropping\n");
 				kfree_skb(skb);
@@ -559,11 +558,7 @@ isdn_audio_eval_dtmf(modem_info * info)
 			}
 			ISDN_AUDIO_SKB_DLECOUNT(skb) = 0;
 			ISDN_AUDIO_SKB_LOCK(skb) = 0;
-			save_flags(flags);
-			cli();
 			isdn_tty_queue_tail(info, skb, 2);
-			restore_flags(flags);
-			/* Schedule dequeuing */
 			if ((dev->modempoll) && (info->rcvsched))
 				mod_timer(&info->read_timer, jiffies + 4);
 		} else
@@ -653,7 +648,6 @@ void
 isdn_audio_put_dle_code(modem_info * info, u_char code)
 {
 	struct sk_buff *skb;
-	unsigned long flags;
 	char *p;
 
 	skb = dev_alloc_skb(2);
@@ -666,7 +660,7 @@ isdn_audio_put_dle_code(modem_info * info, u_char code)
 	p = (char *) skb_put(skb, 2);
 	p[0] = 0x10;
 	p[1] = code;
-	if (skb_headroom(skb) < sizeof(isdn_audio_skb)) {
+	if ((size_t)skb_headroom(skb) < sizeof(isdnaudio_header)) {
 		printk(KERN_WARNING
 		       "isdn_audio: insufficient skb_headroom, dropping\n");
 		kfree_skb(skb);
@@ -674,10 +668,7 @@ isdn_audio_put_dle_code(modem_info * info, u_char code)
 	}
 	ISDN_AUDIO_SKB_DLECOUNT(skb) = 0;
 	ISDN_AUDIO_SKB_LOCK(skb) = 0;
-	save_flags(flags);
-	cli();
 	isdn_tty_queue_tail(info, skb, 2);
-	restore_flags(flags);
 	/* Schedule dequeuing */
 	if ((dev->modempoll) && (info->rcvsched))
 		mod_timer(&info->read_timer, jiffies + 4);
@@ -691,7 +682,7 @@ isdn_audio_eval_silence(modem_info * info)
 
 	what = ' ';
 
-	if (s->idx > (info->emu.vpar[2] * 800)) { 
+	if (s->idx > (u_int)(info->emu.vpar[2] * 800)) { 
 		s->idx = 0;
 		if (!s->state) {	/* silence from beginning of rec */ 
 			what = 's';
@@ -699,9 +690,9 @@ isdn_audio_eval_silence(modem_info * info)
 			what = 'q';
 		}
 	}
-		if ((what == 's') || (what == 'q')) {
-			printk(KERN_DEBUG "ttyI%d: %s\n", info->line,
-				(what=='s') ? "silence":"quiet");
-			isdn_audio_put_dle_code(info, what);
-		} 
+	if ((what == 's') || (what == 'q')) {
+		printk(KERN_DEBUG "ttyI%d: %s\n", info->line,
+			(what=='s') ? "silence":"quiet");
+		isdn_audio_put_dle_code(info, what);
+	} 
 }

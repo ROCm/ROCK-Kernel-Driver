@@ -1689,7 +1689,8 @@ static void idedisk_setup (ide_drive_t *drive)
 		write_cache(drive, (id->cfs_enable_2 & 0x3000));
 
 #ifdef CONFIG_BLK_DEV_IDE_TCQ_DEFAULT
-	HWIF(drive)->ide_dma_queued_on(drive);
+	if (drive->using_dma)
+		HWIF(drive)->ide_dma_queued_on(drive);
 #endif
 }
 
@@ -1716,7 +1717,6 @@ static ide_driver_t idedisk_driver = {
 	.version		= IDEDISK_VERSION,
 	.media			= ide_disk,
 	.busy			= 0,
-	.supports_dma		= 1,
 	.supports_dsc_overlap	= 0,
 	.cleanup		= idedisk_cleanup,
 	.flushcache		= do_idedisk_flushcache,

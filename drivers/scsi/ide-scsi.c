@@ -627,7 +627,6 @@ static ide_driver_t idescsi_driver = {
 	.version		= IDESCSI_VERSION,
 	.media			= ide_scsi,
 	.busy			= 0,
-	.supports_dma		= 1,
 	.supports_dsc_overlap	= 0,
 	.attach			= idescsi_attach,
 	.cleanup		= idescsi_cleanup,

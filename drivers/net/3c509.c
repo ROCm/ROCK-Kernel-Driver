@@ -604,7 +604,7 @@ out1:
 		pnp_device_detach(idev);
 #endif
 out:
-	kfree(dev);
+	free_netdev(dev);
 	return err;
 }
 

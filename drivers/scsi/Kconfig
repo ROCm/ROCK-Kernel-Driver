@@ -22,6 +22,17 @@ config SCSI
 	  module if your root file system (the one containing the directory /)
 	  is located on a SCSI device.
 
+config SCSI_PROC_FS
+	bool "legacy /proc/scsi/ support"
+	depends on SCSI
+	default y
+	---help---
+	  This option enables support for the various files in
+	  /proc/scsi.  In Linux 2.6 this has been superceeded by
+	  files in sysfs but many legacy applications rely on this.
+
+	  If unusure say Y.
+
 comment "SCSI support type (disk, tape, CD-ROM)"
 	depends on SCSI
 
@@ -355,7 +366,7 @@ source "drivers/scsi/aic7xxx/Kconfig.aic79xx"
 # All the I2O code and drivers do not seem to be 64bit safe.
 config SCSI_DPT_I2O
 	tristate "Adaptec I2O RAID support "
-	depends on !X86_64 && SCSI
+	depends on !X86_64 && SCSI && BROKEN
 	help
 	  This driver supports all of Adaptec's I2O based RAID controllers as 
 	  well as the DPT SmartRaid V cards.  This is an Adaptec maintained
@@ -398,7 +409,7 @@ config SCSI_IN2000
 # does not use pci dma and seems to be onboard only for old machines
 config SCSI_AM53C974
 	tristate "AM53/79C974 PCI SCSI support"
-	depends on X86 && PCI && SCSI
+	depends on X86 && PCI && SCSI && BROKEN
 	---help---
 	  This is support for the AM53/79C974 SCSI host adapters.  Please read
 	  <file:Documentation/scsi/AM53C974.txt> for details.  Also, the
@@ -726,13 +737,13 @@ config IBMMCA_SCSI_DEV_RESET
 
 config SCSI_IPS
 	tristate "IBM ServeRAID support"
-	depends on X86 && PCI && SCSI
+	depends on PCI && SCSI
 	---help---
 	  This is support for the IBM ServeRAID hardware RAID controllers.
 	  See <http://www.developer.ibm.com/welcome/netfinity/serveraid.html>
 	  for more information.  If this driver does not work correctly
 	  without modification please contact the author by email at
-	  ipslinux@us.ibm.com.
+	  ipslinux@adaptec.com.
 
 	  You can build this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
@@ -742,7 +753,7 @@ config SCSI_IPS
 
 config SCSI_INITIO
 	tristate "Initio 9100U(W) support"
-	depends on PCI && SCSI
+	depends on PCI && SCSI && BROKEN
 	help
 	  This is support for the Initio 91XXU(W) SCSI host adapter.  Please
 	  read the SCSI-HOWTO, available from
@@ -989,36 +1000,9 @@ config SCSI_NCR_Q720
 	  Unless you have an NCR manufactured machine, the chances are that
 	  you do not have this SCSI card, so say N.
 
-config SCSI_SYM53C8XX
-	tristate "SYM53C8XX SCSI support"
-	depends on PCI && SCSI_SYM53C8XX_2!=y && SCSI
-	---help---
-	  This driver supports all the features of recent 53C8XX chips (used
-	  in PCI SCSI controllers), notably the hardware phase mismatch
-	  feature of the SYM53C896.
-
-	  Older versions of the 53C8XX chips are not supported by this
-	  driver.  If your system uses either a 810 rev. < 16, a 815, or a 825
-	  rev. < 16 PCI SCSI processor, you must use the generic NCR53C8XX
-	  driver ("NCR53C8XX SCSI support" above) or configure both the
-	  NCR53C8XX and this SYM53C8XX drivers either as module or linked to
-	  the kernel image.
-
-	  When both drivers are linked into the kernel, the SYM53C8XX driver
-	  is called first at initialization and you can use the 'excl=ioaddr'
-	  driver boot option to exclude attachment of adapters by the
-	  SYM53C8XX driver.  For example, entering
-	  'sym53c8xx=excl:0xb400,excl=0xc000' at the lilo prompt prevents
-	  adapters at io address 0xb400 and 0xc000 from being attached by the
-	  SYM53C8XX driver, thus allowing the NCR53C8XX driver to attach them.
-	  The 'excl' option is also supported by the NCR53C8XX driver.
-
-	  Please read <file:Documentation/scsi/ncr53c8xx.txt> for more
-	  information.
-
 config SCSI_NCR53C8XX_DEFAULT_TAGS
 	int "  default tagged command queue depth"
-	depends on (SCSI_SYM53C8XX || SCSI_ZALON || SCSI_NCR_Q720)
+	depends on SCSI_ZALON || SCSI_NCR_Q720
 	default "8"
 	---help---
 	  "Tagged command queuing" is a feature of SCSI-2 which improves
@@ -1044,7 +1028,7 @@ config SCSI_NCR53C8XX_DEFAULT_TAGS
 
 config SCSI_NCR53C8XX_MAX_TAGS
 	int "  maximum number of queued commands"
-	depends on (SCSI_SYM53C8XX || SCSI_ZALON || SCSI_NCR_Q720)
+	depends on SCSI_ZALON || SCSI_NCR_Q720
 	default "32"
 	---help---
 	  This option allows you to specify the maximum number of commands
@@ -1061,7 +1045,7 @@ config SCSI_NCR53C8XX_MAX_TAGS
 
 config SCSI_NCR53C8XX_SYNC
 	int "  synchronous transfers frequency in MHz"
-	depends on (SCSI_SYM53C8XX || SCSI_ZALON || SCSI_NCR_Q720)
+	depends on SCSI_ZALON || SCSI_NCR_Q720
 	default "20"
 	---help---
 	  The SCSI Parallel Interface-2 Standard defines 5 classes of transfer
@@ -1095,7 +1079,7 @@ config SCSI_NCR53C8XX_SYNC
 
 config SCSI_NCR53C8XX_PROFILE
 	bool "  enable profiling"
-	depends on (SCSI_SYM53C8XX || SCSI_ZALON || SCSI_NCR_Q720)
+	depends on SCSI_ZALON || SCSI_NCR_Q720
 	help
 	  This option allows you to enable profiling information gathering.
 	  These statistics are not very accurate due to the low frequency
@@ -1104,34 +1088,9 @@ config SCSI_NCR53C8XX_PROFILE
 
 	  The normal answer therefore is N.
 
-config SCSI_NCR53C8XX_IOMAPPED
-	bool "  use normal IO"
-	depends on SCSI_SYM53C8XX && !(SCSI_ZALON || SCSI_NCR_Q720)
-	help
-	  If you say Y here, the driver will use normal IO, as opposed to
-	  memory mapped IO. Memory mapped IO has less latency than normal IO
-	  and works for most Intel-based hardware. Under Linux/Alpha only
-	  normal IO is currently supported by the driver and so, this option
-	  has no effect on those systems.
-
-	  The normal answer therefore is N; try Y only if you encounter SCSI
-	  related problems.
-
-config SCSI_NCR53C8XX_PQS_PDS
-	bool "  include support for the NCR PQS/PDS SCSI card"
-	depends on SCSI_SYM53C8XX
-	help
-	  Say Y here if you have a special SCSI adapter produced by NCR
-	  corporation called a PCI Quad SCSI or PCI Dual SCSI. You do not need
-	  this if you do not have one of these adapters. However, since this
-	  device is detected as a specific PCI device, this option is quite
-	  safe.
-
-	  The common answer here is N, but answering Y is safe.
-
 config SCSI_NCR53C8XX_NO_DISCONNECT
 	bool "  not allow targets to disconnect"
-	depends on (SCSI_SYM53C8XX || SCSI_ZALON || SCSI_NCR_Q720) && SCSI_NCR53C8XX_DEFAULT_TAGS=0
+	depends on (SCSI_ZALON || SCSI_NCR_Q720) && SCSI_NCR53C8XX_DEFAULT_TAGS=0
 	help
 	  This option is only provided for safety if you suspect some SCSI
 	  device of yours to not support properly the target-disconnect
@@ -1139,29 +1098,9 @@ config SCSI_NCR53C8XX_NO_DISCONNECT
 	  not allow targets to disconnect is not reasonable if there is more
 	  than 1 device on a SCSI bus. The normal answer therefore is N.
 
-config SCSI_NCR53C8XX_SYMBIOS_COMPAT
-	bool "  assume boards are SYMBIOS compatible (EXPERIMENTAL)"
-	depends on (SCSI_SYM53C8XX || SCSI_ZALON || SCSI_NCR_Q720 ) && EXPERIMENTAL
-	---help---
-	  This option allows you to enable some features depending on GPIO
-	  wiring. These General Purpose Input/Output pins can be used for
-	  vendor specific features or implementation of the standard SYMBIOS
-	  features. Genuine SYMBIOS controllers use GPIO0 in output for
-	  controller LED and GPIO3 bit as a flag indicating
-	  singled-ended/differential interface. The Tekram DC-390U/F boards
-	  uses a different GPIO wiring.
-
-	  Your answer to this question is ignored if all your controllers have
-	  NVRAM, since the driver is able to detect the board type from the
-	  NVRAM format.
-
-	  If all the controllers in your system are genuine SYMBIOS boards or
-	  use BIOS and drivers from SYMBIOS, you would want to say Y here,
-	  otherwise N. N is the safe answer.
-
 config SCSI_MCA_53C9X
 	tristate "NCR MCA 53C9x SCSI support"
-	depends on MCA && SCSI
+	depends on MCA && SCSI && BROKEN_ON_SMP
 	help
 	  Some MicroChannel machines, notably the NCR 35xx line, use a SCSI
 	  controller based on the NCR 53C94.  This driver will allow use of
@@ -1189,7 +1128,7 @@ config SCSI_PAS16
 
 config SCSI_PCI2000
 	tristate "PCI2000 support"
-	depends on PCI && SCSI
+	depends on PCI && SCSI && BROKEN
 	help
 	  This is support for the PCI2000I EIDE interface card which acts as a
 	  SCSI host adapter.  Please read the SCSI-HOWTO, available from
@@ -1202,7 +1141,7 @@ config SCSI_PCI2000
 
 config SCSI_PCI2220I
 	tristate "PCI2220i support"
-	depends on PCI && SCSI
+	depends on PCI && SCSI && BROKEN
 	help
 	  This is support for the PCI2220i EIDE interface card which acts as a
 	  SCSI host adapter.  Please read the SCSI-HOWTO, available from
@@ -1298,6 +1237,16 @@ config SCSI_QLOGIC_1280
 	  The module will be called qla1280. If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
+config SCSI_QLOGIC_1280_PIO
+	bool "Use PIO instead of MMIO" if !X86_VISWS
+	depends on SCSI_QLOGIC_1280
+	default y if X86_VISWS
+	help
+	  This instructs the driver to use programmed I/O ports (PIO) instead
+	  of PCI shared memory (MMIO).  This can possibly solve some problems
+	  in case your mainboard has memory consistency issues.  If unsure,
+	  say N.
+
 config SCSI_QLOGICPTI
 	tristate "PTI Qlogic, ISP Driver"
 	depends on SBUS && SCSI
@@ -1314,7 +1263,7 @@ config SCSI_QLOGICPTI
 
 config SCSI_SEAGATE
 	tristate "Seagate ST-02 and Future Domain TMC-8xx SCSI support"
-	depends on X86 && ISA && SCSI
+	depends on X86 && ISA && SCSI && BROKEN
 	---help---
 	  These are 8-bit SCSI controllers; the ST-01 is also supported by
 	  this driver.  It is explained in section 3.9 of the SCSI-HOWTO,
@@ -1381,7 +1330,7 @@ config SCSI_DC395x
 
 config SCSI_DC390T
 	tristate "Tekram DC390(T) and Am53/79C974 SCSI support"
-	depends on PCI && SCSI
+	depends on PCI && SCSI && BROKEN
 	---help---
 	  This driver supports PCI SCSI host adapters based on the Am53C974A
 	  chip, e.g. Tekram DC390(T), DawiControl 2974 and some onboard

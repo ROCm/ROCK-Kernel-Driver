@@ -48,10 +48,15 @@ zimageinitrd-$(CONFIG_IBM_OPENBIOS)	:= zImage.initrd-TREE
 
       zimage-$(CONFIG_EBONY)		:= zImage-TREE
 zimageinitrd-$(CONFIG_EBONY)		:= zImage.initrd-TREE
-     extra.o-$(CONFIG_EBONY)		:= direct.o
          end-$(CONFIG_EBONY)		:= ebony
   entrypoint-$(CONFIG_EBONY)		:= 0x01000000
    tftpimage-$(CONFIG_EBONY)		:= /tftpboot/zImage.$(end-y)
+
+      zimage-$(CONFIG_OCOTEA)		:= zImage-TREE
+zimageinitrd-$(CONFIG_OCOTEA)		:= zImage.initrd-TREE
+         end-$(CONFIG_OCOTEA)		:= ocotea
+  entrypoint-$(CONFIG_OCOTEA)		:= 0x01000000
+   tftpimage-$(CONFIG_OCOTEA)		:= /tftpboot/zImage.$(end-y)
 
      extra.o-$(CONFIG_EV64260)		:= direct.o misc-ev64260.o
    tftpimage-$(CONFIG_EV64260)		:= /tftpboot/zImage.ev64260

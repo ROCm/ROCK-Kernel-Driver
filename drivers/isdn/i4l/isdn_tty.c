@@ -132,7 +132,7 @@ static int
 isdn_tty_readbchan(struct modem_info *info, u_char * buf, u_char * fp, int len)
 {
 	int count;
-	int count_pull;
+	u_int count_pull;
 	int count_put;
 	int dflag;
 	struct sk_buff *skb;
@@ -179,7 +179,7 @@ isdn_tty_readbchan(struct modem_info *info, u_char * buf, u_char * fp, int len)
 #endif
 			/* No DLE's in buff, so simply copy it */
 			dflag = 1;
-			if ((count_pull = skb->len) > len) {
+			if ((int)(count_pull = skb->len) > len) {
 				count_pull = len;
 				dflag = 0;
 			}
@@ -315,7 +315,7 @@ isdn_tty_rcv_skb(struct isdn_slot *slot, struct sk_buff *skb)
 				skb_pull(skb, 4);
 	}
 #ifdef CONFIG_ISDN_AUDIO
-	if (skb_headroom(skb) < sizeof(isdn_audio_skb)) {
+	if ((size_t)skb_headroom(skb) < sizeof(isdnaudio_header)) {
 		printk(KERN_WARNING
 		       "isdn_audio: insufficient skb_headroom, dropping\n");
 		kfree_skb(skb);
@@ -1728,9 +1728,6 @@ isdn_tty_open(struct tty_struct *tty, struct file *filp)
 	modem_info *info;
 	int retval, line;
 
-	/* FIXME. This is not unload-race free AFAICS */
-
-	MOD_INC_USE_COUNT;
 
 	line = tty->index;
 	if (line < 0 || line > ISDN_MAX_CHANNELS)
@@ -1738,6 +1735,8 @@ isdn_tty_open(struct tty_struct *tty, struct file *filp)
 	info = &isdn_mdm.info[line];
 	if (isdn_tty_paranoia_check(info, tty->name, "isdn_tty_open"))
 		return -ENODEV;
+	if (!try_module_get(info->owner))
+		printk(KERN_WARNING "%s: cannot reserve module\n", __FUNCTION__);
 #ifdef ISDN_DEBUG_MODEM_OPEN
 	printk(KERN_DEBUG "isdn_tty_open %s, count = %d\n", tty->name,
 	       info->count);
@@ -1753,6 +1752,7 @@ isdn_tty_open(struct tty_struct *tty, struct file *filp)
 #ifdef ISDN_DEBUG_MODEM_OPEN
 		printk(KERN_DEBUG "isdn_tty_open return after startup\n");
 #endif
+		module_put(info->owner);
 		return retval;
 	}
 	retval = isdn_tty_block_til_ready(tty, filp, info);
@@ -1760,6 +1760,7 @@ isdn_tty_open(struct tty_struct *tty, struct file *filp)
 #ifdef ISDN_DEBUG_MODEM_OPEN
 		printk(KERN_DEBUG "isdn_tty_open return after isdn_tty_block_til_ready \n");
 #endif
+		module_put(info->owner);
 		return retval;
 	}
 #ifdef ISDN_DEBUG_MODEM_OPEN
@@ -1779,7 +1780,9 @@ isdn_tty_close(struct tty_struct *tty, struct file *filp)
 	ulong flags;
 	ulong timeout;
 
-	if (!info || isdn_tty_paranoia_check(info, tty->name, "isdn_tty_close"))
+	if (!info)
+		return;
+	if (isdn_tty_paranoia_check(info, tty->name, "isdn_tty_close"))
 		goto out;
 
 	save_flags(flags);
@@ -1859,7 +1862,7 @@ isdn_tty_close(struct tty_struct *tty, struct file *filp)
 	printk(KERN_DEBUG "isdn_tty_close normal exit\n");
 #endif
  out:
-	MOD_DEC_USE_COUNT;
+	module_put(info->owner);
 }
 
 /*
@@ -2036,6 +2039,7 @@ isdn_tty_init(void)
 			return -3;
 		}
 #endif
+		info->owner = THIS_MODULE;
 		init_MUTEX(&info->write_sem);
 		sprintf(info->last_cause, "0000");
 		sprintf(info->last_num, "none");
@@ -2457,7 +2461,7 @@ isdn_tty_at_cout(char *msg, modem_info * info)
 	    (!skb_queue_empty(&info->rpqueue)))) {
 		skb = alloc_skb(strlen(msg)
 #ifdef CONFIG_ISDN_AUDIO
-			+ sizeof(isdn_audio_skb)
+			+ sizeof(isdnaudio_header)
 #endif
 			, GFP_ATOMIC);
 		if (!skb) {
@@ -2465,7 +2469,7 @@ isdn_tty_at_cout(char *msg, modem_info * info)
 			return;
 		}
 #ifdef CONFIG_ISDN_AUDIO
-		skb_reserve(skb, sizeof(isdn_audio_skb));
+		skb_reserve(skb, sizeof(isdnaudio_header));
 #endif
 		sp = skb_put(skb, strlen(msg));
 #ifdef CONFIG_ISDN_AUDIO
