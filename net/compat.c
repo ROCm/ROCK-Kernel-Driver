@@ -405,34 +405,6 @@ static int do_set_attach_filter(int fd, int level, int optname,
 			      sizeof(struct sock_fprog));
 }
 
-static int do_set_icmpv6_filter(int fd, int level, int optname,
-				char *optval, int optlen)
-{
-	struct icmp6_filter kfilter;
-	mm_segment_t old_fs;
-	int ret, i;
-
-	if (optlen < sizeof(kfilter))
-		return -EINVAL;
-	if (copy_from_user(&kfilter, optval, sizeof(kfilter)))
-		return -EFAULT;
-
-	for (i = 0; i < 8; i += 2) {
-		u32 tmp = kfilter.data[i];
-
-		kfilter.data[i] = kfilter.data[i + 1];
-		kfilter.data[i + 1] = tmp;
-	}
-
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-	ret = sys_setsockopt(fd, level, optname,
-			     (char *) &kfilter, sizeof(kfilter));
-	set_fs(old_fs);
-
-	return ret;
-}
-
 static int do_set_sock_timeout(int fd, int level, int optname, char *optval, int optlen)
 {
 	struct compat_timeval *up = (struct compat_timeval *) optval;
@@ -465,9 +437,6 @@ asmlinkage long compat_sys_setsockopt(int fd, int level, int optname,
 					    optval, optlen);
 	if (optname == SO_RCVTIMEO || optname == SO_SNDTIMEO)
 		return do_set_sock_timeout(fd, level, optname, optval, optlen);
-	if (level == SOL_ICMPV6 && optname == ICMPV6_FILTER)
-		return do_set_icmpv6_filter(fd, level, optname,
-					    optval, optlen);
 
 	return sys_setsockopt(fd, level, optname, optval, optlen);
 }
