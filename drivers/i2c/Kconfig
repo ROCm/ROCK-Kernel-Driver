@@ -41,5 +41,13 @@ source drivers/i2c/algos/Kconfig
 source drivers/i2c/busses/Kconfig
 source drivers/i2c/chips/Kconfig
 
+config I2C_DEBUG_CORE
+	bool "I2C Core debugging messages"
+	depends on I2C
+	help
+	  Say Y here if you want the I2C core to produce a bunch of debug
+	  messages to the system log.  Select this if you are having a
+	  problem with I2C support and want to see more of what is going on.
+
 endmenu
 

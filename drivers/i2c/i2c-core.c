@@ -23,7 +23,10 @@
 
 /* $Id: i2c-core.c,v 1.95 2003/01/22 05:25:08 kmalkki Exp $ */
 
-/* #define DEBUG 1 */		/* needed to pick up the dev_dbg() calls */
+#include <linux/config.h>
+#ifdef CONFIG_I2C_DEBUG_CORE
+#define DEBUG	1
+#endif
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -35,15 +38,9 @@
 #include <asm/uaccess.h>
 
 
-#define DEB(x) if (i2c_debug>=1) x;
-#define DEB2(x) if (i2c_debug>=2) x;
-
 static LIST_HEAD(adapters);
 static LIST_HEAD(drivers);
 static DECLARE_MUTEX(core_lists);
-
-/**** debug level */
-static int i2c_debug;
 
 int i2c_device_probe(struct device *dev)
 {
@@ -162,7 +159,7 @@ int i2c_add_adapter(struct i2c_adapter *adap)
 	}
 	up(&core_lists);
 
-	DEB(dev_dbg(&adap->dev, "registered as adapter #%d\n", adap->nr));
+	dev_dbg(&adap->dev, "registered as adapter #%d\n", adap->nr);
 	return 0;
 }
 
@@ -217,7 +214,7 @@ int i2c_del_adapter(struct i2c_adapter *adap)
 	wait_for_completion(&adap->dev_released);
 	wait_for_completion(&adap->class_dev_released);
 
-	DEB(dev_dbg(&adap->dev, "adapter unregistered\n"));
+	dev_dbg(&adap->dev, "adapter unregistered\n");
 
  out_unlock:
 	up(&core_lists);
@@ -250,7 +247,7 @@ int i2c_add_driver(struct i2c_driver *driver)
 		goto out_unlock;
 	
 	list_add_tail(&driver->list,&drivers);
-	DEB(printk(KERN_DEBUG "i2c-core.o: driver %s registered.\n",driver->name));
+	pr_debug("i2c-core: driver %s registered.\n", driver->name);
 
 	/* now look for instances of driver on our adapters */
 	if (driver->flags & I2C_DF_NOTIFY) {
@@ -279,14 +276,14 @@ int i2c_del_driver(struct i2c_driver *driver)
 	 * attached. If so, detach them to be able to kill the driver 
 	 * afterwards.
 	 */
-	DEB2(printk(KERN_DEBUG "i2c-core.o: unregister_driver - looking for clients.\n"));
+	pr_debug("i2c-core: unregister_driver - looking for clients.\n");
 	/* removing clients does not depend on the notify flag, else 
 	 * invalid operation might (will!) result, when using stale client
 	 * pointers.
 	 */
 	list_for_each(item1,&adapters) {
 		adap = list_entry(item1, struct i2c_adapter, list);
-		DEB2(dev_dbg(&adap->dev, "examining adapter\n"));
+		dev_dbg(&adap->dev, "examining adapter\n");
 		if (driver->detach_adapter) {
 			if ((res = driver->detach_adapter(adap))) {
 				dev_warn(&adap->dev, "while unregistering "
@@ -300,9 +297,7 @@ int i2c_del_driver(struct i2c_driver *driver)
 				client = list_entry(item2, struct i2c_client, list);
 				if (client->driver != driver)
 					continue;
-				DEB2(printk(KERN_DEBUG "i2c-core.o: "
-					    "detaching client %s:\n",
-					    client->name));
+				pr_debug("i2c-core.o: detaching client %s:\n", client->name);
 				if ((res = driver->detach_client(client))) {
 					dev_err(&adap->dev, "while "
 						"unregistering driver "
@@ -321,7 +316,7 @@ int i2c_del_driver(struct i2c_driver *driver)
 
 	driver_unregister(&driver->driver);
 	list_del(&driver->list);
-	DEB(printk(KERN_DEBUG "i2c-core.o: driver unregistered: %s\n",driver->name));
+	pr_debug("i2c-core: driver unregistered: %s\n", driver->name);
 
  out_unlock:
 	up(&core_lists);
@@ -372,8 +367,8 @@ int i2c_attach_client(struct i2c_client *client)
 		}
 	}
 
-	DEB(dev_dbg(&adapter->dev, "client [%s] registered to adapter\n",
-			client->name));
+	dev_dbg(&adapter->dev, "client [%s] registered to adapter\n",
+		client->name);
 
 	if (client->flags & I2C_CLIENT_ALLOW_USE)
 		client->usage_count = 0;
@@ -385,7 +380,7 @@ int i2c_attach_client(struct i2c_client *client)
 	
 	snprintf(&client->dev.bus_id[0], sizeof(client->dev.bus_id),
 		"%d-%04x", i2c_adapter_id(adapter), client->addr);
-	printk("registering %s\n", client->dev.bus_id);
+	pr_debug("registering %s\n", client->dev.bus_id);
 	device_register(&client->dev);
 	device_create_file(&client->dev, &dev_attr_client_name);
 	
@@ -404,8 +399,8 @@ int i2c_detach_client(struct i2c_client *client)
 	if (adapter->client_unregister)  {
 		res = adapter->client_unregister(client);
 		if (res) {
-			printk(KERN_ERR
-			       "i2c-core.o: client_unregister [%s] failed, "
+			dev_err(&client->dev,
+			       "client_unregister [%s] failed, "
 			       "client not detached", client->name);
 			goto out;
 		}
@@ -467,9 +462,9 @@ int i2c_release_client(struct i2c_client *client)
 	if(client->flags & I2C_CLIENT_ALLOW_USE) {
 		if(client->usage_count>0)
 			client->usage_count--;
-		else
-		{
-			printk(KERN_WARNING " i2c-core.o: dec_use_client used one too many times\n");
+		else {
+			pr_debug("i2c-core: %s used one too many times\n",
+				__FUNCTION__);
 			return -EPERM;
 		}
 	}
@@ -544,7 +539,7 @@ int i2c_transfer(struct i2c_adapter * adap, struct i2c_msg msgs[],int num)
 	int ret;
 
 	if (adap->algo->master_xfer) {
- 	 	DEB2(dev_dbg(&adap->dev, "master_xfer: with %d msgs.\n", num));
+ 	 	dev_dbg(&adap->dev, "master_xfer: with %d msgs.\n", num);
 
 		down(&adap->bus_lock);
 		ret = adap->algo->master_xfer(adap,msgs,num);
@@ -552,7 +547,7 @@ int i2c_transfer(struct i2c_adapter * adap, struct i2c_msg msgs[],int num)
 
 		return ret;
 	} else {
-		DEB2(dev_dbg(&adap->dev, "I2C level transfers not supported\n"));
+		dev_dbg(&adap->dev, "I2C level transfers not supported\n");
 		return -ENOSYS;
 	}
 }
@@ -569,8 +564,8 @@ int i2c_master_send(struct i2c_client *client,const char *buf ,int count)
 		msg.len = count;
 		msg.buf = (char *)buf;
 	
-		DEB2(dev_dbg(&client->adapter->dev, "master_send: writing %d bytes.\n",
-				count));
+		dev_dbg(&client->adapter->dev, "master_send: writing %d bytes.\n",
+			count);
 	
 		down(&adap->bus_lock);
 		ret = adap->algo->master_xfer(adap,&msg,1);
@@ -598,15 +593,15 @@ int i2c_master_recv(struct i2c_client *client, char *buf ,int count)
 		msg.len = count;
 		msg.buf = buf;
 
-		DEB2(dev_dbg(&client->adapter->dev, "master_recv: reading %d bytes.\n",
-				count));
+		dev_dbg(&client->adapter->dev, "master_recv: reading %d bytes.\n",
+			count);
 	
 		down(&adap->bus_lock);
 		ret = adap->algo->master_xfer(adap,&msg,1);
 		up(&adap->bus_lock);
 	
-		DEB2(printk(KERN_DEBUG "i2c-core.o: master_recv: return:%d (count:%d, addr:0x%02x)\n",
-			ret, count, client->addr));
+		dev_dbg(&client->dev, "master_recv: return:%d (count:%d, addr:0x%02x)\n",
+			ret, count, client->addr);
 	
 		/* if everything went ok (i.e. 1 msg transmitted), return #bytes
 	 	* transmitted, else error code.
@@ -625,8 +620,8 @@ int i2c_control(struct i2c_client *client,
 	int ret = 0;
 	struct i2c_adapter *adap = client->adapter;
 
-	DEB2(printk(KERN_DEBUG "i2c-core.o: i2c ioctl, cmd: 0x%x, arg: %#lx\n", cmd, arg));
-	switch ( cmd ) {
+	dev_dbg(&client->dev, "i2c ioctl, cmd: 0x%x, arg: %#lx\n", cmd, arg);
+	switch (cmd) {
 		case I2C_RETRIES:
 			adap->retries = arg;
 			break;
@@ -670,8 +665,8 @@ int i2c_probe(struct i2c_adapter *adapter,
 			if (((adap_id == address_data->force[i]) || 
 			     (address_data->force[i] == ANY_I2C_BUS)) &&
 			     (addr == address_data->force[i+1])) {
-				DEB2(printk(KERN_DEBUG "i2c-core.o: found force parameter for adapter %d, addr %04x\n",
-				            adap_id,addr));
+				dev_dbg(&adapter->dev, "found force parameter for adapter %d, addr %04x\n",
+					adap_id, addr);
 				if ((err = found_proc(adapter,addr,0)))
 					return err;
 				found = 1;
@@ -688,8 +683,8 @@ int i2c_probe(struct i2c_adapter *adapter,
 			if (((adap_id == address_data->ignore[i]) || 
 			    ((address_data->ignore[i] == ANY_I2C_BUS))) &&
 			    (addr == address_data->ignore[i+1])) {
-				DEB2(printk(KERN_DEBUG "i2c-core.o: found ignore parameter for adapter %d, "
-				     "addr %04x\n", adap_id ,addr));
+				dev_dbg(&adapter->dev, "found ignore parameter for adapter %d, "
+					"addr %04x\n", adap_id ,addr);
 				found = 1;
 			}
 		}
@@ -700,8 +695,8 @@ int i2c_probe(struct i2c_adapter *adapter,
 			    ((address_data->ignore_range[i]==ANY_I2C_BUS))) &&
 			    (addr >= address_data->ignore_range[i+1]) &&
 			    (addr <= address_data->ignore_range[i+2])) {
-				DEB2(printk(KERN_DEBUG "i2c-core.o: found ignore_range parameter for adapter %d, "
-				            "addr %04x\n", adap_id,addr));
+				dev_dbg(&adapter->dev, "found ignore_range parameter for adapter %d, "
+					"addr %04x\n", adap_id,addr);
 				found = 1;
 			}
 		}
@@ -715,8 +710,8 @@ int i2c_probe(struct i2c_adapter *adapter,
 		     i += 1) {
 			if (addr == address_data->normal_i2c[i]) {
 				found = 1;
-				DEB2(printk(KERN_DEBUG "i2c-core.o: found normal i2c entry for adapter %d, "
-				            "addr %02x", adap_id,addr));
+				dev_dbg(&adapter->dev, "found normal i2c entry for adapter %d, "
+					"addr %02x", adap_id,addr);
 			}
 		}
 
@@ -726,8 +721,8 @@ int i2c_probe(struct i2c_adapter *adapter,
 			if ((addr >= address_data->normal_i2c_range[i]) &&
 			    (addr <= address_data->normal_i2c_range[i+1])) {
 				found = 1;
-				DEB2(printk(KERN_DEBUG "i2c-core.o: found normal i2c_range entry for adapter %d, "
-				            "addr %04x\n", adap_id,addr));
+				dev_dbg(&adapter->dev, "found normal i2c_range entry for adapter %d, "
+					"addr %04x\n", adap_id,addr);
 			}
 		}
 
@@ -738,8 +733,8 @@ int i2c_probe(struct i2c_adapter *adapter,
 			    ((address_data->probe[i] == ANY_I2C_BUS))) &&
 			    (addr == address_data->probe[i+1])) {
 				found = 1;
-				DEB2(printk(KERN_DEBUG "i2c-core.o: found probe parameter for adapter %d, "
-				            "addr %04x\n", adap_id,addr));
+				dev_dbg(&adapter->dev, "found probe parameter for adapter %d, "
+					"addr %04x\n", adap_id,addr);
 			}
 		}
 		for (i = 0;
@@ -750,8 +745,8 @@ int i2c_probe(struct i2c_adapter *adapter,
 			   (addr >= address_data->probe_range[i+1]) &&
 			   (addr <= address_data->probe_range[i+2])) {
 				found = 1;
-				DEB2(printk(KERN_DEBUG "i2c-core.o: found probe_range parameter for adapter %d, "
-				            "addr %04x\n", adap_id,addr));
+				dev_dbg(&adapter->dev, "found probe_range parameter for adapter %d, "
+					"addr %04x\n", adap_id,addr);
 			}
 		}
 		if (!found) 
@@ -908,9 +903,9 @@ int i2c_smbus_check_pec(u16 addr, u8 command, int size, u8 partial,
 			cpec = rpec = 0;
 			break;
 	}
-	if(rpec != cpec) {
-		DEB(printk(KERN_DEBUG "i2c-core.o: Bad PEC 0x%02x vs. 0x%02x\n",
-		           rpec, cpec));
+	if (rpec != cpec) {
+		pr_debug("i2c-core: Bad PEC 0x%02x vs. 0x%02x\n",
+			rpec, cpec);
 		return -1;
 	}
 	return 0;	
@@ -1130,13 +1125,13 @@ static s32 i2c_smbus_xfer_emulated(struct i2c_adapter * adapter, u16 addr,
 	case I2C_SMBUS_BLOCK_DATA:
 	case I2C_SMBUS_BLOCK_DATA_PEC:
 		if (read_write == I2C_SMBUS_READ) {
-			printk(KERN_ERR "i2c-core.o: Block read not supported "
+			dev_err(&adapter->dev, "Block read not supported "
 			       "under I2C emulation!\n");
 			return -1;
 		} else {
 			msg[0].len = data->block[0] + 2;
 			if (msg[0].len > I2C_SMBUS_BLOCK_MAX + 2) {
-				printk(KERN_ERR "i2c-core.o: smbus_access called with "
+				dev_err(&adapter->dev, "smbus_access called with "
 				       "invalid block write size (%d)\n",
 				       data->block[0]);
 				return -1;
@@ -1149,7 +1144,7 @@ static s32 i2c_smbus_xfer_emulated(struct i2c_adapter * adapter, u16 addr,
 		break;
 	case I2C_SMBUS_BLOCK_PROC_CALL:
 	case I2C_SMBUS_BLOCK_PROC_CALL_PEC:
-		printk(KERN_ERR "i2c-core.o: Block process call not supported "
+		dev_dbg(&adapter->dev, "Block process call not supported "
 		       "under I2C emulation!\n");
 		return -1;
 	case I2C_SMBUS_I2C_BLOCK_DATA:
@@ -1158,7 +1153,7 @@ static s32 i2c_smbus_xfer_emulated(struct i2c_adapter * adapter, u16 addr,
 		} else {
 			msg[0].len = data->block[0] + 1;
 			if (msg[0].len > I2C_SMBUS_I2C_BLOCK_MAX + 1) {
-				printk("i2c-core.o: i2c_smbus_xfer_emulated called with "
+				dev_err(&adapter->dev, "i2c_smbus_xfer_emulated called with "
 				       "invalid block write size (%d)\n",
 				       data->block[0]);
 				return -1;
@@ -1168,7 +1163,7 @@ static s32 i2c_smbus_xfer_emulated(struct i2c_adapter * adapter, u16 addr,
 		}
 		break;
 	default:
-		printk(KERN_ERR "i2c-core.o: smbus_access called with invalid size (%d)\n",
+		dev_err(&adapter->dev, "smbus_access called with invalid size (%d)\n",
 		       size);
 		return -1;
 	}
@@ -1303,6 +1298,3 @@ EXPORT_SYMBOL(i2c_check_functionality);
 MODULE_AUTHOR("Simon G. Vogl <simon@tk.uni-linz.ac.at>");
 MODULE_DESCRIPTION("I2C-Bus main module");
 MODULE_LICENSE("GPL");
-
-MODULE_PARM(i2c_debug, "i");
-MODULE_PARM_DESC(i2c_debug,"debug level");
