@@ -581,12 +581,8 @@ static void copy_data_pages(void)
 					struct page * page;
 					page = pfn_to_page(zone_pfn + zone->zone_start_pfn);
 					pbe->orig_address = (long) page_address(page);
-					/* Copy page is dangerous: it likes to mess with
-					   preempt count on specific cpus. Wrong preempt 
-					   count is then copied, oops. 
-					*/
-					copy_page((void *)pbe->address, 
-						  (void *)pbe->orig_address);
+					/* copy_page is no usable for copying task structs. */
+					memcpy((void *)pbe->address, (void *)pbe->orig_address, PAGE_SIZE);
 					pbe++;
 				}
 			}
