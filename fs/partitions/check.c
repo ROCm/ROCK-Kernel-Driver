@@ -35,7 +35,7 @@
 #include "efi.h"
 
 #if CONFIG_BLK_DEV_MD
-extern void md_autodetect_dev(kdev_t dev);
+extern void md_autodetect_dev(dev_t dev);
 #endif
 
 int warn_no_part = 1; /*This is ugly: should make genhd removable media aware*/
@@ -87,7 +87,7 @@ static int (*check_part[])(struct parsed_partitions *, struct block_device *) = 
  * a pointer to that same buffer (for convenience).
  */
 
-char *disk_name (struct gendisk *hd, int part, char *buf)
+char *disk_name(struct gendisk *hd, int part, char *buf)
 {
 	if (part < 1<<hd->minor_shift && hd->part[part].de) {
 		int pos;
@@ -124,104 +124,68 @@ static DEVICE_ATTR(type,S_IRUGO,partition_device_type_read,NULL);
 
 static void driverfs_create_partitions(struct gendisk *hd)
 {
-	int pos = -1;
-	char dirname[256];
-	struct device *parent = 0;
-	int max_p;
-	int part;
-	devfs_handle_t dir = 0;
+	int max_p = 1<<hd->minor_shift;
 	struct hd_struct *p = hd->part;
-	
+	char name[DEVICE_NAME_SIZE];
+	char bus_id[BUS_ID_SIZE];
+	struct device *dev, *parent;
+	int part;
+
 	/* get parent driverfs device structure */
 	if (hd->driverfs_dev_arr)
 		parent = hd->driverfs_dev_arr[0];
 	else /* if driverfs not supported by subsystem, skip partitions */
 		return;
-	
-	/* get parent device node directory name */
-	if (hd->de_arr) {
-		dir = hd->de_arr[0];
-		if (dir)
-			pos = devfs_generate_path (dir, dirname, 
-						   sizeof dirname);
+
+	if (parent)  {
+		sprintf(name, "%s", parent->name);
+		sprintf(bus_id, "%s:", parent->bus_id);
+	} else {
+		*name = *bus_id = '\0';
 	}
-	
-	if (pos < 0) {
-		disk_name(hd, 0, dirname);
-		pos = 0;
+
+	dev = &p[0].hd_driverfs_dev;
+	dev->driver_data = (void *)(long)__mkdev(hd->major, hd->first_minor);
+	sprintf(dev->name, "%sdisc", name);
+	sprintf(dev->bus_id, "%sdisc", bus_id);
+	for (part=1; part < max_p; part++) {
+		if (!p[part].nr_sects)
+			continue;
+		dev = &p[part].hd_driverfs_dev;
+		dev->driver_data =
+				(void *)(long)__mkdev(hd->major, hd->first_minor+part);
+		sprintf(dev->name, "%spart%d", name, part);
+		sprintf(dev->bus_id, "%s:p%d", bus_id, part);
 	}
-	
-	max_p = (1 << hd->minor_shift);
-	
-	/* for all partitions setup parents and device node names */
-	for(part=0; part < max_p; part++) {
-		if ((part == 0) || (p[part].nr_sects >= 1)) {
-			struct device * current_driverfs_dev = 
-				&p[part].hd_driverfs_dev;
-			current_driverfs_dev->parent = parent;
-			/* handle disc case */
-			current_driverfs_dev->driver_data =
-					(void *)(long)__mkdev(hd->major, hd->first_minor+part);
-			if (part == 0) {
-				if (parent)  {
-					sprintf(current_driverfs_dev->name,
-						"%sdisc", parent->name);
-					sprintf(current_driverfs_dev->bus_id,
-						"%s:disc", parent->bus_id);
-				} else {
-					sprintf(current_driverfs_dev->name, 
-						"disc");
-					sprintf(current_driverfs_dev->bus_id,
-						"disc");
-				}
-			} else { /* this is a partition */
-				if (parent) {
-					sprintf(current_driverfs_dev->name,
-						"%spart%d", parent->name, part);
-					sprintf(current_driverfs_dev->bus_id,
-						"%s:p%d", parent->bus_id, part);
-				} else {
-					sprintf(current_driverfs_dev->name, 
-						"part%d", part);
-					sprintf(current_driverfs_dev->bus_id, 
-						"p%d" ,part);
-				}
-			}
-			if (parent) current_driverfs_dev->bus = parent->bus;
-			device_register(current_driverfs_dev);
-			device_create_file(current_driverfs_dev,
-					   &dev_attr_type);
-			device_create_file(current_driverfs_dev,
-					   &dev_attr_kdev);
-		}
+
+	for (part=0; part < max_p; part++) {
+		dev = &p[part].hd_driverfs_dev;
+		if (!dev->driver_data)
+			continue;
+		dev->parent = parent;
+		if (parent)
+			dev->bus = parent->bus;
+		device_register(dev);
+		device_create_file(dev, &dev_attr_type);
+		device_create_file(dev, &dev_attr_kdev);
 	}
 }
 
 void driverfs_remove_partitions(struct gendisk *hd)
 {
-	int max_p;
+	int max_p = 1<<hd->minor_shift;
+	struct hd_struct *p;
 	int part;
-	struct device * current_driverfs_dev;
-	struct hd_struct *p = hd->part;
-	
-	max_p=(1 << hd->minor_shift);
-	
-	/* for all parts setup parent relationships and device node names */
-	for(part=1; part < max_p; part++) {
-		if ((p[part].nr_sects >= 1)) {
-			current_driverfs_dev = &p[part].hd_driverfs_dev;
-			device_remove_file(current_driverfs_dev,
-					   &dev_attr_type);
-			device_remove_file(current_driverfs_dev,
-					   &dev_attr_kdev);
-			put_device(current_driverfs_dev);	
+
+	for (part=0, p = hd->part; part < max_p; part++, p++) {
+		struct device *dev = &p->hd_driverfs_dev;
+		if (dev->driver_data) {
+			device_remove_file(dev, &dev_attr_type);
+			device_remove_file(dev, &dev_attr_kdev);
+			put_device(dev);	
+			dev->driver_data = NULL;
 		}
 	}
-	current_driverfs_dev = &p->hd_driverfs_dev;
-	device_remove_file(current_driverfs_dev, &dev_attr_type);
-	device_remove_file(current_driverfs_dev, &dev_attr_kdev);
-	put_device(current_driverfs_dev);	
-	return;
 }
 
 /*
@@ -230,7 +194,7 @@ void driverfs_remove_partitions(struct gendisk *hd)
 void check_partition(struct gendisk *hd, struct block_device *bdev)
 {
 	devfs_handle_t de = NULL;
-	kdev_t dev = to_kdev_t(bdev->bd_dev);
+	dev_t dev = bdev->bd_dev;
 	char buf[64];
 	struct parsed_partitions *state;
 	int i;
@@ -246,10 +210,9 @@ void check_partition(struct gendisk *hd, struct block_device *bdev)
 		printk(KERN_INFO " /dev/%s:", buf + i);
 		sprintf(state->name, "p");
 	} else {
-		unsigned n = hd->major;
 		disk_name(hd, 0, state->name);
 		printk(KERN_INFO " %s:", state->name);
-		if (n - COMPAQ_SMART2_MAJOR <= 7 || n - COMPAQ_CISS_MAJOR <= 7)
+		if (isdigit(state->name[strlen(state->name)-1]))
 			sprintf(state->name, "p");
 	}
 	state->limit = 1<<hd->minor_shift;
@@ -272,7 +235,7 @@ void check_partition(struct gendisk *hd, struct block_device *bdev)
 #if CONFIG_BLK_DEV_MD
 			if (!state->parts[j].flags)
 				continue;
-			md_autodetect_dev(mk_kdev(major(dev),minor(dev)+j));
+			md_autodetect_dev(dev+j);
 #endif
 		}
 		goto out;

@@ -81,6 +81,7 @@ del_gendisk(struct gendisk *disk)
 {
 	struct gendisk **p;
 
+	driverfs_remove_partitions(disk);
 	wipe_partitions(disk);
 	write_lock(&gendisk_lock);
 	for (p = &gendisk_head; *p; p = &((*p)->next))
