@@ -2697,7 +2697,8 @@ int reset_card( struct net_device *dev , int lock) {
 }
 
 struct net_device *_init_airo_card( unsigned short irq, int port,
-				    int is_pcmcia, struct pci_dev *pci )
+				    int is_pcmcia, struct pci_dev *pci,
+				    struct device *dmdev )
 {
 	struct net_device *dev;
 	struct airo_info *ai;
@@ -2759,10 +2760,8 @@ struct net_device *_init_airo_card( unsigned short irq, int port,
 	dev->irq = irq;
 	dev->base_addr = port;
 
-	/* what is with PCMCIA ??? */
-	if (pci) {
-		SET_NETDEV_DEV(dev, &pci->dev);
-	}
+	SET_NETDEV_DEV(dev, dmdev);
+
 
 	if (test_bit(FLAG_MPI,&ai->flags))
 		reset_card (dev, 1);
@@ -2844,9 +2843,10 @@ err_out_free:
 	return NULL;
 }
 
-struct net_device *init_airo_card( unsigned short irq, int port, int is_pcmcia )
+struct net_device *init_airo_card( unsigned short irq, int port, int is_pcmcia,
+				  struct device *dmdev)
 {
-	return _init_airo_card ( irq, port, is_pcmcia, NULL);
+	return _init_airo_card ( irq, port, is_pcmcia, NULL, dmdev);
 }
 
 EXPORT_SYMBOL(init_airo_card);
@@ -5455,9 +5455,9 @@ static int __devinit airo_pci_probe(struct pci_dev *pdev,
 	pci_set_master(pdev);
 
 	if (pdev->device == 0x5000 || pdev->device == 0xa504)
-			dev = _init_airo_card(pdev->irq, pdev->resource[0].start, 0, pdev);
+			dev = _init_airo_card(pdev->irq, pdev->resource[0].start, 0, pdev, &pdev->dev);
 	else
-			dev = _init_airo_card(pdev->irq, pdev->resource[2].start, 0, pdev);
+			dev = _init_airo_card(pdev->irq, pdev->resource[2].start, 0, pdev, &pdev->dev);
 	if (!dev)
 		return -ENODEV;
 
@@ -5559,7 +5559,7 @@ static int __init airo_init_module( void )
 		printk( KERN_INFO
 			"airo:  Trying to configure ISA adapter at irq=%d io=0x%x\n",
 			irq[i], io[i] );
-		if (init_airo_card( irq[i], io[i], 0 ))
+		if (init_airo_card( irq[i], io[i], 0, NULL ))
 			have_isa_dev = 1;
 	}
 

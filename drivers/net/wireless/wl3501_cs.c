@@ -2105,6 +2105,7 @@ static void wl3501_config(dev_link_t *link)
 
 	dev->irq = link->irq.AssignedIRQ;
 	dev->base_addr = link->io.BasePort1;
+	SET_NETDEV_DEV(dev, &handle_to_dev(handle));
 	if (register_netdev(dev)) {
 		printk(KERN_NOTICE "wl3501_cs: register_netdev() failed\n");
 		goto failed;

@@ -564,6 +564,7 @@ static void ray_config(dev_link_t *link)
         return;
     }
 
+    SET_NETDEV_DEV(dev, &handle_to_dev(handle));
     i = register_netdev(dev);
     if (i != 0) {
         printk("ray_config register_netdev() failed\n");

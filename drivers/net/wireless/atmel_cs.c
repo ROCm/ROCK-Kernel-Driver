@@ -347,18 +347,6 @@ static struct {
 	{ 0, 0, "11WAVE/11WP611AL-E", "atmel_at76c502e%s.bin", "11WAVE WaveBuddy" } 
 };
 
-/* This is strictly temporary, until PCMCIA devices get integrated into the device model. */
-static struct device *atmel_device(void)
-{
-	static struct device dev = {
-		.bus_id    = "pcmcia",
-	};
-	kobject_set_name(&dev.kobj, "atmel_cs");
-	kobject_init(&dev.kobj);
-	
-	return &dev;
-}
-
 static void atmel_config(dev_link_t *link)
 {
 	client_handle_t handle;
@@ -549,7 +537,7 @@ static void atmel_config(dev_link_t *link)
 		init_atmel_card(link->irq.AssignedIRQ,
 				link->io.BasePort1,
 				card_index == -1 ? NULL :  card_table[card_index].firmware,
-				atmel_device(),
+				&handle_to_dev(handle),
 				card_present, 
 				link);
 	if (!((local_info_t*)link->priv)->eth_dev) 

@@ -454,6 +454,7 @@ orinoco_cs_config(dev_link_t *link)
 
 	/* register_netdev will give us an ethX name */
 	dev->name[0] = '\0';
+	SET_NETDEV_DEV(dev, &handle_to_dev(handle));
 	/* Tell the stack we exist */
 	if (register_netdev(dev) != 0) {
 		printk(KERN_ERR PFX "register_netdev() failed\n");

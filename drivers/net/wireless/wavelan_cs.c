@@ -4068,6 +4068,7 @@ wv_pcmcia_config(dev_link_t *	link)
 	     lp->mem, dev->irq, (u_int) dev->base_addr);
 #endif
 
+      SET_NETDEV_DEV(dev, &handle_to_dev(handle));
       i = register_netdev(dev);
       if(i != 0)
 	{

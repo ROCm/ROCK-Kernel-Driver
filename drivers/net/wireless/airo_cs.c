@@ -89,7 +89,7 @@ module_param_array(irq_list, int, NULL, 0);
    event handler. 
 */
 
-struct net_device *init_airo_card( int, int, int );
+struct net_device *init_airo_card( int, int, int, struct device * );
 void stop_airo_card( struct net_device *, int );
 int reset_airo_card( struct net_device * );
 
@@ -450,7 +450,7 @@ static void airo_config(dev_link_t *link)
 	CS_CHECK(RequestConfiguration, pcmcia_request_configuration(link->handle, &link->conf));
 	((local_info_t*)link->priv)->eth_dev = 
 		init_airo_card( link->irq.AssignedIRQ,
-				link->io.BasePort1, 1 );
+				link->io.BasePort1, 1, &handle_to_dev(handle) );
 	if (!((local_info_t*)link->priv)->eth_dev) goto cs_failed;
 	
 	/*
