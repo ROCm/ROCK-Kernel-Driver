@@ -2094,8 +2094,8 @@ static void usbnet_disconnect (struct usb_interface *intf)
 	struct usbnet		*dev;
 	struct usb_device	*xdev;
 
-	dev = dev_get_drvdata (&intf->dev);
-	dev_set_drvdata (&intf->dev, NULL);
+	dev = usb_get_intfdata(intf);
+	usb_set_intfdata(intf, NULL);
 	if (!dev)
 		return;
 
@@ -2206,7 +2206,7 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 #endif
 
 	// ok, it's ready to go.
-	dev_set_drvdata (&udev->dev, dev);
+	usb_set_intfdata(udev, dev);
 	mutex_lock (&usbnet_mutex);
 	list_add (&dev->dev_list, &usbnet_list);
 	mutex_unlock (&dev->mutex);

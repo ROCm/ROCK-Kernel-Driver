@@ -1066,7 +1066,7 @@ static int kaweth_probe(
 
 	kaweth_dbg("Kaweth probe returning.");
 
-	dev_set_drvdata (&intf->dev, kaweth);
+	usb_set_intfdata(intf, kaweth);
 	return 0;
 
 err_tx_and_rx:
@@ -1085,11 +1085,11 @@ err_no_netdev:
  ****************************************************************/
 static void kaweth_disconnect(struct usb_interface *intf)
 {
-	struct kaweth_device *kaweth = dev_get_drvdata (&intf->dev);
+	struct kaweth_device *kaweth = usb_get_intfdata(intf);
 
 	kaweth_info("Unregistering");
 
-	dev_set_drvdata (&intf->dev, NULL);
+	usb_set_intfdata(intf, NULL);
 	if (!kaweth) {
 		kaweth_warn("unregistering non-existant device");
 		return;

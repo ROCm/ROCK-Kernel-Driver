@@ -1287,10 +1287,10 @@ error_all:
 
 static void CDCEther_disconnect( struct usb_interface *intf )
 {
-	ether_dev_t *ether_dev = dev_get_drvdata (&intf->dev);
+	ether_dev_t *ether_dev = usb_get_intfdata(intf);
 	struct usb_device *usb;
 
-	dev_set_drvdata (&intf->dev, NULL);
+	usb_set_intfdata(intf, NULL);
 
 	// Sanity check!!!
 	if ( !ether_dev || !ether_dev->usb ) {
