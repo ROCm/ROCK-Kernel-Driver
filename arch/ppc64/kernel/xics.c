@@ -240,14 +240,13 @@ static unsigned int real_irq_to_virt(unsigned int real_irq)
 static int get_irq_server(unsigned int irq)
 {
 	cpumask_t cpumask = irq_affinity[irq];
-	cpumask_t allcpus = CPU_MASK_ALL;
 	cpumask_t tmp = CPU_MASK_NONE;
 	unsigned int server;
 
 #ifdef CONFIG_IRQ_ALL_CPUS
 	/* For the moment only implement delivery to all cpus or one cpu */
 	if (smp_threads_ready) {
-		if (cpus_equal(cpumask, allcpus)) {
+		if (cpus_equal(cpumask, CPU_MASK_ALL)) {
 			server = default_distrib_server;
 		} else {
 			cpus_and(tmp, cpu_online_map, cpumask);
@@ -616,7 +615,6 @@ static void xics_set_affinity(unsigned int virq, cpumask_t cpumask)
 	long status;
 	unsigned long xics_status[2];
 	unsigned long newmask;
-	cpumask_t allcpus = CPU_MASK_ALL;
 	cpumask_t tmp = CPU_MASK_NONE;
 
 	irq = virt_irq_to_real(irq_offset_down(virq));
@@ -632,7 +630,7 @@ static void xics_set_affinity(unsigned int virq, cpumask_t cpumask)
 	}
 
 	/* For the moment only implement delivery to all cpus or one cpu */
-	if (cpus_equal(cpumask, allcpus)) {
+	if (cpus_equal(cpumask, CPU_MASK_ALL)) {
 		newmask = default_distrib_server;
 	} else {
 		cpus_and(tmp, cpu_online_map, cpumask);

@@ -3913,16 +3913,15 @@ void __init sched_init(void)
 	/* Set up an initial dummy domain for early boot */
 	static struct sched_domain sched_domain_init;
 	static struct sched_group sched_group_init;
-	cpumask_t cpu_mask_all = CPU_MASK_ALL;
 
 	memset(&sched_domain_init, 0, sizeof(struct sched_domain));
-	sched_domain_init.span = cpu_mask_all;
+	sched_domain_init.span = CPU_MASK_ALL;
 	sched_domain_init.groups = &sched_group_init;
 	sched_domain_init.last_balance = jiffies;
 	sched_domain_init.balance_interval = INT_MAX; /* Don't balance */
 
 	memset(&sched_group_init, 0, sizeof(struct sched_group));
-	sched_group_init.cpumask = cpu_mask_all;
+	sched_group_init.cpumask = CPU_MASK_ALL;
 	sched_group_init.next = &sched_group_init;
 	sched_group_init.cpu_power = SCHED_LOAD_SCALE;
 #endif

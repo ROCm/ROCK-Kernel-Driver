@@ -19,8 +19,7 @@
 
 static inline cpumask_t target_cpus(void)
 {
-	cpumask_t tmp = CPU_MASK_ALL;
-	return tmp;
+	return CPU_MASK_ALL;
 } 
 #define TARGET_CPUS	(target_cpus())
 

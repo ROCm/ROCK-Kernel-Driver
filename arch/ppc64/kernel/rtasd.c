@@ -364,7 +364,6 @@ static int rtasd(void *unused)
 	unsigned int err_type;
 	int cpu = 0;
 	int event_scan = rtas_token("event-scan");
-	cpumask_t all = CPU_MASK_ALL;
 	int rc;
 
 	daemonize("rtasd");
@@ -419,7 +418,7 @@ static int rtasd(void *unused)
 	for (;;) {
 		set_cpus_allowed(current, cpumask_of_cpu(cpu));
 		do_event_scan(event_scan);
-		set_cpus_allowed(current, all);
+		set_cpus_allowed(current, CPU_MASK_ALL);
 
 		/* Drop hotplug lock, and sleep for a bit (at least
 		 * one second since some machines have problems if we
