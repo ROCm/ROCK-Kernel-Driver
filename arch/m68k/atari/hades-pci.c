@@ -311,26 +311,24 @@ static void __init hades_fixup(int pci_modify)
 			slot = PCI_SLOT(dev->devfn);	/* Determine slot number. */
 			dev->irq = irq_tab[slot];
 			if (pci_modify)
-				pcibios_write_config_byte(dev->bus->number, dev->devfn,
-							  PCI_INTERRUPT_LINE, dev->irq);
+				pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq);
 		}
 	}
 }
 
 /*
- * static void hades_conf_device(unsigned char bus, unsigned char device_fn)
+ * static void hades_conf_device(struct pci_dev *dev)
  *
  * Machine dependent Configure the given device.
  *
  * Parameters:
  *
- * bus		- bus number of the device.
- * device_fn	- device and function number of the device.
+ * dev		- the pci device.
  */
 
-static void __init hades_conf_device(unsigned char bus, unsigned char device_fn)
+static void __init hades_conf_device(struct pci_dev *dev)
 {
-	pcibios_write_config_byte(bus, device_fn, PCI_CACHE_LINE_SIZE, 0);
+	pci_write_config_byte(dev, PCI_CACHE_LINE_SIZE, 0);
 }
 
 static struct pci_ops hades_pci_ops = {

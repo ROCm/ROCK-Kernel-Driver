@@ -2591,8 +2591,8 @@ static ide_startstop_t idetape_do_request (ide_drive_t *drive, struct request *r
 #if 0
 	if (tape->debug_level >= 5)
 		printk(KERN_INFO "ide-tape: rq_status: %d, "
-			"rq_dev: %u, cmd: %ld, errors: %d\n", rq->rq_status,
-			(unsigned int) rq->rq_dev, rq->flags, rq->errors);
+			"dev: %s, cmd: %ld, errors: %d\n", rq->rq_status,
+			 rq->rq_disk->disk_name, rq->flags, rq->errors);
 #endif
 	if (tape->debug_level >= 2)
 		printk(KERN_INFO "ide-tape: sector: %ld, "

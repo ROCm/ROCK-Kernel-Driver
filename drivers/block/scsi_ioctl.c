@@ -51,7 +51,6 @@ int blk_do_rq(request_queue_t *q, struct block_device *bdev, struct request *rq)
 	DECLARE_COMPLETION(wait);
 	int err = 0;
 
-	rq->rq_dev = to_kdev_t(bdev->bd_dev);
 	rq->rq_disk = bdev->bd_disk;
 
 	/*

@@ -312,8 +312,6 @@ static void generic_set_mtrr(unsigned int reg, unsigned long base,
 {
 	prepare_set();
 
-	printk("MTRR: setting reg %x\n",reg);
-
 	if (size == 0) {
 		/* The invalid bit is kept in the mask, so we simply clear the
 		   relevant mask register to disable a range. */

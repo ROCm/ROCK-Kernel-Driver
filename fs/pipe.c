@@ -34,13 +34,12 @@
 /* Drop the inode semaphore and wait for a pipe event, atomically */
 void pipe_wait(struct inode * inode)
 {
-	DECLARE_WAITQUEUE(wait, current);
-	current->state = TASK_INTERRUPTIBLE;
-	add_wait_queue(PIPE_WAIT(*inode), &wait);
+	DEFINE_WAIT(wait);
+
+	prepare_to_wait(PIPE_WAIT(*inode), &wait, TASK_INTERRUPTIBLE);
 	up(PIPE_SEM(*inode));
 	schedule();
-	remove_wait_queue(PIPE_WAIT(*inode), &wait);
-	current->state = TASK_RUNNING;
+	finish_wait(PIPE_WAIT(*inode), &wait);
 	down(PIPE_SEM(*inode));
 }
 

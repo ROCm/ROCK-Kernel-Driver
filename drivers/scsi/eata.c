@@ -1,6 +1,17 @@
 /*
  *      eata.c - Low-level driver for EATA/DMA SCSI host adapters.
  *
+ *      28 Oct 2002 Rev. 8.00 for linux 2.5.44-ac4
+ *        + Use new tcq and adjust_queue_depth api.
+ *        + New command line option (tm:[0-2]) to choose the type of tags:
+ *          0 -> disable tagging ; 1 -> simple tags  ; 2 -> ordered tags.
+ *          Default is tm:0 (tagged commands disabled).
+ *          For compatibility the "tc:" option is an alias of the "tm:"
+ *          option; tc:n is equivalent to tm:0 and tc:y is equivalent to
+ *          tm:1.
+ *        + The tagged_comm module parameter has been removed, use tag_mode
+ *          instead, equivalent to the "tm:" boot option.
+ *
  *      10 Oct 2002 Rev. 7.70 for linux 2.5.42
  *        + Foreport from revision 6.70.
  *
@@ -362,24 +373,21 @@
  *  rs:n  use BIOS order while detecting PCI boards;
  *  lc:y  enables linked commands;
  *  lc:n  disables linked commands;
- *  tc:y  enables tagged commands;
- *  tc:n  disables tagged commands;
- *  tm:0  use head/simple/ordered queue tag sequences;
- *  tm:1  use only simple queue tags;
- *  tm:2  use only head of queue tags;
- *  tm:3  use only ordered queue tags;
+ *  tm:0  disables tagged commands (same as tc:n);
+ *  tm:1  use simple queue tags (same as tc:y);
+ *  tm:2  use ordered queue tags (same as tc:2);
  *  mq:xx set the max queue depth to the value xx (2 <= xx <= 32).
  *
- *  The default value is: "eata=lc:n,tc:n,mq:16,tm:0,et:n,rs:n".
+ *  The default value is: "eata=lc:n,mq:16,tm:0,et:n,rs:n".
  *  An example using the list of detection probes could be:
- *  "eata=0x7410,0x230,lc:y,tc:n,mq:4,et:n".
+ *  "eata=0x7410,0x230,lc:y,tm:2,mq:4,et:n".
  *
  *  When loading as a module, parameters can be specified as well.
  *  The above example would be (use 1 in place of y and 0 in place of n):
  *
- *  modprobe eata io_port=0x7410,0x230 linked_comm=1 tagged_comm=0 \
- *                max_queue_depth=4 tag_mode=0 \
- *                ext_tran=0 rev_scan=1
+ *  modprobe eata io_port=0x7410,0x230 linked_comm=1 \
+ *                max_queue_depth=4 ext_tran=0 tag_mode=2 \
+ *                rev_scan=1
  *
  *  ----------------------------------------------------------------------------
  *  In this implementation, linked commands are designed to work with any DISK
@@ -447,15 +455,11 @@
 MODULE_PARM(boot_options, "s");
 MODULE_PARM(io_port, "1-" __MODULE_STRING(MAX_INT_PARAM) "i");
 MODULE_PARM(linked_comm, "i");
-MODULE_PARM(tagged_comm, "i");
 MODULE_PARM(link_statistics, "i");
 MODULE_PARM(max_queue_depth, "i");
 MODULE_PARM(tag_mode, "i");
 MODULE_PARM(ext_tran, "i");
 MODULE_PARM(rev_scan, "i");
-MODULE_PARM(isa_probe, "i");
-MODULE_PARM(eisa_probe, "i");
-MODULE_PARM(pci_probe, "i");
 MODULE_AUTHOR("Dario Ballabio");
 
 #endif
@@ -472,6 +476,7 @@ MODULE_AUTHOR("Dario Ballabio");
 #include <linux/blk.h>
 #include "scsi.h"
 #include "hosts.h"
+#include "sd.h"
 #include <asm/dma.h>
 #include <asm/irq.h>
 #include "eata.h"
@@ -481,6 +486,7 @@ MODULE_AUTHOR("Dario Ballabio");
 #include <linux/init.h>
 #include <linux/ctype.h>
 #include <linux/spinlock.h>
+#include <scsi/scsicam.h>
 
 #if !defined(__BIG_ENDIAN_BITFIELD) && !defined(__LITTLE_ENDIAN_BITFIELD)
 #error "Adjust your <asm/byteorder.h> defines"
@@ -528,10 +534,9 @@ MODULE_AUTHOR("Dario Ballabio");
 #define ABORTING 6
 #define NO_DMA  0xff
 #define MAXLOOP  10000
-#define TAG_MIXED    0
+#define TAG_DISABLED 0
 #define TAG_SIMPLE   1
-#define TAG_HEAD     2
-#define TAG_ORDERED  3
+#define TAG_ORDERED  2
 
 #define REG_CMD         7
 #define REG_STATUS      7
@@ -543,7 +548,7 @@ MODULE_AUTHOR("Dario Ballabio");
 #define REG_LM          3
 #define REG_MID         4
 #define REG_MSB         5
-#define REGION_SIZE     9UL
+#define REGION_SIZE     9
 #define MAX_ISA_ADDR    0x03ff
 #define MIN_EISA_ADDR   0x1c88
 #define MAX_EISA_ADDR   0xfc88
@@ -567,7 +572,7 @@ MODULE_AUTHOR("Dario Ballabio");
 #define TLDEV(type) ((type) == TYPE_DISK || (type) == TYPE_ROM)
 
 /* "EATA", in Big Endian format */
-#define EATA_SIG_BE 0x45415441
+#define EATA_SIGNATURE 0x41544145
 
 /* Number of valid bytes in the board config structure for EATA 2.0x */
 #define EATA_2_0A_SIZE 28
@@ -578,12 +583,6 @@ MODULE_AUTHOR("Dario Ballabio");
 struct eata_info {
    u_int32_t data_len;  /* Number of valid bytes after this field */
    u_int32_t sign;      /* ASCII "EATA" signature */
-
-#if defined(__BIG_ENDIAN_BITFIELD)
-   unchar version:4, :4;
-   unchar  haaval:1, ata:1, drqvld:1, dmasup:1, morsup:1, trnxfr:1, tarsup:1,
-           ocsena:1;
-#else
    unchar        :4,    /* unused low nibble */
           version:4;    /* EATA version, should be 0x1 */
    unchar  ocsena:1,    /* Overlap Command Support Enabled */
@@ -594,8 +593,6 @@ struct eata_info {
            drqvld:1,    /* DRQ Index (DRQX) is valid */
               ata:1,    /* This is an ATA device */
            haaval:1;    /* Host Adapter Address Valid */
-#endif
-
    ushort cp_pad_len;   /* Number of pad bytes after cp_len */
    unchar host_addr[4]; /* Host Adapter SCSI ID for channels 3, 2, 1, 0 */
    u_int32_t cp_len;    /* Number of valid bytes in cp */
@@ -603,15 +600,6 @@ struct eata_info {
    ushort queue_size;   /* Max number of cp that can be queued */
    ushort unused;
    ushort scatt_size;   /* Max number of entries in scatter/gather table */
-
-#if defined(__BIG_ENDIAN_BITFIELD)
-   unchar    drqx:2, second:1, irq_tr:1, irq:4;
-   unchar  sync;
-   unchar         :4, res1:1, large_sg:1, forcaddr:1, isaena:1;
-   unchar max_chan:3, max_id:5;
-   unchar   max_lun;
-   unchar     eisa:1, pci:1, idquest:1, m1:1, :4;
-#else
    unchar     irq:4,    /* Interrupt Request assigned to this controller */
            irq_tr:1,    /* 0 for edge triggered, 1 for level triggered */
            second:1,    /* 1 if this is a secondary (not primary) controller */
@@ -634,8 +622,6 @@ struct eata_info {
           idquest:1,    /* RAIDNUM returned is questionable */
               pci:1,    /* This board is PCI */
              eisa:1;    /* This board is EISA */
-#endif
-
    unchar   raidnum;    /* Uniquely identifies this HBA in a system */
    unchar   notused;
 
@@ -645,30 +631,18 @@ struct eata_info {
 /* Board config structure */
 struct eata_config {
    ushort len;          /* Number of bytes following this field */
-
-#if defined(__BIG_ENDIAN_BITFIELD)
-   unchar     :4, tarena:1, mdpena:1, ocena:1, edis:1;
-#else
    unchar edis:1,       /* Disable EATA interface after config command */
          ocena:1,       /* Overlapped Commands Enabled */
         mdpena:1,       /* Transfer all Modified Data Pointer Messages */
         tarena:1,       /* Target Mode Enabled for this controller */
               :4;
-#endif
-
    unchar cpad[511];
    };
 
 /* Returned status packet structure */
 struct mssp {
-
-#if defined(__BIG_ENDIAN_BITFIELD)
-   unchar            eoc:1, adapter_status:7;
-#else
    unchar adapter_status:7,    /* State related to current command */
                      eoc:1;    /* End Of Command (1 = command completed) */
-#endif
-
    unchar target_status;       /* SCSI status received after data transfer */
    unchar unused[2];
    u_int32_t inv_res_len;      /* Number of bytes not transferred */
@@ -683,16 +657,6 @@ struct sg_list {
 
 /* MailBox SCSI Command Packet */
 struct mscp {
-
-#if defined(__BIG_ENDIAN_BITFIELD)
-   unchar     din:1, dout:1, interp:1, :1, sg:1, reqsen:1, init:1, sreset:1;
-   unchar sense_len;
-   unchar unused[3];
-   unchar        :7, fwnest:1;
-   unchar        :5, hbaci:1, iat:1, phsunit:1;
-   unchar channel:3, target:5;
-   unchar     one:1, dispri:1, luntar:1, lun:5;
-#else
    unchar  sreset:1,     /* SCSI Bus Reset Signal should be asserted */
              init:1,     /* Re-initialize controller and self test */
            reqsen:1,     /* Transfer Request Sense Data to addr using DMA */
@@ -715,8 +679,6 @@ struct mscp {
            luntar:1,     /* This cp is for Target (not LUN) */
            dispri:1,     /* Disconnect Privilege granted */
               one:1;     /* 1 */
-#endif
-
    unchar mess[3];       /* Massage to/from Target */
    unchar cdb[12];       /* Command Descriptor Block */
    u_int32_t data_len;   /* If sg=0 Data Length, if sg=1 sglist length */
@@ -793,28 +755,22 @@ static unsigned long io_port[] = {
 #define BN(board) (HD(board)->board_name)
 
 /* Device is Big Endian */
-#define H2DEV(x)   cpu_to_be32(x)
-#define DEV2H(x)   be32_to_cpu(x)
-#define H2DEV16(x) cpu_to_be16(x)
-#define DEV2H16(x) be16_to_cpu(x)
-
-/* But transfer orientation from the 16 bit data register is Little Endian */
-#define REG2H(x)   le16_to_cpu(x)
+#define H2DEV(x) cpu_to_be32(x)
+#define DEV2H(x) be32_to_cpu(x)
 
 static void do_interrupt_handler(int, void *, struct pt_regs *);
 static void flush_dev(Scsi_Device *, unsigned long, unsigned int, unsigned int);
 static int do_trace = FALSE;
 static int setup_done = FALSE;
 static int link_statistics;
-static int tag_mode = TAG_MIXED;
 static int ext_tran = FALSE;
 static int rev_scan = TRUE;
 static char *boot_options;
 
 #if defined(CONFIG_SCSI_EATA_TAGGED_QUEUE)
-static int tagged_comm = TRUE;
+static int tag_mode = TAG_SIMPLE;
 #else
-static int tagged_comm = FALSE;
+static int tag_mode = TAG_DISABLED;
 #endif
 
 #if defined(CONFIG_SCSI_EATA_LINKED_COMMANDS)
@@ -846,38 +802,57 @@ static int pci_probe = TRUE;
 #else
 static int pci_probe = FALSE;
 #endif
- 
+
 static int eata2x_slave_attach(Scsi_Device *dev) {
    int j, tqd, utqd;
-   char *link_suffix = "";
+   char *tag_suffix, *link_suffix;
    struct Scsi_Host *host = dev->host;
 
    j = ((struct hostdata *) host->hostdata)->board_number;
 
    utqd = MAX_CMD_PER_LUN;
-   tqd = (host->can_queue - utqd);
+   tqd = max_queue_depth;
 
-   if (TLDEV(dev->type) && (dev->tagged_supported || linked_comm)) {
-      if(!dev->tagged_supported)
-         scsi_adjust_queue_depth(dev, 0, tqd);
-      else
+   if (TLDEV(dev->type) && dev->tagged_supported)
+
+      if (tag_mode == TAG_SIMPLE) {
          scsi_adjust_queue_depth(dev, MSG_SIMPLE_TAG, tqd);
-   } else {
+         tag_suffix = ", simple tags";
+         }
+      else if (tag_mode == TAG_ORDERED) {
+         scsi_adjust_queue_depth(dev, MSG_ORDERED_TAG, tqd);
+         tag_suffix = ", ordered tags";
+         }
+      else {
+         scsi_adjust_queue_depth(dev, 0, tqd);
+         tag_suffix = ", no tags";
+         }
+
+   else if (TLDEV(dev->type) && linked_comm) {
+      scsi_adjust_queue_depth(dev, 0, tqd);
+      tag_suffix = ", untagged";
+      }
+
+   else {
       scsi_adjust_queue_depth(dev, 0, utqd);
-   }
+      tag_suffix = "";
+      }
 
-   if (!dev->simple_tags && dev->new_queue_depth > 2)
+   if (TLDEV(dev->type) && linked_comm && dev->new_queue_depth > 2)
       link_suffix = ", sorted";
-   else if (dev->simple_tags)
+   else if (TLDEV(dev->type))
       link_suffix = ", unsorted";
+   else
+      link_suffix = "";
 
-   printk("%s: scsi%d, channel %d, id %d, lun %d, cmds/lun %d%s.\n",
+   printk("%s: scsi%d, channel %d, id %d, lun %d, cmds/lun %d%s%s.\n",
           BN(j), host->host_no, dev->channel, dev->id, dev->lun,
-          dev->new_queue_depth, link_suffix);
-   return 0;
+          dev->new_queue_depth, link_suffix, tag_suffix);
+
+   return FALSE;
 }
 
-static inline int wait_on_busy(unsigned long iobase, unsigned int loop) {
+static int wait_on_busy(unsigned long iobase, unsigned int loop) {
 
    while (inb(iobase + REG_AUX_STATUS) & ABSY_ASSERTED) {
       udelay(1L);
@@ -887,7 +862,7 @@ static inline int wait_on_busy(unsigned long iobase, unsigned int loop) {
    return FALSE;
 }
 
-static inline int do_dma(unsigned long iobase, unsigned long addr, unchar cmd) {
+static int do_dma(unsigned long iobase, unsigned long addr, unchar cmd) {
    unsigned char *byaddr;
    unsigned long devaddr;
 
@@ -906,7 +881,7 @@ static inline int do_dma(unsigned long iobase, unsigned long addr, unchar cmd) {
    return FALSE;
 }
 
-static inline int read_pio(unsigned long iobase, ushort *start, ushort *end) {
+static int read_pio(unsigned long iobase, ushort *start, ushort *end) {
    unsigned int loop = MAXLOOP;
    ushort *p;
 
@@ -918,13 +893,13 @@ static inline int read_pio(unsigned long iobase, ushort *start, ushort *end) {
          }
 
       loop = MAXLOOP;
-      *p = REG2H(inw(iobase));
+      *p = inw(iobase);
       }
 
    return FALSE;
 }
 
-static inline struct pci_dev *get_pci_dev(unsigned long port_base) {
+static struct pci_dev *get_pci_dev(unsigned long port_base) {
 
 #if defined(CONFIG_PCI)
 
@@ -972,12 +947,12 @@ static void enable_pci_ports(void) {
 #endif /* end CONFIG_PCI */
 }
 
-static inline int port_detect \
+static int port_detect \
       (unsigned long port_base, unsigned int j, Scsi_Host_Template *tpnt) {
    unsigned char irq, dma_channel, subversion, i, is_pci = FALSE;
    unsigned char protocol_rev;
    struct eata_info info;
-   char *bus_type, dma_name[16], tag_type;
+   char *bus_type, dma_name[16];
    struct pci_dev *pdev;
 
    /* Allowed DMA channels for ISA (0 indicates reserved) */
@@ -995,48 +970,31 @@ static inline int port_detect \
       }
 
    if (do_dma(port_base, 0, READ_CONFIG_PIO)) {
-#if defined(DEBUG_DETECT)
-      printk("%s: detect, do_dma failed at 0x%03lx.\n", name, port_base);
-#endif
       release_region(port_base, REGION_SIZE);
       return FALSE;
       }
 
    /* Read the info structure */
    if (read_pio(port_base, (ushort *)&info, (ushort *)&info.ipad[0])) {
-#if defined(DEBUG_DETECT)
-      printk("%s: detect, read_pio failed at 0x%03lx.\n", name, port_base);
-#endif
       release_region(port_base, REGION_SIZE);
       return FALSE;
       }
-
-   info.data_len = DEV2H(info.data_len);
-   info.sign = DEV2H(info.sign);
-   info.cp_pad_len = DEV2H16(info.cp_pad_len);
-   info.cp_len = DEV2H(info.cp_len);
-   info.sp_len = DEV2H(info.sp_len);
-   info.scatt_size = DEV2H16(info.scatt_size);
-   info.queue_size = DEV2H16(info.queue_size);
 
    /* Check the controller "EATA" signature */
-   if (info.sign != EATA_SIG_BE) {
-#if defined(DEBUG_DETECT)
-      printk("%s: signature 0x%04x discarded.\n", name, info.sign);
-#endif
+   if (info.sign != EATA_SIGNATURE) {
       release_region(port_base, REGION_SIZE);
       return FALSE;
       }
 
-   if (info.data_len < EATA_2_0A_SIZE) {
+   if (DEV2H(info.data_len) < EATA_2_0A_SIZE) {
       printk("%s: config structure size (%d bytes) too short, detaching.\n",
-             name, info.data_len);
+             name, DEV2H(info.data_len));
       release_region(port_base, REGION_SIZE);
       return FALSE;
       }
-   else if (info.data_len == EATA_2_0A_SIZE)
+   else if (DEV2H(info.data_len) == EATA_2_0A_SIZE)
       protocol_rev = 'A';
-   else if (info.data_len == EATA_2_0B_SIZE)
+   else if (DEV2H(info.data_len) == EATA_2_0B_SIZE)
       protocol_rev = 'B';
    else
       protocol_rev = 'C';
@@ -1148,7 +1106,7 @@ static inline int port_detect \
 
    /* Set board configuration */
    memset((char *)cf, 0, sizeof(struct eata_config));
-   cf->len = (ushort) H2DEV16((ushort)510);
+   cf->len = (ushort) cpu_to_be16((ushort)510);
    cf->ocena = TRUE;
 
    if (do_dma(port_base, cf_dma_addr, SET_CONFIG_DMA)) {
@@ -1179,9 +1137,9 @@ static inline int port_detect \
    sh[j]->n_io_port = REGION_SIZE;
    sh[j]->dma_channel = dma_channel;
    sh[j]->irq = irq;
-   sh[j]->sg_tablesize = (ushort) info.scatt_size;
+   sh[j]->sg_tablesize = (ushort) be16_to_cpu(info.scatt_size);
    sh[j]->this_id = (ushort) info.host_addr[3];
-   sh[j]->can_queue = (ushort) info.queue_size;
+   sh[j]->can_queue = (ushort) be16_to_cpu(info.queue_size);
    sh[j]->cmd_per_lun = MAX_CMD_PER_LUN;
    memset(HD(j), 0, sizeof(struct hostdata));
    HD(j)->subversion = subversion;
@@ -1268,18 +1226,13 @@ static inline int port_detect \
 
    if (max_queue_depth < MAX_CMD_PER_LUN) max_queue_depth = MAX_CMD_PER_LUN;
 
-   if (tagged_comm) {
-      if      (tag_mode == TAG_SIMPLE)  tag_type = '1';
-      else if (tag_mode == TAG_HEAD)    tag_type = '2';
-      else if (tag_mode == TAG_ORDERED) tag_type = '3';
-      else                              tag_type = 'y';
-      }
-   else                                 tag_type = 'n';
+   if (tag_mode != TAG_DISABLED && tag_mode != TAG_SIMPLE)
+      tag_mode = TAG_ORDERED;
 
    if (j == 0) {
       printk("EATA/DMA 2.0x: Copyright (C) 1994-2002 Dario Ballabio.\n");
-      printk("%s config options -> tc:%c, lc:%c, mq:%d, rs:%c, et:%c, "\
-             "ip:%c, ep:%c, pp:%c.\n", driver_name, tag_type,
+      printk("%s config options -> tm:%d, lc:%c, mq:%d, rs:%c, et:%c, "\
+             "ip:%c, ep:%c, pp:%c.\n", driver_name, tag_mode,
              YESNO(linked_comm), max_queue_depth, YESNO(rev_scan),
              YESNO(ext_tran), YESNO(isa_probe), YESNO(eisa_probe),
              YESNO(pci_probe));
@@ -1301,8 +1254,8 @@ static inline int port_detect \
    printk("%s: Vers. 0x%x, ocs %u, tar %u, trnxfr %u, more %u, SYNC 0x%x, "\
           "sec. %u, infol %d, cpl %d spl %d.\n", name, info.version,
           info.ocsena, info.tarsup, info.trnxfr, info.morsup, info.sync,
-          info.second, info.data_len, info.cp_len,
-          info.sp_len);
+          info.second, DEV2H(info.data_len), DEV2H(info.cp_len),
+          DEV2H(info.sp_len));
 
    if (protocol_rev == 'B' || protocol_rev == 'C')
       printk("%s: isaena %u, forcaddr %u, max_id %u, max_chan %u, "\
@@ -1346,15 +1299,12 @@ static void internal_setup(char *str, int *ints) {
       else val = (int) simple_strtoul(pc, NULL, 0);
 
       if (!strncmp(cur, "lc:", 3)) linked_comm = val;
-      else if (!strncmp(cur, "tc:", 3)) tagged_comm = val;
       else if (!strncmp(cur, "tm:", 3)) tag_mode = val;
+      else if (!strncmp(cur, "tc:", 3)) tag_mode = val;
       else if (!strncmp(cur, "mq:", 3))  max_queue_depth = val;
       else if (!strncmp(cur, "ls:", 3))  link_statistics = val;
       else if (!strncmp(cur, "et:", 3))  ext_tran = val;
       else if (!strncmp(cur, "rs:", 3))  rev_scan = val;
-      else if (!strncmp(cur, "ip:", 3))  isa_probe = val;
-      else if (!strncmp(cur, "ep:", 3))  eisa_probe = val;
-      else if (!strncmp(cur, "pp:", 3))  pci_probe = val;
 
       if ((cur = strchr(cur, ','))) ++cur;
       }
@@ -1419,7 +1369,7 @@ static void add_pci_ports(void) {
    return;
 }
 
-int eata2x_detect(Scsi_Host_Template *tpnt) {
+static int eata2x_detect(Scsi_Host_Template *tpnt) {
    unsigned int j = 0, k;
    unsigned long spin_flags;
 
@@ -1439,19 +1389,7 @@ int eata2x_detect(Scsi_Host_Template *tpnt) {
 
    for (k = 0; k < MAX_BOARDS + 1; k++) sh[k] = NULL;
 
-   for (k = MAX_INT_PARAM; io_port[k]; k++)
-      if (io_port[k] == SKIP) continue;
-      else if (io_port[k] <= MAX_ISA_ADDR) {
-         if (!isa_probe) io_port[k] = SKIP;
-         }
-      else if (io_port[k] >= MIN_EISA_ADDR && io_port[k] <= MAX_EISA_ADDR) {
-         if (!eisa_probe) io_port[k] = SKIP;
-         }
-
-   if (pci_probe) {
-      if (!setup_done) add_pci_ports();
-      else          enable_pci_ports();
-      }
+   if (!setup_done) add_pci_ports();
 
    for (k = 0; io_port[k]; k++) {
 
@@ -1465,7 +1403,7 @@ int eata2x_detect(Scsi_Host_Template *tpnt) {
    return j;
 }
 
-static inline void map_dma(unsigned int i, unsigned int j) {
+static void map_dma(unsigned int i, unsigned int j) {
    unsigned int k, count, pci_dir;
    struct scatterlist *sgpnt;
    struct mscp *cpp;
@@ -1552,7 +1490,7 @@ static void sync_dma(unsigned int i, unsigned int j) {
                        DEV2H(cpp->data_len), pci_dir);
 }
 
-static inline void scsi_to_dev_dir(unsigned int i, unsigned int j) {
+static void scsi_to_dev_dir(unsigned int i, unsigned int j) {
    unsigned int k;
 
    static const unsigned char data_out_cmds[] = {
@@ -1606,7 +1544,7 @@ static inline void scsi_to_dev_dir(unsigned int i, unsigned int j) {
 
 }
 
-static inline int do_qcomm(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *)) {
+static int eata2x_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *)) {
    unsigned int i, j, k;
    struct mscp *cpp;
 
@@ -1670,25 +1608,8 @@ static inline int do_qcomm(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *)) {
    /* Map DMA buffers and SG list */
    map_dma(i, j);
 
-   if (SCpnt->device->simple_tags) {
-
-      if (HD(j)->target_redo[SCpnt->target][SCpnt->channel] ||
-            HD(j)->target_to[SCpnt->target][SCpnt->channel])
-         cpp->mess[0] = ORDERED_QUEUE_TAG;
-      else if (tag_mode == TAG_SIMPLE)  cpp->mess[0] = SIMPLE_QUEUE_TAG;
-      else if (tag_mode == TAG_HEAD)    cpp->mess[0] = HEAD_OF_QUEUE_TAG;
-      else if (tag_mode == TAG_ORDERED) cpp->mess[0] = ORDERED_QUEUE_TAG;
-      else if (SCpnt->device->current_tag == 0)
-         cpp->mess[0] = ORDERED_QUEUE_TAG;
-      else if (SCpnt->device->current_tag == 1)
-         cpp->mess[0] = HEAD_OF_QUEUE_TAG;
-      else
-         cpp->mess[0] = SIMPLE_QUEUE_TAG;
-
-      cpp->mess[1] = SCpnt->device->current_tag++;
-      }
-
-   if (SCpnt->device->new_queue_depth > 2 && !SCpnt->device->simple_tags) {
+   if (linked_comm && SCpnt->device->new_queue_depth > 2
+                                     && TLDEV(SCpnt->device->type)) {
       HD(j)->cp_stat[i] = READY;
       flush_dev(SCpnt->device, SCpnt->request->sector, j, FALSE);
       return 0;
@@ -1707,14 +1628,7 @@ static inline int do_qcomm(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *)) {
    return 0;
 }
 
-int eata2x_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *)) {
-   int rtn;
-
-   rtn = do_qcomm(SCpnt, done);
-   return rtn;
-}
-
-static inline int do_abort(Scsi_Cmnd *SCarg) {
+static int eata2x_eh_abort(Scsi_Cmnd *SCarg) {
    unsigned int i, j;
 
    j = ((struct hostdata *) SCarg->host->hostdata)->board_number;
@@ -1788,12 +1702,7 @@ static inline int do_abort(Scsi_Cmnd *SCarg) {
    panic("%s: abort, mbox %d, invalid cp_stat.\n", BN(j), i);
 }
 
-int eata2x_abort(Scsi_Cmnd *SCarg) {
-
-   return do_abort(SCarg);
-}
-
-static inline int do_reset(Scsi_Cmnd *SCarg) {
+static int eata2x_eh_host_reset(Scsi_Cmnd *SCarg) {
    unsigned int i, j, time, k, c, limit = 0;
    int arg_done = FALSE;
    Scsi_Cmnd *SCpnt;
@@ -1925,23 +1834,18 @@ static inline int do_reset(Scsi_Cmnd *SCarg) {
    return SUCCESS;
 }
 
-int eata2x_reset(Scsi_Cmnd *SCarg) {
-
-   return do_reset(SCarg);
-}
-
-int eata2x_biosparam(struct scsi_device *sdev, struct block_device *bdev,
+int eata2x_bios_param(struct scsi_device *sdev, struct block_device *bdev, 
 		sector_t capacity, int *dkinfo) {
    int size = capacity;
 
-   if (ext_tran || (scsicam_bios_param(bdev, capacity, dkinfo) < 0)) {
+   if (ext_tran || (scsicam_bios_param(disk, bdev, dkinfo) < 0)) {
       dkinfo[0] = 255;
       dkinfo[1] = 63;
       dkinfo[2] = size / (dkinfo[0] * dkinfo[1]);
       }
 
 #if defined (DEBUG_GEOMETRY)
-   printk ("%s: biosparam, head=%d, sec=%d, cyl=%d.\n", driver_name,
+   printk ("%s: bios_param, head=%d, sec=%d, cyl=%d.\n", driver_name,
            dkinfo[0], dkinfo[1], dkinfo[2]);
 #endif
 
@@ -1973,7 +1877,7 @@ static void sort(unsigned long sk[], unsigned int da[], unsigned int n,
    return;
    }
 
-static inline int reorder(unsigned int j, unsigned long cursec,
+static int reorder(unsigned int j, unsigned long cursec,
                  unsigned int ihdlr, unsigned int il[], unsigned int n_ready) {
    Scsi_Cmnd *SCpnt;
    struct mscp *cpp;
@@ -2108,7 +2012,7 @@ static void flush_dev(Scsi_Device *dev, unsigned long cursec, unsigned int j,
 
 }
 
-static inline void ihdlr(int irq, unsigned int j) {
+static void ihdlr(int irq, unsigned int j) {
    Scsi_Cmnd *SCpnt;
    unsigned int i, k, c, status, tstatus, reg;
    struct mssp *spp;
@@ -2351,7 +2255,7 @@ static void do_interrupt_handler(int irq, void *shap, struct pt_regs *regs) {
    spin_unlock_irqrestore(sh[j]->host_lock, spin_flags);
 }
 
-int eata2x_release(struct Scsi_Host *shpnt) {
+static int eata2x_release(struct Scsi_Host *shpnt) {
    unsigned int i, j;
 
    for (j = 0; sh[j] != NULL && sh[j] != shpnt; j++);

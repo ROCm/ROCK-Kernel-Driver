@@ -1530,7 +1530,6 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 	rq->errors = 0;
 	rq->rq_status = RQ_ACTIVE;
 
-	rq->rq_dev = mk_kdev(drive->disk->major, drive->disk->first_minor);
 	rq->rq_disk = drive->disk;
 
 	/*

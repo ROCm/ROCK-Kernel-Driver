@@ -1,5 +1,5 @@
 /*
- * cpu.h - generic cpu defition
+ * include/linux/cpu.h - generic cpu definition
  *
  * This is mainly for topological representation. We define the 
  * basic 'struct cpu' here, which can be embedded in per-arch 
@@ -15,14 +15,18 @@
  * See the following for how to do this: 
  * - drivers/base/intf.c 
  * - Documentation/driver-model/interface.txt
- *
  */
+#ifndef _LINUX_CPU_H_
+#define _LINUX_CPU_H_
 
 #include <linux/device.h>
-
-extern struct device_class cpu_devclass;
+#include <linux/node.h>
 
 struct cpu {
+	int node_id;		/* The node which contains the CPU */
 	struct sys_device sysdev;
 };
 
+extern int register_cpu(struct cpu *, int, struct node *);
+
+#endif /* _LINUX_CPU_H_ */

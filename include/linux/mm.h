@@ -439,6 +439,9 @@ extern void free_area_init_node(int nid, pg_data_t *pgdat, struct page *pmap,
 extern void mem_init(void);
 extern void show_mem(void);
 extern void si_meminfo(struct sysinfo * val);
+#ifdef CONFIG_NUMA
+extern void si_meminfo_node(struct sysinfo *val, int nid);
+#endif
 extern void swapin_readahead(swp_entry_t);
 
 extern int can_share_swap_page(struct page *);

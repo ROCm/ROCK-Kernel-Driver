@@ -3076,7 +3076,7 @@ sys32_ptrace (int request, pid_t pid, unsigned int addr, unsigned int data,
 		break;
 
 	      default:
-		ret = -EIO;
+		ret = ptrace_request(child, request, addr, data);
 		break;
 
 	}

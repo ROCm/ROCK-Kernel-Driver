@@ -2669,7 +2669,7 @@ static int __init i810_ac97_init(struct i810_card *card)
 		codec->codec_write = i810_ac97_set;
 	
 		if(!i810_ac97_probe_and_powerup(card,codec)) {
-			printk("i810_audio: timed out waiting for codec %d analog ready", num_ac97);
+			printk("i810_audio: timed out waiting for codec %d analog ready.\n", num_ac97);
 			kfree(codec);
 			break;	/* it didn't work */
 		}

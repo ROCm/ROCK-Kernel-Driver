@@ -489,7 +489,7 @@ static ide_startstop_t idescsi_issue_pc (ide_drive_t *drive, idescsi_pc_t *pc)
 static ide_startstop_t idescsi_do_request (ide_drive_t *drive, struct request *rq, sector_t block)
 {
 #if IDESCSI_DEBUG_LOG
-	printk (KERN_INFO "rq_status: %d, rq_dev: %u, cmd: %d, errors: %d\n",rq->rq_status,(unsigned int) rq->rq_dev,rq->cmd,rq->errors);
+	printk (KERN_INFO "rq_status: %d, dev: %s, cmd: %d, errors: %d\n",rq->rq_status, rq->rq_disk->disk_name,rq->cmd,rq->errors);
 	printk (KERN_INFO "sector: %ld, nr_sectors: %ld, current_nr_sectors: %ld\n",rq->sector,rq->nr_sectors,rq->current_nr_sectors);
 #endif /* IDESCSI_DEBUG_LOG */
 
@@ -760,9 +760,13 @@ static inline struct bio *idescsi_dma_bio(ide_drive_t *drive, idescsi_pc_t *pc)
 static inline int should_transform(ide_drive_t *drive, Scsi_Cmnd *cmd)
 {
 	idescsi_scsi_t *scsi = drive->driver_data;
+	struct gendisk *disk = cmd->request->rq_disk;
 
-	if (major(cmd->request->rq_dev) == SCSI_GENERIC_MAJOR)
-		return test_bit(IDESCSI_SG_TRANSFORM, &scsi->transform);
+	if (disk) {
+		struct Scsi_Device_Template **p = disk->private_data;
+		if (strcmp((*p)->tag, "sg") == 0)
+			return test_bit(IDESCSI_SG_TRANSFORM, &scsi->transform);
+	}
 	return test_bit(IDESCSI_TRANSFORM, &scsi->transform);
 }
 

@@ -1,0 +1,796 @@
+#
+# For a description of the syntax of this configuration file,
+# see Documentation/kbuild/config-language.txt.
+#
+
+mainmenu "uClinux/68k (w/o MMU) Kernel Configuration"
+
+config MMU
+	bool
+	default n
+
+config SWAP
+	bool
+	default n
+
+config FPU
+	bool
+	default n
+
+config UID16
+	bool
+	default y
+
+config RWSEM_GENERIC_SPINLOCK
+	bool
+	default y
+
+config RWSEM_XCHGADD_ALGORITHM
+	bool
+	default n
+
+
+source "init/Kconfig"
+
+menu "Processor type and features"
+
+choice
+	prompt "CPU"
+	default M68EZ328
+
+config M68328
+	bool "MC68328"
+	help
+	  Motorola 68328 processor support.
+
+config M68EZ328
+	bool "MC68EZ328"
+	help
+	  Motorola 68EX328 processor support.
+
+config M68VZ328
+	bool "MC68VZ328"
+	help
+	  Motorola 68VZ328 processor support.
+
+config M68360
+	bool "MC68360"
+	help
+	  Motorola 68360 processor support.
+
+config M5206
+	bool "MCF5206"
+	help
+	  Motorola ColdFire 5206 processor support.
+
+config M5206e
+	bool "MCF5206e"
+	help
+	  Motorola ColdFire 5206e processor support.
+
+config M5249
+	bool "MCF5249"
+	help
+	  Motorola ColdFire 5249 processor support.
+
+config M5272
+	bool "MCF5272"
+	help
+	  Motorola ColdFire 5272 processor support.
+
+config M5307
+	bool "MCF5307"
+	help
+	  Motorola ColdFire 5307 processor support.
+
+config M5407
+	bool "MCF5407"
+	help
+	  Motorola ColdFire 5407 processor support.
+
+endchoice
+
+config COLDFIRE
+	bool
+	depends on (M5206 || M5206e || M5249 || M5272 || M5307 || M5407)
+	default y
+
+choice
+	prompt "CPU CLOCK Frequency"
+	default AUTO
+
+config CLOCK_AUTO
+	bool "AUTO"
+	---help---
+	  Define the CPU clock frequency in use. On many boards you don't
+	  really need to know, so you can select the AUTO option. On some
+	  boards you need to know the real clock frequency to determine other
+	  system timing (for example baud rate dividors, etc). Some processors
+	  have an internal PLL and you can seletc a frequency to set that too.
+	  You need to know a little about the internals of your processor to
+	  set this. If in doubt choose the AUTO option.
+
+config CLOCK_11MHz
+	bool "11MHz"
+	help
+	  Select an 11MHz CPU clock frequency.
+
+config CLOCK_16MHz
+	bool "16MHz"
+	help
+	  Select an 16MHz CPU clock frequency.
+
+config CLOCK_20MHz
+	bool "20MHz"
+	help
+	  Select an 20MHz CPU clock frequency.
+
+config CLOCK_24MHz
+	bool "24MHz"
+	help
+	  Select an 24MHz CPU clock frequency.
+
+config CLOCK_25MHz
+	bool "25MHz"
+	help
+	  Select an 25MHz CPU clock frequency.
+
+config CLOCK_33MHz
+	bool "33MHz"
+	help
+	  Select an 33MHz CPU clock frequency.
+
+config CLOCK_40MHz
+	bool "40MHz"
+	help
+	  Select an 40MHz CPU clock frequency.
+
+config CLOCK_45MHz
+	bool "45MHz"
+	help
+	  Select an 45MHz CPU clock frequency.
+
+config CLOCK_48MHz
+	bool "48MHz"
+	help
+	  Select an 48MHz CPU clock frequency.
+
+config CLOCK_50MHz
+	bool "50MHz"
+	help
+	  Select an 50MHz CPU clock frequency.
+
+config CLOCK_54MHz
+	bool "54MHz"
+	help
+	  Select an 54MHz CPU clock frequency.
+
+config CLOCK_60MHz
+	bool "60MHz"
+	help
+	  Select an 60MHz CPU clock frequency.
+
+config CLOCK_66MHz
+	bool "66MHz"
+	help
+	  Select an 66MHz CPU clock frequency.
+
+config CLOCK_70MHz
+	bool "70MHz"
+	help
+	  Select an 70MHz CPU clock frequency.
+
+config CLOCK_140MHz
+	bool "140MHz"
+	help
+	  Select an 140MHz CPU clock frequency.
+
+endchoice
+
+config OLDMASK
+	bool "Old mask 5307 (1H55J) silicon"
+	depends on M5307
+	help
+	  Build support for the older revision ColdFire 5307 silicon.
+	  Specifically this is the 1H55J mask revision.
+
+comment "Platform"
+
+config PILOT3
+	bool "Pilot 1000/5000, PalmPilot Personal/Pro, or PalmIII support"
+	depends on M68328
+	help
+	  Support for the Palm Pilot 1000/5000, Personal/Pro and PalmIII.
+
+config XCOPILOT_BUGS
+	bool "  (X)Copilot support"
+	depends on PILOT3
+	help
+	  Support the bugs of Xcopilot.
+
+config UCSIMM
+	bool "uCsimm module support"
+	depends on M68EZ328
+	help
+	  Support for the Arcturus Networks uCsimm module.
+
+config UCDIMM
+	bool "uDsimm module support"
+	depends on M68VZ328
+	help
+	  Support for the Arcturus Networks uDsimm module.
+
+config DRAGEN2
+	bool "Dragen Engine II board support"
+	depends on M68VZ328
+	help
+	  Support for the Dragen Engine II board.
+
+config HWADDR_FROMEEPROM
+	bool "  Read ETH address from EEPROM"
+	depends on DRAGEN2
+	help
+	  Use MAC address from EEPROM.
+
+config HWADDR_OFFSET
+	int "  Offset from start of EEPROM"
+	default "2"
+	depends on HWADDR_FROMEEPROM
+
+config INIT_LCD
+	bool "  Initialize LCD"
+	depends on (UCSIMM || UCDIMM || DRAGEN2)
+	help
+	  Initialize the LCD controller of the 68x328 processor.
+
+config MEMORY_RESERVE
+	int "  Memory reservation (MiB)"
+	depends on (UCSIMM || UCDIMM || DRAGEN2)
+	help
+	  Reserve certain memory regions on 68x328 based boards.
+
+config UCQUICC
+	bool "Lineo uCquicc board support"
+	depends on M68360
+	help
+	  Support for the Lineo uCquicc board.
+
+config ARN5206
+	bool "Arnewsh 5206 board support"
+	depends on M5206
+	help
+	  Support for the Arnewsh 5206 board.
+
+config M5206eC3
+	bool "Motorola M5206eC3 board support"
+	depends on M5206e
+	help
+	  Support for the Motorola M5206eC3 board.
+
+config ELITE
+	bool "Motorola M5206eLITE board support"
+	depends on M5206e
+	help
+	  Support for the Motorola M5206eLITE board.
+
+config M5249C3
+	bool "Motorola M5249C3 board support"
+	depends on M5249
+	help
+	  Support for the Motorola M5249C3 board.
+
+config M5272C3
+	bool "Motorola M5272C3 board support"
+	depends on M5272
+	help
+	  Support for the Motorola M5272C3 board.
+
+config ARN5307
+	bool "Arnewsh 5307 board support"
+	depends on M5307
+	help
+	  Support for the Arnewsh 5307 board.
+
+config M5307C3
+	bool "Motorola M5307C3 board support"
+	depends on M5307
+	help
+	  Support for the Motorola M5307C3 board.
+
+config eLIA
+	bool "Moreton Bay eLIA board support"
+	depends on M5307
+	help
+	  Support for the Moreton Bay eLIA board.
+
+config SECUREEDGEMP3
+	bool "SnapGear SecureEdge/MP3 platform support"
+	depends on M5307
+	help
+	  Support for the SnapGear SecureEdge/MP3 platform.
+
+config M5407C3
+	bool "Motorola M5407C3 board support"
+	depends on M5407
+	help
+	  Support for the Motorola M5407C3 board.
+
+config CLEOPATRA
+	bool "Feith CLEOPATRA board support"
+	depends on (M5307 || M5407)
+	help
+	  Support for the Feith Cleopatra boards.
+
+config NETtel
+	bool "SecureEdge/NETtel board support"
+	depends on (M5206e || M5272 || M5307)
+	help
+	  Support for the SnapGear NETtel/SecureEdge/SnapGear boards.
+
+config SNAPGEAR
+	bool "SnapGear router board support"
+	depends on NETtel
+	help
+	  Special additional support for SnapGear router boards.
+
+config ROMFS_FROM_ROM
+	bool "  ROMFS image not RAM resident"
+	depends on (NETtel || SNAPGEAR)
+	help
+	  The ROMfs filesystem will stay resident in the FLASH/ROM, not be
+	  moved into RAM.
+
+config PILOT
+	bool
+	default y
+	depends on (PILOT3 || PILOT5)
+
+config ARNEWSH
+	bool
+	default y
+	depends on (ARN5206 || ARN5307)
+
+config MOTOROLA
+	bool
+	default y
+	depends on (M5206eC3 || M5249C3 || M5272C3 || M5307C3 || M5407C3)
+
+config LARGE_ALLOCS
+	bool "Allow allocating large blocks (> 1MB) of memory"
+	help
+	  Allow the slab memory allocator to keep chains for very large
+	  memory sizes - upto 32MB. You may need this if your system has
+	  a lot of RAM, and you need to able to allocate very large
+	  contiguous chunks. If unsure, say N.
+
+choice 
+	prompt "RAM size"
+	default AUTO
+
+config RAMAUTO
+	bool "AUTO"
+	---help---
+	  Configure the RAM size on your platform. Many platforms can auto
+	  detect this, on those choose the AUTO option. Otherwise set the
+	  RAM size you intend using.
+
+config RAM4MB
+	bool "4MiB"
+	help
+	  Set RAM size to be 4MiB.
+
+config RAM4MB
+	bool "4MiB"
+	help
+	  Set RAM size to be 4MiB.
+
+config RAM8MB
+	bool "8MiB"
+	help
+	  Set RAM size to be 8MiB.
+
+config RAM16MB
+	bool "16MiB"
+	help
+	  Set RAM size to be 16MiB.
+
+config RAM32MB
+	bool "32MiB"
+	help
+	  Set RAM size to be 32MiB.
+
+endchoice
+
+choice 
+	prompt "RAM bus width"
+	default RAMAUTOBIT
+
+config RAMAUTOBIT
+	bool "AUTO"
+	---help---
+	  Select the physical RAM data bus size. Not needed on most platforms,
+	  so you can generally choose AUTO.
+
+config RAM8BIT
+	bool "8bit"
+	help
+	  Configure RAM bus to be 8 bits wide.
+
+config RAM16BIT
+	bool "16bit"
+	help
+	  Configure RAM bus to be 16 bits wide.
+
+config RAM32BIT
+	bool "32bit"
+	help
+	  Configure RAM bus to be 32 bits wide.
+
+endchoice
+
+choice
+	prompt "Kernel executes from"
+	---help---
+	  Choose the memory type that the kernel will be running in.
+
+config RAMKERNEL
+	bool "RAM"
+	help
+	  The kernel will be resident in RAM when running.
+
+config ROMKERNEL
+	bool "ROM"
+	help
+	  The kernel will be resident in FLASH/ROM when running.
+
+config HIMEMKERNEL
+	bool "HIMEM"
+	help
+	  The kernel will be resident in high memory when running.
+
+endchoice
+
+endmenu
+
+
+menu "Bus options (PCI, PCMCIA, EISA, MCA, ISA)"
+
+config PCI
+	bool "PCI support"
+	help
+	  Support for PCI bus.
+
+config COMEMPCI
+	bool "CO-MEM lite PCI controller support"
+	depends on (M5307 || M5407)
+
+source "drivers/pci/Kconfig"
+
+config HOTPLUG
+	bool "Support for hot-pluggable device"
+	  ---help---
+	  Say Y here if you want to plug devices into your computer while
+	  the system is running, and be able to use them quickly.  In many
+	  cases, the devices can likewise be unplugged at any time too.
+
+	  One well known example of this is PCMCIA- or PC-cards, credit-card
+	  size devices such as network cards, modems or hard drives which are
+	  plugged into slots found on all modern laptop computers.  Another
+	  example, used on modern desktops as well as laptops, is USB.
+
+	  Enable HOTPLUG and KMOD, and build a modular kernel.  Get agent
+	  software (at <http://linux-hotplug.sourceforge.net/>) and install it.
+	  Then your kernel will automatically call out to a user mode "policy
+	  agent" (/sbin/hotplug) to load modules and set up software needed
+	  to use devices as you hotplug them.
+
+source "drivers/pcmcia/Kconfig"
+
+source "drivers/hotplug/Kconfig"
+
+endmenu
+
+menu "Executable file formats"
+
+config KCORE_AOUT
+	bool
+	default y
+
+config KCORE_ELF
+	default y
+
+config BINFMT_FLAT
+	tristate "Kernel support for flat binaries"
+	help
+	  Support uClinux FLAT format binaries.
+
+config BINFMT_ZFLAT
+	bool "  Enable ZFLAT support"
+	depends on BINFMT_FLAT
+	help
+	  Supoprt FLAT format compressed binaries
+
+endmenu
+
+menu "Power management options"
+
+config PM
+	bool "Power Management support"
+	help
+	  Support processor power management modes
+
+endmenu
+
+
+source "drivers/mtd/Kconfig"
+
+source "drivers/parport/Kconfig"
+
+source "drivers/pnp/Kconfig"
+
+source "drivers/block/Kconfig"
+
+
+menu "ATA/IDE/MFM/RLL support"
+
+config IDE
+	tristate "ATA/ATAPI/MFM/RLL device support"
+	---help---
+	  If you say Y here, your kernel will be able to manage low cost mass
+	  storage units such as ATA/(E)IDE and ATAPI units. The most common
+	  cases are IDE hard drives and ATAPI CD-ROM drives.
+
+	  It only makes sense to choose this option if your board actually
+	  has an IDE interface. If unsure, say N.
+
+source "drivers/ide/Kconfig"
+
+endmenu
+
+
+menu "SCSI device support"
+
+config SCSI
+	tristate "SCSI device support"
+	help
+	  If you want to use a SCSI hard disk, SCSI tape drive, SCSI CD-ROM or
+	  any other SCSI device under Linux, say Y and make sure that you know
+	  the name of your SCSI host adapter (the card inside your computer
+	  that "speaks" the SCSI protocol, also called SCSI controller),
+	  because you will be asked for it.
+
+source "drivers/scsi/Kconfig"
+
+endmenu
+
+
+menu "Old CD-ROM drivers (not SCSI, not IDE)"
+	depends on ISA
+
+config CD_NO_IDESCSI
+	bool "Support non-SCSI/IDE/ATAPI CDROM drives"
+	---help---
+	  If you have a CD-ROM drive that is neither SCSI nor IDE/ATAPI, say Y
+	  here, otherwise N. Read the CD-ROM-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  Note that the answer to this question doesn't directly affect the
+	  kernel: saying N will just cause the configurator to skip all
+	  the questions about these CD-ROM drives. If you are unsure what you
+	  have, say Y and find out whether you have one of the following
+	  drives.
+
+	  For each of these drivers, a file Documentation/cdrom/{driver_name}
+	  exists. Especially in cases where you do not know exactly which kind
+	  of drive you have you should read there. Most of these drivers use a
+	  file drivers/cdrom/{driver_name}.h where you can define your
+	  interface parameters and switch some internal goodies.
+
+	  All these CD-ROM drivers are also usable as a module ( = code which
+	  can be inserted in and removed from the running kernel whenever you
+	  want). If you want to compile them as module, say M instead of Y and
+	  read <file:Documentation/modules.txt>.
+
+	  If you want to use any of these CD-ROM drivers, you also have to
+	  answer Y or M to "ISO 9660 CD-ROM file system support" below (this
+	  answer will get "defaulted" for you if you enable any of the Linux
+	  CD-ROM drivers).
+
+source "drivers/cdrom/Kconfig"
+
+endmenu
+
+
+source "drivers/md/Kconfig"
+
+source "drivers/message/fusion/Kconfig"
+
+source "drivers/ieee1394/Kconfig"
+
+source "drivers/message/i2o/Kconfig"
+
+source "net/Kconfig"
+
+
+menu "Network device support"
+	depends on NET
+
+config NETDEVICES
+	bool "Network device support"
+	---help---
+	  You can say N here if you don't intend to connect your Linux box to
+	  any other computer at all or if all your connections will be over a
+	  telephone line with a modem either via UUCP (UUCP is a protocol to
+	  forward mail and news between unix hosts over telephone lines; read
+	  the UUCP-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>) or dialing up a shell
+	  account or a BBS, even using term (term is a program which gives you
+	  almost full Internet connectivity if you have a regular dial up
+	  shell account on some Internet connected Unix computer. Read
+	  <http://www.bart.nl/~patrickr/term-howto/Term-HOWTO.html>).
+
+	  You'll have to say Y if your computer contains a network card that
+	  you want to use under Linux (make sure you know its name because you
+	  will be asked for it and read the Ethernet-HOWTO (especially if you
+	  plan to use more than one network card under Linux)) or if you want
+	  to use SLIP (Serial Line Internet Protocol is the protocol used to
+	  send Internet traffic over telephone lines or null modem cables) or
+	  CSLIP (compressed SLIP) or PPP (Point to Point Protocol, a better
+	  and newer replacement for SLIP) or PLIP (Parallel Line Internet
+	  Protocol is mainly used to create a mini network by connecting the
+	  parallel ports of two local machines) or AX.25/KISS (protocol for
+	  sending Internet traffic over amateur radio links).
+
+	  Make sure to read the NET-3-HOWTO. Eventually, you will have to read
+	  Olaf Kirch's excellent and free book "Network Administrator's
+	  Guide", to be found in <http://www.linuxdoc.org/docs.html#guide>. If
+	  unsure, say Y.
+
+source "drivers/net/Kconfig"
+
+source "drivers/atm/Kconfig"
+
+endmenu
+
+source "net/ax25/Kconfig"
+
+source "net/irda/Kconfig"
+
+source "drivers/isdn/Kconfig"
+
+source "drivers/telephony/Kconfig"
+
+#
+# input before char - char/joystick depends on it. As does USB.
+#
+source "drivers/input/Kconfig"
+
+source "drivers/char/Kconfig"
+
+#source drivers/misc/Config.in
+source "drivers/media/Kconfig"
+
+source "fs/Kconfig"
+
+
+menu "Console drivers"
+	depends on VT
+
+config VGA_CONSOLE
+	bool "VGA text console"
+	help
+	  Saying Y here will allow you to use Linux in text mode through a
+	  display that complies with the generic VGA standard. Virtually
+	  everyone wants that.
+
+	  The program SVGATextMode can be used to utilize SVGA video cards to
+	  their full potential in text mode. Download it from
+	  <ftp://ibiblio.org/pub/Linux/utils/console/>.
+
+	  If unsure, say N.
+
+config VIDEO_SELECT
+	bool "Video mode selection support"
+	---help---
+	  This enables support for text mode selection on kernel startup. If
+	  you want to take advantage of some high-resolution text mode your
+	  card's BIOS offers, but the traditional Linux utilities like
+	  SVGATextMode don't, you can say Y here and set the mode using the
+	  "vga=" option from your boot loader (lilo or loadlin) or set
+	  "vga=ask" which brings up a video mode menu on kernel startup. (Try
+	  "man bootparam" or see the documentation of your boot loader about
+	  how to pass options to the kernel.)
+
+	  Read the file <file:Documentation/svga.txt> for more information
+	  about the Video mode selection support. If unsure, say N.
+
+source "drivers/video/Kconfig"
+
+endmenu
+
+
+menu "Sound"
+
+config SOUND
+	tristate "Sound card support"
+	---help---
+	  If you have a sound card in your computer, i.e. if it can say more
+	  than an occasional beep, say Y.  Be sure to have all the information
+	  about your sound card and its configuration down (I/O port,
+	  interrupt and DMA channel), because you will be asked for it.
+
+	  You want to read the Sound-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>. General information about
+	  the modular sound system is contained in the files
+	  <file:Documentation/sound/Introduction>.  The file
+	  <file:Documentation/sound/README.OSS> contains some slightly
+	  outdated but still useful information as well.
+
+	  If you have a PnP sound card and you want to configure it at boot
+	  time using the ISA PnP tools (read
+	  <http://www.roestock.demon.co.uk/isapnptools/>), then you need to
+	  compile the sound card support as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want)
+	  and load that module after the PnP configuration is finished.  To do
+	  this, say M here and read <file:Documentation/modules.txt> as well
+	  as <file:Documentation/sound/README.modules>; the module will be
+	  called soundcore.o.
+
+	  I'm told that even without a sound card, you can make your computer
+	  say more than an occasional beep, by programming the PC speaker.
+	  Kernel patches and supporting utilities to do that are in the pcsp
+	  package, available at <ftp://ftp.infradead.org/pub/pcsp/>.
+
+source "sound/Kconfig"
+
+endmenu
+
+source "drivers/usb/Kconfig"
+
+source "net/bluetooth/Kconfig"
+
+
+menu "Kernel hacking"
+
+config FULLDEBUG
+	bool "Full Symbolic/Source Debugging support"
+	help
+	  Enable debuging symbols on kernel build.
+
+config MAGIC_SYSRQ
+	bool "Magic SysRq key"
+	help
+	  Enables console device to interprent special characters as
+	  commands to dump state information.
+
+config HIGHPROFILE
+	bool "Use fast second timer for profiling"
+	help
+	  Use a fast secondary clock to produce profiling information.
+
+config DUMPTOFLASH
+	bool "Panic/Dump to FLASH"
+	depends on COLDFIRE
+	help
+	  Dump any panic of trap output into a flash memory segment
+	  for later analysis.
+
+config NO_KERNEL_MSG
+	bool "Suppress Kernel BUG Messages"
+	help
+	  Do not output any debug BUG messages within the kernel.
+
+config BDM_DISABLE
+	bool "Disable BDM signals"
+	depends on (EXPERIMENTAL && COLDFIRE)
+	help
+	  Disable the CPU's BDM signals.
+
+endmenu
+
+source "security/Kconfig"
+
+source "crypto/Kconfig"
+
+source "lib/Kconfig"
+

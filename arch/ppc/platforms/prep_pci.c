@@ -1089,8 +1089,7 @@ Powerplus_Map_Non0(struct pci_dev *dev)
 	devnum = PCI_SLOT(tdev->devfn);
 
 	/* Read the interrupt pin of the device and adjust for indexing */
-	pcibios_read_config_byte(dev->bus->number, dev->devfn,
-			PCI_INTERRUPT_PIN, &intpin);
+	pci_read_config_byte(dev, PCI_INTERRUPT_PIN, &intpin);
 
 	/* If device doesn't request an interrupt, return */
 	if ( (intpin < 1) || (intpin > 4) )
@@ -1162,7 +1161,7 @@ prep_pcibios_fixup(void)
 		pci_for_each_dev(dev) {
 			if (dev->bus->number == 0) {
                        		dev->irq = openpic_to_irq(Motherboard_map[PCI_SLOT(dev->devfn)]);
-				pcibios_write_config_byte(dev->bus->number, dev->devfn, PCI_INTERRUPT_LINE, dev->irq);
+				pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq);
 			} else {
 				if (Motherboard_non0 != NULL)
 					Motherboard_non0(dev);

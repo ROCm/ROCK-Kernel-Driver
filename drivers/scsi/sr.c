@@ -77,7 +77,6 @@ static struct Scsi_Device_Template sr_template = {
 	.name		= "cdrom",
 	.tag		= "sr",
 	.scsi_type	= TYPE_ROM,
-	.major		= SCSI_CDROM_MAJOR,
 	.blk		= 1,
 	.detect		= sr_detect,
 	.init		= sr_init,
@@ -177,6 +176,11 @@ int sr_media_change(struct cdrom_device_info *cdi, int slot)
 	}
 	return retval;
 }
+ 
+static inline struct scsi_cd *scsi_cd(struct gendisk *disk)
+{
+	return container_of(disk->private_data, struct scsi_cd, driver);
+}
 
 /*
  * rw_intr is the interrupt routine for the device driver.
@@ -190,7 +194,7 @@ static void rw_intr(struct scsi_cmnd * SCpnt)
 	int this_count = SCpnt->bufflen >> 9;
 	int good_sectors = (result == 0 ? this_count : 0);
 	int block_sectors = 0;
-	struct scsi_cd *cd = SCpnt->request->rq_disk->private_data;
+	struct scsi_cd *cd = scsi_cd(SCpnt->request->rq_disk);
 
 #ifdef DEBUG
 	printk("sr.c done: %x %p\n", result, SCpnt->request->bh->b_data);
@@ -243,7 +247,7 @@ static void rw_intr(struct scsi_cmnd * SCpnt)
 static int sr_init_command(struct scsi_cmnd * SCpnt)
 {
 	int block=0, this_count, s_size, timeout = SR_TIMEOUT;
-	struct scsi_cd *cd = SCpnt->request->rq_disk->private_data;
+	struct scsi_cd *cd = scsi_cd(SCpnt->request->rq_disk);
 
 	SCSI_LOG_HLQUEUE(1, printk("Doing sr request, dev = %s, block = %d\n",
 				cd->disk->disk_name, block));
@@ -395,26 +399,26 @@ queue:
 
 static int sr_block_open(struct inode *inode, struct file *file)
 {
-	struct scsi_cd *cd = inode->i_bdev->bd_disk->private_data;
+	struct scsi_cd *cd = scsi_cd(inode->i_bdev->bd_disk);
 	return cdrom_open(&cd->cdi, inode, file);
 }
 
 static int sr_block_release(struct inode *inode, struct file *file)
 {
-	struct scsi_cd *cd = inode->i_bdev->bd_disk->private_data;
+	struct scsi_cd *cd = scsi_cd(inode->i_bdev->bd_disk);
 	return cdrom_release(&cd->cdi, file);
 }
 
 static int sr_block_ioctl(struct inode *inode, struct file *file, unsigned cmd,
 			  unsigned long arg)
 {
-	struct scsi_cd *cd = inode->i_bdev->bd_disk->private_data;
+	struct scsi_cd *cd = scsi_cd(inode->i_bdev->bd_disk);
 	return cdrom_ioctl(&cd->cdi, inode, cmd, arg);
 }
 
 static int sr_block_media_changed(struct gendisk *disk)
 {
-	struct scsi_cd *cd = disk->private_data;
+	struct scsi_cd *cd = scsi_cd(disk);
 	return cdrom_media_changed(&cd->cdi);
 }
 
@@ -766,6 +770,7 @@ static int sr_init_one(struct scsi_cd *cd, int first_minor)
 	strcpy(disk->disk_name, cd->cdi.name);
 	disk->fops = &sr_bdops;
 	disk->flags = GENHD_FL_CD;
+	cd->driver = &sr_template;
 	cd->disk = disk;
 	cd->capacity = 0x1fffff;
 	cd->device->sector_size = 2048;/* A guess, just in case */
@@ -798,7 +803,7 @@ static int sr_init_one(struct scsi_cd *cd, int first_minor)
 	disk->driverfs_dev = &cd->device->sdev_driverfs_dev;
 	register_cdrom(&cd->cdi);
 	set_capacity(disk, cd->capacity);
-	disk->private_data = cd;
+	disk->private_data = &cd->driver;
 	disk->queue = &cd->device->request_queue;
 	add_disk(disk);
 

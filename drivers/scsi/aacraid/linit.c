@@ -237,7 +237,7 @@ static int aac_detect(Scsi_Host_Template *template)
 			/* Initialize the ordinal number of the device to -1 */
 			fsa_dev_ptr = &(aac->fsa_dev);
 			for( container = 0; container < MAXIMUM_NUM_CONTAINERS; container++ )
-				fsa_dev_ptr->devno[container] = -1;
+				fsa_dev_ptr->devname[container][0] = '\0';
 
 			dprintk((KERN_DEBUG "Initializing Hardware...\n"));
 			if((*aac_drivers[index].init)(aac , host_ptr->unique_id) != 0)

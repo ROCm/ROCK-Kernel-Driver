@@ -27,6 +27,7 @@
 #include <linux/if_bonding.h>
 #include <linux/blkpg.h>
 #include <linux/blk.h>
+#include <linux/dm-ioctl.h>
 #include <linux/loop.h>
 #include <linux/elevator.h>
 #include <asm/types.h>
@@ -896,6 +897,18 @@ static struct ioctl32_list ioctl32_handler_table[] = {
 	IOCTL32_DEFAULT(VT_UNLOCKSWITCH),
 
 	IOCTL32_DEFAULT(SIOCGSTAMP),
+
+	IOCTL32_DEFAULT(DM_VERSION),
+	IOCTL32_DEFAULT(DM_REMOVE_ALL),
+	IOCTL32_DEFAULT(DM_DEV_CREATE),
+	IOCTL32_DEFAULT(DM_DEV_REMOVE),
+	IOCTL32_DEFAULT(DM_DEV_RELOAD),
+	IOCTL32_DEFAULT(DM_DEV_SUSPEND),
+	IOCTL32_DEFAULT(DM_DEV_RENAME),
+	IOCTL32_DEFAULT(DM_DEV_DEPS),
+	IOCTL32_DEFAULT(DM_DEV_STATUS),
+	IOCTL32_DEFAULT(DM_TARGET_STATUS),
+	IOCTL32_DEFAULT(DM_TARGET_WAIT),
 
 	IOCTL32_DEFAULT(LOOP_SET_FD),
 	IOCTL32_DEFAULT(LOOP_CLR_FD),

@@ -1356,7 +1356,6 @@ int ide_diag_taskfile (ide_drive_t *drive, ide_task_t *args, unsigned long data_
 	rq->special = args;
 	rq->errors = 0;
 	rq->rq_status = RQ_ACTIVE;
-	rq->rq_dev = mk_kdev(disk->major, disk->first_minor);
 	rq->rq_disk = drive->disk;
 	rq->waiting = &wait;
 

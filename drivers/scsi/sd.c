@@ -73,6 +73,7 @@
 
 struct scsi_disk {
 	struct list_head list;		/* list of all scsi_disks */
+	struct Scsi_Device_Template *driver;	/* always &sd_template */
 	struct scsi_device *device;
 	struct gendisk	*disk;
 	sector_t	capacity;	/* size in 512-byte sectors */
@@ -105,9 +106,6 @@ static struct Scsi_Device_Template sd_template = {
 	.name		= "disk",
 	.tag		= "sd",
 	.scsi_type	= TYPE_DISK,
-	.major		= SCSI_DISK0_MAJOR,
-	.min_major	= SCSI_DISK1_MAJOR,
-	.max_major	= SCSI_DISK7_MAJOR,
 	.blk		= 1,
 	.detect		= sd_detect,
 	.attach		= sd_attach,
@@ -144,6 +142,11 @@ static inline void sd_devlist_remove(struct scsi_disk *sdkp)
 	list_del(&sdkp->list);
 	spin_unlock(&sd_devlist_lock);
 }
+ 
+static inline struct scsi_disk *scsi_disk(struct gendisk *disk)
+{
+	return container_of(disk->private_data, struct scsi_disk, driver);
+}
 
 /**
  *	sd_ioctl - process an ioctl
@@ -164,7 +167,7 @@ static int sd_ioctl(struct inode * inode, struct file * filp,
 {
 	struct block_device *bdev = inode->i_bdev;
 	struct gendisk *disk = bdev->bd_disk;
-	struct scsi_disk *sdkp = disk->private_data;
+	struct scsi_disk *sdkp = scsi_disk(disk);
 	struct scsi_device *sdp = sdkp->device;
 	sector_t capacity = sdkp->capacity;
 	struct Scsi_Host *host;
@@ -431,7 +434,7 @@ queue:
 static int sd_open(struct inode *inode, struct file *filp)
 {
 	struct gendisk *disk = inode->i_bdev->bd_disk;
-	struct scsi_disk *sdkp = disk->private_data;
+	struct scsi_disk *sdkp = scsi_disk(disk);
 	struct scsi_device * sdp = sdkp->device;
 	int retval = -ENXIO;
 
@@ -516,7 +519,7 @@ error_out:
 static int sd_release(struct inode *inode, struct file *filp)
 {
 	struct gendisk *disk = inode->i_bdev->bd_disk;
-	struct scsi_disk *sdkp = disk->private_data;
+	struct scsi_disk *sdkp = scsi_disk(disk);
 	struct scsi_device *sdp = sdkp->device;
 
 	SCSI_LOG_HLQUEUE(3, printk("sd_release: disk=%s\n", disk->disk_name));
@@ -670,7 +673,7 @@ sd_set_media_not_present(struct scsi_disk *sdkp) {
  **/
 static int check_scsidisk_media_change(struct gendisk *disk)
 {
-	struct scsi_disk *sdkp = disk->private_data;
+	struct scsi_disk *sdkp = scsi_disk(disk);
 	struct scsi_device *sdp = sdkp->device;
 	int retval;
 	int flag = 0;	/* <<<< what is this for?? */
@@ -1227,6 +1230,7 @@ static int sd_attach(struct scsi_device * sdp)
 	dsk_nr = sd_template.nr_dev++;
 
 	sdkp->device = sdp;
+	sdkp->driver = &sd_template;
 	sdkp->disk = gd;
 
 	sd_init_onedisk(sdkp, gd);
@@ -1243,7 +1247,7 @@ static int sd_attach(struct scsi_device * sdp)
 	gd->flags = GENHD_FL_DRIVERFS | GENHD_FL_DEVFS;
 	if (sdp->removable)
 		gd->flags |= GENHD_FL_REMOVABLE;
-	gd->private_data = sdkp;
+	gd->private_data = &sdkp->driver;
 	gd->queue = &sdkp->device->request_queue;
 
 	sd_devlist_insert(sdkp);
@@ -1266,7 +1270,7 @@ out:
 
 static int sd_revalidate(struct gendisk *disk)
 {
-	struct scsi_disk *sdkp = disk->private_data;
+	struct scsi_disk *sdkp = scsi_disk(disk);
 
 	if (!sdkp->device)
 		return -ENODEV;

@@ -139,7 +139,7 @@ static int dio_refill_pages(struct dio *dio)
 		 */
 		if (dio->page_errors == 0)
 			dio->page_errors = ret;
-		dio->pages[0] = ZERO_PAGE(dio->cur_user_address);
+		dio->pages[0] = ZERO_PAGE(dio->curr_user_address);
 		dio->head = 0;
 		dio->tail = 1;
 		ret = 0;

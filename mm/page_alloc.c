@@ -29,6 +29,10 @@
 #include <linux/slab.h>
 #include <linux/notifier.h>
 
+#include <asm/topology.h>
+
+DECLARE_BITMAP(node_online_map, MAX_NUMNODES);
+DECLARE_BITMAP(memblk_online_map, MAX_NR_MEMBLKS);
 struct pglist_data *pgdat_list;
 unsigned long totalram_pages;
 unsigned long totalhigh_pages;
@@ -461,7 +465,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	/* here we're in the low on memory slow path */
 
 rebalance:
-	if (current->flags & (PF_MEMALLOC | PF_MEMDIE)) {
+	if ((current->flags & (PF_MEMALLOC | PF_MEMDIE)) && !in_interrupt()) {
 		/* go through the zonelist yet again, ignoring mins */
 		for (i = 0; zones[i] != NULL; i++) {
 			struct zone *z = zones[i];
@@ -470,13 +474,6 @@ rebalance:
 			if (page)
 				return page;
 		}
-nopage:
-		if (!(current->flags & PF_NOWARN)) {
-			printk("%s: page allocation failure."
-				" order:%d, mode:0x%x\n",
-				current->comm, order, gfp_mask);
-		}
-		return NULL;
 	}
 
 	/* Atomic allocations - we can't balance anything */
@@ -502,13 +499,21 @@ nopage:
 		}
 	}
 
-	/* Don't let big-order allocations loop */
-	if (order > 3)
-		goto nopage;
+	/*
+	 * Don't let big-order allocations loop.  Yield for kswapd, try again.
+	 */
+	if (order <= 3) {
+		yield();
+		goto rebalance;
+	}
 
-	/* Yield for kswapd, and try again */
-	yield();
-	goto rebalance;
+nopage:
+	if (!(current->flags & PF_NOWARN)) {
+		printk("%s: page allocation failure."
+			" order:%d, mode:0x%x\n",
+			current->comm, order, gfp_mask);
+	}
+	return NULL;
 }
 
 /*
@@ -593,6 +598,18 @@ unsigned int nr_used_zone_pages(void)
 
 	return pages;
 }
+
+#ifdef CONFIG_NUMA
+unsigned int nr_free_pages_pgdat(pg_data_t *pgdat)
+{
+	unsigned int i, sum = 0;
+
+	for (i = 0; i < MAX_NR_ZONES; i++)
+		sum += pgdat->node_zones[i].free_pages;
+
+	return sum;
+}
+#endif
 
 static unsigned int nr_free_zone_pages(int offset)
 {
@@ -720,6 +737,19 @@ void si_meminfo(struct sysinfo *val)
 #endif
 	val->mem_unit = PAGE_SIZE;
 }
+
+#ifdef CONFIG_NUMA
+void si_meminfo_node(struct sysinfo *val, int nid)
+{
+	pg_data_t *pgdat = NODE_DATA(nid);
+
+	val->totalram = pgdat->node_size;
+	val->freeram = nr_free_pages_pgdat(pgdat);
+	val->totalhigh = pgdat->node_zones[ZONE_HIGHMEM].spanned_pages;
+	val->freehigh = pgdat->node_zones[ZONE_HIGHMEM].free_pages;
+	val->mem_unit = PAGE_SIZE;
+}
+#endif
 
 #define K(x) ((x) << (PAGE_SHIFT-10))
 
@@ -1138,6 +1168,7 @@ void __init free_area_init_node(int nid, struct pglist_data *pgdat,
 	pgdat->node_mem_map = node_mem_map;
 
 	free_area_init_core(pgdat, zones_size, zholes_size);
+	memblk_set_online(__node_to_memblk(nid));
 
 	calculate_zone_bitmap(pgdat, zones_size);
 }

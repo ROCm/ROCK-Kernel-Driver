@@ -35,6 +35,10 @@
 
 #include <asm/ptrace.h>
 
+#ifdef CONFIG_VOYAGER
+#include <asm/voyager.h>
+#endif
+
 extern void reset_vc(unsigned int);
 extern struct list_head super_blocks;
 
@@ -319,6 +323,14 @@ static struct sysrq_key_op sysrq_term_op = {
 	action_msg:	"Terminate All Tasks",
 };
 
+#ifdef CONFIG_VOYAGER
+static struct sysrq_key_op sysrq_voyager_dump_op = {
+	handler:	voyager_dump,
+	help_msg:	"voyager",
+	action_msg:	"Dump Voyager Status\n",
+};
+#endif
+
 static void sysrq_handle_kill(int key, struct pt_regs *pt_regs,
 			      struct tty_struct *tty) 
 {
@@ -352,7 +364,11 @@ static struct sysrq_key_op *sysrq_key_table[SYSRQ_KEY_TABLE_LENGTH] = {
 		 it is handled specially on the sparc
 		 and will never arrive */
 /* b */	&sysrq_reboot_op,
+#ifdef CONFIG_VOYAGER
+/* c */ &sysrq_voyager_dump_op,
+#else
 /* c */	NULL,
+#endif
 /* d */	NULL,
 /* e */	&sysrq_term_op,
 /* f */	NULL,
