@@ -60,7 +60,7 @@
 
 #include "i8259.h"
 #include "open_pic.h"
-#include "xics.h"
+#include <asm/xics.h>
 #include <asm/ppcdebug.h>
 
 extern volatile unsigned char *chrp_int_ack_special;

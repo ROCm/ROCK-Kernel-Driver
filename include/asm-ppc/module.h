@@ -18,16 +18,17 @@ struct ppc_plt_entry
 
 struct mod_arch_specific
 {
-	/* How much of the core is actually taken up with core (then
-           we know the rest is for the PLT */
-	unsigned int core_plt_offset;
-
-	/* Same for init */
-	unsigned int init_plt_offset;
+	/* Indices of PLT sections within module. */
+	unsigned int core_plt_section, init_plt_section;
 };
 
 #define Elf_Shdr Elf32_Shdr
 #define Elf_Sym Elf32_Sym
 #define Elf_Ehdr Elf32_Ehdr
 
+/* Make empty sections for module_frob_arch_sections to expand. */
+#ifdef MODULE
+asm(".section .plt,\"ax\",@nobits; .align 3; .previous");
+asm(".section .init.plt,\"ax\",@nobits; .align 3; .previous");
+#endif
 #endif /* _ASM_PPC_MODULE_H */

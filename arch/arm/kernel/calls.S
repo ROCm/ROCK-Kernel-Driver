@@ -14,7 +14,7 @@
 #else
 
 __syscall_start:
-/* 0 */		.long	sys_ni_syscall
+/* 0 */		.long	sys_restart_syscall
 		.long	sys_exit
 		.long	sys_fork_wrapper
 		.long	sys_read

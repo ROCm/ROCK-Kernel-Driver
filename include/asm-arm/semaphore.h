@@ -22,19 +22,18 @@ struct semaphore {
 };
 
 #if WAITQUEUE_DEBUG
-# define __SEM_DEBUG_INIT(name) \
-		, (long)&(name).__magic
+# define __SEM_DEBUG_INIT(name)	.__magic = (long)&(name).__magic
 #else
 # define __SEM_DEBUG_INIT(name)
 #endif
 
-#define __SEMAPHORE_INIT(name,count)			\
-	{ ATOMIC_INIT(count), 0,			\
-	  __WAIT_QUEUE_HEAD_INITIALIZER((name).wait)	\
-	  __SEM_DEBUG_INIT(name) }
+#define __SEMAPHORE_INIT(name,cnt) {				\
+	.count	= ATOMIC_INIT(cnt),				\
+	.wait	= __WAIT_QUEUE_HEAD_INITIALIZER((name).wait),	\
+	__SEM_DEBUG_INIT(name)					\
+}
 
-#define __MUTEX_INITIALIZER(name) \
-	__SEMAPHORE_INIT(name,1)
+#define __MUTEX_INITIALIZER(name) __SEMAPHORE_INIT(name,1)
 
 #define __DECLARE_SEMAPHORE_GENERIC(name,count)	\
 	struct semaphore name = __SEMAPHORE_INIT(name,count)
@@ -60,6 +59,11 @@ static inline void init_MUTEX(struct semaphore *sem)
 static inline void init_MUTEX_LOCKED(struct semaphore *sem)
 {
 	sema_init(sem, 0);
+}
+
+static inline int sema_count(struct semaphore *sem)
+{
+	return atomic_read(&sem->count);
 }
 
 /*

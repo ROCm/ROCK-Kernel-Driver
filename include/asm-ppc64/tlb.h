@@ -62,7 +62,7 @@ static inline void __tlb_remove_tlb_entry(mmu_gather_t *tlb, pte_t *ptep,
 			if (i == PPC64_TLB_BATCH_NR) {
 				int local = 0;
 
-				if (tlb->mm->cpu_vm_mask == (1 << cpu))
+				if (tlb->mm->cpu_vm_mask == (1UL << cpu))
 					local = 1;
 
 				flush_hash_range(tlb->mm->context, i, local);
@@ -80,7 +80,7 @@ static inline void tlb_flush(struct free_pte_ctx *tlb)
 	struct ppc64_tlb_batch *batch = &ppc64_tlb_batch[cpu];
 	int local = 0;
 
-	if (tlb->mm->cpu_vm_mask == (1 << smp_processor_id()))
+	if (tlb->mm->cpu_vm_mask == (1UL << smp_processor_id()))
 		local = 1;
 
 	flush_hash_range(tlb->mm->context, batch->index, local);

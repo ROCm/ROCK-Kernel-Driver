@@ -6,9 +6,12 @@
  */
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/device.h>
+#include <linux/errno.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>
+#include <asm/hardware/sa1111.h>
 #include <asm/mach-types.h>
 
 #include "sa1100_generic.h"
@@ -76,6 +79,9 @@ printk("%s(): config socket %d vcc %d vpp %d\n", __FUNCTION__,
     case 50:	pa_dwr_set = SOCKET1_POWER;			break;
     }
     break;
+
+  default:
+    return -1;
   }
 
   if (conf->vpp != conf->vcc && conf->vpp != 0) {
@@ -90,7 +96,7 @@ printk("%s(): config socket %d vcc %d vpp %d\n", __FUNCTION__,
 
     local_irq_save(flags);
     PA_DWR = (PA_DWR & ~pa_dwr_mask) | pa_dwr_set;
-    locla_irq_restore(flags);
+    local_irq_restore(flags);
   }
 
   return ret;
@@ -117,7 +123,7 @@ int __init pcmcia_jornada720_init(void)
 	return ret;
 }
 
-void __exit pcmcia_jornada720_exit(void)
+void __devexit pcmcia_jornada720_exit(void)
 {
 	sa1100_unregister_pcmcia(&jornada720_pcmcia_ops);
 }

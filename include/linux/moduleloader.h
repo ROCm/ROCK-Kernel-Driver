@@ -15,20 +15,11 @@ unsigned long find_symbol_internal(Elf_Shdr *sechdrs,
 
 /* These must be implemented by the specific architecture */
 
-/* Total size to allocate for the non-releasable code; return len or
-   -error.  mod->core_size is the current generic tally. */
-long module_core_size(const Elf_Ehdr *hdr,
-		      const Elf_Shdr *sechdrs,
-		      const char *secstrings,
-		      struct module *mod);
-
-/* Total size of (if any) sections to be freed after init.  Return 0
-   for none, len, or -error. mod->init_size is the current generic
-   tally. */
-long module_init_size(const Elf_Ehdr *hdr,
-		      const Elf_Shdr *sechdrs,
-		      const char *secstrings,
-		      struct module *mod);
+/* Adjust arch-specific sections.  Return 0 on success.  */
+int module_frob_arch_sections(const Elf_Ehdr *hdr,
+			      const Elf_Shdr *sechdrs,
+			      const char *secstrings,
+			      struct module *mod);
 
 /* Allocator used for allocating struct module, core sections and init
    sections.  Returns NULL on failure. */

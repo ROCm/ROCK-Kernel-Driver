@@ -25,6 +25,7 @@
  * This file contains the system call numbers.
  */
 
+#define __NR_restart_syscall		(__NR_SYSCALL_BASE+  0)
 #define __NR_exit			(__NR_SYSCALL_BASE+  1)
 #define __NR_fork			(__NR_SYSCALL_BASE+  2)
 #define __NR_read			(__NR_SYSCALL_BASE+  3)

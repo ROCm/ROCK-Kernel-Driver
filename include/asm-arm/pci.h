@@ -3,36 +3,20 @@
 
 #ifdef __KERNEL__
 #include <linux/config.h>
-#include <linux/mm.h> /* bah! */
+#include <linux/dma-mapping.h>
 
-#include <asm/arch/hardware.h>
-#include <asm/scatterlist.h>
-#include <asm/page.h>
-#include <asm/io.h>
-
-struct pci_dev;
-
-/*
- * For SA-1111 these functions are "magic" and utilize bounce
- * buffers as need to workaround SA-1111 DMA bugs.  They are called in
- * place of their pci_* counterparts when dev_is_sa1111() returns true.
- */
-dma_addr_t sa1111_map_single(struct pci_dev *, void *, size_t, int);
-void sa1111_unmap_single(struct pci_dev *, dma_addr_t, size_t, int);
-int sa1111_map_sg(struct pci_dev *, struct scatterlist *, int, int);
-void sa1111_unmap_sg(struct pci_dev *, struct scatterlist *, int, int);
-void sa1111_dma_sync_single(struct pci_dev *, dma_addr_t, size_t, int);
-void sa1111_dma_sync_sg(struct pci_dev *, struct scatterlist *, int, int);
+#include <asm/hardware.h> /* for PCIBIOS_MIN_* */
 
 #ifdef CONFIG_SA1111
-
+/*
+ * Keep the SA1111 DMA-mapping tricks until the USB layer gets
+ * properly converted to the new DMA-mapping API, at which time
+ * most of this file can die.
+ */
 #define SA1111_FAKE_PCIDEV ((struct pci_dev *) 1111)
-#define dev_is_sa1111(dev) (dev == SA1111_FAKE_PCIDEV)
-
+#define pcidev_is_sa1111(dev) (dev == SA1111_FAKE_PCIDEV)
 #else
-
-#define dev_is_sa1111(dev) (0)
-
+#define pcidev_is_sa1111(dev) (0)
 #endif
 
 
@@ -46,67 +30,123 @@ static inline void pcibios_penalize_isa_irq(int irq)
 	/* We don't do dynamic PCI IRQ allocation */
 }
 
-/* The PCI address space does equal the physical memory
- * address space.  The networking and block device layers use
- * this boolean for bounce buffer decisions.
+/*
+ * The PCI address space does equal the physical memory address space.
+ * The networking and block device layers use this boolean for bounce
+ * buffer decisions.
  */
 #define PCI_DMA_BUS_IS_PHYS     (0)
 
-/* Allocate and map kernel buffer using consistent mode DMA for a device.
- * hwdev should be valid struct pci_dev pointer for PCI devices,
- * NULL for PCI-like buses (ISA, EISA).
- * Returns non-NULL cpu-view pointer to the buffer if successful and
- * sets *dma_addrp to the pci side dma address as well, else *dma_addrp
- * is undefined.
- */
-extern void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t *handle);
+static inline void *
+pci_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t *handle)
+{
+	int gfp = GFP_KERNEL;
 
-/* Free and unmap a consistent DMA buffer.
- * cpu_addr is what was returned from pci_alloc_consistent,
- * size must be the same as what as passed into pci_alloc_consistent,
- * and likewise dma_addr must be the same as what *dma_addrp was set to.
- *
- * References to the memory and mappings associated with cpu_addr/dma_addr
- * past this call are illegal.
- */
+	if (hwdev == NULL || pcidev_is_sa1111(hwdev) ||
+	    hwdev->dma_mask != 0xffffffff)
+		gfp |= GFP_DMA;
+
+	return consistent_alloc(gfp, size, handle);
+}
+
 static inline void
 pci_free_consistent(struct pci_dev *hwdev, size_t size, void *vaddr,
-		    dma_addr_t dma_handle)
+		    dma_addr_t handle)
 {
-	consistent_free(vaddr, size, dma_handle);
+	dma_free_coherent(hwdev ? &hwdev->dev : NULL, size, vaddr, handle);
 }
 
-/* Map a single buffer of the indicated size for DMA in streaming mode.
- * The 32-bit bus address to use is returned.
- *
- * Once the device is given the dma address, the device owns this memory
- * until either pci_unmap_single or pci_dma_sync_single is performed.
- */
 static inline dma_addr_t
-pci_map_single(struct pci_dev *hwdev, void *ptr, size_t size, int direction)
+pci_map_single(struct pci_dev *hwdev, void *ptr, size_t size, int dir)
 {
-	if (dev_is_sa1111(hwdev))
-		return sa1111_map_single(hwdev, ptr, size, direction);
+	if (pcidev_is_sa1111(hwdev))
+		return sa1111_map_single(ptr, size, dir);
 
-	consistent_sync(ptr, size, direction);
-	return virt_to_bus(ptr);
+	return dma_map_single(hwdev ? &hwdev->dev : NULL, ptr, size, dir);
 }
 
-/* Unmap a single streaming mode DMA translation.  The dma_addr and size
- * must match what was provided for in a previous pci_map_single call.  All
- * other usages are undefined.
- *
- * After this call, reads by the cpu to the buffer are guarenteed to see
- * whatever the device wrote there.
- */
 static inline void
-pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr, size_t size, int direction)
+pci_unmap_single(struct pci_dev *hwdev, dma_addr_t handle, size_t size, int dir)
 {
-	if (dev_is_sa1111(hwdev))
-		sa1111_unmap_single(hwdev, dma_addr, size, direction);
+	if (pcidev_is_sa1111(hwdev)) {
+		sa1111_unmap_single(handle, size, dir);
+		return;
+	}
 
-	/* nothing to do */
+	return dma_unmap_single(hwdev ? &hwdev->dev : NULL, handle, size, dir);
 }
+
+static inline int
+pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents, int dir)
+{
+	if (pcidev_is_sa1111(hwdev))
+		return sa1111_map_sg(sg, nents, dir);
+
+	return dma_map_sg(hwdev ? &hwdev->dev : NULL, sg, nents, dir);
+}
+
+static inline void
+pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents, int dir)
+{
+	if (pcidev_is_sa1111(hwdev)) {
+		sa1111_unmap_sg(sg, nents, dir);
+		return;
+	}
+
+	return dma_unmap_sg(hwdev ? &hwdev->dev : NULL, sg, nents, dir);
+}
+
+static inline void
+pci_dma_sync_single(struct pci_dev *hwdev, dma_addr_t handle, size_t size, int dir)
+{
+	if (pcidev_is_sa1111(hwdev)) {
+	  	sa1111_dma_sync_single(handle, size, dir);
+		return;
+	}
+
+	return dma_sync_single(hwdev ? &hwdev->dev : NULL, handle, size, dir);
+}
+
+static inline void
+pci_dma_sync_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nelems, int dir)
+{
+	if (pcidev_is_sa1111(hwdev)) {
+	  	sa1111_dma_sync_sg(sg, nelems, dir);
+		return;
+	}
+
+	return dma_sync_sg(hwdev ? &hwdev->dev : NULL, sg, nelems, dir);
+}
+
+static inline int pci_dma_supported(struct pci_dev *hwdev, u64 mask)
+{
+	return 1;
+}
+
+/*
+ * We don't support DAC DMA cycles.
+ */
+#define pci_dac_dma_supported(pci_dev, mask)	(0)
+
+/*
+ * Return the index of the PCI controller for device PDEV.
+ */
+#define pci_controller_num(PDEV)	(0)
+
+
+#if defined(CONFIG_SA1111) && !defined(CONFIG_PCI)
+/*
+ * SA-1111 needs these prototypes even when !defined(CONFIG_PCI)
+ *
+ * kmem_cache style wrapper around pci_alloc_consistent()
+ */
+struct pci_pool *pci_pool_create (const char *name, struct pci_dev *dev,
+		size_t size, size_t align, size_t allocation);
+void pci_pool_destroy (struct pci_pool *pool);
+
+void *pci_pool_alloc (struct pci_pool *pool, int flags, dma_addr_t *handle);
+void pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t addr);
+#endif
 
 /*
  * Whether pci_unmap_{single,page} is a nop depends upon the
@@ -126,126 +166,6 @@ pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr, size_t size, int di
 #define pci_unmap_addr_set(PTR, ADDR_NAME, VAL)	do { } while (0)
 #define pci_unmap_len(PTR, LEN_NAME)		(0)
 #define pci_unmap_len_set(PTR, LEN_NAME, VAL)	do { } while (0)
-#endif /* CONFIG_PCI */
-
-/* Map a set of buffers described by scatterlist in streaming
- * mode for DMA.  This is the scather-gather version of the
- * above pci_map_single interface.  Here the scatter gather list
- * elements are each tagged with the appropriate dma address
- * and length.  They are obtained via sg_dma_{address,length}(SG).
- *
- * NOTE: An implementation may be able to use a smaller number of
- *       DMA address/length pairs than there are SG table elements.
- *       (for example via virtual mapping capabilities)
- *       The routine returns the number of addr/length pairs actually
- *       used, at most nents.
- *
- * Device ownership issues as mentioned above for pci_map_single are
- * the same here.
- */
-static inline int
-pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents, int direction)
-{
-	int i;
-
-	if (dev_is_sa1111(hwdev))
-		return sa1111_map_sg(hwdev, sg, nents, direction);
-
-	for (i = 0; i < nents; i++, sg++) {
-		char *virt;
-
-		sg->dma_address = page_to_bus(sg->page) + sg->offset;
-		virt = page_address(sg->page) + sg->offset;
-		consistent_sync(virt, sg->length, direction);
-	}
-
-	return nents;
-}
-
-/* Unmap a set of streaming mode DMA translations.
- * Again, cpu read rules concerning calls here are the same as for
- * pci_unmap_single() above.
- */
-static inline void
-pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents, int direction)
-{
-	if (dev_is_sa1111(hwdev)) {
-		sa1111_unmap_sg(hwdev, sg, nents, direction);
-		return;
-	}
-
-	/* nothing to do */
-}
-
-/* Make physical memory consistent for a single
- * streaming mode DMA translation after a transfer.
- *
- * If you perform a pci_map_single() but wish to interrogate the
- * buffer using the cpu, yet do not wish to teardown the PCI dma
- * mapping, you must call this function before doing so.  At the
- * next point you give the PCI dma address back to the card, the
- * device again owns the buffer.
- */
-static inline void
-pci_dma_sync_single(struct pci_dev *hwdev, dma_addr_t dma_handle, size_t size, int direction)
-{
-	if (dev_is_sa1111(hwdev)) {
-	  	sa1111_dma_sync_single(hwdev, dma_handle, size, direction);
-		return;
-	}
-
-	consistent_sync(bus_to_virt(dma_handle), size, direction);
-}
-
-/* Make physical memory consistent for a set of streaming
- * mode DMA translations after a transfer.
- *
- * The same as pci_dma_sync_single but for a scatter-gather list,
- * same rules and usage.
- */
-static inline void
-pci_dma_sync_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nelems, int direction)
-{
-	int i;
-
-	if (dev_is_sa1111(hwdev)) {
-	  	sa1111_dma_sync_sg(hwdev, sg, nelems, direction);
-		return;
-	}
-
-	for (i = 0; i < nelems; i++, sg++) {
-		char *virt = page_address(sg->page) + sg->offset;
-		consistent_sync(virt, sg->length, direction);
-	}
-}
-
-/* Return whether the given PCI device DMA address mask can
- * be supported properly.  For example, if your device can
- * only drive the low 24-bits during PCI bus mastering, then
- * you would pass 0x00ffffff as the mask to this function.
- */
-static inline int pci_dma_supported(struct pci_dev *hwdev, u64 mask)
-{
-	return 1;
-}
-
-/* This isn't fine. */
-#define pci_dac_dma_supported(pci_dev, mask)	(0)
-
-/* Return the index of the PCI controller for device PDEV. */
-#define pci_controller_num(PDEV)	(0)
-
-
-#if defined(CONFIG_SA1111) && !defined(CONFIG_PCI)
-/* SA-1111 needs these prototypes even when !defined(CONFIG_PCI) */
-
-/* kmem_cache style wrapper around pci_alloc_consistent() */
-struct pci_pool *pci_pool_create (const char *name, struct pci_dev *dev,
-		size_t size, size_t align, size_t allocation);
-void pci_pool_destroy (struct pci_pool *pool);
-
-void *pci_pool_alloc (struct pci_pool *pool, int flags, dma_addr_t *handle);
-void pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t addr);
 #endif
 
 #define HAVE_PCI_MMAP

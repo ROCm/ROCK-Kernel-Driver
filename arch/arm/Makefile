@@ -210,7 +210,6 @@ zi:;	$(Q)$(MAKE) $(build)=$(boot) zinstall
 
 arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
 				   include/config/MARKER
-	@:
 
 include/asm-$(ARCH)/constants.h: arch/$(ARCH)/kernel/asm-offsets.s
 	@echo -n '  Generating $@'
