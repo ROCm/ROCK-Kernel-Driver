@@ -447,7 +447,7 @@ fpu_Arith_exit:
 L_precision_lost_up:
 	push	%edx
 	push	%eax
-	call	SYMBOL_NAME(set_precision_flag_up)
+	call	set_precision_flag_up
 	popl	%eax
 	popl	%edx
 	jmp	L_no_precision_loss
@@ -459,7 +459,7 @@ L_precision_lost_up:
 L_precision_lost_down:
 	push	%edx
 	push	%eax
-	call	SYMBOL_NAME(set_precision_flag_down)
+	call	set_precision_flag_down
 	popl	%eax
 	popl	%edx
 	jmp	L_no_precision_loss
@@ -617,7 +617,7 @@ LPseudoDenormal:
  */
 L_underflow_to_zero:
 	push	%eax
-	call	SYMBOL_NAME(set_precision_flag_down)
+	call	set_precision_flag_down
 	popl	%eax
 
 	push	%eax
@@ -636,7 +636,7 @@ L_underflow_to_zero:
 L_overflow:
 	addw	EXTENDED_Ebias,EXP(%edi)	/* Set for unmasked response. */
 	push	%edi
-	call	SYMBOL_NAME(arith_overflow)
+	call	arith_overflow
 	pop	%edi
 	jmp	fpu_reg_round_signed_special_exit
 

@@ -26,7 +26,7 @@
  * References to members of the boot_cpu_data structure.
  */
 
-#define CPU_PARAMS	SYMBOL_NAME(boot_cpu_data)
+#define CPU_PARAMS	boot_cpu_data
 #define X86		CPU_PARAMS+0
 #define X86_VENDOR	CPU_PARAMS+1
 #define X86_MODEL	CPU_PARAMS+2
@@ -120,8 +120,8 @@ startup_32:
  * No need to cld as DF is already clear from cld above...
  */
 	xorl %eax,%eax
-	movl $ SYMBOL_NAME(__bss_start),%edi
-	movl $ SYMBOL_NAME(_end),%ecx
+	movl $__bss_start,%edi
+	movl $_end,%ecx
 	subl %edi,%ecx
 	rep
 	stosb
@@ -145,7 +145,7 @@ startup_32:
  *
  * Note: %esi still has the pointer to the real-mode data.
  */
-	movl $ SYMBOL_NAME(empty_zero_page),%edi
+	movl $empty_zero_page,%edi
 	movl $512,%ecx
 	cld
 	rep
@@ -154,7 +154,7 @@ startup_32:
 	movl $512,%ecx
 	rep
 	stosl
-	movl SYMBOL_NAME(empty_zero_page)+NEW_CL_POINTER,%esi
+	movl empty_zero_page+NEW_CL_POINTER,%esi
 	andl %esi,%esi
 	jnz 2f			# New command line protocol
 	cmpw $(OLD_CL_MAGIC),OLD_CL_MAGIC_ADDR
@@ -162,7 +162,7 @@ startup_32:
 	movzwl OLD_CL_OFFSET,%esi
 	addl $(OLD_CL_BASE_ADDR),%esi
 2:
-	movl $ SYMBOL_NAME(empty_zero_page)+2048,%edi
+	movl $empty_zero_page+2048,%edi
 	movl $512,%ecx
 	rep
 	movsl
@@ -263,11 +263,11 @@ is386:	pushl %ecx		# restore original EFLAGS
 	cmpb $1,%cl
 	je 1f			# the first CPU calls start_kernel
 				# all other CPUs call initialize_secondary
-	call SYMBOL_NAME(initialize_secondary)
+	call initialize_secondary
 	jmp L6
 1:
 #endif
-	call SYMBOL_NAME(start_kernel)
+	call start_kernel
 L6:
 	jmp L6			# main should never return here, but
 				# just in case, we know what happens.
@@ -309,7 +309,7 @@ setup_idt:
 	movw %dx,%ax		/* selector = 0x0010 = cs */
 	movw $0x8E00,%dx	/* interrupt gate - dpl=0, present */
 
-	lea SYMBOL_NAME(idt_table),%edi
+	lea idt_table,%edi
 	mov $256,%ecx
 rp_sidt:
 	movl %eax,(%edi)
@@ -320,7 +320,7 @@ rp_sidt:
 	ret
 
 ENTRY(stack_start)
-	.long SYMBOL_NAME(init_thread_union)+8192
+	.long init_thread_union+8192
 	.long __KERNEL_DS
 
 /* This is the default interrupt "handler" :-) */
@@ -338,7 +338,7 @@ ignore_int:
 	movl %eax,%ds
 	movl %eax,%es
 	pushl $int_msg
-	call SYMBOL_NAME(printk)
+	call printk
 	popl %eax
 	popl %ds
 	popl %es
@@ -356,21 +356,21 @@ ignore_int:
 #define GDT_ENTRIES	(__TSS(NR_CPUS))
 
 
-.globl SYMBOL_NAME(idt)
-.globl SYMBOL_NAME(gdt)
+.globl idt
+.globl gdt
 
 	ALIGN
 	.word 0
 idt_descr:
 	.word IDT_ENTRIES*8-1		# idt contains 256 entries
-SYMBOL_NAME(idt):
-	.long SYMBOL_NAME(idt_table)
+idt:
+	.long idt_table
 
 	.word 0
 gdt_descr:
 	.word GDT_ENTRIES*8-1
-SYMBOL_NAME(gdt):
-	.long SYMBOL_NAME(gdt_table)
+gdt:
+	.long gdt_table
 
 /*
  * This is initialized to create an identity-mapping at 0-8M (for bootup
