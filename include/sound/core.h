@@ -417,7 +417,7 @@ void snd_verbose_printd(const char *file, int line, const char *format, ...)
  */
 #define snd_assert(expr, args...) do {\
 	if (unlikely(!(expr))) {				\
-		snd_printk("BUG? (%s) (called from %p)\n", __ASTRING__(expr), __builtin_return_address(0));\
+		snd_printk(KERN_ERR "BUG? (%s) (called from %p)\n", __ASTRING__(expr), __builtin_return_address(0));\
 		args;\
 	}\
 } while (0)
@@ -433,7 +433,7 @@ void snd_verbose_printd(const char *file, int line, const char *format, ...)
  */
 #define snd_runtime_check(expr, args...) do {\
 	if (unlikely(!(expr))) {				\
-		snd_printk("ERROR (%s) (called from %p)\n", __ASTRING__(expr), __builtin_return_address(0));\
+		snd_printk(KERN_ERR "ERROR (%s) (called from %p)\n", __ASTRING__(expr), __builtin_return_address(0));\
 		args;\
 	}\
 } while (0)
