@@ -505,7 +505,7 @@ void rtas_stop_self(void)
 {
 	struct rtas_args *rtas_args = &(get_paca()->xRtas);
 
-	local_irq_disable(s);
+	local_irq_disable();
 
 	rtas_args->token = rtas_token("stop-self");
 	BUG_ON(rtas_args->token == RTAS_UNKNOWN_SERVICE);
