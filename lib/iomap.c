@@ -19,7 +19,10 @@
  *
  * Architectures for which this is not true can't use this generic
  * implementation and should do their own copy.
- *
+ */
+
+#ifndef HAVE_ARCH_PIO_SIZE
+/*
  * We encode the physical PIO addresses (0-0xffff) into the
  * pointer by offsetting them with a constant (0x10000) and
  * assuming that all the low addresses are always PIO. That means
@@ -29,6 +32,7 @@
 #define PIO_OFFSET	0x10000UL
 #define PIO_MASK	0x0ffffUL
 #define PIO_RESERVED	0x40000UL
+#endif
 
 /*
  * Ugly macros are a way of life.
