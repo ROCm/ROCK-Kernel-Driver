@@ -63,7 +63,6 @@ void ps2pp_process_packet(struct psmouse *psmouse)
 		packet[0] &= 0x0f;
 		packet[1] = 0;
 		packet[2] = 0;
-
 	}
 }
 
@@ -76,17 +75,8 @@ void ps2pp_process_packet(struct psmouse *psmouse)
 
 static int ps2pp_cmd(struct psmouse *psmouse, unsigned char *param, unsigned char command)
 {
-	unsigned char d;
-	int i;
-
-	if (psmouse_command(psmouse,  NULL, PSMOUSE_CMD_SETSCALE11))
+	if (psmouse_sliced_command(psmouse, command))
 		return -1;
-
-	for (i = 6; i >= 0; i -= 2) {
-		d = (command >> i) & 3;
-		if(psmouse_command(psmouse, &d, PSMOUSE_CMD_SETRES))
-			return -1;
-	}
 
 	if (psmouse_command(psmouse, param, PSMOUSE_CMD_POLL))
 		return -1;
@@ -99,7 +89,7 @@ static int ps2pp_cmd(struct psmouse *psmouse, unsigned char *param, unsigned cha
  * enabled if we do nothing to it. Of course I put this in because I want it
  * disabled :P
  * 1 - enabled (if previously disabled, also default)
- * 0/2 - disabled 
+ * 0/2 - disabled
  */
 
 static void ps2pp_set_smartscroll(struct psmouse *psmouse)
@@ -113,14 +103,11 @@ static void ps2pp_set_smartscroll(struct psmouse *psmouse)
 	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
 	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
 
-	if (psmouse_smartscroll == 1) 
-		param[0] = 1;
-	else
-	if (psmouse_smartscroll > 2)
-		return;
-
-	/* else leave param[0] == 0 to disable */
-	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
+	if (psmouse_smartscroll < 2) {
+		/* 0 - disabled, 1 - enabled */
+		param[0] = psmouse_smartscroll;
+		psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
+	}
 }
 
 /*
@@ -138,102 +125,77 @@ void ps2pp_set_800dpi(struct psmouse *psmouse)
 	psmouse_command(psmouse, &param, PSMOUSE_CMD_SETRES);
 }
 
-/*
- * Detect the exact model and features of a PS2++ or PS2T++ Logitech mouse or
- * touchpad.
- */
 
-static int ps2pp_detect_model(struct psmouse *psmouse, unsigned char *param)
+static int is_model_in_list(unsigned char model, int *model_list)
 {
 	int i;
-	static int logitech_4btn[] = { 12, 40, 41, 42, 43, 52, 73, 80, -1 };
-	static int logitech_wheel[] = { 52, 53, 75, 76, 80, 81, 83, 88, 112, -1 };
-	static int logitech_ps2pp[] = { 12, 13, 40, 41, 42, 43, 50, 51, 52, 53, 73, 75,
-						76, 80, 81, 83, 88, 96, 97, 112, -1 };
-	static int logitech_mx[] = { 61, 112, -1 };
 
-	psmouse->vendor = "Logitech";
-	psmouse->model = ((param[0] >> 4) & 0x07) | ((param[0] << 3) & 0x78);
-
-	if (param[1] < 3)
-		clear_bit(BTN_MIDDLE, psmouse->dev.keybit);
-	if (param[1] < 2)
-		clear_bit(BTN_RIGHT, psmouse->dev.keybit);
-
-	psmouse->type = PSMOUSE_PS2;
-
-	for (i = 0; logitech_ps2pp[i] != -1; i++)
-		if (logitech_ps2pp[i] == psmouse->model)
-			psmouse->type = PSMOUSE_PS2PP;
-
-	if (psmouse->type == PSMOUSE_PS2PP) {
-
-		for (i = 0; logitech_4btn[i] != -1; i++)
-			if (logitech_4btn[i] == psmouse->model)
-				set_bit(BTN_SIDE, psmouse->dev.keybit);
-
-		for (i = 0; logitech_wheel[i] != -1; i++)
-			if (logitech_wheel[i] == psmouse->model) {
-				set_bit(REL_WHEEL, psmouse->dev.relbit);
-				psmouse->name = "Wheel Mouse";
-			}
-
-		for (i = 0; logitech_mx[i] != -1; i++)
-			if (logitech_mx[i]  == psmouse->model) {
-				set_bit(BTN_SIDE, psmouse->dev.keybit);
-				set_bit(BTN_EXTRA, psmouse->dev.keybit);
-				set_bit(BTN_BACK, psmouse->dev.keybit);
-				set_bit(BTN_FORWARD, psmouse->dev.keybit);
-				set_bit(BTN_TASK, psmouse->dev.keybit);
-				psmouse->name = "MX Mouse";
-			}
-
-/*
- * Do Logitech PS2++ / PS2T++ magic init.
- */
-
-		if (psmouse->model == 97) { /* TouchPad 3 */
-
-			set_bit(REL_WHEEL, psmouse->dev.relbit);
-			set_bit(REL_HWHEEL, psmouse->dev.relbit);
-
-			param[0] = 0x11; param[1] = 0x04; param[2] = 0x68; /* Unprotect RAM */
-			psmouse_command(psmouse, param, 0x30d1);
-			param[0] = 0x11; param[1] = 0x05; param[2] = 0x0b; /* Enable features */
-			psmouse_command(psmouse, param, 0x30d1);
-			param[0] = 0x11; param[1] = 0x09; param[2] = 0xc3; /* Enable PS2++ */
-			psmouse_command(psmouse, param, 0x30d1);
-
-			param[0] = 0;
-			if (!psmouse_command(psmouse, param, 0x13d1) &&
-				param[0] == 0x06 && param[1] == 0x00 && param[2] == 0x14) {
-				psmouse->name = "TouchPad 3";
-				return PSMOUSE_PS2TPP;
-			}
-
-		} else {
-
-			param[0] = param[1] = param[2] = 0;
-			ps2pp_cmd(psmouse, param, 0x39); /* Magic knock */
-			ps2pp_cmd(psmouse, param, 0xDB);
-
-			if ((param[0] & 0x78) == 0x48 && (param[1] & 0xf3) == 0xc2 &&
-				(param[2] & 3) == ((param[1] >> 2) & 3)) {
-					ps2pp_set_smartscroll(psmouse);
-					return PSMOUSE_PS2PP;
-			}
-		}
-	}
-
+	for (i = 0; model_list[i] != -1; i++)
+		if (model == model_list[i])
+			return 1;
 	return 0;
 }
 
 /*
- * Logitech magic init.
+ * Set up input device's properties based on the detected mouse model.
  */
-int ps2pp_detect(struct psmouse *psmouse)
+
+static void ps2pp_set_properties(struct psmouse *psmouse, unsigned char protocol,
+				 unsigned char model, unsigned char buttons)
 {
+	static int logitech_4btn[] = { 12, 40, 41, 42, 43, 52, 73, 80, -1 };
+	static int logitech_wheel[] = { 52, 53, 75, 76, 80, 81, 83, 88, 112, -1 };
+	static int logitech_mx[] = { 61, 112, -1 };
+
+	psmouse->vendor = "Logitech";
+	psmouse->model = model;
+
+	if (buttons < 3)
+		clear_bit(BTN_MIDDLE, psmouse->dev.keybit);
+	if (buttons < 2)
+		clear_bit(BTN_RIGHT, psmouse->dev.keybit);
+
+	if (protocol == PSMOUSE_PS2PP) {
+
+		if (is_model_in_list(model, logitech_4btn))
+			set_bit(BTN_SIDE, psmouse->dev.keybit);
+
+		if (is_model_in_list(model, logitech_wheel)) {
+			set_bit(REL_WHEEL, psmouse->dev.relbit);
+			psmouse->name = "Wheel Mouse";
+		}
+
+		if (is_model_in_list(model, logitech_mx)) {
+			set_bit(BTN_SIDE, psmouse->dev.keybit);
+			set_bit(BTN_EXTRA, psmouse->dev.keybit);
+			set_bit(BTN_BACK, psmouse->dev.keybit);
+			set_bit(BTN_FORWARD, psmouse->dev.keybit);
+			set_bit(BTN_TASK, psmouse->dev.keybit);
+			psmouse->name = "MX Mouse";
+		}
+	}
+
+	if (protocol == PSMOUSE_PS2TPP) {
+		set_bit(REL_WHEEL, psmouse->dev.relbit);
+		set_bit(REL_HWHEEL, psmouse->dev.relbit);
+		psmouse->name = "TouchPad 3";
+	}
+}
+
+
+/*
+ * Logitech magic init. Detect whether the mouse is a Logitech one
+ * and its exact model and try turning on extended protocol for ones
+ * that support it.
+ */
+
+int ps2pp_init(struct psmouse *psmouse, int set_properties)
+{
+	static int logitech_ps2pp[] = { 12, 13, 40, 41, 42, 43, 50, 51, 52, 53, 73, 75,
+					76, 80, 81, 83, 88, 96, 97, 112, -1 };
 	unsigned char param[4];
+	unsigned char protocol = PSMOUSE_PS2;
+	unsigned char model, buttons;
 
 	param[0] = 0;
 	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
@@ -243,6 +205,48 @@ int ps2pp_detect(struct psmouse *psmouse)
 	param[1] = 0;
 	psmouse_command(psmouse, param, PSMOUSE_CMD_GETINFO);
 
-	return param[1] != 0 ? ps2pp_detect_model(psmouse, param) : 0;
+	if (param[1] != 0) {
+		model = ((param[0] >> 4) & 0x07) | ((param[0] << 3) & 0x78);
+		buttons = param[1];
+/*
+ * Do Logitech PS2++ / PS2T++ magic init.
+ */
+		if (model == 97) { /* Touch Pad 3 */
+
+			/* Unprotect RAM */
+			param[0] = 0x11; param[1] = 0x04; param[2] = 0x68;
+			psmouse_command(psmouse, param, 0x30d1);
+			/* Enable features */
+			param[0] = 0x11; param[1] = 0x05; param[2] = 0x0b;
+			psmouse_command(psmouse, param, 0x30d1);
+			/* Enable PS2++ */
+			param[0] = 0x11; param[1] = 0x09; param[2] = 0xc3;
+			psmouse_command(psmouse, param, 0x30d1);
+
+			param[0] = 0;
+			if (!psmouse_command(psmouse, param, 0x13d1) &&
+			    param[0] == 0x06 && param[1] == 0x00 && param[2] == 0x14) {
+				protocol = PSMOUSE_PS2TPP;
+			}
+
+		} else if (is_model_in_list(model, logitech_ps2pp)) {
+
+			param[0] = param[1] = param[2] = 0;
+			ps2pp_cmd(psmouse, param, 0x39); /* Magic knock */
+			ps2pp_cmd(psmouse, param, 0xDB);
+
+			if ((param[0] & 0x78) == 0x48 &&
+			    (param[1] & 0xf3) == 0xc2 &&
+			    (param[2] & 0x03) == ((param[1] >> 2) & 3)) {
+				ps2pp_set_smartscroll(psmouse);
+				protocol = PSMOUSE_PS2PP;
+			}
+		}
+
+		if (set_properties)
+			ps2pp_set_properties(psmouse, protocol, model, buttons);
+	}
+
+	return protocol;
 }
 
