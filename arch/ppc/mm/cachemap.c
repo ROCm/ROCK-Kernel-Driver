@@ -36,6 +36,7 @@
 #include <linux/bootmem.h>
 #include <linux/highmem.h>
 #include <linux/pci.h>
+#include <linux/interrupt.h>
 
 #include <asm/pgalloc.h>
 #include <asm/prom.h>
@@ -157,16 +158,62 @@ void consistent_sync(void *vaddr, size_t size, int direction)
 	}
 }
 
+#ifdef CONFIG_HIGHMEM
 /*
- * consistent_sync_page make a page are consistent. identical
- * to consistent_sync, but takes a struct page instead of a virtual address
+ * consistent_sync_page() implementation for non cache coherent
+ * systems using highmem. In this case, each page of a buffer
+ * must be kmapped/kunmapped in order to have a virtual address
+ * for consistent_sync(). This must be interrupt safe so hard
+ * interrupts are disabled and kmap_atomic() are used when in an
+ * interrupt context.
  */
+static inline void __consistent_sync_page(struct page *page,
+		unsigned long offset, size_t size, int direction,
+		int in_int)
+{
+	size_t seg_size = min((size_t)PAGE_SIZE, size) - offset;
+	size_t cur_size = seg_size;
+	unsigned long flags, start, seg_offset = offset;
+	int nr_segs = PAGE_ALIGN(size + (PAGE_SIZE - offset))/PAGE_SIZE;
+	int seg_nr = 0;
 
+	if (in_int) local_irq_save(flags);
+
+	do {
+		if (in_int)
+			start = (unsigned long)kmap_atomic(page + seg_nr, KM_PPC_SYNC_PAGE) + seg_offset; 
+		else
+			start = (unsigned long)kmap(page + seg_nr) + seg_offset; 
+		/* Sync this buffer segment */
+		consistent_sync((void *)start, seg_size, direction);
+		if (in_int)
+			kunmap_atomic((void *)start, KM_PPC_SYNC_PAGE);
+		else
+			kunmap(page + seg_nr);
+		seg_nr++;
+		/* Calculate next buffer segment size */
+		seg_size = min((size_t)PAGE_SIZE, size - cur_size);
+		/* Add the segment size to our running total */
+		cur_size += seg_size;
+		seg_offset = 0;
+	} while (seg_nr < nr_segs);
+
+	if (in_int) local_irq_restore(flags);
+}
+#endif /* CONFIG_HIGHMEM */
+
+/*
+ * consistent_sync_page makes memory consistent. identical
+ * to consistent_sync, but takes a struct page instead of a
+ * virtual address
+ */
 void consistent_sync_page(struct page *page, unsigned long offset,
 	size_t size, int direction)
 {
-	unsigned long start;
-
-	start = (unsigned long)page_address(page) + offset;
+#ifdef CONFIG_HIGHMEM
+	__consistent_sync_page(page, offset, size, direction, in_interrupt());
+#else
+	unsigned long start = (unsigned long)page_address(page) + offset; 
 	consistent_sync((void *)start, size, direction);
+#endif
 }
