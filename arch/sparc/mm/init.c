@@ -107,8 +107,6 @@ void __init sparc_context_init(int numctx)
 		add_to_free_ctxlist(ctx_list_pool + ctx);
 }
 
-#define DEBUG_BOOTMEM
-
 extern unsigned long cmdline_memory_size;
 unsigned long last_valid_pfn;
 
@@ -157,14 +155,11 @@ unsigned long calc_max_low_pfn(void)
 
 unsigned long __init bootmem_init(unsigned long *pages_avail)
 {
-	unsigned long bootmap_size, start_pfn, max_pfn;
+	unsigned long bootmap_size, start_pfn;
 	unsigned long end_of_phys_memory = 0UL;
 	unsigned long bootmap_pfn, bytes_avail, size;
 	int i;
 
-#ifdef DEBUG_BOOTMEM
-	prom_printf("bootmem_init: Scan sp_banks,  ");
-#endif
 	bytes_avail = 0UL;
 	for (i = 0; sp_banks[i].num_bytes != 0; i++) {
 		end_of_phys_memory = sp_banks[i].base_addr +
@@ -234,10 +229,6 @@ unsigned long __init bootmem_init(unsigned long *pages_avail)
 	}
 #endif	
 	/* Initialize the boot-time allocator. */
-#ifdef DEBUG_BOOTMEM
-	prom_printf("init_bootmem(spfn[%lx],bpfn[%lx],mlpfn[%lx])\n",
-		    start_pfn, bootmap_pfn, max_low_pfn);
-#endif
 	bootmap_size = init_bootmem_node(NODE_DATA(0), bootmap_pfn, phys_base>>PAGE_SHIFT, max_low_pfn);
 
 	/* Now register the available physical memory with the
@@ -264,23 +255,14 @@ unsigned long __init bootmem_init(unsigned long *pages_avail)
 
 		size = (last_pfn - curr_pfn) << PAGE_SHIFT;
 		*pages_avail += last_pfn - curr_pfn;
-#ifdef DEBUG_BOOTMEM
-		prom_printf("free_bootmem: base[%lx] size[%lx]\n",
-			    sp_banks[i].base_addr,
-			    size);
-#endif
-		free_bootmem(sp_banks[i].base_addr,
-			     size);
+
+		free_bootmem(sp_banks[i].base_addr, size);
 	}
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (initrd_start) {
-		size = initrd_end - initrd_start;
-#ifdef DEBUG_BOOTMEM
-		prom_printf("reserve_bootmem: base[%lx] size[%lx]\n",
-			     initrd_start, size);
-#endif
 		/* Reserve the initrd image area. */
+		size = initrd_end - initrd_start;
 		reserve_bootmem(initrd_start, size);
 		*pages_avail -= PAGE_ALIGN(size) >> PAGE_SHIFT;
 
@@ -290,9 +272,6 @@ unsigned long __init bootmem_init(unsigned long *pages_avail)
 #endif
 	/* Reserve the kernel text/data/bss. */
 	size = (start_pfn << PAGE_SHIFT) - phys_base;
-#ifdef DEBUG_BOOTMEM
-	prom_printf("reserve_bootmem: base[%lx] size[%lx]\n", phys_base, size);
-#endif
 	reserve_bootmem(phys_base, size);
 	*pages_avail -= PAGE_ALIGN(size) >> PAGE_SHIFT;
 
@@ -301,10 +280,6 @@ unsigned long __init bootmem_init(unsigned long *pages_avail)
 	 * in free_all_bootmem.
 	 */
 	size = bootmap_size;
-#ifdef DEBUG_BOOTMEM
-	prom_printf("reserve_bootmem: base[%lx] size[%lx]\n",
-		    (bootmap_pfn << PAGE_SHIFT), size);
-#endif
 	reserve_bootmem((bootmap_pfn << PAGE_SHIFT), size);
 	*pages_avail -= PAGE_ALIGN(size) >> PAGE_SHIFT;
 
@@ -448,9 +423,6 @@ void __init mem_init(void)
 	max_mapnr = last_valid_pfn - (phys_base >> PAGE_SHIFT);
 	high_memory = __va(max_low_pfn << PAGE_SHIFT);
 
-#ifdef DEBUG_BOOTMEM
-	prom_printf("mem_init: Calling free_all_bootmem().\n");
-#endif
 	num_physpages = totalram_pages = free_all_bootmem();
 
 	for (i = 0; sp_banks[i].num_bytes != 0; i++) {
