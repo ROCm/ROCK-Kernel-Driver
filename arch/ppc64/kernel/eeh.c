@@ -31,6 +31,7 @@
 #include <asm/processor.h>
 #include <asm/naca.h>
 #include <asm/io.h>
+#include <asm/machdep.h>
 #include "pci.h"
 
 #define BUID_HI(buid) ((buid) >> 32)
@@ -48,6 +49,8 @@ static int eeh_implemented;
 #define EEH_MAX_OPTS 4096
 static char *eeh_opts;
 static int eeh_opts_last;
+
+unsigned char	slot_err_buf[RTAS_ERROR_LOG_MAX];
 
 pte_t *find_linux_pte(pgd_t *pgdir, unsigned long va);	/* from htab.c */
 static int eeh_check_opts_config(struct device_node *dn,
@@ -113,8 +116,22 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 	 */
 	if (dn->eeh_config_addr) {
 		ret = rtas_call(ibm_read_slot_reset_state, 3, 3, rets,
-				dn->eeh_config_addr, BUID_HI(dn->phb->buid), BUID_LO(dn->phb->buid));
+				dn->eeh_config_addr, BUID_HI(dn->phb->buid),
+				BUID_LO(dn->phb->buid));
 		if (ret == 0 && rets[1] == 1 && rets[0] >= 2) {
+			unsigned long	slot_err_ret;
+
+			memset(slot_err_buf, 0, RTAS_ERROR_LOG_MAX);
+			slot_err_ret = rtas_call(rtas_token("ibm,slot-error-detail"),
+						 8, 1, NULL, dn->eeh_config_addr,
+						 BUID_HI(dn->phb->buid),
+						 BUID_LO(dn->phb->buid), NULL, 0,
+						 __pa(slot_err_buf), RTAS_ERROR_LOG_MAX,
+						 2 /* Permanent Error */);
+
+			if (slot_err_ret == 0)
+				log_error(slot_err_buf, ERR_TYPE_RTAS_LOG, 1 /* Fatal */);
+
 			/*
 			 * XXX We should create a separate sysctl for this.
 			 *
@@ -123,9 +140,11 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 			 * can use it here.
 			 */
 			if (panic_on_oops)
-				panic("EEH: MMIO failure (%ld) on device:\n%s\n", rets[0], pci_name(dev));
+				panic("EEH: MMIO failure (%ld) on device:\n%s\n",
+				      rets[0], pci_name(dev));
 			else
-				printk("EEH: MMIO failure (%ld) on device:\n%s\n", rets[0], pci_name(dev));
+				printk("EEH: MMIO failure (%ld) on device:\n%s\n",
+				       rets[0], pci_name(dev));
 		}
 	}
 	eeh_false_positives++;
