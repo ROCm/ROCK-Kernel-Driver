@@ -541,6 +541,16 @@ union thread_union {
 	unsigned long stack[INIT_THREAD_SIZE/sizeof(long)];
 };
 
+#ifndef __HAVE_ARCH_KSTACK_END
+static inline int kstack_end(void *addr)
+{
+	/* Reliable end of stack detection:
+	 * Some APM bios versions misalign the stack
+	 */
+	return !(((unsigned long)addr+sizeof(void*)-1) & (THREAD_SIZE-sizeof(void*)));
+}
+#endif
+
 extern union thread_union init_thread_union;
 extern struct task_struct init_task;
 
