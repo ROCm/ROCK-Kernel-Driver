@@ -169,6 +169,7 @@ struct sis900_private {
 	dma_addr_t rx_ring_dma;
 
 	unsigned int tx_full;			/* The Tx queue is full.    */
+	u8 host_bridge_rev;
 };
 
 MODULE_AUTHOR("Jim Huang <cmhuang@sis.com.tw>, Ollie Lho <ollie@sis.com.tw>");
@@ -368,6 +369,7 @@ static int __devinit sis900_probe (struct pci_dev *pci_dev, const struct pci_dev
 {
 	struct sis900_private *sis_priv;
 	struct net_device *net_dev;
+	struct pci_dev *dev;
 	dma_addr_t ring_dma;
 	void *ring_space;
 	long ioaddr;
@@ -474,6 +476,11 @@ static int __devinit sis900_probe (struct pci_dev *pci_dev, const struct pci_dev
 		ret = -ENODEV;
 		goto err_out_unregister;
 	}
+
+	/* save our host bridge revision */
+	dev = pci_find_device(PCI_VENDOR_ID_SI, PCI_DEVICE_ID_SI_630, NULL);
+	if (dev)
+		pci_read_config_byte(dev, PCI_CLASS_REVISION, &sis_priv->host_bridge_rev);
 
 	/* print some information about our NIC */
 	printk(KERN_INFO "%s: %s at %#lx, IRQ %d, ", net_dev->name,
@@ -1110,17 +1117,11 @@ static void sis630_set_eq(struct net_device *net_dev, u8 revision)
 {
 	struct sis900_private *sis_priv = net_dev->priv;
 	u16 reg14h, eq_value=0, max_value=0, min_value=0;
-	u8 host_bridge_rev;
 	int i, maxcount=10;
-	struct pci_dev *dev=NULL;
 
 	if ( !(revision == SIS630E_900_REV || revision == SIS630EA1_900_REV ||
 	       revision == SIS630A_900_REV || revision ==  SIS630ET_900_REV) )
 		return;
-
-	dev = pci_find_device(PCI_VENDOR_ID_SI, PCI_DEVICE_ID_SI_630, dev);
-	if (dev)
-		pci_read_config_byte(dev, PCI_CLASS_REVISION, &host_bridge_rev);
 
 	if (netif_carrier_ok(net_dev)) {
 		reg14h=mdio_read(net_dev, sis_priv->cur_phy, MII_RESV);
@@ -1144,7 +1145,8 @@ static void sis630_set_eq(struct net_device *net_dev, u8 revision)
 		}
 		/* 630B0&B1 rule to determine the equalizer value */
 		if (revision == SIS630A_900_REV && 
-		    (host_bridge_rev == SIS630B0 || host_bridge_rev == SIS630B1)) {
+		    (sis_priv->host_bridge_rev == SIS630B0 || 
+		     sis_priv->host_bridge_rev == SIS630B1)) {
 			if (max_value == 0)
 				eq_value=3;
 			else
@@ -1159,7 +1161,8 @@ static void sis630_set_eq(struct net_device *net_dev, u8 revision)
 	else {
 		reg14h=mdio_read(net_dev, sis_priv->cur_phy, MII_RESV);
 		if (revision == SIS630A_900_REV && 
-		    (host_bridge_rev == SIS630B0 || host_bridge_rev == SIS630B1)) 
+		    (sis_priv->host_bridge_rev == SIS630B0 || 
+		     sis_priv->host_bridge_rev == SIS630B1)) 
 			mdio_write(net_dev, sis_priv->cur_phy, MII_RESV, (reg14h | 0x2200) & 0xBFFF);
 		else
 			mdio_write(net_dev, sis_priv->cur_phy, MII_RESV, (reg14h | 0x2000) & 0xBFFF);
