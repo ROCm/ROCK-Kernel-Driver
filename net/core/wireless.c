@@ -33,8 +33,16 @@
  *	o Propagate events as rtnetlink IFLA_WIRELESS option
  *	o Generate event on selected SET requests
  *
- * v4 - 18.04.01 - Jean II
+ * v4 - 18.04.02 - Jean II
  *	o Fix stupid off by one in iw_ioctl_description : IW_ESSID_MAX_SIZE + 1
+ *
+ * v5 - 21.06.02 - Jean II
+ *	o Add IW_PRIV_TYPE_ADDR in priv_type_size (+cleanup)
+ *	o Reshuffle IW_HEADER_TYPE_XXX to map IW_PRIV_TYPE_XXX changes
+ *	o Add IWEVCUSTOM for driver specific event/scanning token
+ *	o Turn on WE_STRICT_WRITE by default + kernel warning
+ *	o Fix WE_STRICT_WRITE in ioctl_export_private() (32 => iw_num)
+ *	o Fix off-by-one in test (extra_size <= IFNAMSIZ)
  */
 
 /***************************** INCLUDES *****************************/
@@ -50,8 +58,9 @@
 
 /**************************** CONSTANTS ****************************/
 
-/* This will be turned on later on... */
-#undef WE_STRICT_WRITE		/* Check write buffer size */
+/* Enough lenience, let's make sure things are proper... */
+#define WE_STRICT_WRITE		/* Check write buffer size */
+/* I'll probably drop both the define and kernel message in the next version */
 
 /* Debuging stuff */
 #undef WE_IOCTL_DEBUG		/* Debug IOCTL API */
@@ -106,7 +115,7 @@ static const struct iw_ioctl_description	standard_ioctl[] = {
 	/* SIOCSIWSPY */
 	{ IW_HEADER_TYPE_POINT, 0, sizeof(struct sockaddr), 0, IW_MAX_SPY, 0},
 	/* SIOCGIWSPY */
-	{ IW_HEADER_TYPE_POINT, 0, (sizeof(struct sockaddr) + sizeof(struct iw_quality)), 0, IW_MAX_SPY, 0},
+	{ IW_HEADER_TYPE_POINT, 0, (sizeof(struct sockaddr) + sizeof(struct iw_quality)), 0, IW_MAX_GET_SPY, 0},
 	/* -- hole -- */
 	{ IW_HEADER_TYPE_NULL, 0, 0, 0, 0, 0},
 	/* -- hole -- */
@@ -176,25 +185,41 @@ static const struct iw_ioctl_description	standard_event[] = {
 	{ IW_HEADER_TYPE_ADDR, 0, 0, 0, 0, 0},
 	/* IWEVQUAL */
 	{ IW_HEADER_TYPE_QUAL, 0, 0, 0, 0, 0},
+	/* IWEVCUSTOM */
+	{ IW_HEADER_TYPE_POINT, 0, 1, 0, IW_CUSTOM_MAX, 0},
+	/* IWEVREGISTERED */
+	{ IW_HEADER_TYPE_ADDR, 0, 0, 0, 0, 0},
+	/* IWEVEXPIRED */
+	{ IW_HEADER_TYPE_ADDR, 0, 0, 0, 0, 0},
 };
 static const int standard_event_num = (sizeof(standard_event) /
 				       sizeof(struct iw_ioctl_description));
 
 /* Size (in bytes) of the various private data types */
-static const char priv_type_size[] = { 0, 1, 1, 0, 4, 4, 0, 0 };
+static const char priv_type_size[] = {
+	0,				/* IW_PRIV_TYPE_NONE */
+	1,				/* IW_PRIV_TYPE_BYTE */
+	1,				/* IW_PRIV_TYPE_CHAR */
+	0,				/* Not defined */
+	sizeof(__u32),			/* IW_PRIV_TYPE_INT */
+	sizeof(struct iw_freq),		/* IW_PRIV_TYPE_FLOAT */
+	sizeof(struct sockaddr),	/* IW_PRIV_TYPE_ADDR */
+	0,				/* Not defined */
+};
 
 /* Size (in bytes) of various events */
 static const int event_type_size[] = {
-	IW_EV_LCP_LEN,
+	IW_EV_LCP_LEN,			/* IW_HEADER_TYPE_NULL */
 	0,
-	IW_EV_CHAR_LEN,
+	IW_EV_CHAR_LEN,			/* IW_HEADER_TYPE_CHAR */
 	0,
-	IW_EV_UINT_LEN,
-	IW_EV_FREQ_LEN,
+	IW_EV_UINT_LEN,			/* IW_HEADER_TYPE_UINT */
+	IW_EV_FREQ_LEN,			/* IW_HEADER_TYPE_FREQ */
+	IW_EV_ADDR_LEN,			/* IW_HEADER_TYPE_ADDR */
+	0,
 	IW_EV_POINT_LEN,		/* Without variable payload */
-	IW_EV_PARAM_LEN,
-	IW_EV_ADDR_LEN,
-	IW_EV_QUAL_LEN,
+	IW_EV_PARAM_LEN,		/* IW_HEADER_TYPE_PARAM */
+	IW_EV_QUAL_LEN,			/* IW_HEADER_TYPE_QUAL */
 };
 
 /************************ COMMON SUBROUTINES ************************/
@@ -440,8 +465,10 @@ static inline int ioctl_export_private(struct net_device *	dev,
 		return -EFAULT;
 #ifdef WE_STRICT_WRITE
 	/* Check if there is enough buffer up there */
-	if(iwr->u.data.length < (SIOCIWLASTPRIV - SIOCIWFIRSTPRIV + 1))
+	if(iwr->u.data.length < dev->wireless_handlers->num_private_args) {
+		printk(KERN_ERR "%s (WE) : Buffer for request SIOCGIWPRIV too small (%d<%d)\n", dev->name, iwr->u.data.length, dev->wireless_handlers->num_private_args);
 		return -E2BIG;
+	}
 #endif	/* WE_STRICT_WRITE */
 
 	/* Set the number of available ioctls. */
@@ -471,6 +498,7 @@ static inline int ioctl_standard_call(struct net_device *	dev,
 	const struct iw_ioctl_description *	descr;
 	struct iw_request_info			info;
 	int					ret = -EINVAL;
+	int					user_size = 0;
 
 	/* Get the description of the IOCTL */
 	if((cmd - SIOCIWFIRST) >= standard_ioctl_num)
@@ -518,11 +546,8 @@ static inline int ioctl_standard_call(struct net_device *	dev,
 			/* Check NULL pointer */
 			if(iwr->u.data.pointer == NULL)
 				return -EFAULT;
-#ifdef WE_STRICT_WRITE
-			/* Check if there is enough buffer up there */
-			if(iwr->u.data.length < descr->max_tokens)
-				return -E2BIG;
-#endif	/* WE_STRICT_WRITE */
+			/* Save user space buffer size for checking */
+			user_size = iwr->u.data.length;
 		}
 
 #ifdef WE_IOCTL_DEBUG
@@ -559,6 +584,15 @@ static inline int ioctl_standard_call(struct net_device *	dev,
 
 		/* If we have something to return to the user */
 		if (!ret && IW_IS_GET(cmd)) {
+#ifdef WE_STRICT_WRITE
+			/* Check if there is enough buffer up there */
+			if(user_size < iwr->u.data.length) {
+				printk(KERN_ERR "%s (WE) : Buffer for request %04X too small (%d<%d)\n", dev->name, cmd, user_size, iwr->u.data.length);
+				kfree(extra);
+				return -E2BIG;
+			}
+#endif	/* WE_STRICT_WRITE */
+
 			err = copy_to_user(iwr->u.data.pointer, extra,
 					   iwr->u.data.length *
 					   descr->token_size);
@@ -646,12 +680,18 @@ static inline int ioctl_private_call(struct net_device *	dev,
 	/* Compute the size of the set/get arguments */
 	if(descr != NULL) {
 		if(IW_IS_SET(cmd)) {
+			int	offset = 0;	/* For sub-ioctls */
+			/* Check for sub-ioctl handler */
+			if(descr->name[0] == '\0')
+				/* Reserve one int for sub-ioctl index */
+				offset = sizeof(__u32);
+
 			/* Size of set arguments */
 			extra_size = get_priv_size(descr->set_args);
 
 			/* Does it fits in iwr ? */
 			if((descr->set_args & IW_PRIV_SIZE_FIXED) &&
-			   (extra_size < IFNAMSIZ))
+			   ((extra_size + offset) <= IFNAMSIZ))
 				extra_size = 0;
 		} else {
 			/* Size of set arguments */
@@ -659,7 +699,7 @@ static inline int ioctl_private_call(struct net_device *	dev,
 
 			/* Does it fits in iwr ? */
 			if((descr->get_args & IW_PRIV_SIZE_FIXED) &&
-			   (extra_size < IFNAMSIZ))
+			   (extra_size <= IFNAMSIZ))
 				extra_size = 0;
 		}
 	}
@@ -925,7 +965,7 @@ void wireless_send_event(struct net_device *	dev,
 		 * The best the driver could do is to log an error message.
 		 * We will do it ourselves instead...
 		 */
-	  	printk(KERN_ERR "%s (WE) : Invalid Wireless Event (0x%04X)\n",
+	  	printk(KERN_ERR "%s (WE) : Invalid/Unknown Wireless Event (0x%04X)\n",
 		       dev->name, cmd);
 		return;
 	}
