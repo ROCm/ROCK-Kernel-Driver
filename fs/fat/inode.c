@@ -430,12 +430,13 @@ struct dentry *fat_fh_to_dentry(struct super_block *sb, __u32 *fh,
 	struct dentry *result;
 
 	if (fhtype != 3)
-		return NULL;
+		return ERR_PTR(-ESTALE);
 	if (len < 5)
-		return NULL;
+		return ERR_PTR(-ESTALE);
+	/* We cannot find the parent,
+	   It better just *be* there */
 	if (parent)
-		return NULL; /* We cannot find the parent,
-				It better just *be* there */
+		return ERR_PTR(-ESTALE);
 
 	inode = iget(sb, fh[0]);
 	if (!inode || is_bad_inode(inode) ||
