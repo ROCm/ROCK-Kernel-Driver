@@ -384,8 +384,6 @@ void __init setup_arch(char **cmdline_p)
 	conswitchp = &dummy_con;
 #endif
 #endif
-
-	exception_table_check(); 
 }
 
 #ifndef CONFIG_X86_TSC

@@ -378,17 +378,19 @@ static void setup_frame(int sig, struct k_sigaction *ka,
 	if (err)
 		goto give_sigsegv;
 
-	/* Set up to return from userspace.  If provided, use a stub
-	   already in userspace.  */
-	if (ka->sa.sa_flags & SA_RESTORER) {
-		err |= __put_user(ka->sa.sa_restorer, &frame->pretcode);
-	} else {
-		err |= __put_user(frame->retcode, &frame->pretcode);
-		/* This is popl %eax ; movl $,%eax ; int $0x80 */
-		err |= __put_user(0xb858, (short *)(frame->retcode+0));
-		err |= __put_user(__NR_sigreturn, (int *)(frame->retcode+2));
-		err |= __put_user(0x80cd, (short *)(frame->retcode+6));
-	}
+	/* Set up to return from userspace.  */
+	err |= __put_user(fix_to_virt(FIX_VSYSCALL) + 32, &frame->pretcode);
+	 
+	/*
+	 * This is popl %eax ; movl $,%eax ; int $0x80
+	 *
+	 * WE DO NOT USE IT ANY MORE! It's only left here for historical
+	 * reasons and because gdb uses it as a signature to notice
+	 * signal handler stack frames.
+	 */
+	err |= __put_user(0xb858, (short *)(frame->retcode+0));
+	err |= __put_user(__NR_sigreturn, (int *)(frame->retcode+2));
+	err |= __put_user(0x80cd, (short *)(frame->retcode+6));
 
 	if (err)
 		goto give_sigsegv;
@@ -453,17 +455,19 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	if (err)
 		goto give_sigsegv;
 
-	/* Set up to return from userspace.  If provided, use a stub
-	   already in userspace.  */
-	if (ka->sa.sa_flags & SA_RESTORER) {
-		err |= __put_user(ka->sa.sa_restorer, &frame->pretcode);
-	} else {
-		err |= __put_user(frame->retcode, &frame->pretcode);
-		/* This is movl $,%eax ; int $0x80 */
-		err |= __put_user(0xb8, (char *)(frame->retcode+0));
-		err |= __put_user(__NR_rt_sigreturn, (int *)(frame->retcode+1));
-		err |= __put_user(0x80cd, (short *)(frame->retcode+5));
-	}
+	/* Set up to return from userspace.  */
+	err |= __put_user(fix_to_virt(FIX_VSYSCALL) + 64, &frame->pretcode);
+	 
+	/*
+	 * This is movl $,%eax ; int $0x80
+	 *
+	 * WE DO NOT USE IT ANY MORE! It's only left here for historical
+	 * reasons and because gdb uses it as a signature to notice
+	 * signal handler stack frames.
+	 */
+	err |= __put_user(0xb8, (char *)(frame->retcode+0));
+	err |= __put_user(__NR_rt_sigreturn, (int *)(frame->retcode+1));
+	err |= __put_user(0x80cd, (short *)(frame->retcode+5));
 
 	if (err)
 		goto give_sigsegv;
