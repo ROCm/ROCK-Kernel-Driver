@@ -29,9 +29,9 @@ typedef struct {
 	 * Following are the addresses of the AS0, AS1, and DATA registers
 	 * of these chips.  Note that these are board-specific.
 	 */
-	unsigned char *nvram_as0;
-	unsigned char *nvram_as1;
-	unsigned char *nvram_data;
+	unsigned int nvram_as0;
+	unsigned int nvram_as1;
+	unsigned int nvram_data;
 
 	/*
 	 * Define bits to stop external set of regs from changing so
@@ -328,9 +328,9 @@ typedef struct {
 #define	TODC_INIT(clock_type, as0, as1, data, bits) {			\
 	todc_info->rtc_type = clock_type;				\
 									\
-	todc_info->nvram_as0  = (unsigned char *)(as0);			\
-	todc_info->nvram_as1  = (unsigned char *)(as1);			\
-	todc_info->nvram_data = (unsigned char *)(data);			\
+	todc_info->nvram_as0  = (unsigned int)(as0);			\
+	todc_info->nvram_as1  = (unsigned int)(as1);			\
+	todc_info->nvram_data = (unsigned int)(data);			\
 									\
 	todc_info->as0_bits = (bits);					\
 									\

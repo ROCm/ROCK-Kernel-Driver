@@ -82,7 +82,6 @@ extern unsigned long pci_dram_offset;
 #define insl(port, buf, nl)	_insl_ns((u32 *)((port)+_IO_BASE), (buf), (nl))
 #define outsl(port, buf, nl)	_outsl_ns((u32 *)((port)+_IO_BASE), (buf), (nl))
 
-#ifdef CONFIG_PPC_PMAC
 /*
  * On powermacs, we will get a machine check exception if we
  * try to read data from a non-existent I/O port.  Because the
@@ -94,7 +93,7 @@ extern unsigned long pci_dram_offset;
  * all PPC implementations tested so far.  The twi and isync are
  * needed on the 601 (in fact twi; sync works too), the isync and
  * nop are needed on 604[e|r], and any of twi, sync or isync will
- * work on 603[e], 750, 74x0.
+ * work on 603[e], 750, 74xx.
  * The twi creates an explicit data dependency on the returned
  * value which seems to be needed to make the 601 wait for the
  * load to finish.
@@ -140,27 +139,17 @@ extern __inline__ void name(unsigned int val, unsigned int port) \
 }
 
 __do_in_asm(inb, "lbzx")
+__do_out_asm(outb, "stbx")
+#ifdef CONFIG_APUS
+__do_in_asm(inw, "lhz%U1%X1")
+__do_in_asm(inl, "lwz%U1%X1")
+__do_out_asm(outl,"stw%U0%X0")
+__do_out_asm(outw, "sth%U0%X0")
+#else
 __do_in_asm(inw, "lhbrx")
 __do_in_asm(inl, "lwbrx")
-__do_out_asm(outb, "stbx")
 __do_out_asm(outw, "sthbrx")
 __do_out_asm(outl, "stwbrx")
-
-#elif defined(CONFIG_APUS)
-#define inb(port)		in_8((u8 *)((port)+_IO_BASE))
-#define outb(val, port)		out_8((u8 *)((port)+_IO_BASE), (val))
-#define inw(port)		in_be16((u16 *)((port)+_IO_BASE))
-#define outw(val, port)		out_be16((u16 *)((port)+_IO_BASE), (val))
-#define inl(port)		in_be32((u32 *)((port)+_IO_BASE))
-#define outl(val, port)		out_be32((u32 *)((port)+_IO_BASE), (val))
-
-#else /* not APUS or PMAC */
-#define inb(port)		in_8((u8 *)((port)+_IO_BASE))
-#define outb(val, port)		out_8((u8 *)((port)+_IO_BASE), (val))
-#define inw(port)		in_le16((u16 *)((port)+_IO_BASE))
-#define outw(val, port)		out_le16((u16 *)((port)+_IO_BASE), (val))
-#define inl(port)		in_le32((u32 *)((port)+_IO_BASE))
-#define outl(val, port)		out_le32((u32 *)((port)+_IO_BASE), (val))
 #endif
 
 #define inb_p(port)		inb((port))
