@@ -1773,7 +1773,7 @@ e1000_tx_queue(struct e1000_adapter *adapter, int count, int tx_flags)
 	 * know there are new descriptors to fetch.  (Only
 	 * applicable for weak-ordered memory model archs,
 	 * such as IA-64). */
-	wmb();
+	mb();
 
 	tx_ring->next_to_use = i;
 	E1000_WRITE_REG(&adapter->hw, TDT, i);
@@ -2488,7 +2488,7 @@ e1000_alloc_rx_buffers(struct e1000_adapter *adapter)
 			 * know there are new descriptors to fetch.  (Only
 			 * applicable for weak-ordered memory model archs,
 			 * such as IA-64). */
-			wmb();
+			mb();
 
 			E1000_WRITE_REG(&adapter->hw, RDT, i);
 		}

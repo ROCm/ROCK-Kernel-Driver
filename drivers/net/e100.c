@@ -822,7 +822,7 @@ static inline int e100_exec_cb(struct nic *nic, struct sk_buff *skb,
 	/* Order is important otherwise we'll be in a race with h/w:
 	 * set S-bit in current first, then clear S-bit in previous. */
 	cb->command |= cpu_to_le16(cb_s);
-	wmb();
+	mb();
 	cb->prev->command &= cpu_to_le16(~cb_s);
 
 	while(nic->cb_to_send != nic->cb_to_use) {
@@ -1405,7 +1405,7 @@ static inline int e100_rx_alloc_skb(struct nic *nic, struct rx *rx)
 		struct rfd *prev_rfd = (struct rfd *)rx->prev->skb->data;
 		put_unaligned(cpu_to_le32(rx->dma_addr),
 			(u32 *)&prev_rfd->link);
-		wmb();
+		mb();
 		prev_rfd->command &= ~cpu_to_le16(cb_el);
 		pci_dma_sync_single_for_device(nic->pdev, rx->prev->dma_addr,
 					       sizeof(struct rfd), PCI_DMA_TODEVICE);
