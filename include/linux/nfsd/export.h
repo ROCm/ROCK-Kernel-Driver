@@ -85,7 +85,6 @@ void			nfsd_export_init(void);
 void			nfsd_export_shutdown(void);
 void			exp_readlock(void);
 void			exp_readunlock(void);
-struct auth_domain *	exp_getclient(struct sockaddr_in *sin);
 struct svc_expkey *	exp_find_key(struct auth_domain *clp, 
 				     int fsid_type, u32 *fsidv);
 struct svc_export *	exp_get_by_name(struct auth_domain *clp,

@@ -246,7 +246,7 @@ static ssize_t write_getfs(struct file *file, const char *buf, size_t size)
 		return -ENOMEM;
 	memset(res, 0, sizeof(struct knfsd_fh));
 	exp_readlock();
-	if (!(clp = exp_getclient(sin)))
+	if (!(clp = auth_unix_lookup(sin->sin_addr)))
 		err = -EPERM;
 	else {
 		err = exp_rootfh(clp, data.gd_path, res, data.gd_maxlen);
@@ -293,7 +293,7 @@ static ssize_t write_getfd(struct file *file, const char *buf, size_t size)
 		return -ENOMEM;
 	sin = (struct sockaddr_in *)&data.gd_addr;
 	exp_readlock();
-	if (!(clp = exp_getclient(sin)))
+	if (!(clp = auth_unix_lookup(sin->sin_addr)))
 		err = -EPERM;
 	else {
 		err = exp_rootfh(clp, data.gd_path, &fh, NFS_FHSIZE);

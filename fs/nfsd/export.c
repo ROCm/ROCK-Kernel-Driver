@@ -557,19 +557,6 @@ exp_pseudoroot(struct auth_domain *clp, struct svc_fh *fhp)
 	return fh_compose(fhp, exp, exp->ex_dentry, NULL);
 }
 
-/*
- * Find a valid client given an inet address. We always move the most
- * recently used client to the front of the hash chain to speed up
- * future lookups.
- * Locking against other processes is the responsibility of the caller.
- */
-svc_client *
-exp_getclient(struct sockaddr_in *sin)
-{
-	return auth_unix_lookup(sin->sin_addr);
-}
-
-
 /* Iterator */
 
 static void *e_start(struct seq_file *m, loff_t *pos)
