@@ -214,12 +214,12 @@ static struct pci_device_id snd_azf3328_ids[] = {
 
 MODULE_DEVICE_TABLE(pci, snd_azf3328_ids);
 
-static void snd_azf3328_io2_write(azf3328_t *chip, int reg, unsigned char value)
+static inline void snd_azf3328_io2_write(azf3328_t *chip, int reg, unsigned char value)
 {
 	outb(value, chip->io2_port + reg);
 }
 
-static unsigned char snd_azf3328_io2_read(azf3328_t *chip, int reg)
+static inline unsigned char snd_azf3328_io2_read(azf3328_t *chip, int reg)
 {
 	return inb(chip->io2_port + reg);
 }
