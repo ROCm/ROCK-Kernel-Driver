@@ -682,7 +682,6 @@ fastcall void do_debug(struct pt_regs * regs, long error_code)
 {
 	unsigned int condition;
 	struct task_struct *tsk = current;
-	siginfo_t info;
 
 	__asm__ __volatile__("movl %%db6,%0" : "=r" (condition));
 
@@ -718,23 +717,21 @@ fastcall void do_debug(struct pt_regs * regs, long error_code)
 		 */
 		if ((regs->xcs & 3) == 0)
 			goto clear_TF_reenable;
-		if ((tsk->ptrace & (PT_DTRACE|PT_PTRACED)) == PT_DTRACE)
-			goto clear_TF;
+
+		/*
+		 * Was the TF flag set by a debugger? If so, clear it now,
+		 * so that register information is correct.
+		 */
+		if (tsk->ptrace & PT_DTRACE) {
+			regs->eflags &= ~TF_MASK;
+			tsk->ptrace &= ~PT_DTRACE;
+			if (!tsk->ptrace & PT_DTRACE)
+				goto clear_TF;
+		}
 	}
 
 	/* Ok, finally something we can handle */
-	tsk->thread.trap_no = 1;
-	tsk->thread.error_code = error_code;
-	info.si_signo = SIGTRAP;
-	info.si_errno = 0;
-	info.si_code = TRAP_BRKPT;
-	
-	/* If this is a kernel mode trap, save the user PC on entry to 
-	 * the kernel, that's what the debugger can make sense of.
-	 */
-	info.si_addr = ((regs->xcs & 3) == 0) ? (void __user *)tsk->thread.eip
-	                                      : (void __user *)regs->eip;
-	force_sig_info(SIGTRAP, &info, tsk);
+	send_sigtrap(tsk, regs, error_code);
 
 	/* Disable additional traps. They'll be re-enabled when
 	 * the signal is delivered.
@@ -1004,9 +1001,11 @@ static void __init set_task_gate(unsigned int n, unsigned int gdt_entry)
 void __init trap_init(void)
 {
 #ifdef CONFIG_EISA
-	if (isa_readl(0x0FFFD9) == 'E'+('I'<<8)+('S'<<16)+('A'<<24)) {
+	void __iomem *p = ioremap(0x0FFFD9, 4);
+	if (readl(p) == 'E'+('I'<<8)+('S'<<16)+('A'<<24)) {
 		EISA_bus = 1;
 	}
+	iounmap(p);
 #endif
 
 #ifdef CONFIG_X86_LOCAL_APIC

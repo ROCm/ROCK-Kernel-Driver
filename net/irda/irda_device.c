@@ -143,47 +143,6 @@ void irda_device_set_media_busy(struct net_device *dev, int status)
 EXPORT_SYMBOL(irda_device_set_media_busy);
 
 
-int irda_device_set_dtr_rts(struct net_device *dev, int dtr, int rts)
-{
-	struct if_irda_req req;
-	int ret;
-
-	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
-
-	if (!dev->do_ioctl) {
-		ERROR("%s: do_ioctl not impl. by device driver\n",
-				__FUNCTION__);
-		return -1;
-	}
-
-	req.ifr_dtr = dtr;
-	req.ifr_rts = rts;
-
-	ret = dev->do_ioctl(dev, (struct ifreq *) &req, SIOCSDTRRTS);
-
-	return ret;
-}
-
-int irda_device_change_speed(struct net_device *dev, __u32 speed)
-{
-	struct if_irda_req req;
-	int ret;
-
-	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
-
-	if (!dev->do_ioctl) {
-		ERROR("%s: do_ioctl not impl. by device driver\n",
-				__FUNCTION__);
-		return -1;
-	}
-
-	req.ifr_baudrate = speed;
-
-	ret = dev->do_ioctl(dev, (struct ifreq *) &req, SIOCSBANDWIDTH);
-
-	return ret;
-}
-
 /*
  * Function irda_device_is_receiving (dev)
  *
@@ -372,7 +331,7 @@ static void irda_task_timer_expired(void *data)
  *    This function should be used by low level device drivers in a similar way
  *    as ether_setup() is used by normal network device drivers
  */
-void irda_device_setup(struct net_device *dev)
+static void irda_device_setup(struct net_device *dev)
 {
         dev->hard_header_len = 0;
         dev->addr_len        = 0;
@@ -501,33 +460,6 @@ void irda_device_unregister_dongle(struct dongle_reg *dongle)
 	spin_unlock(&dongles->hb_spinlock);
 }
 EXPORT_SYMBOL(irda_device_unregister_dongle);
-
-/*
- * Function irda_device_set_mode (self, mode)
- *
- *    Set the Infrared device driver into mode where it sends and receives
- *    data without using IrLAP framing. Check out the particular device
- *    driver to find out which modes it support.
- */
-int irda_device_set_mode(struct net_device* dev, int mode)
-{
-	struct if_irda_req req;
-	int ret;
-
-	IRDA_DEBUG(0, "%s()\n", __FUNCTION__);
-
-	if (!dev->do_ioctl) {
-		ERROR("%s: set_raw_mode not impl. by device driver\n",
-				__FUNCTION__);
-		return -1;
-	}
-
-	req.ifr_mode = mode;
-
-	ret = dev->do_ioctl(dev, (struct ifreq *) &req, SIOCSMODE);
-
-	return ret;
-}
 
 #ifdef CONFIG_ISA
 /*

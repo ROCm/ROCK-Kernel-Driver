@@ -4,12 +4,6 @@
 /*
  * This file contains the functions and defines necessary to modify and use
  * the x86-64 page table tree.
- * 
- * x86-64 has a 4 level table setup. Generic linux MM only supports
- * three levels. The fourth level is currently a single static page that
- * is shared by everybody and just contains a pointer to the current
- * three level page setup on the beginning and some kernel mappings at 
- * the end. For more details see Documentation/x86_64/mm.txt
  */
 #include <asm/processor.h>
 #include <asm/fixmap.h>
@@ -17,15 +11,14 @@
 #include <linux/threads.h>
 #include <asm/pda.h>
 
-extern pgd_t level3_kernel_pgt[512];
-extern pgd_t level3_physmem_pgt[512];
-extern pgd_t level3_ident_pgt[512];
+extern pud_t level3_kernel_pgt[512];
+extern pud_t level3_physmem_pgt[512];
+extern pud_t level3_ident_pgt[512];
 extern pmd_t level2_kernel_pgt[512];
-extern pml4_t init_level4_pgt[];
-extern pgd_t boot_vmalloc_pgt[];
+extern pgd_t init_level4_pgt[];
 extern unsigned long __supported_pte_mask;
 
-#define swapper_pg_dir NULL
+#define swapper_pg_dir init_level4_pgt
 
 extern void paging_init(void);
 extern void clear_kernel_mapping(unsigned long addr, unsigned long size);
@@ -39,14 +32,17 @@ extern unsigned long pgkern_mask;
 extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
 #define ZERO_PAGE(vaddr) (virt_to_page(empty_zero_page))
 
-#define PML4_SHIFT	39
-#define PTRS_PER_PML4	512
-
 /*
  * PGDIR_SHIFT determines what a top-level page table entry can map
  */
-#define PGDIR_SHIFT	30
+#define PGDIR_SHIFT	39
 #define PTRS_PER_PGD	512
+
+/*
+ * 3rd level page
+ */
+#define PUD_SHIFT	30
+#define PTRS_PER_PUD	512
 
 /*
  * PMD_SHIFT determines the size of the area a middle-level
@@ -64,14 +60,13 @@ extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
 	printk("%s:%d: bad pte %p(%016lx).\n", __FILE__, __LINE__, &(e), pte_val(e))
 #define pmd_ERROR(e) \
 	printk("%s:%d: bad pmd %p(%016lx).\n", __FILE__, __LINE__, &(e), pmd_val(e))
+#define pud_ERROR(e) \
+	printk("%s:%d: bad pud %p(%016lx).\n", __FILE__, __LINE__, &(e), pud_val(e))
 #define pgd_ERROR(e) \
 	printk("%s:%d: bad pgd %p(%016lx).\n", __FILE__, __LINE__, &(e), pgd_val(e))
 
-
-#define pml4_none(x)	(!pml4_val(x))
 #define pgd_none(x)	(!pgd_val(x))
-
-extern inline int pgd_present(pgd_t pgd)	{ return !pgd_none(pgd); }
+#define pud_none(x)	(!pud_val(x))
 
 static inline void set_pte(pte_t *dst, pte_t val)
 {
@@ -83,6 +78,16 @@ static inline void set_pmd(pmd_t *dst, pmd_t val)
         pmd_val(*dst) = pmd_val(val); 
 } 
 
+static inline void set_pud(pud_t *dst, pud_t val)
+{
+	pud_val(*dst) = pud_val(val);
+}
+
+extern inline void pud_clear (pud_t *pud)
+{
+	set_pud(pud, __pud(0));
+}
+
 static inline void set_pgd(pgd_t *dst, pgd_t val)
 {
 	pgd_val(*dst) = pgd_val(val); 
@@ -93,44 +98,29 @@ extern inline void pgd_clear (pgd_t * pgd)
 	set_pgd(pgd, __pgd(0));
 }
 
-static inline void set_pml4(pml4_t *dst, pml4_t val)
-{
-	pml4_val(*dst) = pml4_val(val); 
-}
-
-#define pgd_page(pgd) \
-((unsigned long) __va(pgd_val(pgd) & PHYSICAL_PAGE_MASK))
+#define pud_page(pud) \
+((unsigned long) __va(pud_val(pud) & PHYSICAL_PAGE_MASK))
 
 #define ptep_get_and_clear(xp)	__pte(xchg(&(xp)->pte, 0))
 #define pte_same(a, b)		((a).pte == (b).pte)
 
-#define PML4_SIZE	(1UL << PML4_SHIFT)
-#define PML4_MASK       (~(PML4_SIZE-1))
 #define PMD_SIZE	(1UL << PMD_SHIFT)
 #define PMD_MASK	(~(PMD_SIZE-1))
+#define PUD_SIZE	(1UL << PUD_SHIFT)
+#define PUD_MASK	(~(PUD_SIZE-1))
 #define PGDIR_SIZE	(1UL << PGDIR_SHIFT)
 #define PGDIR_MASK	(~(PGDIR_SIZE-1))
 
 #define USER_PTRS_PER_PGD	(TASK_SIZE/PGDIR_SIZE)
 #define FIRST_USER_PGD_NR	0
 
-#define USER_PGD_PTRS (PAGE_OFFSET >> PGDIR_SHIFT)
-#define KERNEL_PGD_PTRS (PTRS_PER_PGD-USER_PGD_PTRS)
-
-#define TWOLEVEL_PGDIR_SHIFT	20
-#define BOOT_USER_L4_PTRS 1
-#define BOOT_KERNEL_L4_PTRS 511	/* But we will do it in 4rd level */
-
-
-
 #ifndef __ASSEMBLY__
-#define VMALLOC_START    0xffffff0000000000UL
-#define VMALLOC_END      0xffffff7fffffffffUL
-#define MODULES_VADDR    0xffffffffa0000000UL
-#define MODULES_END      0xffffffffafffffffUL
+#define MAXMEM		 0x3fffffffffffUL
+#define VMALLOC_START    0xffffc20000000000UL
+#define VMALLOC_END      0xffffe1ffffffffffUL
+#define MODULES_VADDR    0xffffffff88000000
+#define MODULES_END      0xfffffffffff00000
 #define MODULES_LEN   (MODULES_END - MODULES_VADDR)
-
-#define IOMAP_START      0xfffffe8000000000UL
 
 #define _PAGE_BIT_PRESENT	0
 #define _PAGE_BIT_RW		1
@@ -222,6 +212,14 @@ static inline unsigned long pgd_bad(pgd_t pgd)
        return val & ~(_PAGE_PRESENT | _PAGE_RW | _PAGE_ACCESSED);      
 } 
 
+static inline unsigned long pud_bad(pud_t pud)
+{
+       unsigned long val = pud_val(pud);
+       val &= ~PTE_MASK;
+       val &= ~(_PAGE_USER | _PAGE_DIRTY);
+       return val & ~(_PAGE_PRESENT | _PAGE_RW | _PAGE_ACCESSED);
+}
+
 #define pte_none(x)	(!pte_val(x))
 #define pte_present(x)	(pte_val(x) & (_PAGE_PRESENT | _PAGE_PROTNONE))
 #define pte_clear(xp)	do { set_pte(xp, __pte(0)); } while (0)
@@ -300,54 +298,32 @@ static inline int pmd_large(pmd_t pte) {
 
 /*
  * Level 4 access.
- * Never use these in the common code.
  */
-#define pml4_page(pml4) ((unsigned long) __va(pml4_val(pml4) & PTE_MASK))
-#define pml4_index(address) ((address >> PML4_SHIFT) & (PTRS_PER_PML4-1))
-#define pml4_offset_k(address) (init_level4_pgt + pml4_index(address))
-#define pml4_present(pml4) (pml4_val(pml4) & _PAGE_PRESENT)
-#define mk_kernel_pml4(address) ((pml4_t){ (address) | _KERNPG_TABLE })
-#define level3_offset_k(dir, address) ((pgd_t *) pml4_page(*(dir)) + pgd_index(address))
+#define pgd_page(pgd) ((unsigned long) __va((unsigned long)pgd_val(pgd) & PTE_MASK))
+#define pgd_index(address) (((address) >> PGDIR_SHIFT) & (PTRS_PER_PGD-1))
+#define pgd_offset(mm, addr) ((mm)->pgd + pgd_index(addr))
+#define pgd_offset_k(address) (init_level4_pgt + pgd_index(address))
+#define pgd_present(pgd) (pgd_val(pgd) & _PAGE_PRESENT)
+#define mk_kernel_pgd(address) ((pgd_t){ (address) | _KERNPG_TABLE })
 
-/* PGD - Level3 access */
+/* PUD - Level3 access */
 /* to find an entry in a page-table-directory. */
-#define pgd_index(address) ((address >> PGDIR_SHIFT) & (PTRS_PER_PGD-1))
-static inline pgd_t *__pgd_offset_k(pgd_t *pgd, unsigned long address)
+#define pud_index(address) (((address) >> PUD_SHIFT) & (PTRS_PER_PUD-1))
+#define pud_offset(pgd, address) ((pud_t *) pgd_page(*(pgd)) + pud_index(address))
+#define pud_offset_k(pgd, addr) pud_offset(pgd, addr)
+#define pud_present(pud) (pud_val(pud) & _PAGE_PRESENT)
+
+static inline pud_t *__pud_offset_k(pud_t *pud, unsigned long address)
 { 
-	return pgd + pgd_index(address);
+	return pud + pud_index(address);
 } 
-
-/* Find correct pgd via the hidden fourth level page level: */
-
-/* This accesses the reference page table of the boot cpu. 
-   Other CPUs get synced lazily via the page fault handler. */
-static inline pgd_t *pgd_offset_k(unsigned long address)
-{
-	unsigned long addr;
-
-	addr = pml4_val(init_level4_pgt[pml4_index(address)]);
-	addr &= PHYSICAL_PAGE_MASK;
-	return __pgd_offset_k((pgd_t *)__va(addr), address);
-}
-
-/* Access the pgd of the page table as seen by the current CPU. */ 
-static inline pgd_t *current_pgd_offset_k(unsigned long address)
-{
-	unsigned long addr;
-
-	addr = read_pda(level4_pgt)[pml4_index(address)];
-	addr &= PHYSICAL_PAGE_MASK;
-	return __pgd_offset_k((pgd_t *)__va(addr), address);
-}
-
-#define pgd_offset(mm, address) ((mm)->pgd+pgd_index(address))
 
 /* PMD  - Level 2 access */
 #define pmd_page_kernel(pmd) ((unsigned long) __va(pmd_val(pmd) & PTE_MASK))
 #define pmd_page(pmd)		(pfn_to_page(pmd_val(pmd) >> PAGE_SHIFT))
 
 #define pmd_index(address) (((address) >> PMD_SHIFT) & (PTRS_PER_PMD-1))
-#define pmd_offset(dir, address) ((pmd_t *) pgd_page(*(dir)) + \
+#define pmd_offset(dir, address) ((pmd_t *) pud_page(*(dir)) + \
 			pmd_index(address))
 #define pmd_none(x)	(!pmd_val(x))
 #define pmd_present(x)	(pmd_val(x) & _PAGE_PRESENT)

@@ -103,6 +103,4 @@ extern int rxrpc_trans_immediate_abort(struct rxrpc_transport *trans,
 				       struct rxrpc_message *msg,
 				       int error);
 
-extern void rxrpc_clear_transport(struct rxrpc_transport *trans);
-
 #endif /* _LINUX_RXRPC_TRANSPORT_H */

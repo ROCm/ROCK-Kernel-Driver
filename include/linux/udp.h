@@ -53,11 +53,7 @@ struct udp_opt {
 
 /* WARNING: don't change the layout of the members in udp_sock! */
 struct udp_sock {
-	struct sock	  sk;
-#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-	struct ipv6_pinfo *pinet6;
-#endif
-	struct inet_opt	  inet;
+	struct inet_sock  inet;
 	struct udp_opt	  udp;
 };
 

@@ -580,9 +580,9 @@ static sctp_scope_t sctp_v6_scope(union sctp_addr *addr)
 struct sock *sctp_v6_create_accept_sk(struct sock *sk,
 				      struct sctp_association *asoc)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct sock *newsk;
-	struct inet_opt *newinet;
+	struct inet_sock *newinet;
 	struct ipv6_pinfo *newnp, *np = inet6_sk(sk);
 	struct sctp6_sock *newsctp6sk;
 
@@ -608,7 +608,7 @@ struct sock *sctp_v6_create_accept_sk(struct sock *sk,
 	newsk->sk_shutdown = sk->sk_shutdown;
 
 	newsctp6sk = (struct sctp6_sock *)newsk;
-	newsctp6sk->pinet6 = &newsctp6sk->inet6;
+	newsctp6sk->inet.pinet6 = &newsctp6sk->inet6;
 
 	newinet = inet_sk(newsk);
 	newnp = inet6_sk(newsk);

@@ -8,6 +8,8 @@
 #ifndef _ASM_PGTABLE_H
 #define _ASM_PGTABLE_H
 
+#include <asm-generic/4level-fixup.h>
+
 #include <linux/config.h>
 #ifdef CONFIG_MIPS32
 #include <asm/pgtable-32.h>

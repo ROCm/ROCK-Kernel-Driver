@@ -2,6 +2,8 @@
 #ifndef _PPC_PGTABLE_H
 #define _PPC_PGTABLE_H
 
+#include <asm-generic/4level-fixup.h>
+
 #include <linux/config.h>
 
 #ifndef __ASSEMBLY__

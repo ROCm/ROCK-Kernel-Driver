@@ -359,11 +359,9 @@ static unsigned int __init init_chipset_svwks (struct pci_dev *dev, const char *
 	else if ((dev->device == PCI_DEVICE_ID_SERVERWORKS_CSB5IDE) ||
 		 (dev->device == PCI_DEVICE_ID_SERVERWORKS_CSB6IDE) ||
 		 (dev->device == PCI_DEVICE_ID_SERVERWORKS_CSB6IDE2)) {
-//		u32 pioreg = 0, dmareg = 0;
 
 		/* Third Channel Test */
 		if (!(PCI_FUNC(dev->devfn) & 1)) {
-#if 1
 			struct pci_dev * findev = NULL;
 			u32 reg4c = 0;
 			findev = pci_find_device(PCI_VENDOR_ID_SERVERWORKS,
@@ -375,19 +373,11 @@ static unsigned int __init init_chipset_svwks (struct pci_dev *dev, const char *
 				reg4c |=  0x00000020;
 				pci_write_config_dword(findev, 0x4C, reg4c);
 			}
-#endif
 			outb_p(0x06, 0x0c00);
 			dev->irq = inb_p(0x0c01);
 #if 0
-			/* WE need to figure out how to get the correct one */
-			printk("%s: interrupt %d\n", name, dev->irq);
-			if (dev->irq != 0x0B)
-				dev->irq = 0x0B;
-#endif
-#if 0
 			printk("%s: device class (0x%04x)\n",
 				name, dev->class);
-#else
 			if ((dev->class >> 8) != PCI_CLASS_STORAGE_IDE) {
 				dev->class &= ~0x000F0F00;
 		//		dev->class |= ~0x00000400;
@@ -413,7 +403,8 @@ static unsigned int __init init_chipset_svwks (struct pci_dev *dev, const char *
 			 * interrupt pin to be set, and it is a compatibility
 			 * mode issue.
 			 */
-			dev->irq = 0;
+			if ((dev->class >> 8) == PCI_CLASS_STORAGE_IDE)
+				dev->irq = 0;
 		}
 //		pci_read_config_dword(dev, 0x40, &pioreg)
 //		pci_write_config_dword(dev, 0x40, 0x99999999);
@@ -566,20 +557,17 @@ static void __init init_dma_svwks (ide_hwif_t *hwif, unsigned long dmabase)
 	ide_setup_dma(hwif, dmabase, 8);
 }
 
-static void __init init_setup_svwks (struct pci_dev *dev, ide_pci_device_t *d)
+static int __init init_setup_svwks (struct pci_dev *dev, ide_pci_device_t *d)
 {
-	ide_setup_pci_device(dev, d);
+	return ide_setup_pci_device(dev, d);
 }
 
-static void __init init_setup_csb6 (struct pci_dev *dev, ide_pci_device_t *d)
+static int __init init_setup_csb6 (struct pci_dev *dev, ide_pci_device_t *d)
 {
 	if (!(PCI_FUNC(dev->devfn) & 1)) {
 		d->bootable = NEVER_BOARD;
 		if (dev->resource[0].start == 0x01f1)
 			d->bootable = ON_BOARD;
-	} else {
-		if ((dev->class >> 8) != PCI_CLASS_STORAGE_IDE)
-			return;
 	}
 #if 0
 	if ((IDE_PCI_DEVID_EQ(d->devid, DEVID_CSB6) &&
@@ -591,7 +579,7 @@ static void __init init_setup_csb6 (struct pci_dev *dev, ide_pci_device_t *d)
 			dev->device == PCI_DEVICE_ID_SERVERWORKS_CSB6IDE2) &&
 		       (!(PCI_FUNC(dev->devfn) & 1))) ? 1 : 2;
 
-	ide_setup_pci_device(dev, d);
+	return ide_setup_pci_device(dev, d);
 }
 
 
@@ -608,8 +596,7 @@ static int __devinit svwks_init_one(struct pci_dev *dev, const struct pci_device
 {
 	ide_pci_device_t *d = &serverworks_chipsets[id->driver_data];
 
-	d->init_setup(dev, d);
-	return 0;
+	return d->init_setup(dev, d);
 }
 
 static struct pci_device_id svwks_pci_tbl[] = {
@@ -625,10 +612,6 @@ static struct pci_driver driver = {
 	.name		= "Serverworks_IDE",
 	.id_table	= svwks_pci_tbl,
 	.probe		= svwks_init_one,
-#if 0	/* FIXME: implement */
-	.suspend	= ,
-	.resume		= ,
-#endif
 };
 
 static int svwks_ide_init(void)

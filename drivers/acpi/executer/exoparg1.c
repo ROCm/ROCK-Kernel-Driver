@@ -507,6 +507,10 @@ acpi_ex_opcode_1A_1T_1R (
 
 		status = acpi_ex_convert_to_string (operand[0], &return_desc,
 				 ACPI_EXPLICIT_CONVERT_DECIMAL);
+		if (return_desc == operand[0]) {
+			/* No conversion performed, add ref to handle return value */
+			acpi_ut_add_reference (return_desc);
+		}
 		break;
 
 
@@ -514,12 +518,20 @@ acpi_ex_opcode_1A_1T_1R (
 
 		status = acpi_ex_convert_to_string (operand[0], &return_desc,
 				 ACPI_EXPLICIT_CONVERT_HEX);
+		if (return_desc == operand[0]) {
+			/* No conversion performed, add ref to handle return value */
+			acpi_ut_add_reference (return_desc);
+		}
 		break;
 
 
 	case AML_TO_BUFFER_OP:          /* to_buffer (Data, Result) */
 
 		status = acpi_ex_convert_to_buffer (operand[0], &return_desc);
+		if (return_desc == operand[0]) {
+			/* No conversion performed, add ref to handle return value */
+			acpi_ut_add_reference (return_desc);
+		}
 		break;
 
 
@@ -527,6 +539,10 @@ acpi_ex_opcode_1A_1T_1R (
 
 		status = acpi_ex_convert_to_integer (operand[0], &return_desc,
 				 ACPI_ANY_BASE);
+		if (return_desc == operand[0]) {
+			/* No conversion performed, add ref to handle return value */
+			acpi_ut_add_reference (return_desc);
+		}
 		break;
 
 
@@ -551,10 +567,12 @@ acpi_ex_opcode_1A_1T_1R (
 		goto cleanup;
 	}
 
-	/*
-	 * Store the return value computed above into the target object
-	 */
-	status = acpi_ex_store (return_desc, operand[1], walk_state);
+	if (ACPI_SUCCESS (status)) {
+		/*
+		 * Store the return value computed above into the target object
+		 */
+		status = acpi_ex_store (return_desc, operand[1], walk_state);
+	}
 
 
 cleanup:

@@ -20,21 +20,15 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
+#define DRIVER_AUTHOR		"Gareth Hughes, Leif Delgass, José Fonseca, Jon Smirl"
 
-#include "drm_auth.h"
-#include "drm_agpsupport.h"
-#include "drm_bufs.h"
-#include "drm_context.h"
-#include "drm_dma.h"
-#include "drm_irq.h"
-#include "drm_drawable.h"
-#include "drm_drv.h"
-#include "drm_fops.h"
-#include "drm_init.h"
-#include "drm_ioctl.h"
-#include "drm_lock.h"
-#include "drm_memory.h"
-#include "drm_proc.h"
-#include "drm_vm.h"
-#include "drm_stub.h"
-#include "drm_scatter.h"
+#define DRIVER_NAME		"drm"
+#define DRIVER_DESC		"DRM shared core routines"
+#define DRIVER_DATE		"20040925"
+
+#define DRM_IF_MAJOR	1
+#define DRM_IF_MINOR	2
+
+#define DRIVER_MAJOR	1
+#define DRIVER_MINOR	0
+#define DRIVER_PATCHLEVEL 0

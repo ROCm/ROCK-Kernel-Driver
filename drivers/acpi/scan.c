@@ -2,9 +2,9 @@
  * scan.c - support for transforming the ACPI namespace into individual objects
  */
 
+#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/acpi.h>
-#include <linux/module.h>
 
 #include <acpi/acpi_drivers.h>
 #include <acpi/acinterp.h>	/* for acpi_ex_eisa_id_to_string() */
@@ -35,7 +35,49 @@ static void acpi_device_release(struct kobject * kobj)
 	kfree(dev);
 }
 
+struct acpi_device_attribute {
+	struct attribute attr;
+	ssize_t (*show)(struct acpi_device *, char *);
+	ssize_t (*store)(struct acpi_device *, const char *, size_t);
+};
+
+typedef void acpi_device_sysfs_files(struct kobject *,
+				const struct attribute *);
+
+static void setup_sys_fs_device_files(struct acpi_device *dev,
+		acpi_device_sysfs_files *func);
+
+#define create_sysfs_device_files(dev)	\
+	setup_sys_fs_device_files(dev, (acpi_device_sysfs_files *)&sysfs_create_file)
+#define remove_sysfs_device_files(dev)	\
+	setup_sys_fs_device_files(dev, (acpi_device_sysfs_files *)&sysfs_remove_file)
+
+
+#define to_acpi_device(n) container_of(n, struct acpi_device, kobj)
+#define to_handle_attr(n) container_of(n, struct acpi_device_attribute, attr);
+
+static ssize_t acpi_device_attr_show(struct kobject *kobj,
+		struct attribute *attr, char *buf)
+{
+	struct acpi_device *device = to_acpi_device(kobj);
+	struct acpi_device_attribute *attribute = to_handle_attr(attr);
+	return attribute->show ? attribute->show(device, buf) : 0;
+}
+static ssize_t acpi_device_attr_store(struct kobject *kobj,
+		struct attribute *attr, const char *buf, size_t len)
+{
+	struct acpi_device *device = to_acpi_device(kobj);
+	struct acpi_device_attribute *attribute = to_handle_attr(attr);
+	return attribute->store ? attribute->store(device, buf, len) : len;
+}
+
+static struct sysfs_ops acpi_device_sysfs_ops = {
+	.show	= acpi_device_attr_show,
+	.store	= acpi_device_attr_store,
+};
+
 static struct kobj_type ktype_acpi_ns = {
+	.sysfs_ops	= &acpi_device_sysfs_ops,
 	.release	= acpi_device_release,
 };
 
@@ -58,6 +100,7 @@ static void acpi_device_register(struct acpi_device * device, struct acpi_device
 	INIT_LIST_HEAD(&device->children);
 	INIT_LIST_HEAD(&device->node);
 	INIT_LIST_HEAD(&device->g_list);
+	INIT_LIST_HEAD(&device->wakeup_list);
 
 	spin_lock(&acpi_device_lock);
 	if (device->parent) {
@@ -65,15 +108,17 @@ static void acpi_device_register(struct acpi_device * device, struct acpi_device
 		list_add_tail(&device->g_list,&device->parent->g_list);
 	} else
 		list_add_tail(&device->g_list,&acpi_device_list);
+	if (device->wakeup.flags.valid)
+		list_add_tail(&device->wakeup_list,&acpi_wakeup_device_list);
 	spin_unlock(&acpi_device_lock);
 
-	kobject_init(&device->kobj);
 	strlcpy(device->kobj.name,device->pnp.bus_id,KOBJ_NAME_LEN);
 	if (parent)
 		device->kobj.parent = &parent->kobj;
 	device->kobj.ktype = &ktype_acpi_ns;
 	device->kobj.kset = &acpi_namespace_kset;
-	kobject_add(&device->kobj);
+	kobject_register(&device->kobj);
+	create_sysfs_device_files(device);
 }
 
 static int
@@ -81,6 +126,19 @@ acpi_device_unregister (
 	struct acpi_device	*device, 
 	int			type)
 {
+	spin_lock(&acpi_device_lock);
+	if (device->parent) {
+		list_del(&device->node);
+		list_del(&device->g_list);
+	} else
+		list_del(&device->g_list);
+
+	list_del(&device->wakeup_list);
+
+	spin_unlock(&acpi_device_lock);
+
+	acpi_detach_data(device->handle, acpi_bus_data_handler);
+	remove_sysfs_device_files(device);
 	kobject_unregister(&device->kobj);
 	return 0;
 }
@@ -272,17 +330,119 @@ acpi_bus_get_wakeup_device_flags (
 	if (!acpi_match_ids(device, "PNP0C0D,PNP0C0C,PNP0C0E"))
 		device->wakeup.flags.run_wake = 1;
 
-	/* TBD: lock */
-	INIT_LIST_HEAD(&device->wakeup_list);
-	spin_lock(&acpi_device_lock);
-	list_add_tail(&device->wakeup_list, &acpi_wakeup_device_list);
-	spin_unlock(&acpi_device_lock);
-
 end:
 	if (ACPI_FAILURE(status))
 		device->flags.wake_capable = 0;
 	return_VALUE(0);
 }
+
+/* --------------------------------------------------------------------------
+		ACPI hotplug sysfs device file support
+   -------------------------------------------------------------------------- */
+static ssize_t acpi_eject_store(struct acpi_device *device, 
+		const char *buf, size_t count);
+
+#define ACPI_DEVICE_ATTR(_name,_mode,_show,_store) \
+static struct acpi_device_attribute acpi_device_attr_##_name = \
+		__ATTR(_name, _mode, _show, _store)
+
+ACPI_DEVICE_ATTR(eject, 0200, NULL, acpi_eject_store);
+
+/**
+ * setup_sys_fs_device_files - sets up the device files under device namespace
+ * @@dev:	acpi_device object
+ * @@func:	function pointer to create or destroy the device file
+ */
+static void
+setup_sys_fs_device_files (
+	struct acpi_device *dev,
+	acpi_device_sysfs_files *func)
+{
+	if (dev->flags.ejectable == 1)
+		(*(func))(&dev->kobj,&acpi_device_attr_eject.attr);
+}
+
+static int
+acpi_eject_operation(acpi_handle handle, int lockable)
+{
+	struct acpi_object_list arg_list;
+	union acpi_object arg;
+	acpi_status status = AE_OK;
+
+	/*
+	 * TBD: evaluate _PS3?
+	 */
+
+	if (lockable) {
+		arg_list.count = 1;
+		arg_list.pointer = &arg;
+		arg.type = ACPI_TYPE_INTEGER;
+		arg.integer.value = 0;
+		acpi_evaluate_object(handle, "_LCK", &arg_list, NULL);
+	}
+
+	arg_list.count = 1;
+	arg_list.pointer = &arg;
+	arg.type = ACPI_TYPE_INTEGER;
+	arg.integer.value = 1;
+
+	/*
+	 * TBD: _EJD support.
+	 */
+
+	status = acpi_evaluate_object(handle, "_EJ0", &arg_list, NULL);
+	if (ACPI_FAILURE(status)) {
+		return(-ENODEV);
+	}
+
+	return(0);
+}
+
+
+static ssize_t
+acpi_eject_store(struct acpi_device *device, const char *buf, size_t count)
+{
+	int	result;
+	int	ret = count;
+	int	islockable;
+	acpi_status	status;
+	acpi_handle	handle;
+	acpi_object_type	type = 0;
+
+	if ((!count) || (buf[0] != '1')) {
+		return -EINVAL;
+	}
+
+#ifndef FORCE_EJECT
+	if (device->driver == NULL) {
+		ret = -ENODEV;
+		goto err;
+	}
+#endif
+	status = acpi_get_type(device->handle, &type);
+	if (ACPI_FAILURE(status) || (!device->flags.ejectable) ) {
+		ret = -ENODEV;
+		goto err;
+	}
+
+	islockable = device->flags.lockable;
+	handle = device->handle;
+
+	if (type == ACPI_TYPE_PROCESSOR)
+		result = acpi_bus_trim(device, 0);
+	else
+		result = acpi_bus_trim(device, 1);
+
+	if (!result)
+		result = acpi_eject_operation(handle, islockable);
+
+	if (result) {
+		ret = -EBUSY;
+	}
+err:
+	return ret;
+}
+
 
 /* --------------------------------------------------------------------------
                               Performance Management
@@ -727,7 +887,7 @@ void acpi_device_get_debug_info(struct acpi_device * device, acpi_handle handle,
 #ifdef CONFIG_ACPI_DEBUG_OUTPUT
 	char		*type_string = NULL;
 	char		name[80] = {'?','\0'};
-	acpi_buffer	buffer = {sizeof(name), name};
+	struct acpi_buffer	buffer = {sizeof(name), name};
 
 	switch (type) {
 	case ACPI_BUS_TYPE_DEVICE:
@@ -764,7 +924,55 @@ void acpi_device_get_debug_info(struct acpi_device * device, acpi_handle handle,
 #endif /*CONFIG_ACPI_DEBUG_OUTPUT*/
 }
 
-int 
+
+int
+acpi_bus_remove (
+	struct acpi_device *dev,
+	int rmdevice)
+{
+	int 			result = 0;
+	struct acpi_driver	*driver;
+	
+	ACPI_FUNCTION_TRACE("acpi_bus_remove");
+
+	if (!dev)
+		return_VALUE(-EINVAL);
+
+	driver = dev->driver;
+
+	if ((driver) && (driver->ops.remove)) {
+
+		if (driver->ops.stop) {
+			result = driver->ops.stop(dev, ACPI_BUS_REMOVAL_EJECT);
+			if (result)
+				return_VALUE(result);
+		}
+
+		result = dev->driver->ops.remove(dev, ACPI_BUS_REMOVAL_EJECT);
+		if (result) {
+			return_VALUE(result);
+		}
+
+		atomic_dec(&dev->driver->references);
+		dev->driver = NULL;
+		acpi_driver_data(dev) = NULL;
+	}
+
+	if (!rmdevice)
+		return_VALUE(0);
+
+	if (dev->flags.bus_address) {
+		if ((dev->parent) && (dev->parent->ops.unbind))
+			dev->parent->ops.unbind(dev);
+	}
+	
+	acpi_device_unregister(dev, ACPI_BUS_REMOVAL_EJECT);
+
+	return_VALUE(0);
+}
+
+
+int
 acpi_bus_add (
 	struct acpi_device	**child,
 	struct acpi_device	*parent,
@@ -911,7 +1119,7 @@ end:
 EXPORT_SYMBOL(acpi_bus_add);
 
 
-static int acpi_bus_scan (struct acpi_device	*start)
+int acpi_bus_scan (struct acpi_device	*start)
 {
 	acpi_status		status = AE_OK;
 	struct acpi_device	*parent = NULL;
@@ -1014,6 +1222,62 @@ static int acpi_bus_scan (struct acpi_device	*start)
 }
 EXPORT_SYMBOL(acpi_bus_scan);
 
+
+int
+acpi_bus_trim(struct acpi_device	*start,
+		int rmdevice)
+{
+	acpi_status		status;
+	struct acpi_device	*parent, *child;
+	acpi_handle		phandle, chandle;
+	acpi_object_type	type;
+	u32			level = 1;
+	int			err = 0;
+
+	parent  = start;
+	phandle = start->handle;
+	child = chandle = NULL;
+
+	while ((level > 0) && parent && (!err)) {
+		status = acpi_get_next_object(ACPI_TYPE_ANY, phandle,
+			chandle, &chandle);
+
+		/*
+		 * If this scope is exhausted then move our way back up.
+		 */
+		if (ACPI_FAILURE(status)) {
+			level--;
+			chandle = phandle;
+			acpi_get_parent(phandle, &phandle);
+			child = parent;
+			parent = parent->parent;
+
+			if (level == 0)
+				err = acpi_bus_remove(child, rmdevice);
+			else
+				err = acpi_bus_remove(child, 1);
+
+			continue;
+		}
+
+		status = acpi_get_type(chandle, &type);
+		if (ACPI_FAILURE(status)) {
+			continue;
+		}
+		/*
+		 * If there is a device corresponding to chandle then
+		 * parse it (depth-first).
+		 */
+		if (acpi_bus_get_device(chandle, &child) == 0) {
+			level++;
+			phandle = chandle;
+			chandle = NULL;
+			parent = child;
+		}
+		continue;
+	}
+	return err;
+}
 
 static int
 acpi_bus_scan_fixed (

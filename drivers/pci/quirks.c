@@ -479,26 +479,6 @@ static void __devinit quirk_via_acpi(struct pci_dev *d)
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C586_3,	quirk_via_acpi );
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686_4,	quirk_via_acpi );
 
-static void quirk_via_irqpic(struct pci_dev *dev)
-{
-	u8 irq, new_irq = dev->irq & 0xf;
-
-	pci_read_config_byte(dev, PCI_INTERRUPT_LINE, &irq);
-
-	if (new_irq != irq) {
-		printk(KERN_INFO "PCI: Via IRQ fixup for %s, from %d to %d\n",
-		       pci_name(dev), irq, new_irq);
-
-		udelay(15);
-		pci_write_config_byte(dev, PCI_INTERRUPT_LINE, new_irq);
-	}
-}
-DECLARE_PCI_FIXUP_ENABLE(PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C586_2,	quirk_via_irqpic );
-DECLARE_PCI_FIXUP_ENABLE(PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686_5,	quirk_via_irqpic );
-DECLARE_PCI_FIXUP_ENABLE(PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686_6,	quirk_via_irqpic );
-DECLARE_PCI_FIXUP_ENABLE(PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8233_5,	quirk_via_irqpic );
-
-
 /*
  * PIIX3 USB: We have to disable USB interrupts that are
  * hardwired to PIRQD# and may be shared with an
@@ -691,12 +671,14 @@ DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82454NX,	quirk_
 /*
  *	VIA northbridges care about PCI_INTERRUPT_LINE
  */
-int interrupt_line_quirk;
+int via_interrupt_line_quirk;
 
 static void __devinit quirk_via_bridge(struct pci_dev *pdev)
 {
-	if(pdev->devfn == 0)
-		interrupt_line_quirk = 1;
+	if(pdev->devfn == 0) {
+		printk(KERN_INFO "PCI: Via IRQ fixup\n");
+		via_interrupt_line_quirk = 1;
+	}
 }
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_VIA,	PCI_ANY_ID,                     quirk_via_bridge );
 

@@ -237,6 +237,7 @@ struct page *
 put_kernel_page (struct page *page, unsigned long address, pgprot_t pgprot)
 {
 	pgd_t *pgd;
+	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte;
 
@@ -248,7 +249,11 @@ put_kernel_page (struct page *page, unsigned long address, pgprot_t pgprot)
 
 	spin_lock(&init_mm.page_table_lock);
 	{
-		pmd = pmd_alloc(&init_mm, pgd, address);
+		pud = pud_alloc(&init_mm, pgd, address);
+		if (!pud)
+			goto out;
+
+		pmd = pmd_alloc(&init_mm, pud, address);
 		if (!pmd)
 			goto out;
 		pte = pte_alloc_map(&init_mm, pmd, address);
@@ -381,6 +386,7 @@ create_mem_map_page_table (u64 start, u64 end, void *arg)
 	struct page *map_start, *map_end;
 	int node;
 	pgd_t *pgd;
+	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte;
 
@@ -395,7 +401,11 @@ create_mem_map_page_table (u64 start, u64 end, void *arg)
 		pgd = pgd_offset_k(address);
 		if (pgd_none(*pgd))
 			pgd_populate(&init_mm, pgd, alloc_bootmem_pages_node(NODE_DATA(node), PAGE_SIZE));
-		pmd = pmd_offset(pgd, address);
+		pud = pud_offset(pgd, address);
+
+		if (pud_none(*pud))
+			pud_populate(&init_mm, pud, alloc_bootmem_pages_node(NODE_DATA(node), PAGE_SIZE));
+		pmd = pmd_offset(pud, address);
 
 		if (pmd_none(*pmd))
 			pmd_populate_kernel(&init_mm, pmd, alloc_bootmem_pages_node(NODE_DATA(node), PAGE_SIZE));

@@ -7,7 +7,6 @@
  * 
  **************************************************************************/
 
-#include "i915.h"
 #include "drmP.h"
 #include "drm.h"
 #include "i915_drm.h"
@@ -92,10 +91,7 @@ int i915_irq_emit(DRM_IOCTL_ARGS)
 	drm_i915_irq_emit_t emit;
 	int result;
 
-	if (!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
-		DRM_ERROR("i915_irq_emit called without lock held\n");
-		return DRM_ERR(EINVAL);
-	}
+	LOCK_TEST_WITH_RETURN(dev, filp);
 
 	if (!dev_priv) {
 		DRM_ERROR("%s called with no initialization\n", __FUNCTION__);

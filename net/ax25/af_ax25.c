@@ -755,7 +755,7 @@ out:
 	return res;
 }
 
-int ax25_create(struct socket *sock, int protocol)
+static int ax25_create(struct socket *sock, int protocol)
 {
 	struct sock *sk;
 	ax25_cb *ax25;

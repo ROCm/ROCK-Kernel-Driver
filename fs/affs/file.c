@@ -12,24 +12,7 @@
  *  affs regular file handling primitives
  */
 
-#include <asm/div64.h>
-#include <asm/uaccess.h>
-#include <asm/system.h>
-#include <linux/time.h>
-#include <linux/affs_fs.h>
-#include <linux/fcntl.h>
-#include <linux/kernel.h>
-#include <linux/errno.h>
-#include <linux/slab.h>
-#include <linux/stat.h>
-#include <linux/smp_lock.h>
-#include <linux/dirent.h>
-#include <linux/fs.h>
-#include <linux/amigaffs.h>
-#include <linux/mm.h>
-#include <linux/highmem.h>
-#include <linux/pagemap.h>
-#include <linux/buffer_head.h>
+#include "affs.h"
 
 #if PAGE_SIZE < 4096
 #error PAGE_SIZE must be at least 4096

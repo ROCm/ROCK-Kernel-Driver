@@ -29,6 +29,7 @@
 #include <linux/init.h>
 #include <asm/assembler.h>
 #include <asm/pgtable.h>
+#include <asm/domain.h>
 #include <asm/procinfo.h>
 #include <asm/hardware.h>
 #include <asm/page.h>
@@ -396,7 +397,10 @@ __arm926_setup:
 	mcr	p15, 7, r0, c15, c0, 0
 #endif 
 
-	mov	r0, #0x1f			@ Domains 0, 1 = client
+	mov	r0, #(domain_val(DOMAIN_USER, DOMAIN_MANAGER) | \
+		      domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) | \
+		      domain_val(DOMAIN_TABLE, DOMAIN_MANAGER) | \
+		      domain_val(DOMAIN_IO, DOMAIN_CLIENT))
 	mcr	p15, 0, r0, c3, c0		@ load domain access register
 	mrc	p15, 0, r0, c1, c0		@ get control register v4
 /*
@@ -483,7 +487,12 @@ cpu_arm926_name:
 __arm926_proc_info:
 	.long	0x41069260			@ ARM926EJ-S (v5TEJ)
 	.long	0xff0ffff0
-	.long	0x00000c1e			@ mmuflags
+	.long   PMD_TYPE_SECT | \
+		PMD_SECT_BUFFERABLE | \
+		PMD_SECT_CACHEABLE | \
+		PMD_BIT4 | \
+		PMD_SECT_AP_WRITE | \
+		PMD_SECT_AP_READ
 	b	__arm926_setup
 	.long	cpu_arch_name
 	.long	cpu_elf_name

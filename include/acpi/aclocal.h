@@ -862,7 +862,6 @@ struct acpi_bit_register_info
 /*
  * Large resource descriptor types
  */
-
 #define ACPI_RDESC_TYPE_MEMORY_24               0x81
 #define ACPI_RDESC_TYPE_GENERAL_REGISTER        0x82
 #define ACPI_RDESC_TYPE_LARGE_VENDOR            0x84
@@ -872,6 +871,7 @@ struct acpi_bit_register_info
 #define ACPI_RDESC_TYPE_WORD_ADDRESS_SPACE      0x88
 #define ACPI_RDESC_TYPE_EXTENDED_XRUPT          0x89
 #define ACPI_RDESC_TYPE_QWORD_ADDRESS_SPACE     0x8A
+#define ACPI_RDESC_TYPE_EXTENDED_ADDRESS_SPACE  0x8B
 
 
 /*****************************************************************************

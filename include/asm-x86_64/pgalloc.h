@@ -9,8 +9,10 @@
 
 #define pmd_populate_kernel(mm, pmd, pte) \
 		set_pmd(pmd, __pmd(_PAGE_TABLE | __pa(pte)))
-#define pgd_populate(mm, pgd, pmd) \
-		set_pgd(pgd, __pgd(_PAGE_TABLE | __pa(pmd)))
+#define pud_populate(mm, pud, pmd) \
+		set_pud(pud, __pud(_PAGE_TABLE | __pa(pmd)))
+#define pgd_populate(mm, pgd, pud) \
+		set_pgd(pgd, __pgd(_PAGE_TABLE | __pa(pud)))
 
 static inline void pmd_populate(struct mm_struct *mm, pmd_t *pmd, struct page *pte)
 {
@@ -33,12 +35,37 @@ static inline pmd_t *pmd_alloc_one (struct mm_struct *mm, unsigned long addr)
 	return (pmd_t *)get_zeroed_page(GFP_KERNEL|__GFP_REPEAT);
 }
 
-static inline pgd_t *pgd_alloc (struct mm_struct *mm)
+static inline pud_t *pud_alloc_one(struct mm_struct *mm, unsigned long addr)
 {
-	return (pgd_t *)get_zeroed_page(GFP_KERNEL|__GFP_REPEAT);
+	return (pud_t *)get_zeroed_page(GFP_KERNEL|__GFP_REPEAT);
 }
 
-static inline void pgd_free (pgd_t *pgd)
+static inline void pud_free (pud_t *pud)
+{
+	BUG_ON((unsigned long)pud & (PAGE_SIZE-1));
+	free_page((unsigned long)pud);
+}
+
+static inline pgd_t *pgd_alloc(struct mm_struct *mm)
+{
+	unsigned boundary;
+	pgd_t *pgd = (pgd_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
+	if (!pgd)
+		return NULL;
+	/*
+	 * Copy kernel pointers in from init.
+	 * Could keep a freelist or slab cache of those because the kernel
+	 * part never changes.
+	 */
+	boundary = pgd_index(__PAGE_OFFSET);
+	memset(pgd, 0, boundary * sizeof(pgd_t));
+	memcpy(pgd + boundary,
+	       init_level4_pgt + boundary,
+	       (PTRS_PER_PGD - boundary) * sizeof(pgd_t));
+	return pgd;
+}
+
+static inline void pgd_free(pgd_t *pgd)
 {
 	BUG_ON((unsigned long)pgd & (PAGE_SIZE-1));
 	free_page((unsigned long)pgd);
@@ -73,5 +100,6 @@ extern inline void pte_free(struct page *pte)
 
 #define __pte_free_tlb(tlb,pte) tlb_remove_page((tlb),(pte))
 #define __pmd_free_tlb(tlb,x)   pmd_free(x)
+#define __pud_free_tlb(tlb,x)   pud_free(x)
 
 #endif /* _X86_64_PGALLOC_H */

@@ -104,6 +104,7 @@ typedef int (*acpi_op_suspend)	(struct acpi_device *device, int state);
 typedef int (*acpi_op_resume)	(struct acpi_device *device, int state);
 typedef int (*acpi_op_scan)	(struct acpi_device *device);
 typedef int (*acpi_op_bind)	(struct acpi_device *device);
+typedef int (*acpi_op_unbind)	(struct acpi_device *device);
 typedef int (*acpi_op_match)	(struct acpi_device *device,
 				 struct acpi_driver *driver);
 
@@ -117,6 +118,7 @@ struct acpi_device_ops {
 	acpi_op_resume		resume;
 	acpi_op_scan		scan;
 	acpi_op_bind		bind;
+	acpi_op_unbind		unbind;
 	acpi_op_match		match;
 };
 
@@ -316,7 +318,8 @@ extern struct subsystem acpi_subsys;
  * External Functions
  */
 
-int acpi_bus_get_device(acpi_handle, struct acpi_device **device);
+int acpi_bus_get_device(acpi_handle handle, struct acpi_device **device);
+void acpi_bus_data_handler(acpi_handle handle, u32 function, void *context);
 int acpi_bus_get_status (struct acpi_device *device);
 int acpi_bus_get_power (acpi_handle handle, int *state);
 int acpi_bus_set_power (acpi_handle handle, int state);
@@ -324,6 +327,11 @@ int acpi_bus_generate_event (struct acpi_device *device, u8 type, int data);
 int acpi_bus_receive_event (struct acpi_bus_event *event);
 int acpi_bus_register_driver (struct acpi_driver *driver);
 int acpi_bus_unregister_driver (struct acpi_driver *driver);
+int acpi_bus_scan (struct acpi_device *start);
+int acpi_bus_trim(struct acpi_device *start, int rmdevice);
+int acpi_bus_add (struct acpi_device **child, struct acpi_device *parent,
+		acpi_handle handle, int type);
+
 
 int acpi_match_ids (struct acpi_device	*device, char	*ids);
 int acpi_create_dir(struct acpi_device *);

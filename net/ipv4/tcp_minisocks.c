@@ -41,6 +41,8 @@ int sysctl_tcp_max_tw_buckets = NR_FILE*2;
 int sysctl_tcp_syncookies = SYNC_INIT; 
 int sysctl_tcp_abort_on_overflow;
 
+static void tcp_tw_schedule(struct tcp_tw_bucket *tw, int timeo);
+
 static __inline__ int tcp_in_window(u32 seq, u32 end_seq, u32 s_win, u32 e_win)
 {
 	if (seq == s_win)
@@ -337,7 +339,7 @@ void tcp_time_wait(struct sock *sk, int state, int timeo)
 		tw = kmem_cache_alloc(tcp_timewait_cachep, SLAB_ATOMIC);
 
 	if(tw != NULL) {
-		struct inet_opt *inet = inet_sk(sk);
+		struct inet_sock *inet = inet_sk(sk);
 		int rto = (tp->rto<<2) - (tp->rto>>1);
 
 		/* Give us an identity. */
@@ -551,7 +553,7 @@ static struct timer_list tcp_twcal_timer =
 		TIMER_INITIALIZER(tcp_twcal_tick, 0, 0);
 static struct hlist_head tcp_twcal_row[TCP_TW_RECYCLE_SLOTS];
 
-void tcp_tw_schedule(struct tcp_tw_bucket *tw, int timeo)
+static void tcp_tw_schedule(struct tcp_tw_bucket *tw, int timeo)
 {
 	struct hlist_head *list;
 	int slot;

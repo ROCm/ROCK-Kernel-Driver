@@ -484,6 +484,28 @@ unsigned int acpi_register_gsi(u32 gsi, int edge_level, int active_high_low)
 }
 EXPORT_SYMBOL(acpi_register_gsi);
 
+/*
+ *  ACPI based hotplug support for CPU
+ */
+#ifdef CONFIG_ACPI_HOTPLUG_CPU
+int
+acpi_map_lsapic(acpi_handle handle, int *pcpu)
+{
+	/* TBD */
+	return -EINVAL;
+}
+EXPORT_SYMBOL(acpi_map_lsapic);
+
+
+int
+acpi_unmap_lsapic(int cpu)
+{
+	/* TBD */
+	return -EINVAL;
+}
+EXPORT_SYMBOL(acpi_unmap_lsapic);
+#endif /* CONFIG_ACPI_HOTPLUG_CPU */
+
 static unsigned long __init
 acpi_scan_rsdp (
 	unsigned long		start,

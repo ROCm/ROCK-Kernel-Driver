@@ -28,7 +28,6 @@
  * 
  */
 
-#include "sis.h"
 #include "drmP.h"
 #include "sis_drm.h"
 #include "sis_drv.h"
@@ -159,7 +158,7 @@ int sis_fb_init( DRM_IOCTL_ARGS )
 	DRM_COPY_FROM_USER_IOCTL(fb, (drm_sis_fb_t __user *)data, sizeof(fb));
 
 	if (dev_priv == NULL) {
-		dev->dev_private = DRM(calloc)(1, sizeof(drm_sis_private_t),
+		dev->dev_private = drm_calloc(1, sizeof(drm_sis_private_t),
 		    DRM_MEM_DRIVER);
 		dev_priv = dev->dev_private;
 		if (dev_priv == NULL)
@@ -247,7 +246,7 @@ int sis_ioctl_agp_init( DRM_IOCTL_ARGS )
 	drm_sis_agp_t agp;
 
 	if (dev_priv == NULL) {
-		dev->dev_private = DRM(calloc)(1, sizeof(drm_sis_private_t),
+		dev->dev_private = drm_calloc(1, sizeof(drm_sis_private_t),
 		    DRM_MEM_DRIVER);
 		dev_priv = dev->dev_private;
 		if (dev_priv == NULL)
@@ -403,11 +402,4 @@ int sis_final_context(struct drm_device *dev, int context)
         }
 	
 	return 1;
-}
-
-void DRM(driver_register_fns)(drm_device_t *dev)
-{
-	dev->driver_features = DRIVER_USE_AGP | DRIVER_USE_MTRR;
-	dev->fn_tbl.context_ctor = sis_init_context;
-	dev->fn_tbl.context_dtor = sis_final_context;
 }

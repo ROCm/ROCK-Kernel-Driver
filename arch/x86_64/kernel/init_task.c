@@ -47,5 +47,3 @@ EXPORT_SYMBOL(init_task);
 DEFINE_PER_CPU(struct tss_struct, init_tss) ____cacheline_maxaligned_in_smp;
 
 #define ALIGN_TO_4K __attribute__((section(".data.init_task")))
-
-pgd_t boot_vmalloc_pgt[512]  ALIGN_TO_4K;

@@ -115,7 +115,7 @@ struct acpi_generic_address
 	u8                              address_space_id;       /* Address space where struct or register exists. */
 	u8                              register_bit_width;     /* Size in bits of given register */
 	u8                              register_bit_offset;    /* Bit offset within the register */
-	u8                              reserved;               /* Must be 0 */
+	u8                              access_width;           /* Minimum Access size (ACPI 3.0) */
 	u64                             address;                /* 64-bit address of struct or register */
 };
 

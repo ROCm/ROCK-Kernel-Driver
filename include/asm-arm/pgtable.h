@@ -10,6 +10,8 @@
 #ifndef _ASMARM_PGTABLE_H
 #define _ASMARM_PGTABLE_H
 
+#include <asm-generic/4level-fixup.h>
+
 #include <asm/memory.h>
 #include <asm/proc-fns.h>
 #include <asm/arch/vmalloc.h>

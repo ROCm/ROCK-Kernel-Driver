@@ -5,7 +5,8 @@
 # Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
 #
 config DRM
-	bool "Direct Rendering Manager (XFree86 4.1.0 and higher DRI support)"
+	tristate "Direct Rendering Manager (XFree86 4.1.0 and higher DRI support)"
+	depends on AGP || AGP=n
 	help
 	  Kernel-level support for the Direct Rendering Infrastructure (DRI)
 	  introduced in XFree86 4.0. If you say Y here, you need to select

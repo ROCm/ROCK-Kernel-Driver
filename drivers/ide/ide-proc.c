@@ -492,20 +492,6 @@ void destroy_proc_ide_interface(ide_hwif_t *hwif)
 	}
 }
 
-static void destroy_proc_ide_interfaces(void)
-{
-	int	h;
-
-	for (h = 0; h < MAX_HWIFS; h++) {
-		ide_hwif_t *hwif = &ide_hwifs[h];
-#if 0
-		if (!hwif->present)
-			continue;
-#endif
-		destroy_proc_ide_interface(hwif);
-	}
-}
-
 extern struct seq_operations ide_drivers_op;
 static int ide_drivers_open(struct inode *inode, struct file *file)
 {
@@ -535,6 +521,5 @@ void proc_ide_create(void)
 void proc_ide_destroy(void)
 {
 	remove_proc_entry("ide/drivers", proc_ide_root);
-	destroy_proc_ide_interfaces();
 	remove_proc_entry("ide", NULL);
 }

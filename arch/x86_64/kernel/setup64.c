@@ -66,7 +66,7 @@ __setup("noexec=", nonx_setup);
 
 /*
  * Great future plan:
- * Declare PDA itself and support (irqstack,tss,pml4) as per cpu data.
+ * Declare PDA itself and support (irqstack,tss,pgd) as per cpu data.
  * Always point %gs to its beginning
  */
 void __init setup_per_cpu_areas(void)
@@ -100,7 +100,6 @@ void __init setup_per_cpu_areas(void)
 
 void pda_init(int cpu)
 { 
-        pml4_t *level4;
 	struct x8664_pda *pda = &cpu_pda[cpu];
 
 	/* Setup up data that may be needed in __get_free_pages early */
@@ -119,22 +118,14 @@ void pda_init(int cpu)
 		/* others are initialized in smpboot.c */
 		pda->pcurrent = &init_task;
 		pda->irqstackptr = boot_cpu_stack; 
-		level4 = init_level4_pgt; 
 	} else {
-		level4 = (pml4_t *)__get_free_pages(GFP_ATOMIC, 0); 
-		if (!level4) 
-			panic("Cannot allocate top level page for cpu %d", cpu); 
 		pda->irqstackptr = (char *)
 			__get_free_pages(GFP_ATOMIC, IRQSTACK_ORDER);
 		if (!pda->irqstackptr)
 			panic("cannot allocate irqstack for cpu %d", cpu); 
 	}
 
-	pda->level4_pgt = (unsigned long *)level4; 
-	if (level4 != init_level4_pgt)
-		memcpy(level4, &init_level4_pgt, PAGE_SIZE); 
-	set_pml4(level4 + 510, mk_kernel_pml4(__pa_symbol(boot_vmalloc_pgt)));
-	asm volatile("movq %0,%%cr3" :: "r" (__pa(level4))); 
+	asm volatile("movq %0,%%cr3" :: "r" (__pa_symbol(&init_level4_pgt)));
 
 	pda->irqstackptr += IRQSTACKSIZE-64;
 } 

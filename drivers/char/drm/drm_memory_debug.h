@@ -167,7 +167,7 @@ void *DRM(alloc)(size_t size, int area)
 	return pt;
 }
 
-void *DRM(calloc)(size_t size, size_t nmemb, int area)
+void *DRM(calloc)(size_t nmemb, size_t size, int area)
 {
 	void *addr;
 

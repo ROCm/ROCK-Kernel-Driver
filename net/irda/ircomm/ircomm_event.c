@@ -57,7 +57,7 @@ char *ircomm_state[] = {
 	"IRCOMM_CONN",
 };
 
-char *ircomm_event[] = {
+static char *ircomm_event[] = {
 	"IRCOMM_CONNECT_REQUEST",
         "IRCOMM_CONNECT_RESPONSE",
         "IRCOMM_TTP_CONNECT_INDICATION",

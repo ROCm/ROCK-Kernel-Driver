@@ -1,6 +1,8 @@
 #ifndef _PPC64_PGTABLE_H
 #define _PPC64_PGTABLE_H
 
+#include <asm-generic/4level-fixup.h>
+
 /*
  * This file contains the functions and defines necessary to modify and use
  * the ppc64 hashed page table.

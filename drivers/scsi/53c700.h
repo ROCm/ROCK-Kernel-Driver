@@ -102,7 +102,6 @@ struct NCR_700_SG_List {
  * 18 device supports tag queueing */
 #define NCR_700_DEV_NEGOTIATED_SYNC	(1<<16)
 #define NCR_700_DEV_BEGIN_SYNC_NEGOTIATION	(1<<17)
-#define NCR_700_DEV_BEGIN_TAG_QUEUEING	(1<<18)
 #define NCR_700_DEV_PRINT_SYNC_NEGOTIATION (1<<19)
 
 static inline void
@@ -138,6 +137,27 @@ static inline void
 NCR_700_clear_flag(struct scsi_device *SDp, __u32 flag)
 {
 	spi_flags(SDp->sdev_target) &= ~flag;
+}
+
+enum NCR_700_tag_neg_state {
+	NCR_700_START_TAG_NEGOTIATION = 0,
+	NCR_700_DURING_TAG_NEGOTIATION = 1,
+	NCR_700_FINISHED_TAG_NEGOTIATION = 2,
+};
+
+static inline enum NCR_700_tag_neg_state
+NCR_700_get_tag_neg_state(struct scsi_device *SDp)
+{
+	return (enum NCR_700_tag_neg_state)((spi_flags(SDp->sdev_target)>>20) & 0x3);
+}
+
+static inline void
+NCR_700_set_tag_neg_state(struct scsi_device *SDp,
+			  enum NCR_700_tag_neg_state state)
+{
+	/* clear the slot */
+	spi_flags(SDp->sdev_target) &= ~(0x3 << 20);
+	spi_flags(SDp->sdev_target) |= ((__u32)state) << 20;
 }
 
 struct NCR_700_command_slot {

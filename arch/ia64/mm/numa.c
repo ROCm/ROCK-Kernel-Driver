@@ -20,8 +20,6 @@
 #include <asm/mmzone.h>
 #include <asm/numa.h>
 
-static struct node *sysfs_nodes;
-static struct cpu *sysfs_cpus;
 
 /*
  * The following structures are usually initialized by ACPI or
@@ -49,37 +47,3 @@ paddr_to_nid(unsigned long paddr)
 
 	return (i < num_node_memblks) ? node_memblk[i].nid : (num_node_memblks ? -1 : 0);
 }
-
-static int __init topology_init(void)
-{
-	int i, err = 0;
-
-	sysfs_nodes = kmalloc(sizeof(struct node) * numnodes, GFP_KERNEL);
-	if (!sysfs_nodes) {
-		err = -ENOMEM;
-		goto out;
-	}
-	memset(sysfs_nodes, 0, sizeof(struct node) * numnodes);
-
-	sysfs_cpus = kmalloc(sizeof(struct cpu) * NR_CPUS, GFP_KERNEL);
-	if (!sysfs_cpus) {
-		kfree(sysfs_nodes);
-		err = -ENOMEM;
-		goto out;
-	}
-	memset(sysfs_cpus, 0, sizeof(struct cpu) * NR_CPUS);
-
-	for (i = 0; i < numnodes; i++)
-		if ((err = register_node(&sysfs_nodes[i], i, NULL)))
-			goto out;
-
-	for (i = 0; i < NR_CPUS; i++)
-		if (cpu_online(i))
-			if((err = register_cpu(&sysfs_cpus[i], i,
-					       &sysfs_nodes[cpu_to_node(i)])))
-				goto out;
- out:
-	return err;
-}
-
-__initcall(topology_init);

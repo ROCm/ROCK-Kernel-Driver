@@ -1,6 +1,8 @@
 #ifndef __ASM_SH64_PGTABLE_H
 #define __ASM_SH64_PGTABLE_H
 
+#include <asm-generic/4level-fixup.h>
+
 /*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive

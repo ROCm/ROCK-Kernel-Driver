@@ -49,10 +49,10 @@ static inline int remap_area_pmd(pmd_t * pmd, unsigned long address, unsigned lo
 {
 	unsigned long end;
 
-	address &= ~PGDIR_MASK;
+	address &= ~PUD_MASK;
 	end = address + size;
-	if (end > PGDIR_SIZE)
-		end = PGDIR_SIZE;
+	if (end > PUD_SIZE)
+		end = PUD_SIZE;
 	phys_addr -= address;
 	if (address >= end)
 		BUG();
@@ -67,31 +67,54 @@ static inline int remap_area_pmd(pmd_t * pmd, unsigned long address, unsigned lo
 	return 0;
 }
 
+static inline int remap_area_pud(pud_t * pud, unsigned long address, unsigned long size,
+	unsigned long phys_addr, unsigned long flags)
+{
+	unsigned long end;
+
+	address &= ~PGDIR_MASK;
+	end = address + size;
+	if (end > PGDIR_SIZE)
+		end = PGDIR_SIZE;
+	phys_addr -= address;
+	if (address >= end)
+		BUG();
+	do {
+		pmd_t * pmd = pmd_alloc(&init_mm, pud, address);
+		if (!pmd)
+			return -ENOMEM;
+		remap_area_pmd(pmd, address, end - address, address + phys_addr, flags);
+		address = (address + PUD_SIZE) & PUD_MASK;
+		pmd++;
+	} while (address && (address < end));
+	return 0;
+}
+
 static int remap_area_pages(unsigned long address, unsigned long phys_addr,
 				 unsigned long size, unsigned long flags)
 {
 	int error;
-	pgd_t * dir;
+	pgd_t *pgd;
 	unsigned long end = address + size;
 
 	phys_addr -= address;
-	dir = pgd_offset_k(address);
+	pgd = pgd_offset_k(address);
 	flush_cache_all();
 	if (address >= end)
 		BUG();
 	spin_lock(&init_mm.page_table_lock);
 	do {
-		pmd_t *pmd;
-		pmd = pmd_alloc(&init_mm, dir, address);
+		pud_t *pud;
+		pud = pud_alloc(&init_mm, pgd, address);
 		error = -ENOMEM;
-		if (!pmd)
+		if (!pud)
 			break;
-		if (remap_area_pmd(pmd, address, end - address,
+		if (remap_area_pud(pud, address, end - address,
 					 phys_addr + address, flags))
 			break;
 		error = 0;
 		address = (address + PGDIR_SIZE) & PGDIR_MASK;
-		dir++;
+		pgd++;
 	} while (address && (address < end));
 	spin_unlock(&init_mm.page_table_lock);
 	flush_tlb_all();

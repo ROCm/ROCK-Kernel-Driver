@@ -135,13 +135,6 @@ static inline int is_my_addr(const struct s_smc *smc,
 		*(short *)(&smc->mib.m[MAC0].fddiMACSMTAddress.a[4])) ;
 }
 
-static inline int is_zero(const struct fddi_addr *addr)
-{
-	return(*(short *)(&addr->a[0]) == 0 &&
-	       *(short *)(&addr->a[2]) == 0 &&
-	       *(short *)(&addr->a[4]) == 0 ) ;
-}
-
 static inline int is_broadcast(const struct fddi_addr *addr)
 {
 	return(*(u_short *)(&addr->a[0]) == 0xffff &&

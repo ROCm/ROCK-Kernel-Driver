@@ -297,6 +297,8 @@ Summary of ide driver parameters for kernel command line
 
  "ide=reverse"		: formerly called to pci sub-system, but now local.
 
+ "ide=nodma"		: disable DMA globally for the IDE subsystem.
+
 The following are valid ONLY on ide0, which usually corresponds
 to the first ATA interface found on the particular host, and the defaults for
 the base,ctl ports must not be altered.

@@ -155,7 +155,6 @@ static int print_unex = 1;
 #include <linux/kernel.h>
 #include <linux/timer.h>
 #include <linux/workqueue.h>
-#include <linux/version.h>
 #define FDPATCHES
 #include <linux/fdreg.h>
 

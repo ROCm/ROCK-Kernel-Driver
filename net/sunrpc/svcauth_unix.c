@@ -97,7 +97,7 @@ struct ip_map {
 };
 static struct cache_head	*ip_table[IP_HASHMAX];
 
-void ip_map_put(struct cache_head *item, struct cache_detail *cd)
+static void ip_map_put(struct cache_head *item, struct cache_detail *cd)
 {
 	struct ip_map *im = container_of(item, struct ip_map,h);
 	if (cache_put(item, cd)) {
@@ -417,7 +417,7 @@ struct auth_ops svcauth_null = {
 };
 
 
-int
+static int
 svcauth_unix_accept(struct svc_rqst *rqstp, u32 *authp)
 {
 	struct kvec	*argv = &rqstp->rq_arg.head[0];
@@ -497,7 +497,7 @@ badcred:
 	return SVC_DENIED;
 }
 
-int
+static int
 svcauth_unix_release(struct svc_rqst *rqstp)
 {
 	/* Verifier (such as it is) is already in place.

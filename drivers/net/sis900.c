@@ -48,6 +48,7 @@
 */
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/timer.h>
@@ -120,6 +121,7 @@ static struct mii_chip_info {
 } mii_chip_table[] = {
 	{ "SiS 900 Internal MII PHY", 		0x001d, 0x8000, LAN },
 	{ "SiS 7014 Physical Layer Solution", 	0x0016, 0xf830, LAN },
+	{ "Altimata AC101LF PHY",               0x0022, 0x5520, LAN },
 	{ "AMD 79C901 10BASE-T PHY",  		0x0000, 0x6B70, LAN },
 	{ "AMD 79C901 HomePNA PHY",		0x0000, 0x6B90, HOME},
 	{ "ICS LAN PHY",			0x0015, 0xF440, LAN },
@@ -178,9 +180,9 @@ MODULE_AUTHOR("Jim Huang <cmhuang@sis.com.tw>, Ollie Lho <ollie@sis.com.tw>");
 MODULE_DESCRIPTION("SiS 900 PCI Fast Ethernet driver");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(multicast_filter_limit, "i");
-MODULE_PARM(max_interrupt_work, "i");
-MODULE_PARM(debug, "i");
+module_param(multicast_filter_limit, int, 0444);
+module_param(max_interrupt_work, int, 0444);
+module_param(debug, int, 0444);
 MODULE_PARM_DESC(multicast_filter_limit, "SiS 900/7016 maximum number of filtered multicast addresses");
 MODULE_PARM_DESC(max_interrupt_work, "SiS 900/7016 maximum events handled per interrupt");
 MODULE_PARM_DESC(debug, "SiS 900/7016 debug level (2-4)");

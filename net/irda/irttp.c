@@ -64,6 +64,10 @@ static void irttp_todo_expired(unsigned long data);
 static int irttp_param_max_sdu_size(void *instance, irda_param_t *param, 
 				    int get);
 
+static void irttp_flow_indication(void *instance, void *sap, LOCAL_FLOW flow);
+static void irttp_status_indication(void *instance,
+				    LINK_STATUS link, LOCK_STATUS lock);
+
 /* Information for parsing parameters in IrTTP */
 static pi_minor_info_t pi_minor_call_table[] = {
 	{ NULL, 0 },                                             /* 0x00 */
@@ -961,8 +965,8 @@ static int irttp_data_indication(void *instance, void *sap,
  *    Status_indication, just pass to the higher layer...
  *
  */
-void irttp_status_indication(void *instance,
-			     LINK_STATUS link, LOCK_STATUS lock)
+static void irttp_status_indication(void *instance,
+				    LINK_STATUS link, LOCK_STATUS lock)
 {
 	struct tsap_cb *self;
 
@@ -993,7 +997,7 @@ void irttp_status_indication(void *instance,
  *    Flow_indication : IrLAP tells us to send more data.
  *
  */
-void irttp_flow_indication(void *instance, void *sap, LOCAL_FLOW flow)
+static void irttp_flow_indication(void *instance, void *sap, LOCAL_FLOW flow)
 {
 	struct tsap_cb *self;
 
@@ -1613,7 +1617,7 @@ void irttp_disconnect_indication(void *instance, void *sap, LM_REASON reason,
  *    for some reason should fail. We mark rx sdu as busy to apply back
  *    pressure is necessary.
  */
-void irttp_do_data_indication(struct tsap_cb *self, struct sk_buff *skb)
+static void irttp_do_data_indication(struct tsap_cb *self, struct sk_buff *skb)
 {
 	int err;
 

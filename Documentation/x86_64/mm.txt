@@ -1,148 +1,24 @@
-The paging design used on the x86-64 linux kernel port in 2.4.x provides:
 
-o	per process virtual address space limit of 512 Gigabytes
-o	top of userspace stack located at address 0x0000007fffffffff
-o	PAGE_OFFSET = 0xffff800000000000
-o	start of the kernel = 0xffffffff800000000
-o	global RAM per system 2^64-PAGE_OFFSET-sizeof(kernel) = 128 Terabytes - 2 Gigabytes
-o	no need of any common code change
-o	no need to use highmem to handle the 128 Terabytes of RAM
+<previous description obsolete, deleted>
 
-Description:
+Virtual memory map with 4 level page tables:
 
-	Userspace is able to modify and it sees only the 3rd/2nd/1st level
-	pagetables (pgd_offset() implicitly walks the 1st slot of the 4th
-	level pagetable and it returns an entry into the 3rd level pagetable).
-	This is where the per-process 512 Gigabytes limit cames from.
+0000000000000000 - 00007fffffffffff (=47bits) user space, different per mm
+hole caused by [48:63] sign extension
+ffff800000000000 - ffff80ffffffffff (=40bits) guard hole
+ffff810000000000 - ffffc0ffffffffff (=46bits) direct mapping of phys. memory
+ffffc10000000000 - ffffc1ffffffffff (=40bits) hole
+ffffc20000000000 - ffffe1ffffffffff (=45bits) vmalloc/ioremap space
+... unused hole ...
+ffffffff80000000 - ffffffff82800000 (=40MB)   kernel text mapping, from phys 0
+... unused hole ...
+ffffffff88000000 - fffffffffff00000 (=1919MB) module mapping space
 
-	The common code pgd is the PDPE, the pmd is the PDE, the
-	pte is the PTE. The PML4E remains invisible to the common
-	code.
+vmalloc space is lazily synchronized into the different PML4 pages of
+the processes using the page fault handler, with init_level4_pgt as
+reference.
 
-	The kernel uses all the first 47 bits of the negative half
-	of the virtual address space to build the direct mapping using
-	2 Mbytes page size. The kernel virtual	addresses have bit number
-	47 always set to 1 (and in turn also bits 48-63 are set to 1 too,
-	due the sign extension). This is where the 128 Terabytes - 2 Gigabytes global
-	limit of RAM cames from.
+Current X86-64 implementations only support 40 bit of address space,
+but we support upto 46bits. This expands into MBZ space in the page tables.
 
-	Since the per-process limit is 512 Gigabytes (due to kernel common
-	code 3 level pagetable limitation), the higher virtual address mapped
-	into userspace is 0x7fffffffff and it makes sense to use it
-	as the top of the userspace stack to allow the stack to grow as
-	much as possible.
-
-	Setting the PAGE_OFFSET to 2^39 (after the last userspace
-	virtual address) wouldn't make much difference compared to
-	setting PAGE_OFFSET to 0xffff800000000000 because we have an
-	hole into the virtual address space. The last byte mapped by the
-	255th slot in the 4th level pagetable is at virtual address
-	0x00007fffffffffff and the first byte mapped by the 256th slot in the
-	4th level pagetable is at address 0xffff800000000000. Due to this
-	hole we can't trivially build a direct mapping across all the
-	512 slots of the 4th level pagetable, so we simply use only the
-	second (negative) half of the 4th level pagetable for that purpose
-	(that provides us 128 Terabytes of contigous virtual addresses).
-	Strictly speaking we could build a direct mapping also across the hole
-	using some DISCONTIGMEM trick, but we don't need such a large
-	direct mapping right now.
-
-Future:
-
-	During 2.5.x we can break the 512 Gigabytes per-process limit
-	possibly by removing from the common code any knowledge about the
-	architectural dependent physical layout of the virtual to physical
-	mapping.
-
-	Once the 512 Gigabytes limit will be removed the kernel stack will
-	be moved (most probably to virtual address 0x00007fffffffffff).
-	Nothing	will break in userspace due that move, as nothing breaks
-	in IA32 compiling the kernel with CONFIG_2G.
-
-Linus agreed on not breaking common code and to live with the 512 Gigabytes
-per-process limitation for the 2.4.x timeframe and he has given me and Andi
-some very useful hints... (thanks! :)
-
-Thanks also to H. Peter Anvin for his interesting and useful suggestions on
-the x86-64-discuss lists!
-
-Other memory management related issues follows:
-
-PAGE_SIZE:
-
-	If somebody is wondering why these days we still have a so small
-	4k pagesize (16 or 32 kbytes would be much better for performance
-	of course), the PAGE_SIZE have to remain 4k for 32bit apps to
-	provide 100% backwards compatible IA32 API (we can't allow silent
-	fs corruption or as best a loss of coherency with the page cache
-	by allocating MAP_SHARED areas in MAP_ANONYMOUS memory with a
-	do_mmap_fake). I think it could be possible to have a dynamic page
-	size between 32bit and 64bit apps but it would need extremely
-	intrusive changes in the common code as first for page cache and
-	we sure don't want to depend on them right now even if the
-	hardware would support that.
-
-PAGETABLE SIZE:
-
-	In turn we can't afford to have pagetables larger than 4k because
-	we could not be able to allocate them due physical memory
-	fragmentation, and failing to allocate the kernel stack is a minor
-	issue compared to failing the allocation of a pagetable. If we
-	fail the allocation of a pagetable the only thing we can do is to
-	sched_yield polling the freelist (deadlock prone) or to segfault
-	the task (not even the sighandler would be sure to run).
-
-KERNEL STACK:
-
-	1st stage:
-
-	The kernel stack will be at first allocated with an order 2 allocation
-	(16k) (the utilization of the stack for a 64bit platform really
-	isn't exactly the double of a 32bit platform because the local
-	variables may not be all 64bit wide, but not much less). This will
-	make things even worse than they are right now on IA32 with
-	respect of failing fork/clone due memory fragmentation.
-
-	2nd stage:
-
-	We'll benchmark if reserving one register as task_struct
-	pointer will improve performance of the kernel (instead of
-	recalculating the task_struct pointer starting from the stack
-	pointer each time). My guess is that recalculating will be faster
-	but it worth a try.
-
-		If reserving one register for the task_struct pointer
-		will be faster we can as well split task_struct and kernel
-		stack. task_struct can be a slab allocation or a
-		PAGE_SIZEd allocation, and the kernel stack can then be
-		allocated in a order 1 allocation. Really this is risky,
-		since 8k on a 64bit platform is going to be less than 7k
-		on a 32bit platform but we could try it out. This would
-		reduce the fragmentation problem of an order of magnitude
-		making it equal to the current IA32.
-
-		We must also consider the x86-64 seems to provide in hardware a
-		per-irq stack that could allow us to remove the irq handler
-		footprint from the regular per-process-stack, so it could allow
-		us to live with a smaller kernel stack compared to the other
-		linux architectures.
-
-	3rd stage:
-
-	Before going into production if we still have the order 2
-	allocation we can add a sysctl that allows the kernel stack to be
-	allocated with vmalloc during memory fragmentation. This have to
-	remain turned off during benchmarks :) but it should be ok in real
-	life.
-
-Order of PAGE_CACHE_SIZE and other allocations:
-
-	On the long run we can increase the PAGE_CACHE_SIZE to be
-	an order 2 allocations and also the slab/buffercache etc.ec..
-	could be all done with order 2 allocations. To make the above
-	to work we should change lots of common code thus it can be done
-	only once the basic port will be in a production state. Having
-	a working PAGE_CACHE_SIZE would be a benefit also for
-	IA32 and other architectures of course.
-
-Andrea <andrea@suse.de> SuSE
+-Andi Kleen, Jul 2004

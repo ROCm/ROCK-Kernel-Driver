@@ -20,6 +20,7 @@
 #include <linux/linkage.h>
 #include <linux/init.h>
 #include <asm/assembler.h>
+#include <asm/domain.h>
 #include <asm/constants.h>
 #include <asm/procinfo.h>
 #include <asm/hardware.h>
@@ -213,7 +214,10 @@ __sa1100_setup:
 	mcr	p15, 0, r10, c7, c7		@ invalidate I,D caches on v4
 	mcr	p15, 0, r10, c7, c10, 4		@ drain write buffer on v4
 	mcr	p15, 0, r10, c8, c7		@ invalidate I,D TLBs on v4
-	mov	r0, #0x1f			@ Domains 0, 1 = client
+	mov	r0, #(domain_val(DOMAIN_USER, DOMAIN_MANAGER) | \
+		      domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) | \
+		      domain_val(DOMAIN_TABLE, DOMAIN_MANAGER) | \
+		      domain_val(DOMAIN_IO, DOMAIN_CLIENT))
 	mcr	p15, 0, r0, c3, c0		@ load domain access register
 	mcr	p15, 0, r4, c2, c0		@ load page table pointer
 	mrc	p15, 0, r0, c1, c0		@ get control register v4
@@ -276,7 +280,11 @@ cpu_sa1110_name:
 __sa1100_proc_info:
 	.long	0x4401a110
 	.long	0xfffffff0
-	.long	0x00000c0e
+	.long   PMD_TYPE_SECT | \
+		PMD_SECT_BUFFERABLE | \
+		PMD_SECT_CACHEABLE | \
+		PMD_SECT_AP_WRITE | \
+		PMD_SECT_AP_READ
 	b	__sa1100_setup
 	.long	cpu_arch_name
 	.long	cpu_elf_name
@@ -292,7 +300,11 @@ __sa1100_proc_info:
 __sa1110_proc_info:
 	.long	0x6901b110
 	.long	0xfffffff0
-	.long	0x00000c0e
+	.long   PMD_TYPE_SECT | \
+		PMD_SECT_BUFFERABLE | \
+		PMD_SECT_CACHEABLE | \
+		PMD_SECT_AP_WRITE | \
+		PMD_SECT_AP_READ
 	b	__sa1100_setup
 	.long	cpu_arch_name
 	.long	cpu_elf_name

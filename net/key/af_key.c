@@ -35,7 +35,7 @@
 
 
 /* List of all pfkey sockets. */
-HLIST_HEAD(pfkey_table);
+static HLIST_HEAD(pfkey_table);
 static DECLARE_WAIT_QUEUE_HEAD(pfkey_table_wait);
 static rwlock_t pfkey_table_lock = RW_LOCK_UNLOCKED;
 static atomic_t pfkey_table_users = ATOMIC_INIT(0);

@@ -389,7 +389,7 @@ cleanup:
 	if (local_operand1 != operand1) {
 		acpi_ut_remove_reference (local_operand1);
 	}
-	return_ACPI_STATUS (AE_OK);
+	return_ACPI_STATUS (status);
 }
 
 

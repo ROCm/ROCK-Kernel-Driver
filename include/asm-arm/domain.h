@@ -29,8 +29,9 @@
 #define DOMAIN_CLIENT	1
 #define DOMAIN_MANAGER	3
 
-#define domain_val(dom,type)	((type) << 2*(dom))
+#define domain_val(dom,type)	((type) << (2*(dom)))
 
+#ifndef __ASSEMBLY__
 #define set_domain(x)					\
 	do {						\
 	__asm__ __volatile__(				\
@@ -48,3 +49,4 @@
 	} while (0)
 
 #endif
+#endif /* !__ASSEMBLY__ */

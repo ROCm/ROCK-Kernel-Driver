@@ -937,10 +937,10 @@ void gamma_driver_register_fns(drm_device_t *dev)
 	dev->driver_features = DRIVER_USE_AGP | DRIVER_USE_MTRR | DRIVER_PCI_DMA | DRIVER_HAVE_DMA | DRIVER_HAVE_IRQ;
 	DRM(fops).read = gamma_fops_read;
 	DRM(fops).poll = gamma_fops_poll;
-	dev->fn_tbl.preinit = gamma_driver_preinit;
-	dev->fn_tbl.pretakedown = gamma_driver_pretakedown;
-	dev->fn_tbl.dma_ready = gamma_driver_dma_ready;
-	dev->fn_tbl.dma_quiescent = gamma_driver_dma_quiescent;
-	dev->fn_tbl.dma_flush_block_and_flush = gamma_flush_block_and_flush;
-	dev->fn_tbl.dma_flush_unblock = gamma_flush_unblock;
+	dev->driver.preinit = gamma_driver_preinit;
+	dev->driver.pretakedown = gamma_driver_pretakedown;
+	dev->driver.dma_ready = gamma_driver_dma_ready;
+	dev->driver.dma_quiescent = gamma_driver_dma_quiescent;
+	dev->driver.dma_flush_block_and_flush = gamma_flush_block_and_flush;
+	dev->driver.dma_flush_unblock = gamma_flush_unblock;
 }

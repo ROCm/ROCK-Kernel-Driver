@@ -29,7 +29,6 @@
  *    Keith Whitwell <keith@tungstengraphics.com>
  */
 
-#include "radeon.h"
 #include "drmP.h"
 #include "drm.h"
 #include "radeon_drm.h"
@@ -44,7 +43,7 @@ static struct mem_block *split_block(struct mem_block *p, int start, int size,
 {
 	/* Maybe cut off the start of an existing block */
 	if (start > p->start) {
-		struct mem_block *newblock = DRM_MALLOC(sizeof(*newblock));
+		struct mem_block *newblock = drm_alloc(sizeof(*newblock), DRM_MEM_BUFS );
 		if (!newblock) 
 			goto out;
 		newblock->start = start;
@@ -60,7 +59,7 @@ static struct mem_block *split_block(struct mem_block *p, int start, int size,
    
 	/* Maybe cut off the end of an existing block */
 	if (size < p->size) {
-		struct mem_block *newblock = DRM_MALLOC(sizeof(*newblock));
+		struct mem_block *newblock = drm_alloc(sizeof(*newblock), DRM_MEM_BUFS );
 		if (!newblock)
 			goto out;
 		newblock->start = start + size;
@@ -118,7 +117,7 @@ static void free_block( struct mem_block *p )
 		p->size += q->size;
 		p->next = q->next;
 		p->next->prev = p;
-		DRM_FREE(q, sizeof(*q));
+		drm_free(q, sizeof(*q), DRM_MEM_BUFS );
 	}
 
 	if (p->prev->filp == 0) {
@@ -126,7 +125,7 @@ static void free_block( struct mem_block *p )
 		q->size += p->size;
 		q->next = p->next;
 		q->next->prev = q;
-		DRM_FREE(p, sizeof(*q));
+		drm_free(p, sizeof(*q), DRM_MEM_BUFS );
 	}
 }
 
@@ -134,14 +133,14 @@ static void free_block( struct mem_block *p )
  */
 static int init_heap(struct mem_block **heap, int start, int size)
 {
-	struct mem_block *blocks = DRM_MALLOC(sizeof(*blocks));
+	struct mem_block *blocks = drm_alloc(sizeof(*blocks), DRM_MEM_BUFS );
 
 	if (!blocks) 
 		return DRM_ERR(ENOMEM);
 	
-	*heap = DRM_MALLOC(sizeof(**heap));
+	*heap = drm_alloc(sizeof(**heap), DRM_MEM_BUFS );
 	if (!*heap) {
-		DRM_FREE( blocks, sizeof(*blocks) );
+		drm_free( blocks, sizeof(*blocks), DRM_MEM_BUFS );
 		return DRM_ERR(ENOMEM);
 	}
 
@@ -180,7 +179,7 @@ void radeon_mem_release( DRMFILE filp, struct mem_block *heap )
 			p->size += q->size;
 			p->next = q->next;
 			p->next->prev = p;
-			DRM_FREE(q, sizeof(*q));
+			drm_free(q, sizeof(*q),DRM_MEM_DRIVER);
 		}
 	}
 }
@@ -197,10 +196,10 @@ void radeon_mem_takedown( struct mem_block **heap )
 	for (p = (*heap)->next ; p != *heap ; ) {
 		struct mem_block *q = p;
 		p = p->next;
-		DRM_FREE(q, sizeof(*q));
+		drm_free(q, sizeof(*q),DRM_MEM_DRIVER);
 	}
 
-	DRM_FREE( *heap, sizeof(**heap) );
+	drm_free( *heap, sizeof(**heap),DRM_MEM_DRIVER );
 	*heap = NULL;
 }
 

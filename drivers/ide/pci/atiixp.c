@@ -341,8 +341,7 @@ static ide_pci_device_t atiixp_pci_info[] __devinitdata = {
 
 static int __devinit atiixp_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_setup_pci_device(dev, &atiixp_pci_info[id->driver_data]);
-	return 0;
+	return ide_setup_pci_device(dev, &atiixp_pci_info[id->driver_data]);
 }
 
 static struct pci_device_id atiixp_pci_tbl[] = {

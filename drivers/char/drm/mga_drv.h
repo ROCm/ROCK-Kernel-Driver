@@ -31,6 +31,19 @@
 #ifndef __MGA_DRV_H__
 #define __MGA_DRV_H__
 
+/* General customization:
+ */
+
+#define DRIVER_AUTHOR		"Gareth Hughes, VA Linux Systems Inc."
+
+#define DRIVER_NAME		"mga"
+#define DRIVER_DESC		"Matrox G200/G400"
+#define DRIVER_DATE		"20021029"
+
+#define DRIVER_MAJOR		3
+#define DRIVER_MINOR		1
+#define DRIVER_PATCHLEVEL	0
+
 typedef struct drm_mga_primary_buffer {
 	u8 *start;
 	u8 *end;
@@ -104,6 +117,8 @@ extern int mga_dma_init( DRM_IOCTL_ARGS );
 extern int mga_dma_flush( DRM_IOCTL_ARGS );
 extern int mga_dma_reset( DRM_IOCTL_ARGS );
 extern int mga_dma_buffers( DRM_IOCTL_ARGS );
+extern void mga_driver_pretakedown(drm_device_t *dev);
+extern int mga_driver_dma_quiescent(drm_device_t *dev);
 
 extern int mga_do_wait_for_idle( drm_mga_private_t *dev_priv );
 extern int mga_do_dma_idle( drm_mga_private_t *dev_priv );

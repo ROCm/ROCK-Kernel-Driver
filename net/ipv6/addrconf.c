@@ -48,6 +48,7 @@
 #include <linux/netdevice.h>
 #include <linux/if_arp.h>
 #include <linux/if_arcnet.h>
+#include <linux/if_infiniband.h>
 #include <linux/route.h>
 #include <linux/inetdevice.h>
 #include <linux/init.h>
@@ -1095,6 +1096,12 @@ static int ipv6_generate_eui64(u8 *eui, struct net_device *dev)
 		memset(eui, 0, 7);
 		eui[7] = *(u8*)dev->dev_addr;
 		return 0;
+	case ARPHRD_INFINIBAND:
+		if (dev->addr_len != INFINIBAND_ALEN)
+			return -1;
+		memcpy(eui, dev->dev_addr + 12, 8);
+		eui[0] |= 2;
+		return 0;
 	}
 	return -1;
 }
@@ -1794,7 +1801,8 @@ static void addrconf_dev_config(struct net_device *dev)
 	if ((dev->type != ARPHRD_ETHER) && 
 	    (dev->type != ARPHRD_FDDI) &&
 	    (dev->type != ARPHRD_IEEE802_TR) &&
-	    (dev->type != ARPHRD_ARCNET)) {
+	    (dev->type != ARPHRD_ARCNET) &&
+	    (dev->type != ARPHRD_INFINIBAND)) {
 		/* Alas, we support only Ethernet autoconfiguration. */
 		return;
 	}

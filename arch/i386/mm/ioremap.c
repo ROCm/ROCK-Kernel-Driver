@@ -80,9 +80,14 @@ static int remap_area_pages(unsigned long address, unsigned long phys_addr,
 		BUG();
 	spin_lock(&init_mm.page_table_lock);
 	do {
+		pud_t *pud;
 		pmd_t *pmd;
-		pmd = pmd_alloc(&init_mm, dir, address);
+		
 		error = -ENOMEM;
+		pud = pud_alloc(&init_mm, dir, address);
+		if (!pud)
+			break;
+		pmd = pmd_alloc(&init_mm, pud, address);
 		if (!pmd)
 			break;
 		if (remap_area_pmd(pmd, address, end - address,

@@ -144,6 +144,15 @@ config ACPI_PROCESSOR
 	  ACPI C2 and C3 processor states to save power, on systems that
 	  support it.
 
+config ACPI_HOTPLUG_CPU
+	bool "Processor Hotplug (EXPERIMENTAL)"
+	depends on ACPI_PROCESSOR && HOTPLUG_CPU && EXPERIMENTAL
+	depends on !IA64_SGI_SN
+	select ACPI_CONTAINER
+	default n
+	 ---help---
+	 Select this option if your platform support physical CPU hotplug.
+
 config ACPI_THERMAL
 	tristate "Thermal Zone"
 	depends on ACPI_PROCESSOR
@@ -325,5 +334,12 @@ config X86_PM_TIMER
 	  kernel logs, and/or you are using this on a notebook which
 	  does not yet have an HPET, you should say "Y" here.
 
-endmenu
+config ACPI_CONTAINER
+	tristate "ACPI0004,PNP0A05 and PNP0A06 Container Driver (EXPERIMENTAL)"
+	depends on ACPI && EXPERIMENTAL
+	default (ACPI_HOTPLUG_MEMORY || ACPI_HOTPLUG_CPU || ACPI_HOTPLUG_IO)
+	 ---help---
+	 	This is the ACPI generic container driver which supports
+		ACPI0004, PNP0A05 and PNP0A06 devices
 
+endmenu

@@ -26,9 +26,6 @@
 
 #define LOWMEMSIZE()	(0x9f000)
 
-#define MAXMEM		(120UL * 1024 * 1024 * 1024 * 1024)  /* 120TB */ 
-
-
 #ifndef __ASSEMBLY__
 struct e820entry {
 	u64 addr;	/* start of memory segment */

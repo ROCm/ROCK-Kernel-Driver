@@ -7,7 +7,6 @@
  * 
  **************************************************************************/
 
-#include "i915.h"
 #include "drmP.h"
 #include "drm.h"
 #include "i915_drm.h"
@@ -84,7 +83,7 @@ int i915_dma_cleanup(drm_device_t * dev)
 	 * is freed, it's too late.
 	 */
 	if (dev->irq)
-		DRM(irq_uninstall) (dev);
+		drm_irq_uninstall (dev);
 
 	if (dev->dev_private) {
 		drm_i915_private_t *dev_priv =
@@ -102,7 +101,7 @@ int i915_dma_cleanup(drm_device_t * dev)
 			I915_WRITE(0x02080, 0x1ffff000);
 		}
 
-		DRM(free) (dev->dev_private, sizeof(drm_i915_private_t),
+		drm_free (dev->dev_private, sizeof(drm_i915_private_t),
 			   DRM_MEM_DRIVER);
 
 		dev->dev_private = NULL;
@@ -242,7 +241,7 @@ int i915_dma_init(DRM_IOCTL_ARGS)
 
 	switch (init.func) {
 	case I915_INIT_DMA:
-		dev_priv = DRM(alloc) (sizeof(drm_i915_private_t),
+		dev_priv = drm_alloc (sizeof(drm_i915_private_t),
 				       DRM_MEM_DRIVER);
 		if (dev_priv == NULL)
 			return DRM_ERR(ENOMEM);
@@ -545,10 +544,7 @@ int i915_flush_ioctl(DRM_IOCTL_ARGS)
 {
 	DRM_DEVICE;
 
-	if (!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
-		DRM_ERROR("i915_flush_ioctl called without lock held\n");
-		return DRM_ERR(EINVAL);
-	}
+	LOCK_TEST_WITH_RETURN(dev, filp);
 
 	return i915_quiescent(dev);
 }
@@ -574,10 +570,7 @@ int i915_batchbuffer(DRM_IOCTL_ARGS)
 	DRM_DEBUG("i915 batchbuffer, start %x used %d cliprects %d\n",
 		  batch.start, batch.used, batch.num_cliprects);
 
-	if (!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
-		DRM_ERROR("i915_batchbuffer called without lock held\n");
-		return DRM_ERR(EINVAL);
-	}
+	LOCK_TEST_WITH_RETURN(dev, filp);
 
 	if (batch.num_cliprects && DRM_VERIFYAREA_READ(batch.cliprects,
 						       batch.num_cliprects *
@@ -606,10 +599,7 @@ int i915_cmdbuffer(DRM_IOCTL_ARGS)
 	DRM_DEBUG("i915 cmdbuffer, buf %p sz %d cliprects %d\n",
 		  cmdbuf.buf, cmdbuf.sz, cmdbuf.num_cliprects);
 
-	if (!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
-		DRM_ERROR("i915_cmdbuffer called without lock held\n");
-		return DRM_ERR(EINVAL);
-	}
+	LOCK_TEST_WITH_RETURN(dev, filp);
 
 	if (cmdbuf.num_cliprects &&
 	    DRM_VERIFYAREA_READ(cmdbuf.cliprects,
@@ -645,10 +635,8 @@ int i915_flip_bufs(DRM_IOCTL_ARGS)
 	DRM_DEVICE;
 
 	DRM_DEBUG("%s\n", __FUNCTION__);
-	if (!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
-		DRM_ERROR("i915_flip_buf called without lock held\n");
-		return DRM_ERR(EINVAL);
-	}
+
+	LOCK_TEST_WITH_RETURN(dev, filp);
 
 	return i915_dispatch_flip(dev);
 }
@@ -720,7 +708,7 @@ int i915_setparam(DRM_IOCTL_ARGS)
 	return 0;
 }
 
-static void i915_driver_pretakedown(drm_device_t *dev)
+void i915_driver_pretakedown(drm_device_t *dev)
 {
 	if ( dev->dev_private ) {
 		drm_i915_private_t *dev_priv = dev->dev_private;
@@ -729,7 +717,7 @@ static void i915_driver_pretakedown(drm_device_t *dev)
 	i915_dma_cleanup( dev );
 }
 
-static void i915_driver_prerelease(drm_device_t *dev, DRMFILE filp)
+void i915_driver_prerelease(drm_device_t *dev, DRMFILE filp)
 {
 	if ( dev->dev_private ) {
 		drm_i915_private_t *dev_priv = dev->dev_private;
@@ -737,19 +725,3 @@ static void i915_driver_prerelease(drm_device_t *dev, DRMFILE filp)
 	}
 }
 
-void i915_driver_register_fns(drm_device_t *dev)
-{
-	dev->driver_features = DRIVER_USE_AGP | DRIVER_REQUIRE_AGP | DRIVER_USE_MTRR | DRIVER_HAVE_IRQ | DRIVER_IRQ_SHARED;
-	dev->fn_tbl.pretakedown = i915_driver_pretakedown;
-	dev->fn_tbl.prerelease = i915_driver_prerelease;
-	dev->fn_tbl.irq_preinstall = i915_driver_irq_preinstall;
-	dev->fn_tbl.irq_postinstall = i915_driver_irq_postinstall;
-	dev->fn_tbl.irq_uninstall = i915_driver_irq_uninstall;
-	dev->fn_tbl.irq_handler = i915_driver_irq_handler;
-	
-	dev->counters += 4;
-	dev->types[6] = _DRM_STAT_IRQ;
-	dev->types[7] = _DRM_STAT_PRIMARY;
-	dev->types[8] = _DRM_STAT_SECONDARY;
-	dev->types[9] = _DRM_STAT_DMA;
-}

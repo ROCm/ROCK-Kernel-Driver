@@ -1126,8 +1126,6 @@ typedef struct {
 #define FE_DS3_PHY      0x0080          /* DS3 */
 #define FE_E3_PHY       0x0090          /* E3 */
 		     
-extern void ia_mb25_init (IADEV *);
-
 /*********************** SUNI_PM7345 PHY DEFINE HERE *********************/
 typedef struct _suni_pm7345_t
 {
@@ -1325,8 +1323,6 @@ typedef struct _suni_pm7345_t
 #define SUNI_DS3_COCAI  0x04            /* Corr. HCS errors detected    */
 #define SUNI_DS3_FOVRI  0x02            /* FIFO overrun                 */
 #define SUNI_DS3_FUDRI  0x01            /* FIFO underrun                */
-
-extern void ia_suni_pm7345_init (IADEV *iadev);
 
 ///////////////////SUNI_PM7345 PHY DEFINE END /////////////////////////////
 

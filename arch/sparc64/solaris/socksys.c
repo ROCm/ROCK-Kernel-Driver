@@ -150,7 +150,7 @@ static unsigned int socksys_poll(struct file * filp, poll_table * wait)
 	unsigned int mask = 0;
 
 	ino=filp->f_dentry->d_inode;
-	if (ino && ino->i_sock) {
+	if (ino && S_ISSOCK(ino->i_mode)) {
 		struct sol_socket_struct *sock;
 		sock = (struct sol_socket_struct*)filp->private_data;
 		if (sock && sock->pfirst) {

@@ -32,15 +32,12 @@
 #include <linux/kref.h>
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
-#ifdef CONFIG_KDB
-#include <linux/kdb.h>
-#endif
 
 /*
  * Literals
  */
-#define IPR_DRIVER_VERSION "2.0.11"
-#define IPR_DRIVER_DATE "(August 3, 2004)"
+#define IPR_DRIVER_VERSION "2.0.12"
+#define IPR_DRIVER_DATE "(December 14, 2004)"
 
 /*
  * IPR_DBG_TRACE: Setting this to 1 will turn on some general function tracing
@@ -146,6 +143,7 @@
 /*
  * Adapter Commands
  */
+#define IPR_QUERY_RSRC_STATE				0xC2
 #define IPR_RESET_DEVICE				0xC3
 #define	IPR_RESET_TYPE_SELECT				0x80
 #define	IPR_LUN_RESET					0x40
@@ -1059,20 +1057,20 @@ struct ipr_error_table_t {
 };
 
 struct ipr_software_inq_lid_info {
-    u32  load_id;
-    u32  timestamp[3];
+	u32 load_id;
+	u32 timestamp[3];
 }__attribute__((packed, aligned (4)));
 
 struct ipr_ucode_image_header {
-    u32 header_length;
-    u32 lid_table_offset;
-    u8 major_release;
-    u8 card_type;
-    u8 minor_release[2];
-    u8 reserved[20];
-    char eyecatcher[16];
-    u32 num_lids;
-    struct ipr_software_inq_lid_info lid[1];
+	u32 header_length;
+	u32 lid_table_offset;
+	u8 major_release;
+	u8 card_type;
+	u8 minor_release[2];
+	u8 reserved[20];
+	char eyecatcher[16];
+	u32 num_lids;
+	struct ipr_software_inq_lid_info lid[1];
 }__attribute__((packed, aligned (4)));
 
 /*
@@ -1082,18 +1080,6 @@ struct ipr_ucode_image_header {
 #define IPR_DBG_CMD(CMD) do { CMD; } while (0)
 #else
 #define IPR_DBG_CMD(CMD)
-#endif
-
-#define ipr_breakpoint_data KERN_ERR IPR_NAME\
-": %s: %s: Line: %d ioa_cfg: %p\n", __FILE__, \
-__FUNCTION__, __LINE__, ioa_cfg
-
-#if defined(CONFIG_KDB) && !defined(CONFIG_PPC_ISERIES)
-#define ipr_breakpoint {printk(ipr_breakpoint_data); KDB_ENTER();}
-#define ipr_breakpoint_or_die {printk(ipr_breakpoint_data); KDB_ENTER();}
-#else
-#define ipr_breakpoint
-#define ipr_breakpoint_or_die panic(ipr_breakpoint_data)
 #endif
 
 #ifdef CONFIG_SCSI_IPR_TRACE

@@ -5,6 +5,8 @@
 #ifndef _CRIS_PGTABLE_H
 #define _CRIS_PGTABLE_H
 
+#include <asm-generic/4level-fixup.h>
+
 #ifndef __ASSEMBLY__
 #include <linux/config.h>
 #include <linux/sched.h>
