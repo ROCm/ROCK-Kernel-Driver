@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#182 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#183 $
  *
  * $FreeBSD$
  */
@@ -6605,9 +6605,9 @@ ahd_enable_coalessing(struct ahd_softc *ahd, int enable)
 void
 ahd_pause_and_flushwork(struct ahd_softc *ahd)
 {
-	u_int		intstat;
-	u_int		maxloops;
-	u_int		qfreeze_cnt;
+	u_int intstat;
+	u_int maxloops;
+	u_int qfreeze_cnt;
 
 	maxloops = 1000;
 	ahd->flags |= AHD_ALL_INTERRUPTS;
@@ -7736,6 +7736,9 @@ ahd_handle_scsi_status(struct ahd_softc *ahd, struct scb *scb)
 		ahd_unpause(ahd);
 		ahd_delay(200);
 	} while (--maxloops);
+
+	if (maxloops == 0)
+		ahd_pause(ahd);
 
 	/* Freeze the queue until the client sees the error. */
 	ahd_freeze_devq(ahd, scb);
