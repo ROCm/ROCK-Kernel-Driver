@@ -621,7 +621,7 @@ static int dvb_ca_en50221_read_data(struct dvb_ca_private* ca, int slot, u8* ebu
 
         /* OK, add it to the receive buffer, or copy into external buffer if supplied */
         if (ebuf == NULL) {
-                dvb_ringbuffer_pkt_write(&ca->slot_info[slot].rx_buffer, buf, bytes_read, 0);
+                dvb_ringbuffer_pkt_write(&ca->slot_info[slot].rx_buffer, buf, bytes_read);
         } else {
                 memcpy(ebuf, buf, bytes_read);
         }
