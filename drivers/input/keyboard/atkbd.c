@@ -209,9 +209,24 @@ struct atkbd {
 	unsigned int last;
 	unsigned long time;
 
+	/* Ensures that only one command is executing at a time */
+	struct semaphore cmd_sem;
+
+	/* Used to signal completion from interrupt handler */
+	wait_queue_head_t wait;
+
 	/* Flags */
 	unsigned long flags;
 };
+
+/* Work structure to schedule execution of a command */
+struct atkbd_work {
+	struct work_struct work;
+	struct atkbd *atkbd;
+	int command;
+	unsigned char param[0];
+};
+
 
 static void atkbd_report_key(struct input_dev *dev, struct pt_regs *regs, int code, int value)
 {
@@ -262,10 +277,12 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 					set_bit(ATKBD_FLAG_CMD1, &atkbd->flags);
 				}
 				clear_bit(ATKBD_FLAG_ACK, &atkbd->flags);
+				wake_up_interruptible(&atkbd->wait);
 				break;
 			case ATKBD_RET_NAK:
 				atkbd->nak = 1;
 				clear_bit(ATKBD_FLAG_ACK, &atkbd->flags);
+				wake_up_interruptible(&atkbd->wait);
 				break;
 		}
 		goto out;
@@ -276,10 +293,13 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 		if (atkbd->cmdcnt)
 			atkbd->cmdbuf[--atkbd->cmdcnt] = code;
 
-		clear_bit(ATKBD_FLAG_CMD1, &atkbd->flags);
-		if (!atkbd->cmdcnt)
-			clear_bit(ATKBD_FLAG_CMD, &atkbd->flags);
+		if (test_and_clear_bit(ATKBD_FLAG_CMD1, &atkbd->flags) && atkbd->cmdcnt)
+			wake_up_interruptible(&atkbd->wait);
 
+		if (!atkbd->cmdcnt) {
+			clear_bit(ATKBD_FLAG_CMD, &atkbd->flags);
+			wake_up_interruptible(&atkbd->wait);
+		}
 		goto out;
 	}
 
@@ -412,12 +432,12 @@ out:
  * acknowledge. It doesn't handle resends according to the keyboard
  * protocol specs, because if these are needed, the keyboard needs
  * replacement anyway, and they only make a mess in the protocol.
+ *
+ * atkbd_sendbyte() can only be called from a process context
  */
 
 static int atkbd_sendbyte(struct atkbd *atkbd, unsigned char byte)
 {
-	int timeout = 200000; /* 200 msec */
-
 #ifdef ATKBD_DEBUG
 	printk(KERN_DEBUG "atkbd.c: Sent: %02x\n", byte);
 #endif
@@ -425,8 +445,9 @@ static int atkbd_sendbyte(struct atkbd *atkbd, unsigned char byte)
 	set_bit(ATKBD_FLAG_ACK, &atkbd->flags);
 
 	if (serio_write(atkbd->serio, byte) == 0)
-		while (test_bit(ATKBD_FLAG_ACK, &atkbd->flags) && timeout--)
-			udelay(1);
+		wait_event_interruptible_timeout(atkbd->wait,
+				!test_bit(ATKBD_FLAG_ACK, &atkbd->flags),
+				msecs_to_jiffies(200));
 
 	clear_bit(ATKBD_FLAG_ACK, &atkbd->flags);
 	return -atkbd->nak;
@@ -435,19 +456,21 @@ static int atkbd_sendbyte(struct atkbd *atkbd, unsigned char byte)
 /*
  * atkbd_command() sends a command, and its parameters to the keyboard,
  * then waits for the response and puts it in the param array.
+ *
+ * atkbd_command() can only be called from a process context
  */
 
 static int atkbd_command(struct atkbd *atkbd, unsigned char *param, int command)
 {
-	int timeout = 500000; /* 500 msec */
+	int timeout;
 	int send = (command >> 12) & 0xf;
 	int receive = (command >> 8) & 0xf;
 	int rc = -1;
 	int i;
 
-	if (command == ATKBD_CMD_RESET_BAT)
-		timeout = 4000000; /* 4 sec */
+	timeout = msecs_to_jiffies(command == ATKBD_CMD_RESET_BAT ? 4000 : 500);
 
+	down(&atkbd->cmd_sem);
 	clear_bit(ATKBD_FLAG_CMD, &atkbd->flags);
 
 	if (receive && param)
@@ -464,27 +487,26 @@ static int atkbd_command(struct atkbd *atkbd, unsigned char *param, int command)
 		if (atkbd_sendbyte(atkbd, param[i]))
 			goto out;
 
-	while (test_bit(ATKBD_FLAG_CMD, &atkbd->flags) && timeout--) {
+	timeout = wait_event_interruptible_timeout(atkbd->wait,
+				!test_bit(ATKBD_FLAG_CMD1, &atkbd->flags), timeout);
 
-		if (!test_bit(ATKBD_FLAG_CMD1, &atkbd->flags)) {
+	if (atkbd->cmdcnt && timeout > 0) {
+		if (command == ATKBD_CMD_RESET_BAT && jiffies_to_msecs(timeout) > 100)
+			timeout = msecs_to_jiffies(100);
 
-			if (command == ATKBD_CMD_RESET_BAT && timeout > 100000)
-				timeout = 100000;
-
-			if (command == ATKBD_CMD_GETID &&
-			    atkbd->cmdbuf[receive - 1] != 0xab && atkbd->cmdbuf[receive - 1] != 0xac) {
-				/*
-				 * Device behind the port is not a keyboard
-				 * so we don't need to wait for the 2nd byte
-				 * of ID response.
-				 */
-				clear_bit(ATKBD_FLAG_CMD, &atkbd->flags);
-				atkbd->cmdcnt = 0;
-				break;
-			}
+		if (command == ATKBD_CMD_GETID &&
+		    atkbd->cmdbuf[receive - 1] != 0xab && atkbd->cmdbuf[receive - 1] != 0xac) {
+			/*
+			 * Device behind the port is not a keyboard
+			 * so we don't need to wait for the 2nd byte
+			 * of ID response.
+			 */
+			clear_bit(ATKBD_FLAG_CMD, &atkbd->flags);
+			atkbd->cmdcnt = 0;
 		}
 
-		udelay(1);
+		wait_event_interruptible_timeout(atkbd->wait,
+				!test_bit(ATKBD_FLAG_CMD, &atkbd->flags), timeout);
 	}
 
 	if (param)
@@ -499,9 +521,57 @@ static int atkbd_command(struct atkbd *atkbd, unsigned char *param, int command)
 out:
 	clear_bit(ATKBD_FLAG_CMD, &atkbd->flags);
 	clear_bit(ATKBD_FLAG_CMD1, &atkbd->flags);
+	up(&atkbd->cmd_sem);
 
 	return rc;
 }
+
+/*
+ * atkbd_execute_scheduled_command() sends a command, previously scheduled by
+ * atkbd_schedule_command(), to the keyboard.
+ */
+
+static void atkbd_execute_scheduled_command(void *data)
+{
+	struct atkbd_work *atkbd_work = data;
+
+	atkbd_command(atkbd_work->atkbd, atkbd_work->param, atkbd_work->command);
+
+	kfree(atkbd_work);
+}
+
+/*
+ * atkbd_schedule_command() allows to schedule delayed execution of a keyboard
+ * command and can be used to issue a command from an interrupt or softirq
+ * context.
+ */
+
+static int atkbd_schedule_command(struct atkbd *atkbd, unsigned char *param, int command)
+{
+	struct atkbd_work *atkbd_work;
+	int send = (command >> 12) & 0xf;
+	int receive = (command >> 8) & 0xf;
+
+	if (!test_bit(ATKBD_FLAG_ENABLED, &atkbd->flags))
+		return -1;
+
+	if (!(atkbd_work = kmalloc(sizeof(struct atkbd_work) + max(send, receive), GFP_ATOMIC)))
+		return -1;
+
+	memset(atkbd_work, 0, sizeof(struct atkbd_work));
+	atkbd_work->atkbd = atkbd;
+	atkbd_work->command = command;
+	memcpy(atkbd_work->param, param, send);
+	INIT_WORK(&atkbd_work->work, atkbd_execute_scheduled_command, atkbd_work);
+
+	if (!schedule_work(&atkbd_work->work)) {
+		kfree(atkbd_work);
+		return -1;
+	}
+
+	return 0;
+}
+
 
 /*
  * Event callback from the input module. Events that change the state of
@@ -529,7 +599,7 @@ static int atkbd_event(struct input_dev *dev, unsigned int type, unsigned int co
 			param[0] = (test_bit(LED_SCROLLL, dev->led) ? 1 : 0)
 			         | (test_bit(LED_NUML,    dev->led) ? 2 : 0)
 			         | (test_bit(LED_CAPSL,   dev->led) ? 4 : 0);
-		        atkbd_command(atkbd, param, ATKBD_CMD_SETLEDS);
+		        atkbd_schedule_command(atkbd, param, ATKBD_CMD_SETLEDS);
 
 			if (atkbd->extra) {
 				param[0] = 0;
@@ -538,7 +608,7 @@ static int atkbd_event(struct input_dev *dev, unsigned int type, unsigned int co
 					 | (test_bit(LED_SUSPEND, dev->led) ? 0x04 : 0)
 				         | (test_bit(LED_MISC,    dev->led) ? 0x10 : 0)
 				         | (test_bit(LED_MUTE,    dev->led) ? 0x20 : 0);
-				atkbd_command(atkbd, param, ATKBD_CMD_EX_SETLEDS);
+				atkbd_schedule_command(atkbd, param, ATKBD_CMD_EX_SETLEDS);
 			}
 
 			return 0;
@@ -554,7 +624,7 @@ static int atkbd_event(struct input_dev *dev, unsigned int type, unsigned int co
 			dev->rep[REP_PERIOD] = period[i];
 			dev->rep[REP_DELAY] = delay[j];
 			param[0] = i | (j << 5);
-			atkbd_command(atkbd, param, ATKBD_CMD_SETREP);
+			atkbd_schedule_command(atkbd, param, ATKBD_CMD_SETREP);
 
 			return 0;
 	}
@@ -726,7 +796,11 @@ static void atkbd_cleanup(struct serio *serio)
 static void atkbd_disconnect(struct serio *serio)
 {
 	struct atkbd *atkbd = serio->private;
+
 	clear_bit(ATKBD_FLAG_ENABLED, &atkbd->flags);
+	synchronize_kernel();
+	flush_scheduled_work();
+
 	input_unregister_device(&atkbd->dev);
 	serio_close(serio);
 	kfree(atkbd);
@@ -747,6 +821,9 @@ static void atkbd_connect(struct serio *serio, struct serio_driver *drv)
 	if (!(atkbd = kmalloc(sizeof(struct atkbd), GFP_KERNEL)))
 		return;
 	memset(atkbd, 0, sizeof(struct atkbd));
+
+	init_MUTEX(&atkbd->cmd_sem);
+	init_waitqueue_head(&atkbd->wait);
 
 	switch (serio->type & SERIO_TYPE) {
 
