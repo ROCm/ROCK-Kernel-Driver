@@ -50,9 +50,9 @@
      __asm__ __volatile__ ("rdtsc" : "=a" (low) : : "edx")
 
 #define rdtscll(val) do { \
-     unsigned int a,d; \
-     asm volatile("rdtsc" : "=a" (a), "=d" (d)); \
-     (val) = ((unsigned long)a) | (((unsigned long)d)<<32); \
+     unsigned int __a,__d; \
+     asm volatile("rdtsc" : "=a" (__a), "=d" (__d)); \
+     (val) = ((unsigned long)__a) | (((unsigned long)__d)<<32); \
 } while(0)
 
 #define rdpmc(counter,low,high) \
