@@ -371,26 +371,39 @@ static void *slow_memcpy( void *dst, const void *src, size_t len )
 }
 
 
-int __init atarilance_probe( struct net_device *dev )
-{	
+struct net_device * __init atarilance_probe(int unit)
+{
 	int i;
 	static int found;
-
-	SET_MODULE_OWNER(dev);
+	struct net_device *dev;
+	int err = -ENODEV;
 
 	if (!MACH_IS_ATARI || found)
 		/* Assume there's only one board possible... That seems true, since
 		 * the Riebl/PAM board's address cannot be changed. */
-		return( ENODEV );
+		return ERR_PTR(-ENODEV);
+
+	dev = alloc_etherdev(sizeof(struct lance_private));
+	if (!dev)
+		return ERR_PTR(-ENOMEM);
+	if (unit >= 0) {
+		sprintf(dev->name, "eth%d", unit);
+		netdev_boot_setup_check(dev);
+	}
+	SET_MODULE_OWNER(dev);
 
 	for( i = 0; i < N_LANCE_ADDR; ++i ) {
 		if (lance_probe1( dev, &lance_addr_list[i] )) {
 			found = 1;
-			return( 0 );
+			err = register_netdev(dev);
+			if (!err)
+				return dev;
+			free_irq(dev->irq, dev);
+			break;
 		}
 	}
-
-	return( ENODEV );
+	free_netdev(dev);
+	return ERR_PTR(err);
 }
 
 
@@ -511,12 +524,6 @@ static unsigned long __init lance_probe1( struct net_device *dev,
 	return( 0 );
 
   probe_ok:
-	init_etherdev( dev, sizeof(struct lance_private) );
-	if (!dev->priv) {
-		dev->priv = kmalloc( sizeof(struct lance_private), GFP_KERNEL );
-		if (!dev->priv)
-			return 0;
-	}
 	lp = (struct lance_private *)dev->priv;
 	MEM = (struct lance_memory *)memaddr;
 	IO = lp->iobase = (struct lance_ioreg *)ioaddr;
@@ -1171,26 +1178,21 @@ static int lance_set_mac_address( struct net_device *dev, void *addr )
 
 
 #ifdef MODULE
-static struct net_device atarilance_dev;
+static struct net_device *atarilance_dev;
 
 int init_module(void)
-
-{	int err;
-
-	atarilance_dev.init = atarilance_probe;
-	if ((err = register_netdev( &atarilance_dev ))) {
-		if (err == -EIO)  {
-			printk( "No Atari Lance board found. Module not loaded.\n");
-		}
-		return( err );
-	}
-	return( 0 );
+{
+	atarilance_dev = atarilance_probe(-1);
+	if (IS_ERR(atarilance_dev))
+		return PTR_ERR(atarilance_dev);
+	return 0;
 }
 
 void cleanup_module(void)
-
 {
-	unregister_netdev( &atarilance_dev );
+	unregister_netdev(atarilance_dev);
+	free_irq(atarilance_dev->irq, atarilance_dev);
+	free_netdev(atarilance_dev);
 }
 
 #endif /* MODULE */

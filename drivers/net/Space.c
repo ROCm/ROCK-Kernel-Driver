@@ -74,7 +74,7 @@ extern struct net_device *sonic_probe(int unit);
 extern struct net_device *SK_init(int unit);
 extern struct net_device *seeq8005_probe(int unit);
 extern struct net_device *smc_init(int unit);
-extern int atarilance_probe(struct net_device *);
+extern struct net_device *atarilance_probe(struct net_device *);
 extern struct net_device *sun3lance_probe(int unit);
 extern struct net_device *sun3_82586_probe(int unit);
 extern struct net_device *apne_probe(int unit);
@@ -103,41 +103,10 @@ extern int iph5526_probe(struct net_device *dev);
 /* SBNI adapters */
 extern int sbni_probe(int unit);
 
-struct devprobe
-{
-	int (*probe)(struct net_device *dev);
-	int status;	/* non-zero if autoprobe has failed */
-};
-
 struct devprobe2 {
 	struct net_device *(*probe)(int unit);
 	int status;	/* non-zero if autoprobe has failed */
 };
-
-/*
- * probe_list walks a list of probe functions and calls each so long
- * as a non-zero ioaddr is given, or as long as it hasn't already failed 
- * to find a card in the past (as recorded by "status") when asked to
- * autoprobe (i.e. a probe that fails to find a card when autoprobing
- * will not be asked to autoprobe again).  It exits when a card is found.
- */
-static int __init probe_list(struct net_device *dev, struct devprobe *plist)
-{
-	struct devprobe *p = plist;
-	unsigned long base_addr = dev->base_addr;
-
-	while (p->probe != NULL) {
-		if (base_addr && p->probe(dev) == 0) 	/* probe given addr */
-			return 0;
-		else if (p->status == 0) {		/* has autoprobe failed yet? */
-			p->status = p->probe(dev);	/* no, try autoprobe */
-			if (p->status == 0)
-				return 0;
-		}
-		p++;
-	}
-	return -ENODEV;
-}
 
 static int __init probe_list2(int unit, struct devprobe2 *p, int autoprobe)
 {
@@ -295,14 +264,10 @@ static struct devprobe2 parport_probes[] __initdata = {
 	{NULL, 0},
 };
 
-static struct devprobe m68k_probes[] __initdata = {
+static struct devprobe2 m68k_probes[] __initdata = {
 #ifdef CONFIG_ATARILANCE	/* Lance-based Atari ethernet boards */
 	{atarilance_probe, 0},
 #endif
-	{NULL, 0},
-};
-
-static struct devprobe2 m68k_probes2[] __initdata = {
 #ifdef CONFIG_SUN3LANCE         /* sun3 onboard Lance chip */
 	{sun3lance_probe, 0},
 #endif
@@ -354,40 +319,6 @@ static struct devprobe2 mips_probes[] __initdata = {
  * per bus interface. This drives the legacy devices only for now.
  */
  
-static int __init ethif_probe(int unit)
-{
-	struct net_device *dev;
-	int err = -ENODEV;
-
-	dev = alloc_etherdev(0);
-	if (!dev)
-		return -ENOMEM;
-
-	sprintf(dev->name, "eth%d", unit);
-	netdev_boot_setup_check(dev);
-
-	/* 
-	 * Backwards compatibility - historically an I/O base of 1 was 
-	 * used to indicate not to probe for this ethN interface 
-	 */
-	if (__dev_get_by_name(dev->name) || dev->base_addr == 1) {
-		free_netdev(dev);
-		return -ENXIO;
-	}
-
-	/* 
-	 * The arch specific probes are 1st so that any on-board ethernet
-	 * will be probed before other ISA/EISA/MCA/PCI bus cards.
-	 */
-	if (probe_list(dev, m68k_probes) == 0)
-		err = register_netdev(dev);
-
-	if (err)
-		free_netdev(dev);
-	return err;
-
-}
- 
 static void __init ethif_probe2(int unit)
 {
 	unsigned long base_addr = netdev_boot_base("eth", unit);
@@ -395,7 +326,7 @@ static void __init ethif_probe2(int unit)
 	if (base_addr == 1)
 		return;
 
-	probe_list2(unit, m68k_probes2, base_addr == 0) &&
+	probe_list2(unit, m68k_probes, base_addr == 0) &&
 	probe_list2(unit, mips_probes, base_addr == 0) &&
 	probe_list2(unit, eisa_probes, base_addr == 0) &&
 	probe_list2(unit, mca_probes, base_addr == 0) &&
@@ -484,8 +415,7 @@ static int __init net_olddevs_init(void)
 			trif_probe2(num);
 #endif
 	for (num = 0; num < 8; ++num)
-		if (!ethif_probe(num))
-			ethif_probe2(num);
+		ethif_probe2(num);
 
 #ifdef CONFIG_COPS
 	cops_probe(0);
