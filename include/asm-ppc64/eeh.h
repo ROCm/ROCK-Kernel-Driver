@@ -20,8 +20,10 @@
 #ifndef _PPC64_EEH_H
 #define _PPC64_EEH_H
 
-#include <linux/string.h>
 #include <linux/init.h>
+#include <linux/list.h>
+#include <linux/string.h>
+#include <linux/notifier.h>
 
 struct pci_dev;
 struct device_node;
@@ -29,6 +31,7 @@ struct device_node;
 /* Values for eeh_mode bits in device_node */
 #define EEH_MODE_SUPPORTED	(1<<0)
 #define EEH_MODE_NOCHECK	(1<<1)
+#define EEH_MODE_ISOLATED	(1<<2)
 
 #ifdef CONFIG_PPC_PSERIES
 extern void __init eeh_init(void);
@@ -68,7 +71,28 @@ void eeh_remove_device(struct pci_dev *);
 #define EEH_RELEASE_DMA		3
 int eeh_set_option(struct pci_dev *dev, int options);
 
-/*
+
+/**
+ * Notifier event flags.
+ */
+#define EEH_NOTIFY_FREEZE  1
+
+/** EEH event -- structure holding pci slot data that describes
+ *  a change in the isolation status of a PCI slot.  A pointer
+ *  to this struct is passed as the data pointer in a notify callback.
+ */
+struct eeh_event {
+	struct list_head     list;
+	struct pci_dev       *dev;
+	struct device_node   *dn;
+	int                  reset_state;
+};
+
+/** Register to find out about EEH events. */
+int eeh_register_notifier(struct notifier_block *nb);
+int eeh_unregister_notifier(struct notifier_block *nb);
+
+/**
  * EEH_POSSIBLE_ERROR() -- test for possible MMIO failure.
  *
  * If this macro yields TRUE, the caller relays to eeh_check_failure()
