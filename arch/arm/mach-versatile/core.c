@@ -315,13 +315,11 @@ static unsigned int mmc_status(struct device *dev)
 }
 
 static struct mmc_platform_data mmc0_plat_data = {
-	.mclk		= 33000000,
 	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
 	.status		= mmc_status,
 };
 
 static struct mmc_platform_data mmc1_plat_data = {
-	.mclk		= 33000000,
 	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
 	.status		= mmc_status,
 };
