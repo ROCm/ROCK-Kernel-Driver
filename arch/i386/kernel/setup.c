@@ -62,10 +62,11 @@ unsigned long mmu_cr4_features;
 EXPORT_SYMBOL_GPL(mmu_cr4_features);
 
 #ifdef CONFIG_ACPI_HT_ONLY
-int acpi_disabled __initdata = 1;
+int acpi_disabled = 1;
 #else
-int acpi_disabled __initdata = 0;
+int acpi_disabled = 0;
 #endif
+EXPORT_SYMBOL(acpi_disabled);
 
 int MCA_bus;
 /* for MCA, but anyone else can use it if they want */
