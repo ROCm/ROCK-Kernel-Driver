@@ -1514,7 +1514,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 			rel_fdc();
 			return -EBUSY;
 		}
-		fsync_dev(inode->i_rdev);
+		fsync_bdev(inode->i_bdev);
 		if (fd_motor_on(drive) == 0) {
 			rel_fdc();
 			return -ENODEV;

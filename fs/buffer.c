@@ -343,36 +343,37 @@ int fsync_no_super(struct block_device *bdev)
 
 int fsync_dev(kdev_t dev)
 {
-	sync_buffers(dev, 0);
-
-	lock_kernel();
-	sync_inodes(dev);
-	if (!kdev_none(dev)) {
-		struct super_block *sb = get_super(dev);
-		if (sb) {
-			DQUOT_SYNC(sb);
-			drop_super(sb);
-		}
-	} else
-			DQUOT_SYNC(NULL);
-	sync_supers(dev);
-	unlock_kernel();
-
-	return sync_buffers(dev, 1);
+	struct block_device *bdev = bdget(kdev_t_to_nr(dev));
+	if (bdev) {
+		int res = fsync_bdev(bdev);
+		bdput(bdev);
+		return res;
+	}
+	return 0;
 }
 
-/*
- * There's no real reason to pretend we should
- * ever do anything differently
- */
-void sync_dev(kdev_t dev)
+int fsync_bdev(struct block_device *bdev)
 {
-	fsync_dev(dev);
+	struct super_block *sb = get_super(to_kdev_t(bdev->bd_dev));
+	if (sb) {
+		int res = fsync_super(sb);
+		drop_super(sb);
+		return res;
+	}
+	return fsync_no_super(bdev);
 }
 
 asmlinkage long sys_sync(void)
 {
-	fsync_dev(NODEV);
+	sync_buffers(NODEV, 0);
+
+	lock_kernel();
+	sync_inodes(NODEV);
+	DQUOT_SYNC(NULL);
+	sync_supers(NODEV);
+	unlock_kernel();
+
+	sync_buffers(NODEV, 1);
 	return 0;
 }
 
