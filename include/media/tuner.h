@@ -67,7 +67,9 @@
 #define TUNER_HITACHI_NTSC       40
 #define TUNER_PHILIPS_PAL_MK     41
 #define TUNER_PHILIPS_ATSC       42
-#define TUNER_PHILIPS_FM1236_MK3  43
+#define TUNER_PHILIPS_FM1236_MK3 43
+#define TUNER_PHILIPS_4IN1       44	/* ATI TV Wonder Pro - Conexant */
+#define TUNER_MICROTUNE_4049FM5  45
 
 #define NOTUNER 0
 #define PAL     1	/* PAL_BG */
