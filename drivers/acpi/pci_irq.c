@@ -460,7 +460,7 @@ void
 acpi_pci_irq_disable (
 	struct pci_dev		*dev)
 {
-	u32			gsi = 0;
+	int			gsi = 0;
 	u8			pin = 0;
 	int			edge_level = ACPI_LEVEL_SENSITIVE;
 	int			active_high_low = ACPI_ACTIVE_LOW;
@@ -487,10 +487,10 @@ acpi_pci_irq_disable (
 	 * If no PRT entry was found, we'll try to derive an IRQ from the
 	 * device's parent bridge.
 	 */
-	if (!gsi)
+	if (gsi < 0)
  		gsi = acpi_pci_irq_derive(dev, pin,
 					  &edge_level, &active_high_low);
-	if (!gsi)
+	if (gsi < 0)
 		return_VOID;
 
 	/*
