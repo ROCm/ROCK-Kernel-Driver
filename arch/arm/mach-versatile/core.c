@@ -33,6 +33,7 @@
 #include <asm/mach-types.h>
 #include <asm/hardware/amba.h>
 #include <asm/hardware/amba_clcd.h>
+#include <asm/hardware/icst307.h>
 
 #include <asm/mach/arch.h>
 #include <asm/mach/flash.h>
@@ -42,6 +43,9 @@
 #ifdef CONFIG_MMC
 #include <asm/mach/mmc.h>
 #endif
+
+#include "core.h"
+#include "clock.h"
 
 /*
  * All IO addresses are mapped onto VA 0xFFFx.xxxx, where x.xxxx
@@ -111,19 +115,17 @@ sic_handle_irq(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 
 #if 1
 #define IRQ_MMCI0A	IRQ_VICSOURCE22
-#define IRQ_MMCI1A	IRQ_VICSOURCE23
 #define IRQ_AACI	IRQ_VICSOURCE24
 #define IRQ_ETH		IRQ_VICSOURCE25
 #define PIC_MASK	0xFFD00000
 #else
 #define IRQ_MMCI0A	IRQ_SIC_MMCI0A
-#define IRQ_MMCI1A	IRQ_SIC_MMCI1A
 #define IRQ_AACI	IRQ_SIC_AACI
 #define IRQ_ETH		IRQ_SIC_ETH
 #define PIC_MASK	0
 #endif
 
-static void __init versatile_init_irq(void)
+void __init versatile_init_irq(void)
 {
 	unsigned int i, value;
 
@@ -189,6 +191,10 @@ static struct map_desc versatile_io_desc[] __initdata = {
  { IO_ADDRESS(VERSATILE_SIC_BASE),   VERSATILE_SIC_BASE,   SZ_4K,      MT_DEVICE },
  { IO_ADDRESS(VERSATILE_VIC_BASE),   VERSATILE_VIC_BASE,   SZ_4K,      MT_DEVICE },
  { IO_ADDRESS(VERSATILE_SCTL_BASE),  VERSATILE_SCTL_BASE,  SZ_4K * 9,  MT_DEVICE },
+#ifdef CONFIG_ARCH_VERSATILE_AB
+ { IO_ADDRESS(VERSATILE_GPIO0_BASE), VERSATILE_GPIO0_BASE, SZ_4K,      MT_DEVICE },
+ { IO_ADDRESS(VERSATILE_IB2_BASE),   VERSATILE_IB2_BASE,   SZ_64M,     MT_DEVICE },
+#endif
 #ifdef CONFIG_DEBUG_LL
  { IO_ADDRESS(VERSATILE_UART0_BASE), VERSATILE_UART0_BASE, SZ_4K,      MT_DEVICE },
 #endif
@@ -200,7 +206,7 @@ static struct map_desc versatile_io_desc[] __initdata = {
 #endif
 };
 
-static void __init versatile_map_io(void)
+void __init versatile_map_io(void)
 {
 	iotable_init(versatile_io_desc, ARRAY_SIZE(versatile_io_desc));
 }
@@ -208,7 +214,7 @@ static void __init versatile_map_io(void)
 #define VERSATILE_REFCOUNTER	(IO_ADDRESS(VERSATILE_SYS_BASE) + VERSATILE_SYS_24MHz_OFFSET)
 
 /*
- * This is the VersatilePB sched_clock implementation.  This has
+ * This is the Versatile sched_clock implementation.  This has
  * a resolution of 41.7ns, and a maximum value of about 179s.
  */
 unsigned long long sched_clock(void)
@@ -303,7 +309,7 @@ static struct platform_device smc91x_device = {
 #define VERSATILE_SYSMCI	(IO_ADDRESS(VERSATILE_SYS_BASE) + VERSATILE_SYS_MCI_OFFSET)
 
 #ifdef CONFIG_MMC
-static unsigned int mmc_status(struct device *dev)
+unsigned int mmc_status(struct device *dev)
 {
 	struct amba_device *adev = container_of(dev, struct amba_device, dev);
 	u32 mask;
@@ -320,21 +326,52 @@ static struct mmc_platform_data mmc0_plat_data = {
 	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
 	.status		= mmc_status,
 };
-
-static struct mmc_platform_data mmc1_plat_data = {
-	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
-	.status		= mmc_status,
-};
 #endif
+
+/*
+ * Clock handling
+ */
+static const struct icst307_params versatile_oscvco_params = {
+	.ref		= 24000,
+	.vco_max	= 200000,
+	.vd_min		= 4 + 8,
+	.vd_max		= 511 + 8,
+	.rd_min		= 1 + 2,
+	.rd_max		= 127 + 2,
+};
+
+static void versatile_oscvco_set(struct clk *clk, struct icst307_vco vco)
+{
+	unsigned long sys_lock = IO_ADDRESS(VERSATILE_SYS_BASE) + VERSATILE_SYS_LOCK_OFFSET;
+#if defined(CONFIG_ARCH_VERSATILE_PB)
+	unsigned long sys_osc = IO_ADDRESS(VERSATILE_SYS_BASE) + VERSATILE_SYS_OSC4_OFFSET;
+#elif defined(CONFIG_ARCH_VERSATILE_AB)
+	unsigned long sys_osc = IO_ADDRESS(VERSATILE_SYS_BASE) + VERSATILE_SYS_OSC1_OFFSET;
+#endif
+	u32 val;
+
+	val = readl(sys_osc) & ~0x7ffff;
+	val |= vco.v | (vco.r << 9) | (vco.s << 16);
+
+	writel(0xa05f, sys_lock);
+	writel(val, sys_osc);
+	writel(0, sys_lock);
+}
+
+static struct clk versatile_clcd_clk = {
+	.name	= "CLCDCLK",
+	.params	= &versatile_oscvco_params,
+	.setvco = versatile_oscvco_set,
+};
 
 /*
  * CLCD support.
  */
 #define SYS_CLCD_MODE_MASK	(3 << 0)
-#define SYS_CLCD_MODE_5551	(0 << 0)
-#define SYS_CLCD_MODE_565	(1 << 0)
-#define SYS_CLCD_MODE_888	(2 << 0)
-#define SYS_CLCD_MODE_LT	(3 << 0)
+#define SYS_CLCD_MODE_888	(0 << 0)
+#define SYS_CLCD_MODE_5551	(1 << 0)
+#define SYS_CLCD_MODE_565_RLSB	(2 << 0)
+#define SYS_CLCD_MODE_565_BLSB	(3 << 0)
 #define SYS_CLCD_NLCDIOON	(1 << 2)
 #define SYS_CLCD_VDDPOSSWITCH	(1 << 3)
 #define SYS_CLCD_PWR3V5SWITCH	(1 << 4)
@@ -342,6 +379,7 @@ static struct mmc_platform_data mmc1_plat_data = {
 #define SYS_CLCD_ID_SANYO_3_8	(0x00 << 8)
 #define SYS_CLCD_ID_UNKNOWN_8_4	(0x01 << 8)
 #define SYS_CLCD_ID_EPSON_2_2	(0x02 << 8)
+#define SYS_CLCD_ID_SANYO_2_5	(0x07 << 8)
 #define SYS_CLCD_ID_VGA		(0x1f << 8)
 
 static struct clcd_panel vga = {
@@ -390,6 +428,29 @@ static struct clcd_panel sanyo_3_8_in = {
 	.bpp		= 16,
 };
 
+static struct clcd_panel sanyo_2_5_in = {
+	.mode		= {
+		.name		= "Sanyo QVGA Portrait",
+		.refresh	= 116,
+		.xres		= 240,
+		.yres		= 320,
+		.pixclock	= 100000,
+		.left_margin	= 20,
+		.right_margin	= 10,
+		.upper_margin	= 2,
+		.lower_margin	= 2,
+		.hsync_len	= 10,
+		.vsync_len	= 2,
+		.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+		.vmode		= FB_VMODE_NONINTERLACED,
+	},
+	.width		= -1,
+	.height		= -1,
+	.tim2		= TIM2_IVS | TIM2_IHS | TIM2_IPC,
+	.cntl		= CNTL_LCDTFT | CNTL_LCDVCOMP(1),
+	.bpp		= 16,
+};
+
 static struct clcd_panel epson_2_2_in = {
 	.mode		= {
 		.name		= "Epson QCIF",
@@ -428,6 +489,8 @@ static struct clcd_panel *versatile_clcd_panel(void)
 	val = readl(sys_clcd) & SYS_CLCD_ID_MASK;
 	if (val == SYS_CLCD_ID_SANYO_3_8)
 		panel = &sanyo_3_8_in;
+	else if (val == SYS_CLCD_ID_SANYO_2_5)
+		panel = &sanyo_2_5_in;
 	else if (val == SYS_CLCD_ID_EPSON_2_2)
 		panel = &epson_2_2_in;
 	else if (val == SYS_CLCD_ID_VGA)
@@ -435,9 +498,10 @@ static struct clcd_panel *versatile_clcd_panel(void)
 	else {
 		printk(KERN_ERR "CLCD: unknown LCD panel ID 0x%08x, using VGA\n",
 			val);
+		panel = &vga;
 	}
 
-	return &vga;
+	return panel;
 }
 
 /*
@@ -451,6 +515,20 @@ static void versatile_clcd_disable(struct clcd_fb *fb)
 	val = readl(sys_clcd);
 	val &= ~SYS_CLCD_NLCDIOON | SYS_CLCD_PWR3V5SWITCH;
 	writel(val, sys_clcd);
+
+#ifdef CONFIG_ARCH_VERSATILE_AB
+	/*
+	 * If the LCD is Sanyo 2x5 in on the IB2 board, turn the back-light off
+	 */
+	if (fb->panel == &sanyo_2_5_in) {
+		unsigned long versatile_ib2_ctrl = IO_ADDRESS(VERSATILE_IB2_CTRL);
+		unsigned long ctrl;
+
+		ctrl = readl(versatile_ib2_ctrl);
+		ctrl &= ~0x01;
+		writel(ctrl, versatile_ib2_ctrl);
+	}
+#endif
 }
 
 /*
@@ -466,19 +544,10 @@ static void versatile_clcd_enable(struct clcd_fb *fb)
 
 	switch (fb->fb.var.green.length) {
 	case 5:
-#if 0
-		/*
-		 * For some undocumented reason, we need to select 565 mode
-		 * even when using 555 with VGA.  Maybe this is only true
-		 * for the VGA output and needs to be done for LCD panels?
-		 * I can't get an explaination from the people who should
-		 * know.
-		 */
 		val |= SYS_CLCD_MODE_5551;
 		break;
-#endif
 	case 6:
-		val |= SYS_CLCD_MODE_565;
+		val |= SYS_CLCD_MODE_565_BLSB;
 		break;
 	case 8:
 		val |= SYS_CLCD_MODE_888;
@@ -495,6 +564,20 @@ static void versatile_clcd_enable(struct clcd_fb *fb)
 	 */
 	val |= SYS_CLCD_NLCDIOON | SYS_CLCD_PWR3V5SWITCH;
 	writel(val, sys_clcd);
+
+#ifdef CONFIG_ARCH_VERSATILE_AB
+	/*
+	 * If the LCD is Sanyo 2x5 in on the IB2 board, turn the back-light on
+	 */
+	if (fb->panel == &sanyo_2_5_in) {
+		unsigned long versatile_ib2_ctrl = IO_ADDRESS(VERSATILE_IB2_CTRL);
+		unsigned long ctrl;
+
+		ctrl = readl(versatile_ib2_ctrl);
+		ctrl |= 0x01;
+		writel(ctrl, versatile_ib2_ctrl);
+	}
+#endif
 }
 
 static unsigned long framesize = SZ_1M;
@@ -525,7 +608,7 @@ static void versatile_clcd_remove(struct clcd_fb *fb)
 }
 
 static struct clcd_board clcd_plat_data = {
-	.name		= "Versatile PB",
+	.name		= "Versatile",
 	.check		= clcdfb_check,
 	.decode		= clcdfb_decode,
 	.disable	= versatile_clcd_disable,
@@ -533,23 +616,6 @@ static struct clcd_board clcd_plat_data = {
 	.setup		= versatile_clcd_setup,
 	.remove		= versatile_clcd_remove,
 };
-
-#define AMBA_DEVICE(name,busid,base,plat)			\
-static struct amba_device name##_device = {			\
-	.dev		= {					\
-		.coherent_dma_mask = ~0,			\
-		.bus_id	= busid,				\
-		.platform_data = plat,				\
-	},							\
-	.res		= {					\
-		.start	= VERSATILE_##base##_BASE,		\
-		.end	= (VERSATILE_##base##_BASE) + SZ_4K - 1,\
-		.flags	= IORESOURCE_MEM,			\
-	},							\
-	.dma_mask	= ~0,					\
-	.irq		= base##_IRQ,				\
-	/* .dma		= base##_DMA,*/				\
-}
 
 #define AACI_IRQ	{ IRQ_AACI, NO_IRQ }
 #define AACI_DMA	{ 0x80, 0x81 }
@@ -559,12 +625,6 @@ static struct amba_device name##_device = {			\
 #define KMI0_DMA	{ 0, 0 }
 #define KMI1_IRQ	{ IRQ_SIC_KMI1, NO_IRQ }
 #define KMI1_DMA	{ 0, 0 }
-#define UART3_IRQ	{ IRQ_SIC_UART3, NO_IRQ }
-#define UART3_DMA	{ 0x86, 0x87 }
-#define SCI1_IRQ	{ IRQ_SIC_SCI3, NO_IRQ }
-#define SCI1_DMA	{ 0x88, 0x89 }
-#define MMCI1_IRQ	{ IRQ_MMCI1A, IRQ_SIC_MMCI1B }
-#define MMCI1_DMA	{ 0x85, 0 }
 
 /*
  * These devices are connected directly to the multi-layer AHB switch
@@ -589,10 +649,6 @@ static struct amba_device name##_device = {			\
 #define GPIO0_DMA	{ 0, 0 }
 #define GPIO1_IRQ	{ IRQ_GPIOINT1, NO_IRQ }
 #define GPIO1_DMA	{ 0, 0 }
-#define GPIO2_IRQ	{ IRQ_GPIOINT2, NO_IRQ }
-#define GPIO2_DMA	{ 0, 0 }
-#define GPIO3_IRQ	{ IRQ_GPIOINT3, NO_IRQ }
-#define GPIO3_DMA	{ 0, 0 }
 #define RTC_IRQ		{ IRQ_RTCINT, NO_IRQ }
 #define RTC_DMA		{ 0, 0 }
 
@@ -617,11 +673,6 @@ AMBA_DEVICE(mmc0,  "fpga:05", MMCI0,    &mmc0_plat_data);
 #endif
 AMBA_DEVICE(kmi0,  "fpga:06", KMI0,     NULL);
 AMBA_DEVICE(kmi1,  "fpga:07", KMI1,     NULL);
-AMBA_DEVICE(uart3, "fpga:09", UART3,    NULL);
-AMBA_DEVICE(sci1,  "fpga:0a", SCI1,     NULL);
-#ifdef CONFIG_MMC
-AMBA_DEVICE(mmc1,  "fpga:0b", MMCI1,    &mmc1_plat_data);
-#endif
 
 /* DevChip Primecells */
 AMBA_DEVICE(smc,   "dev:00",  SMC,      NULL);
@@ -632,8 +683,6 @@ AMBA_DEVICE(sctl,  "dev:e0",  SCTL,     NULL);
 AMBA_DEVICE(wdog,  "dev:e1",  WATCHDOG, NULL);
 AMBA_DEVICE(gpio0, "dev:e4",  GPIO0,    NULL);
 AMBA_DEVICE(gpio1, "dev:e5",  GPIO1,    NULL);
-AMBA_DEVICE(gpio2, "dev:e6",  GPIO2,    NULL);
-AMBA_DEVICE(gpio3, "dev:e7",  GPIO3,    NULL);
 AMBA_DEVICE(rtc,   "dev:e8",  RTC,      NULL);
 AMBA_DEVICE(sci0,  "dev:f0",  SCI,      NULL);
 AMBA_DEVICE(uart0, "dev:f1",  UART0,    NULL);
@@ -646,7 +695,6 @@ static struct amba_device *amba_devs[] __initdata = {
 	&uart0_device,
 	&uart1_device,
 	&uart2_device,
-	&uart3_device,
 	&smc_device,
 	&mpmc_device,
 	&clcd_device,
@@ -654,8 +702,6 @@ static struct amba_device *amba_devs[] __initdata = {
 	&wdog_device,
 	&gpio0_device,
 	&gpio1_device,
-	&gpio2_device,
-	&gpio3_device,
 	&rtc_device,
 	&sci0_device,
 	&ssp0_device,
@@ -665,12 +711,9 @@ static struct amba_device *amba_devs[] __initdata = {
 #endif
 	&kmi0_device,
 	&kmi1_device,
-	&sci1_device,
-#ifdef CONFIG_MMC
-	&mmc1_device,
-#endif
 };
 
+#ifdef CONFIG_LEDS
 #define VA_LEDS_BASE (IO_ADDRESS(VERSATILE_SYS_BASE) + VERSATILE_SYS_LED_OFFSET)
 
 static void versatile_leds_event(led_event_t ledevt)
@@ -705,10 +748,13 @@ static void versatile_leds_event(led_event_t ledevt)
 	writel(val, VA_LEDS_BASE);
 	local_irq_restore(flags);
 }
+#endif	/* CONFIG_LEDS */
 
-static void __init versatile_init(void)
+void __init versatile_init(void)
 {
 	int i;
+
+	clk_register(&versatile_clcd_clk);
 
 	platform_device_register(&versatile_flash_device);
 	platform_device_register(&smc91x_device);
@@ -718,7 +764,9 @@ static void __init versatile_init(void)
 		amba_device_register(d, &iomem_resource);
 	}
 
+#ifdef CONFIG_LEDS
 	leds_event = versatile_leds_event;
+#endif
 }
 
 /*
@@ -863,17 +911,7 @@ static void __init versatile_timer_init(void)
 	setup_irq(IRQ_TIMERINT0_1, &versatile_timer_irq);
 }
 
-static struct sys_timer versatile_timer = {
+struct sys_timer versatile_timer = {
 	.init		= versatile_timer_init,
 	.offset		= versatile_gettimeoffset,
 };
-
-MACHINE_START(VERSATILE_PB, "ARM-Versatile PB")
-	MAINTAINER("ARM Ltd/Deep Blue Solutions Ltd")
-	BOOT_MEM(0x00000000, 0x101f1000, 0xf11f1000)
-	BOOT_PARAMS(0x00000100)
-	MAPIO(versatile_map_io)
-	INITIRQ(versatile_init_irq)
-	.timer		= &versatile_timer,
-	INIT_MACHINE(versatile_init)
-MACHINE_END

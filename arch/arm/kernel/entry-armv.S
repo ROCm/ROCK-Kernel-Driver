@@ -464,7 +464,7 @@ ENTRY(soft_irq_mask)
 		.macro	irq_prio_table
 		.endm
 
-#elif defined(CONFIG_ARCH_VERSATILE_PB)
+#elif defined(CONFIG_ARCH_VERSATILE)
 
 		.macro	disable_fiq
 		.endm
