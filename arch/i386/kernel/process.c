@@ -89,11 +89,11 @@ void enable_hlt(void)
 void default_idle(void)
 {
 	if (current_cpu_data.hlt_works_ok && !hlt_counter) {
-		__cli();
+		local_irq_disable();
 		if (!need_resched())
 			safe_halt();
 		else
-			__sti();
+			local_irq_enable();
 	}
 }
 
@@ -106,7 +106,7 @@ static void poll_idle (void)
 {
 	int oldval;
 
-	__sti();
+	local_irq_enable();
 
 	/*
 	 * Deal with another CPU just having chosen a thread to
@@ -290,7 +290,7 @@ void machine_real_restart(unsigned char *code, int length)
 {
 	unsigned long flags;
 
-	__cli();
+	local_irq_disable();
 
 	/* Write zero to CMOS register number 0x0f, which the BIOS POST
 	   routine will recognize as telling it to do a proper reboot.  (Well

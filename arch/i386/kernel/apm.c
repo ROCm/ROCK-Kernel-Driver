@@ -514,9 +514,9 @@ static void apm_error(char *str, int err)
  */
 #define APM_DO_CLI	\
 	if (apm_info.allow_ints) \
-		__sti(); \
+		local_irq_enable(); \
 	else \
-		__cli();
+		local_irq_disable();
 
 #ifdef APM_ZERO_SEGS
 #	define APM_DECL_SEGS \
@@ -570,7 +570,7 @@ static u8 apm_bios_call(u32 func, u32 ebx_in, u32 ecx_in,
 	APM_DECL_SEGS
 	unsigned long	flags;
 
-	__save_flags(flags);
+	local_save_flags(flags);
 	APM_DO_CLI;
 	APM_DO_SAVE_SEGS;
 	/*
@@ -590,7 +590,7 @@ static u8 apm_bios_call(u32 func, u32 ebx_in, u32 ecx_in,
 		: "a" (func), "b" (ebx_in), "c" (ecx_in)
 		: "memory", "cc");
 	APM_DO_RESTORE_SEGS;
-	__restore_flags(flags);
+	local_irq_restore(flags);
 	return *eax & 0xff;
 }
 
@@ -614,7 +614,7 @@ static u8 apm_bios_call_simple(u32 func, u32 ebx_in, u32 ecx_in, u32 *eax)
 	APM_DECL_SEGS
 	unsigned long	flags;
 
-	__save_flags(flags);
+	local_save_flags(flags);
 	APM_DO_CLI;
 	APM_DO_SAVE_SEGS;
 	{
@@ -638,7 +638,7 @@ static u8 apm_bios_call_simple(u32 func, u32 ebx_in, u32 ecx_in, u32 *eax)
 			: "memory", "cc");
 	}
 	APM_DO_RESTORE_SEGS;
-	__restore_flags(flags);
+	local_irq_restore(flags);
 	return error;
 }
 

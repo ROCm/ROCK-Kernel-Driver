@@ -1456,7 +1456,7 @@ static void qpti_intr(int irq, void *dev_id, struct pt_regs *regs)
 		} while (dq != NULL);
 		spin_unlock(qpti->qhost->host_lock);
 	}
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 int qlogicpti_abort(Scsi_Cmnd *Cmnd)

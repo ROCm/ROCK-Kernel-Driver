@@ -36,36 +36,36 @@ static inline void atomic_add(int i, volatile atomic_t *v)
 {
 	unsigned long flags;
 
-	__save_flags_cli(flags);
+	local_save_flags_cli(flags);
 	v->counter += i;
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static inline void atomic_sub(int i, volatile atomic_t *v)
 {
 	unsigned long flags;
 
-	__save_flags_cli(flags);
+	local_save_flags_cli(flags);
 	v->counter -= i;
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static inline void atomic_inc(volatile atomic_t *v)
 {
 	unsigned long flags;
 
-	__save_flags_cli(flags);
+	local_save_flags_cli(flags);
 	v->counter += 1;
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static inline void atomic_dec(volatile atomic_t *v)
 {
 	unsigned long flags;
 
-	__save_flags_cli(flags);
+	local_save_flags_cli(flags);
 	v->counter -= 1;
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static inline int atomic_dec_and_test(volatile atomic_t *v)
@@ -73,10 +73,10 @@ static inline int atomic_dec_and_test(volatile atomic_t *v)
 	unsigned long flags;
 	int val;
 
-	__save_flags_cli(flags);
+	local_save_flags_cli(flags);
 	val = v->counter;
 	v->counter = val -= 1;
-	__restore_flags(flags);
+	local_irq_restore(flags);
 
 	return val == 0;
 }
@@ -86,10 +86,10 @@ static inline int atomic_add_negative(int i, volatile atomic_t *v)
 	unsigned long flags;
 	int val;
 
-	__save_flags_cli(flags);
+	local_save_flags_cli(flags);
 	val = v->counter;
 	v->counter = val += i;
-	__restore_flags(flags);
+	local_irq_restore(flags);
 
 	return val < 0;
 }
@@ -98,9 +98,9 @@ static inline void atomic_clear_mask(unsigned long mask, unsigned long *addr)
 {
 	unsigned long flags;
 
-	__save_flags_cli(flags);
+	local_save_flags_cli(flags);
 	*addr &= ~mask;
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 /* Atomic operations are already serializing on ARM */

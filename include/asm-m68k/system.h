@@ -49,28 +49,25 @@ asmlinkage void resume(void);
 
 /* interrupt control.. */
 #if 0
-#define __sti() asm volatile ("andiw %0,%%sr": : "i" (ALLOWINT) : "memory")
+#define local_irq_enable() asm volatile ("andiw %0,%%sr": : "i" (ALLOWINT) : "memory")
 #else
 #include <asm/hardirq.h>
-#define __sti() ({							      \
+#define local_irq_enable() ({							      \
 	if (MACH_IS_Q40 || !local_irq_count(smp_processor_id()))              \
 		asm volatile ("andiw %0,%%sr": : "i" (ALLOWINT) : "memory");  \
 })
 #endif
-#define __cli() asm volatile ("oriw  #0x0700,%%sr": : : "memory")
-#define __save_flags(x) asm volatile ("movew %%sr,%0":"=d" (x) : : "memory")
-#define __restore_flags(x) asm volatile ("movew %0,%%sr": :"d" (x) : "memory")
+#define local_irq_disable() asm volatile ("oriw  #0x0700,%%sr": : : "memory")
+#define local_save_flags(x) asm volatile ("movew %%sr,%0":"=d" (x) : : "memory")
+#define local_irq_restore(x) asm volatile ("movew %0,%%sr": :"d" (x) : "memory")
 
 /* For spinlocks etc */
-#define local_irq_save(x)	({ __save_flags(x); __cli(); })
-#define local_irq_restore(x)	__restore_flags(x)
-#define local_irq_disable()	__cli()
-#define local_irq_enable()	__sti()
+#define local_irq_save(x)	({ local_save_flags(x); local_irq_disable(); })
 
-#define cli()			__cli()
-#define sti()			__sti()
-#define save_flags(x)		__save_flags(x)
-#define restore_flags(x)	__restore_flags(x)
+#define cli()			local_irq_disable()
+#define sti()			local_irq_enable()
+#define save_flags(x)		local_save_flags(x)
+#define restore_flags(x)	local_irq_restore(x)
 #define save_and_cli(flags)   do { save_flags(flags); cli(); } while(0)
 
 /*

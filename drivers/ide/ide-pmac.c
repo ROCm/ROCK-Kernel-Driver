@@ -419,10 +419,10 @@ pmac_ide_do_setfeature(struct ata_device *drive, u8 command)
 	OUT_BYTE(SETFEATURES_XFER, IDE_FEATURE_REG);
 	OUT_BYTE(WIN_SETFEATURES, IDE_COMMAND_REG);
 	udelay(1);
-	__save_flags(flags);
+	local_save_flags(flags);
 	local_irq_enable();
 	result = wait_for_ready(drive);
-	__restore_flags(flags);
+	local_irq_restore(flags);
 	ata_irq_enable(drive, 1);
 	if (result)
 		printk(KERN_ERR "pmac_ide_do_setfeature disk not ready after SET_FEATURE !\n");

@@ -199,7 +199,7 @@ mvme5100_map_io(void)
 static void
 mvme5100_reset_board(void)
 {
-	__cli();
+	local_irq_disable();
 
 	/* Set exception prefix high - to the firmware */
 	_nmask_and_or_msr(0, MSR_IP);
@@ -223,7 +223,7 @@ mvme5100_restart(char *cmd)
 static void
 mvme5100_halt(void)
 {
-	__cli();
+	local_irq_disable();
 	while (1);
 }
 

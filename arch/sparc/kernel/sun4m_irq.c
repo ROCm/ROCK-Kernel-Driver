@@ -297,13 +297,13 @@ static void __init sun4m_init_timers(void (*counter_fn)(int, void *, struct pt_r
 		 * has copied the firmwares level 14 vector into boot cpu's
 		 * trap table, we must fix this now or we get squashed.
 		 */
-		__save_and_cli(flags);
+		local_irq_save(flags);
 		trap_table->inst_one = lvl14_save[0];
 		trap_table->inst_two = lvl14_save[1];
 		trap_table->inst_three = lvl14_save[2];
 		trap_table->inst_four = lvl14_save[3];
 		local_flush_cache_all();
-		__restore_flags(flags);
+		local_irq_restore(flags);
 	}
 #endif
 }
@@ -315,7 +315,7 @@ void __init sun4m_init_IRQ(void)
 	int num_regs;
 	struct resource r;
     
-	__cli();
+	local_irq_disable();
 	if((ie_node = prom_searchsiblings(prom_getchild(prom_root_node), "obio")) == 0 ||
 	   (ie_node = prom_getchild (ie_node)) == 0 ||
 	   (ie_node = prom_searchsiblings (ie_node, "interrupt")) == 0) {

@@ -84,14 +84,11 @@ struct {
 {								\
 	unsigned long flags;					\
 								\
-	save_flags(flags);					\
-	cli();							\
 	trace.buf[trace.next].name  = (w);			\
 	trace.buf[trace.next].time  = jiffies;			\
 	trace.buf[trace.next].index = (i);			\
 	trace.buf[trace.next].addr  = (long) (a);		\
 	trace.next = (trace.next + 1) & (TRACE_BUF_LEN - 1);	\
-	restore_flags(flags);					\
 }
 
 #else
@@ -1704,9 +1701,6 @@ static int isp1020_load_parameters(struct Scsi_Host *host)
 
 	ENTER("isp1020_load_parameters");
 
-	save_flags(flags);
-	cli();
-
 	hwrev = isp_inw(host, ISP_CFG0) & ISP_CFG0_HWMSK;
 	isp_cfg1 = ISP_CFG1_F64 | ISP_CFG1_BENAB;
 	if (hwrev == ISP_CFG0_1040A) {
@@ -1724,7 +1718,6 @@ static int isp1020_load_parameters(struct Scsi_Host *host)
 	isp1020_mbox_command(host, param);
 
 	if (param[0] != MBOX_COMMAND_COMPLETE) {
-		restore_flags(flags);
 		printk("qlogicisp : set initiator id failure\n");
 		return 1;
 	}
@@ -1736,7 +1729,6 @@ static int isp1020_load_parameters(struct Scsi_Host *host)
 	isp1020_mbox_command(host, param);
 
 	if (param[0] != MBOX_COMMAND_COMPLETE) {
-		restore_flags(flags);
 		printk("qlogicisp : set retry count failure\n");
 		return 1;
 	}
@@ -1747,7 +1739,6 @@ static int isp1020_load_parameters(struct Scsi_Host *host)
 	isp1020_mbox_command(host, param);
 
 	if (param[0] != MBOX_COMMAND_COMPLETE) {
-		restore_flags(flags);
 		printk("qlogicisp : async data setup time failure\n");
 		return 1;
 	}
@@ -1759,7 +1750,6 @@ static int isp1020_load_parameters(struct Scsi_Host *host)
 	isp1020_mbox_command(host, param);
 
 	if (param[0] != MBOX_COMMAND_COMPLETE) {
-		restore_flags(flags);
 		printk("qlogicisp : set active negation state failure\n");
 		return 1;
 	}
@@ -1771,7 +1761,6 @@ static int isp1020_load_parameters(struct Scsi_Host *host)
 	isp1020_mbox_command(host, param);
 
 	if (param[0] != MBOX_COMMAND_COMPLETE) {
-		restore_flags(flags);
 		printk("qlogicisp : set pci control parameter failure\n");
 		return 1;
 	}
@@ -1782,7 +1771,6 @@ static int isp1020_load_parameters(struct Scsi_Host *host)
 	isp1020_mbox_command(host, param);
 
 	if (param[0] != MBOX_COMMAND_COMPLETE) {
-		restore_flags(flags);
 		printk("qlogicisp : set tag age limit failure\n");
 		return 1;
 	}
@@ -1793,7 +1781,6 @@ static int isp1020_load_parameters(struct Scsi_Host *host)
 	isp1020_mbox_command(host, param);
 
 	if (param[0] != MBOX_COMMAND_COMPLETE) {
-		restore_flags(flags);
 		printk("qlogicisp : set selection timeout failure\n");
 		return 1;
 	}
@@ -1812,7 +1799,6 @@ static int isp1020_load_parameters(struct Scsi_Host *host)
 		isp1020_mbox_command(host, param);
 
 		if (param[0] != MBOX_COMMAND_COMPLETE) {
-			restore_flags(flags);
 			printk("qlogicisp : set target parameter failure\n");
 			return 1;
 		}
@@ -1827,7 +1813,6 @@ static int isp1020_load_parameters(struct Scsi_Host *host)
 			isp1020_mbox_command(host, param);
 
 			if (param[0] != MBOX_COMMAND_COMPLETE) {
-				restore_flags(flags);
 				printk("qlogicisp : set device queue "
 				       "parameter failure\n");
 				return 1;
@@ -1854,7 +1839,6 @@ static int isp1020_load_parameters(struct Scsi_Host *host)
 	isp1020_mbox_command(host, param);
 
 	if (param[0] != MBOX_COMMAND_COMPLETE) {
-		restore_flags(flags);
 		printk("qlogicisp : set response queue failure\n");
 		return 1;
 	}
@@ -1879,12 +1863,9 @@ static int isp1020_load_parameters(struct Scsi_Host *host)
 	isp1020_mbox_command(host, param);
 
 	if (param[0] != MBOX_COMMAND_COMPLETE) {
-		restore_flags(flags);
 		printk("qlogicisp : set request queue failure\n");
 		return 1;
 	}
-
-	restore_flags(flags);
 
 	LEAVE("isp1020_load_parameters");
 

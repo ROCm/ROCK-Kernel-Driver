@@ -428,7 +428,7 @@ void smp_send_xmon_break(int cpu)
 
 static void stop_this_cpu(void *dummy)
 {
-	__cli();
+	local_irq_disable();
 	while (1)
 		;
 }
@@ -702,7 +702,7 @@ void __init smp_callin(void)
 	while(!smp_commenced) {
 		barrier();
 	}
-	__sti();
+	local_irq_enable();
 }
 
 /* intel needs this */

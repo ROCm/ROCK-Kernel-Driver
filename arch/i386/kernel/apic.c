@@ -485,13 +485,13 @@ static void apic_pm_suspend(void *data)
 	apic_pm_state.apic_tdcr = apic_read(APIC_TDCR);
 	apic_pm_state.apic_thmr = apic_read(APIC_LVTTHMR);
 	
-	__save_flags(flags);
-	__cli();
+	local_save_flags(flags);
+	local_irq_disable();
 	disable_local_APIC();
 	rdmsr(MSR_IA32_APICBASE, l, h);
 	l &= ~MSR_IA32_APICBASE_ENABLE;
 	wrmsr(MSR_IA32_APICBASE, l, h);
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void apic_pm_resume(void *data)
@@ -499,8 +499,8 @@ static void apic_pm_resume(void *data)
 	unsigned int l, h;
 	unsigned long flags;
 
-	__save_flags(flags);
-	__cli();
+	local_save_flags(flags);
+	local_irq_disable();
 	rdmsr(MSR_IA32_APICBASE, l, h);
 	l &= ~MSR_IA32_APICBASE_BASE;
 	l |= MSR_IA32_APICBASE_ENABLE | APIC_DEFAULT_PHYS_BASE;
@@ -523,7 +523,7 @@ static void apic_pm_resume(void *data)
 	apic_write(APIC_LVTERR, apic_pm_state.apic_lvterr);
 	apic_write(APIC_ESR, 0);
 	apic_read(APIC_ESR);
-	__restore_flags(flags);
+	local_irq_restore(flags);
 	if (apic_pm_state.perfctr_pmdev)
 		pm_send(apic_pm_state.perfctr_pmdev, PM_RESUME, data);
 }
@@ -804,8 +804,8 @@ void setup_APIC_timer(void * data)
 	unsigned long flags;
 	int delta;
 
-	__save_flags(flags);
-	__sti();
+	local_save_flags(flags);
+	local_irq_enable();
 	/*
 	 * ok, Intel has some smart code in their APIC that knows
 	 * if a CPU was in 'hlt' lowpower mode, and this increases
@@ -842,7 +842,7 @@ void setup_APIC_timer(void * data)
 
 	printk("CPU%d<T0:%d,T1:%d,D:%d,S:%d,C:%d>\n", smp_processor_id(), t0, t1, delta, slice, clocks);
 
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 /*
@@ -935,7 +935,7 @@ void __init setup_APIC_clocks (void)
 	printk("Using local APIC timer interrupts.\n");
 	using_apic_timer = 1;
 
-	__cli();
+	local_irq_disable();
 
 	calibration_result = calibrate_APIC_clock();
 	/*
@@ -943,7 +943,7 @@ void __init setup_APIC_clocks (void)
 	 */
 	setup_APIC_timer((void *)calibration_result);
 
-	__sti();
+	local_irq_enable();
 
 	/* and update all other cpus */
 	smp_call_function(setup_APIC_timer, (void *)calibration_result, 1, 1);
@@ -1099,6 +1099,7 @@ asmlinkage void smp_spurious_interrupt(void)
 {
 	unsigned long v;
 
+	irq_enter();
 	/*
 	 * Check if this really is a spurious interrupt and ACK it
 	 * if it is a vectored one.  Just in case...
@@ -1111,6 +1112,7 @@ asmlinkage void smp_spurious_interrupt(void)
 	/* see sw-dev-man vol 3, chapter 7.4.13.5 */
 	printk(KERN_INFO "spurious APIC interrupt on CPU#%d, should never happen.\n",
 			smp_processor_id());
+	irq_exit();
 }
 
 /*
@@ -1121,6 +1123,7 @@ asmlinkage void smp_error_interrupt(void)
 {
 	unsigned long v, v1;
 
+	irq_enter();
 	/* First tickle the hardware, only then report what went on. -- REW */
 	v = apic_read(APIC_ESR);
 	apic_write(APIC_ESR, 0);
@@ -1140,6 +1143,7 @@ asmlinkage void smp_error_interrupt(void)
 	*/
 	printk (KERN_ERR "APIC error on CPU%d: %02lx(%02lx)\n",
 	        smp_processor_id(), v , v1);
+	irq_exit();
 }
 
 /*

@@ -101,21 +101,13 @@ extern void dump_regs(struct pt_regs *);
 
 #ifndef CONFIG_SMP
 
-/*
- * Compatibility macros - they will be removed after some time.
- */
-#define cli()	__cli()
-#define sti()	__sti()
-#define save_flags(flags)	__save_flags(flags)
-#define restore_flags(flags)	__restore_flags(flags)
-#define save_and_cli(flags)	__save_and_cli(flags)
+#define cli()	local_irq_disable()
+#define sti()	local_irq_enable()
+#define save_flags(flags)	local_save_flags(flags)
+#define restore_flags(flags)	local_irq_restore(flags)
+#define save_and_cli(flags)	local_irq_save(flags)
 
 #endif /* !CONFIG_SMP */
-
-#define local_irq_disable()		__cli()
-#define local_irq_enable()		__sti()
-#define local_irq_save(flags)		__save_and_cli(flags)
-#define local_irq_restore(flags)	__restore_flags(flags)
 
 static __inline__ int __is_processor(unsigned long pv)
 {

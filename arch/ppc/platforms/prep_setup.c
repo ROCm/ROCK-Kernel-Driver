@@ -473,7 +473,7 @@ prep_calibrate_decr(void)
 
 		if (request_irq(0, prep_calibrate_decr_handler, 0, "timer", NULL) != 0)
 			panic("Could not allocate timer IRQ!");
-		__sti();
+		local_irq_enable();
 		/* wait for calibrate */
 		while ( calibrate_steps )
 			;
@@ -565,7 +565,7 @@ prep_restart(char *cmd)
 {
 	unsigned long i = 10000;
 
-	__cli();
+	local_irq_disable();
 
 	/* set exception prefix high - to the prom */
 	_nmask_and_or_msr(0, MSR_IP);
@@ -583,7 +583,7 @@ static void __prep
 prep_halt(void)
 {
 	unsigned long flags;
-	__cli();
+	local_irq_disable();
 	/* set exception prefix high - to the prom */
 	save_flags( flags );
 	restore_flags( flags|MSR_IP );
@@ -650,7 +650,7 @@ prep_power_off(void)
 {
 	if ( _prep_type == _PREP_IBM) {
 		unsigned long flags;
-		__cli();
+		local_irq_disable();
 		/* set exception prefix high - to the prom */
 		save_flags( flags );
 		restore_flags( flags|MSR_IP );

@@ -73,8 +73,8 @@ static unsigned char cobra_read_packet(struct gameport *gameport, unsigned int *
 		t[i] = COBRA_MAX_STROBE;
 	}
 	
-	__save_flags(flags);
-	__cli();
+	local_save_flags(flags);
+	local_irq_disable();
 
 	u = gameport_read(gameport);
 
@@ -91,7 +91,7 @@ static unsigned char cobra_read_packet(struct gameport *gameport, unsigned int *
 			}
 	} while (t[0] > 0 || t[1] > 0);
 
-	__restore_flags(flags);
+	local_irq_restore(flags);
 
 	ret = 0;
 

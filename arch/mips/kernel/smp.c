@@ -281,9 +281,9 @@ static inline void wait_on_irq(int cpu)
 				printk("Count spun out.  Huh?\n");
 				count = ~0;
 			}
-			__sti();
+			local_irq_enable();
 			SYNC_OTHER_CORES(cpu);
-			__cli();
+			local_irq_disable();
 			if (irqs_running())
 				continue;
 			if (spin_is_locked(&global_irq_lock))
@@ -335,10 +335,10 @@ void __global_cli(void)
 {
 	unsigned int flags;
 
-	__save_flags(flags);
+	local_save_flags(flags);
 	if (flags & ST0_IE) {
 		int cpu = smp_processor_id();
-		__cli();
+		local_irq_disable();
 		if (!local_irq_count(cpu))
 			get_irqlock(cpu);
 	}
@@ -350,7 +350,7 @@ void __global_sti(void)
 
 	if (!local_irq_count(cpu))
 		release_irqlock(cpu);
-	__sti();
+	local_irq_enable();
 }
 
 /*
@@ -367,7 +367,7 @@ unsigned long __global_save_flags(void)
 	unsigned long flags;
 	int cpu = smp_processor_id();
 
-	__save_flags(flags);
+	local_save_flags(flags);
 	local_enabled = (flags & ST0_IE);
 	/* default to local */
 	retval = 2 + local_enabled;
@@ -393,10 +393,10 @@ void __global_restore_flags(unsigned long flags)
 			__global_sti();
 			break;
 		case 2:
-			__cli();
+			local_irq_disable();
 			break;
 		case 3:
-			__sti();
+			local_irq_enable();
 			break;
 		default:
 			printk("global_restore_flags: %08lx\n", flags);

@@ -968,7 +968,7 @@ lcs_kernel_thread(lcs_drvr_globals * drvr_globals)
 #if LINUX_VERSION_CODE<=KERNEL_VERSION(2,2,16)
 	/* tq_scheduler sometimes leaves interrupts disabled from do
 	 * bottom half */
-	__sti();
+	local_irq_enable();
 #endif
 	if (kernel_thread((int (*)(void *)) drvr_globals->kernel_thread_routine,
 			  (void *) drvr_globals, SIGCHLD) < 0) {

@@ -284,7 +284,7 @@ static void show(char * str)
 # define SYNC_OTHER_CORES(x) udelay(x+1)
 #else
 /*
- * We have to allow irqs to arrive between __sti and __cli
+ * We have to allow irqs to arrive between local_irq_enable and local_irq_disable
  */
 # ifdef CONFIG_IA64
 #  define SYNC_OTHER_CORES(x) __asm__ __volatile__ ("nop 0")
@@ -317,9 +317,9 @@ static inline void wait_on_irq(void)
 				show("wait_on_irq");
 				count = ~0;
 			}
-			__sti();
+			local_irq_enable();
 			SYNC_OTHER_CORES(smp_processor_id());
-			__cli();
+			local_irq_disable();
 			if (irqs_running())
 				continue;
 			if (global_irq_lock)
@@ -394,16 +394,16 @@ void __global_cli(void)
 	unsigned int flags;
 
 #ifdef CONFIG_IA64
-	__save_flags(flags);
+	local_save_flags(flags);
 	if (flags & IA64_PSR_I) {
-		__cli();
+		local_irq_disable();
 		if (!really_local_irq_count())
 			get_irqlock();
 	}
 #else
-	__save_flags(flags);
+	local_save_flags(flags);
 	if (flags & (1 << EFLAGS_IF_SHIFT)) {
-		__cli();
+		local_irq_disable();
 		if (!really_local_irq_count())
 			get_irqlock();
 	}
@@ -414,7 +414,7 @@ void __global_sti(void)
 {
 	if (!really_local_irq_count())
 		release_irqlock(smp_processor_id());
-	__sti();
+	local_irq_enable();
 }
 
 /*
@@ -431,7 +431,7 @@ unsigned long __global_save_flags(void)
 	unsigned long flags;
 	int cpu = smp_processor_id();
 
-	__save_flags(flags);
+	local_save_flags(flags);
 #ifdef CONFIG_IA64
 	local_enabled = (flags & IA64_PSR_I) != 0;
 #else
@@ -460,10 +460,10 @@ void __global_restore_flags(unsigned long flags)
 		__global_sti();
 		break;
 	case 2:
-		__cli();
+		local_irq_disable();
 		break;
 	case 3:
-		__sti();
+		local_irq_enable();
 		break;
 	default:
 		printk("global_restore_flags: %08lx (%08lx)\n",
@@ -489,7 +489,7 @@ int handle_IRQ_event(unsigned int irq, struct pt_regs * regs, struct irqaction *
 	status = 1;	/* Force the "do bottom halves" bit */
 
 	if (!(action->flags & SA_INTERRUPT))
-		__sti();
+		local_irq_enable();
 
 	do {
 		status |= action->flags;
@@ -498,7 +498,7 @@ int handle_IRQ_event(unsigned int irq, struct pt_regs * regs, struct irqaction *
 	} while (action);
 	if (status & SA_SAMPLE_RANDOM)
 		add_interrupt_randomness(irq);
-	__cli();
+	local_irq_disable();
 
 	local_irq_exit(irq);
 

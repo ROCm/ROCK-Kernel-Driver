@@ -86,7 +86,7 @@ void __init cpu_init (void)
 
         if (test_and_set_bit(nr,&cpu_initialized)) {
                 printk("CPU#%d ALREADY INITIALIZED!!!!!!!!!\n", nr);
-                for (;;) __sti();
+                for (;;) local_irq_enable();
         }
         cpus_initialized++;
 

@@ -178,7 +178,7 @@ prpmc800_calibrate_decr(void)
 static void
 prpmc800_restart(char *cmd)
 {
-	__cli();
+	local_irq_disable();
 	writeb(HARRIER_RSTOUT_MASK, HARRIER_MISC_CSR_REG);
 	while(1);
 }
@@ -186,7 +186,7 @@ prpmc800_restart(char *cmd)
 static void
 prpmc800_halt(void)
 {
-	__cli();
+	local_irq_disable();
 	while (1);
 }
 

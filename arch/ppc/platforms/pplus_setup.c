@@ -155,7 +155,7 @@ pplus_restart(char *cmd)
 {
 	unsigned long i = 10000;
 
-	__cli();
+	local_irq_disable();
 
 	/* set VIA IDE controller into native mode */
 	pplus_set_VIA_IDE_native();
@@ -176,7 +176,7 @@ static void
 pplus_halt(void)
 {
 	unsigned long flags;
-	__cli();
+	local_irq_disable();
 	/* set exception prefix high - to the prom */
 	save_flags( flags );
 	restore_flags( flags|MSR_IP );

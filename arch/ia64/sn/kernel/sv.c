@@ -183,7 +183,7 @@ signed long sv_wait(sv_t *sv, int sv_wait_flags, unsigned long timeout)
 #ifdef SV_DEBUG_INTERRUPT_STATE
 	{
 	unsigned long flags;
-	__save_flags(flags);
+	local_save_flags(flags);
 
 	if(sv->sv_flags & SV_INTS) {
 		if(SV_TEST_INTERRUPTS_ENABLED(flags)) {
@@ -279,7 +279,7 @@ void sv_signal(sv_t *sv)
 #ifdef SV_DEBUG_INTERRUPT_STATE
 	if(sv->sv_flags & SV_INTS) {
 		unsigned long flags;
-		__save_flags(flags);
+		local_save_flags(flags);
 		if(SV_TEST_INTERRUPTS_ENABLED(flags))
 			printk(KERN_ERR "sv_signal: SV_INTS and "
 			"interrupts enabled! (flags: 0x%lx)\n", flags);
@@ -296,7 +296,7 @@ void sv_broadcast(sv_t *sv)
 #ifdef SV_DEBUG_INTERRUPT_STATE
 	if(sv->sv_flags & SV_INTS) {
 		unsigned long flags;
-		__save_flags(flags);
+		local_save_flags(flags);
 		if(SV_TEST_INTERRUPTS_ENABLED(flags))
 			printk(KERN_ERR "sv_broadcast: SV_INTS and "
 			       "interrupts enabled! (flags: 0x%lx)\n", flags);
@@ -475,7 +475,7 @@ static int interrupt_test_worker(void *unused)
 	printk("ITW: thread %d started.\n", id);
 
 	while(1) {
-		__save_flags(flags2);
+		local_save_flags(flags2);
 		if(jiffies % 3) {
 			printk("ITW %2d %5d: irqsaving          (%lx)\n", id, it, flags2);
 			spin_lock_irqsave(&int_test_spin, flags);
@@ -484,11 +484,11 @@ static int interrupt_test_worker(void *unused)
 			spin_lock_irq(&int_test_spin);
 		}
 
-		__save_flags(flags2);
+		local_save_flags(flags2);
 		printk("ITW %2d %5d: locked, sv_waiting (%lx).\n", id, it, flags2);
 		sv_wait(&int_test_sv, 0, 0);
 
-		__save_flags(flags2);
+		local_save_flags(flags2);
 		printk("ITW %2d %5d: wait finished      (%lx), pausing\n", id, it, flags2);
 		set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout(jiffies & 0xf);

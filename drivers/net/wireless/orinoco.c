@@ -534,10 +534,10 @@ __orinoco_start_irqs(struct orinoco_private *priv, u16 irqmask)
 
 	TRACE_ENTER(priv->ndev->name);
 
-	__cli(); /* FIXME: is this necessary? */
+	local_irq_disable(); /* FIXME: is this necessary? */
 	set_bit(ORINOCO_STATE_DOIRQ, &priv->state);
 	hermes_set_irqmask(hw, irqmask);
-	__sti();
+	local_irq_enable();
 
 	TRACE_EXIT(priv->ndev->name);
 }

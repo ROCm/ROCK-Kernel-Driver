@@ -344,7 +344,7 @@ void die(const char * str, struct pt_regs * regs, long err)
 	printk("%s: %04lx\n", str, err & 0xffff);
 	cpu = smp_processor_id(); 
 	/* racy, but better than risking deadlock. */ 
-	__cli();
+	local_irq_disable();
 	if (!spin_trylock(&die_lock)) { 
 		if (cpu == die_owner) 
 			/* nested oops. should stop eventually */;

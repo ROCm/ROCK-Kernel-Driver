@@ -286,7 +286,7 @@ ev64260_find_end_of_memory(void)
 static void
 ev64260_reset_board(void)
 {
-	__cli();
+	local_irq_disable();
 
 	/* Set exception prefix high - to the firmware */
 	_nmask_and_or_msr(0, MSR_IP);
@@ -310,7 +310,7 @@ ev64260_restart(char *cmd)
 static void
 ev64260_halt(void)
 {
-	__cli();
+	local_irq_disable();
 	while (1);
 	/* NOTREACHED */
 }

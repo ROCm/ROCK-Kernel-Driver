@@ -184,7 +184,7 @@ prpmc750_calibrate_decr(void)
 static void
 prpmc750_restart(char *cmd)
 {
-	__cli();
+	local_irq_disable();
 	writeb(PRPMC750_MODRST_MASK, PRPMC750_MODRST_REG);
 	while(1);
 }
@@ -192,7 +192,7 @@ prpmc750_restart(char *cmd)
 static void
 prpmc750_halt(void)
 {
-	__cli();
+	local_irq_disable();
 	while (1);
 }
 

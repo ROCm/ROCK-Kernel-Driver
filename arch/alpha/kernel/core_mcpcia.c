@@ -97,7 +97,7 @@ conf_read(unsigned long addr, unsigned char type1,
 
 	cpu = smp_processor_id();
 
-	__save_and_cli(flags);
+	local_irq_save(flags);
 
 	DBG_CFG(("conf_read(addr=0x%lx, type1=%d, hose=%d)\n",
 		 addr, type1, mid));
@@ -131,7 +131,7 @@ conf_read(unsigned long addr, unsigned char type1,
 
 	DBG_CFG(("conf_read(): finished\n"));
 
-	__restore_flags(flags);
+	local_irq_restore(flags);
 	return value;
 }
 
@@ -145,7 +145,7 @@ conf_write(unsigned long addr, unsigned int value, unsigned char type1,
 
 	cpu = smp_processor_id();
 
-	__save_and_cli(flags);	/* avoid getting hit by machine check */
+	local_irq_save(flags);	/* avoid getting hit by machine check */
 
 	/* Reset status register to avoid losing errors.  */
 	stat0 = *(vuip)MCPCIA_CAP_ERR(mid);
@@ -167,7 +167,7 @@ conf_write(unsigned long addr, unsigned int value, unsigned char type1,
 	mb();
 
 	DBG_CFG(("conf_write(): finished\n"));
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static int

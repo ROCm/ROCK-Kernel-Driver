@@ -388,7 +388,7 @@ handle_irq_event(int irq, struct pt_regs *regs, struct irqaction *action)
 	int status = 0;
 
 	if (!(action->flags & SA_INTERRUPT))
-		__sti();
+		local_irq_enable();
 
 	do {
 		status |= action->flags;
@@ -397,7 +397,7 @@ handle_irq_event(int irq, struct pt_regs *regs, struct irqaction *action)
 	} while (action);
 	if (status & SA_SAMPLE_RANDOM)
 		add_interrupt_randomness(irq);
-	__cli();
+	local_irq_disable();
 }
 
 #ifdef CONFIG_SMP

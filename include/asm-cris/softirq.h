@@ -21,7 +21,7 @@ do {                                                    \
         if (!--local_bh_count(smp_processor_id())       \
             && softirq_pending(smp_processor_id())) {   \
                 do_softirq();                           \
-                __sti();                                \
+                local_irq_enable();                                \
         }                                               \
 } while (0)
 

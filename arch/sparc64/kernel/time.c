@@ -432,7 +432,7 @@ void __init clock_probe(void)
 		return;
 	}
 
-	__save_and_cli(flags);
+	local_irq_save(flags);
 
 	cbus = central_bus;
 	if (cbus != NULL)
@@ -610,7 +610,7 @@ try_isa_clock:
 
 	set_system_time();
 	
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 extern void init_timers(void (*func)(int, void *, struct pt_regs *),

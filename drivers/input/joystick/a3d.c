@@ -84,8 +84,8 @@ static int a3d_read_packet(struct gameport *gameport, int length, char *data)
 	t = gameport_time(gameport, A3D_MAX_START);
 	s = gameport_time(gameport, A3D_MAX_STROBE);
 
-	__save_flags(flags);
-	__cli();
+	local_save_flags(flags);
+	local_irq_disable();
 	gameport_trigger(gameport);
 	v = gameport_read(gameport);
 
@@ -98,7 +98,7 @@ static int a3d_read_packet(struct gameport *gameport, int length, char *data)
 		}
 	}
 
-	__restore_flags(flags);
+	local_irq_restore(flags);
 
 	return i;
 }

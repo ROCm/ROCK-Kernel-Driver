@@ -186,7 +186,6 @@ ENTRY(ret_from_fork)
 	# userspace resumption stub bypassing syscall exit tracing
 	ALIGN
 ret_from_intr:
-	preempt_stop
 ret_from_exception:
 	movl EFLAGS(%esp), %eax		# mix EFLAGS and CS
 	movb CS(%esp), %al
