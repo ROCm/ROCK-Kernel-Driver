@@ -236,6 +236,8 @@ static int __init init_kerberos_module(void)
 	gss_register_triple(RPC_AUTH_GSS_KRB5I, gm, 0, RPC_GSS_SVC_INTEGRITY);
 	if (svcauth_gss_register_pseudoflavor(RPC_AUTH_GSS_KRB5, "krb5"))
 		printk("Failed to register %s with server!\n", "krb5");
+	if (svcauth_gss_register_pseudoflavor(RPC_AUTH_GSS_KRB5I, "krb5i"))
+		printk("Failed to register %s with server!\n", "krb5i");
 	gss_mech_put(gm);
 	return 0;
 }
