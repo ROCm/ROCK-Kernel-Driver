@@ -6,6 +6,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
+#include <regex.h>
 #include <sys/utsname.h>
 
 #define LKC_DIRECT_LINK
@@ -655,6 +656,43 @@ struct symbol *sym_find(const char *name)
 
 	return symbol;
 }
+
+struct symbol **sym_re_search(const char *pattern)
+{
+	struct symbol *sym, **sym_arr = NULL;
+	int i, cnt, size;
+	regex_t re;
+
+	cnt = size = 0;
+	/* Skip if empty */
+	if (strlen(pattern) == 0)
+		return NULL;
+	if (regcomp(&re, pattern, REG_EXTENDED|REG_NOSUB|REG_ICASE))
+		return NULL;
+
+	for_all_symbols(i, sym) {
+		if (sym->flags & SYMBOL_CONST || !sym->name)
+			continue;
+		if (regexec(&re, sym->name, 0, NULL, 0))
+			continue;
+		if (cnt + 1 >= size) {
+			void *tmp = sym_arr;
+			size += 16;
+			sym_arr = realloc(sym_arr, size * sizeof(struct symbol *));
+			if (!sym_arr) {
+				free(tmp);
+				return NULL;
+			}
+		}
+		sym_arr[cnt++] = sym;
+	}
+	if (sym_arr)
+		sym_arr[cnt] = NULL;
+	regfree(&re);
+
+	return sym_arr;
+}
+
 
 struct symbol *sym_check_deps(struct symbol *sym);
 
