@@ -119,28 +119,48 @@ static void __devinit pci_fixup_piix4_acpi(struct pci_dev *d)
 
 /*
  * Addresses issues with problems in the memory write queue timer in
- * certain VIA Northbridges.  This bugfix is per VIA's specifications.
+ * certain VIA Northbridges.  This bugfix is per VIA's specifications,
+ * except for the KL133/KM133: clearing bit 5 on those Northbridges seems
+ * to trigger a bug in its integrated ProSavage video card, which
+ * causes screen corruption.  We only clear bits 6 and 7 for that chipset,
+ * until VIA can provide us with definitive information on why screen
+ * corruption occurs, and what exactly those bits do.
  *
  * VIA 8363,8622,8361 Northbridges:
  *  - bits  5, 6, 7 at offset 0x55 need to be turned off
  * VIA 8367 (KT266x) Northbridges:
  *  - bits  5, 6, 7 at offset 0x95 need to be turned off
+ * VIA 8363 rev 0x81/0x84 (KL133/KM133) Northbridges:
+ *  - bits     6, 7 at offset 0x55 need to be turned off
  */
+
+#define VIA_8363_KL133_REVISION_ID 0x81
+#define VIA_8363_KM133_REVISION_ID 0x84
+
 static void __init pci_fixup_via_northbridge_bug(struct pci_dev *d)
 {
 	u8 v;
+	u8 revision;
 	int where = 0x55;
+	int mask = 0x1f; /* clear bits 5, 6, 7 by default */
+
+	pci_read_config_byte(d, PCI_REVISION_ID, &revision);
 
 	if (d->device == PCI_DEVICE_ID_VIA_8367_0) {
   	        where = 0x95; /* the memory write queue timer register is 
-                                 different for the kt266x's: 0x95 not 0x55 */
+				different for the KT266x's: 0x95 not 0x55 */
+	} else if (d->device == PCI_DEVICE_ID_VIA_8363_0 &&
+			(revision == VIA_8363_KL133_REVISION_ID || 
+			revision == VIA_8363_KM133_REVISION_ID)) {
+			mask = 0x3f; /* clear only bits 6 and 7; clearing bit 5
+					causes screen corruption on the KL133/KM133 */
 	}
 
         pci_read_config_byte(d, where, &v);
-	if (v & 0xe0) {
-		printk(KERN_WARNING "Disabling broken memory write queue: [%02x] %02x->%02x\n",
-			where, v, v & 0x1f);
-		v &= 0x1f; /* clear bits 5, 6, 7 */
+	if (v & ~mask) {
+		printk(KERN_WARNING "Disabling VIA memory write queue (PCI ID %04x, rev %02x): [%02x] %02x & %02x -> %02x\n", \
+			d->device, revision, where, v, mask, v & mask);
+		v &= mask;
 		pci_write_config_byte(d, where, v);
 	}
 }
