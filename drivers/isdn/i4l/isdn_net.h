@@ -46,8 +46,6 @@ extern int isdn_net_start_xmit(struct sk_buff *skb, struct net_device *ndev);
 extern int  isdn_net_bind_channel(isdn_net_dev *idev, int slot);
 extern void isdn_net_unbind_channel(isdn_net_dev *idev);
 extern int  isdn_net_dial(isdn_net_dev *idev);
-extern void isdn_net_accept(isdn_net_dev *idev, int slot, char *nr);
-extern int  isdn_net_do_callback(isdn_net_dev *idev);
 
 extern int  isdn_net_bsent(isdn_net_dev *idev, isdn_ctrl *c);
 
