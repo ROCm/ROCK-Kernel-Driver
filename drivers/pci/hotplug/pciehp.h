@@ -68,9 +68,7 @@ struct pci_func {
 	struct pci_dev* pci_dev;
 };
 
-#define SLOT_MAGIC	0x67267321
 struct slot {
-	u32 magic;
 	struct slot *next;
 	u8 bus;
 	u8 device;
@@ -235,46 +233,9 @@ extern struct pci_func *pciehp_slot_list[256];
 
 /* Inline functions */
 
-
-/* Inline functions to check the sanity of a pointer that is passed to us */
-static inline int slot_paranoia_check (struct slot *slot, const char *function)
-{
-	if (!slot) {
-		dbg("%s - slot == NULL", function);
-		return -1;
-	}
-	if (slot->magic != SLOT_MAGIC) {
-		dbg("%s - bad magic number for slot", function);
-		return -1;
-	}
-	if (!slot->hotplug_slot) {
-		dbg("%s - slot->hotplug_slot == NULL!", function);
-		return -1;
-	}
-	return 0;
-}
-
-static inline struct slot *get_slot (struct hotplug_slot *hotplug_slot, const char *function)
-{ 
-	struct slot *slot;
-
-	if (!hotplug_slot) {
-		dbg("%s - hotplug_slot == NULL\n", function);
-		return NULL;
-	}
-
-	slot = (struct slot *)hotplug_slot->private;
-	if (slot_paranoia_check (slot, function))
-                return NULL;
-	return slot;
-}
-
-static inline struct slot *pciehp_find_slot (struct controller *ctrl, u8 device)
+static inline struct slot *pciehp_find_slot(struct controller *ctrl, u8 device)
 {
 	struct slot *p_slot, *tmp_slot = NULL;
-
-	if (!ctrl)
-		return NULL;
 
 	p_slot = ctrl->slot;
 
@@ -293,7 +254,7 @@ static inline struct slot *pciehp_find_slot (struct controller *ctrl, u8 device)
 	return (p_slot);
 }
 
-static inline int wait_for_ctrl_irq (struct controller *ctrl)
+static inline int wait_for_ctrl_irq(struct controller *ctrl)
 {
 	int retval = 0;
 
