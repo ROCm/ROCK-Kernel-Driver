@@ -859,7 +859,7 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 	 * In all other cases we'll let an irq pick up our IO and submit it
 	 * to the controller to improve affinity.
 	 */
-	if (smp_processor_id() == ha->last_irq_cpu || was_empty)
+	if (_smp_processor_id() == ha->last_irq_cpu || was_empty)
 		qla2x00_next(ha);
 
 	spin_lock_irq(ha->host->host_lock);
