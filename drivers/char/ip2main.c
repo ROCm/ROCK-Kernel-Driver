@@ -869,29 +869,19 @@ ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize)
 		 */
 
 		for( i = 0; i < IP2_MAX_BOARDS; ++i ) {
-#ifdef	CONFIG_DEVFS_FS
-			char name[16];
-#endif
-
 			if ( 0 == ip2config.addr[i] ) {
 				continue;
 			}
 
 #ifdef	CONFIG_DEVFS_FS
 			if ( NULL != ( pB = i2BoardPtrTable[i] ) ) {
-				sprintf( name, "ip2/ipl%d", i );
-				devfs_register(NULL, name,
-						DEVFS_FL_DEFAULT,
-						IP2_IPL_MAJOR, 4 * i,
+				devfs_mk_cdev(MKDEV(IP2_IPL_MAJOR, 4 * i),
 						S_IRUSR | S_IWUSR | S_IRGRP | S_IFCHR,
-						&ip2_ipl, NULL);
+						"ip2/ipl%d", i);
 
-				sprintf( name, "ip2/stat%d", i );
-				devfs_register(NULL, name,
-						DEVFS_FL_DEFAULT,
-						IP2_IPL_MAJOR, 4 * i + 1,
+				devfs_mk_cdev(MKDEV(IP2_IPL_MAJOR, 4 * i + 1),
 						S_IRUSR | S_IWUSR | S_IRGRP | S_IFCHR,
-						&ip2_ipl, NULL);
+						"ip2/stat%d", i);
 
 			    for ( box = 0; box < ABS_MAX_BOXES; ++box )
 			    {

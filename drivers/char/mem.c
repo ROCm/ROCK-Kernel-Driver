@@ -660,15 +660,16 @@ static int memory_open(struct inode * inode, struct file * filp)
 	return 0;
 }
 
-void __init memory_devfs_register (void)
-{
-    /*  These are never unregistered  */
-    static const struct {
-	unsigned short minor;
-	char *name;
-	umode_t mode;
-	struct file_operations *fops;
-    } list[] = { /* list of minor devices */
+static struct file_operations memory_fops = {
+	.open		= memory_open,	/* just a selector for the real open */
+};
+
+static const struct {
+	unsigned int		minor;
+	char			*name;
+	umode_t			mode;
+	struct file_operations	*fops;
+} devlist[] = { /* list of minor devices */
 	{1, "mem",     S_IRUSR | S_IWUSR | S_IRGRP, &mem_fops},
 	{2, "kmem",    S_IRUSR | S_IWUSR | S_IRGRP, &kmem_fops},
 	{3, "null",    S_IRUGO | S_IWUGO,           &null_fops},
@@ -680,25 +681,20 @@ void __init memory_devfs_register (void)
 	{8, "random",  S_IRUGO | S_IWUSR,           &random_fops},
 	{9, "urandom", S_IRUGO | S_IWUSR,           &urandom_fops},
 	{11,"kmsg",    S_IRUGO | S_IWUSR,           &kmsg_fops},
-    };
-    int i;
-
-    for (i=0; i<(sizeof(list)/sizeof(*list)); i++)
-	devfs_register (NULL, list[i].name, DEVFS_FL_NONE,
-			MEM_MAJOR, list[i].minor,
-			list[i].mode | S_IFCHR,
-			list[i].fops, NULL);
-}
-
-static struct file_operations memory_fops = {
-	.open		= memory_open,	/* just a selector for the real open */
 };
 
-int __init chr_dev_init(void)
+static int __init chr_dev_init(void)
 {
+	int i;
+
 	if (register_chrdev(MEM_MAJOR,"mem",&memory_fops))
 		printk("unable to get major %d for memory devs\n", MEM_MAJOR);
-	memory_devfs_register();
+
+	for (i = 0; i < ARRAY_SIZE(devlist); i++) {
+		devfs_mk_cdev(MKDEV(MEM_MAJOR, devlist[i].minor),
+				S_IFCHR | devlist[i].mode, devlist[i].name);
+	}
+	
 	rand_initialize();
 #if defined (CONFIG_FB)
 	fbmem_init();

@@ -784,8 +784,6 @@ static int __init lp_setup (char *str)
 
 static int lp_register(int nr, struct parport *port)
 {
-	char name[16];
-
 	lp_table[nr].dev = parport_register_device(port, "lp", 
 						   lp_preempt, NULL, NULL, 0,
 						   (void *) &lp_table[nr]);
@@ -796,11 +794,8 @@ static int lp_register(int nr, struct parport *port)
 	if (reset)
 		lp_reset(nr);
 
-	sprintf (name, "printers/%d", nr);
-	devfs_register (NULL, name,
-			DEVFS_FL_DEFAULT, LP_MAJOR, nr,
-			S_IFCHR | S_IRUGO | S_IWUGO,
-			&lp_fops, NULL);
+	devfs_mk_cdev(MKDEV(LP_MAJOR, nr), S_IFCHR | S_IRUGO | S_IWUGO,
+			"printers/%d", nr);
 
 	printk(KERN_INFO "lp%d: using %s (%s).\n", nr, port->name, 
 	       (port->irq == PARPORT_IRQ_NONE)?"polling":"interrupt-driven");

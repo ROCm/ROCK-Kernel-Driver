@@ -200,8 +200,8 @@ int misc_register(struct miscdevice * misc)
 				"misc/%s", misc->name);
 	}
 
-	devfs_register(NULL, misc->devfs_name, 0, MISC_MAJOR, misc->minor,
-			S_IFCHR|S_IRUSR|S_IWUSR|S_IRGRP, misc->fops, NULL);
+	devfs_mk_cdev(MKDEV(MISC_MAJOR, misc->minor),
+			S_IFCHR|S_IRUSR|S_IWUSR|S_IRGRP, misc->devfs_name);
 
 	/*
 	 * Add it to the front, so that later devices can "override"

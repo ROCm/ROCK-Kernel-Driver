@@ -345,10 +345,9 @@ static int __init dtlk_init(void)
 	}
 	if (dtlk_dev_probe() == 0)
 		printk(", MAJOR %d\n", dtlk_major);
-	devfs_register(NULL, "dtlk", DEVFS_FL_DEFAULT,
-		       dtlk_major, DTLK_MINOR,
-		       S_IFCHR | S_IRUSR | S_IWUSR,
-		       &dtlk_fops, NULL);
+
+	devfs_mk_cdev(MKDEV(dtlk_major, DTLK_MINOR),
+		       S_IFCHR | S_IRUSR | S_IWUSR, "dtlk");
 
 	init_timer(&dtlk_timer);
 	dtlk_timer.function = dtlk_timer_tick;

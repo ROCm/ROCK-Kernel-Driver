@@ -1476,9 +1476,9 @@ static int __init capi_init(void)
 		return -EIO;
 	}
 
-	devfs_register (NULL, "isdn/capi20", DEVFS_FL_DEFAULT,
-			capi_major, 0, S_IFCHR | S_IRUSR | S_IWUSR,
-			&capi_fops, NULL);
+	devfs_mk_cdev(MKDEV(capi_major, 0), S_IFCHR | S_IRUSR | S_IWUSR,
+			"isdn/capi20");
+
 	printk(KERN_NOTICE "capi20: started up with major %d\n", capi_major);
 
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE

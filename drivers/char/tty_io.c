@@ -2100,8 +2100,7 @@ static void tty_register_devfs(struct tty_driver *driver, unsigned index)
 	}
 
 	tty_line_name(driver, index, buf);
-	devfs_register(NULL, buf, 0, MAJOR(dev), MINOR(dev),
-		S_IFCHR | S_IRUSR | S_IWUSR, &tty_fops, NULL);
+	devfs_mk_cdev(dev, S_IFCHR|S_IRUSR|S_IWUSR, buf);
 }
 
 static void tty_unregister_devfs(struct tty_driver *driver, int index)
@@ -2308,34 +2307,25 @@ void __init tty_init(void)
 	if (register_chrdev_region(TTYAUX_MAJOR, 0, 1,
 				   "/dev/tty", &tty_fops) < 0)
 		panic("Couldn't register /dev/tty driver\n");
-
-	devfs_register (NULL, "tty", 0, TTYAUX_MAJOR, 0,
-			S_IFCHR | S_IRUGO | S_IWUGO, &tty_fops, NULL);
+	devfs_mk_cdev(MKDEV(TTYAUX_MAJOR, 0), S_IFCHR|S_IRUGO|S_IWUGO, "tty");
 
 	if (register_chrdev_region(TTYAUX_MAJOR, 1, 1,
 				   "/dev/console", &tty_fops) < 0)
 		panic("Couldn't register /dev/console driver\n");
-
-	devfs_register (NULL, "console", 0, TTYAUX_MAJOR, 1,
-			S_IFCHR | S_IRUSR | S_IWUSR, &tty_fops, NULL);
+	devfs_mk_cdev(MKDEV(TTYAUX_MAJOR, 1), S_IFCHR|S_IRUSR|S_IWUSR, "console");
 
 #ifdef CONFIG_UNIX98_PTYS
 	if (register_chrdev_region(TTYAUX_MAJOR, 2, 1,
 				   "/dev/ptmx", &tty_fops) < 0)
 		panic("Couldn't register /dev/ptmx driver\n");
-
-	devfs_register (NULL, "ptmx", 0, TTYAUX_MAJOR, 2,
-			S_IFCHR | S_IRUGO | S_IWUGO, &tty_fops, NULL);
+	devfs_mk_cdev(MKDEV(TTYAUX_MAJOR, 2), S_IFCHR|S_IRUGO|S_IWUGO, "ptmx");
 #endif
 	
 #ifdef CONFIG_VT
 	if (register_chrdev_region(TTY_MAJOR, 0, 1,
 				   "/dev/vc/0", &tty_fops) < 0)
 		panic("Couldn't register /dev/tty0 driver\n");
-
-	devfs_register (NULL, "vc/0", 0, TTY_MAJOR, 0,
-			S_IFCHR | S_IRUSR | S_IWUSR, &tty_fops, NULL);
-
+	devfs_mk_cdev(MKDEV(TTY_MAJOR, 0), S_IFCHR|S_IRUSR|S_IWUSR, "vc/0");
 	vty_init();
 #endif
 

@@ -5336,12 +5336,9 @@ int __init stli_init(void)
 
 	devfs_mk_dir("staliomem");
 	for (i = 0; i < 4; i++) {
-		char name[16];
-		sprintf(name, "staliomem/%d", i);
-		devfs_register(NULL, name, DEVFS_FL_DEFAULT,
-			       STL_SIOMEMMAJOR, i,
+		devfs_mk_cdev(MKDEV(STL_SIOMEMMAJOR, i),
 			       S_IFCHR | S_IRUSR | S_IWUSR,
-			       &stli_fsiomem, NULL);
+			       "staliomem/%d", i);
 	}
 
 /*

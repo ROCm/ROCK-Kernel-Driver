@@ -784,11 +784,14 @@ int __init ppp_init(void)
 
 	printk(KERN_INFO "PPP generic driver version " PPP_VERSION "\n");
 	err = register_chrdev(PPP_MAJOR, "ppp", &ppp_device_fops);
-	if (err)
+	if (!err) {
+		err = devfs_mk_cdev(MKDEV(PPP_MAJOR, 0),
+				S_IFCHR|S_IRUSR|S_IWUSR, "ppp");
+	}
+
+	if (!err)
 		printk(KERN_ERR "failed to register PPP device (%d)\n", err);
-	devfs_register(NULL, "ppp", DEVFS_FL_DEFAULT, PPP_MAJOR, 0,
-		       S_IFCHR | S_IRUSR | S_IWUSR, &ppp_device_fops, NULL);
-	return 0;
+	return err;
 }
 
 /*

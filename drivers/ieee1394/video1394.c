@@ -1257,7 +1257,6 @@ static struct hpsb_protocol_driver video1394_driver = {
 static void video1394_add_host (struct hpsb_host *host)
 {
 	struct ti_ohci *ohci;
-	char name[16];
 	int minor;
 
 	/* We only work with the OHCI-1394 driver */
@@ -1274,12 +1273,10 @@ static void video1394_add_host (struct hpsb_host *host)
 	hpsb_set_hostinfo(&video1394_highlevel, host, ohci);
 	hpsb_set_hostinfo_key(&video1394_highlevel, host, ohci->id);
 
-	sprintf(name, "%s/%d", VIDEO1394_DRIVER_NAME, ohci->id);
-	minor = IEEE1394_MINOR_BLOCK_VIDEO1394 * 16 + ohci->id;
-	devfs_register(NULL, name, 0, IEEE1394_MAJOR, minor,
-		       S_IFCHR | S_IRUSR | S_IWUSR, &video1394_fops, NULL);
-
-	return;
+	minor = IEEE1394_MINOR_BLOCK_VIDEO1394 * 16 + ohci->id; 
+	devfs_mk_cdev(MKDEV(IEEE1394_MAJOR, minor),
+		       S_IFCHR | S_IRUSR | S_IWUSR,
+		       "%s/%d", VIDEO1394_DRIVER_NAME, ohci->id);
 }
 
 
