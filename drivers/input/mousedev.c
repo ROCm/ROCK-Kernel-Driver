@@ -52,8 +52,10 @@ static unsigned tap_time = 200;
 module_param(tap_time, uint, 0);
 MODULE_PARM_DESC(tap_time, "Tap time for touchpads in absolute mode (msecs)");
 
-struct mousedev_motion {
+struct mousedev_hw_data {
 	int dx, dy, dz;
+	int x, y;
+	int abs_event;
 	unsigned long buttons;
 };
 
@@ -66,7 +68,7 @@ struct mousedev {
 	struct list_head list;
 	struct input_handle handle;
 
-	struct mousedev_motion packet;
+	struct mousedev_hw_data packet;
 	unsigned int pkt_count;
 	int old_x[4], old_y[4];
 	unsigned long touch;
@@ -78,6 +80,11 @@ enum mousedev_emul {
 	MOUSEDEV_EMUL_EXPS
 };
 
+struct mousedev_motion {
+	int dx, dy, dz;
+	unsigned long buttons;
+};
+
 #define PACKET_QUEUE_LEN	16
 struct mousedev_list {
 	struct fasync_struct *fasync;
@@ -87,6 +94,7 @@ struct mousedev_list {
 	struct mousedev_motion packets[PACKET_QUEUE_LEN];
 	unsigned int head, tail;
 	spinlock_t packet_lock;
+	int pos_x, pos_y;
 
 	signed char ps2[6];
 	unsigned char ready, buffer, bufsiz;
@@ -134,15 +142,19 @@ static void mousedev_abs_event(struct input_dev *dev, struct mousedev *mousedev,
 		case ABS_X:
 			size = dev->absmax[ABS_X] - dev->absmin[ABS_X];
 			if (size == 0) size = xres;
-			mousedev->packet.dx = (value * xres - mousedev->old_x[0]) / size;
-			mousedev->old_x[0] = mousedev->packet.dx * size;
+			if (value > dev->absmax[ABS_X]) value = dev->absmax[ABS_X];
+			if (value < dev->absmin[ABS_X]) value = dev->absmin[ABS_X];
+			mousedev->packet.x = ((value - dev->absmin[ABS_X]) * xres) / size;
+			mousedev->packet.abs_event = 1;
 			break;
 
 		case ABS_Y:
 			size = dev->absmax[ABS_Y] - dev->absmin[ABS_Y];
 			if (size == 0) size = yres;
-			mousedev->packet.dy = (value * yres - mousedev->old_y[0]) / size;
-			mousedev->old_y[0] = mousedev->packet.dy * size;
+			if (value > dev->absmax[ABS_Y]) value = dev->absmax[ABS_Y];
+			if (value < dev->absmin[ABS_Y]) value = dev->absmin[ABS_Y];
+			mousedev->packet.y = yres - ((value - dev->absmin[ABS_Y]) * yres) / size;
+			mousedev->packet.abs_event = 1;
 			break;
 	}
 }
@@ -188,7 +200,7 @@ static void mousedev_key_event(struct mousedev *mousedev, unsigned int code, int
 	}
 }
 
-static void mousedev_notify_readers(struct mousedev *mousedev, struct mousedev_motion *packet)
+static void mousedev_notify_readers(struct mousedev *mousedev, struct mousedev_hw_data *packet)
 {
 	struct mousedev_list *list;
 	struct mousedev_motion *p;
@@ -205,6 +217,18 @@ static void mousedev_notify_readers(struct mousedev *mousedev, struct mousedev_m
 				memset(p, 0, sizeof(struct mousedev_motion));
 			}
 		}
+
+		if (packet->abs_event) {
+			p->dx += packet->x - list->pos_x;
+			p->dy += packet->y - list->pos_y;
+			list->pos_x = packet->x;
+			list->pos_y = packet->y;
+		}
+
+		list->pos_x += packet->dx;
+		list->pos_x = list->pos_x < 0 ? 0 : (list->pos_x >= xres ? xres : list->pos_x);
+		list->pos_y += packet->dy;
+		list->pos_y = list->pos_y < 0 ? 0 : (list->pos_y >= yres ? yres : list->pos_y);
 
 		p->dx += packet->dx;
 		p->dy += packet->dy;
@@ -224,7 +248,7 @@ static void mousedev_touchpad_touch(struct mousedev *mousedev, int value)
 {
 	if (!value) {
 		if (mousedev->touch &&
-		    !time_after(jiffies, mousedev->touch + msecs_to_jiffies(tap_time))) {
+		    time_before(jiffies, mousedev->touch + msecs_to_jiffies(tap_time))) {
 			/*
 			 * Toggle left button to emulate tap.
 			 * We rely on the fact that mousedev_mix always has 0
@@ -289,6 +313,7 @@ static void mousedev_event(struct input_handle *handle, unsigned int type, unsig
 				mousedev_notify_readers(&mousedev_mix, &mousedev->packet);
 
 				mousedev->packet.dx = mousedev->packet.dy = mousedev->packet.dz = 0;
+				mousedev->packet.abs_event = 0;
 			}
 			break;
 	}
@@ -374,6 +399,8 @@ static int mousedev_open(struct inode * inode, struct file * file)
 	memset(list, 0, sizeof(struct mousedev_list));
 
 	spin_lock_init(&list->packet_lock);
+	list->pos_x = xres / 2;
+	list->pos_y = yres / 2;
 	list->mousedev = mousedev_table[i];
 	list_add_tail(&list->node, &mousedev_table[i]->list);
 	file->private_data = list;
