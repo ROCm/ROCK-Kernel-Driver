@@ -31,13 +31,15 @@ apcs-$(CONFIG_CPU_32)		:=-mapcs-32
 apcs-$(CONFIG_CPU_26)		:=-mapcs-26 -mcpu=arm3
 
 # This selects which instruction set is used.
-# Note that GCC is lame - it doesn't numerically define an
-# architecture version macro, but instead defines a whole
-# series of macros.
-arch-$(CONFIG_CPU_32v3)		:=-D__LINUX_ARM_ARCH__=3 -march=armv3
+# Note that GCC does not numerically define an architecture version
+# macro, but instead defines a whole series of macros which makes
+# testing for a specific architecture or later rather impossible.
+#
+# Note - GCC does accept -march=armv5te, but someone messed up the assembler or the
+# gcc specs file - this needs fixing properly - ie in gcc and/or binutils.
+arch-$(CONFIG_CPU_32v5)		:=-D__LINUX_ARM_ARCH__=5 -march=armv5t
 arch-$(CONFIG_CPU_32v4)		:=-D__LINUX_ARM_ARCH__=4 -march=armv4
-arch-$(CONFIG_CPU_32v5)		:=-D__LINUX_ARM_ARCH__=5 -march=armv5te
-arch-$(CONFIG_CPU_XSCALE)	:=-D__LINUX_ARM_ARCH__=5 -march=armv4 -Wa,-mxscale #-march=armv5te
+arch-$(CONFIG_CPU_32v3)		:=-D__LINUX_ARM_ARCH__=3 -march=armv3
 
 # This selects how we optimise for the processor.
 tune-$(CONFIG_CPU_ARM610)	:=-mtune=arm610
@@ -48,13 +50,13 @@ tune-$(CONFIG_CPU_ARM922T)	:=-mtune=arm9tdmi
 tune-$(CONFIG_CPU_ARM926T)	:=-mtune=arm9tdmi
 tune-$(CONFIG_CPU_SA110)	:=-mtune=strongarm110
 tune-$(CONFIG_CPU_SA1100)	:=-mtune=strongarm1100
-tune-$(CONFIG_CPU_XSCALE)	:=-mtune=strongarm #-mtune=xscale
+tune-$(CONFIG_CPU_XSCALE)	:=-mtune=strongarm -Wa,-mxscale #-mtune=xscale
 
 # Force -mno-fpu to be passed to the assembler.  Some versions of gcc don't
 # do this with -msoft-float
 CFLAGS_BOOT	:=$(apcs-y) $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float -Wa,-mno-fpu -Uarm
 CFLAGS		+=$(apcs-y) $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float -Wa,-mno-fpu -Uarm
-AFLAGS		+=$(apcs-y) $(arch-y) -mno-fpu -msoft-float -Wa,-mno-fpu
+AFLAGS		+=$(apcs-y) $(arch-y) $(tune-y) -mno-fpu -msoft-float -Wa,-mno-fpu
 
 #Default value
 DATAADDR	:= .
@@ -208,6 +210,7 @@ zi:;	$(Q)$(MAKE) $(build)=$(boot) zinstall
 	)
 
 arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
+				   include/asm-arm/.arch include/asm-arm/.proc \
 				   include/config/MARKER
 
 include/asm-$(ARCH)/constants.h: arch/$(ARCH)/kernel/asm-offsets.s
