@@ -211,7 +211,7 @@ static void hugetlbfs_forget_inode(struct inode *inode)
 		list_add(&inode->i_list, &inode_unused);
 	}
 	inodes_stat.nr_unused++;
-	if (!super_block | (super_block->s_flags & MS_ACTIVE)) {
+	if (!super_block || (super_block->s_flags & MS_ACTIVE)) {
 		spin_unlock(&inode_lock);
 		return;
 	}
