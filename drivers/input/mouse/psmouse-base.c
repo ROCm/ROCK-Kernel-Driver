@@ -363,7 +363,7 @@ static int im_explorer_detect(struct psmouse *psmouse)
  * the mouse may have.
  */
 
-static int psmouse_extensions(struct psmouse *psmouse)
+static int psmouse_extensions(struct psmouse *psmouse, unsigned int max_proto)
 {
 	int synaptics_hardware = 0;
 
@@ -374,12 +374,12 @@ static int psmouse_extensions(struct psmouse *psmouse)
 /*
  * Try Synaptics TouchPad
  */
-	if (psmouse_max_proto > PSMOUSE_PS2 && synaptics_detect(psmouse)) {
+	if (max_proto > PSMOUSE_PS2 && synaptics_detect(psmouse)) {
 		synaptics_hardware = 1;
 		psmouse->vendor = "Synaptics";
 		psmouse->name = "TouchPad";
 
-		if (psmouse_max_proto > PSMOUSE_IMEX) {
+		if (max_proto > PSMOUSE_IMEX) {
 			if (synaptics_init(psmouse) == 0)
 				return PSMOUSE_SYNAPTICS;
 /*
@@ -387,7 +387,7 @@ static int psmouse_extensions(struct psmouse *psmouse)
  * Unfortunately Logitech/Genius probes confuse some firmware versions so
  * we'll have to skip them.
  */
-			psmouse_max_proto = PSMOUSE_IMEX;
+			max_proto = PSMOUSE_IMEX;
 		}
 /*
  * Make sure that touchpad is in relative mode, gestures (taps) are enabled
@@ -395,7 +395,7 @@ static int psmouse_extensions(struct psmouse *psmouse)
 		synaptics_reset(psmouse);
 	}
 
-	if (psmouse_max_proto > PSMOUSE_IMEX && genius_detect(psmouse)) {
+	if (max_proto > PSMOUSE_IMEX && genius_detect(psmouse)) {
 		set_bit(BTN_EXTRA, psmouse->dev.keybit);
 		set_bit(BTN_SIDE, psmouse->dev.keybit);
 		set_bit(REL_WHEEL, psmouse->dev.relbit);
@@ -405,17 +405,16 @@ static int psmouse_extensions(struct psmouse *psmouse)
 		return PSMOUSE_GENPS;
 	}
 
-	if (psmouse_max_proto > PSMOUSE_IMEX) {
+	if (max_proto > PSMOUSE_IMEX) {
 		int type = ps2pp_detect(psmouse);
 		if (type)
 			return type;
 	}
 
-	if (psmouse_max_proto >= PSMOUSE_IMPS && intellimouse_detect(psmouse)) {
+	if (max_proto >= PSMOUSE_IMPS && intellimouse_detect(psmouse)) {
 		set_bit(REL_WHEEL, psmouse->dev.relbit);
 
-		if (psmouse_max_proto >= PSMOUSE_IMEX &&
-					im_explorer_detect(psmouse)) {
+		if (max_proto >= PSMOUSE_IMEX && im_explorer_detect(psmouse)) {
 			set_bit(BTN_SIDE, psmouse->dev.keybit);
 			set_bit(BTN_EXTRA, psmouse->dev.keybit);
 
@@ -478,7 +477,7 @@ static int psmouse_probe(struct psmouse *psmouse)
  * basic PS/2 3-button mouse.
  */
 
-	return psmouse->type = psmouse_extensions(psmouse);
+	return psmouse->type = psmouse_extensions(psmouse, psmouse_max_proto);
 }
 
 /*
