@@ -944,21 +944,15 @@ static struct comx_hardware mixcomhw = {
 	NULL
 };
 	
-/* Module management */
-
-#ifdef MODULE
-#define comx_hw_mixcom_init init_module
-#endif
-
-int __init comx_hw_mixcom_init(void)
+static int __init comx_hw_mixcom_init(void)
 {
-	return(comx_register_hardware(&mixcomhw));
+	return comx_register_hardware(&mixcomhw);
 }
 
-#ifdef MODULE
-void
-cleanup_module(void)
+static void __exit comx_hw_mixcom_exit(void)
 {
 	comx_unregister_hardware("mixcom");
 }
-#endif
+
+module_init(comx_hw_mixcom_init);
+module_exit(comx_hw_mixcom_exit);

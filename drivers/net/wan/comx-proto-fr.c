@@ -988,11 +988,7 @@ static struct comx_hardware fr_dlci = {
 	.hw_dump	= dlci_dump, 
 };
 
-#ifdef MODULE
-#define comx_proto_fr_init init_module
-#endif
-
-int __init comx_proto_fr_init(void)
+static int __init comx_proto_fr_init(void)
 {
 	int ret; 
 
@@ -1005,12 +1001,12 @@ int __init comx_proto_fr_init(void)
 	return comx_register_protocol(&fr_slave_protocol);
 }
 
-#ifdef MODULE
-void cleanup_module(void)
+static void __exit comx_proto_fr_exit(void)
 {
 	comx_unregister_hardware(fr_dlci.name);
 	comx_unregister_protocol(fr_master_protocol.name);
 	comx_unregister_protocol(fr_slave_protocol.name);
 }
-#endif /* MODULE */
 
+module_init(comx_proto_fr_init);
+module_exit(comx_proto_fr_exit);

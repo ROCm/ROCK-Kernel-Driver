@@ -479,20 +479,16 @@ static struct comx_hardware locomx_hw = {
 	NULL
 };
 	
-#ifdef MODULE
-#define comx_hw_locomx_init init_module
-#endif
-
-int __init comx_hw_locomx_init(void)
+static int __init comx_hw_locomx_init(void)
 {
 	comx_register_hardware(&locomx_hw);
 	return 0;
 }
 
-#ifdef MODULE
-void cleanup_module(void)
+static void __exit comx_hw_locomx_exit(void)
 {
 	comx_unregister_hardware("locomx");
-	return;
 }
-#endif
+
+module_init(comx_hw_locomx_init);
+module_exit(comx_hw_locomx_exit);
