@@ -117,7 +117,7 @@ int open_private_file(struct file *filp, struct dentry *dentry, int flags)
 	memset(filp, 0, sizeof(*filp));
 	eventpoll_init_file(filp);
 	filp->f_flags  = flags;
-	filp->f_mode   = ((flags+1) & O_ACCMODE) | FMODE_LSEEK;
+	filp->f_mode   = ((flags+1) & O_ACCMODE) | FMODE_LSEEK | FMODE_PREAD | FMODE_PWRITE;
 	atomic_set(&filp->f_count, 1);
 	filp->f_dentry = dentry;
 	filp->f_mapping = dentry->d_inode->i_mapping;

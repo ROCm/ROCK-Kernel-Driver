@@ -314,7 +314,7 @@ asmlinkage ssize_t sys_pread64(unsigned int fd, char __user *buf,
 	file = fget_light(fd, &fput_needed);
 	if (file) {
 		ret = -ESPIPE;
-		if (file->f_mode & FMODE_LSEEK)
+		if (file->f_mode & FMODE_PREAD)
 			ret = vfs_read(file, buf, count, &pos);
 		fput_light(file, fput_needed);
 	}
@@ -335,7 +335,7 @@ asmlinkage ssize_t sys_pwrite64(unsigned int fd, const char __user *buf,
 	file = fget_light(fd, &fput_needed);
 	if (file) {
 		ret = -ESPIPE;
-		if (file->f_mode & FMODE_LSEEK)  
+		if (file->f_mode & FMODE_PWRITE)  
 			ret = vfs_write(file, buf, count, &pos);
 		fput_light(file, fput_needed);
 	}

@@ -44,7 +44,9 @@ static int fifo_open(struct inode *inode, struct file *filp)
 			goto err_nocleanup;
 	}
 	filp->f_version = 0;
-	filp->f_mode &= ~FMODE_LSEEK;
+
+	/* We can only do regular read/write on fifos */
+	filp->f_mode &= (FMODE_READ | FMODE_WRITE);
 
 	switch (filp->f_mode) {
 	case 1:
