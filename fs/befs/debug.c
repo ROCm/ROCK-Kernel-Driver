@@ -80,7 +80,7 @@ befs_dump_inode(const struct super_block *sb, befs_inode * inode)
 
 	befs_block_run tmp_run;
 
-	befs_debug(sb, "befs_inode infomation");
+	befs_debug(sb, "befs_inode information");
 
 	befs_debug(sb, "  magic1 %08x", fs32_to_cpu(sb, inode->magic1));
 
