@@ -122,12 +122,9 @@ static int power_down(u32 mode)
 	switch(mode) {
 	case PM_DISK_PLATFORM:
 		error = pm_ops->enter(PM_SUSPEND_DISK);
-		if (error) {
-			device_power_up();
-			local_irq_restore(flags);
-			return error;
-		}
+		break;
 	case PM_DISK_SHUTDOWN:
+		printk("Powering off system\n");
 		machine_power_off();
 		break;
 	case PM_DISK_REBOOT:
@@ -135,6 +132,8 @@ static int power_down(u32 mode)
 		break;
 	}
 	machine_halt();
+	device_power_up();
+	local_irq_restore(flags);
 	return 0;
 }
 
@@ -304,7 +303,7 @@ static int enter_state(u32 state)
 		goto Unlock;
 	}
 
-	pr_debug("PM: Preparing system for suspend.\n");
+	pr_debug("PM: Preparing system for suspend\n");
 	if ((error = suspend_prepare(state)))
 		goto Unlock;
 
@@ -493,16 +492,15 @@ static ssize_t state_show(struct subsystem * subsys, char * buf)
 
 static ssize_t state_store(struct subsystem * subsys, const char * buf, size_t n)
 {
-	u32 state;
+	u32 state = PM_SUSPEND_STANDBY;
 	struct pm_state * s;
 	int error;
 
-	for (state = 0; state < PM_SUSPEND_MAX; state++) {
-		s = &pm_states[state];
-		if (s->name && !strcmp(buf,s->name))
+	for (s = &pm_states[state]; s->name; s++, state++) {
+		if (!strcmp(buf,s->name))
 			break;
 	}
-	if (s)
+	if (s->name)
 		error = enter_state(state);
 	else
 		error = -EINVAL;
