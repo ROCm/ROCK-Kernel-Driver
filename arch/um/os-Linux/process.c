@@ -10,6 +10,7 @@
 #include <linux/unistd.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
+#include <sys/ptrace.h>
 #include "os.h"
 #include "user.h"
 #include "user_util.h"
@@ -86,12 +87,13 @@ void os_stop_process(int pid)
 	kill(pid, SIGSTOP);
 }
 
-void os_kill_process(int pid, int reap_child)
+void os_kill_process(int pid, int reap_child, int trace_cont)
 {
 	kill(pid, SIGKILL);
-	if(reap_child)
+	if (trace_cont)
+		ptrace(PTRACE_CONT, pid, NULL, NULL);
+	if (reap_child)
 		CATCH_EINTR(waitpid(pid, NULL, 0));
-		
 }
 
 void os_usr1_process(int pid)

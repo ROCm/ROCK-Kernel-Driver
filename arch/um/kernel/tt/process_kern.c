@@ -66,7 +66,7 @@ void *switch_to_tt(void *prev, void *next, void *last)
 
 	reading = 1;
 	if((from->state == TASK_ZOMBIE) || (from->state == TASK_DEAD))
-		os_kill_process(os_getpid(), 0);
+		os_kill_process(os_getpid(), 0, 0);
 
 	err = os_read_file(from->thread.mode.tt.switch_pipe[0], &c, sizeof(c));
 	if(err != sizeof(c))
@@ -82,7 +82,7 @@ void *switch_to_tt(void *prev, void *next, void *last)
 	prev_sched = current->thread.prev_sched;
 	if((prev_sched->state == TASK_ZOMBIE) || 
 	   (prev_sched->state == TASK_DEAD))
-		os_kill_process(prev_sched->thread.mode.tt.extern_pid, 1);
+		os_kill_process(prev_sched->thread.mode.tt.extern_pid, 1, 1);
 
 	/* This works around a nasty race with 'jail'.  If we are switching
 	 * between two threads of a threaded app and the incoming process 
@@ -119,7 +119,7 @@ void release_thread_tt(struct task_struct *task)
 	int pid = task->thread.mode.tt.extern_pid;
 
 	if(os_getpid() != pid)
-		os_kill_process(pid, 0);
+		os_kill_process(pid, 0, 0);
 }
 
 void exit_thread_tt(void)
@@ -331,10 +331,10 @@ void kill_off_processes_tt(void)
 	me = os_getpid();
         for_each_process(p){
 		if(p->thread.mode.tt.extern_pid != me) 
-			os_kill_process(p->thread.mode.tt.extern_pid, 0);
+			os_kill_process(p->thread.mode.tt.extern_pid, 0, 0);
 	}
 	if(init_task.thread.mode.tt.extern_pid != me) 
-		os_kill_process(init_task.thread.mode.tt.extern_pid, 0);
+		os_kill_process(init_task.thread.mode.tt.extern_pid, 0, 0);
 }
 
 void initial_thread_cb_tt(void (*proc)(void *), void *arg)

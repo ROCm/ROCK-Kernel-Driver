@@ -465,7 +465,7 @@ static int io_pid = -1;
 void kill_io_thread(void)
 {
 	if(io_pid != -1) 
-		os_kill_process(io_pid, 1);
+		os_kill_process(io_pid, 1, 0);
 }
 
 __uml_exitcall(kill_io_thread);

@@ -258,7 +258,7 @@ static void update_thread(void)
  fail:
 	sigio_lock();
 	if(write_sigio_pid != -1) 
-		os_kill_process(write_sigio_pid, 1);
+		os_kill_process(write_sigio_pid, 1, 0);
 	write_sigio_pid = -1;
 	os_close_file(sigio_private[0]);
 	os_close_file(sigio_private[1]);
@@ -385,7 +385,7 @@ void write_sigio_workaround(void)
 	return;
 
  out_kill:
-	os_kill_process(write_sigio_pid, 1);
+	os_kill_process(write_sigio_pid, 1, 0);
 	write_sigio_pid = -1;
  out_close2:
 	os_close_file(sigio_private[0]);
@@ -418,7 +418,7 @@ int read_sigio_fd(int fd)
 static void sigio_cleanup(void)
 {
 	if(write_sigio_pid != -1)
-		os_kill_process(write_sigio_pid, 1);
+		os_kill_process(write_sigio_pid, 1, 0);
 }
 
 __uml_exitcall(sigio_cleanup);

@@ -639,7 +639,7 @@ static void winch_cleanup(void)
 			os_close_file(winch->fd);
 		}
 		if(winch->pid != -1) 
-			os_kill_process(winch->pid, 1);
+			os_kill_process(winch->pid, 1, 0);
 	}
 }
 __uml_exitcall(winch_cleanup);

@@ -45,7 +45,7 @@ static int helper_child(void *arg)
 	errval = errno;
 	printk("execvp of '%s' failed - errno = %d\n", argv[0], errno);
 	os_write_file(data->fd, &errval, sizeof(errval));
-	os_kill_process(os_getpid(), 0);
+	os_kill_process(os_getpid(), 0, 0);
 	return(0);
 }
 
@@ -106,7 +106,7 @@ int run_helper(void (*pre_exec)(void *), void *pre_data, char **argv,
 	return(pid);
 
  out_kill:
-	os_kill_process(pid, 1);
+	os_kill_process(pid, 1, 0);
  out_close:
 	os_close_file(fds[0]);
 	os_close_file(fds[1]);

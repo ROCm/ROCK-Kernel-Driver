@@ -157,10 +157,10 @@ void xterm_close(int fd, void *d)
 	struct xterm_chan *data = d;
 	
 	if(data->pid != -1) 
-		os_kill_process(data->pid, 1);
+		os_kill_process(data->pid, 1, 0);
 	data->pid = -1;
 	if(data->helper_pid != -1) 
-		os_kill_process(data->helper_pid, 0);
+		os_kill_process(data->helper_pid, 0, 0);
 	data->helper_pid = -1;
 	os_close_file(fd);
 }

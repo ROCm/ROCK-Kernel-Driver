@@ -141,7 +141,7 @@ static int ptrace_child(void *arg)
 
 	if(ptrace(PTRACE_TRACEME, 0, 0, 0) < 0){
 		perror("ptrace");
-		os_kill_process(pid, 0);
+		os_kill_process(pid, 0, 0);
 	}
 	os_stop_process(pid);
 	_exit(os_getpid() == pid);
