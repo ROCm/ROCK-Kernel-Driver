@@ -12,7 +12,6 @@
 
 #include <asm/smp.h>
 
-#define MAXNODE 8 
 #define NODEMAPSIZE 0xff
 
 /* Simple perfect hash to map physical addresses to node numbers */

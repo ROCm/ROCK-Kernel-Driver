@@ -22,7 +22,7 @@
 #define Dprintk(x...)
 #endif
 
-struct pglist_data *node_data[MAXNODE];
+struct pglist_data *node_data[MAX_NUMNODES];
 bootmem_data_t plat_node_bdata[MAX_NUMNODES];
 
 int memnode_shift;
@@ -30,7 +30,7 @@ u8  memnodemap[NODEMAPSIZE];
 
 #define NUMA_NO_NODE 0xff
 unsigned char cpu_to_node[NR_CPUS] = { [0 ... NR_CPUS-1] = NUMA_NO_NODE };
-cpumask_t     node_to_cpumask[MAXNODE]; 
+cpumask_t     node_to_cpumask[MAX_NUMNODES];
 
 int numa_off __initdata;
 
@@ -152,7 +152,7 @@ void __init numa_init_array(void)
 	   CPUs, as the number of CPUs is not known yet. 
 	   We round robin the existing nodes. */
 	rr = 0;
-	for (i = 0; i < MAXNODE; i++) {
+	for (i = 0; i < MAX_NUMNODES; i++) {
 		if (node_online(i))
 			continue;
 		if (cpu_to_node[i] != NUMA_NO_NODE)
@@ -175,7 +175,7 @@ int numa_fake __initdata = 0;
 static int numa_emulation(unsigned long start_pfn, unsigned long end_pfn)
 {
  	int i;
- 	struct node nodes[MAXNODE];
+ 	struct node nodes[MAX_NUMNODES];
  	unsigned long sz = ((end_pfn - start_pfn)<<PAGE_SHIFT) / numa_fake;
 
  	/* Kludge needed for the hash function */
