@@ -82,7 +82,7 @@ startup_32:
  * Initialize page tables
  */
 	movl $pg0-__PAGE_OFFSET,%edi /* initialize page tables */
-	movl $007,%eax		/* "007" doesn't mean with right to kill, but
+	movl $007,%eax		/* "007" doesn't mean with license to kill, but
 				   PRESENT+RW+USER */
 2:	stosl
 	add $0x1000,%eax
