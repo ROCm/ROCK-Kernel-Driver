@@ -27,3 +27,9 @@ extern unsigned int sa11x0_freq_to_ppcr(unsigned int khz);
 extern int sa11x0_verify_speed(struct cpufreq_policy *policy);
 extern unsigned int sa11x0_getspeed(unsigned int cpu);
 extern unsigned int sa11x0_ppcr_to_freq(unsigned int idx);
+
+struct flash_platform_data;
+struct resource;
+
+extern void sa11x0_set_flash_data(struct flash_platform_data *flash,
+				  struct resource *res, int nr);
