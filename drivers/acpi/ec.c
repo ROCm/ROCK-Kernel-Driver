@@ -461,11 +461,11 @@ acpi_ec_space_handler (
 next_byte:
 	switch (function) {
 	case ACPI_READ:
-		result = acpi_ec_read(ec, (u8) address + (i*8), &temp);
+		result = acpi_ec_read(ec, (u8) address + i, &temp);
 		*value = (acpi_integer) temp;
 		break;
 	case ACPI_WRITE:
-		result = acpi_ec_write(ec, (u8) address + (i*8), (u8) *value);
+		result = acpi_ec_write(ec, (u8) address + i, (u8) *value);
 		break;
 	default:
 		result = -EINVAL;
