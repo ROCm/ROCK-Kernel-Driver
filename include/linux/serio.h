@@ -45,7 +45,8 @@ struct serio {
 
 	struct serio *parent, *child;
 
-	struct serio_driver *drv;	/* accessed from interrupt, must be protected by serio->lock */
+	struct serio_driver *drv;	/* accessed from interrupt, must be protected by serio->lock and serio->sem */
+	struct semaphore drv_sem;	/* protects serio->drv so attributes can pin driver */
 
 	struct device dev;
 
@@ -120,6 +121,19 @@ static __inline__ void serio_pause_rx(struct serio *serio)
 static __inline__ void serio_continue_rx(struct serio *serio)
 {
 	spin_unlock_irq(&serio->lock);
+}
+
+/*
+ * Use the following fucntions to pin serio's driver in process context
+ */
+static __inline__ int serio_pin_driver(struct serio *serio)
+{
+	return down_interruptible(&serio->drv_sem);
+}
+
+static __inline__ void serio_unpin_driver(struct serio *serio)
+{
+	up(&serio->drv_sem);
 }
 
 
