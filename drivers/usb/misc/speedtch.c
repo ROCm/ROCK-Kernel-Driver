@@ -265,7 +265,7 @@ static inline struct udsl_vcc_data *udsl_find_vcc (struct udsl_instance_data *in
 	struct udsl_vcc_data *vcc;
 
 	list_for_each_entry (vcc, &instance->vcc_list, list)
-		if ((vcc->vpi == vpi) && (vcc->vci == vci))
+		if ((vcc->vci == vci) && (vcc->vpi == vpi))
 			return vcc;
 	return NULL;
 }
