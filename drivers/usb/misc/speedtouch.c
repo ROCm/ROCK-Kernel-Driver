@@ -1007,7 +1007,7 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 *
 ****************************************************************************/
 
-int udsl_usb_init (void)
+static int udsl_usb_init (void)
 {
 	int i;
 
@@ -1022,25 +1022,15 @@ int udsl_usb_init (void)
 	return usb_register (&udsl_usb_driver);
 }
 
-int udsl_usb_cleanup (void)
+static void udsl_usb_cleanup (void)
 {
 	/* killing threads */
 	udsl_atm_sar_stop ();
 	usb_deregister (&udsl_usb_driver);
-	return 0;
 }
 
-#ifdef MODULE
-int init_module (void)
-{
-	return udsl_usb_init ();
-}
-
-int cleanup_module (void)
-{
-	return udsl_usb_cleanup ();
-}
-#endif
+module_init(udsl_usb_init);
+module_exit(udsl_usb_cleanup);
 
 #ifdef DEBUG_PACKET
 /*******************************************************************************
