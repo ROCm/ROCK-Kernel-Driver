@@ -35,12 +35,13 @@
 #include <linux/netfilter.h>
 #include <linux/init.h>
 #include <net/rose.h>
+#include <linux/seq_file.h>
 
 static unsigned int rose_neigh_no = 1;
 
 static struct rose_node  *rose_node_list;
 static spinlock_t rose_node_list_lock = SPIN_LOCK_UNLOCKED;
-static struct rose_neigh *rose_neigh_list;
+struct rose_neigh *rose_neigh_list;
 static spinlock_t rose_neigh_list_lock = SPIN_LOCK_UNLOCKED;
 static struct rose_route *rose_route_list;
 static spinlock_t rose_route_list_lock = SPIN_LOCK_UNLOCKED;
@@ -1066,165 +1067,248 @@ out:
 	return res;
 }
 
-int rose_nodes_get_info(char *buffer, char **start, off_t offset, int length)
+#ifdef CONFIG_PROC_FS
+
+static void *rose_node_start(struct seq_file *seq, loff_t *pos)
 {
 	struct rose_node *rose_node;
-	int len     = 0;
-	off_t pos   = 0;
-	off_t begin = 0;
-	int i;
+	int i = 1;
 
 	spin_lock_bh(&rose_neigh_list_lock);
+	if (*pos == 0)
+		return ROSE_PROC_START;
 
-	len += sprintf(buffer, "address    mask n neigh neigh neigh\n");
+	for (rose_node = rose_node_list; rose_node && i < *pos; 
+	     rose_node = rose_node->next, ++i);
 
-	for (rose_node = rose_node_list; rose_node != NULL; rose_node = rose_node->next) {
+	return (i == *pos) ? rose_node : NULL;
+}
+
+static void *rose_node_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	++*pos;
+	
+	return (v == ROSE_PROC_START) ? rose_node_list 
+		: ((struct rose_node *)v)->next;
+}
+
+static void rose_node_stop(struct seq_file *seq, void *v)
+{
+	spin_unlock_bh(&rose_neigh_list_lock);
+}
+
+static int rose_node_show(struct seq_file *seq, void *v)
+{
+	int i;
+
+	if (v == ROSE_PROC_START)
+		seq_puts(seq, "address    mask n neigh neigh neigh\n");
+	else {
+		const struct rose_node *rose_node = v;
 		/* if (rose_node->loopback) {
-			len += sprintf(buffer + len, "%-10s %04d 1 loopback\n",
+			seq_printf(seq, "%-10s %04d 1 loopback\n",
 				rose2asc(&rose_node->address),
 				rose_node->mask);
 		} else { */
-			len += sprintf(buffer + len, "%-10s %04d %d",
+			seq_printf(seq, "%-10s %04d %d",
 				rose2asc(&rose_node->address),
 				rose_node->mask,
 				rose_node->count);
 
 			for (i = 0; i < rose_node->count; i++)
-				len += sprintf(buffer + len, " %05d",
+				seq_printf(seq, " %05d",
 					rose_node->neighbour[i]->number);
 
-			len += sprintf(buffer + len, "\n");
+			seq_puts(seq, "\n");
 		/* } */
-
-		pos = begin + len;
-
-		if (pos < offset) {
-			len   = 0;
-			begin = pos;
-		}
-
-		if (pos > offset + length)
-			break;
 	}
-	spin_unlock_bh(&rose_neigh_list_lock);
-
-	*start = buffer + (offset - begin);
-	len   -= (offset - begin);
-
-	if (len > length)
-		len = length;
-
-	return len;
+	return 0;
 }
 
-int rose_neigh_get_info(char *buffer, char **start, off_t offset, int length)
+static struct seq_operations rose_node_seqops = {
+	.start = rose_node_start,
+	.next = rose_node_next,
+	.stop = rose_node_stop,
+	.show = rose_node_show,
+};
+
+static int rose_nodes_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &rose_node_seqops);
+}
+
+struct file_operations rose_nodes_fops = {
+	.owner = THIS_MODULE,
+	.open = rose_nodes_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = seq_release,
+};
+
+static void *rose_neigh_start(struct seq_file *seq, loff_t *pos)
 {
 	struct rose_neigh *rose_neigh;
-	int len     = 0;
-	off_t pos   = 0;
-	off_t begin = 0;
-	int i;
+	int i = 1;
 
 	spin_lock_bh(&rose_neigh_list_lock);
+	if (*pos == 0)
+		return ROSE_PROC_START;
 
-	len += sprintf(buffer, "addr  callsign  dev  count use mode restart  t0  tf digipeaters\n");
+	for (rose_neigh = rose_neigh_list; rose_neigh && i < *pos; 
+	     rose_neigh = rose_neigh->next, ++i);
 
-	for (rose_neigh = rose_neigh_list; rose_neigh != NULL; rose_neigh = rose_neigh->next) {
-		/* if (!rose_neigh->loopback) { */
-			len += sprintf(buffer + len, "%05d %-9s %-4s   %3d %3d  %3s     %3s %3lu %3lu",
-				rose_neigh->number,
-				(rose_neigh->loopback) ? "RSLOOP-0" : ax2asc(&rose_neigh->callsign),
-				rose_neigh->dev ? rose_neigh->dev->name : "???",
-				rose_neigh->count,
-				rose_neigh->use,
-				(rose_neigh->dce_mode) ? "DCE" : "DTE",
-				(rose_neigh->restarted) ? "yes" : "no",
-				ax25_display_timer(&rose_neigh->t0timer) / HZ,
-				ax25_display_timer(&rose_neigh->ftimer)  / HZ);
-
-			if (rose_neigh->digipeat != NULL) {
-				for (i = 0; i < rose_neigh->digipeat->ndigi; i++)
-					len += sprintf(buffer + len, " %s", ax2asc(&rose_neigh->digipeat->calls[i]));
-			}
-
-			len += sprintf(buffer + len, "\n");
-
-			pos = begin + len;
-
-			if (pos < offset) {
-				len   = 0;
-				begin = pos;
-			}
-
-			if (pos > offset + length)
-				break;
-		/* } */
-	}
-
-	spin_unlock_bh(&rose_neigh_list_lock);
-
-	*start = buffer + (offset - begin);
-	len   -= (offset - begin);
-
-	if (len > length)
-		len = length;
-
-	return len;
+	return (i == *pos) ? rose_neigh : NULL;
 }
 
-int rose_routes_get_info(char *buffer, char **start, off_t offset, int length)
+static void *rose_neigh_next(struct seq_file *seq, void *v, loff_t *pos)
 {
-	struct rose_route *rose_route;
-	int len     = 0;
-	off_t pos   = 0;
-	off_t begin = 0;
+	++*pos;
+	
+	return (v == ROSE_PROC_START) ? rose_neigh_list 
+		: ((struct rose_neigh *)v)->next;
+}
 
-	spin_lock_bh(&rose_route_list_lock);
+static void rose_neigh_stop(struct seq_file *seq, void *v)
+{
+	spin_unlock_bh(&rose_neigh_list_lock);
+}
 
-	len += sprintf(buffer, "lci  address     callsign   neigh  <-> lci  address     callsign   neigh\n");
+static int rose_neigh_show(struct seq_file *seq, void *v)
+{
+	int i;
 
-	for (rose_route = rose_route_list; rose_route != NULL; rose_route = rose_route->next) {
-		if (rose_route->neigh1 != NULL) {
-			len += sprintf(buffer + len, "%3.3X  %-10s  %-9s  %05d      ",
-				rose_route->lci1,
-				rose2asc(&rose_route->src_addr),
-				ax2asc(&rose_route->src_call),
-				rose_route->neigh1->number);
-		} else {
-			len += sprintf(buffer + len, "000  *           *          00000      ");
+	if (v == ROSE_PROC_START)
+		seq_puts(seq, 
+			 "addr  callsign  dev  count use mode restart  t0  tf digipeaters\n");
+	else {
+		struct rose_neigh *rose_neigh = v;
+
+		/* if (!rose_neigh->loopback) { */
+		seq_printf(seq, "%05d %-9s %-4s   %3d %3d  %3s     %3s %3lu %3lu",
+			   rose_neigh->number,
+			   (rose_neigh->loopback) ? "RSLOOP-0" : ax2asc(&rose_neigh->callsign),
+			   rose_neigh->dev ? rose_neigh->dev->name : "???",
+			   rose_neigh->count,
+			   rose_neigh->use,
+			   (rose_neigh->dce_mode) ? "DCE" : "DTE",
+			   (rose_neigh->restarted) ? "yes" : "no",
+			   ax25_display_timer(&rose_neigh->t0timer) / HZ,
+			   ax25_display_timer(&rose_neigh->ftimer)  / HZ);
+
+		if (rose_neigh->digipeat != NULL) {
+			for (i = 0; i < rose_neigh->digipeat->ndigi; i++)
+				seq_printf(seq, " %s", ax2asc(&rose_neigh->digipeat->calls[i]));
 		}
 
-		if (rose_route->neigh2 != NULL) {
-			len += sprintf(buffer + len, "%3.3X  %-10s  %-9s  %05d\n",
+		seq_puts(seq, "\n");
+	}
+	return 0;
+}
+
+
+static struct seq_operations rose_neigh_seqops = {
+	.start = rose_neigh_start,
+	.next = rose_neigh_next,
+	.stop = rose_neigh_stop,
+	.show = rose_neigh_show,
+};
+
+static int rose_neigh_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &rose_neigh_seqops);
+}
+
+struct file_operations rose_neigh_fops = {
+	.owner = THIS_MODULE,
+	.open = rose_neigh_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = seq_release,
+};
+
+
+static void *rose_route_start(struct seq_file *seq, loff_t *pos)
+{
+	struct rose_route *rose_route;
+	int i = 1;
+
+	spin_lock_bh(&rose_route_list_lock);
+	if (*pos == 0)
+		return ROSE_PROC_START;
+
+	for (rose_route = rose_route_list; rose_route && i < *pos; 
+	     rose_route = rose_route->next, ++i);
+
+	return (i == *pos) ? rose_route : NULL;
+}
+
+static void *rose_route_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	++*pos;
+	
+	return (v == ROSE_PROC_START) ? rose_route_list 
+		: ((struct rose_route *)v)->next;
+}
+
+static void rose_route_stop(struct seq_file *seq, void *v)
+{
+	spin_unlock_bh(&rose_route_list_lock);
+}
+
+static int rose_route_show(struct seq_file *seq, void *v)
+{
+	if (v == ROSE_PROC_START)
+		seq_puts(seq, 
+			 "lci  address     callsign   neigh  <-> lci  address     callsign   neigh\n");
+	else {
+		struct rose_route *rose_route = v;
+
+		if (rose_route->neigh1) 
+			seq_printf(seq,
+				   "%3.3X  %-10s  %-9s  %05d      ",
+				   rose_route->lci1,
+				   rose2asc(&rose_route->src_addr),
+				   ax2asc(&rose_route->src_call),
+				   rose_route->neigh1->number);
+		else 
+			seq_puts(seq, 
+				 "000  *           *          00000      ");
+
+		if (rose_route->neigh2) 
+			seq_printf(seq,
+				   "%3.3X  %-10s  %-9s  %05d\n",
 				rose_route->lci2,
 				rose2asc(&rose_route->dest_addr),
 				ax2asc(&rose_route->dest_call),
 				rose_route->neigh2->number);
-		} else {
-			len += sprintf(buffer + len, "000  *           *          00000\n");
+		 else 
+			 seq_puts(seq,
+				  "000  *           *          00000\n");
 		}
-
-		pos = begin + len;
-
-		if (pos < offset) {
-			len   = 0;
-			begin = pos;
-		}
-
-		if (pos > offset + length)
-			break;
-	}
-
-	spin_unlock_bh(&rose_route_list_lock);
-
-	*start = buffer + (offset - begin);
-	len   -= (offset - begin);
-
-	if (len > length)
-		len = length;
-
-	return len;
+	return 0;
 }
+
+static struct seq_operations rose_route_seqops = {
+	.start = rose_route_start,
+	.next = rose_route_next,
+	.stop = rose_route_stop,
+	.show = rose_route_show,
+};
+
+static int rose_route_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &rose_route_seqops);
+}
+
+struct file_operations rose_routes_fops = {
+	.owner = THIS_MODULE,
+	.open = rose_route_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = seq_release,
+};
+
+#endif /* CONFIG_PROC_FS */
 
 /*
  *	Release all memory associated with ROSE routing structures.

@@ -133,7 +133,7 @@ int ide_end_request (ide_drive_t *drive, int uptodate, int nr_sectors)
 		if (!blk_rq_tagged(rq))
 			blkdev_dequeue_request(rq);
 		else
-			blk_queue_end_tag(&drive->queue, rq);
+			blk_queue_end_tag(drive->queue, rq);
 		HWGROUP(drive)->rq = NULL;
 		end_that_request_last(rq);
 		ret = 0;
@@ -162,10 +162,10 @@ static void ide_complete_pm_request (ide_drive_t *drive, struct request *rq)
 #endif
 	spin_lock_irqsave(&ide_lock, flags);
 	if (blk_pm_suspend_request(rq)) {
-		blk_stop_queue(&drive->queue);
+		blk_stop_queue(drive->queue);
 	} else {
 		drive->blocked = 0;
-		blk_start_queue(&drive->queue);
+		blk_start_queue(drive->queue);
 	}
 	blkdev_dequeue_request(rq);
 	HWGROUP(drive)->rq = NULL;
@@ -756,12 +756,12 @@ repeat:
 	drive = hwgroup->drive;
 	do {
 		if ((!drive->sleep || time_after_eq(jiffies, drive->sleep))
-		    && !elv_queue_empty(&drive->queue)) {
+		    && !elv_queue_empty(drive->queue)) {
 			if (!best
 			 || (drive->sleep && (!best->sleep || 0 < (signed long)(best->sleep - drive->sleep)))
 			 || (!best->sleep && 0 < (signed long)(WAKEUP(best) - WAKEUP(drive))))
 			{
-				if (!blk_queue_plugged(&drive->queue))
+				if (!blk_queue_plugged(drive->queue))
 					best = drive;
 			}
 		}
@@ -902,7 +902,7 @@ queue_next:
 			break;
 		}
 
-		if (blk_queue_plugged(&drive->queue)) {
+		if (blk_queue_plugged(drive->queue)) {
 			if (drive->using_tcq)
 				break;
 
@@ -914,7 +914,7 @@ queue_next:
 		 * we know that the queue isn't empty, but this can happen
 		 * if the q->prep_rq_fn() decides to kill a request
 		 */
-		rq = elv_next_request(&drive->queue);
+		rq = elv_next_request(drive->queue);
 		if (!rq) {
 			hwgroup->busy = !!ata_pending_commands(drive);
 			break;
@@ -1424,7 +1424,7 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 		insert_end = 0;
 		rq->flags |= REQ_PREEMPT;
 	}
-	__elv_add_request(&drive->queue, rq, insert_end, 0);
+	__elv_add_request(drive->queue, rq, insert_end, 0);
 	ide_do_request(hwgroup, IDE_NO_IRQ);
 	spin_unlock_irqrestore(&ide_lock, flags);
 

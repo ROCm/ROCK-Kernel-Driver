@@ -795,16 +795,14 @@ static void __init isa_probe(void)
 	
 	    if (pnp_device_attach(dev) < 0)
 	    	continue;
-	
-	    printk("PNP ");
-	    
+
 	    if (pnp_activate_dev(dev) < 0) {
 		printk("activate failed\n");
 		pnp_device_detach(dev);
 		break;
 	    }
 
-	    if (pnp_port_valid(dev, 0)) {
+	    if (!pnp_port_valid(dev, 0)) {
 		printk("invalid resources ?\n");
 		pnp_device_detach(dev);
 		break;

@@ -947,7 +947,7 @@ static int revalidate_allvol(kdev_t dev)
 		drive_info_struct *drv = &(hba[ctlr]->drv[i]);
 		if (!drv->nr_blocks)
 			continue;
-		hba[ctlr]->queue.hardsect_size = drv->block_size;
+		blk_queue_hardsect_size(hba[ctlr]->queue, drv->block_size);
 		set_capacity(disk, drv->nr_blocks);
 		add_disk(disk);
 	}
@@ -2021,7 +2021,7 @@ static irqreturn_t do_cciss_intr(int irq, void *dev_id, struct pt_regs *regs)
 	/*
 	 * See if we can queue up some more IO
 	 */
-	blk_start_queue(&h->queue);
+	blk_start_queue(h->queue);
 	spin_unlock_irqrestore(CCISS_LOCK(h->ctlr), flags);
 	return IRQ_HANDLED;
 }
@@ -2497,6 +2497,7 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 		|| (hba[i]->cmd_pool == NULL)
 		|| (hba[i]->errinfo_pool == NULL))
         {
+err_all:
 		if(hba[i]->cmd_pool_bits)
                 	kfree(hba[i]->cmd_pool_bits);
                 if(hba[i]->cmd_pool)
@@ -2515,6 +2516,14 @@ static int __init cciss_init_one(struct pci_dev *pdev,
                 printk( KERN_ERR "cciss: out of memory");
 		return(-1);
 	}
+
+	/*
+	 * someone needs to clean up this failure handling mess
+	 */
+	spin_lock_init(&hba[i]->lock);
+	q = blk_init_queue(do_cciss_request, &hba[i]->lock);
+	if (!q)
+		goto err_all;
 
 	/* Initialize the pdev driver private data. 
 		have it point to hba[i].  */
@@ -2536,10 +2545,7 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 
 	cciss_procinit(i);
 
-	q = &hba[i]->queue;
         q->queuedata = hba[i];
-	spin_lock_init(&hba[i]->lock);
-        blk_init_queue(q, do_cciss_request, &hba[i]->lock);
 	blk_queue_bounce_limit(q, hba[i]->pdev->dma_mask);
 
 	/* This is a hardware imposed limit. */
@@ -2559,11 +2565,11 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 		disk->major = COMPAQ_CISS_MAJOR + i;
 		disk->first_minor = j << NWD_SHIFT;
 		disk->fops = &cciss_fops;
-		disk->queue = &hba[i]->queue;
+		disk->queue = hba[i]->queue;
 		disk->private_data = drv;
 		if( !(drv->nr_blocks))
 			continue;
-		hba[i]->queue.hardsect_size = drv->block_size;
+		blk_queue_hardsect_size(hba[i]->queue, drv->block_size);
 		set_capacity(disk, drv->nr_blocks);
 		add_disk(disk);
 	}
@@ -2605,6 +2611,7 @@ static void __devexit cciss_remove_one (struct pci_dev *pdev)
 	pci_set_drvdata(pdev, NULL);
 	iounmap((void*)hba[i]->vaddr);
 	cciss_unregister_scsi(i);  /* unhook from SCSI subsystem */
+	blk_cleanup_queue(hba[i]->queue);
 	unregister_blkdev(COMPAQ_CISS_MAJOR+i, hba[i]->devname);
 	remove_proc_entry(hba[i]->devname, proc_cciss);	
 	

@@ -672,7 +672,7 @@ typedef struct ide_drive_s {
 	char		name[4];	/* drive name, such as "hda" */
         char            driver_req[10];	/* requests specific driver */
 
-	request_queue_t		queue;	/* request queue */
+	request_queue_t		*queue;	/* request queue */
 
 	struct request		*rq;	/* current request */
 	struct ide_drive_s 	*next;	/* circular list of hwgroup drives */
@@ -1774,7 +1774,7 @@ extern int ide_hwif_request_regions(ide_hwif_t *hwif);
 extern void ide_hwif_release_regions(ide_hwif_t* hwif);
 extern void ide_unregister (unsigned int index);
 
-extern void export_ide_init_queue(ide_drive_t *);
+extern int export_ide_init_queue(ide_drive_t *);
 extern u8 export_probe_for_drive(ide_drive_t *);
 extern int probe_hwif_init(ide_hwif_t *);
 
@@ -1818,7 +1818,7 @@ extern struct semaphore ide_cfg_sem;
 static inline int ata_pending_commands(ide_drive_t *drive)
 {
 	if (drive->using_tcq)
-		return blk_queue_tag_depth(&drive->queue);
+		return blk_queue_tag_depth(drive->queue);
 
 	return 0;
 }
@@ -1826,7 +1826,7 @@ static inline int ata_pending_commands(ide_drive_t *drive)
 static inline int ata_can_queue(ide_drive_t *drive)
 {
 	if (drive->using_tcq)
-		return blk_queue_tag_queue(&drive->queue);
+		return blk_queue_tag_queue(drive->queue);
 
 	return 1;
 }

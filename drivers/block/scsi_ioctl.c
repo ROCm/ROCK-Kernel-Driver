@@ -449,6 +449,11 @@ int scsi_cmd_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long ar
 		case CDROMCLOSETRAY:
 			close = 1;
 		case CDROMEJECT:
+			if (blk_get_queue(q)) {
+				err = -ENXIO;
+				break;
+			}
+				
 			rq = blk_get_request(q, WRITE, __GFP_WAIT);
 			rq->flags |= REQ_BLOCK_PC;
 			rq->data = NULL;
@@ -462,7 +467,7 @@ int scsi_cmd_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long ar
 			blk_put_request(rq);
 			break;
 		default:
-			err = -ENOTTY;
+			return -ENOTTY;
 	}
 
 	blk_put_queue(q);

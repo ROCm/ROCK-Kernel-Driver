@@ -221,11 +221,13 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 	 * remote endpoint it should do the following:
 	 * ...
 	 * A2) a serial number should be assigned to the chunk. The serial
-	 * number should be a monotonically increasing number. All serial
-	 * numbers are defined to be initialized at the start of the
+	 * number SHOULD be a monotonically increasing number. The serial
+	 * numbers SHOULD be initialized at the start of the
 	 * association to the same value as the initial TSN.
 	 */
 	asoc->addip_serial = asoc->c.initial_tsn;
+
+	skb_queue_head_init(&asoc->addip_chunks);
 
 	/* Make an empty list of remote transport addresses.  */
 	INIT_LIST_HEAD(&asoc->peer.transport_addr_list);
@@ -263,8 +265,6 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 
 	/* Set up the tsn tracking. */
 	sctp_tsnmap_init(&asoc->peer.tsn_map, SCTP_TSN_MAP_SIZE, 0);
-
-	skb_queue_head_init(&asoc->addip_chunks);
 
 	asoc->need_ecne = 0;
 

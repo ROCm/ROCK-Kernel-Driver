@@ -111,7 +111,7 @@ struct ps2esdi_i_struct {
 	unsigned int head, sect, cyl, wpcom, lzone, ctl;
 };
 static spinlock_t ps2esdi_lock = SPIN_LOCK_UNLOCKED;
-static struct request_queue ps2esdi_queue;
+static struct request_queue *ps2esdi_queue;
 static struct request *current_req;
 
 #if 0
@@ -148,10 +148,14 @@ int __init ps2esdi_init(void)
 
 	/* register the device - pass the name and major number */
 	if (register_blkdev(PS2ESDI_MAJOR, "ed"))
-		return -1;
+		return -EBUSY;
 
 	/* set up some global information - indicating device specific info */
-	blk_init_queue(&ps2esdi_queue, do_ps2esdi_request, &ps2esdi_lock);
+	ps2esdi_queue = blk_init_queue(do_ps2esdi_request, &ps2esdi_lock);
+	if (!ps2esdi_queue) {
+		unregister_blkdev(PS2ESDI_MAJOR, "ed");
+		return -ENOMEM;
+	}
 
 	/* some minor housekeeping - setup the global gendisk structure */
 	error = ps2esdi_geninit();
@@ -159,7 +163,7 @@ int __init ps2esdi_init(void)
 		printk(KERN_WARNING "PS2ESDI: error initialising"
 			" device, releasing resources\n");
 		unregister_blkdev(PS2ESDI_MAJOR, "ed");
-		blk_cleanup_queue(&ps2esdi_queue);
+		blk_cleanup_queue(ps2esdi_queue);
 		return error;
 	}
 	return 0;
@@ -208,7 +212,7 @@ cleanup_module(void) {
 	free_dma(dma_arb_level);
 	free_irq(PS2ESDI_IRQ, &ps2esdi_gendisk);
 	unregister_blkdev(PS2ESDI_MAJOR, "ed");
-	blk_cleanup_queue(&ps2esdi_queue);
+	blk_cleanup_queue(ps2esdi_queue);
 	for (i = 0; i < ps2esdi_drives; i++) {
 		del_gendisk(ps2esdi_gendisk[i]);
 		put_disk(ps2esdi_gendisk[i]);
@@ -407,7 +411,7 @@ static int __init ps2esdi_geninit(void)
 		error = -EBUSY;
 		goto err_out3;
 	}
-	blk_queue_max_sectors(&ps2esdi_queue, 128);
+	blk_queue_max_sectors(ps2esdi_queue, 128);
 
 	error = -ENOMEM;
 	for (i = 0; i < ps2esdi_drives; i++) {
@@ -425,7 +429,7 @@ static int __init ps2esdi_geninit(void)
 		struct gendisk *disk = ps2esdi_gendisk[i];
 		set_capacity(disk, ps2esdi_info[i].head * ps2esdi_info[i].sect *
 				ps2esdi_info[i].cyl);
-		disk->queue = &ps2esdi_queue;
+		disk->queue = ps2esdi_queue;
 		disk->private_data = &ps2esdi_info[i];
 		add_disk(disk);
 	}
@@ -959,7 +963,7 @@ static void ps2esdi_normal_interrupt_handler(u_int int_ret_code)
 		spin_lock_irqsave(&ps2esdi_lock, flags);
 		end_request(current_req, ending);
 		current_req = NULL;
-		do_ps2esdi_request(&ps2esdi_queue);
+		do_ps2esdi_request(ps2esdi_queue);
 		spin_unlock_irqrestore(&ps2esdi_lock, flags);
 	}
 }				/* handle interrupts */

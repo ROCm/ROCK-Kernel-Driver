@@ -732,7 +732,7 @@ static int pcd_detect(void)
 }
 
 /* I/O request processing */
-static struct request_queue pcd_queue;
+static struct request_queue *pcd_queue;
 
 static void do_pcd_request(request_queue_t * q)
 {
@@ -766,7 +766,7 @@ static inline void next_request(int success)
 	spin_lock_irqsave(&pcd_lock, saved_flags);
 	end_request(pcd_req, success);
 	pcd_busy = 0;
-	do_pcd_request(&pcd_queue);
+	do_pcd_request(pcd_queue);
 	spin_unlock_irqrestore(&pcd_lock, saved_flags);
 }
 
@@ -841,7 +841,7 @@ static void do_pcd_read_drq(void)
 
 	do_pcd_read();
 	spin_lock_irqsave(&pcd_lock, saved_flags);
-	do_pcd_request(&pcd_queue);
+	do_pcd_request(pcd_queue);
 	spin_unlock_irqrestore(&pcd_lock, saved_flags);
 }
 
@@ -949,13 +949,19 @@ static int __init pcd_init(void)
 		return -1;
 	}
 
-	blk_init_queue(&pcd_queue, do_pcd_request, &pcd_lock);
+	pcd_queue = blk_init_queue(do_pcd_request, &pcd_lock);
+	if (!pcd_queue) {
+		unregister_blkdev(major, name);
+		for (unit = 0, cd = pcd; unit < PCD_UNITS; unit++, cd++)
+			put_disk(cd->disk);
+		return -1;
+	}
 
 	for (unit = 0, cd = pcd; unit < PCD_UNITS; unit++, cd++) {
 		if (cd->present) {
 			register_cdrom(&cd->info);
 			cd->disk->private_data = cd;
-			cd->disk->queue = &pcd_queue;
+			cd->disk->queue = pcd_queue;
 			add_disk(cd->disk);
 		}
 	}
@@ -976,7 +982,7 @@ static void __exit pcd_exit(void)
 		}
 		put_disk(cd->disk);
 	}
-	blk_cleanup_queue(&pcd_queue);
+	blk_cleanup_queue(pcd_queue);
 	unregister_blkdev(major, name);
 }
 

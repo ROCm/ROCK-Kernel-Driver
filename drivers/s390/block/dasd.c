@@ -1606,15 +1606,11 @@ dasd_setup_blkdev(struct dasd_device * device)
 {
 	int max, rc;
 
-	device->request_queue = kmalloc(sizeof (request_queue_t), GFP_KERNEL);
+	device->request_queue = blk_init_queue(do_dasd_request, &device->request_queue_lock);
 	if (device->request_queue == NULL)
 		return -ENOMEM;
-	memset(device->request_queue, 0, sizeof(request_queue_t));
+
 	device->request_queue->queuedata = device;
-	rc = blk_init_queue(device->request_queue, do_dasd_request,
-			    &device->request_queue_lock);
-	if (rc)
-		return rc;
 #if 0
 	elevator_exit(device->request_queue);
 	rc = elevator_init(device->request_queue, &elevator_noop);
@@ -1641,7 +1637,6 @@ dasd_disable_blkdev(struct dasd_device * device)
 {
 	if (device->request_queue) {
 		blk_cleanup_queue(device->request_queue);
-		kfree(device->request_queue);
 		device->request_queue = NULL;
 	}
 }

@@ -339,6 +339,8 @@ struct request_queue
 
 	struct blk_queue_tag	*queue_tags;
 
+	atomic_t		refcnt;
+
 	/*
 	 * sg stuff
 	 */
@@ -357,6 +359,7 @@ struct request_queue
 #define QUEUE_FLAG_STOPPED	2	/* queue is stopped */
 #define	QUEUE_FLAG_READFULL	3	/* write queue has been filled */
 #define QUEUE_FLAG_WRITEFULL	4	/* read queue has been filled */
+#define QUEUE_FLAG_DEAD		5	/* queue being torn down */
 
 #define blk_queue_plugged(q)	!list_empty(&(q)->plug_list)
 #define blk_queue_tagged(q)	test_bit(QUEUE_FLAG_QUEUED, &(q)->queue_flags)
@@ -533,14 +536,9 @@ static inline void blkdev_dequeue_request(struct request *req)
 }
 
 /*
- * get ready for proper ref counting
- */
-#define blk_put_queue(q)	do { } while (0)
-
-/*
  * Access functions for manipulating queue properties
  */
-extern int blk_init_queue(request_queue_t *, request_fn_proc *, spinlock_t *);
+extern request_queue_t *blk_init_queue(request_fn_proc *, spinlock_t *);
 extern void blk_cleanup_queue(request_queue_t *);
 extern void blk_queue_make_request(request_queue_t *, make_request_fn *);
 extern void blk_queue_bounce_limit(request_queue_t *, u64);
@@ -559,6 +557,10 @@ extern int blk_rq_map_sg(request_queue_t *, struct request *, struct scatterlist
 extern void blk_dump_rq_flags(struct request *, char *);
 extern void generic_unplug_device(void *);
 extern long nr_blockdev_pages(void);
+
+int blk_get_queue(request_queue_t *);
+request_queue_t *blk_alloc_queue(int);
+#define blk_put_queue(q) blk_cleanup_queue((q))
 
 /*
  * tag stuff

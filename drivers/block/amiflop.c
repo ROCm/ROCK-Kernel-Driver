@@ -119,9 +119,9 @@ static long int fd_def_df0 = FD_DD_3;     /* default for df0 if it doesn't ident
 MODULE_PARM(fd_def_df0,"l");
 MODULE_LICENSE("GPL");
 
-static struct request_queue floppy_queue;
-#define QUEUE (&floppy_queue)
-#define CURRENT elv_next_request(&floppy_queue)
+static struct request_queue *floppy_queue;
+#define QUEUE (floppy_queue)
+#define CURRENT elv_next_request(floppy_queue)
 
 /*
  *  Macros
@@ -1715,7 +1715,7 @@ static int __init fd_probe_drives(void)
 		disk->fops = &floppy_fops;
 		sprintf(disk->disk_name, "fd%d", drive);
 		disk->private_data = &unit[drive];
-		disk->queue = &floppy_queue;
+		disk->queue = floppy_queue;
 		set_capacity(disk, 880*2);
 		add_disk(disk);
 	}
@@ -1813,7 +1813,17 @@ int __init amiga_floppy_init(void)
 	post_write_timer.data = 0;
 	post_write_timer.function = post_write;
   
-	blk_init_queue(&floppy_queue, do_fd_request, &amiflop_lock);
+	floppy_queue = blk_init_queue(do_fd_request, &amiflop_lock);
+	if (!floppy_queue) {
+		free_irq(IRQ_AMIGA_CIAA_TB, NULL);
+		free_irq(IRQ_AMIGA_DSKBLK, NULL);
+		amiga_chip_free(raw_buf);
+		release_mem_region(CUSTOM_PHYSADDR+0x20, 8);
+		unregister_blkdev(FLOPPY_MAJOR,"fd");
+		blk_unregister_region(MKDEV(FLOPPY_MAJOR, 0), 256);
+		return -ENOMEM;
+	}
+
 	for (i = 0; i < 128; i++)
 		mfmdecode[i]=255;
 	for (i = 0; i < 16; i++)
@@ -1853,7 +1863,7 @@ void cleanup_module(void)
 	free_irq(IRQ_AMIGA_DSKBLK, NULL);
 	custom.dmacon = DMAF_DISK; /* disable DMA */
 	amiga_chip_free(raw_buf);
-	blk_cleanup_queue(&floppy_queue);
+	blk_cleanup_queue(floppy_queue);
 	release_mem_region(CUSTOM_PHYSADDR+0x20, 8);
 	unregister_blkdev(FLOPPY_MAJOR, "fd");
 }

@@ -130,7 +130,7 @@ static int idedisk_start_tag(ide_drive_t *drive, struct request *rq)
 	spin_lock_irqsave(&ide_lock, flags);
 
 	if (ata_pending_commands(drive) < drive->queue_depth)
-		ret = blk_queue_start_tag(&drive->queue, rq);
+		ret = blk_queue_start_tag(drive->queue, rq);
 
 	spin_unlock_irqrestore(&ide_lock, flags);
 	return ret;
@@ -1593,10 +1593,10 @@ static void idedisk_setup (ide_drive_t *drive)
 		if (max_s > hwif->rqsize)
 			max_s = hwif->rqsize;
 
-		blk_queue_max_sectors(&drive->queue, max_s);
+		blk_queue_max_sectors(drive->queue, max_s);
 	}
 
-	printk("%s: max request size: %dKiB\n", drive->name, drive->queue.max_sectors / 2);
+	printk("%s: max request size: %dKiB\n", drive->name, drive->queue->max_sectors / 2);
 
 	/* Extract geometry if we did not already have one for the drive */
 	if (!drive->cyl || !drive->head || !drive->sect) {
