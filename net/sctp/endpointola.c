@@ -152,8 +152,6 @@ sctp_endpoint_t *sctp_endpoint_init(sctp_endpoint_t *ep, sctp_protocol_t *proto,
 		SCTP_DEFAULT_TIMEOUT_SACK;
 	ep->timeouts[SCTP_EVENT_TIMEOUT_AUTOCLOSE] = 
 		sp->autoclose * HZ;
-	ep->timeouts[SCTP_EVENT_TIMEOUT_PMTU_RAISE] = 
-		SCTP_DEFAULT_TIMEOUT_PMTU_RAISE;
 
 	/* Set up the default send/receive buffer space.  */
 

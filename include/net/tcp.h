@@ -566,7 +566,8 @@ static inline void tcp_openreq_free(struct open_request *req)
  */
 
 struct tcp_func {
-	int			(*queue_xmit)		(struct sk_buff *skb);
+	int			(*queue_xmit)		(struct sk_buff *skb,
+							 int ipfragok);
 
 	void			(*send_check)		(struct sock *sk,
 							 struct tcphdr *th,

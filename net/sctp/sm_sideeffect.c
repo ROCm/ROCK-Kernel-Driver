@@ -427,7 +427,8 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 		case SCTP_CMD_RETRAN:
 			/* Mark a transport for retransmission.  */
 			sctp_retransmit(&asoc->outqueue,
-					command->obj.transport, 0);
+					command->obj.transport,
+					SCTP_RETRANSMIT_T3_RTX);
 			break;
 
 		case SCTP_CMD_TRANSMIT:
@@ -957,12 +958,6 @@ void sctp_generate_sack_event(unsigned long data)
 	sctp_generate_timeout_event(asoc, SCTP_EVENT_TIMEOUT_SACK);
 }
 
-void sctp_generate_pmtu_raise_event(unsigned long data)
-{
-	sctp_association_t *asoc = (sctp_association_t *) data;
-	sctp_generate_timeout_event(asoc, SCTP_EVENT_TIMEOUT_PMTU_RAISE);
-}
-
 sctp_timer_event_t *sctp_timer_events[SCTP_NUM_TIMEOUT_TYPES] = {
 	NULL,
 	sctp_generate_t1_cookie_event,
@@ -974,7 +969,6 @@ sctp_timer_event_t *sctp_timer_events[SCTP_NUM_TIMEOUT_TYPES] = {
 	sctp_generate_heartbeat_event,
 	sctp_generate_sack_event,
 	sctp_generate_autoclose_event,
-	sctp_generate_pmtu_raise_event,
 };
 
 /********************************************************************

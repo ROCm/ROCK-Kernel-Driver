@@ -948,3 +948,32 @@ sctp_transport_t *sctp_assoc_choose_shutdown_transport(sctp_association_t *asoc)
 
 	return t;
 }
+
+/* Update the association's pmtu and frag_point by going through all the
+ * transports. This routine is called when a transport's PMTU has changed.
+ */
+void sctp_assoc_sync_pmtu(sctp_association_t *asoc)
+{
+	sctp_transport_t *t;
+	struct list_head *pos;
+	__u32 pmtu = 0;
+
+	if (!asoc)
+		return;
+
+	/* Get the lowest pmtu of all the transports. */
+	list_for_each(pos, &asoc->peer.transport_addr_list) {
+		t = list_entry(pos, sctp_transport_t, transports);
+		if (!pmtu || (t->pmtu < pmtu))
+			pmtu = t->pmtu;
+	}
+
+	if (pmtu) {
+		asoc->pmtu = pmtu;
+		asoc->frag_point = pmtu - (SCTP_IP_OVERHEAD +
+					   sizeof(sctp_data_chunk_t));
+	}
+
+	SCTP_DEBUG_PRINTK("%s: asoc:%p, pmtu:%d, frag_point:%d\n",
+			  __FUNCTION__, asoc, asoc->pmtu, asoc->frag_point);
+}

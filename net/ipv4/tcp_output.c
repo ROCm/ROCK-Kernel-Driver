@@ -276,7 +276,7 @@ int tcp_transmit_skb(struct sock *sk, struct sk_buff *skb)
 
 		TCP_INC_STATS(TcpOutSegs);
 
-		err = tp->af_specific->queue_xmit(skb);
+		err = tp->af_specific->queue_xmit(skb, 0);
 		if (err <= 0)
 			return err;
 

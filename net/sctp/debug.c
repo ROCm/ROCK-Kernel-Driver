@@ -202,7 +202,6 @@ static const char *sctp_timer_tbl[] = {
 	"TIMEOUT_HEARTBEAT",
 	"TIMEOUT_SACK",
 	"TIMEOUT_AUTOCLOSE",
-	"TIMEOUT_PMTU_RAISE",
 };
 
 /* Lookup timer debug name. */

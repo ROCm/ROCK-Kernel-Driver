@@ -98,7 +98,7 @@ static inline void sctp_v6_err(struct sk_buff *skb,
 }
 
 /* Based on tcp_v6_xmit() in tcp_ipv6.c. */
-static inline int sctp_v6_xmit(struct sk_buff *skb)
+static inline int sctp_v6_xmit(struct sk_buff *skb, int ipfragok)
 {
 	struct sock *sk = skb->sk;
 	struct ipv6_pinfo *np = inet6_sk(sk);

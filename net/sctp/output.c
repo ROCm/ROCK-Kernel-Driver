@@ -80,6 +80,7 @@ sctp_packet_t *sctp_packet_config(sctp_packet_t *packet,
 	packet->ecn_capable = ecn_capable;
 	packet->get_prepend_chunk = prepend_handler;
 	packet->has_cookie_echo = 0;
+	packet->ipfragok = 0;
 
 	/* We might need to call the prepend_handler right away.  */
 	if (packet_empty)
@@ -101,6 +102,7 @@ sctp_packet_t *sctp_packet_init(sctp_packet_t *packet,
 	packet->ecn_capable = 0;
 	packet->get_prepend_chunk = NULL;
 	packet->has_cookie_echo = 0;
+	packet->ipfragok = 0;
 	packet->malloced = 0;
 	sctp_packet_reset(packet);
 	return packet;
@@ -192,6 +194,7 @@ sctp_xmit_t sctp_packet_append_chunk(sctp_packet_t *packet, sctp_chunk_t *chunk)
 				 * transmit and rely on IP
 				 * fragmentation.
 				 */
+				packet->ipfragok = 1;
 				goto append;
 			}
 		} else { /* !packet_empty */
@@ -425,6 +428,7 @@ int sctp_packet_transmit(sctp_packet_t *packet)
 	dst = transport->dst;
 	if (!dst || dst->obsolete) {
 		sctp_transport_route(transport, NULL, sctp_sk(sk));
+		sctp_assoc_sync_pmtu(asoc);
 	}
 
 	nskb->dst = dst_clone(transport->dst);
@@ -433,7 +437,7 @@ int sctp_packet_transmit(sctp_packet_t *packet)
 
 	SCTP_DEBUG_PRINTK("***sctp_transmit_packet*** skb length %d\n",
 			  nskb->len);
-	(*transport->af_specific->queue_xmit)(nskb);
+	(*transport->af_specific->queue_xmit)(nskb, packet->ipfragok);
 out:
 	packet->size = SCTP_IP_OVERHEAD;
 	return err;

@@ -238,8 +238,9 @@ void sctp_retransmit_mark(struct sctp_outq *q, sctp_transport_t *transport,
 		/* If we are doing retransmission due to a fast retransmit,
 		 * only the chunk's that are marked for fast retransmit
 		 * should be added to the retransmit queue.  If we are doing
-		 * retransmission due to a timeout, only the chunks that are
-		 * not yet acked should be added to the retransmit queue.
+		 * retransmission due to a timeout or pmtu discovery, only the
+		 * chunks that are not yet acked should be added to the
+		 * retransmit queue.
 		 */
 		if ((fast_retransmit && chunk->fast_retransmit) ||
 		   (!fast_retransmit && !chunk->tsn_gap_acked)) {
@@ -295,14 +296,21 @@ void sctp_retransmit_mark(struct sctp_outq *q, sctp_transport_t *transport,
  * one packet out.
  */
 void sctp_retransmit(struct sctp_outq *q, sctp_transport_t *transport,
-		     __u8 fast_retransmit)
+		     sctp_retransmit_reason_t reason)
 {
 	int error = 0;
+	__u8 fast_retransmit = 0;
 
-	if (fast_retransmit) {
-		sctp_transport_lower_cwnd(transport, SCTP_LOWER_CWND_FAST_RTX);
-	} else {
+	switch(reason) {
+	case SCTP_RETRANSMIT_T3_RTX:
 		sctp_transport_lower_cwnd(transport, SCTP_LOWER_CWND_T3_RTX);
+		break;
+	case SCTP_RETRANSMIT_FAST_RTX:
+		sctp_transport_lower_cwnd(transport, SCTP_LOWER_CWND_FAST_RTX);
+		fast_retransmit = 1;
+		break;
+	default:
+		break;
 	}
 
 	sctp_retransmit_mark(q, transport, fast_retransmit);
@@ -1501,7 +1509,7 @@ static void sctp_check_transmitted(struct sctp_outq *q,
 
 	if (transport) {
 		if (do_fast_retransmit)
-			sctp_retransmit(q, transport, do_fast_retransmit);
+			sctp_retransmit(q, transport, SCTP_RETRANSMIT_FAST_RTX);
 
 		SCTP_DEBUG_PRINTK("%s: transport: %p, cwnd: %d, "
 				  "ssthresh: %d, flight_size: %d, pba: %d\n",

@@ -118,11 +118,10 @@ typedef enum {
 	SCTP_EVENT_TIMEOUT_HEARTBEAT,
 	SCTP_EVENT_TIMEOUT_SACK,
 	SCTP_EVENT_TIMEOUT_AUTOCLOSE,
-	SCTP_EVENT_TIMEOUT_PMTU_RAISE,
 
 } sctp_event_timeout_t;
 
-#define SCTP_EVENT_TIMEOUT_MAX		SCTP_EVENT_TIMEOUT_PMTU_RAISE
+#define SCTP_EVENT_TIMEOUT_MAX		SCTP_EVENT_TIMEOUT_AUTOCLOSE
 #define SCTP_NUM_TIMEOUT_TYPES		(SCTP_EVENT_TIMEOUT_MAX + 1)
 
 typedef enum {
@@ -319,10 +318,6 @@ typedef enum {
 #define SCTP_DEFAULT_TIMEOUT_SACK	((200 * HZ) / 1000)
 #define SCTP_DEFAULT_TIMEOUT_SACK_MAX	((500 * HZ) / 1000) /* 500 ms */
 
-/* How long do we wait before attempting to raise the PMTU?  */
-#define SCTP_DEFAULT_TIMEOUT_PMTU_RAISE (10 * 60 * HZ) /* 10 Minutes */
-#define SCTP_DEFAULT_TIMEOUT_PMTU_RAISE_MIN (10 * 60 * HZ) /* 10 Minutes */
-
 /* RTO.Initial              - 3  seconds
  * RTO.Min                  - 1  second
  * RTO.Max                  - 60 seconds
@@ -441,6 +436,13 @@ typedef enum {
 #define SCTP_ADDR6_PEERSUPP	0x00000004	/* IPv6 address is supported by
 						   peer */
 
+/* Reasons to retransmit. */
+typedef enum {
+	SCTP_RETRANSMIT_T3_RTX,
+	SCTP_RETRANSMIT_FAST_RTX,
+	SCTP_RETRANSMIT_PMTU_DISCOVERY,
+} sctp_retransmit_reason_t;
+
 /* Reasons to lower cwnd. */
 typedef enum {
 	SCTP_LOWER_CWND_T3_RTX,
@@ -450,4 +452,3 @@ typedef enum {
 } sctp_lower_cwnd_t;
 
 #endif /* __sctp_constants_h__ */
-

@@ -1139,27 +1139,6 @@ sctp_sm_table_entry_t other_event_table[SCTP_NUM_OTHER_TYPES][SCTP_STATE_NUM_STA
 	{.fn = sctp_sf_timer_ignore, .name = "sctp_sf_timer_ignore"}, \
 }
 
-#define TYPE_SCTP_EVENT_TIMEOUT_PMTU_RAISE { \
-	/* SCTP_STATE_EMPTY */ \
-	{.fn = sctp_sf_bug, .name = "sctp_sf_bug"}, \
-	/* SCTP_STATE_CLOSED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_COOKIE_WAIT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_COOKIE_ECHOED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_ESTABLISHED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_PENDING */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_RECEIVED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-	/* SCTP_STATE_SHUTDOWN_ACK_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
-}
-
 sctp_sm_table_entry_t timeout_event_table[SCTP_NUM_TIMEOUT_TYPES][SCTP_STATE_NUM_STATES] = {
 	TYPE_SCTP_EVENT_TIMEOUT_NONE,
 	TYPE_SCTP_EVENT_TIMEOUT_T1_COOKIE,
@@ -1171,7 +1150,6 @@ sctp_sm_table_entry_t timeout_event_table[SCTP_NUM_TIMEOUT_TYPES][SCTP_STATE_NUM
 	TYPE_SCTP_EVENT_TIMEOUT_HEARTBEAT,
 	TYPE_SCTP_EVENT_TIMEOUT_SACK,
 	TYPE_SCTP_EVENT_TIMEOUT_AUTOCLOSE,
-	TYPE_SCTP_EVENT_TIMEOUT_PMTU_RAISE,
 };
 
 sctp_sm_table_entry_t *sctp_chunk_event_lookup(sctp_cid_t cid, sctp_state_t state)

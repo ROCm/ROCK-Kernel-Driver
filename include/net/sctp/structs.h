@@ -238,7 +238,8 @@ struct sctp_protocol {
  * (i.e. things that depend on the address family.)
  */
 struct sctp_af {
-	int		(*queue_xmit)	(struct sk_buff *skb);
+	int		(*queue_xmit)	(struct sk_buff *skb,
+					 int ipfragok);
 	int 		(*setsockopt)	(struct sock *sk,
 					 int level,
 					 int optname,
@@ -619,6 +620,9 @@ struct SCTP_packet {
 	/* This packet contains a COOKIE-ECHO chunk. */
 	int has_cookie_echo;
 
+	/* SCTP cannot fragment this packet. So let ip fragment it. */
+	int ipfragok;
+
 	int malloced;
 };
 
@@ -936,7 +940,8 @@ int sctp_outq_set_output_handlers(struct sctp_outq *,
 				  sctp_outq_ohandler_t build,
 				  sctp_outq_ohandler_force_t force);
 void sctp_outq_restart(struct sctp_outq *);
-void sctp_retransmit(struct sctp_outq *, sctp_transport_t *, __u8);
+void sctp_retransmit(struct sctp_outq *, sctp_transport_t *,
+		     sctp_retransmit_reason_t);
 void sctp_retransmit_mark(struct sctp_outq *, sctp_transport_t *, __u8);
 
 
@@ -1625,6 +1630,8 @@ void sctp_assoc_update(sctp_association_t *dst, sctp_association_t *src);
 __u32 __sctp_association_get_next_tsn(sctp_association_t *);
 __u32 __sctp_association_get_tsn_block(sctp_association_t *, int);
 __u16 __sctp_association_get_next_ssn(sctp_association_t *, __u16 sid);
+
+void sctp_assoc_sync_pmtu(sctp_association_t *);
 
 int sctp_cmp_addr_exact(const union sctp_addr *ss1,
 		        const union sctp_addr *ss2);
