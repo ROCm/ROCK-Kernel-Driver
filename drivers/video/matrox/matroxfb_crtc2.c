@@ -29,7 +29,7 @@ MODULE_PARM_DESC(mem, "Memory size reserved for dualhead (default=8MB)");
 static int matroxfb_dh_getcolreg(unsigned regno, unsigned *red, unsigned *green,
 		unsigned *blue, unsigned *transp, struct fb_info* info) {
 #define m2info ((struct matroxfb_dh_fb_info*)info)
-	if (regno > 16)
+	if (regno >= 16)
 		return 1;
 	*red = m2info->palette[regno].red;
 	*blue = m2info->palette[regno].blue;
@@ -44,7 +44,7 @@ static int matroxfb_dh_setcolreg(unsigned regno, unsigned red, unsigned green,
 #define m2info ((struct matroxfb_dh_fb_info*)info)
 	struct display* p;
 
-	if (regno > 16)
+	if (regno >= 16)
 		return 1;
 	m2info->palette[regno].red = red;
 	m2info->palette[regno].blue = blue;
