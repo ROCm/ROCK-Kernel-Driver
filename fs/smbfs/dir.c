@@ -400,14 +400,23 @@ smb_new_dentry(struct dentry *dentry)
 void
 smb_renew_times(struct dentry * dentry)
 {
-	read_lock(&dparent_lock);
+	dget(dentry);
+	spin_lock(&dentry->d_lock);
 	for (;;) {
+		struct dentry *parent;
+
 		dentry->d_time = jiffies;
 		if (IS_ROOT(dentry))
 			break;
-		dentry = dentry->d_parent;
+		parent = dentry->d_parent;
+		dget(parent);
+		spin_unlock(&dentry->d_lock);
+		dput(dentry);
+		dentry = parent;
+		spin_lock(&dentry->d_lock);
 	}
-	read_unlock(&dparent_lock);
+	spin_unlock(&dentry->d_lock);
+	dput(dentry);
 }
 
 static struct dentry *

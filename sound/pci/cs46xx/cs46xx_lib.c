@@ -3381,7 +3381,9 @@ static void amp_voyetra(cs46xx_t *chip, int change)
 	/* Manage the EAPD bit on the Crystal 4297 
 	   and the Analog AD1885 */
 	   
+#ifdef CONFIG_SND_CS46XX_NEW_DSP
 	int old = chip->amplifier;
+#endif
 	int oval, val;
 	
 	chip->amplifier += change;

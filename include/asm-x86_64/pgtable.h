@@ -151,7 +151,7 @@ static inline void set_pml4(pml4_t *dst, pml4_t val)
 #define _PAGE_ACCESSED	0x020
 #define _PAGE_DIRTY	0x040
 #define _PAGE_PSE	0x080	/* 2MB page */
-#define _PAGE_FILE	0x040	/* pagecache or swap */
+#define _PAGE_FILE	0x040	/* set:pagecache, unset:swap */
 #define _PAGE_GLOBAL	0x100	/* Global TLB entry */
 
 #define _PAGE_PROTNONE	0x080	/* If not present */

@@ -497,11 +497,7 @@ static int afs_d_revalidate(struct dentry *dentry, int flags)
 
 	_enter("%s,%x",dentry->d_name.name,flags);
 
-	/* lock down the parent dentry so we can peer at it */
-	read_lock(&dparent_lock);
-	parent = dget(dentry->d_parent);
-	read_unlock(&dparent_lock);
-
+	parent = dget_parent(dentry);
 	dir = parent->d_inode;
 	inode = dentry->d_inode;
 

@@ -583,7 +583,8 @@ static int do_proc_readlink(struct dentry *dentry, struct vfsmount *mnt,
 
 	if (len > buflen)
 		len = buflen;
-	copy_to_user(buffer, path, len);
+	if (copy_to_user(buffer, path, len))
+		len = -EFAULT;
  out:
 	free_page((unsigned long)tmp);
 	return len;

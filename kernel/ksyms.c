@@ -159,7 +159,6 @@ EXPORT_SYMBOL(lookup_one_len);
 EXPORT_SYMBOL(lookup_hash);
 EXPORT_SYMBOL(sys_close);
 EXPORT_SYMBOL(dcache_lock);
-EXPORT_SYMBOL(dparent_lock);
 EXPORT_SYMBOL(d_alloc_root);
 EXPORT_SYMBOL(d_delete);
 EXPORT_SYMBOL(dget_locked);
