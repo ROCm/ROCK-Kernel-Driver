@@ -261,10 +261,6 @@ acpi_os_writable (
 	void                    *pointer,
 	u32                     length);
 
-u32
-acpi_os_get_timer (
-	void);
-
 acpi_status
 acpi_os_signal (
 	u32                     function,
@@ -284,10 +280,6 @@ acpi_os_vprintf (
 	const NATIVE_CHAR       *format,
 	va_list                 args);
 
-void
-acpi_os_redirect_output (
-	void                    *destination);
-
 
 /*
  * Debug input
@@ -296,18 +288,6 @@ acpi_os_redirect_output (
 u32
 acpi_os_get_line (
 	NATIVE_CHAR             *buffer);
-
-
-/*
- * Debug
- */
-
-void
-acpi_os_dbg_assert(
-	void                    *failed_assertion,
-	void                    *file_name,
-	u32                     line_number,
-	NATIVE_CHAR             *message);
 
 
 #endif /* __ACPIOSXF_H__ */

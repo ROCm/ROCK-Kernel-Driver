@@ -134,16 +134,6 @@ acpi_os_allocate(ACPI_SIZE size)
 	return kmalloc(size, GFP_KERNEL);
 }
 
-void *
-acpi_os_callocate(ACPI_SIZE size)
-{
-	void *ptr = acpi_os_allocate(size);
-	if (ptr)
-		memset(ptr, 0, size);
-
-	return ptr;
-}
-
 void
 acpi_os_free(void *ptr)
 {
@@ -523,37 +513,6 @@ acpi_os_read_pci_configuration (
 
 #endif /*CONFIG_ACPI_PCI*/
 
-acpi_status
-acpi_os_load_module (
-	char *module_name)
-{
-	ACPI_FUNCTION_TRACE ("os_load_module");
-
-	if (!module_name)
-		return_ACPI_STATUS (AE_BAD_PARAMETER);
-
-	if (request_module(module_name) < 0) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Unable to load module [%s].\n", module_name));
-		return_ACPI_STATUS (AE_ERROR);
-	}
-
-	return_ACPI_STATUS (AE_OK);
-}
-
-acpi_status
-acpi_os_unload_module (
-	char *module_name)
-{
-	if (!module_name)
-		return AE_BAD_PARAMETER;
-
-	/* TODO: How on Linux? */
-	/* this is done automatically for all modules with
-	use_count = 0, I think. see: MOD_INC_USE_COUNT -ASG */
-
-	return AE_OK;
-}
-
 
 /*
  * See acpi_os_queue_for_execution()
@@ -695,9 +654,10 @@ acpi_os_create_semaphore(
 
 	ACPI_FUNCTION_TRACE ("os_create_semaphore");
 
-	sem = acpi_os_callocate(sizeof(struct semaphore));
+	sem = acpi_os_allocate(sizeof(struct semaphore));
 	if (!sem)
 		return_ACPI_STATUS (AE_NO_MEMORY);
+	memset(sem, 0, sizeof(struct semaphore));
 
 	sema_init(sem, initial_units);
 
@@ -913,12 +873,3 @@ acpi_os_signal (
 
 	return AE_OK;
 }
-
-acpi_status
-acpi_os_breakpoint(NATIVE_CHAR *msg)
-{
-	acpi_os_printf("breakpoint: %s", msg);
-	
-	return AE_OK;
-}
-
