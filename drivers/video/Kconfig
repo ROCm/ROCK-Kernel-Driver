@@ -225,6 +225,10 @@ config FB_CT65550
 	  This is the frame buffer device driver for the Chips & Technologies
 	  65550 graphics chip in PowerBooks.
 
+config FB_ASILIANT
+	bool "Chips 69000 display support"
+	depends on FB && PCI
+
 config FB_IMSTT
 	bool "IMS Twin Turbo display support"
 	depends on FB && PCI
