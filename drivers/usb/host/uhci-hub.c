@@ -36,33 +36,30 @@ static int uhci_hub_status_data(struct usb_hcd *hcd, char *buf)
 {
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
 	unsigned int io_addr = uhci->io_addr;
-	int i, len = 1;
+	int i;
 
 	*buf = 0;
 	for (i = 0; i < uhci->rh_numports; i++) {
-		*buf |= (inw(io_addr + USBPORTSC1 + i * 2) & RWC_BITS) != 0
-				? (1 << (i + 1))
-				: 0;
-		len = (i + 1) / 8 + 1;
+		if (inw(io_addr + USBPORTSC1 + i * 2) & RWC_BITS)
+			*buf |= (1 << (i + 1));
 	}
-
 	return !!*buf;
 }
 
 #define OK(x)			len = (x); break
 
 #define CLR_RH_PORTSTAT(x) \
-	status = inw(io_addr + USBPORTSC1 + 2 * (wIndex-1)); \
+	status = inw(port_addr); \
 	status &= ~(RWC_BITS|WZ_BITS); \
 	status &= ~(x); \
 	status |= RWC_BITS & (x); \
-	outw(status, io_addr + USBPORTSC1 + 2 * (wIndex-1))
+	outw(status, port_addr)
 
 #define SET_RH_PORTSTAT(x) \
-	status = inw(io_addr + USBPORTSC1 + 2 * (wIndex-1)); \
+	status = inw(port_addr); \
 	status |= (x); \
 	status &= ~(RWC_BITS|WZ_BITS); \
-	outw(status, io_addr + USBPORTSC1 + 2 * (wIndex-1))
+	outw(status, port_addr)
 
 
 /* size of returned buffer is part of USB spec */
@@ -71,8 +68,8 @@ static int uhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 {
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
 	int status, retval = 0, len = 0;
-	unsigned int io_addr = uhci->io_addr;
-	u16 wPortChange, wPortStatus;
+	unsigned int port_addr = uhci->io_addr + USBPORTSC1 + 2 * (wIndex-1);
+	__u16 wPortChange, wPortStatus;
 
 	switch (typeReq) {
 		/* Request Destination:
@@ -87,9 +84,19 @@ static int uhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 		*(__u32 *)buf = cpu_to_le32(0);
 		OK(4);		/* hub power */
 	case GetPortStatus:
-		status = inw(io_addr + USBPORTSC1 + 2 * (wIndex - 1));
+		if (!wIndex || wIndex > uhci->rh_numports)
+			goto err;
+		status = inw(port_addr);
 
-		/* C_SUSPEND and C_RESET are always false */
+		/* Intel controllers report the OverCurrent bit active on.
+		 * VIA controllers report it active off, so we'll adjust the
+		 * bit value.  (It's not standardized in the UHCI spec.)
+		 */
+		if (to_pci_dev(hcd->self.controller)->vendor ==
+				PCI_VENDOR_ID_VIA)
+			status ^= USBPORTSC_OC;
+
+		/* UHCI doesn't support C_SUSPEND and C_RESET (always false) */
 		wPortChange = 0;
 		if (status & USBPORTSC_CSC)
 			wPortChange |= 1 << (USB_PORT_FEAT_C_CONNECTION - 16);
@@ -122,20 +129,12 @@ static int uhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 		*(__u16 *)buf = cpu_to_le16(wPortStatus);
 		*(__u16 *)(buf + 2) = cpu_to_le16(wPortChange);
 		OK(4);
-	case SetHubFeature:
-		switch (wValue) {
-		case C_HUB_OVER_CURRENT:
-		case C_HUB_LOCAL_POWER:
-			break;
-		default:
-			goto err;
-		}
-		break;
+	case SetHubFeature:		/* We don't implement these */
 	case ClearHubFeature:
 		switch (wValue) {
 		case C_HUB_OVER_CURRENT:
 		case C_HUB_LOCAL_POWER:
-			OK(0);	/* hub power over current */
+			OK(0);
 		default:
 			goto err;
 		}
@@ -159,7 +158,7 @@ static int uhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 			OK(0);
 		case USB_PORT_FEAT_POWER:
 			/* UHCI has no power switching */
-			OK(0); /* port power ** */
+			OK(0);
 		default:
 			goto err;
 		}
@@ -189,7 +188,7 @@ static int uhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 			OK(0);
 		case USB_PORT_FEAT_C_OVER_CURRENT:
 			CLR_RH_PORTSTAT(USBPORTSC_OCC);
-			OK(0);	/* port power over current */
+			OK(0);
 		case USB_PORT_FEAT_C_RESET:
 			/* this driver won't report these */
 			OK(0);
@@ -198,8 +197,7 @@ static int uhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 		}
 		break;
 	case GetHubDescriptor:
-		len = min_t(unsigned int, wLength,
-			  min_t(unsigned int, sizeof(root_hub_hub_des), wLength));
+		len = min_t(unsigned int, sizeof(root_hub_hub_des), wLength);
 		memcpy(buf, root_hub_hub_des, len);
 		if (len > 2)
 			buf[2] = uhci->rh_numports;

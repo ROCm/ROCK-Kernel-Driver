@@ -225,20 +225,22 @@ static int uhci_show_sc(int port, unsigned short status, char *buf, int len)
 	char *out = buf;
 
 	/* Try to make sure there's enough memory */
-	if (len < 80)
+	if (len < 160)
 		return 0;
 
-	out += sprintf(out, "  stat%d     =     %04x   %s%s%s%s%s%s%s%s\n",
+	out += sprintf(out, "  stat%d     =     %04x  %s%s%s%s%s%s%s%s%s%s\n",
 		port,
 		status,
-		(status & USBPORTSC_SUSP) ? "PortSuspend " : "",
-		(status & USBPORTSC_PR) ?   "PortReset " : "",
-		(status & USBPORTSC_LSDA) ? "LowSpeed " : "",
-		(status & USBPORTSC_RD) ?   "ResumeDetect " : "",
-		(status & USBPORTSC_PEC) ?  "EnableChange " : "",
-		(status & USBPORTSC_PE) ?   "PortEnabled " : "",
-		(status & USBPORTSC_CSC) ?  "ConnectChange " : "",
-		(status & USBPORTSC_CCS) ?  "PortConnected " : "");
+		(status & USBPORTSC_SUSP) ?	" Suspend" : "",
+		(status & USBPORTSC_OCC) ?	" OverCurrentChange" : "",
+		(status & USBPORTSC_OC) ?	" OverCurrent" : "",
+		(status & USBPORTSC_PR) ?	" Reset" : "",
+		(status & USBPORTSC_LSDA) ?	" LowSpeed" : "",
+		(status & USBPORTSC_RD) ?	" ResumeDetect" : "",
+		(status & USBPORTSC_PEC) ?	" EnableChange" : "",
+		(status & USBPORTSC_PE) ?	" Enabled" : "",
+		(status & USBPORTSC_CSC) ?	" ConnectChange" : "",
+		(status & USBPORTSC_CCS) ?	" Connected" : "");
 
 	return out - buf;
 }
