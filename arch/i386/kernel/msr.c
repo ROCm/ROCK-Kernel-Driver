@@ -233,10 +233,10 @@ static ssize_t msr_write(struct file *file, const char __user *buf,
 
 static int msr_open(struct inode *inode, struct file *file)
 {
-	int cpu = iminor(file->f_dentry->d_inode);
+	unsigned int cpu = iminor(file->f_dentry->d_inode);
 	struct cpuinfo_x86 *c = &(cpu_data)[cpu];
 
-	if (!cpu_online(cpu))
+	if (cpu >= NR_CPUS || !cpu_online(cpu))
 		return -ENXIO;	/* No such CPU */
 	if (!cpu_has(c, X86_FEATURE_MSR))
 		return -EIO;	/* MSR not supported */
