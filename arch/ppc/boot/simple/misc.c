@@ -99,7 +99,9 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 	unsigned long initrd_loc, TotalMemory = 0;
 
 	serial_fixups();
+#ifdef CONFIG_SERIAL_8250_CONSOLE
 	com_port = serial_init(0, NULL);
+#endif
 
 #ifdef CONFIG_44x
 	/* Reset MAL */
@@ -269,7 +271,8 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 
 /* Allow decompress_kernel to be hooked into.  This is the default. */
 void * __attribute__ ((weak))
-load_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
+load_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
+		void *ign1, void *ign2)
 {
 		return decompress_kernel(load_addr, num_words, cksum);
 }
