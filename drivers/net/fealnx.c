@@ -411,6 +411,12 @@ struct netdev_private {
 	/* Media monitoring timer. */
 	struct timer_list timer;
 
+	/* Reset timer */
+	struct timer_list reset_timer;
+	int reset_timer_armed;
+	unsigned long crvalue_sv;
+	unsigned long imrvalue_sv;
+
 	/* Frequently used values: keep some adjacent for cache effect. */
 	int flags;
 	struct pci_dev *pci_dev;
@@ -446,6 +452,7 @@ static int netdev_open(struct net_device *dev);
 static void getlinktype(struct net_device *dev);
 static void getlinkstatus(struct net_device *dev);
 static void netdev_timer(unsigned long data);
+static void reset_timer(unsigned long data);
 static void tx_timeout(struct net_device *dev);
 static void init_ring(struct net_device *dev);
 static int start_tx(struct sk_buff *skb, struct net_device *dev);
@@ -457,21 +464,7 @@ static int mii_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 static struct ethtool_ops netdev_ethtool_ops;
 static int netdev_close(struct net_device *dev);
 static void reset_rx_descriptors(struct net_device *dev);
-
-static void stop_nic_tx(long ioaddr, long crvalue)
-{
-	writel(crvalue & (~CR_W_TXEN), ioaddr + TCRRCR);
-
-	/* wait for tx stop */
-	{
-		int i = 0, delay = 0x1000;
-
-		while ((!(readl(ioaddr + TCRRCR) & CR_R_TXSTOP)) && (i < delay)) {
-			++i;
-		}
-	}
-}
-
+static void reset_tx_descriptors(struct net_device *dev);
 
 static void stop_nic_rx(long ioaddr, long crvalue)
 {
@@ -691,7 +684,7 @@ static int __devinit fealnx_init_one(struct pci_dev *pdev,
 	dev->set_multicast_list = &set_rx_mode;
 	dev->do_ioctl = &mii_ioctl;
 	dev->ethtool_ops = &netdev_ethtool_ops;
-	dev->tx_timeout = tx_timeout;
+	dev->tx_timeout = &tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
 	
 	err = register_netdev(dev);
@@ -1006,6 +999,11 @@ static int netdev_open(struct net_device *dev)
 	/* timer handler */
 	add_timer(&np->timer);
 
+	init_timer(&np->reset_timer);
+	np->reset_timer.data = (unsigned long) dev;
+	np->reset_timer.function = &reset_timer;
+	np->reset_timer_armed = 0;
+
 	return 0;
 }
 
@@ -1206,44 +1204,39 @@ static void netdev_timer(unsigned long data)
 }
 
 
-static void tx_timeout(struct net_device *dev)
+/* Take lock before calling */
+/* Reset chip and disable rx, tx and interrupts */
+static void reset_and_disable_rxtx(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
 	long ioaddr = dev->base_addr;
-	int i;
-
-	printk(KERN_WARNING "%s: Transmit timed out, status %8.8x,"
-	       " resetting...\n", dev->name, readl(ioaddr + ISR));
-
-	{
-
-		printk(KERN_DEBUG "  Rx ring %p: ", np->rx_ring);
-		for (i = 0; i < RX_RING_SIZE; i++)
-			printk(" %8.8x", (unsigned int) np->rx_ring[i].status);
-		printk("\n" KERN_DEBUG "  Tx ring %p: ", np->tx_ring);
-		for (i = 0; i < TX_RING_SIZE; i++)
-			printk(" %4.4x", np->tx_ring[i].status);
-		printk("\n");
-	}
-
-	/* Reinit. Gross */
+	int delay=51;
 
 	/* Reset the chip's Tx and Rx processes. */
-	stop_nic_tx(ioaddr, 0);
-	reset_rx_descriptors(dev);
+	stop_nic_rxtx(ioaddr, 0);
 
 	/* Disable interrupts by clearing the interrupt mask. */
-	writel(0x0000, ioaddr + IMR);
+	writel(0, ioaddr + IMR);
 
 	/* Reset the chip to erase previous misconfiguration. */
 	writel(0x00000001, ioaddr + BCR);
 
 	/* Ueimor: wait for 50 PCI cycles (and flush posted writes btw). 
-	   We surely wait too long (address+data phase). Who cares ? */
-	for (i = 0; i < 50; i++) {
+	   We surely wait too long (address+data phase). Who cares? */
+	while(--delay) {
 		readl(ioaddr + BCR);
 		rmb();
 	}
+}
+
+
+/* Take lock before calling */
+/* Restore chip after reset */
+static void enable_rxtx(struct net_device *dev)
+{
+	struct netdev_private *np = dev->priv;
+	long ioaddr = dev->base_addr;
+
+	reset_rx_descriptors(dev);
 
 	writel(np->tx_ring_dma + ((char*)np->cur_tx - (char*)np->tx_ring),
 		ioaddr + TXLBA);
@@ -1253,15 +1246,71 @@ static void tx_timeout(struct net_device *dev)
 	writel(np->bcrvalue, ioaddr + BCR);
 
 	writel(0, ioaddr + RXPDR);
-	set_rx_mode(dev);
+	set_rx_mode(dev); /* changes np->crvalue, writes it into TCRRCR */
+
 	/* Clear and Enable interrupts by setting the interrupt mask. */
 	writel(FBE | TUNF | CNTOVF | RBU | TI | RI, ioaddr + ISR);
 	writel(np->imrvalue, ioaddr + IMR);
 
 	writel(0, ioaddr + TXPDR);
+}
+
+
+static void reset_timer(unsigned long data)
+{
+	struct net_device *dev = (struct net_device *) data;
+	struct netdev_private *np = dev->priv;
+	unsigned long flags;
+
+	printk(KERN_WARNING "%s: resetting tx and rx machinery\n", dev->name);
+
+	spin_lock_irqsave(&np->lock, flags);
+	np->crvalue = np->crvalue_sv;
+	np->imrvalue = np->imrvalue_sv;
+
+	reset_and_disable_rxtx(dev);
+	/* works for me without this:
+	reset_tx_descriptors(dev); */
+	enable_rxtx(dev);
+	netif_start_queue(dev); /* FIXME: or netif_wake_queue(dev); ? */
+		
+	np->reset_timer_armed = 0;
+
+	spin_unlock_irqrestore(&np->lock, flags);
+}
+
+
+static void tx_timeout(struct net_device *dev)
+{
+	struct netdev_private *np = dev->priv;
+	long ioaddr = dev->base_addr;
+	unsigned long flags;
+	int i;
+
+	printk(KERN_WARNING "%s: Transmit timed out, status %8.8x,"
+	       " resetting...\n", dev->name, readl(ioaddr + ISR));
+
+	{
+		printk(KERN_DEBUG "  Rx ring %p: ", np->rx_ring);
+		for (i = 0; i < RX_RING_SIZE; i++)
+			printk(" %8.8x", (unsigned int) np->rx_ring[i].status);
+		printk("\n" KERN_DEBUG "  Tx ring %p: ", np->tx_ring);
+		for (i = 0; i < TX_RING_SIZE; i++)
+			printk(" %4.4x", np->tx_ring[i].status);
+		printk("\n");
+	}
+	
+	spin_lock_irqsave(&np->lock, flags);
+
+	reset_and_disable_rxtx(dev);
+	reset_tx_descriptors(dev);
+	enable_rxtx(dev);
+
+	spin_unlock_irqrestore(&np->lock, flags);
 
 	dev->trans_start = jiffies;
 	np->stats.tx_errors++;
+	netif_wake_queue(dev); /* or .._start_.. ?? */
 }
 
 
@@ -1317,6 +1366,7 @@ static void init_ring(struct net_device *dev)
 
 	for (i = 0; i < TX_RING_SIZE; i++) {
 		np->tx_ring[i].status = 0;
+		/* do we need np->tx_ring[i].control = XXX; ?? */
 		np->tx_ring[i].next_desc = np->tx_ring_dma +
 			(i + 1)*sizeof(struct fealnx_desc);
 		np->tx_ring[i].next_desc_logical = &np->tx_ring[i + 1];
@@ -1403,6 +1453,42 @@ static int start_tx(struct sk_buff *skb, struct net_device *dev)
 
 	spin_unlock_irqrestore(&np->lock, flags);
 	return 0;
+}
+
+
+/* Take lock before calling */
+/* Chip probably hosed tx ring. Clean up. */
+static void reset_tx_descriptors(struct net_device *dev)
+{
+	struct netdev_private *np = dev->priv;
+	struct fealnx_desc *cur;
+	int i;
+
+	/* initialize tx variables */
+	np->cur_tx = &np->tx_ring[0];
+	np->cur_tx_copy = &np->tx_ring[0];
+	np->really_tx_count = 0;
+	np->free_tx_count = TX_RING_SIZE;
+
+	for (i = 0; i < TX_RING_SIZE; i++) {
+		cur = &np->tx_ring[i];
+		if(cur->skbuff) {
+			pci_unmap_single(np->pci_dev, cur->buffer,
+				cur->skbuff->len, PCI_DMA_TODEVICE);
+			dev_kfree_skb(cur->skbuff);
+			/* or dev_kfree_skb_irq(cur->skbuff); ? */
+			cur->skbuff = NULL;
+		}
+		cur->status = 0;
+		cur->control = 0;	/* needed? */
+		/* probably not needed. We do it for purely paranoid reasons */
+		cur->next_desc = np->tx_ring_dma +
+			(i+1)*sizeof(struct fealnx_desc);
+		cur->next_desc_logical = &np->tx_ring[i+1];
+	}
+	/* for the last tx descriptor */
+	np->tx_ring[TX_RING_SIZE-1].next_desc = np->tx_ring_dma;
+	np->tx_ring[TX_RING_SIZE-1].next_desc_logical = &np->tx_ring[0];
 }
 
 
@@ -1564,6 +1650,20 @@ static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *rgs
 		if (--boguscnt < 0) {
 			printk(KERN_WARNING "%s: Too much work at interrupt, "
 			       "status=0x%4.4x.\n", dev->name, intr_status);
+			if(!np->reset_timer_armed) {
+				np->reset_timer_armed = 1;
+				np->reset_timer.expires = RUN_AT(HZ/2);
+				add_timer(&np->reset_timer);
+				stop_nic_rxtx(ioaddr, 0);
+				netif_stop_queue(dev);
+				/* or netif_tx_disable(dev); ?? */
+				/* Prevent other paths from enabling tx,rx,intrs */
+				np->crvalue_sv = np->crvalue;
+				np->imrvalue_sv = np->imrvalue;
+				np->crvalue &= ~(CR_W_TXEN | CR_W_RXEN); /* or simply = 0? */
+				np->imrvalue = 0;
+			}
+
 			break;
 		}
 	} while (1);
@@ -1879,6 +1979,7 @@ static int netdev_close(struct net_device *dev)
 	stop_nic_rxtx(ioaddr, 0);
 
 	del_timer_sync(&np->timer);
+	del_timer_sync(&np->reset_timer);
 
 	free_irq(dev->irq, dev);
 
