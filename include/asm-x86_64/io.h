@@ -135,9 +135,9 @@ extern inline void * phys_to_virt(unsigned long address)
 #define page_to_phys(page)	((page - mem_map) << PAGE_SHIFT)
 #endif
 
-extern void * __ioremap(unsigned long offset, unsigned long size, unsigned long flags);
+extern void __iomem *__ioremap(unsigned long offset, unsigned long size, unsigned long flags);
 
-extern inline void * ioremap (unsigned long offset, unsigned long size)
+extern inline void __iomem * ioremap (unsigned long offset, unsigned long size)
 {
 	return __ioremap(offset, size, 0);
 }
@@ -147,8 +147,8 @@ extern inline void * ioremap (unsigned long offset, unsigned long size)
  * it's useful if some control registers are in such an area and write combining
  * or read caching is not desirable:
  */
-extern void * ioremap_nocache (unsigned long offset, unsigned long size);
-extern void iounmap(void *addr);
+extern void __iomem * ioremap_nocache (unsigned long offset, unsigned long size);
+extern void iounmap(void __iomem *addr);
 
 /*
  * ISA I/O bus memory addresses are 1:1 with the physical address.
@@ -173,10 +173,10 @@ extern void iounmap(void *addr);
  * memory location directly.
  */
 
-#define readb(addr) (*(volatile unsigned char *) (addr))
-#define readw(addr) (*(volatile unsigned short *) (addr))
-#define readl(addr) (*(volatile unsigned int *) (addr))
-#define readq(addr) (*(volatile unsigned long *) (addr))
+#define readb(addr) (*(__force volatile __u8 *) (__u8 __iomem *)(addr))
+#define readw(addr) (*(__force volatile __u16 *) (__u16 __iomem *)(addr))
+#define readl(addr) (*(__force volatile __u32 *) (__u32 __iomem *)(addr))
+#define readq(addr) (*(__force volatile __u64 *) (__u64 __iomem *)(addr))
 #define readb_relaxed(a) readb(a)
 #define readw_relaxed(a) readw(a)
 #define readl_relaxed(a) readl(a)
@@ -187,29 +187,29 @@ extern void iounmap(void *addr);
 #define __raw_readq readq
 
 #ifdef CONFIG_UNORDERED_IO
-static inline void __writel(u32 val, void *addr)
+static inline void __writel(__u32 val, void __iomem *addr)
 {
-	volatile u32 *target = addr;
+	volatile __u32 __iomem *target = addr;
 	asm volatile("movnti %1,%0"
 		     : "=m" (*target)
 		     : "r" (val) : "memory");
 }
 
-static inline void __writeq(u64 val, void *addr)
+static inline void __writeq(__u64 val, void __iomem *addr)
 {
-	volatile u64 *target = addr;
+	volatile __u64 *target = addr;
 	asm volatile("movnti %1,%0"
 		     : "=m" (*target)
 		     : "r" (val) : "memory");
 }
-#define writeq(val,addr) __writeq((val),(void *)(addr))
-#define writel(val,addr) __writel((val),(void *)(addr))
+#define writeq(val,addr) __writeq((val),(void __iomem *)(addr))
+#define writel(val,addr) __writel((val),(void __iomem *)(addr))
 #else
-#define writel(b,addr) (*(volatile unsigned int *) (addr) = (b))
-#define writeq(b,addr) (*(volatile unsigned long *) (addr) = (b))
+#define writel(b,addr) (*(__force volatile __u32 *)(__u32 __iomem *)(addr) = (b))
+#define writeq(b,addr) (*(__force volatile __u64 *)(__u64 __iomem *)(addr) = (b))
 #endif
-#define writeb(b,addr) (*(volatile unsigned char *) (addr) = (b))
-#define writew(b,addr) (*(volatile unsigned short *) (addr) = (b))
+#define writeb(b,addr) (*(__force volatile __u8 *)(__u8 __iomem *)(addr) = (b))
+#define writew(b,addr) (*(__force volatile __u16 *)(__u16 __iomem *)(addr) = (b))
 #define __raw_writeb writeb
 #define __raw_writew writew
 #define __raw_writel writel
@@ -219,10 +219,10 @@ void *__memcpy_fromio(void*,unsigned long,unsigned);
 void *__memcpy_toio(unsigned long,const void*,unsigned);
 
 #define memcpy_fromio(to,from,len) \
-  __memcpy_fromio((to),(unsigned long)(from),(len))
+  __memcpy_fromio((to),(unsigned long)(void __iomem *)(from),(len))
 #define memcpy_toio(to,from,len) \
-  __memcpy_toio((unsigned long)(to),(from),(len))
-#define memset_io(a,b,c)	memset((void *)(a),(b),(c))
+  __memcpy_toio((unsigned long)(void __iomem *)(to),(from),(len))
+#define memset_io(a,b,c)	memset((__force void *)(void __iomem *)(a),(b),(c))
 
 /*
  * ISA space is 'always mapped' on a typical x86 system, no need to
@@ -232,7 +232,7 @@ void *__memcpy_toio(unsigned long,const void*,unsigned);
  * used as the IO-area pointer (it can be iounmapped as well, so the
  * analogy with PCI is quite large):
  */
-#define __ISA_IO_base ((char *)(PAGE_OFFSET))
+#define __ISA_IO_base ((char __iomem *)(PAGE_OFFSET))
 
 #define isa_readb(a) readb(__ISA_IO_base + (a))
 #define isa_readw(a) readw(__ISA_IO_base + (a))

@@ -111,7 +111,7 @@ static int remap_area_pages(unsigned long address, unsigned long phys_addr,
  * have to convert them into an offset in a page-aligned mapping, but the
  * caller shouldn't need to know that small detail.
  */
-void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flags)
+void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flags)
 {
 	void * addr;
 	struct vm_struct * area;
@@ -126,7 +126,7 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 	 * Don't remap the low PCI/ISA area, it's always mapped..
 	 */
 	if (phys_addr >= 0xA0000 && last_addr < 0x100000)
-		return phys_to_virt(phys_addr);
+		return (__force void __iomem *)phys_to_virt(phys_addr);
 
 	/*
 	 * Don't allow anybody to remap normal RAM that we're using..
@@ -164,7 +164,7 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 		vunmap(addr);
 		return NULL;
 	}
-	return (void *) (offset + (char *)addr);
+	return (__force void __iomem *) (offset + (char *)addr);
 }
 
 /**
@@ -189,9 +189,9 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
  * Must be freed with iounmap.
  */
 
-void *ioremap_nocache (unsigned long phys_addr, unsigned long size)
+void __iomem *ioremap_nocache (unsigned long phys_addr, unsigned long size)
 {
-	void *p = __ioremap(phys_addr, size, _PAGE_PCD);
+	void __iomem *p = __ioremap(phys_addr, size, _PAGE_PCD);
 	if (!p) 
 		return p; 
 
@@ -212,7 +212,7 @@ void *ioremap_nocache (unsigned long phys_addr, unsigned long size)
 	return p;					
 }
 
-void iounmap(void *addr)
+void iounmap(void __iomem *addr)
 {
 	struct vm_struct *p;
 	if (addr <= high_memory) 
