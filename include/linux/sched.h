@@ -226,15 +226,15 @@ struct signal_struct {
 	struct k_sigaction	action[_NSIG];
 	spinlock_t		siglock;
 
-        /* current thread group signal load-balancing target: */
-        task_t                  *curr_target;
+	/* current thread group signal load-balancing target: */
+	task_t			*curr_target;
 
+	/* shared signal handling: */
 	struct sigpending	shared_pending;
 
 	/* thread group exit support */
 	int			group_exit;
 	int			group_exit_code;
-
 	struct task_struct	*group_exit_task;
 };
 

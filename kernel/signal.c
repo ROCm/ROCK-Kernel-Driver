@@ -781,7 +781,7 @@ force_sig_info(int sig, struct siginfo *info, struct task_struct *t)
 	recalc_sigpending_tsk(t);
 	spin_unlock_irqrestore(&t->sigmask_lock, flags);
 
-	return send_sig_info(sig, (void *)1, t);
+	return send_sig_info(sig, info, t);
 }
 
 static int
