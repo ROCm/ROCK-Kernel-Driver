@@ -664,11 +664,13 @@ static int __init i8042_check_aux(struct i8042_values *values)
 /*
  * External connection test - filters out AT-soldered PS/2 i8042's
  * 0x00 - no error, 0x01-0x03 - clock/data stuck, 0xff - general error
+ * 0xfa - no error on some notebooks which ignore the spec
  * We ignore general error, since some chips report it even under normal
  * operation.
  */
 
-	if (i8042_command(&param, I8042_CMD_AUX_TEST) || (param && param != 0xff))
+	if (i8042_command(&param, I8042_CMD_AUX_TEST)
+	    || (param && param != 0xfa && param != 0xff))
 		return -1;
 
 /*
