@@ -232,6 +232,9 @@ static struct bin_attribute firmware_attr_data_tmpl = {
 static void
 fw_class_dev_release(struct class_device *class_dev)
 {
+	struct firmware_priv *fw_priv = class_get_devdata(class_dev);
+
+	kfree(fw_priv);
 	kfree(class_dev);
 }
 
@@ -257,6 +260,8 @@ fw_setup_class_device(struct class_device **class_dev_p,
 						GFP_KERNEL);
 	struct class_device *class_dev = kmalloc(sizeof (struct class_device),
 						 GFP_KERNEL);
+
+	*class_dev_p = NULL;
 
 	if (!fw_priv || !class_dev) {
 		printk(KERN_ERR "%s: kmalloc failed\n", __FUNCTION__);
@@ -318,10 +323,11 @@ error_remove_data:
 	sysfs_remove_bin_file(&class_dev->kobj, &fw_priv->attr_data);
 error_unreg_class_dev:
 	class_device_unregister(class_dev);
+	goto out;
+
 error_kfree:
 	kfree(fw_priv);
 	kfree(class_dev);
-	*class_dev_p = NULL;
 out:
 	return retval;
 }
@@ -374,7 +380,6 @@ request_firmware(const struct firmware **firmware, const char *name,
 	wait_for_completion(&fw_priv->completion);
 
 	del_timer_sync(&fw_priv->timeout);
-	fw_remove_class_device(class_dev);
 
 	if (fw_priv->fw->size && !test_bit(FW_STATUS_ABORT, &fw_priv->status)) {
 		*firmware = fw_priv->fw;
@@ -383,7 +388,7 @@ request_firmware(const struct firmware **firmware, const char *name,
 		vfree(fw_priv->fw->data);
 		kfree(fw_priv->fw);
 	}
-	kfree(fw_priv);
+	fw_remove_class_device(class_dev);
 out:
 	return retval;
 }
