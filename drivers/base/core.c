@@ -18,7 +18,10 @@
 # define DBG(x...)
 #endif
 
-static struct device * device_root;
+static struct device device_root = {
+	bus_id:		"root",
+	name:		"System Root",
+};
 
 int (*platform_notify)(struct device * dev) = NULL;
 int (*platform_notify_remove)(struct device * dev) = NULL;
@@ -49,9 +52,9 @@ int device_register(struct device *dev)
 	spin_lock_init(&dev->lock);
 	atomic_set(&dev->refcount,2);
 
-	if (dev != device_root) {
+	if (dev != &device_root) {
 		if (!dev->parent)
-			dev->parent = device_root;
+			dev->parent = &device_root;
 		get_device(dev->parent);
 		list_add_tail(&dev->node,&dev->parent->children);
 	}
@@ -117,16 +120,10 @@ void put_device(struct device * dev)
 
 static int __init device_init_root(void)
 {
-	device_root = kmalloc(sizeof(*device_root),GFP_KERNEL);
-	if (!device_root)
-		return -ENOMEM;
-	memset(device_root,0,sizeof(*device_root));
-	strcpy(device_root->bus_id,"root");
-	strcpy(device_root->name,"System Root");
-	return device_register(device_root);
+	return device_register(&device_root);
 }
 
-static int __init device_driver_init(void)
+static int __init device_init(void)
 {
 	int error = 0;
 
@@ -141,17 +138,12 @@ static int __init device_driver_init(void)
 		return error;
 	}
 
-	error = device_init_root();
-	if (error) {
+	if ((error = device_init_root()))
 		printk(KERN_ERR "%s: device root init failed!\n", __FUNCTION__);
-		return error;
-	}
-
-	DBG("DEV: Done Initialising\n");
 	return error;
 }
 
-subsys_initcall(device_driver_init);
+subsys_initcall(device_init);
 
 EXPORT_SYMBOL(device_register);
 EXPORT_SYMBOL(put_device);
