@@ -590,7 +590,7 @@ static void uart_flush_buffer(struct tty_struct *tty)
 	unsigned long flags;
 
 	DPRINTK("uart_flush_buffer(%d) called\n",
-	        MINOR(tty->device) - tty->driver.minor_start);
+	        minor(tty->device) - tty->driver.minor_start);
 
 	spin_lock_irqsave(&info->port->lock, flags);
 	uart_circ_clear(&info->xmit);

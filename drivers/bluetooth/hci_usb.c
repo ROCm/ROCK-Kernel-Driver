@@ -92,9 +92,9 @@ static struct usb_device_id ignore_ids[] = {
 	{ }	/* Terminating entry */
 };
 
-static void hci_usb_interrupt(struct urb *urb);
-static void hci_usb_rx_complete(struct urb *urb);
-static void hci_usb_tx_complete(struct urb *urb);
+static void hci_usb_interrupt(struct urb *urb, struct pt_regs *regs);
+static void hci_usb_rx_complete(struct urb *urb, struct pt_regs *regs);
+static void hci_usb_tx_complete(struct urb *urb, struct pt_regs *regs);
 
 static struct urb *hci_usb_get_completed(struct hci_usb *husb)
 {
@@ -429,7 +429,7 @@ int hci_usb_send_frame(struct sk_buff *skb)
 	return 0;
 }
 
-static void hci_usb_interrupt(struct urb *urb)
+static void hci_usb_interrupt(struct urb *urb, struct pt_regs *regs)
 {
 	struct hci_usb *husb = (void *) urb->context;
 	struct hci_usb_scb *scb;
@@ -531,7 +531,7 @@ exit:
 				husb->hdev.name, status);
 }
 
-static void hci_usb_tx_complete(struct urb *urb)
+static void hci_usb_tx_complete(struct urb *urb, struct pt_regs *regs)
 {
 	struct sk_buff *skb  = (struct sk_buff *) urb->context;
 	struct hci_dev *hdev = (struct hci_dev *) skb->dev;
@@ -563,7 +563,7 @@ static void hci_usb_tx_complete(struct urb *urb)
 	return;
 }
 
-static void hci_usb_rx_complete(struct urb *urb)
+static void hci_usb_rx_complete(struct urb *urb, struct pt_regs *regs)
 {
 	struct sk_buff *skb  = (struct sk_buff *) urb->context;
 	struct hci_dev *hdev = (struct hci_dev *) skb->dev;

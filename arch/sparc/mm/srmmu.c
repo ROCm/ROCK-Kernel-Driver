@@ -136,8 +136,16 @@ static inline int srmmu_device_memory(unsigned long x)
 
 int srmmu_cache_pagetables;
 
-/* XXX Make this dynamic based on ram size - Anton */
-#define SRMMU_NOCACHE_BITMAP_SIZE (SRMMU_NOCACHE_NPAGES * 16)
+/* these will be initialized in srmmu_nocache_calcsize() */
+int srmmu_nocache_npages;
+unsigned long srmmu_nocache_size;
+unsigned long srmmu_nocache_end;
+unsigned long pkmap_base;
+unsigned long pkmap_base_end;
+unsigned long srmmu_nocache_bitmap_size;
+extern unsigned long fix_kmap_begin;
+extern unsigned long fix_kmap_end;
+
 #define SRMMU_NOCACHE_BITMAP_SHIFT (PAGE_SHIFT - 4)
 
 void *srmmu_nocache_pool;
@@ -331,7 +339,7 @@ static unsigned long __srmmu_get_nocache(int size, int align)
 	spin_lock(&srmmu_nocache_spinlock);
 
 repeat:
-	offset = find_next_zero_bit(srmmu_nocache_bitmap, SRMMU_NOCACHE_BITMAP_SIZE, offset);
+	offset = find_next_zero_bit(srmmu_nocache_bitmap, srmmu_nocache_bitmap_size, offset);
 
 	/* we align on physical address */
 	if (align) {
@@ -341,7 +349,7 @@ repeat:
 		offset = (va_tmp - SRMMU_NOCACHE_VADDR) >> SRMMU_NOCACHE_BITMAP_SHIFT;
 	}
 
-	if ((SRMMU_NOCACHE_BITMAP_SIZE - offset) < size) {
+	if ((srmmu_nocache_bitmap_size - offset) < size) {
 		printk("Run out of nocached RAM!\n");
 		spin_unlock(&srmmu_nocache_spinlock);
 		return 0;
@@ -393,9 +401,9 @@ void srmmu_free_nocache(unsigned long vaddr, int size)
 		    vaddr, (unsigned long)SRMMU_NOCACHE_VADDR);
 		BUG();
 	}
-	if (vaddr >= SRMMU_NOCACHE_END) {
+	if (vaddr >= srmmu_nocache_end) {
 		printk("Vaddr %lx is bigger than nocache end 0x%lx\n",
-		    vaddr, (unsigned long)SRMMU_NOCACHE_END);
+		    vaddr, srmmu_nocache_end);
 		BUG();
 	}
 	if (size & (size-1)) {
@@ -429,6 +437,35 @@ void srmmu_free_nocache(unsigned long vaddr, int size)
 
 void srmmu_early_allocate_ptable_skeleton(unsigned long start, unsigned long end);
 
+extern unsigned long probe_memory(void);	/* in fault.c */
+
+/* Reserve nocache dynamically proportionally to the amount of
+ * system RAM. -- Tomas Szepe <szepe@pinerecords.com>, June 2002
+ */
+void srmmu_nocache_calcsize(void)
+{
+	unsigned long sysmemavail = probe_memory() / 1024;
+
+	srmmu_nocache_npages =
+		sysmemavail / SRMMU_NOCACHE_ALCRATIO / 1024 * 256;
+	if (sysmemavail % (SRMMU_NOCACHE_ALCRATIO * 1024))
+		srmmu_nocache_npages += 256;
+
+	/* anything above 1280 blows up */
+	if (srmmu_nocache_npages > 1280) srmmu_nocache_npages = 1280;
+
+	srmmu_nocache_size = srmmu_nocache_npages * PAGE_SIZE;
+	srmmu_nocache_bitmap_size = srmmu_nocache_npages * 16;
+	srmmu_nocache_end = SRMMU_NOCACHE_VADDR + srmmu_nocache_size;
+	fix_kmap_begin = srmmu_nocache_end;
+	fix_kmap_end = fix_kmap_begin + (KM_TYPE_NR * NR_CPUS - 1) * PAGE_SIZE;
+	pkmap_base = SRMMU_NOCACHE_VADDR + srmmu_nocache_size + 0x40000;
+	pkmap_base_end = pkmap_base + LAST_PKMAP * PAGE_SIZE;
+
+	/* printk("system memory available = %luk\nnocache ram size = %luk\n",
+		sysmemavail, srmmu_nocache_size / 1024); */
+}
+
 void srmmu_nocache_init(void)
 {
 	pgd_t *pgd;
@@ -437,24 +474,24 @@ void srmmu_nocache_init(void)
 	unsigned long paddr, vaddr;
 	unsigned long pteval;
 
-	srmmu_nocache_pool = __alloc_bootmem(SRMMU_NOCACHE_SIZE, PAGE_SIZE, 0UL);
-	memset(srmmu_nocache_pool, 0, SRMMU_NOCACHE_SIZE);
+	srmmu_nocache_pool = __alloc_bootmem(srmmu_nocache_size, PAGE_SIZE, 0UL);
+	memset(srmmu_nocache_pool, 0, srmmu_nocache_size);
 
-	srmmu_nocache_bitmap = __alloc_bootmem(SRMMU_NOCACHE_BITMAP_SIZE, SMP_CACHE_BYTES, 0UL);
-	memset(srmmu_nocache_bitmap, 0, SRMMU_NOCACHE_BITMAP_SIZE);
+	srmmu_nocache_bitmap = __alloc_bootmem(srmmu_nocache_bitmap_size, SMP_CACHE_BYTES, 0UL);
+	memset(srmmu_nocache_bitmap, 0, srmmu_nocache_bitmap_size);
 
 	srmmu_swapper_pg_dir = (pgd_t *)__srmmu_get_nocache(SRMMU_PGD_TABLE_SIZE, SRMMU_PGD_TABLE_SIZE);
 	memset(__nocache_fix(srmmu_swapper_pg_dir), 0, SRMMU_PGD_TABLE_SIZE);
 	init_mm.pgd = srmmu_swapper_pg_dir;
 
-	srmmu_early_allocate_ptable_skeleton(SRMMU_NOCACHE_VADDR, SRMMU_NOCACHE_END);
+	srmmu_early_allocate_ptable_skeleton(SRMMU_NOCACHE_VADDR, srmmu_nocache_end);
 
 	spin_lock_init(&srmmu_nocache_spinlock);
 
 	paddr = __pa((unsigned long)srmmu_nocache_pool);
 	vaddr = SRMMU_NOCACHE_VADDR;
 
-	while (vaddr < SRMMU_NOCACHE_END) {
+	while (vaddr < srmmu_nocache_end) {
 		pgd = pgd_offset_k(vaddr);
 		pmd = srmmu_pmd_offset(__nocache_fix(pgd), vaddr);
 		pte = srmmu_pte_offset(__nocache_fix(pmd), vaddr);
@@ -1286,6 +1323,7 @@ void __init srmmu_paging_init(void)
 	pages_avail = 0;
 	last_valid_pfn = bootmem_init(&pages_avail);
 
+	srmmu_nocache_calcsize();
 	srmmu_nocache_init();
         srmmu_inherit_prom_mappings(0xfe400000,(LINUX_OPPROM_ENDVM-PAGE_SIZE));
 	map_kernel();
@@ -1307,12 +1345,12 @@ void __init srmmu_paging_init(void)
 	srmmu_allocate_ptable_skeleton(DVMA_VADDR, DVMA_END);
 #endif
 
-	srmmu_allocate_ptable_skeleton(FIX_KMAP_BEGIN, FIX_KMAP_END);
-	srmmu_allocate_ptable_skeleton(PKMAP_BASE, PKMAP_BASE_END);
+	srmmu_allocate_ptable_skeleton(fix_kmap_begin, fix_kmap_end);
+	srmmu_allocate_ptable_skeleton(pkmap_base, pkmap_base_end);
 
-	pgd = pgd_offset_k(PKMAP_BASE);
-	pmd = srmmu_pmd_offset(pgd, PKMAP_BASE);
-	pte = srmmu_pte_offset(pmd, PKMAP_BASE);
+	pgd = pgd_offset_k(pkmap_base);
+	pmd = srmmu_pmd_offset(pgd, pkmap_base);
+	pte = srmmu_pte_offset(pmd, pkmap_base);
 	pkmap_page_table = pte;
 
 	flush_cache_all();
@@ -1359,7 +1397,7 @@ static void srmmu_mmu_info(struct seq_file *m)
 		   "nocache used\t: %d\n",
 		   srmmu_name,
 		   num_contexts,
-		   SRMMU_NOCACHE_SIZE,
+		   srmmu_nocache_size,
 		   (srmmu_nocache_used << SRMMU_NOCACHE_BITMAP_SHIFT));
 }
 

@@ -14,23 +14,26 @@
 
 #define SRMMU_MAXMEM		0x0c000000
 
-#define SRMMU_NOCACHE_VADDR	0xfc000000	/* KERNBASE + SRMMU_MAXMEM */
-/* XXX Make this dynamic based on ram size - Anton */
-#define SRMMU_NOCACHE_NPAGES	256
-#define SRMMU_NOCACHE_SIZE	(SRMMU_NOCACHE_NPAGES * PAGE_SIZE)
-#define SRMMU_NOCACHE_END	(SRMMU_NOCACHE_VADDR + SRMMU_NOCACHE_SIZE)
+#define SRMMU_NOCACHE_VADDR	(KERNBASE + SRMMU_MAXMEM)
+				/* = 0x0fc000000 */
 
-#define FIX_KMAP_BEGIN		0xfc100000
-#define FIX_KMAP_END (FIX_KMAP_BEGIN + ((KM_TYPE_NR*NR_CPUS)-1)*PAGE_SIZE)
-
-#define PKMAP_BASE		0xfc140000
-#define PKMAP_BASE_END		(PKMAP_BASE+LAST_PKMAP*PAGE_SIZE)
+/* The following constant is used in mm/srmmu.c::srmmu_nocache_calcsize()
+ * to determine the amount of memory that will be reserved as nocache:
+ *
+ * 256 pages will be taken as nocache per each
+ * SRMMU_NOCACHE_ALCRATIO MB of system memory.
+ *
+ * limits enforced:	nocache minimum = 256 pages
+ *			nocache maximum = 1280 pages
+ */
+#define SRMMU_NOCACHE_ALCRATIO	64	/* 256 pages per 64MB of system RAM */
 
 #define SUN4M_IOBASE_VADDR	0xfd000000 /* Base for mapping pages */
 #define IOBASE_VADDR		0xfe000000
 #define IOBASE_END		0xfe300000
 
 #define VMALLOC_START		0xfe300000
+
 /* XXX Alter this when I get around to fixing sun4c - Anton */
 #define VMALLOC_END		0xffc00000
 

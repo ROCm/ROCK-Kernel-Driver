@@ -1351,6 +1351,18 @@ EXPORT_SYMBOL(unblock_all_signals);
  * System call entry points.
  */
 
+asmlinkage long sys_restart_syscall(void)
+{
+	struct restart_block *restart = &current_thread_info()->restart_block;
+	return restart->fn(restart);
+}
+
+long do_no_restart_syscall(struct restart_block *param)
+{
+	return -EINTR;
+}
+
+
 /*
  * We don't need to get the kernel lock - this is all local to this
  * particular thread.. (and that's good, because this is _heavily_

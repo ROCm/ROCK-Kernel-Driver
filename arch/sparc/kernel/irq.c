@@ -401,8 +401,8 @@ void unexpected_irq(int irq, void *dev_id, struct pt_regs * regs)
 		printk("Expecting: ");
         	for (i = 0; i < 16; i++)
                 	if (action->handler)
-                        	prom_printf("[%s:%d:0x%x] ", action->name,
-				    (int) i, (unsigned int) action->handler);
+                        	printk("[%s:%d:0x%x] ", action->name,
+				       (int) i, (unsigned int) action->handler);
 	}
         printk("AIEEE\n");
 	panic("bogus interrupt received");

@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Name: hwsleep.c - ACPI Hardware Sleep/Wake Interface
- *              $Revision: 47 $
+ *              $Revision: 48 $
  *
  *****************************************************************************/
 
@@ -236,7 +236,7 @@ acpi_enter_sleep_state (
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
-	ACPI_DEBUG_PRINT ((ACPI_DB_OK, "Entering S%d\n", sleep_state));
+	ACPI_DEBUG_PRINT ((ACPI_DB_INIT, "Entering sleep state [S%d]\n", sleep_state));
 
 	/* Clear SLP_EN and SLP_TYP fields */
 

@@ -531,6 +531,13 @@ static int __init sis900_mii_probe (struct net_device * net_dev)
 		
 		if ((mii_phy = kmalloc(sizeof(struct mii_phy), GFP_KERNEL)) == NULL) {
 			printk(KERN_INFO "Cannot allocate mem for struct mii_phy\n");
+			mii_phy = sis_priv->first_mii;
+			while (mii_phy) {
+				struct mii_phy *phy;
+				phy = mii_phy;
+				mii_phy = mii_phy->next;
+				kfree(phy);
+			}
 			return 0;
 		}
 		

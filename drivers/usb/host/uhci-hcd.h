@@ -299,7 +299,7 @@ struct uhci_hcd {
 #endif
 
 	/* Grabbed from PCI */
-	unsigned int io_addr;
+	unsigned long io_addr;
 
 	struct pci_pool *qh_pool;
 	struct pci_pool *td_pool;

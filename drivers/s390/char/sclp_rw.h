@@ -11,6 +11,9 @@
 #ifndef __SCLP_RW_H__
 #define __SCLP_RW_H__
 
+#include <linux/list.h>
+#include <linux/timer.h>
+
 struct mto {
 	u16 length;
 	u16 type;
@@ -70,6 +73,8 @@ struct sclp_buffer {
 	struct write_sccb *sccb;
 	char *current_line;
 	int current_length;
+	int retry_count;
+	struct timer_list retry_timer;
 	/* output format settings */
 	unsigned short columns;
 	unsigned short htab;
@@ -84,8 +89,7 @@ int sclp_rw_init(void);
 struct sclp_buffer *sclp_make_buffer(void *, unsigned short, unsigned short);
 void *sclp_unmake_buffer(struct sclp_buffer *);
 int sclp_buffer_space(struct sclp_buffer *);
-int sclp_write(struct sclp_buffer *buffer, const char *, int, int);
-void sclp_move_current_line(struct sclp_buffer *, struct sclp_buffer *);
+int sclp_write(struct sclp_buffer *buffer, const unsigned char *, int, int);
 void sclp_emit_buffer(struct sclp_buffer *,void (*)(struct sclp_buffer *,int));
 void sclp_set_columns(struct sclp_buffer *, unsigned short);
 void sclp_set_htab(struct sclp_buffer *, unsigned short);

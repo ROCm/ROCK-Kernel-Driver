@@ -585,7 +585,12 @@ static struct miscdevice psaux_mouse = {
 
 static int __init psaux_init(void)
 {
-	misc_register(&psaux_mouse);
+	int retval;
+
+	retval = misc_register(&psaux_mouse);
+	if(retval < 0)
+		return retval;
+
 	queue = (struct aux_queue *) kmalloc(sizeof(*queue), GFP_KERNEL);
 	memset(queue, 0, sizeof(*queue));
 	queue->head = queue->tail = 0;

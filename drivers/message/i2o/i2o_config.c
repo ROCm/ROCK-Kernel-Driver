@@ -930,7 +930,7 @@ static int __init i2o_config_init(void)
 		printk(KERN_ERR "i2o_config: no memory for page buffer.\n");
 		return -ENOBUFS;
 	}
-	if(misc_register(&i2o_miscdev)==-1)
+	if(misc_register(&i2o_miscdev) < 0)
 	{
 		printk(KERN_ERR "i2o_config: can't register device.\n");
 		kfree(page_buf);

@@ -486,14 +486,14 @@ static unsigned int dsp_poll(struct file *file, struct poll_table_struct *wait)
 }
 
 struct file_operations saa7134_dsp_fops = {
-	owner:   THIS_MODULE,
-	open:    dsp_open,
-	release: dsp_release,
-	read:    dsp_read,
-	write:   dsp_write,
-	ioctl:   dsp_ioctl,
-	poll:    dsp_poll,
-	llseek:  no_llseek,
+	.owner   = THIS_MODULE,
+	.open    = dsp_open,
+	.release = dsp_release,
+	.read    = dsp_read,
+	.write   = dsp_write,
+	.ioctl   = dsp_ioctl,
+	.poll    = dsp_poll,
+	.llseek  = no_llseek,
 };
 
 /* ------------------------------------------------------------------ */
@@ -670,11 +670,11 @@ static int mixer_ioctl(struct inode *inode, struct file *file,
 }
 
 struct file_operations saa7134_mixer_fops = {
-	owner:   THIS_MODULE,
-	open:    mixer_open,
-	release: mixer_release,
-	ioctl:   mixer_ioctl,
-	llseek:  no_llseek,
+	.owner   = THIS_MODULE,
+	.open    = mixer_open,
+	.release = mixer_release,
+	.ioctl   = mixer_ioctl,
+	.llseek  = no_llseek,
 };
 
 /* ------------------------------------------------------------------ */

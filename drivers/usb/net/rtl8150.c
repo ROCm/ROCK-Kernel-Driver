@@ -143,7 +143,7 @@ static int set_registers(rtl8150_t * dev, u16 indx, u16 size, void *data)
 			       indx, 0, data, size, HZ / 2);
 }
 
-static void ctrl_callback(struct urb *urb)
+static void ctrl_callback(struct urb *urb, struct pt_regs *regs)
 {
 	rtl8150_t *dev;
 
@@ -336,7 +336,7 @@ static void unlink_all_urbs(rtl8150_t * dev)
 	usb_unlink_urb(dev->ctrl_urb);
 }
 
-static void read_bulk_callback(struct urb *urb)
+static void read_bulk_callback(struct urb *urb, struct pt_regs *regs)
 {
 	rtl8150_t *dev;
 	unsigned pkt_len, res;
@@ -435,7 +435,7 @@ tlsched:
 	tasklet_schedule(&dev->tl);
 }
 
-static void write_bulk_callback(struct urb *urb)
+static void write_bulk_callback(struct urb *urb, struct pt_regs *regs)
 {
 	rtl8150_t *dev;
 
@@ -451,7 +451,7 @@ static void write_bulk_callback(struct urb *urb)
 	netif_wake_queue(dev->netdev);
 }
 
-void intr_callback(struct urb *urb)
+void intr_callback(struct urb *urb, struct pt_regs *regs)
 {
 	rtl8150_t *dev;
 	int status;

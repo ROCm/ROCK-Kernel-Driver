@@ -7,6 +7,9 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999-2001
  *
+ * $Revision: 1.6 $
+ *
+ * History of changes
  * 05/04/02 split from dasd.c, code restructuring.
  */
 
@@ -17,7 +20,6 @@
 
 #include <asm/debug.h>
 #include <asm/ebcdic.h>
-#include <asm/irq.h>
 #include <asm/uaccess.h>
 
 /* This is ugly... */
@@ -36,7 +38,7 @@ dasd_alloc_erp_request(char *magic, int cplength, int datasize,
 
 	/* Sanity checks */
 	if ( magic == NULL || datasize > PAGE_SIZE ||
-	     (cplength*sizeof(ccw1_t)) > PAGE_SIZE)
+	     (cplength*sizeof(struct ccw1)) > PAGE_SIZE)
 		BUG();
 	debug_text_event ( dasd_debug_area, 1, "ALLC");
 	debug_text_event ( dasd_debug_area, 1, magic);
@@ -45,7 +47,7 @@ dasd_alloc_erp_request(char *magic, int cplength, int datasize,
 
 	size = (sizeof(dasd_ccw_req_t) + 7L) & -8L;
 	if (cplength > 0)
-		size += cplength * sizeof(ccw1_t);
+		size += cplength * sizeof(struct ccw1);
 	if (datasize > 0)
 		size += datasize;
 	spin_lock_irqsave(&device->mem_lock, flags);
@@ -57,9 +59,9 @@ dasd_alloc_erp_request(char *magic, int cplength, int datasize,
 	data = (char *) cqr + ((sizeof(dasd_ccw_req_t) + 7L) & -8L);
 	cqr->cpaddr = NULL;
 	if (cplength > 0) {
-		cqr->cpaddr = (ccw1_t *) data;
-		data += cplength*sizeof(ccw1_t);
-		memset(cqr->cpaddr, 0, cplength*sizeof(ccw1_t));
+		cqr->cpaddr = (struct ccw1 *) data;
+		data += cplength*sizeof(struct ccw1);
+		memset(cqr->cpaddr, 0, cplength*sizeof(struct ccw1));
 	}
 	cqr->data = NULL;
 	if (datasize > 0) {
@@ -201,18 +203,25 @@ hex_dump_memory(dasd_device_t *device, void *data, int len)
 }
 
 void
-dasd_log_ccw(dasd_ccw_req_t * cqr, int caller, __u32 cpa)
+dasd_log_sense(dasd_ccw_req_t *cqr, struct irb *irb)
 {
 	dasd_device_t *device;
-	dasd_ccw_req_t *lcqr;
-	ccw1_t *ccw;
-	int cplength;
 
 	device = cqr->device;
 	/* dump sense data */
 	if (device->discipline && device->discipline->dump_sense)
-		device->discipline->dump_sense(device, cqr);
+		device->discipline->dump_sense(device, cqr, irb);
+}
 
+void
+dasd_log_ccw(dasd_ccw_req_t * cqr, int caller, __u32 cpa)
+{
+	dasd_device_t *device;
+	dasd_ccw_req_t *lcqr;
+	struct ccw1 *ccw;
+	int cplength;
+
+	device = cqr->device;
 	/* log the channel program */
 	for (lcqr = cqr; lcqr != NULL; lcqr = lcqr->refers) {
 		DEV_MESSAGE(KERN_ERR, device,
@@ -229,17 +238,17 @@ dasd_log_ccw(dasd_ccw_req_t * cqr, int caller, __u32 cpa)
 			DEV_MESSAGE(KERN_ERR, device, "%s",
 				    "Start of channel program:");
 			hex_dump_memory(device, lcqr->cpaddr,
-					40*sizeof(ccw1_t));
+					40*sizeof(struct ccw1));
 
 			DEV_MESSAGE(KERN_ERR, device, "%s",
 				    "End of channel program:");
 			hex_dump_memory(device, lcqr->cpaddr + cplength - 10,
-					10*sizeof(ccw1_t));
+					10*sizeof(struct ccw1));
 		} else {	/* log the whole CP */
 			DEV_MESSAGE(KERN_ERR, device, "%s",
 				    "Channel program (complete):");
 			hex_dump_memory(device, lcqr->cpaddr,
-					cplength*sizeof(ccw1_t));
+					cplength*sizeof(struct ccw1));
 		}
 
 		if (lcqr != cqr)
@@ -258,7 +267,7 @@ dasd_log_ccw(dasd_ccw_req_t * cqr, int caller, __u32 cpa)
 				    "Failed CCW (%p) (area):",
 				    (void *) (long) cpa);
 			hex_dump_memory(device, cqr->cpaddr - 10,
-					20*sizeof(ccw1_t));
+					20*sizeof(struct ccw1));
 		}
 	}
 
@@ -268,4 +277,5 @@ EXPORT_SYMBOL(dasd_default_erp_action);
 EXPORT_SYMBOL(dasd_default_erp_postaction);
 EXPORT_SYMBOL(dasd_alloc_erp_request);
 EXPORT_SYMBOL(dasd_free_erp_request);
+EXPORT_SYMBOL(dasd_log_sense);
 EXPORT_SYMBOL(dasd_log_ccw);

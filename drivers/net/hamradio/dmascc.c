@@ -400,7 +400,7 @@ int __init dmascc_init(void) {
     /* Check valid I/O address regions */
     for (i = 0; i < hw[h].num_devs; i++)
       if (base[i]) {
-	if (check_region(base[i], hw[h].io_size))
+	if (!request_region(base[i], hw[h].io_size, "dmascc"))
 	  base[i] = 0;
 	else {
 	  tcmd[i] = base[i] + hw[h].tmr_offset + TMR_CTRL;
@@ -446,11 +446,12 @@ int __init dmascc_init(void) {
     /* Evaluate measurements */
     for (i = 0; i < hw[h].num_devs; i++)
       if (base[i]) {
-	if (delay[i] >= 9 && delay[i] <= 11) {
-	  /* Ok, we have found an adapter */
-	  if (setup_adapter(base[i], h, n) == 0)
-	    n++;
-	}
+	if ((delay[i] >= 9 && delay[i] <= 11)&& 
+	    /* Ok, we have found an adapter */
+	    (setup_adapter(base[i], h, n) == 0))
+	  n++;
+	else
+	  release_region(base[i], hw[h].io_size);
       }
 
   } /* NUM_TYPES */
@@ -606,7 +607,6 @@ int __init setup_adapter(int card_base, int type, int n) {
     rtnl_unlock();
   }
 
-  request_region(card_base, hw[type].io_size, "dmascc");
 
   info->next = first;
   first = info;

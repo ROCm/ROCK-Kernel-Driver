@@ -20,6 +20,7 @@
  * - if the contents of this structure are changed, the assembly constants must also be changed
  */
 #ifndef __ASSEMBLY__
+
 struct thread_info {
 	struct task_struct	*task;		/* main task structure */
 	struct exec_domain	*exec_domain;	/* execution domain */
@@ -31,6 +32,7 @@ struct thread_info {
 					 	   0-0xBFFFFFFF for user-thead
 						   0-0xFFFFFFFF for kernel-thread
 						*/
+	struct restart_block    restart_block;
 
 	__u8			supervisor_stack[0];
 };
@@ -44,6 +46,7 @@ struct thread_info {
 #define TI_CPU		0x0000000C
 #define TI_PRE_COUNT	0x00000010
 #define TI_ADDR_LIMIT	0x00000014
+#define TI_RESTART_BLOCK 0x0000018
 
 #endif
 
@@ -55,6 +58,7 @@ struct thread_info {
  * preempt_count needs to be 1 initially, until the scheduler is functional.
  */
 #ifndef __ASSEMBLY__
+
 #define INIT_THREAD_INFO(tsk)			\
 {						\
 	.task		= &tsk,			\
@@ -63,6 +67,9 @@ struct thread_info {
 	.cpu		= 0,			\
 	.preempt_count	= 1,			\
 	.addr_limit	= KERNEL_DS,		\
+	.restart_block = {			\
+		.fn = do_no_restart_syscall,	\
+	},					\
 }
 
 #define init_thread_info	(init_thread_union.thread_info)

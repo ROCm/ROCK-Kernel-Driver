@@ -295,7 +295,7 @@ static int ohci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 		 * with HC dead, we won't respect hc queue pointers
 		 * any more ... just clean up every urb's memory.
 		 */
-		finish_urb (ohci, urb);
+		finish_urb (ohci, urb, NULL);
 	}
 	return 0;
 }
@@ -531,7 +531,7 @@ static int hc_start (struct ohci_hcd *ohci)
 
 /* an interrupt happens */
 
-static void ohci_irq (struct usb_hcd *hcd)
+static void ohci_irq (struct usb_hcd *hcd, struct pt_regs *ptregs)
 {
 	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
 	struct ohci_regs	*regs = ohci->regs;
@@ -570,7 +570,7 @@ static void ohci_irq (struct usb_hcd *hcd)
   
 	if (ints & OHCI_INTR_WDH) {
 		writel (OHCI_INTR_WDH, &regs->intrdisable);	
-		dl_done_list (ohci, dl_reverse_done_list (ohci));
+		dl_done_list (ohci, dl_reverse_done_list (ohci), ptregs);
 		writel (OHCI_INTR_WDH, &regs->intrenable); 
 	}
   
@@ -581,7 +581,7 @@ static void ohci_irq (struct usb_hcd *hcd)
 	 */
 	spin_lock (&ohci->lock);
 	if (ohci->ed_rm_list)
-		finish_unlinks (ohci, le16_to_cpu (ohci->hcca->frame_no));
+		finish_unlinks (ohci, le16_to_cpu (ohci->hcca->frame_no), ptregs);
 	if ((ints & OHCI_INTR_SF) != 0 && !ohci->ed_rm_list)
 		writel (OHCI_INTR_SF, &regs->intrdisable);	
 	spin_unlock (&ohci->lock);

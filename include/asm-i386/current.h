@@ -1,7 +1,7 @@
 #ifndef _I386_CURRENT_H
 #define _I386_CURRENT_H
 
-#include <asm/thread_info.h>
+#include <linux/thread_info.h>
 
 struct task_struct;
 

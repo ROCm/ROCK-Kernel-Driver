@@ -466,6 +466,18 @@ startup:basr  %r13,0                     # get base
         mvc   __LC_IPLDEV(4),IPL_DEVICE-PARMAREA(%r12)
 	
 #
+# clear bss memory
+#
+        l     %r2,.Lbss_bgn-.LPG1(%r13) # start of bss
+        l     %r3,.Lbss_end-.LPG1(%r13) # end of bss
+        sr    %r3,%r2                   # length of bss
+        sr    %r4,%r4                   #
+        sr    %r5,%r5                   # set src,length and pad to zero
+        sr    %r0,%r0                   #
+        mvcle %r2,%r4,0                 # clear mem
+        jo    .-4                       # branch back, if not finish
+
+#
 # find memory chunks.
 #
 	mvc   __LC_PGM_NEW_PSW(8),.Lpcmem-.LPG1(%r13)
@@ -579,6 +591,8 @@ startup:basr  %r13,0                     # get base
 .Lmemsize:.long memory_size
 .Lmchunk:.long memory_chunk
 .Lmflags:.long machine_flags
+.Lbss_bgn:  .long  __bss_start
+.Lbss_end:  .long  _end
 
 	.org PARMAREA-64
 .Lduct:	.long 0,0,0,0,0,0,0,0
@@ -620,17 +634,6 @@ _stext:	basr  %r13,0                    # get base
         ahi   %r15,-96
         xc    0(4,%r15),0(%r15)         # set backchain to zero
 
-#
-# clear bss memory
-#
-        l     %r2,.Lbss_bgn-.LPG2(%r13) # start of bss
-        l     %r3,.Lbss_end-.LPG2(%r13) # end of bss
-        sr    %r3,%r2                   # length of bss
-        sr    %r4,%r4                   #
-        sr    %r5,%r5                   # set src,length and pad to zero
-        sr    %r0,%r0                   #
-        mvcle %r2,%r4,0                 # clear mem
-        jo    .-4                       # branch back, if not finish
 # check control registers
         stctl  %c0,%c15,0(%r15)
 	oi     2(%r15),0x20             # enable sigp external interrupts
@@ -651,7 +654,5 @@ _stext:	basr  %r13,0                    # get base
 .Ldw:	    .long  0x000a0000,0x00000000
 .Linittu:   .long  init_thread_union
 .Lstart:    .long  start_kernel
-.Lbss_bgn:  .long  __bss_start
-.Lbss_end:  .long  _end
 .Laregs:    .long  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 

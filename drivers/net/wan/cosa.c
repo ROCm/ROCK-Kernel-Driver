@@ -447,7 +447,7 @@ static __inline__ void channel_init(struct channel_data *chan)
 static int cosa_probe(int base, int irq, int dma)
 {
 	struct cosa_data *cosa = cosa_cards+nr_cards;
-	int i;
+	int i, err = 0;
 
 	memset(cosa, 0, sizeof(struct cosa_data));
 
@@ -482,12 +482,13 @@ static int cosa_probe(int base, int irq, int dma)
 	cosa->statusreg = is_8bit(cosa)?base+1:base+2;
 	spin_lock_init(&cosa->lock);
 
-	if (check_region(base, is_8bit(cosa)?2:4))
+	if (!request_region(base, is_8bit(cosa)?2:4,"cosa"))
 		return -1;
 	
 	if (cosa_reset_and_read_id(cosa, cosa->id_string) < 0) {
 		printk(KERN_DEBUG "cosa: probe at 0x%x failed.\n", base);
-		return -1;
+		err = -1;
+		goto err_out;
 	}
 
 	/* Test the validity of identification string */
@@ -501,6 +502,13 @@ static int cosa_probe(int base, int irq, int dma)
 		printk(KERN_INFO "cosa: valid signature not found at 0x%x.\n",
 			base);
 #endif
+		err = -1;
+		goto err_out;
+	}
+	/* Update the name of the region now we know the type of card */ 
+	release_region(base, is_8bit(cosa)?2:4);
+	if (!request_region(base, is_8bit(cosa)?2:4, cosa->type)) {
+		printk(KERN_DEBUG "cosa: changing name at 0x%x failed.\n", base);
 		return -1;
 	}
 
@@ -529,7 +537,8 @@ static int cosa_probe(int base, int irq, int dma)
 		if (irq < 0) {
 			printk (KERN_INFO "cosa IRQ autoprobe: multiple interrupts obtained (%d, board at 0x%x)\n",
 				irq, cosa->datareg);
-			return -1;
+			err = -1;
+			goto err_out;
 		}
 		if (irq == 0) {
 			printk (KERN_INFO "cosa IRQ autoprobe: no interrupt obtained (board at 0x%x)\n",
@@ -543,23 +552,29 @@ static int cosa_probe(int base, int irq, int dma)
 	cosa->usage = 0;
 	cosa->nchannels = 2;	/* FIXME: how to determine this? */
 
-	request_region(base, is_8bit(cosa)?2:4, cosa->type);
-	if (request_irq(cosa->irq, cosa_interrupt, 0, cosa->type, cosa))
-		goto bad1;
+	if (request_irq(cosa->irq, cosa_interrupt, 0, cosa->type, cosa)) {
+		err = -1;
+		goto err_out;
+	}
 	if (request_dma(cosa->dma, cosa->type)) {
-		free_irq(cosa->irq, cosa);
-bad1:		release_region(cosa->datareg,is_8bit(cosa)?2:4);
-		printk(KERN_NOTICE "cosa%d: allocating resources failed\n",
-			cosa->num);
-		return -1;
+		err = -1;
+		goto err_out1;
 	}
 	
 	cosa->bouncebuf = kmalloc(COSA_MTU, GFP_KERNEL|GFP_DMA);
+	if (!cosa->bouncebuf) {
+		err = -ENOMEM;
+		goto err_out2;
+	}
 	sprintf(cosa->name, "cosa%d", cosa->num);
 
 	/* Initialize the per-channel data */
 	cosa->chan = kmalloc(sizeof(struct channel_data)*cosa->nchannels,
-		GFP_KERNEL);
+			     GFP_KERNEL);
+	if (!cosa->chan) {
+	        err = -ENOMEM;
+		goto err_out3;
+	}
 	memset(cosa->chan, 0, sizeof(struct channel_data)*cosa->nchannels);
 	for (i=0; i<cosa->nchannels; i++) {
 		cosa->chan[i].cosa = cosa;
@@ -572,6 +587,17 @@ bad1:		release_region(cosa->datareg,is_8bit(cosa)?2:4);
 		cosa->datareg, cosa->irq, cosa->dma, cosa->nchannels);
 
 	return nr_cards++;
+err_out3:
+	kfree(cosa->bouncebuf);
+err_out2:
+	free_dma(cosa->dma);
+err_out1:
+	free_irq(cosa->irq, cosa);
+err_out:	
+	release_region(cosa->datareg,is_8bit(cosa)?2:4);
+	printk(KERN_NOTICE "cosa%d: allocating resources failed\n",
+	       cosa->num);
+	return err;
 }
 
 

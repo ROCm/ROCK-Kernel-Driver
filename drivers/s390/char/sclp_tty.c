@@ -32,7 +32,7 @@
 #define SCLP_TTY_BUF_SIZE 512
 
 /*
- * There is excatly one SCLP terminal, so we can keep things simple
+ * There is exactly one SCLP terminal, so we can keep things simple
  * and allocate all variables statically.
  */
 
@@ -265,13 +265,14 @@ sclp_ttybuf_callback(struct sclp_buffer *buffer, int rc)
 	struct sclp_buffer *next;
 	void *page;
 
-	/* FIXME: what if rc != 0x0020 */
+	/* Ignore return code - because tty-writes aren't critical,
+	   we do without a sophisticated error recovery mechanism.  */
 	page = sclp_unmake_buffer(buffer);
 	spin_lock_irqsave(&sclp_tty_lock, flags);
-	list_add_tail((struct list_head *) page, &sclp_tty_pages);
-	sclp_tty_buffer_count--;
 	/* Remove buffer from outqueue */
 	list_del(&buffer->list);
+	sclp_tty_buffer_count--;
+	list_add_tail((struct list_head *) page, &sclp_tty_pages);
 	/* Check if there is a pending buffer on the out queue. */
 	next = NULL;
 	if (!list_empty(&sclp_tty_outqueue))
@@ -489,8 +490,8 @@ void sclp_tty_input(unsigned char* buf, unsigned int count)
 		/* send (normal) input to line discipline */
 		memcpy(sclp_tty->flip.char_buf_ptr, buf, count);
 		if (count < 2 ||
-		    strncmp (buf + count - 2, "^n", 2) ||
-		    strncmp (buf + count - 2, "\0252n", 2)) {
+		    strncmp ((const char *) buf + count - 2, "^n", 2) ||
+		    strncmp ((const char *) buf + count - 2, "\0252n", 2)) {
 			sclp_tty->flip.char_buf_ptr[count] = '\n';
 			count++;
 		} else
@@ -558,7 +559,7 @@ sclp_switch_cases(unsigned char *buf, int count,
 }
 
 static void
-sclp_get_input(char *start, char *end)
+sclp_get_input(unsigned char *start, unsigned char *end)
 {
 	int count;
 
@@ -572,7 +573,7 @@ sclp_get_input(char *start, char *end)
 
 	/*
 	 * if set in ioctl find out characters in lower or upper case
-	 * (depends on current case) seperated by a special character,
+	 * (depends on current case) separated by a special character,
 	 * works on EBCDIC
 	 */
 	if (sclp_ioctls.delim)
@@ -625,8 +626,8 @@ sclp_eval_selfdeftextmsg(struct gds_subvector *start,
 		subvec = find_gds_subvector(subvec, end, 0x30);
 		if (!subvec)
 			break;
-		sclp_get_input((void *)(subvec + 1),
-			       (void *) subvec + subvec->length);
+		sclp_get_input((unsigned char *)(subvec + 1),
+			       (unsigned char *) subvec + subvec->length);
 		(void *) subvec += subvec->length;
 	}
 }

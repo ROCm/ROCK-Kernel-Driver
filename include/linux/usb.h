@@ -414,7 +414,7 @@ struct usb_device_id {
  * specific device.
  */
 #define USB_DEVICE(vend,prod) \
-	match_flags: USB_DEVICE_ID_MATCH_DEVICE, idVendor: (vend), idProduct: (prod)
+	.match_flags = USB_DEVICE_ID_MATCH_DEVICE, .idVendor = (vend), .idProduct = (prod)
 /**
  * USB_DEVICE_VER - macro used to describe a specific usb device with a version range
  * @vend: the 16 bit USB Vendor ID
@@ -426,7 +426,7 @@ struct usb_device_id {
  * specific device, with a version range.
  */
 #define USB_DEVICE_VER(vend,prod,lo,hi) \
-	match_flags: USB_DEVICE_ID_MATCH_DEVICE_AND_VERSION, idVendor: (vend), idProduct: (prod), bcdDevice_lo: (lo), bcdDevice_hi: (hi)
+	.match_flags = USB_DEVICE_ID_MATCH_DEVICE_AND_VERSION, .idVendor = (vend), .idProduct = (prod), .bcdDevice_lo = (lo), .bcdDevice_hi = (hi)
 
 /**
  * USB_DEVICE_INFO - macro used to describe a class of usb devices
@@ -438,7 +438,7 @@ struct usb_device_id {
  * specific class of devices.
  */
 #define USB_DEVICE_INFO(cl,sc,pr) \
-	match_flags: USB_DEVICE_ID_MATCH_DEV_INFO, bDeviceClass: (cl), bDeviceSubClass: (sc), bDeviceProtocol: (pr)
+	.match_flags = USB_DEVICE_ID_MATCH_DEV_INFO, .bDeviceClass = (cl), .bDeviceSubClass = (sc), .bDeviceProtocol = (pr)
 
 /**
  * USB_INTERFACE_INFO - macro used to describe a class of usb interfaces 
@@ -450,7 +450,7 @@ struct usb_device_id {
  * specific class of interfaces.
  */
 #define USB_INTERFACE_INFO(cl,sc,pr) \
-	match_flags: USB_DEVICE_ID_MATCH_INT_INFO, bInterfaceClass: (cl), bInterfaceSubClass: (sc), bInterfaceProtocol: (pr)
+	.match_flags = USB_DEVICE_ID_MATCH_INT_INFO, .bInterfaceClass = (cl), .bInterfaceSubClass = (sc), .bInterfaceProtocol = (pr)
 
 /* -------------------------------------------------------------------------- */
 
@@ -554,8 +554,9 @@ struct usb_iso_packet_descriptor {
 };
 
 struct urb;
+struct pt_regs;
 
-typedef void (*usb_complete_t)(struct urb *);
+typedef void (*usb_complete_t)(struct urb *, struct pt_regs *);
 
 /**
  * struct urb - USB Request Block

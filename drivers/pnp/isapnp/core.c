@@ -449,13 +449,13 @@ static struct pnp_dev * __init isapnp_parse_device(struct pnp_card *card, int si
 	dev = isapnp_alloc(sizeof(struct pnp_dev));
 	if (!dev)
 		return NULL;
-	pnp_init_device(dev);
 	dev->number = number;
 	isapnp_parse_id(dev, (tmp[1] << 8) | tmp[0], (tmp[3] << 8) | tmp[2]);
 	dev->regs = tmp[4];
 	dev->card = card;
 	if (size > 5)
 		dev->regs |= tmp[5] << 8;
+	dev->protocol = &isapnp_protocol;
 	return dev;
 }
 
@@ -640,7 +640,7 @@ static int __init isapnp_create_device(struct pnp_card *card,
 		return 1;
 	if (pnp_build_resource(dev, 0) == NULL)
 		return 1;
-	list_add_tail(&dev->card_list, &card->devices);
+	pnpc_add_device(card,dev);
 	while (1) {
 		if (isapnp_read_tag(&type, &size)<0)
 			return 1;
@@ -653,7 +653,7 @@ static int __init isapnp_create_device(struct pnp_card *card,
 				if ((dev = isapnp_parse_device(card, size, number++)) == NULL)
 					return 1;
 				pnp_build_resource(dev,0);
-				list_add_tail(&dev->card_list, &card->devices);
+				pnpc_add_device(card,dev);
 				size = 0;
 				skip = 0;
 			} else {
@@ -848,7 +848,7 @@ static void isapnp_parse_card_id(struct pnp_card * card, unsigned short vendor, 
 			device & 0x0f,
 			(device >> 12) & 0x0f,
 			(device >> 8) & 0x0f);
-	list_add_tail(&id->id_list,&card->ids);
+	pnpc_add_id(id,card);
 }
 
 /*
@@ -879,12 +879,11 @@ static int __init isapnp_build_device_list(void)
 			;
 		else if (checksum == 0x00 || checksum != header[8])	/* not valid CSN */
 			continue;
-		if ((card = isapnp_alloc(sizeof(struct pci_bus))) == NULL)
+		if ((card = isapnp_alloc(sizeof(struct pnp_card))) == NULL)
 			continue;
 
 		card->number = csn;
 		INIT_LIST_HEAD(&card->devices);
-		INIT_LIST_HEAD(&card->ids);
 		isapnp_parse_card_id(card, (header[1] << 8) | header[0], (header[3] << 8) | header[2]);
 		card->serial = (header[7] << 24) | (header[6] << 16) | (header[5] << 8) | header[4];
 		isapnp_checksum_value = 0x00;
@@ -892,8 +891,8 @@ static int __init isapnp_build_device_list(void)
 		if (isapnp_checksum_value != 0x00)
 			printk(KERN_ERR "isapnp: checksum for device %i is not valid (0x%x)\n", csn, isapnp_checksum_value);
 		card->checksum = isapnp_checksum_value;
-
-		list_add_tail(&card->node, &isapnp_cards);
+		card->protocol = &isapnp_protocol;
+		pnpc_add_card(card);
 	}
 	return 0;
 }
@@ -1061,25 +1060,6 @@ struct pnp_protocol isapnp_protocol = {
 	.disable = isapnp_disable_resources,
 };
 
-static inline int isapnp_init_device_tree(void)
-{
-
-	struct pnp_card *card;
-
-	isapnp_for_each_card(card) {
-		struct list_head *devlist;
-		for (devlist = card->devices.next; devlist != &card->devices; devlist = devlist->next) {
-			struct pnp_dev *dev = card_to_pnp_dev(devlist);
-			snprintf(dev->dev.name, sizeof(dev->dev.name), "%s", dev->name);
-			dev->card = card;
-			dev->protocol = &isapnp_protocol;
-			pnp_add_device(dev);
-		}
-	}
-
-	return 0;
-}
-
 int __init isapnp_init(void)
 {
 	int cards;
@@ -1104,7 +1084,7 @@ int __init isapnp_init(void)
 		return -EBUSY;
 	}
 
-	if(pnp_protocol_register(&isapnp_protocol)<0)
+	if(pnp_register_protocol(&isapnp_protocol)<0)
 		return -EBUSY;
 
 	/*
@@ -1143,7 +1123,7 @@ int __init isapnp_init(void)
 	isapnp_build_device_list();
 	cards = 0;
 
-	isapnp_for_each_card(card) {
+	protocol_for_each_card(&isapnp_protocol,card) {
 		cards++;
 		if (isapnp_verbose) {
 			struct list_head *devlist;
@@ -1162,7 +1142,6 @@ int __init isapnp_init(void)
 		printk(KERN_INFO "isapnp: No Plug & Play card found\n");
 	}
 
-	isapnp_init_device_tree();
 	isapnp_proc_init();
 	return 0;
 }

@@ -7,6 +7,16 @@
 #ifndef _LINUX_THREAD_INFO_H
 #define _LINUX_THREAD_INFO_H
 
+/*
+ * System call restart block. 
+ */
+struct restart_block {
+	long (*fn)(struct restart_block *);
+	unsigned long arg0, arg1, arg2;
+};
+
+extern long do_no_restart_syscall(struct restart_block *parm);
+
 #include <linux/bitops.h>
 #include <asm/thread_info.h>
 

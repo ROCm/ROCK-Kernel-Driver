@@ -41,6 +41,9 @@ VERSION 1.2	<2002/11/30>
 #include <linux/etherdevice.h>
 #include <linux/delay.h>
 #include <linux/crc32.h>
+#include <linux/init.h>
+
+#include <asm/io.h>
 
 #define RTL8169_VERSION "1.2"
 #define MODULENAME "r8169"

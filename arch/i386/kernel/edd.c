@@ -698,10 +698,9 @@ edd_match_scsidev(struct edd_device *edev, struct scsi_device *sd)
 static struct scsi_device *
 edd_find_matching_scsi_device(struct edd_device *edev)
 {
-	struct list_head *shost_node, *sdev_node;
+	struct list_head *sdev_node;
 	int rc = 1;
 	struct scsi_device *sd = NULL;
-	struct device *shost_dev, *sdev_dev;
 	struct pci_dev *pci_dev;
 
 	rc = edd_dev_is_type(edev, "SCSI");
@@ -714,28 +713,18 @@ edd_find_matching_scsi_device(struct edd_device *edev)
 
 	get_device(&pci_dev->dev);
 
-	list_for_each(shost_node, &pci_dev->dev.children) {
-		shost_dev = children_to_dev(shost_node);
-		get_device(shost_dev);
-
-		list_for_each(sdev_node, &shost_dev->children) {
-			sdev_dev = children_to_dev(sdev_node);
-			get_device(sdev_dev);
-			sd = to_scsi_device(sdev_dev);
-			rc = edd_match_scsidev(edev, sd);
-			put_device(sdev_dev);
-			if (!rc)
-				break;
-		}
-		put_device(shost_dev);
+	list_for_each(sdev_node, &pci_dev->dev.children) {
+		struct device *sdev_dev = children_to_dev(sdev_node);
+		get_device(sdev_dev);
+		sd = to_scsi_device(sdev_dev);
+		rc = edd_match_scsidev(edev, sd);
+		put_device(sdev_dev);
 		if (!rc)
 			break;
 	}
 
 	put_device(&pci_dev->dev);
-	if (!rc)
-		return sd;
-	return NULL;
+	return rc ? NULL : sd;
 }
 
 static int

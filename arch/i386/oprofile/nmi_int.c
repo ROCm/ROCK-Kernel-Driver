@@ -13,7 +13,7 @@
 #include <linux/smp.h>
 #include <linux/oprofile.h>
 #include <linux/pm.h>
-#include <asm/thread_info.h>
+#include <linux/thread_info.h>
 #include <asm/nmi.h>
 #include <asm/ptrace.h>
 #include <asm/msr.h>

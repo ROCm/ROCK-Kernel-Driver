@@ -654,8 +654,10 @@ void debug_set_level(debug_info_t* id, int new_level)
                         id->name, new_level, 0, DEBUG_MAX_LEVEL);
         } else {
                 id->level = new_level;
+#ifdef DEBUG
                 printk(KERN_INFO 
 			"debug: %s: new level %i\n",id->name,id->level);
+#endif
         }
 	spin_unlock_irqrestore(&id->lock,flags);
 }

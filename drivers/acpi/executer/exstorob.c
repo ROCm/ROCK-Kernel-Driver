@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exstorob - AML Interpreter object store support, store to object
- *              $Revision: 46 $
+ *              $Revision: 47 $
  *
  *****************************************************************************/
 
@@ -65,15 +65,17 @@ acpi_ex_store_buffer_to_buffer (
 	length = source_desc->buffer.length;
 
 	/*
-	 * If target is a buffer of length zero, allocate a new
-	 * buffer of the proper length
+	 * If target is a buffer of length zero or is a static buffer,
+	 * allocate a new buffer of the proper length
 	 */
-	if (target_desc->buffer.length == 0) {
+	if ((target_desc->buffer.length == 0) ||
+		(target_desc->common.flags & AOPOBJ_STATIC_POINTER)) {
 		target_desc->buffer.pointer = ACPI_MEM_ALLOCATE (length);
 		if (!target_desc->buffer.pointer) {
 			return (AE_NO_MEMORY);
 		}
 
+		target_desc->common.flags &= ~AOPOBJ_STATIC_POINTER;
 		target_desc->buffer.length = length;
 	}
 
@@ -137,11 +139,13 @@ acpi_ex_store_string_to_string (
 	length = source_desc->string.length;
 
 	/*
-	 * Setting a string value replaces the old string
+	 * Replace existing string value if it will fit and the string
+	 * pointer is not a static pointer (part of an ACPI table)
 	 */
-	if (length < target_desc->string.length) {
+	if ((length < target_desc->string.length) &&
+	   (!(target_desc->common.flags & AOPOBJ_STATIC_POINTER))) {
 		/*
-		 * String will fit in existing buffer.
+		 * String will fit in existing non-static buffer.
 		 * Clear old string and copy in the new one
 		 */
 		ACPI_MEMSET (target_desc->string.pointer, 0, (ACPI_SIZE) target_desc->string.length + 1);
@@ -165,6 +169,7 @@ acpi_ex_store_string_to_string (
 			return (AE_NO_MEMORY);
 		}
 
+		target_desc->common.flags &= ~AOPOBJ_STATIC_POINTER;
 		ACPI_MEMCPY (target_desc->string.pointer, buffer, length);
 	}
 

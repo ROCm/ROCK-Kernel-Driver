@@ -1,3 +1,16 @@
+/* 
+ * File...........: linux/drivers/s390/block/dasd_eckd.h
+ * Author(s)......: Holger Smolinski <Holger.Smolinski@de.ibm.com>
+ *                  Horst Hummel <Horst.Hummel@de.ibm.com> 
+ * Bugreports.to..: <Linux390@de.ibm.com>
+ * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
+ *
+ * $Revision: 1.5 $
+ *
+ * History of changes 
+ * 
+ */
+
 #ifndef DASD_ECKD_H
 #define DASD_ECKD_H
 
@@ -102,6 +115,10 @@ typedef struct DE_eckd_data_t {
 	__u8 ga_extended;	/* Global Attributes Extended	*/
 	ch_t beg_ext;
 	ch_t end_ext;
+	unsigned long long ep_sys_time; /* Extended Parameter - System Time Stamp */
+	__u8 ep_format;        /* Extended Parameter format byte       */
+	__u8 ep_prio;          /* Extended Parameter priority I/O byte */
+	__u8 ep_reserved[6];   /* Extended Parameter Reserved          */
 } __attribute__ ((packed)) DE_eckd_data_t;
 
 typedef struct LO_eckd_data_t {
@@ -141,7 +158,8 @@ typedef struct dasd_eckd_characteristics_t {
 		unsigned char reserved2:4;
 		unsigned char reserved3:8;
 		unsigned char defect_wr:1;
-		unsigned char reserved4:2;
+		unsigned char XRC_supported:1; 
+		unsigned char reserved4:1;
 		unsigned char striping:1;
 		unsigned char reserved5:4;
 		unsigned char cfw:1;
@@ -322,6 +340,4 @@ typedef struct dasd_psf_prssd_data_t {
 	unsigned char varies[9];
 } __attribute__ ((packed)) dasd_psf_prssd_data_t;
 
-int dasd_eckd_init(void);
-void dasd_eckd_cleanup(void);
 #endif				/* DASD_ECKD_H */

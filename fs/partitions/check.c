@@ -315,8 +315,8 @@ static ssize_t part_stat_read(struct hd_struct * p,
 			      char *page, size_t count, loff_t off)
 {
 	return off ? 0 : sprintf(page, "%8u %8llu %8u %8llu\n",
-				p->reads, (u64)p->read_sectors,
-				p->writes, (u64)p->write_sectors);
+				p->reads, (unsigned long long)p->read_sectors,
+				p->writes, (unsigned long long)p->write_sectors);
 }
 static struct part_attribute part_attr_dev = {
 	.attr = {.name = "dev", .mode = S_IRUGO },

@@ -299,7 +299,7 @@ static void __init pagetable_init (void)
 #endif
 }
 
-void __init zap_low_mappings (void)
+void zap_low_mappings (void)
 {
 	int i;
 	/*

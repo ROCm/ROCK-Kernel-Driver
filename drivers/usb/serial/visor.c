@@ -173,8 +173,8 @@ static int  visor_calc_num_ports(struct usb_serial *serial);
 static void visor_shutdown	(struct usb_serial *serial);
 static int  visor_ioctl		(struct usb_serial_port *port, struct file * file, unsigned int cmd, unsigned long arg);
 static void visor_set_termios	(struct usb_serial_port *port, struct termios *old_termios);
-static void visor_write_bulk_callback	(struct urb *urb);
-static void visor_read_bulk_callback	(struct urb *urb);
+static void visor_write_bulk_callback	(struct urb *urb, struct pt_regs *regs);
+static void visor_read_bulk_callback	(struct urb *urb, struct pt_regs *regs);
 static int  clie_3_5_startup	(struct usb_serial *serial);
 
 
@@ -449,7 +449,7 @@ static int visor_chars_in_buffer (struct usb_serial_port *port)
 }
 
 
-static void visor_write_bulk_callback (struct urb *urb)
+static void visor_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 
@@ -470,7 +470,7 @@ static void visor_write_bulk_callback (struct urb *urb)
 }
 
 
-static void visor_read_bulk_callback (struct urb *urb)
+static void visor_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);

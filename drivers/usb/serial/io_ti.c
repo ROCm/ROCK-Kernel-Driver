@@ -1614,7 +1614,7 @@ static void handle_new_lsr (struct edgeport_port *edge_port, int lsr_data, __u8 
 }
 
 
-static void edge_interrupt_callback (struct urb *urb)
+static void edge_interrupt_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct edgeport_serial	*edge_serial = (struct edgeport_serial *)urb->context;
 	struct usb_serial_port *port;
@@ -1713,7 +1713,7 @@ exit:
 		     __FUNCTION__, status);
 }
 
-static void edge_bulk_in_callback (struct urb *urb)
+static void edge_bulk_in_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct edgeport_port *edge_port = (struct edgeport_port *)urb->context;
 	unsigned char *data = urb->transfer_buffer;
@@ -1781,7 +1781,7 @@ exit:
 		     __FUNCTION__, status);
 }
 
-static void edge_bulk_out_callback (struct urb *urb)
+static void edge_bulk_out_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);

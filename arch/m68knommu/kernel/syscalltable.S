@@ -145,10 +145,10 @@ ENTRY(sys_call_table)
 	.long sys_adjtimex
 	.long sys_ni_syscall	/* 125 */ /* sys_mprotect */
 	.long sys_sigprocmask
-	.long sys_create_module
+	.long sys_ni_syscall	/* old "creat_module" */
 	.long sys_init_module
 	.long sys_delete_module
-	.long sys_get_kernel_syms /* 130 */
+	.long sys_ni_syscall	/* 130: old "get_kernel_syms" */
 	.long sys_quotactl
 	.long sys_getpgid
 	.long sys_fchdir
@@ -185,9 +185,9 @@ ENTRY(sys_call_table)
 	.long sys_setresuid16
 	.long sys_getresuid16	/* 165 */
 	.long sys_ni_syscall	/* for vm86 */
-	.long sys_query_module
+	.long sys_ni_syscall	/* old "query_module" */
 	.long sys_poll
-	.long sys_ni_syscall	/*sys_nfsservctl*/
+	.long sys_ni_syscall	/* sys_nfsservctl */
 	.long sys_setresgid16	/* 170 */
 	.long sys_getresgid16
 	.long sys_prctl
@@ -236,7 +236,7 @@ ENTRY(sys_call_table)
 	.long sys_setfsuid	/* 215 */
 	.long sys_setfsgid
 	.long sys_pivot_root
-	.long sys_mincore
+	.long sys_ni_syscall	/* sys_mincore */
 	.long sys_ni_syscall	/* sys_madvise */
 	.long sys_getdents64	/* 220 */
 	.long sys_fcntl64

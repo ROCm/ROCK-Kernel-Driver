@@ -506,6 +506,8 @@ handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 	if (regs->orig_eax >= 0) {
 		/* If so, check system call restarting.. */
 		switch (regs->eax) {
+		        case -ERESTART_RESTARTBLOCK:
+				current_thread_info()->restart_block.fn = do_no_restart_syscall;
 			case -ERESTARTNOHAND:
 				regs->eax = -EINTR;
 				break;
@@ -589,6 +591,10 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 		    regs->eax == -ERESTARTSYS ||
 		    regs->eax == -ERESTARTNOINTR) {
 			regs->eax = regs->orig_eax;
+			regs->eip -= 2;
+		}
+		if (regs->eax == -ERESTART_RESTARTBLOCK){
+			regs->eax = __NR_restart_syscall;
 			regs->eip -= 2;
 		}
 	}

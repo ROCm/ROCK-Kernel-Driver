@@ -25,17 +25,17 @@
 #include <linux/netfilter_bridge/ebt_vlan.h>
 
 static unsigned char debug;
-#define MODULE_VERSION "0.4 (" __DATE__ " " __TIME__ ")"
+#define MODULE_VERSION "0.6"
 
-MODULE_PARM (debug, "0-1b");
-MODULE_PARM_DESC (debug, "debug=1 is turn on debug messages");
-MODULE_AUTHOR ("Nick Fedchik <nick@fedchik.org.ua>");
-MODULE_DESCRIPTION ("802.1Q match module (ebtables extension), v"
-		    MODULE_VERSION);
-MODULE_LICENSE ("GPL");
+MODULE_PARM(debug, "0-1b");
+MODULE_PARM_DESC(debug, "debug=1 is turn on debug messages");
+MODULE_AUTHOR("Nick Fedchik <nick@fedchik.org.ua>");
+MODULE_DESCRIPTION("802.1Q match module (ebtables extension), v"
+		   MODULE_VERSION);
+MODULE_LICENSE("GPL");
 
 
-#define DEBUG_MSG(...) if (debug) printk (KERN_DEBUG __FILE__ ":" __VA_ARGS__)
+#define DEBUG_MSG(...) if (debug) printk (KERN_DEBUG "ebt_vlan: " __VA_ARGS__)
 #define INV_FLAG(_inv_flag_) (info->invflags & _inv_flag_) ? "!" : ""
 #define GET_BITMASK(_BIT_MASK_) info->bitmask & _BIT_MASK_
 #define SET_BITMASK(_BIT_MASK_) info->bitmask |= _BIT_MASK_
@@ -59,11 +59,10 @@ MODULE_LICENSE ("GPL");
  * 1 - miss (rule params not acceptable to the parsed frame)
  */
 static int
-ebt_filter_vlan (const struct sk_buff *skb,
-		 const struct net_device *in,
-		 const struct net_device *out,
-		 const void *data,
-		 unsigned int datalen)
+ebt_filter_vlan(const struct sk_buff *skb,
+		const struct net_device *in,
+		const struct net_device *out,
+		const void *data, unsigned int datalen)
 {
 	struct ebt_vlan_info *info = (struct ebt_vlan_info *) data;	/* userspace data */
 	struct vlan_ethhdr *frame = (struct vlan_ethhdr *) skb->mac.raw;	/* Passed tagged frame */
@@ -75,62 +74,35 @@ ebt_filter_vlan (const struct sk_buff *skb,
 
 	/*
 	 * Tag Control Information (TCI) consists of the following elements:
-	 * - User_priority. This field allows the tagged frame to carry user_priority
-	 * information across Bridged LANs in which individual LAN segments may be unable to signal
-	 * priority information (e.g., 802.3/Ethernet segments). 
-	 * The user_priority field is three bits in length, 
-	 * interpreted as a binary number. The user_priority is therefore
-	 * capable of representing eight priority levels, 0 through 7. 
-	 * The use and interpretation of this field is defined in ISO/IEC 15802-3.
-	 * - Canonical Format Indicator (CFI). This field is used,
-	 * in 802.3/Ethernet, to signal the presence or absence
-	 * of a RIF field, and, in combination with the Non-canonical Format Indicator (NCFI) carried
-	 * in the RIF, to signal the bit order of address information carried in the encapsulated
-	 * frame. The Canonical Format Indicator (CFI) is a single bit flag value.
-	 * - VLAN Identifier (VID). This field uniquely identifies the VLAN to
-	 * which the frame belongs. The twelve-bit VLAN Identifier (VID) field 
-	 * uniquely identify the VLAN to which the frame belongs. 
-	 * The VID is encoded as an unsigned binary number. 
+	 * - User_priority. The user_priority field is three bits in length, 
+	 * interpreted as a binary number. 
+	 * - Canonical Format Indicator (CFI). The Canonical Format Indicator 
+	 * (CFI) is a single bit flag value. Currently ignored.
+	 * - VLAN Identifier (VID). The VID is encoded as 
+	 * an unsigned binary number. 
 	 */
-	TCI = ntohs (frame->h_vlan_TCI);
-	id = TCI & 0xFFF;
-	prio = TCI >> 13;
+	TCI = ntohs(frame->h_vlan_TCI);
+	id = TCI & VLAN_VID_MASK;
+	prio = (TCI >> 13) & 0x7;
 	encap = frame->h_vlan_encapsulated_proto;
 
 	/*
-	 * First step is to check is null VLAN ID present
-	 * in the parsed frame
+	 * Checking VLAN Identifier (VID)
 	 */
-	if (!(id)) {
-		/*
-		 * Checking VLAN Identifier (VID)
-		 */
-		if (GET_BITMASK (EBT_VLAN_ID)) {	/* Is VLAN ID parsed? */
-			EXIT_ON_MISMATCH (id, EBT_VLAN_ID);
-			DEBUG_MSG
-			    ("matched rule id=%s%d for frame id=%d\n",
-			     INV_FLAG (EBT_VLAN_ID), info->id, id);
-		}
-	} else {
-		/*
-		 * Checking user_priority
-		 */
-		if (GET_BITMASK (EBT_VLAN_PRIO)) {	/* Is VLAN user_priority parsed? */
-			EXIT_ON_MISMATCH (prio, EBT_VLAN_PRIO);
-			DEBUG_MSG
-			    ("matched rule prio=%s%d for frame prio=%d\n",
-			     INV_FLAG (EBT_VLAN_PRIO), info->prio,
-			     prio);
-		}
+	if (GET_BITMASK(EBT_VLAN_ID)) {	/* Is VLAN ID parsed? */
+		EXIT_ON_MISMATCH(id, EBT_VLAN_ID);
+	}
+	/*
+	 * Checking user_priority
+	 */
+	if (GET_BITMASK(EBT_VLAN_PRIO)) {	/* Is VLAN user_priority parsed? */
+		EXIT_ON_MISMATCH(prio, EBT_VLAN_PRIO);
 	}
 	/*
 	 * Checking Encapsulated Proto (Length/Type) field
 	 */
-	if (GET_BITMASK (EBT_VLAN_ENCAP)) {	/* Is VLAN Encap parsed? */
-		EXIT_ON_MISMATCH (encap, EBT_VLAN_ENCAP);
-		DEBUG_MSG ("matched encap=%s%2.4X for frame encap=%2.4X\n",
-			   INV_FLAG (EBT_VLAN_ENCAP),
-			   ntohs (info->encap), ntohs (encap));
+	if (GET_BITMASK(EBT_VLAN_ENCAP)) {	/* Is VLAN Encap parsed? */
+		EXIT_ON_MISMATCH(encap, EBT_VLAN_ENCAP);
 	}
 	/*
 	 * All possible extension parameters was parsed.
@@ -141,7 +113,7 @@ ebt_filter_vlan (const struct sk_buff *skb,
 
 /*
  * Function description: ebt_vlan_check() is called when userspace 
- * delivers the table to the kernel, 
+ * delivers the table entry to the kernel, 
  * and to check that userspace doesn't give a bad table.
  * Parameters:
  * const char *tablename - table name string
@@ -154,29 +126,29 @@ ebt_filter_vlan (const struct sk_buff *skb,
  * 1 - miss (rule params is out of range, invalid, incompatible, etc.)
  */
 static int
-ebt_check_vlan (const char *tablename,
-		unsigned int hooknr,
-		const struct ebt_entry *e, void *data,
-		unsigned int datalen)
+ebt_check_vlan(const char *tablename,
+	       unsigned int hooknr,
+	       const struct ebt_entry *e, void *data, unsigned int datalen)
 {
 	struct ebt_vlan_info *info = (struct ebt_vlan_info *) data;
 
 	/*
 	 * Parameters buffer overflow check 
 	 */
-	if (datalen != sizeof (struct ebt_vlan_info)) {
+	if (datalen != sizeof(struct ebt_vlan_info)) {
 		DEBUG_MSG
-		    ("params size %d is not eq to ebt_vlan_info (%d)\n",
-		     datalen, sizeof (struct ebt_vlan_info));
+		    ("passed size %d is not eq to ebt_vlan_info (%d)\n",
+		     datalen, sizeof(struct ebt_vlan_info));
 		return -EINVAL;
 	}
 
 	/*
 	 * Is it 802.1Q frame checked?
 	 */
-	if (e->ethproto != __constant_htons (ETH_P_8021Q)) {
-		DEBUG_MSG ("passed entry proto %2.4X is not 802.1Q (8100)\n",
-			   (unsigned short) ntohs (e->ethproto));
+	if (e->ethproto != __constant_htons(ETH_P_8021Q)) {
+		DEBUG_MSG
+		    ("passed entry proto %2.4X is not 802.1Q (8100)\n",
+		     (unsigned short) ntohs(e->ethproto));
 		return -EINVAL;
 	}
 
@@ -185,8 +157,8 @@ ebt_check_vlan (const char *tablename,
 	 * True if even one bit is out of mask
 	 */
 	if (info->bitmask & ~EBT_VLAN_MASK) {
-		DEBUG_MSG ("bitmask %2X is out of mask (%2X)\n",
-			   info->bitmask, EBT_VLAN_MASK);
+		DEBUG_MSG("bitmask %2X is out of mask (%2X)\n",
+			  info->bitmask, EBT_VLAN_MASK);
 		return -EINVAL;
 	}
 
@@ -194,91 +166,62 @@ ebt_check_vlan (const char *tablename,
 	 * Check for inversion flags range 
 	 */
 	if (info->invflags & ~EBT_VLAN_MASK) {
-		DEBUG_MSG ("inversion flags %2X is out of mask (%2X)\n",
-			   info->invflags, EBT_VLAN_MASK);
+		DEBUG_MSG("inversion flags %2X is out of mask (%2X)\n",
+			  info->invflags, EBT_VLAN_MASK);
 		return -EINVAL;
 	}
 
 	/*
 	 * Reserved VLAN ID (VID) values
 	 * -----------------------------
-	 * 0 - The null VLAN ID. Indicates that the tag header contains only user_priority information;
-	 * no VLAN identifier is present in the frame. This VID value shall not be
-	 * configured as a PVID, configured in any Filtering Database entry, or used in any
-	 * Management operation.
-	 * 
-	 * 1 - The default Port VID (PVID) value used for classifying frames on ingress through a Bridge
-	 * Port. The PVID value can be changed by management on a per-Port basis.
-	 * 
-	 * 0x0FFF - Reserved for implementation use. This VID value shall not be configured as a
-	 * PVID or transmitted in a tag header.
-	 * 
-	 * The remaining values of VID are available for general use as VLAN identifiers.
-	 * A Bridge may implement the ability to support less than the full range of VID values; 
-	 * i.e., for a given implementation,
-	 * an upper limit, N, is defined for the VID values supported, where N is less than or equal to 4094.
-	 * All implementations shall support the use of all VID values in the range 0 through their defined maximum
-	 * VID, N.
-	 * 
-	 * For Linux, N = 4094.
+	 * 0 - The null VLAN ID. 
+	 * 1 - The default Port VID (PVID)
+	 * 0x0FFF - Reserved for implementation use. 
+	 * if_vlan.h: VLAN_GROUP_ARRAY_LEN 4096.
 	 */
-	if (GET_BITMASK (EBT_VLAN_ID)) {	/* when vlan-id param was spec-ed */
+	if (GET_BITMASK(EBT_VLAN_ID)) {	/* when vlan-id param was spec-ed */
 		if (!!info->id) {	/* if id!=0 => check vid range */
-			if (info->id > 4094) {	/* check if id > than (0x0FFE) */
+			if (info->id > VLAN_GROUP_ARRAY_LEN) {
 				DEBUG_MSG
-				    ("vlan id %d is out of range (1-4094)\n",
+				    ("id %d is out of range (1-4096)\n",
 				     info->id);
 				return -EINVAL;
 			}
 			/*
 			 * Note: This is valid VLAN-tagged frame point.
-			 * Any value of user_priority are acceptable, but could be ignored
-			 * according to 802.1Q Std.
+			 * Any value of user_priority are acceptable, 
+			 * but should be ignored according to 802.1Q Std.
+			 * So we just drop the prio flag. 
 			 */
-		} else {
-			/*
-			 * if id=0 (null VLAN ID)  => Check for user_priority range 
-			 */
-			if (GET_BITMASK (EBT_VLAN_PRIO)) {
-				if ((unsigned char) info->prio > 7) {
-					DEBUG_MSG
-					    ("prio %d is out of range (0-7)\n",
-					     info->prio);
-					return -EINVAL;
-				}
-			}
-			/*
-			 * Note2: This is valid priority-tagged frame point
-			 * with null VID field.
-			 */
+			info->bitmask &= ~EBT_VLAN_PRIO;
 		}
-	} else {		/* VLAN Id not set */
-		if (GET_BITMASK (EBT_VLAN_PRIO)) {	/* But user_priority is set - abnormal! */
-			info->id = 0;	/* Set null VID (case for Priority-tagged frames) */
-			SET_BITMASK (EBT_VLAN_ID);	/* and set id flag */
+		/*
+		 * Else, id=0 (null VLAN ID)  => user_priority range (any?)
+		 */
+	}
+
+	if (GET_BITMASK(EBT_VLAN_PRIO)) {
+		if ((unsigned char) info->prio > 7) {
+			DEBUG_MSG
+			    ("prio %d is out of range (0-7)\n",
+			     info->prio);
+			return -EINVAL;
 		}
 	}
 	/*
-	 * Check for encapsulated proto range - it is possible to be any value for u_short range.
-	 * When relaying a tagged frame between 802.3/Ethernet MACs, 
-	 * a Bridge may adjust the padding field such that
-	 * the minimum size of a transmitted tagged frame is 68 octets (7.2).
+	 * Check for encapsulated proto range - it is possible to be 
+	 * any value for u_short range.
 	 * if_ether.h:  ETH_ZLEN        60   -  Min. octets in frame sans FCS
 	 */
-	if (GET_BITMASK (EBT_VLAN_ENCAP)) {
-		if ((unsigned short) ntohs (info->encap) < ETH_ZLEN) {
+	if (GET_BITMASK(EBT_VLAN_ENCAP)) {
+		if ((unsigned short) ntohs(info->encap) < ETH_ZLEN) {
 			DEBUG_MSG
-			    ("encap packet length %d is less than minimal %d\n",
-			     ntohs (info->encap), ETH_ZLEN);
+			    ("encap frame length %d is less than minimal\n",
+			     ntohs(info->encap));
 			return -EINVAL;
 		}
 	}
 
-	/*
-	 * Otherwise is all correct 
-	 */
-	DEBUG_MSG ("802.1Q tagged frame checked (%s table, %d hook)\n",
-		   tablename, hooknr);
 	return 0;
 }
 
@@ -293,24 +236,22 @@ static struct ebt_match filter_vlan = {
 
 /*
  * Module initialization function.
- * Called when module is loaded to kernelspace
  */
-static int __init init (void)
+static int __init init(void)
 {
-	DEBUG_MSG ("ebtables 802.1Q extension module v"
-		   MODULE_VERSION "\n");
-	DEBUG_MSG ("module debug=%d\n", !!debug);
-	return ebt_register_match (&filter_vlan);
+	DEBUG_MSG("ebtables 802.1Q extension module v"
+		  MODULE_VERSION "\n");
+	DEBUG_MSG("module debug=%d\n", !!debug);
+	return ebt_register_match(&filter_vlan);
 }
 
 /*
  * Module "finalization" function
- * Called when download module from kernelspace
  */
-static void __exit fini (void)
+static void __exit fini(void)
 {
-	ebt_unregister_match (&filter_vlan);
+	ebt_unregister_match(&filter_vlan);
 }
 
-module_init (init);
-module_exit (fini);
+module_init(init);
+module_exit(fini);

@@ -45,10 +45,6 @@
 #define LnTpFlgs_EndText	0x1000
 #define LnTpFlgs_PromptText	0x0800
 
-#define SCLP_COMMAND_INITIATED	0
-#define SCLP_BUSY		2
-#define SCLP_NOT_OPERATIONAL	3
-
 typedef unsigned int sclp_cmdw_t;
 
 #define SCLP_CMDW_READDATA	0x00770005
@@ -129,6 +125,7 @@ void sclp_add_request(struct sclp_req *req);
 void sclp_sync_wait(void);
 int sclp_register(struct sclp_register *reg);
 void sclp_unregister(struct sclp_register *reg);
+char *sclp_error_message(u16 response_code);
 
 /* useful inlines */
 

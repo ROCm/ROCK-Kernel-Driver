@@ -5,6 +5,8 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 2000, 2001
  *
+ * $Revision: 1.19 $
+ *
  * History of changes:
  * 05/14/01 fixed PL030160GTO (BUG() in erp_action_5)
  * 05/04/02 code restructuring.
@@ -13,7 +15,6 @@
 #include <linux/timer.h>
 #include <linux/slab.h>
 #include <asm/idals.h>
-#include <asm/s390io.h>
 #include <asm/todclk.h>
 
 #define PRINTK_HEADER "dasd_erp(3990): "
@@ -148,16 +149,16 @@ dasd_3990_erp_examine_32(dasd_ccw_req_t * cqr, char *sense)
  *   dasd_era_recover	for all others.
  */
 dasd_era_t
-dasd_3990_erp_examine(dasd_ccw_req_t * cqr, devstat_t * stat)
+dasd_3990_erp_examine(dasd_ccw_req_t * cqr, struct irb * irb)
 {
 
-	char *sense = stat->ii.sense.data;
+	char *sense = irb->ecw;
 	dasd_era_t era = dasd_era_recover;
 	dasd_device_t *device = cqr->device;
 
 	/* check for successful execution first */
-	if (stat->cstat == 0x00 &&
-	    stat->dstat == (DEV_STAT_CHN_END | DEV_STAT_DEV_END))
+	if (irb->scsw.cstat == 0x00 &&
+	    irb->scsw.dstat == (DEV_STAT_CHN_END | DEV_STAT_DEV_END))
 		return dasd_era_none;
 
 	/* distinguish between 24 and 32 byte sense data */
@@ -172,8 +173,10 @@ dasd_3990_erp_examine(dasd_ccw_req_t * cqr, devstat_t * stat)
 	}
 
 	/* log the erp chain if fatal error occurred */
-	if ((era == dasd_era_fatal) && (device->state >= DASD_STATE_READY))
-		dasd_log_ccw(cqr, 0, stat->cpa);
+	if ((era == dasd_era_fatal) && (device->state >= DASD_STATE_READY)) {
+		dasd_log_sense(cqr, irb);
+		dasd_log_ccw(cqr, 0, irb->scsw.cpa);
+	}
 
 	return era;
 
@@ -296,42 +299,39 @@ dasd_3990_erp_int_req(dasd_ccw_req_t * erp)
  *
  * RETURN VALUES
  *   erp		modified pointer to the ERP
- *
  */
 static void
 dasd_3990_erp_alternate_path(dasd_ccw_req_t * erp)
 {
-
 	dasd_device_t *device = erp->device;
-	int irq = device->devinfo.irq;
+	__u8 opm;
 
 	/* try alternate valid path */
-	erp->lpm &= ~(erp->dstat->lpum);
-	erp->options |= DOIO_VALID_LPM;	/* use LPM for DO_IO */
+	opm = ccw_device_get_path_mask(device->cdev);
+	//FIXME: start with get_opm ?
+	if (erp->lpm == 0)
+		erp->lpm = LPM_ANYPATH & ~(erp->dstat->esw.esw0.sublog.lpum);
+	else
+		erp->lpm &= ~(erp->dstat->esw.esw0.sublog.lpum);
 
-	if ((erp->lpm & ioinfo[irq]->opm) != 0x00) {
+	if ((erp->lpm & opm) != 0x00) {
 
 		DEV_MESSAGE(KERN_DEBUG, device,
 			    "try alternate lpm=%x (lpum=%x / opm=%x)",
-			    erp->lpm, erp->dstat->lpum, ioinfo[irq]->opm);
+			    erp->lpm, erp->dstat->esw.esw0.sublog.lpum, opm);
 
 		/* reset status to queued to handle the request again... */
 		erp->status = DASD_CQR_QUEUED;
-
 		erp->retries = 1;
-
 	} else {
-
 		DEV_MESSAGE(KERN_ERR, device,
 			    "No alternate channel path left (lpum=%x / "
 			    "opm=%x) -> permanent error",
-			    erp->dstat->lpum, ioinfo[irq]->opm);
+			    erp->dstat->esw.esw0.sublog.lpum, opm);
 
 		/* post request with permanent error */
 		erp->status = DASD_CQR_FAILED;
-
 	}
-
 }				/* end dasd_3990_erp_alternate_path */
 
 /*
@@ -355,7 +355,7 @@ dasd_3990_erp_DCTL(dasd_ccw_req_t * erp, char modifier)
 
 	dasd_device_t *device = erp->device;
 	DCTL_data_t *DCTL_data;
-	ccw1_t *ccw;
+	struct ccw1 *ccw;
 	dasd_ccw_req_t *dctl_cqr;
 
 	dctl_cqr = dasd_alloc_erp_request((char *) &erp->magic, 1,
@@ -373,7 +373,7 @@ dasd_3990_erp_DCTL(dasd_ccw_req_t * erp, char modifier)
 	DCTL_data->modifier = modifier;
 
 	ccw = dctl_cqr->cpaddr;
-	memset(ccw, 0, sizeof (ccw1_t));
+	memset(ccw, 0, sizeof (struct ccw1));
 	ccw->cmd_code = CCW_CMD_DCTL;
 	ccw->count = 4;
 	ccw->cda = (__u32)(addr_t) DCTL_data;
@@ -381,7 +381,6 @@ dasd_3990_erp_DCTL(dasd_ccw_req_t * erp, char modifier)
 	dctl_cqr->refers = erp;
 	dctl_cqr->device = erp->device;
 	dctl_cqr->magic = erp->magic;
-	dctl_cqr->lpm = LPM_ANYPATH;
 	dctl_cqr->expires = 5 * 60 * HZ;
 	dctl_cqr->retries = 2;
 
@@ -1122,6 +1121,9 @@ dasd_3990_handle_env_data(dasd_ccw_req_t * erp, char *sense)
 		break;
 
 	default:	/* unknown message format - should not happen */
+	        DEV_MESSAGE (KERN_WARNING, device,
+                             "unknown message format %02x",
+                             msg_format);
 		break;
 	}			/* end switch message format */
 
@@ -1650,7 +1652,7 @@ dasd_3990_erp_action_1B_32(dasd_ccw_req_t * default_erp, char *sense)
 	dasd_ccw_req_t *erp;
 	DE_eckd_data_t *DE_data;
 	char *LO_data;		/* LO_eckd_data_t */
-	ccw1_t *ccw;
+	struct ccw1 *ccw;
 
 	DEV_MESSAGE(KERN_DEBUG, device, "%s",
 		    "Write not finished because of unexpected condition");
@@ -1675,7 +1677,7 @@ dasd_3990_erp_action_1B_32(dasd_ccw_req_t * default_erp, char *sense)
 
 	/* determine the address of the CCW to be restarted */
 	/* Imprecise ending is not set -> addr from IRB-SCSW */
-	cpa = default_erp->refers->dstat->cpa;
+	cpa = default_erp->refers->dstat->scsw.cpa;
 
 	if (cpa == 0) {
 
@@ -1735,7 +1737,7 @@ dasd_3990_erp_action_1B_32(dasd_ccw_req_t * default_erp, char *sense)
 
 	/* create DE ccw */
 	ccw = erp->cpaddr;
-	memset(ccw, 0, sizeof (ccw1_t));
+	memset(ccw, 0, sizeof (struct ccw1));
 	ccw->cmd_code = DASD_ECKD_CCW_DEFINE_EXTENT;
 	ccw->flags = CCW_FLAG_CC;
 	ccw->count = 16;
@@ -1743,7 +1745,7 @@ dasd_3990_erp_action_1B_32(dasd_ccw_req_t * default_erp, char *sense)
 
 	/* create LO ccw */
 	ccw++;
-	memset(ccw, 0, sizeof (ccw1_t));
+	memset(ccw, 0, sizeof (struct ccw1));
 	ccw->cmd_code = DASD_ECKD_CCW_LOCATE_RECORD;
 	ccw->flags = CCW_FLAG_CC;
 	ccw->count = 16;
@@ -1759,7 +1761,6 @@ dasd_3990_erp_action_1B_32(dasd_ccw_req_t * default_erp, char *sense)
 	erp->refers = default_erp->refers;
 	erp->device = device;
 	erp->magic = default_erp->magic;
-	erp->lpm = 0xFF;
 	erp->expires = 0;
 	erp->retries = 256;
 	erp->status = DASD_CQR_FILLED;
@@ -1795,7 +1796,7 @@ dasd_3990_update_1B(dasd_ccw_req_t * previous_erp, char *sense)
 	dasd_ccw_req_t *cqr;
 	dasd_ccw_req_t *erp;
 	char *LO_data;		/* LO_eckd_data_t */
-	ccw1_t *ccw;
+	struct ccw1 *ccw;
 
 	DEV_MESSAGE(KERN_DEBUG, device, "%s",
 		    "Write not finished because of unexpected condition"
@@ -1821,7 +1822,7 @@ dasd_3990_update_1B(dasd_ccw_req_t * previous_erp, char *sense)
 
 	/* determine the address of the CCW to be restarted */
 	/* Imprecise ending is not set -> addr from IRB-SCSW */
-	cpa = previous_erp->dstat->cpa;
+	cpa = previous_erp->dstat->scsw.cpa;
 
 	if (cpa == 0) {
 
@@ -1954,7 +1955,7 @@ dasd_3990_erp_compound_path(dasd_ccw_req_t * erp, char *sense)
 			/* reset the lpm and the status to be able to 
 			 * try further actions. */
 
-			erp->lpm = LPM_ANYPATH;
+			erp->lpm = 0;
 
 			erp->status = DASD_CQR_ERROR;
 
@@ -2234,7 +2235,7 @@ dasd_3990_erp_inspect(dasd_ccw_req_t * erp)
 	dasd_ccw_req_t *erp_new = NULL;
 	/* sense data are located in the refers record of the */
 	/* already set up new ERP !			      */
-	char *sense = erp->refers->dstat->ii.sense.data;
+	char *sense = erp->refers->dstat->ecw;
 
 	/* distinguish between 24 and 32 byte sense data */
 	if (sense[27] & DASD_SENSE_BIT_0) {
@@ -2291,7 +2292,6 @@ dasd_3990_erp_add_erp(dasd_ccw_req_t * cqr)
 	erp->refers = cqr;
 	erp->device = cqr->device;
 	erp->magic = cqr->magic;
-	erp->lpm = 0xFF;
 	erp->expires = 0;
 	erp->retries = 256;
 
@@ -2357,18 +2357,14 @@ dasd_3990_erp_error_match(dasd_ccw_req_t * cqr1, dasd_ccw_req_t * cqr2)
 {
 
 	/* check failed CCW */
-	if (cqr1->dstat->cpa != cqr2->dstat->cpa) {
+	if (cqr1->dstat->scsw.cpa != cqr2->dstat->scsw.cpa) {
 		//	return 0;	/* CCW doesn't match */
 	}
 
 	/* check sense data; byte 0-2,25,27 */
-	if (!((strncmp(cqr1->dstat->ii.sense.data,
-		       cqr2->dstat->ii.sense.data,
-		       3) == 0) &&
-	      (cqr1->dstat->ii.sense.data[27] ==
-	       cqr2->dstat->ii.sense.data[27]) &&
-	      (cqr1->dstat->ii.sense.data[25] ==
-	       cqr2->dstat->ii.sense.data[25]))) {
+	if (!((strncmp(cqr1->dstat->ecw, cqr2->dstat->ecw, 3) == 0) &&
+	      (cqr1->dstat->ecw[27] == cqr2->dstat->ecw[27]) &&
+	      (cqr1->dstat->ecw[25] == cqr2->dstat->ecw[25]))) {
 
 		return 0;	/* sense doesn't match */
 	}
@@ -2441,7 +2437,7 @@ dasd_3990_erp_further_erp(dasd_ccw_req_t * erp)
 {
 
 	dasd_device_t *device = erp->device;
-	char *sense = erp->dstat->ii.sense.data;
+	char *sense = erp->dstat->ecw;
 
 	/* check for 24 byte sense ERP */
 	if ((erp->function == dasd_3990_erp_bus_out) ||
@@ -2553,7 +2549,7 @@ dasd_3990_erp_handle_match_erp(dasd_ccw_req_t * erp_head, dasd_ccw_req_t * erp)
 
 	if (erp->retries > 0) {
 
-		char *sense = erp->dstat->ii.sense.data;
+		char *sense = erp->dstat->ecw;
 
 		/* check for special retries */
 		if (erp->function == dasd_3990_erp_action_4) {
@@ -2611,7 +2607,7 @@ dasd_3990_erp_action(dasd_ccw_req_t * cqr)
 
 	dasd_ccw_req_t *erp = NULL;
 	dasd_device_t *device = cqr->device;
-	__u32 cpa = cqr->dstat->cpa;
+	__u32 cpa = cqr->dstat->scsw.cpa;
 
 #ifdef ERP_DEBUG
 	/* print current erp_chain */
@@ -2631,8 +2627,8 @@ dasd_3990_erp_action(dasd_ccw_req_t * cqr)
 #endif				/* ERP_DEBUG */
 
 	/* double-check if current erp/cqr was successfull */
-	if ((cqr->dstat->cstat == 0x00) &&
-	    (cqr->dstat->dstat == (DEV_STAT_CHN_END | DEV_STAT_DEV_END))) {
+	if ((cqr->dstat->scsw.cstat == 0x00) &&
+	    (cqr->dstat->scsw.dstat == (DEV_STAT_CHN_END|DEV_STAT_DEV_END))) {
 
 		DEV_MESSAGE(KERN_DEBUG, device,
 			    "ERP called for successful request %p"
@@ -2643,7 +2639,7 @@ dasd_3990_erp_action(dasd_ccw_req_t * cqr)
 		return cqr;
 	}
 	/* check if sense data are available */
-	if (!cqr->dstat->ii.sense.data) {
+	if (!cqr->dstat->ecw) {
 		DEV_MESSAGE(KERN_DEBUG, device,
 			    "ERP called witout sense data avail ..."
 			    "request %p - NO ERP possible", cqr);

@@ -5,6 +5,11 @@
  * ...............: by Hartmunt Penner <hpenner@de.ibm.com>
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
+ *
+ * $Revision: 1.4 $
+ *
+ * History of changes
+ *
  */
 
 #define MDSK_WRITE_REQ 0x01
@@ -70,5 +75,3 @@ typedef struct diag_rw_io_t {
 
     diag_rw_io_t;
 
-int dasd_diag_init(void);
-void dasd_diag_cleanup(void);

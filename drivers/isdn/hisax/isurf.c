@@ -242,14 +242,12 @@ setup_isurf(struct IsdnCard *card)
 		return (0);
 #endif
 	}
-	if (check_region(cs->hw.isurf.reset, 1)) {
+	if (!request_region(cs->hw.isurf.reset, 1, "isurf isdn")) {
 		printk(KERN_WARNING
 			"HiSax: %s config port %x already in use\n",
 			CardType[card->typ],
 			cs->hw.isurf.reset);
 			return (0);
-	} else {
-		request_region(cs->hw.isurf.reset, 1, "isurf isdn");
 	}
 	if (check_mem_region(cs->hw.isurf.phymem, ISURF_IOMEM_SIZE)) {
 		printk(KERN_WARNING

@@ -5,7 +5,9 @@
  * ...............: by Hartmunt Penner <hpenner@de.ibm.com>
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
-
+ *
+ * $Revision: 1.27 $
+ *
  * History of changes
  * 07/13/00 Added fixup sections for diagnoses ans saved some registers
  * 07/14/00 fixed constraints in newly generated inline asm
@@ -22,13 +24,13 @@
 #include <linux/slab.h>
 #include <linux/hdreg.h>	/* HDIO_GETGEO			    */
 #include <linux/bio.h>
+#include <linux/module.h>
+#include <linux/init.h>
 
 #include <asm/dasd.h>
 #include <asm/debug.h>
 #include <asm/ebcdic.h>
 #include <asm/io.h>
-#include <asm/irq.h>
-#include <asm/s390dyn.h>
 #include <asm/s390_ext.h>
 #include <asm/todclk.h>
 
@@ -40,7 +42,7 @@
 #endif				/* PRINTK_HEADER */
 #define PRINTK_HEADER "dasd(diag):"
 
-static dasd_discipline_t dasd_diag_discipline;
+MODULE_LICENSE("GPL");
 
 typedef struct dasd_diag_private_t {
 	dasd_diag_characteristics_t rdc_data;
@@ -57,25 +59,30 @@ typedef struct dasd_diag_req_t {
 static __inline__ int
 dia250(void *iob, int cmd)
 {
-	__asm__ __volatile__("	  lr	0,%1\n"
-			     "	  diag	0,%0,0x250\n"
+	int rc;
+
+	__asm__ __volatile__("    lhi   %0,3\n"
+			     "	  lr	0,%2\n"
+			     "	  diag	0,%1,0x250\n"
 			     "0:  ipm	%0\n"
 			     "	  srl	%0,28\n"
 			     "	  or	%0,1\n"
 			     "1:\n"
-			     ".section .fixup,\"ax\"\n"
-			     "2:  lhi	%0,3\n"
-			     "	  bras	1,3f\n"
-			     "	  .long 1b\n"
-			     "3:  l	1,0(1)\n"
-			     "	  br	1\n"
-			     ".previous\n"
+#ifndef CONFIG_ARCH_S390X
 			     ".section __ex_table,\"a\"\n"
 			     "	  .align 4\n"
-			     "	  .long 0b,2b\n" ".previous\n":"+d"(cmd)
-			     :"d"((void *) __pa(iob))
-			     :"0", "1", "cc");
-	return cmd;
+			     "	  .long 0b,1b\n"
+			     ".previous\n"
+#else
+			     ".section __ex_table,\"a\"\n"
+			     "	  .align 8\n"
+			     "	  .quad  0b,1b\n"
+			     ".previous\n"
+#endif
+			     : "=&d" (rc)
+			     : "d" (cmd), "d" ((void *) __pa(iob))
+			     : "0", "1", "cc");
+	return rc;
 }
 
 static __inline__ int
@@ -89,7 +96,7 @@ mdsk_init_io(dasd_device_t * device, int blocksize, int offset, int size)
 	iib = &private->iib;
 	memset(iib, 0, sizeof (diag_init_io_t));
 
-	iib->dev_nr = device->devinfo.devno;
+	iib->dev_nr = device->devno;
 	iib->block_size = blocksize;
 	iib->offset = offset;
 	iib->start_block = 0;
@@ -110,7 +117,7 @@ mdsk_term_io(dasd_device_t * device)
 	private = (dasd_diag_private_t *) device->private;
 	iib = &private->iib;
 	memset(iib, 0, sizeof (diag_init_io_t));
-	iib->dev_nr = device->devinfo.devno;
+	iib->dev_nr = device->devno;
 	rc = dia250(iib, TERM_BIO);
 	return rc & 3;
 }
@@ -127,7 +134,7 @@ dasd_start_diag(dasd_ccw_req_t * cqr)
 	private = (dasd_diag_private_t *) device->private;
 	dreq = (dasd_diag_req_t *) cqr->data;
 
-	private->iob.dev_nr = device->devinfo.devno;
+	private->iob.dev_nr = device->devno;
 	private->iob.key = 0;
 	private->iob.flags = 2;	/* do asynchronous io */
 	private->iob.block_count = dreq->block_count;
@@ -191,7 +198,7 @@ dasd_ext_handler(struct pt_regs *regs, __u16 code)
 	}
 
 	/* get irq lock to modify request queue */
-	spin_lock_irqsave(get_irq_lock(device->devinfo.irq), flags);
+	spin_lock_irqsave(get_ccwdev_lock(device->cdev), flags);
 
 	cqr->stopclk = get_clock();
 
@@ -219,7 +226,7 @@ dasd_ext_handler(struct pt_regs *regs, __u16 code)
 		dasd_clear_timer(device);
 	dasd_schedule_bh(device);
 
-	spin_unlock_irqrestore(get_irq_lock(device->devinfo.irq), flags);
+	spin_unlock_irqrestore(get_ccwdev_lock(device->cdev), flags);
 	irq_exit();
 }
 
@@ -245,10 +252,10 @@ dasd_diag_check_device(dasd_device_t *device)
 	}
 	/* Read Device Characteristics */
 	rdc_data = (void *) &(private->rdc_data);
-	rdc_data->dev_nr = device->devinfo.devno;
+	rdc_data->dev_nr = device->devno;
 	rdc_data->rdc_len = sizeof (dasd_diag_characteristics_t);
 
-	rc = diag210((diag210_t *) rdc_data);
+	rc = diag210((struct diag210 *) rdc_data);
 	if (rc)
 		return -ENOTSUPP;
 
@@ -328,7 +335,7 @@ dasd_diag_fill_geometry(dasd_device_t *device, struct hd_geometry *geo)
 }
 
 static dasd_era_t
-dasd_diag_examine_error(dasd_ccw_req_t * cqr, devstat_t * stat)
+dasd_diag_examine_error(dasd_ccw_req_t * cqr, struct irb * stat)
 {
 	return dasd_era_fatal;
 }
@@ -433,7 +440,8 @@ dasd_diag_fill_info(dasd_device_t * device, dasd_information2_t * info)
 }
 
 static void
-dasd_diag_dump_sense(dasd_device_t *device, dasd_ccw_req_t * req)
+dasd_diag_dump_sense(dasd_device_t *device, dasd_ccw_req_t * req,
+		     struct irb *stat)
 {
 	char *page;
 
@@ -443,8 +451,8 @@ dasd_diag_dump_sense(dasd_device_t *device, dasd_ccw_req_t * req)
 		return;
 	}
 	sprintf(page, KERN_WARNING PRINTK_HEADER
-		"device %04X on irq %d: I/O status report:\n",
-		device->devinfo.devno, device->devinfo.irq);
+		"device %s: I/O status report:\n",
+		device->cdev->dev.bus_id);
 
 	MESSAGE(KERN_ERR, "Sense data:\n%s", page);
 
@@ -463,7 +471,7 @@ dasd_diag_dump_sense(dasd_device_t *device, dasd_ccw_req_t * req)
  * start the next request if one finishes off. That makes 252.75 blocks
  * for one request. Give a little safety and the result is 240.
  */
-static dasd_discipline_t dasd_diag_discipline = {
+dasd_discipline_t dasd_diag_discipline = {
 	.owner = THIS_MODULE,
 	.name = "DIAG",
 	.ebcname = "DIAG",
@@ -479,7 +487,7 @@ static dasd_discipline_t dasd_diag_discipline = {
 	.fill_info = dasd_diag_fill_info,
 };
 
-int
+static int __init
 dasd_diag_init(void)
 {
 	if (!MACHINE_IS_VM) {
@@ -489,13 +497,13 @@ dasd_diag_init(void)
 		return -EINVAL;
 	}
 	ASCEBC(dasd_diag_discipline.ebcname, 4);
+
 	ctl_set_bit(0, 9);
 	register_external_interrupt(0x2603, dasd_ext_handler);
-	dasd_discipline_add(&dasd_diag_discipline);
 	return 0;
 }
 
-void
+static void __exit
 dasd_diag_cleanup(void)
 {
 	if (!MACHINE_IS_VM) {
@@ -504,24 +512,12 @@ dasd_diag_cleanup(void)
 			dasd_diag_discipline.name);
 		return;
 	}
-	dasd_discipline_del(&dasd_diag_discipline);
 	unregister_external_interrupt(0x2603, dasd_ext_handler);
 	ctl_clear_bit(0, 9);
 }
 
-#ifdef MODULE
-int
-init_module(void)
-{
-	return dasd_diag_init();
-}
-
-void
-cleanup_module(void)
-{
-	dasd_diag_cleanup();
-}
-#endif
+module_init(dasd_diag_init);
+module_exit(dasd_diag_cleanup);
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

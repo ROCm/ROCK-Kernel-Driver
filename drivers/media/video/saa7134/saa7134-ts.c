@@ -151,10 +151,10 @@ static void buffer_release(struct file *file, struct videobuf_buffer *vb)
 }
 
 static struct videobuf_queue_ops ts_qops = {
-	buf_setup:    buffer_setup,
-	buf_prepare:  buffer_prepare,
-	buf_queue:    buffer_queue,
-	buf_release:  buffer_release,
+	.buf_setup    = buffer_setup,
+	.buf_prepare  = buffer_prepare,
+	.buf_queue    = buffer_queue,
+	.buf_release  = buffer_release,
 };
 
 /* ------------------------------------------------------------------ */
@@ -375,14 +375,14 @@ static int ts_ioctl(struct inode *inode, struct file *file,
 
 static struct file_operations ts_fops =
 {
-	owner:	  THIS_MODULE,
-	open:	  ts_open,
-	release:  ts_release,
-	read:	  ts_read,
-	poll:	  ts_poll,
-	mmap:	  ts_mmap,
-	ioctl:	  ts_ioctl,
-	llseek:   no_llseek,
+	.owner	  = THIS_MODULE,
+	.open	  = ts_open,
+	.release  = ts_release,
+	.read	  = ts_read,
+	.poll	  = ts_poll,
+	.mmap	  = ts_mmap,
+	.ioctl	  = ts_ioctl,
+	.llseek   = no_llseek,
 };
 
 
@@ -391,12 +391,12 @@ static struct file_operations ts_fops =
 
 struct video_device saa7134_ts_template =
 {
-	name:          "saa7134-ts",
-	type:          0 /* FIXME */,
-	type2:         0 /* FIXME */,
-	hardware:      0,
-	fops:          &ts_fops,
-	minor:	       -1,
+	.name          = "saa7134-ts",
+	.type          = 0 /* FIXME */,
+	.type2         = 0 /* FIXME */,
+	.hardware      = 0,
+	.fops          = &ts_fops,
+	.minor	       = -1,
 };
 
 int saa7134_ts_init(struct saa7134_dev *dev)

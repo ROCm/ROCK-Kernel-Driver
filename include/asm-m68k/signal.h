@@ -207,8 +207,6 @@ extern __inline__ int __gen_sigismember(sigset_t *set, int _sig)
 	 __const_sigismember(set,sig) :		\
 	 __gen_sigismember(set,sig))
 
-#define sigmask(sig)	(1UL << ((sig) - 1))
-
 extern __inline__ int sigfindinword(unsigned long word)
 {
 	__asm__("bfffo %1{#0,#0},%0" : "=d"(word) : "d"(word & -word) : "cc");

@@ -2222,7 +2222,7 @@ void __init console_init(void)
 #ifdef CONFIG_TN3270_CONSOLE
 	tub3270_con_init();
 #endif
-#ifdef CONFIG_TN3215
+#ifdef CONFIG_TN3215_CONSOLE
 	con3215_init();
 #endif
 #ifdef CONFIG_SCLP_CONSOLE
@@ -2363,10 +2363,7 @@ void __init tty_init(void)
 #ifdef CONFIG_TN3270
 	tub3270_init();
 #endif
-#ifdef CONFIG_TN3215
-	tty3215_init();
-#endif
-#ifdef CONFIG_SCLP
+#ifdef CONFIG_SCLP_TTY
 	sclp_tty_init();
 #endif
 #ifdef CONFIG_A2232

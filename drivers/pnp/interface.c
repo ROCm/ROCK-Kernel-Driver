@@ -321,13 +321,13 @@ static DEVICE_ATTR(resources,S_IRUGO | S_IWUSR,
 static ssize_t pnp_show_current_ids(struct device *dmdev, char *buf, size_t count, loff_t off)
 {
 	char *str = buf;
-	struct list_head * pos;
 	struct pnp_dev *dev = to_pnp_dev(dmdev);
+	struct pnp_id * pos = dev->id;
 	if (off)
 		return 0;
-	list_for_each(pos,&dev->ids) {
-		struct pnp_id * cur = to_pnp_id(pos);
-		str += sprintf(str,"%s\n", cur->id);
+	while (pos) {
+		str += sprintf(str,"%s\n", pos->id);
+		pos = pos->next;
 	}
 	return (str - buf);
 }

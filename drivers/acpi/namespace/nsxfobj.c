@@ -141,7 +141,7 @@ acpi_get_parent (
 	*ret_handle =
 		acpi_ns_convert_entry_to_handle (acpi_ns_get_parent_node (node));
 
-	/* Return exception if parent is null */
+	/* Return exeption if parent is null */
 
 	if (!acpi_ns_get_parent_node (node)) {
 		status = AE_NULL_ENTRY;

@@ -87,7 +87,7 @@ MODULE_DEVICE_TABLE(usb, pegasus_ids);
 
 static int update_eth_regs_async(pegasus_t *);
 /* Aargh!!! I _really_ hate such tweaks */
-static void ctrl_callback(struct urb *urb)
+static void ctrl_callback(struct urb *urb, struct pt_regs *regs)
 {
 	pegasus_t *pegasus = urb->context;
 
@@ -524,7 +524,7 @@ static inline struct sk_buff *pull_skb(pegasus_t * pegasus)
 	return NULL;
 }
 
-static void read_bulk_callback(struct urb *urb)
+static void read_bulk_callback(struct urb *urb, struct pt_regs *regs)
 {
 	pegasus_t *pegasus = urb->context;
 	struct net_device *net;
@@ -644,7 +644,7 @@ try_again:
 	}
 }
 
-static void write_bulk_callback(struct urb *urb)
+static void write_bulk_callback(struct urb *urb, struct pt_regs *regs)
 {
 	pegasus_t *pegasus = urb->context;
 
@@ -661,7 +661,7 @@ static void write_bulk_callback(struct urb *urb)
 	netif_wake_queue(pegasus->net);
 }
 
-static void intr_callback(struct urb *urb)
+static void intr_callback(struct urb *urb, struct pt_regs *regs)
 {
 	pegasus_t *pegasus = urb->context;
 	struct net_device *net;
@@ -1092,7 +1092,7 @@ static void pegasus_set_multicast(struct net_device *net)
 	}
 
 	pegasus->flags |= ETH_REGS_CHANGE;
-	ctrl_callback(pegasus->ctrl_urb);
+	ctrl_callback(pegasus->ctrl_urb, NULL);
 
 	netif_wake_queue(net);
 }

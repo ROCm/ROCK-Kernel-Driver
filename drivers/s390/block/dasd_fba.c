@@ -1,9 +1,12 @@
-
 /* 
  * File...........: linux/drivers/s390/block/dasd_fba.c
  * Author(s)......: Holger Smolinski <Holger.Smolinski@de.ibm.com>
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
+ *
+ * $Revision: 1.25 $
+ *
+ * History of changes
  *	    fixed partition handling and HDIO_GETGEO
  * 2002/01/04 Created 2.4-2.5 compatibility mode
  * 05/04/02 code restructuring.
@@ -17,13 +20,14 @@
 #include <linux/slab.h>
 #include <linux/hdreg.h>	/* HDIO_GETGEO			    */
 #include <linux/bio.h>
+#include <linux/module.h>
+#include <linux/init.h>
 
 #include <asm/idals.h>
 #include <asm/ebcdic.h>
 #include <asm/io.h>
-#include <asm/irq.h>
-#include <asm/s390dyn.h>
 #include <asm/todclk.h>
+#include <asm/ccwdev.h>
 
 #include "dasd_int.h"
 #include "dasd_fba.h"
@@ -38,30 +42,47 @@
 #define DASD_FBA_CCW_LOCATE 0x43
 #define DASD_FBA_CCW_DEFINE_EXTENT 0x63
 
+MODULE_LICENSE("GPL");
+
 static dasd_discipline_t dasd_fba_discipline;
 
 typedef struct dasd_fba_private_t {
 	dasd_fba_characteristics_t rdc_data;
 } dasd_fba_private_t;
 
-static
-devreg_t dasd_fba_known_devices[] = {
-	{
-		.ci = {.hc = {.ctype = 0x6310, .dtype = 0x9336}},
-		.flag = (DEVREG_MATCH_CU_TYPE |
-		      DEVREG_MATCH_DEV_TYPE | DEVREG_TYPE_DEVCHARS),
-		.oper_func = dasd_oper_handler
-	},
-	{
-		.ci = {.hc = {.ctype = 0x3880, .dtype = 0x3370}},
-		.flag = (DEVREG_MATCH_CU_TYPE |
-		      DEVREG_MATCH_DEV_TYPE | DEVREG_TYPE_DEVCHARS),
-		.oper_func = dasd_oper_handler
-	}
+static struct ccw_device_id dasd_fba_ids[] = {
+	{ CCW_DEVICE_DEVTYPE (0x6310, 0, 0x9336, 0), driver_info: 0x1},
+	{ CCW_DEVICE_DEVTYPE (0x3880, 0, 0x3370, 0), driver_info: 0x2},
+	{ /* end of list */ },
+};
+
+MODULE_DEVICE_TABLE(ccw, dasd_fba_ids);
+
+static struct ccw_driver dasd_fba_driver; /* see below */
+static int
+dasd_fba_probe(struct ccw_device *cdev)
+{
+	return  dasd_generic_probe (cdev, &dasd_fba_discipline);
+}
+
+static int
+dasd_fba_set_online(struct ccw_device *cdev)
+{
+	return dasd_generic_set_online (cdev, &dasd_fba_discipline);
+}
+
+static struct ccw_driver dasd_fba_driver = {
+	.name        = "dasd-fba",
+	.owner       = THIS_MODULE,
+	.ids         = dasd_fba_ids,
+	.probe       = dasd_fba_probe,
+	.remove      = dasd_generic_remove,
+	.set_offline = dasd_generic_set_offline,
+	.set_online  = dasd_fba_set_online,
 };
 
 static inline void
-define_extent(ccw1_t * ccw, DE_fba_data_t *data, int rw,
+define_extent(struct ccw1 * ccw, DE_fba_data_t *data, int rw,
 	      int blksize, int beg, int nr)
 {
 	ccw->cmd_code = DASD_FBA_CCW_DEFINE_EXTENT;
@@ -81,7 +102,7 @@ define_extent(ccw1_t * ccw, DE_fba_data_t *data, int rw,
 }
 
 static inline void
-locate_record(ccw1_t * ccw, LO_fba_data_t *data, int rw,
+locate_record(struct ccw1 * ccw, LO_fba_data_t *data, int rw,
 	      int block_nr, int block_ct)
 {
 	ccw->cmd_code = DASD_FBA_CCW_LOCATE;
@@ -99,22 +120,11 @@ locate_record(ccw1_t * ccw, LO_fba_data_t *data, int rw,
 	data->blk_ct = block_ct;
 }
 
-static inline int
-dasd_fba_id_check(s390_dev_info_t * info)
-{
-	if (info->sid_data.cu_type == 0x3880)
-		if (info->sid_data.dev_type == 0x3370)
-			return 0;
-	if (info->sid_data.cu_type == 0x6310)
-		if (info->sid_data.dev_type == 0x9336)
-			return 0;
-	return -ENODEV;
-}
-
-static inline int
+static int
 dasd_fba_check_characteristics(struct dasd_device_t *device)
 {
 	dasd_fba_private_t *private;
+	struct ccw_device *cdev = device->cdev;	
 	void *rdc_data;
 	int rc;
 
@@ -130,7 +140,7 @@ dasd_fba_check_characteristics(struct dasd_device_t *device)
 	}
 	/* Read Device Characteristics */
 	rdc_data = (void *) &(private->rdc_data);
-	rc = read_dev_chars(device->devinfo.irq, &rdc_data, 32);
+	rc = read_dev_chars(device->cdev, &rdc_data, 32);
 	if (rc) {
 		MESSAGE(KERN_WARNING,
 			"Read device characteristics returned error %d", rc);
@@ -139,25 +149,14 @@ dasd_fba_check_characteristics(struct dasd_device_t *device)
 
 	DEV_MESSAGE(KERN_INFO, device,
 		    "%04X/%02X(CU:%04X/%02X) %dMB at(%d B/blk)",
-		    device->devinfo.sid_data.dev_type,
-		    device->devinfo.sid_data.dev_model,
-		    device->devinfo.sid_data.cu_type,
-		    device->devinfo.sid_data.cu_model,
+		    cdev->id.dev_type,
+		    cdev->id.dev_model,
+		    cdev->id.cu_type,
+		    cdev->id.cu_model,
 		    ((private->rdc_data.blk_bdsa *
 		      (private->rdc_data.blk_size >> 9)) >> 11),
 		    private->rdc_data.blk_size);
 	return 0;
-}
-
-static int
-dasd_fba_check_device(struct dasd_device_t *device)
-{
-	int rc;
-
-	rc = dasd_fba_id_check(&device->devinfo);
-	if (rc)
-		return rc;
-	return dasd_fba_check_characteristics(device);
 }
 
 static int
@@ -193,20 +192,22 @@ dasd_fba_fill_geometry(struct dasd_device_t *device, struct hd_geometry *geo)
 }
 
 static dasd_era_t
-dasd_fba_examine_error(dasd_ccw_req_t * cqr, devstat_t * stat)
+dasd_fba_examine_error(dasd_ccw_req_t * cqr, struct irb * irb)
 {
 	dasd_device_t *device;
+	struct ccw_device *cdev;
 
 	device = (dasd_device_t *) cqr->device;
-	if (stat->cstat == 0x00 &&
-	    stat->dstat == (DEV_STAT_CHN_END | DEV_STAT_DEV_END))
+	if (irb->scsw.cstat == 0x00 &&
+	    irb->scsw.dstat == (DEV_STAT_CHN_END | DEV_STAT_DEV_END))
 		return dasd_era_none;
-
-	switch (device->devinfo.sid_data.dev_model) {
+	
+	cdev = device->cdev;
+	switch (cdev->id.dev_model) {
 	case 0x3370:
-		return dasd_3370_erp_examine(cqr, stat);
+		return dasd_3370_erp_examine(cqr, irb);
 	case 0x9336:
-		return dasd_9336_erp_examine(cqr, stat);
+		return dasd_9336_erp_examine(cqr, irb);
 	default:
 		return dasd_era_recover;
 	}
@@ -236,7 +237,7 @@ dasd_fba_build_cp(dasd_device_t * device, struct request *req)
 	unsigned long *idaws;
 	LO_fba_data_t *LO_data;
 	dasd_ccw_req_t *cqr;
-	ccw1_t *ccw;
+	struct ccw1 *ccw;
 	struct bio *bio;
 	struct bio_vec *bv;
 	char *dst;
@@ -359,7 +360,8 @@ dasd_fba_fill_info(dasd_device_t * device, dasd_information2_t * info)
 }
 
 static void
-dasd_fba_dump_sense(struct dasd_device_t *device, dasd_ccw_req_t * req)
+dasd_fba_dump_sense(struct dasd_device_t *device, dasd_ccw_req_t * req,
+		    struct irb *irb)
 {
 	char *page;
 
@@ -369,8 +371,8 @@ dasd_fba_dump_sense(struct dasd_device_t *device, dasd_ccw_req_t * req)
 		return;
 	}
 	sprintf(page, KERN_WARNING PRINTK_HEADER
-		"device %04X on irq %d: I/O status report:\n",
-		device->devinfo.devno, device->devinfo.irq);
+		"device %s: I/O status report:\n",
+		device->cdev->dev.bus_id);
 
 	MESSAGE(KERN_ERR, "Sense data:\n%s", page);
 
@@ -396,7 +398,7 @@ static dasd_discipline_t dasd_fba_discipline = {
 	.name = "FBA ",
 	.ebcname = "FBA ",
 	.max_blocks = 96,
-	.check_device = dasd_fba_check_device,
+	.check_device = dasd_fba_check_characteristics,
 	.do_analysis = dasd_fba_do_analysis,
 	.fill_geometry = dasd_fba_fill_geometry,
 	.start_IO = dasd_start_IO,
@@ -409,41 +411,22 @@ static dasd_discipline_t dasd_fba_discipline = {
 	.fill_info = dasd_fba_fill_info,
 };
 
-int
+static int __init
 dasd_fba_init(void)
 {
-	int i;
-
 	ASCEBC(dasd_fba_discipline.ebcname, 4);
-	dasd_discipline_add(&dasd_fba_discipline);
-	for (i = 0; i < sizeof(dasd_fba_known_devices) / sizeof(devreg_t); i++)
-		s390_device_register(&dasd_fba_known_devices[i]);
-	return 0;
+
+	return ccw_driver_register(&dasd_fba_driver);
 }
 
-void
+static void __exit
 dasd_fba_cleanup(void)
 {
-	int i;
-
-	for (i = 0; i < sizeof(dasd_fba_known_devices) / sizeof(devreg_t); i++)
-		s390_device_unregister(&dasd_fba_known_devices[i]);
-	dasd_discipline_del(&dasd_fba_discipline);
+	ccw_driver_unregister(&dasd_fba_driver);
 }
 
-#ifdef MODULE
-int
-init_module(void)
-{
-	return dasd_fba_init();
-}
-
-void
-cleanup_module(void)
-{
-	dasd_fba_cleanup();
-}
-#endif
+module_init(dasd_fba_init);
+module_exit(dasd_fba_cleanup);
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

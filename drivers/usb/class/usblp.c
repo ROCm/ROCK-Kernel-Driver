@@ -260,7 +260,7 @@ static int proto_bias = -1;
  * URB callback.
  */
 
-static void usblp_bulk_read(struct urb *urb)
+static void usblp_bulk_read(struct urb *urb, struct pt_regs *regs)
 {
 	struct usblp *usblp = urb->context;
 
@@ -274,7 +274,7 @@ static void usblp_bulk_read(struct urb *urb)
 	wake_up_interruptible(&usblp->wait);
 }
 
-static void usblp_bulk_write(struct urb *urb)
+static void usblp_bulk_write(struct urb *urb, struct pt_regs *regs)
 {
 	struct usblp *usblp = urb->context;
 

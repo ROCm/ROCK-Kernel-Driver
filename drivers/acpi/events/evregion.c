@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evregion - ACPI Address_space (Op_region) handler dispatch
- *              $Revision: 135 $
+ *              $Revision: 136 $
  *
  *****************************************************************************/
 
@@ -172,7 +172,7 @@ acpi_ev_execute_reg_method (
 	/*
 	 *  Execute the method, no return value
 	 */
-	ACPI_DEBUG_EXEC(acpi_ut_display_init_pathname (region_obj2->extra.method_REG, " [Method]"));
+	ACPI_DEBUG_EXEC(acpi_ut_display_init_pathname (ACPI_TYPE_METHOD, region_obj2->extra.method_REG, NULL));
 	status = acpi_ns_evaluate_by_handle (region_obj2->extra.method_REG, params, NULL);
 
 	acpi_ut_remove_reference (params[1]);

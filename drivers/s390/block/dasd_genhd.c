@@ -1,5 +1,5 @@
 /*
- * File...........: linux/drivers/s390/block/dasd_ioctl.c
+ * File...........: linux/drivers/s390/block/dasd_genhd.c
  * Author(s)......: Holger Smolinski <Holger.Smolinski@de.ibm.com>
  *		    Horst Hummel <Horst.Hummel@de.ibm.com>
  *		    Carsten Otte <Cotte@de.ibm.com>
@@ -9,6 +9,9 @@
  *
  * Dealing with devices registered to multiple major numbers.
  *
+ * $Revision: 1.23 $
+ *
+ * History of changes
  * 05/04/02 split from dasd.c, code restructuring.
  */
 
@@ -19,7 +22,6 @@
 #include <linux/blkpg.h>
 #include <linux/blk.h>
 
-#include <asm/irq.h>
 #include <asm/uaccess.h>
 
 /* This is ugly... */
@@ -72,7 +74,6 @@ dasd_register_major(int major)
 	/* Initialize major info structure. */
 	mi->major = new_major;
 
-	/* Setup block device pointers for the new major. */
 	/* Insert the new major info structure into dasd_major_info list. */
 	spin_lock(&dasd_major_lock);
 	list_add_tail(&mi->list, &dasd_major_info);
@@ -102,35 +103,6 @@ dasd_unregister_major(struct major_info * mi)
 
 	/* Free memory. */
 	kfree(mi);
-}
-
-/*
- * This one is needed for naming 18000+ possible dasd devices.
- *   dasda - dasdz : 26 devices
- *   dasdaa - dasdzz : 676 devices, added up = 702
- *   dasdaaa - dasdzzz : 17576 devices, added up = 18278
- */
-int
-dasd_device_name(char *str, int index, int partition)
-{
-	int len;
-
-	if (partition > DASD_PARTN_MASK)
-		return -EINVAL;
-
-	len = sprintf(str, "dasd");
-	if (index > 25) {
-		if (index > 701)
-			len += sprintf(str + len, "%c",
-				       'a' + (((index - 702) / 676) % 26));
-		len += sprintf(str + len, "%c",
-			       'a' + (((index - 26) / 26) % 26));
-	}
-	len += sprintf(str + len, "%c", 'a' + (index % 26));
-
-	if (partition)
-		len += sprintf(str + len, "%d", partition);
-	return 0;
 }
 
 /*
@@ -164,7 +136,7 @@ dasd_gendisk_alloc(int devindex)
 			return ERR_PTR(rc);
 		}
 	}
-
+	
 	gdp = alloc_disk(1 << DASD_PARTN_BITS);
 	if (!gdp)
 		return ERR_PTR(-ENOMEM);
@@ -196,7 +168,7 @@ dasd_gendisk_alloc(int devindex)
 /*
  * Return devindex of first device using a specific major number.
  */
-int dasd_gendisk_major_index(int major)
+static int dasd_gendisk_major_index(int major)
 {
 	struct list_head *l;
 	struct major_info *mi;

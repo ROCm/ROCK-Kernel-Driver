@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exmisc - ACPI AML (p-code) execution - specific opcodes
- *              $Revision: 112 $
+ *              $Revision: 113 $
  *
  *****************************************************************************/
 
@@ -281,8 +281,8 @@ acpi_ex_do_concatenate (
 
 		/* Operand0 is string  */
 
-		new_buf = ACPI_MEM_ALLOCATE ((ACPI_SIZE) obj_desc1->string.length +
-				  (ACPI_SIZE) obj_desc2->string.length + 1);
+		new_buf = ACPI_MEM_CALLOCATE ((ACPI_SIZE) obj_desc1->string.length +
+				   (ACPI_SIZE) obj_desc2->string.length + 1);
 		if (!new_buf) {
 			ACPI_REPORT_ERROR
 				(("Ex_do_concatenate: String allocation failure\n"));

@@ -2,7 +2,7 @@
 # S/390 character devices
 #
 
-export-objs := sclp_rw.o tape_core.o tape_devmap.o tape_std.o
+export-objs := sclp.o tape_core.o tape_devmap.o tape_std.o
 
 tub3270-objs := tuball.o tubfs.o tubtty.o \
                      tubttyaid.o tubttybld.o tubttyscl.o \
@@ -10,8 +10,8 @@ tub3270-objs := tuball.o tubfs.o tubtty.o \
 
 obj-y += ctrlchar.o
 obj-$(CONFIG_TN3215) += con3215.o
-obj-$(CONFIG_SCLP) += sclp.o
-obj-$(CONFIG_SCLP_TTY) += sclp_rw.o sclp_tty.o
+obj-$(CONFIG_SCLP) += sclp.o sclp_rw.o
+obj-$(CONFIG_SCLP_TTY) += sclp_tty.o
 obj-$(CONFIG_SCLP_CONSOLE) += sclp_con.o
 obj-$(CONFIG_SCLP_CPI) += sclp_cpi.o
 obj-$(CONFIG_TN3270) += tub3270.o
