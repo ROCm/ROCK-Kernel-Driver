@@ -1191,7 +1191,7 @@ snd_nm256_mixer(nm256_t *chip)
 	/* looks like nm256 hangs up when unexpected registers are touched... */
 	static int mixer_regs[] = {
 		AC97_MASTER, AC97_HEADPHONE, AC97_MASTER_MONO,
-		AC97_PC_BEEP, AC97_PHONE, AC97_MIC, AC97_LINE,
+		AC97_PC_BEEP, AC97_PHONE, AC97_MIC, AC97_LINE, AC97_CD,
 		AC97_VIDEO, AC97_AUX, AC97_PCM, AC97_REC_SEL,
 		AC97_REC_GAIN, AC97_GENERAL_PURPOSE, AC97_3D_CONTROL,
 		AC97_EXTENDED_ID,
