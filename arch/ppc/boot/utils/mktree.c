@@ -15,19 +15,20 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <netinet/in.h>
+#include <stdint.h>
 
 /* This gets tacked on the front of the image.  There are also a few
  * bytes allocated after the _start label used by the boot rom (see
  * head.S for details).
  */
 typedef struct boot_block {
-	unsigned long bb_magic;		/* 0x0052504F */
-	unsigned long bb_dest;		/* Target address of the image */
-	unsigned long bb_num_512blocks;	/* Size, rounded-up, in 512 byte blks */
-	unsigned long bb_debug_flag;	/* Run debugger or image after load */
-	unsigned long bb_entry_point;	/* The image address to start */
-	unsigned long bb_checksum;	/* 32 bit checksum including header */
-	unsigned long reserved[2];
+	uint32_t bb_magic;		/* 0x0052504F */
+	uint32_t bb_dest;		/* Target address of the image */
+	uint32_t bb_num_512blocks;	/* Size, rounded-up, in 512 byte blks */
+	uint32_t bb_debug_flag;	/* Run debugger or image after load */
+	uint32_t bb_entry_point;	/* The image address to start */
+	uint32_t bb_checksum;	/* 32 bit checksum including header */
+	uint32_t reserved[2];
 } boot_block_t;
 
 #define IMGBLK	512

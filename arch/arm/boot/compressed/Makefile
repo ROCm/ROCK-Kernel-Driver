@@ -51,6 +51,10 @@ ifeq ($(CONFIG_DEBUG_ICEDCC),y)
 OBJS            += ice-dcc.o
 endif
 
+ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
+OBJS		+= big-endian.o
+endif
+
 #
 # We now have a PIC decompressor implementation.  Decompressors running
 # from RAM should not define ZTEXTADDR.  Decompressors running directly
