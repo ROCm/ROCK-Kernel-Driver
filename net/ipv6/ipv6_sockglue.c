@@ -157,7 +157,8 @@ int ipv6_setsockopt(struct sock *sk, int level, int optname, char *optval,
 				break;
 			}
 
-			if (!(ipv6_addr_type(&np->daddr) & IPV6_ADDR_MAPPED)) {
+			if (ipv6_only_sock(sk) ||
+			    !(ipv6_addr_type(&np->daddr) & IPV6_ADDR_MAPPED)) {
 				retv = -EADDRNOTAVAIL;
 				break;
 			}
@@ -202,6 +203,13 @@ int ipv6_setsockopt(struct sock *sk, int level, int optname, char *optval,
 			break;
 		}
 		goto e_inval;
+
+	case IPV6_V6ONLY:
+		if (inet_sk(sk)->num)
+			goto e_inval;
+		np->ipv6only = valbool;
+		retv = 0;
+		break;
 
 	case IPV6_PKTINFO:
 		np->rxopt.bits.rxinfo = valbool;
@@ -474,6 +482,10 @@ int ipv6_getsockopt(struct sock *sk, int level, int optname, char *optval,
 			return -ENOTCONN;
 		break;
 	}
+
+	case IPV6_V6ONLY:
+		val = np->ipv6only;
+		break;
 
 	case IPV6_PKTINFO:
 		val = np->rxopt.bits.rxinfo;

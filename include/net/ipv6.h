@@ -102,6 +102,9 @@ struct frag_hdr {
 
 #include <net/sock.h>
 
+/* sysctls */
+extern int sysctl_ipv6_bindv6only;
+
 extern struct ipv6_mib		ipv6_statistics[NR_CPUS*2];
 #define IP6_INC_STATS(field)		SNMP_INC_STATS(ipv6_statistics, field)
 #define IP6_INC_STATS_BH(field)		SNMP_INC_STATS_BH(ipv6_statistics, field)

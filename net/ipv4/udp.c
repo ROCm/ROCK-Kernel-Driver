@@ -66,6 +66,9 @@
  *					datagrams.
  *	Hirokazu Takahashi	:	sendfile() on UDP works now.
  *		Arnaldo C. Melo :	convert /proc/net/udp to seq_file
+ *	YOSHIFUJI Hideaki @USAGI and:	Support IPV6_V6ONLY socket option, which
+ *	Alexey Kuznetsov:		allow both IPv4 and IPv6 sockets to bind
+ *					a single port at the same time.
  *
  *
  *		This program is free software; you can redistribute it and/or
@@ -87,6 +90,7 @@
 #include <linux/mm.h>
 #include <linux/config.h>
 #include <linux/inet.h>
+#include <linux/ipv6.h>
 #include <linux/netdevice.h>
 #include <net/snmp.h>
 #include <net/tcp.h>
@@ -170,6 +174,7 @@ gotit:
 
 			if (inet2->num == snum &&
 			    sk2 != sk &&
+			    !ipv6_only_sock(sk2) &&
 			    sk2->bound_dev_if == sk->bound_dev_if &&
 			    (!inet2->rcv_saddr ||
 			     !inet->rcv_saddr ||
@@ -228,29 +233,29 @@ struct sock *udp_v4_lookup_longway(u32 saddr, u16 sport, u32 daddr, u16 dport, i
 	for(sk = udp_hash[hnum & (UDP_HTABLE_SIZE - 1)]; sk != NULL; sk = sk->next) {
 		struct inet_opt *inet = inet_sk(sk);
 
-		if (inet->num == hnum) {
-			int score = 0;
+		if (inet->num == hnum && !ipv6_only_sock(sk)) {
+			int score = (sk->family == PF_INET ? 1 : 0);
 			if (inet->rcv_saddr) {
 				if (inet->rcv_saddr != daddr)
 					continue;
-				score++;
+				score+=2;
 			}
 			if (inet->daddr) {
 				if (inet->daddr != saddr)
 					continue;
-				score++;
+				score+=2;
 			}
 			if (inet->dport) {
 				if (inet->dport != sport)
 					continue;
-				score++;
+				score+=2;
 			}
 			if(sk->bound_dev_if) {
 				if(sk->bound_dev_if != dif)
 					continue;
-				score++;
+				score+=2;
 			}
-			if(score == 4) {
+			if(score == 9) {
 				result = sk;
 				break;
 			} else if(score > badness) {
@@ -288,6 +293,7 @@ static inline struct sock *udp_v4_mcast_next(struct sock *sk,
 		    (inet->daddr && inet->daddr != rmt_addr)		||
 		    (inet->dport != rmt_port && inet->dport)		||
 		    (inet->rcv_saddr && inet->rcv_saddr != loc_addr)	||
+		    ipv6_only_sock(s)					||
 		    (s->bound_dev_if && s->bound_dev_if != dif))
 			continue;
 		break;

@@ -47,9 +47,13 @@
  *					coma.
  *	Andi Kleen		:	Fix new listen.
  *	Andi Kleen		:	Fix accept error reporting.
+ *	YOSHIFUJI Hideaki @USAGI and:	Support IPV6_V6ONLY socket option, which
+ *	Alexey Kuznetsov		allow both IPv4 and IPv6 sockets to bind
+ *					a single port at the same time.
  */
 
 #include <linux/config.h>
+
 #include <linux/types.h>
 #include <linux/fcntl.h>
 #include <linux/random.h>
@@ -62,6 +66,7 @@
 #include <net/inet_common.h>
 
 #include <linux/inet.h>
+#include <linux/ipv6.h>
 #include <linux/stddef.h>
 #include <linux/ipsec.h>
 
@@ -176,7 +181,9 @@ static inline int tcp_bind_conflict(struct sock *sk, struct tcp_bind_bucket *tb)
 	int sk_reuse = sk->reuse;
 
 	for ( ; sk2; sk2 = sk2->bind_next) {
-		if (sk != sk2 && sk->bound_dev_if == sk2->bound_dev_if) {
+		if (sk != sk2 &&
+		    !ipv6_only_sock(sk2) &&
+		    sk->bound_dev_if == sk2->bound_dev_if) {
 			if (!sk_reuse || !sk2->reuse ||
 			    sk2->state == TCP_LISTEN) {
 				struct inet_opt *inet2 = inet_sk(sk2);
@@ -412,25 +419,25 @@ static struct sock *__tcp_v4_lookup_listener(struct sock *sk, u32 daddr,
 	struct sock *result = NULL;
 	int score, hiscore;
 
-	hiscore=0;
+	hiscore=-1;
 	for (; sk; sk = sk->next) {
 		struct inet_opt *inet = inet_sk(sk);
 
-		if (inet->num == hnum) {
+		if (inet->num == hnum && !ipv6_only_sock(sk)) {
 			__u32 rcv_saddr = inet->rcv_saddr;
 
-			score = 1;
+			score = (sk->family == PF_INET ? 1 : 0);
 			if (rcv_saddr) {
 				if (rcv_saddr != daddr)
 					continue;
-				score++;
+				score+=2;
 			}
 			if (sk->bound_dev_if) {
 				if (sk->bound_dev_if != dif)
 					continue;
-				score++;
+				score+=2;
 			}
-			if (score == 3)
+			if (score == 5)
 				return sk;
 			if (score > hiscore) {
 				hiscore = score;
@@ -454,6 +461,7 @@ __inline__ struct sock *tcp_v4_lookup_listener(u32 daddr, unsigned short hnum,
 
 		if (inet->num == hnum && !sk->next &&
 		    (!inet->rcv_saddr || inet->rcv_saddr == daddr) &&
+		    (sk->family == PF_INET || !ipv6_only_sock(sk)) &&
 		    !sk->bound_dev_if)
 			goto sherry_cache;
 		sk = __tcp_v4_lookup_listener(sk, daddr, hnum, dif);

@@ -462,6 +462,15 @@ ak@muc.de
 IPv6 has no global variables such as tcp_*.  tcp_* settings under ipv4/ also
 apply to IPv6 [XXX?].
 
+bindv6only - BOOLEAN
+	Default value for IPV6_V6ONLY socket option,
+	which restricts use of the IPv6 socket to IPv6 communication 
+	only.
+		TRUE: disable IPv4-mapped address feature
+		FALSE: enable IPv4-mapped address feature
+
+	Default: FALSE (as specified in RFC2553bis)
+
 conf/default/*:
 	Change the interface-specific default settings.
 
