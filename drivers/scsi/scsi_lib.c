@@ -1320,19 +1320,22 @@ static void scsi_request_fn(struct request_queue *q)
 u64 scsi_calculate_bounce_limit(struct Scsi_Host *shost)
 {
 	struct device *host_dev;
+	u64 bounce_limit = 0xffffffff;
 
 	if (shost->unchecked_isa_dma)
 		return BLK_BOUNCE_ISA;
-
-	host_dev = scsi_get_device(shost);
-	if (PCI_DMA_BUS_IS_PHYS && host_dev && host_dev->dma_mask)
-		return *host_dev->dma_mask;
-
 	/*
 	 * Platforms with virtual-DMA translation
 	 * hardware have no practical limit.
 	 */
-	return BLK_BOUNCE_ANY;
+	if (!PCI_DMA_BUS_IS_PHYS)
+		return BLK_BOUNCE_ANY;
+
+	host_dev = scsi_get_device(shost);
+	if (host_dev && host_dev->dma_mask)
+		bounce_limit = *host_dev->dma_mask;
+
+	return bounce_limit;
 }
 
 struct request_queue *scsi_alloc_queue(struct scsi_device *sdev)
