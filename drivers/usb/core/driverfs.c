@@ -140,7 +140,7 @@ show_maxchild (struct device *dev, char *buf)
 	udev = to_usb_device (dev);
 	return sprintf (buf, "%d\n", udev->maxchild);
 }
-static DEVICE_ATTR(maxChild, S_IRUGO, show_maxchild, NULL);
+static DEVICE_ATTR(maxchild, S_IRUGO, show_maxchild, NULL);
 
 /* Descriptor fields */
 #define usb_descriptor_attr(field, format_string)			\
