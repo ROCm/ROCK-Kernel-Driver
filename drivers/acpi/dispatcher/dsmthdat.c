@@ -203,9 +203,10 @@ acpi_ds_method_data_init_args (
 	while ((index < ACPI_METHOD_NUM_ARGS) && (index < max_param_count) && params[index]) {
 		/*
 		 * A valid parameter.
-		 * Store the argument in the method/walk descriptor
+		 * Store the argument in the method/walk descriptor.
+		 * Do not copy the arg in order to implement call by reference
 		 */
-		status = acpi_ds_store_object_to_local (AML_ARG_OP, index, params[index],
+		status = acpi_ds_method_data_set_value (AML_ARG_OP, index, params[index],
 				 walk_state);
 		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);
