@@ -425,7 +425,6 @@ static int hugetlbfs_mknod(struct inode *dir,
 	}
 	inode = hugetlbfs_get_inode(dir->i_sb, current->fsuid, gid, mode, dev);
 	if (inode) {
-		dir->i_size += PSEUDO_DIRENT_SIZE;
 		dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 		d_instantiate(dentry, inode);
 		dget(dentry);	/* Extra count - pin the dentry in core */
@@ -470,7 +469,6 @@ static int hugetlbfs_symlink(struct inode *dir,
 		} else
 			iput(inode);
 	}
-	dir->i_size += PSEUDO_DIRENT_SIZE;
 	dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 
 	return error;
@@ -507,7 +505,6 @@ static int hugetlbfs_link(struct dentry *old_dentry,
 {
 	struct inode *inode = old_dentry->d_inode;
 
-	dir->i_size += PSEUDO_DIRENT_SIZE;
 	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 	inode->i_nlink++;
 	atomic_inc(&inode->i_count);
@@ -520,7 +517,6 @@ static int hugetlbfs_unlink(struct inode *dir, struct dentry *dentry)
 {
 	struct inode *inode = dentry->d_inode;
 
-	dir->i_size -= PSEUDO_DIRENT_SIZE;
 	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 	inode->i_nlink--;
 	dput(dentry);
@@ -554,8 +550,6 @@ static int hugetlbfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		new_dir->i_nlink++;
 	}
 
-	old_dir->i_size -= PSEUDO_DIRENT_SIZE;
-	new_dir->i_size += PSEUDO_DIRENT_SIZE;
 	old_dir->i_ctime = old_dir->i_mtime = new_dir->i_ctime =
 		new_dir->i_mtime = inode->i_ctime = CURRENT_TIME;
 	return 0;
