@@ -15,7 +15,6 @@
 #include <linux/fddidevice.h>
 #include <linux/trdevice.h>
 #include <linux/fcdevice.h>
-#include <linux/ioport.h>
 #include <linux/tty.h>
 #include <net/snmp.h>
 #include <net/checksum.h>
@@ -30,7 +29,6 @@
 
 #ifdef CONFIG_INET
 #include <net/protocol.h>
-#include <net/icmp.h>
 #include <net/inet_common.h>
 #include <linux/inet.h>
 #include <linux/mroute.h>
@@ -67,9 +65,6 @@ EXPORT_SYMBOL(destroy_EII_client);
 /* Internet layer registration */
 EXPORT_SYMBOL(inet_add_protocol);
 EXPORT_SYMBOL(inet_del_protocol);
-EXPORT_SYMBOL(icmp_send);
-EXPORT_SYMBOL(icmp_statistics);
-EXPORT_SYMBOL(icmp_err_convert);
 EXPORT_SYMBOL(ip_options_compile);
 EXPORT_SYMBOL(ip_options_undo);
 EXPORT_SYMBOL(in_aton);
@@ -98,9 +93,6 @@ EXPORT_SYMBOL(net_statistics);
 
 /* Used by at least ipip.c.  */
 EXPORT_SYMBOL(ipv4_config);
-
-/* Used by other modules */
-EXPORT_SYMBOL(xrlim_allow);
 
 EXPORT_SYMBOL(ip_rcv);
 #endif  /* CONFIG_INET */
