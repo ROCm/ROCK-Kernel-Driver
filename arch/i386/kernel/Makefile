@@ -12,6 +12,7 @@ obj-y	:= process.o semaphore.o signal.o entry.o traps.o irq.o vm86.o \
 		bootflag.o
 
 obj-y				+= cpu/
+obj-y				+= timers/
 obj-$(CONFIG_X86_BIOS_REBOOT)	+= reboot.o
 obj-$(CONFIG_MCA)		+= mca.o
 obj-$(CONFIG_X86_MSR)		+= msr.o

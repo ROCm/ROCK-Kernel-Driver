@@ -268,8 +268,6 @@ static inline void do_timer_interrupt(int irq, void *dev_id, struct pt_regs *reg
 #endif
 }
 
-static int use_tsc;
-
 /*
  * This is the same as the above, except we _also_ save the current
  * Time Stamp Counter value at the time of the timer interrupt, so that
@@ -277,8 +275,6 @@ static int use_tsc;
  */
 void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	int count;
-
 	/*
 	 * Here we are in the timer irq handler. We just have irqs locally
 	 * disabled but we don't know if the timer_bh is running on the other
