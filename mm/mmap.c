@@ -7,6 +7,7 @@
  */
 
 #include <linux/slab.h>
+#include <linux/mm.h>
 #include <linux/shm.h>
 #include <linux/mman.h>
 #include <linux/pagemap.h>
@@ -20,6 +21,7 @@
 #include <linux/hugetlb.h>
 #include <linux/profile.h>
 #include <linux/module.h>
+#include <linux/acct.h>
 #include <linux/mount.h>
 #include <linux/mempolicy.h>
 #include <linux/rmap.h>
@@ -1019,6 +1021,8 @@ out:
 					pgoff, flags & MAP_NONBLOCK);
 		down_write(&mm->mmap_sem);
 	}
+	acct_update_integrals();
+	update_mem_hiwater();
 	return addr;
 
 unmap_and_free_vma:
@@ -1365,6 +1369,8 @@ int expand_stack(struct vm_area_struct * vma, unsigned long address)
 	if (vma->vm_flags & VM_LOCKED)
 		vma->vm_mm->locked_vm += grow;
 	__vm_stat_account(vma->vm_mm, vma->vm_flags, vma->vm_file, grow);
+	acct_update_integrals();
+	update_mem_hiwater();
 	anon_vma_unlock(vma);
 	return 0;
 }
@@ -1428,6 +1434,8 @@ int expand_stack(struct vm_area_struct *vma, unsigned long address)
 	if (vma->vm_flags & VM_LOCKED)
 		vma->vm_mm->locked_vm += grow;
 	__vm_stat_account(vma->vm_mm, vma->vm_flags, vma->vm_file, grow);
+	acct_update_integrals();
+        update_mem_hiwater();
 	anon_vma_unlock(vma);
 	return 0;
 }
@@ -1815,6 +1823,8 @@ out:
 		mm->locked_vm += len >> PAGE_SHIFT;
 		make_pages_present(addr, addr + len);
 	}
+	acct_update_integrals();
+	update_mem_hiwater();
 	return addr;
 }
 

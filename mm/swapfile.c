@@ -24,6 +24,7 @@
 #include <linux/module.h>
 #include <linux/rmap.h>
 #include <linux/security.h>
+#include <linux/acct.h>
 #include <linux/backing-dev.h>
 #include <linux/syscalls.h>
 
@@ -436,6 +437,8 @@ unuse_pte(struct vm_area_struct *vma, unsigned long address, pte_t *dir,
 	set_pte(dir, pte_mkold(mk_pte(page, vma->vm_page_prot)));
 	page_add_anon_rmap(page, vma, address);
 	swap_free(entry);
+	acct_update_integrals();
+	update_mem_hiwater();
 }
 
 /* vma->vm_mm->page_table_lock is held */

@@ -47,6 +47,7 @@
 #include <linux/security.h>
 #include <linux/syscalls.h>
 #include <linux/rmap.h>
+#include <linux/acct.h>
 
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
@@ -1165,6 +1166,8 @@ int do_execve(char * filename,
 
 		/* execve success */
 		security_bprm_free(bprm);
+		acct_update_integrals();
+		update_mem_hiwater();
 		kfree(bprm);
 		return retval;
 	}

@@ -39,6 +39,7 @@
 #include <linux/audit.h>
 #include <linux/profile.h>
 #include <linux/rmap.h>
+#include <linux/acct.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -469,6 +470,9 @@ static int copy_mm(unsigned long clone_flags, struct task_struct * tsk)
 	if (retval)
 		goto free_pt;
 
+	mm->hiwater_rss = mm->rss;
+	mm->hiwater_vm = mm->total_vm;
+
 good_mm:
 	tsk->mm = mm;
 	tsk->active_mm = mm;
@@ -880,6 +884,8 @@ static task_t *copy_process(unsigned long clone_flags,
 	p->wchar = 0;		/* I/O counter: bytes written */
 	p->syscr = 0;		/* I/O counter: read syscalls */
 	p->syscw = 0;		/* I/O counter: write syscalls */
+	acct_clear_integrals(p);
+
 	p->lock_depth = -1;		/* -1 = no lock */
 	do_posix_clock_monotonic_gettime(&p->start_time);
 	p->security = NULL;

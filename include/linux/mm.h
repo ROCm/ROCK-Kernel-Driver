@@ -833,6 +833,9 @@ static inline void vm_stat_unaccount(struct vm_area_struct *vma)
 							-vma_pages(vma));
 }
 
+/* update per process rss and vm hiwater data */
+extern void update_mem_hiwater(void);
+
 #ifndef CONFIG_DEBUG_PAGEALLOC
 static inline void
 kernel_map_pages(struct page *page, int numpages, int enable)

@@ -120,9 +120,13 @@ struct acct_v3
 struct super_block;
 extern void acct_auto_close(struct super_block *sb);
 extern void acct_process(long exitcode);
+extern void acct_update_integrals(void);
+extern void acct_clear_integrals(struct task_struct *tsk);
 #else
 #define acct_auto_close(x)	do { } while (0)
 #define acct_process(x)		do { } while (0)
+#define acct_update_integrals()		do { } while (0)
+#define acct_clear_integrals(task)	do { } while (0)
 #endif
 
 /*
