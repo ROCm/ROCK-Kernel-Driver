@@ -31,6 +31,7 @@
 #include <linux/init.h>
 #include <linux/input.h>
 #include <linux/serio.h>
+#include <linux/tqueue.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
 MODULE_DESCRIPTION("AT and PS/2 keyboard driver");

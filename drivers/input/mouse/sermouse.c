@@ -253,11 +253,11 @@ static void sermouse_connect(struct serio *serio, struct serio_dev *dev)
 	sermouse->type = serio->type & SERIO_PROTO;
 	c = (serio->type & SERIO_EXTRA) >> 16;
 
-	if (c & 0x01) set_bit(BTN_MIDDLE, &sermouse->dev.keybit);
-	if (c & 0x02) set_bit(BTN_SIDE, &sermouse->dev.keybit);
-	if (c & 0x04) set_bit(BTN_EXTRA, &sermouse->dev.keybit);
-	if (c & 0x10) set_bit(REL_WHEEL, &sermouse->dev.relbit);
-	if (c & 0x20) set_bit(REL_HWHEEL, &sermouse->dev.relbit);
+	if (c & 0x01) set_bit(BTN_MIDDLE, sermouse->dev.keybit);
+	if (c & 0x02) set_bit(BTN_SIDE, sermouse->dev.keybit);
+	if (c & 0x04) set_bit(BTN_EXTRA, sermouse->dev.keybit);
+	if (c & 0x10) set_bit(REL_WHEEL, sermouse->dev.relbit);
+	if (c & 0x20) set_bit(REL_HWHEEL, sermouse->dev.relbit);
 
 	sprintf(sermouse->phys, "%s/input0", serio->phys);
 

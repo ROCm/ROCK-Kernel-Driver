@@ -2,10 +2,6 @@
 # Makefile for the mouse drivers.
 #
 
-# The target object and module list name.
-
-O_TARGET	:= mousedrv.o
-
 # Each configuration option enables a list of files.
 
 obj-$(CONFIG_MOUSE_AMIGA)	+= amimouse.o

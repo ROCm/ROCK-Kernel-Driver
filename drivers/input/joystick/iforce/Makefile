@@ -2,8 +2,6 @@
 # Makefile for the I-Force driver
 #
 
-O_TARGET := iforce-drv.o
-
 # I-Force may need both USB and RS-232
 
 CONFIG_JOYSTICK_IFORCE := n
@@ -24,7 +22,11 @@ endif
 
 obj-$(CONFIG_JOYSTICK_IFORCE)	+= iforce.o 
 
+# The global Rules.make.
+
 include $(TOPDIR)/Rules.make
+
+# iforce.o is a multipart module.
 
 IFORCEOBJS = iforce-ff.o iforce-main.o iforce-packets.o
 
@@ -38,4 +40,3 @@ endif
 
 iforce.o: $(IFORCEOBJS) 
 	$(LD) -i $(IFORCEOBJS) -o $@
-

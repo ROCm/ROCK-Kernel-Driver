@@ -2,10 +2,6 @@
 # Makefile for the input core drivers.
 #
 
-# The target object and module list name.
-
-O_TARGET	:= keybdrv.o
-
 # Each configuration option enables a list of files.
 
 obj-$(CONFIG_KEYBOARD_ATKBD)		+= atkbd.o
