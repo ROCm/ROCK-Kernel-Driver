@@ -50,6 +50,9 @@ int acpi_lapic;
 int acpi_ioapic;
 int acpi_strict;
 
+acpi_interrupt_flags acpi_sci_flags __initdata;
+int acpi_sci_override_gsi __initdata;
+
 #ifdef CONFIG_X86_LOCAL_APIC
 static u64 acpi_lapic_addr __initdata = APIC_DEFAULT_PHYS_BASE;
 #endif
@@ -244,6 +247,34 @@ acpi_parse_ioapic (
 	return 0;
 }
 
+/*
+ * Parse Interrupt Source Override for the ACPI SCI
+ */
+static void
+acpi_parse_sci_int_src_ovr(u8 bus_irq, u16 polarity, u16 trigger, u32 global_irq)
+{
+	if (trigger == 0)	/* compatible SCI trigger is level */
+		trigger = 3;
+
+	if (polarity == 0)	/* compatible SCI polarity is low */
+		polarity = 3;
+
+	/* Command-line over-ride via acpi_sci= */
+	if (acpi_sci_flags.trigger)
+		trigger = acpi_sci_flags.trigger;
+
+	if (acpi_sci_flags.polarity)
+		polarity = acpi_sci_flags.polarity;
+
+	mp_override_legacy_irq(bus_irq, polarity, trigger, global_irq);
+
+	/*
+	 * stash over-ride to indicate we've been here
+	 * and for later update of acpi_fadt
+	 */
+	acpi_sci_override_gsi = global_irq;
+	return;
+}
 
 static int __init
 acpi_parse_int_src_ovr (
@@ -256,6 +287,13 @@ acpi_parse_int_src_ovr (
 		return -EINVAL;
 
 	acpi_table_print_madt_entry(header);
+
+	if (intsrc->bus_irq == acpi_fadt.sci_int) {
+		acpi_parse_sci_int_src_ovr(intsrc->bus_irq,
+			intsrc->flags.polarity, intsrc->flags.trigger,
+			intsrc->global_irq);
+		return 0;
+	}
 
 	mp_override_legacy_irq (
 		intsrc->bus_irq,
@@ -287,14 +325,14 @@ acpi_parse_nmi_src (
 #endif /* CONFIG_X86_IO_APIC */
 
 #ifdef	CONFIG_ACPI_BUS
+
 /*
- * "acpi_pic_sci=level" (current default)
- * programs the PIC-mode SCI to Level Trigger.
- * (NO-OP if the BIOS set Level Trigger already)
+ * acpi_pic_sci_set_trigger()
+ * 
+ * use ELCR to set PIC-mode trigger type for SCI
  *
  * If a PIC-mode SCI is not recognized or gives spurious IRQ7's
- * it may require Edge Trigger -- use "acpi_pic_sci=edge"
- * (NO-OP if the BIOS set Edge Trigger already)
+ * it may require Edge Trigger -- use "acpi_sci=edge"
  *
  * Port 0x4d0-4d1 are ECLR1 and ECLR2, the Edge/Level Control Registers
  * for the 8259 PIC.  bit[n] = 1 means irq[n] is Level, otherwise Edge.
@@ -302,10 +340,8 @@ acpi_parse_nmi_src (
  * ECLR2 is IRQ's 8-15 (IRQ 8, 13 must be 0)
  */
 
-static int __initdata	acpi_pic_sci_trigger;	/* 0: level, 1: edge */
-
 void __init
-acpi_pic_sci_set_trigger(unsigned int irq)
+acpi_pic_sci_set_trigger(unsigned int irq, u16 trigger)
 {
 	unsigned char mask = 1 << (irq & 7);
 	unsigned int port = 0x4d0 + (irq >> 3);
@@ -316,37 +352,21 @@ acpi_pic_sci_set_trigger(unsigned int irq)
 	if (!(val & mask)) {
 		printk(" Edge");
 
-		if (!acpi_pic_sci_trigger) {
+		if (trigger == 3) {
 			printk(" set to Level");
 			outb(val | mask, port);
 		}
 	} else {
 		printk(" Level");
 
-		if (acpi_pic_sci_trigger) {
+		if (trigger == 1) {
 			printk(" set to Edge");
-			outb(val | mask, port);
+			outb(val & ~mask, port);
 		}
 	}
 	printk(" Trigger.\n");
 }
 
-int __init
-acpi_pic_sci_setup(char *str)
-{
-	while (str && *str) {
-		if (strncmp(str, "level", 5) == 0)
-			acpi_pic_sci_trigger = 0;	/* force level trigger */
-		if (strncmp(str, "edge", 4) == 0)
-			acpi_pic_sci_trigger = 1;	/* force edge trigger */
-		str = strchr(str, ',');
-		if (str)
-			str += strspn(str, ", \t");
-	}
-	return 1;
-}
-
-__setup("acpi_pic_sci=", acpi_pic_sci_setup);
 
 #endif /* CONFIG_ACPI_BUS */
 
@@ -442,8 +462,6 @@ static int __init acpi_parse_hpet(unsigned long phys, unsigned long size)
 #define	acpi_parse_hpet	NULL
 #endif
 
-/* detect the location of the ACPI PM Timer */
-#ifdef CONFIG_X86_PM_TIMER
 extern u32 pmtmr_ioport;
 
 static int __init acpi_parse_fadt(unsigned long phys, unsigned long size)
@@ -456,6 +474,13 @@ static int __init acpi_parse_fadt(unsigned long phys, unsigned long size)
 		return 0;
 	}
 
+#ifdef	CONFIG_ACPI_INTERPRETER
+	/* initialize sci_int early for INT_SRC_OVR MADT parsing */
+	acpi_fadt.sci_int = fadt->sci_int;
+#endif
+
+#ifdef CONFIG_X86_PM_TIMER
+	/* detect the location of the ACPI PM Timer */
 	if (fadt->revision >= FADT2_REVISION_ID) {
 		/* FADT rev. 2 */
 		if (fadt->xpm_tmr_blk.address_space_id != ACPI_ADR_SPACE_SYSTEM_IO)
@@ -468,11 +493,9 @@ static int __init acpi_parse_fadt(unsigned long phys, unsigned long size)
 	}
 	if (pmtmr_ioport)
 		printk(KERN_INFO PREFIX "PM-Timer IO Port: %#x\n", pmtmr_ioport);
+#endif
 	return 0;
 }
-#else
-#define	acpi_parse_fadt	NULL
-#endif
 
 
 unsigned long __init
@@ -592,6 +615,13 @@ acpi_parse_madt_ioapic_entries(void)
 		return count;
 	}
 
+	/*
+	 * If BIOS did not supply an INT_SRC_OVR for the SCI
+	 * pretend we got one so we can set the SCI flags.
+	 */
+	if (!acpi_sci_override_gsi)
+		acpi_parse_sci_int_src_ovr(acpi_fadt.sci_int, 0, 0, acpi_fadt.sci_int);
+
 	count = acpi_table_parse_madt(ACPI_MADT_NMI_SRC, acpi_parse_nmi_src, NR_IRQ_VECTORS);
 	if (count < 0) {
 		printk(KERN_ERR PREFIX "Error parsing NMI SRC entry\n");
@@ -697,11 +727,15 @@ acpi_boot_init (void)
 	}
 
 	/*
+	 * set sci_int and PM timer address
+	 */
+	acpi_table_parse(ACPI_FADT, acpi_parse_fadt);
+
+	/*
 	 * Process the Multiple APIC Description Table (MADT), if present
 	 */
 	acpi_process_madt();
 
-	acpi_table_parse(ACPI_FADT, acpi_parse_fadt);
 	acpi_table_parse(ACPI_HPET, acpi_parse_hpet);
 	acpi_table_parse(ACPI_MCFG, acpi_parse_mcfg);
 
