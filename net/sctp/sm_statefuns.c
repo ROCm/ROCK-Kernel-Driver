@@ -242,13 +242,12 @@ sctp_disposition_t sctp_sf_do_5_1B_init(const sctp_endpoint_t *ep,
 	if (!new_asoc)
 		goto nomem;
 
-	/* FIXME: sctp_process_init can fail, but there is no
-	 * status nor handling.
-	 */
-	sctp_process_init(new_asoc, chunk->chunk_hdr->type,
-			  sctp_source(chunk),
-			  (sctp_init_chunk_t *)chunk->chunk_hdr,
-			  GFP_ATOMIC);
+	/* The call, sctp_process_init(), can fail on memory allocation.  */
+	if (!sctp_process_init(new_asoc, chunk->chunk_hdr->type,
+			       sctp_source(chunk),
+			       (sctp_init_chunk_t *)chunk->chunk_hdr,
+			       GFP_ATOMIC))
+		goto nomem_init;
 
 	sctp_add_cmd_sf(commands, SCTP_CMD_NEW_ASOC, SCTP_ASOC(new_asoc));
 
@@ -301,10 +300,10 @@ sctp_disposition_t sctp_sf_do_5_1B_init(const sctp_endpoint_t *ep,
 	return SCTP_DISPOSITION_DELETE_TCB;
 
 nomem_ack:
-	sctp_association_free(new_asoc);
 	if (err_chunk)
 		sctp_free_chunk(err_chunk);
-
+nomem_init:
+	sctp_association_free(new_asoc);
 nomem:
 	return SCTP_DISPOSITION_NOMEM;
 }
@@ -562,9 +561,11 @@ sctp_disposition_t sctp_sf_do_5_1D_ce(const sctp_endpoint_t *ep,
 	 * effects--it is safe to run them here.
 	 */
 	peer_init = &chunk->subh.cookie_hdr->c.peer_init[0];
-	sctp_process_init(new_asoc, chunk->chunk_hdr->type,
-			  &chunk->subh.cookie_hdr->c.peer_addr, peer_init,
-			  GFP_ATOMIC);
+
+	if (!sctp_process_init(new_asoc, chunk->chunk_hdr->type,
+			       &chunk->subh.cookie_hdr->c.peer_addr,
+			       peer_init, GFP_ATOMIC))
+		goto nomem_init;
 
 	repl = sctp_make_cookie_ack(new_asoc, chunk);
 	if (!repl)
@@ -591,10 +592,9 @@ sctp_disposition_t sctp_sf_do_5_1D_ce(const sctp_endpoint_t *ep,
 
 nomem_ev:
 	sctp_free_chunk(repl);
-
 nomem_repl:
+nomem_init:
 	sctp_association_free(new_asoc);
-
 nomem:
 	return SCTP_DISPOSITION_NOMEM;
 }
@@ -674,7 +674,7 @@ sctp_disposition_t sctp_sf_heartbeat(const sctp_endpoint_t *ep,
 	sctp_chunk_t *reply;
 	sctp_sender_hb_info_t hbinfo;
 	size_t paylen = 0;
-	
+
 	hbinfo.param_hdr.type = SCTP_PARAM_HEARTBEAT_INFO;
 	hbinfo.param_hdr.length = htons(sizeof(sctp_sender_hb_info_t));
 	hbinfo.daddr = transport->ipaddr;
@@ -730,7 +730,7 @@ sctp_disposition_t sctp_sf_sendbeat_8_3(const sctp_endpoint_t *ep,
 	}
 	sctp_add_cmd_sf(commands, SCTP_CMD_HB_TIMERS_UPDATE,
 			SCTP_TRANSPORT(transport));
-	
+
         return SCTP_DISPOSITION_CONSUME;
 }
 
@@ -1140,8 +1140,13 @@ static sctp_disposition_t sctp_sf_do_unexpected_init(
 	 * Verification Tag and Peers Verification tag into a reserved
 	 * place (local tie-tag and per tie-tag) within the state cookie.
 	 */
-	sctp_process_init(new_asoc, chunk->chunk_hdr->type, sctp_source(chunk),
-			  (sctp_init_chunk_t *)chunk->chunk_hdr, GFP_ATOMIC);
+	if (!sctp_process_init(new_asoc, chunk->chunk_hdr->type,
+			       sctp_source(chunk),
+			       (sctp_init_chunk_t *)chunk->chunk_hdr,
+			       GFP_ATOMIC)) {
+		retval = SCTP_DISPOSITION_NOMEM;
+		goto nomem_init;
+	}
 
 	/* Make sure no new addresses are being added during the
 	 * restart.   Do not do this check for COOKIE-WAIT state,
@@ -1212,6 +1217,7 @@ cleanup:
 nomem:
 	retval = SCTP_DISPOSITION_NOMEM;
 	goto cleanup;
+nomem_init:
 cleanup_asoc:
 	sctp_association_free(new_asoc);
 	goto cleanup;
@@ -1341,15 +1347,16 @@ static sctp_disposition_t sctp_sf_do_dupcook_a(const sctp_endpoint_t *ep,
 	 * side effects--it is safe to run them here.
 	 */
 	peer_init = &chunk->subh.cookie_hdr->c.peer_init[0];
-	sctp_process_init(new_asoc, chunk->chunk_hdr->type,
-			  sctp_source(chunk), peer_init, GFP_ATOMIC);
+
+	if (!sctp_process_init(new_asoc, chunk->chunk_hdr->type,
+			       sctp_source(chunk), peer_init, GFP_ATOMIC))
+		goto nomem;
 
 	/* Make sure no new addresses are being added during the
 	 * restart.  Though this is a pretty complicated attack
 	 * since you'd have to get inside the cookie.
 	 */
 	if (!sctp_sf_check_restart_addrs(new_asoc, asoc, chunk, commands)) {
-		printk("cookie echo check\n");
 		return SCTP_DISPOSITION_CONSUME;
 	}
 
@@ -1406,8 +1413,9 @@ static sctp_disposition_t sctp_sf_do_dupcook_b(const sctp_endpoint_t *ep,
 	 * side effects--it is safe to run them here.
 	 */
 	peer_init = &chunk->subh.cookie_hdr->c.peer_init[0];
-	sctp_process_init(new_asoc, chunk->chunk_hdr->type,
-			  sctp_source(chunk), peer_init, GFP_ATOMIC);
+	if (!sctp_process_init(new_asoc, chunk->chunk_hdr->type,
+			       sctp_source(chunk), peer_init, GFP_ATOMIC))
+		goto nomem;
 
 	/* Update the content of current association.  */
 	sctp_add_cmd_sf(commands, SCTP_CMD_UPDATE_ASSOC, SCTP_ASOC(new_asoc));
@@ -3671,7 +3679,7 @@ sctp_disposition_t sctp_sf_shutdown_ack_sent_prm_abort(
 	return sctp_sf_shutdown_sent_prm_abort(ep, asoc, type, arg, commands);
 }
 
-/* 
+/*
  * Process the REQUESTHEARTBEAT primitive
  *
  * 10.1 ULP-to-SCTP

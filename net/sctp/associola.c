@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001 International Business Machines Corp.
+ * Copyright (c) 2001-2002 International Business Machines Corp.
  * Copyright (c) 2001 Intel Corp.
  * Copyright (c) 2001 La Monte H.P. Yarroll
  * 
@@ -906,17 +906,13 @@ static void sctp_assoc_bh_rcv(sctp_association_t *asoc)
 		 * the incoming chunk.  If so, get out of the while loop.
 		 */
 		if (!sctp_id2assoc(sk, associd))
-			goto out;
+			break;
 
-		if (error != 0)
-			goto err_out;
+		/* If there is an error on chunk, discard this packet. */
+		if (error && chunk)
+			chunk->pdiscard = 1;
 	}
 
-err_out:
-	/* Is this the right way to pass errors up to the ULP?  */
-	if (error)
-		sk->err = -error;
-out:
 }
 
 /* This routine moves an association from its old sk to a new sk.  */

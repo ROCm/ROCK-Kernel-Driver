@@ -69,10 +69,10 @@ static void sctp_do_8_2_transport_strike(sctp_association_t *asoc,
 static void sctp_cmd_init_failed(sctp_cmd_seq_t *, sctp_association_t *asoc);
 static void sctp_cmd_assoc_failed(sctp_cmd_seq_t *, sctp_association_t *asoc,
 				  sctp_event_t event_type, sctp_chunk_t *chunk);
-static void sctp_cmd_process_init(sctp_cmd_seq_t *, sctp_association_t *asoc,
-				  sctp_chunk_t *chunk,
-				  sctp_init_chunk_t *peer_init,
-				  int priority);
+static int sctp_cmd_process_init(sctp_cmd_seq_t *, sctp_association_t *asoc,
+				 sctp_chunk_t *chunk,
+				 sctp_init_chunk_t *peer_init,
+				 int priority);
 static void sctp_cmd_hb_timers_start(sctp_cmd_seq_t *, sctp_association_t *);
 static void sctp_cmd_hb_timers_update(sctp_cmd_seq_t *, sctp_association_t *,
 				      sctp_transport_t *);
@@ -343,9 +343,14 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 			break;
 
 		case SCTP_CMD_PEER_INIT:
-			/* Process a unified INIT from the peer.  */
-			sctp_cmd_process_init(commands, asoc, chunk,
-					      command->obj.ptr, priority);
+			/* Process a unified INIT from the peer.
+			 * Note: Only used during INIT-ACK processing.  If
+			 * there is an error just return to the outter
+			 * layer which will bail.
+			 */
+			error = sctp_cmd_process_init(commands, asoc, chunk,
+						      command->obj.ptr,
+						      priority);
 			break;
 
 		case SCTP_CMD_GEN_COOKIE_ECHO:
@@ -564,7 +569,7 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 		case SCTP_CMD_HB_TIMERS_START:
 			sctp_cmd_hb_timers_start(commands, asoc);
 			break;
-	
+
 		case SCTP_CMD_HB_TIMERS_UPDATE:
 			t = command->obj.transport;
 			sctp_cmd_hb_timers_update(commands, asoc, t);
@@ -595,6 +600,8 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 			       command->verb, command->obj.ptr);
 			break;
 		};
+		if (error)
+			return error;
 	}
 
 	return error;
@@ -657,7 +664,7 @@ static sctp_chunk_t *sctp_do_ecn_ecne_work(sctp_association_t *asoc,
 	}
 
 	/* Always try to quiet the other end.  In case of lost CWR,
-	 * resend last_cwr_tsn.  
+	 * resend last_cwr_tsn.
 	 */
 	repl = sctp_make_cwr(asoc, asoc->last_cwr_tsn, chunk);
 
@@ -1067,22 +1074,32 @@ static void sctp_cmd_assoc_failed(sctp_cmd_seq_t *commands,
 }
 
 /* Process an init chunk (may be real INIT/INIT-ACK or an embedded INIT
- * inside the cookie.
+ * inside the cookie.  In reality, this is only used for INIT-ACK processing
+ * since all other cases use "temporary" associations and can do all
+ * their work in statefuns directly. 
  */
-static void sctp_cmd_process_init(sctp_cmd_seq_t *commands,
-				  sctp_association_t *asoc,
-				  sctp_chunk_t *chunk,
-				  sctp_init_chunk_t *peer_init,
-				  int priority)
+static int sctp_cmd_process_init(sctp_cmd_seq_t *commands,
+				 sctp_association_t *asoc,
+				 sctp_chunk_t *chunk,
+				 sctp_init_chunk_t *peer_init,
+				 int priority)
 {
-	/* The command sequence holds commands assuming that the
-	 * processing will happen successfully.  If this is not the
-	 * case, rewind the sequence and add appropriate  error handling
-	 * to the sequence.
+	int error;
+
+	/* We only process the init as a sideeffect in a single
+	 * case.   This is when we process the INIT-ACK.   If we
+	 * fail during INIT processing (due to malloc problems),
+	 * just return the error and stop processing the stack.
 	 */
-	sctp_process_init(asoc, chunk->chunk_hdr->type,
-			  sctp_source(chunk), peer_init,
-			  priority);
+
+	if (!sctp_process_init(asoc, chunk->chunk_hdr->type,
+			       sctp_source(chunk), peer_init,
+			       priority))
+		error = -ENOMEM;
+	else
+		error = 0;
+
+	return error;
 }
 
 /* Helper function to break out starting up of heartbeat timers.  */
