@@ -555,21 +555,36 @@ struct bus_type * find_bus(char * name)
  */
 int bus_register(struct bus_type * bus)
 {
+	int retval;
+
 	kobject_set_name(&bus->subsys.kset.kobj,bus->name);
 	subsys_set_kset(bus,bus_subsys);
-	subsystem_register(&bus->subsys);
+	retval = subsystem_register(&bus->subsys);
+	if (retval) 
+		goto out;
 
 	kobject_set_name(&bus->devices.kobj, "devices");
 	bus->devices.subsys = &bus->subsys;
-	kset_register(&bus->devices);
+	retval = kset_register(&bus->devices);
+	if (retval)
+		goto bus_devices_fail;
 
 	kobject_set_name(&bus->drivers.kobj, "drivers");
 	bus->drivers.subsys = &bus->subsys;
 	bus->drivers.ktype = &ktype_driver;
-	kset_register(&bus->drivers);
+	retval = kset_register(&bus->drivers);
+	if (retval)
+		goto bus_drivers_fail;
 
 	pr_debug("bus type '%s' registered\n",bus->name);
 	return 0;
+
+bus_drivers_fail:
+	kset_unregister(&bus->devices);
+bus_devices_fail:
+	subsystem_unregister(&bus->subsys);
+out:
+	return retval;
 }
 
 
