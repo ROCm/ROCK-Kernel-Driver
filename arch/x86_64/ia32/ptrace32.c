@@ -210,6 +210,7 @@ static struct task_struct *find_target(int request, int pid, int *err)
 		return child; 
 	} 
  out:
+	if (child)
 	put_task_struct(child);
 	return NULL; 
 	

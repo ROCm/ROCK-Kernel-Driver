@@ -935,8 +935,8 @@ acpi_os_get_line(char *buffer)
 }
 
 /* Assumes no unreadable holes inbetween */
-BOOLEAN
-acpi_os_readable(void *ptr, u32 len)
+u8
+acpi_os_readable(void *ptr, acpi_size len)
 {
 #if defined(__i386__) || defined(__x86_64__) 
 	char tmp;
@@ -945,8 +945,8 @@ acpi_os_readable(void *ptr, u32 len)
 	return 1;
 }
 
-BOOLEAN
-acpi_os_writable(void *ptr, u32 len)
+u8
+acpi_os_writable(void *ptr, acpi_size len)
 {
 	/* could do dummy write (racy) or a kernel page table lookup.
 	   The later may be difficult at early boot when kmap doesn't work yet. */

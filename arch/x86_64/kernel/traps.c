@@ -27,6 +27,7 @@
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -206,7 +207,7 @@ void show_trace_task(struct task_struct *tsk)
 	show_trace((unsigned long *)rsp);
 }
 
-void show_stack(unsigned long * rsp)
+void show_stack(struct task_struct *tsk, unsigned long * rsp)
 {
 	unsigned long *stack;
 	int i;
@@ -214,7 +215,7 @@ void show_stack(unsigned long * rsp)
 	unsigned long *irqstack_end = (unsigned long *) (cpu_pda[cpu].irqstackptr);
 	unsigned long *irqstack = (unsigned long *) (cpu_pda[cpu].irqstackptr - IRQSTACKSIZE);    
 
-	// debugging aid: "show_stack(NULL);" prints the
+	// debugging aid: "show_stack(NULL, NULL);" prints the
 	// back trace for this cpu.
 
 	if(rsp==NULL)
@@ -269,7 +270,7 @@ void show_registers(struct pt_regs *regs)
 	if (in_kernel) {
 
 		printk("Stack: ");
-		show_stack((unsigned long*)rsp);
+		show_stack(NULL, (unsigned long*)rsp);
 
 		printk("\nCode: ");
 		if(regs->rip < PAGE_OFFSET)
@@ -831,3 +832,4 @@ void __init trap_init(void)
 	 */
 	cpu_init();
 }
+

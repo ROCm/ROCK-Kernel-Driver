@@ -486,10 +486,10 @@ __SYSCALL(__NR_get_thread_area, sys_ni_syscall)	/* use arch_prctl */
 __SYSCALL(__NR_lookup_dcookie, sys_lookup_dcookie)
 #define __NR_epoll_create	213
 __SYSCALL(__NR_epoll_create, sys_epoll_create)
-#define __NR_epoll_ctl	214
-__SYSCALL(__NR_epoll_ctl, sys_epoll_ctl)
-#define __NR_epoll_wait	215
-__SYSCALL(__NR_epoll_wait, sys_epoll_wait)
+#define __NR_epoll_ctl_old	214
+__SYSCALL(__NR_epoll_ctl_old, sys_ni_syscall)
+#define __NR_epoll_wait_old	215
+__SYSCALL(__NR_epoll_wait_old, sys_ni_syscall)
 #define __NR_remap_file_pages	216
 __SYSCALL(__NR_remap_file_pages, sys_remap_file_pages)
 #define __NR_getdents64	217
@@ -522,8 +522,12 @@ __SYSCALL(__NR_clock_getres, sys_clock_getres)
 __SYSCALL(__NR_clock_nanosleep, sys_clock_nanosleep)
 #define __NR_exit_group		231
 __SYSCALL(__NR_exit_group, sys_exit_group)
+#define __NR_epoll_wait		232
+__SYSCALL(__NR_epoll_wait, sys_epoll_wait)
+#define __NR_epoll_ctl		233
+__SYSCALL(__NR_epoll_ctl, sys_epoll_ctl)
 
-#define __NR_syscall_max __NR_exit_group
+#define __NR_syscall_max __NR_epoll_ctl
 #ifndef __NO_STUBS
 
 /* user-visible error numbers are in the range -1 - -4095 */

@@ -401,6 +401,9 @@ extern int kern_addr_valid(unsigned long addr);
 #define pgtable_cache_init()   do { } while (0)
 #define check_pgt_cache()      do { } while (0)
 
+#define PAGE_AGP    PAGE_KERNEL_NOCACHE
+#define HAVE_PAGE_AGP 1
+
 /* fs/proc/kcore.c */
 #define	kc_vaddr_to_offset(v) ((v) & __VIRTUAL_MASK)
 #define	kc_offset_to_vaddr(o) \
