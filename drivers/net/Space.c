@@ -77,7 +77,7 @@ extern struct net_device *smc_init(int unit);
 extern int atarilance_probe(struct net_device *);
 extern int sun3lance_probe(struct net_device *);
 extern int sun3_82586_probe(struct net_device *);
-extern int apne_probe(struct net_device *);
+extern struct net_device *apne_probe(int unit);
 extern struct net_device *bionet_probe(int unit);
 extern struct net_device *pamsnet_probe(int unit);
 extern struct net_device *cs89x0_probe(int unit);
@@ -305,13 +305,13 @@ static struct devprobe m68k_probes[] __initdata = {
 #ifdef CONFIG_SUN3_82586        /* sun3 onboard Intel 82586 chip */
 	{sun3_82586_probe, 0},
 #endif
-#ifdef CONFIG_APNE		/* A1200 PCMCIA NE2000 */
-	{apne_probe, 0},
-#endif
 	{NULL, 0},
 };
 
 static struct devprobe2 m68k_probes2[] __initdata = {
+#ifdef CONFIG_APNE		/* A1200 PCMCIA NE2000 */
+	{apne_probe, 0},
+#endif
 #ifdef CONFIG_ATARI_BIONET	/* Atari Bionet Ethernet board */
 	{bionet_probe, 0},
 #endif

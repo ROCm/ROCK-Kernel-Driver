@@ -116,28 +116,38 @@ static const char version[] =
 
 static int apne_owned;	/* signal if card already owned */
 
-int __init apne_probe(struct net_device *dev)
+struct net_device * __init apne_probe(int unit)
 {
+	struct net_device *dev;
 #ifndef MANUAL_CONFIG
 	char tuple[8];
 #endif
+	int err;
 
 	if (apne_owned)
-		return -ENODEV;
-
-	SET_MODULE_OWNER(dev);
+		return ERR_PTR(-ENODEV);
 
 	if ( !(AMIGAHW_PRESENT(PCMCIA)) )
-		return (-ENODEV);
+		return ERR_PTR(-ENODEV);
                                 
 	printk("Looking for PCMCIA ethernet card : ");
                                         
 	/* check if a card is inserted */
 	if (!(PCMCIA_INSERTED)) {
 		printk("NO PCMCIA card inserted\n");
-		return (-ENODEV);
+		return ERR_PTR(-ENODEV);
 	}
-                                                                                                
+
+	dev = alloc_etherdev(0);
+	if (!dev)
+		return ERR_PTR(-ENOMEM);
+	dev->priv = NULL;
+	if (unit >= 0) {
+		sprintf(dev->name, "eth%d", unit);
+		netdev_boot_setup_check(dev);
+	}
+	SET_MODULE_OWNER(dev);
+
 	/* disable pcmcia irq for readtuple */
 	pcmcia_disable_irq();
 
@@ -145,17 +155,41 @@ int __init apne_probe(struct net_device *dev)
 	if ((pcmcia_copy_tuple(CISTPL_FUNCID, tuple, 8) < 3) ||
 		(tuple[2] != CISTPL_FUNCID_NETWORK)) {
 		printk("not an ethernet card\n");
-		return (-ENODEV);
+		/* XXX: shouldn't we re-enable irq here? */
+		free_netdev(dev);
+		return ERR_PTR(-ENODEV);
 	}
 #endif
 
 	printk("ethernet PCMCIA card inserted\n");
 
-	if (init_pcmcia())
-		return apne_probe1(dev, IOBASE);
-	else
-		return (-ENODEV);
+	if (!init_pcmcia()) {
+		/* XXX: shouldn't we re-enable irq here? */
+		free_netdev(dev);
+		return ERR_PTR(-ENODEV);
+	}
 
+	if (!request_region(IOBASE, 0x20, dev->name)) {
+		free_netdev(dev);
+		return ERR_PTR(-EBUSY);
+	}
+
+	err = apne_probe1(dev, IOBASE);
+	if (err) {
+		release_region(IOBASE, 0x20);
+		free_netdev(dev);
+		return ERR_PTR(err);
+	}
+	err = register_netdev(dev);
+	if (!err)
+		return dev;
+
+	pcmcia_disable_irq();
+	free_irq(IRQ_AMIGA_PORTS, dev);
+	pcmcia_reset();
+	release_region(IOBASE, 0x20);
+	free_netdev(dev);
+	return ERR_PTR(err);
 }
 
 static int __init apne_probe1(struct net_device *dev, int ioaddr)
@@ -534,32 +568,29 @@ static irqreturn_t apne_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 }
 
 #ifdef MODULE
-static struct net_device apne_dev;
+static struct net_device *apne_dev;
 
 int init_module(void)
 {
 	int err;
 
-	apne_dev.init = apne_probe;
-	if ((err = register_netdev(&apne_dev))) {
-		if (err == -EIO)
-			printk("No PCMCIA NEx000 ethernet card found.\n");
-		return (err);
-	}
-	return (0);
+	apne_dev = apne_probe(-1);
+	if (IS_ERR(apne_dev))
+		return PTR_ERR(apne_dev);
+	return 0;
 }
 
 void cleanup_module(void)
 {
-	unregister_netdev(&apne_dev);
+	unregister_netdev(apne_dev);
 
 	pcmcia_disable_irq();
 
-	free_irq(IRQ_AMIGA_PORTS, &apne_dev);
+	free_irq(IRQ_AMIGA_PORTS, apne_dev);
 
 	pcmcia_reset();
 
-	apne_owned = 0;
+	free_netdev(apne_dev);
 }
 
 #endif
