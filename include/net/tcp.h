@@ -169,10 +169,9 @@ struct tcp_tw_bucket {
 	 * XXX Yes I know this is gross, but I'd have to edit every single
 	 * XXX networking file if I created a "struct sock_header". -DaveM
 	 */
-	volatile unsigned char	state,		/* Connection state	      */
-				substate;	/* "zapped" -> "substate"     */
+	unsigned short		family;
+	volatile unsigned char	state;		/* Connection state	      */
 	unsigned char		reuse;		/* SO_REUSEADDR setting       */
-	unsigned char		rcv_wscale;	/* also TW bucket specific    */
 	int			bound_dev_if;
 	/* Main hash linkage for various protocol lookup tables. */
 	struct sock		*next;
@@ -180,8 +179,9 @@ struct tcp_tw_bucket {
 	struct sock		*bind_next;
 	struct sock		**bind_pprev;
 	atomic_t		refcnt;
-	unsigned short		family;
 	/* End of struct sock/struct tcp_tw_bucket shared layout */
+	volatile unsigned char	substate;
+	unsigned char		rcv_wscale;
 	__u16			sport;
 	/* Socket demultiplex comparisons on incoming packets. */
 	/* these five are in inet_opt */

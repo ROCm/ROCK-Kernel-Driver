@@ -157,18 +157,18 @@ do {	spin_lock_init(&((__sk)->lock.slock)); \
  */
 struct sock {
 	/* Begin of struct sock/struct tcp_tw_bucket shared layout */
-	volatile unsigned char	state,
-				zapped;
+	unsigned short		family;
+	volatile unsigned char	state;
 	unsigned char		reuse;
-	unsigned char		shutdown;
 	int			bound_dev_if;
 	struct sock		*next;
 	struct sock		**pprev;
 	struct sock		*bind_next;
 	struct sock		**bind_pprev;
 	atomic_t		refcnt;
-	unsigned short		family;
 	/* End of struct sock/struct tcp_tw_bucket shared layout */
+	volatile unsigned char	zapped;
+	unsigned char		shutdown;
 	unsigned char		use_write_queue;
 	unsigned char		userlocks;
 	socket_lock_t		lock;
