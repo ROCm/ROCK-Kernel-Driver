@@ -406,11 +406,12 @@ static struct sk_buff *udsl_decode_aal5 (struct udsl_vcc_data *ctx, struct sk_bu
 **  encode  **
 *************/
 
+static const unsigned char zeros[ATM_CELL_PAYLOAD];
+
 static void udsl_groom_skb (struct atm_vcc *vcc, struct sk_buff *skb)
 {
 	struct udsl_control *ctrl = UDSL_SKB (skb);
-	unsigned int i, zero_padding;
-	unsigned char zero = 0;
+	unsigned int zero_padding;
 	u32 crc;
 
 	ctrl->atm_data.vcc = vcc;
@@ -436,8 +437,7 @@ static void udsl_groom_skb (struct atm_vcc *vcc, struct sk_buff *skb)
 	ctrl->aal5_trailer [3] = skb->len;
 
 	crc = crc32_be (~0, skb->data, skb->len);
-	for (i = 0; i < zero_padding; i++)
-		crc = crc32_be (crc, &zero, 1);
+	crc = crc32_be (crc, zeros, zero_padding);
 	crc = crc32_be (crc, ctrl->aal5_trailer, 4);
 	crc = ~crc;
 
