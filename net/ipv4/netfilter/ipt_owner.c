@@ -115,8 +115,6 @@ match(const struct sk_buff *skb,
       const struct net_device *out,
       const void *matchinfo,
       int offset,
-      const void *hdr,
-      u_int16_t datalen,
       int *hotdrop)
 {
 	const struct ipt_owner_info *info = matchinfo;
@@ -170,8 +168,11 @@ checkentry(const char *tablename,
                 return 0;
         }
 
-	if (matchsize != IPT_ALIGN(sizeof(struct ipt_owner_info)))
+	if (matchsize != IPT_ALIGN(sizeof(struct ipt_owner_info))) {
+		printk("Matchsize %u != %u\n", matchsize,
+		       IPT_ALIGN(sizeof(struct ipt_owner_info)));
 		return 0;
+	}
 
 	return 1;
 }
