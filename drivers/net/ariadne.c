@@ -54,7 +54,7 @@
 #include <asm/amigaints.h>
 #include <asm/amigahw.h>
 #include <linux/zorro.h>
-#include <asm/io.h>
+
 #include <asm/irq.h>
 
 #include "ariadne.h"
