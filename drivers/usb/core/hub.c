@@ -1345,6 +1345,7 @@ int usb_physical_reset_device(struct usb_device *dev)
 			dev->devpath, ret);
 		return ret;
 	}
+	dev->state = USB_STATE_CONFIGURED;
 
 	for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
 		struct usb_interface *intf = dev->actconfig->interface[i];
