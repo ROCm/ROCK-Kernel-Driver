@@ -527,6 +527,14 @@ acpi_processor_get_info (
 		request_region(pr->throttling.address, 6, "ACPI CPU throttle");
 	}
 
+	if (!errata.smp && (pr->id == 0) && acpi_fadt.cst_cnt) {
+		status = acpi_os_write_port(acpi_fadt.smi_cmd, acpi_fadt.cst_cnt, 8);
+		if (ACPI_FAILURE(status)) {
+			ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
+					  "Notifying BIOS of _CST ability failed\n"));
+		}
+	}
+
 	acpi_processor_get_power_info(pr);
 #ifdef CONFIG_CPU_FREQ
 	acpi_processor_ppc_has_changed(pr);
