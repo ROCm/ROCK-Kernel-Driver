@@ -735,6 +735,12 @@ S: Schimmelsrain 1
 S: D-69231 Rauenberg
 S: Germany
 
+N: Jean Delvare
+E: khali@linux-fr.org
+W: http://khali.linux-fr.org/
+D: Several hardware monitoring drivers
+S: France
+
 N: Peter Denison
 E: peterd@pnd-pc.demon.co.uk
 W: http://www.pnd-pc.demon.co.uk/promise/
