@@ -36,6 +36,7 @@ config BINFMT_FLAT
 config BINFMT_ZFLAT
 	bool "Enable ZFLAT support"
 	depends on BINFMT_FLAT
+	select ZLIB_INFLATE
 	help
 	  Support FLAT format compressed binaries
 
