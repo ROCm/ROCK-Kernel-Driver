@@ -344,6 +344,7 @@
 #define PCI_DEVICE_ID_ATI_RS300_200	0x5833
 /* ATI IXP Chipset */
 #define PCI_DEVICE_ID_ATI_IXP_IDE	0x4349
+#define PCI_DEVICE_ID_ATI_IXP2_IDE	0x4369	/* True name not yet sure */
 
 #define PCI_VENDOR_ID_VLSI		0x1004
 #define PCI_DEVICE_ID_VLSI_82C592	0x0005
