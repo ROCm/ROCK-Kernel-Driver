@@ -173,6 +173,7 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 	mm->free_area_cache = oldmm->mmap_base;
 	mm->map_count = 0;
 	mm->rss = 0;
+	mm->anon_rss = 0;
 	cpus_clear(mm->cpu_vm_mask);
 	mm->mm_rb = RB_ROOT;
 	rb_link = &mm->mm_rb.rb_node;

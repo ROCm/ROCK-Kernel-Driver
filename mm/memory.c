@@ -334,6 +334,8 @@ skip_copy_pte_range:
 				pte = pte_mkold(pte);
 				get_page(page);
 				dst->rss++;
+				if (PageAnon(page))
+					dst->anon_rss++;
 				set_pte(dst_pte, pte);
 				page_dup_rmap(page);
 cont_copy_pte_range_noset:
@@ -424,7 +426,9 @@ static void zap_pte_range(struct mmu_gather *tlb,
 				set_pte(ptep, pgoff_to_pte(page->index));
 			if (pte_dirty(pte))
 				set_page_dirty(page);
-			if (pte_young(pte) && !PageAnon(page))
+			if (PageAnon(page))
+				tlb->mm->anon_rss--;
+			else if (pte_young(pte))
 				mark_page_accessed(page);
 			tlb->freed++;
 			page_remove_rmap(page);
@@ -1109,6 +1113,8 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	spin_lock(&mm->page_table_lock);
 	page_table = pte_offset_map(pmd, address);
 	if (likely(pte_same(*page_table, pte))) {
+		if (PageAnon(old_page))
+			mm->anon_rss--;
 		if (PageReserved(old_page))
 			++mm->rss;
 		else
