@@ -1237,16 +1237,18 @@ int usb_serial_probe(struct usb_interface *interface,
 	}
 
 #if defined(CONFIG_USB_SERIAL_PL2303) || defined(CONFIG_USB_SERIAL_PL2303_MODULE)
-#if 0
+#if 1
 	/* BEGIN HORRIBLE HACK FOR PL2303 */ 
 	/* this is needed due to the looney way its endpoints are set up */
-	if (ifnum == 1) {
-		if (((dev->descriptor.idVendor == PL2303_VENDOR_ID) &&
-		     (dev->descriptor.idProduct == PL2303_PRODUCT_ID)) ||
-		    ((dev->descriptor.idVendor == ATEN_VENDOR_ID) &&
-		     (dev->descriptor.idProduct == ATEN_PRODUCT_ID))) {
+	if (((dev->descriptor.idVendor == PL2303_VENDOR_ID) &&
+	     (dev->descriptor.idProduct == PL2303_PRODUCT_ID)) ||
+	    ((dev->descriptor.idVendor == ATEN_VENDOR_ID) &&
+	     (dev->descriptor.idProduct == ATEN_PRODUCT_ID))) {
+		//if (ifnum == 1) {
+		if (interface != &dev->actconfig->interface[0]) {
 			/* check out the endpoints of the other interface*/
-			interface = &dev->actconfig->interface[ifnum ^ 1];
+			//interface = &dev->actconfig->interface[ifnum ^ 1];
+			interface = &dev->actconfig->interface[0];
 			iface_desc = &interface->altsetting[0];
 			for (i = 0; i < iface_desc->bNumEndpoints; ++i) {
 				endpoint = &iface_desc->endpoint[i];
@@ -1258,6 +1260,15 @@ int usb_serial_probe(struct usb_interface *interface,
 					++num_interrupt_in;
 				}
 			}
+		}
+
+		/* Now make sure the PL-2303 is configured correctly.
+		 * If not, give up now and hope this hack will work
+		 * properly during a later invocation of usb_serial_probe
+		 */
+		if (num_bulk_in == 0 || num_bulk_out == 0) {
+			info("PL-2303 hack: descriptors matched but endpoints did not");
+			return NULL;
 		}
 	}
 	/* END HORRIBLE HACK FOR PL2303 */
