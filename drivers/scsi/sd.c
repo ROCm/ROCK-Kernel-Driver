@@ -402,8 +402,7 @@ static int sd_init_command(Scsi_Cmnd * SCpnt)
 		nbuff, (rq_data_dir(SCpnt->request) == WRITE) ? 
 		"writing" : "reading", this_count, SCpnt->request->nr_sectors));
 
-	SCpnt->cmnd[1] = (SCpnt->device->scsi_level <= SCSI_2) ?
-			 ((SCpnt->lun << 5) & 0xe0) : 0;
+	SCpnt->cmnd[1] = 0;
 
 	if (((this_count > 0xff) || (block > 0x1fffff)) || SCpnt->device->ten) {
 		if (this_count > 0xffff)
@@ -815,9 +814,7 @@ sd_spinup_disk(Scsi_Disk *sdkp, char *diskname,
 
 		while (retries < 3) {
 			cmd[0] = TEST_UNIT_READY;
-			cmd[1] = (sdp->scsi_level <= SCSI_2) ?
-				((sdp->lun << 5) & 0xe0) : 0;
-			memset((void *) &cmd[2], 0, 8);
+			memset((void *) &cmd[1], 0, 9);
 
 			SRpnt->sr_cmd_len = 0;
 			SRpnt->sr_sense_buffer[0] = 0;
@@ -851,9 +848,7 @@ sd_spinup_disk(Scsi_Disk *sdkp, char *diskname,
 				printk(KERN_NOTICE "%s: Spinning up disk...",
 				       diskname);
 				cmd[0] = START_STOP;
-				cmd[1] = (sdp->scsi_level <= SCSI_2) ?
-					((sdp->lun << 5) & 0xe0) : 0;
-				cmd[1] |= 1;	/* Return immediately */
+				cmd[1] = 1;	/* Return immediately */
 				memset((void *) &cmd[2], 0, 8);
 				cmd[4] = 1;	/* Start spin cycle */
 				SRpnt->sr_cmd_len = 0;
@@ -894,7 +889,6 @@ sd_read_cache_type(Scsi_Disk *sdkp, char *diskname,
 		   Scsi_Request *SRpnt, unsigned char *buffer) {
 
 	unsigned char cmd[10];
-	Scsi_Device *sdp = sdkp->device;
 	int the_result, retries;
 
 	retries = 3;
@@ -902,9 +896,7 @@ sd_read_cache_type(Scsi_Disk *sdkp, char *diskname,
 
 		memset((void *) &cmd[0], 0, 10);
 		cmd[0] = MODE_SENSE;
-		cmd[1] = (sdp->scsi_level <= SCSI_2) ?
-			 ((sdp->lun << 5) & 0xe0) : 0;
-		cmd[1] |= 0x08;	/* DBD */
+		cmd[1] = 0x08;	/* DBD */
 		cmd[2] = 0x08;	/* current values, cache page */
 		cmd[4] = 128;	/* allocation length */
 
@@ -968,9 +960,7 @@ sd_read_capacity(Scsi_Disk *sdkp, char *diskname,
 	retries = 3;
 	do {
 		cmd[0] = READ_CAPACITY;
-		cmd[1] = (sdp->scsi_level <= SCSI_2) ?
-			((sdp->lun << 5) & 0xe0) : 0;
-		memset((void *) &cmd[2], 0, 8);
+		memset((void *) &cmd[1], 0, 9);
 		memset((void *) buffer, 0, 8);
 
 		SRpnt->sr_cmd_len = 0;
@@ -1090,7 +1080,6 @@ sd_do_mode_sense6(Scsi_Device *sdp, Scsi_Request *SRpnt,
 
 	memset((void *) &cmd[0], 0, 8);
 	cmd[0] = MODE_SENSE;
-	cmd[1] = (sdp->scsi_level <= SCSI_2) ? ((sdp->lun << 5) & 0xe0) : 0;
 	cmd[2] = modepage;
 	cmd[4] = len;
 
@@ -1611,7 +1600,6 @@ static int sd_synchronize_cache(int index, int verbose)
 		unsigned char cmd[10] = { 0 };
 
 		cmd[0] = SYNCHRONIZE_CACHE;
-		cmd[1] = SDpnt->scsi_level <= SCSI_2 ? (SDpnt->lun << 5) & 0xe0 : 0;
 		/* leave the rest of the command zero to indicate 
 		 * flush everything */
 		scsi_wait_req(SRpnt, (void *)cmd, NULL, 0,

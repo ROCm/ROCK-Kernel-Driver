@@ -705,10 +705,6 @@ sg_common_write(Sg_fd * sfp, Sg_request * srp,
 	SRpnt->sr_request->rq_dev = sdp->i_rdev;
 	SRpnt->sr_sense_buffer[0] = 0;
 	SRpnt->sr_cmd_len = hp->cmd_len;
-	if (!(hp->flags & SG_FLAG_LUN_INHIBIT)) {
-		if (sdp->device->scsi_level <= SCSI_2)
-			cmnd[1] = (cmnd[1] & 0x1f) | (sdp->device->lun << 5);
-	}
 	SRpnt->sr_use_sg = srp->data.k_use_sg;
 	SRpnt->sr_sglist_len = srp->data.sglist_len;
 	SRpnt->sr_bufflen = srp->data.bufflen;

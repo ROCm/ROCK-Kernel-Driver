@@ -336,9 +336,7 @@ static int sr_init_command(Scsi_Cmnd * SCpnt)
 		   (rq_data_dir(SCpnt->request) == WRITE) ? "writing" : "reading",
 				 this_count, SCpnt->request->nr_sectors));
 
-	SCpnt->cmnd[1] = (SCpnt->device->scsi_level <= SCSI_2) ?
-			 ((SCpnt->lun << 5) & 0xe0) : 0;
-
+	SCpnt->cmnd[1] = 0;
 	block = (unsigned int)SCpnt->request->sector / (s_size >> 9);
 
 	if (this_count > 0xffff)
@@ -486,9 +484,7 @@ static void get_sectorsize(Scsi_CD *cd)
 
 	do {
 		cmd[0] = READ_CAPACITY;
-		cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
-			 ((cd->device->lun << 5) & 0xe0) : 0;
-		memset((void *) &cmd[2], 0, 8);
+		memset((void *) &cmd[1], 0, 9);
 		SRpnt->sr_request->rq_status = RQ_SCSI_BUSY;	/* Mark as really busy */
 		SRpnt->sr_cmd_len = 0;
 
@@ -599,8 +595,6 @@ void get_capabilities(Scsi_CD *cd)
 	}
 	memset(&cgc, 0, sizeof(struct cdrom_generic_command));
 	cgc.cmd[0] = MODE_SENSE;
-	cgc.cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
-		     ((cd->device->lun << 5) & 0xe0) : 0;
 	cgc.cmd[2] = 0x2a;
 	cgc.cmd[4] = 128;
 	cgc.buffer = buffer;
@@ -678,13 +672,6 @@ void get_capabilities(Scsi_CD *cd)
  */
 static int sr_packet(struct cdrom_device_info *cdi, struct cdrom_generic_command *cgc)
 {
-	Scsi_CD *cd = cdi->handle;
-	Scsi_Device *device = cd->device;
-	
-	/* set the LUN */
-	if (device->scsi_level <= SCSI_2)
-		cgc->cmd[1] |= device->lun << 5;
-
 	if (cgc->timeout <= 0)
 		cgc->timeout = IOCTL_TIMEOUT;
 
