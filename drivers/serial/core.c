@@ -2405,17 +2405,22 @@ int uart_register_port(struct uart_driver *drv, struct uart_port *port)
 			goto out;
 		}
 
-		state->port->iobase   = port->iobase;
-		state->port->membase  = port->membase;
-		state->port->irq      = port->irq;
-		state->port->uartclk  = port->uartclk;
-		state->port->fifosize = port->fifosize;
-		state->port->regshift = port->regshift;
-		state->port->iotype   = port->iotype;
-		state->port->flags    = port->flags;
-		state->port->line     = state - drv->state;
+		/*
+		 * If the port is already initialised, don't touch it.
+		 */
+		if (state->port->type == PORT_UNKNOWN) {
+			state->port->iobase   = port->iobase;
+			state->port->membase  = port->membase;
+			state->port->irq      = port->irq;
+			state->port->uartclk  = port->uartclk;
+			state->port->fifosize = port->fifosize;
+			state->port->regshift = port->regshift;
+			state->port->iotype   = port->iotype;
+			state->port->flags    = port->flags;
+			state->port->line     = state - drv->state;
 
-		__uart_register_port(drv, state, state->port);
+			__uart_register_port(drv, state, state->port);
+		}
 
 		ret = state->port->line;
 	} else
