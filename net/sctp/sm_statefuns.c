@@ -966,7 +966,7 @@ static int sctp_sf_check_restart_addrs(const sctp_association_t *new_asoc,
 		new_addr = list_entry(pos, struct sctp_transport, transports);
 		found = 0;
 		list_for_each(pos2, &asoc->peer.transport_addr_list) {
-			addr = list_entry(pos2, struct sctp_transport, 
+			addr = list_entry(pos2, struct sctp_transport,
 					  transports);
 			if (sctp_cmp_addr_exact(&new_addr->ipaddr,
 						&addr->ipaddr)) {
@@ -1049,20 +1049,17 @@ static char sctp_tietags_compare(sctp_association_t *new_asoc,
 	    (asoc->c.peer_vtag == new_asoc->c.peer_ttag))
 		return 'A';
 
-	/* Collision case D.
-	 * Note: Test case D first, otherwise it may be incorrectly
-	 * identified as second case of B if the value of the Tie_tag is
-	 * not filled into the state cookie.
-	 */
-	if ((asoc->c.my_vtag == new_asoc->c.my_vtag) &&
-	    (asoc->c.peer_vtag == new_asoc->c.peer_vtag))
-		return 'D';
-
 	/* Collision case B. */
 	if ((asoc->c.my_vtag == new_asoc->c.my_vtag) &&
 	    ((asoc->c.peer_vtag != new_asoc->c.peer_vtag) ||
-	     (!new_asoc->c.my_ttag && !new_asoc->c.peer_ttag)))
+	     (0 == asoc->c.peer_vtag))) {
 		return 'B';
+	}
+
+	/* Collision case D. */
+	if ((asoc->c.my_vtag == new_asoc->c.my_vtag) &&
+	    (asoc->c.peer_vtag == new_asoc->c.peer_vtag))
+		return 'D';
 
 	/* Collision case C. */
 	if ((asoc->c.my_vtag != new_asoc->c.my_vtag) &&
@@ -1071,7 +1068,8 @@ static char sctp_tietags_compare(sctp_association_t *new_asoc,
 	    (0 == new_asoc->c.peer_ttag))
 		return 'C';
 
-	return 'E'; /* No such case available. */
+	/* No match to any of the special cases; discard this packet. */
+	return 'E';
 }
 
 /* Common helper routine for both duplicate and simulataneous INIT
@@ -1501,11 +1499,17 @@ static sctp_disposition_t sctp_sf_do_dupcook_d(const sctp_endpoint_t *ep,
 	sctp_ulpevent_t *ev = NULL;
 	sctp_chunk_t *repl;
 
-	/* The local endpoint cannot use any value from the received
-	 * state cookie and need to immediately resend a COOKIE-ACK
-	 * and move into ESTABLISHED if it hasn't done so.
+	/* Clarification from Implementor's Guide:
+	 * D) When both local and remote tags match the endpoint should
+         * enter the ESTABLISHED state, if it is in the COOKIE-ECHOED state.
+         * It should stop any cookie timer that may be running and send
+         * a COOKIE ACK.
 	 */
-	if (SCTP_STATE_ESTABLISHED != asoc->state) {
+
+	/* Don't accidentally move back into established state. */
+	if (asoc->state < SCTP_STATE_ESTABLISHED) {
+		sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_STOP,
+				SCTP_TO(SCTP_EVENT_TIMEOUT_T1_COOKIE));
 		sctp_add_cmd_sf(commands, SCTP_CMD_NEW_STATE,
 				SCTP_STATE(SCTP_STATE_ESTABLISHED));
 		sctp_add_cmd_sf(commands, SCTP_CMD_HB_TIMERS_START,
@@ -1529,13 +1533,14 @@ static sctp_disposition_t sctp_sf_do_dupcook_d(const sctp_endpoint_t *ep,
 				SCTP_ULPEVENT(ev));
 	}
 	sctp_add_cmd_sf(commands, SCTP_CMD_TRANSMIT, SCTP_NULL());
-
+	
 	repl = sctp_make_cookie_ack(new_asoc, chunk);
 	if (!repl)
 		goto nomem;
-
+	
 	sctp_add_cmd_sf(commands, SCTP_CMD_REPLY, SCTP_CHUNK(repl));
 	sctp_add_cmd_sf(commands, SCTP_CMD_TRANSMIT, SCTP_NULL());
+
 	return SCTP_DISPOSITION_CONSUME;
 
 nomem:
@@ -1606,8 +1611,6 @@ sctp_disposition_t sctp_sf_do_5_2_4_dupcook(const sctp_endpoint_t *ep,
 			sctp_send_stale_cookie_err(ep, asoc, chunk, commands,
 						   err_chk_p);
 			return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
-
-			break;
 		case -SCTP_IERROR_BAD_SIG:
 		default:
 			return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
@@ -1640,9 +1643,8 @@ sctp_disposition_t sctp_sf_do_5_2_4_dupcook(const sctp_endpoint_t *ep,
 					      new_asoc);
 		break;
 
-	default: /* No such case, discard it. */
-		printk(KERN_WARNING "%s:unknown case\n", __FUNCTION__);
-		retval = SCTP_DISPOSITION_DISCARD;
+	default: /* Discard packet for all others. */
+		retval = sctp_sf_pdiscard(ep, asoc, type, arg, commands);
 		break;
         };
 
@@ -1849,8 +1851,8 @@ sctp_disposition_t sctp_sf_do_5_2_6_stale(const sctp_endpoint_t *ep,
 	sctp_add_cmd_sf(commands, SCTP_CMD_COUNTER_INC,
 			SCTP_COUNTER(SCTP_COUNTER_INIT_ERROR));
 
-	/* If we've sent any data bundled with COOKIE-ECHO we need to 
-	 * resend. 
+	/* If we've sent any data bundled with COOKIE-ECHO we need to
+	 * resend.
 	 */
 	list_for_each(pos, &asoc->peer.transport_addr_list) {
 		t = list_entry(pos, struct sctp_transport, transports);
