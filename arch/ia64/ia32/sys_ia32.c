@@ -2779,7 +2779,8 @@ sys32_epoll_wait(int epfd, struct epoll_event32 *events, int maxevents,
 	size = maxevents * sizeof(struct epoll_event);
 	events64 = kmalloc(size, GFP_KERNEL);
 	if (events64 == NULL) {
-		events64 = __get_free_pages(GFP_KERNEL, get_order(size));
+		events64 = (struct epoll_event *)
+				__get_free_pages(GFP_KERNEL, get_order(size));
 		if (events64 == NULL) 
 			return -ENOMEM;
 		do_free_pages = 1;
@@ -2805,7 +2806,7 @@ sys32_epoll_wait(int epfd, struct epoll_event32 *events, int maxevents,
 	}
 
 	if (do_free_pages)
-		free_pages(events64, get_order(size));
+		free_pages((unsigned long) events64, get_order(size));
 	else
 		kfree(events64);
 	return numevents;
