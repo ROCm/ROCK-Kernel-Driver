@@ -21,7 +21,6 @@
 
 #include <linux/config.h>
 
-#include <linux/version.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/types.h>
@@ -52,7 +51,7 @@ MODULE_DESCRIPTION("v4l(1) compatibility layer for v4l2 drivers.");
 MODULE_LICENSE("GPL");
 
 #define dprintk(fmt, arg...)	if (debug) \
-	printk(KERN_DEBUG "v4l1-compat: " fmt, ## arg)
+	printk(KERN_DEBUG "v4l1-compat: " fmt , ## arg)
 
 /*
  *	I O C T L   T R A N S L A T I O N
@@ -80,8 +79,10 @@ get_v4l_control(struct inode            *inode,
 	{
 		ctrl2.id = qctrl2.id;
 		err = drv(inode, file, VIDIOC_G_CTRL, &ctrl2);
-		if (err < 0)
+		if (err < 0) {
 			dprintk("VIDIOC_G_CTRL: %d\n",err);
+			return 0;
+		}
 		return ((ctrl2.value - qctrl2.minimum) * 65535
 			 + (qctrl2.maximum - qctrl2.minimum) / 2)
 			/ (qctrl2.maximum - qctrl2.minimum);
@@ -207,17 +208,10 @@ static int poll_one(struct file *file)
 {
 	int retval = 1;
 	poll_table *table;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,48)
-	poll_table wait_table;
-
-	poll_initwait(&wait_table);
-	table = &wait_table;
-#else
 	struct poll_wqueues pwq;
 
 	poll_initwait(&pwq);
 	table = &pwq.pt;
-#endif
 	for (;;) {
 		int mask;
 		set_current_state(TASK_INTERRUPTIBLE);
@@ -231,12 +225,8 @@ static int poll_one(struct file *file)
 		}
 		schedule();
 	}
-	current->state = TASK_RUNNING;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,48)
-	poll_freewait(&wait_table);
-#else
+	set_current_state(TASK_RUNNING);
 	poll_freewait(&pwq);
-#endif
 	return retval;
 }
 
@@ -482,6 +472,7 @@ v4l_compat_translate_ioctl(struct inode         *inode,
 			fmt2->fmt.pix.width  = win->width;
 			fmt2->fmt.pix.height = win->height;
 			fmt2->fmt.pix.field  = V4L2_FIELD_ANY;
+			fmt2->fmt.pix.bytesperline = 0;
 			err = drv(inode, file, VIDIOC_S_FMT, fmt2);
 			if (err < 0)
 				dprintk("VIDIOCSWIN / VIDIOC_S_FMT #1: %d\n",
@@ -509,6 +500,14 @@ v4l_compat_translate_ioctl(struct inode         *inode,
 	}
 	case VIDIOCCAPTURE: /*  turn on/off preview  */
 	{
+		int *on = arg;
+
+		if (0 == *on) {
+			/* dirty hack time.  But v4l1 has no STREAMOFF
+			 * equivalent in the API, and this one at
+			 * least comes close ... */
+			drv(inode, file, VIDIOC_STREAMOFF, NULL);
+		}
 		err = drv(inode, file, VIDIOC_OVERLAY, arg);
 		if (err < 0)
 			dprintk("VIDIOCCAPTURE / VIDIOC_PREVIEW: %d\n",err);
@@ -719,7 +718,8 @@ v4l_compat_translate_ioctl(struct inode         *inode,
 	case VIDIOCGFREQ: /*  get frequency  */
 	{
 		int *freq = arg;
-		
+
+		freq2.tuner = 0;
 		err = drv(inode, file, VIDIOC_G_FREQUENCY, &freq2);
 		if (err < 0)
 			dprintk("VIDIOCGFREQ / VIDIOC_G_FREQUENCY: %d\n",err);
@@ -731,6 +731,7 @@ v4l_compat_translate_ioctl(struct inode         *inode,
 	{
 		int *freq = arg;
 
+		freq2.tuner = 0;
 		drv(inode, file, VIDIOC_G_FREQUENCY, &freq2);
 		freq2.frequency = *freq;
 		err = drv(inode, file, VIDIOC_S_FREQUENCY, &freq2);
@@ -877,6 +878,7 @@ v4l_compat_translate_ioctl(struct inode         *inode,
 			fmt2->fmt.pix.pixelformat =
 				palette_to_pixelformat(mm->format);
 			fmt2->fmt.pix.field = V4L2_FIELD_ANY;
+			fmt2->fmt.pix.bytesperline = 0;
 			err = drv(inode, file, VIDIOC_S_FMT, fmt2);
 			if (err < 0) {
 				dprintk("VIDIOCMCAPTURE / VIDIOC_S_FMT: %d\n",err);
@@ -895,7 +897,7 @@ v4l_compat_translate_ioctl(struct inode         *inode,
 			dprintk("VIDIOCMCAPTURE / VIDIOC_QBUF: %d\n",err);
 			break;
 		}
-		err = drv(inode, file, VIDIOC_STREAMON, &buf2.type);
+		err = drv(inode, file, VIDIOC_STREAMON, NULL);
 		if (err < 0)
 			dprintk("VIDIOCMCAPTURE / VIDIOC_STREAMON: %d\n",err);
 		break;
@@ -989,7 +991,7 @@ v4l_compat_translate_ioctl(struct inode         *inode,
 
 		if (fmt2->fmt.vbi.samples_per_line != fmt->samples_per_line ||
 		    fmt2->fmt.vbi.sampling_rate    != fmt->sampling_rate    ||
-		    fmt2->fmt.vbi.sample_format    != V4L2_PIX_FMT_GREY     ||
+		    VIDEO_PALETTE_RAW              != fmt->sample_format    ||
 		    fmt2->fmt.vbi.start[0]         != fmt->start[0]         ||
 		    fmt2->fmt.vbi.count[0]         != fmt->count[0]         ||
 		    fmt2->fmt.vbi.start[1]         != fmt->start[1]         ||
@@ -999,10 +1001,9 @@ v4l_compat_translate_ioctl(struct inode         *inode,
 			break;
 		}
 		err = drv(inode, file, VIDIOC_S_FMT, fmt2);
-		if (err < 0) {
+		if (err < 0)
 			dprintk("VIDIOCSVBIFMT / VIDIOC_S_FMT: %d\n", err);
-			break;
-		}
+		break;
 	}
 	
 	default:
