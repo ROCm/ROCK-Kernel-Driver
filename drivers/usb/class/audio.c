@@ -3841,8 +3841,7 @@ static void usb_audio_disconnect(struct usb_interface *intf)
 		return;
 	}
 	down(&open_sem);
-	list_del(&s->audiodev);
-	INIT_LIST_HEAD(&s->audiodev);
+	list_del_init(&s->audiodev);
 	s->usbdev = NULL;
 	dev_set_drvdata (&intf->dev, NULL);
 

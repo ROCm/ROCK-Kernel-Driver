@@ -158,8 +158,7 @@ static inline void insert_hash(struct hfs_cat_entry *entry)
 
 static inline void remove_hash(struct hfs_cat_entry *entry)
 {
-	list_del(&entry->hash);
-	INIT_LIST_HEAD(&entry->hash);
+	list_del_init(&entry->hash);
 }
 
 /*
@@ -223,8 +222,7 @@ static void delete_entry(struct hfs_cat_entry *entry)
 {
         if (!(entry->state & HFS_DELETED)) {
 	        entry->state |= HFS_DELETED;
-		list_del(&entry->hash);
-		INIT_LIST_HEAD(&entry->hash);
+		list_del_init(&entry->hash);
 
 	        if (entry->type == HFS_CDR_FIL) {
 		  /* free all extents */
@@ -836,8 +834,7 @@ static void invalidate_list(struct list_head *head, struct hfs_mdb *mdb,
 		}
 
 		if (!entry->count) {
-		        list_del(&entry->hash);
-			INIT_LIST_HEAD(&entry->hash);
+		        list_del_init(&entry->hash);
 			list_del(&entry->list);
 			list_add(&entry->list, dispose);
 			continue;
