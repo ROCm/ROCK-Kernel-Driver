@@ -437,7 +437,7 @@ struct atapi_mechstat_header {
 
 	byte     curlba[3];
 	byte     nslots;
-	__u8 short slot_tablelen;
+	__u8	 slot_tablelen;
 };
 
 
