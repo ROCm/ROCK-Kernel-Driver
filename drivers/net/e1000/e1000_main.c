@@ -834,18 +834,25 @@ e1000_setup_rctl(struct e1000_adapter *adapter)
 {
 	uint32_t rctl;
 
-	/* Setup the Receive Control Register */
-	rctl = E1000_RCTL_EN | E1000_RCTL_BAM |
-	       E1000_RCTL_LBM_NO | E1000_RCTL_RDMTS_HALF |
-	       (adapter->hw.mc_filter_type << E1000_RCTL_MO_SHIFT);
+	rctl = E1000_READ_REG(&adapter->hw, RCTL);
+
+	rctl &= ~(3 << E1000_RCTL_MO_SHIFT);
+
+	rctl |= E1000_RCTL_EN | E1000_RCTL_BAM |
+	        E1000_RCTL_LBM_NO | E1000_RCTL_RDMTS_HALF |
+	        (adapter->hw.mc_filter_type << E1000_RCTL_MO_SHIFT);
 
 	if(adapter->hw.tbi_compatibility_on == 1)
 		rctl |= E1000_RCTL_SBP;
+	else
+		rctl &= ~E1000_RCTL_SBP;
 
+	rctl &= ~(E1000_RCTL_SZ_4096);
 	switch (adapter->rx_buffer_len) {
 	case E1000_RXBUFFER_2048:
 	default:
 		rctl |= E1000_RCTL_SZ_2048;
+		rctl &= ~(E1000_RCTL_BSEX | E1000_RCTL_LPE);
 		break;
 	case E1000_RXBUFFER_4096:
 		rctl |= E1000_RCTL_SZ_4096 | E1000_RCTL_BSEX | E1000_RCTL_LPE;
@@ -1961,8 +1968,8 @@ e1000_alloc_rx_buffers(struct e1000_adapter *adapter)
 
 		rx_desc->buffer_addr = cpu_to_le64(rx_ring->buffer_info[i].dma);
 
-		/* move tail */
-		E1000_WRITE_REG(&adapter->hw, RDT, i);
+		if(!(i % E1000_RX_BUFFER_WRITE))
+			E1000_WRITE_REG(&adapter->hw, RDT, i);
 
 		i = (i + 1) % rx_ring->count;
 	}

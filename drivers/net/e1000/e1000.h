@@ -140,7 +140,9 @@ struct e1000_adapter;
 #define E1000_RXBUFFER_16384 16384
 
 /* How many Tx Descriptors do we need to call netif_wake_queue ? */
-#define E1000_TX_QUEUE_WAKE 16
+#define E1000_TX_QUEUE_WAKE	16
+/* How many Rx Buffers do we bundle into one write to the hardware ? */
+#define E1000_RX_BUFFER_WRITE	16
 
 #define E1000_JUMBO_PBA      0x00000028
 #define E1000_DEFAULT_PBA    0x00000030
@@ -201,7 +203,6 @@ struct e1000_adapter {
 	uint16_t link_duplex;
 	spinlock_t stats_lock;
 	atomic_t irq_sem;
-	boolean_t rx_csum;
 
 	/* TX */
 	struct e1000_desc_ring tx_ring;
@@ -215,6 +216,7 @@ struct e1000_adapter {
 	uint64_t hw_csum_err;
 	uint64_t hw_csum_good;
 	uint32_t rx_int_delay;
+	boolean_t rx_csum;
 
 	/* OS defined structs */
 	struct net_device *netdev;
