@@ -45,6 +45,8 @@
 #define VORTEX_EQ_SOURCE (VORTEX_EQ_BASE + 0x430)
 #define VORTEX_EQ_CTRL   (VORTEX_EQ_BASE + 0x440)
 
+#define VORTEX_BAND_COEFF_SIZE 0x30
+
 /* CEqHw.s */
 static void vortex_EqHw_SetTimeConsts(vortex_t * vortex, u16 gain, u16 level)
 {
@@ -319,25 +321,27 @@ static void vortex_EqHw_GetRightGainsCurrent(vortex_t * vortex, u16 a[])
 
 #endif
 /* EQ band levels settings */
-static void vortex_EqHw_SetLevels(vortex_t * vortex, u16 a[])
+static void vortex_EqHw_SetLevels(vortex_t * vortex, u16 peaks[])
 {
 	eqhw_t *eqhw = &(vortex->eq.this04);
-	int ebx;
+	int i;
 
-	for (ebx = 0; ebx < eqhw->this04; ebx++) {
-		hwwrite(vortex->mmio, 0x2b024 + ebx * 0x30, a[ebx]);
+	/* set left peaks */
+	for (i = 0; i < eqhw->this04; i++) {
+		hwwrite(vortex->mmio, 0x2b024 + i * VORTEX_BAND_COEFF_SIZE, peaks[i]);
 	}
 
-	hwwrite(vortex->mmio, 0x2b3cc, a[eqhw->this04]);
-	hwwrite(vortex->mmio, 0x2b3d8, a[eqhw->this04 + 1]);
+	hwwrite(vortex->mmio, 0x2b3cc, peaks[eqhw->this04]);
+	hwwrite(vortex->mmio, 0x2b3d8, peaks[eqhw->this04 + 1]);
 
-	for (ebx = 0; ebx < eqhw->this04; ebx++) {
-		hwwrite(vortex->mmio, 0x2b204 + ebx * 0x30,
-			a[ebx + (eqhw->this04 + 2)]);
+	/* set right peaks */
+	for (i = 0; i < eqhw->this04; i++) {
+		hwwrite(vortex->mmio, 0x2b204 + i * VORTEX_BAND_COEFF_SIZE,
+			peaks[i + (eqhw->this04 + 2)]);
 	}
 
-	hwwrite(vortex->mmio, 0x2b3e4, a[2 + (eqhw->this04 * 2)]);
-	hwwrite(vortex->mmio, 0x2b3f0, a[3 + (eqhw->this04 * 2)]);
+	hwwrite(vortex->mmio, 0x2b3e4, peaks[2 + (eqhw->this04 * 2)]);
+	hwwrite(vortex->mmio, 0x2b3f0, peaks[3 + (eqhw->this04 * 2)]);
 }
 
 #if 0
