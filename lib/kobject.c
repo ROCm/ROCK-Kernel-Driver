@@ -236,8 +236,6 @@ static void unlink(struct kobject * kobj)
 		list_del_init(&kobj->entry);
 		up_write(&kobj->kset->subsys->rwsem);
 	}
-	if (kobj->parent) 
-		kobject_put(kobj->parent);
 	kobject_put(kobj);
 }
 
@@ -274,9 +272,11 @@ int kobject_add(struct kobject * kobj)
 	kobj->parent = parent;
 
 	error = create_dir(kobj);
-	if (error)
+	if (error) {
 		unlink(kobj);
-	else {
+		if (parent)
+			kobject_put(parent);
+	} else {
 		/* If this kobj does not belong to a kset,
 		   try to find a parent that does. */
 		top_kobj = kobj;
@@ -452,6 +452,7 @@ void kobject_cleanup(struct kobject * kobj)
 {
 	struct kobj_type * t = get_ktype(kobj);
 	struct kset * s = kobj->kset;
+	struct kobject * parent = kobj->parent;
 
 	pr_debug("kobject %s: cleaning up\n",kobject_name(kobj));
 	if (kobj->k_name != kobj->name)
@@ -461,6 +462,8 @@ void kobject_cleanup(struct kobject * kobj)
 		t->release(kobj);
 	if (s)
 		kset_put(s);
+	if (parent) 
+		kobject_put(parent);
 }
 
 /**
