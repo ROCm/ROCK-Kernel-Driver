@@ -220,6 +220,6 @@ ENTRY(v4t_late_abort)
 	and	r6, r6, #15			@ number of regs to transfer
 	and	r5, r8, #7 << 8
 	ldr	r7, [sp, r5, lsr #6]
-	sub	r7, r7, r6, lsr #2		@ always decrement
+	sub	r7, r7, r6, lsl #2		@ always decrement
 	str	r7, [sp, r5, lsr #6]
 	mov	pc, lr
