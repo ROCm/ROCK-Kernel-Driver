@@ -92,6 +92,15 @@ struct snd_ice1712_card_info snd_vt1720_mobo_cards[] __devinitdata = {
 		.eeprom_size = sizeof(k8x800_eeprom),
 		.eeprom_data = k8x800_eeprom,
 	},
+	{
+		.subvendor = VT1720_SUBDEVICE_ZNF3_250,
+		.name = "Chaintech ZNF3-250",
+		/* identical with k8x800 */
+		.chip_init = k8x800_init,
+		.build_controls = k8x800_add_controls,
+		.eeprom_size = sizeof(k8x800_eeprom),
+		.eeprom_data = k8x800_eeprom,
+	},
 	{ } /* terminator */
 };
 
