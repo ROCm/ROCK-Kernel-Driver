@@ -575,45 +575,45 @@ static int __init agp_intel_i460_probe (struct pci_dev *dev, const struct pci_de
 	return 0;
 }
 
-static struct pci_device_id agp_i460_pci_table[] __initdata = {
+static struct pci_device_id agp_intel_i460_pci_table[] __initdata = {
 	{
 	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
 	.class_mask	= ~0,
 	.vendor		= PCI_VENDOR_ID_INTEL,
-	.device		= PCI_DEVICE_ID_INTEL_460GX,
+	.device		= PCI_DEVICE_ID_INTEL_84460GX,
 	.subvendor	= PCI_ANY_ID,
 	.subdevice	= PCI_ANY_ID,
 	},
 	{ }
 };
 
-MODULE_DEVICE_TABLE(pci, agp_i460_pci_table);
+MODULE_DEVICE_TABLE(pci, agp_intel_i460_pci_table);
 
-static struct __initdata pci_driver agp_i460_pci_driver = {
+static struct __initdata pci_driver agp_intel_i460_pci_driver = {
 	.name		= "agpgart-intel-i460",
-	.id_table	= agp_i460_pci_table,
-	.probe		= agp_i460_probe,
+	.id_table	= agp_intel_i460_pci_table,
+	.probe		= agp_intel_i460_probe,
 };
 
-static int __init agp_i460_init(void)
+static int __init agp_intel_i460_init(void)
 {
 	int ret_val;
 
-	ret_val = pci_module_init(&agp_i460_pci_driver);
+	ret_val = pci_module_init(&agp_intel_i460_pci_driver);
 	if (ret_val)
 		agp_bridge.type = NOT_SUPPORTED;
 
 	return ret_val;
 }
 
-static void __exit agp_i460_cleanup(void)
+static void __exit agp_intel_i460_cleanup(void)
 {
 	agp_unregister_driver();
-	pci_unregister_driver(&agp_i460_pci_driver);
+	pci_unregister_driver(&agp_intel_i460_pci_driver);
 }
 
-module_init(agp_i460_init);
-module_exit(agp_i460_cleanup);
+module_init(agp_intel_i460_init);
+module_exit(agp_intel_i460_cleanup);
 
 MODULE_AUTHOR("Chris Ahna <Christopher.J.Ahna@intel.com>");
 MODULE_LICENSE("GPL and additional rights");

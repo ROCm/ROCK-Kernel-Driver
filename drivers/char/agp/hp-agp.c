@@ -216,8 +216,7 @@ static void hp_zx1_tlbflush(agp_memory * mem)
 {
 	struct _hp_private *hp = &hp_private;
 
-	OUTREG64(hp->registers, HP_ZX1_PCOM, 
-		hp->gart_base | log2(hp->gart_size));
+	OUTREG64(hp->registers, HP_ZX1_PCOM, hp->gart_base | log2(hp->gart_size));
 	INREG64(hp->registers, HP_ZX1_PCOM);
 }
 
@@ -251,7 +250,7 @@ static int hp_zx1_create_gatt_table(void)
 static int hp_zx1_free_gatt_table(void)
 {
 	struct _hp_private *hp = &hp_private;
-	
+
 	if (hp->io_pdir_owner)
 		free_pages((unsigned long) hp->io_pdir,
 			    get_order(hp->io_pdir_size));
@@ -368,6 +367,7 @@ static int __init agp_find_supported_device(struct pci_dev *dev)
 		return hp_zx1_setup(dev);
 	}
 	return -ENODEV;
+}
 
 static int __init agp_hp_probe (struct pci_dev *dev, const struct pci_device_id *ent)
 {
@@ -375,14 +375,14 @@ static int __init agp_hp_probe (struct pci_dev *dev, const struct pci_device_id 
 		agp_register_driver(dev);
 		return 0;
 	}
-	return -ENODEV;	
+	return -ENODEV;
 }
 
 static struct pci_device_id agp_hp_pci_table[] __initdata = {
 	{
 	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
 	.class_mask	= ~0,
-	.vendor_id	= PCI_VENDOR_ID_HP,
+	.vendor		= PCI_VENDOR_ID_HP,
 	.device		= PCI_DEVICE_ID_HP_ZX1_LBA,
 	.subvendor	= PCI_ANY_ID,
 	.subdevice	= PCI_ANY_ID,
@@ -412,7 +412,7 @@ static int __init agp_hp_init(void)
 static void __exit agp_hp_cleanup(void)
 {
 	agp_unregister_driver();
-	pci_unregister_driver(&agp_pci_driver);
+	pci_unregister_driver(&agp_hp_pci_driver);
 }
 
 module_init(agp_hp_init);
