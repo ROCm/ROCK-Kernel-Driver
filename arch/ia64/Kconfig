@@ -766,11 +766,12 @@ endmenu
 
 source "drivers/usb/Kconfig"
 
-source "lib/Kconfig"
 
 source "net/bluetooth/Kconfig"
 
 endif
+
+source "lib/Kconfig"
 
 source "arch/ia64/hp/sim/Kconfig"
 
