@@ -74,14 +74,14 @@ static int daca_set_volume(pmac_daca_t *mix)
 	if (! mix->i2c.client)
 		return -ENODEV;
   
-	if (mix->right_vol > DACA_VOL_MAX)
+	if (mix->left_vol > DACA_VOL_MAX)
 		data[0] = DACA_VOL_MAX;
 	else
-		data[0] = mix->right_vol;
-	if (mix->left_vol > DACA_VOL_MAX)
+		data[0] = mix->left_vol;
+	if (mix->right_vol > DACA_VOL_MAX)
 		data[1] = DACA_VOL_MAX;
 	else
-		data[1] = mix->left_vol;
+		data[1] = mix->right_vol;
 	data[1] |= mix->deemphasis ? 0x40 : 0;
 	if (snd_pmac_keywest_write(&mix->i2c, DACA_REG_AVOL, 2, data) < 0) {
 		snd_printk("failed to set volume \n");  
