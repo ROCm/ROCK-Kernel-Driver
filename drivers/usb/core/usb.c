@@ -2587,7 +2587,7 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
 #define SET_ADDRESS_RETRYS	2
 int usb_new_device(struct usb_device *dev)
 {
-	int err;
+	int err = 0;
 	int i;
 	int j;
 
