@@ -249,7 +249,7 @@ void reparent_to_init(void)
 	/* signals? */
 	security_task_reparent_to_init(current);
 	memcpy(current->rlim, init_task.rlim, sizeof(*(current->rlim)));
-	current->user = INIT_USER;
+	switch_uid(INIT_USER);
 
 	write_unlock_irq(&tasklist_lock);
 }

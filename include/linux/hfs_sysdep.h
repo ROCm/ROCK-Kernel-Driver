@@ -155,13 +155,8 @@ static inline void hfs_buffer_dirty(hfs_buffer buffer) {
 }
 
 static inline void hfs_buffer_sync(hfs_buffer buffer) {
-	while (buffer_locked(buffer)) {
-		wait_on_buffer(buffer);
-	}
-	if (buffer_dirty(buffer)) {
-		ll_rw_block(WRITE, 1, &buffer);
-		wait_on_buffer(buffer);
-	}
+	if (buffer_dirty(buffer))
+		sync_dirty_buffer(buffer);
 }
 
 static inline void *hfs_buffer_data(const hfs_buffer buffer) {

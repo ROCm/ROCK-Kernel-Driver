@@ -114,6 +114,7 @@ void ufs_free_fragments (struct inode * inode, unsigned fragment, unsigned count
 	ubh_mark_buffer_dirty (USPI_UBH);
 	ubh_mark_buffer_dirty (UCPI_UBH);
 	if (sb->s_flags & MS_SYNCHRONOUS) {
+		ubh_wait_on_buffer (UCPI_UBH);
 		ubh_ll_rw_block (WRITE, 1, (struct ufs_buffer_head **)&ucpi);
 		ubh_wait_on_buffer (UCPI_UBH);
 	}
@@ -199,6 +200,7 @@ do_more:
 	ubh_mark_buffer_dirty (USPI_UBH);
 	ubh_mark_buffer_dirty (UCPI_UBH);
 	if (sb->s_flags & MS_SYNCHRONOUS) {
+		ubh_wait_on_buffer (UCPI_UBH);
 		ubh_ll_rw_block (WRITE, 1, (struct ufs_buffer_head **)&ucpi);
 		ubh_wait_on_buffer (UCPI_UBH);
 	}
@@ -228,10 +230,8 @@ failed:
 		memset (bh->b_data, 0, sb->s_blocksize); \
 		set_buffer_uptodate(bh); \
 		mark_buffer_dirty (bh); \
-		if (IS_SYNC(inode)) { \
-			ll_rw_block (WRITE, 1, &bh); \
-			wait_on_buffer (bh); \
-		} \
+		if (IS_SYNC(inode)) \
+			sync_dirty_buffer(bh); \
 		brelse (bh); \
 	}
 
@@ -364,10 +364,8 @@ unsigned ufs_new_fragments (struct inode * inode, u32 * p, unsigned fragment,
 				clear_buffer_dirty(bh);
 				bh->b_blocknr = result + i;
 				mark_buffer_dirty (bh);
-				if (IS_SYNC(inode)) {
-					ll_rw_block (WRITE, 1, &bh);
-					wait_on_buffer (bh);
-				}
+				if (IS_SYNC(inode))
+					sync_dirty_buffer(bh);
 				brelse (bh);
 			}
 			else
@@ -459,6 +457,7 @@ unsigned ufs_add_fragments (struct inode * inode, unsigned fragment,
 	ubh_mark_buffer_dirty (USPI_UBH);
 	ubh_mark_buffer_dirty (UCPI_UBH);
 	if (sb->s_flags & MS_SYNCHRONOUS) {
+		ubh_wait_on_buffer (UCPI_UBH);
 		ubh_ll_rw_block (WRITE, 1, (struct ufs_buffer_head **)&ucpi);
 		ubh_wait_on_buffer (UCPI_UBH);
 	}
@@ -584,6 +583,7 @@ succed:
 	ubh_mark_buffer_dirty (USPI_UBH);
 	ubh_mark_buffer_dirty (UCPI_UBH);
 	if (sb->s_flags & MS_SYNCHRONOUS) {
+		ubh_wait_on_buffer (UCPI_UBH);
 		ubh_ll_rw_block (WRITE, 1, (struct ufs_buffer_head **)&ucpi);
 		ubh_wait_on_buffer (UCPI_UBH);
 	}

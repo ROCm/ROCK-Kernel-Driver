@@ -449,8 +449,7 @@ int updateSuper(struct super_block *sb, uint state)
 	}
 
 	mark_buffer_dirty(bh);
-	ll_rw_block(WRITE, 1, &bh);
-	wait_on_buffer(bh);
+	sync_dirty_buffer(bh);
 	brelse(bh);
 
 	return 0;
