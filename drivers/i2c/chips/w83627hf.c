@@ -57,9 +57,7 @@ MODULE_PARM_DESC(force_i2c,
 
 /* Addresses to scan */
 static unsigned short normal_i2c[] = { I2C_CLIENT_END };
-static unsigned short normal_i2c_range[] = { I2C_CLIENT_END };
 static unsigned int normal_isa[] = { 0, I2C_CLIENT_ISA_END };
-static unsigned int normal_isa_range[] = { I2C_CLIENT_ISA_END };
 
 /* Insmod parameters */
 SENSORS_INSMOD_4(w83627hf, w83627thf, w83697hf, w83637hf);
