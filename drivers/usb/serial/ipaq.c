@@ -130,13 +130,13 @@ static int ipaq_open(struct usb_serial_port *port, struct file *filp)
 		return -ENODEV;
 	}
 	
-	dbg(__FUNCTION__ " - port %d", port->number);
+	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	bytes_in = 0;
 	bytes_out = 0;
 	priv = (struct ipaq_private *)kmalloc(sizeof(struct ipaq_private), GFP_KERNEL);
 	if (priv == NULL) {
-		err(__FUNCTION__ " - Out of memory");
+		err("%s - Out of memory", __FUNCTION__);
 		return -ENOMEM;
 	}
 	port->private = (void *)priv;
@@ -198,7 +198,7 @@ static int ipaq_open(struct usb_serial_port *port, struct file *filp)
 		      ipaq_read_bulk_callback, port);
 	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
 	if (result) {
-		err(__FUNCTION__ " - failed submitting read urb, error %d", result);
+		err("%s - failed submitting read urb, error %d", __FUNCTION__, result);
 		goto error;
 	}
 
@@ -218,12 +218,12 @@ static int ipaq_open(struct usb_serial_port *port, struct file *filp)
 			return 0;
 		}
 	}
-	err(__FUNCTION__ " - failed doing control urb, error %d", result);
+	err("%s - failed doing control urb, error %d", __FUNCTION__, result);
 	goto error;
 
 enomem:
 	result = -ENOMEM;
-	err(__FUNCTION__ " - Out of memory");
+	err("%s - Out of memory", __FUNCTION__);
 error:
 	ipaq_destroy_lists(port);
 	kfree(priv);
@@ -240,7 +240,7 @@ static void ipaq_close(struct usb_serial_port *port, struct file *filp)
 		return; 
 	}
 	
-	dbg(__FUNCTION__ " - port %d", port->number);
+	dbg("%s - port %d", __FUNCTION__, port->number);
 			 
 	serial = get_usb_serial(port, __FUNCTION__);
 	if (!serial)
@@ -271,15 +271,15 @@ static void ipaq_read_bulk_callback(struct urb *urb)
 	if (port_paranoia_check(port, __FUNCTION__))
 		return;
 
-	dbg(__FUNCTION__ " - port %d", port->number);
+	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	if (!serial) {
-		dbg(__FUNCTION__ " - bad serial pointer, exiting");
+		dbg("%s - bad serial pointer, exiting", __FUNCTION__);
 		return;
 	}
 
 	if (urb->status) {
-		dbg(__FUNCTION__ " - nonzero read bulk status received: %d", urb->status);
+		dbg("%s - nonzero read bulk status received: %d", __FUNCTION__, urb->status);
 		return;
 	}
 
@@ -306,7 +306,7 @@ static void ipaq_read_bulk_callback(struct urb *urb)
 		      ipaq_read_bulk_callback, port);
 	result = usb_submit_urb(port->read_urb, GFP_ATOMIC);
 	if (result)
-		err(__FUNCTION__ " - failed resubmitting read urb, error %d", result);
+		err("%s - failed resubmitting read urb, error %d", __FUNCTION__, result);
 	return;
 }
 
@@ -317,7 +317,7 @@ static int ipaq_write(struct usb_serial_port *port, int from_user, const unsigne
 	int			bytes_sent = 0;
 	int			transfer_size;
 
-	dbg(__FUNCTION__ " - port %d", port->number);
+	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	usb_serial_debug_data(__FILE__, __FUNCTION__, count, buf);
 	
@@ -344,7 +344,7 @@ static int ipaq_write_bulk(struct usb_serial_port *port, int from_user, const un
 	unsigned long		flags;
 
 	if (priv->free_len <= 0) {
-		dbg(__FUNCTION__ " - we're stuffed");
+		dbg("%s - we're stuffed", __FUNCTION__);
 		return -EAGAIN;
 	}
 
@@ -356,7 +356,7 @@ static int ipaq_write_bulk(struct usb_serial_port *port, int from_user, const un
 	}
 	spin_unlock_irqrestore(&write_list_lock, flags);
 	if (pkt == NULL) {
-		dbg(__FUNCTION__ " - we're stuffed");
+		dbg("%s - we're stuffed", __FUNCTION__);
 		return -EAGAIN;
 	}
 
@@ -379,7 +379,7 @@ static int ipaq_write_bulk(struct usb_serial_port *port, int from_user, const un
 		spin_unlock_irqrestore(&write_list_lock, flags);
 		result = usb_submit_urb(port->write_urb, GFP_ATOMIC);
 		if (result) {
-			err(__FUNCTION__ " - failed submitting write urb, error %d", result);
+			err("%s - failed submitting write urb, error %d", __FUNCTION__, result);
 		}
 	} else {
 		spin_unlock_irqrestore(&write_list_lock, flags);
@@ -398,7 +398,7 @@ static void ipaq_write_gather(struct usb_serial_port *port)
 
 	if (urb->status == -EINPROGRESS) {
 		/* Should never happen */
-		err(__FUNCTION__ " - flushing while urb is active !");
+		err("%s - flushing while urb is active !", __FUNCTION__);
 		return;
 	}
 	room = URBDATA_SIZE;
@@ -439,10 +439,10 @@ static void ipaq_write_bulk_callback(struct urb *urb)
 		return;
 	}
 	
-	dbg(__FUNCTION__ " - port %d", port->number);
+	dbg("%s - port %d", __FUNCTION__, port->number);
 	
 	if (urb->status) {
-		dbg(__FUNCTION__ " - nonzero write bulk status received: %d", urb->status);
+		dbg("%s - nonzero write bulk status received: %d", __FUNCTION__, urb->status);
 	}
 
 	spin_lock_irqsave(&write_list_lock, flags);
@@ -451,7 +451,7 @@ static void ipaq_write_bulk_callback(struct urb *urb)
 		spin_unlock_irqrestore(&write_list_lock, flags);
 		result = usb_submit_urb(port->write_urb, GFP_ATOMIC);
 		if (result) {
-			err(__FUNCTION__ " - failed submitting write urb, error %d", result);
+			err("%s - failed submitting write urb, error %d", __FUNCTION__, result);
 		}
 	} else {
 		priv->active = 0;
@@ -467,7 +467,7 @@ static int ipaq_write_room(struct usb_serial_port *port)
 {
 	struct ipaq_private	*priv = (struct ipaq_private *)port->private;
 
-	dbg(__FUNCTION__ " - freelen %d", priv->free_len);
+	dbg("%s - freelen %d", __FUNCTION__, priv->free_len);
 	return priv->free_len;
 }
 
@@ -475,7 +475,7 @@ static int ipaq_chars_in_buffer(struct usb_serial_port *port)
 {
 	struct ipaq_private	*priv = (struct ipaq_private *)port->private;
 
-	dbg(__FUNCTION__ " - queuelen %d", priv->queue_len);
+	dbg("%s - queuelen %d", __FUNCTION__, priv->queue_len);
 	return priv->queue_len;
 }
 
@@ -503,14 +503,14 @@ static void ipaq_destroy_lists(struct usb_serial_port *port)
 
 static int ipaq_startup(struct usb_serial *serial)
 {
-	dbg(__FUNCTION__);
+	dbg("%s", __FUNCTION__);
 	usb_set_configuration(serial->dev, 1);
 	return 0;
 }
 
 static void ipaq_shutdown(struct usb_serial *serial)
 {
-	dbg (__FUNCTION__);
+	dbg("%s", __FUNCTION__);
 }
 
 static int __init ipaq_init(void)
