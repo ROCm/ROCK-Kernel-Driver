@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 1999-2002 Petko Manolov (petkan@users.sourceforge.net)
+ *  Copyright (c) 1999-2003 Petko Manolov (petkan@users.sourceforge.net)
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -45,7 +45,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v0.5.10 (2003/04/01)"
+#define DRIVER_VERSION "v0.5.12 (2003/06/06)"
 #define DRIVER_AUTHOR "Petko Manolov <petkan@users.sourceforge.net>"
 #define DRIVER_DESC "Pegasus/Pegasus II USB Ethernet driver"
 
@@ -564,7 +564,14 @@ static void read_bulk_callback(struct urb *urb, struct pt_regs *regs)
 		dbg("%s: reset MAC", net->name);
 		pegasus->flags &= ~PEGASUS_RX_BUSY;
 		break;
+	case -EPIPE:		/* stall, or disconnect from TT */
+		/* FIXME schedule work to clear the halt */
+		warn("%s: no rx stall recovery", net->name);
+		return;
 	case -ENOENT:
+	case -ECONNRESET:
+	case -ESHUTDOWN:
+		dbg("%s: rx unlink, %d", net->name, urb->status);
 		return;
 	default:
 		dbg("%s: RX status %d", net->name, urb->status);
@@ -604,6 +611,9 @@ static void read_bulk_callback(struct urb *urb, struct pt_regs *regs)
 	pegasus->stats.rx_packets++;
 	pegasus->stats.rx_bytes += pkt_len;
 
+	if (pegasus->flags & PEGASUS_UNPLUG)
+		return;
+
 	spin_lock(&pegasus->rx_pool_lock);
 	pegasus->rx_skb = pull_skb(pegasus);
 	spin_unlock(&pegasus->rx_pool_lock);
@@ -631,24 +641,24 @@ goon:
 static void rx_fixup(unsigned long data)
 {
 	pegasus_t *pegasus;
+	unsigned long flags;
 
 	pegasus = (pegasus_t *) data;
+	if (pegasus->flags & PEGASUS_UNPLUG)
+		return;
 
-	spin_lock_irq(&pegasus->rx_pool_lock);
+	spin_lock_irqsave(&pegasus->rx_pool_lock, flags);
 	fill_skb_pool(pegasus);
-	spin_unlock_irq(&pegasus->rx_pool_lock);
 	if (pegasus->flags & PEGASUS_RX_URB_FAIL)
 		if (pegasus->rx_skb)
 			goto try_again;
 	if (pegasus->rx_skb == NULL) {
-		spin_lock_irq(&pegasus->rx_pool_lock);
 		pegasus->rx_skb = pull_skb(pegasus);
-		spin_unlock_irq(&pegasus->rx_pool_lock);
 	}
 	if (pegasus->rx_skb == NULL) {
 		warn("wow, low on memory");
 		tasklet_schedule(&pegasus->rx_tl);
-		return;
+		goto done;
 	}
 	usb_fill_bulk_urb(pegasus->rx_urb, pegasus->usb,
 			  usb_rcvbulkpipe(pegasus->usb, 1),
@@ -661,23 +671,41 @@ try_again:
 	} else {
 		pegasus->flags &= ~PEGASUS_RX_URB_FAIL;
 	}
+done:
+	spin_unlock_irqrestore(&pegasus->rx_pool_lock, flags);
 }
 
 static void write_bulk_callback(struct urb *urb, struct pt_regs *regs)
 {
 	pegasus_t *pegasus = urb->context;
+	struct net_device *net = pegasus->net;
 
 	if (!pegasus || !(pegasus->flags & PEGASUS_RUNNING))
 		return;
 
-	if (!netif_device_present(pegasus->net))
+	if (!netif_device_present(net))
 		return;
 
-	if (urb->status)
-		info("%s: TX status %d", pegasus->net->name, urb->status);
+	switch (urb->status) {
+	case -EPIPE:
+		/* FIXME schedule_work() to clear the tx halt */
+		netif_stop_queue(net);
+		warn("%s: no tx stall recovery", net->name);
+		return;
+	case -ENOENT:
+	case -ECONNRESET:
+	case -ESHUTDOWN:
+		dbg("%s: tx unlink, %d", net->name, urb->status);
+		return;
+	default:
+		info("%s: TX status %d", net->name, urb->status);
+		/* FALL THROUGH */
+	case 0:
+		break;
+	}
 
-	pegasus->net->trans_start = jiffies;
-	netif_wake_queue(pegasus->net);
+	net->trans_start = jiffies;
+	netif_wake_queue(net);
 }
 
 static void intr_callback(struct urb *urb, struct pt_regs *regs)
@@ -754,8 +782,16 @@ static int pegasus_start_xmit(struct sk_buff *skb, struct net_device *net)
 			  write_bulk_callback, pegasus);
 	if ((res = usb_submit_urb(pegasus->tx_urb, GFP_ATOMIC))) {
 		warn("failed tx_urb %d", res);
-		pegasus->stats.tx_errors++;
-		netif_start_queue(net);
+		switch (res) {
+		case -EPIPE:		/* stall, or disconnect from TT */
+			/* cleanup should already have been scheduled */
+			break;
+		case -ENODEV:		/* disconnect() upcoming */
+			break;
+		default:
+			pegasus->stats.tx_errors++;
+			netif_start_queue(net);
+		}
 	} else {
 		pegasus->stats.tx_packets++;
 		pegasus->stats.tx_bytes += skb->len;
@@ -908,6 +944,7 @@ static int pegasus_close(struct net_device *net)
 	netif_stop_queue(net);
 	if (!(pegasus->flags & PEGASUS_UNPLUG))
 		disable_net_traffic(pegasus);
+	tasklet_kill(&pegasus->rx_tl);
 	unlink_all_urbs(pegasus);
 	up(&pegasus->sem);
 
@@ -926,11 +963,15 @@ static int pegasus_ethtool_ioctl(struct net_device *dev, void *useraddr)
 	switch (ethcmd) {
 	/* get driver-specific version/etc. info */
 	case ETHTOOL_GDRVINFO:{
-			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
-			strlcpy(info.driver, driver_name,
-				sizeof (info.driver));
-			strlcpy(info.version, DRIVER_VERSION,
-				sizeof (info.version));
+			struct ethtool_drvinfo info;
+			memset (&info, 0, sizeof (info));
+			info.cmd = ETHTOOL_GDRVINFO;
+			strncpy(info.driver, driver_name,
+				sizeof (info.driver) - 1);
+			strncpy(info.version, DRIVER_VERSION,
+				sizeof (info.version) - 1);
+			usb_make_path(pegasus->usb, info.bus_info,
+				      sizeof (info.bus_info));
 			if (copy_to_user(useraddr, &info, sizeof (info)))
 				return -EFAULT;
 			return 0;
@@ -999,12 +1040,15 @@ static int pegasus_ethtool_ioctl(struct net_device *net, void *uaddr)
 		return -EFAULT;
 	switch (cmd) {
 	case ETHTOOL_GDRVINFO:{
-			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
-			strncpy(info.driver, driver_name, sizeof info.driver);
+			struct ethtool_drvinfo info;
+			memset (&info, 0, sizeof (info));
+			info.cmd = ETHTOOL_GDRVINFO;
+			strncpy(info.driver, driver_name,
+				sizeof (info.driver) - 1);
 			strncpy(info.version, DRIVER_VERSION,
-				ETHTOOL_BUSINFO_LEN);
+				sizeof (info.version) - 1);
 			usb_make_path(pegasus->usb, info.bus_info,
-				      sizeof info.bus_info);
+				      sizeof (info.bus_info));
 			if (copy_to_user(uaddr, &info, sizeof (info)))
 				return -EFAULT;
 			return 0;
@@ -1012,15 +1056,20 @@ static int pegasus_ethtool_ioctl(struct net_device *net, void *uaddr)
 	case ETHTOOL_GSET:{
 			struct ethtool_cmd ecmd;
 			short lpa, bmcr;
+			u8 port;
 
-			memset(&ecmd, 0, sizeof ecmd);
+			memset(&ecmd, 0, sizeof (ecmd));
 			ecmd.supported = (SUPPORTED_10baseT_Half |
 					  SUPPORTED_10baseT_Full |
 					  SUPPORTED_100baseT_Half |
 					  SUPPORTED_100baseT_Full |
 					  SUPPORTED_Autoneg |
 					  SUPPORTED_TP | SUPPORTED_MII);
-			ecmd.port = PORT_TP;
+			get_registers(pegasus, Reg7b, 1, &port);
+			if (port == 0)
+				ecmd.port = PORT_MII;
+			else
+				ecmd.port = PORT_TP;
 			ecmd.transceiver = XCVR_INTERNAL;
 			ecmd.phy_address = pegasus->phy;
 			read_mii_word(pegasus, pegasus->phy, MII_BMCR, &bmcr);
@@ -1142,7 +1191,10 @@ static inline void setup_pegasus_II(pegasus_t * pegasus)
 	set_register(pegasus, Reg1d, 0);
 	set_register(pegasus, Reg7b, 1);
 	mdelay(100);
-	set_register(pegasus, Reg7b, 2);
+	if ((pegasus->features & HAS_HOME_PNA) && mii_mode)
+		set_register(pegasus, Reg7b, 0);
+	else
+		set_register(pegasus, Reg7b, 2);
 
 	set_register(pegasus, 0x83, data);
 	get_registers(pegasus, 0x83, 1, &data);
@@ -1262,7 +1314,6 @@ static void pegasus_disconnect(struct usb_interface *intf)
 	pegasus->flags |= PEGASUS_UNPLUG;
 	unregister_netdev(pegasus->net);
 	usb_put_dev(interface_to_usbdev(intf));
-	unlink_all_urbs(pegasus);
 	free_all_urbs(pegasus);
 	free_skb_pool(pegasus);
 	if (pegasus->rx_skb)
@@ -1273,7 +1324,6 @@ static void pegasus_disconnect(struct usb_interface *intf)
 }
 
 static struct usb_driver pegasus_driver = {
-	.owner = THIS_MODULE,
 	.name = driver_name,
 	.probe = pegasus_probe,
 	.disconnect = pegasus_disconnect,

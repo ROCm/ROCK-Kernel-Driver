@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2002 Petko Manolov - Petkan (petkan@users.sourceforge.net)
+ * Copyright (c) 1999-2003 Petko Manolov - Petkan (petkan@users.sourceforge.net)
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as published
@@ -130,6 +130,7 @@ struct usb_eth_dev {
 #define	VENDOR_ELCON		0x0db7
 #define	VENDOR_ELSA		0x05cc
 #define	VENDOR_HAWKING		0x0e66
+#define	VENDOR_HP		0x03f0
 #define	VENDOR_IODATA		0x04bb
 #define	VENDOR_KINGSTON		0x0951
 #define	VENDOR_LANEED		0x056e
@@ -224,6 +225,8 @@ PEGASUS_DEV( "Elsa Micolink USB2Ethernet", VENDOR_ELSA, 0x3000,
 		DEFAULT_GPIO_RESET )
 PEGASUS_DEV( "Hawking UF100 10/100 Ethernet", VENDOR_HAWKING, 0x400c,
 		DEFAULT_GPIO_RESET | PEGASUS_II )
+PEGASUS_DEV( "HP hn210c Ethernet USB", VENDOR_HP, 0x811c,
+		DEFAULT_GPIO_RESET | PEGASUS_II )	
 PEGASUS_DEV( "IO DATA USB ET/TX", VENDOR_IODATA, 0x0904,
 		DEFAULT_GPIO_RESET )
 PEGASUS_DEV( "IO DATA USB ET/TX-S", VENDOR_IODATA, 0x0913,
