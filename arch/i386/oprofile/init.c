@@ -9,6 +9,7 @@
 
 #include <linux/oprofile.h>
 #include <linux/init.h>
+#include <linux/errno.h>
  
 /* We support CPUs that have performance counters like the Pentium Pro
  * with the NMI mode driver.
