@@ -32,14 +32,10 @@
 # http://oss.sgi.com/projects/GenInfo/NoticeExplan
 #
 
-EXTRA_CFLAGS    := -DLITTLE_ENDIAN
+O_TARGET := sn1.a
 
-all: sn1.a
+obj-y := cache.o error.o iomv.o synergy.o sn1_smp.o
 
-O_TARGET        = sn1.a
-
-obj-y          = cache.o error.o iomv.o synergy.o sn1_smp.o
-
-clean::
+EXTRA_CFLAGS := -DLITTLE_ENDIAN
 
 include $(TOPDIR)/Rules.make
