@@ -750,13 +750,35 @@ static void __init quirk_sis_96x_smbus(struct pci_dev *dev)
  * bridges pretend to be 85C503/5513 instead.  In that case see if we
  * spotted a compatible north bridge to make sure.
  * (pci_find_device doesn't work yet)
+ *
+ * We can also enable the sis96x bit in the discovery register..
  */
 static int __devinitdata sis_96x_compatible = 0;
 
+#define SIS_DETECT_REGISTER 0x40
+
 static void __init quirk_sis_503_smbus(struct pci_dev *dev)
 {
-	if (sis_96x_compatible)
-		quirk_sis_96x_smbus(dev);
+	u8 reg;
+	u16 devid;
+
+	pci_read_config_byte(dev, SIS_DETECT_REGISTER, &reg);
+	pci_write_config_byte(dev, SIS_DETECT_REGISTER, reg | (1 << 6));
+	pci_read_config_word(dev, PCI_DEVICE_ID, &devid);
+	if ((devid & 0xfff0) != 0x0960) {
+		pci_write_config_byte(dev, SIS_DETECT_REGISTER, reg);
+		return;
+	}
+
+	/* Make people aware that we changed the config.. */
+	printk(KERN_WARNING "Uncovering SIS%x that hid as a SIS503 (compatible=%d)\n", devid, sis_96x_compatible);
+
+	/*
+	 * Ok, it now shows up as a 96x.. The 96x quirks are after
+	 * the 503 quirk in the quirk table, so they'll automatically
+	 * run and enable things like the SMBus device
+	 */
+	dev->device = devid;
 }
 
 static void __init quirk_sis_96x_compatible(struct pci_dev *dev)
