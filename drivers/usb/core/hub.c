@@ -2050,7 +2050,7 @@ hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port)
 			hdev->bus->b_hnp_enable = 0;
 	}
 
-	retval = clear_port_feature(hdev, port, USB_PORT_FEAT_SUSPEND);
+	retval = clear_port_feature(hdev, port + 1, USB_PORT_FEAT_SUSPEND);
 	if (retval < 0 && retval != -EPIPE)
 		dev_dbg(&udev->dev, "can't clear suspend; %d\n", retval);
 
