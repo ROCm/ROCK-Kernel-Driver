@@ -772,6 +772,15 @@ config IDE
 
 	  If unsure, say Y.
 
+config IDE_MAX_HWIFS 
+	int "Max IDE interfaces"
+	depends on IDE
+	default 4
+	help
+	  This is the maximum number of IDE hardware interfaces that will
+	  be supported by the driver. Make sure it is at least as high as
+	  the number IDE interfaces in your system.
+
 source "drivers/ide/Kconfig"
 
 endmenu
