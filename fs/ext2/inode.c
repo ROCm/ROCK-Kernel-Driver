@@ -640,16 +640,16 @@ ext2_writepages(struct address_space *mapping, int *nr_to_write)
 }
 
 struct address_space_operations ext2_aops = {
-	readpage:		ext2_readpage,
-	readpages:		ext2_readpages,
-	writepage:		ext2_writepage,
-	sync_page:		block_sync_page,
-	prepare_write:		ext2_prepare_write,
-	commit_write:		generic_commit_write,
-	bmap:			ext2_bmap,
-	direct_IO:		ext2_direct_IO,
-	writepages:		ext2_writepages,
-	vm_writeback:		generic_vm_writeback,
+	.readpage		= ext2_readpage,
+	.readpages		= ext2_readpages,
+	.writepage		= ext2_writepage,
+	.sync_page		= block_sync_page,
+	.prepare_write		= ext2_prepare_write,
+	.commit_write		= generic_commit_write,
+	.bmap			= ext2_bmap,
+	.direct_IO		= ext2_direct_IO,
+	.writepages		= ext2_writepages,
+	.vm_writeback		= generic_vm_writeback,
 };
 
 /*
