@@ -278,15 +278,14 @@ static int acm_tty_open(struct tty_struct *tty, struct file *filp)
 
 
 
-	if (acm->used) {
+	if (acm->used++) {
 		goto done;
         }
 
 	acm->ctrlurb->dev = acm->dev;
 	if (usb_submit_urb(acm->ctrlurb, GFP_KERNEL)) {
 		dbg("usb_submit_urb(ctrl irq) failed");
-		rv = -EIO;
-		goto err_out;
+		goto bail_out;
 	}
 
 	acm->readurb->dev = acm->dev;
@@ -303,7 +302,6 @@ static int acm_tty_open(struct tty_struct *tty, struct file *filp)
 	tty->low_latency = 1;
 
 done:
-	acm->used++;
 err_out:
 	up(&open_sem);
 	return rv;
@@ -312,6 +310,8 @@ full_bailout:
 	usb_kill_urb(acm->readurb);
 bail_out_and_unlink:
 	usb_kill_urb(acm->ctrlurb);
+bail_out:
+	acm->used--;
 	up(&open_sem);
 	return -EIO;
 }
