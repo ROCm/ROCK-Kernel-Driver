@@ -771,8 +771,7 @@ C_END(switch_thread)
 	.data
 
 	.align 4
-	.globl CSYM(trap_table)
-CSYM(trap_table):
+C_DATA(trap_table):
 	.long bad_trap_wrapper		// trap 0, doesn't use trap table. 
 	.long syscall_long		// trap 1, `long' syscall. 
 	.long bad_trap_wrapper
@@ -789,13 +788,13 @@ CSYM(trap_table):
 	.long bad_trap_wrapper
 	.long bad_trap_wrapper
 	.long bad_trap_wrapper
+C_END(trap_table)
 
 
 	.section .rodata
 	
 	.align 4
-	.globl CSYM(sys_call_table)
-CSYM(sys_call_table):
+C_DATA(sys_call_table):
 	.long CSYM(sys_ni_syscall)	// 0  -  old "setup()" system call
 	.long CSYM(sys_exit)
 	.long sys_fork_wrapper
@@ -1003,3 +1002,4 @@ CSYM(sys_call_table):
 	.long CSYM(sys_ni_syscall)	// sys_madvise
 
 	.space (NR_syscalls-205)*4
+C_END(sys_call_table)

@@ -118,4 +118,4 @@ C_ENTRY(start):
 	// Start Linux kernel.
 	mov	hilo(CSYM(machine_halt)), lp
 	jr	CSYM(start_kernel)
-END(start)
+C_END(start)
