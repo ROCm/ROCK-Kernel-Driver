@@ -230,7 +230,7 @@ pcibios_fixup_device_resources(struct pci_dev *dev, struct pci_bus *bus)
 void __init
 pcibios_fixup_bus(struct pci_bus *bus)
 {
-	/* Propogate hose info into the subordinate devices.  */
+	/* Propagate hose info into the subordinate devices.  */
 
 	struct pci_controller *hose = bus->sysdata;
 	struct list_head *ln;

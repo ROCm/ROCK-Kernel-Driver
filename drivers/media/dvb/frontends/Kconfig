@@ -1,13 +1,17 @@
 comment "Supported Frontend Modules"
 	depends on DVB
 
-config DVB_ALPS_BSRU6
-	tristate "Alps BSRU6 (QPSK)"
+config DVB_STV0299
+	tristate "STV0299 based DVB-S frontend (QPSK)"
 	depends on DVB_CORE
 	help
 	  A DVB-S tuner module. 
 
-	  Say Y when you want to support this frontend.
+	  Say Y when you want to support frontend based on this 
+	  demodulator.
+
+	  Some examples are the Alps BSRU6, the Philips SU1278 and
+	  the LG TDQB-S00x.
 
 	  If you don't know what tuner module is soldered on your 
 	  DVB adapter simply enable all supported frontends, the 
@@ -29,22 +33,34 @@ config DVB_ALPS_TDLB7
 	help
 	  A DVB-T tuner module. Say Y when you want to support this frontend.
 
-	  This tuner module needs some microcode located in a file called 
+	  This tuner module needs some microcode located in a file called
 	  "Sc_main.mc" in the windows driver. Please pass the module parameter
-	  mcfile="/PATH/FILENAME" when loading alps_tdlb7.
+	  mcfile="/PATH/FILENAME" when loading alps_tdlb7.o.
 
-	  If you don't know what tuner module is soldered on your 
-	  DVB adapter simply enable all supported frontends, the 
+	  If you don't know what tuner module is soldered on your
+	  DVB adapter simply enable all supported frontends, the
 	  right one will get autodetected.
 
+
 config DVB_ALPS_TDMB7
-	tristate "Alps BSRV2 (OFDM)"
+	tristate "Alps TDMB7 (OFDM)"
 	depends on DVB_CORE
 	help
-	  A DVB-S tuner module. Say Y when you want to support this frontend.
+	  A DVB-T tuner module. Say Y when you want to support this frontend.
 
-	  If you don't know what tuner module is soldered on your 
-	  DVB adapter simply enable all supported frontends, the 
+	  If you don't know what tuner module is soldered on your
+	  DVB adapter simply enable all supported frontends, the
+	  right one will get autodetected.
+
+config DVB_ATMEL_AT76C651
+	tristate "Atmel AT76C651 (QAM)"
+	depends on DVB_CORE
+	help
+	  The AT76C651 Demodulator is used in some DVB-C SetTopBoxes. Say Y
+	  when you see this demodulator chip near your tuner module.
+
+	  If you don't know what tuner module is soldered on your
+	  DVB adapter simply enable all supported frontends, the
 	  right one will get autodetected.
 
 config DVB_GRUNDIG_29504_491

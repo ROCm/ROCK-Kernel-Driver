@@ -194,6 +194,7 @@ ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *re
 	up_read(&mm->mmap_sem);
 	if (current->pid == 1) {
 		yield();
+		down_read(&mm->mmap_sem);
 		goto survive;
 	}
 	printk(KERN_CRIT "VM: killing process %s\n", current->comm);

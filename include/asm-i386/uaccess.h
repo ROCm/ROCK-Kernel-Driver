@@ -110,7 +110,7 @@ int __verify_write(const void *, unsigned long);
  *
  * See access_ok() for more details.
  */
-static inline int verify_area(int type, const void * addr, unsigned long size)
+static inline int verify_area(int type, const void __user * addr, unsigned long size)
 {
 	return access_ok(type,addr,size) ? 0 : -EFAULT;
 }
@@ -373,8 +373,8 @@ do {									\
 		: "m"(__m(addr)), "i"(errret), "0"(err))
 
 
-unsigned long __copy_to_user_ll(void *to, const void *from, unsigned long n);
-unsigned long __copy_from_user_ll(void *to, const void *from, unsigned long n);
+unsigned long __copy_to_user_ll(void __user *to, const void *from, unsigned long n);
+unsigned long __copy_from_user_ll(void *to, const void __user *from, unsigned long n);
 
 /*
  * Here we special-case 1, 2 and 4-byte copy_*_user invocations.  On a fault
@@ -398,7 +398,7 @@ unsigned long __copy_from_user_ll(void *to, const void *from, unsigned long n);
  * On success, this will be zero.
  */
 static inline unsigned long
-__copy_to_user(void *to, const void *from, unsigned long n)
+__copy_to_user(void __user *to, const void *from, unsigned long n)
 {
 	if (__builtin_constant_p(n)) {
 		unsigned long ret;
@@ -436,7 +436,7 @@ __copy_to_user(void *to, const void *from, unsigned long n)
  * data to the requested size using zero bytes.
  */
 static inline unsigned long
-__copy_from_user(void *to, const void *from, unsigned long n)
+__copy_from_user(void *to, const void __user *from, unsigned long n)
 {
 	if (__builtin_constant_p(n)) {
 		unsigned long ret;
@@ -470,7 +470,7 @@ __copy_from_user(void *to, const void *from, unsigned long n)
  * On success, this will be zero.
  */
 static inline unsigned long
-copy_to_user(void *to, const void *from, unsigned long n)
+copy_to_user(void __user *to, const void *from, unsigned long n)
 {
 	if (access_ok(VERIFY_WRITE, to, n))
 		n = __copy_to_user(to, from, n);
@@ -494,15 +494,15 @@ copy_to_user(void *to, const void *from, unsigned long n)
  * data to the requested size using zero bytes.
  */
 static inline unsigned long
-copy_from_user(void *to, const void *from, unsigned long n)
+copy_from_user(void *to, const void __user *from, unsigned long n)
 {
 	if (access_ok(VERIFY_READ, from, n))
 		n = __copy_from_user(to, from, n);
 	return n;
 }
 
-long strncpy_from_user(char *dst, const char *src, long count);
-long __strncpy_from_user(char *dst, const char *src, long count);
+long strncpy_from_user(char *dst, const char __user *src, long count);
+long __strncpy_from_user(char *dst, const char __user *src, long count);
 
 /**
  * strlen_user: - Get the size of a string in user space.
@@ -520,8 +520,8 @@ long __strncpy_from_user(char *dst, const char *src, long count);
  */
 #define strlen_user(str) strnlen_user(str, ~0UL >> 1)
 
-long strnlen_user(const char *str, long n);
-unsigned long clear_user(void *mem, unsigned long len);
-unsigned long __clear_user(void *mem, unsigned long len);
+long strnlen_user(const char __user *str, long n);
+unsigned long clear_user(void __user *mem, unsigned long len);
+unsigned long __clear_user(void __user *mem, unsigned long len);
 
 #endif /* __i386_UACCESS_H */

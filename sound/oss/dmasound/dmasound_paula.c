@@ -298,14 +298,14 @@ GENERATE_AMI_CT_16(ami_ct_u16le, AMI_CT_U16LE)
 
 
 static TRANS transAmiga = {
-	ct_ulaw:	ami_ct_ulaw,
-	ct_alaw:	ami_ct_alaw,
-	ct_s8:		ami_ct_s8,
-	ct_u8:		ami_ct_u8,
-	ct_s16be:	ami_ct_s16be,
-	ct_u16be:	ami_ct_u16be,
-	ct_s16le:	ami_ct_s16le,
-	ct_u16le:	ami_ct_u16le,
+	.ct_ulaw	= ami_ct_ulaw,
+	.ct_alaw	= ami_ct_alaw,
+	.ct_s8		= ami_ct_s8,
+	.ct_u8		= ami_ct_u8,
+	.ct_s16be	= ami_ct_s16be,
+	.ct_u16be	= ami_ct_u16be,
+	.ct_s16le	= ami_ct_s16le,
+	.ct_u16le	= ami_ct_u16le,
 };
 
 /*** Low level stuff *********************************************************/
@@ -681,44 +681,44 @@ static int AmiStateInfo(char *buffer, size_t space)
 /*** Machine definitions *****************************************************/
 
 static SETTINGS def_hard = {
-	format: AFMT_S8,
-	stereo: 0,
-	size: 8,
-	speed: 8000
+	.format	= AFMT_S8,
+	.stereo	= 0,
+	.size	= 8,
+	.speed	= 8000
 } ;
 
 static SETTINGS def_soft = {
-	format: AFMT_U8,
-	stereo: 0,
-	size: 8,
-	speed: 8000
+	.format	= AFMT_U8,
+	.stereo	= 0,
+	.size	= 8,
+	.speed	= 8000
 } ;
 
 static MACHINE machAmiga = {
-	name:		"Amiga",
-	name2:		"AMIGA",
-	open:		AmiOpen,
-	release:	AmiRelease,
-	dma_alloc:	AmiAlloc,
-	dma_free:	AmiFree,
-	irqinit:	AmiIrqInit,
+	.name		= "Amiga",
+	.name2		= "AMIGA",
+	.open		= AmiOpen,
+	.release	= AmiRelease,
+	.dma_alloc	= AmiAlloc,
+	.dma_free	= AmiFree,
+	.irqinit	= AmiIrqInit,
 #ifdef MODULE
-	irqcleanup:	AmiIrqCleanUp,
+	.irqcleanup	= AmiIrqCleanUp,
 #endif /* MODULE */
-	init:		AmiInit,
-	silence:	AmiSilence,
-	setFormat:	AmiSetFormat,
-	setVolume:	AmiSetVolume,
-	setTreble:	AmiSetTreble,
-	play:		AmiPlay,
-	mixer_init:	AmiMixerInit,
-	mixer_ioctl:	AmiMixerIoctl,
-	write_sq_setup:	AmiWriteSqSetup,
-	state_info:	AmiStateInfo,
-	min_dsp_speed:	8000,
-	version:	((DMASOUND_PAULA_REVISION<<8) | DMASOUND_PAULA_EDITION),
-	hardware_afmts:	(AFMT_S8 | AFMT_S16_BE), /* h'ware-supported formats *only* here */
-        capabilities:   DSP_CAP_BATCH          /* As per SNDCTL_DSP_GETCAPS */
+	.init		= AmiInit,
+	.silence	= AmiSilence,
+	.setFormat	= AmiSetFormat,
+	.setVolume	= AmiSetVolume,
+	.setTreble	= AmiSetTreble,
+	.play		= AmiPlay,
+	.mixer_init	= AmiMixerInit,
+	.mixer_ioctl	= AmiMixerIoctl,
+	.write_sq_setup	= AmiWriteSqSetup,
+	.state_info	= AmiStateInfo,
+	.min_dsp_speed	= 8000,
+	.version	= ((DMASOUND_PAULA_REVISION<<8) | DMASOUND_PAULA_EDITION),
+	.hardware_afmts	= (AFMT_S8 | AFMT_S16_BE), /* h'ware-supported formats *only* here */
+	.capabilities	= DSP_CAP_BATCH          /* As per SNDCTL_DSP_GETCAPS */
 };
 
 

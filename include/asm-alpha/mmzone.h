@@ -51,7 +51,7 @@ PLAT_NODE_DATA_LOCALNR(unsigned long p, int n)
 #ifdef CONFIG_DISCONTIGMEM
 
 /*
- * Following are macros that each numa implmentation must define.
+ * Following are macros that each numa implementation must define.
  */
 
 /*

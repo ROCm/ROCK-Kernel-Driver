@@ -279,12 +279,15 @@ smp_callin (void)
 
 	smp_setup_percpu_timer();
 
-	/*
-	 * Synchronize the ITC with the BP
-	 */
-	Dprintk("Going to syncup ITC with BP.\n");
+	if (!(sal_platform_features & IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT)) {
+		/*
+		 * Synchronize the ITC with the BP
+		 */
+		Dprintk("Going to syncup ITC with BP.\n");
 
-	ia64_sync_itc(0);
+		ia64_sync_itc(0);
+	}
+
 	/*
 	 * Get our bogomips.
 	 */

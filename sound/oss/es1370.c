@@ -140,7 +140,6 @@
 
 /*****************************************************************************/
       
-#include <linux/version.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/string.h>
@@ -1054,11 +1053,11 @@ static int es1370_ioctl_mixdev(struct inode *inode, struct file *file, unsigned 
 }
 
 static /*const*/ struct file_operations es1370_mixer_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	ioctl:		es1370_ioctl_mixdev,
-	open:		es1370_open_mixdev,
-	release:	es1370_release_mixdev,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.ioctl		= es1370_ioctl_mixdev,
+	.open		= es1370_open_mixdev,
+	.release	= es1370_release_mixdev,
 };
 
 /* --------------------------------------------------------------------- */
@@ -1816,15 +1815,15 @@ static int es1370_release(struct inode *inode, struct file *file)
 }
 
 static /*const*/ struct file_operations es1370_audio_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		es1370_read,
-	write:		es1370_write,
-	poll:		es1370_poll,
-	ioctl:		es1370_ioctl,
-	mmap:		es1370_mmap,
-	open:		es1370_open,
-	release:	es1370_release,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.read		= es1370_read,
+	.write		= es1370_write,
+	.poll		= es1370_poll,
+	.ioctl		= es1370_ioctl,
+	.mmap		= es1370_mmap,
+	.open		= es1370_open,
+	.release	= es1370_release,
 };
 
 /* --------------------------------------------------------------------- */
@@ -2240,14 +2239,14 @@ static int es1370_release_dac(struct inode *inode, struct file *file)
 }
 
 static /*const*/ struct file_operations es1370_dac_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	write:		es1370_write_dac,
-	poll:		es1370_poll_dac,
-	ioctl:		es1370_ioctl_dac,
-	mmap:		es1370_mmap_dac,
-	open:		es1370_open_dac,
-	release:	es1370_release_dac,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.write		= es1370_write_dac,
+	.poll		= es1370_poll_dac,
+	.ioctl		= es1370_ioctl_dac,
+	.mmap		= es1370_mmap_dac,
+	.open		= es1370_open_dac,
+	.release	= es1370_release_dac,
 };
 
 /* --------------------------------------------------------------------- */
@@ -2513,13 +2512,13 @@ static int es1370_midi_release(struct inode *inode, struct file *file)
 }
 
 static /*const*/ struct file_operations es1370_midi_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		es1370_midi_read,
-	write:		es1370_midi_write,
-	poll:		es1370_midi_poll,
-	open:		es1370_midi_open,
-	release:	es1370_midi_release,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.read		= es1370_midi_read,
+	.write		= es1370_midi_write,
+	.poll		= es1370_midi_poll,
+	.open		= es1370_midi_open,
+	.release	= es1370_midi_release,
 };
 
 /* --------------------------------------------------------------------- */

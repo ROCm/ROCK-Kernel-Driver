@@ -181,7 +181,6 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
-#include <linux/version.h>
 #include <linux/string.h>
 #include <linux/ctype.h>
 #include <linux/ioport.h>
@@ -2772,15 +2771,15 @@ static int trident_release(struct inode *inode, struct file *file)
 }
 
 static /*const*/ struct file_operations trident_audio_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		trident_read,
-	write:		trident_write,
-	poll:		trident_poll,
-	ioctl:		trident_ioctl,
-	mmap:		trident_mmap,
-	open:		trident_open,
-	release:	trident_release,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.read		= trident_read,
+	.write		= trident_write,
+	.poll		= trident_poll,
+	.ioctl		= trident_ioctl,
+	.mmap		= trident_mmap,
+	.open		= trident_open,
+	.release	= trident_release,
 };
 
 /* trident specific AC97 functions */
@@ -3894,10 +3893,10 @@ static int trident_ioctl_mixdev(struct inode *inode, struct file *file, unsigned
 }
 
 static /*const*/ struct file_operations trident_mixer_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	ioctl:		trident_ioctl_mixdev,
-	open:		trident_open_mixdev,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.ioctl		= trident_ioctl_mixdev,
+	.open		= trident_open_mixdev,
 };
 
 static int ali_reset_5451(struct trident_card *card)
@@ -4376,12 +4375,12 @@ MODULE_LICENSE("GPL");
 #define TRIDENT_MODULE_NAME "trident"
 
 static struct pci_driver trident_pci_driver = {
-	name:		TRIDENT_MODULE_NAME,
-	id_table:	trident_pci_tbl,
-	probe:		trident_probe,
-	remove:		__devexit_p(trident_remove),
-	suspend:	trident_suspend,
-	resume:		trident_resume
+	.name		= TRIDENT_MODULE_NAME,
+	.id_table	= trident_pci_tbl,
+	.probe		= trident_probe,
+	.remove		= __devexit_p(trident_remove),
+	.suspend	= trident_suspend,
+	.resume		= trident_resume
 };
 
 static int __init trident_init_module (void)

@@ -59,6 +59,9 @@
 #define _PAGE_ED		(__IA64_UL(1) << 52)	/* exception deferral */
 #define _PAGE_PROTNONE		(__IA64_UL(1) << 63)
 
+/* Valid only for a PTE with the present bit cleared: */
+#define _PAGE_FILE		(1 << 1)		/* see swap & file pte remarks below */
+
 #define _PFN_MASK		_PAGE_PPN_MASK
 #define _PAGE_CHG_MASK		(_PFN_MASK | _PAGE_A | _PAGE_D)
 
@@ -253,6 +256,7 @@ ia64_phys_addr_valid (unsigned long addr)
 #define pte_exec(pte)		((pte_val(pte) & _PAGE_AR_RX) != 0)
 #define pte_dirty(pte)		((pte_val(pte) & _PAGE_D) != 0)
 #define pte_young(pte)		((pte_val(pte) & _PAGE_A) != 0)
+#define pte_file(pte)		((pte_val(pte) & _PAGE_FILE) != 0)
 /*
  * Note: we convert AR_RWX to AR_RX and AR_RW to AR_R by clearing the 2nd bit in the
  * access rights:
@@ -402,11 +406,34 @@ pte_same (pte_t a, pte_t b)
 extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
 extern void paging_init (void);
 
-#define __swp_type(entry)		(((entry).val >> 1) & 0xff)
+/*
+ * Note: The macros below rely on the fact that MAX_SWAPFILES_SHIFT <= number of
+ *	 bits in the swap-type field of the swap pte.  It would be nice to
+ *	 enforce that, but we can't easily include <linux/swap.h> here.
+ *	 (Of course, better still would be to define MAX_SWAPFILES_SHIFT here...).
+ *
+ * Format of swap pte:
+ *	bit   0   : present bit (must be zero)
+ *	bit   1   : _PAGE_FILE (must be zero)
+ *	bits  2- 8: swap-type
+ *	bits  9-62: swap offset
+ *	bit  63   : _PAGE_PROTNONE bit
+ *
+ * Format of file pte:
+ *	bit   0   : present bit (must be zero)
+ *	bit   1   : _PAGE_FILE (must be one)
+ *	bits  2-62: file_offset/PAGE_SIZE
+ *	bit  63   : _PAGE_PROTNONE bit
+ */
+#define __swp_type(entry)		(((entry).val >> 2) & 0x7f)
 #define __swp_offset(entry)		(((entry).val << 1) >> 10)
-#define __swp_entry(type,offset)	((swp_entry_t) { ((type) << 1) | ((long) (offset) << 9) })
+#define __swp_entry(type,offset)	((swp_entry_t) { ((type) << 2) | ((long) (offset) << 9) })
 #define __pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) })
 #define __swp_entry_to_pte(x)		((pte_t) { (x).val })
+
+#define PTE_FILE_MAX_BITS		61
+#define pte_to_pgoff(pte)		((pte_val(pte) << 1) >> 3)
+#define pgoff_to_pte(off)		((pte_t) { ((off) << 2) | _PAGE_FILE })
 
 #define io_remap_page_range remap_page_range	/* XXX is this right? */
 

@@ -178,7 +178,7 @@ static inline dma_addr_t snd_sgbuf_get_addr(struct snd_sg_buf *sgbuf, size_t off
 /*
  * wrappers
  */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 4, 0)
+
 #ifdef CONFIG_PCI
 #if defined(__i386__) || defined(__ppc__) || defined(__x86_64__)
 #define HACK_PCI_ALLOC_CONSISTENT
@@ -187,7 +187,6 @@ void *snd_pci_hack_alloc_consistent(struct pci_dev *hwdev, size_t size,
 				    dma_addr_t *dma_handle);
 #endif /* arch */
 #endif /* CONFIG_PCI */
-#endif /* LINUX >= 2.4.0 */
 
 
 #endif /* __SOUND_MEMALLOC_H */

@@ -943,28 +943,28 @@ static unsigned int ad1848_set_bits(int dev, unsigned int arg)
 
 static struct audio_driver ad1848_audio_driver =
 {
-	owner:		THIS_MODULE,
-	open:		ad1848_open,
-	close:		ad1848_close,
-	output_block:	ad1848_output_block,
-	start_input:	ad1848_start_input,
-	prepare_for_input:	ad1848_prepare_for_input,
-	prepare_for_output:	ad1848_prepare_for_output,
-	halt_io:	ad1848_halt,
-	halt_input:	ad1848_halt_input,
-	halt_output:	ad1848_halt_output,
-	trigger:	ad1848_trigger,
-	set_speed:	ad1848_set_speed,
-	set_bits:	ad1848_set_bits,
-	set_channels:	ad1848_set_channels
+	.owner			= THIS_MODULE,
+	.open			= ad1848_open,
+	.close			= ad1848_close,
+	.output_block		= ad1848_output_block,
+	.start_input		= ad1848_start_input,
+	.prepare_for_input	= ad1848_prepare_for_input,
+	.prepare_for_output	= ad1848_prepare_for_output,
+	.halt_io		= ad1848_halt,
+	.halt_input		= ad1848_halt_input,
+	.halt_output		= ad1848_halt_output,
+	.trigger		= ad1848_trigger,
+	.set_speed		= ad1848_set_speed,
+	.set_bits		= ad1848_set_bits,
+	.set_channels		= ad1848_set_channels
 };
 
 static struct mixer_operations ad1848_mixer_operations =
 {
-	owner:	THIS_MODULE,
-	id:	"SOUNDPORT",
-	name:	"AD1848/CS4248/CS4231",
-	ioctl:	ad1848_mixer_ioctl
+	.owner	= THIS_MODULE,
+	.id	= "SOUNDPORT",
+	.name	= "AD1848/CS4248/CS4231",
+	.ioctl	= ad1848_mixer_ioctl
 };
 
 static int ad1848_open(int dev, int mode)

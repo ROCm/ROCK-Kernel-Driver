@@ -30,7 +30,9 @@
 
 struct dvb_i2c_bus {
 	struct list_head list_head;
-	int (*xfer) (struct dvb_i2c_bus *i2c, struct i2c_msg msgs[], int num);
+	int (*xfer) (struct dvb_i2c_bus *i2c, 
+		     const struct i2c_msg msgs[],
+		     int num);
 	void *data;
 	struct dvb_adapter *adapter;
 	int id;
@@ -38,17 +40,16 @@ struct dvb_i2c_bus {
 };
 
 
-extern 
-struct dvb_i2c_bus* dvb_register_i2c_bus (int (*xfer) (struct dvb_i2c_bus *i2c,
-						       struct i2c_msg msgs[],
-						       int num),
-					  void *data,
-					  struct dvb_adapter *adapter,
-					  int id);
+extern struct dvb_i2c_bus*
+dvb_register_i2c_bus (int (*xfer) (struct dvb_i2c_bus *i2c,
+				   const struct i2c_msg *msgs, int num),
+		      void *data,
+		      struct dvb_adapter *adapter,
+		      int id);
 
 extern
 void dvb_unregister_i2c_bus (int (*xfer) (struct dvb_i2c_bus *i2c,
-					  struct i2c_msg msgs[], int num),
+					  const struct i2c_msg msgs[], int num),
 			     struct dvb_adapter *adapter,
 			     int id);
 

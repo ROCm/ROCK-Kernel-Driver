@@ -194,17 +194,17 @@ static int pas_buffer_status(int dev)
 
 static struct midi_operations pas_midi_operations =
 {
-	owner:		THIS_MODULE,
-	info:		{"Pro Audio Spectrum", 0, 0, SNDCARD_PAS},
-	converter:	&std_midi_synth,
-	in_info:	{0},
-	open:		pas_midi_open,
-	close:		pas_midi_close,
-	outputc:	pas_midi_out,
-	start_read:	pas_midi_start_read,
-	end_read:	pas_midi_end_read,
-	kick:		pas_midi_kick,
-	buffer_status:	pas_buffer_status,
+	.owner		= THIS_MODULE,
+	.info		= {"Pro Audio Spectrum", 0, 0, SNDCARD_PAS},
+	.converter	= &std_midi_synth,
+	.in_info	= {0},
+	.open		= pas_midi_open,
+	.close		= pas_midi_close,
+	.outputc	= pas_midi_out,
+	.start_read	= pas_midi_start_read,
+	.end_read	= pas_midi_end_read,
+	.kick		= pas_midi_kick,
+	.buffer_status	= pas_buffer_status,
 };
 
 void __init pas_midi_init(void)

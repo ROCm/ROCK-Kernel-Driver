@@ -23,12 +23,14 @@
 #include <linux/module.h>
 #include <linux/delay.h>
 
-#include "compat.h"
 #include "dvb_frontend.h"
 
 
-static int debug = 0;
-#define dprintk	if (debug) printk
+#if 0
+#define dprintk(x...) printk(x)
+#else
+#define dprintk(x...)
+#endif
 
 
 /**
@@ -36,36 +38,58 @@ static int debug = 0;
  *  extra memory but use frontend->data as bitfield
  */
 
-#define SET_PWM(frontend,pwm) do { 		\
-	(int) frontend->data &= ~0xff; 		\
-	(int) frontend->data |= pwm; 		\
+#define SET_PWM(data,pwm) do { 		\
+	(int) data &= ~0xff; 		\
+	(int) data |= pwm; 		\
 } while (0)
 
-#define SET_REG0(frontend,reg0) do {		\
-	(int) frontend->data &= ~(0xff << 8); 	\
-	(int) frontend->data |= reg0 << 8; 	\
+#define SET_REG0(data,reg0) do {	\
+	(int) data &= ~(0xff << 8); 	\
+	(int) data |= reg0 << 8; 	\
 } while (0)
 
-#define SET_TUNER(frontend,type) do {		\
-	(int) frontend->data &= ~(0xff << 16); 	\
-	(int) frontend->data |= type << 16;	\
+#define SET_TUNER(data,type) do {	\
+	(int) data &= ~(0xff << 16); 	\
+	(int) data |= type << 16;	\
 } while (0)
 
-#define GET_PWM(frontend) ((u8) ((int) frontend->data & 0xff))
-#define GET_REG0(frontend) ((u8) (((int) frontend->data >> 8) & 0xff))
-#define GET_TUNER(frontend) ((u8) (((int) frontend->data >> 16) & 0xff))
+#define SET_DEMOD_ADDR(data,type) do {	\
+	(int) data &= ~(0xff << 24); 	\
+	(int) data |= type << 24;	\
+} while (0)
 
+#define GET_PWM(data) ((u8) ((int) data & 0xff))
+#define GET_REG0(data) ((u8) (((int) data >> 8) & 0xff))
+#define GET_TUNER(data) ((u8) (((int) data >> 16) & 0xff))
+#define GET_DEMOD_ADDR(data) ((u8) (((int) data >> 24) & 0xff))
+
+
+static inline
+void ddelay (int ms)
+{
+	current->state=TASK_INTERRUPTIBLE;
+	schedule_timeout((HZ*ms)/1000);
+}
 
 
 static
 struct dvb_frontend_info ves1820_info = {
-	.name	= "VES1820/Grundig tuner as used on the Siemens DVB-C card",
-	.type	= FE_QAM,
-	.frequency_stepsize	= 62500,
-	.frequency_min		= 51000000,
-	.frequency_max		= 858000000,
-	.caps	= FE_CAN_QAM_16 | FE_CAN_QAM_32 | FE_CAN_QAM_64 |
-		  FE_CAN_QAM_128 | FE_CAN_QAM_256
+	.name = "VES1820 based DVB-C frontend",
+	.type = FE_QAM,
+	.frequency_stepsize = 62500,
+	.frequency_min = 51000000,
+	.frequency_max = 858000000,
+	.symbol_rate_min = (57840000/2)/64,     /* SACLK/64 == (XIN/2)/64 */
+	.symbol_rate_max = (57840000/2)/4,      /* SACLK/4 */
+#if 0
+	frequency_tolerance: ???,
+	symbol_rate_tolerance: ???,  /* ppm */  /* == 8% (spec p. 5) */
+	notifier_delay: ?,
+#endif
+	.caps = FE_CAN_QAM_16 | FE_CAN_QAM_32 | FE_CAN_QAM_64 |
+		FE_CAN_QAM_128 | FE_CAN_QAM_256 | 
+		FE_CAN_FEC_AUTO | FE_CAN_INVERSION_AUTO |
+		FE_CAN_CLEAN_SETUP | FE_CAN_RECOVER
 };
 
 
@@ -73,22 +97,24 @@ struct dvb_frontend_info ves1820_info = {
 static
 u8 ves1820_inittab [] =
 {
-  0x69, 0x6A, 0x9B, 0x0A, 0x52, 0x46, 0x26, 0x1A,
-  0x43, 0x6A, 0xAA, 0xAA, 0x1E, 0x85, 0x43, 0x28,
-  0xE0, 0x00, 0xA1, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
-  0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x40
+	0x69, 0x6A, 0x9B, 0x0A, 0x52, 0x46, 0x26, 0x1A,
+	0x43, 0x6A, 0xAA, 0xAA, 0x1E, 0x85, 0x43, 0x28,
+	0xE0, 0x00, 0xA1, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
+	0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x40
 };
 
 
 static
-int ves1820_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
+int ves1820_writereg (struct dvb_frontend *fe, u8 reg, u8 data)
 {
-        int ret;
+	u8 addr = GET_DEMOD_ADDR(fe->data);
         u8 buf[] = { 0x00, reg, data };
-	struct i2c_msg msg = { .addr = 0x09, .flags = 0, .buf = buf, .len = 3 };
+	struct i2c_msg msg = { addr: addr, flags: 0, buf: buf, len: 3 };
+	struct dvb_i2c_bus *i2c = fe->i2c;
+        int ret;
 
 	ret = i2c->xfer (i2c, &msg, 1);
 
@@ -103,14 +129,15 @@ int ves1820_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
 
 
 static
-u8 ves1820_readreg (struct dvb_i2c_bus *i2c, u8 reg)
+u8 ves1820_readreg (struct dvb_frontend *fe, u8 reg)
 {
-	int ret;
 	u8 b0 [] = { 0x00, reg };
 	u8 b1 [] = { 0 };
-	struct i2c_msg msg [] = { { .addr = 0x09, .flags = 0, .buf = b0, .len = 2 },
-	                   { .addr = 0x09, .flags = I2C_M_RD, .buf = b1, .len = 1 } };
-
+	u8 addr = GET_DEMOD_ADDR(fe->data);
+	struct i2c_msg msg [] = { { addr: addr, flags: 0, buf: b0, len: 2 },
+	                   { addr: addr, flags: I2C_M_RD, buf: b1, len: 1 } };
+	struct dvb_i2c_bus *i2c = fe->i2c;
+	int ret;
 
 	ret = i2c->xfer (i2c, msg, 2);
 
@@ -125,7 +152,7 @@ static
 int tuner_write (struct dvb_i2c_bus *i2c, u8 addr, u8 data [4])
 {
         int ret;
-        struct i2c_msg msg = { .addr = addr, .flags = 0, .buf = data, .len = 4 };
+        struct i2c_msg msg = { addr: addr, flags: 0, buf: data, len: 4 };
 
         ret = i2c->xfer (i2c, &msg, 1);
 
@@ -141,15 +168,18 @@ int tuner_write (struct dvb_i2c_bus *i2c, u8 addr, u8 data [4])
  *   reference clock comparision frequency of 62.5 kHz.
  */
 static
-int tuner_set_tv_freq (struct dvb_frontend *frontend, u32 freq)
+int tuner_set_tv_freq (struct dvb_frontend *fe, u32 freq)
 {
         u32 div;
 	static u8 addr [] = { 0x61, 0x62 };
 	static u8 byte3 [] = { 0x8e, 0x85 };
-	int tuner_type = GET_TUNER(frontend);
+	int tuner_type = GET_TUNER(fe->data);
         u8 buf [4];
 
-	div = (freq + 36250000 + 31250) / 62500;
+	if (tuner_type == 0xff)     /*  PLL not reachable over i2c ...  */
+		return 0;
+
+	div = (freq + 36125000 + 31250) / 62500;
 	buf[0] = (div >> 8) & 0x7f;
 	buf[1] = div & 0xff;
 	buf[2] = byte3[tuner_type];
@@ -163,115 +193,56 @@ int tuner_set_tv_freq (struct dvb_frontend *frontend, u32 freq)
 			  freq < 454000000 ? 0x92 : 0x34);
 	}
 
-        return tuner_write (frontend->i2c, addr[tuner_type], buf);
+        return tuner_write (fe->i2c, addr[tuner_type], buf);
 }
 
 
 static
-int probe_tuner (struct dvb_frontend *frontend)
+int ves1820_setup_reg0 (struct dvb_frontend *fe, u8 reg0)
 {
-	struct dvb_i2c_bus *i2c = frontend->i2c;
-	struct i2c_msg msg = { .addr = 0x61, .flags = 0, .buf = NULL, .len = 0 };
+	reg0 |= GET_REG0(fe->data) & 0x62;
+	
+	ves1820_writereg (fe, 0x00, reg0 & 0xfe);
+        ves1820_writereg (fe, 0x00, reg0 | 0x01);
 
-	if (i2c->xfer(i2c, &msg, 1) == 1) {
-		SET_TUNER(frontend,0);
-		printk ("%s: setup for tuner spXXXX\n", __FILE__);
-	} else {
-		SET_TUNER(frontend,1);
-		printk ("%s: setup for tuner sp5659c\n", __FILE__);
+	/**
+	 *  check lock and toggle inversion bit if required...
+	 */
+	if (!(ves1820_readreg (fe, 0x11) & 0x08)) {
+		ddelay(1);
+		if (!(ves1820_readreg (fe, 0x11) & 0x08)) {
+			reg0 ^= 0x20;
+			ves1820_writereg (fe, 0x00, reg0 & 0xfe);
+        		ves1820_writereg (fe, 0x00, reg0 | 0x01);
+		}
 	}
+
+	SET_REG0(fe->data, reg0);
 
 	return 0;
 }
 
 
 static
-int ves1820_init (struct dvb_frontend *frontend)
+int ves1820_init (struct dvb_frontend *fe)
 {
-	struct dvb_i2c_bus *i2c = frontend->i2c;
-	u8 b0 [] = { 0xff };
-	u8 pwm;
 	int i;
-	struct i2c_msg msg [] = { { .addr = 0x50, .flags = 0, .buf = b0, .len = 1 },
-	                   { .addr = 0x50, .flags = I2C_M_RD, .buf = &pwm, .len = 1 } };
         
         dprintk("VES1820: init chip\n");
 
-	i2c->xfer (i2c, msg, 2);
-
-	dprintk("VES1820: pwm=%02x\n", pwm);
-
-	if (pwm == 0xff)
-                pwm=0x48;
-
-        ves1820_writereg (i2c, 0, 0);
+        ves1820_writereg (fe, 0, 0);
 
 	for (i=0; i<53; i++)
-                ves1820_writereg (i2c, i, ves1820_inittab[i]);
+                ves1820_writereg (fe, i, ves1820_inittab[i]);
 
-        ves1820_writereg (i2c, 0x34, pwm);
-
-	(int) frontend->data = 0;
-	SET_PWM(frontend,pwm);
-
-	probe_tuner (frontend);
+	ves1820_writereg (fe, 0x34, GET_PWM(fe->data)); 
 
 	return 0;
 }
 
 
 static
-int ves1820_setup_reg0 (struct dvb_frontend *frontend,
-			u8 real_qam, fe_spectral_inversion_t inversion)
-{
-	struct dvb_i2c_bus *i2c = frontend->i2c;
-	u8 reg0 = (ves1820_inittab[0] & 0xe3) | (real_qam << 2);
-
-	switch (inversion) {
-	case INVERSION_OFF:      /* XXX FIXME: reversed?? p. 25  */
-		reg0 |= 0x20;
-		break;
-
-	case INVERSION_ON:
-		reg0 &= 0xdf;
-		break;
-
-	default:
-		return -EINVAL;
-	}
-
-	SET_REG0(frontend, reg0);
-
-	ves1820_writereg (i2c, 0x00, reg0 & 0xfe);
-        ves1820_writereg (i2c, 0x00, reg0);
-
-	return 0;
-}
-
-
-static
-int ves1820_reset (struct dvb_frontend *frontend)
-{
-	struct dvb_i2c_bus *i2c = frontend->i2c;
-	u8 reg0 = GET_REG0(frontend);
-
-	ves1820_writereg (i2c, 0x00, reg0 & 0xfe);
-        ves1820_writereg (i2c, 0x00, reg0);
-
-	return 0;
-}
-
-
-static
-void ves1820_reset_uncorrected_block_counter (struct dvb_i2c_bus *i2c)
-{
-	ves1820_writereg (i2c, 0x10, ves1820_inittab[0x10] & 0xdf);
-        ves1820_writereg (i2c, 0x10, ves1820_inittab[0x10]);
-}
-
-
-static
-int ves1820_set_symbolrate (struct dvb_i2c_bus *i2c, u32 symbolrate)
+int ves1820_set_symbolrate (struct dvb_frontend *fe, u32 symbolrate)
 {
         s32 BDR; 
         s32 BDRI;
@@ -280,7 +251,7 @@ int ves1820_set_symbolrate (struct dvb_i2c_bus *i2c, u32 symbolrate)
         u32 tmp, ratio;
 
 #define XIN 57840000UL
-#define FIN (57840000UL>>4)
+#define FIN (XIN >> 4)
 
         if (symbolrate > XIN/2) 
                 symbolrate = XIN/2;
@@ -317,81 +288,50 @@ int ves1820_set_symbolrate (struct dvb_i2c_bus *i2c, u32 symbolrate)
         
         NDEC = (NDEC << 6) | ves1820_inittab[0x03];
 
-        ves1820_writereg (i2c, 0x03, NDEC);
-        ves1820_writereg (i2c, 0x0a, BDR&0xff);
-        ves1820_writereg (i2c, 0x0b, (BDR>> 8)&0xff);
-        ves1820_writereg (i2c, 0x0c, (BDR>>16)&0x3f);
+        ves1820_writereg (fe, 0x03, NDEC);
+        ves1820_writereg (fe, 0x0a, BDR&0xff);
+        ves1820_writereg (fe, 0x0b, (BDR>> 8)&0xff);
+        ves1820_writereg (fe, 0x0c, (BDR>>16)&0x3f);
 
-        ves1820_writereg (i2c, 0x0d, BDRI);
-        ves1820_writereg (i2c, 0x0e, SFIL);
+        ves1820_writereg (fe, 0x0d, BDRI);
+        ves1820_writereg (fe, 0x0e, SFIL);
 
         return 0;
 }
 
 
 static
-void ves1820_reset_pwm (struct dvb_frontend *frontend) 
-{
-	u8 pwm = GET_PWM(frontend);
-
-	ves1820_writereg (frontend->i2c, 0x34, pwm); 
-}
-
-
-typedef struct {
-        fe_modulation_t  QAM_Mode;
-        int         NoOfSym;
-        u8          Reg1;
-        u8          Reg5;
-        u8          Reg8;
-        u8          Reg9;
-} QAM_SETTING;
-
-
-QAM_SETTING QAM_Values[] = {	
-        {  QAM_16,  16, 140, 164, 162, 145 },
-        {  QAM_32,  32, 140, 120, 116, 150 },
-        {  QAM_64,  64, 106,  70,  67, 106 },
-        { QAM_128, 128, 120,  54,  52, 126 },
-        { QAM_256, 256,  92,  38,  35, 107 }
-};
-
-
-static
-int ves1820_set_parameters (struct dvb_frontend *frontend,
+int ves1820_set_parameters (struct dvb_frontend *fe,
 			    struct dvb_frontend_parameters *p)
 {
-	struct dvb_i2c_bus* i2c = frontend->i2c;
-        int real_qam;
-        
-        switch (p->u.qam.modulation) {
-        case QAM_16 : real_qam = 0; break;
-        case QAM_32 : real_qam = 1; break;
-        case QAM_64 : real_qam = 2; break;
-        case QAM_128: real_qam = 3; break;
-        case QAM_256: real_qam = 4; break;
-        default:
-                return -EINVAL;
-        }
+	static const u8 reg0x00 [] = { 0x00, 0x04, 0x08, 0x0c, 0x10 };
+	static const u8 reg0x01 [] = {  140,  140,  106,  120,   92 };
+	static const u8 reg0x05 [] = {  135,  100,   70,   54,   38 };
+	static const u8 reg0x08 [] = {  162,  116,   67,   52,   35 };
+	static const u8 reg0x09 [] = {  145,  150,  106,  126,  107 };
+	int real_qam = p->u.qam.modulation - QAM_16;
 
-	tuner_set_tv_freq (frontend, p->frequency);
-	ves1820_set_symbolrate (i2c, p->u.qam.symbol_rate);
-	ves1820_reset_pwm (frontend);
+	if (real_qam < 0 || real_qam > 4)
+		return -EINVAL;
 
-        ves1820_writereg (i2c, 0x01, QAM_Values[real_qam].Reg1);
-        ves1820_writereg (i2c, 0x05, QAM_Values[real_qam].Reg5);
-        ves1820_writereg (i2c, 0x08, QAM_Values[real_qam].Reg8);
-        ves1820_writereg (i2c, 0x09, QAM_Values[real_qam].Reg9);
+	tuner_set_tv_freq (fe, p->frequency);
+	ves1820_set_symbolrate (fe, p->u.qam.symbol_rate);
+	ves1820_writereg (fe, 0x34, GET_PWM(fe->data));
 
-	ves1820_setup_reg0 (frontend, real_qam, p->inversion);
-	
+        ves1820_writereg (fe, 0x01, reg0x01[real_qam]);
+        ves1820_writereg (fe, 0x05, reg0x05[real_qam]);
+        ves1820_writereg (fe, 0x08, reg0x08[real_qam]);
+        ves1820_writereg (fe, 0x09, reg0x09[real_qam]);
+
+	ves1820_setup_reg0 (fe, reg0x00[real_qam]);
+
 	return 0;
 }
 
 
 
 static
-int ves1820_ioctl (struct dvb_frontend *frontend, unsigned int cmd, void *arg)
+int ves1820_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 {
         switch (cmd) {
 	case FE_GET_INFO:
@@ -405,7 +345,7 @@ int ves1820_ioctl (struct dvb_frontend *frontend, unsigned int cmd, void *arg)
 
 		*status = 0;
 
-                sync = ves1820_readreg (frontend->i2c, 0x11);
+                sync = ves1820_readreg (fe, 0x11);
 
 		if (sync & 2)
 			*status |= FE_HAS_SIGNAL;
@@ -427,35 +367,37 @@ int ves1820_ioctl (struct dvb_frontend *frontend, unsigned int cmd, void *arg)
 
 	case FE_READ_BER:
 	{
-		u32 ber = ves1820_readreg(frontend->i2c, 0x14) |
-			        (ves1820_readreg(frontend->i2c, 0x15) << 8) |
-			 ((ves1820_readreg(frontend->i2c, 0x16) & 0x0f) << 16);
+		u32 ber = ves1820_readreg(fe, 0x14) |
+			 (ves1820_readreg(fe, 0x15) << 8) |
+			 ((ves1820_readreg(fe, 0x16) & 0x0f) << 16);
 		*((u32*) arg) = 10 * ber;
 		break;
 	}
 	case FE_READ_SIGNAL_STRENGTH:
 	{
-		u8 gain = ves1820_readreg(frontend->i2c, 0x17);
+		u8 gain = ves1820_readreg(fe, 0x17);
 		*((u16*) arg) = (gain << 8) | gain;
 		break;
 	}
 
 	case FE_READ_SNR:
 	{
-		u8 quality = ~ves1820_readreg(frontend->i2c, 0x18);
+		u8 quality = ~ves1820_readreg(fe, 0x18);
 		*((u16*) arg) = (quality << 8) | quality;
 		break;
 	}
 
 	case FE_READ_UNCORRECTED_BLOCKS:
-		*((u32*) arg) = ves1820_readreg (frontend->i2c, 0x13) & 0x7f;
+		*((u32*) arg) = ves1820_readreg (fe, 0x13) & 0x7f;
 		if (*((u32*) arg) == 0x7f)
 			*((u32*) arg) = 0xffffffff;
-		ves1820_reset_uncorrected_block_counter (frontend->i2c);
+		/* reset uncorrected block counter */
+		ves1820_writereg (fe, 0x10, ves1820_inittab[0x10] & 0xdf);
+	        ves1820_writereg (fe, 0x10, ves1820_inittab[0x10]);
 		break;
 
         case FE_SET_FRONTEND:
-		return ves1820_set_parameters (frontend, arg);
+		return ves1820_set_parameters (fe, arg);
 
 	case FE_GET_FRONTEND:
 		/*  XXX FIXME: implement! */
@@ -468,16 +410,12 @@ int ves1820_ioctl (struct dvb_frontend *frontend, unsigned int cmd, void *arg)
 		break;
 
 	case FE_SLEEP:
-		ves1820_writereg (frontend->i2c, 0x1b, 0x02);  /* pdown ADC */
-		ves1820_writereg (frontend->i2c, 0x00, 0x80);  /* standby */
+		ves1820_writereg (fe, 0x1b, 0x02);  /* pdown ADC */
+		ves1820_writereg (fe, 0x00, 0x80);  /* standby */
 		break;
 
         case FE_INIT:
-                return ves1820_init (frontend);
-
-        case FE_RESET:
-		ves1820_reset (frontend);
-		break;
+                return ves1820_init (fe);
 
         default:
                 return -EINVAL;
@@ -488,12 +426,89 @@ int ves1820_ioctl (struct dvb_frontend *frontend, unsigned int cmd, void *arg)
 
 
 static
+int probe_tuner (struct dvb_i2c_bus *i2c)
+{
+	static const
+	struct i2c_msg msg1 = { addr: 0x61, flags: 0, buf: NULL, len: 0 };
+	static const
+	struct i2c_msg msg2 = { addr: 0x62, flags: 0, buf: NULL, len: 0 };
+	int type;
+
+	if (i2c->xfer(i2c, &msg1, 1) == 1) {
+		type = 0;
+		printk ("%s: setup for tuner spXXXX\n", __FILE__);
+	} else if (i2c->xfer(i2c, &msg2, 1) == 1) {
+		type = 1;
+		printk ("%s: setup for tuner sp5659c\n", __FILE__);
+	} else {
+		type = -1;
+		printk ("%s: unknown PLL, "
+			"please report to <linuxdvb@linuxtv.org>!!\n",
+			__FILE__);
+	}
+
+	return type;
+}
+
+
+static
+u8 read_pwm (struct dvb_i2c_bus *i2c)
+{
+	u8 b = 0xff;
+	u8 pwm;
+	struct i2c_msg msg [] = { { addr: 0x50, flags: 0, buf: &b, len: 1 },
+			 { addr: 0x50, flags: I2C_M_RD, buf: &pwm, len: 1 } };
+
+	i2c->xfer (i2c, msg, 2);
+
+	dprintk("VES1820: pwm=%02x\n", pwm);
+
+	if (pwm == 0xff)
+		pwm = 0x48;
+
+	return pwm;
+}
+
+
+static
+int probe_demod_addr (struct dvb_i2c_bus *i2c)
+{
+	u8 b [] = { 0x00, 0x1a };
+	u8 id;
+	struct i2c_msg msg [] = { { addr: 0x08, flags: 0, buf: b, len: 2 },
+	                   { addr: 0x08, flags: I2C_M_RD, buf: &id, len: 1 } };
+
+	if (i2c->xfer(i2c, msg, 2) == 2 && (id & 0xf0) == 0x70)
+		return msg[0].addr;
+
+	msg[0].addr = msg[1].addr = 0x09;
+
+	if (i2c->xfer(i2c, msg, 2) == 2 && (id & 0xf0) == 0x70)
+		return msg[0].addr;
+
+	return -1;
+}
+
+
+static
 int ves1820_attach (struct dvb_i2c_bus *i2c)
 {
-        if ((ves1820_readreg (i2c, 0x1a) & 0xf0) != 0x70)
-                return -ENODEV;
-        
-        dvb_register_frontend (ves1820_ioctl, i2c, NULL, &ves1820_info);
+	void *data = NULL;
+	int demod_addr;
+	int tuner_type;
+
+	if ((demod_addr = probe_demod_addr(i2c)) < 0)
+		return -ENODEV;
+
+	if ((tuner_type = probe_tuner(i2c)) < 0)
+		return -ENODEV;
+
+	SET_PWM(data, read_pwm(i2c));
+	SET_REG0(data, ves1820_inittab[0]);
+	SET_TUNER(data, tuner_type);
+	SET_DEMOD_ADDR(data, demod_addr);
+
+	dvb_register_frontend (ves1820_ioctl, i2c, data, &ves1820_info);
 
         return 0;
 }
@@ -524,8 +539,7 @@ void __exit exit_ves1820 (void)
 module_init(init_ves1820);
 module_exit(exit_ves1820);
 
-MODULE_DESCRIPTION("");
-MODULE_AUTHOR("Ralph Metzler");
+MODULE_DESCRIPTION("VES1820 DVB-C frontend driver");
+MODULE_AUTHOR("Ralph Metzler, Holger Waechtler");
 MODULE_LICENSE("GPL");
-MODULE_PARM(debug,"i");
 

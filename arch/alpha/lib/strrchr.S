@@ -2,7 +2,7 @@
  * arch/alpha/lib/strrchr.S
  * Contributed by Richard Henderson (rth@tamu.edu)
  *
- * Return the address of the last occurrance of a given character
+ * Return the address of the last occurrence of a given character
  * within a null-terminated string, or null if it is not found.
  */
 

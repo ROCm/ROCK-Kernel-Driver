@@ -493,28 +493,28 @@ static int ctrls[AWE_MD_END];
 
 static struct synth_operations awe_operations =
 {
-	owner:		THIS_MODULE,
-	id:		"EMU8K",
-	info:		&awe_info,
-	midi_dev:	0,
-	synth_type:	SYNTH_TYPE_SAMPLE,
-	synth_subtype:	SAMPLE_TYPE_AWE32,
-	open:		awe_open,
-	close:		awe_close,
-	ioctl:		awe_ioctl,
-	kill_note:	awe_kill_note,
-	start_note:	awe_start_note,
-	set_instr:	awe_set_instr_2,
-	reset:		awe_reset,
-	hw_control:	awe_hw_control,
-	load_patch:	awe_load_patch,
-	aftertouch:	awe_aftertouch,
-	controller:	awe_controller,
-	panning:	awe_panning,
-	volume_method:	awe_volume_method,
-	bender:		awe_bender,
-	alloc_voice:	awe_alloc,
-	setup_voice:	awe_setup_voice
+	.owner		= THIS_MODULE,
+	.id		= "EMU8K",
+	.info		= &awe_info,
+	.midi_dev	= 0,
+	.synth_type	= SYNTH_TYPE_SAMPLE,
+	.synth_subtype	= SAMPLE_TYPE_AWE32,
+	.open		= awe_open,
+	.close		= awe_close,
+	.ioctl		= awe_ioctl,
+	.kill_note	= awe_kill_note,
+	.start_note	= awe_start_note,
+	.set_instr	= awe_set_instr_2,
+	.reset		= awe_reset,
+	.hw_control	= awe_hw_control,
+	.load_patch	= awe_load_patch,
+	.aftertouch	= awe_aftertouch,
+	.controller	= awe_controller,
+	.panning	= awe_panning,
+	.volume_method	= awe_volume_method,
+	.bender		= awe_bender,
+	.alloc_voice	= awe_alloc,
+	.setup_voice	= awe_setup_voice
 };
 
 
@@ -4287,10 +4287,10 @@ static int awe_mixer_ioctl(int dev, unsigned int cmd, caddr_t arg);
 static int my_mixerdev = -1;
 
 static struct mixer_operations awe_mixer_operations = {
-	owner:	THIS_MODULE,
-	id:	"AWE",
-	name:	"AWE32 Equalizer",
-	ioctl:	awe_mixer_ioctl,
+	.owner	= THIS_MODULE,
+	.id	= "AWE",
+	.name	= "AWE32 Equalizer",
+	.ioctl	= awe_mixer_ioctl,
 };
 
 static void __init attach_mixer(void)
@@ -5232,13 +5232,13 @@ static int xg_control_change(MidiStatus *st, int cmd, int val);
 
 static struct midi_operations awe_midi_operations =
 {
-	owner:		THIS_MODULE,
-	info:		{"AWE Midi Emu", 0, 0, SNDCARD_SB},
-	in_info:	{0},
-	open:		awe_midi_open, /*open*/
-	close:		awe_midi_close, /*close*/
-	ioctl:		awe_midi_ioctl, /*ioctl*/
-	outputc:	awe_midi_outputc, /*outputc*/
+	.owner		= THIS_MODULE,
+	.info		= {"AWE Midi Emu", 0, 0, SNDCARD_SB},
+	.in_info	= {0},
+	.open		= awe_midi_open, /*open*/
+	.close		= awe_midi_close, /*close*/
+	.ioctl		= awe_midi_ioctl, /*ioctl*/
+	.outputc	= awe_midi_outputc, /*outputc*/
 };
 
 static int my_mididev = -1;

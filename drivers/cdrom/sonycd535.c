@@ -797,10 +797,10 @@ do_cdu535_request(request_queue_t * q)
 	Byte cmd[2];
 
 	while (1) {
-		if (blk_queue_empty(q))
+		req = elv_next_request(q);
+		if (!req)
 			return;
 
-		req = elv_next_request(q);
 		block = req->sector;
 		nsect = req->nr_sectors;
 		if (!(req->flags & REQ_CMD))

@@ -51,4 +51,10 @@
  */
 #define NR_IRQS 224
 
+#define FPU_IRQ			13
+
+#define	FIRST_VM86_IRQ		3
+#define LAST_VM86_IRQ		15
+#define invalid_vm86_irq(irq)	((irq) < 3 || (irq) > 15)
+
 #endif /* _ASM_IRQ_VECTORS_H */

@@ -190,8 +190,9 @@ static void jsfd_read(char *buf, unsigned long p, size_t togo) {
 
 static void jsfd_do_request(request_queue_t *q)
 {
-	while (!blk_queue_empty(q)) {
-		struct request *req = elv_next_request(q);
+	struct request *req;
+	
+	while ((req = elv_next_request(q)) != NULL) {
 		struct jsfd_part *jdp = req->rq_disk->private_data;
 		unsigned long offset = req->sector << 9;
 		size_t len = req->current_nr_sectors << 9;

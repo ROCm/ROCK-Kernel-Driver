@@ -231,18 +231,18 @@ static inline int uart6850_buffer_status(int dev)
 
 static struct midi_operations uart6850_operations =
 {
-	owner:		THIS_MODULE,
-	info:		{"6850 UART", 0, 0, SNDCARD_UART6850},
-	converter:	&std_midi_synth,
-	in_info:	{0},
-	open:		uart6850_open,
-	close:		uart6850_close,
-	outputc:	uart6850_out,
-	start_read:	uart6850_start_read,
-	end_read:	uart6850_end_read,
-	kick:		uart6850_kick,
-	command:	uart6850_command,
-	buffer_status:	uart6850_buffer_status
+	.owner		= THIS_MODULE,
+	.info		= {"6850 UART", 0, 0, SNDCARD_UART6850},
+	.converter	= &std_midi_synth,
+	.in_info	= {0},
+	.open		= uart6850_open,
+	.close		= uart6850_close,
+	.outputc	= uart6850_out,
+	.start_read	= uart6850_start_read,
+	.end_read	= uart6850_end_read,
+	.kick		= uart6850_kick,
+	.command	= uart6850_command,
+	.buffer_status	= uart6850_buffer_status
 };
 
 

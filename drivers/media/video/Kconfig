@@ -230,5 +230,32 @@ config VIDEO_SAA7134
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
 
+config VIDEO_MXB
+	tristate "Siemens-Nixdorf 'Multimedia eXtension Board'"
+	depends on VIDEO_DEV && PCI && I2C
+	---help---
+	  This is a video4linux driver for the 'Multimedia eXtension Board'
+	  TV card by Siemens-Nixdorf.
+	  
+	  This driver is available as a module called mxb ( = code
+	  which can be inserted in and removed from the running kernel
+	  whenever you want). If you want to compile it as a module, say M
+	  here and read <file:Documentation/modules.txt>.
+
+config VIDEO_DPC
+	tristate "Philips-Semiconductors 'dpc7146 demonstration board'"
+	depends on VIDEO_DEV && PCI && I2C
+	---help---
+	  This is a video4linux driver for the 'dpc7146 demonstration
+	  board' by Philips-Semiconductors. It's the reference design
+	  for SAA7146 bases boards, so if you have some unsupported
+	  saa7146 based, analog video card, chances are good that it
+	  will work with this skeleton driver.
+	  
+	  This driver is available as a module called dpc7146 ( = code
+	  which can be inserted in and removed from the running kernel
+	  whenever you want). If you want to compile it as a module, say M
+	  here and read <file:Documentation/modules.txt>.
+
 endmenu
 

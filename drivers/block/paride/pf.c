@@ -780,10 +780,10 @@ static void do_pf_request(request_queue_t * q)
 	if (pf_busy)
 		return;
 repeat:
-	if (elv_queue_empty(q))
+	pf_req = elv_next_request(q);
+	if (!pf_req)
 		return;
 
-	pf_req = elv_next_request(q);
 	pf_current = pf_req->rq_disk->private_data;
 	pf_block = pf_req->sector;
 	pf_run = pf_req->nr_sectors;

@@ -491,15 +491,15 @@ static int sound_mmap(struct file *file, struct vm_area_struct *vma)
 }
 
 struct file_operations oss_sound_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		sound_read,
-	write:		sound_write,
-	poll:		sound_poll,
-	ioctl:		sound_ioctl,
-	mmap:		sound_mmap,
-	open:		sound_open,
-	release:	sound_release,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.read		= sound_read,
+	.write		= sound_write,
+	.poll		= sound_poll,
+	.ioctl		= sound_ioctl,
+	.mmap		= sound_mmap,
+	.open		= sound_open,
+	.release	= sound_release,
 };
 
 /*

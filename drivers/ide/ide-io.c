@@ -673,7 +673,8 @@ repeat:
 	best = NULL;
 	drive = hwgroup->drive;
 	do {
-		if (!blk_queue_empty(&drive->queue) && (!drive->sleep || time_after_eq(jiffies, drive->sleep))) {
+		if ((!drive->sleep || time_after_eq(jiffies, drive->sleep))
+		    && !elv_queue_empty(&drive->queue)) {
 			if (!best
 			 || (drive->sleep && (!best->sleep || 0 < (signed long)(best->sleep - drive->sleep)))
 			 || (!best->sleep && 0 < (signed long)(WAKEUP(best) - WAKEUP(drive))))

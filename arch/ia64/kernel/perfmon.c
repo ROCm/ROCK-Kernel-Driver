@@ -24,6 +24,7 @@
 #include <linux/wrapper.h>
 #include <linux/mm.h>
 #include <linux/sysctl.h>
+#include <linux/smp.h>
 
 #include <asm/bitops.h>
 #include <asm/errno.h>
@@ -133,12 +134,6 @@
 
 #define PFM_CPUINFO_CLEAR(v)	__get_cpu_var(pfm_syst_info) &= ~(v)
 #define PFM_CPUINFO_SET(v)	__get_cpu_var(pfm_syst_info) |= (v)
-
-#ifdef CONFIG_SMP
-#define cpu_is_online(i) (cpu_online_map & (1UL << i))
-#else
-#define cpu_is_online(i)        (i==0)
-#endif
 
 /*
  * debugging
@@ -1082,7 +1077,7 @@ pfx_is_sane(struct task_struct *task, pfarg_context_t *pfx)
 		 * and it must be a valid CPU
 		 */
 		cpu = ffz(~pfx->ctx_cpu_mask);
-		if (cpu_is_online(cpu) == 0) {
+		if (cpu_online(cpu) == 0) {
 			DBprintk(("CPU%d is not online\n", cpu));
 			return -EINVAL;
 		}
@@ -3153,7 +3148,7 @@ pfm_proc_info(char *page)
 	p += sprintf(p, "ovfl_mask              : 0x%lx\n", pmu_conf.ovfl_val);
 
 	for(i=0; i < NR_CPUS; i++) {
-		if (cpu_is_online(i) == 0) continue;
+		if (cpu_online(i) == 0) continue;
 		p += sprintf(p, "CPU%-2d overflow intrs   : %lu\n", i, pfm_stats[i].pfm_ovfl_intr_count);
 		p += sprintf(p, "CPU%-2d spurious intrs   : %lu\n", i, pfm_stats[i].pfm_spurious_ovfl_intr_count);
 		p += sprintf(p, "CPU%-2d recorded samples : %lu\n", i, pfm_stats[i].pfm_recorded_samples_count);

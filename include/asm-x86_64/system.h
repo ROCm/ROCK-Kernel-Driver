@@ -40,7 +40,7 @@ struct save_context_frame {
 /* It would be more efficient to let the compiler clobber most of these registers.
    Clobbering all is not possible because that lets reload freak out. Even just 
    clobbering six generates wrong code with gcc 3.1 for me so do it this way for now.
-   rbp needs to be always explicitely saved because gcc cannot clobber the
+   rbp needs to be always explicitly saved because gcc cannot clobber the
    frame pointer and the scheduler is compiled with frame pointers. -AK */
 #define SAVE_CONTEXT \
 	__PUSH(rsi) __PUSH(rdi) \

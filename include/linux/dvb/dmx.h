@@ -21,13 +21,14 @@
  *
  */
 
-#ifndef _DMX_H_
-#define _DMX_H_
+#ifndef _DVBDMX_H_
+#define _DVBDMX_H_
 
 #ifdef __KERNEL__
 #include <linux/types.h>
 #else
 #include <stdint.h>
+#include <time.h>
 #endif
 
 #define DMX_FILTER_SIZE 16
@@ -154,8 +155,14 @@ typedef enum {
 	DMX_SOURCE_DVR0   = 16,
 	DMX_SOURCE_DVR1,
 	DMX_SOURCE_DVR2,
-	DMX_SOURCE_DVR3,
+	DMX_SOURCE_DVR3
 } dmx_source_t;
+
+struct dmx_stc {
+	unsigned int num;	/* input : which STC? 0..N */
+	unsigned int base;	/* output: divisor for stc to get 90 kHz clock */
+	uint64_t stc;		/* output: stc in 'base'*90 kHz units */
+};
 
 
 #define DMX_START                _IO('o',41) 
@@ -164,9 +171,10 @@ typedef enum {
 #define DMX_SET_PES_FILTER       _IOW('o',44,struct dmx_pes_filter_params)
 #define DMX_SET_BUFFER_SIZE      _IO('o',45)
 #define DMX_GET_EVENT            _IOR('o',46,struct dmx_event)
-#define DMX_GET_PES_PIDS         _IOR('o',47,uint16_t)
+#define DMX_GET_PES_PIDS         _IOR('o',47,uint16_t[5])
 #define DMX_GET_CAPS             _IOR('o',48,dmx_caps_t)
 #define DMX_SET_SOURCE           _IOW('o',49,dmx_source_t)
+#define DMX_GET_STC              _IOWR('o',50,struct dmx_stc)
 
-#endif /*_DMX_H_*/
+#endif /*_DVBDMX_H_*/
 

@@ -2,12 +2,11 @@
  * Generic HDLC support routines for Linux
  * Point-to-point protocol support
  *
- * Copyright (C) 1999 - 2001 Krzysztof Halasa <khc@pm.waw.pl>
+ * Copyright (C) 1999 - 2003 Krzysztof Halasa <khc@pm.waw.pl>
  *
  * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * under the terms of version 2 of the GNU General Public License
+ * as published by the Free Software Foundation.
  */
 
 #include <linux/config.h>
@@ -68,10 +67,10 @@ static void ppp_close(hdlc_device *hdlc)
 
 
 
-static void ppp_rx(struct sk_buff *skb)
+static unsigned short ppp_type_trans(struct sk_buff *skb,
+				     struct net_device *dev)
 {
-	skb->protocol = htons(ETH_P_WAN_PPP);
-	netif_rx(skb);
+	return __constant_htons(ETH_P_WAN_PPP);
 }
 
 
@@ -103,7 +102,8 @@ int hdlc_ppp_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 
 		hdlc->open = ppp_open;
 		hdlc->stop = ppp_close;
-		hdlc->netif_rx = ppp_rx;
+		hdlc->netif_rx = NULL;
+		hdlc->type_trans = ppp_type_trans;
 		hdlc->proto = IF_PROTO_PPP;
 		dev->hard_start_xmit = hdlc->xmit;
 		dev->hard_header = NULL;

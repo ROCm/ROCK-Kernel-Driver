@@ -78,9 +78,6 @@ struct flock {
 	pid_t l_pid;
 };
 
-#ifdef __KERNEL__
-# define flock64	flock
-#endif
-
 #define F_LINUX_SPECIFIC_BASE	1024
+
 #endif /* _ASM_IA64_FCNTL_H */

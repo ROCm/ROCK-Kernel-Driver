@@ -29,7 +29,7 @@
 
 extern int     *gus_osp;
 extern int      gus_base;
-extern spinlock_t lock;
+extern spinlock_t gus_lock;
 static int      volumes[ICS_MIXDEVS];
 static int      left_fix[ICS_MIXDEVS] =
 {1, 1, 1, 2, 1, 2};
@@ -87,12 +87,12 @@ static void write_mix(int dev, int chn, int vol)
 		attn_addr |= 0x03;
 	}
 
-	spin_lock_irqsave(&lock, flags);
+	spin_lock_irqsave(&gus_lock, flags);
 	outb((ctrl_addr), u_MixSelect);
 	outb((selector[dev]), u_MixData);
 	outb((attn_addr), u_MixSelect);
 	outb(((unsigned char) vol), u_MixData);
-	spin_unlock_irqrestore(&lock,flags);
+	spin_unlock_irqrestore(&gus_lock,flags);
 }
 
 static int set_volumes(int dev, int vol)
@@ -209,10 +209,10 @@ static int ics2101_mixer_ioctl(int dev, unsigned int cmd, caddr_t arg)
 
 static struct mixer_operations ics2101_mixer_operations =
 {
-	owner:	THIS_MODULE,
-	id:	"ICS2101",
-	name:	"ICS2101 Multimedia Mixer",
-	ioctl:	ics2101_mixer_ioctl
+	.owner	= THIS_MODULE,
+	.id	= "ICS2101",
+	.name	= "ICS2101 Multimedia Mixer",
+	.ioctl	= ics2101_mixer_ioctl
 };
 
 int __init ics2101_mixer_init(void)

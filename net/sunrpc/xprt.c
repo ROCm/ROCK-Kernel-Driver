@@ -625,7 +625,8 @@ skb_read_bits(skb_reader_t *desc, void *to, size_t len)
 {
 	if (len > desc->count)
 		len = desc->count;
-	skb_copy_bits(desc->skb, desc->offset, to, len);
+	if (skb_copy_bits(desc->skb, desc->offset, to, len))
+		return 0;
 	desc->count -= len;
 	desc->offset += len;
 	return len;
@@ -669,11 +670,15 @@ csum_partial_copy_to_xdr(struct xdr_buf *xdr, struct sk_buff *skb)
 		csum2 = skb_checksum(skb, desc.offset, skb->len - desc.offset, 0);
 		desc.csum = csum_block_add(desc.csum, csum2, desc.offset);
 	}
+	if (desc.count)
+		return -1;
 	if ((unsigned short)csum_fold(desc.csum))
 		return -1;
 	return 0;
 no_checksum:
 	xdr_partial_copy_from_skb(xdr, 0, &desc, skb_read_bits);
+	if (desc.count)
+		return -1;
 	return 0;
 }
 
@@ -750,7 +755,8 @@ tcp_copy_data(skb_reader_t *desc, void *p, size_t len)
 {
 	if (len > desc->count)
 		len = desc->count;
-	skb_copy_bits(desc->skb, desc->offset, p, len);
+	if (skb_copy_bits(desc->skb, desc->offset, p, len))
+		return 0;
 	desc->offset += len;
 	desc->count -= len;
 	return len;

@@ -45,13 +45,7 @@ char *task_mem(struct mm_struct *mm, char *buffer)
 
 unsigned long task_vsize(struct mm_struct *mm)
 {
-	struct vm_area_struct *vma;
-	unsigned long vsize = 0;
-
-	for (vma = mm->mmap; vma; vma = vma->vm_next)
-		vsize += vma->vm_end - vma->vm_start;
-
-	return vsize;
+	return PAGE_SIZE * mm->total_vm;
 }
 
 int task_statm(struct mm_struct *mm, int *shared, int *text,

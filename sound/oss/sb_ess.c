@@ -718,18 +718,18 @@ static short ess_audio_set_channels(int dev, short channels)
 
 static struct audio_driver ess_audio_driver =   /* ESS ES688/1688 */
 {
-	owner:			THIS_MODULE,
-	open:			sb_audio_open,
-	close:			sb_audio_close,
-	output_block:	ess_set_output_parms,
-	start_input:	ess_set_input_parms,
-	prepare_for_input:	ess_audio_prepare_for_input,
-	prepare_for_output:	ess_audio_prepare_for_output,
-	halt_io:		ess_audio_halt_xfer,
-	trigger:		ess_audio_trigger,
-	set_speed:		ess_audio_set_speed,
-	set_bits:		ess_audio_set_bits,
-	set_channels:	ess_audio_set_channels
+	.owner			= THIS_MODULE,
+	.open			= sb_audio_open,
+	.close			= sb_audio_close,
+	.output_block		= ess_set_output_parms,
+	.start_input		= ess_set_input_parms,
+	.prepare_for_input	= ess_audio_prepare_for_input,
+	.prepare_for_output	= ess_audio_prepare_for_output,
+	.halt_io		= ess_audio_halt_xfer,
+	.trigger		= ess_audio_trigger,
+	.set_speed		= ess_audio_set_speed,
+	.set_bits		= ess_audio_set_bits,
+	.set_channels		= ess_audio_set_channels
 };
 
 /*

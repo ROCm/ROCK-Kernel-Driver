@@ -48,6 +48,7 @@ struct dvb_adapter {
 	devfs_handle_t devfs_handle;
 	struct list_head list_head;
 	struct list_head device_list;
+	const char *name;
 };
 
 
@@ -63,14 +64,14 @@ struct dvb_device {
 	int writers;
 
         /* don't really need those !? -- FIXME: use video_usercopy  */
-	int (*kernel_ioctl)(struct inode *inode, struct file *file,
+        int (*kernel_ioctl)(struct inode *inode, struct file *file,
 			    unsigned int cmd, void *arg);
 
 	void *priv;
 };
 
 
-extern int dvb_register_adapter (struct dvb_adapter **padap, char *name);
+extern int dvb_register_adapter (struct dvb_adapter **padap, const char *name);
 extern int dvb_unregister_adapter (struct dvb_adapter *adap);
 
 extern int dvb_register_device (struct dvb_adapter *adap,
@@ -84,7 +85,10 @@ extern void dvb_unregister_device (struct dvb_device *dvbdev);
 extern int dvb_generic_open (struct inode *inode, struct file *file);
 extern int dvb_generic_release (struct inode *inode, struct file *file);
 extern int dvb_generic_ioctl (struct inode *inode, struct file *file,
-		      unsigned int cmd, unsigned long arg);
-
+			      unsigned int cmd, unsigned long arg);
+int dvb_usercopy(struct inode *inode, struct file *file,
+                     unsigned int cmd, unsigned long arg,
+                     int (*func)(struct inode *inode, struct file *file,
+                     unsigned int cmd, void *arg));
 #endif /* #ifndef _DVBDEV_H_ */
 

@@ -16,7 +16,6 @@
 #include <linux/poll.h>
 #include <linux/delay.h>
 #include <linux/sysrq.h>
-#include <linux/compatmac.h>
 #include <linux/proc_fs.h>
 #include <linux/irq.h>
 #include <linux/pm.h>

@@ -21,8 +21,8 @@
  *
  */
 
-#ifndef _CA_H_
-#define _CA_H_
+#ifndef _DVBCA_H_
+#define _DVBCA_H_
 
 /* slot interface types and info */
 
@@ -33,6 +33,7 @@ typedef struct ca_slot_info {
 #define CA_CI            1     /* CI high level interface */
 #define CA_CI_LINK       2     /* CI link layer level interface */
 #define CA_CI_PHYS       4     /* CI physical layer level interface */
+#define CA_DESCR         8     /* built-in descrambler */
 #define CA_SC          128     /* simple smart card interface */
 
         unsigned int flags;
@@ -44,7 +45,7 @@ typedef struct ca_slot_info {
 /* descrambler types and info */
 
 typedef struct ca_descr_info {
-        unsigned int num;          /* number of available descramblers (keys) */ 
+        unsigned int num;          /* number of available descramblers (keys) */
         unsigned int type;         /* type of supported scrambling system */
 #define CA_ECD           1
 #define CA_NDS           2
@@ -59,18 +60,23 @@ typedef struct ca_caps {
 } ca_caps_t;
 
 /* a message to/from a CI-CAM */
-typedef struct ca_msg {   
-        unsigned int index;         
+typedef struct ca_msg {
+        unsigned int index;
         unsigned int type;
         unsigned int length;
         unsigned char msg[256];
 } ca_msg_t;
 
 typedef struct ca_descr {
-        unsigned int index;    
-        unsigned int parity;
+        unsigned int index;
+        unsigned int parity;	/* 0 == even, 1 == odd */
         unsigned char cw[8];
 } ca_descr_t;
+
+typedef struct ca_pid {
+        unsigned int pid;
+        int index;		/* -1 == disable*/
+} ca_pid_t;
 
 #define CA_RESET          _IO('o', 128)
 #define CA_GET_CAP        _IOR('o', 129, ca_caps_t)
@@ -79,6 +85,7 @@ typedef struct ca_descr {
 #define CA_GET_MSG        _IOR('o', 132, ca_msg_t)
 #define CA_SEND_MSG       _IOW('o', 133, ca_msg_t)
 #define CA_SET_DESCR      _IOW('o', 134, ca_descr_t)
+#define CA_SET_PID        _IOW('o', 135, ca_pid_t)
 
 #endif
 

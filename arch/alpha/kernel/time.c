@@ -331,7 +331,7 @@ time_init(void)
 
 	/* From John Bowman <bowman@math.ualberta.ca>: allow the values
 	   to settle, as the Update-In-Progress bit going low isn't good
-	   enough on some hardware.  2ms is our guess; we havn't found 
+	   enough on some hardware.  2ms is our guess; we haven't found 
 	   bogomips yet, but this is close on a 500Mhz box.  */
 	__delay(1000000);
 

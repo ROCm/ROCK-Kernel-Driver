@@ -253,7 +253,7 @@ ia32_syscall_table:
 	data8 sys_umount	  /* recycled never used phys( */
 	data8 sys32_ni_syscall	  /* old lock syscall holder */
 	data8 sys32_ioctl
-	data8 sys32_fcntl	  /* 55 */
+	data8 compat_sys_fcntl	  /* 55 */
 	data8 sys32_ni_syscall	  /* old mpx syscall holder */
 	data8 sys_setpgid
 	data8 sys32_ni_syscall	  /* old ulimit syscall holder */
@@ -419,7 +419,7 @@ ia32_syscall_table:
 	data8 sys_mincore
 	data8 sys_madvise
 	data8 sys_getdents64	  /* 220 */
-	data8 sys32_fcntl64
+	data8 compat_sys_fcntl64
 	data8 sys_ni_syscall		/* reserved for TUX */
 	data8 sys_ni_syscall		/* reserved for Security */
 	data8 sys_gettid

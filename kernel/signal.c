@@ -1720,7 +1720,7 @@ int sigprocmask(int how, sigset_t *set, sigset_t *oldset)
 }
 
 asmlinkage long
-sys_rt_sigprocmask(int how, sigset_t *set, sigset_t *oset, size_t sigsetsize)
+sys_rt_sigprocmask(int how, sigset_t __user *set, sigset_t __user *oset, size_t sigsetsize)
 {
 	int error = -EINVAL;
 	sigset_t old_set, new_set;
@@ -1755,7 +1755,7 @@ out:
 	return error;
 }
 
-long do_sigpending(void *set, unsigned long sigsetsize)
+long do_sigpending(void __user *set, unsigned long sigsetsize)
 {
 	long error = -EINVAL;
 	sigset_t pending;
@@ -1780,14 +1780,14 @@ out:
 }	
 
 asmlinkage long
-sys_rt_sigpending(sigset_t *set, size_t sigsetsize)
+sys_rt_sigpending(sigset_t __user *set, size_t sigsetsize)
 {
 	return do_sigpending(set, sigsetsize);
 }
 
 #ifndef HAVE_ARCH_COPY_SIGINFO_TO_USER
 
-int copy_siginfo_to_user(siginfo_t *to, siginfo_t *from)
+int copy_siginfo_to_user(siginfo_t __user *to, siginfo_t *from)
 {
 	int err;
 
@@ -1850,8 +1850,10 @@ int copy_siginfo_to_user(siginfo_t *to, siginfo_t *from)
 #endif
 
 asmlinkage long
-sys_rt_sigtimedwait(const sigset_t *uthese, siginfo_t *uinfo,
-		    const struct timespec *uts, size_t sigsetsize)
+sys_rt_sigtimedwait(const sigset_t __user *uthese,
+		    siginfo_t __user *uinfo,
+		    const struct timespec __user *uts,
+		    size_t sigsetsize)
 {
 	int ret, sig;
 	sigset_t these;
@@ -1980,7 +1982,7 @@ sys_tkill(int pid, int sig)
 }
 
 asmlinkage long
-sys_rt_sigqueueinfo(int pid, int sig, siginfo_t *uinfo)
+sys_rt_sigqueueinfo(int pid, int sig, siginfo_t __user *uinfo)
 {
 	siginfo_t info;
 
@@ -2069,7 +2071,7 @@ do_sigaction(int sig, const struct k_sigaction *act, struct k_sigaction *oact)
 }
 
 int 
-do_sigaltstack (const stack_t *uss, stack_t *uoss, unsigned long sp)
+do_sigaltstack (const stack_t __user *uss, stack_t __user *uoss, unsigned long sp)
 {
 	stack_t oss;
 	int error;
@@ -2133,7 +2135,7 @@ out:
 }
 
 asmlinkage long
-sys_sigpending(old_sigset_t *set)
+sys_sigpending(old_sigset_t __user *set)
 {
 	return do_sigpending(set, sizeof(*set));
 }
@@ -2142,7 +2144,7 @@ sys_sigpending(old_sigset_t *set)
 /* Alpha has its own versions with special arguments.  */
 
 asmlinkage long
-sys_sigprocmask(int how, old_sigset_t *set, old_sigset_t *oset)
+sys_sigprocmask(int how, old_sigset_t __user *set, old_sigset_t __user *oset)
 {
 	int error;
 	old_sigset_t old_set, new_set;
@@ -2192,7 +2194,9 @@ out:
 
 #ifndef __sparc__
 asmlinkage long
-sys_rt_sigaction(int sig, const struct sigaction *act, struct sigaction *oact,
+sys_rt_sigaction(int sig,
+		 const struct sigaction __user *act,
+		 struct sigaction __user *oact,
 		 size_t sigsetsize)
 {
 	struct k_sigaction new_sa, old_sa;

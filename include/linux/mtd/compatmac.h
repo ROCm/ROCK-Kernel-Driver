@@ -17,7 +17,6 @@
 #ifndef __LINUX_MTD_COMPATMAC_H__
 #define __LINUX_MTD_COMPATMAC_H__
 
-#include <linux/compatmac.h>
 #include <linux/types.h> /* used later in this header */
 #include <linux/module.h>
 #ifndef LINUX_VERSION_CODE

@@ -31,7 +31,6 @@
  */
 
 #include <linux/module.h>
-#include <linux/version.h>
 #include <asm/uaccess.h>
 #include <linux/fs.h>
 
@@ -675,9 +674,9 @@ static int emu10k1_mixer_release(struct inode *inode, struct file *file)
 }
 
 struct file_operations emu10k1_mixer_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	ioctl:		emu10k1_mixer_ioctl,
-	open:		emu10k1_mixer_open,
-	release:	emu10k1_mixer_release,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.ioctl		= emu10k1_mixer_ioctl,
+	.open		= emu10k1_mixer_open,
+	.release	= emu10k1_mixer_release,
 };

@@ -98,18 +98,18 @@ static int krxtimod(void *arg)
 		spin_lock(&krxtimod_lock);
 		if (list_empty(&krxtimod_list)) {
 			timeout = MAX_SCHEDULE_TIMEOUT;
-		}
-		else {
-			timer = list_entry(krxtimod_list.next,rxrpc_timer_t,link);
-			timeout = timer->timo_jif;
+		} else {
+			unsigned long tmo;
+
+			timer = list_entry(krxtimod_list.next,
+					   rxrpc_timer_t, link);
+			tmo = timer->timo_jif;
 			jif = jiffies;
 
-			if (time_before_eq(timeout,jif))
+			if (time_before_eq(tmo,jif))
 				goto immediate;
 
-			else {
-				timeout = (long)timeout - (long)jiffies;
-			}
+			timeout = (long)tmo - (long)jiffies;
 		}
 		spin_unlock(&krxtimod_lock);
 

@@ -99,9 +99,9 @@ void remove_from_page_cache(struct page *page)
 	if (unlikely(!PageLocked(page)))
 		PAGE_BUG(page);
 
-	write_lock(&mapping->page_lock);
+	spin_lock(&mapping->page_lock);
 	__remove_from_page_cache(page);
-	write_unlock(&mapping->page_lock);
+	spin_unlock(&mapping->page_lock);
 }
 
 static inline int sync_page(struct page *page)
@@ -133,9 +133,9 @@ static int __filemap_fdatawrite(struct address_space *mapping, int sync_mode)
 	if (mapping->backing_dev_info->memory_backed)
 		return 0;
 
-	write_lock(&mapping->page_lock);
+	spin_lock(&mapping->page_lock);
 	list_splice_init(&mapping->dirty_pages, &mapping->io_pages);
-	write_unlock(&mapping->page_lock);
+	spin_unlock(&mapping->page_lock);
 	ret = do_writepages(mapping, &wbc);
 	return ret;
 }
@@ -166,7 +166,7 @@ int filemap_fdatawait(struct address_space * mapping)
 
 restart:
 	progress = 0;
-	write_lock(&mapping->page_lock);
+	spin_lock(&mapping->page_lock);
         while (!list_empty(&mapping->locked_pages)) {
 		struct page *page;
 
@@ -180,7 +180,7 @@ restart:
 		if (!PageWriteback(page)) {
 			if (++progress > 32) {
 				if (need_resched()) {
-					write_unlock(&mapping->page_lock);
+					spin_unlock(&mapping->page_lock);
 					__cond_resched();
 					goto restart;
 				}
@@ -190,16 +190,16 @@ restart:
 
 		progress = 0;
 		page_cache_get(page);
-		write_unlock(&mapping->page_lock);
+		spin_unlock(&mapping->page_lock);
 
 		wait_on_page_writeback(page);
 		if (PageError(page))
 			ret = -EIO;
 
 		page_cache_release(page);
-		write_lock(&mapping->page_lock);
+		spin_lock(&mapping->page_lock);
 	}
-	write_unlock(&mapping->page_lock);
+	spin_unlock(&mapping->page_lock);
 	return ret;
 }
 
@@ -227,7 +227,7 @@ int add_to_page_cache(struct page *page, struct address_space *mapping,
 
 	if (error == 0) {
 		page_cache_get(page);
-		write_lock(&mapping->page_lock);
+		spin_lock(&mapping->page_lock);
 		error = radix_tree_insert(&mapping->page_tree, offset, page);
 		if (!error) {
 			SetPageLocked(page);
@@ -235,7 +235,7 @@ int add_to_page_cache(struct page *page, struct address_space *mapping,
 		} else {
 			page_cache_release(page);
 		}
-		write_unlock(&mapping->page_lock);
+		spin_unlock(&mapping->page_lock);
 		radix_tree_preload_end();
 	}
 	return error;
@@ -364,11 +364,11 @@ struct page * find_get_page(struct address_space *mapping, unsigned long offset)
 	 * We scan the hash list read-only. Addition to and removal from
 	 * the hash-list needs a held write-lock.
 	 */
-	read_lock(&mapping->page_lock);
+	spin_lock(&mapping->page_lock);
 	page = radix_tree_lookup(&mapping->page_tree, offset);
 	if (page)
 		page_cache_get(page);
-	read_unlock(&mapping->page_lock);
+	spin_unlock(&mapping->page_lock);
 	return page;
 }
 
@@ -379,11 +379,11 @@ struct page *find_trylock_page(struct address_space *mapping, unsigned long offs
 {
 	struct page *page;
 
-	read_lock(&mapping->page_lock);
+	spin_lock(&mapping->page_lock);
 	page = radix_tree_lookup(&mapping->page_tree, offset);
 	if (page && TestSetPageLocked(page))
 		page = NULL;
-	read_unlock(&mapping->page_lock);
+	spin_unlock(&mapping->page_lock);
 	return page;
 }
 
@@ -403,15 +403,15 @@ struct page *find_lock_page(struct address_space *mapping,
 {
 	struct page *page;
 
-	read_lock(&mapping->page_lock);
+	spin_lock(&mapping->page_lock);
 repeat:
 	page = radix_tree_lookup(&mapping->page_tree, offset);
 	if (page) {
 		page_cache_get(page);
 		if (TestSetPageLocked(page)) {
-			read_unlock(&mapping->page_lock);
+			spin_unlock(&mapping->page_lock);
 			lock_page(page);
-			read_lock(&mapping->page_lock);
+			spin_lock(&mapping->page_lock);
 
 			/* Has the page been truncated while we slept? */
 			if (page->mapping != mapping || page->index != offset) {
@@ -421,7 +421,7 @@ repeat:
 			}
 		}
 	}
-	read_unlock(&mapping->page_lock);
+	spin_unlock(&mapping->page_lock);
 	return page;
 }
 
@@ -491,12 +491,12 @@ unsigned int find_get_pages(struct address_space *mapping, pgoff_t start,
 	unsigned int i;
 	unsigned int ret;
 
-	read_lock(&mapping->page_lock);
+	spin_lock(&mapping->page_lock);
 	ret = radix_tree_gang_lookup(&mapping->page_tree,
 				(void **)pages, start, nr_pages);
 	for (i = 0; i < ret; i++)
 		page_cache_get(pages[i]);
-	read_unlock(&mapping->page_lock);
+	spin_unlock(&mapping->page_lock);
 	return ret;
 }
 

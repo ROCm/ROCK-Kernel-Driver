@@ -366,26 +366,26 @@ static void vidc_audio_trigger(int dev, int enable_bits)
 
 static struct audio_driver vidc_audio_driver =
 {
-	owner:			THIS_MODULE,
-	open:			vidc_audio_open,
-	close:			vidc_audio_close,
-	output_block:		vidc_audio_output_block,
-	start_input:		vidc_audio_start_input,
-	prepare_for_input:	vidc_audio_prepare_for_input,
-	prepare_for_output:	vidc_audio_prepare_for_output,
-	halt_io:		vidc_audio_reset,
-	local_qlen:		vidc_audio_local_qlen,
-	trigger:		vidc_audio_trigger,
-	set_speed:		vidc_audio_set_speed,
-	set_bits:		vidc_audio_set_format,
-	set_channels:		vidc_audio_set_channels
+	.owner			= THIS_MODULE,
+	.open			= vidc_audio_open,
+	.close			= vidc_audio_close,
+	.output_block		= vidc_audio_output_block,
+	.start_input		= vidc_audio_start_input,
+	.prepare_for_input	= vidc_audio_prepare_for_input,
+	.prepare_for_output	= vidc_audio_prepare_for_output,
+	.halt_io		= vidc_audio_reset,
+	.local_qlen		= vidc_audio_local_qlen,
+	.trigger		= vidc_audio_trigger,
+	.set_speed		= vidc_audio_set_speed,
+	.set_bits		= vidc_audio_set_format,
+	.set_channels		= vidc_audio_set_channels
 };
 
 static struct mixer_operations vidc_mixer_operations = {
-	owner:		THIS_MODULE,
-	id:		"VIDC",
-	name:		"VIDCsound",
-	ioctl:		vidc_mixer_ioctl
+	.owner		= THIS_MODULE,
+	.id		= "VIDC",
+	.name		= "VIDCsound",
+	.ioctl		= vidc_mixer_ioctl
 };
 
 void vidc_update_filler(int format, int channels)

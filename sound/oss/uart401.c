@@ -204,17 +204,17 @@ static inline int uart401_buffer_status(int dev)
 
 static const struct midi_operations uart401_operations =
 {
-	owner:		THIS_MODULE,
-	info:		{"MPU-401 (UART) MIDI", 0, 0, SNDCARD_MPU401},
-	converter:	&std_midi_synth,
-	in_info:	{0},
-	open:		uart401_open,
-	close:		uart401_close,
-	outputc:	uart401_out,
-	start_read:	uart401_start_read,
-	end_read:	uart401_end_read,
-	kick:		uart401_kick,
-	buffer_status:	uart401_buffer_status,
+	.owner		= THIS_MODULE,
+	.info		= {"MPU-401 (UART) MIDI", 0, 0, SNDCARD_MPU401},
+	.converter	= &std_midi_synth,
+	.in_info	= {0},
+	.open		= uart401_open,
+	.close		= uart401_close,
+	.outputc	= uart401_out,
+	.start_read	= uart401_start_read,
+	.end_read	= uart401_end_read,
+	.kick		= uart401_kick,
+	.buffer_status	= uart401_buffer_status,
 };
 
 static void enter_uart_mode(uart401_devc * devc)

@@ -932,7 +932,7 @@ pull_pages:
 int skb_copy_bits(const struct sk_buff *skb, int offset, void *to, int len)
 {
 	int i, copy;
-	int start = skb->len - skb->data_len;
+	int start = skb_headlen(skb);
 
 	if (offset > (int)skb->len - len)
 		goto fault;
@@ -1009,7 +1009,7 @@ fault:
 unsigned int skb_checksum(const struct sk_buff *skb, int offset,
 			  int len, unsigned int csum)
 {
-	int start = skb->len - skb->data_len;
+	int start = skb_headlen(skb);
 	int i, copy = start - offset;
 	int pos = 0;
 
@@ -1085,7 +1085,7 @@ unsigned int skb_checksum(const struct sk_buff *skb, int offset,
 unsigned int skb_copy_and_csum_bits(const struct sk_buff *skb, int offset,
 				    u8 *to, int len, unsigned int csum)
 {
-	int start = skb->len - skb->data_len;
+	int start = skb_headlen(skb);
 	int i, copy = start - offset;
 	int pos = 0;
 
@@ -1170,9 +1170,9 @@ void skb_copy_and_csum_dev(const struct sk_buff *skb, u8 *to)
 	if (skb->ip_summed == CHECKSUM_HW)
 		csstart = skb->h.raw - skb->data;
 	else
-		csstart = skb->len - skb->data_len;
+		csstart = skb_headlen(skb);
 
-	if (csstart > skb->len - skb->data_len)
+	if (csstart > skb_headlen(skb))
 		BUG();
 
 	memcpy(to, skb->data, csstart);

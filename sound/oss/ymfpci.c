@@ -2038,23 +2038,23 @@ static int ymf_release_mixdev(struct inode *inode, struct file *file)
 }
 
 static /*const*/ struct file_operations ymf_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		ymf_read,
-	write:		ymf_write,
-	poll:		ymf_poll,
-	ioctl:		ymf_ioctl,
-	mmap:		ymf_mmap,
-	open:		ymf_open,
-	release:	ymf_release,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.read		= ymf_read,
+	.write		= ymf_write,
+	.poll		= ymf_poll,
+	.ioctl		= ymf_ioctl,
+	.mmap		= ymf_mmap,
+	.open		= ymf_open,
+	.release	= ymf_release,
 };
 
 static /*const*/ struct file_operations ymf_mixer_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	ioctl:		ymf_ioctl_mixdev,
-	open:		ymf_open_mixdev,
-	release:	ymf_release_mixdev,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.ioctl		= ymf_ioctl_mixdev,
+	.open		= ymf_open_mixdev,
+	.release	= ymf_release_mixdev,
 };
 
 /*
@@ -2650,12 +2650,12 @@ MODULE_DESCRIPTION("Yamaha YMF7xx PCI Audio");
 MODULE_LICENSE("GPL");
 
 static struct pci_driver ymfpci_driver = {
-	name:		"ymfpci",
-	id_table:	ymf_id_tbl,
-	probe:		ymf_probe_one,
-	remove:		__devexit_p(ymf_remove_one),
-	suspend:	ymf_suspend,
-	resume:		ymf_resume
+	.name		= "ymfpci",
+	.id_table	= ymf_id_tbl,
+	.probe		= ymf_probe_one,
+	.remove		= __devexit_p(ymf_remove_one),
+	.suspend	= ymf_suspend,
+	.resume		= ymf_resume
 };
 
 static int __init ymf_init_module(void)

@@ -208,7 +208,7 @@ static int __init ali_generic_setup (struct pci_dev *pdev)
 	agp_bridge->cleanup = ali_cleanup;
 	agp_bridge->tlb_flush = ali_tlbflush;
 	agp_bridge->mask_memory = ali_mask_memory;
-	agp_bridge->agp_enable = agp_generic_agp_enable;
+	agp_bridge->agp_enable = agp_generic_enable;
 	agp_bridge->cache_flush = ali_cache_flush;
 	agp_bridge->create_gatt_table = agp_generic_create_gatt_table;
 	agp_bridge->free_gatt_table = agp_generic_free_gatt_table;

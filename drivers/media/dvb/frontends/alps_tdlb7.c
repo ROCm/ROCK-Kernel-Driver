@@ -51,7 +51,6 @@
 #include <linux/fs.h>
 #include <linux/unistd.h>
 
-#include "compat.h"
 #include "dvb_frontend.h"
 
 static int debug = 0;
@@ -63,7 +62,7 @@ static char * mcfile = "/usr/lib/DVB/driver/frontends/Sc_main.mc";
 #define dprintk	if (debug) printk
 
 /* microcode size for sp8870 */
-#define SP8870_CODE_SIZE 16384
+#define SP8870_CODE_SIZE 16382
 
 /* starting point for microcode in file 'Sc_main.mc' */
 #define SP8870_CODE_OFFSET 0x0A
@@ -73,15 +72,21 @@ static int errno;
 
 static
 struct dvb_frontend_info tdlb7_info = {
-	.name			= "Alps TDLB7",
-	.type			= FE_OFDM,
-	.frequency_min		= 470000000,
-	.frequency_max		= 860000000,
-	.frequency_stepsize	= 166666,
-	.caps			= FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 |
-				  FE_CAN_FEC_3_4 | FE_CAN_FEC_5_6 |
-				  FE_CAN_FEC_7_8 | FE_CAN_FEC_AUTO |
-				  FE_CAN_QPSK | FE_CAN_QAM_16 | FE_CAN_QAM_64
+	name: "Alps TDLB7",
+	type: FE_OFDM,
+	frequency_min: 470000000,
+	frequency_max: 860000000,
+	frequency_stepsize: 166666,
+#if 0
+    	frequency_tolerance: ???,
+	symbol_rate_min: ???,
+	symbol_rate_max: ???,
+	symbol_rate_tolerance: ???,
+	notifier_delay: 0,
+#endif
+	caps: FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 |
+	      FE_CAN_FEC_5_6 | FE_CAN_FEC_7_8 | FE_CAN_FEC_AUTO |
+	      FE_CAN_QPSK | FE_CAN_QAM_16 | FE_CAN_QAM_64
 };
 
 
@@ -89,7 +94,7 @@ static
 int sp8870_writereg (struct dvb_i2c_bus *i2c, u16 reg, u16 data)
 {
         u8 buf [] = { reg >> 8, reg & 0xff, data >> 8, data & 0xff };
-	struct i2c_msg msg = { .addr = 0x71, .flags = 0, .buf = buf, .len = 4 };
+	struct i2c_msg msg = { addr: 0x71, flags: 0, buf: buf, len: 4 };
 	int err;
 
         if ((err = i2c->xfer (i2c, &msg, 1)) != 1) {
@@ -107,8 +112,8 @@ u16 sp8870_readreg (struct dvb_i2c_bus *i2c, u16 reg)
 	int ret;
 	u8 b0 [] = { reg >> 8 , reg & 0xff };
 	u8 b1 [] = { 0, 0 };
-	struct i2c_msg msg [] = { { .addr = 0x71, .flags = 0, .buf = b0, .len = 2 },
-			   { .addr = 0x71, .flags = I2C_M_RD, .buf = b1, .len = 2 } };
+	struct i2c_msg msg [] = { { addr: 0x71, flags: 0, buf: b0, len: 2 },
+			   { addr: 0x71, flags: I2C_M_RD, buf: b1, len: 2 } };
 
 	ret = i2c->xfer (i2c, msg, 2);
 
@@ -123,7 +128,7 @@ static
 int sp5659_write (struct dvb_i2c_bus *i2c, u8 data [4])
 {
         int ret;
-        struct i2c_msg msg = { .addr = 0x60, .flags = 0, .buf = data, .len = 4 };
+        struct i2c_msg msg = { addr: 0x60, flags: 0, buf: data, len: 4 };
 
         ret = i2c->xfer (i2c, &msg, 1);
 
@@ -135,10 +140,21 @@ int sp5659_write (struct dvb_i2c_bus *i2c, u8 data [4])
 
 
 static
-int sp5659_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq, u8 pwr)
+int sp5659_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
 {
         u32 div = (freq + 36200000) / 166666;
-        u8 buf [4] = { (div >> 8) & 0x7f, div & 0xff, 0x85, (pwr << 5) | 0x30 };
+        u8 buf [4];
+	int pwr;
+
+	if (freq <= 782000000)
+		pwr = 1;
+	else 
+		pwr = 2;
+
+	buf[0] = (div >> 8) & 0x7f;
+	buf[1] = div & 0xff;
+	buf[2] = 0x85;
+	buf[3] = pwr << 6;
 
 	return sp5659_write (i2c, buf);
 }
@@ -193,8 +209,14 @@ int sp8870_load_code(struct dvb_i2c_bus *i2c)
 	int c;
 	mm_segment_t fs = get_fs();
 
-	sp8870_writereg(i2c,0x8F08,0x1FFF);
-	sp8870_writereg(i2c,0x8F0A,0x0000);
+	// system controller stop 
+	sp8870_writereg(i2c,0x0F00,0x0000);
+
+	// instruction RAM register hiword
+	sp8870_writereg(i2c,0x8F08,((SP8870_CODE_SIZE/2) & 0xFFFF));
+
+	// instruction RAM MWR
+	sp8870_writereg(i2c,0x8F0A,((SP8870_CODE_SIZE/2) >> 16));
 
 	set_fs(get_ds());
         if (sp8870_read_code(mcfile,(char**) &lcode)<0) return -1;
@@ -210,7 +232,8 @@ int sp8870_load_code(struct dvb_i2c_bus *i2c)
 		msg.buf=buf;
 		msg.len=c;
         	if ((err = i2c->xfer (i2c, &msg, 1)) != 1) {
-			dprintk ("%s: i2c error (err == %i)\n", __FUNCTION__, err);
+			dprintk ("%s: i2c error (err == %i)\n",
+				 __FUNCTION__, err);
         		vfree(lcode);
 			return -EREMOTEIO;
 		}
@@ -228,48 +251,39 @@ int sp8870_init (struct dvb_i2c_bus *i2c)
 
 	dprintk ("%s\n", __FUNCTION__);
 
-	sp8870_readreg(i2c,0x200);
-     	sp8870_readreg(i2c,0x200);
-	sp8870_readreg(i2c,0x0F00);	/* system controller stop */
-	sp8870_readreg(i2c,0x0301);	/* ???????? */
-	sp8870_readreg(i2c,0x0309);	/* integer carrier offset */
-	sp8870_readreg(i2c,0x030A);	/* fractional carrier offset */
-	sp8870_readreg(i2c,0x0311);	/* filter for 8 Mhz channel */
-	sp8870_readreg(i2c,0x0319);	/* sample rate correction bit [23..17] */
-	sp8870_readreg(i2c,0x031A);	/* sample rate correction bit [16..0] */
-	sp8870_readreg(i2c,0x0338);	/* ???????? */
-	sp8870_readreg(i2c,0x0F00);
-	sp8870_readreg(i2c,0x0200);
+	// system controller stop 
+	sp8870_writereg(i2c,0x0F00,0x0000);
 
-	if (loadcode) {
-		dprintk("%s: loading mcfile '%s' !\n", __FUNCTION__, mcfile);
-		if (sp8870_load_code(i2c)==0)
-		    dprintk("%s: microcode loaded!\n", __FUNCTION__);
-	}else{
-		dprintk("%s: without loading mcfile!\n", __FUNCTION__);
-	}
+	// ADC mode: 2 for MT8872, 3 for MT8870/8871 
+	sp8870_writereg(i2c,0x0301,0x0003);
+
+	// Reed Solomon parity bytes passed to output
+	sp8870_writereg(i2c,0x0C13,0x0001);
+
+	// MPEG clock is suppressed if no valid data
+	sp8870_writereg(i2c,0x0C14,0x0001);
+
+	// sample rate correction bit [23..17]
+	sp8870_writereg(i2c,0x0319,0x000A);
+
+	// sample rate correction bit [16..0]
+	sp8870_writereg(i2c,0x031A,0x0AAB);
+
+	// integer carrier offset
+	sp8870_writereg(i2c,0x0309,0x0400);
+
+	// fractional carrier offset
+	sp8870_writereg(i2c,0x030A,0x0000);
+
+	// filter for 8 Mhz channel 
+	sp8870_writereg(i2c,0x0311,0x0000);
+
+	// scan order: 2k first = 0x0000, 8k first = 0x0001 
+	sp8870_writereg(i2c,0x0338,0x0000);
 
 	return 0;
 }
 
-
-static
-int sp8870_reset (struct dvb_i2c_bus *i2c)
-{
-	dprintk("%s\n", __FUNCTION__);
-	sp8870_writereg(i2c,0x0F00,0x0000);	/* system controller stop */
-	sp8870_writereg(i2c,0x0301,0x0003);	/* ???????? */
-	sp8870_writereg(i2c,0x0309,0x0400);	/* integer carrier offset */
-	sp8870_writereg(i2c,0x030A,0x0000);	/* fractional carrier offset */
-	sp8870_writereg(i2c,0x0311,0x0000);	/* filter for 8 Mhz channel */
-	sp8870_writereg(i2c,0x0319,0x000A);	/* sample rate correction bit [23..17] */
-	sp8870_writereg(i2c,0x031A,0x0AAB);	/* sample rate correction bit [16..0] */
-	sp8870_writereg(i2c,0x0338,0x0000);	/* ???????? */
-	sp8870_writereg(i2c,0x0201,0x0000);	/* interrupts for change of lock or tuner adjustment disabled */
-	sp8870_writereg(i2c,0x0F00,0x0001);	/* system controller start */
-
-        return 0;
-}
 
 static
 int tdlb7_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
@@ -285,10 +299,10 @@ int tdlb7_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 	{
 		fe_status_t *status = arg;
 		int sync = sp8870_readreg (i2c, 0x0200);
+		int signal = 0xff-sp8870_readreg (i2c, 0x303);
 
 		*status=0;
-
-		if (sync&0x04) // FIXME: find criteria for having signal
+		if (signal>10) // FIXME: is 10 the right value ?
 			*status |= FE_HAS_SIGNAL;
 
 		if (sync&0x04) // FIXME: find criteria
@@ -309,15 +323,15 @@ int tdlb7_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
         case FE_READ_BER:
 	{
 		u32 *ber=(u32 *) arg;
-		*ber=sp8870_readreg(i2c,0x0C07);  // bit error rate before Viterbi
+		// bit error rate before Viterbi
+		*ber=sp8870_readreg(i2c,0x0C07);
 		break;
 
 	}
 
-        case FE_READ_SIGNAL_STRENGTH:		// not supported by hardware?
+        case FE_READ_SIGNAL_STRENGTH:		// FIXME: correct registers ?
 	{
-		s32 *signal=(s32 *) arg;
-                *signal=0;
+		*((u16*) arg) = 0xffff-((sp8870_readreg (i2c, 0x306) << 8) | sp8870_readreg (i2c, 0x303));
 		break;
 	}
 
@@ -325,27 +339,64 @@ int tdlb7_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 	{
 		s32 *snr=(s32 *) arg;
                 *snr=0;  
-		break;
+		return -EOPNOTSUPP;
 	}
 
 	case FE_READ_UNCORRECTED_BLOCKS: 	// not supported by hardware?
 	{
 		u32 *ublocks=(u32 *) arg;
 		*ublocks=0;  
-		break;
+		return -EOPNOTSUPP;
 	}
 
         case FE_SET_FRONTEND:
         {
 		struct dvb_frontend_parameters *p = arg;
-		sp5659_set_tv_freq (i2c, p->frequency, 0);
-		 			// all other parameters are set by the on card
-					// system controller. Don't know how to pass 
-					// distinct values to the card.
-		break;			
+
+		// system controller stop 
+		sp8870_writereg(i2c,0x0F00,0x0000);
+
+		sp5659_set_tv_freq (i2c, p->frequency);
+
+		// sample rate correction bit [23..17]
+		sp8870_writereg(i2c,0x0319,0x000A);
+		
+		// sample rate correction bit [16..0]
+		sp8870_writereg(i2c,0x031A,0x0AAB);
+
+		// integer carrier offset 
+		sp8870_writereg(i2c,0x0309,0x0400);
+
+		// fractional carrier offset
+		sp8870_writereg(i2c,0x030A,0x0000);
+
+		// filter for 6/7/8 Mhz channel
+		if (p->u.ofdm.bandwidth == BANDWIDTH_6_MHZ)
+			sp8870_writereg(i2c,0x0311,0x0002);
+		else if (p->u.ofdm.bandwidth == BANDWIDTH_7_MHZ)
+			sp8870_writereg(i2c,0x0311,0x0001);
+		else
+			sp8870_writereg(i2c,0x0311,0x0000);
+
+		// scan order: 2k first = 0x0000, 8k first = 0x0001 
+		if (p->u.ofdm.transmission_mode == TRANSMISSION_MODE_2K)
+			sp8870_writereg(i2c,0x0338,0x0000);
+		else
+			sp8870_writereg(i2c,0x0338,0x0001);
+
+		// instruction RAM register loword
+		sp8870_writereg(i2c,0x0F09,0x0000);
+
+		// instruction RAM register hiword
+		sp8870_writereg(i2c,0x0F08,0x0000);
+
+		// system controller start
+		sp8870_writereg(i2c,0x0F00,0x0001);
+
+		break;
         }
 
-	case FE_GET_FRONTEND: 		// how to do this?
+	case FE_GET_FRONTEND:  // FIXME: read known values back from Hardware...
 	{
 		break;
 	}
@@ -355,9 +406,6 @@ int tdlb7_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 
         case FE_INIT:
 		return sp8870_init (i2c);
-
-	case FE_RESET:
-		return sp8870_reset (i2c);
 
 	default:
 		return -EOPNOTSUPP;
@@ -371,12 +419,20 @@ static
 int tdlb7_attach (struct dvb_i2c_bus *i2c)
 {
 
-	struct i2c_msg msg = { .addr = 0x71, .flags = 0, .buf = NULL, .len = 0 };
+	struct i2c_msg msg = { addr: 0x71, flags: 0, buf: NULL, len: 0 };
 
 	dprintk ("%s\n", __FUNCTION__);
 
 	if (i2c->xfer (i2c, &msg, 1) != 1)
                 return -ENODEV;
+
+	if (loadcode) {
+		dprintk("%s: loading mcfile '%s' !\n", __FUNCTION__, mcfile);
+		if (sp8870_load_code(i2c)==0)
+		    dprintk("%s: microcode loaded!\n", __FUNCTION__);
+	}else{
+		dprintk("%s: without loading mcfile!\n", __FUNCTION__);
+	}
 
 	dvb_register_frontend (tdlb7_ioctl, i2c, NULL, &tdlb7_info);
 

@@ -3608,31 +3608,6 @@ xfs_ichgtime(xfs_inode_t *ip,
 	ip->i_update_core = 1;
 }
 
-/*
- * xfs_ibusy_check -- Checks whether inode reference count allows unmount
- *
- * The value returned is one if the reference count would prevent an unmount.
- */
-int
-xfs_ibusy_check(
-	xfs_inode_t	*ip,
-	int		refs)
-{
-	xfs_mount_t	*mp = ip->i_mount;
-
-	if ((refs == 1) && (ip == mp->m_rootip))
-		return (0);
-	if ((refs == 1) && (ip == mp->m_rbmip))
-		return (0);
-	if ((refs == 1) && (ip == mp->m_rsumip))
-		return (0);
-	if (mp->m_quotainfo && ip->i_ino == mp->m_sb.sb_uquotino)
-		return (0);
-	if (mp->m_quotainfo && ip->i_ino == mp->m_sb.sb_gquotino)
-		return (0);
-	return (1);
-}
-
 #ifdef XFS_ILOCK_TRACE
 void
 xfs_ilock_trace(xfs_inode_t *ip, int lock, unsigned int lockflags, inst_t *ra)

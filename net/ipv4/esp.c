@@ -452,6 +452,7 @@ void esp_destroy(struct xfrm_state *x)
 		kfree(esp->auth.work_icv);
 		esp->auth.work_icv = NULL;
 	}
+	kfree(esp);
 }
 
 int esp_init_state(struct xfrm_state *x, void *args)
@@ -552,6 +553,7 @@ error:
 static struct xfrm_type esp_type =
 {
 	.description	= "ESP4",
+	.owner		= THIS_MODULE,
 	.proto	     	= IPPROTO_ESP,
 	.init_state	= esp_init_state,
 	.destructor	= esp_destroy,

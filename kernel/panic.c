@@ -20,6 +20,8 @@
 asmlinkage void sys_sync(void);	/* it's really int */
 
 int panic_timeout;
+int panic_on_oops;
+int tainted;
 
 struct notifier_block *panic_notifier_list;
 
@@ -28,7 +30,6 @@ static int __init panic_setup(char *str)
 	panic_timeout = simple_strtoul(str, NULL, 0);
 	return 1;
 }
-
 __setup("panic=", panic_setup);
 
 /**
@@ -51,7 +52,7 @@ NORET_TYPE void panic(const char * fmt, ...)
 
 	bust_spinlocks(1);
 	va_start(args, fmt);
-	vsprintf(buf, fmt, args);
+	vsnprintf(buf, sizeof(buf), fmt, args);
 	va_end(args);
 	printk(KERN_EMERG "Kernel panic: %s\n",buf);
 	if (in_interrupt())
@@ -123,5 +124,3 @@ const char *print_tainted()
 		snprintf(buf, sizeof(buf), "Not tainted");
 	return(buf);
 }
-
-int tainted = 0;

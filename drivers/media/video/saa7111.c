@@ -57,14 +57,12 @@ struct saa7111 {
 	int sat;
 };
 
-#define   I2C_SAA7111        0x48
-
-#define   I2C_DELAY   10
-
 static unsigned short normal_i2c[] = { 34>>1, I2C_CLIENT_END };	
 static unsigned short normal_i2c_range[] = { I2C_CLIENT_END };	
 
 I2C_CLIENT_INSMOD;
+
+static struct i2c_client client_template;
 
 /* ----------------------------------------------------------------------- */
 
@@ -73,40 +71,45 @@ static int saa7111_attach(struct i2c_adapter *adap, int addr, unsigned short fla
 	int i;
 	struct saa7111 *decoder;
 	struct i2c_client *client;
+
+	/* who wrote this? init[] is used for i2c_master_send() which expects an array that
+	   will be used for the 'buf' part of an i2c message unchanged. so, the first byte
+	   needs to be the subaddress to start with, then follow the data bytes... */
 	static const unsigned char init[] = {
-		0x00, 0x00,	/* 00 - ID byte */
-		0x01, 0x00,	/* 01 - reserved */
+		0x00,	  /* start address */
+	
+		0x00,	  /* 00 - ID byte */
+		0x00,	  /* 01 - reserved */
 
 		/*front end */
-		0x02, 0xd0,	/* 02 - FUSE=3, GUDL=2, MODE=0 */
-		0x03, 0x23,	/* 03 - HLNRS=0, VBSL=1, WPOFF=0, HOLDG=0, GAFIX=0, GAI1=256, GAI2=256 */
-		0x04, 0x00,	/* 04 - GAI1=256 */
-		0x05, 0x00,	/* 05 - GAI2=256 */
+		0xd0,	  /* 02 - FUSE=3, GUDL=2, MODE=0 */
+		0x23,	  /* 03 - HLNRS=0, VBSL=1, WPOFF=0, HOLDG=0, GAFIX=0, GAI1=256, GAI2=256 */
+		0x00,	  /* 04 - GAI1=256 */
+		0x00,	  /* 05 - GAI2=256 */
 
 		/* decoder */
-		0x06, 0xf3,	/* 06 - HSB at  13(50Hz) /  17(60Hz) pixels after end of last line */
-		0x07, 0x13,	/* 07 - HSS at 113(50Hz) / 117(60Hz) pixels after end of last line */
-		0x08, 0xc8,	/* 08 - AUFD=1, FSEL=1, EXFIL=0, VTRC=1, HPLL=0, VNOI=0 */
-		0x09, 0x01,	/* 09 - BYPS=0, PREF=0, BPSS=0, VBLB=0, UPTCV=0, APER=1 */
-		0x0a, 0x80,	/* 0a - BRIG=128 */
-		0x0b, 0x47,	/* 0b - CONT=1.109 */
-		0x0c, 0x40,	/* 0c - SATN=1.0 */
-		0x0d, 0x00,	/* 0d - HUE=0 */
-		0x0e, 0x01,	/* 0e - CDTO=0, CSTD=0, DCCF=0, FCTC=0, CHBW=1 */
-		0x0f, 0x00,	/* 0f - reserved */
-		0x10, 0x48,	/* 10 - OFTS=1, HDEL=0, VRLN=1, YDEL=0 */
-		0x11, 0x1c,	/* 11 - GPSW=0, CM99=0, FECO=0, COMPO=1, OEYC=1, OEHV=1, VIPB=0, COLO=0 */
-		0x12, 0x00,	/* 12 - output control 2 */
-		0x13, 0x00,	/* 13 - output control 3 */
-		0x14, 0x00,	/* 14 - reserved */
-		0x15, 0x00,	/* 15 - VBI */
-		0x16, 0x00,	/* 16 - VBI */
-		0x17, 0x00,	/* 17 - VBI */
+		0xf3,	  /* 06 - HSB at  13(50Hz) /  17(60Hz) pixels after end of last line */
+		0x13,	  /* 07 - HSS at 113(50Hz) / 117(60Hz) pixels after end of last line */
+		0xc8,	  /* 08 - AUFD=1, FSEL=1, EXFIL=0, VTRC=1, HPLL=0, VNOI=0 */
+		0x01,	  /* 09 - BYPS=0, PREF=0, BPSS=0, VBLB=0, UPTCV=0, APER=1 */
+		0x80,	  /* 0a - BRIG=128 */
+		0x47,	  /* 0b - CONT=1.109 */
+		0x40,	  /* 0c - SATN=1.0 */
+		0x00,	  /* 0d - HUE=0 */
+		0x01,	  /* 0e - CDTO=0, CSTD=0, DCCF=0, FCTC=0, CHBW=1 */
+		0x00,	  /* 0f - reserved */
+		0x48,	  /* 10 - OFTS=1, HDEL=0, VRLN=1, YDEL=0 */
+		0x1c,	  /* 11 - GPSW=0, CM99=0, FECO=0, COMPO=1, OEYC=1, OEHV=1, VIPB=0, COLO=0 */
+		0x00,	  /* 12 - output control 2 */
+		0x00,	  /* 13 - output control 3 */
+		0x00,	  /* 14 - reserved */
+		0x00,	  /* 15 - VBI */
+		0x00,	  /* 16 - VBI */
+		0x00,	  /* 17 - VBI */
 	};
 	client = kmalloc(sizeof(*client), GFP_KERNEL);
 	if(client == NULL) 
 		return -ENOMEM;
-	memset(client, 0, sizeof(*client));
 	client_template.adapter = adap;
 	client_template.addr = addr;
 	memcpy(client, &client_template, sizeof(*client));
@@ -136,9 +139,10 @@ static int saa7111_attach(struct i2c_adapter *adap, int addr, unsigned short fla
 		printk(KERN_ERR "%s_attach: init status %d\n",
 		       client->dev.name, i);
 	} else {
-		printk(KERN_INFO "%s_attach: chip version %x\n",
-		       client->dev.name, i2c_smbus_read_byte_data(client, 0x00) >> 4);
+		printk(KERN_INFO "%s_attach: chip version %x @ 0x%08x\n",
+		       client->dev.name, i2c_smbus_read_byte_data(client, 0x00) >> 4,addr);
 	}
+
 	init_MUTEX(&decoder->lock);
 	i2c_attach_client(client);
 	MOD_INC_USE_COUNT;
@@ -146,6 +150,16 @@ static int saa7111_attach(struct i2c_adapter *adap, int addr, unsigned short fla
 }
 static int saa7111_probe(struct i2c_adapter *adap)
 {
+	/* probing unknown devices on any Matrox i2c-bus takes ages due to the
+	   slow bit banging algorithm used. because of the fact a saa7111(a)
+	   is *never* present on a Matrox gfx card, we can skip such adapters
+	   here */
+	if( 0 != (adap->id & I2C_HW_B_G400)) {
+		return -ENODEV;
+	}
+	
+	printk("saa7111: probing %s i2c adapter [id=0x%x]\n",
+                       adap->dev.name,adap->id);
 	return i2c_probe(adap, &addr_data, saa7111_attach);
 }
 
@@ -385,6 +399,9 @@ static int saa7111_command(struct i2c_client *client, unsigned int cmd,
 /* ----------------------------------------------------------------------- */
 
 static struct i2c_driver i2c_driver_saa7111 = {
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,54)
+	.owner		= THIS_MODULE,
+#endif
 	.name 		= "saa7111",		 /* name */
 	.id 		= I2C_DRIVERID_SAA7111A, /* ID */
 	.flags 		= I2C_DF_NOTIFY,

@@ -462,7 +462,7 @@ void cleanup_module(void)
 EXPORT_SYMBOL(cleanup_module);
 
 asmlinkage long
-sys_delete_module(const char *name_user, unsigned int flags)
+sys_delete_module(const char __user *name_user, unsigned int flags)
 {
 	struct module *mod;
 	char name[MODULE_NAME_LEN];
@@ -670,7 +670,7 @@ static int obsparm_copy_string(const char *val, struct kernel_param *kp)
 	return 0;
 }
 
-extern int set_obsolete(const char *val, struct kernel_param *kp)
+int set_obsolete(const char *val, struct kernel_param *kp)
 {
 	unsigned int min, max;
 	unsigned int size, maxsize;
@@ -1082,9 +1082,9 @@ static void set_license(struct module *mod, Elf_Shdr *sechdrs, int licenseidx)
 
 /* Allocate and load the module: note that size of section 0 is always
    zero, and we rely on this for optional sections. */
-static struct module *load_module(void *umod,
+static struct module *load_module(void __user *umod,
 				  unsigned long len,
-				  const char *uargs)
+				  const char __user *uargs)
 {
 	Elf_Ehdr *hdr;
 	Elf_Shdr *sechdrs;
@@ -1360,9 +1360,9 @@ static struct module *load_module(void *umod,
 
 /* This is where the real work happens */
 asmlinkage long
-sys_init_module(void *umod,
+sys_init_module(void __user *umod,
 		unsigned long len,
-		const char *uargs)
+		const char __user *uargs)
 {
 	struct module *mod;
 	int ret;

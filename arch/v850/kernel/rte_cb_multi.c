@@ -16,22 +16,55 @@
 
 #include <asm/machdep.h>
 
+#define IRQ_ADDR(irq) (0x80 + (irq) * 0x10)
+
 /* A table of which interrupt vectors to install, since blindly
    installing all of them makes the debugger stop working.  This is a
    list of offsets in the interrupt vector area; each entry means to
    copy that particular 16-byte vector.  An entry less than zero ends
    the table.  */
 static long multi_intv_install_table[] = {
-	0x40, 0x50,		/* trap vectors */
+	/* Trap vectors */
+	0x40, 0x50,		
+
 #ifdef CONFIG_RTE_CB_MULTI_DBTRAP
-	0x60,			/* illegal insn / dbtrap */
+	/* Illegal insn / dbtrap.  These are used by multi, so only handle
+	   them if configured to do so.  */
+	0x60,
 #endif
-	/* Note -- illegal insn trap is used by the debugger.  */
-	0xD0, 0xE0, 0xF0,	/* GINT1 - GINT3 */
-	0x240, 0x250, 0x260, 0x270, /* timer D interrupts */
-	0x2D0, 0x2E0, 0x2F0,	/* UART channel 0 */
-	0x310, 0x320, 0x330,	/* UART channel 1 */
-	0x350, 0x360, 0x370,	/* UART channel 2 */
+
+	/* GINT1 - GINT3 (note, not GINT0!) */
+	IRQ_ADDR (IRQ_GINT(1)),
+	IRQ_ADDR (IRQ_GINT(2)),
+	IRQ_ADDR (IRQ_GINT(3)),
+
+	/* Timer D interrupts (up to 4 timers) */
+	IRQ_ADDR (IRQ_INTCMD(0)),
+#if IRQ_INTCMD_NUM > 1
+	IRQ_ADDR (IRQ_INTCMD(1)),
+#if IRQ_INTCMD_NUM > 2
+	IRQ_ADDR (IRQ_INTCMD(2)),
+#if IRQ_INTCMD_NUM > 3
+	IRQ_ADDR (IRQ_INTCMD(3)),
+#endif
+#endif
+#endif
+	
+	/* UART interrupts (up to 3 channels) */
+	IRQ_ADDR (IRQ_INTSER (0)), /* err */
+	IRQ_ADDR (IRQ_INTSR  (0)), /* rx */
+	IRQ_ADDR (IRQ_INTST  (0)), /* tx */
+#if IRQ_INTSR_NUM > 1
+	IRQ_ADDR (IRQ_INTSER (1)), /* err */
+	IRQ_ADDR (IRQ_INTSR  (1)), /* rx */
+	IRQ_ADDR (IRQ_INTST  (1)), /* tx */
+#if IRQ_INTSR_NUM > 2
+	IRQ_ADDR (IRQ_INTSER (2)), /* err */
+	IRQ_ADDR (IRQ_INTSR  (2)), /* rx */
+	IRQ_ADDR (IRQ_INTST  (2)), /* tx */
+#endif
+#endif
+
 	-1
 };
 

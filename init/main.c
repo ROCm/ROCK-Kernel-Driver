@@ -60,7 +60,7 @@
  * To avoid associated bogus bug reports, we flatly refuse to compile
  * with a gcc that is known to be too old from the very beginning.
  */
-#if __GNUC__ < 2 || (__GNUC__ == 2 && __GNUC_MINOR__ < 91)
+#if __GNUC__ < 2 || (__GNUC__ == 2 && __GNUC_MINOR__ < 95)
 #error Sorry, your GCC is too old. It builds incorrect kernels.
 #endif
 

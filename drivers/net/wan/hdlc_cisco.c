@@ -2,12 +2,11 @@
  * Generic HDLC support routines for Linux
  * Cisco HDLC support
  *
- * Copyright (C) 2000 - 2001 Krzysztof Halasa <khc@pm.waw.pl>
+ * Copyright (C) 2000 - 2003 Krzysztof Halasa <khc@pm.waw.pl>
  *
  * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * under the terms of version 2 of the GNU General Public License
+ * as published by the Free Software Foundation.
  */
 
 #include <linux/config.h>
@@ -80,15 +79,41 @@ static void cisco_keepalive_send(hdlc_device *hdlc, u32 type,
 	data->par1 = htonl(par1);
 	data->par2 = htonl(par2);
 	data->rel = 0xFFFF;
-	data->time = htonl(jiffies * 1000 / HZ);
+	/* we will need do_div here if 1000 % HZ != 0 */
+	data->time = htonl((jiffies - INITIAL_JIFFIES) * (1000 / HZ));
 
 	skb_put(skb, sizeof(cisco_packet));
 	skb->priority = TC_PRIO_CONTROL;
 	skb->dev = hdlc_to_dev(hdlc);
+	skb->nh.raw = skb->data;
 
 	dev_queue_xmit(skb);
 }
 
+
+
+static unsigned short cisco_type_trans(struct sk_buff *skb,
+				       struct net_device *dev)
+{
+	hdlc_header *data = (hdlc_header*)skb->data;
+
+	if (skb->len < sizeof(hdlc_header))
+		return __constant_htons(ETH_P_HDLC);
+
+	if (data->address != CISCO_MULTICAST &&
+	    data->address != CISCO_UNICAST)
+		return __constant_htons(ETH_P_HDLC);
+
+	switch(data->protocol) {
+	case __constant_htons(ETH_P_IP):
+	case __constant_htons(ETH_P_IPX):
+	case __constant_htons(ETH_P_IPV6):
+		skb_pull(skb, sizeof(hdlc_header));
+		return data->protocol;
+	default:
+		return __constant_htons(ETH_P_HDLC);
+	}
+}
 
 
 static void cisco_rx(struct sk_buff *skb)
@@ -109,14 +134,6 @@ static void cisco_rx(struct sk_buff *skb)
 	skb_pull(skb, sizeof(hdlc_header));
 
 	switch(ntohs(data->protocol)) {
-	case ETH_P_IP:
-	case ETH_P_IPX:
-	case ETH_P_IPV6:
-		skb->protocol = data->protocol;
-		skb->dev = hdlc_to_dev(hdlc);
-		netif_rx(skb);
-		return;
-
 	case CISCO_SYS_INFO:
 		/* Packet is not needed, drop it. */
 		dev_kfree_skb_any(skb);
@@ -288,6 +305,7 @@ int hdlc_cisco_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 		hdlc->open = cisco_open;
 		hdlc->stop = cisco_close;
 		hdlc->netif_rx = cisco_rx;
+		hdlc->type_trans = cisco_type_trans;
 		hdlc->proto = IF_PROTO_CISCO;
 		dev->hard_start_xmit = hdlc->xmit;
 		dev->hard_header = cisco_hard_header;

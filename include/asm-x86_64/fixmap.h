@@ -66,7 +66,7 @@ extern void __this_fixmap_does_not_exist(void);
 
 /*
  * 'index to address' translation. If anyone tries to use the idx
- * directly without tranlation, we catch the bug with a NULL-deference
+ * directly without translation, we catch the bug with a NULL-deference
  * kernel oops. Illegal ranges of incoming indices are caught too.
  */
 extern inline unsigned long fix_to_virt(const unsigned int idx)

@@ -23,7 +23,6 @@
 #include <linux/module.h>
 #include <linux/init.h>
 
-#include "compat.h"
 #include "dvb_frontend.h"
 
 static int debug = 0;
@@ -32,20 +31,20 @@ static int debug = 0;
 
 static
 struct dvb_frontend_info bsrv2_info = {
-	.name			= "Alps BSRV2",
-	.type			= FE_QPSK,
-	.frequency_min		= 950000,
-	.frequency_max		= 2150000,
-	.frequency_stepsize	= 250,           /* kHz for QPSK frontends */
-	.frequency_tolerance	= 29500,
-	.symbol_rate_min	= 1000000,
-	.symbol_rate_max	= 45000000,
-	.notifier_delay		= 50,                /* 1/20 s */
-	.caps			= FE_CAN_INVERSION_AUTO |
-				  FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 |
-				  FE_CAN_FEC_3_4 | FE_CAN_FEC_5_6 |
-				  FE_CAN_FEC_7_8 | FE_CAN_FEC_AUTO |
-				  FE_CAN_QPSK
+	name: "Alps BSRV2",
+	type: FE_QPSK,
+	frequency_min: 950000,
+	frequency_max: 2150000,
+	frequency_stepsize: 250,           /* kHz for QPSK frontends */
+	frequency_tolerance: 29500,
+	symbol_rate_min: 1000000,
+	symbol_rate_max: 45000000,
+/*      symbol_rate_tolerance: ???,*/
+	notifier_delay: 50,                /* 1/20 s */
+	caps:   FE_CAN_INVERSION_AUTO |
+		FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 |
+		FE_CAN_FEC_5_6 | FE_CAN_FEC_7_8 | FE_CAN_FEC_AUTO |
+		FE_CAN_QPSK
 };
 
 
@@ -73,10 +72,10 @@ u8 init_1893_wtab[] =
 
 
 static
-int ves1893_writereg (struct dvb_i2c_bus *i2c, int reg, int data)
+int ves1893_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
 {
         u8 buf [] = { 0x00, reg, data };
-	struct i2c_msg msg = { .addr = 0x08, .flags = 0, .buf = buf, .len = 3 };
+	struct i2c_msg msg = { addr: 0x08, flags: 0, buf: buf, len: 3 };
 	int err;
 
         if ((err = i2c->xfer (i2c, &msg, 1)) != 1) {
@@ -94,8 +93,8 @@ u8 ves1893_readreg (struct dvb_i2c_bus *i2c, u8 reg)
 	int ret;
 	u8 b0 [] = { 0x00, reg };
 	u8 b1 [] = { 0 };
-	struct i2c_msg msg [] = { { .addr = 0x08, .flags = 0, .buf = b0, .len = 2 },
-			   { .addr = 0x08, .flags = I2C_M_RD, .buf = b1, .len = 1 } };
+	struct i2c_msg msg [] = { { addr: 0x08, flags: 0, buf: b0, len: 2 },
+			   { addr: 0x08, flags: I2C_M_RD, buf: b1, len: 1 } };
 
 	ret = i2c->xfer (i2c, msg, 2);
 
@@ -110,7 +109,7 @@ static
 int sp5659_write (struct dvb_i2c_bus *i2c, u8 data [4])
 {
         int ret;
-        struct i2c_msg msg = { .addr = 0x61, .flags = 0, .buf = data, .len = 4 };
+        struct i2c_msg msg = { addr: 0x61, flags: 0, buf: data, len: 4 };
 
         ret = i2c->xfer (i2c, &msg, 1);
 
@@ -297,7 +296,7 @@ int ves1893_set_voltage (struct dvb_i2c_bus *i2c, fe_sec_voltage_t voltage)
 		return ves1893_writereg (i2c, 0x1f, 0x30);
 	default:
 		return -EINVAL;
-	};
+	}
 }
 
 
@@ -314,7 +313,7 @@ int bsrv2_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
         case FE_READ_STATUS:
 	{
 		fe_status_t *status = arg;
-		int sync = ves1893_readreg (i2c, 0x0e);
+		u8 sync = ves1893_readreg (i2c, 0x0e);
 
 		*status = 0;
 

@@ -739,9 +739,10 @@ static void do_pcd_request(request_queue_t * q)
 	if (pcd_busy)
 		return;
 	while (1) {
-		if (blk_queue_empty(q))
-			return;
 		pcd_req = elv_next_request(q);
+		if (!pcd_req)
+			return;
+
 		if (rq_data_dir(pcd_req) == READ) {
 			struct pcd_unit *cd = pcd_req->rq_disk->private_data;
 			if (cd != pcd_current)

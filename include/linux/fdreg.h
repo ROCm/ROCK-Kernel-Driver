@@ -7,8 +7,12 @@
  */
 
 #ifdef FDPATCHES
-
 #define FD_IOPORT fdc_state[fdc].address
+#else
+/* It would be a lot saner just to force fdc_state[fdc].address to always
+   be set ! FIXME */
+#define FD_IOPORT 0x3f0
+#endif
 
 /* Fd controller regs. S&C, about page 340 */
 #define FD_STATUS	(4 + FD_IOPORT )
@@ -22,16 +26,6 @@
 
 /* Diskette Control Register (write)*/
 #define FD_DCR		(7 + FD_IOPORT )
-
-#else
-
-#define FD_STATUS	0x3f4
-#define FD_DATA		0x3f5
-#define FD_DOR		0x3f2		/* Digital Output Register */
-#define FD_DIR		0x3f7		/* Digital Input Register (read) */
-#define FD_DCR		0x3f7		/* Diskette Control Register (write)*/
-
-#endif
 
 /* Bits of main status register */
 #define STATUS_BUSYMASK	0x0F		/* drive busy mask */

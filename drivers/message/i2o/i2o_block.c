@@ -783,14 +783,12 @@ static void i2ob_request(request_queue_t *q)
 	struct i2ob_device *dev;
 	u32 m;
 	
-	while (blk_queue_empty(q)) {
+	while ((req = elv_next_request(q)) != NULL) {
 		/*
 		 *	On an IRQ completion if there is an inactive
 		 *	request on the queue head it means it isnt yet
 		 *	ready to dispatch.
 		 */
-		req = elv_next_request(q);
-
 		if(req->rq_status == RQ_INACTIVE)
 			return;
 

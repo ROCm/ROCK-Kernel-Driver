@@ -456,8 +456,10 @@ static int __init longhaul_get_ranges (void)
 	}
 
 	longhaul_table[k].frequency = CPUFREQ_TABLE_END;
-	if (!k)
+	if (!k) {
+		kfree (longhaul_table);
 		return -EINVAL;
+	}
 	
 	return 0;
 }
@@ -524,6 +526,7 @@ static int longhaul_target (struct cpufreq_policy *policy,
 static int longhaul_cpu_init (struct cpufreq_policy *policy)
 {
 	struct cpuinfo_x86 *c = cpu_data;
+	int ret;
 
 	switch (c->x86_model) {
 	case 6:		/* VIA C3 Samuel C5A */
@@ -554,7 +557,6 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
 		memcpy (clock_ratio, longhaul3_clock_ratio, sizeof(longhaul3_clock_ratio));
 		memcpy (eblcr_table, c5m_eblcr, sizeof(c5m_eblcr));
 		break;
-
 	}
 
 	printk (KERN_INFO "longhaul: VIA CPU detected. Longhaul version %d supported\n", longhaul);
@@ -566,8 +568,9 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
 			longhaul_setup_voltagescaling (lo, hi);
 	}
 
-	if (longhaul_get_ranges())
-		return -ENOMEM;
+	ret = longhaul_get_ranges();
+	if (ret != 0)
+		return ret;
 
  	policy->policy = CPUFREQ_POLICY_PERFORMANCE;
  	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;

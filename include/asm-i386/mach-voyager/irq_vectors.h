@@ -57,6 +57,12 @@
 
 #define NR_IRQS 224
 
+#define FPU_IRQ				13
+
+#define	FIRST_VM86_IRQ		3
+#define LAST_VM86_IRQ		15
+#define invalid_vm86_irq(irq)	((irq) < 3 || (irq) > 15)
+
 #ifndef __ASSEMBLY__
 extern asmlinkage void vic_cpi_interrupt(void);
 extern asmlinkage void vic_sys_interrupt(void);

@@ -40,7 +40,6 @@
 
 #include <linux/kernel.h>
 #include <linux/config.h>
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/types.h>
@@ -1081,12 +1080,12 @@ static void intr(int irq, void *dev_id, struct pt_regs *regs)
 }
 
 static struct file_operations dev_fileops = {
-	owner:		THIS_MODULE,
-	read:		dev_read,
-	write:		dev_write,
-	ioctl:		dev_ioctl,
-	open:		dev_open,
-	release:	dev_release,
+	.owner		= THIS_MODULE,
+	.read		= dev_read,
+	.write		= dev_write,
+	.ioctl		= dev_ioctl,
+	.open		= dev_open,
+	.release	= dev_release,
 };
 
 static int reset_dsp(void)

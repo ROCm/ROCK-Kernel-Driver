@@ -231,8 +231,8 @@ static inline void get_page(struct page *page)
 static inline void put_page(struct page *page)
 {
 	if (PageCompound(page)) {
+		page = (struct page *)page->lru.next;
 		if (put_page_testzero(page)) {
-			page = (struct page *)page->lru.next;
 			if (page->lru.prev) {	/* destructor? */
 				(*(void (*)(struct page *))page->lru.prev)(page);
 			} else {

@@ -155,7 +155,7 @@ __setup("console=", console_setup);
  *	8 -- Set level of messages printed to console
  *	9 -- Return number of unread characters in the log buffer
  */
-int do_syslog(int type, char * buf, int len)
+int do_syslog(int type, char __user * buf, int len)
 {
 	unsigned long i, j, limit, count;
 	int do_clear = 0;
@@ -276,7 +276,7 @@ out:
 	return error;
 }
 
-asmlinkage long sys_syslog(int type, char * buf, int len)
+asmlinkage long sys_syslog(int type, char __user * buf, int len)
 {
 	return do_syslog(type, buf, len);
 }
