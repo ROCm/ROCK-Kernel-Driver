@@ -133,7 +133,7 @@ static dev_link_t *dev_list = NULL;
 static void serial_remove(dev_link_t *link)
 {
 	struct serial_info *info = link->priv;
-	int i, ret;
+	int i;
 
 	link->state &= ~DEV_PRESENT;
 
