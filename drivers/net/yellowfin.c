@@ -406,6 +406,7 @@ static void yellowfin_error(struct net_device *dev, int intr_status);
 static int yellowfin_close(struct net_device *dev);
 static struct net_device_stats *yellowfin_get_stats(struct net_device *dev);
 static void set_rx_mode(struct net_device *dev);
+static struct ethtool_ops ethtool_ops;
 
 
 static int __devinit yellowfin_init_one(struct pci_dev *pdev,
@@ -521,6 +522,7 @@ static int __devinit yellowfin_init_one(struct pci_dev *pdev,
 	dev->get_stats = &yellowfin_get_stats;
 	dev->set_multicast_list = &set_rx_mode;
 	dev->do_ioctl = &netdev_ioctl;
+	SET_ETHTOOL_OPS(dev, &ethtool_ops);
 	dev->tx_timeout = yellowfin_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
 
@@ -1394,29 +1396,17 @@ static void set_rx_mode(struct net_device *dev)
 	outw(cfg_value | 0x1000, ioaddr + Cnfg);
 }
 
-static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
+static void yellowfin_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
 	struct yellowfin_private *np = netdev_priv(dev);
-	u32 ethcmd;
-		
-	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
-		return -EFAULT;
-
-        switch (ethcmd) {
-        case ETHTOOL_GDRVINFO: {
-		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
-		strcpy(info.driver, DRV_NAME);
-		strcpy(info.version, DRV_VERSION);
-		strcpy(info.bus_info, pci_name(np->pci_dev));
-		if (copy_to_user(useraddr, &info, sizeof(info)))
-			return -EFAULT;
-		return 0;
-	}
-
-        }
-	
-	return -EOPNOTSUPP;
+	strcpy(info->driver, DRV_NAME);
+	strcpy(info->version, DRV_VERSION);
+	strcpy(info->bus_info, pci_name(np->pci_dev));
 }
+
+static struct ethtool_ops ethtool_ops = {
+	.get_drvinfo = yellowfin_get_drvinfo
+};
 
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
@@ -1425,8 +1415,6 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	struct mii_ioctl_data *data = if_mii(rq);
 
 	switch(cmd) {
-	case SIOCETHTOOL:
-		return netdev_ethtool_ioctl(dev, rq->ifr_data);
 	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
 		data->phy_id = np->phys[0] & 0x1f;
 		/* Fall Through */
