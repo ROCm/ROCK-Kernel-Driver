@@ -33,6 +33,8 @@
 #include <asm/processor.h>
 #include <linux/threads.h>
 
+struct vm_area_struct; /* forward declaration (include/linux/mm.h) */
+
 extern pgd_t swapper_pg_dir[] __attribute__ ((aligned (4096)));
 extern void paging_init(void);
 
@@ -493,22 +495,22 @@ extern inline pte_t pte_mkdirty(pte_t pte)
 	 * sske instruction is slow. It is faster to let the
 	 * next instruction set the dirty bit.
 	 */
-	pte_val(pte) &= ~ _PAGE_ISCLEAN;
 	return pte;
 }
 
 extern inline pte_t pte_mkold(pte_t pte)
 {
-	asm volatile ("rrbe 0,%0" : : "a" (pte_val(pte)) : "cc" );
+	/* S/390 doesn't keep its dirty/referenced bit in the pte.
+	 * There is no point in clearing the real referenced bit.
+	 */
 	return pte;
 }
 
 extern inline pte_t pte_mkyoung(pte_t pte)
 {
-	/* To set the referenced bit we read the first word from the real
-	 * page with a special instruction: load using real address (lura).
-	 * Isn't S/390 a nice architecture ?! */
-	asm volatile ("lura 0,%0" : : "a" (pte_val(pte) & PAGE_MASK) : "0" );
+	/* S/390 doesn't keep its dirty/referenced bit in the pte.
+	 * There is no point in setting the real referenced bit.
+	 */
 	return pte;
 }
 
@@ -521,6 +523,14 @@ static inline int ptep_test_and_clear_young(pte_t *ptep)
 		      "srl  %0,28\n\t" 
                       : "=d" (ccode) : "a" (pte_val(*ptep)) : "cc" );
 	return ccode & 2;
+}
+
+static inline int
+ptep_clear_flush_young(struct vm_area_struct *vma,
+			unsigned long address, pte_t *ptep)
+{
+	/* No need to flush TLB; bits are in storage key */
+	return ptep_test_and_clear_young(ptep);
 }
 
 static inline int ptep_test_and_clear_dirty(pte_t *ptep)
@@ -539,9 +549,36 @@ static inline int ptep_test_and_clear_dirty(pte_t *ptep)
 	return 1;
 }
 
+static inline int
+ptep_clear_flush_dirty(struct vm_area_struct *vma,
+			unsigned long address, pte_t *ptep)
+{
+	/* No need to flush TLB; bits are in storage key */
+	return ptep_test_and_clear_dirty(ptep);
+}
+
 static inline pte_t ptep_get_and_clear(pte_t *ptep)
 {
 	pte_t pte = *ptep;
+	pte_clear(ptep);
+	return pte;
+}
+
+static inline pte_t
+ptep_clear_flush(struct vm_area_struct *vma,
+		 unsigned long address, pte_t *ptep)
+{
+	pte_t pte = *ptep;
+#ifndef __s390x__
+	if (!(pte_val(pte) & _PAGE_INVALID)) {
+		/* S390 has 1mb segments, we are emulating 4MB segments */
+		pte_t *pto = (pte_t *) (((unsigned long) ptep) & 0x7ffffc00);
+		__asm__ __volatile__ ("ipte %0,%1" : : "a" (pto), "a" (address));
+	}
+#else /* __s390x__ */
+	if (!(pte_val(pte) & _PAGE_INVALID)) 
+		__asm__ __volatile__ ("ipte %0,%1" : : "a" (ptep), "a" (address));
+#endif /* __s390x__ */
 	pte_clear(ptep);
 	return pte;
 }
@@ -555,6 +592,14 @@ static inline void ptep_set_wrprotect(pte_t *ptep)
 static inline void ptep_mkdirty(pte_t *ptep)
 {
 	pte_mkdirty(*ptep);
+}
+
+static inline void
+ptep_establish(struct vm_area_struct *vma, 
+	       unsigned long address, pte_t *ptep, pte_t entry)
+{
+	ptep_clear_flush(vma, address, ptep);
+	set_pte(ptep, entry);
 }
 
 /*
@@ -726,6 +771,18 @@ typedef pte_t *pte_addr_t;
 #ifdef __s390x__
 # define HAVE_ARCH_UNMAPPED_AREA
 #endif /* __s390x__ */
+
+#define __HAVE_ARCH_PTEP_ESTABLISH
+#define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_YOUNG
+#define __HAVE_ARCH_PTEP_CLEAR_YOUNG_FLUSH
+#define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_DIRTY
+#define __HAVE_ARCH_PTEP_CLEAR_DIRTY_FLUSH
+#define __HAVE_ARCH_PTEP_GET_AND_CLEAR
+#define __HAVE_ARCH_PTEP_CLEAR_FLUSH
+#define __HAVE_ARCH_PTEP_SET_WRPROTECT
+#define __HAVE_ARCH_PTEP_MKDIRTY
+#define __HAVE_ARCH_PTE_SAME
+#include <asm-generic/pgtable.h>
 
 #endif /* _S390_PAGE_H */
 

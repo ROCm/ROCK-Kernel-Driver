@@ -159,29 +159,4 @@ static inline void pte_free(struct page *pte)
  */
 #define set_pgdir(addr,entry) do { } while(0)
 
-static inline pte_t ptep_invalidate(struct vm_area_struct *vma, 
-                                    unsigned long address, pte_t *ptep)
-{
-	pte_t pte = *ptep;
-#ifndef __s390x__
-	if (!(pte_val(pte) & _PAGE_INVALID)) {
-		/* S390 has 1mb segments, we are emulating 4MB segments */
-		pte_t *pto = (pte_t *) (((unsigned long) ptep) & 0x7ffffc00);
-		__asm__ __volatile__ ("ipte %0,%1" : : "a" (pto), "a" (address));
-	}
-#else /* __s390x__ */
-	if (!(pte_val(pte) & _PAGE_INVALID)) 
-		__asm__ __volatile__ ("ipte %0,%1" : : "a" (ptep), "a" (address));
-#endif /* __s390x__ */
-	pte_clear(ptep);
-	return pte;
-}
-
-static inline void ptep_establish(struct vm_area_struct *vma, 
-                                  unsigned long address, pte_t *ptep, pte_t entry)
-{
-	ptep_invalidate(vma, address, ptep);
-	set_pte(ptep, entry);
-}
-
 #endif /* _S390_PGALLOC_H */

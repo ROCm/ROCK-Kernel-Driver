@@ -30,10 +30,9 @@ static int filemap_sync_pte(pte_t *ptep, struct vm_area_struct *vma,
 		unsigned long pfn = pte_pfn(pte);
 		if (pfn_valid(pfn)) {
 			page = pfn_to_page(pfn);
-			if (!PageReserved(page) && ptep_test_and_clear_dirty(ptep)) {
-				flush_tlb_page(vma, address);
+			if (!PageReserved(page) &&
+			    ptep_clear_flush_dirty(vma, address, ptep))
 				set_page_dirty(page);
-			}
 		}
 	}
 	return 0;

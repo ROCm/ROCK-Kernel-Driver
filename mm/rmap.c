@@ -329,8 +329,7 @@ static int try_to_unmap_one(struct page * page, pte_addr_t paddr)
 
 	/* Nuke the page table entry. */
 	flush_cache_page(vma, address);
-	pte = ptep_get_and_clear(ptep);
-	flush_tlb_page(vma, address);
+	pte = ptep_clear_flush(vma, address, ptep);
 
 	if (PageSwapCache(page)) {
 		/*
