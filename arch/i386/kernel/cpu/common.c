@@ -629,6 +629,6 @@ void __init cpu_init (void)
 	 * Force FPU initialization:
 	 */
 	current_thread_info()->status = 0;
-	current->used_math = 0;
+	clear_used_math();
 	mxcsr_feature_mask_init();
 }

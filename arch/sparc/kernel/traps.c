@@ -246,17 +246,17 @@ void do_fpd_trap(struct pt_regs *regs, unsigned long pc, unsigned long npc,
 		       &fptask->thread.fpqueue[0], &fptask->thread.fpqdepth);
 	}
 	last_task_used_math = current;
-	if(current->used_math) {
+	if(used_math()) {
 		fpload(&current->thread.float_regs[0], &current->thread.fsr);
 	} else {
 		/* Set initial sane state. */
 		fpload(&init_fregs[0], &init_fsr);
-		current->used_math = 1;
+		set_used_math();
 	}
 #else
-	if(!current->used_math) {
+	if(!used_math()) {
 		fpload(&init_fregs[0], &init_fsr);
-		current->used_math = 1;
+		set_used_math();
 	} else {
 		fpload(&current->thread.float_regs[0], &current->thread.fsr);
 	}

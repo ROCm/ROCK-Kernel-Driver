@@ -178,11 +178,11 @@ asmlinkage int restore_sigcontext(struct pt_regs *regs, struct sigcontext *sc)
 	restore_gp_reg(31);
 #undef restore_gp_reg
 
-	err |= __get_user(current->used_math, &sc->sc_used_math);
+	err |= __get_user(!!used_math(), &sc->sc_used_math);
 
 	preempt_disable();
 
-	if (current->used_math) {
+	if (used_math()) {
 		/* restore fpu context if we have used it before */
 		own_fpu();
 		err |= restore_fp_context(sc);
@@ -323,9 +323,9 @@ inline int setup_sigcontext(struct pt_regs *regs, struct sigcontext *sc)
 	err |= __put_user(regs->cp0_cause, &sc->sc_cause);
 	err |= __put_user(regs->cp0_badvaddr, &sc->sc_badvaddr);
 
-	err |= __put_user(current->used_math, &sc->sc_used_math);
+	err |= __put_user(!!used_math(), &sc->sc_used_math);
 
-	if (!current->used_math)
+	if (!used_math())
 		goto out;
 
 	/*

@@ -7,7 +7,6 @@
  *
  */
 
-#define TSK_USED_MATH 788 /* offsetof(struct task_struct, used_math) */
 #define TSK_ACTIVE_MM 96 /* offsetof(struct task_struct, active_mm) */
 
 #define VMA_VM_MM 0 /* offsetof(struct vm_area_struct, vm_mm) */

@@ -911,7 +911,7 @@ asmlinkage void math_state_restore(struct pt_regs regs)
 	struct task_struct *tsk = thread->task;
 
 	clts();		/* Allow maths ops (or we recurse) */
-	if (!tsk->used_math)
+	if (!tsk_used_math(tsk))
 		init_fpu(tsk);
 	restore_fpu(tsk);
 	thread->status |= TS_USEDFPU;	/* So we fnsave on switch_to() */

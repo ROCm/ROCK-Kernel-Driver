@@ -271,7 +271,7 @@ void flush_thread(void)
 	memset(&tsk->thread.debug, 0, sizeof(struct debug_info));
 	memset(&thread->fpstate, 0, sizeof(union fp_state));
 
-	current->used_math = 0;
+	clear_used_math();
 }
 
 void release_thread(struct task_struct *dead_task)
@@ -305,7 +305,7 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long stack_start,
 int dump_fpu (struct pt_regs *regs, struct user_fp *fp)
 {
 	struct thread_info *thread = current_thread_info();
-	int used_math = current->used_math;
+	int used_math = !!used_math();
 
 	if (used_math)
 		memcpy(fp, &thread->fpstate.soft, sizeof (*fp));

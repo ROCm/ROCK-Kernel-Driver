@@ -192,9 +192,9 @@ restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *sc, int *peax
 			err |= restore_i387(buf);
 		} else {
 			struct task_struct *me = current;
-			if (me->used_math) {
+			if (used_math()) {
 				clear_fpu(me);
-				me->used_math = 0;
+				clear_used_math();
 			}
 		}
 	}

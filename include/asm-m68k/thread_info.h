@@ -48,6 +48,7 @@ struct thread_info {
 #define TIF_NOTIFY_RESUME	2	/* resumption notification requested */
 #define TIF_SIGPENDING		3	/* signal pending */
 #define TIF_NEED_RESCHED	4	/* rescheduling necessary */
+#define TIF_MEMDIE		5
 
 extern int thread_flag_fixme(void);
 

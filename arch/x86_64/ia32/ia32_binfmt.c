@@ -214,7 +214,7 @@ elf_core_copy_task_fpregs(struct task_struct *tsk, struct pt_regs *regs, elf_fpr
 	struct _fpstate_ia32 *fpstate = (void*)fpu; 
 	mm_segment_t oldfs = get_fs();
 
-	if (!tsk->used_math) 
+	if (!tsk_used_math(tsk)) 
 		return 0;
 	if (!regs)
 		regs = (struct pt_regs *)tsk->thread.rsp0;
@@ -235,7 +235,7 @@ static inline int
 elf_core_copy_task_xfpregs(struct task_struct *t, elf_fpxregset_t *xfpu)
 {
 	struct pt_regs *regs = ((struct pt_regs *)(t->thread.rsp0))-1; 
-	if (!t->used_math) 
+	if (!tsk_used_math(t)) 
 		return 0;
 	if (t == current)
 		unlazy_fpu(t); 

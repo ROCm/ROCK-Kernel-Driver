@@ -112,18 +112,14 @@ struct zone {
 	unsigned long		free_pages;
 	unsigned long		pages_min, pages_low, pages_high;
 	/*
-	 * protection[] is a pre-calculated number of extra pages that must be
-	 * available in a zone in order for __alloc_pages() to allocate memory
-	 * from the zone. i.e., for a GFP_KERNEL alloc of "order" there must
-	 * be "(1<<order) + protection[ZONE_NORMAL]" free pages in the zone
-	 * for us to choose to allocate the page from that zone.
-	 *
-	 * It uses both min_free_kbytes and sysctl_lower_zone_protection.
-	 * The protection values are recalculated if either of these values
-	 * change.  The array elements are in zonelist order:
-	 *	[0] == GFP_DMA, [1] == GFP_KERNEL, [2] == GFP_HIGHMEM.
+	 * We don't know if the memory that we're going to allocate will be freeable
+	 * or/and it will be released eventually, so to avoid totally wasting several
+	 * GB of ram we must reserve some of the lower zone memory (otherwise we risk
+	 * to run OOM on the lower zones despite there's tons of freeable ram
+	 * on the higher zones). This array is recalculated at runtime if the
+	 * sysctl_lowmem_reserve_ratio sysctl changes.
 	 */
-	unsigned long		protection[MAX_NR_ZONES];
+	unsigned long		lowmem_reserve[MAX_NR_ZONES];
 
 	struct per_cpu_pageset	pageset[NR_CPUS];
 
@@ -368,7 +364,8 @@ struct ctl_table;
 struct file;
 int min_free_kbytes_sysctl_handler(struct ctl_table *, int, struct file *, 
 					void __user *, size_t *, loff_t *);
-int lower_zone_protection_sysctl_handler(struct ctl_table *, int, struct file *,
+extern int sysctl_lowmem_reserve_ratio[MAX_NR_ZONES-1];
+int lowmem_reserve_ratio_sysctl_handler(struct ctl_table *, int, struct file *,
 					void __user *, size_t *, loff_t *);
 
 #include <linux/topology.h>

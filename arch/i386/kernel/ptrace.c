@@ -592,7 +592,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 			break;
 		}
 		ret = 0;
-		if (!child->used_math)
+		if (!tsk_used_math(child))
 			init_fpu(child);
 		get_fpregs((struct user_i387_struct __user *)data, child);
 		break;
@@ -604,7 +604,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 			ret = -EIO;
 			break;
 		}
-		child->used_math = 1;
+		set_stopped_child_used_math(child);
 		set_fpregs(child, (struct user_i387_struct __user *)data);
 		ret = 0;
 		break;
@@ -616,7 +616,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 			ret = -EIO;
 			break;
 		}
-		if (!child->used_math)
+		if (!tsk_used_math(child))
 			init_fpu(child);
 		ret = get_fpxregs((struct user_fxsr_struct __user *)data, child);
 		break;
@@ -628,7 +628,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 			ret = -EIO;
 			break;
 		}
-		child->used_math = 1;
+		set_stopped_child_used_math(child);
 		ret = set_fpxregs(child, (struct user_fxsr_struct __user *)data);
 		break;
 	}
