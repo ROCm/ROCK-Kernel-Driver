@@ -333,6 +333,7 @@ void svcauth_unix_purge(void)
 static int
 svcauth_null_accept(struct svc_rqst *rqstp, u32 *authp)
 {
+	struct svc_program *prog = rqstp->rq_server->sv_program;
 	struct kvec	*argv = &rqstp->rq_arg.head[0];
 	struct kvec	*resv = &rqstp->rq_res.head[0];
 	int		rv=0;
@@ -359,9 +360,10 @@ svcauth_null_accept(struct svc_rqst *rqstp, u32 *authp)
 	if (rqstp->rq_cred.cr_group_info == NULL)
 		return SVC_DROP; /* kmalloc failure - client must retry */
 
-	/* Put NULL verifier */
-	svc_putu32(resv, RPC_AUTH_NULL);
-	svc_putu32(resv, 0);
+	if (prog->pg_need_auth && !prog->pg_need_auth(rqstp)) {
+		rv = SVC_OK;
+		goto accepted;
+	}
 
 	strcpy(key.m_class, rqstp->rq_server->sv_program->pg_class);
 	key.m_addr = rqstp->rq_addr.sin_addr;
@@ -390,6 +392,11 @@ svcauth_null_accept(struct svc_rqst *rqstp, u32 *authp)
 
 	if (rqstp->rq_client == NULL && rqstp->rq_proc != 0)
 		*authp = rpc_autherr_badcred;
+
+accepted:
+	/* Put NULL verifier */
+	svc_putu32(resv, RPC_AUTH_NULL);
+	svc_putu32(resv, 0);
 
 	return rv;
 }
@@ -420,6 +427,7 @@ struct auth_ops svcauth_null = {
 int
 svcauth_unix_accept(struct svc_rqst *rqstp, u32 *authp)
 {
+	struct svc_program *prog = rqstp->rq_server->sv_program;
 	struct kvec	*argv = &rqstp->rq_arg.head[0];
 	struct kvec	*resv = &rqstp->rq_res.head[0];
 	struct svc_cred	*cred = &rqstp->rq_cred;
@@ -458,6 +466,10 @@ svcauth_unix_accept(struct svc_rqst *rqstp, u32 *authp)
 		return SVC_DENIED;
 	}
 
+	if (prog->pg_need_auth && !prog->pg_need_auth(rqstp)) {
+		rv = SVC_OK;
+		goto accepted;
+	}
 
 	strcpy(key.m_class, rqstp->rq_server->sv_program->pg_class);
 	key.m_addr = rqstp->rq_addr.sin_addr;
@@ -486,6 +498,7 @@ svcauth_unix_accept(struct svc_rqst *rqstp, u32 *authp)
 	if (rv  == SVC_OK && rqstp->rq_client == NULL && rqstp->rq_proc != 0)
 		goto badcred;
 
+accepted:
 	/* Put NULL verifier */
 	svc_putu32(resv, RPC_AUTH_NULL);
 	svc_putu32(resv, 0);

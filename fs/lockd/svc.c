@@ -210,6 +210,32 @@ lockd(struct svc_rqst *rqstp)
 	module_put_and_exit(0);
 }
 
+static int
+lockd_rqst_needs_auth(struct svc_rqst *rqstp)
+{
+	u32 proc = rqstp->rq_proc;
+
+	if (proc == 0
+	 || proc == NLMPROC_GRANTED
+	 || proc == NLMPROC_TEST_RES
+	 || proc == NLMPROC_LOCK_RES
+	 || proc == NLMPROC_CANCEL_RES
+	 || proc == NLMPROC_UNLOCK_RES
+	 || proc == NLMPROC_GRANTED_RES
+	 || proc == NLMPROC_NSM_NOTIFY)
+		return 0;
+	return 1;
+}
+
+#ifdef CONFIG_STATD
+static int
+statd_rqst_needs_auth(struct svc_rqst *rqstp)
+{
+	/* statd is unauthenticated */
+	return 0;
+}
+#endif
+
 /*
  * Bring up the lockd process if it's not already up.
  */
@@ -471,6 +497,8 @@ static struct svc_program	nsmsvc_program = {
 	.pg_name	= "statd",		/* service name */
 	.pg_class	= "nfsd",		/* share authentication with nfsd */
 	.pg_stats	= &nsmsvc_stats,	/* stats table */
+
+	.pg_need_auth	= statd_rqst_needs_auth,
 };
 
 #define nsmsvc_program_p &nsmsvc_program
@@ -520,4 +548,6 @@ struct svc_program	nlmsvc_program = {
 	.pg_name	= "lockd",		/* service name */
 	.pg_class	= "nfsd",		/* share authentication with nfsd */
 	.pg_stats	= &nlmsvc_stats,	/* stats table */
+
+	.pg_need_auth	= lockd_rqst_needs_auth,
 };
