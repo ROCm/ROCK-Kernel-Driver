@@ -587,8 +587,8 @@ struct scsi_device {
 	char * model;		/* ... after scan; point to static string */
 	char * rev;		/* ... "nullnullnullnull" before scan */
 	unsigned char current_tag;	/* current tag */
-	unsigned char sync_min_period;	/* Not less than this period */
-	unsigned char sync_max_offset;	/* Not greater than this offset */
+//	unsigned char sync_min_period;	/* Not less than this period */
+//	unsigned char sync_max_offset;	/* Not greater than this offset */
 
 	unsigned online:1;
 	unsigned writeable:1;
@@ -599,7 +599,7 @@ struct scsi_device {
 	unsigned lockable:1;	/* Able to prevent media removal */
 	unsigned borken:1;	/* Tell the Seagate driver to be 
 				 * painfully slow on this device */
-	unsigned disconnect:1;	/* can disconnect */
+//	unsigned disconnect:1;	/* can disconnect */
 	unsigned soft_reset:1;	/* Uses soft reset option */
 	unsigned sdtr:1;	/* Device supports SDTR messages */
 	unsigned wdtr:1;	/* Device supports WDTR messages */
@@ -619,8 +619,8 @@ struct scsi_device {
 	unsigned remap:1;	/* support remapping  */
 	unsigned starved:1;	/* unable to process commands because
 				   host busy */
-	unsigned sync:1;	/* Sync transfer state, managed by host */
-	unsigned wide:1;	/* WIDE transfer state, managed by host */
+//	unsigned sync:1;	/* Sync transfer state, managed by host */
+//	unsigned wide:1;	/* WIDE transfer state, managed by host */
 
 	unsigned int device_blocked;	/* Device returned QUEUE_FULL. */
 
