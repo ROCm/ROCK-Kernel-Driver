@@ -136,7 +136,20 @@ static inline void pagecache_acct(int count)
 
 static inline unsigned long get_page_cache_size(void)
 {
-        return atomic_read(&nr_pagecache);
+	int val = atomic_read(&nr_pagecache);
+
+	/* 
+	 * Since we have a per cpu count that spills into the global count,
+	 * the global count can be up to nr_cpus * PAGECACHE_ACCT_THRESHOLD
+	 * different to the actual count.
+	 *
+	 * While an approximation here is OK, we need to be careful to never
+	 * return a negative value.
+	 */
+	if (unlikely(val < 0))
+		return 0;
+
+	return val;
 }
 
 static inline void ___add_to_page_cache(struct page *page,
