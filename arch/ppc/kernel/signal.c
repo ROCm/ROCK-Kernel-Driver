@@ -33,7 +33,7 @@
 #include <asm/pgtable.h>
 #include <asm/cacheflush.h>
 
-#define DEBUG_SIG 0
+#undef DEBUG_SIG
 
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
 
