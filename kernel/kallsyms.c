@@ -171,21 +171,23 @@ static int get_ksymbol_mod(struct kallsym_iter *iter)
 	return 1;
 }
 
-static void get_ksymbol_core(struct kallsym_iter *iter)
+/* Returns space to next name. */
+static unsigned long get_ksymbol_core(struct kallsym_iter *iter)
 {
-	unsigned stemlen;
+	unsigned stemlen, off = iter->nameoff;
 
 	/* First char of each symbol name indicates prefix length
 	   shared with previous name (stem compression). */
-	stemlen = kallsyms_names[iter->nameoff++];
+	stemlen = kallsyms_names[off++];
 
-	strlcpy(iter->name+stemlen, kallsyms_names+iter->nameoff, 128-stemlen);
-	iter->nameoff += strlen(kallsyms_names + iter->nameoff) + 1;
+	strlcpy(iter->name+stemlen, kallsyms_names + off, 128-stemlen);
+	off += strlen(kallsyms_names + off) + 1;
 	iter->owner = NULL;
 	iter->value = kallsyms_addresses[iter->pos];
 	iter->type = 't';
 
 	upcase_if_global(iter);
+	return off - iter->nameoff;
 }
 
 static void reset_iter(struct kallsym_iter *iter)
@@ -210,9 +212,10 @@ static int update_iter(struct kallsym_iter *iter, loff_t pos)
 
 	/* We need to iterate through the previous symbols: can be slow */
 	for (; iter->pos != pos; iter->pos++) {
-		get_ksymbol_core(iter);
+		iter->nameoff += get_ksymbol_core(iter);
 		cond_resched();
 	}
+	get_ksymbol_core(iter);
 	return 1;
 }
 
