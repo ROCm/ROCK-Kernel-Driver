@@ -809,6 +809,7 @@ struct input_dev {
 	int (*erase_effect)(struct input_dev *dev, int effect_id);
 
 	struct input_handle *grab;
+	struct device *dev;
 
 	struct list_head	h_list;
 	struct list_head	node;
@@ -921,7 +922,7 @@ void input_event(struct input_dev *dev, unsigned int type, unsigned int code, in
 #define input_regs(a,b)		do { (a)->regs = (b); } while (0)
 #define input_sync(a)		do { input_event(a, EV_SYN, SYN_REPORT, 0); (a)->regs = NULL; } while (0)
 
-extern struct class input_class;
+extern struct class_simple *input_class;
 
 #endif
 #endif
