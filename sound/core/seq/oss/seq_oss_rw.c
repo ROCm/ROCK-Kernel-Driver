@@ -41,7 +41,7 @@ static int insert_queue(seq_oss_devinfo_t *dp, evrec_t *rec, struct file *opt);
  */
 
 int
-snd_seq_oss_read(seq_oss_devinfo_t *dp, char *buf, int count)
+snd_seq_oss_read(seq_oss_devinfo_t *dp, char __user *buf, int count)
 {
 	seq_oss_readq_t *readq = dp->readq;
 	int cnt, pos;
@@ -81,7 +81,7 @@ snd_seq_oss_read(seq_oss_devinfo_t *dp, char *buf, int count)
  */
 
 int
-snd_seq_oss_write(seq_oss_devinfo_t *dp, const char *buf, int count, struct file *opt)
+snd_seq_oss_write(seq_oss_devinfo_t *dp, const char __user *buf, int count, struct file *opt)
 {
 	int rc, c, p, ev_size;
 	evrec_t rec;

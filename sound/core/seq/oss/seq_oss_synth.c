@@ -450,7 +450,7 @@ snd_seq_oss_synth_reset(seq_oss_devinfo_t *dp, int dev)
  */
 int
 snd_seq_oss_synth_load_patch(seq_oss_devinfo_t *dp, int dev, int fmt,
-			    const char *buf, int p, int c)
+			    const char __user *buf, int p, int c)
 {
 	seq_oss_synth_t *rec;
 	int rc;
