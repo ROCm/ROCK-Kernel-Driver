@@ -1362,8 +1362,34 @@ static const snd_kcontrol_new_t snd_ac97_cm9739_controls_spdif[] = {
 	/* BIT 8: SPD32 - 32bit SPDIF - not supported yet */
 };
 
+static int snd_ac97_cm9739_center_mic_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
+{
+	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
+	if (ac97->regs[AC97_CM9739_MULTI_CHAN] & 0x1000)
+		ucontrol->value.integer.value[0] = 1;
+	else
+		ucontrol->value.integer.value[0] = 0;
+	return 0;
+}
+
+static int snd_ac97_cm9739_center_mic_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
+{
+	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
+	return snd_ac97_update_bits(ac97, AC97_CM9739_MULTI_CHAN, 0x3000,
+				    ucontrol->value.integer.value[0] ? 
+				    0x1000 : 0x2000);
+}
+
 static const snd_kcontrol_new_t snd_ac97_cm9739_controls[] = {
 	AC97_SINGLE("Line-In As Surround", AC97_CM9739_MULTI_CHAN, 10, 1, 0),
+	{
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = "Mic As Center/LFE",
+		.info = snd_ac97_info_single,
+		.get = snd_ac97_cm9739_center_mic_get,
+		.put = snd_ac97_cm9739_center_mic_put,
+		.private_value = AC97_SINGLE_VALUE(0, 0, 1, 0) /* only mask needed */
+	},
 };
 
 static int patch_cm9739_specific(ac97_t * ac97)
@@ -1398,10 +1424,13 @@ int patch_cm9739(ac97_t * ac97)
 	}
 
 	/* set-up multi channel */
-	/* bit 13: enable internal vref output for mic */
-	/* bit 12: enable center/lfe */
 	/* bit 14: 0 = SPDIF, 1 = EAPD */
-	val = (1 << 12) | (1 << 13);
+	/* bit 13: enable internal vref output for mic */
+	/* bit 12: disable center/lfe (swithable) */
+	/* bit 10: disable surround/line (switchable) */
+	/* bit 9: mix 2 surround off */
+	/* bit 0: dB */
+	val = (1 << 13);
 	if (! (ac97->ext_id & AC97_EI_SPDIF))
 		val |= (1 << 14);
 	snd_ac97_write_cache(ac97, AC97_CM9739_MULTI_CHAN, val);
