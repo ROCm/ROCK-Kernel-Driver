@@ -54,7 +54,7 @@ static void longrun_get_policy(struct cpufreq_policy *policy)
 
 	policy->min = longrun_low_freq + msr_lo * 
 		((longrun_high_freq - longrun_low_freq) / 100);
-	policy->min = longrun_low_freq + msr_hi * 
+	policy->max = longrun_low_freq + msr_hi * 
 		((longrun_high_freq - longrun_low_freq) / 100);
 	policy->cpu = 0;
 }
