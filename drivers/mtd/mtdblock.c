@@ -395,11 +395,9 @@ static void handle_mtdblock_request(void)
 	while (!blk_queue_empty(&mtd_queue)) {
 		struct request *req = elv_next_request(&mtd_queue);
 		spin_unlock_irq(mtd_queue.queue_lock);
-		mtdblk = mtdblks[minor(req->rq_dev)];
+		struct mtdblk_dev **p = req->rq_disk->private_data;
+		mtdblk = *p;
 		res = 0;
-
-		if (minor(req->rq_dev) >= MAX_MTD_DEVICES)
-			panic("handle_mtdblock_request: minor out of bound");
 
 		if (! (req->flags & REQ_CMD))
 			goto end_req;
@@ -557,6 +555,7 @@ static void mtd_notify_add(struct mtd_info* mtd)
 
 		mtddisk[mtd->index] = disk;
 		set_capacity(disk, mtd->size / 512);
+		disk->private_data = &mtdblks[mtd->index];
 		disk->queue = &mtd_queue;
 		add_disk(disk);
 	}

@@ -492,9 +492,9 @@ static void do_ps2esdi_request(request_queue_t * q)
 	req = elv_next_request(q);
 
 #if 0
-	printk("%s:got request. device : %d minor : %d command : %d  sector : %ld count : %ld, buffer: %p\n",
+	printk("%s:got request. device : %s command : %d  sector : %ld count : %ld, buffer: %p\n",
 	       DEVICE_NAME,
-	       DEVICE_NR(req->rq_dev), minor(req->rq_dev),
+	       req->rq_disk->disk_name,
 	       req->cmd, req->sector,
 	       req->current_nr_sectors, req->buffer);
 #endif

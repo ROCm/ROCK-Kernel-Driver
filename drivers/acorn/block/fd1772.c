@@ -1209,8 +1209,8 @@ static void redo_fd_request(void)
 	int device, drive, type;
 	struct archy_floppy_struct *floppy;
 
-	DPRINT(("redo_fd_request: CURRENT=%08lx CURRENT->rq_dev=%04x CURRENT->sector=%ld\n",
-		(unsigned long) CURRENT, CURRENT ? CURRENT->rq_dev : 0,
+	DPRINT(("redo_fd_request: CURRENT=%p dev=%s CURRENT->sector=%ld\n",
+		CURRENT, CURRENT ? CURRENT->rq_disk->disk_name : "",
 		!blk_queue_empty(QUEUE) ? CURRENT->sector : 0));
 
 repeat:
@@ -1218,13 +1218,6 @@ repeat:
 	if (blk_queue_empty(QUEUE))
 		goto the_end;
 
-	if (major(CURRENT->rq_dev) != MAJOR_NR)
-		panic(DEVICE_NAME ": request list destroyed");
-
-	if (CURRENT->bh) {
-		if (!buffer_locked(CURRENT->bh))
-			panic(DEVICE_NAME ": block not locked");
-	}
 	device = minor(CURRENT->rq_dev);
 	drive = device & 3;
 	type = device >> 2;

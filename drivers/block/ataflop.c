@@ -1440,8 +1440,8 @@ static void redo_fd_request(void)
 {
 	int device, drive, type;
   
-	DPRINT(("redo_fd_request: CURRENT=%08lx CURRENT->dev=%04x CURRENT->sector=%ld\n",
-		(unsigned long)CURRENT, !blk_queue_empty(QUEUE) ? CURRENT->rq_dev : 0,
+	DPRINT(("redo_fd_request: CURRENT=%p dev=%s CURRENT->sector=%ld\n",
+		CURRENT, !blk_queue_empty(QUEUE) ? CURRENT->rq_disk->disk_name : "",
 		!blk_queue_empty(QUEUE) ? CURRENT->sector : 0 ));
 
 	IsFormatting = 0;
@@ -1450,9 +1450,6 @@ repeat:
 
 	if (blk_queue_empty(QUEUE))
 		goto the_end;
-
-	if (major(CURRENT->rq_dev) != MAJOR_NR)
-		panic(DEVICE_NAME ": request list destroyed");
 
 	device = minor(CURRENT->rq_dev);
 	drive = device & 3;
