@@ -226,7 +226,7 @@ static struct pci_device_id agp_sis_pci_table[] __initdata = {
 
 MODULE_DEVICE_TABLE(pci, agp_sis_pci_table);
 
-static struct __initdata pci_driver agp_sis_pci_driver = {
+static struct pci_driver agp_sis_pci_driver = {
 	.name		= "agpgart-sis",
 	.id_table	= agp_sis_pci_table,
 	.probe		= agp_sis_probe,

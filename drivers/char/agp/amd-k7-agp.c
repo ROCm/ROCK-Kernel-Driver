@@ -456,7 +456,7 @@ static struct pci_device_id agp_amdk7_pci_table[] __initdata = {
 
 MODULE_DEVICE_TABLE(pci, agp_amdk7_pci_table);
 
-static struct __initdata pci_driver agp_amdk7_pci_driver = {
+static struct pci_driver agp_amdk7_pci_driver = {
 	.name		= "agpgart-amdk7",
 	.id_table	= agp_amdk7_pci_table,
 	.probe		= agp_amdk7_probe,

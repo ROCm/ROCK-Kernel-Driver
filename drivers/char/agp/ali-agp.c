@@ -377,7 +377,7 @@ static struct pci_device_id agp_ali_pci_table[] __initdata = {
 
 MODULE_DEVICE_TABLE(pci, agp_ali_pci_table);
 
-static struct __initdata pci_driver agp_ali_pci_driver = {
+static struct pci_driver agp_ali_pci_driver = {
 	.name		= "agpgart-ali",
 	.id_table	= agp_ali_pci_table,
 	.probe		= agp_ali_probe,

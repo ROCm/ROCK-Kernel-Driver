@@ -346,7 +346,7 @@ static struct pci_device_id agp_nvidia_pci_table[] __initdata = {
 
 MODULE_DEVICE_TABLE(pci, agp_nvidia_pci_table);
 
-static struct __initdata pci_driver agp_nvidia_pci_driver = {
+static struct pci_driver agp_nvidia_pci_driver = {
 	.name		= "agpgart-nvidia",
 	.id_table	= agp_nvidia_pci_table,
 	.probe		= agp_nvidia_probe,

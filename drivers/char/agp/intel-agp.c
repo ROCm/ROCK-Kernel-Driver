@@ -1429,7 +1429,7 @@ static struct pci_device_id agp_intel_pci_table[] __initdata = {
 
 MODULE_DEVICE_TABLE(pci, agp_intel_pci_table);
 
-static struct __initdata pci_driver agp_intel_pci_driver = {
+static struct pci_driver agp_intel_pci_driver = {
 	.name		= "agpgart-intel",
 	.id_table	= agp_intel_pci_table,
 	.probe		= agp_intel_probe,

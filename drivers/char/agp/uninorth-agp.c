@@ -373,7 +373,7 @@ static struct pci_device_id agp_uninorth_pci_table[] __initdata = {
 
 MODULE_DEVICE_TABLE(pci, agp_uninorth_pci_table);
 
-static struct __initdata pci_driver agp_uninorth_pci_driver = {
+static struct pci_driver agp_uninorth_pci_driver = {
 	.name		= "agpgart-uninorth",
 	.id_table	= agp_uninorth_pci_table,
 	.probe		= agp_uninorth_probe,
