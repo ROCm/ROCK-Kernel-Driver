@@ -1,3 +1,105 @@
+Release Date	: Thu Feb 03 12:27:22 EST 2005 - Seokmann Ju <sju@lsil.com>
+Current Version	: 2.20.4.5 (scsi module), 2.20.2.5 (cmm module)
+Older Version	: 2.20.4.4 (scsi module), 2.20.2.4 (cmm module)
+
+1.	Modified name of two attributes in scsi_host_template.
+	On Wed, 2005-02-02 at 10:56 -0500, Ju, Seokmann wrote:
+	> +	.sdev_attrs			= megaraid_device_attrs,
+	> +	.shost_attrs			= megaraid_class_device_attrs,
+
+	These are, perhaps, slightly confusing names.
+	The terms device and class_device have well defined meanings in the
+	generic device model, neither of which is what you mean here.
+	Why not simply megaraid_sdev_attrs and megaraid_shost_attrs?
+
+	Other than this, it looks fine to me too.
+
+Release Date	: Thu Jan 27 00:01:03 EST 2005 - Atul Mukker <atulm@lsil.com>
+Current Version	: 2.20.4.4 (scsi module), 2.20.2.5 (cmm module)
+Older Version	: 2.20.4.3 (scsi module), 2.20.2.4 (cmm module)
+
+1.	Bump up the version of scsi module due to its conflict.
+
+Release Date	: Thu Jan 21 00:01:03 EST 2005 - Atul Mukker <atulm@lsil.com>
+Current Version	: 2.20.4.3 (scsi module), 2.20.2.5 (cmm module)
+Older Version	: 2.20.4.2 (scsi module), 2.20.2.4 (cmm module)
+
+1.	Remove driver ioctl for logical drive to scsi address translation and
+	replace with the sysfs attribute. To remove drives and change
+	capacity, application shall now use the device attribute to get the
+	logical drive number for a scsi device. For adding newly created
+	logical drives, class device attribute would be required to uniquely
+	identify each controller.
+		- Atul Mukker <atulm@lsil.com>
+
+	"James, I've been thinking about this a little more, and you may be on
+	to something here. Let each driver add files as such:"
+
+		- Matt Domsch <Matt_Domsch@dell.com>, 12.15.2004
+		 linux-scsi mailing list
+
+
+	"Then, if you simply publish your LD number as an extra parameter of
+	the device, you can look through /sys to find it."
+
+		- James Bottomley <James.Bottomley@SteelEye.com>, 01.03.2005
+		 linux-scsi mailing list
+
+
+	"I don't see why not ... it's your driver, you can publish whatever
+	extra information you need as scsi_device attributes; that was one of
+	the designs of the extensible attribute system."
+
+		- James Bottomley <James.Bottomley@SteelEye.com>, 01.06.2005
+		 linux-scsi mailing list
+
+2.	Add AMI megaraid support - Brian King <brking@charter.net>
+		PCI_VENDOR_ID_AMI, PCI_DEVICE_ID_AMI_MEGARAID3,
+		PCI_VENDOR_ID_AMI, PCI_SUBSYS_ID_PERC3_DC,
+
+3.	Make some code static - Adrian Bunk <bunk@stusta.de>
+	Date:	Mon, 15 Nov 2004 03:14:57 +0100
+
+	The patch below makes some needlessly global code static.
+	-wait_queue_head_t wait_q;
+	+static wait_queue_head_t wait_q;
+
+	Signed-off-by: Adrian Bunk <bunk@stusta.de>
+
+4.	Added NEC ROMB support - NEC MegaRAID PCI Express ROMB controller
+		PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_MEGARAID_NEC_ROMB_2E,
+		PCI_SUBSYS_ID_NEC, PCI_SUBSYS_ID_MEGARAID_NEC_ROMB_2E,
+
+5.	Fixed Tape drive issue : For any Direct CDB command to physical device
+	including tape, timeout value set by driver was 10 minutes. With this 
+	value, most of command will return within timeout. However, for those
+	command like ERASE or FORMAT, it takes more than an hour depends on
+	capacity of the device and the command could be terminated before it 
+	completes.
+	To address this issue, the 'timeout' field in the DCDB command will 
+	have NO TIMEOUT (i.e., 4) value as its timeout on DCDB command.
+
+
+
+Release Date	: Thu Dec  9 19:10:23 EST 2004
+	- Sreenivas Bagalkote <sreenib@lsil.com>
+
+Current Version	: 2.20.4.2 (scsi module), 2.20.2.4 (cmm module)
+Older Version	: 2.20.4.1 (scsi module), 2.20.2.3 (cmm module)
+
+i.	Introduced driver ioctl that returns scsi address for a given ld.
+	
+	"Why can't the existing sysfs interfaces be used to do this?"
+		- Brian King (brking@us.ibm.com)
+	
+	"I've looked into solving this another way, but I cannot see how
+	to get this driver-private mapping of logical drive number-> HCTL
+	without putting code something like this into the driver."
+
+	"...and by providing a mapping a function to userspace, the driver
+	is free to change its mapping algorithm in the future if necessary .."
+		- Matt Domsch (Matt_Domsch@dell.com)
+
 Release Date	: Thu Dec  9 19:02:14 EST 2004 - Sreenivas Bagalkote <sreenib@lsil.com>
 
 Current Version	: 2.20.4.1 (scsi module), 2.20.2.3 (cmm module)
@@ -13,7 +115,7 @@ Older Version	: 2.20.4.0 (scsi module), 2.20.2.1 (cmm module)
 i.	Handle IOCTL cmd timeouts more properly.
 
 ii.	pci_dma_sync_{sg,single}_for_cpu was introduced into megaraid_mbox
-	incorrectly (instead of _for_device). Changed to appropriate
+	incorrectly (instead of _for_device). Changed to appropriate 
 	pci_dma_sync_{sg,single}_for_device.
 
 Release Date	: Wed Oct 06 11:15:29 EDT 2004 - Sreenivas Bagalkote <sreenib@lsil.com>

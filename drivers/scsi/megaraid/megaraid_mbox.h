@@ -21,8 +21,8 @@
 #include "megaraid_ioctl.h"
 
 
-#define MEGARAID_VERSION	"2.20.4.1"
-#define MEGARAID_EXT_VERSION	"(Release Date: Thu Nov  4 17:44:59 EST 2004)"
+#define MEGARAID_VERSION	"2.20.4.5"
+#define MEGARAID_EXT_VERSION	"(Release Date: Thu Feb 03 12:27:22 EST 2005)"
 
 
 /*
@@ -137,6 +137,9 @@
 #define PCI_SUBSYS_ID_PERC3_DC				0x0493
 #define PCI_SUBSYS_ID_PERC3_SC				0x0475
 
+#define PCI_DEVICE_ID_MEGARAID_NEC_ROMB_2E		0x0408
+#define PCI_SUBSYS_ID_MEGARAID_NEC_ROMB_2E		0x8287
+
 #ifndef PCI_SUBSYS_ID_FSC
 #define PCI_SUBSYS_ID_FSC				0x1734
 #endif
@@ -216,6 +219,14 @@ typedef struct {
  * @param hw_error		: set if FW not responding
  * @param fast_load		: If set, skip physical device scanning
  * @channel_class		: channel class, RAID or SCSI
+ * @sysfs_sem			: semaphore to serialize access to sysfs res.
+ * @sysfs_uioc			: management packet to issue FW calls from sysfs
+ * @sysfs_mbox64		: mailbox packet to issue FW calls from sysfs
+ * @sysfs_buffer		: data buffer for FW commands issued from sysfs
+ * @sysfs_buffer_dma		: DMA buffer for FW commands issued from sysfs
+ * @sysfs_wait_q		: wait queue for sysfs operations
+ * @random_del_supported	: set if the random deletion is supported
+ * @curr_ldmap			: current LDID map
  *
  * Initialization structure for mailbox controllers: memory based and IO based
  * All the fields in this structure are LLD specific and may be discovered at
@@ -223,6 +234,7 @@ typedef struct {
  *
  * NOTE: The fields of this structures are placed to minimize cache misses
  */
+#define MAX_LD_EXTENDED64	64
 typedef struct {
 	mbox64_t			*una_mbox64;
 	dma_addr_t			una_mbox64_dma;
@@ -247,6 +259,14 @@ typedef struct {
 	int				hw_error;
 	int				fast_load;
 	uint8_t				channel_class;
+	struct semaphore		sysfs_sem;
+	uioc_t				*sysfs_uioc;
+	mbox64_t			*sysfs_mbox64;
+	caddr_t				sysfs_buffer;
+	dma_addr_t			sysfs_buffer_dma;
+	wait_queue_head_t		sysfs_wait_q;
+	int				random_del_supported;
+	uint16_t			curr_ldmap[MAX_LD_EXTENDED64];
 } mraid_device_t;
 
 // route to raid device from adapter

@@ -10,7 +10,7 @@
  *	   2 of the License, or (at your option) any later version.
  *
  * FILE		: megaraid_mbox.c
- * Version	: v2.20.4.1 (Nov 04 2004)
+ * Version	: v2.20.4.5 (Feb 03 2005)
  *
  * Authors:
  * 	Atul Mukker		<Atul.Mukker@lsil.com>
@@ -60,12 +60,11 @@
  * INTEL RAID Controller SROMBU42E	1000	0408	8086	3499
  * INTEL RAID Controller SRCU51L	1000	1960	8086	0520
  *
- *
  * FSC	MegaRAID PCI Express ROMB	1000	0408	1734	1065
- *
  *
  * ACER	MegaRAID ROMB-2E		1000	0408	1025	004D
  *
+ * NEC	MegaRAID PCI Express ROMB	1000	0408	1033	8287
  *
  * For history of changes, see Documentation/ChangeLog.megaraid
  */
@@ -90,6 +89,9 @@ static void megaraid_free_cmd_packets(adapter_t *);
 
 static int megaraid_mbox_setup_dma_pools(adapter_t *);
 static void megaraid_mbox_teardown_dma_pools(adapter_t *);
+
+static int megaraid_sysfs_alloc_resources(adapter_t *);
+static void megaraid_sysfs_free_resources(adapter_t *);
 
 static int megaraid_abort_handler(struct scsi_cmnd *);
 static int megaraid_reset_handler(struct scsi_cmnd *);
@@ -120,6 +122,9 @@ static void megaraid_mbox_prepare_epthru(adapter_t *, scb_t *,
 static irqreturn_t megaraid_isr(int, void *, struct pt_regs *);
 
 static void megaraid_mbox_dpc(unsigned long);
+
+static ssize_t megaraid_sysfs_show_app_hndl(struct class_device *, char *);
+static ssize_t megaraid_sysfs_show_ldnum(struct device *, char *);
 
 static int megaraid_cmm_register(adapter_t *);
 static int megaraid_cmm_unregister(adapter_t *);
@@ -197,7 +202,7 @@ MODULE_PARM_DESC(debug_level, "Debug level for driver (default=0)");
  * ### global data ###
  */
 static uint8_t megaraid_mbox_version[8] =
-	{ 0x02, 0x20, 0x04, 0x00, 9, 27, 20, 4 };
+	{ 0x02, 0x20, 0x04, 0x05, 2, 3, 20, 5 };
 
 
 /*
@@ -299,6 +304,12 @@ static struct pci_device_id pci_id_table_g[] =  {
 		PCI_DEVICE_ID_AMI_MEGARAID3,
 		PCI_VENDOR_ID_AMI,
 		PCI_SUBSYS_ID_PERC3_SC,
+	},
+	{
+		PCI_VENDOR_ID_AMI,
+		PCI_DEVICE_ID_AMI_MEGARAID3,
+		PCI_VENDOR_ID_AMI,
+		PCI_SUBSYS_ID_PERC3_DC,
 	},
 	{
 		PCI_VENDOR_ID_LSI_LOGIC,
@@ -438,6 +449,12 @@ static struct pci_device_id pci_id_table_g[] =  {
 		PCI_VENDOR_ID_AI,
 		PCI_SUBSYS_ID_MEGARAID_ACER_ROMB_2E,
 	},
+	{
+		PCI_VENDOR_ID_LSI_LOGIC,
+		PCI_DEVICE_ID_MEGARAID_NEC_ROMB_2E,
+		PCI_VENDOR_ID_NEC,
+		PCI_SUBSYS_ID_MEGARAID_NEC_ROMB_2E,
+	},
 	{0}	/* Terminating entry */
 };
 MODULE_DEVICE_TABLE(pci, pci_id_table_g);
@@ -454,6 +471,29 @@ static struct pci_driver megaraid_pci_driver_g = {
 };
 
 
+
+// definitions for the device attributes for exporting logical drive number
+// for a scsi address (Host, Channel, Id, Lun)
+
+CLASS_DEVICE_ATTR(megaraid_mbox_app_hndl, S_IRUSR, megaraid_sysfs_show_app_hndl,
+		NULL);
+
+// Host template initializer for megaraid mbox sysfs device attributes
+static struct class_device_attribute *megaraid_shost_attrs[] = {
+	&class_device_attr_megaraid_mbox_app_hndl,
+	NULL,
+};
+
+
+DEVICE_ATTR(megaraid_mbox_ld, S_IRUSR, megaraid_sysfs_show_ldnum, NULL);
+
+// Host template initializer for megaraid mbox sysfs device attributes
+static struct device_attribute *megaraid_sdev_attrs[] = {
+	&dev_attr_megaraid_mbox_ld,
+	NULL,
+};
+
+
 /*
  * Scsi host template for megaraid unified driver
  */
@@ -467,6 +507,8 @@ static struct scsi_host_template megaraid_template_g = {
 	.eh_bus_reset_handler		= megaraid_reset_handler,
 	.eh_host_reset_handler		= megaraid_reset_handler,
 	.use_clustering			= ENABLE_CLUSTERING,
+	.sdev_attrs			= megaraid_sdev_attrs,
+	.shost_attrs			= megaraid_shost_attrs,
 };
 
 
@@ -953,6 +995,8 @@ megaraid_init_mbox(adapter_t *adapter)
 		}
 		adapter->device_ids[adapter->max_channel][adapter->init_id] =
 			0xFF;
+
+		raid_dev->random_del_supported = 1;
 	}
 
 	/*
@@ -977,6 +1021,14 @@ megaraid_init_mbox(adapter_t *adapter)
 	 */
 	adapter->cmd_per_lun = megaraid_cmd_per_lun;
 
+	/*
+	 * Allocate resources required to issue FW calls, when sysfs is
+	 * accessed
+	 */
+	if (megaraid_sysfs_alloc_resources(adapter) != 0) {
+		goto out_alloc_cmds;
+	}
+
 	// Set the DMA mask to 64-bit. All supported controllers as capable of
 	// DMA in this range
 	if (pci_set_dma_mask(adapter->pdev, 0xFFFFFFFFFFFFFFFFULL) != 0) {
@@ -984,7 +1036,7 @@ megaraid_init_mbox(adapter_t *adapter)
 		con_log(CL_ANN, (KERN_WARNING
 			"megaraid: could not set DMA mask for 64-bit.\n"));
 
-		goto out_alloc_cmds;
+		goto out_free_sysfs_res;
 	}
 
 	// setup tasklet for DPC
@@ -996,6 +1048,8 @@ megaraid_init_mbox(adapter_t *adapter)
 
 	return 0;
 
+out_free_sysfs_res:
+	megaraid_sysfs_free_resources(adapter);
 out_alloc_cmds:
 	megaraid_free_cmd_packets(adapter);
 out_free_irq:
@@ -1024,6 +1078,8 @@ megaraid_fini_mbox(adapter_t *adapter)
 	megaraid_mbox_flush_cache(adapter);
 
 	tasklet_kill(&adapter->dpc_h);
+
+	megaraid_sysfs_free_resources(adapter);
 
 	megaraid_free_cmd_packets(adapter);
 
@@ -1559,12 +1615,14 @@ mbox_post_cmd(adapter_t *adapter, scb_t *scb)
 
 	if (scb->dma_direction == PCI_DMA_TODEVICE) {
 		if (!scb->scp->use_sg) {	// sg list not used
-			pci_dma_sync_single_for_device(adapter->pdev, ccb->buf_dma_h,
+			pci_dma_sync_single_for_device(adapter->pdev,
+					ccb->buf_dma_h,
 					scb->scp->request_bufflen,
 					PCI_DMA_TODEVICE);
 		}
 		else {
-			pci_dma_sync_sg_for_device(adapter->pdev, scb->scp->request_buffer,
+			pci_dma_sync_sg_for_device(adapter->pdev,
+				scb->scp->request_buffer,
 				scb->scp->use_sg, PCI_DMA_TODEVICE);
 		}
 	}
@@ -2107,7 +2165,8 @@ megaraid_mbox_prepare_pthru(adapter_t *adapter, scb_t *scb,
 	channel	= scb->dev_channel;
 	target	= scb->dev_target;
 
-	pthru->timeout		= 1;	// 0=6sec, 1=60sec, 2=10min, 3=3hrs
+	// 0=6sec, 1=60sec, 2=10min, 3=3hrs, 4=NO timeout
+	pthru->timeout		= 4;	
 	pthru->ars		= 1;
 	pthru->islogical	= 0;
 	pthru->channel		= 0;
@@ -2155,7 +2214,8 @@ megaraid_mbox_prepare_epthru(adapter_t *adapter, scb_t *scb,
 	channel	= scb->dev_channel;
 	target	= scb->dev_target;
 
-	epthru->timeout		= 1;	// 0=6sec, 1=60sec, 2=10min, 3=3hrs
+	// 0=6sec, 1=60sec, 2=10min, 3=3hrs, 4=NO timeout
+	epthru->timeout		= 4;	
 	epthru->ars		= 1;
 	epthru->islogical	= 0;
 	epthru->channel		= 0;
@@ -3306,7 +3366,7 @@ megaraid_mbox_support_random_del(adapter_t *adapter)
 	memset((caddr_t)raw_mbox, 0, sizeof(mbox_t));
 
 	raw_mbox[0] = FC_DEL_LOGDRV;
-	raw_mbox[0] = OP_SUP_DEL_LOGDRV;
+	raw_mbox[2] = OP_SUP_DEL_LOGDRV;
 
 	// Issue the command
 	rval = 0;
@@ -3719,8 +3779,9 @@ megaraid_mbox_mm_command(adapter_t *adapter, uioc_t *kioc)
 
 	spin_unlock_irqrestore(USER_FREE_LIST_LOCK(adapter), flags);
 
-	scb->state	= SCB_ACTIVE;
-	scb->dma_type	= MRAID_DMA_NONE;
+	scb->state		= SCB_ACTIVE;
+	scb->dma_type		= MRAID_DMA_NONE;
+	scb->dma_direction	= PCI_DMA_NONE;
 
 	ccb		= (mbox_ccb_t *)scb->ccb;
 	mbox64		= (mbox64_t *)(unsigned long)kioc->cmdbuf;
@@ -3886,6 +3947,324 @@ gather_hbainfo(adapter_t *adapter, mraid_hba_info_t *hinfo)
 /*
  * END: Interface for the common management module
  */
+
+
+
+/**
+ * megaraid_sysfs_alloc_resources - allocate sysfs related resources
+ *
+ * Allocate packets required to issue FW calls whenever the sysfs attributes
+ * are read. These attributes would require up-to-date information from the
+ * FW. Also set up resources for mutual exclusion to share these resources and
+ * the wait queue.
+ *
+ * @param adapter : controller's soft state
+ *
+ * @return 0 on success
+ * @return -ERROR_CODE on failure
+ */
+static int
+megaraid_sysfs_alloc_resources(adapter_t *adapter)
+{
+	mraid_device_t	*raid_dev = ADAP2RAIDDEV(adapter);
+	int		rval = 0;
+
+	raid_dev->sysfs_uioc = kmalloc(sizeof(uioc_t), GFP_KERNEL);
+
+	raid_dev->sysfs_mbox64 = kmalloc(sizeof(mbox64_t), GFP_KERNEL);
+
+	raid_dev->sysfs_buffer = pci_alloc_consistent(adapter->pdev,
+			PAGE_SIZE, &raid_dev->sysfs_buffer_dma);
+
+	if (!raid_dev->sysfs_uioc || !raid_dev->sysfs_mbox64 ||
+		!raid_dev->sysfs_buffer) {
+
+		con_log(CL_ANN, (KERN_WARNING
+			"megaraid: out of memory, %s %d\n", __FUNCTION__,
+			__LINE__));
+
+		rval = -ENOMEM;
+
+		megaraid_sysfs_free_resources(adapter);
+	}
+
+	sema_init(&raid_dev->sysfs_sem, 1);
+
+	init_waitqueue_head(&raid_dev->sysfs_wait_q);
+
+	return rval;
+}
+
+
+/**
+ * megaraid_sysfs_free_resources - free sysfs related resources
+ *
+ * Free packets allocated for sysfs FW commands
+ *
+ * @param adapter : controller's soft state
+ */
+static void
+megaraid_sysfs_free_resources(adapter_t *adapter)
+{
+	mraid_device_t	*raid_dev = ADAP2RAIDDEV(adapter);
+
+	if (raid_dev->sysfs_uioc) kfree(raid_dev->sysfs_uioc);
+
+	if (raid_dev->sysfs_mbox64) kfree(raid_dev->sysfs_mbox64);
+
+	if (raid_dev->sysfs_buffer) {
+		pci_free_consistent(adapter->pdev, PAGE_SIZE,
+			raid_dev->sysfs_buffer, raid_dev->sysfs_buffer_dma);
+	}
+}
+
+
+/**
+ * megaraid_sysfs_get_ldmap_done - callback for get ldmap
+ *
+ * Callback routine called in the ISR/tasklet context for get ldmap call
+ *
+ * @param uioc : completed packet
+ */
+static void
+megaraid_sysfs_get_ldmap_done(uioc_t *uioc)
+{
+	adapter_t	*adapter = (adapter_t *)uioc->buf_vaddr;
+	mraid_device_t	*raid_dev = ADAP2RAIDDEV(adapter);
+
+	uioc->status = 0;
+
+	wake_up(&raid_dev->sysfs_wait_q);
+}
+
+
+/**
+ * megaraid_sysfs_get_ldmap_timeout - timeout handling for get ldmap
+ *
+ * Timeout routine to recover and return to application, in case the adapter
+ * has stopped responding. A timeout of 60 seconds for this command seem like
+ * a good value
+ *
+ * @param uioc : timed out packet
+ */
+static void
+megaraid_sysfs_get_ldmap_timeout(unsigned long data)
+{
+	uioc_t		*uioc = (uioc_t *)data;
+	adapter_t	*adapter = (adapter_t *)uioc->buf_vaddr;
+	mraid_device_t	*raid_dev = ADAP2RAIDDEV(adapter);
+
+	uioc->status = -ETIME;
+
+	wake_up(&raid_dev->sysfs_wait_q);
+}
+
+
+/**
+ * megaraid_sysfs_get_ldmap - get update logical drive map
+ *
+ * This routine will be called whenever user reads the logical drive
+ * attributes, go get the current logical drive mapping table from the
+ * firmware. We use the managment API's to issue commands to the controller.
+ *
+ * NOTE: The commands issuance functionality is not generalized and
+ * implemented in context of "get ld map" command only. If required, the
+ * command issuance logical can be trivially pulled out and implemented as a
+ * standalone libary. For now, this should suffice since there is no other
+ * user of this interface.
+ *
+ * @param adapter : controller's soft state
+ *
+ * @return 0 on success
+ * @return -1 on failure
+ */
+static int
+megaraid_sysfs_get_ldmap(adapter_t *adapter)
+{
+	mraid_device_t		*raid_dev = ADAP2RAIDDEV(adapter);
+	uioc_t			*uioc;
+	mbox64_t		*mbox64;
+	mbox_t			*mbox;
+	char			*raw_mbox;
+	struct timer_list	sysfs_timer;
+	struct timer_list	*timerp;
+	caddr_t			ldmap;
+	int			rval = 0;
+
+	/*
+	 * Allow only one read at a time to go through the sysfs attributes
+	 */
+	down(&raid_dev->sysfs_sem);
+
+	uioc	= raid_dev->sysfs_uioc;
+	mbox64	= raid_dev->sysfs_mbox64;
+	ldmap	= raid_dev->sysfs_buffer;
+
+	memset(uioc, sizeof(uioc_t), 0);
+	memset(mbox64, sizeof(mbox64_t), 0);
+	memset(ldmap, sizeof(raid_dev->curr_ldmap), 0);
+
+	mbox		= &mbox64->mbox32;
+	raw_mbox	= (char *)mbox;
+	uioc->cmdbuf    = (uint64_t)(unsigned long)mbox64;
+	uioc->buf_vaddr	= (caddr_t)adapter;
+	uioc->status	= -ENODATA;
+	uioc->done	= megaraid_sysfs_get_ldmap_done;
+
+	/*
+	 * Prepare the mailbox packet to get the current logical drive mapping
+	 * table
+	 */
+	mbox->xferaddr = (uint32_t)raid_dev->sysfs_buffer_dma;
+
+	raw_mbox[0] = FC_DEL_LOGDRV;
+	raw_mbox[2] = OP_GET_LDID_MAP;
+
+	/*
+	 * Setup a timer to recover from a non-responding controller
+	 */
+	timerp	= &sysfs_timer;
+	init_timer(timerp);
+
+	timerp->function	= megaraid_sysfs_get_ldmap_timeout;
+	timerp->data		= (unsigned long)uioc;
+	timerp->expires		= jiffies + 60 * HZ;
+
+	add_timer(timerp);
+
+	/*
+	 * Send the command to the firmware
+	 */
+	rval = megaraid_mbox_mm_command(adapter, uioc);
+
+	if (rval == 0) {	// command successfully issued
+		wait_event(raid_dev->sysfs_wait_q, (uioc->status != -ENODATA));
+
+		/*
+		 * Check if the command timed out
+		 */
+		if (uioc->status == -ETIME) {
+			con_log(CL_ANN, (KERN_NOTICE
+				"megaraid: sysfs get ld map timed out\n"));
+
+			rval = -ETIME;
+		}
+		else {
+			rval = mbox->status;
+		}
+
+		if (rval == 0) {
+			memcpy(raid_dev->curr_ldmap, ldmap,
+				sizeof(raid_dev->curr_ldmap));
+		}
+		else {
+			con_log(CL_ANN, (KERN_NOTICE
+				"megaraid: get ld map failed with %x\n", rval));
+		}
+	}
+	else {
+		con_log(CL_ANN, (KERN_NOTICE
+			"megaraid: could not issue ldmap command:%x\n", rval));
+	}
+
+
+	del_timer_sync(timerp);
+
+	up(&raid_dev->sysfs_sem);
+
+	return rval;
+}
+
+
+/**
+ * megaraid_sysfs_show_app_hndl - display application handle for this adapter
+ *
+ * Display the handle used by the applications while executing management
+ * tasks on the adapter. We invoke a management module API to get the adapter
+ * handle, since we do not interface with applications directly.
+ *
+ * @param cdev	: class device object representation for the host
+ * @param buf	: buffer to send data to
+ */
+static ssize_t
+megaraid_sysfs_show_app_hndl(struct class_device *cdev, char *buf)
+{
+	struct Scsi_Host *shost = class_to_shost(cdev);
+	adapter_t	*adapter = (adapter_t *)SCSIHOST2ADAP(shost);
+	uint32_t	app_hndl;
+
+	app_hndl = mraid_mm_adapter_app_handle(adapter->unique_id);
+
+	return snprintf(buf, 8, "%u\n", app_hndl);
+}
+
+
+/**
+ * megaraid_sysfs_show_ldnum - display the logical drive number for this device
+ *
+ * Display the logical drive number for the device in question, if it a valid
+ * logical drive. For physical devices, "-1" is returned
+ * The logical drive number is displayed in following format
+ *
+ * <SCSI ID> <LD NUM> <LD STICKY ID> <APP ADAPTER HANDLE>
+ *   <int>     <int>       <int>            <int>
+ *
+ * @param dev	: device object representation for the scsi device
+ * @param buf	: buffer to send data to
+ */
+static ssize_t
+megaraid_sysfs_show_ldnum(struct device *dev, char *buf)
+{
+	struct scsi_device *sdev = to_scsi_device(dev);
+	adapter_t	*adapter = (adapter_t *)SCSIHOST2ADAP(sdev->host);
+	mraid_device_t	*raid_dev = ADAP2RAIDDEV(adapter);
+	int		scsi_id = -1;
+	int		logical_drv = -1;
+	int		ldid_map = -1;
+	uint32_t	app_hndl = 0;
+	int		mapped_sdev_id;
+	int		rval;
+	int		i;
+
+	if (raid_dev->random_del_supported &&
+			MRAID_IS_LOGICAL_SDEV(adapter, sdev)) {
+
+		rval = megaraid_sysfs_get_ldmap(adapter);
+		if (rval == 0) {
+
+			for (i = 0; i < MAX_LOGICAL_DRIVES_40LD; i++) {
+
+				mapped_sdev_id = sdev->id;
+
+				if (sdev->id > adapter->init_id) {
+					mapped_sdev_id -= 1;
+				}
+
+				if (raid_dev->curr_ldmap[i] == mapped_sdev_id) {
+
+					scsi_id = sdev->id;
+
+					logical_drv = i;
+
+					ldid_map = raid_dev->curr_ldmap[i];
+
+					app_hndl = mraid_mm_adapter_app_handle(
+							adapter->unique_id);
+
+					break;
+				}
+			}
+		}
+		else {
+			con_log(CL_ANN, (KERN_NOTICE
+				"megaraid: sysfs get ld map failed: %x\n",
+				rval));
+		}
+	}
+
+	return snprintf(buf, 36, "%d %d %d %d\n", scsi_id, logical_drv,
+			ldid_map, app_hndl);
+}
 
 
 /*
