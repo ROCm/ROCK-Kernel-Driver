@@ -167,6 +167,36 @@ static struct platform_device sa11x0udc_device = {
 	.resource	= sa11x0udc_resources,
 };
 
+static struct resource sa11x0uart1_resources[] = {
+	[0] = {
+		.start	= 0x80010000,
+		.end	= 0x8001ffff,
+		.flags	= IORESOURCE_MEM,
+	},
+};
+
+static struct platform_device sa11x0uart1_device = {
+	.name		= "sa11x0-uart",
+	.id		= 1,
+	.num_resources	= ARRAY_SIZE(sa11x0uart1_resources),
+	.resource	= sa11x0uart1_resources,
+};
+
+static struct resource sa11x0uart3_resources[] = {
+	[0] = {
+		.start	= 0x80050000,
+		.end	= 0x8005ffff,
+		.flags	= IORESOURCE_MEM,
+	},
+};
+
+static struct platform_device sa11x0uart3_device = {
+	.name		= "sa11x0-uart",
+	.id		= 3,
+	.num_resources	= ARRAY_SIZE(sa11x0uart3_resources),
+	.resource	= sa11x0uart3_resources,
+};
+
 static struct resource sa11x0mcp_resources[] = {
 	[0] = {
 		.start	= 0x80060000,
@@ -234,6 +264,8 @@ static struct platform_device sa11x0pcmcia_device = {
 
 static struct platform_device *sa11x0_devices[] __initdata = {
 	&sa11x0udc_device,
+	&sa11x0uart1_device,
+	&sa11x0uart3_device,
 	&sa11x0mcp_device,
 	&sa11x0ssp_device,
 	&sa11x0pcmcia_device,
