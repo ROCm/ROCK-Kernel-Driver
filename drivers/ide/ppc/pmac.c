@@ -1560,56 +1560,6 @@ pmac_ide_probe(void)
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC
 
 /*
- * We build & map the sglist for a given request.
- */
-static int __pmac
-pmac_ide_build_sglist(ide_drive_t *drive, struct request *rq)
-{
-	ide_hwif_t *hwif = HWIF(drive);
-	struct scatterlist *sg = hwif->sg_table;
-	int nents;
-
-	nents = blk_rq_map_sg(drive->queue, rq, sg);
-		
-	if (rq_data_dir(rq) == READ)
-		hwif->sg_dma_direction = PCI_DMA_FROMDEVICE;
-	else
-		hwif->sg_dma_direction = PCI_DMA_TODEVICE;
-
-	return pci_map_sg(hwif->pci_dev, sg, nents, hwif->sg_dma_direction);
-}
-
-/*
- * Same as above but for a "raw" taskfile request
- */
-static int __pmac
-pmac_ide_raw_build_sglist(ide_drive_t *drive, struct request *rq)
-{
-	ide_hwif_t *hwif = HWIF(drive);
-	struct scatterlist *sg = hwif->sg_table;
-	int nents = 0;
-	ide_task_t *args = rq->special;
-	unsigned char *virt_addr = rq->buffer;
-	int sector_count = rq->nr_sectors;
-
-	if (args->command_type == IDE_DRIVE_TASK_RAW_WRITE)
-		hwif->sg_dma_direction = PCI_DMA_TODEVICE;
-	else
-		hwif->sg_dma_direction = PCI_DMA_FROMDEVICE;
-
-	if (sector_count > 128) {
-		sg_init_one(&sg[nents], virt_addr, 128 * SECTOR_SIZE);
-		nents++;
-		virt_addr = virt_addr + (128 * SECTOR_SIZE);
-		sector_count -= 128;
-	}
-	sg_init_one(&sg[nents], virt_addr, sector_count * SECTOR_SIZE);
-	nents++;
-
-	return pci_map_sg(hwif->pci_dev, sg, nents, hwif->sg_dma_direction);
-}
-
-/*
  * pmac_ide_build_dmatable builds the DBDMA command list
  * for a transfer and sets the DBDMA channel to point to it.
  */
@@ -1634,9 +1584,9 @@ pmac_ide_build_dmatable(ide_drive_t *drive, struct request *rq)
 
 	/* Build sglist */
 	if (HWGROUP(drive)->rq->flags & REQ_DRIVE_TASKFILE)
-		hwif->sg_nents = i = pmac_ide_raw_build_sglist(drive, rq);
+		hwif->sg_nents = i = ide_raw_build_sglist(drive, rq);
 	else
-		hwif->sg_nents = i = pmac_ide_build_sglist(drive, rq);
+		hwif->sg_nents = i = ide_build_sglist(drive, rq);
 	if (!i)
 		return 0;
 
