@@ -47,6 +47,7 @@ union palette {
 };
 
 struct acornfb_par {
+	struct device	*dev;
 	unsigned long	screen_end;
 	unsigned int	dram_size;
 	unsigned int	vram_half_sam;

@@ -601,11 +601,7 @@ source "arch/arm/oprofile/Kconfig"
 
 source "drivers/video/Kconfig"
 
-if ARCH_ACORN || ARCH_CLPS7500 || ARCH_TBOX || ARCH_SHARK || ARCH_SA1100 || PCI
-
 source "sound/Kconfig"
-
-endif
 
 source "drivers/misc/Kconfig"
 

@@ -1167,7 +1167,7 @@ static int swap_show(struct seq_file *swap, void *v)
 
 	file = ptr->swap_file;
 	len = seq_path(swap, file->f_vfsmnt, file->f_dentry, " \t\n\\");
-	seq_printf(swap, "%*s %s\t%d\t%ld\t%d\n",
+	seq_printf(swap, "%*s%s\t%d\t%ld\t%d\n",
 		       len < 40 ? 40 - len : 1, " ",
 		       S_ISBLK(file->f_dentry->d_inode->i_mode) ?
 				"partition" : "file\t",

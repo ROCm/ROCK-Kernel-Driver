@@ -60,6 +60,7 @@
 #include <linux/vfs.h>
 #include <linux/ptrace.h>
 #include <linux/highuid.h>
+#include <linux/vmalloc.h>
 #include <asm/mman.h>
 #include <asm/types.h>
 #include <asm/uaccess.h>
