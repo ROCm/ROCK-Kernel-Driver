@@ -400,23 +400,30 @@ void flush_thread(void)
 	}
 }
 
-static __inline__ struct sparc_stackf *
-clone_stackframe(struct sparc_stackf *dst, struct sparc_stackf *src)
+static __inline__ struct sparc_stackf __user *
+clone_stackframe(struct sparc_stackf __user *dst,
+		 struct sparc_stackf __user *src)
 {
-	unsigned long size;
-	struct sparc_stackf *sp;
+	unsigned long size, fp;
+	struct sparc_stackf *tmp;
+	struct sparc_stackf __user *sp;
 
-	size = ((unsigned long)src->fp) - ((unsigned long)src);
-	sp = (struct sparc_stackf *)(((unsigned long)dst) - size); 
+	if (get_user(tmp, &src->fp))
+		return NULL;
+
+	fp = (unsigned long) tmp;
+	size = (fp - ((unsigned long) src));
+	fp = (unsigned long) dst;
+	sp = (struct sparc_stackf __user *)(fp - size); 
 
 	/* do_fork() grabs the parent semaphore, we must release it
 	 * temporarily so we can build the child clone stack frame
 	 * without deadlocking.
 	 */
-	if (copy_to_user(sp, src, size))
-		sp = (struct sparc_stackf *) 0;
-	else if (put_user(dst, &sp->fp))
-		sp = (struct sparc_stackf *) 0;
+	if (__copy_user(sp, src, size))
+		sp = NULL;
+	else if (put_user(fp, &sp->fp))
+		sp = NULL;
 
 	return sp;
 }
@@ -435,8 +442,8 @@ asmlinkage int sparc_do_fork(unsigned long clone_flags,
 
 	return do_fork(clone_flags, stack_start,
 		       regs, stack_size,
-		       (int *) parent_tid_ptr,
-		       (int *) child_tid_ptr);
+		       (int __user *) parent_tid_ptr,
+		       (int __user *) child_tid_ptr);
 }
 
 /* Copy a Sparc thread.  The fork() return value conventions
@@ -519,15 +526,17 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 		p->thread.current_ds = USER_DS;
 
 		if (sp != regs->u_regs[UREG_FP]) {
-			struct sparc_stackf *childstack;
-			struct sparc_stackf *parentstack;
+			struct sparc_stackf __user *childstack;
+			struct sparc_stackf __user *parentstack;
 
 			/*
 			 * This is a clone() call with supplied user stack.
 			 * Set some valid stack frames to give to the child.
 			 */
-			childstack = (struct sparc_stackf *) (sp & ~0x7UL);
-			parentstack = (struct sparc_stackf *) regs->u_regs[UREG_FP];
+			childstack = (struct sparc_stackf __user *)
+				(sp & ~0x7UL);
+			parentstack = (struct sparc_stackf __user *)
+				regs->u_regs[UREG_FP];
 
 #if 0
 			printk("clone: parent stack:\n");
@@ -654,12 +663,14 @@ asmlinkage int sparc_execve(struct pt_regs *regs)
 	if(regs->u_regs[UREG_G1] == 0)
 		base = 1;
 
-	filename = getname((char *)regs->u_regs[base + UREG_I0]);
+	filename = getname((char __user *)regs->u_regs[base + UREG_I0]);
 	error = PTR_ERR(filename);
 	if(IS_ERR(filename))
 		goto out;
-	error = do_execve(filename, (char **) regs->u_regs[base + UREG_I1],
-			  (char **) regs->u_regs[base + UREG_I2], regs);
+	error = do_execve(filename,
+			  (char __user * __user *)regs->u_regs[base + UREG_I1],
+			  (char __user * __user *)regs->u_regs[base + UREG_I2],
+			  regs);
 	putname(filename);
 	if (error == 0)
 		current->ptrace &= ~PT_DTRACE;
@@ -679,25 +690,25 @@ pid_t kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 {
 	long retval;
 
-	__asm__ __volatile("mov %4, %%g2\n\t"    /* Set aside fn ptr... */
-			   "mov %5, %%g3\n\t"    /* and arg. */
-			   "mov %1, %%g1\n\t"
-			   "mov %2, %%o0\n\t"    /* Clone flags. */
-			   "mov 0, %%o1\n\t"     /* usp arg == 0 */
-			   "t 0x10\n\t"          /* Linux/Sparc clone(). */
-			   "cmp %%o1, 0\n\t"
-			   "be 1f\n\t"           /* The parent, just return. */
-			   " nop\n\t"            /* Delay slot. */
-			   "jmpl %%g2, %%o7\n\t" /* Call the function. */
-			   " mov %%g3, %%o0\n\t" /* Get back the arg in delay. */
-			   "mov %3, %%g1\n\t"
-			   "t 0x10\n\t"          /* Linux/Sparc exit(). */
-			   /* Notreached by child. */
-			   "1: mov %%o0, %0\n\t" :
-			   "=r" (retval) :
-			   "i" (__NR_clone), "r" (flags | CLONE_VM | CLONE_UNTRACED),
-			   "i" (__NR_exit),  "r" (fn), "r" (arg) :
-			   "g1", "g2", "g3", "o0", "o1", "memory", "cc");
+	__asm__ __volatile__("mov %4, %%g2\n\t"    /* Set aside fn ptr... */
+			     "mov %5, %%g3\n\t"    /* and arg. */
+			     "mov %1, %%g1\n\t"
+			     "mov %2, %%o0\n\t"    /* Clone flags. */
+			     "mov 0, %%o1\n\t"     /* usp arg == 0 */
+			     "t 0x10\n\t"          /* Linux/Sparc clone(). */
+			     "cmp %%o1, 0\n\t"
+			     "be 1f\n\t"           /* The parent, just return. */
+			     " nop\n\t"            /* Delay slot. */
+			     "jmpl %%g2, %%o7\n\t" /* Call the function. */
+			     " mov %%g3, %%o0\n\t" /* Get back the arg in delay. */
+			     "mov %3, %%g1\n\t"
+			     "t 0x10\n\t"          /* Linux/Sparc exit(). */
+			     /* Notreached by child. */
+			     "1: mov %%o0, %0\n\t" :
+			     "=r" (retval) :
+			     "i" (__NR_clone), "r" (flags | CLONE_VM | CLONE_UNTRACED),
+			     "i" (__NR_exit),  "r" (fn), "r" (arg) :
+			     "g1", "g2", "g3", "o0", "o1", "memory", "cc");
 	return retval;
 }
 
