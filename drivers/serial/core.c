@@ -2472,6 +2472,8 @@ EXPORT_SYMBOL(uart_register_driver);
 EXPORT_SYMBOL(uart_unregister_driver);
 EXPORT_SYMBOL(uart_register_port);
 EXPORT_SYMBOL(uart_unregister_port);
+EXPORT_SYMBOL(uart_add_one_port);
+EXPORT_SYMBOL(uart_remove_one_port);
 
 MODULE_DESCRIPTION("Serial driver core");
 MODULE_LICENSE("GPL");
