@@ -19,7 +19,6 @@
 #include <linux/ioport.h>
 #include <linux/tty.h>
 #include <net/snmp.h>
-#include <net/dst.h>
 #include <net/checksum.h>
 #include <linux/etherdevice.h>
 #include <net/route.h>
@@ -64,11 +63,6 @@ extern void destroy_8023_client(struct datalink_proto *);
 
 EXPORT_SYMBOL(sk_run_filter);
 EXPORT_SYMBOL(sk_chk_filter);
-
-/*	dst_entry	*/
-EXPORT_SYMBOL(dst_alloc);
-EXPORT_SYMBOL(__dst_free);
-EXPORT_SYMBOL(dst_destroy);
 
 /* Needed by unix.o */
 EXPORT_SYMBOL(files_stat);
