@@ -1319,7 +1319,6 @@ static int htb_dump(struct Qdisc *sch, struct sk_buff *skb)
 	struct rtattr *rta;
 	struct tc_htb_glob gopt;
 	HTB_DBG(0,1,"htb_dump sch=%p, handle=%X\n",sch,sch->handle);
-	/* stats */
 	HTB_QLOCK(sch);
 	gopt.direct_pkts = q->direct_pkts;
 
@@ -1359,10 +1358,8 @@ static int htb_dump_class(struct Qdisc *sch, unsigned long arg,
 	HTB_QLOCK(sch);
 	tcm->tcm_parent = cl->parent ? cl->parent->classid : TC_H_ROOT;
 	tcm->tcm_handle = cl->classid;
-	if (!cl->level && cl->un.leaf.q) {
+	if (!cl->level && cl->un.leaf.q)
 		tcm->tcm_info = cl->un.leaf.q->handle;
-		cl->stats.qlen = cl->un.leaf.q->q.qlen;
-	}
 
 	rta = (struct rtattr*)b;
 	RTA_PUT(skb, TCA_OPTIONS, 0, NULL);
@@ -1375,22 +1372,36 @@ static int htb_dump_class(struct Qdisc *sch, unsigned long arg,
 	opt.level = cl->level; 
 	RTA_PUT(skb, TCA_HTB_PARMS, sizeof(opt), &opt);
 	rta->rta_len = skb->tail - b;
-
-#ifdef HTB_RATECM
-	cl->stats.bps = cl->rate_bytes/(HTB_EWMAC*HTB_HSIZE);
-	cl->stats.pps = cl->rate_packets/(HTB_EWMAC*HTB_HSIZE);
-#endif
-
-	cl->xstats.tokens = cl->tokens;
-	cl->xstats.ctokens = cl->ctokens;
-	RTA_PUT(skb, TCA_STATS, sizeof(cl->stats), &cl->stats);
-	RTA_PUT(skb, TCA_XSTATS, sizeof(cl->xstats), &cl->xstats);
 	HTB_QUNLOCK(sch);
 	return skb->len;
 rtattr_failure:
 	HTB_QUNLOCK(sch);
 	skb_trim(skb, b - skb->data);
 	return -1;
+}
+
+static int
+htb_dump_class_stats(struct Qdisc *sch, unsigned long arg,
+	struct gnet_dump *d)
+{
+	struct htb_class *cl = (struct htb_class*)arg;
+
+#ifdef HTB_RATECM
+	cl->rate_est.bps = cl->rate_bytes/(HTB_EWMAC*HTB_HSIZE);
+	cl->rate_est.pps = cl->rate_packets/(HTB_EWMAC*HTB_HSIZE);
+#endif
+
+	if (!cl->level && cl->un.leaf.q)
+		cl->qstats.qlen = cl->un.leaf.q->q.qlen;
+	cl->xstats.tokens = cl->tokens;
+	cl->xstats.ctokens = cl->ctokens;
+
+	if (gnet_stats_copy_basic(d, &cl->bstats) < 0 ||
+	    gnet_stats_copy_rate_est(d, &cl->rate_est) < 0 ||
+	    gnet_stats_copy_queue(d, &cl->qstats) < 0)
+		return -1;
+
+	return gnet_stats_copy_app(d, &cl->xstats, sizeof(cl->xstats));
 }
 
 static int htb_graft(struct Qdisc *sch, unsigned long arg, struct Qdisc *new,
@@ -1747,6 +1758,7 @@ static struct Qdisc_class_ops htb_class_ops = {
 	.bind_tcf	=	htb_bind_filter,
 	.unbind_tcf	=	htb_unbind_filter,
 	.dump		=	htb_dump_class,
+	.dump_stats	=	htb_dump_class_stats,
 };
 
 static struct Qdisc_ops htb_qdisc_ops = {
