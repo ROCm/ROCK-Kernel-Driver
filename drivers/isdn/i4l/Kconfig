@@ -1,9 +1,29 @@
 #
 # Old ISDN4Linux config
 #
+
+config ISDN_NET_SIMPLE
+	bool '  Support raw-IP and other simple protocols'
+	depends on INET
+	help
+	  This options enables 'raw IP over ISDN', 'ethernet over ISDN',
+	  'raw IP with UI header' and 'IP + type field' encapsulations.
+	  
+	  If you never heard of any of those, you probably want to say N.
+
+config ISDN_NET_CISCO
+	bool '  Support CISCO router protocols'
+	depends on INET
+	help
+	  This options enables 'CISCO HDLC' encapsulation with
+	  optional support for CISCO keep-alive frames.
+	  
+	  Unless you want to connect to a Cisco Router in HDLC mode,
+	  you probably want to say N.
+
 config ISDN_PPP
 	bool "Support synchronous PPP"
-	depends on ISDN && INET
+	depends on INET
 	help
 	  Over digital connections such as ISDN, there is no need to
 	  synchronize sender and recipient's clocks with start and stop bits
@@ -32,7 +52,7 @@ config ISDN_MPP
 
 config ISDN_PPP_BSDCOMP
 	tristate "Support BSD compression"
-	depends on ISDN_PPP && ISDN
+	depends on ISDN_PPP
 	help
 	  Support for the BSD-Compress compression method for PPP, which uses
 	  the LZW compression method to compress each PPP packet before it is
@@ -43,7 +63,6 @@ config ISDN_PPP_BSDCOMP
 
 config ISDN_AUDIO
 	bool "Support audio via ISDN"
-	depends on ISDN
 	help
 	  If you say Y here, the modem-emulator will support a subset of the
 	  EIA Class 8 Voice commands. Using a getty with voice-support
@@ -66,7 +85,7 @@ config ISDN_TTY_FAX
 
 config ISDN_X25
 	bool "X.25 PLP on top of ISDN"
-	depends on ISDN && X25
+	depends on X25
 	help
 	  This feature provides the X.25 protocol over ISDN connections.
 	  See <file:Documentation/isdn/README.x25> for more information
@@ -74,11 +93,10 @@ config ISDN_X25
 
 
 menu "ISDN feature submodules"
-	depends on ISDN!=n
+	depends on ISDN
 
 config ISDN_DRV_LOOP
 	tristate "isdnloop support"
-	depends on ISDN
 	help
 	  This driver provides a virtual ISDN card. Its primary purpose is
 	  testing of linklevel features or configuration without getting
@@ -88,8 +106,7 @@ config ISDN_DRV_LOOP
 
 config ISDN_DIVERSION
 	tristate "Support isdn diversion services"
-	depends on ISDN
-	---help---
+	help
 	  This option allows you to use some supplementary diversion
 	  services in conjunction with the HiSax driver on an EURO/DSS1
 	  line.
@@ -106,4 +123,3 @@ config ISDN_DIVERSION
 	  Please read the file <file:Documentation/isdn/README.diversion>.
 
 endmenu
-
