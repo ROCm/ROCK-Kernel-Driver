@@ -277,9 +277,9 @@ config IDE_TASK_IOCTL
 	  If you are unsure, say N here.
 
 config IDE_TASKFILE_IO
-	bool 'IDE Taskfile IO'
-	depends on BLK_DEV_IDE
-	default y
+	bool 'IDE Taskfile IO (EXPERIMENTAL)'
+	depends on BLK_DEV_IDE && EXPERIMENTAL
+	default n
 	---help---
 	  Use new taskfile IO code.
 
