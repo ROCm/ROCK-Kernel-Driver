@@ -93,8 +93,11 @@ void os_kill_process(int pid, int reap_child)
 
 void os_usr1_process(int pid)
 {
+#ifdef __NR_tkill
 	syscall(__NR_tkill, pid, SIGUSR1);
-	/* kill(pid, SIGUSR1); */
+#else
+	kill(pid, SIGUSR1);
+#endif
 }
 
 int os_getpid(void)
