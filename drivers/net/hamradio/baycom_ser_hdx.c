@@ -540,11 +540,11 @@ static int baycom_ioctl(struct net_device *dev, struct ifreq *ifr,
 /* --------------------------------------------------------------------- */
 
 static struct hdlcdrv_ops ser12_ops = {
-	bc_drvname,
-	bc_drvinfo,
-	ser12_open,
-	ser12_close,
-	baycom_ioctl
+	.drvname = bc_drvname,
+	.drvinfo = bc_drvinfo,
+	.open    = ser12_open,
+	.close   = ser12_close,
+	.ioctl   = baycom_ioctl,
 };
 
 /* --------------------------------------------------------------------- */
