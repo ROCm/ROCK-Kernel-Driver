@@ -25,9 +25,6 @@
 
 #define RX_STD_MAX_SIZE			1536
 #define RX_JUMBO_MAX_SIZE		0xdeadbeef /* XXX */
-#if TG3_MINI_RING_WORKS
-#define RX_MINI_MAX_SIZE		256
-#endif
 
 /* First 256 bytes are a mirror of PCI config space. */
 #define TG3PCI_VENDOR			0x00000000
@@ -1301,9 +1298,7 @@
 #define NIC_SRAM_MAC_ADDR_HIGH_MBOX	0x00000c14
 #define NIC_SRAM_MAC_ADDR_LOW_MBOX	0x00000c18
 
-#if TG3_MINI_RING_WORKS
 #define NIC_SRAM_RX_MINI_BUFFER_DESC	0x00001000
-#endif
 
 #define NIC_SRAM_DMA_DESC_POOL_BASE	0x00002000
 #define  NIC_SRAM_DMA_DESC_POOL_SIZE	 0x00002000
@@ -1453,9 +1448,7 @@ struct tg3_rx_buffer_desc {
 #define RXD_FLAGS_SHIFT	0
 
 #define RXD_FLAG_END			0x0004
-#if TG3_MINI_RING_WORKS
 #define RXD_FLAG_MINI			0x0800
-#endif
 #define RXD_FLAG_JUMBO			0x0020
 #define RXD_FLAG_VLAN			0x0040
 #define RXD_FLAG_ERROR			0x0400
@@ -1490,9 +1483,7 @@ struct tg3_rx_buffer_desc {
 #define RXD_OPAQUE_INDEX_SHIFT		0
 #define RXD_OPAQUE_RING_STD		0x00010000
 #define RXD_OPAQUE_RING_JUMBO		0x00020000
-#if TG3_MINI_RING_WORKS
 #define RXD_OPAQUE_RING_MINI		0x00040000
-#endif
 #define RXD_OPAQUE_RING_MASK		0x00070000
 };
 
@@ -1728,6 +1719,8 @@ struct tg3_bufmgr_config {
 };
 
 struct tg3 {
+	/* begin "general, frequently-used members" cacheline section */
+
 	/* SMP locking strategy:
 	 *
 	 * lock: Held during all operations except TX packet
@@ -1741,18 +1734,51 @@ struct tg3 {
 	 * necessary for acquisition of 'tx_lock'.
 	 */
 	spinlock_t			lock;
-	spinlock_t			tx_lock;
+	spinlock_t			indirect_lock;
 
+	unsigned long			regs;
+	struct net_device		*dev;
+	struct pci_dev			*pdev;
+
+	struct tg3_hw_status		*hw_status;
+	dma_addr_t			status_mapping;
+
+	u32				msg_enable;
+
+	/* begin "tx thread" cacheline section */
 	u32				tx_prod;
 	u32				tx_cons;
+	u32				tx_pending;
+
+	spinlock_t			tx_lock;
+
+	/* TX descs are only used if TG3_FLAG_HOST_TXDS is set. */
+	struct tg3_tx_buffer_desc	*tx_ring;
+	struct tx_ring_info		*tx_buffers;
+	dma_addr_t			tx_desc_mapping;
+
+	/* begin "rx thread" cacheline section */
 	u32				rx_rcb_ptr;
 	u32				rx_std_ptr;
 	u32				rx_jumbo_ptr;
-#if TG3_MINI_RING_WORKS
-	u32				rx_mini_ptr;
+	u32				rx_pending;
+	u32				rx_jumbo_pending;
+#if TG3_VLAN_TAG_USED
+	struct vlan_group		*vlgrp;
 #endif
-	spinlock_t			indirect_lock;
 
+	struct tg3_rx_buffer_desc	*rx_std;
+	struct ring_info		*rx_std_buffers;
+	dma_addr_t			rx_std_mapping;
+
+	struct tg3_rx_buffer_desc	*rx_jumbo;
+	struct ring_info		*rx_jumbo_buffers;
+	dma_addr_t			rx_jumbo_mapping;
+
+	struct tg3_rx_buffer_desc	*rx_rcb;
+	dma_addr_t			rx_rcb_mapping;
+
+	/* begin "everything else" cacheline(s) section */
 	struct net_device_stats		net_stats;
 	struct net_device_stats		net_stats_prev;
 	unsigned long			phy_crc_errors;
@@ -1791,8 +1817,6 @@ struct tg3 {
 #define TG3_FLAG_SPLIT_MODE		0x40000000
 #define TG3_FLAG_INIT_COMPLETE		0x80000000
 
-	u32				msg_enable;
-
 	u32				split_mode_max_reqs;
 #define SPLIT_MODE_5704_MAX_REQ		3
 
@@ -1805,13 +1829,6 @@ struct tg3 {
 
 	struct tg3_link_config		link_config;
 	struct tg3_bufmgr_config	bufmgr_config;
-
-	u32				rx_pending;
-#if TG3_MINI_RING_WORKS
-	u32				rx_mini_pending;
-#endif
-	u32				rx_jumbo_pending;
-	u32				tx_pending;
 
 	/* cache h/w values, often passed straight to h/w */
 	u32				rx_mode;
@@ -1864,36 +1881,6 @@ struct tg3 {
 	 (X) == PHY_ID_BCM5411 || (X) == PHY_ID_BCM5701 || \
 	 (X) == PHY_ID_BCM5703 || (X) == PHY_ID_BCM5704 || \
 	 (X) == PHY_ID_BCM8002 || (X) == PHY_ID_SERDES)
-
-	unsigned long			regs;
-	struct pci_dev			*pdev;
-	struct net_device		*dev;
-#if TG3_VLAN_TAG_USED
-	struct vlan_group		*vlgrp;
-#endif
-
-	struct tg3_rx_buffer_desc	*rx_std;
-	struct ring_info		*rx_std_buffers;
-	dma_addr_t			rx_std_mapping;
-#if TG3_MINI_RING_WORKS
-	struct tg3_rx_buffer_desc	*rx_mini;
-	struct ring_info		*rx_mini_buffers;
-	dma_addr_t			rx_mini_mapping;
-#endif
-	struct tg3_rx_buffer_desc	*rx_jumbo;
-	struct ring_info		*rx_jumbo_buffers;
-	dma_addr_t			rx_jumbo_mapping;
-
-	struct tg3_rx_buffer_desc	*rx_rcb;
-	dma_addr_t			rx_rcb_mapping;
-
-	/* TX descs are only used if TG3_FLAG_HOST_TXDS is set. */
-	struct tg3_tx_buffer_desc	*tx_ring;
-	struct tx_ring_info		*tx_buffers;
-	dma_addr_t			tx_desc_mapping;
-
-	struct tg3_hw_status		*hw_status;
-	dma_addr_t			status_mapping;
 
 	struct tg3_hw_stats		*hw_stats;
 	dma_addr_t			stats_mapping;
