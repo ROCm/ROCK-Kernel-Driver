@@ -15,7 +15,7 @@
  *
  *      (see also mptbase.c)
  *
- *  Copyright (c) 1999-2003 LSI Logic Corporation
+ *  Copyright (c) 1999-2004 LSI Logic Corporation
  *  Originally By: Steven J. Ralston
  *  (mailto:sjralston1@netscape.net)
  *  (mailto:mpt_linux_developer@lsil.com)
@@ -342,6 +342,7 @@ struct mpt_ioctl_command32 {
 #define CPQFCTS_IOC_MAGIC 'Z'
 #define HP_IOC_MAGIC 'Z'
 #define HP_GETHOSTINFO		_IOR(HP_IOC_MAGIC, 20, hp_host_info_t)
+#define HP_GETHOSTINFO1		_IOR(HP_IOC_MAGIC, 20, hp_host_info_rev0_t)
 #define HP_GETTARGETINFO	_IOR(HP_IOC_MAGIC, 21, hp_target_info_t)
 
 /* All HP IOCTLs must include this header
@@ -357,7 +358,7 @@ typedef struct _hp_header {
 /*
  *  Header:
  *  iocnum 	required (input)
- *  host 	ignored	
+ *  host 	ignored
  *  channe	ignored
  *  id		ignored
  *  lun		ignored
@@ -371,9 +372,9 @@ typedef struct _hp_host_info {
 	u8		 devfn;
 	u8		 bus;
 	ushort		 host_no;		/* SCSI Host number, if scsi driver not loaded*/
-	u8		 fw_version[16];	/* string */	
+	u8		 fw_version[16];	/* string */
 	u8		 serial_number[24];	/* string */
-	u32		 ioc_status;	
+	u32		 ioc_status;
 	u32		 bus_phys_width;
 	u32		 base_io_addr;
 	u32		 rsvd;
@@ -382,10 +383,33 @@ typedef struct _hp_host_info {
 	unsigned int	 timeouts;		/* num timeouts */
 } hp_host_info_t;
 
+/* replace ulongs with uints, need to preserve backwards
+ * compatibility.
+ */
+typedef struct _hp_host_info_rev0 {
+	hp_header_t	 hdr;
+	u16		 vendor;
+	u16		 device;
+	u16		 subsystem_vendor;
+	u16		 subsystem_id;
+	u8		 devfn;
+	u8		 bus;
+	ushort		 host_no;		/* SCSI Host number, if scsi driver not loaded*/
+	u8		 fw_version[16];	/* string */
+	u8		 serial_number[24];	/* string */
+	u32		 ioc_status;
+	u32		 bus_phys_width;
+	u32		 base_io_addr;
+	u32		 rsvd;
+	unsigned long	 hard_resets;		/* driver initiated resets */
+	unsigned long	 soft_resets;		/* ioc, external resets */
+	unsigned long	 timeouts;		/* num timeouts */
+} hp_host_info_rev0_t;
+
 /*
  *  Header:
  *  iocnum 	required (input)
- *  host 	required	
+ *  host 	required
  *  channel	required	(bus number)
  *  id		required
  *  lun		ignored

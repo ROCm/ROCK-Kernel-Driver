@@ -50,6 +50,8 @@ typedef struct {
 	struct cdev *cdevs[2];  /* Auto-rewind and non-rewind devices */
 } ST_mode;
 
+/* Number of modes can be changed by changing ST_NBR_MODE_BITS. The maximum
+   number of modes is 16 (ST_NBR_MODE_BITS 4) */
 #define ST_NBR_MODE_BITS 2
 #define ST_NBR_MODES (1 << ST_NBR_MODE_BITS)
 #define ST_MODE_SHIFT (7 - ST_NBR_MODE_BITS)

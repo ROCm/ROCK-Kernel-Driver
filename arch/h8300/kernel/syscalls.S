@@ -116,7 +116,7 @@ SYMBOL_NAME_LABEL(sys_call_table)
 	.long SYMBOL_NAME(sys_ni_syscall)				/* old profil syscall holder */
 	.long SYMBOL_NAME(sys_statfs)
 	.long SYMBOL_NAME(sys_fstatfs)		/* 100 */
-	.long SYMBOL_NAME(sys_ioperm)
+	.long SYMBOL_NAME(sys_ni_syscall)	/* ioperm for i386 */
 	.long SYMBOL_NAME(sys_socketcall)
 	.long SYMBOL_NAME(sys_syslog)
 	.long SYMBOL_NAME(sys_setitimer)

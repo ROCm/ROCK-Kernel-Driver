@@ -134,8 +134,6 @@ ia32_load_state (struct task_struct *t)
 	regs->r17 = (_TSS << 48) | (_LDT << 32) | (__u32) regs->r17;
 	regs->r30 = load_desc(_LDT);				/* LDTD */
 	load_TLS(&t->thread, smp_processor_id());
-
-	put_cpu();
 }
 
 /*

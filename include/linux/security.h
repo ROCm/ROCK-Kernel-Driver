@@ -177,7 +177,7 @@ struct swap_info_struct;
  *	options cleanly (a filesystem may modify the data e.g. with strsep()).
  *	This also allows the original mount data to be stripped of security-
  *	specific options to avoid having to make filesystems aware of them.
- *	@fstype the type of filesystem being mounted.
+ *	@type the type of filesystem being mounted.
  *	@orig the original mount data copied from userspace.
  *	@copy copied data which will be passed to the security module.
  *	Returns 0 if the copy was successful.
@@ -1033,7 +1033,8 @@ struct security_operations {
 
 	int (*sb_alloc_security) (struct super_block * sb);
 	void (*sb_free_security) (struct super_block * sb);
-	int (*sb_copy_data)(const char *fstype, void *orig, void *copy);
+	int (*sb_copy_data)(struct file_system_type *type,
+			    void *orig, void *copy);
 	int (*sb_kern_mount) (struct super_block *sb, void *data);
 	int (*sb_statfs) (struct super_block * sb);
 	int (*sb_mount) (char *dev_name, struct nameidata * nd,
@@ -1318,9 +1319,10 @@ static inline void security_sb_free (struct super_block *sb)
 	security_ops->sb_free_security (sb);
 }
 
-static inline int security_sb_copy_data (const char *fstype, void *orig, void *copy)
+static inline int security_sb_copy_data (struct file_system_type *type,
+					 void *orig, void *copy)
 {
-	return security_ops->sb_copy_data (fstype, orig, copy);
+	return security_ops->sb_copy_data (type, orig, copy);
 }
 
 static inline int security_sb_kern_mount (struct super_block *sb, void *data)
@@ -1988,7 +1990,8 @@ static inline int security_sb_alloc (struct super_block *sb)
 static inline void security_sb_free (struct super_block *sb)
 { }
 
-static inline int security_sb_copy_data (const char *fstype, void *orig, void *copy)
+static inline int security_sb_copy_data (struct file_system_type *type,
+					 void *orig, void *copy)
 {
 	return 0;
 }

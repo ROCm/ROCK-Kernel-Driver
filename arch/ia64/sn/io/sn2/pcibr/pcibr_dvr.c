@@ -2501,7 +2501,7 @@ pcibr_pcix_rbars_calc(pcibr_soft_t pcibr_soft)
     if (pcibr_soft->bs_pcix_num_funcs) {
 	if (pcibr_soft->bs_pcix_num_funcs > NUM_RBAR) {
 	    printk(KERN_WARNING
-		"%lx: Must oversubscribe Read Buffer Attribute Registers"
+		"%s: Must oversubscribe Read Buffer Attribute Registers"
 		"(RBAR).  Bus has %d RBARs but %d funcs need them.\n",
 		pcibr_soft->bs_name, NUM_RBAR, pcibr_soft->bs_pcix_num_funcs);
 	    percent_allowed = 0;
@@ -2603,7 +2603,7 @@ pcibr_debug(uint32_t type, vertex_hdl_t vhdl, char *format, ...)
 		memset(buffer, 0, 1024);
 		vsnprintf(buffer, 1024, format, ap);
 		va_end(ap);
-		printk("", "%s", buffer);
+		printk("%s", buffer);
 		kfree(buffer);
 	    }
         }

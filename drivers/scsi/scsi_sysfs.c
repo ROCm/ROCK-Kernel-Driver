@@ -13,6 +13,7 @@
 #include <linux/device.h>
 
 #include <scsi/scsi_host.h>
+#include <scsi/scsi_transport.h>
 #include "scsi.h"
 
 #include "scsi_priv.h"
@@ -58,21 +59,24 @@ static int scsi_scan(struct Scsi_Host *shost, const char *str)
  * shost_show_function: macro to create an attr function that can be used to
  * show a non-bit field.
  */
-#define shost_show_function(field, format_string)			\
+#define shost_show_function(name, field, format_string)			\
 static ssize_t								\
-show_##field (struct class_device *class_dev, char *buf)		\
+show_##name (struct class_device *class_dev, char *buf)			\
 {									\
 	struct Scsi_Host *shost = class_to_shost(class_dev);		\
-	return snprintf (buf, 20, format_string, shost->field);	\
+	return snprintf (buf, 20, format_string, shost->field);		\
 }
 
 /*
  * shost_rd_attr: macro to create a function and attribute variable for a
  * read only field.
  */
-#define shost_rd_attr(field, format_string)				\
-	shost_show_function(field, format_string)			\
-static CLASS_DEVICE_ATTR(field, S_IRUGO, show_##field, NULL)
+#define shost_rd_attr2(name, field, format_string)			\
+	shost_show_function(name, field, format_string)			\
+static CLASS_DEVICE_ATTR(name, S_IRUGO, show_##name, NULL)
+
+#define shost_rd_attr(field, format_string) \
+shost_rd_attr2(field, field, format_string)
 
 /*
  * Create the actual show/store functions and data structures.
@@ -96,6 +100,7 @@ shost_rd_attr(host_busy, "%hu\n");
 shost_rd_attr(cmd_per_lun, "%hd\n");
 shost_rd_attr(sg_tablesize, "%hu\n");
 shost_rd_attr(unchecked_isa_dma, "%d\n");
+shost_rd_attr2(proc_name, hostt->proc_name, "%s\n");
 
 static struct class_device_attribute *scsi_sysfs_shost_attrs[] = {
 	&class_device_attr_unique_id,
@@ -103,6 +108,7 @@ static struct class_device_attribute *scsi_sysfs_shost_attrs[] = {
 	&class_device_attr_cmd_per_lun,
 	&class_device_attr_sg_tablesize,
 	&class_device_attr_unchecked_isa_dma,
+	&class_device_attr_proc_name,
 	&class_device_attr_scan,
 	NULL
 };
@@ -344,6 +350,7 @@ static int attr_add(struct device *dev, struct device_attribute *attr)
  **/
 int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 {
+	struct class_device_attribute **attrs;
 	int error = -EINVAL, i;
 
 	if (sdev->sdev_state != SDEV_CREATED)
@@ -361,6 +368,12 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 	if (error) {
 		printk(KERN_INFO "error 2\n");
 		goto clean_device;
+	}
+
+	if (sdev->transport_classdev.class) {
+		error = class_device_add(&sdev->transport_classdev);
+		if (error)
+			goto clean_device2;
 	}
 
 	get_device(&sdev->sdev_gendev);
@@ -388,10 +401,24 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 		}
 	}
 
+ 	if (sdev->transport_classdev.class) {
+ 		attrs = sdev->host->transportt->attrs;
+ 		for (i = 0; attrs[i]; i++) {
+ 			error = class_device_create_file(&sdev->transport_classdev,
+ 							 attrs[i]);
+ 			if (error) {
+ 				scsi_remove_device(sdev);
+				goto out;
+			}
+ 		}
+ 	}
+
  out:
 	return error;
 
-clean_device:
+ clean_device2:
+	class_device_del(&sdev->sdev_classdev);
+ clean_device:
 	sdev->sdev_state = SDEV_CANCEL;
 
 	device_del(&sdev->sdev_gendev);
@@ -409,9 +436,12 @@ void scsi_remove_device(struct scsi_device *sdev)
 	if (sdev->sdev_state == SDEV_RUNNING || sdev->sdev_state == SDEV_CANCEL) {
 		sdev->sdev_state = SDEV_DEL;
 		class_device_unregister(&sdev->sdev_classdev);
+		class_device_unregister(&sdev->transport_classdev);
 		device_del(&sdev->sdev_gendev);
 		if (sdev->host->hostt->slave_destroy)
 			sdev->host->hostt->slave_destroy(sdev);
+		if (sdev->host->transportt->cleanup)
+			sdev->host->transportt->cleanup(sdev);
 		put_device(&sdev->sdev_gendev);
 	}
 }
@@ -498,3 +528,7 @@ int scsi_sysfs_add_host(struct Scsi_Host *shost)
 
 	return 0;
 }
+
+/* A blank transport template that is used in drivers that don't
+ * yet implement Transport Attributes */
+struct scsi_transport_template blank_transport_template = { 0, };

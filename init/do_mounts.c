@@ -163,6 +163,9 @@ dev_t __init name_to_dev_t(char *name)
 	res = Root_NFS;
 	if (strcmp(name, "nfs") == 0)
 		goto done;
+	res = Root_RAM0;
+	if (strcmp(name, "ram") == 0)
+		goto done;
 
 	if (strlen(name) > 31)
 		goto fail;

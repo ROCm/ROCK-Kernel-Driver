@@ -47,7 +47,7 @@ extern void smp_invalidate_rcv(void);		/* Process an NMI */
 extern void (*mtrr_hook) (void);
 extern void zap_low_mappings(void);
 void smp_stop_cpu(void);
-extern int cpu_sibling_map[];
+extern char cpu_sibling_map[];
 
 #define SMP_TRAMPOLINE_BASE 0x6000
 
@@ -74,7 +74,15 @@ extern __inline int hard_smp_processor_id(void)
 	return GET_APIC_ID(*(unsigned int *)(APIC_BASE+APIC_ID));
 }
 
-#define safe_smp_processor_id() (disable_apic ? 0 : hard_smp_processor_id())
+/*
+ * Some lowlevel functions might want to know about
+ * the real APIC ID <-> CPU # mapping.
+ * AK: why is this volatile?
+ */
+extern volatile char x86_apicid_to_cpu[NR_CPUS];
+extern volatile char x86_cpu_to_apicid[NR_CPUS];
+
+#define safe_smp_processor_id() (disable_apic ? 0 : x86_apicid_to_cpu[hard_smp_processor_id()])
 
 #define cpu_online(cpu) cpu_isset(cpu, cpu_online_map)
 #endif /* !ASSEMBLY */

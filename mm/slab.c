@@ -445,8 +445,8 @@ static inline void **dbg_userword(kmem_cache_t *cachep, void *objp)
 /*
  * Do not go above this order unless 0 objects fit into the slab.
  */
-#define	BREAK_GFP_ORDER_HI	2
-#define	BREAK_GFP_ORDER_LO	1
+#define	BREAK_GFP_ORDER_HI	1
+#define	BREAK_GFP_ORDER_LO	0
 static int slab_break_gfp_order = BREAK_GFP_ORDER_LO;
 
 /* Macros for storing/retrieving the cachep and or slab from the

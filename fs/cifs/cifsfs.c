@@ -77,6 +77,7 @@ cifs_read_super(struct super_block *sb, void *data,
 	struct cifs_sb_info *cifs_sb;
 	int rc = 0;
 
+	sb->s_flags |= MS_NODIRATIME; /* and probably even noatime */
 	sb->s_fs_info = kmalloc(sizeof(struct cifs_sb_info),GFP_KERNEL);
 	cifs_sb = CIFS_SB(sb);
 	if(cifs_sb == NULL)

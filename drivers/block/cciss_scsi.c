@@ -693,7 +693,7 @@ complete_scsi_command( CommandList_struct *cp, int timeout, __u32 tag)
 	scsi_cmd_free(ctlr, cp);
 }
 
-static int __init 
+static int
 cciss_scsi_detect(int ctlr)
 {
 	struct Scsi_Host *sh;

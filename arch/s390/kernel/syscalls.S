@@ -109,7 +109,7 @@ SYSCALL(sys_setpriority,sys_setpriority,sys32_setpriority_wrapper)
 NI_SYSCALL							/* old profil syscall */
 SYSCALL(sys_statfs,sys_statfs,compat_sys_statfs_wrapper)
 SYSCALL(sys_fstatfs,sys_fstatfs,compat_sys_fstatfs_wrapper)	/* 100 */
-SYSCALL(sys_ioperm,sys_ni_syscall,sys_ni_syscall)
+NI_SYSCALL							/* ioperm for i386 */
 SYSCALL(sys_socketcall,sys_socketcall,compat_sys_socketcall_wrapper)
 SYSCALL(sys_syslog,sys_syslog,sys32_syslog_wrapper)
 SYSCALL(sys_setitimer,sys_setitimer,compat_sys_setitimer_wrapper)

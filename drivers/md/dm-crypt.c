@@ -621,7 +621,8 @@ crypt_clone(struct crypt_config *cc, struct crypt_io *io, struct bio *bio,
 	return clone;
 }
 
-static int crypt_map(struct dm_target *ti, struct bio *bio)
+static int crypt_map(struct dm_target *ti, struct bio *bio,
+		     union map_info *map_context)
 {
 	struct crypt_config *cc = (struct crypt_config *) ti->private;
 	struct crypt_io *io = mempool_alloc(cc->io_pool, GFP_NOIO);
@@ -739,6 +740,7 @@ static int crypt_status(struct dm_target *ti, status_type_t type,
 
 static struct target_type crypt_target = {
 	.name   = "crypt",
+	.version= {1, 0, 0},
 	.module = THIS_MODULE,
 	.ctr    = crypt_ctr,
 	.dtr    = crypt_dtr,

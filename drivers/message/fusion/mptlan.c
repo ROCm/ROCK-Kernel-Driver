@@ -23,7 +23,7 @@
  *
  *      (see also mptbase.c)
  *
- *  Copyright (c) 2000-2003 LSI Logic Corporation
+ *  Copyright (c) 2000-2004 LSI Logic Corporation
  *  Originally By: Noah Romer
  *  (mailto:mpt_linux_developer@lsil.com)
  *
@@ -340,12 +340,15 @@ mpt_lan_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
 	struct mpt_lan_priv *priv = (struct mpt_lan_priv *) dev->priv;
 
 	dlprintk((KERN_INFO MYNAM ": IOC %s_reset routed to LAN driver!\n",
-			reset_phase==MPT_IOC_PRE_RESET ? "pre" : "post"));
+			reset_phase==MPT_IOC_SETUP_RESET ? "setup" : (
+			reset_phase==MPT_IOC_PRE_RESET ? "pre" : "post")));
 
 	if (priv->mpt_rxfidx == NULL)
 		return (1);
 
-	if (reset_phase == MPT_IOC_PRE_RESET) {
+	if (reset_phase == MPT_IOC_SETUP_RESET) {
+		;
+	} else if (reset_phase == MPT_IOC_PRE_RESET) {
 		int i;
 		unsigned long flags;
 

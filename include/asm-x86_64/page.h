@@ -137,6 +137,13 @@ extern __inline__ int get_order(unsigned long size)
 #define VM_STACK_DEFAULT_FLAGS \
 	(test_thread_flag(TIF_IA32) ? vm_stack_flags32 : vm_stack_flags) 
 	
+#define CONFIG_ARCH_GATE_AREA 1	
+
+#ifndef __ASSEMBLY__
+struct task_struct;
+struct vm_area_struct *get_gate_vma(struct task_struct *tsk);
+int in_gate_area(struct task_struct *task, unsigned long addr);
+#endif
 
 #endif /* __KERNEL__ */
 

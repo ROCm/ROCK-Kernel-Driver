@@ -268,6 +268,7 @@ static int hfs_fill_super(struct super_block *sb, void *data, int silent)
 	}
 
 	sb->s_op = &hfs_super_operations;
+	sb->s_flags |= MS_NODIRATIME;
 	init_MUTEX(&sbi->bitmap_lock);
 
 	res = hfs_mdb_get(sb);

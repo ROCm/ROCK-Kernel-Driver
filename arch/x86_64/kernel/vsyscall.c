@@ -31,9 +31,6 @@
  *    broken programs will segfault and there's no security risk until we choose to
  *    fix it.
  *
- * Add HPET support (port from 2.4). Still needed?
- * Nop out vsyscall syscall to avoid anchor for buffer overflows when sysctl off.
- * 
  * These are not urgent things that we need to address only before shipping the first
  * production binary kernels.
  */
@@ -89,7 +86,7 @@ static force_inline void do_vgettimeofday(struct timeval * tv)
 			if (t < __vxtime.last_tsc) t = __vxtime.last_tsc;
 			usec += ((t - __vxtime.last_tsc) *
 				 __vxtime.tsc_quot) >> 32;
-			/* See comment in x86_64 do_gettimeopfday. */ 
+			/* See comment in x86_64 do_gettimeofday. */ 
 		} else {
 			usec += ((readl(fix_to_virt(VSYSCALL_HPET) + 0xf0) -
 				  __vxtime.last) * __vxtime.quot) >> 32;
@@ -106,6 +103,7 @@ static force_inline void do_get_tz(struct timezone * tz)
 		*tz = __sys_tz;
 }
 
+
 static force_inline int gettimeofday(struct timeval *tv, struct timezone *tz)
 {
 	int ret;
@@ -113,6 +111,15 @@ static force_inline int gettimeofday(struct timeval *tv, struct timezone *tz)
 		: "=a" (ret)
 		: "0" (__NR_gettimeofday),"D" (tv),"S" (tz) : __syscall_clobber );
 	return ret;
+}
+
+static force_inline long time_syscall(long *t)
+{
+	long secs;
+	asm volatile("syscall" 
+		: "=a" (secs)
+		: "0" (__NR_time),"D" (t) : __syscall_clobber);
+	return secs;
 }
 
 static int __vsyscall(0) vgettimeofday(struct timeval * tv, struct timezone * tz)
@@ -126,16 +133,15 @@ static int __vsyscall(0) vgettimeofday(struct timeval * tv, struct timezone * tz
 	return 0;
 }
 
-static time_t __vsyscall(1) vtime(time_t * t)
+/* This will break when the xtime seconds get inaccurate, but that is
+ * unlikely */
+static time_t __vsyscall(1) vtime(time_t *t)
 {
-	struct timeval tv; 
 	if (unlikely(!__sysctl_vsyscall))
-		gettimeofday(&tv, NULL);
-	else
-		do_vgettimeofday(&tv);
-	if (t)
-		*t = tv.tv_sec; 
-	return tv.tv_sec;
+		return time_syscall(t);
+	else if (t)
+		*t = __xtime.tv_sec;		
+	return __xtime.tv_sec;
 }
 
 static long __vsyscall(2) venosys_0(void)

@@ -389,11 +389,6 @@ static int __init set_preferred_console(void)
 }
 console_initcall(set_preferred_console);
 
-asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int on)
-{
-	return -EIO;
-}
-
 extern char *sparc_cpu_type[];
 extern char *sparc_fpu_type[];
 

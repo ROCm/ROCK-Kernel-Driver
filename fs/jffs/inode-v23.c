@@ -70,6 +70,8 @@ static int jffs_fill_super(struct super_block *sb, void *data, int silent)
 	struct inode *root_inode;
 	struct jffs_control *c;
 
+	sb->s_flags |= MS_NODIRATIME;
+
 	D1(printk(KERN_NOTICE "JFFS: Trying to mount device %s.\n",
 		  sb->s_id));
 

@@ -33,6 +33,14 @@ struct hash_cell {
 	struct dm_table *new_map;
 };
 
+struct vers_iter {
+    size_t param_size;
+    struct dm_target_versions *vers, *old_vers;
+    char *end;
+    uint32_t flags;
+};
+
+
 #define NUM_BUCKETS 64
 #define MASK_BUCKETS (NUM_BUCKETS - 1)
 static struct list_head _name_buckets[NUM_BUCKETS];
@@ -88,30 +96,24 @@ static unsigned int hash_str(const char *str)
  *---------------------------------------------------------------*/
 static struct hash_cell *__get_name_cell(const char *str)
 {
-	struct list_head *tmp;
 	struct hash_cell *hc;
 	unsigned int h = hash_str(str);
 
-	list_for_each (tmp, _name_buckets + h) {
-		hc = list_entry(tmp, struct hash_cell, name_list);
+	list_for_each_entry (hc, _name_buckets + h, name_list)
 		if (!strcmp(hc->name, str))
 			return hc;
-	}
 
 	return NULL;
 }
 
 static struct hash_cell *__get_uuid_cell(const char *str)
 {
-	struct list_head *tmp;
 	struct hash_cell *hc;
 	unsigned int h = hash_str(str);
 
-	list_for_each (tmp, _uuid_buckets + h) {
-		hc = list_entry(tmp, struct hash_cell, uuid_list);
+	list_for_each_entry (hc, _uuid_buckets + h, uuid_list)
 		if (!strcmp(hc->uuid, str))
 			return hc;
-	}
 
 	return NULL;
 }
@@ -414,6 +416,80 @@ static int list_devices(struct dm_ioctl *param, size_t param_size)
 	up_write(&_hash_lock);
 	return 0;
 }
+
+static void list_version_get_needed(struct target_type *tt, void *param)
+{
+    int *needed = param;
+
+    *needed += strlen(tt->name);
+    *needed += sizeof(tt->version);
+    *needed += ALIGN_MASK;
+}
+
+static void list_version_get_info(struct target_type *tt, void *param)
+{
+    struct vers_iter *info = param;
+
+    /* Check space - it might have changed since the first iteration */
+    if ((char *)info->vers + sizeof(tt->version) + strlen(tt->name) + 1 >
+	info->end) {
+
+	info->flags = DM_BUFFER_FULL_FLAG;
+	return;
+    }
+
+    if (info->old_vers)
+	info->old_vers->next = (uint32_t) ((void *)info->vers -
+					   (void *)info->old_vers);
+    info->vers->version[0] = tt->version[0];
+    info->vers->version[1] = tt->version[1];
+    info->vers->version[2] = tt->version[2];
+    info->vers->next = 0;
+    strcpy(info->vers->name, tt->name);
+
+    info->old_vers = info->vers;
+    info->vers = align_ptr(((void *) ++info->vers) + strlen(tt->name) + 1);
+}
+
+static int list_versions(struct dm_ioctl *param, size_t param_size)
+{
+	size_t len, needed = 0;
+	struct dm_target_versions *vers;
+	struct vers_iter iter_info;
+
+	/*
+	 * Loop through all the devices working out how much
+	 * space we need.
+	 */
+	dm_target_iterate(list_version_get_needed, &needed);
+
+	/*
+	 * Grab our output buffer.
+	 */
+	vers = get_result_buffer(param, param_size, &len);
+	if (len < needed) {
+		param->flags |= DM_BUFFER_FULL_FLAG;
+		goto out;
+	}
+	param->data_size = param->data_start + needed;
+
+	iter_info.param_size = param_size;
+	iter_info.old_vers = NULL;
+	iter_info.vers = vers;
+	iter_info.flags = 0;
+	iter_info.end = (char *)vers+len;
+
+	/*
+	 * Now loop through filling out the names & versions.
+	 */
+	dm_target_iterate(list_version_get_info, &iter_info);
+	param->flags |= iter_info.flags;
+
+ out:
+	return 0;
+}
+
+
 
 static int check_name(const char *name)
 {
@@ -935,6 +1011,7 @@ static void retrieve_deps(struct dm_table *table,
 	unsigned int count = 0;
 	struct list_head *tmp;
 	size_t len, needed;
+	struct dm_dev *dd;
 	struct dm_target_deps *deps;
 
 	deps = get_result_buffer(param, param_size, &len);
@@ -942,7 +1019,7 @@ static void retrieve_deps(struct dm_table *table,
 	/*
 	 * Count the devices.
 	 */
-	list_for_each(tmp, dm_table_get_devices(table))
+	list_for_each (tmp, dm_table_get_devices(table))
 		count++;
 
 	/*
@@ -959,10 +1036,8 @@ static void retrieve_deps(struct dm_table *table,
 	 */
 	deps->count = count;
 	count = 0;
-	list_for_each(tmp, dm_table_get_devices(table)) {
-		struct dm_dev *dd = list_entry(tmp, struct dm_dev, list);
+	list_for_each_entry (dd, dm_table_get_devices(table), list)
 		deps->dev[count++] = huge_encode_dev(dd->bdev->bd_dev);
-	}
 
 	param->data_size = param->data_start + needed;
 }
@@ -1045,7 +1120,9 @@ static ioctl_fn lookup_ioctl(unsigned int cmd)
 		{DM_TABLE_LOAD_CMD, table_load},
 		{DM_TABLE_CLEAR_CMD, table_clear},
 		{DM_TABLE_DEPS_CMD, table_deps},
-		{DM_TABLE_STATUS_CMD, table_status}
+		{DM_TABLE_STATUS_CMD, table_status},
+
+		{DM_LIST_VERSIONS_CMD, list_versions}
 	};
 
 	return (cmd >= ARRAY_SIZE(_ioctls)) ? NULL : _ioctls[cmd].fn;
@@ -1119,7 +1196,9 @@ static int validate_params(uint cmd, struct dm_ioctl *param)
 	param->flags &= ~DM_BUFFER_FULL_FLAG;
 
 	/* Ignores parameters */
-	if (cmd == DM_REMOVE_ALL_CMD || cmd == DM_LIST_DEVICES_CMD)
+	if (cmd == DM_REMOVE_ALL_CMD ||
+	    cmd == DM_LIST_DEVICES_CMD ||
+	    cmd == DM_LIST_VERSIONS_CMD)
 		return 0;
 
 	/* Unless creating, either name or uuid but not both */

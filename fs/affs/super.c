@@ -293,6 +293,7 @@ static int affs_fill_super(struct super_block *sb, void *data, int silent)
 
 	sb->s_magic             = AFFS_SUPER_MAGIC;
 	sb->s_op                = &affs_sops;
+	sb->s_flags |= MS_NODIRATIME;
 
 	sbi = kmalloc(sizeof(struct affs_sb_info), GFP_KERNEL);
 	if (!sbi)

@@ -1,7 +1,7 @@
 /*
  * linux/drivers/char/synclink.c
  *
- * $Id: synclink.c,v 4.16 2003/09/05 15:26:02 paulkf Exp $
+ * $Id: synclink.c,v 4.21 2004/03/08 15:29:22 paulkf Exp $
  *
  * Device driver for Microgate SyncLink ISA and PCI
  * high speed multiprotocol serial adapters.
@@ -909,7 +909,7 @@ MODULE_PARM(txdmabufs,"1-" __MODULE_STRING(MAX_TOTAL_DEVICES) "i");
 MODULE_PARM(txholdbufs,"1-" __MODULE_STRING(MAX_TOTAL_DEVICES) "i");
 
 static char *driver_name = "SyncLink serial driver";
-static char *driver_version = "$Revision: 4.16 $";
+static char *driver_version = "$Revision: 4.21 $";
 
 static int synclink_init_one (struct pci_dev *dev,
 				     const struct pci_device_id *ent);
@@ -7846,12 +7846,13 @@ static void mgsl_sppp_init(struct mgsl_struct *info)
 	info->if_ptr = &info->pppdev;
 	info->netdev = info->pppdev.dev = d;
 
-	sppp_attach(&info->pppdev);
-
 	d->base_addr = info->io_base;
 	d->irq = info->irq_level;
 	d->dma = info->dma_level;
 	d->priv = info;
+
+	sppp_attach(&info->pppdev);
+	mgsl_setup(d);
 
 	if (register_netdev(d)) {
 		printk(KERN_WARNING "%s: register_netdev failed.\n", d->name);
@@ -8022,7 +8023,7 @@ struct net_device_stats *mgsl_net_stats(struct net_device *dev)
 
 int mgsl_sppp_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
-	struct mgsl_struct *info = (struct mgsl_struct *)dev->priv;
+	struct mgsl_struct *info = dev->priv;
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("%s(%d):mgsl_ioctl %s cmd=%08X\n", __FILE__,__LINE__,
 			info->netname, cmd );

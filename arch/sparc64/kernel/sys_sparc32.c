@@ -282,11 +282,6 @@ static inline long put_tv32(struct compat_timeval *o, struct timeval *i)
 		 __put_user(i->tv_usec, &o->tv_usec)));
 }
 
-asmlinkage long sys32_ioperm(u32 from, u32 num, int on)
-{
-	return sys_ioperm((unsigned long)from, (unsigned long)num, on);
-}
-
 struct msgbuf32 { s32 mtype; char mtext[1]; };
 
 struct ipc_perm32

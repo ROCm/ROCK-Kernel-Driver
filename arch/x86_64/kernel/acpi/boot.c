@@ -78,6 +78,31 @@ __acpi_map_table (
 	return NULL; 
 } 	      
 
+#ifdef CONFIG_PCI_MMCONFIG
+static int __init acpi_parse_mcfg(unsigned long phys_addr, unsigned long size)
+{
+	struct acpi_table_mcfg *mcfg;
+
+	if (!phys_addr || !size)
+		return -EINVAL;
+
+	mcfg = (struct acpi_table_mcfg *) __acpi_map_table(phys_addr, size);
+	if (!mcfg) {
+		printk(KERN_WARNING PREFIX "Unable to map MCFG\n");
+		return -ENODEV;
+	}
+
+	if (mcfg->base_reserved) {
+		printk(KERN_ERR PREFIX "MMCONFIG not in low 4GB of memory\n");
+		return -ENODEV;
+	}
+
+	pci_mmcfg_base_addr = mcfg->base_address;
+
+	return 0;
+}
+#endif /* CONFIG_PCI_MMCONFIG */
+
 #ifdef CONFIG_X86_LOCAL_APIC
 
 static u64 acpi_lapic_addr __initdata = APIC_DEFAULT_PHYS_BASE;
@@ -233,6 +258,24 @@ acpi_parse_nmi_src (
 }
 
 #endif /*CONFIG_X86_IO_APIC*/
+
+static int __init acpi_parse_sbf(unsigned long phys_addr, unsigned long size)
+{
+	struct acpi_table_sbf *sb;
+
+	if (!phys_addr || !size)
+		return -EINVAL;
+
+	sb = (struct acpi_table_sbf *) __acpi_map_table(phys_addr, size);
+	if (!sb) {
+		printk(KERN_WARNING PREFIX "Unable to map SBF\n");
+		return -ENODEV;
+	}
+
+	sbf_port = sb->sbf_cmos; /* Save CMOS port */
+
+	return 0;
+}
 
 #ifdef CONFIG_HPET_TIMER
 static int __init
@@ -404,6 +447,8 @@ acpi_boot_init (void)
 		return result;
 	}
 
+	(void) acpi_table_parse(ACPI_BOOT, acpi_parse_sbf);
+
 	result = acpi_blacklisted();
 	if (result) {
 		printk(KERN_WARNING PREFIX "BIOS listed in blacklist, disabling ACPI support\n");
@@ -548,6 +593,12 @@ acpi_boot_init (void)
 	result = acpi_table_parse(ACPI_HPET, acpi_parse_hpet);
 	if (result < 0) 
 		printk("ACPI: no HPET table found (%d).\n", result); 
+#endif
+
+#ifdef CONFIG_PCI_MMCONFIG
+	result = acpi_table_parse(ACPI_MCFG, acpi_parse_mcfg);
+	if (result)
+		printk(KERN_ERR PREFIX "Error %d parsing MCFG\n", result);
 #endif
 
 	return 0;

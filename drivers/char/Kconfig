@@ -740,6 +740,7 @@ config HW_RANDOM
 
 config NVRAM
 	tristate "/dev/nvram support"
+	depends on ATARI || X86 || X86_64 || ARM || GENERIC_NVRAM
 	---help---
 	  If you say Y here and create a character special file /dev/nvram
 	  with major number 10 and minor number 144 using mknod ("man mknod"),
