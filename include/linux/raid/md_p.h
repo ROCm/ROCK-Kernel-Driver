@@ -173,5 +173,58 @@ static inline __u64 md_event(mdp_super_t *sb) {
 	return (ev<<32)| sb->events_lo;
 }
 
+/*
+ * The version-1 superblock :
+ * All numeric fields are little-endian.
+ *
+ * total size: 256 bytes plus 2 per device.
+ *  1K allows 384 devices.
+ */
+struct mdp_superblock_1 {
+	/* constant array information - 128 bytes */
+	__u32	magic;		/* MD_SB_MAGIC: 0xa92b4efc - little endian */
+	__u32	major_version;	/* 1 */
+	__u32	feature_map;	/* 0 for now */
+	__u32	pad0;		/* always set to 0 when writing */
+
+	__u8	set_uuid[16];	/* user-space generated. */
+	char	set_name[32];	/* set and interpreted by user-space */
+
+	__u64	ctime;		/* lo 40 bits are seconds, top 24 are microseconds or 0*/
+	__u32	level;		/* -4 (multipath), -1 (linear), 0,1,4,5 */
+	__u32	layout;		/* only for raid5 currently */
+	__u64	size;		/* used size of component devices, in 512byte sectors */
+
+	__u32	chunksize;	/* in 512byte sectors */
+	__u32	raid_disks;
+	__u8	pad1[128-92];	/* set to 0 when written */
+
+	/* constant this-device information - 64 bytes */
+	__u64	data_offset;	/* sector start of data, often 0 */
+	__u64	data_size;	/* sectors in this device that can be used for data */
+	__u64	super_offset;	/* sector start of this superblock */
+	__u64	recovery_offset;/* sectors before this offset (from data_offset) have been recovered */
+	__u32	dev_number;	/* permanent identifier of this  device - not role in raid */
+	__u32	cnt_corrected_read; /* number of read errors that were corrected by re-writing */
+	__u8	device_uuid[16]; /* user-space setable, ignored by kernel */
+	__u8	pad2[64-56];	/* set to 0 when writing */
+
+	/* array state information - 64 bytes */
+	__u64	utime;		/* 40 bits second, 24 btes microseconds */
+	__u64	events;		/* incremented when superblock updated */
+	__u64	resync_offset;	/* data before this offset (from data_offset) known to be in sync */
+	__u32	sb_csum;	/* checksum upto devs[max_dev] */
+	__u32	max_dev;	/* size of devs[] array to consider */
+	__u8	pad3[64-40];	/* set to 0 when writing */
+
+	/* device state information. Indexed by dev_number.
+	 * 2 bytes per device
+	 * Note there are no per-device state flags. State information is rolled
+	 * into the 'roles' value.  If a device is spare or faulty, then it doesn't
+	 * have a meaningful role.
+	 */
+	__u16	dev_roles[0];	/* role in array, or 0xffff for a spare, or 0xfffe for faulty */
+};
+
 #endif 
 

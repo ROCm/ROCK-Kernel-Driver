@@ -203,7 +203,6 @@ struct disk_info {
 struct raid5_private_data {
 	struct stripe_head	**stripe_hashtbl;
 	mddev_t			*mddev;
-	mdk_thread_t		*thread;
 	struct disk_info	disks[MD_SB_DISKS];
 	struct disk_info	*spare;
 	int			chunk_size, level, algorithm;
@@ -226,7 +225,6 @@ struct raid5_private_data {
 							 * waiting for 25% to be free
 							 */        
 	spinlock_t		device_lock;
-	char			thread_name[MD_THREAD_NAME_MAX];
 };
 
 typedef struct raid5_private_data raid5_conf_t;
