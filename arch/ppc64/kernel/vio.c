@@ -145,7 +145,7 @@ static int __init vio_bus_init(void)
 		return 1;
 	}
 	memset(vio_bus_device, 0, sizeof(struct vio_dev));
-	strcpy(vio_bus_device->dev.bus_id, "vdevice");
+	strcpy(vio_bus_device->dev.bus_id, "vio");
 
 	err = device_register(&vio_bus_device->dev);
 	if (err) {
@@ -193,6 +193,15 @@ static void __devinit vio_dev_release(struct device *dev)
 	of_node_put(viodev->archdata);
 	kfree(viodev);
 }
+
+static ssize_t viodev_show_name(struct device *dev, char *buf)
+{
+	struct vio_dev *viodev = to_vio_dev(dev);
+	struct device_node *of_node = viodev->archdata;
+
+	return sprintf(buf, "%s\n", of_node->name);
+}
+DEVICE_ATTR(name, S_IRUSR | S_IRGRP | S_IROTH, viodev_show_name, NULL);
 
 /**
  * vio_register_device: - Register a new vio device.
@@ -251,8 +260,7 @@ struct vio_dev * __devinit vio_register_device(struct device_node *of_node)
 	/* init generic 'struct device' fields: */
 	viodev->dev.parent = &vio_bus_device->dev;
 	viodev->dev.bus = &vio_bus_type;
-	snprintf(viodev->dev.bus_id, BUS_ID_SIZE, "%s@%lx",
-		of_node->name, viodev->unit_address);
+	snprintf(viodev->dev.bus_id, BUS_ID_SIZE, "%lx", viodev->unit_address);
 	viodev->dev.release = vio_dev_release;
 
 	/* register with generic device framework */
@@ -263,6 +271,7 @@ struct vio_dev * __devinit vio_register_device(struct device_node *of_node)
 		kfree(viodev);
 		return NULL;
 	}
+	device_create_file(&viodev->dev, &dev_attr_name);
 
 	return viodev;
 }
