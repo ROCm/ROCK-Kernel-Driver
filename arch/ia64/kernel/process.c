@@ -582,6 +582,15 @@ kernel_thread (int (*fn)(void *), void *arg, unsigned long flags)
 
 	tid = clone(flags | CLONE_VM | CLONE_UNTRACED, 0);
 	if (parent != current) {
+#ifdef CONFIG_IA32_SUPPORT
+		if (IS_IA32_PROCESS(ia64_task_regs(current))) {
+			/* A kernel thread is always a 64-bit process. */
+			current->thread.map_base  = DEFAULT_MAP_BASE;
+			current->thread.task_size = DEFAULT_TASK_SIZE;
+			ia64_set_kr(IA64_KR_IO_BASE, current->thread.old_iob);
+			ia64_set_kr(IA64_KR_TSSD, current->thread.old_k1);
+		}
+#endif
 		result = (*fn)(arg);
 		_exit(result);
 	}
