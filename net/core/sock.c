@@ -443,7 +443,8 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 		struct timeval tm;
 	} v;
 	
-	unsigned int lv=sizeof(int),len;
+	unsigned int lv = sizeof(int);
+	int len;
   	
   	if(get_user(len,optlen))
   		return -EFAULT;
