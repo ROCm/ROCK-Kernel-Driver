@@ -258,7 +258,6 @@ int esp6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_b
 		u8 nexthdr[2];
 		struct scatterlist *sg = &esp->sgbuf[0];
 		u8 padlen;
-		u8 *prevhdr;
 
 		if (unlikely(nfrags > ESP_NUM_FAST_SG)) {
 			sg = kmalloc(sizeof(struct scatterlist)*nfrags, GFP_ATOMIC);
@@ -289,8 +288,7 @@ int esp6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_b
 		skb->nh.raw += sizeof(struct ipv6_esp_hdr) + esp->conf.ivlen;
 		memcpy(skb->nh.raw, tmp_hdr, hdr_len);
 		skb->nh.ipv6h->payload_len = htons(skb->len - sizeof(struct ipv6hdr));
-		ip6_find_1stfragopt(skb, &prevhdr);
-		ret = *prevhdr = nexthdr[1];
+		ret = nexthdr[1];
 	}
 
 out:
