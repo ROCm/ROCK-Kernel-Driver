@@ -432,8 +432,7 @@ struct pci_bus {
 	unsigned char	productver;	/* product version */
 	unsigned char	checksum;	/* if zero - checksum passed */
 	unsigned char	pad1;
-
-	struct iobus	iobus;		/* Generic device interface */
+	struct	device	* dev;
 };
 
 #define pci_bus_b(n) list_entry(n, struct pci_bus, node)

@@ -1086,13 +1086,7 @@ struct pci_bus * __devinit pci_add_new_bus(struct pci_bus *parent, struct pci_de
 	child->parent = parent;
 	child->ops = parent->ops;
 	child->sysdata = parent->sysdata;
-
-	/* init generic fields */
-	child->iobus.self = &dev->dev;
-	child->iobus.parent = &parent->iobus;
-	dev->dev.subordinate = &child->iobus;
-
-	strcpy(child->iobus.name,dev->dev.name);
+	child->dev = &dev->dev;
 
 	/*
 	 * Set up the primary, secondary and subordinate
@@ -1361,16 +1355,11 @@ unsigned int __devinit pci_do_scan_bus(struct pci_bus *bus)
 	DBG("Scanning bus %02x\n", bus->number);
 	max = bus->secondary;
 
-	/* we should know for sure what the bus number is, so set the bus ID
-	 * for the bus and make sure it's registered in the device tree */
-	sprintf(bus->iobus.bus_id,"pci%d",bus->number);
-	iobus_register(&bus->iobus);
-
 	/* Create a device template */
 	memset(&dev0, 0, sizeof(dev0));
 	dev0.bus = bus;
 	dev0.sysdata = bus->sysdata;
-	dev0.dev.parent = &bus->iobus;
+	dev0.dev.parent = bus->dev;
 	dev0.dev.driver = &pci_device_driver;
 
 	/* Go find them, Rover! */
@@ -1430,9 +1419,11 @@ struct pci_bus * __devinit  pci_alloc_primary_bus(int bus)
 		return NULL;
 	list_add_tail(&b->node, &pci_root_buses);
 
-	sprintf(b->iobus.bus_id,"pci%d",bus);
-	strcpy(b->iobus.name,"Host/PCI Bridge");
-	iobus_register(&b->iobus);
+	b->dev = kmalloc(sizeof(*(b->dev)),GFP_KERNEL);
+	memset(b->dev,0,sizeof(*(b->dev)));
+	sprintf(b->dev->bus_id,"pci%d",bus);
+	strcpy(b->dev->name,"Host/PCI Bridge");
+	device_register(b->dev);
 
 	b->number = b->secondary = bus;
 	b->resource[0] = &ioport_resource;

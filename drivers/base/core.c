@@ -18,19 +18,13 @@
 # define DBG(x...)
 #endif
 
-static struct iobus device_root = {
-	bus_id: "root",
-	name:	"Logical System Root",
-};
+static struct device * device_root;
 
 int (*platform_notify)(struct device * dev) = NULL;
 int (*platform_notify_remove)(struct device * dev) = NULL;
 
 extern int device_make_dir(struct device * dev);
 extern void device_remove_dir(struct device * dev);
-
-extern int iobus_make_dir(struct iobus * iobus);
-extern void iobus_remove_dir(struct iobus * iobus);
 
 static spinlock_t device_lock;
 
@@ -48,19 +42,23 @@ int device_register(struct device *dev)
 
 	if (!dev || !strlen(dev->bus_id))
 		return -EINVAL;
-	BUG_ON(!dev->parent);
 
 	spin_lock(&device_lock);
 	INIT_LIST_HEAD(&dev->node);
+	INIT_LIST_HEAD(&dev->children);
 	spin_lock_init(&dev->lock);
 	atomic_set(&dev->refcount,2);
 
-	get_iobus(dev->parent);
-	list_add_tail(&dev->node,&dev->parent->devices);
+	if (dev != device_root) {
+		if (!dev->parent)
+			dev->parent = device_root;
+		get_device(dev->parent);
+		list_add_tail(&dev->node,&dev->parent->children);
+	}
 	spin_unlock(&device_lock);
 
-	DBG("DEV: registering device: ID = '%s', name = %s, parent = %s\n",
-	    dev->bus_id, dev->name, parent->bus_id);
+	DBG("DEV: registering device: ID = '%s', name = %s\n",
+	    dev->bus_id, dev->name);
 
 	if ((error = device_make_dir(dev)))
 		goto register_done;
@@ -71,8 +69,8 @@ int device_register(struct device *dev)
 
  register_done:
 	put_device(dev);
-	if (error)
-		put_iobus(dev->parent);
+	if (error && dev->parent)
+		put_device(dev->parent);
 	return error;
 }
 
@@ -101,9 +99,6 @@ void put_device(struct device * dev)
 	/* remove the driverfs directory */
 	device_remove_dir(dev);
 
-	if (dev->subordinate)
-		iobus_remove_dir(dev->subordinate);
-
 	/* Notify the platform of the removal, in case they
 	 * need to do anything...
 	 */
@@ -117,70 +112,18 @@ void put_device(struct device * dev)
 	if (dev->driver && dev->driver->remove)
 		dev->driver->remove(dev,REMOVE_FREE_RESOURCES);
 
-	put_iobus(dev->parent);
-}
-
-int iobus_register(struct iobus *bus)
-{
-	int error;
-
-	if (!bus || !strlen(bus->bus_id))
-		return -EINVAL;
-	
-	spin_lock(&device_lock);
-	atomic_set(&bus->refcount,2);
-	spin_lock_init(&bus->lock);
-	INIT_LIST_HEAD(&bus->node);
-	INIT_LIST_HEAD(&bus->devices);
-	INIT_LIST_HEAD(&bus->children);
-
-	if (bus != &device_root) {
-		if (!bus->parent)
-			bus->parent = &device_root;
-		get_iobus(bus->parent);
-		list_add_tail(&bus->node,&bus->parent->children);
-	}
-	spin_unlock(&device_lock);
-
-	DBG("DEV: registering bus. ID = '%s' name = '%s' parent = %p\n",
-	    bus->bus_id,bus->name,bus->parent);
-
-	error = iobus_make_dir(bus);
-
-	put_iobus(bus);
-	if (error && bus->parent)
-		put_iobus(bus->parent);
-	return error;
-}
-
-/**
- * iobus_unregister - remove bus and children from device tree
- * @bus:	pointer to bus structure
- *
- * Remove device from parent's list of children and decrement
- * reference count on controlling device. That should take care of
- * the rest of the cleanup.
- */
-void put_iobus(struct iobus * iobus)
-{
-	if (!atomic_dec_and_lock(&iobus->refcount,&device_lock))
-		return;
-	list_del_init(&iobus->node);
-	spin_unlock(&device_lock);
-
-	if (!list_empty(&iobus->devices) ||
-	    !list_empty(&iobus->children))
-		BUG();
-
-	put_iobus(iobus->parent);
-	/* unregister itself */
-	put_device(iobus->self);
+	put_device(dev->parent);
 }
 
 static int __init device_init_root(void)
 {
-	/* initialize parent bus lists */
-	return iobus_register(&device_root);
+	device_root = kmalloc(sizeof(*device_root),GFP_KERNEL);
+	if (!device_root)
+		return -ENOMEM;
+	memset(device_root,0,sizeof(*device_root));
+	strcpy(device_root->bus_id,"root");
+	strcpy(device_root->name,"System Root");
+	return device_register(device_root);
 }
 
 static int __init device_driver_init(void)
@@ -212,5 +155,3 @@ subsys_initcall(device_driver_init);
 
 EXPORT_SYMBOL(device_register);
 EXPORT_SYMBOL(put_device);
-EXPORT_SYMBOL(iobus_register);
-EXPORT_SYMBOL(put_iobus);
