@@ -47,7 +47,8 @@ static int sendcmd(
 				      2: address is in scsi3addr */
 	unsigned int log_unit,
 	__u8	page_code,
-	unsigned char *scsi3addr );
+	unsigned char *scsi3addr,
+	int cmd_type);
 
 
 int __init cciss_scsi_detect(Scsi_Host_Template *tpnt);
