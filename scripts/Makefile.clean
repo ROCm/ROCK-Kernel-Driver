@@ -42,7 +42,7 @@ quiet_cmd_clean = CLEAN   $(obj)
 
 __clean: $(subdir-ymn)
 ifneq ($(strip $(__clean-files) $(clean-rule)),)
-	$(call cmd,clean)
+	+$(call cmd,clean)
 else
 	@:
 endif
