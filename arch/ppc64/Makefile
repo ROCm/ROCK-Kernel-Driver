@@ -19,7 +19,7 @@ LINKFLAGS	= -T arch/ppc64/vmlinux.lds -Bstatic \
 		-e $(KERNELLOAD) -Ttext $(KERNELLOAD)
 CFLAGS		:= $(CFLAGS) -fsigned-char -msoft-float -pipe \
 		-Wno-uninitialized -mminimal-toc -mtraceback=full \
-		-Wa,-mpower4
+		-Wa,-mpower4 -finline-limit-2000
 CPP		= $(CC) -E $(CFLAGS)
 
 
