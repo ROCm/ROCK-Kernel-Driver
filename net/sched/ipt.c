@@ -92,6 +92,25 @@ ipt_destroy_target(struct ipt_entry_target *t)
 }
 
 static int
+tcf_ipt_release(struct tcf_ipt *p, int bind)
+{
+	int ret = 0;
+	if (p) {
+		if (bind)
+			p->bindcnt--;
+		p->refcnt--;
+		if (p->bindcnt <= 0 && p->refcnt <= 0) {
+			ipt_destroy_target(p->t);
+			kfree(p->tname);
+			kfree(p->t);
+			tcf_hash_destroy(p);
+			ret = ACT_P_DELETED;
+		}
+	}
+	return ret;
+}
+
+static int
 tcf_ipt_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a,
              int ovr, int bind)
 {
@@ -129,7 +148,7 @@ tcf_ipt_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a,
 		ret = ACT_P_CREATED;
 	} else {
 		if (!ovr) {
-			tcf_hash_release(p, bind);
+			tcf_ipt_release(p, bind);
 			return -EEXIST;
 		}
 	}
@@ -178,15 +197,8 @@ err1:
 static int
 tcf_ipt_cleanup(struct tc_action *a, int bind)
 {
-	struct tcf_ipt *p = PRIV(a,ipt);
-
-	if (NULL != p) {
-		struct ipt_entry_target *t = p->t;
-		if (t && t->u.kernel.target)
-			module_put(t->u.kernel.target->me);
-		return tcf_hash_release(p, bind);
-	}
-	return 0;
+	struct tcf_ipt *p = PRIV(a, ipt);
+	return tcf_ipt_release(p, bind);
 }
 
 static int
