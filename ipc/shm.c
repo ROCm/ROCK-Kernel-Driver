@@ -688,6 +688,10 @@ long do_shmat(int shmid, char __user *shmaddr, int shmflg, ulong *raddr)
 		o_flags = O_RDWR;
 		acc_mode = S_IRUGO | S_IWUGO;
 	}
+	if (shmflg & SHM_EXEC) {
+		prot |= PROT_EXEC;
+		acc_mode |= S_IXUGO;
+	}
 
 	/*
 	 * We cannot rely on the fs check since SYSV IPC does have an

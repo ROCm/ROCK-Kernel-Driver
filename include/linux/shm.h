@@ -44,6 +44,7 @@ struct shmid_ds {
 #define	SHM_RDONLY	010000	/* read-only access */
 #define	SHM_RND		020000	/* round attach address to SHMLBA boundary */
 #define	SHM_REMAP	040000	/* take-over region on attach */
+#define	SHM_EXEC	0100000	/* execution access */
 
 /* super user shmctl commands */
 #define SHM_LOCK 	11
