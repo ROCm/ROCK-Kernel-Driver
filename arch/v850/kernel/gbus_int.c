@@ -71,7 +71,7 @@ int gbus_int_irq_enabled (unsigned irq)
 }
 
 /* Disable all GBUS irqs.  */
-int gbus_int_disable_irqs ()
+void gbus_int_disable_irqs ()
 {
 	unsigned w, n;
 	for (w = 0; w < GBUS_INT_NUM_WORDS; w++)

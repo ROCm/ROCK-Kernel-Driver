@@ -65,7 +65,7 @@ extern void gbus_int_disable_irq (unsigned irq);
 /* Return true if interrupt handling for interrupt IRQ is enabled.  */
 extern int gbus_int_irq_enabled (unsigned irq);
 /* Disable all GBUS irqs.  */
-extern int gbus_int_disable_irqs (void);
+extern void gbus_int_disable_irqs (void);
 /* Clear any pending interrupts for IRQ.  */
 extern void gbus_int_clear_pending_irq (unsigned irq);
 /* Return true if interrupt IRQ is pending (but disabled).  */
