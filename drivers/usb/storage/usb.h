@@ -102,6 +102,7 @@ struct us_unusual_dev {
 #define US_FL_IGNORE_SER      0x00000010 /* Ignore the serial number given  */
 #define US_FL_SCM_MULT_TARG   0x00000020 /* supports multiple targets	    */
 #define US_FL_FIX_INQUIRY     0x00000040 /* INQUIRY response needs fixing   */
+#define US_FL_FIX_CAPACITY    0x00000080 /* READ CAPACITY response too big  */
 
 #define US_FL_DEV_ATTACHED    0x00010000 /* is the device attached?	    */
 #define US_FLIDX_IP_WANTED   17  /* 0x00020000	is an IRQ expected?	    */
