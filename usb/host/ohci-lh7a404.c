@@ -191,7 +191,6 @@ int usb_hcd_lh7a404_probe (const struct hc_driver *driver,
  */
 void usb_hcd_lh7a404_remove (struct usb_hcd *hcd, struct platform_device *dev)
 {
-	struct usb_device	*hub;
 	void *base;
 
 	pr_debug ("remove: %s, state %x", hcd->self.bus_name, hcd->state);
@@ -199,11 +198,10 @@ void usb_hcd_lh7a404_remove (struct usb_hcd *hcd, struct platform_device *dev)
 	if (in_interrupt ())
 		BUG ();
 
-	hub = hcd->self.root_hub;
 	hcd->state = USB_STATE_QUIESCING;
 
 	pr_debug ("%s: roothub graceful disconnect", hcd->self.bus_name);
-	usb_disconnect (&hub);
+	usb_disconnect (&hcd->self.root_hub);
 
 	hcd->driver->stop (hcd);
 	hcd->state = USB_STATE_HALT;
