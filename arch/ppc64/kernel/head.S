@@ -1119,6 +1119,12 @@ _GLOBAL(save_remaining_regs)
 	SAVE_8GPRS(24, r1)
 
 	/*
+	 * Clear the RESULT field
+	 */
+	li	r22,0
+	std	r22,RESULT(r1)
+
+	/*
 	 * Test if from user state; result will be tested later
 	 */
 	andi.	r23,r23,MSR_PR		/* Set CR for later branch */
