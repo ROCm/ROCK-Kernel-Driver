@@ -70,21 +70,6 @@ static unsigned int calc_speed (int mult, int fsb)
 }
 
 
-static unsigned int longhaul_get_cpu_fsb (void)
-{
-	unsigned long lo, hi;
-	unsigned int eblcr_fsb_table[] = { 66, 133, 100, -1 };
-	unsigned int invalue=0;
-
-	if (fsb == 0) {
-		rdmsr (MSR_IA32_EBL_CR_POWERON, lo, hi);
-		invalue = (lo & (1<<18|1<<19)) >>18;
-		fsb = eblcr_fsb_table[invalue];
-	}
-	return fsb;
-}
-
-
 static int longhaul_get_cpu_mult (void)
 {
 	unsigned long invalue=0,lo, hi;
@@ -193,6 +178,39 @@ static void longhaul_setstate (unsigned int clock_ratio_index)
 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 }
 
+/*
+ * Centaur decided to make life a little more tricky.
+ * Only longhaul v1 is allowed to read EBLCR BSEL[0:1].
+ * Samuel2 and above have to try and guess what the FSB is.
+ * We do this by assuming we booted at maximum multiplier, and interpolate
+ * between that value multiplied by possible FSBs and cpu_mhz which
+ * was calculated at boot time. Really ugly, but no other way to do this.
+ */
+static int _guess (int guess, int maxmult)
+{
+	int target;
+
+	target = ((maxmult/10)*guess);
+	if (maxmult%10 != 0)
+		target += (guess/2);
+	target &= ~0xf;
+	return target;
+}
+
+static int guess_fsb(int maxmult)
+{
+	int speed = (cpu_khz/1000) & ~0xf;
+	int i;
+	int speeds[3] = { 66, 100, 133 };
+
+	for (i=0; i<3; i++) {
+		if (_guess(speeds[i],maxmult) == speed)
+			return speeds[i];
+	}
+	return 0;
+}
+
+
 
 static int __init longhaul_get_ranges (void)
 {
@@ -203,8 +221,8 @@ static int __init longhaul_get_ranges (void)
 		-1,110,120,-1,135,115,125,105,130,150,160,140,-1,155,-1,145 };
 	unsigned int j, k = 0;
 	union msr_longhaul longhaul;
-
-	fsb = longhaul_get_cpu_fsb();
+	unsigned long lo, hi;
+	unsigned int eblcr_fsb_table[] = { 66, 133, 100, -1 };
 
 	switch (longhaul_version) {
 	case 1:
@@ -212,6 +230,9 @@ static int __init longhaul_get_ranges (void)
 		   Assume min=3.0x & max = whatever we booted at. */
 		minmult = 30;
 		maxmult = longhaul_get_cpu_mult();
+		rdmsr (MSR_IA32_EBL_CR_POWERON, lo, hi);
+		invalue = (lo & (1<<18|1<<19)) >>18;
+		fsb = eblcr_fsb_table[invalue];
 		break;
 
 	case 2 ... 3:
@@ -222,14 +243,13 @@ static int __init longhaul_get_ranges (void)
 			invalue += 16;
 		maxmult=multipliers[invalue];
 
-#if 0
 		invalue = longhaul.bits.MinMHzBR;
-		if (longhaul.bits.MinMHzBR4);
-			invalue += 16;
-		minmult = multipliers[invalue];
-#else
-		minmult = 30; /* as per spec */
-#endif
+		if (longhaul.bits.MinMHzBR4 == 1)
+			minmult = 30;
+		else
+			minmult = multipliers[invalue];
+
+		fsb = guess_fsb(maxmult);
 		break;
 	}
 
