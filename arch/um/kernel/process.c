@@ -224,7 +224,7 @@ static int stop_ptraced_child(int pid, void *stack, int exitcode, int mustpanic)
 	return ret;
 }
 
-static int force_sysemu_disabled = 0;
+static int force_sysemu_disabled = 1;
 
 static int __init nosysemu_cmd_param(char *str, int* add)
 {
@@ -232,20 +232,35 @@ static int __init nosysemu_cmd_param(char *str, int* add)
 	return 0;
 }
 
+static int __init sysemu_cmd_param(char *str, int* add)
+{
+	force_sysemu_disabled = 0;
+	return 0;
+}
+
 __uml_setup("nosysemu", nosysemu_cmd_param,
 		"nosysemu\n"
-		"    Turns off syscall emulation patch for ptrace (SYSEMU) on.\n"
+		"    Turns off syscall emulation patch for ptrace (SYSEMU).\n"
 		"    SYSEMU is a performance-patch introduced by Laurent Vivier. It changes\n"
 		"    behaviour of ptrace() and helps reducing host context switch rate.\n"
 		"    To make it working, you need a kernel patch for your host, too.\n"
 		"    See http://perso.wanadoo.fr/laurent.vivier/UML/ for further information.\n\n");
+__uml_setup("sysemu", sysemu_cmd_param,
+		"sysemu\n"
+		"    Turns on syscall emulation patch for ptrace (SYSEMU).\n\n");
 
 static void __init check_sysemu(void)
 {
 	void *stack;
 	int pid, syscall, n, status, count=0;
 
-	printk("Checking syscall emulation patch for ptrace...");
+	if (force_sysemu_disabled) {
+		printk("Skipping syscall emulation patch check (disabled)\n");
+		sysemu_supported = 0;
+		set_using_sysemu(0);
+		return;
+	}
+
 	sysemu_supported = 0;
 	pid = start_ptraced_child(&stack);
 

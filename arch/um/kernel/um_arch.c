@@ -438,9 +438,7 @@ void __init setup_arch(char **cmdline_p)
  	strcpy(command_line, saved_command_line);
  	*cmdline_p = command_line;
 	setup_hostinfo();
-#if defined(CONFIG_DUMMY_CONSOLE)
-	conswitchp = &dummy_con;
-#endif  
+	console_use_vt = 0;
 }
 
 void __init check_bugs(void)
