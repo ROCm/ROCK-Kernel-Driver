@@ -1,7 +1,7 @@
 /*
- *   Copyright (c) International Business Machines  Corp., 2002
- *   Copyright (c) Andreas Gruenbacher, 2001
- *   Copyright (c) Linus Torvalds, 1991, 1992
+ *   Copyright (C) International Business Machines  Corp., 2002-2004
+ *   Copyright (C) Andreas Gruenbacher, 2001
+ *   Copyright (C) Linus Torvalds, 1991, 1992
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@
 
 #include <linux/sched.h>
 #include <linux/fs.h>
+#include <linux/quotaops.h>
 #include "jfs_incore.h"
 #include "jfs_xattr.h"
 #include "jfs_acl.h"
@@ -280,6 +281,12 @@ int jfs_setattr(struct dentry *dentry, struct iattr *iattr)
 	rc = inode_change_ok(inode, iattr);
 	if (rc)
 		return rc;
+
+	if ((iattr->ia_valid & ATTR_UID && iattr->ia_uid != inode->i_uid) ||
+	    (iattr->ia_valid & ATTR_GID && iattr->ia_gid != inode->i_gid)) {
+		if (DQUOT_TRANSFER(inode, iattr))
+			return -EDQUOT;
+	}
 
 	rc = inode_setattr(inode, iattr);
 
