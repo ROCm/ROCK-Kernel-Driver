@@ -112,9 +112,9 @@ devfn_to_vertex(unsigned char busnum, unsigned int devfn)
 	pci_bus = pci_bus_to_vertex(busnum);
 	if (!pci_bus) {
 		/*
-		 * During probing, the Linux pci code invents non existant
+		 * During probing, the Linux pci code invents non-existent
 		 * bus numbers and pci_dev structures and tries to access
-		 * them to determine existance. Don't crib during probing.
+		 * them to determine existence. Don't crib during probing.
 		 */
 		if (done_probing)
 			printk("devfn_to_vertex: Invalid bus number %d given.\n", busnum);

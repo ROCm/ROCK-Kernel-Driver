@@ -24,9 +24,6 @@
 #include <linux/coda_fs_i.h>
 
 /* initialize the debugging variables */
-int coda_debug;
-int coda_print_entry; 
-int coda_access_cache = 1;
 int coda_fake_statfs;
 
 /* print a fid */
@@ -92,35 +89,23 @@ unsigned short coda_flags_to_cflags(unsigned short flags)
 {
 	unsigned short coda_flags = 0;
 	
-	if ( (flags & O_ACCMODE) == O_RDONLY ){ 
-		CDEBUG(D_FILE, "--> C_O_READ added\n");
+	if ((flags & O_ACCMODE) == O_RDONLY)
 		coda_flags |= C_O_READ;
-	}
 
-	if ( (flags & O_ACCMODE) ==  O_RDWR ) { 
-		CDEBUG(D_FILE, "--> C_O_READ | C_O_WRITE added\n");
+	if ((flags & O_ACCMODE) == O_RDWR)
 		coda_flags |= C_O_READ | C_O_WRITE;
-	}
 
-	if ( (flags & O_ACCMODE) == O_WRONLY ){ 
-		CDEBUG(D_FILE, "--> C_O_WRITE added\n");
+	if ((flags & O_ACCMODE) == O_WRONLY)
 		coda_flags |= C_O_WRITE;
-	}
 
-	if ( flags & O_TRUNC )  { 
-		CDEBUG(D_FILE, "--> C_O_TRUNC added\n");
+	if (flags & O_TRUNC)
 		coda_flags |= C_O_TRUNC;
-	}
 
-	if ( flags & O_CREAT )  { 
-		CDEBUG(D_FILE, "--> C_O_CREAT added\n");
+	if (flags & O_CREAT)
 		coda_flags |= C_O_CREAT;
-	}
 
-	if ( flags & O_EXCL ) {
+	if (flags & O_EXCL)
 		coda_flags |= C_O_EXCL;
-		CDEBUG(D_FILE, "--> C_O_EXCL added\n");
-	}
 
 	return coda_flags;
 }

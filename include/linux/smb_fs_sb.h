@@ -54,8 +54,7 @@ struct smb_sb_info {
 	   to put it on the stack. This points to temp_buf space. */
 	char *name_buf;
 
-	int (*convert)(char *, int, const char *, int,
-		       struct nls_table *, struct nls_table *);
+	struct smb_ops *ops;
 };
 
 

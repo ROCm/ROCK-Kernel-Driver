@@ -379,6 +379,9 @@ static void ultra32_block_output(struct net_device *dev,
 #define MAX_ULTRA32_CARDS   4	/* Max number of Ultra cards per module */
 static struct net_device dev_ultra[MAX_ULTRA32_CARDS];
 
+MODULE_DESCRIPTION("SMC Ultra32 EISA ethernet driver");
+MODULE_LICENSE("GPL");
+
 int init_module(void)
 {
 	int this_dev, found = 0;
@@ -415,5 +418,4 @@ void cleanup_module(void)
 	}
 }
 #endif /* MODULE */
-MODULE_LICENSE("GPL");
 

@@ -546,7 +546,7 @@ printk("SIG queue (%s:%d): %d ", t->comm, t->pid, sig);
 	if (bad_signal(sig, info, t))
 		goto out_nolock;
 
-	/* The null signal is a permissions and process existance probe.
+	/* The null signal is a permissions and process existence probe.
 	   No signal is actually delivered.  Same goes for zombies. */
 	ret = 0;
 	if (!sig || !t->sig)

@@ -88,19 +88,43 @@ if [ "$CONFIG_ALPHA_CABRIOLET" = "y" ]
 then
 	define_bool CONFIG_ALPHA_EB64P y
 fi
-if [ "$CONFIG_ALPHA_EB164" = "y" -o "$CONFIG_ALPHA_PC164" = "y" \
-	-o "$CONFIG_ALPHA_ALCOR" = "y" -o "$CONFIG_ALPHA_TAKARA" = "y" ]
+if [ "$CONFIG_ALPHA_ALCOR" = "y" ]
+then
+	define_bool CONFIG_ALPHA_EV5 y
+	define_bool CONFIG_ALPHA_CIA y
+	bool 'EV56 CPU (speed >= 366MHz)?' CONFIG_ALPHA_EV56
+fi
+if [ "$CONFIG_ALPHA_EB164" = "y" ]
 then
 	define_bool CONFIG_ALPHA_EV5 y
 	define_bool CONFIG_ALPHA_CIA y
 fi
-if [ "$CONFIG_ALPHA_MIKASA" = "y" -o "$CONFIG_ALPHA_NORITAKE" = "y" ]
+if [ "$CONFIG_ALPHA_PC164" = "y" -o "$CONFIG_ALPHA_TAKARA" = "y" ]
+then
+	define_bool CONFIG_ALPHA_EV5 y
+	define_bool CONFIG_ALPHA_EV56 y
+	define_bool CONFIG_ALPHA_CIA y
+fi
+if [ "$CONFIG_ALPHA_MIKASA" = "y" ]
 then
 	bool 'EV5 CPU daughtercard (model 5/xxx)?' CONFIG_ALPHA_PRIMO
 	if [ "$CONFIG_ALPHA_PRIMO" = "y" ]
 	then
 		define_bool CONFIG_ALPHA_EV5 y
 		define_bool CONFIG_ALPHA_CIA y
+	else
+		define_bool CONFIG_ALPHA_EV4 y
+		define_bool CONFIG_ALPHA_APECS y
+	fi
+fi
+if [ "$CONFIG_ALPHA_NORITAKE" = "y" ]
+then
+	bool 'EV5 CPU daughtercard (model 5/xxx)?' CONFIG_ALPHA_PRIMO
+	if [ "$CONFIG_ALPHA_PRIMO" = "y" ]
+	then
+		define_bool CONFIG_ALPHA_EV5 y
+		define_bool CONFIG_ALPHA_CIA y
+		bool 'EV56 CPU (speed >= 333MHz)?' CONFIG_ALPHA_EV56
 	else
 		define_bool CONFIG_ALPHA_EV4 y
 		define_bool CONFIG_ALPHA_APECS y
@@ -121,6 +145,7 @@ if [ "$CONFIG_ALPHA_MIATA" = "y" -o "$CONFIG_ALPHA_LX164" = "y" \
 	-o "$CONFIG_ALPHA_SX164" = "y" -o "$CONFIG_ALPHA_RUFFIAN" = "y" ]
 then
 	define_bool CONFIG_ALPHA_EV5 y
+	define_bool CONFIG_ALPHA_EV56 y
 	define_bool CONFIG_ALPHA_CIA y
 	define_bool CONFIG_ALPHA_PYXIS y
 fi
@@ -145,10 +170,12 @@ if [ "$CONFIG_ALPHA_RAWHIDE" = "y" ]
 then
 	define_bool CONFIG_ALPHA_EV5 y
 	define_bool CONFIG_ALPHA_MCPCIA y
+	bool 'EV56 CPU (speed >= 400MHz)?' CONFIG_ALPHA_EV56
 fi
 if [ "$CONFIG_ALPHA_RX164" = "y" ]
 then
 	define_bool CONFIG_ALPHA_EV5 y
+	define_bool CONFIG_ALPHA_EV56 y
 	define_bool CONFIG_ALPHA_POLARIS y
 fi
 if [ "$CONFIG_ALPHA_JENSEN" = "y" ]

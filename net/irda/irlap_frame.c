@@ -768,6 +768,9 @@ void irlap_send_data_primary_poll(struct irlap_cb *self, struct sk_buff *skb)
 {
 	struct sk_buff *tx_skb;
 
+	/* Stop P timer */
+	del_timer(&self->poll_timer);
+		
 	/* Is this reliable or unreliable data? */
 	if (skb->data[1] == I_FRAME) {
 		
@@ -793,22 +796,14 @@ void irlap_send_data_primary_poll(struct irlap_cb *self, struct sk_buff *skb)
 		 *  skb, since retransmitted need to set or clear the poll
 		 *  bit depending on when they are sent.  
 		 */
-		/* Stop P timer */
-		del_timer(&self->poll_timer);
-		
 		tx_skb->data[1] |= PF_BIT;
 		
 		self->vs = (self->vs + 1) % 8;
 		self->ack_required = FALSE;
-		self->window = self->window_size;
-
-		irlap_start_final_timer(self, self->final_timeout);
 
 		irlap_send_i_frame(self, tx_skb, CMD_FRAME);
 	} else {
 		IRDA_DEBUG(4, __FUNCTION__ "(), sending unreliable frame\n");
-
-		del_timer(&self->poll_timer);
 
 		if (self->ack_required) {
 			irlap_send_ui_frame(self, skb_get(skb), self->caddr, CMD_FRAME);
@@ -818,9 +813,15 @@ void irlap_send_data_primary_poll(struct irlap_cb *self, struct sk_buff *skb)
 			skb->data[1] |= PF_BIT;
 			irlap_send_ui_frame(self, skb_get(skb), self->caddr, CMD_FRAME);
 		}
-		self->window = self->window_size;
-		irlap_start_final_timer(self, self->final_timeout);
 	}
+
+	self->window = self->window_size;
+#ifdef CONFIG_IRDA_DYNAMIC_WINDOW
+	/* We are allowed to transmit a maximum number of bytes again. */
+	self->bytes_left = self->line_capacity;
+#endif /* CONFIG_IRDA_DYNAMIC_WINDOW */
+
+	irlap_start_final_timer(self, self->final_timeout);
 }
 
 /*
@@ -858,11 +859,8 @@ void irlap_send_data_secondary_final(struct irlap_cb *self,
 		tx_skb->data[1] |= PF_BIT;
 		
 		self->vs = (self->vs + 1) % 8; 
-		self->window = self->window_size;
 		self->ack_required = FALSE;
 		
-		irlap_start_wd_timer(self, self->wd_timeout);
-
 		irlap_send_i_frame(self, tx_skb, RSP_FRAME); 
 	} else {
 		if (self->ack_required) {
@@ -873,10 +871,15 @@ void irlap_send_data_secondary_final(struct irlap_cb *self,
 			skb->data[1] |= PF_BIT;
 			irlap_send_ui_frame(self, skb_get(skb), self->caddr, RSP_FRAME);
 		}
-		self->window = self->window_size;
-
-		irlap_start_wd_timer(self, self->wd_timeout);
 	}
+
+	self->window = self->window_size;
+#ifdef CONFIG_IRDA_DYNAMIC_WINDOW
+	/* We are allowed to transmit a maximum number of bytes again. */
+	self->bytes_left = self->line_capacity;
+#endif /* CONFIG_IRDA_DYNAMIC_WINDOW */
+
+	irlap_start_wd_timer(self, self->wd_timeout);
 }
 
 /*

@@ -1,9 +1,7 @@
 /*
- *  linux/drivers/ide/ide-pci.c		Version 1.05	June 9, 2000
- *
  *  Copyright (c) 1998-2000  Andre Hedrick <andre@linux-ide.org>
- *
  *  Copyright (c) 1995-1998  Mark Lord
+ *
  *  May be copied or modified under the terms of the GNU General Public License
  */
 
@@ -168,9 +166,9 @@ extern void ide_dmacapable_via82cxxx(ide_hwif_t *, unsigned long);
 #endif
 
 typedef struct ide_pci_enablebit_s {
-	byte	reg;	/* byte pci reg holding the enable-bit */
-	byte	mask;	/* mask to isolate the enable-bit */
-	byte	val;	/* value of masked reg when "enabled" */
+	u8	reg;	/* pci configuration register holding the enable-bit */
+	u8	mask;	/* mask used to isolate the enable-bit */
+	u8	val;	/* expected value of masked register when "enabled" */
 } ide_pci_enablebit_t;
 
 /* Flags used to untangle quirk handling.
@@ -230,9 +228,10 @@ static ide_pci_device_t pci_chipsets[] __initdata = {
 	{PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20267, pci_init_pdc202xx, ata66_pdc202xx, ide_init_pdc202xx, NULL, {{0x50,0x02,0x02}, {0x50,0x04,0x04}}, OFF_BOARD, 48, ATA_F_IRQ  | ATA_F_DMA },
 # endif
 	{PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20268, pci_init_pdc202xx, ata66_pdc202xx, ide_init_pdc202xx, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 0, ATA_F_IRQ | ATA_F_DMA },
-	/* Promise used a different PCI ident for the raid card apparently to try and
-	   prevent Linux detecting it and using our own raid code. We want to detect
-	   it for the ataraid drivers, so we have to list both here.. */
+	/* Promise used a different PCI identification for the raid card
+	 * apparently to try and prevent Linux detecting it and using our own
+	 * raid code. We want to detect it for the ataraid drivers, so we have
+	 * to list both here.. */
 	{PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20268R, pci_init_pdc202xx, ata66_pdc202xx, ide_init_pdc202xx, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 0, ATA_F_IRQ  | ATA_F_DMA },
 	{PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20269, pci_init_pdc202xx, ata66_pdc202xx, ide_init_pdc202xx, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 0, ATA_F_IRQ | ATA_F_DMA },
 	{PCI_VENDOR_ID_PROMISE, PCI_DEVICE_ID_PROMISE_20275, pci_init_pdc202xx, ata66_pdc202xx,	ide_init_pdc202xx, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 0, ATA_F_IRQ | ATA_F_DMA },
@@ -303,7 +302,9 @@ static ide_pci_device_t pci_chipsets[] __initdata = {
 #ifdef CONFIG_BLK_DEV_IT8172
 	{PCI_VENDOR_ID_ITE, PCI_DEVICE_ID_ITE_IT8172G, pci_init_it8172,	NULL, ide_init_it8172, NULL, {{0x00,0x00,0x00}, {0x40,0x00,0x01}}, ON_BOARD, 0, 0 },
 #endif
-	/* Those are id's of chips we don't deal currently with. */
+	/* Those are id's of chips we don't deal currently with,
+	 * but which still need some generic quirk handling.
+	 */
 	{PCI_VENDOR_ID_PCTECH, PCI_DEVICE_ID_PCTECH_SAMURAI_IDE, NULL, NULL, NULL, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, 0 },
 	{PCI_VENDOR_ID_CMD, PCI_DEVICE_ID_CMD_640, NULL, NULL, IDE_IGNORE, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, 0 },
 	{PCI_VENDOR_ID_NS, PCI_DEVICE_ID_NS_87410, NULL, NULL, NULL, NULL, {{0x43,0x08,0x08}, {0x47,0x08,0x08}}, ON_BOARD, 0, 0 },
@@ -313,10 +314,11 @@ static ide_pci_device_t pci_chipsets[] __initdata = {
 	{PCI_VENDOR_ID_UMC, PCI_DEVICE_ID_UMC_UM8886A, NULL, NULL, NULL, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, ATA_F_FIXIRQ },
 	{PCI_VENDOR_ID_UMC, PCI_DEVICE_ID_UMC_UM8886BF, NULL, NULL, NULL, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, ATA_F_FIXIRQ },
 	{PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C561, NULL, NULL, NULL, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, ATA_F_NOADMA },
+	{PCI_VENDOR_ID_TTI, PCI_DEVICE_ID_TTI_HPT366, NULL, NULL, IDE_NO_DRIVER, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 240, ATA_F_IRQ | ATA_F_HPTHACK },
 	{0, 0, NULL, NULL, NULL, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0 }};
 
 /*
- * This allows offboard ide-pci cards the enable a BIOS, verify interrupt
+ * This allows off board ide-pci cards the enable a BIOS, verify interrupt
  * settings of split-mirror pci-config space, place chipset into init-mode,
  * and/or preserve an interrupt if the card is not native ide support.
  */
@@ -332,7 +334,7 @@ static unsigned int __init trust_pci_irq(ide_pci_device_t *d, struct pci_dev *de
  * Match a PCI IDE port against an entry in ide_hwifs[],
  * based on io_base port if possible.
  */
-static ide_hwif_t __init *lookup_hwif (unsigned long io_base, byte bootable, const char *name)
+static ide_hwif_t __init *lookup_hwif (unsigned long io_base, int bootable, const char *name)
 {
 	int h;
 	ide_hwif_t *hwif;
@@ -396,7 +398,8 @@ static ide_hwif_t __init *lookup_hwif (unsigned long io_base, byte bootable, con
 
 static int __init setup_pci_baseregs (struct pci_dev *dev, const char *name)
 {
-	byte reg, progif = 0;
+	u8 reg;
+	u8 progif = 0;
 
 	/*
 	 * Place both IDE interfaces into PCI "native" mode:
@@ -428,10 +431,111 @@ static int __init setup_pci_baseregs (struct pci_dev *dev, const char *name)
 	return 0;
 }
 
+#ifdef CONFIG_BLK_DEV_IDEDMA
+
+/*
+ * Fetch the DMA Bus-Master-I/O-Base-Address (BMIBA) from PCI space:
+ */
+static unsigned long __init get_dma_base(ide_hwif_t *hwif, int extra, const char *name)
+{
+	unsigned long	dma_base = 0;
+	struct pci_dev	*dev = hwif->pci_dev;
+
+	/*
+	 * If we are on the second channel, the dma base address will be one
+	 * entry away from the primary interface.
+	 */
+
+	if (hwif->mate && hwif->mate->dma_base)
+		dma_base = hwif->mate->dma_base - (hwif->channel ? 0 : 8);
+	else
+		dma_base = pci_resource_start(dev, 4);
+
+	if (!dma_base)
+		return 0;
+
+	if (extra) /* PDC20246, PDC20262, HPT343, & HPT366 */
+		request_region(dma_base + 16, extra, name);
+
+	dma_base += hwif->channel ? 8 : 0;
+	hwif->dma_extra = extra;
+
+	if ((dev->vendor == PCI_VENDOR_ID_AL && dev->device == PCI_DEVICE_ID_AL_M5219) ||
+			(dev->vendor == PCI_VENDOR_ID_AMD && dev->device == PCI_DEVICE_ID_AMD_VIPER_7409) ||
+			(dev->vendor == PCI_VENDOR_ID_CMD && dev->device == PCI_DEVICE_ID_CMD_643)) {
+		outb(inb(dma_base + 2) & 0x60, dma_base+2);
+		if (inb(dma_base + 2) & 0x80)
+			printk(KERN_INFO "%s: simplex device: DMA forced\n", name);
+	} else {
+
+		/*
+		 * If the device claims "simplex" DMA, this means only one of
+		 * the two interfaces can be trusted with DMA at any point in
+		 * time.  So we should enable DMA only on one of the two
+		 * interfaces.
+		 */
+
+		if ((inb(dma_base + 2) & 0x80)) {
+			if ((!hwif->drives[0].present && !hwif->drives[1].present) ||
+					(hwif->mate && hwif->mate->dma_base)) {
+				printk("%s: simplex device:  DMA disabled\n", name);
+				dma_base = 0;
+			}
+		}
+	}
+
+	return dma_base;
+}
+
+/*
+ * Setup DMA transfers on a channel.
+ */
+static void __init setup_channel_dma(ide_hwif_t *hwif, struct pci_dev *dev,
+		ide_pci_device_t *d,
+		int port,
+		u8 class_rev,
+		int pciirq, ide_hwif_t **mate,
+		int autodma, unsigned short *pcicmd)
+{
+	unsigned long dma_base;
+
+	if (d->flags & ATA_F_NOADMA)
+		autodma = 0;
+
+	if (autodma)
+		hwif->autodma = 1;
+
+	if (!((d->flags & ATA_F_DMA) || ((dev->class >> 8) == PCI_CLASS_STORAGE_IDE && (dev->class & 0x80))))
+		return;
+
+	dma_base = get_dma_base(hwif, (!*mate && d->extra) ? d->extra : 0, dev->name);
+	if (dma_base && !(*pcicmd & PCI_COMMAND_MASTER)) {
+
+		/*
+		 * Set up BM-DMA capability (PnP BIOS should have done this already)
+		 */
+		if (!(d->vendor == PCI_VENDOR_ID_CYRIX && d->device == PCI_DEVICE_ID_CYRIX_5530_IDE))
+			hwif->autodma = 0;	/* default DMA off if we had to configure it here */
+		pci_write_config_word(dev, PCI_COMMAND, *pcicmd | PCI_COMMAND_MASTER);
+		if (pci_read_config_word(dev, PCI_COMMAND, pcicmd) || !(*pcicmd & PCI_COMMAND_MASTER)) {
+			printk("%s: %s error updating PCICMD\n", hwif->name, dev->name);
+			dma_base = 0;
+		}
+	}
+	if (dma_base) {
+		if (d->dma_init)
+			d->dma_init(hwif, dma_base);
+		else
+			ide_setup_dma(hwif, dma_base, 8);
+	} else
+		printk("%s: %s Bus-Master DMA was disabled by BIOS\n", hwif->name, dev->name);
+}
+#endif
+
 /*
  * Setup a particular port on an ATA host controller.
  *
- * This get's called once for the master and for the slave interface.
+ * This gets called once for the master and for the slave interface.
  */
 static int __init setup_host_channel(struct pci_dev *dev,
 		ide_pci_device_t *d,
@@ -525,9 +629,9 @@ controller_ok:
 		}
 	}
 
-	/* Hard wired IRQ lines on UMC chips and no DMA transfers.*/
+	/* Cross wired IRQ lines on UMC chips and no DMA transfers.*/
 	if (d->flags & ATA_F_FIXIRQ) {
-		hwif->irq = hwif->channel ? 15 : 14;
+		hwif->irq = port ? 15 : 14;
 		goto no_dma;
 	}
 	if (d->flags & ATA_F_NODMA)
@@ -540,53 +644,22 @@ controller_ok:
 		if (d->ata66_check)
 			hwif->udma_four = d->ata66_check(hwif);
 	}
+
 #ifdef CONFIG_BLK_DEV_IDEDMA
-	if (d->flags & ATA_F_NOADMA)
-		autodma = 0;
-
-	if (autodma)
-		hwif->autodma = 1;
-
-	if ((d->flags & ATA_F_DMA) || ((dev->class >> 8) == PCI_CLASS_STORAGE_IDE && (dev->class & 0x80))) {
-		unsigned long dma_base;
-
-		dma_base = ide_get_or_set_dma_base(hwif, (!*mate && d->extra) ? d->extra : 0, dev->name);
-		if (dma_base && !(*pcicmd & PCI_COMMAND_MASTER)) {
-
-			/*
-			 * Set up BM-DMA capability (PnP BIOS should have done this already)
-			 */
-			if (!(d->vendor == PCI_VENDOR_ID_CYRIX && d->device == PCI_DEVICE_ID_CYRIX_5530_IDE))
-				hwif->autodma = 0;	/* default DMA off if we had to configure it here */
-			pci_write_config_word(dev, PCI_COMMAND, *pcicmd | PCI_COMMAND_MASTER);
-			if (pci_read_config_word(dev, PCI_COMMAND, pcicmd) || !(*pcicmd & PCI_COMMAND_MASTER)) {
-				printk("%s: %s error updating PCICMD\n", hwif->name, dev->name);
-				dma_base = 0;
-			}
-		}
-		if (dma_base) {
-			if (d->dma_init)
-				d->dma_init(hwif, dma_base);
-			else	/* FIXME: use a generic device descriptor instead */
-				ide_setup_dma(hwif, dma_base, 8);
-		} else {
-			printk("%s: %s Bus-Master DMA was disabled by BIOS\n", hwif->name, dev->name);
-		}
-	}
+	setup_channel_dma(hwif, dev, d, port, class_rev, pciirq,  mate, autodma, pcicmd);
 #endif
+
 no_dma:
 	if (d->init_hwif)  /* Call chipset-specific routine for each enabled hwif */
 		d->init_hwif(hwif);
 
 	*mate = hwif;
 
-	/* we are done */
-
 	return 0;
 }
 
 /*
- * Looks at the primary/secondary chanells on a PCI IDE device and, if they
+ * Looks at the primary/secondary channels on a PCI IDE device and, if they
  * are enabled, prepares the IDE driver for use with them.  This generic code
  * works for most PCI chipsets.
  *
@@ -628,10 +701,11 @@ check_if_enabled:
 	if (!(pcicmd & PCI_COMMAND_IO)) {	/* is device disabled? */
 		/*
 		 * PnP BIOS was *supposed* to have set this device up for us,
-		 * but we can do it ourselves, so long as the BIOS has assigned an IRQ
-		 *  (or possibly the device is using a "legacy header" for IRQs).
-		 * Maybe the user deliberately *disabled* the device,
-		 * but we'll eventually ignore it again if no drives respond.
+		 * but we can do it ourselves, so long as the BIOS has assigned
+		 * an IRQ (or possibly the device is using a "legacy header"
+		 * for IRQs).  Maybe the user deliberately *disabled* the
+		 * device, but we'll eventually ignore it again if no drives
+		 * respond.
 		 */
 		if (tried_config++
 		 || setup_pci_baseregs(dev, dev->name)
@@ -663,7 +737,7 @@ check_if_enabled:
 	if (dev->class >> 8 == PCI_CLASS_STORAGE_RAID) {
 		/* By rights we want to ignore these, but the Promise Fastrak
 		   people have some strange ideas about proprietary so we have
-		   to act otherwise on those. The supertrak however we need
+		   to act otherwise on those. The Supertrak however we need
 		   to skip */
 		if (d->vendor == PCI_VENDOR_ID_PROMISE && d->device == PCI_DEVICE_ID_PROMISE_20265) {
 			printk(KERN_INFO "ide: Found promise 20265 in RAID mode.\n");
@@ -680,7 +754,7 @@ check_if_enabled:
 	if ((dev->class & ~(0xfa)) != ((PCI_CLASS_STORAGE_IDE << 8) | 5)) {
 		printk("%s: not 100%% native mode: will probe irqs later\n", dev->name);
 		/*
-		 * This allows offboard ide-pci cards the enable a BIOS,
+		 * This allows off board ide-pci cards the enable a BIOS,
 		 * verify interrupt settings of split-mirror pci-config
 		 * space, place chipset into init-mode, and/or preserve
 		 * an interrupt if the card is not native ide support.
@@ -690,10 +764,10 @@ check_if_enabled:
 		else
 			pciirq = trust_pci_irq(d, dev);
 	} else if (tried_config) {
-		printk("%s: will probe irqs later\n", dev->name);
+		printk("%s: will probe IRQs later\n", dev->name);
 		pciirq = 0;
 	} else if (!pciirq) {
-		printk("%s: bad irq (%d): will probe later\n", dev->name, pciirq);
+		printk("%s: bad IRQ (%d): will probe later\n", dev->name, pciirq);
 		pciirq = 0;
 	} else {
 		if (d->init_chipset)
@@ -729,7 +803,8 @@ static void __init pdc20270_device_order_fixup (struct pci_dev *dev, ide_pci_dev
 			if ((findev->vendor == dev->vendor) &&
 			    (findev->device == dev->device) &&
 			    (PCI_SLOT(findev->devfn) & 2)) {
-				byte irq = 0, irq2 = 0;
+				u8 irq = 0;
+				u8 irq2 = 0;
 				dev2 = findev;
 				pci_read_config_byte(dev, PCI_INTERRUPT_LINE, &irq);
 				pci_read_config_byte(dev2, PCI_INTERRUPT_LINE, &irq2);
@@ -805,7 +880,7 @@ static void __init hpt366_device_order_fixup (struct pci_dev *dev, ide_pci_devic
 }
 
 /*
- * This finds all PCI IDE controllers and calls appriopriate initialization
+ * This finds all PCI IDE controllers and calls appropriate initialization
  * functions for them.
  */
 static void __init ide_scan_pcidev(struct pci_dev *dev)

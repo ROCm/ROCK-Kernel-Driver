@@ -66,9 +66,9 @@ fixup_jornada720(struct machine_desc *desc, struct param_struct *params,
 
 static struct map_desc jornada720_io_desc[] __initdata = {
  /* virtual     physical    length      domain     r  w  c  b */
-  { 0xf0000000, 0x48000000, 0x00100000, DOMAIN_IO, 1, 1, 0, 0 }, /* Epson registers */
-  { 0xf1000000, 0x48200000, 0x00100000, DOMAIN_IO, 1, 1, 0, 0 }, /* Epson frame buffer */
-  { 0xf4000000, 0x40000000, 0x00100000, DOMAIN_IO, 1, 1, 0, 0 }, /* SA-1111 */
+  { 0xf0000000, 0x48000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* Epson registers */
+  { 0xf1000000, 0x48200000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* Epson frame buffer */
+  { 0xf4000000, 0x40000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* SA-1111 */
   LAST_DESC
 };
 

@@ -528,6 +528,7 @@ static inline void yam_rx_flag(struct net_device *dev, struct yam_port *yp)
 				skb->protocol = htons(ETH_P_AX25);
 				skb->mac.raw = skb->data;
 				netif_rx(skb);
+				dev->last_rx = jiffies;
 				++yp->stats.rx_packets;
 			}
 		}

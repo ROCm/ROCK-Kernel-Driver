@@ -311,7 +311,7 @@ static int rd_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 		case BLKROSET:
 		case BLKROGET:
 		case BLKSSZGET:
-			error = blk_ioctl(inode->i_rdev, cmd, arg);
+			error = blk_ioctl(inode->i_bdev, cmd, arg);
 	};
 out:
 	return error;

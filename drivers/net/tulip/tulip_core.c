@@ -15,8 +15,8 @@
 */
 
 #define DRV_NAME	"tulip"
-#define DRV_VERSION	"1.1.11"
-#define DRV_RELDATE	"Feb 08, 2002"
+#define DRV_VERSION	"1.1.12"
+#define DRV_RELDATE	"Mar 07, 2002"
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -1164,31 +1164,13 @@ static void __devinit tulip_mwi_config (struct pci_dev *pdev,
 {
 	struct tulip_private *tp = dev->priv;
 	u8 cache;
-	u16 pci_command, new_command;
+	u16 pci_command;
 	u32 csr0;
 
 	if (tulip_debug > 3)
 		printk(KERN_DEBUG "%s: tulip_mwi_config()\n", pdev->slot_name);
 
 	tp->csr0 = csr0 = 0;
-
-	/* check for sane cache line size. from acenic.c. */
-	pci_read_config_byte(pdev, PCI_CACHE_LINE_SIZE, &cache);
-	if ((cache << 2) != SMP_CACHE_BYTES) {
-		printk(KERN_WARNING "%s: PCI cache line size set incorrectly "
-		       "(%i bytes) by BIOS/FW, correcting to %i\n",
-		       pdev->slot_name, (cache << 2), SMP_CACHE_BYTES);
-		pci_write_config_byte(pdev, PCI_CACHE_LINE_SIZE,
-				      SMP_CACHE_BYTES >> 2);
-		udelay(5);
-	}
-
-	/* read cache line size again, hardware may not have accepted
-	 * our cache line size change
-	 */
-	pci_read_config_byte(pdev, PCI_CACHE_LINE_SIZE, &cache);
-	if (!cache)
-		goto out;
 
 	/* if we have any cache line size at all, we can do MRM */
 	csr0 |= MRM;
@@ -1200,15 +1182,19 @@ static void __devinit tulip_mwi_config (struct pci_dev *pdev,
 	/* set or disable MWI in the standard PCI command bit.
 	 * Check for the case where  mwi is desired but not available
 	 */
+	if (csr0 & MWI)	pci_set_mwi(pdev);
+	else		pci_clear_mwi(pdev);
+
+	/* read result from hardware (in case bit refused to enable) */
 	pci_read_config_word(pdev, PCI_COMMAND, &pci_command);
-	if (csr0 & MWI)	new_command = pci_command | PCI_COMMAND_INVALIDATE;
-	else		new_command = pci_command & ~PCI_COMMAND_INVALIDATE;
-	if (new_command != pci_command) {
-		pci_write_config_word(pdev, PCI_COMMAND, new_command);
-		udelay(5);
-		pci_read_config_word(pdev, PCI_COMMAND, &pci_command);
-		if ((csr0 & MWI) && (!(pci_command & PCI_COMMAND_INVALIDATE)))
-			csr0 &= ~MWI;
+	if ((csr0 & MWI) && (!(pci_command & PCI_COMMAND_INVALIDATE)))
+		csr0 &= ~MWI;
+
+	/* if cache line size hardwired to zero, no MWI */
+	pci_read_config_byte(pdev, PCI_CACHE_LINE_SIZE, &cache);
+	if ((csr0 & MWI) && (cache == 0)) {
+		csr0 &= ~MWI;
+		pci_clear_mwi(pdev);
 	}
 
 	/* assign per-cacheline-size cache alignment and
@@ -1225,20 +1211,29 @@ static void __devinit tulip_mwi_config (struct pci_dev *pdev,
 		csr0 |= MRL | (3 << CALShift) | (32 << BurstLenShift);
 		break;
 	default:
-		goto out;
+		cache = 0;
+		break;
 	}
 
-	tp->csr0 = csr0;
-	goto out;
+	/* if we have a good cache line size, we by now have a good
+	 * csr0, so save it and exit
+	 */
+	if (cache)
+		goto out;
 
+	/* we don't have a good csr0 or cache line size, disable MWI */
 	if (csr0 & MWI) {
-		pci_command &= ~PCI_COMMAND_INVALIDATE;
-		pci_write_config_word(pdev, PCI_COMMAND, pci_command);
+		pci_clear_mwi(pdev);
 		csr0 &= ~MWI;
 	}
-	tp->csr0 = csr0 | (8 << BurstLenShift) | (1 << CALShift);
+
+	/* sane defaults for burst length and cache alignment
+	 * originally from de4x5 driver
+	 */
+	csr0 |= (8 << BurstLenShift) | (1 << CALShift);
 
 out:
+	tp->csr0 = csr0;
 	if (tulip_debug > 2)
 		printk(KERN_DEBUG "%s: MWI config cacheline=%d, csr0=%08x\n",
 		       pdev->slot_name, cache, csr0);

@@ -1253,6 +1253,7 @@ static void __dldwd_ev_rx(dldwd_priv_t *priv, hermes_t *hw)
 
 	/* Pass the packet to the networking stack */
 	netif_rx(skb);
+	dev->last_rx = jiffies;
 	stats->rx_packets++;
 	stats->rx_bytes += length;
 

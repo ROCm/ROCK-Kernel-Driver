@@ -1,8 +1,8 @@
 /*
  * USB IR Dongle driver
  *
- *	Copyright (C) 2001 Greg Kroah-Hartman (greg@kroah.com)
- *	Copyright (C) 2002 Gary Brubaker (xavyer@ix.netcom.com)
+ *	Copyright (C) 2001-2002	Greg Kroah-Hartman (greg@kroah.com)
+ *	Copyright (C) 2002	Gary Brubaker (xavyer@ix.netcom.com)
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -20,6 +20,11 @@
  * <dag@brattli.net>, and Jean Tourrilhes <jt@hpl.hp.com>
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
+ *
+ * 2002_Mar_07	greg kh
+ *	moved some needed structures and #define values from the
+ *	net/irda/irda-usb.h file into our file, as we don't want to depend on
+ *	that codebase compiling correctly :)
  *
  * 2002_Jan_14  gb
  *	Added module parameter to force specific number of XBOFs.
@@ -56,7 +61,6 @@
 #include <linux/module.h>
 #include <linux/spinlock.h>
 #include <linux/usb.h>
-#include <net/irda/irda-usb.h>
 
 #ifdef CONFIG_USB_SERIAL_DEBUG
 	static int debug = 1;
@@ -72,6 +76,33 @@
 #define DRIVER_VERSION "v0.4"
 #define DRIVER_AUTHOR "Greg Kroah-Hartman <greg@kroah.com>"
 #define DRIVER_DESC "USB IR Dongle driver"
+
+/* USB IrDA class spec information */
+#define USB_CLASS_IRDA		0x02
+#define USB_DT_IRDA		0x21
+#define IU_REQ_GET_CLASS_DESC	0x06
+#define SPEED_2400		0x01
+#define SPEED_9600		0x02
+#define SPEED_19200		0x03
+#define SPEED_38400		0x04
+#define SPEED_57600		0x05
+#define SPEED_115200		0x06
+#define SPEED_576000		0x07
+#define SPEED_1152000		0x08
+#define SPEED_4000000		0x09
+
+struct irda_class_desc {
+	u8	bLength;
+	u8	bDescriptorType;
+	u16	bcdSpecRevision;
+	u8	bmDataSize;
+	u8	bmWindowSize;
+	u8	bmMinTurnaroundTime;
+	u16	wBaudRate;
+	u8	bmAdditionalBOFs;
+	u8	bIrdaRateSniff;
+	u8	bMaxUnicastList;
+} __attribute__ ((packed));
 
 /* if overridden by the user, then use their value for the size of the read and
  * write urbs */
@@ -158,7 +189,7 @@ static struct irda_class_desc *irda_usb_find_class_desc(struct usb_device *dev, 
 	ret = usb_control_msg(dev, usb_rcvctrlpipe(dev,0),
 			IU_REQ_GET_CLASS_DESC,
 			USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-			0, ifnum, desc, sizeof(*desc), MSECS_TO_JIFFIES(500));
+			0, ifnum, desc, sizeof(*desc), HZ);
 	
 	dbg("%s -  ret=%d", __FUNCTION__, ret);
 	if (ret < sizeof(*desc)) {

@@ -146,8 +146,7 @@ void OUT_BYTE(unsigned char data, ide_ioreg_t reg);
 unsigned char IN_BYTE(ide_ioreg_t reg);
 
 /* this tells ide.h not to define the standard macros */
-#define HAVE_ARCH_OUT_BYTE
-#define HAVE_ARCH_IN_BYTE
+#define HAVE_ARCH_IN_OUT	1
 
 #endif /* __KERNEL__ */
 

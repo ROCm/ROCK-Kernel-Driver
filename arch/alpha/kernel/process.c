@@ -64,7 +64,6 @@ cpu_idle(void)
 		while (!need_resched())
 			barrier();
 		schedule();
-		check_pgt_cache();
 	}
 }
 

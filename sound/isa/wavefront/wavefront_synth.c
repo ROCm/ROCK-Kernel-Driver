@@ -111,30 +111,6 @@ MODULE_PARM_DESC(ramcheck_time, "how many seconds to wait for the RAM test");
 MODULE_PARM(osrun_time,"i");
 MODULE_PARM_DESC(osrun_time, "how many seconds to wait for the ICS2115 OS");
 
-/*
- *	This sucks, hopefully it'll get standardised
- */
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,18) && LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
-#define loops_per_sec loops_per_jiffy*HZ
-#elif LINUX_VERSION_CODE == KERNEL_VERSION(2,4,0) && defined(I_DIRTY_PAGES) /* linux/fs.h */
-#define loops_per_sec loops_per_jiffy*HZ
-#elif LINUX_VERSION_CODE > KERNEL_VERSION(2,4,0)
-#define loops_per_sec loops_per_jiffy*HZ
-#endif
- 
-#if defined(__alpha__) || defined(__powerpc__)
-#ifdef __SMP__
-#define LOOPS_PER_SEC	(cpu_data[smp_processor_id()].loops_per_sec)
-#else
-#define LOOPS_PER_SEC	(loops_per_sec)
-#endif
-#endif
-
-#if defined(__i386__)
-#define LOOPS_PER_SEC	(current_cpu_data.loops_per_sec)
-#endif
- 
 /* if WF_DEBUG not defined, no run-time debugging messages will
    be available via the debug flag setting. Given the current
    beta state of the driver, this will remain set until a future 
@@ -323,26 +299,16 @@ wavefront_wait (snd_wavefront_t *dev, int mask)
 
 {
 	int             i;
-	static int      short_loop_cnt = 0;
-
-	/* Compute the loop count that lets us sleep for about the
-	   right amount of time, cache issues, bus speeds and all
-	   other issues being unequal but largely irrelevant.
-	*/
-
-	if (short_loop_cnt == 0) {
-		short_loop_cnt = wait_usecs *
-			(LOOPS_PER_SEC / 1000000);
-	}
 
 	/* Spin for a short period of time, because >99% of all
 	   requests to the WaveFront can be serviced inline like this.
 	*/
 
-	for (i = 0; i < short_loop_cnt; i++) {
+	for (i = 0; i < wait_usecs; i += 5) {
 		if (wavefront_status (dev) & mask) {
 			return 1;
 		}
+		udelay(5);
 	}
 
 	for (i = 0; i < sleep_tries; i++) {
@@ -1316,18 +1282,21 @@ wavefront_fetch_multisample (snd_wavefront_t *dev,
     
 	for (i = 0; i < num_samples; i++) {
 		char d[2];
+		int val;
 	
-		if ((d[0] = wavefront_read (dev)) == -1) {
+		if ((val = wavefront_read (dev)) == -1) {
 			snd_printk ("upload multisample failed "
 				    "during sample loop.\n");
 			return -(EIO);
 		}
+		d[0] = val;
 
-		if ((d[1] = wavefront_read (dev)) == -1) {
+		if ((val = wavefront_read (dev)) == -1) {
 			snd_printk ("upload multisample failed "
 				    "during sample loop.\n");
 			return -(EIO);
 		}
+		d[1] = val;
 	
 		header->hdr.ms.SampleNumber[i] =
 			demunge_int32 ((unsigned char *) d, 2);

@@ -13,7 +13,6 @@
 #include <linux/config.h>
 #include <asm/arch/memory.h>
 #include <asm/arch/vmalloc.h>
-#include <asm/proc-fns.h>
 
 /*
  * PMD_SHIFT determines the size of the area a second-level page table can map
@@ -146,8 +145,16 @@ static inline pte_t mk_pte_phys(unsigned long physpage, pgprot_t pgprot)
 #define pmd_offset(dir, addr)	((pmd_t *)(dir))
 
 /* Find an entry in the third-level page table.. */
-#define __pte_offset(addr)	(((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
-#define pte_offset(dir, addr)	((pte_t *)pmd_page(*(dir)) + __pte_offset(addr))
+#define __pte_index(addr)	(((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
+
+#define pmd_page(dir)		((struct page *)__pmd_page(dir))
+
+#define __pte_offset(dir, addr)	((pte_t *)__pmd_page(*(dir)) + __pte_index(addr))
+#define pte_offset_kernel	__pte_offset
+#define pte_offset_map		__pte_offset
+#define pte_offset_map_nested	__pte_offset
+#define pte_unmap(pte)		do { } while (0)
+#define pte_unmap_nested(pte)	do { } while (0)
 
 #include <asm/proc/pgtable.h>
 

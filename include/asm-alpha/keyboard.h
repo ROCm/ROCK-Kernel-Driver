@@ -60,7 +60,8 @@ extern unsigned char pckbd_sysrq_xlate[128];
  * Machine specific bits for the PS/2 driver
  */
 
-#define AUX_IRQ 12
+/* Jensen puts this at 9, everyone else at the standard 12.  */
+#define AUX_IRQ  (RTC_PORT(0) == 0x170 ? 9 : 12)
 
 #define aux_request_irq(hand, dev_id)                                  \
        request_irq(AUX_IRQ, hand, SA_SHIRQ, "PS/2 Mouse", dev_id)

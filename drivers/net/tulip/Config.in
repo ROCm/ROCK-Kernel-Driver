@@ -1,0 +1,27 @@
+#
+# Tulip family network device configuration
+#
+
+mainmenu_option next_comment
+comment '"Tulip" family network device support'
+
+bool '"Tulip" family network device support' CONFIG_NET_TULIP
+if [ "$CONFIG_NET_TULIP" = "y" ]; then
+   dep_tristate '    Early DECchip Tulip (dc2104x) PCI support (EXPERIMENTAL)' CONFIG_DE2104X $CONFIG_PCI $CONFIG_EXPERIMENTAL
+   dep_tristate '    DECchip Tulip (dc2114x) PCI support' CONFIG_TULIP $CONFIG_PCI
+   if [ "$CONFIG_TULIP" = "y" -o "$CONFIG_TULIP" = "m" ]; then
+      dep_bool '      New bus configuration (EXPERIMENTAL)' CONFIG_TULIP_MWI $CONFIG_EXPERIMENTAL
+      bool '      Use PCI shared mem for NIC registers' CONFIG_TULIP_MMIO
+   fi
+   if [ "$CONFIG_PCI" = "y" -o "$CONFIG_EISA" = "y" ]; then
+      tristate '    Generic DECchip & DIGITAL EtherWORKS PCI/EISA' CONFIG_DE4X5
+   fi
+   dep_tristate '    Winbond W89c840 Ethernet support' CONFIG_WINBOND_840 $CONFIG_PCI
+   dep_tristate '    Davicom DM910x/DM980x support' CONFIG_DM9102 $CONFIG_PCI
+   if [ "$CONFIG_CARDBUS" = "y" ]; then
+      tristate '  Xircom CardBus support (new driver)' CONFIG_PCMCIA_XIRCOM
+      tristate '  Xircom Tulip-like CardBus support (old driver)' CONFIG_PCMCIA_XIRTULIP
+   fi
+fi
+
+endmenu

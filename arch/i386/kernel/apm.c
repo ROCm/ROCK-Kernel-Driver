@@ -812,7 +812,7 @@ recalc:
 
 	t1 = IDLE_LEAKY_MAX;
 
-	while (need_resched()) {
+	while (!need_resched()) {
 		if (use_apm_idle) {
 			unsigned int t;
 

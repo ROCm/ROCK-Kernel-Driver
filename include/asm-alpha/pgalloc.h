@@ -230,53 +230,35 @@ extern void flush_tlb_range(struct vm_area_struct *, unsigned long, unsigned lon
  * used to allocate a kernel page table - this turns on ASN bits
  * if any.
  */
-#ifndef CONFIG_SMP
-extern struct pgtable_cache_struct {
-	unsigned long *pgd_cache;
-	unsigned long *pmd_cache;
-	unsigned long *pte_cache;
-	unsigned long pgtable_cache_sz;
-} quicklists;
-#else
-#include <asm/smp.h>
-#define quicklists cpu_data[smp_processor_id()]
-#endif
-#define pgd_quicklist (quicklists.pgd_cache)
-#define pmd_quicklist (quicklists.pmd_cache)
-#define pte_quicklist (quicklists.pte_cache)
-#define pgtable_cache_size (quicklists.pgtable_cache_sz)
 
-#define pmd_populate(mm, pmd, pte)	pmd_set(pmd, pte)
-#define pgd_populate(mm, pgd, pmd)	pgd_set(pgd, pmd)
-
-extern pgd_t *get_pgd_slow(void);
-
-static inline pgd_t *get_pgd_fast(void)
+static inline void
+pmd_populate(struct mm_struct *mm, pmd_t *pmd, struct page *pte)
 {
-	unsigned long *ret;
-
-	if ((ret = pgd_quicklist) != NULL) {
-		pgd_quicklist = (unsigned long *)(*ret);
-		ret[0] = 0;
-		pgtable_cache_size--;
-	} else
-		ret = (unsigned long *)get_pgd_slow();
-	return (pgd_t *)ret;
+	pmd_set(pmd, (pte_t *)((pte - mem_map) << PAGE_SHIFT));
 }
 
-static inline void free_pgd_fast(pgd_t *pgd)
+static inline void
+pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmd, pte_t *pte)
 {
-	*(unsigned long *)pgd = (unsigned long) pgd_quicklist;
-	pgd_quicklist = (unsigned long *) pgd;
-	pgtable_cache_size++;
+	pmd_set(pmd, pte);
 }
 
-static inline void free_pgd_slow(pgd_t *pgd)
+static inline void
+pgd_populate(struct mm_struct *mm, pgd_t *pgd, pmd_t *pmd)
+{
+	pgd_set(pgd, pmd);
+}
+
+extern pgd_t *pgd_alloc(struct mm_struct *mm);
+
+static inline void
+pgd_free(pgd_t *pgd)
 {
 	free_page((unsigned long)pgd);
 }
 
-static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long address)
+static inline pmd_t *
+pmd_alloc_one(struct mm_struct *mm, unsigned long address)
 {
 	pmd_t *ret = (pmd_t *)__get_free_page(GFP_KERNEL);
 	if (ret)
@@ -284,67 +266,30 @@ static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long address)
 	return ret;
 }
 
-static inline pmd_t *pmd_alloc_one_fast(struct mm_struct *mm, unsigned long address)
-{
-	unsigned long *ret;
-
-	if ((ret = (unsigned long *)pte_quicklist) != NULL) {
-		pte_quicklist = (unsigned long *)(*ret);
-		ret[0] = 0;
-		pgtable_cache_size--;
-	}
-	return (pmd_t *)ret;
-}
-
-static inline void pmd_free_fast(pmd_t *pmd)
-{
-	*(unsigned long *)pmd = (unsigned long) pte_quicklist;
-	pte_quicklist = (unsigned long *) pmd;
-	pgtable_cache_size++;
-}
-
-static inline void pmd_free_slow(pmd_t *pmd)
+static inline void
+pmd_free(pmd_t *pmd)
 {
 	free_page((unsigned long)pmd);
 }
 
-static inline pte_t *pte_alloc_one(struct mm_struct *mm, unsigned long address)
-{
-	pte_t *pte = (pte_t *)__get_free_page(GFP_KERNEL);
-	if (pte)
-		clear_page(pte);
-	return pte;
-}
+extern pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr);
 
-static inline pte_t *pte_alloc_one_fast(struct mm_struct *mm, unsigned long address)
-{
-	unsigned long *ret;
-
-	if ((ret = (unsigned long *)pte_quicklist) != NULL) {
-		pte_quicklist = (unsigned long *)(*ret);
-		ret[0] = 0;
-		pgtable_cache_size--;
-	}
-	return (pte_t *)ret;
-}
-
-static inline void pte_free_fast(pte_t *pte)
-{
-	*(unsigned long *)pte = (unsigned long) pte_quicklist;
-	pte_quicklist = (unsigned long *) pte;
-	pgtable_cache_size++;
-}
-
-static inline void pte_free_slow(pte_t *pte)
+static inline void
+pte_free_kernel(pte_t *pte)
 {
 	free_page((unsigned long)pte);
 }
 
-#define pte_free(pte)		pte_free_fast(pte)
-#define pmd_free(pmd)		pmd_free_fast(pmd)
-#define pgd_free(pgd)		free_pgd_fast(pgd)
-#define pgd_alloc(mm)		get_pgd_fast()
+static inline struct page *
+pte_alloc_one(struct mm_struct *mm, unsigned long addr)
+{
+	return virt_to_page(pte_alloc_one_kernel(mm, addr));
+}
 
-extern int do_check_pgt_cache(int, int);
+static inline void
+pte_free(struct page *page)
+{
+	__free_page(page);
+}
 
 #endif /* _ALPHA_PGALLOC_H */

@@ -252,6 +252,10 @@ typedef union {
 #define DIRENTSIZ(namlen) \
     ( (sizeof(struct dirent) - 2*(JFS_NAME_MAX+1) + 2*((namlen)+1) + 3) &~ 3 )
 
+/*
+ * Maximum file offset for directories.
+ */
+#define DIREND	INT_MAX
 
 /*
  *	external declarations

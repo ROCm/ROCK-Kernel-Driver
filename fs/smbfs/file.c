@@ -55,12 +55,13 @@ static int
 smb_readpage_sync(struct dentry *dentry, struct page *page)
 {
 	char *buffer = kmap(page);
-	unsigned long offset = page->index << PAGE_CACHE_SHIFT;
-	int rsize = smb_get_rsize(server_from_dentry(dentry));
+	loff_t offset = (loff_t)page->index << PAGE_CACHE_SHIFT;
+	struct smb_sb_info *server = server_from_dentry(dentry);
+	unsigned int rsize = smb_get_rsize(server);
 	int count = PAGE_SIZE;
 	int result;
 
-	VERBOSE("file %s/%s, count=%d@%ld, rsize=%d\n",
+	VERBOSE("file %s/%s, count=%d@%Ld, rsize=%d\n",
 		DENTRY_PATH(dentry), count, offset, rsize);
 
 	result = smb_open(dentry, SMB_O_RDONLY);
@@ -74,7 +75,7 @@ smb_readpage_sync(struct dentry *dentry, struct page *page)
 		if (count < rsize)
 			rsize = count;
 
-		result = smb_proc_read(dentry->d_inode, offset, rsize, buffer);
+		result = server->ops->read(dentry->d_inode,offset,rsize,buffer);
 		if (result < 0)
 			goto io_error;
 
@@ -118,21 +119,23 @@ smb_readpage(struct file *file, struct page *page)
  */
 static int
 smb_writepage_sync(struct inode *inode, struct page *page,
-		   unsigned long offset, unsigned int count)
+		   unsigned long pageoffset, unsigned int count)
 {
-	char *buffer = kmap(page) + offset;
-	int wsize = smb_get_wsize(server_from_inode(inode));
+	loff_t offset;
+	char *buffer = kmap(page) + pageoffset;
+	struct smb_sb_info *server = server_from_inode(inode);
+	unsigned int wsize = smb_get_wsize(server);
 	int result, written = 0;
 
-	offset += page->index << PAGE_CACHE_SHIFT;
-	VERBOSE("file ino=%ld, fileid=%d, count=%d@%ld, wsize=%d\n",
-		inode->i_ino, SMB_I(inode)->fileid, count, offset, wsize);
+	offset = ((loff_t)page->index << PAGE_CACHE_SHIFT) + pageoffset;
+	VERBOSE("file ino=%ld, fileid=%d, count=%d@%Ld, wsize=%d\n",
+		inode->i_ino, inode->u.smbfs_i.fileid, count, offset, wsize);
 
 	do {
 		if (count < wsize)
 			wsize = count;
 
-		result = smb_proc_write(inode, offset, wsize, buffer);
+		result = server->ops->write(inode, offset, wsize, buffer);
 		if (result < 0) {
 			PARANOIA("failed write, wsize=%d, result=%d\n",
 				 wsize, result);

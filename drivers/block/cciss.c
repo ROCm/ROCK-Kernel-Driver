@@ -469,7 +469,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 	case BLKROSET:
 	case BLKROGET:
 	case BLKPG:
-		return blk_ioctl(inode->i_rdev, cmd, arg);
+		return blk_ioctl(inode->i_bdev, cmd, arg);
 	case CCISS_GETPCIINFO:
 	{
 		cciss_pci_info_struct pciinfo;

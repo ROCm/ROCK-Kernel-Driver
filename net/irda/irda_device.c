@@ -598,7 +598,7 @@ void setup_dma(int channel, char *buffer, int count, int mode)
 	disable_dma(channel);
 	clear_dma_ff(channel);
 	set_dma_mode(channel, mode);
-	set_dma_addr(channel, virt_to_bus(buffer));
+	set_dma_addr(channel, isa_virt_to_bus(buffer));
 	set_dma_count(channel, count);
 	enable_dma(channel);
 

@@ -65,7 +65,7 @@ Plug 'n Play
 ------------
 
 In previous kernels (2.2.x), some configuration was required to
-get the driver to talk to the card.  Being the new millenium and
+get the driver to talk to the card.  Being the new millennium and
 all, the 2.4.x kernels now support auto-configuration if ISA PnP
 support is configured in.  Theoretically, the driver even supports
 having more than one card in this case.

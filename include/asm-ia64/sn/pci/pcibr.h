@@ -47,7 +47,7 @@ typedef struct pcibr_intr_s *pcibr_intr_t;
  *	These functions are normal device driver entry points
  *	and are called along with the similar entry points from
  *	other device drivers. They are included here as documentation
- *	of their existance and purpose.
+ *	of their existence and purpose.
  *
  *	pcibr_init() is called to inform us that there is a pcibr driver
  *	configured into the kernel; it is responsible for registering

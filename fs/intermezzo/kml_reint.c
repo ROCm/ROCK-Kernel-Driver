@@ -360,8 +360,7 @@ static int set_system_mtpt (char *mtpt, struct dentry **old_root)
         struct dentry *dentry;
 	int error;
 
-	if (path_init(pathname, LOOKUP_PARENT, &nd))
-		error = path_walk(mtpt, &nd);
+	error = path_lookup(pathname, LOOKUP_PARENT, &nd);
         if (error) {
                 CDEBUG (D_KML, "Yean!!!!::Can't find mtpt::%s\n", mtpt);
                 return error;

@@ -67,17 +67,17 @@
 /* System ID register */
 
 /* IRQ Source Register */
-#define PT_IRQ_LAN		( 1<<0 )
-#define PT_IRQ_X		( 1<<1 )
-#define PT_IRQ_SA1111	( 1<<2 )
-#define PT_IRQ_RS1		( 1<<3 )
-#define PT_IRQ_RS1_RING	( 1<<4 )
-#define PT_IRQ_RS1_DCD	( 1<<5 )
-#define PT_IRQ_RS1_DSR	( 1<<6 )
-#define PT_IRQ_RS2		( 1<<7 )
+#define PT_IRR_LAN		( 1<<0 )
+#define PT_IRR_X		( 1<<1 )
+#define PT_IRR_SA1111	( 1<<2 )
+#define PT_IRR_RS1		( 1<<3 )
+#define PT_IRR_RS1_RING	( 1<<4 )
+#define PT_IRR_RS1_DCD	( 1<<5 )
+#define PT_IRR_RS1_DSR	( 1<<6 )
+#define PT_IRR_RS2		( 1<<7 )
 
 /* FIXME */
-#define PT_IRQ_USAR		( 1<<1 )
+#define PT_IRR_USAR		( 1<<1 )
 
 /* CTRL 0 */
 #define PT_CTRL0_USBSLAVE	( 1<<0 )

@@ -2477,7 +2477,7 @@ do_dasd_ioctl (struct inode *inp, /* unsigned */ int no, unsigned long data)
 			rc = -EFAULT;
 		} else {
 			if ( bsz >= device->sizes.bp_block )
-				rc = blk_ioctl (inp->i_rdev, no, data);
+				rc = blk_ioctl (inp->i_bdev, no, data);
 			else
 				rc = -EINVAL; 
 		}
@@ -2493,7 +2493,7 @@ do_dasd_ioctl (struct inode *inp, /* unsigned */ int no, unsigned long data)
 	case BLKPG:
 	case BLKELVGET:
 	case BLKELVSET:
-		return blk_ioctl (inp->i_rdev, no, data);
+		return blk_ioctl (inp->i_bdev, no, data);
 		break;
 	default:{
 

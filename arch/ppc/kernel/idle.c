@@ -47,17 +47,10 @@ extern unsigned long yield_count;
 #define run_light_on(x)         do { } while (0)
 #endif /* CONFIG_PPC_ISERIES */
 
-void zero_paged(void);
 void power_save(void);
 
-unsigned long zero_paged_on = 0;
-unsigned long powersave_nap = 0;
-
-unsigned long *zero_cache;    /* head linked list of pre-zero'd pages */
-atomic_t zerototal;      /* # pages zero'd over time */
-atomic_t zeropage_hits;  /* # zero'd pages request that we've done */
-atomic_t zero_sz;	      /* # currently pre-zero'd pages */
-atomic_t zeropage_calls; /* # zero'd pages request that've been made */
+unsigned long zero_paged_on;
+unsigned long powersave_nap;
 
 int idled(void)
 {
@@ -92,7 +85,6 @@ int idled(void)
 		if (need_resched()) {
 			run_light_on(1);
 			schedule();
-			check_pgt_cache();
 		}
 #ifdef CONFIG_PPC_ISERIES
 		else {
@@ -114,141 +106,6 @@ int cpu_idle(void)
 	idled();
 	return 0; 
 }
-
-#if 0
-/*
- * Returns a pre-zero'd page from the list otherwise returns
- * NULL.
- */
-unsigned long get_zero_page_fast(void)
-{
-	unsigned long page = 0;
-
-	atomic_inc(&zero_cache_calls);
-	if ( zero_quicklist )
-	{
-		/* atomically remove this page from the list */
-		register unsigned long tmp;
-		asm (	"101:lwarx  %1,0,%3\n"  /* reserve zero_cache */
-			"    lwz    %0,0(%1)\n" /* get next -- new zero_cache */
-			PPC405_ERR77(0,%3)
-			"    stwcx. %0,0,%3\n"  /* update zero_cache */
-			"    bne-   101b\n"     /* if lost reservation try again */
-			: "=&r" (tmp), "=&r" (page), "+m" (zero_cache)
-			: "r" (&zero_quicklist)
-			: "cc" );
-#ifdef CONFIG_SMP
-		/* if another cpu beat us above this can happen -- Cort */
-		if ( page == 0 ) 
-			return 0;
-#endif /* CONFIG_SMP */		
-		/* we can update zerocount after the fact since it is not
-		 * used for anything but control of a loop which doesn't
-		 * matter since it won't affect anything if it zeros one
-		 * less page -- Cort
-		 */
-		atomic_inc((atomic_t *)&zero_cache_hits);
-		atomic_dec((atomic_t *)&zero_cache_sz);
-		
-		/* zero out the pointer to next in the page */
-		*(unsigned long *)page = 0;
-		return page;
-	}
-	return 0;
-}
-
-/*
- * Experimental stuff to zero out pages in the idle task
- * to speed up get_free_pages(). Zero's out pages until
- * we've reached the limit of zero'd pages.  We handle
- * reschedule()'s in here so when we return we know we've
- * zero'd all we need to for now.
- */
-int zero_cache_water[2] = { 25, 96 }; /* high and low water marks for zero cache */
-void zero_paged(void)
-{
-	unsigned long pageptr = 0;	/* current page being zero'd */
-	unsigned long bytecount = 0;  
-        register unsigned long tmp;
-	pte_t *pte;
-
-	if ( atomic_read(&zero_cache_sz) >= zero_cache_water[0] )
-		return;
-	while ( (atomic_read(&zero_cache_sz) < zero_cache_water[1]) && !need_resched() )
-	{
-		/*
-		 * Mark a page as reserved so we can mess with it
-		 * If we're interrupted we keep this page and our place in it
-		 * since we validly hold it and it's reserved for us.
-		 */
-		pageptr = __get_free_pages(GFP_ATOMIC, 0);
-		if ( !pageptr )
-			return;
-		
-		cond_resched();
-		
-		/*
-		 * Make the page no cache so we don't blow our cache with 0's
-		 */
-		pte = find_pte(&init_mm, pageptr);
-		if ( !pte )
-		{
-			printk("pte NULL in zero_paged()\n");
-			return;
-		}
-		
-		pte_uncache(*pte);
-		flush_tlb_page(find_vma(&init_mm,pageptr),pageptr);
-		/*
-		 * Important here to not take time away from real processes.
-		 */
-		for ( bytecount = 0; bytecount < PAGE_SIZE ; bytecount += 4 )
-		{
-			cond_resched();
-			*(unsigned long *)(bytecount + pageptr) = 0;
-		}
-		
-		/*
-		 * If we finished zero-ing out a page add this page to
-		 * the zero_cache atomically -- we can't use
-		 * down/up since we can't sleep in idle.
-		 * Disabling interrupts is also a bad idea since we would
-		 * steal time away from real processes.
-		 * We can also have several zero_paged's running
-		 * on different processors so we can't interfere with them.
-		 * So we update the list atomically without locking it.
-		 * -- Cort
-		 */
-		
-		/* turn cache on for this page */
-		pte_cache(*pte);
-		flush_tlb_page(find_vma(&init_mm,pageptr),pageptr);
-		/* atomically add this page to the list */
-		asm (	"101:lwarx  %0,0,%2\n"  /* reserve zero_cache */
-			"    stw    %0,0(%3)\n" /* update *pageptr */
-#ifdef CONFIG_SMP
-			"    sync\n"            /* let store settle */
-#endif			
- 			PPC405_ERR77(0,%2)
-			"    stwcx. %3,0,%2\n"  /* update zero_cache in mem */
-			"    bne-   101b\n"     /* if lost reservation try again */
-			: "=&r" (tmp), "+m" (zero_quicklist)
-			: "r" (&zero_quicklist), "r" (pageptr)
-			: "cc" );
-		/*
-		 * This variable is used in the above loop and nowhere
-		 * else so the worst that could happen is we would
-		 * zero out one more or one less page than we want
-		 * per processor on the machine.  This is because
-		 * we could add our page to the list but not have
-		 * zerocount updated yet when another processor
-		 * reads it.  -- Cort
-		 */
-		atomic_inc((atomic_t *)&zero_cache_sz);
-		atomic_inc((atomic_t *)&zero_cache_total);
-	}
-}
-#endif /* 0 */
 
 void power_save(void)
 {

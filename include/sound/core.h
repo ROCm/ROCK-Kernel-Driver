@@ -22,6 +22,10 @@
  *
  */
 
+#ifdef CONFIG_PM
+#include <linux/sched.h>		/* wake_up() and struct semaphore */
+#endif
+
 /* Typedef's */
 typedef struct timeval snd_timestamp_t;
 typedef struct sndrv_interval snd_interval_t;

@@ -84,12 +84,12 @@
   #define SPIN_LOCK_UNLOCKED (spinlock_t) { 0 }
 #endif
 
-#define spin_lock_init(lock)	do { } while(0)
+#define spin_lock_init(lock)	do { (void)(lock); } while(0)
 #define _raw_spin_lock(lock)	(void)(lock) /* Not "unused variable". */
-#define spin_is_locked(lock)	(0)
-#define _raw_spin_trylock(lock)	({1; })
-#define spin_unlock_wait(lock)	do { } while(0)
-#define _raw_spin_unlock(lock)	do { } while(0)
+#define spin_is_locked(lock)	((void)(lock), 0)
+#define _raw_spin_trylock(lock)	((void)(lock), 1)
+#define spin_unlock_wait(lock)	do { (void)(lock); } while(0)
+#define _raw_spin_unlock(lock)	do { (void)(lock); } while(0)
 
 #elif (DEBUG_SPINLOCKS < 2)
 

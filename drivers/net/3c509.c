@@ -1103,14 +1103,15 @@ MODULE_PARM(debug,"i");
 MODULE_PARM(irq,"1-8i");
 MODULE_PARM(xcvr,"1-8i");
 MODULE_PARM(max_interrupt_work, "i");
-MODULE_PARM_DESC(debug, "EtherLink III debug level (0-6)");
-MODULE_PARM_DESC(irq, "EtherLink III IRQ number(s) (assigned)");
-MODULE_PARM_DESC(xcvr,"EtherLink III tranceiver(s) (0=internal, 1=external)");
-MODULE_PARM_DESC(max_interrupt_work, "EtherLink III maximum events handled per interrupt");
+MODULE_PARM_DESC(debug, "debug level (0-6)");
+MODULE_PARM_DESC(irq, "IRQ number(s) (assigned)");
+MODULE_PARM_DESC(xcvr,"tranceiver(s) (0=internal, 1=external)");
+MODULE_PARM_DESC(max_interrupt_work, "maximum events handled per interrupt");
 #ifdef __ISAPNP__
 MODULE_PARM(nopnp, "i");
-MODULE_PARM_DESC(nopnp, "EtherLink III disable ISA PnP support (0-1)");
+MODULE_PARM_DESC(nopnp, "disable ISA PnP support (0-1)");
 #endif	/* __ISAPNP__ */
+MODULE_DESCRIPTION("3Com Etherlink III (3c509, 3c509B) ISA/PnP ethernet driver");
 
 int
 init_module(void)

@@ -256,6 +256,7 @@ static void sp_bump(struct sixpack *sp, char cmd)
 	skb->mac.raw = skb->data;
 	skb->protocol = htons(ETH_P_AX25);
 	netif_rx(skb);
+	dev->last_rx = jiffies;
 	sp->stats.rx_packets++;
 }
 

@@ -68,8 +68,8 @@ static struct status_event_list_t {
 	event_decode_t decode;
 } status_event[] = {
 	/* 0x80 - 0xf0 */
-	{SNDRV_SEQ_EVENT_NOTEOFF,		2, note_event, note_decode},
-	{SNDRV_SEQ_EVENT_NOTEON,		2, note_event, note_decode},
+	{SNDRV_SEQ_EVENT_NOTEOFF,	2, note_event, note_decode},
+	{SNDRV_SEQ_EVENT_NOTEON,	2, note_event, note_decode},
 	{SNDRV_SEQ_EVENT_KEYPRESS,	2, note_event, note_decode},
 	{SNDRV_SEQ_EVENT_CONTROLLER,	2, two_param_ctrl_event, two_param_decode},
 	{SNDRV_SEQ_EVENT_PGMCHANGE,	1, one_param_ctrl_event, one_param_decode},
@@ -78,9 +78,9 @@ static struct status_event_list_t {
 	{SNDRV_SEQ_EVENT_NONE,		0, NULL, NULL}, /* 0xf0 */
 	/* 0xf0 - 0xff */
 	{SNDRV_SEQ_EVENT_SYSEX,		1, NULL, NULL}, /* sysex: 0xf0 */
-	{SNDRV_SEQ_EVENT_QFRAME,		1, one_param_event, one_param_decode}, /* 0xf1 */
-	{SNDRV_SEQ_EVENT_SONGPOS,		2, songpos_event, songpos_decode}, /* 0xf2 */
-	{SNDRV_SEQ_EVENT_SONGSEL,		1, one_param_event, one_param_decode}, /* 0xf3 */
+	{SNDRV_SEQ_EVENT_QFRAME,	1, one_param_event, one_param_decode}, /* 0xf1 */
+	{SNDRV_SEQ_EVENT_SONGPOS,	2, songpos_event, songpos_decode}, /* 0xf2 */
+	{SNDRV_SEQ_EVENT_SONGSEL,	1, one_param_event, one_param_decode}, /* 0xf3 */
 	{SNDRV_SEQ_EVENT_NONE,		0, NULL, NULL}, /* 0xf4 */
 	{SNDRV_SEQ_EVENT_NONE,		0, NULL, NULL}, /* 0xf5 */
 	{SNDRV_SEQ_EVENT_TUNE_REQUEST,	0, NULL, NULL},	/* 0xf6 */
@@ -92,7 +92,7 @@ static struct status_event_list_t {
 	{SNDRV_SEQ_EVENT_STOP, 		0, NULL, NULL}, /* 0xfc */
 	{SNDRV_SEQ_EVENT_NONE, 		0, NULL, NULL}, /* 0xfd */
 	{SNDRV_SEQ_EVENT_SENSING, 	0, NULL, NULL}, /* 0xfe */
-	{SNDRV_SEQ_EVENT_RESET, 		0, NULL, NULL}, /* 0xff */
+	{SNDRV_SEQ_EVENT_RESET, 	0, NULL, NULL}, /* 0xff */
 };
 
 static int extra_decode_ctrl14(snd_midi_event_t *dev, unsigned char *buf, int len, snd_seq_event_t *ev);
@@ -128,6 +128,7 @@ int snd_midi_event_new(int bufsize, snd_midi_event_t **rdev)
 		}
 	}
 	dev->bufsize = bufsize;
+	dev->lastcmd = 0xff;
 	spin_lock_init(&dev->lock);
 	*rdev = dev;
 	return 0;

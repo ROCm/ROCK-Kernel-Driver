@@ -13,7 +13,7 @@ snd-i2c-objs := i2c.o
 snd-cs8427-objs := cs8427.o
 snd-tea6330t-objs := tea6330t.o
 
-# Module Dependency
+# Toplevel Module Dependency
 obj-$(CONFIG_SND_INTERWAVE_STB) += snd-tea6330t.o snd-i2c.o
 obj-$(CONFIG_SND_ICE1712) += snd-cs8427.o snd-i2c.o
 

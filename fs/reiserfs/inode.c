@@ -1702,7 +1702,7 @@ static int grab_tail_page(struct inode *p_s_inode,
 	** call prepare_write
 	*/
 	reiserfs_warning("clm-6000: error reading block %lu on dev %s\n",
-	                  bh->b_blocknr, kdevname(bh->b_dev)) ;
+	                  bh->b_blocknr, p_s_inode->i_sb->s_id) ;
 	error = -EIO ;
 	goto unlock ;
     }

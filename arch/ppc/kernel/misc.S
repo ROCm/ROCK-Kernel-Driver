@@ -369,34 +369,39 @@ _GLOBAL(_tlbia)
 	isync
 #else
 #if defined(CONFIG_SMP)
-	mfmsr	r10
-	SYNC
-	rlwinm	r0,r10,0,17,15		/* clear bit 16 (MSR_EE) */
-	mtmsr	r0
-	SYNC
-	lis	r9,hash_table_lock@h
-	ori	r9,r9,hash_table_lock@l
 	rlwinm	r8,r1,0,0,18
 	lwz	r8,TI_CPU(r8)
 	oris	r8,r8,10
+	mfmsr	r10
+	SYNC
+	rlwinm	r0,r10,0,17,15		/* clear bit 16 (MSR_EE) */
+	rlwinm	r0,r0,0,28,26		/* clear DR */
+	mtmsr	r0
+	SYNC_601
+	isync
+	lis	r9,mmu_hash_lock@h
+	ori	r9,r9,mmu_hash_lock@l
+	tophys(r9,r9)
 10:	lwarx	r7,0,r9
 	cmpi	0,r7,0
 	bne-	10b
-	/* No 405 Erratum 77 fix needed here, because 4xx can't do SMP */
 	stwcx.	r8,0,r9
 	bne-	10b
-#endif /* CONFIG_SMP */
 	sync
 	tlbia
 	sync
-#ifdef CONFIG_SMP
 	TLBSYNC
 	li	r0,0
-	stw	r0,0(r9)		/* clear hash_table_lock */
+	stw	r0,0(r9)		/* clear mmu_hash_lock */
 	mtmsr	r10
-	SYNC
-#endif
-#endif
+	SYNC_601
+	isync
+#else /* CONFIG_SMP */
+	sync
+	tlbia
+	sync
+#endif /* CONFIG_SMP */
+#endif /* CONFIG_4xx */
 	blr	
 
 /*
@@ -415,33 +420,37 @@ _GLOBAL(_tlbie)
 10:
 #else
 #if defined(CONFIG_SMP)
-	mfmsr	r10
-	SYNC
-	rlwinm	r0,r10,0,17,15		/* clear bit 16 (MSR_EE) */
-	mtmsr	r0
-	SYNC
-	lis	r9,hash_table_lock@h
-	ori	r9,r9,hash_table_lock@l
 	rlwinm	r8,r1,0,0,18
 	lwz	r8,TI_CPU(r8)
 	oris	r8,r8,11
+	mfmsr	r10
+	SYNC
+	rlwinm	r0,r10,0,17,15		/* clear bit 16 (MSR_EE) */
+	rlwinm	r0,r0,0,28,26		/* clear DR */
+	mtmsr	r0
+	SYNC_601
+	isync
+	lis	r9,mmu_hash_lock@h
+	ori	r9,r9,mmu_hash_lock@l
+	tophys(r9,r9)
 10:	lwarx	r7,0,r9
 	cmpi	0,r7,0
 	bne-	10b
-	PPC405_ERR77(0,r9)
 	stwcx.	r8,0,r9
 	bne-	10b
 	eieio
-#endif /* CONFIG_SMP */
 	tlbie	r3
 	sync
-#ifdef CONFIG_SMP
 	TLBSYNC
 	li	r0,0
-	stw	r0,0(r9)		/* clear hash_table_lock */
+	stw	r0,0(r9)		/* clear mmu_hash_lock */
 	mtmsr	r10
-	SYNC
-#endif
+	SYNC_601
+	isync
+#else /* CONFIG_SMP */
+	tlbie	r3
+	sync
+#endif /* CONFIG_SMP */
 #endif /* CONFIG_4xx */
 	blr
 
@@ -627,6 +636,40 @@ _GLOBAL(__flush_dcache_icache)
 	addi	r6,r6,L1_CACHE_LINE_SIZE
 	bdnz	1b
 	sync
+	isync
+	blr
+
+/*
+ * Flush a particular page from the data cache to RAM, identified
+ * by its physical address.  We turn off the MMU so we can just use
+ * the physical address (this may be a highmem page without a kernel
+ * mapping).
+ *
+ *	void __flush_dcache_icache_phys(unsigned long physaddr)
+ */
+_GLOBAL(__flush_dcache_icache_phys)
+	mfspr	r5,PVR
+	rlwinm	r5,r5,16,16,31
+	cmpi	0,r5,1
+	beqlr					/* for 601, do nothing */
+	mfmsr	r10
+	rlwinm	r0,r10,0,28,26			/* clear DR */
+	mtmsr	r0
+	isync
+	rlwinm	r3,r3,0,0,19			/* Get page base address */
+	li	r4,4096/L1_CACHE_LINE_SIZE	/* Number of lines in a page */
+	mtctr	r4
+	mr	r6,r3
+0:	dcbst	0,r3				/* Write line to ram */
+	addi	r3,r3,L1_CACHE_LINE_SIZE
+	bdnz	0b
+	sync
+	mtctr	r4
+1:	icbi	0,r6
+	addi	r6,r6,L1_CACHE_LINE_SIZE
+	bdnz	1b
+	sync
+	mtmsr	r10				/* restore DR */
 	isync
 	blr
 	

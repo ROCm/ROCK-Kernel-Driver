@@ -132,7 +132,7 @@ static void sa1100_irda_rx_dma_start(struct sa1100_irda *si)
 	Ser2HSCR0 = si->hscr0 | HSCR0_HSSP;
 
 	/*
-	 * Enable the DMA, receiver and recieve interrupt.
+	 * Enable the DMA, receiver and receive interrupt.
 	 */
 	sa1100_dma_flush_all(si->rxdma);
 	sa1100_dma_queue_buffer(si->rxdma, NULL, si->rxbuf_dma, HPSIR_MAX_RXLEN);

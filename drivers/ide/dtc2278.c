@@ -1,10 +1,6 @@
 /*
- *  linux/drivers/ide/dtc2278.c		Version 0.02	Feb 10, 1996
- *
  *  Copyright (C) 1996  Linus Torvalds & author (see below)
  */
-
-#undef REALLY_SLOW_IO           /* most systems can safely undef this */
 
 #include <linux/types.h>
 #include <linux/kernel.h>

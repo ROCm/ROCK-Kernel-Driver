@@ -839,7 +839,7 @@ hash_page:
 
 	/* 
 	 * We hard enable here (but first soft disable) so that the hash_page
-	 * code can spin on the hash_table_lock without problem on a shared
+	 * code can spin on the mmu_hash_lock without problem on a shared
 	 * processor
 	 */
 	li	r0,0

@@ -31,8 +31,8 @@ fixup_itsy(struct machine_desc *desc, struct param_struct *params,
    likely wrong. */
 static struct map_desc itsy_io_desc[] __initdata = {
  /* virtual     physical    length      domain     r  w  c  b */
-  { 0xe8000000, 0x00000000, 0x02000000, DOMAIN_IO, 1, 1, 0, 0 }, /* Flash bank 0 */
-  { 0xf0000000, 0x49000000, 0x01000000, DOMAIN_IO, 1, 1, 0, 0 }, /* EGPIO 0 */
+  { 0xe8000000, 0x00000000, 0x02000000, DOMAIN_IO, 0, 1, 0, 0 }, /* Flash bank 0 */
+  { 0xf0000000, 0x49000000, 0x01000000, DOMAIN_IO, 0, 1, 0, 0 }, /* EGPIO 0 */
   LAST_DESC
 };
 

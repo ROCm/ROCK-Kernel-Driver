@@ -114,7 +114,7 @@ int snd_info_minor_register(void)
 	snd_info_entry_t *entry;
 
 	memset(snd_sndstat_strings, 0, sizeof(snd_sndstat_strings));
-	if ((entry = snd_info_create_module_entry(THIS_MODULE, "sndstat", NULL)) != NULL) {
+	if ((entry = snd_info_create_module_entry(THIS_MODULE, "sndstat", snd_oss_root)) != NULL) {
 		entry->content = SNDRV_INFO_CONTENT_TEXT;
 		entry->c.text.read_size = 2048;
 		entry->c.text.read = snd_sndstat_proc_read;

@@ -1,10 +1,6 @@
 /*
- *  linux/drivers/ide/ide-disk.c	Version 1.13	Nov 28, 2001
- *
  *  Copyright (C) 1994-1998  Linus Torvalds & authors (see below)
- */
-
-/*
+ *
  *  Mostly written by Mark Lord <mlord@pobox.com>
  *                and Gadi Oxman <gadio@netvision.net.il>
  *                and Andre Hedrick <andre@linux-ide.org>
@@ -33,8 +29,6 @@
  */
 
 #define IDEDISK_VERSION	"1.13"
-
-#undef REALLY_SLOW_IO		/* most systems can safely undef this */
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -351,7 +345,19 @@ static int idedisk_open (struct inode *inode, struct file *filp, ide_drive_t *dr
 	return 0;
 }
 
-static int do_idedisk_flushcache(ide_drive_t *drive);
+static int idedisk_flushcache(ide_drive_t *drive)
+{
+	struct hd_drive_task_hdr taskfile;
+	struct hd_drive_hob_hdr hobfile;
+	memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
+	memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
+	if (drive->id->cfs_enable_2 & 0x2400) {
+		taskfile.command	= WIN_FLUSH_CACHE_EXT;
+	} else {
+		taskfile.command	= WIN_FLUSH_CACHE;
+	}
+	return ide_wait_taskfile(drive, &taskfile, &hobfile, NULL);
+}
 
 static void idedisk_release (struct inode *inode, struct file *filp, ide_drive_t *drive)
 {
@@ -367,15 +373,16 @@ static void idedisk_release (struct inode *inode, struct file *filp, ide_drive_t
 			drive->doorlocking = 0;
 	}
 	if ((drive->id->cfs_enable_2 & 0x3000) && drive->wcache)
-		if (do_idedisk_flushcache(drive))
+		if (idedisk_flushcache(drive))
 			printk (KERN_INFO "%s: Write Cache FAILED Flushing!\n",
 				drive->name);
 	MOD_DEC_USE_COUNT;
 }
 
-static int idedisk_media_change (ide_drive_t *drive)
+static int idedisk_check_media_change (ide_drive_t *drive)
 {
-	return drive->removable;	/* if removable, always assume it was changed */
+	/* if removable, always assume it was changed */
+	return drive->removable;
 }
 
 /*
@@ -707,7 +714,7 @@ static int get_smart_values(ide_drive_t *drive, byte *buf)
 	taskfile.low_cylinder	= SMART_LCYL_PASS;
 	taskfile.high_cylinder	= SMART_HCYL_PASS;
 	taskfile.command	= WIN_SMART;
-	(void) smart_enable(drive);
+	smart_enable(drive);
 	return ide_wait_taskfile(drive, &taskfile, &hobfile, buf);
 }
 
@@ -722,7 +729,7 @@ static int get_smart_thresholds(ide_drive_t *drive, byte *buf)
 	taskfile.low_cylinder	= SMART_LCYL_PASS;
 	taskfile.high_cylinder	= SMART_HCYL_PASS;
 	taskfile.command	= WIN_SMART;
-	(void) smart_enable(drive);
+	smart_enable(drive);
 	return ide_wait_taskfile(drive, &taskfile, &hobfile, buf);
 }
 
@@ -831,32 +838,18 @@ static int write_cache (ide_drive_t *drive, int arg)
 	if (!(drive->id->cfs_enable_2 & 0x3000))
 		return 1;
 
-	(void) ide_wait_taskfile(drive, &taskfile, &hobfile, NULL);
+	ide_wait_taskfile(drive, &taskfile, &hobfile, NULL);
 	drive->wcache = arg;
 	return 0;
 }
 
-static int do_idedisk_standby (ide_drive_t *drive)
+static int idedisk_standby (ide_drive_t *drive)
 {
 	struct hd_drive_task_hdr taskfile;
 	struct hd_drive_hob_hdr hobfile;
 	memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
 	memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
 	taskfile.command	= WIN_STANDBYNOW1;
-	return ide_wait_taskfile(drive, &taskfile, &hobfile, NULL);
-}
-
-static int do_idedisk_flushcache (ide_drive_t *drive)
-{
-	struct hd_drive_task_hdr taskfile;
-	struct hd_drive_hob_hdr hobfile;
-	memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
-	memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
-	if (drive->id->cfs_enable_2 & 0x2400) {
-		taskfile.command	= WIN_FLUSH_CACHE_EXT;
-	} else {
-		taskfile.command	= WIN_FLUSH_CACHE;
-	}
 	return ide_wait_taskfile(drive, &taskfile, &hobfile, NULL);
 }
 
@@ -871,7 +864,7 @@ static int set_acoustic (ide_drive_t *drive, int arg)
 	taskfile.sector_count	= arg;
 
 	taskfile.command	= WIN_SETFEATURES;
-	(void) ide_wait_taskfile(drive, &taskfile, &hobfile, NULL);
+	ide_wait_taskfile(drive, &taskfile, &hobfile, NULL);
 	drive->acoustic = arg;
 	return 0;
 }
@@ -1040,20 +1033,13 @@ static void idedisk_setup(ide_drive_t *drive)
 
 static int idedisk_cleanup (ide_drive_t *drive)
 {
-
-	/* FIXME: we will have to think twice whatever this is the proper place
-	 * to do it.
-	 */
-
 	put_device(&drive->device);
 	if ((drive->id->cfs_enable_2 & 0x3000) && drive->wcache)
-		if (do_idedisk_flushcache(drive))
+		if (idedisk_flushcache(drive))
 			printk (KERN_INFO "%s: Write Cache FAILED Flushing!\n",
 				drive->name);
 	return ide_unregister_subdriver(drive);
 }
-
-static int idedisk_reinit(ide_drive_t *drive);
 
 /*
  *      IDE subdriver functions, registered with ide.c
@@ -1061,50 +1047,21 @@ static int idedisk_reinit(ide_drive_t *drive);
 static struct ata_operations idedisk_driver = {
 	owner:			THIS_MODULE,
 	cleanup:		idedisk_cleanup,
-	standby:		do_idedisk_standby,
-	flushcache:		do_idedisk_flushcache,
+	standby:		idedisk_standby,
 	do_request:		do_rw_disk,
 	end_request:		NULL,
 	ioctl:			NULL,
 	open:			idedisk_open,
 	release:		idedisk_release,
-	media_change:		idedisk_media_change,
-	revalidate:		ide_revalidate_drive,
+	check_media_change:	idedisk_check_media_change,
+	revalidate:		NULL, /* use default method */
 	pre_reset:		idedisk_pre_reset,
 	capacity:		idedisk_capacity,
 	special:		idedisk_special,
-	proc:			idedisk_proc,
-	driver_reinit:		idedisk_reinit,
+	proc:			idedisk_proc
 };
 
 MODULE_DESCRIPTION("ATA DISK Driver");
-
-static int idedisk_reinit(ide_drive_t *drive)
-{
-	int failed = 0;
-
-	MOD_INC_USE_COUNT;
-
-	if (ide_register_subdriver (drive, &idedisk_driver)) {
-		printk (KERN_ERR "ide-disk: %s: Failed to register the driver with ide.c\n", drive->name);
-		return 1;
-	}
-
-	ata_ops(drive)->busy++;
-	idedisk_setup(drive);
-	if ((!drive->head || drive->head > 16) && !drive->select.b.lba) {
-		printk(KERN_ERR "%s: INVALID GEOMETRY: %d PHYSICAL HEADS?\n", drive->name, drive->head);
-		idedisk_cleanup(drive);
-		ata_ops(drive)->busy--;
-		return 1;
-	}
-	ata_ops(drive)->busy--;
-	failed--;
-
-	revalidate_drives();
-	MOD_DEC_USE_COUNT;
-	return 0;
-}
 
 static void __exit idedisk_exit (void)
 {
@@ -1136,15 +1093,12 @@ int idedisk_init (void)
 			printk (KERN_ERR "ide-disk: %s: Failed to register the driver with ide.c\n", drive->name);
 			continue;
 		}
-		ata_ops(drive)->busy++;
 		idedisk_setup(drive);
 		if ((!drive->head || drive->head > 16) && !drive->select.b.lba) {
 			printk(KERN_ERR "%s: INVALID GEOMETRY: %d PHYSICAL HEADS?\n", drive->name, drive->head);
 			idedisk_cleanup(drive);
-			ata_ops(drive)->busy--;
 			continue;
 		}
-		ata_ops(drive)->busy--;
 		failed--;
 	}
 	revalidate_drives();

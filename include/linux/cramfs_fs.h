@@ -24,6 +24,12 @@ typedef unsigned int u32;
 #define CRAMFS_OFFSET_WIDTH 26
 
 /*
+ * Since inode.namelen is a unsigned 6-bit number, the maximum cramfs
+ * path length is 63 << 2 = 252.
+ */
+#define CRAMFS_MAXPATHLEN (((1 << CRAMFS_NAMELEN_WIDTH) - 1) << 2)
+
+/*
  * Reasonably terse representation of the inode data.
  */
 struct cramfs_inode {
@@ -52,14 +58,14 @@ struct cramfs_info {
  * Superblock information at the beginning of the FS.
  */
 struct cramfs_super {
-	u32 magic;		/* 0x28cd3d45 - random number */
-	u32 size;		/* length in bytes */
-	u32 flags;		/* 0 */
-	u32 future;		/* 0 */
-	u8 signature[16];	/* "Compressed ROMFS" */
+	u32 magic;			/* 0x28cd3d45 - random number */
+	u32 size;			/* length in bytes */
+	u32 flags;			/* feature flags */
+	u32 future;			/* reserved for future use */
+	u8 signature[16];		/* "Compressed ROMFS" */
 	struct cramfs_info fsid;	/* unique filesystem info */
-	u8 name[16];		/* user-defined name */
-	struct cramfs_inode root;	/* Root inode data */
+	u8 name[16];			/* user-defined name */
+	struct cramfs_inode root;	/* root inode data */
 };
 
 /*
@@ -79,7 +85,10 @@ struct cramfs_super {
  * if (flags & ~CRAMFS_SUPPORTED_FLAGS).  Maybe that should be
  * changed to test super.future instead.
  */
-#define CRAMFS_SUPPORTED_FLAGS (0x7ff)
+#define CRAMFS_SUPPORTED_FLAGS	( 0x000000ff \
+				| CRAMFS_FLAG_HOLES \
+				| CRAMFS_FLAG_WRONG_SIGNATURE \
+				| CRAMFS_FLAG_SHIFTED_ROOT_OFFSET )
 
 /* Uncompression interfaces to the underlying zlib */
 int cramfs_uncompress_block(void *dst, int dstlen, void *src, int srclen);

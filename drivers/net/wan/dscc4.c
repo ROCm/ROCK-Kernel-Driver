@@ -72,7 +72,7 @@
  * the documentation/chipset releases. An on-line errata would be welcome.
  *
  * TODO:
- * - syncppp oopses. X25 untested.
+ * - test X25.
  * - use polling at high irq/s,
  * - performance analysis,
  * - endianness.
@@ -91,6 +91,7 @@
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/errno.h>
+#include <linux/list.h>
 #include <linux/ioport.h>
 #include <linux/pci.h>
 #include <linux/kernel.h>
@@ -114,7 +115,7 @@
 #include <linux/hdlc.h>
 
 /* Version */
-static const char version[] = "$Id: dscc4.c,v 1.157 2002/01/28 01:54:19 romieu Exp $\n";
+static const char version[] = "$Id: dscc4.c,v 1.158 2002/01/30 00:40:37 romieu Exp $\n";
 static int debug;
 static int quartz;
 
@@ -168,9 +169,9 @@ struct RxFD {
 #define BRR_DIVIDER_MAX 64*0x00008000
 #define dev_per_card	4
 
-#define SOURCE_ID(flags) ((flags >> 28 ) & 0x03)
-#define TO_SIZE(state) ((state >> 16) & 0x1fff)
-#define TO_STATE(len) cpu_to_le32((len & TxSizeMax) << 16)
+#define SOURCE_ID(flags) (((flags) >> 28 ) & 0x03)
+#define TO_SIZE(state) (((state) >> 16) & 0x1fff)
+#define TO_STATE(len) cpu_to_le32(((len) & TxSizeMax) << 16)
 #define RX_MAX(len) ((((len) >> 5) + 1)<< 5)
 #define SCC_REG_START(id) SCC_START+(id)*SCC_OFFSET
 
@@ -343,6 +344,11 @@ static inline int dscc4_set_quartz(struct dscc4_dev_priv *, int);
 static int dscc4_tx_poll(struct dscc4_dev_priv *, struct net_device *);
 #endif
 
+static inline struct dscc4_dev_priv *dscc4_priv(struct net_device *dev)
+{
+	return list_entry(dev, struct dscc4_dev_priv, hdlc.netdev);
+}
+
 static inline void dscc4_patch_register(u32 ioaddr, u32 mask, u32 value)
 {
 	u32 state;
@@ -479,52 +485,49 @@ static int dscc4_do_action(struct net_device *dev, char *msg)
 
 static inline int dscc4_xpr_ack(struct dscc4_dev_priv *dpriv)
 {
-	int cur, ret = 0;
-	s16 i;
+	int cur = dpriv->iqtx_current%IRQ_RING_SIZE;
+	s16 i = 0;
 
-	cur = dpriv->iqtx_current%IRQ_RING_SIZE;
-	for (i = 0; i >= 0; i++) {
+	do {
 		if (!(dpriv->flags & (NeedIDR | NeedIDT)) ||
 		    (dpriv->iqtx[cur] & Xpr))
 			break;
 		smp_rmb();
-	}
-	if (i < 0) {
-		printk(KERN_ERR "%s: %s timeout\n", "dscc4", "XPR");
-		ret = -1;
-	}
-	return ret;
+	} while (i++ >= 0);
+
+	return i;
 }
 
 static inline void dscc4_rx_skb(struct dscc4_dev_priv *dpriv, int cur,
 	struct RxFD *rx_fd, struct net_device *dev)
 {
+	struct net_device_stats *stats = &dev_to_hdlc(dev)->stats;
 	struct pci_dev *pdev = dpriv->pci_priv->pdev;
 	struct sk_buff *skb;
 	int pkt_len;
 
 	skb = dpriv->rx_skbuff[cur];
-	pkt_len = TO_SIZE(rx_fd->state2) - 1;
-	pci_dma_sync_single(pdev, rx_fd->data, pkt_len + 1, PCI_DMA_FROMDEVICE);
-	if((skb->data[pkt_len] & FrameOk) == FrameOk) {
+	pkt_len = TO_SIZE(rx_fd->state2);
+	pci_dma_sync_single(pdev, rx_fd->data, pkt_len, PCI_DMA_FROMDEVICE);
+	if((skb->data[--pkt_len] & FrameOk) == FrameOk) {
 		pci_unmap_single(pdev, rx_fd->data, skb->len, PCI_DMA_FROMDEVICE);
-		dev_to_hdlc(dev)->stats.rx_packets++;
-		dev_to_hdlc(dev)->stats.rx_bytes += pkt_len;
+		stats->rx_packets++;
+		stats->rx_bytes += pkt_len;
 		skb->tail += pkt_len;
 		skb->len = pkt_len;
-       		if (netif_running(hdlc_to_dev(&dpriv->hdlc)))
+       		if (netif_running(dev))
 			skb->protocol = htons(ETH_P_HDLC);
 		netif_rx(skb);
 		try_get_rx_skb(dpriv, cur, dev);
 	} else {
 		if(skb->data[pkt_len] & FrameRdo)
-			dev_to_hdlc(dev)->stats.rx_fifo_errors++;
+			stats->rx_fifo_errors++;
 		else if(!(skb->data[pkt_len] | ~FrameCrc))
-			dev_to_hdlc(dev)->stats.rx_crc_errors++;
+			stats->rx_crc_errors++;
 		else if(!(skb->data[pkt_len] | ~(FrameVfr | FrameRab)))
-			dev_to_hdlc(dev)->stats.rx_length_errors++;
+			stats->rx_length_errors++;
 		else
-			dev_to_hdlc(dev)->stats.rx_errors++;
+			stats->rx_errors++;
 	}
 	rx_fd->state1 |= Hold;
 	rx_fd->state2 = 0x00000000;
@@ -612,7 +615,7 @@ static int __init dscc4_init_one (struct pci_dev *pdev,
 	 * SCC 0-3 private rx/tx irq structures 
 	 * IQRX/TXi needs to be set soon. Learned it the hard way...
 	 */
-	for(i = 0; i < dev_per_card; i++) {
+	for (i = 0; i < dev_per_card; i++) {
 		dpriv = priv->root + i;
 		dpriv->iqtx = (u32 *) pci_alloc_consistent(pdev,
 			IRQ_RING_SIZE*sizeof(u32), &dpriv->iqtx_dma);
@@ -620,7 +623,7 @@ static int __init dscc4_init_one (struct pci_dev *pdev,
 			goto err_out_free_iqtx;
 		writel(dpriv->iqtx_dma, ioaddr + IQTX0 + i*4);
 	}
-	for(i = 0; i < dev_per_card; i++) {
+	for (i = 0; i < dev_per_card; i++) {
 		dpriv = priv->root + i;
 		dpriv->iqrx = (u32 *) pci_alloc_consistent(pdev,
 			IRQ_RING_SIZE*sizeof(u32), &dpriv->iqrx_dma);
@@ -740,7 +743,6 @@ static int dscc4_found1(struct pci_dev *pdev, unsigned long ioaddr)
 		dpriv->dev_id = i;
 		dpriv->pci_priv = ppriv;
 		spin_lock_init(&dpriv->lock);
-		d->priv = dpriv;
 
 		hdlc->xmit = dscc4_start_xmit;
 		hdlc->attach = dscc4_hdlc_attach;
@@ -778,7 +780,7 @@ static void dscc4_timer(unsigned long data)
 	struct dscc4_dev_priv *dpriv;
 	struct dscc4_pci_priv *ppriv;
 
-	dpriv = dev->priv;
+	dpriv = dscc4_priv(dev);
 	if (netif_queue_stopped(dev) && 
 	   ((jiffies - dev->trans_start) > TX_TIMEOUT)) {
 		ppriv = dpriv->pci_priv;
@@ -844,7 +846,7 @@ static int dscc4_loopback_check(struct dscc4_dev_priv *dpriv)
 
 static int dscc4_open(struct net_device *dev)
 {
-	struct dscc4_dev_priv *dpriv = dev->priv;
+	struct dscc4_dev_priv *dpriv = dscc4_priv(dev);
 	hdlc_device *hdlc = &dpriv->hdlc;
 	struct dscc4_pci_priv *ppriv;
 	u32 ioaddr;
@@ -893,8 +895,10 @@ static int dscc4_open(struct net_device *dev)
 	 * WARNING, a really missing XPR usually means a hardware 
 	 * reset is needed. Suggestions anyone ?
 	 */
-	if (dscc4_xpr_ack(dpriv))
+	if (dscc4_xpr_ack(dpriv) < 0) {
+		printk(KERN_ERR "%s: %s timeout\n", DRV_NAME, "XPR");
 		goto err_free_ring;
+	}
 	
 	netif_start_queue(dev);
 
@@ -925,7 +929,7 @@ static int dscc4_tx_poll(struct dscc4_dev_priv *dpriv, struct net_device *dev)
 
 static int dscc4_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct dscc4_dev_priv *dpriv = dev->priv;
+	struct dscc4_dev_priv *dpriv = dscc4_priv(dev);
 	struct dscc4_pci_priv *ppriv;
 	struct TxFD *tx_fd;
 	int cur, next;
@@ -935,7 +939,6 @@ static int dscc4_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	next = dpriv->tx_current%TX_RING_SIZE;
 	dpriv->tx_skbuff[next] = skb;
 	tx_fd = dpriv->tx_fd + next;
-	printk(KERN_DEBUG "%s: %d sent\n", dev->name, skb->len);
 	tx_fd->state = FrameEnd | Hold | TO_STATE(skb->len);
 	tx_fd->data = pci_map_single(ppriv->pdev, skb->data, skb->len,
 				     PCI_DMA_TODEVICE);
@@ -972,7 +975,7 @@ static int dscc4_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 static int dscc4_close(struct net_device *dev)
 {
-	struct dscc4_dev_priv *dpriv = (struct dscc4_dev_priv *)dev->priv;
+	struct dscc4_dev_priv *dpriv = dscc4_priv(dev);
 	u32 ioaddr = dev->base_addr;
 	int dev_id;
 	hdlc_device *hdlc = dev_to_hdlc(dev);
@@ -1011,7 +1014,7 @@ static inline int dscc4_check_clock_ability(int port)
 
 static int dscc4_set_clock(struct net_device *dev, u32 *bps, u32 *state)
 {
-	struct dscc4_dev_priv *dpriv = (struct dscc4_dev_priv *)dev->priv;
+	struct dscc4_dev_priv *dpriv = dscc4_priv(dev);
 	u32 brr;
 
 	*state &= ~Ccr0ClockMask;
@@ -1062,37 +1065,29 @@ static int dscc4_set_clock(struct net_device *dev, u32 *bps, u32 *state)
 
 static int dscc4_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
-	struct dscc4_dev_priv *dpriv = dev->priv;
-	struct if_settings *if_s = &ifr->ifr_settings;
+	union line_settings *line = &ifr->ifr_settings->ifs_line;
+	struct dscc4_dev_priv *dpriv = dscc4_priv(dev);
 	const size_t size = sizeof(dpriv->settings);
 	int ret = 0;
 
         if (dev->flags & IFF_UP)
                 return -EBUSY;
 
-	if (cmd != SIOCDEVICE)
+	if (cmd != SIOCWANDEV)
 		return -EOPNOTSUPP;
 
-	switch(ifr->ifr_settings.type) {
+	switch(ifr->ifr_settings->type) {
 	case IF_GET_IFACE:
-		if_s->type = IF_IFACE_SYNC_SERIAL;
-		if (if_s->data_length == 0)
-			return 0;
-		if (if_s->data_length < size)
-			return -ENOMEM;
-		if (copy_to_user(if_s->data, &dpriv->settings, size))
+		ifr->ifr_settings->type = IF_IFACE_SYNC_SERIAL;
+		if (copy_to_user(&line->sync, &dpriv->settings, size))
 			return -EFAULT;
-		if_s->data_length = size;
 		break;
 
 	case IF_IFACE_SYNC_SERIAL:
 		if(!capable(CAP_NET_ADMIN))
 			return -EPERM;
 
-		if (if_s->data_length != size)
-			return -ENOMEM;
-
-		if (copy_from_user(&dpriv->settings, if_s->data, size))
+		if (copy_from_user(&dpriv->settings, &line->sync, size))
 			return -EFAULT;
 		ret = dscc4_set_iface(dev);
 		break;
@@ -1133,7 +1128,7 @@ static int dscc4_match(struct thingie *p, int value)
 
 static int dscc4_clock_setting(struct net_device *dev)
 {
-	struct dscc4_dev_priv *dpriv = dev->priv;
+	struct dscc4_dev_priv *dpriv = dscc4_priv(dev);
 	sync_serial_settings *settings = &dpriv->settings;
 	u32 bps, state;
 	u32 ioaddr;
@@ -1160,7 +1155,7 @@ static int dscc4_clock_setting(struct net_device *dev)
 
 static int dscc4_encoding_setting(struct net_device *dev)
 {
-	struct dscc4_dev_priv *dpriv = dev->priv;
+	struct dscc4_dev_priv *dpriv = dscc4_priv(dev);
 	struct thingie encoding[] = {
 		{ ENCODING_NRZ,		0x00000000 },
 		{ ENCODING_NRZI,	0x00200000 },
@@ -1184,7 +1179,7 @@ static int dscc4_encoding_setting(struct net_device *dev)
 
 static int dscc4_loopback_setting(struct net_device *dev)
 {
-	struct dscc4_dev_priv *dpriv = dev->priv;
+	struct dscc4_dev_priv *dpriv = dscc4_priv(dev);
 	sync_serial_settings *settings = &dpriv->settings;
 	u32 ioaddr, state;
 
@@ -1203,7 +1198,7 @@ static int dscc4_loopback_setting(struct net_device *dev)
 
 static int dscc4_crc_setting(struct net_device *dev)
 {
-	struct dscc4_dev_priv *dpriv = dev->priv;
+	struct dscc4_dev_priv *dpriv = dscc4_priv(dev);
 	struct thingie crc[] = {
 		{ PARITY_CRC16_PR0_CCITT,	0x00000010 },
 		{ PARITY_CRC16_PR1_CCITT,	0x00000000 },
@@ -1516,7 +1511,6 @@ try:
 		}
 	} else { /* ! SccEvt */
 #ifdef DEBUG_PARANOIA
-		int i;
 		static struct {
 			u32 mask;
 			const char *irq_name;
@@ -1528,21 +1522,21 @@ try:
 			{ 0x00000008, "PLLA"},
 			{ 0x00000004, "CDSC"},
 			{ 0, NULL}
-		};
+		}, *evt;
 #endif /* DEBUG_PARANOIA */
 		state &= 0x00ffffff;
 #ifdef DEBUG_PARANOIA
-		for (i = 0; evts[i].irq_name; i++) {
-			if (state & evts[i].mask) {
+		for (evt = evts; evt->irq_name; evt++) {
+			if (state & evt->mask) {
 				printk(KERN_DEBUG "%s: %s\n", dev->name, 
-					evts[i].irq_name);
-				if (!(state &= ~evts[i].mask))
+					evt->irq_name);
+				if (!(state &= ~evt->mask))
 					goto try;
 			}
 		}
 #endif /* DEBUG_PARANOIA */
 		/*
-		 * Receive Data Overflow (FIXME: untested)
+		 * Receive Data Overflow (FIXME: fscked)
 		 */
 		if (state & Rdo) {
 			u32 ioaddr, scc_offset, scc_addr;
@@ -1633,7 +1627,7 @@ try:
 
 static int dscc4_init_ring(struct net_device *dev)
 {
-	struct dscc4_dev_priv *dpriv = (struct dscc4_dev_priv *)dev->priv;
+	struct dscc4_dev_priv *dpriv = dscc4_priv(dev);
 	struct TxFD *tx_fd;
 	struct RxFD *rx_fd;
 	int i;
@@ -1654,7 +1648,7 @@ static int dscc4_init_ring(struct net_device *dev)
 	dpriv->tx_dirty = 0;
 
 	/* the dma core of the dscc4 will be locked on the first desc */
-	for(i = 0; i < TX_RING_SIZE; ) {
+	for (i = 0; i < TX_RING_SIZE; ) {
 		reset_TxFD(tx_fd);
 	        /* FIXME: NULL should be ok - to be tried */
 	        tx_fd->data = dpriv->tx_fd_dma;
@@ -1689,7 +1683,7 @@ static int dscc4_init_ring(struct net_device *dev)
 				     skb->len, PCI_DMA_TODEVICE);
 	dpriv->tx_skbuff[0] = skb;
 }
-	for (i = 0; i < RX_RING_SIZE;) {
+	for (i = 0; i < RX_RING_SIZE; ) {
 		/* size set by the host. Multiple of 4 bytes please */
 	        rx_fd->state1 = HiDesc; /* Hi, no Hold */
 	        rx_fd->state2 = 0x00000000;
@@ -1753,7 +1747,8 @@ static void __exit dscc4_remove_one(struct pci_dev *pdev)
 static int dscc4_hdlc_attach(hdlc_device *hdlc, unsigned short encoding, 
 	unsigned short parity)
 {
-	struct dscc4_dev_priv *dpriv = hdlc_to_dev(hdlc)->priv;
+	struct net_device *dev = hdlc_to_dev(hdlc);
+	struct dscc4_dev_priv *dpriv = dscc4_priv(dev);
 
 	if (encoding != ENCODING_NRZ &&
 	    encoding != ENCODING_NRZI &&
@@ -1782,7 +1777,7 @@ static struct pci_device_id dscc4_pci_tbl[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, dscc4_pci_tbl);
 
 static struct pci_driver dscc4_driver = {
-	name:           "dscc4",
+	name:           DRV_NAME,
 	id_table:       dscc4_pci_tbl,
 	probe:          dscc4_init_one,
 	remove:         dscc4_remove_one,

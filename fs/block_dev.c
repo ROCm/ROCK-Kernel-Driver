@@ -442,6 +442,27 @@ void bd_forget(struct inode *inode)
 	spin_unlock(&bdev_lock);
 }
 
+int bd_claim(struct block_device *bdev, void *holder)
+{
+	int res = -EBUSY;
+	spin_lock(&bdev_lock);
+	if (!bdev->bd_holder || bdev->bd_holder == holder) {
+		bdev->bd_holder = holder;
+		bdev->bd_holders++;
+		res = 0;
+	}
+	spin_unlock(&bdev_lock);
+	return res;
+}
+
+void bd_release(struct block_device *bdev)
+{
+	spin_lock(&bdev_lock);
+	if (!--bdev->bd_holders)
+		bdev->bd_holder = NULL;
+	spin_unlock(&bdev_lock);
+}
+
 static struct {
 	const char *name;
 	struct block_device_operations *bdops;

@@ -117,12 +117,12 @@ int ZEXPORT zlib_inflate(z, f)
 z_streamp z;
 int f;
 {
-  int r;
+  int r, trv;
   uInt b;
 
   if (z == Z_NULL || z->state == Z_NULL || z->next_in == Z_NULL)
     return Z_STREAM_ERROR;
-  f = f == Z_FINISH ? Z_BUF_ERROR : Z_OK;
+  trv = f == Z_FINISH ? Z_BUF_ERROR : Z_OK;
   r = Z_BUF_ERROR;
   while (1) switch (z->state->mode)
   {
@@ -193,10 +193,10 @@ int f;
         break;
       }
       if (r == Z_OK)
-        r = f;
+        r = trv;
       if (r != Z_STREAM_END)
         return r;
-      r = f;
+      r = trv;
       zlib_inflate_blocks_reset(z->state->blocks, z, &z->state->sub.check.was);
       if (z->state->nowrap)
       {

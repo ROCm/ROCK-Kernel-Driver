@@ -20,7 +20,7 @@
 
 static struct map_desc anakin_io_desc[] __initdata = {
 	{ IO_BASE,    IO_START,    IO_SIZE,    DOMAIN_IO, 0, 1, 0, 0 },
-	{ FLASH_BASE, FLASH_START, FLASH_SIZE, DOMAIN_IO, 1, 1, 0, 0 },
+	{ FLASH_BASE, FLASH_START, FLASH_SIZE, DOMAIN_IO, 0, 1, 0, 0 },
 	{ VGA_BASE,   VGA_START,   VGA_SIZE,   DOMAIN_IO, 0, 1, 0, 0 },
 	LAST_DESC
 };

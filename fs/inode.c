@@ -291,15 +291,15 @@ static inline void __sync_one(struct inode *inode, int sync)
 
 static inline void sync_one(struct inode *inode, int sync)
 {
-	if (inode->i_state & I_LOCK) {
+	while (inode->i_state & I_LOCK) {
 		__iget(inode);
 		spin_unlock(&inode_lock);
 		__wait_on_inode(inode);
 		iput(inode);
 		spin_lock(&inode_lock);
-	} else {
-		__sync_one(inode, sync);
 	}
+
+	__sync_one(inode, sync);
 }
 
 static inline void sync_list(struct list_head *head)

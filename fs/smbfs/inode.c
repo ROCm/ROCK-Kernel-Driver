@@ -445,8 +445,7 @@ smb_put_super(struct super_block *sb)
 	if (server->conn_pid)
 	       kill_proc(server->conn_pid, SIGTERM, 1);
 
-	smb_kfree(server->mnt);
-	smb_kfree(server->temp_buf);
+	smb_kfree(server->ops);
 	if (server->packet)
 		smb_vfree(server->packet);
 
@@ -468,6 +467,7 @@ int smb_fill_super(struct super_block *sb, void *raw_data, int silent)
 	struct inode *root_inode;
 	struct smb_fattr root;
 	int ver;
+	void *mem;
 
 	if (!raw_data)
 		goto out_no_data;
@@ -494,22 +494,29 @@ int smb_fill_super(struct super_block *sb, void *raw_data, int silent)
 	if (!server->packet)
 		goto out_no_mem;
 
-	/* Allocate the global temp buffer */
-	server->temp_buf = smb_kmalloc(2*SMB_MAXPATHLEN+20, GFP_KERNEL);
-	if (!server->temp_buf)
+	/* Allocate the global temp buffer and some superblock helper structs */
+	VERBOSE("alloc chunk = %d\n", sizeof(struct smb_ops) +
+		sizeof(struct smb_mount_data_kernel) +
+		2*SMB_MAXPATHLEN + 20);
+	mem = smb_kmalloc(sizeof(struct smb_ops) +
+			  sizeof(struct smb_mount_data_kernel) +
+			  2*SMB_MAXPATHLEN + 20, GFP_KERNEL);
+	if (!mem)
 		goto out_no_temp;
+
+	server->ops = mem;
+	server->mnt = mem + sizeof(struct smb_ops);
+	server->name_buf = mem + sizeof(struct smb_ops) +
+		sizeof(struct smb_mount_data_kernel);
+	server->temp_buf = mem + sizeof(struct smb_ops) +
+		sizeof(struct smb_mount_data_kernel) +
+		SMB_MAXPATHLEN + 1;
 
 	/* Setup NLS stuff */
 	server->remote_nls = NULL;
 	server->local_nls = NULL;
-	server->name_buf = server->temp_buf + SMB_MAXPATHLEN + 20;
 
-	/* Allocate the mount data structure */
-	/* FIXME: merge this with the other malloc and get a whole page? */
-	mnt = smb_kmalloc(sizeof(struct smb_mount_data_kernel), GFP_KERNEL);
-	if (!mnt)
-		goto out_no_mount;
-	server->mnt = mnt;
+	mnt = server->mnt;
 
 	memset(mnt, 0, sizeof(struct smb_mount_data_kernel));
 	strncpy(mnt->codepage.local_name, CONFIG_NLS_DEFAULT,
@@ -565,9 +572,7 @@ int smb_fill_super(struct super_block *sb, void *raw_data, int silent)
 out_no_root:
 	iput(root_inode);
 out_bad_option:
-	smb_kfree(server->mnt);
-out_no_mount:
-	smb_kfree(server->temp_buf);
+	smb_kfree(mem);
 out_no_temp:
 	smb_vfree(server->packet);
 out_no_mem:
@@ -630,8 +635,7 @@ smb_notify_change(struct dentry *dentry, struct iattr *attr)
 		error = smb_open(dentry, O_WRONLY);
 		if (error)
 			goto out;
-		error = smb_proc_trunc(server, SMB_I(inode)->fileid,
-				       attr->ia_size);
+		error = server->ops->truncate(inode, attr->ia_size);
 		if (error)
 			goto out;
 		error = vmtruncate(inode, attr->ia_size);

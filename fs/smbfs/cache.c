@@ -84,7 +84,7 @@ smb_dget_fpos(struct dentry *dentry, struct dentry *parent, unsigned long fpos)
 	struct list_head *next;
 
 	if (d_validate(dent, parent)) {
-		if (dent->d_name.len <= SMB_MAXPATHLEN &&
+		if (dent->d_name.len <= SMB_MAXNAMELEN &&
 		    (unsigned long)dent->d_fsdata == fpos) {
 			if (!dent->d_inode) {
 				dput(dent);

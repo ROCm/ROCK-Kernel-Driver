@@ -4183,12 +4183,18 @@
 14e3  AMTELCO
 14e4  BROADCOM Corporation
 	1644  NetXtreme BCM5700 Gigabit Ethernet
+		1014 0277  Broadcom Vigil B5700 1000Base-T
+		1028 00d1  Broadcom BCM5700
+		1028 0106  Broadcom BCM5700
+		1028 0109  Broadcom BCM5700
+		1028 010a  Broadcom BCM5700
 		10b7 1000  3C996-T 1000BaseTX
 		10b7 1001  3C996B-T 1000BaseTX
 		10b7 1002  3C996C-T 1000BaseTX
 		10b7 1003  3C997-T 1000BaseTX
 		10b7 1004  3C996-SX 1000BaseSX
 		10b7 1005  3C997-SX 1000BaseSX
+		10b7 1008  3C942 Gigabit LOM (31X31)
 		14e4 0002  NetXtreme 1000BaseSX
 		14e4 0003  NetXtreme 1000BaseSX
 		14e4 0004  NetXtreme 1000BaseTX
@@ -4197,6 +4203,7 @@
 		0e11 007c  NC7770 1000BaseTX
 		0e11 007d  NC6770 1000BaseSX
 		0e11 0085  NC7780 1000BaseTX
+		1028 0121  Broadcom BCM5701
 		10b7 1004  3C996-SX 1000BaseSX
 		10b7 1006  3C996B-T 1000BaseTX
 		10b7 1007  3C1000-T 1000BaseTX
@@ -4207,7 +4214,16 @@
 		14e4 0007  NetXtreme BCM5701 1000BaseSX
 		14e4 0008  NetXtreme BCM5701 1000BaseTX
 		14e4 8008  NetXtreme BCM5701 1000BaseTX
+	1646  NetXtreme BCM5702 Gigabit Ethernet
+		14e4 8009  Broadcom BCM5702
 	1647  NetXtreme BCM5703 Gigabit Ethernet
+		0e11 009a  NC7770
+		0e11 0099  NC7780
+		14e4 0009  Broadcom BCM5703
+		14e4 8009  Broadcom BCM5703
+	164d  NetXtreme BCM5702FE Gigabit Ethernet
+	16a6  NetXtreme BCM5702X Gigabit Ethernet
+	16a7  NetXtreme BCM5703X Gigabit Ethernet
 	5820  BCM5820 Crypto Accelerator
 14e5  Pixelfusion Ltd
 14e6  SHINING Technology Inc
@@ -4647,6 +4663,8 @@
 	0400  FarSync T2P (2 port X.21/V.35/V.24)
 	0440  FarSync T4P (4 port X.21/V.35/V.24)
 1668  Action Tec Electronics Inc
+173b  Altima (nee BroadCom)
+	03e8  AC1000 Gigabit Ethernet
 1813  Ambient Technologies Inc
 1a08  Sierra semiconductor
 	0000  SC15064

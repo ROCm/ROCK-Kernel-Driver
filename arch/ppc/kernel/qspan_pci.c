@@ -14,7 +14,7 @@
  * PCI access and QSpan control register addresses.  The selection is
  * further selected by a bit setting in a board control register.
  * Although it should happen, we disable interrupts during this operation
- * to make sure some driver doesn't accidently access the PCI while
+ * to make sure some driver doesn't accidentally access the PCI while
  * we have switched the chip select.
  */
 

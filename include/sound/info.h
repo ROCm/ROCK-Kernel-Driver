@@ -104,6 +104,11 @@ extern int snd_info_minor_unregister(void);
 #ifdef CONFIG_PROC_FS
 
 extern snd_info_entry_t *snd_seq_root;
+#ifdef CONFIG_SND_OSSEMUL
+extern snd_info_entry_t *snd_oss_root;
+#else
+#define snd_oss_root NULL
+#endif
 
 int snd_iprintf(snd_info_buffer_t * buffer, char *fmt,...) __attribute__ ((format (printf, 2, 3)));
 int snd_info_init(void);
@@ -138,6 +143,7 @@ void snd_remove_proc_entry(struct proc_dir_entry *parent,
 #else
 
 #define snd_seq_root NULL
+#define snd_oss_root NULL
 
 static inline int snd_iprintf(snd_info_buffer_t * buffer, char *fmt,...) { return 0; }
 static inline int snd_info_init(void) { return 0; }
