@@ -2,7 +2,7 @@ This file contains brief information about the SCSI tape driver.
 The driver is currently maintained by Kai Mäkisara (email
 Kai.Makisara@kolumbus.fi)
 
-Last modified: Sun Apr  6 22:44:13 2003 by makisara
+Last modified: Sat Apr 12 20:26:37 2003 by makisara
 
 
 BASICS
@@ -201,11 +201,17 @@ BOOT TIME CONFIGURATION
 
 If the driver is compiled into the kernel, the same parameters can be
 also set using, e.g., the LILO command line. The preferred syntax is
-to use the same keywords as when loading the driver as module. If
-several parameters are set, the keyword-value pairs are separated with
-a comma (no spaces allowed). A colon can be used instead of the equal
-mark. The definition is prepended by the string st=. Here is an
-example:
+is to use the same keyword used when loading as module but prepended
+with 'st.'. For instance, to set the maximum number of scatter/gather
+segments, the parameter 'st.max_sg_segs=xx' should be used (xx is the
+number of scatter/gather segments).
+
+For compatibility, the old syntax from early 2.5 and 2.4 kernel
+versions is supported. The same keywords can be used as when loading
+the driver as module. If several parameters are set, the keyword-value
+pairs are separated with a comma (no spaces allowed). A colon can be
+used instead of the equal mark. The definition is prepended by the
+string st=. Here is an example:
 
 	st=buffer_kbs:64,write_threhold_kbs:60
 

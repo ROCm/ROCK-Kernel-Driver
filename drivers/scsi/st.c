@@ -12,13 +12,13 @@
    Copyright 1992 - 2003 Kai Makisara
    email Kai.Makisara@kolumbus.fi
 
-   Last modified: Sat Apr 12 20:20:39 2003 by makisara
+   Last modified: Sun Apr 13 10:17:18 2003 by makisara
    Some small formal changes - aeb, 950809
 
    Last modified: 18-JAN-1998 Richard Gooch <rgooch@atnf.csiro.au> Devfs support
  */
 
-static char *verstr = "20030412";
+static char *verstr = "20030413";
 
 #include <linux/module.h>
 
@@ -34,6 +34,7 @@ static char *verstr = "20030412";
 #include <linux/fcntl.h>
 #include <linux/spinlock.h>
 #include <linux/blk.h>
+#include <linux/moduleparam.h>
 #include <asm/uaccess.h>
 #include <asm/dma.h>
 #include <asm/system.h>
@@ -77,17 +78,21 @@ MODULE_AUTHOR("Kai Makisara");
 MODULE_DESCRIPTION("SCSI Tape Driver");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(buffer_kbs, "i");
+/* Set 'perm' (4th argument) to 0 to disable module_param's definition
+ * of sysfs parameters (which module_param doesn't yet support).
+ * Sysfs parameters defined explicitly later.
+ */
+module_param_named(buffer_kbs, buffer_kbs, int, 0);
 MODULE_PARM_DESC(buffer_kbs, "Default driver buffer size for fixed block mode (KB; 32)");
-MODULE_PARM(max_sg_segs, "i");
+module_param_named(max_sg_segs, max_sg_segs, int, 0);
 MODULE_PARM_DESC(max_sg_segs, "Maximum number of scatter/gather segments to use (256)");
-MODULE_PARM(try_direct_io, "i");
+module_param_named(try_direct_io, try_direct_io, int, 0);
 MODULE_PARM_DESC(try_direct_io, "Try direct I/O between user buffer and tape drive (1)");
 
 /* Extra parameters for testing */
-MODULE_PARM(try_rdio, "i");
+module_param_named(try_rdio, try_rdio, int, 0);
 MODULE_PARM_DESC(try_rdio, "Try direct read i/o when possible");
-MODULE_PARM(try_wdio, "i");
+module_param_named(try_wdio, try_wdio, int, 0);
 MODULE_PARM_DESC(try_wdio, "Try direct write i/o when possible");
 
 #ifndef MODULE
@@ -165,6 +170,10 @@ static int sgl_unmap_user_pages(struct scatterlist *, const unsigned int, int);
 
 static int st_attach(Scsi_Device *);
 static void st_detach(Scsi_Device *);
+
+static void do_create_driverfs_files(void);
+static void do_remove_driverfs_files(void);
+
 
 static struct Scsi_Device_Template st_template = {
 	.module =	THIS_MODULE,
@@ -3972,8 +3981,10 @@ static int __init init_st(void)
 		verstr, st_fixed_buffer_size, st_max_sg_segs);
 
 	if (register_chrdev(SCSI_TAPE_MAJOR, "st", &st_fops) >= 0) {
-		if (scsi_register_device(&st_template) == 0)
+		if (scsi_register_device(&st_template) == 0) {
+			do_create_driverfs_files();
 			return 0;
+		}
 		unregister_chrdev(SCSI_TAPE_MAJOR, "st");
 	}
 
@@ -3985,6 +3996,7 @@ static void __exit exit_st(void)
 {
 	int i;
 
+	do_remove_driverfs_files();
 	scsi_unregister_device(&st_template);
 	unregister_chrdev(SCSI_TAPE_MAJOR, "st");
 	if (scsi_tapes != NULL) {
@@ -4001,6 +4013,52 @@ static void __exit exit_st(void)
 
 module_init(init_st);
 module_exit(exit_st);
+
+
+/* The sysfs interface. Read-only at the moment */
+static ssize_t st_try_direct_io_show(struct device_driver *ddp, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n", try_direct_io);
+}
+static DRIVER_ATTR(try_direct_io, S_IRUGO, st_try_direct_io_show, NULL);
+
+static ssize_t st_fixed_buffer_size_show(struct device_driver *ddp, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n", st_fixed_buffer_size);
+}
+static DRIVER_ATTR(fixed_buffer_size, S_IRUGO, st_fixed_buffer_size_show, NULL);
+
+static ssize_t st_max_sg_segs_show(struct device_driver *ddp, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n", st_max_sg_segs);
+}
+static DRIVER_ATTR(max_sg_segs, S_IRUGO, st_max_sg_segs_show, NULL);
+
+static ssize_t st_version_show(struct device_driver *ddd, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "[%s]\n", verstr);
+}
+static DRIVER_ATTR(version, S_IRUGO, st_version_show, NULL);
+
+static void do_create_driverfs_files(void)
+{
+	struct device_driver *driverfs = &st_template.scsi_driverfs_driver;
+
+	driver_create_file(driverfs, &driver_attr_try_direct_io);
+	driver_create_file(driverfs, &driver_attr_fixed_buffer_size);
+	driver_create_file(driverfs, &driver_attr_max_sg_segs);
+	driver_create_file(driverfs, &driver_attr_version);
+}
+
+static void do_remove_driverfs_files(void)
+{
+	struct device_driver *driverfs = &st_template.scsi_driverfs_driver;
+
+	driver_remove_file(driverfs, &driver_attr_version);
+	driver_remove_file(driverfs, &driver_attr_max_sg_segs);
+	driver_remove_file(driverfs, &driver_attr_fixed_buffer_size);
+	driver_remove_file(driverfs, &driver_attr_try_direct_io);
+}
 
 
 /* Pin down user pages and put them into a scatter gather list. Returns <= 0 if
