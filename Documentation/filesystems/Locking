@@ -276,21 +276,34 @@ foo_get_block(). It's an overkill, since block bitmaps can be protected by
 internal fs locking and real critical areas are much smaller than the areas
 filesystems protect now.
 
---------------------------- file_lock ------------------------------------
+----------------------- file_lock_operations ------------------------------
 prototypes:
-	void (*fl_notify)(struct file_lock *);	/* unblock callback */
 	void (*fl_insert)(struct file_lock *);	/* lock insertion callback */
 	void (*fl_remove)(struct file_lock *);	/* lock removal callback */
+	void (*fl_copy_lock)(struct file_lock *, struct file_lock *);
+	void (*fl_release_private)(struct file_lock *);
+
 
 locking rules:
-		BKL	may block
-fl_notify:	yes	no
-fl_insert:	yes	no
-fl_remove:	yes	no
+			BKL	may block
+fl_insert:		yes	no
+fl_remove:		yes	no
+fl_copy_lock:		yes	no
+fl_release_private:	yes	yes
+
+----------------------- lock_manager_operations ---------------------------
+prototypes:
+	int (*fl_compare_owner)(struct file_lock *, struct file_lock *);
+	void (*fl_notify)(struct file_lock *);  /* unblock callback */
+
+locking rules:
+			BKL	may block
+fl_compare_owner:	yes	no
+fl_notify:		yes	no
+
 	Currently only NLM provides instances of this class. None of the
 them block. If you have out-of-tree instances - please, show up. Locking
 in that area will change.
-
 --------------------------- buffer_head -----------------------------------
 prototypes:
 	void (*b_end_io)(struct buffer_head *bh, int uptodate);
