@@ -386,3 +386,19 @@ u8 ide_get_best_pio_mode (ide_drive_t *drive, u8 mode_wanted, u8 max_mode, ide_p
 }
 
 EXPORT_SYMBOL_GPL(ide_get_best_pio_mode);
+
+void ide_toggle_bounce(ide_drive_t *drive, int on)
+{
+	u64 addr = BLK_BOUNCE_HIGH;	/* dma64_addr_t */
+
+	if (on && drive->media == ide_disk) {
+		if (!PCI_DMA_BUS_IS_PHYS)
+			addr = BLK_BOUNCE_ANY;
+		else
+			addr = HWIF(drive)->pci_dev->dma_mask;
+	}
+
+	blk_queue_bounce_limit(&drive->queue, addr);
+}
+
+EXPORT_SYMBOL(ide_toggle_bounce);

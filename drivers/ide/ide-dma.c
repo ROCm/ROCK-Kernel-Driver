@@ -445,20 +445,6 @@ static int dma_timer_expiry (ide_drive_t *drive)
 	return 0;
 }
 
-static void ide_toggle_bounce(ide_drive_t *drive, int on)
-{
-	u64 addr = BLK_BOUNCE_HIGH;	/* dma64_addr_t */
-
-	if (on && drive->media == ide_disk) {
-		if (!PCI_DMA_BUS_IS_PHYS)
-			addr = BLK_BOUNCE_ANY;
-		else
-			addr = HWIF(drive)->pci_dev->dma_mask;
-	}
-
-	blk_queue_bounce_limit(&drive->queue, addr);
-}
-
 int __ide_dma_host_off (ide_drive_t *drive)
 {
 	ide_hwif_t *hwif	= HWIF(drive);

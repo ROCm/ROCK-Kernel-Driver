@@ -1753,6 +1753,7 @@ extern u8 ide_dma_speed(ide_drive_t *drive, u8 mode);
 extern u8 ide_rate_filter(u8 mode, u8 speed); 
 extern int ide_dma_enable(ide_drive_t *drive);
 extern char *ide_xfer_verbose(u8 xfer_rate);
+extern void ide_toggle_bounce(ide_drive_t *drive, int on);
 
 extern spinlock_t ide_lock;
 

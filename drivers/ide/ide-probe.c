@@ -778,6 +778,8 @@ static void ide_init_queue(ide_drive_t *drive)
 
 	/* This is a driver limit and could be eliminated. */
 	blk_queue_max_phys_segments(q, PRD_ENTRIES);
+
+	ide_toggle_bounce(drive, 1);
 }
 
 /*
