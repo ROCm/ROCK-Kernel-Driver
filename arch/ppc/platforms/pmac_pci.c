@@ -137,101 +137,118 @@ macrisc_cfg_access(struct pci_controller* hose, u8 bus, u8 dev_fn, u8 offset)
 	/* Uninorth will return garbage if we don't read back the value ! */
 	do {
 		out_le32(hose->cfg_addr, caddr);
-	} while(in_le32(hose->cfg_addr) != caddr);
+	} while (in_le32(hose->cfg_addr) != caddr);
 
 	offset &= has_uninorth ? 0x07 : 0x03;
 	return (unsigned int)(hose->cfg_data) + (unsigned int)offset;
 }
 
-#define cfg_read(val, addr, type, op, op2)	\
-	*val = op((type)(addr))
-#define cfg_write(val, addr, type, op, op2)	\
-	op((type *)(addr), (val)); (void) op2((type *)(addr))
+static int __pmac
+macrisc_read_config(struct pci_bus *bus, unsigned int devfn, int offset,
+		    int len, u32 *val)
+{
+	struct pci_controller *hose = bus->sysdata;
+	unsigned int addr;
 
-#define cfg_read_bad(val, size)		*val = bad_##size;
-#define cfg_write_bad(val, size)
-
-#define bad_byte	0xff
-#define bad_word	0xffff
-#define bad_dword	0xffffffffU
-
-#define MACRISC_PCI_OP(rw, size, type, op, op2)				    \
-static int __pmac							    \
-macrisc_##rw##_config_##size(struct pci_dev *dev, int off, type val)	    \
-{									    \
-	struct pci_controller *hose = dev->sysdata;			    \
-	unsigned int addr;						    \
-									    \
-	addr = macrisc_cfg_access(hose, dev->bus->number, dev->devfn, off); \
-	if (!addr) {							    \
-		cfg_##rw##_bad(val, size)				    \
-		return PCIBIOS_DEVICE_NOT_FOUND;			    \
-	}								    \
-	cfg_##rw(val, addr, type, op, op2);				    \
-	return PCIBIOS_SUCCESSFUL;					    \
+	addr = macrisc_cfg_access(hose, bus->number, devfn, offset);
+	if (!addr)
+		return PCIBIOS_DEVICE_NOT_FOUND;
+	/*
+	 * Note: the caller has already checked that offset is
+	 * suitably aligned and that len is 1, 2 or 4.
+	 */
+	switch (len) {
+	case 1:
+		*val = in_8((u8 *)addr);
+		break;
+	case 2:
+		*val = in_le16((u16 *)addr);
+		break;
+	default:
+		*val = in_le32((u32 *)addr);
+		break;
+	}
+	return PCIBIOS_SUCCESSFUL;
 }
 
-MACRISC_PCI_OP(read, byte, u8 *, in_8, x)
-MACRISC_PCI_OP(read, word, u16 *, in_le16, x)
-MACRISC_PCI_OP(read, dword, u32 *, in_le32, x)
-MACRISC_PCI_OP(write, byte, u8, out_8, in_8)
-MACRISC_PCI_OP(write, word, u16, out_le16, in_le16)
-MACRISC_PCI_OP(write, dword, u32, out_le32, in_le32)
+static int __pmac
+macrisc_write_config(struct pci_bus *bus, unsigned int devfn, int offset,
+		     int len, u32 val)
+{
+	struct pci_controller *hose = bus->sysdata;
+	unsigned int addr;
+
+	addr = macrisc_cfg_access(hose, bus->number, devfn, offset);
+	if (!addr)
+		return PCIBIOS_DEVICE_NOT_FOUND;
+	/*
+	 * Note: the caller has already checked that offset is
+	 * suitably aligned and that len is 1, 2 or 4.
+	 */
+	switch (len) {
+	case 1:
+		out_8((u8 *)addr, val);
+		(void) in_8((u8 *)addr);
+		break;
+	case 2:
+		out_le16((u16 *)addr, val);
+		(void) in_le16((u16 *)addr);
+		break;
+	default:
+		out_le32((u32 *)addr, val);
+		(void) in_le32((u32 *)addr);
+		break;
+	}
+	return PCIBIOS_SUCCESSFUL;
+}
 
 static struct pci_ops macrisc_pci_ops =
 {
-	macrisc_read_config_byte,
-	macrisc_read_config_word,
-	macrisc_read_config_dword,
-	macrisc_write_config_byte,
-	macrisc_write_config_word,
-	macrisc_write_config_dword
+	macrisc_read_config,
+	macrisc_write_config
 };
 
 /*
  * Verifiy that a specific (bus, dev_fn) exists on chaos
  */
 static int __pmac
-chaos_validate_dev(struct pci_dev *dev, int offset)
+chaos_validate_dev(struct pci_bus *bus, int devfn, int offset)
 {
-	if(pci_device_to_OF_node(dev) == 0)
+	if (pci_busdev_to_OF_node(bus, devfn) == 0)
 		return PCIBIOS_DEVICE_NOT_FOUND;
-	if((dev->vendor == 0x106b) && (dev->device == 3) && (offset >= 0x10) &&
-	    (offset != 0x14) && (offset != 0x18) && (offset <= 0x24)) {
+	if (/*(dev->vendor == 0x106b) && (dev->device == 3) &&*/ (offset >= 0x10)
+	    && (offset != 0x14) && (offset != 0x18) && (offset <= 0x24)) {
 		return PCIBIOS_BAD_REGISTER_NUMBER;
 	}
 	return PCIBIOS_SUCCESSFUL;
 }
 
-#define CHAOS_PCI_OP(rw, size, type)					\
-static int __pmac							\
-chaos_##rw##_config_##size(struct pci_dev *dev, int off, type val)	\
-{									\
-	int result = chaos_validate_dev(dev, off);			\
-	if(result == PCIBIOS_BAD_REGISTER_NUMBER) {			\
-		cfg_##rw##_bad(val, size)				\
-		return PCIBIOS_BAD_REGISTER_NUMBER;			\
-	}								\
-	if(result == PCIBIOS_SUCCESSFUL)				\
-		return macrisc_##rw##_config_##size(dev, off, val);	\
-	return result;							\
+static int __pmac
+chaos_read_config(struct pci_bus *bus, unsigned int devfn, int offset,
+		  int len, u32 *val)
+{
+	int result = chaos_validate_dev(bus, devfn, offset);
+	if (result == PCIBIOS_BAD_REGISTER_NUMBER)
+		*val = ~0U;
+	if (result != PCIBIOS_SUCCESSFUL)
+		return result;
+	return macrisc_read_config(bus, devfn, offset, len, val);
 }
 
-CHAOS_PCI_OP(read, byte, u8 *)
-CHAOS_PCI_OP(read, word, u16 *)
-CHAOS_PCI_OP(read, dword, u32 *)
-CHAOS_PCI_OP(write, byte, u8)
-CHAOS_PCI_OP(write, word, u16)
-CHAOS_PCI_OP(write, dword, u32) 
+static int __pmac
+chaos_write_config(struct pci_bus *bus, unsigned int devfn, int offset,
+		   int len, u32 val)
+{
+	int result = chaos_validate_dev(bus, devfn, offset);
+	if (result != PCIBIOS_SUCCESSFUL)
+		return result;
+	return macrisc_write_config(bus, devfn, offset, len, val);
+}
 
 static struct pci_ops chaos_pci_ops =
 {
-	chaos_read_config_byte,
-	chaos_read_config_word,
-	chaos_read_config_dword,
-	chaos_write_config_byte,
-	chaos_write_config_word,
-	chaos_write_config_dword
+	chaos_read_config,
+	chaos_write_config
 };
 
 
@@ -489,7 +506,8 @@ pcibios_fixup_OF_interrupts(void)
 	 * obtained from the OF device-tree
 	 */
 	pci_for_each_dev(dev) {
-		struct device_node* node = pci_device_to_OF_node(dev);
+		struct device_node *node;
+		node = pci_device_to_OF_node(dev);
 		/* this is the node, see if it has interrupts */
 		if (node && node->n_intrs > 0)
 			dev->irq = node->intrs[0].line;

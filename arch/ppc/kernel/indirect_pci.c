@@ -24,48 +24,88 @@
 #include <asm/pci-bridge.h>
 #include <asm/machdep.h>
 
-#define cfg_read(val, addr, type, op)	*val = op((type)(addr))
-#define cfg_write(val, addr, type, op)	op((type *)(addr), (val))
+static int
+indirect_read_config(struct pci_bus *bus, unsigned int devfn, int offset,
+		     int len, u32 *val)
+{
+	struct pci_controller *hose = bus->sysdata;
+	volatile unsigned char *cfg_data;
 
-#define INDIRECT_PCI_OP(rw, size, type, op, mask)			 \
-static int								 \
-indirect_##rw##_config_##size(struct pci_dev *dev, int offset, type val) \
-{									 \
-	struct pci_controller *hose = dev->sysdata;			 \
-									 \
-	if (ppc_md.pci_exclude_device)					 \
-		if (ppc_md.pci_exclude_device(dev->bus->number, dev->devfn)) \
-			return PCIBIOS_DEVICE_NOT_FOUND;		 \
-									 \
-	out_be32(hose->cfg_addr, 					 \
-		 ((offset & 0xfc) << 24) | (dev->devfn << 16)		 \
-		 | ((dev->bus->number - hose->bus_offset) << 8) | 0x80); \
-	cfg_##rw(val, hose->cfg_data + (offset & mask), type, op);	 \
-	return PCIBIOS_SUCCESSFUL;    					 \
+	if (ppc_md.pci_exclude_device)
+		if (ppc_md.pci_exclude_device(bus->number, devfn))
+			return PCIBIOS_DEVICE_NOT_FOUND;
+
+	out_be32(hose->cfg_addr,
+		 ((offset & 0xfc) << 24) | (devfn << 16)
+		 | ((bus->number - hose->bus_offset) << 8) | 0x80);
+	/*
+	 * Note: the caller has already checked that offset is
+	 * suitably aligned and that len is 1, 2 or 4.
+	 */
+	cfg_data = hose->cfg_data + (offset & 3);
+	switch (len) {
+	case 1:
+		*val = in_8((u8 *)cfg_data);
+		break;
+	case 2:
+		*val = in_le16((u16 *)cfg_data);
+		break;
+	default:
+		*val = in_le32((u32 *)cfg_data);
+		break;
+	}
+	return PCIBIOS_SUCCESSFUL;
 }
 
-INDIRECT_PCI_OP(read, byte, u8 *, in_8, 3)
-INDIRECT_PCI_OP(read, word, u16 *, in_le16, 2)
-INDIRECT_PCI_OP(read, dword, u32 *, in_le32, 0)
-INDIRECT_PCI_OP(write, byte, u8, out_8, 3)
-INDIRECT_PCI_OP(write, word, u16, out_le16, 2)
-INDIRECT_PCI_OP(write, dword, u32, out_le32, 0)
+static int
+indirect_write_config(struct pci_bus *bus, unsigned int devfn, int offset,
+		      int len, u32 val)
+{
+	struct pci_controller *hose = bus->sysdata;
+	volatile unsigned char *cfg_data;
+
+	if (ppc_md.pci_exclude_device)
+		if (ppc_md.pci_exclude_device(bus->number, devfn))
+			return PCIBIOS_DEVICE_NOT_FOUND;
+
+	out_be32(hose->cfg_addr,
+		 ((offset & 0xfc) << 24) | (devfn << 16)
+		 | ((bus->number - hose->bus_offset) << 8) | 0x80);
+	/*
+	 * Note: the caller has already checked that offset is
+	 * suitably aligned and that len is 1, 2 or 4.
+	 */
+	cfg_data = hose->cfg_data + (offset & 3);
+	switch (len) {
+	case 1:
+		out_8((u8 *)cfg_data, val);
+		break;
+	case 2:
+		out_le16((u16 *)cfg_data, val);
+		break;
+	default:
+		out_le32((u32 *)cfg_data, val);
+		break;
+	}
+	return PCIBIOS_SUCCESSFUL;
+}
 
 static struct pci_ops indirect_pci_ops =
 {
-	indirect_read_config_byte,
-	indirect_read_config_word,
-	indirect_read_config_dword,
-	indirect_write_config_byte,
-	indirect_write_config_word,
-	indirect_write_config_dword
+	indirect_read_config,
+	indirect_write_config
 };
 
 void __init
 setup_indirect_pci(struct pci_controller* hose, u32 cfg_addr, u32 cfg_data)
 {
-	hose->ops = &indirect_pci_ops;
-	hose->cfg_addr = (unsigned int *) ioremap(cfg_addr, 4);
-	hose->cfg_data = (unsigned char *) ioremap(cfg_data, 4);
-}
+	unsigned long base = cfg_addr & PAGE_MASK;
+	char *mbase;
 
+	mbase = ioremap(base, PAGE_SIZE);
+	hose->cfg_addr = (unsigned int *)(mbase + (cfg_addr & ~PAGE_MASK));
+	if ((cfg_data & PAGE_MASK) != base)
+		mbase = ioremap(cfg_data & PAGE_MASK, PAGE_SIZE);
+	hose->cfg_data = (unsigned char *)(mbase + (cfg_data & ~PAGE_MASK));
+	hose->ops = &indirect_pci_ops;
+}
