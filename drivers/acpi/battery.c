@@ -486,14 +486,18 @@ acpi_battery_read_state (
 	else
 		p += sprintf(p, "capacity state:          critical\n");
 
-	if ((bst->state & 0x01) && (bst->state & 0x02))
+	if ((bst->state & 0x01) && (bst->state & 0x02)){
 		p += sprintf(p, "charging state:          charging/discharging\n");
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+					"Battery Charging and Discharging?\n"));
+	}
 	else if (bst->state & 0x01)
 		p += sprintf(p, "charging state:          discharging\n");
 	else if (bst->state & 0x02)
 		p += sprintf(p, "charging state:          charging\n");
-	else
-		p += sprintf(p, "charging state:          unknown\n");
+	else {
+		p += sprintf(p, "charging state:          charged\n");
+	}
 
 	if (bst->present_rate == ACPI_BATTERY_VALUE_UNKNOWN)
 		p += sprintf(p, "present rate:            unknown\n");
