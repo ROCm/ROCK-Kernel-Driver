@@ -318,7 +318,8 @@ static int setup_pci_slot(struct slot *slot)
 		dealloc_slot_struct(slot);
 		return 1;
 	}
-
+	
+	strcpy(slot->name, pci_name(slot->bridge));
 	/* find slot's pci_dev if it's not empty */
 	if (slot->hotplug_slot->info->adapter_status == EMPTY) {
 		slot->state = EMPTY;	/* slot is empty */

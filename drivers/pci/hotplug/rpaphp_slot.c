@@ -80,28 +80,25 @@ struct slot *alloc_slot_struct(struct device_node *dn, int drc_index, char *drc_
 {
 	struct slot *slot;
 	
-	dbg("Enter %s: dn->full_name=%s drc_index=0x%x drc_name=%s\n",
-		__FUNCTION__, dn->full_name, drc_index, drc_name);
-
 	slot = kmalloc(sizeof (struct slot), GFP_KERNEL);
 	if (!slot)
 		goto error_nomem;
 	memset(slot, 0, sizeof (struct slot));
 	slot->hotplug_slot = kmalloc(sizeof (struct hotplug_slot), GFP_KERNEL);
 	if (!slot->hotplug_slot)
-		goto error_hpslot;
+		goto error_slot;
 	memset(slot->hotplug_slot, 0, sizeof (struct hotplug_slot));
 	slot->hotplug_slot->info = kmalloc(sizeof (struct hotplug_slot_info),
 					   GFP_KERNEL);
 	if (!slot->hotplug_slot->info)
-		goto error_hoslot;
+		goto error_hpslot;
 	memset(slot->hotplug_slot->info, 0, sizeof (struct hotplug_slot_info));
 	slot->hotplug_slot->name = kmalloc(BUS_ID_SIZE + 1, GFP_KERNEL);
 	if (!slot->hotplug_slot->name)
-		goto error_name;
+		goto error_info;
 	slot->location = kmalloc(strlen(drc_name) + 1, GFP_KERNEL);
 	if (!slot->location)
-		goto error_info;
+		goto error_name;
 	slot->name = slot->hotplug_slot->name;
 	slot->dn = dn;
 	slot->index = drc_index;
@@ -111,15 +108,13 @@ struct slot *alloc_slot_struct(struct device_node *dn, int drc_index, char *drc_
 	slot->hotplug_slot->ops = &rpaphp_hotplug_slot_ops;
 	slot->hotplug_slot->release = &rpaphp_release_slot;
 	slot->hotplug_slot->info->cur_bus_speed = PCI_SPEED_UNKNOWN;
-	dbg("Exit %s: slot->dn->full_name=%s drc_index=0x%x drc_name=%s\n",
-		__FUNCTION__, slot->dn->full_name, slot->index, slot->name);
 
 	return slot;
 
-error_info:
-	kfree(slot->hotplug_slot->info);
 error_name:
 	kfree(slot->hotplug_slot->name);
+error_info:
+	kfree(slot->hotplug_slot->info);
 error_hpslot:
 	kfree(slot->hotplug_slot);
 error_slot:
