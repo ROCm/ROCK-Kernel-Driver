@@ -11,4 +11,14 @@ SUBLEVEL=$5
   echo '#define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))'
 ) > .tmpversion
 
-mv -f .tmpversion $TARGET
+# Only replace the real version.h if the new one is different
+# in order to preserve the timestamp and avoid unnecessary
+# recompilations.
+
+if [ -r $TARGET ] && \
+      cmp -s $TARGET .tmpversion; then
+   echo $TARGET is unchanged;
+   rm -f .tmpversion
+else
+   mv -f .tmpversion $TARGET
+fi
