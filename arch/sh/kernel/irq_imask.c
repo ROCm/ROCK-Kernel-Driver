@@ -1,4 +1,4 @@
-/* $Id: irq_imask.c,v 1.6 2000/03/06 14:11:32 gniibe Exp $
+/* $Id: irq_imask.c,v 1.13 2001/07/12 08:13:56 gniibe Exp $
  *
  * linux/arch/sh/kernel/irq_imask.c
  *
@@ -99,7 +99,8 @@ static void mask_and_ack_imask(unsigned int irq)
 
 static void end_imask_irq(unsigned int irq)
 {
-	enable_imask_irq(irq);
+	if (!(irq_desc[irq].status & (IRQ_DISABLED|IRQ_INPROGRESS)))
+		enable_imask_irq(irq);
 }
 
 static void shutdown_imask_irq(unsigned int irq)

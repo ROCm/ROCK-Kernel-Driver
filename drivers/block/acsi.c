@@ -1792,8 +1792,7 @@ int acsi_init( void )
 	
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
 	read_ahead[MAJOR_NR] = 8;		/* 8 sector (4kB) read-ahead */
-	acsi_gendisk.next = gendisk_head;
-	gendisk_head = &acsi_gendisk;
+	add_gendisk(&acsi_gendisk);
 
 #ifdef CONFIG_ATARI_SLM
 	err = slm_init();
@@ -1817,8 +1816,6 @@ int init_module(void)
 
 void cleanup_module(void)
 {
-	struct gendisk ** gdp;
-
 	del_timer( &acsi_timer );
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 	atari_stram_free( acsi_buffer );
@@ -1826,13 +1823,7 @@ void cleanup_module(void)
 	if (devfs_unregister_blkdev( MAJOR_NR, "ad" ) != 0)
 		printk( KERN_ERR "acsi: cleanup_module failed\n");
 
-	for (gdp = &gendisk_head; *gdp; gdp = &((*gdp)->next))
-		if (*gdp == &acsi_gendisk)
-			break;
-	if (!*gdp)
-		printk( KERN_ERR "acsi: entry in disk chain missing!\n" );
-	else
-		*gdp = (*gdp)->next;
+	del_gendisk(&acsi_gendisk);
 }
 #endif
 

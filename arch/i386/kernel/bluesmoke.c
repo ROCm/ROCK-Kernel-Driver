@@ -38,7 +38,7 @@ static void intel_machine_check(struct pt_regs * regs, long error_code)
 			high&=~(1<<31);
 			if(high&(1<<27))
 			{
-				rdmsr(MSR_IA32_MC0_ADDR+i*4, alow, ahigh);
+				rdmsr(MSR_IA32_MC0_MISC+i*4, alow, ahigh);
 				printk("[%08x%08x]", alow, ahigh);
 			}
 			if(high&(1<<26))

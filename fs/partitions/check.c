@@ -36,7 +36,6 @@
 
 extern int *blk_size[];
 
-struct gendisk *gendisk_head;
 int warn_no_part = 1; /*This is ugly: should make genhd removable media aware*/
 
 static int (*check_part[])(struct gendisk *hd, kdev_t dev, unsigned long first_sect, int first_minor) = {
@@ -249,39 +248,6 @@ unsigned int get_ptable_blocksize(kdev_t dev)
 
 	return ret;
 }
-
-#ifdef CONFIG_PROC_FS
-int get_partition_list(char *page, char **start, off_t offset, int count)
-{
-	struct gendisk *dsk;
-	int len;
-
-	len = sprintf(page, "major minor  #blocks  name\n\n");
-	for (dsk = gendisk_head; dsk; dsk = dsk->next) {
-		int n;
-
-		for (n = 0; n < (dsk->nr_real << dsk->minor_shift); n++)
-			if (dsk->part[n].nr_sects) {
-				char buf[64];
-
-				len += sprintf(page + len,
-					       "%4d  %4d %10d %s\n",
-					       dsk->major, n, dsk->sizes[n],
-					       disk_name(dsk, n, buf));
-				if (len < offset)
-					offset -= len, len = 0;
-				else if (len >= offset + count)
-					goto leave_loops;
-			}
-	}
-leave_loops:
-	*start = page + offset;
-	len -= offset;
-	if (len < 0)
-		len = 0;
-	return len > count ? count : len;
-}
-#endif
 
 static void check_partition(struct gendisk *hd, kdev_t dev, int first_part_minor)
 {

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.pmac_pci.c 1.25 08/19/01 22:23:04 paulus
+ * BK Id: SCCS/s.pmac_pci.c 1.27 09/08/01 15:47:42 paulus
  */
 /*
  * Support for PCI bridges found on Power Macintoshes.
@@ -22,7 +22,7 @@
 #include <linux/init.h>
 #include <linux/bootmem.h>
 
-#include <asm/init.h>
+#include <asm/sections.h>
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/pci-bridge.h>

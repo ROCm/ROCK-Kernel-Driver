@@ -30,13 +30,9 @@ enum cpu_type {
 
 struct sh_cpuinfo {
 	enum cpu_type type;
+	char	hard_math;
 	unsigned long loops_per_jiffy;
 
-	char	hard_math;
-
-	unsigned long *pgd_quick;
-	unsigned long *pte_quick;
-	unsigned long pgtable_cache_sz;
 	unsigned int cpu_clock, master_clock, bus_clock, module_clock;
 #ifdef CONFIG_CPU_SUBTYPE_ST40STB1
 	unsigned int memory_clock;
@@ -163,7 +159,7 @@ extern int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
  * FPU lazy state save handling.
  */
 
-extern __inline__ void release_fpu(void)
+static __inline__ void release_fpu(void)
 {
 	unsigned long __dummy;
 
@@ -175,7 +171,7 @@ extern __inline__ void release_fpu(void)
 			     : "r" (SR_FD));
 }
 
-extern __inline__ void grab_fpu(void)
+static __inline__ void grab_fpu(void)
 {
 	unsigned long __dummy;
 
@@ -207,7 +203,7 @@ extern void save_fpu(struct task_struct *__tsk);
 /*
  * Return saved PC of a blocked thread.
  */
-extern __inline__ unsigned long thread_saved_pc(struct thread_struct *t)
+static __inline__ unsigned long thread_saved_pc(struct thread_struct *t)
 {
 	return t->pc;
 }

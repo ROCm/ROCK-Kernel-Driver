@@ -1,4 +1,4 @@
-/* $Id: process.c,v 1.33 2000/03/25 00:06:15 gniibe Exp $
+/* $Id: process.c,v 1.34 2001/07/30 12:42:11 gniibe Exp $
  *
  *  linux/arch/sh/kernel/process.c
  *
@@ -11,40 +11,13 @@
  * This file handles the architecture-dependent parts of process handling..
  */
 
-#define __KERNEL_SYSCALLS__
-#include <stdarg.h>
-
-#include <linux/config.h>
-
-#include <linux/errno.h>
-#include <linux/sched.h>
-#include <linux/kernel.h>
-#include <linux/mm.h>
-#include <linux/smp.h>
-#include <linux/smp_lock.h>
-#include <linux/stddef.h>
-#include <linux/ptrace.h>
-#include <linux/slab.h>
-#include <linux/vmalloc.h>
-#include <linux/user.h>
-#include <linux/a.out.h>
-#include <linux/interrupt.h>
 #include <linux/unistd.h>
-#include <linux/delay.h>
-#include <linux/reboot.h>
-#include <linux/init.h>
-#include <linux/irq.h>
+#include <linux/slab.h>
 
-#include <asm/uaccess.h>
-#include <asm/pgtable.h>
-#include <asm/system.h>
 #include <asm/io.h>
-#include <asm/processor.h>
+#include <asm/uaccess.h>
 #include <asm/mmu_context.h>
 #include <asm/elf.h>
-#ifdef CONFIG_SH_STANDARD_BIOS
-#include <asm/sh_bios.h>
-#endif
 
 static int hlt_counter=0;
 
@@ -71,11 +44,17 @@ void cpu_idle(void *unused)
 	current->counter = -100;
 
 	while (1) {
-		while (!current->need_resched) {
-			if (hlt_counter)
-				continue;
+		if (hlt_counter) {
+			if (current->need_resched)
+				break;
+		} else {
+			__cli();
+			while (!current->need_resched) {
+				__sti();
+				asm volatile("sleep" : : : "memory");
+				__cli();
+			}
 			__sti();
-			asm volatile("sleep" : : : "memory");
 		}
 		schedule();
 		check_pgt_cache();
@@ -84,16 +63,15 @@ void cpu_idle(void *unused)
 
 void machine_restart(char * __unused)
 {
-#ifdef CONFIG_SH_STANDARD_BIOS
-	sh_bios_shutdown(1);
-#endif
+	/* SR.BL=1 and invoke address error to let CPU reset (manual reset) */
+	asm volatile("ldc %0, sr\n\t"
+		     "mov.l @%1, %0" : : "r" (0x10000000), "r" (0x80000001));
 }
 
 void machine_halt(void)
 {
-#ifdef CONFIG_SH_STANDARD_BIOS
-	sh_bios_shutdown(0);
-#endif
+	while (1)
+		asm volatile("sleep" : : : "memory");
 }
 
 void machine_power_off(void)

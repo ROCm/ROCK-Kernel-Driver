@@ -42,21 +42,45 @@ extern void paging_init(void);
 #define flush_icache_range(start, end)		do { } while (0)
 #define flush_icache_page(vma,pg)		do { } while (0)
 #define flush_cache_sigtramp(vaddr)		do { } while (0)
+
+#define p3_cache_init()				do { } while (0)
+
 #elif defined(__SH4__)
 /*
  *  Caches are broken on SH-4, so we need them.
  */
+
+/* Page is 4K, OC size is 16K, there are four lines. */
+#define CACHE_ALIAS 0x00003000
+
 extern void flush_cache_all(void);
 extern void flush_cache_mm(struct mm_struct *mm);
 extern void flush_cache_range(struct mm_struct *mm, unsigned long start,
 			      unsigned long end);
 extern void flush_cache_page(struct vm_area_struct *vma, unsigned long addr);
-extern void flush_page_to_ram(struct page *page);
 extern void flush_dcache_page(struct page *pg);
 extern void flush_icache_range(unsigned long start, unsigned long end);
-extern void flush_icache_page(struct vm_area_struct *vma, struct page *pg);
 extern void flush_cache_sigtramp(unsigned long addr);
+
+#define flush_page_to_ram(page)			do { } while (0)
+#define flush_icache_page(vma,pg)		do { } while (0)
+
+/* Initialization of P3 area for copy_user_page */
+extern void p3_cache_init(void);
+
+#define PG_mapped	PG_arch_1
+
+/* We provide our own get_unmapped_area to avoid cache alias issue */
+#define HAVE_ARCH_UNMAPPED_AREA
 #endif
+
+/* Flush (write-back only) a region (smaller than a page) */
+extern void __flush_wback_region(void *start, int size);
+/* Flush (write-back & invalidate) a region (smaller than a page) */
+extern void __flush_purge_region(void *start, int size);
+/* Flush (invalidate only) a region (smaller than a page) */
+extern void __flush_invalidate_region(void *start, int size);
+
 
 /*
  * Basically we have the same two-level (which is the logical three level
@@ -82,8 +106,14 @@ extern unsigned long empty_zero_page[1024];
 #define USER_PTRS_PER_PGD	(TASK_SIZE/PGDIR_SIZE)
 #define FIRST_USER_PGD_NR	0
 
+#define PTE_PHYS_MASK	0x1ffff000
+
 #ifndef __ASSEMBLY__
-#define VMALLOC_START	P3SEG
+/*
+ * First 1MB map is used by fixed purpose.
+ * Currently only 4-enty (16kB) is used (see arch/sh/mm/cache.c)
+ */
+#define VMALLOC_START	(P3SEG+0x00100000)
 #define VMALLOC_VMADDR(x) ((unsigned long)(x))
 #define VMALLOC_END	P4SEG
 
@@ -180,9 +210,9 @@ extern unsigned long empty_zero_page[1024];
  * Permanent address of a page. Obviously must never be
  * called on a highmem page.
  */
-#define page_address(page)  ((page)->virtual)
-#define pages_to_mb(x) ((x) >> (20-PAGE_SHIFT))
-#define pte_page(x) (mem_map+(unsigned long)(((pte_val(x) -__MEMORY_START) >> PAGE_SHIFT)))
+#define page_address(page)  ((page)->virtual) /* P1 address of the page */
+#define pages_to_mb(x)	((x) >> (20-PAGE_SHIFT))
+#define pte_page(x) 	phys_to_page(pte_val(x)&PTE_PHYS_MASK)
 
 /*
  * The following only work if pte_present() is true.
@@ -193,7 +223,7 @@ static inline int pte_exec(pte_t pte) { return pte_val(pte) & _PAGE_USER; }
 static inline int pte_dirty(pte_t pte){ return pte_val(pte) & _PAGE_DIRTY; }
 static inline int pte_young(pte_t pte){ return pte_val(pte) & _PAGE_ACCESSED; }
 static inline int pte_write(pte_t pte){ return pte_val(pte) & _PAGE_RW; }
-static inline int pte_shared(pte_t pte){ return pte_val(pte) & _PAGE_SHARED; }
+static inline int pte_not_present(pte_t pte){ return !(pte_val(pte) & _PAGE_PRESENT); }
 
 static inline pte_t pte_rdprotect(pte_t pte)	{ set_pte(&pte, __pte(pte_val(pte) & ~_PAGE_USER)); return pte; }
 static inline pte_t pte_exprotect(pte_t pte)	{ set_pte(&pte, __pte(pte_val(pte) & ~_PAGE_USER)); return pte; }
@@ -215,9 +245,8 @@ static inline pte_t pte_mkwrite(pte_t pte)	{ set_pte(&pte, __pte(pte_val(pte) | 
 #define mk_pte(page,pgprot)						\
 ({	pte_t __pte;							\
 									\
-	set_pte(&__pte, __pte(((page)-mem_map) * 			\
-		(unsigned long long)PAGE_SIZE + pgprot_val(pgprot) +	\
-		__MEMORY_START));					\
+	set_pte(&__pte, __pte(PHYSADDR(page_address(page))		\
+				+pgprot_val(pgprot)));			\
 	__pte;								\
 })
 
@@ -266,8 +295,10 @@ extern void update_mmu_cache(struct vm_area_struct * vma,
  *
  * We just can use generic implementation, as SuperH has no SMP feature.
  * (We needed atomic implementation for SMP)
+ *
  */
-#include <asm-generic/pgtable.h>
+
+#define pte_same(A,B)	(pte_val(A) == pte_val(B))
 
 #endif /* !__ASSEMBLY__ */
 

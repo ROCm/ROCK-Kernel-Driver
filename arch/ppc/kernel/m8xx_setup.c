@@ -1,7 +1,6 @@
 /*
- * BK Id: SCCS/s.m8xx_setup.c 1.27 08/20/01 15:25:16 paulus
- */
-/*
+ * BK Id: SCCS/s.m8xx_setup.c 1.29 08/30/01 09:01:04 trini
+ *
  *  linux/arch/ppc/kernel/setup.c
  *
  *  Copyright (C) 1995  Linus Torvalds
@@ -172,8 +171,7 @@ abort(void)
 	machine_restart(NULL);
 }
 
-/* A place holder for time base interrupts, if they are ever enabled.
-*/
+/* A place holder for time base interrupts, if they are ever enabled. */
 void timebase_interrupt(int irq, void * dev, struct pt_regs * regs)
 {
 	printk ("timebase_interrupt()\n");
@@ -188,13 +186,11 @@ void __init m8xx_calibrate_decr(void)
 	bd_t	*binfo = (bd_t *)__res;
 	int freq, fp, divisor;
 
-	/* Unlock the SCCR.
-	*/
+	/* Unlock the SCCR. */
 	((volatile immap_t *)IMAP_ADDR)->im_clkrstk.cark_sccrk = ~KAPWR_KEY;
 	((volatile immap_t *)IMAP_ADDR)->im_clkrstk.cark_sccrk = KAPWR_KEY;
 
-	/* Force all 8xx processors to use divide by 16 processor clock.
-	*/
+	/* Force all 8xx processors to use divide by 16 processor clock. */
 	((volatile immap_t *)IMAP_ADDR)->im_clkrst.car_sccr |= 0x02000000;
 
 	/* Processor frequency is MHz.
@@ -224,15 +220,17 @@ void __init m8xx_calibrate_decr(void)
 	 */
 	((volatile immap_t *)IMAP_ADDR)->im_sitk.sitk_tbscrk = ~KAPWR_KEY;
 	((volatile immap_t *)IMAP_ADDR)->im_sitk.sitk_rtcsck = ~KAPWR_KEY;
-	((volatile immap_t *)IMAP_ADDR)->im_sitk.sitk_tbk = ~KAPWR_KEY;
+	((volatile immap_t *)IMAP_ADDR)->im_sitk.sitk_tbk    = ~KAPWR_KEY;
 	((volatile immap_t *)IMAP_ADDR)->im_sitk.sitk_tbscrk = KAPWR_KEY;
 	((volatile immap_t *)IMAP_ADDR)->im_sitk.sitk_rtcsck = KAPWR_KEY;
-	((volatile immap_t *)IMAP_ADDR)->im_sitk.sitk_tbk = KAPWR_KEY;
+	((volatile immap_t *)IMAP_ADDR)->im_sitk.sitk_tbk    = KAPWR_KEY;
 
-	/* Disable the RTC one second and alarm interrupts.
-	*/
+	/* Disable the RTC one second and alarm interrupts. */
 	((volatile immap_t *)IMAP_ADDR)->im_sit.sit_rtcsc &=
 						~(RTCSC_SIE | RTCSC_ALE);
+	/* Enable the RTC */
+	((volatile immap_t *)IMAP_ADDR)->im_sit.sit_rtcsc |=
+						(RTCSC_RTF | RTCSC_RTE);
 
 	/* Enabling the decrementer also enables the timebase interrupts
 	 * (or from the other point of view, to get decrementer interrupts
@@ -260,15 +258,14 @@ m8xx_set_rtc_time(unsigned long time)
 	return(0);
 }
 
-unsigned long
+static unsigned long
 m8xx_get_rtc_time(void)
 {
-	/* Get time from the RTC.
-	*/
+	/* Get time from the RTC. */
 	return((unsigned long)(((immap_t *)IMAP_ADDR)->im_sit.sit_rtc));
 }
 
-void
+static void
 m8xx_restart(char *cmd)
 {
 	__volatile__ unsigned char dummy;
@@ -288,20 +285,21 @@ m8xx_restart(char *cmd)
 	while(1);
 }
 
-void
+static void
 m8xx_power_off(void)
 {
    m8xx_restart(NULL);
 }
 
-void
+static void
 m8xx_halt(void)
 {
    m8xx_restart(NULL);
 }
 
 
-int m8xx_setup_residual(char *buffer)
+static int
+m8xx_setup_residual(char *buffer)
 {
         int     len = 0;
 	bd_t	*bp;
@@ -322,7 +320,7 @@ int m8xx_setup_residual(char *buffer)
  * External interrupts can be either edge or level triggered, and
  * need to be initialized by the appropriate driver.
  */
-void __init
+static void __init
 m8xx_init_IRQ(void)
 {
 	int i;
@@ -353,12 +351,12 @@ m8xx_init_IRQ(void)
  * IDE stuff.
  */
 #ifdef CONFIG_BLK_DEV_MPC8xx_IDE
-void ide_interrupt_handler (void *dev)
+static void ide_interrupt_handler (void *dev)
 {
 }
 #endif
 
-int
+static int
 m8xx_ide_default_irq(ide_ioreg_t base)
 {
 #ifdef CONFIG_BLK_DEV_MPC8xx_IDE
@@ -371,13 +369,13 @@ m8xx_ide_default_irq(ide_ioreg_t base)
 #endif
 }
 
-ide_ioreg_t
+static ide_ioreg_t
 m8xx_ide_default_io_base(int index)
 {
         return index;
 }
 
-int
+static int
 m8xx_ide_request_irq(unsigned int irq,
 		       void (*handler)(int, void *, struct pt_regs *),
 		       unsigned long flags, 
@@ -392,8 +390,9 @@ m8xx_ide_request_irq(unsigned int irq,
  *
  * See include/linux/ide.h for definition of hw_regs_t (p, base)
  */
-void m8xx_ide_init_hwif_ports(hw_regs_t *hw,
-	ide_ioreg_t data_port, ide_ioreg_t ctrl_port, int *irq)
+static void
+m8xx_ide_init_hwif_ports(hw_regs_t *hw, ide_ioreg_t data_port, 
+		ide_ioreg_t ctrl_port, int *irq)
 {
 	int i;
 #ifdef CONFIG_BLK_DEV_MPC8xx_IDE
@@ -565,7 +564,8 @@ m8xx_ide_tuneproc(ide_drive_t *drive, byte pio)
  * functions in the image just to get prom_init, all we really need right
  * now is the initialization of the physical memory region.
  */
-unsigned long __init m8xx_find_end_of_memory(void)
+static unsigned long __init
+m8xx_find_end_of_memory(void)
 {
 	bd_t	*binfo;
 	extern unsigned char __res[];
@@ -581,7 +581,8 @@ unsigned long __init m8xx_find_end_of_memory(void)
  * All of this fits into the same 4Mbyte region, so it only
  * requires one page table page.  (or at least it used to  -- paulus)
  */
-void __init m8xx_map_io(void)
+static void __init
+m8xx_map_io(void)
 {
         io_block_mapping(IMAP_ADDR, IMAP_ADDR, IMAP_SIZE, _PAGE_IO);
 #ifdef CONFIG_MBX
@@ -613,9 +614,8 @@ void __init m8xx_map_io(void)
 
 void __init
 platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
-	      unsigned long r6, unsigned long r7)
+		unsigned long r6, unsigned long r7)
 {
-
 	if ( r3 )
 		memcpy( (void *)__res,(void *)(r3+KERNELBASE), sizeof(bd_t) );
 	
@@ -633,8 +633,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #endif /* CONFIG_BLK_DEV_INITRD */
 	/* take care of cmd line */
 	if ( r6 )
-	{
-		
+	{	
 		*(char *)(r7+KERNELBASE) = 0;
 		strcpy(cmd_line, (char *)(r6+KERNELBASE));
 	}

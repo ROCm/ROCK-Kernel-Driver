@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.pmac_setup.c 1.37 08/29/01 10:07:29 paulus
+ * BK Id: SCCS/s.pmac_setup.c 1.39 09/08/01 15:47:42 paulus
  */
 /*
  *  linux/arch/ppc/kernel/setup.c
@@ -51,7 +51,7 @@
 #include <linux/pmu.h>
 
 #include <asm/processor.h>
-#include <asm/init.h>
+#include <asm/sections.h>
 #include <asm/prom.h>
 #include <asm/system.h>
 #include <asm/pgtable.h>

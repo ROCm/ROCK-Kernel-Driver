@@ -2,20 +2,11 @@
  * Copyright 2000 by Hans Reiser, licensing governed by reiserfs/README
  */
 
-#ifdef __KERNEL__
-
 #include <linux/config.h>
 #include <asm/uaccess.h>
 #include <linux/string.h>
 #include <linux/sched.h>
 #include <linux/reiserfs_fs.h>
-
-#else
-
-#include "nokernel.h"
-
-#endif
-
 
 /* this is one and only function that is used outside (do_balance.c) */
 int	balance_internal (
@@ -1103,25 +1094,11 @@ int balance_internal (struct tree_balance * tb,			/* tree_balance structure 		*/
 
     n = B_NR_ITEMS (tbSh); /*number of items in S[h] */
 
-#ifdef REISERFS_FSCK
-    if ( -1 <= child_pos && child_pos <= n && insert_num > 0 ) {
-#else
 	if ( 0 <= child_pos && child_pos <= n && insert_num > 0 ) {
-#endif
 	    bi.tb = tb;
 	    bi.bi_bh = tbSh;
 	    bi.bi_parent = PATH_H_PPARENT (tb->tb_path, h);
 	    bi.bi_position = PATH_H_POSITION (tb->tb_path, h + 1);
-#ifdef REISERFS_FSCK
-	    if (child_pos == -1) {
-		/* this is a little different from original do_balance: 
-		   here we insert the minimal keys in the tree, that has never happened when file system works */
-		if (tb->CFL[h-1] || insert_num != 1 || h != 1)
-		    die ("balance_internal: invalid child_pos");
-/*      insert_child (tb->S[h], tb->S[h-1], child_pos, insert_num, B_N_ITEM_HEAD(tb->S[0],0), insert_ptr);*/
-		internal_insert_childs (&bi, child_pos, insert_num, B_N_PITEM_HEAD (PATH_PLAST_BUFFER (tb->tb_path), 0), insert_ptr);
-	    } else
-#endif
 		internal_insert_childs (
 		    &bi,/*tbSh,*/
 		    /*		( tb->S[h-1]->b_parent == tb->S[h] ) ? tb->S[h-1]->b_next :  tb->S[h]->b_child->b_next,*/

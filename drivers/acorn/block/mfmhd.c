@@ -1450,10 +1450,7 @@ int mfm_init (void)
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
 	read_ahead[MAJOR_NR] = 8;	/* 8 sector (4kB?) read ahread */
 
-#ifndef MODULE
-	mfm_gendisk.next = gendisk_head;
-	gendisk_head = &mfm_gendisk;
-#endif
+	add_gendisk(&mfm_gendisk);
 
 	Busy = 0;
 	lastspecifieddrive = -1;
@@ -1512,6 +1509,7 @@ void cleanup_module(void)
 		outw (0, mfm_irqenable);	/* Required to enable IRQs from MFM podule */
 	free_irq(mfm_irq, NULL);
 	unregister_blkdev(MAJOR_NR, "mfm");
+	del_gendisk(&mfm_gendisk);
 	if (ecs)
 		ecard_release(ecs);
 	if (mfm_addr)

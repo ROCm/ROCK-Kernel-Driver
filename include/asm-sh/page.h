@@ -24,8 +24,8 @@
 #ifdef __KERNEL__
 #ifndef __ASSEMBLY__
 
-#define clear_page(page)	memset((void *)(page), 0, PAGE_SIZE)
-#define copy_page(to,from)	memcpy((void *)(to), (void *)(from), PAGE_SIZE)
+extern void clear_page(void *to);
+extern void copy_page(void *to, void *from);
 
 #if defined(__sh3__)
 #define clear_user_page(page, vaddr)	clear_page(page)
@@ -33,6 +33,8 @@
 #elif defined(__SH4__)
 extern void clear_user_page(void *to, unsigned long address);
 extern void copy_user_page(void *to, void *from, unsigned long address);
+extern void __clear_user_page(void *to, void *orig_to);
+extern void __copy_user_page(void *to, void *from, void *orig_to);
 #endif
 
 /*
@@ -67,12 +69,24 @@ typedef struct { unsigned long pgprot; } pgprot_t;
  */
 
 #define __MEMORY_START		CONFIG_MEMORY_START
+#define __MEMORY_SIZE		CONFIG_MEMORY_SIZE
+#ifdef CONFIG_DISCONTIGMEM
+/* Just for HP690, for now.. */
+#define __MEMORY_START_2ND	(__MEMORY_START+0x02000000)
+#define __MEMORY_SIZE_2ND	0x001000000 /* 16MB */
+#endif
 
 #define PAGE_OFFSET		(0x80000000UL)
 #define __pa(x)			((unsigned long)(x)-PAGE_OFFSET)
 #define __va(x)			((void *)((unsigned long)(x)+PAGE_OFFSET))
-#define virt_to_page(kaddr)	(mem_map + ((__pa(kaddr)-__MEMORY_START) >> PAGE_SHIFT))
+
+#ifndef CONFIG_DISCONTIGMEM
+#define phys_to_page(phys)	(mem_map + (((phys)-__MEMORY_START) >> PAGE_SHIFT))
 #define VALID_PAGE(page)	((page - mem_map) < max_mapnr)
+#define page_to_phys(page)	(((page - mem_map) << PAGE_SHIFT) + __MEMORY_START)
+#endif
+
+#define virt_to_page(kaddr)	phys_to_page(__pa(kaddr))
 
 #ifndef __ASSEMBLY__
 
@@ -89,7 +103,7 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 } while (0)
 
 /* Pure 2^n version of get_order */
-extern __inline__ int get_order(unsigned long size)
+static __inline__ int get_order(unsigned long size)
 {
 	int order;
 

@@ -54,17 +54,6 @@
  * Note that several drives may have the same major.
  */
 
-/* a linear search, superfluous when dev is a pointer */
-static struct gendisk *get_gendisk(kdev_t dev) {
-	struct gendisk *g;
-	int m = MAJOR(dev);
-
-	for (g = gendisk_head; g; g = g->next)
-		if (g->major == m)
-			break;
-	return g;
-}
-
 /*
  * Add a partition.
  *

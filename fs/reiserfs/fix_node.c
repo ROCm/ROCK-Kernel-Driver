@@ -35,20 +35,11 @@
  **/
 
 
-#ifdef __KERNEL__
-
 #include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/locks.h>
 #include <linux/reiserfs_fs.h>
-
-#else
-
-#include "nokernel.h"
-
-#endif
-
 
 
 /* To make any changes in the tree we find a node, that contains item
@@ -122,11 +113,7 @@ static void create_virtual_node (struct tree_balance * tb, int h)
     ih = B_N_PITEM_HEAD (Sh, 0);
 
     /* define the mergeability for 0-th item (if it is not being deleted) */
-#ifdef REISERFS_FSCK
-    if (is_left_mergeable (tb->tb_sb, tb->tb_path) == 1 && (vn->vn_mode != M_DELETE || vn->vn_affected_item_num))
-#else
     if (op_is_left_mergeable (&(ih->ih_key), Sh->b_size) && (vn->vn_mode != M_DELETE || vn->vn_affected_item_num))
-#endif
 	    vn->vn_vi[0].vi_type |= VI_TYPE_LEFT_MERGEABLE;
 
     /* go through all items those remain in the virtual node (except for the new (inserted) one) */
@@ -207,13 +194,8 @@ static void create_virtual_node (struct tree_balance * tb, int h)
 	struct key * key;
 
 	key = B_N_PDELIM_KEY (tb->CFR[0], tb->rkey[0]);
-#ifdef REISERFS_FSCK
-	if (is_right_mergeable (tb->tb_sb, tb->tb_path) == 1 && (vn->vn_mode != M_DELETE ||
-								 vn->vn_affected_item_num != B_NR_ITEMS (Sh) - 1))
-#else
 	if (op_is_left_mergeable (key, Sh->b_size) && (vn->vn_mode != M_DELETE ||
 						       vn->vn_affected_item_num != B_NR_ITEMS (Sh) - 1))
-#endif
 		vn->vn_vi[vn->vn_nr_item-1].vi_type |= VI_TYPE_RIGHT_MERGEABLE;
 
 #ifdef CONFIG_REISERFS_CHECK
@@ -717,8 +699,6 @@ static int are_leaves_removable (struct tree_balance * tb, int lfree, int rfree)
     ih = B_N_PITEM_HEAD (S0, 0);
     if (tb->CFR[0] && !comp_short_le_keys (&(ih->ih_key), B_N_PDELIM_KEY (tb->CFR[0], tb->rkey[0])))
 	if (is_direntry_le_ih (ih)) {
-#ifndef REISERFS_FSCK
-		
 	    /* Directory must be in correct state here: that is
 	       somewhere at the left side should exist first directory
 	       item. But the item being deleted can not be that first
@@ -734,30 +714,6 @@ static int are_leaves_removable (struct tree_balance * tb, int lfree, int rfree)
 	    if (le_key_k_offset (ih_version (ih), &(ih->ih_key)) == DOT_OFFSET)
 		reiserfs_panic (tb->tb_sb, "vs-8130: are_leaves_removable: "
 				"first directory item can not be removed until directory is not empty");
-#endif
-	
-	
-#else	/* REISERFS_FSCK */
-
-	    /* we can delete any directory item in fsck (if it is unreachable) */
-	    if (ih->ih_key.k_offset != DOT_OFFSET) {
-		/* must get left neighbor here to make sure, that left
-		   neighbor is of the same directory */
-		struct buffer_head * left;
-		
-		left = get_left_neighbor (tb->tb_sb, tb->tb_path);
-		if (left) {
-		    struct item_head * last;
-		    
-		    if (B_NR_ITEMS (left) == 0)
-			reiserfs_panic (tb->tb_sb, "vs-8135: are_leaves_removable: "
-					"empty node in the tree");
-		    last = B_N_PITEM_HEAD (left, B_NR_ITEMS (left) - 1);
-		    if (!comp_short_keys (&last->ih_key, &ih->ih_key))
-			ih_size = IH_SIZE;
-		    brelse (left);
-		}
-	    }
 #endif
       }
     
@@ -859,11 +815,6 @@ static int  get_empty_nodes(
 			n_retval = CARRY_ON;
   struct super_block *	p_s_sb = p_s_tb->tb_sb;
 
-
-#ifdef REISERFS_FSCK
-   if (n_h == 0 && p_s_tb->insert_size[n_h] == 0x7fff)
-     return CARRY_ON;
-#endif
 
   /* number_of_freeblk is the number of empty blocks which have been
      acquired for use by the balancing algorithm minus the number of
@@ -1311,13 +1262,8 @@ static inline int can_node_be_removed (int mode, int lfree, int sfree, int rfree
     if (
 	lfree + rfree + sfree < MAX_CHILD_SIZE(Sh) + levbytes
 	/* shifting may merge items which might save space */
-#ifdef REISERFS_FSCK
-	- (( ! h && is_left_mergeable (tb->tb_sb, tb->tb_path) == 1 ) ? IH_SIZE : 0)
-	- (( ! h && r_ih && is_right_mergeable (tb->tb_sb, tb->tb_path) == 1 ) ? IH_SIZE : 0)
-#else
 	- (( ! h && op_is_left_mergeable (&(ih->ih_key), Sh->b_size) ) ? IH_SIZE : 0)
 	- (( ! h && r_key && op_is_left_mergeable (r_key, Sh->b_size) ) ? IH_SIZE : 0)
-#endif
 	+ (( h ) ? KEY_SIZE : 0))
     {
 	/* node can not be removed */
@@ -1387,15 +1333,6 @@ static int ip_check_balance (struct tree_balance * tb, int h)
     /* Sh is the node whose balance is currently being checked */
     struct buffer_head * Sh;
   
-#ifdef REISERFS_FSCK
-    /* special mode for insert pointer to the most low internal node */
-    if (h == 0 && vn->vn_mode == M_INTERNAL) {
-	/* blk_num == 2 is to get pointer inserted to the next level */
-	set_parameters (tb, h, 0, 0, 2, NULL, -1, -1);
-	return 0;
-    }
-#endif
-
     Sh = PATH_H_PBUFFER (tb->tb_path, h);
     levbytes = tb->insert_size[h];
   
@@ -2514,16 +2451,6 @@ int fix_nodes (int n_op_mode,
             return REPEAT_SEARCH;
     }
 
-#ifndef __KERNEL__
-    if ( atomic_read (&(p_s_tbS0->b_count)) > 1 || 
-	 (p_s_tb->L[0] && atomic_read (&(p_s_tb->L[0]->b_count)) > 1) ||
-	 (p_s_tb->R[0] && atomic_read (&(p_s_tb->R[0]->b_count)) > 1) ) {
-	printk ("mode=%c, insert_size=%d\n", n_op_mode, p_s_tb->insert_size[0]);
-	print_cur_tb ("first three parameters are invalid");
-	reiserfs_panic (p_s_tb->tb_sb, "PAP-8310: fix_nodes: all buffers must be hold once in one thread processing");
-    }
-#endif
-
 #ifdef CONFIG_REISERFS_CHECK
     if ( cur_tb ) {
 	print_cur_tb ("fix_nodes");
@@ -2546,19 +2473,10 @@ int fix_nodes (int n_op_mode,
 
     /* Check parameters. */
     switch (n_op_mode) {
-#ifdef REISERFS_FSCK
-    case M_INTERNAL:
-	break;
-    case M_INSERT:
-	if ( n_item_num < 0 || n_item_num > B_NR_ITEMS(p_s_tbS0) )
-	    reiserfs_panic(p_s_tb->tb_sb,"PAP-8325: fix_nodes: Incorrect item number %d (in S0 - %d) in case of insert",
-			   n_item_num, B_NR_ITEMS(p_s_tbS0));
-#else
     case M_INSERT:
 	if ( n_item_num <= 0 || n_item_num > B_NR_ITEMS(p_s_tbS0) )
 	    reiserfs_panic(p_s_tb->tb_sb,"PAP-8330: fix_nodes: Incorrect item number %d (in S0 - %d) in case of insert",
 			   n_item_num, B_NR_ITEMS(p_s_tbS0));
-#endif
 	break;
     case M_PASTE:
     case M_DELETE:
@@ -2754,151 +2672,10 @@ void unfix_nodes (struct tree_balance * tb)
 	    brelse (tb->used[i]);
 	}
     }
-
-#if 0 /* shouldn't this be in CONFIG_REISERFS_CHECK??? */
-    /* make sure, that all we have released got really freed */
-    for (i = 0; i < sizeof (tb->thrown) / sizeof (tb->thrown[0]); i ++)
-	if (tb->thrown[i]) {
-	    if (atomic_read (&(tb->thrown[i]->b_count))) {
-		/* the log will have the count at one and the buffers marked */
-		if (atomic_read(&(tb->thrown[i]->b_count)) > 1 || 
-		    !(buffer_journaled(tb->thrown[i]) || 
-		      buffer_journal_dirty(tb->thrown[i]))) {
-		    foo_print (tb->thrown[i], tb->tb_sb);
-		    printk ("unfix_nodes: Waiting...(block %lu, count %d)\n", 
-			    tb->thrown[i]->b_blocknr, 
-			    atomic_read (&(tb->thrown[i]->b_count)));
-		    wait_buffer_until_released (tb->thrown[i]);
-		    printk ("unfix_nodes: Done (block %lu, count %d)\n", 
-			    tb->thrown[i]->b_blocknr, 
-			    atomic_read (&(tb->thrown[i]->b_count)));
-		}
-	    }
-	}
-#endif /* 0 */
     if (tb->vn_buf) 
 	reiserfs_kfree (tb->vn_buf, tb->vn_buf_size, tb->tb_sb);
 
 } 
-
-
-
-#ifndef REISERFS_FSCK
-
-// is_left_mergeable is now one of the item methods
-
-#else
-
-// this works only in fsck
-
-int are_items_mergeable (struct item_head * left, struct item_head * right, int bsize)
-{
-  if (comp_keys (&left->ih_key, &right->ih_key) != -1) {
-    reiserfs_panic (0, "vs-16070: are_items_mergeable: left %k, right %k", &(left->ih_key), &(right->ih_key));
-  }
-
-  if (comp_short_keys (&left->ih_key, &right->ih_key))
-    return 0;
-
-  if (I_IS_DIRECTORY_ITEM (left)) {
-    return 1;
-  }
-
-  if ((I_IS_DIRECT_ITEM (left) && I_IS_DIRECT_ITEM (right)) || 
-      (I_IS_INDIRECT_ITEM (left) && I_IS_INDIRECT_ITEM (right)))
-    return (left->ih_key.k_offset + I_BYTES_NUMBER (left, bsize) == right->ih_key.k_offset) ? 1 : 0;
-
-  return 0;
-}
-
-/* get left neighbor of the leaf node */
-static struct buffer_head * get_left_neighbor (struct super_block * s, struct path * path)
-{
-  struct key key;
-  INITIALIZE_PATH (path_to_left_neighbor);
-  struct buffer_head * bh;
-
-  copy_key (&key, B_N_PKEY (PATH_PLAST_BUFFER (path), 0));
-  decrement_key (&key);
-
-/*  init_path (&path_to_left_neighbor);*/
-  search_by_key (s, &key, &path_to_left_neighbor, DISK_LEAF_NODE_LEVEL, READ_BLOCKS);
-  // FIXME: fsck is to handle I/O failures somehow as well
-  if (PATH_LAST_POSITION (&path_to_left_neighbor) == 0) {
-    pathrelse (&path_to_left_neighbor);
-    return 0;
-  }
-  bh = PATH_PLAST_BUFFER (&path_to_left_neighbor);
-  bh->b_count ++;
-  pathrelse (&path_to_left_neighbor);
-  return bh;
-}
-
-extern struct key  MIN_KEY;
-static struct buffer_head * get_right_neighbor (struct super_block * s, struct path * path)
-{
-  struct key key;
-  struct key * rkey;
-  INITIALIZE_PATH (path_to_right_neighbor);
-  struct buffer_head * bh;
-
-  rkey = get_rkey (path, s);
-  if (comp_keys (rkey, &MIN_KEY) == 0)
-    reiserfs_panic (s, "vs-16080: get_right_neighbor: get_rkey returned min key (path has changed)");
-  copy_key (&key, rkey);
-
-  
-  /*init_path (&path_to_right_neighbor);*/
-  search_by_key (s, &key, &path_to_right_neighbor, DISK_LEAF_NODE_LEVEL, READ_BLOCKS);
-  if (PATH_PLAST_BUFFER (&path_to_right_neighbor) == PATH_PLAST_BUFFER (path)) {
-    pathrelse (&path_to_right_neighbor);
-    return 0;
-  }
-  bh = PATH_PLAST_BUFFER (&path_to_right_neighbor);
-  bh->b_count ++;
-  pathrelse (&path_to_right_neighbor);
-  return bh;
-}
-
-
-int is_left_mergeable (struct super_block * s, struct path * path)
-{
-  struct item_head * right;
-  struct buffer_head * bh;
-  int retval;
-  
-  right = B_N_PITEM_HEAD (PATH_PLAST_BUFFER (path), 0);
-
-  bh = get_left_neighbor (s, path);
-  if (bh == 0) {
-    return 0;
-  }
-  retval = are_items_mergeable (B_N_PITEM_HEAD (bh, B_NR_ITEMS (bh) - 1), right, bh->b_size);
-  brelse (bh);
-  return retval;
-}
-
-
-int is_right_mergeable (struct super_block * s, struct path * path)
-{
-  struct item_head * left;
-  struct buffer_head * bh;
-  int retval;
-  
-  left = B_N_PITEM_HEAD (PATH_PLAST_BUFFER (path), B_NR_ITEMS (PATH_PLAST_BUFFER (path)) - 1);
-
-  bh = get_right_neighbor (s, path);
-  if (bh == 0) {
-    return 0;
-  }
-  retval = are_items_mergeable (left, B_N_PITEM_HEAD (bh, 0), bh->b_size);
-  brelse (bh);
-  return retval;
-}
-
-#endif /* REISERFS_FSCK */
-
-
 
 
 

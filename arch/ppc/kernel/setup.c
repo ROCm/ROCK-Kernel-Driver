@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.setup.c 1.55 08/24/01 20:07:37 paulus
+ * BK Id: SCCS/s.setup.c 1.57 09/08/01 15:47:42 paulus
  */
 /*
  * Common prep/pmac/chrp boot and setup code.
@@ -17,7 +17,6 @@
 #include <linux/tty.h>
 #include <linux/bootmem.h>
 
-#include <asm/init.h>
 #include <asm/residual.h>
 #include <asm/io.h>
 #include <asm/prom.h>

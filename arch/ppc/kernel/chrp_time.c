@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.chrp_time.c 1.7 05/17/01 18:14:21 cort
+ * BK Id: SCCS/s.chrp_time.c 1.10 09/08/01 15:47:42 paulus
  */
 /*
  *  linux/arch/i386/kernel/time.c
@@ -29,7 +29,7 @@
 #include <asm/processor.h>
 #include <asm/nvram.h>
 #include <asm/prom.h>
-#include <asm/init.h>
+#include <asm/sections.h>
 #include <asm/time.h>
 
 extern spinlock_t rtc_lock;

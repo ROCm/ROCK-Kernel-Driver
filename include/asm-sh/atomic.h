@@ -93,4 +93,10 @@ static __inline__ void atomic_set_mask(unsigned int mask, atomic_t *v)
 	restore_flags(flags);
 }
 
+/* Atomic operations are already serializing on SH */
+#define smp_mb__before_atomic_dec()	barrier()
+#define smp_mb__after_atomic_dec()	barrier()
+#define smp_mb__before_atomic_inc()	barrier()
+#define smp_mb__after_atomic_inc()	barrier()
+
 #endif /* __ASM_SH_ATOMIC_H */

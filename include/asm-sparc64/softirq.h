@@ -20,13 +20,6 @@ do { if (!--local_bh_count(smp_processor_id()) && \
      }						  \
 } while (0)
 
-#define __do_cpu_raise_softirq(cpu, nr)	(softirq_pending(cpu) |= (1<<nr))
-#define __cpu_raise_softirq(cpu,nr)			\
-do {	unsigned long flags;				\
-	local_irq_save(flags);				\
-	__do_cpu_raise_softirq(cpu, nr);			\
-	local_irq_restore(flags);			\
-} while (0)
 #define in_softirq() (local_bh_count(smp_processor_id()) != 0)
 
 #endif /* !(__SPARC64_SOFTIRQ_H) */

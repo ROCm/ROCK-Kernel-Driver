@@ -1200,7 +1200,8 @@ fst_ioctl ( struct net_device *dev, struct ifreq *ifr, int cmd )
                 /* Sanity check the parameters. We don't support partial writes
                  * when going over the top
                  */
-                if ( wrthdr.size + wrthdr.offset > FST_MEMSIZE )
+                if ( wrthdr.size > FST_MEMSIZE || wrthdr.offset > FST_MEMSIZE
+                                || wrthdr.size + wrthdr.offset > FST_MEMSIZE )
                 {
                         return -ENXIO;
                 }

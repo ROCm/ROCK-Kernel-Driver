@@ -184,8 +184,7 @@ int __init ps2esdi_init(void)
 	read_ahead[MAJOR_NR] = 8;	/* 8 sector (4kB) read ahead */
 
 	/* some minor housekeeping - setup the global gendisk structure */
-	ps2esdi_gendisk.next = gendisk_head;
-	gendisk_head = &ps2esdi_gendisk;
+	add_gendisk(&ps2esdi_gendisk);
 	ps2esdi_geninit();
 	return 0;
 }				/* ps2esdi_init */
@@ -232,6 +231,7 @@ cleanup_module(void)
 	free_dma(dma_arb_level);
   	free_irq(PS2ESDI_IRQ, NULL)
 	devfs_unregister_blkdev(MAJOR_NR, "ed");
+	del_gendisk(&ps2esdi_gendisk);
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 }
 #endif /* MODULE */

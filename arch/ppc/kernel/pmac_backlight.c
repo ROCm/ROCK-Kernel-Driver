@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.pmac_backlight.c 1.5 05/17/01 18:14:21 cort
+ * BK Id: SCCS/s.pmac_backlight.c 1.8 09/08/01 15:47:42 paulus
  */
 /*
  * Miscellaneous procedures for dealing with the PowerMac hardware.
@@ -14,7 +14,7 @@
 #include <linux/stddef.h>
 #include <linux/reboot.h>
 #include <linux/nvram.h>
-#include <asm/init.h>
+#include <asm/sections.h>
 #include <asm/ptrace.h>
 #include <asm/io.h>
 #include <asm/pgtable.h>

@@ -1,20 +1,12 @@
 /*
  * Copyright 2000 by Hans Reiser, licensing governed by reiserfs/README
  */
-#ifdef __KERNEL__
 
 #include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/fs.h>
 #include <linux/reiserfs_fs.h>
 #include <linux/string.h>
-
-#else
-
-#include "nokernel.h"
-#include <limits.h>
-
-#endif
 
 #include <stdarg.h>
 
@@ -324,16 +316,12 @@ extern struct tree_balance * cur_tb;
 
 void reiserfs_panic (struct super_block * sb, const char * fmt, ...)
 {
-#ifdef __KERNEL__
   show_reiserfs_locks() ;
-#endif
   do_reiserfs_warning;
   printk ("%s", error_buf);
   BUG ();
   // console_print (error_buf);
   // for (;;);
-
-#ifdef __KERNEL__
 
   /* comment before release */
   //for (;;);
@@ -354,9 +342,6 @@ void reiserfs_panic (struct super_block * sb, const char * fmt, ...)
 
   panic ("REISERFS: panic (device %s): %s\n",
 	 sb ? kdevname(sb->s_dev) : "sb == 0", error_buf);
-#else
-  exit (0);
-#endif
 }
 
 
@@ -676,142 +661,6 @@ void print_cur_tb (char * mes)
 {
     printk ("%s\n%s", mes, print_tb_buf);
 }
-
-
-#ifndef __KERNEL__
-
-void print_bmap_block (int i, char * data, int size, int silent)
-{
-    int j, k;
-    int bits = size * 8;
-    int zeros = 0, ones = 0;
-  
-
-    if (test_bit (0, data)) {
-	/* first block addressed by this bitmap block is used */
-	ones ++;
-	if (!silent)
-	    printf ("Busy (%d-", i * bits);
-	for (j = 1; j < bits; j ++) {
-	    while (test_bit (j, data)) {
-		ones ++;
-		if (j == bits - 1) {
-		    if (!silent)
-			printf ("%d)\n", j + i * bits);
-		    goto end;
-		}
-		j++;
-	    }
-	    if (!silent)
-		printf ("%d) Free(%d-", j - 1 + i * bits, j + i * bits);
-
-	    while (!test_bit (j, data)) {
-		zeros ++;
-		if (j == bits - 1) {
-		    if (!silent)
-			printf ("%d)\n", j + i * bits);
-		    goto end;
-		}
-		j++;
-	    }
-	    if (!silent)
-		printf ("%d) Busy(%d-", j - 1 + i * bits, j + i * bits);
-
-	    j --;
-	end:
-	}
-    } else {
-	/* first block addressed by this bitmap is free */
-	zeros ++;
-	if (!silent)
-	    printf ("Free (%d-", i * bits);
-	for (j = 1; j < bits; j ++) {
-	    k = 0;
-	    while (!test_bit (j, data)) {
-		k ++;
-		if (j == bits - 1) {
-		    if (!silent)
-			printf ("%d)\n", j + i * bits);
-		    zeros += k;
-		    goto end2;
-		}
-		j++;
-	    }
-	    zeros += k;
-	    if (!silent)
-		printf ("%d) Busy(%d-", j - 1 + i * bits, j + i * bits);
-	    
-	    k = 0;
-	    while (test_bit (j, data)) {
-		ones ++;
-		if (j == bits - 1) {
-		    if (!silent)
-			printf ("%d)\n", j + i * bits);
-		    ones += k;
-		    goto end2;
-		}
-		j++;
-	    }
-	    ones += k;
-	    if (!silent)
-		printf ("%d) Busy(%d-", j - 1 + i * bits, j + i * bits);
-	
-	    j --;
-	end2:
-	}
-    }
-
-    printf ("used %d, free %d\n", ones, zeros);
-}
-
-
-/* if silent == 1, do not print details */
-void print_bmap (struct super_block * s, int silent)
-{
-    int bmapnr = SB_BMAP_NR (s);
-    int i;
-
-    printf ("Bitmap blocks are:\n");
-    for (i = 0; i < bmapnr; i ++) {
-	printf ("#%d: block %lu: ", i, SB_AP_BITMAP(s)[i]->b_blocknr);
-	print_bmap_block (i, SB_AP_BITMAP(s)[i]->b_data, s->s_blocksize, silent);
-    }
-
-}
-
-
-
-
-void print_objectid_map (struct super_block * s)
-{
-  int i;
-  struct reiserfs_super_block * rs;
-  unsigned long * omap;
-
-  rs = SB_DISK_SUPER_BLOCK (s);
-  omap = (unsigned long *)(rs + 1);
-  printk ("Map of objectids\n");
-      
-  for (i = 0; i < rs->s_oid_cursize; i ++) {
-    if (i % 2 == 0)
-      printk ("busy(%lu-%lu) ", omap[i], omap[i+1] - 1); 
-    else
-      printk ("free(%lu-%lu) ", 
-	      omap[i], ((i+1) == rs->s_oid_cursize) ? -1 : omap[i+1] - 1);
-    }
-  printk ("\n");
-  
-  printk ("Object id array has size %d (max %d):", rs->s_oid_cursize, 
-	  rs->s_oid_maxsize);
-  
-  for (i = 0; i < rs->s_oid_cursize; i ++)
-    printk ("%lu ", omap[i]); 
-  printk ("\n");
-
-}
-
-#endif	/* #ifndef __KERNEL__ */
-
 
 static void check_leaf_block_head (struct buffer_head * bh)
 {

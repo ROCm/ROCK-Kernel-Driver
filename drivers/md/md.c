@@ -222,18 +222,6 @@ static mddev_t * alloc_mddev (kdev_t dev)
 	return mddev;
 }
 
-struct gendisk * find_gendisk (kdev_t dev)
-{
-	struct gendisk *tmp = gendisk_head;
-
-	while (tmp != NULL) {
-		if (tmp->major == MAJOR(dev))
-			return (tmp);
-		tmp = tmp->next;
-	}
-	return (NULL);
-}
-
 mdk_rdev_t * find_rdev_nr(mddev_t *mddev, int nr)
 {
 	mdk_rdev_t * rdev;
@@ -281,7 +269,7 @@ char * partition_name (kdev_t dev)
 	/*
 	 * ok, add this new device name to the list
 	 */
-	hd = find_gendisk (dev);
+	hd = get_gendisk (dev);
 	dname->name = NULL;
 	if (hd)
 		dname->name = disk_name (hd, MINOR(dev), dname->namebuf);
@@ -569,7 +557,7 @@ abort:
 static kdev_t dev_unit(kdev_t dev)
 {
 	unsigned int mask;
-	struct gendisk *hd = find_gendisk(dev);
+	struct gendisk *hd = get_gendisk(dev);
 
 	if (!hd)
 		return 0;
@@ -3515,9 +3503,8 @@ int md__init md_init (void)
 	
 
 	read_ahead[MAJOR_NR] = INT_MAX;
-	md_gendisk.next = gendisk_head;
 
-	gendisk_head = &md_gendisk;
+	add_gendisk(&md_gendisk);
 
 	md_recovery_thread = md_register_thread(md_do_recovery, NULL, name);
 	if (!md_recovery_thread)
@@ -3843,8 +3830,6 @@ static void free_device_names(void)
 
 void cleanup_module (void)
 {
-	struct gendisk **gendisk_ptr;
-
 	md_unregister_thread(md_recovery_thread);
 	devfs_unregister(devfs_handle);
 
@@ -3854,15 +3839,9 @@ void cleanup_module (void)
 #ifdef CONFIG_PROC_FS
 	remove_proc_entry("mdstat", NULL);
 #endif
-	
-	gendisk_ptr = &gendisk_head;
-	while (*gendisk_ptr) {
-		if (*gendisk_ptr == &md_gendisk) {
-			*gendisk_ptr = md_gendisk.next;
-			break;
-		}
-		gendisk_ptr = & (*gendisk_ptr)->next;
-	}
+
+	del_gendisk(&md_gendisk);
+
 	blk_dev[MAJOR_NR].queue = NULL;
 	blksize_size[MAJOR_NR] = NULL;
 	blk_size[MAJOR_NR] = NULL;

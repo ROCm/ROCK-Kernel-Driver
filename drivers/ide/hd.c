@@ -842,8 +842,7 @@ int __init hd_init(void)
 	}
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
 	read_ahead[MAJOR_NR] = 8;		/* 8 sector (4kB) read-ahead */
-	hd_gendisk.next = gendisk_head;
-	gendisk_head = &hd_gendisk;
+	add_gendisk(&hd_gendisk, MAJOR_NR);
 	init_timer(&device_timer);
 	device_timer.function = hd_times_out;
 	hd_geninit();

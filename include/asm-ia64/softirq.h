@@ -18,8 +18,6 @@ do {											\
 } while (0)
 
 
-#define __cpu_raise_softirq(cpu,nr)	set_bit((nr), &softirq_pending(cpu))
-
 #define in_softirq()		(local_bh_count() != 0)
 
 #endif /* _ASM_IA64_SOFTIRQ_H */

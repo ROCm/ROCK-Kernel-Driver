@@ -1,7 +1,6 @@
 /*
  * Copyright 2000 by Hans Reiser, licensing governed by reiserfs/README
  */
-#ifdef __KERNEL__
 
 #include <linux/config.h>
 #include <linux/sched.h>
@@ -9,12 +8,6 @@
 #include <linux/locks.h>
 #include <linux/smp_lock.h>
 #include <asm/uaccess.h>
-
-#else
-
-#include "nokernel.h"
-
-#endif
 
 /* args for the create parameter of reiserfs_get_block */
 #define GET_BLOCK_NO_CREATE 0 /* don't create new blocks or convert tails */

@@ -1,4 +1,4 @@
-/* $Id: setup_cqreek.c,v 1.6 2001/02/14 09:36:42 gniibe Exp $
+/* $Id: setup_cqreek.c,v 1.9 2001/07/30 12:43:28 gniibe Exp $
  *
  * arch/sh/kernel/setup_cqreek.c
  *
@@ -85,15 +85,16 @@ static void mask_and_ack_cqreek(unsigned int irq)
 	unsigned short stat_port = cqreek_irq_data[irq].stat_port;
 	unsigned short bit = cqreek_irq_data[irq].bit;
 
-	inw(stat_port);
 	disable_cqreek_irq(irq);
 	/* Clear IRQ (it might be edge IRQ) */
+	inw(stat_port);
 	outw_p(bit, stat_port);
 }
 
 static void end_cqreek_irq(unsigned int irq)
 {
-	enable_cqreek_irq(irq);
+	if (!(irq_desc[irq].status & (IRQ_DISABLED|IRQ_INPROGRESS)))
+		enable_cqreek_irq(irq);
 }
 
 static unsigned int startup_cqreek_irq(unsigned int irq)
@@ -156,16 +157,9 @@ void __init init_cqreek_IRQ(void)
  */
 void __init setup_cqreek(void)
 {
-	extern void disable_hlt(void);
 	int i;
 /* udelay is not available at setup time yet... */
 #define DELAY() do {for (i=0; i<10000; i++) ctrl_inw(0xa0000000);} while(0)
-
-	/*
-	 * XXX: I don't know the reason, but it becomes so fragile with
-	 * "sleep", so we need to stop sleeping.
-	 */
-	disable_hlt();
 
 	if ((inw (BRIDGE_FEATURE) & 1)) { /* We have IDE interface */
 		outw_p(0, BRIDGE_IDE_INTR_LVL);

@@ -1,15 +1,31 @@
-/*  macros.h
+/*
+ * macros.h
  *
- *  Copyright (C) 1995 Martin von Löwis
- *  Copyright (C) 1996 Régis Duchesne
+ * Copyright (C) 1995 Martin von Löwis
+ * Copyright (C) 1996 Régis Duchesne
+ * Copyright (c) 2001 Anton Altaparmakov
  */
+#include <linux/ntfs_fs_i.h>
+#include <linux/fs.h>
+#include <asm/page.h>
 
 #define NTFS_FD(vol)		((vol)->u.fd)
 
 #define NTFS_SB(vol)		((struct super_block*)(vol)->sb)
 #define NTFS_SB2VOL(sb)         (&(sb)->u.ntfs_sb)
 #define NTFS_INO2VOL(ino)	(&((ino)->i_sb->u.ntfs_sb))
-#define NTFS_LINO2NINO(ino)     (&((ino)->u.ntfs_i))
+#define NTFS_LINO2NINO(ino)     ((struct ntfs_inode_info*)(&((ino)->u.ntfs_i)))
+static inline struct inode *VFS_I(struct ntfs_inode_info *ntfs_ino)
+{
+	struct inode *i = (struct inode*)((char*)ntfs_ino -
+			((char*)&(((struct inode*)NULL)->u.ntfs_i) -
+			(char*)NULL));
+#ifdef DEBUG
+	if ((char*)NTFS_LINO2NINO(i) != (char*)ntfs_ino)
+		BUG();
+#endif
+	return i;
+}
 
 #define IS_MAGIC(a,b)		(*(int*)(a) == *(int*)(b))
 #define IS_MFT_RECORD(a)	IS_MAGIC((a),"FILE")

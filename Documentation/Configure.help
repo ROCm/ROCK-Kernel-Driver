@@ -17055,12 +17055,12 @@ CONFIG_6xx
 
 Motorola MPC8260 CPM support
 CONFIG_8260
-   The MPC8260 CPM (Communications Processor Module) is a typically
-   embedded CPU made by Motorola.  Selecting this option means that
-   you wish to build a kernel for a machine with specifically an 8260
-   for a CPU.
+  The MPC8260 CPM (Communications Processor Module) is a typical
+  embedded CPU made by Motorola. Selecting this option means that you
+  wish to build a kernel for a machine with specifically an 8260 for
+  a CPU.
 
-   If in doubt, say N.
+  If in doubt, say N.
 
 Workarounds for PPC601 bugs
 CONFIG_PPC601_SYNC_FIX
@@ -17084,6 +17084,121 @@ CONFIG_ALL_PPC
   Platform), and several embedded PowerPC systems containing 4xx, 6xx,
   7xx, 8xx, 74xx, and 82xx processors.  Currently, the default option
   is to build a kernel which works on the first three. 
+
+Embedded 8xx Board Type
+CONFIG_RPXLITE
+  RPX-Lite:
+    Embedded Planet RPX Lite
+
+  RPX-Classic:
+    Embedded Planet RPX Classic Low-fat.
+
+  BSE-IP: 
+    Bright Star Engineering ip-Engine.
+
+  TQM823L:
+  TQM850L:
+  TQM855L:
+  TQM860L:
+    MPC8xx based family of mini modules, half credit card size,
+    up to 64 MB of RAM, 8 MB Flash, (Fast) Ethernet, 2 x serial ports,
+    2 x CAN bus interface, ...
+      Manufacturer: TQ Components, www.tq-group.de
+      Date of Release: October (?) 1999
+      End of Life: not yet :-)
+      URL:
+      - module: http://www.denx.de/PDF/TQM8xxLHWM201.pdf
+      - starter kit: http://www.denx.de/PDF/STK8xxLHWM201.pdf
+      - images: http://www.denx.de/embedded-ppc-en.html
+
+  FPS850L:
+    FingerPrint Sensor System (based on TQM850L)
+      Manufacturer: IKENDI AG, http://www.ikendi.com/
+      Date of Release: November 1999
+      End of life: end 2000 ?
+      URL: see TQM850L
+
+  SPD823TS:
+    MPC823 based board used in the "Tele Server" product
+    Manufacturer: Speech Design, http://www.speech-design.de/
+    Date of Release: Mid 2000 (?)
+    End of life: -
+    URL: http://www.speech-design.de/
+         select "English", then "Teleteam Solutions", then "TeleServer"
+
+  IVMS8:
+    MPC860 based board used in the "Integrated Voice Mail System",
+    Small Version (8 voice channels)
+    Manufacturer: Speech Design, http://www.speech-design.de/
+    Date of Release: December 2000 (?)
+    End of life: -
+    URL: http://www.speech-design.de/
+
+  IVML24:
+    MPC860 based board used in the "Integrated Voice Mail System", 
+    Large Version (24 voice channels)
+    Manufacturer: Speech Design, http://www.speech-design.de/
+    Date of Release: March 2001  (?)
+    End of life: -
+    URL: http://www.speech-design.de/
+
+  SM850:
+    Service Module (based on TQM850L)
+    Manufacturer: Dependable Computer Systems, http://www.decomsys.com/
+    Date of Release: end 2000 (?)
+    End of life: mid 2001 (?)
+    URL: http://www.tz-mikroelektronik.de/ServiceModule/index.html
+
+  HERMES:
+    Hermes-Pro ISDN/LAN router with integrated 8 x hub
+    Manufacturer: Multidata Gesellschaft für Datentechnik und Informatik
+      http://www.multidata.de/
+    Date of Release: 2000 (?)
+    End of life: -
+    URL: http://www.multidata.de/english/products/hpro.htm
+
+  IP860:	
+    VMEBus IP (Industry Pack) carrier board with MPC860
+    Manufacturer: MicroSys GmbH, http://www.microsys.de/
+    Date of Release: ?
+    End of life: -
+    URL: http://www.microsys.de/html/ip860.html
+
+  PCU_E:
+    PCU = Peripheral Controller Unit, Extended
+    Manufacturer: Siemens AG, ICN (Information and Communication Networks)
+    	http://www.siemens.de/page/1,3771,224315-1-999_2_226207-0,00.html
+    Date of Release: April 2001
+    End of life: August 2001
+    URL: n. a.
+
+Embedded 82xx Board Type
+CONFIG_EST8260
+  EST8260: Wind River System, Inc. EST SBC8260
+
+  TQM8260:
+    MPC8260 based module, little larger than credit card,
+    up to 128 MB global + 64 MB local RAM, 32 MB Flash,
+    32 kB EEPROM, 256 kB L@ Cache, 10baseT + 100baseT Ethernet,
+    2 x serial ports, ...
+      Manufacturer: TQ Components, www.tq-group.de
+      Date of Release: June 2001
+      End of Life: not yet :-)
+      URL: http://www.denx.de/PDF/TQM82xx_SPEC_Rev005.pdf
+
+  PM826:
+    Modular system with MPC8260 CPU
+    Manufacturer: MicroSys GmbH, http://www.microsys.de/
+    Date of Release: mid 2001
+    End of life: -
+    URL: http://www.microsys.de/html/pm826.html
+
+  CU824:
+    VMEBus Board with PCI extension with MPC8240 CPU
+    Manufacturer: MicroSys GmbH, http://www.microsys.de/
+    Date of Release: early 2001 (?)
+    End of life: -
+    URL: http://www.microsys.de/html/cu824.html
 
 AltiVec Kernel Support
 CONFIG_ALTIVEC

@@ -26,10 +26,6 @@
 #define FULLROUNDS 10		/* 32 is overkill, 16 is strong crypto */
 #define PARTROUNDS 6		/* 6 gets complete mixing */
 
-#ifndef __KERNEL__
-typedef __u32 u32;
-#endif
-
 /* a, b, c, d - data; h0, h1 - accumulated hash */
 #define TEACORE(rounds)							\
 	do {								\

@@ -1,7 +1,7 @@
 #ifndef __ASM_SH_HD64461
 #define __ASM_SH_HD64461
 /*
- *	$Id: hd64461.h,v 1.1 2000/06/10 21:45:48 yaegashi Exp $
+ *	$Id: hd64461.h,v 1.7 2001/07/07 11:43:58 yaegashi Exp $
  *	Copyright (C) 2000 YAEGASHI Takeshi
  *	Hitachi HD64461 companion chip support
  */
@@ -70,5 +70,6 @@
 #endif
 
 #define HD64461_IRQBASE		OFFCHIP_IRQ_BASE
+#define HD64461_IRQ_NUM 	16
 
 #endif

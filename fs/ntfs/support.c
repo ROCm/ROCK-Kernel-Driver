@@ -33,8 +33,8 @@ void ntfs_debug(int mask, const char *fmt, ...)
 	/* Filter it with the debugging level required */
 	if (ntdebug & mask) {
 		va_start(ap,fmt);
-		strcpy(print_buf, KERN_DEBUG);
-		vsprintf(print_buf + 3, fmt, ap);
+		strcpy(print_buf, KERN_DEBUG "NTFS: ");
+		vsprintf(print_buf + 9, fmt, ap);
 		printk(print_buf);
 		va_end(ap);
 	}
@@ -62,9 +62,6 @@ void ntfs_free(void *block)
 }
 #endif
 #else /* End of DEBUG functions. Normal ones below... */
-void ntfs_debug(int mask, const char *fmt, ...)
-{
-}
 
 #ifndef ntfs_malloc
 void *ntfs_malloc(int size)
@@ -117,7 +114,7 @@ int ntfs_read_mft_record(ntfs_volume *vol, int mftno, char *buf)
 	ntfs_io io;
 
 	ntfs_debug(DEBUG_OTHER, "read_mft_record 0x%x\n", mftno);
-	if (mftno == FILE_$Mft)
+	if (mftno == FILE_Mft)
 	{
 		ntfs_memcpy(buf, vol->mft, vol->mft_record_size);
 		return 0;

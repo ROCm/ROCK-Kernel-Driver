@@ -38,7 +38,7 @@
 #include <asm/pgtable.h>
 #include <asm/hardirq.h>
 #include <asm/softirq.h>
-#include <asm/init.h>
+#include <asm/sections.h>
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/smp.h>
@@ -140,7 +140,8 @@ static inline void psurge_clr_ipi(int cpu)
  */
 static unsigned long psurge_smp_message[NR_CPUS];
 
-void psurge_smp_message_recv(struct pt_regs *regs)
+void __pmac
+psurge_smp_message_recv(struct pt_regs *regs)
 {
 	int cpu = smp_processor_id();
 	int msg;
@@ -157,13 +158,13 @@ void psurge_smp_message_recv(struct pt_regs *regs)
 			smp_message_recv(msg, regs);
 }
 
-void
+void __pmac
 psurge_primary_intr(int irq, void *d, struct pt_regs *regs)
 {
 	psurge_smp_message_recv(regs);
 }
 
-static void
+static void __pmac
 smp_psurge_message_pass(int target, int msg, unsigned long data, int wait)
 {
 	int i;
@@ -376,7 +377,7 @@ smp_psurge_setup_cpu(int cpu_nr)
 		psurge_dual_sync_tb(cpu_nr);
 }
 
-static int
+static int __init
 smp_core99_probe(void)
 {
 	struct device_node *cpus;
@@ -397,7 +398,7 @@ smp_core99_probe(void)
 	return ncpus;
 }
 
-static void
+static void __init
 smp_core99_kick_cpu(int nr)
 {
 	unsigned long save_vector, new_vector;
@@ -472,7 +473,7 @@ smp_core99_setup_cpu(int cpu_nr)
 }
 
 /* PowerSurge-style Macs */
-struct smp_ops_t psurge_smp_ops = {
+struct smp_ops_t psurge_smp_ops __pmacdata = {
 	smp_psurge_message_pass,
 	smp_psurge_probe,
 	smp_psurge_kick_cpu,
@@ -480,7 +481,7 @@ struct smp_ops_t psurge_smp_ops = {
 };
 
 /* Core99 Macs (dual G4s) */
-struct smp_ops_t core99_smp_ops = {
+struct smp_ops_t core99_smp_ops __pmacdata = {
 	smp_openpic_message_pass,
 	smp_core99_probe,
 	smp_core99_kick_cpu,

@@ -33,7 +33,7 @@
 static inline int pgd_none(pgd_t pgd)		{ return 0; }
 static inline int pgd_bad(pgd_t pgd)		{ return 0; }
 static inline int pgd_present(pgd_t pgd)	{ return 1; }
-static inline void pgd_clear (pgd_t * pgdp) 	{ pgd_val(*(pgdp)) = 0; }
+static inline void pgd_clear (pgd_t * pgdp) 	{ }
 
 /*
  * Certain architectures need to do special things when PTEs

@@ -747,7 +747,7 @@ static int init_irq (ide_hwif_t *hwif)
  */
 static void init_gendisk (ide_hwif_t *hwif)
 {
-	struct gendisk *gd, **gdp;
+	struct gendisk *gd;
 	unsigned int unit, units, minors;
 	int *bs, *max_sect, *max_ra;
 	extern devfs_handle_t ide_devfs_handle;
@@ -800,8 +800,8 @@ static void init_gendisk (ide_hwif_t *hwif)
 	if (gd->flags)
 		memset (gd->flags, 0, sizeof *gd->flags * units);
 
-	for (gdp = &gendisk_head; *gdp; gdp = &((*gdp)->next)) ;
-	hwif->gd = *gdp = gd;			/* link onto tail of list */
+	hwif->gd = gd;
+	add_gendisk(gd);
 
 	for (unit = 0; unit < units; ++unit) {
 		if (hwif->drives[unit].present) {

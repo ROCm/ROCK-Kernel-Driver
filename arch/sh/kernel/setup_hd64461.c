@@ -1,5 +1,5 @@
 /*
- *	$Id: setup_hd64461.c,v 1.1 2000/06/10 21:45:18 yaegashi Exp $
+ *	$Id: setup_hd64461.c,v 1.9 2001/07/15 23:26:56 gniibe Exp $
  *	Copyright (C) 2000 YAEGASHI Takeshi
  *	Hitachi HD64461 companion chip support
  */
@@ -57,7 +57,8 @@ static void mask_and_ack_hd64461(unsigned int irq)
 
 static void end_hd64461_irq(unsigned int irq)
 {
-	enable_hd64461_irq(irq);
+	if (!(irq_desc[irq].status & (IRQ_DISABLED|IRQ_INPROGRESS)))
+		enable_hd64461_irq(irq);
 }
 
 

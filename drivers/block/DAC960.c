@@ -1938,13 +1938,7 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
   /*
     Install the Generic Disk Information structure at the end of the list.
   */
-  if ((GenericDiskInfo = gendisk_head) != NULL)
-    {
-      while (GenericDiskInfo->next != NULL)
-	GenericDiskInfo = GenericDiskInfo->next;
-      GenericDiskInfo->next = &Controller->GenericDiskInfo;
-    }
-  else gendisk_head = &Controller->GenericDiskInfo;
+  add_gendisk(&Controller->GenericDiskInfo);
   /*
     Indicate the Block Device Registration completed successfully,
   */
@@ -1980,16 +1974,7 @@ static void DAC960_UnregisterBlockDevice(DAC960_Controller_T *Controller)
   /*
     Remove the Generic Disk Information structure from the list.
   */
-  if (gendisk_head != &Controller->GenericDiskInfo)
-    {
-      GenericDiskInfo_T *GenericDiskInfo = gendisk_head;
-      while (GenericDiskInfo != NULL &&
-	     GenericDiskInfo->next != &Controller->GenericDiskInfo)
-	GenericDiskInfo = GenericDiskInfo->next;
-      if (GenericDiskInfo != NULL)
-	GenericDiskInfo->next = GenericDiskInfo->next->next;
-    }
-  else gendisk_head = Controller->GenericDiskInfo.next;
+  del_gendisk(&Controller->GenericDiskInfo);
 }
 
 

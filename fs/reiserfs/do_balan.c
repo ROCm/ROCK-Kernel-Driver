@@ -16,19 +16,10 @@
  **
  **/
 
-#ifdef __KERNEL__
-
 #include <linux/config.h>
 #include <asm/uaccess.h>
 #include <linux/sched.h>
 #include <linux/reiserfs_fs.h>
-
-#else
-
-#include "nokernel.h"
-
-#endif
-
 
 #ifdef CONFIG_REISERFS_CHECK
 
@@ -662,11 +653,7 @@ static int balance_leaf (struct tree_balance * tb,
 		{
 		    struct item_head * pasted;
 
-#ifdef REISERFS_FSCK
-		    if ( ! item_pos  && is_left_mergeable (tb->tb_sb, tb->tb_path) == 1 )
-#else
 			if ( ! item_pos  && op_is_left_mergeable (B_N_PKEY (tbS0, 0), tbS0->b_size) )
-#endif
 			{ /* if we paste into first item of S[0] and it is left mergable */
 			    /* then increment pos_in_item by the size of the last item in L[0] */
 			    pasted = B_N_PITEM_HEAD(tb->L[0],n-1);
@@ -1606,10 +1593,6 @@ struct buffer_head * get_FEB (struct tree_balance * tb)
     tb->FEB[i] = 0;
     tb->used[i] = first_b;
 
-#ifdef REISERFS_FSCK
-    mark_block_formatted (first_b->b_blocknr);
-#endif
-
     return(first_b);
 }
 
@@ -1656,20 +1639,6 @@ void reiserfs_invalidate_buffer (struct tree_balance * tb, struct buffer_head * 
     */
 
     store_thrown (tb, bh);
-#if 0
-#ifdef REISERFS_FSCK
-    {
-	struct buffer_head * to_be_forgotten;
-	
-	to_be_forgotten = find_buffer (bh->b_dev, bh->b_blocknr, bh->b_size);
-	if (to_be_forgotten) {
-	    to_be_forgotten->b_count ++;
-	    bforget (to_be_forgotten);
-	}
-	unmark_block_formatted (bh->b_blocknr);
-    }
-#endif
-#endif
 }
 
 /* Replace n_dest'th key in buffer dest by n_src'th key of buffer src.*/
@@ -1915,13 +1884,6 @@ static inline void do_balance_starts (struct tree_balance *tb)
     if (check_before_balancing (tb))
 	reiserfs_panic (tb->tb_sb, "PAP-12340: do_balance: locked buffers in TB");
 
-#ifndef __KERNEL__
-    if ( atomic_read(&(PATH_PLAST_BUFFER(tb->tb_path)->b_count)) > 1 || (tb->L[0] && atomic_read(&(tb->L[0]->b_count)) > 1) ||
-	 (tb->R[0] && atomic_read(&(tb->R[0]->b_count)) > 1) ) {
-	print_cur_tb ("first three parameters are invalid");
-	reiserfs_panic (tb->tb_sb, "PAP-12345: do_balance: counter too big");
-    }
-#endif /* !__KERNEL__ */
     cur_tb = tb;
     
 #endif /* CONFIG_REISERFS_CHECK */
@@ -2003,26 +1965,6 @@ void do_balance (struct tree_balance * tb, /* tree_balance structure */
     atomic_inc (&(fs_generation (tb->tb_sb)));
     do_balance_starts (tb);
     
-#ifdef REISERFS_FSCK
-    if (flag == M_INTERNAL) {
-	insert_ptr[0] = (struct buffer_head *)body;
-	/* we must prepare insert_key */
-
-	if (PATH_H_B_ITEM_ORDER (tb->tb_path, 0)/*LAST_POSITION (tb->tb_path)*//*item_pos*/ == -1) {
-		/* get delimiting key from buffer in tree */
-		copy_key (&insert_key[0].ih_key, B_N_PKEY (PATH_PLAST_BUFFER (tb->tb_path), 0));
-		/*insert_ptr[0]->b_item_order = 0;*/
-	} else {
-	    /* get delimiting key from new buffer */
-	    copy_key (&insert_key[0].ih_key, B_N_PKEY((struct buffer_head *)body,0));
-	    /*insert_ptr[0]->b_item_order = item_pos;*/
-	}
-      
-	/* and insert_ptr instead of balance_leaf */
-	child_pos = PATH_H_B_ITEM_ORDER (tb->tb_path, 0)/*item_pos*/;
-    } else
-#endif
-
 	/* balance leaf returns 0 except if combining L R and S into
 	   one node.  see balance_internal() for explanation of this
 	   line of code.*/

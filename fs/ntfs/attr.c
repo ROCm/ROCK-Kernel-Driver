@@ -247,83 +247,97 @@ int ntfs_insert_run(ntfs_attribute *attr, int cnum, ntfs_cluster_t cluster,
 		ntfs_memmove(attr->d.r.runlist + cnum + 1,
 			     attr->d.r.runlist + cnum,
 			     (attr->d.r.len - cnum) * sizeof(ntfs_runlist));
-	attr->d.r.runlist[cnum].cluster = cluster;
+	attr->d.r.runlist[cnum].lcn = cluster;
 	attr->d.r.runlist[cnum].len = len;
 	attr->d.r.len++;
 	return 0;
 }
 
-/* Extends an attribute. Another run will be added if necessary, but we try to
- * extend the last run in the run list first.
- * FIXME: what if there isn't enough contiguous space, we don't create
- * multiple runs?
+/**
+ * ntfs_extend_attr - extend allocated size of an attribute
+ * @ino:	ntfs inode containing the attribute to extend
+ * @attr:	attribute which to extend
+ * @len:	desired new length for @attr (_not_ the amount to extend by)
  *
- * *len: the desired new length of the attr (_not_ the amount to extend by)
+ * Extends an attribute. Allocate clusters on the volume which @ino belongs to.
+ * Extends the run list accordingly, preferably by extending the last run of
+ * the existing run list, first.
+ *
+ * Only modifies attr->allocated, i.e. doesn't touch attr->size, nor
+ * attr->initialized.
  */
-int ntfs_extend_attr(ntfs_inode *ino, ntfs_attribute *attr, __s64 *len, int flags)
+int ntfs_extend_attr(ntfs_inode *ino, ntfs_attribute *attr, const __s64 len)
 {
-	int error = 0;
-	ntfs_runlist *rl;
-	int rlen;
-	ntfs_cluster_t cluster;
-	int clen;
+	int rlen, rl2_len, err = 0;
+	ntfs_cluster_t cluster, clen;
+	ntfs_runlist *rl, *rl2;
 
 	if ((attr->flags & (ATTR_IS_COMPRESSED | ATTR_IS_ENCRYPTED)) ||
 			ino->record_count > 1)
 		return -EOPNOTSUPP;
+	/*
+	 * FIXME: Don't make non-resident if the attribute type is not right.
+	 * For example cannot make index attribute non-resident! (AIA)
+	 */
 	if (attr->resident) {
-		error = ntfs_make_attr_nonresident(ino, attr);
-		if (error)
-			return error;
+		err = ntfs_make_attr_nonresident(ino, attr);
+		if (err)
+			return err;
 	}
-	if (*len <= attr->allocated)
+	if (len <= attr->allocated)
 		return 0;	/* Truly stupid things do sometimes happen. */
 	rl = attr->d.r.runlist;
-	rlen = attr->d.r.len - 1;
-	if (rlen >= 0)
-		cluster = rl[rlen].cluster + rl[rlen].len;
+	rlen = attr->d.r.len;
+	if (rlen > 0)
+		cluster = rl[rlen - 1].lcn + rl[rlen - 1].len;
 	else
 		/* No preference for allocation space. */
-		cluster = 0;
-	/* Calculate the extra space we need, and round up to multiple of
-	 * cluster size to get number of new clusters needed */
-	clen = ((*len - attr->allocated) + ino->vol->cluster_size - 1) >>
-						ino->vol->cluster_size_bits;
-	if (clen == 0)
-		return 0;
-	/* FIXME: try to allocate smaller pieces */
-	error = ntfs_allocate_clusters(ino->vol, &cluster, &clen,
-				       flags | ALLOC_REQUIRE_SIZE);
-	if (error)
-		return error;
-	attr->allocated += (__s64)clen << ino->vol->cluster_size_bits;
-	*len = attr->allocated;
-	/* Contiguous chunk. */
-	if (rlen >= 0 && cluster == rl[rlen].cluster + rl[rlen].len) {
-		rl[rlen].len += clen;
-		return 0;
-	}
+		cluster = (ntfs_cluster_t)-1;
 	/*
-	 * FIXME: if ntfs_insert_run fails we need to deallocate the cluster
-	 * to revert to state before we were called...
+	 * Calculate the extra space we need, and round up to multiple of
+	 * cluster size to get number of new clusters needed.
 	 */
-	ntfs_insert_run(attr, rlen + 1, cluster, clen);
+	clen = (len - attr->allocated + ino->vol->cluster_size - 1) >>
+			ino->vol->cluster_size_bits;
+	if (!clen)
+		return 0;
+	err = ntfs_allocate_clusters(ino->vol, &cluster, &clen, &rl2,
+			&rl2_len, DATA_ZONE);
+	if (err)
+		return err;
+	attr->allocated += (__s64)clen << ino->vol->cluster_size_bits;
+	if (rlen > 0) {
+		err = splice_runlists(&rl, &rlen, rl2, rl2_len);
+		ntfs_vfree(rl2);
+		if (err)
+			return err;
+	} else {
+		if (rl)
+			ntfs_vfree(rl);
+		rl = rl2;
+		rlen = rl2_len;
+	}
+	attr->d.r.runlist = rl;
+	attr->d.r.len = rlen;
 	return 0;
 }
 
 int ntfs_make_attr_nonresident(ntfs_inode *ino, ntfs_attribute *attr)
 {
+	int error;
+	ntfs_io io;
 	void *data = attr->d.data;
 	__s64 len = attr->size;
-	int error;
-	__s64 alen;
-	ntfs_io io;
+
 	attr->d.r.len = 0;
-	attr->d.r.runlist = 0;
+	attr->d.r.runlist = NULL;
 	attr->resident = 0;
+	/*
+	 * ->allocated is updated by ntfs_extend_attr(), while ->initialized
+	 * and ->size are updated by ntfs_readwrite_attr(). (AIA)
+	 */
 	attr->allocated = attr->initialized = 0;
-	alen = len;
-	error = ntfs_extend_attr(ino, attr, &alen, ALLOC_REQUIRE_SIZE);
+	error = ntfs_extend_attr(ino, attr, len);
 	if (error)
 		return error; /* FIXME: On error, restore old values. */
 	io.fn_put = ntfs_put;
@@ -349,21 +363,22 @@ int ntfs_attr_allnonresident(ntfs_inode *ino)
 	return error;
 }
 
-/* Resize the attribute to a newsize. */
+/*
+ * Resize the attribute to a newsize. attr->allocated and attr->size are
+ * updated, but attr->initialized is not changed unless it becomes bigger than
+ * attr->size, in which case it is set to attr->size.
+ */
 int ntfs_resize_attr(ntfs_inode *ino, ntfs_attribute *attr, __s64 newsize)
 {
 	int error = 0;
 	__s64 oldsize = attr->size;
 	int clustersizebits = ino->vol->cluster_size_bits;
 	int i, count, newcount;
-	ntfs_runlist *rl;
-	__s64 newlen;
+	ntfs_runlist *rl, *rlt;
 
 	if (newsize == oldsize)
 		return 0;
-	/* FIXME: Modifying compressed attributes not supported yet. */
 	if (attr->flags & (ATTR_IS_COMPRESSED | ATTR_IS_ENCRYPTED))
-		/* FIXME: Extending is easy: just insert sparse runs. */
 		return -EOPNOTSUPP;
 	if (attr->resident) {
 		void *v;
@@ -396,58 +411,72 @@ int ntfs_resize_attr(ntfs_inode *ino, ntfs_attribute *attr, __s64 newsize)
 	/* Non-resident attribute. */
 	rl = attr->d.r.runlist;
 	if (newsize < oldsize) {
+		int rl_size;
 		/*
 		 * FIXME: We might be going awfully wrong for newsize = 0,
 		 * possibly even leaking memory really badly. But considering
-		 * in that case there is more breakage due to -ENOTSUP stuff
+		 * in that case there is more breakage due to -EOPNOTSUPP stuff
 		 * further down the code path, who cares for the moment... (AIA)
 		 */
 		for (i = 0, count = 0; i < attr->d.r.len; i++) {
 			if ((__s64)(count + rl[i].len) << clustersizebits >
-									newsize)
+					newsize) {
+				i++;
 				break;
+			}
 			count += (int)rl[i].len;
 		}
-		newlen = i + 1;
-		/* Free unused clusters in current run, unless sparse. */
 		newcount = count;
-		if (rl[i].cluster != (ntfs_cluster_t)-1) {
-			int rounded = newsize - ((__s64)count <<
-							clustersizebits);
+		/* Free unused clusters in current run, unless sparse. */
+		if (rl[--i].lcn != (ntfs_cluster_t)-1) {
+			ntfs_cluster_t rounded = newsize - ((__s64)count <<
+					clustersizebits);
 			rounded = (rounded + ino->vol->cluster_size - 1) >>
-								clustersizebits;
-			error = ntfs_deallocate_clusters(ino->vol, 
-						rl[i].cluster + rounded,
-						(int)rl[i].len - rounded);
+					clustersizebits;
+			error = ntfs_deallocate_cluster_run(ino->vol, 
+					rl[i].lcn + rounded,
+					rl[i].len - rounded);
 			if (error)
 				return error; /* FIXME: Incomplete operation. */
 			rl[i].len = rounded;
 			newcount = count + rounded;
 		}
 		/* Free all other runs. */
-		for (i++; i < attr->d.r.len; i++)
-			if (rl[i].cluster != (ntfs_cluster_t)-1) {
-				error = ntfs_deallocate_clusters(ino->vol,
-								rl[i].cluster,
-								(int)rl[i].len);
-				if (error)
-					return error; /* FIXME: Incomplete 
-						       * operation */
-			}
-		/* FIXME: Free space for extra runs in memory? */
-		attr->d.r.len = newlen;
-	} else {
-		newlen = newsize;
-		error = ntfs_extend_attr(ino, attr, &newlen,
-					 ALLOC_REQUIRE_SIZE);
+		i++;
+		error = ntfs_deallocate_clusters(ino->vol, rl + i,
+				attr->d.r.len - i);
 		if (error)
 			return error; /* FIXME: Incomplete operation. */
-		newcount = newlen >> clustersizebits;
+		/*
+		 * Free space for extra runs in memory if enough memory left
+		 * to do so. FIXME: Only do it if it would free memory. (AIA)
+		 */
+		rl_size = ((i + 1) * sizeof(ntfs_runlist) + PAGE_SIZE - 1) &
+				PAGE_MASK;
+		if (rl_size < ((attr->d.r.len * sizeof(ntfs_runlist) +
+				PAGE_SIZE - 1) & PAGE_MASK)) {
+			rlt = ntfs_vmalloc(rl_size);
+			if (rlt) {
+				ntfs_memcpy(rlt, rl, i * sizeof(ntfs_runlist));
+				ntfs_vfree(rl);
+				attr->d.r.runlist = rl = rlt;
+			}
+		}
+		rl[i].lcn = (ntfs_cluster_t)-1;
+		rl[i].len = (ntfs_cluster_t)0;
+		attr->d.r.len = i;
+	} else {
+		error = ntfs_extend_attr(ino, attr, newsize);
+		if (error)
+			return error; /* FIXME: Incomplete operation. */
+		newcount = (newsize + ino->vol->cluster_size - 1) >>
+				clustersizebits;
 	}
 	/* Fill in new sizes. */
 	attr->allocated = (__s64)newcount << clustersizebits;
 	attr->size = newsize;
-	/* attr->initialized does not change. */
+	if (attr->initialized > newsize)
+		attr->initialized = newsize;
 	if (!newsize)
 		error = ntfs_make_attr_resident(ino, attr);
 	return error;
@@ -535,7 +564,7 @@ static int ntfs_process_runs(ntfs_inode *ino, ntfs_attribute* attr,
 	 * base mft record contains the last extent instead of the first one
 	 * and the first extent is stored, like any intermediate extents in
 	 * extension mft records. This would be difficult to allow the way the
-	 * run list is stored in memory. Thus we fix else where by causing the
+	 * runlist is stored in memory. Thus we fix elsewhere by causing the
 	 * attribute list attribute to be processed immediately when found. The
 	 * extents will then be processed starting with the first one. */
 	for (cnum = 0, vcn = 0; cnum < attr->d.r.len; cnum++)
@@ -549,7 +578,7 @@ static int ntfs_process_runs(ntfs_inode *ino, ntfs_attribute* attr,
 			ntfs_error("Problem with runlist in extended record\n");
 			return -1;
 		}
-		/* Tried to insert an already inserted run list. */
+		/* Tried to insert an already inserted runlist. */
 		return 0;
 	}
 	if (!endvcn) {
@@ -731,7 +760,7 @@ int ntfs_read_compressed(ntfs_inode *ino, ntfs_attribute *attr, __s64 offset,
 	io.do_read = 1;
 	io.fn_put = ntfs_put;
 	io.fn_get = 0;
-	cluster = rl->cluster;
+	cluster = rl->lcn;
 	len = rl->len;
 	copied = 0;
 	while (l) {
@@ -780,7 +809,7 @@ int ntfs_read_compressed(ntfs_inode *ino, ntfs_attribute *attr, __s64 offset,
 					rnum++;
 					rl++;
 					vcn += len;
-					cluster = cl1 = rl->cluster;
+					cluster = cl1 = rl->lcn;
 					len = rl->len;
 				}
 				got += l1;
@@ -822,7 +851,7 @@ int ntfs_read_compressed(ntfs_inode *ino, ntfs_attribute *attr, __s64 offset,
 			rnum++;
 			rl++;
 			vcn += len;
-			cluster = rl->cluster;
+			cluster = rl->lcn;
 			len = rl->len;
 		}
 	}

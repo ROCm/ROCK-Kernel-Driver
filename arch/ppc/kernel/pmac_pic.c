@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.pmac_pic.c 1.18 08/19/01 22:23:04 paulus
+ * BK Id: SCCS/s.pmac_pic.c 1.20 09/08/01 15:47:42 paulus
  */
 #include <linux/config.h>
 #include <linux/stddef.h>
@@ -8,7 +8,7 @@
 #include <linux/signal.h>
 #include <linux/pci.h>
 
-#include <asm/init.h>
+#include <asm/sections.h>
 #include <asm/io.h>
 #include <asm/smp.h>
 #include <asm/prom.h>

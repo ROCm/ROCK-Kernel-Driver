@@ -1,4 +1,4 @@
-/* $Id: traps.c,v 1.5 2000/02/27 08:27:55 gniibe Exp $
+/* $Id: traps.c,v 1.14 2001/07/24 08:07:10 gniibe Exp $
  *
  *  linux/arch/sh/traps.c
  *
@@ -314,10 +314,10 @@ static int handle_unaligned_access(u16 instruction, struct pt_regs *regs)
 
 	/* shout about the first ten userspace fixups */
 	if (user_mode(regs) && handle_unaligned_notify_count>0) {
-	    handle_unaligned_notify_count--;
+		handle_unaligned_notify_count--;
 
-	    printk("Fixing up unaligned userspace access in \"%s\" pid=%d pc=0x%p ins=0x%04hx\n",
-		   current->comm,current->pid,(u16*)regs->pc,instruction);
+		printk("Fixing up unaligned userspace access in \"%s\" pid=%d pc=0x%p ins=0x%04hx\n",
+		       current->comm,current->pid,(u16*)regs->pc,instruction);
 	}
 
 	ret = -EFAULT;
@@ -502,7 +502,7 @@ asmlinkage void do_exception_error(unsigned long r4, unsigned long r5,
 	die_if_kernel("exception", &regs, ex);
 }
 
-#if defined(CONFIG_DEBUG_KERNEL_WITH_GDB_STUB) || defined(CONFIG_SH_STANDARD_BIOS)
+#if defined(CONFIG_SH_STANDARD_BIOS)
 void *gdb_vbr_vector;
 #endif
 
@@ -514,7 +514,7 @@ void __init trap_init(void)
 	exception_handling_table[12] = (void *)do_reserved_inst;
 	exception_handling_table[13] = (void *)do_illegal_slot_inst;
 
-#if defined(CONFIG_DEBUG_KERNEL_WITH_GDB_STUB) || defined(CONFIG_SH_STANDARD_BIOS)
+#if defined(CONFIG_SH_STANDARD_BIOS)
     	/*
 	 * Read the old value of the VBR register to initialise
 	 * the vector through which debug and BIOS traps are

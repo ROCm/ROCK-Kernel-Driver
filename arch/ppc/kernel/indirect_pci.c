@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.indirect_pci.c 1.7 05/17/01 18:14:21 cort
+ * BK Id: SCCS/s.indirect_pci.c 1.10 09/08/01 15:47:42 paulus
  */
 /*
  * Support for indirect PCI bridges.
@@ -19,7 +19,6 @@
 #include <linux/init.h>
 #include <linux/bootmem.h>
 
-#include <asm/init.h>
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/pci-bridge.h>

@@ -48,6 +48,7 @@
 * Aug 07, 1998	David Fong	Initial version.
 *****************************************************************************/
 
+#include <linux/module.h>
 #include <linux/version.h>
 #include <linux/kernel.h>	/* printk(), and other useful stuff */
 #include <linux/stddef.h>	/* offsetof(), etc. */

@@ -74,6 +74,7 @@ struct softirq_action
 asmlinkage void do_softirq(void);
 extern void open_softirq(int nr, void (*action)(struct softirq_action*), void *data);
 extern void softirq_init(void);
+#define __cpu_raise_softirq(cpu, nr) do { softirq_pending(cpu) |= 1UL << (nr); } while (0)
 extern void FASTCALL(cpu_raise_softirq(unsigned int cpu, unsigned int nr));
 extern void FASTCALL(raise_softirq(unsigned int nr));
 

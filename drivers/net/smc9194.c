@@ -88,7 +88,11 @@ static const char version[] =
  . Do you want to use 32 bit xfers?  This should work on all chips, as
  . the chipset is designed to accommodate them.
 */
+#ifdef __sh__
+#undef USE_32_BIT
+#else
 #define USE_32_BIT 1
+#endif
 
 /*
  .the SMC9194 can be at any of the following port addresses.  To change,
@@ -983,12 +987,6 @@ static int __init smc_probe(struct net_device *dev, int ioaddr)
 		retval = -ENODEV;
 		goto err_out;
 	}
-	if (dev->irq == 2) {
-		/* Fixup for users that don't know that IRQ 2 is really IRQ 9,
-		 * or don't know which one to set.
-		 */
-		dev->irq = 9;
-	}
 
 	/* now, print out the card info, in a short format.. */
 
@@ -1369,13 +1367,11 @@ static void smc_rcv(struct net_device *dev)
 			packet_length & 0x3  );
 #else
 		PRINTK3((" Reading %d words and %d byte(s) \n",
-			(packet_length >> 1 ), packet_length & 1 );
-		if ( packet_length & 1 )
-			*(data++) = inb( ioaddr + DATA_1 );
-		insw(ioaddr + DATA_1 , data, (packet_length + 1 ) >> 1);
+			(packet_length >> 1 ), packet_length & 1 ));
+		insw(ioaddr + DATA_1 , data, packet_length >> 1);
 		if ( packet_length & 1 ) {
 			data += packet_length & ~1;
-			*((data++) = inb( ioaddr + DATA_1 );
+			*(data++) = inb( ioaddr + DATA_1 );
 		}
 #endif
 #if	SMC_DEBUG > 2

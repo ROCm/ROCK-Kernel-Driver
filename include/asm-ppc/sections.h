@@ -1,11 +1,9 @@
 /*
- * BK Id: SCCS/s.init.h 1.8 07/06/01 09:19:30 trini
+ * BK Id: SCCS/s.sections.h 1.11 09/08/01 15:47:43 paulus
  */
 #ifdef __KERNEL__
-#ifndef _PPC_INIT_H
-#define _PPC_INIT_H
-
-#include <linux/init.h>
+#ifndef _PPC_SECTIONS_H
+#define _PPC_SECTIONS_H
 
 #define __pmac __attribute__ ((__section__ (".text.pmac")))
 #define __pmacdata __attribute__ ((__section__ (".data.pmac")))
@@ -32,5 +30,5 @@
 	__argopenfirmware __openfirmware; \
 	__argopenfirmware
 	
-#endif /* _PPC_INIT_H */
+#endif /* _PPC_SECTIONS_H */
 #endif /* __KERNEL__ */

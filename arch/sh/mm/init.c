@@ -1,4 +1,4 @@
-/* $Id: init.c,v 1.17 2000-04-08 15:38:54+09 gniibe Exp $
+/* $Id: init.c,v 1.18 2001/08/03 11:22:06 gniibe Exp $
  *
  *  linux/arch/sh/mm/init.c
  *
@@ -40,34 +40,13 @@
  */
 unsigned long mmu_context_cache;
 
+#ifdef CONFIG_DISCONTIGMEM
+pg_data_t discontig_page_data[NR_NODES];
+bootmem_data_t discontig_node_bdata[NR_NODES];
+#endif
+
 static unsigned long totalram_pages;
 static unsigned long totalhigh_pages;
-
-extern unsigned long init_smp_mappings(unsigned long);
-
-extern unsigned long empty_zero_page[1024];
-
-int do_check_pgt_cache(int low, int high)
-{
-	int freed = 0;
-	if (pgtable_cache_size > high) {
-		do {
-			if (pgd_quicklist) {
-				free_pgd_slow(get_pgd_fast());
-				freed++;
-			}
-			if (pmd_quicklist) {
-				pmd_free_slow(pmd_alloc_one_fast(NULL, 0));
-				freed++;
-			}
-			if (pte_quicklist) {
-				pte_free_slow(pte_alloc_one_fast(NULL, 0));
-				freed++;
-			}
-		} while (pgtable_cache_size > low);
-	}
-	return freed;
-}
 
 void show_mem(void)
 {
@@ -91,7 +70,6 @@ void show_mem(void)
 	printk("%d reserved pages\n",reserved);
 	printk("%d pages shared\n",shared);
 	printk("%d pages swap cached\n",cached);
-	printk("%ld pages in page table cache\n",pgtable_cache_size);
 	show_buffers();
 }
 
@@ -146,12 +124,18 @@ void __init paging_init(void)
 			zones_size[ZONE_DMA] = max_dma - start_pfn;
 			zones_size[ZONE_NORMAL] = low - max_dma;
 		}
-		free_area_init_node(0, 0, 0, zones_size, __MEMORY_START, 0);
+		free_area_init_node(0, NODE_DATA(0), 0, zones_size, __MEMORY_START, 0);
+#ifdef CONFIG_DISCONTIGMEM
+		zones_size[ZONE_DMA] = __MEMORY_SIZE_2ND >> PAGE_SHIFT;
+		zones_size[ZONE_NORMAL] = 0;
+		free_area_init_node(1, NODE_DATA(1), 0, zones_size, __MEMORY_START_2ND, 0);
+#endif
  	}
 }
 
 void __init mem_init(void)
 {
+	extern unsigned long empty_zero_page[1024];
 	int codesize, reservedpages, datasize, initsize;
 	int tmp;
 
@@ -160,10 +144,13 @@ void __init mem_init(void)
 
 	/* clear the zero-page */
 	memset(empty_zero_page, 0, PAGE_SIZE);
-	flush_page_to_ram(virt_to_page(empty_zero_page));
+	__flush_wback_region(empty_zero_page, PAGE_SIZE);
 
 	/* this will put all low memory onto the freelists */
-	totalram_pages += free_all_bootmem();
+	totalram_pages += free_all_bootmem_node(NODE_DATA(0));
+#ifdef CONFIG_DISCONTIGMEM
+	totalram_pages += free_all_bootmem_node(NODE_DATA(1));
+#endif
 	reservedpages = 0;
 	for (tmp = 0; tmp < num_physpages; tmp++)
 		/*
@@ -182,6 +169,8 @@ void __init mem_init(void)
 		reservedpages << (PAGE_SHIFT-10),
 		datasize >> 10,
 		initsize >> 10);
+
+	p3_cache_init();
 }
 
 void free_initmem(void)

@@ -40,9 +40,19 @@ int ntfs_decompress_run(unsigned char **data, int *length,
 
 void ntfs_decompress(unsigned char *dest, unsigned char *src, ntfs_size_t l);
 
-void ntfs_fill_mft_header(ntfs_u8 *mft, int recordsize, int blocksize,
-		int sequence_number);
+int splice_runlists(ntfs_runlist **rl1, int *r1len, const ntfs_runlist *rl2,
+		int r2len);
 
-extern __inline__ int ntfs_test_and_set_bit(unsigned char *byte,
-		const int bit);
+/*
+ * NOTE: Neither of the ntfs_*_bit functions are atomic! But we don't need
+ * them atomic at present as we never operate on shared/cached bitmaps.
+ */
+static __inline__ int ntfs_test_and_set_bit(unsigned char *byte, const int bit)
+{
+	unsigned char *ptr = byte + (bit >> 3);
+	int b = 1 << (bit & 7);
+	int oldbit = *ptr & b ? 1 : 0;
+	*ptr |= b;
+	return oldbit;
+}
 

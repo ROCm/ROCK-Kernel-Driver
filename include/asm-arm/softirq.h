@@ -21,6 +21,4 @@ do {									\
 		__asm__("bl%? __do_softirq": : : "lr");/* out of line */\
 } while (0)
 
-#define __cpu_raise_softirq(cpu, nr) __set_bit(nr, &softirq_pending(cpu))
-
 #endif	/* __ASM_SOFTIRQ_H */

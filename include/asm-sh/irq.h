@@ -33,6 +33,15 @@
 #define RTC_IPR_POS	 0
 #define RTC_PRIORITY	TIMER_PRIORITY
 
+#if defined(__sh3__)
+#define DMTE0_IRQ	48
+#define DMTE1_IRQ	49
+#define DMTE2_IRQ	50
+#define DMTE3_IRQ	51
+#define DMA_IPR_ADDR	INTC_IPRE
+#define DMA_IPR_POS	3
+#define DMA_PRIORITY	7
+#elif defined(__SH4__)
 #define DMTE0_IRQ	34
 #define DMTE1_IRQ	35
 #define DMTE2_IRQ	36
@@ -41,6 +50,7 @@
 #define DMA_IPR_ADDR	INTC_IPRC
 #define DMA_IPR_POS	2
 #define DMA_PRIORITY	7
+#endif
 
 #if defined (CONFIG_CPU_SUBTYPE_SH7707) || defined (CONFIG_CPU_SUBTYPE_SH7708) || \
     defined (CONFIG_CPU_SUBTYPE_SH7709) || defined (CONFIG_CPU_SUBTYPE_SH7750) || \
@@ -170,6 +180,12 @@ extern void disable_irq_nosync(unsigned int);
 extern void enable_irq(unsigned int);
 
 /*
+ * Simple Mask Register Support
+ */
+extern void make_maskreg_irq(unsigned int irq);
+extern unsigned short *irq_mask_register;
+
+/*
  * Function for "on chip support modules".
  */
 extern void make_ipr_irq(unsigned int irq, unsigned int addr,
@@ -277,7 +293,8 @@ extern void make_intc2_irq(unsigned int irq,unsigned int addr,
        
 #ifdef CONFIG_SH_GENERIC
 
-extern __inline__ int irq_demux(int irq) {
+static __inline__ int irq_demux(int irq)
+{
 	if (sh_mv.mv_irq_demux) {
 		irq = sh_mv.mv_irq_demux(irq);
 	}

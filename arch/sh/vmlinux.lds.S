@@ -1,4 +1,4 @@
-/* $Id: vmlinux.lds.S,v 1.4 1999/12/23 11:37:45 gniibe Exp $
+/* $Id: vmlinux.lds.in,v 1.5 2001/07/27 11:45:55 gniibe Exp $
  * ld script to make SuperH Linux kernel
  * Written by Niibe Yutaka
  */
@@ -74,7 +74,11 @@ SECTIONS
   . = ALIGN(4096);
   .data.page_aligned : { *(.data.idt) }
 
+#ifdef CONFIG_CPU_SH3	
+  . = ALIGN(16);
+#else
   . = ALIGN(32);
+#endif	
   .data.cacheline_aligned : { *(.data.cacheline_aligned) }
 
   . = ALIGN(4);

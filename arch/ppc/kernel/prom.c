@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.prom.c 1.40 08/24/01 20:13:31 paulus
+ * BK Id: SCCS/s.prom.c 1.42 09/08/01 15:47:42 paulus
  */
 /*
  * Procedures for interfacing to the Open Firmware PROM on
@@ -20,7 +20,7 @@
 #include <linux/threads.h>
 #include <linux/spinlock.h>
 
-#include <asm/init.h>
+#include <asm/sections.h>
 #include <asm/prom.h>
 #include <asm/page.h>
 #include <asm/processor.h>

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.feature.c 1.19 08/19/01 22:23:04 paulus
+ * BK Id: SCCS/s.feature.c 1.21 09/08/01 15:47:42 paulus
  */
 /*
  *  arch/ppc/kernel/feature.c
@@ -20,7 +20,7 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/spinlock.h>
-#include <asm/init.h>
+#include <asm/sections.h>
 #include <asm/errno.h>
 #include <asm/ohare.h>
 #include <asm/heathrow.h>

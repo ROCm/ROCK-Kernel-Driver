@@ -1,4 +1,4 @@
-/* $Id: time.c,v 1.20 2000/02/28 12:42:51 gniibe Exp $
+/* $Id: time.c,v 1.30 2001/09/01 14:34:31 mrbrown Exp $
  *
  *  linux/arch/sh/kernel/time.c
  *
@@ -183,10 +183,9 @@ static long last_rtc_update;
 static inline void do_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	do_timer(regs);
-#if 0
+
 	if (!user_mode(regs))
 		sh_do_profile(regs->pc);
-#endif
 
 #ifdef CONFIG_HEARTBEAT
 	if (sh_mv.mv_heartbeat != NULL) 
@@ -360,17 +359,11 @@ void __init time_init(void)
 #endif
 #endif
 
-	if (MACH_DREAMCAST)
-		xtime.tv_sec = xtime.tv_usec = 0;
-	else
-		rtc_gettimeofday(&xtime);
+	rtc_gettimeofday(&xtime);
 
 	setup_irq(TIMER_IRQ, &irq0);
 
-	if (MACH_DREAMCAST)
-		timer_freq = 50*1000*1000/4;
-	else
-		timer_freq = get_timer_frequency();
+	timer_freq = get_timer_frequency();
 
 	module_clock = timer_freq * 4;
 
@@ -391,10 +384,9 @@ void __init time_init(void)
 	}
 #elif defined(__SH4__)
 	{
-		unsigned long pvr;
-		frqcr = ctrl_inw(FRQCR);
-
 #ifdef CONFIG_CPU_SUBTYPE_ST40STB1
+		unsigned long pvr;
+
 		/* This should probably be moved into the SH3 probing code, and then use the processor
 		 * structure to determine which CPU we are running on.
 		 */
@@ -435,6 +427,8 @@ void __init time_init(void)
 		} else
 #endif
 		{
+			frqcr = ctrl_inw(FRQCR);
+
 			ifc  = ifc_table[(frqcr>> 6) & 0x0007];
 			bfc  = bfc_table[(frqcr>> 3) & 0x0007];
 			pfc = pfc_table[frqcr & 0x0007];

@@ -36,8 +36,6 @@ do {							                \
 			do_softirq();					\
 } while (0)
 
-#define __cpu_raise_softirq(cpu, nr) (softirq_pending(cpu) |= (1<<nr))
-
 #endif	/* __ASM_SOFTIRQ_H */
 
 

@@ -1,7 +1,6 @@
 /*
  * Copyright 2000 by Hans Reiser, licensing governed by reiserfs/README
  */
-#ifdef __KERNEL__
 
 #include <linux/config.h>
 #include <linux/sched.h>
@@ -9,13 +8,6 @@
 #include <linux/locks.h>
 #include <asm/bitops.h>
 #include <linux/list.h>
-
-#else
-
-#include "nokernel.h"
-
-#endif
-
 
 #ifdef CONFIG_REISERFS_CHECK
 

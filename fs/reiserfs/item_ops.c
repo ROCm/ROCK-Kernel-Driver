@@ -2,17 +2,8 @@
  * Copyright 2000 by Hans Reiser, licensing governed by reiserfs/README
  */
 
-#ifdef __KERNEL__
-
 #include <linux/sched.h>
 #include <linux/reiserfs_fs.h>
-
-#else
-
-#include "nokernel.h"
-
-#endif
-
 
 // this contains item handlers for old item types: sd, direct,
 // indirect, directory
@@ -46,14 +37,7 @@ static char * print_time (time_t t)
 {
     static char timebuf[256];
 
-#ifndef __KERNEL__
-//    struct tm *loctime;
-//    loctime = localtime (&t);
-    sprintf (timebuf, "%s", asctime (localtime (&t)));
-    timebuf[strlen (timebuf) - 1] = 0;
-#else
     sprintf (timebuf, "%ld", t);
-#endif
     return timebuf;
 }
 

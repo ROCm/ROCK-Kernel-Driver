@@ -2035,7 +2035,7 @@ static int irda_getsockopt(struct socket *sock, int level, int optname,
 	if (get_user(len, optlen))
 		return -EFAULT;
 
-	if(optlen < 0)
+	if(len < 0)
 		return -EINVAL;
 		
 	switch (optname) {

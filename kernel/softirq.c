@@ -108,6 +108,9 @@ restart:
 	local_irq_restore(flags);
 }
 
+/*
+ * This function must run with irq disabled!
+ */
 inline void cpu_raise_softirq(unsigned int cpu, unsigned int nr)
 {
 	__cpu_raise_softirq(cpu, nr);
@@ -127,7 +130,11 @@ inline void cpu_raise_softirq(unsigned int cpu, unsigned int nr)
 
 void raise_softirq(unsigned int nr)
 {
+	long flags;
+
+	local_irq_save(flags);
 	cpu_raise_softirq(smp_processor_id(), nr);
+	local_irq_restore(flags);
 }
 
 void open_softirq(int nr, void (*action)(struct softirq_action*), void *data)
@@ -195,8 +202,8 @@ static void tasklet_action(struct softirq_action *a)
 		local_irq_disable();
 		t->next = tasklet_vec[cpu].list;
 		tasklet_vec[cpu].list = t;
-		local_irq_enable();
 		__cpu_raise_softirq(cpu, TASKLET_SOFTIRQ);
+		local_irq_enable();
 	}
 }
 
@@ -229,8 +236,8 @@ static void tasklet_hi_action(struct softirq_action *a)
 		local_irq_disable();
 		t->next = tasklet_hi_vec[cpu].list;
 		tasklet_hi_vec[cpu].list = t;
-		local_irq_enable();
 		__cpu_raise_softirq(cpu, HI_SOFTIRQ);
+		local_irq_enable();
 	}
 }
 

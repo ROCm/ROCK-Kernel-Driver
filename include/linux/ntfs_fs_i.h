@@ -70,8 +70,7 @@ typedef s32 ntfs_cluster_t;
 #endif
 
 /* Definition of the NTFS in-memory inode structure. */
-struct ntfs_inode_info{
-	unsigned long mmu_private;
+struct ntfs_inode_info {
 	struct ntfs_sb_info *vol;
 	unsigned long i_number;		/* Should be really 48 bits. */
 	__u16 sequence_number;		/* The current sequence number. */

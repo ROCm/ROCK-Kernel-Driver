@@ -311,7 +311,6 @@ int __init init_module(void)
 void cleanup_module(void)
 {
 	int i;
-	struct gendisk *g;
 	char buff[4]; 
 
 	for(i=0; i<nr_ctlr; i++) {
@@ -335,16 +334,7 @@ void cleanup_module(void)
 			hba[i]->cmd_pool_dhandle);
 		kfree(hba[i]->cmd_pool_bits);
 
-		if (gendisk_head == &ida_gendisk[i]) {
-			gendisk_head = ida_gendisk[i].next;
-		} else {
-			for(g=gendisk_head; g; g=g->next) {
-				if (g->next == &ida_gendisk[i]) {
-					g->next = ida_gendisk[i].next;
-					break;
-				}
-			}
-		}
+		del_gendisk(&ida_gendisk[i]);
 	}
 	remove_proc_entry("cpqarray", proc_root_driver);
 	kfree(ida);
@@ -550,8 +540,7 @@ int __init cpqarray_init(void)
 		ida_gendisk[i].nr_real = 0; 
 	
 		/* Get on the disk list */
-		ida_gendisk[i].next = gendisk_head;
-		gendisk_head = &ida_gendisk[i];
+		add_gendisk(&ida_gendisk[i]);
 
 		init_timer(&hba[i]->timer);
 		hba[i]->timer.expires = jiffies + IDA_TIMER;

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.prep_pci.c 1.24 08/20/01 15:06:15 paulus
+ * BK Id: SCCS/s.prep_pci.c 1.26 09/08/01 15:47:42 paulus
  */
 /*
  * PReP pci functions.
@@ -15,7 +15,7 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 
-#include <asm/init.h>
+#include <asm/sections.h>
 #include <asm/byteorder.h>
 #include <asm/io.h>
 #include <asm/ptrace.h>

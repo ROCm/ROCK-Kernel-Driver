@@ -1,10 +1,11 @@
 /*
- *	$Id: mach_dc.c,v 1.4 2001/05/24 05:09:16 mrbrown Exp $
+ *	$Id: mach_dc.c,v 1.5 2001/09/01 14:34:31 mrbrown Exp $
  *	SEGA Dreamcast machine vector
  */
 
 #include <linux/config.h>
 #include <linux/init.h>
+#include <linux/time.h>
 
 #include <asm/machvec.h>
 #include <asm/machvec_init.h>
@@ -15,6 +16,10 @@
 
 void __init setup_dreamcast(void);
 void __init dreamcast_pcibios_init(void);
+
+/* Custom Dreamcast RTC routines */
+void aica_rtc_gettimeofday(struct timeval *tv);
+int aica_rtc_settimeofday(const struct timeval *tv);
 
 /*
  * The Machine Vector
@@ -59,6 +64,9 @@ struct sh_machine_vector mv_dreamcast __initmv = {
 	mv_init_arch:		setup_dreamcast,
 	mv_isa_port2addr:	dreamcast_isa_port2addr,
 	mv_irq_demux:		systemasic_irq_demux,
+
+	mv_rtc_gettimeofday:	aica_rtc_gettimeofday,
+	mv_rtc_settimeofday:	aica_rtc_settimeofday,
 
 	mv_hw_dreamcast:	1,
 };

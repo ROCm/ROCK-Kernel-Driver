@@ -1,4 +1,4 @@
-/* $Id: irq_ipr.c,v 1.6 2000/05/14 08:41:25 gniibe Exp $
+/* $Id: irq_ipr.c,v 1.20 2001/07/15 23:26:56 gniibe Exp $
  *
  * linux/arch/sh/kernel/irq_ipr.c
  *
@@ -102,7 +102,8 @@ static void mask_and_ack_ipr(unsigned int irq)
 
 static void end_ipr_irq(unsigned int irq)
 {
-	enable_ipr_irq(irq);
+	if (!(irq_desc[irq].status & (IRQ_DISABLED|IRQ_INPROGRESS)))
+		enable_ipr_irq(irq);
 }
 
 void make_ipr_irq(unsigned int irq, unsigned int addr, int pos, int priority)
@@ -176,7 +177,8 @@ static void mask_and_ack_pint(unsigned int irq)
 
 static void end_pint_irq(unsigned int irq)
 {
-	enable_pint_irq(irq);
+	if (!(irq_desc[irq].status & (IRQ_DISABLED|IRQ_INPROGRESS)))
+		enable_pint_irq(irq);
 }
 
 void make_pint_irq(unsigned int irq)

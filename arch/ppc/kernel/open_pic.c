@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.open_pic.c 1.26 08/20/01 22:33:28 paulus
+ * BK Id: SCCS/s.open_pic.c 1.28 09/08/01 15:47:42 paulus
  */
 /*
  *  arch/ppc/kernel/open_pic.c -- OpenPIC Interrupt Handling
@@ -23,7 +23,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/prom.h>
-#include <asm/init.h>
+#include <asm/sections.h>
 
 #include "local_irq.h"
 #include "open_pic.h"

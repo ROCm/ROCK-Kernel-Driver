@@ -1,4 +1,4 @@
-/* $Id: fault.c,v 1.13 2000/03/07 12:05:24 gniibe Exp $
+/* $Id: fault.c,v 1.48 2001/08/09 00:27:04 gniibe Exp $
  *
  *  linux/arch/sh/mm/fault.c
  *  Copyright (C) 1999  Niibe Yutaka
@@ -28,10 +28,6 @@
 #include <asm/mmu_context.h>
 
 extern void die(const char *,struct pt_regs *,long);
-static void __flush_tlb_page(unsigned long asid, unsigned long page);
-#if defined(__SH4__)
-static void __flush_tlb_phys(unsigned long phys);
-#endif
 
 /*
  * Ugly, ugly, but the goto's result in better assembly..
@@ -242,8 +238,10 @@ asmlinkage int __do_page_fault(struct pt_regs *regs, unsigned long writeaccess,
 	pte_t *pte;
 	pte_t entry;
 
-	if (address >= VMALLOC_START && address < VMALLOC_END)
+	if (address >= P3SEG && address < P4SEG)
 		dir = pgd_offset_k(address);
+	else if (address >= TASK_SIZE)
+		return 1;
 	else
 		dir = pgd_offset(current->mm, address);
 
@@ -257,7 +255,7 @@ asmlinkage int __do_page_fault(struct pt_regs *regs, unsigned long writeaccess,
 	}
 	pte = pte_offset(pmd, address);
 	entry = *pte;
-	if (pte_none(entry) || !pte_present(entry)
+	if (pte_none(entry) || pte_not_present(entry)
 	    || (writeaccess && !pte_write(entry)))
 		return 1;
 
@@ -283,27 +281,24 @@ void update_mmu_cache(struct vm_area_struct * vma,
 	unsigned long pteval;
 	unsigned long vpn;
 #if defined(__SH4__)
+	struct page *page;
 	unsigned long ptea;
 #endif
 
-	save_and_cli(flags);
-#if defined(__SH4__)
-	if (pte_shared(pte)) {
-		struct page *pg;
+	/* Ptrace may call this routine. */
+	if (vma && current->active_mm != vma->vm_mm)
+		return;
 
-		pteval = pte_val(pte);
-		pteval &= PAGE_MASK; /* Physicall page address */
-		__flush_tlb_phys(pteval);
-		pg = virt_to_page(__va(pteval));
-		flush_dcache_page(pg);
+#if defined(__SH4__)
+	page = pte_page(pte);
+	if (VALID_PAGE(page) && !test_bit(PG_mapped, &page->flags)) {
+		unsigned long phys = pte_val(pte) & PTE_PHYS_MASK;
+		__flush_wback_region((void *)P1SEGADDR(phys), PAGE_SIZE);
+		__set_bit(PG_mapped, &page->flags);
 	}
 #endif
 
-	/* Ptrace may call this routine. */
-	if (vma && current->active_mm != vma->vm_mm) {
-		restore_flags(flags);
-		return;
-	}
+	save_and_cli(flags);
 
 	/* Set PTEH register */
 	vpn = (address & MMU_VPN_MASK) | get_asid();
@@ -327,7 +322,7 @@ void update_mmu_cache(struct vm_area_struct * vma,
 	restore_flags(flags);
 }
 
-static void __flush_tlb_page(unsigned long asid, unsigned long page)
+void __flush_tlb_page(unsigned long asid, unsigned long page)
 {
 	unsigned long addr, data;
 
@@ -349,40 +344,6 @@ static void __flush_tlb_page(unsigned long asid, unsigned long page)
 	back_to_P1();
 #endif
 }
-
-#if defined(__SH4__)
-static void __flush_tlb_phys(unsigned long phys)
-{
-	unsigned long addr, data, pte;
-
-	pte = phys | MMU_UTLB_VALID;
-	for (addr = MMU_UTLB_DATA_ARRAY;
-	     addr < MMU_UTLB_DATA_ARRAY+(MMU_UTLB_ENTRIES<<MMU_U_ENTRY_SHIFT);
-	     addr += (1<<MMU_U_ENTRY_SHIFT)) {
-		data = ctrl_inl(addr);
-		if ((data & (MMU_UTLB_VALID|PAGE_MASK)) == pte) {
-			data &= ~MMU_UTLB_VALID;
-			jump_to_P2();
-			ctrl_outl(data, addr);
-			back_to_P1();
-			break;
-		}
-	}
-	pte = phys | MMU_ITLB_VALID;
-	for (addr = MMU_ITLB_DATA_ARRAY;
-	     addr < MMU_ITLB_DATA_ARRAY+(MMU_ITLB_ENTRIES<<MMU_I_ENTRY_SHIFT);
-	     addr += (1<<MMU_I_ENTRY_SHIFT)) {
-		data = ctrl_inl(addr);
-		if ((data & (MMU_ITLB_VALID|PAGE_MASK)) == pte) {
-			data &= ~MMU_ITLB_VALID;
-			jump_to_P2();
-			ctrl_outl(data, addr);
-			back_to_P1();
-			break;
-		}
-	}
-}
-#endif
 
 void flush_tlb_page(struct vm_area_struct *vma, unsigned long page)
 {

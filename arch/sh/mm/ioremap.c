@@ -1,4 +1,4 @@
-/* $Id: ioremap.c,v 1.2 1999/11/25 14:00:28 gniibe Exp $
+/* $Id: ioremap.c,v 1.4 2001/06/30 09:18:39 gniibe Exp $
  *
  * arch/sh/mm/ioremap.c
  *
@@ -13,8 +13,8 @@
 #include <asm/io.h>
 #include <asm/pgalloc.h>
 
-static inline void remap_area_pte(pte_t * pte, unsigned long address, unsigned long size,
-	unsigned long phys_addr, unsigned long flags)
+static inline void remap_area_pte(pte_t * pte, unsigned long address,
+	unsigned long size, unsigned long phys_addr, unsigned long flags)
 {
 	unsigned long end;
 	pgprot_t pgprot = __pgprot(_PAGE_PRESENT | _PAGE_RW |
@@ -36,11 +36,11 @@ static inline void remap_area_pte(pte_t * pte, unsigned long address, unsigned l
 		address += PAGE_SIZE;
 		phys_addr += PAGE_SIZE;
 		pte++;
-	} while (address && address < end);
+	} while (address && (address < end));
 }
 
-static inline int remap_area_pmd(pmd_t * pmd, unsigned long address, unsigned long size,
-	unsigned long phys_addr, unsigned long flags)
+static inline int remap_area_pmd(pmd_t * pmd, unsigned long address,
+	unsigned long size, unsigned long phys_addr, unsigned long flags)
 {
 	unsigned long end;
 
@@ -58,19 +58,19 @@ static inline int remap_area_pmd(pmd_t * pmd, unsigned long address, unsigned lo
 		remap_area_pte(pte, address, end - address, address + phys_addr, flags);
 		address = (address + PMD_SIZE) & PMD_MASK;
 		pmd++;
-	} while (address && address < end);
+	} while (address && (address < end));
 	return 0;
 }
 
-static int remap_area_pages(unsigned long address, unsigned long phys_addr,
-			    unsigned long size, unsigned long flags)
+int remap_area_pages(unsigned long address, unsigned long phys_addr,
+		     unsigned long size, unsigned long flags)
 {
 	int error;
 	pgd_t * dir;
 	unsigned long end = address + size;
 
 	phys_addr -= address;
-	dir = pgd_offset(&init_mm, address);
+	dir = pgd_offset_k(address);
 	flush_cache_all();
 	if (address >= end)
 		BUG();
@@ -106,7 +106,7 @@ static int remap_area_pages(unsigned long address, unsigned long phys_addr,
  * have to convert them into an offset in a page-aligned mapping, but the
  * caller shouldn't need to know that small detail.
  */
-void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flags)
+void * p3_ioremap(unsigned long phys_addr, unsigned long size, unsigned long flags)
 {
 	void * addr;
 	struct vm_struct * area;
@@ -150,7 +150,7 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 	return (void *) (offset + (char *)addr);
 }
 
-void iounmap(void *addr)
+void p3_iounmap(void *addr)
 {
 	if (addr > high_memory)
 		return vfree((void *) (PAGE_MASK & (unsigned long) addr));

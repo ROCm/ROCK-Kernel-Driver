@@ -1975,9 +1975,8 @@ int i2o_block_init(void)
 
 	/*
 	 *	Adding i2ob_gendisk into the gendisk list.
-	 */	
-	i2ob_gendisk.next = gendisk_head;
-	gendisk_head = &i2ob_gendisk;
+	 */
+	add_gendisk(&i2ob_gendisk);
 
 	return 0;
 }
@@ -2047,20 +2046,6 @@ void cleanup_module(void)
 	 */
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 
-	/*
-	 *	Why isnt register/unregister gendisk in the kernel ???
-	 */
-
-	if (gendisk_head == &i2ob_gendisk) {
-		gendisk_head = i2ob_gendisk.next;
-		}
-	else {
-		for (gdp = gendisk_head; gdp; gdp = gdp->next)
-			if (gdp->next == &i2ob_gendisk)
-			{
-				gdp->next = i2ob_gendisk.next;
-				break;
-			}
-	}
+	del_gendisk(&i2ob_gendisk);
 }
 #endif

@@ -2059,7 +2059,7 @@ jump_eight:
 
 void ide_unregister (unsigned int index)
 {
-	struct gendisk *gd, **gdp;
+	struct gendisk *gd;
 	ide_drive_t *drive, *d;
 	ide_hwif_t *hwif, *g;
 	ide_hwgroup_t *hwgroup;
@@ -2179,13 +2179,9 @@ void ide_unregister (unsigned int index)
 	blk_dev[hwif->major].data = NULL;
 	blk_dev[hwif->major].queue = NULL;
 	blksize_size[hwif->major] = NULL;
-	for (gdp = &gendisk_head; *gdp; gdp = &((*gdp)->next))
-		if (*gdp == hwif->gd)
-			break;
-	if (*gdp == NULL)
-		printk("gd not in disk chain!\n");
-	else {
-		gd = *gdp; *gdp = gd->next;
+	gd = hwif->gd;
+	if (gd) {
+		del_gendisk(gd);
 		kfree(gd->sizes);
 		kfree(gd->part);
 		if (gd->de_arr)
@@ -2193,6 +2189,7 @@ void ide_unregister (unsigned int index)
 		if (gd->flags)
 			kfree (gd->flags);
 		kfree(gd);
+		hwif->gd = NULL;
 	}
 	old_hwif		= *hwif;
 	init_hwif_data (index);	/* restore hwif data to pristine status */

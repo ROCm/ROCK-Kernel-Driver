@@ -1217,10 +1217,9 @@ int netif_rx(struct sk_buff *skb)
 enqueue:
 			dev_hold(skb->dev);
 			__skb_queue_tail(&queue->input_pkt_queue,skb);
-			local_irq_restore(flags);
-
 			/* Runs from irqs or BH's, no need to wake BH */
 			__cpu_raise_softirq(this_cpu, NET_RX_SOFTIRQ);
+			local_irq_restore(flags);
 #ifndef OFFLINE_SAMPLE
 			get_sample_stats(this_cpu);
 #endif
@@ -1529,10 +1528,9 @@ softnet_break:
 
 	local_irq_disable();
 	netdev_rx_stat[this_cpu].time_squeeze++;
-	local_irq_enable();
-
 	/* This already runs in BH context, no need to wake up BH's */
 	__cpu_raise_softirq(this_cpu, NET_RX_SOFTIRQ);
+	local_irq_enable();
 
 	NET_PROFILE_LEAVE(softnet_process);
 	return;

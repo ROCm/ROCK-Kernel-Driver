@@ -42,6 +42,7 @@
 #include <asm/io.h>
 #include <asm/pgtable.h>
 #include <asm/system.h>
+#include <asm/sections.h>
 #include <asm/irq.h>
 #include <asm/hardirq.h>
 #include <asm/feature.h>
@@ -1736,7 +1737,6 @@ int __openfirmware powerbook_sleep_Core99(void)
 int __openfirmware powerbook_sleep_3400(void)
 {
 	int ret, i, x;
-	unsigned long msr;
 	unsigned int hid0;
 	unsigned long p, wait;
 	struct adb_request sleep_req;

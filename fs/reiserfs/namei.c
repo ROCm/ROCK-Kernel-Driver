@@ -11,19 +11,11 @@
  * NO WARRANTY
  */
 
-#ifdef __KERNEL__
-
 #include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/bitops.h>
 #include <linux/reiserfs_fs.h>
 #include <linux/smp_lock.h>
-
-#else
-
-#include "nokernel.h"
-
-#endif
 
 				/* there should be an overview right
                                    here, as there should be in every

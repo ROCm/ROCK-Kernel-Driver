@@ -29,7 +29,7 @@ extern unsigned long mmu_context_cache;
  */
 #define MMU_VPN_MASK	0xfffff000
 
-extern __inline__ void
+static __inline__ void
 get_new_mmu_context(struct mm_struct *mm)
 {
 	extern void flush_tlb_all(void);
@@ -51,7 +51,7 @@ get_new_mmu_context(struct mm_struct *mm)
 /*
  * Get MMU context if needed.
  */
-extern __inline__ void
+static __inline__ void
 get_mmu_context(struct mm_struct *mm)
 {
 	if (mm) {
@@ -67,8 +67,8 @@ get_mmu_context(struct mm_struct *mm)
  * Initialize the context related info for a new mm_struct
  * instance.
  */
-extern __inline__ int init_new_context(struct task_struct *tsk,
-					struct mm_struct *mm)
+static __inline__ int init_new_context(struct task_struct *tsk,
+				       struct mm_struct *mm)
 {
 	mm->context = NO_CONTEXT;
 	return 0;
@@ -78,7 +78,7 @@ extern __inline__ int init_new_context(struct task_struct *tsk,
  * Destroy context related info for an mm_struct that is about
  * to be put to rest.
  */
-extern __inline__ void destroy_context(struct mm_struct *mm)
+static __inline__ void destroy_context(struct mm_struct *mm)
 {
 	/* Do nothing */
 }
@@ -126,7 +126,7 @@ extern __inline__ void destroy_context(struct mm_struct *mm)
 #define MMU_ITLB_VALID		0x100
 #endif
 
-extern __inline__ void set_asid(unsigned long asid)
+static __inline__ void set_asid(unsigned long asid)
 {
 	unsigned long __dummy;
 
@@ -139,7 +139,7 @@ extern __inline__ void set_asid(unsigned long asid)
 			        "r" (0xffffff00));
 }
 
-extern __inline__ unsigned long get_asid(void)
+static __inline__ unsigned long get_asid(void)
 {
 	unsigned long asid;
 
@@ -154,7 +154,7 @@ extern __inline__ unsigned long get_asid(void)
  * After we have set current->mm to a new value, this activates
  * the context for the new mm so we see the new mappings.
  */
-extern __inline__ void activate_context(struct mm_struct *mm)
+static __inline__ void activate_context(struct mm_struct *mm)
 {
 	get_mmu_context(mm);
 	set_asid(mm->context & MMU_CONTEXT_ASID_MASK);
@@ -162,7 +162,7 @@ extern __inline__ void activate_context(struct mm_struct *mm)
 
 /* MMU_TTB can be used for optimizing the fault handling.
    (Currently not used) */
-extern __inline__ void switch_mm(struct mm_struct *prev,
+static __inline__ void switch_mm(struct mm_struct *prev,
 				 struct mm_struct *next,
 				 struct task_struct *tsk, unsigned int cpu)
 {
@@ -181,7 +181,7 @@ extern __inline__ void switch_mm(struct mm_struct *prev,
 #define activate_mm(prev, next) \
 	switch_mm((prev),(next),NULL,smp_processor_id())
 
-extern __inline__ void
+static __inline__ void
 enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
 {
 }

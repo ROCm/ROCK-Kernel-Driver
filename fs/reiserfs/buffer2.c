@@ -10,20 +10,12 @@
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
  */
-#ifdef __KERNEL__
 
 #include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/locks.h>
 #include <linux/reiserfs_fs.h>
 #include <linux/smp_lock.h>
-
-#else
-
-#include "nokernel.h"
-
-#endif
-
 
 /*
  *  wait_buffer_until_released

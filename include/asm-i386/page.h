@@ -87,7 +87,6 @@ typedef struct { unsigned long pgprot; } pgprot_t;
  * see^H^H^Hhear bugs in early bootup as well!
  */
 #define BUG() do { \
-	printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); \
 	__asm__ __volatile__(".byte 0x0f,0x0b"); \
 } while (0)
 

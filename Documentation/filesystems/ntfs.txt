@@ -82,7 +82,6 @@ mft_zone_multiplier=	Set the MFT zone multiplier for the volume (this
 				2		25%
 				3		37.5%
 				4		50%
-			NOTE: This is currently ignored! Work in progress.
 
 Known bugs and (mis-)features
 =============================
@@ -93,13 +92,61 @@ Known bugs and (mis-)features
 
 - Writing of extension records is not supported properly.
 
-- $MFT extension is badly broken and really needs rewriting.
-
 Please send bug reports/comments/feed back/abuse to the Linux-NTFS development
 list at sourceforge: linux-ntfs-dev@lists.sourceforge.net
 
 ChangeLog
 =========
+
+NTFS 1.1.18:
+
+	- Enhanced & bug fixed cluster deallocation (race fixes, etc.)
+	- Complete rewrite of cluster allocation, now race free.
+	- Fixed several bugs in the attribute modification codepaths.
+	- Hopefully fixed bug where the first sectors of some people's
+	  partitions would be overwritten by the mft. And in general fixed up
+	  mft extension code a bit (still incomplete though).
+	- Introduce splice_runlist() to allow generic splicing of two run
+	  lists into one.
+	- MFT zone is now implemented. [Stage 2 of 3; only lack dynamic
+	  growing of mft zone but that is AFAIK not even done by Windows, and
+	  the overhead would be so large that it is probably not worth doing
+	  at all, so Stage 3 might never happen...]
+	- Complete rewrite of $MFT extension and ntfs inode allocation code.
+	- Made the NTFS driver initialization string show the compile options
+	  used (i.e. whether read-only or read-write, whether a module, and
+	  whether with debug support).
+	- Modify ntfs_fill_mft_header() to set all fields and to accept more
+	  arguments.
+	- Get rid of superfluous add_mft_header().
+	- Get rid of some unused code.
+	- Fixed several bugs in and generally cleaned up ntfs_readdir,
+	  ntfs_getdir_unsorted(), and ntfs_printcb. Now they spew out huge
+	  amounts of debug output if debugging is enabled. This will be
+	  removed once I know that this works for everyone.
+	- ntfs_readdir now shows hidden files. The only files that are now
+	  hidden are the first 16 inodes (i.e. the hard coded system files),
+	  which is consistent with Windows NT4. Using the show_sys_files mount
+	  option, these files are then shown, too.
+	- Fixed the displaying of the "." and ".." directories. We still cannot
+	  cope with more than 65536 files in a directory index block which is
+	  not a problem and we now cannot cope with more than 32766 directory
+	  index blocks which should not be a problem unless you have a
+	  directory with an insanely large number of files in it. The exact
+	  number depends on the length of the file names of the directory
+	  entries and on the size of the dircetory index blocks.
+	- Fixed all problems with the last file in a directory (e.g. the last
+	  file should no longer disappear and tab completion should work). If
+	  there are still disappearing files or any other problems with the
+	  last file in a directory, please report them! Thanks.
+	- Rewrote ntfs_extend_attr() to use the new cluster allocator and the
+	  freshly introduced splice_runlists() function. This simplified
+	  ntfs_extend_attr() a lot which in turn seems to have removed one or
+	  more bugs from it.
+	- Probably other things I have forgotten... (-;
+	- Removed dollar signs from the names in the system file enumeration.
+	  Apparently gcc doesn't support dollar signs on PPC architecture.
+	  (Andrzej Krzysztofowicz)
 
 NTFS 1.1.17:
 

@@ -3,17 +3,9 @@
  */
 
 
-#ifdef __KERNEL__
-
 #include <linux/sched.h>
 #include <linux/reiserfs_fs.h>
 #include <linux/smp_lock.h>
-
-#else
-
-#include "nokernel.h"
-
-#endif
 
 /*
 ** We pack the tails of files on file close, not at the time they are written.

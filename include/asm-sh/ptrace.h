@@ -1,6 +1,8 @@
 #ifndef __ASM_SH_PTRACE_H
 #define __ASM_SH_PTRACE_H
 
+#include <asm/processor.h>
+
 /*
  * Copyright (C) 1999, 2000  Niibe Yutaka
  *
@@ -69,6 +71,12 @@ extern void show_regs(struct pt_regs *);
 
 /* User Break Controller */
 
+#if defined(CONFIG_CPU_SUBTYPE_SH7709)
+#define UBC_TYPE_SH7729	(cpu_data->type == CPU_SH7729)
+#else
+#define UBC_TYPE_SH7729	0
+#endif
+
 #if defined(__sh3__)
 #define UBC_BARA                0xffffffb0
 #define UBC_BAMRA               0xffffffb4
@@ -106,14 +114,17 @@ extern void show_regs(struct pt_regs *);
 #define BBR_INST		(1 << 4)
 #define BBR_DATA		(2 << 4)
 #define BBR_READ		(1 << 2)
-#define BBR_WRITE		(2 << 4)
+#define BBR_WRITE		(2 << 2)
 #define BBR_BYTE		0x1
 #define BBR_HALF		0x2
 #define BBR_LONG		0x3
-#define BBR_QUAD		(1 << 6)
+#define BBR_QUAD		(1 << 6)	/* SH7750 */
+#define BBR_CPU			(1 << 6)	/* SH7709A,SH7729 */
+#define BBR_DMA			(2 << 6)	/* SH7709A,SH7729 */
 
 #define BRCR_CMFA		(1 << 15)
 #define BRCR_CMFB		(1 << 14)
+#define BRCR_PCTE		(1 << 11)
 #define BRCR_PCBA		(1 << 10)	/* 1: after execution */
 #define BRCR_DBEB		(1 << 7)
 #define BRCR_PCBB		(1 << 6)

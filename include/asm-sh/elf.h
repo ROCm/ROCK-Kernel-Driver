@@ -7,7 +7,6 @@
 
 #include <asm/ptrace.h>
 #include <asm/user.h>
-#include <asm/byteorder.h>
 
 typedef unsigned long elf_greg_t;
 

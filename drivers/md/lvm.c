@@ -394,8 +394,6 @@ static struct gendisk lvm_gendisk =
  */
 int lvm_init(void)
 {
-	struct gendisk *gendisk_ptr = NULL;
-
 	if (register_chrdev(LVM_CHAR_MAJOR, lvm_name, &lvm_chr_fops) < 0) {
 		printk(KERN_ERR "%s -- register_chrdev failed\n", lvm_name);
 		return -EIO;
@@ -423,19 +421,7 @@ int lvm_init(void)
 	lvm_init_vars();
 	lvm_geninit(&lvm_gendisk);
 
-	/* insert our gendisk at the corresponding major */
-	if (gendisk_head != NULL) {
-		gendisk_ptr = gendisk_head;
-		while (gendisk_ptr->next != NULL &&
-		       gendisk_ptr->major > lvm_gendisk.major) {
-			gendisk_ptr = gendisk_ptr->next;
-		}
-		lvm_gendisk.next = gendisk_ptr->next;
-		gendisk_ptr->next = &lvm_gendisk;
-	} else {
-		gendisk_head = &lvm_gendisk;
-		lvm_gendisk.next = NULL;
-	}
+	add_gendisk(&lvm_gendisk);
 
 #ifdef LVM_HD_NAME
 	/* reference from drivers/block/genhd.c */
@@ -469,8 +455,6 @@ int lvm_init(void)
  */
 static void lvm_cleanup(void)
 {
-	struct gendisk *gendisk_ptr = NULL, *gendisk_ptr_prev = NULL;
-
 	devfs_unregister (lvm_devfs_handle);
 
 	if (unregister_chrdev(LVM_CHAR_MAJOR, lvm_name) < 0) {
@@ -481,16 +465,7 @@ static void lvm_cleanup(void)
 	}
 
 
-	gendisk_ptr = gendisk_ptr_prev = gendisk_head;
-	while (gendisk_ptr != NULL) {
-		if (gendisk_ptr == &lvm_gendisk)
-			break;
-		gendisk_ptr_prev = gendisk_ptr;
-		gendisk_ptr = gendisk_ptr->next;
-	}
-	/* delete our gendisk from chain */
-	if (gendisk_ptr == &lvm_gendisk)
-		gendisk_ptr_prev->next = gendisk_ptr->next;
+	del_gendisk(&lvm_gendisk);
 
 	blk_size[MAJOR_NR] = NULL;
 	blksize_size[MAJOR_NR] = NULL;

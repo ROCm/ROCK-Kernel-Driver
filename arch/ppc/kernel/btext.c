@@ -12,7 +12,7 @@
 #include <linux/init.h>
 #include <linux/version.h>
 
-#include <asm/init.h>
+#include <asm/sections.h>
 #include <asm/bootx.h>
 #include <asm/btext.h>
 #include <asm/prom.h>

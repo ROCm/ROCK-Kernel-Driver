@@ -44,7 +44,7 @@
 
 #include <linux/generic_serial.h>
 
-#ifdef CONFIG_DEBUG_KERNEL_WITH_GDB_STUB
+#ifdef CONFIG_SH_STANDARD_BIOS
 #include <asm/sh_bios.h>
 #endif
 
@@ -94,6 +94,7 @@ MODULE_PARM(sci_debug, "i");
 
 #define dprintk(x...) do { if (sci_debug) printk(x); } while(0)
 
+#ifdef CONFIG_SERIAL_CONSOLE
 static void put_char(struct sci_port *port, char c)
 {
 	unsigned long flags;
@@ -111,8 +112,9 @@ static void put_char(struct sci_port *port, char c)
 
 	restore_flags(flags);
 }
+#endif
 
-#ifdef CONFIG_DEBUG_KERNEL_WITH_GDB_STUB
+#ifdef CONFIG_SH_STANDARD_BIOS
 
 static void handle_error(struct sci_port *port)
 {				/* Clear error flags */
@@ -161,12 +163,12 @@ static __inline__ char lowhex(int  x)
  * This routine does not wait for a positive acknowledge.
  */
 
-static void put_string(struct sci_port *port,
-				  const char *buffer, int count)
+#ifdef CONFIG_SERIAL_CONSOLE
+static void put_string(struct sci_port *port, const char *buffer, int count)
 {
 	int i;
 	const unsigned char *p = buffer;
-#ifdef CONFIG_DEBUG_KERNEL_WITH_GDB_STUB
+#ifdef CONFIG_SH_STANDARD_BIOS
 	int checksum;
 
     	/* This call only does a trap the first time it is
@@ -202,7 +204,7 @@ static void put_string(struct sci_port *port,
 		put_char(port, *p++);
 	}
 }
-
+#endif
 
 
 static struct real_driver sci_real_driver = {
@@ -1159,7 +1161,7 @@ int __init sci_init(void)
 
 	sci_init_drivers();
 
-#ifdef CONFIG_DEBUG_KERNEL_WITH_GDB_STUB
+#ifdef CONFIG_SH_STANDARD_BIOS
 	sh_bios_gdb_detach();
 #endif
 	return 0;		/* Return -EIO when not detected */

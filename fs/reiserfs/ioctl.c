@@ -2,20 +2,12 @@
  * Copyright 2000 by Hans Reiser, licensing governed by reiserfs/README
  */
 
-#ifdef __KERNEL__
-
 #include <linux/fs.h>
 #include <linux/reiserfs_fs.h>
 #include <linux/sched.h>
 #include <asm/uaccess.h>
 #include <linux/smp_lock.h>
 #include <linux/locks.h>
-
-#else
-
-#include "nokernel.h"
-
-#endif
 
 /*
 ** reiserfs_ioctl - handler for ioctl for inode

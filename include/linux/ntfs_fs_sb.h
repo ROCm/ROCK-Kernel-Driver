@@ -11,7 +11,12 @@ struct ntfs_sb_info{
 	void *nls_map;
 	unsigned int ngt;
 	char mft_zone_multiplier;
+	unsigned long mft_data_pos;
+	ntfs_cluster_t mft_zone_pos;
+	ntfs_cluster_t mft_zone_start;
 	ntfs_cluster_t mft_zone_end;
+	ntfs_cluster_t data1_zone_pos;
+	ntfs_cluster_t data2_zone_pos;
 	/* Configuration provided by user with the ntfstools.
 	 * FIXME: This is no longer possible. What is this good for? (AIA) */
 	ntfs_size_t partition_bias;	/* For access to underlying device. */

@@ -1,4 +1,4 @@
-/* $Id: ptrace.c,v 1.6 2000/06/08 23:44:50 gniibe Exp $
+/* $Id: ptrace.c,v 1.12 2001/07/23 00:00:56 gniibe Exp $
  *
  * linux/arch/sh/kernel/ptrace.c
  *
@@ -122,24 +122,29 @@ ubc_set_tracing(int asid, unsigned long nextpc1, unsigned nextpc2)
 {
 	ctrl_outl(nextpc1, UBC_BARA);
 	ctrl_outb(asid, UBC_BASRA);
-#if defined(CONFIG_CPU_SUBTYPE_SH7709)
-	ctrl_outl(0x0fff, UBC_BAMRA);
-#else
-	ctrl_outb(BAMR_12, UBC_BAMRA);
-#endif
-	ctrl_outw(BBR_INST | BBR_READ, UBC_BBRA);
+	if(UBC_TYPE_SH7729){
+		ctrl_outl(0x0fff, UBC_BAMRA);
+		ctrl_outw(BBR_INST | BBR_READ | BBR_CPU, UBC_BBRA);
+	}else{
+		ctrl_outb(BAMR_12, UBC_BAMRA);
+		ctrl_outw(BBR_INST | BBR_READ, UBC_BBRA);
+	}
 
 	if (nextpc2 != (unsigned long) -1) {
 		ctrl_outl(nextpc2, UBC_BARB);
 		ctrl_outb(asid, UBC_BASRB);
-#if defined(CONFIG_CPU_SUBTYPE_SH7709)
-		ctrl_outl(0x0fff, UBC_BAMRA);
-#else
-		ctrl_outb(BAMR_12, UBC_BAMRB);
-#endif
-		ctrl_outw(BBR_INST | BBR_READ, UBC_BBRB);
+		if(UBC_TYPE_SH7729){
+			ctrl_outl(0x0fff, UBC_BAMRB);
+			ctrl_outw(BBR_INST | BBR_READ | BBR_CPU, UBC_BBRB);
+		}else{
+			ctrl_outb(BAMR_12, UBC_BAMRB);
+			ctrl_outw(BBR_INST | BBR_READ, UBC_BBRB);
+		}
 	}
-	ctrl_outw(BRCR_PCBA | BRCR_PCBB, UBC_BRCR);
+	if(UBC_TYPE_SH7729)
+		ctrl_outl(BRCR_PCBA | BRCR_PCBB | BRCR_PCTE, UBC_BRCR);
+	else
+		ctrl_outw(BRCR_PCBA | BRCR_PCBB, UBC_BRCR);
 }
 
 asmlinkage int sys_ptrace(long request, long pid, long addr, long data)

@@ -17,6 +17,75 @@
 #include <linux/blk.h>
 #include <linux/init.h>
 
+
+struct gendisk *gendisk_head;
+
+void
+add_gendisk(struct gendisk *gp)
+{
+	gp->next = gendisk_head;
+	gendisk_head = gp;
+}
+
+void
+del_gendisk(struct gendisk *gp)
+{
+	struct gendisk **gpp;
+
+	for (gpp = &gendisk_head; *gpp; gpp = &((*gpp)->next))
+		if (*gpp == gp)
+			break;
+	if (*gpp)
+		*gpp = (*gpp)->next;
+}
+
+struct gendisk *
+get_gendisk(kdev_t dev)
+{
+	struct gendisk *gp = NULL;
+	int maj = MAJOR(dev);
+
+	for (gp = gendisk_head; gp; gp = gp->next)
+		if (gp->major == maj)
+			return gp;
+	return NULL;
+}
+
+#ifdef CONFIG_PROC_FS
+int
+get_partition_list(char *page, char **start, off_t offset, int count)
+{
+	struct gendisk *gp;
+	char buf[64];
+	int len, n;
+
+	len = sprintf(page, "major minor  #blocks  name\n\n");
+	for (gp = gendisk_head; gp; gp = gp->next) {
+		for (n = 0; n < (gp->nr_real << gp->minor_shift); n++) {
+			if (gp->part[n].nr_sects == 0)
+				continue;
+
+			len += snprintf(page + len, 63,
+					"%4d  %4d %10d %s\n",
+					gp->major, n, gp->sizes[n],
+					disk_name(gp, n, buf));
+			if (len < offset)
+				offset -= len, len = 0;
+			else if (len >= offset + count)
+				goto out;
+		}
+	}
+
+out:
+	*start = page + offset;
+	len -= offset;
+	if (len < 0)
+		len = 0;
+	return len > count ? count : len;
+}
+#endif
+
+
 extern int blk_dev_init(void);
 #ifdef CONFIG_BLK_DEV_DAC960
 extern void DAC960_Initialize(void);

@@ -21,13 +21,14 @@ obj-y	:= process.o signal.o entry.o traps.o irq.o irq_ipr.o \
 obj-$(CONFIG_CF_ENABLER)	+= cf-enabler.o
 obj-$(CONFIG_CPU_SH4)		+= fpu.o
 obj-$(CONFIG_SH_RTC)            += rtc.o
+obj-$(CONFIG_SH_DMA)		+= dma.o
 obj-$(CONFIG_SH_STANDARD_BIOS)	+= sh_bios.o
 
 ifeq ($(CONFIG_PCI),y)
 ifeq ($(CONFIG_SH_DREAMCAST),y)
-obj-y 				+= pci-dc.o
+obj-y 				+= pci-dc.o pcibios.o
 else
-obj-y                           += pci-dma.o 
+obj-y                           += pci-dma.o pcibios.o
 obj-$(CONFIG_CPU_SUBTYPE_ST40STB1)+= pci_st40.o
 obj-$(CONFIG_CPU_SUBTYPE_SH7751)+= pci-sh7751.o 
 obj-$(CONFIG_SH_BIGSUR)+= pci-bigsur.o
@@ -41,8 +42,10 @@ machine-specific-objs		+= mach_hp600.o
 obj-$(CONFIG_SH_SOLUTION_ENGINE)+= mach_se.o setup_se.o io_se.o led_se.o
 machine-specific-objs		+= mach_se.o setup_se.o io_se.o led_se.o
 
-obj-$(CONFIG_SH_7751_SOLUTION_ENGINE)+= mach_se.o setup_se.o io_se.o led_se.o pci-7751se.o
-machine-specific-objs           += mach_se.o setup_se.o io_se.o led_se.o pci-7751se.o
+obj-$(CONFIG_SH_7751_SOLUTION_ENGINE)+= mach_7751se.o setup_7751se.o \
+					io_7751se.o led_7751se.o
+machine-specific-objs           += mach_7751se.o 7751setup_se.o \
+				   io_7751se.o led_7751se.o pci-7751se.o
 
 obj-$(CONFIG_SH_BIGSUR)		+= mach_bigsur.o setup_bigsur.o io_bigsur.o led_bigsur.o
 machine-specific-objs		+= mach_bigsur.o setup_bigsur.o io_bigsur.o led_bigsur.o
@@ -64,11 +67,14 @@ machine-specific-objs		+= setup_hd64461.o io_hd64461.o
 
 obj-$(CONFIG_CPU_SUBTYPE_ST40STB1) +=irq_intc2.o
 
+obj-$(CONFIG_SH_ADX)		+= mach_adx.o setup_adx.o io_adx.o irq_maskreg.o
+machine-specific-objs		+= mach_adx.o setup_adx.o io_adx.o irq_maskreg.o
+
 # Doesn't compile well, so don't include in machine-specific-objs
 obj-$(CONFIG_HD64465)		+= setup_hd64465.o io_hd64465.o hd64465_gpio.o
 obj-$(CONFIG_SH_DMIDA)		+= mach_dmida.o
 obj-$(CONFIG_SH_EC3104)         += setup_ec3104.o io_ec3104.o mach_ec3104.o
-obj-$(CONFIG_SH_DREAMCAST)	+= mach_dc.o setup_dc.o io_dc.o
+obj-$(CONFIG_SH_DREAMCAST)	+= mach_dc.o setup_dc.o io_dc.o rtc-aica.o
 
 ifeq ($(CONFIG_SH_GENERIC),y)
 obj-y		+= $(machine-specific-objs)

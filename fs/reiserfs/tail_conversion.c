@@ -2,20 +2,11 @@
  * Copyright 1999 Hans Reiser, see reiserfs/README for licensing and copyright details
  */
 
-#ifdef __KERNEL__
-
 #include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/pagemap.h>
 #include <linux/reiserfs_fs.h>
 #include <linux/locks.h>
-
-#else
-
-#include "nokernel.h"
-
-#endif
-
 
 /* access to tail : when one is going to read tail it must make sure, that is not running.
  direct2indirect and indirect2direct can not run concurrently */

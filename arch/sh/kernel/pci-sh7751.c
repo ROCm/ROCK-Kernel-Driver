@@ -20,7 +20,6 @@
 #include <linux/errno.h>
 #include <linux/irq.h>
 
-#include <asm/segment.h>
 #include <asm/machvec.h>
 #include <asm/io.h>
 #include <asm/pci-sh7751.h>
@@ -57,10 +56,10 @@ static int pci_conf1_read_config_byte(struct pci_dev *dev, int where, u8 *value)
     /* PCIPDR may only be accessed as 32 bit words, 
      * so we must do byte alignment by hand 
      */
-	__save_and_cli(flags);
+	save_and_cli(flags);
 	outl(CONFIG_CMD(dev,where), PCI_REG(SH7751_PCIPAR));
 	word = inl(PCI_REG(SH7751_PCIPDR));
-	__restore_flags(flags);
+	restore_flags(flags);
 	switch (where & 0x3) {
 	    case 3:
 		    *value = (u8)(word >> 24);
@@ -88,10 +87,10 @@ static int pci_conf1_read_config_word(struct pci_dev *dev, int where, u16 *value
     /* PCIPDR may only be accessed as 32 bit words, 
      * so we must do word alignment by hand 
      */
-	__save_and_cli(flags);
+	save_and_cli(flags);
 	outl(CONFIG_CMD(dev,where), PCI_REG(SH7751_PCIPAR));
 	word = inl(PCI_REG(SH7751_PCIPDR));
-	__restore_flags(flags);
+	restore_flags(flags);
 	switch (where & 0x3) {
 	    case 3:
 		    // This should never happen...
@@ -116,10 +115,10 @@ static int pci_conf1_read_config_dword(struct pci_dev *dev, int where, u32 *valu
 {
 	unsigned long flags;
 	
-	__save_and_cli(flags);
+	save_and_cli(flags);
 	outl(CONFIG_CMD(dev,where), PCI_REG(SH7751_PCIPAR));
 	*value = inl(PCI_REG(SH7751_PCIPDR));
-	__restore_flags(flags);
+	restore_flags(flags);
 	PCIDBG(4,"pci_conf1_read_config_dword@0x%08x=0x%x\n",
 	     CONFIG_CMD(dev,where),*value);
 	return PCIBIOS_SUCCESSFUL;    
@@ -135,14 +134,14 @@ static int pci_conf1_write_config_byte(struct pci_dev *dev, int where, u8 value)
     /* Since SH7751 only does 32bit access we'll have to do a
      * read,mask,write operation
      */ 
-	__save_and_cli(flags);
+	save_and_cli(flags);
 	outl(CONFIG_CMD(dev,where), PCI_REG(SH7751_PCIPAR));
 	word = inl(PCI_REG(SH7751_PCIPDR)) ;
 	word &= ~mask;
 	word |= value << shift;
  
 	outl(word, PCI_REG(SH7751_PCIPDR));
-	__restore_flags(flags);
+	restore_flags(flags);
 	PCIDBG(4,"pci_conf1_write_config_byte@0x%08x=0x%x\n",
 	     CONFIG_CMD(dev,where),word);
 	return PCIBIOS_SUCCESSFUL;
@@ -161,14 +160,14 @@ static int pci_conf1_write_config_word(struct pci_dev *dev, int where, u16 value
      */ 
 	if (shift == 24)
 	    return PCIBIOS_BAD_REGISTER_NUMBER;
-	__save_and_cli(flags);
+	save_and_cli(flags);
 	outl(CONFIG_CMD(dev,where), PCI_REG(SH7751_PCIPAR));
 	word = inl(PCI_REG(SH7751_PCIPDR)) ;
 	word &= ~mask;
 	word |= value << shift;
  
 	outl(value, PCI_REG(SH7751_PCIPDR));
-	__restore_flags(flags);
+	restore_flags(flags);
 	PCIDBG(4,"pci_conf1_write_config_word@0x%08x=0x%x\n",
 	     CONFIG_CMD(dev,where),word);
 	return PCIBIOS_SUCCESSFUL;
@@ -178,10 +177,10 @@ static int pci_conf1_write_config_dword(struct pci_dev *dev, int where, u32 valu
 {
 	unsigned long flags;
 
-	__save_and_cli(flags);
+	save_and_cli(flags);
 	outl(CONFIG_CMD(dev,where), PCI_REG(SH7751_PCIPAR));
 	outl(value, PCI_REG(SH7751_PCIPDR));
-	__restore_flags(flags);
+	restore_flags(flags);
 	PCIDBG(4,"pci_conf1_write_config_dword@0x%08x=0x%x\n",
 	     CONFIG_CMD(dev,where),value);
 	return PCIBIOS_SUCCESSFUL;
@@ -233,7 +232,7 @@ struct pci_ops * __init pci_check_direct(void)
  * BIOS32 and PCI BIOS handling.
  * 
  * The BIOS version of the pci functions is not yet implemented but it is left
- * in for completeness.  Currently an error will be genereated at compile time. 
+ * in for completeness.  Currently an error will be generated at compile time. 
  */
  
 #ifdef CONFIG_PCI_BIOS
@@ -417,54 +416,6 @@ char * __init pcibios_setup(char *str)
 	return str;
 }
 
-void
-pcibios_update_resource(struct pci_dev *dev, struct resource *root,
-			struct resource *res, int resource)
-{
-	u32 new, check;
-	int reg;
-
-	new = res->start | (res->flags & PCI_REGION_FLAG_MASK);
-	if (resource < 6) {
-		reg = PCI_BASE_ADDRESS_0 + 4*resource;
-	} else if (resource == PCI_ROM_RESOURCE) {
-		res->flags |= PCI_ROM_ADDRESS_ENABLE;
-		new |= PCI_ROM_ADDRESS_ENABLE;
-		reg = dev->rom_base_reg;
-	} else {
-		/* Somebody might have asked allocation of a non-standard resource */
-		return;
-	}
-	
-	pci_write_config_dword(dev, reg, new);
-	pci_read_config_dword(dev, reg, &check);
-	if ((new ^ check) & ((new & PCI_BASE_ADDRESS_SPACE_IO) ? PCI_BASE_ADDRESS_IO_MASK : PCI_BASE_ADDRESS_MEM_MASK)) {
-		printk(KERN_ERR "PCI: Error while updating region "
-		       "%s/%d (%08x != %08x)\n", dev->slot_name, resource,
-		       new, check);
-	}
-}
-
-/*
- * We need to avoid collisions with `mirrored' VGA ports
- * and other strange ISA hardware, so we always want the
- * addresses to be allocated in the 0x000-0x0ff region
- * modulo 0x400.
- */
-void
-pcibios_align_resource(void *data, struct resource *res, unsigned long size)
-{
-	if (res->flags & IORESOURCE_IO) {
-		unsigned long start = res->start;
-
-		if (start & 0x300) {
-			start = (start + 0x3ff) & ~0x3ff;
-			res->start = start;
-		}
-	}
-}
-
-
 /*
  *    Allocate the bridge and device resources
  */
@@ -593,53 +544,6 @@ void __init pcibios_resource_survey(void)
 	pcibios_assign_resources();
 }
 
-int pcibios_enable_device(struct pci_dev *dev)
-{
-	u16 cmd, old_cmd;
-	int idx;
-	struct resource *r;
-
-	pci_read_config_word(dev, PCI_COMMAND, &cmd);
-	old_cmd = cmd;
-	for(idx=0; idx<6; idx++) {
-		r = &dev->resource[idx];
-		if (!r->start && r->end) {
-			printk(KERN_ERR "PCI: Device %s not available because of resource collisions\n", dev->slot_name);
-			return -EINVAL;
-		}
-		if (r->flags & IORESOURCE_IO)
-			cmd |= PCI_COMMAND_IO;
-		if (r->flags & IORESOURCE_MEM)
-			cmd |= PCI_COMMAND_MEMORY;
-	}
-	if (dev->resource[PCI_ROM_RESOURCE].start)
-		cmd |= PCI_COMMAND_MEMORY;
-	if (cmd != old_cmd) {
-		printk(KERN_INFO "PCI: Enabling device %s (%04x -> %04x)\n", dev->name, old_cmd, cmd);
-		pci_write_config_word(dev, PCI_COMMAND, cmd);
-	}
-	return 0;
-}
-
-/*
- *  If we set up a device for bus mastering, we need to check and set
- *  the latency timer as it may not be properly set.
- */
-unsigned int pcibios_max_latency = 255;
-
-void pcibios_set_master(struct pci_dev *dev)
-{
-	u8 lat;
-	pci_read_config_byte(dev, PCI_LATENCY_TIMER, &lat);
-	if (lat < 16)
-		lat = (64 <= pcibios_max_latency) ? 64 : pcibios_max_latency;
-	else if (lat > pcibios_max_latency)
-		lat = pcibios_max_latency;
-	else
-		return;
-	printk(KERN_INFO "PCI: Setting latency timer of device %s to %d\n", dev->name, lat);
-	pci_write_config_byte(dev, PCI_LATENCY_TIMER, lat);
-}
 
 /***************************************************************************************/
 /* 
@@ -665,10 +569,4 @@ static int pcibios_lookup_irq(struct pci_dev *dev, u8 slot, u8 pin)
 	PCIDBG(2,"Setting IRQ for slot %s to %d\n", dev->slot_name, irq);
 
 	return irq;
-}
-
-void __init pcibios_update_irq(struct pci_dev *dev, int irq)
-{
-	PCIDBG(3,"PCI: Update IRQ for %s on irq %d\n", dev->name, irq);
-	pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq);
 }

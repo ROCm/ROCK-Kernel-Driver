@@ -8,8 +8,8 @@
  *
  * Released under the terms of the GNU GPL v2.0.
  * 
- * This file originally bore the message:
- *	$Id: setup_dc.c,v 1.5 2001/05/24 05:09:16 mrbrown Exp $
+ * This file originally bore the message (with enclosed-$):
+ *	Id: setup_dc.c,v 1.5 2001/05/24 05:09:16 mrbrown Exp
  *	SEGA Dreamcast support
  */
 
@@ -70,21 +70,29 @@ int __init gapspci_init(void);
 /* Disable the hardware event by masking its bit in its EMR */
 static inline void disable_systemasic_irq(unsigned int irq)
 {
+	unsigned long flags;
 	__u32 emr = EMR_BASE + (LEVEL(irq) << 4) + (LEVEL(irq) << 2);
 	__u32 mask;
+
+	save_and_cli(flags);
 	mask = inl(emr);
 	mask &= ~(1 << EVENT_BIT(irq));
 	outl(mask, emr);
+	restore_flags(flags);
 }
 
 /* Enable the hardware event by setting its bit in its EMR */
 static inline void enable_systemasic_irq(unsigned int irq)
 {
+	unsigned long flags;
 	__u32 emr = EMR_BASE + (LEVEL(irq) << 4) + (LEVEL(irq) << 2);
 	__u32 mask;
+
+	save_and_cli(flags);
 	mask = inl(emr);
 	mask |= (1 << EVENT_BIT(irq));
 	outl(mask, emr);
+	restore_flags(flags);
 }
 
 /* Acknowledge a hardware event by writing its bit back to its ESR */
@@ -98,7 +106,8 @@ static void ack_systemasic_irq(unsigned int irq)
 /* After a IRQ has been ack'd and responded to, it needs to be renabled */
 static void end_systemasic_irq(unsigned int irq)
 {
-	enable_systemasic_irq(irq);
+	if (!(irq_desc[irq].status & (IRQ_DISABLED|IRQ_INPROGRESS)))
+		enable_systemasic_irq(irq);
 }
 
 static unsigned int startup_systemasic_irq(unsigned int irq)

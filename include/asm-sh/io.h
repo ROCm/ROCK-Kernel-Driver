@@ -21,7 +21,7 @@
  *  __inb expands to an inline function call (which either calls via the
  *        mach_vec if generic, or a machine specific implementation)
  *  _inb  is a real function call (note ___raw fns are _ version of __raw)
- *  inb   by default expands to _inb, but the machine specif code may
+ *  inb   by default expands to _inb, but the machine specific code may
  *        define it to __inb if it chooses.
  */
 
@@ -109,7 +109,7 @@
 
 # if defined(CONFIG_SH_HP600)
 #  include <asm/io_hd64461.h>
-# elif (defined(CONFIG_SH_SOLUTION_ENGINE) || defined(CONFIG_SH_7751_SOLUTION_ENGINE))
+# elif defined(CONFIG_SH_SOLUTION_ENGINE)
 #  include <asm/io_se.h>
 # elif defined(CONFIG_SH_SH2000)
 #  include <asm/io_sh2000.h>
@@ -125,6 +125,10 @@
 #  include <asm/io_cat68701.h>
 # elif defined(CONFIG_SH_BIGSUR)
 #  include <asm/io_bigsur.h>
+# elif defined(CONFIG_SH_7751_SOLUTION_ENGINE)
+#  include <asm/io_7751se.h>
+# elif defined(CONFIG_SH_ADX)
+#  include <asm/io_adx.h>
 # elif defined(CONFIG_SH_UNKNOWN)
 #  include <asm/io_unknown.h>
 # else
@@ -327,7 +331,7 @@ extern void		writel(unsigned int b, unsigned long addr);
  * If the platform has PC-like I/O, this function converts the offset into
  * an address.
  */
-extern __inline__ unsigned long isa_port2addr(unsigned long offset)
+static __inline__ unsigned long isa_port2addr(unsigned long offset)
 {
 	return __isa_port2addr(offset);
 }
@@ -351,32 +355,32 @@ extern void memcpy_toio(unsigned long, const void *, unsigned long);
 extern void memset_io(unsigned long, int, unsigned long);
 
 /* SuperH on-chip I/O functions */
-extern __inline__ unsigned char ctrl_inb(unsigned long addr)
+static __inline__ unsigned char ctrl_inb(unsigned long addr)
 {
 	return *(volatile unsigned char*)addr;
 }
 
-extern __inline__ unsigned short ctrl_inw(unsigned long addr)
+static __inline__ unsigned short ctrl_inw(unsigned long addr)
 {
 	return *(volatile unsigned short*)addr;
 }
 
-extern __inline__ unsigned int ctrl_inl(unsigned long addr)
+static __inline__ unsigned int ctrl_inl(unsigned long addr)
 {
 	return *(volatile unsigned long*)addr;
 }
 
-extern __inline__ void ctrl_outb(unsigned char b, unsigned long addr)
+static __inline__ void ctrl_outb(unsigned char b, unsigned long addr)
 {
 	*(volatile unsigned char*)addr = b;
 }
 
-extern __inline__ void ctrl_outw(unsigned short b, unsigned long addr)
+static __inline__ void ctrl_outw(unsigned short b, unsigned long addr)
 {
 	*(volatile unsigned short*)addr = b;
 }
 
-extern __inline__ void ctrl_outl(unsigned int b, unsigned long addr)
+static __inline__ void ctrl_outl(unsigned int b, unsigned long addr)
 {
         *(volatile unsigned long*)addr = b;
 }
@@ -389,18 +393,19 @@ extern __inline__ void ctrl_outl(unsigned int b, unsigned long addr)
  * Change virtual addresses to physical addresses and vv.
  * These are trivial on the 1:1 Linux/SuperH mapping
  */
-extern __inline__ unsigned long virt_to_phys(volatile void * address)
+static __inline__ unsigned long virt_to_phys(volatile void * address)
 {
 	return PHYSADDR(address);
 }
 
-extern __inline__ void * phys_to_virt(unsigned long address)
+static __inline__ void * phys_to_virt(unsigned long address)
 {
 	return (void *)P1SEGADDR(address);
 }
 
 #define virt_to_bus virt_to_phys
 #define bus_to_virt phys_to_virt
+#define page_to_bus page_to_phys
 
 /*
  * readX/writeX() are used to access memory mapped devices. On some
@@ -463,11 +468,11 @@ out:
  */
 
 #define dma_cache_wback_inv(_start,_size) \
-    cache_flush_area((unsigned long)(_start),((unsigned long)(_start)+(_size)))
+    __flush_purge_region(_start,_size)
 #define dma_cache_inv(_start,_size) \
-    cache_purge_area((unsigned long)(_start),((unsigned long)(_start)+(_size)))
+    __flush_invalidate_region(_start,_size)
 #define dma_cache_wback(_start,_size) \
-    cache_wback_area((unsigned long)(_start),((unsigned long)(_start)+(_size)))
+    __flush_wback_region(_start,_size)
 
 #endif /* __KERNEL__ */
 #endif /* __ASM_SH_IO_H */

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.chrp_pci.c 1.20 08/08/01 16:35:43 paulus
+ * BK Id: SCCS/s.chrp_pci.c 1.22 09/08/01 15:47:42 paulus
  */
 /*
  * CHRP pci routines.
@@ -21,7 +21,7 @@
 #include <asm/prom.h>
 #include <asm/gg2.h>
 #include <asm/machdep.h>
-#include <asm/init.h>
+#include <asm/sections.h>
 #include <asm/pci-bridge.h>
 
 #include "open_pic.h"

@@ -455,8 +455,7 @@ int pd_init (void)
         
 	pd_gendisk.major = major;
 	pd_gendisk.major_name = name;
-	pd_gendisk.next = gendisk_head;
-	gendisk_head = &pd_gendisk;
+	add_gendisk(&pd_gendisk);
 
 	for(i=0;i<PD_DEVS;i++) pd_blocksizes[i] = 1024;
 	blksize_size[MAJOR_NR] = pd_blocksizes;
@@ -642,12 +641,7 @@ void    cleanup_module(void)
 	int unit;
 
         devfs_unregister_blkdev(MAJOR_NR,name);
-        for(gdp=&gendisk_head;*gdp;gdp=&((*gdp)->next))
-                if (*gdp == &pd_gendisk) break;
-        if (*gdp) *gdp = (*gdp)->next;
-
-	for (unit=0;unit<PD_UNITS;unit++) 
-	   if (PD.present) pi_release(PI);
+	del_gendisk(&pd_gendisk);
 }
 
 #endif

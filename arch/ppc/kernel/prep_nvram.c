@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.prep_nvram.c 1.9 05/17/01 18:14:22 cort
+ * BK Id: SCCS/s.prep_nvram.c 1.12 09/08/01 15:47:42 paulus
  */
 /*
  *  linux/arch/ppc/kernel/prep_nvram.c
@@ -12,7 +12,7 @@
 #include <linux/slab.h>
 #include <linux/ioport.h>
 
-#include <asm/init.h>
+#include <asm/sections.h>
 #include <asm/segment.h>
 #include <asm/io.h>
 #include <asm/processor.h>

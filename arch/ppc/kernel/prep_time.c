@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.prep_time.c 1.7 05/17/01 18:14:22 cort
+ * BK Id: SCCS/s.prep_time.c 1.10 09/08/01 15:47:42 paulus
  */
 /*
  *  linux/arch/i386/kernel/time.c
@@ -23,7 +23,7 @@
 #include <linux/kernel_stat.h>
 #include <linux/init.h>
 
-#include <asm/init.h>
+#include <asm/sections.h>
 #include <asm/segment.h>
 #include <asm/io.h>
 #include <asm/processor.h>

@@ -11,8 +11,6 @@
  * NO WARRANTY
  */
 
-#ifdef __KERNEL__
-
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/sched.h>
@@ -21,14 +19,6 @@
 #include <linux/smp_lock.h>
 #include <linux/locks.h>
 #include <linux/init.h>
-
-#else
-
-#include "nokernel.h"
-#include <stdlib.h> // for simple_strtoul
-
-#endif
-
 
 #define REISERFS_OLD_BLOCKSIZE 4096
 #define REISERFS_SUPER_MAGIC_STRING_OFFSET_NJ 20
@@ -806,8 +796,6 @@ int reiserfs_statfs (struct super_block * s, struct statfs * buf)
   return 0;
 }
 
-#ifdef __KERNEL__
-
 static DECLARE_FSTYPE_DEV(reiserfs_fs_type,"reiserfs",reiserfs_read_super);
 
 //
@@ -830,8 +818,6 @@ static void __exit exit_reiserfs_fs(void)
 
 module_init(init_reiserfs_fs) ;
 module_exit(exit_reiserfs_fs) ;
-
-#endif
 
 
 

@@ -41,8 +41,6 @@
 **                      log blocks to hit disk if it doesn't want to.
 */
 
-#ifdef __KERNEL__
-
 #include <linux/config.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -60,13 +58,6 @@
 #include <linux/stat.h>
 #include <linux/string.h>
 #include <linux/smp_lock.h>
-
-#else
-
-#include "nokernel.h"
-
-#endif
-
 
 /* the number of mounted filesystems.  This is used to decide when to
 ** start and kill the commit thread
@@ -2333,7 +2324,6 @@ int journal_end_sync(struct reiserfs_transaction_handle *th, struct super_block 
   return do_journal_end(th, p_s_sb, nblocks, COMMIT_NOW | WAIT) ;
 }
 
-#ifdef __KERNEL__
 int show_reiserfs_locks(void) {
 
   dump_journal_writers() ;
@@ -2353,7 +2343,6 @@ printk("journal lock is %d, join lock is %d, writers %d must wait is %d\n",
 #endif
   return 0 ;
 }
-#endif
 
 /*
 ** used to get memory back from async commits that are floating around

@@ -1,72 +1,54 @@
 /*
- * BK Id: SCCS/s.tqm8xx.h 1.7 08/17/01 15:23:17 paulus
+ * BK Id: SCCS/s.tqm8xx.h 1.8 08/30/01 09:01:04 trini
  */
 /*
- * A collection of structures, addresses, and values associated with
- * the TQ Systems TQM8xx(L) modules.  This was originally created for the
- * MBX860, and probably needs revisions for other boards (like the 821).
- * When this file gets out of control, we can split it up into more
- * meaningful pieces.
- *
- * Based on mbx.h, Copyright (c) 1997 Dan Malek (dmalek@jlc.net)
- *
- * Copyright (c) 1999,2000 Wolfgang Denk (wd@denx.de)
+ * TQM8xx(L) board specific definitions
+ * 
+ * Copyright (c) 1999,2000,2001 Wolfgang Denk (wd@denx.de)
  */
-#ifndef __MACH_TQM8xx_DEFS
-#define __MACH_TQM8xx_DEFS
+
+#ifndef __MACH_TQM8xx_H
+#define __MACH_TQM8xx_H
 
 #include <linux/config.h>
+ 
+#include <asm/ppcboot.h>
 
-#ifndef __ASSEMBLY__
+#define	TQM_IMMR_BASE	0xFFF00000	/* phys. addr of IMMR */
+#define	TQM_IMAP_SIZE	(64 * 1024)	/* size of mapped area */
 
-typedef	void (interrupt_handler_t)(void *);
+#define	IMAP_ADDR	TQM_IMMR_BASE	/* physical base address of IMMR area */
+#define IMAP_SIZE	TQM_IMAP_SIZE	/* mapped size of IMMR area */
 
-typedef struct serial_io {
-	int	(*getc)(void);
-	int	(*tstc)(void);
-	void	(*putc)(const char c);
-	void	(*printf)(const char *fmt, ...);
-} serial_io_t;
-
-typedef struct intr_util {
-	void	(*install_hdlr)(int, interrupt_handler_t *, void *);
-	void	(*free_hdlr)(int);
-} intr_util_t;
-
-
-/* A Board Information structure that is given to a program when
- * ppcboot starts it up.
+/*-----------------------------------------------------------------------
+ * PCMCIA stuff
+ *-----------------------------------------------------------------------
+ *
  */
-typedef struct bd_info {
-	 unsigned long	bi_memstart;	/* start of  DRAM memory		*/
-	 unsigned long	bi_memsize;	/* size	 of  DRAM memory in bytes	*/
-	 unsigned long	bi_flashstart;	/* start of FLASH memory		*/
-	 unsigned long	bi_flashsize;	/* size	 of FLASH memory		*/
-	 unsigned long	bi_flashoffset; /* reserved area for startup monitor	*/
-	 unsigned long	bi_sramstart;	/* start of  SRAM memory		*/
-	 unsigned long	bi_sramsize;	/* size	 of  SRAM memory		*/
-	 unsigned long	bi_immr_base;	/* base of IMMR register		*/
-	 unsigned long	bi_bootflags;	/* boot / reboot flag (for LynxOS)	*/
-	 unsigned long	bi_ip_addr;	/* IP Address				*/
-	 unsigned char	bi_enetaddr[6]; /* Ethernet adress			*/
-	 unsigned char	bi_reserved[2]; /* -- just for alignment --		*/
-	 unsigned long	bi_intfreq;	/* Internal Freq, in MHz		*/
-	 unsigned long	bi_busfreq;	/* Bus Freq, in MHz			*/
-	 unsigned long	bi_baudrate;	/* Console Baudrate			*/
-	 serial_io_t	bi_serial_io;	/* Addr of monitor fnc for Console I/O	*/
-	 intr_util_t	bi_interrupt;	/* Addr of monitor fnc for Interrupts	*/
-} bd_t;
+#define PCMCIA_MEM_SIZE		( 64 << 20 )
 
-#endif /* __ASSEMBLY__ */
+#define	MAX_HWIFS	1	/* overwrite default in include/asm-ppc/ide.h */
 
-#define	TQM_IMMR_BASE	0xFFF00000	/* phys. addr of IMMR			*/
-#define	TQM_IMAP_SIZE	(64 * 1024)	/* size of mapped area			*/
+/*
+ * Definitions for IDE0 Interface
+ */
+#define IDE0_BASE_OFFSET		0
+#define IDE0_DATA_REG_OFFSET		(PCMCIA_MEM_SIZE + 0x320)
+#define IDE0_ERROR_REG_OFFSET		(2 * PCMCIA_MEM_SIZE + 0x320 + 1)
+#define IDE0_NSECTOR_REG_OFFSET		(2 * PCMCIA_MEM_SIZE + 0x320 + 2)
+#define IDE0_SECTOR_REG_OFFSET		(2 * PCMCIA_MEM_SIZE + 0x320 + 3)
+#define IDE0_LCYL_REG_OFFSET		(2 * PCMCIA_MEM_SIZE + 0x320 + 4)
+#define IDE0_HCYL_REG_OFFSET		(2 * PCMCIA_MEM_SIZE + 0x320 + 5)
+#define IDE0_SELECT_REG_OFFSET		(2 * PCMCIA_MEM_SIZE + 0x320 + 6)
+#define IDE0_STATUS_REG_OFFSET		(2 * PCMCIA_MEM_SIZE + 0x320 + 7)
+#define IDE0_CONTROL_REG_OFFSET		0x0106
+#define IDE0_IRQ_REG_OFFSET		0x000A	/* not used */
 
-#define	IMAP_ADDR	TQM_IMMR_BASE	/* physical base address of IMMR area	*/
-#define IMAP_SIZE	TQM_IMAP_SIZE	/* mapped size of IMMR area		*/
+#define	IDE0_INTERRUPT			13
+
 
 /* We don't use the 8259.
 */
 #define NR_8259_INTS	0
 
-#endif	/* __MACH_TQM8xx_DEFS */
+#endif	/* __MACH_TQM8xx_H */

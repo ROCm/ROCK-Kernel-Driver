@@ -1965,8 +1965,7 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 	hba[i]->gendisk.nr_real = hba[i]->num_luns;
 
 	/* Get on the disk list */ 
-	hba[i]->gendisk.next = gendisk_head;
-	gendisk_head = &(hba[i]->gendisk); 
+	add_gendisk(&(hba[i]->gendisk));
 
 	cciss_geninit(i);
 	for(j=0; j<NWD; j++)
@@ -1982,7 +1981,6 @@ static void __devexit cciss_remove_one (struct pci_dev *pdev)
 {
 	ctlr_info_t *tmp_ptr;
 	int i;
-	struct gendisk *g;
 
 	if (pdev->driver_data == NULL)
 	{
@@ -2007,19 +2005,8 @@ static void __devexit cciss_remove_one (struct pci_dev *pdev)
 	
 
 	/* remove it from the disk list */
-	if (gendisk_head == &(hba[i]->gendisk))
-	{
-		gendisk_head = hba[i]->gendisk.next;
-	} else
-	{
-		for(g=gendisk_head; g ; g=g->next)
-		{
-			if(g->next == &(hba[i]->gendisk))
-			{
-				g->next = hba[i]->gendisk.next;
-			}
-		}
-	}
+	del_gendisk(&(hba[i]->gendisk));
+
 	pci_free_consistent(hba[i]->pdev, NR_CMDS * sizeof(CommandList_struct), 
 		hba[i]->cmd_pool, hba[i]->cmd_pool_dhandle);
 	pci_free_consistent(hba[i]->pdev, NR_CMDS * sizeof( ErrorInfo_struct),

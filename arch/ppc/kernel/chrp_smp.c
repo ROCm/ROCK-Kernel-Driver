@@ -31,7 +31,7 @@
 #include <asm/pgtable.h>
 #include <asm/hardirq.h>
 #include <asm/softirq.h>
-#include <asm/init.h>
+#include <asm/sections.h>
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/smp.h>
@@ -43,7 +43,7 @@
 
 extern unsigned long smp_chrp_cpu_nr;
 
-static int
+static int __init
 smp_chrp_probe(void)
 {
 	if (smp_chrp_cpu_nr > 1)
@@ -52,14 +52,14 @@ smp_chrp_probe(void)
 	return smp_chrp_cpu_nr;
 }
 
-static void
+static void __init
 smp_chrp_kick_cpu(int nr)
 {
 	*(unsigned long *)KERNELBASE = nr;
 	asm volatile("dcbf 0,%0"::"r"(KERNELBASE):"memory");
 }
 
-static void
+static void __init
 smp_chrp_setup_cpu(int cpu_nr)
 {
 	static atomic_t ready = ATOMIC_INIT(1);
@@ -101,7 +101,7 @@ smp_chrp_setup_cpu(int cpu_nr)
 }
 
 #ifdef CONFIG_POWER4
-static void
+static void __chrp
 smp_xics_message_pass(int target, int msg, unsigned long data, int wait)
 {
 	/* for now, only do reschedule messages
@@ -116,13 +116,13 @@ smp_xics_message_pass(int target, int msg, unsigned long data, int wait)
 	}
 }
 
-static int
+static int __chrp
 smp_xics_probe(void)
 {
 	return smp_chrp_cpu_nr;
 }
 
-static void
+static void __chrp
 smp_xics_setup_cpu(int cpu_nr)
 {
 	if (cpu_nr > 0)
@@ -131,7 +131,7 @@ smp_xics_setup_cpu(int cpu_nr)
 #endif /* CONFIG_POWER4 */
 
 /* CHRP with openpic */
-struct smp_ops_t chrp_smp_ops = {
+struct smp_ops_t chrp_smp_ops __chrpdata = {
 	smp_openpic_message_pass,
 	smp_chrp_probe,
 	smp_chrp_kick_cpu,
@@ -140,7 +140,7 @@ struct smp_ops_t chrp_smp_ops = {
 
 #ifdef CONFIG_POWER4
 /* CHRP with new XICS interrupt controller */
-struct smp_ops_t xics_smp_ops = {
+struct smp_ops_t xics_smp_ops __chrpdata = {
 	smp_xics_message_pass,
 	smp_xics_probe,
 	smp_chrp_kick_cpu,

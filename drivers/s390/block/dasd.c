@@ -714,10 +714,9 @@ dasd_register_major (major_info_t * major_info)
 
 	INIT_BLK_DEV (major, do_dasd_request, dasd_get_queue, NULL);
 
-	major_info->gendisk.major = major;
-	major_info->gendisk.next = gendisk_head;
 	major_info->gendisk.sizes = blk_size[major];
-	gendisk_head = &major_info->gendisk;
+	major_info->gendisk.major = major;
+	add_gendisk (&major_info->gendisk);
 	return major;
 
         /* error handling - free the prior allocated memory */  
@@ -775,7 +774,6 @@ dasd_unregister_major (major_info_t * major_info)
 {
 	int rc = 0;
 	int major;
-	struct gendisk *dd, *prev = NULL;
 	unsigned long flags;
 
 	if (major_info == NULL) {
@@ -784,20 +782,8 @@ dasd_unregister_major (major_info_t * major_info)
 	major = major_info->gendisk.major;
 	INIT_BLK_DEV (major, NULL, NULL, NULL);
 
-	/* do the gendisk stuff */
-	for (dd = gendisk_head; dd; dd = dd->next) {
-		if (dd == &major_info->gendisk) {
-			if (prev)
-				prev->next = dd->next;
-			else
-				gendisk_head = dd->next;
-			break;
-		}
-		prev = dd;
-	}
-	if (dd == NULL) {
-		return -ENOENT;
-	}
+	del_gendisk (&major_info->gendisk);
+
 	kfree (major_info->dasd_device);
 	kfree (major_info->gendisk.part);
 

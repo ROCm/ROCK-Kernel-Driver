@@ -15,8 +15,8 @@
 #include <asm/rtc.h>
 #include <asm/machvec_init.h>
 
-#include <asm/io_hd64461.h>
-#include <asm/io_generic.h>
+#include <asm/io.h>
+#include <asm/hd64461.h>
 #include <asm/irq.h>
 
 /*
@@ -26,7 +26,7 @@
 struct sh_machine_vector mv_hp620 __initmv = {
 	mv_name:		"hp620",
 
-	mv_nr_irqs:		80, /* HD64461_IRQBASE+16, see hd64461.h */
+	mv_nr_irqs:		HD64461_IRQBASE+HD64461_IRQ_NUM,
 
 	mv_inb:			hd64461_inb,
 	mv_inw:			hd64461_inw,
@@ -71,7 +71,7 @@ ALIAS_MV(hp620)
 struct sh_machine_vector mv_hp680 __initmv = {
 	mv_name:		"hp680",
 
-	mv_nr_irqs:		80, /* HD64461_IRQBASE+16, see hd64461.h */
+	mv_nr_irqs:		HD64461_IRQBASE+HD64461_IRQ_NUM,
 
 	mv_inb:			hd64461_inb,
 	mv_inw:			hd64461_inw,
@@ -116,7 +116,7 @@ ALIAS_MV(hp680)
 struct sh_machine_vector mv_hp690 __initmv = {
 	mv_name:		"hp690",
 
-	mv_nr_irqs:		80, /* HD64461_IRQBASE+16, see hd64461.h */
+	mv_nr_irqs:		HD64461_IRQBASE+HD64461_IRQ_NUM,
 
 	mv_inb:			hd64461_inb,
 	mv_inw:			hd64461_inw,

@@ -121,6 +121,9 @@ extern void *memmove(void *__dest, __const__ void *__src, size_t __n);
 #define __HAVE_ARCH_MEMCHR
 extern void *memchr(const void *__s, int __c, size_t __n);
 
+#define __HAVE_ARCH_STRLEN
+extern size_t strlen(const char *);
+
 /* Don't build bcopy at all ...  */
 #define __HAVE_ARCH_BCOPY
 

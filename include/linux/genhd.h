@@ -74,6 +74,14 @@ struct gendisk {
 	devfs_handle_t *de_arr;         /* one per physical disc */
 	char *flags;                    /* one per physical disc */
 };
+
+/* drivers/block/genhd.c */
+extern struct gendisk *gendisk_head;
+
+extern void add_gendisk(struct gendisk *gp);
+extern void del_gendisk(struct gendisk *gp);
+extern struct gendisk *get_gendisk(kdev_t dev);
+
 #endif  /*  __KERNEL__  */
 
 #ifdef CONFIG_SOLARIS_X86_PARTITION
@@ -230,7 +238,6 @@ struct unixware_disklabel {
 #endif /* CONFIG_MINIX_SUBPARTITION */
 
 #ifdef __KERNEL__
-extern struct gendisk *gendisk_head;	/* linked list of disks */
 
 char *disk_name (struct gendisk *hd, int minor, char *buf);
 

@@ -43,6 +43,45 @@ asmlinkage int sys_pipe(unsigned long r4, unsigned long r5,
 	return error;
 }
 
+#if defined(__SH4__)
+/*
+ * To avoid cache alias, we map the shard page with same color.
+ */
+#define COLOUR_ALIGN(addr)	(((addr)+SHMLBA-1)&~(SHMLBA-1))
+
+unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr,
+	unsigned long len, unsigned long pgoff, unsigned long flags)
+{
+	struct vm_area_struct *vma;
+
+	if (flags & MAP_FIXED) {
+		/* We do not accept a shared mapping if it would violate
+		 * cache aliasing constraints.
+		 */
+		if ((flags & MAP_SHARED) && (addr & (SHMLBA - 1)))
+			return -EINVAL;
+		return addr;
+	}
+
+	if (len > TASK_SIZE)
+		return -ENOMEM;
+	if (!addr)
+		addr = TASK_UNMAPPED_BASE;
+
+	addr = COLOUR_ALIGN(addr);
+
+	for (vma = find_vma(current->mm, addr); ; vma = vma->vm_next) {
+		/* At this point:  (!vma || addr < vma->vm_end). */
+		if (TASK_SIZE - len < addr)
+			return -ENOMEM;
+		if (!vma || addr + len <= vma->vm_start)
+			return addr;
+		addr = vma->vm_end;
+		addr = COLOUR_ALIGN(addr);
+	}
+}
+#endif
+
 static inline long
 do_mmap2(unsigned long addr, unsigned long len, unsigned long prot, 
 	 unsigned long flags, int fd, unsigned long pgoff)

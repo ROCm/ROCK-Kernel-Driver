@@ -78,7 +78,6 @@ extern void md_done_sync(mddev_t *mddev, int blocks, int ok);
 extern void md_sync_acct(kdev_t dev, unsigned long nr_sectors);
 extern void md_recover_arrays (void);
 extern int md_check_ordering (mddev_t *mddev);
-extern struct gendisk * find_gendisk (kdev_t dev);
 extern int md_notify_reboot(struct notifier_block *this,
 					unsigned long code, void *x);
 extern int md_error (mddev_t *mddev, kdev_t rdev);

@@ -42,6 +42,7 @@ choice 'SuperH system type'					\
 	 CAT68701		CONFIG_SH_CAT68701		\
 	 BigSur			CONFIG_SH_BIGSUR		\
 	 SH2000			CONFIG_SH_SH2000		\
+	 ADX			CONFIG_SH_ADX			\
 	 BareCPU		CONFIG_SH_UNKNOWN" Generic
 
 # The SH7750 RTC module is disabled in the Dreamcast
@@ -88,23 +89,39 @@ if [ "$CONFIG_CPU_SUBTYPE_ST40STB1" = "y" ]; then
    define_bool CONFIG_CPU_SH4 y
 fi
 bool 'Little Endian' CONFIG_CPU_LITTLE_ENDIAN
+# Platform-specific memory start and size definitions
 if [ "$CONFIG_SH_SOLUTION_ENGINE" = "y" -o "$CONFIG_SH_HP600" = "y" -o \
      "$CONFIG_SH_BIGSUR" = "y" -o "$CONFIG_SH_7751_SOLUTION_ENGINE" = "y" -o \
      "$CONFIG_SH_DREAMCAST" = "y" -o "$CONFIG_SH_SH2000" = "y" ]; then
-  define_hex CONFIG_MEMORY_START 0c000000
-else
-  if [ "$CONFIG_CPU_SUBTYPE_ST40STB1" = "y" ]; then
-    bool 'Memory on LMI' CONFIG_ST40_LMI_MEMORY
-    if [ "$CONFIG_ST40_LMI_MEMORY" = "y" ] ; then
+   define_hex CONFIG_MEMORY_START 0c000000
+   define_hex CONFIG_MEMORY_SIZE 00400000
+   define_bool CONFIG_MEMORY_SET y
+fi
+if [ "$CONFIG_CPU_SUBTYPE_ST40STB1" = "y" ]; then
+   bool 'Memory on LMI' CONFIG_ST40_LMI_MEMORY
+   if [ "$CONFIG_ST40_LMI_MEMORY" = "y" ] ; then
       define_hex CONFIG_MEMORY_START 08000000
-    else
-      hex 'EMI physical memory start address' CONFIG_MEMORY_START 08000000
-    fi
-  else
-    hex 'Physical memory start address' CONFIG_MEMORY_START 08000000
-  fi
+      define_hex CONFIG_MEMORY_SIZE 00400000
+      define_bool CONFIG_MEMORY_SET y
+   fi
+fi
+if [ "$CONFIG_SH_ADX" = "y" ]; then
+   define_hex CONFIG_MEMORY_START 08000000
+   define_hex CONFIG_MEMORY_SIZE 00400000
+   define_bool CONFIG_MEMORY_SET y
+fi
+# If none of the above have set memory start/size, ask the user.
+if [ "$CONFIG_MEMORY_SET" != "y" ]; then
+   hex 'Physical memory start address' CONFIG_MEMORY_START 08000000
+   hex 'Physical memory size' CONFIG_MEMORY_SIZE 00400000
 fi
 endmenu
+
+if [ "$CONFIG_SH_HP690" = "y" ]; then
+  define_bool CONFIG_DISCONTIGMEM y
+else
+  define_bool CONFIG_DISCONTIGMEM n
+fi
 
 mainmenu_option next_comment
 comment 'General setup'
@@ -120,8 +137,21 @@ define_bool CONFIG_SBUS n
 bool 'Networking support' CONFIG_NET
 
 if [ "$CONFIG_SH_GENERIC" = "y" -o "$CONFIG_SH_SOLUTION_ENGINE" = "y" -o \
-     "$CONFIG_SH_UNKNOWN" = "y" -o "$CONFIG_SH_CAT68701" = "y" ]; then
+     "$CONFIG_SH_UNKNOWN" = "y" -o "$CONFIG_SH_CAT68701" = "y" -o \
+     "$CONFIG_SH_ADX" = "y" ]; then
   bool 'Compact Flash Enabler support' CONFIG_CF_ENABLER
+fi
+
+if [ "$CONFIG_CF_ENABLER" = "y" ]; then
+   choice 'Compact Flash Connection Area' \
+	"Area5 CONFIG_CF_AREA5 \
+	 Area6 CONFIG_CF_AREA6" Area6
+   if [ "$CONFIG_CF_AREA5" = "y" ]; then
+      define_hex CONFIG_CF_BASE_ADDR b4000000
+   fi
+   if [ "$CONFIG_CF_AREA6" = "y" ]; then
+      define_hex CONFIG_CF_BASE_ADDR b8000000
+   fi
 fi
 
 bool 'Hitachi HD64461 companion chip support' CONFIG_HD64461
@@ -136,6 +166,8 @@ if [ "$CONFIG_HD64465" = "y" ]; then
    int 'HD64465 IRQ' CONFIG_HD64465_IRQ 5
 fi
 
+bool 'DMA controller (DMAC) support' CONFIG_SH_DMA
+
 bool 'PCI support' CONFIG_PCI
 if [ "$CONFIG_PCI" = "y" ]; then
    choice '  PCI access mode' \
@@ -148,6 +180,7 @@ if [ "$CONFIG_PCI" = "y" ]; then
    if [ "$CONFIG_PCI_GODIRECT" = "y" -o "$CONFIG_PCI_GOANY" = "y" ]; then
       define_bool CONFIG_PCI_DIRECT y
    fi
+   define_bool CONFIG_SH_PCIDMA_NONCOHERENT n
 fi
 
 source drivers/pci/Config.in
@@ -224,13 +257,22 @@ if [ "$CONFIG_NET" = "y" ]; then
    endmenu
 fi
 
+mainmenu_option next_comment
+comment 'Old CD-ROM drivers (not SCSI, not IDE)'
+
+bool 'Support non-SCSI/IDE/ATAPI CDROM drives' CONFIG_CD_NO_IDESCSI
+if [ "$CONFIG_CD_NO_IDESCSI" != "n" ]; then
+   source drivers/cdrom/Config.in
+fi
+endmenu
+
 #
 # input before char - char/joystick depends on it. As does USB.
 #
 source drivers/input/Config.in
 
 if [ "$CONFIG_SH_DREAMCAST" = "y" ]; then
-source drivers/maple/Config.in
+   source drivers/maple/Config.in
 fi
 
 mainmenu_option next_comment
@@ -259,7 +301,7 @@ if [ "$CONFIG_SH_GENERIC" = "y" -o \
      "$CONFIG_SH_BIGSUR" = "y" -o \
      "$CONFIG_SH_7751_SOLUTION_ENGINE" = "y" -o \
      "$CONFIG_SH_SOLUTION_ENGINE" = "y" ]; then
-  bool 'Heartbeat LED' CONFIG_HEARTBEAT
+   bool 'Heartbeat LED' CONFIG_HEARTBEAT
 fi
 
 if [ "$CONFIG_SH_DREAMCAST" = "y" -a "$CONFIG_MAPLE" != "n" ]; then
@@ -322,7 +364,6 @@ comment 'Kernel hacking'
 bool 'Magic SysRq key' CONFIG_MAGIC_SYSRQ
 bool 'Use LinuxSH standard BIOS' CONFIG_SH_STANDARD_BIOS
 if [ "$CONFIG_SH_STANDARD_BIOS" = "y" ]; then
-   bool 'GDB Stub kernel debug' CONFIG_DEBUG_KERNEL_WITH_GDB_STUB
    bool 'Early printk support' CONFIG_SH_EARLY_PRINTK
 fi
 endmenu

@@ -38,9 +38,8 @@ obj-$(CONFIG_ACPI)	+= os.o acpi_ksyms.o
 obj-$(CONFIG_ACPI)	+= $(foreach dir,$(acpi-subdirs),$(dir)/$(dir).o) 
 ifdef CONFIG_ACPI_KERNEL_CONFIG
    obj-$(CONFIG_ACPI) 	+= acpiconf.o osconf.o
-else
-   obj-$(CONFIG_ACPI)	+= driver.o
 endif
+obj-$(CONFIG_ACPI)	+= driver.o
 
 ifeq ($(CONFIG_ACPI_BUSMGR),y)
 	obj-y			+= ospm/ospm.o

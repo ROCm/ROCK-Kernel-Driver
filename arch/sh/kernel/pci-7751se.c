@@ -41,13 +41,13 @@ int __init pcibios_init_platform(void)
    unsigned long bcr1, wcr1, wcr2, wcr3, mcr;
    unsigned short bcr2;
 
-   //
-   // Initialize the slave bus controller on the pcic.  The values used
-   // here should not be hardcoded, but they should be taken from the bsc
-   // on the processor, to make this function as generic as possible.
-   // (i.e. Another sbc may usr different SDRAM timing settings -- in order
-   // for the pcic to work, its settings need to be exactly the same.)
-   //
+   /*
+    * Initialize the slave bus controller on the pcic.  The values used
+    * here should not be hardcoded, but they should be taken from the bsc
+    * on the processor, to make this function as generic as possible.
+    * (i.e. Another sbc may usr different SDRAM timing settings -- in order
+    * for the pcic to work, its settings need to be exactly the same.)
+    */
    bcr1 = (*(volatile unsigned long*)(SH7751_BCR1));
    bcr2 = (*(volatile unsigned short*)(SH7751_BCR2));
    wcr1 = (*(volatile unsigned long*)(SH7751_WCR1));
@@ -67,21 +67,47 @@ int __init pcibios_init_platform(void)
    mcr = (mcr & PCIMCR_MRSET_OFF) & PCIMCR_RFSH_OFF;
    PCIC_WRITE(SH7751_PCIMCR, mcr);      /* PCIC MCR */
 
-   PCIC_WRITE(SH7751_PCIINTM, 0x0000c3ff);
-   PCIC_WRITE(SH7751_PCIAINTM, 0x0000980f);
-   PCIC_WRITE(SH7751_PCICONF1, 0xF39000C7);  /* FB9000C7 */
-   PCIC_WRITE(SH7751_PCICONF2, 0x00000000);  /* PCI Class code & Revision ID */
-   PCIC_WRITE(SH7751_PCICONF4, 0xab000001);  /* PCI I/O */
-   PCIC_WRITE(SH7751_PCICONF5, 0x0c000000);  /* PCI MEM0 old val: 0xb0000000 */
-   PCIC_WRITE(SH7751_PCICONF6, 0xd0000000);  /* PCI MEM1 */
-   PCIC_WRITE(SH7751_PCICONF11, 0x35051054); /* PCI Sub system ID & Sub system vendor ID */
-   PCIC_WRITE(SH7751_PCILSR0, 0x03f00000);   /* PCI MEM0 */
-   PCIC_WRITE(SH7751_PCILSR1, 0x00000000);   /* PCI MEM1 */
-   PCIC_WRITE(SH7751_PCILAR0, 0x0c000000);   /* MEM0 */
-   PCIC_WRITE(SH7751_PCILAR1, 0x00000000);   /* MEM1 */
 
+   /* Enable all interrupts, so we know what to fix */
+   PCIC_WRITE(SH7751_PCIINTM, 0x0000c3ff);
+   PCIC_WRITE(SH7751_PCIAINTM, 0x0000380f);
+
+   /* Set up standard PCI config registers */
+   PCIC_WRITE(SH7751_PCICONF1, 	0xF39000C7); /* Bus Master, Mem & I/O access */
+   PCIC_WRITE(SH7751_PCICONF2, 	0x00000000); /* PCI Class code & Revision ID */
+   PCIC_WRITE(SH7751_PCICONF4, 	0xab000001); /* PCI I/O address (local regs) */
+   PCIC_WRITE(SH7751_PCICONF5, 	0x0c000000); /* PCI MEM address (local RAM)  */
+   PCIC_WRITE(SH7751_PCICONF6, 	0xd0000000); /* PCI MEM address (unused)     */
+   PCIC_WRITE(SH7751_PCICONF11, 0x35051054); /* PCI Subsystem ID & Vendor ID */
+   PCIC_WRITE(SH7751_PCILSR0, 0x03f00000);   /* MEM (full 64M exposed)       */
+   PCIC_WRITE(SH7751_PCILSR1, 0x00000000);   /* MEM (unused)                 */
+   PCIC_WRITE(SH7751_PCILAR0, 0x0c000000);   /* MEM (direct map from PCI)    */
+   PCIC_WRITE(SH7751_PCILAR1, 0x00000000);   /* MEM (unused)                 */
+
+   /* Now turn it on... */
    PCIC_WRITE(SH7751_PCICR, 0xa5000001);
 
+   /*
+    * Set PCIMBR and PCIIOBR here, assuming a single window
+    * (16M MEM, 256K IO) is enough.  If a larger space is
+    * needed, the readx/writex and inx/outx functions will
+    * have to do more (e.g. setting registers for each call).
+    */
+
+   /*
+    * Set the MBR so PCI address is one-to-one with window,
+    * meaning all calls go straight through... use ifdef to
+    * catch erroneous assumption.
+    */
+#if PCIBIOS_MIN_MEM != SH7751_PCI_MEMORY_BASE
+#error One-to-one assumption for PCI memory mapping is wrong!?!?!?
+#endif   
+   PCIC_WRITE(SH7751_PCIMBR, PCIBIOS_MIN_MEM);
+
+   /* Set IOBR for window containing area specified in pci.h */
+   PCIC_WRITE(SH7751_PCIIOBR, (PCIBIOS_MIN_IO & SH7751_PCIIOBR_MASK));
+
+   /* All done, may as well say so... */
    printk("SH7751 PCI: Finished initialization of the PCI controller\n");
 
    return 1;

@@ -8,8 +8,6 @@
  * The kernel part of the (on-line) reiserfs resizer.
  */
 
-#ifdef __KERNEL__
-
 #include <linux/kernel.h>
 #include <linux/vmalloc.h>
 #include <linux/locks.h>
@@ -17,12 +15,6 @@
 #include <linux/errno.h>
 #include <linux/reiserfs_fs.h>
 #include <linux/reiserfs_fs_sb.h>
-
-#else
-
-#include "nokernel.h"
-
-#endif
 
 int reiserfs_resize (struct super_block * s, unsigned long block_count_new)
 {

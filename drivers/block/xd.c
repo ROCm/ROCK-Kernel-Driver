@@ -173,8 +173,7 @@ int __init xd_init (void)
 	devfs_handle = devfs_mk_dir (NULL, xd_gendisk.major_name, NULL);
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
 	read_ahead[MAJOR_NR] = 8;	/* 8 sector (4kB) read ahead */
-	xd_gendisk.next = gendisk_head;
-	gendisk_head = &xd_gendisk;
+	add_gendisk(&xd_gendisk);
 	xd_geninit();
 
 	return 0;
@@ -1112,18 +1111,12 @@ MODULE_PARM(nodma, "i");
 
 static void xd_done (void)
 {
-	struct gendisk ** gdp;
-	
 	blksize_size[MAJOR_NR] = NULL;
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 	blk_size[MAJOR_NR] = NULL;
 	hardsect_size[MAJOR_NR] = NULL;
 	read_ahead[MAJOR_NR] = 0;
-	for (gdp = &gendisk_head; *gdp; gdp = &((*gdp)->next))
-		if (*gdp == &xd_gendisk)
-			break;
-	if (*gdp)
-		*gdp = (*gdp)->next;
+	del_gendisk(&xd_gendisk);
 	release_region(xd_iobase,4);
 }
 

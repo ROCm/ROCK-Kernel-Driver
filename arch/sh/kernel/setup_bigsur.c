@@ -181,10 +181,12 @@ static void mask_and_ack_bigsur(unsigned int irq)
 static void end_bigsur_irq(unsigned int irq)
 {
    	DPRINTK("end_bigsur_irq IRQ %d\n", irq);
-	if(irq >= BIGSUR_IRQ_LOW && irq < BIGSUR_IRQ_HIGH)	
-		enable_bigsur_l1irq(irq);
-	else
-		enable_bigsur_l2irq(irq);
+	if (!(irq_desc[irq].status & (IRQ_DISABLED|IRQ_INPROGRESS))) {
+		if(irq >= BIGSUR_IRQ_LOW && irq < BIGSUR_IRQ_HIGH)	
+			enable_bigsur_l1irq(irq);
+		else
+			enable_bigsur_l2irq(irq);
+	}
 }
 
 static unsigned int startup_bigsur_irq(unsigned int irq)

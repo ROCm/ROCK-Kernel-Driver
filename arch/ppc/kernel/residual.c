@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.residual.c 1.7 05/17/01 18:14:22 cort
+ * BK Id: SCCS/s.residual.c 1.11 09/08/01 15:47:42 paulus
  */
 /*
  * Code to deal with the PReP residual data.
@@ -44,7 +44,7 @@
 #include <linux/pci.h>
 #include <linux/ide.h>
 
-#include <asm/init.h>
+#include <asm/sections.h>
 #include <asm/mmu.h>
 #include <asm/processor.h>
 #include <asm/io.h>
@@ -55,7 +55,7 @@
 unsigned char __res[sizeof(RESIDUAL)] __prepdata = {0,};
 RESIDUAL *res = (RESIDUAL *)&__res;
 
-const char * PnP_BASE_TYPES[] __initdata = {
+char * PnP_BASE_TYPES[] __initdata = {
   "Reserved",
   "MassStorageDevice",
   "NetworkInterfaceController",
@@ -71,7 +71,7 @@ const char * PnP_BASE_TYPES[] __initdata = {
 
 /* Device Sub Type Codes */
 
-const unsigned char * PnP_SUB_TYPES[] __initdata = {
+unsigned char * PnP_SUB_TYPES[] __initdata = {
   "\001\000SCSIController",
   "\001\001IDEController",
   "\001\002FloppyController",
@@ -128,7 +128,7 @@ const unsigned char * PnP_SUB_TYPES[] __initdata = {
 
 /* Device Interface Type Codes */
 
-const  unsigned char * PnP_INTERFACES[] __initdata = {
+unsigned char * PnP_INTERFACES[] __initdata = {
   "\000\000\000General",
   "\001\000\000GeneralSCSI",
   "\001\001\000GeneralIDE",

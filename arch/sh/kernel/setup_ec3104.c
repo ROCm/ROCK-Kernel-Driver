@@ -167,7 +167,8 @@ static void mask_and_ack_ec3104_irq(unsigned int irq)
 
 static void end_ec3104_irq(unsigned int irq)
 {
-	unmask_ec3104_irq(irq);
+	if (!(irq_desc[irq].status & (IRQ_DISABLED|IRQ_INPROGRESS)))
+		unmask_ec3104_irq(irq);
 }
 
 static unsigned int startup_ec3104_irq(unsigned int irq)

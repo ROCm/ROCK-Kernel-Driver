@@ -1,4 +1,4 @@
-/* $Id: entry.S,v 1.71 2000/03/22 13:29:33 gniibe Exp $
+/* $Id: entry.S,v 1.71 2001/07/27 11:47:50 gniibe Exp $
  *
  *  linux/arch/sh/entry.S
  *
@@ -220,7 +220,7 @@ call_dae:
 1:	.long	MMU_TEA
 2:	.long   SYMBOL_NAME(do_address_error)
 
-#if defined(CONFIG_DEBUG_KERNEL_WITH_GDB_STUB) || defined(CONFIG_SH_STANDARD_BIOS)
+#if defined(CONFIG_SH_STANDARD_BIOS)
 	.align	2
 	/* Unwind the stack and jmp to the debug entry */
 debug_kernel:
@@ -263,7 +263,7 @@ debug_kernel:
 
 	.align	2
 debug_trap:	
-#if defined(CONFIG_DEBUG_KERNEL_WITH_GDB_STUB) || defined(CONFIG_SH_STANDARD_BIOS)
+#if defined(CONFIG_SH_STANDARD_BIOS)
 	mov	#OFF_SR, r0
 	mov.l	@(r0,r15), r0		! get status register
 	shll	r0
@@ -293,8 +293,23 @@ error:
 !
 !
 ENTRY(ret_from_fork)
-	bra	SYMBOL_NAME(ret_from_syscall)
-	 add	#4, r15	! pop down bogus r0 (see switch_to MACRO)
+	mov.l	@r15+,r0
+	! Call schedule_tail
+	mov.l	1f, r1
+	jsr @r1
+	 mov	r0, r4
+	! If we're being traced, return via syscall_ret_trace, otherwise
+	! return directly to ret_from_syscall
+	stc	k_current, r0
+	mov.l	@(tsk_ptrace,r0), r0	! Is current PTRACE_SYSCALL'd?
+	mov	#PT_TRACESYS, r1
+	tst	r1, r0
+	bt	ret_from_syscall
+	bra	syscall_ret_trace
+	 nop	 
+
+	.align	2
+1:	.long	SYMBOL_NAME(schedule_tail)
 
 /*
  * Old syscall interface:

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.pmac_nvram.c 1.13 08/19/01 22:23:04 paulus
+ * BK Id: SCCS/s.pmac_nvram.c 1.15 09/08/01 15:47:42 paulus
  */
 /*
  * Miscellaneous procedures for dealing with the PowerMac hardware.
@@ -12,7 +12,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
-#include <asm/init.h>
+#include <asm/sections.h>
 #include <asm/io.h>
 #include <asm/system.h>
 #include <asm/prom.h>

@@ -466,7 +466,6 @@ struct freepool {
 	int n;
 };
 
-#define MAX_PHY 0x20
 
 struct fs_dev {
 	struct fs_dev *next;		/* other FS devices */
@@ -474,9 +473,8 @@ struct fs_dev {
 
 	unsigned char irq;		/* IRQ */
 	struct pci_dev *pci_dev;	/* PCI stuff */
-	struct atm_dev *atm_dev[MAX_PHY];
+	struct atm_dev *atm_dev;
 	struct timer_list timer;
-	int start_number; 
 
 	unsigned long hw_base;		/* mem base address */
 	unsigned long base;             /* Mapping of base address */

@@ -1,5 +1,5 @@
 /*
- * $Id: setup_hd64465.c,v 1.3 2001/02/07 17:52:53 stuart_menefy Exp $
+ * $Id: setup_hd64465.c,v 1.4 2001/07/15 23:26:56 gniibe Exp $
  *
  * Setup and IRQ handling code for the HD64465 companion chip.
  * by Greg Banks <gbanks@pocketpenguins.com>
@@ -70,7 +70,8 @@ static void mask_and_ack_hd64465(unsigned int irq)
 
 static void end_hd64465_irq(unsigned int irq)
 {
-	enable_hd64465_irq(irq);
+	if (!(irq_desc[irq].status & (IRQ_DISABLED|IRQ_INPROGRESS)))
+		enable_hd64465_irq(irq);
 }
 
 

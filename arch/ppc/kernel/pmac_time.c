@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.pmac_time.c 1.14 08/19/01 22:23:04 paulus
+ * BK Id: SCCS/s.pmac_time.c 1.16 09/08/01 15:47:42 paulus
  */
 /*
  * Support for periodic interrupts (100 per second) and for getting
@@ -22,7 +22,7 @@
 #include <linux/cuda.h>
 #include <linux/pmu.h>
 
-#include <asm/init.h>
+#include <asm/sections.h>
 #include <asm/prom.h>
 #include <asm/system.h>
 #include <asm/io.h>

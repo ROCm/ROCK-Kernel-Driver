@@ -578,7 +578,6 @@ static struct gendisk sd_gendisk =
 static struct gendisk *sd_gendisks = &sd_gendisk;
 
 #define SD_GENDISK(i)    sd_gendisks[(i) / SCSI_DISKS_PER_MAJOR]
-#define LAST_SD_GENDISK  sd_gendisks[N_USED_SD_MAJORS - 1]
 
 /*
  * rw_intr is the interrupt routine for the device driver.
@@ -1147,12 +1146,10 @@ static int sd_init()
 		sd_gendisks[i].part = sd + (i * SCSI_DISKS_PER_MAJOR << 4);
 		sd_gendisks[i].sizes = sd_sizes + (i * SCSI_DISKS_PER_MAJOR << 4);
 		sd_gendisks[i].nr_real = 0;
-		sd_gendisks[i].next = sd_gendisks + i + 1;
 		sd_gendisks[i].real_devices =
 		    (void *) (rscsi_disks + i * SCSI_DISKS_PER_MAJOR);
 	}
 
-	LAST_SD_GENDISK.next = NULL;
 	return 0;
 
 cleanup_gendisks_flags:
@@ -1184,19 +1181,13 @@ cleanup_devfs:
 
 static void sd_finish()
 {
-	struct gendisk *gendisk;
 	int i;
 
 	for (i = 0; i < N_USED_SD_MAJORS; i++) {
 		blk_dev[SD_MAJOR(i)].queue = sd_find_queue;
+		add_gendisk(&sd_gendisks[i]);
 	}
-	for (gendisk = gendisk_head; gendisk != NULL; gendisk = gendisk->next)
-		if (gendisk == sd_gendisks)
-			break;
-	if (gendisk == NULL) {
-		LAST_SD_GENDISK.next = gendisk_head;
-		gendisk_head = sd_gendisks;
-	}
+
 	for (i = 0; i < sd_template.dev_max; ++i)
 		if (!rscsi_disks[i].capacity && rscsi_disks[i].device) {
 			sd_init_onedisk(i);
@@ -1377,10 +1368,7 @@ static int __init init_sd(void)
 
 static void __exit exit_sd(void)
 {
-	struct gendisk **prev_sdgd_link;
-	struct gendisk *sdgd;
 	int i;
-	int removed = 0;
 
 	scsi_unregister_module(MODULE_SCSI_DEV, &sd_template);
 
@@ -1394,26 +1382,9 @@ static void __exit exit_sd(void)
 		kfree(sd_blocksizes);
 		kfree(sd_hardsizes);
 		kfree((char *) sd);
-
-		/*
-		 * Now remove sd_gendisks from the linked list
-		 */
-		prev_sdgd_link = &gendisk_head;
-		while ((sdgd = *prev_sdgd_link) != NULL) {
-			if (sdgd >= sd_gendisks && sdgd <= &LAST_SD_GENDISK) {
-				removed++;
-				*prev_sdgd_link = sdgd->next;
-				continue;
-			}
-			prev_sdgd_link = &sdgd->next;
-		}
-
-		if (removed != N_USED_SD_MAJORS)
-			printk("%s %d sd_gendisks in disk chain",
-			       removed > N_USED_SD_MAJORS ? "total" : "just", removed);
-
 	}
 	for (i = 0; i < N_USED_SD_MAJORS; i++) {
+		del_gendisk(&sd_gendisks[i]);
 		blk_size[SD_MAJOR(i)] = NULL;
 		hardsect_size[SD_MAJOR(i)] = NULL;
 		read_ahead[SD_MAJOR(i)] = 0;

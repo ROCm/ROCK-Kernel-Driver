@@ -49,11 +49,7 @@ void set_rtc_time(struct rtc_time *t)
 {
 	unsigned long nowtime;
 
-	printk(KERN_INFO "rtc.c:set_rtc_time: %04d-%02d-%02d %02d:%02d:%02d.\n", t->tm_year+1900, t->tm_mon+1, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec);
-
 	nowtime = mktime(t->tm_year+1900, t->tm_mon+1, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec);
-
-	printk(KERN_INFO "rtc.c:set_rtc_time: set rtc time to %ld seconds.\n", nowtime);
 
 	(ppc_md.set_rtc_time)(nowtime);
 }

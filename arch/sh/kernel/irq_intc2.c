@@ -92,7 +92,8 @@ static void mask_and_ack_intc2(unsigned int irq)
 
 static void end_intc2_irq(unsigned int irq)
 {
-	enable_intc2_irq(irq);
+	if (!(irq_desc[irq].status & (IRQ_DISABLED|IRQ_INPROGRESS)))
+		enable_intc2_irq(irq);
 }
 
 void make_intc2_irq(unsigned int irq, unsigned int addr, 

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.prep_setup.c 1.34 08/29/01 10:07:29 paulus
+ * BK Id: SCCS/s.prep_setup.c 1.36 09/08/01 15:47:42 paulus
  */
 /*
  *  linux/arch/ppc/kernel/setup.c
@@ -41,7 +41,7 @@
 #include <linux/pci.h>
 #include <linux/ide.h>
 
-#include <asm/init.h>
+#include <asm/sections.h>
 #include <asm/mmu.h>
 #include <asm/processor.h>
 #include <asm/residual.h>

@@ -1753,17 +1753,6 @@ int get_buffers_from_range (struct super_block * p_s_sb, struct key * p_s_range_
 			    int n_max_nr_buffers_to_return);
 */
 
-#ifndef REISERFS_FSCK
-
-//inline int is_left_mergeable (struct item_head * ih, unsigned long bsize);
-
-#else
-
-int is_left_mergeable (struct super_block * s, struct path * path);
-int is_right_mergeable (struct super_block * s, struct path * path);
-int are_items_mergeable (struct item_head * left, struct item_head * right, int bsize);
-
-#endif
 void padd_item (char * item, int total_length, int length);
 
 

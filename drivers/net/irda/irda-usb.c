@@ -76,7 +76,8 @@ static struct usb_device_id dongles[] = {
 	{ USB_DEVICE(0x50f, 0x180), driver_info: IUC_SPEED_BUG | IUC_NO_WINDOW },
 	/* Extended Systems, Inc.,  XTNDAccess IrDA USB (ESI-9685) */
 	{ USB_DEVICE(0x8e9, 0x100), driver_info: IUC_SPEED_BUG | IUC_NO_WINDOW },
-	{ match_flags: USB_DEVICE_ID_MATCH_INT_CLASS,
+	{ match_flags: USB_DEVICE_ID_MATCH_INT_CLASS |
+	               USB_DEVICE_ID_MATCH_INT_SUBCLASS,
 	  bInterfaceClass: USB_CLASS_APP_SPEC,
 	  bInterfaceSubClass: USB_CLASS_IRDA,
 	  driver_info: IUC_DEFAULT, },

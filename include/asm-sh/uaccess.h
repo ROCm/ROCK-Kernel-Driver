@@ -1,4 +1,4 @@
-/* $Id: uaccess.h,v 1.10 2000/03/24 13:53:45 gniibe Exp $
+/* $Id: uaccess.h,v 1.12 2001/07/27 06:09:47 gniibe Exp $
  *
  * User space memory access functions
  *
@@ -195,7 +195,7 @@ extern void __put_user_unknown(void);
 /* Generic arbitrary sized copy.  */
 /* Return the number of bytes NOT copied */
 /* XXX: should be such that: 4byte and the rest. */
-extern __inline__ __kernel_size_t
+static __inline__ __kernel_size_t
 __copy_user(void *__to, const void *__from, __kernel_size_t __n)
 {
 	unsigned long __dummy, _f, _t;
@@ -260,7 +260,7 @@ __copy_res; })
 
 /* XXX: Not sure it works well..
    should be such that: 4byte clear and the rest. */
-extern __inline__ __kernel_size_t
+static __inline__ __kernel_size_t
 __clear_user(void *addr, __kernel_size_t size)
 {
 	unsigned long __a;
@@ -299,7 +299,7 @@ if (__cl_size && __access_ok(((unsigned long)(__cl_addr)), __cl_size)) \
 __cl_size = __clear_user(__cl_addr, __cl_size); \
 __cl_size; })
 
-extern __inline__ int
+static __inline__ int
 __strncpy_from_user(unsigned long __dest, unsigned long __src, int __count)
 {
 	__kernel_size_t res;
@@ -351,7 +351,7 @@ __sfu_res = __strncpy_from_user((unsigned long) (dest), __sfu_src, __sfu_count);
 /*
  * Return the size of a string (including the ending 0!)
  */
-extern __inline__ long __strnlen_user(const char *__s, long __n)
+static __inline__ long __strnlen_user(const char *__s, long __n)
 {
 	unsigned long res;
 	unsigned long __dummy;
@@ -384,7 +384,7 @@ extern __inline__ long __strnlen_user(const char *__s, long __n)
 	return res;
 }
 
-extern __inline__ long strnlen_user(const char *s, long n)
+static __inline__ long strnlen_user(const char *s, long n)
 {
 	if (!__addr_ok(s))
 		return 0;

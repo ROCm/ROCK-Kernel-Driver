@@ -129,29 +129,54 @@ static __inline__ void __cli(void)
 			     : "memory");
 }
 
-#define __save_flags(x) 			\
-x = (__extension__ ({	unsigned long __sr;	\
-	__asm__ __volatile__(			\
-		"stc	sr, %0"		\
-		: "=&r" (__sr)			\
-		: /* no inputs */		\
-		: "memory");			\
-	 (__sr & 0x000000f0);}))
+#define __save_flags(x) \
+	__asm__("stc sr, %0; and #0xf0, %0" : "=&z" (x) :/**/: "memory" )
 
-#define __save_and_cli(x)    				\
-x = (__extension__ ({	unsigned long __dummy,__sr;	\
-	__asm__ __volatile__(                   	\
-		"stc	sr, %1\n\t" 			\
-		"mov	%1, %0\n\t" 			\
-		"or	#0xf0, %0\n\t" 			\
-		"ldc	%0, sr"     			\
-		: "=&z" (__dummy), "=&r" (__sr)		\
-		: /* no inputs */ 			\
-		: "memory"); (__sr & 0x000000f0); }))
+static __inline__ unsigned long __save_and_cli(void)
+{
+	unsigned long flags, __dummy;
 
+	__asm__ __volatile__("stc	sr, %1\n\t"
+			     "mov	%1, %0\n\t"
+			     "or	#0xf0, %0\n\t"
+			     "ldc	%0, sr\n\t"
+			     "mov	%1, %0\n\t"
+			     "and	#0xf0, %0"
+			     : "=&z" (flags), "=&r" (__dummy)
+			     :/**/
+			     : "memory" );
+	return flags;
+}
+
+#ifdef DEBUG_CLI_STI
+static __inline__ void  __restore_flags(unsigned long x)
+{
+	if ((x & 0x000000f0) != 0x000000f0)
+		__sti();
+	else {
+		unsigned long flags;
+		__save_flags(flags);
+
+		if (flags == 0) {
+			extern void dump_stack(void);
+			printk(KERN_ERR "BUG!\n");
+			dump_stack();
+			__cli();
+		}
+	}
+}
+#else
 #define __restore_flags(x) do { 			\
-	if (x != 0x000000f0)	/* not CLI-ed? */		\
+	if ((x & 0x000000f0) != 0x000000f0)		\
 		__sti();				\
+} while (0)
+#endif
+
+#define really_restore_flags(x) do { 			\
+	if ((x & 0x000000f0) != 0x000000f0)		\
+		__sti();				\
+	else						\
+		__cli();				\
 } while (0)
 
 /*
@@ -191,7 +216,7 @@ do {							\
 } while (0)
 
 /* For spinlocks etc */
-#define local_irq_save(x)	__save_and_cli(x)
+#define local_irq_save(x)	x = __save_and_cli()
 #define local_irq_restore(x)	__restore_flags(x)
 #define local_irq_disable()	__cli()
 #define local_irq_enable()	__sti()
@@ -212,7 +237,7 @@ extern void __global_restore_flags(unsigned long);
 #define cli() __cli()
 #define sti() __sti()
 #define save_flags(x) __save_flags(x)
-#define save_and_cli(x) __save_and_cli(x)
+#define save_and_cli(x) x = __save_and_cli()
 #define restore_flags(x) __restore_flags(x)
 
 #endif

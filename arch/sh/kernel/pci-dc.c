@@ -1,5 +1,5 @@
 /*
- $	$Id: pci-dc.c,v 1.2 2001/05/24 05:09:16 mrbrown Exp $
+ $	$Id: pci-dc.c,v 1.5 2001/08/24 12:38:19 dwmw2 Exp $
  *	Dreamcast PCI: Supports SEGA Broadband Adaptor only.
  */
 
@@ -104,62 +104,6 @@ static struct pci_ops pci_config_ops = {
 };
 
 
-void pcibios_align_resource(void *data, struct resource *res,
-			    unsigned long size)
-{
-}
-
-
-void __init pcibios_update_irq(struct pci_dev *dev, int irq)
-{
-}
-
-
-void __init pcibios_update_resource(struct pci_dev *dev, struct resource *root,
-			     struct resource *res, int resource)
-{
-}
-
-
-void pcibios_set_master(struct pci_dev *dev)
-{
-	/* No special bus mastering setup handling */
-}
-
-
-int pcibios_enable_device(struct pci_dev *dev)
-{
-
-	u16 cmd, old_cmd;
-	int idx;
-	struct resource *r;
-
-	pci_read_config_word(dev, PCI_COMMAND, &cmd);
-	old_cmd = cmd;
-	for (idx = 0; idx < 6; idx++) {
-		r = dev->resource + idx;
-		if (!r->start && r->end) {
-			printk(KERN_ERR
-			       "PCI: Device %s not available because"
-			       " of resource collisions\n",
-			       dev->slot_name);
-			return -EINVAL;
-		}
-		if (r->flags & IORESOURCE_IO)
-			cmd |= PCI_COMMAND_IO;
-		if (r->flags & IORESOURCE_MEM)
-			cmd |= PCI_COMMAND_MEMORY;
-	}
-	if (cmd != old_cmd) {
-		printk("PCI: enabling device %s (%04x -> %04x)\n",
-		       dev->slot_name, old_cmd, cmd);
-		pci_write_config_word(dev, PCI_COMMAND, cmd);
-	}
-	return 0;
-
-}
-
-
 void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 			   dma_addr_t * dma_handle)
 {
@@ -172,7 +116,7 @@ void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 
 	gapspci_dma_used = PAGE_ALIGN(gapspci_dma_used+size);
 	
-	printk("pci_alloc_consistent: %ld bytes at 0x%p\n", size, buf);
+	printk("pci_alloc_consistent: %ld bytes at 0x%lx\n", (long)size, buf);
 
 	*dma_handle = (dma_addr_t)buf;
 
@@ -184,6 +128,7 @@ void pci_free_consistent(struct pci_dev *hwdev, size_t size,
 			 void *vaddr, dma_addr_t dma_handle)
 {
 	/* XXX */
+	gapspci_dma_used = 0;
 }
 
 

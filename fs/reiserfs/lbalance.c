@@ -2,19 +2,11 @@
  * Copyright 2000 by Hans Reiser, licensing governed by reiserfs/README
  */
 
-#ifdef __KERNEL__
-
 #include <linux/config.h>
 #include <asm/uaccess.h>
 #include <linux/string.h>
 #include <linux/sched.h>
 #include <linux/reiserfs_fs.h>
-
-#else
-
-#include "nokernel.h"
-
-#endif
 
 /* these are used in do_balance.c */
 
@@ -66,13 +58,8 @@ static void leaf_copy_dir_entries (struct buffer_info * dest_bi, struct buffer_h
 
     /* if there are no items in dest or the first/last item in dest is not item of the same directory */
     if ( (item_num_in_dest == - 1) ||
-#ifdef REISERFS_FSCK
-	 (last_first == FIRST_TO_LAST && are_items_mergeable (B_N_PITEM_HEAD (dest, item_num_in_dest), ih, dest->b_size) == 0) ||
-	 (last_first == LAST_TO_FIRST && are_items_mergeable (ih, B_N_PITEM_HEAD (dest, item_num_in_dest), dest->b_size) == 0)) {
-#else
 	(last_first == FIRST_TO_LAST && le_key_k_offset (ih_version (ih), &(ih->ih_key)) == DOT_OFFSET) ||
 	    (last_first == LAST_TO_FIRST && comp_short_le_keys/*COMP_SHORT_KEYS*/ (&ih->ih_key, B_N_PKEY (dest, item_num_in_dest)))) {
-#endif
 	/* create new item in dest */
 	struct item_head new_ih;
 
@@ -135,11 +122,7 @@ static int leaf_copy_boundary_item (struct buffer_info * dest_bi, struct buffer_
        that we copy, so we return */
     ih = B_N_PITEM_HEAD (src, 0);
     dih = B_N_PITEM_HEAD (dest, dest_nr_item - 1);
-#ifdef REISERFS_FSCK
-    if (!dest_nr_item || (are_items_mergeable (dih, ih, src->b_size) == 0))
-#else
     if (!dest_nr_item || (!op_is_left_mergeable (&(ih->ih_key), src->b_size)))
-#endif
       /* there is nothing to merge */
       return 0;
       
@@ -202,11 +185,7 @@ static int leaf_copy_boundary_item (struct buffer_info * dest_bi, struct buffer_
   ih = B_N_PITEM_HEAD (src, src_nr_item - 1);
   dih = B_N_PITEM_HEAD (dest, 0);
 
-#ifdef REISERFS_FSCK
-  if (!dest_nr_item || are_items_mergeable (ih, dih, src->b_size) == 0)
-#else
   if (!dest_nr_item || !op_is_left_mergeable (&(dih->ih_key), src->b_size))
-#endif
     return 0;
   
   if ( is_direntry_le_ih (ih)) {

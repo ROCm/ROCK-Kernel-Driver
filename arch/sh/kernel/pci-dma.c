@@ -29,7 +29,7 @@ void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 		*dma_handle = virt_to_bus(ret);
 	}
 	/* We must flush the cache before we pass it on to the device */
-	flush_cache_all();
+	dma_cache_wback_inv(ret, size);
 	return  P2SEGADDR(ret);
 }
 

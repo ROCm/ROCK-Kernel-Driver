@@ -19,7 +19,11 @@
 #define DEBUG_NAME1  1024
 #define DEBUG_NAME2  2048
 
+#ifdef DEBUG
 void ntfs_debug(int mask, const char *fmt, ...);
+#else
+#define ntfs_debug(mask, fmt, ...)	do {} while (0)
+#endif
 
 #include <linux/slab.h>
 #include <linux/vmalloc.h>

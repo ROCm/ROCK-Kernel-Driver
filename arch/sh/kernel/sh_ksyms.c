@@ -9,6 +9,7 @@
 #include <linux/interrupt.h>
 #include <linux/smp_lock.h>
 #include <linux/vmalloc.h>
+#include <linux/pci.h>
 
 #include <asm/semaphore.h>
 #include <asm/processor.h>
@@ -18,7 +19,6 @@
 #include <asm/hardirq.h>
 #include <asm/delay.h>
 #include <asm/pgalloc.h>
-#include <asm/pci.h>
 #include <linux/irq.h>
 
 extern void dump_thread(struct pt_regs *, struct user *);

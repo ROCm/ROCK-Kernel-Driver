@@ -9,8 +9,7 @@
 ntfs_u8* ntfs_find_attr_in_mft_rec(ntfs_volume *vol, ntfs_u8 *m, __u32 type,
 			wchar_t *name, __u32 name_len, int ic, __u16 instance);
 
-int ntfs_extend_attr(ntfs_inode *ino, ntfs_attribute *attr, __s64 *len,
-		     int flags);
+int ntfs_extend_attr(ntfs_inode *ino, ntfs_attribute *attr, const __s64 len);
 
 int ntfs_resize_attr(ntfs_inode *ino, ntfs_attribute *attr, __s64 newsize);
 
@@ -35,5 +34,5 @@ int ntfs_new_attr(ntfs_inode *ino, int type, void *name, int namelen,
 		  void *value, int value_len, int *pos, int *found);
 
 int ntfs_insert_run(ntfs_attribute *attr, int cnum, ntfs_cluster_t cluster,
-		     int len );
+		     int len);
 

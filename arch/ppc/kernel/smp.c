@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.smp.c 1.29 08/20/01 21:35:14 paulus
+ * BK Id: SCCS/s.smp.c 1.31 09/08/01 15:47:42 paulus
  */
 /*
  * Smp support for ppc.
@@ -31,7 +31,6 @@
 #include <asm/pgtable.h>
 #include <asm/hardirq.h>
 #include <asm/softirq.h>
-#include <asm/init.h>
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/smp.h>

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.chrp_setup.c 1.34 08/29/01 10:07:29 paulus
+ * BK Id: SCCS/s.chrp_setup.c 1.36 09/08/01 15:47:42 paulus
  */
 /*
  *  linux/arch/ppc/kernel/setup.c
@@ -51,7 +51,7 @@
 #include <asm/irq.h>
 #include <asm/hydra.h>
 #include <asm/keyboard.h>
-#include <asm/init.h>
+#include <asm/sections.h>
 #include <asm/time.h>
 #include <asm/btext.h>
 

@@ -1,4 +1,4 @@
-/* $Id: irq.c,v 1.12 2000/03/06 14:07:50 gniibe Exp $
+/* $Id: irq.c,v 1.21 2001/07/17 02:26:53 gniibe Exp $
  *
  * linux/arch/sh/kernel/irq.c
  *
@@ -31,7 +31,6 @@
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/bitops.h>
-#include <asm/smp.h>
 #include <asm/pgalloc.h>
 #include <asm/delay.h>
 #include <asm/irq.h>
@@ -399,7 +398,7 @@ unsigned long probe_irq_on(void)
 
 		spin_lock_irq(&desc->lock);
 		if (!desc->action)
-		  desc->handler->startup(i);
+			desc->handler->startup(i);
 		spin_unlock_irq(&desc->lock);
 	}
 
@@ -452,7 +451,6 @@ unsigned long probe_irq_on(void)
 		}
 		spin_unlock_irq(&desc->lock);
 	}
-	spin_unlock_irq(&desc->lock);
 
 	return val;
 }
@@ -536,7 +534,7 @@ int setup_irq(unsigned int irq, struct irqaction * new)
 
 	if (!shared) {
 		desc->depth = 0;
-		desc->status &= ~IRQ_DISABLED;
+		desc->status &= ~(IRQ_DISABLED | IRQ_AUTODETECT | IRQ_WAITING);
 		desc->handler->startup(irq);
 	}
 	spin_unlock_irqrestore(&desc->lock,flags);

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.apus_setup.c 1.18 08/20/01 15:25:16 paulus
+ * BK Id: SCCS/s.apus_setup.c 1.20 09/08/01 15:47:42 paulus
  */
 /*
  *  linux/arch/ppc/kernel/apus_setup.c
@@ -76,7 +76,6 @@ static u_short driveid_types[] = {
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/machdep.h>
-#include <asm/init.h>
 
 #include "local_irq.h"
 

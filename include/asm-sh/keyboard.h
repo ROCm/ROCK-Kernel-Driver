@@ -1,9 +1,10 @@
 #ifndef	__ASM_SH_KEYBOARD_H
 #define	__ASM_SH_KEYBOARD_H
 /*
- *	$Id: keyboard.h,v 1.1 2000/06/10 21:45:48 yaegashi Exp $
+ *	$Id: keyboard.h,v 1.12 2001/09/06 04:01:41 gniibe Exp $
  */
 
+#include <linux/kd.h>
 #include <linux/config.h>
 #include <asm/machvec.h>
 
@@ -21,12 +22,17 @@ static __inline__ int kbd_getkeycode(unsigned int scancode)
     return scancode > 127 ? -EINVAL : scancode;
 }
 
+#ifdef CONFIG_SH_DREAMCAST
+extern int kbd_translate(unsigned char scancode, unsigned char *keycode,
+			 char raw_mode);
+#else
 static __inline__ int kbd_translate(unsigned char scancode,
 				    unsigned char *keycode, char raw_mode)
 {
     *keycode = scancode;
     return 1;
 }
+#endif
 
 static __inline__ char kbd_unexpected_up(unsigned char keycode)
 {

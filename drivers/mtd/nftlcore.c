@@ -1059,8 +1059,7 @@ static int __init init_nftl(void)
 		}
 		blksize_size[MAJOR_NR] = nftl_blocksizes;
 
-		nftl_gendisk.next = gendisk_head;
-		gendisk_head = &nftl_gendisk;
+		add_gendisk(&nftl_gendisk);
 	}
 	
 	register_mtd_user(&nftl_notifier);
@@ -1083,11 +1082,7 @@ static void __exit cleanup_nftl(void)
 
 	/* remove ourself from generic harddisk list
 	   FIXME: why can't I found this partition on /proc/partition */
-  	for (gdp = &gendisk_head; *gdp; gdp = &((*gdp)->next))
-    		if (*gdp == &nftl_gendisk) {
-      			gd = *gdp; *gdp = gd->next;
-      			break;
-		}
+	del_gendisk(&nftl_gendisk);:
 }
 
 module_init(init_nftl);

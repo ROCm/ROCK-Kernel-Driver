@@ -13,6 +13,7 @@
 
 #include <asm/io.h>
 #include <linux/rtc.h>			/* get the user-level API */
+#include <linux/spinlock.h>		/* spinlock_t */
 #include <asm/mc146818rtc.h>		/* register access macros */
 
 extern spinlock_t rtc_lock;		/* serialize CMOS RAM access */

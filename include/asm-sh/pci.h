@@ -3,6 +3,8 @@
 
 #ifdef __KERNEL__
 
+#include <linux/config.h>
+
 /* Can be used to override the logic in pci_scan_bus for skipping
    already-configured bus numbers - to be used for buggy BIOSes
    or architectures with incomplete PCI setup by the loader */
@@ -24,7 +26,7 @@
 #define PCIBIOS_MIN_IO		0x2000
 #define PCIBIOS_MIN_MEM		0xFD000000
 
-#elif defined(CONFIG_SH_7751_SOLUTION_ENGINE) && defined(CONFIG_CPU_SUBTYPE_SH7751)
+#elif defined(CONFIG_SH_7751_SOLUTION_ENGINE)
 #define PCIBIOS_MIN_IO          0x4000
 #define PCIBIOS_MIN_MEM         0xFD000000
 #endif
@@ -32,10 +34,6 @@
 struct pci_dev;
 
 extern void pcibios_set_master(struct pci_dev *dev);
-//static inline void pcibios_set_master(struct pci_dev *dev)
-//{
-	/* No special bus mastering setup handling */
-//}
 
 static inline void pcibios_penalize_isa_irq(int irq)
 {
@@ -80,10 +78,14 @@ extern void pci_free_consistent(struct pci_dev *hwdev, size_t size,
  * until either pci_unmap_single or pci_dma_sync_single is performed.
  */
 static inline dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr,
-					size_t size,int directoin)
+					size_t size, int direction)
 {
-  
-        flush_cache_all();
+	if (direction == PCI_DMA_NONE)
+                BUG();
+
+#ifdef CONFIG_SH_PCIDMA_NONCOHERENT
+	dma_cache_wback_inv(ptr, size);
+#endif
 	return virt_to_bus(ptr);
 }
 
@@ -116,9 +118,17 @@ static inline void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr,
  * the same here.
  */
 static inline int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
-			     int nents,int direction)
+			     int nents, int direction)
 {
-        flush_cache_all();
+#ifdef CONFIG_SH_PCIDMA_NONCOHERENT
+	int i;
+
+	for (i=0; i<nents; i++)
+		dma_cache_wback_inv(sg[i].address, sg[i].length);
+#endif
+	if (direction == PCI_DMA_NONE)
+                BUG();
+
 	return nents;
 }
 
@@ -127,7 +137,7 @@ static inline int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
  * pci_unmap_single() above.
  */
 static inline void pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg,
-				int nents,int direction)
+				int nents, int direction)
 {
 	/* Nothing to do */
 }
@@ -143,9 +153,15 @@ static inline void pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg,
  */
 static inline void pci_dma_sync_single(struct pci_dev *hwdev,
 				       dma_addr_t dma_handle,
-				       size_t size,int direction)
+				       size_t size, int direction)
 {
-	/* Nothing to do */
+	if (direction == PCI_DMA_NONE)
+                BUG();
+
+#ifdef CONFIG_SH_PCIDMA_NONCOHERENT
+	dma_cache_wback_inv(bus_to_virt(dma_handle), size);
+#endif
+	
 }
 
 /* Make physical memory consistent for a set of streaming
@@ -156,9 +172,17 @@ static inline void pci_dma_sync_single(struct pci_dev *hwdev,
  */
 static inline void pci_dma_sync_sg(struct pci_dev *hwdev,
 				   struct scatterlist *sg,
-				   int nelems,int direction)
+				   int nelems, int direction)
 {
-	/* Nothing to do */
+	if (direction == PCI_DMA_NONE)
+                BUG();
+
+#ifdef CONFIG_SH_PCIDMA_NONCOHERENT
+	int i;
+
+	for (i=0; i<nelems; i++)
+		dma_cache_wback_inv(sg[i].address, sg[i].length);
+#endif
 }
 
 
@@ -167,7 +191,7 @@ static inline void pci_dma_sync_sg(struct pci_dev *hwdev,
  * only drive the low 24-bits during PCI bus mastering, then
  * you would pass 0x00ffffff as the mask to this function.
  */
-extern inline int pci_dma_supported(struct pci_dev *hwdev, dma_addr_t mask)
+static inline int pci_dma_supported(struct pci_dev *hwdev, dma_addr_t mask)
 {
 	return 1;
 }

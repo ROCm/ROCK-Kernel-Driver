@@ -52,7 +52,6 @@
  * reiserfs_paste_into_item
  * reiserfs_insert_item
  */
-#ifdef __KERNEL__
 
 #include <linux/config.h>
 #include <linux/sched.h>
@@ -61,14 +60,6 @@
 #include <linux/pagemap.h>
 #include <linux/reiserfs_fs.h>
 #include <linux/smp_lock.h>
-
-#else
-
-#include "nokernel.h"
-
-#endif
-
-
 
 /* Does the buffer contain a disk block which is in the tree. */
 inline int B_IS_IN_TREE (struct buffer_head * p_s_bh)
@@ -1212,10 +1203,6 @@ static char  prepare_for_delete_or_cut(
 		    /* Block is locked or held more than by one holder and by
                        journal. */
 
-#ifndef __KERNEL__
-		    reiserfs_panic(p_s_sb, "PAP-5270: prepare_for_delete_or_cut: b_count != 1");
-#endif
-
 #ifdef CONFIG_REISERFS_CHECK
 		    if (n_repeat_counter && (n_repeat_counter % 100000) == 0) {
 		      printk("prepare_for_delete, waiting on buffer %lu, b_count %d, %s%cJDIRTY %cJDIRTY_WAIT\n", 
@@ -1280,11 +1267,9 @@ static char  prepare_for_delete_or_cut(
 		}
 #endif
 
-#ifdef __KERNEL__
 		run_task_queue(&tq_disk);
 		current->policy |= SCHED_YIELD;
 		schedule();
-#endif
 	    }
 	    /* This loop can be optimized. */
 	} while ( (*p_n_removed < n_unfm_number || need_research) &&

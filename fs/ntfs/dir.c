@@ -430,7 +430,7 @@ int ntfs_split_indexroot(ntfs_inode *ino)
 
 	ra = ntfs_find_attr(ino, ino->vol->at_index_root, I30);
 	if (!ra)
-		return -E2BIG;
+		return -ENOTDIR;
 	bsize = ino->vol->mft_record_size;
 	root = ntfs_malloc(bsize);
 	if (!root)
@@ -740,7 +740,7 @@ static int ntfs_getdir_iterate(ntfs_iterate_s *walk, char *start, char *entry)
 
 /* Find an entry in the directory. Return 0 if not found, otherwise copy the
  * entry to the result buffer. */
-int ntfs_getdir(ntfs_iterate_s* walk)
+int ntfs_getdir(ntfs_iterate_s *walk)
 {
 	int length = walk->dir->vol->mft_record_size;
 	int retval, error;
@@ -788,31 +788,31 @@ int ntfs_getdir_byname(ntfs_iterate_s *walk)
 	return ntfs_getdir(walk);
 }
 
-int ntfs_getdir_unsorted(ntfs_inode *ino, ntfs_u32 *p_high, ntfs_u32* p_low,
-			 int (*cb)(ntfs_u8*, void*), void *param)
+int ntfs_getdir_unsorted(ntfs_inode *ino, u32 *p_high, u32 *p_low,
+		int (*cb)(ntfs_u8 *, void *), void *param)
 {
 	char *buf = 0, *entry = 0;
-	ntfs_io io;
-	int length;
-	int block;
-	int start;
 	ntfs_attribute *attr;
 	ntfs_volume *vol;
-	int byte, bit;
-	int error = 0;
+	int length, block, byte, bit, error = 0;
+	u32 start, finish;
+	ntfs_io io;
 
 	if (!ino) {
-		ntfs_error("No inode passed to getdir_unsorted\n");
+		ntfs_error(__FUNCTION__ "(): No inode! Returning -EINVAL.\n");
 		return -EINVAL;
 	}
 	vol = ino->vol;
 	if (!vol) {
-		ntfs_error("Inode %d has no volume\n", ino->i_number);
+		ntfs_error(__FUNCTION__ "(): Inode %lx has no volume. "
+				"Returning -EINVAL.\n", ino->i_number);
 		return -EINVAL;
 	}
-	ntfs_debug(DEBUG_DIR3, "unsorted 1\n");
-	/* Are we still in the index root? */
+	ntfs_debug(DEBUG_DIR3, __FUNCTION__ "(): Unsorted 1: Entering for "
+			"inode 0x%lx, p_high = 0x%x, p_low = 0x%x.\n",
+			ino->i_number, *p_high, *p_low);
 	if (*p_high == 0) {
+		/* We are still in the index root. */
 		buf = ntfs_malloc(length = vol->mft_record_size);
 		if (!buf)
 			return -ENOMEM;
@@ -820,15 +820,16 @@ int ntfs_getdir_unsorted(ntfs_inode *ino, ntfs_u32 *p_high, ntfs_u32* p_low,
 		io.param = buf;
 		io.size = length;
 		error = ntfs_read_attr(ino, vol->at_index_root, I30, 0, &io);
-		if (error) {
-			ntfs_free(buf);
-			return error;
-		}
+		if (error)
+			goto read_err_ret;
 		ino->u.index.recordsize = NTFS_GETU32(buf + 0x8);
 		ino->u.index.clusters_per_record = NTFS_GETU32(buf + 0xC);
 		entry = buf + 0x20;
-		ntfs_debug(DEBUG_DIR3, "unsorted 2\n");
-	} else { /* we are in an index record */
+		ntfs_debug(DEBUG_DIR3, __FUNCTION__ "(): Unsorted 2: In index "
+				"root.\n");
+		/* Compensate for faked "." and "..". */
+		start = 2;
+	} else { /* We are in an index record. */
 		length = ino->u.index.recordsize;
 		buf = ntfs_malloc(length);
 		if (!buf)
@@ -840,43 +841,48 @@ int ntfs_getdir_unsorted(ntfs_inode *ino, ntfs_u32 *p_high, ntfs_u32* p_low,
 		block = *p_high - ino->u.index.clusters_per_record;
 		error = ntfs_read_attr(ino, vol->at_index_allocation, I30,
 				(__s64)block << vol->cluster_size_bits, &io);
-		if (!error && io.size != length)
-			error = -EIO;
-		if (error) {
-			ntfs_error("read failed\n");
-			ntfs_free(buf);
-			return error;
-		}
+		if (error || io.size != length)
+			goto read_err_ret;
 		if (!ntfs_check_index_record(ino, buf)) {
-			ntfs_error("%x is not an index record\n", block);
+			ntfs_error(__FUNCTION__ "(): Block 0x%x is not an "
+					"index record. Returning -ENOTDIR.\n",
+					block);
 			ntfs_free(buf);
 			return -ENOTDIR;
 		}
 		entry = buf + NTFS_GETU16(buf + 0x18) + 0x18;
-		ntfs_debug(DEBUG_DIR3, "unsorted 3\n");
+		ntfs_debug(DEBUG_DIR3, __FUNCTION__ "(): Unsorted 3: In index "
+				"allocation.\n");
+		start = 0;
 	}
 	/* Process the entries. */
-	start = *p_low;
-	while (ntfs_entry_is_used(entry)) {
-		ntfs_debug(DEBUG_DIR3, "unsorted 4\n");
-		if (start)
-			start--; /* Skip entries that were already processed. */
-		else {
-			ntfs_debug(DEBUG_DIR3, "unsorted 5\n");
-			if ((error = cb(entry, param)))
-				/* The entry could not be processed. */
-				break;
-			(*p_low)++;
+	finish = *p_low;
+	for (; ntfs_entry_is_used(entry); entry += NTFS_GETU16(entry + 8)) {
+		if (start < finish) {
+			/* Skip entries that were already processed. */
+			ntfs_debug(DEBUG_DIR3, __FUNCTION__ "(): Unsorted 4: "
+					"Skipping already processed entry "
+					"p_high 0x%x, p_low 0x%x.\n", *p_high,
+					start);
+			start++;
+			continue;
 		}
-		entry += NTFS_GETU16(entry + 8);
+		ntfs_debug(DEBUG_DIR3, __FUNCTION__ "(): Unsorted 5: "
+				"Processing entry p_high 0x%x, p_low 0x%x.\n",
+				*p_high, *p_low);
+		if ((error = cb(entry, param))) {
+			/* filldir signalled us to stop. */
+			ntfs_debug(DEBUG_DIR3, __FUNCTION__ "(): "
+					"Unsorted 6: cb returned %i, "
+					"returning 0, p_high 0x%x, p_low 0x%x."
+					"\n", *p_high, *p_low);
+			ntfs_free(buf);
+			return 0;
+		}
+		++*p_low;
 	}
-	ntfs_debug(DEBUG_DIR3, "unsorted 6\n");
-	/* Caller did not process all entries. */
-	if (error) {
-		ntfs_free(buf);
-		ntfs_debug(DEBUG_DIR3, "unsorted 7\n");
-		return error;
-	}
+	ntfs_debug(DEBUG_DIR3, __FUNCTION__ "(): Unsorted 7: After processing "
+			"entries, p_high 0x%x, p_low 0x%x.\n", *p_high, *p_low);
 	/* We have to locate the next record. */
 	ntfs_free(buf);
 	buf = 0;
@@ -884,9 +890,10 @@ int ntfs_getdir_unsorted(ntfs_inode *ino, ntfs_u32 *p_high, ntfs_u32* p_low,
 	attr = ntfs_find_attr(ino, vol->at_bitmap, I30);
 	if (!attr) {
 		/* Directory does not have index allocation. */
-		*p_high = 0xFFFFFFFF;
-		*p_low = 0;
-		ntfs_debug(DEBUG_DIR3, "unsorted 8\n");
+		*p_high = 0x7fff;
+		ntfs_debug(DEBUG_DIR3, __FUNCTION__ "(): Unsorted 8: No index "
+				"allocation. Returning 0, p_high 0x7fff, "
+				"p_low 0x0.\n");
 		return 0;
 	}
 	buf = ntfs_malloc(length = attr->size);
@@ -895,38 +902,44 @@ int ntfs_getdir_unsorted(ntfs_inode *ino, ntfs_u32 *p_high, ntfs_u32* p_low,
 	io.param = buf;
 	io.size = length;
 	error = ntfs_read_attr(ino, vol->at_bitmap, I30, 0, &io);
-	if (!error && io.size != length)
-		error = -EIO;
-	if (error) {
-		ntfs_free(buf);
-		ntfs_debug(DEBUG_DIR3, "unsorted 9\n");
-		return -EIO;
-	}
+	if (error || io.size != length)
+		goto read_err_ret;
 	attr = ntfs_find_attr(ino, vol->at_index_allocation, I30);
 	if (!attr) {
 		ntfs_free(buf);
-		ntfs_debug(DEBUG_DIR3, "unsorted 9.5\n");
+		ntfs_debug(DEBUG_DIR3, __FUNCTION__ "(): Unsorted 9: Find "
+				"attr failed. Returning -EIO.\n");
 		return -EIO;
 	}
-	while (1) {
-		if ((__s64)*p_high << vol->cluster_size_bits > attr->size) {
+	/* Loop while going through non-allocated index records. */
+	do {
+		if ((s64)*p_high << vol->cluster_size_bits >
+				attr->initialized) {
 			/* No more index records. */
-			*p_high = 0xFFFFFFFF;
+			*p_high = 0x7fff;
 			ntfs_free(buf);
-			ntfs_debug(DEBUG_DIR3, "unsorted 10\n");
+			ntfs_debug(DEBUG_DIR3, __FUNCTION__ "(): Unsorted 10: "
+					"No more index records. Returning 0, "
+					"p_high 0x7fff, p_low 0x%x.\n", *p_low);
 			return 0;
 		}
 		*p_high += ino->u.index.clusters_per_record;
 		byte = *p_high / ino->u.index.clusters_per_record - 1;
 		bit = 1 << (byte & 7);
 		byte = byte >> 3;
-		/* This record is allocated. */
-		if (buf[byte] & bit)
-			break;
-	}
-	ntfs_debug(DEBUG_DIR3, "unsorted 11\n");
+	} while (!(buf[byte] & bit));
+	ntfs_debug(DEBUG_DIR3, __FUNCTION__ "(): Unsorted 11: Done. "
+			"Returning 0, p_high 0x%x, p_low 0x%x.\n", *p_high,
+			*p_low);
 	ntfs_free(buf);
 	return 0;
+read_err_ret:
+	if (!error)
+		error = -EIO;
+	ntfs_error(__FUNCTION__ "(): Read failed. Returning error code %i.\n",
+			error);
+	ntfs_free(buf);
+	return error;
 }
 
 int ntfs_dir_add(ntfs_inode *dir, ntfs_inode *new, ntfs_attribute *name)
@@ -1033,7 +1046,7 @@ int ntfs_add_index_root(ntfs_inode *ino, int type)
 				data, sizeof(data), &da);
 }
 
-int ntfs_mkdir(ntfs_inode* dir, const char* name, int namelen,
+int ntfs_mkdir(ntfs_inode *dir, const char *name, int namelen,
 	       ntfs_inode *result)
 {
 	int error;

@@ -75,6 +75,11 @@ LIBS := $(TOPDIR)/arch/sh/lib/lib.a $(LIBS) $(TOPDIR)/arch/sh/lib/lib.a \
 
 MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
 
+ifneq ($(CONFIG_SH_GENERIC)$(CONFIG_SH_STB1_HARP)$(CONFIG_SH_STB1_OVERDRIVE),)
+SUBDIRS += arch/sh/stboards
+CORE_FILES += arch/sh/stboards/stboards.o
+endif
+
 vmlinux: arch/sh/vmlinux.lds
 
 arch/sh/vmlinux.lds: arch/sh/vmlinux.lds.S FORCE
@@ -93,6 +98,7 @@ zdisk: vmlinux
 archclean:
 	@$(MAKEBOOT) clean
 	$(MAKE) -C arch/$(ARCH)/kernel clean
+	$(MAKE) -C arch/$(ARCH)/stboards clean
 #	$(MAKE) -C arch/$(ARCH)/tools clean
 
 archmrproper:
