@@ -1931,7 +1931,7 @@ void ip6_route_cleanup(void)
 {
 #ifdef CONFIG_PROC_FS
 	proc_net_remove("ipv6_route");
-	remove_proc_entry("rt6_stats", proc_net);
+	proc_net_remove("rt6_stats");
 #endif
 	xfrm6_fini();
 	rt6_ifdown(NULL);

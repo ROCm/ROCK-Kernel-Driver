@@ -1058,6 +1058,6 @@ int __init raw6_proc_init(void)
 
 void raw6_proc_exit(void)
 {
-	remove_proc_entry("raw6", proc_net);
+	proc_net_remove("raw6");
 }
 #endif	/* CONFIG_PROC_FS */

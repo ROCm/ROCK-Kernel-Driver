@@ -77,11 +77,13 @@ MODULE_LICENSE("GPL");
 extern int raw6_proc_init(void);
 extern int raw6_proc_exit(void);
 
-extern int anycast6_get_info(char *, char **, off_t, int);
 extern int tcp6_get_info(char *, char **, off_t, int);
 extern int udp6_get_info(char *, char **, off_t, int);
-extern int afinet6_get_info(char *, char **, off_t, int);
-extern int afinet6_get_snmp(char *, char **, off_t, int);
+
+extern int ipv6_misc_proc_init(void);
+extern int ipv6_misc_proc_exit(void);
+
+extern int anycast6_get_info(char *, char **, off_t, int);
 #endif
 
 #ifdef CONFIG_SYSCTL
@@ -816,9 +818,7 @@ static int __init inet6_init(void)
 
 #ifdef CONFIG_PROC_FS
 proc_anycast6_fail:
-	proc_net_remove("snmp6");
-	proc_net_remove("dev_snmp6");
-	proc_net_remove("sockstat6");
+	ipv6_misc_proc_exit();
 proc_misc6_fail:
 	proc_net_remove("udp6");
 proc_udp6_fail:
@@ -852,9 +852,7 @@ static void inet6_exit(void)
 	raw6_proc_exit();
 	proc_net_remove("tcp6");
 	proc_net_remove("udp6");
-	proc_net_remove("sockstat6");
-	proc_net_remove("dev_snmp6");
-	proc_net_remove("snmp6");
+	ipv6_misc_proc_exit();
 	proc_net_remove("anycast6");
 #endif
 	/* Cleanup code parts. */
