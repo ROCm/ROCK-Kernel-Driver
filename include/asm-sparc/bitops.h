@@ -207,12 +207,74 @@ static __inline__ unsigned long ffz(unsigned long word)
 	return result;
 }
 
+/**
+ * __ffs - find first bit in word.
+ * @word: The word to search
+ *
+ * Undefined if no bit exists, so code should check against 0 first.
+ */
+static __inline__ int __ffs(unsigned long word)
+{
+	int num = 0;
+
+	if ((word & 0xffff) == 0) {
+		num += 16;
+		word >>= 16;
+	}
+	if ((word & 0xff) == 0) {
+		num += 8;
+		word >>= 8;
+	}
+	if ((word & 0xf) == 0) {
+		num += 4;
+		word >>= 4;
+	}
+	if ((word & 0x3) == 0) {
+		num += 2;
+		word >>= 2;
+	}
+	if ((word & 0x1) == 0)
+		num += 1;
+	return num;
+}
+
+/*
+ * Every architecture must define this function. It's the fastest
+ * way of searching a 140-bit bitmap where the first 100 bits are
+ * unlikely to be set. It's guaranteed that at least one of the 140
+ * bits is cleared.
+ */
+static __inline__ int sched_find_first_bit(unsigned long *b)
+{
+
+	if (unlikely(b[0]))
+		return __ffs(b[0]);
+	if (unlikely(b[1]))
+		return __ffs(b[1]) + 32;
+	if (unlikely(b[2]))
+		return __ffs(b[2]) + 64;
+	if (b[3])
+		return __ffs(b[3]) + 96;
+	return __ffs(b[4]) + 128;
+}
+
 /*
  * ffs: find first bit set. This is defined the same way as
  * the libc and compiler builtin ffs routines, therefore
  * differs in spirit from the above ffz (man ffs).
  */
-#define ffs(x) generic_ffs(x)
+static __inline__ int ffs(int x)
+{
+	if (!x)
+		return 0;
+	return __ffs((unsigned long)x);
+}
+
+/*
+ * fls: find last (most-significant) bit set.
+ * Note fls(0) = 0, fls(1) = 1, fls(0x80000000) = 32.
+ */
+#define fls(x) generic_fls(x)
 
 /*
  * hweightN: returns the hamming weight (i.e. the number
@@ -272,6 +334,34 @@ found_middle:
 #define find_first_zero_bit(addr, size) \
         find_next_zero_bit((addr), (size), 0)
 
+/**
+ * find_next_bit - find the first set bit in a memory region
+ * @addr: The address to base the search on
+ * @offset: The bitnumber to start searching at
+ * @size: The maximum size to search
+ *
+ * Scheduler induced bitop, do not use.
+ */
+static __inline__ int find_next_bit(unsigned long *addr, int size, int offset)
+{
+	unsigned long *p = addr + (offset >> 5);
+	int num = offset & ~0x1f;
+	unsigned long word;
+
+	word = *p++;
+	word &= ~((1 << (offset & 0x1f)) - 1);
+	while (num < size) {
+		if (word != 0) {
+			return __ffs(word) + num;
+		}
+		word = *p++;
+		num += 0x20;
+	}
+	return num;
+}
+
+/*
+ */
 static __inline__ int test_le_bit(int nr, __const__ void * addr)
 {
 	__const__ unsigned char *ADDR = (__const__ unsigned char *) addr;

@@ -16,6 +16,7 @@
 #include <asm/oplib.h>
 #include <asm/bpp.h>
 #include <asm/irq.h>
+#include <asm/pcic.h>		/* pcic_present */
 
 struct sbus_bus *sbus_root = NULL;
 
@@ -334,7 +335,7 @@ static int __init sbus_init(void)
 		   (nd = prom_getchild(iommund)) == 0 ||
 		   (nd = prom_searchsiblings(nd, "sbus")) == 0) {
 #ifdef CONFIG_PCI
-                        if (!pcibios_present()) {       
+                        if (!pcic_present()) {
                                 prom_printf("Neither SBUS nor PCI found.\n");
                                 prom_halt();
                         }

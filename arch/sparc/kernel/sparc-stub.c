@@ -109,6 +109,8 @@
 #include <asm/kgdb.h>
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
+#include <asm/cacheflush.h>
+
 /*
  *
  * external low-level support routines

@@ -11,6 +11,8 @@
 
 #include <linux/config.h>
 #include <linux/spinlock.h>
+/* XXX This creates many nasty warnings. */
+/* #include <linux/highmem.h> */	/* kmap_atomic in pte_offset_map */
 #include <asm/asi.h>
 #ifdef CONFIG_SUN4
 #include <asm/pgtsun4.h>
@@ -25,6 +27,8 @@
 #include <asm/system.h>
 
 #ifndef __ASSEMBLY__
+
+struct vm_area_struct;
 
 extern void load_mmu(void);
 extern unsigned long calc_highpages(void);
@@ -183,7 +187,7 @@ extern unsigned long empty_zero_page;
 
 #define BAD_PAGETABLE __bad_pagetable()
 #define BAD_PAGE __bad_page()
-#define ZERO_PAGE(vaddr) (mem_map + (((unsigned long)&empty_zero_page - PAGE_OFFSET + phys_base) >> PAGE_SHIFT))
+#define ZERO_PAGE(vaddr) (virt_to_page(empty_zero_page))
 
 /* number of bits that fit into a memory pointer */
 #define BITS_PER_PTR      (8*sizeof(unsigned long))
@@ -193,7 +197,7 @@ extern unsigned long empty_zero_page;
 
 #define SIZEOF_PTR_LOG2   2
 
-BTFIXUPDEF_CALL_CONST(unsigned long, pmd_page, pmd_t)
+BTFIXUPDEF_CALL_CONST(struct page *, pmd_page, pmd_t)
 BTFIXUPDEF_CALL_CONST(unsigned long, pgd_page, pgd_t)
 
 #define pmd_page(pmd) BTFIXUP_CALL(pmd_page)(pmd)
@@ -291,13 +295,12 @@ BTFIXUPDEF_CALL_CONST(pte_t, pte_mkyoung, pte_t)
 #define pte_mkyoung(pte) BTFIXUP_CALL(pte_mkyoung)(pte)
 
 #define page_pte_prot(page, prot)	mk_pte(page, prot)
-#define page_pte(page)			page_pte_prot(page, __pgprot(0))
+#define page_pte(page)			mk_pte(page, __pgprot(0))
+#define pfn_pte(pfn, prot)		mk_pte(pfn_to_page(pfn), prot)
 
-/* Permanent address of a page. */
-#define page_address(page)  ((page)->virtual)
-
-BTFIXUPDEF_CALL(struct page *, pte_page, pte_t)
-#define pte_page(pte) BTFIXUP_CALL(pte_page)(pte)
+BTFIXUPDEF_CALL(unsigned long,	 pte_pfn, pte_t)
+#define pte_pfn(pte) BTFIXUP_CALL(pte_pfn)(pte)
+#define pte_page(pte)	pfn_to_page(pte_pfn(pte))
 
 /*
  * Conversion functions: convert a page and protection to a page entry,
@@ -311,12 +314,6 @@ BTFIXUPDEF_CALL_CONST(pte_t, mk_pte_io, unsigned long, pgprot_t, int)
 #define mk_pte(page,pgprot) BTFIXUP_CALL(mk_pte)(page,pgprot)
 #define mk_pte_phys(page,pgprot) BTFIXUP_CALL(mk_pte_phys)(page,pgprot)
 #define mk_pte_io(page,pgprot,space) BTFIXUP_CALL(mk_pte_io)(page,pgprot,space)
-
-BTFIXUPDEF_CALL(void, pgd_set, pgd_t *, pmd_t *)
-BTFIXUPDEF_CALL(void, pmd_set, pmd_t *, pte_t *)
-
-#define pgd_set(pgdp,pmdp) BTFIXUP_CALL(pgd_set)(pgdp,pmdp)
-#define pmd_set(pmdp,ptep) BTFIXUP_CALL(pmd_set)(pmdp,ptep)
 
 BTFIXUPDEF_INT(pte_modify_mask)
 
@@ -335,20 +332,31 @@ extern __inline__ pte_t pte_modify(pte_t pte, pgprot_t newprot)
 /* to find an entry in a kernel page-table-directory */
 #define pgd_offset_k(address) pgd_offset(&init_mm, address)
 
-BTFIXUPDEF_CALL(pmd_t *, pmd_offset, pgd_t *, unsigned long)
-BTFIXUPDEF_CALL(pte_t *, pte_offset, pmd_t *, unsigned long)
-
 /* Find an entry in the second-level page table.. */
+BTFIXUPDEF_CALL(pmd_t *, pmd_offset, pgd_t *, unsigned long)
 #define pmd_offset(dir,addr) BTFIXUP_CALL(pmd_offset)(dir,addr)
 
 /* Find an entry in the third-level page table.. */ 
-#define pte_offset(dir,addr) BTFIXUP_CALL(pte_offset)(dir,addr)
+BTFIXUPDEF_CALL(pte_t *, pte_offset_kernel, pmd_t *, unsigned long)
+#define pte_offset_kernel(dir,addr) BTFIXUP_CALL(pte_offset_kernel)(dir,addr)
+
+/* __pte_offset is not BTFIXUP-ed, but PTRS_PER_PTE is, so it's ok. */
+#define __pte_offset(address) \
+	(((address) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
+#if 0 /* XXX Should we expose pmd_page_kernel? */
+#define pte_offset_kernel(dir, addr) \
+	((pte_t *) pmd_page_kernel(*(dir)) + __pte_offset(addr))
+#endif
+#define pte_offset_map(dir, addr) \
+	((pte_t *) kmap_atomic(pmd_page(*(dir)), KM_PTE0) + __pte_offset(addr))
+#define pte_offset_map_nested(dir, addr) \
+	((pte_t *) kmap_atomic(pmd_page(*(dir)), KM_PTE1) + __pte_offset(addr))
+
+#define pte_unmap(pte)		kunmap_atomic(pte, KM_PTE0)
+#define pte_unmap_nested(pte)	kunmap_atomic(pte, KM_PTE1)
 
 /* The permissions for pgprot_val to make a page mapped on the obio space */
 extern unsigned int pg_iobits;
-
-#define flush_icache_page(vma, pg)      do { } while(0)
-#define flush_icache_user_range(vma,pg,adr,len)	do { } while (0)
 
 /* Certain architectures need to do special things when pte's
  * within a page table are directly modified.  Thus, the following

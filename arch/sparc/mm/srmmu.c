@@ -1,8 +1,8 @@
-/* $Id: srmmu.c,v 1.234 2001/12/21 04:56:15 davem Exp $
+/*
  * srmmu.c:  SRMMU specific routines for memory management.
  *
  * Copyright (C) 1995 David S. Miller  (davem@caip.rutgers.edu)
- * Copyright (C) 1995 Pete Zaitcev
+ * Copyright (C) 1995,2002 Pete Zaitcev (zaitcev@yahoo.com)
  * Copyright (C) 1996 Eddie C. Dost    (ecd@skynet.be)
  * Copyright (C) 1997,1998 Jakub Jelinek (jj@sunsite.mff.cuni.cz)
  * Copyright (C) 1999,2000 Anton Blanchard (anton@samba.org)
@@ -132,11 +132,32 @@ spinlock_t srmmu_nocache_spinlock;
 static inline unsigned long srmmu_pgd_page(pgd_t pgd)
 { return srmmu_device_memory(pgd_val(pgd))?~0:(unsigned long)__nocache_va((pgd_val(pgd) & SRMMU_PTD_PMASK) << 4); }
 
-static inline unsigned long srmmu_pmd_page(pmd_t pmd)
-{ return srmmu_device_memory(pmd_val(pmd))?~0:(unsigned long)__nocache_va((pmd_val(pmd) & SRMMU_PTD_PMASK) << 4); }
+static inline unsigned long srmmu_pmd_page_kernel(pmd_t pmd)
+{
+	return (unsigned long)
+	    __nocache_va((pmd_val(pmd) & SRMMU_PTD_PMASK) << 4);
+}
 
-static inline struct page *srmmu_pte_page(pte_t pte)
-{ return (mem_map + (unsigned long)(srmmu_device_memory(pte_val(pte))?~0:(((pte_val(pte) & SRMMU_PTE_PMASK) << 4) >> PAGE_SHIFT))); }
+static struct page *srmmu_pmd_page(pmd_t pmd)	/* XXX inline later */
+{
+
+	if (srmmu_device_memory(pmd_val(pmd))) {
+		/* XXX Anton obviously had something in mind when he did this.
+		 * But what?
+		 */
+		/* return (struct page *)~0; */
+		BUG();	/* NO WAY */
+	}
+	return virt_to_page(srmmu_pmd_page_kernel(pmd));
+}
+
+static inline unsigned long srmmu_pte_pfn(pte_t pte)
+{
+	if (srmmu_device_memory(pte_val(pte)))
+		BUG();
+	return (unsigned long)
+	    (((pte_val(pte) & SRMMU_PTE_PMASK) << 4) >> PAGE_SHIFT);
+}
 
 static inline int srmmu_pte_none(pte_t pte)
 { return !(pte_val(pte) & 0xFFFFFFF); }
@@ -219,7 +240,16 @@ static inline void srmmu_pgd_set(pgd_t * pgdp, pmd_t * pmdp)
 { srmmu_set_pte((pte_t *)pgdp, (SRMMU_ET_PTD | (__nocache_pa((unsigned long) pmdp) >> 4))); }
 
 static inline void srmmu_pmd_set(pmd_t * pmdp, pte_t * ptep)
-{ srmmu_set_pte((pte_t *)pmdp, (SRMMU_ET_PTD | (__nocache_pa((unsigned long) ptep) >> 4))); }
+{
+	srmmu_set_pte((pte_t *)pmdp,
+	    (SRMMU_ET_PTD | (__nocache_pa((unsigned long) ptep) >> 4)));
+}
+
+static inline void srmmu_pmd_populate(pmd_t * pmdp, struct page * ptep)
+{
+	srmmu_set_pte((pte_t *)pmdp,
+	    (SRMMU_ET_PTD | (((ptep - mem_map) << PAGE_SHIFT) >> 4)));
+}
 
 static inline pte_t srmmu_pte_modify(pte_t pte, pgprot_t newprot)
 { return __pte((pte_val(pte) & SRMMU_CHG_MASK) | pgprot_val(newprot)); }
@@ -234,7 +264,13 @@ static inline pmd_t *srmmu_pmd_offset(pgd_t * dir, unsigned long address)
 
 /* Find an entry in the third-level page table.. */ 
 static inline pte_t *srmmu_pte_offset(pmd_t * dir, unsigned long address)
-{ return (pte_t *) srmmu_pmd_page(*dir) + ((address >> PAGE_SHIFT) & (SRMMU_PTRS_PER_PTE - 1)); }
+{
+	unsigned long pte;
+
+	pte = srmmu_pmd_page_kernel(*dir);
+	return (pte_t *) pte +
+			((address >> PAGE_SHIFT) & (SRMMU_PTRS_PER_PTE - 1));
+}
 
 unsigned long __srmmu_get_nocache(int size, int align)
 {
@@ -387,19 +423,24 @@ static void srmmu_free_pgd_fast(pgd_t *pgd)
 	srmmu_free_nocache((unsigned long)pgd, SRMMU_PGD_TABLE_SIZE);
 }
 
-static pte_t *srmmu_pte_alloc_one_fast(struct mm_struct *mm, unsigned long address)
+static pte_t *srmmu_pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 {
 	return (pte_t *)srmmu_get_nocache(SRMMU_PTE_TABLE_SIZE, SRMMU_PTE_TABLE_SIZE);
 }
 
-static pte_t *srmmu_pte_alloc_one(struct mm_struct *mm, unsigned long address)
+static struct page *srmmu_pte_alloc_one(struct mm_struct *mm, unsigned long address)
 {
-	return NULL;
+	return virt_to_page(srmmu_pte_alloc_one_kernel(mm, address));
 }
 
 static void srmmu_free_pte_fast(pte_t *pte)
 {
 	srmmu_free_nocache((unsigned long)pte, SRMMU_PTE_TABLE_SIZE);
+}
+
+static void srmmu_pte_free(struct page *pte)
+{
+	srmmu_free_nocache((unsigned long)page_address(pte), SRMMU_PTE_TABLE_SIZE);
 }
 
 static pmd_t *srmmu_pmd_alloc_one_fast(struct mm_struct *mm, unsigned long address)
@@ -517,19 +558,15 @@ void srmmu_unmapioaddr(unsigned long virt_addr)
  * mappings on the kernel stack without any special code as we did
  * need on the sun4c.
  */
-struct task_struct *srmmu_alloc_task_struct(void)
+struct thread_info *srmmu_alloc_thread_info(void)
 {
-	return (struct task_struct *) __get_free_pages(GFP_KERNEL, 1);
+	return (struct thread_info *)
+	    __get_free_pages(GFP_KERNEL, THREAD_INFO_ORDER);
 }
 
-static void srmmu_free_task_struct(struct task_struct *tsk)
+static void srmmu_free_thread_info(struct thread_info *ti)
 {
-	free_pages((unsigned long)tsk, 1);
-}
-
-static void srmmu_get_task_struct(struct task_struct *tsk)
-{
-	atomic_inc(&virt_to_page(tsk)->count);
+	free_pages((unsigned long)ti, THREAD_INFO_ORDER);
 }
 
 /* tsunami.S */
@@ -1170,8 +1207,8 @@ void __init srmmu_paging_init(void)
 	srmmu_allocate_ptable_skeleton(PKMAP_BASE, PKMAP_BASE_END);
 
 	pgd = pgd_offset_k(PKMAP_BASE);
-	pmd = pmd_offset(pgd, PKMAP_BASE);
-	pte = pte_offset(pmd, PKMAP_BASE);
+	pmd = srmmu_pmd_offset(pgd, PKMAP_BASE);
+	pte = srmmu_pte_offset(pmd, PKMAP_BASE);
 	pkmap_page_table = pte;
 
 	flush_cache_all();
@@ -1209,6 +1246,10 @@ void __init srmmu_paging_init(void)
 		free_area_init_node(0, NULL, NULL, zones_size,
 				    phys_base, zholes_size);
 	}
+
+/* P3: easy to fix, todo. Current code is utterly broken, though. */
+	if (phys_base != 0)
+		panic("phys_base nonzero");
 }
 
 static void srmmu_mmu_info(struct seq_file *m)
@@ -1282,7 +1323,7 @@ static void __init init_vac_layout(void)
 			if(vac_line_size < min_line_size)
 				min_line_size = vac_line_size;
 			cpu++;
-			if(cpu == smp_num_cpus)
+			if (cpu >= NR_CPUS || !cpu_online(cpu))
 				break;
 #else
 			break;
@@ -1944,9 +1985,8 @@ static void __init get_srmmu_type(void)
 }
 
 /* dont laugh, static pagetables */
-static int srmmu_check_pgt_cache(int low, int high)
+static void srmmu_check_pgt_cache(int low, int high)
 {
-	return 0;
 }
 
 extern unsigned long spwin_mmu_patchme, fwin_mmu_patchme,
@@ -2017,16 +2057,16 @@ void __init ld_mmu_srmmu(void)
 #ifndef CONFIG_SMP	
 	BTFIXUPSET_CALL(___xchg32, ___xchg32_sun4md, BTFIXUPCALL_SWAPG1G2);
 #endif
-	BTFIXUPSET_CALL(do_check_pgt_cache, srmmu_check_pgt_cache, BTFIXUPCALL_NORM);
+	BTFIXUPSET_CALL(do_check_pgt_cache, srmmu_check_pgt_cache, BTFIXUPCALL_NOP);
 
 	BTFIXUPSET_CALL(set_pte, srmmu_set_pte, BTFIXUPCALL_SWAPO0O1);
 	BTFIXUPSET_CALL(switch_mm, srmmu_switch_mm, BTFIXUPCALL_NORM);
 
-	BTFIXUPSET_CALL(pte_page, srmmu_pte_page, BTFIXUPCALL_NORM);
+	BTFIXUPSET_CALL(pte_pfn, srmmu_pte_pfn, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(pmd_page, srmmu_pmd_page, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(pgd_page, srmmu_pgd_page, BTFIXUPCALL_NORM);
 
-	BTFIXUPSET_SETHI(none_mask, 0xF0000000); /* XXX P3: is it used? */
+	BTFIXUPSET_SETHI(none_mask, 0xF0000000);
 
 	BTFIXUPSET_CALL(pte_present, srmmu_pte_present, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(pte_clear, srmmu_pte_clear, BTFIXUPCALL_SWAPO0G0);
@@ -2041,16 +2081,18 @@ void __init ld_mmu_srmmu(void)
 	BTFIXUPSET_CALL(pgd_clear, srmmu_pgd_clear, BTFIXUPCALL_SWAPO0G0);
 
 	BTFIXUPSET_CALL(mk_pte, srmmu_mk_pte, BTFIXUPCALL_NORM);
-	BTFIXUPSET_CALL(pfn_pte, srmmu_pfn_pte, BTFIXUPCALL_NORM);
+	BTFIXUPSET_CALL(mk_pte_phys, srmmu_mk_pte_phys, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(mk_pte_io, srmmu_mk_pte_io, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(pgd_set, srmmu_pgd_set, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(pmd_set, srmmu_pmd_set, BTFIXUPCALL_NORM);
+	BTFIXUPSET_CALL(pmd_populate, srmmu_pmd_populate, BTFIXUPCALL_NORM);
 	
 	BTFIXUPSET_INT(pte_modify_mask, SRMMU_CHG_MASK);
 	BTFIXUPSET_CALL(pmd_offset, srmmu_pmd_offset, BTFIXUPCALL_NORM);
-	BTFIXUPSET_CALL(pte_offset, srmmu_pte_offset, BTFIXUPCALL_NORM);
+	BTFIXUPSET_CALL(pte_offset_kernel, srmmu_pte_offset, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(free_pte_fast, srmmu_free_pte_fast, BTFIXUPCALL_NORM);
-	BTFIXUPSET_CALL(pte_alloc_one_fast, srmmu_pte_alloc_one_fast, BTFIXUPCALL_NORM);
+	BTFIXUPSET_CALL(pte_free, srmmu_pte_free, BTFIXUPCALL_NORM);
+	BTFIXUPSET_CALL(pte_alloc_one_kernel, srmmu_pte_alloc_one_kernel, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(pte_alloc_one, srmmu_pte_alloc_one, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(free_pmd_fast, srmmu_free_pmd_fast, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(pmd_alloc_one_fast, srmmu_pmd_alloc_one_fast, BTFIXUPCALL_NORM);
@@ -2071,10 +2113,8 @@ void __init ld_mmu_srmmu(void)
 	
 	BTFIXUPSET_CALL(mmu_info, srmmu_mmu_info, BTFIXUPCALL_NORM);
 
-	/* Task struct and kernel stack allocating/freeing. */
-	BTFIXUPSET_CALL(alloc_task_struct, srmmu_alloc_task_struct, BTFIXUPCALL_NORM);
-	BTFIXUPSET_CALL(free_task_struct, srmmu_free_task_struct, BTFIXUPCALL_NORM);
-	BTFIXUPSET_CALL(get_task_struct, srmmu_get_task_struct, BTFIXUPCALL_NORM);
+	BTFIXUPSET_CALL(alloc_thread_info, srmmu_alloc_thread_info, BTFIXUPCALL_NORM);
+	BTFIXUPSET_CALL(free_thread_info, srmmu_free_thread_info, BTFIXUPCALL_NORM);
 
 	get_srmmu_type();
 	patch_window_trap_handlers();

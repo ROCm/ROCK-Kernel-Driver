@@ -481,7 +481,7 @@ static int show_cpuinfo(struct seq_file *m, void *__unused)
 		   (short) romvec->pv_printrev,
 		   &cputypval,
 		   linux_num_cpus,
-		   smp_num_cpus
+		   num_online_cpus()
 #ifndef CONFIG_SMP
 		   , loops_per_jiffy/(500000/HZ),
 		   (loops_per_jiffy/(5000/HZ)) % 100
