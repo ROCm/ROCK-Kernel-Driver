@@ -103,9 +103,7 @@ static struct {
 static inline u32 *
 xdr_encode_fhandle(u32 *p, struct nfs_fh *fh)
 {
-	*p++ = htonl(fh->size);
-	memcpy(p, fh->data, fh->size);
-	return p + XDR_QUADLEN(fh->size);
+	return xdr_encode_array(p, fh->data, fh->size);
 }
 
 static inline u32 *

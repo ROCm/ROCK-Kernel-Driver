@@ -611,9 +611,6 @@ call_encode(struct rpc_task *task)
 	rcvbuf->page_len	 = 0;
 	rcvbuf->len		 = bufsiz;
 
-	/* Zero buffer so we have automatic zero-padding of opaque & string */
-	memset(task->tk_buffer, 0, bufsiz);
-
 	/* Encode header and provided arguments */
 	encode = task->tk_msg.rpc_proc->p_encode;
 	if (!(p = call_header(task))) {
