@@ -38,7 +38,7 @@ static struct pci_dev *bmide_dev;
 static int nforce_get_info (char *buffer, char **addr, off_t offset, int count)
 {
 	char *p = buffer;
-	u32 bibma = pci_resource_start(bmide_dev, 4);
+	unsigned long bibma = pci_resource_start(bmide_dev, 4);
 	u8 c0 = 0, c1 = 0;
 
 	/*
@@ -109,7 +109,6 @@ static int nforce_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 	pio_timing	&= ~(0x03 << drive->dn);
 
 	switch(speed) {
-#ifdef CONFIG_BLK_DEV_IDEDMA
 		case XFER_UDMA_7:
 		case XFER_UDMA_6:
 			speed = XFER_UDMA_5;
@@ -155,7 +154,6 @@ static int nforce_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 		case XFER_SW_DMA_0:
 			dma_pio_timing |= 0xA8;
 			break;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 		case XFER_PIO_4:
 			dma_pio_timing |= 0x20;
 			break;
@@ -176,9 +174,7 @@ static int nforce_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 
 	pio_timing |= (0x03 << drive->dn);
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	pci_write_config_byte(dev, drive_pci[drive->dn], ultra_timing);
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 	pci_write_config_byte(dev, drive_pci2[drive->dn], dma_pio_timing);
 	pci_write_config_byte(dev, 0x5c, pio_timing);
 
@@ -191,7 +187,6 @@ static void nforce_tune_drive (ide_drive_t *drive, u8 pio)
 	(void) nforce_tune_chipset(drive, (XFER_PIO_0 + pio));
 }
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 /*
  * This allows the configuration of ide_pci chipset registers
  * for cards that learn about the drive's UDMA, DMA, PIO capabilities
@@ -251,9 +246,8 @@ no_dma_set:
 	}
 	return hwif->ide_dma_on(drive);
 }
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
-unsigned int __init init_chipset_nforce (struct pci_dev *dev, const char *name)
+static unsigned int __init init_chipset_nforce (struct pci_dev *dev, const char *name)
 {
 #if defined(DISPLAY_NFORCE_TIMINGS) && defined(CONFIG_PROC_FS)
 	if (!nforce_proc) {
@@ -318,7 +312,6 @@ static void __init init_hwif_nforce (ide_hwif_t *hwif)
 	hwif->mwdma_mask = 0x07;
 	hwif->swdma_mask = 0x07;
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	if (!(hwif->udma_four))
 		hwif->udma_four = ata66_nforce(hwif);
 	hwif->ide_dma_check = &nforce_config_drive_xfer_rate;
@@ -326,7 +319,6 @@ static void __init init_hwif_nforce (ide_hwif_t *hwif)
 		hwif->autodma = 1;
 	hwif->drives[0].autodma = hwif->autodma;
 	hwif->drives[1].autodma = hwif->autodma;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 }
 
 /* FIXME - not needed */
