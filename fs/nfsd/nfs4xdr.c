@@ -1691,7 +1691,8 @@ nfsd4_encode_read(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_read 
 {
 	u32 eof;
 	int v, pn;
-	unsigned long maxcount, len;
+	unsigned long maxcount; 
+	long len;
 	ENCODE_HEAD;
 
 	if (nfserr)
@@ -1731,6 +1732,10 @@ nfsd4_encode_read(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_read 
 	resp->xbuf->head[0].iov_len = ((char*)resp->p) - (char*)resp->xbuf->head[0].iov_base;
 
 	resp->xbuf->page_len = maxcount;
+
+	/* read zero bytes -> don't set up tail */
+	if(!maxcount)
+		return 0;        
 
 	/* set up page for remaining responses */
 	svc_take_page(resp->rqstp);
