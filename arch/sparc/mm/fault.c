@@ -441,13 +441,13 @@ asmlinkage void do_sun4c_fault(struct pt_regs *regs, int text_fault, int write,
 				      _SUN4C_PAGE_VALID |
 				      _SUN4C_PAGE_DIRTY);
 
-			save_and_cli(flags);
+			local_irq_save(flags);
 			if (sun4c_get_segmap(address) != invalid_segment) {
 				sun4c_put_pte(address, pte_val(*ptep));
-				restore_flags(flags);
+				local_irq_restore(flags);
 				return;
 			}
-			restore_flags(flags);
+			local_irq_restore(flags);
 		}
 	    } else {
 		if ((pte_val(*ptep) & (_SUN4C_PAGE_READ|_SUN4C_PAGE_PRESENT))
@@ -457,13 +457,13 @@ asmlinkage void do_sun4c_fault(struct pt_regs *regs, int text_fault, int write,
 			*ptep = __pte(pte_val(*ptep) | _SUN4C_PAGE_ACCESSED |
 				      _SUN4C_PAGE_VALID);
 
-			save_and_cli(flags);
+			local_irq_save(flags);
 			if (sun4c_get_segmap(address) != invalid_segment) {
 				sun4c_put_pte(address, pte_val(*ptep));
-				restore_flags(flags);
+				local_irq_restore(flags);
 				return;
 			}
-			restore_flags(flags);
+			local_irq_restore(flags);
 		}
 	    }
 	}

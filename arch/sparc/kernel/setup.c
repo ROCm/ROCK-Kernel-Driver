@@ -74,7 +74,7 @@ void prom_sync_me(void)
 	unsigned long prom_tbr, flags;
 
 	/* XXX Badly broken. FIX! - Anton */
-	save_and_cli(flags);
+	local_irq_save(flags);
 	__asm__ __volatile__("rd %%tbr, %0\n\t" : "=r" (prom_tbr));
 	__asm__ __volatile__("wr %0, 0x0, %%tbr\n\t"
 			     "nop\n\t"
@@ -86,9 +86,9 @@ void prom_sync_me(void)
 	prom_printf("PROM SYNC COMMAND...\n");
 	show_free_areas();
 	if(current->pid != 0) {
-		sti();
+		local_irq_enable();
 		sys_sync();
-		cli();
+		local_irq_disable();
 	}
 	prom_printf("Returning to prom\n");
 
@@ -96,7 +96,7 @@ void prom_sync_me(void)
 			     "nop\n\t"
 			     "nop\n\t"
 			     "nop\n\t" : : "r" (prom_tbr));
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 	return;
 }

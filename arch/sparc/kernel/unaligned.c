@@ -311,15 +311,19 @@ __asm__ __volatile__ (								\
 	store_common(dst_addr, size, src_val, errh);				\
 })
 
-/* XXX Need to capture/release other cpu's for SMP around this. */
+extern void smp_capture(void);
+extern void smp_release(void);
+
 #define do_atomic(srcdest_reg, mem, errh) ({					\
 	unsigned long flags, tmp;						\
 										\
-	save_and_cli(flags);							\
+	smp_capture();								\
+	local_irq_save(flags);							\
 	tmp = *srcdest_reg;							\
 	do_integer_load(srcdest_reg, 4, mem, 0, errh);				\
 	store_common(mem, 4, &tmp, errh);					\
-	restore_flags(flags);							\
+	local_irq_restore(flags);						\
+	smp_release();								\
 })
 
 static inline void advance(struct pt_regs *regs)

@@ -68,7 +68,7 @@ static void sun4c_disable_irq(unsigned int irq_nr)
 	unsigned long flags;
 	unsigned char current_mask, new_mask;
     
-	save_and_cli(flags);
+	local_irq_save(flags);
 	irq_nr &= (NR_IRQS - 1);
 	current_mask = *interrupt_enable;
 	switch(irq_nr) {
@@ -85,11 +85,11 @@ static void sun4c_disable_irq(unsigned int irq_nr)
 		new_mask = ((current_mask) & (~(SUN4C_INT_E14)));
 		break;
 	default:
-		restore_flags(flags);
+		local_irq_restore(flags);
 		return;
 	}
 	*interrupt_enable = new_mask;
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void sun4c_enable_irq(unsigned int irq_nr)
@@ -97,7 +97,7 @@ static void sun4c_enable_irq(unsigned int irq_nr)
 	unsigned long flags;
 	unsigned char current_mask, new_mask;
     
-	save_and_cli(flags);
+	local_irq_save(flags);
 	irq_nr &= (NR_IRQS - 1);
 	current_mask = *interrupt_enable;
 	switch(irq_nr) {
@@ -114,11 +114,11 @@ static void sun4c_enable_irq(unsigned int irq_nr)
 		new_mask = ((current_mask) | SUN4C_INT_E14);
 		break;
 	default:
-		restore_flags(flags);
+		local_irq_restore(flags);
 		return;
 	}
 	*interrupt_enable = new_mask;
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 #define TIMER_IRQ  	10    /* Also at level 14, but we ignore that one. */
