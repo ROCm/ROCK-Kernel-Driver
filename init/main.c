@@ -68,6 +68,7 @@ extern void mca_init(void);
 extern void sbus_init(void);
 extern void sysctl_init(void);
 extern void signals_init(void);
+extern void buffer_init(void);
 
 extern void radix_tree_init(void);
 extern void free_initmem(void);

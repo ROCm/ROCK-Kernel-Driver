@@ -143,7 +143,6 @@ BUFFER_FNS(Async_Write, async_write)
  */
 
 void FASTCALL(mark_buffer_dirty(struct buffer_head *bh));
-void buffer_init(void);
 void init_buffer(struct buffer_head *, bh_end_io_t *, void *);
 void set_bh_page(struct buffer_head *bh,
 		struct page *page, unsigned long offset);
