@@ -293,9 +293,6 @@ cpci_hp_register_bus(struct pci_bus *bus, u8 first, u8 last)
 	if(!(controller && bus)) {
 		return -ENODEV;
 	}
-	if(last < first) {
-		return -EINVAL;
-	}
 
 	/*
 	 * Create a structure for each slot, and register that slot
@@ -378,10 +375,6 @@ cpci_hp_unregister_bus(struct pci_bus *bus)
 	struct list_head *tmp;
 	struct list_head *next;
 	int status;
-
-	if(!bus) {
-		return -ENODEV;
-	}
 
 	spin_lock(&list_lock);
 	if(!slots) {
