@@ -67,7 +67,7 @@ ia32_install_shared_page (struct vm_area_struct *vma, unsigned long address, int
 }
 
 static struct vm_operations_struct ia32_shared_page_vm_ops = {
-	nopage:	ia32_install_shared_page
+	.nopage =ia32_install_shared_page
 };
 
 void

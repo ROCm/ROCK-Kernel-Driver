@@ -53,7 +53,7 @@ ia64_get_itc (void)
 
 	__asm__ __volatile__("mov %0=ar.itc" : "=r"(result) :: "memory");
 #ifdef CONFIG_ITANIUM
-	while (unlikely ((__s32) result == -1)
+	while (unlikely((__s32) result == -1))
 		__asm__ __volatile__("mov %0=ar.itc" : "=r"(result) :: "memory");
 #endif
 	return result;

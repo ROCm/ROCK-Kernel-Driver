@@ -30,12 +30,12 @@ static void simcons_write (struct console *, const char *, unsigned);
 static kdev_t simcons_console_device (struct console *);
 
 struct console hpsim_cons = {
-	name:		"simcons",
-	write:		simcons_write,
-	device:		simcons_console_device,
-	setup:		simcons_init,
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
+	.name =		"simcons",
+	.write =	simcons_write,
+	.device =	simcons_console_device,
+	.setup =	simcons_init,
+	.flags =	CON_PRINTBUFFER,
+	.index =	-1,
 };
 
 static int

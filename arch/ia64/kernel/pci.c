@@ -165,7 +165,7 @@ struct pci_ops pci_sal_ops = {
  */
 
 struct pci_bus *
-pcibios_scan_root(int seg, int bus)
+pcibios_scan_root(int bus)
 {
 	struct list_head *list = NULL;
 	struct pci_bus *pci_bus = NULL;
@@ -174,12 +174,12 @@ pcibios_scan_root(int seg, int bus)
 		pci_bus = pci_bus_b(list);
 		if (pci_bus->number == bus) {
 			/* Already scanned */
-			printk("PCI: Bus (%02x:%02x) already probed\n", seg, bus);
+			printk("PCI: Bus (%02x) already probed\n", bus);
 			return pci_bus;
 		}
 	}
 
-	printk("PCI: Probing PCI hardware on bus (%02x:%02x)\n", seg, bus);
+	printk("PCI: Probing PCI hardware on bus (%02x)\n", bus);
 
 	return pci_scan_bus(bus, pci_root_ops, NULL);
 }
@@ -265,12 +265,37 @@ pcibios_fixup_pbus_ranges (struct pci_bus * bus, struct pbus_set_ranges_data * r
 int
 pcibios_enable_device (struct pci_dev *dev)
 {
+	u16 cmd, old_cmd;
+	int idx;
+	struct resource *r;
+
 	if (!dev)
 		return -EINVAL;
 
-	/* Not needed, since we enable all devices at startup.  */
+	pci_read_config_word(dev, PCI_COMMAND, &cmd);
+	old_cmd = cmd;
+	for (idx=0; idx<6; idx++) {
+		r = &dev->resource[idx];
+		if (!r->start && r->end) {
+			printk(KERN_ERR
+			       "PCI: Device %s not available because of resource collisions\n",
+			       dev->slot_name);
+			return -EINVAL;
+		}
+		if (r->flags & IORESOURCE_IO)
+			cmd |= PCI_COMMAND_IO;
+		if (r->flags & IORESOURCE_MEM)
+			cmd |= PCI_COMMAND_MEMORY;
+	}
+	if (dev->resource[PCI_ROM_RESOURCE].start)
+		cmd |= PCI_COMMAND_MEMORY;
+	if (cmd != old_cmd) {
+		printk("PCI: Enabling device %s (%04x -> %04x)\n", dev->slot_name, old_cmd, cmd);
+		pci_write_config_word(dev, PCI_COMMAND, cmd);
+	}
 
 	printk(KERN_INFO "PCI: Found IRQ %d for device %s\n", dev->irq, dev->slot_name);
+
 	return 0;
 }
 

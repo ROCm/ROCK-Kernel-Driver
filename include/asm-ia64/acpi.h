@@ -30,11 +30,74 @@
 
 #ifdef __KERNEL__
 
-#define __acpi_map_table(phys_addr, size) __va(phys_addr)
+#define COMPILER_DEPENDENT_INT64	long
+#define COMPILER_DEPENDENT_UINT64	unsigned long
+
+/*
+ * Calling conventions:
+ *
+ * ACPI_SYSTEM_XFACE        - Interfaces to host OS (handlers, threads)
+ * ACPI_EXTERNAL_XFACE      - External ACPI interfaces
+ * ACPI_INTERNAL_XFACE      - Internal ACPI interfaces
+ * ACPI_INTERNAL_VAR_XFACE  - Internal variable-parameter list interfaces
+ */
+#define ACPI_SYSTEM_XFACE
+#define ACPI_EXTERNAL_XFACE
+#define ACPI_INTERNAL_XFACE
+#define ACPI_INTERNAL_VAR_XFACE
+
+/* Asm macros */
+
+#define ACPI_ASM_MACROS
+#define BREAKPOINT3
+#define ACPI_DISABLE_IRQS() local_irq_disable()
+#define ACPI_ENABLE_IRQS()  local_irq_enable()
+#define ACPI_FLUSH_CPU_CACHE()
+
+#define ACPI_ACQUIRE_GLOBAL_LOCK(GLptr, Acq) \
+	do { \
+	__asm__ volatile ("1:  ld4      r29=%1\n"  \
+		";;\n"                  \
+		"mov    ar.ccv=r29\n"   \
+		"mov    r2=r29\n"       \
+		"shr.u  r30=r29,1\n"    \
+		"and    r29=-4,r29\n"   \
+		";;\n"                  \
+		"add    r29=2,r29\n"    \
+		"and    r30=1,r30\n"    \
+		";;\n"                  \
+		"add    r29=r29,r30\n"  \
+		";;\n"                  \
+		"cmpxchg4.acq   r30=%1,r29,ar.ccv\n" \
+		";;\n"                  \
+		"cmp.eq p6,p7=r2,r30\n" \
+		"(p7) br.dpnt.few 1b\n" \
+		"cmp.gt p8,p9=3,r29\n"  \
+		";;\n"                  \
+		"(p8) mov %0=-1\n"      \
+		"(p9) mov %0=r0\n"      \
+		:"=r"(Acq):"m"(GLptr):"r2","r29","r30","memory"); \
+	} while (0)
+
+#define ACPI_RELEASE_GLOBAL_LOCK(GLptr, Acq) \
+	do { \
+	__asm__ volatile ("1:  ld4      r29=%1\n" \
+		";;\n"                  \
+		"mov    ar.ccv=r29\n"   \
+		"mov    r2=r29\n"       \
+		"and    r29=-4,r29\n"   \
+		";;\n"                  \
+		"cmpxchg4.acq   r30=%1,r29,ar.ccv\n" \
+		";;\n"                  \
+		"cmp.eq p6,p7=r2,r30\n" \
+		"(p7) br.dpnt.few 1b\n" \
+		"and    %0=1,r2\n"      \
+		";;\n"                  \
+		:"=r"(Acq):"m"(GLptr):"r2","r29","r30","memory"); \
+	} while (0)
 
 const char *acpi_get_sysname (void);
 int acpi_boot_init (char *cdline);
-int acpi_find_rsdp (unsigned long *phys_addr);
 int acpi_request_vector (u32 int_type);
 int acpi_get_prt (struct pci_vector_struct **vectors, int *count);
 int acpi_get_interrupt_model(int *type);
