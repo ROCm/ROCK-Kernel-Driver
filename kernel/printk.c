@@ -243,19 +243,13 @@ int do_syslog(int type, char * buf, int len)
 
 		break;
 	case 5:		/* Clear ring buffer */
-		spin_lock_irq(&logbuf_lock);
 		logged_chars = 0;
-		spin_unlock_irq(&logbuf_lock);
 		break;
 	case 6:		/* Disable logging to console */
-		spin_lock_irq(&logbuf_lock);
 		console_loglevel = minimum_console_loglevel;
-		spin_unlock_irq(&logbuf_lock);
 		break;
 	case 7:		/* Enable logging to console */
-		spin_lock_irq(&logbuf_lock);
 		console_loglevel = default_console_loglevel;
-		spin_unlock_irq(&logbuf_lock);
 		break;
 	case 8:		/* Set level of messages printed to console */
 		error = -EINVAL;
@@ -263,15 +257,11 @@ int do_syslog(int type, char * buf, int len)
 			goto out;
 		if (len < minimum_console_loglevel)
 			len = minimum_console_loglevel;
-		spin_lock_irq(&logbuf_lock);
 		console_loglevel = len;
-		spin_unlock_irq(&logbuf_lock);
 		error = 0;
 		break;
 	case 9:		/* Number of chars in the log buffer */
-		spin_lock_irq(&logbuf_lock);
 		error = log_end - log_start;
-		spin_unlock_irq(&logbuf_lock);
 		break;
 	default:
 		error = -EINVAL;
