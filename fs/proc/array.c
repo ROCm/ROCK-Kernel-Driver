@@ -358,7 +358,8 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 		nice,
 		0UL /* removed */,
 		jiffies_to_clock_t(task->it_real_value),
-		(unsigned long long) jiffies_64_to_clock_t(task->start_time),
+		(unsigned long long)
+		    jiffies_64_to_clock_t(task->start_time - INITIAL_JIFFIES),
 		vsize,
 		mm ? mm->rss : 0, /* you might want to shift this left 3 */
 		task->rlim[RLIMIT_RSS].rlim_cur,

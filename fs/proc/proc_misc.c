@@ -104,7 +104,7 @@ static int uptime_read_proc(char *page, char **start, off_t off,
 	unsigned long uptime_remainder;
 	int len;
 
-	uptime = get_jiffies_64();
+	uptime = get_jiffies_64() - INITIAL_JIFFIES;
 	uptime_remainder = (unsigned long) do_div(uptime, HZ);
 
 #if HZ!=100
@@ -320,7 +320,7 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 {
 	int i, len;
 	extern unsigned long total_forks;
-	u64 jif = get_jiffies_64();
+	u64 jif = get_jiffies_64() - INITIAL_JIFFIES;
 	unsigned int sum = 0, user = 0, nice = 0, system = 0, idle = 0, iowait = 0;
 
 	for (i = 0 ; i < NR_CPUS; i++) {

@@ -32,7 +32,7 @@
 #include <asm/irq.h>
 #include <asm/leds.h>
 
-u64 jiffies_64;
+u64 jiffies_64 = INITIAL_JIFFIES;
 
 extern unsigned long wall_jiffies;
 
