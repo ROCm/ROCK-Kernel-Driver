@@ -188,8 +188,10 @@ static void irda_connect_confirm(void *instance, void *sap,
 	IRDA_DEBUG(2, "%s(%p)\n", __FUNCTION__, self);
 
 	sk = self->sk;
-	if (sk == NULL)
+	if (sk == NULL) {
+		dev_kfree_skb(skb);
 		return;
+	}
 
 	dev_kfree_skb(skb);
 	// Should be ??? skb_queue_tail(&sk->sk_receive_queue, skb);
@@ -248,8 +250,10 @@ static void irda_connect_indication(void *instance, void *sap,
 	IRDA_DEBUG(2, "%s(%p)\n", __FUNCTION__, self);
 
 	sk = self->sk;
-	if (sk == NULL)
+	if (sk == NULL) {
+		dev_kfree_skb(skb);
 		return;
+	}
 
 	/* How much header space do we need to reserve */
 	self->max_header_size = max_header_size;
