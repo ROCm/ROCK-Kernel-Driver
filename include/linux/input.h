@@ -32,7 +32,7 @@
 #else
 #include <sys/time.h>
 #include <sys/ioctl.h>
-#include <stdint.h>
+#include <asm/types.h>
 #endif
 
 /*
@@ -41,9 +41,9 @@
 
 struct input_event {
 	struct timeval time;
-	uint16_t type;
-	uint16_t code;
-	int32_t value;
+	__u16 type;
+	__u16 code;
+	__s32 value;
 };
 
 /*
@@ -57,18 +57,18 @@ struct input_event {
  */
 
 struct input_id {
-	uint16_t bustype;
-	uint16_t vendor;
-	uint16_t product;
-	uint16_t version;
+	__u16 bustype;
+	__u16 vendor;
+	__u16 product;
+	__u16 version;
 };
 
 struct input_absinfo {
-	int value;
-	int minimum;
-	int maximum;
-	int fuzz;
-	int flat;
+	__s32 value;
+	__s32 minimum;
+	__s32 maximum;
+	__s32 fuzz;
+	__s32 flat;
 };
 
 #define EVIOCGVERSION		_IOR('E', 0x01, int)			/* get driver version */
@@ -611,62 +611,62 @@ struct input_absinfo {
  */
 
 struct ff_replay {
-	uint16_t length; /* Duration of an effect in ms. All other times are also expressed in ms */
-	uint16_t delay;  /* Time to wait before to start playing an effect */
+	__u16 length; /* Duration of an effect in ms. All other times are also expressed in ms */
+	__u16 delay;  /* Time to wait before to start playing an effect */
 };
 
 struct ff_trigger {
-	uint16_t button;   /* Number of button triggering an effect */
-	uint16_t interval; /* Time to wait before an effect can be re-triggered (ms) */
+	__u16 button;   /* Number of button triggering an effect */
+	__u16 interval; /* Time to wait before an effect can be re-triggered (ms) */
 };
 
 struct ff_envelope {
-	uint16_t attack_length;	/* Duration of attack (ms) */
-	uint16_t attack_level;	/* Level at beginning of attack */
-	uint16_t fade_length;	/* Duration of fade (ms) */
-	uint16_t fade_level;	/* Level at end of fade */
+	__u16 attack_length;	/* Duration of attack (ms) */
+	__u16 attack_level;	/* Level at beginning of attack */
+	__u16 fade_length;	/* Duration of fade (ms) */
+	__u16 fade_level;	/* Level at end of fade */
 };
 
 /* FF_CONSTANT */
 struct ff_constant_effect {
-	int16_t level;	    /* Strength of effect. Negative values are OK */
+	__s16 level;	    /* Strength of effect. Negative values are OK */
 	struct ff_envelope envelope;
 };
 
 /* FF_RAMP */
 struct ff_ramp_effect {
-	int16_t start_level;
-	int16_t end_level;
+	__s16 start_level;
+	__s16 end_level;
 	struct ff_envelope envelope;
 };
 
 /* FF_SPRING of FF_FRICTION */
 struct ff_condition_effect {
-	uint16_t right_saturation; /* Max level when joystick is on the right */
-	uint16_t left_saturation;  /* Max level when joystick in on the left */
+	__u16 right_saturation; /* Max level when joystick is on the right */
+	__u16 left_saturation;  /* Max level when joystick in on the left */
 
-	int16_t right_coeff;	/* Indicates how fast the force grows when the
+	__s16 right_coeff;	/* Indicates how fast the force grows when the
 				   joystick moves to the right */
-	int16_t left_coeff;	/* Same for left side */
+	__s16 left_coeff;	/* Same for left side */
 
-	uint16_t deadband;	/* Size of area where no force is produced */
-	int16_t center;	/* Position of dead zone */
+	__u16 deadband;	/* Size of area where no force is produced */
+	__s16 center;	/* Position of dead zone */
 
 };
 
 /* FF_PERIODIC */
 struct ff_periodic_effect {
-	uint16_t waveform;	/* Kind of wave (sine, square...) */
-	uint16_t period;	/* in ms */
-	int16_t magnitude;	/* Peak value */
-	int16_t offset;	/* Mean value of wave (roughly) */
-	uint16_t phase;		/* 'Horizontal' shift */
+	__u16 waveform;	/* Kind of wave (sine, square...) */
+	__u16 period;	/* in ms */
+	__s16 magnitude;	/* Peak value */
+	__s16 offset;	/* Mean value of wave (roughly) */
+	__u16 phase;		/* 'Horizontal' shift */
 
 	struct ff_envelope envelope;
 
 /* Only used if waveform == FF_CUSTOM */
-	uint32_t custom_len;	/* Number of samples  */	
-	int16_t *custom_data;	/* Buffer of samples */
+	__u32 custom_len;	/* Number of samples  */	
+	__s16 *custom_data;	/* Buffer of samples */
 /* Note: the data pointed by custom_data is copied by the driver. You can
  * therefore dispose of the memory after the upload/update */
 };
@@ -677,22 +677,22 @@ struct ff_periodic_effect {
    by the heavy motor.
 */
 struct ff_rumble_effect {
-	uint16_t strong_magnitude;  /* Magnitude of the heavy motor */
-	uint16_t weak_magnitude;    /* Magnitude of the light one */
+	__u16 strong_magnitude;  /* Magnitude of the heavy motor */
+	__u16 weak_magnitude;    /* Magnitude of the light one */
 };
 
 /*
  * Structure sent through ioctl from the application to the driver
  */
 struct ff_effect {
-	uint16_t type;
+	__u16 type;
 /* Following field denotes the unique id assigned to an effect.
  * If user sets if to -1, a new effect is created, and its id is returned in the same field
  * Else, the user sets it to the effect id it wants to update.
  */
-	int16_t id;
+	__s16 id;
 
-	uint16_t direction;	/* Direction. 0 deg -> 0x0000 (down)
+	__u16 direction;	/* Direction. 0 deg -> 0x0000 (down)
 					     90 deg -> 0x4000 (left)
 					    180 deg -> 0x8000 (up)
 					    270 deg -> 0xC000 (right)
