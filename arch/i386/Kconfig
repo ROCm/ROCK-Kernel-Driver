@@ -303,11 +303,6 @@ config X86_POPAD_OK
 	depends on !M386
 	default y
 
-config X86_USE_STRING_486
-	bool
-	depends on MELAN || M586MMX || M586TSC || M586 || M486
-	default y
-
 config X86_ALIGNMENT_16
 	bool
 	depends on MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCYRIXIII || MELAN || MK6 || M586MMX || M586TSC || M586 || M486
