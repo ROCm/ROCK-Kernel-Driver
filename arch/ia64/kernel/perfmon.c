@@ -1998,7 +1998,7 @@ pfm_close(struct inode *inode, struct file *filp)
 
 		/*
 		 * XXX: check for signals :
-		 * 	- ok of explicit close
+		 * 	- ok for explicit close
 		 * 	- not ok when coming from exit_files()
 		 */
       		schedule();
@@ -4978,26 +4978,14 @@ pfm_resume_after_ovfl(pfm_context_t *ctx, unsigned long ovfl_regs, struct pt_reg
 static void
 pfm_context_force_terminate(pfm_context_t *ctx, struct pt_regs *regs)
 {
-	if (ctx->ctx_fl_system) {
-		printk(KERN_ERR "perfmon: pfm_context_force_terminate [%d] is system-wide\n", current->pid);
-		return;
+	int ret;
+
+	DPRINT(("entering for [%d]\n", current->pid));
+
+	ret = pfm_context_unload(ctx, NULL, 0, regs);
+	if (ret) {
+		printk(KERN_ERR "pfm_context_force_terminate: [%d] unloaded failed with %d\n", current->pid, ret);
 	}
-	/*
-	 * we stop the whole thing, we do no need to flush
-	 * we know we WERE masked
-	 */
-	pfm_clear_psr_up();
-	ia64_psr(regs)->up = 0;
-	ia64_psr(regs)->sp = 1;
-
-	/*
-	 * disconnect the task from the context and vice-versa
-	 */
-	current->thread.pfm_context  = NULL;
-	current->thread.flags       &= ~IA64_THREAD_PM_VALID;
-	ctx->ctx_task = NULL;
-
-	DPRINT(("context terminated\n"));
 
 	/*
 	 * and wakeup controlling task, indicating we are now disconnected
@@ -5021,7 +5009,7 @@ pfm_handle_work(void)
 	unsigned long flags;
 	unsigned long ovfl_regs;
 	unsigned int reason;
-	int ret;
+	int ret, must_free = 0;
 
 	ctx = PFM_GET_CTX(current);
 	if (ctx == NULL) {
@@ -5099,6 +5087,7 @@ pfm_handle_work(void)
 do_zombie:
 		DPRINT(("context is zombie, bailing out\n"));
 		pfm_context_force_terminate(ctx, regs);
+		must_free = 1;
 		goto nothing_to_do;
 	}
 	/*
@@ -5113,6 +5102,8 @@ skip_blocking:
 nothing_to_do:
 
 	UNPROTECT_CTX(ctx, flags);
+
+	if (must_free) pfm_context_free(ctx);
 }
 
 static int
@@ -5370,9 +5361,8 @@ pfm_overflow_handler(struct task_struct *task, pfm_context_t *ctx, u64 pmc0, str
 		if (ovfl_notify == 0) reset_pmds = ovfl_pmds;
 	}
 
-	DPRINT(("ovfl_pmds=0x%lx reset_pmds=0x%lx\n",
-		ovfl_pmds,
-		reset_pmds));
+	DPRINT_ovfl(("ovfl_pmds=0x%lx reset_pmds=0x%lx\n", ovfl_pmds, reset_pmds));
+
 	/*
 	 * reset the requested PMD registers using the short reset values
 	 */
@@ -6367,6 +6357,9 @@ pfm_flush_pmds(struct task_struct *task, pfm_context_t *ctx)
 	 * XXX: sampling situation is not taken into account here
 	 */
 	mask2 = ctx->ctx_used_pmds[0];
+
+	DPRINT(("is_self=%d ovfl_val=0x%lx mask2=0x%lx\n", is_self, ovfl_val, mask2));
+
 	for (i = 0; mask2; i++, mask2>>=1) {
 
 		/* skip non used pmds */
@@ -6405,7 +6398,7 @@ pfm_flush_pmds(struct task_struct *task, pfm_context_t *ctx)
 			}
 		}
 
-		DPRINT(("[%d] is_self=%d ctx_pmd[%d]=0x%lx  pmd_val=0x%lx\n", task->pid, is_self, i, val, pmd_val));
+		DPRINT(("[%d] ctx_pmd[%d]=0x%lx  pmd_val=0x%lx\n", task->pid, i, val, pmd_val));
 
 		if (is_self) task->thread.pmds[i] = pmd_val;
 
