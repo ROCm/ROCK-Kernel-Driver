@@ -699,7 +699,7 @@ do_udp_sendmsg:
 		if (likely(up->pending)) {
 			if (unlikely(up->pending != AF_INET6)) {
 				release_sock(sk);
-				return -EINVAL;
+				return -EAFNOSUPPORT;
 			}
 			dst = NULL;
 			goto do_append_data;
