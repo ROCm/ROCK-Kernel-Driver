@@ -189,7 +189,7 @@ static void __init BusLogic_RegisterHostAdapter(struct BusLogic_HostAdapter *Hos
   registered BusLogic Host Adapters.
 */
 
-static void __init BusLogic_UnregisterHostAdapter(struct BusLogic_HostAdapter *HostAdapter)
+static void BusLogic_UnregisterHostAdapter(struct BusLogic_HostAdapter *HostAdapter)
 {
   if (HostAdapter == BusLogic_FirstRegisteredHostAdapter)
     {
