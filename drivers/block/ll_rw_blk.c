@@ -2429,7 +2429,7 @@ EXPORT_SYMBOL(generic_make_request);
  * interfaces, @bio must be presetup and ready for I/O.
  *
  */
-int submit_bio(int rw, struct bio *bio)
+void submit_bio(int rw, struct bio *bio)
 {
 	int count = bio_sectors(bio);
 
@@ -2451,7 +2451,6 @@ int submit_bio(int rw, struct bio *bio)
 	}
 
 	generic_make_request(bio);
-	return 1;
 }
 
 EXPORT_SYMBOL(submit_bio);

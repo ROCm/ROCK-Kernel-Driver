@@ -170,7 +170,6 @@ struct page *follow_huge_addr(struct mm_struct *mm, struct vm_area_struct *vma, 
 	ptep = huge_pte_offset(mm, addr);
 	page = pte_page(*ptep);
 	page += ((addr & ~HPAGE_MASK) >> PAGE_SHIFT);
-	get_page(page);
 	return page;
 }
 int pmd_huge(pmd_t pmd)

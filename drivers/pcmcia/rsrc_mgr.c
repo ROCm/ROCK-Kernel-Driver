@@ -33,6 +33,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
@@ -56,7 +57,7 @@
 
 /* Parameters that can be set with 'insmod' */
 
-#define INT_MODULE_PARM(n, v) static int n = v; MODULE_PARM(n, "i")
+#define INT_MODULE_PARM(n, v) static int n = v; module_param(n, int, 0444)
 
 INT_MODULE_PARM(probe_mem,	1);		/* memory probe? */
 #ifdef CONFIG_PCMCIA_PROBE

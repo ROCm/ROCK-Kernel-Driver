@@ -2052,7 +2052,6 @@ int copy_siginfo_to_user(siginfo_t __user *to, siginfo_t *from)
 	case __SI_MESGQ: /* But this is */
 		err |= __put_user(from->si_pid, &to->si_pid);
 		err |= __put_user(from->si_uid, &to->si_uid);
-		err |= __put_user(from->si_int, &to->si_int);
 		err |= __put_user(from->si_ptr, &to->si_ptr);
 		break;
 	default: /* this is just in case for now ... */
