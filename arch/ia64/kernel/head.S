@@ -144,13 +144,13 @@ start_ap:
 	movl r3=task_for_booting_cpu
  	;;
 	ld8 r3=[r3]
-	movl r2=init_thread_union
+	movl r2=init_task
 	;;
 	cmp.eq isBP,isAP=r3,r0
 	;;
 (isAP)	mov r2=r3
 #else
-	movl r2=init_thread_union
+	movl r2=init_task
 	cmp.eq isBP,isAP=r0,r0
 #endif
 	;;

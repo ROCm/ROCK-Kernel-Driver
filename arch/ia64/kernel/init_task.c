@@ -26,17 +26,17 @@ struct mm_struct init_mm = INIT_MM(init_mm);
  * We need to make sure that this is properly aligned due to the way process stacks are
  * handled. This is done by having a special ".data.init_task" section...
  */
-#define init_thread_info	init_thread_union.s.thread_info
+#define init_thread_info	init_task_mem.s.thread_info
 
-union init_thread {
+static union {
 	struct {
 		struct task_struct task;
 		struct thread_info thread_info;
 	} s;
 	unsigned long stack[KERNEL_STACK_SIZE/sizeof (unsigned long)];
-} init_thread_union __attribute__((section(".data.init_task"))) = {{
-	.task =		INIT_TASK(init_thread_union.s.task),
-	.thread_info =	INIT_THREAD_INFO(init_thread_union.s.task)
+} init_task_mem __attribute__((section(".data.init_task"))) = {{
+	.task =		INIT_TASK(init_task_mem.s.task),
+	.thread_info =	INIT_THREAD_INFO(init_task_mem.s.task)
 }};
 
-asm (".global init_task; init_task = init_thread_union");
+asm (".global init_task; init_task = init_task_mem");

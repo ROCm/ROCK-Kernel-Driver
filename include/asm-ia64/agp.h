@@ -4,7 +4,7 @@
 /*
  * IA-64 specific AGP definitions.
  *
- * Copyright (C) 2002 Hewlett-Packard Co
+ * Copyright (C) 2002-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
@@ -17,8 +17,5 @@
 #define unmap_page_from_agp(page)	/* nothing */
 #define flush_agp_mappings()		/* nothing */
 #define flush_agp_cache()		mb()
-
-/* Page-protection value to be used for AGP memory mapped into kernel space.  */
-#define PAGE_AGP			PAGE_KERNEL
 
 #endif /* _ASM_IA64_AGP_H */

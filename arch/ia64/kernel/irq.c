@@ -74,7 +74,7 @@ irq_desc_t _irq_desc[NR_IRQS] __cacheline_aligned = {
 };
 
 #ifdef CONFIG_IA64_GENERIC
-struct irq_desc * __ia64_irq_desc (unsigned int irq)
+irq_desc_t * __ia64_irq_desc (unsigned int irq)
 {
 	return _irq_desc + irq;
 }
@@ -171,7 +171,7 @@ int show_interrupts(struct seq_file *p, void *v)
 	seq_putc(p, '\n');
 
 	for (i = 0 ; i < NR_IRQS ; i++) {
-		idesc = irq_desc(i);
+		idesc = irq_descp(i);
 		spin_lock_irqsave(&idesc->lock, flags);
 		action = idesc->action;
 		if (!action)
@@ -218,7 +218,7 @@ skip:
 #ifdef CONFIG_SMP
 inline void synchronize_irq(unsigned int irq)
 {
-	while (irq_desc(irq)->status & IRQ_INPROGRESS)
+	while (irq_descp(irq)->status & IRQ_INPROGRESS)
 		cpu_relax();
 }
 #endif
@@ -352,7 +352,7 @@ static void note_interrupt(int irq, irq_desc_t *desc, irqreturn_t action_ret)
 
 inline void disable_irq_nosync(unsigned int irq)
 {
-	irq_desc_t *desc = irq_desc(irq);
+	irq_desc_t *desc = irq_descp(irq);
 	unsigned long flags;
 
 	spin_lock_irqsave(&desc->lock, flags);
@@ -395,7 +395,7 @@ void disable_irq(unsigned int irq)
 
 void enable_irq(unsigned int irq)
 {
-	irq_desc_t *desc = irq_desc(irq);
+	irq_desc_t *desc = irq_descp(irq);
 	unsigned long flags;
 
 	spin_lock_irqsave(&desc->lock, flags);
@@ -437,7 +437,7 @@ unsigned int do_IRQ(unsigned long irq, struct pt_regs *regs)
 	 * 0 return value means that this irq is already being
 	 * handled by some other CPU. (or is disabled)
 	 */
-	irq_desc_t *desc = irq_desc(irq);
+	irq_desc_t *desc = irq_descp(irq);
 	struct irqaction * action;
 	irqreturn_t action_ret;
 	unsigned int status;
@@ -620,7 +620,7 @@ void free_irq(unsigned int irq, void *dev_id)
 	if (irq >= NR_IRQS)
 		return;
 
-	desc = irq_desc(irq);
+	desc = irq_descp(irq);
 	spin_lock_irqsave(&desc->lock,flags);
 	p = &desc->action;
 	for (;;) {
@@ -682,7 +682,7 @@ unsigned long probe_irq_on(void)
 	 * flush such a longstanding irq before considering it as spurious.
 	 */
 	for (i = NR_IRQS-1; i > 0; i--)  {
-		desc = irq_desc(i);
+		desc = irq_descp(i);
 
 		spin_lock_irq(&desc->lock);
 		if (!desc->action)
@@ -700,7 +700,7 @@ unsigned long probe_irq_on(void)
 	 * happened in the previous stage, it may have masked itself)
 	 */
 	for (i = NR_IRQS-1; i > 0; i--) {
-		desc = irq_desc(i);
+		desc = irq_descp(i);
 
 		spin_lock_irq(&desc->lock);
 		if (!desc->action) {
@@ -722,7 +722,7 @@ unsigned long probe_irq_on(void)
 	 */
 	val = 0;
 	for (i = 0; i < NR_IRQS; i++) {
-		irq_desc_t *desc = irq_desc(i);
+		irq_desc_t *desc = irq_descp(i);
 		unsigned int status;
 
 		spin_lock_irq(&desc->lock);
@@ -762,7 +762,7 @@ unsigned int probe_irq_mask(unsigned long val)
 
 	mask = 0;
 	for (i = 0; i < 16; i++) {
-		irq_desc_t *desc = irq_desc(i);
+		irq_desc_t *desc = irq_descp(i);
 		unsigned int status;
 
 		spin_lock_irq(&desc->lock);
@@ -807,7 +807,7 @@ int probe_irq_off(unsigned long val)
 	nr_irqs = 0;
 	irq_found = 0;
 	for (i = 0; i < NR_IRQS; i++) {
-		irq_desc_t *desc = irq_desc(i);
+		irq_desc_t *desc = irq_descp(i);
 		unsigned int status;
 
 		spin_lock_irq(&desc->lock);
@@ -836,7 +836,7 @@ int setup_irq(unsigned int irq, struct irqaction * new)
 	int shared = 0;
 	unsigned long flags;
 	struct irqaction *old, **p;
-	irq_desc_t *desc = irq_desc(irq);
+	irq_desc_t *desc = irq_descp(irq);
 
 	if (desc->handler == &no_irq_type)
 		return -ENOSYS;
@@ -963,15 +963,16 @@ static int irq_affinity_read_proc (char *page, char **start, off_t off,
 }
 
 static int irq_affinity_write_proc (struct file *file, const char *buffer,
-					unsigned long count, void *data)
+				    unsigned long count, void *data)
 {
 	unsigned int irq = (unsigned long) data;
 	int full_count = count, err;
 	unsigned long new_value;
 	const char *buf = buffer;
+	irq_desc_t *desc = irq_descp(irq);
 	int redir;
 
-	if (!irq_desc(irq)->handler->set_affinity)
+	if (!desc->handler->set_affinity)
 		return -EIO;
 
 	if (buf[0] == 'r' || buf[0] == 'R') {
@@ -993,8 +994,7 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 	if (!(new_value & cpu_online_map))
 		return -EINVAL;
 
-	irq_desc(irq)->handler->set_affinity(irq | (redir? IA64_IRQ_REDIRECTED : 0), new_value);
-
+	desc->handler->set_affinity(irq | (redir? IA64_IRQ_REDIRECTED : 0), new_value);
 	return full_count;
 }
 
@@ -1030,7 +1030,7 @@ static void register_irq_proc (unsigned int irq)
 {
 	char name [MAX_NAMELEN];
 
-	if (!root_irq_dir || (irq_desc(irq)->handler == &no_irq_type) || irq_dir[irq])
+	if (!root_irq_dir || (irq_descp(irq)->handler == &no_irq_type) || irq_dir[irq])
 		return;
 
 	memset(name, 0, MAX_NAMELEN);
@@ -1083,7 +1083,7 @@ void init_irq_proc (void)
 	 * Create entries for all existing IRQs.
 	 */
 	for (i = 0; i < NR_IRQS; i++) {
-		if (irq_desc(i)->handler == &no_irq_type)
+		if (irq_descp(i)->handler == &no_irq_type)
 			continue;
 		register_irq_proc(i);
 	}

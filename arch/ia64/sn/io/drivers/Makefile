@@ -9,4 +9,4 @@
 
 EXTRA_CFLAGS    := -DLITTLE_ENDIAN
 
-obj-y				+= ioconfig_bus.o ifconfig_net.o
+obj-y				+= ioconfig_bus.o
