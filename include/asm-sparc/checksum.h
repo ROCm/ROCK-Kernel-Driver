@@ -18,7 +18,6 @@
  
 #include <linux/in6.h>
 #include <asm/uaccess.h>
-#include <asm/cprefix.h>
 
 /* computes the checksum of a memory block at buff, length len,
  * and adds in "sum" (32-bit)
@@ -51,7 +50,7 @@ csum_partial_copy_nocheck (const char *src, char *dst, int len,
 	register int l asm("g1") = len;
 
 	__asm__ __volatile__ (
-		"call " C_LABEL_STR(__csum_partial_copy_sparc_generic) "\n\t"
+		"call __csum_partial_copy_sparc_generic\n\t"
 		" mov %6, %%g7\n"
 	: "=&r" (ret), "=&r" (d), "=&r" (l)
 	: "0" (ret), "1" (d), "2" (l), "r" (sum)
@@ -81,7 +80,7 @@ csum_partial_copy_from_user(const char *src, char *dst, int len,
 		".word 1f,2\n\t"
 		".previous\n"
 		"1:\n\t"
-		"call " C_LABEL_STR(__csum_partial_copy_sparc_generic) "\n\t"
+		"call __csum_partial_copy_sparc_generic\n\t"
 		" st %8, [%%sp + 64]\n"
 		: "=&r" (ret), "=&r" (d), "=&r" (l), "=&r" (s)
 		: "0" (ret), "1" (d), "2" (l), "3" (s), "r" (err)
@@ -110,7 +109,7 @@ csum_partial_copy_to_user(const char *src, char *dst, int len,
 		".word 1f,1\n\t"
 		".previous\n"
 		"1:\n\t"
-		"call " C_LABEL_STR(__csum_partial_copy_sparc_generic) "\n\t"
+		"call __csum_partial_copy_sparc_generic\n\t"
 		" st %8, [%%sp + 64]\n"
 		: "=&r" (ret), "=&r" (d), "=&r" (l), "=&r" (s)
 		: "0" (ret), "1" (d), "2" (l), "3" (s), "r" (err)

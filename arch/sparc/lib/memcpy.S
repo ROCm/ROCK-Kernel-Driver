@@ -9,13 +9,11 @@
 
 #ifdef __KERNEL__
 
-#include <asm/cprefix.h>
-
 #define FUNC(x) 											\
-	.globl	C_LABEL(x);										\
-	.type	C_LABEL(x),@function;									\
+	.globl	x;		\
+	.type	x,@function;	\
 	.align	4;											\
-C_LABEL(x):
+x:
 
 #undef FASTER_REVERSE
 #undef FASTER_NONALIGNED

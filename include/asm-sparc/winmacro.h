@@ -106,9 +106,9 @@
 #ifdef CONFIG_SMP
 #define LOAD_CURRENT4M(dest_reg, idreg) \
         rd       %tbr, %idreg; \
-	sethi    %hi(C_LABEL(current_set)), %dest_reg; \
+	sethi    %hi(current_set), %dest_reg; \
         srl      %idreg, 10, %idreg; \
-	or       %dest_reg, %lo(C_LABEL(current_set)), %dest_reg; \
+	or       %dest_reg, %lo(current_set), %dest_reg; \
 	and      %idreg, 0xc, %idreg; \
 	ld       [%idreg + %dest_reg], %dest_reg;
 
@@ -119,15 +119,15 @@
 /* Blackbox - take care with this... - check smp4m and smp4d before changing this. */
 #define LOAD_CURRENT(dest_reg, idreg) 					\
 	sethi	 %hi(___b_load_current), %idreg;			\
-	sethi    %hi(C_LABEL(current_set)), %dest_reg; 			\
-	sethi    %hi(C_LABEL(boot_cpu_id4)), %idreg; 			\
-	or       %dest_reg, %lo(C_LABEL(current_set)), %dest_reg; 	\
-	ldub	 [%idreg + %lo(C_LABEL(boot_cpu_id4))], %idreg;		\
+	sethi    %hi(current_set), %dest_reg; 			\
+	sethi    %hi(boot_cpu_id4), %idreg; 			\
+	or       %dest_reg, %lo(current_set), %dest_reg; 	\
+	ldub	 [%idreg + %lo(boot_cpu_id4)], %idreg;		\
 	ld       [%idreg + %dest_reg], %dest_reg;
 #else
 #define LOAD_CURRENT(dest_reg, idreg) \
-        sethi    %hi(C_LABEL(current_set)), %idreg; \
-        ld       [%idreg + %lo(C_LABEL(current_set))], %dest_reg;
+        sethi    %hi(current_set), %idreg; \
+        ld       [%idreg + %lo(current_set)], %dest_reg;
 #endif
 
 #endif /* !(_SPARC_WINMACRO_H) */

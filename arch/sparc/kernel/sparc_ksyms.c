@@ -298,8 +298,7 @@ EXPORT_SYMBOL(__copy_user);
 EXPORT_SYMBOL(__strncpy_from_user);
 
 /* Networking helper routines. */
-/* XXX This is NOVERS because C_LABEL_STR doesn't get the version number. -DaveM */
-EXPORT_SYMBOL_NOVERS(__csum_partial_copy_sparc_generic);
+EXPORT_SYMBOL(__csum_partial_copy_sparc_generic);
 EXPORT_SYMBOL(csum_partial);
 
 /* Cache flushing.  */

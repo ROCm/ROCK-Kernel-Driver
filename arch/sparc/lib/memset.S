@@ -7,7 +7,6 @@
  * occurs and we were called as clear_user.
  */
 
-#include <asm/cprefix.h>
 #include <asm/ptrace.h>
 
 /* Work around cpp -rob */
@@ -61,12 +60,12 @@
         .globl  __bzero_begin
 __bzero_begin:
 
-	.globl	C_LABEL(__bzero), C_LABEL(__memset), 
-	.globl	C_LABEL(memset)
-	.globl	C_LABEL(__memset_start), C_LABEL(__memset_end)
-C_LABEL(__memset_start):
-C_LABEL(__memset):
-C_LABEL(memset):
+	.globl	__bzero, __memset, 
+	.globl	memset
+	.globl	__memset_start, __memset_end
+__memset_start:
+__memset:
+memset:
 	and	%o1, 0xff, %g3
 	sll	%g3, 8, %g2
 	or	%g3, %g2, %g3
@@ -90,7 +89,7 @@ C_LABEL(memset):
 	b	4f
 	 sub	%o0, %o2, %o0
 
-C_LABEL(__bzero):
+__bzero:
 	mov	%g0, %g3
 1:
 	cmp	%o1, 7
@@ -168,7 +167,7 @@ C_LABEL(__bzero):
 0:
 	retl
 	 clr	%o0
-C_LABEL(__memset_end):
+__memset_end:
 
 	.section .fixup,#alloc,#execinstr
 	.align	4
@@ -195,7 +194,7 @@ C_LABEL(__memset_end):
 	save	%sp, -104, %sp
 	mov	%i5, %o0
 	mov	%i7, %o1
-	call	C_LABEL(lookup_fault)
+	call	lookup_fault
 	 mov	%i4, %o2
 	ret
 	 restore
