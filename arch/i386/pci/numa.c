@@ -104,6 +104,9 @@ static int __init pci_numa_init(void)
 	pci_config_read = pci_conf1_read;
 	pci_config_write = pci_conf1_write;
 
+	if (pcibios_scanned++)
+		return 0;
+
 	pci_root_bus = pcibios_scan_root(0);
 	if (clustered_apic_mode && (numnodes > 1)) {
 		for (quad = 1; quad < numnodes; ++quad) {

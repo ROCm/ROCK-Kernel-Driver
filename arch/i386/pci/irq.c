@@ -12,7 +12,6 @@
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
-#include <linux/acpi.h>
 #include <asm/io.h>
 #include <asm/smp.h>
 #include <asm/io_apic.h>
@@ -22,7 +21,6 @@
 #define PIRQ_SIGNATURE	(('$' << 0) + ('P' << 8) + ('I' << 16) + ('R' << 24))
 #define PIRQ_VERSION 0x0100
 
-int pci_use_acpi_routing = 0;
 int broken_hp_bios_irq9;
 
 static struct irq_routing_table *pirq_table;
@@ -46,7 +44,7 @@ struct irq_router {
 	int (*set)(struct pci_dev *router, struct pci_dev *dev, int pirq, int new);
 };
 
-int (*pci_lookup_irq)(struct pci_dev * dev, int assign) = NULL;
+int (*pcibios_enable_irq)(struct pci_dev *dev) = NULL;
 
 /*
  *  Search 0xf0000 -- 0xfffff for the PCI IRQ Routing Table.
@@ -690,7 +688,7 @@ static int __init pcibios_irq_init(void)
 {
 	DBG("PCI: IRQ init\n");
 
-	if (pci_lookup_irq)
+	if (pcibios_enable_irq)
 		return 0;
 
 	pirq_table = pirq_find_routing_table();
@@ -712,7 +710,9 @@ static int __init pcibios_irq_init(void)
 		if (io_apic_assign_pci_irqs)
 			pirq_table = NULL;
 	}
-	pci_lookup_irq = pcibios_lookup_irq;
+
+	pcibios_enable_irq = pirq_enable_irq;
+
 	pcibios_fixup_irqs();
 	return 0;
 }
@@ -781,7 +781,7 @@ void __init pcibios_fixup_irqs(void)
 		 * Still no IRQ? Try to lookup one...
 		 */
 		if (pin && !dev->irq)
-			pci_lookup_irq(dev, 0);
+			pcibios_lookup_irq(dev, 0);
 	}
 }
 
@@ -794,11 +794,11 @@ void pcibios_penalize_isa_irq(int irq)
 	pirq_penalty[irq] += 100;
 }
 
-void pcibios_enable_irq(struct pci_dev *dev)
+int pirq_enable_irq(struct pci_dev *dev)
 {
 	u8 pin;
 	pci_read_config_byte(dev, PCI_INTERRUPT_PIN, &pin);
-	if (pin && !pci_lookup_irq(dev, 1) && !dev->irq) {
+	if (pin && !pcibios_lookup_irq(dev, 1) && !dev->irq) {
 		char *msg;
 		if (io_apic_assign_pci_irqs)
 			msg = " Probably buggy MP table.";
@@ -809,4 +809,6 @@ void pcibios_enable_irq(struct pci_dev *dev)
 		printk(KERN_WARNING "PCI: No IRQ known for interrupt pin %c of device %s.%s\n",
 		       'A' + pin - 1, dev->slot_name, msg);
 	}
+
+	return 0;
 }
