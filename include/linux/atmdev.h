@@ -214,6 +214,8 @@ struct atm_cirange {
 
 #ifdef CONFIG_PROC_FS
 #include <linux/proc_fs.h>
+
+extern struct proc_dir_entry *atm_proc_root;
 #endif
 
 
