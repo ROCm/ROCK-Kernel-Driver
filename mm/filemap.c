@@ -916,7 +916,7 @@ generic_file_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
 	return ret;
 }
 
-static int file_send_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size)
+int file_send_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size)
 {
 	ssize_t written;
 	unsigned long count = desc->count;

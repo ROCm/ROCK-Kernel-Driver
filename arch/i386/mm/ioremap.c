@@ -289,7 +289,7 @@ void __init bt_iounmap(void *addr, unsigned long size)
 
 	idx = FIX_BTMAP_BEGIN;
 	while (nrpages > 0) {
-		__set_fixmap(idx, 0, __pgprot(0));
+		clear_fixmap(idx);
 		--idx;
 		--nrpages;
 	}

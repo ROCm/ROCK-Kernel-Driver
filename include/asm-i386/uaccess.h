@@ -64,7 +64,6 @@ int __verify_write(const void *, unsigned long);
 
 #define access_ok(type,addr,size) ( (__range_ok(addr,size) == 0) && \
 			 ((type) == VERIFY_READ || boot_cpu_data.wp_works_ok || \
-			 segment_eq(get_fs(),KERNEL_DS) || \
 			  __verify_write((void *)(addr),(size))))
 
 #endif

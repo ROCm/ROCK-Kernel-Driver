@@ -47,10 +47,9 @@ tmpfs has the following uses:
    shared memory)
 
 3) Some people (including me) find it very convenient to mount it
-   e.g. on /tmp and /var/tmp and have a big swap partition. But be
-   aware: loop mounts of tmpfs files do not work due to the internal
-   design. So mkinitrd shipped by most distributions will fail with a
-   tmpfs /tmp.
+   e.g. on /tmp and /var/tmp and have a big swap partition. And now
+   loop mounts of tmpfs files do work, so mkinitrd shipped by most
+   distributions should succeed with a tmpfs /tmp.
 
 4) And probably a lot more I do not know about :-)
 
@@ -90,13 +89,9 @@ TODOs:
    size=50% the tmpfs instance should be able to grow to 50 percent of
    RAM + swap. So the instance should adapt automatically if you add
    or remove swap space.
-2) loop mounts: This is difficult since loop.c relies on the readpage
-   operation. This operation gets a page from the caller to be filled
-   with the content of the file at that position. But tmpfs always has
-   the page and thus cannot copy the content to the given page. So it
-   cannot provide this operation. The VM had to be changed seriously
-   to achieve this.
-3) Show the number of tmpfs RAM pages. (As shared?)
+2) Show the number of tmpfs RAM pages. (As shared?)
 
 Author:
    Christoph Rohland <cr@sap.com>, 1.12.01
+Updated:
+   Hugh Dickins <hugh@veritas.com>, 17 Oct 2002

@@ -3287,13 +3287,13 @@ static int __init md_setup(char *str)
 	return 1;
 }
 
-extern kdev_t name_to_kdev_t(char *line) __init;
+extern dev_t name_to_dev_t(char *line) __init;
 void __init md_setup_drive(void)
 {
 	int minor, i;
-	kdev_t dev;
+	dev_t dev;
 	mddev_t*mddev;
-	kdev_t devices[MD_SB_DISKS+1];
+	dev_t devices[MD_SB_DISKS+1];
 
 	for (minor = 0; minor < MAX_MD_DEVS; minor++) {
 		int err = 0;
@@ -3312,16 +3312,17 @@ void __init md_setup_drive(void)
 			if (p)
 				*p++ = 0;
 
-			dev = name_to_kdev_t(devname);
-			handle = devfs_get_handle(NULL, devname, major(dev), minor(dev),
-						  DEVFS_SPECIAL_BLK, 1);
+			dev = name_to_dev_t(devname);
+			handle = devfs_get_handle(NULL, devname,
+						MAJOR(dev), MINOR(dev),
+						DEVFS_SPECIAL_BLK, 1);
 			if (handle != 0) {
 				unsigned major, minor;
 				devfs_get_maj_min(handle, &major, &minor);
-				dev = mk_kdev(major, minor);
+				dev = MKDEV(major, minor);
 				devfs_put(handle);
 			}
-			if (kdev_none(dev)) {
+			if (!dev) {
 				printk(KERN_WARNING "md: Unknown device name: %s\n", devname);
 				break;
 			}
@@ -3331,7 +3332,7 @@ void __init md_setup_drive(void)
 
 			devname = p;
 		}
-		devices[i] = to_kdev_t(0);
+		devices[i] = 0;
 
 		if (!md_setup_args.device_set[minor])
 			continue;
@@ -3375,13 +3376,13 @@ void __init md_setup_drive(void)
 			err = set_array_info(mddev, &ainfo);
 			for (i = 0; !err && i <= MD_SB_DISKS; i++) {
 				dev = devices[i];
-				if (kdev_none(dev))
+				if (!dev)
 					break;
 				dinfo.number = i;
 				dinfo.raid_disk = i;
 				dinfo.state = (1<<MD_DISK_ACTIVE)|(1<<MD_DISK_SYNC);
-				dinfo.major = major(dev);
-				dinfo.minor = minor(dev);
+				dinfo.major = MAJOR(dev);
+				dinfo.minor = MINOR(dev);
 				mddev->raid_disks++;
 				err = add_new_disk (mddev, &dinfo);
 			}
@@ -3389,10 +3390,10 @@ void __init md_setup_drive(void)
 			/* persistent */
 			for (i = 0; i <= MD_SB_DISKS; i++) {
 				dev = devices[i];
-				if (kdev_none(dev))
+				if (!dev)
 					break;
-				dinfo.major = major(dev);
-				dinfo.minor = minor(dev);
+				dinfo.major = MAJOR(dev);
+				dinfo.minor = MINOR(dev);
 				add_new_disk (mddev, &dinfo);
 			}
 		}
