@@ -30,8 +30,15 @@
 #define ETHER1394_REGION_ADDR		0xfffff0200000ULL
 #define ETHER1394_REGION_ADDR_END	(ETHER1394_REGION_ADDR + ETHER1394_REGION_ADDR_LEN)
 
+/* GASP identifier numbers for IPv4 over IEEE 1394 */
+#define ETHER1394_GASP_SPECIFIER_ID	0x00005E
+#define ETHER1394_GASP_VERSION		1
+
 /* Node set == 64 */
 #define NODE_SET			(ALL_NODES + 1)
+
+enum eth1394_bc_states { ETHER1394_BC_CLOSED, ETHER1394_BC_OPENED,
+			 ETHER1394_BC_CHECK };
 
 /* Private structure for our ethernet driver */
 struct eth1394_priv {
@@ -43,6 +50,9 @@ struct eth1394_priv {
 	u32 fifo_lo[ALL_NODES];		/* 32bit lo fifo offset per node */
 	u64 eui[ALL_NODES];		/* EUI-64 per node		 */
 	spinlock_t lock;		/* Private lock			 */
+	int broadcast_channel;		/* Async stream Broadcast Channel */
+	enum eth1394_bc_states bc_state; /* broadcast channel state	 */
+	struct hpsb_iso *iso;		/* Async stream recv handle	 */
 };
 
 struct host_info {
@@ -51,12 +61,15 @@ struct host_info {
 	struct net_device *dev;
 };
 
+typedef enum {ETH1394_GASP, ETH1394_WRREQ} eth1394_tx_type;
+
 /* This is our task struct. It's used for the packet complete callback.  */
 struct packet_task {
 	struct sk_buff *skb;	/* Socket buffer we are sending */
 	nodeid_t dest_node;	/* Destination of the packet */
 	u64 addr;		/* Address */
 	struct hpsb_queue_struct tq;	/* The task */
+	eth1394_tx_type tx_type;	/* Send data via GASP or Write Req. */
 };
 
 /* IP1394 headers */
