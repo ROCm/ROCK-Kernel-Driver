@@ -141,7 +141,7 @@ peek_user(struct task_struct *child, addr_t addr, addr_t data)
 		/*
 		 * psw and gprs are stored on the stack
 		 */
-		tmp = *(addr_t *)((addr_t) __KSTK_PTREGS(child) + addr);
+		tmp = *(addr_t *)((addr_t) &__KSTK_PTREGS(child)->psw + addr);
 		if (addr == (addr_t) &dummy->regs.psw.mask)
 			/* Remove per bit from user psw. */
 			tmp &= ~PSW_MASK_PER;
@@ -215,7 +215,7 @@ poke_user(struct task_struct *child, addr_t addr, addr_t data)
 			   high order bit but older gdb's rely on it */
 			data |= PSW_ADDR_AMODE;
 #endif
-		*(addr_t *)((addr_t) __KSTK_PTREGS(child) + addr) = data;
+		*(addr_t *)((addr_t) &__KSTK_PTREGS(child)->psw + addr) = data;
 
 	} else if (addr < (addr_t) (&dummy->regs.orig_gpr2)) {
 		/*
@@ -360,7 +360,7 @@ peek_user_emu31(struct task_struct *child, addr_t addr, addr_t data)
 				PSW32_ADDR_AMODE31;
 		} else {
 			/* gpr 0-15 */
-			tmp = *(__u32 *)((addr_t) __KSTK_PTREGS(child) + 
+			tmp = *(__u32 *)((addr_t) &__KSTK_PTREGS(child)->psw +
 					 addr*2 + 4);
 		}
 	} else if (addr < (addr_t) (&dummy32->regs.orig_gpr2)) {
@@ -439,8 +439,8 @@ poke_user_emu31(struct task_struct *child, addr_t addr, addr_t data)
 				(__u64) tmp & PSW32_ADDR_INSN;
 		} else {
 			/* gpr 0-15 */
-			*(__u32*)((addr_t) __KSTK_PTREGS(child) + addr*2 + 4) =
-				tmp;
+			*(__u32*)((addr_t) &__KSTK_PTREGS(child)->psw
+				  + addr*2 + 4) = tmp;
 		}
 	} else if (addr < (addr_t) (&dummy32->regs.orig_gpr2)) {
 		/*

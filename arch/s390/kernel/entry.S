@@ -24,7 +24,8 @@
  * Stack layout for the system_call stack entry.
  * The first few entries are identical to the user_regs_struct.
  */
-SP_PTREGS    =  STACK_FRAME_OVERHEAD 
+SP_PTREGS    =  STACK_FRAME_OVERHEAD
+SP_ARGS      =  STACK_FRAME_OVERHEAD + __PT_ARGS
 SP_PSW       =  STACK_FRAME_OVERHEAD + __PT_PSW
 SP_R0        =  STACK_FRAME_OVERHEAD + __PT_GPRS
 SP_R1        =  STACK_FRAME_OVERHEAD + __PT_GPRS + 4
@@ -230,12 +231,14 @@ system_call:
 sysc_enter:
         GET_THREAD_INFO           # load pointer to task_struct to R9
 	sla	%r7,2             # *4 and test for svc 0
-	bnz	BASED(sysc_do_restart)  # svc number > 0
+	bnz	BASED(sysc_nr_ok) # svc number > 0
 	# svc 0: system call number in %r1
 	cl	%r1,BASED(.Lnr_syscalls)
-	bnl	BASED(sysc_do_restart)
+	bnl	BASED(sysc_nr_ok)
 	lr	%r7,%r1           # copy svc number to %r7
 	sla	%r7,2             # *4
+sysc_nr_ok:
+	mvc	SP_ARGS(4,%r15),SP_R7(%r15)
 sysc_do_restart:
 	tm	__TI_flags+3(%r9),(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT)
         l       %r8,sys_call_table-system_call(%r7,%r13) # get system call addr.
@@ -510,6 +513,7 @@ pgm_svcper:
 	lr	%r7,%r1           # copy svc number to %r7
 	sla	%r7,2             # *4
 pgm_svcstd:
+	mvc	SP_ARGS(4,%r15),SP_R7(%r15)
 	tm	__TI_flags+3(%r9),(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT)
         l       %r8,sys_call_table-system_call(%r7,%r13) # get system call addr.
         bnz     BASED(pgm_tracesys)
