@@ -58,7 +58,7 @@ static inline void wb977_ww(int reg, int val)
 	outb(reg, 0x370);
 	outb(val >> 8, 0x371);
 	outb(reg + 1, 0x370);
-	outb(val, 0x371);
+	outb(val & 255, 0x371);
 }
 
 #define wb977_device_select(dev)	wb977_wb(0x07, dev)
@@ -488,7 +488,7 @@ static inline void rwa010_waveartist_init(int base, int irq, int dma)
 	WRITE_RWA(7, 0);
 
 	dprintk("WaveArtist base: ");
-	WRITE_RWA(0x61, base);
+	WRITE_RWA(0x61, base & 255);
 	i = inb(0x203);
 
 	WRITE_RWA(0x60, base >> 8);
@@ -510,7 +510,7 @@ static inline void rwa010_soundblaster_init(int sb_base, int al_base, int irq, i
 	WRITE_RWA(7, 1);
 
 	dprintk("SoundBlaster base: ");
-	WRITE_RWA(0x61, sb_base);
+	WRITE_RWA(0x61, sb_base & 255);
 	i = inb(0x203);
 
 	WRITE_RWA(0x60, sb_base >> 8);
@@ -525,7 +525,7 @@ static inline void rwa010_soundblaster_init(int sb_base, int al_base, int irq, i
 	dprintk("%d (%d)\n", inb(0x203), dma);
 
 	dprintk("AdLib base: ");
-	WRITE_RWA(0x63, al_base);
+	WRITE_RWA(0x63, al_base & 255);
 	i = inb(0x203);
 
 	WRITE_RWA(0x62, al_base >> 8);
