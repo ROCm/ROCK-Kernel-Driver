@@ -656,7 +656,9 @@ xfs_iformat_extents(
 	int		nex;
 	int		real_size;
 	int		size;
+#if ARCH_CONVERT != ARCH_NOCONVERT
 	int		i;
+#endif
 
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	nex = XFS_DFORK_NEXTENTS_ARCH(dip, whichfork, ARCH_CONVERT);
