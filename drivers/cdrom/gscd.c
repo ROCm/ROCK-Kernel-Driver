@@ -1029,3 +1029,4 @@ MODULE_AUTHOR("Oliver Raupach <raupach@nwfs1.rz.fh-hannover.de>");
 MODULE_LICENSE("GPL");
 module_init(gscd_init);
 module_exit(gscd_exit);
+MODULE_ALIAS_BLOCKDEV_MAJOR(GOLDSTAR_CDROM_MAJOR);

@@ -4607,3 +4607,5 @@ MODULE_LICENSE("GPL");
 __setup ("floppy=", floppy_setup);
 module_init(floppy_init)
 #endif
+
+MODULE_ALIAS_BLOCKDEV_MAJOR(FLOPPY_MAJOR);

@@ -1103,5 +1103,5 @@ __setup ("xd_geo=", xd_manual_geo_init);
 
 #endif /* MODULE */
 
-module_init(xd_init)
-
+module_init(xd_init);
+MODULE_ALIAS_BLOCKDEV_MAJOR(XT_DISK_MAJOR);
