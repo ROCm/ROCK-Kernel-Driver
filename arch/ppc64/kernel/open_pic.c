@@ -576,7 +576,7 @@ void openpic_request_IPIs(void)
  */
 static spinlock_t openpic_setup_lock __initdata = SPIN_LOCK_UNLOCKED;
 
-void __init do_openpic_setup_cpu(void)
+void __devinit do_openpic_setup_cpu(void)
 {
 #ifdef CONFIG_IRQ_ALL_CPUS
  	int i;

@@ -45,17 +45,6 @@ found_middle:
 	return result + ffz(tmp);
 }
 
-static __inline__ unsigned long ___ffs(unsigned long word)
-{
-        unsigned long result = 0;
-
-        while (!(word & 1UL)) {
-                result++;
-                word >>= 1;
-        }
-        return result;
-}
-
 unsigned long find_next_bit(unsigned long *addr, unsigned long size, unsigned long offset)
 {
 	unsigned long *p = addr + (offset >> 6);
@@ -91,7 +80,7 @@ found_first:
 	if (tmp == 0UL)        /* Are any bits set? */
 		return result + size; /* Nope. */
 found_middle:
-	return result + ___ffs(tmp);
+	return result + __ffs(tmp);
 }
 
 static __inline__ unsigned int ext2_ilog2(unsigned int x) 

@@ -293,9 +293,6 @@ int timer_interrupt(struct pt_regs * regs)
 
 	irq_exit();
 
-	if (softirq_pending(cpu))
-		do_softirq();
-	
 	return 1;
 }
 

@@ -22,7 +22,10 @@ extern plat_pg_data_t plat_node_data[];
 #define MAX_NUMNODES 4
 
 /* XXX grab this from the device tree - Anton */
-#define PHYSADDR_TO_NID(pa)		((pa) >> 36)
+#define MEMORY_ZONE_BITS	33
+#define CPU_SHIFT_BITS          1
+
+#define PHYSADDR_TO_NID(pa)		((pa) >> MEMORY_ZONE_BITS)
 #define PLAT_NODE_DATA(n)		(&plat_node_data[(n)])
 #define PLAT_NODE_DATA_STARTNR(n)	\
 	(PLAT_NODE_DATA(n)->gendata.node_start_mapnr)
@@ -84,7 +87,7 @@ extern plat_pg_data_t plat_node_data[];
 #ifdef CONFIG_NUMA
 
 /* XXX grab this from the device tree - Anton */
-#define cputonode(cpu)	((cpu) >> 3)
+#define cputonode(cpu)	((cpu) >> CPU_SHIFT_BITS)
 
 #define numa_node_id()	cputonode(smp_processor_id())
 

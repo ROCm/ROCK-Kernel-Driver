@@ -30,7 +30,6 @@
 extern unsigned long cpu_online_map;
 
 extern void smp_message_pass(int target, int msg, unsigned long data, int wait);
-extern void smp_store_cpu_info(int id);
 extern void smp_send_tlb_invalidate(int);
 extern void smp_send_xmon_break(int cpu);
 struct pt_regs;
@@ -57,9 +56,7 @@ extern volatile unsigned long cpu_callin_map[NR_CPUS];
 
 #define smp_processor_id() (get_paca()->xPacaIndex)
 
-/* remove when the boot sequence gets rewritten to use hotplug interface */
 extern int boot_cpuid;
-extern int ppc64_is_smp;
 
 /* Since OpenPIC has only 4 IPIs, we use slightly different message numbers.
  *
