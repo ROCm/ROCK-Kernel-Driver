@@ -42,9 +42,9 @@
                 next_round_robin: 1     /* Round robin index */             \
         },                                                                  \
         lpQueuePtr: (lpq),              /* &xItLpQueue,                  */ \
-        xRtas: {                                                            \
+        /* xRtas: {                                                            \
                 lock: SPIN_LOCK_UNLOCKED                                    \
-        },                                                                  \
+        }, */                                                                  \
         xProcStart: (start),            /* Processor start */               \
         xLpPaca: {                                                          \
                 xDesc: 0xd397d781,      /* "LpPa"          */               \
