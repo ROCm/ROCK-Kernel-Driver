@@ -60,9 +60,6 @@ static inline void timeval_normalize(struct timeval * tv)
 
 long __vxtime_sequence[2] __section_vxtime_sequence;
 
-/* The rest of the kernel knows it as this. */
-extern void do_gettimeofday(struct timeval *tv) __attribute__((alias("do_vgettimeofday"))); 
-
 inline void do_vgettimeofday(struct timeval * tv)
 {
 	long sequence;

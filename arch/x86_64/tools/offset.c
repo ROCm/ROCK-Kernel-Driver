@@ -42,10 +42,6 @@ int main(void)
 	ENTRY(irqrsp);
 	ENTRY(irqcount);
 	ENTRY(irqstack); 
-	ENTRY(pgd_quick);
-	ENTRY(pmd_quick);
-	ENTRY(pte_quick);
-	ENTRY(pgtable_cache_sz);
 	ENTRY(cpunumber);
 	ENTRY(irqstackptr);
 	ENTRY(me);
