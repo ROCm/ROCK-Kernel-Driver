@@ -258,7 +258,7 @@ void __init check_ioapic(void)
 						iommu_aperture_disabled = 1;
 					}
 #endif
-					/* FALL THROUGH */
+					return;
 				case PCI_VENDOR_ID_NVIDIA:
 #ifndef CONFIG_SMP
 					printk(KERN_INFO 
