@@ -263,9 +263,6 @@ sbni_pci_probe( struct net_device  *dev )
 {
 	struct pci_dev  *pdev = NULL;
 
-	if( !pci_present( ) )
-		return  -ENODEV;
-
 	while( (pdev = pci_find_class( PCI_CLASS_NETWORK_OTHER << 8, pdev ))
 	       != NULL ) {
 		int  pci_irq_line;
