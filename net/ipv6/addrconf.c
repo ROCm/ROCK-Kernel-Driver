@@ -300,6 +300,7 @@ void in6_dev_finish_destroy(struct inet6_dev *idev)
 		printk("Freeing alive inet6 device %p\n", idev);
 		return;
 	}
+	snmp6_unregister_dev(idev);
 	inet6_dev_count--;
 	kfree(idev);
 }
@@ -331,6 +332,15 @@ static struct inet6_dev * ipv6_add_dev(struct net_device *dev)
 		inet6_dev_count++;
 		/* We refer to the device */
 		dev_hold(dev);
+
+		if (snmp6_register_dev(ndev) < 0) {
+			ADBG((KERN_WARNING
+				"%s(): cannot create /proc/net/dev_snmp6/%s\n",
+				__FUNCTION__, dev->name));
+			neigh_parms_release(&nd_tbl, ndev->nd_parms);
+			in6_dev_finish_destroy(ndev);
+			return NULL;
+		}
 
 #ifdef CONFIG_IPV6_PRIVACY
 		get_random_bytes(ndev->rndid, sizeof(ndev->rndid));

@@ -415,6 +415,7 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 {
 	static struct in6_addr tmpaddr;
 	struct inet6_ifaddr *ifp;
+	struct inet6_dev *idev;
 	struct flowi fl;
 	struct rt6_info *rt = NULL;
 	struct dst_entry* dst;
@@ -497,10 +498,14 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 
 	dst_clone(dst);
 	skb->dst = dst;
+	idev = in6_dev_get(dst->dev);
 	dst_output(skb);
 
-	ICMP6_INC_STATS(Icmp6OutNeighborAdvertisements);
-	ICMP6_INC_STATS(Icmp6OutMsgs);
+	ICMP6_INC_STATS(idev, Icmp6OutNeighborAdvertisements);
+	ICMP6_INC_STATS(idev, Icmp6OutMsgs);
+
+	if (likely(idev != NULL))
+		in6_dev_put(idev);
 }        
 
 void ndisc_send_ns(struct net_device *dev, struct neighbour *neigh,
@@ -510,6 +515,7 @@ void ndisc_send_ns(struct net_device *dev, struct neighbour *neigh,
 	struct flowi fl;
 	struct rt6_info *rt = NULL;
 	struct dst_entry* dst;
+	struct inet6_dev *idev;
         struct sock *sk = ndisc_socket->sk;
         struct sk_buff *skb;
         struct nd_msg *msg;
@@ -576,10 +582,14 @@ void ndisc_send_ns(struct net_device *dev, struct neighbour *neigh,
 	/* send it! */
 	dst_clone(dst);
 	skb->dst = dst;
+	idev = in6_dev_get(dst->dev);
 	dst_output(skb);
 
-	ICMP6_INC_STATS(Icmp6OutNeighborSolicits);
-	ICMP6_INC_STATS(Icmp6OutMsgs);
+	ICMP6_INC_STATS(idev, Icmp6OutNeighborSolicits);
+	ICMP6_INC_STATS(idev, Icmp6OutMsgs);
+
+	if (likely(idev != NULL))
+		in6_dev_put(idev);
 }
 
 void ndisc_send_rs(struct net_device *dev, struct in6_addr *saddr,
@@ -588,6 +598,7 @@ void ndisc_send_rs(struct net_device *dev, struct in6_addr *saddr,
 	struct flowi fl;
 	struct rt6_info *rt = NULL;
 	struct dst_entry* dst;
+	struct inet6_dev *idev;
 	struct sock *sk = ndisc_socket->sk;
         struct sk_buff *skb;
         struct icmp6hdr *hdr;
@@ -644,10 +655,14 @@ void ndisc_send_rs(struct net_device *dev, struct in6_addr *saddr,
 	/* send it! */
 	dst_clone(dst);
 	skb->dst = dst;
+	idev = in6_dev_get(dst->dev);
 	dst_output(skb);
 
-	ICMP6_INC_STATS(Icmp6OutRouterSolicits);
-	ICMP6_INC_STATS(Icmp6OutMsgs);
+	ICMP6_INC_STATS(idev, Icmp6OutRouterSolicits);
+	ICMP6_INC_STATS(idev, Icmp6OutMsgs);
+
+	if (likely(idev != NULL))
+		in6_dev_put(idev);
 }
 		   
 
@@ -1271,6 +1286,7 @@ void ndisc_send_redirect(struct sk_buff *skb, struct neighbour *neigh,
 	struct net_device *dev;
 	struct rt6_info *rt;
 	struct dst_entry *dst;
+	struct inet6_dev *idev;
 	struct flowi fl;
 	u8 *opt;
 	int rd_len;
@@ -1379,10 +1395,14 @@ void ndisc_send_redirect(struct sk_buff *skb, struct neighbour *neigh,
 					     csum_partial((u8 *) icmph, len, 0));
 
 	skb->dst = dst;
+	idev = in6_dev_get(dst->dev);
 	dst_output(skb);
 
-	ICMP6_INC_STATS(Icmp6OutRedirects);
-	ICMP6_INC_STATS(Icmp6OutMsgs);
+	ICMP6_INC_STATS(idev, Icmp6OutRedirects);
+	ICMP6_INC_STATS(idev, Icmp6OutMsgs);
+
+	if (likely(idev != NULL))
+		in6_dev_put(idev);
 }
 
 static void pndisc_redo(struct sk_buff *skb)

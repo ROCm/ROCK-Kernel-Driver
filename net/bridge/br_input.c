@@ -59,15 +59,16 @@ int br_handle_frame_finish(struct sk_buff *skb)
 
 	dest = skb->mac.ethernet->h_dest;
 
+	rcu_read_lock();
 	p = skb->dev->br_port;
-	if (p == NULL)
-		goto err_nolock;
+	smp_read_barrier_depends();
+
+	if (p == NULL || p->state == BR_STATE_DISABLED) {
+		kfree(skb);
+		goto out;
+	}
 
 	br = p->br;
-	read_lock(&br->lock);
-	if (skb->dev->br_port == NULL)
-		goto err;
-
 	passedup = 0;
 	if (br->dev.flags & IFF_PROMISC) {
 		struct sk_buff *skb2;
@@ -105,35 +106,20 @@ int br_handle_frame_finish(struct sk_buff *skb)
 	br_flood_forward(br, skb, 0);
 
 out:
-	read_unlock(&br->lock);
-	return 0;
-
-err:
-	read_unlock(&br->lock);
-err_nolock:
-	kfree_skb(skb);
+	rcu_read_unlock();
 	return 0;
 }
 
 int br_handle_frame(struct sk_buff *skb)
 {
-	struct net_bridge *br;
 	unsigned char *dest;
 	struct net_bridge_port *p;
 
 	dest = skb->mac.ethernet->h_dest;
 
+	rcu_read_lock();
 	p = skb->dev->br_port;
-	if (p == NULL)
-		goto err_nolock;
-
-	br = p->br;
-	read_lock(&br->lock);
-	if (skb->dev->br_port == NULL)
-		goto err;
-
-	if (!(br->dev.flags & IFF_UP) ||
-	    p->state == BR_STATE_DISABLED)
+	if (p == NULL || p->state == BR_STATE_DISABLED)
 		goto err;
 
 	if (skb->mac.ethernet->h_source[0] & 1)
@@ -141,39 +127,30 @@ int br_handle_frame(struct sk_buff *skb)
 
 	if (p->state == BR_STATE_LEARNING ||
 	    p->state == BR_STATE_FORWARDING)
-		br_fdb_insert(br, p, skb->mac.ethernet->h_source, 0);
+		br_fdb_insert(p->br, p, skb->mac.ethernet->h_source, 0);
 
-	if (br->stp_enabled &&
+	if (p->br->stp_enabled &&
 	    !memcmp(dest, bridge_ula, 5) &&
-	    !(dest[5] & 0xF0))
-		goto handle_special_frame;
+	    !(dest[5] & 0xF0)) {
+		if (!dest[5]) 
+			br_stp_handle_bpdu(skb);
+		goto err;
+	}
 
 	if (p->state == BR_STATE_FORWARDING) {
 		if (br_should_route_hook && br_should_route_hook(&skb)) {
-			read_unlock(&br->lock);
+			rcu_read_unlock();
 			return -1;
 		}
 
 		NF_HOOK(PF_BRIDGE, NF_BR_PRE_ROUTING, skb, skb->dev, NULL,
 			br_handle_frame_finish);
-		read_unlock(&br->lock);
+		rcu_read_unlock();
 		return 0;
 	}
 
 err:
-	read_unlock(&br->lock);
-err_nolock:
+	rcu_read_unlock();
 	kfree_skb(skb);
-	return 0;
-
-handle_special_frame:
-	if (!dest[5]) {
-		br_stp_handle_bpdu(skb);
-		read_unlock(&br->lock);
-		return 0;
-	}
-
-	kfree_skb(skb);
-	read_unlock(&br->lock);
 	return 0;
 }
