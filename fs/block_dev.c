@@ -22,6 +22,7 @@
 #include <linux/mpage.h>
 #include <linux/mount.h>
 #include <linux/uio.h>
+#include <linux/namei.h>
 #include <asm/uaccess.h>
 
 
@@ -795,4 +796,83 @@ const char *__bdevname(dev_t dev)
 
 	sprintf(buffer, "%s(%d,%d)", name, MAJOR(dev), MINOR(dev));
 	return buffer;
+}
+
+/**
+ * open_bdev_excl  -  open a block device by name and set it up for use
+ *
+ * @path:	special file representing the block device
+ * @flags:	%MS_RDONLY for opening read-only
+ * @kind:	usage (same as the 4th paramter to blkdev_get)
+ * @holder:	owner for exclusion
+ *
+ * Open the blockdevice described by the special file at @path, claim it
+ * for the @holder and properly set it up for @kind usage.
+ */
+struct block_device *open_bdev_excl(const char *path, int flags,
+				    int kind, void *holder)
+{
+	struct inode *inode;
+	struct block_device *bdev;
+	struct nameidata nd;
+	mode_t mode = FMODE_READ;
+	int error = 0;
+
+	if (!path || !*path)
+		return ERR_PTR(-EINVAL);
+
+	error = path_lookup(path, LOOKUP_FOLLOW, &nd);
+	if (error)
+		return ERR_PTR(error);
+
+	inode = nd.dentry->d_inode;
+	error = -ENOTBLK;
+	if (!S_ISBLK(inode->i_mode))
+		goto path_release;
+	error = -EACCES;
+	if (nd.mnt->mnt_flags & MNT_NODEV)
+		goto path_release;
+	error = bd_acquire(inode);
+	if (error)
+		goto path_release;
+	bdev = inode->i_bdev;
+
+	/* Done with lookups */
+	path_release(&nd);
+
+	if (!(flags & MS_RDONLY))
+		mode |= FMODE_WRITE;
+	error = blkdev_get(bdev, mode, 0, kind);
+	if (error)
+		return ERR_PTR(error);
+	error = -EACCES;
+	if (!(flags & MS_RDONLY) && bdev_read_only(bdev))
+		goto blkdev_put;
+	error = bd_claim(bdev, holder);
+	if (error)
+		goto blkdev_put;
+
+	return bdev;
+	
+blkdev_put:
+	blkdev_put(bdev, BDEV_FS);
+	return ERR_PTR(error);
+
+path_release:
+	path_release(&nd);
+	return ERR_PTR(error);
+}
+
+/**
+ * close_bdev_excl  -  release a blockdevice openen by open_bdev_excl()
+ *
+ * @bdev:	blockdevice to close
+ * @kind:	usage (same as the 4th paramter to blkdev_get)
+ *
+ * This is the counterpart to open_bdev_excl().
+ */
+void close_bdev_excl(struct block_device *bdev, int kind)
+{
+	bd_release(bdev);
+	blkdev_put(bdev, kind);
 }
