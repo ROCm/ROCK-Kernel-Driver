@@ -31,20 +31,55 @@
 #include "cifs_fs_sb.h"
 
 #ifdef CIFS_EXPERIMENTAL
-static int initiate_cifs_search(struct file * file, char * full_path)
+extern int CIFSFindFirst2(const int xid, struct cifsTconInfo *tcon,
+            const char *searchName, const struct nls_table *nls_codepage,
+            char ** ppfindData /* first search entries */,
+            char ** ppbuf /* beginning of smb response */,
+            int  *searchCount, __u16 *searchHandle,
+            int *pUnicodeFlag, int *pEndOfSearchFlag, int *level);
+
+static int initiate_cifs_search(const int xid, struct file * file, char * full_path)
 {
 	int rc = 0;
+    struct cifsFileInfo * cifsFile;
+	struct cifs_sb_info *cifs_sb;
+	struct cifsTconInfo *pTcon;
+	char * pfindData;
+	char * pbuf;
+	int Unicode;
+	int EndOfSearch;
+	int level;
 
 	if(file->private_data == NULL) {
 		file->private_data = 
 			kmalloc(sizeof(struct cifsFileInfo),GFP_KERNEL);
 
-		if(file->private_data == NULL)
+		if(file->private_data == NULL) {
 			return -ENOMEM;
-	} else {
-		/* BB reset fields */
+		} else {
+			memset(file->private_data,0,sizeof(struct cifsFileInfo));
+		}
 	}
-	/* BB call CIFSFindFirst2 BB */
+	/* if not end of search do we have to close it first? */
+	cifsFile = (struct cifsFileInfo *)file->private_data;
+	cifsFile->invalidHandle = TRUE;
+     
+	cifs_sb = CIFS_SB(file->f_dentry->d_sb);
+	if(cifs_sb == NULL)
+		return -EINVAL;
+
+	pTcon = cifs_sb->tcon;
+	if(pTcon == NULL)
+		return -EINVAL;
+
+	rc = CIFSFindFirst2(xid, pTcon,full_path,cifs_sb->local_nls,
+              &pfindData /* first search entries */,
+              &pbuf /* beginning of smb response */,
+              &cifsFile->entries_in_buffer, &cifsFile->netfid,
+              &EndOfSearch,&Unicode,&level);
+ 
+	if(EndOfSearch)
+		cifsFile->endOfSearch = TRUE;
 
 	return rc;
 }
@@ -57,8 +92,7 @@ static int find_cifs_entry(loff_t index_to_find /* BB add missing parm */)
 	return rc;
 }
 
-int
-cifs_readdir2(struct file *file, void *direntry, filldir_t filldir)
+int cifs_readdir2(struct file *file, void *direntry, filldir_t filldir)
 {
 	int rc = 0;
 	int xid;
@@ -81,13 +115,16 @@ cifs_readdir2(struct file *file, void *direntry, filldir_t filldir)
 
 	xid = GetXid();
 
-	cifs_sb = CIFS_SB(file->f_dentry->d_sb);
-	pTcon = cifs_sb->tcon;
-
 	if(file->f_dentry == NULL) {
 		FreeXid(xid);
 		return -EIO;
 	}
+
+	cifs_sb = CIFS_SB(file->f_dentry->d_sb);
+	pTcon = cifs_sb->tcon;
+	if(pTcon == NULL)
+		return -EINVAL;
+
 	down(&file->f_dentry->d_sb->s_vfs_rename_sem);
 	full_path = build_wildcard_path_from_dentry(file->f_dentry);
 	up(&file->f_dentry->d_sb->s_vfs_rename_sem);
@@ -112,6 +149,7 @@ cifs_readdir2(struct file *file, void *direntry, filldir_t filldir)
 		if (filldir(direntry, "..", 2, file->f_pos,
 		     file->f_dentry->d_parent->d_inode->i_ino, DT_DIR) < 0) {
 			cERROR(1, ("Filldir for parent dir failed "));
+			rc = -ENOMEM;
 			break;
 		}
 		file->f_pos++;
@@ -122,10 +160,8 @@ cifs_readdir2(struct file *file, void *direntry, filldir_t filldir)
 			if it before then restart search
 			if after then keep searching till find it */
 
-		
-		
 		if(file->private_data == NULL) {
-			rc = initiate_cifs_search(file,full_path);
+			rc = initiate_cifs_search(xid,file,full_path);
 			if(rc) {
 				FreeXid(xid);
 				if(full_path)
@@ -134,8 +170,8 @@ cifs_readdir2(struct file *file, void *direntry, filldir_t filldir)
 			}
 		}
 
-		find_cifs_entry(file->f_pos, somethingdfda);
-		close search or seek to right position */
+		find_cifs_entry(file->f_pos);
+		/*close search or seek to right position */
 		if (file->private_data) {
 			cifsFile = (struct cifsFileInfo *) file->private_data;
 			if (cifsFile->endOfSearch) {

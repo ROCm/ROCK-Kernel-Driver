@@ -255,9 +255,11 @@ struct cifsFileInfo {
 	unsigned emptyDir:1;
 	unsigned invalidHandle:1;  /* file closed via session abend */
 	struct semaphore fh_sem; /* prevents reopen race after dead ses*/
-	char * search_resume_name;
-	unsigned int resume_name_length;
-	__u32 resume_key;
+	char * search_resume_name; /* BB removeme BB */
+	unsigned int resume_name_length;  /* BB removeme BB */
+	__u32    resume_key;              /* BB removeme BB */
+	loff_t   index_of_last_entry_in_buf;
+	int 	entries_in_buffer;
 };
 
 /*
