@@ -594,6 +594,7 @@ static void __init pcwd_validate_timeout(void)
  
 static int __init pcwatchdog_init(void)
 {
+	char *firmware;
 	int i, found = 0;
 	pcwd_validate_timeout();
 	spin_lock_init(&io_lock);
@@ -633,10 +634,12 @@ static int __init pcwatchdog_init(void)
 
 	if (revision == PCWD_REVISION_A)
 		printk(KERN_INFO "pcwd: PC Watchdog (REV.A) detected at port 0x%03x\n", current_readport);
-	else if (revision == PCWD_REVISION_C)
+	else if (revision == PCWD_REVISION_C) {
+		firmware = get_firmware();
 		printk(KERN_INFO "pcwd: PC Watchdog (REV.C) detected at port 0x%03x (Firmware version: %s)\n",
-			current_readport, get_firmware());
-	else {
+			current_readport, firmware);
+		kfree(firmware);
+	} else {
 		/* Should NEVER happen, unless get_revision() fails. */
 		printk("pcwd: Unable to get revision.\n");
 		return -1;
