@@ -1,0 +1,35 @@
+uClinux-2.4 for H8/300 README
+Yoshinori Sato <ysato@users.sourceforge.jp>
+
+* Supported CPU
+H8/300H
+H8S is planning.
+
+* Supported Target
+1.simulator of GDB
+  require patches.
+
+2.AE 3068/AE 3069
+  more information 
+  MICROTRONIQUE <http://www.microtronique.com/>
+  Akizuki Denshi Tsusho Ltd. <http://www.akizuki.ne.jp> (Japanese Only)
+
+3.H8MAX 
+  Under development
+  see http://www.strawbelly-linux.com (Japanese Only)
+
+* Toolchain Version
+gcc-3.1 or higher and patch
+see arch/h8300/tools_patch/README
+binutils-2.12 or higher
+gdb-5.2 or higher
+The environment that can compile a h8300-elf binary is necessary.
+
+* Userland Develop environment
+Tempolary used h8300-hms(h8300-coff) Toolchain.
+I prepare toolchain corresponding to h8300-elf.
+
+* A few words of thanks
+Porting to H8/300H is support of Information-technology Promotion Agency, Japan.
+I thank support.
+and All developer/user.
