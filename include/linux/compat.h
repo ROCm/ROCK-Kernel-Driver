@@ -10,6 +10,7 @@
 
 #include <linux/stat.h>
 #include <linux/param.h>	/* for HZ */
+#include <linux/fcntl.h>	/* for struct flock */
 #include <asm/compat.h>
 
 #define compat_jiffies_to_clock_t(x)	\
@@ -33,6 +34,8 @@ struct compat_tms {
 };
 
 extern int cp_compat_stat(struct kstat *, struct compat_stat *);
+extern int get_compat_flock(struct flock *, struct compat_flock *);
+extern int put_compat_flock(struct flock *, struct compat_flock *);
 
 #endif /* CONFIG_COMPAT */
 #endif /* _LINUX_COMPAT_H */
