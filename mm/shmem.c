@@ -376,29 +376,31 @@ static void shmem_delete_inode(struct inode * inode)
 	clear_inode(inode);
 }
 
-static int shmem_clear_swp (swp_entry_t entry, swp_entry_t *ptr, int size) {
+static inline int shmem_find_swp(swp_entry_t entry, swp_entry_t *ptr, swp_entry_t *eptr)
+{
 	swp_entry_t *test;
 
-	for (test = ptr; test < ptr + size; test++) {
-		if (test->val == entry.val) {
-			swap_free (entry);
-			*test = (swp_entry_t) {0};
+	for (test = ptr; test < eptr; test++) {
+		if (test->val == entry.val)
 			return test - ptr;
-		}
 	}
 	return -1;
 }
 
-static int shmem_unuse_inode (struct shmem_inode_info *info, swp_entry_t entry, struct page *page)
+static int shmem_unuse_inode(struct shmem_inode_info *info, swp_entry_t entry, struct page *page)
 {
 	swp_entry_t *ptr;
 	unsigned long idx;
 	int offset;
-	struct inode *inode = NULL;
+	struct inode *inode;
 
 	idx = 0;
+	ptr = info->i_direct;
 	spin_lock (&info->lock);
-	offset = shmem_clear_swp (entry, info->i_direct, SHMEM_NR_DIRECT);
+	offset = info->next_index;
+	if (offset > SHMEM_NR_DIRECT)
+		offset = SHMEM_NR_DIRECT;
+	offset = shmem_find_swp(entry, ptr, ptr + offset);
 	if (offset >= 0)
 		goto found;
 
@@ -407,7 +409,10 @@ static int shmem_unuse_inode (struct shmem_inode_info *info, swp_entry_t entry, 
 		ptr = shmem_swp_entry(info, idx, 0);
 		if (IS_ERR(ptr))
 			continue;
-		offset = shmem_clear_swp (entry, ptr, ENTRIES_PER_PAGE);
+		offset = info->next_index - idx;
+		if (offset > ENTRIES_PER_PAGE)
+			offset = ENTRIES_PER_PAGE;
+		offset = shmem_find_swp(entry, ptr, ptr + offset);
 		if (offset >= 0)
 			goto found;
 	}
@@ -416,7 +421,11 @@ static int shmem_unuse_inode (struct shmem_inode_info *info, swp_entry_t entry, 
 found:
 	idx += offset;
 	inode = igrab(&info->vfs_inode);
+	/* move head to start search for next from here */
+	list_move_tail(&shmem_inodes, &info->list);
 	spin_unlock(&shmem_ilock);
+	swap_free(entry);
+	ptr[offset] = (swp_entry_t) {0};
 
 	while (inode && move_from_swap_cache(page, idx, inode->i_mapping)) {
 		/*
@@ -454,7 +463,7 @@ void shmem_unuse(swp_entry_t entry, struct page *page)
 	list_for_each(p, &shmem_inodes) {
 		info = list_entry(p, struct shmem_inode_info, list);
 
-		if (shmem_unuse_inode(info, entry, page))
+		if (info->swapped && shmem_unuse_inode(info, entry, page))
 			return;
 	}
 	spin_unlock (&shmem_ilock);
@@ -754,7 +763,7 @@ struct inode *shmem_get_inode(struct super_block *sb, int mode, int dev)
 			inode->i_op = &shmem_inode_operations;
 			inode->i_fop = &shmem_file_operations;
 			spin_lock (&shmem_ilock);
-			list_add (&SHMEM_I(inode)->list, &shmem_inodes);
+			list_add_tail(&SHMEM_I(inode)->list, &shmem_inodes);
 			spin_unlock (&shmem_ilock);
 			break;
 		case S_IFDIR:
@@ -1190,7 +1199,7 @@ static int shmem_symlink(struct inode * dir, struct dentry *dentry, const char *
 		}
 		inode->i_op = &shmem_symlink_inode_operations;
 		spin_lock (&shmem_ilock);
-		list_add (&info->list, &shmem_inodes);
+		list_add_tail(&info->list, &shmem_inodes);
 		spin_unlock (&shmem_ilock);
 		kaddr = kmap(page);
 		memcpy(kaddr, symname, len);
