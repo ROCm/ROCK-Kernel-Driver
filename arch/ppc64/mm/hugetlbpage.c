@@ -40,7 +40,7 @@ static struct list_head hugepage_freelists[MAX_NUMNODES];
 
 static void enqueue_huge_page(struct page *page)
 {
-	list_add(&page->list,
+	list_add(&page->lru,
 		&hugepage_freelists[page_zone(page)->zone_pgdat->node_id]);
 }
 
@@ -63,8 +63,8 @@ static struct page *dequeue_huge_page(void)
 	}
 
 	if (!list_empty(&hugepage_freelists[nid])) {
-		page = list_entry(hugepage_freelists[nid].next, struct page, list);
-		list_del(&page->list);
+		page = list_entry(hugepage_freelists[nid].next, struct page, lru);
+		list_del(&page->lru);
 	}
 
 	if (largepage_roundrobin)
@@ -452,7 +452,7 @@ static void free_huge_page(struct page *page)
 	BUG_ON(page_count(page));
 	BUG_ON(page->mapping);
 
-	INIT_LIST_HEAD(&page->list);
+	INIT_LIST_HEAD(&page->lru);
 
 	spin_lock(&htlbpage_lock);
 	enqueue_huge_page(page);

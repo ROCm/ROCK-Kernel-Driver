@@ -33,7 +33,7 @@ static spinlock_t htlbpage_lock = SPIN_LOCK_UNLOCKED;
 
 static void enqueue_huge_page(struct page *page)
 {
-	list_add(&page->list,
+	list_add(&page->lru,
 		 &hugepage_freelists[page_zone(page)->zone_pgdat->node_id]);
 }
 
@@ -51,7 +51,7 @@ static struct page *dequeue_huge_page(void)
 	    !list_empty(&hugepage_freelists[nid])) {
 		page = list_entry(hugepage_freelists[nid].next,
 				  struct page, list);
-		list_del(&page->list);
+		list_del(&page->lru);
 	}
 	return page;
 }
@@ -254,8 +254,6 @@ static void free_huge_page(struct page *page)
 	BUG_ON(page_count(page));
 	BUG_ON(page->mapping);
 
-	INIT_LIST_HEAD(&page->list);
-
 	spin_lock(&htlbpage_lock);
 	enqueue_huge_page(page);
 	htlbpagemem++;
@@ -388,7 +386,7 @@ static int try_to_free_low(int count)
 	/* all lowmem is on node 0 */
 	list_for_each(p, &hugepage_freelists[0]) {
 		if (map) {
-			list_del(&map->list);
+			list_del(&map->lru);
 			update_and_free_page(map);
 			htlbpagemem--;
 			map = NULL;
@@ -400,7 +398,7 @@ static int try_to_free_low(int count)
 			map = page;
 	}
 	if (map) {
-		list_del(&map->list);
+		list_del(&map->lru);
 		update_and_free_page(map);
 		htlbpagemem--;
 		count++;
