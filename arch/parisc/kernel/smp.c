@@ -459,7 +459,6 @@ smp_cpu_init(int cpunum)
  */
 void __init smp_callin(void)
 {
-	extern void cpu_idle(void);	/* arch/parisc/kernel/process.c */
 	int slave_id = cpu_now_booting;
 #if 0
 	void *istack;

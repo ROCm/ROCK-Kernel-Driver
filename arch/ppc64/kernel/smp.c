@@ -73,7 +73,6 @@ static volatile unsigned int cpu_callin_map[NR_CPUS];
 
 extern unsigned char stab_array[];
 
-extern int cpu_idle(void *unused);
 void smp_call_function_interrupt(void);
 
 int smt_enabled_at_boot = 1;
@@ -517,7 +516,8 @@ int __devinit start_secondary(void *unused)
 
 	local_irq_enable();
 
-	return cpu_idle(NULL);
+	cpu_idle();
+	return 0;
 }
 
 int setup_profiling_timer(unsigned int multiplier)

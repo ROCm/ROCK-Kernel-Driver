@@ -245,7 +245,7 @@ void cpu_idle_wait(void)
 EXPORT_SYMBOL_GPL(cpu_idle_wait);
 
 void __attribute__((noreturn))
-cpu_idle (void *unused)
+cpu_idle (void)
 {
 	void (*mark_idle)(int) = ia64_mark_idle;
 	int cpu = smp_processor_id();

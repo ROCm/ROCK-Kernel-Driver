@@ -42,7 +42,6 @@
 #include <asm/tlbflush.h>
 
 /* prototypes */
-extern int cpu_idle(void * unused);
 
 extern volatile int __cpu_logical_map[];
 
@@ -557,7 +556,8 @@ int __devinit start_secondary(void *cpuvoid)
         /* Print info about this processor */
         print_cpu_info(&S390_lowcore.cpu_data);
         /* cpu_idle will call schedule for us */
-        return cpu_idle(NULL);
+        cpu_idle();
+        return 0;
 }
 
 static void __init smp_create_idle(unsigned int cpu)

@@ -299,10 +299,9 @@ static int native_idle(void)
 
 #endif /* CONFIG_PPC_ISERIES */
 
-int cpu_idle(void)
+void cpu_idle(void)
 {
 	idle_loop();
-	return 0;
 }
 
 int powersave_nap;

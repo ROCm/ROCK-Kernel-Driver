@@ -411,12 +411,10 @@ void __init smp_callin(void)
 
 int cpucount;
 
-extern int cpu_idle(void);
-
 /*
  * Activate a secondary processor.
  */
-int __init start_secondary(void *unused)
+static void __init start_secondary(void *unused)
 {
 	/*
 	 * Dont put anything before smp_callin(), SMP
@@ -441,7 +439,7 @@ int __init start_secondary(void *unused)
 	local_flush_tlb();
 	cpu_set(smp_processor_id(), cpu_online_map);
 	wmb();
-	return cpu_idle();
+	cpu_idle();
 }
 
 /*

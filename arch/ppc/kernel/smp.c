@@ -60,7 +60,6 @@ static struct smp_ops_t *smp_ops;
 volatile unsigned long cpu_callin_map[NR_CPUS];
 
 int start_secondary(void *);
-extern int cpu_idle(void *unused);
 void smp_call_function_interrupt(void);
 static int __smp_call_function(void (*func) (void *info), void *info,
 			       int wait, int target);
@@ -358,7 +357,8 @@ int __devinit start_secondary(void *unused)
 	smp_ops->take_timebase();
 	printk("CPU %i done timebase take...\n", cpu);
 
-	return cpu_idle(NULL);
+	cpu_idle();
+	return 0;
 }
 
 int __cpu_up(unsigned int cpu)

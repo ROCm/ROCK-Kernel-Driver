@@ -288,7 +288,6 @@ static int __init init_setup(char *str)
 __setup("init=", init_setup);
 
 extern void setup_arch(char **);
-extern void cpu_idle(void);
 
 #ifndef CONFIG_SMP
 

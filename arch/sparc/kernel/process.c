@@ -81,10 +81,8 @@ void default_idle(void)
 /*
  * the idle loop on a Sparc... ;)
  */
-int cpu_idle(void)
+void cpu_idle(void)
 {
-	int ret = -EPERM;
-
 	if (current->pid != 0)
 		goto out;
 
@@ -128,15 +126,14 @@ int cpu_idle(void)
 		schedule();
 		check_pgt_cache();
 	}
-	ret = 0;
 out:
-	return ret;
+	return;
 }
 
 #else
 
 /* This is being executed in task 0 'user space'. */
-int cpu_idle(void)
+void cpu_idle(void)
 {
 	/* endless idle loop with no priority at all */
 	while(1) {

@@ -60,10 +60,10 @@ void default_idle(void)
 /*
  * the idle loop on a Sparc... ;)
  */
-int cpu_idle(void)
+void cpu_idle(void)
 {
 	if (current->pid != 0)
-		return -EPERM;
+		return;
 
 	/* endless idle loop with no priority at all */
 	for (;;) {
@@ -80,7 +80,7 @@ int cpu_idle(void)
 		schedule();
 		check_pgt_cache();
 	}
-	return 0;
+	return;
 }
 
 #else
@@ -90,7 +90,7 @@ int cpu_idle(void)
  */
 #define idle_me_harder()	(cpu_data(smp_processor_id()).idle_volume += 1)
 #define unidle_me()		(cpu_data(smp_processor_id()).idle_volume = 0)
-int cpu_idle(void)
+void cpu_idle(void)
 {
 	set_thread_flag(TIF_POLLING_NRFLAG);
 	while(1) {

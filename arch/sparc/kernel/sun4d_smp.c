@@ -145,7 +145,6 @@ void __init smp4d_callin(void)
 	spin_unlock_irqrestore(&sun4d_imsk_lock, flags);
 }
 
-extern int cpu_idle(void *unused);
 extern void init_IRQ(void);
 extern void cpu_panic(void);
 
