@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2004, R. Byron Moore
+ * Copyright (C) 2000 - 2005, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -516,7 +516,7 @@ acpi_ds_init_object_from_op (
 
 			case AML_REVISION_OP:
 
-				obj_desc->integer.value = ACPI_CA_SUPPORT_LEVEL;
+				obj_desc->integer.value = ACPI_CA_VERSION;
 				break;
 
 			default:

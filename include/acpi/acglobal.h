@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2004, R. Byron Moore
+ * Copyright (C) 2000 - 2005, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -96,6 +96,7 @@ extern      u32                                 acpi_gbl_nesting_level;
  * 1) Allow "implicit return" of last value in a control method
  * 2) Allow access beyond end of operation region
  * 3) Allow access to uninitialized locals/args (auto-init to integer 0)
+ * 4) Allow ANY object type to be a source operand for the Store() operator
  */
 ACPI_EXTERN u8       ACPI_INIT_GLOBAL (acpi_gbl_enable_interpreter_slack, FALSE);
 
