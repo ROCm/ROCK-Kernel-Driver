@@ -1,6 +1,6 @@
 #ifndef _dmasound_h_
 /*
- *  linux/drivers/sound/dmasound/dmasound.h
+ *  linux/sound/oss/dmasound/dmasound.h
  *
  *
  *  Minor numbers for the sound driver.

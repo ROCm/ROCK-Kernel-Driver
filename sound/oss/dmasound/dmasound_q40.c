@@ -1,9 +1,9 @@
 /*
- *  linux/drivers/sound/dmasound/dmasound_q40.c
+ *  linux/sound/oss/dmasound/dmasound_q40.c
  *
  *  Q40 DMA Sound Driver
  *
- *  See linux/drivers/sound/dmasound/dmasound_core.c for copyright and credits
+ *  See linux/sound/oss/dmasound/dmasound_core.c for copyright and credits
  *  prior to 28/01/2001
  *
  *  28/01/2001 [0.1] Iain Sandoe

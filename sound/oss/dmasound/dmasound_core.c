@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/sound/dmasound/dmasound_core.c
+ *  linux/sound/oss/dmasound/dmasound_core.c
  *
  *
  *  OSS/Free compatible Atari TT/Falcon and Amiga DMA sound driver for
