@@ -85,8 +85,6 @@
 #define IDE4_MAJOR	56
 #define IDE5_MAJOR	57
 
-#define LVM_BLK_MAJOR	58	/* Logical Volume Manager */
-
 #define SCSI_DISK1_MAJOR	65
 #define SCSI_DISK2_MAJOR	66
 #define SCSI_DISK3_MAJOR	67
@@ -137,8 +135,6 @@
 #define JSFD_MAJOR	99
 
 #define PHONE_MAJOR	100
-
-#define LVM_CHAR_MAJOR	109	/* Logical Volume Manager */
 
 #define RTF_MAJOR	150
 #define RAW_MAJOR	162

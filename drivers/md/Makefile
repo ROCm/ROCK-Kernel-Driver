@@ -3,7 +3,6 @@
 #
 
 export-objs	:= md.o xor.o dm-table.o dm-target.o
-lvm-mod-objs	:= lvm.o lvm-snap.o lvm-fs.o
 dm-mod-objs	:= dm.o dm-table.o dm-target.o dm-linear.o dm-stripe.o \
 		   dm-ioctl.o
 
@@ -18,7 +17,6 @@ obj-$(CONFIG_MD_RAID1)		+= raid1.o
 obj-$(CONFIG_MD_RAID5)		+= raid5.o xor.o
 obj-$(CONFIG_MD_MULTIPATH)	+= multipath.o
 obj-$(CONFIG_BLK_DEV_MD)	+= md.o
-obj-$(CONFIG_BLK_DEV_LVM)	+= lvm-mod.o
 obj-$(CONFIG_BLK_DEV_DM)	+= dm-mod.o
 
 include $(TOPDIR)/Rules.make

@@ -990,12 +990,6 @@ L:	ldm-devel@lists.sourceforge.net
 W:	http://ldm.sourceforge.net
 S:	Maintained
 
-LOGICAL VOLUME MANAGER
-P:	Heinz Mauelshagen
-L:	linux-LVM@sistina.com
-W:	http://www.sistina.com/lvm
-S:	Maintained 
-
 LSILOGIC/SYMBIOS/NCR 53C8XX and 53C1010 PCI-SCSI drivers
 P:	Gerard Roudier
 M:	groudier@free.fr

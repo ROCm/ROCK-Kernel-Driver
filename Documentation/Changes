@@ -114,9 +114,6 @@ Architectural changes
 DevFS is now in the kernel.  See Documentation/filesystems/devfs/* in
 the kernel source tree for all the gory details.
 
-The Logical Volume Manager (LVM) is now in the kernel.  If you want to
-use this, you'll need to install the necessary LVM toolset.
-
 32-bit UID support is now in place.  Have fun!
 
 Linux documentation for functions is transitioning to inline
@@ -329,10 +326,6 @@ o  <http://www.namesys.com/pub/reiserfsprogs/reiserfsprogs-3.6.3.tar.gz>
 Xfsprogs
 --------
 o  <ftp://oss.sgi.com/projects/xfs/download/cmd_tars/xfsprogs-2.1.0.src.tar.gz>
-
-LVM toolset
------------
-o  <http://www.sistina.com/lvm/>
 
 Pcmcia-cs
 ---------
