@@ -292,40 +292,6 @@ acpi_parse_lapic_nmi (acpi_table_entry_header *header)
 
 
 static int __init
-acpi_find_iosapic (unsigned int gsi, u32 *gsi_base, char **iosapic_address)
-{
-	struct acpi_table_iosapic *iosapic;
-	int ver;
-	int max_pin;
-	char *p;
-	char *end;
-
-	if (!gsi_base || !iosapic_address)
-		return -ENODEV;
-
-	p = (char *) (acpi_madt + 1);
-	end = p + (acpi_madt->header.length - sizeof(struct acpi_table_madt));
-
-	while (p < end) {
-		if (*p == ACPI_MADT_IOSAPIC) {
-			iosapic = (struct acpi_table_iosapic *) p;
-
-			*gsi_base = iosapic->global_irq_base;
-			*iosapic_address = ioremap(iosapic->address, 0);
-
-			ver = iosapic_version(*iosapic_address);
-			max_pin = (ver >> 16) & 0xff;
-
-			if ((gsi - *gsi_base) <= max_pin)
-				return 0;	/* Found it! */
-		}
-		p += p[1];
-	}
-	return -ENODEV;
-}
-
-
-static int __init
 acpi_parse_iosapic (acpi_table_entry_header *header)
 {
 	struct acpi_table_iosapic *iosapic;
@@ -348,8 +314,6 @@ acpi_parse_plat_int_src (acpi_table_entry_header *header)
 {
 	struct acpi_table_plat_int_src *plintsrc;
 	int vector;
-	u32 gsi_base;
-	char *iosapic_address;
 
 	plintsrc = (struct acpi_table_plat_int_src *) header;
 	if (!plintsrc)
@@ -359,11 +323,6 @@ acpi_parse_plat_int_src (acpi_table_entry_header *header)
 
 	if (!iosapic_register_platform_intr) {
 		printk(KERN_WARNING PREFIX "No ACPI platform interrupt support\n");
-		return -ENODEV;
-	}
-
-	if (acpi_find_iosapic(plintsrc->global_irq, &gsi_base, &iosapic_address)) {
-		printk(KERN_WARNING PREFIX "IOSAPIC not found\n");
 		return -ENODEV;
 	}
 
@@ -377,9 +336,7 @@ acpi_parse_plat_int_src (acpi_table_entry_header *header)
 						plintsrc->eid,
 						plintsrc->id,
 						(plintsrc->flags.polarity == 1) ? 1 : 0,
-						(plintsrc->flags.trigger == 1) ? 1 : 0,
-						gsi_base,
-						iosapic_address);
+						(plintsrc->flags.trigger == 1) ? 1 : 0);
 
 	platform_intr_list[plintsrc->type] = vector;
 	return 0;
@@ -639,8 +596,7 @@ acpi_parse_fadt (unsigned long phys_addr, unsigned long size)
 {
 	struct acpi_table_header *fadt_header;
 	struct fadt_descriptor_rev2 *fadt;
-	u32 sci_irq, gsi_base;
-	char *iosapic_address;
+	u32 sci_irq;
 
 	if (!phys_addr || !size)
 		return -EINVAL;
@@ -662,8 +618,7 @@ acpi_parse_fadt (unsigned long phys_addr, unsigned long size)
 	if (has_8259 && sci_irq < 16)
 		return 0;	/* legacy, no setup required */
 
-	if (!acpi_find_iosapic(sci_irq, &gsi_base, &iosapic_address))
-		iosapic_register_intr(sci_irq, 0, 0, gsi_base, iosapic_address);
+	iosapic_register_intr(sci_irq, 0, 0);
 	return 0;
 }
 
@@ -717,8 +672,6 @@ acpi_parse_spcr (unsigned long phys_addr, unsigned long size)
 	if ((spcr->base_addr.space_id != ACPI_SERIAL_PCICONF_SPACE) &&
 	    (spcr->int_type == ACPI_SERIAL_INT_SAPIC))
 	{
-		u32 gsi_base;
-		char *iosapic_address;
 		int vector;
 
 		/* We have a UART in memory space with an SAPIC interrupt */
@@ -728,11 +681,7 @@ acpi_parse_spcr (unsigned long phys_addr, unsigned long size)
 			 (spcr->global_int[1] << 8)  |
 			 (spcr->global_int[0])  );
 
-		/* Which iosapic does this interrupt belong to? */
-
-		if (!acpi_find_iosapic(gsi, &gsi_base, &iosapic_address))
-			vector = iosapic_register_intr(gsi, 1, 1,
-						       gsi_base, iosapic_address);
+		vector = iosapic_register_intr(gsi, 1, 1);
 	}
 	return 0;
 }
@@ -892,8 +841,6 @@ int __init
 acpi_register_irq (u32 gsi, u32 polarity, u32 trigger)
 {
 	int vector = 0;
-	u32 irq_base;
-	char *iosapic_address;
 
 	if (acpi_madt->flags.pcat_compat && (gsi < 16))
 		return isa_irq_to_vector(gsi);
@@ -901,12 +848,8 @@ acpi_register_irq (u32 gsi, u32 polarity, u32 trigger)
 	if (!iosapic_register_intr)
 		return 0;
 
-	/* Find the IOSAPIC */
-	if (!acpi_find_iosapic(gsi, &irq_base, &iosapic_address)) {
-		/* Turn it on */
-		vector = iosapic_register_intr (gsi, polarity, trigger,
-						irq_base, iosapic_address);
-	}
+	/* Turn it on */
+	vector = iosapic_register_intr (gsi, polarity, trigger);
 	return vector;
 }
 
