@@ -932,11 +932,6 @@ config AU1000_USB_DEVICE
 	depends on MIPS_PB1500 || MIPS_PB1100 || MIPS_PB1000
 	default n
 
-config COBALT_LCD
-	bool
-	depends on MIPS_COBALT
-	default y
-
 config MIPS_GT96100
 	bool
 	depends on MIPS_EV96100

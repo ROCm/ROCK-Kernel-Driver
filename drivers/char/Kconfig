@@ -793,6 +793,13 @@ config EFI_RTC
 	bool "EFI Real Time Clock Services"
 	depends on IA64
 
+config COBALT_LCD
+	bool "Support for Cobalt LCD"
+	depends on MIPS_COBALT
+	help
+	  This option enables support for the LCD display and buttons found
+	  on Cobalt systems through a misc device.
+
 config H8
 	bool "Tadpole ANA H8 Support (OBSOLETE)"
 	depends on OBSOLETE && ALPHA_BOOK1
