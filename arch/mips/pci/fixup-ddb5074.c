@@ -17,8 +17,5 @@ static void ddb5074_fixup(struct pci_dev *dev)
 	pci_write_config_byte(dev, 0x7e, t8);
 }
 
-struct pci_fixup pcibios_fixups[] __initdata = {
-	{ PCI_FIXUP_FINAL, PCI_VENDOR_ID_AL, PCI_DEVICE_ID_AL_M7101,
-	  ddb5074_fixup },
-	{0}
-};
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_AL, PCI_DEVICE_ID_AL_M7101,
+	ddb5074_fixup);

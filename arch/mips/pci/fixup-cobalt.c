@@ -41,6 +41,9 @@ static void qube_raq_via_bmIDE_fixup(struct pci_dev *dev)
 	pci_write_config_byte(dev, PCI_CACHE_LINE_SIZE, 7);
 }
 
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C586_1,
+	 qube_raq_via_bmIDE_fixup);
+
 static void qube_raq_galileo_fixup(struct pci_dev *dev)
 {
 	unsigned short galileo_id;
@@ -73,13 +76,8 @@ static void qube_raq_galileo_fixup(struct pci_dev *dev)
 	}
 }
 
-struct pci_fixup pcibios_fixups[] __initdata = {
-	{PCI_FIXUP_HEADER, PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C586_1,
-	 qube_raq_via_bmIDE_fixup},
-	{PCI_FIXUP_HEADER, PCI_VENDOR_ID_GALILEO, PCI_ANY_ID,
-	 qube_raq_galileo_fixup},
-	0
-};
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_GALILEO, PCI_ANY_ID,
+	qube_raq_galileo_fixup);
 
 static char irq_tab_cobalt[] __initdata = {
   [COBALT_PCICONF_CPU]     = 0,

@@ -128,12 +128,14 @@ static void __devinit pci_fixup_83c553(struct pci_dev *dev)
 	pci_write_config_word(dev, 0x44, 0xb000);
 	outb(0x08, 0x4d1);
 }
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_WINBOND, PCI_DEVICE_ID_WINBOND_83C553, pci_fixup_83c553);
 
 static void __devinit pci_fixup_unassign(struct pci_dev *dev)
 {
 	dev->resource[0].end -= dev->resource[0].start;
 	dev->resource[0].start = 0;
 }
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_WINBOND2, PCI_DEVICE_ID_WINBOND2_89C940F, pci_fixup_unassign);
 
 /*
  * Prevent the PCI layer from seeing the resources allocated to this device
@@ -154,6 +156,7 @@ static void __devinit pci_fixup_dec21285(struct pci_dev *dev)
 		}
 	}
 }
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_DEC, PCI_DEVICE_ID_DEC_21285, pci_fixup_dec21285);
 
 /*
  * Same as above. The PrPMC800 carrier board for the PrPMC1100 
@@ -178,6 +181,7 @@ static void __devinit pci_fixup_prpmc1100(struct pci_dev *dev)
 		}
 	}
 }
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_IXP4XX, pci_fixup_prpmc1100);
 
 /*
  * PCI IDE controllers use non-standard I/O port decoding, respect it.
@@ -198,6 +202,7 @@ static void __devinit pci_fixup_ide_bases(struct pci_dev *dev)
 		}
 	}
 }
+DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, pci_fixup_ide_bases);
 
 /*
  * Put the DEC21142 to sleep
@@ -206,6 +211,7 @@ static void __devinit pci_fixup_dec21142(struct pci_dev *dev)
 {
 	pci_write_config_dword(dev, 0x40, 0x80000000);
 }
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_DEC, PCI_DEVICE_ID_DEC_21142, pci_fixup_dec21142);
 
 /*
  * The CY82C693 needs some rather major fixups to ensure that it does
@@ -271,38 +277,7 @@ static void __devinit pci_fixup_cy82c693(struct pci_dev *dev)
 		pci_write_config_byte(dev, 0x45, 0x03);
 	}
 }
-
-struct pci_fixup pcibios_fixups[] = {
-	{
-		PCI_FIXUP_HEADER,
-		PCI_VENDOR_ID_CONTAQ,	PCI_DEVICE_ID_CONTAQ_82C693,
-		pci_fixup_cy82c693
-	}, {
-		PCI_FIXUP_HEADER,
-		PCI_VENDOR_ID_DEC,	PCI_DEVICE_ID_DEC_21142,
-		pci_fixup_dec21142
-	}, {
-		PCI_FIXUP_HEADER,
-		PCI_VENDOR_ID_DEC,	PCI_DEVICE_ID_DEC_21285,
-		pci_fixup_dec21285
-	}, {
-		PCI_FIXUP_HEADER,
-		PCI_VENDOR_ID_WINBOND,	PCI_DEVICE_ID_WINBOND_83C553,
-		pci_fixup_83c553
-	}, {
-		PCI_FIXUP_HEADER,
-		PCI_VENDOR_ID_WINBOND2,	PCI_DEVICE_ID_WINBOND2_89C940F,
-		pci_fixup_unassign
-	}, {
-		PCI_FIXUP_HEADER,
-		PCI_ANY_ID,		PCI_ANY_ID,
-		pci_fixup_ide_bases
-	}, {
-		PCI_FIXUP_HEADER,
-		PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_IXP4XX,
-		pci_fixup_prpmc1100
-	}, { 0 }
-};
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_CONTAQ, PCI_DEVICE_ID_CONTAQ_82C693, pci_fixup_cy82c693);
 
 void __devinit pcibios_update_irq(struct pci_dev *dev, int irq)
 {

@@ -329,6 +329,9 @@ static void __init pci_fixup_ioc3(struct pci_dev *d)
 	pci_disable_swapping(d);
 }
 
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_SGI, PCI_DEVICE_ID_SGI_IOC3,
+	 pci_fixup_ioc3);
+
 static void __init pci_fixup_isp1020(struct pci_dev *d)
 {
 	struct bridge_controller *bc = BRIDGE_CONTROLLER(d->bus);
@@ -352,6 +355,9 @@ static void __init pci_fixup_isp1020(struct pci_dev *d)
 
 	pci_enable_swapping(d);
 }
+
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_QLOGIC, PCI_DEVICE_ID_QLOGIC_ISP1020,
+	 pci_fixup_isp1020);
 
 static void __init pci_fixup_isp2x00(struct pci_dev *d)
 {
@@ -427,14 +433,7 @@ static void __init pci_fixup_isp2x00(struct pci_dev *d)
 	/*d->resource[1].flags |= 1; */
 }
 
-struct pci_fixup pcibios_fixups[] = {
-	{PCI_FIXUP_HEADER, PCI_VENDOR_ID_SGI, PCI_DEVICE_ID_SGI_IOC3,
-	 pci_fixup_ioc3},
-	{PCI_FIXUP_HEADER, PCI_VENDOR_ID_QLOGIC, PCI_DEVICE_ID_QLOGIC_ISP1020,
-	 pci_fixup_isp1020},
-	{PCI_FIXUP_HEADER, PCI_VENDOR_ID_QLOGIC, PCI_DEVICE_ID_QLOGIC_ISP2100,
-	 pci_fixup_isp2x00},
-	{PCI_FIXUP_HEADER, PCI_VENDOR_ID_QLOGIC, PCI_DEVICE_ID_QLOGIC_ISP2200,
-	 pci_fixup_isp2x00},
-	{0}
-};
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_QLOGIC, PCI_DEVICE_ID_QLOGIC_ISP2100,
+	 pci_fixup_isp2x00);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_QLOGIC, PCI_DEVICE_ID_QLOGIC_ISP2200,
+	 pci_fixup_isp2x00);

@@ -46,8 +46,6 @@
 #define DBG(x...)
 #endif
 
-struct pci_fixup pcibios_fixups[1];
-
 /*
  * Low-level SAL-based PCI configuration access functions. Note that SAL
  * calls are already serialized (via sal_lock), so we don't need another
