@@ -1,9 +1,10 @@
 #
 # AIC79XX 2.5.X Kernel configuration File.
-# $Id: //depot/linux-aic79xx-2.5.0/drivers/scsi/aic7xxx/Kconfig.aic79xx#1 $
+# $Id: //depot/linux-aic79xx-2.5.0/drivers/scsi/aic7xxx/Kconfig.aic79xx#2 $
 #
 config SCSI_AIC79XX
 	tristate "Adaptec AIC79xx U320 support"
+	depends on PCI
 	help
 	This driver supports all of Adaptec's Ultra 320 PCI-X
 	based SCSI controllers.

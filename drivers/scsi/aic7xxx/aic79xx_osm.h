@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#88 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#90 $
  *
  */
 #ifndef _AIC79XX_LINUX_H_
@@ -141,7 +141,7 @@ typedef Scsi_Cmnd      *ahd_io_ctx_t;
 /************************* Configuration Data *********************************/
 extern int aic79xx_allow_memio;
 extern int aic79xx_detect_complete;
-extern Scsi_Host_Template* aic79xx_driver_template;
+extern Scsi_Host_Template aic79xx_driver_template;
 
 /***************************** Bus Space/DMA **********************************/
 
@@ -246,10 +246,6 @@ int	ahd_dmamap_unload(struct ahd_softc *, bus_dma_tag_t, bus_dmamap_t);
 typedef struct timer_list ahd_timer_t;
 
 /********************************** Includes **********************************/
-/* Host template and function declarations referenced by the template. */
-#include "aic79xx_host.h"
-
-/* Core driver definitions */
 #if CONFIG_AIC79XX_REG_PRETTY_PRINT
 #define AIC_DEBUG_REGISTERS 1
 #else
@@ -1052,6 +1048,9 @@ ahd_flush_device_writes(struct ahd_softc *ahd)
 #define ahd_pci_set_dma_mask(dev_softc, mask)	\
 	(((dev_softc)->dma_mask = mask) && 0)
 #endif
+/**************************** Proc FS Support *********************************/
+int	ahd_linux_proc_info(char *, char **, off_t, int, int, int);
+
 /*************************** Domain Validation ********************************/
 #define AHD_DV_CMD(cmd) ((cmd)->scsi_done == ahd_linux_dv_complete)
 #define AHD_DV_SIMQ_FROZEN(ahd)					\

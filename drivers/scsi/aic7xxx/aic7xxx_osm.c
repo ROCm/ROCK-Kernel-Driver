@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#160 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#161 $
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -812,7 +812,6 @@ static int	   ahc_linux_release(struct Scsi_Host *);
 static int	   ahc_linux_queue(Scsi_Cmnd *, void (*)(Scsi_Cmnd *));
 static const char *ahc_linux_info(struct Scsi_Host *);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-static int	   ahc_linux_slave_alloc(Scsi_Device *);
 static int	   ahc_linux_slave_configure(Scsi_Device *);
 static void	   ahc_linux_slave_destroy(Scsi_Device *);
 static int	   ahd_linux_biosparam(struct scsi_device*,

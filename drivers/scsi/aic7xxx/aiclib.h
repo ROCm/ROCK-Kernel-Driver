@@ -825,6 +825,25 @@ typedef enum {
 
 extern const char *scsi_sense_key_text[];
 
+/************************* Large Disk Handling ********************************/
+static __inline int aic_sector_div(u_long capacity, int heads, int sectors);
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+static __inline int
+aic_sector_div(u_long capacity, int heads, int sectors)
+{
+	return (capacity / (heads * sectors));
+}
+#else
+static __inline int
+aic_sector_div(sector_t capacity, int heads, int sectors)
+{
+	/* ugly, ugly sector_div calling convention.. */
+	sector_div(capacity, (heads * sectors));
+	return (int)capacity;
+}
+#endif
+
 /**************************** Module Library Hack *****************************/
 /*
  * What we'd like to do is have a single "scsi library" module that both the

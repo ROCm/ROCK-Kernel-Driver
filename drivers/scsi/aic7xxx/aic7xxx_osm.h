@@ -18,8 +18,6 @@
  * along with this program; see the file COPYING.  If not, write to
  * the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
  * 
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#108 $
- *
  * Copyright (c) 2000-2001 Adaptec Inc.
  * All rights reserved.
  *
@@ -55,7 +53,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#108 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#109 $
  *
  */
 #ifndef _AIC7XXX_LINUX_H_
@@ -156,7 +154,7 @@ typedef Scsi_Cmnd      *ahc_io_ctx_t;
 extern int aic7xxx_no_probe;
 extern int aic7xxx_allow_memio;
 extern int aic7xxx_detect_complete;
-extern Scsi_Host_Template* aic7xxx_driver_template;
+extern Scsi_Host_Template aic7xxx_driver_template;
 
 /***************************** Bus Space/DMA **********************************/
 
@@ -261,10 +259,6 @@ int	ahc_dmamap_unload(struct ahc_softc *, bus_dma_tag_t, bus_dmamap_t);
 typedef struct timer_list ahc_timer_t;
 
 /********************************** Includes **********************************/
-/* Host template and function declarations referenced by the template. */
-#include "aic7xxx_host.h"
-
-/* Core driver definitions */
 #if CONFIG_AIC7XXX_REG_PRETTY_PRINT
 #define AIC_DEBUG_REGISTERS 1
 #else
@@ -1020,6 +1014,9 @@ ahc_flush_device_writes(struct ahc_softc *ahc)
 #define ahc_pci_set_dma_mask(dev_softc, mask)  			\
 	(((dev_softc)->dma_mask = mask) && 0)
 #endif
+/**************************** Proc FS Support *********************************/
+int	ahc_linux_proc_info(char *, char **, off_t, int, int, int);
+
 /*************************** Domain Validation ********************************/
 #define AHC_DV_CMD(cmd) ((cmd)->scsi_done == ahc_linux_dv_complete)
 #define AHC_DV_SIMQ_FROZEN(ahc)					\
