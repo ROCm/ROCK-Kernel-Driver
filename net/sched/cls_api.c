@@ -239,8 +239,10 @@ replay:
 				 * replay the request.  We indicate this using
 				 * -EAGAIN.
 				 */
-				if (tp_ops != NULL)
+				if (tp_ops != NULL) {
+					module_put(tp_ops->owner);
 					err = -EAGAIN;
+				}
 			}
 #endif
 			kfree(tp);

@@ -1214,7 +1214,7 @@ hfsc_delete_class(struct Qdisc *sch, unsigned long arg)
 }
 
 static struct hfsc_class *
-hfsc_classify(struct sk_buff *skb, struct Qdisc *sch, int *qres)
+hfsc_classify(struct sk_buff *skb, struct Qdisc *sch, int *qerr)
 {
 	struct hfsc_sched *q = qdisc_priv(sch);
 	struct hfsc_class *cl;
@@ -1227,35 +1227,20 @@ hfsc_classify(struct sk_buff *skb, struct Qdisc *sch, int *qres)
 		if (cl->level == 0)
 			return cl;
 
+	*qerr = NET_XMIT_DROP;
 	tcf = q->root.filter_list;
 	while (tcf && (result = tc_classify(skb, tcf, &res)) >= 0) {
 #ifdef CONFIG_NET_CLS_ACT
-		int terminal = 0;
 		switch (result) {
-		case TC_ACT_SHOT: 
-			*qres = NET_XMIT_DROP;
-			terminal = 1;
-			break;
 		case TC_ACT_QUEUED:
 		case TC_ACT_STOLEN: 
-			terminal = 1;
-			break;
-		case TC_ACT_RECLASSIFY: 
-		case TC_ACT_OK:
-		case TC_ACT_UNSPEC:
-		default:
-		break;
-		}
-
-		if (terminal) {
-			kfree_skb(skb);
+			*qerr = NET_XMIT_SUCCESS;
+		case TC_ACT_SHOT: 
 			return NULL;
 		}
-#else
-#ifdef CONFIG_NET_CLS_POLICE
+#elif defined(CONFIG_NET_CLS_POLICE)
 		if (result == TC_POLICE_SHOT)
 			return NULL;
-#endif
 #endif
 		if ((cl = (struct hfsc_class *)res.class) == NULL) {
 			if ((cl = hfsc_find_class(res.classid, sch)) == NULL)
@@ -1652,27 +1637,19 @@ hfsc_dump_qdisc(struct Qdisc *sch, struct sk_buff *skb)
 static int
 hfsc_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 {
-	int ret = NET_XMIT_SUCCESS;
-	struct hfsc_class *cl = hfsc_classify(skb, sch, &ret);
-	unsigned int len = skb->len;
+	struct hfsc_class *cl;
+	unsigned int len;
 	int err;
 
-
-#ifdef CONFIG_NET_CLS_ACT
+	cl = hfsc_classify(skb, sch, &err);
 	if (cl == NULL) {
-		if (NET_XMIT_DROP == ret) {
+		if (err == NET_XMIT_DROP)
 			sch->qstats.drops++;
-		}
-		return ret;
-	}
-#else
-	if (cl == NULL) {
 		kfree_skb(skb);
-		sch->qstats.drops++;
-		return NET_XMIT_DROP;
+		return err;
 	}
-#endif
 
+	len = skb->len;
 	err = cl->qdisc->enqueue(skb, cl->qdisc);
 	if (unlikely(err != NET_XMIT_SUCCESS)) {
 		cl->qstats.drops++;
