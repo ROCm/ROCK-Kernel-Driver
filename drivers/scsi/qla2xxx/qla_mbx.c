@@ -1607,7 +1607,7 @@ qla2x00_get_port_name(scsi_qla_host_t *ha, uint16_t loop_id, uint8_t *name,
  *	BIT_1 = mailbox error.
  */
 uint8_t
-qla2x00_get_link_status(scsi_qla_host_t *ha, uint8_t loop_id,
+qla2x00_get_link_status(scsi_qla_host_t *ha, uint16_t loop_id,
     link_stat_t *ret_buf, uint16_t *status)
 {
 	int rval;
