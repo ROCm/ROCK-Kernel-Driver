@@ -96,10 +96,22 @@ MODULE_AUTHOR(MODULEAUTHOR);
 MODULE_DESCRIPTION(my_NAME);
 MODULE_LICENSE("GPL");
 
-/* Set string for command line args from insmod */
 #ifdef MODULE
-char *mptscsih = NULL;
-module_param(mptscsih, charp, 0);
+static int dv = MPTSCSIH_DOMAIN_VALIDATION;
+module_param(dv, int, 0);
+MODULE_PARM_DESC(dv, "DV Algorithm: enhanced = 1, basic = 0 (default=MPTSCSIH_DOMAIN_VALIDATION=1)");
+
+static int width = MPTSCSIH_MAX_WIDTH;
+module_param(width, int, 0);
+MODULE_PARM_DESC(width, "Max Bus Width: wide = 1, narrow = 0 (default=MPTSCSIH_MAX_WIDTH=1)");
+
+static ushort factor = MPTSCSIH_MIN_SYNC;
+module_param(factor, ushort, 0);
+MODULE_PARM_DESC(factor, "Min Sync Factor: (default=MPTSCSIH_MIN_SYNC=0x08)");
+
+static int saf_te = MPTSCSIH_SAF_TE;
+module_param(saf_te, int, 0);
+MODULE_PARM_DESC(saf_te, "Force enabling SEP Processor: (default=MPTSCSIH_SAF_TE=0)");
 #endif
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -200,9 +212,6 @@ static int	mptscsih_doDv(MPT_SCSI_HOST *hd, int channel, int target);
 static void	mptscsih_dv_parms(MPT_SCSI_HOST *hd, DVPARAMETERS *dv,void *pPage);
 static void	mptscsih_fillbuf(char *buffer, int size, int index, int width);
 #endif
-#ifdef MODULE
-static int	mptscsih_setup(char *str);
-#endif
 /* module entry point */
 static int  __init   mptscsih_init  (void);
 static void __exit   mptscsih_exit  (void);
@@ -245,11 +254,9 @@ static DECLARE_WAIT_QUEUE_HEAD (scandv_waitq);
 static int scandv_wait_done = 1;
 
 
-/* Driver default setup
+/* Driver command line structure
  */
-static struct mptscsih_driver_setup
-	driver_setup = MPTSCSIH_DRIVER_SETUP;
-
+static struct mptscsih_driver_setup driver_setup;
 static struct scsi_host_template driver_template;
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -1242,9 +1249,9 @@ mptscsih_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		}
 
 		if (ioc->spi_data.minSyncFactor <
-		  driver_setup.min_sync_fac) {
+		  driver_setup.min_sync_factor) {
 			ioc->spi_data.minSyncFactor =
-			  driver_setup.min_sync_fac;
+			  driver_setup.min_sync_factor;
 		}
 
 		if (ioc->spi_data.minSyncFactor == MPT_ASYNC) {
@@ -1271,7 +1278,7 @@ mptscsih_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 			"dv %x width %x factor %x saf_te %x\n",
 			ioc->name, driver_setup.dv,
 			driver_setup.max_width,
-			driver_setup.min_sync_fac,
+			driver_setup.min_sync_factor,
 			driver_setup.saf_te));
 	}
 
@@ -1489,9 +1496,15 @@ mptscsih_init(void)
 	}
 
 #ifdef MODULE
-	/* Evaluate the command line arguments, if any */
-	if (mptscsih)
-		mptscsih_setup(mptscsih);
+	dinitprintk((KERN_INFO MYNAM
+		": Command Line Args: dv=%d max_width=%d "
+		"factor=0x%x saf_te=%d\n",
+		dv, width, factor, saf_te));
+
+	driver_setup.dv = (dv) ? 1 : 0;
+	driver_setup.max_width = (width) ? 1 : 0;
+	driver_setup.min_sync_factor = factor;
+	driver_setup.saf_te = (saf_te) ? 1 : 0;;
 #endif
 
 	if(mpt_device_driver_register(&mptscsih_driver,
@@ -2943,7 +2956,7 @@ mptscsih_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
 
 		/* 4. Renegotiate to all devices, if SCSI
 		 */
-		if (hd->ioc->bus_type == SCSI) {
+		if (ioc->bus_type == SCSI) {
 			dnegoprintk(("writeSDP1: ALL_IDS USE_NVRAM\n"));
 			mptscsih_writeSDP1(hd, 0, 0, MPT_SCSICFG_ALL_IDS | MPT_SCSICFG_USE_NVRAM);
 		}
@@ -6074,107 +6087,6 @@ mptscsih_fillbuf(char *buffer, int size, int index, int width)
 #endif /* ~MPTSCSIH_ENABLE_DOMAIN_VALIDATION */
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-/* Commandline Parsing routines and defines.
- *
- * insmod format:
- *	insmod mptscsih mptscsih="width:1 dv:n factor:0x09 saf-te:1"
- *  boot format:
- *	mptscsih=width:1,dv:n,factor:0x8,saf-te:1
- *
- */
-#ifdef MODULE
-#define	ARG_SEP	' '
-#else
-#define	ARG_SEP	','
-#endif
-
-#ifdef MODULE
-static char setup_token[] __initdata =
-	"dv:"
-	"width:"
-	"factor:"
-	"saf-te:"
-       ;	/* DO NOT REMOVE THIS ';' */
-#endif
-       
-#define OPT_DV			1
-#define OPT_MAX_WIDTH		2
-#define OPT_MIN_SYNC_FACTOR	3
-#define OPT_SAF_TE		4
-
-/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-#ifdef MODULE
-static int
-get_setup_token(char *p)
-{
-	char *cur = setup_token;
-	char *pc;
-	int i = 0;
-
-	while (cur != NULL && (pc = strchr(cur, ':')) != NULL) {
-		++pc;
-		++i;
-		if (!strncmp(p, cur, pc - cur))
-			return i;
-		cur = pc;
-	}
-	return 0;
-}
-
-/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-static int
-mptscsih_setup(char *str)
-{
-	char *cur = str;
-	char *pc, *pv;
-	unsigned long val;
-	int  c;
-
-	while (cur != NULL && (pc = strchr(cur, ':')) != NULL) {
-		char *pe;
-
-		val = 0;
-		pv = pc;
-		c = *++pv;
-
-		if	(c == 'n')
-			val = 0;
-		else if	(c == 'y')
-			val = 1;
-		else
-			val = (int) simple_strtoul(pv, &pe, 0);
-
-		printk("Found Token: %s, value %x\n", cur, (int)val);
-		switch (get_setup_token(cur)) {
-		case OPT_DV:
-			driver_setup.dv = val;
-			break;
-
-		case OPT_MAX_WIDTH:
-			driver_setup.max_width = val;
-			break;
-
-		case OPT_MIN_SYNC_FACTOR:
-			driver_setup.min_sync_fac = val;
-			break;
-
-		case OPT_SAF_TE:
-			driver_setup.saf_te = val;
-			break;
-
-		default:
-			printk("mptscsih_setup: unexpected boot option '%.*s' ignored\n", (int)(pc-cur+1), cur);
-			break;
-		}
-
-		if ((cur = strchr(cur, ARG_SEP)) != NULL)
-			++cur;
-	}
-	return 1;
-}
-#endif
-/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-
 
 module_init(mptscsih_init);
 module_exit(mptscsih_exit);
