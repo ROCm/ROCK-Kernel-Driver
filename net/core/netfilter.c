@@ -574,7 +574,15 @@ void nf_reinject(struct sk_buff *skb, struct nf_info *info,
 	/* Release those devices we held, or Alexey will kill me. */
 	if (info->indev) dev_put(info->indev);
 	if (info->outdev) dev_put(info->outdev);
-	
+#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
+	if (skb->nf_bridge) {
+		if (skb->nf_bridge->physindev)
+			dev_put(skb->nf_bridge->physindev);
+		if (skb->nf_bridge->physoutdev)
+			dev_put(skb->nf_bridge->physoutdev);
+	}
+#endif
+
 	kfree(info);
 	return;
 }

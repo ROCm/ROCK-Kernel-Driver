@@ -554,9 +554,6 @@ struct Scsi_Device_Template
     struct device_driver scsi_driverfs_driver;
 };
 
-void  scsi_initialize_queue(Scsi_Device *, struct Scsi_Host *);
-
-
 /*
  * Highlevel driver registration/unregistration.
  */

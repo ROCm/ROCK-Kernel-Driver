@@ -98,6 +98,11 @@ EXPORT_SYMBOL(scsi_host_put);
 EXPORT_SYMBOL(scsi_device_types);
 
 /*
+ * This is for st to find the bounce limit
+ */
+EXPORT_SYMBOL(scsi_calculate_bounce_limit);
+
+/*
  * Externalize timers so that HBAs can safely start/restart commands.
  */
 extern void scsi_add_timer(Scsi_Cmnd *, int, void ((*) (Scsi_Cmnd *)));

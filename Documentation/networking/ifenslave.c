@@ -41,6 +41,16 @@
  *    - 2002/02/18 Erik Habbinga <erik_habbinga @ hp dot com> :
  *       - ifr2.ifr_flags was not initialized in the hwaddr_notset case,
  *         SIOCGIFFLAGS now called before hwaddr_notset test
+ *
+ *    - 2002/10/31 Tony Cureington <tony.cureington * hp_com> :
+ *       - If the master does not have a hardware address when the first slave
+ *         is enslaved, the master is assigned the hardware address of that 
+ *         slave - there is a comment in bonding.c stating "ifenslave takes 
+ *         care of this now." This corrects the problem of slaves having 
+ *         different hardware addresses in active-backup mode when 
+ *         multiple interfaces are specified on a single ifenslave command
+ *         (ifenslave bond0 eth0 eth1).
+ *
  */
 
 static char *version =
@@ -131,6 +141,7 @@ main(int argc, char **argv)
 	sa_family_t master_family;
 	char **spp, *master_ifname, *slave_ifname;
 	int hwaddr_notset;
+	int master_up;
 
 	while ((c = getopt_long(argc, argv, "acdfrvV?h", longopts, 0)) != EOF)
 		switch (c) {
@@ -300,10 +311,86 @@ main(int argc, char **argv)
 				return 1;
 			}
 
-			if (hwaddr_notset) { /* we do nothing */
+			if (hwaddr_notset) {
+				/* assign the slave hw address to the 
+				 * master since it currently does not 
+				 * have one; otherwise, slaves may
+				 * have different hw addresses in 
+				 * active-backup mode as seen when enslaving 
+				 * using "ifenslave bond0 eth0 eth1" because
+				 * hwaddr_notset is set outside this loop.
+				 * TODO: put this and the "else" portion in
+				 *       a function.
+				 */
+				goterr = 0;
+				master_up = 0;
+				if (if_flags.ifr_flags & IFF_UP) {
+					if_flags.ifr_flags &= ~IFF_UP;
+					if (ioctl(skfd, SIOCSIFFLAGS, 
+							&if_flags) < 0) {
+						goterr = 1;
+						fprintf(stderr, 
+							"Shutting down "
+							"interface %s failed: "
+							"%s\n",
+							master_ifname, 
+							strerror(errno));
+					} else {
+						/* we took the master down, 
+						 * so we must bring it up 
+						 */
+						master_up = 1; 
+					}
+				}
 
-			}
-			else {  /* we'll assign master's hwaddr to this slave */
+				if (!goterr) {
+					/* get the slaves MAC address */
+					strncpy(if_hwaddr.ifr_name, 
+							slave_ifname, IFNAMSIZ);
+					if (ioctl(skfd, SIOCGIFHWADDR, 
+							&if_hwaddr) < 0) {
+						fprintf(stderr, 
+							"Could not get MAC "
+							"address of %s: %s\n",
+							slave_ifname, 
+							strerror(errno));
+						strncpy(if_hwaddr.ifr_name, 
+							master_ifname, 
+							IFNAMSIZ);
+						goterr=1;
+					}
+				}
+
+				if (!goterr) {
+					strncpy(if_hwaddr.ifr_name, 
+						master_ifname, IFNAMSIZ);
+					if (ioctl(skfd, SIOCSIFHWADDR, 
+							&if_hwaddr) < 0) {
+						fprintf(stderr, 
+							"Could not set MAC "
+							"address of %s: %s\n",
+							master_ifname, 
+							strerror(errno));
+						goterr=1;
+					} else {
+						hwaddr_notset = 0;
+					}
+				}
+
+				if (master_up) {
+					if_flags.ifr_flags |= IFF_UP;
+					if (ioctl(skfd, SIOCSIFFLAGS, 
+							&if_flags) < 0) {
+						fprintf(stderr, 
+							"Bringing up interface "
+							"%s failed: %s\n",
+							master_ifname, 
+							strerror(errno));
+					}
+				}
+
+			} else {  
+				/* we'll assign master's hwaddr to this slave */
 				if (ifr2.ifr_flags & IFF_UP) {
 					ifr2.ifr_flags &= ~IFF_UP;
 					if (ioctl(skfd, SIOCSIFFLAGS, &ifr2) < 0) {

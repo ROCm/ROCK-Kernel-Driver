@@ -37,9 +37,9 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic7xxx_inline.h#31 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx_inline.h#39 $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx_inline.h,v 1.8 2000/11/12 05:19:46 gibbs Exp $
+ * $FreeBSD$
  */
 
 #ifndef _AIC7XXX_INLINE_H_
@@ -231,12 +231,25 @@ ahc_name(struct ahc_softc *ahc)
 
 /*********************** Miscelaneous Support Functions ***********************/
 
-static __inline void	ahc_update_residual(struct scb *scb);
+static __inline void	ahc_update_residual(struct ahc_softc *ahc,
+					    struct scb *scb);
 static __inline struct ahc_initiator_tinfo *
 			ahc_fetch_transinfo(struct ahc_softc *ahc,
 					    char channel, u_int our_id,
 					    u_int remote_id,
 					    struct ahc_tmode_tstate **tstate);
+static __inline uint16_t
+			ahc_inw(struct ahc_softc *ahc, u_int port);
+static __inline void	ahc_outw(struct ahc_softc *ahc, u_int port,
+				 u_int value);
+static __inline uint32_t
+			ahc_inl(struct ahc_softc *ahc, u_int port);
+static __inline void	ahc_outl(struct ahc_softc *ahc, u_int port,
+				 uint32_t value);
+static __inline uint64_t
+			ahc_inq(struct ahc_softc *ahc, u_int port);
+static __inline void	ahc_outq(struct ahc_softc *ahc, u_int port,
+				 uint64_t value);
 static __inline struct scb*
 			ahc_get_scb(struct ahc_softc *ahc);
 static __inline void	ahc_free_scb(struct ahc_softc *ahc, struct scb *scb);
@@ -255,13 +268,13 @@ static __inline uint32_t
  * for this SCB/transaction.
  */
 static __inline void
-ahc_update_residual(struct scb *scb)
+ahc_update_residual(struct ahc_softc *ahc, struct scb *scb)
 {
 	uint32_t sgptr;
 
 	sgptr = ahc_le32toh(scb->hscb->sgptr);
 	if ((sgptr & SG_RESID_VALID) != 0)
-		ahc_calc_residual(scb);
+		ahc_calc_residual(ahc, scb);
 }
 
 /*
@@ -282,6 +295,63 @@ ahc_fetch_transinfo(struct ahc_softc *ahc, char channel, u_int our_id,
 		our_id += 8;
 	*tstate = ahc->enabled_targets[our_id];
 	return (&(*tstate)->transinfo[remote_id]);
+}
+
+static __inline uint16_t
+ahc_inw(struct ahc_softc *ahc, u_int port)
+{
+	return ((ahc_inb(ahc, port+1) << 8) | ahc_inb(ahc, port));
+}
+
+static __inline void
+ahc_outw(struct ahc_softc *ahc, u_int port, u_int value)
+{
+	ahc_outb(ahc, port, value & 0xFF);
+	ahc_outb(ahc, port+1, (value >> 8) & 0xFF);
+}
+
+static __inline uint32_t
+ahc_inl(struct ahc_softc *ahc, u_int port)
+{
+	return ((ahc_inb(ahc, port))
+	      | (ahc_inb(ahc, port+1) << 8)
+	      | (ahc_inb(ahc, port+2) << 16)
+	      | (ahc_inb(ahc, port+3) << 24));
+}
+
+static __inline void
+ahc_outl(struct ahc_softc *ahc, u_int port, uint32_t value)
+{
+	ahc_outb(ahc, port, (value) & 0xFF);
+	ahc_outb(ahc, port+1, ((value) >> 8) & 0xFF);
+	ahc_outb(ahc, port+2, ((value) >> 16) & 0xFF);
+	ahc_outb(ahc, port+3, ((value) >> 24) & 0xFF);
+}
+
+static __inline uint64_t
+ahc_inq(struct ahc_softc *ahc, u_int port)
+{
+	return ((ahc_inb(ahc, port))
+	      | (ahc_inb(ahc, port+1) << 8)
+	      | (ahc_inb(ahc, port+2) << 16)
+	      | (ahc_inb(ahc, port+3) << 24)
+	      | (((uint64_t)ahc_inb(ahc, port+4)) << 32)
+	      | (((uint64_t)ahc_inb(ahc, port+5)) << 40)
+	      | (((uint64_t)ahc_inb(ahc, port+6)) << 48)
+	      | (((uint64_t)ahc_inb(ahc, port+7)) << 56));
+}
+
+static __inline void
+ahc_outq(struct ahc_softc *ahc, u_int port, uint64_t value)
+{
+	ahc_outb(ahc, port, value & 0xFF);
+	ahc_outb(ahc, port+1, (value >> 8) & 0xFF);
+	ahc_outb(ahc, port+2, (value >> 16) & 0xFF);
+	ahc_outb(ahc, port+3, (value >> 24) & 0xFF);
+	ahc_outb(ahc, port+4, (value >> 32) & 0xFF);
+	ahc_outb(ahc, port+5, (value >> 40) & 0xFF);
+	ahc_outb(ahc, port+6, (value >> 48) & 0xFF);
+	ahc_outb(ahc, port+7, (value >> 56) & 0xFF);
 }
 
 /*
@@ -357,8 +427,8 @@ ahc_swap_with_next_hscb(struct ahc_softc *ahc, struct scb *scb)
 	memcpy(q_hscb, scb->hscb, sizeof(*scb->hscb));
 	if ((scb->flags & SCB_CDB32_PTR) != 0) {
 		q_hscb->shared_data.cdb_ptr =
-		    ahc_hscb_busaddr(ahc, q_hscb->tag)
-		  + offsetof(struct hardware_scb, cdb32);	
+		    ahc_htole32(ahc_hscb_busaddr(ahc, q_hscb->tag)
+			      + offsetof(struct hardware_scb, cdb32));
 	}
 	q_hscb->tag = saved_tag;
 	q_hscb->next = scb->hscb->tag;
@@ -471,7 +541,8 @@ ahc_check_cmdcmpltqueues(struct ahc_softc *ahc)
 	if (ahc->qoutfifo[ahc->qoutfifonext] != SCB_LIST_NULL)
 		retval |= AHC_RUN_QOUTFIFO;
 #ifdef AHC_TARGET_MODE
-	if ((ahc->flags & AHC_TARGETROLE) != 0) {
+	if ((ahc->flags & AHC_TARGETROLE) != 0
+	 && (ahc->flags & AHC_TQINFIFO_BLOCKED) == 0) {
 		ahc_dmamap_sync(ahc, ahc->shared_data_dmat,
 				ahc->shared_data_dmamap,
 				ahc_targetcmd_offset(ahc, ahc->tqinfifofnext),
@@ -492,6 +563,15 @@ ahc_intr(struct ahc_softc *ahc)
 {
 	u_int	intstat;
 
+	if ((ahc->pause & INTEN) == 0) {
+		/*
+		 * Our interrupt is not enabled on the chip
+		 * and may be disabled for re-entrancy reasons,
+		 * so just return.  This is likely just a shared
+		 * interrupt.
+		 */
+		return;
+	}
 	/*
 	 * Instead of directly reading the interrupt status register,
 	 * infer the cause of the interrupt by checking our in-core
@@ -517,10 +597,7 @@ ahc_intr(struct ahc_softc *ahc)
 		 * and asserted the interrupt again.
 		 */
 		ahc_flush_device_writes(ahc);
-#ifdef AHC_TARGET_MODE
-		if ((ahc->flags & AHC_INITIATORROLE) != 0)
-#endif
-			ahc_run_qoutfifo(ahc);
+		ahc_run_qoutfifo(ahc);
 #ifdef AHC_TARGET_MODE
 		if ((ahc->flags & AHC_TARGETROLE) != 0)
 			ahc_run_tqinfifo(ahc, /*paused*/FALSE);

@@ -54,19 +54,23 @@ static int __init sysenter_setup(void)
 		0xc3			/* ret */
 	};
 	static const char sysent[] = {
-		0x9c,			/* pushf */
 		0x51,			/* push %ecx */
 		0x52,			/* push %edx */
 		0x55,			/* push %ebp */
+	/* 3: backjump target */
 		0x89, 0xe5,		/* movl %esp,%ebp */
 		0x0f, 0x34,		/* sysenter */
-	/* System call restart point is here! (SYSENTER_RETURN - 2) */
-		0xeb, 0xfa,		/* jmp to "movl %esp,%ebp" */
-	/* System call normal return point is here! (SYSENTER_RETURN in entry.S) */
+
+	/* 7: align return point with nop's to make disassembly easier */
+		0x90, 0x90, 0x90, 0x90,
+		0x90, 0x90, 0x90,
+
+	/* 14: System call restart point is here! (SYSENTER_RETURN - 2) */
+		0xeb, 0xf3,		/* jmp to "movl %esp,%ebp" */
+	/* 16: System call normal return point is here! (SYSENTER_RETURN in entry.S) */
 		0x5d,			/* pop %ebp */
 		0x5a,			/* pop %edx */
 		0x59,			/* pop %ecx */
-		0x9d,			/* popf - restore TF */
 		0xc3			/* ret */
 	};
 	unsigned long page = get_zeroed_page(GFP_ATOMIC);

@@ -20,6 +20,8 @@
  *        add timers for delayed responses [20020721]
  *   Patrick Mansfield <patmans@us.ibm.com> max_luns+scsi_level [20021031]
  *   Mike Anderson <andmike@us.ibm.com> sysfs work [20021118]
+ *   dpg: change style of boot options to "scsi_debug.num_devs=2" and
+ *        module options to "modprobe scsi_debug num_devs=2" [20021221]
  */
 
 #include <linux/config.h>
@@ -37,6 +39,7 @@
 #include <linux/proc_fs.h>
 #include <linux/smp_lock.h>
 #include <linux/vmalloc.h>
+#include <linux/moduleparam.h>
 
 #include <linux/blk.h>
 #include "scsi.h"
@@ -51,7 +54,7 @@
 
 #include "scsi_debug.h"
 
-static const char * scsi_debug_version_str = "Version: 1.66 (20021205)";
+static const char * scsi_debug_version_str = "Version: 1.67 (20021221)";
 
 #ifndef SCSI_CMD_READ_16
 #define SCSI_CMD_READ_16 0x88
@@ -63,7 +66,7 @@ static const char * scsi_debug_version_str = "Version: 1.66 (20021205)";
 #define SDEBUG_TAGGED_QUEUING 0 /* 0 | MSG_SIMPLE_TAG | MSG_ORDERED_TAG */
 
 /* Default values for driver parameters */
-#define DEF_NR_FAKE_DEVS   1
+#define DEF_NUM_DEVS   1
 #define DEF_DEV_SIZE_MB   8
 #define DEF_EVERY_NTH   100
 #define DEF_DELAY   1
@@ -82,7 +85,7 @@ static const char * scsi_debug_version_str = "Version: 1.66 (20021205)";
 #define OPT_MEDIUM_ERR_ADDR   0x1234
 
 static int scsi_debug_dev_size_mb = DEF_DEV_SIZE_MB;
-static int scsi_debug_num_devs = DEF_NR_FAKE_DEVS;
+static int scsi_debug_num_devs = DEF_NUM_DEVS;
 static int scsi_debug_opts = DEF_OPTS;
 static int scsi_debug_every_nth = DEF_EVERY_NTH;
 static int scsi_debug_cmnd_count = 0;
@@ -1100,159 +1103,32 @@ static int schedule_resp(struct scsi_cmnd * cmnd,
 	}
 }
 
-#ifndef MODULE
-static int __init num_devs_setup(char *str)
-{   
-    int tmp; 
-    
-    if (get_option(&str, &tmp) == 1) {
-        if (tmp > 0)
-            scsi_debug_num_devs = tmp;
-        return 1;
-    } else {
-        printk(KERN_INFO "scsi_debug_num_devs: usage scsi_debug_num_devs=<n> "
-               "(<n> can be from 1 to around 2000)\n");
-        return 0;
-    }
-}
-__setup("scsi_debug_num_devs=", num_devs_setup);
-
-static int __init max_luns_setup(char *str)
-{   
-    int tmp; 
-    
-    if (get_option(&str, &tmp) == 1) {
-        if (tmp > 0)
-            scsi_debug_max_luns = tmp;
-        return 1;
-    } else {
-        printk(KERN_INFO "scsi_debug_max_luns: usage scsi_debug_max_luns=<n> "
-               "(<n> is a postive integer (def=2))\n");
-        return 0;
-    }
-}
-__setup("scsi_debug_max_luns=", max_luns_setup);
-
-static int __init scsi_level_setup(char *str)
-{   
-    int tmp; 
-    
-    if (get_option(&str, &tmp) == 1) {
-        if (tmp > 0)
-            scsi_debug_scsi_level = tmp;
-        return 1;
-    } else {
-        printk(KERN_INFO "scsi_debug_scsi_level: usage "
-	"scsi_debug_scsi_level=<n> (<n> is 1..4 (def=3))\n");
-        return 0;
-    }
-}
-__setup("scsi_debug_scsi_level=", scsi_level_setup);
-
-static int __init dev_size_mb_setup(char *str)
-{   
-    int tmp; 
-    
-    if (get_option(&str, &tmp) == 1) {
-        if (tmp > 0)
-            scsi_debug_dev_size_mb = tmp;
-        return 1;
-    } else {
-        printk(KERN_INFO "scsi_debug_dev_size_mb: usage "
-	       "scsi_debug_dev_size_mb=<n>\n"
-               "    (<n> is number of MB ram shared by all devs\n");
-        return 0;
-    }
-}
-__setup("scsi_debug_dev_size_mb=", dev_size_mb_setup);
-
-static int __init opts_setup(char *str)
-{   
-    int tmp; 
-    
-    if (get_option(&str, &tmp) == 1) {
-        if (tmp > 0)
-            scsi_debug_opts = tmp;
-        return 1;
-    } else {
-        printk(KERN_INFO "scsi_debug_opts: usage "
-	       "scsi_debug_opts=<n>\n"
-               "    (1->noise, 2->medium_error, 4->... (can be or-ed)\n");
-        return 0;
-    }
-}
-__setup("scsi_debug_opts=", opts_setup);
-
-static int __init every_nth_setup(char *str)
-{
-    int tmp;
-
-    if (get_option(&str, &tmp) == 1) {
-        if (tmp > 0)
-            scsi_debug_every_nth = tmp;
-        return 1;
-    } else {
-        printk(KERN_INFO "scsi_debug_every_nth: usage "
-               "scsi_debug_every_nth=<n>\n"
-               "    timeout every nth command (when ...)\n");
-        return 0;
-    }
-}
-__setup("scsi_debug_every_nth=", every_nth_setup);
-
-static int __init delay_setup(char *str)
-{
-    int tmp;
-
-    if (get_option(&str, &tmp) == 1) {
-	scsi_debug_delay = tmp;
-        return 1;
-    } else {
-        printk(KERN_INFO "scsi_debug_delay: usage "
-               "scsi_debug_delay=<n>\n"
-               "    delay response <n> jiffies\n");
-        return 0;
-    }
-}
-__setup("scsi_debug_delay=", delay_setup);
-
-static int __init add_host_setup(char *str)
-{
-    int tmp;
-
-    if (get_option(&str, &tmp) == 1) {
-	scsi_debug_add_host = tmp;
-        return 1;
-    } else {
-        printk(KERN_INFO "scsi_debug_add_host: usage "
-               "scsi_debug_add_host=<n>\n"
-               "    <n> 0..127 (default 1)\n");
-        return 0;
-    }
-}
-__setup("scsi_debug_add_host=", add_host_setup);
-
-#endif
+/* Set 'perm' (4th argument) to 0 to disable module_param's definition
+ * of sysfs parameters (which module_param doesn't yet support).
+ * Sysfs parameters defined explicitly below. 
+ */
+module_param_named(num_devs, scsi_debug_num_devs, int, 0);
+module_param_named(max_luns, scsi_debug_max_luns, int, 0);
+module_param_named(scsi_level, scsi_debug_scsi_level, int, 0);
+module_param_named(dev_size_mb, scsi_debug_dev_size_mb, int, 0);
+module_param_named(opts, scsi_debug_opts, int, 0); /* perm=0644 */
+module_param_named(every_nth, scsi_debug_every_nth, int, 0);
+module_param_named(delay, scsi_debug_delay, int, 0); /* perm=0644 */
+module_param_named(add_host, scsi_debug_add_host, int, 0); /* perm=0644 */
 
 MODULE_AUTHOR("Eric Youngdale + Douglas Gilbert");
 MODULE_DESCRIPTION("SCSI debug adapter driver");
-MODULE_PARM(scsi_debug_num_devs, "i");
-MODULE_PARM_DESC(scsi_debug_num_devs, "number of SCSI devices to simulate");
-MODULE_PARM(scsi_debug_max_luns, "i");
-MODULE_PARM_DESC(scsi_debug_max_luns, "number of SCSI LUNs per target to simulate");
-MODULE_PARM(scsi_debug_scsi_level, "i");
-MODULE_PARM_DESC(scsi_debug_scsi_level, "SCSI level to simulate");
-MODULE_PARM(scsi_debug_dev_size_mb, "i");
-MODULE_PARM_DESC(scsi_debug_dev_size_mb, "size in MB of ram shared by devs");
-MODULE_PARM(scsi_debug_opts, "i");
-MODULE_PARM_DESC(scsi_debug_opts, "1->noise, 2->medium_error, 4->...");
-MODULE_PARM(scsi_debug_every_nth, "i");
-MODULE_PARM_DESC(scsi_debug_every_nth, "timeout every nth command(def=100)");
-MODULE_PARM(scsi_debug_delay, "i");
-MODULE_PARM_DESC(scsi_debug_delay, "# of jiffies to delay response(def=1)");
-MODULE_PARM(scsi_debug_add_host, "i");
-MODULE_PARM_DESC(scsi_debug_add_host, "0..127 hosts allowed(def=1)");
 MODULE_LICENSE("GPL");
+
+MODULE_PARM_DESC(num_devs, "number of SCSI devices to simulate");
+MODULE_PARM_DESC(max_luns, "number of SCSI LUNs per target to simulate");
+MODULE_PARM_DESC(scsi_level, "SCSI level to simulate");
+MODULE_PARM_DESC(dev_size_mb, "size in MB of ram shared by devs");
+MODULE_PARM_DESC(opts, "1->noise, 2->medium_error, 4->...");
+MODULE_PARM_DESC(every_nth, "timeout every nth command(def=100)");
+MODULE_PARM_DESC(delay, "# of jiffies to delay response(def=1)");
+MODULE_PARM_DESC(add_host, "0..127 hosts allowed(def=1)");
+
 
 static char sdebug_info[256];
 
