@@ -55,7 +55,7 @@ static u_int bus_error_jmp[100];
 /* Breakpoint stuff */
 struct bpt {
 	unsigned long address;
-	unsigned long instr;
+	unsigned instr;
 	unsigned long count;
 	unsigned char enabled;
 	char funcname[64];	/* function name for humans */

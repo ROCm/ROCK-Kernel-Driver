@@ -21,6 +21,8 @@
 #include <linux/ide.h>
 #include <linux/seq_file.h>
 #include <linux/ioport.h>
+#include <linux/console.h>
+#include <linux/version.h>
 #include <linux/tty.h>
 #include <linux/root_dev.h>
 #include <asm/io.h>
@@ -116,6 +118,23 @@ void ppcdbg_initialize(void) {
 	_naca->debug_switch = PPC_DEBUG_DEFAULT; /* | PPCDBG_BUSWALK | PPCDBG_PHBINIT | PPCDBG_MM | PPCDBG_MMINIT | PPCDBG_TCEINIT | PPCDBG_TCE */;
 }
 
+static struct console udbg_console = {
+	name:	"udbg",
+	write:	udbg_console_write,
+	flags:	CON_PRINTBUFFER,
+	index:	-1,
+};
+
+static int early_console_initialized;
+
+void __init disable_early_printk(void)
+{
+	if (!early_console_initialized)
+		return;
+	unregister_console(&udbg_console);
+	early_console_initialized = 0;
+}
+
 /*
  * Do some initial setup of the system.  The paramters are those which 
  * were passed in from the bootloader.
@@ -162,62 +181,31 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 #endif
 	}
 
-	udbg_puts("\n-----------------------------------------------------\n");
-	udbg_puts("Naca Info...\n\n");
-	udbg_puts("naca                       = 0x");
-	udbg_puthex((unsigned long)naca);
-	udbg_putc('\n');
+	if (naca->platform & PLATFORM_PSERIES) {
+		early_console_initialized = 1;
+		register_console(&udbg_console);
+	}
 
-	udbg_puts("naca->physicalMemorySize   = 0x");
-	udbg_puthex(naca->physicalMemorySize);
-	udbg_putc('\n');
+	printk("Starting Linux PPC64 %s\n", UTS_RELEASE);
 
-	udbg_puts("naca->dCacheL1LineSize     = 0x");
-	udbg_puthex(naca->dCacheL1LineSize);
-	udbg_putc('\n');
-
-	udbg_puts("naca->dCacheL1LogLineSize  = 0x");
-	udbg_puthex(naca->dCacheL1LogLineSize);
-	udbg_putc('\n');
-
-	udbg_puts("naca->dCacheL1LinesPerPage = 0x");
-	udbg_puthex(naca->dCacheL1LinesPerPage);
-	udbg_putc('\n');
-
-	udbg_puts("naca->iCacheL1LineSize     = 0x");
-	udbg_puthex(naca->iCacheL1LineSize);
-	udbg_putc('\n');
-
-	udbg_puts("naca->iCacheL1LogLineSize  = 0x");
-	udbg_puthex(naca->iCacheL1LogLineSize);
-	udbg_putc('\n');
-
-	udbg_puts("naca->iCacheL1LinesPerPage = 0x");
-	udbg_puthex(naca->iCacheL1LinesPerPage);
-	udbg_putc('\n');
-
-	udbg_puts("naca->pftSize              = 0x");
-	udbg_puthex(naca->pftSize);
-	udbg_putc('\n');
-
-	udbg_puts("naca->serialPortAddr       = 0x");
-	udbg_puthex(naca->serialPortAddr);
-	udbg_putc('\n');
-
-	udbg_puts("naca->interrupt_controller = 0x");
-	udbg_puthex(naca->interrupt_controller);
-	udbg_putc('\n');
-
-	udbg_printf("\nHTAB Info ...\n\n"); 
-	udbg_puts("htab_data.htab             = 0x");
-	udbg_puthex((unsigned long)htab_data.htab);
-	udbg_putc('\n');
-	udbg_puts("htab_data.num_ptegs        = 0x");
-	udbg_puthex(htab_data.htab_num_ptegs);
-	udbg_putc('\n');
-
-	udbg_puts("\n-----------------------------------------------------\n");
-
+	printk("-----------------------------------------------------\n");
+	printk("naca                       = 0x%p\n", naca);
+#if 0
+	printk("naca->processorCount       = 0x%x\n", naca->processorCount);
+#endif
+	printk("naca->physicalMemorySize   = 0x%lx\n", naca->physicalMemorySize);
+	printk("naca->dCacheL1LineSize     = 0x%x\n", naca->dCacheL1LineSize);
+	printk("naca->dCacheL1LogLineSize  = 0x%x\n", naca->dCacheL1LogLineSize);
+	printk("naca->dCacheL1LinesPerPage = 0x%x\n", naca->dCacheL1LinesPerPage);
+	printk("naca->iCacheL1LineSize     = 0x%x\n", naca->iCacheL1LineSize);
+	printk("naca->iCacheL1LogLineSize  = 0x%x\n", naca->iCacheL1LogLineSize);
+	printk("naca->iCacheL1LinesPerPage = 0x%x\n", naca->iCacheL1LinesPerPage);
+	printk("naca->pftSize              = 0x%lx\n", naca->pftSize);
+	printk("naca->debug_switch         = 0x%lx\n", naca->debug_switch);
+	printk("naca->interrupt_controller = 0x%d\n", naca->interrupt_controller);
+	printk("htab_data.htab             = 0x%p\n", htab_data.htab);
+	printk("htab_data.num_ptegs        = 0x%lx\n", htab_data.htab_num_ptegs);
+	printk("-----------------------------------------------------\n");
 
 	if (naca->platform & PLATFORM_PSERIES) {
 		finish_device_tree();
@@ -492,7 +480,6 @@ void __init ppc64_calibrate_delay(void)
 	printk("Calibrating delay loop... %lu.%02lu BogoMips\n",
 			       loops_per_jiffy/(500000/HZ),
 			       loops_per_jiffy/(5000/HZ) % 100);
-
 }	
 
 extern void (*calibrate_delay)(void);
