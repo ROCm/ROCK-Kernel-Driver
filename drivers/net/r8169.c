@@ -369,7 +369,7 @@ struct ring_info {
 };
 
 struct rtl8169_private {
-	void *mmio_addr;		/* memory map physical address */
+	void __iomem *mmio_addr;	/* memory map physical address */
 	struct pci_dev *pci_dev;	/* Index of PCI device  */
 	struct net_device_stats stats;	/* statistics of net device */
 	spinlock_t lock;		/* spin lock flag */
@@ -397,9 +397,9 @@ struct rtl8169_private {
 #endif
 	int (*set_speed)(struct net_device *, u8 autoneg, u16 speed, u8 duplex);
 	void (*get_settings)(struct net_device *, struct ethtool_cmd *);
-	void (*phy_reset_enable)(void *);
-	unsigned int (*phy_reset_pending)(void *);
-	unsigned int (*link_ok)(void *);
+	void (*phy_reset_enable)(void __iomem *);
+	unsigned int (*phy_reset_pending)(void __iomem *);
+	unsigned int (*link_ok)(void __iomem *);
 	struct work_struct task;
 };
 
@@ -422,7 +422,7 @@ static void rtl8169_set_rx_mode(struct net_device *dev);
 static void rtl8169_tx_timeout(struct net_device *dev);
 static struct net_device_stats *rtl8169_get_stats(struct net_device *netdev);
 static int rtl8169_rx_interrupt(struct net_device *, struct rtl8169_private *,
-				void *);
+				void __iomem *);
 #ifdef CONFIG_R8169_NAPI
 static int rtl8169_poll(struct net_device *dev, int *budget);
 #endif
@@ -439,7 +439,7 @@ static const unsigned int rtl8169_rx_config =
 #define PHY_Cap_100_Half_Or_Less PHY_Cap_100_Half | PHY_Cap_10_Full_Or_Less
 #define PHY_Cap_100_Full_Or_Less PHY_Cap_100_Full | PHY_Cap_100_Half_Or_Less
 
-static void mdio_write(void *ioaddr, int RegAddr, int value)
+static void mdio_write(void __iomem *ioaddr, int RegAddr, int value)
 {
 	int i;
 
@@ -454,7 +454,7 @@ static void mdio_write(void *ioaddr, int RegAddr, int value)
 	}
 }
 
-static int mdio_read(void *ioaddr, int RegAddr)
+static int mdio_read(void __iomem *ioaddr, int RegAddr)
 {
 	int i, value = -1;
 
@@ -472,32 +472,32 @@ static int mdio_read(void *ioaddr, int RegAddr)
 	return value;
 }
 
-static unsigned int rtl8169_tbi_reset_pending(void *ioaddr)
+static unsigned int rtl8169_tbi_reset_pending(void __iomem *ioaddr)
 {
 	return RTL_R32(TBICSR) & TBIReset;
 }
 
-static unsigned int rtl8169_xmii_reset_pending(void *ioaddr)
+static unsigned int rtl8169_xmii_reset_pending(void __iomem *ioaddr)
 {
 	return mdio_read(ioaddr, 0) & 0x8000;
 }
 
-static unsigned int rtl8169_tbi_link_ok(void *ioaddr)
+static unsigned int rtl8169_tbi_link_ok(void __iomem *ioaddr)
 {
 	return RTL_R32(TBICSR) & TBILinkOk;
 }
 
-static unsigned int rtl8169_xmii_link_ok(void *ioaddr)
+static unsigned int rtl8169_xmii_link_ok(void __iomem *ioaddr)
 {
 	return RTL_R8(PHYstatus) & LinkStatus;
 }
 
-static void rtl8169_tbi_reset_enable(void *ioaddr)
+static void rtl8169_tbi_reset_enable(void __iomem *ioaddr)
 {
 	RTL_W32(TBICSR, RTL_R32(TBICSR) | TBIReset);
 }
 
-static void rtl8169_xmii_reset_enable(void *ioaddr)
+static void rtl8169_xmii_reset_enable(void __iomem *ioaddr)
 {
 	unsigned int val;
 
@@ -506,7 +506,7 @@ static void rtl8169_xmii_reset_enable(void *ioaddr)
 }
 
 static void rtl8169_check_link_status(struct net_device *dev,
-				      struct rtl8169_private *tp, void *ioaddr)
+				      struct rtl8169_private *tp, void __iomem *ioaddr)
 {
 	unsigned long flags;
 
@@ -570,7 +570,7 @@ static int rtl8169_set_speed_tbi(struct net_device *dev,
 				 u8 autoneg, u16 speed, u8 duplex)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
-	void *ioaddr = tp->mmio_addr;
+	void __iomem *ioaddr = tp->mmio_addr;
 	int ret = 0;
 	u32 reg;
 
@@ -594,7 +594,7 @@ static int rtl8169_set_speed_xmii(struct net_device *dev,
 				  u8 autoneg, u16 speed, u8 duplex)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
-	void *ioaddr = tp->mmio_addr;
+	void __iomem *ioaddr = tp->mmio_addr;
 	int auto_nego, giga_ctrl;
 
 	auto_nego = mdio_read(ioaddr, PHY_AUTO_NEGO_REG);
@@ -666,7 +666,7 @@ static u32 rtl8169_get_rx_csum(struct net_device *dev)
 static int rtl8169_set_rx_csum(struct net_device *dev, u32 data)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
-	void *ioaddr = tp->mmio_addr;
+	void __iomem *ioaddr = tp->mmio_addr;
 	unsigned long flags;
 
 	spin_lock_irqsave(&tp->lock, flags);
@@ -697,7 +697,7 @@ static void rtl8169_vlan_rx_register(struct net_device *dev,
 				     struct vlan_group *grp)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
-	void *ioaddr = tp->mmio_addr;
+	void __iomem *ioaddr = tp->mmio_addr;
 	unsigned long flags;
 
 	spin_lock_irqsave(&tp->lock, flags);
@@ -711,7 +711,7 @@ static void rtl8169_vlan_rx_register(struct net_device *dev,
 static void rtl8169_vlan_rx_kill_vid(struct net_device *dev, unsigned short vid)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
-	void *ioaddr = tp->mmio_addr;
+	void __iomem *ioaddr = tp->mmio_addr;
 	unsigned long flags;
 
 	spin_lock_irqsave(&tp->lock, flags);
@@ -758,7 +758,7 @@ static int rtl8169_rx_vlan_skb(struct rtl8169_private *tp, struct RxDesc *desc,
 static void rtl8169_gset_tbi(struct net_device *dev, struct ethtool_cmd *cmd)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
-	void *ioaddr = tp->mmio_addr;
+	void __iomem *ioaddr = tp->mmio_addr;
 	u32 status;
 
 	cmd->supported =
@@ -777,7 +777,7 @@ static void rtl8169_gset_tbi(struct net_device *dev, struct ethtool_cmd *cmd)
 static void rtl8169_gset_xmii(struct net_device *dev, struct ethtool_cmd *cmd)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
-	void *ioaddr = tp->mmio_addr;
+	void __iomem *ioaddr = tp->mmio_addr;
 	u8 status;
 
 	cmd->supported = SUPPORTED_10baseT_Half |
@@ -859,7 +859,7 @@ static struct ethtool_ops rtl8169_ethtool_ops = {
 	.get_regs		= rtl8169_get_regs,
 };
 
-static void rtl8169_write_gmii_reg_bit(void *ioaddr, int reg, int bitnum,
+static void rtl8169_write_gmii_reg_bit(void __iomem *ioaddr, int reg, int bitnum,
 				       int bitval)
 {
 	int val;
@@ -870,7 +870,7 @@ static void rtl8169_write_gmii_reg_bit(void *ioaddr, int reg, int bitnum,
 	mdio_write(ioaddr, reg, val & 0xffff); 
 }
 
-static void rtl8169_get_mac_version(struct rtl8169_private *tp, void *ioaddr)
+static void rtl8169_get_mac_version(struct rtl8169_private *tp, void __iomem *ioaddr)
 {
 	const struct {
 		u32 mask;
@@ -911,7 +911,7 @@ static void rtl8169_print_mac_version(struct rtl8169_private *tp)
 	dprintk("mac_version == Unknown\n");
 }
 
-static void rtl8169_get_phy_version(struct rtl8169_private *tp, void *ioaddr)
+static void rtl8169_get_phy_version(struct rtl8169_private *tp, void __iomem *ioaddr)
 {
 	const struct {
 		u16 mask;
@@ -957,7 +957,7 @@ static void rtl8169_print_phy_version(struct rtl8169_private *tp)
 static void rtl8169_hw_phy_config(struct net_device *dev)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
-	void *ioaddr = tp->mmio_addr;
+	void __iomem *ioaddr = tp->mmio_addr;
 	struct {
 		u16 regs[5]; /* Beware of bit-sign propagation */
 	} phy_magic[5] = { {
@@ -1027,7 +1027,7 @@ static void rtl8169_phy_timer(unsigned long __opaque)
 	struct net_device *dev = (struct net_device *)__opaque;
 	struct rtl8169_private *tp = netdev_priv(dev);
 	struct timer_list *timer = &tp->timer;
-	void *ioaddr = tp->mmio_addr;
+	void __iomem *ioaddr = tp->mmio_addr;
 	unsigned long timeout = RTL8169_PHY_TIMEOUT;
 
 	assert(tp->mac_version > RTL_GIGA_MAC_VER_B);
@@ -1089,7 +1089,7 @@ static inline void rtl8169_request_timer(struct net_device *dev)
 }
 
 static void rtl8169_release_board(struct pci_dev *pdev, struct net_device *dev,
-				  void *ioaddr)
+				  void __iomem *ioaddr)
 {
 	iounmap(ioaddr);
 	pci_release_regions(pdev);
@@ -1099,9 +1099,9 @@ static void rtl8169_release_board(struct pci_dev *pdev, struct net_device *dev,
 
 static int __devinit
 rtl8169_init_board(struct pci_dev *pdev, struct net_device **dev_out,
-		   void **ioaddr_out)
+		   void __iomem **ioaddr_out)
 {
-	void *ioaddr;
+	void __iomem *ioaddr;
 	struct net_device *dev;
 	struct rtl8169_private *tp;
 	int rc = -ENOMEM, i, acpi_idle_state = 0, pm_cap;
@@ -1247,7 +1247,7 @@ rtl8169_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	struct net_device *dev = NULL;
 	struct rtl8169_private *tp;
-	void *ioaddr = NULL;
+	void __iomem *ioaddr = NULL;
 	static int board_idx = -1;
 	static int printed_version = 0;
 	u8 autoneg, duplex;
@@ -1388,7 +1388,7 @@ static int rtl8169_suspend(struct pci_dev *pdev, u32 state)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 	struct rtl8169_private *tp = netdev_priv(dev);
-	void *ioaddr = tp->mmio_addr;
+	void __iomem *ioaddr = tp->mmio_addr;
 	unsigned long flags;
 
 	if (!netif_running(dev))
@@ -1478,7 +1478,7 @@ err_free_irq:
 	goto out;
 }
 
-static void rtl8169_hw_reset(void *ioaddr)
+static void rtl8169_hw_reset(void __iomem *ioaddr)
 {
 	/* Disable interrupts */
 	RTL_W16(IntrMask, 0x0000);
@@ -1494,7 +1494,7 @@ static void
 rtl8169_hw_start(struct net_device *dev)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
-	void *ioaddr = tp->mmio_addr;
+	void __iomem *ioaddr = tp->mmio_addr;
 	u32 i;
 
 	/* Soft reset the chip. */
@@ -1843,7 +1843,7 @@ static int rtl8169_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct rtl8169_private *tp = netdev_priv(dev);
 	unsigned int frags, entry = tp->cur_tx % NUM_TX_DESC;
 	struct TxDesc *txd = tp->TxDescArray + entry;
-	void *ioaddr = tp->mmio_addr;
+	void __iomem *ioaddr = tp->mmio_addr;
 	dma_addr_t mapping;
 	u32 status, len;
 	u32 opts1;
@@ -1920,7 +1920,7 @@ static void rtl8169_pcierr_interrupt(struct net_device *dev)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
 	struct pci_dev *pdev = tp->pci_dev;
-	void *ioaddr = tp->mmio_addr;
+	void __iomem *ioaddr = tp->mmio_addr;
 	u16 pci_status, pci_cmd;
 
 	pci_read_config_word(pdev, PCI_COMMAND, &pci_cmd);
@@ -1958,7 +1958,7 @@ static void rtl8169_pcierr_interrupt(struct net_device *dev)
 
 static void
 rtl8169_tx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
-		     void *ioaddr)
+		     void __iomem *ioaddr)
 {
 	unsigned int dirty_tx, tx_left;
 
@@ -2039,7 +2039,7 @@ static inline int rtl8169_try_rx_copy(struct sk_buff **sk_buff, int pkt_size,
 
 static int
 rtl8169_rx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
-		     void *ioaddr)
+		     void __iomem *ioaddr)
 {
 	unsigned int cur_rx, rx_left, count;
 	int delta;
@@ -2136,7 +2136,7 @@ rtl8169_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 	struct net_device *dev = (struct net_device *) dev_instance;
 	struct rtl8169_private *tp = netdev_priv(dev);
 	int boguscnt = max_interrupt_work;
-	void *ioaddr = tp->mmio_addr;
+	void __iomem *ioaddr = tp->mmio_addr;
 	int status = 0;
 	int handled = 0;
 
@@ -2206,7 +2206,7 @@ static int rtl8169_poll(struct net_device *dev, int *budget)
 {
 	unsigned int work_done, work_to_do = min(*budget, dev->quota);
 	struct rtl8169_private *tp = netdev_priv(dev);
-	void *ioaddr = tp->mmio_addr;
+	void __iomem *ioaddr = tp->mmio_addr;
 
 	work_done = rtl8169_rx_interrupt(dev, tp, ioaddr);
 	rtl8169_tx_interrupt(dev, tp, ioaddr);
@@ -2236,7 +2236,7 @@ rtl8169_close(struct net_device *dev)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
 	struct pci_dev *pdev = tp->pci_dev;
-	void *ioaddr = tp->mmio_addr;
+	void __iomem *ioaddr = tp->mmio_addr;
 
 	netif_stop_queue(dev);
 
@@ -2281,7 +2281,7 @@ static void
 rtl8169_set_rx_mode(struct net_device *dev)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
-	void *ioaddr = tp->mmio_addr;
+	void __iomem *ioaddr = tp->mmio_addr;
 	unsigned long flags;
 	u32 mc_filter[2];	/* Multicast hash filter */
 	int i, rx_mode;
@@ -2333,7 +2333,7 @@ rtl8169_set_rx_mode(struct net_device *dev)
 static struct net_device_stats *rtl8169_get_stats(struct net_device *dev)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
-	void *ioaddr = tp->mmio_addr;
+	void __iomem *ioaddr = tp->mmio_addr;
 	unsigned long flags;
 
 	if (netif_running(dev)) {
