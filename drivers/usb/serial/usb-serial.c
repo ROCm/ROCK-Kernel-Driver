@@ -489,6 +489,7 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 		if (retval) {
 			port->open_count = 0;
 			module_put(serial->type->owner);
+			kobject_put(&serial->kobj);
 		}
 	}
 bailout:
