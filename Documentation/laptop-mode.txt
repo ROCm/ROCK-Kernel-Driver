@@ -49,11 +49,10 @@ has experimental support for APM, you might want to try that first.)
 Caveats
 -------
 
-* The downside of laptop mode is that you have a chance of losing up
-  to 10 minutes of work. If you cannot afford this, don't use it! It's
-  wise to turn OFF laptop mode when you're almost out of battery --
-  although this will make the battery run out faster, at least you'll
-  lose less work when it actually runs out.
+* The downside of laptop mode is that you have a chance of losing up to 10
+  minutes of work. If you cannot afford this, don't use it! The supplied ACPI
+  scripts automatically turn off laptop mode when the battery almost runs out,
+  so that you won't lose any data at the end of your battery life.
 
 * Most desktop hard drives have a very limited lifetime measured in spindown
   cycles, typically about 50.000 times (it's usually listed on the spec sheet).
@@ -124,6 +123,11 @@ MAX_AGE:
 Maximum time, in seconds, of hard drive spindown time that you are
 confortable with. Worst case, it's possible that you could lose this
 amount of work if your battery fails while you're in laptop mode.
+
+MINIMUM_BATTERY_MINUTES:
+
+Automatically disable laptop mode if the remaining number of minutes of
+battery power is less than this value. Default is 10 minutes.
 
 AC_HD/BATT_HD:
 
@@ -234,6 +238,10 @@ It should be installed as /etc/default/laptop-mode on Debian, and as
 # confortable with. Worst case, it's possible that you could lose this
 # amount of work if your battery fails you while in laptop mode.
 #MAX_AGE=600
+
+# Automatically disable laptop mode when the number of minutes of battery
+# that you have left goes below this threshold.
+MINIMUM_BATTERY_MINUTES=10
 
 # Read-ahead, in 512-byte sectors. You can spin down the disk while playing MP3/OGG
 # by setting the disk readahead to 8MB (READAHEAD=16384). Effectively, the disk
@@ -689,33 +697,83 @@ ACPI integration
 ----------------
 
 Dax Kelson submitted this so that the ACPI acpid daemon will
-kick off the laptop_mode script and run hdparm.
+kick off the laptop_mode script and run hdparm. The part that
+automatically disables laptop mode when the battery is low was
+writen by Jan Topinski.
 
 -----------------/etc/acpi/events/ac_adapter BEGIN------------------------------
 event=ac_adapter
-action=/etc/acpi/actions/battery.sh
+action=/etc/acpi/actions/ac.sh %e
 ----------------/etc/acpi/events/ac_adapter END---------------------------------
 
-----------------/etc/acpi/actions/battery.sh BEGIN------------------------------
+
+-----------------/etc/acpi/events/battery BEGIN---------------------------------
+event=battery.*
+action=/etc/acpi/actions/battery.sh %e
+----------------/etc/acpi/events/battery END------------------------------------
+
+
+----------------/etc/acpi/actions/ac.sh BEGIN-----------------------------------
 #!/bin/bash
 
-# ac/battery event handler
+# ac on/offline event handler
 
 status=`awk '/^state: / { print $2 }' /proc/acpi/ac_adapter/$2/state`
 
 case $status in
         "on-line")
-                echo "AC mode: disabling laptop mode."
                 /sbin/laptop_mode stop
                 exit 0
         ;;
         "off-line")
-                echo "Battery mode: enabling laptop mode."
                 /sbin/laptop_mode start
                 exit 0
         ;;
 esac
----------------------------/etc/acpi/actions/battery.sh END---------------------
+---------------------------/etc/acpi/actions/ac.sh END--------------------------
+
+
+---------------------------/etc/acpi/actions/battery.sh BEGIN-------------------
+#! /bin/bash
+
+# Automatically disable laptop mode when the battery almost runs out.
+
+BATT_INFO=/proc/acpi/battery/$2/state
+
+if [[ -f /proc/sys/vm/laptop_mode ]]
+then
+   LM=`cat /proc/sys/vm/laptop_mode`
+   if [[ $LM -gt 0 ]]
+   then
+     if [[ -f $BATT_INFO ]]
+     then
+        # Source the config file only now that we know we need
+        if [ -f /etc/default/laptop-mode ] ; then
+                # Debian
+                . /etc/default/laptop-mode
+        elif [ -f /etc/sysconfig/laptop-mode ] ; then
+                # Others
+                . /etc/sysconfig/laptop-mode
+        fi
+        MINIMUM_BATTERY_MINUTES=${MINIMUM_BATTERY_MINUTES:-'10'}
+
+        ACTION="`cat $BATT_INFO | grep charging | cut -c 26-`"
+        if [[ ACTION -eq "discharging" ]]
+        then
+           PRESENT_RATE=`cat $BATT_INFO | grep "present rate:" | sed  "s/.* \([0-9][0-9]* \).*/\1/" `
+           REMAINING=`cat $BATT_INFO | grep "remaining capacity:" | sed  "s/.* \([0-9][0-9]* \).*/\1/" `
+        fi
+        if (($REMAINING * 60 / $PRESENT_RATE < $MINIMUM_BATTERY_MINUTES))
+        then
+           /sbin/laptop_mode stop
+        fi
+     else
+       logger -p daemon.warning "You are using laptop mode and your battery interface $BATT_INFO is missing. This may lead to loss of data when the battery runs out. Check kernel ACPI support and /proc/acpi/battery folder, and edit /etc/acpi/battery.sh to set BATT_INFO to the correct path."
+     fi
+   fi
+fi
+---------------------------/etc/acpi/actions/battery.sh END--------------------
+
 
 Monitoring tool
 ---------------
