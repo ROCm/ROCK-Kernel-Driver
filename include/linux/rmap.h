@@ -6,7 +6,6 @@
  */
 
 #include <linux/config.h>
-#include <linux/linkage.h>
 
 #define page_map_lock(page) \
 	bit_spin_lock(PG_maplock, (unsigned long *)&(page)->flags)
@@ -15,10 +14,9 @@
 
 #ifdef CONFIG_MMU
 
-void fastcall page_add_anon_rmap(struct page *,
-		struct mm_struct *, unsigned long addr);
-void fastcall page_add_file_rmap(struct page *);
-void fastcall page_remove_rmap(struct page *);
+void page_add_anon_rmap(struct page *, struct mm_struct *, unsigned long);
+void page_add_file_rmap(struct page *);
+void page_remove_rmap(struct page *);
 
 /**
  * page_dup_rmap - duplicate pte mapping to a page
@@ -34,7 +32,7 @@ static inline void page_dup_rmap(struct page *page)
 	page_map_unlock(page);
 }
 
-int fastcall mremap_move_anon_rmap(struct page *page, unsigned long addr);
+int mremap_move_anon_rmap(struct page *page, unsigned long addr);
 
 /**
  * mremap_moved_anon_rmap - does new address clash with that noted?
@@ -85,8 +83,8 @@ void exit_rmap(struct mm_struct *);
 /*
  * Called from mm/vmscan.c to handle paging out
  */
-int fastcall page_referenced(struct page *);
-int fastcall try_to_unmap(struct page *);
+int page_referenced(struct page *);
+int try_to_unmap(struct page *);
 
 #else	/* !CONFIG_MMU */
 

@@ -259,8 +259,8 @@ static inline int page_referenced_anon(struct page *page)
 	}
 
 	/*
-	 * The warning below may appear if page_referenced catches the
-	 * page in between page_add_{anon,file}_rmap and its replacement
+	 * The warning below may appear if page_referenced_anon catches
+	 * the page in between page_add_anon_rmap and its replacement
 	 * demanded by mremap_moved_anon_page: so remove the warning once
 	 * we're convinced that anonmm rmap really is finding its pages.
 	 */
@@ -343,7 +343,7 @@ out:
  * returns the number of ptes which referenced the page.
  * Caller needs to hold the rmap lock.
  */
-int fastcall page_referenced(struct page *page)
+int page_referenced(struct page *page)
 {
 	int referenced = 0;
 
@@ -370,7 +370,7 @@ int fastcall page_referenced(struct page *page)
  *
  * The caller needs to hold the mm->page_table_lock.
  */
-void fastcall page_add_anon_rmap(struct page *page,
+void page_add_anon_rmap(struct page *page,
 	struct mm_struct *mm, unsigned long address)
 {
 	struct anonmm *anonmm = mm->anonmm;
@@ -396,7 +396,7 @@ void fastcall page_add_anon_rmap(struct page *page,
  *
  * The caller needs to hold the mm->page_table_lock.
  */
-void fastcall page_add_file_rmap(struct page *page)
+void page_add_file_rmap(struct page *page)
 {
 	BUG_ON(PageAnon(page));
 	if (!pfn_valid(page_to_pfn(page)) || PageReserved(page))
@@ -415,7 +415,7 @@ void fastcall page_add_file_rmap(struct page *page)
  *
  * Caller needs to hold the mm->page_table_lock.
  */
-void fastcall page_remove_rmap(struct page *page)
+void page_remove_rmap(struct page *page)
 {
 	BUG_ON(PageReserved(page));
 	BUG_ON(!page->mapcount);
@@ -444,7 +444,7 @@ void fastcall page_remove_rmap(struct page *page)
  * If it is shared, then caller must take a copy of the page instead:
  * not very clever, but too rare a case to merit cleverness.
  */
-int fastcall mremap_move_anon_rmap(struct page *page, unsigned long address)
+int mremap_move_anon_rmap(struct page *page, unsigned long address)
 {
 	int move = 0;
 	if (page->mapcount == 1) {
@@ -812,7 +812,7 @@ out:
  * SWAP_AGAIN	- we missed a trylock, try again later
  * SWAP_FAIL	- the page is unswappable
  */
-int fastcall try_to_unmap(struct page *page)
+int try_to_unmap(struct page *page)
 {
 	int ret;
 
