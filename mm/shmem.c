@@ -605,6 +605,7 @@ repeat:
 		}
 		error = move_from_swap_cache(page, idx, mapping);
 		if (error < 0) {
+			spin_unlock(&info->lock);
 			unlock_page(page);
 			page_cache_release(page);
 			return ERR_PTR(error);
