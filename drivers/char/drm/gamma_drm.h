@@ -48,6 +48,16 @@ typedef struct _drm_gamma_sarea {
 	int vertex_prim;
 } drm_gamma_sarea_t;
 
+/* WARNING: If you change any of these defines, make sure to change the
+ * defines in the Xserver file (xf86drmGamma.h)
+ */
+
+/* Gamma specific ioctls
+ * The device specific ioctl range is 0x40 to 0x79.
+ */
+#define DRM_IOCTL_GAMMA_INIT		DRM_IOW( 0x40, drm_gamma_init_t)
+#define DRM_IOCTL_GAMMA_COPY		DRM_IOW( 0x41, drm_gamma_copy_t)
+
 typedef struct drm_gamma_copy {
 	unsigned int	DMAOutputAddress;
 	unsigned int	DMAOutputCount;
