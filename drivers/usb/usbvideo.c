@@ -68,10 +68,9 @@ static int usbvideo_default_procfs_write_proc(
  */
 unsigned long usbvideo_kvirt_to_pa(unsigned long adr)
 {
-	unsigned long va, kva, ret;
+	unsigned long kva, ret;
 
-	va = VMALLOC_VMADDR(adr);
-	kva = page_address(vmalloc_to_page(va));
+	kva = page_address(vmalloc_to_page((void *)adr));
 	ret = __pa(kva);
 	MDEBUG(printk("kv2pa(%lx-->%lx)", adr, ret));
 	return ret;

@@ -141,24 +141,33 @@ __setup("bttv.radio=", p_radio);
  * defined way to get at the kernel page tables.
  */
 
-static inline unsigned long uvirt_to_bus(unsigned long adr) 
-{
-        unsigned long kva, ret;
 
-	kva = page_address(vmalloc_to_page(adr));
-	ret = virt_to_bus((void *)kva);
-        MDEBUG(printk("uv2b(%lx-->%lx)", adr, ret));
-        return ret;
+/*
+ * Take a vmalloc address, and turn it into
+ * the aliased kernel virtual address..
+ *
+ * CAREFUL! Anybody who does this gets to sit
+ * in their own cr*p when it comes to virtual
+ * cache aliases. It's _your_ problem.
+ *
+ * Also, note how it only works within one page.
+ * If you're doing page-crossing stuff, you're on
+ * your own.
+ *
+ * THIS IS BROKEN CODE! You shouldn't do things
+ * like this.
+ */
+static inline void *vmalloc_to_virt(void *addr)
+{
+	struct page *page = vmalloc_to_page(addr);
+	return page_address(page) + (~PAGE_MASK & (unsigned long)addr);
 }
 
-static inline unsigned long kvirt_to_bus(unsigned long adr) 
+static inline unsigned long kvirt_to_bus(unsigned long addr) 
 {
-        unsigned long va, kva, ret;
-
-        va = VMALLOC_VMADDR(adr);
-	kva = page_address(vmalloc_to_page(va));
-	ret = virt_to_bus((void *)kva);
-        MDEBUG(printk("kv2b(%lx-->%lx)", adr, ret));
+	unsigned long ret;
+	ret = virt_to_bus(vmalloc_to_virt((void *)addr));
+        MDEBUG(printk("kv2b(%lx-->%lx)", addr, ret));
         return ret;
 }
 
@@ -166,21 +175,18 @@ static inline unsigned long kvirt_to_bus(unsigned long adr)
  * This is used when initializing the contents of the
  * area and marking the pages as reserved.
  */
-static inline unsigned long kvirt_to_pa(unsigned long adr) 
+static inline unsigned long kvirt_to_pa(unsigned long addr) 
 {
-        unsigned long va, kva, ret;
-
-        va = VMALLOC_VMADDR(adr);
-	kva = page_address(vmalloc_to_page(va));
-	ret = __pa(kva);
-        MDEBUG(printk("kv2pa(%lx-->%lx)", adr, ret));
+        unsigned long ret;
+	ret = virt_to_phys(vmalloc_to_virt((void *)addr));
+        MDEBUG(printk("kv2pa(%lx-->%lx)", addr, ret));
         return ret;
 }
 
 static void * rvmalloc(signed long size)
 {
 	void * mem;
-	unsigned long adr, page;
+	unsigned long adr;
 
 	mem=vmalloc_32(size);
 	if (NULL == mem)
@@ -191,8 +197,7 @@ static void * rvmalloc(signed long size)
 	        adr=(unsigned long) mem;
 		while (size > 0) 
                 {
-	                page = kvirt_to_pa(adr);
-			mem_map_reserve(virt_to_page(__va(page)));
+			mem_map_reserve(vmalloc_to_page((void *)adr));
 			adr+=PAGE_SIZE;
 			size-=PAGE_SIZE;
 		}
@@ -202,15 +207,14 @@ static void * rvmalloc(signed long size)
 
 static void rvfree(void * mem, signed long size)
 {
-        unsigned long adr, page;
+        unsigned long adr;
         
 	if (mem) 
 	{
 	        adr=(unsigned long) mem;
 		while (size > 0) 
                 {
-	                page = kvirt_to_pa(adr);
-			mem_map_unreserve(virt_to_page(__va(page)));
+			mem_map_unreserve(vmalloc_to_page((void *)adr));
 			adr+=PAGE_SIZE;
 			size-=PAGE_SIZE;
 		}

@@ -380,10 +380,9 @@ static unsigned char uvQuanTable518[] = OV518_UVQUANTABLE;
 static inline unsigned long 
 kvirt_to_pa(unsigned long adr)
 {
-	unsigned long va, kva, ret;
+	unsigned long kva, ret;
 
-	va = VMALLOC_VMADDR(adr);
-	kva = page_address(vmalloc_to_page(va));
+	kva = page_address(vmalloc_to_page((void *)adr));
 	ret = __pa(kva);
 	return ret;
 }
