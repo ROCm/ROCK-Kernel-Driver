@@ -1539,7 +1539,7 @@ static unsigned long __init check_display(unsigned long mem)
 	return DOUBLEWORD_ALIGN(mem);
 }
 
-/* Return (relocated) pointer to this much memory: skips initrd if any. */
+/* Return (relocated) pointer to this much memory: moves initrd if reqd. */
 static void __init *__make_room(unsigned long *mem_start, unsigned long *mem_end,
 				unsigned long needed, unsigned long align)
 {
@@ -1548,11 +1548,21 @@ static void __init *__make_room(unsigned long *mem_start, unsigned long *mem_end
 
 	*mem_start = ALIGN(*mem_start, align);
 	if (*mem_start + needed > *mem_end) {
+		/* FIXME: Apple OF doesn't map unclaimed mem.  If this
+		 * ever happened on G5, we'd need to fix. */
+		unsigned long initrd_len;
+
 		if (*mem_end != RELOC(initrd_start))
 			prom_panic(RELOC("No memory for copy_device_tree"));
-		*mem_start = RELOC(initrd_end);
-		/* We can't pass huge values to OF, so use 1G. */
-		*mem_end = *mem_start + 1024*1024*1024;
+
+		prom_print("Huge device_tree: moving initrd\n");
+		/* Move by 4M. */
+		initrd_len = RELOC(initrd_end) - RELOC(initrd_start);
+		*mem_end = RELOC(initrd_start) + 4 * 1024 * 1024;
+		memmove((void *)*mem_end, (void *)RELOC(initrd_start),
+			initrd_len);
+		RELOC(initrd_start) = *mem_end;
+		RELOC(initrd_end) = RELOC(initrd_start) + initrd_len;
 	}
 
 	ret = (void *)*mem_start;
@@ -1977,10 +1987,22 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 #endif /* DEBUG_PROM */
 
 	lmb_reserve(0, __pa(RELOC(klimit)));
+
 #ifdef CONFIG_BLK_DEV_INITRD
-	/* If this didn't cover the initrd, do so now */
-	if (mem < RELOC(initrd_start))
-		lmb_reserve(RELOC(initrd_start), RELOC(initrd_end) - RELOC(initrd_start));
+	if (RELOC(initrd_start)) {
+		unsigned long initrd_len;
+		initrd_len = RELOC(initrd_end) - RELOC(initrd_start);
+
+		/* Move initrd if it's where we're going to copy kernel. */
+		if (RELOC(initrd_start) < __pa(RELOC(klimit))) {
+			memmove((void *)mem, (void *)RELOC(initrd_start),
+				initrd_len);
+			RELOC(initrd_start) = mem;
+			RELOC(initrd_end) = mem + initrd_len;
+		}
+
+		lmb_reserve(RELOC(initrd_start), initrd_len);
+	}
 #endif /* CONFIG_BLK_DEV_INITRD */
 
 	if (_systemcfg->platform == PLATFORM_PSERIES)
