@@ -79,6 +79,29 @@ void kobject_init(struct kobject * kobj)
 	kobj->kset = kset_get(kobj->kset);
 }
 
+
+/**
+ *	unlink - remove kobject from kset list.
+ *	@kobj:	kobject.
+ *
+ *	Remove the kobject from the kset list and decrement
+ *	its parent's refcount.
+ *	This is separated out, so we can use it in both 
+ *	kobject_del() and kobject_add() on error.
+ */
+
+static void unlink(struct kobject * kobj)
+{
+	if (kobj->kset) {
+		down_write(&kobj->kset->subsys->rwsem);
+		list_del_init(&kobj->entry);
+		up_write(&kobj->kset->subsys->rwsem);
+	}
+	if (kobj->parent) 
+		kobject_put(kobj->parent);
+	kobject_put(kobj);
+}
+
 /**
  *	kobject_add - add an object to the hierarchy.
  *	@kobj:	object.
@@ -109,8 +132,8 @@ int kobject_add(struct kobject * kobj)
 		up_write(&kobj->kset->subsys->rwsem);
 	}
 	error = create_dir(kobj);
-	if (error && parent)
-		kobject_put(parent);
+	if (error)
+		unlink(kobj);
 	return error;
 }
 
@@ -140,14 +163,7 @@ int kobject_register(struct kobject * kobj)
 void kobject_del(struct kobject * kobj)
 {
 	sysfs_remove_dir(kobj);
-	if (kobj->kset) {
-		down_write(&kobj->kset->subsys->rwsem);
-		list_del_init(&kobj->entry);
-		up_write(&kobj->kset->subsys->rwsem);
-	}
-	if (kobj->parent) 
-		kobject_put(kobj->parent);
-	kobject_put(kobj);
+	unlink(kobj);
 }
 
 /**
