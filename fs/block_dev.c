@@ -550,7 +550,7 @@ static int do_open(struct block_device *bdev, struct file *file)
 {
 	struct module *owner = NULL;
 	struct gendisk *disk;
-	int ret = -ENXIO;
+	int ret = -ENODEV;
 	int part;
 
 	file->f_mapping = bdev->bd_inode->i_mapping;
@@ -563,6 +563,7 @@ static int do_open(struct block_device *bdev, struct file *file)
 	}
 	owner = disk->fops->owner;
 
+	ret = -ENXIO;
 	down(&bdev->bd_sem);
 	if (!bdev->bd_openers) {
 		bdev->bd_disk = disk;

@@ -1280,12 +1280,17 @@ mptbase_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		return r;
 	}
 
+#if 0
+	/* broken because some code assumes that multiple calls
+	   to pci_alloc_consistent return data in the same 4GB segment. 
+	   This cannot work on machines with enough memory. */
 	if (!pci_set_consistent_dma_mask(pdev, mask))
 		dprintk((KERN_INFO MYNAM
 			": Using 64 bit consistent mask\n"));
 	else
 		dprintk((KERN_INFO MYNAM
 			": Not using 64 bit consistent mask\n"));
+#endif
 
 	ioc = kmalloc(sizeof(MPT_ADAPTER), GFP_ATOMIC);
 	if (ioc == NULL) {

@@ -1256,7 +1256,6 @@ sg_cmd_done(Scsi_Cmnd * SCpnt)
 	SRpnt->sr_request->rq_disk = NULL; /* "sg" _disowns_ request blk */
 
 	srp->my_cmdp = NULL;
-	srp->done = 1;
 
 	SCSI_LOG_TIMEOUT(4, printk("sg_cmd_done: %s, pack_id=%d, res=0x%x\n",
 		sdp->disk->disk_name, srp->header.pack_id, (int) SRpnt->sr_result));
@@ -1312,8 +1311,9 @@ sg_cmd_done(Scsi_Cmnd * SCpnt)
 	}
 	if (sfp && srp) {
 		/* Now wake up any sg_read() that is waiting for this packet. */
-		wake_up_interruptible(&sfp->read_wait);
 		kill_fasync(&sfp->async_qp, SIGPOLL, POLL_IN);
+		srp->done = 1;
+		wake_up_interruptible(&sfp->read_wait);
 	}
 }
 

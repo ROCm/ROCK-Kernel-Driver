@@ -1,4 +1,4 @@
-/* $Id: capifunc.c,v 1.48 2004/01/11 19:20:54 armin Exp $
+/* $Id: capifunc.c,v 1.57 2004/03/20 18:18:03 armin Exp $
  *
  * ISDN interface module for Eicon active cards DIVA.
  * CAPI Interface common functions
@@ -18,6 +18,7 @@
 #include "divacapi.h"
 #include "divasync.h"
 #include "capifunc.h"
+#include "dlist.h"
 
 #define DBG_MINIMUM  (DL_LOG + DL_FTL + DL_ERR)
 #define DBG_DEFAULT  (DBG_MINIMUM + DL_XLOG + DL_REG)
@@ -39,9 +40,9 @@ extern word CapiRegister(word);
 extern word api_put(APPL *, CAPI_MSG *);
 
 static diva_os_spin_lock_t api_lock;
-static diva_os_spin_lock_t ll_lock;
 
-static diva_card *cards;
+static LIST_HEAD(cards);
+
 static dword notify_handle;
 static void DIRequest(ENTITY * e);
 static DESCRIPTOR MAdapter;
@@ -56,6 +57,11 @@ static char *diva_procinfo(struct capi_ctr *);
 static u16 diva_send_message(struct capi_ctr *,
 			     diva_os_message_buffer_s *);
 extern void diva_os_set_controller_struct(struct capi_ctr *);
+
+/*
+ * include queue functions
+ */
+#include "dlist.c"
 
 extern void DIVA_DIDD_Read(DESCRIPTOR *, int);
 
@@ -152,26 +158,15 @@ byte UnMapController(byte MappedController)
 static int find_free_id(void)
 {
 	int num = 0;
-	diva_card *p;
-	diva_os_spin_lock_magic_t old_irql;
+	DIVA_CAPI_ADAPTER *a;
 
-	diva_os_enter_spin_lock(&ll_lock, &old_irql, "find free id");
-	while (num < 100) {
-		num++;
-		p = cards;
-		while (p) {
-			if (p->Id == num)
+	while (num < MAX_DESCRIPTORS) {
+		a = &adapter[num];
+		if (!a->Id)
 				break;
-			p = p->next;
-		}
-		if(!p) {
-		diva_os_leave_spin_lock(&ll_lock, &old_irql,
-					"find free id");
-		return (num);
-		}
+		num++;
 	}
-	diva_os_leave_spin_lock(&ll_lock, &old_irql, "find free id");
-	return (999);
+	return(num + 1);
 }
 
 /*
@@ -179,21 +174,17 @@ static int find_free_id(void)
  */
 static diva_card *find_card_by_ctrl(word controller)
 {
-	diva_card *p;
-	diva_os_spin_lock_magic_t old_irql;
+	struct list_head *tmp;
+	diva_card *card;
 
-	diva_os_enter_spin_lock(&ll_lock, &old_irql, "find card ctrl");
-	p = cards;
-
-	while (p) {
-		if (ControllerMap[p->Id] == controller) {
-			diva_os_leave_spin_lock(&ll_lock, &old_irql,
-						"find card ctrl");
-			return p;
+	list_for_each(tmp, &cards) {
+		card = list_entry(tmp, diva_card, list);
+		if (ControllerMap[card->Id] == controller) {
+			if (card->remove_in_progress)
+				card = NULL;
+			return(card);
 		}
-		p = p->next;
 	}
-	diva_os_leave_spin_lock(&ll_lock, &old_irql, "find card ctrl");
 	return (diva_card *) 0;
 }
 
@@ -358,28 +349,18 @@ void sendf(APPL * appl, word command, dword Id, word Number, byte * format, ...)
 /*
  * cleanup adapter
  */
-static void clean_adapter(int id)
+static void clean_adapter(int id, diva_entity_queue_t* free_mem_q)
 {
 	DIVA_CAPI_ADAPTER *a;
-#if IMPLEMENT_LINE_INTERCONNECT2
 	int i, k;
-#endif				/* IMPLEMENT_LINE_INTERCONNECT2 */
 
 	a = &adapter[id];
-#if IMPLEMENT_LINE_INTERCONNECT
-	if (a->li_pri) {
-		if (a->li_config.pri)
-			diva_os_free(0, a->li_config.pri);
-	} else {
-		if (a->li_config.bri)
-			diva_os_free(0, a->li_config.bri);
-	}
-#endif				/* IMPLEMENT_LINE_INTERCONNECT */
-#if IMPLEMENT_LINE_INTERCONNECT2
 	k = li_total_channels - a->li_channels;
 	if (k == 0) {
-		diva_os_free(0, li_config_table);
+		if (li_config_table) {
+			diva_q_add_tail(free_mem_q, (diva_entity_link_t*)li_config_table);
 		li_config_table = NULL;
+		}
 	} else {
 		if (a->li_base < k) {
 			memmove(&li_config_table[a->li_base],
@@ -401,9 +382,8 @@ static void clean_adapter(int id)
 		if (adapter[i].request)
 			adapter[i].li_base -= a->li_channels;
 	}
-#endif				/* IMPLEMENT_LINE_INTERCONNECT2 */
 	if (a->plci)
-		diva_os_free(0, a->plci);
+		diva_q_add_tail(free_mem_q, (diva_entity_link_t*)a->plci);
 
 	memset(a, 0x00, sizeof(DIVA_CAPI_ADAPTER));
 	while ((max_adapter != 0) && !adapter[max_adapter - 1].request)
@@ -411,67 +391,87 @@ static void clean_adapter(int id)
 }
 
 /*
+ * remove a card, but ensures consistent state of LI tables
+ * in the time adapter is removed
+ */
+static void divacapi_remove_card(DESCRIPTOR * d)
+{
+	struct list_head *tmp;
+	diva_card *card = NULL;
+	diva_entity_queue_t free_mem_q;
+	diva_entity_link_t* link;
+	diva_os_spin_lock_magic_t old_irql;
+
+	diva_q_init (&free_mem_q);
+
+	/*
+	 * Set "remove in progress flag".
+	 * Ensures that there is no call from sendf to CAPI in
+	 * the time CAPI controller is about to be removed.
+	 */
+	diva_os_enter_spin_lock(&api_lock, &old_irql, "remove card");
+	list_for_each(tmp, &cards) {
+		card = list_entry(tmp, diva_card, list);
+		if (card->d.request == d->request) {
+			card->remove_in_progress = 1;
+			list_del(tmp);
+			break;
+		}
+	}
+	diva_os_leave_spin_lock(&api_lock, &old_irql, "remove card");
+
+	if (card) {
+		/*
+		 * Detach CAPI. Sendf cannot call to CAPI any more.
+		 * After detach no call to send_message() is done too.
+		 */
+		detach_capi_ctr(&card->capi_ctrl);
+
+		/*
+		 * Now get API lock (to ensure stable state of LI tables)
+		 * and update the adapter map/LI table.
+		 */
+		diva_os_enter_spin_lock(&api_lock, &old_irql, "remove card");
+
+		clean_adapter(card->Id - 1, &free_mem_q);
+		DBG_TRC(("DelAdapterMap (%d) -> (%d)",
+				ControllerMap[card->Id], card->Id))
+				ControllerMap[card->Id] = 0;
+		DBG_TRC(("adapter remove, max_adapter=%d",
+				max_adapter));
+		diva_os_leave_spin_lock(&api_lock, &old_irql, "remove card");
+		
+		/* After releasing the lock, we can free the memory */
+		diva_os_free (0, card);
+	}
+
+	/* free queued memory areas */
+	while ((link = diva_q_get_head(&free_mem_q))) {
+		diva_q_remove(&free_mem_q, link);
+		diva_os_free(0, link);
+	}
+}
+
+/*
  * remove cards
  */
 static void DIVA_EXIT_FUNCTION divacapi_remove_cards(void)
 {
-	diva_card *last;
+	DESCRIPTOR d;
+	struct list_head *tmp;
 	diva_card *card;
 	diva_os_spin_lock_magic_t old_irql;
 
-	diva_os_enter_spin_lock(&ll_lock, &old_irql, "remove cards");
-	card = cards;
-
-	while (card) {
-		detach_capi_ctr(&card->capi_ctrl);
-		clean_adapter(card->Id - 1);
-		DBG_TRC(("adapter remove, max_adapter=%d", max_adapter));
-		card = card->next;
+rescan:
+	diva_os_enter_spin_lock(&api_lock, &old_irql, "remove cards");
+	list_for_each(tmp, &cards) {
+		card = list_entry(tmp, diva_card, list);
+		diva_os_leave_spin_lock(&api_lock, &old_irql, "remove cards");
+		d.request = card->d.request;
+		divacapi_remove_card(&d);
+		goto rescan;
 	}
-
-	card = cards;
-	while (card) {
-		last = card;
-		card = card->next;
-		diva_os_free(0, last);
-	}
-	diva_os_leave_spin_lock(&ll_lock, &old_irql, "remove cards");
-}
-
-/*
- * remove a card
- */
-static void divacapi_remove_card(DESCRIPTOR * d)
-{
-	diva_card *last;
-	diva_card *card;
-	diva_os_spin_lock_magic_t old_irql;
-
-	diva_os_enter_spin_lock(&ll_lock, &old_irql, "remove card");
-	last = card = cards;
-	while (card) {
-		if (card->d.request == d->request) {
-			detach_capi_ctr(&card->capi_ctrl);
-			clean_adapter(card->Id - 1);
-			DBG_TRC(
-				("DelAdapterMap (%d) -> (%d)",
-				 ControllerMap[card->Id], card->Id))
-			    ControllerMap[card->Id] = 0;
-			DBG_TRC(
-				("adapter remove, max_adapter=%d",
-				 max_adapter));
-			if (card == last)
-				cards = card->next;
-			else
-				last->next = card->next;
-
-			diva_os_free(0, card);
-			break;
-		}
-		last = card;
-		card = card->next;
-	}
-	diva_os_leave_spin_lock(&ll_lock, &old_irql, "remove card");
+	diva_os_leave_spin_lock(&api_lock, &old_irql, "remove cards");
 }
 
 /*
@@ -500,10 +500,9 @@ static int diva_add_card(DESCRIPTOR * d)
 	DIVA_CAPI_ADAPTER *a = NULL;
 	IDI_SYNC_REQ sync_req;
 	char serial[16];
-#if IMPLEMENT_LINE_INTERCONNECT2
+	void* mem_to_free;
 	LI_CONFIG *new_li_config_table;
 	int j;
-#endif				/* IMPLEMENT_LINE_INTERCONNECT2 */
 
 	if (!(card = (diva_card *) diva_os_malloc(0, sizeof(diva_card)))) {
 		DBG_ERR(("diva_add_card: failed to allocate card struct."))
@@ -529,7 +528,11 @@ static int diva_add_card(DESCRIPTOR * d)
 		    diva_os_free(0, card);
 		return (0);
 	}
+	
+	diva_os_enter_spin_lock(&api_lock, &old_irql, "find id");
 	card->Id = find_free_id();
+	diva_os_leave_spin_lock(&api_lock, &old_irql, "find id");
+	
 	strlcpy(ctrl->manu, M_COMPANY, sizeof(ctrl->manu));
 	ctrl->version.majorversion = 2;
 	ctrl->version.minorversion = 0;
@@ -600,9 +603,7 @@ static int diva_add_card(DESCRIPTOR * d)
 #if IMPLEMENT_DTMF
 		a->profile.Global_Options |= 0x8;
 #endif				/* IMPLEMENT_DTMF */
-#if (IMPLEMENT_LINE_INTERCONNECT || IMPLEMENT_LINE_INTERCONNECT2)
-		a->profile.Global_Options |= 0x80;
-#endif				/* (IMPLEMENT_LINE_INTERCONNECT || IMPLEMENT_LINE_INTERCONNECT2) */
+		a->profile.Global_Options |= 0x80; /* Line Interconnect */
 #if IMPLEMENT_ECHO_CANCELLER
 		a->profile.Global_Options |= 0x100;
 #endif				/* IMPLEMENT_ECHO_CANCELLER */
@@ -620,25 +621,6 @@ static int diva_add_card(DESCRIPTOR * d)
 		a->manufacturer_features = 0;
 	}
 
-#if IMPLEMENT_LINE_INTERCONNECT
-	a->li_pri = (a->profile.Channels > 2);
-	if (a->li_pri) {
-		if (!(a->li_config.pri = (LI_CONFIG_PRI *) diva_os_malloc(0, sizeof(LI_CONFIG_PRI)))) {
-			DBG_ERR(("diva_add_card: failed alloc li_config.pri struct."))
-			memset(a, 0, sizeof(DIVA_CAPI_ADAPTER));
-			return (0);
-		}
-		memset(a->li_config.pri, 0, sizeof(LI_CONFIG_PRI));
-	} else 
-		if (!(a->li_config.bri = (LI_CONFIG_BRI *) diva_os_malloc(0, sizeof(LI_CONFIG_BRI)))) {
-			DBG_ERR(("diva_add_card: failed alloc li_config.bri struct."))
-			memset(a, 0, sizeof(DIVA_CAPI_ADAPTER));
-			return (0);
-		}
-		memset(a->li_config.bri, 0, sizeof(LI_CONFIG_BRI));
-	}
-#endif				/* IMPLEMENT_LINE_INTERCONNECT */
-#if IMPLEMENT_LINE_INTERCONNECT2
 	a->li_pri = (a->profile.Channels > 2);
 	a->li_channels = a->li_pri ? MIXER_CHANNELS_PRI : MIXER_CHANNELS_BRI;
 	a->li_base = 0;
@@ -654,6 +636,10 @@ static int diva_add_card(DESCRIPTOR * d)
 		memset(a, 0, sizeof(DIVA_CAPI_ADAPTER));
 		return (0);
 	}
+
+	/* Prevent access to line interconnect table in process update */
+	diva_os_enter_spin_lock(&api_lock, &old_irql, "add card");
+	
 	j = 0;
 	for (i = 0; i < k; i++) {
 		if ((i >= a->li_base) && (i < a->li_base + a->li_channels))
@@ -694,25 +680,26 @@ static int diva_add_card(DESCRIPTOR * d)
 	}
 	li_total_channels = k;
 
-	if (li_config_table != NULL)
-		diva_os_free(0, li_config_table);
+	mem_to_free = li_config_table;
 
 	li_config_table = new_li_config_table;
 	for (i = card->Id; i < max_adapter; i++) {
 		if (adapter[i].request)
 			adapter[i].li_base += a->li_channels;
 	}
-#endif				/* IMPLEMENT_LINE_INTERCONNECT2 */
 
 	if (a == &adapter[max_adapter])
 		max_adapter++;
 
-	diva_os_enter_spin_lock(&ll_lock, &old_irql, "add card");
-	card->next = cards;
-	cards = card;
-	diva_os_leave_spin_lock(&ll_lock, &old_irql, "add card");
-
+	list_add(&(card->list), &cards);
 	AutomaticLaw(a);
+
+	diva_os_leave_spin_lock(&api_lock, &old_irql, "add card");
+
+	if (mem_to_free) {
+		diva_os_free (0, mem_to_free);
+	}
+
 	i = 0;
 	while (i++ < 30) {
 		if (a->automatic_law > 3)
@@ -863,6 +850,7 @@ static void diva_release_appl(struct capi_ctr *ctrl, __u16 appl)
 {
 	diva_os_spin_lock_magic_t old_irql;
 	APPL *this = &application[appl - 1];
+	void *mem_to_free = NULL;
 
 	DBG_TRC(("application %d(%d) cleanup", this->Id, appl))
 
@@ -874,12 +862,14 @@ static void diva_release_appl(struct capi_ctr *ctrl, __u16 appl)
 	diva_os_enter_spin_lock(&api_lock, &old_irql, "release_appl");
 	if (this->Id) {
 		CapiRelease(this->Id);
-		if (this->DataNCCI)
-			diva_os_free(0, this->DataNCCI);
+		mem_to_free = this->DataNCCI;
 		this->DataNCCI = NULL;
 		this->Id = 0;
 	}
 	diva_os_leave_spin_lock(&api_lock, &old_irql, "release_appl");
+
+	if (mem_to_free)
+		diva_os_free(0, mem_to_free);
 
 }
 
@@ -905,6 +895,11 @@ static u16 diva_send_message(struct capi_ctr *ctrl,
 		return CAPI_REGOSRESOURCEERR;
 	}
 	DBG_PRV1(("Write - appl = %d, cmd = 0x%x", this->Id, command))
+
+	if (card->remove_in_progress) {
+		DBG_ERR(("CAPI_SEND_MSG - remove in progress!"))
+		return CAPI_REGOSRESOURCEERR;
+	}
 
 	if (!this->Id) {
 		return CAPI_ILLAPPNR;
@@ -1163,11 +1158,30 @@ static void remove_main_structs(void)
 }
 
 /*
+ * api_remove_start
+ */
+static void do_api_remove_start(void)
+{
+	diva_os_spin_lock_magic_t old_irql;
+	int ret = 1, count = 100;
+
+	do {
+		diva_os_enter_spin_lock(&api_lock, &old_irql, "api remove start");
+		ret = api_remove_start();
+		diva_os_leave_spin_lock(&api_lock, &old_irql, "api remove start");
+
+		diva_os_sleep(10);
+	} while (ret && count--);
+
+	if (ret)
+		DBG_ERR(("could not remove signaling ID's"))
+}
+
+/*
  * init
  */
 int DIVA_INIT_FUNCTION init_capifunc(void)
 {
-	diva_os_initialize_spin_lock(&ll_lock, "capifunc");
 	diva_os_initialize_spin_lock(&api_lock, "capifunc");
 	memset(ControllerMap, 0, MAX_DESCRIPTORS + 1);
 	max_adapter = 0;
@@ -1175,12 +1189,16 @@ int DIVA_INIT_FUNCTION init_capifunc(void)
 
 	if (!init_main_structs()) {
 		DBG_ERR(("init: failed to init main structs."))
+		diva_os_destroy_spin_lock(&api_lock, "capifunc");
 		return (0);
 	}
 
 	if (!divacapi_connect_didd()) {
 		DBG_ERR(("init: failed to connect to DIDD."))
+		do_api_remove_start();
+		divacapi_remove_cards();
 		remove_main_structs();
+		diva_os_destroy_spin_lock(&api_lock, "capifunc");
 		return (0);
 	}
 
@@ -1192,21 +1210,9 @@ int DIVA_INIT_FUNCTION init_capifunc(void)
  */
 void DIVA_EXIT_FUNCTION finit_capifunc(void)
 {
-	int count = 100;
-	word ret = 1;
-
-	while (ret && count--) {
-		ret = api_remove_start();
-		diva_os_sleep(10);
-	}
-	if (ret)
-		DBG_ERR(("could not remove signaling ID's"))
-
+	do_api_remove_start();
 		    divacapi_disconnect_didd();
 	divacapi_remove_cards();
-
 	remove_main_structs();
-
 	diva_os_destroy_spin_lock(&api_lock, "capifunc");
-	diva_os_destroy_spin_lock(&ll_lock, "capifunc");
 }
