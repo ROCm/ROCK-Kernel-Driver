@@ -2370,7 +2370,7 @@ smb_proc_readdir_long(struct file *filp, void *dirent, filldir_t filldir,
 		if (req->rq_rcls != 0) {
 			result = smb_errno(req);
 			PARANOIA("name=%s, result=%d, rcls=%d, err=%d\n",
-				 mask, result, server->rcls, server->err);
+				 mask, result, req->rq_rcls, req->rq_err);
 			break;
 		}
 
@@ -2526,7 +2526,7 @@ smb_proc_getattr_ff(struct smb_sb_info *server, struct dentry *dentry,
 	result = smb_add_request(req);
 	if (result < 0)
 		goto out_free;
-	if (server->rcls != 0) {
+	if (req->rq_rcls != 0) {
 		result = smb_errno(req);
 #ifdef SMBFS_PARANOIA
 		if (result != -ENOENT)
@@ -2639,7 +2639,7 @@ smb_proc_getattr_trans2(struct smb_sb_info *server, struct dentry *dir,
 	result = smb_add_request(req);
 	if (result < 0)
 		goto out;
-	if (server->rcls != 0) {
+	if (req->rq_rcls != 0) {
 		VERBOSE("for %s: result=%d, rcls=%d, err=%d\n",
 			&param[6], result, req->rq_rcls, req->rq_err);
 		result = smb_errno(req);
@@ -3218,7 +3218,7 @@ smb_proc_read_link(struct smb_sb_info *server, struct dentry *d,
 	if (result < 0)
 		goto out_free;
 	DEBUG1("for %s: result=%d, rcls=%d, err=%d\n",
-		&param[6], result, server->rcls, server->err);
+		&param[6], result, req->rq_rcls, req->rq_err);
 
 	/* copy data up to the \0 or buffer length */
 	result = len;
@@ -3268,7 +3268,7 @@ smb_proc_symlink(struct smb_sb_info *server, struct dentry *d,
 		goto out_free;
 
 	DEBUG1("for %s: result=%d, rcls=%d, err=%d\n",
-		&param[6], result, server->rcls, server->err);
+		&param[6], result, req->rq_rcls, req->rq_err);
 	result = 0;
 
 out_free:
@@ -3315,7 +3315,7 @@ smb_proc_link(struct smb_sb_info *server, struct dentry *dentry,
 		goto out_free;
 
 	DEBUG1("for %s: result=%d, rcls=%d, err=%d\n",
-	       &param[6], result, server->rcls, server->err);
+	       &param[6], result, req->rq_rcls, req->rq_err);
 	result = 0;
 
 out_free:
