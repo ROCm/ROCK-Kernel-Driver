@@ -177,6 +177,7 @@ static int worker_thread(void *__startup)
 	current->flags |= PF_IOTHREAD;
 	cwq->thread = current;
 
+	set_user_nice(current, -10);
 	set_cpus_allowed(current, 1UL << cpu);
 
 	spin_lock_irq(&current->sig->siglock);
