@@ -577,7 +577,7 @@ done(struct sl811 *sl811, struct sl811h_ep *ep, u8 bank, struct pt_regs *regs)
 					urb->status = urbstat;
 				spin_unlock(&urb->lock);
 
-				req = 0;
+				req = NULL;
 				ep->nextpid = USB_PID_ACK;
 			}
 			break;
@@ -1151,7 +1151,7 @@ sl811h_hub_descriptor (
 	/* no overcurrent errors detection/handling */
 	temp |= 0x0010;
 
-	desc->wHubCharacteristics = cpu_to_le16(temp);
+	desc->wHubCharacteristics = (__force __u16)cpu_to_le16(temp);
 
 	/* two bitmaps:  ports removable, and legacy PortPwrCtrlMask */
 	desc->bitmap[0] = 1 << 1;
