@@ -1,0 +1,46 @@
+#!/usr/bin/perl
+
+use strict;
+
+## Copyright (C) Michael Still (mikal@stillhq.com)
+## Released under the terms of the GNU GPL
+##
+## A script to make or install the manpages extracted by split-man
+##
+## Arguements: $1 -- the word "convert" or "install"
+##             $2 -- the directory containing the SGML files for the manpages
+##             $3 -- the filename which contained the sgmldoc output
+##                     (I need this so I know which manpages to convert)
+
+my($LISTING);
+
+if($ARGV[0] eq ""){
+  die "Usage: makeman [convert | install] <dir> <file>\n";
+}
+
+if( ! -d "$ARGV[1]" ){
+  die "Output directory \"$ARGV[1]\" does not exist\n";
+}
+
+if($ARGV[0] eq "convert"){
+  open LISTING, "grep \"<refentrytitle>\" $ARGV[2] |";
+  while(<LISTING>){
+    s/<\/.*$//;
+    s/^.*>//;
+    s/\.sgml//;
+    s/struct //;
+    s/typedef //;
+
+    chomp;
+    print "Processing $_\n";
+    system("cd $ARGV[1]; docbook2man $_.sgml; gzip -f $_.9\n");
+  }
+}
+elsif($ARGV[0] eq "install"){
+  system("mkdir -p /usr/local/man/man9/; install $ARGV[1]/*.9.gz /usr/local/man/man9/");
+}
+else{
+  die "Usage: makeman [convert | install] <dir> <file>\n";
+}
+
+print "Done\n";

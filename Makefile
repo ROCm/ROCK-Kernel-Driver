@@ -236,7 +236,7 @@ depfile = $(subst $(comma),_,$(@D)/.$(@F).d)
 noconfig_targets := xconfig gconfig menuconfig config oldconfig randconfig \
 		    defconfig allyesconfig allnoconfig allmodconfig \
 		    clean mrproper distclean rpm \
-		    help tags TAGS cscope sgmldocs psdocs pdfdocs htmldocs \
+		    help tags TAGS cscope %docs \
 		    checkconfig checkhelp checkincludes
 
 RCS_FIND_IGNORE := \( -name SCCS -o -name BitKeeper -o -name .svn -o -name CVS \) -prune -o
@@ -833,7 +833,7 @@ help:
 
 # Documentation targets
 # ---------------------------------------------------------------------------
-sgmldocs psdocs pdfdocs htmldocs: scripts/docproc FORCE
+%docs: scripts/docproc FORCE
 	$(Q)$(MAKE) $(build)=Documentation/DocBook $@
 
 # Scripts to check various things for consistency
