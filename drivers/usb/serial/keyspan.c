@@ -1037,7 +1037,7 @@ static int keyspan_fake_startup (struct usb_serial *serial)
 	}
 
 	if (record == NULL) {
-		err("Required keyspan firmware image (%s) unavailable.", fw_name);
+		dev_err(serial->dev->dev, "Required keyspan firmware image (%s) unavailable.\n", fw_name);
 		return(1);
 	}
 
@@ -1051,10 +1051,10 @@ static int keyspan_fake_startup (struct usb_serial *serial)
 					     (unsigned char *)record->data,
 					     record->data_size, 0xa0);
 		if (response < 0) {
-			err("ezusb_writememory failed for Keyspan"
-			    "firmware (%d %04X %p %d)",
-			    response, 
-			    record->address, record->data, record->data_size);
+			dev_err(serial->dev->dev, "ezusb_writememory failed for Keyspan"
+				"firmware (%d %04X %p %d)\n",
+				response, 
+				record->address, record->data, record->data_size);
 			break;
 		}
 		record++;
@@ -1849,7 +1849,7 @@ static int keyspan_startup (struct usb_serial *serial)
 		if (d_details->product_id == serial->dev->descriptor.idProduct)
 			break;
 	if (d_details == NULL) {
-		err("%s - unknown product id %x", __FUNCTION__, serial->dev->descriptor.idProduct);
+		dev_err(serial->dev->dev, "%s - unknown product id %x\n", __FUNCTION__, serial->dev->descriptor.idProduct);
 		return 1;
 	}
 
