@@ -26,9 +26,9 @@
 
 #include "ieee1394.h"
 
-/* Register for incoming packets. This is 8192 bytes, which supports up to
- * 1600mbs. We'll need to change this if that ever becomes "small" :)  */
-#define ETHER1394_REGION_ADDR_LEN	8192
+/* Register for incoming packets. This is 4096 bytes, which supports up to
+ * S3200 (per Table 16-3 of IEEE 1394b-2002). */
+#define ETHER1394_REGION_ADDR_LEN	4096
 #define ETHER1394_REGION_ADDR		0xfffff0200000ULL
 #define ETHER1394_REGION_ADDR_END	(ETHER1394_REGION_ADDR + ETHER1394_REGION_ADDR_LEN)
 

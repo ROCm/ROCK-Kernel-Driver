@@ -1000,7 +1000,7 @@ static ssize_t mem_dmaread(struct memdata *md, u32 physbuf, ssize_t count,
         DECLARE_WAITQUEUE(wait, current);
 
         count &= ~3;
-        count = MIN(count, 53196);
+        count = min(count, 53196);
         retval = count;
 
         if (reg_read(md->lynx, DMA_CHAN_CTRL(CHANNEL_LOCALBUS))
@@ -1011,14 +1011,14 @@ static ssize_t mem_dmaread(struct memdata *md, u32 physbuf, ssize_t count,
         reg_write(md->lynx, LBUS_ADDR, md->type | offset);
 
         pcl = edit_pcl(md->lynx, md->lynx->dmem_pcl, &pcltmp);
-        pcl->buffer[0].control = PCL_CMD_LBUS_TO_PCI | MIN(count, 4092);
+        pcl->buffer[0].control = PCL_CMD_LBUS_TO_PCI | min(count, 4092);
         pcl->buffer[0].pointer = physbuf;
         count -= 4092;
 
         i = 0;
         while (count > 0) {
                 i++;
-                pcl->buffer[i].control = MIN(count, 4092);
+                pcl->buffer[i].control = min(count, 4092);
                 pcl->buffer[i].pointer = physbuf + i * 4092;
                 count -= 4092;
         }

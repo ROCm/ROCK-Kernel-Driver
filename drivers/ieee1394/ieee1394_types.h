@@ -7,7 +7,7 @@
 #include <linux/version.h>
 #include <linux/list.h>
 #include <linux/init.h>
-#include <linux/string.h>
+#include <linux/spinlock.h>
 #include <asm/semaphore.h>
 #include <asm/byteorder.h>
 
@@ -18,11 +18,6 @@
 #define minor(dev) MINOR(dev)
 #endif
 
-#include <linux/spinlock.h>
-
-#ifndef MIN
-#define MIN(a,b) ((a) < (b) ? (a) : (b))
-#endif
 
 /* Transaction Label handling */
 struct hpsb_tlabel_pool {
