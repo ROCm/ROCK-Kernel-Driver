@@ -1,3 +1,6 @@
+# ==========================================================================
+# Cleaning up
+# ==========================================================================
 
 src := $(obj)
 
@@ -8,6 +11,9 @@ __clean:
 
 include $(obj)/Makefile
 
+# Figure out what we need to build from the various variables
+# ==========================================================================
+
 __subdir-y	:= $(patsubst %/,%,$(filter %/, $(obj-y)))
 subdir-y	+= $(__subdir-y)
 __subdir-m	:= $(patsubst %/,%,$(filter %/, $(obj-m)))
@@ -17,26 +23,43 @@ subdir-n	+= $(__subdir-n)
 __subdir-	:= $(patsubst %/,%,$(filter %/, $(obj-)))
 subdir-		+= $(__subdir-)
 
+# Subdirectories we need to descend into
+
 subdir-ym	:= $(sort $(subdir-y) $(subdir-m))
 subdir-ymn      := $(sort $(subdir-ym) $(subdir-n) $(subdir-))
+
+# Add subdir path
 
 EXTRA_TARGETS	:= $(addprefix $(obj)/,$(EXTRA_TARGETS))
 clean-files	:= $(addprefix $(obj)/,$(clean-files))
 host-progs	:= $(addprefix $(obj)/,$(host-progs))
 subdir-ymn	:= $(addprefix $(obj)/,$(subdir-ymn))
 
+# ==========================================================================
+
 __clean-files := $(wildcard $(EXTRA_TARGETS) $(host-progs) $(clean-files))
+
+quiet_cmd_clean = CLEAN   $(__cleanfiles)
+      cmd_clean = 	rm -f $(__clean-files);	$(clean-rule)
 
 __clean: $(subdir-ymn)
 ifneq ($(strip $(__clean-files) $(clean-rule)),)
-	rm -f $(__clean-files)
-	$(clean-rule)
+	$(call cmd,clean)
 else
 	@:
 endif
 
-.PHONY: $(subdir-ymn)
+# ===========================================================================
+# Generic stuff
+# ===========================================================================
 
+# Descending
+# ---------------------------------------------------------------------------
+
+.PHONY: $(subdir-ymn)
 $(subdir-ymn):
 	$(Q)$(MAKE) -rR -f scripts/Makefile.clean obj=$@
 
+# If quiet is set, only print short version of command
+
+cmd = @$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))' &&) $(cmd_$(1))

@@ -544,8 +544,7 @@ _modinst_post:
 
 .PHONY: $(patsubst %, _modinst_%, $(SUBDIRS))
 $(patsubst %, _modinst_%, $(SUBDIRS)) :
-	+@$(call descend,$(patsubst _modinst_%,%,$@),modules_install)
-
+	$(Q)$(MAKE) MAKEFILES= -rR -f scripts/Makefile.modinst obj=$(patsubst _modinst_%,%,$@)
 else # CONFIG_MODULES
 
 # Modules not configured
