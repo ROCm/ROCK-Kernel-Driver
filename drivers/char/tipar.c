@@ -284,7 +284,6 @@ tipar_write(struct file *file, const char *buf, size_t count, loff_t * ppos)
 	    minor(file->f_dentry->d_inode->i_rdev) - TIPAR_MINOR;
 	ssize_t n;
 
-	printk("_write\n");
 	parport_claim_or_block(table[minor].dev);
 
 	for (n = 0; n < count; n++) {
@@ -321,7 +320,6 @@ tipar_read(struct file *file, char *buf, size_t count, loff_t * ppos)
 	if (ppos != &file->f_pos)
 		return -ESPIPE;
 
-	printk("_read\n");
 	parport_claim_or_block(table[minor].dev);
 
 	while (n < count) {
