@@ -4635,9 +4635,11 @@ static int tg3_reset_hw(struct tg3 *tp)
 
 	/* This works around an issue with Athlon chipsets on
 	 * B3 tigon3 silicon.  This bit has no effect on any
-	 * other revision.
+	 * other revision.  But do not set this on PCI Express
+	 * chips.
 	 */
-	tp->pci_clock_ctrl |= CLOCK_CTRL_DELAY_PCI_GRANT;
+	if (!(tp->tg3_flags2 & TG3_FLG2_PCI_EXPRESS))
+		tp->pci_clock_ctrl |= CLOCK_CTRL_DELAY_PCI_GRANT;
 	tw32_f(TG3PCI_CLOCK_CTRL, tp->pci_clock_ctrl);
 
 	if (tp->pci_chip_rev_id == CHIPREV_ID_5704_A0 &&
