@@ -931,6 +931,8 @@ void test_des(void)
 		printk("%s\n", memcmp(q, des_tv[i].result, len) ? "fail" : "pass");
 	}
 
+	crypto_free_tfm(tfm);
+
 	/*
 	 * Scenario F:
 	 * 

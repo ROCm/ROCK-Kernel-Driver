@@ -15,22 +15,22 @@
  */
 #include <linux/init.h>
 #include <linux/module.h>
-#include <linux/spinlock.h>
+#include <linux/rwsem.h>
 #include <linux/list.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/crypto.h>
 #include "internal.h"
 
-static rwlock_t crypto_alg_lock = RW_LOCK_UNLOCKED;
 static LIST_HEAD(crypto_alg_list);
+static struct rw_semaphore crypto_alg_sem;
 
 static void *c_start(struct seq_file *m, loff_t *pos)
 {
 	struct list_head *v;
 	loff_t n = *pos;
 
-	read_lock(&crypto_alg_lock);
+	down_read(&crypto_alg_sem);
 	list_for_each(v, &crypto_alg_list)
 		if (!n--)
 			return list_entry(v, struct crypto_alg, cra_list);
@@ -49,7 +49,7 @@ static void *c_next(struct seq_file *m, void *p, loff_t *pos)
 
 static void c_stop(struct seq_file *m, void *p)
 {
-	read_unlock(&crypto_alg_lock);
+	up_read(&crypto_alg_sem);
 }
 
 static int c_show(struct seq_file *m, void *p)
@@ -95,15 +95,17 @@ struct file_operations proc_crypto_ops = {
 	.release	= seq_release
 };
 
-
-static inline void crypto_alg_get(struct crypto_alg *alg)
+static inline int crypto_alg_get(struct crypto_alg *alg)
 {
-	/* XXX: inc refcount */
+	if (alg->cra_module)
+		return try_inc_mod_count(alg->cra_module);
+	else
+		return 1;
 }
 
 static inline void crypto_alg_put(struct crypto_alg *alg)
 {
-	/* XXX: dec refcount */
+	__MOD_DEC_USE_COUNT(alg->cra_module);
 }
 
 struct crypto_alg *crypto_alg_lookup(u32 algid)
@@ -111,18 +113,18 @@ struct crypto_alg *crypto_alg_lookup(u32 algid)
 	struct list_head *p;
 	struct crypto_alg *alg = NULL;
 	
-	read_lock(&crypto_alg_lock);
+	down_read(&crypto_alg_sem);
 	
 	list_for_each(p, &crypto_alg_list) {
 		if ((((struct crypto_alg *)p)->cra_id
 				& CRYPTO_ALG_MASK) == algid) {
-			alg = (struct crypto_alg *)p;
-			crypto_alg_get(alg);
+			if (crypto_alg_get((struct crypto_alg *)p))
+				alg = (struct crypto_alg *)p;
 			break;
 		}
 	}
 
-	read_unlock(&crypto_alg_lock);
+	up_read(&crypto_alg_sem);
 	return alg;
 }
 
@@ -213,7 +215,7 @@ int crypto_register_alg(struct crypto_alg *alg)
 	int ret = 0;
 	struct list_head *p;
 	
-	write_lock(&crypto_alg_lock);
+	down_write(&crypto_alg_sem);
 	
 	list_for_each(p, &crypto_alg_list) {
 		struct crypto_alg *q = (struct crypto_alg *)p;
@@ -225,7 +227,7 @@ int crypto_register_alg(struct crypto_alg *alg)
 	}
 	list_add_tail(&alg->cra_list, &crypto_alg_list);
 out:	
-	write_unlock(&crypto_alg_lock);
+	up_write(&crypto_alg_sem);
 	return ret;
 }
 
@@ -234,26 +236,27 @@ int crypto_unregister_alg(struct crypto_alg *alg)
 	int ret = -ENOENT;
 	struct list_head *p;
 	
-	write_lock(&crypto_alg_lock);
+	down_write(&crypto_alg_sem);
 	
 	list_for_each(p, &crypto_alg_list) {
 		if (alg == (struct crypto_alg *)p) {
+			BUG_ON(!alg->cra_module);
 			list_del(p);
 			ret = 0;
 			goto out;
 		}
 	}
 out:	
-	write_unlock(&crypto_alg_lock);
+	up_write(&crypto_alg_sem);
 	return ret;
 }
-
 
 static int __init init_crypto(void)
 {
 	struct proc_dir_entry *proc;
 	
 	printk(KERN_INFO "Initializing Cryptographic API\n");
+	init_rwsem(&crypto_alg_sem);
 	proc = create_proc_entry("crypto", 0, NULL);
 	if (proc)
 		proc->proc_fops = &proc_crypto_ops;
@@ -267,4 +270,3 @@ EXPORT_SYMBOL_GPL(crypto_register_alg);
 EXPORT_SYMBOL_GPL(crypto_unregister_alg);
 EXPORT_SYMBOL_GPL(crypto_alloc_tfm);
 EXPORT_SYMBOL_GPL(crypto_free_tfm);
-

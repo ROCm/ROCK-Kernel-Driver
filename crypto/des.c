@@ -1259,6 +1259,7 @@ static struct crypto_alg des_alg = {
 	.cra_name	=	"des",
 	.cra_blocksize	=	DES_BLOCK_SIZE,
 	.cra_ctxsize	=	sizeof(struct des_ctx),
+	.cra_module	=	THIS_MODULE,
 	.cra_u		=	{ .cipher = {
 	.cia_keysize	=	DES_KEY_SIZE,
 	.cia_ivsize	=	DES_BLOCK_SIZE,
@@ -1272,6 +1273,7 @@ static struct crypto_alg des3_ede_alg = {
 	.cra_name	=	"des3_ede",
 	.cra_blocksize	=	DES3_EDE_BLOCK_SIZE,
 	.cra_ctxsize	=	sizeof(struct des3_ede_ctx),
+	.cra_module	=	THIS_MODULE,
 	.cra_u		=	{ .cipher = {
 	.cia_keysize	=	DES3_EDE_KEY_SIZE,
 	.cia_ivsize	=	DES3_EDE_BLOCK_SIZE,

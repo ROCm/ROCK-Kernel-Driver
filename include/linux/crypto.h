@@ -100,6 +100,8 @@ struct crypto_alg {
 		struct digest_alg digest;
 		struct compress_alg compress;
 	} cra_u;
+	
+	struct module *cra_module;
 };
 
 /*

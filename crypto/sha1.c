@@ -182,6 +182,7 @@ static struct crypto_alg alg = {
 	.cra_name	=	"sha1",
 	.cra_blocksize	=	SHA1_HMAC_BLOCK_SIZE,
 	.cra_ctxsize	=	sizeof(struct sha1_ctx),
+	.cra_module	=	THIS_MODULE,
 	.cra_u		=	{ .digest = {
 	.dia_digestsize	=	SHA1_DIGEST_SIZE,
 	.dia_init   	= 	sha1_init,

@@ -219,6 +219,7 @@ static struct crypto_alg alg = {
 	.cra_name	=	"md5",
 	.cra_blocksize	=	MD5_HMAC_BLOCK_SIZE,
 	.cra_ctxsize	=	sizeof(struct md5_ctx),
+	.cra_module	=	THIS_MODULE,
 	.cra_u		=	{ .digest = {
 	.dia_digestsize	=	MD5_DIGEST_SIZE,
 	.dia_init   	= 	md5_init,
