@@ -200,8 +200,6 @@ struct fb_info *riva_boards = NULL;
 
 /* command line data, set in rivafb_setup() */
 static char fontname[40] __initdata = { 0 };
-static u32  pseudo_palette[17];
-static char nomove = 0;
 static char nohwcursor __initdata = 0;
 static char noblink = 0;
 #ifdef CONFIG_MTRR
@@ -480,7 +478,7 @@ static void rivafb_download_cursor(struct riva_par *par)
  *
  * CALLED FROM:
  * rivafb_set_font()
- * rivafb_set_var()
+ * rivafb_set_par()
  */
 static void rivafb_create_cursor(struct riva_par *par, int width, int height)
 {
@@ -713,7 +711,7 @@ static void riva_load_state(struct riva_par *par, struct riva_regs *regs)
  * Calculate some timings and then send em off to riva_load_state().
  *
  * CALLED FROM:
- * rivafb_set_var()
+ * rivafb_set_par()
  */
 static void riva_load_video_mode(struct fb_info *info,
 				 struct fb_var_screeninfo *video_mode)
@@ -805,7 +803,7 @@ static void riva_load_video_mode(struct fb_info *info,
  * 
  *
  * CALLED FROM:
- * rivafb_set_var()
+ * rivafb_check_var()
  */
 static int rivafb_do_maximize(struct fb_info *info,
 			      struct fb_var_screeninfo *var,
@@ -1234,6 +1232,8 @@ static int rivafb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 
 static int rivafb_set_par(struct fb_info *info)
 {
+	struct riva_par *par = (struct riva_par *) info->par;
+
 	switch (info->var.bits_per_pixel) {
 	case 8:
 		info->fix.line_length = info->var.xres_virtual;
@@ -1253,49 +1253,11 @@ static int rivafb_set_par(struct fb_info *info)
 		disp->dispsw.cursor = rivafb_cursor;
 		disp->dispsw.set_font = rivafb_set_font;
 	}
+	rivafb_create_cursor(par, fontwidth(dsp), fontheight(dsp));
 */
-	return 0;
-}
 
-static int rivafb_set_var(struct fb_var_screeninfo *var, int con,
-			  struct fb_info *info)
-{
-	struct riva_par *par = (struct riva_par *) info->par;
-	unsigned chgvar = 0;
-
-	/* if var has changed, we should call changevar() later */
-	if (con >= 0) {
-		chgvar = ((info->var.xres != var->xres) ||
-			  (info->var.yres != var->yres) ||
-			  (info->var.xres_virtual != var->xres_virtual) ||
-			  (info->var.yres_virtual != var->yres_virtual) ||
-			  (info->var.accel_flags != var->accel_flags) ||
-			  (info->var.bits_per_pixel != var->bits_per_pixel)
-			  || memcmp(&info->var.red, &var->red,
-				    sizeof(var->red))
-			  || memcmp(&info->var.green, &var->green,
-				    sizeof(var->green))
-			  || memcmp(&info->var.blue, &var->blue,
-				    sizeof(var->blue)));
-	}
-
-	rivafb_check_var(var, info);
-
-	if ((var->activate & FB_ACTIVATE_MASK) == FB_ACTIVATE_NOW) {
-		info->var = *var;
-		
-		if (chgvar) {
-			rivafb_set_par(info);
-			gen_set_disp(con, info);
-
-			if (info && info->changevar)
-				info->changevar(con);
-		}
-
-		//rivafb_create_cursor(par, fontwidth(dsp), fontheight(dsp));
-		riva_load_video_mode(info, var);
-		riva_setup_accel(par);
-	}
+	riva_load_video_mode(info, &info->var);
+	riva_setup_accel(par);
 	return 0;
 }
 
@@ -1401,9 +1363,11 @@ static struct fb_ops riva_fb_ops = {
 	owner:		THIS_MODULE,
 	fb_get_fix:	gen_get_fix,
 	fb_get_var:	gen_get_var,
-	fb_set_var:	rivafb_set_var,
+	fb_set_var:	gen_set_var,
 	fb_get_cmap:	gen_get_cmap,
 	fb_set_cmap:	gen_set_cmap,
+	fb_check_var:	rivafb_check_var,
+	fb_set_par:	rivafb_set_par,
 	fb_setcolreg:	rivafb_setcolreg,
 	fb_pan_display:	rivafb_pan_display,
 	fb_blank:	rivafb_blank,
@@ -1412,22 +1376,6 @@ static struct fb_ops riva_fb_ops = {
 	fb_imageblit:	rivafb_imageblit,
 	fb_rasterimg:	rivafb_rasterimg,
 };
-
-static int __devinit riva_init_disp(struct fb_info *info)
-{
-	struct display *disp;
-
-	assert(info != NULL);
-
-	disp = kmalloc(sizeof(struct display), GFP_KERNEL);
-        if (!disp) return -1;
-        memset(disp, 0, sizeof(struct display));
-
-	info->disp = disp;
-
-	gen_set_disp(-1, info);
-	return 0;
-}
 
 static int __devinit riva_set_fbinfo(struct fb_info *info)
 {
@@ -1439,7 +1387,6 @@ static int __devinit riva_set_fbinfo(struct fb_info *info)
 	/* FIXME: set monspecs to what??? */
 
 	info->display_fg = NULL;
-	info->pseudo_palette = pseudo_palette;
 	info->currcon = -1;
 	strncpy(info->fontname, fontname, sizeof(info->fontname));
 	info->fontname[sizeof(info->fontname) - 1] = 0;
@@ -1459,8 +1406,7 @@ static int __devinit riva_set_fbinfo(struct fb_info *info)
 	info->var = rivafb_default_var;
 	fb_alloc_cmap(&info->cmap, riva_get_cmap_len(&info->var), 0);
 
-	if (riva_init_disp(info) < 0)	/* must be done last */
-		return -1;
+	gen_set_var(&info->var, -1, info);
 	return 0;
 }
 
@@ -1478,21 +1424,27 @@ static int __devinit rivafb_init_one(struct pci_dev *pd,
 	struct riva_chip_info *rci = &riva_chip_info[ent->driver_data];
 	struct riva_par *default_par;
 	struct fb_info *info;
+	int size;
 
 	assert(pd != NULL);
 	assert(rci != NULL);
 
-	info = kmalloc(sizeof(struct fb_info), GFP_KERNEL);
+	size = sizeof(struct fb_info) + sizeof(struct display) + sizeof(u32) * 16;
+
+	info = kmalloc(size, GFP_KERNEL);
 	if (!info)
 		goto err_out;
 
-	memset(info, 0, sizeof(struct fb_info));
+	memset(info, 0, size);
 
 	default_par = kmalloc(sizeof(struct riva_par), GFP_KERNEL);
         if (!default_par)
                 goto err_out;
 
         memset(default_par, 0, sizeof(struct riva_par));
+
+	info->disp = (struct display *)(info + 1);
+	info->pseudo_palette = (void *)(info->disp + 1); 
 
 	strcat(rivafb_fix.id, rci->name);
 	default_par->riva.Architecture = rci->arch_rev;
@@ -1698,8 +1650,6 @@ int __init rivafb_setup(char *options)
 
 		} else if (!strncmp(this_opt, "noblink", 7)) {
 			noblink = 1;
-		} else if (!strncmp(this_opt, "nomove", 6)) {
-			nomove = 1;
 #ifdef CONFIG_MTRR
 		} else if (!strncmp(this_opt, "nomtrr", 6)) {
 			nomtrr = 1;
@@ -1752,8 +1702,6 @@ module_exit(rivafb_exit);
 
 MODULE_PARM(font, "s");
 MODULE_PARM_DESC(font, "Specifies one of the compiled-in fonts (default=none)");
-MODULE_PARM(nomove, "i");
-MODULE_PARM_DESC(nomove, "Enables YSCROLL_NOMOVE (0 or 1=enabled) (default=0)");
 MODULE_PARM(nohwcursor, "i");
 MODULE_PARM_DESC(nohwcursor, "Disables hardware cursor (0 or 1=disabled) (default=0)");
 MODULE_PARM(noblink, "i");
