@@ -1346,9 +1346,6 @@ static struct expansion_card *ecs;
  */
 static int mfm_probecontroller (unsigned int mfm_addr)
 {
-	if (check_region (mfm_addr, 10))
-		return 0;
-
 	if (inw (MFM_STATUS) & STAT_BSY) {
 		outw (CMD_ABT, MFM_COMMAND);
 		udelay (50);
@@ -1406,14 +1403,18 @@ int mfm_init (void)
 		ecard_claim(ecs);
 	}
 
-	if (register_blkdev(MAJOR_NR, "mfm", &mfm_fops)) {
-		printk("mfm_init: unable to get major number %d\n", MAJOR_NR);
+	printk("mfm: found at address %08X, interrupt %d\n", mfm_addr, mfm_irq);
+	if (!request_region (mfm_addr, 10, "mfm")) {
 		ecard_release(ecs);
 		return -1;
 	}
 
-	printk("mfm: found at address %08X, interrupt %d\n", mfm_addr, mfm_irq);
-	request_region (mfm_addr, 10, "mfm");
+	if (register_blkdev(MAJOR_NR, "mfm", &mfm_fops)) {
+		printk("mfm_init: unable to get major number %d\n", MAJOR_NR);
+		ecard_release(ecs);
+		release_region(mfm_addr, 10);
+		return -1;
+	}
 
 	/* Stuff for the assembler routines to get to */
 	hdc63463_baseaddress	= ioaddr(mfm_addr);
