@@ -277,10 +277,7 @@ static void release_mm(struct mm_struct * mm)
  */
 static struct mm_struct * take_task_mm(struct task_struct * task)
 {
-	struct mm_struct * mm;
-	task_lock(task);
-	mm = task->mm;
-	task_unlock(task);
+	struct mm_struct * mm = task->mm;
  
 	/* if task->mm !NULL, mm_count must be at least 1. It cannot
 	 * drop to 0 without the task exiting, which will have to sleep
@@ -310,6 +307,32 @@ static inline int is_ctx_switch(unsigned long val)
 }
  
 
+/* compute number of filled slots in cpu_buffer queue */
+static unsigned long nr_filled_slots(struct oprofile_cpu_buffer * b)
+{
+	unsigned long head = b->head_pos;
+	unsigned long tail = b->tail_pos;
+
+	if (head >= tail)
+		return head - tail;
+
+	return head + (b->buffer_size - tail);
+}
+
+
+static void increment_tail(struct oprofile_cpu_buffer * b)
+{
+	unsigned long new_tail = b->tail_pos + 1;
+
+	rmb();
+
+	if (new_tail < (b->buffer_size))
+		b->tail_pos = new_tail;
+	else
+		b->tail_pos = 0;
+}
+
+
 /* Sync one of the CPU's buffers into the global event buffer.
  * Here we need to go through each batch of samples punctuated
  * by context switch notes, taking the task's mmap_sem and doing
@@ -322,10 +345,14 @@ static void sync_buffer(struct oprofile_cpu_buffer * cpu_buf)
 	struct task_struct * new;
 	unsigned long cookie;
 	int in_kernel = 1;
-	int i;
+	unsigned int i;
  
-	for (i=0; i < cpu_buf->pos; ++i) {
-		struct op_sample * s = &cpu_buf->buffer[i];
+	/* Remember, only we can modify tail_pos */
+
+	unsigned long const available_elements = nr_filled_slots(cpu_buf);
+  
+	for (i=0; i < available_elements; ++i) {
+		struct op_sample * s = &cpu_buf->buffer[cpu_buf->tail_pos];
  
 		if (is_ctx_switch(s->eip)) {
 			if (s->event <= 1) {
@@ -345,6 +372,8 @@ static void sync_buffer(struct oprofile_cpu_buffer * cpu_buf)
 		} else {
 			add_sample(mm, s, in_kernel);
 		}
+
+		increment_tail(cpu_buf);
 	}
 	release_mm(mm);
 
@@ -369,17 +398,8 @@ static void sync_cpu_buffers(void)
  
 		cpu_buf = &cpu_buffer[i];
  
-		/* We take a spin lock even though we might
-		 * sleep. It's OK because other users are try
-		 * lockers only, and this region is already
-		 * protected by buffer_sem. It's raw to prevent
-		 * the preempt bogometer firing. Fruity, huh ? */
-		if (cpu_buf->pos > 0) {
-			_raw_spin_lock(&cpu_buf->int_lock);
-			add_cpu_switch(i);
-			sync_buffer(cpu_buf);
-			_raw_spin_unlock(&cpu_buf->int_lock);
-		}
+		add_cpu_switch(i);
+		sync_buffer(cpu_buf);
 	}
 
 	up(&buffer_sem);
