@@ -441,6 +441,9 @@ static int __init agp_efficeon_init(void)
 {
 	static int agp_initialised=0;
 
+	if (agp_off)
+		return -EINVAL;
+
 	if (agp_initialised == 1)
 		return 0;
 	agp_initialised=1;

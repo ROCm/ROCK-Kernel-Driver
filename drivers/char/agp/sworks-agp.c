@@ -539,6 +539,8 @@ static struct pci_driver agp_serverworks_pci_driver = {
 
 static int __init agp_serverworks_init(void)
 {
+	if (agp_off)
+		return -EINVAL;
 	return pci_module_init(&agp_serverworks_pci_driver);
 }
 

@@ -524,6 +524,8 @@ zx1_gart_probe (acpi_handle obj, u32 depth, void *context, void **ret)
 static int __init
 agp_hp_init (void)
 {
+	if (agp_off)
+		return -EINVAL;
 
 	acpi_get_devices("HWP0003", zx1_gart_probe, "HWP0003", NULL);
 	if (hp_zx1_gart_found)

@@ -478,6 +478,8 @@ static struct pci_driver agp_amdk7_pci_driver = {
 
 static int __init agp_amdk7_init(void)
 {
+	if (agp_off)
+		return -EINVAL;
 	return pci_module_init(&agp_amdk7_pci_driver);
 }
 

@@ -396,6 +396,8 @@ static struct pci_driver agp_ali_pci_driver = {
 
 static int __init agp_ali_init(void)
 {
+	if (agp_off)
+		return -EINVAL;
 	return pci_module_init(&agp_ali_pci_driver);
 }
 

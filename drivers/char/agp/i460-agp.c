@@ -622,6 +622,8 @@ static struct pci_driver agp_intel_i460_pci_driver = {
 
 static int __init agp_intel_i460_init(void)
 {
+	if (agp_off)
+		return -EINVAL;
 	return pci_module_init(&agp_intel_i460_pci_driver);
 }
 
