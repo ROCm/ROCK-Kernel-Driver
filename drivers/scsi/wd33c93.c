@@ -304,44 +304,10 @@ read_1_byte(const wd33c93_regs regs)
  * will be a DATA_OUT phase with this command, false otherwise.
  * (Thanks to Joerg Dorchain for the research and suggestion.)
  */
-static int
+static inline int
 is_dir_out(Scsi_Cmnd * cmd)
 {
-	switch (cmd->cmnd[0]) {
-	case WRITE_6:
-	case WRITE_10:
-	case WRITE_12:
-	case WRITE_LONG:
-	case WRITE_SAME:
-	case WRITE_BUFFER:
-	case WRITE_VERIFY:
-	case WRITE_VERIFY_12:
-	case COMPARE:
-	case COPY:
-	case COPY_VERIFY:
-	case SEARCH_EQUAL:
-	case SEARCH_HIGH:
-	case SEARCH_LOW:
-	case SEARCH_EQUAL_12:
-	case SEARCH_HIGH_12:
-	case SEARCH_LOW_12:
-	case FORMAT_UNIT:
-	case REASSIGN_BLOCKS:
-	case RESERVE:
-	case MODE_SELECT:
-	case MODE_SELECT_10:
-	case LOG_SELECT:
-	case SEND_DIAGNOSTIC:
-	case CHANGE_DEFINITION:
-	case UPDATE_BLOCK:
-	case SET_WINDOW:
-	case MEDIUM_SCAN:
-	case SEND_VOLUME_TAG:
-	case 0xea:
-		return 1;
-	default:
-		return 0;
-	}
+	return cmd->sc_data_direction == SCSI_DATA_WRITE;
 }
 
 static struct sx_period sx_table[] = {
