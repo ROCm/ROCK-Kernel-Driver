@@ -33,24 +33,15 @@
 /*
  * file operation structure for tape devices
  */
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,3,98))
 static struct block_device_operations tapeblock_fops = {
-#else
-static struct file_operations tapeblock_fops = {
-#endif
-    owner   : THIS_MODULE,
-    open    : tapeblock_open,      /* open */
-    release : tapeblock_release,   /* release */
-        };
+	.owner		= THIS_MODULE,
+	.open		= tapeblock_open,
+	.release	= tapeblock_release,
+};
 
 int    tapeblock_major = 0;
 
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,3,98))
 static void tape_request_fn (request_queue_t * queue);
-#else
-static void tape_request_fn (void);
-#endif
-
 static request_queue_t* tapeblock_getqueue (kdev_t kdev);
 
 #ifdef CONFIG_DEVFS_FS
@@ -81,7 +72,6 @@ tapeblock_rmdevfstree (tape_dev_t* td) {
 
 void 
 tapeblock_setup(tape_dev_t* td) {
-    blk_size[tapeblock_major][td->first_minor]=0; // this will be detected
     blk_queue_hardsect_size(&ti->request_queue, 2048);
     blk_init_queue (&td->blk_data.request_queue, tape_request_fn); 
 #ifdef CONFIG_DEVFS_FS
@@ -106,12 +96,6 @@ tapeblock_init(void) {
 	if (tapeblock_major == 0) tapeblock_major = result;   /* accept dynamic major number*/
 	INIT_BLK_DEV(tapeblock_major,tape_request_fn,tapeblock_getqueue,NULL);
 	PRINT_WARN(KERN_ERR " tape gets major %d for block device\n", tapeblock_major);
-	blk_size[tapeblock_major] = (int*) kmalloc (256*sizeof(int),GFP_KERNEL);
-	if (blk_size[tapeblock_major]==NULL) goto out_undo_bdev;
-	memset(blk_size[tapeblock_major],0,256*sizeof(int));
-	hardsect_size[tapeblock_major] = (int*) kmalloc (256*sizeof(int),GFP_KERNEL);
-	if (hardsect_size[tapeblock_major]==NULL) goto out_undo_blk_size;
-	memset(hardsect_size[tapeblock_major],0,256*sizeof(int));
 	max_sectors[tapeblock_major] = (int*) kmalloc (256*sizeof(int),GFP_KERNEL);
 	if (max_sectors[tapeblock_major]==NULL) goto out_undo_hardsect_size;
 	memset(max_sectors[tapeblock_major],0,256*sizeof(int));
@@ -141,14 +125,10 @@ tapeblock_init(void) {
 out_undo_max_sectors:
 	kfree(max_sectors[tapeblock_major]);
 out_undo_hardsect_size:
-	kfree(hardsect_size[tapeblock_major]);
 out_undo_blk_size:
-	kfree(blk_size[tapeblock_major]);
 out_undo_bdev:
 	unregister_blkdev(tapeblock_major, "tBLK");
 	result=-ENOMEM;
-	blk_size[tapeblock_major]=
-	hardsect_size[tapeblock_major]=
 	max_sectors[tapeblock_major]=NULL;
 	tapeblock_major=-1;    
 out:
@@ -160,14 +140,6 @@ void
 tapeblock_uninit(void) {
 	if (tapeblock_major==-1)
 	        goto out; /* init failed so there is nothing to clean up */
-	if (blk_size[tapeblock_major]!=NULL) {
-		kfree(blk_size[tapeblock_major]);
-		blk_size[tapeblock_major]=NULL;
-	}
-	if (hardsect_size[tapeblock_major]!=NULL) {
-		kfree (hardsect_size[tapeblock_major]);
-		hardsect_size[tapeblock_major]=NULL;
-	}
 	if (max_sectors[tapeblock_major]!=NULL) {
 		kfree (max_sectors[tapeblock_major]);
 		max_sectors[tapeblock_major]=NULL;
@@ -256,7 +228,6 @@ tapeblock_release(struct inode *inode, struct file *filp) {
 	tape_put_device(td); /* 2x ! */
 	if ( td->discipline->owner )
 		__MOD_DEC_USE_COUNT(td->discipline->owner);
-	invalidate_bdev(inode->i_rdev, 0);
 out:
 	return rc;
 }
@@ -321,11 +292,7 @@ tapeblock_exec_IO (tape_dev_t* td) {
     if (tape_state_get (td) == TS_NOT_OPER) {
 	return;
     }
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,3,98))
 	if (list_empty (&td->blk_data.request_queue.queue_head)) {
-#else
-	if (td->blk_data.request_queue==NULL) {
-#endif
 	// nothing more to do or device has dissapeared;)
 	tape_sprintf_event (tape_dbf_area,6,"b:Qempty\n");
 	return;
@@ -396,9 +363,7 @@ tapeblock_schedule_exec_io (tape_dev_t *td)
         if (atomic_compare_and_swap(0,1,&td->blk_data.bh_scheduled)) {
                 return;
         }
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,3,98))
 	INIT_LIST_HEAD(&td->blk_data.bh_tq.list);
-#endif
 	td->blk_data.bh_tq.sync = 0;
 	td->blk_data.bh_tq.routine = (void *) (void *) run_tapeblock_exec_IO;
 	td->blk_data.bh_tq.data = td;
@@ -408,21 +373,6 @@ tapeblock_schedule_exec_io (tape_dev_t *td)
 	return;
 }
 
-/* wrappers around do_tape_request for different kernel versions */
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,98))
-static void tape_request_fn (void) { 
-	tape_dev_t* td=tape_first_dev;
-	long lockflags;
-	read_lock_irqsave(&tape_dev_lock,lockflags);
-	while (td!=NULL) {
-		tape_get_device(td);
-		do_tape_request(td);
-		tape_put_device(td);
-		td=td->next;
-	}
-	read_unlock_irqsave(&tape_dev_lock,lockflags);
-}
-#else
 static void  tape_request_fn (request_queue_t* queue) {
 	tape_dev_t* td=tape_get_device_by_queue(queue);
 	if (td!=NULL) {
@@ -430,7 +380,6 @@ static void  tape_request_fn (request_queue_t* queue) {
 		tape_put_device(td);
 	}		
 }
-#endif
 
 static request_queue_t* tapeblock_getqueue (kdev_t kdev) {
 	tape_dev_t* td=tape_get_device_by_minor(MINOR(kdev));
