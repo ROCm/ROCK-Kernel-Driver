@@ -204,7 +204,7 @@ const char *snd_ac97_stereo_enhancements[] =
   /*  24 */ "Wolfson Microelectronics 3D Enhancement",
   /*  25 */ "Delta Integration 3D Enhancement",
   /*  26 */ "SigmaTel 3D Enhancement",
-  /*  27 */ "Reserved 27",
+  /*  27 */ "IC Ensemble/KS Waves",
   /*  28 */ "Rockwell 3D Stereo Enhancement",
   /*  29 */ "Reserved 29",
   /*  30 */ "Reserved 30",
