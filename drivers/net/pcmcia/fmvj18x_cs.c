@@ -502,6 +502,8 @@ static void fmvj18x_config(dev_link_t *link)
     }
 
     if (link->io.NumPorts2 != 0) {
+    	link->irq.Attributes =
+		IRQ_TYPE_DYNAMIC_SHARING|IRQ_FIRST_SHARED|IRQ_HANDLE_PRESENT;
 	ret = mfc_try_io_port(link);
 	if (ret != CS_SUCCESS) goto cs_failed;
     } else if (cardtype == UNGERMANN) {

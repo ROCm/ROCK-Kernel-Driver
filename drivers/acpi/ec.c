@@ -94,13 +94,6 @@ static struct acpi_ec	*ec_ecdt;
 /* External interfaces use first EC only, so remember */
 static struct acpi_device *first_ec;
 
-/*
- * We use kernel thread to handle ec's gpe query, so the query may defer.
- * The query need a context, which can be freed when we replace ec_ecdt
- * with EC device. So defered query may have a wrong context.
- * We use an indication to avoid it
- */
-static int ec_device_init = 0;
 /* --------------------------------------------------------------------------
                              Transaction Management
    -------------------------------------------------------------------------- */
@@ -400,11 +393,8 @@ acpi_ec_gpe_handler (
 
 	acpi_disable_gpe(NULL, ec->gpe_bit, ACPI_ISR);
 
-	if (!ec_device_init)
-		acpi_ec_gpe_query(ec); /* directly query when device didn't init */
-	else
-		status = acpi_os_queue_for_execution(OSD_PRIORITY_GPE,
-			acpi_ec_gpe_query, ec);
+	status = acpi_os_queue_for_execution(OSD_PRIORITY_GPE,
+		acpi_ec_gpe_query, ec);
 }
 
 /* --------------------------------------------------------------------------
@@ -599,8 +589,6 @@ acpi_ec_add (
 	   we now have the *real* EC info, so kill the makeshift one.*/
 	acpi_evaluate_integer(ec->handle, "_UID", NULL, &uid);
 	if (ec_ecdt && ec_ecdt->uid == uid) {
-		acpi_disable_gpe(NULL, ec_ecdt->gpe_bit, ACPI_NOT_ISR);
-		ec_device_init = 1;
 		acpi_remove_address_space_handler(ACPI_ROOT_OBJECT,
 			ACPI_ADR_SPACE_EC, &acpi_ec_space_handler);
 	

@@ -40,13 +40,13 @@ void llc_add_pack(int type, void (*handler)(struct llc_sap *sap,
 					    struct sk_buff *skb))
 {
 	if (type == LLC_DEST_SAP || type == LLC_DEST_CONN)
-		llc_type_handlers[type] = handler;
+		llc_type_handlers[type - 1] = handler;
 }
 
 void llc_remove_pack(int type)
 {
 	if (type == LLC_DEST_SAP || type == LLC_DEST_CONN)
-		llc_type_handlers[type] = NULL;
+		llc_type_handlers[type - 1] = NULL;
 }
 
 void llc_set_station_handler(void (*handler)(struct sk_buff *skb))

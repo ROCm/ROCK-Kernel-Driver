@@ -178,12 +178,6 @@ void tcp_bind_hash(struct sock *sk, struct tcp_bind_bucket *tb,
 	tcp_sk(sk)->bind_hash = tb;
 }
 
-static inline const u32 tcp_v4_rcv_saddr(const struct sock *sk)
-{
-	return likely(sk->sk_state != TCP_TIME_WAIT) ?
-		inet_sk(sk)->rcv_saddr : tcptw_sk(sk)->tw_rcv_saddr;
-}
-
 static inline int tcp_bind_conflict(struct sock *sk, struct tcp_bind_bucket *tb)
 {
 	const u32 sk_rcv_saddr = tcp_v4_rcv_saddr(sk);

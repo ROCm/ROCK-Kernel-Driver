@@ -219,6 +219,7 @@ struct tcp_tw_bucket {
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 	struct in6_addr		tw_v6_daddr;
 	struct in6_addr		tw_v6_rcv_saddr;
+	int			tw_v6_ipv6only;
 #endif
 };
 
@@ -266,6 +267,38 @@ static __inline__ int tw_del_dead_node(struct tcp_tw_bucket *tw)
 	hlist_for_each_entry_safe(tw, node, safe, jail, tw_death_node)
 
 #define tcptw_sk(__sk)	((struct tcp_tw_bucket *)(__sk))
+
+static inline const u32 tcp_v4_rcv_saddr(const struct sock *sk)
+{
+	return likely(sk->sk_state != TCP_TIME_WAIT) ?
+		inet_sk(sk)->rcv_saddr : tcptw_sk(sk)->tw_rcv_saddr;
+}
+
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+static inline const struct in6_addr *__tcp_v6_rcv_saddr(const struct sock *sk)
+{
+	return likely(sk->sk_state != TCP_TIME_WAIT) ?
+		&inet6_sk(sk)->rcv_saddr : &tcptw_sk(sk)->tw_v6_rcv_saddr;
+}
+
+static inline const struct in6_addr *tcp_v6_rcv_saddr(const struct sock *sk)
+{
+	return sk->sk_family == AF_INET6 ? __tcp_v6_rcv_saddr(sk) : NULL;
+}
+
+#define tcptw_sk_ipv6only(__sk)	(tcptw_sk(__sk)->tw_v6_ipv6only)
+
+static inline int tcp_v6_ipv6only(const struct sock *sk)
+{
+	return likely(sk->sk_state != TCP_TIME_WAIT) ?
+		ipv6_only_sock(sk) : tcptw_sk_ipv6only(sk);
+}
+#else
+# define __tcp_v6_rcv_saddr(__sk)	NULL
+# define tcp_v6_rcv_saddr(__sk)		NULL
+# define tcptw_sk_ipv6only(__sk)	0
+# define tcp_v6_ipv6only(__sk)		0
+#endif
 
 extern kmem_cache_t *tcp_timewait_cachep;
 

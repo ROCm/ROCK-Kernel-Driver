@@ -247,7 +247,7 @@ static int
 bttv_i2c_wait_done(struct bttv *btv)
 {
 	u32 stat;
-	int timeout;
+	unsigned long timeout;
 
 	timeout = jiffies + HZ/100 + 1; /* 10ms */
 	for (;;) {

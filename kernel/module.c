@@ -1658,7 +1658,7 @@ static struct module *load_module(void __user *umod,
 				 NULL);
 	}
 	if (err < 0)
-		goto cleanup;
+		goto arch_cleanup;
 
 	/* Get rid of temporary copy */
 	vfree(hdr);
@@ -1666,6 +1666,8 @@ static struct module *load_module(void __user *umod,
 	/* Done! */
 	return mod;
 
+ arch_cleanup:
+	module_arch_cleanup(mod);
  cleanup:
 	module_unload_free(mod);
 	module_free(mod, mod->module_init);
