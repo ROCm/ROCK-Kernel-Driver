@@ -162,8 +162,6 @@ static int uart_startup(struct uart_state *state, int init_hw)
 			return -ENOMEM;
 
 		info->xmit.buf = (unsigned char *) page;
-		info->tmpbuf = info->xmit.buf + UART_XMIT_SIZE;
-		init_MUTEX(&info->tmpbuf_sem);
 		uart_circ_clear(&info->xmit);
 	}
 
@@ -238,7 +236,6 @@ static void uart_shutdown(struct uart_state *state)
 	if (info->xmit.buf) {
 		free_page((unsigned long)info->xmit.buf);
 		info->xmit.buf = NULL;
-		info->tmpbuf = NULL;
 	}
 
 	/*
@@ -450,71 +447,6 @@ __uart_put_char(struct uart_port *port, struct circ_buf *circ, unsigned char c)
 	spin_unlock_irqrestore(&port->lock, flags);
 }
 
-static inline int
-__uart_user_write(struct uart_port *port, struct circ_buf *circ,
-		  const unsigned char __user *buf, int count)
-{
-	unsigned long flags;
-	int c, ret = 0;
-
-	if (down_interruptible(&port->info->tmpbuf_sem))
-		return -EINTR;
-
-	while (1) {
-		int c1;
-		c = CIRC_SPACE_TO_END(circ->head, circ->tail, UART_XMIT_SIZE);
-		if (count < c)
-			c = count;
-		if (c <= 0)
-			break;
-
-		c -= copy_from_user(port->info->tmpbuf, buf, c);
-		if (!c) {
-			if (!ret)
-				ret = -EFAULT;
-			break;
-		}
-		spin_lock_irqsave(&port->lock, flags);
-		c1 = CIRC_SPACE_TO_END(circ->head, circ->tail, UART_XMIT_SIZE);
-		if (c1 < c)
-			c = c1;
-		memcpy(circ->buf + circ->head, port->info->tmpbuf, c);
-		circ->head = (circ->head + c) & (UART_XMIT_SIZE - 1);
-		spin_unlock_irqrestore(&port->lock, flags);
-		buf += c;
-		count -= c;
-		ret += c;
-	}
-	up(&port->info->tmpbuf_sem);
-
-	return ret;
-}
-
-static inline int
-__uart_kern_write(struct uart_port *port, struct circ_buf *circ,
-		  const unsigned char *buf, int count)
-{
-	unsigned long flags;
-	int c, ret = 0;
-
-	spin_lock_irqsave(&port->lock, flags);
-	while (1) {
-		c = CIRC_SPACE_TO_END(circ->head, circ->tail, UART_XMIT_SIZE);
-		if (count < c)
-			c = count;
-		if (c <= 0)
-			break;
-		memcpy(circ->buf + circ->head, buf, c);
-		circ->head = (circ->head + c) & (UART_XMIT_SIZE - 1);
-		buf += c;
-		count -= c;
-		ret += c;
-	}
-	spin_unlock_irqrestore(&port->lock, flags);
-
-	return ret;
-}
-
 static void uart_put_char(struct tty_struct *tty, unsigned char ch)
 {
 	struct uart_state *state = tty->driver_data;
@@ -531,13 +463,28 @@ static int
 uart_write(struct tty_struct *tty, const unsigned char * buf, int count)
 {
 	struct uart_state *state = tty->driver_data;
-	int ret;
+	struct uart_port *port = state->port;
+	struct circ_buf *circ = &state->info->xmit;
+	unsigned long flags;
+	int c, ret = 0;
 
-	if (!state->info->xmit.buf)
+	if (!circ->buf)
 		return 0;
 
-	ret = __uart_kern_write(state->port, &state->info->xmit,
-				buf, count);
+	spin_lock_irqsave(&port->lock, flags);
+	while (1) {
+		c = CIRC_SPACE_TO_END(circ->head, circ->tail, UART_XMIT_SIZE);
+		if (count < c)
+			c = count;
+		if (c <= 0)
+			break;
+		memcpy(circ->buf + circ->head, buf, c);
+		circ->head = (circ->head + c) & (UART_XMIT_SIZE - 1);
+		buf += c;
+		count -= c;
+		ret += c;
+	}
+	spin_unlock_irqrestore(&port->lock, flags);
 
 	uart_start(tty);
 	return ret;

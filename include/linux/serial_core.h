@@ -246,7 +246,7 @@ struct uart_state {
 	struct semaphore	sem;
 };
 
-#define UART_XMIT_SIZE 1024
+#define UART_XMIT_SIZE	PAGE_SIZE
 /*
  * This is the state information which is only valid when the port
  * is open; it may be freed by the core driver once the device has
@@ -267,9 +267,6 @@ struct uart_info {
 #define UIF_CTS_FLOW		(1 << 26)
 #define UIF_NORMAL_ACTIVE	(1 << 29)
 #define UIF_INITIALIZED		(1 << 31)
-
-	unsigned char		*tmpbuf;
-	struct semaphore	tmpbuf_sem;
 
 	int			blocked_open;
 
