@@ -76,7 +76,6 @@ static inline void x86_do_profile(struct pt_regs * regs)
 {
 	unsigned long eip;
 	extern unsigned long prof_cpu_mask;
-	extern char _stext;
 #ifdef CONFIG_PROFILING
 	extern void x86_profile_hook(struct pt_regs *);
  
