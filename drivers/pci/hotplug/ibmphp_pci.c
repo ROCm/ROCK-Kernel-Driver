@@ -1062,8 +1062,7 @@ static int configure_bridge (struct pci_func **func_passed, u8 slotno)
 	}
 
 error:
-	if (amount_needed)
-		kfree (amount_needed);
+	kfree(amount_needed);
 	if (pfmem)
 		ibmphp_remove_resource (pfmem);
 	if (io)
