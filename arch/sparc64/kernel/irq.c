@@ -1097,6 +1097,18 @@ void init_irqwork_curcpu(void)
 
 	memset(__irq_work + smp_processor_id(), 0, sizeof(*workp));
 
+	/* Make sure we are called with PSTATE_IE disabled.  */
+	__asm__ __volatile__("rdpr	%%pstate, %0\n\t"
+			     : "=r" (tmp));
+	if (tmp & PSTATE_IE) {
+		prom_printf("BUG: init_irqwork_curcpu() called with "
+			    "PSTATE_IE enabled, bailing.\n");
+		__asm__ __volatile__("mov	%%i7, %0\n\t"
+				     : "=r" (tmp));
+		prom_printf("BUG: Called from %lx\n", tmp);
+		prom_halt();
+	}
+
 	/* Set interrupt globals.  */
 	workp = &__irq_work[smp_processor_id()];
 	__asm__ __volatile__(
@@ -1105,7 +1117,7 @@ void init_irqwork_curcpu(void)
 	"mov	%2, %%g6\n\t"
 	"wrpr	%0, 0x0, %%pstate\n\t"
 	: "=&r" (tmp)
-	: "i" (PSTATE_IG | PSTATE_IE), "r" (workp));
+	: "i" (PSTATE_IG), "r" (workp));
 }
 
 /* Only invoked on boot processor. */
