@@ -375,7 +375,7 @@ struct rhine_chip_info {
 
 
 enum chip_capability_flags {
-	HasESIPhy=2, HasDavicomPhy=4,
+	HasDavicomPhy=4,
 	ReqTxAlign=0x10, HasWOL=0x20,
 };
 
@@ -1085,9 +1085,8 @@ static void init_registers(struct net_device *dev)
 
 	/* The LED outputs of various MII xcvrs should be configured. */
 	/* For NS or Mison phys, turn on bit 1 in register 0x17 */
-	/* For ESI phys, turn on bit 7 in register 0x17. */
 	mdio_write(dev, rp->phys[0], 0x17, mdio_read(dev, rp->phys[0], 0x17) |
-		   (rp->drv_flags & HasESIPhy) ? 0x0080 : 0x0001);
+		   0x0001);
 }
 
 /* Read and write over the MII Management Data I/O (MDIO) interface. */
