@@ -703,11 +703,10 @@ svc_tcp_accept(struct svc_sock *svsk)
 	 * tell us anything. For now just warn about unpriv connections.
 	 */
 	if (ntohs(sin.sin_port) >= 1024) {
-		if (net_ratelimit())
-			printk(KERN_WARNING
-				   "%s: connect from unprivileged port: %u.%u.%u.%u:%d\n",
-				   serv->sv_name, 
-				   NIPQUAD(sin.sin_addr.s_addr), ntohs(sin.sin_port));
+		dprintk(KERN_WARNING
+			"%s: connect from unprivileged port: %u.%u.%u.%u:%d\n",
+			serv->sv_name, 
+			NIPQUAD(sin.sin_addr.s_addr), ntohs(sin.sin_port));
 	}
 
 	dprintk("%s: connect from %u.%u.%u.%u:%04x\n", serv->sv_name,
@@ -1286,7 +1285,7 @@ svc_delete_socket(struct svc_sock *svsk)
 		kfree(svsk);
 	} else {
 		spin_unlock_bh(&serv->sv_lock);
-		printk(KERN_NOTICE "svc: server socket destroy delayed\n");
+		dprintk(KERN_NOTICE "svc: server socket destroy delayed\n");
 		/* svsk->sk_server = NULL; */
 	}
 }
