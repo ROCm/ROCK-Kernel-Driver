@@ -756,7 +756,8 @@ int pc87360_detect(struct i2c_adapter *adapter, int address, int kind)
 
 	for (i = 0; i < 3; i++) {
 		if (((data->address[i] = extra_isa[i]))
-		 && !request_region(extra_isa[i], PC87360_EXTENT, "pc87360")) {
+		 && !request_region(extra_isa[i], PC87360_EXTENT,
+		 		    pc87360_driver.name)) {
 			dev_err(&new_client->dev, "Region 0x%x-0x%x already "
 				"in use!\n", extra_isa[i],
 				extra_isa[i]+PC87360_EXTENT-1);

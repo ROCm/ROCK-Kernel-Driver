@@ -462,7 +462,7 @@ int lm78_detect(struct i2c_adapter *adapter, int address, int kind)
 
 	/* Reserve the ISA region */
 	if (is_isa)
-		if (!request_region(address, LM78_EXTENT, "lm78")) {
+		if (!request_region(address, LM78_EXTENT, lm78_driver.name)) {
 			err = -EBUSY;
 			goto ERROR0;
 		}
