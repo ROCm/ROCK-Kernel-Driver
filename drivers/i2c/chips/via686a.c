@@ -727,7 +727,7 @@ static int via686a_detect(struct i2c_adapter *adapter, int address, int kind)
 	new_client->dev.parent = &adapter->dev;
 
 	/* Fill in the remaining client fields and put into the global list */
-	snprintf(new_client->name, DEVICE_NAME_SIZE, client_name);
+	snprintf(new_client->name, I2C_NAME_SIZE, client_name);
 
 	data->valid = 0;
 	init_MUTEX(&data->update_lock);
