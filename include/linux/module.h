@@ -138,8 +138,10 @@ extern struct module __this_module;
 #define MODULE_DESCRIPTION(_description) MODULE_INFO(description, _description)
 
 /* Type information for a module parameter. */
+#ifndef MODULE_PARM_TYPE
 #define MODULE_PARM_TYPE(name, _type) \
 	__MODULE_INFO(parmtype, name##type, #name ":" _type)
+#endif
 
 /* One for each parameter, describing how to use it.  Some files do
    multiple of these per line, so can't just use MODULE_INFO. */
