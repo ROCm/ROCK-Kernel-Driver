@@ -4,15 +4,17 @@
 mainmenu_option next_comment
 comment 'Plug and Play configuration'
 
-dep_bool 'Plug and Play support' CONFIG_PNP
+bool 'Plug and Play support' CONFIG_PNP
 
-   dep_bool '  Plug and Play device name database' CONFIG_PNP_NAMES $CONFIG_PNP
-   dep_bool '  PnP Debug Messages' CONFIG_PNP_DEBUG $CONFIG_PNP
+if [ "$CONFIG_PNP" = "y" ]; then
+   bool '  Plug and Play device name database' CONFIG_PNP_NAMES
+   bool '  PnP Debug Messages' CONFIG_PNP_DEBUG
 
-comment 'Protocols' $CONFIG_PNP
+   comment 'Protocols'
 
-if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-   dep_bool '  ISA Plug and Play support (EXPERIMENTAL)' CONFIG_ISAPNP $CONFIG_PNP
-   dep_bool '  Plug and Play BIOS support (EXPERIMENTAL)' CONFIG_PNPBIOS $CONFIG_PNP
+   if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+      bool '  ISA Plug and Play support (EXPERIMENTAL)' CONFIG_ISAPNP
+      bool '  Plug and Play BIOS support (EXPERIMENTAL)' CONFIG_PNPBIOS
+   fi
 fi
 endmenu
