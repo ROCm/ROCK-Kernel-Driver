@@ -171,7 +171,7 @@ static int i810_map_buffer(drm_buf_t *buf, struct file *filp)
 		/* Real error */
 		DRM_ERROR("mmap error\n");
 		retcode = (signed int)buf_priv->virtual;
-		buf_priv->virtual = 0;
+		buf_priv->virtual = NULL;
 	}
 	up_write( &current->mm->mmap_sem );
 
@@ -193,7 +193,7 @@ static int i810_unmap_buffer(drm_buf_t *buf)
 	up_write(&current->mm->mmap_sem);
 
    	buf_priv->currently_mapped = I810_BUF_UNMAPPED;
-   	buf_priv->virtual = 0;
+   	buf_priv->virtual = NULL;
 
 	return retcode;
 }
@@ -459,7 +459,7 @@ int i810_dma_init_compat(drm_i810_init_t *init, unsigned long arg)
 {
 
 	/* Get v1.1 init data */
-	if (copy_from_user(init, (drm_i810_pre12_init_t *)arg,
+	if (copy_from_user(init, (drm_i810_pre12_init_t __user *)arg,
 			  sizeof(drm_i810_pre12_init_t))) {
 		return -EFAULT;
 	}
@@ -468,7 +468,7 @@ int i810_dma_init_compat(drm_i810_init_t *init, unsigned long arg)
 
 		/* This is a v1.2 client, just get the v1.2 init data */
 		DRM_INFO("Using POST v1.2 init.\n");
-		if (copy_from_user(init, (drm_i810_init_t *)arg,
+		if (copy_from_user(init, (drm_i810_init_t __user *)arg,
 				   sizeof(drm_i810_init_t))) {
 			return -EFAULT;
 		}
@@ -497,7 +497,7 @@ int i810_dma_init(struct inode *inode, struct file *filp,
    	int retcode = 0;
 
 	/* Get only the init func */
-	if (copy_from_user(&init, (void *)arg, sizeof(drm_i810_init_func_t))) 
+	if (copy_from_user(&init, (void __user *)arg, sizeof(drm_i810_init_func_t))) 
 		return -EFAULT;
 
    	switch(init.func) {
@@ -521,7 +521,7 @@ int i810_dma_init(struct inode *inode, struct file *filp,
 		default:
 	 	case I810_INIT_DMA_1_4:
 			DRM_INFO("Using v1.4 init.\n");
-  			if (copy_from_user(&init, (drm_i810_init_t *)arg,
+  			if (copy_from_user(&init, (drm_i810_init_t __user *)arg,
 					  sizeof(drm_i810_init_t))) {
 				return -EFAULT;
 			}
@@ -846,11 +846,11 @@ static void i810_dma_dispatch_vertex(drm_device_t *dev,
 
 		put_user((GFX_OP_PRIMITIVE | prim |
 					     ((used/4)-2)),
-		(u32 *)buf_priv->virtual);
+		(u32 __user *)buf_priv->virtual);
 
 		if (used & 4) {
 			put_user(0,
-			(u32 *)((u32)buf_priv->virtual + used));
+			(u32 __user *)((u32)buf_priv->virtual + used));
 			used += 4;
 		}
 
@@ -1056,7 +1056,7 @@ int i810_dma_vertex(struct inode *inode, struct file *filp,
      					dev_priv->sarea_priv;
 	drm_i810_vertex_t vertex;
 
-	if (copy_from_user(&vertex, (drm_i810_vertex_t *)arg, sizeof(vertex)))
+	if (copy_from_user(&vertex, (drm_i810_vertex_t __user *)arg, sizeof(vertex)))
 		return -EFAULT;
 
 	if (!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
@@ -1091,7 +1091,7 @@ int i810_clear_bufs(struct inode *inode, struct file *filp,
 	drm_device_t *dev = priv->dev;
 	drm_i810_clear_t clear;
 
-   	if (copy_from_user(&clear, (drm_i810_clear_t *)arg, sizeof(clear)))
+   	if (copy_from_user(&clear, (drm_i810_clear_t __user *)arg, sizeof(clear)))
 		return -EFAULT;
 
 	if (!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
@@ -1153,7 +1153,7 @@ int i810_getbuf(struct inode *inode, struct file *filp, unsigned int cmd,
    	drm_i810_sarea_t *sarea_priv = (drm_i810_sarea_t *)
      					dev_priv->sarea_priv;
 
-   	if (copy_from_user(&d, (drm_i810_dma_t *)arg, sizeof(d)))
+   	if (copy_from_user(&d, (drm_i810_dma_t __user *)arg, sizeof(d)))
 		return -EFAULT;
 
 	if (!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
@@ -1168,7 +1168,7 @@ int i810_getbuf(struct inode *inode, struct file *filp, unsigned int cmd,
 	DRM_DEBUG("i810_dma: %d returning %d, granted = %d\n",
 		  current->pid, retcode, d.granted);
 
-	if (copy_to_user((drm_dma_t *)arg, &d, sizeof(d)))
+	if (copy_to_user((drm_dma_t __user *)arg, &d, sizeof(d)))
 		return -EFAULT;
    	sarea_priv->last_dispatch = (int) hw_status[5];
 
@@ -1266,7 +1266,7 @@ int i810_dma_mc(struct inode *inode, struct file *filp,
 		dev_priv->sarea_priv;
 	drm_i810_mc_t mc;
 
-	if (copy_from_user(&mc, (drm_i810_mc_t *)arg, sizeof(mc)))
+	if (copy_from_user(&mc, (drm_i810_mc_t __user *)arg, sizeof(mc)))
 		return -EFAULT;
 
 
@@ -1309,7 +1309,7 @@ int i810_ov0_info(struct inode *inode, struct file *filp,
 
 	data.offset = dev_priv->overlay_offset;
 	data.physical = dev_priv->overlay_physical;
-	if (copy_to_user((drm_i810_overlay_t *)arg,&data,sizeof(data)))
+	if (copy_to_user((drm_i810_overlay_t __user *)arg,&data,sizeof(data)))
 		return -EFAULT;
 	return 0;
 }
