@@ -150,7 +150,7 @@ struct bus_type pnp_bus_type = {
 
 int pnp_register_driver(struct pnp_driver *drv)
 {
-	int count = 0;
+	int count;
 	pnp_dbg("the driver '%s' has been registered", drv->name);
 
 	drv->driver.name = drv->name;
@@ -194,7 +194,6 @@ void pnp_free_ids(struct pnp_dev *dev)
 		struct pnp_id *pnp_id = to_pnp_id(pos);
 		kfree(pnp_id);
 	}
-	return;
 }
 
 EXPORT_SYMBOL(pnp_register_driver);

@@ -23,7 +23,6 @@ static void pnp_convert_id(char *buf, unsigned short vendor, unsigned short devi
 			device & 0x0f,
 			(device >> 12) & 0x0f,
 			(device >> 8) & 0x0f);
-	return;
 }
 
 struct pnp_card *pnp_find_card(unsigned short vendor,
