@@ -602,6 +602,35 @@ static int x25_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	return 0;
 }
 
+static int x25_wait_for_connection_establishment(struct sock *sk)
+{
+	DECLARE_WAITQUEUE(wait, current);
+        int rc;
+
+	add_wait_queue_exclusive(sk->sleep, &wait);
+	for (;;) {
+		__set_current_state(TASK_INTERRUPTIBLE);
+		rc = -ERESTARTSYS;
+		if (signal_pending(current))
+			break;
+		rc = sock_error(sk);
+		if (rc) {
+			sk->socket->state = SS_UNCONNECTED;
+			break;
+		}
+		rc = 0;
+		if (sk->state != TCP_ESTABLISHED) {
+			release_sock(sk);
+			schedule();
+			lock_sock(sk);
+		} else
+			break;
+	}
+	__set_current_state(TASK_RUNNING);
+	remove_wait_queue(sk->sleep, &wait);
+	return rc;
+}
+
 static int x25_connect(struct socket *sock, struct sockaddr *uaddr, int addr_len, int flags)
 {
 	struct sock *sk = sock->sk;
@@ -610,6 +639,7 @@ static int x25_connect(struct socket *sock, struct sockaddr *uaddr, int addr_len
 	struct x25_route *rt;
 	int rc = 0;
 
+	lock_sock(sk);
 	if (sk->state == TCP_ESTABLISHED && sock->state == SS_CONNECTING) {
 		sock->state = SS_CONNECTED;
 		goto out;	/* Connect completed during a ERESTARTSYS event */
@@ -673,35 +703,48 @@ static int x25_connect(struct socket *sock, struct sockaddr *uaddr, int addr_len
 	if (sk->state != TCP_ESTABLISHED && (flags & O_NONBLOCK))
 		goto out_put_neigh;
 
-	cli();	/* To avoid races on the sleep */
-
-	/*
-	 * A Clear Request or timeout or failed routing will go to closed.
-	 */
-	rc = -ERESTARTSYS;
-	while (sk->state == TCP_SYN_SENT) {
-		/* FIXME: going to sleep with interrupts disabled */
-		interruptible_sleep_on(sk->sleep);
-		if (signal_pending(current))
-			goto out_unlock;
-	}
-
-	if (sk->state != TCP_ESTABLISHED) {
-		sock->state = SS_UNCONNECTED;
-		rc = sock_error(sk);	/* Always set at this point */
-		goto out_unlock;
-	}
+	rc = x25_wait_for_connection_establishment(sk);
+	if (rc)
+		goto out_put_neigh;
 
 	sock->state = SS_CONNECTED;
 	rc = 0;
-out_unlock:
-	sti();
 out_put_neigh:
 	if (rc)
 		x25_neigh_put(x25->neighbour);
 out_put_route:
 	x25_route_put(rt);
 out:
+	release_sock(sk);
+	return rc;
+}
+
+static int x25_wait_for_data(struct sock *sk, int timeout)
+{
+	DECLARE_WAITQUEUE(wait, current);
+	int rc = 0;
+
+	add_wait_queue_exclusive(sk->sleep, &wait);
+	for (;;) {
+		__set_current_state(TASK_INTERRUPTIBLE);
+		if (sk->shutdown & RCV_SHUTDOWN)
+			break;
+		rc = -ERESTARTSYS;
+		if (signal_pending(current))
+			break;
+		rc = -EAGAIN;
+		if (!timeout)
+			break;
+		rc = 0;
+		if (skb_queue_empty(&sk->receive_queue)) {
+			release_sock(sk);
+			timeout = schedule_timeout(timeout);
+			lock_sock(sk);
+		} else
+			break;
+	}
+	__set_current_state(TASK_RUNNING);
+	remove_wait_queue(sk->sleep, &wait);
 	return rc;
 }
 	
@@ -719,29 +762,17 @@ static int x25_accept(struct socket *sock, struct socket *newsock, int flags)
 	if (sk->type != SOCK_SEQPACKET)
 		goto out;
 
-	/*
-	 *	The write queue this time is holding sockets ready to use
-	 *	hooked into the CALL INDICATION we saved
-	 */
-	do {
-		cli();
-		if ((skb = skb_dequeue(&sk->receive_queue)) == NULL) {
-			rc = -EWOULDBLOCK;
-			if (flags & O_NONBLOCK)
-				goto out_unlock;
-			/* FIXME: going to sleep with interrupts disabled */
-			interruptible_sleep_on(sk->sleep);
-			rc = -ERESTARTSYS;
-			if (signal_pending(current))
-				goto out_unlock;
-		}
-	} while (!skb);
-
+	rc = x25_wait_for_data(sk, sk->rcvtimeo);
+	if (rc)
+		goto out;
+	skb = skb_dequeue(&sk->receive_queue);
+	rc = -EINVAL;
+	if (!skb->sk)
+		goto out;
 	newsk	      = skb->sk;
 	newsk->pair   = NULL;
 	newsk->socket = newsock;
 	newsk->sleep  = &newsock->wait;
-	sti();
 
 	/* Now attach up the new socket */
 	skb->sk = NULL;
@@ -752,9 +783,6 @@ static int x25_accept(struct socket *sock, struct socket *newsock, int flags)
 	rc = 0;
 out:
 	return rc;
-out_unlock:
-	sti();
-	goto out;
 }
 
 static int x25_getname(struct socket *sock, struct sockaddr *uaddr, int *uaddr_len, int peer)
