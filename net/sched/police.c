@@ -180,7 +180,8 @@ int tcf_act_police_locate(struct rtattr *rta, struct rtattr *est,struct tc_actio
 	if (rtattr_parse(tb, TCA_POLICE_MAX, RTA_DATA(rta), RTA_PAYLOAD(rta)) < 0)
 		return -1;
 
-	if (tb[TCA_POLICE_TBF-1] == NULL)
+	if (tb[TCA_POLICE_TBF-1] == NULL ||
+	    RTA_PAYLOAD(tb[TCA_POLICE_TBF-1]) != sizeof(*parm))
 		return -1;
 
 	parm = RTA_DATA(tb[TCA_POLICE_TBF-1]);
@@ -220,11 +221,17 @@ override:
 			goto failure;
 		}
 	}
-	if (tb[TCA_POLICE_RESULT-1])
-		p->result = *(int*)RTA_DATA(tb[TCA_POLICE_RESULT-1]);
+	if (tb[TCA_POLICE_RESULT-1]) {
+		if (RTA_PAYLOAD(tb[TCA_POLICE_RESULT-1]) != sizeof(u32))
+			goto failure;
+		p->result = *(u32*)RTA_DATA(tb[TCA_POLICE_RESULT-1]);
+	}
 #ifdef CONFIG_NET_ESTIMATOR
-	if (tb[TCA_POLICE_AVRATE-1])
+	if (tb[TCA_POLICE_AVRATE-1]) {
+		if (RTA_PAYLOAD(tb[TCA_POLICE_AVRATE-1]) != sizeof(u32))
+			goto failure;
 		p->ewma_rate = *(u32*)RTA_DATA(tb[TCA_POLICE_AVRATE-1]);
+	}
 #endif
 	p->toks = p->burst = parm->burst;
 	p->mtu = parm->mtu;
@@ -424,7 +431,8 @@ struct tcf_police * tcf_police_locate(struct rtattr *rta, struct rtattr *est)
 	if (rtattr_parse(tb, TCA_POLICE_MAX, RTA_DATA(rta), RTA_PAYLOAD(rta)) < 0)
 		return NULL;
 
-	if (tb[TCA_POLICE_TBF-1] == NULL)
+	if (tb[TCA_POLICE_TBF-1] == NULL ||
+	    RTA_PAYLOAD(tb[TCA_POLICE_TBF-1]) != sizeof(*parm))
 		return NULL;
 
 	parm = RTA_DATA(tb[TCA_POLICE_TBF-1]);
@@ -449,11 +457,17 @@ struct tcf_police * tcf_police_locate(struct rtattr *rta, struct rtattr *est)
 		    (p->P_tab = qdisc_get_rtab(&parm->peakrate, tb[TCA_POLICE_PEAKRATE-1])) == NULL)
 			goto failure;
 	}
-	if (tb[TCA_POLICE_RESULT-1])
-		p->result = *(int*)RTA_DATA(tb[TCA_POLICE_RESULT-1]);
+	if (tb[TCA_POLICE_RESULT-1]) {
+		if (RTA_PAYLOAD(tb[TCA_POLICE_RESULT-1]) != sizeof(u32))
+			goto failure;
+		p->result = *(u32*)RTA_DATA(tb[TCA_POLICE_RESULT-1]);
+	}
 #ifdef CONFIG_NET_ESTIMATOR
-	if (tb[TCA_POLICE_AVRATE-1])
+	if (tb[TCA_POLICE_AVRATE-1]) {
+		if (RTA_PAYLOAD(tb[TCA_POLICE_AVRATE-1]) != sizeof(u32))
+			goto failure;
 		p->ewma_rate = *(u32*)RTA_DATA(tb[TCA_POLICE_AVRATE-1]);
+	}
 #endif
 	p->toks = p->burst = parm->burst;
 	p->mtu = parm->mtu;
