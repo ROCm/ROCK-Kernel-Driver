@@ -149,7 +149,7 @@ static int setup_btree_index(unsigned int l, struct dm_table *t)
 	return 0;
 }
 
-static void *dm_vcalloc(unsigned long nmemb, unsigned long elem_size)
+void *dm_vcalloc(unsigned long nmemb, unsigned long elem_size)
 {
 	unsigned long size;
 	void *addr;
@@ -858,6 +858,7 @@ void dm_table_resume_targets(struct dm_table *t)
 }
 
 
+EXPORT_SYMBOL(dm_vcalloc);
 EXPORT_SYMBOL(dm_get_device);
 EXPORT_SYMBOL(dm_put_device);
 EXPORT_SYMBOL(dm_table_event);
