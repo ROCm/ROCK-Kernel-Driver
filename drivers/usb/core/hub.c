@@ -2244,8 +2244,8 @@ hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port,
 
 	/* Should we verify that the value is valid? */
 	i = udev->descriptor.bMaxPacketSize0;
-	dev_dbg(&udev->dev, "ep0 maxpacket = %d\n", i);
 	if (udev->epmaxpacketin[0] != i) {
+		dev_dbg(&udev->dev, "ep0 maxpacket = %d\n", i);
 		usb_disable_endpoint(udev, 0 + USB_DIR_IN);
 		usb_disable_endpoint(udev, 0 + USB_DIR_OUT);
 		udev->epmaxpacketin[0] = udev->epmaxpacketout[0] = i;
@@ -2550,6 +2550,14 @@ static void hub_events(void)
 
 		usb_get_dev(hdev);
 		spin_unlock_irq(&hub_event_lock);
+
+		dev_dbg(hub_dev, "state %d ports %d chg %04x evt %04x\n",
+				hdev->state, hub->descriptor
+					? hub->descriptor->bNbrPorts
+					: 0,
+				/* NOTE: expects max 15 ports... */
+				(u16) hub->change_bits[0],
+				(u16) hub->event_bits[0]);
 
 		/* Lock the device, then check to see if we were
 		 * disconnected while waiting for the lock to succeed. */

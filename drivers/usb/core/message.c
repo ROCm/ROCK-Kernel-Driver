@@ -34,8 +34,9 @@ static void timeout_kill(unsigned long data)
 {
 	struct urb	*urb = (struct urb *) data;
 
-	dev_warn(&urb->dev->dev, "%s timeout on ep%d%s\n",
+	dev_warn(&urb->dev->dev, "%s timeout from '%s' on ep%d%s\n",
 		usb_pipecontrol(urb->pipe) ? "control" : "bulk",
+		current->comm,
 		usb_pipeendpoint(urb->pipe),
 		usb_pipein(urb->pipe) ? "in" : "out");
 	usb_unlink_urb(urb);
