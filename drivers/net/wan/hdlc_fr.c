@@ -378,8 +378,7 @@ int pvc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 
 static inline struct net_device_stats *pvc_get_stats(struct net_device *dev)
 {
-	return (struct net_device_stats *)
-		((char *)dev + sizeof(struct net_device));
+	return netdev_priv(dev);
 }
 
 
@@ -997,7 +996,13 @@ static void fr_close(struct net_device *dev)
 	}
 }
 
-
+static void dlci_setup(struct net_device *dev)
+{
+	dev->type = ARPHRD_DLCI;
+	dev->flags = IFF_POINTOPOINT;
+	dev->hard_header_len = 10;
+	dev->addr_len = 2;
+}
 
 static int fr_add_pvc(struct net_device *master, unsigned int dlci, int type)
 {
@@ -1021,26 +1026,24 @@ static int fr_add_pvc(struct net_device *master, unsigned int dlci, int type)
 
 	used = pvc_is_used(pvc);
 
-	dev = kmalloc(sizeof(struct net_device) +
-		      sizeof(struct net_device_stats), GFP_KERNEL);
+	if (type == ARPHRD_ETHER)
+		dev = alloc_netdev(sizeof(struct net_device_stats),
+				   "pvceth%d", ether_setup);
+	else
+		dev = alloc_netdev(sizeof(struct net_device_stats),
+				   "pvc%d", dlci_setup);
+
 	if (!dev) {
 		printk(KERN_WARNING "%s: Memory squeeze on fr_pvc()\n",
 		       master->name);
 		delete_unused_pvcs(hdlc);
 		return -ENOBUFS;
 	}
-	memset(dev, 0, sizeof(struct net_device) +
-	       sizeof(struct net_device_stats));
 
 	if (type == ARPHRD_ETHER) {
-		ether_setup(dev);
 		memcpy(dev->dev_addr, "\x00\x01", 2);
                 get_random_bytes(dev->dev_addr + 2, ETH_ALEN - 2);
 	} else {
-		dev->type = ARPHRD_DLCI;
-		dev->flags = IFF_POINTOPOINT;
-		dev->hard_header_len = 10;
-		dev->addr_len = 2;
 		*(u16*)dev->dev_addr = htons(dlci);
 		dlci_to_q922(dev->broadcast, dlci);
 	}
@@ -1054,15 +1057,15 @@ static int fr_add_pvc(struct net_device *master, unsigned int dlci, int type)
 	dev->tx_queue_len = 0;
 	dev->priv = pvc;
 
-	result = dev_alloc_name(dev, prefix);
+	result = dev_alloc_name(dev, dev->name);
 	if (result < 0) {
-		kfree(dev);
+		free_netdev(dev);
 		delete_unused_pvcs(hdlc);
 		return result;
 	}
 
 	if (register_netdevice(dev) != 0) {
-		kfree(dev);
+		free_netdev(dev);
 		delete_unused_pvcs(hdlc);
 		return -EIO;
 	}
