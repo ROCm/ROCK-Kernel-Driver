@@ -227,10 +227,9 @@ choice_option: T_OPTIONAL
 	printd(DEBUG_PARSE, "%s:%d:optional\n", zconf_curname(), zconf_lineno());
 };
 
-choice_option: T_DEFAULT symbol
+choice_option: T_DEFAULT symbol if_expr
 {
-	menu_add_prop(P_DEFAULT, NULL, $2, NULL);
-	//current_choice->prop->def = $2;
+	menu_add_prop(P_DEFAULT, NULL, $2, $3);
 	printd(DEBUG_PARSE, "%s:%d:default\n", zconf_curname(), zconf_lineno());
 };
 
@@ -245,7 +244,6 @@ if: T_IF expr
 {
 	printd(DEBUG_PARSE, "%s:%d:if\n", zconf_curname(), zconf_lineno());
 	menu_add_entry(NULL);
-	//current_entry->prompt = menu_add_prop(T_IF, NULL, NULL, $2);
 	menu_add_dep($2);
 	menu_end_entry();
 	menu_add_menu();
