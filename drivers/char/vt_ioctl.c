@@ -63,6 +63,10 @@ unsigned char keyboard_type = KB_101;
 asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int on);
 #endif
 
+unsigned int video_font_height;
+unsigned int default_font_height;
+unsigned int video_scan_lines;
+
 /*
  * these are the valid i/o ports we're allowed to change. they map all the
  * video ports
@@ -187,38 +191,56 @@ do_kbkeycode_ioctl(int cmd, struct kbkeycode *user_kbkc, int perm)
 static inline int
 do_kdgkb_ioctl(int cmd, struct kbsentry *user_kdgkb, int perm)
 {
-	struct kbsentry tmp;
+	struct kbsentry *kbs;
 	char *p;
 	u_char *q;
 	int sz;
 	int delta;
 	char *first_free, *fj, *fnw;
 	int i, j, k;
+	int ret;
+
+	kbs = kmalloc(sizeof(*kbs), GFP_KERNEL);
+	if (!kbs) {
+		ret = -ENOMEM;
+		goto reterr;
+	}
 
 	/* we mostly copy too much here (512bytes), but who cares ;) */
-	if (copy_from_user(&tmp, user_kdgkb, sizeof(struct kbsentry)))
-		return -EFAULT;
-	tmp.kb_string[sizeof(tmp.kb_string)-1] = '\0';
-	if (tmp.kb_func >= MAX_NR_FUNC)
-		return -EINVAL;
-	i = tmp.kb_func;
+	if (copy_from_user(kbs, user_kdgkb, sizeof(struct kbsentry))) {
+		ret = -EFAULT;
+		goto reterr;
+	}
+	kbs->kb_string[sizeof(kbs->kb_string)-1] = '\0';
+	if (kbs->kb_func >= MAX_NR_FUNC) {
+		ret = -EINVAL;
+		goto reterr;
+	}
+	i = kbs->kb_func;
 
 	switch (cmd) {
 	case KDGKBSENT:
-		sz = sizeof(tmp.kb_string) - 1; /* sz should have been
+		sz = sizeof(kbs->kb_string) - 1; /* sz should have been
 						  a struct member */
 		q = user_kdgkb->kb_string;
 		p = func_table[i];
 		if(p)
 			for ( ; *p && sz; p++, sz--)
-				if (put_user(*p, q++))
-					return -EFAULT;
-		if (put_user('\0', q))
-			return -EFAULT;
+				if (put_user(*p, q++)) {
+					ret = -EFAULT;
+					goto reterr;
+				}
+		if (put_user('\0', q)) {
+			ret = -EFAULT;
+			goto reterr;
+		}
+		kfree(kbs);
 		return ((p && *p) ? -EOVERFLOW : 0);
 	case KDSKBSENT:
-		if (!perm)
-			return -EPERM;
+		if (!perm) {
+			ret = -EPERM;
+			goto reterr;
+		}
 
 		q = func_table[i];
 		first_free = funcbufptr + (funcbufsize - funcbufleft);
@@ -229,7 +251,7 @@ do_kdgkb_ioctl(int cmd, struct kbsentry *user_kdgkb, int perm)
 		else
 			fj = first_free;
 
-		delta = (q ? -strlen(q) : 1) + strlen(tmp.kb_string);
+		delta = (q ? -strlen(q) : 1) + strlen(kbs->kb_string);
 		if (delta <= funcbufleft) { 	/* it fits in current buf */
 		    if (j < MAX_NR_FUNC) {
 			memmove(fj + delta, fj, first_free - fj);
@@ -245,8 +267,10 @@ do_kdgkb_ioctl(int cmd, struct kbsentry *user_kdgkb, int perm)
 		    while (sz < funcbufsize - funcbufleft + delta)
 		      sz <<= 1;
 		    fnw = (char *) kmalloc(sz, GFP_KERNEL);
-		    if(!fnw)
-		      return -ENOMEM;
+		    if(!fnw) {
+		      ret = -ENOMEM;
+		      goto reterr;
+		    }
 
 		    if (!q)
 		      func_table[i] = fj;
@@ -268,17 +292,19 @@ do_kdgkb_ioctl(int cmd, struct kbsentry *user_kdgkb, int perm)
 		    funcbufleft = funcbufleft - delta + sz - funcbufsize;
 		    funcbufsize = sz;
 		}
-		strcpy(func_table[i], tmp.kb_string);
+		strcpy(func_table[i], kbs->kb_string);
 		break;
 	}
-	return 0;
+	ret = 0;
+reterr:
+	kfree(kbs);
+	return ret;
 }
 
 static inline int 
-do_fontx_ioctl(int cmd, struct consolefontdesc *user_cfd, int perm)
+do_fontx_ioctl(int cmd, struct consolefontdesc *user_cfd, int perm, struct console_font_op *op)
 {
 	struct consolefontdesc cfdarg;
-	struct console_font_op op;
 	int i;
 
 	if (copy_from_user(&cfdarg, user_cfd, sizeof(struct consolefontdesc))) 
@@ -288,25 +314,25 @@ do_fontx_ioctl(int cmd, struct consolefontdesc *user_cfd, int perm)
 	case PIO_FONTX:
 		if (!perm)
 			return -EPERM;
-		op.op = KD_FONT_OP_SET;
-		op.flags = KD_FONT_FLAG_OLD;
-		op.width = 8;
-		op.height = cfdarg.charheight;
-		op.charcount = cfdarg.charcount;
-		op.data = cfdarg.chardata;
-		return con_font_op(fg_console, &op);
+		op->op = KD_FONT_OP_SET;
+		op->flags = KD_FONT_FLAG_OLD;
+		op->width = 8;
+		op->height = cfdarg.charheight;
+		op->charcount = cfdarg.charcount;
+		op->data = cfdarg.chardata;
+		return con_font_op(fg_console, op);
 	case GIO_FONTX: {
-		op.op = KD_FONT_OP_GET;
-		op.flags = KD_FONT_FLAG_OLD;
-		op.width = 8;
-		op.height = cfdarg.charheight;
-		op.charcount = cfdarg.charcount;
-		op.data = cfdarg.chardata;
-		i = con_font_op(fg_console, &op);
+		op->op = KD_FONT_OP_GET;
+		op->flags = KD_FONT_FLAG_OLD;
+		op->width = 8;
+		op->height = cfdarg.charheight;
+		op->charcount = cfdarg.charcount;
+		op->data = cfdarg.chardata;
+		i = con_font_op(fg_console, op);
 		if (i)
 			return i;
-		cfdarg.charheight = op.height;
-		cfdarg.charcount = op.charcount;
+		cfdarg.charheight = op->height;
+		cfdarg.charcount = op->charcount;
 		if (copy_to_user(user_cfd, &cfdarg, sizeof(struct consolefontdesc)))
 			return -EFAULT;
 		return 0;
@@ -351,8 +377,8 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 	unsigned char ucval;
 	struct kbd_struct * kbd;
 	struct vt_struct *vt = (struct vt_struct *)tty->driver_data;
-	struct vc_data *vc = vc_cons[vt->vc_num].d;
-	
+	struct console_font_op op;	/* used in multiple places here */
+
 	console = vt->vc_num;
 
 	if (!vc_cons_allocated(console)) 	/* impossible? */
@@ -827,7 +853,7 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 		__get_user(clin, &vtconsize->v_clin);
 		__get_user(vcol, &vtconsize->v_vcol);
 		__get_user(ccol, &vtconsize->v_ccol);
-		vlin = vlin ? vlin : vc->vc_scan_lines;
+		vlin = vlin ? vlin : video_scan_lines;
 		if (clin) {
 			if (ll) {
 				if (ll != vlin/clin)
@@ -847,9 +873,9 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 			return -EINVAL;
 		    
 		if (vlin)
-			vc->vc_scan_lines = vlin;
+			video_scan_lines = vlin;
 		if (clin)
-			vc->vc_font.height = clin;
+			video_font_height = clin;
 	
 		for (i = 0; i < MAX_NR_CONSOLES; i++)
 			vc_resize(i, cc, ll);
@@ -857,7 +883,6 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 	}
 
 	case PIO_FONT: {
-		struct console_font_op op;
 		if (!perm)
 			return -EPERM;
 		op.op = KD_FONT_OP_SET;
@@ -870,7 +895,6 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 	}
 
 	case GIO_FONT: {
-		struct console_font_op op;
 		op.op = KD_FONT_OP_GET;
 		op.flags = KD_FONT_FLAG_OLD;
 		op.width = 8;
@@ -890,7 +914,7 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 
 	case PIO_FONTX:
 	case GIO_FONTX:
-		return do_fontx_ioctl(cmd, (struct consolefontdesc *)arg, perm);
+		return do_fontx_ioctl(cmd, (struct consolefontdesc *)arg, perm, &op);
 
 	case PIO_FONTRESET:
 	{
@@ -903,7 +927,6 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 		return -ENOSYS;
 #else
 		{
-		struct console_font_op op;
 		op.op = KD_FONT_OP_SET_DEFAULT;
 		op.data = NULL;
 		i = con_font_op(fg_console, &op);
@@ -915,7 +938,6 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 	}
 
 	case KDFONTOP: {
-		struct console_font_op op;
 		if (copy_from_user(&op, (void *) arg, sizeof(op)))
 			return -EFAULT;
 		if (!perm && op.op != KD_FONT_OP_GET)

@@ -21,7 +21,25 @@
 #ifndef _PARISC_ASSEMBLY_H
 #define _PARISC_ASSEMBLY_H
 
-#if defined(__LP64__) && defined(__ASSEMBLY__)
+#ifdef __LP64__
+#define LDREG	ldd
+#define STREG	std
+#define LDREGM	ldd,mb
+#define STREGM	std,ma
+#define RP_OFFSET	16
+#define FRAME_SIZE	128
+#else
+#define LDREG	ldw
+#define STREG	stw
+#define LDREGM	ldwm
+#define STREGM	stwm
+#define RP_OFFSET	20
+#define FRAME_SIZE	64
+#endif
+
+#ifdef __ASSEMBLY__
+
+#ifdef __LP64__
 /* the 64-bit pa gnu assembler unfortunately defaults to .level 1.1 or 2.0 so
  * work around that for now... */
 	.level 2.0w
@@ -100,22 +118,6 @@
 	ldil	L%\value, \reg
 	ldo	R%\value(\reg), \reg
 	.endm
-
-#ifdef __LP64__
-#define LDREG	ldd
-#define STREG	std
-#define LDREGM	ldd,mb
-#define STREGM	std,ma
-#define RP_OFFSET	16
-#define FRAME_SIZE	128
-#else
-#define LDREG	ldw
-#define STREG	stw
-#define LDREGM	ldwm
-#define STREGM	stwm
-#define RP_OFFSET	20
-#define FRAME_SIZE	64
-#endif
 
 	.macro loadgp
 #ifdef __LP64__
@@ -420,4 +422,5 @@
 	REST_CR	(%cr22, PT_PSW	(\regs))
 	.endm
 
+#endif /* __ASSEMBLY__ */
 #endif

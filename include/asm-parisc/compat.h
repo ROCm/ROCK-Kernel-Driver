@@ -18,6 +18,7 @@ typedef u16	compat_mode_t;
 typedef u32	compat_ino_t;
 typedef u32	compat_dev_t;
 typedef s32	compat_off_t;
+typedef s64	compat_loff_t;
 typedef u16	compat_nlink_t;
 typedef u16	compat_ipc_pid_t;
 typedef s32	compat_daddr_t;
@@ -96,7 +97,7 @@ struct compat_statfs {
 typedef u32		compat_old_sigset_t;	/* at least 32 bits */
 
 #define _COMPAT_NSIG		64
-#define _COMPAT_NSIG_BPW	BITS_PER_LONG
+#define _COMPAT_NSIG_BPW	32
 
 typedef u32		compat_sigset_word;
 

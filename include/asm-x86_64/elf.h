@@ -39,7 +39,7 @@ typedef struct user_i387_struct elf_fpregset_t;
    We might as well make sure everything else is cleared too (except for %esp),
    just to make things more deterministic.
  */
-#define ELF_PLAT_INIT(_r)	do { \
+#define ELF_PLAT_INIT(_r, load_addr)	do { \
 	struct task_struct *cur = current; \
 	(_r)->rbx = 0; (_r)->rcx = 0; (_r)->rdx = 0; \
 	(_r)->rsi = 0; (_r)->rdi = 0; (_r)->rbp = 0; \

@@ -50,7 +50,7 @@
  * talk to him...
  */
 extern void ia64_init_addr_space (void);
-#define ELF_PLAT_INIT(_r)	ia64_init_addr_space()
+#define ELF_PLAT_INIT(_r, load_addr)	ia64_init_addr_space()
 
 /* ELF register definitions.  This is needed for core dump support.  */
 

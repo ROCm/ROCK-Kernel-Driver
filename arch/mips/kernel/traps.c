@@ -191,12 +191,13 @@ spinlock_t die_lock;
 extern void __die(const char * str, struct pt_regs * regs, const char *where,
                   unsigned long line)
 {
+	static int die_counter;
 	console_verbose();
 	spin_lock_irq(&die_lock);
 	printk("%s", str);
 	if (where)
 		printk(" in %s, line %ld", where, line);
-	printk(":\n");
+	printk("[#%d]:\n", ++die_counter);
 	show_regs(regs);
 	printk("Process %s (pid: %d, stackpage=%08lx)\n",
 		current->comm, current->pid, (unsigned long) current);

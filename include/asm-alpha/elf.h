@@ -50,7 +50,7 @@ typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
    we start programs with a value of 0 to indicate that there is no
    such function.  */
 
-#define ELF_PLAT_INIT(_r)       _r->r0 = 0
+#define ELF_PLAT_INIT(_r, load_addr)	_r->r0 = 0
 
 /* The registers are layed out in pt_regs for PAL and syscall
    convenience.  Re-order them for the linear elf_gregset_t.  */

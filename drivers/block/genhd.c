@@ -538,12 +538,20 @@ struct gendisk *alloc_disk(int minors)
 struct gendisk *get_disk(struct gendisk *disk)
 {
 	struct module *owner;
+	struct kobject *kobj;
+
 	if (!disk->fops)
 		return NULL;
 	owner = disk->fops->owner;
 	if (owner && !try_module_get(owner))
 		return NULL;
-	return to_disk(kobject_get(&disk->kobj));
+	kobj = kobject_get(&disk->kobj);
+	if (kobj == NULL) {
+		module_put(owner);
+		return NULL;
+	}
+	return to_disk(kobj);
+
 }
 
 void put_disk(struct gendisk *disk)
