@@ -137,7 +137,7 @@ static FUNC_ST0 const fp_etc_table[] = {
   ftst_, fxam, (FUNC_ST0)FPU_illegal, (FUNC_ST0)FPU_illegal
 };
 
-void FPU_etc()
+void FPU_etc(void)
 {
   (fp_etc_table[FPU_rm])(&st(0), FPU_gettag0());
 }
