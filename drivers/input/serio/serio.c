@@ -26,6 +26,10 @@
  * Should you need to contact me, the author, you can do so either by
  * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
  * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
+ *
+ * Changes:
+ * 20 Jul. 2003    Daniele Bellucci <bellucda@tiscali.it>
+ *                 Minor cleanups.
  */
 
 #include <linux/stddef.h>
@@ -213,7 +217,7 @@ void serio_close(struct serio *serio)
 	serio->dev = NULL;
 }
 
-int serio_init(void)
+static int __init serio_init(void)
 {
 	int pid;
 
@@ -230,7 +234,7 @@ int serio_init(void)
 	return 0;
 }
 
-void serio_exit(void)
+static void __exit serio_exit(void)
 {
 	kill_proc(serio_pid, SIGTERM, 1);
 	wait_for_completion(&serio_exited);
