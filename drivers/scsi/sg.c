@@ -2658,7 +2658,7 @@ sg_allow_access(unsigned char opcode, char dev_type)
 
 #ifdef CONFIG_PROC_FS
 static int
-sg_last_dev()
+sg_last_dev(void)
 {
 	int k;
 	unsigned long iflags;
@@ -2770,7 +2770,7 @@ static struct sg_proc_leaf sg_proc_leaf_arr[] = {
 extern struct proc_dir_entry *proc_scsi;
 
 static int
-sg_proc_init()
+sg_proc_init(void)
 {
 	int k, mask;
 	int num_leaves =
@@ -2798,7 +2798,7 @@ sg_proc_init()
 }
 
 static void
-sg_proc_cleanup()
+sg_proc_cleanup(void)
 {
 	int k;
 	int num_leaves =
