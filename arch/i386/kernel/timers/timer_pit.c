@@ -15,7 +15,7 @@ extern spinlock_t i8253_lock;
 
 static int init_pit(void)
 {
-	return 1;
+	return 0;
 }
 
 static void mark_offset_pit(void)
@@ -122,7 +122,7 @@ static unsigned long get_offset_pit(void)
 
 /* tsc timer_opts struct */
 struct timer_opts timer_pit = {
-	init: init_pit, 
-	mark_offset: mark_offset_pit, 
-	get_offset: get_offset_pit
+	.init =		init_pit, 
+	.mark_offset =	mark_offset_pit, 
+	.get_offset =	get_offset_pit,
 };

@@ -6,6 +6,7 @@
 #include <linux/spinlock.h>
 #include <linux/init.h>
 #include <linux/timex.h>
+#include <linux/errno.h>
 
 #include <asm/timer.h>
 #include <asm/io.h>
@@ -263,17 +264,17 @@ static int init_tsc(void)
 #ifdef CONFIG_CPU_FREQ
 			cpufreq_register_notifier(&time_cpufreq_notifier_block, CPUFREQ_TRANSITION_NOTIFIER);
 #endif
-			return 1;
+			return 0;
 		}
 	}
-	return 0;
+	return -ENODEV;
 }
 
 /************************************************************/
 
 /* tsc timer_opts struct */
 struct timer_opts timer_tsc = {
-	init: init_tsc, 
-	mark_offset: mark_offset_tsc, 
-	get_offset: get_offset_tsc
+	.init =		init_tsc,
+	.mark_offset =	mark_offset_tsc, 
+	.get_offset =	get_offset_tsc,
 };
