@@ -104,7 +104,7 @@ int sysdev_driver_register(struct sysdev_class * cls,
 			   struct sysdev_driver * drv)
 {
 	down_write(&system_subsys.rwsem);
-	if (kset_get(&cls->kset))
+	if (cls && kset_get(&cls->kset))
 		list_add_tail(&drv->entry,&cls->drivers);
 	else
 		list_add_tail(&drv->entry,&global_drivers);
