@@ -136,7 +136,7 @@ int cifs_verify_signature(struct smb_hdr * cifs_pdu, const char * mac_key,
 int cifs_calculate_mac_key(char * key, const char * rn, const char * password)
 {
 	char temp_key[16];
-	if ((key == NULL) || (rn == NULL) || (password == NULL))
+	if ((key == NULL) || (rn == NULL))
 		return -EINVAL;
 
 	E_md4hash(password, temp_key);
@@ -156,7 +156,7 @@ int CalcNTLMv2_partial_mac_key(struct cifsSesInfo * ses, struct nls_table * nls_
 	if(ses)
 		return -EINVAL;
 
-	E_md4hash(ses->password_with_pad, temp_hash);
+	E_md4hash(ses->password, temp_hash);
 
 	hmac_md5_init_limK_to_64(temp_hash, 16, &ctx);
 	user_name_len = strlen(ses->userName);
@@ -165,11 +165,10 @@ int CalcNTLMv2_partial_mac_key(struct cifsSesInfo * ses, struct nls_table * nls_
 	dom_name_len = strlen(ses->domainName);
 	if(dom_name_len > MAX_USERNAME_SIZE)
 		return -EINVAL;
-
-	
+  
 	ucase_buf = kmalloc((MAX_USERNAME_SIZE+1), GFP_KERNEL);
         unicode_buf = kmalloc((MAX_USERNAME_SIZE+1)*4, GFP_KERNEL);
-	
+   
 	for(i=0;i<user_name_len;i++)
 		ucase_buf[i] = nls_info->charset2upper[(int)ses->userName[i]];
 	ucase_buf[i] = 0;

@@ -1,3 +1,7 @@
+Version 1.01
+------------
+Allow passwords longer than 16 bytes. Allow null password string.
+
 Version 1.00
 ------------
 Gracefully clean up failed mounts when attempting to mount to servers such as

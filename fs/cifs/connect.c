@@ -392,14 +392,23 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 	return 0;
 }
 
+static void * 
+cifs_kcalloc(size_t size, int type)
+{
+	void *addr;
+	addr = kmalloc(size, type);
+	if (addr)
+		memset(addr, 0, size);
+	return addr;
+}
+
 static int
 cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol)
 {
 	char *value;
 	char *data;
-	int  temp_len;
+	int  temp_len, i;
 
-	memset(vol,0,sizeof(struct smb_vol));
 	vol->linux_uid = current->uid;	/* current->euid instead? */
 	vol->linux_gid = current->gid;
 	vol->dir_mode = S_IRWXUGO;
@@ -432,12 +441,60 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 		} else if (strnicmp(data, "pass", 4) == 0) {
 			if (!value || !*value) {
 				vol->password = NULL;
-			} else if (strnlen(value, 17) < 17) {
-				vol->password = value;
-			} else {
-				printk(KERN_WARNING "CIFS: password too long\n");
-				return 1;
+				continue;
 			}
+			temp_len = strlen(value);
+			/* removed password length check, NTLM passwords
+				can be arbitrarily long */
+
+			/* if comma in password, the string will be 
+			prematurely null terminated.  Commas in password are
+			specified across the cifs mount interface by a double
+			comma ie ,, and a comma used as in other cases ie ','
+			as a parameter delimiter/separator is single and due
+			to the strsep above is temporarily zeroed. */
+
+			/* NB: password legally can have multiple commas and
+			the only illegal character in a password is null */
+				
+			printk("\nvalue: %s",value);
+			if ((value[temp_len] == 0) && (value[temp_len+1] == ',')) {
+				/* reinsert comma */
+				value[temp_len] = ',';
+
+				while(value[temp_len] != 0)  {
+					temp_len++;
+					if((value[temp_len] == ',') && (value[temp_len+1] != ',')) {
+						/* single comma indicating start of next parm */
+						break;
+					}
+				}
+				printk("\nnew value with comma stuffing: %s",value);
+				if(value[temp_len] == 0) {
+					options = NULL;
+				} else {
+					value[temp_len] = 0;
+					/* move options to point to start of next parm */
+					options = value + temp_len + 1;
+				}
+				/* go from value to (value + temp_len) condensing double commas to singles */
+				vol->password = cifs_kcalloc(temp_len, GFP_KERNEL);
+				for(i=0;i<temp_len;i++) {
+					vol->password[i] = value[i];
+					if(value[i] == ',' && value[i+1] == ',') {
+						/* skip second comma */
+						i++;
+					}
+				}
+				/* value[temp_len] is zeroed above so
+					 vol->password[temp_len] guaranteed to be null */
+			} else {
+				vol->password = cifs_kcalloc(temp_len + 1, GFP_KERNEL);
+				strcpy(vol->password, value);
+			}
+			printk("\npassword after munging: %s",vol->password);
+			/* allocate memory for password and copy password in to it */
+			
 		} else if (strnicmp(data, "ip", 2) == 0) {
 			if (!value || !*value) {
 				vol->UNCip = NULL;
@@ -839,6 +896,8 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 
 	xid = GetXid();
 	cFYI(1, ("Entering cifs_mount. Xid: %d with: %s", xid, mount_data));
+	
+	memset(&volume_info,0,sizeof(struct smb_vol));
 
 	if (cifs_parse_mount_options(mount_data, devname, &volume_info)) {
 		if(volume_info.UNC)
@@ -940,8 +999,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 
 		if (!rc){   
 			if (volume_info.password)
-				strncpy(pSesInfo->password_with_pad,
-					volume_info.password,CIFS_ENCPWD_SIZE);
+				pSesInfo->password = volume_info.password;
 			if (volume_info.username)
 				strncpy(pSesInfo->userName,
 					volume_info.username,MAX_USERNAME_SIZE);
@@ -1063,17 +1121,6 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 	FreeXid(xid);
 	return rc;
 }
-
-static void * 
-cifs_kcalloc(size_t size, int type)
-{
-	void *addr;
-	addr = kmalloc(size, type);
-	if (addr)
-		memset(addr, 0, size);
-	return addr;
-}
-
 
 static int
 CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses,
@@ -2529,13 +2576,13 @@ int cifs_setup_session(unsigned int xid, struct cifsSesInfo *pSesInfo,
 						rc = -ENOMEM;
 
 				} else {
-					SMBNTencrypt(pSesInfo->password_with_pad,
+					SMBNTencrypt(pSesInfo->password,
 						pSesInfo->server->cryptKey,
 						ntlm_session_key);
 
 					cifs_calculate_mac_key(pSesInfo->mac_signing_key,
 						ntlm_session_key,
-						pSesInfo->password_with_pad);
+						pSesInfo->password);
 				}
 			/* for better security the weaker lanman hash not sent
 			   in AuthSessSetup so we no longer calculate it */
@@ -2547,12 +2594,12 @@ int cifs_setup_session(unsigned int xid, struct cifsSesInfo *pSesInfo,
 					nls_info);
 			}
 		} else { /* old style NTLM 0.12 session setup */
-			SMBNTencrypt(pSesInfo->password_with_pad,
+			SMBNTencrypt(pSesInfo->password,
 				pSesInfo->server->cryptKey,
 				ntlm_session_key);
 
 			cifs_calculate_mac_key(pSesInfo->mac_signing_key, 
-				ntlm_session_key, pSesInfo->password_with_pad);
+				ntlm_session_key, pSesInfo->password);
 			rc = CIFSSessSetup(xid, pSesInfo,
 				ntlm_session_key, nls_info);
 		}
