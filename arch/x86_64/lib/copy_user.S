@@ -6,8 +6,12 @@
 
 #define FIX_ALIGNMENT 1
 		
-	#include <asm/thread_info.h>
+#define movnti movq  /* write to cache for now */
+#define prefetch prefetcht2
+		
+	#include <asm/current.h>
 	#include <asm/offset.h>
+	#include <asm/thread_info.h>
 
 /* Standard copy_to_user with segment limit checking */		
 	.globl copy_to_user
@@ -62,7 +66,7 @@ copy_user_generic:
 	   the small movements in ioctls etc., but not penalize the bigger
 	   filesystem data copies too much. */
 	pushq %rbx
-	prefetcht0 (%rsi)
+	prefetch (%rsi)
 	xorl %eax,%eax		/*zero for the exception handler */
 
 #ifdef FIX_ALIGNMENT
@@ -82,7 +86,7 @@ after_bad_alignment:
 	jz   loop_no_prefetch
 	
 loop:
-	prefetchnta 64(%rsi)
+	prefetch 64(%rsi)
 	
 loop_no_prefetch:	
 s1:	movq (%rsi),%r11
@@ -118,10 +122,11 @@ handle_tail:
 	movl $8,%ebx
 loop_8:
 s9:	movq (%rsi),%r8
-d9:	movnti %r8,(%rdi)
+d9:	movq %r8,(%rdi)
 	addq %rbx,%rdi
 	addq %rbx,%rsi
-	loop loop_8
+	decl %ecx
+	jnz loop_8
 	
 handle_7:		
 	movl %edx,%ecx	
@@ -132,7 +137,8 @@ s10:	movb (%rsi),%bl
 d10:	movb %bl,(%rdi)
 	incq %rdi
 	incq %rsi
-	loop loop_1
+	decl %ecx
+	jnz loop_1
 			
 ende:
 	sfence
@@ -153,7 +159,8 @@ s11:	movb (%rsi),%bl
 d11:	movb %bl,(%rdi)
 	incq %rsi
 	incq %rdi
-	loop align_1
+	decl %ecx
+	jnz align_1
 	jmp after_bad_alignment
 small_align:
 	addq %r9,%rdx

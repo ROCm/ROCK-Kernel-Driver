@@ -11,39 +11,49 @@
  * Copy a null terminated string from userspace.
  */
 
-long __strncpy_from_user(char *dst, const char *src, long count)
+#define __do_strncpy_from_user(dst,src,count,res)			   \
+do {									   \
+	long __d0, __d1, __d2;						   \
+	__asm__ __volatile__(						   \
+		"	testq %1,%1\n"					   \
+		"	jz 2f\n"					   \
+		"0:	lodsb\n"					   \
+		"	stosb\n"					   \
+		"	testb %%al,%%al\n"				   \
+		"	jz 1f\n"					   \
+		"	decq %1\n"					   \
+		"	jnz 0b\n"					   \
+		"1:	subq %1,%0\n"					   \
+		"2:\n"							   \
+		".section .fixup,\"ax\"\n"				   \
+		"3:	movq %5,%0\n"					   \
+		"	jmp 2b\n"					   \
+		".previous\n"						   \
+		".section __ex_table,\"a\"\n"				   \
+		"	.align 4\n"					   \
+		"	.quad 0b,3b\n"					   \
+		".previous"						   \
+		: "=r"(res), "=c"(count), "=&a" (__d0), "=&S" (__d1),	   \
+		  "=&D" (__d2)						   \
+		: "i"(-EFAULT), "0"(count), "1"(count), "3"(src), "4"(dst) \
+		: "memory");						   \
+} while (0)
+
+long
+__strncpy_from_user(char *dst, const char *src, long count)
 {
 	long res;
-	long __d0, __d1, __d2;
-	asm volatile(		\
-		"	testq %1,%1\n"
-		"	jz 2f\n"
-		"0:	lodsb\n"
-		"	stosb\n"
-		"	testb %%al,%%al\n"
-		"   	loopnz 0b\n"
-		"1:	subq %1,%0\n"
-		"2:\n"
-		".section .fixup,\"ax\"\n"
-		"3:	movq %5,%0\n"
-		"	jmp 2b\n"
-		".previous\n"
-		".section __ex_table,\"a\"\n"
-		"	.align 8\n"
-		"	.quad 0b,3b\n"
-		".previous"
-		: "=r"(res), "=c"(count), "=&a" (__d0), "=&S" (__d1),
-		  "=&D" (__d2)
-		: "i"(-EFAULT), "0"(count), "1"(count), "3"(src), "4"(dst)
-		: "memory");
+	__do_strncpy_from_user(dst, src, count, res);
 	return res;
 }
 
-long strncpy_from_user(char *dst, const char *src, long count)
+long
+strncpy_from_user(char *dst, const char *src, long count)
 {
+	long res = -EFAULT;
 	if (access_ok(VERIFY_READ, src, 1))
-		return __strncpy_from_user(dst, src, count);
-	return -EFAULT;
+		__do_strncpy_from_user(dst, src, count, res);
+	return res;
 }
 
 /*
@@ -60,13 +70,13 @@ unsigned long __clear_user(void *addr, unsigned long size)
 		"	jz     4f\n"
 		"0:	movnti %[zero],(%[dst])\n"
 		"	addq   %[eight],%[dst]\n"
-		"	loop   0b\n"
+		"	decl %%ecx ; jnz   0b\n"
 		"4:	movq  %[size1],%%rcx\n"
 		"	testl %%ecx,%%ecx\n"
 		"	jz     2f\n"
 		"1:	movb   %b[zero],(%[dst])\n"
 		"	incq   %[dst]\n"
-		"	loop   1b\n"
+		"	decl %%ecx ; jnz  1b\n"
 		"2:	sfence\n"
 		".section .fixup,\"ax\"\n"
 		"3:	lea 0(%[size1],%[size8],8),%[size8]\n"

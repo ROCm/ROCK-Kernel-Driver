@@ -34,6 +34,7 @@
 	thunk rwsem_down_read_failed_thunk,rwsem_down_read_failed
 	thunk rwsem_down_write_failed_thunk,rwsem_down_write_failed
 	thunk rwsem_wake_thunk,rwsem_wake
+	thunk rwsem_downgrade_thunk,rwsem_downgrade_wake
 #endif	
 	thunk do_softirq_thunk,do_softirq
 	
