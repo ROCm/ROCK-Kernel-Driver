@@ -479,7 +479,7 @@ static int snd_es1688_capture_trigger(snd_pcm_substream_t * substream,
 	return snd_es1688_trigger(chip, cmd, 0x0f);
 }
 
-irqreturn_t snd_es1688_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t snd_es1688_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	es1688_t *chip = dev_id;
 
@@ -1042,7 +1042,6 @@ int snd_es1688_mixer(es1688_t *chip)
 
 EXPORT_SYMBOL(snd_es1688_mixer_write);
 EXPORT_SYMBOL(snd_es1688_mixer_read);
-EXPORT_SYMBOL(snd_es1688_interrupt);
 EXPORT_SYMBOL(snd_es1688_create);
 EXPORT_SYMBOL(snd_es1688_pcm);
 EXPORT_SYMBOL(snd_es1688_mixer);

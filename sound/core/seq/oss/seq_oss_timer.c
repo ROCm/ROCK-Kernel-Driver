@@ -149,7 +149,7 @@ send_timer_event(seq_oss_devinfo_t *dp, int type, int value)
 	ev.queue = dp->queue;
 	ev.data.queue.queue = dp->queue;
 	ev.data.queue.param.value = value;
-	return snd_seq_kernel_client_dispatch(dp->cseq, &ev, 0, 0);
+	return snd_seq_kernel_client_dispatch(dp->cseq, &ev, 1, 0);
 }
 
 /*

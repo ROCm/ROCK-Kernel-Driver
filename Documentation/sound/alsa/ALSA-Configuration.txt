@@ -252,6 +252,7 @@ Module parameters
     Module for video cards based on Bt87x chips.
 
     digital_rate - Override the default digital rate (Hz)
+    load_all	- Load the driver even if the card model isn't known
 
     Module supports up to 8 cards.
 
