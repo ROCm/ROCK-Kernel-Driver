@@ -15,6 +15,7 @@
 #include <linux/irq.h>
 #include <linux/smp.h>
 #include <linux/interrupt.h>
+#include <linux/signal.h>
 #include <asm/prom.h>
 #include <asm/io.h>
 #include <asm/pgtable.h>
@@ -423,8 +424,11 @@ nextnode:
 	}
 
 #ifdef CONFIG_SMP
-	real_irq_to_virt_map[XICS_IPI] = virt_irq_to_real_map[XICS_IPI] = XICS_IPI;
-	request_irq(XICS_IPI + XICS_IRQ_OFFSET, xics_ipi_action, 0, "IPI", 0);
+	real_irq_to_virt_map[XICS_IPI] = virt_irq_to_real_map[XICS_IPI] =
+		XICS_IPI;
+	/* IPIs are marked SA_INTERRUPT as they must run with irqs disabled */
+	request_irq(XICS_IPI + XICS_IRQ_OFFSET, xics_ipi_action, SA_INTERRUPT,
+		    "IPI", 0);
 	irq_desc[XICS_IPI+XICS_IRQ_OFFSET].status |= IRQ_PER_CPU;
 #endif
 	ppc64_boot_msg(0x21, "XICS Done");
