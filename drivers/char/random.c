@@ -2247,22 +2247,27 @@ static struct keydata {
 static spinlock_t ip_lock = SPIN_LOCK_UNLOCKED;
 static unsigned int ip_cnt;
 
-static struct keydata *__check_and_rekey(time_t time)
+static void rekey_seq_generator(void *private_)
 {
 	struct keydata *keyptr;
+	struct timeval 	tv;
+
+	do_gettimeofday(&tv);
+
 	spin_lock_bh(&ip_lock);
 	keyptr = &ip_keydata[ip_cnt&1];
-	if (!keyptr->rekey_time || (time - keyptr->rekey_time) > REKEY_INTERVAL) {
-		keyptr = &ip_keydata[1^(ip_cnt&1)];
-		keyptr->rekey_time = time;
-		get_random_bytes(keyptr->secret, sizeof(keyptr->secret));
-		keyptr->count = (ip_cnt&COUNT_MASK)<<HASH_BITS;
-		mb();
-		ip_cnt++;
-	}
+
+	keyptr = &ip_keydata[1^(ip_cnt&1)];
+	keyptr->rekey_time = tv.tv_sec;
+	get_random_bytes(keyptr->secret, sizeof(keyptr->secret));
+	keyptr->count = (ip_cnt&COUNT_MASK)<<HASH_BITS;
+	mb();
+	ip_cnt++;
+
 	spin_unlock_bh(&ip_lock);
-	return keyptr;
 }
+
+static DECLARE_WORK(rekey_work, rekey_seq_generator, NULL);
 
 static inline struct keydata *check_and_rekey(time_t time)
 {
@@ -2270,7 +2275,7 @@ static inline struct keydata *check_and_rekey(time_t time)
 
 	rmb();
 	if (!keyptr->rekey_time || (time - keyptr->rekey_time) > REKEY_INTERVAL) {
-		keyptr = __check_and_rekey(time);
+		schedule_work(&rekey_work);
 	}
 
 	return keyptr;
