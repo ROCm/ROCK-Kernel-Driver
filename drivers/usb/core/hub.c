@@ -674,6 +674,7 @@ static int hub_configure(struct usb_hub *hub,
 		hub->indicator [0] = INDICATOR_CYCLE;
 
 	hub_power_on(hub);
+	hub->change_bits[0] = ~0;
 	hub_activate(hub);
 	return 0;
 
