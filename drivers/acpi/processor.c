@@ -1761,6 +1761,9 @@ acpi_cpufreq_init (
 
 	ACPI_FUNCTION_TRACE("acpi_cpufreq_init");
 
+	if (!pr->flags.performance)
+		return_VALUE(0);
+
 	if (cpufreq_usage_count) {
 		if (pr->flags.performance == 1)
 			cpufreq_usage_count++;

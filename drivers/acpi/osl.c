@@ -717,6 +717,9 @@ acpi_os_wait_semaphore(
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Waiting for semaphore[%p|%d|%d]\n", handle, units, timeout));
 
+	if (in_atomic())
+		timeout = 0;
+
 	switch (timeout)
 	{
 		/*
@@ -838,7 +841,7 @@ acpi_os_writable(void *ptr, u32 len)
 u32
 acpi_os_get_thread_id (void)
 {
-	if (!in_interrupt())
+	if (!in_atomic())
 		return current->pid;
 
 	return 0;
