@@ -188,11 +188,13 @@ u8 pciehp_handle_presence_change(u8 hp_slot, void *inst_id)
 		/*
 		 * Card Present
 		 */
+		info("Card present on Slot(%d)\n", ctrl->first_slot + hp_slot);
 		taskInfo->event_type = INT_PRESENCE_ON;
 	} else {
 		/*
 		 * Not Present
 		 */
+		info("Card not present on Slot(%d)\n", ctrl->first_slot + hp_slot);
 		taskInfo->event_type = INT_PRESENCE_OFF;
 	}
 
