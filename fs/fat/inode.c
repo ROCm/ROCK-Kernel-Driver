@@ -843,18 +843,12 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		brelse(bh);
 		goto out_invalid;
 	}
-	if (!b->secs_track) {
-		if (!silent)
-			printk(KERN_ERR "FAT: bogus sectors-per-track value\n");
-		brelse(bh);
-		goto out_invalid;
-	}
-	if (!b->heads) {
-		if (!silent)
-			printk(KERN_ERR "FAT: bogus number-of-heads value\n");
-		brelse(bh);
-		goto out_invalid;
-	}
+
+	/*
+	 * Earlier we checked here that b->secs_track and b->head are nonzero,
+	 * but it turns out valid FAT filesystems can have zero there.
+	 */
+
 	media = b->media;
 	if (!FAT_VALID_MEDIA(media)) {
 		if (!silent)
