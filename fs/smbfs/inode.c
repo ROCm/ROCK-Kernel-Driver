@@ -604,7 +604,13 @@ out_no_server:
 static int
 smb_statfs(struct super_block *sb, struct statfs *buf)
 {
-	int result = smb_proc_dskattr(sb, buf);
+	int result;
+	
+	lock_kernel();
+
+	result = smb_proc_dskattr(sb, buf);
+
+	unlock_kernel();
 
 	buf->f_type = SMB_SUPER_MAGIC;
 	buf->f_namelen = SMB_MAXPATHLEN;

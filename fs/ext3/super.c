@@ -504,7 +504,7 @@ static struct super_operations ext3_sops = {
 	write_super:	ext3_write_super,	/* BKL not held. We take it. Needed? */
 	write_super_lockfs: ext3_write_super_lockfs, /* BKL not held. Take it */
 	unlockfs:	ext3_unlockfs,		/* BKL not held.  We take it */
-	statfs:		ext3_statfs,		/* BKL held */
+	statfs:		ext3_statfs,		/* BKL not held. */
 	remount_fs:	ext3_remount,		/* BKL held */
 };
 
