@@ -27,13 +27,18 @@ indirect_read_config(struct pci_bus *bus, unsigned int devfn, int offset,
 {
 	struct pci_controller *hose = bus->sysdata;
 	volatile unsigned char *cfg_data;
+	u8 cfg_type = 0;
 
 	if (ppc_md.pci_exclude_device)
 		if (ppc_md.pci_exclude_device(bus->number, devfn))
 			return PCIBIOS_DEVICE_NOT_FOUND;
+	
+	if (hose->set_cfg_type)
+		if (bus->number != hose->first_busno)
+			cfg_type = 1;
 
 	out_be32(hose->cfg_addr,
-		 ((offset & 0xfc) << 24) | (devfn << 16)
+		 (((offset & 0xfc) | cfg_type) << 24) | (devfn << 16)
 		 | ((bus->number - hose->bus_offset) << 8) | 0x80);
 	/*
 	 * Note: the caller has already checked that offset is
@@ -60,13 +65,18 @@ indirect_write_config(struct pci_bus *bus, unsigned int devfn, int offset,
 {
 	struct pci_controller *hose = bus->sysdata;
 	volatile unsigned char *cfg_data;
+	u8 cfg_type = 0;
 
 	if (ppc_md.pci_exclude_device)
 		if (ppc_md.pci_exclude_device(bus->number, devfn))
 			return PCIBIOS_DEVICE_NOT_FOUND;
 
+	if (hose->set_cfg_type)
+		if (bus->number != hose->first_busno)
+			cfg_type = 1;
+
 	out_be32(hose->cfg_addr,
-		 ((offset & 0xfc) << 24) | (devfn << 16)
+		 (((offset & 0xfc) | cfg_type) << 24) | (devfn << 16)
 		 | ((bus->number - hose->bus_offset) << 8) | 0x80);
 	/*
 	 * Note: the caller has already checked that offset is
