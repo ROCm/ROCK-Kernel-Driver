@@ -229,7 +229,7 @@ pci_find_parent_resource(const struct pci_dev *dev, struct resource *res)
 /**
  * pci_set_power_state - Set the power state of a PCI device
  * @dev: PCI device to be suspended
- * @state: Power state we're entering
+ * @state: PCI power state (D0, D1, D2, D3hot, D3cold) we're entering
  *
  * Transition a device to a new power state, using the Power Management 
  * Capabilities in the device's config space.
@@ -242,7 +242,7 @@ pci_find_parent_resource(const struct pci_dev *dev, struct resource *res)
  */
 
 int
-pci_set_power_state(struct pci_dev *dev, int state)
+pci_set_power_state(struct pci_dev *dev, pci_power_t state)
 {
 	int pm;
 	u16 pmcsr, pmc;
@@ -354,7 +354,7 @@ pci_enable_device_bars(struct pci_dev *dev, int bars)
 {
 	int err;
 
-	pci_set_power_state(dev, 0);
+	pci_set_power_state(dev, PCI_D0);
 	if ((err = pcibios_enable_device(dev, bars)) < 0)
 		return err;
 	return 0;
@@ -428,7 +428,7 @@ pci_disable_device(struct pci_dev *dev)
  * 0 if operation is successful.
  * 
  */
-int pci_enable_wake(struct pci_dev *dev, u32 state, int enable)
+int pci_enable_wake(struct pci_dev *dev, pci_power_t state, int enable)
 {
 	int pm;
 	u16 value;
