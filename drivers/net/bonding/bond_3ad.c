@@ -2356,8 +2356,8 @@ int bond_3ad_get_active_agg_info(struct bonding *bond, struct ad_info *ad_info)
 
 int bond_3ad_xmit_xor(struct sk_buff *skb, struct net_device *dev)
 {
-	slave_t *slave, *start_at;
-	struct bonding *bond = (struct bonding *) dev->priv;
+	struct slave *slave, *start_at;
+	struct bonding *bond = (struct bonding *)dev->priv;
 	struct ethhdr *data = (struct ethhdr *)skb->data;
 	int slave_agg_no;
 	int slaves_in_agg;
@@ -2379,7 +2379,7 @@ int bond_3ad_xmit_xor(struct sk_buff *skb, struct net_device *dev)
 	slave = bond->prev;
 
 	/* check if bond is empty */
-	if ((slave == (struct slave *) bond) || (bond->slave_cnt == 0)) {
+	if ((slave == (struct slave *)bond) || (bond->slave_cnt == 0)) {
 		printk(KERN_DEBUG DRV_NAME ": Error: bond is empty\n");
 		dev_kfree_skb(skb);
 		read_unlock(&bond->lock);
@@ -2413,7 +2413,7 @@ int bond_3ad_xmit_xor(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	slave_agg_no = (data->h_dest[5]^slave->dev->dev_addr[5]) % slaves_in_agg;
-	while (slave != (slave_t *)bond) {
+	while (slave != (struct slave *)bond) {
 		struct aggregator *agg = SLAVE_AD_INFO(slave).port.aggregator;
 
 		if (agg && (agg->aggregator_identifier == agg_id)) {
@@ -2432,7 +2432,7 @@ int bond_3ad_xmit_xor(struct sk_buff *skb, struct net_device *dev)
 		}
 	}
 
-	if (slave == (slave_t *)bond) {
+	if (slave == (struct slave *)bond) {
 		printk(KERN_ERR DRV_NAME ": Error: Couldn't find a slave to tx on for aggregator ID %d\n", agg_id);
 		dev_kfree_skb(skb);
 		read_unlock(&bond->lock);

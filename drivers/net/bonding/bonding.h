@@ -61,7 +61,7 @@
 		     ((slave)->state == BOND_STATE_ACTIVE))
 
 
-typedef struct slave {
+struct slave {
 	struct slave *next;
 	struct slave *prev;
 	struct net_device *dev;
@@ -76,7 +76,7 @@ typedef struct slave {
 	u8     perm_hwaddr[ETH_ALEN];
 	struct ad_slave_info ad_info; /* HUGE - better to dynamically alloc */
 	struct tlb_slave_info tlb_info;
-} slave_t;
+};
 
 /*
  * Here are the locking policies for the two bonding locks:
@@ -87,12 +87,12 @@ typedef struct slave {
  * 3) When we lock with bond->ptrlock, we must lock with bond->lock
  *    beforehand.
  */
-typedef struct bonding {
-	slave_t *next;
-	slave_t *prev;
-	slave_t *current_slave;
-	slave_t *primary_slave;
-	slave_t *current_arp_slave;
+struct bonding {
+	struct slave *next;
+	struct slave *prev;
+	struct slave *current_slave;
+	struct slave *primary_slave;
+	struct slave *current_arp_slave;
 	__s32 slave_cnt;
 	rwlock_t lock;
 	rwlock_t ptrlock;
@@ -109,22 +109,22 @@ typedef struct bonding {
 	unsigned short flags;
 	struct ad_bond_info ad_info;
 	struct alb_bond_info alb_info;
-} bonding_t;
+};
 
 /* Forward declarations */
-void bond_set_slave_active_flags(slave_t *slave);
-void bond_set_slave_inactive_flags(slave_t *slave);
+void bond_set_slave_active_flags(struct slave *slave);
+void bond_set_slave_inactive_flags(struct slave *slave);
 
 /**
  * These functions can be used for iterating the slave list
  * (which is circular)
  * Caller must hold bond lock for read
  */
-extern inline struct slave*
+extern inline struct slave *
 bond_get_first_slave(struct bonding *bond)
 {
 	/* if there are no slaves return NULL */
-	if (bond->next == (slave_t *)bond) {
+	if (bond->next == (struct slave *)bond) {
 		return NULL;
 	}
 	return bond->next;
@@ -133,7 +133,7 @@ bond_get_first_slave(struct bonding *bond)
 /**
  * Caller must hold bond lock for read
  */
-extern inline struct slave*
+extern inline struct slave *
 bond_get_next_slave(struct bonding *bond, struct slave *slave)
 {
 	/* If we have reached the last slave return NULL */
@@ -148,13 +148,13 @@ bond_get_next_slave(struct bonding *bond, struct slave *slave)
  *
  * Caller must hold bond lock for read
  */
-extern inline struct slave*
+extern inline struct slave *
 bond_get_slave_by_dev(struct bonding *bond, struct net_device *slave_dev)
 {
 	struct slave *our_slave = bond->next;
 
 	/* check if the list of slaves is empty */
-	if (our_slave == (slave_t *)bond) {
+	if (our_slave == (struct slave *)bond) {
 		return NULL;
 	}
 
@@ -166,14 +166,14 @@ bond_get_slave_by_dev(struct bonding *bond, struct net_device *slave_dev)
 	return our_slave;
 }
 
-extern inline struct bonding*
+extern inline struct bonding *
 bond_get_bond_by_slave(struct slave *slave)
 {
 	if (!slave || !slave->dev->master) {
 		return NULL;
 	}
 
-	return (struct bonding *)(slave->dev->master->priv);
+	return (struct bonding *)slave->dev->master->priv;
 }
 
 #endif /* _LINUX_BONDING_H */

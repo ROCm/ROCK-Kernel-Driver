@@ -257,7 +257,7 @@ tlb_deinitialize(struct bonding *bond)
 }
 
 /* Caller must hold bond lock for read */
-static struct slave*
+static struct slave *
 tlb_get_least_loaded_slave(struct bonding *bond)
 {
 	struct slave *slave;
@@ -299,7 +299,7 @@ tlb_get_least_loaded_slave(struct bonding *bond)
 }
 
 /* Caller must hold bond lock for read */
-struct slave*
+struct slave *
 tlb_choose_channel(struct bonding *bond, u32 hash_index, u32 skb_len)
 {
 	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
@@ -397,7 +397,7 @@ rlb_update_entry_from_arp(struct bonding *bond, struct arp_pkt *arp)
 static int
 rlb_arp_recv(struct sk_buff *skb,
 	     struct net_device *dev,
-	     struct packet_type* ptype)
+	     struct packet_type *ptype)
 {
 	struct bonding *bond = (struct bonding *)dev->priv;
 	int ret = NET_RX_DROP;
@@ -432,7 +432,7 @@ out:
 }
 
 /* Caller must hold bond lock for read */
-static struct slave*
+static struct slave *
 rlb_next_rx_slave(struct bonding *bond)
 {
 	struct slave *rx_slave = NULL, *slave = NULL;
@@ -607,7 +607,7 @@ rlb_req_update_slave_clients(struct bonding *bond, struct slave *slave)
 	u8 ntt = 0;
 	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
 	u8 mac_bcast[ETH_ALEN] = {0xff,0xff,0xff,0xff,0xff,0xff};
-	struct rlb_client_info* client_info = NULL;
+	struct rlb_client_info *client_info = NULL;
 
 	_lock_rx_hashtbl(bond);
 
@@ -680,7 +680,7 @@ rlb_req_update_subnet_clients(struct bonding *bond, u32 src_ip)
 }
 
 /* Caller must hold both bond and ptr locks for read */
-struct slave*
+struct slave *
 rlb_choose_channel(struct bonding *bond, struct arp_pkt *arp)
 {
 	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
@@ -768,7 +768,7 @@ rlb_choose_channel(struct bonding *bond, struct arp_pkt *arp)
  * does not choose channel for other arp types since they are
  * sent on the current_slave
  */
-static struct slave*
+static struct slave *
 rlb_arp_xmit(struct sk_buff *skb, struct bonding *bond)
 {
 	struct arp_pkt *arp = (struct arp_pkt *)skb->nh.raw;
@@ -1287,7 +1287,7 @@ bond_alb_deinitialize(struct bonding *bond)
 int
 bond_alb_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct bonding *bond = (struct bonding *) dev->priv;
+	struct bonding *bond = (struct bonding *)dev->priv;
 	struct ethhdr *eth_data = (struct ethhdr *)skb->data;
 	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
 	struct slave *tx_slave = NULL;
@@ -1652,7 +1652,7 @@ bond_alb_assign_current_slave(struct bonding *bond, struct slave *new_slave)
 int
 bond_alb_set_mac_address(struct net_device *dev, void *addr)
 {
-	struct bonding *bond = dev->priv;
+	struct bonding *bond = (struct bonding *)dev->priv;
 	struct sockaddr *sa = addr;
 	struct slave *swap_slave = NULL;
 	int error = 0;
