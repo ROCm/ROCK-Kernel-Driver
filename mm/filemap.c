@@ -628,7 +628,7 @@ static void wait_on_page_bit(struct page *page, int bit_nr)
  */
 void ___wait_on_page_locked(struct page *page)
 {
-	wait_on_page_bit(page, PG_locked_dontuse);
+	wait_on_page_bit(page, PG_locked);
 }
 EXPORT_SYMBOL(___wait_on_page_locked);
 

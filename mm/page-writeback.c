@@ -29,12 +29,12 @@
 /*
  * Start background writeback (via pdflush) at this level
  */
-static int dirty_background_ratio = 20;
+static int dirty_background_ratio = 40;
 
 /*
  * The generator of dirty data starts async writeback at this level
  */
-static int dirty_async_ratio = 60;
+static int dirty_async_ratio = 50;
 
 /*
  * The generator of dirty data performs sync writeout at this level
@@ -62,25 +62,27 @@ void balance_dirty_pages(struct address_space *mapping)
 	int async_thresh;
 	int sync_thresh;
 	int wake_pdflush = 0;
-	unsigned long dirty_and_locked;
+	unsigned long dirty_and_writeback;
 
 	get_page_state(&ps);
-	dirty_and_locked = ps.nr_dirty + ps.nr_locked;
+	dirty_and_writeback = ps.nr_dirty + ps.nr_writeback;
 
 	background_thresh = (dirty_background_ratio * tot) / 100;
 	async_thresh = (dirty_async_ratio * tot) / 100;
 	sync_thresh = (dirty_sync_ratio * tot) / 100;
 
-	if (dirty_and_locked > sync_thresh) {
-		int nr_to_write = dirty_and_locked - async_thresh;
+	if (dirty_and_writeback > sync_thresh) {
+		int nr_to_write = 1500;
 
 		writeback_unlocked_inodes(&nr_to_write, WB_SYNC_LAST, NULL);
+		get_page_state(&ps);
+		dirty_and_writeback = ps.nr_dirty + ps.nr_writeback;
 		wake_pdflush = 1;
-	} else if (dirty_and_locked > async_thresh) {
-		int nr_to_write = dirty_and_locked - async_thresh;
+	} else if (dirty_and_writeback > async_thresh) {
+		int nr_to_write = 1500;
 
 		writeback_unlocked_inodes(&nr_to_write, WB_SYNC_NONE, NULL);
-	} else if (dirty_and_locked > background_thresh) {
+	} else if (dirty_and_writeback > background_thresh) {
 		wake_pdflush = 1;
 	}
 
@@ -88,9 +90,8 @@ void balance_dirty_pages(struct address_space *mapping)
 		/*
 		 * There is no flush thread against this device. Start one now.
 		 */
-		get_page_state(&ps);
-		if (ps.nr_dirty > 0) {
-			pdflush_flush(ps.nr_dirty);
+		if (dirty_and_writeback > async_thresh) {
+			pdflush_flush(dirty_and_writeback - async_thresh);
 			yield();
 		}
 	}
@@ -109,7 +110,7 @@ void balance_dirty_pages_ratelimited(struct address_space *mapping)
 
 	preempt_disable();
 	cpu = smp_processor_id();
-	if (ratelimits[cpu].count++ >= 32) {
+	if (ratelimits[cpu].count++ >= 1000) {
 		ratelimits[cpu].count = 0;
 		preempt_enable();
 		balance_dirty_pages(mapping);

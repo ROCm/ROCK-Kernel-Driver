@@ -159,7 +159,7 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		"SwapTotal:    %8lu kB\n"
 		"SwapFree:     %8lu kB\n"
 		"Dirty:        %8lu kB\n"
-		"Locked:       %8lu kB\n",
+		"Writeback:    %8lu kB\n",
 		K(i.totalram),
 		K(i.freeram),
 		K(i.sharedram),
@@ -175,7 +175,7 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		K(i.totalswap),
 		K(i.freeswap),
 		K(ps.nr_dirty),
-		K(ps.nr_locked)
+		K(ps.nr_writeback)
 		);
 
 	return proc_calc_metrics(page, start, off, count, eof, len);
