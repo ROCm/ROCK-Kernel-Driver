@@ -486,6 +486,21 @@ setup_arch(char **cmdline_p)
 	hwrpb = (struct hwrpb_struct*) __va(INIT_HWRPB->phys_addr);
 	boot_cpuid = hard_smp_processor_id();
 
+        /*
+	 * Pre-process the system type to make sure it will be valid.
+	 *
+	 * This may restore real CABRIO and EB66+ family names, ie
+	 * EB64+ and EB66.
+	 *
+	 * Oh, and "white box" AS800 (aka DIGITAL Server 3000 series)
+	 * and AS1200 (DIGITAL Server 5000 series) have the type as
+	 * the negative of the real one.
+	 */
+        if ((long)hwrpb->sys_type < 0) {
+		hwrpb->sys_type = -((long)hwrpb->sys_type);
+		hwrpb_update_checksum(hwrpb);
+	}
+
 	/* Register a call for panic conditions. */
 	notifier_chain_register(&panic_notifier_list, &alpha_panic_block);
 
