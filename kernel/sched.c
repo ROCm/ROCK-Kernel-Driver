@@ -902,11 +902,9 @@ unsigned long nr_uninterruptible(void)
 {
 	unsigned long i, sum = 0;
 
-	for (i = 0; i < NR_CPUS; i++) {
-		if (!cpu_online(i))
-			continue;
+	for_each_cpu(i)
 		sum += cpu_rq(i)->nr_uninterruptible;
-	}
+
 	return sum;
 }
 
@@ -914,11 +912,9 @@ unsigned long nr_context_switches(void)
 {
 	unsigned long i, sum = 0;
 
-	for (i = 0; i < NR_CPUS; i++) {
-		if (!cpu_online(i))
-			continue;
+	for_each_cpu(i)
 		sum += cpu_rq(i)->nr_switches;
-	}
+
 	return sum;
 }
 
@@ -926,11 +922,9 @@ unsigned long nr_iowait(void)
 {
 	unsigned long i, sum = 0;
 
-	for (i = 0; i < NR_CPUS; ++i) {
-		if (!cpu_online(i))
-			continue;
+	for_each_cpu(i)
 		sum += atomic_read(&cpu_rq(i)->nr_iowait);
-	}
+
 	return sum;
 }
 

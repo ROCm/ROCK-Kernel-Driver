@@ -332,10 +332,7 @@ int del_timer_sync(struct timer_list *timer)
 del_again:
 	ret += del_timer(timer);
 
-	for (i = 0; i < NR_CPUS; i++) {
-		if (!cpu_online(i))
-			continue;
-
+	for_each_cpu(i) {
 		base = &per_cpu(tvec_bases, i);
 		if (base->running_timer == timer) {
 			while (base->running_timer == timer) {

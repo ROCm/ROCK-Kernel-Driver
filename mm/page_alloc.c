@@ -868,14 +868,14 @@ void __get_page_state(struct page_state *ret, int nr)
 	while (cpu < NR_CPUS) {
 		unsigned long *in, *out, off;
 
-		if (!cpu_online(cpu)) {
+		if (!cpu_possible(cpu)) {
 			cpu++;
 			continue;
 		}
 
 		in = (unsigned long *)&per_cpu(page_states, cpu);
 		cpu++;
-		if (cpu < NR_CPUS && cpu_online(cpu))
+		if (cpu < NR_CPUS && cpu_possible(cpu))
 			prefetch(&per_cpu(page_states, cpu));
 		out = (unsigned long *)ret;
 		for (off = 0; off < nr; off++)

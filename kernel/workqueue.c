@@ -366,9 +366,7 @@ int current_is_keventd(void)
 
 	BUG_ON(!keventd_wq);
 
-	for (cpu = 0; cpu < NR_CPUS; cpu++) {
-		if (!cpu_online(cpu))
-			continue;
+	for_each_cpu(cpu) {
 		cwq = keventd_wq->cpu_wq + cpu;
 		if (current == cwq->thread)
 			return 1;

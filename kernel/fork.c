@@ -60,10 +60,9 @@ int nr_processes(void)
 	int cpu;
 	int total = 0;
 
-	for (cpu = 0; cpu < NR_CPUS; cpu++) {
-		if (cpu_online(cpu))
-			total += per_cpu(process_counts, cpu);
-	}
+	for_each_cpu(cpu)
+		total += per_cpu(process_counts, cpu);
+
 	return total;
 }
 
