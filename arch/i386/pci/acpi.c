@@ -32,4 +32,14 @@ static int __init pci_acpi_init(void)
 	return 0;
 }
 
+/*
+ * pci_disable_acpi()
+ * act like pci=noacpi seen on command line
+ * called by DMI blacklist code
+ */
+__init void pci_disable_acpi(void)
+{
+        pci_probe |= PCI_NO_ACPI_ROUTING;
+}
+
 subsys_initcall(pci_acpi_init);

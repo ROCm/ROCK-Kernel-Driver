@@ -846,8 +846,11 @@ config SOFTWARE_SUSPEND
 
 source "drivers/acpi/Kconfig"
 
+menu "APM (Advanced Power Management) BIOS Support"
+depends on PM
+
 config APM
-	tristate "Advanced Power Management BIOS support"
+	tristate "APM (Advanced Power Management) BIOS support"
 	depends on PM
 	---help---
 	  APM is a BIOS specification for saving power using several different
@@ -990,6 +993,8 @@ config APM_REAL_MODE_POWER_OFF
 	  Use real mode APM BIOS calls to switch off the computer. This is
 	  a work-around for a number of buggy BIOSes. Switch this option on if
 	  your computer crashes instead of powering off properly.
+
+endmenu
 
 source "arch/i386/kernel/cpu/cpufreq/Kconfig"
 

@@ -273,6 +273,16 @@ retry:
 		printk("VFS: Cannot open root device \"%s\" or %s\n",
 				root_device_name, b);
 		printk("Please append a correct \"root=\" boot option\n");
+#ifdef __i386__
+ 		{
+ 			extern void dmi_dump_system(void);
+ 			printk ("You may want to retry boot with pci=noacpi, "
+ 				"acpi=ht, or acpi=off on the command line.\n");
+ 			printk ("If one of them helps please report it with "
+ 				"the following lines:\n");
+ 			dmi_dump_system();
+ 		}
+#endif
 		panic("VFS: Unable to mount root fs on %s", b);
 	}
 	panic("VFS: Unable to mount root fs on %s", __bdevname(ROOT_DEV, b));

@@ -11,7 +11,6 @@
 
 #include "cpu.h"
 
-static int disable_P4_HT __initdata = 0;
 extern int trap_init_f00f_bug(void);
 
 #ifdef CONFIG_X86_INTEL_USERCOPY
@@ -68,13 +67,6 @@ int __init ppro_with_ram_bug(void)
 	return 0;
 }
 	
-static int __init P4_disable_ht(char *s)
-{
-	disable_P4_HT = 1;
-	return 1;
-}
-__setup("noht", P4_disable_ht);
-
 #define LVL_1_INST	1
 #define LVL_1_DATA	2
 #define LVL_2		3
@@ -281,7 +273,7 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 		strcpy(c->x86_model_id, p);
 	
 #ifdef CONFIG_X86_HT
-	if (cpu_has(c, X86_FEATURE_HT) && !disable_P4_HT) {
+	if (cpu_has(c, X86_FEATURE_HT)) {
 		extern	int phys_proc_id[NR_CPUS];
 		
 		u32 	eax, ebx, ecx, edx;
@@ -329,8 +321,6 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 	}
 too_many_siblings:
 
-	if (disable_P4_HT)
-		clear_bit(X86_FEATURE_HT, c->x86_capability);
 #endif
 
 	/* Work around errata */

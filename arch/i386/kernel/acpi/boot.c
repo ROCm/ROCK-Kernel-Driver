@@ -39,6 +39,7 @@
 #define PREFIX			"ACPI: "
 
 extern int acpi_disabled;
+extern int acpi_ht;
 
 /* --------------------------------------------------------------------------
                               Boot-time Configuration
@@ -157,7 +158,7 @@ acpi_parse_lapic_addr_ovr (
 	return 0;
 }
 
-#ifndef CONFIG_ACPI_HT_ONLY
+#ifdef CONFIG_ACPI
 
 static int __init
 acpi_parse_lapic_nmi (
@@ -177,7 +178,7 @@ acpi_parse_lapic_nmi (
 	return 0;
 }
 
-#endif /*CONFIG_ACPI_HT_ONLY*/
+#endif /*CONFIG_ACPI*/
 
 #endif /*CONFIG_X86_LOCAL_APIC*/
 
@@ -185,7 +186,7 @@ acpi_parse_lapic_nmi (
 
 int acpi_ioapic;
 
-#ifndef CONFIG_ACPI_HT_ONLY
+#ifdef CONFIG_ACPI
 
 static int __init
 acpi_parse_ioapic (
@@ -247,7 +248,7 @@ acpi_parse_nmi_src (
 	return 0;
 }
 
-#endif /*!CONFIG_ACPI_HT_ONLY*/ 
+#endif /*CONFIG_ACPI*/ 
 #endif /*CONFIG_X86_IO_APIC*/
 
 
@@ -289,11 +290,33 @@ acpi_find_rsdp (void)
 	return rsdp_phys;
 }
 
+/*
+ * acpi_boot_init()
+ *  called from setup_arch(), always.
+ *	1. maps ACPI tables for later use
+ *	2. enumerates lapics
+ *	3. enumerates io-apics
+ *
+ * side effects:
+ *	acpi_lapic = 1 if LAPIC found
+ *	acpi_ioapic = 1 if IOAPIC found
+ *	if (acpi_lapic && acpi_ioapic) smp_found_config = 1;
+ *	if acpi_blacklisted() acpi_disabled = 1;
+ *	acpi_irq_model=...
+ *	...
+ *
+ * return value: (currently ignored)
+ *	0: success
+ *	!0: failure
+ */
 
 int __init
 acpi_boot_init (void)
 {
 	int			result = 0;
+
+	if (acpi_disabled && !acpi_ht)
+		 return 1;
 
 	/*
 	 * The default interrupt routing model is PIC (8259).  This gets
@@ -308,14 +331,14 @@ acpi_boot_init (void)
 	if (result)
 		return result;
 
+#ifdef	CONFIG_ACPI
 	result = acpi_blacklisted();
 	if (result) {
 		printk(KERN_WARNING PREFIX "BIOS listed in blacklist, disabling ACPI support\n");
 		acpi_disabled = 1;
 		return result;
 	}
-	else
-		printk(KERN_NOTICE PREFIX "BIOS not listed in blacklist\n");
+#endif
 
 #ifdef CONFIG_X86_LOCAL_APIC
 
@@ -366,26 +389,36 @@ acpi_boot_init (void)
 		return result;
 	}
 
-#ifndef CONFIG_ACPI_HT_ONLY
+#ifdef	CONFIG_ACPI
 	result = acpi_table_parse_madt(ACPI_MADT_LAPIC_NMI, acpi_parse_lapic_nmi);
 	if (result < 0) {
 		printk(KERN_ERR PREFIX "Error parsing LAPIC NMI entry\n");
 		/* TBD: Cleanup to allow fallback to MPS */
 		return result;
 	}
-#endif /*!CONFIG_ACPI_HT_ONLY*/
+#endif /*CONFIG_ACPI*/
 
 	acpi_lapic = 1;
 
 #endif /*CONFIG_X86_LOCAL_APIC*/
 
 #ifdef CONFIG_X86_IO_APIC
-#ifndef CONFIG_ACPI_HT_ONLY
+#ifdef	CONFIG_ACPI
 
 	/* 
 	 * I/O APIC 
 	 * --------
 	 */
+
+	/*
+	 * ACPI interpreter is required to complete interrupt setup,
+	 * so if it is off, don't enumerate the io-apics with ACPI.
+	 * If MPS is present, it will handle them,
+	 * otherwise the system will stay in PIC mode
+	 */
+	if (acpi_disabled) {
+		return 1;
+        }
 
 	result = acpi_table_parse_madt(ACPI_MADT_IOAPIC, acpi_parse_ioapic);
 	if (!result) { 
@@ -418,7 +451,7 @@ acpi_boot_init (void)
 
 	acpi_ioapic = 1;
 
-#endif /*!CONFIG_ACPI_HT_ONLY*/
+#endif /*CONFIG_ACPI*/
 #endif /*CONFIG_X86_IO_APIC*/
 
 #ifdef CONFIG_X86_LOCAL_APIC
