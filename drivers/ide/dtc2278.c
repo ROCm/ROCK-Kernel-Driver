@@ -89,7 +89,7 @@ static void tune_dtc2278 (ide_drive_t *drive, byte pio)
 	 * 32bit I/O has to be enabled for *both* drives at the same time.
 	 */
 	drive->io_32bit = 1;
-	HWIF(drive)->drives[!drive->select.b.unit].io_32bit = 1;
+	drive->channel->drives[!drive->select.b.unit].io_32bit = 1;
 }
 
 void __init init_dtc2278 (void)
@@ -126,5 +126,5 @@ void __init init_dtc2278 (void)
 	ide_hwifs[1].drives[1].no_unmask = 1;
 	ide_hwifs[0].mate = &ide_hwifs[1];
 	ide_hwifs[1].mate = &ide_hwifs[0];
-	ide_hwifs[1].channel = 1;
+	ide_hwifs[1].unit = 1;
 }

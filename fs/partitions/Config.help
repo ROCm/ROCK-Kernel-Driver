@@ -115,6 +115,11 @@ CONFIG_SGI_PARTITION
   Say Y here if you would like to be able to read the hard disk
   partition table format used by SGI machines.
 
+CONFIG_EFI_PARTITION
+  Say Y here if you would like to use hard disks under Linux which
+  were partitioned using EFI GPT.  Presently only useful on the
+  IA-64 platform.
+
 CONFIG_ULTRIX_PARTITION
   Say Y here if you would like to be able to read the hard disk
   partition table format used by DEC (now Compaq) Ultrix machines.

@@ -100,7 +100,7 @@ static int arc_floppy_cmdend_get_dma_residue(dmach_t channel, dma_t *dma)
 	/* 10/1/1999 DAG - Presume whether there is an outstanding command? */
 	extern unsigned int fdc1772_fdc_int_done;
 
-	* Explicit! If the int done is 0 then 1 int to go */
+	/* Explicit! If the int done is 0 then 1 int to go */
 	return (fdc1772_fdc_int_done==0)?1:0;
 }
 

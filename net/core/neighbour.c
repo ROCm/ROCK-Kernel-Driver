@@ -1239,6 +1239,7 @@ int neigh_add(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 	read_lock(&neigh_tbl_lock);
 	for (tbl=neigh_tables; tbl; tbl = tbl->next) {
 		int err = 0;
+		int override = 1;
 		struct neighbour *n;
 
 		if (tbl->family != ndm->ndm_family)
@@ -1266,6 +1267,7 @@ int neigh_add(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 		if (n) {
 			if (nlh->nlmsg_flags&NLM_F_EXCL)
 				err = -EEXIST;
+			override = nlh->nlmsg_flags&NLM_F_REPLACE;
 		} else if (!(nlh->nlmsg_flags&NLM_F_CREATE))
 			err = -ENOENT;
 		else {
@@ -1278,7 +1280,7 @@ int neigh_add(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 		if (err == 0) {
 			err = neigh_update(n, nda[NDA_LLADDR-1] ? RTA_DATA(nda[NDA_LLADDR-1]) : NULL,
 					   ndm->ndm_state,
-					   nlh->nlmsg_flags&NLM_F_REPLACE, 0);
+					   override, 0);
 		}
 		if (n)
 			neigh_release(n);

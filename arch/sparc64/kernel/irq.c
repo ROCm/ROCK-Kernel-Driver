@@ -82,7 +82,7 @@ unsigned char dma_sync_reg_table_entry = 0;
  */
 #define MAX_STATIC_ALLOC	4
 static struct irqaction static_irqaction[MAX_STATIC_ALLOC];
-static int static_irq_count = 0;
+static int static_irq_count;
 
 /* This is exported so that fast IRQ handlers can get at it... -DaveM */
 struct irqaction *irq_action[NR_IRQS+1] = {

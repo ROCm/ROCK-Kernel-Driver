@@ -32,6 +32,7 @@
 #include <linux/types.h>
 #include <linux/irq.h>
 #include <linux/acpi.h>
+#include <linux/err.h>
 
 #define PREFIX			"ACPI: "
 

@@ -1443,7 +1443,7 @@ aic7xxx_setup(char *s)
 
   end = strchr(s, '\0');
 
-  for (p = strtok(s, ",."); p; p = strtok(NULL, ",."))
+  while ((p = strsep(&s, ",.")) != NULL)
   {
     for (i = 0; i < NUMBER(options); i++)
     {
@@ -1525,7 +1525,7 @@ aic7xxx_setup(char *s)
               }
             }
             while((p != base) && (p != NULL))
-              p = strtok(NULL, ",.");
+              p = strsep(&s, ",.");
           }
         }
         else if (p[n] == ':')

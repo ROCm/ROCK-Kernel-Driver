@@ -1,9 +1,3 @@
-/*
- *	uart401.h 
- *
- * Copyright:	Christoph Hellwig <chhellwig@gmx.net>
- *
- */
 
 /*	From uart401.c */
 int probe_uart401 (struct address_info *hw_config, struct module *owner);

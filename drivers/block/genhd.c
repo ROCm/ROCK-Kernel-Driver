@@ -22,6 +22,7 @@
 #include <linux/blk.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
+#include <linux/seq_file.h>
 
 
 static rwlock_t gendisk_lock;
@@ -142,39 +143,58 @@ get_nr_sects(kdev_t dev)
 }
 
 #ifdef CONFIG_PROC_FS
-int
-get_partition_list(char *page, char **start, off_t offset, int count)
+/* iterator */
+static void *part_start(struct seq_file *part, loff_t *pos)
 {
-	struct gendisk *gp;
-	char buf[64];
-	int len, n;
+	loff_t k = *pos;
+	struct gendisk *sgp;
 
-	len = sprintf(page, "major minor  #blocks  name\n\n");
 	read_lock(&gendisk_lock);
-	for (gp = gendisk_head; gp; gp = gp->next) {
-		for (n = 0; n < (gp->nr_real << gp->minor_shift); n++) {
-			if (gp->part[n].nr_sects == 0)
-				continue;
+	for (sgp = gendisk_head; sgp; sgp = sgp->next) {
+		if (!k--)
+			return sgp;
+	}
+	return NULL;
+}
 
-			len += snprintf(page + len, 63,
-					"%4d  %4d %10d %s\n",
-					gp->major, n, gp->sizes[n],
-					disk_name(gp, n, buf));
-			if (len < offset)
-				offset -= len, len = 0;
-			else if (len >= offset + count)
-				goto out;
-		}
+static void *part_next(struct seq_file *part, void *v, loff_t *pos)
+{
+	++*pos;
+	return ((struct gendisk *)v)->next;
+}
+
+static void part_stop(struct seq_file *part, void *v)
+{
+	read_unlock(&gendisk_lock);
+}
+
+static int show_partition(struct seq_file *part, void *v)
+{
+	struct gendisk *sgp = v;
+	int n;
+	char buf[64];
+
+	if (sgp == gendisk_head)
+		seq_puts(part, "major minor  #blocks  name\n\n");
+
+	/* show all non-0 size partitions of this disk */
+	for (n = 0; n < (sgp->nr_real << sgp->minor_shift); n++) {
+		if (sgp->part[n].nr_sects == 0)
+			continue;
+		seq_printf(part, "%4d  %4d %10d %s\n",
+			sgp->major, n, sgp->sizes[n],
+			disk_name(sgp, n, buf));
 	}
 
-out:
-	read_unlock(&gendisk_lock);
-	*start = page + offset;
-	len -= offset;
-	if (len < 0)
-		len = 0;
-	return len > count ? count : len;
+	return 0;
 }
+
+struct seq_operations partitions_op = {
+	start:	part_start,
+	next:	part_next,
+	stop:	part_stop,
+	show:	show_partition
+};
 #endif
 
 

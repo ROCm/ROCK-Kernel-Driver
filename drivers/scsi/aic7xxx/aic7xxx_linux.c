@@ -906,7 +906,7 @@ ahc_softc_comp(struct ahc_softc *lahc, struct ahc_softc *rahc)
 }
 
 static void
-ahc_linux_setup_tag_info(char *p, char *end)
+ahc_linux_setup_tag_info(char *p, char *end, char *s)
 {
 	char	*base;
 	char	*tok;
@@ -986,7 +986,7 @@ ahc_linux_setup_tag_info(char *p, char *end)
 		}
 	}
 	while ((p != base) && (p != NULL))
-		p = strtok(NULL, ",.");
+		p = strsep(&s, ",.");
 }
 
 /*
@@ -1018,7 +1018,8 @@ aic7xxx_setup(char *s)
 
 	end = strchr(s, '\0');
 
-	for (p = strtok(s, ",."); p; p = strtok(NULL, ",.")) {
+	while ((p = strsep(&s, ",.")) != NULL) {
+		if (!*p) continue;
 		for (i = 0; i < NUM_ELEMENTS(options); i++) {
 			n = strlen(options[i].name);
 
@@ -1026,7 +1027,7 @@ aic7xxx_setup(char *s)
 				continue;
 
 			if (strncmp(p, "tag_info", n) == 0) {
-				ahc_linux_setup_tag_info(p + n, end);
+				ahc_linux_setup_tag_info(p + n, end, s);
 			} else if (p[n] == ':') {
 				*(options[i].flag) =
 				    simple_strtoul(p + n + 1, NULL, 0);

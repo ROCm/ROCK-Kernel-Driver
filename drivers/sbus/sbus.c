@@ -392,6 +392,10 @@ static int __init sbus_init(void)
 		sbus_bus_ranges_init(iommund, sbus);
 
 		sbus_devs = prom_getchild(this_sbus);
+		if (!sbus_devs) {
+			sbus->devices = NULL;
+			goto next_bus;
+		}
 
 		sbus->devices = kmalloc(sizeof(struct sbus_dev), GFP_ATOMIC);
 
@@ -455,7 +459,7 @@ static int __init sbus_init(void)
 		sbus_fixup_all_regs(sbus->devices);
 
 		dvma_init(sbus);
-
+	next_bus:
 		num_sbus++;
 		if(sparc_cpu_model == sun4u) {
 			this_sbus = prom_getsibling(this_sbus);

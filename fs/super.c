@@ -26,6 +26,7 @@
 #include <linux/smp_lock.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/acct.h>
+#include <linux/blkdev.h>
 #include <asm/uaccess.h>
 
 void get_filesystem(struct file_system_type *fs);
@@ -513,6 +514,8 @@ struct super_block *get_sb_bdev(struct file_system_type *fs_type,
 	} else {
 		s->s_flags = flags;
 		strncpy(s->s_id, bdevname(dev), sizeof(s->s_id));
+		s->s_old_blocksize = block_size(dev);
+		sb_set_blocksize(s, s->s_old_blocksize);
 		error = fill_super(s, data, flags & MS_VERBOSE ? 1 : 0);
 		if (error) {
 			up_write(&s->s_umount);
@@ -535,6 +538,7 @@ void kill_block_super(struct super_block *sb)
 {
 	struct block_device *bdev = sb->s_bdev;
 	generic_shutdown_super(sb);
+	set_blocksize(to_kdev_t(bdev->bd_dev), sb->s_old_blocksize);
 	bd_release(bdev);
 	blkdev_put(bdev, BDEV_FS);
 }

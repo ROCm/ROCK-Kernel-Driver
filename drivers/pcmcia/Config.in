@@ -24,6 +24,8 @@ if [ "$CONFIG_PCMCIA" != "n" ]; then
       dep_tristate '  HD64465 host bridge support' CONFIG_HD64465_PCMCIA $CONFIG_PCMCIA
    fi
 fi
-dep_tristate '  SA1100 support' CONFIG_PCMCIA_SA1100 $CONFIG_ARCH_SA1100 $CONFIG_PCMCIA
+if [ "$CONFIG_ARM" = "y" ]; then
+   dep_tristate '  SA1100 support' CONFIG_PCMCIA_SA1100 $CONFIG_ARCH_SA1100 $CONFIG_PCMCIA
+fi
 
 endmenu

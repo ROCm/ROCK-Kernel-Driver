@@ -302,6 +302,7 @@ int lvm_snapshot_COW(kdev_t org_phys_dev,
 {
 	const char * reason;
 	kdev_t snap_phys_dev;
+	struct block_device *org_bdev, *snap_bdev;
 	unsigned long org_start, snap_start, virt_start, pe_off;
 	int idx = lv_snap->u.lv_remap_ptr, chunk_size = lv_snap->u.lv_chunk_size;
 	struct kiobuf * iobuf;
@@ -320,6 +321,15 @@ int lvm_snapshot_COW(kdev_t org_phys_dev,
 	/* calculate physical boundaries of destination chunk */
 	snap_phys_dev = lv_snap->u.lv_block_exception[idx].rdev_new;
 	snap_start = lv_snap->u.lv_block_exception[idx].rsector_new;
+
+	org_bdev = bdget(kdev_t_to_nr(org_phys_dev));
+	if (!org_bdev)
+		goto fail_enomem;
+	snap_bdev = bdget(kdev_t_to_nr(snap_phys_dev));
+	if (!snap_bdev) {
+		bdput(org_bdev);
+		goto fail_enomem;
+	}
 
 #ifdef DEBUG_SNAPSHOT
 	printk(KERN_INFO
@@ -356,7 +366,7 @@ int lvm_snapshot_COW(kdev_t org_phys_dev,
 						nr_sectors, blksize_org))
 			goto fail_prepare;
 
-		if (brw_kiovec(READ, 1, &iobuf, org_phys_dev,
+		if (brw_kiovec(READ, 1, &iobuf, org_bdev,
 			       lv_snap->blocks, blksize_org) != (nr_sectors<<9))
 			goto fail_raw_read;
 
@@ -364,7 +374,7 @@ int lvm_snapshot_COW(kdev_t org_phys_dev,
 						nr_sectors, blksize_snap))
 			goto fail_prepare;
 
-		if (brw_kiovec(WRITE, 1, &iobuf, snap_phys_dev,
+		if (brw_kiovec(WRITE, 1, &iobuf, snap_bdev,
 			       lv_snap->blocks, blksize_snap) !=(nr_sectors<<9))
 			goto fail_raw_write;
 	}
@@ -387,16 +397,21 @@ int lvm_snapshot_COW(kdev_t org_phys_dev,
 		if (lv_snap->u.lv_remap_ptr * 100 / lv_snap->u.lv_remap_end >= lv_snap->lv_snapshot_use_rate)
 			wake_up_interruptible(&lv_snap->lv_snapshot_wait);
 	}
+	bdput(snap_bdev);
+	bdput(org_bdev);
 	return 0;
 
 	/* slow path */
  out:
+	bdput(snap_bdev);
+	bdput(org_bdev);
+ out1:
 	lvm_drop_snapshot(vg, lv_snap, reason);
 	return 1;
 
  fail_out_of_space:
 	reason = "out of space";
-	goto out;
+	goto out1;
  fail_raw_read:
 	reason = "read error";
 	goto out;
@@ -405,7 +420,9 @@ int lvm_snapshot_COW(kdev_t org_phys_dev,
 	goto out;
  fail_blksize:
 	reason = "blocksize error";
-	goto out;
+ fail_enomem:
+	reason = "out of memory";
+	goto out1;
 
  fail_prepare:
 	reason = "couldn't prepare kiovec blocks "
@@ -569,6 +586,7 @@ static int _write_COW_table_block(vg_t *vg, lv_t *lv_snap,
 		COW_entries_per_pe, COW_chunks_per_pe, COW_entries_per_block;
 	ulong blocks[1];
 	kdev_t snap_phys_dev;
+	struct block_device *bdev;
 	lv_block_exception_t *be;
 	struct kiobuf * COW_table_iobuf = lv_snap->lv_COW_table_iobuf;
 	lv_COW_table_disk_t * lv_COW_table =
@@ -580,6 +598,8 @@ static int _write_COW_table_block(vg_t *vg, lv_t *lv_snap,
 	/* get physical addresse of destination chunk */
 	snap_phys_dev = lv_snap->u.lv_block_exception[idx].rdev_new;
 	snap_pe_start = lv_snap->u.lv_block_exception[idx - (idx % COW_entries_per_pe)].rsector_new - lv_snap->u.lv_chunk_size;
+
+	bdev = bdget(kdev_t_to_nr(snap_phys_dev));
 
 	blksize_snap = block_size(snap_phys_dev);
 
@@ -611,7 +631,7 @@ static int _write_COW_table_block(vg_t *vg, lv_t *lv_snap,
 
 	COW_table_iobuf->length = blksize_snap;
 
-	if (brw_kiovec(WRITE, 1, &COW_table_iobuf, snap_phys_dev,
+	if (brw_kiovec(WRITE, 1, &COW_table_iobuf, bdev,
 		       blocks, blksize_snap) != blksize_snap)
 		goto fail_raw_write;
 
@@ -629,25 +649,30 @@ static int _write_COW_table_block(vg_t *vg, lv_t *lv_snap,
 			idx++;
 			snap_phys_dev = lv_snap->u.lv_block_exception[idx].rdev_new;
 			snap_pe_start = lv_snap->u.lv_block_exception[idx - (idx % COW_entries_per_pe)].rsector_new - lv_snap->u.lv_chunk_size;
+			bdput(bdev);
+			bdev = bdget(kdev_t_to_nr(snap_phys_dev));
 			blksize_snap = block_size(snap_phys_dev);
 			blocks[0] = snap_pe_start >> (blksize_snap >> 10);
 		} else blocks[0]++;
 
-               if (brw_kiovec(WRITE, 1, &COW_table_iobuf, snap_phys_dev,
+               if (brw_kiovec(WRITE, 1, &COW_table_iobuf, bdev,
                                  blocks, blksize_snap) !=
                     blksize_snap)
 			goto fail_raw_write;
 	}
 
  out:
+	bdput(bdev);
 	return 0;
 
  fail_raw_write:
 	*reason = "write error";
+	bdput(bdev);
 	return 1;
 
  fail_pv_get_number:
 	*reason = "_pv_get_number failed";
+	bdput(bdev);
 	return 1;
 }
 

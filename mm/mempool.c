@@ -34,6 +34,9 @@ mempool_t * mempool_create(int min_nr, mempool_alloc_t *alloc_fn,
 	mempool_t *pool;
 	int i;
 
+	BUG_ON(!alloc_fn);
+	BUG_ON(!free_fn);
+
 	pool = kmalloc(sizeof(*pool), GFP_KERNEL);
 	if (!pool)
 		return NULL;

@@ -22,7 +22,7 @@ static unsigned long power_reg = 0UL;
 #define POWER_COURTESY_OFF (1 << 1)
 
 static DECLARE_WAIT_QUEUE_HEAD(powerd_wait);
-static int button_pressed = 0;
+static int button_pressed;
 
 static void power_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
@@ -81,7 +81,7 @@ void __init power_init(void)
 {
 	struct linux_ebus *ebus;
 	struct linux_ebus_device *edev;
-	static int invoked = 0;
+	static int invoked;
 
 	if (invoked)
 		return;

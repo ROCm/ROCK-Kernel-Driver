@@ -295,6 +295,22 @@ static __init int apm_is_horked(struct dmi_blacklist *d)
 	return 0;
 }
 
+/*
+ * Work around broken HP Pavilion Notebooks which assign USB to
+ * IRQ 9 even though it is actually wired to IRQ 11
+ */
+static __init int fix_broken_hp_bios_irq9(struct dmi_blacklist *d)
+{
+#ifdef CONFIG_PCI
+	extern int broken_hp_bios_irq9;
+	if (broken_hp_bios_irq9 == 0)
+	{
+		broken_hp_bios_irq9 = 1;
+		printk(KERN_INFO "%s detected - fixing broken IRQ routing\n", d->ident);
+	}
+#endif
+	return 0;
+}
 
 /*
  *  Check for clue free BIOS implementations who use
@@ -438,6 +454,25 @@ static int __init local_apic_kills_bios(struct dmi_blacklist *d)
 }
 
 /*
+ * The Microstar 6163-2 (a.k.a Pro) mainboard will hang shortly after
+ * resumes, and also at what appears to be asynchronous APM events,
+ * if the local APIC is enabled.
+ */
+static int __init apm_kills_local_apic(struct dmi_blacklist *d)
+{
+#ifdef CONFIG_X86_LOCAL_APIC
+	extern int dont_enable_local_apic;
+	if (apm_info.bios.version && !dont_enable_local_apic) {
+		dont_enable_local_apic = 1;
+		printk(KERN_WARNING "%s with broken BIOS detected. "
+		       "Refusing to enable the local APIC.\n",
+		       d->ident);
+	}
+#endif
+	return 0;
+}
+
+/*
  * The Intel AL440LX mainboard will hang randomly if the local APIC
  * timer is running and the APM BIOS hasn't been disabled.
  */
@@ -483,10 +518,10 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			} },
 #endif			
 	{ broken_ps2_resume, "Dell Latitude C600", {	/* Handle problems with APM on the C600 */
-		        MATCH(DMI_SYS_VENDOR, "Dell"),
+			MATCH(DMI_SYS_VENDOR, "Dell"),
 			MATCH(DMI_PRODUCT_NAME, "Latitude C600"),
 			NO_MATCH, NO_MATCH
-	                } },
+			} },
 	{ broken_apm_power, "Dell Inspiron 5000e", {	/* Handle problems with APM on Inspiron 5000e */
 			MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies LTD"),
 			MATCH(DMI_BIOS_VERSION, "A04"),
@@ -512,6 +547,11 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_PRODUCT_NAME, "PowerEdge 300/"),
 			NO_MATCH, NO_MATCH
 			} },
+	{ set_bios_reboot, "Dell PowerEdge 2400", {  /* Handle problems with rebooting on Dell 300/800's */
+			MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
+			MATCH(DMI_PRODUCT_NAME, "PowerEdge 2400"),
+			NO_MATCH, NO_MATCH
+			} },
 	{ set_apm_ints, "Dell Inspiron", {	/* Allow interrupts during suspend on Dell Inspiron laptops*/
 			MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
 			MATCH(DMI_PRODUCT_NAME, "Inspiron 4000"),
@@ -533,11 +573,22 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_PRODUCT_NAME, "Delhi3"),
 			NO_MATCH, NO_MATCH,
 			} },
+	{ apm_is_horked, "Fujitsu-Siemens", { /* APM crashes */
+			MATCH(DMI_BIOS_VENDOR, "hoenix/FUJITSU SIEMENS"),
+			MATCH(DMI_BIOS_VERSION, "Version1.01"),
+			NO_MATCH, NO_MATCH,
+			} },
 	{ apm_is_horked, "Sharp PC-PJ/AX", { /* APM crashes */
 			MATCH(DMI_SYS_VENDOR, "SHARP"),
 			MATCH(DMI_PRODUCT_NAME, "PC-PJ/AX"),
 			MATCH(DMI_BIOS_VENDOR,"SystemSoft"),
 			MATCH(DMI_BIOS_VERSION,"Version R2.08")
+			} },
+	{ apm_is_horked, "Dell Inspiron 2500", { /* APM crashes */
+			MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
+			MATCH(DMI_PRODUCT_NAME, "Inspiron 2500"),
+			MATCH(DMI_BIOS_VENDOR,"Phoenix Technologies LTD"),
+			MATCH(DMI_BIOS_VERSION,"A11")
 			} },
 	{ sony_vaio_laptop, "Sony Vaio", { /* This is a Sony Vaio laptop */
 			MATCH(DMI_SYS_VENDOR, "Sony Corporation"),
@@ -548,7 +599,7 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies LTD"),
 			MATCH(DMI_BIOS_VERSION, "R0206H"),
 			MATCH(DMI_BIOS_DATE, "08/23/99"), NO_MATCH
-	} },
+			} },
 
 	{ swab_apm_power_in_minutes, "Sony VAIO", { /* Handle problems with APM on Sony Vaio PCG-N505VX */
 			MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies LTD"),
@@ -572,6 +623,12 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies LTD"),
 			MATCH(DMI_BIOS_VERSION, "WME01Z1"),
 			MATCH(DMI_BIOS_DATE, "08/11/00"), NO_MATCH
+			} },
+
+	{ swab_apm_power_in_minutes, "Sony VAIO", {	/* Handle problems with APM on Sony Vaio PCG-Z600LEK(DE) */
+			MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies LTD"),
+			MATCH(DMI_BIOS_VERSION, "R0206Z3"),
+			MATCH(DMI_BIOS_DATE, "12/25/00"), NO_MATCH
 			} },
 
 	{ swab_apm_power_in_minutes, "Sony VAIO", {	/* Handle problems with APM on Sony Vaio PCG-Z505LS */
@@ -616,6 +673,17 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_PRODUCT_NAME, "Latitude"),
 			NO_MATCH, NO_MATCH
 			} },
+
+	{ local_apic_kills_bios, "IBM Thinkpad T20", {
+			MATCH(DMI_BOARD_VENDOR, "IBM"),
+			MATCH(DMI_BOARD_NAME, "264741U"),
+			NO_MATCH, NO_MATCH
+			} },
+
+	{ apm_kills_local_apic, "Microstar 6163", {
+			MATCH(DMI_BOARD_VENDOR, "MICRO-STAR INTERNATIONAL CO., LTD"),
+			MATCH(DMI_BOARD_NAME, "MS-6163"),
+			NO_MATCH, NO_MATCH } },
 
 	{ apm_kills_local_apic_timer, "Intel AL440LX", {
 			MATCH(DMI_BOARD_VENDOR, "Intel Corporation"),
@@ -678,7 +746,14 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			NO_MATCH, NO_MATCH
 			} },
 	 
-			
+	{ fix_broken_hp_bios_irq9, "HP Pavilion N5400 Series Laptop", {
+			MATCH(DMI_SYS_VENDOR, "Hewlett-Packard"),
+			MATCH(DMI_BIOS_VERSION, "GE.M1.03"),
+			MATCH(DMI_PRODUCT_VERSION, "HP Pavilion Notebook Model GE"),
+			MATCH(DMI_BOARD_VERSION, "OmniBook N32N-736")
+			} },
+ 
+
 	/*
 	 *	Generic per vendor APM settings
 	 */

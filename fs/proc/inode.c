@@ -133,8 +133,11 @@ static int parse_options(char *options,uid_t *uid,gid_t *gid)
 
 	*uid = current->uid;
 	*gid = current->gid;
-	if (!options) return 1;
-	for (this_char = strtok(options,","); this_char; this_char = strtok(NULL,",")) {
+	if (!options)
+		return 1;
+	while ((this_char = strsep(&options,",")) != NULL) {
+		if (!*this_char)
+			continue;
 		if ((value = strchr(this_char,'=')) != NULL)
 			*value++ = 0;
 		if (!strcmp(this_char,"uid")) {

@@ -327,7 +327,7 @@ static void do_nbd_request(request_queue_t * q)
 		req = CURRENT;
 #ifdef PARANOIA
 		if (!req)
-			FAIL("que not empty but no request?");
+			FAIL("queue not empty but no request?");
 #endif
 		dev = minor(req->rq_dev);
 #ifdef PARANOIA

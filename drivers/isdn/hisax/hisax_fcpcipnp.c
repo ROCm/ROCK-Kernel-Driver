@@ -65,6 +65,7 @@ MODULE_DEVICE_TABLE(isapnp, fcpnp_ids);
 
 static int protocol = 2;       /* EURO-ISDN Default */
 MODULE_PARM(protocol, "i");
+MODULE_LICENSE("GPL");
 
 // ----------------------------------------------------------------------
 

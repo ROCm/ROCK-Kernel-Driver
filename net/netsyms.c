@@ -364,7 +364,6 @@ EXPORT_SYMBOL(tcp_inherit_port);
 EXPORT_SYMBOL(tcp_v4_syn_recv_sock);
 EXPORT_SYMBOL(tcp_v4_do_rcv);
 EXPORT_SYMBOL(tcp_v4_connect);
-EXPORT_SYMBOL(tcp_v4_hash_connecting);
 EXPORT_SYMBOL(tcp_unhash);
 EXPORT_SYMBOL(udp_prot);
 EXPORT_SYMBOL(tcp_prot);

@@ -4,7 +4,7 @@
  * Originally (C) 1998 Christian Schmidt <schmidt@digadd.de>
  * Modifications (c) 1998 Tom Lees <tom@lpsg.demon.co.uk>
  * Minor reorganizations by David Hinds <dahinds@users.sourceforge.net>
- * Modifications (c) 2001 by Thomas Hood <jdthood@mail.com>
+ * Modifications (c) 2001,2002 by Thomas Hood <jdthood@mail.com>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -190,8 +190,8 @@ static inline u16 call_pnp_bios(u16 func, u16 arg1, u16 arg2, u16 arg3,
 	/* If we get here and this is set then the PnP BIOS faulted on us. */
 	if(pnp_bios_is_utter_crap)
 	{
-		printk(KERN_ERR "PnPBIOS: Warning! Your PnP BIOS caused a fatal error. Attempting to continue.\n");
-		printk(KERN_ERR "PnPBIOS: You may need to reboot with the \"nobiospnp\" option to operate stably.\n");
+		printk(KERN_ERR "PnPBIOS: Warning! Your PnP BIOS caused a fatal error. Attempting to continue\n");
+		printk(KERN_ERR "PnPBIOS: You may need to reboot with the \"nobiospnp\" option to operate stably\n");
 		printk(KERN_ERR "PnPBIOS: Check with your vendor for an updated BIOS\n");
 	}
 
@@ -205,11 +205,16 @@ static inline u16 call_pnp_bios(u16 func, u16 arg1, u16 arg2, u16 arg3,
  *
  */
 
+static void pnpbios_warn_unexpected_status(const char * module, u16 status)
+{
+	printk(KERN_ERR "PnPBIOS: %s: Unexpected status 0x%x\n", module, status);
+}
+
 void *pnpbios_kmalloc(size_t size, int f)
 {
 	void *p = kmalloc( size, f );
 	if ( p == NULL )
-		printk(KERN_ERR "PnPBIOS: kmalloc() failed.\n");
+		printk(KERN_ERR "PnPBIOS: kmalloc() failed\n");
 	return p;
 }
 
@@ -251,7 +256,7 @@ static void update_devlist( u8 nodenum, struct pnp_bios_node *data );
 static int __pnp_bios_dev_node_info(struct pnp_dev_node_info *data)
 {
 	u16 status;
-	if (!pnp_bios_present ())
+	if (!pnp_bios_present())
 		return PNP_FUNCTION_NOT_SUPPORTED;
 	Q2_SET_SEL(PNP_TS1, data, sizeof(struct pnp_dev_node_info));
 	status = call_pnp_bios(PNP_GET_NUM_SYS_DEV_NODES, 0, PNP_TS1, 2, PNP_TS1, PNP_DS, 0, 0);
@@ -263,7 +268,7 @@ int pnp_bios_dev_node_info(struct pnp_dev_node_info *data)
 {
 	int status = __pnp_bios_dev_node_info( data );
 	if ( status )
-		printk(KERN_WARNING "PnPBIOS: dev_node_info: Unexpected status 0x%x\n", status);
+		pnpbios_warn_unexpected_status( "dev_node_info", status );
 	return status;
 }
 
@@ -284,7 +289,7 @@ int pnp_bios_dev_node_info(struct pnp_dev_node_info *data)
 static int __pnp_bios_get_dev_node(u8 *nodenum, char boot, struct pnp_bios_node *data)
 {
 	u16 status;
-	if (!pnp_bios_present ())
+	if (!pnp_bios_present())
 		return PNP_FUNCTION_NOT_SUPPORTED;
 	if ( !boot & pnpbios_dont_use_current_config )
 		return PNP_FUNCTION_NOT_SUPPORTED;
@@ -299,7 +304,7 @@ int pnp_bios_get_dev_node(u8 *nodenum, char boot, struct pnp_bios_node *data)
 	int status;
 	status =  __pnp_bios_get_dev_node( nodenum, boot, data );
 	if ( status )
-		printk(KERN_WARNING "PnPBIOS: get_dev_node: Unexpected 0x%x\n", status);
+		pnpbios_warn_unexpected_status( "get_dev_node", status );
 	return status;
 }
 
@@ -313,7 +318,7 @@ int pnp_bios_get_dev_node(u8 *nodenum, char boot, struct pnp_bios_node *data)
 static int __pnp_bios_set_dev_node(u8 nodenum, char boot, struct pnp_bios_node *data)
 {
 	u16 status;
-	if (!pnp_bios_present ())
+	if (!pnp_bios_present())
 		return PNP_FUNCTION_NOT_SUPPORTED;
 	if ( !boot & pnpbios_dont_use_current_config )
 		return PNP_FUNCTION_NOT_SUPPORTED;
@@ -327,17 +332,14 @@ int pnp_bios_set_dev_node(u8 nodenum, char boot, struct pnp_bios_node *data)
 	int status;
 	status =  __pnp_bios_set_dev_node( nodenum, boot, data );
 	if ( status ) {
-		printk(KERN_WARNING "PnPBIOS: set_dev_node: Unexpected set_dev_node status 0x%x\n", status);
+		pnpbios_warn_unexpected_status( "set_dev_node", status );
 		return status;
 	}
-	if ( !boot ) {
-		/* Update devlist */
+	if ( !boot ) { /* Update devlist */
 		u8 thisnodenum = nodenum;
-		status =  __pnp_bios_get_dev_node( &nodenum, boot, data );
-		if ( status ) {
-			printk(KERN_WARNING "PnPBIOS: set_dev_node: Unexpected get_dev_node status 0x%x\n", status);
+		status =  pnp_bios_get_dev_node( &nodenum, boot, data );
+		if ( status )
 			return status;
-		}
 		update_devlist( thisnodenum, data );
 	}
 	return status;
@@ -350,7 +352,7 @@ int pnp_bios_set_dev_node(u8 nodenum, char boot, struct pnp_bios_node *data)
 static int pnp_bios_get_event(u16 *event)
 {
 	u16 status;
-	if (!pnp_bios_present ())
+	if (!pnp_bios_present())
 		return PNP_FUNCTION_NOT_SUPPORTED;
 	Q2_SET_SEL(PNP_TS1, event, sizeof(u16));
 	status = call_pnp_bios(PNP_GET_EVENT, 0, PNP_TS1, PNP_DS, 0, 0 ,0 ,0);
@@ -365,7 +367,7 @@ static int pnp_bios_get_event(u16 *event)
 static int pnp_bios_send_message(u16 message)
 {
 	u16 status;
-	if (!pnp_bios_present ())
+	if (!pnp_bios_present())
 		return PNP_FUNCTION_NOT_SUPPORTED;
 	status = call_pnp_bios(PNP_SEND_MESSAGE, message, PNP_DS, 0, 0, 0, 0, 0);
 	return status;
@@ -379,7 +381,7 @@ static int pnp_bios_send_message(u16 message)
 static int pnp_bios_dock_station_info(struct pnp_docking_station_info *data)
 {
 	u16 status;
-	if (!pnp_bios_present ())
+	if (!pnp_bios_present())
 		return PNP_FUNCTION_NOT_SUPPORTED;
 	Q2_SET_SEL(PNP_TS1, data, sizeof(struct pnp_docking_station_info));
 	status = call_pnp_bios(PNP_GET_DOCKING_STATION_INFORMATION, 0, PNP_TS1, PNP_DS, 0, 0, 0, 0);
@@ -395,7 +397,7 @@ static int pnp_bios_dock_station_info(struct pnp_docking_station_info *data)
 static int pnp_bios_set_stat_res(char *info)
 {
 	u16 status;
-	if (!pnp_bios_present ())
+	if (!pnp_bios_present())
 		return PNP_FUNCTION_NOT_SUPPORTED;
 	Q2_SET_SEL(PNP_TS1, info, *((u16 *) info));
 	status = call_pnp_bios(PNP_SET_STATIC_ALLOCED_RES_INFO, 0, PNP_TS1, PNP_DS, 0, 0, 0, 0);
@@ -403,21 +405,28 @@ static int pnp_bios_set_stat_res(char *info)
 }
 #endif
 
-#if needed
 /*
  * Call PnP BIOS with function 0x0a, "get statically allocated resource
  * information"
  */
-static int pnp_bios_get_stat_res(char *info)
+static int __pnp_bios_get_stat_res(char *info)
 {
 	u16 status;
-	if (!pnp_bios_present ())
+	if (!pnp_bios_present())
 		return PNP_FUNCTION_NOT_SUPPORTED;
 	Q2_SET_SEL(PNP_TS1, info, 64 * 1024);
 	status = call_pnp_bios(PNP_GET_STATIC_ALLOCED_RES_INFO, 0, PNP_TS1, PNP_DS, 0, 0, 0, 0);
 	return status;
 }
-#endif
+
+int pnp_bios_get_stat_res(char *info)
+{
+	int status;
+	status = __pnp_bios_get_stat_res( info );
+	if ( status )
+		pnpbios_warn_unexpected_status( "get_stat_res", status );
+	return status;
+}
 
 #if needed
 /*
@@ -426,7 +435,7 @@ static int pnp_bios_get_stat_res(char *info)
 static int pnp_bios_apm_id_table(char *table, u16 *size)
 {
 	u16 status;
-	if (!pnp_bios_present ())
+	if (!pnp_bios_present())
 		return PNP_FUNCTION_NOT_SUPPORTED;
 	Q2_SET_SEL(PNP_TS1, table, *size);
 	Q2_SET_SEL(PNP_TS2, size, sizeof(u16));
@@ -435,45 +444,58 @@ static int pnp_bios_apm_id_table(char *table, u16 *size)
 }
 #endif
 
-#if needed
 /*
  * Call PnP BIOS with function 0x40, "get isa pnp configuration structure"
  */
-static int pnp_bios_isapnp_config(struct pnp_isa_config_struc *data)
+static int __pnp_bios_isapnp_config(struct pnp_isa_config_struc *data)
 {
 	u16 status;
-	if (!pnp_bios_present ())
+	if (!pnp_bios_present())
 		return PNP_FUNCTION_NOT_SUPPORTED;
 	Q2_SET_SEL(PNP_TS1, data, sizeof(struct pnp_isa_config_struc));
 	status = call_pnp_bios(PNP_GET_PNP_ISA_CONFIG_STRUC, 0, PNP_TS1, PNP_DS, 0, 0, 0, 0);
 	return status;
 }
-#endif
 
-#if needed
+int pnp_bios_isapnp_config(struct pnp_isa_config_struc *data)
+{
+	int status;
+	status = __pnp_bios_isapnp_config( data );
+	if ( status )
+		pnpbios_warn_unexpected_status( "isapnp_config", status );
+	return status;
+}
+
 /*
  * Call PnP BIOS with function 0x41, "get ESCD info"
  */
-static int pnp_bios_escd_info(struct escd_info_struc *data)
+static int __pnp_bios_escd_info(struct escd_info_struc *data)
 {
 	u16 status;
-	if (!pnp_bios_present ())
+	if (!pnp_bios_present())
 		return ESCD_FUNCTION_NOT_SUPPORTED;
 	Q2_SET_SEL(PNP_TS1, data, sizeof(struct escd_info_struc));
 	status = call_pnp_bios(PNP_GET_ESCD_INFO, 0, PNP_TS1, 2, PNP_TS1, 4, PNP_TS1, PNP_DS);
 	return status;
 }
-#endif
 
-#if needed
+int pnp_bios_escd_info(struct escd_info_struc *data)
+{
+	int status;
+	status = __pnp_bios_escd_info( data );
+	if ( status )
+		pnpbios_warn_unexpected_status( "escd_info", status );
+	return status;
+}
+
 /*
  * Call PnP BIOS function 0x42, "read ESCD"
  * nvram_base is determined by calling escd_info
  */
-static int pnp_bios_read_escd(char *data, u32 nvram_base)
+static int __pnp_bios_read_escd(char *data, u32 nvram_base)
 {
 	u16 status;
-	if (!pnp_bios_present ())
+	if (!pnp_bios_present())
 		return ESCD_FUNCTION_NOT_SUPPORTED;
 	Q2_SET_SEL(PNP_TS1, data, 64 * 1024);
 	set_base(gdt[PNP_TS2 >> 3], nvram_base);
@@ -481,7 +503,15 @@ static int pnp_bios_read_escd(char *data, u32 nvram_base)
 	status = call_pnp_bios(PNP_READ_ESCD, 0, PNP_TS1, PNP_TS2, PNP_DS, 0, 0, 0);
 	return status;
 }
-#endif
+
+int pnp_bios_read_escd(char *data, u32 nvram_base)
+{
+	int status;
+	status = __pnp_bios_read_escd( data, nvram_base );
+	if ( status )
+		pnpbios_warn_unexpected_status( "read_escd", status );
+	return status;
+}
 
 #if needed
 /*
@@ -490,7 +520,7 @@ static int pnp_bios_read_escd(char *data, u32 nvram_base)
 static int pnp_bios_write_escd(char *data, u32 nvram_base)
 {
 	u16 status;
-	if (!pnp_bios_present ())
+	if (!pnp_bios_present())
 		return ESCD_FUNCTION_NOT_SUPPORTED;
 	Q2_SET_SEL(PNP_TS1, data, 64 * 1024);
 	set_base(gdt[PNP_TS2 >> 3], nvram_base);
@@ -574,13 +604,13 @@ static int pnp_dock_event(int dock, struct pnp_docking_station_info *info)
 static int pnp_dock_thread(void * unused)
 {
 	static struct pnp_docking_station_info now;
-	int docked = -1, d;
+	int docked = -1, d = 0;
 	daemonize();
 	reparent_to_init();
-	strcpy(current->comm, "kpnpbios");
+	strcpy(current->comm, "kpnpbiosd");
 	while(!unloading && !signal_pending(current))
 	{
-		int err;
+		int status;
 		
 		/*
 		 * Poll every 2 seconds
@@ -590,9 +620,9 @@ static int pnp_dock_thread(void * unused)
 		if(signal_pending(current))
 			break;
 
-		err = pnp_bios_dock_station_info(&now);
+		status = pnp_bios_dock_station_info(&now);
 
-		switch(err)
+		switch(status)
 		{
 			/*
 			 * No dock to manage
@@ -606,7 +636,7 @@ static int pnp_dock_thread(void * unused)
 				d = 1;
 				break;
 			default:
-				printk(KERN_WARNING "PnPBIOS: pnp_dock_thread: Unexpected status 0x%x returned by BIOS.\n", err);
+				pnpbios_warn_unexpected_status( "pnp_dock_thread", status );
 				continue;
 		}
 		if(d != docked)
@@ -615,7 +645,7 @@ static int pnp_dock_thread(void * unused)
 			{
 				docked = d;
 #if 0
-				printk(KERN_INFO "PnPBIOS: Docking station %stached.\n", docked?"at":"de");
+				printk(KERN_INFO "PnPBIOS: Docking station %stached\n", docked?"at":"de");
 #endif
 			}
 		}
@@ -848,15 +878,14 @@ static void inline pnpid32_to_pnpid(u32 id, char *str)
  */
 static void __init build_devlist(void)
 {
-	int i;
-	int nodenum;
-	int nodes_got = 0;
-	int devs = 0;
+	u8 nodenum;
+	unsigned int nodes_got = 0;
+	unsigned int devs = 0;
 	struct pnp_bios_node *node;
 	struct pnp_dev_node_info node_info;
 	struct pci_dev *dev;
 	
-	if (!pnp_bios_present ())
+	if (!pnp_bios_present())
 		return;
 
 	if (pnp_bios_dev_node_info(&node_info) != 0)
@@ -866,26 +895,20 @@ static void __init build_devlist(void)
 	if (!node)
 		return;
 
-	for(i=0,nodenum=0; i<0xff && nodenum!=0xff; i++) {
-		int thisnodenum = nodenum;
-		/* For now we build the list from the "boot" config
-		 * because asking for the "current" config causes
-		 * some BIOSes to crash.                          */
-		if (pnp_bios_get_dev_node((u8 *)&nodenum, (char )1 , node)) {
-			printk(KERN_WARNING "PnPBIOS: PnP BIOS reported error on attempt to get dev node.\n");
+	for(nodenum=0; nodenum<0xff; ) {
+		u8 thisnodenum = nodenum;
+		/* We build the list from the "boot" config because
+		 * asking for the "current" config causes some
+		 * BIOSes to crash.
+		 */
+		if (pnp_bios_get_dev_node(&nodenum, (char )1 , node))
 			break;
-		}
-		/* The BIOS returns with nodenum = the next node number */
-		if (nodenum < thisnodenum) {
-			printk(KERN_WARNING "PnPBIOS: Node number is out of sequence. Naughty BIOS!\n");
-			break;
-		}
 		nodes_got++;
 		dev =  pnpbios_kmalloc(sizeof (struct pci_dev), GFP_KERNEL);
 		if (!dev)
 			break;
 		memset(dev,0,sizeof(struct pci_dev));
-		dev->devfn=thisnodenum;
+		dev->devfn = thisnodenum;
 		memcpy(dev->name,"PNPBIOS",8);
 		pnpid32_to_pnpid(node->eisa_id,dev->slot_name);
 		node_resource_data_to_dev(node,dev);
@@ -893,10 +916,14 @@ static void __init build_devlist(void)
 			kfree(dev);
 		else
 			devs++;
+		if (nodenum <= thisnodenum) {
+			printk(KERN_ERR "PnPBIOS: build_devlist: Node number 0x%x is out of sequence following node 0x%x. Aborting.\n", (unsigned int)nodenum, (unsigned int)thisnodenum);
+			break;
+		}
 	}
 	kfree(node);
 
-	printk(KERN_INFO "PnPBIOS: %i node%s reported by PnP BIOS; %i recorded by driver.\n",
+	printk(KERN_INFO "PnPBIOS: %i node%s reported by PnP BIOS; %i recorded by driver\n",
 		nodes_got, nodes_got != 1 ? "s" : "", devs);
 }
 
@@ -1062,7 +1089,7 @@ static void __init reserve_ioport_range(char *pnpid, int start, int end)
 	regionid = pnpbios_kmalloc(16, GFP_KERNEL);
 	if ( regionid == NULL )
 		return;
-	sprintf(regionid, "PnPBIOS %s", pnpid);
+	snprintf(regionid, 16, "PnPBIOS %s", pnpid);
 	res = request_region(start,end-start+1,regionid);
 	if ( res == NULL )
 		kfree( regionid );
@@ -1074,7 +1101,7 @@ static void __init reserve_ioport_range(char *pnpid, int start, int end)
 	 * have double reservations.
 	 */
 	printk(KERN_INFO
-		"PnPBIOS: %s: ioport range 0x%x-0x%x %s reserved.\n",
+		"PnPBIOS: %s: ioport range 0x%x-0x%x %s reserved\n",
 		pnpid, start, end,
 		NULL != res ? "has been" : "could not be"
 	);
@@ -1193,14 +1220,14 @@ int __init pnpbios_init(void)
 {
 	union pnp_bios_expansion_header *check;
 	u8 sum;
-	int i, length;
+	int i, length, r;
 
 	spin_lock_init(&pnp_bios_lock);
 	spin_lock_init(&pnpbios_devices_lock);
 
 	if(pnpbios_disabled) {
-		printk(KERN_INFO "PnPBIOS: Disabled.\n");
-		return 0;
+		printk(KERN_INFO "PnPBIOS: Disabled\n");
+		return -ENODEV;
 	}
 
 	if ( is_sony_vaio_laptop )
@@ -1224,13 +1251,13 @@ int __init pnpbios_init(void)
 		if (sum)
 			continue;
 		if (check->fields.version < 0x10) {
-			printk(KERN_WARNING "PnPBIOS: PnP BIOS version %d.%d is not supported.\n",
+			printk(KERN_WARNING "PnPBIOS: PnP BIOS version %d.%d is not supported\n",
 			       check->fields.version >> 4,
 			       check->fields.version & 15);
 			continue;
 		}
-		printk(KERN_INFO "PnPBIOS: Found PnP BIOS installation structure at 0x%p.\n", check);
-		printk(KERN_INFO "PnPBIOS: PnP BIOS version %d.%d, entry 0x%x:0x%x, dseg 0x%x.\n",
+		printk(KERN_INFO "PnPBIOS: Found PnP BIOS installation structure at 0x%p\n", check);
+		printk(KERN_INFO "PnPBIOS: PnP BIOS version %d.%d, entry 0x%x:0x%x, dseg 0x%x\n",
                        check->fields.version >> 4, check->fields.version & 15,
 		       check->fields.pm16cseg, check->fields.pm16offset,
 		       check->fields.pm16dseg);
@@ -1242,12 +1269,21 @@ int __init pnpbios_init(void)
 		pnp_bios_hdr = check;
 		break;
 	}
+	if (!pnp_bios_present())
+		return -ENODEV;
 	build_devlist();
 	if ( ! dont_reserve_resources )
 		reserve_resources();
 #ifdef CONFIG_PROC_FS
-	pnpbios_proc_init();
+	r = pnpbios_proc_init();
+	if (r)
+		return r;
 #endif
+	return 0;
+}
+
+static int __init pnpbios_thread_init(void)
+{
 #ifdef CONFIG_HOTPLUG	
 	init_completion(&unload_sem);
 	if(kernel_thread(pnp_dock_thread, NULL, CLONE_FS | CLONE_FILES | CLONE_SIGNAL)>0)
@@ -1256,23 +1292,46 @@ int __init pnpbios_init(void)
 	return 0;
 }
 
-#ifdef MODULE
+#ifndef MODULE
+
+/* init/main.c calls pnpbios_init early */
+
+/* Start the kernel thread later: */
+module_init(pnpbios_thread_init);
+
+#else
+
+/*
+ * N.B.: Building pnpbios as a module hasn't been fully implemented
+ */
 
 MODULE_LICENSE("GPL");
 
-/* We have to run it early and not as a module. */
-module_init(pnpbios_init);
-
-#ifdef CONFIG_HOTPLUG
-static void pnpbios_exit(void)
+static int __init pnpbios_init_all(void)
 {
-	/* free_resources() ought to go here */
-	/* pnpbios_proc_done() */
-	unloading = 1;
-	wait_for_completion(&unload_sem);
+	int r;
+
+	r = pnpbios_init();
+	if (r)
+		return r;
+	r = pnpbios_thread_init();
+	if (r)
+		return r;
+	return 0;
 }
 
+static void __exit pnpbios_exit(void)
+{
+#ifdef CONFIG_HOTPLUG
+	unloading = 1;
+	wait_for_completion(&unload_sem);
+#endif
+	pnpbios_proc_exit();
+	/* We ought to free resources here */
+	return;
+}
+
+module_init(pnpbios_init_all);
 module_exit(pnpbios_exit);
 
-#endif
 #endif

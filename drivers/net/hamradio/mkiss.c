@@ -345,7 +345,7 @@ static void ax_bump(struct ax_disp *ax)
 	skb->mac.raw  = skb->data;
 	skb->protocol = htons(ETH_P_AX25);
 	netif_rx(skb);
-	dev->last_rx = jiffies;
+	tmp_ax->dev->last_rx = jiffies;
 	tmp_ax->rx_packets++;
 }
 

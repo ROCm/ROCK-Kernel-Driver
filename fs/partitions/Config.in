@@ -32,6 +32,7 @@ if [ "$CONFIG_PARTITION_ADVANCED" = "y" ]; then
    bool '  SGI partition support' CONFIG_SGI_PARTITION
    bool '  Ultrix partition table support' CONFIG_ULTRIX_PARTITION
    bool '  Sun partition tables support' CONFIG_SUN_PARTITION
+   bool '  EFI GUID Partition support' CONFIG_EFI_PARTITION
 else
    if [ "$ARCH" = "alpha" ]; then
       define_bool CONFIG_OSF_PARTITION y

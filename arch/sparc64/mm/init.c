@@ -699,7 +699,7 @@ static void __flush_nucleus_vptes(void)
 	}
 }
 
-static int prom_ditlb_set = 0;
+static int prom_ditlb_set;
 struct prom_tlb_entry {
 	int		tlb_ent;
 	unsigned long	tlb_tag;

@@ -42,6 +42,7 @@
 #include <linux/blk.h>
 #include <linux/blkdev.h>
 #include <linux/genhd.h>
+#include <linux/completion.h>
 
 #define CCISS_DRIVER_VERSION(maj,min,submin) ((maj<<16)|(min<<8)|(submin))
 #define DRIVER_NAME "Compaq CISS Driver (v 2.5.0)"

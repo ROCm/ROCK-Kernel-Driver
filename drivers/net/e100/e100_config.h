@@ -190,6 +190,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define CB_CFIG_LONG_RX_OK	    BIT_3
 
+#define NO_LOOPBACK	0	
+#define MAC_LOOPBACK	0x01
+#define PHY_LOOPBACK	0x02
+
 /* function prototypes */
 extern void e100_config_init(struct e100_private *bdp);
 extern unsigned char e100_force_config(struct e100_private *bdp);
@@ -201,5 +205,8 @@ extern void e100_config_mulcast_enbl(struct e100_private *bdp,
 				     unsigned char enable);
 extern void e100_config_ifs(struct e100_private *bdp);
 extern void e100_config_force_dplx(struct e100_private *bdp);
+extern u8 e100_config_loopback_mode(struct e100_private *bdp, u8 mode);
+extern u8 e100_config_dynamic_tbd(struct e100_private *bdp, u8 enable);
+extern u8 e100_config_tcb_ext_enable(struct e100_private *bdp, u8 enable);
 
 #endif /* _E100_CONFIG_INC_ */

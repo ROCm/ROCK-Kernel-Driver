@@ -1133,3 +1133,5 @@ static int __init econet_proto_init(void)
 
 module_init(econet_proto_init);
 module_exit(econet_proto_exit);
+
+MODULE_LICENSE("GPL");

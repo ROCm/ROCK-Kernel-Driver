@@ -383,7 +383,7 @@ int __init lance_probe(struct net_device *dev)
 					return 0;
 				}
 			}
-			release_resource(r);
+			release_region(ioaddr, LANCE_TOTAL_SIZE);
 		}
 	}
 	return -ENODEV;

@@ -583,7 +583,7 @@ static int rt_garbage_collect(void)
 	if (atomic_read(&ipv4_dst_ops.entries) < ip_rt_max_size)
 		goto out;
 	if (net_ratelimit())
-		printk("dst cache overflow\n");
+		printk(KERN_WARNING "dst cache overflow\n");
 	return 1;
 
 work_done:
@@ -657,7 +657,7 @@ restart:
 			}
 
 			if (net_ratelimit())
-				printk("Neighbour table overflow.\n");
+				printk(KERN_WARNING "Neighbour table overflow.\n");
 			rt_drop(rt);
 			return -ENOBUFS;
 		}
@@ -667,8 +667,8 @@ restart:
 #if RT_CACHE_DEBUG >= 2
 	if (rt->u.rt_next) {
 		struct rtable *trt;
-		printk("rt_cache @%02x: %u.%u.%u.%u", hash,
-				NIPQUAD(rt->rt_dst));
+		printk(KERN_DEBUG "rt_cache @%02x: %u.%u.%u.%u", hash,
+		       NIPQUAD(rt->rt_dst));
 		for (trt = rt->u.rt_next; trt; trt = trt->u.rt_next)
 			printk(" . %u.%u.%u.%u", NIPQUAD(trt->rt_dst));
 		printk("\n");
@@ -2454,7 +2454,7 @@ void __init ip_rt_init(void)
 
 #ifdef CONFIG_NET_CLS_ROUTE
 	for (order = 0;
-	     (PAGE_SIZE << order) < 256 * sizeof(ip_rt_acct) * NR_CPUS; order++)
+	     (PAGE_SIZE << order) < 256 * sizeof(struct ip_rt_acct) * NR_CPUS; order++)
 		/* NOTHING */;
 	ip_rt_acct = (struct ip_rt_acct *)__get_free_pages(GFP_KERNEL, order);
 	if (!ip_rt_acct)
@@ -2487,7 +2487,7 @@ void __init ip_rt_init(void)
 	if (!rt_hash_table)
 		panic("Failed to allocate IP route cache hash table\n");
 
-	printk("IP: routing cache hash table of %u buckets, %ldKbytes\n",
+	printk(KERN_INFO "IP: routing cache hash table of %u buckets, %ldKbytes\n",
 	       rt_hash_mask,
 	       (long) (rt_hash_mask * sizeof(struct rt_hash_bucket)) / 1024);
 

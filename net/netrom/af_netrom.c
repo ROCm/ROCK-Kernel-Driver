@@ -29,7 +29,7 @@
  *	NET/ROM 006	Alan(GW4PTS)	Brought in line with the ANK changes
  *			Jonathan(G4KLX)	Removed hdrincl.
  *	NET/ROM 007	Jonathan(G4KLX)	New timer architecture.
- *					Impmented Idle timer.
+ *					Implemented Idle timer.
  *			Arnaldo C. Melo s/suser/capable/, micro cleanups
  */
 
@@ -1338,6 +1338,7 @@ MODULE_PARM_DESC(nr_ndevs, "number of NET/ROM devices");
 
 MODULE_AUTHOR("Jonathan Naylor G4KLX <g4klx@g4klx.demon.co.uk>");
 MODULE_DESCRIPTION("The amateur radio NET/ROM network and transport layer protocol");
+MODULE_LICENSE("GPL");
 
 static void __exit nr_exit(void)
 {

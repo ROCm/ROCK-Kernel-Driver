@@ -46,8 +46,8 @@ volatile int __cpu_number_map[NR_CPUS]  __attribute__ ((aligned (SMP_CACHE_BYTES
 volatile int __cpu_logical_map[NR_CPUS] __attribute__ ((aligned (SMP_CACHE_BYTES)));
 
 /* Please don't make this stuff initdata!!!  --DaveM */
-static unsigned char boot_cpu_id = 0;
-static int smp_activated = 0;
+static unsigned char boot_cpu_id;
+static int smp_activated;
 
 /* Kernel spinlock */
 spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
@@ -898,7 +898,7 @@ extern unsigned long xcall_capture;
 
 static atomic_t smp_capture_depth = ATOMIC_INIT(0);
 static atomic_t smp_capture_registry = ATOMIC_INIT(0);
-static unsigned long penguins_are_doing_time = 0;
+static unsigned long penguins_are_doing_time;
 
 void smp_capture(void)
 {

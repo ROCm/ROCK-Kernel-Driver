@@ -201,12 +201,12 @@ static inline void ser12_set_divisor(struct net_device *dev,
 /* --------------------------------------------------------------------- */
 
 #if 0
-extern inline unsigned int hweight16(unsigned int w)
+static inline unsigned int hweight16(unsigned int w)
         __attribute__ ((unused));
-extern inline unsigned int hweight8(unsigned int w)
+static inline unsigned int hweight8(unsigned int w)
         __attribute__ ((unused));
 
-extern inline unsigned int hweight16(unsigned int w)
+static inline unsigned int hweight16(unsigned int w)
 {
         unsigned short res = (w & 0x5555) + ((w >> 1) & 0x5555);
         res = (res & 0x3333) + ((res >> 2) & 0x3333);
@@ -214,7 +214,7 @@ extern inline unsigned int hweight16(unsigned int w)
         return (res & 0x00FF) + ((res >> 8) & 0x00FF);
 }
 
-extern inline unsigned int hweight8(unsigned int w)
+static inline unsigned int hweight8(unsigned int w)
 {
         unsigned short res = (w & 0x55) + ((w >> 1) & 0x55);
         res = (res & 0x33) + ((res >> 2) & 0x33);

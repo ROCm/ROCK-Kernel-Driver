@@ -571,14 +571,12 @@ static int __init pci_intmap_match(struct pci_dev *pdev, unsigned int *interrupt
 	struct pci_pbm_info *pbm = dev_pcp->pbm;
 	struct linux_prom_pci_registers *pregs = dev_pcp->prom_regs;
 	unsigned int hi, mid, lo, irq;
-	int i, num_intmap;
-
-	if (pbm->num_pbm_intmap == 0)
-		return 0;
+	int i, num_intmap, map_slot;
 
 	intmap = &pbm->pbm_intmap[0];
 	intmask = &pbm->pbm_intmask;
 	num_intmap = pbm->num_pbm_intmap;
+	map_slot = 0;
 
 	/* If we are underneath a PCI bridge, use PROM register
 	 * property of the parent bridge which is closest to
@@ -639,9 +637,19 @@ static int __init pci_intmap_match(struct pci_dev *pdev, unsigned int *interrupt
 				printk("pci_intmap_match: Trying to recover.\n");
 				return 0;
 			}
+
+			if (pdev->bus->self != bus_dev)
+				map_slot = 1;
 		} else {
 			pregs = bus_pcp->prom_regs;
+			map_slot = 1;
 		}
+	}
+
+	if (map_slot) {
+		*interrupt = ((*interrupt
+			       - 1
+			       + PCI_SLOT(pdev->devfn)) & 0x3) + 1;
 	}
 
 	hi   = pregs->phys_hi & intmask->phys_hi;
@@ -655,24 +663,33 @@ static int __init pci_intmap_match(struct pci_dev *pdev, unsigned int *interrupt
 		    intmap[i].phys_lo  == lo	&&
 		    intmap[i].interrupt == irq) {
 			*interrupt = intmap[i].cinterrupt;
+			printk("PCI-IRQ: Routing bus[%2x] slot[%2x] map[%d] to INO[%02x]\n",
+			       pdev->bus->number, PCI_SLOT(pdev->devfn),
+			       map_slot, *interrupt);
 			return 1;
 		}
 	}
 
-	/* Print it both to OBP console and kernel one so that if bootup
-	 * hangs here the user has the information to report.
+	/* We will run this code even if pbm->num_pbm_intmap is zero, just so
+	 * we can apply the slot mapping to the PROM interrupt property value.
+	 * So do not spit out these warnings in that case.
 	 */
-	prom_printf("pci_intmap_match: bus %02x, devfn %02x: ",
-		    pdev->bus->number, pdev->devfn);
-	prom_printf("IRQ [%08x.%08x.%08x.%08x] not found in interrupt-map\n",
-		    pregs->phys_hi, pregs->phys_mid, pregs->phys_lo, *interrupt);
-	prom_printf("Please email this information to davem@redhat.com\n");
+	if (num_intmap != 0) {
+		/* Print it both to OBP console and kernel one so that if bootup
+		 * hangs here the user has the information to report.
+		 */
+		prom_printf("pci_intmap_match: bus %02x, devfn %02x: ",
+			    pdev->bus->number, pdev->devfn);
+		prom_printf("IRQ [%08x.%08x.%08x.%08x] not found in interrupt-map\n",
+			    pregs->phys_hi, pregs->phys_mid, pregs->phys_lo, *interrupt);
+		prom_printf("Please email this information to davem@redhat.com\n");
 
-	printk("pci_intmap_match: bus %02x, devfn %02x: ",
-	       pdev->bus->number, pdev->devfn);
-	printk("IRQ [%08x.%08x.%08x.%08x] not found in interrupt-map\n",
-	       pregs->phys_hi, pregs->phys_mid, pregs->phys_lo, *interrupt);
-	printk("Please email this information to davem@redhat.com\n");
+		printk("pci_intmap_match: bus %02x, devfn %02x: ",
+		       pdev->bus->number, pdev->devfn);
+		printk("IRQ [%08x.%08x.%08x.%08x] not found in interrupt-map\n",
+		       pregs->phys_hi, pregs->phys_mid, pregs->phys_lo, *interrupt);
+		printk("Please email this information to davem@redhat.com\n");
+	}
 
 	return 0;
 }
@@ -718,20 +735,6 @@ static void __init pdev_fixup_irq(struct pci_dev *pdev)
 	if ((prom_irq & PCI_IRQ_INO) & 0x20) {
 		pdev->irq = p->irq_build(pbm, pdev, (portid << 6 | prom_irq));
 		goto have_irq;
-	}
-
-	/* Firmware gets quad-hme interrupts property totally
-	 * wrong.  It is 4 EBUS+HME devices behind a Digital bridge.
-	 * For each of the 4 instances the EBUS has interrupt property
-	 * '1' and the HME has interrupt property '2'.  So we have to
-	 * fix this up.
-	 */
-	if (!strcmp(pcp->prom_name, "SUNW,qfe") ||
-	    !strcmp(pcp->prom_name, "qfe")) {
-		if (PCI_SLOT(pdev->devfn) & ~3)
-			BUG();
-
-		prom_irq = PCI_SLOT(pdev->devfn) + 1;
 	}
 
 	/* Can we find a matching entry in the interrupt-map? */

@@ -702,7 +702,7 @@ static int ppa_completion(Scsi_Cmnd * cmd)
 	 * change things for "normal" hardware since generally 
 	 * the 6th bit is always high.
 	 * This makes the CPU load higher on some hardware 
-	 * but otherwise we can not get more then 50K/secs 
+	 * but otherwise we can not get more than 50K/secs 
 	 * on this problem hardware.
 	 */
 	if ((r & 0xc0) != 0xc0) {

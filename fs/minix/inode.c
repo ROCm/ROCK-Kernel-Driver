@@ -10,15 +10,11 @@
  */
 
 #include <linux/module.h>
-
-#include <linux/fs.h>
-#include <linux/minix_fs.h>
+#include "minix.h"
 #include <linux/slab.h>
 #include <linux/locks.h>
 #include <linux/init.h>
-#include <linux/smp_lock.h>
 #include <linux/highuid.h>
-#include <linux/blkdev.h>
 
 static void minix_read_inode(struct inode * inode);
 static void minix_write_inode(struct inode * inode, int wait);
@@ -29,31 +25,8 @@ static void minix_delete_inode(struct inode *inode)
 {
 	inode->i_size = 0;
 	minix_truncate(inode);
-	lock_kernel();
 	minix_free_inode(inode);
-	unlock_kernel();
 }
-
-static void minix_commit_super(struct super_block * sb)
-{
-	mark_buffer_dirty(minix_sb(sb)->s_sbh);
-	sb->s_dirt = 0;
-}
-
-static void minix_write_super(struct super_block * sb)
-{
-	struct minix_super_block * ms;
-
-	if (!(sb->s_flags & MS_RDONLY)) {
-		ms = minix_sb(sb)->s_ms;
-
-		if (ms->s_state & MINIX_VALID_FS)
-			ms->s_state &= ~MINIX_VALID_FS;
-		minix_commit_super(sb);
-	}
-	sb->s_dirt = 0;
-}
-
 
 static void minix_put_super(struct super_block *sb)
 {
@@ -125,7 +98,6 @@ static struct super_operations minix_sops = {
 	write_inode:	minix_write_inode,
 	delete_inode:	minix_delete_inode,
 	put_super:	minix_put_super,
-	write_super:	minix_write_super,
 	statfs:		minix_statfs,
 	remount_fs:	minix_remount,
 };
@@ -145,15 +117,11 @@ static int minix_remount (struct super_block * sb, int * flags, char * data)
 		/* Mounting a rw partition read-only. */
 		ms->s_state = sbi->s_mount_state;
 		mark_buffer_dirty(sbi->s_sbh);
-		sb->s_dirt = 1;
-		minix_commit_super(sb);
-	}
-	else {
+	} else {
 	  	/* Mount a partition which is read-only, read-write. */
 		sbi->s_mount_state = ms->s_state;
 		ms->s_state &= ~MINIX_VALID_FS;
 		mark_buffer_dirty(sbi->s_sbh);
-		sb->s_dirt = 1;
 
 		if (!(sbi->s_mount_state & MINIX_VALID_FS))
 			printk ("MINIX-fs warning: remounting unchecked fs, "
@@ -272,7 +240,6 @@ static int minix_fill_super(struct super_block *s, void *data, int silent)
 	if (!(s->s_flags & MS_RDONLY)) {
 		ms->s_state &= ~MINIX_VALID_FS;
 		mark_buffer_dirty(bh);
-		s->s_dirt = 1;
 	}
 	if (!(sbi->s_mount_state & MINIX_VALID_FS))
 		printk ("MINIX-fs: mounting unchecked file system, "
@@ -332,10 +299,10 @@ static int minix_statfs(struct super_block *sb, struct statfs *buf)
 	buf->f_type = sb->s_magic;
 	buf->f_bsize = sb->s_blocksize;
 	buf->f_blocks = (sbi->s_nzones - sbi->s_firstdatazone) << sbi->s_log_zone_size;
-	buf->f_bfree = minix_count_free_blocks(sb);
+	buf->f_bfree = minix_count_free_blocks(sbi);
 	buf->f_bavail = buf->f_bfree;
 	buf->f_files = sbi->s_ninodes;
-	buf->f_ffree = minix_count_free_inodes(sb);
+	buf->f_ffree = minix_count_free_inodes(sbi);
 	buf->f_namelen = sbi->s_namelen;
 	return 0;
 }
@@ -526,12 +493,7 @@ static struct buffer_head *minix_update_inode(struct inode *inode)
 
 static void minix_write_inode(struct inode * inode, int wait)
 {
-	struct buffer_head *bh;
-
-	lock_kernel();
-	bh = minix_update_inode(inode);
-	unlock_kernel();
-	brelse(bh);
+	brelse(minix_update_inode(inode));
 }
 
 int minix_sync_inode(struct inode * inode)
@@ -562,12 +524,10 @@ int minix_sync_inode(struct inode * inode)
  */
 void minix_truncate(struct inode * inode)
 {
-	lock_kernel();
 	if (INODE_VERSION(inode) == MINIX_V1)
 		V1_minix_truncate(inode);
 	else
 		V2_minix_truncate(inode);
-	unlock_kernel();
 }
 
 static struct super_block *minix_get_sb(struct file_system_type *fs_type,

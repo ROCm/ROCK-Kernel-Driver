@@ -243,7 +243,7 @@ static int svwks_tune_chipset (ide_drive_t *drive, byte speed)
 	byte dma_modes[]	= { 0x77, 0x21, 0x20 };
 	byte pio_modes[]	= { 0x5d, 0x47, 0x34, 0x22, 0x20 };
 
-	ide_hwif_t *hwif	= HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
 	byte unit		= (drive->select.b.unit & 0x01);
 	byte csb5		= (dev->device == PCI_DEVICE_ID_SERVERWORKS_CSB5IDE) ? 1 : 0;
@@ -255,7 +255,7 @@ static int svwks_tune_chipset (ide_drive_t *drive, byte speed)
 
 	byte drive_pci		= 0x00;
 	byte drive_pci2		= 0x00;
-	byte drive_pci3		= hwif->channel ? 0x57 : 0x56;
+	byte drive_pci3		= hwif->unit ? 0x57 : 0x56;
 
 	byte ultra_enable	= 0x00;
 	byte ultra_timing	= 0x00;
@@ -413,7 +413,7 @@ static void svwks_tune_drive (ide_drive_t *drive, byte pio)
 static int config_chipset_for_dma (ide_drive_t *drive)
 {
 	struct hd_driveid *id	= drive->id;
-	struct pci_dev *dev	= HWIF(drive)->pci_dev;
+	struct pci_dev *dev	= drive->channel->pci_dev;
 	byte udma_66	= eighty_ninty_three(drive);
 	int ultra66	= (dev->device == PCI_DEVICE_ID_SERVERWORKS_CSB5IDE) ? 1 : 0;
 	int ultra100	= (ultra66 && svwks_revision >= SVWKS_CSB5_REVISION_NEW) ? 1 : 0;
@@ -436,7 +436,7 @@ static int config_drive_xfer_rate (ide_drive_t *drive)
 	struct hd_driveid *id = drive->id;
 	ide_dma_action_t dma_func = ide_dma_on;
 
-	if (id && (id->capability & 1) && HWIF(drive)->autodma) {
+	if (id && (id->capability & 1) && drive->channel->autodma) {
 		/* Consult the list of known "bad" drives */
 		if (ide_dmaproc(ide_dma_bad_drive, drive)) {
 			dma_func = ide_dma_off;
@@ -477,7 +477,7 @@ fast_ata_pio:
 no_dma_set:
 		config_chipset_for_pio(drive);
 	}
-	return HWIF(drive)->dmaproc(dma_func, drive);
+	return drive->channel->dmaproc(dma_func, drive);
 }
 
 static int svwks_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
@@ -487,7 +487,7 @@ static int svwks_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 			return config_drive_xfer_rate(drive);
 		case ide_dma_end:
 		{
-			ide_hwif_t *hwif		= HWIF(drive);
+			struct ata_channel *hwif = drive->channel;
 			unsigned long dma_base		= hwif->dma_base;
 	
 			if(inb(dma_base+0x02)&1)
@@ -584,13 +584,13 @@ unsigned int __init pci_init_svwks(struct pci_dev *dev)
  * Bit 14 clear = primary IDE channel does not have 80-pin cable.
  * Bit 14 set   = primary IDE channel has 80-pin cable.
  */
-static unsigned int __init ata66_svwks_dell (ide_hwif_t *hwif)
+static unsigned int __init ata66_svwks_dell(struct ata_channel *hwif)
 {
 	struct pci_dev *dev = hwif->pci_dev;
 	if (dev->subsystem_vendor == PCI_VENDOR_ID_DELL &&
 	    dev->vendor	== PCI_VENDOR_ID_SERVERWORKS &&
 	    dev->device == PCI_DEVICE_ID_SERVERWORKS_CSB5IDE)
-		return ((1 << (hwif->channel + 14)) &
+		return ((1 << (hwif->unit + 14)) &
 			dev->subsystem_device) ? 1 : 0;
 	return 0;
 }
@@ -601,18 +601,18 @@ static unsigned int __init ata66_svwks_dell (ide_hwif_t *hwif)
  *
  * WARNING: this only works on Alpine hardware!
  */
-static unsigned int __init ata66_svwks_cobalt (ide_hwif_t *hwif)
+static unsigned int __init ata66_svwks_cobalt(struct ata_channel *hwif)
 {
 	struct pci_dev *dev = hwif->pci_dev;
 	if (dev->subsystem_vendor == PCI_VENDOR_ID_SUN &&
 	    dev->vendor	== PCI_VENDOR_ID_SERVERWORKS &&
 	    dev->device == PCI_DEVICE_ID_SERVERWORKS_CSB5IDE)
-		return ((1 << (hwif->channel + 14)) &
+		return ((1 << (hwif->unit + 14)) &
 			dev->subsystem_device) ? 1 : 0;
 	return 0;
 }
 
-unsigned int __init ata66_svwks (ide_hwif_t *hwif)
+unsigned int __init ata66_svwks(struct ata_channel *hwif)
 {
 	struct pci_dev *dev = hwif->pci_dev;
 
@@ -627,10 +627,10 @@ unsigned int __init ata66_svwks (ide_hwif_t *hwif)
 	return 0;
 }
 
-void __init ide_init_svwks (ide_hwif_t *hwif)
+void __init ide_init_svwks(struct ata_channel *hwif)
 {
 	if (!hwif->irq)
-		hwif->irq = hwif->channel ? 15 : 14;
+		hwif->irq = hwif->unit ? 15 : 14;
 
 	hwif->tuneproc = &svwks_tune_drive;
 	hwif->speedproc = &svwks_tune_chipset;

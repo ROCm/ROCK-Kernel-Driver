@@ -6,10 +6,9 @@
  *  table of configured filesystems
  */
 
-#include <linux/config.h>
+#include <linux/fs.h>
 #include <linux/slab.h>
 #include <linux/kmod.h>
-#define __NO_VERSION__
 #include <linux/module.h>
 #include <asm/uaccess.h>
 

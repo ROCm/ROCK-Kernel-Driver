@@ -407,5 +407,6 @@ static int __init lapb_init(void)
 
 MODULE_AUTHOR("Jonathan Naylor <g4klx@g4klx.demon.co.uk>");
 MODULE_DESCRIPTION("The X.25 Link Access Procedure B link layer protocol");
+MODULE_LICENSE("GPL");
 
 module_init(lapb_init);

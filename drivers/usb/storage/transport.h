@@ -112,7 +112,7 @@ struct bulk_cs_wrap {
 #define US_BULK_GET_MAX_LUN	0xfe
 
 /*
- * us_bulk_transfer() return codes
+ * usb_stor_transfer() return codes
  */
 #define US_BULK_TRANSFER_GOOD		0  /* good transfer                 */
 #define US_BULK_TRANSFER_SHORT		1  /* transfered less than expected */

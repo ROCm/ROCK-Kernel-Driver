@@ -185,7 +185,7 @@ static struct pcic_sn2list pcic_known_sysnames[] = {
  * Only one PCIC per IIep,
  * and since we have no SMP IIep, only one per system.
  */
-static int pcic0_up = 0;
+static int pcic0_up;
 static struct linux_pcic pcic0;
 
 unsigned int pcic_regs;

@@ -178,7 +178,6 @@ static void atyfbcon_blank(int blank, struct fb_info *fb);
 static int aty_init(struct fb_info_aty *info, const char *name);
 #ifdef CONFIG_ATARI
 static int store_video_par(char *videopar, unsigned char m64_num);
-static char *strtoke(char *s, const char *ct);
 #endif
 
 static void aty_set_crtc(const struct fb_info_aty *info,
@@ -2595,13 +2594,13 @@ static int __init store_video_par(char *video_str, unsigned char m64_num)
 
     printk("store_video_par() '%s' \n", video_str);
 
-    if (!(p = strtoke(video_str, ";")) || !*p)
+    if (!(p = strsep(&video_str, ";")) || !*p)
 	goto mach64_invalid;
     vmembase = simple_strtoul(p, NULL, 0);
-    if (!(p = strtoke(NULL, ";")) || !*p)
+    if (!(p = strsep(&video_str, ";")) || !*p)
 	goto mach64_invalid;
     size = simple_strtoul(p, NULL, 0);
-    if (!(p = strtoke(NULL, ";")) || !*p)
+    if (!(p = strsep(&video_str, ";")) || !*p)
 	goto mach64_invalid;
     guiregbase = simple_strtoul(p, NULL, 0);
 
@@ -2615,25 +2614,6 @@ static int __init store_video_par(char *video_str, unsigned char m64_num)
 mach64_invalid:
     phys_vmembase[m64_num]   = 0;
     return -1;
-}
-
-static char __init *strtoke(char *s, const char *ct)
-{
-    static char *ssave = NULL;
-    char *sbegin, *send;
-
-    sbegin  = s ? s : ssave;
-    if (!sbegin)
-	return NULL;
-    if (*sbegin == '\0') {
-	ssave = NULL;
-	return NULL;
-    }
-    send = strpbrk(sbegin, ct);
-    if (send && *send != '\0')
-	*send++ = '\0';
-    ssave = send;
-    return sbegin;
 }
 #endif /* CONFIG_ATARI */
 

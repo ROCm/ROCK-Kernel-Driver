@@ -311,7 +311,7 @@
  *  include in the list of i/o ports to be probed all the PCI SCSI controllers.
  *
  *  Due to a DPT BIOS "feature", it might not be possible to force an EISA
- *  address on more then a single DPT PCI board, so in this case you have to
+ *  address on more than a single DPT PCI board, so in this case you have to
  *  let the PCI BIOS assign the addresses.
  *
  *  The sequence of detection probes is:

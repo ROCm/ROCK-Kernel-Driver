@@ -232,6 +232,7 @@ void __init MP_processor_info (struct mpc_config_processor *m)
 	if (m->mpc_apicid > MAX_APICS) {
 		printk("Processor #%d INVALID. (Max ID: %d).\n",
 			m->mpc_apicid, MAX_APICS);
+		--num_processors;
 		return;
 	}
 	ver = m->mpc_apicver;
@@ -816,11 +817,13 @@ void __init find_intel_smp (void)
 	 * trustworthy, simply because the SMP table may have been
 	 * stomped on during early boot. These loaders are buggy and
 	 * should be fixed.
+	 *
+	 * MP1.4 SPEC states to only scan first 1K of 4K EBDA.
 	 */
 
 	address = *(unsigned short *)phys_to_virt(0x40E);
 	address <<= 4;
-	smp_scan_config(address, 0x1000);
+	smp_scan_config(address, 0x400);
 	if (smp_found_config)
 		printk(KERN_WARNING "WARNING: MP table in the EBDA can be UNSAFE, contact linux-smp@vger.kernel.org if you experience SMP problems!\n");
 }

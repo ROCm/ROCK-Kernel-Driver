@@ -397,7 +397,7 @@ int agp_unbind_memory(agp_memory * curr)
 static void agp_generic_agp_enable(u32 mode)
 {
 	struct pci_dev *device = NULL;
-	u32 command, scratch, cap_id;
+	u32 command, scratch; 
 	u8 cap_ptr;
 
 	pci_read_config_dword(agp_bridge.dev,
@@ -410,34 +410,8 @@ static void agp_generic_agp_enable(u32 mode)
 	 */
 
 
-	pci_for_each_dev(device)
-	{
-		/*
-		 *	Enable AGP devices. Most will be VGA display but
-		 *	some may be coprocessors on non VGA devices too
-		 */
-		 
-		if((((device->class >> 16) & 0xFF) != PCI_BASE_CLASS_DISPLAY) &&
-			(device->class != (PCI_CLASS_PROCESSOR_CO << 8)))
-			continue;
-
-		pci_read_config_dword(device, 0x04, &scratch);
-
-		if (!(scratch & 0x00100000))
-			continue;
-
-		pci_read_config_byte(device, 0x34, &cap_ptr);
-
-		if (cap_ptr != 0x00) {
-			do {
-				pci_read_config_dword(device,
-						      cap_ptr, &cap_id);
-
-				if ((cap_id & 0xff) != 0x02)
-					cap_ptr = (cap_id >> 8) & 0xff;
-			}
-			while (((cap_id & 0xff) != 0x02) && (cap_ptr != 0x00));
-		}
+	pci_for_each_dev(device) {
+		cap_ptr = pci_find_capability(device, PCI_CAP_ID_AGP);
 		if (cap_ptr != 0x00) {
 			/*
 			 * Ok, here we have a AGP device. Disable impossible 
@@ -506,25 +480,8 @@ static void agp_generic_agp_enable(u32 mode)
 	 *        command registers.
 	 */
 
-	while ((device = pci_find_class(PCI_CLASS_DISPLAY_VGA << 8,
-					device)) != NULL) {
-		pci_read_config_dword(device, 0x04, &scratch);
-
-		if (!(scratch & 0x00100000))
-			continue;
-
-		pci_read_config_byte(device, 0x34, &cap_ptr);
-
-		if (cap_ptr != 0x00) {
-			do {
-				pci_read_config_dword(device,
-						      cap_ptr, &cap_id);
-
-				if ((cap_id & 0xff) != 0x02)
-					cap_ptr = (cap_id >> 8) & 0xff;
-			}
-			while (((cap_id & 0xff) != 0x02) && (cap_ptr != 0x00));
-		}
+	pci_for_each_dev(device) {
+		cap_ptr = pci_find_capability(device, PCI_CAP_ID_AGP);
 		if (cap_ptr != 0x00)
 			pci_write_config_dword(device, cap_ptr + 8, command);
 	}
@@ -809,9 +766,9 @@ static unsigned long agp_generic_alloc_page(void)
 	struct page * page;
 	
 	page = alloc_page(GFP_KERNEL);
-	if (page == NULL) {
+	if (page == NULL)
 		return 0;
-	}
+
 	get_page(page);
 	LockPage(page);
 	atomic_inc(&agp_bridge.current_memory_agp);
@@ -823,10 +780,9 @@ static void agp_generic_destroy_page(unsigned long addr)
 	void *pt = (void *) addr;
 	struct page *page;
 
-	if (pt == NULL) {
+	if (pt == NULL)
 		return;
-	}
-	
+
 	page = virt_to_page(pt);
 	put_page(page);
 	UnlockPage(page);
@@ -3318,24 +3274,8 @@ static void serverworks_agp_enable(u32 mode)
 	 */
 
 
-	pci_for_each_dev(device)
-	{
-		/*
-		 *	Enable AGP devices. Most will be VGA display but
-		 *	some may be coprocessors on non VGA devices too
-		 */
-		 
-		if((((device->class >> 16) & 0xFF) != PCI_BASE_CLASS_DISPLAY) &&
-			(device->class != (PCI_CLASS_PROCESSOR_CO << 8)))
-			continue;
-
-		pci_read_config_dword(device, 0x04, &scratch);
-
-		if (!(scratch & 0x00100000))
-			continue;
-
-		pci_read_config_byte(device, 0x34, &cap_ptr);
-
+	pci_for_each_dev(device) {
+		cap_ptr = pci_find_capability(device, PCI_CAP_ID_AGP);
 		if (cap_ptr != 0x00) {
 			do {
 				pci_read_config_dword(device,
@@ -3413,25 +3353,8 @@ static void serverworks_agp_enable(u32 mode)
 	 *        command registers.
 	 */
 
-	while ((device = pci_find_class(PCI_CLASS_DISPLAY_VGA << 8,
-					device)) != NULL) {
-		pci_read_config_dword(device, 0x04, &scratch);
-
-		if (!(scratch & 0x00100000))
-			continue;
-
-		pci_read_config_byte(device, 0x34, &cap_ptr);
-
-		if (cap_ptr != 0x00) {
-			do {
-				pci_read_config_dword(device,
-						      cap_ptr, &cap_id);
-
-				if ((cap_id & 0xff) != 0x02)
-					cap_ptr = (cap_id >> 8) & 0xff;
-			}
-			while (((cap_id & 0xff) != 0x02) && (cap_ptr != 0x00));
-		}
+	pci_for_each_dev(device) {
+		cap_ptr = pci_find_capability(device, PCI_CAP_ID_AGP);
 		if (cap_ptr != 0x00)
 			pci_write_config_dword(device, cap_ptr + 8, command);
 	}
@@ -3881,7 +3804,6 @@ static int __init agp_find_supported_device(void)
 {
 	struct pci_dev *dev = NULL;
 	u8 cap_ptr = 0x00;
-	u32 cap_id, scratch;
 
 	if ((dev = pci_find_class(PCI_CLASS_BRIDGE_HOST << 8, NULL)) == NULL)
 		return -ENODEV;
@@ -4022,20 +3944,7 @@ static int __init agp_find_supported_device(void)
 #endif	/* CONFIG_AGP_SWORKS */
 
 	/* find capndx */
-	pci_read_config_dword(dev, 0x04, &scratch);
-	if (!(scratch & 0x00100000))
-		return -ENODEV;
-
-	pci_read_config_byte(dev, 0x34, &cap_ptr);
-	if (cap_ptr != 0x00) {
-		do {
-			pci_read_config_dword(dev, cap_ptr, &cap_id);
-
-			if ((cap_id & 0xff) != 0x02)
-				cap_ptr = (cap_id >> 8) & 0xff;
-		}
-		while (((cap_id & 0xff) != 0x02) && (cap_ptr != 0x00));
-	}
+	cap_ptr = pci_find_capability(dev, PCI_CAP_ID_AGP);
 	if (cap_ptr == 0x00)
 		return -ENODEV;
 	agp_bridge.capndx = cap_ptr;

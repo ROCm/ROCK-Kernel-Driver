@@ -59,6 +59,7 @@
 #include <linux/tty.h>
 #include <linux/file.h>
 #include <linux/slab.h>
+#include <linux/sysctl.h>
 #include <linux/smp_lock.h>
 #include <linux/init.h>
 
@@ -1240,9 +1241,22 @@ warn_put_all:
 	return ret;
 }
 
+static ctl_table fs_table[] = {
+	{FS_NRDQUOT, "dquot-nr", &nr_dquots, 2*sizeof(int),
+	 0444, NULL, &proc_dointvec},
+	{},
+};
+
+static ctl_table dquot_table[] = {
+	{CTL_FS, "fs", NULL, 0, 0555, fs_table},
+	{},
+};
+
 static int __init dquot_init(void)
 {
 	int i;
+
+	register_sysctl_table(dquot_table, 0);
 
 	for (i = 0; i < NR_DQHASH; i++)
 		INIT_LIST_HEAD(dquot_hash + i);

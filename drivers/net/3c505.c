@@ -1383,7 +1383,7 @@ static inline void elp_init(struct net_device *dev)
 	/*
 	 * memory information
 	 */
-	dev->mem_start = dev->mem_end = dev->rmem_end = dev->rmem_start = 0;
+	dev->mem_start = dev->mem_end = 0;
 }
 
 /************************************************************

@@ -29,7 +29,7 @@
  * Notes: 
  *  1) the IEEE754 library (-le) performs the actual arithmetic;
  *  2) if you know that you won't have an fpu, then you'll get much 
- *     better performance by compiling with -msoft-float!  */
+ *     better performance by compiling with -msoft-float!
  *
  *  Nov 7, 2000
  *  Massive changes to integrate with Linux kernel.

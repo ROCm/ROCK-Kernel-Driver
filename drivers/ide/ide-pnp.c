@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * (for example /usr/src/linux/COPYING); if not, write to the Free
- * Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.  
+ * Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
 #include <linux/ide.h>
@@ -57,7 +57,7 @@ struct pnp_dev_t {
 static int __init pnpide_generic_init(struct pci_dev *dev, int enable)
 {
 	hw_regs_t hw;
-	ide_hwif_t *hwif;
+	struct ata_channel *hwif;
 	int index;
 
 	if (!enable)

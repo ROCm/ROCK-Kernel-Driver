@@ -465,7 +465,7 @@ err_out:
 #define EE_DATA_READ	0x80	/* EEPROM chip data out, in reg. 17. */
 
 /* Delay between EEPROM clock transitions. */
-#define eeprom_delay()	do {} while (0);
+#define eeprom_delay()	do { } while (0)
 
 /* The EEPROM commands include the alway-set leading bit. */
 #define EE_WRITE_CMD	(5 << 6)

@@ -894,7 +894,7 @@ int journal_create (journal_t *journal)
 		__brelse(bh);
 	}
 
-	fsync_dev(to_kdev_t(journal->j_dev->bd_dev));
+	fsync_bdev(journal->j_dev);
 	jbd_debug(1, "JBD: journal cleared.\n");
 
 	/* OK, fill in the initial static fields in the new superblock */
