@@ -61,8 +61,6 @@ extern void destroy_8023_client(struct datalink_proto *);
 #endif
 
 /* Socket layer support routines */
-EXPORT_SYMBOL(memcpy_fromiovec);
-EXPORT_SYMBOL(memcpy_tokerneliovec);
 
 EXPORT_SYMBOL(sk_run_filter);
 EXPORT_SYMBOL(sk_chk_filter);
@@ -77,11 +75,8 @@ EXPORT_SYMBOL(net_ratelimit);
 EXPORT_SYMBOL(net_random);
 EXPORT_SYMBOL(net_srandom);
 
-/* Needed by smbfs.o */
-
 /* Needed by unix.o */
 EXPORT_SYMBOL(files_stat);
-EXPORT_SYMBOL(memcpy_toiovec);
 
 #ifdef CONFIG_IPX_MODULE
 EXPORT_SYMBOL(make_8023_client);
@@ -89,7 +84,6 @@ EXPORT_SYMBOL(destroy_8023_client);
 EXPORT_SYMBOL(make_EII_client);
 EXPORT_SYMBOL(destroy_EII_client);
 #endif
-
 
 #ifdef CONFIG_NET_DIVERT
 EXPORT_SYMBOL(alloc_divert_blk);
@@ -134,10 +128,6 @@ EXPORT_SYMBOL(flow_cache_genid);
 #if defined (CONFIG_IPV6_MODULE) || defined (CONFIG_IP_SCTP_MODULE)
 /* inet functions common to v4 and v6 */
 
-/* Socket demultiplexing. */
-
-EXPORT_SYMBOL(memcpy_fromiovecend);
-EXPORT_SYMBOL(csum_partial_copy_fromiovecend);
 /* UDP/TCP exported functions for TCPv6 */
 EXPORT_SYMBOL(net_statistics); 
 #endif
@@ -155,8 +145,6 @@ EXPORT_SYMBOL(ip_rcv);
 EXPORT_SYMBOL(tr_source_route);
 EXPORT_SYMBOL(tr_type_trans);
 #endif
-
-/* Device callback registration */
 
 /* support for loadable net drivers */
 #ifdef CONFIG_NET
