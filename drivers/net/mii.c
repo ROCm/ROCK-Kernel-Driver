@@ -192,9 +192,12 @@ int mii_nway_restart (struct mii_if_info *mii)
 
 void mii_check_link (struct mii_if_info *mii)
 {
-	if (mii_link_ok(mii))
+	int cur_link = mii_link_ok(mii);
+	int prev_link = netif_carrier_ok(mii->dev);
+
+	if (cur_link && !prev_link)
 		netif_carrier_on(mii->dev);
-	else
+	else if (prev_link && !cur_link)
 		netif_carrier_off(mii->dev);
 }
 

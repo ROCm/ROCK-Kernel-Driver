@@ -184,7 +184,7 @@
 				 NETIF_MSG_WOL		| \
 				 NETIF_MSG_RX_ERR	| \
 				 NETIF_MSG_TX_ERR)
-static int debug = NATSEMI_DEF_MSG;
+static int debug = -1;
 
 /* Maximum events (Rx packets, etc.) to handle at each interrupt. */
 static int max_interrupt_work = 20;
@@ -256,7 +256,7 @@ MODULE_PARM(full_duplex, "1-" __MODULE_STRING(MAX_UNITS) "i");
 MODULE_PARM_DESC(max_interrupt_work, 
 	"DP8381x maximum events handled per interrupt");
 MODULE_PARM_DESC(mtu, "DP8381x MTU (all boards)");
-MODULE_PARM_DESC(debug, "DP8381x default debug bitmask");
+MODULE_PARM_DESC(debug, "DP8381x default debug level");
 MODULE_PARM_DESC(rx_copybreak, 
 	"DP8381x copy breakpoint for copy-only-tiny-frames");
 MODULE_PARM_DESC(options, 
@@ -796,7 +796,7 @@ static int __devinit natsemi_probe1 (struct pci_dev *pdev,
 	pci_set_drvdata(pdev, dev);
 	np->iosize = iosize;
 	spin_lock_init(&np->lock);
-	np->msg_enable = debug;
+	np->msg_enable = (debug >= 0) ? (1<<debug)-1 : NATSEMI_DEF_MSG;
 	np->hands_off = 0;
 
 	/* Reset the chip to erase previous misconfiguration. */
