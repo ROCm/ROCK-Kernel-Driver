@@ -34,6 +34,7 @@
 #include <linux/delay.h>
 #include <asm/semaphore.h>
 #include <asm/io.h>		
+#include <linux/pcieport_if.h>
 #include "pci_hotplug.h"
 
 #define MY_NAME	"pciehp"
@@ -311,7 +312,7 @@ enum php_ctlr_type {
 
 typedef u8(*php_intr_callback_t) (unsigned int change_id, void *instance_id);
 
-int pcie_init(struct controller *ctrl, struct pci_dev *pdev,
+int pcie_init(struct controller *ctrl, struct pcie_device *dev,
 		php_intr_callback_t attention_button_callback,
 		php_intr_callback_t switch_change_callback,
 		php_intr_callback_t presence_change_callback,

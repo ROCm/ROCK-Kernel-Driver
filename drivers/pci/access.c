@@ -7,7 +7,7 @@
  * configuration space.
  */
 
-static spinlock_t pci_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(pci_lock);
 
 /*
  *  Wrappers for all PCI configuration access functions.  They just check
