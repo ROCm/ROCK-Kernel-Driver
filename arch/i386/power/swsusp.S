@@ -8,10 +8,11 @@
 
 	.text
 
-ENTRY(swsusp_arch_suspend)
+ENTRY(do_magic)
 	pushl %ebx
 	cmpl $0,8(%esp)
 	jne .L1450
+	call do_magic_suspend_1
 	call save_processor_state
 
 	movl %esp, saved_context_esp
@@ -24,13 +25,14 @@ ENTRY(swsusp_arch_suspend)
 	movl %edi, saved_context_edi
 	pushfl ; popl saved_context_eflags
 
-	call swsusp_suspend
+	call do_magic_suspend_2
 	jmp .L1449
 	.p2align 4,,7
 .L1450:
 	movl $swapper_pg_dir-__PAGE_OFFSET,%ecx
 	movl %ecx,%cr3
 
+	call do_magic_resume_1
 	movl $0,loop
 	cmpl $0,nr_copy_pages
 	je .L1453
@@ -76,13 +78,11 @@ ENTRY(swsusp_arch_suspend)
 	movl saved_context_edx, %edx
 	movl saved_context_esi, %esi
 	movl saved_context_edi, %edi
+	call restore_processor_state
 	pushl saved_context_eflags ; popfl
-	call swsusp_resume
+	call do_magic_resume_2
 .L1449:
-	popl	%ebx
-	pushl	%eax
-	call	restore_processor_state
-	popl	%eax
+	popl %ebx
 	ret
 
        .section .data.nosave
@@ -91,4 +91,4 @@ loop:
 loop2:
        .quad 0
        .previous
-
+	
