@@ -530,10 +530,10 @@ bttv_set_dma(struct bttv *btv, int override, int irqflags)
 	d2printk(KERN_DEBUG
 		 "bttv%d: capctl=%x irq=%d top=%08Lx/%08Lx even=%08Lx/%08Lx\n",
 		 btv->nr,capctl,irqflags,
-		 btv->vcurr   ? (u64)btv->vcurr->top.dma      : 0,
-		 btv->top     ? (u64)btv->top->top.dma        : 0,
-		 btv->vcurr   ? (u64)btv->vcurr->bottom.dma   : 0,
-		 btv->bottom  ? (u64)btv->bottom->bottom.dma  : 0);
+		 btv->vcurr   ? (unsigned long long)btv->vcurr->top.dma      : 0,
+		 btv->top     ? (unsigned long long)btv->top->top.dma        : 0,
+		 btv->vcurr   ? (unsigned long long)btv->vcurr->bottom.dma   : 0,
+		 btv->bottom  ? (unsigned long long)btv->bottom->bottom.dma  : 0);
 	
 	cmd = BT848_RISC_JUMP;
 	if (irqflags) {
@@ -568,7 +568,7 @@ bttv_risc_init_main(struct bttv *btv)
 	if ((rc = bttv_riscmem_alloc(btv->dev,&btv->main,PAGE_SIZE)) < 0)
 		return rc;
 	dprintk(KERN_DEBUG "bttv%d: risc main @ %08Lx\n",
-		btv->nr,(u64)btv->main.dma);
+		btv->nr,(unsigned long long)btv->main.dma);
 
 	btv->main.cpu[0] = cpu_to_le32(BT848_RISC_SYNC | BT848_RISC_RESYNC |
 				       BT848_FIFO_STATUS_VRE);
@@ -612,7 +612,7 @@ bttv_risc_hook(struct bttv *btv, int slot, struct bttv_riscmem *risc,
 		btv->main.cpu[slot+1] = cpu_to_le32(next);
 	} else {
 		d2printk(KERN_DEBUG "bttv%d: risc=%p slot[%d]=%08Lx irq=%d\n",
-			 btv->nr,risc,slot,(u64)risc->dma,irqflags);
+			 btv->nr,risc,slot,(unsigned long long)risc->dma,irqflags);
 		cmd = BT848_RISC_JUMP;
 		if (irqflags)
 			cmd |= BT848_RISC_IRQ | (irqflags << 16);

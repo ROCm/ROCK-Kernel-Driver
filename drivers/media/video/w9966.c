@@ -179,8 +179,8 @@ static int w9966_i2c_rbyte(struct w9966_dev* cam);
 
 static int w9966_v4l_ioctl(struct inode *inode, struct file *file,
 			   unsigned int cmd, unsigned long arg);
-static int w9966_v4l_read(struct file *file, char *buf,
-			  size_t count, loff_t *ppos);
+static ssize_t w9966_v4l_read(struct file *file, char *buf,
+			      size_t count, loff_t *ppos);
 
 static struct file_operations w9966_fops = {
 	.owner		= THIS_MODULE,
@@ -867,8 +867,8 @@ static int w9966_v4l_ioctl(struct inode *inode, struct file *file,
 }
 
 // Capture data
-static int w9966_v4l_read(struct file *file, char *buf,
-			  size_t count, loff_t *ppos)
+static ssize_t w9966_v4l_read(struct file *file, char *buf,
+			      size_t count, loff_t *ppos)
 {
 	struct video_device *vdev = video_devdata(file);
 	struct w9966_dev *cam = (struct w9966_dev *)vdev->priv;

@@ -150,7 +150,7 @@ int budget_patch_diseqc_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *
         }
 
         case FE_DISEQC_SEND_BURST:
-                av7110_send_diseqc_msg (budget, 0, NULL, (int) arg);
+                av7110_send_diseqc_msg (budget, 0, NULL, (int) (long) arg);
                 break;
 
         default:
