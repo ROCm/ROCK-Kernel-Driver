@@ -7,12 +7,14 @@
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/smp.h>
+#include <linux/interrupt.h>
 #include <asm/ptrace.h>
 #include <asm/string.h>
 #include <asm/prom.h>
 #include <asm/bitops.h>
 #include <asm/bootx.h>
 #include <asm/machdep.h>
+#include <asm/xmon.h>
 #ifdef CONFIG_PMAC_BACKLIGHT
 #include <asm/backlight.h>
 #endif
@@ -103,7 +105,12 @@ static void cpu_cmd(void);
 #endif /* CONFIG_SMP */
 static int pretty_print_addr(unsigned long addr);
 static void csum(void);
+#ifdef CONFIG_BOOTX_TEXT
+static void vidcmds(void);
+#endif
 static void bootcmds(void);
+static void proccall(void);
+static void printtime(void);
 
 extern int print_insn_big_powerpc(FILE *, unsigned long, unsigned);
 extern void printf(const char *fmt, ...);
@@ -115,6 +122,9 @@ extern void xmon_enter(void);
 extern void xmon_leave(void);
 extern char* xmon_find_symbol(unsigned long addr, unsigned long* saddr);
 extern unsigned long xmon_symbol_to_addr(char* symbol);
+
+static unsigned start_tb[NR_CPUS][2];
+static unsigned stop_tb[NR_CPUS][2];
 
 #define GETWORD(v)	(((v)[0] << 24) + ((v)[1] << 16) + ((v)[2] << 8) + (v)[3])
 
@@ -165,6 +175,20 @@ extern inline void __delay(unsigned int loops)
 				     "r" (loops) : "ctr");
 }
 
+static void get_tb(unsigned *p)
+{
+	unsigned hi, lo, hiagain;
+
+	if ((get_pvr() >> 16) == 1)
+		return;
+
+	do {
+		asm volatile("mftbu %0; mftb %1; mftbu %2"
+			     : "=r" (hi), "=r" (lo), "=r" (hiagain));
+	} while (hi != hiagain);
+	p[0] = hi;
+	p[1] = lo;
+}
 
 void
 xmon(struct pt_regs *excp)
@@ -172,6 +196,7 @@ xmon(struct pt_regs *excp)
 	struct pt_regs regs;
 	int msr, cmd;
 
+	get_tb(stop_tb[smp_processor_id()]);
 	if (excp == NULL) {
 		asm volatile ("stw	0,0(%0)\n\
 			lwz	0,0(1)\n\
@@ -234,17 +259,18 @@ xmon(struct pt_regs *excp)
 	clear_bit(smp_processor_id(), &cpus_in_xmon);
 #endif /* CONFIG_SMP */
 	set_msr(msr);		/* restore interrupt enable */
+	get_tb(start_tb[smp_processor_id()]);
 }
 
-void
+irqreturn_t
 xmon_irq(int irq, void *d, struct pt_regs *regs)
 {
 	unsigned long flags;
-	local_save_flags(flags);
-	local_irq_disable();
+	local_irq_save(flags);
 	printf("Keyboard interrupt\n");
 	xmon(regs);
 	local_irq_restore(flags);
+	return IRQ_HANDLED;
 }
 
 int
@@ -481,11 +507,37 @@ cmds(struct pt_regs *excp)
 			cpu_cmd();
 			break;
 #endif /* CONFIG_SMP */
+#ifdef CONFIG_BOOTX_TEXT
+		case 'v':
+			vidcmds();
+			break;
+#endif
 		case 'z':
 			bootcmds();
 			break;
+		case 'p':
+			proccall();
+			break;
+		case 'T':
+			printtime();
+			break;
 		}
 	}
+}
+
+extern unsigned tb_to_us;
+
+#define mulhwu(x,y) \
+({unsigned z; asm ("mulhwu %0,%1,%2" : "=r" (z) : "r" (x), "r" (y)); z;})
+
+static void printtime(void)
+{
+	unsigned int delta;
+
+	delta = stop_tb[smp_processor_id()][1]
+		- start_tb[smp_processor_id()][1];
+	delta = mulhwu(tb_to_us, delta);
+	printf("%u.%06u seconds\n", delta / 1000000, delta % 1000000);
 }
 
 static void bootcmds(void)
@@ -550,6 +602,44 @@ static void cpu_cmd(void)
 	}
 }
 #endif /* CONFIG_SMP */
+
+#ifdef CONFIG_BOOTX_TEXT
+extern boot_infos_t disp_bi;
+
+static void vidcmds(void)
+{
+	int c = inchar();
+	unsigned int val, w;
+	extern int boot_text_mapped;
+
+	if (!boot_text_mapped)
+		return;
+	if (c != '\n' && scanhex(&val)) {
+		switch (c) {
+		case 'd':
+			w = disp_bi.dispDeviceRowBytes
+				/ (disp_bi.dispDeviceDepth >> 3);
+			disp_bi.dispDeviceDepth = val;
+			disp_bi.dispDeviceRowBytes = w * (val >> 3);
+			return;
+		case 'p':
+			disp_bi.dispDeviceRowBytes = val;
+			return;
+		case 'w':
+			disp_bi.dispDeviceRect[2] = val;
+			return;
+		case 'h':
+			disp_bi.dispDeviceRect[3] = val;
+			return;
+		}
+	}
+	printf("W = %d (0x%x) H = %d (0x%x) D = %d (0x%x) P = %d (0x%x)\n",
+	       disp_bi.dispDeviceRect[2], disp_bi.dispDeviceRect[2],
+	       disp_bi.dispDeviceRect[3], disp_bi.dispDeviceRect[3],
+	       disp_bi.dispDeviceDepth, disp_bi.dispDeviceDepth,
+	       disp_bi.dispDeviceRowBytes, disp_bi.dispDeviceRowBytes);
+}
+#endif /* CONFIG_BOOTX_TEXT */
 
 static unsigned short fcstab[256] = {
 	0x0000, 0x1189, 0x2312, 0x329b, 0x4624, 0x57ad, 0x6536, 0x74bf,
@@ -927,34 +1017,6 @@ super_regs()
 	scannl();
 }
 
-#if 0
-static void
-openforth()
-{
-    int c;
-    char *p;
-    char cmd[1024];
-    int args[5];
-    extern int (*prom_entry)(int *);
-
-    p = cmd;
-    c = skipbl();
-    while (c != '\n') {
-	*p++ = c;
-	c = inchar();
-    }
-    *p = 0;
-    args[0] = (int) "interpret";
-    args[1] = 1;
-    args[2] = 1;
-    args[3] = (int) cmd;
-    (*prom_entry)(args);
-    printf("\n");
-    if (args[4] != 0)
-	printf("error %x\n", args[4]);
-}
-#endif
-
 #ifndef CONFIG_PPC_STD_MMU
 static void
 dump_hash_table()
@@ -1176,11 +1238,13 @@ mwrite(unsigned adrs, void *buf, int size)
 }
 
 static int fault_type;
+static int fault_except;
 static char *fault_chars[] = { "--", "**", "##" };
 
 static void
 handle_fault(struct pt_regs *regs)
 {
+	fault_except = TRAP(regs);
 	fault_type = TRAP(regs) == 0x200? 0: TRAP(regs) == 0x300? 1: 2;
 	longjmp(bus_error_jmp, 1);
 }
@@ -1576,6 +1640,41 @@ memzcan()
 	}
 	if (ook)
 		printf("%.8x\n", a - mskip);
+}
+
+void proccall(void)
+{
+	unsigned int args[8];
+	unsigned int ret;
+	int i;
+	typedef unsigned int (*callfunc_t)(unsigned int, unsigned int,
+			unsigned int, unsigned int, unsigned int,
+			unsigned int, unsigned int, unsigned int);
+	callfunc_t func;
+
+	scanhex(&adrs);
+	if (termch != '\n')
+		termch = 0;
+	for (i = 0; i < 8; ++i)
+		args[i] = 0;
+	for (i = 0; i < 8; ++i) {
+		if (!scanhex(&args[i]) || termch == '\n')
+			break;
+		termch = 0;
+	}
+	func = (callfunc_t) adrs;
+	ret = 0;
+	if (setjmp(bus_error_jmp) == 0) {
+		debugger_fault_handler = handle_fault;
+		sync();
+		ret = func(args[0], args[1], args[2], args[3],
+			   args[4], args[5], args[6], args[7]);
+		sync();
+		printf("return value is %x\n", ret);
+	} else {
+		printf("*** %x exception occurred\n", fault_except);
+	}
+	debugger_fault_handler = 0;
 }
 
 /* Input scanning routines */
