@@ -3225,6 +3225,7 @@ static int __devinit bttv_probe(struct pci_dev *dev,
         INIT_LIST_HEAD(&btv->capture);
         INIT_LIST_HEAD(&btv->vcapture);
 
+	init_timer(&btv->timeout);
 	btv->timeout.function = bttv_irq_timeout;
 	btv->timeout.data     = (unsigned long)btv;
 	

@@ -572,7 +572,6 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 	} else {
 		INIT_WORK(&server->rcv.tq, ncpdgram_rcv_proc, server);
 		INIT_WORK(&server->timeout_tq, ncpdgram_timeout_proc, server);
-		init_timer(&server->timeout_tm);
 		server->timeout_tm.data = (unsigned long)server;
 		server->timeout_tm.function = ncpdgram_timeout_call;
 	}

@@ -1696,7 +1696,7 @@ static void __init taint_real_pages(void)
 
 #ifdef CONFIG_HUGETLB_PAGE
 long htlbpagemem = 0;
-long htlbpage_max;
+int htlbpage_max;
 long htlbzone_pages;
 extern struct list_head htlbpage_freelist;
 #endif
