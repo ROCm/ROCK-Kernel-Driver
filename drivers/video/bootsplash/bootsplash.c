@@ -404,6 +404,7 @@ static int splash_getraw(unsigned char *start, unsigned char *end, int *update)
 	*update = -1;
 
     if (!update || start[7] < '2' || start[7] > '3' || splash_geti(start, 12) != (int)0xffffffff)
+	printk(KERN_INFO "bootsplash %s: looking for picture...", SPLASH_VERSION);
 
     for (ndata = start; ndata < end; ndata++) {
 	if (ndata[0] != 'B' || ndata[1] != 'O' || ndata[2] != 'O' || ndata[3] != 'T')
