@@ -33,10 +33,11 @@
 	- Tx timeout recovery
 	- More support for ethtool.
 
-	Version LK1.04a (jgarzik):
+	Version LK1.04a:
 	- Remove unused/constant members from struct pci_id_info
 	(which then allows removal of 'drv_flags' from private struct)
-	- If no phy is found, fail to load that board
+	(jgarzik)
+	- If no phy is found, fail to load that board (jgarzik)
 	- Always start phy id scan at id 1 to avoid problems (Donald Becker)
 	- Autodetect where mii_preable_required is needed,
 	default to not needed.  (Donald Becker)
@@ -45,18 +46,25 @@
 	- Remove mii_preamble_required module parameter (Donald Becker)
 	- Add per-interface mii_preamble_required (setting is autodetected)
 	  (Donald Becker)
-	- Remove unnecessary cast from void pointer
-	- Re-align comments in private struct
+	- Remove unnecessary cast from void pointer (jgarzik)
+	- Re-align comments in private struct (jgarzik)
 
-	Version LK1.04c:
+	Version LK1.04c (jgarzik):
 	- Support bitmapped message levels (NETIF_MSG_xxx), and the
 	  two ethtool ioctls that get/set them
 	- Don't hand-code MII ethtool support, use standard API/lib
 
+	Version LK1.04d:
+	- Merge from Donald Becker's sundance.c: (Jason Lunz)
+		* proper support for variably-sized MTUs
+		* default to PIO, to fix chip bugs
+	- Add missing unregister_netdev (Jason Lunz)
+	- Add CONFIG_SUNDANCE_MMIO config option (jgarzik)
+
 */
 
 #define DRV_NAME	"sundance"
-#define DRV_VERSION	"1.01+LK1.04c"
+#define DRV_VERSION	"1.01+LK1.04d"
 #define DRV_RELDATE	"19-Sep-2002"
 
 
@@ -65,7 +73,6 @@
 static int debug = 1;			/* 1 normal messages, 0 quiet .. 7 verbose. */
 /* Maximum events (Rx packets, etc.) to handle at each interrupt. */
 static int max_interrupt_work = 0;
-static int mtu;
 /* Maximum number of multicast addresses to filter (vs. rx-all-multicast).
    Typical is a 64 element hash table based on the Ethernet CRC.  */
 static int multicast_filter_limit = 32;
@@ -162,13 +169,11 @@ MODULE_DESCRIPTION("Sundance Alta Ethernet driver");
 MODULE_LICENSE("GPL");
 
 MODULE_PARM(max_interrupt_work, "i");
-MODULE_PARM(mtu, "i");
 MODULE_PARM(debug, "i");
 MODULE_PARM(rx_copybreak, "i");
 MODULE_PARM(media, "1-" __MODULE_STRING(MAX_UNITS) "s");
 MODULE_PARM(flowctrl, "i");
 MODULE_PARM_DESC(max_interrupt_work, "Sundance Alta maximum events handled per interrupt");
-MODULE_PARM_DESC(mtu, "Sundance Alta MTU (all boards)");
 MODULE_PARM_DESC(debug, "Sundance Alta debug level (0-5)");
 MODULE_PARM_DESC(rx_copybreak, "Sundance Alta copy breakpoint for copy-only-tiny-frames");
 MODULE_PARM_DESC(flowctrl, "Sundance Alta flow control [0|1]");
@@ -247,6 +252,10 @@ IVc. Errata
 
 */
 
+/* Work-around for Kendin chip bugs. */
+#ifndef CONFIG_SUNDANCE_MMIO
+#define USE_IO_OPS 1
+#endif
 
 static struct pci_device_id sundance_pci_tbl[] __devinitdata = {
 	{0x1186, 0x1002, 0x1186, 0x1002, 0, 0, 0},
@@ -329,7 +338,7 @@ enum alta_offsets {
 	MACCtrl0 = 0x50,
 	MACCtrl1 = 0x52,
 	StationAddr = 0x54,
-	MaxTxSize = 0x5A,
+	MaxFrameSize = 0x5A,
 	RxMode = 0x5c,
 	MIICtrl = 0x5e,
 	MulticastFilter0 = 0x60,
@@ -457,6 +466,7 @@ struct netdev_private {
 			IntrDrvRqst | IntrTxDone | StatsMax | \
 			LinkChange)
 
+static int  change_mtu(struct net_device *dev, int new_mtu);
 static int  eeprom_read(long ioaddr, int location);
 static int  mdio_read(struct net_device *dev, int phy_id, int location);
 static void mdio_write(struct net_device *dev, int phy_id, int location, int value);
@@ -563,10 +573,8 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 	dev->do_ioctl = &netdev_ioctl;
 	dev->tx_timeout = &tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
+	dev->change_mtu = &change_mtu;
 	pci_set_drvdata(pdev, dev);
-
-	if (mtu)
-		dev->mtu = mtu;
 
 	i = register_netdev(dev);
 	if (i)
@@ -599,7 +607,7 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 		if (phy_idx == 0) {
 			printk(KERN_INFO "%s: No MII transceiver found, aborting.  ASIC status %x\n",
 				   dev->name, readl(ioaddr + ASICCtrl));
-			goto err_out_unmap_rx;
+			goto err_out_unregister;
 		}
 
 		np->mii_if.phy_id = np->phys[0];
@@ -673,6 +681,8 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 	card_idx++;
 	return 0;
 
+err_out_unregister:
+	unregister_netdev(dev);
 err_out_unmap_rx:
         pci_free_consistent(pdev, RX_TOTAL_SIZE, np->rx_ring, np->rx_ring_dma);
 err_out_unmap_tx:
@@ -689,6 +699,15 @@ err_out_netdev:
 	return -ENODEV;
 }
 
+static int change_mtu(struct net_device *dev, int new_mtu)
+{
+	if ((new_mtu < 68) || (new_mtu > 8191)) /* Set by RxDMAFrameLen */
+		return -EINVAL;
+	if (netif_running(dev))
+		return -EBUSY;
+	dev->mtu = new_mtu;
+	return 0;
+}
 
 /* Read the EEPROM and MII Management Data I/O (MDIO) interfaces. */
 static int __devinit eeprom_read(long ioaddr, int location)
@@ -818,6 +837,10 @@ static int netdev_open(struct net_device *dev)
 		writeb(dev->dev_addr[i], ioaddr + StationAddr + i);
 
 	/* Initialize other registers. */
+	writew(dev->mtu + 14, ioaddr + MaxFrameSize);
+	if (dev->mtu > 2047)
+		writel(readl(ioaddr + ASICCtrl) | 0x0C, ioaddr + ASICCtrl);
+
 	/* Configure the PCI bus bursts and FIFO thresholds. */
 
 	if (dev->if_port == 0)
@@ -950,7 +973,7 @@ static void init_ring(struct net_device *dev)
 	np->cur_rx = np->cur_tx = 0;
 	np->dirty_rx = np->dirty_tx = 0;
 
-	np->rx_buf_sz = (dev->mtu <= 1500 ? PKT_BUF_SZ : dev->mtu + 32);
+	np->rx_buf_sz = (dev->mtu <= 1500 ? PKT_BUF_SZ : dev->mtu + 36);
 
 	/* Initialize all Rx descriptors. */
 	for (i = 0; i < RX_RING_SIZE; i++) {
