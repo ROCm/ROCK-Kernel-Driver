@@ -1,7 +1,7 @@
 # -*- shell-script -*-
 
 menu "IEEE 1394 (FireWire) support (EXPERIMENTAL)"
-	depends on PCI && EXPERIMENTAL
+	depends on EXPERIMENTAL
 
 config IEEE1394
 	tristate "IEEE 1394 (FireWire) support (EXPERIMENTAL)"
@@ -15,7 +15,7 @@ config IEEE1394
 	  is the core support only, you will also need to select a driver for
 	  your IEEE 1394 adapter.
 
-	  To compile this driver as a module, choose M here: the
+	  To compile this driver as a module, say M here: the
 	  module will be called ieee1394.
 
 comment "Subsystem Options"
@@ -56,13 +56,13 @@ comment "Texas Instruments PCILynx requires I2C bit-banging"
 
 config IEEE1394_PCILYNX
 	tristate "Texas Instruments PCILynx support"
-	depends on IEEE1394 && I2C_ALGOBIT
+	depends on PCI && IEEE1394 && I2C_ALGOBIT
 	help
 	  Say Y here if you have an IEEE-1394 controller with the Texas
 	  Instruments PCILynx chip.  Note: this driver is written for revision
 	  2 of this chip and may not work with revision 0.
 
-	  To compile this driver as a module, choose M here: the
+	  To compile this driver as a module, say M here: the
 	  module will be called pcilynx.
 
 # Non-maintained pcilynx options
@@ -72,7 +72,7 @@ config IEEE1394_PCILYNX
 # fi
 config IEEE1394_OHCI1394
 	tristate "OHCI-1394 support"
-	depends on IEEE1394
+	depends on PCI && IEEE1394
 	help
 	  Enable this driver if you have an IEEE 1394 controller based on the
 	  OHCI-1394 specification. The current driver is only tested with OHCI
@@ -80,7 +80,7 @@ config IEEE1394_OHCI1394
 	  use one of these chipsets.  It should work with any OHCI-1394
 	  compliant card, however.
 
-	  To compile this driver as a module, choose M here: the
+	  To compile this driver as a module, say M here: the
 	  module will be called ohci1394.
 
 comment "Protocol Drivers"
@@ -122,7 +122,7 @@ config IEEE1394_DV1394
 
 	  The user-space API for dv1394 is documented in dv1394.h.
 
-	  To compile this driver as a module, choose M here: the
+	  To compile this driver as a module, say M here: the
 	  module will be called dv1394.
 
 config IEEE1394_RAWIO
@@ -134,7 +134,7 @@ config IEEE1394_RAWIO
 	  direct communication of user programs with the IEEE 1394 bus and
 	  thus with the attached peripherals.
 
-	  To compile this driver as a module, choose M here: the
+	  To compile this driver as a module, say M here: the
 	  module will be called raw1394.
 
 config IEEE1394_CMP
@@ -144,7 +144,7 @@ config IEEE1394_CMP
 	  This option enables the Connection Management Procedures
 	  (IEC61883-1) driver, which implements input and output plugs.
 
-	  To compile this driver as a module, choose M here: the
+	  To compile this driver as a module, say M here: the
 	  module will be called cmp.
 
 config IEEE1394_AMDTP
@@ -157,7 +157,7 @@ config IEEE1394_AMDTP
 
 	  The userspace interface is documented in amdtp.h.
 
-	  To compile this driver as a module, choose M here: the
+	  To compile this driver as a module, say M here: the
 	  module will be called amdtp.
 
 endmenu
