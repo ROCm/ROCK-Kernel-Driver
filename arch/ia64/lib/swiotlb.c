@@ -239,7 +239,7 @@ unmap_single (struct pci_dev *hwdev, char *dma_addr, size_t size, int direction)
 		for (i = index + nslots - 1; i >= index; i--)
 			io_tlb_list[i] = ++count;
 		/*
-		 * Step 2: merge the returned slots with the preceeding slots, if
+		 * Step 2: merge the returned slots with the preceding slots, if
 		 * available (non zero)
 		 */
 		for (i = index - 1;  (OFFSET(i, IO_TLB_SEGSIZE) != IO_TLB_SEGSIZE -1) &&
@@ -399,7 +399,7 @@ swiotlb_sync_single (struct pci_dev *hwdev, dma_addr_t pci_addr, size_t size, in
 
 /*
  * Map a set of buffers described by scatterlist in streaming mode for DMA.  This is the
- * scather-gather version of the above swiotlb_map_single interface.  Here the scatter
+ * scatter-gather version of the above swiotlb_map_single interface.  Here the scatter
  * gather list elements are each tagged with the appropriate dma address and length.  They
  * are obtained via sg_dma_{address,length}(SG).
  *

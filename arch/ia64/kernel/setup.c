@@ -60,6 +60,8 @@ struct ia64_boot_param *ia64_boot_param;
 struct screen_info screen_info;
 
 unsigned long ia64_iobase;	/* virtual address for I/O accesses */
+struct io_space io_space[MAX_IO_SPACES];
+unsigned int num_io_spaces;
 
 unsigned char aux_device_present = 0xaa;        /* XXX remove this when legacy I/O is gone */
 
@@ -412,6 +414,11 @@ setup_arch (char **cmdline_p)
 	}
 	ia64_iobase = (unsigned long) ioremap(phys_iobase, 0);
 
+	/* setup legacy IO port space */
+	io_space[0].mmio_base = ia64_iobase;
+	io_space[0].sparse = 1;
+	num_io_spaces = 1;
+
 #ifdef CONFIG_SMP
 	cpu_physical_id(0) = hard_smp_processor_id();
 #endif
@@ -421,7 +428,7 @@ setup_arch (char **cmdline_p)
 #ifdef CONFIG_ACPI_BOOT
 	acpi_boot_init();
 #endif
-#ifdef CONFIG_SERIAL_HCDP
+#ifdef CONFIG_SERIAL_8250_HCDP
 	if (efi.hcdp) {
 		void setup_serial_hcdp(void *);
 

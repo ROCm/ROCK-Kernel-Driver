@@ -3,6 +3,9 @@
  * Purpose:	Generic MCA handling layer
  *
  * Updated for latest kernel
+ * Copyright (C) 2003 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
+ *
  * Copyright (C) 2002 Dell Computer Corporation
  * Copyright (C) Matt Domsch (Matt_Domsch@dell.com)
  *
@@ -18,6 +21,7 @@
  * Copyright (C) 1999 Silicon Graphics, Inc.
  * Copyright (C) Vijay Chander(vijay@engr.sgi.com)
  *
+ * 03/04/15 D. Mosberger Added INIT backtrace support.
  * 02/03/25 M. Domsch	GUID cleanups
  *
  * 02/01/04 J. Hall	Aligned MCA stack to 16 bytes, added platform vs. CPU
@@ -39,6 +43,7 @@
 #include <linux/sched.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
+#include <linux/kallsyms.h>
 #include <linux/smp_lock.h>
 #include <linux/bootmem.h>
 #include <linux/acpi.h>
@@ -47,6 +52,7 @@
 #include <linux/kernel.h>
 #include <linux/smp.h>
 
+#include <asm/delay.h>
 #include <asm/machvec.h>
 #include <asm/page.h>
 #include <asm/ptrace.h>
@@ -139,7 +145,7 @@ ia64_mca_log_sal_error_record(int sal_info_type, int called_from_init)
 
 	/* Get the MCA error record */
 	if (!ia64_log_get(sal_info_type, (prfunc_t)printk))
-		return platform_err;                 // no record retrieved
+		return platform_err;		/* no record retrieved */
 
 	/* TODO:
 	 * 1. analyze error logs to determine recoverability
@@ -176,18 +182,167 @@ ia64_mca_cpe_int_handler (int cpe_irq, void *arg, struct pt_regs *ptregs)
 	ia64_mca_log_sal_error_record(SAL_INFO_TYPE_CPE, 0);
 }
 
-/*
- * This routine will be used to deal with platform specific handling
- * of the init, i.e. drop into the kernel debugger on server machine,
- * or if the processor is part of some parallel machine without a
- * console, then we would call the appropriate debug hooks here.
- */
-void
-init_handler_platform (struct pt_regs *regs)
+static void
+show_min_state (pal_min_state_area_t *minstate)
 {
+	u64 iip = minstate->pmsa_iip + ((struct ia64_psr *)(&minstate->pmsa_ipsr))->ri;
+	u64 xip = minstate->pmsa_xip + ((struct ia64_psr *)(&minstate->pmsa_xpsr))->ri;
+
+	printk("NaT bits\t%016lx\n", minstate->pmsa_nat_bits);
+	printk("pr\t\t%016lx\n", minstate->pmsa_pr);
+	printk("b0\t\t%016lx ", minstate->pmsa_br0); print_symbol("%s\n", minstate->pmsa_br0);
+	printk("ar.rsc\t\t%016lx\n", minstate->pmsa_rsc);
+	printk("cr.iip\t\t%016lx ", iip); print_symbol("%s\n", iip);
+	printk("cr.ipsr\t\t%016lx\n", minstate->pmsa_ipsr);
+	printk("cr.ifs\t\t%016lx\n", minstate->pmsa_ifs);
+	printk("xip\t\t%016lx ", xip); print_symbol("%s\n", xip);
+	printk("xpsr\t\t%016lx\n", minstate->pmsa_xpsr);
+	printk("xfs\t\t%016lx\n", minstate->pmsa_xfs);
+	printk("b1\t\t%016lx ", minstate->pmsa_br1);
+	print_symbol("%s\n", minstate->pmsa_br1);
+
+	printk("\nstatic registers r0-r15:\n");
+	printk(" r0- 3 %016lx %016lx %016lx %016lx\n",
+	       0UL, minstate->pmsa_gr[0], minstate->pmsa_gr[1], minstate->pmsa_gr[2]);
+	printk(" r4- 7 %016lx %016lx %016lx %016lx\n",
+	       minstate->pmsa_gr[3], minstate->pmsa_gr[4],
+	       minstate->pmsa_gr[5], minstate->pmsa_gr[6]);
+	printk(" r8-11 %016lx %016lx %016lx %016lx\n",
+	       minstate->pmsa_gr[7], minstate->pmsa_gr[8],
+	       minstate->pmsa_gr[9], minstate->pmsa_gr[10]);
+	printk("r11-15 %016lx %016lx %016lx %016lx\n",
+	       minstate->pmsa_gr[11], minstate->pmsa_gr[12],
+	       minstate->pmsa_gr[13], minstate->pmsa_gr[14]);
+
+	printk("\nbank 0:\n");
+	printk("r16-19 %016lx %016lx %016lx %016lx\n",
+	       minstate->pmsa_bank0_gr[0], minstate->pmsa_bank0_gr[1],
+	       minstate->pmsa_bank0_gr[2], minstate->pmsa_bank0_gr[3]);
+	printk("r20-23 %016lx %016lx %016lx %016lx\n",
+	       minstate->pmsa_bank0_gr[4], minstate->pmsa_bank0_gr[5],
+	       minstate->pmsa_bank0_gr[6], minstate->pmsa_bank0_gr[7]);
+	printk("r24-27 %016lx %016lx %016lx %016lx\n",
+	       minstate->pmsa_bank0_gr[8], minstate->pmsa_bank0_gr[9],
+	       minstate->pmsa_bank0_gr[10], minstate->pmsa_bank0_gr[11]);
+	printk("r28-31 %016lx %016lx %016lx %016lx\n",
+	       minstate->pmsa_bank0_gr[12], minstate->pmsa_bank0_gr[13],
+	       minstate->pmsa_bank0_gr[14], minstate->pmsa_bank0_gr[15]);
+
+	printk("\nbank 1:\n");
+	printk("r16-19 %016lx %016lx %016lx %016lx\n",
+	       minstate->pmsa_bank1_gr[0], minstate->pmsa_bank1_gr[1],
+	       minstate->pmsa_bank1_gr[2], minstate->pmsa_bank1_gr[3]);
+	printk("r20-23 %016lx %016lx %016lx %016lx\n",
+	       minstate->pmsa_bank1_gr[4], minstate->pmsa_bank1_gr[5],
+	       minstate->pmsa_bank1_gr[6], minstate->pmsa_bank1_gr[7]);
+	printk("r24-27 %016lx %016lx %016lx %016lx\n",
+	       minstate->pmsa_bank1_gr[8], minstate->pmsa_bank1_gr[9],
+	       minstate->pmsa_bank1_gr[10], minstate->pmsa_bank1_gr[11]);
+	printk("r28-31 %016lx %016lx %016lx %016lx\n",
+	       minstate->pmsa_bank1_gr[12], minstate->pmsa_bank1_gr[13],
+	       minstate->pmsa_bank1_gr[14], minstate->pmsa_bank1_gr[15]);
+}
+
+static void
+fetch_min_state (pal_min_state_area_t *ms, struct pt_regs *pt, struct switch_stack *sw)
+{
+	u64 *dst_banked, *src_banked, bit, shift, nat_bits;
+	int i;
+
+	/*
+	 * First, update the pt-regs and switch-stack structures with the contents stored
+	 * in the min-state area:
+	 */
+	if (((struct ia64_psr *) &ms->pmsa_ipsr)->ic == 0) {
+		pt->cr_ipsr = ms->pmsa_xpsr;
+		pt->cr_iip = ms->pmsa_xip;
+		pt->cr_ifs = ms->pmsa_xfs;
+	} else {
+		pt->cr_ipsr = ms->pmsa_ipsr;
+		pt->cr_iip = ms->pmsa_iip;
+		pt->cr_ifs = ms->pmsa_ifs;
+	}
+	pt->ar_rsc = ms->pmsa_rsc;
+	pt->pr = ms->pmsa_pr;
+	pt->r1 = ms->pmsa_gr[0];
+	pt->r2 = ms->pmsa_gr[1];
+	pt->r3 = ms->pmsa_gr[2];
+	sw->r4 = ms->pmsa_gr[3];
+	sw->r5 = ms->pmsa_gr[4];
+	sw->r6 = ms->pmsa_gr[5];
+	sw->r7 = ms->pmsa_gr[6];
+	pt->r8 = ms->pmsa_gr[7];
+	pt->r9 = ms->pmsa_gr[8];
+	pt->r10 = ms->pmsa_gr[9];
+	pt->r11 = ms->pmsa_gr[10];
+	pt->r12 = ms->pmsa_gr[11];
+	pt->r13 = ms->pmsa_gr[12];
+	pt->r14 = ms->pmsa_gr[13];
+	pt->r15 = ms->pmsa_gr[14];
+	dst_banked = &pt->r16;		/* r16-r31 are contiguous in struct pt_regs */
+	src_banked = ms->pmsa_bank1_gr;
+	for (i = 0; i < 16; ++i)
+		dst_banked[i] = src_banked[i];
+	pt->b0 = ms->pmsa_br0;
+	sw->b1 = ms->pmsa_br1;
+
+	/* construct the NaT bits for the pt-regs structure: */
+#	define PUT_NAT_BIT(dst, addr)					\
+	do {								\
+		bit = nat_bits & 1; nat_bits >>= 1;			\
+		shift = ((unsigned long) addr >> 3) & 0x3f;		\
+		dst = ((dst) & ~(1UL << shift)) | (bit << shift);	\
+	} while (0)
+
+	/* Rotate the saved NaT bits such that bit 0 corresponds to pmsa_gr[0]: */
+	shift = ((unsigned long) &ms->pmsa_gr[0] >> 3) & 0x3f;
+	nat_bits = (ms->pmsa_nat_bits >> shift) | (ms->pmsa_nat_bits << (64 - shift));
+
+	PUT_NAT_BIT(sw->caller_unat, &pt->r1);
+	PUT_NAT_BIT(sw->caller_unat, &pt->r2);
+	PUT_NAT_BIT(sw->caller_unat, &pt->r3);
+	PUT_NAT_BIT(sw->ar_unat, &sw->r4);
+	PUT_NAT_BIT(sw->ar_unat, &sw->r5);
+	PUT_NAT_BIT(sw->ar_unat, &sw->r6);
+	PUT_NAT_BIT(sw->ar_unat, &sw->r7);
+	PUT_NAT_BIT(sw->caller_unat, &pt->r8);	PUT_NAT_BIT(sw->caller_unat, &pt->r9);
+	PUT_NAT_BIT(sw->caller_unat, &pt->r10);	PUT_NAT_BIT(sw->caller_unat, &pt->r11);
+	PUT_NAT_BIT(sw->caller_unat, &pt->r12);	PUT_NAT_BIT(sw->caller_unat, &pt->r13);
+	PUT_NAT_BIT(sw->caller_unat, &pt->r14);	PUT_NAT_BIT(sw->caller_unat, &pt->r15);
+	nat_bits >>= 16;	/* skip over bank0 NaT bits */
+	PUT_NAT_BIT(sw->caller_unat, &pt->r16);	PUT_NAT_BIT(sw->caller_unat, &pt->r17);
+	PUT_NAT_BIT(sw->caller_unat, &pt->r18);	PUT_NAT_BIT(sw->caller_unat, &pt->r19);
+	PUT_NAT_BIT(sw->caller_unat, &pt->r20);	PUT_NAT_BIT(sw->caller_unat, &pt->r21);
+	PUT_NAT_BIT(sw->caller_unat, &pt->r22);	PUT_NAT_BIT(sw->caller_unat, &pt->r23);
+	PUT_NAT_BIT(sw->caller_unat, &pt->r24);	PUT_NAT_BIT(sw->caller_unat, &pt->r25);
+	PUT_NAT_BIT(sw->caller_unat, &pt->r26);	PUT_NAT_BIT(sw->caller_unat, &pt->r27);
+	PUT_NAT_BIT(sw->caller_unat, &pt->r28);	PUT_NAT_BIT(sw->caller_unat, &pt->r29);
+	PUT_NAT_BIT(sw->caller_unat, &pt->r30);	PUT_NAT_BIT(sw->caller_unat, &pt->r31);
+}
+
+void
+init_handler_platform (sal_log_processor_info_t *proc_ptr,
+		       struct pt_regs *pt, struct switch_stack *sw)
+{
+	struct unw_frame_info info;
+
 	/* if a kernel debugger is available call it here else just dump the registers */
 
-	show_regs(regs);		/* dump the state info */
+	/*
+	 * Wait for a bit.  On some machines (e.g., HP's zx2000 and zx6000, INIT can be
+	 * generated via the BMC's command-line interface, but since the console is on the
+	 * same serial line, the user will need some time to switch out of the BMC before
+	 * the dump begins.
+	 */
+	printk("Delaying for 5 seconds...\n");
+	udelay(5*1000000);
+	show_min_state(&SAL_LPI_PSI_INFO(proc_ptr)->min_state_area);
+
+	fetch_min_state(&SAL_LPI_PSI_INFO(proc_ptr)->min_state_area, pt, sw);
+	unw_init_from_interruption(&info, current, pt, sw);
+	ia64_do_show_stack(&info, NULL);
+
+	printk("\nINIT dump complete.  Please reboot now.\n");
 	while (1);			/* hang city if no debugger */
 }
 
@@ -263,7 +418,6 @@ ia64_mca_register_cpev (int cpev)
 /*
  * routine to process and prepare to dump min_state_save
  * information for debugging purposes.
- *
  */
 void
 ia64_process_min_state_save (pal_min_state_area_t *pmss)
@@ -271,8 +425,6 @@ ia64_process_min_state_save (pal_min_state_area_t *pmss)
 	int i, max = MIN_STATE_AREA_SIZE;
 	u64 *tpmss_ptr = (u64 *)pmss;
 	u64 *return_min_state_ptr = ia64_mca_min_state_save_info;
-
-	/* dump out the min_state_area information */
 
 	for (i=0;i<max;i++) {
 
@@ -986,7 +1138,7 @@ ia64_mca_cpe_int_caller(void *dummy)
  *  ia64_mca_cpe_poll
  *
  *	Poll for Corrected Platform Errors (CPEs), dynamically adjust
- *	polling interval based on occurance of an event.
+ *	polling interval based on occurrence of an event.
  *
  * Inputs   :   dummy(unused)
  * Outputs  :   None
@@ -1062,7 +1214,7 @@ device_initcall(ia64_mca_late_init);
  *
  */
 void
-ia64_init_handler (struct pt_regs *regs)
+ia64_init_handler (struct pt_regs *pt, struct switch_stack *sw)
 {
 	sal_log_processor_info_t *proc_ptr;
 	ia64_err_rec_t *plog_ptr;
@@ -1089,7 +1241,7 @@ ia64_init_handler (struct pt_regs *regs)
 	/* Clear the INIT SAL logs now that they have been saved in the OS buffer */
 	ia64_sal_clear_state_info(SAL_INFO_TYPE_INIT);
 
-	init_handler_platform(regs);              /* call platform specific routines */
+	init_handler_platform(proc_ptr, pt, sw);	/* call platform specific routines */
 }
 
 /*
@@ -2139,7 +2291,8 @@ ia64_log_print(int sal_info_type, prfunc_t prfunc)
 	switch(sal_info_type) {
 	      case SAL_INFO_TYPE_MCA:
 		prfunc("+BEGIN HARDWARE ERROR STATE AT MCA\n");
-		platform_err = ia64_log_platform_info_print(IA64_LOG_CURR_BUFFER(sal_info_type), prfunc);
+		platform_err = ia64_log_platform_info_print(IA64_LOG_CURR_BUFFER(sal_info_type),
+							    prfunc);
 		prfunc("+END HARDWARE ERROR STATE AT MCA\n");
 		break;
 	      case SAL_INFO_TYPE_INIT:

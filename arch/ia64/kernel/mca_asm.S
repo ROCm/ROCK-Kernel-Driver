@@ -766,8 +766,6 @@ GLOBAL_ENTRY(ia64_monarch_init_handler)
 	// stash the information the SAL passed to os
 	SAL_TO_OS_MCA_HANDOFF_STATE_SAVE(r2)
 	;;
-
-// now we want to save information so we can dump registers
 	SAVE_MIN_WITH_COVER
 	;;
 	mov r8=cr.ifa
@@ -798,10 +796,12 @@ IVirtual_Switch:
 	//
 	// Let's call the C handler to get the rest of the state info
 	//
-	alloc r14=ar.pfs,0,0,1,0		// now it's safe (must be first in insn group!)
-	;;					//
+	alloc r14=ar.pfs,0,0,2,0		// now it's safe (must be first in insn group!)
+	;;
 	adds out0=16,sp				// out0 = pointer to pt_regs
 	;;
+	DO_SAVE_SWITCH_STACK
+	adds out1=16,sp				// out0 = pointer to switch_stack
 
 	br.call.sptk.many rp=ia64_init_handler
 .ret1:

@@ -32,6 +32,24 @@
  */
 #define IO_SPACE_LIMIT		0xffffffffffffffffUL
 
+#define MAX_IO_SPACES			16
+#define IO_SPACE_BITS			24
+#define IO_SPACE_SIZE			(1UL << IO_SPACE_BITS)
+
+#define IO_SPACE_NR(port)		((port) >> IO_SPACE_BITS)
+#define IO_SPACE_BASE(space)		((space) << IO_SPACE_BITS)
+#define IO_SPACE_PORT(port)		((port) & (IO_SPACE_SIZE - 1))
+
+#define IO_SPACE_SPARSE_ENCODING(p)	((((p) >> 2) << 12) | (p & 0xfff))
+
+struct io_space {
+	unsigned long mmio_base;	/* base in MMIO space */
+	int sparse;
+};
+
+extern struct io_space io_space[];
+extern unsigned int num_io_spaces;
+
 # ifdef __KERNEL__
 
 #include <asm/machvec.h>
@@ -80,11 +98,17 @@ __ia64_get_io_port_base (void)
 static inline void*
 __ia64_mk_io_addr (unsigned long port)
 {
-	const unsigned long io_base = __ia64_get_io_port_base();
-	unsigned long addr;
+	struct io_space *space;
+	unsigned long offset;
 
-	addr = io_base | ((port >> 2) << 12) | (port & 0xfff);
-	return (void *) addr;
+	space = &io_space[IO_SPACE_NR(port)];
+	port = IO_SPACE_PORT(port);
+	if (space->sparse)
+		offset = IO_SPACE_SPARSE_ENCODING(port);
+	else
+		offset = port;
+
+	return (void *) (space->mmio_base | offset);
 }
 
 /*

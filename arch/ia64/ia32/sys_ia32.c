@@ -243,8 +243,7 @@ mmap_subpage (struct file *file, unsigned long start, unsigned long end, int pro
 		return -ENOMEM;
 
 	if (old_prot)
-		if (copy_from_user(page, (void *) PAGE_START(start), PAGE_SIZE))
-			return -EFAULT;
+		copy_from_user(page, (void *) PAGE_START(start), PAGE_SIZE);
 
 	down_write(&current->mm->mmap_sem);
 	{
@@ -1005,77 +1004,6 @@ sys32_writev (int fd, struct compat_iovec *vector, u32 count)
 	return ret;
 }
 
-#define RLIM_INFINITY32	0x7fffffff
-#define RESOURCE32(x) ((x > RLIM_INFINITY32) ? RLIM_INFINITY32 : x)
-
-struct rlimit32 {
-	int	rlim_cur;
-	int	rlim_max;
-};
-
-extern asmlinkage long sys_getrlimit (unsigned int resource, struct rlimit *rlim);
-
-asmlinkage long
-sys32_old_getrlimit (unsigned int resource, struct rlimit32 *rlim)
-{
-	mm_segment_t old_fs = get_fs();
-	struct rlimit r;
-	int ret;
-
-	set_fs(KERNEL_DS);
-	ret = sys_getrlimit(resource, &r);
-	set_fs(old_fs);
-	if (!ret) {
-		ret = put_user(RESOURCE32(r.rlim_cur), &rlim->rlim_cur);
-		ret |= put_user(RESOURCE32(r.rlim_max), &rlim->rlim_max);
-	}
-	return ret;
-}
-
-asmlinkage long
-sys32_getrlimit (unsigned int resource, struct rlimit32 *rlim)
-{
-	mm_segment_t old_fs = get_fs();
-	struct rlimit r;
-	int ret;
-
-	set_fs(KERNEL_DS);
-	ret = sys_getrlimit(resource, &r);
-	set_fs(old_fs);
-	if (!ret) {
-		if (r.rlim_cur >= 0xffffffff)
-			r.rlim_cur = 0xffffffff;
-		if (r.rlim_max >= 0xffffffff)
-			r.rlim_max = 0xffffffff;
-		ret = put_user(r.rlim_cur, &rlim->rlim_cur);
-		ret |= put_user(r.rlim_max, &rlim->rlim_max);
-	}
-	return ret;
-}
-
-extern asmlinkage long sys_setrlimit (unsigned int resource, struct rlimit *rlim);
-
-asmlinkage long
-sys32_setrlimit (unsigned int resource, struct rlimit32 *rlim)
-{
-	struct rlimit r;
-	int ret;
-	mm_segment_t old_fs = get_fs();
-
-	if (resource >= RLIM_NLIMITS)
-		return -EINVAL;
-	if (get_user(r.rlim_cur, &rlim->rlim_cur) || get_user(r.rlim_max, &rlim->rlim_max))
-		return -EFAULT;
-	if (r.rlim_cur == RLIM_INFINITY32)
-		r.rlim_cur = RLIM_INFINITY;
-	if (r.rlim_max == RLIM_INFINITY32)
-		r.rlim_max = RLIM_INFINITY;
-	set_fs(KERNEL_DS);
-	ret = sys_setrlimit(resource, &r);
-	set_fs(old_fs);
-	return ret;
-}
-
 /*
  * sys32_ipc() is the de-multiplexer for the SysV IPC calls in 32bit emulation..
  *
@@ -1648,19 +1576,35 @@ shmctl32 (int first, int second, void *uptr)
 	return err;
 }
 
+extern int sem_ctls[];
+#define sc_semopm	(sem_ctls[2])
+
 static long
-semtimedop32(int semid, struct sembuf *tsems, int nsems,
-	     const struct compat_timespec *timeout32)
+semtimedop32(int semid, struct sembuf *tsops, int nsops,
+	     struct compat_timespec *timeout32)
 {
 	struct timespec t;
-	if (get_user (t.tv_sec, &timeout32->tv_sec) ||
-	    get_user (t.tv_nsec, &timeout32->tv_nsec))
+	mm_segment_t oldfs;
+	long ret;
+
+	/* parameter checking precedence should mirror sys_semtimedop() */
+	if (nsops < 1 || semid < 0)
+		return -EINVAL;
+	if (nsops > sc_semopm)
+		return -E2BIG;
+	if (!access_ok(VERIFY_READ, tsops, nsops * sizeof(struct sembuf)) ||
+	    get_compat_timespec(&t, timeout32))
 		return -EFAULT;
-	return sys_semtimedop(semid, tsems, nsems, &t);
+
+	oldfs = get_fs();
+	set_fs(KERNEL_DS);
+	ret = sys_semtimedop(semid, tsops, nsops, &t);
+	set_fs(oldfs);
+	return ret;
 }
 
 asmlinkage long
-sys32_ipc (u32 call, int first, int second, int third, u32 ptr, u32 fifth)
+sys32_ipc(u32 call, int first, int second, int third, u32 ptr, u32 fifth)
 {
 	int version;
 
@@ -1668,12 +1612,15 @@ sys32_ipc (u32 call, int first, int second, int third, u32 ptr, u32 fifth)
 	call &= 0xffff;
 
 	switch (call) {
+	      case SEMTIMEDOP:
+		if (fifth)
+			return semtimedop32(first, (struct sembuf *)AA(ptr),
+				second, (struct compat_timespec *)AA(fifth));
+		/* else fall through for normal semop() */
 	      case SEMOP:
 		/* struct sembuf is the same on 32 and 64bit :)) */
-		return sys_semtimedop(first, (struct sembuf *)AA(ptr), second, NULL);
-	      case SEMTIMEDOP:
-		return semtimedop32(first, (struct sembuf *)AA(ptr), second,
-				    (const struct compat_timespec *)AA(fifth));
+		return sys_semtimedop(first, (struct sembuf *)AA(ptr), second,
+				      NULL);
 	      case SEMGET:
 		return sys_semget(first, second, third);
 	      case SEMCTL:
@@ -1724,98 +1671,10 @@ sys32_time (int *tloc)
 	return i;
 }
 
-struct rusage32 {
-	struct compat_timeval ru_utime;
-	struct compat_timeval ru_stime;
-	int    ru_maxrss;
-	int    ru_ixrss;
-	int    ru_idrss;
-	int    ru_isrss;
-	int    ru_minflt;
-	int    ru_majflt;
-	int    ru_nswap;
-	int    ru_inblock;
-	int    ru_oublock;
-	int    ru_msgsnd;
-	int    ru_msgrcv;
-	int    ru_nsignals;
-	int    ru_nvcsw;
-	int    ru_nivcsw;
-};
-
-static int
-put_rusage (struct rusage32 *ru, struct rusage *r)
-{
-	int err;
-
-	if (!access_ok(VERIFY_WRITE, ru, sizeof(*ru)))
-		return -EFAULT;
-
-	err = __put_user (r->ru_utime.tv_sec, &ru->ru_utime.tv_sec);
-	err |= __put_user (r->ru_utime.tv_usec, &ru->ru_utime.tv_usec);
-	err |= __put_user (r->ru_stime.tv_sec, &ru->ru_stime.tv_sec);
-	err |= __put_user (r->ru_stime.tv_usec, &ru->ru_stime.tv_usec);
-	err |= __put_user (r->ru_maxrss, &ru->ru_maxrss);
-	err |= __put_user (r->ru_ixrss, &ru->ru_ixrss);
-	err |= __put_user (r->ru_idrss, &ru->ru_idrss);
-	err |= __put_user (r->ru_isrss, &ru->ru_isrss);
-	err |= __put_user (r->ru_minflt, &ru->ru_minflt);
-	err |= __put_user (r->ru_majflt, &ru->ru_majflt);
-	err |= __put_user (r->ru_nswap, &ru->ru_nswap);
-	err |= __put_user (r->ru_inblock, &ru->ru_inblock);
-	err |= __put_user (r->ru_oublock, &ru->ru_oublock);
-	err |= __put_user (r->ru_msgsnd, &ru->ru_msgsnd);
-	err |= __put_user (r->ru_msgrcv, &ru->ru_msgrcv);
-	err |= __put_user (r->ru_nsignals, &ru->ru_nsignals);
-	err |= __put_user (r->ru_nvcsw, &ru->ru_nvcsw);
-	err |= __put_user (r->ru_nivcsw, &ru->ru_nivcsw);
-	return err;
-}
-
-asmlinkage long
-sys32_wait4 (int pid, unsigned int *stat_addr, int options, struct rusage32 *ru)
-{
-	if (!ru)
-		return sys_wait4(pid, stat_addr, options, NULL);
-	else {
-		struct rusage r;
-		int ret;
-		unsigned int status;
-		mm_segment_t old_fs = get_fs();
-
-		set_fs(KERNEL_DS);
-		ret = sys_wait4(pid, stat_addr ? &status : NULL, options, &r);
-		set_fs(old_fs);
-		if (put_rusage(ru, &r))
-			return -EFAULT;
-		if (stat_addr && put_user(status, stat_addr))
-			return -EFAULT;
-		return ret;
-	}
-}
-
 asmlinkage long
 sys32_waitpid (int pid, unsigned int *stat_addr, int options)
 {
-	return sys32_wait4(pid, stat_addr, options, NULL);
-}
-
-
-extern asmlinkage long sys_getrusage (int who, struct rusage *ru);
-
-asmlinkage long
-sys32_getrusage (int who, struct rusage32 *ru)
-{
-	struct rusage r;
-	int ret;
-	mm_segment_t old_fs = get_fs();
-
-	set_fs(KERNEL_DS);
-	ret = sys_getrusage(who, &r);
-	set_fs(old_fs);
-	if (put_rusage (ru, &r))
-		return -EFAULT;
-	return ret;
+	return compat_sys_wait4(pid, stat_addr, options, NULL);
 }
 
 static unsigned int

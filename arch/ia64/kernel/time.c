@@ -221,7 +221,7 @@ timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	do {
 	    /*
 	     * If we're too close to the next clock tick for comfort, we increase the
-	     * saftey margin by intentionally dropping the next tick(s).  We do NOT update
+	     * safety margin by intentionally dropping the next tick(s).  We do NOT update
 	     * itm.next because that would force us to call do_timer() which in turn would
 	     * let our clock run too fast (with the potentially devastating effect of
 	     * losing monotony of time).

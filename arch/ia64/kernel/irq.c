@@ -50,7 +50,7 @@
  * Linux has a controller-independent x86 interrupt architecture.
  * every controller has a 'controller-template', that is used
  * by the main code to do the right thing. Each driver-visible
- * interrupt source is transparently wired to the apropriate
+ * interrupt source is transparently wired to the appropriate
  * controller. Thus drivers need not be aware of the
  * interrupt-controller.
  *
@@ -705,7 +705,7 @@ unsigned int probe_irq_mask(unsigned long val)
  *	The interrupt probe logic state is returned to its previous
  *	value.
  *
- *	BUGS: When used in a module (which arguably shouldnt happen)
+ *	BUGS: When used in a module (which arguably shouldn't happen)
  *	nothing prevents two IRQ probe callers from overlapping. The
  *	results of this are non-optimal.
  */
