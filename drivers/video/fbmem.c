@@ -749,6 +749,7 @@ register_framebuffer(struct fb_info *fb_info)
 		if (!registered_fb[i])
 			break;
 	fb_info->node = mk_kdev(FB_MAJOR, i);
+	fb_info->currcon = -1;
 	registered_fb[i] = fb_info;
 	if (!fb_ever_opened[i]) {
 		struct module *owner = fb_info->fbops->owner;

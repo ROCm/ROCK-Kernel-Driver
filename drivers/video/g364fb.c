@@ -243,9 +243,7 @@ int __init g364fb_init(void)
 	fb_info.fix = fb_fix;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 
-	fb_info.currcon = -1;
 	fb_info.fontname[0] = '\0';
-	fb_info.updatevar = gen_update_var;
 	fb_alloc_cmap(&fb_info.cmap, 255, 0);
 
 	if (register_framebuffer(&fb_info) < 0)

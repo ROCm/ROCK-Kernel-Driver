@@ -348,7 +348,6 @@ int __init vesafb_init(void)
 	fb_info.fbops = &vesafb_ops;
 	fb_info.var = vesafb_defined;
 	fb_info.fix = vesafb_fix;
-	fb_info.currcon = -1;
 	fb_info.updatevar = gen_update_var;
 	fb_info.pseudo_palette = pseudo_palette;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;

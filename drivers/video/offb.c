@@ -530,9 +530,7 @@ static void __init offb_init_fb(const char *name, const char *full_name,
 	info->screen_base = ioremap(address, fix->smem_len);
 	info->par = par;
 	info->pseudo_palette = (void *) (info + 1);
-	info->currcon = -1;
 	info->fontname[0] = '\0';
-	info->updatevar = gen_update_var;
 	info->flags = FBINFO_FLAG_DEFAULT;
 
 	fb_alloc_cmap(&info->cmap, 256, 0);

@@ -158,9 +158,6 @@ int __init hpfb_init_one(unsigned long base)
 	fb_info.fix   = hpfb_fix;
 	fb_info.screen_base = (char *)hpfb_fix.smem_start;	// FIXME
 
-	/* The below feilds will go away !!!! */
-	fb_info.currcon		= -1;
-        fb_info.updatevar	= gen_update_var;
 	fb_alloc_cmap(&fb_info.cmap, 256, 0);
 
 	if (register_framebuffer(&fb_info) < 0)

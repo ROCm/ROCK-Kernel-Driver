@@ -439,9 +439,6 @@ int __init vfb_init(void)
 	fb_info.pseudo_palette = &vfb_pseudo_palette;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 
-	fb_info.currcon = -1;
-	fb_info.updatevar = gen_update_var;
-
 	fb_alloc_cmap(&fb_info.cmap, 256, 0);
 
 	if (register_framebuffer(&fb_info) < 0) {

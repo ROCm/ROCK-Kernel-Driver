@@ -719,8 +719,6 @@ int __init sgivwfb_init(void)
 	fb_info.fbops = &sgivwfb_ops;
 	fb_info.pseudo_palette = pseudo_palette;
 	fb_info.par = &default_par;
-	fb_info.currcon = -1;
-	fb_info.updatevar = gen_update_var;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 
 	fb_info.screen_base =

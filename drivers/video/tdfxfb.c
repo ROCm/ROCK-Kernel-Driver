@@ -1074,11 +1074,6 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 	info->pseudo_palette	= (void *)(info->par + 1); 
 	info->flags		= FBINFO_FLAG_DEFAULT;
 
-	/* The below fields will go away !!!! */
-	strcpy(info->modename, info->fix.id);
-	info->currcon		= -1;
-	info->updatevar		= gen_update_var;
-
 	if (!mode_option)
 		mode_option = "640x480@60";
 	 

@@ -75,13 +75,11 @@ anakinfb_init(void)
 	memset(&fb_info, 0, sizeof(struct fb_info));
 
 	fb_info.node = NODEV;
-	fb_info.currcon = -1;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 	fb_info.fbops = &anakinfb_ops;
 	fb_info.var = anakinfb_var;
 	fb_info.fix = anakinfb_fix;
 	strcpy(fb_info.fontname, "VGA8x16");
-	fb_info.updatevar = gen_update_var;
 	if (!(request_mem_region(VGA_START, VGA_SIZE, "vga")))
 		return -ENOMEM;
 	if (fb_info.screen_base = ioremap(VGA_START, VGA_SIZE)) {

@@ -36,8 +36,6 @@
 #include <asm/dec/tc.h>
 #include "pmag-ba-fb.h"
 
-#include <video/fbcon.h>
-
 struct pmag_ba_ramdac_regs {
 	unsigned char addr_low;
 	unsigned char pad0[3];

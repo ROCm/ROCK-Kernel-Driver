@@ -364,8 +364,6 @@ struct fb_info {
    char fontname[40];			/* default font name */
    devfs_handle_t devfs_handle;         /* Devfs handle for new name         */
    devfs_handle_t devfs_lhandle;        /* Devfs handle for compat. symlink  */
-   int (*updatevar)(int, struct fb_info*);
-					/* tell fb to update the vars */
    void *pseudo_palette;                /* Fake palette of 16 colors and 
 					   the cursor's color for non
                                            palette mode */

@@ -112,8 +112,6 @@ int q40fb_init(void)
    	fb_info.screen_base = (char *) q40fb_fix.smem_start;
 
 	/* The below feilds will go away !!!! */
-	fb_info.currcon		= -1;
-	fb_info.updatevar	= gen_update_var;
 	fb_alloc_cmap(&fb_info.cmap, 16, 0);
 
 	master_outb(3, DISPLAY_CONTROL_REG);

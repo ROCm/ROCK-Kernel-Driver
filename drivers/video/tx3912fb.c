@@ -292,12 +292,10 @@ int __init tx3912fb_init(void)
 		return -ENOMEM;
 
 	fb_info.node = NODEV;
-	fb_info.currcon = -1;
 	fb_info.fbops = &tx3912fb_ops;
 	fb_info.var = tx3912fb_var;
 	fb_info.fix = tx3912fb_fix;
 	fb_info.pseudo_palette = pseudo_palette;
-	fb_info.updatevar = gen_update_var;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 
 	/* Clear the framebuffer */

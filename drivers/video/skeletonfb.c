@@ -418,15 +418,6 @@ int __init xxxfb_init(void)
     info.flags = FBINFO_FLAG_DEFAULT;
     info.par = current_par;
 
-    /* The following has to be set but in th efuture will go away */
-    strcpy(info.modename, xxxfb_fix.id);
-    info.changevar = NULL;
-    info.currcon = -1;
-    info.disp = &disp; 			
-    info.switch_con = gen_switch;
-    info.updatevar = gen_update_var;
-    
-
     /*
      * This should give a reasonable default video mode. The following is
      * done when we can set a video mode. 

@@ -235,10 +235,8 @@ unsigned long __init dnfb_init(unsigned long mem_start)
 	int err;
 
 	fb_info.fontname[0] = 0;
-	fb_info.updatevar = gen_update_var;
 	fb_info.node = NODEV;
 	fb_info.fbops = &dn_fb_ops;
-	fb_info.currcon = -1;
 	fb_info.fix = dnfb_fix;
 	fb_info.var = dnfb_var;
 	fb_info.screen_base = (u_char *) fb_info.fix.smem_start;

@@ -162,8 +162,6 @@ int __init hitfb_init(void)
 	fb_info.pseudo_palette 	= pseudo_palette;	
 	fb_info.flags 		= FBINFO_FLAG_DEFAULT;
     	
-	fb_info.currcon = -1;
-	fb_info.updatevar = gen_update_var;
 	fb_info.screen_base = (void *) hitfb_fix.smem_start;
 
 	size = (fb_info.var.bits_per_pixel == 8) ? 256 : 16;
