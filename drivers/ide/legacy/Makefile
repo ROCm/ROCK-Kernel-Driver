@@ -16,10 +16,7 @@ obj-$(CONFIG_BLK_DEV_Q40IDE)		+= q40ide.o
 obj-$(CONFIG_BLK_DEV_IDECS)		+= ide-cs.o
 
 # Last of all
-ifneq ($(CONFIG_X86_PC9800),y)
 obj-$(CONFIG_BLK_DEV_HD)		+= hd.o
-else
-obj-$(CONFIG_BLK_DEV_HD)		+= hd98.o
-endif
+obj-$(CONFIG_BLK_DEV_HD98)		+= hd98.o
 
 EXTRA_CFLAGS	:= -Idrivers/ide
