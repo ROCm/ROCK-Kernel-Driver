@@ -4,7 +4,7 @@
 
 EXTRA_AFLAGS := -ansi
 
-obj-y    := ultra.o fault.o init.o generic.o extable.o modutil.o
+obj-y    := ultra.o fault.o init.o generic.o extable.o
 
 obj-$(CONFIG_HUGETLB_PAGE) += hugetlbpage.o
 

@@ -22,6 +22,7 @@ obj-$(CONFIG_SMP) += trampoline.o smp.o sun4m_smp.o sun4d_smp.o
 obj-$(CONFIG_SUN_AUXIO) += auxio.o
 obj-$(CONFIG_PCI) += ebus.o
 obj-$(CONFIG_SUN_PM) += apc.o pmc.o
+obj-$(CONFIG_MODULES) += module.o
 
 ifdef CONFIG_SUNOS_EMUL
 obj-y += sys_sunos.o sunos_ioctl.o
