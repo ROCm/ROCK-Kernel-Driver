@@ -1095,12 +1095,16 @@ static int set_format(snd_usb_substream_t *subs, struct audioformat *fmt)
 	subs->fill_max = 0;
 
 	/* we need a sync pipe in async OUT or adaptive IN mode */
+	/* check the number of EP, since some devices have broken
+	 * descriptors which fool us.  if it has only one EP,
+	 * assume it as adaptive-out or sync-in.
+	 */
 	attr = fmt->ep_attr & EP_ATTR_MASK;
-	if ((is_playback && attr == EP_ATTR_ASYNC) ||
-	    (! is_playback && attr == EP_ATTR_ADAPTIVE)) {
-		/* check endpoint */
-		if (altsd->bNumEndpoints < 2 ||
-		    get_endpoint(alts, 1)->bmAttributes != 0x01 ||
+	if (((is_playback && attr == EP_ATTR_ASYNC) ||
+	     (! is_playback && attr == EP_ATTR_ADAPTIVE)) &&
+	    altsd->bNumEndpoints >= 2) {
+		/* check sync-pipe endpoint */
+		if (get_endpoint(alts, 1)->bmAttributes != 0x01 ||
 		    get_endpoint(alts, 1)->bSynchAddress != 0) {
 			snd_printk(KERN_ERR "%d:%d:%d : invalid synch pipe\n",
 				   dev->devnum, fmt->iface, fmt->altsetting);
