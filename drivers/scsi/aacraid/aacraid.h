@@ -512,6 +512,7 @@ struct adapter_ops
 	void (*adapter_enable_int)(struct aac_dev *dev, u32 event);
 	void (*adapter_disable_int)(struct aac_dev *dev, u32 event);
 	int  (*adapter_sync_cmd)(struct aac_dev *dev, u32 command, u32 p1, u32 *status);
+	int  (*adapter_check_health)(struct aac_dev *dev);
 };
 
 /*
@@ -942,6 +943,8 @@ struct aac_dev
 #define aac_adapter_disable_int(dev, event) \
 	dev->a_ops.adapter_disable_int(dev, event)
 
+#define aac_adapter_check_health(dev) \
+	(dev)->a_ops.adapter_check_health(dev)
 
 
 #define FIB_CONTEXT_FLAG_TIMED_OUT		(0x00000001)

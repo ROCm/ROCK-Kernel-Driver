@@ -49,6 +49,7 @@
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_tcq.h>
 #include <scsi/scsicam.h>
+#include <scsi/scsi_eh.h>
 
 #include "aacraid.h"
 
@@ -339,6 +340,51 @@ static int aac_eh_abort(struct scsi_cmnd *cmd)
 	return FAILED;
 }
 
+/*
+ *	aac_eh_reset	- Reset command handling
+ *	@scsi_cmd:	SCSI command block causing the reset
+ *
+ */
+static int aac_eh_reset(struct scsi_cmnd* cmd)
+{
+	struct scsi_device * dev = cmd->device;
+	struct Scsi_Host * host = dev->host;
+	struct scsi_cmnd * command;
+	int count;
+	unsigned long flags;
+
+	printk(KERN_ERR "%s: Host adapter reset request. SCSI hang ?\n", 
+					AAC_DRIVERNAME);
+
+
+	if (aac_adapter_check_health((struct aac_dev *)host->hostdata)) {
+		printk(KERN_ERR "%s: Host adapter appears dead\n", 
+				AAC_DRIVERNAME);
+		return -ENODEV;
+	}
+	/*
+	 * Wait for all commands to complete to this specific
+	 * target (block maximum 60 seconds).
+	 */
+	for (count = 60; count; --count) {
+		__shost_for_each_device(dev, host) {
+			spin_lock_irqsave(&dev->list_lock, flags);
+			list_for_each_entry(command, &dev->cmd_list, list) {
+				if (command->serial_number) {
+					spin_unlock_irqrestore(&dev->list_lock, flags);
+					return SUCCESS;
+				}
+			}
+			spin_unlock_irqrestore(&dev->list_lock, flags);
+		}
+		spin_unlock_irq(host->host_lock);
+		scsi_sleep(HZ);
+		spin_lock_irq(host->host_lock);
+	}
+	printk(KERN_ERR "%s: SCSI bus appears hung\n", AAC_DRIVERNAME);
+	return -ETIMEDOUT;
+}
+
 /**
  *	aac_cfg_open		-	open a configuration file
  *	@inode: inode being opened
@@ -397,6 +443,7 @@ static struct scsi_host_template aac_driver_template = {
 	.bios_param     		= aac_biosparm,	
 	.slave_configure		= aac_slave_configure,
 	.eh_abort_handler		= aac_eh_abort,
+	.eh_host_reset_handler		= aac_eh_reset,
 	.can_queue      		= AAC_NUM_IO_FIB,	
 	.this_id        		= 16,
 	.sg_tablesize   		= 16,
