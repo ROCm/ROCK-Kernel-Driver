@@ -32,7 +32,7 @@ adfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 {
 	struct inode *inode = filp->f_dentry->d_inode;
 	struct super_block *sb = inode->i_sb;
-	struct adfs_dir_ops *ops = sb->u.adfs_sb.s_dir;
+	struct adfs_dir_ops *ops = ADFS_SB(sb)->s_dir;
 	struct object_info obj;
 	struct adfs_dir dir;
 	int ret = 0;
@@ -89,7 +89,7 @@ adfs_dir_update(struct super_block *sb, struct object_info *obj)
 {
 	int ret = -EINVAL;
 #ifdef CONFIG_ADFS_FS_RW
-	struct adfs_dir_ops *ops = sb->u.adfs_sb.s_dir;
+	struct adfs_dir_ops *ops = ADFS_SB(sb)->s_dir;
 	struct adfs_dir dir;
 
 	printk(KERN_INFO "adfs_dir_update: object %06X in dir %06X\n",
@@ -143,7 +143,7 @@ static int
 adfs_dir_lookup_byname(struct inode *inode, struct qstr *name, struct object_info *obj)
 {
 	struct super_block *sb = inode->i_sb;
-	struct adfs_dir_ops *ops = sb->u.adfs_sb.s_dir;
+	struct adfs_dir_ops *ops = ADFS_SB(sb)->s_dir;
 	struct adfs_dir dir;
 	int ret;
 
@@ -206,7 +206,7 @@ struct file_operations adfs_dir_operations = {
 static int
 adfs_hash(struct dentry *parent, struct qstr *qstr)
 {
-	const unsigned int name_len = parent->d_sb->u.adfs_sb.s_namelen;
+	const unsigned int name_len = ADFS_SB(parent->d_sb)->s_namelen;
 	const unsigned char *name;
 	unsigned long hash;
 	int i;
