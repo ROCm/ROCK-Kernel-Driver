@@ -422,7 +422,7 @@ static __init int trif_probe(int unit)
 extern int loopback_init(void);
 
 /*  Statically configured drivers -- order matters here. */
-void __init probe_old_netdevs(void)
+static int __init net_olddevs_init(void)
 {
 	int num;
 
@@ -450,7 +450,11 @@ void __init probe_old_netdevs(void)
 #ifdef CONFIG_LTPC
 	ltpc_probe();
 #endif
+
+	return 0;
 }
+
+device_initcall(net_olddevs_init);
 
 /*
  * The @dev_base list is protected by @dev_base_lock and the rtln

@@ -279,8 +279,7 @@ sn_pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents, int dire
 	 * scatterlist.
 	 */
 	for (i = 0; i < nents; i++, sg++) {
-		phys_addr = __pa(sg->dma_address ? sg->dma_address :
-			(unsigned long)page_address(sg->page) + sg->offset);
+		phys_addr = __pa((unsigned long)page_address(sg->page) + sg->offset);
 
 		/*
 		 * Handle the most common case: 64 bit cards.  This
