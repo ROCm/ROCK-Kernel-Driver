@@ -346,8 +346,6 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 		}
 	}
 
-	classzone->need_balance = 1;
-	mb();
 	/* we're somewhat low on memory, failed to find what we needed */
 	for (i = 0; zones[i] != NULL; i++) {
 		struct zone *z = zones[i];
@@ -873,7 +871,6 @@ void __init free_area_init_core(pg_data_t *pgdat,
 		spin_lock_init(&zone->lru_lock);
 		zone->zone_pgdat = pgdat;
 		zone->free_pages = 0;
-		zone->need_balance = 0;
 		INIT_LIST_HEAD(&zone->active_list);
 		INIT_LIST_HEAD(&zone->inactive_list);
 		atomic_set(&zone->refill_counter, 0);
