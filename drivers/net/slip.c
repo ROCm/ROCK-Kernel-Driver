@@ -1369,6 +1369,7 @@ static int __init slip_init(void)
 	/* Fill in our line protocol discipline, and register it */
 	if ((status = tty_register_ldisc(N_SLIP, &sl_ldisc)) != 0)  {
 		printk(KERN_ERR "SLIP: can't register line discipline (err = %d)\n", status);
+		kfree(slip_devs);
 	}
 	return status;
 }
