@@ -6,6 +6,7 @@
  *  Bits taken from various places.
  */
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
@@ -61,7 +62,7 @@ void pcibios_report_status(u_int status_mask, int warn)
  * Bug 3 is responsible for the sound DMA grinding to a halt.  We now
  * live with bug 2.
  */
-static void __init pci_fixup_83c553(struct pci_dev *dev)
+static void __devinit pci_fixup_83c553(struct pci_dev *dev)
 {
 	/*
 	 * Set memory region to start at address 0, and enable IO
@@ -112,7 +113,7 @@ static void __init pci_fixup_83c553(struct pci_dev *dev)
 	outb(0x08, 0x4d1);
 }
 
-static void __init pci_fixup_unassign(struct pci_dev *dev)
+static void __devinit pci_fixup_unassign(struct pci_dev *dev)
 {
 	dev->resource[0].end -= dev->resource[0].start;
 	dev->resource[0].start = 0;
@@ -123,7 +124,7 @@ static void __init pci_fixup_unassign(struct pci_dev *dev)
  * if it is the host bridge by marking it as such.  These resources are of
  * no consequence to the PCI layer (they are handled elsewhere).
  */
-static void __init pci_fixup_dec21285(struct pci_dev *dev)
+static void __devinit pci_fixup_dec21285(struct pci_dev *dev)
 {
 	int i;
 
@@ -141,7 +142,7 @@ static void __init pci_fixup_dec21285(struct pci_dev *dev)
 /*
  * PCI IDE controllers use non-standard I/O port decoding, respect it.
  */
-static void __init pci_fixup_ide_bases(struct pci_dev *dev)
+static void __devinit pci_fixup_ide_bases(struct pci_dev *dev)
 {
 	struct resource *r;
 	int i;
@@ -161,7 +162,7 @@ static void __init pci_fixup_ide_bases(struct pci_dev *dev)
 /*
  * Put the DEC21142 to sleep
  */
-static void __init pci_fixup_dec21142(struct pci_dev *dev)
+static void __devinit pci_fixup_dec21142(struct pci_dev *dev)
 {
 	pci_write_config_dword(dev, 0x40, 0x80000000);
 }
@@ -182,7 +183,7 @@ static void __init pci_fixup_dec21142(struct pci_dev *dev)
  * functional.  However, The CY82C693U _does not work_ in bus
  * master mode without locking the PCI bus solid.
  */
-static void __init pci_fixup_cy82c693(struct pci_dev *dev)
+static void __devinit pci_fixup_cy82c693(struct pci_dev *dev)
 {
 	if ((dev->class >> 8) == PCI_CLASS_STORAGE_IDE) {
 		u32 base0, base1;
@@ -511,6 +512,8 @@ static void __init pcibios_init_hw(struct hw_pci *hw)
 				panic("PCI: unable to scan bus!");
 
 			busnr = sys->bus->subordinate + 1;
+
+			list_add(&sys->node, &hw->buses);
 		} else {
 			kfree(sys);
 			if (ret < 0)
@@ -521,17 +524,36 @@ static void __init pcibios_init_hw(struct hw_pci *hw)
 
 void __init pci_common_init(struct hw_pci *hw)
 {
+	struct pci_sys_data *sys;
+
+	INIT_LIST_HEAD(&hw->buses);
+
 	if (hw->preinit)
 		hw->preinit();
 	pcibios_init_hw(hw);
 	if (hw->postinit)
 		hw->postinit();
 
-	/*
-	 * Assign any unassigned resources.
-	 */
-	pci_assign_unassigned_resources();
 	pci_fixup_irqs(pcibios_swizzle, pcibios_map_irq);
+
+	list_for_each_entry(sys, &hw->buses, node) {
+		struct pci_bus *bus = sys->bus;
+
+		/*
+		 * Size the bridge windows.
+		 */
+		pci_bus_size_bridges(bus);
+
+		/*
+		 * Assign resources.
+		 */
+		pci_bus_assign_resources(bus);
+
+		/*
+		 * Tell drivers about devices found.
+		 */
+		pci_bus_add_devices(bus);
+	}
 }
 
 char * __init pcibios_setup(char *str)

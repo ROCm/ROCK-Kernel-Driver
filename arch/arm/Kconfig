@@ -546,9 +546,9 @@ config CPU_FREQ_SA1110
 if (CPU_FREQ_SA1100 || CPU_FREQ_SA1110)
 
 config CPU_FREQ_GOV_USERSPACE
- 	bool
- 	depends on CPU_FREQ
- 	default y
+	tristate
+	depends on CPU_FREQ
+	default y
 
 config CPU_FREQ_24_API
 	bool
@@ -1027,9 +1027,6 @@ source "drivers/scsi/Kconfig"
 
 endmenu
 
-#if [ "$CONFIG_ARCH_CLPS711X" = "y" ]; then
-#   source drivers/ssi/Config.in
-#fi
 source "drivers/ieee1394/Kconfig"
 
 source "drivers/message/i2o/Kconfig"
