@@ -1548,14 +1548,22 @@ static int bond_enslave(struct net_device *master_dev,
 		}
 	}
 
-	/* if we're in active-backup mode, we need one and only one active
-	 * interface. The backup interfaces will have their NOARP flag set
-	 * because we need them to be completely deaf and not to respond to
-	 * any ARP request on the network to avoid fooling a switch. Thus,
-	 * since we guarantee that current_slave always point to the last
-	 * usable interface, we just have to verify this interface's flag.
-	 */
-	if (bond_mode == BOND_MODE_ACTIVEBACKUP) {
+	if (USES_PRIMARY(bond_mode) && primary != NULL) {
+		/* if there is a primary slave, remember it */
+		if (strcmp(primary, new_slave->dev->name) == 0) {
+			bond->primary_slave = new_slave;
+		}
+	}
+
+	switch (bond_mode) {
+	case BOND_MODE_ACTIVEBACKUP:
+		/* if we're in active-backup mode, we need one and only one active
+		 * interface. The backup interfaces will have their NOARP flag set
+		 * because we need them to be completely deaf and not to respond to
+		 * any ARP request on the network to avoid fooling a switch. Thus,
+		 * since we guarantee that current_slave always point to the last
+		 * usable interface, we just have to verify this interface's flag.
+		 */
 		if (((bond->current_slave == NULL)
 			|| (bond->current_slave->dev->flags & IFF_NOARP))
 			&& (new_slave->link != BOND_LINK_DOWN)) {
@@ -1568,13 +1576,8 @@ static int bond_enslave(struct net_device *master_dev,
 			dprintk("This is just a backup slave\n");
 			bond_set_slave_inactive_flags(new_slave);
 		}
-		/* if there is a primary slave, remember it */
-		if (primary != NULL) {
-			if (strcmp(primary, new_slave->dev->name) == 0) {
-				bond->primary_slave = new_slave;
-			}
-		}
-	} else if (bond_mode == BOND_MODE_8023AD) {
+		break;
+	case BOND_MODE_8023AD:
 		/* in 802.3ad mode, the internal mechanism
 		 * will activate the slaves in the selected
 		 * aggregator
@@ -1594,8 +1597,9 @@ static int bond_enslave(struct net_device *master_dev,
 		}
 
 		bond_3ad_bind_slave(new_slave);
-	} else if ((bond_mode == BOND_MODE_TLB) ||
-		   (bond_mode == BOND_MODE_ALB)) {
+		break;
+	case BOND_MODE_TLB:
+	case BOND_MODE_ALB:
 		new_slave->state = BOND_STATE_ACTIVE;
 		if ((bond->current_slave == NULL) && (new_slave->link != BOND_LINK_DOWN)) {
 			/* first slave or no active slave yet, and this link
@@ -1603,14 +1607,8 @@ static int bond_enslave(struct net_device *master_dev,
 			 */
 			change_active_interface(bond, new_slave);
 		}
-
-		/* if there is a primary slave, remember it */
-		if (primary != NULL) {
-			if (strcmp(primary, new_slave->dev->name) == 0) {
-				bond->primary_slave = new_slave;
-			}
-		}
-	} else {
+		break;
+	default:
 		dprintk("This slave is always active in trunk mode\n");
 		/* always active in trunk mode */
 		new_slave->state = BOND_STATE_ACTIVE;
@@ -1621,7 +1619,9 @@ static int bond_enslave(struct net_device *master_dev,
 		 */
 		if (bond->current_slave == NULL) 
 			bond->current_slave = new_slave;
-	}
+
+		break;
+	} /* switch(bond_mode) */
 
 	write_unlock_bh(&bond->lock);
 
@@ -2078,9 +2078,9 @@ static int bond_release_all(struct net_device *master)
 		goto out;
 	}
 
-	change_active_interface(bond, NULL);
 	bond->current_arp_slave = NULL;
 	bond->primary_slave = NULL;
+	change_active_interface(bond, NULL);
 
 	while ((our_slave = bond->prev) != (struct slave *)bond) {
 		/* Inform AD package of unbinding of slave
@@ -3827,6 +3827,7 @@ static int __init bond_init(struct net_device *dev)
 	bond->next = bond->prev = (struct slave *)bond;
 	bond->current_slave = NULL;
 	bond->current_arp_slave = NULL;
+	bond->primary_slave = NULL;
 	bond->device = dev;
 
 	/* Initialize the device structure. */
