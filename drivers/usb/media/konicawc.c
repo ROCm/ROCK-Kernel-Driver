@@ -381,9 +381,15 @@ static int konicawc_start_data(struct uvd *uvd)
 	int i, errFlag;
 	struct konicawc *cam = (struct konicawc *)uvd->user_data;
 	int pktsz;
-	struct usb_host_interface *interface;
+	struct usb_interface *intf;
+	struct usb_host_interface *interface = NULL;
 
-	interface = &dev->actconfig->interface[uvd->iface]->altsetting[spd_to_iface[cam->speed]];
+	intf = usb_ifnum_to_if(dev, uvd->iface);
+	if (intf)
+		interface = usb_altnum_to_altsetting(intf,
+				spd_to_iface[cam->speed]);
+	if (!interface)
+		return -ENXIO;
 	pktsz = interface->endpoint[1].desc.wMaxPacketSize;
 	DEBUG(1, "pktsz = %d", pktsz);
 	if (!CAMERA_IS_OPERATIONAL(uvd)) {
@@ -721,7 +727,7 @@ static int konicawc_probe(struct usb_interface *intf, const struct usb_device_id
 {
 	struct usb_device *dev = interface_to_usbdev(intf);
 	struct uvd *uvd = NULL;
-	int i, nas;
+	int ix, i, nas;
 	int actInterface=-1, inactInterface=-1, maxPS=0;
 	unsigned char video_ep = 0;
 
@@ -741,11 +747,12 @@ static int konicawc_probe(struct usb_interface *intf, const struct usb_device_id
 		return -ENODEV;
 	}
 	/* Validate all alternate settings */
-	for (i=0; i < nas; i++) {
+	for (ix=0; ix < nas; ix++) {
 		const struct usb_host_interface *interface;
 		const struct usb_endpoint_descriptor *endpoint;
 
-		interface = &intf->altsetting[i];
+		interface = &intf->altsetting[ix];
+		i = interface->desc.bAlternateSetting;
 		if (interface->desc.bNumEndpoints != 2) {
 			err("Interface %d. has %u. endpoints!",
 			    interface->desc.bInterfaceNumber,
