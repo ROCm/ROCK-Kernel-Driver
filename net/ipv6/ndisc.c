@@ -903,6 +903,9 @@ static void ndisc_recv_na(struct sk_buff *skb)
 	if (neigh) {
 		u8 old_flags = neigh->flags;
 
+		if (neigh->nud_state & NUD_FAILED)
+			goto out;
+
 		neigh_update(neigh, lladdr,
 			     msg->icmph.icmp6_solicited ? NUD_REACHABLE : NUD_STALE,
 			     NEIGH_UPDATE_F_WEAK_OVERRIDE|
@@ -920,6 +923,7 @@ static void ndisc_recv_na(struct sk_buff *skb)
 				ip6_del_rt(rt, NULL, NULL);
 		}
 
+out:
 		neigh_release(neigh);
 	}
 }
