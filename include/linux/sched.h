@@ -455,7 +455,7 @@ extern struct task_struct init_task;
 extern struct   mm_struct init_mm;
 
 /* PID hashing. (shouldnt this be dynamic?) */
-#define PIDHASH_SZ (4096 >> 2)
+#define PIDHASH_SZ 8192
 extern struct task_struct *pidhash[PIDHASH_SZ];
 
 #define pid_hashfn(x)	((((x) >> 8) ^ (x)) & (PIDHASH_SZ - 1))
