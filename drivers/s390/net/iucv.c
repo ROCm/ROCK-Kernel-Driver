@@ -1,5 +1,5 @@
 /* 
- * $Id: iucv.c,v 1.32 2002/02/12 21:52:20 felfert Exp $
+ * $Id: iucv.c,v 1.9 2002/11/06 13:37:25 cohuck Exp $
  *
  * IUCV network driver
  *
@@ -29,7 +29,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.32 $
+ * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.9 $
  *
  */
 
@@ -47,7 +47,6 @@
 #include <asm/atomic.h>
 #include "iucv.h"
 #include <asm/io.h>
-#include <asm/irq.h>
 #include <asm/s390_ext.h>
 #include <asm/ebcdic.h>
 
@@ -275,9 +274,7 @@ static iucv_param * iucv_param_pool;
 
 MODULE_AUTHOR("(C) 2001 IBM Corp. by Fritz Elfert (felfert@millenux.com)");
 MODULE_DESCRIPTION("Linux for S/390 IUCV lowlevel driver");
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,12))
 MODULE_LICENSE("GPL");
-#endif
 
 /*
  * Debugging stuff
@@ -336,7 +333,7 @@ do { \
 static void
 iucv_banner(void)
 {
-	char vbuf[] = "$Revision: 1.32 $";
+	char vbuf[] = "$Revision: 1.9 $";
 	char *version = vbuf;
 
 	if ((version = strchr(version, ':'))) {
