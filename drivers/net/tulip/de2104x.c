@@ -1676,8 +1676,6 @@ static void de_get_regs(struct net_device *dev, struct ethtool_regs *regs,
 {
 	struct de_private *de = dev->priv;
 
-	if (regs->len > DE_REGS_SIZE)
-		regs->len = DE_REGS_SIZE;
 	regs->version = (DE_REGS_VER << 2) | de->de21040;
 
 	spin_lock_irq(&de->lock);
