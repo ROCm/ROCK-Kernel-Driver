@@ -36,6 +36,7 @@
 
 #include <linux/types.h>
 #include <linux/seq_file.h>
+#include <linux/init.h>
 #include <net/sctp/sctp.h>
 
 static char *sctp_snmp_list[] = {
