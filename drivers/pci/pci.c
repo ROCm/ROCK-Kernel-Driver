@@ -700,6 +700,10 @@ pci_clear_mwi(struct pci_dev *dev)
 	}
 }
 
+#ifndef HAVE_ARCH_PCI_SET_DMA_MASK
+/*
+ * These can be overridden by arch-specific implementations
+ */
 int
 pci_set_dma_mask(struct pci_dev *dev, u64 mask)
 {
@@ -732,6 +736,7 @@ pci_set_consistent_dma_mask(struct pci_dev *dev, u64 mask)
 
 	return 0;
 }
+#endif
      
 static int __devinit pci_init(void)
 {
