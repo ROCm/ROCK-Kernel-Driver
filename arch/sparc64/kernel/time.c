@@ -342,14 +342,17 @@ static void __hbird_write_compare(unsigned long val)
 
 static void hbtick_init_tick(unsigned long offset)
 {
+	unsigned long val;
+
 	tick_disable_protection();
 
-	__hbird_write_compare(__hbird_read_stick() + offset);
+	val = __hbird_read_stick() & ~(1UL << 63);
+	__hbird_write_compare(val + offset);
 }
 
 static unsigned long hbtick_get_tick(void)
 {
-	return __hbird_read_stick();
+	return __hbird_read_stick() & ~(1UL << 63);
 }
 
 static unsigned long hbtick_get_compare(void)
@@ -363,6 +366,8 @@ static unsigned long hbtick_add_tick(unsigned long adj, unsigned long offset)
 
 	val = __hbird_read_stick() + adj;
 	__hbird_write_stick(val);
+
+	val &= ~(1UL << 63);
 	__hbird_write_compare(val + offset);
 
 	return val;
@@ -372,6 +377,7 @@ static unsigned long hbtick_add_compare(unsigned long adj)
 {
 	unsigned long val = __hbird_read_compare() + adj;
 
+	val &= ~(1UL << 63);
 	__hbird_write_compare(val);
 
 	return val;
