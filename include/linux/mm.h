@@ -193,11 +193,6 @@ typedef struct page {
 #define page_count(p)		atomic_read(&(p)->count)
 #define set_page_count(p,v) 	atomic_set(&(p)->count, v)
 
-static inline void init_page_count(struct page *page)
-{
-	page->count.counter = 0;
-}
-
 /*
  * Various page->flags bits:
  *

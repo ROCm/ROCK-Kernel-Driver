@@ -286,8 +286,8 @@ static unsigned long i810_alloc_page(drm_device_t *dev)
 	if(address == 0UL)
 		return 0;
 
-	atomic_inc(&virt_to_page(address)->count);
-	set_bit(PG_locked, &virt_to_page(address)->flags);
+	get_page(virt_to_page(address));
+	LockPage(virt_to_page(address));
 
 	return address;
 }
@@ -296,9 +296,8 @@ static void i810_free_page(drm_device_t *dev, unsigned long page)
 {
 	if (page) {
 		struct page *p = virt_to_page(page);
-		atomic_dec(p);
-		clear_bit(PG_locked, &p->flags);
-		wake_up_page(p);
+		put_page(p);
+		UnlockPage(p);
 		free_page(page);
 	}
 }
