@@ -221,6 +221,7 @@ config SUN_PM
 
 config SUN4
 	bool "Support for SUN4 machines (disables SUN4[CDM] support)"
+	depends on !SMP
 	help
 	  Say Y here if, and only if, your machine is a sun4. Note that
 	  a kernel compiled with this option will run only on sun4.
