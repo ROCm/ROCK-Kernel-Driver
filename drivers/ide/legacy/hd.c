@@ -838,11 +838,9 @@ static void __init hd_geninit(void)
 	}
 
 	for(drive=0; drive < NR_HD; drive++) {
-		add_gendisk(hd_gendisk + drive);
-		register_disk(hd_gendisk + drive,
-			mk_kdev(MAJOR_NR,drive<<6), 1<<6,
-			&hd_fops, hd_info[drive].head * hd_info[drive].sect *
-			hd_info[drive].cyl);
+		struct hd_i_struct *p = hd_info + drive;
+		set_capacity(hd_gendisk + drive, p->head * p->sect * p->cyl);
+		add_disk(hd_gendisk + drive);
 	}
 }
 

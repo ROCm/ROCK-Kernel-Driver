@@ -1466,9 +1466,8 @@ static int do_md_run(mddev_t * mddev)
 		mddev->state &= ~(1 << MD_SB_CLEAN);
 	md_update_sb(mddev);
 	md_recover_arrays();
-	add_gendisk(disk);
-	register_disk(disk, mk_kdev(disk->major,disk->first_minor),
-			1, &md_fops, md_size[mdidx(mddev)]<<1);
+	set_capacity(disk, md_size[mdidx(mddev)]<<1);
+	add_disk(disk);
 	disks[mdidx(mddev)] = disk;
 
 	return (0);

@@ -91,7 +91,7 @@ struct gendisk {
 };
 
 /* drivers/block/genhd.c */
-extern void add_gendisk(struct gendisk *gp);
+extern void add_disk(struct gendisk *disk);
 extern void del_gendisk(struct gendisk *gp);
 extern void unlink_gendisk(struct gendisk *gp);
 extern struct gendisk *get_gendisk(kdev_t dev);

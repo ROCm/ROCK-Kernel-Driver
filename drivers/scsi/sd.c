@@ -1250,10 +1250,8 @@ static void sd_finish()
 		if (sdkp && (0 == sdkp->capacity) && sdkp->device) {
 			sd_init_onedisk(sdkp, k);
 			if (!sdkp->has_been_registered) {
-				add_gendisk(sd_disks[k]);
-				register_disk(sd_disks[k], MKDEV_SD(k),
-						1<<4, &sd_fops,
-						sdkp->capacity);
+				set_capacity(sd_disks[k], sdkp->capacity);
+				add_disk(sd_disks[k]);
 				sdkp->has_been_registered = 1;
 			}
 		}

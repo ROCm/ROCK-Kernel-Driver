@@ -932,12 +932,7 @@ static int __init pcd_init(void)
 		if (cd->present) {
 			struct gendisk *disk = &cd->disk;
 			register_cdrom(&cd->info);
-			add_gendisk(disk);
-			register_disk(disk,
-				      mk_kdev(disk->major,disk->first_minor),
-				      1<<disk->minor_shift,
-				      disk->fops,
-				      0);
+			add_disk(disk);
 		}
 	}
 

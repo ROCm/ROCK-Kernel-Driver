@@ -3443,12 +3443,7 @@ int __init cdu31a_init(void)
 		scd_info.mask = deficiency;
 		if (register_cdrom(&scd_info))
 			goto errout0;
-		add_gendisk(disk);
-		register_disk(disk,
-			      mk_kdev(disk->major,disk->first_minor),
-			      1<<disk->minor_shift,
-			      disk->fops,
-			      0);
+		add_disk(disk);
 	}
 
 

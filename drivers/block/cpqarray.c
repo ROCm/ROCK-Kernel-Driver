@@ -449,11 +449,8 @@ int __init cpqarray_init(void)
 				continue;
 			disk->major_name = ida_names + (i*NWD+j)*10;
 			(BLK_DEFAULT_QUEUE(MAJOR_NR + i))->hardsect_size = drv->blk_size;
-			add_gendisk(disk);
-			register_disk(disk,
-				      mk_kdev(disk->major,disk->first_minor),
-				      1<<disk->minor_shift, disk->fops,
-				      drv->nr_blks);
+			set_capacity(disk, drv->nr_blks);
+			add_disk(disk);
 		}
 	}
 	/* done ! */
@@ -1475,11 +1472,8 @@ static int revalidate_allvol(kdev_t dev)
 			continue;
 		(BLK_DEFAULT_QUEUE(MAJOR_NR + ctlr))->hardsect_size = drv->blk_size;
 		disk->major_name = ida_names + (ctlr*NWD+i)*10;
-		add_gendisk(disk);
-		register_disk(disk,
-			      mk_kdev(disk->major,disk->first_minor),
-			      1<<disk->minor_shift, disk->fops,
-			      drv->nr_blks);
+		set_capacity(disk, drv->nr_blks);
+		add_disk(disk);
 	}
 
 	hba[ctlr]->usage_count--;

@@ -1014,13 +1014,17 @@ static void mfm_interrupt_handler(int unused, void *dev_id, struct pt_regs *regs
 /*
  * Tell the user about the drive if we decided it exists.
  */
-static void mfm_geometry (int drive)
+static void mfm_geometry(int drive)
 {
-	if (mfm_info[drive].cylinders)
-		printk ("mfm%c: %dMB CHS=%d/%d/%d LCC=%d RECOMP=%d\n", 'a' + drive,
-			mfm_info[drive].cylinders * mfm_info[drive].heads * mfm_info[drive].sectors / 4096,
-			mfm_info[drive].cylinders, mfm_info[drive].heads, mfm_info[drive].sectors,
-			mfm_info[drive].lowcurrent, mfm_info[drive].precomp);
+	struct mfm_info *p = mfm_info + drive;
+	struct gendisk *disk = mfm_gendisk + drive;
+	if (p->cylinders)
+		printk ("%s: %dMB CHS=%d/%d/%d LCC=%d RECOMP=%d\n",
+			disk->major_name,
+			p->cylinders * p->heads * p->sectors / 4096,
+			p->cylinders, p->heads, p->sectors,
+			p->lowcurrent, p->precomp);
+	set_capacity(disk, p->cylinders * p->heads * p->sectors / 2);
 }
 
 #ifdef CONFIG_BLK_DEV_MFM_AUTODETECT
@@ -1241,7 +1245,6 @@ void xd_set_geometry(struct block_device *bdev, unsigned char secsptrack,
 		if (raw_cmd.dev == drive)
 			mfm_specify ();
 		mfm_geometry (drive);
-		set_capacity(&mfm_gendisk[drive], mfm_info[drive].cylinders * mfm_info[drive].heads * mfm_info[drive].sectors / 2);
 	}
 }
 
@@ -1267,12 +1270,8 @@ static void mfm_geninit (void)
 		outw(0x80, mfm_irqenable);	/* Required to enable IRQs from MFM podule */
 
 	for (i = 0; i < mfm_drives; i++) {
-		add_gendisk(mfm_gendisk + i);
-		mfm_geometry (i);
-		register_disk(mfm_gendisk + i, mk_kdev(MAJOR_NR,i<<6), 1<<6,
-				&mfm_fops,
-				mfm_info[i].cylinders * mfm_info[i].heads *
-				mfm_info[i].sectors / 2);
+		mfm_geometry(i);
+		add_disk(mfm_gendisk + i);
 	}
 }
 

@@ -687,10 +687,8 @@ static int pd_detect( void )
 			PD.gd.fops = &pd_fops;
 			PD.gd.major = major;
 			PD.gd.first_minor = unit << PD_BITS;
-			add_gendisk(&PD.gd);
-			register_disk(&PD.gd,mk_kdev(MAJOR_NR,unit<<PD_BITS),
-					PD_PARTNS,&pd_fops,
-					PD.capacity);
+			set_capacity(&PD.gd, PD.capacity);
+			add_disk(&PD.gd);
 		}
 	}
 	if (k)

@@ -808,9 +808,8 @@ void sr_finish()
 				   &dev_attr_kdev);
 		disk->de = cd->device->de;
 		register_cdrom(&cd->cdi);
-		add_gendisk(disk);
-		register_disk(disk, mk_kdev(disk->major, disk->first_minor),
-				1<<disk->minor_shift, disk->fops, cd->capacity);
+		set_capacity(disk, cd->capacity);
+		add_disk(disk);
 	}
 }
 

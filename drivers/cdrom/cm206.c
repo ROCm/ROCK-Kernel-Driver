@@ -1482,12 +1482,7 @@ int __init cm206_init(void)
 		printk(KERN_INFO "Cannot register for cdrom %d!\n", MAJOR_NR);
 		goto out_cdrom;
 	}
-	add_gendisk(disk);
-	register_disk(disk,
-		      mk_kdev(disk->major,disk->first_minor),
-		      1<<disk->minor_shift,
-		      disk->fops,
-		      0);
+	add_disk(disk);
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_cm206_request,
 		       &cm206_lock);
 	blk_queue_hardsect_size(BLK_DEFAULT_QUEUE(MAJOR_NR), 2048);

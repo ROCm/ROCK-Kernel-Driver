@@ -3143,10 +3143,7 @@ static int ide_cdrom_attach (ide_drive_t *drive)
 	DRIVER(drive)->busy--;
 
 	cdrom_read_toc(drive, &sense);
-	add_gendisk(g);
-	register_disk(g, mk_kdev(g->major,g->first_minor),
-		      1<<g->minor_shift, ide_fops,
-		      get_capacity(g));
+	add_disk(g);
 	return 0;
 failed:
 	return 1;

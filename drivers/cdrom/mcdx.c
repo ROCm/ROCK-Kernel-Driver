@@ -1230,12 +1230,7 @@ int __init mcdx_init_drive(int drive)
 		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 		return 2;
 	}
-	add_gendisk(disk);
-	register_disk(disk,
-		      mk_kdev(disk->major,disk->first_minor),
-		      1<<disk->minor_shift,
-		      disk->fops,
-		      0);
+	add_disk(disk);
 	printk(msg);
 	return 0;
 }

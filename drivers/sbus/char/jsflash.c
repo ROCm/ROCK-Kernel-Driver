@@ -641,10 +641,8 @@ static int jsfd_init(void)
 		disk->major_name = names[i];
 		disk->fops = &jsfd_fops;
 		disk->minor_shift = 0;
-		add_gendisk(disk);
-		register_disk(disk, mk_kdev(disk->major, disk->first_minor),
-				1<<disk->minor_shift, disk->fops,
-				jdp->dsize >> 9);
+		set_capacity(disk, jdp->dsize >> 9);
+		add_disk(disk);
 		set_device_ro(MKDEV(JSFD_MAJOR, i), 1);
 	}
 	return 0;

@@ -49,9 +49,7 @@ static int mtdblock_open(struct inode *inode, struct file *file)
 	}
 
 	set_capacit(disk, mtd->size>>9);
-	add_gendisk(disk);
-	register_disk(disk, mk_kdev(disk->major, disk->first_minor),
-			1<<disk->minor_shift, disk->fops, get_capacity(disk));
+	add_disk(disk);
 
 	DEBUG(1, "ok\n");
 

@@ -40,8 +40,7 @@ static struct gendisk *gendisk_head;
  * This function registers the partitioning information in @gp
  * with the kernel.
  */
-void
-add_gendisk(struct gendisk *gp)
+static void add_gendisk(struct gendisk *gp)
 {
 	struct gendisk *sgp;
 	struct hd_struct *p = NULL;
@@ -80,7 +79,14 @@ out:
 	write_unlock(&gendisk_lock);
 }
 
-EXPORT_SYMBOL(add_gendisk);
+void add_disk(struct gendisk *disk)
+{
+	add_gendisk(disk);
+	register_disk(disk, mk_kdev(disk->major, disk->first_minor),
+			1<<disk->minor_shift, disk->fops, get_capacity(disk));
+}
+
+EXPORT_SYMBOL(add_disk);
 EXPORT_SYMBOL(del_gendisk);
 
 void unlink_gendisk(struct gendisk *disk)

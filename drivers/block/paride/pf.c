@@ -987,10 +987,7 @@ static int __init pf_init(void)
 		struct gendisk *disk = &pf->disk;
 		if (!pf->present)
 			continue;
-		add_gendisk(disk);
-		register_disk(disk, mk_kdev(disk->major, disk->first_minor),
-				1<<disk->minor_shift, disk->fops,
-				get_capacity(disk));
+		add_disk(disk);
 	}
 	return 0;
 }

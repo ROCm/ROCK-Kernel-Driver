@@ -5843,12 +5843,7 @@ int __init sbpcd_init(void)
 		{
 			printk(" sbpcd: Unable to register with Uniform CD-ROm driver\n");
 		}
-		add_gendisk(disk);
-		register_disk(disk,
-			      mk_kdev(disk->major,disk->first_minor),
-			      1<<disk->minor_shift,
-			      disk->fops,
-			      0);
+		add_disk(disk);
 	}
 	blk_queue_hardsect_size(BLK_DEFAULT_QUEUE(MAJOR_NR), CD_FRAMESIZE);
 

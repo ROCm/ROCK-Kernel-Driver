@@ -139,10 +139,9 @@ static void NFTL_setup(struct mtd_info *mtd)
 	gd->first_minor = firstfree << NFTL_PARTN_BITS;
 	gd->minor_shift = NFTL_PARTN_BITS;
 	gd->major_name = name;
+	set_capacity(gd, nftl->nr_sects);
 	nftl->disk = gd;
-	add_gendisk(gd);
-	register_disk(gd, mk_kdev(MAJOR_NR,firstfree<<NFTL_PARTN_BITS),
-		      1<<NFTL_PARTN_BITS, &nftl_fops, nftl->nr_sects);
+	add_disk(gd);
 }
 
 static void NFTL_unsetup(int i)
