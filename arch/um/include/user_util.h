@@ -62,7 +62,6 @@ extern void set_cmdline(char *cmd);
 extern void input_cb(void (*proc)(void *), void *arg, int arg_len);
 extern int get_pty(void);
 extern void *um_kmalloc(int size);
-extern int raw(int fd, int complain);
 extern int switcheroo(int fd, int prot, void *from, void *to, int size);
 extern void setup_machinename(char *machine_out);
 extern void setup_hostinfo(void);
@@ -89,6 +88,9 @@ extern int arch_fixup(unsigned long address, void *sc_ptr);
 extern void forward_pending_sigio(int target);
 extern int can_do_skas(void);
 extern void arch_init_thread(void);
+
+extern int __raw(int fd, int complain, int now);
+#define raw(fd, complain) __raw((fd), (complain), 1)
 
 #endif
 
