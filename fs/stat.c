@@ -106,7 +106,7 @@ static int cp_old_stat(struct kstat *stat, struct __old_kernel_stat __user * sta
 {
 	static int warncount = 5;
 	struct __old_kernel_stat tmp;
-
+	
 	if (warncount > 0) {
 		warncount--;
 		printk(KERN_WARNING "VFS: Warning: %s using old stat() call. Recompile your binary.\n",
@@ -116,6 +116,7 @@ static int cp_old_stat(struct kstat *stat, struct __old_kernel_stat __user * sta
 		warncount = 0;
 	}
 
+	memset(&tmp, 0, sizeof(struct __old_kernel_stat));
 	tmp.st_dev = stat->dev;
 	tmp.st_ino = stat->ino;
 	tmp.st_mode = stat->mode;

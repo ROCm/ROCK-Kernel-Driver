@@ -1958,6 +1958,9 @@ int pcmcia_request_irq(client_handle_t handle, irq_req_t *req)
 	    irq = req->IRQInfo1 & IRQ_MASK;
 	    ret = try_irq(req->Attributes, irq, 1);
 	}
+#else
+    } else {
+	ret = CS_UNSUPPORTED_MODE;
 #endif
     }
     if (ret != 0) return ret;

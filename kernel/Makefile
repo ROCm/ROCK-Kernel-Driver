@@ -19,6 +19,10 @@ obj-$(CONFIG_CPU_FREQ) += cpufreq.o
 obj-$(CONFIG_BSD_PROCESS_ACCT) += acct.o
 obj-$(CONFIG_SOFTWARE_SUSPEND) += suspend.o
 obj-$(CONFIG_COMPAT) += compat.o
+obj-$(CONFIG_IKCONFIG) += configs.o
+
+# files to be removed upon make clean
+clean-files := ikconfig.h
 
 ifneq ($(CONFIG_IA64),y)
 # According to Alan Modra <alan@linuxcare.com.au>, the -fno-omit-frame-pointer is
@@ -28,3 +32,9 @@ ifneq ($(CONFIG_IA64),y)
 # to get a correct value for the wait-channel (WCHAN in ps). --davidm
 CFLAGS_sched.o := $(PROFILING) -fno-omit-frame-pointer
 endif
+
+$(obj)/ikconfig.h: scripts/mkconfigs .config Makefile
+	$(CONFIG_SHELL) scripts/mkconfigs .config Makefile > $(obj)/ikconfig.h
+
+$(obj)/configs.o: $(obj)/ikconfig.h $(obj)/configs.c \
+		include/linux/version.h include/linux/compile.h

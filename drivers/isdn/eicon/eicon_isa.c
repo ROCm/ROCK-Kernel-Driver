@@ -90,7 +90,7 @@ eicon_isa_find_card(int Mem, int Irq, char * Id)
 	if ((Mem < 0x0c0000) ||
 	    (Mem > 0x0fc000) ||
 	    (Mem & 0xfff)) { 
-		printk(KERN_WARNING "eicon_isa: illegal membase 0x%x for %s\n",
+		printk(KERN_WARNING "eicon_isa: invalid membase 0x%x for %s\n",
 			 Mem, Id);
 		return -1;
 	}
@@ -326,7 +326,7 @@ eicon_isa_load(eicon_isa_card *card, eicon_isa_codebuf *cb) {
 		/* Check for valid IRQ */
 		if ((card->irq < 0) || (card->irq > 15) || 
 		    (!((1 << card->irq) & eicon_isa_valid_irq[card->type & 0x0f]))) {
-			printk(KERN_WARNING "eicon_isa_load: illegal irq: %d\n", card->irq);
+			printk(KERN_WARNING "eicon_isa_load: invalid irq: %d\n", card->irq);
 			eicon_isa_release_shmem(card);
 			kfree(code);
 			return -EINVAL;

@@ -133,16 +133,16 @@ struct hw_interrupt_type open_pic_ipi = {
 #if 1
 #define check_arg_ipi(ipi) \
     if (ipi < 0 || ipi >= OPENPIC_NUM_IPI) \
-	printk("open_pic.c:%d: illegal ipi %d\n", __LINE__, ipi);
+	printk("open_pic.c:%d: invalid ipi %d\n", __LINE__, ipi);
 #define check_arg_timer(timer) \
     if (timer < 0 || timer >= OPENPIC_NUM_TIMERS) \
-	printk("open_pic.c:%d: illegal timer %d\n", __LINE__, timer);
+	printk("open_pic.c:%d: invalid timer %d\n", __LINE__, timer);
 #define check_arg_vec(vec) \
     if (vec < 0 || vec >= OPENPIC_NUM_VECTORS) \
-	printk("open_pic.c:%d: illegal vector %d\n", __LINE__, vec);
+	printk("open_pic.c:%d: invalid vector %d\n", __LINE__, vec);
 #define check_arg_pri(pri) \
     if (pri < 0 || pri >= OPENPIC_NUM_PRI) \
-	printk("open_pic.c:%d: illegal priority %d\n", __LINE__, pri);
+	printk("open_pic.c:%d: invalid priority %d\n", __LINE__, pri);
 /*
  * Print out a backtrace if it's out of range, since if it's larger than NR_IRQ's
  * data has probably been corrupted and we're going to panic or deadlock later
@@ -151,11 +151,11 @@ struct hw_interrupt_type open_pic_ipi = {
 #define check_arg_irq(irq) \
     if (irq < open_pic_irq_offset || irq >= NumSources+open_pic_irq_offset \
 	|| ISR[irq - open_pic_irq_offset] == 0) { \
-      printk("open_pic.c:%d: illegal irq %d\n", __LINE__, irq); \
+      printk("open_pic.c:%d: invalid irq %d\n", __LINE__, irq); \
       dump_stack(); }
 #define check_arg_cpu(cpu) \
     if (cpu < 0 || cpu >= NumProcessors){ \
-	printk("open_pic.c:%d: illegal cpu %d\n", __LINE__, cpu); \
+	printk("open_pic.c:%d: invalid cpu %d\n", __LINE__, cpu); \
 	dump_stack(); }
 #else
 #define check_arg_ipi(ipi)	do {} while (0)

@@ -3838,9 +3838,9 @@ static char *async_cache_tab[] = {
 /*31*/  "\007\000\002\012\001\013\001"
         "GDT HA %u, Fault bus %u, ID %u: old disk detected",
 /*32*/  "\007\000\002\012\001\013\001"
-        "GDT HA %u, Fault bus %u, ID %u: plugging an active disk is illegal",
+        "GDT HA %u, Fault bus %u, ID %u: plugging an active disk is invalid",
 /*33*/  "\007\000\002\012\001\013\001"
-        "GDT HA %u, Fault bus %u, ID %u: illegal device detected",
+        "GDT HA %u, Fault bus %u, ID %u: invalid device detected",
 /*34*/  "\011\000\002\012\001\013\001\006\004"
         "GDT HA %u, Fault bus %u, ID %u: insufficient disk capacity (%lu MB required)",
 /*35*/  "\007\000\002\012\001\013\001"

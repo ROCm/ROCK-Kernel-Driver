@@ -8,7 +8,7 @@
  *  $Log: fault.c,v $
  *  Revision 1.8  2003/07/04 13:02:48  tobiasa
  *  Moved code snippet from arch/cris/mm/fault.c that searches for fixup code
- *  to seperate function in arch-specific files.
+ *  to separate function in arch-specific files.
  *
  *  Revision 1.7  2003/01/22 06:48:38  starvik
  *  Fixed warnings issued by GCC 3.2.1

@@ -2,15 +2,16 @@
  *
  * Name:	skgepnmi.c
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.87 $
- * Date:	$Date: 2001/04/06 13:35:09 $
+ * Version:	$Revision: 1.109 $
+ * Date:	$Date: 2003/07/17 14:15:24 $
  * Purpose:	Private Network Management Interface
  *
  ****************************************************************************/
 
 /******************************************************************************
  *
- *	(C)Copyright 1998-2001 SysKonnect GmbH.
+ *	(C)Copyright 1998-2002 SysKonnect GmbH.
+ *	(C)Copyright 2002-2003 Marvell.
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -26,6 +27,114 @@
  * History:
  *
  *	$Log: skgepnmi.c,v $
+ *	Revision 1.109  2003/07/17 14:15:24  tschilli
+ *	Bug in SkPnmiGenIoctl() fixed.
+ *	
+ *	Revision 1.108  2003/05/27 07:10:11  tschilli
+ *	Bug in SkPnmiGenIoctl() fixed.
+ *	
+ *	Revision 1.107  2003/05/23 13:01:10  tschilli
+ *	Code for DIAG support added (#define SK_DIAG_SUPPORT).
+ *	Code for generic PNMI IOCTL support added. The new function
+ *	SkPnmiGenIoctl() is used for this purpose.
+ *	Handling of OID_SKGE_BOARDLEVEL added.
+ *	Incorrect buffer size handling of OID_SKGE_MTU during GET action fixed.
+ *	Return code handling in PowerManagement() fixed.
+ *	Editorial changes.
+ *  
+ *	Revision 1.106  2003/04/10 14:47:31  rschmidt
+ *	Fixed handling for OID_GEN_RCV_OK and OID_GEN_XMIT_OK for YUKON's GMAC
+ *	in GetPhysStatVal().
+ *	Replaced macro PHY_READ() with function call SkXmPhyRead().
+ *	Made optimisations for readability and code size.
+ *	Editorial changes.
+ *	
+ *	Revision 1.105  2003/04/09 12:51:32  rschmidt
+ *	Fixed XMAC only handling for some events in SkPnmiEvent().
+ *	Fixed return value for OID_GEN_RCV_OK (SK_PNMI_HRX) in GetPhysStatVal().
+ *	Editorial changes.
+ *	
+ *	Revision 1.104  2003/03/27 11:18:21  tschilli
+ *	BRK statements from DEBUG code removed.
+ *	OID_GEN_XMIT_OK and OID_GEN_RCV_OK work with Yukon now.
+ *	Copyright messages changed.
+ *	
+ *	Revision 1.103  2002/12/20 09:57:13  tschilli
+ *	SK_PNMI_EVT_VCT_RESET event code changed.
+ *	Unused variable from Vct() removed.
+ *	
+ *	Revision 1.102  2002/12/16 14:03:24  tschilli
+ *	VCT code in Vct() changed.
+ *	
+ *	Revision 1.101  2002/12/16 09:04:10  tschilli
+ *	Code for VCT handling added.
+ *	
+ *	Revision 1.100  2002/09/26 14:28:13  tschilli
+ *	For XMAC the values in the SK_PNMI_PORT Port struct are copied to
+ *	the new SK_PNMI_PORT BufPort struct during a MacUpdate() call.
+ *	These values are used when GetPhysStatVal() is called. With this
+ *	mechanism you get the best results when software corrections for
+ *	counters are needed. Example: RX_LONGFRAMES.
+ *	
+ *	Revision 1.99  2002/09/17 12:31:19  tschilli
+ *	OID_SKGE_TX_HW_ERROR_CTS, OID_SKGE_OUT_ERROR_CTS, OID_GEN_XMIT_ERROR:
+ *	Double count of SK_PNMI_HTX_EXCESS_COL in function General() removed.
+ *	OID_PNP_CAPABILITIES: sizeof(SK_PM_WAKE_UP_CAPABILITIES) changed to
+ *	sizeof(SK_PNP_CAPABILITIES) in function PowerManagement().
+ *	
+ *	Revision 1.98  2002/09/10 09:00:03  rwahl
+ *	Adapted boolean definitions according sktypes.
+ *	
+ *	Revision 1.97  2002/09/05 15:07:03  rwahl
+ *	Editorial changes.
+ *	
+ *	Revision 1.96  2002/09/05 11:04:14  rwahl
+ *	- Rx/Tx packets statistics of virtual port were zero on link down (#10750)
+ *	- For GMAC the overflow IRQ for Rx longframe counter was not counted.
+ *	- Incorrect calculation for oids OID_SKGE_RX_HW_ERROR_CTS,
+ *	  OID_SKGE_IN_ERRORS_CTS,  OID_GEN_RCV_ERROR.
+ *	- Moved correction for OID_SKGE_STAT_RX_TOO_LONG to GetPhysStatVal().
+ *	- Editorial changes.
+ *	
+ *	Revision 1.95  2002/09/04 08:53:37  rwahl
+ *	- Incorrect statistics for Rx_too_long counter with jumbo frame (#10751)
+ *	- StatRxFrameTooLong & StatRxPMaccErr counters were not reset.
+ *	- Fixed compiler warning for debug msg arg types.
+ *	
+ *	Revision 1.94  2002/08/09 15:42:14  rwahl
+ *	- Fixed StatAddr table for GMAC.
+ *	- VirtualConf(): returned indeterminated status for speed oids if no
+ *	  active port.
+ *	
+ *	Revision 1.93  2002/08/09 11:04:59  rwahl
+ *	Added handler for link speed caps.
+ *	
+ *	Revision 1.92  2002/08/09 09:43:03  rwahl
+ *	- Added handler for NDIS OID_PNP_xxx ids.
+ *	
+ *	Revision 1.91  2002/07/17 19:53:03  rwahl
+ *	- Added StatOvrflwBit table for XMAC & GMAC.
+ *	- Extended StatAddr table for GMAC. Added check of number of counters
+ *	  in enumeration and size of StatAddr table on init level.
+ *	- Added use of GIFunc table.
+ *	- ChipSet is not static anymore,
+ *	- Extended SIRQ event handler for both mac types.
+ *	- Fixed rx short counter bug (#10620)
+ *	- Added handler for oids SKGE_SPEED_MODE & SKGE_SPEED_STATUS.
+ *	- Extended GetPhysStatVal() for GMAC.
+ *	- Editorial changes.
+ *	
+ *	Revision 1.90  2002/05/22 08:56:25  rwahl
+ *	- Moved OID table to separate source file.
+ *	- Fix: TX_DEFFERAL counter incremented in full-duplex mode.
+ *	- Use string definitions for error msgs.
+ *	
+ *	Revision 1.89  2001/09/18 10:01:30  mkunz
+ *	some OID's fixed for dualnetmode
+ *	
+ *	Revision 1.88  2001/08/02 07:58:08  rwahl
+ *	- Fixed NetIndex to csum module at ResetCounter().
+ *	
  *	Revision 1.87  2001/04/06 13:35:09  mkunz
  *	-Bugs fixed in handling of OID_SKGE_MTU and the VPD OID's
  *	
@@ -37,7 +146,6 @@
  *	
  *	Revision 1.84  2001/03/06 09:04:55  mkunz
  *	Made some changes in instance calculation
- *	C	^VS:
  *	
  *	Revision 1.83  2001/02/15 09:15:32  mkunz
  *	Necessary changes for dual net mode added
@@ -101,7 +209,7 @@
  *	Added state check to PHY_READ call (hanged if called during startup).
  *	
  *	Revision 1.67  1999/09/22 09:53:20  rwahl
- *	- Read Broadcom register for updating fcs error counter (1000Base-T).
+ *	- Read Broadcom register for updating FCS error counter (1000Base-T).
  *
  *	Revision 1.66  1999/08/26 13:47:56  rwahl
  *	Added SK_DRIVER_SENDEVENT when queueing RLMT_CHANGE_THRES trap.
@@ -236,7 +344,7 @@
  *	-Fixed bug for RX counters. On an RX overflow interrupt the high
  *	 words of all RX counters were incremented.
  *	-SET operations on FLOWCTRL_MODE and LINK_MODE accept now the
- *	 value 0, which has no effect. It is useful for multiple instance
+ *	 value 0, which has no effect. It is usefull for multiple instance
  *	 SETs.
  *	
  *	Revision 1.37  1998/11/20 08:02:04  mhaveman
@@ -361,14 +469,14 @@
  ****************************************************************************/
 
 
+#ifndef _lint
 static const char SysKonnectFileId[] =
-	"@(#) $Id: skgepnmi.c,v 1.87 2001/04/06 13:35:09 mkunz Exp $"
-	" (C) SysKonnect.";
+	"@(#) $Id: skgepnmi.c,v 1.109 2003/07/17 14:15:24 tschilli Exp $ (C) Marvell.";
+#endif /* !_lint */
 
 #include "h/skdrv1st.h"
 #include "h/sktypes.h"
 #include "h/xmac_ii.h"
-
 #include "h/skdebug.h"
 #include "h/skqueue.h"
 #include "h/skgepnmi.h"
@@ -379,7 +487,16 @@ static const char SysKonnectFileId[] =
 #include "h/skgeinit.h"
 #include "h/skdrv2nd.h"
 #include "h/skgepnm2.h"
+#ifdef SK_POWER_MGMT
+#include "h/skgepmgt.h"
+#endif
+/* defines *******************************************************************/
 
+#ifndef DEBUG
+#define PNMI_STATIC	static
+#else	/* DEBUG */
+#define PNMI_STATIC
+#endif /* DEBUG */
 
 /*
  * Public Function prototypes
@@ -393,1047 +510,271 @@ int SkPnmiSetVar(SK_AC *pAC, SK_IOC IoC, SK_U32 Id, void *pBuf,
 	unsigned int *pLen, SK_U32 Instance, SK_U32 NetIndex);
 int SkPnmiGetStruct(SK_AC *pAC, SK_IOC IoC, void *pBuf,
 	unsigned int *pLen, SK_U32 NetIndex);
-int SkPnmiPreSetStruct(SK_AC *pAC, SK_IOC IoC, void *pBuf, 
+int SkPnmiPreSetStruct(SK_AC *pAC, SK_IOC IoC, void *pBuf,
 	unsigned int *pLen, SK_U32 NetIndex);
-int SkPnmiSetStruct(SK_AC *pAC, SK_IOC IoC, void *pBuf, 
+int SkPnmiSetStruct(SK_AC *pAC, SK_IOC IoC, void *pBuf,
 	unsigned int *pLen, SK_U32 NetIndex);
 int SkPnmiEvent(SK_AC *pAC, SK_IOC IoC, SK_U32 Event, SK_EVPARA Param);
+int SkPnmiGenIoctl(SK_AC *pAC, SK_IOC IoC, void * pBuf,
+	unsigned int * pLen, SK_U32 NetIndex);
 
 
 /*
  * Private Function prototypes
  */
-static int Addr(SK_AC *pAC, SK_IOC IoC, int action,
-	SK_U32 Id, char *pBuf, unsigned int *pLen, SK_U32 Instance,
-	unsigned int TableIndex, SK_U32 NetIndex);
-static SK_U8 CalculateLinkModeStatus(SK_AC *pAC, SK_IOC IoC, unsigned int
+
+PNMI_STATIC SK_U8 CalculateLinkModeStatus(SK_AC *pAC, SK_IOC IoC, unsigned int
 	PhysPortIndex);
-static SK_U8 CalculateLinkStatus(SK_AC *pAC, SK_IOC IoC, unsigned int
+PNMI_STATIC SK_U8 CalculateLinkStatus(SK_AC *pAC, SK_IOC IoC, unsigned int
 	PhysPortIndex);
-static void CopyMac(char *pDst, SK_MAC_ADDR *pMac);
-static void CopyTrapQueue(SK_AC *pAC, char *pDstBuf);
-static int CsumStat(SK_AC *pAC, SK_IOC IoC, int action, SK_U32 Id,
-	char *pBuf, unsigned int *pLen, SK_U32 Instance,
-	unsigned int TableIndex, SK_U32 NetIndex);
-static int General(SK_AC *pAC, SK_IOC IoC, int action, SK_U32 Id,
-	char *pBuf, unsigned int *pLen, SK_U32 Instance,
-	unsigned int TableIndex, SK_U32 NetIndex);
-static SK_U64 GetPhysStatVal(SK_AC *pAC, SK_IOC IoC,
+PNMI_STATIC void CopyMac(char *pDst, SK_MAC_ADDR *pMac);
+PNMI_STATIC void CopyTrapQueue(SK_AC *pAC, char *pDstBuf);
+PNMI_STATIC SK_U64 GetPhysStatVal(SK_AC *pAC, SK_IOC IoC,
 	unsigned int PhysPortIndex, unsigned int StatIndex);
-static SK_U64 GetStatVal(SK_AC *pAC, SK_IOC IoC, unsigned int LogPortIndex,
+PNMI_STATIC SK_U64 GetStatVal(SK_AC *pAC, SK_IOC IoC, unsigned int LogPortIndex,
 	unsigned int StatIndex, SK_U32 NetIndex);
-static char* GetTrapEntry(SK_AC *pAC, SK_U32 TrapId, unsigned int Size);
-static void GetTrapQueueLen(SK_AC *pAC, unsigned int *pLen,
+PNMI_STATIC char* GetTrapEntry(SK_AC *pAC, SK_U32 TrapId, unsigned int Size);
+PNMI_STATIC void GetTrapQueueLen(SK_AC *pAC, unsigned int *pLen,
 	unsigned int *pEntries);
-static int GetVpdKeyArr(SK_AC *pAC, SK_IOC IoC, char *pKeyArr,
+PNMI_STATIC int GetVpdKeyArr(SK_AC *pAC, SK_IOC IoC, char *pKeyArr,
 	unsigned int KeyArrLen, unsigned int *pKeyNo);
-static int LookupId(SK_U32 Id);
-static int Mac8023Stat(SK_AC *pAC, SK_IOC IoC, int action, SK_U32 Id,
-	char *pBuf, unsigned int *pLen, SK_U32 Instance,
-	unsigned int TableIndex, SK_U32 NetIndex);
-static int MacPrivateConf(SK_AC *pAC, SK_IOC IoC, int action, SK_U32 Id,
-	char *pBuf, unsigned int *pLen, SK_U32 Instance,
-	unsigned int TableIndex, SK_U32 NetIndex);
-static int MacPrivateStat(SK_AC *pAC, SK_IOC IoC, int action, SK_U32 Id,
-	char *pBuf, unsigned int *pLen, SK_U32 Instance,
-	unsigned int TableIndex, SK_U32 NetIndex);
-static int MacUpdate(SK_AC *pAC, SK_IOC IoC, unsigned int FirstMac,
+PNMI_STATIC int LookupId(SK_U32 Id);
+PNMI_STATIC int MacUpdate(SK_AC *pAC, SK_IOC IoC, unsigned int FirstMac,
 	unsigned int LastMac);
-static int Monitor(SK_AC *pAC, SK_IOC IoC, int action,
-	SK_U32 Id, char *pBuf, unsigned int *pLen, SK_U32 Instance,
-	unsigned int TableIndex, SK_U32 NetIndex);
-static int OidStruct(SK_AC *pAC, SK_IOC IoC, int action, SK_U32 Id,
-	char *pBuf, unsigned int *pLen, SK_U32 Instance,
-	unsigned int TableIndex, SK_U32 NetIndex);
-static int Perform(SK_AC *pAC, SK_IOC IoC, int action, SK_U32 Id,
-	char *pBuf, unsigned int* pLen, SK_U32 Instance,
-	unsigned int TableIndex, SK_U32 NetIndex);
-static int PnmiStruct(SK_AC *pAC, SK_IOC IoC, int Action, char *pBuf,
+PNMI_STATIC int PnmiStruct(SK_AC *pAC, SK_IOC IoC, int Action, char *pBuf,
 	unsigned int *pLen, SK_U32 NetIndex);
-static int PnmiVar(SK_AC *pAC, SK_IOC IoC, int Action, SK_U32 Id,
+PNMI_STATIC int PnmiVar(SK_AC *pAC, SK_IOC IoC, int Action, SK_U32 Id,
 	char *pBuf, unsigned int *pLen, SK_U32 Instance, SK_U32 NetIndex);
-static void QueueRlmtNewMacTrap(SK_AC *pAC, unsigned int ActiveMac);
-static void QueueRlmtPortTrap(SK_AC *pAC, SK_U32 TrapId,
+PNMI_STATIC void QueueRlmtNewMacTrap(SK_AC *pAC, unsigned int ActiveMac);
+PNMI_STATIC void QueueRlmtPortTrap(SK_AC *pAC, SK_U32 TrapId,
 	unsigned int PortIndex);
-static void QueueSensorTrap(SK_AC *pAC, SK_U32 TrapId,
+PNMI_STATIC void QueueSensorTrap(SK_AC *pAC, SK_U32 TrapId,
 	unsigned int SensorIndex);
-static void QueueSimpleTrap(SK_AC *pAC, SK_U32 TrapId);
-static void ResetCounter(SK_AC *pAC, SK_IOC IoC, SK_U32 NetIndex);
-static int Rlmt(SK_AC *pAC, SK_IOC IoC, int action, SK_U32 Id,
-	char *pBuf, unsigned int *pLen, SK_U32 Instance,
-	unsigned int TableIndex, SK_U32 NetIndex);
-static int RlmtStat(SK_AC *pAC, SK_IOC IoC, int action, SK_U32 Id,
-	char *pBuf, unsigned int *pLen, SK_U32 Instance,
-	unsigned int TableIndex, SK_U32 NetIndex);
-static int RlmtUpdate(SK_AC *pAC, SK_IOC IoC, SK_U32 NetIndex);
-static int SensorStat(SK_AC *pAC, SK_IOC IoC, int action, SK_U32 Id,
-	char *pBuf, unsigned int *pLen, SK_U32 Instance,
-	unsigned int TableIndex, SK_U32 NetIndex);
-static int SirqUpdate(SK_AC *pAC, SK_IOC IoC);
-static void VirtualConf(SK_AC *pAC, SK_IOC IoC, SK_U32 Id, char *pBuf);
-static int Vpd(SK_AC *pAC, SK_IOC IoC, int action, SK_U32 Id,
-	char *pBuf, unsigned int *pLen, SK_U32 Instance,
-	unsigned int TableIndex, SK_U32 NetIndex);
-
-
-/******************************************************************************
- *
- * Global variables
- */
+PNMI_STATIC void QueueSimpleTrap(SK_AC *pAC, SK_U32 TrapId);
+PNMI_STATIC void ResetCounter(SK_AC *pAC, SK_IOC IoC, SK_U32 NetIndex);
+PNMI_STATIC int RlmtUpdate(SK_AC *pAC, SK_IOC IoC, SK_U32 NetIndex);
+PNMI_STATIC int SirqUpdate(SK_AC *pAC, SK_IOC IoC);
+PNMI_STATIC void VirtualConf(SK_AC *pAC, SK_IOC IoC, SK_U32 Id, char *pBuf);
+PNMI_STATIC int Vct(SK_AC *pAC, SK_IOC IoC, int Action, SK_U32 Id, char *pBuf,
+	unsigned int *pLen, SK_U32 Instance, unsigned int TableIndex, SK_U32 NetIndex);
+PNMI_STATIC void CheckVctStatus(SK_AC *, SK_IOC, char *, SK_U32, SK_U32);
 
 /*
  * Table to correlate OID with handler function and index to
  * hardware register stored in StatAddress if applicable.
  */
-static const SK_PNMI_TAB_ENTRY IdTable[] = {
-	{OID_GEN_XMIT_OK,
-		0,
-		0,
-		0,
-		SK_PNMI_RO, Mac8023Stat, SK_PNMI_HTX},
-	{OID_GEN_RCV_OK,
-		0,
-		0,
-		0,
-		SK_PNMI_RO, Mac8023Stat, SK_PNMI_HRX},
-	{OID_GEN_XMIT_ERROR,
-		0,
-		0,
-		0,
-		SK_PNMI_RO, General, 0},
-	{OID_GEN_RCV_ERROR,
-		0,
-		0,
-		0,
-		SK_PNMI_RO, General, 0},
-	{OID_GEN_RCV_NO_BUFFER,
-		0,
-		0,
-		0,
-		SK_PNMI_RO, General, 0},
-	{OID_GEN_DIRECTED_FRAMES_XMIT,
-		0,
-		0,
-		0,
-		SK_PNMI_RO, Mac8023Stat, SK_PNMI_HTX_UNICAST},
-	{OID_GEN_MULTICAST_FRAMES_XMIT,
-		0,
-		0,
-		0,
-		SK_PNMI_RO, Mac8023Stat, SK_PNMI_HTX_MULTICAST},
-	{OID_GEN_BROADCAST_FRAMES_XMIT,
-		0,
-		0,
-		0,
-		SK_PNMI_RO, Mac8023Stat, SK_PNMI_HTX_BROADCAST},
-	{OID_GEN_DIRECTED_FRAMES_RCV,
-		0,
-		0,
-		0,
-		SK_PNMI_RO, Mac8023Stat, SK_PNMI_HRX_UNICAST},
-	{OID_GEN_MULTICAST_FRAMES_RCV,
-		0,
-		0,
-		0,
-		SK_PNMI_RO, Mac8023Stat, SK_PNMI_HRX_MULTICAST},
-	{OID_GEN_BROADCAST_FRAMES_RCV,
-		0,
-		0,
-		0,
-		SK_PNMI_RO, Mac8023Stat, SK_PNMI_HRX_BROADCAST},
-	{OID_GEN_RCV_CRC_ERROR,
-		0,
-		0,
-		0,
-		SK_PNMI_RO, Mac8023Stat, SK_PNMI_HRX_FCS},
-	{OID_GEN_TRANSMIT_QUEUE_LENGTH,
-		0,
-		0,
-		0,
-		SK_PNMI_RO, General, 0},
-	{OID_802_3_PERMANENT_ADDRESS,
-		0,
-		0,
-		0,
-		SK_PNMI_RO, Mac8023Stat, 0},
-	{OID_802_3_CURRENT_ADDRESS,
-		0,
-		0,
-		0,
-		SK_PNMI_RO, Mac8023Stat, 0},
-	{OID_802_3_RCV_ERROR_ALIGNMENT,
-		0,
-		0,
-		0,
-		SK_PNMI_RO, Mac8023Stat, SK_PNMI_HRX_FRAMING},
-	{OID_802_3_XMIT_ONE_COLLISION,
-		0,
-		0,
-		0,
-		SK_PNMI_RO, Mac8023Stat, SK_PNMI_HTX_SINGLE_COL},
-	{OID_802_3_XMIT_MORE_COLLISIONS,
-		0,
-		0,
-		0,
-		SK_PNMI_RO, Mac8023Stat, SK_PNMI_HTX_MULTI_COL},
-	{OID_802_3_XMIT_DEFERRED,
-		0,
-		0,
-		0,
-		SK_PNMI_RO, Mac8023Stat, SK_PNMI_HTX_DEFFERAL},
-	{OID_802_3_XMIT_MAX_COLLISIONS,
-		0,
-		0,
-		0,
-		SK_PNMI_RO, Mac8023Stat, SK_PNMI_HTX_EXCESS_COL},
-	{OID_802_3_RCV_OVERRUN,
-		0,
-		0,
-		0,
-		SK_PNMI_RO, Mac8023Stat, SK_PNMI_HRX_OVERFLOW},
-	{OID_802_3_XMIT_UNDERRUN,
-		0,
-		0,
-		0,
-		SK_PNMI_RO, Mac8023Stat, SK_PNMI_HTX_UNDERRUN},
-	{OID_802_3_XMIT_TIMES_CRS_LOST,
-		0,
-		0,
-		0,
-		SK_PNMI_RO, Mac8023Stat, SK_PNMI_HTX_CARRIER},
-	{OID_802_3_XMIT_LATE_COLLISIONS,
-		0,
-		0,
-		0,
-		SK_PNMI_RO, Mac8023Stat, SK_PNMI_HTX_LATE_COL},
-	{OID_SKGE_MDB_VERSION,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(MgmtDBVersion),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_SUPPORTED_LIST,
-		0,
-		0,
-		0,
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_ALL_DATA,
-		0,
-		0,
-		0,
-		SK_PNMI_RW, OidStruct, 0},
-	{OID_SKGE_VPD_FREE_BYTES,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(VpdFreeBytes),
-		SK_PNMI_RO, Vpd, 0},
-	{OID_SKGE_VPD_ENTRIES_LIST,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(VpdEntriesList),
-		SK_PNMI_RO, Vpd, 0},
-	{OID_SKGE_VPD_ENTRIES_NUMBER,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(VpdEntriesNumber),
-		SK_PNMI_RO, Vpd, 0},
-	{OID_SKGE_VPD_KEY,
-		SK_PNMI_VPD_ENTRIES,
-		sizeof(SK_PNMI_VPD),
-		SK_PNMI_OFF(Vpd) + SK_PNMI_VPD_OFF(VpdKey),
-		SK_PNMI_RO, Vpd, 0},
-	{OID_SKGE_VPD_VALUE,
-		SK_PNMI_VPD_ENTRIES,
-		sizeof(SK_PNMI_VPD),
-		SK_PNMI_OFF(Vpd) + SK_PNMI_VPD_OFF(VpdValue),
-		SK_PNMI_RO, Vpd, 0},
-	{OID_SKGE_VPD_ACCESS,
-		SK_PNMI_VPD_ENTRIES,
-		sizeof(SK_PNMI_VPD),
-		SK_PNMI_OFF(Vpd) + SK_PNMI_VPD_OFF(VpdAccess),
-		SK_PNMI_RO, Vpd, 0},
-	{OID_SKGE_VPD_ACTION,
-		SK_PNMI_VPD_ENTRIES,
-		sizeof(SK_PNMI_VPD),
-		SK_PNMI_OFF(Vpd) + SK_PNMI_VPD_OFF(VpdAction),
-		SK_PNMI_RW, Vpd, 0},
-	{OID_SKGE_PORT_NUMBER,		
-		1,
-		0,
-		SK_PNMI_MAI_OFF(PortNumber),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_DEVICE_TYPE,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(DeviceType),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_DRIVER_DESCR,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(DriverDescr),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_DRIVER_VERSION,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(DriverVersion),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_HW_DESCR,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(HwDescr),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_HW_VERSION,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(HwVersion),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_CHIPSET,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(Chipset),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_ACTION,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(Action),
-		SK_PNMI_RW, Perform, 0},
-	{OID_SKGE_RESULT,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(TestResult),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_BUS_TYPE,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(BusType),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_BUS_SPEED,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(BusSpeed),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_BUS_WIDTH,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(BusWidth),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_TX_SW_QUEUE_LEN,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(TxSwQueueLen),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_TX_SW_QUEUE_MAX,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(TxSwQueueMax),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_TX_RETRY,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(TxRetryCts),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_RX_INTR_CTS,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(RxIntrCts),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_TX_INTR_CTS,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(TxIntrCts),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_RX_NO_BUF_CTS,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(RxNoBufCts),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_TX_NO_BUF_CTS,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(TxNoBufCts),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_TX_USED_DESCR_NO,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(TxUsedDescrNo),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_RX_DELIVERED_CTS,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(RxDeliveredCts),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_RX_OCTETS_DELIV_CTS,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(RxOctetsDeliveredCts),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_RX_HW_ERROR_CTS,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(RxHwErrorsCts),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_TX_HW_ERROR_CTS,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(TxHwErrorsCts),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_IN_ERRORS_CTS,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(InErrorsCts),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_OUT_ERROR_CTS,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(OutErrorsCts),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_ERR_RECOVERY_CTS,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(ErrRecoveryCts),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_SYSUPTIME,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(SysUpTime),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_SENSOR_NUMBER,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(SensorNumber),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_SENSOR_INDEX,
-		SK_PNMI_SENSOR_ENTRIES,
-		sizeof(SK_PNMI_SENSOR),
-		SK_PNMI_OFF(Sensor) + SK_PNMI_SEN_OFF(SensorIndex),
-		SK_PNMI_RO, SensorStat, 0},
-	{OID_SKGE_SENSOR_DESCR,
-		SK_PNMI_SENSOR_ENTRIES,
-		sizeof(SK_PNMI_SENSOR),
-		SK_PNMI_OFF(Sensor) + SK_PNMI_SEN_OFF(SensorDescr),
-		SK_PNMI_RO, SensorStat, 0},
-	{OID_SKGE_SENSOR_TYPE,
-		SK_PNMI_SENSOR_ENTRIES,
-		sizeof(SK_PNMI_SENSOR),
-		SK_PNMI_OFF(Sensor) + SK_PNMI_SEN_OFF(SensorType),
-		SK_PNMI_RO, SensorStat, 0},
-	{OID_SKGE_SENSOR_VALUE,
-		SK_PNMI_SENSOR_ENTRIES,
-		sizeof(SK_PNMI_SENSOR),
-		SK_PNMI_OFF(Sensor) + SK_PNMI_SEN_OFF(SensorValue),
-		SK_PNMI_RO, SensorStat, 0},
-	{OID_SKGE_SENSOR_WAR_THRES_LOW,
-		SK_PNMI_SENSOR_ENTRIES,
-		sizeof(SK_PNMI_SENSOR),
-		SK_PNMI_OFF(Sensor) + SK_PNMI_SEN_OFF(SensorWarningThresholdLow),
-		SK_PNMI_RO, SensorStat, 0},
-	{OID_SKGE_SENSOR_WAR_THRES_UPP,
-		SK_PNMI_SENSOR_ENTRIES,
-		sizeof(SK_PNMI_SENSOR),
-		SK_PNMI_OFF(Sensor) + SK_PNMI_SEN_OFF(SensorWarningThresholdHigh),
-		SK_PNMI_RO, SensorStat, 0},
-	{OID_SKGE_SENSOR_ERR_THRES_LOW,
-		SK_PNMI_SENSOR_ENTRIES,
-		sizeof(SK_PNMI_SENSOR),
-		SK_PNMI_OFF(Sensor) + SK_PNMI_SEN_OFF(SensorErrorThresholdLow),
-		SK_PNMI_RO, SensorStat, 0},
-	{OID_SKGE_SENSOR_ERR_THRES_UPP,
-		SK_PNMI_SENSOR_ENTRIES,
-		sizeof(SK_PNMI_SENSOR),
-		SK_PNMI_OFF(Sensor) + SK_PNMI_SEN_OFF(SensorErrorThresholdHigh),
-		SK_PNMI_RO, SensorStat, 0},
-	{OID_SKGE_SENSOR_STATUS,
-		SK_PNMI_SENSOR_ENTRIES,
-		sizeof(SK_PNMI_SENSOR),
-		SK_PNMI_OFF(Sensor) + SK_PNMI_SEN_OFF(SensorStatus),
-		SK_PNMI_RO, SensorStat, 0},
-	{OID_SKGE_SENSOR_WAR_CTS,
-		SK_PNMI_SENSOR_ENTRIES,
-		sizeof(SK_PNMI_SENSOR),
-		SK_PNMI_OFF(Sensor) + SK_PNMI_SEN_OFF(SensorWarningCts),
-		SK_PNMI_RO, SensorStat, 0},
-	{OID_SKGE_SENSOR_ERR_CTS,
-		SK_PNMI_SENSOR_ENTRIES,
-		sizeof(SK_PNMI_SENSOR),
-		SK_PNMI_OFF(Sensor) + SK_PNMI_SEN_OFF(SensorErrorCts),
-		SK_PNMI_RO, SensorStat, 0},
-	{OID_SKGE_SENSOR_WAR_TIME,
-		SK_PNMI_SENSOR_ENTRIES,
-		sizeof(SK_PNMI_SENSOR),
-		SK_PNMI_OFF(Sensor) + SK_PNMI_SEN_OFF(SensorWarningTimestamp),
-		SK_PNMI_RO, SensorStat, 0},
-	{OID_SKGE_SENSOR_ERR_TIME,
-		SK_PNMI_SENSOR_ENTRIES,
-		sizeof(SK_PNMI_SENSOR),
-		SK_PNMI_OFF(Sensor) + SK_PNMI_SEN_OFF(SensorErrorTimestamp),
-		SK_PNMI_RO, SensorStat, 0},
-	{OID_SKGE_CHKSM_NUMBER,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(ChecksumNumber),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_CHKSM_RX_OK_CTS,
-		SKCS_NUM_PROTOCOLS,
-		sizeof(SK_PNMI_CHECKSUM),
-		SK_PNMI_OFF(Checksum) + SK_PNMI_CHK_OFF(ChecksumRxOkCts),
-		SK_PNMI_RO, CsumStat, 0},
-	{OID_SKGE_CHKSM_RX_UNABLE_CTS,
-		SKCS_NUM_PROTOCOLS,
-		sizeof(SK_PNMI_CHECKSUM),
-		SK_PNMI_OFF(Checksum) + SK_PNMI_CHK_OFF(ChecksumRxUnableCts),
-		SK_PNMI_RO, CsumStat, 0},
-	{OID_SKGE_CHKSM_RX_ERR_CTS,
-		SKCS_NUM_PROTOCOLS,
-		sizeof(SK_PNMI_CHECKSUM),
-		SK_PNMI_OFF(Checksum) + SK_PNMI_CHK_OFF(ChecksumRxErrCts),
-		SK_PNMI_RO, CsumStat, 0},
-	{OID_SKGE_CHKSM_TX_OK_CTS,
-		SKCS_NUM_PROTOCOLS,
-		sizeof(SK_PNMI_CHECKSUM),
-		SK_PNMI_OFF(Checksum) + SK_PNMI_CHK_OFF(ChecksumTxOkCts),
-		SK_PNMI_RO, CsumStat, 0},
-	{OID_SKGE_CHKSM_TX_UNABLE_CTS,
-		SKCS_NUM_PROTOCOLS,
-		sizeof(SK_PNMI_CHECKSUM),
-		SK_PNMI_OFF(Checksum) + SK_PNMI_CHK_OFF(ChecksumTxUnableCts),
-		SK_PNMI_RO, CsumStat, 0},
-	{OID_SKGE_STAT_TX,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatTxOkCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HTX},
-	{OID_SKGE_STAT_TX_OCTETS,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatTxOctetsOkCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HTX_OCTET},
-	{OID_SKGE_STAT_TX_BROADCAST,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatTxBroadcastOkCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HTX_BROADCAST},
-	{OID_SKGE_STAT_TX_MULTICAST,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatTxMulticastOkCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HTX_MULTICAST},
-	{OID_SKGE_STAT_TX_UNICAST,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatTxUnicastOkCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HTX_UNICAST},
-	{OID_SKGE_STAT_TX_LONGFRAMES,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatTxLongFramesCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HTX_LONGFRAMES},
-	{OID_SKGE_STAT_TX_BURST,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatTxBurstCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HTX_BURST},
-	{OID_SKGE_STAT_TX_PFLOWC,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatTxPauseMacCtrlCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HTX_PMACC},
-	{OID_SKGE_STAT_TX_FLOWC,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatTxMacCtrlCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HTX_MACC},
-	{OID_SKGE_STAT_TX_SINGLE_COL,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatTxSingleCollisionCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HTX_SINGLE_COL},
-	{OID_SKGE_STAT_TX_MULTI_COL,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatTxMultipleCollisionCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HTX_MULTI_COL},
-	{OID_SKGE_STAT_TX_EXCESS_COL,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatTxExcessiveCollisionCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HTX_EXCESS_COL},
-	{OID_SKGE_STAT_TX_LATE_COL,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatTxLateCollisionCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HTX_LATE_COL},
-	{OID_SKGE_STAT_TX_DEFFERAL,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatTxDeferralCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HTX_DEFFERAL},
-	{OID_SKGE_STAT_TX_EXCESS_DEF,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatTxExcessiveDeferralCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HTX_EXCESS_DEF},
-	{OID_SKGE_STAT_TX_UNDERRUN,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatTxFifoUnderrunCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HTX_UNDERRUN},
-	{OID_SKGE_STAT_TX_CARRIER,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatTxCarrierCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HTX_CARRIER},
-/*	{OID_SKGE_STAT_TX_UTIL,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatTxUtilization),
-		SK_PNMI_RO, MacPrivateStat, (SK_U16)(-1)}, */
-	{OID_SKGE_STAT_TX_64,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatTx64Cts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HTX_64},
-	{OID_SKGE_STAT_TX_127,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatTx127Cts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HTX_127},
-	{OID_SKGE_STAT_TX_255,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatTx255Cts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HTX_255},
-	{OID_SKGE_STAT_TX_511,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatTx511Cts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HTX_511},
-	{OID_SKGE_STAT_TX_1023,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatTx1023Cts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HTX_1023},
-	{OID_SKGE_STAT_TX_MAX,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatTxMaxCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HTX_MAX},
-	{OID_SKGE_STAT_TX_SYNC,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatTxSyncCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HTX_SYNC},
-	{OID_SKGE_STAT_TX_SYNC_OCTETS,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatTxSyncOctetsCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HTX_SYNC_OCTET},
-	{OID_SKGE_STAT_RX,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatRxOkCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HRX},
-	{OID_SKGE_STAT_RX_OCTETS,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatRxOctetsOkCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HRX_OCTET},
-	{OID_SKGE_STAT_RX_BROADCAST,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatRxBroadcastOkCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HRX_BROADCAST},
-	{OID_SKGE_STAT_RX_MULTICAST,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatRxMulticastOkCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HRX_MULTICAST},
-	{OID_SKGE_STAT_RX_UNICAST,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatRxUnicastOkCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HRX_UNICAST},
-	{OID_SKGE_STAT_RX_LONGFRAMES,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatRxLongFramesCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HRX_LONGFRAMES},
-	{OID_SKGE_STAT_RX_PFLOWC,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatRxPauseMacCtrlCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HRX_PMACC},
-	{OID_SKGE_STAT_RX_FLOWC,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatRxMacCtrlCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HRX_MACC},
-	{OID_SKGE_STAT_RX_PFLOWC_ERR,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatRxPauseMacCtrlErrorCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HRX_PMACC_ERR},
-	{OID_SKGE_STAT_RX_FLOWC_UNKWN,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatRxMacCtrlUnknownCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HRX_MACC_UNKWN},
-	{OID_SKGE_STAT_RX_BURST,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatRxBurstCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HRX_BURST},
-	{OID_SKGE_STAT_RX_MISSED,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatRxMissedCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HRX_MISSED},
-	{OID_SKGE_STAT_RX_FRAMING,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatRxFramingCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HRX_FRAMING},
-	{OID_SKGE_STAT_RX_OVERFLOW,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatRxFifoOverflowCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HRX_OVERFLOW},
-	{OID_SKGE_STAT_RX_JABBER,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatRxJabberCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HRX_JABBER},
-	{OID_SKGE_STAT_RX_CARRIER,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatRxCarrierCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HRX_CARRIER},
-	{OID_SKGE_STAT_RX_IR_LENGTH,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatRxIRLengthCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HRX_IRLENGTH},
-	{OID_SKGE_STAT_RX_SYMBOL,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatRxSymbolCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HRX_SYMBOL},
-	{OID_SKGE_STAT_RX_SHORTS,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatRxShortsCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HRX_SHORTS},
-	{OID_SKGE_STAT_RX_RUNT,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatRxRuntCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HRX_RUNT},
-	{OID_SKGE_STAT_RX_CEXT,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatRxCextCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HRX_CEXT},
-	{OID_SKGE_STAT_RX_TOO_LONG,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatRxTooLongCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HRX_TOO_LONG},
-	{OID_SKGE_STAT_RX_FCS,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatRxFcsCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HRX_FCS},
-/*	{OID_SKGE_STAT_RX_UTIL,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatRxUtilization),
-		SK_PNMI_RO, MacPrivateStat, (SK_U16)(-1)}, */
-	{OID_SKGE_STAT_RX_64,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatRx64Cts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HRX_64},
-	{OID_SKGE_STAT_RX_127,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatRx127Cts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HRX_127},
-	{OID_SKGE_STAT_RX_255,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatRx255Cts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HRX_255},
-	{OID_SKGE_STAT_RX_511,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatRx511Cts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HRX_511},
-	{OID_SKGE_STAT_RX_1023,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatRx1023Cts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HRX_1023},
-	{OID_SKGE_STAT_RX_MAX,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_STAT),
-		SK_PNMI_OFF(Stat) + SK_PNMI_STA_OFF(StatRxMaxCts),
-		SK_PNMI_RO, MacPrivateStat, SK_PNMI_HRX_MAX},
-	{OID_SKGE_PHYS_CUR_ADDR,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_CONF),
-		SK_PNMI_OFF(Conf) + SK_PNMI_CNF_OFF(ConfMacCurrentAddr),
-		SK_PNMI_RW, Addr, 0},
-	{OID_SKGE_PHYS_FAC_ADDR,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_CONF),
-		SK_PNMI_OFF(Conf) + SK_PNMI_CNF_OFF(ConfMacFactoryAddr),
-		SK_PNMI_RO, Addr, 0},
-	{OID_SKGE_PMD,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_CONF),
-		SK_PNMI_OFF(Conf) + SK_PNMI_CNF_OFF(ConfPMD),
-		SK_PNMI_RO, MacPrivateConf, 0},
-	{OID_SKGE_CONNECTOR,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_CONF),
-		SK_PNMI_OFF(Conf) + SK_PNMI_CNF_OFF(ConfConnector),
-		SK_PNMI_RO, MacPrivateConf, 0},
-	{OID_SKGE_LINK_CAP,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_CONF),
-		SK_PNMI_OFF(Conf) + SK_PNMI_CNF_OFF(ConfLinkCapability),
-		SK_PNMI_RO, MacPrivateConf, 0},
-	{OID_SKGE_LINK_MODE,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_CONF),
-		SK_PNMI_OFF(Conf) + SK_PNMI_CNF_OFF(ConfLinkMode),
-		SK_PNMI_RW, MacPrivateConf, 0},
-	{OID_SKGE_LINK_MODE_STATUS,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_CONF),
-		SK_PNMI_OFF(Conf) + SK_PNMI_CNF_OFF(ConfLinkModeStatus),
-		SK_PNMI_RO, MacPrivateConf, 0},
-	{OID_SKGE_LINK_STATUS,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_CONF),
-		SK_PNMI_OFF(Conf) + SK_PNMI_CNF_OFF(ConfLinkStatus),
-		SK_PNMI_RO, MacPrivateConf, 0},
-	{OID_SKGE_FLOWCTRL_CAP,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_CONF),
-		SK_PNMI_OFF(Conf) + SK_PNMI_CNF_OFF(ConfFlowCtrlCapability),
-		SK_PNMI_RO, MacPrivateConf, 0},
-	{OID_SKGE_FLOWCTRL_MODE,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_CONF),
-		SK_PNMI_OFF(Conf) + SK_PNMI_CNF_OFF(ConfFlowCtrlMode),
-		SK_PNMI_RW, MacPrivateConf, 0},
-	{OID_SKGE_FLOWCTRL_STATUS,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_CONF),
-		SK_PNMI_OFF(Conf) + SK_PNMI_CNF_OFF(ConfFlowCtrlStatus),
-		SK_PNMI_RO, MacPrivateConf, 0},
-	{OID_SKGE_PHY_OPERATION_CAP,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_CONF),
-		SK_PNMI_OFF(Conf) + SK_PNMI_CNF_OFF(ConfPhyOperationCapability),
-		SK_PNMI_RO, MacPrivateConf, 0},
-	{OID_SKGE_PHY_OPERATION_MODE,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_CONF),
-		SK_PNMI_OFF(Conf) + SK_PNMI_CNF_OFF(ConfPhyOperationMode),
-		SK_PNMI_RW, MacPrivateConf, 0},
-	{OID_SKGE_PHY_OPERATION_STATUS,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_CONF),
-		SK_PNMI_OFF(Conf) + SK_PNMI_CNF_OFF(ConfPhyOperationStatus),
-		SK_PNMI_RO, MacPrivateConf, 0},
-	{OID_SKGE_TRAP,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(Trap),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_TRAP_NUMBER,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(TrapNumber),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_RLMT_MODE,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(RlmtMode),
-		SK_PNMI_RW, Rlmt, 0},
-	{OID_SKGE_RLMT_PORT_NUMBER,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(RlmtPortNumber),
-		SK_PNMI_RO, Rlmt, 0},
-	{OID_SKGE_RLMT_PORT_ACTIVE,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(RlmtPortActive),
-		SK_PNMI_RO, Rlmt, 0},
-	{OID_SKGE_RLMT_PORT_PREFERRED,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(RlmtPortPreferred),
-		SK_PNMI_RW, Rlmt, 0},
-	{OID_SKGE_RLMT_CHANGE_CTS,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(RlmtChangeCts),
-		SK_PNMI_RO, Rlmt, 0},
-	{OID_SKGE_RLMT_CHANGE_TIME,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(RlmtChangeTime),
-		SK_PNMI_RO, Rlmt, 0},
-	{OID_SKGE_RLMT_CHANGE_ESTIM,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(RlmtChangeEstimate),
-		SK_PNMI_RO, Rlmt, 0},
-	{OID_SKGE_RLMT_CHANGE_THRES,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(RlmtChangeThreshold),
-		SK_PNMI_RW, Rlmt, 0},
-	{OID_SKGE_RLMT_PORT_INDEX,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_RLMT),
-		SK_PNMI_OFF(Rlmt) + SK_PNMI_RLM_OFF(RlmtIndex),
-		SK_PNMI_RO, RlmtStat, 0},
-	{OID_SKGE_RLMT_STATUS,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_RLMT),
-		SK_PNMI_OFF(Rlmt) + SK_PNMI_RLM_OFF(RlmtStatus),
-		SK_PNMI_RO, RlmtStat, 0},
-	{OID_SKGE_RLMT_TX_HELLO_CTS,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_RLMT),
-		SK_PNMI_OFF(Rlmt) + SK_PNMI_RLM_OFF(RlmtTxHelloCts),
-		SK_PNMI_RO, RlmtStat, 0},
-	{OID_SKGE_RLMT_RX_HELLO_CTS,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_RLMT),
-		SK_PNMI_OFF(Rlmt) + SK_PNMI_RLM_OFF(RlmtRxHelloCts),
-		SK_PNMI_RO, RlmtStat, 0},
-	{OID_SKGE_RLMT_TX_SP_REQ_CTS,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_RLMT),
-		SK_PNMI_OFF(Rlmt) + SK_PNMI_RLM_OFF(RlmtTxSpHelloReqCts),
-		SK_PNMI_RO, RlmtStat, 0},
-	{OID_SKGE_RLMT_RX_SP_CTS,
-		SK_PNMI_MAC_ENTRIES,
-		sizeof(SK_PNMI_RLMT),
-		SK_PNMI_OFF(Rlmt) + SK_PNMI_RLM_OFF(RlmtRxSpHelloCts),
-		SK_PNMI_RO, RlmtStat, 0},
-	{OID_SKGE_RLMT_MONITOR_NUMBER,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(RlmtMonitorNumber),
-		SK_PNMI_RO, General, 0},
-	{OID_SKGE_RLMT_MONITOR_INDEX,
-		SK_PNMI_MONITOR_ENTRIES,
-		sizeof(SK_PNMI_RLMT_MONITOR),
-		SK_PNMI_OFF(RlmtMonitor) + SK_PNMI_MON_OFF(RlmtMonitorIndex),
-		SK_PNMI_RO, Monitor, 0},
-	{OID_SKGE_RLMT_MONITOR_ADDR,
-		SK_PNMI_MONITOR_ENTRIES,
-		sizeof(SK_PNMI_RLMT_MONITOR),
-		SK_PNMI_OFF(RlmtMonitor) + SK_PNMI_MON_OFF(RlmtMonitorAddr),
-		SK_PNMI_RO, Monitor, 0},
-	{OID_SKGE_RLMT_MONITOR_ERRS,
-		SK_PNMI_MONITOR_ENTRIES,
-		sizeof(SK_PNMI_RLMT_MONITOR),
-		SK_PNMI_OFF(RlmtMonitor) + SK_PNMI_MON_OFF(RlmtMonitorErrorCts),
-		SK_PNMI_RO, Monitor, 0},
-	{OID_SKGE_RLMT_MONITOR_TIMESTAMP,
-		SK_PNMI_MONITOR_ENTRIES,
-		sizeof(SK_PNMI_RLMT_MONITOR),
-		SK_PNMI_OFF(RlmtMonitor) + SK_PNMI_MON_OFF(RlmtMonitorTimestamp),
-		SK_PNMI_RO, Monitor, 0},
-	{OID_SKGE_RLMT_MONITOR_ADMIN,
-		SK_PNMI_MONITOR_ENTRIES,
-		sizeof(SK_PNMI_RLMT_MONITOR),
-		SK_PNMI_OFF(RlmtMonitor) + SK_PNMI_MON_OFF(RlmtMonitorAdmin),
-		SK_PNMI_RW, Monitor, 0},
-	{OID_SKGE_MTU,
-		1,
-		0,
-		SK_PNMI_MAI_OFF(MtuSize),
-		SK_PNMI_RW, MacPrivateConf, 0},
+#include "skgemib.c"
+
+/* global variables **********************************************************/
+
+/*
+ * Overflow status register bit table and corresponding counter
+ * dependent on MAC type - the number relates to the size of overflow
+ * mask returned by the pFnMacOverflow function
+ */
+PNMI_STATIC const SK_U16 StatOvrflwBit[][SK_PNMI_MAC_TYPES] = {
+/* Bit0  */	{ SK_PNMI_HTX, 				SK_PNMI_HTX_UNICAST},
+/* Bit1  */	{ SK_PNMI_HTX_OCTETHIGH, 	SK_PNMI_HTX_BROADCAST},
+/* Bit2  */	{ SK_PNMI_HTX_OCTETLOW, 	SK_PNMI_HTX_PMACC},
+/* Bit3  */	{ SK_PNMI_HTX_BROADCAST, 	SK_PNMI_HTX_MULTICAST},
+/* Bit4  */	{ SK_PNMI_HTX_MULTICAST, 	SK_PNMI_HTX_OCTETLOW},
+/* Bit5  */	{ SK_PNMI_HTX_UNICAST, 		SK_PNMI_HTX_OCTETHIGH},
+/* Bit6  */	{ SK_PNMI_HTX_LONGFRAMES, 	SK_PNMI_HTX_64},
+/* Bit7  */	{ SK_PNMI_HTX_BURST, 		SK_PNMI_HTX_127},
+/* Bit8  */	{ SK_PNMI_HTX_PMACC, 		SK_PNMI_HTX_255},
+/* Bit9  */	{ SK_PNMI_HTX_MACC, 		SK_PNMI_HTX_511},
+/* Bit10 */	{ SK_PNMI_HTX_SINGLE_COL, 	SK_PNMI_HTX_1023},
+/* Bit11 */	{ SK_PNMI_HTX_MULTI_COL, 	SK_PNMI_HTX_MAX},
+/* Bit12 */	{ SK_PNMI_HTX_EXCESS_COL, 	SK_PNMI_HTX_LONGFRAMES},
+/* Bit13 */	{ SK_PNMI_HTX_LATE_COL, 	SK_PNMI_HTX_RESERVED},
+/* Bit14 */	{ SK_PNMI_HTX_DEFFERAL, 	SK_PNMI_HTX_COL},
+/* Bit15 */	{ SK_PNMI_HTX_EXCESS_DEF, 	SK_PNMI_HTX_LATE_COL},
+/* Bit16 */	{ SK_PNMI_HTX_UNDERRUN, 	SK_PNMI_HTX_EXCESS_COL},
+/* Bit17 */	{ SK_PNMI_HTX_CARRIER, 		SK_PNMI_HTX_MULTI_COL},
+/* Bit18 */	{ SK_PNMI_HTX_UTILUNDER, 	SK_PNMI_HTX_SINGLE_COL},
+/* Bit19 */	{ SK_PNMI_HTX_UTILOVER, 	SK_PNMI_HTX_UNDERRUN},
+/* Bit20 */	{ SK_PNMI_HTX_64, 			SK_PNMI_HTX_RESERVED},
+/* Bit21 */	{ SK_PNMI_HTX_127, 			SK_PNMI_HTX_RESERVED},
+/* Bit22 */	{ SK_PNMI_HTX_255, 			SK_PNMI_HTX_RESERVED},
+/* Bit23 */	{ SK_PNMI_HTX_511, 			SK_PNMI_HTX_RESERVED},
+/* Bit24 */	{ SK_PNMI_HTX_1023, 		SK_PNMI_HTX_RESERVED},
+/* Bit25 */	{ SK_PNMI_HTX_MAX, 			SK_PNMI_HTX_RESERVED},
+/* Bit26 */	{ SK_PNMI_HTX_RESERVED, 	SK_PNMI_HTX_RESERVED},
+/* Bit27 */	{ SK_PNMI_HTX_RESERVED, 	SK_PNMI_HTX_RESERVED},
+/* Bit28 */	{ SK_PNMI_HTX_RESERVED, 	SK_PNMI_HTX_RESERVED},
+/* Bit29 */	{ SK_PNMI_HTX_RESERVED, 	SK_PNMI_HTX_RESERVED},
+/* Bit30 */	{ SK_PNMI_HTX_RESERVED, 	SK_PNMI_HTX_RESERVED},
+/* Bit31 */	{ SK_PNMI_HTX_RESERVED, 	SK_PNMI_HTX_RESERVED},
+/* Bit32 */	{ SK_PNMI_HRX, 				SK_PNMI_HRX_UNICAST},
+/* Bit33 */	{ SK_PNMI_HRX_OCTETHIGH, 	SK_PNMI_HRX_BROADCAST},
+/* Bit34 */	{ SK_PNMI_HRX_OCTETLOW, 	SK_PNMI_HRX_PMACC},
+/* Bit35 */	{ SK_PNMI_HRX_BROADCAST, 	SK_PNMI_HRX_MULTICAST},
+/* Bit36 */	{ SK_PNMI_HRX_MULTICAST, 	SK_PNMI_HRX_FCS},
+/* Bit37 */	{ SK_PNMI_HRX_UNICAST, 		SK_PNMI_HRX_RESERVED},
+/* Bit38 */	{ SK_PNMI_HRX_PMACC, 		SK_PNMI_HRX_OCTETLOW},
+/* Bit39 */	{ SK_PNMI_HRX_MACC, 		SK_PNMI_HRX_OCTETHIGH},
+/* Bit40 */	{ SK_PNMI_HRX_PMACC_ERR, 	SK_PNMI_HRX_BADOCTETLOW},
+/* Bit41 */	{ SK_PNMI_HRX_MACC_UNKWN,	SK_PNMI_HRX_BADOCTETHIGH},
+/* Bit42 */	{ SK_PNMI_HRX_BURST, 		SK_PNMI_HRX_UNDERSIZE},
+/* Bit43 */	{ SK_PNMI_HRX_MISSED, 		SK_PNMI_HRX_RUNT},
+/* Bit44 */	{ SK_PNMI_HRX_FRAMING, 		SK_PNMI_HRX_64},
+/* Bit45 */	{ SK_PNMI_HRX_OVERFLOW, 	SK_PNMI_HRX_127},
+/* Bit46 */	{ SK_PNMI_HRX_JABBER, 		SK_PNMI_HRX_255},
+/* Bit47 */	{ SK_PNMI_HRX_CARRIER, 		SK_PNMI_HRX_511},
+/* Bit48 */	{ SK_PNMI_HRX_IRLENGTH, 	SK_PNMI_HRX_1023},
+/* Bit49 */	{ SK_PNMI_HRX_SYMBOL, 		SK_PNMI_HRX_MAX},
+/* Bit50 */	{ SK_PNMI_HRX_SHORTS, 		SK_PNMI_HRX_LONGFRAMES},
+/* Bit51 */	{ SK_PNMI_HRX_RUNT, 		SK_PNMI_HRX_TOO_LONG},
+/* Bit52 */	{ SK_PNMI_HRX_TOO_LONG, 	SK_PNMI_HRX_JABBER},
+/* Bit53 */	{ SK_PNMI_HRX_FCS, 			SK_PNMI_HRX_RESERVED},
+/* Bit54 */	{ SK_PNMI_HRX_RESERVED, 	SK_PNMI_HRX_OVERFLOW},
+/* Bit55 */	{ SK_PNMI_HRX_CEXT, 		SK_PNMI_HRX_RESERVED},
+/* Bit56 */	{ SK_PNMI_HRX_UTILUNDER, 	SK_PNMI_HRX_RESERVED},
+/* Bit57 */	{ SK_PNMI_HRX_UTILOVER, 	SK_PNMI_HRX_RESERVED},
+/* Bit58 */	{ SK_PNMI_HRX_64, 			SK_PNMI_HRX_RESERVED},
+/* Bit59 */	{ SK_PNMI_HRX_127, 			SK_PNMI_HRX_RESERVED},
+/* Bit60 */	{ SK_PNMI_HRX_255, 			SK_PNMI_HRX_RESERVED},
+/* Bit61 */	{ SK_PNMI_HRX_511, 			SK_PNMI_HRX_RESERVED},
+/* Bit62 */	{ SK_PNMI_HRX_1023, 		SK_PNMI_HRX_RESERVED},
+/* Bit63 */	{ SK_PNMI_HRX_MAX, 			SK_PNMI_HRX_RESERVED}
 };
 
 /*
  * Table for hardware register saving on resets and port switches
  */
-static const SK_PNMI_STATADDR StatAddress[SK_PNMI_MAX_IDX] = {
-	/*  0 */	{TRUE, XM_TXF_OK},
-	/*  1 */	{TRUE, 0},
-	/*  2 */	{FALSE, 0},
-	/*  3 */	{TRUE, XM_TXF_BC_OK},
-	/*  4 */	{TRUE, XM_TXF_MC_OK},
-	/*  5 */	{TRUE, XM_TXF_UC_OK},
-	/*  6 */	{TRUE, XM_TXF_LONG},
-	/*  7 */	{TRUE, XM_TXE_BURST},
-	/*  8 */	{TRUE, XM_TXF_MPAUSE},
-	/*  9 */	{TRUE, XM_TXF_MCTRL},
-	/* 10 */	{TRUE, XM_TXF_SNG_COL},
-	/* 11 */	{TRUE, XM_TXF_MUL_COL},
-	/* 12 */	{TRUE, XM_TXF_ABO_COL},
-	/* 13 */	{TRUE, XM_TXF_LAT_COL},
-	/* 14 */	{TRUE, XM_TXF_DEF},
-	/* 15 */	{TRUE, XM_TXF_EX_DEF},
-	/* 16 */	{TRUE, XM_TXE_FIFO_UR},
-	/* 17 */	{TRUE, XM_TXE_CS_ERR},
-	/* 18 */	{FALSE, 0},
-	/* 19 */	{FALSE, 0},
-	/* 20 */	{TRUE, XM_TXF_64B},
-	/* 21 */	{TRUE, XM_TXF_127B},
-	/* 22 */	{TRUE, XM_TXF_255B},
-	/* 23 */	{TRUE, XM_TXF_511B},
-	/* 24 */	{TRUE, XM_TXF_1023B},
-	/* 25 */	{TRUE, XM_TXF_MAX_SZ},
-	/* 26 */	{FALSE, 0},
-	/* 27 */	{FALSE, 0},
-	/* 28 */	{FALSE, 0},
-	/* 29 */	{FALSE, 0},
-	/* 30 */	{FALSE, 0},
-	/* 31 */	{FALSE, 0},
-	/* 32 */	{TRUE, XM_RXF_OK},
-	/* 33 */	{TRUE, 0},
-	/* 34 */	{FALSE, 0},
-	/* 35 */	{TRUE, XM_RXF_BC_OK},
-	/* 36 */	{TRUE, XM_RXF_MC_OK},
-	/* 37 */	{TRUE, XM_RXF_UC_OK},
-	/* 38 */	{TRUE, XM_RXF_MPAUSE},
-	/* 39 */	{TRUE, XM_RXF_MCTRL},
-	/* 40 */	{TRUE, XM_RXF_INV_MP},
-	/* 41 */	{TRUE, XM_RXF_INV_MOC},
-	/* 42 */	{TRUE, XM_RXE_BURST},
-	/* 43 */	{TRUE, XM_RXE_FMISS},
-	/* 44 */	{TRUE, XM_RXF_FRA_ERR},
-	/* 45 */	{TRUE, XM_RXE_FIFO_OV},
-	/* 46 */	{TRUE, XM_RXF_JAB_PKT},
-	/* 47 */	{TRUE, XM_RXE_CAR_ERR},
-	/* 48 */	{TRUE, XM_RXF_LEN_ERR},
-	/* 49 */	{TRUE, XM_RXE_SYM_ERR},
-	/* 50 */	{TRUE, XM_RXE_SHT_ERR},
-	/* 51 */	{TRUE, XM_RXE_RUNT},
-	/* 52 */	{TRUE, XM_RXF_LNG_ERR},
-	/* 53 */	{TRUE, XM_RXF_FCS_ERR},
-	/* 54 */	{FALSE, 0},
-	/* 55 */	{TRUE, XM_RXF_CEX_ERR},
-	/* 56 */	{FALSE, 0},
-	/* 57 */	{FALSE, 0},
-	/* 58 */	{TRUE, XM_RXF_64B},
-	/* 59 */	{TRUE, XM_RXF_127B},
-	/* 60 */	{TRUE, XM_RXF_255B},
-	/* 61 */	{TRUE, XM_RXF_511B},
-	/* 62 */	{TRUE, XM_RXF_1023B},
-	/* 63 */	{TRUE, XM_RXF_MAX_SZ},
-	/* 64 */	{FALSE, 0},
-	/* 65 */	{FALSE, 0},
-	/* 66 */	{TRUE, 0}
+PNMI_STATIC const SK_PNMI_STATADDR StatAddr[SK_PNMI_MAX_IDX][SK_PNMI_MAC_TYPES] = {
+	/* SK_PNMI_HTX */
+	{{XM_TXF_OK, SK_TRUE}, {0, SK_FALSE}},
+	/* SK_PNMI_HTX_OCTETHIGH */
+	{{XM_TXO_OK_HI, SK_TRUE}, {GM_TXO_OK_HI, SK_TRUE}},
+	/* SK_PNMI_HTX_OCTETLOW */
+	{{XM_TXO_OK_LO, SK_FALSE}, {GM_TXO_OK_LO, SK_FALSE}},
+	/* SK_PNMI_HTX_BROADCAST */
+	{{XM_TXF_BC_OK, SK_TRUE}, {GM_TXF_BC_OK, SK_TRUE}},
+	/* SK_PNMI_HTX_MULTICAST */
+	{{XM_TXF_MC_OK, SK_TRUE}, {GM_TXF_MC_OK, SK_TRUE}},
+	/* SK_PNMI_HTX_UNICAST */
+	{{XM_TXF_UC_OK, SK_TRUE}, {GM_TXF_UC_OK, SK_TRUE}},
+	/* SK_PNMI_HTX_BURST */
+	{{XM_TXE_BURST, SK_TRUE}, {0, SK_FALSE}},
+	/* SK_PNMI_HTX_PMACC */
+	{{XM_TXF_MPAUSE, SK_TRUE}, {GM_TXF_MPAUSE, SK_TRUE}},
+	/* SK_PNMI_HTX_MACC */
+	{{XM_TXF_MCTRL, SK_TRUE}, {0, SK_FALSE}},
+	/* SK_PNMI_HTX_COL */
+	{{0, SK_FALSE}, {GM_TXF_COL, SK_TRUE}},
+	/* SK_PNMI_HTX_SINGLE_COL */
+	{{XM_TXF_SNG_COL, SK_TRUE}, {GM_TXF_SNG_COL, SK_TRUE}},
+	/* SK_PNMI_HTX_MULTI_COL */
+	{{XM_TXF_MUL_COL, SK_TRUE}, {GM_TXF_MUL_COL, SK_TRUE}},
+	/* SK_PNMI_HTX_EXCESS_COL */
+	{{XM_TXF_ABO_COL, SK_TRUE}, {GM_TXF_ABO_COL, SK_TRUE}},
+	/* SK_PNMI_HTX_LATE_COL */
+	{{XM_TXF_LAT_COL, SK_TRUE}, {GM_TXF_LAT_COL, SK_TRUE}},
+	/* SK_PNMI_HTX_DEFFERAL */
+	{{XM_TXF_DEF, SK_TRUE}, {0, SK_FALSE}},
+	/* SK_PNMI_HTX_EXCESS_DEF */
+	{{XM_TXF_EX_DEF, SK_TRUE}, {0, SK_FALSE}},
+	/* SK_PNMI_HTX_UNDERRUN */
+	{{XM_TXE_FIFO_UR, SK_TRUE}, {GM_TXE_FIFO_UR, SK_TRUE}},
+	/* SK_PNMI_HTX_CARRIER */
+	{{XM_TXE_CS_ERR, SK_TRUE}, {0, SK_FALSE}},
+	/* SK_PNMI_HTX_UTILUNDER */
+	{{0, SK_FALSE}, {0, SK_FALSE}},
+	/* SK_PNMI_HTX_UTILOVER */
+	{{0, SK_FALSE}, {0, SK_FALSE}},
+	/* SK_PNMI_HTX_64 */
+	{{XM_TXF_64B, SK_TRUE}, {GM_TXF_64B, SK_TRUE}},
+	/* SK_PNMI_HTX_127 */
+	{{XM_TXF_127B, SK_TRUE}, {GM_TXF_127B, SK_TRUE}},
+	/* SK_PNMI_HTX_255 */
+	{{XM_TXF_255B, SK_TRUE}, {GM_TXF_255B, SK_TRUE}},
+	/* SK_PNMI_HTX_511 */
+	{{XM_TXF_511B, SK_TRUE}, {GM_TXF_511B, SK_TRUE}},
+	/* SK_PNMI_HTX_1023 */
+	{{XM_TXF_1023B, SK_TRUE}, {GM_TXF_1023B, SK_TRUE}},
+	/* SK_PNMI_HTX_MAX */
+	{{XM_TXF_MAX_SZ, SK_TRUE}, {GM_TXF_1518B, SK_TRUE}},
+	/* SK_PNMI_HTX_LONGFRAMES  */
+	{{XM_TXF_LONG, SK_TRUE}, {GM_TXF_MAX_SZ, SK_TRUE}},
+	/* SK_PNMI_HTX_SYNC */
+	{{0, SK_FALSE}, {0, SK_FALSE}},
+	/* SK_PNMI_HTX_SYNC_OCTET */
+	{{0, SK_FALSE}, {0, SK_FALSE}},
+	/* SK_PNMI_HTX_RESERVED */
+	{{0, SK_FALSE}, {0, SK_FALSE}},
+	/* SK_PNMI_HRX */
+	{{XM_RXF_OK, SK_TRUE}, {0, SK_FALSE}},
+	/* SK_PNMI_HRX_OCTETHIGH */
+	{{XM_RXO_OK_HI, SK_TRUE}, {GM_RXO_OK_HI, SK_TRUE}},
+	/* SK_PNMI_HRX_OCTETLOW */
+	{{XM_RXO_OK_LO, SK_FALSE}, {GM_RXO_OK_LO, SK_FALSE}},
+	/* SK_PNMI_HRX_BADOCTETHIGH */
+	{{0, SK_FALSE}, {GM_RXO_ERR_HI, SK_TRUE}},
+	/* SK_PNMI_HRX_BADOCTETLOW */
+	{{0, SK_FALSE}, {GM_RXO_ERR_LO, SK_TRUE}},
+	/* SK_PNMI_HRX_BROADCAST */
+	{{XM_RXF_BC_OK, SK_TRUE}, {GM_RXF_BC_OK, SK_TRUE}},
+	/* SK_PNMI_HRX_MULTICAST */
+	{{XM_RXF_MC_OK, SK_TRUE}, {GM_RXF_MC_OK, SK_TRUE}},
+	/* SK_PNMI_HRX_UNICAST */
+	{{XM_RXF_UC_OK, SK_TRUE}, {GM_RXF_UC_OK, SK_TRUE}},
+	/* SK_PNMI_HRX_PMACC */
+	{{XM_RXF_MPAUSE, SK_TRUE}, {GM_RXF_MPAUSE, SK_TRUE}},
+	/* SK_PNMI_HRX_MACC */
+	{{XM_RXF_MCTRL, SK_TRUE}, {0, SK_FALSE}},
+	/* SK_PNMI_HRX_PMACC_ERR */
+	{{XM_RXF_INV_MP, SK_TRUE}, {0, SK_FALSE}},
+	/* SK_PNMI_HRX_MACC_UNKWN */
+	{{XM_RXF_INV_MOC, SK_TRUE}, {0, SK_FALSE}},
+	/* SK_PNMI_HRX_BURST */
+	{{XM_RXE_BURST, SK_TRUE}, {0, SK_FALSE}},
+	/* SK_PNMI_HRX_MISSED */
+	{{XM_RXE_FMISS, SK_TRUE}, {0, SK_FALSE}},
+	/* SK_PNMI_HRX_FRAMING */
+	{{XM_RXF_FRA_ERR, SK_TRUE}, {0, SK_FALSE}},
+	/* SK_PNMI_HRX_UNDERSIZE */
+	{{0, SK_FALSE}, {GM_RXF_SHT, SK_TRUE}},
+	/* SK_PNMI_HRX_OVERFLOW */
+	{{XM_RXE_FIFO_OV, SK_TRUE}, {GM_RXE_FIFO_OV, SK_TRUE}},
+	/* SK_PNMI_HRX_JABBER */
+	{{XM_RXF_JAB_PKT, SK_TRUE}, {GM_RXF_JAB_PKT, SK_TRUE}},
+	/* SK_PNMI_HRX_CARRIER */
+	{{XM_RXE_CAR_ERR, SK_TRUE}, {0, SK_FALSE}},
+	/* SK_PNMI_HRX_IRLENGTH */
+	{{XM_RXF_LEN_ERR, SK_TRUE}, {0, SK_FALSE}},
+	/* SK_PNMI_HRX_SYMBOL */
+	{{XM_RXE_SYM_ERR, SK_TRUE}, {0, SK_FALSE}},
+	/* SK_PNMI_HRX_SHORTS */
+	{{XM_RXE_SHT_ERR, SK_TRUE}, {0, SK_FALSE}},
+	/* SK_PNMI_HRX_RUNT */
+	{{XM_RXE_RUNT, SK_TRUE}, {GM_RXE_FRAG, SK_TRUE}},
+	/* SK_PNMI_HRX_TOO_LONG */
+	{{XM_RXF_LNG_ERR, SK_TRUE}, {GM_RXF_LNG_ERR, SK_TRUE}},
+	/* SK_PNMI_HRX_FCS */
+	{{XM_RXF_FCS_ERR, SK_TRUE}, {GM_RXF_FCS_ERR, SK_TRUE}},
+	/* SK_PNMI_HRX_CEXT */
+	{{XM_RXF_CEX_ERR, SK_TRUE}, {0, SK_FALSE}},
+	/* SK_PNMI_HRX_UTILUNDER */
+	{{0, SK_FALSE}, {0, SK_FALSE}},
+	/* SK_PNMI_HRX_UTILOVER */
+	{{0, SK_FALSE}, {0, SK_FALSE}},
+	/* SK_PNMI_HRX_64 */
+	{{XM_RXF_64B, SK_TRUE}, {GM_RXF_64B, SK_TRUE}},
+	/* SK_PNMI_HRX_127 */
+	{{XM_RXF_127B, SK_TRUE}, {GM_RXF_127B, SK_TRUE}},
+	/* SK_PNMI_HRX_255 */
+	{{XM_RXF_255B, SK_TRUE}, {GM_RXF_255B, SK_TRUE}},
+	/* SK_PNMI_HRX_511 */
+	{{XM_RXF_511B, SK_TRUE}, {GM_RXF_511B, SK_TRUE}},
+	/* SK_PNMI_HRX_1023 */
+	{{XM_RXF_1023B, SK_TRUE}, {GM_RXF_1023B, SK_TRUE}},
+	/* SK_PNMI_HRX_MAX */
+	{{XM_RXF_MAX_SZ, SK_TRUE}, {GM_RXF_1518B, SK_TRUE}},
+	/* SK_PNMI_HRX_LONGFRAMES */
+	{{0, SK_FALSE}, {GM_RXF_MAX_SZ, SK_TRUE}},
+	/* SK_PNMI_HRX_RESERVED */
+	{{0, SK_FALSE}, {0, SK_FALSE}}
 };
 
 
@@ -1457,7 +798,6 @@ static const SK_PNMI_STATADDR StatAddress[SK_PNMI_MAX_IDX] = {
  * Returns:
  *	Always 0
  */
-
 int SkPnmiInit(
 SK_AC *pAC,		/* Pointer to adapter context */
 SK_IOC IoC,		/* IO context handle */
@@ -1468,6 +808,7 @@ int Level)		/* Initialization level */
 	SK_U16		Val16;		/* Multiple purpose 16 bit variable */
 	SK_U8		Val8;		/* Mulitple purpose 8 bit variable */
 	SK_EVPARA	EventParam;	/* Event struct for timer event */
+	SK_PNMI_VCT	*pVctBackupData;
 
 
 	SK_DBG_MSG(pAC, SK_DBGMOD_PNMI, SK_DBGCAT_CTRL,
@@ -1485,6 +826,31 @@ int Level)		/* Initialization level */
 			pAC->Pnmi.Port[PortIndex].ActiveFlag = SK_FALSE;
 			pAC->Pnmi.DualNetActiveFlag = SK_FALSE;
 		}
+
+#ifdef SK_PNMI_CHECK
+		if (SK_PNMI_MAX_IDX != SK_PNMI_CNT_NO) {
+			
+			SK_ERR_LOG(pAC, SK_ERRCL_SW, SK_PNMI_ERR049, SK_PNMI_ERR049MSG);
+
+			SK_DBG_MSG(pAC, SK_DBGMOD_PNMI, SK_DBGCAT_INIT | SK_DBGCAT_FATAL,
+					   ("CounterOffset struct size (%d) differs from"
+						"SK_PNMI_MAX_IDX (%d)\n",
+						SK_PNMI_CNT_NO, SK_PNMI_MAX_IDX));
+		}
+
+		if (SK_PNMI_MAX_IDX !=
+			(sizeof(StatAddr) / (sizeof(SK_PNMI_STATADDR) * SK_PNMI_MAC_TYPES))) {
+			
+			SK_ERR_LOG(pAC, SK_ERRCL_SW, SK_PNMI_ERR050, SK_PNMI_ERR050MSG);
+
+			SK_DBG_MSG(pAC, SK_DBGMOD_PNMI, SK_DBGCAT_INIT | SK_DBGCAT_FATAL,
+					   ("StatAddr table size (%d) differs from "
+						"SK_PNMI_MAX_IDX (%d)\n",
+						(sizeof(StatAddr) /
+						 (sizeof(SK_PNMI_STATADDR) * SK_PNMI_MAC_TYPES)),
+						 SK_PNMI_MAX_IDX));
+		}
+#endif /* SK_PNMI_CHECK */
 		break;
 
 	case SK_INIT_IO:
@@ -1495,12 +861,16 @@ int Level)		/* Initialization level */
 
 		for (PortIndex = 0; PortIndex < PortMax; PortIndex ++) {
 
-			Val16 = XM_SC_CLR_RXC | XM_SC_CLR_TXC;
-			XM_OUT16(IoC, PortIndex, XM_STAT_CMD, Val16);
-			/* Clear two times according to Errata #3 */
-			XM_OUT16(IoC, PortIndex, XM_STAT_CMD, Val16);
+			pAC->GIni.GIFunc.pFnMacResetCounter(pAC, IoC, PortIndex);
 		}
-
+		
+		/* Initialize DSP variables for Vct() to 0xff => Never written! */		
+		for (PortIndex = 0; PortIndex < PortMax; PortIndex ++) {
+			pAC->GIni.GP[PortIndex].PCableLen = 0xff;
+			pVctBackupData = &pAC->Pnmi.VctBackup[PortIndex];
+			pVctBackupData->PCableLen = 0xff;
+		}
+		
 		/*
 		 * Get pci bus speed
 		 */
@@ -1523,6 +893,22 @@ int Level)		/* Initialization level */
 		}
 		else {
 			pAC->Pnmi.PciBusWidth = 64;
+		}
+
+		/*
+		 * Get chipset
+		 */
+		switch (pAC->GIni.GIChipId) {
+		case CHIP_ID_GENESIS:
+			pAC->Pnmi.Chipset = SK_PNMI_CHIPSET_XMAC;
+			break;
+
+		case CHIP_ID_YUKON:
+			pAC->Pnmi.Chipset = SK_PNMI_CHIPSET_YUKON;
+			break;
+
+		default:
+			break;
 		}
 
 		/*
@@ -1639,23 +1025,22 @@ int Level)		/* Initialization level */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occured
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to take
  *	                         the data.
  *	SK_PNMI_ERR_UNKNOWN_OID  The requested OID is unknown
  *	SK_PNMI_ERR_UNKNOWN_INST The requested instance of the OID doesn't
- *                               exist (e.g. port instance 3 on a two port
+ *                           exist (e.g. port instance 3 on a two port
  *	                         adapter.
  */
-
 int SkPnmiGetVar(
 SK_AC *pAC,		/* Pointer to adapter context */
 SK_IOC IoC,		/* IO context handle */
 SK_U32 Id,		/* Object ID that is to be processed */
-void *pBuf,		/* Buffer to which to mgmt data will be retrieved */
+void *pBuf,		/* Buffer to which the management data will be copied */
 unsigned int *pLen,	/* On call: buffer length. On return: used buffer */
 SK_U32 Instance,	/* Instance (1..n) that is to be queried or -1 */
-SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
+SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 {
 	SK_DBG_MSG(pAC, SK_DBGMOD_PNMI, SK_DBGCAT_CTRL,
 		("PNMI: SkPnmiGetVar: Called, Id=0x%x, BufLen=%d, Instance=%d, NetIndex=%d\n",
@@ -1672,13 +1057,13 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  * Description:
  *	Calls a general sub-function for all this stuff. The preset does
  *	the same as a set, but returns just before finally setting the
- *	new value. This is useful to check if a set might be successful.
- *	If as instance a -1 is passed, an array of values is supposed and
- *	all instance of the OID will be set.
+ *	new value. This is usefull to check if a set might be successfull.
+ *	If the instance -1 is passed, an array of values is supposed and
+ *	all instances of the OID will be set.
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -1687,18 +1072,17 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *	SK_PNMI_ERR_READ_ONLY    The OID is read-only and cannot be set.
  *	SK_PNMI_ERR_UNKNOWN_OID  The requested OID is unknown.
  *	SK_PNMI_ERR_UNKNOWN_INST The requested instance of the OID doesn't
- *                               exist (e.g. port instance 3 on a two port
+ *                           exist (e.g. port instance 3 on a two port
  *	                         adapter.
  */
-
 int SkPnmiPreSetVar(
 SK_AC *pAC,		/* Pointer to adapter context */
 SK_IOC IoC,		/* IO context handle */
 SK_U32 Id,		/* Object ID that is to be processed */
-void *pBuf,		/* Buffer which stores the mgmt data to be set */
-unsigned int *pLen,	/* Total length of mgmt data */
+void *pBuf,		/* Buffer to which the management data will be copied */
+unsigned int *pLen,	/* Total length of management data */
 SK_U32 Instance,	/* Instance (1..n) that is to be set or -1 */
-SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
+SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 {
 	SK_DBG_MSG(pAC, SK_DBGMOD_PNMI, SK_DBGCAT_CTRL,
 		("PNMI: SkPnmiPreSetVar: Called, Id=0x%x, BufLen=%d, Instance=%d, NetIndex=%d\n",
@@ -1716,13 +1100,13 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  * Description:
  *	Calls a general sub-function for all this stuff. The preset does
  *	the same as a set, but returns just before finally setting the
- *	new value. This is useful to check if a set might be successful.
- *	If as instance a -1 is passed, an array of values is supposed and
- *	all instance of the OID will be set.
+ *	new value. This is usefull to check if a set might be successfull.
+ *	If the instance -1 is passed, an array of values is supposed and
+ *	all instances of the OID will be set.
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -1731,18 +1115,17 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *	SK_PNMI_ERR_READ_ONLY    The OID is read-only and cannot be set.
  *	SK_PNMI_ERR_UNKNOWN_OID  The requested OID is unknown.
  *	SK_PNMI_ERR_UNKNOWN_INST The requested instance of the OID doesn't
- *                               exist (e.g. port instance 3 on a two port
+ *                           exist (e.g. port instance 3 on a two port
  *	                         adapter.
  */
-
 int SkPnmiSetVar(
 SK_AC *pAC,		/* Pointer to adapter context */
 SK_IOC IoC,		/* IO context handle */
 SK_U32 Id,		/* Object ID that is to be processed */
-void *pBuf,		/* Buffer which stores the mgmt data to be set */
-unsigned int *pLen,	/* Total length of mgmt data */
+void *pBuf,		/* Buffer to which the management data will be copied */
+unsigned int *pLen,	/* Total length of management data */
 SK_U32 Instance,	/* Instance (1..n) that is to be set or -1 */
-SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
+SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 {
 	SK_DBG_MSG(pAC, SK_DBGMOD_PNMI, SK_DBGCAT_CTRL,
 		("PNMI: SkPnmiSetVar: Called, Id=0x%x, BufLen=%d, Instance=%d, NetIndex=%d\n",
@@ -1766,18 +1149,17 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occured
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to take
  *	                         the data.
- *	SK_PNMI_ERR_UNKNOWN_NET  The requested NetIndex doesn't exist 
+ *	SK_PNMI_ERR_UNKNOWN_NET  The requested NetIndex doesn't exist
  */
-
 int SkPnmiGetStruct(
 SK_AC *pAC,		/* Pointer to adapter context */
 SK_IOC IoC,		/* IO context handle */
-void *pBuf,		/* Buffer which will store the retrieved data */
+void *pBuf,		/* Buffer to which the management data will be copied. */
 unsigned int *pLen,	/* Length of buffer */
-SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
+SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 {
 	int		Ret;
 	unsigned int	TableIndex;
@@ -1861,8 +1243,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 
 	/* Retrieve values */
 	SK_MEMSET((char *)pBuf, 0, SK_PNMI_STRUCT_SIZE);
-	for (TableIndex = 0; TableIndex < sizeof(IdTable)/sizeof(IdTable[0]);
-		TableIndex ++) {
+	for (TableIndex = 0; TableIndex < ID_TABLE_SIZE; TableIndex ++) {
 
 		InstanceNo = IdTable[TableIndex].InstanceNo;
 		for (InstanceCnt = 1; InstanceCnt <= InstanceNo;
@@ -1935,7 +1316,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  * Description:
  *	Calls a general sub-function for all this set stuff. The preset does
  *	the same as a set, but returns just before finally setting the
- *	new value. This is useful to check if a set might be successful.
+ *	new value. This is usefull to check if a set might be successfull.
  *	The sub-function runs through the IdTable, checks which OIDs are able
  *	to set, and calls the handler function of the OID to perform the
  *	preset. The return value of the function will also be stored in
@@ -1944,26 +1325,25 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
  *	SK_PNMI_ERR_BAD_VALUE    The passed value is not in the valid
  *	                         value range.
  */
-
 int SkPnmiPreSetStruct(
 SK_AC *pAC,		/* Pointer to adapter context */
 SK_IOC IoC,		/* IO context handle */
 void *pBuf,		/* Buffer which contains the data to be set */
 unsigned int *pLen,	/* Length of buffer */
-SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
+SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 {
 	SK_DBG_MSG(pAC, SK_DBGMOD_PNMI, SK_DBGCAT_CTRL,
 		("PNMI: SkPnmiPreSetStruct: Called, BufLen=%d, NetIndex=%d\n",
 			*pLen, NetIndex));
 
-	return (PnmiStruct(pAC, IoC, SK_PNMI_PRESET, (char *)pBuf, 
+	return (PnmiStruct(pAC, IoC, SK_PNMI_PRESET, (char *)pBuf,
     					pLen, NetIndex));
 }
 
@@ -1983,26 +1363,25 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
  *	SK_PNMI_ERR_BAD_VALUE    The passed value is not in the valid
  *	                         value range.
  */
-
 int SkPnmiSetStruct(
 SK_AC *pAC,		/* Pointer to adapter context */
 SK_IOC IoC,		/* IO context handle */
 void *pBuf,		/* Buffer which contains the data to be set */
 unsigned int *pLen,	/* Length of buffer */
-SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
+SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 {
 	SK_DBG_MSG(pAC, SK_DBGMOD_PNMI, SK_DBGCAT_CTRL,
 		("PNMI: SkPnmiSetStruct: Called, BufLen=%d, NetIndex=%d\n",
 			*pLen, NetIndex));
 
-	return (PnmiStruct(pAC, IoC, SK_PNMI_SET, (char *)pBuf, 
+	return (PnmiStruct(pAC, IoC, SK_PNMI_SET, (char *)pBuf,
     					pLen, NetIndex));
 }
 
@@ -2049,14 +1428,13 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *	                              is now an active port. PNMI will now
  *	                              add the statistic data of this port to
  *	                              the virtual port.
- *	SK_PNMI_EVT_RLMT_SET_NETS     Notifies PNMI about the net mode. The first Parameter
+ *	SK_PNMI_EVT_RLMT_SET_NETS     Notifies PNMI about the net mode. The first parameter
  *	                              contains the number of nets. 1 means single net, 2 means
- *	                              dual net. The second Parameter is -1
+ *	                              dual net. The second parameter is -1
  *
  * Returns:
  *	Always 0
  */
-
 int SkPnmiEvent(
 SK_AC *pAC,		/* Pointer to adapter context */
 SK_IOC IoC,		/* IO context handle */
@@ -2065,13 +1443,14 @@ SK_EVPARA Param)	/* Event dependent parameter */
 {
 	unsigned int	PhysPortIndex;
     unsigned int	MaxNetNumber;
-	int		CounterIndex;
-	int		Ret;
+	int			CounterIndex;
+	int			Ret;
 	SK_U16		MacStatus;
 	SK_U64		OverflowStatus;
 	SK_U64		Mask;
-	SK_U32		MacCntEvent;
+	int			MacType;
 	SK_U64		Value;
+	SK_U32		Val32;
 	SK_U16		Register;
 	SK_EVPARA	EventParam;
 	SK_U64		NewestValue;
@@ -2079,6 +1458,11 @@ SK_EVPARA Param)	/* Event dependent parameter */
 	SK_U64		Delta;
 	SK_PNMI_ESTIMATE *pEst;
 	SK_U32		NetIndex;
+	SK_GEPORT	*pPrt;
+	SK_PNMI_VCT	*pVctBackupData;
+	SK_U32		RetCode;
+	int		i;
+	SK_U32		CableLength;
 
 
 #ifdef DEBUG
@@ -2086,11 +1470,13 @@ SK_EVPARA Param)	/* Event dependent parameter */
 
 		SK_DBG_MSG(pAC, SK_DBGMOD_PNMI, SK_DBGCAT_CTRL,
 			("PNMI: SkPnmiEvent: Called, Event=0x%x, Param=0x%x\n",
-			(unsigned long)Event, (unsigned long)Param.Para64));
+			(unsigned int)Event, (unsigned int)Param.Para64));
 	}
-#endif
+#endif /* DEBUG */
 	SK_PNMI_CHECKFLAGS("SkPnmiEvent: On call");
 
+	MacType = pAC->GIni.GIMacType;
+	
 	switch (Event) {
 
 	case SK_PNMI_EVT_SIRQ_OVERFLOW:
@@ -2100,33 +1486,20 @@ SK_EVPARA Param)	/* Event dependent parameter */
 		if (PhysPortIndex >= SK_MAX_MACS) {
 
 			SK_DBG_MSG(pAC, SK_DBGMOD_PNMI, SK_DBGCAT_CTRL,
-				("PNMI: ERR: SkPnmiEvent: SK_PNMI_EVT_SIRQ_OVERFLOW parameter wrong, PhysPortIndex=0x%x\n",
+				("PNMI: ERR: SkPnmiEvent: SK_PNMI_EVT_SIRQ_OVERFLOW parameter"
+				 " wrong, PhysPortIndex=0x%x\n",
 				PhysPortIndex));
 			return (0);
 		}
-#endif
+#endif /* DEBUG */
 		OverflowStatus = 0;
 
 		/*
-		 * Check which source caused an overflow interrupt. The
-		 * interrupt source is a self-clearing register. We only
-		 * need to check the interrupt source once. Another check
-		 * will be done by the SIRQ module to be sure that no
-		 * interrupt get lost during process time.
+		 * Check which source caused an overflow interrupt.
 		 */
-		if ((MacStatus & XM_IS_RXC_OV) == XM_IS_RXC_OV) {
-
-			XM_IN32(IoC, PhysPortIndex, XM_RX_CNT_EV,
-				&MacCntEvent);
-			OverflowStatus |= (SK_U64)MacCntEvent << 32;
-		}
-		if ((MacStatus & XM_IS_TXC_OV) == XM_IS_TXC_OV) {
-
-			XM_IN32(IoC, PhysPortIndex, XM_TX_CNT_EV,
-				&MacCntEvent);
-			OverflowStatus |= (SK_U64)MacCntEvent;
-		}
-		if (OverflowStatus == 0) {
+		if ((pAC->GIni.GIFunc.pFnMacOverflow(pAC, IoC, PhysPortIndex,
+				MacStatus, &OverflowStatus) != 0) ||
+			(OverflowStatus == 0)) {
 
 			SK_PNMI_CHECKFLAGS("SkPnmiEvent: On return");
 			return (0);
@@ -2145,45 +1518,46 @@ SK_EVPARA Param)	/* Event dependent parameter */
 				continue;
 			}
 
-			switch (CounterIndex) {
+			switch (StatOvrflwBit[CounterIndex][MacType]) {
 
 			case SK_PNMI_HTX_UTILUNDER:
 			case SK_PNMI_HTX_UTILOVER:
-				XM_IN16(IoC, PhysPortIndex, XM_TX_CMD,
-					&Register);
-				Register |= XM_TX_SAM_LINE;
-				XM_OUT16(IoC, PhysPortIndex, XM_TX_CMD,
-					Register);
+				if (MacType == SK_MAC_XMAC) {
+					XM_IN16(IoC, PhysPortIndex, XM_TX_CMD, &Register);
+					Register |= XM_TX_SAM_LINE;
+					XM_OUT16(IoC, PhysPortIndex, XM_TX_CMD, Register);
+				}
 				break;
 
 			case SK_PNMI_HRX_UTILUNDER:
 			case SK_PNMI_HRX_UTILOVER:
-				XM_IN16(IoC, PhysPortIndex, XM_RX_CMD,
-					&Register);
-				Register |= XM_RX_SAM_LINE;
-				XM_OUT16(IoC, PhysPortIndex, XM_RX_CMD,
-					Register);
+				if (MacType == SK_MAC_XMAC) {
+					XM_IN16(IoC, PhysPortIndex, XM_RX_CMD, &Register);
+					Register |= XM_RX_SAM_LINE;
+					XM_OUT16(IoC, PhysPortIndex, XM_RX_CMD, Register);
+				}
 				break;
 
 			case SK_PNMI_HTX_OCTETHIGH:
 			case SK_PNMI_HTX_OCTETLOW:
-			case SK_PNMI_HTX_RESERVED26:
-			case SK_PNMI_HTX_RESERVED27:
-			case SK_PNMI_HTX_RESERVED28:
-			case SK_PNMI_HTX_RESERVED29:
-			case SK_PNMI_HTX_RESERVED30:
-			case SK_PNMI_HTX_RESERVED31:
+			case SK_PNMI_HTX_RESERVED:
 			case SK_PNMI_HRX_OCTETHIGH:
 			case SK_PNMI_HRX_OCTETLOW:
 			case SK_PNMI_HRX_IRLENGTH:
-			case SK_PNMI_HRX_RESERVED22:
+			case SK_PNMI_HRX_RESERVED:
 			
 			/*
 			 * the following counters aren't be handled (id > 63)
 			 */
 			case SK_PNMI_HTX_SYNC:
 			case SK_PNMI_HTX_SYNC_OCTET:
+				break;
+
 			case SK_PNMI_HRX_LONGFRAMES:
+				if (MacType == SK_MAC_GMAC) {
+					pAC->Pnmi.Port[PhysPortIndex].
+						CounterHigh[CounterIndex] ++;
+				}
 				break;
 
 			default:
@@ -2202,7 +1576,8 @@ SK_EVPARA Param)	/* Event dependent parameter */
 				(unsigned int)Param.Para64));
 			return (0);
 		}
-#endif
+#endif /* DEBUG */
+
 		/*
 		 * Store a trap message in the trap buffer and generate
 		 * an event for user space applications with the
@@ -2218,11 +1593,12 @@ SK_EVPARA Param)	/* Event dependent parameter */
 		if ((unsigned int)Param.Para64 >= (unsigned int)pAC->I2c.MaxSens) {
 
 			SK_DBG_MSG(pAC, SK_DBGMOD_PNMI, SK_DBGCAT_CTRL,
-				("PNMI: ERR:SkPnmiEvent: SK_PNMI_EVT_SEN_WAR_UPP parameter wrong, SensorIndex=%d\n",
+				("PNMI: ERR: SkPnmiEvent: SK_PNMI_EVT_SEN_WAR_UPP parameter wrong, SensorIndex=%d\n",
 				(unsigned int)Param.Para64));
 			return (0);
 		}
-#endif
+#endif /* DEBUG */
+
 		/*
 		 * Store a trap message in the trap buffer and generate
 		 * an event for user space applications with the
@@ -2242,7 +1618,8 @@ SK_EVPARA Param)	/* Event dependent parameter */
 				(unsigned int)Param.Para64));
 			return (0);
 		}
-#endif
+#endif /* DEBUG */
+
 		/*
 		 * Store a trap message in the trap buffer and generate
 		 * an event for user space applications with the
@@ -2262,7 +1639,8 @@ SK_EVPARA Param)	/* Event dependent parameter */
 				(unsigned int)Param.Para64));
 			return (0);
 		}
-#endif
+#endif /* DEBUG */
+
 		/*
 		 * Store a trap message in the trap buffer and generate
 		 * an event for user space applications with the
@@ -2282,7 +1660,7 @@ SK_EVPARA Param)	/* Event dependent parameter */
 		 * Be careful in changing these values, on change check
 		 *   - typedef of SK_PNMI_ESTIMATE (Size of EstValue
 		 *     array one less than value number)
-		 *   - Timer initilization SkTimerStart() in SkPnmiInit
+		 *   - Timer initialization SkTimerStart() in SkPnmiInit
 		 *   - Delta value below must be multiplicated with
 		 *     power of 2
 		 *
@@ -2355,20 +1733,21 @@ SK_EVPARA Param)	/* Event dependent parameter */
 
 			return (0);
 		}
-#endif
+#endif /* DEBUG */
 
 		/*
-		 * Set all counters and timestamps to zero
+		 * Set all counters and timestamps to zero.
+		 * The according NetIndex is required as a
+		 * parameter of the event.
 		 */
-		ResetCounter(pAC, IoC, NetIndex); /* the according NetIndex is required
-												as a Parameter of the Event */ 
+		ResetCounter(pAC, IoC, NetIndex);
 		break;
 
 	case SK_PNMI_EVT_XMAC_RESET:
 		/*
 		 * To grant continuous counter values store the current
 		 * XMAC statistic values to the entries 1..n of the
-		 * CounterOffset array. XMAC Errata #2 
+		 * CounterOffset array. XMAC Errata #2
 		 */
 #ifdef DEBUG
 		if ((unsigned int)Param.Para64 >= SK_MAX_MACS) {
@@ -2396,67 +1775,96 @@ SK_EVPARA Param)	/* Event dependent parameter */
 		 */
 		pAC->Pnmi.MacUpdatedFlag ++;
 
-		for (CounterIndex = 0; CounterIndex < SK_PNMI_SCNT_NOT;
+		for (CounterIndex = 0; CounterIndex < SK_PNMI_MAX_IDX;
 			CounterIndex ++) {
 
-			if (!StatAddress[CounterIndex].GetOffset) {
+			if (!StatAddr[CounterIndex][MacType].GetOffset) {
 
 				continue;
 			}
 
-			pAC->Pnmi.Port[PhysPortIndex].
-				CounterOffset[CounterIndex] = GetPhysStatVal(
-				pAC, IoC, PhysPortIndex, CounterIndex);
-			pAC->Pnmi.Port[PhysPortIndex].
-				CounterHigh[CounterIndex] = 0;
+			pAC->Pnmi.Port[PhysPortIndex].CounterOffset[CounterIndex] =
+				GetPhysStatVal(pAC, IoC, PhysPortIndex, CounterIndex);
+			
+			pAC->Pnmi.Port[PhysPortIndex].CounterHigh[CounterIndex] = 0;
 		}
 
 		pAC->Pnmi.MacUpdatedFlag --;
 		break;
 
 	case SK_PNMI_EVT_RLMT_PORT_UP:
+		PhysPortIndex = (unsigned int)Param.Para32[0];
 #ifdef DEBUG
-		if ((unsigned int)Param.Para32[0] >= SK_MAX_MACS) {
+		if (PhysPortIndex >= SK_MAX_MACS) {
 
 			SK_DBG_MSG(pAC, SK_DBGMOD_PNMI, SK_DBGCAT_CTRL,
-				("PNMI: ERR: SkPnmiEvent: SK_PNMI_EVT_RLMT_PORT_UP parameter wrong, PhysPortIndex=%d\n",
-				(unsigned int)Param.Para32[0]));
+				("PNMI: ERR: SkPnmiEvent: SK_PNMI_EVT_RLMT_PORT_UP parameter"
+                 " wrong, PhysPortIndex=%d\n", PhysPortIndex));
 
 			return (0);
 		}
-#endif
+#endif /* DEBUG */
+
 		/*
 		 * Store a trap message in the trap buffer and generate an event for
 		 * user space applications with the SK_DRIVER_SENDEVENT macro.
 		 */
-		QueueRlmtPortTrap(pAC, OID_SKGE_TRAP_RLMT_PORT_UP,
-			(unsigned int)Param.Para32[0]);
+		QueueRlmtPortTrap(pAC, OID_SKGE_TRAP_RLMT_PORT_UP, PhysPortIndex);
 		(void)SK_DRIVER_SENDEVENT(pAC, IoC);
+
+		/* Bugfix for XMAC errata (#10620)*/
+		if (MacType == SK_MAC_XMAC) {
+			/* Add incremental difference to offset (#10620)*/
+			(void)pAC->GIni.GIFunc.pFnMacStatistic(pAC, IoC, PhysPortIndex,
+				XM_RXE_SHT_ERR, &Val32);
+			
+			Value = (((SK_U64)pAC->Pnmi.Port[PhysPortIndex].
+				 CounterHigh[SK_PNMI_HRX_SHORTS] << 32) | (SK_U64)Val32);
+			pAC->Pnmi.Port[PhysPortIndex].CounterOffset[SK_PNMI_HRX_SHORTS] +=
+				Value - pAC->Pnmi.Port[PhysPortIndex].RxShortZeroMark;
+		}
+		
+		/* Tell VctStatus() that a link was up meanwhile. */
+		pAC->Pnmi.VctStatus[PhysPortIndex] |= SK_PNMI_VCT_LINK;		
 		break;
 
-	case SK_PNMI_EVT_RLMT_PORT_DOWN:
+    case SK_PNMI_EVT_RLMT_PORT_DOWN:
+		PhysPortIndex = (unsigned int)Param.Para32[0];
+
 #ifdef DEBUG
-		if ((unsigned int)Param.Para32[0] >= SK_MAX_MACS) {
+		if (PhysPortIndex >= SK_MAX_MACS) {
 
 			SK_DBG_MSG(pAC, SK_DBGMOD_PNMI, SK_DBGCAT_CTRL,
-				("PNMI: ERR: SkPnmiEvent: SK_PNMI_EVT_RLMT_PORT_DOWN parameter wrong, PhysPortIndex=%d\n",
-				(unsigned int)Param.Para32[0]));
+				("PNMI: ERR: SkPnmiEvent: SK_PNMI_EVT_RLMT_PORT_DOWN parameter"
+                 " wrong, PhysPortIndex=%d\n", PhysPortIndex));
 
 			return (0);
 		}
-#endif
+#endif /* DEBUG */
+
 		/*
 		 * Store a trap message in the trap buffer and generate an event for
 		 * user space applications with the SK_DRIVER_SENDEVENT macro.
 		 */
-		QueueRlmtPortTrap(pAC, OID_SKGE_TRAP_RLMT_PORT_DOWN,
-			(unsigned int)Param.Para32[0]);
+		QueueRlmtPortTrap(pAC, OID_SKGE_TRAP_RLMT_PORT_DOWN, PhysPortIndex);
 		(void)SK_DRIVER_SENDEVENT(pAC, IoC);
+
+		/* Bugfix #10620 - get zero level for incremental difference */
+		if (MacType == SK_MAC_XMAC) {
+
+			(void)pAC->GIni.GIFunc.pFnMacStatistic(pAC, IoC, PhysPortIndex,
+				XM_RXE_SHT_ERR, &Val32);
+			
+			pAC->Pnmi.Port[PhysPortIndex].RxShortZeroMark =
+				(((SK_U64)pAC->Pnmi.Port[PhysPortIndex].
+				 CounterHigh[SK_PNMI_HRX_SHORTS] << 32) | (SK_U64)Val32);
+		}
 		break;
 
 	case SK_PNMI_EVT_RLMT_ACTIVE_DOWN:
 		PhysPortIndex = (unsigned int)Param.Para32[0];
 		NetIndex = (SK_U32)Param.Para32[1];
+
 #ifdef DEBUG
 		if (PhysPortIndex >= SK_MAX_MACS) {
 
@@ -2471,7 +1879,8 @@ SK_EVPARA Param)	/* Event dependent parameter */
 				("PNMI: ERR: SkPnmiEvent: SK_PNMI_EVT_RLMT_ACTIVE_DOWN parameter too high, NetIndex=%d\n",
 				NetIndex));
 		}
-#endif
+#endif /* DEBUG */
+
 		/*
 		 * For now, ignore event if NetIndex != 0.
 		 */
@@ -2512,7 +1921,7 @@ SK_EVPARA Param)	/* Event dependent parameter */
 		for (CounterIndex = 0; CounterIndex < SK_PNMI_MAX_IDX;
 			CounterIndex ++) {
 
-			if (!StatAddress[CounterIndex].GetOffset) {
+			if (!StatAddr[CounterIndex][MacType].GetOffset) {
 
 				continue;
 			}
@@ -2533,6 +1942,7 @@ SK_EVPARA Param)	/* Event dependent parameter */
 	case SK_PNMI_EVT_RLMT_ACTIVE_UP:
 		PhysPortIndex = (unsigned int)Param.Para32[0];
 		NetIndex = (SK_U32)Param.Para32[1];
+
 #ifdef DEBUG
 		if (PhysPortIndex >= SK_MAX_MACS) {
 
@@ -2547,7 +1957,8 @@ SK_EVPARA Param)	/* Event dependent parameter */
 				("PNMI: ERR: SkPnmiEvent: SK_PNMI_EVT_RLMT_ACTIVE_UP parameter too high, NetIndex=%d\n",
 				NetIndex));
 		}
-#endif
+#endif /* DEBUG */
+
 		/*
 		 * For now, ignore event if NetIndex != 0.
 		 */
@@ -2599,7 +2010,7 @@ SK_EVPARA Param)	/* Event dependent parameter */
 		for (CounterIndex = 0; CounterIndex < SK_PNMI_MAX_IDX;
 			CounterIndex ++) {
 
-			if (!StatAddress[CounterIndex].GetOffset) {
+			if (!StatAddr[CounterIndex][MacType].GetOffset) {
 
 				continue;
 			}
@@ -2609,9 +2020,7 @@ SK_EVPARA Param)	/* Event dependent parameter */
 			pAC->Pnmi.VirtualCounterOffset[CounterIndex] -= Value;
 		}
 
-		/*
-		 * Set port to active
-		 */
+		/* Set port to active */
 		pAC->Pnmi.Port[PhysPortIndex].ActiveFlag = SK_TRUE;
 
 		pAC->Pnmi.MacUpdatedFlag --;
@@ -2644,13 +2053,65 @@ SK_EVPARA Param)	/* Event dependent parameter */
 			return (SK_PNMI_ERR_UNKNOWN_NET);
 		}
 
-        if((unsigned int)Param.Para32[0] == 1){ /* single net mode */
+        if ((unsigned int)Param.Para32[0] == 1) { /* single net mode */
         	pAC->Pnmi.DualNetActiveFlag = SK_FALSE;
         }
         else { /* dual net mode */
         	pAC->Pnmi.DualNetActiveFlag = SK_TRUE;
         }
         break;
+
+    case SK_PNMI_EVT_VCT_RESET:
+		PhysPortIndex = Param.Para32[0];
+		pPrt = &pAC->GIni.GP[PhysPortIndex];
+		pVctBackupData = &pAC->Pnmi.VctBackup[PhysPortIndex];
+		
+		if (pAC->Pnmi.VctStatus[PhysPortIndex] & SK_PNMI_VCT_PENDING) {
+			RetCode = SkGmCableDiagStatus(pAC, IoC, PhysPortIndex, SK_FALSE);
+			if (RetCode == 2) {
+				/*
+				 * VCT test is still running.
+				 * Start VCT timer counter again.
+				 */
+				SK_MEMSET((char *) &Param, 0, sizeof(Param));
+				Param.Para32[0] = PhysPortIndex;
+				Param.Para32[1] = -1;
+				SkTimerStart(pAC, IoC,
+					&pAC->Pnmi.VctTimeout[PhysPortIndex].VctTimer,
+				4000000, SKGE_PNMI, SK_PNMI_EVT_VCT_RESET, Param);
+				break;
+			}
+			pAC->Pnmi.VctStatus[PhysPortIndex] &= ~SK_PNMI_VCT_PENDING;
+			pAC->Pnmi.VctStatus[PhysPortIndex] |=
+				(SK_PNMI_VCT_NEW_VCT_DATA | SK_PNMI_VCT_TEST_DONE);
+			
+			/* Copy results for later use to PNMI struct. */
+			for (i = 0; i < 4; i++)  {
+				if (pPrt->PMdiPairSts[i] == SK_PNMI_VCT_NORMAL_CABLE) {
+					if ((pPrt->PMdiPairLen[i] > 35) &&
+						(pPrt->PMdiPairLen[i] < 0xff)) {
+						pPrt->PMdiPairSts[i] = SK_PNMI_VCT_IMPEDANCE_MISMATCH;
+					}
+				}
+				if ((pPrt->PMdiPairLen[i] > 35) &&
+					(pPrt->PMdiPairLen[i] != 0xff)) {
+					CableLength = 1000 *
+						(((175 * pPrt->PMdiPairLen[i]) / 210) - 28);
+				}
+				else {
+					CableLength = 0;
+				}
+				pVctBackupData->PMdiPairLen[i] = CableLength;
+				pVctBackupData->PMdiPairSts[i] = pPrt->PMdiPairSts[i];
+			}
+			
+			Param.Para32[0] = PhysPortIndex;
+			Param.Para32[1] = -1;
+			SkEventQueue(pAC, SKGE_DRV, SK_DRV_PORT_RESET, Param);
+			SkEventDispatcher(pAC, IoC);
+		}
+		
+		break;
 
 	default:
 		break;
@@ -2678,20 +2139,19 @@ SK_EVPARA Param)	/* Event dependent parameter */
  *	SkGePnmiPreSetVar, or SkGePnmiSetVar.
  *
  * Returns:
- *	SK_PNMI_ERR_XXX. For details have a look to the description of the
+ *	SK_PNMI_ERR_XXX. For details have a look at the description of the
  *	calling functions.
- *	SK_PNMI_ERR_UNKNOWN_NET  The requested NetIndex doesn't exist 
+ *	SK_PNMI_ERR_UNKNOWN_NET  The requested NetIndex doesn't exist
  */
-
-static int PnmiVar(
+PNMI_STATIC int PnmiVar(
 SK_AC *pAC,		/* Pointer to adapter context */
 SK_IOC IoC,		/* IO context handle */
-int Action,		/* Get/PreSet/Set action */
+int Action,		/* GET/PRESET/SET action */
 SK_U32 Id,		/* Object ID that is to be processed */
-char *pBuf,		/* Buffer which stores the mgmt data to be set */
-unsigned int *pLen,	/* Total length of mgmt data */
+char *pBuf,		/* Buffer used for the management data transfer */
+unsigned int *pLen,	/* Total length of pBuf management data  */
 SK_U32 Instance,	/* Instance (1..n) that is to be set or -1 */
-SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
+SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 {
 	unsigned int	TableIndex;
 	int		Ret;
@@ -2703,9 +2163,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 		return (SK_PNMI_ERR_UNKNOWN_OID);
 	}
 	
-    /* 
-     * Check NetIndex 
-     */
+    /* Check NetIndex */
 	if (NetIndex >= pAC->Rlmt.NumNets) {
 		return (SK_PNMI_ERR_UNKNOWN_NET);
 	}
@@ -2736,16 +2194,15 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_XXX. The codes are described in the calling functions.
- *	SK_PNMI_ERR_UNKNOWN_NET  The requested NetIndex doesn't exist 
+ *	SK_PNMI_ERR_UNKNOWN_NET  The requested NetIndex doesn't exist
  */
-
-static int PnmiStruct(
+PNMI_STATIC int PnmiStruct(
 SK_AC *pAC,		/* Pointer to adapter context */
 SK_IOC IoC,		/* IO context handle */
-int  Action,		/* Set action to be performed */
-char *pBuf,		/* Buffer which contains the data to be set */
-unsigned int *pLen,	/* Length of buffer */
-SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
+int  Action,	/* PRESET/SET action to be performed */
+char *pBuf,		/* Buffer used for the management data transfer */
+unsigned int *pLen,	/* Length of pBuf management data buffer */
+SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 {
 	int		Ret;
 	unsigned int	TableIndex;
@@ -2771,9 +2228,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 		return (SK_PNMI_ERR_TOO_SHORT);
 	}
 	
-    /* 
-     * Check NetIndex 
-     */
+    /* Check NetIndex */
 	if (NetIndex >= pAC->Rlmt.NumNets) {
 		return (SK_PNMI_ERR_UNKNOWN_NET);
 	}
@@ -2802,10 +2257,10 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 	pAC->Pnmi.SirqUpdatedFlag ++;
 
 	/* Preset/Set values */
-	for (TableIndex = 0; TableIndex < sizeof(IdTable)/sizeof(IdTable[0]);
-		TableIndex ++) {
+	for (TableIndex = 0; TableIndex < ID_TABLE_SIZE; TableIndex ++) {
 
-		if (IdTable[TableIndex].Access != SK_PNMI_RW) {
+		if ((IdTable[TableIndex].Access != SK_PNMI_RW) &&
+			(IdTable[TableIndex].Access != SK_PNMI_WO)) {
 
 			continue;
 		}
@@ -2906,14 +2361,12 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  * Returns:
  *	The table index or -1 if not found.
  */
-
-static int LookupId(
+PNMI_STATIC int LookupId(
 SK_U32 Id)		/* Object identifier to be searched */
 {
 	int i;
-	int Len = sizeof(IdTable)/sizeof(IdTable[0]);
 
-	for (i=0; i<Len; i++) {
+	for (i = 0; i < ID_TABLE_SIZE; i++) {
 
 		if (IdTable[i].Id == Id) {
 
@@ -2934,7 +2387,7 @@ SK_U32 Id)		/* Object identifier to be searched */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -2942,20 +2395,19 @@ SK_U32 Id)		/* Object identifier to be searched */
  *	                         value range.
  *	SK_PNMI_ERR_READ_ONLY    The OID is read-only and cannot be set.
  *	SK_PNMI_ERR_UNKNOWN_INST The requested instance of the OID doesn't
- *                               exist (e.g. port instance 3 on a two port
+ *                           exist (e.g. port instance 3 on a two port
  *	                         adapter.
  */
-
-static int OidStruct(
+PNMI_STATIC int OidStruct(
 SK_AC *pAC,		/* Pointer to adapter context */
 SK_IOC IoC,		/* IO context handle */
-int Action,		/* Get/PreSet/Set action */
+int Action,		/* GET/PRESET/SET action */
 SK_U32 Id,		/* Object ID that is to be processed */
-char *pBuf,		/* Buffer to which to mgmt data will be retrieved */
-unsigned int *pLen,	/* On call: buffer length. On return: used buffer */
+char *pBuf,		/* Buffer used for the management data transfer */
+unsigned int *pLen,	/* On call: pBuf buffer length. On return: used buffer */
 SK_U32 Instance,	/* Instance (1..n) that is to be queried or -1 */
 unsigned int TableIndex, /* Index to the Id table */
-SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
+SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 {
 	if (Id != OID_SKGE_ALL_DATA) {
 
@@ -3002,7 +2454,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -3010,20 +2462,19 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *	                         value range.
  *	SK_PNMI_ERR_READ_ONLY    The OID is read-only and cannot be set.
  *	SK_PNMI_ERR_UNKNOWN_INST The requested instance of the OID doesn't
- *                               exist (e.g. port instance 3 on a two port
+ *                           exist (e.g. port instance 3 on a two port
  *	                         adapter.
  */
-
-static int Perform(
+PNMI_STATIC int Perform(
 SK_AC *pAC,		/* Pointer to adapter context */
 SK_IOC IoC,		/* IO context handle */
-int Action,		/* Get/PreSet/Set action */
+int Action,		/* GET/PRESET/SET action */
 SK_U32 Id,		/* Object ID that is to be processed */
-char *pBuf,		/* Buffer to which to mgmt data will be retrieved */
-unsigned int *pLen,	/* On call: buffer length. On return: used buffer */
+char *pBuf,		/* Buffer used for the management data transfer */
+unsigned int *pLen,	/* On call: pBuf buffer length. On return: used buffer */
 SK_U32 Instance,	/* Instance (1..n) that is to be queried or -1 */
 unsigned int TableIndex, /* Index to the Id table */
-SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
+SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 {
 	int	Ret;
 	SK_U32	ActionOp;
@@ -3137,28 +2588,28 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
  *	SK_PNMI_ERR_UNKNOWN_INST The requested instance of the OID doesn't
- *                               exist (e.g. port instance 3 on a two port
+ *                           exist (e.g. port instance 3 on a two port
  *	                         adapter.
  */
-
-static int Mac8023Stat(
+PNMI_STATIC int Mac8023Stat(
 SK_AC *pAC,		/* Pointer to adapter context */
 SK_IOC IoC,		/* IO context handle */
-int Action,		/* Get/PreSet/Set action */
+int Action,		/* GET/PRESET/SET action */
 SK_U32 Id,		/* Object ID that is to be processed */
-char *pBuf,		/* Buffer to which to mgmt data will be retrieved */
-unsigned int *pLen,	/* On call: buffer length. On return: used buffer */
+char *pBuf,		/* Buffer used for the management data transfer */
+unsigned int *pLen,	/* On call: pBuf buffer length. On return: used buffer */
 SK_U32 Instance,	/* Instance (1..n) that is to be queried or -1 */
 unsigned int TableIndex,	/* Index to the Id table */
-SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
+SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 {
-	int    Ret;
-	SK_U64 StatVal;
+	int     Ret;
+	SK_U64  StatVal;
+	SK_U32  StatVal32;
 	SK_BOOL Is64BitReq = SK_FALSE;
 
 	/*
@@ -3179,9 +2630,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 		return (SK_PNMI_ERR_READ_ONLY);
 	}
 
-	/*
-	 * Check length
-	 */
+	/* Check length */
 	switch (Id) {
 
 	case OID_802_3_PERMANENT_ADDRESS:
@@ -3202,9 +2651,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 
 #else /* SK_NDIS_64BIT_CTR */
 
-		/*
-		 * for compatibility, at least 32bit are required for oid
-		 */
+		/* for compatibility, at least 32bit are required for OID */
 		if (*pLen < sizeof(SK_U32)) {
 			/*
 			* but indicate handling for 64bit values,
@@ -3250,11 +2697,8 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 	default:
 		StatVal = GetStatVal(pAC, IoC, 0, IdTable[TableIndex].Param, NetIndex);
 
-		/*
-		 * by default 32bit values are evaluated
-		 */
+		/* by default 32bit values are evaluated */
 		if (!Is64BitReq) {
-			SK_U32	StatVal32;
 			StatVal32 = (SK_U32)StatVal;
 			SK_PNMI_STORE_U32(pBuf, StatVal32);
 			*pLen = sizeof(SK_U32);
@@ -3276,47 +2720,47 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  * MacPrivateStat - OID handler function of OID_SKGE_STAT_XXX
  *
  * Description:
- *	Retrieves the XMAC statistic data.
+ *	Retrieves the MAC statistic data.
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
  *	SK_PNMI_ERR_UNKNOWN_INST The requested instance of the OID doesn't
- *                               exist (e.g. port instance 3 on a two port
+ *                           exist (e.g. port instance 3 on a two port
  *	                         adapter.
  */
-
-static int MacPrivateStat(
+PNMI_STATIC int MacPrivateStat(
 SK_AC *pAC,		/* Pointer to adapter context */
 SK_IOC IoC,		/* IO context handle */
-int Action,		/* Get/PreSet/Set action */
+int Action,		/* GET/PRESET/SET action */
 SK_U32 Id,		/* Object ID that is to be processed */
-char *pBuf,		/* Buffer to which to mgmt data will be retrieved */
-unsigned int *pLen,	/* On call: buffer length. On return: used buffer */
+char *pBuf,		/* Buffer used for the management data transfer */
+unsigned int *pLen,	/* On call: pBuf buffer length. On return: used buffer */
 SK_U32 Instance,	/* Instance (1..n) that is to be queried or -1 */
 unsigned int TableIndex, /* Index to the Id table */
-SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
+SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 {
 	unsigned int	LogPortMax;
 	unsigned int	LogPortIndex;
 	unsigned int	PhysPortMax;
 	unsigned int	Limit;
 	unsigned int	Offset;
-	int		Ret;
-	SK_U64		StatVal;
+	int				MacType;
+	int				Ret;
+	SK_U64			StatVal;
+	
+	
 
-
-	/*
-	 * Calculate instance if wished. MAC index 0 is the virtual
-	 * MAC.
-	 */
+	/* Calculate instance if wished. MAC index 0 is the virtual MAC */
 	PhysPortMax = pAC->GIni.GIMacsFound;
 	LogPortMax = SK_PNMI_PORT_PHYS2LOG(PhysPortMax);
+	
+	MacType = pAC->GIni.GIMacType;
 
-	if(pAC->Pnmi.DualNetActiveFlag == SK_TRUE){ /* Dual net mode */
+	if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) { /* Dual net mode */
 		LogPortMax--;
 	}
 
@@ -3337,19 +2781,14 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 		Limit = LogPortMax;
 	}
 
-
-	/*
-	 * Check action
-	 */
+	/* Check action */
 	if (Action != SK_PNMI_GET) {
 
 		*pLen = 0;
 		return (SK_PNMI_ERR_READ_ONLY);
 	}
 
-	/*
-	 * Check length
-	 */
+	/* Check length */
 	if (*pLen < (Limit - LogPortIndex) * sizeof(SK_U64)) {
 
 		*pLen = (Limit - LogPortIndex) * sizeof(SK_U64);
@@ -3357,7 +2796,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 	}
 
 	/*
-	 * Update XMAC statistic and increment semaphore to indicate that
+	 * Update MAC statistic and increment semaphore to indicate that
 	 * an update was already done.
 	 */
 	Ret = MacUpdate(pAC, IoC, 0, pAC->GIni.GIMacsFound - 1);
@@ -3368,9 +2807,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 	}
 	pAC->Pnmi.MacUpdatedFlag ++;
 
-	/*
-	 * Get value
-	 */
+	/* Get value */
 	Offset = 0;
 	for (; LogPortIndex < Limit; LogPortIndex ++) {
 
@@ -3384,26 +2821,45 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 		case OID_SKGE_STAT_RX_UTIL:
 			return (SK_PNMI_ERR_GENERAL);
 */
-		/*
-		 * Frames longer than IEEE 802.3 frame max size are counted
-		 * by XMAC in frame_too_long counter even reception of long
-		 * frames was enabled and the frame was correct.
-		 * So correct the value by subtracting RxLongFrame counter.
-		 */
-		case OID_SKGE_STAT_RX_TOO_LONG:
-			StatVal = GetStatVal(pAC, IoC, LogPortIndex,
-					     IdTable[TableIndex].Param, NetIndex) -
-				GetStatVal(pAC, IoC, LogPortIndex,
-					   SK_PNMI_HRX_LONGFRAMES, NetIndex);
-			SK_PNMI_STORE_U64(pBuf + Offset, StatVal);
+		case OID_SKGE_STAT_RX:
+			if (MacType == SK_MAC_GMAC) {
+				StatVal =
+					GetStatVal(pAC, IoC, LogPortIndex,
+							   SK_PNMI_HRX_BROADCAST, NetIndex) +
+					GetStatVal(pAC, IoC, LogPortIndex,
+							   SK_PNMI_HRX_MULTICAST, NetIndex) +
+					GetStatVal(pAC, IoC, LogPortIndex,
+							   SK_PNMI_HRX_UNICAST, NetIndex) +
+					GetStatVal(pAC, IoC, LogPortIndex,
+							   SK_PNMI_HRX_UNDERSIZE, NetIndex);
+			}
+			else {
+				StatVal = GetStatVal(pAC, IoC, LogPortIndex,
+					IdTable[TableIndex].Param, NetIndex);
+			}
+			break;
+
+		case OID_SKGE_STAT_TX:
+			if (MacType == SK_MAC_GMAC) {
+				StatVal =
+					GetStatVal(pAC, IoC, LogPortIndex,
+							   SK_PNMI_HTX_BROADCAST, NetIndex) +
+					GetStatVal(pAC, IoC, LogPortIndex,
+							   SK_PNMI_HTX_MULTICAST, NetIndex) +
+					GetStatVal(pAC, IoC, LogPortIndex,
+							   SK_PNMI_HTX_UNICAST, NetIndex);
+			}
+			else {
+				StatVal = GetStatVal(pAC, IoC, LogPortIndex,
+					IdTable[TableIndex].Param, NetIndex);
+			}
 			break;
 
 		default:
 			StatVal = GetStatVal(pAC, IoC, LogPortIndex,
 				IdTable[TableIndex].Param, NetIndex);
-			SK_PNMI_STORE_U64(pBuf + Offset, StatVal);
-			break;
 		}
+		SK_PNMI_STORE_U64(pBuf + Offset, StatVal);
 
 		Offset += sizeof(SK_U64);
 	}
@@ -3427,7 +2883,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -3435,20 +2891,19 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *	                         value range.
  *	SK_PNMI_ERR_READ_ONLY    The OID is read-only and cannot be set.
  *	SK_PNMI_ERR_UNKNOWN_INST The requested instance of the OID doesn't
- *                               exist (e.g. port instance 3 on a two port
+ *                           exist (e.g. port instance 3 on a two port
  *	                         adapter.
  */
-
-static int Addr(
+PNMI_STATIC int Addr(
 SK_AC *pAC,		/* Pointer to adapter context */
 SK_IOC IoC,		/* IO context handle */
-int Action,		/* Get/PreSet/Set action */
+int Action,		/* GET/PRESET/SET action */
 SK_U32 Id,		/* Object ID that is to be processed */
-char *pBuf,		/* Buffer to which to mgmt data will be retrieved */
-unsigned int *pLen,	/* On call: buffer length. On return: used buffer */
+char *pBuf,		/* Buffer used for the management data transfer */
+unsigned int *pLen,	/* On call: pBuf buffer length. On return: used buffer */
 SK_U32 Instance,	/* Instance (1..n) that is to be queried or -1 */
 unsigned int TableIndex, /* Index to the Id table */
-SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
+SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 {
 	int		Ret;
 	unsigned int	LogPortMax;
@@ -3458,8 +2913,6 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 	unsigned int	Limit;
 	unsigned int	Offset = 0;
 
-
-
 	/*
 	 * Calculate instance if wished. MAC index 0 is the virtual
 	 * MAC.
@@ -3467,7 +2920,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 	PhysPortMax = pAC->GIni.GIMacsFound;
 	LogPortMax = SK_PNMI_PORT_PHYS2LOG(PhysPortMax);
 
-	if(pAC->Pnmi.DualNetActiveFlag == SK_TRUE){ /* Dual net mode */
+	if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) { /* Dual net mode */
 		LogPortMax--;
 	}
 
@@ -3481,7 +2934,6 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 		LogPortIndex = SK_PNMI_PORT_INST2LOG(Instance);
 		Limit = LogPortIndex + 1;
 	}
-
 	else { /* Instance == (SK_U32)(-1), get all Instances of that OID */
 
 		LogPortIndex = 0;
@@ -3493,9 +2945,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 	 */
 	if (Action == SK_PNMI_GET) {
 
-		/*
-		 * Check length
-		*/
+		/* Check length */
 		if (*pLen < (Limit - LogPortIndex) * 6) {
 
 			*pLen = (Limit - LogPortIndex) * 6;
@@ -3571,9 +3021,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 			return (SK_PNMI_ERR_GENERAL);
 		}
 
-		/*
-		 * Check length
-		*/
+		/* Check length */
 		if (*pLen < (Limit - LogPortIndex) * 6) {
 
 			*pLen = (Limit - LogPortIndex) * 6;
@@ -3639,25 +3087,24 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
  *	SK_PNMI_ERR_UNKNOWN_INST The requested instance of the OID doesn't
- *                               exist (e.g. port instance 3 on a two port
+ *                           exist (e.g. port instance 3 on a two port
  *	                         adapter.
  */
-
-static int CsumStat(
+PNMI_STATIC int CsumStat(
 SK_AC *pAC,		/* Pointer to adapter context */
 SK_IOC IoC,		/* IO context handle */
-int Action,		/* Get/PreSet/Set action */
+int Action,		/* GET/PRESET/SET action */
 SK_U32 Id,		/* Object ID that is to be processed */
-char *pBuf,		/* Buffer to which to mgmt data will be retrieved */
-unsigned int *pLen,	/* On call: buffer length. On return: used buffer */
+char *pBuf,		/* Buffer used for the management data transfer */
+unsigned int *pLen,	/* On call: pBuf buffer length. On return: used buffer */
 SK_U32 Instance,	/* Instance (1..n) that is to be queried or -1 */
 unsigned int TableIndex, /* Index to the Id table */
-SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
+SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 {
 	unsigned int	Index;
 	unsigned int	Limit;
@@ -3692,9 +3139,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 		return (SK_PNMI_ERR_READ_ONLY);
 	}
 
-	/*
-	 * Check length
-	 */
+	/* Check length */
 	if (*pLen < (Limit - Index) * sizeof(SK_U64)) {
 
 		*pLen = (Limit - Index) * sizeof(SK_U64);
@@ -3758,25 +3203,24 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
  *	SK_PNMI_ERR_UNKNOWN_INST The requested instance of the OID doesn't
- *                               exist (e.g. port instance 3 on a two port
+ *                           exist (e.g. port instance 3 on a two port
  *	                         adapter.
  */
-
-static int SensorStat(
+PNMI_STATIC int SensorStat(
 SK_AC *pAC,		/* Pointer to adapter context */
 SK_IOC IoC,		/* IO context handle */
-int Action,		/* Get/PreSet/Set action */
+int Action,		/* GET/PRESET/SET action */
 SK_U32 Id,		/* Object ID that is to be processed */
-char *pBuf,		/* Buffer to which to mgmt data will be retrieved */
-unsigned int *pLen,	/* On call: buffer length. On return: used buffer */
+char *pBuf,		/* Buffer used for the management data transfer */
+unsigned int *pLen,	/* On call: pBuf buffer length. On return: used buffer */
 SK_U32 Instance,	/* Instance (1..n) that is to be queried or -1 */
 unsigned int TableIndex, /* Index to the Id table */
-SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
+SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 {
 	unsigned int	i;
 	unsigned int	Index;
@@ -3815,9 +3259,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 		return (SK_PNMI_ERR_READ_ONLY);
 	}
 
-	/*
-	 * Check length
-	 */
+	/* Check length */
 	switch (Id) {
 
 	case OID_SKGE_SENSOR_VALUE:
@@ -3976,8 +3418,8 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 			break;
 
 		default:
-			SK_ERR_LOG(pAC, SK_ERRCL_SW, SK_PNMI_ERR013,
-				SK_PNMI_ERR013MSG);
+			SK_DBG_MSG(pAC, SK_DBGMOD_PNMI, SK_DBGCAT_ERR,
+				("SensorStat: Unknown OID should be handled before"));
 
 			return (SK_PNMI_ERR_GENERAL);
 		}
@@ -4003,7 +3445,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -4011,20 +3453,19 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *	                         value range.
  *	SK_PNMI_ERR_READ_ONLY    The OID is read-only and cannot be set.
  *	SK_PNMI_ERR_UNKNOWN_INST The requested instance of the OID doesn't
- *                               exist (e.g. port instance 3 on a two port
+ *                           exist (e.g. port instance 3 on a two port
  *	                         adapter.
  */
-
-static int Vpd(
+PNMI_STATIC int Vpd(
 SK_AC *pAC,		/* Pointer to adapter context */
 SK_IOC IoC,		/* IO context handle */
-int Action,		/* Get/PreSet/Set action */
+int Action,		/* GET/PRESET/SET action */
 SK_U32 Id,		/* Object ID that is to be processed */
-char *pBuf,		/* Buffer to which to mgmt data will be retrieved */
-unsigned int *pLen,	/* On call: buffer length. On return: used buffer */
+char *pBuf,		/* Buffer used for the management data transfer */
+unsigned int *pLen,	/* On call: pBuf buffer length. On return: used buffer */
 SK_U32 Instance,	/* Instance (1..n) that is to be queried or -1 */
 unsigned int TableIndex, /* Index to the Id table */
-SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
+SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 {
 	SK_VPD_STATUS	*pVpdStatus;
 	unsigned int	BufLen;
@@ -4043,8 +3484,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 	/*
 	 * Get array of all currently stored VPD keys
 	 */
-	Ret = GetVpdKeyArr(pAC, IoC, &KeyArr[0][0], sizeof(KeyArr),
-		&KeyNo);
+	Ret = GetVpdKeyArr(pAC, IoC, &KeyArr[0][0], sizeof(KeyArr), &KeyNo);
 	if (Ret != SK_PNMI_ERR_OK) {
 		*pLen = 0;
 		return (Ret);
@@ -4290,7 +3730,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 			*pLen = 0;
 			return (SK_PNMI_ERR_GENERAL);
 		}
-	} 
+	}
 	else {
 		/* The only OID which can be set is VPD_ACTION */
 		if (Id != OID_SKGE_VPD_ACTION) {
@@ -4482,25 +3922,24 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
  *	SK_PNMI_ERR_UNKNOWN_INST The requested instance of the OID doesn't
- *                               exist (e.g. port instance 3 on a two port
+ *                           exist (e.g. port instance 3 on a two port
  *	                         adapter.
  */
-
-static int General(
+PNMI_STATIC int General(
 SK_AC *pAC,		/* Pointer to adapter context */
 SK_IOC IoC,		/* IO context handle */
-int Action,		/* Get/PreSet/Set action */
+int Action,		/* GET/PRESET/SET action */
 SK_U32 Id,		/* Object ID that is to be processed */
-char *pBuf,		/* Buffer to which to mgmt data will be retrieved */
+char *pBuf,		/* Buffer used for the management data transfer */
 unsigned int *pLen,	/* On call: buffer length. On return: used buffer */
 SK_U32 Instance,	/* Instance (1..n) that is to be queried or -1 */
 unsigned int TableIndex, /* Index to the Id table */
-SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
+SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 {
 	int		Ret;
 	unsigned int	Index;
@@ -4515,10 +3954,10 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 	SK_U64		Val64TxHwErrs = 0;
 	SK_BOOL		Is64BitReq = SK_FALSE;
 	char		Buf[256];
-
+	int			MacType;
 
 	/*
-	 * Check instance. We only handle single instance variables
+	 * Check instance. We only handle single instance variables.
 	 */
 	if (Instance != (SK_U32)(-1) && Instance != 1) {
 
@@ -4534,7 +3973,9 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 		*pLen = 0;
 		return (SK_PNMI_ERR_READ_ONLY);
 	}
-
+	
+	MacType = pAC->GIni.GIMacType;
+	
 	/*
 	 * Check length for the various supported OIDs
 	 */
@@ -4565,6 +4006,14 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 
 		Is64BitReq = (*pLen < sizeof(SK_U64)) ? SK_FALSE : SK_TRUE;
 #endif /* SK_NDIS_64BIT_CTR */
+		break;
+
+	case OID_SKGE_BOARDLEVEL:
+		if (*pLen < sizeof(SK_U32)) {
+
+			*pLen = sizeof(SK_U32);
+			return (SK_PNMI_ERR_TOO_SHORT);
+		}
 		break;
 
 	case OID_SKGE_PORT_NUMBER:
@@ -4662,15 +4111,14 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 			Val64RxHwErrs =
 				GetStatVal(pAC, IoC, 0, SK_PNMI_HRX_MISSED, NetIndex) +
 				GetStatVal(pAC, IoC, 0, SK_PNMI_HRX_FRAMING, NetIndex) +
-				GetStatVal(pAC, IoC, 0, SK_PNMI_HRX_OVERFLOW, NetIndex)+
+				GetStatVal(pAC, IoC, 0, SK_PNMI_HRX_OVERFLOW, NetIndex) +
 				GetStatVal(pAC, IoC, 0, SK_PNMI_HRX_JABBER, NetIndex) +
 				GetStatVal(pAC, IoC, 0, SK_PNMI_HRX_CARRIER, NetIndex) +
-				GetStatVal(pAC, IoC, 0, SK_PNMI_HRX_IRLENGTH, NetIndex)+
+				GetStatVal(pAC, IoC, 0, SK_PNMI_HRX_IRLENGTH, NetIndex) +
 				GetStatVal(pAC, IoC, 0, SK_PNMI_HRX_SYMBOL, NetIndex) +
 				GetStatVal(pAC, IoC, 0, SK_PNMI_HRX_SHORTS, NetIndex) +
 				GetStatVal(pAC, IoC, 0, SK_PNMI_HRX_RUNT, NetIndex) +
-				GetStatVal(pAC, IoC, 0, SK_PNMI_HRX_TOO_LONG, NetIndex)-
-				GetStatVal(pAC, IoC, 0, SK_PNMI_HRX_LONGFRAMES, NetIndex)+
+				GetStatVal(pAC, IoC, 0, SK_PNMI_HRX_TOO_LONG, NetIndex) +
 				GetStatVal(pAC, IoC, 0, SK_PNMI_HRX_FCS, NetIndex) +
 				GetStatVal(pAC, IoC, 0, SK_PNMI_HRX_CEXT, NetIndex);
 	        break;
@@ -4680,10 +4128,9 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 		case OID_GEN_XMIT_ERROR:
 			Val64TxHwErrs =
 				GetStatVal(pAC, IoC, 0, SK_PNMI_HTX_EXCESS_COL, NetIndex) +
-				GetStatVal(pAC, IoC, 0, SK_PNMI_HTX_LATE_COL, NetIndex)+
-				GetStatVal(pAC, IoC, 0, SK_PNMI_HTX_UNDERRUN, NetIndex)+
-				GetStatVal(pAC, IoC, 0, SK_PNMI_HTX_CARRIER, NetIndex)+
-				GetStatVal(pAC, IoC, 0, SK_PNMI_HTX_EXCESS_COL, NetIndex);
+				GetStatVal(pAC, IoC, 0, SK_PNMI_HTX_LATE_COL, NetIndex) +
+				GetStatVal(pAC, IoC, 0, SK_PNMI_HTX_UNDERRUN, NetIndex) +
+				GetStatVal(pAC, IoC, 0, SK_PNMI_HTX_CARRIER, NetIndex);
 			break;
 		}
 	}
@@ -4694,7 +4141,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 	switch (Id) {
 
 	case OID_SKGE_SUPPORTED_LIST:
-		Len = sizeof(IdTable)/sizeof(IdTable[0]) * sizeof(SK_U32);
+		Len = ID_TABLE_SIZE * sizeof(SK_U32);
 		if (*pLen < Len) {
 
 			*pLen = Len;
@@ -4707,6 +4154,12 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 			SK_PNMI_STORE_U32(pBuf + Offset, Val32);
 		}
 		*pLen = Len;
+		break;
+
+	case OID_SKGE_BOARDLEVEL:
+		Val32 = (SK_U32)pAC->GIni.GILevel;
+		SK_PNMI_STORE_U32(pBuf, Val32);
+		*pLen = sizeof(SK_U32);
 		break;
 
 	case OID_SKGE_PORT_NUMBER:
@@ -4833,7 +4286,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 		break;
 
 	case OID_SKGE_CHIPSET:
-		Val16 = SK_PNMI_CHIPSET;
+		Val16 = pAC->Pnmi.Chipset;
 		SK_PNMI_STORE_U16(pBuf, Val16);
 		*pLen = sizeof(SK_U16);
 		break;
@@ -4895,141 +4348,281 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 		break;
 
 	case OID_SKGE_TX_SW_QUEUE_LEN:
-		/* Dual net mode */
-		if(pAC->Pnmi.DualNetActiveFlag == SK_TRUE){
-			Val64 = pAC->Pnmi.Port[NetIndex].TxSwQueueLen;
+		/* 2002-09-17 pweber: For XMAC, use the frozen SW counters (BufPort) */
+		if (MacType == SK_MAC_XMAC) {
+			/* Dual net mode */
+			if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {
+				Val64 = pAC->Pnmi.BufPort[NetIndex].TxSwQueueLen;
+			}
+			/* Single net mode */
+			else {
+				Val64 = pAC->Pnmi.BufPort[0].TxSwQueueLen +
+					pAC->Pnmi.BufPort[1].TxSwQueueLen;
+			}			
 		}
-		/* Single net mode */
 		else {
-			Val64 =  pAC->Pnmi.Port[0].TxSwQueueLen +
-				pAC->Pnmi.Port[1].TxSwQueueLen;
-		}			
+			/* Dual net mode */
+			if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {
+				Val64 = pAC->Pnmi.Port[NetIndex].TxSwQueueLen;
+			}
+			/* Single net mode */
+			else {
+				Val64 = pAC->Pnmi.Port[0].TxSwQueueLen +
+					pAC->Pnmi.Port[1].TxSwQueueLen;
+			}			
+		}
 		SK_PNMI_STORE_U64(pBuf, Val64);
 		*pLen = sizeof(SK_U64);
 		break;
 
 
 	case OID_SKGE_TX_SW_QUEUE_MAX:
-		/* Dual net mode */
-		if(pAC->Pnmi.DualNetActiveFlag == SK_TRUE){
-			Val64 = pAC->Pnmi.Port[NetIndex].TxSwQueueMax;
+		/* 2002-09-17 pweber: For XMAC, use the frozen SW counters (BufPort) */
+		if (MacType == SK_MAC_XMAC) {
+			/* Dual net mode */
+			if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {
+				Val64 = pAC->Pnmi.BufPort[NetIndex].TxSwQueueMax;
+			}
+			/* Single net mode */
+			else {
+				Val64 = pAC->Pnmi.BufPort[0].TxSwQueueMax +
+					pAC->Pnmi.BufPort[1].TxSwQueueMax;
+			}
 		}
-		/* Single net mode */
 		else {
-			Val64 = pAC->Pnmi.Port[0].TxSwQueueMax +
-				pAC->Pnmi.Port[1].TxSwQueueMax;
+			/* Dual net mode */
+			if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {
+				Val64 = pAC->Pnmi.Port[NetIndex].TxSwQueueMax;
+			}
+			/* Single net mode */
+			else {
+				Val64 = pAC->Pnmi.Port[0].TxSwQueueMax +
+					pAC->Pnmi.Port[1].TxSwQueueMax;
+			}
 		}
 		SK_PNMI_STORE_U64(pBuf, Val64);
 		*pLen = sizeof(SK_U64);
 		break;
 
 	case OID_SKGE_TX_RETRY:
-		/* Dual net mode */
-		if(pAC->Pnmi.DualNetActiveFlag == SK_TRUE){
-			Val64 = pAC->Pnmi.Port[NetIndex].TxRetryCts;
+		/* 2002-09-17 pweber: For XMAC, use the frozen SW counters (BufPort) */
+		if (MacType == SK_MAC_XMAC) {
+			/* Dual net mode */
+			if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {
+				Val64 = pAC->Pnmi.BufPort[NetIndex].TxRetryCts;
+			}
+			/* Single net mode */
+			else {
+				Val64 = pAC->Pnmi.BufPort[0].TxRetryCts +
+					pAC->Pnmi.BufPort[1].TxRetryCts;
+			}
 		}
-		/* Single net mode */
 		else {
-			Val64 = pAC->Pnmi.Port[0].TxRetryCts +
-				pAC->Pnmi.Port[1].TxRetryCts;
+			/* Dual net mode */
+			if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {
+				Val64 = pAC->Pnmi.Port[NetIndex].TxRetryCts;
+			}
+			/* Single net mode */
+			else {
+				Val64 = pAC->Pnmi.Port[0].TxRetryCts +
+					pAC->Pnmi.Port[1].TxRetryCts;
+			}
 		}
 		SK_PNMI_STORE_U64(pBuf, Val64);
 		*pLen = sizeof(SK_U64);
 		break;
 
 	case OID_SKGE_RX_INTR_CTS:
-		/* Dual net mode */
-		if(pAC->Pnmi.DualNetActiveFlag == SK_TRUE){
-			Val64 = pAC->Pnmi.Port[NetIndex].RxIntrCts;
+		/* 2002-09-17 pweber: For XMAC, use the frozen SW counters (BufPort) */
+		if (MacType == SK_MAC_XMAC) {
+			/* Dual net mode */
+			if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {
+				Val64 = pAC->Pnmi.BufPort[NetIndex].RxIntrCts;
+			}
+			/* Single net mode */
+			else {
+				Val64 = pAC->Pnmi.BufPort[0].RxIntrCts +
+					pAC->Pnmi.BufPort[1].RxIntrCts;
+			}
 		}
-		/* Single net mode */
 		else {
-			Val64 = pAC->Pnmi.Port[0].RxIntrCts +
-				pAC->Pnmi.Port[1].RxIntrCts;
+			/* Dual net mode */
+			if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {
+				Val64 = pAC->Pnmi.Port[NetIndex].RxIntrCts;
+			}
+			/* Single net mode */
+			else {
+				Val64 = pAC->Pnmi.Port[0].RxIntrCts +
+					pAC->Pnmi.Port[1].RxIntrCts;
+			}
 		}
 		SK_PNMI_STORE_U64(pBuf, Val64);
 		*pLen = sizeof(SK_U64);
 		break;
 
 	case OID_SKGE_TX_INTR_CTS:
-		/* Dual net mode */
-		if(pAC->Pnmi.DualNetActiveFlag == SK_TRUE){
-			Val64 = pAC->Pnmi.Port[NetIndex].TxIntrCts;
+		/* 2002-09-17 pweber: For XMAC, use the frozen SW counters (BufPort) */
+		if (MacType == SK_MAC_XMAC) {
+			/* Dual net mode */
+			if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {
+				Val64 = pAC->Pnmi.BufPort[NetIndex].TxIntrCts;
+			}
+			/* Single net mode */
+			else {
+				Val64 = pAC->Pnmi.BufPort[0].TxIntrCts +
+					pAC->Pnmi.BufPort[1].TxIntrCts;
+			}
 		}
-		/* Single net mode */
 		else {
-			Val64 = pAC->Pnmi.Port[0].TxIntrCts +
-				pAC->Pnmi.Port[1].TxIntrCts;
+			/* Dual net mode */
+			if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {
+				Val64 = pAC->Pnmi.Port[NetIndex].TxIntrCts;
+			}
+			/* Single net mode */
+			else {
+				Val64 = pAC->Pnmi.Port[0].TxIntrCts +
+					pAC->Pnmi.Port[1].TxIntrCts;
+			}
 		}
 		SK_PNMI_STORE_U64(pBuf, Val64);
 		*pLen = sizeof(SK_U64);
 		break;
 
 	case OID_SKGE_RX_NO_BUF_CTS:
-		/* Dual net mode */
-		if(pAC->Pnmi.DualNetActiveFlag == SK_TRUE){
-			Val64 = pAC->Pnmi.Port[NetIndex].RxNoBufCts;
+		/* 2002-09-17 pweber: For XMAC, use the frozen SW counters (BufPort) */
+		if (MacType == SK_MAC_XMAC) {
+			/* Dual net mode */
+			if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {
+				Val64 = pAC->Pnmi.BufPort[NetIndex].RxNoBufCts;
+			}
+			/* Single net mode */
+			else {
+				Val64 = pAC->Pnmi.BufPort[0].RxNoBufCts +
+					pAC->Pnmi.BufPort[1].RxNoBufCts;
+			}
 		}
-		/* Single net mode */
 		else {
-			Val64 = pAC->Pnmi.Port[0].RxNoBufCts +
-				pAC->Pnmi.Port[1].RxNoBufCts;
+			/* Dual net mode */
+			if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {
+				Val64 = pAC->Pnmi.Port[NetIndex].RxNoBufCts;
+			}
+			/* Single net mode */
+			else {
+				Val64 = pAC->Pnmi.Port[0].RxNoBufCts +
+					pAC->Pnmi.Port[1].RxNoBufCts;
+			}
 		}
 		SK_PNMI_STORE_U64(pBuf, Val64);
 		*pLen = sizeof(SK_U64);
 		break;
 
 	case OID_SKGE_TX_NO_BUF_CTS:
-		/* Dual net mode */
-		if(pAC->Pnmi.DualNetActiveFlag == SK_TRUE){
-			Val64 = pAC->Pnmi.Port[NetIndex].TxNoBufCts;
+		/* 2002-09-17 pweber: For XMAC, use the frozen SW counters (BufPort) */
+		if (MacType == SK_MAC_XMAC) {
+			/* Dual net mode */
+			if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {
+				Val64 = pAC->Pnmi.BufPort[NetIndex].TxNoBufCts;
+			}
+			/* Single net mode */
+			else {
+				Val64 = pAC->Pnmi.BufPort[0].TxNoBufCts +
+					pAC->Pnmi.BufPort[1].TxNoBufCts;
+			}
 		}
-		/* Single net mode */
 		else {
-			Val64 = pAC->Pnmi.Port[0].TxNoBufCts +
-				pAC->Pnmi.Port[1].TxNoBufCts;
+			/* Dual net mode */
+			if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {
+				Val64 = pAC->Pnmi.Port[NetIndex].TxNoBufCts;
+			}
+			/* Single net mode */
+			else {
+				Val64 = pAC->Pnmi.Port[0].TxNoBufCts +
+					pAC->Pnmi.Port[1].TxNoBufCts;
+			}
 		}
 		SK_PNMI_STORE_U64(pBuf, Val64);
 		*pLen = sizeof(SK_U64);
 		break;
 
 	case OID_SKGE_TX_USED_DESCR_NO:
-		/* Dual net mode */
-		if(pAC->Pnmi.DualNetActiveFlag == SK_TRUE){
-			Val64 = pAC->Pnmi.Port[NetIndex].TxUsedDescrNo;
+		/* 2002-09-17 pweber: For XMAC, use the frozen SW counters (BufPort) */
+		if (MacType == SK_MAC_XMAC) {
+			/* Dual net mode */
+			if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {
+				Val64 = pAC->Pnmi.BufPort[NetIndex].TxUsedDescrNo;
+			}
+			/* Single net mode */
+			else {
+				Val64 = pAC->Pnmi.BufPort[0].TxUsedDescrNo +
+					pAC->Pnmi.BufPort[1].TxUsedDescrNo;
+			}
 		}
-		/* Single net mode */
 		else {
-			Val64 = pAC->Pnmi.Port[0].TxUsedDescrNo +
-				pAC->Pnmi.Port[1].TxUsedDescrNo;
+			/* Dual net mode */
+			if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {
+				Val64 = pAC->Pnmi.Port[NetIndex].TxUsedDescrNo;
+			}
+			/* Single net mode */
+			else {
+				Val64 = pAC->Pnmi.Port[0].TxUsedDescrNo +
+					pAC->Pnmi.Port[1].TxUsedDescrNo;
+			}
 		}
 		SK_PNMI_STORE_U64(pBuf, Val64);
 		*pLen = sizeof(SK_U64);
 		break;
 
 	case OID_SKGE_RX_DELIVERED_CTS:
-		/* Dual net mode */
-		if(pAC->Pnmi.DualNetActiveFlag == SK_TRUE){
-			Val64 = pAC->Pnmi.Port[NetIndex].RxDeliveredCts;
+		/* 2002-09-17 pweber: For XMAC, use the frozen SW counters (BufPort) */
+		if (MacType == SK_MAC_XMAC) {
+			/* Dual net mode */
+			if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {
+				Val64 = pAC->Pnmi.BufPort[NetIndex].RxDeliveredCts;
+			}
+			/* Single net mode */
+			else {
+				Val64 = pAC->Pnmi.BufPort[0].RxDeliveredCts +
+					pAC->Pnmi.BufPort[1].RxDeliveredCts;
+			}
 		}
-		/* Single net mode */
 		else {
-			Val64 = pAC->Pnmi.Port[0].RxDeliveredCts +
-				pAC->Pnmi.Port[1].RxDeliveredCts;
+			/* Dual net mode */
+			if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {
+				Val64 = pAC->Pnmi.Port[NetIndex].RxDeliveredCts;
+			}
+			/* Single net mode */
+			else {
+				Val64 = pAC->Pnmi.Port[0].RxDeliveredCts +
+					pAC->Pnmi.Port[1].RxDeliveredCts;
+			}
 		}
 		SK_PNMI_STORE_U64(pBuf, Val64);
 		*pLen = sizeof(SK_U64);
 		break;
 
 	case OID_SKGE_RX_OCTETS_DELIV_CTS:
-		/* Dual net mode */
-		if(pAC->Pnmi.DualNetActiveFlag == SK_TRUE){
-			Val64 = pAC->Pnmi.Port[NetIndex].RxOctetsDeliveredCts;
+		/* 2002-09-17 pweber: For XMAC, use the frozen SW counters (BufPort) */
+		if (MacType == SK_MAC_XMAC) {
+			/* Dual net mode */
+			if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {
+				Val64 = pAC->Pnmi.BufPort[NetIndex].RxOctetsDeliveredCts;
+			}
+			/* Single net mode */
+			else {
+				Val64 = pAC->Pnmi.BufPort[0].RxOctetsDeliveredCts +
+					pAC->Pnmi.BufPort[1].RxOctetsDeliveredCts;
+			}
 		}
-		/* Single net mode */
 		else {
-			Val64 = pAC->Pnmi.Port[0].RxOctetsDeliveredCts +
-				pAC->Pnmi.Port[1].RxOctetsDeliveredCts;
+			/* Dual net mode */
+			if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {
+				Val64 = pAC->Pnmi.Port[NetIndex].RxOctetsDeliveredCts;
+			}
+			/* Single net mode */
+			else {
+				Val64 = pAC->Pnmi.Port[0].RxOctetsDeliveredCts +
+					pAC->Pnmi.Port[1].RxOctetsDeliveredCts;
+			}
 		}
 		SK_PNMI_STORE_U64(pBuf, Val64);
 		*pLen = sizeof(SK_U64);
@@ -5046,44 +4639,88 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 		break;
 
 	case OID_SKGE_IN_ERRORS_CTS:
-		/* Dual net mode */
-		if(pAC->Pnmi.DualNetActiveFlag == SK_TRUE){
-			Val64 = Val64RxHwErrs + pAC->Pnmi.Port[NetIndex].RxNoBufCts;
+		/* 2002-09-17 pweber: For XMAC, use the frozen SW counters (BufPort) */
+		if (MacType == SK_MAC_XMAC) {
+			/* Dual net mode */
+			if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {
+				Val64 = Val64RxHwErrs + pAC->Pnmi.BufPort[NetIndex].RxNoBufCts;
+			}
+			/* Single net mode */
+			else {
+				Val64 = Val64RxHwErrs +
+					pAC->Pnmi.BufPort[0].RxNoBufCts +
+					pAC->Pnmi.BufPort[1].RxNoBufCts;
+			}
 		}
-		/* Single net mode */
 		else {
-			Val64 = Val64RxHwErrs + 
-				pAC->Pnmi.Port[0].RxNoBufCts +
-				pAC->Pnmi.Port[1].RxNoBufCts;
+			/* Dual net mode */
+			if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {
+				Val64 = Val64RxHwErrs + pAC->Pnmi.Port[NetIndex].RxNoBufCts;
+			}
+			/* Single net mode */
+			else {
+				Val64 = Val64RxHwErrs +
+					pAC->Pnmi.Port[0].RxNoBufCts +
+					pAC->Pnmi.Port[1].RxNoBufCts;
+			}
 		}
 		SK_PNMI_STORE_U64(pBuf, Val64);
 		*pLen = sizeof(SK_U64);
 		break;
 
 	case OID_SKGE_OUT_ERROR_CTS:
-		/* Dual net mode */
-		if(pAC->Pnmi.DualNetActiveFlag == SK_TRUE){
-			Val64 = Val64TxHwErrs + pAC->Pnmi.Port[NetIndex].TxNoBufCts;
+		/* 2002-09-17 pweber: For XMAC, use the frozen SW counters (BufPort) */
+		if (MacType == SK_MAC_XMAC) {
+			/* Dual net mode */
+			if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {
+				Val64 = Val64TxHwErrs + pAC->Pnmi.BufPort[NetIndex].TxNoBufCts;
+			}
+			/* Single net mode */
+			else {
+				Val64 = Val64TxHwErrs +
+					pAC->Pnmi.BufPort[0].TxNoBufCts +
+					pAC->Pnmi.BufPort[1].TxNoBufCts;
+			}
 		}
-		/* Single net mode */
 		else {
-			Val64 = Val64TxHwErrs + 
-				pAC->Pnmi.Port[0].TxNoBufCts +
-				pAC->Pnmi.Port[1].TxNoBufCts;
+			/* Dual net mode */
+			if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {
+				Val64 = Val64TxHwErrs + pAC->Pnmi.Port[NetIndex].TxNoBufCts;
+			}
+			/* Single net mode */
+			else {
+				Val64 = Val64TxHwErrs +
+					pAC->Pnmi.Port[0].TxNoBufCts +
+					pAC->Pnmi.Port[1].TxNoBufCts;
+			}
 		}
 		SK_PNMI_STORE_U64(pBuf, Val64);
 		*pLen = sizeof(SK_U64);
 		break;
 
 	case OID_SKGE_ERR_RECOVERY_CTS:
-		/* Dual net mode */
-		if(pAC->Pnmi.DualNetActiveFlag == SK_TRUE){
-			Val64 = pAC->Pnmi.Port[NetIndex].ErrRecoveryCts;
+		/* 2002-09-17 pweber: For XMAC, use the frozen SW counters (BufPort) */
+		if (MacType == SK_MAC_XMAC) {
+			/* Dual net mode */
+			if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {
+				Val64 = pAC->Pnmi.BufPort[NetIndex].ErrRecoveryCts;
+			}
+			/* Single net mode */
+			else {
+				Val64 = pAC->Pnmi.BufPort[0].ErrRecoveryCts +
+					pAC->Pnmi.BufPort[1].ErrRecoveryCts;
+			}
 		}
-		/* Single net mode */
 		else {
-			Val64 = pAC->Pnmi.Port[0].ErrRecoveryCts +
-				pAC->Pnmi.Port[1].ErrRecoveryCts;
+			/* Dual net mode */
+			if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {
+				Val64 = pAC->Pnmi.Port[NetIndex].ErrRecoveryCts;
+			}
+			/* Single net mode */
+			else {
+				Val64 = pAC->Pnmi.Port[0].ErrRecoveryCts +
+					pAC->Pnmi.Port[1].ErrRecoveryCts;
+			}
 		}
 		SK_PNMI_STORE_U64(pBuf, Val64);
 		*pLen = sizeof(SK_U64);
@@ -5103,7 +4740,13 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 		break;
 
 	case OID_GEN_RCV_ERROR:
-		Val64 = Val64RxHwErrs + pAC->Pnmi.Port[NetIndex].RxNoBufCts;
+		/* 2002-09-17 pweber: For XMAC, use the frozen SW counters (BufPort) */
+		if (MacType == SK_MAC_XMAC) {
+			Val64 = Val64RxHwErrs + pAC->Pnmi.BufPort[NetIndex].RxNoBufCts;
+		}
+		else {
+			Val64 = Val64RxHwErrs + pAC->Pnmi.Port[NetIndex].RxNoBufCts;
+		}
 
 		/*
 		 * by default 32bit values are evaluated
@@ -5120,7 +4763,13 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 		break;
 
 	case OID_GEN_XMIT_ERROR:
-		Val64 = Val64TxHwErrs + pAC->Pnmi.Port[NetIndex].TxNoBufCts;
+		/* 2002-09-17 pweber: For XMAC, use the frozen SW counters (BufPort) */
+		if (MacType == SK_MAC_XMAC) {
+			Val64 = Val64TxHwErrs + pAC->Pnmi.BufPort[NetIndex].TxNoBufCts;
+		}
+		else {
+			Val64 = Val64TxHwErrs + pAC->Pnmi.Port[NetIndex].TxNoBufCts;
+		}
 
 		/*
 		 * by default 32bit values are evaluated
@@ -5137,7 +4786,13 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 		break;
 
 	case OID_GEN_RCV_NO_BUFFER:
-		Val64 = pAC->Pnmi.Port[NetIndex].RxNoBufCts;
+		/* 2002-09-17 pweber: For XMAC, use the frozen SW counters (BufPort) */
+		if (MacType == SK_MAC_XMAC) {
+			Val64 = pAC->Pnmi.BufPort[NetIndex].RxNoBufCts;
+		}
+		else {
+			Val64 = pAC->Pnmi.Port[NetIndex].RxNoBufCts;
+		}
 
 		/*
 		 * by default 32bit values are evaluated
@@ -5189,7 +4844,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -5197,20 +4852,19 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *	                         value range.
  *	SK_PNMI_ERR_READ_ONLY    The OID is read-only and cannot be set.
  *	SK_PNMI_ERR_UNKNOWN_INST The requested instance of the OID doesn't
- *                               exist (e.g. port instance 3 on a two port
+ *                           exist (e.g. port instance 3 on a two port
  *	                         adapter.
  */
-
-static int Rlmt(
+PNMI_STATIC int Rlmt(
 SK_AC *pAC,		/* Pointer to adapter context */
 SK_IOC IoC,		/* IO context handle */
-int Action,		/* Get/PreSet/Set action */
+int Action,		/* GET/PRESET/SET action */
 SK_U32 Id,		/* Object ID that is to be processed */
-char *pBuf,		/* Buffer to which to mgmt data will be retrieved */
-unsigned int *pLen,	/* On call: buffer length. On return: used buffer */
+char *pBuf,		/* Buffer used for the management data transfer */
+unsigned int *pLen,	/* On call: pBuf buffer length. On return: used buffer */
 SK_U32 Instance,	/* Instance (1..n) that is to be queried or -1 */
 unsigned int TableIndex, /* Index to the Id table */
-SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
+SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 {
 	int		Ret;
 	unsigned int	PhysPortIndex;
@@ -5230,7 +4884,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 	}
 
 	/*
-	 * Perform the requested action
+	 * Perform the requested action.
 	 */
 	if (Action == SK_PNMI_GET) {
 
@@ -5359,8 +5013,8 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 			break;
 
 		default:
-			SK_ERR_LOG(pAC, SK_ERRCL_SW, SK_PNMI_ERR036,
-				SK_PNMI_ERR036MSG);
+			SK_DBG_MSG(pAC, SK_DBGMOD_PNMI, SK_DBGCAT_ERR,
+				("Rlmt: Unknown OID should be handled before"));
 
 			pAC->Pnmi.RlmtUpdatedFlag --;
 			*pLen = 0;
@@ -5498,25 +5152,24 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
  *	SK_PNMI_ERR_UNKNOWN_INST The requested instance of the OID doesn't
- *                               exist (e.g. port instance 3 on a two port
+ *                           exist (e.g. port instance 3 on a two port
  *	                         adapter.
  */
-
-static int RlmtStat(
+PNMI_STATIC int RlmtStat(
 SK_AC *pAC,		/* Pointer to adapter context */
 SK_IOC IoC,		/* IO context handle */
-int Action,		/* Get/PreSet/Set action */
+int Action,		/* GET/PRESET/SET action */
 SK_U32 Id,		/* Object ID that is to be processed */
-char *pBuf,		/* Buffer to which to mgmt data will be retrieved */
-unsigned int *pLen,	/* On call: buffer length. On return: used buffer */
+char *pBuf,		/* Buffer used for the management data transfer */
+unsigned int *pLen,	/* On call: pBuf buffer length. On return: used buffer */
 SK_U32 Instance,	/* Instance (1..n) that is to be queried or -1 */
 unsigned int TableIndex, /* Index to the Id table */
-SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
+SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 {
 	unsigned int	PhysPortMax;
 	unsigned int	PhysPortIndex;
@@ -5527,7 +5180,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 	SK_U64		Val64;
 
 	/*
-	 * Calculate the port indexes from the instance
+	 * Calculate the port indexes from the instance.
 	 */
 	PhysPortMax = pAC->GIni.GIMacsFound;
 
@@ -5543,7 +5196,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 		PhysPortIndex = Instance - 1;
 
 		/* Dual net mode */
-		if(pAC->Pnmi.DualNetActiveFlag == SK_TRUE){
+		if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {
 			PhysPortIndex = NetIndex;
 		}
 
@@ -5556,7 +5209,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 		Limit = PhysPortMax;
 
 		/* Dual net mode */
-		if(pAC->Pnmi.DualNetActiveFlag == SK_TRUE){
+		if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {
 			PhysPortIndex = NetIndex;
 			Limit = PhysPortIndex + 1;
 		}
@@ -5674,8 +5327,8 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 			break;
 
 		default:
-			SK_ERR_LOG(pAC, SK_ERRCL_SW, SK_PNMI_ERR040,
-				SK_PNMI_ERR040MSG);
+			SK_DBG_MSG(pAC, SK_DBGMOD_PNMI, SK_DBGCAT_ERR,
+				("RlmtStat: Unknown OID should be errored before"));
 
 			pAC->Pnmi.RlmtUpdatedFlag --;
 			*pLen = 0;
@@ -5698,7 +5351,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -5706,20 +5359,19 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *	                         value range.
  *	SK_PNMI_ERR_READ_ONLY    The OID is read-only and cannot be set.
  *	SK_PNMI_ERR_UNKNOWN_INST The requested instance of the OID doesn't
- *                               exist (e.g. port instance 3 on a two port
+ *                           exist (e.g. port instance 3 on a two port
  *	                         adapter.
  */
-
-static int MacPrivateConf(
+PNMI_STATIC int MacPrivateConf(
 SK_AC *pAC,		/* Pointer to adapter context */
 SK_IOC IoC,		/* IO context handle */
-int Action,		/* Get/PreSet/Set action */
+int Action,		/* GET/PRESET/SET action */
 SK_U32 Id,		/* Object ID that is to be processed */
-char *pBuf,		/* Buffer to which to mgmt data will be retrieved */
-unsigned int *pLen,	/* On call: buffer length. On return: used buffer */
+char *pBuf,		/* Buffer used for the management data transfer */
+unsigned int *pLen,	/* On call: pBuf buffer length. On return: used buffer */
 SK_U32 Instance,	/* Instance (1..n) that is to be queried or -1 */
 unsigned int TableIndex, /* Index to the Id table */
-SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
+SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 {
 	unsigned int	PhysPortMax;
 	unsigned int	PhysPortIndex;
@@ -5728,19 +5380,18 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 	unsigned int	Limit;
 	unsigned int	Offset;
 	char		Val8;
-	int		Ret;
+	char 		*pBufPtr;
+	int			Ret;
 	SK_EVPARA	EventParam;
 	SK_U32		Val32;
 
-
 	/*
-	 * Calculate instance if wished. MAC index 0 is the virtual
-	 * MAC.
+	 * Calculate instance if wished. MAC index 0 is the virtual MAC.
 	 */
 	PhysPortMax = pAC->GIni.GIMacsFound;
 	LogPortMax = SK_PNMI_PORT_PHYS2LOG(PhysPortMax);
 
-	if(pAC->Pnmi.DualNetActiveFlag == SK_TRUE){ /* Dual net mode */
+	if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) { /* Dual net mode */
 		LogPortMax--;
 	}
 
@@ -5766,9 +5417,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 	 */
 	if (Action == SK_PNMI_GET) {
 
-		/*
-		 * Check length
-		 */
+		/* Check length */
 		switch (Id) {
 
 		case OID_SKGE_PMD:
@@ -5783,18 +5432,20 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 		case OID_SKGE_PHY_OPERATION_CAP:
 		case OID_SKGE_PHY_OPERATION_MODE:
 		case OID_SKGE_PHY_OPERATION_STATUS:
+		case OID_SKGE_SPEED_CAP:
+		case OID_SKGE_SPEED_MODE:
+		case OID_SKGE_SPEED_STATUS:
 			if (*pLen < (Limit - LogPortIndex) * sizeof(SK_U8)) {
 
-				*pLen = (Limit - LogPortIndex) *
-					sizeof(SK_U8);
+				*pLen = (Limit - LogPortIndex) * sizeof(SK_U8);
 				return (SK_PNMI_ERR_TOO_SHORT);
 			}
 			break;
 
         case OID_SKGE_MTU:
-			if (*pLen < sizeof(SK_U32)) {
+			if (*pLen < (Limit - LogPortIndex) * sizeof(SK_U32)) {
 
-				*pLen = sizeof(SK_U32);
+				*pLen = (Limit - LogPortIndex) * sizeof(SK_U32);
 				return (SK_PNMI_ERR_TOO_SHORT);
 			}
 			break;
@@ -5823,210 +5474,303 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 		Offset = 0;
 		for (; LogPortIndex < Limit; LogPortIndex ++) {
 
+			pBufPtr = pBuf + Offset;
+			
 			switch (Id) {
 
 			case OID_SKGE_PMD:
-				*(pBuf + Offset) = pAC->Pnmi.PMD;
+				*pBufPtr = pAC->Pnmi.PMD;
 				Offset += sizeof(char);
 				break;
 
 			case OID_SKGE_CONNECTOR:
-				*(pBuf + Offset) = pAC->Pnmi.Connector;
+				*pBufPtr = pAC->Pnmi.Connector;
 				Offset += sizeof(char);
 				break;
 
 			case OID_SKGE_LINK_CAP:
-				if (LogPortIndex == 0) {
+				if (!pAC->Pnmi.DualNetActiveFlag) { /* SingleNetMode */
+					if (LogPortIndex == 0) {
+						/* Get value for virtual port */
+						VirtualConf(pAC, IoC, Id, pBufPtr);
+					}
+					else {
+						/* Get value for physical ports */
+						PhysPortIndex = SK_PNMI_PORT_LOG2PHYS(
+							pAC, LogPortIndex);
 
-					/* Get value for virtual port */
-					VirtualConf(pAC, IoC, Id, pBuf +
-						Offset);
+						*pBufPtr = pAC->GIni.GP[PhysPortIndex].PLinkCap;
+					}
 				}
-				else {
-					/* Get value for physical ports */
-					PhysPortIndex = SK_PNMI_PORT_LOG2PHYS(
-						pAC, LogPortIndex);
-
-					*(pBuf + Offset) = pAC->GIni.GP[
-						PhysPortIndex].PLinkCap;
+				else { /* DualNetMode */
+					
+					*pBufPtr = pAC->GIni.GP[NetIndex].PLinkCap;
 				}
 				Offset += sizeof(char);
 				break;
 
 			case OID_SKGE_LINK_MODE:
-				if (LogPortIndex == 0) {
+				if (!pAC->Pnmi.DualNetActiveFlag) { /* SingleNetMode */
+					if (LogPortIndex == 0) {
+						/* Get value for virtual port */
+						VirtualConf(pAC, IoC, Id, pBufPtr);
+					}
+					else {
+						/* Get value for physical ports */
+						PhysPortIndex = SK_PNMI_PORT_LOG2PHYS(
+							pAC, LogPortIndex);
 
-					/* Get value for virtual port */
-					VirtualConf(pAC, IoC, Id, pBuf +
-						Offset);
+						*pBufPtr = pAC->GIni.GP[PhysPortIndex].PLinkModeConf;
+					}
 				}
-				else {
-					/* Get value for physical ports */
-					PhysPortIndex = SK_PNMI_PORT_LOG2PHYS(
-						pAC, LogPortIndex);
-
-					*(pBuf + Offset) = pAC->GIni.GP[
-						PhysPortIndex].PLinkModeConf;
+				else { /* DualNetMode */
+				
+					*pBufPtr = pAC->GIni.GP[NetIndex].PLinkModeConf;
 				}
-
 				Offset += sizeof(char);
 				break;
 
 			case OID_SKGE_LINK_MODE_STATUS:
-				if (LogPortIndex == 0) {
+				if (!pAC->Pnmi.DualNetActiveFlag) { /* SingleNetMode */
+					if (LogPortIndex == 0) {
+						/* Get value for virtual port */
+						VirtualConf(pAC, IoC, Id, pBufPtr);
+					}
+					else {
+						/* Get value for physical port */
+						PhysPortIndex = SK_PNMI_PORT_LOG2PHYS(
+							pAC, LogPortIndex);
 
-					/* Get value for virtual port */
-					VirtualConf(pAC, IoC, Id, pBuf +
-						Offset);
+						*pBufPtr =
+							CalculateLinkModeStatus(pAC, IoC, PhysPortIndex);
+					}
 				}
-				else {
-					/* Get value for physical port */
-					PhysPortIndex = SK_PNMI_PORT_LOG2PHYS(
-						pAC, LogPortIndex);
-
-					*(pBuf + Offset) =
-						CalculateLinkModeStatus(pAC,
-							IoC, PhysPortIndex);
+				else { /* DualNetMode */
+					
+					*pBufPtr = CalculateLinkModeStatus(pAC, IoC, NetIndex);
 				}
 				Offset += sizeof(char);
 				break;
 
 			case OID_SKGE_LINK_STATUS:
-				if (LogPortIndex == 0) {
-
-					/* Get value for virtual port */
-					VirtualConf(pAC, IoC, Id, pBuf +
-						Offset);
+				if (!pAC->Pnmi.DualNetActiveFlag) { /* SingleNetMode */
+					if (LogPortIndex == 0) {
+						/* Get value for virtual port */
+						VirtualConf(pAC, IoC, Id, pBufPtr);
+					}
+					else {
+						/* Get value for physical ports */
+						PhysPortIndex = SK_PNMI_PORT_LOG2PHYS(
+							pAC, LogPortIndex);
+	
+						*pBufPtr = CalculateLinkStatus(pAC, IoC, PhysPortIndex);
+					}
 				}
-				else {
-					/* Get value for physical ports */
-					PhysPortIndex = SK_PNMI_PORT_LOG2PHYS(
-						pAC, LogPortIndex);
+				else { /* DualNetMode */
 
-					*(pBuf + Offset) =
-						CalculateLinkStatus(pAC,
-							IoC, PhysPortIndex);
+					*pBufPtr = CalculateLinkStatus(pAC, IoC, NetIndex);
 				}
 				Offset += sizeof(char);
 				break;
 
 			case OID_SKGE_FLOWCTRL_CAP:
-				if (LogPortIndex == 0) {
-
-					/* Get value for virtual port */
-					VirtualConf(pAC, IoC, Id, pBuf +
-						Offset);
+				if (!pAC->Pnmi.DualNetActiveFlag) { /* SingleNetMode */
+					if (LogPortIndex == 0) {
+						/* Get value for virtual port */
+						VirtualConf(pAC, IoC, Id, pBufPtr);
+					}
+					else {
+						/* Get value for physical ports */
+						PhysPortIndex = SK_PNMI_PORT_LOG2PHYS(
+							pAC, LogPortIndex);
+	
+						*pBufPtr = pAC->GIni.GP[PhysPortIndex].PFlowCtrlCap;
+					}
 				}
-				else {
-					/* Get value for physical ports */
-					PhysPortIndex = SK_PNMI_PORT_LOG2PHYS(
-						pAC, LogPortIndex);
-
-					*(pBuf + Offset) = pAC->GIni.GP[
-						PhysPortIndex].PFlowCtrlCap;
+				else { /* DualNetMode */
+				
+					*pBufPtr = pAC->GIni.GP[NetIndex].PFlowCtrlCap;
 				}
 				Offset += sizeof(char);
 				break;
 
 			case OID_SKGE_FLOWCTRL_MODE:
-				if (LogPortIndex == 0) {
-
-					/* Get value for virtual port */
-					VirtualConf(pAC, IoC, Id, pBuf +
-						Offset);
+				if (!pAC->Pnmi.DualNetActiveFlag) { /* SingleNetMode */
+					if (LogPortIndex == 0) {
+						/* Get value for virtual port */
+						VirtualConf(pAC, IoC, Id, pBufPtr);
+					}
+					else {
+						/* Get value for physical port */
+						PhysPortIndex = SK_PNMI_PORT_LOG2PHYS(
+							pAC, LogPortIndex);
+	
+						*pBufPtr = pAC->GIni.GP[PhysPortIndex].PFlowCtrlMode;
+					}
 				}
-				else {
-					/* Get value for physical port */
-					PhysPortIndex = SK_PNMI_PORT_LOG2PHYS(
-						pAC, LogPortIndex);
+				else { /* DualNetMode */
 
-					*(pBuf + Offset) = pAC->GIni.GP[
-						PhysPortIndex].PFlowCtrlMode;
+					*pBufPtr = pAC->GIni.GP[NetIndex].PFlowCtrlMode;
 				}
 				Offset += sizeof(char);
 				break;
 
 			case OID_SKGE_FLOWCTRL_STATUS:
-				if (LogPortIndex == 0) {
-
-					/* Get value for virtual port */
-					VirtualConf(pAC, IoC, Id, pBuf +
-						Offset);
+				if (!pAC->Pnmi.DualNetActiveFlag) { /* SingleNetMode */
+					if (LogPortIndex == 0) {
+						/* Get value for virtual port */
+						VirtualConf(pAC, IoC, Id, pBufPtr);
+					}
+					else {
+						/* Get value for physical port */
+						PhysPortIndex = SK_PNMI_PORT_LOG2PHYS(
+							pAC, LogPortIndex);
+	
+						*pBufPtr = pAC->GIni.GP[PhysPortIndex].PFlowCtrlStatus;
+					}
 				}
-				else {
-					/* Get value for physical port */
-					PhysPortIndex = SK_PNMI_PORT_LOG2PHYS(
-						pAC, LogPortIndex);
+				else { /* DualNetMode */
 
-					*(pBuf + Offset) = pAC->GIni.GP[
-						PhysPortIndex].PFlowCtrlStatus;
+					*pBufPtr = pAC->GIni.GP[NetIndex].PFlowCtrlStatus;
 				}
 				Offset += sizeof(char);
 				break;
 
 			case OID_SKGE_PHY_OPERATION_CAP:
-				if (LogPortIndex == 0) {
-
-					/* Get value for virtual port */
-					VirtualConf(pAC, IoC, Id, pBuf +
-						Offset);
+				if (!pAC->Pnmi.DualNetActiveFlag) { /* SingleNetMode */
+					if (LogPortIndex == 0) {
+						/* Get value for virtual port */
+						VirtualConf(pAC, IoC, Id, pBufPtr);
+					}
+					else {
+						/* Get value for physical ports */
+						PhysPortIndex = SK_PNMI_PORT_LOG2PHYS(
+							pAC, LogPortIndex);
+	
+						*pBufPtr = pAC->GIni.GP[PhysPortIndex].PMSCap;
+					}
 				}
-				else {
-					/* Get value for physical ports */
-					PhysPortIndex = SK_PNMI_PORT_LOG2PHYS(
-						pAC, LogPortIndex);
-
-					*(pBuf + Offset) = pAC->GIni.GP[
-						PhysPortIndex].PMSCap;
+				else { /* DualNetMode */
+				
+					*pBufPtr = pAC->GIni.GP[NetIndex].PMSCap;
 				}
 				Offset += sizeof(char);
 				break;
 
 			case OID_SKGE_PHY_OPERATION_MODE:
-				if (LogPortIndex == 0) {
+				if (!pAC->Pnmi.DualNetActiveFlag) { /* SingleNetMode */
+					if (LogPortIndex == 0) {
+						/* Get value for virtual port */
+						VirtualConf(pAC, IoC, Id, pBufPtr);
+					}
+					else {
+						/* Get value for physical port */
+						PhysPortIndex = SK_PNMI_PORT_LOG2PHYS(
+							pAC, LogPortIndex);
 
-					/* Get value for virtual port */
-					VirtualConf(pAC, IoC, Id, pBuf +
-						Offset);
+						*pBufPtr = pAC->GIni.GP[PhysPortIndex].PMSMode;
+					}
 				}
-				else {
-					/* Get value for physical port */
-					PhysPortIndex = SK_PNMI_PORT_LOG2PHYS(
-						pAC, LogPortIndex);
-
-					*(pBuf + Offset) = pAC->GIni.GP[
-						PhysPortIndex].PMSMode;
+				else { /* DualNetMode */
+				
+					*pBufPtr = pAC->GIni.GP[NetIndex].PMSMode;
 				}
 				Offset += sizeof(char);
 				break;
 
 			case OID_SKGE_PHY_OPERATION_STATUS:
-				if (LogPortIndex == 0) {
-
-					/* Get value for virtual port */
-					VirtualConf(pAC, IoC, Id, pBuf +
-						Offset);
+				if (!pAC->Pnmi.DualNetActiveFlag) { /* SingleNetMode */
+					if (LogPortIndex == 0) {
+						/* Get value for virtual port */
+						VirtualConf(pAC, IoC, Id, pBufPtr);
+					}
+					else {
+						/* Get value for physical port */
+						PhysPortIndex = SK_PNMI_PORT_LOG2PHYS(
+							pAC, LogPortIndex);
+	
+						*pBufPtr = pAC->GIni.GP[PhysPortIndex].PMSStatus;
+					}
 				}
 				else {
-					/* Get value for physical port */
-					PhysPortIndex = SK_PNMI_PORT_LOG2PHYS(
-						pAC, LogPortIndex);
-
-					*(pBuf + Offset) = pAC->GIni.GP[
-						PhysPortIndex].PMSStatus;
+				
+					*pBufPtr = pAC->GIni.GP[NetIndex].PMSStatus;
 				}
 				Offset += sizeof(char);
 				break;
 
+			case OID_SKGE_SPEED_CAP:
+				if (!pAC->Pnmi.DualNetActiveFlag) { /* SingleNetMode */
+					if (LogPortIndex == 0) {
+						/* Get value for virtual port */
+						VirtualConf(pAC, IoC, Id, pBufPtr);
+					}
+					else {
+						/* Get value for physical ports */
+						PhysPortIndex = SK_PNMI_PORT_LOG2PHYS(
+							pAC, LogPortIndex);
+	
+						*pBufPtr = pAC->GIni.GP[PhysPortIndex].PLinkSpeedCap;
+					}
+				}
+				else { /* DualNetMode */
+				
+					*pBufPtr = pAC->GIni.GP[NetIndex].PLinkSpeedCap;
+				}
+				Offset += sizeof(char);
+				break;
+
+			case OID_SKGE_SPEED_MODE:
+				if (!pAC->Pnmi.DualNetActiveFlag) { /* SingleNetMode */
+					if (LogPortIndex == 0) {
+						/* Get value for virtual port */
+						VirtualConf(pAC, IoC, Id, pBufPtr);
+					}
+					else {
+						/* Get value for physical port */
+						PhysPortIndex = SK_PNMI_PORT_LOG2PHYS(
+							pAC, LogPortIndex);
+	
+						*pBufPtr = pAC->GIni.GP[PhysPortIndex].PLinkSpeed;
+					}
+				}
+				else { /* DualNetMode */
+
+					*pBufPtr = pAC->GIni.GP[NetIndex].PLinkSpeed;
+				}
+				Offset += sizeof(char);
+				break;
+
+			case OID_SKGE_SPEED_STATUS:
+				if (!pAC->Pnmi.DualNetActiveFlag) { /* SingleNetMode */
+					if (LogPortIndex == 0) {
+						/* Get value for virtual port */
+						VirtualConf(pAC, IoC, Id, pBufPtr);
+					}
+					else {
+						/* Get value for physical port */
+						PhysPortIndex = SK_PNMI_PORT_LOG2PHYS(
+							pAC, LogPortIndex);
+	
+						*pBufPtr = pAC->GIni.GP[PhysPortIndex].PLinkSpeedUsed;
+					}
+				}
+				else { /* DualNetMode */
+
+					*pBufPtr = pAC->GIni.GP[NetIndex].PLinkSpeedUsed;
+				}
+				Offset += sizeof(char);
+				break;
+			
 			case OID_SKGE_MTU:
 				Val32 = SK_DRIVER_GET_MTU(pAC, IoC, NetIndex);
-				SK_PNMI_STORE_U32(pBuf + Offset, Val32);
+				SK_PNMI_STORE_U32(pBufPtr, Val32);
 				Offset += sizeof(SK_U32);
 				break;
 
 			default:
-				SK_ERR_LOG(pAC, SK_ERRCL_SW, SK_PNMI_ERR042,
-					SK_PNMI_ERR042MSG);
+				SK_DBG_MSG(pAC, SK_DBGMOD_PNMI, SK_DBGCAT_ERR,
+					("MacPrivateConf: Unknown OID should be handled before"));
 
 				pAC->Pnmi.SirqUpdatedFlag --;
 				return (SK_PNMI_ERR_GENERAL);
@@ -6047,6 +5791,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 	case OID_SKGE_LINK_MODE:
 	case OID_SKGE_FLOWCTRL_MODE:
 	case OID_SKGE_PHY_OPERATION_MODE:
+	case OID_SKGE_SPEED_MODE:
 		if (*pLen < Limit - LogPortIndex) {
 
 			*pLen = Limit - LogPortIndex;
@@ -6284,8 +6029,8 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 						EventParam) > 0) {
 
 						SK_ERR_LOG(pAC, SK_ERRCL_SW,
-							SK_PNMI_ERR052,
-							SK_PNMI_ERR052MSG);
+							SK_PNMI_ERR042,
+							SK_PNMI_ERR042MSG);
 
 						*pLen = 0;
 						return (SK_PNMI_ERR_GENERAL);
@@ -6304,14 +6049,90 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 					SK_HWEV_SET_ROLE, EventParam) > 0) {
 
 					SK_ERR_LOG(pAC, SK_ERRCL_SW,
-						SK_PNMI_ERR052,
-						SK_PNMI_ERR052MSG);
+						SK_PNMI_ERR042,
+						SK_PNMI_ERR042MSG);
 
 					*pLen = 0;
 					return (SK_PNMI_ERR_GENERAL);
 				}
 			}
 
+			Offset += sizeof(char);
+			break;
+
+		case OID_SKGE_SPEED_MODE:
+			/* Check the value range */
+			Val8 = *(pBuf + Offset);
+			if (Val8 == 0) {
+
+				Offset += sizeof(char);
+				break;
+			}
+			if (Val8 < (SK_LSPEED_AUTO) ||
+				(LogPortIndex != 0 && Val8 > (SK_LSPEED_1000MBPS)) ||
+				(LogPortIndex == 0 && Val8 > (SK_LSPEED_INDETERMINATED))) {
+
+				*pLen = 0;
+				return (SK_PNMI_ERR_BAD_VALUE);
+			}
+
+			/* The preset ends here */
+			if (Action == SK_PNMI_PRESET) {
+
+				return (SK_PNMI_ERR_OK);
+			}
+
+			if (LogPortIndex == 0) {
+
+				/*
+				 * The virtual port consists of all currently
+				 * active ports. Find them and send an event
+				 * with the new flow control mode to SIRQ.
+				 */
+				for (PhysPortIndex = 0;
+					PhysPortIndex < PhysPortMax;
+					PhysPortIndex ++) {
+
+					if (!pAC->Pnmi.Port[PhysPortIndex].ActiveFlag) {
+
+						continue;
+					}
+
+					EventParam.Para32[0] = PhysPortIndex;
+					EventParam.Para32[1] = (SK_U32)Val8;
+					if (SkGeSirqEvent(pAC, IoC,
+						SK_HWEV_SET_SPEED,
+						EventParam) > 0) {
+
+						SK_ERR_LOG(pAC, SK_ERRCL_SW,
+							SK_PNMI_ERR045,
+							SK_PNMI_ERR045MSG);
+
+						*pLen = 0;
+						return (SK_PNMI_ERR_GENERAL);
+					}
+				}
+			}
+			else {
+				/*
+				 * Send an event with the new flow control
+				 * mode to the SIRQ module.
+				 */
+				EventParam.Para32[0] = SK_PNMI_PORT_LOG2PHYS(
+					pAC, LogPortIndex);
+				EventParam.Para32[1] = (SK_U32)Val8;
+				if (SkGeSirqEvent(pAC, IoC,
+					SK_HWEV_SET_SPEED,
+					EventParam) > 0) {
+
+					SK_ERR_LOG(pAC, SK_ERRCL_SW,
+						SK_PNMI_ERR045,
+						SK_PNMI_ERR045MSG);
+
+					*pLen = 0;
+					return (SK_PNMI_ERR_GENERAL);
+				}
+			}
 			Offset += sizeof(char);
 			break;
 
@@ -6341,8 +6162,8 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 			break;
 
 		default:
-			SK_ERR_LOG(pAC, SK_ERRCL_SW, SK_PNMI_ERR045,
-				SK_PNMI_ERR045MSG);
+            SK_DBG_MSG(pAC, SK_DBGMOD_PNMI, SK_DBGCAT_ERR,
+                ("MacPrivateConf: Unknown OID should be handled before set"));
 
 			*pLen = 0;
 			return (SK_PNMI_ERR_GENERAL);
@@ -6362,7 +6183,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -6370,20 +6191,19 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *	                         value range.
  *	SK_PNMI_ERR_READ_ONLY    The OID is read-only and cannot be set.
  *	SK_PNMI_ERR_UNKNOWN_INST The requested instance of the OID doesn't
- *                               exist (e.g. port instance 3 on a two port
+ *                           exist (e.g. port instance 3 on a two port
  *	                         adapter.
  */
-
-static int Monitor(
+PNMI_STATIC int Monitor(
 SK_AC *pAC,		/* Pointer to adapter context */
 SK_IOC IoC,		/* IO context handle */
-int Action,		/* Get/PreSet/Set action */
+int Action,		/* GET/PRESET/SET action */
 SK_U32 Id,		/* Object ID that is to be processed */
-char *pBuf,		/* Buffer to which to mgmt data will be retrieved */
-unsigned int *pLen,	/* On call: buffer length. On return: used buffer */
+char *pBuf,		/* Buffer used for the management data transfer */
+unsigned int *pLen,	/* On call: pBuf buffer length. On return: used buffer */
 SK_U32 Instance,	/* Instance (1..n) that is to be queried or -1 */
 unsigned int TableIndex, /* Index to the Id table */
-SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
+SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
 {
 	unsigned int	Index;
 	unsigned int	Limit;
@@ -6394,7 +6214,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 	/*
 	 * Calculate instance if wished.
 	 */
-/* XXX Not yet implemented. Return always an empty table. */
+	/* XXX Not yet implemented. Return always an empty table. */
 	Entries = 0;
 
 	if ((Instance != (SK_U32)(-1))) {
@@ -6489,25 +6309,26 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  * Returns:
  *	Nothing
  */
-
-static void VirtualConf(
+PNMI_STATIC void VirtualConf(
 SK_AC *pAC,		/* Pointer to adapter context */
 SK_IOC IoC,		/* IO context handle */
 SK_U32 Id,		/* Object ID that is to be processed */
-char *pBuf)		/* Buffer to which to mgmt data will be retrieved */
+char *pBuf)		/* Buffer used for the management data transfer */
 {
 	unsigned int	PhysPortMax;
 	unsigned int	PhysPortIndex;
 	SK_U8		Val8;
 	SK_BOOL		PortActiveFlag;
-
+	SK_GEPORT	*pPrt;
 
 	*pBuf = 0;
 	PortActiveFlag = SK_FALSE;
 	PhysPortMax = pAC->GIni.GIMacsFound;
-
+	
 	for (PhysPortIndex = 0; PhysPortIndex < PhysPortMax;
 		PhysPortIndex ++) {
+
+		pPrt = &pAC->GIni.GP[PhysPortIndex];
 
 		/* Check if the physical port is active */
 		if (!pAC->Pnmi.Port[PhysPortIndex].ActiveFlag) {
@@ -6527,15 +6348,14 @@ char *pBuf)		/* Buffer to which to mgmt data will be retrieved */
 			 * From a curious point of view the virtual port
 			 * is capable of all found capabilities.
 			 */
-			*pBuf |= pAC->GIni.GP[PhysPortIndex].PLinkCap;
+			*pBuf |= pPrt->PLinkCap;
 			break;
 
 		case OID_SKGE_LINK_MODE:
 			/* Check if it is the first active port */
 			if (*pBuf == 0) {
 
-				*pBuf = pAC->GIni.GP[PhysPortIndex].
-					PLinkModeConf;
+				*pBuf = pPrt->PLinkModeConf;
 				continue;
 			}
 
@@ -6544,8 +6364,7 @@ char *pBuf)		/* Buffer to which to mgmt data will be retrieved */
 			 * mode than the first one we return a value that
 			 * indicates that the link mode is indeterminated.
 			 */
-			if (*pBuf != pAC->GIni.GP[PhysPortIndex].PLinkModeConf
-				) {
+			if (*pBuf != pPrt->PLinkModeConf) {
 
 				*pBuf = SK_LMODE_INDETERMINATED;
 			}
@@ -6553,8 +6372,7 @@ char *pBuf)		/* Buffer to which to mgmt data will be retrieved */
 
 		case OID_SKGE_LINK_MODE_STATUS:
 			/* Get the link mode of the physical port */
-			Val8 = CalculateLinkModeStatus(pAC, IoC,
-				PhysPortIndex);
+			Val8 = CalculateLinkModeStatus(pAC, IoC, PhysPortIndex);
 
 			/* Check if it is the first active port */
 			if (*pBuf == 0) {
@@ -6602,8 +6420,7 @@ char *pBuf)		/* Buffer to which to mgmt data will be retrieved */
 			/* Check if it is the first active port */
 			if (*pBuf == 0) {
 
-				*pBuf = pAC->GIni.GP[PhysPortIndex].
-					PFlowCtrlCap;
+				*pBuf = pPrt->PFlowCtrlCap;
 				continue;
 			}
 
@@ -6611,15 +6428,14 @@ char *pBuf)		/* Buffer to which to mgmt data will be retrieved */
 			 * From a curious point of view the virtual port
 			 * is capable of all found capabilities.
 			 */
-			*pBuf |= pAC->GIni.GP[PhysPortIndex].PFlowCtrlCap;
+			*pBuf |= pPrt->PFlowCtrlCap;
 			break;
 
 		case OID_SKGE_FLOWCTRL_MODE:
 			/* Check if it is the first active port */
 			if (*pBuf == 0) {
 
-				*pBuf = pAC->GIni.GP[PhysPortIndex].
-					PFlowCtrlMode;
+				*pBuf = pPrt->PFlowCtrlMode;
 				continue;
 			}
 
@@ -6628,8 +6444,7 @@ char *pBuf)		/* Buffer to which to mgmt data will be retrieved */
 			 * control mode than the first one, we return a value
 			 * that indicates that the mode is indeterminated.
 			 */
-			if (*pBuf != pAC->GIni.GP[PhysPortIndex].
-				PFlowCtrlMode) {
+			if (*pBuf != pPrt->PFlowCtrlMode) {
 
 				*pBuf = SK_FLOW_MODE_INDETERMINATED;
 			}
@@ -6639,8 +6454,7 @@ char *pBuf)		/* Buffer to which to mgmt data will be retrieved */
 			/* Check if it is the first active port */
 			if (*pBuf == 0) {
 
-				*pBuf = pAC->GIni.GP[PhysPortIndex].
-					PFlowCtrlStatus;
+				*pBuf = pPrt->PFlowCtrlStatus;
 				continue;
 			}
 
@@ -6650,18 +6464,17 @@ char *pBuf)		/* Buffer to which to mgmt data will be retrieved */
 			 * value that indicates that the status is
 			 * indeterminated.
 			 */
-			if (*pBuf != pAC->GIni.GP[PhysPortIndex].
-				PFlowCtrlStatus) {
+			if (*pBuf != pPrt->PFlowCtrlStatus) {
 
 				*pBuf = SK_FLOW_STAT_INDETERMINATED;
 			}
 			break;
+		
 		case OID_SKGE_PHY_OPERATION_CAP:
 			/* Check if it is the first active port */
 			if (*pBuf == 0) {
 
-				*pBuf = pAC->GIni.GP[PhysPortIndex].
-					PMSCap;
+				*pBuf = pPrt->PMSCap;
 				continue;
 			}
 
@@ -6669,15 +6482,14 @@ char *pBuf)		/* Buffer to which to mgmt data will be retrieved */
 			 * From a curious point of view the virtual port
 			 * is capable of all found capabilities.
 			 */
-			*pBuf |= pAC->GIni.GP[PhysPortIndex].PMSCap;
+			*pBuf |= pPrt->PMSCap;
 			break;
 
 		case OID_SKGE_PHY_OPERATION_MODE:
 			/* Check if it is the first active port */
 			if (*pBuf == 0) {
 
-				*pBuf = pAC->GIni.GP[PhysPortIndex].
-					PMSMode;
+				*pBuf = pPrt->PMSMode;
 				continue;
 			}
 
@@ -6686,8 +6498,7 @@ char *pBuf)		/* Buffer to which to mgmt data will be retrieved */
 			 * slave mode than the first one, we return a value
 			 * that indicates that the mode is indeterminated.
 			 */
-			if (*pBuf != pAC->GIni.GP[PhysPortIndex].
-				PMSMode) {
+			if (*pBuf != pPrt->PMSMode) {
 
 				*pBuf = SK_MS_MODE_INDETERMINATED;
 			}
@@ -6697,8 +6508,7 @@ char *pBuf)		/* Buffer to which to mgmt data will be retrieved */
 			/* Check if it is the first active port */
 			if (*pBuf == 0) {
 
-				*pBuf = pAC->GIni.GP[PhysPortIndex].
-					PMSStatus;
+				*pBuf = pPrt->PMSStatus;
 				continue;
 			}
 
@@ -6708,10 +6518,48 @@ char *pBuf)		/* Buffer to which to mgmt data will be retrieved */
 			 * value that indicates that the status is
 			 * indeterminated.
 			 */
-			if (*pBuf != pAC->GIni.GP[PhysPortIndex].
-				PMSStatus) {
+			if (*pBuf != pPrt->PMSStatus) {
 
 				*pBuf = SK_MS_STAT_INDETERMINATED;
+			}
+			break;
+		
+		case OID_SKGE_SPEED_MODE:
+			/* Check if it is the first active port */
+			if (*pBuf == 0) {
+
+				*pBuf = pPrt->PLinkSpeed;
+				continue;
+			}
+
+			/*
+			 * If we find an active port with a different flow
+			 * control mode than the first one, we return a value
+			 * that indicates that the mode is indeterminated.
+			 */
+			if (*pBuf != pPrt->PLinkSpeed) {
+
+				*pBuf = SK_LSPEED_INDETERMINATED;
+			}
+			break;
+		
+		case OID_SKGE_SPEED_STATUS:
+			/* Check if it is the first active port */
+			if (*pBuf == 0) {
+
+				*pBuf = pPrt->PLinkSpeedUsed;
+				continue;
+			}
+
+			/*
+			 * If we find an active port with a different flow
+			 * control status than the first one, we return a
+			 * value that indicates that the status is
+			 * indeterminated.
+			 */
+			if (*pBuf != pPrt->PLinkSpeedUsed) {
+
+				*pBuf = SK_LSPEED_STAT_INDETERMINATED;
 			}
 			break;
 		}
@@ -6760,6 +6608,17 @@ char *pBuf)		/* Buffer to which to mgmt data will be retrieved */
 		case OID_SKGE_PHY_OPERATION_STATUS:
 			*pBuf = SK_MS_STAT_INDETERMINATED;
 			break;
+		case OID_SKGE_SPEED_CAP:
+			*pBuf = SK_LSPEED_CAP_INDETERMINATED;
+			break;
+
+		case OID_SKGE_SPEED_MODE:
+			*pBuf = SK_LSPEED_INDETERMINATED;
+			break;
+
+		case OID_SKGE_SPEED_STATUS:
+			*pBuf = SK_LSPEED_STAT_INDETERMINATED;
+			break;
 		}
 	}
 }
@@ -6779,14 +6638,12 @@ char *pBuf)		/* Buffer to which to mgmt data will be retrieved */
  * Returns:
  *	Link status of physical port
  */
-
-static SK_U8 CalculateLinkStatus(
+PNMI_STATIC SK_U8 CalculateLinkStatus(
 SK_AC *pAC,			/* Pointer to adapter context */
 SK_IOC IoC,			/* IO context handle */
 unsigned int PhysPortIndex)	/* Physical port index */
 {
 	SK_U8	Result;
-
 
 	if (!pAC->GIni.GP[PhysPortIndex].PHWLinkUp) {
 
@@ -6813,21 +6670,19 @@ unsigned int PhysPortIndex)	/* Physical port index */
  *
  * Description:
  *	The COMMON module only tells us if the mode is half or full duplex.
- *	But in the decade of auto sensing it is useful for the user to
+ *	But in the decade of auto sensing it is usefull for the user to
  *	know if the mode was negotiated or forced. Therefore we have a
  *	look to the mode, which was last used by the negotiation process.
  *
  * Returns:
  *	The link mode status
  */
-
-static SK_U8 CalculateLinkModeStatus(
+PNMI_STATIC SK_U8 CalculateLinkModeStatus(
 SK_AC *pAC,			/* Pointer to adapter context */
 SK_IOC IoC,			/* IO context handle */
 unsigned int PhysPortIndex)	/* Physical port index */
 {
 	SK_U8	Result;
-
 
 	/* Get the current mode, which can be full or half duplex */
 	Result = pAC->GIni.GP[PhysPortIndex].PLinkModeStatus;
@@ -6836,7 +6691,7 @@ unsigned int PhysPortIndex)	/* Physical port index */
 	if (Result < SK_LMODE_STAT_HALF) {
 
 		Result = SK_LMODE_STAT_UNKNOWN;
-	} 
+	}
 	else if (pAC->GIni.GP[PhysPortIndex].PLinkMode >= SK_LMODE_AUTOHALF) {
 
 		/*
@@ -6869,8 +6724,7 @@ unsigned int PhysPortIndex)	/* Physical port index */
  *	SK_PNMI_ERR_OK	     Task successfully performed.
  *	SK_PNMI_ERR_GENERAL  Something went wrong.
  */
-
-static int GetVpdKeyArr(
+PNMI_STATIC int GetVpdKeyArr(
 SK_AC *pAC,		/* Pointer to adapter context */
 SK_IOC IoC,		/* IO context handle */
 char *pKeyArr,		/* Ptr KeyArray */
@@ -6966,8 +6820,7 @@ unsigned int *pKeyNo)	/* Number of keys */
  *	SK_PNMI_ERR_OK	     Task successfully performed.
  *	SK_PNMI_ERR_GENERAL  Something went wrong.
  */
-
-static int SirqUpdate(
+PNMI_STATIC int SirqUpdate(
 SK_AC *pAC,	/* Pointer to adapter context */
 SK_IOC IoC)	/* IO context handle */
 {
@@ -7006,8 +6859,7 @@ SK_IOC IoC)	/* IO context handle */
  *	SK_PNMI_ERR_OK	     Task successfully performed.
  *	SK_PNMI_ERR_GENERAL  Something went wrong.
  */
-
-static int RlmtUpdate(
+PNMI_STATIC int RlmtUpdate(
 SK_AC *pAC,	/* Pointer to adapter context */
 SK_IOC IoC,	/* IO context handle */
 SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
@@ -7043,23 +6895,19 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  * Description:
  *	The XMAC holds its statistic internally. To obtain the current
  *	values we must send a command so that the statistic data will
- *	be written to a predefined memory area on the adapter. 
+ *	be written to a predefined memory area on the adapter.
  *
  * Returns:
  *	SK_PNMI_ERR_OK	     Task successfully performed.
  *	SK_PNMI_ERR_GENERAL  Something went wrong.
  */
-
-static int MacUpdate(
+PNMI_STATIC int MacUpdate(
 SK_AC *pAC,		/* Pointer to adapter context */
 SK_IOC IoC,		/* IO context handle */
 unsigned int FirstMac,	/* Index of the first Mac to be updated */
 unsigned int LastMac)	/* Index of the last Mac to be updated */
 {
 	unsigned int	MacIndex;
-	SK_U16		StatReg;
-	unsigned int	WaitIndex;
-
 
 	/*
 	 * Were the statistics already updated during the
@@ -7070,31 +6918,21 @@ unsigned int LastMac)	/* Index of the last Mac to be updated */
 		return (SK_PNMI_ERR_OK);
 	}
 
-	/* Send an update command to all XMACs specified */
+	/* Send an update command to all MACs specified */
 	for (MacIndex = FirstMac; MacIndex <= LastMac; MacIndex ++) {
 
-		StatReg = XM_SC_SNP_TXC | XM_SC_SNP_RXC;
-		XM_OUT16(IoC, MacIndex, XM_STAT_CMD, StatReg);
-
 		/*
-		 * It is an auto-clearing register. If the command bits
-		 * went to zero again, the statistics are transfered.
-		 * Normally the command should be executed immediately.
-		 * But just to be sure we execute a loop.
+		 * 2002-09-13 pweber:	Freeze the current SW counters.
+		 *                      (That should be done as close as
+		 *                      possible to the update of the
+		 *                      HW counters)
 		 */
-		for (WaitIndex = 0; WaitIndex < 10; WaitIndex ++) {
-
-			XM_IN16(IoC, MacIndex, XM_STAT_CMD, &StatReg);
-			if ((StatReg & (XM_SC_SNP_TXC | XM_SC_SNP_RXC)) ==
-				0) {
-
-				break;
-			}
+		if (pAC->GIni.GIMacType == SK_MAC_XMAC) {
+			pAC->Pnmi.BufPort[MacIndex] = pAC->Pnmi.Port[MacIndex];
 		}
-		if (WaitIndex == 10 ) {
-
-			SK_ERR_LOG(pAC, SK_ERRCL_HW, SK_PNMI_ERR050,
-				SK_PNMI_ERR050MSG);
+			
+		/* 2002-09-13 pweber:  Update the HW counter  */
+		if (pAC->GIni.GIFunc.pFnMacUpdateStats(pAC, IoC, MacIndex) != 0) {
 
 			return (SK_PNMI_ERR_GENERAL);
 		}
@@ -7119,8 +6957,7 @@ unsigned int LastMac)	/* Index of the last Mac to be updated */
  * Returns:
  *	Requested statistic value
  */
-
-static SK_U64 GetStatVal(
+PNMI_STATIC SK_U64 GetStatVal(
 SK_AC *pAC,					/* Pointer to adapter context */
 SK_IOC IoC,					/* IO context handle */
 unsigned int LogPortIndex,	/* Index of the logical Port to be processed */
@@ -7129,16 +6966,16 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 {
 	unsigned int	PhysPortIndex;
 	unsigned int	PhysPortMax;
-	SK_U64		Val = 0;
+	SK_U64			Val = 0;
 
 
-	if(pAC->Pnmi.DualNetActiveFlag == SK_TRUE){	/* Dual net mode */
+	if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {	/* Dual net mode */
 
 		PhysPortIndex = NetIndex;
+		
 		Val = GetPhysStatVal(pAC, IoC, PhysPortIndex, StatIndex);
-    }	/* end of dual net mode */
-
-	else { /* single net mode */
+	}
+	else {	/* Single Net mode */
 
 		if (LogPortIndex == 0) {
 
@@ -7150,8 +6987,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 
 				if (pAC->Pnmi.Port[PhysPortIndex].ActiveFlag) {
 
-					Val += GetPhysStatVal(pAC, IoC, PhysPortIndex,
-						StatIndex);
+					Val += GetPhysStatVal(pAC, IoC, PhysPortIndex, StatIndex);
 				}
 			}
 
@@ -7161,9 +6997,10 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 		else {
 			/* Get counter value of physical port */
 			PhysPortIndex = SK_PNMI_PORT_LOG2PHYS(pAC, LogPortIndex);
+			
 			Val = GetPhysStatVal(pAC, IoC, PhysPortIndex, StatIndex);
 		}
-	} /* end of single net mode */
+	}
 	return (Val);
 }
 
@@ -7183,87 +7020,325 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  * Returns:
  *	Counter value
  */
-
-static SK_U64 GetPhysStatVal(
+PNMI_STATIC SK_U64 GetPhysStatVal(
 SK_AC *pAC,					/* Pointer to adapter context */
 SK_IOC IoC,					/* IO context handle */
 unsigned int PhysPortIndex,	/* Index of the logical Port to be processed */
 unsigned int StatIndex)		/* Index to statistic value */
 {
-	SK_U64		Val = 0;
-	SK_U32		LowVal;
-	SK_U32		HighVal;
-
+	SK_U64	Val = 0;
+	SK_U32	LowVal = 0;
+	SK_U32	HighVal = 0;
+	SK_U16	Word;
+	int		MacType;
+	unsigned int HelpIndex;
+	SK_GEPORT	*pPrt;
+	
+	SK_PNMI_PORT	*pPnmiPrt;
+	SK_GEMACFUNC	*pFnMac;
+	
+	pPrt = &pAC->GIni.GP[PhysPortIndex];
+	
+	MacType = pAC->GIni.GIMacType;
+	
+	/* 2002-09-17 pweber: For XMAC, use the frozen SW counters (BufPort) */
+	if (MacType == SK_MAC_XMAC) {
+		pPnmiPrt = &pAC->Pnmi.BufPort[PhysPortIndex];
+	}
+	else {
+		pPnmiPrt = &pAC->Pnmi.Port[PhysPortIndex];
+	}
+	
+	pFnMac   = &pAC->GIni.GIFunc;
 
 	switch (StatIndex) {
-
-	case SK_PNMI_HTX_OCTET:
-		XM_IN32(IoC, PhysPortIndex, XM_TXO_OK_LO, &LowVal);
-		XM_IN32(IoC, PhysPortIndex, XM_TXO_OK_HI, &HighVal);
+	case SK_PNMI_HTX:
+		if (MacType == SK_MAC_GMAC) {
+			(void)pFnMac->pFnMacStatistic(pAC, IoC, PhysPortIndex,
+							StatAddr[SK_PNMI_HTX_BROADCAST][MacType].Reg,
+							&LowVal);
+			(void)pFnMac->pFnMacStatistic(pAC, IoC, PhysPortIndex,
+							StatAddr[SK_PNMI_HTX_MULTICAST][MacType].Reg,
+							&HighVal);
+			LowVal += HighVal;
+			(void)pFnMac->pFnMacStatistic(pAC, IoC, PhysPortIndex,
+							StatAddr[SK_PNMI_HTX_UNICAST][MacType].Reg,
+							&HighVal);
+			LowVal += HighVal;
+		}
+		else {
+			(void)pFnMac->pFnMacStatistic(pAC, IoC, PhysPortIndex,
+										  StatAddr[StatIndex][MacType].Reg,
+										  &LowVal);
+		}
+		HighVal = pPnmiPrt->CounterHigh[StatIndex];
+		break;
+	
+	case SK_PNMI_HRX:
+		if (MacType == SK_MAC_GMAC) {
+			(void)pFnMac->pFnMacStatistic(pAC, IoC, PhysPortIndex,
+							StatAddr[SK_PNMI_HRX_BROADCAST][MacType].Reg,
+							&LowVal);
+			(void)pFnMac->pFnMacStatistic(pAC, IoC, PhysPortIndex,
+							StatAddr[SK_PNMI_HRX_MULTICAST][MacType].Reg,
+							&HighVal);
+			LowVal += HighVal;
+			(void)pFnMac->pFnMacStatistic(pAC, IoC, PhysPortIndex,
+							StatAddr[SK_PNMI_HRX_UNICAST][MacType].Reg,
+							&HighVal);
+			LowVal += HighVal;
+		}
+		else {
+			(void)pFnMac->pFnMacStatistic(pAC, IoC, PhysPortIndex,
+										  StatAddr[StatIndex][MacType].Reg,
+										  &LowVal);
+		}
+		HighVal = pPnmiPrt->CounterHigh[StatIndex];
 		break;
 
+	case SK_PNMI_HTX_OCTET:
 	case SK_PNMI_HRX_OCTET:
-		XM_IN32(IoC, PhysPortIndex, XM_RXO_OK_LO, &LowVal);
-		XM_IN32(IoC, PhysPortIndex, XM_RXO_OK_HI, &HighVal);
+		(void)pFnMac->pFnMacStatistic(pAC, IoC, PhysPortIndex,
+									  StatAddr[StatIndex][MacType].Reg,
+									  &HighVal);
+		(void)pFnMac->pFnMacStatistic(pAC, IoC, PhysPortIndex,
+									  StatAddr[StatIndex + 1][MacType].Reg,
+									  &LowVal);
+		break;
+
+	case SK_PNMI_HTX_BURST:
+	case SK_PNMI_HTX_EXCESS_DEF:
+	case SK_PNMI_HTX_CARRIER:
+		/* Not supported by GMAC */
+		if (MacType == SK_MAC_GMAC) {
+			return (Val);
+		}
+
+		(void)pFnMac->pFnMacStatistic(pAC, IoC, PhysPortIndex,
+									  StatAddr[StatIndex][MacType].Reg,
+									  &LowVal);
+		HighVal = pPnmiPrt->CounterHigh[StatIndex];
+		break;
+
+	case SK_PNMI_HTX_MACC:
+		/* GMAC only supports PAUSE MAC control frames */
+		if (MacType == SK_MAC_GMAC) {
+			HelpIndex = SK_PNMI_HTX_PMACC;
+		}
+		else {
+			HelpIndex = StatIndex;
+		}
+		
+		(void)pFnMac->pFnMacStatistic(pAC, IoC, PhysPortIndex,
+								StatAddr[HelpIndex][MacType].Reg,
+								&LowVal);
+
+		HighVal = pPnmiPrt->CounterHigh[StatIndex];
+		break;
+
+	case SK_PNMI_HTX_COL:
+	case SK_PNMI_HRX_UNDERSIZE:
+		/* Not supported by XMAC */
+		if (MacType == SK_MAC_XMAC) {
+			return (Val);
+		}
+
+		(void)pFnMac->pFnMacStatistic(pAC, IoC, PhysPortIndex,
+									  StatAddr[StatIndex][MacType].Reg,
+									  &LowVal);
+		HighVal = pPnmiPrt->CounterHigh[StatIndex];
+		break;
+
+	case SK_PNMI_HTX_DEFFERAL:
+		/* Not supported by GMAC */
+		if (MacType == SK_MAC_GMAC) {
+			return (Val);
+		}
+		
+		/*
+		 * XMAC counts frames with deferred transmission
+		 * even in full-duplex mode.
+		 *
+		 * In full-duplex mode the counter remains constant!
+		 */
+		if ((pPrt->PLinkModeStatus == SK_LMODE_STAT_AUTOFULL) ||
+			(pPrt->PLinkModeStatus == SK_LMODE_STAT_FULL)) {
+
+			LowVal = 0;
+			HighVal = 0;
+		}
+		else {
+			/* Otherwise get contents of hardware register */
+			(void)pFnMac->pFnMacStatistic(pAC, IoC, PhysPortIndex,
+										  StatAddr[StatIndex][MacType].Reg,
+										  &LowVal);
+			HighVal = pPnmiPrt->CounterHigh[StatIndex];
+		}
+		break;
+
+	case SK_PNMI_HRX_BADOCTET:
+		/* Not supported by XMAC */
+		if (MacType == SK_MAC_XMAC) {
+			return (Val);
+		}
+
+		(void)pFnMac->pFnMacStatistic(pAC, IoC, PhysPortIndex,
+									  StatAddr[StatIndex][MacType].Reg,
+									  &HighVal);
+		(void)pFnMac->pFnMacStatistic(pAC, IoC, PhysPortIndex,
+									  StatAddr[StatIndex + 1][MacType].Reg,
+                                      &LowVal);
 		break;
 
 	case SK_PNMI_HTX_OCTETLOW:
 	case SK_PNMI_HRX_OCTETLOW:
+	case SK_PNMI_HRX_BADOCTETLOW:
 		return (Val);
 
-	case SK_PNMI_HTX_SYNC:
-		LowVal = (SK_U32)pAC->Pnmi.Port[PhysPortIndex].StatSyncCts;
-		HighVal = (SK_U32)
-			(pAC->Pnmi.Port[PhysPortIndex].StatSyncCts >> 32);
-		break;
-
-	case SK_PNMI_HTX_SYNC_OCTET:
-		LowVal = (SK_U32)pAC->Pnmi.Port[PhysPortIndex].
-			StatSyncOctetsCts;
-		HighVal = (SK_U32)
-			(pAC->Pnmi.Port[PhysPortIndex].StatSyncOctetsCts >>
-			32);
-		break;
-
 	case SK_PNMI_HRX_LONGFRAMES:
-		LowVal = (SK_U32)pAC->Pnmi.Port[PhysPortIndex].StatRxLongFrameCts;
-		HighVal = (SK_U32)
-			(pAC->Pnmi.Port[PhysPortIndex].StatRxLongFrameCts >> 32);
+		/* For XMAC the SW counter is managed by PNMI */
+		if (MacType == SK_MAC_XMAC) {
+			return (pPnmiPrt->StatRxLongFrameCts);
+		}
+		
+		(void)pFnMac->pFnMacStatistic(pAC, IoC, PhysPortIndex,
+									  StatAddr[StatIndex][MacType].Reg,
+									  &LowVal);
+		HighVal = pPnmiPrt->CounterHigh[StatIndex];
+		break;
+		
+	case SK_PNMI_HRX_TOO_LONG:
+		(void)pFnMac->pFnMacStatistic(pAC, IoC, PhysPortIndex,
+								StatAddr[StatIndex][MacType].Reg,
+								&LowVal);
+		HighVal = pPnmiPrt->CounterHigh[StatIndex];
+		
+		Val = (((SK_U64)HighVal << 32) | (SK_U64)LowVal);
+
+		if (MacType == SK_MAC_GMAC) {
+			/* For GMAC the SW counter is additionally managed by PNMI */
+			Val += pPnmiPrt->StatRxFrameTooLongCts;
+		}
+		else {
+			/*
+			 * Frames longer than IEEE 802.3 frame max size are counted
+			 * by XMAC in frame_too_long counter even reception of long
+			 * frames was enabled and the frame was correct.
+			 * So correct the value by subtracting RxLongFrame counter.
+			 */
+			Val -= pPnmiPrt->StatRxLongFrameCts;
+		}
+
+		LowVal = (SK_U32)Val;
+		HighVal = (SK_U32)(Val >> 32);
+		break;
+		
+	case SK_PNMI_HRX_SHORTS:
+		/* Not supported by GMAC */
+		if (MacType == SK_MAC_GMAC) {
+			/* GM_RXE_FRAG?? */
+			return (Val);
+		}
+		
+		/*
+		 * XMAC counts short frame errors even if link down (#10620)
+		 *
+		 * If link-down the counter remains constant
+		 */
+		if (pPrt->PLinkModeStatus != SK_LMODE_STAT_UNKNOWN) {
+
+			/* Otherwise get incremental difference */
+			(void)pFnMac->pFnMacStatistic(pAC, IoC, PhysPortIndex,
+										  StatAddr[StatIndex][MacType].Reg,
+										  &LowVal);
+			HighVal = pPnmiPrt->CounterHigh[StatIndex];
+
+			Val = (((SK_U64)HighVal << 32) | (SK_U64)LowVal);
+			Val -= pPnmiPrt->RxShortZeroMark;
+
+			LowVal = (SK_U32)Val;
+			HighVal = (SK_U32)(Val >> 32);
+		}
+		break;
+
+	case SK_PNMI_HRX_MACC:
+	case SK_PNMI_HRX_MACC_UNKWN:
+	case SK_PNMI_HRX_BURST:
+	case SK_PNMI_HRX_MISSED:
+	case SK_PNMI_HRX_FRAMING:
+	case SK_PNMI_HRX_CARRIER:
+	case SK_PNMI_HRX_IRLENGTH:
+	case SK_PNMI_HRX_SYMBOL:
+	case SK_PNMI_HRX_CEXT:
+		/* Not supported by GMAC */
+		if (MacType == SK_MAC_GMAC) {
+			return (Val);
+		}
+
+		(void)pFnMac->pFnMacStatistic(pAC, IoC, PhysPortIndex,
+									  StatAddr[StatIndex][MacType].Reg,
+									  &LowVal);
+		HighVal = pPnmiPrt->CounterHigh[StatIndex];
+		break;
+
+	case SK_PNMI_HRX_PMACC_ERR:
+		/* For GMAC the SW counter is managed by PNMI */
+		if (MacType == SK_MAC_GMAC) {
+			return (pPnmiPrt->StatRxPMaccErr);
+		}
+		
+		(void)pFnMac->pFnMacStatistic(pAC, IoC, PhysPortIndex,
+									  StatAddr[StatIndex][MacType].Reg,
+									  &LowVal);
+		HighVal = pPnmiPrt->CounterHigh[StatIndex];
+		break;
+
+	/* SW counter managed by PNMI */
+	case SK_PNMI_HTX_SYNC:
+		LowVal = (SK_U32)pPnmiPrt->StatSyncCts;
+		HighVal = (SK_U32)(pPnmiPrt->StatSyncCts >> 32);
+		break;
+
+	/* SW counter managed by PNMI */
+	case SK_PNMI_HTX_SYNC_OCTET:
+		LowVal = (SK_U32)pPnmiPrt->StatSyncOctetsCts;
+		HighVal = (SK_U32)(pPnmiPrt->StatSyncOctetsCts >> 32);
 		break;
 
 	case SK_PNMI_HRX_FCS:
-		/* 
-		 * Broadcom filters fcs errors and counts it in 
+		/*
+		 * Broadcom filters FCS errors and counts it in
 		 * Receive Error Counter register
 		 */
-		if (pAC->GIni.GP[PhysPortIndex].PhyType == SK_PHY_BCOM) {
+		if (pPrt->PhyType == SK_PHY_BCOM) {
 			/* do not read while not initialized (PHY_READ hangs!)*/
-			if (pAC->GIni.GP[PhysPortIndex].PState) {
-				PHY_READ(IoC, &pAC->GIni.GP[PhysPortIndex],
-					 PhysPortIndex, PHY_BCOM_RE_CTR,
-					&LowVal);
+			if (pPrt->PState != SK_PRT_RESET) {
+				SkXmPhyRead(pAC, IoC, PhysPortIndex, PHY_BCOM_RE_CTR, &Word);
+				
+				LowVal = Word;
 			}
-			else {
-				LowVal = 0;
-			}
-			HighVal = pAC->Pnmi.Port[PhysPortIndex].CounterHigh[StatIndex];
+			HighVal = pPnmiPrt->CounterHigh[StatIndex];
 		}
 		else {
-			XM_IN32(IoC, PhysPortIndex,
-				StatAddress[StatIndex].Param, &LowVal);
-			HighVal = pAC->Pnmi.Port[PhysPortIndex].CounterHigh[StatIndex];
+			(void)pFnMac->pFnMacStatistic(pAC, IoC, PhysPortIndex,
+										  StatAddr[StatIndex][MacType].Reg,
+										  &LowVal);
+			HighVal = pPnmiPrt->CounterHigh[StatIndex];
 		}
+		break;
+
 	default:
-		XM_IN32(IoC, PhysPortIndex, StatAddress[StatIndex].Param,
-			&LowVal);
-		HighVal = pAC->Pnmi.Port[PhysPortIndex].CounterHigh[StatIndex];
+		(void)pFnMac->pFnMacStatistic(pAC, IoC, PhysPortIndex,
+									  StatAddr[StatIndex][MacType].Reg,
+									  &LowVal);
+		HighVal = pPnmiPrt->CounterHigh[StatIndex];
 		break;
 	}
 
 	Val = (((SK_U64)HighVal << 32) | (SK_U64)LowVal);
 
 	/* Correct value because of possible XMAC reset. XMAC Errata #2 */
-	Val += pAC->Pnmi.Port[PhysPortIndex].CounterOffset[StatIndex];
+	Val += pPnmiPrt->CounterOffset[StatIndex];
 
 	return (Val);
 }
@@ -7279,8 +7354,7 @@ unsigned int StatIndex)		/* Index to statistic value */
  * Returns:
  *	Nothing
  */
-
-static void ResetCounter(
+PNMI_STATIC void ResetCounter(
 SK_AC *pAC,		/* Pointer to adapter context */
 SK_IOC IoC,		/* IO context handle */
 SK_U32 NetIndex)
@@ -7305,20 +7379,17 @@ SK_U32 NetIndex)
 
 	/* Notify CSUM module */
 #ifdef SK_USE_CSUM
-	EventParam.Para64 = (SK_U64)(-1);
+	EventParam.Para32[0] = NetIndex;
+	EventParam.Para32[1] = (SK_U32)-1;
 	SkEventQueue(pAC, SKGE_CSUM, SK_CSUM_EVENT_CLEAR_PROTO_STATS,
 		EventParam);
-#endif
-
+#endif /* SK_USE_CSUM */
+	
 	/* Clear XMAC statistic */
 	for (PhysPortIndex = 0; PhysPortIndex <
 		(unsigned int)pAC->GIni.GIMacsFound; PhysPortIndex ++) {
 
-		XM_OUT16(IoC, PhysPortIndex, XM_STAT_CMD,
-			XM_SC_CLR_RXC | XM_SC_CLR_TXC);
-		/* Clear two times according to Errata #3 */
-		XM_OUT16(IoC, PhysPortIndex, XM_STAT_CMD,
-			XM_SC_CLR_RXC | XM_SC_CLR_TXC);
+		(void)pAC->GIni.GIFunc.pFnMacResetCounter(pAC, IoC, PhysPortIndex);
 
 		SK_MEMSET((char *)&pAC->Pnmi.Port[PhysPortIndex].CounterHigh,
 			0, sizeof(pAC->Pnmi.Port[PhysPortIndex].CounterHigh));
@@ -7333,6 +7404,12 @@ SK_U32 NetIndex)
 		SK_MEMSET((char *)&pAC->Pnmi.Port[PhysPortIndex].
 			StatRxLongFrameCts, 0, sizeof(pAC->Pnmi.Port[
 			PhysPortIndex].StatRxLongFrameCts));
+		SK_MEMSET((char *)&pAC->Pnmi.Port[PhysPortIndex].
+				  StatRxFrameTooLongCts, 0, sizeof(pAC->Pnmi.Port[
+			PhysPortIndex].StatRxFrameTooLongCts));
+		SK_MEMSET((char *)&pAC->Pnmi.Port[PhysPortIndex].
+				  StatRxPMaccErr, 0, sizeof(pAC->Pnmi.Port[
+			PhysPortIndex].StatRxPMaccErr));
 	}
 
 	/*
@@ -7364,7 +7441,7 @@ SK_U32 NetIndex)
  *
  * Description:
  *	The trap buffer stores various events. A user application somehow
- *	gets notified that an event occurred and retrieves the trap buffer
+ *	gets notified that an event occured and retrieves the trap buffer
  *	contens (or simply polls the buffer). The buffer is organized as
  *	a ring which stores the newest traps at the beginning. The oldest
  *	traps are overwritten by the newest ones. Each trap entry has a
@@ -7373,8 +7450,7 @@ SK_U32 NetIndex)
  * Returns:
  *	A pointer to the trap entry
  */
-
-static char* GetTrapEntry(
+PNMI_STATIC char* GetTrapEntry(
 SK_AC *pAC,		/* Pointer to adapter context */
 SK_U32 TrapId,		/* SNMP ID of the trap */
 unsigned int Size)	/* Space needed for trap entry */
@@ -7399,11 +7475,11 @@ unsigned int Size)	/* Space needed for trap entry */
 	if (Beg >= Size) {
 
 		NeededSpace = Size;
-		Wrap = FALSE;
+		Wrap = SK_FALSE;
 	}
 	else {
 		NeededSpace = Beg + Size;
-		Wrap = TRUE;
+		Wrap = SK_TRUE;
 	}
 
 	/*
@@ -7424,18 +7500,18 @@ unsigned int Size)	/* Space needed for trap entry */
 		End -= EntrySize;
 #ifdef DEBUG
 		SK_MEMSET(pBuf + End, (char)(-1), EntrySize);
-#endif
+#endif /* DEBUG */
 		if (End == BufPad) {
 #ifdef DEBUG
 			SK_MEMSET(pBuf, (char)(-1), End);
-#endif
+#endif /* DEBUG */
 			BufFree += End;
 			End = 0;
 			BufPad = 0;
 		}
 	}
 
-	/* 
+	/*
 	 * Insert new entry as first entry. Newest entries are
 	 * stored at the beginning of the queue.
 	 */
@@ -7479,8 +7555,7 @@ unsigned int Size)	/* Space needed for trap entry */
  * Returns:
  *	Nothing
  */
-
-static void CopyTrapQueue(
+PNMI_STATIC void CopyTrapQueue(
 SK_AC *pAC,		/* Pointer to adapter context */
 char *pDstBuf)		/* Buffer to which the queued traps will be copied */
 {
@@ -7523,8 +7598,7 @@ char *pDstBuf)		/* Buffer to which the queued traps will be copied */
  * Returns:
  *	Nothing
  */
-
-static void GetTrapQueueLen(
+PNMI_STATIC void GetTrapQueueLen(
 SK_AC *pAC,		/* Pointer to adapter context */
 unsigned int *pLen,	/* Length in Bytes of all queued traps */
 unsigned int *pEntries)	/* Returns number of trapes stored in queue */
@@ -7566,8 +7640,7 @@ unsigned int *pEntries)	/* Returns number of trapes stored in queue */
  * Returns:
  *	Nothing
  */
-
-static void QueueSimpleTrap(
+PNMI_STATIC void QueueSimpleTrap(
 SK_AC *pAC,		/* Pointer to adapter context */
 SK_U32 TrapId)		/* Type of sensor trap */
 {
@@ -7585,8 +7658,7 @@ SK_U32 TrapId)		/* Type of sensor trap */
  * Returns:
  *	Nothing
  */
-
-static void QueueSensorTrap(
+PNMI_STATIC void QueueSensorTrap(
 SK_AC *pAC,			/* Pointer to adapter context */
 SK_U32 TrapId,			/* Type of sensor trap */
 unsigned int SensorIndex)	/* Index of sensor which caused the trap */
@@ -7641,8 +7713,7 @@ unsigned int SensorIndex)	/* Index of sensor which caused the trap */
  * Returns:
  *	Nothing
  */
-
-static void QueueRlmtNewMacTrap(
+PNMI_STATIC void QueueRlmtNewMacTrap(
 SK_AC *pAC,		/* Pointer to adapter context */
 unsigned int ActiveMac)	/* Index (0..n) of the currently active port */
 {
@@ -7669,8 +7740,7 @@ unsigned int ActiveMac)	/* Index (0..n) of the currently active port */
  * Returns:
  *	Nothing
  */
-
-static void QueueRlmtPortTrap(
+PNMI_STATIC void QueueRlmtPortTrap(
 SK_AC *pAC,		/* Pointer to adapter context */
 SK_U32 TrapId,		/* Type of RLMT port trap */
 unsigned int PortIndex)	/* Index of the port, which changed its state */
@@ -7697,8 +7767,7 @@ unsigned int PortIndex)	/* Index of the port, which changed its state */
  * Returns:
  *	Nothing
  */
-
-static void CopyMac(
+PNMI_STATIC void CopyMac(
 char *pDst,		/* Pointer to destination buffer */
 SK_MAC_ADDR *pMac)	/* Pointer of Source */
 {
@@ -7710,3 +7779,716 @@ SK_MAC_ADDR *pMac)	/* Pointer of Source */
 		*(pDst + i) = pMac->a[i];
 	}
 }
+
+#ifdef SK_POWER_MGMT
+/*****************************************************************************
+ *
+ * PowerManagement - OID handler function of PowerManagement OIDs
+ *
+ * Description:
+ *	The code is simple. No description necessary.
+ *
+ * Returns:
+ *	SK_PNMI_ERR_OK           The request was successfully performed.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
+ *	                         the correct data (e.g. a 32bit value is
+ *	                         needed, but a 16 bit value was passed).
+ *	SK_PNMI_ERR_UNKNOWN_INST The requested instance of the OID doesn't
+ *                               exist (e.g. port instance 3 on a two port
+ *	                         adapter.
+ */
+
+PNMI_STATIC int PowerManagement(
+SK_AC *pAC,		/* Pointer to adapter context */
+SK_IOC IoC,		/* IO context handle */
+int Action,		/* Get/PreSet/Set action */
+SK_U32 Id,		/* Object ID that is to be processed */
+char *pBuf,		/* Buffer to which to mgmt data will be retrieved */
+unsigned int *pLen,	/* On call: buffer length. On return: used buffer */
+SK_U32 Instance,	/* Instance (1..n) that is to be queried or -1 */
+unsigned int TableIndex, /* Index to the Id table */
+SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
+{
+	
+	SK_U32	RetCode = SK_PNMI_ERR_GENERAL;
+
+	/*
+	 * Check instance. We only handle single instance variables
+	 */
+	if (Instance != (SK_U32)(-1) && Instance != 1) {
+
+		*pLen = 0;
+		return (SK_PNMI_ERR_UNKNOWN_INST);
+	}
+	
+    
+    /* Check length */
+    switch (Id) {
+
+    case OID_PNP_CAPABILITIES:
+        if (*pLen < sizeof(SK_PNP_CAPABILITIES)) {
+
+            *pLen = sizeof(SK_PNP_CAPABILITIES);
+            return (SK_PNMI_ERR_TOO_SHORT);
+        }
+        break;
+
+	case OID_PNP_SET_POWER:
+    case OID_PNP_QUERY_POWER:
+    	if (*pLen < sizeof(SK_DEVICE_POWER_STATE))
+    	{
+    		*pLen = sizeof(SK_DEVICE_POWER_STATE);
+    		return (SK_PNMI_ERR_TOO_SHORT);
+    	}
+        break;
+
+    case OID_PNP_ADD_WAKE_UP_PATTERN:
+    case OID_PNP_REMOVE_WAKE_UP_PATTERN:
+		if (*pLen < sizeof(SK_PM_PACKET_PATTERN)) {
+
+			*pLen = sizeof(SK_PM_PACKET_PATTERN);
+			return (SK_PNMI_ERR_TOO_SHORT);
+		}
+		break;
+
+    case OID_PNP_ENABLE_WAKE_UP:
+        if (*pLen < sizeof(SK_U32)) {
+
+            *pLen = sizeof(SK_U32);
+            return (SK_PNMI_ERR_TOO_SHORT);
+        }
+        break;
+    }
+	
+    /*
+	 * Perform action
+	 */
+	if (Action == SK_PNMI_GET) {
+
+		/*
+		 * Get value
+		 */
+		switch (Id) {
+
+		case OID_PNP_CAPABILITIES:
+			RetCode = SkPowerQueryPnPCapabilities(pAC, IoC, pBuf, pLen);
+			break;
+
+		case OID_PNP_QUERY_POWER:
+			/* The Windows DDK describes: An OID_PNP_QUERY_POWER requests
+			 the miniport to indicate whether it can transition its NIC
+			 to the low-power state.
+			 A miniport driver must always return NDIS_STATUS_SUCCESS
+			 to a query of OID_PNP_QUERY_POWER. */
+			*pLen = sizeof(SK_DEVICE_POWER_STATE);;
+            RetCode = SK_PNMI_ERR_OK;
+			break;
+
+			/* NDIS handles these OIDs as write-only.
+			 * So in case of get action the buffer with written length = 0
+			 * is returned
+			 */
+		case OID_PNP_SET_POWER:
+		case OID_PNP_ADD_WAKE_UP_PATTERN:
+		case OID_PNP_REMOVE_WAKE_UP_PATTERN:
+			*pLen = 0;	
+            RetCode = SK_PNMI_ERR_NOT_SUPPORTED;
+			break;
+
+		case OID_PNP_ENABLE_WAKE_UP:
+			RetCode = SkPowerGetEnableWakeUp(pAC, IoC, pBuf, pLen);
+			break;
+
+		default:
+			RetCode = SK_PNMI_ERR_GENERAL;
+			break;
+		}
+
+		return (RetCode);
+	}
+	
+
+	/*
+	 * Perform preset or set
+	 */
+	
+	/* POWER module does not support PRESET action */
+	if (Action == SK_PNMI_PRESET) {
+		return (SK_PNMI_ERR_OK);
+	}
+
+	switch (Id) {
+	case OID_PNP_SET_POWER:
+		RetCode = SkPowerSetPower(pAC, IoC, pBuf, pLen);	
+		break;
+
+	case OID_PNP_ADD_WAKE_UP_PATTERN:
+		RetCode = SkPowerAddWakeUpPattern(pAC, IoC, pBuf, pLen);	
+		break;
+		
+	case OID_PNP_REMOVE_WAKE_UP_PATTERN:
+		RetCode = SkPowerRemoveWakeUpPattern(pAC, IoC, pBuf, pLen);	
+		break;
+		
+	case OID_PNP_ENABLE_WAKE_UP:
+		RetCode = SkPowerSetEnableWakeUp(pAC, IoC, pBuf, pLen);
+		break;
+		
+	default:
+		RetCode = SK_PNMI_ERR_READ_ONLY;
+	}
+	
+	return (RetCode);
+}
+#endif /* SK_POWER_MGMT */
+
+#ifdef SK_DIAG_SUPPORT
+/*****************************************************************************
+ *
+ * DiagActions - OID handler function of Diagnostic driver 
+ *
+ * Description:
+ *	The code is simple. No description necessary.
+ *
+ * Returns:
+ *	SK_PNMI_ERR_OK           The request was successfully performed.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
+ *	                         the correct data (e.g. a 32bit value is
+ *	                         needed, but a 16 bit value was passed).
+ *	SK_PNMI_ERR_UNKNOWN_INST The requested instance of the OID doesn't
+ *                           exist (e.g. port instance 3 on a two port
+ *	                         adapter.
+ */
+
+PNMI_STATIC int DiagActions(
+SK_AC *pAC,		/* Pointer to adapter context */
+SK_IOC IoC,		/* IO context handle */
+int Action,		/* GET/PRESET/SET action */
+SK_U32 Id,		/* Object ID that is to be processed */
+char *pBuf,		/* Buffer used for the management data transfer */
+unsigned int *pLen,	/* On call: pBuf buffer length. On return: used buffer */
+SK_U32 Instance,	/* Instance (1..n) that is to be queried or -1 */
+unsigned int TableIndex, /* Index to the Id table */
+SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
+{
+
+	SK_U32	RetCode = SK_PNMI_ERR_GENERAL;
+
+	/*
+	 * Check instance. We only handle single instance variables.
+	 */
+	if (Instance != (SK_U32)(-1) && Instance != 1) {
+
+		*pLen = 0;
+		return (SK_PNMI_ERR_UNKNOWN_INST);
+	}
+
+	/*
+	 * Check length.
+	 */
+	switch (Id) {
+
+	case OID_SKGE_DIAG_MODE:
+		if (*pLen < sizeof(SK_U32)) {
+
+			*pLen = sizeof(SK_U32);
+			return (SK_PNMI_ERR_TOO_SHORT);
+		}
+		break;
+
+	default:
+		SK_ERR_LOG(pAC, SK_ERRCL_SW, SK_PNMI_ERR040, SK_PNMI_ERR040MSG);
+		*pLen = 0;
+		return (SK_PNMI_ERR_GENERAL);
+	}
+
+	/* Perform action. */
+
+	/* GET value. */
+	if (Action == SK_PNMI_GET) {
+
+		switch (Id) {
+
+		case OID_SKGE_DIAG_MODE:
+			SK_PNMI_STORE_U32(pBuf, pAC->DiagModeActive);
+			*pLen = sizeof(SK_U32);	
+			RetCode = SK_PNMI_ERR_OK;
+			break;
+
+		default:
+			*pLen = 0;	
+			RetCode = SK_PNMI_ERR_GENERAL;
+			break;
+		}
+
+		return (RetCode); 
+	}
+
+	/* From here SET or PRESET value. */
+	
+	/* PRESET value is not supported. */
+	if (Action == SK_PNMI_PRESET) {
+		return (SK_PNMI_ERR_OK); 
+	}
+
+	/* SET value. */
+	switch (Id) {
+		case OID_SKGE_DIAG_MODE:
+
+			/* Handle the SET. */
+			switch (*pBuf) {
+		
+				/* Enter the DIAG mode in the driver. */
+				case 1:
+					/* If DiagMode is not active, we can enter it. */
+					if (!pAC->DiagModeActive) {
+
+						RetCode = SkDrvEnterDiagMode(pAC);	
+					}
+					else {
+
+						RetCode = SK_PNMI_ERR_GENERAL;
+					}
+					break;
+
+				/* Leave the DIAG mode in the driver. */
+				case 0:
+					RetCode = SkDrvLeaveDiagMode(pAC);	
+					break;
+
+				default:
+					RetCode = SK_PNMI_ERR_BAD_VALUE;
+					break;
+			}
+			break;
+
+		default:
+			RetCode = SK_PNMI_ERR_GENERAL;
+	}
+
+	if (RetCode == SK_PNMI_ERR_OK) {
+		*pLen = sizeof(SK_U32);
+	}
+	else {
+
+		*pLen = 0;
+	}
+	return (RetCode);
+}
+#endif /* SK_DIAG_SUPPORT */
+
+/*****************************************************************************
+ *
+ * Vct - OID handler function of  OIDs
+ *
+ * Description:
+ *	The code is simple. No description necessary.
+ *
+ * Returns:
+ *	SK_PNMI_ERR_OK           The request was performed successfully.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
+ *	                         the correct data (e.g. a 32bit value is
+ *	                         needed, but a 16 bit value was passed).
+ *	SK_PNMI_ERR_UNKNOWN_INST The requested instance of the OID doesn't
+ *                           exist (e.g. port instance 3 on a two port
+ *	                         adapter).
+ *	SK_PNMI_ERR_READ_ONLY	 Only the Get action is allowed.
+ *
+ */
+
+PNMI_STATIC int Vct(
+SK_AC *pAC,		/* Pointer to adapter context */
+SK_IOC IoC,		/* IO context handle */
+int Action,		/* GET/PRESET/SET action */
+SK_U32 Id,		/* Object ID that is to be processed */
+char *pBuf,		/* Buffer used for the management data transfer */
+unsigned int *pLen,	/* On call: pBuf buffer length. On return: used buffer */
+SK_U32 Instance,	/* Instance (-1,2..n) that is to be queried */
+unsigned int TableIndex, /* Index to the Id table */
+SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode always zero */
+{
+	SK_GEPORT	*pPrt;
+	SK_PNMI_VCT	*pVctBackupData;
+	SK_U32		LogPortMax;
+	SK_U32		PhysPortMax;
+	SK_U32		PhysPortIndex;
+	SK_U32		Limit;
+	SK_U32		Offset;
+	SK_BOOL		Link;
+	SK_U32		RetCode = SK_PNMI_ERR_GENERAL;
+	int		i;
+	SK_EVPARA	Para;
+	SK_U32		CableLength;
+	
+	/*
+	 * Calculate the port indexes from the instance.
+	 */
+	PhysPortMax = pAC->GIni.GIMacsFound;
+	LogPortMax = SK_PNMI_PORT_PHYS2LOG(PhysPortMax);
+	
+	/* Dual net mode? */
+	if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {
+		LogPortMax--;
+	}
+	
+	if ((Instance != (SK_U32) (-1))) {
+		/* Check instance range. */
+		if ((Instance < 2) || (Instance > LogPortMax)) {
+			*pLen = 0;
+			return (SK_PNMI_ERR_UNKNOWN_INST);
+		}
+		
+		if (pAC->Pnmi.DualNetActiveFlag == SK_TRUE) {
+			PhysPortIndex = NetIndex;
+		}
+		else {
+			PhysPortIndex = Instance - 2;
+		}
+		Limit = PhysPortIndex + 1;
+	}
+	else {
+		/*
+		 * Instance == (SK_U32) (-1), get all Instances of that OID.
+		 *
+		 * Not implemented yet. May be used in future releases.
+		 */
+		PhysPortIndex = 0;
+		Limit = PhysPortMax;
+	}
+	
+	pPrt = &pAC->GIni.GP[PhysPortIndex];
+	if (pPrt->PHWLinkUp) {
+		Link = SK_TRUE;
+	}
+	else {
+		Link = SK_FALSE;
+	}
+	
+	/* Check MAC type */
+	if (pPrt->PhyType != SK_PHY_MARV_COPPER) {
+		*pLen = 0;
+		return (SK_PNMI_ERR_GENERAL);
+	}
+	
+	/* Initialize backup data pointer. */
+	pVctBackupData = &pAC->Pnmi.VctBackup[PhysPortIndex];
+	
+	/* Check action type */
+	if (Action == SK_PNMI_GET) {
+		/* Check length */
+		switch (Id) {
+		
+		case OID_SKGE_VCT_GET:
+			if (*pLen < (Limit - PhysPortIndex) * sizeof(SK_PNMI_VCT)) {
+				*pLen = (Limit - PhysPortIndex) * sizeof(SK_PNMI_VCT);
+				return (SK_PNMI_ERR_TOO_SHORT);
+			}
+			break;
+		
+		case OID_SKGE_VCT_STATUS:
+			if (*pLen < (Limit - PhysPortIndex) * sizeof(SK_U8)) {
+				*pLen = (Limit - PhysPortIndex) * sizeof(SK_U8);
+				return (SK_PNMI_ERR_TOO_SHORT);
+			}
+			break;
+		
+		default:
+			*pLen = 0;
+			return (SK_PNMI_ERR_GENERAL);
+		}	
+		
+		/* Get value */
+		Offset = 0;
+		for (; PhysPortIndex < Limit; PhysPortIndex++) {
+			switch (Id) {
+			
+			case OID_SKGE_VCT_GET:
+				if ((Link == SK_FALSE) &&
+					(pAC->Pnmi.VctStatus[PhysPortIndex] & SK_PNMI_VCT_PENDING)) {
+					RetCode = SkGmCableDiagStatus(pAC, IoC, PhysPortIndex, SK_FALSE);
+					if (RetCode == 0) {
+						pAC->Pnmi.VctStatus[PhysPortIndex] &= ~SK_PNMI_VCT_PENDING;
+						pAC->Pnmi.VctStatus[PhysPortIndex] |=
+							(SK_PNMI_VCT_NEW_VCT_DATA | SK_PNMI_VCT_TEST_DONE);
+						
+						/* Copy results for later use to PNMI struct. */
+						for (i = 0; i < 4; i++)  {
+							if (pPrt->PMdiPairSts[i] == SK_PNMI_VCT_NORMAL_CABLE) {
+								if ((pPrt->PMdiPairLen[i] > 35) && (pPrt->PMdiPairLen[i] < 0xff)) {
+									pPrt->PMdiPairSts[i] = SK_PNMI_VCT_IMPEDANCE_MISMATCH;
+								}
+							}
+							if ((pPrt->PMdiPairLen[i] > 35) && (pPrt->PMdiPairLen[i] != 0xff)) {
+								CableLength = 1000 * (((175 * pPrt->PMdiPairLen[i]) / 210) - 28);
+							}
+							else {
+								CableLength = 0;
+							}
+							pVctBackupData->PMdiPairLen[i] = CableLength;
+							pVctBackupData->PMdiPairSts[i] = pPrt->PMdiPairSts[i];
+						}
+
+						Para.Para32[0] = PhysPortIndex;
+						Para.Para32[1] = -1;
+						SkEventQueue(pAC, SKGE_DRV, SK_DRV_PORT_RESET, Para);
+						SkEventDispatcher(pAC, IoC);
+					}
+					else {
+						; /* VCT test is running. */
+					}
+				}
+				
+				/* Get all results. */
+				CheckVctStatus(pAC, IoC, pBuf, Offset, PhysPortIndex);
+				Offset += sizeof(SK_U8);
+				*(pBuf + Offset) = pPrt->PCableLen;
+				Offset += sizeof(SK_U8);
+				for (i = 0; i < 4; i++)  {
+					SK_PNMI_STORE_U32((pBuf + Offset), pVctBackupData->PMdiPairLen[i]);
+					Offset += sizeof(SK_U32);
+				}
+				for (i = 0; i < 4; i++)  {
+					*(pBuf + Offset) = pVctBackupData->PMdiPairSts[i];
+					Offset += sizeof(SK_U8);
+				}
+				
+				RetCode = SK_PNMI_ERR_OK;
+				break;
+		
+			case OID_SKGE_VCT_STATUS:
+				CheckVctStatus(pAC, IoC, pBuf, Offset, PhysPortIndex);
+				Offset += sizeof(SK_U8);
+				RetCode = SK_PNMI_ERR_OK;
+				break;
+			
+			default:
+				*pLen = 0;
+				return (SK_PNMI_ERR_GENERAL);
+			}
+		} /* for */
+		*pLen = Offset;
+		return (RetCode);
+	
+	} /* if SK_PNMI_GET */
+	
+	/*
+	 * From here SET or PRESET action. Check if the passed
+	 * buffer length is plausible.
+	 */
+	
+	/* Check length */
+	switch (Id) {
+	case OID_SKGE_VCT_SET:
+		if (*pLen < (Limit - PhysPortIndex) * sizeof(SK_U32)) {
+			*pLen = (Limit - PhysPortIndex) * sizeof(SK_U32);
+			return (SK_PNMI_ERR_TOO_SHORT);
+		}
+		break;
+	
+	default:
+		*pLen = 0;
+		return (SK_PNMI_ERR_GENERAL);
+	}
+	
+	/*
+	 * Perform preset or set.
+	 */
+	
+	/* VCT does not support PRESET action. */
+	if (Action == SK_PNMI_PRESET) {
+		return (SK_PNMI_ERR_OK);
+	}
+	
+	Offset = 0;
+	for (; PhysPortIndex < Limit; PhysPortIndex++) {
+		switch (Id) {
+		case OID_SKGE_VCT_SET: /* Start VCT test. */
+			if (Link == SK_FALSE) {
+				SkGeStopPort(pAC, IoC, PhysPortIndex, SK_STOP_ALL, SK_SOFT_RST);
+				
+				RetCode = SkGmCableDiagStatus(pAC, IoC, PhysPortIndex, SK_TRUE);
+				if (RetCode == 0) { /* RetCode: 0 => Start! */
+					pAC->Pnmi.VctStatus[PhysPortIndex] |= SK_PNMI_VCT_PENDING;
+					pAC->Pnmi.VctStatus[PhysPortIndex] &= ~SK_PNMI_VCT_NEW_VCT_DATA;
+					pAC->Pnmi.VctStatus[PhysPortIndex] &= ~SK_PNMI_VCT_LINK;
+					
+					/*
+					 * Start VCT timer counter.
+					 */
+					SK_MEMSET((char *) &Para, 0, sizeof(Para));
+					Para.Para32[0] = PhysPortIndex;
+					Para.Para32[1] = -1;
+					SkTimerStart(pAC, IoC, &pAC->Pnmi.VctTimeout[PhysPortIndex].VctTimer,
+						4000000, SKGE_PNMI, SK_PNMI_EVT_VCT_RESET, Para);
+					SK_PNMI_STORE_U32((pBuf + Offset), RetCode);
+					RetCode = SK_PNMI_ERR_OK;
+				}
+				else { /* RetCode: 2 => Running! */
+					SK_PNMI_STORE_U32((pBuf + Offset), RetCode);
+					RetCode = SK_PNMI_ERR_OK;
+				}
+			}
+			else { /* RetCode: 4 => Link! */
+				RetCode = 4;
+				SK_PNMI_STORE_U32((pBuf + Offset), RetCode);
+				RetCode = SK_PNMI_ERR_OK;
+			}
+			Offset += sizeof(SK_U32);
+			break;
+	
+		default:
+			*pLen = 0;
+			return (SK_PNMI_ERR_GENERAL);
+		}
+	} /* for */
+	*pLen = Offset;
+	return (RetCode);
+
+} /* Vct */
+
+
+PNMI_STATIC void CheckVctStatus(
+SK_AC		*pAC,
+SK_IOC		IoC,
+char		*pBuf,
+SK_U32		Offset,
+SK_U32		PhysPortIndex)
+{
+	SK_GEPORT 	*pPrt;
+	SK_PNMI_VCT	*pVctData;
+	SK_U32		RetCode;
+	
+	pPrt = &pAC->GIni.GP[PhysPortIndex];
+	
+	pVctData = (SK_PNMI_VCT *) (pBuf + Offset);
+	pVctData->VctStatus = SK_PNMI_VCT_NONE;
+	
+	if (!pPrt->PHWLinkUp) {
+		
+		/* Was a VCT test ever made before? */
+		if (pAC->Pnmi.VctStatus[PhysPortIndex] & SK_PNMI_VCT_TEST_DONE) {
+			if ((pAC->Pnmi.VctStatus[PhysPortIndex] & SK_PNMI_VCT_LINK)) {
+				pVctData->VctStatus |= SK_PNMI_VCT_OLD_VCT_DATA;
+			}
+			else {
+				pVctData->VctStatus |= SK_PNMI_VCT_NEW_VCT_DATA;
+			}
+		}
+		
+		/* Check VCT test status. */
+		RetCode = SkGmCableDiagStatus(pAC,IoC, PhysPortIndex, SK_FALSE);
+		if (RetCode == 2) { /* VCT test is running. */
+			pVctData->VctStatus |= SK_PNMI_VCT_RUNNING;
+		}
+		else { /* VCT data was copied to pAC here. Check PENDING state. */
+			if (pAC->Pnmi.VctStatus[PhysPortIndex] & SK_PNMI_VCT_PENDING) {
+				pVctData->VctStatus |= SK_PNMI_VCT_NEW_VCT_DATA;
+			}
+		}
+		
+		if (pPrt->PCableLen != 0xff) { /* Old DSP value. */
+			pVctData->VctStatus |= SK_PNMI_VCT_OLD_DSP_DATA;
+		}
+	}
+	else {
+		
+		/* Was a VCT test ever made before? */
+		if (pAC->Pnmi.VctStatus[PhysPortIndex] & SK_PNMI_VCT_TEST_DONE) {
+			pVctData->VctStatus &= ~SK_PNMI_VCT_NEW_VCT_DATA;
+			pVctData->VctStatus |= SK_PNMI_VCT_OLD_VCT_DATA;
+		}
+		
+		/* DSP only valid in 100/1000 modes. */
+		if (pAC->GIni.GP[PhysPortIndex].PLinkSpeedUsed !=
+			SK_LSPEED_STAT_10MBPS) {	
+			pVctData->VctStatus |= SK_PNMI_VCT_NEW_DSP_DATA;
+		}
+	}
+} /* CheckVctStatus */
+
+
+/*****************************************************************************
+ *
+ *      SkPnmiGenIoctl - Handles new generic PNMI IOCTL, calls the needed
+ *                       PNMI function depending on the subcommand and
+ *                       returns all data belonging to the complete database
+ *                       or OID request.
+ *
+ * Description:
+ *	Looks up the requested subcommand, calls the corresponding handler
+ *	function and passes all required parameters to it.
+ *	The function is called by the driver. It is needed to handle the new
+ *  generic PNMI IOCTL. This IOCTL is given to the driver and contains both
+ *  the OID and a subcommand to decide what kind of request has to be done.
+ *
+ * Returns:
+ *	SK_PNMI_ERR_OK           The request was successfully performed
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occured
+ *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to take
+ *	                         the data.
+ *	SK_PNMI_ERR_UNKNOWN_OID  The requested OID is unknown
+ *	SK_PNMI_ERR_UNKNOWN_INST The requested instance of the OID doesn't
+ *                           exist (e.g. port instance 3 on a two port
+ *	                         adapter.
+ */
+int SkPnmiGenIoctl(
+SK_AC		*pAC,		/* Pointer to adapter context struct */
+SK_IOC		IoC,		/* I/O context */
+void		*pBuf,		/* Buffer used for the management data transfer */
+unsigned int *pLen,		/* Length of buffer */
+SK_U32		NetIndex)	/* NetIndex (0..n), in single net mode always zero */
+{
+SK_I32	Mode;			/* Store value of subcommand. */
+SK_U32	Oid;			/* Store value of OID. */
+int		ReturnCode;		/* Store return value to show status of PNMI action. */
+int 	HeaderLength;	/* Length of desired action plus OID. */
+
+	ReturnCode = SK_PNMI_ERR_GENERAL;
+	
+	SK_MEMCPY(&Mode, pBuf, sizeof(SK_I32));
+	SK_MEMCPY(&Oid, (char *) pBuf + sizeof(SK_I32), sizeof(SK_U32));
+	HeaderLength = sizeof(SK_I32) + sizeof(SK_U32);
+	*pLen = *pLen - HeaderLength;
+	SK_MEMCPY((char *) pBuf + sizeof(SK_I32), (char *) pBuf + HeaderLength, *pLen);
+	
+	switch(Mode) {
+	case SK_GET_SINGLE_VAR:
+		ReturnCode = SkPnmiGetVar(pAC, IoC, Oid, 
+				(char *) pBuf + sizeof(SK_I32), pLen,
+				((SK_U32) (-1)), NetIndex);
+		SK_PNMI_STORE_U32(pBuf, ReturnCode);
+		*pLen = *pLen + sizeof(SK_I32);
+		break;
+	case SK_PRESET_SINGLE_VAR:
+		ReturnCode = SkPnmiPreSetVar(pAC, IoC, Oid, 
+				(char *) pBuf + sizeof(SK_I32), pLen,
+				((SK_U32) (-1)), NetIndex);
+		SK_PNMI_STORE_U32(pBuf, ReturnCode);
+		*pLen = *pLen + sizeof(SK_I32);
+		break;
+	case SK_SET_SINGLE_VAR:
+		ReturnCode = SkPnmiSetVar(pAC, IoC, Oid, 
+				(char *) pBuf + sizeof(SK_I32), pLen,
+				((SK_U32) (-1)), NetIndex);
+		SK_PNMI_STORE_U32(pBuf, ReturnCode);
+		*pLen = *pLen + sizeof(SK_I32);
+		break;
+	case SK_GET_FULL_MIB:
+		ReturnCode = SkPnmiGetStruct(pAC, IoC, pBuf, pLen, NetIndex);
+		break;
+	case SK_PRESET_FULL_MIB:
+		ReturnCode = SkPnmiPreSetStruct(pAC, IoC, pBuf, pLen, NetIndex);
+		break;
+	case SK_SET_FULL_MIB:
+		ReturnCode = SkPnmiSetStruct(pAC, IoC, pBuf, pLen, NetIndex);
+		break;
+	default:
+		break;
+	}
+	
+	return (ReturnCode);
+
+} /* SkGeIocGen */

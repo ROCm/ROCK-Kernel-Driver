@@ -2,16 +2,15 @@
  *
  * Name:	skvpd.h
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.9 $
- * Date:	$Date: 1999/11/22 14:02:27 $
+ * Version:	$Revision: 1.15 $
+ * Date:	$Date: 2003/01/13 10:39:38 $
  * Purpose:	Defines and Macros for VPD handling
  *
  ******************************************************************************/
 
 /******************************************************************************
  *
- *	(C)Copyright 1998,1999 SysKonnect,
- *	a business unit of Schneider & Koch & Co. Datensysteme GmbH.
+ *	(C)Copyright 1998-2003 SysKonnect GmbH.
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -27,6 +26,33 @@
  * History:
  *
  *	$Log: skvpd.h,v $
+ *	Revision 1.15  2003/01/13 10:39:38  rschmidt
+ *	Replaced define for PCI device Id for YUKON with GENESIS
+ *	Editorial changes
+ *	
+ *	Revision 1.14  2002/11/14 15:18:10  gheinig
+ *	Added const specifier to key and buf parameters for VpdPara,VpdRead
+ *	and VpdWrite. This is necessary for the Diag 7 GUI API
+ *	
+ *	Revision 1.13  2002/10/14 15:58:18  rschmidt
+ *	Added entry in rom_size struct s_vpd
+ *	Editorial changes
+ *	
+ *	Revision 1.12  2002/09/09 14:43:51  mkarl
+ *	added PCI Id of Yukon for reading VPD in diag before the adapter has
+ *	been initialized
+ *	editorial changes
+ *	
+ *	Revision 1.11  2002/07/26 13:19:16  mkarl
+ *	added support for Yukon
+ *	added vpd_size to VPD struct
+ *	
+ *	Revision 1.10  2000/08/10 11:29:07  rassmann
+ *	Editorial changes.
+ *	Preserving 32-bit alignment in structs for the adapter context.
+ *	Removed unused function VpdWriteDword() (#if 0).
+ *	Made VpdReadKeyword() available for SKDIAG only.
+ *	
  *	Revision 1.9  1999/11/22 14:02:27  cgoos
  *	Changed license header to GPL.
  *	
@@ -45,7 +71,7 @@
  *	Changed constants in SK_SWAP_32 to UL.
  *	
  *	Revision 1.4  1998/08/19 08:14:09  gklug
- *	fix: remove struct keyword as much as possible from the c-code (see CCC)
+ *	fix: remove struct keyword as much as possible from the C-code (see CCC)
  *	
  *	Revision 1.3  1998/08/18 08:18:56  malthoff
  *	Modify VPD in and out macros for SK_DIAG
@@ -99,7 +125,12 @@
 /*
  * Define READ and WRITE Constants.
  */
-#define	VPD_SIZE	512
+
+#define VPD_DEV_ID_GENESIS 	0x4300
+
+#define	VPD_SIZE_YUKON		256
+#define	VPD_SIZE_GENESIS	512
+#define	VPD_SIZE			512
 #define VPD_READ	0x0000
 #define VPD_WRITE	0x8000
 
@@ -115,40 +146,44 @@
 
 /* VPD status */
 	/* bit 7..1 reserved */
-#define VPD_VALID	(1<<0)		/* VPD data buffer, vpd_free_ro, */
-					/* and vpd_free_rw valid	 */
+#define VPD_VALID	(1<<0)	/* VPD data buffer, vpd_free_ro, */
+							/* and vpd_free_rw valid	 */
 
 /*
  * VPD structs
  */
 typedef	struct s_vpd_status {
-	unsigned short	vpd_status ;	/* VPD status, description see above */
-	int		vpd_free_ro ;	/* unused bytes in read only area */
-	int		vpd_free_rw ;	/* bytes available in read/write area */
+	unsigned short	Align01;			/* Alignment */
+	unsigned short	vpd_status;			/* VPD status, description see above */
+	int				vpd_free_ro;		/* unused bytes in read only area */
+	int				vpd_free_rw;		/* bytes available in read/write area */
 } SK_VPD_STATUS;
 
 typedef	struct s_vpd {
-	SK_VPD_STATUS	v ;			/* VPD status structure */
-	char		vpd_buf[VPD_SIZE] ;	/* VPD buffer */
+	SK_VPD_STATUS	v;					/* VPD status structure */
+	char			vpd_buf[VPD_SIZE];	/* VPD buffer */
+	int				rom_size;			/* VPD ROM Size from PCI_OUR_REG_2 */
+	int				vpd_size;			/* saved VPD-size */
 } SK_VPD;
 
 typedef	struct s_vpd_para {
-	unsigned int	p_len ;		/* parameter length */
-	char		*p_val ;	/* points to the value */
+	unsigned int	p_len;	/* parameter length */
+	char			*p_val;	/* points to the value */
 } SK_VPD_PARA;
 
 /*
  * structure of Large Resource Type Identifiers
  */
-/* was removed, because of alignment problems */
+
+/* was removed because of alignment problems */
 
 /*
- * sturcture of VPD keywords
+ * structure of VPD keywords
  */
 typedef	struct s_vpd_key {
-	char		p_key[2] ;	/* 2 bytes ID string */
-	unsigned char	p_len ;		/* 1 byte length */
-	char		p_val ;		/* start of the value string */
+	char			p_key[2];	/* 2 bytes ID string */
+	unsigned char	p_len;		/* 1 byte length */
+	char			p_val;		/* start of the value string */
 } SK_VPD_KEY;
 
 
@@ -172,39 +207,39 @@ typedef	struct s_vpd_key {
 #define VPD_IN32(pAC,IoC,Addr,pVal)	SK_IN32(IoC,PCI_C(Addr),pVal)
 #endif	/* VPD_DO_IO */
 #else	/* SKDIAG */
-#define VPD_OUT8(pAC,Ioc,Addr,Val) {				\
+#define VPD_OUT8(pAC,Ioc,Addr,Val) {			\
 		if ((pAC)->DgT.DgUseCfgCycle)			\
-			SkPciWriteCfgByte(pAC,Addr,Val) ;	\
-		else						\
+			SkPciWriteCfgByte(pAC,Addr,Val);	\
+		else									\
 			SK_OUT8(pAC,PCI_C(Addr),Val);		\
 		}
-#define VPD_OUT16(pAC,Ioc,Addr,Val) {				\
+#define VPD_OUT16(pAC,Ioc,Addr,Val) {			\
 		if ((pAC)->DgT.DgUseCfgCycle)			\
-			SkPciWriteCfgWord(pAC,Addr,Val) ;	\
+			SkPciWriteCfgWord(pAC,Addr,Val);	\
 		else						\
 			SK_OUT16(pAC,PCI_C(Addr),Val);		\
 		}
-#define VPD_OUT32(pAC,Ioc,Addr,Val) {				\
+#define VPD_OUT32(pAC,Ioc,Addr,Val) {			\
 		if ((pAC)->DgT.DgUseCfgCycle)			\
-			SkPciWriteCfgDWord(pAC,Addr,Val) ;	\
+			SkPciWriteCfgDWord(pAC,Addr,Val);	\
 		else						\
 			SK_OUT32(pAC,PCI_C(Addr),Val); 		\
 		}
-#define VPD_IN8(pAC,Ioc,Addr,pVal) {				\
+#define VPD_IN8(pAC,Ioc,Addr,pVal) {			\
 		if ((pAC)->DgT.DgUseCfgCycle) 			\
-			SkPciReadCfgByte(pAC,Addr,pVal) ;	\
+			SkPciReadCfgByte(pAC,Addr,pVal);	\
 		else						\
 			SK_IN8(pAC,PCI_C(Addr),pVal); 		\
 		}
-#define VPD_IN16(pAC,Ioc,Addr,pVal) {				\
+#define VPD_IN16(pAC,Ioc,Addr,pVal) {			\
 		if ((pAC)->DgT.DgUseCfgCycle) 			\
-			SkPciReadCfgWord(pAC,Addr,pVal) ;	\
+			SkPciReadCfgWord(pAC,Addr,pVal);	\
 		else						\
 			SK_IN16(pAC,PCI_C(Addr),pVal); 		\
 		}
-#define VPD_IN32(pAC,Ioc,Addr,pVal) {				\
+#define VPD_IN32(pAC,Ioc,Addr,pVal) {			\
 		if ((pAC)->DgT.DgUseCfgCycle)			\
-			SkPciReadCfgDWord(pAC,Addr,pVal) ;	\
+			SkPciReadCfgDWord(pAC,Addr,pVal);	\
 		else						\
 			SK_IN32(pAC,PCI_C(Addr),pVal);		\
 		}
@@ -213,50 +248,52 @@ typedef	struct s_vpd_key {
 /* function prototypes ********************************************************/
 
 #ifndef	SK_KR_PROTO
+#ifdef SKDIAG
 extern SK_U32	VpdReadDWord(
 	SK_AC		*pAC,
 	SK_IOC		IoC,
-	int		addr) ;
+	int			addr);
+#endif	/* SKDIAG */
 
 extern int	VpdSetupPara(
 	SK_AC		*pAC,
-	char		*key,
-	char		*buf,
-	int		len,
-	int		type,
-	int		op) ;
+	const char	*key,
+	const char	*buf,
+	int			len,
+	int			type,
+	int			op);
 
 extern SK_VPD_STATUS	*VpdStat(
 	SK_AC		*pAC,
-	SK_IOC		IoC) ;
+	SK_IOC		IoC);
 
 extern int	VpdKeys(
 	SK_AC		*pAC,
 	SK_IOC		IoC,
 	char		*buf,
-	int		*len,
-	int		*elements) ;
+	int			*len,
+	int			*elements);
 
 extern int	VpdRead(
 	SK_AC		*pAC,
 	SK_IOC		IoC,
-	char		*key,
+	const char	*key,
 	char		*buf,
-	int		*len) ;
+	int			*len);
 
-extern	SK_BOOL	VpdMayWrite(
-	char		*key) ;
+extern SK_BOOL	VpdMayWrite(
+	char		*key);
 
 extern int	VpdWrite(
 	SK_AC		*pAC,
 	SK_IOC		IoC,
-	char		*key,
-	char		*buf) ;
+	const char	*key,
+	const char	*buf);
 
 extern int	VpdDelete(
 	SK_AC		*pAC,
 	SK_IOC		IoC,
-	char		*key) ;
+	char		*key);
 
 extern int	VpdUpdate(
 	SK_AC		*pAC,
@@ -265,34 +302,34 @@ extern int	VpdUpdate(
 extern void	VpdErrLog(
 	SK_AC		*pAC,
 	SK_IOC		IoC,
-	char		*msg) ;
+	char		*msg);
 
 #ifdef	SKDIAG
 extern int	VpdReadBlock(
 	SK_AC		*pAC,
 	SK_IOC		IoC,
 	char		*buf,
-	int		addr,
-	int		len) ;
+	int			addr,
+	int			len);
 
 extern int	VpdWriteBlock(
 	SK_AC		*pAC,
 	SK_IOC		IoC,
 	char		*buf,
-	int		addr,
-	int		len) ;
+	int			addr,
+	int			len);
 #endif	/* SKDIAG */
 #else	/* SK_KR_PROTO */
-extern SK_U32	VpdReadDWord() ;
-extern int	VpdSetupPara() ;
-extern SK_VPD_STATUS	*VpdStat() ;
-extern int	VpdKeys() ;
-extern int	VpdRead() ;
-extern SK_BOOL	VpdMayWrite() ;
-extern int	VpdWrite() ;
-extern int	VpdDelete() ;
-extern int	VpdUpdate() ;
-extern void	VpdErrLog() ;
+extern SK_U32	VpdReadDWord();
+extern int	VpdSetupPara();
+extern SK_VPD_STATUS	*VpdStat();
+extern int	VpdKeys();
+extern int	VpdRead();
+extern SK_BOOL	VpdMayWrite();
+extern int	VpdWrite();
+extern int	VpdDelete();
+extern int	VpdUpdate();
+extern void	VpdErrLog();
 #endif	/* SK_KR_PROTO */
 
 #endif	/* __INC_SKVPD_H_ */

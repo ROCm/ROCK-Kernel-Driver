@@ -1847,7 +1847,7 @@ static int  get_direct_parent(
     if ( n_path_offset <= FIRST_PATH_ELEMENT_OFFSET ) {
 	
 	RFALSE( n_path_offset < FIRST_PATH_ELEMENT_OFFSET - 1,
-		"PAP-8260: illegal offset in the path");
+		"PAP-8260: invalid offset in the path");
 
 	if ( PATH_OFFSET_PBUFFER(p_s_path, FIRST_PATH_ELEMENT_OFFSET)->b_blocknr ==
 	     SB_ROOT_BLOCK (p_s_tb->tb_sb) ) {

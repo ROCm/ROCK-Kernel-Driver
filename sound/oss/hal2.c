@@ -787,9 +787,9 @@ static int hal2_mixer_ioctl(hal2_card_t *hal2, unsigned int cmd,
 
         if (cmd == SOUND_MIXER_INFO) {
 		mixer_info info;
-		
-		strncpy(info.id, hal2str, sizeof(info.id));
-		strncpy(info.name, hal2str, sizeof(info.name));
+		memset(&info, 0, sizeof(info));
+		strlcpy(info.id, hal2str, sizeof(info.id));
+		strlcpy(info.name, hal2str, sizeof(info.name));
 		info.modify_counter = hal2->mixer.modcnt;
 		if (copy_to_user((void *)arg, &info, sizeof(info)))
 			return -EFAULT;
@@ -797,9 +797,9 @@ static int hal2_mixer_ioctl(hal2_card_t *hal2, unsigned int cmd,
 	}
 	if (cmd == SOUND_OLD_MIXER_INFO) {
 		_old_mixer_info info;
-		
-		strncpy(info.id, hal2str, sizeof(info.id));
-		strncpy(info.name, hal2str, sizeof(info.name));
+		memset(&info, 0, sizeof(info));
+		strlcpy(info.id, hal2str, sizeof(info.id));
+		strlcpy(info.name, hal2str, sizeof(info.name));
 		if (copy_to_user((void *)arg, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;

@@ -4977,7 +4977,7 @@ intr_dma (struct Scsi_Host *host, struct NCR53c7x0_cmd *cmd) {
 		hostdata->options |= OPTION_NO_PRINT_RACE;
 	    }
 	} else {
-	    printk(KERN_ALERT "scsi%d : illegal instruction\n", host->host_no);
+	    printk(KERN_ALERT "scsi%d : invalid instruction\n", host->host_no);
 	    print_lots (host);
 	    printk(KERN_ALERT "         mail Richard@sleepie.demon.co.uk with ALL\n"
 		              "         boot messages and diagnostic output\n");

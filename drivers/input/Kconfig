@@ -5,7 +5,7 @@
 menu "Input device support"
 
 config INPUT
-	tristate "Input devices (needed for keyboard, mouse, ...)"
+	tristate "Input devices (needed for keyboard, mouse, ...)" if EMBEDDED
 	default y
 	---help---
 	  Say Y here if you have any input device (mouse, keyboard, tablet,
@@ -27,7 +27,7 @@ config INPUT
 comment "Userland interfaces"
 
 config INPUT_MOUSEDEV
-	tristate "Mouse interface"
+	tristate "Mouse interface" if EMBEDDED
 	default y
 	depends on INPUT
 	---help---
@@ -45,7 +45,7 @@ config INPUT_MOUSEDEV
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
 config INPUT_MOUSEDEV_PSAUX
-	bool "Provide legacy /dev/psaux device"
+	bool "Provide legacy /dev/psaux device" if EMBEDDED
 	default y
 	depends on INPUT_MOUSEDEV
 

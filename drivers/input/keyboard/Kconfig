@@ -2,7 +2,7 @@
 # Input core configuration
 #
 config INPUT_KEYBOARD
-	bool "Keyboards"
+	bool "Keyboards" if EMBEDDED || !X86
 	default y
 	depends on INPUT
 	help
@@ -12,7 +12,7 @@ config INPUT_KEYBOARD
 	  If unsure, say Y.
 
 config KEYBOARD_ATKBD
-	tristate "AT keyboard support"
+	tristate "AT keyboard support" if EMBEDDED || !X86 
 	default y
 	depends on INPUT && INPUT_KEYBOARD && SERIO
 	help

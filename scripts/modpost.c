@@ -296,12 +296,14 @@ handle_modversions(struct module *mod, struct elf_info *info,
 		/* ignore global offset table */
 		if (strcmp(symname, "_GLOBAL_OFFSET_TABLE_") == 0)
 			break;
+#ifdef STT_REGISTER
 		if (info->hdr->e_machine == EM_SPARC ||
 		    info->hdr->e_machine == EM_SPARCV9) {
 			/* Ignore register directives. */
 			if (ELF_ST_TYPE(sym->st_info) == STT_REGISTER)
 				break;
 		}
+#endif
 		
 		if (memcmp(symname, MODULE_SYMBOL_PREFIX,
 			   strlen(MODULE_SYMBOL_PREFIX)) == 0) {
