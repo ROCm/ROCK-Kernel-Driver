@@ -391,7 +391,7 @@ restart:
 		ret = 1;
 	}
 
-	if ((queued < cfq_quantum) && good_queues)
+	if ((queued < cfqd->cfq_quantum) && good_queues)
 		goto restart;
 
 	return ret;
@@ -562,7 +562,7 @@ static int cfq_may_queue(request_queue_t *q, int rw)
 
 	cfqq = cfq_find_cfq_hash(cfqd, current->tgid);
 	if (cfqq) {
-		int limit = (q->nr_requests - cfq_queued) / cfqd->busy_queues;
+		int limit = (q->nr_requests - cfqd->cfq_queued) / cfqd->busy_queues;
 
 		if (limit < 3)
 			limit = 3;
