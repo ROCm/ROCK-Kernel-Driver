@@ -591,12 +591,12 @@ static ssize_t set_pwm_enable1(struct device *dev, const char *buf,
 	return count;
 }
 
-static DEVICE_ATTR(fan1_pwm, S_IRUGO | S_IWUSR, show_pwm1, set_pwm1);
-static DEVICE_ATTR(fan1_pwm_enable, S_IRUGO | S_IWUSR,
+static DEVICE_ATTR(pwm1, S_IRUGO | S_IWUSR, show_pwm1, set_pwm1);
+static DEVICE_ATTR(pwm1_enable, S_IRUGO | S_IWUSR,
 		show_pwm_enable1, set_pwm_enable1);
 #define device_create_file_pwm1(client) do { \
-	device_create_file(&new_client->dev, &dev_attr_fan1_pwm); \
-	device_create_file(&new_client->dev, &dev_attr_fan1_pwm_enable); \
+	device_create_file(&new_client->dev, &dev_attr_pwm1); \
+	device_create_file(&new_client->dev, &dev_attr_pwm1_enable); \
 } while (0)
 
 /* This function is called when:

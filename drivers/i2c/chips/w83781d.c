@@ -740,22 +740,26 @@ static ssize_t show_regs_pwm_##offset (struct device *dev, char *buf) \
 { \
 	return show_pwm_reg(dev, buf, offset); \
 } \
-static ssize_t store_regs_pwm_##offset (struct device *dev, const char *buf, size_t count) \
+static ssize_t store_regs_pwm_##offset (struct device *dev, \
+		const char *buf, size_t count) \
 { \
 	return store_pwm_reg(dev, buf, count, offset); \
 } \
-static DEVICE_ATTR(fan##offset##_pwm, S_IRUGO | S_IWUSR, show_regs_pwm_##offset, store_regs_pwm_##offset);
+static DEVICE_ATTR(pwm##offset, S_IRUGO | S_IWUSR, \
+		show_regs_pwm_##offset, store_regs_pwm_##offset);
 
 #define sysfs_pwmenable(offset) \
 static ssize_t show_regs_pwmenable_##offset (struct device *dev, char *buf) \
 { \
 	return show_pwmenable_reg(dev, buf, offset); \
 } \
-static ssize_t store_regs_pwmenable_##offset (struct device *dev, const char *buf, size_t count) \
+static ssize_t store_regs_pwmenable_##offset (struct device *dev, \
+		const char *buf, size_t count) \
 { \
 	return store_pwmenable_reg(dev, buf, count, offset); \
 } \
-static DEVICE_ATTR(fan##offset##_pwm_enable, S_IRUGO | S_IWUSR, show_regs_pwmenable_##offset, store_regs_pwmenable_##offset);
+static DEVICE_ATTR(pwm##offset##_enable, S_IRUGO | S_IWUSR, \
+		show_regs_pwmenable_##offset, store_regs_pwmenable_##offset);
 
 sysfs_pwm(1);
 sysfs_pwm(2);
@@ -765,12 +769,12 @@ sysfs_pwm(4);
 
 #define device_create_file_pwm(client, offset) \
 do { \
-device_create_file(&client->dev, &dev_attr_fan##offset##_pwm); \
+device_create_file(&client->dev, &dev_attr_pwm##offset); \
 } while (0)
 
 #define device_create_file_pwmenable(client, offset) \
 do { \
-device_create_file(&client->dev, &dev_attr_fan##offset##_pwm_enable); \
+device_create_file(&client->dev, &dev_attr_pwm##offset##_enable); \
 } while (0)
 
 static ssize_t

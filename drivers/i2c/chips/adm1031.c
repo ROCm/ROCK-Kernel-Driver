@@ -436,7 +436,7 @@ static ssize_t set_pwm_##offset (struct device *dev,			\
 {									\
 	return set_pwm(dev, buf, count, 0x##offset - 1);		\
 }									\
-static DEVICE_ATTR(fan##offset##_pwm, S_IRUGO | S_IWUSR,		\
+static DEVICE_ATTR(pwm##offset, S_IRUGO | S_IWUSR,			\
 		   show_pwm_##offset, set_pwm_##offset)
 
 pwm_reg(1);
@@ -799,7 +799,7 @@ static int adm1031_detect(struct i2c_adapter *adapter, int address, int kind)
 	device_create_file(&new_client->dev, &dev_attr_fan1_input);
 	device_create_file(&new_client->dev, &dev_attr_fan1_div);
 	device_create_file(&new_client->dev, &dev_attr_fan1_min);
-	device_create_file(&new_client->dev, &dev_attr_fan1_pwm);
+	device_create_file(&new_client->dev, &dev_attr_pwm1);
 	device_create_file(&new_client->dev, &dev_attr_auto_fan1_channel);
 	device_create_file(&new_client->dev, &dev_attr_temp1_input);
 	device_create_file(&new_client->dev, &dev_attr_temp1_min);
@@ -826,7 +826,7 @@ static int adm1031_detect(struct i2c_adapter *adapter, int address, int kind)
 		device_create_file(&new_client->dev, &dev_attr_fan2_input);
 		device_create_file(&new_client->dev, &dev_attr_fan2_div);
 		device_create_file(&new_client->dev, &dev_attr_fan2_min);
-		device_create_file(&new_client->dev, &dev_attr_fan2_pwm);
+		device_create_file(&new_client->dev, &dev_attr_pwm2);
 		device_create_file(&new_client->dev,
 				   &dev_attr_auto_fan2_channel);
 		device_create_file(&new_client->dev, &dev_attr_temp3_input);

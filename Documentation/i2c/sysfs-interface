@@ -135,12 +135,15 @@ fan[1-3]_div	Fan divisor.
 		Note that this is actually an internal clock divisor, which
 		affects the measurable speed range, not the read value.
 
-fan[1-3]_pwm	Pulse width modulation fan control.
+*******
+* PWM *
+*******
+pwm[1-3]	Pulse width modulation fan control.
 		Integer value in the range 0 to 255
 		Read/Write
 		255 is max or 100%.
 
-fan[1-3]_pwm_enable
+pwm[1-3]_enable
 		Switch PWM on and off.
 		Not always present even if fan*_pwm is.
 		0 to turn off

@@ -182,13 +182,13 @@ static ssize_t get_fan_div(struct device *dev, char *buf, int nr)
 	return sprintf(buf, "%d\n", DIV_FROM_REG(data->fan_div[nr]));
 }
 
-static ssize_t get_fan_pwm(struct device *dev, char *buf, int nr)
+static ssize_t get_pwm(struct device *dev, char *buf, int nr)
 {
 	struct smsc47m1_data *data = smsc47m1_update_device(dev, 0);
 	return sprintf(buf, "%d\n", PWM_FROM_REG(data->pwm[nr]));
 }
 
-static ssize_t get_fan_pwm_en(struct device *dev, char *buf, int nr)
+static ssize_t get_pwm_en(struct device *dev, char *buf, int nr)
 {
 	struct smsc47m1_data *data = smsc47m1_update_device(dev, 0);
 	return sprintf(buf, "%d\n", PWM_EN_FROM_REG(data->pwm[nr]));
@@ -256,7 +256,7 @@ static ssize_t set_fan_div(struct device *dev, const char *buf,
 	return count;
 }
 
-static ssize_t set_fan_pwm(struct device *dev, const char *buf,
+static ssize_t set_pwm(struct device *dev, const char *buf,
 		size_t count, int nr)
 {
 	struct i2c_client *client = to_i2c_client(dev);
@@ -275,7 +275,7 @@ static ssize_t set_fan_pwm(struct device *dev, const char *buf,
 	return count;
 }
 
-static ssize_t set_fan_pwm_en(struct device *dev, const char *buf,
+static ssize_t set_pwm_en(struct device *dev, const char *buf,
 		size_t count, int nr)
 {
 	struct i2c_client *client = to_i2c_client(dev);
@@ -318,23 +318,23 @@ static ssize_t set_fan##offset##_div (struct device *dev,		\
 {									\
 	return set_fan_div(dev, buf, count, 0x##offset - 1);		\
 }									\
-static ssize_t get_fan##offset##_pwm (struct device *dev, char *buf)	\
+static ssize_t get_pwm##offset (struct device *dev, char *buf)		\
 {									\
-	return get_fan_pwm(dev, buf, 0x##offset - 1);			\
+	return get_pwm(dev, buf, 0x##offset - 1);			\
 }									\
-static ssize_t set_fan##offset##_pwm (struct device *dev,		\
+static ssize_t set_pwm##offset (struct device *dev,			\
 		const char *buf, size_t count)				\
 {									\
-	return set_fan_pwm(dev, buf, count, 0x##offset - 1);		\
+	return set_pwm(dev, buf, count, 0x##offset - 1);		\
 }									\
-static ssize_t get_fan##offset##_pwm_en (struct device *dev, char *buf)	\
+static ssize_t get_pwm##offset##_en (struct device *dev, char *buf)	\
 {									\
-	return get_fan_pwm_en(dev, buf, 0x##offset - 1);		\
+	return get_pwm_en(dev, buf, 0x##offset - 1);			\
 }									\
-static ssize_t set_fan##offset##_pwm_en (struct device *dev,		\
+static ssize_t set_pwm##offset##_en (struct device *dev,		\
 		const char *buf, size_t count)				\
 {									\
-	return set_fan_pwm_en(dev, buf, count, 0x##offset - 1);		\
+	return set_pwm_en(dev, buf, count, 0x##offset - 1);		\
 }									\
 static DEVICE_ATTR(fan##offset##_input, S_IRUGO, get_fan##offset,	\
 		NULL);							\
@@ -342,10 +342,10 @@ static DEVICE_ATTR(fan##offset##_min, S_IRUGO | S_IWUSR,		\
 		get_fan##offset##_min, set_fan##offset##_min);		\
 static DEVICE_ATTR(fan##offset##_div, S_IRUGO | S_IWUSR,		\
 		get_fan##offset##_div, set_fan##offset##_div);		\
-static DEVICE_ATTR(fan##offset##_pwm, S_IRUGO | S_IWUSR,		\
-		get_fan##offset##_pwm, set_fan##offset##_pwm);		\
-static DEVICE_ATTR(fan##offset##_pwm_enable, S_IRUGO | S_IWUSR,		\
-		get_fan##offset##_pwm_en, set_fan##offset##_pwm_en);
+static DEVICE_ATTR(pwm##offset, S_IRUGO | S_IWUSR,			\
+		get_pwm##offset, set_pwm##offset);			\
+static DEVICE_ATTR(pwm##offset##_enable, S_IRUGO | S_IWUSR,		\
+		get_pwm##offset##_en, set_pwm##offset##_en);
 
 fan_present(1);
 fan_present(2);
@@ -462,15 +462,15 @@ static int smsc47m1_detect(struct i2c_adapter *adapter, int address, int kind)
 
 	if ((smsc47m1_read_value(new_client, SMSC47M1_REG_PPIN(0)) & 0x05)
 	    == 0x04) {
-		device_create_file(&new_client->dev, &dev_attr_fan1_pwm);
-		device_create_file(&new_client->dev, &dev_attr_fan1_pwm_enable);
+		device_create_file(&new_client->dev, &dev_attr_pwm1);
+		device_create_file(&new_client->dev, &dev_attr_pwm1_enable);
 	} else
 		dev_dbg(&new_client->dev, "PWM 1 not enabled by hardware, "
 			"skipping\n");
 	if ((smsc47m1_read_value(new_client, SMSC47M1_REG_PPIN(1)) & 0x05)
 	    == 0x04) {
-		device_create_file(&new_client->dev, &dev_attr_fan2_pwm);
-		device_create_file(&new_client->dev, &dev_attr_fan2_pwm_enable);
+		device_create_file(&new_client->dev, &dev_attr_pwm2);
+		device_create_file(&new_client->dev, &dev_attr_pwm2_enable);
 	} else
 		dev_dbg(&new_client->dev, "PWM 2 not enabled by hardware, "
 			"skipping\n");
