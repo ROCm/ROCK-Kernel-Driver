@@ -245,3 +245,64 @@ void eth_header_cache_update(struct hh_cache *hh, struct net_device *dev, unsign
 }
 
 EXPORT_SYMBOL(eth_type_trans);
+
+static int eth_mac_addr(struct net_device *dev, void *p)
+{
+	struct sockaddr *addr=p;
+	if (netif_running(dev))
+		return -EBUSY;
+	memcpy(dev->dev_addr, addr->sa_data,dev->addr_len);
+	return 0;
+}
+
+static int eth_change_mtu(struct net_device *dev, int new_mtu)
+{
+	if ((new_mtu < 68) || (new_mtu > 1500))
+		return -EINVAL;
+	dev->mtu = new_mtu;
+	return 0;
+}
+
+/*
+ * Fill in the fields of the device structure with ethernet-generic values.
+ */
+void ether_setup(struct net_device *dev)
+{
+	dev->change_mtu		= eth_change_mtu;
+	dev->hard_header	= eth_header;
+	dev->rebuild_header 	= eth_rebuild_header;
+	dev->set_mac_address 	= eth_mac_addr;
+	dev->hard_header_cache	= eth_header_cache;
+	dev->header_cache_update= eth_header_cache_update;
+	dev->hard_header_parse	= eth_header_parse;
+
+	dev->type		= ARPHRD_ETHER;
+	dev->hard_header_len 	= ETH_HLEN;
+	dev->mtu		= 1500; /* eth_mtu */
+	dev->addr_len		= ETH_ALEN;
+	dev->tx_queue_len	= 1000;	/* Ethernet wants good queues */	
+	dev->flags		= IFF_BROADCAST|IFF_MULTICAST;
+	
+	memset(dev->broadcast,0xFF, ETH_ALEN);
+
+}
+EXPORT_SYMBOL(ether_setup);
+
+/**
+ * alloc_etherdev - Allocates and sets up an ethernet device
+ * @sizeof_priv: Size of additional driver-private structure to be allocated
+ *	for this ethernet device
+ *
+ * Fill in the fields of the device structure with ethernet-generic
+ * values. Basically does everything except registering the device.
+ *
+ * Constructs a new net device, complete with a private data area of
+ * size @sizeof_priv.  A 32-byte (not bit) alignment is enforced for
+ * this private data area.
+ */
+
+struct net_device *alloc_etherdev(int sizeof_priv)
+{
+	return alloc_netdev(sizeof_priv, "eth%d", ether_setup);
+}
+EXPORT_SYMBOL(alloc_etherdev);
