@@ -1,5 +1,5 @@
 /*
- * AGPGART module version 1.0
+ * AGPGART driver backend routines.
  * Copyright (C) 2002 Dave Jones.
  * Copyright (C) 1999 Jeff Hartmann.
  * Copyright (C) 1999 Precision Insight, Inc.
