@@ -161,9 +161,9 @@ do {						\
 /*
  * Global list of active external journals
  */
-LIST_HEAD(jfs_external_logs);
-struct jfs_log *dummy_log = NULL;
-DECLARE_MUTEX(jfs_log_sem);
+static LIST_HEAD(jfs_external_logs);
+static struct jfs_log *dummy_log = NULL;
+static DECLARE_MUTEX(jfs_log_sem);
 
 /*
  * external references
@@ -205,7 +205,7 @@ static int lmLogSync(struct jfs_log * log, int nosyncwait);
  *	statistics
  */
 #ifdef CONFIG_JFS_STATISTICS
-struct lmStat {
+static struct lmStat {
 	uint commit;		/* # of commit */
 	uint pagedone;		/* # of page written */
 	uint submitted;		/* # of pages submitted */
@@ -1435,6 +1435,8 @@ int lmLogInit(struct jfs_log * log)
 	 *      unwind on error
 	 */
       errout30:		/* release log page */
+	log->wqueue = NULL;
+	bp->l_wqnext = NULL;
 	lbmFree(bp);
 
       errout20:		/* release log superblock */
