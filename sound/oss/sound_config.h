@@ -137,7 +137,7 @@ static inline int translate_mode(struct file *file)
 #endif
 
 #ifndef DDB
-#define DDB(x) {}
+#define DDB(x) do {} while (0)
 #endif
 
 #ifndef MDB
