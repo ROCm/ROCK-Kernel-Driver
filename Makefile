@@ -592,10 +592,6 @@ CLEAN_FILES += \
 	net/khttpd/times.h \
 	submenu*
 
-# 	directories removed with 'make clean'
-CLEAN_DIRS += \
-	modules
-
 # 	files removed with 'make mrproper'
 MRPROPER_FILES += \
 	include/linux/autoconf.h include/linux/version.h \
@@ -633,7 +629,6 @@ clean:	archclean
 		   -name .\*.tmp -o -name .\*.d \) -type f -print \
 		| grep -v lxdialog/ | xargs rm -f
 	@rm -f $(CLEAN_FILES)
-	@rm -rf $(CLEAN_DIRS)
 	@$(MAKE) -C Documentation/DocBook clean
 
 mrproper: clean archmrproper
