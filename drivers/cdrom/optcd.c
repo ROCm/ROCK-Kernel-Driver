@@ -71,7 +71,6 @@
 #include <linux/mm.h>
 #include <linux/ioport.h>
 #include <linux/init.h>
-#include <linux/devfs_fs_kernel.h>
 
 #include <asm/io.h>
 #include <linux/blk.h>
@@ -2033,6 +2032,8 @@ static int __init optcd_init(void)
 	optcd_disk->first_minor = 0;
 	optcd_disk->fops = &opt_fops;
 	sprintf(optcd_disk->disk_name, "optcd");
+	sprintf(optcd_disk->devfs_name, "optcd");
+
 	if (!request_region(optcd_port, 4, "optcd")) {
 		printk(KERN_ERR "optcd: conflict, I/O port 0x%x already used\n",
 			optcd_port);
@@ -2065,8 +2066,8 @@ static int __init optcd_init(void)
 		put_disk(optcd_disk);
 		return -EIO;
 	}
-	devfs_register (NULL, "optcd", DEVFS_FL_DEFAULT, MAJOR_NR, 0,
-			S_IFBLK | S_IRUGO | S_IWUGO, &opt_fops, NULL);
+
+
 	blk_init_queue(&opt_queue, do_optcd_request, &optcd_lock);
 	blk_queue_hardsect_size(&opt_queue, 2048);
 	optcd_disk->queue = &opt_queue;
@@ -2079,7 +2080,6 @@ static int __init optcd_init(void)
 
 static void __exit optcd_exit(void)
 {
-	devfs_remove("optcd");
 	del_gendisk(optcd_disk);
 	put_disk(optcd_disk);
 	if (unregister_blkdev(MAJOR_NR, "optcd") == -EINVAL) {
