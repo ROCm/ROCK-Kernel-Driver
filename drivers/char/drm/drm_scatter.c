@@ -61,6 +61,12 @@ void drm_sg_cleanup( drm_sg_mem_t *entry )
 		   DRM_MEM_SGLISTS );
 }
 
+#ifdef _LP64
+# define ScatterHandle(x) (unsigned int)((x >> 32) + (x & ((1L << 32) - 1)))
+#else
+# define ScatterHandle(x) (unsigned int)(x)
+#endif
+
 int drm_sg_alloc( struct inode *inode, struct file *filp,
 		   unsigned int cmd, unsigned long arg )
 {
@@ -114,7 +120,7 @@ int drm_sg_alloc( struct inode *inode, struct file *filp,
 	}
 	memset( (void *)entry->busaddr, 0, pages * sizeof(*entry->busaddr) );
 
-	entry->virtual = vmalloc_32( pages << PAGE_SHIFT );
+	entry->virtual = vmalloc( pages << PAGE_SHIFT );
 	if ( !entry->virtual ) {
 		drm_free( entry->busaddr,
 			   entry->pages * sizeof(*entry->busaddr),
@@ -133,12 +139,12 @@ int drm_sg_alloc( struct inode *inode, struct file *filp,
 	 */
 	memset( entry->virtual, 0, pages << PAGE_SHIFT );
 
-	entry->handle = (unsigned long)entry->virtual;
+	entry->handle = ScatterHandle((unsigned long)entry->virtual);
 
 	DRM_DEBUG( "sg alloc handle  = %08lx\n", entry->handle );
 	DRM_DEBUG( "sg alloc virtual = %p\n", entry->virtual );
 
-	for ( i = entry->handle, j = 0 ; j < pages ; i += PAGE_SIZE, j++ ) {
+	for ( i = (unsigned long)entry->virtual, j = 0 ; j < pages ; i += PAGE_SIZE, j++ ) {
 		entry->pagelist[j] = vmalloc_to_page((void *)i);
 		if (!entry->pagelist[j])
 			goto failed;

@@ -84,6 +84,10 @@ static struct drm_driver driver = {
 	.reclaim_buffers = drm_core_reclaim_buffers,
 	.get_map_ofs = drm_core_get_map_ofs,
 	.get_reg_ofs = drm_core_get_reg_ofs,
+#ifdef __x86_64__
+	.register_ioctl32 = r128_register_ioctl32,
+	.unregister_ioctl32 = r128_unregister_ioctl32,
+#endif
 	.postinit = postinit,
 	.version = version,
 	.ioctls = r128_ioctls,

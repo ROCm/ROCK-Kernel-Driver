@@ -326,7 +326,8 @@ static void r128_cce_init_ring_buffer( drm_device_t *dev,
 		ring_start = dev_priv->cce_ring->offset - dev->agp->base;
 	else
 #endif
-		ring_start = dev_priv->cce_ring->offset - dev->sg->handle;
+		ring_start = dev_priv->cce_ring->offset 
+		    - (unsigned long)dev->sg->virtual;
 
 	R128_WRITE( R128_PM4_BUFFER_OFFSET, ring_start | R128_AGP_OFFSET );
 
@@ -537,7 +538,7 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 		dev_priv->cce_buffers_offset = dev->agp->base;
 	else
 #endif
-		dev_priv->cce_buffers_offset = dev->sg->handle;
+	dev_priv->cce_buffers_offset = (unsigned long)dev->sg->virtual;
 
 	dev_priv->ring.start = (u32 *)dev_priv->cce_ring->handle;
 	dev_priv->ring.end = ((u32 *)dev_priv->cce_ring->handle

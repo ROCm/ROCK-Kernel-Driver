@@ -90,6 +90,10 @@ static struct drm_driver driver = {
 	.get_map_ofs = drm_core_get_map_ofs,
 	.get_reg_ofs = drm_core_get_reg_ofs,
 	.postinit = postinit,
+#ifdef __x86_64__
+	.register_ioctl32 = mga_register_ioctl32,
+	.unregister_ioctl32 = mga_unregister_ioctl32,
+#endif
 	.version = version,
 	.ioctls = mga_ioctls,
 	.dma_ioctl = mga_dma_buffers,

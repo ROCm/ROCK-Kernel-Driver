@@ -310,6 +310,9 @@ int drm_init( struct drm_driver *driver )
 			drm_probe(pdev, pid, driver);
 		}
 	}
+	if (driver->register_ioctl32)
+	    driver->register_ioctl32();
+
 	return 0;
 }
 EXPORT_SYMBOL(drm_init);
@@ -350,7 +353,10 @@ static void drm_cleanup( drm_device_t *dev )
 
 	if (dev->driver->postcleanup)
 		dev->driver->postcleanup(dev);
-	
+
+	if (dev->driver->unregister_ioctl32)
+	        dev->driver->unregister_ioctl32();
+
 	if ( drm_put_minor(dev) )
 		DRM_ERROR( "Cannot unload module\n" );
 }

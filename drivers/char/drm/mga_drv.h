@@ -112,6 +112,10 @@ typedef struct drm_mga_private {
 	drm_local_map_t *agp_textures;
 } drm_mga_private_t;
 
+                               /* mga_ioctl32.c */
+extern int mga_register_ioctl32( void );
+extern void mga_unregister_ioctl32( void );
+
 				/* mga_dma.c */
 extern int mga_dma_init( DRM_IOCTL_ARGS );
 extern int mga_dma_flush( DRM_IOCTL_ARGS );

@@ -563,6 +563,8 @@ struct drm_driver {
 	int (*postcleanup)(struct drm_device *);
 	int (*presetup)(struct drm_device *);
 	int (*postsetup)(struct drm_device *);
+	int (*register_ioctl32)( void );
+	void (*unregister_ioctl32)( void );
  	int (*dma_ioctl)( DRM_IOCTL_ARGS );
 	int (*open_helper)(struct drm_device *, drm_file_t *);
 	void (*free_filp_priv)(struct drm_device *, drm_file_t *);
@@ -1029,7 +1031,7 @@ static __inline__ struct drm_map *drm_core_findmap(struct drm_device *dev, unsig
 	list_for_each( _list, &dev->maplist->head ) {
 		drm_map_list_t *_entry = list_entry( _list, drm_map_list_t, head );
 		if ( _entry->map &&
-		     _entry->map->offset == offset ) {
+		     _entry->map->pub_handle == offset ) {
 			return _entry->map;
 		}
 	}

@@ -1134,10 +1134,11 @@ static void radeon_cp_init_ring_buffer( drm_device_t *dev,
        } else
 #endif
 		ring_start = (dev_priv->cp_ring->offset
-			      - dev->sg->handle
+			      - (unsigned long)dev->sg->virtual
 			      + dev_priv->gart_vm_start);
 
 	RADEON_WRITE( RADEON_CP_RB_BASE, ring_start );
+	RADEON_READ( RADEON_CP_RB_WPTR_DELAY ); /* read back to propagate */
 
 	/* Set the write pointer delay */
 	RADEON_WRITE( RADEON_CP_RB_WPTR_DELAY, 0 );
@@ -1160,14 +1161,15 @@ static void radeon_cp_init_ring_buffer( drm_device_t *dev,
 		drm_sg_mem_t *entry = dev->sg;
 		unsigned long tmp_ofs, page_ofs;
 
-		tmp_ofs = dev_priv->ring_rptr->offset - dev->sg->handle;
+		tmp_ofs = dev_priv->ring_rptr->offset 
+		    - (unsigned long)dev->sg->virtual;
 		page_ofs = tmp_ofs >> PAGE_SHIFT;
 
 		RADEON_WRITE( RADEON_CP_RB_RPTR_ADDR,
 			     entry->busaddr[page_ofs]);
 		DRM_DEBUG( "ring rptr: offset=0x%08lx handle=0x%08lx\n",
 			   (unsigned long) entry->busaddr[page_ofs],
-			   entry->handle + tmp_ofs );
+			   (unsigned long)entry->virtual + tmp_ofs );
 	}
 
 	/* Initialize the scratch register pointer.  This will cause
@@ -1486,7 +1488,7 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 	else
 #endif
 		dev_priv->gart_buffers_offset = (dev->agp_buffer_map->offset
-						- dev->sg->handle
+						- (unsigned long)dev->sg->virtual
 						+ dev_priv->gart_vm_start);
 
 	DRM_DEBUG( "dev_priv->gart_size %d\n",
