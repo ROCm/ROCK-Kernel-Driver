@@ -85,14 +85,10 @@ extern struct task_struct *current_set[NR_CPUS];
 
 void mm_init_ppc64(void);
 
-unsigned long *pmac_find_end_of_memory(void);
-extern unsigned long *find_end_of_memory(void);
-
 extern pgd_t ioremap_dir[];
 pgd_t * ioremap_pgd = (pgd_t *)&ioremap_dir;
 
 static void map_io_page(unsigned long va, unsigned long pa, int flags);
-extern void die_if_kernel(char *,struct pt_regs *,long);
 
 unsigned long klimit = (unsigned long)_end;
 
@@ -437,12 +433,11 @@ void free_initrd_mem(unsigned long start, unsigned long end)
 }
 #endif
 
-
-
 /*
  * Do very early mm setup.
  */
-void __init mm_init_ppc64(void) {
+void __init mm_init_ppc64(void)
+{
 	struct paca_struct *lpaca;
 	unsigned long guard_page, index;
 
@@ -469,8 +464,6 @@ void __init mm_init_ppc64(void) {
 
 	ppc_md.progress("MM:exit", 0x211);
 }
-
-
 
 /*
  * Initialize the bootmem system and give it all the memory we

@@ -5,7 +5,6 @@
 define_bool CONFIG_UID16 n
 define_bool CONFIG_RWSEM_GENERIC_SPINLOCK n
 define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM y
-define_bool CONFIG_GENERIC_BUST_SPINLOCK n
 define_bool CONFIG_GENERIC_ISA_DMA y
 define_bool CONFIG_HAVE_DEC_LOCK y
 
@@ -30,8 +29,6 @@ define_bool CONFIG_PREEMPT n
 
 if [ "$CONFIG_PPC_ISERIES" = "y" ]; then
    define_bool CONFIG_MSCHUNKS y
-else
-bool 'MsChunks Physical to Absolute address translation support' CONFIG_MSCHUNKS
 fi
 
 endmenu
@@ -206,10 +203,16 @@ source net/bluetooth/Config.in
 mainmenu_option next_comment
 comment 'Kernel hacking'
 
-bool 'Magic SysRq key' CONFIG_MAGIC_SYSRQ
-bool 'Include kgdb kernel debugger' CONFIG_KGDB
-bool 'Include xmon kernel debugger' CONFIG_XMON
-bool 'Include PPCDBG realtime debugging' CONFIG_PPCDBG
+bool 'Kernel debugging' CONFIG_DEBUG_KERNEL
+if [ "$CONFIG_DEBUG_KERNEL" != "n" ]; then
+   bool '  Debug memory allocations' CONFIG_DEBUG_SLAB
+   bool '  Magic SysRq key' CONFIG_MAGIC_SYSRQ
+   bool '  Include xmon kernel debugger' CONFIG_XMON
+   if [ "$CONFIG_XMON" = "y" ]; then
+      bool '  Enable xmon by default' CONFIG_XMON_DEFAULT
+   fi
+   bool '  Include PPCDBG realtime debugging' CONFIG_PPCDBG
+fi
 endmenu
 
 source lib/Config.in

@@ -55,9 +55,31 @@
 #define smp_wmb()	__asm__ __volatile__("": : :"memory")
 #endif /* CONFIG_SMP */
 
+#ifdef CONFIG_DEBUG_KERNEL
+extern void (*debugger)(struct pt_regs *regs);
+extern int (*debugger_bpt)(struct pt_regs *regs);
+extern int (*debugger_sstep)(struct pt_regs *regs);
+extern int (*debugger_iabr_match)(struct pt_regs *regs);
+extern int (*debugger_dabr_match)(struct pt_regs *regs);
+extern void (*debugger_fault_handler)(struct pt_regs *regs);
+#else
+#define debugger(regs)			do { } while (0)
+#define debugger_bpt(regs)		0
+#define debugger_sstep(regs)		0
+#define debugger_iabr_match(regs)	0
+#define debugger_dabr_match(regs)	0
+#define debugger_fault_handler		((void (*)(struct pt_regs *))0)
+#endif
+
 #ifdef CONFIG_XMON
 extern void xmon_irq(int, void *, struct pt_regs *);
-extern void xmon(struct pt_regs *excp);
+
+extern void xmon(struct pt_regs *regs);
+extern int xmon_bpt(struct pt_regs *regs);
+extern int xmon_sstep(struct pt_regs *regs);
+extern int xmon_iabr_match(struct pt_regs *regs);
+extern int xmon_dabr_match(struct pt_regs *regs);
+extern void (*xmon_fault_handler)(struct pt_regs *regs);
 #endif
 
 extern void print_backtrace(unsigned long *);

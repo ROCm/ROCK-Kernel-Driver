@@ -38,38 +38,18 @@
 #include <asm/ppcdebug.h>
 
 extern int fix_alignment(struct pt_regs *);
-extern void bad_page_fault(struct pt_regs *, unsigned long);
+extern void bad_page_fault(struct pt_regs *, unsigned long, int);
 
 /* This is true if we are using the firmware NMI handler (typically LPAR) */
 extern int fwnmi_active;
 
-#ifdef CONFIG_XMON
-extern void xmon(struct pt_regs *regs);
-extern int xmon_bpt(struct pt_regs *regs);
-extern int xmon_sstep(struct pt_regs *regs);
-extern int xmon_iabr_match(struct pt_regs *regs);
-extern int xmon_dabr_match(struct pt_regs *regs);
-extern void (*xmon_fault_handler)(struct pt_regs *regs);
-#endif
-
-#ifdef CONFIG_XMON
-#define CONFIG_DEBUGGER
-void (*debugger)(struct pt_regs *regs) = xmon;
-int (*debugger_bpt)(struct pt_regs *regs) = xmon_bpt;
-int (*debugger_sstep)(struct pt_regs *regs) = xmon_sstep;
-int (*debugger_iabr_match)(struct pt_regs *regs) = xmon_iabr_match;
-int (*debugger_dabr_match)(struct pt_regs *regs) = xmon_dabr_match;
-void (*debugger_fault_handler)(struct pt_regs *regs);
-#else
-#ifdef CONFIG_KGDB
-#define CONFIG_DEBUGGER
+#ifdef CONFIG_DEBUG_KERNEL
 void (*debugger)(struct pt_regs *regs);
 int (*debugger_bpt)(struct pt_regs *regs);
 int (*debugger_sstep)(struct pt_regs *regs);
 int (*debugger_iabr_match)(struct pt_regs *regs);
 int (*debugger_dabr_match)(struct pt_regs *regs);
 void (*debugger_fault_handler)(struct pt_regs *regs);
-#endif
 #endif
 
 /*
@@ -103,10 +83,8 @@ static void
 _exception(int signr, siginfo_t *info, struct pt_regs *regs)
 {
 	if (!user_mode(regs)) {
-#ifdef CONFIG_DEBUGGER
 		if (debugger)
 			debugger(regs);
-#endif
 		die("Exception in kernel mode\n", regs, signr);
 	}
 
@@ -159,10 +137,8 @@ SystemResetException(struct pt_regs *regs)
 		errlog = FWNMI_get_errinfo(regs);
 	}
 
-#ifdef CONFIG_DEBUGGER
 	if (debugger)
 		debugger(regs);
-#endif
 
 #ifdef PANIC_ON_ERROR
 	panic("System Reset");
@@ -201,14 +177,13 @@ MachineCheckException(struct pt_regs *regs)
 				return;
 		}
 
-#ifdef CONFIG_DEBUGGER
 		if (debugger_fault_handler) {
 			debugger_fault_handler(regs);
 			return;
 		}
 		if (debugger)
 			debugger(regs);
-#endif
+
 		console_verbose();
 		spin_lock_irq(&die_lock);
 		bust_spinlocks(1);
@@ -252,10 +227,8 @@ InstructionBreakpointException(struct pt_regs *regs)
 {
 	siginfo_t info;
 
-#ifdef CONFIG_DEBUGGER
 	if (debugger_iabr_match && debugger_iabr_match(regs))
 		return;
-#endif
 
 	info.si_signo = SIGTRAP;
 	info.si_errno = 0;
@@ -325,10 +298,9 @@ ProgramCheckException(struct pt_regs *regs)
 	} else if (regs->msr & 0x20000) {
 		/* trap exception */
 
-#ifdef CONFIG_DEBUGGER
 		if (debugger_bpt && debugger_bpt(regs))
 			return;
-#endif
+
 		info.si_signo = SIGTRAP;
 		info.si_errno = 0;
 		info.si_code = TRAP_BRKPT;
@@ -352,10 +324,8 @@ SingleStepException(struct pt_regs *regs)
 
 	regs->msr &= ~MSR_SE;  /* Turn off 'trace' bit */
 
-#ifdef CONFIG_DEBUGGER
 	if (debugger_sstep && debugger_sstep(regs))
 		return;
-#endif
 
 	info.si_signo = SIGTRAP;
 	info.si_errno = 0;
@@ -402,7 +372,7 @@ AlignmentException(struct pt_regs *regs)
 			force_sig_info(SIGSEGV, &info, current);
 		} else {
 			/* Search exception table */
-			bad_page_fault(regs, regs->dar);
+			bad_page_fault(regs, regs->dar, SIGSEGV);
 		}
 
 		return;

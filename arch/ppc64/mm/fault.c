@@ -38,10 +38,7 @@
 
 #include <asm/ppcdebug.h>
 
-#if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
-extern void (*debugger)(struct pt_regs *);
-extern void (*debugger_fault_handler)(struct pt_regs *);
-extern int (*debugger_dabr_match)(struct pt_regs *);
+#ifdef CONFIG_DEBUG_KERNEL
 int debugger_kernel_faults = 1;
 #endif
 
@@ -69,7 +66,7 @@ void do_page_fault(struct pt_regs *regs, unsigned long address,
 	if (regs->trap == 0x400)
 		error_code &= 0x48200000;
 
-#if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
+#ifdef CONFIG_DEBUG_KERNEL
 	if (debugger_fault_handler && (regs->trap == 0x300 ||
 				regs->trap == 0x380)) {
 		debugger_fault_handler(regs);
@@ -81,7 +78,7 @@ void do_page_fault(struct pt_regs *regs, unsigned long address,
 		if (debugger_dabr_match(regs))
 			return;
 	}
-#endif /* CONFIG_XMON || CONFIG_KGDB */
+#endif
 
 	if (in_interrupt() || mm == NULL) {
 		bad_page_fault(regs, address, SIGSEGV);
@@ -102,7 +99,7 @@ void do_page_fault(struct pt_regs *regs, unsigned long address,
 
 good_area:
 	code = SEGV_ACCERR;
-	
+
 	/* a write */
 	if (is_write) {
 		if (!(vma->vm_flags & VM_WRITE))
@@ -122,18 +119,18 @@ good_area:
 	 * make sure we exit gracefully rather than endlessly redo
 	 * the fault.
 	 */
-        switch (handle_mm_fault(mm, vma, address, is_write)) {
+	switch (handle_mm_fault(mm, vma, address, is_write)) {
 
-        case 1:
-                current->min_flt++;
-                break;
-        case 2:
-                current->maj_flt++;
-                break;
-        case 0:
-                goto do_sigbus;
-        default:
-                goto out_of_memory;
+	case 1:
+		current->min_flt++;
+		break;
+	case 2:
+		current->maj_flt++;
+		break;
+	case 0:
+		goto do_sigbus;
+	default:
+		goto out_of_memory;
 	}
 
 	up_read(&mm->mmap_sem);
@@ -149,8 +146,8 @@ bad_area:
 		info.si_code = code;
 		info.si_addr = (void *) address;
 #ifdef CONFIG_XMON
-	        ifppcdebug(PPCDBG_SIGNALXMON)
-        	    PPCDBG_ENTER_DEBUGGER_REGS(regs);
+		ifppcdebug(PPCDBG_SIGNALXMON)
+			PPCDBG_ENTER_DEBUGGER_REGS(regs);
 #endif
 
 		force_sig_info(SIGSEGV, &info, current);
@@ -207,10 +204,9 @@ bad_page_fault(struct pt_regs *regs, unsigned long address, int sig)
 	}
 
 	/* kernel has accessed a bad area */
-#if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
+#ifdef CONFIG_DEBUG_KERNEL
 	if (debugger_kernel_faults)
 		debugger(regs);
 #endif
 	die("Kernel access of bad area", regs, sig);
 }
-

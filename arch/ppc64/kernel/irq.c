@@ -75,22 +75,6 @@ irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned =
 int ppc_spurious_interrupts = 0;
 struct irqaction *ppc_irq_action[NR_IRQS];
 unsigned long lpEvent_count = 0;
-#ifdef CONFIG_XMON
-extern void xmon(struct pt_regs *regs);
-extern int xmon_bpt(struct pt_regs *regs);
-extern int xmon_sstep(struct pt_regs *regs);
-extern int xmon_iabr_match(struct pt_regs *regs);
-extern int xmon_dabr_match(struct pt_regs *regs);
-extern void (*xmon_fault_handler)(struct pt_regs *regs);
-#endif
-#ifdef CONFIG_XMON
-extern void (*debugger)(struct pt_regs *regs);
-extern int (*debugger_bpt)(struct pt_regs *regs);
-extern int (*debugger_sstep)(struct pt_regs *regs);
-extern int (*debugger_iabr_match)(struct pt_regs *regs);
-extern int (*debugger_dabr_match)(struct pt_regs *regs);
-extern void (*debugger_fault_handler)(struct pt_regs *regs);
-#endif
 
 /* nasty hack for shared irq's since we need to do kmalloc calls but
  * can't very early in the boot when we need to do a request irq.
