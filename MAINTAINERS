@@ -818,11 +818,11 @@ W:	http://www.farsite.co.uk/
 S:	Supported
 
 FRAMEBUFFER LAYER
-P:	James Simmons, Geert Uytterhoeven	
-M:	jsimmons@infradead.org, geert@linux-m68k.org	
+P:	Antonino Daplas
+M:	adaplas@pol.net
 L:	linux-fbdev-devel@lists.sourceforge.net	
 W:	http://linux-fbdev.sourceforge.net/
-S:	Supported
+S:	Maintained
 
 FILE LOCKING (flock() and fcntl()/lockf())
 P:	Matthew Wilcox
