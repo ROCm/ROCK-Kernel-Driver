@@ -367,6 +367,9 @@ void cfb_fillrect(struct fb_info *p, const struct fb_fillrect *rect)
 	unsigned long *dst;
 	int dst_idx, left;
 
+	if (p->state != FBINFO_STATE_RUNNING)
+		return;
+
 	/* We want rotation but lack hardware to do it for us. */
 	if (!p->fbops->fb_rotate && p->var.rotate) {
 	}	
