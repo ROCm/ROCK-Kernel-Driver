@@ -1266,6 +1266,20 @@ repeat:
 			page_cache_release(page);
 			return err;
 		}
+	} else {
+	    	/*
+		 * If a nonlinear mapping then store the file page offset
+		 * in the pte.
+		 */
+	    	unsigned long pgidx;
+		pgidx = (addr - vma->vm_start) >> PAGE_SHIFT;
+		pgidx += vma->vm_pgoff;
+		pgidx >>= PAGE_CACHE_SHIFT - PAGE_SHIFT;
+		if (pgoff != pgidx) {
+	    		err = install_file_pte(mm, vma, addr, pgoff, prot);
+			if (err)
+		    		return err;
+		}
 	}
 
 	len -= PAGE_SIZE;
