@@ -249,6 +249,7 @@ static inline void pte_chain_lock(struct page *page)
 
 static inline void pte_chain_unlock(struct page *page)
 {
+	smp_mb__before_clear_bit();
 	clear_bit(PG_chainlock, &page->flags);
 	preempt_enable();
 }
