@@ -60,6 +60,7 @@
    extern int ips_eh_reset(Scsi_Cmnd *);
    extern int ips_queue(Scsi_Cmnd *, void (*) (Scsi_Cmnd *));
    extern int ips_biosparam(Disk *, struct block_device *, int *);
+   extern int ips_slave_attach(Scsi_Device *);
    extern const char * ips_info(struct Scsi_Host *);
    extern void do_ips(int, void *, struct pt_regs *);
 
@@ -481,7 +482,8 @@
     eh_host_reset_handler : ips_eh_reset, \
     abort : NULL,                         \
     reset : NULL,                         \
-    slave_attach : NULL,                  \
+    slave_attach : ips_slave_attach,      \
+    slave_detach : NULL,                  \
     bios_param : ips_biosparam,           \
     can_queue : 0,                        \
     this_id: -1,                          \

@@ -374,7 +374,11 @@ static void tcp_retransmit_timer(struct sock *sk)
 		}
 	}
 
-	tcp_enter_loss(sk, 0);
+	if (tcp_use_frto(sk)) {
+		tcp_enter_frto(sk);
+	} else {
+		tcp_enter_loss(sk, 0);
+	}
 
 	if (tcp_retransmit_skb(sk, skb_peek(&sk->write_queue)) > 0) {
 		/* Retransmission failed because of local congestion,

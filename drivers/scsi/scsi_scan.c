@@ -1477,11 +1477,14 @@ static int scsi_add_lun(Scsi_Device *sdevscan, Scsi_Device **sdevnew,
 		if (sdt->detect)
 			sdev->attached += (*sdt->detect) (sdev);
 
-	if (sdev->host->hostt->slave_attach != NULL)
+	if (sdev->host->hostt->slave_attach != NULL) {
 		if (sdev->host->hostt->slave_attach(sdev) != 0) {
-			printk(KERN_INFO "scsi_add_lun: failed low level driver attach, setting device offline");
+			printk(KERN_INFO "%s: scsi_add_lun: failed low level driver attach, setting device offline", devname);
 			sdev->online = FALSE;
 		}
+	} else if(sdev->host->cmd_per_lun) {
+		scsi_adjust_queue_depth(sdev, 0, sdev->host->cmd_per_lun);
+	}
 
 	if (sdevnew != NULL)
 		*sdevnew = sdev;
@@ -2017,21 +2020,6 @@ static void scsi_scan_selected_lun(struct Scsi_Host *shost, uint channel,
 	scsi_free_sdev(sdevscan);
 	if (res == SCSI_SCAN_LUN_PRESENT) {
 		BUG_ON(sdev == NULL);
-		/*
-		 * FIXME calling select_queue_depths is wrong for adapters
-		 * that modify queue depths of all scsi devices - the
-		 * adapter might change a queue depth (not for this sdev),
-		 * but the mid-layer will not change the queue depth. This
-		 * does not cause an oops, but queue_depth will not match
-		 * the actual queue depth used.
-		 *
-		 * Perhaps use a default queue depth, and allow them to be
-		 * modified at boot/insmod time, and/or via sysctl/ioctl/proc;
-		 * plus have dynamic queue depth adjustment like the
-		 * aic7xxx driver.
-		 */
-		if (shost->select_queue_depths != NULL)
-			(shost->select_queue_depths) (shost, shost->host_queue);
 
 		for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
 			if (sdt->init && sdt->dev_noticed)

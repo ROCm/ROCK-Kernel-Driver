@@ -27,6 +27,7 @@
 #include <linux/config.h>
 #include <net/dst.h>
 #include <net/inetpeer.h>
+#include <net/flow.h>
 #include <linux/in_route.h>
 #include <linux/rtnetlink.h>
 #include <linux/route.h>
@@ -44,19 +45,6 @@
  * some modules referring to it. */
 
 #define RT_CONN_FLAGS(sk)   (RT_TOS(inet_sk(sk)->tos) | sk->localroute)
-
-struct rt_key
-{
-	__u32			dst;
-	__u32			src;
-	int			iif;
-	int			oif;
-#ifdef CONFIG_IP_ROUTE_FWMARK
-	__u32			fwmark;
-#endif
-	__u8			tos;
-	__u8			scope;
-};
 
 struct inet_peer;
 struct rtable
@@ -78,7 +66,7 @@ struct rtable
 	__u32			rt_gateway;
 
 	/* Cache lookup keys */
-	struct rt_key		key;
+	struct flowi		fl;
 
 	/* Miscellaneous cached information */
 	__u32			rt_spec_dst; /* RFC1122 specific destination */
@@ -124,7 +112,7 @@ extern void		ip_rt_redirect(u32 old_gw, u32 dst, u32 new_gw,
 				       u32 src, u8 tos, struct net_device *dev);
 extern void		ip_rt_advice(struct rtable **rp, int advice);
 extern void		rt_cache_flush(int how);
-extern int		ip_route_output_key(struct rtable **, const struct rt_key *key);
+extern int		ip_route_output_key(struct rtable **, const struct flowi *flp);
 extern int		ip_route_input(struct sk_buff*, u32 dst, u32 src, u8 tos, struct net_device *devin);
 extern unsigned short	ip_rt_frag_needed(struct iphdr *iph, unsigned short new_mtu);
 extern void		ip_rt_update_pmtu(struct dst_entry *dst, unsigned mtu);
@@ -135,16 +123,6 @@ extern void		ip_rt_multicast_event(struct in_device *);
 extern int		ip_rt_ioctl(unsigned int cmd, void *arg);
 extern void		ip_rt_get_source(u8 *src, struct rtable *rt);
 extern int		ip_rt_dump(struct sk_buff *skb,  struct netlink_callback *cb);
-
-/* Deprecated: use ip_route_output_key directly */
-static inline int ip_route_output(struct rtable **rp,
-				      u32 daddr, u32 saddr, u32 tos, int oif)
-{
-	struct rt_key key = { dst:daddr, src:saddr, oif:oif, tos:tos };
-
-	return ip_route_output_key(rp, &key);
-}
-
 
 static inline void ip_rt_put(struct rtable * rt)
 {
@@ -163,15 +141,20 @@ static inline char rt_tos2priority(u8 tos)
 
 static inline int ip_route_connect(struct rtable **rp, u32 dst, u32 src, u32 tos, int oif)
 {
+	struct flowi fl = { .nl_u = { .ip4_u = { .daddr = dst,
+						 .saddr = src,
+						 .tos   = tos } },
+			    .oif = oif };
+
 	int err;
-	err = ip_route_output(rp, dst, src, tos, oif);
+	err = ip_route_output_key(rp, &fl);
 	if (err || (dst && src))
 		return err;
-	dst = (*rp)->rt_dst;
-	src = (*rp)->rt_src;
+	fl.fl4_dst = (*rp)->rt_dst;
+	fl.fl4_src = (*rp)->rt_src;
 	ip_rt_put(*rp);
 	*rp = NULL;
-	return ip_route_output(rp, dst, src, tos, oif);
+	return ip_route_output_key(rp, &fl);
 }
 
 extern void rt_bind_peer(struct rtable *rt, int create);

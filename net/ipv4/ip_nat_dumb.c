@@ -117,23 +117,21 @@ ip_do_nat(struct sk_buff *skb)
 			if (rt->rt_flags&RTCF_SNAT) {
 				if (ciph->daddr != osaddr) {
 					struct   fib_result res;
-					struct   rt_key key;
 					unsigned flags = 0;
-
-					key.src = ciph->daddr;
-					key.dst = ciph->saddr;
-					key.iif = skb->dev->ifindex;
-					key.oif = 0;
+					struct flowi fl = { .nl_u =
+							    { .ip4_u =
+							      { .daddr = ciph->saddr,
+								.saddr = ciph->daddr,
 #ifdef CONFIG_IP_ROUTE_TOS
-					key.tos = RT_TOS(ciph->tos);
+								.tos = RT_TOS(ciph->tos)
 #endif
-#ifdef CONFIG_IP_ROUTE_FWMARK
-					key.fwmark = 0;
-#endif
+							      } },
+							    .iif = skb->dev->ifindex };
+
 					/* Use fib_lookup() until we get our own
 					 * hash table of NATed hosts -- Rani
 				 	 */
-					if (fib_lookup(&key, &res) == 0) {
+					if (fib_lookup(&fl, &res) == 0) {
 						if (res.r) {
 							ciph->daddr = fib_rules_policy(ciph->daddr, &res, &flags);
 							if (ciph->daddr != idaddr)

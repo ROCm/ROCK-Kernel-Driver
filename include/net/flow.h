@@ -1,6 +1,6 @@
 /*
  *
- *	Flow based forwarding rules (usage: firewalling, etc)
+ *	Generic internet FLOW.
  *
  */
 
@@ -8,12 +8,16 @@
 #define _NET_FLOW_H
 
 struct flowi {
-	int	proto;		/*	{TCP, UDP, ICMP}	*/
+	int	oif;
+	int	iif;
 
 	union {
 		struct {
 			__u32			daddr;
 			__u32			saddr;
+			__u32			fwmark;
+			__u8			tos;
+			__u8			scope;
 		} ip4_u;
 		
 		struct {
@@ -27,9 +31,12 @@ struct flowi {
 #define fl6_flowlabel	nl_u.ip6_u.flowlabel
 #define fl4_dst		nl_u.ip4_u.daddr
 #define fl4_src		nl_u.ip4_u.saddr
+#define fl4_fwmark	nl_u.ip4_u.fwmark
+#define fl4_tos		nl_u.ip4_u.tos
+#define fl4_scope	nl_u.ip4_u.scope
 
-	int	oif;
-
+	__u8	proto;
+	__u8	flags;
 	union {
 		struct {
 			__u16	sport;
@@ -41,61 +48,8 @@ struct flowi {
 			__u8	code;
 		} icmpt;
 
-		unsigned long	data;
+		__u32		spi;
 	} uli_u;
-};
-
-#define FLOWR_NODECISION	0	/* rule not appliable to flow	*/
-#define FLOWR_SELECT		1	/* flow must follow this rule	*/
-#define FLOWR_CLEAR		2	/* priority level clears flow	*/
-#define FLOWR_ERROR		3
-
-struct fl_acc_args {
-	int	type;
-
-
-#define FL_ARG_FORWARD	1
-#define FL_ARG_ORIGIN	2
-
-	union {
-		struct sk_buff		*skb;
-		struct {
-			struct sock	*sk;
-			struct flowi	*flow;
-		} fl_o;
-	} fl_u;
-};
-
-
-struct pkt_filter {
-	atomic_t		refcnt;
-	unsigned int		offset;
-	__u32			value;
-	__u32			mask;
-	struct pkt_filter	*next;
-};
-
-#define FLR_INPUT		1
-#define FLR_OUTPUT		2
-
-struct flow_filter {
-	int				type;
-	union {
-		struct pkt_filter	*filter;
-		struct sock		*sk;
-	} u;
-};
-
-struct flow_rule {
-	struct flow_rule_ops		*ops;
-	unsigned char			private[0];
-};
-
-struct flow_rule_ops {
-	int			(*accept)(struct rt6_info *rt,
-					  struct rt6_info *rule,
-					  struct fl_acc_args *args,
-					  struct rt6_info **nrt);
 };
 
 #endif

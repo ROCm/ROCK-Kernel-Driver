@@ -68,12 +68,13 @@ do_masquerade(struct sk_buff **pskb, const struct net_device *dev)
 	/* Setup the masquerade, if not already */
 	if (!info->initialized) {
 		u_int32_t newsrc;
+		struct flowi fl = { .nl_u = { .ip4_u = { .daddr = iph->daddr } } };
 		struct rtable *rt;
 		struct ip_nat_multi_range range;
 
 		/* Pass 0 instead of saddr, since it's going to be changed
 		   anyway. */
-		if (ip_route_output(&rt, iph->daddr, 0, 0, 0) != 0) {
+		if (ip_route_output_key(&rt, &fl) != 0) {
 			DEBUGP("ipnat_rule_masquerade: Can't reroute.\n");
 			return NF_DROP;
 		}

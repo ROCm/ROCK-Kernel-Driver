@@ -46,7 +46,6 @@
 	eh_host_reset_handler: NULL,				\
 	abort: aic7xxx_abort,					\
 	reset: aic7xxx_reset,					\
-	select_queue_depths: NULL,				\
 	slave_attach: aic7xxx_slave_attach,			\
 	slave_detach: aic7xxx_slave_detach,			\
 	bios_param: aic7xxx_biosparam,				\

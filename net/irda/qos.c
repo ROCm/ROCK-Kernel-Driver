@@ -70,13 +70,18 @@ unsigned sysctl_min_tx_turn_time = 10;
  * 1.2, chapt 5.3.2.1, p41). But, this number includes the LAP header
  * (2 bytes), and CRC (32 bits at 4 Mb/s). So, for the I field (LAP
  * payload), that's only 2042 bytes. Oups !
- * I've had trouble trouble transmitting 2048 bytes frames with USB
- * dongles and nsc-ircc at 4 Mb/s, so adjust to 2042... I don't know
- * if this bug applies only for 2048 bytes frames or all negociated
- * frame sizes, but all hardware seem to support "2048 bytes" frames.
- * You can use the sysctl to play with this value anyway.
+ * My nsc-ircc hardware has troubles receiving 2048 bytes frames at 4 Mb/s,
+ * so adjust to 2042... I don't know if this bug applies only for 2048
+ * bytes frames or all negociated frame sizes, but you can use the sysctl
+ * to play with this value anyway.
  * Jean II */
 unsigned sysctl_max_tx_data_size = 2042;
+/*
+ * Maximum transmit window, i.e. number of LAP frames between turn-around.
+ * This allow to override what the peer told us. Some peers are buggy and
+ * don't always support what they tell us.
+ * Jean II */
+unsigned sysctl_max_tx_window = 7;
 
 static int irlap_param_baud_rate(void *instance, irda_param_t *param, int get);
 static int irlap_param_link_disconnect(void *instance, irda_param_t *parm, 
@@ -184,7 +189,19 @@ int msb_index (__u16 word)
 {
 	__u16 msb = 0x8000;
 	int index = 15;   /* Current MSB */
-	
+
+	/* Check for buggy peers.
+	 * Note : there is a small probability that it could be us, but I
+	 * would expect driver authors to catch that pretty early and be
+	 * able to check precisely what's going on. If a end user sees this,
+	 * it's very likely the peer. - Jean II */
+	if (word == 0) {
+		WARNING("%s(), Detected buggy peer, adjust null PV to 0x1!\n",
+			 __FUNCTION__);
+		/* The only safe choice (we don't know the array size) */
+		word = 0x1;
+	}
+
 	while (msb) {
 		if (word & msb)
 			break;   /* Found it! */
@@ -335,9 +352,13 @@ void irlap_adjust_qos_settings(struct qos_info *qos)
 
 	/*
 	 * Make sure the mintt is sensible.
+	 * Main culprit : Ericsson T39. - Jean II
 	 */
 	if (sysctl_min_tx_turn_time > qos->min_turn_time.value) {
 		int i;
+
+		WARNING("%s(), Detected buggy peer, adjust mtt to %dus!\n",
+			 __FUNCTION__, sysctl_min_tx_turn_time);
 
 		/* We don't really need bits, but easier this way */
 		i = value_highest_bit(sysctl_min_tx_turn_time, min_turn_times,
@@ -398,6 +419,11 @@ void irlap_adjust_qos_settings(struct qos_info *qos)
 	if (qos->data_size.value > sysctl_max_tx_data_size)
 		/* Allow non discrete adjustement to avoid loosing capacity */
 		qos->data_size.value = sysctl_max_tx_data_size;
+	/*
+	 * Override Tx window if user request it. - Jean II
+	 */
+	if (qos->window_size.value > sysctl_max_tx_window)
+		qos->window_size.value = sysctl_max_tx_window;
 }
 
 /*

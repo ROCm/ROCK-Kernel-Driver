@@ -372,14 +372,20 @@ int ip_queue_xmit(struct sk_buff *skb)
 		if(opt && opt->srr)
 			daddr = opt->faddr;
 
-		/* If this fails, retransmit mechanism of transport layer will
-		 * keep trying until route appears or the connection times itself
-		 * out.
-		 */
-		if (ip_route_output(&rt, daddr, inet->saddr,
-				    RT_CONN_FLAGS(sk),
-				    sk->bound_dev_if))
-			goto no_route;
+		{
+			struct flowi fl = { .nl_u = { .ip4_u =
+						      { .daddr = daddr,
+							.saddr = inet->saddr,
+							.tos = RT_CONN_FLAGS(sk) } },
+					    .oif = sk->bound_dev_if };
+
+			/* If this fails, retransmit mechanism of transport layer will
+			 * keep trying until route appears or the connection times itself
+			 * out.
+			 */
+			if (ip_route_output_key(&rt, &fl))
+				goto no_route;
+		}
 		__sk_dst_set(sk, &rt->u.dst);
 		tcp_v4_setup_caps(sk, &rt->u.dst);
 	}
@@ -991,8 +997,14 @@ void ip_send_reply(struct sock *sk, struct sk_buff *skb, struct ip_reply_arg *ar
 			daddr = replyopts.opt.faddr;
 	}
 
-	if (ip_route_output(&rt, daddr, rt->rt_spec_dst, RT_TOS(skb->nh.iph->tos), 0))
-		return;
+	{
+		struct flowi fl = { .nl_u = { .ip4_u =
+					      { .daddr = daddr,
+						.saddr = rt->rt_spec_dst,
+						.tos = RT_TOS(skb->nh.iph->tos) } } };
+		if (ip_route_output_key(&rt, &fl))
+			return;
+	}
 
 	/* And let IP do all the hard work.
 

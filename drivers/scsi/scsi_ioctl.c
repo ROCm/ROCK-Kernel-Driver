@@ -424,6 +424,14 @@ int scsi_ioctl(Scsi_Device * dev, int cmd, void *arg)
 		return 0;
 	case SCSI_IOCTL_GET_BUS_NUMBER:
 		return put_user(dev->host->host_no, (int *) arg);
+	/*
+	 * The next two ioctls either need to go or need to be changed to
+	 * pass tagged queueing changes through the low level drivers.
+	 * Simply enabling or disabling tagged queueing without the knowledge
+	 * of the low level driver is a *BAD* thing.
+	 *
+	 * Oct. 10, 2002 - Doug Ledford <dledford@redhat.com>
+	 */
 	case SCSI_IOCTL_TAGGED_ENABLE:
 		if (!capable(CAP_SYS_ADMIN))
 			return -EACCES;

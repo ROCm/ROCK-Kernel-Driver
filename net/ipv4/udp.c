@@ -529,7 +529,12 @@ int udp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		rt = (struct rtable*)sk_dst_check(sk, 0);
 
 	if (rt == NULL) {
-		err = ip_route_output(&rt, daddr, ufh.saddr, tos, ipc.oif);
+		struct flowi fl = { .nl_u = { .ip4_u =
+					      { .daddr = daddr,
+						.saddr = ufh.saddr,
+						.tos = tos } },
+				    .oif = ipc.oif };
+		err = ip_route_output_key(&rt, &fl);
 		if (err)
 			goto out;
 

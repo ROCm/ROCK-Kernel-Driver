@@ -244,8 +244,9 @@ static int atkbd_command(struct atkbd *atkbd, unsigned char *param, int command)
 
 	while (atkbd->cmdcnt && timeout--) udelay(10);
 
-	for (i = 0; i < receive; i++)
-		param[i] = atkbd->cmdbuf[(receive - 1) - i];
+	if (param)
+		for (i = 0; i < receive; i++)
+			param[i] = atkbd->cmdbuf[(receive - 1) - i];
 
 	if (atkbd->cmdcnt) 
 		return (atkbd->cmdcnt = 0) - 1;

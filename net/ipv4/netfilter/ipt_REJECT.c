@@ -130,12 +130,19 @@ static void send_reset(struct sk_buff *oldskb, int local)
 	nskb->nh.iph->check = ip_fast_csum((unsigned char *)nskb->nh.iph, 
 					   nskb->nh.iph->ihl);
 
-	/* Routing: if not headed for us, route won't like source */
-	if (ip_route_output(&rt, nskb->nh.iph->daddr,
-			    local ? nskb->nh.iph->saddr : 0,
-			    RT_TOS(nskb->nh.iph->tos) | RTO_CONN,
-			    0) != 0)
-		goto free_nskb;
+	{
+		struct flowi fl = { .nl_u = { .ip4_u =
+					      { .daddr = nskb->nh.iph->daddr,
+						.saddr = (local ?
+							  nskb->nh.iph->saddr :
+							  0),
+						.tos = (RT_TOS(nskb->nh.iph->tos) |
+							RTO_CONN) } } };
+
+		/* Routing: if not headed for us, route won't like source */
+		if (ip_route_output_key(&rt, &fl))
+			goto free_nskb;
+	}
 
 	dst_release(nskb->dst);
 	nskb->dst = &rt->u.dst;
@@ -207,9 +214,14 @@ static void send_unreach(struct sk_buff *skb_in, int code)
 
 	tos = (iph->tos & IPTOS_TOS_MASK) | IPTOS_PREC_INTERNETCONTROL;
 
-	if (ip_route_output(&rt, iph->saddr, saddr, RT_TOS(tos), 0))
-		return;
-
+	{
+		struct flowi fl = { .nl_u = { .ip4_u =
+					      { .daddr = iph->saddr,
+						.saddr = saddr,
+						.tos = RT_TOS(tos) } } };
+		if (ip_route_output_key(&rt, &fl))
+			return;
+	}
 	/* RFC says return as much as we can without exceeding 576 bytes. */
 	length = skb_in->len + sizeof(struct iphdr) + sizeof(struct icmphdr);
 

@@ -266,7 +266,7 @@ fn_new_zone(struct fn_hash *table, int z)
 }
 
 static int
-fn_hash_lookup(struct fib_table *tb, const struct rt_key *key, struct fib_result *res)
+fn_hash_lookup(struct fib_table *tb, const struct flowi *flp, struct fib_result *res)
 {
 	int err;
 	struct fn_zone *fz;
@@ -275,7 +275,7 @@ fn_hash_lookup(struct fib_table *tb, const struct rt_key *key, struct fib_result
 	read_lock(&fib_hash_lock);
 	for (fz = t->fn_zone_list; fz; fz = fz->fz_next) {
 		struct fib_node *f;
-		fn_key_t k = fz_key(key->dst, fz);
+		fn_key_t k = fz_key(flp->fl4_dst, fz);
 
 		for (f = fz_chain(k, fz); f; f = f->fn_next) {
 			if (!fn_key_eq(k, f->fn_key)) {
@@ -285,17 +285,17 @@ fn_hash_lookup(struct fib_table *tb, const struct rt_key *key, struct fib_result
 					continue;
 			}
 #ifdef CONFIG_IP_ROUTE_TOS
-			if (f->fn_tos && f->fn_tos != key->tos)
+			if (f->fn_tos && f->fn_tos != flp->fl4_tos)
 				continue;
 #endif
 			f->fn_state |= FN_S_ACCESSED;
 
 			if (f->fn_state&FN_S_ZOMBIE)
 				continue;
-			if (f->fn_scope < key->scope)
+			if (f->fn_scope < flp->fl4_scope)
 				continue;
 
-			err = fib_semantic_match(f->fn_type, FIB_INFO(f), key, res);
+			err = fib_semantic_match(f->fn_type, FIB_INFO(f), flp, res);
 			if (err == 0) {
 				res->type = f->fn_type;
 				res->scope = f->fn_scope;
@@ -338,7 +338,7 @@ static int fib_detect_death(struct fib_info *fi, int order,
 }
 
 static void
-fn_hash_select_default(struct fib_table *tb, const struct rt_key *key, struct fib_result *res)
+fn_hash_select_default(struct fib_table *tb, const struct flowi *flp, struct fib_result *res)
 {
 	int order, last_idx;
 	struct fib_node *f;

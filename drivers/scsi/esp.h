@@ -64,6 +64,17 @@ enum esp_rev {
 	espunknown = 0x07
 };
 
+/* We allocate one of these for each scsi device and attach it to
+ * SDptr->hostdata for use in the driver
+ */
+struct esp_device {
+  unsigned char sync_min_period;
+  unsigned char sync_max_offset;
+  unsigned sync:1;
+  unsigned wide:1;
+  unsigned disconnect:1;
+};
+
 /* We get one of these for each ESP probed. */
 struct esp {
 	unsigned long		eregs;		/* ESP controller registers */
@@ -399,7 +410,7 @@ extern int esp_abort(Scsi_Cmnd *);
 extern int esp_reset(Scsi_Cmnd *, unsigned int);
 extern int esp_proc_info(char *buffer, char **start, off_t offset, int length,
 			 int hostno, int inout);
-extern int esp_revoke(Scsi_Device* SDptr);
+extern void esp_slave_detach(Scsi_Device* SDptr);
 
 #ifdef CONFIG_SPARC64
 #define SCSI_SPARC_ESP {                                        \
@@ -407,7 +418,7 @@ extern int esp_revoke(Scsi_Device* SDptr);
 		proc_info:      &esp_proc_info,			\
 		name:           "Sun ESP 100/100a/200",		\
 		detect:         esp_detect,			\
-		revoke:		esp_revoke,			\
+		slave_detach:	esp_slave_detach,		\
 		info:           esp_info,			\
 		command:        esp_command,			\
 		queuecommand:   esp_queue,			\
@@ -427,7 +438,7 @@ extern int esp_revoke(Scsi_Device* SDptr);
 		proc_info:      &esp_proc_info,			\
 		name:           "Sun ESP 100/100a/200",		\
 		detect:         esp_detect,			\
-		revoke:		esp_revoke,			\
+		slave_detach:	esp_slave_detach,		\
 		info:           esp_info,			\
 		command:        esp_command,			\
 		queuecommand:   esp_queue,			\

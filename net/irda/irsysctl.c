@@ -35,7 +35,7 @@
 #define NET_IRDA 412 /* Random number */
 enum { DISCOVERY=1, DEVNAME, DEBUG, FAST_POLL, DISCOVERY_SLOTS,
        DISCOVERY_TIMEOUT, SLOT_TIMEOUT, MAX_BAUD_RATE, MIN_TX_TURN_TIME,
-       MAX_TX_DATA_SIZE, MAX_NOREPLY_TIME, WARN_NOREPLY_TIME,
+       MAX_TX_DATA_SIZE, MAX_TX_WINDOW, MAX_NOREPLY_TIME, WARN_NOREPLY_TIME,
        LAP_KEEPALIVE_TIME };
 
 extern int  sysctl_discovery;
@@ -48,6 +48,7 @@ extern char sysctl_devname[];
 extern int  sysctl_max_baud_rate;
 extern int  sysctl_min_tx_turn_time;
 extern int  sysctl_max_tx_data_size;
+extern int  sysctl_max_tx_window;
 extern int  sysctl_max_noreply_time;
 extern int  sysctl_warn_noreply_time;
 extern int  sysctl_lap_keepalive_time;
@@ -69,6 +70,8 @@ static int max_min_tx_turn_time = 10000;	/* See qos.c - IrLAP spec */
 static int min_min_tx_turn_time = 0;
 static int max_max_tx_data_size = 2048;		/* See qos.c - IrLAP spec */
 static int min_max_tx_data_size = 64;
+static int max_max_tx_window = 7;		/* See qos.c - IrLAP spec */
+static int min_max_tx_window = 1;
 static int max_max_noreply_time = 40;		/* See qos.c - IrLAP spec */
 static int min_max_noreply_time = 3;
 static int max_warn_noreply_time = 3;		/* 3s == standard */
@@ -125,6 +128,9 @@ static ctl_table irda_table[] = {
 	{ MAX_TX_DATA_SIZE, "max_tx_data_size", &sysctl_max_tx_data_size,
 	  sizeof(int), 0644, NULL, &proc_dointvec_minmax, &sysctl_intvec,
 	  NULL, &min_max_tx_data_size, &max_max_tx_data_size },
+	{ MAX_TX_WINDOW, "max_tx_window", &sysctl_max_tx_window,
+	  sizeof(int), 0644, NULL, &proc_dointvec_minmax, &sysctl_intvec,
+	  NULL, &min_max_tx_window, &max_max_tx_window },
 	{ MAX_NOREPLY_TIME, "max_noreply_time", &sysctl_max_noreply_time,
 	  sizeof(int), 0644, NULL, &proc_dointvec_minmax, &sysctl_intvec,
 	  NULL, &min_max_noreply_time, &max_max_noreply_time },

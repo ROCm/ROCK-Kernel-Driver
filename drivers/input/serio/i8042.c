@@ -26,14 +26,16 @@ MODULE_DESCRIPTION("i8042 keyboard and mouse controller driver");
 MODULE_LICENSE("GPL");
 
 MODULE_PARM(i8042_noaux, "1i");
+MODULE_PARM(i8042_nomux, "1i");
 MODULE_PARM(i8042_unlock, "1i");
 MODULE_PARM(i8042_reset, "1i");
 MODULE_PARM(i8042_direct, "1i");
 MODULE_PARM(i8042_dumbkbd, "1i");
 
-static int i8042_noaux;
-static int i8042_unlock;
 static int i8042_reset;
+static int i8042_noaux;
+static int i8042_nomux;
+static int i8042_unlock;
 static int i8042_direct;
 static int i8042_dumbkbd;
 
@@ -220,7 +222,6 @@ static int i8042_aux_write(struct serio *port, unsigned char c)
 	return retval;
 }
 
-
 /*
  * i8042_open() is called when a port is open by the higher layer.
  * It allocates the interrupt and enables in in the chip.
@@ -323,8 +324,8 @@ static struct serio i8042_aux_port =
 
 static struct i8042_values i8042_mux_values[4];
 static struct serio i8042_mux_port[4];
-static char i8042_mux_names[4][16];
-static char i8042_mux_short[4][8];
+static char i8042_mux_names[4][32];
+static char i8042_mux_short[4][16];
 static char i8042_mux_phys[4][32];
 
 /*
@@ -364,15 +365,15 @@ static void i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		dfl = ((str & I8042_STR_PARITY) ? SERIO_PARITY : 0) |
 		      ((str & I8042_STR_TIMEOUT) ? SERIO_TIMEOUT : 0);
 
-		if (i8042_mux_values[0].exists && (buffer[i].str & I8042_STR_AUXDATA)) {
+		if (i8042_mux_values[0].exists && (str & I8042_STR_AUXDATA)) {
 
-			if (buffer[i].str & I8042_STR_MUXERR) {
-				switch (buffer[i].data) {
+			if (str & I8042_STR_MUXERR) {
+				switch (data) {
 					case 0xfd:
 					case 0xfe: dfl = SERIO_TIMEOUT; break;
 					case 0xff: dfl = SERIO_PARITY; break;
 				}
-				buffer[i].data = 0xfe;
+				data = 0xfe;
 			} else dfl = 0;
 
 			dbg("%02x <- i8042 (interrupt, aux%d, %d%s%s)",
@@ -380,8 +381,7 @@ static void i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				dfl & SERIO_PARITY ? ", bad parity" : "",
 				dfl & SERIO_TIMEOUT ? ", timeout" : "");
 
-			if (i8042_mux_values[(str >> 6)].exists)
-				serio_interrupt(i8042_mux_port + (str >> 6), buffer[i].data, dfl);
+			serio_interrupt(i8042_mux_port + ((str >> 6) & 3), data, dfl);
 			continue;
 		}
 
@@ -390,8 +390,8 @@ static void i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			dfl & SERIO_PARITY ? ", bad parity" : "",
 			dfl & SERIO_TIMEOUT ? ", timeout" : "");
 
-		if (i8042_aux_values.exists && (buffer[i].str & I8042_STR_AUXDATA)) {
-			serio_interrupt(&i8042_aux_port, buffer[i].data, dfl);
+		if (i8042_aux_values.exists && (str & I8042_STR_AUXDATA)) {
+			serio_interrupt(&i8042_aux_port, data, dfl);
 			continue;
 		}
 
@@ -602,8 +602,14 @@ static int __init i8042_check_mux(struct i8042_values *values)
 	if (i8042_command(&param, I8042_CMD_AUX_LOOP) || param == 0x5b)
 		return -1;
 
-	printk(KERN_INFO "i8042.c: Detected active multiplexing controller, rev%d.%d.\n",
-		~param >> 4, ~param & 0xf);
+	printk(KERN_INFO "i8042.c: Detected active multiplexing controller, rev %d.%d.\n",
+		(~param >> 4) & 0xf, ~param & 0xf);
+
+/*
+ * In MUX mode the keyboard translation seems to be always off.
+ */
+ 
+	i8042_direct = 1;
 
 /*
  * Disable all muxed ports by disabling AUX.
@@ -742,6 +748,12 @@ static int __init i8042_setup_reset(char *str)
 static int __init i8042_setup_noaux(char *str)
 {
 	i8042_noaux = 1;
+	i8042_nomux = 1;
+	return 1;
+}
+static int __init i8042_setup_nomux(char *str)
+{
+	i8042_nomux = 1;
 	return 1;
 }
 static int __init i8042_setup_unlock(char *str)
@@ -762,6 +774,7 @@ static int __init i8042_setup_dumbkbd(char *str)
 
 __setup("i8042_reset", i8042_setup_reset);
 __setup("i8042_noaux", i8042_setup_noaux);
+__setup("i8042_nomux", i8042_setup_nomux);
 __setup("i8042_unlock", i8042_setup_unlock);
 __setup("i8042_direct", i8042_setup_direct);
 __setup("i8042_dumbkbd", i8042_setup_dumbkbd);
@@ -796,6 +809,7 @@ static void __init i8042_init_mux_values(struct i8042_values *values, struct ser
 	sprintf(i8042_mux_short[index], "AUX%d", index);
 	port->name = i8042_mux_names[index];
 	port->phys = i8042_mux_phys[index];
+	port->driver = values;
 	values->name = i8042_mux_short[index];
 	values->mux = index;
 }
@@ -809,8 +823,8 @@ int __init i8042_init(void)
 	if (i8042_platform_init())
 		return -EBUSY;
 
-	i8042_aux_values.irq =	I8042_AUX_IRQ;
-	i8042_kbd_values.irq =	I8042_KBD_IRQ;
+	i8042_aux_values.irq = I8042_AUX_IRQ;
+	i8042_kbd_values.irq = I8042_KBD_IRQ;
 
 	if (i8042_controller_init())
 		return -ENODEV;
@@ -821,7 +835,7 @@ int __init i8042_init(void)
 	for (i = 0; i < 4; i++)
 		i8042_init_mux_values(i8042_mux_values + i, i8042_mux_port + i, i);
 
-	if (!i8042_noaux && !i8042_check_mux(&i8042_aux_values))
+	if (!i8042_nomux && !i8042_check_mux(&i8042_aux_values))
 		for (i = 0; i < 4; i++)
 			i8042_port_register(i8042_mux_values + i, i8042_mux_port + i);
 	else 

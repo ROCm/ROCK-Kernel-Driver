@@ -144,17 +144,15 @@ fib_get_procinfo(char *buffer, char **start, off_t offset, int length)
 
 struct net_device * ip_dev_find(u32 addr)
 {
-	struct rt_key key;
+	struct flowi fl = { .nl_u = { .ip4_u = { .daddr = addr } } };
 	struct fib_result res;
 	struct net_device *dev = NULL;
 
-	memset(&key, 0, sizeof(key));
-	key.dst = addr;
 #ifdef CONFIG_IP_MULTIPLE_TABLES
 	res.r = NULL;
 #endif
 
-	if (!local_table || local_table->tb_lookup(local_table, &key, &res)) {
+	if (!local_table || local_table->tb_lookup(local_table, &fl, &res)) {
 		return NULL;
 	}
 	if (res.type != RTN_LOCAL)
@@ -170,7 +168,7 @@ out:
 
 unsigned inet_addr_type(u32 addr)
 {
-	struct rt_key		key;
+	struct flowi		fl = { .nl_u = { .ip4_u = { .daddr = addr } } };
 	struct fib_result	res;
 	unsigned ret = RTN_BROADCAST;
 
@@ -179,15 +177,13 @@ unsigned inet_addr_type(u32 addr)
 	if (MULTICAST(addr))
 		return RTN_MULTICAST;
 
-	memset(&key, 0, sizeof(key));
-	key.dst = addr;
 #ifdef CONFIG_IP_MULTIPLE_TABLES
 	res.r = NULL;
 #endif
 	
 	if (local_table) {
 		ret = RTN_UNICAST;
-		if (local_table->tb_lookup(local_table, &key, &res) == 0) {
+		if (local_table->tb_lookup(local_table, &fl, &res) == 0) {
 			ret = res.type;
 			fib_res_put(&res);
 		}
@@ -207,17 +203,14 @@ int fib_validate_source(u32 src, u32 dst, u8 tos, int oif,
 			struct net_device *dev, u32 *spec_dst, u32 *itag)
 {
 	struct in_device *in_dev;
-	struct rt_key key;
+	struct flowi fl = { .nl_u = { .ip4_u =
+				      { .daddr = src,
+					.saddr = dst,
+					.tos = tos } },
+			    .iif = oif };
 	struct fib_result res;
 	int no_addr, rpf;
 	int ret;
-
-	key.dst = src;
-	key.src = dst;
-	key.tos = tos;
-	key.oif = 0;
-	key.iif = oif;
-	key.scope = RT_SCOPE_UNIVERSE;
 
 	no_addr = rpf = 0;
 	read_lock(&inetdev_lock);
@@ -231,7 +224,7 @@ int fib_validate_source(u32 src, u32 dst, u8 tos, int oif,
 	if (in_dev == NULL)
 		goto e_inval;
 
-	if (fib_lookup(&key, &res))
+	if (fib_lookup(&fl, &res))
 		goto last_resort;
 	if (res.type != RTN_UNICAST)
 		goto e_inval_res;
@@ -252,10 +245,10 @@ int fib_validate_source(u32 src, u32 dst, u8 tos, int oif,
 		goto last_resort;
 	if (rpf)
 		goto e_inval;
-	key.oif = dev->ifindex;
+	fl.oif = dev->ifindex;
 
 	ret = 0;
-	if (fib_lookup(&key, &res) == 0) {
+	if (fib_lookup(&fl, &res) == 0) {
 		if (res.type == RTN_UNICAST) {
 			*spec_dst = FIB_RES_PREFSRC(res);
 			ret = FIB_RES_NH(res).nh_scope >= RT_SCOPE_HOST;

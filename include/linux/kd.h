@@ -134,7 +134,8 @@ struct kbkeycode {
 
 struct kbd_repeat {
 	int delay;	/* in msec; <= 0: don't change */
-	int rate;	/* in msec; <= 0: don't change */
+	int period;	/* in msec; <= 0: don't change */
+			/* earlier this field was misnamed "rate" */
 };
 
 #define KDKBDREP        0x4B52  /* set keyboard delay/repeat rate;

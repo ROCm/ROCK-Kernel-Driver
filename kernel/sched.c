@@ -1953,7 +1953,6 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
 		BUG();
 #endif
 
-	preempt_disable();
 	rq = task_rq_lock(p, &flags);
 	p->cpus_allowed = new_mask;
 	/*
@@ -1962,7 +1961,7 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
 	 */
 	if (new_mask & (1UL << task_cpu(p))) {
 		task_rq_unlock(rq, &flags);
-		goto out;
+		return;
 	}
 	/*
 	 * If the task is not on a runqueue (and not running), then
@@ -1971,17 +1970,16 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
 	if (!p->array && !task_running(rq, p)) {
 		set_task_cpu(p, __ffs(p->cpus_allowed));
 		task_rq_unlock(rq, &flags);
-		goto out;
+		return;
 	}
 	init_completion(&req.done);
 	req.task = p;
 	list_add(&req.list, &rq->migration_queue);
 	task_rq_unlock(rq, &flags);
+
 	wake_up_process(rq->migration_thread);
 
 	wait_for_completion(&req.done);
-out:
-	preempt_enable();
 }
 
 /*
@@ -1999,16 +1997,12 @@ static int migration_thread(void * data)
 	sigfillset(&current->blocked);
 	set_fs(KERNEL_DS);
 
+	/*
+	 * Either we are running on the right CPU, or there's a
+	 * a migration thread on the target CPU, guaranteed.
+	 */
 	set_cpus_allowed(current, 1UL << cpu);
 
-	/*
-	 * Migration can happen without a migration thread on the
-	 * target CPU because here we remove the thread from the
-	 * runqueue and the helper thread then moves this thread
-	 * to the target CPU - we'll wake up there.
-	 */
-	if (smp_processor_id() != cpu)
-	printk("migration_task %d on cpu=%d\n", cpu, smp_processor_id());
 	ret = setscheduler(0, SCHED_FIFO, &param);
 
 	rq = this_rq();
@@ -2055,6 +2049,8 @@ repeat:
 			if (p->array) {
 				deactivate_task(p, rq_src);
 				activate_task(p, rq_dest);
+				if (p->prio < rq_dest->curr->prio)
+					resched_task(rq_dest->curr);
 			}
 		}
 		double_rq_unlock(rq_src, rq_dest);

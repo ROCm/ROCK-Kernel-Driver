@@ -28,6 +28,7 @@ comment 'FIR device drivers'
 dep_tristate 'IrDA USB dongles (EXPERIMENTAL)' CONFIG_USB_IRDA $CONFIG_IRDA $CONFIG_USB $CONFIG_EXPERIMENTAL
 dep_tristate 'NSC PC87108/PC87338' CONFIG_NSC_FIR  $CONFIG_IRDA
 dep_tristate 'Winbond W83977AF (IR)' CONFIG_WINBOND_FIR $CONFIG_IRDA
+dep_tristate 'Toshiba Type-O IR Port (old driver)' CONFIG_TOSHIBA_OLD $CONFIG_IRDA
 dep_tristate 'Toshiba Type-O IR Port' CONFIG_TOSHIBA_FIR $CONFIG_IRDA
 if [ "$CONFIG_EXPERIMENTAL" != "n" ]; then
 dep_tristate 'SMC IrCC (EXPERIMENTAL)' CONFIG_SMC_IRCC_FIR $CONFIG_IRDA

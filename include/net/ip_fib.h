@@ -17,6 +17,7 @@
 #define _NET_IP_FIB_H
 
 #include <linux/config.h>
+#include <net/flow.h>
 
 struct kern_rta
 {
@@ -117,7 +118,7 @@ struct fib_table
 {
 	unsigned char	tb_id;
 	unsigned	tb_stamp;
-	int		(*tb_lookup)(struct fib_table *tb, const struct rt_key *key, struct fib_result *res);
+	int		(*tb_lookup)(struct fib_table *tb, const struct flowi *flp, struct fib_result *res);
 	int		(*tb_insert)(struct fib_table *table, struct rtmsg *r,
 				     struct kern_rta *rta, struct nlmsghdr *n,
 				     struct netlink_skb_parms *req);
@@ -130,7 +131,7 @@ struct fib_table
 	int		(*tb_get_info)(struct fib_table *table, char *buf,
 				       int first, int count);
 	void		(*tb_select_default)(struct fib_table *table,
-					     const struct rt_key *key, struct fib_result *res);
+					     const struct flowi *flp, struct fib_result *res);
 
 	unsigned char	tb_data[0];
 };
@@ -152,18 +153,18 @@ static inline struct fib_table *fib_new_table(int id)
 	return fib_get_table(id);
 }
 
-static inline int fib_lookup(const struct rt_key *key, struct fib_result *res)
+static inline int fib_lookup(const struct flowi *flp, struct fib_result *res)
 {
-	if (local_table->tb_lookup(local_table, key, res) &&
-	    main_table->tb_lookup(main_table, key, res))
+	if (local_table->tb_lookup(local_table, flp, res) &&
+	    main_table->tb_lookup(main_table, flp, res))
 		return -ENETUNREACH;
 	return 0;
 }
 
-static inline void fib_select_default(const struct rt_key *key, struct fib_result *res)
+static inline void fib_select_default(const struct flowi *flp, struct fib_result *res)
 {
 	if (FIB_RES_GW(*res) && FIB_RES_NH(*res).nh_scope == RT_SCOPE_LINK)
-		main_table->tb_select_default(main_table, key, res);
+		main_table->tb_select_default(main_table, flp, res);
 }
 
 #else /* CONFIG_IP_MULTIPLE_TABLES */
@@ -171,7 +172,7 @@ static inline void fib_select_default(const struct rt_key *key, struct fib_resul
 #define main_table (fib_tables[RT_TABLE_MAIN])
 
 extern struct fib_table * fib_tables[RT_TABLE_MAX+1];
-extern int fib_lookup(const struct rt_key *key, struct fib_result *res);
+extern int fib_lookup(const struct flowi *flp, struct fib_result *res);
 extern struct fib_table *__fib_new_table(int id);
 extern void fib_rule_put(struct fib_rule *r);
 
@@ -191,7 +192,7 @@ static inline struct fib_table *fib_new_table(int id)
 	return fib_tables[id] ? : __fib_new_table(id);
 }
 
-extern void fib_select_default(const struct rt_key *key, struct fib_result *res);
+extern void fib_select_default(const struct flowi *flp, struct fib_result *res);
 
 #endif /* CONFIG_IP_MULTIPLE_TABLES */
 
@@ -204,13 +205,13 @@ extern int inet_rtm_getroute(struct sk_buff *skb, struct nlmsghdr* nlh, void *ar
 extern int inet_dump_fib(struct sk_buff *skb, struct netlink_callback *cb);
 extern int fib_validate_source(u32 src, u32 dst, u8 tos, int oif,
 			       struct net_device *dev, u32 *spec_dst, u32 *itag);
-extern void fib_select_multipath(const struct rt_key *key, struct fib_result *res);
+extern void fib_select_multipath(const struct flowi *flp, struct fib_result *res);
 
 /* Exported by fib_semantics.c */
 extern int 		ip_fib_check_default(u32 gw, struct net_device *dev);
 extern void		fib_release_info(struct fib_info *);
 extern int		fib_semantic_match(int type, struct fib_info *,
-					   const struct rt_key *, struct fib_result*);
+					   const struct flowi *, struct fib_result*);
 extern struct fib_info	*fib_create_info(const struct rtmsg *r, struct kern_rta *rta,
 					 const struct nlmsghdr *, int *err);
 extern int fib_nh_match(struct rtmsg *r, struct nlmsghdr *, struct kern_rta *rta, struct fib_info *fi);

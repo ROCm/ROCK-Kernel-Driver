@@ -56,8 +56,6 @@
 #include <linux/sysctl.h>
 #endif
 
-#undef CONFIG_RT6_POLICY
-
 /* Set to 3 to get tracing. */
 #define RT6_DEBUG 2
 
@@ -103,16 +101,22 @@ static struct dst_ops ip6_dst_ops = {
 };
 
 struct rt6_info ip6_null_entry = {
-	{{NULL, ATOMIC_INIT(1), 1, &loopback_dev,
-	  -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	  -ENETUNREACH, NULL, NULL,
-	  ip6_pkt_discard, ip6_pkt_discard,
-#ifdef CONFIG_NET_CLS_ROUTE
-	  0,
-#endif
-	  &ip6_dst_ops}},
-	NULL, {{{0}}}, RTF_REJECT|RTF_NONEXTHOP, ~0U,
-	255, ATOMIC_INIT(1), {NULL}, {{{{0}}}, 0}, {{{{0}}}, 0}
+	.u = {
+		.dst = {
+			.__refcnt	= ATOMIC_INIT(1),
+			.__use		= 1,
+			.dev		= &loopback_dev,
+			.obsolete	= -1,
+			.error		= -ENETUNREACH,
+			.input		= ip6_pkt_discard,
+			.output		= ip6_pkt_discard,
+			.ops		= &ip6_dst_ops
+		}
+	},
+	.rt6i_flags	= (RTF_REJECT | RTF_NONEXTHOP),
+	.rt6i_metric	= ~(u32) 0,
+	.rt6i_hoplimit	= 255,
+	.rt6i_ref	= ATOMIC_INIT(1),
 };
 
 struct fib6_node ip6_routing_table = {
@@ -120,24 +124,6 @@ struct fib6_node ip6_routing_table = {
 	&ip6_null_entry,
 	0, RTN_ROOT|RTN_TL_ROOT|RTN_RTINFO, 0
 };
-
-#ifdef CONFIG_RT6_POLICY
-int	ip6_rt_policy = 0;
-
-struct pol_chain *rt6_pol_list = NULL;
-
-
-static int rt6_flow_match_in(struct rt6_info *rt, struct sk_buff *skb);
-static int rt6_flow_match_out(struct rt6_info *rt, struct sock *sk);
-
-static struct rt6_info	*rt6_flow_lookup(struct rt6_info *rt,
-					 struct in6_addr *daddr,
-					 struct in6_addr *saddr,
-					 struct fl_acc_args *args);
-
-#else
-#define ip6_rt_policy (0)
-#endif
 
 /* Protects all the ip6 fib */
 
@@ -386,38 +372,6 @@ static struct rt6_info *rt6_cow(struct rt6_info *ort, struct in6_addr *daddr,
 	return &ip6_null_entry;
 }
 
-#ifdef CONFIG_RT6_POLICY
-static __inline__ struct rt6_info *rt6_flow_lookup_in(struct rt6_info *rt,
-						      struct sk_buff *skb)
-{
-	struct in6_addr *daddr, *saddr;
-	struct fl_acc_args arg;
-
-	arg.type = FL_ARG_FORWARD;
-	arg.fl_u.skb = skb;
-
-	saddr = &skb->nh.ipv6h->saddr;
-	daddr = &skb->nh.ipv6h->daddr;
-
-	return rt6_flow_lookup(rt, daddr, saddr, &arg);
-}
-
-static __inline__ struct rt6_info *rt6_flow_lookup_out(struct rt6_info *rt,
-						       struct sock *sk,
-						       struct flowi *fl)
-{
-	struct fl_acc_args arg;
-
-	arg.type = FL_ARG_ORIGIN;
-	arg.fl_u.fl_o.sk = sk;
-	arg.fl_u.fl_o.flow = fl;
-
-	return rt6_flow_lookup(rt, fl->nl_u.ip6_u.daddr, fl->nl_u.ip6_u.saddr,
-			       &arg);
-}
-
-#endif
-
 #define BACKTRACK() \
 if (rt == &ip6_null_entry && strict) { \
        while ((fn = fn->parent) != NULL) { \
@@ -450,53 +404,29 @@ restart:
 	rt = fn->leaf;
 
 	if ((rt->rt6i_flags & RTF_CACHE)) {
-		if (ip6_rt_policy == 0) {
-			rt = rt6_device_match(rt, skb->dev->ifindex, strict);
-			BACKTRACK();
-			dst_clone(&rt->u.dst);
-			goto out;
-		}
-
-#ifdef CONFIG_RT6_POLICY
-		if ((rt->rt6i_flags & RTF_FLOW)) {
-			struct rt6_info *sprt;
-
-			for (sprt = rt; sprt; sprt = sprt->u.next) {
-				if (rt6_flow_match_in(sprt, skb)) {
-					rt = sprt;
-					dst_clone(&rt->u.dst);
-					goto out;
-				}
-			}
-		}
-#endif
+		rt = rt6_device_match(rt, skb->dev->ifindex, strict);
+		BACKTRACK();
+		dst_clone(&rt->u.dst);
+		goto out;
 	}
 
 	rt = rt6_device_match(rt, skb->dev->ifindex, 0);
 	BACKTRACK();
 
-	if (ip6_rt_policy == 0) {
-		if (!rt->rt6i_nexthop && !(rt->rt6i_flags & RTF_NONEXTHOP)) {
-			read_unlock_bh(&rt6_lock);
+	if (!rt->rt6i_nexthop && !(rt->rt6i_flags & RTF_NONEXTHOP)) {
+		read_unlock_bh(&rt6_lock);
 
-			rt = rt6_cow(rt, &skb->nh.ipv6h->daddr,
-				     &skb->nh.ipv6h->saddr);
+		rt = rt6_cow(rt, &skb->nh.ipv6h->daddr,
+			     &skb->nh.ipv6h->saddr);
 			
-			if (rt->u.dst.error != -EEXIST || --attempts <= 0)
-				goto out2;
-			/* Race condition! In the gap, when rt6_lock was
-			   released someone could insert this route.  Relookup.
-			 */
-			goto relookup;
-		}
-		dst_clone(&rt->u.dst);
-	} else {
-#ifdef CONFIG_RT6_POLICY
-		rt = rt6_flow_lookup_in(rt, skb);
-#else
-		/* NEVER REACHED */
-#endif
+		if (rt->u.dst.error != -EEXIST || --attempts <= 0)
+			goto out2;
+		/* Race condition! In the gap, when rt6_lock was
+		   released someone could insert this route.  Relookup.
+		*/
+		goto relookup;
 	}
+	dst_clone(&rt->u.dst);
 
 out:
 	read_unlock_bh(&rt6_lock);
@@ -525,26 +455,10 @@ restart:
 	rt = fn->leaf;
 
 	if ((rt->rt6i_flags & RTF_CACHE)) {
-		if (ip6_rt_policy == 0) {
-			rt = rt6_device_match(rt, fl->oif, strict);
-			BACKTRACK();
-			dst_clone(&rt->u.dst);
-			goto out;
-		}
-
-#ifdef CONFIG_RT6_POLICY
-		if ((rt->rt6i_flags & RTF_FLOW)) {
-			struct rt6_info *sprt;
-
-			for (sprt = rt; sprt; sprt = sprt->u.next) {
-				if (rt6_flow_match_out(sprt, sk)) {
-					rt = sprt;
-					dst_clone(&rt->u.dst);
-					goto out;
-				}
-			}
-		}
-#endif
+		rt = rt6_device_match(rt, fl->oif, strict);
+		BACKTRACK();
+		dst_clone(&rt->u.dst);
+		goto out;
 	}
 	if (rt->rt6i_flags & RTF_DEFAULT) {
 		if (rt->rt6i_metric >= IP6_RT_PRIO_ADDRCONF)
@@ -554,29 +468,21 @@ restart:
 		BACKTRACK();
 	}
 
-	if (ip6_rt_policy == 0) {
-		if (!rt->rt6i_nexthop && !(rt->rt6i_flags & RTF_NONEXTHOP)) {
-			read_unlock_bh(&rt6_lock);
+	if (!rt->rt6i_nexthop && !(rt->rt6i_flags & RTF_NONEXTHOP)) {
+		read_unlock_bh(&rt6_lock);
 
-			rt = rt6_cow(rt, fl->nl_u.ip6_u.daddr,
-				     fl->nl_u.ip6_u.saddr);
+		rt = rt6_cow(rt, fl->nl_u.ip6_u.daddr,
+			     fl->nl_u.ip6_u.saddr);
 			
-			if (rt->u.dst.error != -EEXIST || --attempts <= 0)
-				goto out2;
+		if (rt->u.dst.error != -EEXIST || --attempts <= 0)
+			goto out2;
 
-			/* Race condition! In the gap, when rt6_lock was
-			   released someone could insert this route.  Relookup.
-			 */
-			goto relookup;
-		}
-		dst_clone(&rt->u.dst);
-	} else {
-#ifdef CONFIG_RT6_POLICY
-		rt = rt6_flow_lookup_out(rt, sk, fl);
-#else
-		/* NEVER REACHED */
-#endif
+		/* Race condition! In the gap, when rt6_lock was
+		   released someone could insert this route.  Relookup.
+		*/
+		goto relookup;
 	}
+	dst_clone(&rt->u.dst);
 
 out:
 	read_unlock_bh(&rt6_lock);
@@ -1303,121 +1209,6 @@ int ip6_rt_addr_del(struct in6_addr *addr, struct net_device *dev)
 
 	return err;
 }
-
-#ifdef CONFIG_RT6_POLICY
-
-static int rt6_flow_match_in(struct rt6_info *rt, struct sk_buff *skb)
-{
-	struct flow_filter *frule;
-	struct pkt_filter *filter;
-	int res = 1;
-
-	if ((frule = rt->rt6i_filter) == NULL)
-		goto out;
-
-	if (frule->type != FLR_INPUT) {
-		res = 0;
-		goto out;
-	}
-
-	for (filter = frule->u.filter; filter; filter = filter->next) {
-		__u32 *word;
-
-		word = (__u32 *) skb->h.raw;
-		word += filter->offset;
-
-		if ((*word ^ filter->value) & filter->mask) {
-			res = 0;
-			break;
-		}
-	}
-
-out:
-	return res;
-}
-
-static int rt6_flow_match_out(struct rt6_info *rt, struct sock *sk)
-{
-	struct flow_filter *frule;
-	int res = 1;
-
-	if ((frule = rt->rt6i_filter) == NULL)
-		goto out;
-
-	if (frule->type != FLR_INPUT) {
-		res = 0;
-		goto out;
-	}
-
-	if (frule->u.sk != sk)
-		res = 0;
-out:
-	return res;
-}
-
-static struct rt6_info *rt6_flow_lookup(struct rt6_info *rt,
-					struct in6_addr *daddr,
-					struct in6_addr *saddr,
-					struct fl_acc_args *args)
-{
-	struct flow_rule *frule;
-	struct rt6_info *nrt = NULL;
-	struct pol_chain *pol;
-
-	for (pol = rt6_pol_list; pol; pol = pol->next) {
-		struct fib6_node *fn;
-		struct rt6_info *sprt;
-
-		fn = fib6_lookup(pol->rules, daddr, saddr);
-
-		do {
-			for (sprt = fn->leaf; sprt; sprt=sprt->u.next) {
-				int res;
-
-				frule = sprt->rt6i_flowr;
-#if RT6_DEBUG >= 2
-				if (frule == NULL) {
-					printk(KERN_DEBUG "NULL flowr\n");
-					goto error;
-				}
-#endif
-				res = frule->ops->accept(rt, sprt, args, &nrt);
-
-				switch (res) {
-				case FLOWR_SELECT:
-					goto found;
-				case FLOWR_CLEAR:
-					goto next_policy;
-				case FLOWR_NODECISION:
-					break;
-				default:
-					goto error;
-				};
-			}
-
-			fn = fn->parent;
-
-		} while ((fn->fn_flags & RTN_TL_ROOT) == 0);
-
-	next_policy:
-	}
-
-error:
-	dst_clone(&ip6_null_entry.u.dst);
-	return &ip6_null_entry;
-
-found:
-	if (nrt == NULL)
-		goto error;
-
-	nrt->rt6i_flags |= RTF_CACHE;
-	dst_clone(&nrt->u.dst);
-	err = rt6_ins(nrt);
-	if (err)
-		nrt->u.dst.error = err;
-	return nrt;
-}
-#endif
 
 static int fib6_ifdown(struct rt6_info *rt, void *arg)
 {

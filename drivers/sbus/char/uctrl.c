@@ -107,7 +107,7 @@ struct uctrl_status {
 	u8 speaker_volume; /* 0x23 */
 	u8 control_tft_brightness; /* 0x24 */
 	u8 control_kbd_repeat_delay; /* 0x28 */
-	u8 control_kbd_repeat_rate; /* 0x29 */
+	u8 control_kbd_repeat_period; /* 0x29 */
 	u8 control_screen_contrast; /* 0x2F */
 };
 
