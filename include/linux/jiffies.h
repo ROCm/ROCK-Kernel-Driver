@@ -3,6 +3,7 @@
 
 #include <linux/types.h>
 #include <linux/spinlock.h>
+#include <linux/seqlock.h>
 #include <asm/system.h>
 #include <asm/param.h>			/* for HZ */
 
@@ -17,13 +18,15 @@ extern unsigned long volatile jiffies;
 static inline u64 get_jiffies_64(void)
 {
 #if BITS_PER_LONG < 64
-	extern rwlock_t xtime_lock;
-	unsigned long flags;
+	extern seqlock_t xtime_lock;
+	unsigned long seq;
 	u64 tmp;
 
-	read_lock_irqsave(&xtime_lock, flags);
-	tmp = jiffies_64;
-	read_unlock_irqrestore(&xtime_lock, flags);
+	do {
+		seq = read_seqbegin(&xtime_lock);
+		tmp = jiffies_64;
+	} while (read_seqretry(&xtime_lock, seq));
+
 	return tmp;
 #else
 	return (u64)jiffies;

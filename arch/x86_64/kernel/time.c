@@ -18,6 +18,7 @@
 #include <linux/init.h>
 #include <linux/mc146818rtc.h>
 #include <linux/irq.h>
+#include <linux/time.h>
 #include <linux/ioport.h>
 #include <linux/module.h>
 #include <linux/device.h>
@@ -27,7 +28,6 @@
 
 u64 jiffies_64; 
 
-extern rwlock_t xtime_lock;
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 
 unsigned int cpu_khz;					/* TSC clocks / usec, not used here */
@@ -70,21 +70,22 @@ inline unsigned int do_gettimeoffset(void)
 
 void do_gettimeofday(struct timeval *tv)
 {
-	unsigned long flags, t;
+	unsigned long flags, t, seq;
  	unsigned int sec, usec;
 
-	read_lock_irqsave(&xtime_lock, flags);
-	spin_lock(&time_offset_lock);
+	spin_lock_irqsave(&time_offset_lock, flags);
+	do {
+		seq = read_seqbegin(&xtime_lock);
 
-	sec = xtime.tv_sec;
-	usec = xtime.tv_nsec / 1000;
+		sec = xtime.tv_sec;
+		usec = xtime.tv_nsec / 1000;
 
-	t = (jiffies - wall_jiffies) * (1000000L / HZ) + do_gettimeoffset();
-	if (t > timeoffset) timeoffset = t;
-	usec += timeoffset;
+		t = (jiffies - wall_jiffies) * (1000000L / HZ) + do_gettimeoffset();
+		if (t > timeoffset) timeoffset = t;
+		usec += timeoffset;
 
-	spin_unlock(&time_offset_lock);
-	read_unlock_irqrestore(&xtime_lock, flags);
+	} while (read_seqretry(&xtime_lock, seq));
+	spin_unlock_irqrestore(&time_offset_lock, flags);
 
 	tv->tv_sec = sec + usec / 1000000;
 	tv->tv_usec = usec % 1000000;
@@ -98,7 +99,7 @@ void do_gettimeofday(struct timeval *tv)
 
 void do_settimeofday(struct timeval *tv)
 {
-	write_lock_irq(&xtime_lock);
+	write_seqlock_irq(&xtime_lock);
 	vxtime_lock();
 
 	tv->tv_usec -= do_gettimeoffset() +
@@ -118,7 +119,7 @@ void do_settimeofday(struct timeval *tv)
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
 
-	write_unlock_irq(&xtime_lock);
+	write_sequnlock_irq(&xtime_lock);
 }
 
 /*
@@ -201,7 +202,7 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
  * variables, because both do_timer() and us change them -arca+vojtech
 	 */
 
-	write_lock(&xtime_lock);
+	write_seqlock(&xtime_lock);
 	vxtime_lock();
 
 	{
@@ -251,7 +252,7 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
  
 	vxtime_unlock();
-	write_unlock(&xtime_lock);
+	write_sequnlock(&xtime_lock);
 }
 
 unsigned long get_cmos_time(void)

@@ -51,7 +51,6 @@ static ext_int_info_t ext_int_info_timer;
 static uint64_t xtime_cc;
 static uint64_t init_timer_cc;
 
-extern rwlock_t xtime_lock;
 extern unsigned long wall_jiffies;
 
 void tod_to_timeval(__u64 todval, struct timespec *xtime)
@@ -78,12 +77,14 @@ static inline unsigned long do_gettimeoffset(void)
 void do_gettimeofday(struct timeval *tv)
 {
 	unsigned long flags;
+	unsigned long seq;
 	unsigned long usec, sec;
 
-	read_lock_irqsave(&xtime_lock, flags);
-	sec = xtime.tv_sec;
-	usec = xtime.tv_nsec + do_gettimeoffset();
-	read_unlock_irqrestore(&xtime_lock, flags);
+	do {
+		seq = read_seqbegin_irqsave(&xtime_lock, flags);
+		sec = xtime.tv_sec;
+		usec = xtime.tv_nsec + do_gettimeoffset();
+	} while (read_seqretry_irqrestore(&xtime_lock, seq, flags));
 
 	while (usec >= 1000000) {
 		usec -= 1000000;
@@ -97,7 +98,7 @@ void do_gettimeofday(struct timeval *tv)
 void do_settimeofday(struct timeval *tv)
 {
 
-	write_lock_irq(&xtime_lock);
+	write_seqlock_irq(&xtime_lock);
 	/* This is revolting. We need to set the xtime.tv_usec
 	 * correctly. However, the value in this location is
 	 * is value at the last tick.
@@ -117,7 +118,7 @@ void do_settimeofday(struct timeval *tv)
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
-	write_unlock_irq(&xtime_lock);
+	write_sequnlock_irq(&xtime_lock);
 }
 
 /*
@@ -152,7 +153,7 @@ static void do_comparator_interrupt(struct pt_regs *regs, __u16 error_code)
 	 * Do not rely on the boot cpu to do the calls to do_timer.
 	 * Spread it over all cpus instead.
 	 */
-	write_lock(&xtime_lock);
+	write_seqlock(&xtime_lock);
 	if (S390_lowcore.jiffy_timer > xtime_cc) {
 		__u32 xticks;
 
@@ -167,7 +168,7 @@ static void do_comparator_interrupt(struct pt_regs *regs, __u16 error_code)
 		while (xticks--)
 			do_timer(regs);
 	}
-	write_unlock(&xtime_lock);
+	write_sequnlock(&xtime_lock);
 	while (ticks--)
 		update_process_times(user_mode(regs));
 #else

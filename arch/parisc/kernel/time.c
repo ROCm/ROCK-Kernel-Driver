@@ -36,7 +36,6 @@ u64 jiffies_64;
 
 /* xtime and wall_jiffies keep wall-clock time */
 extern unsigned long wall_jiffies;
-extern rwlock_t xtime_lock;
 
 static long clocktick;	/* timer cycles per tick */
 static long halftick;
@@ -115,9 +114,9 @@ void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		smp_do_timer(regs);
 #endif
 		if (cpu == 0) {
-			write_lock(&xtime_lock);
+			write_seqlock(&xtime_lock);
 			do_timer(regs);
-			write_unlock(&xtime_lock);
+			write_sequnlock(&xtime_lock);
 		}
 	}
     
@@ -172,16 +171,14 @@ gettimeoffset (void)
 void
 do_gettimeofday (struct timeval *tv)
 {
-	unsigned long flags, usec, sec;
+	unsigned long flags, seq, usec, sec;
 
-	read_lock_irqsave(&xtime_lock, flags);
-	{
+	do {
+		seq = read_seqbegin_irqsave(&xtime_lock, flags);
 		usec = gettimeoffset();
-	
 		sec = xtime.tv_sec;
 		usec += (xtime.tv_nsec / 1000);
-	}
-	read_unlock_irqrestore(&xtime_lock, flags);
+	} while (read_seqretry_irqrestore(&xtime_lock, seq, flags));
 
 	while (usec >= 1000000) {
 		usec -= 1000000;
@@ -195,7 +192,7 @@ do_gettimeofday (struct timeval *tv)
 void
 do_settimeofday (struct timeval *tv)
 {
-	write_lock_irq(&xtime_lock);
+	write_seqlock_irq(&xtime_lock);
 	{
 		/*
 		 * This is revolting. We need to set "xtime"
@@ -219,7 +216,7 @@ do_settimeofday (struct timeval *tv)
 		time_maxerror = NTP_PHASE_LIMIT;
 		time_esterror = NTP_PHASE_LIMIT;
 	}
-	write_unlock_irq(&xtime_lock);
+	write_sequnlock_irq(&xtime_lock);
 }
 
 
@@ -241,10 +238,10 @@ void __init time_init(void)
 	mtctl(next_tick, 16);
 
 	if(pdc_tod_read(&tod_data) == 0) {
-		write_lock_irq(&xtime_lock);
+		write_seqlock_irq(&xtime_lock);
 		xtime.tv_sec = tod_data.tod_sec;
 		xtime.tv_nsec = tod_data.tod_usec * 1000;
-		write_unlock_irq(&xtime_lock);
+		write_sequnlock_irq(&xtime_lock);
 	} else {
 		printk(KERN_ERR "Error reading tod clock\n");
 	        xtime.tv_sec = 0;

@@ -34,7 +34,6 @@
 
 u64 jiffies_64;
 
-extern rwlock_t xtime_lock;
 extern unsigned long wall_jiffies;
 
 /* this needs a better home */
@@ -148,18 +147,20 @@ static void do_leds(void)
 void do_gettimeofday(struct timeval *tv)
 {
 	unsigned long flags;
+	unsigned long seq;
 	unsigned long usec, sec, lost;
 
-	read_lock_irqsave(&xtime_lock, flags);
-	usec = gettimeoffset();
+	do {
+		seq = read_seqbegin_irqsave(&xtime_lock, flags);
+		usec = gettimeoffset();
 
-	lost = jiffies - wall_jiffies;
-	if (lost)
-		usec += lost * USECS_PER_JIFFY;
+		lost = jiffies - wall_jiffies;
+		if (lost)
+			usec += lost * USECS_PER_JIFFY;
 
-	sec = xtime.tv_sec;
-	usec += xtime.tv_nsec / 1000;
-	read_unlock_irqrestore(&xtime_lock, flags);
+		sec = xtime.tv_sec;
+		usec += xtime.tv_nsec / 1000;
+	} while (read_seqretry_irqrestore(&xtime_lock, seq, flags));
 
 	/* usec may have gone up a lot: be safe */
 	while (usec >= 1000000) {
@@ -173,7 +174,7 @@ void do_gettimeofday(struct timeval *tv)
 
 void do_settimeofday(struct timeval *tv)
 {
-	write_lock_irq(&xtime_lock);
+	write_seqlock_irq(&xtime_lock);
 	/*
 	 * This is revolting. We need to set "xtime" correctly. However, the
 	 * value in this location is the value at the most recent update of
@@ -194,7 +195,7 @@ void do_settimeofday(struct timeval *tv)
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
-	write_unlock_irq(&xtime_lock);
+	write_sequnlock_irq(&xtime_lock);
 }
 
 static struct irqaction timer_irq = {
