@@ -5486,7 +5486,7 @@ static int osst_attach(Scsi_Device * SDp)
 			   0, 0, &osst_fops, NULL);
 # endif
 	}
-	devfs_register_tape (tpnt->de_r[0]);
+	disk->number = devfs_register_tape(SDp->de);
 #endif
 
 	tpnt->device = SDp;
@@ -5647,6 +5647,7 @@ static void osst_detach(Scsi_Device * SDp)
 			devfs_unregister (tpnt->de_n[mode]);
 			tpnt->de_n[mode] = NULL;
 		}
+		devfs_unregister_tape(tpnt->disk->number);
 #endif
 		put_disk(tpnt->disk);
 		kfree(tpnt);

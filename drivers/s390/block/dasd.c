@@ -283,7 +283,7 @@ dasd_free_device(dasd_device_t *device)
 static inline int
 dasd_state_new_to_known(dasd_device_t *device)
 {
-	char buffer[5];
+	char buffer[10];
 	dasd_devmap_t *devmap;
 	umode_t devfs_perm;
 	devfs_handle_t dir;
@@ -303,8 +303,8 @@ dasd_state_new_to_known(dasd_device_t *device)
 		return rc;
 
 	/* Add a proc directory and the dasd device entry to devfs. */
-	sprintf(buffer, "%04x", device->devinfo.devno);
-	dir = devfs_mk_dir(dasd_devfs_handle, buffer, device);
+	sprintf(buffer, "dasd/%04x", device->devinfo.devno);
+	dir = devfs_mk_dir(NULL, buffer, NULL);
 	device->gdp->de = dir;
 	if (devmap->features & DASD_FEATURE_READONLY)
 		devfs_perm = S_IFBLK | S_IRUSR;

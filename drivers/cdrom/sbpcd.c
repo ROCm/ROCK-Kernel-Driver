@@ -5871,8 +5871,8 @@ int __init sbpcd_init(void)
 		disk->fops = &sbpcd_bdops;
 		strcpy(disk->disk_name, sbpcd_infop->name);
 		disk->flags = GENHD_FL_CD;
-		sprintf(nbuff, "c0t%d", p->drv_id);
-		disk->de = devfs_mk_dir(devfs_handle, nbuff, NULL);
+		sprintf(nbuff, "sbp/c0t%d", p->drv_id);
+		disk->de = devfs_mk_dir(NULL, nbuff, NULL);
 		p->disk = disk;
 		if (register_cdrom(sbpcd_infop))
 		{

@@ -54,7 +54,7 @@ struct poll_table_page {
  * poll table.
  */
 
-void poll_freewait(poll_table* pt)
+void __pollfreewait(poll_table* pt)
 {
 	struct poll_table_page * p = pt->table;
 	while (p) {

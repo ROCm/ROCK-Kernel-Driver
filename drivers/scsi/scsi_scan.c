@@ -1323,7 +1323,6 @@ static int scsi_add_lun(Scsi_Device *sdevscan, Scsi_Device **sdevnew,
 {
 	Scsi_Device *sdev;
 	char devname[64];
-	extern devfs_handle_t scsi_devfs_handle;
 
 	sdev = scsi_alloc_sdev(sdevscan->host, sdevscan->channel,
 				     sdevscan->id, sdevscan->lun);
@@ -1445,13 +1444,13 @@ static int scsi_add_lun(Scsi_Device *sdevscan, Scsi_Device **sdevnew,
 	 */
 	device_create_file(&sdev->sdev_driverfs_dev, &dev_attr_type);
 
-	sprintf(devname, "host%d/bus%d/target%d/lun%d",
+	sprintf(devname, "scsi/host%d/bus%d/target%d/lun%d",
 		sdev->host->host_no, sdev->channel, sdev->id, sdev->lun);
 	if (sdev->de)
 		printk(KERN_WARNING "scsi devfs dir: \"%s\" already exists\n",
 		       devname);
 	else
-		sdev->de = devfs_mk_dir(scsi_devfs_handle, devname, NULL);
+		sdev->de = devfs_mk_dir(NULL, devname, NULL);
 	/*
 	 * End driverfs/devfs code.
 	 */

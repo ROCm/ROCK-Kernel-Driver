@@ -350,7 +350,7 @@ skip:
 
 int dvb_register_adapter(dvb_adapter_t **padap, char *name)
 {
-	char dirname[10];
+	char dirname[16];
 	dvb_adapter_t *adap;
 	int num;
 
@@ -374,8 +374,8 @@ int dvb_register_adapter(dvb_adapter_t **padap, char *name)
 
 	printk ("%s: registering new adapter (%s).\n", __FUNCTION__, name);
 	
-	sprintf(dirname, "adapter%d", num);
-	adap->devfs_handle = devfs_mk_dir(dvb_devfs_handle, dirname, NULL);
+	sprintf(dirname, "dvb/adapter%d", num);
+	adap->devfs_handle = devfs_mk_dir(NULL, dirname, NULL);
 	adap->num = num;
 
 	list_add_tail (&adap->list_head, &dvb_adapter_list);

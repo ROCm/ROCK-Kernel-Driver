@@ -80,26 +80,33 @@
  *	@de: Any tape device entry in the device directory.
  */
 
-void devfs_register_tape (devfs_handle_t de)
+int devfs_register_tape (devfs_handle_t de)
 {
     int pos;
-    devfs_handle_t parent, slave;
-    char name[16], dest[64];
+    devfs_handle_t slave;
+    char name[32], dest[64];
     static unsigned int tape_counter;
-    static devfs_handle_t tape_dir;
+    int n = tape_counter++;
 
-    if (tape_dir == NULL) tape_dir = devfs_mk_dir (NULL, "tapes", NULL);
-    parent = devfs_get_parent (de);
-    pos = devfs_generate_path (parent, dest + 3, sizeof dest - 3);
-    if (pos < 0) return;
+    pos = devfs_generate_path (de, dest + 3, sizeof dest - 3);
+    if (pos < 0) return -1;
     strncpy (dest + pos, "../", 3);
-    sprintf (name, "tape%u", tape_counter++);
-    devfs_mk_symlink (tape_dir, name, DEVFS_FL_DEFAULT, dest + pos,
-		      &slave, NULL);
-    devfs_auto_unregister (de, slave);
+    sprintf (name, "tapes/tape%u", n);
+    devfs_mk_symlink (NULL, name, DEVFS_FL_DEFAULT, dest + pos, &slave, NULL);
+    return n;
 }   /*  End Function devfs_register_tape  */
 EXPORT_SYMBOL(devfs_register_tape);
 
+void devfs_unregister_tape(int num)
+{
+	if (num >= 0) {
+		char name[32];
+		sprintf(name, "tapes/tape%u", num);
+		devfs_find_and_unregister(NULL, name, 0, 0, 0, 0);
+	}
+}
+
+EXPORT_SYMBOL(devfs_unregister_tape);
 
 /**
  *	devfs_register_series - Register a sequence of device entries.
