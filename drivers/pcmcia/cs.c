@@ -1549,7 +1549,7 @@ int pcmcia_release_window(window_handle_t win)
 
     /* Release system memory */
     if(!(s->features & SS_CAP_STATIC_MAP))
-	release_mem_region(win->base, win->size);
+	release_mem_region(win->ctl.sys_start, win->ctl.sys_stop - win->ctl.sys_start + 1);
     win->handle->state &= ~CLIENT_WIN_REQ(win->index);
 
     win->magic = 0;
@@ -1871,14 +1871,14 @@ int pcmcia_request_window(client_handle_t *handle, win_req_t *req, window_handle
     win->index = w;
     win->handle = *handle;
     win->sock = s;
-    win->base = req->Base;
-    win->size = req->Size;
+    win->ctl.sys_start = req->Base;
 
     if (!(s->features & SS_CAP_STATIC_MAP) &&
-	find_mem_region(&win->base, win->size, align,
+	find_mem_region(&win->ctl.sys_start, req->Size, align,
 			(req->Attributes & WIN_MAP_BELOW_1MB),
 			(*handle)->dev_info, s))
 	return CS_IN_USE;
+    win->ctl.sys_stop = win->ctl.sys_start + req->Size - 1;
     (*handle)->state |= CLIENT_WIN_REQ(w);
 
     /* Configure the socket controller */
@@ -1893,8 +1893,6 @@ int pcmcia_request_window(client_handle_t *handle, win_req_t *req, window_handle
 	win->ctl.flags |= MAP_16BIT;
     if (req->Attributes & WIN_USE_WAIT)
 	win->ctl.flags |= MAP_USE_WAIT;
-    win->ctl.sys_start = win->base;
-    win->ctl.sys_stop = win->base + win->size-1;
     win->ctl.card_start = 0;
     if (s->ops->set_mem_map(s, &win->ctl) != 0)
 	return CS_BAD_ARGS;

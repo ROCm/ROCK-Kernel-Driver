@@ -154,8 +154,6 @@ typedef struct window_t {
 	u_short			index;
 	client_handle_t		handle;
 	struct pcmcia_socket 	*sock;
-	u_long			base;
-	u_long			size;
 	pccard_mem_map		ctl;
 } window_t;
 
