@@ -520,11 +520,14 @@ int __devinit pci_scan_slot(struct pci_bus *bus, int devfn)
 		struct pci_dev *dev;
 
 		dev = pci_scan_device(bus, devfn);
-		if (!dev)
-			continue;
-
-		if (func != 0)
+		if (func == 0) {
+			if (!dev)
+				break;
+		} else {
+			if (!dev)
+				continue;
 			dev->multifunction = 1;
+		}
 
 		/* Fix up broken headers */
 		pci_fixup_device(PCI_FIXUP_HEADER, dev);
