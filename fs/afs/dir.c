@@ -72,7 +72,7 @@ typedef union afs_dirent {
 		u8	name[16];
 		u8	overflow[4];	/* if any char of the name (inc NUL) reaches here, consume
 					 * the next dirent too */
-	};
+	} parts;
 	u8	extended_name[32];
 } afs_dirent_t;
 
@@ -258,7 +258,7 @@ static int afs_dir_iterate_block(unsigned *fpos,
 
 		/* got a valid entry */
 		dire = &block->dirents[offset];
-		nlen = strnlen(dire->name,sizeof(*block) - offset*sizeof(afs_dirent_t));
+		nlen = strnlen(dire->parts.name,sizeof(*block) - offset*sizeof(afs_dirent_t));
 
 		_debug("ENT[%u.%u]: %s %u \"%.*s\"\n",
 		       blkoff/sizeof(afs_dir_block_t),offset,
@@ -290,11 +290,11 @@ static int afs_dir_iterate_block(unsigned *fpos,
 
 		/* found the next entry */
 		ret = filldir(cookie,
-			      dire->name,
+			      dire->parts.name,
 			      nlen,
 			      blkoff + offset * sizeof(afs_dirent_t),
-			      ntohl(dire->vnode),
-			      filldir==afs_dir_lookup_filldir ? dire->unique : DT_UNKNOWN);
+			      ntohl(dire->parts.vnode),
+			      filldir==afs_dir_lookup_filldir ? dire->parts.unique : DT_UNKNOWN);
 		if (ret<0) {
 			_leave(" = 0 [full]");
 			return 0;
