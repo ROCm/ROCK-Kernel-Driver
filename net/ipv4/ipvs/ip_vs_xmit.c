@@ -15,10 +15,7 @@
  *
  */
 
-#include <linux/config.h>
-#include <linux/types.h>
 #include <linux/kernel.h>
-#include <linux/compiler.h>
 #include <linux/ip.h>
 #include <linux/tcp.h>                  /* for tcphdr */
 #include <net/tcp.h>                    /* for csum_tcpudp_magic */

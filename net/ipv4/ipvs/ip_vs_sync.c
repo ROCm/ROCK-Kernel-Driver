@@ -18,14 +18,9 @@
  *					messages filtering.
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
-#include <linux/kernel.h>
-#include <linux/errno.h>
 #include <linux/slab.h>
 #include <linux/net.h>
-#include <linux/sched.h>
-#include <linux/unistd.h>
 #include <linux/completion.h>
 
 #include <linux/skbuff.h>

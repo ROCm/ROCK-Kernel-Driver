@@ -24,10 +24,7 @@
  *
  */
 
-#include <linux/config.h>
-#include <linux/types.h>
 #include <linux/kernel.h>
-#include <linux/compiler.h>
 #include <linux/vmalloc.h>
 #include <linux/proc_fs.h>		/* for proc_net_* */
 #include <linux/seq_file.h>

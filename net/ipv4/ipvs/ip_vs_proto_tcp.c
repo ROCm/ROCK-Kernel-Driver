@@ -15,8 +15,7 @@
  *
  */
 
-#include <linux/config.h>
-#include <linux/compiler.h>
+#include <linux/kernel.h>
 #include <linux/ip.h>
 #include <linux/tcp.h>                  /* for tcphdr */
 #include <net/ip.h>
