@@ -30,7 +30,8 @@ static inline int INET_ECN_is_capable(__u8 dsfield)
 static inline __u8 INET_ECN_encapsulate(__u8 outer, __u8 inner)
 {
 	outer &= ~INET_ECN_MASK;
-	outer |= (inner & INET_ECN_MASK) ?: INET_ECN_ECT_0;
+	outer |= !INET_ECN_is_ce(inner) ? (inner & INET_ECN_MASK) :
+					  INET_ECN_ECT_0;
 	return outer;
 }
 
