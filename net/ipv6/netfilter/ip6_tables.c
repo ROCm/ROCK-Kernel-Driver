@@ -7,6 +7,8 @@
  * 19 Jan 2002 Harald Welte <laforge@gnumonks.org>
  * 	- increase module usage count as soon as we have rules inside
  * 	  a table
+ * 06 Jun 2002 Andras Kis-Szabo <kisza@sch.bme.hu>
+ *      - new extension header parser code
  */
 #include <linux/config.h>
 #include <linux/skbuff.h>
@@ -25,6 +27,7 @@
 #include <linux/netfilter_ipv6/ip6_tables.h>
 
 #define IPV6_HDR_LEN	(sizeof(struct ipv6hdr))
+#define IPV6_OPTHDR_LEN	(sizeof(struct ipv6_opt_hdr))
 
 /*#define DEBUG_IP_FIREWALL*/
 /*#define DEBUG_ALLOW_ALL*/ /* Useful for remote debugging */
@@ -133,43 +136,23 @@ static int ip6_masked_addrcmp(struct in6_addr addr1, struct in6_addr mask,
 	return 0;
 }
 
-/* takes in current header and pointer to the header */
-/* if another header exists, sets hdrptr to the next header
-   and returns the new header value, else returns 0 */
-static u_int8_t ip6_nexthdr(u_int8_t currenthdr, u_int8_t *hdrptr)
+/* Check for an extension */
+int 
+ip6t_ext_hdr(u8 nexthdr)
 {
-	int i;
-	u_int8_t hdrlen, nexthdr = 0;
-	switch(currenthdr){
-		case IPPROTO_AH:
-		/* whoever decided to do the length of AUTH for ipv6
-		in 32bit units unlike other headers should be beaten...
-		repeatedly...with a large stick...no, an even LARGER
-		stick...no, you're still not thinking big enough */
-			nexthdr = *hdrptr;
-			hdrlen = hdrptr[i] * 4 + 8;
-			hdrptr = hdrptr + hdrlen;
-			break;
-		/*stupid rfc2402 */
-		case IPPROTO_DSTOPTS:
-		case IPPROTO_ROUTING:
-		case IPPROTO_HOPOPTS:
-			nexthdr = *hdrptr;
-			hdrlen = hdrptr[1] * 8 + 8;
-			hdrptr = hdrptr + hdrlen;
-			break;
-		case IPPROTO_FRAGMENT:
-			nexthdr = *hdrptr;
-			hdrptr = hdrptr + 8;
-			break;
-	}	
-	return nexthdr;
-
+        return ( (nexthdr == IPPROTO_HOPOPTS)   ||
+                 (nexthdr == IPPROTO_ROUTING)   ||
+                 (nexthdr == IPPROTO_FRAGMENT)  ||
+                 (nexthdr == IPPROTO_ESP)       ||
+                 (nexthdr == IPPROTO_AH)        ||
+                 (nexthdr == IPPROTO_NONE)      ||
+                 (nexthdr == IPPROTO_DSTOPTS) );
 }
 
 /* Returns whether matches rule or not. */
 static inline int
-ip6_packet_match(const struct ipv6hdr *ipv6,
+ip6_packet_match(const struct sk_buff *skb,
+		 const struct ipv6hdr *ipv6,
 		 const char *indev,
 		 const char *outdev,
 		 const struct ip6t_ip6 *ip6info,
@@ -227,17 +210,58 @@ ip6_packet_match(const struct ipv6hdr *ipv6,
 	/* look for the desired protocol header */
 	if((ip6info->flags & IP6T_F_PROTO)) {
 		u_int8_t currenthdr = ipv6->nexthdr;
-		u_int8_t *hdrptr;
-		hdrptr = (u_int8_t *)(ipv6 + 1);
-		do {
-			if (ip6info->proto == currenthdr) {
-				if(ip6info->invflags & IP6T_INV_PROTO)
-					return 0;
-				return 1;
+		struct ipv6_opt_hdr *hdrptr;
+		u_int16_t ptr;		/* Header offset in skb */
+		u_int16_t hdrlen;	/* Header */
+
+		ptr = IPV6_HDR_LEN;
+
+		while (ip6t_ext_hdr(currenthdr)) {
+	                /* Is there enough space for the next ext header? */
+	                if (skb->len - ptr < IPV6_OPTHDR_LEN)
+	                        return 0;
+
+			/* NONE or ESP: there isn't protocol part */
+			/* If we want to count these packets in '-p all',
+			 * we will change the return 0 to 1*/
+			if ((currenthdr == IPPROTO_NONE) || 
+				(currenthdr == IPPROTO_ESP))
+				return 0;
+
+	                hdrptr = (struct ipv6_opt_hdr *)(skb->data + ptr);
+
+			/* Size calculation */
+	                if (currenthdr == IPPROTO_FRAGMENT) {
+	                        hdrlen = 8;
+	                } else if (currenthdr == IPPROTO_AH)
+	                        hdrlen = (hdrptr->hdrlen+2)<<2;
+	                else
+	                        hdrlen = ipv6_optlen(hdrptr);
+
+			currenthdr = hdrptr->nexthdr;
+	                ptr += hdrlen;
+			/* ptr is too large */
+	                if ( ptr > skb->len ) 
+				return 0;
+		}
+
+		/* currenthdr contains the protocol header */
+
+		dprintf("Packet protocol %hi ?= %s%hi.\n",
+				currenthdr, 
+				ip6info->invflags & IP6T_INV_PROTO ? "!":"",
+				ip6info->proto);
+
+		if (ip6info->proto == currenthdr) {
+			if(ip6info->invflags & IP6T_INV_PROTO) {
+				return 0;
 			}
-			currenthdr = ip6_nexthdr(currenthdr, hdrptr);
-		} while(currenthdr);
-		if (!(ip6info->invflags & IP6T_INV_PROTO))
+			return 1;
+		}
+
+		/* We need match for the '-p all', too! */
+		if ((ip6info->proto != 0) &&
+			!(ip6info->invflags & IP6T_INV_PROTO))
 			return 0;
 	}
 	return 1;
@@ -359,7 +383,8 @@ ip6t_do_table(struct sk_buff **pskb,
 		IP_NF_ASSERT(e);
 		IP_NF_ASSERT(back);
 		(*pskb)->nfcache |= e->nfcache;
-		if (ip6_packet_match(ipv6, indev, outdev, &e->ipv6, offset)) {
+		if (ip6_packet_match(*pskb, ipv6, indev, outdev, 
+			&e->ipv6, offset)) {
 			struct ip6t_entry_target *t;
 
 			if (IP6T_MATCH_ITERATE(e, do_match,
@@ -1826,6 +1851,7 @@ EXPORT_SYMBOL(ip6t_register_match);
 EXPORT_SYMBOL(ip6t_unregister_match);
 EXPORT_SYMBOL(ip6t_register_target);
 EXPORT_SYMBOL(ip6t_unregister_target);
+EXPORT_SYMBOL(ip6t_ext_hdr);
 
 module_init(init);
 module_exit(fini);

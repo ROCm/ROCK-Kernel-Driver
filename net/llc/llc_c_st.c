@@ -347,7 +347,7 @@ static struct llc_conn_state_trans llc_common_state_trans_11d = {
  * Common dummy state transition; must be last entry for all state
  * transition groups - it'll be on .bss, so will be zeroed.
  */
-static struct llc_conn_state_trans llc_common_state_trans_n;
+static struct llc_conn_state_trans llc_common_state_trans_end;
 
 /* LLC_CONN_STATE_ADM transitions */
 /* State transitions for LLC_CONN_EV_CONN_REQ event */
@@ -432,15 +432,15 @@ static struct llc_conn_state_trans llc_adm_state_trans_5 = {
  */
 static struct llc_conn_state_trans *llc_adm_state_transitions[] = {
 	[0] = &llc_adm_state_trans_1,		/* Request */
-	[1] = &llc_common_state_trans_n,
-	[2] = &llc_common_state_trans_n,	/* local_busy */
-	[3] = &llc_common_state_trans_n,	/* init_pf_cycle */
-	[4] = &llc_common_state_trans_n,	/* timer */
+	[1] = &llc_common_state_trans_end,
+	[2] = &llc_common_state_trans_end,	/* local_busy */
+	[3] = &llc_common_state_trans_end,	/* init_pf_cycle */
+	[4] = &llc_common_state_trans_end,	/* timer */
 	[5] = &llc_adm_state_trans_2,		/* Receive frame */
 	[6] = &llc_adm_state_trans_3,
 	[7] = &llc_adm_state_trans_4,
 	[8] = &llc_adm_state_trans_5,
-	[9] = &llc_common_state_trans_n,
+	[9] = &llc_common_state_trans_end,
 };
 
 /* LLC_CONN_STATE_SETUP transitions */
@@ -593,18 +593,18 @@ static struct llc_conn_state_trans llc_setup_state_trans_8 = {
  * one to each transition
  */
 static struct llc_conn_state_trans *llc_setup_state_transitions[] = {
-	 [0] = &llc_common_state_trans_n,	/* Request */
-	 [1] = &llc_common_state_trans_n,	/* local busy */
-	 [2] = &llc_common_state_trans_n,	/* init_pf_cycle */
+	 [0] = &llc_common_state_trans_end,	/* Request */
+	 [1] = &llc_common_state_trans_end,	/* local busy */
+	 [2] = &llc_common_state_trans_end,	/* init_pf_cycle */
 	 [3] = &llc_setup_state_trans_3,	/* Timer */
 	 [4] = &llc_setup_state_trans_7,
 	 [5] = &llc_setup_state_trans_8,
-	 [6] = &llc_common_state_trans_n,
+	 [6] = &llc_common_state_trans_end,
 	 [7] = &llc_setup_state_trans_1,	/* Receive frame */
 	 [8] = &llc_setup_state_trans_2,
 	 [9] = &llc_setup_state_trans_4,
 	[10] = &llc_setup_state_trans_5,
-	[11] = &llc_common_state_trans_n,
+	[11] = &llc_common_state_trans_end,
 };
 
 /* LLC_CONN_STATE_NORMAL transitions */
@@ -1287,13 +1287,13 @@ static struct llc_conn_state_trans *llc_normal_state_transitions[] = {
 	 [2] = &llc_normal_state_trans_2_1,
 	 [3] = &llc_common_state_trans_1,
 	 [4] = &llc_common_state_trans_2,
-	 [5] = &llc_common_state_trans_n,
+	 [5] = &llc_common_state_trans_end,
 	 [6] = &llc_normal_state_trans_21,
 	 [7] = &llc_normal_state_trans_3,	/* Local busy */
 	 [8] = &llc_normal_state_trans_4,
-	 [9] = &llc_common_state_trans_n,
+	 [9] = &llc_common_state_trans_end,
 	[10] = &llc_normal_state_trans_18,	/* Init pf cycle */
-	[11] = &llc_common_state_trans_n,
+	[11] = &llc_common_state_trans_end,
 	[12] = &llc_common_state_trans_11a,	/* Timers */
 	[13] = &llc_common_state_trans_11b,
 	[14] = &llc_common_state_trans_11c,
@@ -1301,7 +1301,7 @@ static struct llc_conn_state_trans *llc_normal_state_transitions[] = {
 	[16] = &llc_normal_state_trans_19,
 	[17] = &llc_normal_state_trans_20a,
 	[18] = &llc_normal_state_trans_20b,
-	[19] = &llc_common_state_trans_n,
+	[19] = &llc_common_state_trans_end,
 	[20] = &llc_normal_state_trans_8b,	/* Receive frames */
 	[21] = &llc_normal_state_trans_9b,
 	[22] = &llc_normal_state_trans_10,
@@ -1337,7 +1337,7 @@ static struct llc_conn_state_trans *llc_normal_state_transitions[] = {
 	[52] = &llc_common_state_trans_8c,
 	[53] = &llc_common_state_trans_9,
 	/* [54] = &llc_common_state_trans_10, */
-	[54] = &llc_common_state_trans_n,
+	[54] = &llc_common_state_trans_end,
 };
 
 /* LLC_CONN_STATE_BUSY transitions */
@@ -2096,16 +2096,16 @@ static struct llc_conn_state_trans *llc_busy_state_transitions[] = {
 	 [2] = &llc_busy_state_trans_1,
 	 [3] = &llc_busy_state_trans_2,
 	 [4] = &llc_busy_state_trans_2_1,
-	 [5] = &llc_common_state_trans_n,
+	 [5] = &llc_common_state_trans_end,
 	 [6] = &llc_busy_state_trans_3,		/* Local busy */
 	 [7] = &llc_busy_state_trans_4,
 	 [8] = &llc_busy_state_trans_5,
 	 [9] = &llc_busy_state_trans_6,
 	[10] = &llc_busy_state_trans_7,
 	[11] = &llc_busy_state_trans_8,
-	[12] = &llc_common_state_trans_n,
+	[12] = &llc_common_state_trans_end,
 	[13] = &llc_busy_state_trans_22,	/* Initiate PF cycle */
-	[14] = &llc_common_state_trans_n,
+	[14] = &llc_common_state_trans_end,
 	[15] = &llc_common_state_trans_11a,	/* Timer */
 	[16] = &llc_common_state_trans_11b,
 	[17] = &llc_common_state_trans_11c,
@@ -2115,7 +2115,7 @@ static struct llc_conn_state_trans *llc_busy_state_transitions[] = {
 	[21] = &llc_busy_state_trans_24b,
 	[22] = &llc_busy_state_trans_25,
 	[23] = &llc_busy_state_trans_26,
-	[24] = &llc_common_state_trans_n,
+	[24] = &llc_common_state_trans_end,
 	[25] = &llc_busy_state_trans_9a,	/* Receive frame */
 	[26] = &llc_busy_state_trans_9b,
 	[27] = &llc_busy_state_trans_10a,
@@ -2150,7 +2150,7 @@ static struct llc_conn_state_trans *llc_busy_state_transitions[] = {
 	[56] = &llc_common_state_trans_8c,
 	[57] = &llc_common_state_trans_9,
 	/* [58] = &llc_common_state_trans_10, */
-	[58] = &llc_common_state_trans_n,
+	[58] = &llc_common_state_trans_end,
 };
 
 /* LLC_CONN_STATE_REJ transitions */
@@ -2770,15 +2770,15 @@ static struct llc_conn_state_trans llc_reject_state_trans_20b = {
 static struct llc_conn_state_trans *llc_reject_state_transitions[] = {
 	 [0] = &llc_common_state_trans_1,	/* Request */
 	 [1] = &llc_common_state_trans_2,
-	 [2] = &llc_common_state_trans_n,
+	 [2] = &llc_common_state_trans_end,
 	 [3] = &llc_reject_state_trans_1,
 	 [4] = &llc_reject_state_trans_2,
 	 [5] = &llc_reject_state_trans_2_1,
 	 [6] = &llc_reject_state_trans_3,	/* Local busy */
 	 [7] = &llc_reject_state_trans_4,
-	 [8] = &llc_common_state_trans_n,
+	 [8] = &llc_common_state_trans_end,
 	 [9] = &llc_reject_state_trans_17,	/* Initiate PF cycle */
-	[10] = &llc_common_state_trans_n,
+	[10] = &llc_common_state_trans_end,
 	[11] = &llc_common_state_trans_11a,	/* Timer */
 	[12] = &llc_common_state_trans_11b,
 	[13] = &llc_common_state_trans_11c,
@@ -2787,7 +2787,7 @@ static struct llc_conn_state_trans *llc_reject_state_transitions[] = {
 	[16] = &llc_reject_state_trans_19,
 	[17] = &llc_reject_state_trans_20a,
 	[18] = &llc_reject_state_trans_20b,
-	[19] = &llc_common_state_trans_n,
+	[19] = &llc_common_state_trans_end,
 	[20] = &llc_common_state_trans_3,	/* Receive frame */
 	[21] = &llc_common_state_trans_4,
 	[22] = &llc_common_state_trans_5,
@@ -2821,7 +2821,7 @@ static struct llc_conn_state_trans *llc_reject_state_transitions[] = {
 	[49] = &llc_reject_state_trans_15a,
 	[50] = &llc_reject_state_trans_15b,
 	[51] = &llc_reject_state_trans_16,
-	[52] = &llc_common_state_trans_n,
+	[52] = &llc_common_state_trans_end,
 };
 
 /* LLC_CONN_STATE_AWAIT transitions */
@@ -3209,16 +3209,16 @@ static struct llc_conn_state_trans *llc_await_state_transitions[] = {
 	 [0] = &llc_common_state_trans_1,	/* Request */
 	 [1] = &llc_common_state_trans_2,
 	 [2] = &llc_await_state_trans_1_0,
-	 [3] = &llc_common_state_trans_n,
+	 [3] = &llc_common_state_trans_end,
 	 [4] = &llc_await_state_trans_1,	/* Local busy */
-	 [5] = &llc_common_state_trans_n,
-	 [6] = &llc_common_state_trans_n,	/* Initiate PF Cycle */
+	 [5] = &llc_common_state_trans_end,
+	 [6] = &llc_common_state_trans_end,	/* Initiate PF Cycle */
 	 [7] = &llc_common_state_trans_11a,	/* Timer */
 	 [8] = &llc_common_state_trans_11b,
 	 [9] = &llc_common_state_trans_11c,
 	[10] = &llc_common_state_trans_11d,
 	[11] = &llc_await_state_trans_14,
-	[12] = &llc_common_state_trans_n,
+	[12] = &llc_common_state_trans_end,
 	[13] = &llc_common_state_trans_3,	/* Receive frame */
 	[14] = &llc_common_state_trans_4,
 	[15] = &llc_common_state_trans_5,
@@ -3250,7 +3250,7 @@ static struct llc_conn_state_trans *llc_await_state_transitions[] = {
 	[40] = &llc_await_state_trans_12a,
 	[41] = &llc_await_state_trans_12b,
 	[42] = &llc_await_state_trans_13,
-	[43] = &llc_common_state_trans_n,
+	[43] = &llc_common_state_trans_end,
 };
 
 /* LLC_CONN_STATE_AWAIT_BUSY transitions */
@@ -3683,18 +3683,18 @@ static struct llc_conn_state_trans *llc_await_busy_state_transitions[] = {
 	 [0] = &llc_common_state_trans_1,		/* Request */
 	 [1] = &llc_common_state_trans_2,
 	 [2] = &llc_await_busy_state_trans_1_0,
-	 [3] = &llc_common_state_trans_n,
+	 [3] = &llc_common_state_trans_end,
 	 [4] = &llc_await_busy_state_trans_1,		/* Local busy */
 	 [5] = &llc_await_busy_state_trans_2,
 	 [6] = &llc_await_busy_state_trans_3,
-	 [7] = &llc_common_state_trans_n,
-	 [8] = &llc_common_state_trans_n,		/* Initiate PF cycle */
+	 [7] = &llc_common_state_trans_end,
+	 [8] = &llc_common_state_trans_end,		/* Initiate PF cycle */
 	 [9] = &llc_common_state_trans_11a,		/* Timer */
 	[10] = &llc_common_state_trans_11b,
 	[11] = &llc_common_state_trans_11c,
 	[12] = &llc_common_state_trans_11d,
 	[13] = &llc_await_busy_state_trans_16,
-	[14] = &llc_common_state_trans_n,
+	[14] = &llc_common_state_trans_end,
 	[15] = &llc_await_busy_state_trans_4,		/* Receive frame */
 	[16] = &llc_await_busy_state_trans_5a,
 	[17] = &llc_await_busy_state_trans_5b,
@@ -3726,7 +3726,7 @@ static struct llc_conn_state_trans *llc_await_busy_state_transitions[] = {
 	[43] = &llc_common_state_trans_8c,
 	[44] = &llc_common_state_trans_9,
 	/* [45] = &llc_common_state_trans_10, */
-	[45] = &llc_common_state_trans_n,
+	[45] = &llc_common_state_trans_end,
 };
 
 /* ----------------- LLC_CONN_STATE_AWAIT_REJ transitions --------------- */
@@ -4110,16 +4110,16 @@ static struct llc_conn_state_trans *llc_await_rejct_state_transitions[] = {
 	 [0] = &llc_await_reject_state_trans_1_0,
 	 [1] = &llc_common_state_trans_1,		/* requests */
 	 [2] = &llc_common_state_trans_2,
-	 [3] = &llc_common_state_trans_n,
+	 [3] = &llc_common_state_trans_end,
 	 [4] = &llc_await_rejct_state_trans_1,		/* local busy */
-	 [5] = &llc_common_state_trans_n,
-	 [6] = &llc_common_state_trans_n,		/* Initiate PF cycle */
+	 [5] = &llc_common_state_trans_end,
+	 [6] = &llc_common_state_trans_end,		/* Initiate PF cycle */
 	 [7] = &llc_await_rejct_state_trans_13,	/* timers */
 	 [8] = &llc_common_state_trans_11a,
 	 [9] = &llc_common_state_trans_11b,
 	[10] = &llc_common_state_trans_11c,
 	[11] = &llc_common_state_trans_11d,
-	[12] = &llc_common_state_trans_n,
+	[12] = &llc_common_state_trans_end,
 	[13] = &llc_await_rejct_state_trans_2a,	/* receive frames */
 	[14] = &llc_await_rejct_state_trans_2b,
 	[15] = &llc_await_rejct_state_trans_3,
@@ -4151,7 +4151,7 @@ static struct llc_conn_state_trans *llc_await_rejct_state_transitions[] = {
 	[41] = &llc_common_state_trans_8c,
 	[42] = &llc_common_state_trans_9,
 	/* [43] = &llc_common_state_trans_10, */
-	[43] = &llc_common_state_trans_n,
+	[43] = &llc_common_state_trans_end,
 };
 
 /* LLC_CONN_STATE_D_CONN transitions */
@@ -4392,13 +4392,13 @@ static struct llc_conn_state_trans llc_d_conn_state_trans_8 = {
  */
 static struct llc_conn_state_trans *llc_d_conn_state_transitions[] = {
 	 [0] = &llc_d_conn_state_trans_5,	/* Request */
-	 [1] = &llc_common_state_trans_n,
-	 [2] = &llc_common_state_trans_n,	/* Local busy */
-	 [3] = &llc_common_state_trans_n,	/* Initiate PF cycle */
+	 [1] = &llc_common_state_trans_end,
+	 [2] = &llc_common_state_trans_end,	/* Local busy */
+	 [3] = &llc_common_state_trans_end,	/* Initiate PF cycle */
 	 [4] = &llc_d_conn_state_trans_6,	/* Timer */
 	 [5] = &llc_d_conn_state_trans_7,
 	 [6] = &llc_d_conn_state_trans_8,
-	 [7] = &llc_common_state_trans_n,
+	 [7] = &llc_common_state_trans_end,
 	 [8] = &llc_d_conn_state_trans_1,	/* Receive frame */
 	 [9] = &llc_d_conn_state_trans_1_1,
 	[10] = &llc_d_conn_state_trans_2,
@@ -4406,7 +4406,7 @@ static struct llc_conn_state_trans *llc_d_conn_state_transitions[] = {
 	[12] = &llc_d_conn_state_trans_3,
 	[13] = &llc_d_conn_state_trans_4,
 	[14] = &llc_d_conn_state_trans_4_1,
-	[15] = &llc_common_state_trans_n,
+	[15] = &llc_common_state_trans_end,
 };
 
 /* LLC_CONN_STATE_RESET transitions */
@@ -4678,14 +4678,14 @@ static struct llc_conn_state_trans llc_rst_state_trans_8_1 = {
  */
 static struct llc_conn_state_trans *llc_rst_state_transitions[] = {
 	 [0] = &llc_rst_state_trans_6,		/* Request */
-	 [1] = &llc_common_state_trans_n,
-	 [2] = &llc_common_state_trans_n,	/* Local busy */
-	 [3] = &llc_common_state_trans_n,	/* Initiate PF cycle */
+	 [1] = &llc_common_state_trans_end,
+	 [2] = &llc_common_state_trans_end,	/* Local busy */
+	 [3] = &llc_common_state_trans_end,	/* Initiate PF cycle */
 	 [4] = &llc_rst_state_trans_3,		/* Timer */
 	 [5] = &llc_rst_state_trans_7,
 	 [6] = &llc_rst_state_trans_8,
 	 [7] = &llc_rst_state_trans_8_1,
-	 [8] = &llc_common_state_trans_n,
+	 [8] = &llc_common_state_trans_end,
 	 [9] = &llc_rst_state_trans_1,		/* Receive frame */
 	[10] = &llc_rst_state_trans_2,
 	[11] = &llc_rst_state_trans_2_1,
@@ -4693,7 +4693,7 @@ static struct llc_conn_state_trans *llc_rst_state_transitions[] = {
 	[13] = &llc_rst_state_trans_4_1,
 	[14] = &llc_rst_state_trans_5,
 	[15] = &llc_rst_state_trans_5_1,
-	[16] = &llc_common_state_trans_n,
+	[16] = &llc_common_state_trans_end,
 };
 
 /* LLC_CONN_STATE_ERROR transitions */
@@ -4849,19 +4849,19 @@ static struct llc_conn_state_trans llc_error_state_trans_9 = {
  */
 static struct llc_conn_state_trans *llc_error_state_transitions[] = {
 	 [0] = &llc_error_state_trans_9,	/* Request */
-	 [1] = &llc_common_state_trans_n,
-	 [2] = &llc_common_state_trans_n,	/* Local busy */
-	 [3] = &llc_common_state_trans_n,	/* Initiate PF cycle */
+	 [1] = &llc_common_state_trans_end,
+	 [2] = &llc_common_state_trans_end,	/* Local busy */
+	 [3] = &llc_common_state_trans_end,	/* Initiate PF cycle */
 	 [4] = &llc_error_state_trans_7,	/* Timer */
 	 [5] = &llc_error_state_trans_8,
-	 [6] = &llc_common_state_trans_n,
+	 [6] = &llc_common_state_trans_end,
 	 [7] = &llc_error_state_trans_1,	/* Receive frame */
 	 [8] = &llc_error_state_trans_2,
 	 [9] = &llc_error_state_trans_3,
 	[10] = &llc_error_state_trans_4,
 	[11] = &llc_error_state_trans_5,
 	[12] = &llc_error_state_trans_6,
-	[13] = &llc_common_state_trans_n,
+	[13] = &llc_common_state_trans_end,
 };
 
 /* LLC_CONN_STATE_TEMP transitions */
@@ -4886,61 +4886,61 @@ static struct llc_conn_state_trans llc_temp_state_trans_1 = {
  */
 static struct llc_conn_state_trans *llc_temp_state_transitions[] = {
 	[0] = &llc_temp_state_trans_1,		/* requests */
-	[1] = &llc_common_state_trans_n,
-	[2] = &llc_common_state_trans_n,	/* local busy */
-	[3] = &llc_common_state_trans_n,	/* init_pf_cycle */
-	[4] = &llc_common_state_trans_n,	/* timer */
-	[5] = &llc_common_state_trans_n,	/* receive */
+	[1] = &llc_common_state_trans_end,
+	[2] = &llc_common_state_trans_end,	/* local busy */
+	[3] = &llc_common_state_trans_end,	/* init_pf_cycle */
+	[4] = &llc_common_state_trans_end,	/* timer */
+	[5] = &llc_common_state_trans_end,	/* receive */
 };
 
 /* Connection State Transition Table */
-struct llc_conn_state llc_conn_state_table[] = {
-	{
-		.current_state =LLC_CONN_STATE_ADM,
-		.transitions =	llc_adm_state_transitions,
+struct llc_conn_state llc_conn_state_table[NBR_CONN_STATES] = {
+	[LLC_CONN_STATE_ADM - 1] = {
+		.current_state	= LLC_CONN_STATE_ADM,
+		.transitions	= llc_adm_state_transitions,
 	},
-	{
-		.current_state =LLC_CONN_STATE_SETUP,
-		.transitions =	llc_setup_state_transitions,
+	[LLC_CONN_STATE_SETUP - 1] = {
+		.current_state	= LLC_CONN_STATE_SETUP,
+		.transitions	= llc_setup_state_transitions,
 	},
-	{
-		.current_state =LLC_CONN_STATE_NORMAL,
-		.transitions =	llc_normal_state_transitions,
+	[LLC_CONN_STATE_NORMAL - 1] = {
+		.current_state	= LLC_CONN_STATE_NORMAL,
+		.transitions	= llc_normal_state_transitions,
 	},
-	{
-		.current_state =LLC_CONN_STATE_BUSY,
-		.transitions =	llc_busy_state_transitions,
+	[LLC_CONN_STATE_BUSY - 1] = {
+		.current_state	= LLC_CONN_STATE_BUSY,
+		.transitions	= llc_busy_state_transitions,
 	},
-	{
-		.current_state =LLC_CONN_STATE_REJ,
-		.transitions =	llc_reject_state_transitions,
+	[LLC_CONN_STATE_REJ - 1] = {
+		.current_state	= LLC_CONN_STATE_REJ,
+		.transitions	= llc_reject_state_transitions,
 	},
-	{
-		.current_state =LLC_CONN_STATE_AWAIT,
-		.transitions =	llc_await_state_transitions,
+	[LLC_CONN_STATE_AWAIT - 1] = {
+		.current_state	= LLC_CONN_STATE_AWAIT,
+		.transitions	= llc_await_state_transitions,
 	},
-	{
-		.current_state =LLC_CONN_STATE_AWAIT_BUSY,
-		.transitions =	llc_await_busy_state_transitions,
+	[LLC_CONN_STATE_AWAIT_BUSY - 1] = {
+		.current_state	= LLC_CONN_STATE_AWAIT_BUSY,
+		.transitions	= llc_await_busy_state_transitions,
 	},
-	{
-		.current_state =LLC_CONN_STATE_AWAIT_REJ,
-		.transitions =	llc_await_rejct_state_transitions,
+	[LLC_CONN_STATE_AWAIT_REJ - 1] = {
+		.current_state	= LLC_CONN_STATE_AWAIT_REJ,
+		.transitions	= llc_await_rejct_state_transitions,
 	},
-	{
-		.current_state =LLC_CONN_STATE_D_CONN,
-		.transitions =	llc_d_conn_state_transitions,
+	[LLC_CONN_STATE_D_CONN - 1] = {
+		.current_state	= LLC_CONN_STATE_D_CONN,
+		.transitions	= llc_d_conn_state_transitions,
 	},
-	{
-		.current_state =LLC_CONN_STATE_RESET,
-		.transitions =	llc_rst_state_transitions,
+	[LLC_CONN_STATE_RESET - 1] = {
+		.current_state	= LLC_CONN_STATE_RESET,
+		.transitions	= llc_rst_state_transitions,
 	},
-	{
-		.current_state =LLC_CONN_STATE_ERROR,
-		.transitions =	llc_error_state_transitions,
+	[LLC_CONN_STATE_ERROR - 1] = {
+		.current_state	= LLC_CONN_STATE_ERROR,
+		.transitions	= llc_error_state_transitions,
 	},
-	{
-		.current_state =LLC_CONN_STATE_TEMP,
-		.transitions =	llc_temp_state_transitions,
+	[LLC_CONN_STATE_TEMP - 1] = {
+		.current_state	= LLC_CONN_STATE_TEMP,
+		.transitions	= llc_temp_state_transitions,
 	},
 };

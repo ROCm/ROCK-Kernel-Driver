@@ -3,8 +3,7 @@
 #
 
 export-objs  := ip_conntrack_standalone.o ip_fw_compat.o ip_nat_standalone.o \
-		ip_tables.o arp_tables.o ip_conntrack_ftp.o \
-		ip_conntrack_irc.o
+		ip_tables.o arp_tables.o
 
 # objects for the conntrack and NAT core (used by standalone and backw. compat)
 ip_nf_conntrack-objs	:= ip_conntrack_core.o ip_conntrack_proto_generic.o ip_conntrack_proto_tcp.o ip_conntrack_proto_udp.o ip_conntrack_proto_icmp.o
@@ -25,7 +24,13 @@ obj-$(CONFIG_IP_NF_CONNTRACK) += ip_conntrack.o
 
 # connection tracking helpers
 obj-$(CONFIG_IP_NF_FTP) += ip_conntrack_ftp.o
+ifdef CONFIG_IP_NF_NAT_FTP
+	export-objs += ip_conntrack_ftp.o
+endif
 obj-$(CONFIG_IP_NF_IRC) += ip_conntrack_irc.o
+ifdef CONFIG_IP_NF_NAT_IRC
+	export-objs += ip_conntrack_irc.o
+endif
 
 # NAT helpers 
 obj-$(CONFIG_IP_NF_NAT_FTP) += ip_nat_ftp.o
@@ -40,18 +45,24 @@ obj-$(CONFIG_IP_NF_MANGLE) += iptable_mangle.o
 obj-$(CONFIG_IP_NF_NAT) += iptable_nat.o
 
 # matches
+obj-$(CONFIG_IP_NF_MATCH_HELPER) += ipt_helper.o
 obj-$(CONFIG_IP_NF_MATCH_LIMIT) += ipt_limit.o
 obj-$(CONFIG_IP_NF_MATCH_MARK) += ipt_mark.o
 obj-$(CONFIG_IP_NF_MATCH_MAC) += ipt_mac.o
+
+obj-$(CONFIG_IP_NF_MATCH_PKTTYPE) += ipt_pkttype.o
 obj-$(CONFIG_IP_NF_MATCH_MULTIPORT) += ipt_multiport.o
 obj-$(CONFIG_IP_NF_MATCH_OWNER) += ipt_owner.o
 obj-$(CONFIG_IP_NF_MATCH_TOS) += ipt_tos.o
+obj-$(CONFIG_IP_NF_MATCH_ECN) += ipt_ecn.o
+obj-$(CONFIG_IP_NF_MATCH_DSCP) += ipt_dscp.o
 obj-$(CONFIG_IP_NF_MATCH_AH_ESP) += ipt_ah.o ipt_esp.o
 
 obj-$(CONFIG_IP_NF_MATCH_LENGTH) += ipt_length.o
 
 obj-$(CONFIG_IP_NF_MATCH_TTL) += ipt_ttl.o
 obj-$(CONFIG_IP_NF_MATCH_STATE) += ipt_state.o
+obj-$(CONFIG_IP_NF_MATCH_CONNTRACK) += ipt_conntrack.o
 obj-$(CONFIG_IP_NF_MATCH_UNCLEAN) += ipt_unclean.o
 obj-$(CONFIG_IP_NF_MATCH_TCPMSS) += ipt_tcpmss.o
 
@@ -59,6 +70,8 @@ obj-$(CONFIG_IP_NF_MATCH_TCPMSS) += ipt_tcpmss.o
 obj-$(CONFIG_IP_NF_TARGET_REJECT) += ipt_REJECT.o
 obj-$(CONFIG_IP_NF_TARGET_MIRROR) += ipt_MIRROR.o
 obj-$(CONFIG_IP_NF_TARGET_TOS) += ipt_TOS.o
+obj-$(CONFIG_IP_NF_TARGET_ECN) += ipt_ECN.o
+obj-$(CONFIG_IP_NF_TARGET_DSCP) += ipt_DSCP.o
 obj-$(CONFIG_IP_NF_TARGET_MARK) += ipt_MARK.o
 obj-$(CONFIG_IP_NF_TARGET_MASQUERADE) += ipt_MASQUERADE.o
 obj-$(CONFIG_IP_NF_TARGET_REDIRECT) += ipt_REDIRECT.o

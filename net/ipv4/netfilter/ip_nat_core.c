@@ -738,11 +738,10 @@ static inline int exp_for_packet(struct ip_conntrack_expect *exp,
 	struct ip_conntrack_protocol *proto;
 	int ret = 1;
 
-	READ_LOCK(&ip_conntrack_lock);
+	MUST_BE_READ_LOCKED(&ip_conntrack_lock);
 	proto = ip_ct_find_proto((*pskb)->nh.iph->protocol);
 	if (proto->exp_matches_pkt)
 		ret = proto->exp_matches_pkt(exp, pskb);
-	READ_UNLOCK(&ip_conntrack_lock);
 
 	return ret;
 }
@@ -999,4 +998,5 @@ void ip_nat_cleanup(void)
 {
 	ip_ct_selective_cleanup(&clean_nat, NULL);
 	ip_conntrack_destroyed = NULL;
+	vfree(bysource);
 }

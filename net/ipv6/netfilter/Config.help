@@ -1,9 +1,24 @@
+CONFIG_IP6_NF_MATCH_EUI64
+  This module performs checking on the IPv6 source address
+  Compares the last 64 bits with the EUI64 (delivered
+  from the MAC address) address
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+
 CONFIG_IP6_NF_MATCH_MAC
   mac matching allows you to match packets based on the source
   Ethernet address of the packet.
 
   If you want to compile it as a module, say M here and read
   <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+CONFIG_IP6_NF_MATCH_LENGTH
+  This option allows you to match the length of a packet against a
+  specific value or range of values.
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
 
 CONFIG_IP6_NF_MATCH_MARK
   Netfilter mark matching allows you to match packets based on the

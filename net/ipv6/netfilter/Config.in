@@ -24,6 +24,10 @@ if [ "$CONFIG_IP6_NF_IPTABLES" != "n" ]; then
   fi
 #  dep_tristate '  MAC address match support' CONFIG_IP6_NF_MATCH_MAC $CONFIG_IP6_NF_IPTABLES
   dep_tristate '  netfilter MARK match support' CONFIG_IP6_NF_MATCH_MARK $CONFIG_IP6_NF_IPTABLES
+  dep_tristate '  Packet Length match support' CONFIG_IP6_NF_MATCH_LENGTH $CONFIG_IP6_NF_IPTABLES
+  if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+    dep_tristate '  EUI64 address check (EXPERIMENTAL)' CONFIG_IP6_NF_MATCH_EUI64 $CONFIG_IP6_NF_IPTABLES
+  fi
 #  dep_tristate '  Multiple port match support' CONFIG_IP6_NF_MATCH_MULTIPORT $CONFIG_IP6_NF_IPTABLES
 #  dep_tristate '  TOS match support' CONFIG_IP6_NF_MATCH_TOS $CONFIG_IP6_NF_IPTABLES
 #  if [ "$CONFIG_IP6_NF_CONNTRACK" != "n" ]; then

@@ -39,7 +39,8 @@ static void send_reset(struct sk_buff *oldskb, int local)
 	struct tcphdr *otcph, *tcph;
 	struct rtable *rt;
 	unsigned int otcplen;
-	u_int16_t tmp;
+	u_int16_t tmp_port;
+	u_int32_t tmp_addr;
 	int needs_ack;
 
 	/* IP header checks: fragment, too short. */
@@ -74,14 +75,17 @@ static void send_reset(struct sk_buff *oldskb, int local)
 #ifdef CONFIG_NETFILTER_DEBUG
 	nskb->nf_debug = 0;
 #endif
+	nskb->nfmark = 0;
 
 	tcph = (struct tcphdr *)((u_int32_t*)nskb->nh.iph + nskb->nh.iph->ihl);
 
 	/* Swap source and dest */
-	nskb->nh.iph->daddr = xchg(&nskb->nh.iph->saddr, nskb->nh.iph->daddr);
-	tmp = tcph->source;
+	tmp_addr = nskb->nh.iph->saddr;
+	nskb->nh.iph->saddr = nskb->nh.iph->daddr;
+	nskb->nh.iph->daddr = tmp_addr;
+	tmp_port = tcph->source;
 	tcph->source = tcph->dest;
-	tcph->dest = tmp;
+	tcph->dest = tmp_port;
 
 	/* Truncate to length (no data) */
 	tcph->doff = sizeof(struct tcphdr)/4;

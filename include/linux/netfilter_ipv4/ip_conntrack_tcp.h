@@ -2,10 +2,6 @@
 #define _IP_CONNTRACK_TCP_H
 /* TCP tracking. */
 
-#ifndef __KERNEL__
-#error Only in kernel.
-#endif
-
 enum tcp_conntrack {
 	TCP_CONNTRACK_NONE,
 	TCP_CONNTRACK_ESTABLISHED,

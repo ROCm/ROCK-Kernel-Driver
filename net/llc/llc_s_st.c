@@ -24,7 +24,7 @@
  * last entry for this state
  * all members are zeros, .bss zeroes it
  */
-static struct llc_sap_state_trans llc_sap_state_trans_n;
+static struct llc_sap_state_trans llc_sap_state_trans_end;
 
 /* state LLC_SAP_STATE_INACTIVE transition for
  * LLC_SAP_EV_ACTIVATION_REQ event
@@ -43,7 +43,7 @@ static struct llc_sap_state_trans llc_sap_inactive_state_trans_1 = {
 /* array of pointers; one to each transition */
 static struct llc_sap_state_trans *llc_sap_inactive_state_transitions[] = {
 	[0] = &llc_sap_inactive_state_trans_1,
-	[1] = &llc_sap_state_trans_n,
+	[1] = &llc_sap_state_trans_end,
 };
 
 /* state LLC_SAP_STATE_ACTIVE transition for LLC_SAP_EV_RX_UI event */
@@ -167,17 +167,17 @@ static struct llc_sap_state_trans *llc_sap_active_state_transitions[] = {
 	[6] = &llc_sap_active_state_trans_7,
 	[7] = &llc_sap_active_state_trans_8,
 	[8] = &llc_sap_active_state_trans_9,
-	[9] = &llc_sap_state_trans_n,
+	[9] = &llc_sap_state_trans_end,
 };
 
 /* SAP state transition table */
-struct llc_sap_state llc_sap_state_table[] = {
-	{
-		.curr_state =	LLC_SAP_STATE_INACTIVE,
-		.transitions =	llc_sap_inactive_state_transitions,
+struct llc_sap_state llc_sap_state_table[LLC_NR_SAP_STATES] = {
+	[LLC_SAP_STATE_INACTIVE - 1] = {
+		.curr_state	= LLC_SAP_STATE_INACTIVE,
+		.transitions	= llc_sap_inactive_state_transitions,
        	},
-	{
-		.curr_state =	LLC_SAP_STATE_ACTIVE,
-		.transitions =	llc_sap_active_state_transitions,
+	[LLC_SAP_STATE_ACTIVE - 1] = {
+		.curr_state	= LLC_SAP_STATE_ACTIVE,
+		.transitions	= llc_sap_active_state_transitions,
 	},
 };

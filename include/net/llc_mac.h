@@ -20,4 +20,15 @@ extern struct net_device *mac_dev_peer(struct net_device *current_dev,
 extern int llc_pdu_router(struct llc_sap *sap, struct sock *sk,
 			  struct sk_buff *skb, u8 type);
 extern u16 lan_hdrs_init(struct sk_buff *skb, u8 *sa, u8 *da);
+
+static __inline__ void llc_set_backlog_type(struct sk_buff *skb, char type)
+{
+	skb->cb[sizeof(skb->cb) - 1] = type;
+}
+
+static __inline__ char llc_backlog_type(struct sk_buff *skb)
+{
+	return skb->cb[sizeof(skb->cb) - 1];
+}
+
 #endif /* LLC_MAC_H */

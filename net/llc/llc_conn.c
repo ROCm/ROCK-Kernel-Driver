@@ -28,56 +28,37 @@
 
 static int llc_find_offset(int state, int ev_type);
 static void llc_conn_send_pdus(struct sock *sk);
-static int llc_conn_service(struct sock *sk, struct llc_conn_state_ev *ev);
+static int llc_conn_service(struct sock *sk, struct sk_buff *skb);
 static int llc_exec_conn_trans_actions(struct sock *sk,
 				       struct llc_conn_state_trans *trans,
-				       struct llc_conn_state_ev *ev);
-static struct llc_conn_state_trans *
-	     llc_qualify_conn_ev(struct sock *sk, struct llc_conn_state_ev *ev);
+				       struct sk_buff *ev);
+static struct llc_conn_state_trans *llc_qualify_conn_ev(struct sock *sk,
+							struct sk_buff *skb);
 
 /* Offset table on connection states transition diagram */
 static int llc_offset_table[NBR_CONN_STATES][NBR_CONN_EV];
 
 /**
- *	llc_conn_alloc_event: allocates an event
- *	@sk: socket that event is associated
- *
- *	Returns pointer to allocated connection on success, %NULL on failure.
- */
-struct llc_conn_state_ev *llc_conn_alloc_ev(struct sock *sk)
-{
-	struct llc_conn_state_ev *ev = NULL;
-
-	/* verify connection is valid, active and open */
-	if (llc_sk(sk)->state != LLC_CONN_OUT_OF_SVC) {
-		/* get event structure to build a station event */
-		ev = kmalloc(sizeof(*ev), GFP_ATOMIC);
-		if (ev)
-			memset(ev, 0, sizeof(*ev));
-	}
-	return ev;
-}
-
-/**
  *	llc_conn_send_event - sends event to connection state machine
  *	@sk: connection
- *	@ev: occurred event
+ *	@skb: occurred event
  *
  *	Sends an event to connection state machine. after processing event
  *	(executing it's actions and changing state), upper layer will be
  *	indicated or confirmed, if needed. Returns 0 for success, 1 for
  *	failure. The socket lock has to be held before calling this function.
  */
-int llc_conn_send_ev(struct sock *sk, struct llc_conn_state_ev *ev)
+int llc_conn_send_ev(struct sock *sk, struct sk_buff *skb)
 {
 	/* sending event to state machine */
-	int rc = llc_conn_service(sk, ev);
+	int rc = llc_conn_service(sk, skb);
 	struct llc_opt *llc = llc_sk(sk);
+	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 	u8 flag = ev->flag;
 	struct llc_prim_if_block *ind_prim = ev->ind_prim;
 	struct llc_prim_if_block *cfm_prim = ev->cfm_prim;
 
-	llc_conn_free_ev(ev);
+	llc_conn_free_ev(skb);
 #ifdef THIS_BREAKS_DISCONNECT_NOTIFICATION_BADLY
 	/* check if the connection was freed by the state machine by
 	 * means of llc_conn_disc */
@@ -125,15 +106,14 @@ void llc_conn_send_pdu(struct sock *sk, struct sk_buff *skb)
  *	llc_conn_rtn_pdu - sends received data pdu to upper layer
  *	@sk: Active connection
  *	@skb: Received data frame
- *	@ev: Occurred event
  *
  *	Sends received data pdu to upper layer (by using indicate function).
  *	Prepares service parameters (prim and prim_data). calling indication
  *	function will be done in llc_conn_send_ev.
  */
-void llc_conn_rtn_pdu(struct sock *sk, struct sk_buff *skb,
-		      struct llc_conn_state_ev *ev)
+void llc_conn_rtn_pdu(struct sock *sk, struct sk_buff *skb)
 {
+	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 	struct llc_opt *llc = llc_sk(sk);
 	struct llc_sap *sap = llc->sap;
 	struct llc_prim_if_block *prim = &sap->llc_ind_prim;
@@ -291,34 +271,37 @@ static void llc_conn_send_pdus(struct sock *sk)
 
 /**
  *	llc_conn_free_ev - free event
- *	@ev: event to free
+ *	@skb: event to free
  *
  *	Free allocated event.
  */
-void llc_conn_free_ev(struct llc_conn_state_ev *ev)
+void llc_conn_free_ev(struct sk_buff *skb)
 {
+	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
+
 	if (ev->type == LLC_CONN_EV_TYPE_PDU) {
-		/* free the frame that binded to this event */
-		struct llc_pdu_sn *pdu =
-				(struct llc_pdu_sn *)ev->data.pdu.skb->nh.raw;
+		/* free the frame that is bound to this event */
+		struct llc_pdu_sn *pdu = llc_pdu_sn_hdr(skb);
 
 		if (LLC_PDU_TYPE_IS_I(pdu) || !ev->flag || !ev->ind_prim)
-			kfree_skb(ev->data.pdu.skb);
-	}
-	/* free event structure to free list of the same */
-	kfree(ev);
+			kfree_skb(skb);
+	} else if (ev->type == LLC_CONN_EV_TYPE_PRIM &&
+		   ev->data.prim.prim != LLC_DATA_PRIM)
+		kfree_skb(skb);
+	else if (ev->type == LLC_CONN_EV_TYPE_P_TMR)
+		kfree_skb(skb);
 }
 
 /**
  *	llc_conn_service - finds transition and changes state of connection
  *	@sk: connection
- *	@ev: happened event
+ *	@skb: happened event
  *
  *	This function finds transition that matches with happened event, then
  *	executes related actions and finally changes state of connection.
  *	Returns 0 for success, 1 for failure.
  */
-static int llc_conn_service(struct sock *sk, struct llc_conn_state_ev *ev)
+static int llc_conn_service(struct sock *sk, struct sk_buff *skb)
 {
 	int rc = 1;
 	struct llc_conn_state_trans *trans;
@@ -326,9 +309,9 @@ static int llc_conn_service(struct sock *sk, struct llc_conn_state_ev *ev)
 	if (llc_sk(sk)->state > NBR_CONN_STATES)
 		goto out;
 	rc = 0;
-	trans = llc_qualify_conn_ev(sk, ev);
+	trans = llc_qualify_conn_ev(sk, skb);
 	if (trans) {
-		rc = llc_exec_conn_trans_actions(sk, trans, ev);
+		rc = llc_exec_conn_trans_actions(sk, trans, skb);
 		if (!rc && trans->next_state != NO_STATE_CHANGE)
 			llc_sk(sk)->state = trans->next_state;
 	}
@@ -339,26 +322,28 @@ out:
 /**
  *	llc_qualify_conn_ev - finds transition for event
  *	@sk: connection
- *	@ev: happened event
+ *	@skb: happened event
  *
  *	This function finds transition that matches with happened event.
  *	Returns pointer to found transition on success, %NULL otherwise.
  */
-static struct llc_conn_state_trans *
-	     llc_qualify_conn_ev(struct sock *sk, struct llc_conn_state_ev *ev)
+static struct llc_conn_state_trans *llc_qualify_conn_ev(struct sock *sk,
+							struct sk_buff *skb)
 {
 	struct llc_conn_state_trans **next_trans;
 	llc_conn_ev_qfyr_t *next_qualifier;
+	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
+	struct llc_opt *llc = llc_sk(sk);
 	struct llc_conn_state *curr_state =
-				&llc_conn_state_table[llc_sk(sk)->state - 1];
+					&llc_conn_state_table[llc->state - 1];
 
 	/* search thru events for this state until
 	 * list exhausted or until no more
 	 */
 	for (next_trans = curr_state->transitions +
-		llc_find_offset(llc_sk(sk)->state - 1, ev->type);
+		llc_find_offset(llc->state - 1, ev->type);
 	     (*next_trans)->ev; next_trans++) {
-		if (!((*next_trans)->ev)(sk, ev)) {
+		if (!((*next_trans)->ev)(sk, skb)) {
 			/* got POSSIBLE event match; the event may require
 			 * qualification based on the values of a number of
 			 * state flags; if all qualifications are met (i.e.,
@@ -367,7 +352,7 @@ static struct llc_conn_state_trans *
 			 */
 			for (next_qualifier = (*next_trans)->ev_qualifiers;
 			     next_qualifier && *next_qualifier &&
-			     !(*next_qualifier)(sk, ev); next_qualifier++)
+			     !(*next_qualifier)(sk, skb); next_qualifier++)
 				/* nothing */;
 			if (!next_qualifier || !*next_qualifier)
 				/* all qualifiers executed successfully; this is
@@ -384,7 +369,7 @@ static struct llc_conn_state_trans *
  *	llc_exec_conn_trans_actions - executes related actions
  *	@sk: connection
  *	@trans: transition that it's actions must be performed
- *	@ev: happened event
+ *	@skb: happened event
  *
  *	Executes actions that is related to happened event. Returns 0 for
  *	success, 1 to indicate failure of at least one action or 2 if the
@@ -392,14 +377,14 @@ static struct llc_conn_state_trans *
  */
 static int llc_exec_conn_trans_actions(struct sock *sk,
 				       struct llc_conn_state_trans *trans,
-				       struct llc_conn_state_ev *ev)
+				       struct sk_buff *skb)
 {
 	int rc = 0;
 	llc_conn_action_t *next_action;
 
 	for (next_action = trans->ev_actions;
 	     next_action && *next_action; next_action++) {
-		int rc2 = (*next_action)(sk, ev);
+		int rc2 = (*next_action)(sk, skb);
 
 		if (rc2 == 2) {
 			rc = rc2;

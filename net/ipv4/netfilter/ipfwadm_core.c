@@ -122,8 +122,10 @@
 #include <net/icmp.h>
 #include <linux/netlink.h>
 #include <linux/init.h>
+#include <linux/spinlock.h>
 #include <linux/netfilter_ipv4/ipfwadm_core.h>
 #include <linux/netfilter_ipv4/compat_firewall.h>
+#include <linux/netfilter_ipv4/lockhelp.h>
 
 #include <net/checksum.h>
 #include <linux/proc_fs.h>
@@ -153,6 +155,8 @@
 #else
 #define dprint_ip(a)
 #endif
+
+static rwlock_t ip_fw_lock = RW_LOCK_UNLOCKED;
 
 #if defined(CONFIG_IP_ACCT) || defined(CONFIG_IP_FIREWALL)
 
@@ -442,6 +446,11 @@ int ip_fw_chk(struct iphdr *ip, struct net_device *rif, __u16 *redirport,
 	dprintf1("\n");
 #endif
 
+	if (mode == IP_FW_MODE_CHK)
+		READ_LOCK(&ip_fw_lock);
+	else
+		WRITE_LOCK(&ip_fw_lock);
+	
 	for (f=chain;f;f=f->fw_next)
 	{
 		/*
@@ -646,7 +655,8 @@ int ip_fw_chk(struct iphdr *ip, struct net_device *rif, __u16 *redirport,
 #ifdef CONFIG_IP_FIREWALL_NETLINK
 		if((policy&IP_FW_F_PRN) && (answer == FW_REJECT || answer == FW_BLOCK))
 		{
-			struct sk_buff *skb=alloc_skb(128, GFP_ATOMIC);
+			struct sk_buff *skb=alloc_skb(128, (mode == IP_FW_MODE_CHK) ?
+							GFP_KERNEL : GFP_ATOMIC);
 			if(skb)
 			{
 				int len = min_t(unsigned int,
@@ -659,29 +669,36 @@ int ip_fw_chk(struct iphdr *ip, struct net_device *rif, __u16 *redirport,
 			}
 		}
 #endif
-		return answer;
 	} else
 		/* we're doing accounting, always ok */
-		return 0;
+		answer = 0;
+	
+	if (mode == IP_FW_MODE_CHK)
+		READ_UNLOCK(&ip_fw_lock);
+	else
+		WRITE_UNLOCK(&ip_fw_lock);
+
+	return answer;
 }
 
 
 static void zero_fw_chain(struct ip_fw *chainptr)
 {
 	struct ip_fw *ctmp=chainptr;
+	
+	WRITE_LOCK(&ip_fw_lock);
 	while(ctmp)
 	{
 		ctmp->fw_pcnt=0L;
 		ctmp->fw_bcnt=0L;
 		ctmp=ctmp->fw_next;
 	}
+	WRITE_UNLOCK(&ip_fw_lock);
 }
 
 static void free_fw_chain(struct ip_fw *volatile* chainptr)
 {
-	unsigned long flags;
-	save_flags(flags);
-	cli();
+	WRITE_LOCK(&ip_fw_lock);
 	while ( *chainptr != NULL )
 	{
 		struct ip_fw *ftmp;
@@ -690,7 +707,7 @@ static void free_fw_chain(struct ip_fw *volatile* chainptr)
 		kfree(ftmp);
 		MOD_DEC_USE_COUNT;
 	}
-	restore_flags(flags);
+	WRITE_UNLOCK(&ip_fw_lock);
 }
 
 /* Volatiles to keep some of the compiler versions amused */
@@ -698,11 +715,8 @@ static void free_fw_chain(struct ip_fw *volatile* chainptr)
 static int insert_in_chain(struct ip_fw *volatile* chainptr, struct ip_fw *frwl,int len)
 {
 	struct ip_fw *ftmp;
-	unsigned long flags;
 
-	save_flags(flags);
-
-	ftmp = kmalloc( sizeof(struct ip_fw), GFP_ATOMIC );
+	ftmp = kmalloc( sizeof(struct ip_fw), GFP_KERNEL );
 	if ( ftmp == NULL )
 	{
 #ifdef DEBUG_IP_FIREWALL
@@ -721,7 +735,7 @@ static int insert_in_chain(struct ip_fw *volatile* chainptr, struct ip_fw *frwl,
 	ftmp->fw_pcnt=0L;
 	ftmp->fw_bcnt=0L;
 
-	cli();
+	WRITE_LOCK(&ip_fw_lock);
 
 	if ((ftmp->fw_vianame)[0]) {
 		if (!(ftmp->fw_viadev = dev_get_by_name(ftmp->fw_vianame)))
@@ -731,7 +745,7 @@ static int insert_in_chain(struct ip_fw *volatile* chainptr, struct ip_fw *frwl,
 
 	ftmp->fw_next = *chainptr;
        	*chainptr=ftmp;
-	restore_flags(flags);
+	WRITE_UNLOCK(&ip_fw_lock);
 	MOD_INC_USE_COUNT;
 	return(0);
 }
@@ -741,11 +755,8 @@ static int append_to_chain(struct ip_fw *volatile* chainptr, struct ip_fw *frwl,
 	struct ip_fw *ftmp;
 	struct ip_fw *chtmp=NULL;
 	struct ip_fw *volatile chtmp_prev=NULL;
-	unsigned long flags;
 
-	save_flags(flags);
-
-	ftmp = kmalloc( sizeof(struct ip_fw), GFP_ATOMIC );
+	ftmp = kmalloc( sizeof(struct ip_fw), GFP_KERNEL );
 	if ( ftmp == NULL )
 	{
 #ifdef DEBUG_IP_FIREWALL
@@ -766,7 +777,7 @@ static int append_to_chain(struct ip_fw *volatile* chainptr, struct ip_fw *frwl,
 
 	ftmp->fw_next = NULL;
 
-	cli();
+	WRITE_LOCK(&ip_fw_lock);
 
 	if ((ftmp->fw_vianame)[0]) {
 		if (!(ftmp->fw_viadev = dev_get_by_name(ftmp->fw_vianame)))
@@ -782,7 +793,7 @@ static int append_to_chain(struct ip_fw *volatile* chainptr, struct ip_fw *frwl,
 		chtmp_prev->fw_next=ftmp;
 	else
         	*chainptr=ftmp;
-	restore_flags(flags);
+	WRITE_UNLOCK(&ip_fw_lock);
 	MOD_INC_USE_COUNT;
 	return(0);
 }
@@ -792,10 +803,8 @@ static int del_from_chain(struct ip_fw *volatile*chainptr, struct ip_fw *frwl)
 	struct ip_fw 	*ftmp,*ltmp;
 	unsigned short	tport1,tport2,tmpnum;
 	char		matches,was_found;
-	unsigned long 	flags;
 
-	save_flags(flags);
-	cli();
+	WRITE_LOCK(&ip_fw_lock);
 
 	ftmp=*chainptr;
 
@@ -804,7 +813,7 @@ static int del_from_chain(struct ip_fw *volatile*chainptr, struct ip_fw *frwl)
 #ifdef DEBUG_IP_FIREWALL
 		printk("ip_fw_ctl:  chain is empty\n");
 #endif
-		restore_flags(flags);
+		WRITE_UNLOCK(&ip_fw_lock);
 		return( EINVAL );
 	}
 
@@ -856,7 +865,7 @@ static int del_from_chain(struct ip_fw *volatile*chainptr, struct ip_fw *frwl)
 			ftmp = ftmp->fw_next;
 		 }
 	}
-	restore_flags(flags);
+	WRITE_UNLOCK(&ip_fw_lock);
 	if (was_found) {
 		MOD_DEC_USE_COUNT;
 		return 0;
@@ -1110,7 +1119,6 @@ static int ip_chain_procinfo(int stage, char *buffer, char **start,
 {
 	off_t pos=0, begin=0;
 	struct ip_fw *i;
-	unsigned long flags;
 	int len, p;
 	int last_len = 0;
 
@@ -1147,8 +1155,7 @@ static int ip_chain_procinfo(int stage, char *buffer, char **start,
 			break;
 	}
 
-	save_flags(flags);
-	cli();
+	READ_LOCK(&ip_fw_lock);
 
 	while(i!=NULL)
 	{
@@ -1177,16 +1184,19 @@ static int ip_chain_procinfo(int stage, char *buffer, char **start,
 			len = last_len;
 			break;
 		}
+/* Not possible in 2.3.29+, also allowing read lock instead of write -- JM */
+#if 0
 		else if(reset)
 		{
 			/* This needs to be done at this specific place! */
 			i->fw_pcnt=0L;
 			i->fw_bcnt=0L;
 		}
+#endif
 		last_len = len;
 		i=i->fw_next;
 	}
-	restore_flags(flags);
+	READ_UNLOCK(&ip_fw_lock);
 	*start=buffer+(offset-begin);
 	len-=(offset-begin);
 	if(len>length)
@@ -1329,12 +1339,10 @@ int ipfw_device_event(struct notifier_block *this, unsigned long event, void *pt
 {
 	struct net_device *dev=ptr;
 	char *devname = dev->name;
-	unsigned long flags;
 	struct ip_fw *fw;
 	int chn;
 
-	save_flags(flags);
-	cli();
+	WRITE_LOCK(&ip_fw_lock);
 
 	if (event == NETDEV_UP) {
 		for (chn = 0; chn < IP_FW_CHAINS; chn++)
@@ -1351,7 +1359,7 @@ int ipfw_device_event(struct notifier_block *this, unsigned long event, void *pt
 					fw->fw_viadev = (struct net_device*)-1;
 	}
 
-	restore_flags(flags);
+	WRITE_UNLOCK(&ip_fw_lock);
 	return NOTIFY_DONE;
 }
 

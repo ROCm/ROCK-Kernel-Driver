@@ -56,6 +56,16 @@ CONFIG_IP_NF_MATCH_LIMIT
   If you want to compile it as a module, say M here and read
   <file:Documentation/modules.txt>.  If unsure, say `N'.
 
+CONFIG_IP_NF_MATCH_PKTTYPE
+  This patch allows you to match packet in accrodance
+  to its "class", eg. BROADCAST, MULTICAST, ...
+  
+  Typical usage:
+  iptables -A INPUT -m pkttype --pkt-type broadcast -j LOG
+  
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+
 CONFIG_IP_NF_MATCH_MAC
   MAC matching allows you to match packets based on the source
   Ethernet address of the packet.
@@ -100,12 +110,38 @@ CONFIG_IP_NF_MATCH_AH_ESP
   If you want to compile it as a module, say M here and read
   Documentation/modules.txt.  If unsure, say `N'.
 
+CONFIG_IP_NF_TARGET_DSCP
+  This option adds a `DSCP' match, which allows you to match against
+  the IPv4 header DSCP field (DSCP codepoint).
+
+  The DSCP codepoint can have any value between 0x0 and 0x4f.
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+
+CONFIG_IP_NF_MATCH_ECN
+  This option adds a `ECN' match, which allows you to match against
+  the IPv4 and TCP header ECN fields.
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+
 CONFIG_IP_NF_MATCH_TOS
   TOS matching allows you to match packets based on the Type Of
   Service fields of the IP packet.
 
   If you want to compile it as a module, say M here and read
   <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+CONFIG_IP_NF_MATCH_CONNTRACK
+  This is a general conntrack match module, a superset of the state match.
+
+  It allows matching on additional conntrack information, which is
+  useful in complex configurations, such as NAT gateways with multiple
+  internet links or tunnels.
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
 
 CONFIG_IP_NF_MATCH_STATE
   Connection state matching allows you to match packets based on their
@@ -211,6 +247,30 @@ CONFIG_IP_NF_MANGLE
   If you want to compile it as a module, say M here and read
   <file:Documentation/modules.txt>.  If unsure, say `N'.
 
+CONFIG_IP_NF_TARGET_DSCP
+  This option adds a `DSCP' target, which allows you to create rules in
+  the iptables mangle table. The selected packet has the DSCP field set
+  to the hex value provided on the command line; unlike the TOS target
+  which will only set the legal values within ip.h.
+
+  The DSCP field can be set to any value between 0x0 and 0x4f. It does
+  take into account that bits 6 and 7 are used by ECN.
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+
+CONFIG_IP_NF_TARGET_ECN
+  This option adds a `ECN' target, which can be used in the iptables mangle
+  table.  
+
+  You can use this target to remove the ECN bits from the IPv4 header of
+  an IP packet.  This is particularly useful, if you need to work around
+  existing ECN blackholes on the internet, but don't want to disable
+  ECN support in general.
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+
 CONFIG_IP_NF_TARGET_TOS
   This option adds a `TOS' target, which allows you to create rules in
   the `mangle' table which alter the Type Of Service field of an IP
@@ -229,6 +289,13 @@ CONFIG_IP_NF_TARGET_MARK
 
   If you want to compile it as a module, say M here and read
   <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+CONFIG_IP_NF_MATCH_HELPER
+  Helper matching allows you to match packets in dynamic connections
+  tracked by a conntrack-helper, ie. ip_conntrack_ftp
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `Y'.
 
 CONFIG_IP_NF_TARGET_TCPMSS
   This option adds a `TCPMSS' target, which allows you to alter the

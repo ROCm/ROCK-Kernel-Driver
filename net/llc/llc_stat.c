@@ -24,7 +24,7 @@
  * last entry for this state
  * all members are zeros, .bss zeroes it
  */
-static struct llc_station_state_trans llc_stat_state_trans_n;
+static struct llc_station_state_trans llc_stat_state_trans_end;
 
 /* DOWN STATE transitions */
 
@@ -59,7 +59,7 @@ static struct llc_station_state_trans llc_stat_down_state_trans_2 = {
 static struct llc_station_state_trans *llc_stat_dwn_state_trans[] = {
 	[0] = &llc_stat_down_state_trans_1,
 	[1] = &llc_stat_down_state_trans_2,
-	[2] = &llc_stat_state_trans_n,
+	[2] = &llc_stat_state_trans_end,
 };
 
 /* UP STATE transitions */
@@ -104,7 +104,7 @@ static struct llc_station_state_trans *llc_stat_up_state_trans [] = {
 	[0] = &llc_stat_up_state_trans_1,
 	[1] = &llc_stat_up_state_trans_2,
 	[2] = &llc_stat_up_state_trans_3,
-	[3] = &llc_stat_state_trans_n,
+	[3] = &llc_stat_state_trans_end,
 };
 
 /* DUP ADDR CHK STATE transitions */
@@ -162,7 +162,7 @@ static llc_station_action_t llc_stat_dupaddr_state_actions_4[] = {
 static struct llc_station_state_trans llc_stat_dupaddr_state_trans_4 = {
 	.ev	    = llc_stat_ev_ack_tmr_exp_lt_retry_cnt_max_retry,
 	.next_state = LLC_STATION_STATE_DUP_ADDR_CHK,
-	.ev_actions = llc_stat_dupaddr_state_actions_4
+	.ev_actions = llc_stat_dupaddr_state_actions_4,
 };
 
 /* state transition for LLC_STATION_EV_ACK_TMR_EXP_EQ_RETRY_CNT_MAX_RETRY
@@ -199,20 +199,20 @@ static struct llc_station_state_trans *llc_stat_dupaddr_state_trans[] = {
 	[3] = &llc_stat_dupaddr_state_trans_1,	/* Receive frame */
 	[4] = &llc_stat_dupaddr_state_trans_2,
 	[5] = &llc_stat_dupaddr_state_trans_3,
-	[6] = &llc_stat_state_trans_n
+	[6] = &llc_stat_state_trans_end,
 };
 
 struct llc_station_state llc_station_state_table[LLC_NBR_STATION_STATES] = {
-	{
+	[LLC_STATION_STATE_DOWN - 1] = {
 		.curr_state  = LLC_STATION_STATE_DOWN,
 		.transitions = llc_stat_dwn_state_trans,
 	},
-	{
+	[LLC_STATION_STATE_DUP_ADDR_CHK - 1] = {
 		.curr_state  = LLC_STATION_STATE_DUP_ADDR_CHK,
 		.transitions = llc_stat_dupaddr_state_trans,
 	},
-	{
+	[LLC_STATION_STATE_UP - 1] = {
 		.curr_state  = LLC_STATION_STATE_UP,
 		.transitions = llc_stat_up_state_trans,
-	}
+	},
 };
