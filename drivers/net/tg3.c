@@ -445,9 +445,14 @@ static void tg3_switch_clocks(struct tg3 *tp)
 		       0x1f);
 	tp->pci_clock_ctrl = clock_ctrl;
 
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705 &&
-	    GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5750 &&
-	    (orig_clock_ctrl & CLOCK_CTRL_44MHZ_CORE) != 0) {
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705 ||
+	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750) {
+		if (orig_clock_ctrl & CLOCK_CTRL_625_CORE) {
+			tw32_f(TG3PCI_CLOCK_CTRL,
+			       clock_ctrl | CLOCK_CTRL_625_CORE);
+			udelay(40);
+		}
+	} else if ((orig_clock_ctrl & CLOCK_CTRL_44MHZ_CORE) != 0) {
 		tw32_f(TG3PCI_CLOCK_CTRL,
 		     clock_ctrl |
 		     (CLOCK_CTRL_44MHZ_CORE | CLOCK_CTRL_ALTCLK));
