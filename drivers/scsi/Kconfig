@@ -320,7 +320,7 @@ source "drivers/scsi/aic7xxx/Kconfig.aic7xxx"
 
 config SCSI_AIC7XXX_OLD
 	tristate "Adaptec AIC7xxx support (old driver)"
-	depends on SCSI
+	depends on (ISA || EISA || PCI ) && SCSI
 	help
 	  WARNING This driver is an older aic7xxx driver and is no longer
 	  under active development.  Adaptec, Inc. is writing a new driver to
@@ -595,7 +595,7 @@ config SCSI_EATA_MAX_TAGS
 
 config SCSI_EATA_PIO
 	tristate "EATA-PIO (old DPT PM2001, PM2012A) support"
-	depends on SCSI
+	depends on (ISA || EISA || PCI) && SCSI
 	---help---
 	  This driver supports all EATA-PIO protocol compliant SCSI Host
 	  Adapters like the DPT PM2001 and the PM2012A.  EATA-DMA compliant
