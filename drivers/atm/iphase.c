@@ -3281,7 +3281,7 @@ static struct pci_driver ia_driver = {
 	.name =         DEV_LABEL,
 	.id_table =     ia_pci_tbl,
 	.probe =        ia_init_one,
-	.remove =       ia_remove_one,
+	.remove =       __devexit_p(ia_remove_one),
 };
 
 static int __init ia_module_init(void)

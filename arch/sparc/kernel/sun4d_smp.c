@@ -29,7 +29,6 @@
 #include <asm/pgtable.h>
 #include <asm/oplib.h>
 #include <asm/hardirq.h>
-#include <asm/softirq.h>
 #include <asm/sbus.h>
 #include <asm/sbi.h>
 

@@ -5,7 +5,6 @@
 #include <linux/cache.h>
 #include <linux/threads.h>
 
-/* softirq.h is sensitive to the offsets of these fields */
 typedef struct {
 	unsigned int __softirq_pending;
 	unsigned int __local_irq_count;

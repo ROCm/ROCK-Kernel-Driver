@@ -5,10 +5,10 @@
 #include <linux/config.h>
 #include <linux/linkage.h>
 #include <linux/bitops.h>
+#include <linux/preempt.h>
 #include <asm/atomic.h>
 #include <asm/hardirq.h>
 #include <asm/ptrace.h>
-#include <asm/softirq.h>
 #include <asm/system.h>
 
 struct irqaction {
@@ -36,6 +36,13 @@ extern void free_irq(unsigned int, void *);
 # define save_and_cli(x)	local_irq_save(x)
 #endif
 
+/* SoftIRQ primitives.  */
+#define local_bh_disable() \
+		do { preempt_count() += SOFTIRQ_OFFSET; barrier(); } while (0)
+#define __local_bh_enable() \
+		do { barrier(); preempt_count() -= SOFTIRQ_OFFSET; } while (0)
+
+extern void local_bh_enable(void);
 
 /* PLEASE, avoid to allocate new softirqs, if you need not _really_ high
    frequency threaded job scheduling. For almost all the purposes

@@ -101,8 +101,6 @@ static inline kdev_t val_to_kdev(unsigned int val)
 #define NODEV		(mk_kdev(0,0))
 #define B_FREE		(mk_kdev(0xff,0xff))
 
-extern const char * kdevname(kdev_t);	/* note: returns pointer to static data! */
-
 static inline int kdev_same(kdev_t dev1, kdev_t dev2)
 {
 	return dev1.value == dev2.value;

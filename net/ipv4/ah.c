@@ -18,7 +18,7 @@
 static int ip_clear_mutable_options(struct iphdr *iph, u32 *daddr)
 {
 	unsigned char * optptr = (unsigned char*)(iph+1);
-	int  l = iph->ihl*4 - 20;
+	int  l = iph->ihl*4 - sizeof(struct iphdr);
 	int  optlen;
 
 	while (l > 0) {
@@ -132,7 +132,7 @@ static int ah_output(struct sk_buff *skb)
 		top_iph->frag_off = iph->frag_off;
 		top_iph->daddr = iph->daddr;
 		if (iph->ihl != 5)
-			memcpy(top_iph+1, iph+1, iph->ihl*5 - 20);
+			memcpy(top_iph+1, iph+1, iph->ihl*4 - sizeof(struct iphdr));
 	}
 	ip_send_check(top_iph);
 
@@ -288,7 +288,7 @@ static int ah_init_state(struct xfrm_state *x, void *args)
 	
 	x->props.header_len = XFRM_ALIGN8(ahp->icv_trunc_len + AH_HLEN_NOICV);
 	if (x->props.mode)
-		x->props.header_len += 20;
+		x->props.header_len += sizeof(struct iphdr);
 	x->data = ahp;
 
 	return 0;

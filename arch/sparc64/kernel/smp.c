@@ -31,7 +31,6 @@
 #include <asm/pgtable.h>
 #include <asm/oplib.h>
 #include <asm/hardirq.h>
-#include <asm/softirq.h>
 #include <asm/uaccess.h>
 #include <asm/timer.h>
 #include <asm/starfire.h>

@@ -45,6 +45,7 @@
 #include <acpi/acpi.h>
 #include <acpi/acinterp.h>
 #include <acpi/acnamesp.h>
+#include <acpi/acevents.h>
 
 #define _COMPONENT          ACPI_UTILITIES
 	 ACPI_MODULE_NAME    ("utdelete")
@@ -127,6 +128,14 @@ acpi_ut_delete_internal_obj (
 		/* Free the (variable length) element pointer array */
 
 		obj_pointer = object->package.elements;
+		break;
+
+
+	case ACPI_TYPE_DEVICE:
+
+		if (object->device.gpe_block) {
+			(void) acpi_ev_delete_gpe_block (object->device.gpe_block);
+		}
 		break;
 
 

@@ -107,7 +107,7 @@
 /* This include could be elsewhere, since it is not wireless specific */
 #include "wireless/i82593.h"
 
-static const char version[] __initdata = "znet.c:v1.02 9/23/94 becker@scyld.com\n";
+static char version[] __initdata = "znet.c:v1.02 9/23/94 becker@scyld.com\n";
 
 #ifndef ZNET_DEBUG
 #define ZNET_DEBUG 1

@@ -378,7 +378,7 @@ acpi_ec_gpe_query (
 	acpi_evaluate_object(ec->handle, object_name, NULL, NULL);
 
 end:
-	acpi_enable_event(ec->gpe_bit, ACPI_EVENT_GPE, 0);
+	acpi_enable_gpe(NULL, ec->gpe_bit, ACPI_NOT_ISR);
 }
 
 static void
@@ -391,7 +391,7 @@ acpi_ec_gpe_handler (
 	if (!ec)
 		return;
 
-	acpi_disable_event(ec->gpe_bit, ACPI_EVENT_GPE, 0);
+	acpi_disable_gpe(NULL, ec->gpe_bit, ACPI_ISR);
 
 	status = acpi_os_queue_for_execution(OSD_PRIORITY_GPE,
 		acpi_ec_gpe_query, ec);
@@ -589,12 +589,13 @@ acpi_ec_add (
 		acpi_remove_address_space_handler(ACPI_ROOT_OBJECT,
 			ACPI_ADR_SPACE_EC, &acpi_ec_space_handler);
 	
-		acpi_remove_gpe_handler(ec_ecdt->gpe_bit, &acpi_ec_gpe_handler);
+		acpi_remove_gpe_handler(NULL, ec_ecdt->gpe_bit, &acpi_ec_gpe_handler);
 
 		kfree(ec_ecdt);
 	}
 
 	/* Get GPE bit assignment (EC events). */
+	/* TODO: Add support for _GPE returning a package */
 	status = acpi_evaluate_integer(ec->handle, "_GPE", NULL, &ec->gpe_bit);
 	if (ACPI_FAILURE(status)) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
@@ -714,7 +715,7 @@ acpi_ec_start (
 	/*
 	 * Install GPE handler
 	 */
-	status = acpi_install_gpe_handler(ec->gpe_bit,
+	status = acpi_install_gpe_handler(NULL, ec->gpe_bit,
 		ACPI_EVENT_EDGE_TRIGGERED, &acpi_ec_gpe_handler, ec);
 	if (ACPI_FAILURE(status)) {
 		return_VALUE(-ENODEV);
@@ -724,7 +725,7 @@ acpi_ec_start (
 			ACPI_ADR_SPACE_EC, &acpi_ec_space_handler,
 			&acpi_ec_space_setup, ec);
 	if (ACPI_FAILURE(status)) {
-		acpi_remove_gpe_handler(ec->gpe_bit, &acpi_ec_gpe_handler);
+		acpi_remove_gpe_handler(NULL, ec->gpe_bit, &acpi_ec_gpe_handler);
 		return_VALUE(-ENODEV);
 	}
 
@@ -752,7 +753,7 @@ acpi_ec_stop (
 	if (ACPI_FAILURE(status))
 		return_VALUE(-ENODEV);
 
-	status = acpi_remove_gpe_handler(ec->gpe_bit, &acpi_ec_gpe_handler);
+	status = acpi_remove_gpe_handler(NULL, ec->gpe_bit, &acpi_ec_gpe_handler);
 	if (ACPI_FAILURE(status))
 		return_VALUE(-ENODEV);
 
@@ -798,7 +799,7 @@ acpi_ec_ecdt_probe (void)
 	/*
 	 * Install GPE handler
 	 */
-	status = acpi_install_gpe_handler(ec_ecdt->gpe_bit,
+	status = acpi_install_gpe_handler(NULL, ec_ecdt->gpe_bit,
 		ACPI_EVENT_EDGE_TRIGGERED, &acpi_ec_gpe_handler,
 		ec_ecdt);
 	if (ACPI_FAILURE(status)) {
@@ -809,7 +810,7 @@ acpi_ec_ecdt_probe (void)
 			ACPI_ADR_SPACE_EC, &acpi_ec_space_handler,
 			&acpi_ec_space_setup, ec_ecdt);
 	if (ACPI_FAILURE(status)) {
-		acpi_remove_gpe_handler(ec_ecdt->gpe_bit,
+		acpi_remove_gpe_handler(NULL, ec_ecdt->gpe_bit,
 			&acpi_ec_gpe_handler);
 		goto error;
 	}

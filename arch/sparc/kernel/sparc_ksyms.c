@@ -40,7 +40,6 @@
 #include <asm/smp.h>
 #include <asm/mostek.h>
 #include <asm/ptrace.h>
-#include <asm/softirq.h>
 #include <asm/hardirq.h>
 #include <asm/user.h>
 #include <asm/uaccess.h>

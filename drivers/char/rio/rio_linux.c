@@ -1139,7 +1139,6 @@ static int __init rio_init(void)
   struct vpd_prom *vpdp;
   int okboard;
 
-
 #ifdef CONFIG_PCI
 #ifndef TWO_ZERO
   struct pci_dev *pdev = NULL;
@@ -1161,8 +1160,16 @@ static int __init rio_init(void)
     rio_debug=-1;
   }
 
+  if (misc_register(&rio_fw_device) < 0) {
+    printk(KERN_ERR "RIO: Unable to register firmware loader driver.\n");
+    return -EIO;
+  }
+
   retval = rio_init_datastructures ();
-  if (retval < 0) return retval;
+  if (retval < 0) {
+    misc_deregister(&rio_fw_device);
+    return retval;
+  }
 
 #ifdef CONFIG_PCI
   if (pci_present ()) {
@@ -1400,12 +1407,10 @@ static int __init rio_init(void)
 
   if (found) {
     rio_dprintk (RIO_DEBUG_INIT, "rio: total of %d boards detected.\n", found);
-
-    if (misc_register(&rio_fw_device) < 0) {
-      printk(KERN_ERR "RIO: Unable to register firmware loader driver.\n");
-      return -EIO;
-    }
     rio_init_drivers ();
+  } else {
+    /* deregister the misc device we created earlier */
+    misc_deregister(&rio_fw_device);
   }
 
   func_exit();

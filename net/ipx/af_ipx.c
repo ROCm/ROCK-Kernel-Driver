@@ -180,7 +180,8 @@ out_unlock:
 	spin_unlock_bh(&intrfc->if_sklist_lock);
 	sock_put(sk);
 	ipxitf_put(intrfc);
-out:	return;
+out:
+	return;
 }
 
 static void ipx_destroy_socket(struct sock *sk)
@@ -403,7 +404,8 @@ static int ipxitf_device_event(struct notifier_block *notifier,
 		i = tmp;
 	}
 	spin_unlock_bh(&ipx_interfaces_lock);
-out:	return NOTIFY_DONE;
+out:
+	return NOTIFY_DONE;
 }
 
 static void ipxitf_def_skb_handler(struct sock *sock, struct sk_buff *skb)
@@ -463,7 +465,8 @@ static int ipxitf_demux_socket(struct ipx_interface *intrfc,
 		kfree_skb(skb);
 
 	ret = 0;
-out:	spin_unlock_bh(&intrfc->if_sklist_lock);
+out:
+	spin_unlock_bh(&intrfc->if_sklist_lock);
 	return ret;
 }
 #else
@@ -578,7 +581,8 @@ static int ipxitf_demux_socket(struct ipx_interface *intrfc,
 		ipxitf_def_skb_handler(sock2, skb2);
 
 	ret = 0;
-out:	if (sock1)
+out:
+	if (sock1)
 		sock_put(sock1);
 	if (sock2)
 		sock_put(sock2);
@@ -716,7 +720,8 @@ static int ipxitf_send(struct ipx_interface *intrfc, struct sk_buff *skb,
 
 	/* Send it out */
 	dl->request(dl, skb, dest_node);
-out:	return 0;
+out:
+	return 0;
 }
 
 static int ipxrtr_add_route(__u32 network, struct ipx_interface *intrfc,
@@ -903,7 +908,8 @@ static int ipxitf_pprop(struct ipx_interface *intrfc, struct sk_buff *skb)
 		}
 	}
 	spin_unlock_bh(&ipx_interfaces_lock);
-out:	return ret;
+out:
+	return ret;
 }
 
 static void ipxitf_insert(struct ipx_interface *intrfc)
@@ -979,7 +985,8 @@ static int ipxitf_create_internal(struct ipx_interface_definition *idef)
 
 	ret = ipxitf_add_local_route(intrfc);
 	ipxitf_put(intrfc);
-out:	return ret;
+out:
+	return ret;
 }
 
 static int ipx_map_frame_type(unsigned char type)
@@ -1109,7 +1116,8 @@ out_intrfc:
 	goto out;
 out_dev:
 	dev_put(dev);
-out:	return err;
+out:
+	return err;
 }
 
 static int ipxitf_delete(struct ipx_interface_definition *idef)
@@ -1146,7 +1154,8 @@ static int ipxitf_delete(struct ipx_interface_definition *idef)
 	__ipxitf_put(intrfc);
 
 	ret = 0;
-out:	spin_unlock_bh(&ipx_interfaces_lock);
+out:
+	spin_unlock_bh(&ipx_interfaces_lock);
 	return ret;
 }
 
@@ -1197,7 +1206,8 @@ static struct ipx_interface *ipxitf_auto_create(struct net_device *dev,
 		dev_hold(dev);
 	}
 
-out:	return intrfc;
+out:
+	return intrfc;
 }
 
 static int ipxitf_ioctl(unsigned int cmd, void *arg)
@@ -1346,7 +1356,8 @@ static int ipxrtr_add_route(__u32 network, struct ipx_interface *intrfc,
 	ret = 0;
 out_put:
 	ipxrtr_put(rt);
-out:	return ret;
+out:
+	return ret;
 }
 
 static void ipxrtr_del_routes(struct ipx_interface *intrfc)
@@ -1375,7 +1386,8 @@ static int ipxrtr_create(struct ipx_route_definition *rd)
 		goto out;
 	ret = ipxrtr_add_route(rd->ipx_network, intrfc, rd->ipx_router_node);
 	ipxitf_put(intrfc);
-out:	return ret;
+out:
+	return ret;
 }
 
 static int ipxrtr_delete(long net)
@@ -1401,7 +1413,8 @@ static int ipxrtr_delete(long net)
 		r = &(tmp->ir_next);
 	}
 	err = -ENOENT;
-out:	write_unlock_bh(&ipx_routes_lock);
+out:
+	write_unlock_bh(&ipx_routes_lock);
 	return err;
 }
 
@@ -1528,7 +1541,8 @@ out_put:
 	ipxitf_put(intrfc);
 	if (rt)
 		ipxrtr_put(rt);
-out:	return err;
+out:
+	return err;
 }
 
 /* the skb has to be unshared, we'll end up calling ipxitf_send, that'll
@@ -1587,7 +1601,8 @@ static int ipxrtr_ioctl(unsigned int cmd, void *arg)
 		}
 	}
 
-out:	return ret;
+out:
+	return ret;
 }
 
 const char *ipx_frame_name(unsigned short frame)
@@ -1634,7 +1649,8 @@ static int ipx_setsockopt(struct socket *sock, int level, int optname,
 
 	ipx_sk(sk)->type = opt;
 	ret = 0;
-out:	return ret;
+out:
+	return ret;
 }
 
 static int ipx_getsockopt(struct socket *sock, int level, int optname,
@@ -1664,7 +1680,8 @@ static int ipx_getsockopt(struct socket *sock, int level, int optname,
 		goto out;
 
 	ret = 0;
-out:	return ret;
+out:
+	return ret;
 }
 
 static int ipx_create(struct socket *sock, int protocol)
@@ -1706,9 +1723,12 @@ static int ipx_create(struct socket *sock, int protocol)
 	sock_init_data(sock, sk);
 	sk->no_check = 1;		/* Checksum off by default */
 	ret = 0;
-out:	return ret;
-outsk:	sk_free(sk);
-decmod:	MOD_DEC_USE_COUNT;
+out:
+	return ret;
+outsk:
+	sk_free(sk);
+decmod:
+	MOD_DEC_USE_COUNT;
 	goto out;
 }
 
@@ -1729,7 +1749,8 @@ static int ipx_release(struct socket *sock)
 	if (sock->type == SOCK_DGRAM)
 		MOD_DEC_USE_COUNT;
 
-out:	return 0;
+out:
+	return 0;
 }
 
 /* caller must hold a reference to intrfc */
@@ -1847,7 +1868,8 @@ static int ipx_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	ret = 0;
 out_put:
 	ipxitf_put(intrfc);
-out:	return ret;
+out:
+	return ret;
 }
 
 static int ipx_connect(struct socket *sock, struct sockaddr *uaddr,
@@ -1907,7 +1929,8 @@ static int ipx_connect(struct socket *sock, struct sockaddr *uaddr,
 	if (rt)
 		ipxrtr_put(rt);
 	ret = 0;
-out:	return ret;
+out:
+	return ret;
 }
 
 
@@ -1954,7 +1977,8 @@ static int ipx_getname(struct socket *sock, struct sockaddr *uaddr,
 	memcpy(uaddr, &sipx, sizeof(sipx));
 
 	ret = 0;
-out:	return ret;
+out:
+	return ret;
 }
 
 int ipx_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
@@ -2005,8 +2029,10 @@ int ipx_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 	ret = ipxitf_rcv(intrfc, skb);
 	ipxitf_put(intrfc);
 	goto out;
-drop:	kfree_skb(skb);
-out:	return ret;
+drop:
+	kfree_skb(skb);
+out:
+	return ret;
 }
 
 static int ipx_sendmsg(struct kiocb *iocb, struct socket *sock,
@@ -2065,7 +2091,8 @@ static int ipx_sendmsg(struct kiocb *iocb, struct socket *sock,
 				     flags & MSG_DONTWAIT);
 	if (ret >= 0)
 		ret = len;
-out:	return ret;
+out:
+	return ret;
 }
 
 
@@ -2134,7 +2161,8 @@ static int ipx_recvmsg(struct kiocb *iocb, struct socket *sock,
 
 out_free:
 	skb_free_datagram(sk, skb);
-out:	return err;
+out:
+	return err;
 }
 
 

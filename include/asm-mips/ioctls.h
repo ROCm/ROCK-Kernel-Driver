@@ -74,6 +74,12 @@
 /* #define TIOCSETD	_IOW('t', 27, int)	set line discipline */
 						/* 127-124 compat */
 
+#define TIOCSBRK	0x5427  /* BSD compatibility */
+#define TIOCCBRK	0x5428  /* BSD compatibility */
+#define TIOCGSID	0x7416  /* Return the session ID of FD */
+#define TIOCGPTN	_IOR('T',0x30, unsigned int) /* Get Pty Number (of pty-mux device) */
+#define TIOCSPTLCK	_IOW('T',0x31, int)  /* Lock/unlock Pty */
+
 /* I hope the range from 0x5480 on is free ... */
 #define TIOCSCTTY	0x5480		/* become controlling tty */
 #define TIOCGSOFTCAR	0x5481
@@ -81,15 +87,7 @@
 #define TIOCLINUX	0x5483
 #define TIOCGSERIAL	0x5484
 #define TIOCSSERIAL	0x5485
-
 #define TCSBRKP		0x5486	/* Needed for POSIX tcsendbreak() */
-#define TIOCTTYGSTRUCT	0x5487  /* For debugging only */
-#define TIOCSBRK	0x5427  /* BSD compatibility */
-#define TIOCCBRK	0x5428  /* BSD compatibility */
-#define TIOCGSID	0x7416  /* Return the session ID of FD */
-#define TIOCGPTN	_IOR('T',0x30, unsigned int) /* Get Pty Number (of pty-mux device) */
-#define TIOCSPTLCK	_IOW('T',0x31, int)  /* Lock/unlock Pty */
-
 #define TIOCSERCONFIG	0x5488
 #define TIOCSERGWILD	0x5489
 #define TIOCSERSWILD	0x548a

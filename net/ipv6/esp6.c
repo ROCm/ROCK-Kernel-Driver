@@ -468,7 +468,7 @@ int esp6_init_state(struct xfrm_state *x, void *args)
 	crypto_cipher_setkey(esp->conf.tfm, esp->conf.key, esp->conf.key_len);
 	x->props.header_len = 8 + esp->conf.ivlen;
 	if (x->props.mode)
-		x->props.header_len += 40;  /* XXX ext hdr */
+		x->props.header_len += sizeof(struct ipv6hdr);
 	x->data = esp;
 	return 0;
 

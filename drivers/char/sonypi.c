@@ -532,7 +532,7 @@ static int sonypi_misc_ioctl(struct inode *ip, struct file *fp,
 			ret = -EFAULT;
 		break;
 	case SONYPI_IOCGBAT1REM:
-		if (ec_read16(SONYPI_BAT1_FULL, &val16)) {
+		if (ec_read16(SONYPI_BAT1_LEFT, &val16)) {
 			ret = -EIO;
 			break;
 		}
@@ -540,7 +540,7 @@ static int sonypi_misc_ioctl(struct inode *ip, struct file *fp,
 			ret = -EFAULT;
 		break;
 	case SONYPI_IOCGBAT2CAP:
-		if (ec_read16(SONYPI_BAT1_FULL, &val16)) {
+		if (ec_read16(SONYPI_BAT2_FULL, &val16)) {
 			ret = -EIO;
 			break;
 		}
@@ -548,7 +548,7 @@ static int sonypi_misc_ioctl(struct inode *ip, struct file *fp,
 			ret = -EFAULT;
 		break;
 	case SONYPI_IOCGBAT2REM:
-		if (ec_read16(SONYPI_BAT1_FULL, &val16)) {
+		if (ec_read16(SONYPI_BAT2_LEFT, &val16)) {
 			ret = -EIO;
 			break;
 		}

@@ -379,26 +379,27 @@ static int fdomain_event(event_t event, int priority,
     return 0;
 } /* fdomain_event */
 
-/*====================================================================*/
+static struct pcmcia_driver fdomain_cs_driver = {
+	.owner		= THIS_MODULE,
+	.drv		= {
+		.name	= "fdomain_cs",
+	},
+	.attach		= fdomain_attach,
+	.detach		= fdomain_detach,
+};
 
-static int __init init_fdomain_cs(void) {
-    servinfo_t serv;
-    DEBUG(0, "%s\n", version);
-    CardServices(GetCardServicesInfo, &serv);
-    if (serv.Revision != CS_RELEASE_CODE) {
-	printk(KERN_NOTICE "fdomain_cs: Card Services release "
-	       "does not match!\n");
-	return -1;
-    }
-    register_pccard_driver(&dev_info, &fdomain_attach, &fdomain_detach);
-    return 0;
+static int __init init_fdomain_cs(void)
+{
+	return pcmcia_register_driver(&fdomain_cs_driver);
 }
 
-static void __exit exit_fdomain_cs(void) {
-    DEBUG(0, "fdomain_cs: unloading\n");
-    unregister_pccard_driver(&dev_info);
-    while (dev_list != NULL)
-	fdomain_detach(dev_list);
+static void __exit exit_fdomain_cs(void)
+{
+	pcmcia_unregister_driver(&fdomain_cs_driver);
+
+	/* XXX: this really needs to move into generic code.. */
+	while (dev_list != NULL)
+		fdomain_detach(dev_list);
 }
 
 module_init(init_fdomain_cs);

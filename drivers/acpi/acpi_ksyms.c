@@ -74,6 +74,8 @@ EXPORT_SYMBOL(acpi_install_fixed_event_handler);
 EXPORT_SYMBOL(acpi_remove_fixed_event_handler);
 EXPORT_SYMBOL(acpi_acquire_global_lock);
 EXPORT_SYMBOL(acpi_release_global_lock);
+EXPORT_SYMBOL(acpi_install_gpe_block);
+EXPORT_SYMBOL(acpi_remove_gpe_block);
 EXPORT_SYMBOL(acpi_get_current_resources);
 EXPORT_SYMBOL(acpi_get_possible_resources);
 EXPORT_SYMBOL(acpi_walk_resources);

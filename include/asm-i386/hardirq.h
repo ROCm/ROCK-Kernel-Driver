@@ -5,7 +5,6 @@
 #include <linux/threads.h>
 #include <linux/irq.h>
 
-/* assembly code in softirq.h is sensitive to the offsets of these fields */
 typedef struct {
 	unsigned int __softirq_pending;
 	unsigned int __syscall_count;
