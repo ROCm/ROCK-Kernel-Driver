@@ -117,7 +117,7 @@ void arch_check_bugs(void)
 	if(check_cpu_feature("xmm", &have_it)) cpu_has_xmm = have_it;
 }
 
-int arch_handle_signal(int sig, struct uml_pt_regs *regs)
+int arch_handle_signal(int sig, union uml_pt_regs *regs)
 {
 	unsigned long ip;
 

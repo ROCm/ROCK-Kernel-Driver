@@ -13,41 +13,40 @@
 #include "task.h"
 #include "sigcontext.h"
 
-void sig_handler_common_skas(int sig, struct sigcontext *sc)
+void sig_handler_common_skas(int sig, void *sc_ptr)
 {
-	struct uml_pt_regs save_regs, *r;
+	struct sigcontext *sc = sc_ptr;
+	struct skas_regs *r;
 	struct signal_info *info;
 	int save_errno = errno;
 
-	r = (struct uml_pt_regs *) TASK_REGS(get_current());
-	save_regs = *r;
+	r = &TASK_REGS(get_current())->skas;
 	r->is_user = 0;
-	r->mode.skas.fault_addr = SC_FAULT_ADDR(sc);
-	r->mode.skas.fault_type = SC_FAULT_TYPE(sc);
-	r->mode.skas.trap_type = SC_TRAP_TYPE(sc);
+	r->fault_addr = SC_FAULT_ADDR(sc);
+	r->fault_type = SC_FAULT_TYPE(sc);
+	r->trap_type = SC_TRAP_TYPE(sc);
 
 	change_sig(SIGUSR1, 1);
 	info = &sig_info[sig];
 	if(!info->is_irq) unblock_signals();
 
-	(*info->handler)(sig, r);
+	(*info->handler)(sig, (union uml_pt_regs *) r);
 
-	*r = save_regs;
 	errno = save_errno;
 }
 
 extern int missed_ticks[];
 
-void user_signal(int sig, struct uml_pt_regs *regs)
+void user_signal(int sig, union uml_pt_regs *regs)
 {
 	struct signal_info *info;
 
 	if(sig == SIGVTALRM)
 		missed_ticks[cpu()]++;
-	regs->is_user = 1;
-	regs->mode.skas.fault_addr = 0;
-	regs->mode.skas.fault_type = 0;
-	regs->mode.skas.trap_type = 0;
+	regs->skas.is_user = 1;
+	regs->fault_addr = 0;
+	regs->skas.fault_type = 0;
+	regs->skas.trap_type = 0;
 	info = &sig_info[sig];
 	(*info->handler)(sig, regs);
 
