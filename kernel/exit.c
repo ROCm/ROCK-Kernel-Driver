@@ -15,6 +15,7 @@
 #include <linux/tty.h>
 #include <linux/namespace.h>
 #include <linux/security.h>
+#include <linux/cpu.h>
 #include <linux/acct.h>
 #include <linux/file.h>
 #include <linux/binfmts.h>
@@ -781,8 +782,14 @@ static void exit_notify(struct task_struct *tsk)
 
 	/* If the process is dead, release it - nobody will wait for it */
 	if (state == TASK_DEAD) {
+		lock_cpu_hotplug();
 		release_task(tsk);
 		write_lock_irq(&tasklist_lock);
+		/*
+		 * No preemption may happen from this point on,
+		 * or CPU hotplug (and task exit) breaks:
+		 */
+		unlock_cpu_hotplug();
 		tsk->state = state;
 		_raw_write_unlock(&tasklist_lock);
 		local_irq_enable();
