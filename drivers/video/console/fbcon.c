@@ -975,15 +975,13 @@ void accel_cursor(struct vc_data *vc, struct fb_info *info, int flags, int xx, i
 	int bgshift = (vc->vc_hi_font_mask) ? 13 : 12;
 	int fgshift = (vc->vc_hi_font_mask) ? 9 : 8;
 	static char mask[64], image[64];
-	int fg_color, bg_color, height, width, c;
 	struct fb_cursor cursor;
-	static int shape;
+	int height, width, c;
 	char *font, *dest;
-
+	static int shape;
+	
 	cursor.set = FB_CUR_SETPOS;
 
-	fg_color = info->cursor.image.fg_color;
-	bg_color = info->cursor.image.bg_color;
 	height = info->cursor.image.height;
 	width = info->cursor.image.width;
 	dest = info->cursor.dest;
@@ -995,6 +993,11 @@ void accel_cursor(struct vc_data *vc, struct fb_info *info, int flags, int xx, i
 		cursor.set |= FB_CUR_SETSIZE;
 	}	
 
+	if (cursor.set & FB_CUR_SETSIZE) {
+		memset(image, 0xff, 64);
+		cursor.set |= FB_CUR_SETSHAPE;
+	}
+
 	if ((vc->vc_cursor_type & 0x0f) != shape) {
 		shape = vc->vc_cursor_type & 0x0f;
 		cursor.set |= FB_CUR_SETSHAPE;
@@ -1002,14 +1005,13 @@ void accel_cursor(struct vc_data *vc, struct fb_info *info, int flags, int xx, i
 
 	c = scr_readw((u16 *) vc->vc_pos);
 
-	if (fg_color != attr_fgcol(fgshift, c) ||
-	    bg_color != attr_bgcol(bgshift, c)) {
-		fg_color = attr_fgcol(fgshift, c);
-		bg_color = attr_bgcol(bgshift, c);
+	if (info->cursor.image.fg_color != attr_fgcol(fgshift, c) ||
+	    info->cursor.image.bg_color != attr_bgcol(bgshift, c)) {
+		cursor.image.fg_color = attr_fgcol(fgshift, c);
+		cursor.image.bg_color = attr_bgcol(bgshift, c);
 		cursor.set |= FB_CUR_SETCMAP;
 	}
-	c &= charmask;
-	font = vc->vc_font.data + (c * ((width + 7) / 8) * height);
+	font = vc->vc_font.data + ((c & charmask) * ((width + 7) >> 3) * height);
 	if (font != dest) {
 		dest = font;
 		cursor.set |= FB_CUR_SETDEST;
@@ -1020,15 +1022,10 @@ void accel_cursor(struct vc_data *vc, struct fb_info *info, int flags, int xx, i
 	else
 		cursor.enable = 0;
 
-	if (cursor.set & FB_CUR_SETSIZE) {
-		memset(image, 0xff, 64);
-		cursor.set |= FB_CUR_SETSHAPE;
-	}		
-
 	if (cursor.set & FB_CUR_SETSHAPE) {
 		int w, cur_height, size, i = 0;
-
-		w = (width + 7) / 8;
+		
+		w = (width + 7) >> 3;
 
 		switch (vc->vc_cursor_type & 0x0f) {
 			case CUR_NONE:
@@ -1060,8 +1057,6 @@ void accel_cursor(struct vc_data *vc, struct fb_info *info, int flags, int xx, i
 			mask[i++] = 0xff;
 	}
 
-	cursor.image.bg_color = bg_color;
-	cursor.image.fg_color = fg_color;
 	cursor.image.width = width;
 	cursor.image.height = height;
 	cursor.image.dx = xx * width;

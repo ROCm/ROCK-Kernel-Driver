@@ -19,14 +19,13 @@
 
 int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 {
-	unsigned dsize = ((cursor->image.width + 7)/8) * cursor->image.height;
+	unsigned dsize = ((cursor->image.width + 7) >> 3) * cursor->image.height;
 	unsigned int scan_align = info->pixmap.scan_align - 1;
 	unsigned int buf_align = info->pixmap.buf_align - 1;
 	unsigned int i, size, s_pitch, d_pitch;
-	static u8 src[64];
-	u8 *dst;
+	u8 *dst, src[64];
 
-	s_pitch = (cursor->image.width + 7)/8;
+	s_pitch = (cursor->image.width + 7) >> 3;
 	d_pitch = (s_pitch + scan_align) & ~scan_align;
 	size = d_pitch * cursor->image.height + buf_align;
 	size &= ~buf_align;
@@ -61,8 +60,11 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	}	
 
 	if (cursor->set & FB_CUR_SETSHAPE) {
-	}
-
+		if (info->cursor.mask)	kfree(info->cursor.mask);
+		info->cursor.mask = kmalloc(dsize, GFP_KERNEL);
+		memcpy(info->cursor.mask, cursor->mask, dsize);
+	}	
+	
 	if (cursor->enable) {
 		switch (cursor->rop) {
 		case ROP_XOR:
@@ -86,7 +88,6 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 		move_buf_aligned(info, dst, cursor->dest, s_pitch, d_pitch, 
 			  	 cursor->image.height);
 	}
-
 	info->fbops->fb_imageblit(info, &info->cursor.image);
 	return 0;
 }
