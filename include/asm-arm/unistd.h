@@ -13,6 +13,8 @@
 #ifndef __ASM_ARM_UNISTD_H
 #define __ASM_ARM_UNISTD_H
 
+#include <linux/linkage.h>
+
 #define __NR_SYSCALL_BASE	0x900000
 
 /*
