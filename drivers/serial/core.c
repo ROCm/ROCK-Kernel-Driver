@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/char/serial_core.c
+ *  linux/drivers/char/core.c
  *
  *  Driver core for serial ports
  *
@@ -22,7 +22,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- *  $Id: serial_core.c,v 1.89 2002/07/20 18:07:32 rmk Exp $
+ *  $Id: core.c,v 1.90 2002/07/21 21:32:30 rmk Exp $
  *
  */
 #include <linux/config.h>

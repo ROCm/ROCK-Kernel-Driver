@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/char/serial_8250.c
+ *  linux/drivers/char/8250.c
  *
  *  Driver for 8250/16550-type serial ports
  *
@@ -12,7 +12,7 @@
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
- *  $Id: serial_8250.c,v 1.80 2002/07/21 08:57:55 rmk Exp $
+ *  $Id: 8250.c,v 1.83 2002/07/21 23:08:22 rmk Exp $
  *
  * A note about mapbase / membase
  *
@@ -54,7 +54,7 @@
 #endif
 
 #include <linux/serial_core.h>
-#include "serial_8250.h"
+#include "8250.h"
 
 /*
  * Configuration:
@@ -1296,8 +1296,6 @@ serial8250_change_speed(struct uart_port *port, unsigned int cflag,
 	unsigned char cval, fcr = 0;
 	unsigned long flags;
 
-	printk("+++ change_speed port %p cflag %08x quot %d\n", port, cflag, quot);
-
 	switch (cflag & CSIZE) {
 	case CS5:
 		cval = 0x00;
@@ -1835,7 +1833,6 @@ static int __init serial8250_console_setup(struct console *co, char *options)
 	if (co->index >= UART_NR)
 		co->index = 0;
 	port = &serial8250_ports[co->index].port;
-	printk("+++ index %d port %p iobase %x\n", co->index, port, port->iobase);
 
 	/*
 	 * Temporary fix.
@@ -1844,7 +1841,6 @@ static int __init serial8250_console_setup(struct console *co, char *options)
 
 	if (options)
 		uart_parse_options(options, &baud, &parity, &bits, &flow);
-	printk("+++ baud %d bits %d parity %c flow %c\n", baud, parity, bits, flow);
 
 	return uart_set_options(port, co, baud, parity, bits, flow);
 }
@@ -1969,7 +1965,7 @@ static int __init serial8250_init(void)
 {
 	int ret, i;
 
-	printk(KERN_INFO "Serial: 8250/16550 driver $Revision: 1.80 $ "
+	printk(KERN_INFO "Serial: 8250/16550 driver $Revision: 1.83 $ "
 		"IRQ sharing %sabled\n", share_irqs ? "en" : "dis");
 
 	for (i = 0; i < NR_IRQS; i++)
@@ -2001,7 +1997,7 @@ EXPORT_SYMBOL(unregister_serial);
 EXPORT_SYMBOL(serial8250_get_irq_map);
 
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("Generic 8250/16x50 serial driver $Revision: 1.80 $");
+MODULE_DESCRIPTION("Generic 8250/16x50 serial driver $Revision: 1.83 $");
 
 MODULE_PARM(share_irqs, "i");
 MODULE_PARM_DESC(share_irqs, "Share IRQs with other non-8250/16x50 devices"

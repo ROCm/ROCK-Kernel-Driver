@@ -1,11 +1,11 @@
 /*
- * linux/drivers/char/serial_21285.c
+ * linux/drivers/char/21285.c
  *
  * Driver for the serial port on the 21285 StrongArm-110 core logic chip.
  *
  * Based on drivers/char/serial.c
  *
- *  $Id: serial_21285.c,v 1.32 2002/07/21 08:57:55 rmk Exp $
+ *  $Id: 21285.c,v 1.33 2002/07/21 21:32:29 rmk Exp $
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -527,7 +527,7 @@ static int __init serial21285_init(void)
 {
 	int ret;
 
-	printk(KERN_INFO "Serial: 21285 driver $Revision: 1.32 $\n");
+	printk(KERN_INFO "Serial: 21285 driver $Revision: 1.33 $\n");
 
 	serial21285_setup_ports();
 
@@ -550,4 +550,4 @@ module_exit(serial21285_exit);
 EXPORT_NO_SYMBOLS;
 
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("Intel Footbridge (21285) serial driver $Revision: 1.32 $");
+MODULE_DESCRIPTION("Intel Footbridge (21285) serial driver $Revision: 1.33 $");

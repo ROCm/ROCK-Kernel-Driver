@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/char/serial_clps711x.c
+ *  linux/drivers/char/clps711x.c
  *
  *  Driver for CLPS711x serial ports
  *
@@ -22,7 +22,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- *  $Id: serial_clps711x.c,v 1.38 2002/07/21 08:57:55 rmk Exp $
+ *  $Id: clps711x.c,v 1.39 2002/07/21 21:32:30 rmk Exp $
  *
  */
 #include <linux/config.h>
@@ -611,7 +611,7 @@ static int __init clps711xuart_init(void)
 {
 	int ret, i;
 
-	printk(KERN_INFO "Serial: CLPS711x driver $Revision: 1.38 $\n");
+	printk(KERN_INFO "Serial: CLPS711x driver $Revision: 1.39 $\n");
 
 	ret = uart_register_driver(&clps711x_reg);
 	if (ret)
@@ -639,5 +639,5 @@ module_exit(clps711xuart_exit);
 EXPORT_NO_SYMBOLS;
 
 MODULE_AUTHOR("Deep Blue Solutions Ltd");
-MODULE_DESCRIPTION("CLPS-711x generic serial driver $Revision: 1.38 $");
+MODULE_DESCRIPTION("CLPS-711x generic serial driver $Revision: 1.39 $");
 MODULE_LICENSE("GPL");

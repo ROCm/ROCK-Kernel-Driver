@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/char/serial_sa1100.c
+ *  linux/drivers/char/sa1100.c
  *
  *  Driver for SA11x0 serial ports
  *
@@ -21,7 +21,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- *  $Id: serial_sa1100.c,v 1.41 2002/07/21 08:57:55 rmk Exp $
+ *  $Id: sa1100.c,v 1.42 2002/07/21 21:32:30 rmk Exp $
  *
  */
 #include <linux/config.h>
@@ -866,7 +866,7 @@ static int __init sa1100_serial_init(void)
 {
 	int ret;
 
-	printk(KERN_INFO "Serial: SA11x0 driver $Revision: 1.41 $\n");
+	printk(KERN_INFO "Serial: SA11x0 driver $Revision: 1.42 $\n");
 
 	sa1100_init_ports();
 	ret = uart_register_driver(&sa1100_reg);
@@ -895,5 +895,5 @@ module_exit(sa1100_serial_exit);
 EXPORT_NO_SYMBOLS;
 
 MODULE_AUTHOR("Deep Blue Solutions Ltd");
-MODULE_DESCRIPTION("SA1100 generic serial port driver $Revision: 1.41 $");
+MODULE_DESCRIPTION("SA1100 generic serial port driver $Revision: 1.42 $");
 MODULE_LICENSE("GPL");

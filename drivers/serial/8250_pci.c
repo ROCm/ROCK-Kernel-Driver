@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/char/serial_8250_pci.c
+ *  linux/drivers/char/8250_pci.c
  *
  *  Probe module for 8250/16550-type PCI serial ports.
  *
@@ -11,7 +11,7 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License.
  *
- *  $Id: serial_8250_pci.c,v 1.18 2002/03/10 22:32:08 rmk Exp $
+ *  $Id: 8250_pci.c,v 1.19 2002/07/21 21:32:30 rmk Exp $
  */
 #include <linux/module.h>
 #include <linux/init.h>
@@ -31,7 +31,7 @@
 #include <asm/byteorder.h>
 #include <asm/serial.h>
 
-#include "serial_8250.h"
+#include "8250.h"
 
 
 #ifndef IS_PCI_REGION_IOPORT

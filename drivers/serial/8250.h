@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/char/serial_8250.h
+ *  linux/drivers/char/8250.h
  *
  *  Driver for 8250/16550-type serial ports
  *
@@ -12,7 +12,7 @@
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
- *  $Id: serial_8250.h,v 1.7 2002/07/06 16:24:46 rmk Exp $
+ *  $Id: 8250.h,v 1.8 2002/07/21 21:32:30 rmk Exp $
  */
 
 #include <linux/config.h>

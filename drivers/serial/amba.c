@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/char/serial_amba.c
+ *  linux/drivers/char/amba.c
  *
  *  Driver for AMBA serial ports
  *
@@ -22,7 +22,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- *  $Id: serial_amba.c,v 1.35 2002/07/21 08:57:55 rmk Exp $
+ *  $Id: amba.c,v 1.36 2002/07/21 21:32:30 rmk Exp $
  *
  * This is a generic driver for ARM AMBA-type serial ports.  They
  * have a lot of 16550-like features, but are not register compatable.
@@ -751,7 +751,7 @@ static int __init ambauart_init(void)
 {
 	int ret;
 
-	printk(KERN_INFO "Serial: AMBA driver $Revision: 1.35 $\n");
+	printk(KERN_INFO "Serial: AMBA driver $Revision: 1.36 $\n");
 
 	ret = uart_register_driver(&amba_reg);
 	if (ret == 0) {
@@ -779,5 +779,5 @@ module_exit(ambauart_exit);
 EXPORT_NO_SYMBOLS;
 
 MODULE_AUTHOR("ARM Ltd/Deep Blue Solutions Ltd");
-MODULE_DESCRIPTION("ARM AMBA serial port driver $Revision: 1.35 $");
+MODULE_DESCRIPTION("ARM AMBA serial port driver $Revision: 1.36 $");
 MODULE_LICENSE("GPL");
