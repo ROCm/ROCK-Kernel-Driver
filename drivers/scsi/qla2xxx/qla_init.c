@@ -4116,6 +4116,10 @@ qla2x00_abort_isp(scsi_qla_host_t *ha)
 			atomic_set(&ha->loop_state, LOOP_DOWN);
 			atomic_set(&ha->loop_down_timer, LOOP_DOWN_TIME);
 			qla2x00_mark_all_devices_lost(ha);
+		} else {
+			if (!atomic_read(&ha->loop_down_timer))
+				atomic_set(&ha->loop_down_timer,
+				    LOOP_DOWN_TIME);
 		}
 
 		spin_lock_irqsave(&ha->hardware_lock, flags);
