@@ -70,12 +70,6 @@ Version 0.1:
 */
 
 #include "atmsar.h"
-#include <linux/module.h>
-#include <linux/init.h>
-
-#define DRIVER_AUTHOR "Johan Verrept, Johan.Verrept@advalvas.be"
-#define DRIVER_DESC "General SAR library for ATM devices"
-#define DRIVER_VERSION "0.2.4A"
 
 /***********************
  **
@@ -693,28 +687,3 @@ struct sk_buff *atmsar_decode_aal5 (struct atmsar_vcc_data *ctx, struct sk_buff 
 	PDEBUG ("atmsar_decode_aal5 returns pdu 0x%p with length %d\n", skb, skb->len);
 	return skb;
 };
-
-
-static int start (void)
-{
-	return 0;
-}
-
-static void cleanup (void)
-{
-}
-
-module_init (start);
-module_exit (cleanup);
-
-EXPORT_SYMBOL (atmsar_open);
-EXPORT_SYMBOL (atmsar_close);
-EXPORT_SYMBOL (atmsar_encode_rawcell);
-EXPORT_SYMBOL (atmsar_encode_aal5);
-EXPORT_SYMBOL (atmsar_decode_rawcell);
-EXPORT_SYMBOL (atmsar_decode_aal5);
-EXPORT_SYMBOL (atmsar_alloc_tx);
-
-MODULE_AUTHOR (DRIVER_AUTHOR);
-MODULE_DESCRIPTION (DRIVER_DESC);
-MODULE_LICENSE ("GPL");
