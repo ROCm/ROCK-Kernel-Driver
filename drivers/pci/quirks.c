@@ -873,9 +873,9 @@ static void __init quirk_usb_disable_smm_bios(struct pci_dev *pdev)
 		iounmap(base);
 	}
 }
-#endif
 
 DECLARE_PCI_FIXUP_FINAL(PCI_ANY_ID,	PCI_ANY_ID,	quirk_usb_disable_smm_bios);
+#endif
 
 /*
  * SiS 96x south bridge: BIOS typically hides SMBus device...
