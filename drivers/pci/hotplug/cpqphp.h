@@ -766,7 +766,6 @@ static inline int wait_for_ctrl_irq (struct controller *ctrl)
 	set_current_state(TASK_INTERRUPTIBLE);
 	/* Sleep for up to 1 second to wait for the LED to change. */
 	schedule_timeout(1*HZ);
-	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&ctrl->queue, &wait);
 	if (signal_pending(current))
 		retval =  -EINTR;

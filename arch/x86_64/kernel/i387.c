@@ -138,12 +138,3 @@ int dump_task_fpu(struct task_struct *tsk, struct user_i387_struct *fpu)
 }
 	return fpvalid;
 }
-
-#ifdef CONFIG_SMP
-void dump_smp_unlazy_fpu(void)
-{
-	unlazy_fpu(current);
-	return;
-}
-#endif
-

@@ -8,6 +8,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <asm/io.h>
 
 /* Copies a block of memory to a device in an efficient manner.
@@ -457,3 +458,10 @@ void outsl (unsigned long port, const void *src, unsigned long count)
 		break;
 	}
 }
+
+EXPORT_SYMBOL(insb);
+EXPORT_SYMBOL(insw);
+EXPORT_SYMBOL(insl);
+EXPORT_SYMBOL(outsb);
+EXPORT_SYMBOL(outsw);
+EXPORT_SYMBOL(outsl);

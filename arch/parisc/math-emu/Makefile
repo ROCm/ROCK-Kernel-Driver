@@ -2,6 +2,11 @@
 # Makefile for the linux/parisc floating point code
 #
 
+# See arch/parisc/math-emu/README
+CFLAGS += -Wno-parentheses -Wno-implicit-function-declaration \
+	-Wno-uninitialized -Wno-strict-prototypes -Wno-return-type \
+	-Wno-implicit-int
+
 obj-y	 := frnd.o driver.o decode_exc.o fpudispatch.o denormal.o \
 		dfmpy.o sfmpy.o sfsqrt.o dfsqrt.o dfadd.o fmpyfadd.o \
 		sfadd.o dfsub.o sfsub.o fcnvfxt.o fcnvff.o fcnvxf.o \

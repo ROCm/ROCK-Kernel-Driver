@@ -198,6 +198,8 @@ static inline int _snd_magic_bad(void *obj, unsigned long magic)
 #define vx_pipe_t_magic				0xa15a4112
 #define azf3328_t_magic				0xa15a4200
 
+#define snd_card_harmony_t_magic		0xa15a4300
+
 #else
 
 #define snd_magic_kcalloc(type, extra, flags) (type *) snd_kcalloc(sizeof(type) + extra, flags)

@@ -193,6 +193,7 @@ void disable_irq(int irq)
 	else
 		BUG();
 }
+EXPORT_SYMBOL(disable_irq);
 
 void enable_irq(int irq)
 {
@@ -208,6 +209,7 @@ void enable_irq(int irq)
 	else
 		BUG();
 }
+EXPORT_SYMBOL(enable_irq);
 
 int show_interrupts(struct seq_file *p, void *v)
 {
@@ -698,6 +700,7 @@ void synchronize_irq(unsigned int irqnum)
 {
 	while (in_irq()) ;
 }
+EXPORT_SYMBOL(synchronize_irq);
 #endif
 
 
@@ -847,6 +850,7 @@ unsigned int probe_irq_mask(unsigned long irqs)
 {
 	return 0;
 }
+EXPORT_SYMBOL(probe_irq_mask);
 
 void __init init_IRQ(void)
 {

@@ -1859,15 +1859,6 @@ static void __devexit vlsi_irda_remove(struct pci_dev *pdev)
  * otherwise we might get cheated by pci-pm.
  */
 
-static int vlsi_irda_save_state(struct pci_dev *pdev, u32 state)
-{
-	if (state < 1 || state > 3 ) {
-		ERROR("%s - %s: invalid pm state request: %u\n",
-			__FUNCTION__, PCIDEV_NAME(pdev), state);
-		return -1;
-	}
-	return 0;
-}
 
 static int vlsi_irda_suspend(struct pci_dev *pdev, u32 state)
 {
@@ -1970,7 +1961,6 @@ static struct pci_driver vlsi_irda_driver = {
 	.probe		= vlsi_irda_probe,
 	.remove		= __devexit_p(vlsi_irda_remove),
 #ifdef CONFIG_PM
-	.save_state	= vlsi_irda_save_state,
 	.suspend	= vlsi_irda_suspend,
 	.resume		= vlsi_irda_resume,
 #endif

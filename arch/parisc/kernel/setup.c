@@ -43,6 +43,7 @@
 #include <asm/led.h>
 #include <asm/machdep.h>	/* for pa7300lc_init() proto */
 #include <asm/pdc_chassis.h>
+#include <asm/io.h>
 
 #define COMMAND_LINE_SIZE 1024
 char	saved_command_line[COMMAND_LINE_SIZE];
@@ -208,27 +209,32 @@ static void __init parisc_proc_mkdir(void)
                         proc_runway_root = proc_mkdir("bus/runway", 0);
                 }
                 break;
+	default:
+		/* FIXME: this was added to prevent the compiler 
+		 * complaining about missing pcx, pcxs and pcxt
+		 * I'm assuming they have neither gsc nor runway */
+		break;
 	}
 }
 
 static struct resource central_bus = {
 	.name	= "Central Bus",
-	.start	= (unsigned long)0xfffffffffff80000,
-	.end    = (unsigned long)0xfffffffffffaffff,
+	.start	= F_EXTEND(0xfff80000),
+	.end    = F_EXTEND(0xfffaffff),
 	.flags	= IORESOURCE_MEM,
 };
 
 static struct resource local_broadcast = {
 	.name	= "Local Broadcast",
-	.start	= (unsigned long)0xfffffffffffb0000,
-	.end	= (unsigned long)0xfffffffffffdffff,
+	.start	= F_EXTEND(0xfffb0000),
+	.end	= F_EXTEND(0xfffdffff),
 	.flags	= IORESOURCE_MEM,
 };
 
 static struct resource global_broadcast = {
 	.name	= "Global Broadcast",
-	.start	= (unsigned long)0xfffffffffffe0000,
-	.end	= (unsigned long)0xffffffffffffffff,
+	.start	= F_EXTEND(0xfffe0000),
+	.end	= F_EXTEND(0xffffffff),
 	.flags	= IORESOURCE_MEM,
 };
 

@@ -36,10 +36,18 @@
 #define current_text_addr() ({ void *pc; __asm__("\n\tblr 0,%0\n\tnop":"=r" (pc)); pc; })
 
 #define TASK_SIZE               (current->thread.task_size)
-#define DEFAULT_TASK_SIZE       (0xFFF00000UL)
-
 #define TASK_UNMAPPED_BASE      (current->thread.map_base)
-#define DEFAULT_MAP_BASE        (0x40000000UL)
+
+#define DEFAULT_TASK_SIZE32	(0xFFF00000UL)
+#define DEFAULT_MAP_BASE32	(0x40000000UL)
+
+#ifdef __LP64__
+#define DEFAULT_TASK_SIZE       (MAX_ADDRESS-0xf000000)
+#define DEFAULT_MAP_BASE        (0x200000000UL)
+#else
+#define DEFAULT_TASK_SIZE	DEFAULT_TASK_SIZE32
+#define DEFAULT_MAP_BASE	DEFAULT_MAP_BASE32
+#endif
 
 #ifndef __ASSEMBLY__
 
@@ -247,7 +255,17 @@ on downward growing arches, it looks like this:
  *
  * Note that the S/390 people took the easy way out and hacked their
  * GCC to make the stack grow downwards.
+ *
+ * Final Note: For entry from syscall, the W (wide) bit of the PSW
+ * is stuffed into the lowest bit of the user sp (%r30), so we fill
+ * it in here from the current->personality
  */
+
+#ifdef __LP64__
+#define USER_WIDE_MODE	(personality(current->personality) == PER_LINUX)
+#else
+#define USER_WIDE_MODE	0
+#endif
 
 #define start_thread(regs, new_pc, new_sp) do {		\
 	elf_addr_t *sp = (elf_addr_t *)new_sp;		\
@@ -266,12 +284,12 @@ on downward growing arches, it looks like this:
 	regs->sr[5] = spaceid;				\
 	regs->sr[6] = spaceid;				\
 	regs->sr[7] = spaceid;				\
-	regs->gr[ 0] = USER_PSW;                        \
+	regs->gr[ 0] = USER_PSW | (USER_WIDE_MODE ? PSW_W : 0); \
 	regs->fr[ 0] = 0LL;                            	\
 	regs->fr[ 1] = 0LL;                            	\
 	regs->fr[ 2] = 0LL;                            	\
 	regs->fr[ 3] = 0LL;                            	\
-	regs->gr[30] = ((unsigned long)sp + 63) &~ 63;	\
+	regs->gr[30] = (((unsigned long)sp + 63) &~ 63) | (USER_WIDE_MODE ? 1 : 0); \
 	regs->gr[31] = pc;				\
 							\
 	get_user(regs->gr[25], (argv - 1));		\
@@ -299,8 +317,6 @@ static inline unsigned long get_wchan(struct task_struct *p)
 #define KSTK_EIP(tsk)	((tsk)->thread.regs.iaoq[0])
 #define KSTK_ESP(tsk)	((tsk)->thread.regs.gr[30])
 
-#endif /* __ASSEMBLY__ */
-
 #ifdef  CONFIG_PA20
 #define ARCH_HAS_PREFETCH
 extern inline void prefetch(const void *addr)
@@ -316,5 +332,7 @@ extern inline void prefetchw(const void *addr)
 #endif
 
 #define cpu_relax()	barrier()
+
+#endif /* __ASSEMBLY__ */
 
 #endif /* __ASM_PARISC_PROCESSOR_H */

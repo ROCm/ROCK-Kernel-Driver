@@ -69,7 +69,7 @@ static int debug;
 
 static LIST_HEAD(pci_hotplug_slot_list);
 
-static struct subsystem hotplug_slots_subsys;
+struct subsystem pci_hotplug_slots_subsys;
 
 static ssize_t hotplug_slot_attr_show(struct kobject *kobj,
 		struct attribute *attr, char *buf)
@@ -104,7 +104,7 @@ static struct kobj_type hotplug_slot_ktype = {
 	.release = &hotplug_slot_release,
 };
 
-static decl_subsys(hotplug_slots, &hotplug_slot_ktype, NULL);
+decl_subsys(pci_hotplug_slots, &hotplug_slot_ktype, NULL);
 
 
 /* these strings match up with the values in pci_bus_speed */
@@ -534,7 +534,7 @@ int pci_hp_register (struct hotplug_slot *slot)
 		return -EINVAL;
 
 	strlcpy(slot->kobj.name, slot->name, KOBJ_NAME_LEN);
-	kobj_set_kset_s(slot, hotplug_slots_subsys);
+	kobj_set_kset_s(slot, pci_hotplug_slots_subsys);
 
 	/* this can fail if we have already registered a slot with the same name */
 	if (kobject_register(&slot->kobj)) {
@@ -629,8 +629,8 @@ static int __init pci_hotplug_init (void)
 {
 	int result;
 
-	kset_set_kset_s(&hotplug_slots_subsys, pci_bus_type.subsys);
-	result = subsystem_register(&hotplug_slots_subsys);
+	kset_set_kset_s(&pci_hotplug_slots_subsys, pci_bus_type.subsys);
+	result = subsystem_register(&pci_hotplug_slots_subsys);
 	if (result) {
 		err("Register subsys with error %d\n", result);
 		goto exit;
@@ -645,7 +645,7 @@ static int __init pci_hotplug_init (void)
 	goto exit;
 	
 err_subsys:
-	subsystem_unregister(&hotplug_slots_subsys);
+	subsystem_unregister(&pci_hotplug_slots_subsys);
 exit:
 	return result;
 }
@@ -653,7 +653,7 @@ exit:
 static void __exit pci_hotplug_exit (void)
 {
 	cpci_hotplug_exit();
-	subsystem_unregister(&hotplug_slots_subsys);
+	subsystem_unregister(&pci_hotplug_slots_subsys);
 }
 
 module_init(pci_hotplug_init);
@@ -665,6 +665,7 @@ MODULE_LICENSE("GPL");
 MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "Debugging mode enabled or not");
 
+EXPORT_SYMBOL_GPL(pci_hotplug_slots_subsys);
 EXPORT_SYMBOL_GPL(pci_hp_register);
 EXPORT_SYMBOL_GPL(pci_hp_deregister);
 EXPORT_SYMBOL_GPL(pci_hp_change_slot_info);

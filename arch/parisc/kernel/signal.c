@@ -25,6 +25,8 @@
 #include <linux/unistd.h>
 #include <linux/stddef.h>
 #include <linux/compat.h>
+#include <linux/elf.h>
+#include <linux/personality.h>
 #include <asm/ucontext.h>
 #include <asm/rt_sigframe.h>
 #include <asm/uaccess.h>
@@ -41,8 +43,11 @@
 
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
 
-/* Use this to get at 32-bit user passed pointers. 
- *    See sys_sparc32.c for description about these. */
+/* gcc will complain if a pointer is cast to an integer of different
+ * size.  If you really need to do this (and we do for an ELF32 user
+ * application in an ELF64 kernel) then you have to do a cast to an
+ * integer of the same size first.  The A() macro accomplishes
+ * this. */
 #define A(__x)	((unsigned long)(__x))
 
 int do_signal(sigset_t *oldset, struct pt_regs *regs, int in_syscall);
@@ -166,11 +171,17 @@ sys_rt_sigreturn(struct pt_regs *regs, int in_syscall)
 	struct rt_sigframe *frame;
 	struct siginfo si;
 	sigset_t set;
-	unsigned long usp = regs->gr[30];
+	unsigned long usp = (regs->gr[30] & ~(0x01UL));
+	unsigned long sigframe_size = PARISC_RT_SIGFRAME_SIZE;
+#ifdef __LP64__
+	if(personality(current->personality) == PER_LINUX32)
+		sigframe_size = PARISC_RT_SIGFRAME_SIZE32;
+#endif
+
 
 	/* Unwind the user stack to get the rt_sigframe structure. */
 	frame = (struct rt_sigframe *)
-		(usp - PARISC_RT_SIGFRAME_SIZE);
+		(usp - sigframe_size);
 	DBG(("in sys_rt_sigreturn, frame is %p\n", frame));
 
 	if (__copy_from_user(&set, &frame->uc.uc_sigmask, sizeof(set)))
@@ -271,11 +282,12 @@ setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	       sigset_t *set, struct pt_regs *regs, int in_syscall)
 {
 	struct rt_sigframe *frame;
-	unsigned long rp, usp, haddr;
+	unsigned long rp, usp;
+	unsigned long haddr, sigframe_size;
 	struct siginfo si;
 	int err = 0;
 
-	usp = regs->gr[30];
+	usp = (regs->gr[30] & ~(0x01UL));
 	frame = get_sigframe(ka, usp, sizeof(*frame));
 
 	DBG(("setup_rt_frame 1: frame %p info %p\n", frame, info));
@@ -308,64 +320,86 @@ setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	}
 #endif
 
-#undef CACHE_FLUSHING_IS_NOT_BROKEN
-#ifdef CACHE_FLUSHING_IS_NOT_BROKEN
+	flush_user_dcache_range((unsigned long) &frame->tramp[0],
+			   (unsigned long) &frame->tramp[4]);
 	flush_user_icache_range((unsigned long) &frame->tramp[0],
 			   (unsigned long) &frame->tramp[4]);
-#else
-	/* It should *always* be cache line-aligned, but the compiler
-	sometimes screws up. */
-	asm volatile("fdc 0(%%sr3,%0)\n\t"
-		     "fdc %1(%%sr3,%0)\n\t"
-		     "sync\n\t"
-		     "fic 0(%%sr3,%0)\n\t"
-		     "fic %1(%%sr3,%0)\n\t"
-		     "sync\n\t"
-		      : : "r" (frame->tramp), "r" (L1_CACHE_BYTES));
-#endif
 
 	rp = (unsigned long) frame->tramp;
 
 	if (err)
 		goto give_sigsegv;
 
-/* Much more has to happen with signals than this -- but it'll at least */
-/* provide a pointer to some places which definitely need a look. */
-#define HACK u32
+	haddr = A(ka->sa.sa_handler);
+	/* The sa_handler may be a pointer to a function descriptor */
+#ifdef __LP64__
+	if(personality(current->personality) == PER_LINUX32) {
+#endif
+		if (haddr & PA_PLABEL_FDESC) {
+			Elf32_Fdesc fdesc;
+			Elf32_Fdesc *ufdesc = (Elf32_Fdesc *)A(haddr & ~3);
 
-	haddr = (HACK)A(ka->sa.sa_handler);
-	/* ARGH!  Fucking brain damage.  You don't want to know. */
-	if (haddr & 2) {
-		HACK *plabel;
-		HACK ltp;
+			err = __copy_from_user(&fdesc, ufdesc, sizeof(fdesc));
 
-		plabel = (HACK *) (haddr & ~3);
-		err |= __get_user(haddr, plabel);
-		err |= __get_user(ltp, plabel + 1);
+			if (err)
+				goto give_sigsegv;
+
+			haddr = fdesc.addr;
+			regs->gr[19] = fdesc.gp;
+		}
+#ifdef __LP64__
+	} else {
+		Elf64_Fdesc fdesc;
+		Elf64_Fdesc *ufdesc = (Elf64_Fdesc *)A(haddr & ~3);
+		
+		err = __copy_from_user(&fdesc, ufdesc, sizeof(fdesc));
+		
 		if (err)
 			goto give_sigsegv;
-		regs->gr[19] = ltp;
+		
+		haddr = fdesc.addr;
+		regs->gr[19] = fdesc.gp;
+		DBG(("64 bit signal, exe=%#lx, r19=%#lx, in_syscall=%d\n",
+		     haddr, regs->gr[19], in_syscall));
 	}
+#endif
 
 	/* The syscall return path will create IAOQ values from r31.
 	 */
-	if (in_syscall)
-		regs->gr[31] = (HACK) haddr;
-	else {
-		regs->gr[0] = USER_PSW;
-		regs->iaoq[0] = (HACK) haddr | 3;
+	sigframe_size = PARISC_RT_SIGFRAME_SIZE;
+#ifdef __LP64__
+	if(personality(current->personality) == PER_LINUX32)
+		sigframe_size = PARISC_RT_SIGFRAME_SIZE32;
+#endif
+	if (in_syscall) {
+		regs->gr[31] = haddr;
+#ifdef __LP64__
+		if(personality(current->personality) == PER_LINUX)
+			sigframe_size |= 1;
+#endif
+	} else {
+		unsigned long psw = USER_PSW;
+#ifdef __LP64__
+		if(personality(current->personality) == PER_LINUX)
+			psw |= PSW_W;
+#endif
+
+		regs->gr[0] = psw;
+		regs->iaoq[0] = haddr | 3;
 		regs->iaoq[1] = regs->iaoq[0] + 4;
 	}
 
 	regs->gr[2]  = rp;                /* userland return pointer */
 	regs->gr[26] = sig;               /* signal number */
-	regs->gr[25] = (HACK)A(&frame->info); /* siginfo pointer */
-	regs->gr[24] = (HACK)A(&frame->uc);   /* ucontext pointer */
+	regs->gr[25] = A(&frame->info); /* siginfo pointer */
+	regs->gr[24] = A(&frame->uc);   /* ucontext pointer */
+	
 	DBG(("making sigreturn frame: %#lx + %#x = %#lx\n",
-	       regs->gr[30], PARISC_RT_SIGFRAME_SIZE,
-	       regs->gr[30] + PARISC_RT_SIGFRAME_SIZE));
+	       regs->gr[30], sigframe_size,
+	       regs->gr[30] + sigframe_size));
 	/* Raise the user stack pointer to make a proper call frame. */
-	regs->gr[30] = ((HACK)A(frame) + PARISC_RT_SIGFRAME_SIZE);
+	regs->gr[30] = (A(frame) + sigframe_size);
+
 
 	DBG(("SIG deliver (%s:%d): frame=0x%p sp=%#lx iaoq=%#lx/%#lx rp=%#lx\n",
 	       current->comm, current->pid, frame, regs->gr[30],

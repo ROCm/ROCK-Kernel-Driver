@@ -530,11 +530,6 @@ static struct pci_driver superio_driver = {
 
 static int __init superio_modinit(void)
 {
-#ifdef CONFIG_SERIAL_8250
-	extern int serial8250_init(void);
-	serial8250_init();
-#endif
-
 	return pci_module_init(&superio_driver);
 }
 
@@ -543,5 +538,10 @@ static void __exit superio_exit(void)
 	pci_unregister_driver(&superio_driver);
 }
 
-module_init(superio_modinit);
+/* Make late initcall to ensure the serial and tty layers are initialised
+ * before we start superio.
+ *
+ * FIXME: does this break the superio console?
+ */
+late_initcall(superio_modinit);
 module_exit(superio_exit);
