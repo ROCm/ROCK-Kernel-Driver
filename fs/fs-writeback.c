@@ -61,6 +61,12 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 			sb->s_op->dirty_inode(inode);
 	}
 
+	/*
+	 * make sure that changes are seen by all cpus before we test i_state
+	 * -- mikulas
+	 */
+	smp_mb();
+
 	/* avoid the locking if we can */
 	if ((inode->i_state & flags) == flags)
 		return;
@@ -136,6 +142,12 @@ __sync_single_inode(struct inode *inode, struct writeback_control *wbc)
 	dirty = inode->i_state & I_DIRTY;
 	inode->i_state |= I_LOCK;
 	inode->i_state &= ~I_DIRTY;
+
+	/*
+	 * smp_rmb(); note: if you remove write_lock below, you must add this.
+	 * mark_inode_dirty doesn't take spinlock, make sure that inode is not
+	 * read speculatively by this cpu before &= ~I_DIRTY  -- mikulas
+	 */
 
 	write_lock(&mapping->page_lock);
 	if (wait || !wbc->for_kupdate || list_empty(&mapping->io_pages))
