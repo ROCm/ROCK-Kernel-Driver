@@ -40,10 +40,10 @@
 
 extern struct xfsstats xfsstats;
 
-STATIC ulong xfs_min[XFS_PARAM] = { 0, 0, 0, 0 };
-STATIC ulong xfs_max[XFS_PARAM] = { 1, 1, 1, 1 };
+STATIC ulong xfs_min[XFS_PARAM] = { 0, 0, 0, 0, 0 };
+STATIC ulong xfs_max[XFS_PARAM] = { 1, 1, 1, 1, 127 };
 
-xfs_param_t xfs_params = { 0, 1, 0, 0 };
+xfs_param_t xfs_params = { 0, 1, 0, 0, 0 };
 
 static struct ctl_table_header *xfs_table_header;
 
@@ -89,6 +89,10 @@ STATIC ctl_table xfs_table[] = {
 	{XFS_SYMLINK_MODE, "irix_symlink_mode", &xfs_params.symlink_mode,
 	sizeof(ulong), 0644, NULL, &proc_doulongvec_minmax,
 	&sysctl_intvec, NULL, &xfs_min[5], &xfs_max[5]},
+
+	{XFS_PANIC_MASK, "panic_mask", &xfs_params.panic_mask,
+	sizeof(ulong), 0644, NULL, &proc_doulongvec_minmax,
+	&sysctl_intvec, NULL, &xfs_min[6], &xfs_max[6]},
 
 	{0}
 };
