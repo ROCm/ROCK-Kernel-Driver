@@ -62,7 +62,7 @@ typedef unsigned long  ulg;
 
          /* functions */
 
-typedef uLong (ZEXPORT *check_func) OF((uLong check, const Byte *buf,
+typedef uLong (*check_func) OF((uLong check, const Byte *buf,
 				       uInt len));
 
 
