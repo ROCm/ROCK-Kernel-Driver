@@ -149,11 +149,11 @@ static int __cleanup_transaction(journal_t *journal, transaction_t *transaction)
 		 * BUF_CLEAN.
 		 */
 		/*
-		 * AKPM: I think the buffer_jdirty test is redundant - it
+		 * AKPM: I think the buffer_jbddirty test is redundant - it
 		 * shouldn't have NULL b_transaction?
 		 */
 		next_jh = jh->b_cpnext;
-		if (!buffer_dirty(bh) && !buffer_jdirty(bh)) {
+		if (!buffer_dirty(bh) && !buffer_jbddirty(bh)) {
 			BUFFER_TRACE(bh, "remove from checkpoint");
 			__journal_remove_checkpoint(jh);
 			__journal_remove_journal_head(bh);
@@ -528,7 +528,7 @@ void __journal_insert_checkpoint(struct journal_head *jh,
 			       transaction_t *transaction)
 {
 	JBUFFER_TRACE(jh, "entry");
-	J_ASSERT_JH(jh, buffer_dirty(jh2bh(jh)) || buffer_jdirty(jh2bh(jh)));
+	J_ASSERT_JH(jh, buffer_dirty(jh2bh(jh)) || buffer_jbddirty(jh2bh(jh)));
 	J_ASSERT_JH(jh, jh->b_cp_transaction == NULL);
 
 	assert_spin_locked(&journal_datalist_lock);

@@ -117,38 +117,6 @@ static int journal_convert_superblock_v1(journal_t *, journal_superblock_t *);
 spinlock_t journal_datalist_lock = SPIN_LOCK_UNLOCKED;
 
 /*
- * jh_splice_lock needs explantion.
- *
- * In a number of places we want to do things like:
- *
- *	if (buffer_jbd(bh) && bh2jh(bh)->foo)
- *
- * This is racy on SMP, because another CPU could remove the journal_head
- * in the middle of this expression.  We need locking.
- *
- * But we can greatly optimise the locking cost by testing BH_JBD
- * outside the lock.  So, effectively:
- *
- *	ret = 0;
- *	if (buffer_jbd(bh)) {
- *		spin_lock(&jh_splice_lock);
- *		if (buffer_jbd(bh)) {	 (* Still there? *)
- *			ret = bh2jh(bh)->foo;
- *		}
- *		spin_unlock(&jh_splice_lock);
- *	}
- *	return ret;
- *
- * Now, that protects us from races where another CPU can remove the
- * journal_head.  But it doesn't defend us from the situation where another
- * CPU can *add* a journal_head.  This is a correctness issue.  But it's not
- * a problem because a) the calling code was *already* racy and b) it often
- * can't happen at the call site and c) the places where we add journal_heads
- * tend to be under external locking.
- */
-spinlock_t jh_splice_lock = SPIN_LOCK_UNLOCKED;
-
-/*
  * List of all journals in the system.  Protected by the BKL.
  */
 static LIST_HEAD(all_journals);
@@ -404,7 +372,7 @@ int journal_write_metadata_buffer(transaction_t *transaction,
 	 * also part of a shared mapping, and another thread has
 	 * decided to launch a writepage() against this buffer.
 	 */
-	J_ASSERT_JH(jh_in, buffer_jdirty(jh2bh(jh_in)));
+	J_ASSERT_JH(jh_in, buffer_jbddirty(jh2bh(jh_in)));
 
 	/*
 	 * If a new transaction has already done a buffer copy-out, then
@@ -1761,16 +1729,10 @@ struct journal_head *journal_add_journal_head(struct buffer_head *bh)
 			journal_free_journal_head(jh);
 			jh = bh->b_private;
 		} else {
-			/*
-			 * We actually don't need jh_splice_lock when
-			 * adding a journal_head - only on removal.
-			 */
-			spin_lock(&jh_splice_lock);
 			set_bit(BH_JBD, &bh->b_state);
 			bh->b_private = jh;
 			jh->b_bh = bh;
 			atomic_inc(&bh->b_count);
-			spin_unlock(&jh_splice_lock);
 			BUFFER_TRACE(bh, "added journal_head");
 		}
 	}
@@ -1808,12 +1770,10 @@ void __journal_remove_journal_head(struct buffer_head *bh)
 			J_ASSERT_BH(bh, buffer_jbd(bh));
 			J_ASSERT_BH(bh, jh2bh(jh) == bh);
 			BUFFER_TRACE(bh, "remove journal_head");
-			spin_lock(&jh_splice_lock);
 			bh->b_private = NULL;
 			jh->b_bh = NULL;	/* debug, really */
 			clear_bit(BH_JBD, &bh->b_state);
 			__brelse(bh);
-			spin_unlock(&jh_splice_lock);
 			journal_free_journal_head(jh);
 		} else {
 			BUFFER_TRACE(bh, "journal_head was locked");

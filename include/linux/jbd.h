@@ -1084,50 +1084,6 @@ extern int jbd_blocks_per_page(struct inode *inode);
 
 #ifdef __KERNEL__
 
-extern spinlock_t jh_splice_lock;
-/*
- * Once `expr1' has been found true, take jh_splice_lock
- * and then reevaluate everything.
- */
-#define SPLICE_LOCK(expr1, expr2)				\
-	({							\
-		int ret = (expr1);				\
-		if (ret) {					\
-			spin_lock(&jh_splice_lock);		\
-			ret = (expr1) && (expr2);		\
-			spin_unlock(&jh_splice_lock);		\
-		}						\
-		ret;						\
-	})
-
-/*
- * A number of buffer state predicates.  They test for
- * buffer_jbd() because they are used in core kernel code.
- *
- * These will be racy on SMP unless we're *sure* that the
- * buffer won't be detached from the journalling system
- * in parallel.
- */
-
-/* Return true if the buffer is on journal list `list' */
-static inline int buffer_jlist_eq(struct buffer_head *bh, int list)
-{
-	return SPLICE_LOCK(buffer_jbd(bh), bh2jh(bh)->b_jlist == list);
-}
-
-/* Return true if this bufer is dirty wrt the journal */
-static inline int buffer_jdirty(struct buffer_head *bh)
-{
-	return buffer_jbd(bh) && buffer_jbddirty(bh);
-}
-
-/* Return true if it's a data buffer which journalling is managing */
-static inline int buffer_jbd_data(struct buffer_head *bh)
-{
-	return SPLICE_LOCK(buffer_jbd(bh),
-			bh2jh(bh)->b_jlist == BJ_SyncData);
-}
-
 #ifdef CONFIG_SMP
 #define assert_spin_locked(lock)	J_ASSERT(spin_is_locked(lock))
 #else
@@ -1155,7 +1111,6 @@ static inline int buffer_jbd_data(struct buffer_head *bh)
 #define J_ASSERT(expr)			do {} while (0)
 #define J_ASSERT_BH(bh, expr)		do {} while (0)
 #define buffer_jbd(bh)			0
-#define buffer_jlist_eq(bh, val)	0
 #define journal_buffer_journal_lru(bh)	0
 
 #endif	/* defined(__KERNEL__) && !defined(CONFIG_JBD) */

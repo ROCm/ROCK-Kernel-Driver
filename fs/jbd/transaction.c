@@ -1131,7 +1131,7 @@ void journal_release_buffer (handle_t *handle, struct buffer_head *bh)
 
 	spin_lock(&journal_datalist_lock);
 	if (jh->b_jlist == BJ_Reserved && jh->b_transaction == transaction &&
-	    !buffer_jdirty(jh2bh(jh))) {
+	    !buffer_jbddirty(jh2bh(jh))) {
 		JBUFFER_TRACE(jh, "unused: refiling it");
 		handle->h_buffer_credits++;
 		__journal_refile_buffer(jh);
@@ -1850,7 +1850,7 @@ static int journal_unmap_buffer(journal_t *journal, struct buffer_head *bh)
 
 zap_buffer:	
 	clear_buffer_dirty(bh);
-	J_ASSERT_BH(bh, !buffer_jdirty(bh));
+	J_ASSERT_BH(bh, !buffer_jbddirty(bh));
 	clear_buffer_mapped(bh);
 	clear_buffer_req(bh);
 	clear_buffer_new(bh);

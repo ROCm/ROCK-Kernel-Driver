@@ -497,7 +497,7 @@ start_journal_io:
 		jh = commit_transaction->t_shadow_list->b_tprev;
 		bh = jh2bh(jh);
 		clear_bit(BH_JWrite, &bh->b_state);
-		J_ASSERT_BH(bh, buffer_jdirty(bh));
+		J_ASSERT_BH(bh, buffer_jbddirty(bh));
 
 		/* The metadata is now released for reuse, but we need
                    to remember it against this transaction so that when
@@ -682,7 +682,7 @@ skip_commit: /* The journal should be unlocked by now. */
 			clear_buffer_jbddirty(bh);
 		}
 			
-		if (buffer_jdirty(bh)) {
+		if (buffer_jbddirty(bh)) {
 			JBUFFER_TRACE(jh, "add to new checkpointing trans");
 			__journal_insert_checkpoint(jh, commit_transaction);
 			JBUFFER_TRACE(jh, "refile for checkpoint writeback");
