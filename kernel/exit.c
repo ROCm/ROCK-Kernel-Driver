@@ -66,8 +66,12 @@ static void release_task(struct task_struct * p)
 	atomic_dec(&p->user->processes);
 	security_ops->task_free_security(p);
 	free_uid(p->user);
-	BUG_ON(p->ptrace || !list_empty(&p->ptrace_list) ||
-					!list_empty(&p->ptrace_children));
+	if (unlikely(p->ptrace)) {
+		write_lock_irq(&tasklist_lock);
+		__ptrace_unlink(p);
+		write_unlock_irq(&tasklist_lock);
+	}
+	BUG_ON(!list_empty(&p->ptrace_list) || !list_empty(&p->ptrace_children));
 	unhash_process(p);
 
 	release_thread(p);
@@ -428,7 +432,7 @@ static inline void forget_original_parent(struct task_struct * father)
 	 * There are only two places where our children can be:
 	 *
 	 * - in our child list
-	 * - in the global ptrace list
+	 * - in our ptraced child list
 	 *
 	 * Search them and reparent children.
 	 */
@@ -443,14 +447,22 @@ static inline void forget_original_parent(struct task_struct * father)
 	read_unlock(&tasklist_lock);
 }
 
-static inline void zap_thread(task_t *p, task_t *father)
+static inline void zap_thread(task_t *p, task_t *father, int traced)
 {
-	ptrace_unlink(p);
-	list_del_init(&p->sibling);
-	p->ptrace = 0;
+	/* If we were tracing the thread, release it; otherwise preserve the
+	   ptrace links.  */
+	if (unlikely(traced)) {
+		task_t *trace_task = p->parent;
+		__ptrace_unlink(p);
+		p->ptrace = 1;
+		__ptrace_link(p, trace_task);
+	} else {
+		p->ptrace = 0;
+		list_del_init(&p->sibling);
+		p->parent = p->real_parent;
+		list_add_tail(&p->sibling, &p->parent->children);
+	}
 
-	p->parent = p->real_parent;
-	list_add_tail(&p->sibling, &p->parent->children);
 	if (p->state == TASK_ZOMBIE && p->exit_signal != -1)
 		do_notify_parent(p, p->exit_signal);
 	/*
@@ -541,11 +553,11 @@ static void exit_notify(void)
 
 zap_again:
 	list_for_each_safe(_p, _n, &current->children)
-		zap_thread(list_entry(_p,struct task_struct,sibling), current);
+		zap_thread(list_entry(_p,struct task_struct,sibling), current, 0);
 	list_for_each_safe(_p, _n, &current->ptrace_children)
-		zap_thread(list_entry(_p,struct task_struct,ptrace_list), current);
+		zap_thread(list_entry(_p,struct task_struct,ptrace_list), current, 1);
 	/*
-	 * reparent_thread might drop the tasklist lock, thus we could
+	 * zap_thread might drop the tasklist lock, thus we could
 	 * have new children queued back from the ptrace list into the
 	 * child list:
 	 */
@@ -716,17 +728,11 @@ repeat:
 				retval = p->pid;
 				if (p->real_parent != p->parent) {
 					write_lock_irq(&tasklist_lock);
-					ptrace_unlink(p);
+					__ptrace_unlink(p);
 					do_notify_parent(p, SIGCHLD);
 					write_unlock_irq(&tasklist_lock);
-				} else {
-					if (p->ptrace) {
-						write_lock_irq(&tasklist_lock);
-						ptrace_unlink(p);
-						write_unlock_irq(&tasklist_lock);
-					}
+				} else
 					release_task(p);
-				}
 				goto end_wait4;
 			default:
 				continue;
