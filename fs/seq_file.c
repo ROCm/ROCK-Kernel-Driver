@@ -6,6 +6,7 @@
  */
 
 #include <linux/fs.h>
+#include <linux/module.h>
 #include <linux/seq_file.h>
 #include <linux/slab.h>
 
@@ -36,6 +37,8 @@ int seq_open(struct file *file, struct seq_operations *op)
 	file->private_data = p;
 	return 0;
 }
+
+EXPORT_SYMBOL(seq_open);
 
 /**
  *	seq_read -	->read() method for sequential files.
@@ -144,6 +147,8 @@ Efault:
 	goto Done;
 }
 
+EXPORT_SYMBOL(seq_read);
+
 static int traverse(struct seq_file *m, loff_t offset)
 {
 	loff_t pos = 0;
@@ -228,6 +233,8 @@ loff_t seq_lseek(struct file *file, loff_t offset, int origin)
 	return retval;
 }
 
+EXPORT_SYMBOL(seq_lseek);
+
 /**
  *	seq_release -	free the structures associated with sequential file.
  *	@file: file in question
@@ -243,6 +250,8 @@ int seq_release(struct inode *inode, struct file *file)
 	kfree(m);
 	return 0;
 }
+
+EXPORT_SYMBOL(seq_release);
 
 /**
  *	seq_escape -	print string into buffer, escaping some characters
@@ -279,6 +288,8 @@ int seq_escape(struct seq_file *m, const char *s, const char *esc)
         return 0;
 }
 
+EXPORT_SYMBOL(seq_escape);
+
 int seq_printf(struct seq_file *m, const char *f, ...)
 {
 	va_list args;
@@ -297,9 +308,11 @@ int seq_printf(struct seq_file *m, const char *f, ...)
 	return -1;
 }
 
+EXPORT_SYMBOL(seq_printf);
+
 int seq_path(struct seq_file *m,
-		struct vfsmount *mnt, struct dentry *dentry,
-		char *esc)
+	     struct vfsmount *mnt, struct dentry *dentry,
+	     char *esc)
 {
 	if (m->count < m->size) {
 		char *s = m->buf + m->count;
@@ -328,6 +341,8 @@ int seq_path(struct seq_file *m,
 	return -1;
 }
 
+EXPORT_SYMBOL(seq_path);
+
 static void *single_start(struct seq_file *p, loff_t *pos)
 {
 	return NULL + (*pos == 0);
@@ -343,7 +358,8 @@ static void single_stop(struct seq_file *p, void *v)
 {
 }
 
-int single_open(struct file *file, int (*show)(struct seq_file *, void*), void *data)
+int single_open(struct file *file, int (*show)(struct seq_file *, void *),
+		void *data)
 {
 	struct seq_operations *op = kmalloc(sizeof(*op), GFP_KERNEL);
 	int res = -ENOMEM;
@@ -362,6 +378,8 @@ int single_open(struct file *file, int (*show)(struct seq_file *, void*), void *
 	return res;
 }
 
+EXPORT_SYMBOL(single_open);
+
 int single_release(struct inode *inode, struct file *file)
 {
 	struct seq_operations *op = ((struct seq_file *)file->private_data)->op;
@@ -369,6 +387,8 @@ int single_release(struct inode *inode, struct file *file)
 	kfree(op);
 	return res;
 }
+
+EXPORT_SYMBOL(single_release);
 
 int seq_release_private(struct inode *inode, struct file *file)
 {
@@ -379,3 +399,4 @@ int seq_release_private(struct inode *inode, struct file *file)
 	return seq_release(inode, file);
 }
 
+EXPORT_SYMBOL(seq_release_private);

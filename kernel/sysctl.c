@@ -19,6 +19,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/mm.h>
 #include <linux/swap.h>
 #include <linux/slab.h>
@@ -1994,3 +1995,19 @@ void unregister_sysctl_table(struct ctl_table_header * table)
 }
 
 #endif /* CONFIG_SYSCTL */
+
+/*
+ * No sense putting this after each symbol definition, twice,
+ * exception granted :-)
+ */
+EXPORT_SYMBOL(proc_dointvec);
+EXPORT_SYMBOL(proc_dointvec_jiffies);
+EXPORT_SYMBOL(proc_dointvec_minmax);
+EXPORT_SYMBOL(proc_dostring);
+EXPORT_SYMBOL(proc_doulongvec_minmax);
+EXPORT_SYMBOL(proc_doulongvec_ms_jiffies_minmax);
+EXPORT_SYMBOL(register_sysctl_table);
+EXPORT_SYMBOL(sysctl_intvec);
+EXPORT_SYMBOL(sysctl_jiffies);
+EXPORT_SYMBOL(sysctl_string);
+EXPORT_SYMBOL(unregister_sysctl_table);

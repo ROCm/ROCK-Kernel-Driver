@@ -70,6 +70,8 @@ int set_blocksize(struct block_device *bdev, int size)
 	return 0;
 }
 
+EXPORT_SYMBOL(set_blocksize);
+
 int sb_set_blocksize(struct super_block *sb, int size)
 {
 	int bits;
@@ -82,6 +84,8 @@ int sb_set_blocksize(struct super_block *sb, int size)
 	return sb->s_blocksize;
 }
 
+EXPORT_SYMBOL(sb_set_blocksize);
+
 int sb_min_blocksize(struct super_block *sb, int size)
 {
 	int minsize = bdev_hardsect_size(sb->s_bdev);
@@ -89,6 +93,8 @@ int sb_min_blocksize(struct super_block *sb, int size)
 		size = minsize;
 	return sb_set_blocksize(sb, size);
 }
+
+EXPORT_SYMBOL(sb_min_blocksize);
 
 static int
 blkdev_get_block(struct inode *inode, sector_t iblock,
@@ -358,6 +364,8 @@ struct block_device *bdget(dev_t dev)
 	return bdev;
 }
 
+EXPORT_SYMBOL(bdget);
+
 long nr_blockdev_pages(void)
 {
 	struct list_head *p;
@@ -376,6 +384,8 @@ void bdput(struct block_device *bdev)
 {
 	iput(bdev->bd_inode);
 }
+
+EXPORT_SYMBOL(bdput);
  
 int bd_acquire(struct inode *inode)
 {
@@ -444,6 +454,8 @@ int bd_claim(struct block_device *bdev, void *holder)
 	return res;
 }
 
+EXPORT_SYMBOL(bd_claim);
+
 void bd_release(struct block_device *bdev)
 {
 	spin_lock(&bdev_lock);
@@ -453,6 +465,8 @@ void bd_release(struct block_device *bdev)
 		bdev->bd_holder = NULL;
 	spin_unlock(&bdev_lock);
 }
+
+EXPORT_SYMBOL(bd_release);
 
 /*
  * Tries to open block device by device number.  Use it ONLY if you
@@ -470,6 +484,8 @@ struct block_device *open_by_devnum(dev_t dev, unsigned mode, int kind)
 		err = blkdev_get(bdev, mode, flags, kind);
 	return err ? ERR_PTR(err) : bdev;
 }
+
+EXPORT_SYMBOL(open_by_devnum);
 
 /*
  * This routine checks whether a removable media has been changed,
@@ -499,6 +515,8 @@ int check_disk_change(struct block_device *bdev)
 		bdev->bd_invalidated = 1;
 	return 1;
 }
+
+EXPORT_SYMBOL(check_disk_change);
 
 static void bd_set_size(struct block_device *bdev, loff_t size)
 {
@@ -632,6 +650,8 @@ int blkdev_get(struct block_device *bdev, mode_t mode, unsigned flags, int kind)
 	return do_open(bdev, bdev->bd_inode, &fake_file);
 }
 
+EXPORT_SYMBOL(blkdev_get);
+
 int blkdev_open(struct inode * inode, struct file * filp)
 {
 	struct block_device *bdev;
@@ -661,6 +681,8 @@ int blkdev_open(struct inode * inode, struct file * filp)
 	blkdev_put(bdev, BDEV_FILE);
 	return res;
 }
+
+EXPORT_SYMBOL(blkdev_open);
 
 int blkdev_put(struct block_device *bdev, int kind)
 {
@@ -709,6 +731,8 @@ int blkdev_put(struct block_device *bdev, int kind)
 	bdput(bdev);
 	return ret;
 }
+
+EXPORT_SYMBOL(blkdev_put);
 
 int blkdev_close(struct inode * inode, struct file * filp)
 {
@@ -760,6 +784,8 @@ struct file_operations def_blk_fops = {
 	.sendfile	= generic_file_sendfile,
 };
 
+EXPORT_SYMBOL(def_blk_fops);
+
 int ioctl_by_bdev(struct block_device *bdev, unsigned cmd, unsigned long arg)
 {
 	int res;
@@ -769,6 +795,8 @@ int ioctl_by_bdev(struct block_device *bdev, unsigned cmd, unsigned long arg)
 	set_fs(old_fs);
 	return res;
 }
+
+EXPORT_SYMBOL(ioctl_by_bdev);
 
 /**
  * lookup_bdev  - lookup a struct block_device by name
@@ -854,6 +882,8 @@ blkdev_put:
 	return ERR_PTR(error);
 }
 
+EXPORT_SYMBOL(open_bdev_excl);
+
 /**
  * close_bdev_excl  -  release a blockdevice openen by open_bdev_excl()
  *
@@ -867,3 +897,5 @@ void close_bdev_excl(struct block_device *bdev, int kind)
 	bd_release(bdev);
 	blkdev_put(bdev, kind);
 }
+
+EXPORT_SYMBOL(close_bdev_excl);

@@ -195,6 +195,8 @@ void inode_init_once(struct inode *inode)
 	i_size_ordered_init(inode);
 }
 
+EXPORT_SYMBOL(inode_init_once);
+
 static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 {
 	struct inode * inode = (struct inode *) foo;
@@ -229,7 +231,6 @@ void __iget(struct inode * inode)
  * that the inode is no longer useful. We just
  * terminate it with extreme prejudice.
  */
- 
 void clear_inode(struct inode *inode)
 {
 	invalidate_inode_buffers(inode);
@@ -250,6 +251,8 @@ void clear_inode(struct inode *inode)
 		cd_forget(inode);
 	inode->i_state = I_CLEAR;
 }
+
+EXPORT_SYMBOL(clear_inode);
 
 /*
  * Dispose-list gets a local list with local inodes in it, so it doesn't
@@ -327,7 +330,6 @@ static int invalidate_list(struct list_head *head, struct super_block * sb, stru
  *	fails because there are busy inodes then a non zero value is returned.
  *	If the discard is successful all the inodes have been discarded.
  */
- 
 int invalidate_inodes(struct super_block * sb)
 {
 	int busy;
@@ -346,6 +348,8 @@ int invalidate_inodes(struct super_block * sb)
 
 	return busy;
 }
+
+EXPORT_SYMBOL(invalidate_inodes);
  
 int __invalidate_device(struct block_device *bdev, int do_sync)
 {
@@ -371,6 +375,8 @@ int __invalidate_device(struct block_device *bdev, int do_sync)
 	invalidate_bdev(bdev, 0);
 	return res;
 }
+
+EXPORT_SYMBOL(__invalidate_device);
 
 static int can_unuse(struct inode *inode)
 {
@@ -532,7 +538,6 @@ repeat:
  *
  *	Allocates a new inode for given superblock.
  */
- 
 struct inode *new_inode(struct super_block *sb)
 {
 	static unsigned long last_ino;
@@ -552,6 +557,8 @@ struct inode *new_inode(struct super_block *sb)
 	return inode;
 }
 
+EXPORT_SYMBOL(new_inode);
+
 void unlock_new_inode(struct inode *inode)
 {
 	/*
@@ -565,6 +572,7 @@ void unlock_new_inode(struct inode *inode)
 	inode->i_state &= ~(I_LOCK|I_NEW);
 	wake_up_inode(inode);
 }
+
 EXPORT_SYMBOL(unlock_new_inode);
 
 /*
@@ -685,7 +693,6 @@ static inline unsigned long hash(struct super_block *sb, unsigned long hashval)
  *	With a large number of inodes live on the file system this function
  *	currently becomes quite slow.
  */
- 
 ino_t iunique(struct super_block *sb, ino_t max_reserved)
 {
 	static ino_t counter;
@@ -709,6 +716,8 @@ retry:
 	
 }
 
+EXPORT_SYMBOL(iunique);
+
 struct inode *igrab(struct inode *inode)
 {
 	spin_lock(&inode_lock);
@@ -724,6 +733,8 @@ struct inode *igrab(struct inode *inode)
 	spin_unlock(&inode_lock);
 	return inode;
 }
+
+EXPORT_SYMBOL(igrab);
 
 /**
  * ifind - internal function, you want ilookup5() or iget5().
@@ -818,6 +829,7 @@ struct inode *ilookup5(struct super_block *sb, unsigned long hashval,
 
 	return ifind(sb, head, test, data);
 }
+
 EXPORT_SYMBOL(ilookup5);
 
 /**
@@ -840,6 +852,7 @@ struct inode *ilookup(struct super_block *sb, unsigned long ino)
 
 	return ifind_fast(sb, head, ino);
 }
+
 EXPORT_SYMBOL(ilookup);
 
 /**
@@ -880,6 +893,7 @@ struct inode *iget5_locked(struct super_block *sb, unsigned long hashval,
 	 */
 	return get_new_inode(sb, head, test, set, data);
 }
+
 EXPORT_SYMBOL(iget5_locked);
 
 /**
@@ -913,6 +927,7 @@ struct inode *iget_locked(struct super_block *sb, unsigned long ino)
 	 */
 	return get_new_inode_fast(sb, head, ino);
 }
+
 EXPORT_SYMBOL(iget_locked);
 
 /**
@@ -923,7 +938,6 @@ EXPORT_SYMBOL(iget_locked);
  *
  *	Add an inode to the inode hash for this superblock.
  */
- 
 void __insert_inode_hash(struct inode *inode, unsigned long hashval)
 {
 	struct hlist_head *head = inode_hashtable + hash(inode->i_sb, hashval);
@@ -932,19 +946,22 @@ void __insert_inode_hash(struct inode *inode, unsigned long hashval)
 	spin_unlock(&inode_lock);
 }
 
+EXPORT_SYMBOL(__insert_inode_hash);
+
 /**
  *	remove_inode_hash - remove an inode from the hash
  *	@inode: inode to unhash
  *
  *	Remove an inode from the superblock.
  */
- 
 void remove_inode_hash(struct inode *inode)
 {
 	spin_lock(&inode_lock);
 	hlist_del_init(&inode->i_hash);
 	spin_unlock(&inode_lock);
 }
+
+EXPORT_SYMBOL(remove_inode_hash);
 
 /*
  * Tell the filesystem that this inode is no longer of any interest and should
@@ -988,6 +1005,7 @@ void generic_delete_inode(struct inode *inode)
 		BUG();
 	destroy_inode(inode);
 }
+
 EXPORT_SYMBOL(generic_delete_inode);
 
 static void generic_forget_inode(struct inode *inode)
@@ -1059,7 +1077,6 @@ static inline void iput_final(struct inode *inode)
  *	Puts an inode, dropping its usage count. If the inode use count hits
  *	zero the inode is also then freed and may be destroyed.
  */
- 
 void iput(struct inode *inode)
 {
 	if (inode) {
@@ -1076,6 +1093,8 @@ void iput(struct inode *inode)
 	}
 }
 
+EXPORT_SYMBOL(iput);
+
 /**
  *	bmap	- find a block number in a file
  *	@inode: inode of file
@@ -1087,7 +1106,6 @@ void iput(struct inode *inode)
  *	disk block relative to the disk start that holds that block of the 
  *	file.
  */
- 
 sector_t bmap(struct inode * inode, sector_t block)
 {
 	sector_t res = 0;
@@ -1095,6 +1113,8 @@ sector_t bmap(struct inode * inode, sector_t block)
 		res = inode->i_mapping->a_ops->bmap(inode->i_mapping, block);
 	return res;
 }
+
+EXPORT_SYMBOL(bmap);
 
 /*
  * Return true if the filesystem which backs this inode considers the two
@@ -1117,7 +1137,6 @@ static int inode_times_differ(struct inode *inode,
  *	This function automatically handles read only file systems and media,
  *	as well as the "noatime" flag and inode specific "noatime" markers.
  */
- 
 void update_atime(struct inode *inode)
 {
 	struct timespec now;
@@ -1138,6 +1157,8 @@ void update_atime(struct inode *inode)
 			inode->i_atime = now;
 	}
 }
+
+EXPORT_SYMBOL(update_atime);
 
 /**
  *	inode_update_time	-	update mtime and ctime time
@@ -1170,6 +1191,7 @@ void inode_update_time(struct inode *inode, int ctime_too)
 	if (sync_it)
 		mark_inode_dirty_sync(inode);
 }
+
 EXPORT_SYMBOL(inode_update_time);
 
 int inode_needs_sync(struct inode *inode)
@@ -1180,6 +1202,7 @@ int inode_needs_sync(struct inode *inode)
 		return 1;
 	return 0;
 }
+
 EXPORT_SYMBOL(inode_needs_sync);
 
 /*
@@ -1375,3 +1398,5 @@ void init_special_inode(struct inode *inode, umode_t mode, dev_t rdev)
 		printk(KERN_DEBUG "init_special_inode: bogus i_mode (%o)\n",
 		       mode);
 }
+
+EXPORT_SYMBOL(init_special_inode);

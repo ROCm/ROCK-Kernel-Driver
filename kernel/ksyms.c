@@ -45,7 +45,6 @@
 #include <linux/uio.h>
 #include <linux/tty.h>
 #include <linux/in6.h>
-#include <linux/seq_file.h>
 #include <linux/binfmts.h>
 #include <linux/namei.h>
 #include <linux/buffer_head.h>
@@ -138,18 +137,9 @@ EXPORT_SYMBOL(page_address);
 EXPORT_SYMBOL(get_user_pages);
 
 /* filesystem internal functions */
-EXPORT_SYMBOL(def_blk_fops);
-EXPORT_SYMBOL(update_atime);
 EXPORT_SYMBOL(get_fs_type);
-EXPORT_SYMBOL(user_get_super);
-EXPORT_SYMBOL(get_super);
-EXPORT_SYMBOL(drop_super);
 EXPORT_SYMBOL(fput);
 EXPORT_SYMBOL(fget);
-EXPORT_SYMBOL(igrab);
-EXPORT_SYMBOL(iunique);
-EXPORT_SYMBOL(iput);
-EXPORT_SYMBOL(inode_init_once);
 EXPORT_SYMBOL(lookup_mnt);
 EXPORT_SYMBOL(sys_close);
 EXPORT_SYMBOL(dcache_lock);
@@ -161,9 +151,6 @@ EXPORT_SYMBOL(filp_open);
 EXPORT_SYMBOL(filp_close);
 EXPORT_SYMBOL(put_filp);
 EXPORT_SYMBOL(files_lock);
-EXPORT_SYMBOL(check_disk_change);
-EXPORT_SYMBOL(invalidate_inodes);
-EXPORT_SYMBOL(__invalidate_device);
 EXPORT_SYMBOL(invalidate_inode_pages);
 EXPORT_SYMBOL_GPL(invalidate_inode_pages2);
 EXPORT_SYMBOL(truncate_inode_pages);
@@ -171,16 +158,6 @@ EXPORT_SYMBOL(inode_setattr);
 EXPORT_SYMBOL(inode_change_ok);
 EXPORT_SYMBOL(write_inode_now);
 EXPORT_SYMBOL(notify_change);
-EXPORT_SYMBOL(set_blocksize);
-EXPORT_SYMBOL(sb_set_blocksize);
-EXPORT_SYMBOL(sb_min_blocksize);
-EXPORT_SYMBOL(bdget);
-EXPORT_SYMBOL(bdput);
-EXPORT_SYMBOL(bd_claim);
-EXPORT_SYMBOL(bd_release);
-EXPORT_SYMBOL(open_bdev_excl);
-EXPORT_SYMBOL(close_bdev_excl);
-EXPORT_SYMBOL(open_by_devnum);
 EXPORT_SYMBOL(blockdev_direct_IO);
 EXPORT_SYMBOL(file_ra_state_init);
 EXPORT_SYMBOL(generic_ro_fops);
@@ -214,16 +191,6 @@ EXPORT_SYMBOL(lock_may_read);
 EXPORT_SYMBOL(lock_may_write);
 EXPORT_SYMBOL(fd_install);
 EXPORT_SYMBOL(put_unused_fd);
-EXPORT_SYMBOL(get_sb_bdev);
-EXPORT_SYMBOL(kill_block_super);
-EXPORT_SYMBOL(get_sb_nodev);
-EXPORT_SYMBOL(get_sb_single);
-EXPORT_SYMBOL(kill_anon_super);
-EXPORT_SYMBOL(kill_litter_super);
-EXPORT_SYMBOL(generic_shutdown_super);
-EXPORT_SYMBOL(deactivate_super);
-EXPORT_SYMBOL(sget);
-EXPORT_SYMBOL(set_anon_super);
 EXPORT_SYMBOL(do_select);
 
 /* for stackable file systems (lofs, wrapfs, cryptfs, etc.) */
@@ -239,11 +206,6 @@ EXPORT_SYMBOL(tty_unregister_driver);
 EXPORT_SYMBOL(tty_std_termios);
 
 /* block device driver support */
-EXPORT_SYMBOL(bmap);
-EXPORT_SYMBOL(blkdev_open);
-EXPORT_SYMBOL(blkdev_get);
-EXPORT_SYMBOL(blkdev_put);
-EXPORT_SYMBOL(ioctl_by_bdev);
 EXPORT_SYMBOL(read_dev_sector);
 EXPORT_SYMBOL(iov_shorten);
 EXPORT_SYMBOL_GPL(default_backing_dev_info);
@@ -255,31 +217,8 @@ EXPORT_SYMBOL(tty_flip_buffer_push);
 /* filesystem registration */
 EXPORT_SYMBOL(register_filesystem);
 EXPORT_SYMBOL(unregister_filesystem);
-EXPORT_SYMBOL(kern_mount);
 EXPORT_SYMBOL(__mntput);
 EXPORT_SYMBOL(may_umount);
-
-/* executable format registration */
-EXPORT_SYMBOL(register_binfmt);
-EXPORT_SYMBOL(unregister_binfmt);
-EXPORT_SYMBOL(search_binary_handler);
-EXPORT_SYMBOL(prepare_binprm);
-EXPORT_SYMBOL(compute_creds);
-EXPORT_SYMBOL(remove_arg_zero);
-EXPORT_SYMBOL(set_binfmt);
-
-/* sysctl table registration */
-EXPORT_SYMBOL(register_sysctl_table);
-EXPORT_SYMBOL(unregister_sysctl_table);
-EXPORT_SYMBOL(sysctl_string);
-EXPORT_SYMBOL(sysctl_intvec);
-EXPORT_SYMBOL(sysctl_jiffies);
-EXPORT_SYMBOL(proc_dostring);
-EXPORT_SYMBOL(proc_dointvec);
-EXPORT_SYMBOL(proc_dointvec_jiffies);
-EXPORT_SYMBOL(proc_dointvec_minmax);
-EXPORT_SYMBOL(proc_doulongvec_ms_jiffies_minmax);
-EXPORT_SYMBOL(proc_doulongvec_minmax);
 
 /* interrupt handling */
 EXPORT_SYMBOL(request_irq);
@@ -373,37 +312,12 @@ EXPORT_SYMBOL(securebits);
 EXPORT_SYMBOL(cap_bset);
 EXPORT_SYMBOL(daemonize);
 EXPORT_SYMBOL(csum_partial); /* for networking and md */
-EXPORT_SYMBOL(seq_escape);
-EXPORT_SYMBOL(seq_printf);
-EXPORT_SYMBOL(seq_path);
-EXPORT_SYMBOL(seq_open);
-EXPORT_SYMBOL(seq_release);
-EXPORT_SYMBOL(seq_read);
-EXPORT_SYMBOL(seq_lseek);
-EXPORT_SYMBOL(single_open);
-EXPORT_SYMBOL(single_release);
-EXPORT_SYMBOL(seq_release_private);
-
-/* Program loader interfaces */
-#ifdef CONFIG_MMU
-EXPORT_SYMBOL(setup_arg_pages);
-#endif
-EXPORT_SYMBOL(copy_strings_kernel);
-EXPORT_SYMBOL(do_execve);
-EXPORT_SYMBOL(flush_old_exec);
-EXPORT_SYMBOL(kernel_read);
-EXPORT_SYMBOL(open_exec);
 
 /* Miscellaneous access points */
 EXPORT_SYMBOL(si_meminfo);
 
 /* Added to make file system as module */
 EXPORT_SYMBOL(sys_tz);
-EXPORT_SYMBOL(clear_inode);
-EXPORT_SYMBOL(init_special_inode);
-EXPORT_SYMBOL(new_inode);
-EXPORT_SYMBOL(__insert_inode_hash);
-EXPORT_SYMBOL(remove_inode_hash);
 EXPORT_SYMBOL(make_bad_inode);
 EXPORT_SYMBOL(is_bad_inode);
 EXPORT_SYMBOL(__inode_dir_notify);
@@ -419,8 +333,6 @@ EXPORT_SYMBOL(fs_overflowgid);
 /* all busmice */
 EXPORT_SYMBOL(fasync_helper);
 EXPORT_SYMBOL(kill_fasync);
-
-/* binfmt_aout */
 
 /* library functions */
 EXPORT_SYMBOL(strnicmp);

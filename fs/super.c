@@ -21,6 +21,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/smp_lock.h>
 #include <linux/acct.h>
@@ -134,6 +135,8 @@ void deactivate_super(struct super_block *s)
 	}
 }
 
+EXPORT_SYMBOL(deactivate_super);
+
 /**
  *	grab_super	- acquire an active reference
  *	@s	- reference we are trying to make active
@@ -214,6 +217,8 @@ void generic_shutdown_super(struct super_block *sb)
 	up_write(&sb->s_umount);
 }
 
+EXPORT_SYMBOL(generic_shutdown_super);
+
 /**
  *	sget	-	find or create a superblock
  *	@type:	filesystem type superblock should belong to
@@ -259,11 +264,15 @@ retry:
 	return s;
 }
 
+EXPORT_SYMBOL(sget);
+
 void drop_super(struct super_block *sb)
 {
 	up_read(&sb->s_umount);
 	put_super(sb);
 }
+
+EXPORT_SYMBOL(drop_super);
 
 static inline void write_super(struct super_block *sb)
 {
@@ -382,6 +391,8 @@ rescan:
 	spin_unlock(&sb_lock);
 	return NULL;
 }
+
+EXPORT_SYMBOL(get_super);
  
 struct super_block * user_get_super(dev_t dev)
 {
@@ -404,6 +415,8 @@ rescan:
 	spin_unlock(&sb_lock);
 	return NULL;
 }
+
+EXPORT_SYMBOL(user_get_super);
 
 asmlinkage long sys_ustat(unsigned dev, struct ustat __user * ubuf)
 {
@@ -534,6 +547,8 @@ int set_anon_super(struct super_block *s, void *data)
 	return 0;
 }
 
+EXPORT_SYMBOL(set_anon_super);
+
 void kill_anon_super(struct super_block *sb)
 {
 	int slot = MINOR(sb->s_dev);
@@ -543,12 +558,16 @@ void kill_anon_super(struct super_block *sb)
 	spin_unlock(&unnamed_dev_lock);
 }
 
+EXPORT_SYMBOL(kill_anon_super);
+
 void kill_litter_super(struct super_block *sb)
 {
 	if (sb->s_root)
 		d_genocide(sb->s_root);
 	kill_anon_super(sb);
 }
+
+EXPORT_SYMBOL(kill_litter_super);
 
 static int set_bdev_super(struct super_block *s, void *data)
 {
@@ -608,6 +627,8 @@ out:
 	return s;
 }
 
+EXPORT_SYMBOL(get_sb_bdev);
+
 void kill_block_super(struct super_block *sb)
 {
 	struct block_device *bdev = sb->s_bdev;
@@ -615,6 +636,8 @@ void kill_block_super(struct super_block *sb)
 	set_blocksize(bdev, sb->s_old_blocksize);
 	close_bdev_excl(bdev, BDEV_FS);
 }
+
+EXPORT_SYMBOL(kill_block_super);
 
 struct super_block *get_sb_nodev(struct file_system_type *fs_type,
 	int flags, void *data,
@@ -637,6 +660,8 @@ struct super_block *get_sb_nodev(struct file_system_type *fs_type,
 	s->s_flags |= MS_ACTIVE;
 	return s;
 }
+
+EXPORT_SYMBOL(get_sb_nodev);
 
 static int compare_single(struct super_block *s, void *p)
 {
@@ -666,6 +691,8 @@ struct super_block *get_sb_single(struct file_system_type *fs_type,
 	do_remount_sb(s, flags, data, 0);
 	return s;
 }
+
+EXPORT_SYMBOL(get_sb_single);
 
 struct vfsmount *
 do_kern_mount(const char *fstype, int flags, const char *name, void *data)
@@ -709,3 +736,5 @@ struct vfsmount *kern_mount(struct file_system_type *type)
 {
 	return do_kern_mount(type->name, 0, type->name, NULL);
 }
+
+EXPORT_SYMBOL(kern_mount);
