@@ -549,16 +549,10 @@ static int
 isdn_ppp_if_get_unit(char *namebuf);
 
 static void
-isdn_ppp_dev_push_header(void *priv, struct sk_buff *skb, u16 proto);
-
-static void
-isdn_ppp_dev_xmit(void *priv, struct sk_buff *skb);
+isdn_ppp_dev_xmit(void *priv, struct sk_buff *skb, u16 proto);
 
 static struct sk_buff *
 isdn_ppp_lp_alloc_skb(void *priv, int len, int gfp_mask);
-
-static void
-isdn_ppp_lp_push_header(void *priv, struct sk_buff *skb, u16 proto);
 
 /* New CCP stuff */
 static void
@@ -585,22 +579,29 @@ isdn_ppp_frame_log(char *info, char *data, int len, int maxlen,int unit,int slot
 	}
 }
 
-
-static void
-isdn_ppp_push_header(isdn_net_dev *idev, struct sk_buff *skb, u16 proto)
+void
+ippp_push_proto(isdn_net_dev *idev, struct sk_buff *skb, u16 proto)
 {
-	unsigned char *p;
-
-	if (skb_headroom(skb) < 4) {
+	if (skb_headroom(skb) < 2) {
 		isdn_BUG();
 		return;
 	}
-
 	if ((idev->pppcfg & SC_COMP_PROT) && proto <= 0xff)
 		put_u8(skb_push(skb, 1), proto);
 	else
 		put_u16(skb_push(skb, 2), proto);
 
+}
+
+static void
+ippp_push_ac(isdn_net_dev *idev, struct sk_buff *skb)
+{
+	unsigned char *p;
+
+	if (skb_headroom(skb) < 2) {
+		isdn_BUG();
+		return;
+	}
 	if (idev->pppcfg & SC_COMP_AC)
 		return;
 
@@ -721,7 +722,6 @@ isdn_ppp_bind(isdn_net_dev *idev)
 	idev->ccp->proto       = PPP_COMPFRAG;
 	idev->ccp->priv        = idev;
 	idev->ccp->alloc_skb   = isdn_ppp_dev_alloc_skb;
-	idev->ccp->push_header = isdn_ppp_dev_push_header;
 	idev->ccp->xmit        = isdn_ppp_dev_xmit;
 	idev->ccp->kick_up     = isdn_ppp_dev_kick_up;
 
@@ -1012,6 +1012,7 @@ isdn_ppp_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 	if (ipppd->debug & 0x40)
                 isdn_ppp_frame_log("xmit1", skb->data, skb->len, 32, ipppd->unit, -1);
 
+	ippp_push_proto(idev, skb, proto);
 	ippp_mp_xmit(idev, skb, proto);
 	return 0;
 
@@ -1026,11 +1027,11 @@ isdn_ppp_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 }
 
 void
-ippp_xmit(isdn_net_dev *idev, struct sk_buff *skb, u16 proto)
+ippp_xmit(isdn_net_dev *idev, struct sk_buff *skb)
 {
 	struct ipppd *ipppd = idev->ipppd;
 
-	isdn_ppp_push_header(idev, skb, proto);
+	ippp_push_ac(idev, skb);
 
 	if (ipppd->debug & 0x40) {
 		isdn_ppp_frame_log("xmit3", skb->data, skb->len, 32, ipppd->unit, -1);
@@ -1207,37 +1208,17 @@ isdn_ppp_lp_alloc_skb(void *priv, int len, int gfp_mask)
 }
 
 static void
-isdn_ppp_dev_push_header(void *priv, struct sk_buff *skb, u16 proto)
+isdn_ppp_dev_xmit(void *priv, struct sk_buff *skb, u16 proto)
 {
 	isdn_net_dev *idev = priv;
 
-	isdn_ppp_push_header(idev, skb, proto);
-}
-
-static void
-isdn_ppp_lp_push_header(void *priv, struct sk_buff *skb, u16 proto)
-{
-	isdn_net_local *lp = priv;
-	isdn_net_dev *idev;
-
-	if (list_empty(&lp->online)) {
-		isdn_BUG();
-		return;
-	}
-	idev = list_entry(lp->online.next, isdn_net_dev, online);
-	isdn_ppp_push_header(idev, skb, proto);
-}
-
-static void
-isdn_ppp_dev_xmit(void *priv, struct sk_buff *skb)
-{
-	isdn_net_dev *idev = priv;
-
+	ippp_push_proto(idev, skb, proto);
+	ippp_push_ac(idev, skb);
 	isdn_net_write_super(idev, skb);
 }
 
 static void
-isdn_ppp_lp_xmit(void *priv, struct sk_buff *skb)
+isdn_ppp_lp_xmit(void *priv, struct sk_buff *skb, u16 proto)
 {
 	isdn_net_local *lp = priv;
 	isdn_net_dev *idev;
@@ -1247,6 +1228,8 @@ isdn_ppp_lp_xmit(void *priv, struct sk_buff *skb)
 		return;
 	}
 	idev = list_entry(lp->online.next, isdn_net_dev, online);
+	ippp_push_proto(idev, skb, proto);
+	ippp_push_ac(idev, skb);
 	isdn_net_write_super(idev, skb);
 }
 
@@ -1280,7 +1263,6 @@ isdn_ppp_open(isdn_net_local *lp)
 	lp->ccp->proto       = PPP_COMP;
 	lp->ccp->priv        = lp;
 	lp->ccp->alloc_skb   = isdn_ppp_lp_alloc_skb;
-	lp->ccp->push_header = isdn_ppp_lp_push_header;
 	lp->ccp->xmit        = isdn_ppp_lp_xmit;
 	lp->ccp->kick_up     = isdn_ppp_lp_kick_up;
 	

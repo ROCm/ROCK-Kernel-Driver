@@ -102,7 +102,6 @@ do_xmit_reset(struct ippp_ccp *ccp, unsigned char code, unsigned char id,
 	u16 proto = ccp->proto == PPP_COMP ? PPP_CCP : PPP_CCPFRAG;
 
 	skb = ccp->alloc_skb(ccp->priv, 4 + len, GFP_ATOMIC);
-	ccp->push_header(ccp->priv, skb, proto);
 
 	p = skb_put(skb, 4);
 	p += put_u8 (p, code);
@@ -114,7 +113,7 @@ do_xmit_reset(struct ippp_ccp *ccp, unsigned char code, unsigned char id,
 
 	isdn_ppp_frame_log("ccp-xmit", skb->data, skb->len, 32, -1, -1);
 
-	ccp->xmit(ccp->priv, skb);
+	ccp->xmit(ccp->priv, skb, proto);
 }
 
 /* The timer callback function which is called when a ResetReq has timed out,

@@ -9,6 +9,17 @@
  * of the GNU General Public License, incorporated herein by reference.
  */
 
+/*
+ * Data Over Voice (DOV) support added - Guy Ellis 23-Mar-02 
+ *                                       guy@traverse.com.au
+ * Outgoing calls - looks for a 'V' in first char of dialed number
+ * Incoming calls - checks first character of eaz as follows:
+ *   Numeric - accept DATA only - original functionality
+ *   'V'     - accept VOICE (DOV) only
+ *   'B'     - accept BOTH DATA and DOV types
+ *
+ */
+
 /* Locking works as follows: 
  *
  * The configuration of isdn_net_devs works via ioctl on

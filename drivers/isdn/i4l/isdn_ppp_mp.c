@@ -95,7 +95,7 @@ ippp_mp_xmit(isdn_net_dev *idev, struct sk_buff *skb, u16 proto)
 	long txseq;
 
 	if (!(lp->mp_cfg & SC_MP_PROT)) {
-		return ippp_xmit(idev, skb, proto);
+		return ippp_xmit(idev, skb);
 	}
 
 	/* we could do something smarter than just sending
@@ -105,22 +105,21 @@ ippp_mp_xmit(isdn_net_dev *idev, struct sk_buff *skb, u16 proto)
 	
 	if (lp->mp_cfg & SC_OUT_SHORT_SEQ) {
 		/* sequence number: 12bit */
-		p = skb_push(skb, 3);
+		p = skb_push(skb, 2);
 		p[0] = MP_BEGIN_FRAG | MP_END_FRAG | ((txseq >> 8) & 0xf);
 		p[1] = txseq & 0xff;
-		p[2] = proto;
 	} else {
 		/* sequence number: 24bit */
-		p = skb_push(skb, 5);
+		p = skb_push(skb, 4);
 		p[0] = MP_BEGIN_FRAG | MP_END_FRAG;
 		p[1] = (txseq >> 16) & 0xff;
 		p[2] = (txseq >>  8) & 0xff;
 		p[3] = (txseq >>  0) & 0xff;
-		p[4] = proto;
 	}
 	proto = PPP_MP;
 	skb = ippp_ccp_compress(idev->ccp, skb, &proto);
-	ippp_xmit(idev, skb, proto);
+	ippp_push_proto(idev, skb, proto);
+	ippp_xmit(idev, skb);
 }
 
 static void mp_receive(isdn_net_dev *idev, struct sk_buff *skb);

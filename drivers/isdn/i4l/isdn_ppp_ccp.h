@@ -36,9 +36,8 @@ struct ippp_ccp {
 	int                         mru;
 	int                         debug;
 	void                       *priv;
-	void            (*xmit)(void *priv, struct sk_buff *skb);
+	void            (*xmit)(void *priv, struct sk_buff *skb, u16 proto);
 	void            (*kick_up)(void *priv);
-	void            (*push_header)(void *priv, struct sk_buff *skb, u16);
 	struct sk_buff *(*alloc_skb)(void *priv, int len, int gfp_mask);
 };
 

@@ -26,7 +26,10 @@ int
 isdn_ppp_strip_proto(struct sk_buff *skb, u16 *proto);
 
 void
-ippp_xmit(isdn_net_dev *idev, struct sk_buff *skb, u16 proto);
+ippp_push_proto(isdn_net_dev *idev, struct sk_buff *skb, u16 proto);
+
+void
+ippp_xmit(isdn_net_dev *idev, struct sk_buff *skb);
 
 void
 ippp_receive(isdn_net_dev *idev, struct sk_buff *skb, u16 proto);
