@@ -61,7 +61,10 @@ static void flush_kernel_map(void *address)
 			asm volatile("clflush (%0)" :: "r" (address + i)); 
 	} else
 		asm volatile("wbinvd":::"memory"); 
-	__flush_tlb_one(address);
+	if (address)
+		__flush_tlb_one(address);
+	else
+		__flush_tlb_all();
 }
 
 
@@ -202,13 +205,18 @@ void global_flush_tlb(void)
 	down_read(&init_mm.mmap_sem);
 	df = xchg(&df_list, NULL);
 	up_read(&init_mm.mmap_sem);
-	flush_map((df && !df->next) ? df->address : 0);
-	for (; df; df = next_df) { 
-		next_df = df->next;
-		if (df->fpage) 
-			__free_page(df->fpage);
-		kfree(df);
-	} 
+	if (df) {
+		if (!df->next)
+			flush_map(df->address);
+		else
+			flush_map(0); /* flush everything */
+		for (; df; df = next_df) { 
+			next_df = df->next;
+			if (df->fpage) 
+				__free_page(df->fpage);
+			kfree(df);
+		}
+	}
 } 
 
 EXPORT_SYMBOL(change_page_attr);

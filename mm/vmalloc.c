@@ -199,19 +199,21 @@ struct vm_struct *__get_vm_area(unsigned long size, unsigned long flags,
 		align = 1ul << bit;
 	}
 	addr = ALIGN(start, align);
+	size = PAGE_ALIGN(size);
 
 	area = kmalloc(sizeof(*area), GFP_KERNEL);
 	if (unlikely(!area))
 		return NULL;
 
-	/*
-	 * We always allocate a guard page.
-	 */
-	size += PAGE_SIZE;
 	if (unlikely(!size)) {
 		kfree (area);
 		return NULL;
 	}
+
+	/*
+	 * We always allocate a guard page.
+	 */
+	size += PAGE_SIZE;
 
 	write_lock(&vmlist_lock);
 	for (p = &vmlist; (tmp = *p) != NULL ;p = &tmp->next) {
@@ -290,6 +292,11 @@ found:
 	unmap_vm_area(tmp);
 	*p = tmp->next;
 	write_unlock(&vmlist_lock);
+
+	/*
+	 * Remove the guard page.
+	 */
+	tmp->size -= PAGE_SIZE;
 	return tmp;
 }
 

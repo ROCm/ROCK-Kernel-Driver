@@ -195,9 +195,9 @@ void __iomem *ioremap_nocache (unsigned long phys_addr, unsigned long size)
 		return p; 
 
 	/* Guaranteed to be > phys_addr, as per __ioremap() */
-	last_addr = phys_addr + size - 1;
+	last_addr = phys_addr + size;
 
-	if (last_addr < virt_to_phys(high_memory)) { 
+	if (last_addr <= virt_to_phys(high_memory)) { 
 		struct page *ppage = virt_to_page(__va(phys_addr));		
 		unsigned long npages;
 
@@ -232,7 +232,7 @@ void iounmap(volatile void __iomem *addr)
 		return;
 	} 
 
-	if ((p->flags >> 24) && p->phys_addr < virt_to_phys(high_memory)) { 
+	if ((p->flags >> 24) && p->phys_addr + p->size <= virt_to_phys(high_memory)) { 
 		change_page_attr(virt_to_page(__va(p->phys_addr)),
 				 p->size >> PAGE_SHIFT,
 				 PAGE_KERNEL); 				 
