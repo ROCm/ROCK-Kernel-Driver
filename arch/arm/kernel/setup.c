@@ -73,6 +73,9 @@ unsigned int elf_hwcap;
 #ifdef MULTI_CPU
 struct processor processor;
 #endif
+#ifdef MULTI_TLB
+struct cpu_tlb_fns cpu_tlb;
+#endif
 
 unsigned char aux_device_present;
 char elf_platform[ELF_PLATFORM_SIZE];
@@ -241,6 +244,9 @@ static void __init setup_processor(void)
 
 #ifdef MULTI_CPU
 	processor = *list->proc;
+#endif
+#ifdef MULTI_TLB
+	cpu_tlb = *list->tlb;
 #endif
 
 	printk("Processor: %s %s revision %d\n",

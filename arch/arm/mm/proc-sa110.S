@@ -406,61 +406,6 @@ ENTRY(cpu_sa1100_icache_invalidate_page)
 	mcr	p15, 0, r0, c7, c5, 0		@ invalidate I cache
 	mov	pc, lr
 
-/* ================================== TLB ================================= */
-
-/*
- * cpu_sa110_tlb_invalidate_all()
- *
- * Invalidate all TLB entries
- */
-	.align	5
-ENTRY(cpu_sa110_tlb_invalidate_all)
-ENTRY(cpu_sa1100_tlb_invalidate_all)
-	mov	r0, #0
-	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
-	mcr	p15, 0, r0, c8, c7, 0		@ invalidate I & D TLBs
-	mov	pc, lr
-
-/*
- * cpu_sa110_tlb_invalidate_range(start, end)
- *
- * invalidate TLB entries covering the specified range
- *
- * start: range start address
- * end:   range end address
- */
-	.align	5
-ENTRY(cpu_sa110_tlb_invalidate_range)
-ENTRY(cpu_sa1100_tlb_invalidate_range)
-	bic	r0, r0, #0x0ff
-	bic	r0, r0, #0xf00
-	mov	r3, #0
-	mcr	p15, 0, r3, c7, c10, 4		@ drain WB
-1:	mcr	p15, 0, r0, c8, c6, 1		@ invalidate D TLB entry
-	add	r0, r0, #PAGESIZE
-	cmp	r0, r1
-	blo	1b
-	mcr	p15, 0, r3, c8, c5, 0		@ invalidate I TLB
-	mov	pc, lr
-
-/*
- * cpu_sa110_tlb_invalidate_page(page, flags)
- *
- * invalidate the TLB entries for the specified page.
- *
- * page:  page to invalidate
- * flags: non-zero if we include the I TLB
- */
-	.align	5
-ENTRY(cpu_sa110_tlb_invalidate_page)
-ENTRY(cpu_sa1100_tlb_invalidate_page)
-	mov	r3, #0
-	mcr	p15, 0, r3, c7, c10, 4		@ drain WB
-	teq	r1, #0
-	mcr	p15, 0, r0, c8, c6, 1		@ invalidate D TLB entry
-	mcrne	p15, 0, r3, c8, c5, 0		@ invalidate I TLB
-	mov	pc, lr
-
 /* =============================== PageTable ============================== */
 
 /*
@@ -615,11 +560,6 @@ ENTRY(sa110_processor_functions)
 	.word	cpu_sa110_icache_invalidate_range
 	.word	cpu_sa110_icache_invalidate_page
 
-	/* tlb */
-	.word	cpu_sa110_tlb_invalidate_all
-	.word	cpu_sa110_tlb_invalidate_range
-	.word	cpu_sa110_tlb_invalidate_page
-
 	/* pgtable */
 	.word	cpu_sa110_set_pgd
 	.word	cpu_sa110_set_pmd
@@ -665,19 +605,14 @@ ENTRY(sa1100_processor_functions)
 	.word	cpu_sa1100_icache_invalidate_range
 	.word	cpu_sa1100_icache_invalidate_page
 
-	/* tlb */
-	.word	cpu_sa1100_tlb_invalidate_all
-	.word	cpu_sa1100_tlb_invalidate_range
-	.word	cpu_sa1100_tlb_invalidate_page
-
 	/* pgtable */
 	.word	cpu_sa1100_set_pgd
 	.word	cpu_sa1100_set_pmd
 	.word	cpu_sa1100_set_pte
 
 	/* misc */
-	.word	armv4_clear_user_page
-	.word	armv4_copy_user_page
+	.word	armv4_mc_clear_user_page
+	.word	armv4_mc_copy_user_page
 
 	.size	sa1100_processor_functions, . - sa1100_processor_functions
 
@@ -715,6 +650,7 @@ __sa110_proc_info:
 	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_26BIT | HWCAP_FAST_MULT
 	.long	cpu_sa110_info
 	.long	sa110_processor_functions
+	.long	v4wb_tlb_fns
 	.size	__sa110_proc_info, . - __sa110_proc_info
 
 	.type	__sa1100_proc_info,#object
@@ -728,6 +664,7 @@ __sa1100_proc_info:
 	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_26BIT | HWCAP_FAST_MULT
 	.long	cpu_sa1100_info
 	.long	sa1100_processor_functions
+	.long	v4wb_tlb_fns
 	.size	__sa1100_proc_info, . - __sa1100_proc_info
 
 	.type	__sa1110_proc_info,#object
@@ -741,4 +678,5 @@ __sa1110_proc_info:
 	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_26BIT | HWCAP_FAST_MULT
 	.long	cpu_sa1110_info
 	.long	sa1100_processor_functions
+	.long	v4wb_tlb_fns
 	.size	__sa1110_proc_info, . - __sa1110_proc_info

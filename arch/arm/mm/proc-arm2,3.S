@@ -341,6 +341,7 @@ arm3_elf_name:	.asciz	"v2"
 		.long	0
 		.long	cpu_arm2_info
 		.long	SYMBOL_NAME(arm2_processor_functions)
+		.long	0
 
 		.long	0x41560250
 		.long	0xfffffff0
@@ -351,6 +352,7 @@ arm3_elf_name:	.asciz	"v2"
 		.long	0
 		.long	cpu_arm250_info
 		.long	SYMBOL_NAME(arm250_processor_functions)
+		.long	0
 
 		.long	0x41560300
 		.long	0xfffffff0
@@ -361,4 +363,4 @@ arm3_elf_name:	.asciz	"v2"
 		.long	0
 		.long	cpu_arm3_info
 		.long	SYMBOL_NAME(arm3_processor_functions)
-
+		.long	0
