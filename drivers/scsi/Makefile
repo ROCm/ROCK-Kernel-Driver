@@ -25,9 +25,7 @@ export-objs	:= scsi_syms.o 53c700.o
 mod-subdirs	:= pcmcia ../acorn/scsi
 
 
-subdir-$(CONFIG_SCSI_AIC7XXX)	+= aic7xxx
 subdir-$(CONFIG_PCMCIA)		+= pcmcia
-
 
 obj-$(CONFIG_SCSI)		+= scsi_mod.o
 
@@ -64,9 +62,7 @@ obj-$(CONFIG_SCSI_ULTRASTOR)	+= ultrastor.o
 obj-$(CONFIG_SCSI_AHA152X)	+= aha152x.o
 obj-$(CONFIG_SCSI_AHA1542)	+= aha1542.o
 obj-$(CONFIG_SCSI_AHA1740)	+= aha1740.o
-ifeq ($(CONFIG_SCSI_AIC7XXX),y)
-obj-$(CONFIG_SCSI_AIC7XXX)	+= aic7xxx/aic7xxx_drv.o
-endif
+obj-$(CONFIG_SCSI_AIC7XXX)	+= aic7xxx/
 obj-$(CONFIG_SCSI_AIC7XXX_OLD)	+= aic7xxx_old.o
 obj-$(CONFIG_SCSI_IPS)		+= ips.o
 obj-$(CONFIG_SCSI_FD_MCS)	+= fd_mcs.o
@@ -87,10 +83,7 @@ obj-$(CONFIG_SCSI_T128)		+= t128.o
 obj-$(CONFIG_SCSI_DMX3191D)	+= dmx3191d.o
 obj-$(CONFIG_SCSI_DTC3280)	+= dtc.o
 obj-$(CONFIG_SCSI_NCR53C7xx)	+= 53c7,8xx.o 
-subdir-$(CONFIG_SCSI_SYM53C8XX_2)	+= sym53c8xx_2
-ifeq ($(CONFIG_SCSI_SYM53C8XX_2),y)
-  obj-$(CONFIG_SCSI_SYM53C8XX_2)	+= sym53c8xx_2/sym53c8xx_2.o
-endif
+obj-$(CONFIG_SCSI_SYM53C8XX_2)	+= sym53c8xx_2/
 obj-$(CONFIG_SCSI_SYM53C8XX)	+= sym53c8xx.o 
 obj-$(CONFIG_SCSI_NCR53C8XX)	+= ncr53c8xx.o 
 obj-$(CONFIG_SCSI_EATA_DMA)	+= eata_dma.o
@@ -123,8 +116,7 @@ obj-$(CONFIG_SCSI_FCAL)		+= fcal.o
 obj-$(CONFIG_SCSI_CPQFCTS)	+= cpqfc.o
 obj-$(CONFIG_SCSI_LASI700)	+= lasi700.o 53c700.o
 
-subdir-$(CONFIG_ARCH_ACORN)	+= ../acorn/scsi
-obj-$(CONFIG_ARCH_ACORN)	+= ../acorn/scsi/acorn-scsi.o
+obj-$(CONFIG_ARCH_ACORN)	+= ../acorn/scsi/
 
 obj-$(CONFIG_CHR_DEV_ST)	+= st.o
 obj-$(CONFIG_CHR_DEV_OSST)	+= osst.o

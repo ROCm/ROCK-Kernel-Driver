@@ -2,8 +2,6 @@
 # Makefile for the Linux aic7xxx SCSI driver.
 #
 
-O_TARGET := aic7xxx_drv.o
-
 obj-$(CONFIG_SCSI_AIC7XXX)	+= aic7xxx.o
 
 # Core files

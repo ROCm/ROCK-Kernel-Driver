@@ -5,8 +5,6 @@
 # Rewritten to use lists instead of if-statements.
 #
 
-O_TARGET := built-in.o
-
 obj-$(CONFIG_IPHASE5526)	+= iph5526.o
 
 include $(TOPDIR)/Rules.make

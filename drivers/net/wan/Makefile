@@ -5,8 +5,6 @@
 # Rewritten to use lists instead of if-statements.
 #
 
-O_TARGET := built-in.o
-
 export-objs :=	z85230.o syncppp.o comx.o sdladrv.o cycx_drv.o hdlc_generic.o \
 		dlci.o pc300_drv.o
 

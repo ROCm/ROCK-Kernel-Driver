@@ -1,16 +1,18 @@
 # Makefile for the kernel ISDN subsystem and device drivers.
 
-# The target object and module list name.
-
-O_TARGET	:= built-in.o
-
 # Objects that export symbols.
 
 export-objs	:= isdn_common.o
 
+# Each configuration option enables a list of files.
+
+obj-$(CONFIG_ISDN)			+= isdn.o
+obj-$(CONFIG_ISDN_PPP_BSDCOMP)		+= isdn_bsdcomp.o
+
 # Multipart objects.
 
-isdn-objs	:= isdn_net.o isdn_tty.o isdn_v110.o isdn_common.o
+isdn-objs				:= isdn_net.o isdn_tty.o \
+					   isdn_v110.o isdn_common.o
 
 # Optional parts of multipart objects.
 
@@ -20,12 +22,5 @@ isdn-objs-$(CONFIG_ISDN_AUDIO)		+= isdn_audio.o
 isdn-objs-$(CONFIG_ISDN_TTY_FAX)	+= isdn_ttyfax.o
 
 isdn-objs				+= $(isdn-objs-y)
-
-# Each configuration option enables a list of files.
-
-obj-$(CONFIG_ISDN)			+= isdn.o
-obj-$(CONFIG_ISDN_PPP_BSDCOMP)		+= isdn_bsdcomp.o
-
-# The global Rules.make.
 
 include $(TOPDIR)/Rules.make

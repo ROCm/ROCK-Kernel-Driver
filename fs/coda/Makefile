@@ -2,11 +2,10 @@
 # Makefile for the Linux Coda filesystem routines.
 #
 
-O_TARGET := coda.o
+obj-$(CONFIG_CODA_FS) += coda.o
 
-obj-y   := psdev.o cache.o cnode.o inode.o dir.o file.o upcall.o coda_linux.o\
-           symlink.o pioctl.o sysctl.o 
-obj-m   := $(O_TARGET)
+coda-objs := psdev.o cache.o cnode.o inode.o dir.o file.o upcall.o \
+	     coda_linux.o symlink.o pioctl.o sysctl.o 
 
 # If you want debugging output, please uncomment the following line.
 

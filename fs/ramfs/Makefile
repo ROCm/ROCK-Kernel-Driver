@@ -2,9 +2,8 @@
 # Makefile for the linux ramfs routines.
 #
 
-O_TARGET := ramfs.o
+obj-$(CONFIG_RAMFS) += ramfs.o
 
-obj-y := inode.o
-obj-m := $(O_TARGET)
+ramfs-objs := inode.o
 
 include $(TOPDIR)/Rules.make

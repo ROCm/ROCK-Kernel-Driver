@@ -3,8 +3,6 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := _mpu401.o
-
 export-objs  := mpu401_uart.o
 
 snd-mpu401-objs := mpu401.o

@@ -2,8 +2,6 @@
 # Makefile for the FPU instruction emulation.
 #
 
-O_TARGET := built-in.o
-
 obj-$(CONFIG_MATHEMU) += math-emu.o
 
 math-emu-objs	:= math.o qrnnd.o

@@ -2,8 +2,6 @@
 # Makefile for ALSA
 #
 
-O_TARGET    := _arm.o
-
 snd-sa11xx-uda1341-objs := sa11xx-uda1341.o
 
 # Toplevel Module Dependency

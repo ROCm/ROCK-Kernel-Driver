@@ -3,8 +3,6 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := _emu10k1.o
-
 export-objs  := emu10k1_main.o
 
 snd-emu10k1-objs := emu10k1.o emu10k1_main.o \

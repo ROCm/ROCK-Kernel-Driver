@@ -5,8 +5,6 @@
 # Rewritten to use lists instead of if-statements.
 #
 
-L_TARGET := paride.a
-
 export-objs := paride.o bpck6.o
 
 obj-$(CONFIG_PARIDE)		+= paride.o

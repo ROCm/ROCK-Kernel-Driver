@@ -1,11 +1,10 @@
 #
 # Makefile for the filesystem export support routines.
 
-O_TARGET := exportfs.o
-
 export-objs := expfs.o
 
-obj-y :=    expfs.o
-obj-m := $(O_TARGET)
+obj-$(CONFIG_EXPORTFS) += exportfs.o
+
+exportfs-objs := expfs.o
 
 include $(TOPDIR)/Rules.make

@@ -2,8 +2,6 @@
 # Makefile for ALSA
 #
 
-O_TARGET = l3.o
-
 export-objs += uda1341.o
 
 snd-uda1341-objs := uda1341.o

@@ -2,10 +2,7 @@
 # Makefile for the Linux Traffic Control Unit.
 #
 
-O_TARGET := sched.o
-
 obj-y	:= sch_generic.o
-
 
 obj-$(CONFIG_NET_SCHED)		+= sch_api.o sch_fifo.o
 obj-$(CONFIG_NET_ESTIMATOR)	+= estimator.o

@@ -182,14 +182,8 @@ obj-$(CONFIG_TOSHIBA) += toshiba.o
 obj-$(CONFIG_I8K) += i8k.o
 obj-$(CONFIG_DS1620) += ds1620.o
 obj-$(CONFIG_INTEL_RNG) += i810_rng.o
-
 obj-$(CONFIG_QIC02_TAPE) += tpqic02.o
-
-subdir-$(CONFIG_FTAPE) += ftape
-ifeq ($(CONFIG_FTAPE),y)
-  obj-y       += ftape/ftape.o
-endif
-
+obj-$(CONFIG_FTAPE) += ftape/
 obj-$(CONFIG_H8) += h8.o
 obj-$(CONFIG_PPDEV) += ppdev.o
 obj-$(CONFIG_DZ) += dz.o
@@ -216,23 +210,10 @@ obj-$(CONFIG_MACHZ_WDT) += machzwd.o
 obj-$(CONFIG_SH_WDT) += shwdt.o
 obj-$(CONFIG_EUROTECH_WDT) += eurotechwdt.o
 obj-$(CONFIG_SOFT_WATCHDOG) += softdog.o
-
 obj-$(CONFIG_MWAVE) += mwave/
-
-subdir-$(CONFIG_AGP) += agp
-ifeq ($(CONFIG_AGP),y)
-  obj-y += agp/agp.o
-endif
-
-subdir-$(CONFIG_DRM) += drm
-ifeq ($(CONFIG_DRM),y)
-  obj-y += drm/drm.o
-endif
-
-subdir-$(CONFIG_PCMCIA) += pcmcia
-ifeq ($(CONFIG_PCMCIA),y)
-  obj-y += pcmcia/pcmcia_char.o
-endif
+obj-$(CONFIG_AGP) += agp/
+obj-$(CONFIG_DRM) += drm/
+obj-$(CONFIG_PCMCIA) += pcmcia/
 
 include $(TOPDIR)/Rules.make
 

@@ -1,8 +1,9 @@
-O_TARGET := driverfs.o
+#
+# Makefile for the driverfs virtual filesystem.
+#
 
 export-objs := inode.o
 
 obj-y := inode.o
-obj-m := $(O_TARGET)
 
 include $(TOPDIR)/Rules.make

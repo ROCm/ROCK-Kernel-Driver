@@ -10,11 +10,7 @@
 #		Christoph Hellwig <hch@infradead.org>
 #
 
-
-O_TARGET := built-in.o
-
 export-objs	= hdlcdrv.o
-
 
 obj-$(CONFIG_DMASCC)		+= dmascc.o
 obj-$(CONFIG_SCC)		+= scc.o

@@ -1,4 +1,3 @@
-# File: drivers/irda/Makefile
 #
 # Makefile for the Linux IrDA infrared port device drivers.
 #
@@ -6,10 +5,7 @@
 # Rewritten to use lists instead of if-statements.
 #
 
-O_TARGET := built-in.o
-
 export-objs	= irport.o
-
 
 obj-$(CONFIG_IRTTY_SIR)		+= irtty.o
 obj-$(CONFIG_IRPORT_SIR)	+= 		irport.o

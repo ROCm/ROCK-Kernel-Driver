@@ -3,8 +3,6 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := _ac97.o
-
 export-objs  := ac97_codec.o ak4531_codec.o
 
 snd-ac97-codec-objs := ac97_codec.o

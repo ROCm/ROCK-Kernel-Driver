@@ -1,18 +1,6 @@
 #
-# drivers/net/tulip/Makefile
-#
 # Makefile for the Linux "Tulip" family network device drivers.
 #
-
-O_TARGET := built-in.o
-
-obj-y		:=
-obj-m		:=
-obj-n		:=
-obj-		:=
-
-# Things that need to export symbols
-export-objs	:=
 
 obj-$(CONFIG_PCMCIA_XIRTULIP)	+= xircom_tulip_cb.o
 obj-$(CONFIG_PCMCIA_XIRCOM)	+= xircom_cb.o

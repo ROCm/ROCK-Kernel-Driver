@@ -3,8 +3,6 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := _opti9xx.o
-
 snd-opti92x-ad1848-objs := opti92x-ad1848.o
 snd-opti92x-cs4231-objs := opti92x-cs4231.o
 snd-opti93x-objs := opti93x.o
