@@ -19,11 +19,15 @@ static struct list_head df_list = LIST_HEAD_INIT(df_list);
 
 pte_t *lookup_address(unsigned long address) 
 { 
-	pgd_t *pgd = pgd_offset_k(address); 
+	pgd_t *pgd = pgd_offset_k(address);
+	pud_t *pud;
 	pmd_t *pmd;
 	if (pgd_none(*pgd))
 		return NULL;
-	pmd = pmd_offset(pgd, address); 	       
+	pud = pud_offset(pgd, address);
+	if (pud_none(*pud))
+		return NULL;
+	pmd = pmd_offset(pud, address);
 	if (pmd_none(*pmd))
 		return NULL;
 	if (pmd_large(*pmd))
@@ -77,9 +81,11 @@ static void set_pmd_pte(pte_t *kpte, unsigned long address, pte_t pte)
 	spin_lock_irqsave(&pgd_lock, flags);
 	for (page = pgd_list; page; page = (struct page *)page->index) {
 		pgd_t *pgd;
+		pud_t *pud;
 		pmd_t *pmd;
 		pgd = (pgd_t *)page_address(page) + pgd_index(address);
-		pmd = pmd_offset(pgd, address);
+		pud = pud_offset(pgd, address);
+		pmd = pmd_offset(pud, address);
 		set_pte_atomic((pte_t *)pmd, pte);
 	}
 	spin_unlock_irqrestore(&pgd_lock, flags);
@@ -92,7 +98,7 @@ static void set_pmd_pte(pte_t *kpte, unsigned long address, pte_t pte)
 static inline void revert_page(struct page *kpte_page, unsigned long address)
 {
 	pte_t *linear = (pte_t *) 
-		pmd_offset(pgd_offset(&init_mm, address), address);
+		pmd_offset(pud_offset(pgd_offset_k(address), address), address);
 	set_pmd_pte(linear,  address,
 		    pfn_pte((__pa(address) & LARGE_PAGE_MASK) >> PAGE_SHIFT,
 			    PAGE_KERNEL_LARGE));

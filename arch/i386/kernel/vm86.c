@@ -137,6 +137,7 @@ struct pt_regs * fastcall save_v86_state(struct kernel_vm86_regs * regs)
 static void mark_screen_rdonly(struct task_struct * tsk)
 {
 	pgd_t *pgd;
+	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte, *mapped;
 	int i;
@@ -151,7 +152,15 @@ static void mark_screen_rdonly(struct task_struct * tsk)
 		pgd_clear(pgd);
 		goto out;
 	}
-	pmd = pmd_offset(pgd, 0xA0000);
+	pud = pud_offset(pgd, 0xA0000);
+	if (pud_none(*pud))
+		goto out;
+	if (pud_bad(*pud)) {
+		pud_ERROR(*pud);
+		pud_clear(pud);
+		goto out;
+	}
+	pmd = pmd_offset(pud, 0xA0000);
 	if (pmd_none(*pmd))
 		goto out;
 	if (pmd_bad(*pmd)) {
