@@ -56,7 +56,7 @@ static const unsigned long palette_4[16] = {
 #define palette_setpixel(p)	*(unsigned long *)(IO_START+0x00400000) = 0x10000000|((p) & 255)
 #define palette_write(v)	*(unsigned long *)(IO_START+0x00400000) = 0x00000000|((v) & 0x00ffffff)
 
-extern struct param_struct params;
+static struct param_struct *params = (struct param_struct *)PARAMS_PHYS;
 
 #ifndef STANDALONE_DEBUG 
 /*
@@ -64,13 +64,13 @@ extern struct param_struct params;
  */
 static void puts(const char *s)
 {
-	extern void ll_write_char(char *, unsigned long);
+	extern void ll_write_char(char *, char c, char white);
 	int x,y;
 	unsigned char c;
 	char *ptr;
 
-	x = params.video_x;
-	y = params.video_y;
+	x = params->video_x;
+	y = params->video_y;
 
 	while ( ( c = *(unsigned char *)s++ ) != '\0' ) {
 		if ( c == '\n' ) {
@@ -79,8 +79,8 @@ static void puts(const char *s)
 				y--;
 			}
 		} else {
-			ptr = VIDMEM + ((y*video_num_columns*params.bytes_per_char_v+x)*bytes_per_char_h);
-			ll_write_char(ptr, c|(white<<16));
+			ptr = VIDMEM + ((y*video_num_columns*params->bytes_per_char_v+x)*bytes_per_char_h);
+			ll_write_char(ptr, c, white);
 			if ( ++x >= video_num_columns ) {
 				x = 0;
 				if ( ++y >= video_num_lines ) {
@@ -90,8 +90,8 @@ static void puts(const char *s)
 		}
 	}
 
-	params.video_x = x;
-	params.video_y = y;
+	params->video_x = x;
+	params->video_y = y;
 }
 
 static void error(char *x);
@@ -103,9 +103,9 @@ static void arch_decomp_setup(void)
 {
 	int i;
 	
-	video_num_lines = params.video_num_rows;
-	video_num_columns = params.video_num_cols;
-	bytes_per_char_h = params.bytes_per_char_h;
+	video_num_lines = params->video_num_rows;
+	video_num_columns = params->video_num_cols;
+	bytes_per_char_h = params->bytes_per_char_h;
 	video_size_row = video_num_columns * bytes_per_char_h;
 	if (bytes_per_char_h == 4)
 		for (i = 0; i < 256; i++)
@@ -140,7 +140,7 @@ static void arch_decomp_setup(void)
 		white = 7;
 	}
 
-	if (params.nr_pages * params.page_size < 4096*1024) error("<4M of mem\n");
+	if (params->nr_pages * params->page_size < 4096*1024) error("<4M of mem\n");
 }
 #endif
 

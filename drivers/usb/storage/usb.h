@@ -134,6 +134,10 @@ struct us_data {
 	struct semaphore	dev_semaphore;	 /* protect pusb_dev */
 	struct usb_device	*pusb_dev;	 /* this usb_device */
 	unsigned long		flags;		 /* from filter initially */
+	unsigned int		send_bulk_pipe;	 /* cached pipe values */
+	unsigned int		recv_bulk_pipe;
+	unsigned int		send_ctrl_pipe;
+	unsigned int		recv_ctrl_pipe;
 
 	/* information about the device -- always good */
 	char			vendor[USB_STOR_STRING_LEN];

@@ -32,6 +32,7 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
+#include <asm/semaphore.h>
 
 #include "ptrace.h"
 
@@ -77,8 +78,7 @@ static void dump_mem(const char *str, unsigned long bottom, unsigned long top)
 	fs = get_fs();
 	set_fs(KERNEL_DS);
 
-	printk("%s", str);
-	printk("(0x%08lx to 0x%08lx)\n", bottom, top);
+	printk("%s(0x%08lx to 0x%08lx)\n", str, bottom, top);
 
 	for (p = bottom & ~31; p < top;) {
 		printk("%04lx: ", p & 0xffff);
@@ -136,7 +136,7 @@ static void dump_instr(struct pt_regs *regs)
 	set_fs(fs);
 }
 
-static void dump_stack(struct task_struct *tsk, unsigned long sp)
+static void __dump_stack(struct task_struct *tsk, unsigned long sp)
 {
 	dump_mem("Stack: ", sp, 8192+(unsigned long)tsk->thread_info);
 }
@@ -163,15 +163,20 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
 }
 
 /*
- * This is called from SysRq-T (show_task) to display the current
- * call trace for each process.  Very useful.
+ * This is called from SysRq-T (show_task) to display the current call
+ * trace for each process.  This version will also display the running
+ * threads call trace (ie, us.)
  */
 void show_trace_task(struct task_struct *tsk)
 {
-	if (tsk != current) {
-		unsigned int fp = thread_saved_fp(tsk);
-		c_backtrace(fp, 0x10);
-	}
+	unsigned int fp;
+
+	if (tsk != current)
+		fp = thread_saved_fp(tsk);
+	else
+		asm("mov%? %0, fp" : "=r" (fp));
+
+	c_backtrace(fp, 0x10);
 }
 
 spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
@@ -193,7 +198,7 @@ NORET_TYPE void die(const char *str, struct pt_regs *regs, int err)
 		current->comm, current->pid, tsk->thread_info + 1);
 
 	if (!user_mode(regs) || in_interrupt()) {
-		dump_stack(tsk, (unsigned long)(regs + 1));
+		__dump_stack(tsk, (unsigned long)(regs + 1));
 		dump_backtrace(regs, tsk);
 		dump_instr(regs);
 	}

@@ -9,6 +9,7 @@
 #include <linux/init.h>
 
 #include <asm/hardware.h>
+#include <asm/mach-types.h>
 #include <asm/irq.h>
 #include "sa1100_generic.h"
 
@@ -160,14 +161,14 @@ static int yopy_pcmcia_socket_suspend(int sock)
 }
 
 static struct pcmcia_low_level yopy_pcmcia_ops = {
-	init:			yopy_pcmcia_init,
-	shutdown:		yopy_pcmcia_shutdown,
-	socket_state:		yopy_pcmcia_socket_state,
-	get_irq_info:		yopy_pcmcia_get_irq_info,
-	configure_socket:	yopy_pcmcia_configure_socket,
+	.init			= yopy_pcmcia_init,
+	.shutdown		= yopy_pcmcia_shutdown,
+	.socket_state		= yopy_pcmcia_socket_state,
+	.get_irq_info		= yopy_pcmcia_get_irq_info,
+	.configure_socket	= yopy_pcmcia_configure_socket,
 
-	socket_init:		yopy_pcmcia_socket_init,
-	socket_suspend:		yopy_pcmcia_socket_suspend,
+	.socket_init		= yopy_pcmcia_socket_init,
+	.socket_suspend		= yopy_pcmcia_socket_suspend,
 };
 
 int __init pcmcia_yopy_init(void)

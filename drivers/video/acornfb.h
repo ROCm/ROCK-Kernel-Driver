@@ -47,10 +47,7 @@ union palette {
 };
 
 struct acornfb_par {
-	unsigned long	screen_base;
-	unsigned long	screen_base_p;
 	unsigned long	screen_end;
-	unsigned long	screen_size;
 	unsigned int	dram_size;
 	unsigned int	vram_half_sam;
 	unsigned int	palette_size;

@@ -326,7 +326,7 @@ typedef struct acornscsi_hostdata {
 	syncxfer_t	sync_state;		/* sync xfer negociation state		*/
 	unsigned char	disconnect_ok:1;	/* device can disconnect		*/
     } device[8];
-    unsigned char	busyluns[8];		/* array of bits indicating LUNs busy	*/
+    unsigned long	busyluns[64 / sizeof(unsigned long)];/* array of bits indicating LUNs busy	*/
 
     /* DMA info */
     struct {

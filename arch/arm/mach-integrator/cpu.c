@@ -73,36 +73,37 @@ static struct vco freq_to_vco(unsigned int freq_khz, int factor)
  * Validate the speed in khz.  If it is outside our
  * range, then return the lowest.
  */
-static unsigned int
-integrator_validatespeed(unsigned int cpu, unsigned int freq_khz)
+static void integrator_verify_speed(struct cpufreq_policy *policy)
 {
 	struct vco vco;
 
-	if (freq_khz < 12000)
-		freq_khz = 12000;
-	if (freq_khz > 160000)
-		freq_khz = 160000;
+	if (policy->max > policy->max_cpu_freq)
+		policy->max = policy->max_cpu_freq;
 
-	vco = freq_to_vco(freq_khz, 1);
+	if (policy->max < 12000)
+		policy->max = 12000;
+	if (policy->max > 160000)
+		policy->max = 160000;
 
-	if (vco.vdw < 4 || vco.vdw > 152)
-		return -EINVAL;
+	vco = freq_to_vco(policy->max, 1);
 
-	return vco_to_freq(vco, 1);
+	if (vco.vdw < 4)
+		vco.vdw = 4;
+	if (vco.vdw > 152)
+		vco.vdw = 152;
+
+	policy->min = policy->max = vco_to_freq(vco, 1);
 }
 
-static void integrator_setspeed(unsigned int cpu, unsigned int freq_khz)
+static void do_set_policy(int cpu, struct cpufreq_policy *policy)
 {
-	struct vco vco = freq_to_vco(freq_khz, 1);
-	unsigned long cpus_allowed;
+	struct vco vco = freq_to_vco(policy->max, 1);
 	u_int cm_osc;
 
 	/*
-	 * Save this threads cpus_allowed mask, and bind to the
-	 * specified CPU.  When this call returns, we should be
-	 * running on the right CPU.
+	 * Bind to the specified CPU.  When this call returns,
+	 * we should be running on the right CPU.
 	 */
-	cpus_allowed = current->cpus_allowed;
 	set_cpus_allowed(current, 1 << cpu);
 	BUG_ON(cpu != smp_processor_id());
 
@@ -113,6 +114,26 @@ static void integrator_setspeed(unsigned int cpu, unsigned int freq_khz)
 	__raw_writel(0xa05f, CM_LOCK);
 	__raw_writel(cm_osc, CM_OSC);
 	__raw_writel(0, CM_LOCK);
+}
+
+static void integrator_set_policy(struct cpufreq_policy *policy)
+{
+	unsigned long cpus_allowed;
+	int cpu;
+
+	/*
+	 * Save this threads cpus_allowed mask.
+	 */
+	cpus_allowed = current->cpus_allowed;
+
+	if (policy->cpu == CPUFREQ_ALL_CPUS) {
+		for (cpu = 0; cpu < NR_CPUS; cpu++) {
+			if (!cpu_online(cpu))
+				continue;
+			do_set_policy(cpu, policy);
+		}
+	} else
+		do_set_policy(policy->cpu, policy);
 
 	/*
 	 * Restore the CPUs allowed mask.
@@ -120,23 +141,30 @@ static void integrator_setspeed(unsigned int cpu, unsigned int freq_khz)
 	set_cpus_allowed(current, cpus_allowed);
 }
 
+static struct cpufreq_policy integrator_policy = {
+	.cpu		= 0,
+	.policy		= CPUFREQ_POLICY_POWERSAVE,
+	.max_cpu_freq	= 160000,
+};
+
 static struct cpufreq_driver integrator_driver = {
-	.validate	= integrator_validatespeed,
-	.setspeed	= integrator_setspeed,
-	.sync		= 1,
+	.verify		= integrator_verify_speed,
+	.setpolicy	= integrator_set_policy,
+	.policy		= &integrator_policy,
+	.cpu_min_freq	= 12000,
 };
 #endif
 
 static int __init integrator_cpu_init(void)
 {
-	struct cpufreq_freqs *freqs;
+	struct cpufreq_policy *policies;
 	unsigned long cpus_allowed;
 	int cpu;
 
-	freqs = kmalloc(sizeof(struct cpufreq_freqs) * NR_CPUS,
-			GFP_KERNEL);
-	if (!freqs) {
-		printk(KERN_ERR "CPU: unable to allocate cpufreqs structure\n");
+	policies = kmalloc(sizeof(struct cpufreq_freqs) * NR_CPUS,
+			   GFP_KERNEL);
+	if (!policies) {
+		printk(KERN_ERR "CPU: unable to allocate policies structure\n");
 		return -ENOMEM;
 	}
 
@@ -164,18 +192,20 @@ static int __init integrator_cpu_init(void)
 		vco.od = (cm_osc >> 8) & 7;
 		vco.vdw = cm_osc & 255;
 
-		freqs[cpu].min = 12000;
-		freqs[cpu].max = 160000;
-		freqs[cpu].cur = vco_to_freq(vco, 1);
+		policies[cpu].cpu = cpu;
+		policies[cpu].policy = CPUFREQ_POLICY_POWERSAVE,
+		policies[cpu].max_cpu_freq = 160000;
+		policies[cpu].min =
+		policies[cpu].max = vco_to_freq(vco, 1);
 	}
 
 	set_cpus_allowed(current, cpus_allowed);
 
 #ifdef CONFIG_CPU_FREQ
-	integrator_driver.freq = freqs;
+	integrator_driver.policy = policies;
 	cpufreq_register(&integrator_driver);
 #else
-	kfree(freqs);
+	kfree(policies);
 #endif
 
 	return 0;

@@ -224,18 +224,21 @@ sddr09_send_command(struct us_data *us,
 		    unsigned char direction,
 		    unsigned char *xfer_data,
 		    unsigned int xfer_len) {
-	int pipe;
+	unsigned int pipe;
 	unsigned char requesttype = (0x41 | direction);
+	int rc;
 
 	// Get the receive or send control pipe number
 
 	if (direction == USB_DIR_IN)
-		pipe = usb_rcvctrlpipe(us->pusb_dev,0);
+		pipe = us->recv_ctrl_pipe;
 	else
-		pipe = usb_sndctrlpipe(us->pusb_dev,0);
+		pipe = us->send_ctrl_pipe;
 
-	return usb_storage_send_control(us, pipe, request, requesttype,
+	rc = usb_stor_ctrl_transfer(us, pipe, request, requesttype,
 				   0, 0, xfer_data, xfer_len);
+	return (rc == USB_STOR_XFER_GOOD ? USB_STOR_TRANSPORT_GOOD :
+			USB_STOR_TRANSPORT_ERROR);
 }
 
 static int
@@ -276,7 +279,6 @@ sddr09_request_sense(struct us_data *us, unsigned char *sensebuf, int buflen) {
 		0x03, LUNBITS, 0, 0, buflen, 0, 0, 0, 0, 0, 0, 0
 	};
 	int result;
-	unsigned int act_len;
 
 	result = sddr09_send_scsi_command(us, command, sizeof(command));
 	if (result != USB_STOR_TRANSPORT_GOOD) {
@@ -284,7 +286,8 @@ sddr09_request_sense(struct us_data *us, unsigned char *sensebuf, int buflen) {
 		return result;
 	}
 
-	result = usb_storage_raw_bulk(us, SCSI_DATA_READ, sensebuf, buflen, &act_len);
+	result = usb_stor_bulk_transfer_buf(us, us->recv_bulk_pipe,
+			sensebuf, buflen, NULL);
 	if (result != USB_STOR_XFER_GOOD) {
 		US_DEBUGP("request sense bulk in failed\n");
 		return USB_STOR_TRANSPORT_ERROR;
@@ -343,11 +346,11 @@ sddr09_readX(struct us_data *us, int x, unsigned long fromaddress,
 		return result;
 	}
 
-	result = usb_storage_bulk_transport(us, SCSI_DATA_READ,
-				       buf, bulklen, use_sg);
+	result = usb_stor_bulk_transfer_sg(us, us->recv_bulk_pipe,
+				       buf, bulklen, use_sg, NULL);
 
 	if (result != USB_STOR_XFER_GOOD) {
-		US_DEBUGP("Result for bulk_transport in sddr09_read2%d %d\n",
+		US_DEBUGP("Result for bulk_transfer in sddr09_read2%d %d\n",
 			  x, result);
 		return USB_STOR_TRANSPORT_ERROR;
 	}
@@ -510,11 +513,11 @@ sddr09_writeX(struct us_data *us,
 		return result;
 	}
 
-	result = usb_storage_bulk_transport(us, SCSI_DATA_WRITE,
-				       buf, bulklen, use_sg);
+	result = usb_stor_bulk_transfer_sg(us, us->send_bulk_pipe,
+				       buf, bulklen, use_sg, NULL);
 
 	if (result != USB_STOR_XFER_GOOD) {
-		US_DEBUGP("Result for bulk_transport in sddr09_writeX %d\n",
+		US_DEBUGP("Result for bulk_transfer in sddr09_writeX %d\n",
 			  result);
 		return USB_STOR_TRANSPORT_ERROR;
 	}
@@ -592,11 +595,11 @@ sddr09_read_sg_test_only(struct us_data *us) {
 	if (!buf)
 		return USB_STOR_TRANSPORT_ERROR;
 
-	result = usb_storage_bulk_transport(us, SCSI_DATA_READ,
-				       buf, bulklen, 0);
+	result = usb_stor_bulk_transfer_buf(us, us->recv_bulk_pipe,
+				       buf, bulklen, NULL);
 	kfree(buf);
 	if (result != USB_STOR_XFER_GOOD) {
-		US_DEBUGP("Result for bulk_transport in sddr09_read_sg %d\n",
+		US_DEBUGP("Result for bulk_transfer in sddr09_read_sg %d\n",
 			  result);
 		return USB_STOR_TRANSPORT_ERROR;
 	}
@@ -631,8 +634,8 @@ sddr09_read_status(struct us_data *us, unsigned char *status) {
 	if (result != USB_STOR_TRANSPORT_GOOD)
 		return result;
 
-	result = usb_storage_bulk_transport(us, SCSI_DATA_READ,
-				       data, sizeof(data), 0);
+	result = usb_stor_bulk_transfer_buf(us, us->recv_bulk_pipe,
+				       data, sizeof(data), NULL);
 	*status = data[0];
 	return (result == USB_STOR_XFER_GOOD ?
 			USB_STOR_TRANSPORT_GOOD : USB_STOR_TRANSPORT_ERROR);
@@ -954,7 +957,8 @@ sddr09_read_deviceID(struct us_data *us, unsigned char *deviceID) {
 	if (result != USB_STOR_TRANSPORT_GOOD)
 		return result;
 
-	result = usb_storage_bulk_transport(us, SCSI_DATA_READ, content, 64, 0);
+	result = usb_stor_bulk_transfer_buf(us, us->recv_bulk_pipe,
+			content, 64, NULL);
 
 	for (i = 0; i < 4; i++)
 		deviceID[i] = content[i];
@@ -1368,6 +1372,7 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 	};
 
+	srb->resid = 0;
 	info = (struct sddr09_card_info *)us->extra;
 	if (!info) {
 		nand_init_ecc();
@@ -1544,17 +1549,16 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 	if (srb->sc_data_direction == SCSI_DATA_WRITE ||
 	    srb->sc_data_direction == SCSI_DATA_READ) {
+		unsigned int pipe = (srb->sc_data_direction == SCSI_DATA_WRITE)
+				? us->send_bulk_pipe : us->recv_bulk_pipe;
 
 		US_DEBUGP("SDDR09: %s %d bytes\n",
 			  (srb->sc_data_direction == SCSI_DATA_WRITE) ?
 			  "sending" : "receiving",
 			  srb->request_bufflen);
 
-		result = usb_storage_bulk_transport(us,
-					       srb->sc_data_direction,
-					       srb->request_buffer, 
-					       srb->request_bufflen,
-					       srb->use_sg);
+		result = usb_stor_bulk_transfer_srb(us, pipe, srb,
+							srb->request_bufflen);
 
 		return (result == USB_STOR_XFER_GOOD ?
 			USB_STOR_TRANSPORT_GOOD : USB_STOR_TRANSPORT_ERROR);

@@ -55,6 +55,7 @@
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/fs.h>
+#include <linux/mm.h>
 #include <linux/time.h>
 #include <linux/types.h>
 #include <linux/string.h>
@@ -481,14 +482,14 @@ static void prune_dqcache(int count)
  * more memory
  */
 
-int shrink_dqcache_memory(int ratio, unsigned int gfp_mask)
+static int shrink_dqcache_memory(int nr, unsigned int gfp_mask)
 {
-	int entries = dqstats.allocated_dquots / ratio + 1;
-
-	lock_kernel();
-	prune_dqcache(entries);
-	unlock_kernel();
-	return entries;
+	if (nr) {
+		lock_kernel();
+		prune_dqcache(nr);
+		unlock_kernel();
+	}
+	return dqstats.allocated_dquots;
 }
 
 /*
@@ -1490,6 +1491,9 @@ static ctl_table sys_table[] = {
 	{},
 };
 
+/* SLAB cache for dquot structures */
+kmem_cache_t *dquot_cachep;
+
 static int __init dquot_init(void)
 {
 	int i;
@@ -1499,9 +1503,17 @@ static int __init dquot_init(void)
 		INIT_LIST_HEAD(dquot_hash + i);
 	printk(KERN_NOTICE "VFS: Disk quotas v%s\n", __DQUOT_VERSION__);
 
+	dquot_cachep = kmem_cache_create("dquot", 
+			sizeof(struct dquot), sizeof(unsigned long) * 4,
+			SLAB_HWCACHE_ALIGN, NULL, NULL);
+	if (!dquot_cachep)
+		panic("Cannot create dquot SLAB cache");
+
+	set_shrinker(DEFAULT_SEEKS, shrink_dqcache_memory);
+
 	return 0;
 }
-__initcall(dquot_init);
+module_init(dquot_init);
 
 EXPORT_SYMBOL(register_quota_format);
 EXPORT_SYMBOL(unregister_quota_format);

@@ -85,7 +85,7 @@ static unsigned long iq80310_gettimeoffset (void)
 	/*
 	 * Now convert them to usec.
 	 */
-	usec = (unsigned long)(elapsed*tick)/LATCH;
+	usec = (unsigned long)(elapsed * (tick_nsec / 1000))/LATCH;
 
 	return usec;
 }

@@ -14,31 +14,10 @@
  */
 #include <linux/linkage.h>
 #include <asm/constants.h>
+#include <asm/tlbflush.h>
 #include "proc-macros.S"
 
 	.align	5
-/*
- *	v4_flush_user_tlb_mm(mm)
- *
- *	Invalidate all TLB entries in a particular address space
- *
- *	- mm    - mm_struct describing address space
- */
-ENTRY(v4_flush_user_tlb_mm)
-	act_mm	r1				@ get current->active_mm
-	teq	r0, r1				@ == mm ?
-	movne	pc, lr				@ no, we dont do anything
-
-/*
- *	v4_flush_kern_tlb_all()
- *
- *	Invalidate the entire TLB
- */
-ENTRY(v4_flush_kern_tlb_all)
-	mov	r0, #0
-	mcr	p15, 0, r0, c8, c7, 0		@ invalidate I + D TLBs
-	mov	pc, lr
-
 /*
  *	v4_flush_user_tlb_range(start, end, mm)
  *
@@ -65,25 +44,6 @@ ENTRY(v4_flush_user_tlb_range)
 	mov	pc, lr
 
 /*
- *	v4_flush_user_tlb_page(vaddr,vma)
- *
- *	Invalidate the specified page in the specified address space.
- *
- *	- vaddr - virtual address (may not be aligned)
- *	- vma   - vma_struct describing address range
- */
-	.align	5
-ENTRY(v4_flush_user_tlb_page)
-	vma_vm_mm r2, r1			@ get vma->vm_mm
-	act_mm	r3				@ get current->active_mm
-	teq	r2, r3				@ equal
-	movne	pc, lr				@ no
-	vma_vm_flags r2, r1
-.v4_flush_kern_tlb_page:
-	mcr	p15, 0, r0, c8, c7, 1		@ invalidate TLB entry
-	mov	pc, lr
-
-/*
  *	v4_flush_kerm_tlb_range(start, end)
  *
  *	Invalidate a range of TLB entries in the specified kernel
@@ -95,27 +55,11 @@ ENTRY(v4_flush_user_tlb_page)
 .globl v4_flush_kern_tlb_range
 .equ v4_flush_kern_tlb_range, .v4_flush_kern_tlb_range
 
-
-/*
- *	v4_flush_kern_tlb_page(kaddr)
- *
- *	Invalidate the TLB entry for the specified page.  The address
- *	will be in the kernels virtual memory space.  Current uses
- *	only require the D-TLB to be invalidated.
- *
- *	- kaddr - Kernel virtual memory address
- */
-.globl v4_flush_kern_tlb_page
-.equ v4_flush_kern_tlb_page, .v4_flush_kern_tlb_page
-
 	.section ".text.init", #alloc, #execinstr
 
 	.type	v4_tlb_fns, #object
 ENTRY(v4_tlb_fns)
-	.long	v4_flush_kern_tlb_all
-	.long	v4_flush_user_tlb_mm
 	.long	v4_flush_user_tlb_range
-	.long	v4_flush_user_tlb_page
 	.long	v4_flush_kern_tlb_range
-	.long	v4_flush_kern_tlb_page
+	.long	v4_tlb_flags
 	.size	v4_tlb_fns, . - v4_tlb_fns

@@ -62,13 +62,12 @@ static inline int jumpshot_bulk_read(struct us_data *us,
 				     unsigned char *data, 
 				     unsigned int len)
 {
-	unsigned int act_len;	/* ignored */
-
 	if (len == 0)
 		return USB_STOR_XFER_GOOD;
 
 	US_DEBUGP("jumpshot_bulk_read:  len = %d\n", len);
-	return usb_storage_raw_bulk(us, SCSI_DATA_READ, data, len, &act_len);
+	return usb_stor_bulk_transfer_buf(us, us->recv_bulk_pipe,
+			data, len, NULL);
 }
 
 
@@ -76,13 +75,12 @@ static inline int jumpshot_bulk_write(struct us_data *us,
 				      unsigned char *data, 
 				      unsigned int len)
 {
-	unsigned int act_len;	/* ignored */
-
 	if (len == 0)
 		return USB_STOR_XFER_GOOD;
 
 	US_DEBUGP("jumpshot_bulk_write:  len = %d\n", len);
-	return usb_storage_raw_bulk(us, SCSI_DATA_WRITE, data, len, &act_len);
+	return usb_stor_bulk_transfer_buf(us, us->send_bulk_pipe,
+			data, len, NULL);
 }
 
 
@@ -95,12 +93,11 @@ static int jumpshot_get_status(struct us_data  *us)
 		return USB_STOR_TRANSPORT_ERROR;
 
 	// send the setup
-	rc = usb_storage_send_control(us,
-				   usb_rcvctrlpipe(us->pusb_dev, 0),
+	rc = usb_stor_ctrl_transfer(us, us->recv_ctrl_pipe,
 				   0, 0xA0, 0, 7, &reply, 1);
 
-	if (rc != USB_STOR_TRANSPORT_GOOD)
-		return rc;
+	if (rc != USB_STOR_XFER_GOOD)
+		return USB_STOR_TRANSPORT_ERROR;
 
 	if (reply != 0x50) {
 		US_DEBUGP("jumpshot_get_status:  0x%2x\n",
@@ -160,10 +157,9 @@ static int jumpshot_read_data(struct us_data *us,
 		command[5] |= (sector >> 24) & 0x0F;
 
 		// send the setup + command
-		result = usb_storage_send_control(us,
-					       usb_sndctrlpipe(us->pusb_dev, 0),
+		result = usb_stor_ctrl_transfer(us, us->send_ctrl_pipe,
 					       0, 0x20, 0, 1, command, 7);
-		if (result != USB_STOR_TRANSPORT_GOOD)
+		if (result != USB_STOR_XFER_GOOD)
 			goto leave;
 
 		// read the result
@@ -247,9 +243,10 @@ static int jumpshot_write_data(struct us_data *us,
 		command[5] |= (sector >> 24) & 0x0F;
 
 		// send the setup + command
-		result = usb_storage_send_control(
-			us, usb_sndctrlpipe(us->pusb_dev, 0),
+		result = usb_stor_ctrl_transfer(us, us->send_ctrl_pipe,
 			0, 0x20, 0, 1, command, 7);
+		if (result != USB_STOR_XFER_GOOD)
+			goto leave;
 
 		// send the data
 		result = jumpshot_bulk_write(us, ptr, len);
@@ -302,11 +299,10 @@ static int jumpshot_id_device(struct us_data *us,
 		return USB_STOR_TRANSPORT_ERROR;
 
 	// send the setup
-	rc = usb_storage_send_control(us,
-				   usb_sndctrlpipe(us->pusb_dev, 0),
+	rc = usb_stor_ctrl_transfer(us, us->send_ctrl_pipe,
 				   0, 0x20, 0, 6, command, 2);
 
-	if (rc != USB_STOR_TRANSPORT_GOOD) {
+	if (rc != USB_STOR_XFER_GOOD) {
 		US_DEBUGP("jumpshot_id_device:  Gah! "
 			  "send_control for read_capacity failed\n");
 		return rc;
@@ -468,7 +464,7 @@ int jumpshot_transport(Scsi_Cmnd * srb, struct us_data *us)
 		0x00, 0x80, 0x00, 0x01, 0x1F, 0x00, 0x00, 0x00
 	};
 
-
+	srb->resid = 0;
 	if (!us->extra) {
 		us->extra = kmalloc(sizeof(struct jumpshot_info), GFP_NOIO);
 		if (!us->extra) {

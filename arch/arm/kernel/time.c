@@ -115,8 +115,8 @@ static inline void do_set_rtc(void)
 	    time_before(xtime.tv_sec, next_rtc_update))
 		return;
 
-	if (xtime.tv_usec < 50000 - (tick >> 1) &&
-	    xtime.tv_usec >= 50000 + (tick >> 1))
+	if (xtime.tv_nsec < 500000000 - ((unsigned) tick_nsec >> 1) &&
+	    xtime.tv_nsec >= 500000000 + ((unsigned) tick_nsec >> 1))
 		return;
 
 	if (set_rtc())
@@ -166,7 +166,7 @@ void do_gettimeofday(struct timeval *tv)
 		usec += lost * USECS_PER_JIFFY;
 
 	sec = xtime.tv_sec;
-	usec += xtime.tv_usec;
+	usec += xtime.tv_nsec / 1000;
 	read_unlock_irqrestore(&xtime_lock, flags);
 
 	/* usec may have gone up a lot: be safe */
@@ -196,7 +196,8 @@ void do_settimeofday(struct timeval *tv)
 		tv->tv_sec--;
 	}
 
-	xtime = *tv;
+	xtime.tv_sec = tv->tv_sec;
+	xtime.tv_nsec = tv->tv_usec * 1000;
 	time_adjust = 0;		/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;

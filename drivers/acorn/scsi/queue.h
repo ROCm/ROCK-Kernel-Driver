@@ -46,7 +46,7 @@ extern Scsi_Cmnd *queue_remove (Queue_t *queue);
  *	     exclude - array of busy LUNs
  * Returns : Scsi_Cmnd if successful (and a reference), or NULL if no command available
  */
-extern Scsi_Cmnd *queue_remove_exclude (Queue_t *queue, void *exclude);
+extern Scsi_Cmnd *queue_remove_exclude (Queue_t *queue, unsigned long *exclude);
 
 #define queue_add_cmd_ordered(queue,SCpnt) \
 	__queue_add(queue,SCpnt,(SCpnt)->cmnd[0] == REQUEST_SENSE)
