@@ -4240,6 +4240,9 @@ static int tg3_reset_hw(struct tg3 *tp)
 		return -ENODEV;
 	}
 
+	/* Setup replenish threshold. */
+	tw32(RCVBDI_STD_THRESH, tp->rx_pending / 8);
+
 	/* Initialize TG3_BDINFO's at:
 	 *  RCVDBDI_STD_BD:	standard eth size rx ring
 	 *  RCVDBDI_JUMBO_BD:	jumbo frame rx ring
@@ -4261,17 +4264,24 @@ static int tg3_reset_hw(struct tg3 *tp)
 	     ((u64) tp->rx_std_mapping >> 32));
 	tw32(RCVDBDI_STD_BD + TG3_BDINFO_HOST_ADDR + TG3_64BIT_REG_LOW,
 	     ((u64) tp->rx_std_mapping & 0xffffffff));
-	tw32(RCVDBDI_STD_BD + TG3_BDINFO_MAXLEN_FLAGS,
-	     RX_STD_MAX_SIZE << BDINFO_FLAGS_MAXLEN_SHIFT);
 	tw32(RCVDBDI_STD_BD + TG3_BDINFO_NIC_ADDR,
 	     NIC_SRAM_RX_BUFFER_DESC);
 
 	/* Don't even try to program the JUMBO/MINI buffer descriptor
 	 * configs on 5705.
 	 */
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) {
+		tw32(RCVDBDI_STD_BD + TG3_BDINFO_MAXLEN_FLAGS,
+		     RX_STD_MAX_SIZE_5705 << BDINFO_FLAGS_MAXLEN_SHIFT);
+	} else {
+		tw32(RCVDBDI_STD_BD + TG3_BDINFO_MAXLEN_FLAGS,
+		     RX_STD_MAX_SIZE << BDINFO_FLAGS_MAXLEN_SHIFT);
+
 		tw32(RCVDBDI_MINI_BD + TG3_BDINFO_MAXLEN_FLAGS,
 		     BDINFO_FLAGS_DISABLED);
+
+		/* Setup replenish threshold. */
+		tw32(RCVBDI_JUMBO_THRESH, tp->rx_jumbo_pending / 8);
 
 		if (tp->tg3_flags & TG3_FLAG_JUMBO_ENABLE) {
 			tw32(RCVDBDI_JUMBO_BD + TG3_BDINFO_HOST_ADDR + TG3_64BIT_REG_HIGH,
@@ -4286,11 +4296,8 @@ static int tg3_reset_hw(struct tg3 *tp)
 			tw32(RCVDBDI_JUMBO_BD + TG3_BDINFO_MAXLEN_FLAGS,
 			     BDINFO_FLAGS_DISABLED);
 		}
-	}
 
-	/* Setup replenish thresholds. */
-	tw32(RCVBDI_STD_THRESH, tp->rx_pending / 8);
-	tw32(RCVBDI_JUMBO_THRESH, tp->rx_jumbo_pending / 8);
+	}
 
 	/* There is only one send ring on 5705, no need to explicitly
 	 * disable the others.
@@ -4394,15 +4401,21 @@ static int tg3_reset_hw(struct tg3 *tp)
 	}
 
 	tw32(HOSTCC_RXCOL_TICKS, 0);
-	tw32(HOSTCC_RXMAX_FRAMES, 1);
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705)
-		tw32(HOSTCC_RXCOAL_TICK_INT, 0);
-	tw32(HOSTCC_RXCOAL_MAXF_INT, 1);
 	tw32(HOSTCC_TXCOL_TICKS, LOW_TXCOL_TICKS);
+	tw32(HOSTCC_RXMAX_FRAMES, 1);
 	tw32(HOSTCC_TXMAX_FRAMES, LOW_RXMAX_FRAMES);
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705)
+		tw32(HOSTCC_RXCOAL_TICK_INT, 0);
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705)
 		tw32(HOSTCC_TXCOAL_TICK_INT, 0);
+	tw32(HOSTCC_RXCOAL_MAXF_INT, 1);
 	tw32(HOSTCC_TXCOAL_MAXF_INT, 0);
+
+	/* set status block DMA address */
+	tw32(HOSTCC_STATUS_BLK_HOST_ADDR + TG3_64BIT_REG_HIGH,
+	     ((u64) tp->status_mapping >> 32));
+	tw32(HOSTCC_STATUS_BLK_HOST_ADDR + TG3_64BIT_REG_LOW,
+	     ((u64) tp->status_mapping & 0xffffffff));
 
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
 		/* Status/statistics block address.  See tg3_timer,
@@ -4415,10 +4428,6 @@ static int tg3_reset_hw(struct tg3 *tp)
 		     ((u64) tp->stats_mapping >> 32));
 		tw32(HOSTCC_STATS_BLK_HOST_ADDR + TG3_64BIT_REG_LOW,
 		     ((u64) tp->stats_mapping & 0xffffffff));
-		tw32(HOSTCC_STATUS_BLK_HOST_ADDR + TG3_64BIT_REG_HIGH,
-		     ((u64) tp->status_mapping >> 32));
-		tw32(HOSTCC_STATUS_BLK_HOST_ADDR + TG3_64BIT_REG_LOW,
-		     ((u64) tp->status_mapping & 0xffffffff));
 		tw32(HOSTCC_STATS_BLK_NIC_ADDR, NIC_SRAM_STATS_BLK);
 		tw32(HOSTCC_STATUS_BLK_NIC_ADDR, NIC_SRAM_STATUS_BLK);
 	}
