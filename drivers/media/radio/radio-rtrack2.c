@@ -1,7 +1,7 @@
 /* RadioTrack II driver for Linux radio support (C) 1998 Ben Pfaff
  * 
  * Based on RadioTrack I/RadioReveal (C) 1997 M. Kirkwood
- * Coverted to new API by Alan Cox <Alan.Cox@linux.org>
+ * Converted to new API by Alan Cox <Alan.Cox@linux.org>
  * Various bugfixes and enhancements by Russell Kroll <rkroll@exploits.org>
  *
  * TODO: Allow for more than one of these foolish entities :-)
