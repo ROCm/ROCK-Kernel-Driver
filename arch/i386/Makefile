@@ -29,10 +29,10 @@ cflags-$(CONFIG_M386)		+= -march=i386
 cflags-$(CONFIG_M486)		+= -march=i486
 cflags-$(CONFIG_M586)		+= -march=i586
 cflags-$(CONFIG_M586TSC)	+= -march=i586
-cflags-$(CONFIG_M586MMX)	+= -march=i586
+cflags-$(CONFIG_M586MMX)	+= $(shell if $(CC) -march=pentium-mmx -S -o /dev/null -xc /dev/null >/dev/null 2>&1; then echo "-march=pentium-mmx"; else echo "-march=i586"; fi) 
 cflags-$(CONFIG_M686)		+= -march=i686
-cflags-$(CONFIG_MPENTIUMIII)	+= -march=i686
-cflags-$(CONFIG_MPENTIUM4)	+= -march=i686
+cflags-$(CONFIG_MPENTIUMIII)	+= $(shell if $(CC) -march=pentium3 -S -o /dev/null -xc /dev/null >/dev/null 2>&1; then echo "-march=pentium3"; else echo "-march=i686"; fi) 
+cflags-$(CONFIG_MPENTIUM4)	+= $(shell if $(CC) -march=pentium4 -S -o /dev/null -xc /dev/null >/dev/null 2>&1; then echo "-march=pentium4"; else echo "-march=i686"; fi) 
 cflags-$(CONFIG_MK6)		+= $(shell if $(CC) -march=k6 -S -o /dev/null -xc /dev/null >/dev/null 2>&1; then echo "-march=k6"; else echo "-march=i586"; fi)
 cflags-$(CONFIG_MK7)		+= $(shell if $(CC) -march=athlon -S -o /dev/null -xc /dev/null >/dev/null 2>&1; then echo "-march=athlon"; else echo "-march=i686 -malign-functions=4"; fi) 
 cflags-$(CONFIG_MCRUSOE)	+= -march=i686 -malign-functions=0 -malign-jumps=0 -malign-loops=0
