@@ -618,8 +618,10 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 		else if (!memcmp(from, "acpi_sci=low", 12))
 			acpi_sci_flags.polarity = 3;
 
+#ifdef CONFIG_X86_IO_APIC
 		else if (!memcmp(from, "acpi_skip_timer_override", 24))
 			acpi_skip_timer_override = 1;
+#endif
 
 #ifdef CONFIG_X86_LOCAL_APIC
 		/* disable IO-APIC */
