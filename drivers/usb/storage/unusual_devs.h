@@ -75,28 +75,26 @@ UNUSUAL_DEV(  0x03f0, 0x0307, 0x0001, 0x0001,
 
 /* Deduced by Jonathan Woithe <jwoithe@physics.adelaide.edu.au>
  * Entry needed for flags: US_FL_FIX_INQUIRY because initial inquiry message
- * always fails and confuses drive; without US_FL_START_STOP, drive accesses
- * (read or write) all fail.
+ * always fails and confuses drive.
  */
 UNUSUAL_DEV(  0x0411, 0x001c, 0x0113, 0x0113,
 		"Buffalo",
 		"DUB-P40G HDD",
-		US_SC_SCSI, US_PR_BULK, NULL,
-		US_FL_FIX_INQUIRY | US_FL_START_STOP),
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_INQUIRY ),
 
 #ifdef CONFIG_USB_STORAGE_DPCM
 UNUSUAL_DEV(  0x0436, 0x0005, 0x0100, 0x0100,
 		"Microtech",
 		"CameraMate (DPCM_USB)",
- 		US_SC_SCSI, US_PR_DPCM_USB, NULL,
-		US_FL_START_STOP ),
+ 		US_SC_SCSI, US_PR_DPCM_USB, NULL, 0 ),
 #endif
 
 /* Made with the help of Edd Dumbill <edd@usefulinc.com> */
 UNUSUAL_DEV(  0x0451, 0x5409, 0x0001, 0x0001,
 		"Frontier Labs",
 		"Nex II Digital",
-		US_SC_SCSI, US_PR_BULK, NULL, US_FL_START_STOP),
+		US_SC_SCSI, US_PR_BULK, NULL, 0),
 
 /* Patch submitted by Philipp Friedrich <philipp@void.at> */
 UNUSUAL_DEV(  0x0482, 0x0100, 0x0100, 0x0100,
@@ -124,15 +122,6 @@ UNUSUAL_DEV(  0x04b8, 0x0602, 0x0110, 0x0110,
 		"785EPX Storage",
 		US_SC_SCSI, US_PR_BULK, NULL, US_FL_SINGLE_LUN),
 
-/* Reported by Jan Willamowius <jan@willamowius.de>
- * The device needs the flags only.
- */
-UNUSUAL_DEV(  0x04c8, 0x0723, 0x0000, 0x9999,
-		"Konica",
-		"KD-200Z",
-		US_SC_SCSI, US_PR_BULK, NULL,
-		US_FL_START_STOP),
-
 UNUSUAL_DEV(  0x04cb, 0x0100, 0x0000, 0x2210,
 		"Fujifilm",
 		"FinePix 1400Zoom",
@@ -144,7 +133,7 @@ UNUSUAL_DEV(  0x04cb, 0x0100, 0x0000, 0x2210,
 UNUSUAL_DEV(  0x04ce, 0x0002, 0x0074, 0x0074,
 		"ScanLogic",
 		"SL11R-IDE",
-		US_SC_SCSI, US_PR_BULK, NULL,
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY),
 
 /* Reported by Kriston Fincher <kriston@airmail.net>
@@ -183,14 +172,14 @@ UNUSUAL_DEV(  0x04e6, 0x0003, 0x0000, 0x9999,
 		"Sandisk",
 		"ImageMate SDDR09",
 		US_SC_SCSI, US_PR_EUSB_SDDR09, NULL,
-		US_FL_SINGLE_LUN | US_FL_START_STOP ),
+		US_FL_SINGLE_LUN ),
 
 /* This entry is from Andries.Brouwer@cwi.nl */
 UNUSUAL_DEV(  0x04e6, 0x0005, 0x0100, 0x0208,
 		"SCM Microsystems",
 		"eUSB SmartMedia / CompactFlash Adapter",
 		US_SC_SCSI, US_PR_DPCM_USB, sddr09_init, 
-		US_FL_START_STOP), 
+		0), 
 #endif
 
 UNUSUAL_DEV(  0x04e6, 0x0006, 0x0100, 0x0205, 
@@ -247,40 +236,40 @@ UNUSUAL_DEV(  0x0525, 0xa140, 0x0100, 0x0100,
 		"Iomega",
 		"USB Clik! 40",
 		US_SC_8070, US_PR_BULK, NULL,
-		US_FL_FIX_INQUIRY | US_FL_START_STOP ),
+		US_FL_FIX_INQUIRY ),
 
 /* This entry is needed because the device reports Sub=ff */
 UNUSUAL_DEV(  0x054c, 0x0010, 0x0106, 0x0450, 
 		"Sony",
 		"DSC-S30/S70/S75/505V/F505/F707/F717/P8", 
 		US_SC_SCSI, US_PR_CB, NULL,
-		US_FL_SINGLE_LUN | US_FL_START_STOP | US_FL_MODE_XLATE ),
+		US_FL_SINGLE_LUN | US_FL_MODE_XLATE ),
 
 /* Reported by wim@geeks.nl */
 UNUSUAL_DEV(  0x054c, 0x0025, 0x0100, 0x0100, 
 		"Sony",
 		"Memorystick NW-MS7",
 		US_SC_UFI, US_PR_CB, NULL,
-		US_FL_SINGLE_LUN | US_FL_START_STOP ),
+		US_FL_SINGLE_LUN ),
 
 UNUSUAL_DEV(  0x054c, 0x002d, 0x0100, 0x0100, 
 		"Sony",
 		"Memorystick MSAC-US1",
 		US_SC_UFI, US_PR_CB, NULL,
-		US_FL_SINGLE_LUN | US_FL_START_STOP ),
+		US_FL_SINGLE_LUN ),
 
 /* Submitted by Klaus Mueller <k.mueller@intershop.de> */
 UNUSUAL_DEV(  0x054c, 0x002e, 0x0106, 0x0310, 
 		"Sony",
 		"Handycam",
 		US_SC_SCSI, US_PR_CB, NULL,
-		US_FL_SINGLE_LUN | US_FL_START_STOP | US_FL_MODE_XLATE),
+		US_FL_SINGLE_LUN | US_FL_MODE_XLATE),
 
 UNUSUAL_DEV(  0x054c, 0x0032, 0x0000, 0x9999,
 		"Sony",
 		"Memorystick MSC-U01N",
 		US_SC_UFI, US_PR_CB, NULL,
-		US_FL_SINGLE_LUN | US_FL_START_STOP ),
+		US_FL_SINGLE_LUN ),
 		
 /* Submitted by Nathan Babb <nathan@lexi.com> */
 UNUSUAL_DEV(  0x054c, 0x006d, 0x0000, 0x9999,
@@ -316,7 +305,7 @@ UNUSUAL_DEV(  0x059f, 0xa601, 0x0200, 0x0200,
 UNUSUAL_DEV( 0x0a17, 0x0004, 0x1000, 0x1000,
                 "Pentax",
                 "Optio 2/3/400",
-                US_SC_8070, US_PR_CBI, NULL,
+                US_SC_DEVICE, US_PR_DEVICE, NULL,
                 US_FL_FIX_INQUIRY ),
 
 /* Submitted by Per Winkvist <per.winkvist@uk.com> */
@@ -380,7 +369,7 @@ UNUSUAL_DEV(  0x05dc, 0xb002, 0x0000, 0x0113,
 UNUSUAL_DEV(  0x05e3, 0x0700, 0x0000, 0xffff,
 		"SIIG",
 		"CompactFlash Card Reader",
-		US_SC_SCSI, US_PR_BULK, NULL,
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
 
 /* Reported by Peter Marks <peter.marks@turner.com>
@@ -393,12 +382,20 @@ UNUSUAL_DEV(  0x05e3, 0x0700, 0x0000, 0xffff,
 UNUSUAL_DEV(  0x05e3, 0x0702, 0x0000, 0x0001,
 		"EagleTec",
 		"External Hard Disk",
-		US_SC_SCSI, US_PR_BULK, NULL,
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
 
 UNUSUAL_DEV(  0x05e3, 0x0700, 0x0000, 0x9999,
 		"Unknown",
 		"GL641USB based CF Card reader",
+		US_SC_SCSI, US_PR_BULK, NULL,
+		US_FL_FIX_INQUIRY | US_FL_MODE_XLATE),
+
+/* Reported by Hanno Boeck <hanno@gmx.de>
+ * Taken from the Lycoris Kernel */
+UNUSUAL_DEV(  0x0636, 0x0003, 0x0000, 0x9999,
+		"Vivitar",
+		"Vivicam 35Xx",
 		US_SC_SCSI, US_PR_BULK, NULL,
 		US_FL_FIX_INQUIRY | US_FL_MODE_XLATE),
 
@@ -412,24 +409,8 @@ UNUSUAL_DEV(  0x066b, 0x0105, 0x0100, 0x0100,
 		"Olympus",
 		"Camedia MAUSB-2",
 		US_SC_SCSI, US_PR_EUSB_SDDR09, NULL,
-		US_FL_SINGLE_LUN | US_FL_START_STOP ),
+		US_FL_SINGLE_LUN ),
 #endif
-
-/* Submitted by kedar@centillium
- * Needed for START_STOP flag, but that is unconfirmed */
-UNUSUAL_DEV( 0x0686, 0x4006, 0x0001, 0x0001,
-		"Minolta",
-		"Dimage S304",
-		US_SC_SCSI, US_PR_BULK, NULL,
-		US_FL_START_STOP ),
-
-/* Submitted by f.brugmans@hccnet.nl
- * Needed for START_STOP flag */
-UNUSUAL_DEV( 0x0686, 0x4007, 0x0001, 0x0001,
-		"Minolta",
-		"Dimage S304",
-		US_SC_SCSI, US_PR_BULK, NULL,
-		US_FL_START_STOP ),
 
 UNUSUAL_DEV(  0x0693, 0x0002, 0x0100, 0x0100, 
 		"Hagiwara",
@@ -445,13 +426,12 @@ UNUSUAL_DEV(  0x0781, 0x0001, 0x0200, 0x0200,
 		"Sandisk",
 		"ImageMate SDDR-05a",
 		US_SC_SCSI, US_PR_CB, NULL,
-		US_FL_SINGLE_LUN | US_FL_START_STOP),
+		US_FL_SINGLE_LUN ),
 
 UNUSUAL_DEV(  0x0781, 0x0002, 0x0009, 0x0009, 
 		"Sandisk",
 		"ImageMate SDDR-31",
-		US_SC_SCSI, US_PR_BULK, NULL,
-		US_FL_IGNORE_SER),
+		US_SC_SCSI, US_PR_BULK, NULL, 0 ),
 
 UNUSUAL_DEV(  0x0781, 0x0100, 0x0100, 0x0100,
 		"Sandisk",
@@ -464,7 +444,7 @@ UNUSUAL_DEV(  0x0781, 0x0200, 0x0000, 0x9999,
 		"Sandisk",
 		"ImageMate SDDR-09",
 		US_SC_SCSI, US_PR_EUSB_SDDR09, NULL,
-		US_FL_SINGLE_LUN | US_FL_START_STOP ),
+		US_FL_SINGLE_LUN ),
 #endif
 
 #ifdef CONFIG_USB_STORAGE_FREECOM
@@ -490,8 +470,7 @@ UNUSUAL_DEV(  0x07af, 0x0005, 0x0100, 0x0100,
 UNUSUAL_DEV(  0x07af, 0x0006, 0x0100, 0x0100,
 		"Microtech",
 		"CameraMate (DPCM_USB)",
- 		US_SC_SCSI, US_PR_DPCM_USB, NULL,
-		US_FL_START_STOP ),
+ 		US_SC_SCSI, US_PR_DPCM_USB, NULL, 0 ),
 #endif
 
 #ifdef CONFIG_USB_STORAGE_DATAFAB
@@ -568,7 +547,7 @@ UNUSUAL_DEV( 0x07c4, 0xa103, 0x0000, 0x9999,
 UNUSUAL_DEV(  0x07c4, 0xa400, 0x0000, 0xffff,
 		"Datafab",
 		"KECF-USB",
-		US_SC_SCSI, US_PR_BULK, NULL,
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
 
 /* Casio QV 2x00/3x00/4000/8000 digital still cameras are not conformant
@@ -629,20 +608,7 @@ UNUSUAL_DEV(  0x1065, 0x2136, 0x0000, 0x0001,
 		"Global Channel Solutions",
 		"EasyDisk EDxxxx",
 		US_SC_SCSI, US_PR_BULK, NULL,
-		US_FL_MODE_XLATE | US_FL_START_STOP | US_FL_FIX_INQUIRY ),
-
-/* Submitted by Brian Hall <brihall@pcisys.net>
- * Needed for START_STOP flag */
-UNUSUAL_DEV(  0x0c76, 0x0003, 0x0100, 0x0100,
-		"JMTek",
-		"USBDrive",
-		US_SC_SCSI, US_PR_BULK, NULL,
-		US_FL_START_STOP ),
-UNUSUAL_DEV(  0x0c76, 0x0005, 0x0100, 0x0100,
-		"JMTek",
-		"USBDrive",
-		US_SC_SCSI, US_PR_BULK, NULL,
-		US_FL_START_STOP ),
+		US_FL_MODE_XLATE | US_FL_FIX_INQUIRY ),
 
 /* Reported by Dan Pilone <pilone@slac.com>
  * The device needs the flags only.
@@ -652,8 +618,8 @@ UNUSUAL_DEV(  0x0c76, 0x0005, 0x0100, 0x0100,
 UNUSUAL_DEV(  0x1065, 0x2136, 0x0000, 0x9999,
 		"CCYU TECHNOLOGY",
 		"EasyDisk Portable Device",
-		US_SC_SCSI, US_PR_BULK, NULL,
-		US_FL_MODE_XLATE | US_FL_START_STOP),
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_MODE_XLATE ),
 
 #ifdef CONFIG_USB_STORAGE_SDDR55
 UNUSUAL_DEV(  0x55aa, 0xa103, 0x0000, 0x9999, 
@@ -670,5 +636,5 @@ UNUSUAL_DEV(  0x08ca, 0x2011, 0x0000, 0x9999,
 	"AIPTEK",
 	"PocketCAM 3Mega",
 	US_SC_SCSI, US_PR_BULK, NULL,
-	US_FL_MODE_XLATE | US_FL_START_STOP),
+	US_FL_MODE_XLATE ),
 

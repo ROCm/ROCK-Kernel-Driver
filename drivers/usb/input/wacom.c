@@ -590,7 +590,7 @@ static int wacom_probe(struct usb_interface *intf, const struct usb_device_id *i
 			 wacom->data, wacom->features->pktlen,
 			 wacom->features->irq, wacom, endpoint->bInterval);
 	wacom->irq->transfer_dma = wacom->data_dma;
-	wacom->irq->transfer_flags |= URB_NO_DMA_MAP;
+	wacom->irq->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 
 	input_register_device(&wacom->dev);
 

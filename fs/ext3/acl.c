@@ -416,12 +416,14 @@ ext3_acl_chmod(struct inode *inode)
 
 		handle = ext3_journal_start(inode, EXT3_XATTR_TRANS_BLOCKS);
 		if (IS_ERR(handle)) {
+			error = PTR_ERR(handle);
 			ext3_std_error(inode->i_sb, error);
-			return PTR_ERR(handle);
+			goto out;
 		}
 		error = ext3_set_acl(handle, inode, ACL_TYPE_ACCESS, clone);
 		ext3_journal_stop(handle);
 	}
+out:
 	posix_acl_release(clone);
 	return error;
 }

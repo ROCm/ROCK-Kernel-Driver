@@ -136,9 +136,9 @@ static int usb_stor_msg_common(struct us_data *us, int timeout)
 	struct timer_list to_timer;
 	int status;
 
-	/* don't submit URBS during abort/disconnect processing */
+	/* don't submit URBs during abort/disconnect processing */
 	if (us->flags & DONT_SUBMIT)
-		return -ECONNRESET;
+		return -EIO;
 
 	/* set up data structures for the wakeup system */
 	init_completion(&urb_done);
@@ -299,17 +299,17 @@ static int interpret_urb_result(struct us_data *us, unsigned int pipe,
 			return USB_STOR_XFER_ERROR;
 		return USB_STOR_XFER_STALLED;
 
-	/* NAK - that means we've retried this a few times already */
+	/* timeout or excessively long NAK */
 	case -ETIMEDOUT:
-		US_DEBUGP("-- device NAKed\n");
+		US_DEBUGP("-- timeout or NAK\n");
 		return USB_STOR_XFER_ERROR;
 
 	/* babble - the device tried to send more than we wanted to read */
 	case -EOVERFLOW:
-		US_DEBUGP("-- Babble\n");
+		US_DEBUGP("-- babble\n");
 		return USB_STOR_XFER_LONG;
 
-	/* the transfer was cancelled, presumably by an abort */
+	/* the transfer was cancelled by abort, disconnect, or timeout */
 	case -ECONNRESET:
 		US_DEBUGP("-- transfer cancelled\n");
 		return USB_STOR_XFER_ERROR;
@@ -318,6 +318,11 @@ static int interpret_urb_result(struct us_data *us, unsigned int pipe,
 	case -EREMOTEIO:
 		US_DEBUGP("-- short read transfer\n");
 		return USB_STOR_XFER_SHORT;
+
+	/* abort or disconnect in progress */
+	case -EIO:
+		US_DEBUGP("-- abort or disconnect in progress\n");
+		return USB_STOR_XFER_ERROR;
 
 	/* the catch-all error case */
 	default:
@@ -430,7 +435,7 @@ int usb_stor_bulk_transfer_sglist(struct us_data *us, unsigned int pipe,
 	/* initialize the scatter-gather request block */
 	US_DEBUGP("%s: xfer %u bytes, %d entries\n", __FUNCTION__,
 			length, num_sg);
-	result = usb_sg_init(us->current_sg, us->pusb_dev, pipe, 0,
+	result = usb_sg_init(&us->current_sg, us->pusb_dev, pipe, 0,
 			sg, num_sg, length, SLAB_NOIO);
 	if (result) {
 		US_DEBUGP("usb_sg_init returned %d\n", result);
@@ -447,19 +452,19 @@ int usb_stor_bulk_transfer_sglist(struct us_data *us, unsigned int pipe,
 		/* cancel the request, if it hasn't been cancelled already */
 		if (test_and_clear_bit(US_FLIDX_SG_ACTIVE, &us->flags)) {
 			US_DEBUGP("-- cancelling sg request\n");
-			usb_sg_cancel(us->current_sg);
+			usb_sg_cancel(&us->current_sg);
 		}
 	}
 
 	/* wait for the completion of the transfer */
-	usb_sg_wait(us->current_sg);
+	usb_sg_wait(&us->current_sg);
 	clear_bit(US_FLIDX_SG_ACTIVE, &us->flags);
 
-	result = us->current_sg->status;
+	result = us->current_sg.status;
 	if (act_len)
-		*act_len = us->current_sg->bytes;
+		*act_len = us->current_sg.bytes;
 	return interpret_urb_result(us, pipe, length, result,
-			us->current_sg->bytes);
+			us->current_sg.bytes);
 }
 
 /*
@@ -518,7 +523,7 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 	/* if the command gets aborted by the higher layers, we need to
 	 * short-circuit all other processing
 	 */
-	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
+	if (us->sm_state == US_STATE_ABORTING) {
 		US_DEBUGP("-- command was aborted\n");
 		goto Handle_Abort;
 	}
@@ -650,7 +655,7 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 		srb->cmd_len = old_cmd_len;
 		memcpy(srb->cmnd, old_cmnd, MAX_COMMAND_SIZE);
 
-		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
+		if (us->sm_state == US_STATE_ABORTING) {
 			US_DEBUGP("-- auto-sense aborted\n");
 			goto Handle_Abort;
 		}
@@ -734,7 +739,7 @@ void usb_stor_stop_transport(struct us_data *us)
 	/* If we are waiting for a scatter-gather operation, cancel it. */
 	if (test_and_clear_bit(US_FLIDX_SG_ACTIVE, &us->flags)) {
 		US_DEBUGP("-- cancelling sg request\n");
-		usb_sg_cancel(us->current_sg);
+		usb_sg_cancel(&us->current_sg);
 	}
 }
 

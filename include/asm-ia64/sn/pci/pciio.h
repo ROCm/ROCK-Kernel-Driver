@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
 #ifndef _ASM_SN_PCI_PCIIO_H
 #define _ASM_SN_PCI_PCIIO_H
@@ -277,7 +277,7 @@ typedef struct pciio_win_alloc_s *pciio_win_alloc_t;
 #define PCIIO_PIOMAP_WIN(n)	(0x8+(n))
 
 typedef pciio_piomap_t
-pciio_piomap_alloc_f    (devfs_handle_t dev,	/* set up mapping for this device */
+pciio_piomap_alloc_f    (vertex_hdl_t dev,	/* set up mapping for this device */
 			 device_desc_t dev_desc,	/* device descriptor */
 			 pciio_space_t space,	/* which address space */
 			 iopaddr_t pcipio_addr,		/* starting address */
@@ -297,7 +297,7 @@ typedef void
 pciio_piomap_done_f     (pciio_piomap_t pciio_piomap);
 
 typedef caddr_t
-pciio_piotrans_addr_f   (devfs_handle_t dev,	/* translate for this device */
+pciio_piotrans_addr_f   (vertex_hdl_t dev,	/* translate for this device */
 			 device_desc_t dev_desc,	/* device descriptor */
 			 pciio_space_t space,	/* which address space */
 			 iopaddr_t pciio_addr,	/* starting address */
@@ -305,7 +305,7 @@ pciio_piotrans_addr_f   (devfs_handle_t dev,	/* translate for this device */
 			 unsigned flags);
 
 typedef caddr_t
-pciio_pio_addr_f        (devfs_handle_t dev,	/* translate for this device */
+pciio_pio_addr_f        (vertex_hdl_t dev,	/* translate for this device */
 			 device_desc_t dev_desc,	/* device descriptor */
 			 pciio_space_t space,	/* which address space */
 			 iopaddr_t pciio_addr,	/* starting address */
@@ -314,14 +314,14 @@ pciio_pio_addr_f        (devfs_handle_t dev,	/* translate for this device */
 			 unsigned flags);
 
 typedef iopaddr_t
-pciio_piospace_alloc_f  (devfs_handle_t dev,	/* PIO space for this device */
+pciio_piospace_alloc_f  (vertex_hdl_t dev,	/* PIO space for this device */
 			 device_desc_t dev_desc,	/* Device descriptor   */
 			 pciio_space_t space,	/* which address space  */
 			 size_t byte_count,	/* Number of bytes of space */
 			 size_t alignment);	/* Alignment of allocation  */
 
 typedef void
-pciio_piospace_free_f   (devfs_handle_t dev,	/* Device freeing space */
+pciio_piospace_free_f   (vertex_hdl_t dev,	/* Device freeing space */
 			 pciio_space_t space,	/* Which space is freed */
 			 iopaddr_t pci_addr,	/* Address being freed */
 			 size_t size);	/* Size freed           */
@@ -329,7 +329,7 @@ pciio_piospace_free_f   (devfs_handle_t dev,	/* Device freeing space */
 /* DMA MANAGEMENT */
 
 typedef pciio_dmamap_t
-pciio_dmamap_alloc_f    (devfs_handle_t dev,	/* set up mappings for this device */
+pciio_dmamap_alloc_f    (vertex_hdl_t dev,	/* set up mappings for this device */
 			 device_desc_t dev_desc,	/* device descriptor */
 			 size_t byte_count_max,		/* max size of a mapping */
 			 unsigned flags);	/* defined in dma.h */
@@ -342,123 +342,107 @@ pciio_dmamap_addr_f     (pciio_dmamap_t dmamap,		/* use these mapping resources 
 			 paddr_t paddr,	/* map for this address */
 			 size_t byte_count);	/* map this many bytes */
 
-typedef alenlist_t
-pciio_dmamap_list_f     (pciio_dmamap_t dmamap,		/* use these mapping resources */
-			 alenlist_t alenlist,	/* map this address/length list */
-			 unsigned flags);
-
 typedef void
 pciio_dmamap_done_f     (pciio_dmamap_t dmamap);
 
 typedef iopaddr_t
-pciio_dmatrans_addr_f   (devfs_handle_t dev,	/* translate for this device */
+pciio_dmatrans_addr_f   (vertex_hdl_t dev,	/* translate for this device */
 			 device_desc_t dev_desc,	/* device descriptor */
 			 paddr_t paddr,	/* system physical address */
 			 size_t byte_count,	/* length */
-			 unsigned flags);	/* defined in dma.h */
-
-typedef alenlist_t
-pciio_dmatrans_list_f   (devfs_handle_t dev,	/* translate for this device */
-			 device_desc_t dev_desc,	/* device descriptor */
-			 alenlist_t palenlist,	/* system address/length list */
 			 unsigned flags);	/* defined in dma.h */
 
 typedef void
 pciio_dmamap_drain_f	(pciio_dmamap_t map);
 
 typedef void
-pciio_dmaaddr_drain_f	(devfs_handle_t vhdl,
+pciio_dmaaddr_drain_f	(vertex_hdl_t vhdl,
 			 paddr_t addr,
 			 size_t bytes);
 
 typedef void
-pciio_dmalist_drain_f	(devfs_handle_t vhdl,
+pciio_dmalist_drain_f	(vertex_hdl_t vhdl,
 			 alenlist_t list);
 
 /* INTERRUPT MANAGEMENT */
 
 typedef pciio_intr_t
-pciio_intr_alloc_f      (devfs_handle_t dev,	/* which PCI device */
+pciio_intr_alloc_f      (vertex_hdl_t dev,	/* which PCI device */
 			 device_desc_t dev_desc,	/* device descriptor */
 			 pciio_intr_line_t lines,	/* which line(s) will be used */
-			 devfs_handle_t owner_dev);	/* owner of this intr */
+			 vertex_hdl_t owner_dev);	/* owner of this intr */
 
 typedef void
 pciio_intr_free_f       (pciio_intr_t intr_hdl);
 
-#ifdef CONFIG_IA64_SGI_SN1
-typedef int
-pciio_intr_connect_f    (pciio_intr_t intr_hdl);	/* pciio intr resource handle */
-#else
 typedef int
 pciio_intr_connect_f    (pciio_intr_t intr_hdl, intr_func_t intr_func, intr_arg_t intr_arg);	/* pciio intr resource handle */
-#endif
 
 typedef void
 pciio_intr_disconnect_f (pciio_intr_t intr_hdl);
 
-typedef devfs_handle_t
+typedef vertex_hdl_t
 pciio_intr_cpu_get_f    (pciio_intr_t intr_hdl);	/* pciio intr resource handle */
 
 /* CONFIGURATION MANAGEMENT */
 
 typedef void
-pciio_provider_startup_f (devfs_handle_t pciio_provider);
+pciio_provider_startup_f (vertex_hdl_t pciio_provider);
 
 typedef void
-pciio_provider_shutdown_f (devfs_handle_t pciio_provider);
+pciio_provider_shutdown_f (vertex_hdl_t pciio_provider);
 
 typedef int	
-pciio_reset_f		(devfs_handle_t conn);	/* pci connection point */
+pciio_reset_f		(vertex_hdl_t conn);	/* pci connection point */
 
 typedef int
-pciio_write_gather_flush_f (devfs_handle_t dev);    /* Device flushing buffers */
+pciio_write_gather_flush_f (vertex_hdl_t dev);    /* Device flushing buffers */
 
 typedef pciio_endian_t			/* actual endianness */
-pciio_endian_set_f      (devfs_handle_t dev,	/* specify endianness for this device */
+pciio_endian_set_f      (vertex_hdl_t dev,	/* specify endianness for this device */
 			 pciio_endian_t device_end,	/* endianness of device */
 			 pciio_endian_t desired_end);	/* desired endianness */
 
 typedef pciio_priority_t
-pciio_priority_set_f    (devfs_handle_t pcicard,
+pciio_priority_set_f    (vertex_hdl_t pcicard,
 			 pciio_priority_t device_prio);
 
 typedef uint64_t
-pciio_config_get_f	(devfs_handle_t conn,	/* pci connection point */
+pciio_config_get_f	(vertex_hdl_t conn,	/* pci connection point */
 			 unsigned reg,		/* register byte offset */
 			 unsigned size);	/* width in bytes (1..4) */
 
 typedef void
-pciio_config_set_f	(devfs_handle_t conn,	/* pci connection point */
+pciio_config_set_f	(vertex_hdl_t conn,	/* pci connection point */
 			 unsigned reg,		/* register byte offset */
 			 unsigned size,		/* width in bytes (1..4) */
 			 uint64_t value);	/* value to store */
 
 typedef int
-pciio_error_devenable_f (devfs_handle_t pconn_vhdl, int error_code);
+pciio_error_devenable_f (vertex_hdl_t pconn_vhdl, int error_code);
 
 typedef pciio_slot_t
-pciio_error_extract_f	(devfs_handle_t vhdl,
+pciio_error_extract_f	(vertex_hdl_t vhdl,
 			 pciio_space_t *spacep,
 			 iopaddr_t *addrp);
 
 typedef void
-pciio_driver_reg_callback_f	(devfs_handle_t conn,
+pciio_driver_reg_callback_f	(vertex_hdl_t conn,
 				int key1,
 				int key2,
 				int error);
 
 typedef void
-pciio_driver_unreg_callback_f	(devfs_handle_t conn, /* pci connection point */
+pciio_driver_unreg_callback_f	(vertex_hdl_t conn, /* pci connection point */
 				 int key1,
 				 int key2,
 				 int error);
 
 typedef int
-pciio_device_unregister_f	(devfs_handle_t conn);
+pciio_device_unregister_f	(vertex_hdl_t conn);
 
 typedef int
-pciio_dma_enabled_f		(devfs_handle_t conn);
+pciio_dma_enabled_f		(vertex_hdl_t conn);
 
 /*
  * Adapters that provide a PCI interface adhere to this software interface.
@@ -477,10 +461,8 @@ typedef struct pciio_provider_s {
     pciio_dmamap_alloc_f   *dmamap_alloc;
     pciio_dmamap_free_f    *dmamap_free;
     pciio_dmamap_addr_f    *dmamap_addr;
-    pciio_dmamap_list_f    *dmamap_list;
     pciio_dmamap_done_f    *dmamap_done;
     pciio_dmatrans_addr_f  *dmatrans_addr;
-    pciio_dmatrans_list_f  *dmatrans_list;
     pciio_dmamap_drain_f   *dmamap_drain;
     pciio_dmaaddr_drain_f  *dmaaddr_drain;
     pciio_dmalist_drain_f  *dmalist_drain;
@@ -525,10 +507,8 @@ extern pciio_piospace_free_f pciio_piospace_free;
 extern pciio_dmamap_alloc_f pciio_dmamap_alloc;
 extern pciio_dmamap_free_f pciio_dmamap_free;
 extern pciio_dmamap_addr_f pciio_dmamap_addr;
-extern pciio_dmamap_list_f pciio_dmamap_list;
 extern pciio_dmamap_done_f pciio_dmamap_done;
 extern pciio_dmatrans_addr_f pciio_dmatrans_addr;
-extern pciio_dmatrans_list_f pciio_dmatrans_list;
 extern pciio_dmamap_drain_f pciio_dmamap_drain;
 extern pciio_dmaaddr_drain_f pciio_dmaaddr_drain;
 extern pciio_dmalist_drain_f pciio_dmalist_drain;
@@ -580,34 +560,31 @@ pciio_driver_register  (pciio_vendor_id_t vendor_id,	/* card's vendor number */
 			unsigned flags);
 
 extern void
-pciio_error_register   (devfs_handle_t pconn,	/* which slot */
+pciio_error_register   (vertex_hdl_t pconn,	/* which slot */
 			error_handler_f *efunc,	/* function to call */
 			error_handler_arg_t einfo);	/* first parameter */
 
 extern void             pciio_driver_unregister(char *driver_prefix);
 
-typedef void		pciio_iter_f(devfs_handle_t pconn);	/* a connect point */
-
-extern void             pciio_iterate(char *driver_prefix,
-				      pciio_iter_f *func);
+typedef void		pciio_iter_f(vertex_hdl_t pconn);	/* a connect point */
 
 /* Interfaces used by PCI Bus Providers to talk to
  * the Generic PCI layer.
  */
-extern devfs_handle_t
-pciio_device_register  (devfs_handle_t connectpt,	/* vertex at center of bus */
-			devfs_handle_t master,	/* card's master ASIC (pci provider) */
+extern vertex_hdl_t
+pciio_device_register  (vertex_hdl_t connectpt,	/* vertex at center of bus */
+			vertex_hdl_t master,	/* card's master ASIC (pci provider) */
 			pciio_slot_t slot,	/* card's slot (0..?) */
 			pciio_function_t func,	/* card's func (0..?) */
 			pciio_vendor_id_t vendor,	/* card's vendor number */
 			pciio_device_id_t device);	/* card's device number */
 
 extern void
-pciio_device_unregister(devfs_handle_t connectpt);
+pciio_device_unregister(vertex_hdl_t connectpt);
 
 extern pciio_info_t
 pciio_device_info_new  (pciio_info_t pciio_info,	/* preallocated info struct */
-			devfs_handle_t master,	/* card's master ASIC (pci provider) */
+			vertex_hdl_t master,	/* card's master ASIC (pci provider) */
 			pciio_slot_t slot,	/* card's slot (0..?) */
 			pciio_function_t func,	/* card's func (0..?) */
 			pciio_vendor_id_t vendor,	/* card's vendor number */
@@ -616,24 +593,24 @@ pciio_device_info_new  (pciio_info_t pciio_info,	/* preallocated info struct */
 extern void
 pciio_device_info_free(pciio_info_t pciio_info);
 
-extern devfs_handle_t
+extern vertex_hdl_t
 pciio_device_info_register(
-			devfs_handle_t connectpt,	/* vertex at center of bus */
+			vertex_hdl_t connectpt,	/* vertex at center of bus */
 			pciio_info_t pciio_info);	/* details about conn point */
 
 extern void
 pciio_device_info_unregister(
-			devfs_handle_t connectpt,	/* vertex at center of bus */
+			vertex_hdl_t connectpt,	/* vertex at center of bus */
 			pciio_info_t pciio_info);	/* details about conn point */
 
 
 extern int              
 pciio_device_attach(
-			devfs_handle_t pcicard,   /* vertex created by pciio_device_register */
+			vertex_hdl_t pcicard,   /* vertex created by pciio_device_register */
 			int drv_flags);
 extern int
 pciio_device_detach(
-			devfs_handle_t pcicard,   /* vertex created by pciio_device_register */
+			vertex_hdl_t pcicard,   /* vertex created by pciio_device_register */
                         int drv_flags);
 
 
@@ -654,20 +631,12 @@ pciio_device_win_populate(pciio_win_map_t win_map,	/* win map */
 			  size_t size);			/* size of free range */
 
 /* allocate window from mapping resource */
-#ifdef CONFIG_IA64_SGI_SN1
-extern iopaddr_t
-pciio_device_win_alloc(pciio_win_map_t win_map,		/* win map */
-		       pciio_win_alloc_t win_alloc,	/* opaque allocation cookie */
-		       size_t size,			/* size of allocation */
-		       size_t align);			/* alignment of allocation */
-#else
 extern iopaddr_t
 pciio_device_win_alloc(pciio_win_map_t win_map,		/* win map */
 		       pciio_win_alloc_t win_alloc,	/* opaque allocation cookie */
 		       size_t start,			/* start unit, or 0 */
 		       size_t size,			/* size of allocation */
 		       size_t align);			/* alignment of allocation */
-#endif
 
 /* free previously allocated window */
 extern void
@@ -680,11 +649,11 @@ pciio_device_win_free(pciio_win_alloc_t win_alloc);	/* opaque allocation cookie 
  */
 
 /* Generic PCI interrupt interfaces */
-extern devfs_handle_t     pciio_intr_dev_get(pciio_intr_t pciio_intr);
-extern devfs_handle_t     pciio_intr_cpu_get(pciio_intr_t pciio_intr);
+extern vertex_hdl_t     pciio_intr_dev_get(pciio_intr_t pciio_intr);
+extern vertex_hdl_t     pciio_intr_cpu_get(pciio_intr_t pciio_intr);
 
 /* Generic PCI pio interfaces */
-extern devfs_handle_t     pciio_pio_dev_get(pciio_piomap_t pciio_piomap);
+extern vertex_hdl_t     pciio_pio_dev_get(pciio_piomap_t pciio_piomap);
 extern pciio_slot_t     pciio_pio_slot_get(pciio_piomap_t pciio_piomap);
 extern pciio_space_t    pciio_pio_space_get(pciio_piomap_t pciio_piomap);
 extern iopaddr_t        pciio_pio_pciaddr_get(pciio_piomap_t pciio_piomap);
@@ -692,26 +661,26 @@ extern ulong            pciio_pio_mapsz_get(pciio_piomap_t pciio_piomap);
 extern caddr_t          pciio_pio_kvaddr_get(pciio_piomap_t pciio_piomap);
 
 /* Generic PCI dma interfaces */
-extern devfs_handle_t     pciio_dma_dev_get(pciio_dmamap_t pciio_dmamap);
+extern vertex_hdl_t     pciio_dma_dev_get(pciio_dmamap_t pciio_dmamap);
 
 /* Register/unregister PCI providers and get implementation handle */
-extern void             pciio_provider_register(devfs_handle_t provider, pciio_provider_t *pciio_fns);
-extern void             pciio_provider_unregister(devfs_handle_t provider);
-extern pciio_provider_t *pciio_provider_fns_get(devfs_handle_t provider);
+extern void             pciio_provider_register(vertex_hdl_t provider, pciio_provider_t *pciio_fns);
+extern void             pciio_provider_unregister(vertex_hdl_t provider);
+extern pciio_provider_t *pciio_provider_fns_get(vertex_hdl_t provider);
 
 /* Generic pci slot information access interface */
-extern pciio_info_t     pciio_info_chk(devfs_handle_t vhdl);
-extern pciio_info_t     pciio_info_get(devfs_handle_t vhdl);
-extern pciio_info_t     pciio_hostinfo_get(devfs_handle_t vhdl);
-extern void             pciio_info_set(devfs_handle_t vhdl, pciio_info_t widget_info);
-extern devfs_handle_t     pciio_info_dev_get(pciio_info_t pciio_info);
-extern devfs_handle_t     pciio_info_hostdev_get(pciio_info_t pciio_info);
+extern pciio_info_t     pciio_info_chk(vertex_hdl_t vhdl);
+extern pciio_info_t     pciio_info_get(vertex_hdl_t vhdl);
+extern pciio_info_t     pciio_hostinfo_get(vertex_hdl_t vhdl);
+extern void             pciio_info_set(vertex_hdl_t vhdl, pciio_info_t widget_info);
+extern vertex_hdl_t     pciio_info_dev_get(pciio_info_t pciio_info);
+extern vertex_hdl_t     pciio_info_hostdev_get(pciio_info_t pciio_info);
 extern pciio_bus_t	pciio_info_bus_get(pciio_info_t pciio_info);
 extern pciio_slot_t     pciio_info_slot_get(pciio_info_t pciio_info);
 extern pciio_function_t	pciio_info_function_get(pciio_info_t pciio_info);
 extern pciio_vendor_id_t pciio_info_vendor_id_get(pciio_info_t pciio_info);
 extern pciio_device_id_t pciio_info_device_id_get(pciio_info_t pciio_info);
-extern devfs_handle_t     pciio_info_master_get(pciio_info_t pciio_info);
+extern vertex_hdl_t     pciio_info_master_get(pciio_info_t pciio_info);
 extern arbitrary_info_t pciio_info_mfast_get(pciio_info_t pciio_info);
 extern pciio_provider_t *pciio_info_pops_get(pciio_info_t pciio_info);
 extern error_handler_f *pciio_info_efunc_get(pciio_info_t);
@@ -722,8 +691,8 @@ extern size_t		pciio_info_bar_size_get(pciio_info_t, int);
 extern iopaddr_t	pciio_info_rom_base_get(pciio_info_t);
 extern size_t		pciio_info_rom_size_get(pciio_info_t);
 extern int		pciio_info_type1_get(pciio_info_t);
-extern int              pciio_error_handler(devfs_handle_t, int, ioerror_mode_t, ioerror_t *);
-extern int		pciio_dma_enabled(devfs_handle_t);
+extern int              pciio_error_handler(vertex_hdl_t, int, ioerror_mode_t, ioerror_t *);
+extern int		pciio_dma_enabled(vertex_hdl_t);
 
 #endif				/* C or C++ */
 #endif				/* _ASM_SN_PCI_PCIIO_H */

@@ -119,13 +119,11 @@ flags_err:
 		if (IS_ERR(handle))
 			return PTR_ERR(handle);
 		err = ext3_reserve_inode_write(handle, inode, &iloc);
-		if (err)
-			return err;
-
-		inode->i_ctime = CURRENT_TIME;
-		inode->i_generation = generation;
-
-		err = ext3_mark_iloc_dirty(handle, inode, &iloc);
+		if (err == 0) {
+			inode->i_ctime = CURRENT_TIME;
+			inode->i_generation = generation;
+			err = ext3_mark_iloc_dirty(handle, inode, &iloc);
+		}
 		ext3_journal_stop(handle);
 		return err;
 	}

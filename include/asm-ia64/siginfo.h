@@ -69,13 +69,6 @@ typedef struct siginfo {
 			long _band;	/* POLL_IN, POLL_OUT, POLL_MSG (XPG requires a "long") */
 			int _fd;
 		} _sigpoll;
-
-		/* SIGPROF */
-		struct {
-			pid_t _pid;		/* which child */
-			uid_t _uid;		/* sender's uid */
-			unsigned long _pfm_ovfl_counters[4]; /* which PMU counter overflowed */
-		} _sigprof;
 	} _sifields;
 } siginfo_t;
 
@@ -93,14 +86,6 @@ typedef struct siginfo {
  */
 #define __ISR_VALID_BIT	0
 #define __ISR_VALID	(1 << __ISR_VALID_BIT)
-
-/*
- * si_code values
- * Positive values for kernel-generated signals.
- */
-#ifdef __KERNEL__
-#define __SI_PROF	(6 << 16)
-#endif
 
 /*
  * SIGILL si_codes
@@ -137,11 +122,6 @@ typedef struct siginfo {
 #undef NSIGTRAP
 #define NSIGTRAP	4
 
-/*
- * SIGPROF si_codes
- */
-#define PROF_OVFL	(__SI_PROF|1)  /* some counters overflowed */
-
 #ifdef __KERNEL__
 #include <linux/string.h>
 
@@ -151,8 +131,8 @@ copy_siginfo (siginfo_t *to, siginfo_t *from)
 	if (from->si_code < 0)
 		memcpy(to, from, sizeof(siginfo_t));
 	else
-		/* _sigprof is currently the largest know union member */
-		memcpy(to, from, 4*sizeof(int) + sizeof(from->_sifields._sigprof));
+		/* _sigchld is currently the largest know union member */
+		memcpy(to, from, 4*sizeof(int) + sizeof(from->_sifields._sigchld));
 }
 
 extern int copy_siginfo_from_user(siginfo_t *to, siginfo_t *from);
