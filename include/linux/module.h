@@ -277,8 +277,12 @@ struct module *module_get_kallsym(unsigned int symnum,
 				  char *type,
 				  char namebuf[128]);
 int is_exported(const char *name, const struct module *mod);
-#ifdef CONFIG_MODULE_UNLOAD
 
+extern void __module_put_and_exit(struct module *mod, long code)
+	__attribute__((noreturn));
+#define module_put_and_exit(code) __module_put_and_exit(THIS_MODULE, code);
+
+#ifdef CONFIG_MODULE_UNLOAD
 unsigned int module_refcount(struct module *mod);
 void __symbol_put(const char *symbol);
 #define symbol_put(x) __symbol_put(MODULE_SYMBOL_PREFIX #x)
@@ -439,6 +443,8 @@ static inline int unregister_module_notifier(struct notifier_block * nb)
 {
 	return 0;
 }
+
+#define module_put_and_exit(code) do_exit(code)
 
 #endif /* CONFIG_MODULES */
 

@@ -98,6 +98,17 @@ int init_module(void)
 }
 EXPORT_SYMBOL(init_module);
 
+/* A thread that wants to hold a reference to a module only while it
+ * is running can call ths to safely exit.
+ * nfsd and lockd use this.
+ */
+void __module_put_and_exit(struct module *mod, long code)
+{
+	module_put(mod);
+	do_exit(code);
+}
+EXPORT_SYMBOL(__module_put_and_exit);
+	
 /* Find a module section: 0 means not found. */
 static unsigned int find_sec(Elf_Ehdr *hdr,
 			     Elf_Shdr *sechdrs,

@@ -116,9 +116,12 @@ nfsd_svc(unsigned short port, int nrservs)
 	nrservs -= (nfsd_serv->sv_nrthreads-1);
 	while (nrservs > 0) {
 		nrservs--;
+		__module_get(THIS_MODULE);
 		error = svc_create_thread(nfsd, nfsd_serv);
-		if (error < 0)
+		if (error < 0) {
+			module_put(THIS_MODULE);
 			break;
+		}
 	}
 	victim = nfsd_list.next;
 	while (nrservs < 0 && victim != &nfsd_list) {
@@ -175,7 +178,6 @@ nfsd(struct svc_rqst *rqstp)
 	sigset_t shutdown_mask, allowed_mask;
 
 	/* Lock module and set up kernel thread */
-	MOD_INC_USE_COUNT;
 	lock_kernel();
 	daemonize("nfsd");
 	current->rlim[RLIMIT_FSIZE].rlim_cur = RLIM_INFINITY;
@@ -281,7 +283,7 @@ out:
 	svc_exit_thread(rqstp);
 
 	/* Release module */
-	MOD_DEC_USE_COUNT;
+	module_put_and_exit(0);
 }
 
 int
