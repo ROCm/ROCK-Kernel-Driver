@@ -634,7 +634,11 @@ spi_dv_device_internal(struct scsi_request *sreq, u8 *buffer)
 	/* OK, now we have our initial speed set by the read only inquiry
 	 * test, now try an echo buffer test (if the device allows it) */
 
-	if ((len = spi_dv_device_get_echo_buffer(sreq, buffer)) == 0) {
+	len = 0;
+	if (sdev->ppr)
+		len = spi_dv_device_get_echo_buffer(sreq, buffer);
+
+	if (len == 0) {
 		SPI_PRINTK(sdev->sdev_target, KERN_INFO, "Domain Validation skipping write tests\n");
 		return;
 	}
