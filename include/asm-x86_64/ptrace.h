@@ -34,10 +34,6 @@
 
 #define PTRACE_OLDSETOPTIONS         21
 
-/* Dummy values for ptrace */ 
-#define FS 1000 
-#define GS 1008
-
 #ifndef __ASSEMBLY__ 
 
 struct pt_regs {

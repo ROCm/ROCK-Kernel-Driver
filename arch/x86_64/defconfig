@@ -7,6 +7,7 @@ CONFIG_MMU=y
 CONFIG_RWSEM_GENERIC_SPINLOCK=y
 CONFIG_X86_CMPXCHG=y
 CONFIG_EARLY_PRINTK=y
+CONFIG_HPET_TIMER=y
 CONFIG_GENERIC_ISA_DMA=y
 
 #
@@ -64,7 +65,8 @@ CONFIG_X86_MCE=y
 #
 # Power management options
 #
-# CONFIG_PM is not set
+CONFIG_PM=y
+CONFIG_SOFTWARE_SUSPEND=y
 
 #
 # ACPI Support
@@ -72,12 +74,15 @@ CONFIG_X86_MCE=y
 CONFIG_ACPI=y
 # CONFIG_ACPI_HT_ONLY is not set
 CONFIG_ACPI_BOOT=y
+CONFIG_ACPI_SLEEP=y
+CONFIG_ACPI_SLEEP_PROC_FS=y
 CONFIG_ACPI_AC=y
 CONFIG_ACPI_BATTERY=y
 CONFIG_ACPI_BUTTON=y
 CONFIG_ACPI_FAN=y
 CONFIG_ACPI_PROCESSOR=y
 CONFIG_ACPI_THERMAL=y
+# CONFIG_ACPI_ASUS is not set
 CONFIG_ACPI_TOSHIBA=y
 CONFIG_ACPI_DEBUG=y
 CONFIG_ACPI_BUS=y
@@ -105,6 +110,11 @@ CONFIG_BINFMT_ELF=y
 CONFIG_IA32_EMULATION=y
 CONFIG_COMPAT=y
 CONFIG_UID16=y
+
+#
+# Generic Driver Options
+#
+# CONFIG_FW_LOADER is not set
 
 #
 # Memory Technology Devices (MTD)
@@ -151,6 +161,7 @@ CONFIG_IDEDISK_MULTI_MODE=y
 # CONFIG_IDEDISK_STROKE is not set
 CONFIG_BLK_DEV_IDECD=y
 # CONFIG_BLK_DEV_IDEFLOPPY is not set
+# CONFIG_BLK_DEV_IDESCSI is not set
 # CONFIG_IDE_TASK_IOCTL is not set
 
 #
@@ -198,7 +209,58 @@ CONFIG_BLK_DEV_IDE_MODES=y
 #
 # SCSI device support
 #
-# CONFIG_SCSI is not set
+CONFIG_SCSI=y
+
+#
+# SCSI support type (disk, tape, CD-ROM)
+#
+CONFIG_BLK_DEV_SD=y
+# CONFIG_CHR_DEV_ST is not set
+# CONFIG_CHR_DEV_OSST is not set
+# CONFIG_BLK_DEV_SR is not set
+# CONFIG_CHR_DEV_SG is not set
+
+#
+# Some SCSI devices (e.g. CD jukebox) support multiple LUNs
+#
+# CONFIG_SCSI_MULTI_LUN is not set
+# CONFIG_SCSI_REPORT_LUNS is not set
+# CONFIG_SCSI_CONSTANTS is not set
+# CONFIG_SCSI_LOGGING is not set
+
+#
+# SCSI low-level drivers
+#
+# CONFIG_BLK_DEV_3W_XXXX_RAID is not set
+# CONFIG_SCSI_ACARD is not set
+# CONFIG_SCSI_AACRAID is not set
+# CONFIG_SCSI_AIC7XXX is not set
+# CONFIG_SCSI_AIC7XXX_OLD is not set
+# CONFIG_SCSI_AIC79XX is not set
+# CONFIG_SCSI_ADVANSYS is not set
+# CONFIG_SCSI_AM53C974 is not set
+# CONFIG_SCSI_MEGARAID is not set
+# CONFIG_SCSI_BUSLOGIC is not set
+# CONFIG_SCSI_CPQFCTS is not set
+# CONFIG_SCSI_DMX3191D is not set
+# CONFIG_SCSI_EATA is not set
+# CONFIG_SCSI_EATA_PIO is not set
+# CONFIG_SCSI_FUTURE_DOMAIN is not set
+# CONFIG_SCSI_GDTH is not set
+# CONFIG_SCSI_IPS is not set
+# CONFIG_SCSI_INITIO is not set
+# CONFIG_SCSI_INIA100 is not set
+# CONFIG_SCSI_SYM53C8XX_2 is not set
+# CONFIG_SCSI_SYM53C8XX is not set
+# CONFIG_SCSI_PCI2000 is not set
+# CONFIG_SCSI_PCI2220I is not set
+# CONFIG_SCSI_QLOGIC_ISP is not set
+# CONFIG_SCSI_QLOGIC_FC is not set
+# CONFIG_SCSI_QLOGIC_1280 is not set
+# CONFIG_SCSI_DC395x is not set
+# CONFIG_SCSI_DC390T is not set
+# CONFIG_SCSI_NSP32 is not set
+# CONFIG_SCSI_DEBUG is not set
 
 #
 # Multi-device support (RAID and LVM)
@@ -213,6 +275,11 @@ CONFIG_BLK_DEV_IDE_MODES=y
 #
 # Fusion MPT device support
 #
+CONFIG_FUSION=y
+CONFIG_FUSION_BOOT=y
+CONFIG_FUSION_MAX_SGE=40
+# CONFIG_FUSION_ISENSE is not set
+# CONFIG_FUSION_CTL is not set
 
 #
 # IEEE 1394 (FireWire) support (EXPERIMENTAL)
@@ -246,7 +313,12 @@ CONFIG_IP_MULTICAST=y
 # CONFIG_INET_AH is not set
 # CONFIG_INET_ESP is not set
 # CONFIG_INET_IPCOMP is not set
-# CONFIG_IPV6 is not set
+CONFIG_IPV6=y
+CONFIG_IPV6_PRIVACY=y
+# CONFIG_INET6_AH is not set
+# CONFIG_INET6_ESP is not set
+# CONFIG_INET6_IPCOMP is not set
+# CONFIG_IPV6_TUNNEL is not set
 # CONFIG_XFRM_USER is not set
 
 #
@@ -307,6 +379,7 @@ CONFIG_NET_PCI=y
 CONFIG_AMD8111_ETH=y
 # CONFIG_ADAPTEC_STARFIRE is not set
 # CONFIG_B44 is not set
+# CONFIG_TC35815 is not set
 # CONFIG_DGRS is not set
 # CONFIG_EEPRO100 is not set
 # CONFIG_E100 is not set
@@ -356,6 +429,7 @@ CONFIG_TIGON3=y
 #
 # Token Ring devices (depends on LLC=y)
 #
+# CONFIG_NET_FC is not set
 # CONFIG_RCPCI is not set
 # CONFIG_SHAPER is not set
 
@@ -405,6 +479,7 @@ CONFIG_SERIO=y
 CONFIG_SERIO_I8042=y
 # CONFIG_SERIO_SERPORT is not set
 # CONFIG_SERIO_CT82C710 is not set
+# CONFIG_SERIO_PCIPS2 is not set
 
 #
 # Input Device Drivers
@@ -434,6 +509,7 @@ CONFIG_HW_CONSOLE=y
 #
 CONFIG_SERIAL_8250=y
 CONFIG_SERIAL_8250_CONSOLE=y
+# CONFIG_SERIAL_8250_ACPI is not set
 # CONFIG_SERIAL_8250_EXTENDED is not set
 
 #
@@ -467,7 +543,11 @@ CONFIG_UNIX98_PTY_COUNT=256
 #
 # IPMI
 #
-# CONFIG_IPMI_HANDLER is not set
+CONFIG_IPMI_HANDLER=y
+CONFIG_IPMI_PANIC_EVENT=y
+CONFIG_IPMI_DEVICE_INTERFACE=y
+CONFIG_IPMI_KCS=y
+CONFIG_IPMI_WATCHDOG=y
 
 #
 # Watchdog Cards
@@ -487,10 +567,15 @@ CONFIG_RTC=y
 # CONFIG_FTAPE is not set
 CONFIG_AGP=y
 CONFIG_AGP_AMD_8151=y
-# CONFIG_DRM is not set
+CONFIG_DRM=y
+# CONFIG_DRM_TDFX is not set
+# CONFIG_DRM_GAMMA is not set
+# CONFIG_DRM_R128 is not set
+CONFIG_DRM_RADEON=y
+# CONFIG_DRM_MGA is not set
 # CONFIG_MWAVE is not set
 CONFIG_RAW_DRIVER=y
-# CONFIG_HANGCHECK_TIMER is not set
+CONFIG_HANGCHECK_TIMER=y
 
 #
 # Misc devices
@@ -613,7 +698,35 @@ CONFIG_DUMMY_CONSOLE=y
 #
 # Sound
 #
-# CONFIG_SOUND is not set
+CONFIG_SOUND=y
+
+#
+# Advanced Linux Sound Architecture
+#
+# CONFIG_SND is not set
+
+#
+# Open Sound System
+#
+CONFIG_SOUND_PRIME=y
+# CONFIG_SOUND_BT878 is not set
+# CONFIG_SOUND_CMPCI is not set
+# CONFIG_SOUND_EMU10K1 is not set
+# CONFIG_SOUND_FUSION is not set
+# CONFIG_SOUND_CS4281 is not set
+# CONFIG_SOUND_ES1370 is not set
+# CONFIG_SOUND_ES1371 is not set
+# CONFIG_SOUND_ESSSOLO1 is not set
+# CONFIG_SOUND_MAESTRO is not set
+# CONFIG_SOUND_MAESTRO3 is not set
+CONFIG_SOUND_ICH=y
+# CONFIG_SOUND_RME96XX is not set
+# CONFIG_SOUND_SONICVIBES is not set
+# CONFIG_SOUND_TRIDENT is not set
+# CONFIG_SOUND_MSNDCLAS is not set
+# CONFIG_SOUND_MSNDPIN is not set
+# CONFIG_SOUND_VIA82CXXX is not set
+# CONFIG_SOUND_OSS is not set
 
 #
 # USB support
@@ -629,7 +742,8 @@ CONFIG_DUMMY_CONSOLE=y
 #
 # Profiling support
 #
-# CONFIG_PROFILING is not set
+CONFIG_PROFILING=y
+CONFIG_OPROFILE=y
 
 #
 # Kernel hacking
@@ -653,7 +767,21 @@ CONFIG_MCE_DEBUG=y
 #
 # Cryptographic options
 #
-# CONFIG_CRYPTO is not set
+CONFIG_CRYPTO=y
+# CONFIG_CRYPTO_HMAC is not set
+# CONFIG_CRYPTO_NULL is not set
+# CONFIG_CRYPTO_MD4 is not set
+CONFIG_CRYPTO_MD5=y
+# CONFIG_CRYPTO_SHA1 is not set
+# CONFIG_CRYPTO_SHA256 is not set
+# CONFIG_CRYPTO_SHA512 is not set
+# CONFIG_CRYPTO_DES is not set
+# CONFIG_CRYPTO_BLOWFISH is not set
+# CONFIG_CRYPTO_TWOFISH is not set
+# CONFIG_CRYPTO_SERPENT is not set
+# CONFIG_CRYPTO_AES is not set
+# CONFIG_CRYPTO_DEFLATE is not set
+# CONFIG_CRYPTO_TEST is not set
 
 #
 # Library routines

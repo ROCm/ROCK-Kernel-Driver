@@ -10,7 +10,7 @@ $(obj)/syscall32.o: $(src)/syscall32.c $(obj)/vsyscall.so
 
 # The DSO images are built using a special linker script.
 $(obj)/vsyscall.so: $(src)/vsyscall.lds $(obj)/vsyscall.o
-	$(CC) -m32 -nostdlib -shared -s -Wl,-soname=linux-vsyscall.so.1 \
+	$(CC) -m32 -nostdlib -shared -s -Wl,-soname=linux-gate.so.1 \
 		-o $@ -Wl,-T,$^
 
 clean-files += vsyscall.so

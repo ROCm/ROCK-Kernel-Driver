@@ -30,6 +30,7 @@
 #include <asm/kdebug.h>
 #include <asm/unistd.h>
 #include <asm/delay.h>
+#include <asm/tlbflush.h>
 
 extern spinlock_t rtc_lock;
 
@@ -212,3 +213,6 @@ EXPORT_SYMBOL(fake_node);
 #endif
 
 EXPORT_SYMBOL(clear_page);
+
+EXPORT_SYMBOL(flush_tlb_page);
+EXPORT_SYMBOL_GPL(flush_tlb_all);

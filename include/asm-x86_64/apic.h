@@ -77,6 +77,8 @@ extern void setup_secondary_APIC_clock (void);
 extern void setup_apic_nmi_watchdog (void);
 extern void disable_lapic_nmi_watchdog(void);
 extern void enable_lapic_nmi_watchdog(void);
+extern void disable_timer_nmi_watchdog(void);
+extern void enable_timer_nmi_watchdog(void);
 extern inline void nmi_watchdog_tick (struct pt_regs * regs, unsigned reason);
 extern int APIC_init_uniprocessor (void);
 extern void disable_APIC_timer(void);
