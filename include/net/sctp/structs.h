@@ -1633,6 +1633,8 @@ __u32 __sctp_association_get_tsn_block(sctp_association_t *, int);
 __u16 __sctp_association_get_next_ssn(sctp_association_t *, __u16 sid);
 
 void sctp_assoc_sync_pmtu(sctp_association_t *);
+void sctp_assoc_rwnd_increase(sctp_association_t *, int);
+void sctp_assoc_rwnd_decrease(sctp_association_t *, int);
 
 int sctp_cmp_addr_exact(const union sctp_addr *ss1,
 		        const union sctp_addr *ss2);

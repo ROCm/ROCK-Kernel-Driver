@@ -1191,6 +1191,12 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr 
 			goto out_free;
 		sctp_skb_pull(skb, copied);
 		skb_queue_head(&sk->receive_queue, skb);
+		/* When only partial message is copied to the user, increase
+		 * rwnd by that amount. If all the data in the skb is read,
+		 * rwnd is updated when the skb's destructor is called via
+		 * sctp_ulpevent_free().
+		 */
+		sctp_assoc_rwnd_increase(event->asoc, copied);
 		goto out;
 	} else {
 		 msg->msg_flags |= MSG_EOR;
