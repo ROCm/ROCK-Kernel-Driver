@@ -7,7 +7,7 @@
 # can't do it
 CHMOD_FILES := docgen gen-all-syms kernel-doc mkcompile_h makelst
 
-all: fixdep split-include $(CHMOD_FILES)
+all: fixdep split-include docproc $(CHMOD_FILES)
 
 $(CHMOD_FILES): FORCE
 	@chmod a+x $@
@@ -36,11 +36,6 @@ kconfig.tk: $(TOPDIR)/arch/$(ARCH)/config.in tkparse $(HEADER) $(TAIL) FORCE
 	  cat $(TAIL)                                           \
 	) > $@
 	chmod 755 $@
-
-# DocBook stuff
-# ---------------------------------------------------------------------------
-
-doc-progs: docproc
 
 # ---------------------------------------------------------------------------
 
