@@ -117,7 +117,7 @@ struct e1000_adapter;
 /* How many Tx Descriptors do we need to call netif_wake_queue ? */
 #define E1000_TX_QUEUE_WAKE	16
 /* How many Rx Buffers do we bundle into one write to the hardware ? */
-#define E1000_RX_BUFFER_WRITE	16
+#define E1000_RX_BUFFER_WRITE	16	/* Must be power of 2 */
 
 #define AUTO_ALL_MODES       0
 #define E1000_EEPROM_APME    4
@@ -152,7 +152,8 @@ struct e1000_desc_ring {
 };
 
 #define E1000_DESC_UNUSED(R) \
-((((R)->next_to_clean + (R)->count) - ((R)->next_to_use + 1)) % ((R)->count))
+	((((R)->next_to_clean > (R)->next_to_use) ? 0 : (R)->count) + \
+	(R)->next_to_clean - (R)->next_to_use - 1)
 
 #define E1000_GET_DESC(R, i, type)	(&(((struct type *)((R).desc))[i]))
 #define E1000_RX_DESC(R, i)		E1000_GET_DESC(R, i, e1000_rx_desc)
@@ -186,7 +187,6 @@ struct e1000_adapter {
 	uint32_t txd_cmd;
 	uint32_t tx_int_delay;
 	uint32_t tx_abs_int_delay;
-	int max_data_per_txd;
 	uint32_t tx_fifo_head;
 	uint32_t tx_head_addr;
 	uint32_t tx_fifo_size;

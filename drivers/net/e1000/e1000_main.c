@@ -155,12 +155,8 @@ static void e1000_update_stats(struct e1000_adapter *adapter);
 static inline void e1000_irq_disable(struct e1000_adapter *adapter);
 static inline void e1000_irq_enable(struct e1000_adapter *adapter);
 static void e1000_intr(int irq, void *data, struct pt_regs *regs);
-static void e1000_clean_tx_irq(struct e1000_adapter *adapter);
-#ifdef CONFIG_E1000_NAPI
-static int e1000_poll(struct net_device *netdev, int *budget);
-#else
-static void e1000_clean_rx_irq(struct e1000_adapter *adapter);
-#endif
+static boolean_t e1000_clean_tx_irq(struct e1000_adapter *adapter);
+static boolean_t e1000_clean_rx_irq(struct e1000_adapter *adapter);
 static void e1000_alloc_rx_buffers(struct e1000_adapter *adapter);
 static int e1000_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd);
 static int e1000_mii_ioctl(struct net_device *netdev, struct ifreq *ifr,
@@ -420,10 +416,6 @@ e1000_probe(struct pci_dev *pdev,
 	netdev->change_mtu = &e1000_change_mtu;
 	netdev->do_ioctl = &e1000_ioctl;
 	netdev->tx_timeout = &e1000_tx_timeout;
-#ifdef CONFIG_E1000_NAPI
-	netdev->poll = &e1000_poll;
-	netdev->weight = 64;
-#endif
 	netdev->watchdog_timeo = 5 * HZ;
 	netdev->vlan_rx_register = e1000_vlan_rx_register;
 	netdev->vlan_rx_add_vid = e1000_vlan_rx_add_vid;
@@ -477,13 +469,6 @@ e1000_probe(struct pci_dev *pdev,
 	e1000_read_part_num(&adapter->hw, &(adapter->part_num));
 
 	e1000_get_bus_info(&adapter->hw);
-
-	if((adapter->hw.mac_type == e1000_82544) &&
-	   (adapter->hw.bus_type == e1000_bus_type_pcix))
-
-		adapter->max_data_per_txd = 4096;
-	else
-		adapter->max_data_per_txd = MAX_JUMBO_FRAME_SIZE;
 
 	init_timer(&adapter->tx_fifo_stall_timer);
 	adapter->tx_fifo_stall_timer.function = &e1000_82547_tx_fifo_stall;
@@ -1423,12 +1408,12 @@ e1000_tso(struct e1000_adapter *adapter, struct sk_buff *skb, int tx_flags)
 			E1000_TXD_CMD_IP | E1000_TXD_CMD_TCP |
 			(skb->len - (hdr_len)));
 
-		i = (i + 1) % adapter->tx_ring.count;
+		if(++i == adapter->tx_ring.count) i = 0;
 		adapter->tx_ring.next_to_use = i;
 
 		return TRUE;
 	}
-	
+
 	return FALSE;
 }
 
@@ -1453,7 +1438,7 @@ e1000_tx_csum(struct e1000_adapter *adapter, struct sk_buff *skb)
 		context_desc->cmd_and_length =
 			cpu_to_le32(adapter->txd_cmd | E1000_TXD_CMD_DEXT);
 
-		i = (i + 1) % adapter->tx_ring.count;
+		if(++i == adapter->tx_ring.count) i = 0;
 		adapter->tx_ring.next_to_use = i;
 
 		return TRUE;
@@ -1462,24 +1447,24 @@ e1000_tx_csum(struct e1000_adapter *adapter, struct sk_buff *skb)
 	return FALSE;
 }
 
+#define E1000_MAX_TXD_PWR	12
+#define E1000_MAX_DATA_PER_TXD	(1<<E1000_MAX_TXD_PWR)
+
 static inline int
 e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb)
 {
 	struct e1000_desc_ring *tx_ring = &adapter->tx_ring;
-	int len, offset, size, count, i;
+	int len = skb->len, offset = 0, size, count = 0, i;
+
 	int tso = skb_shinfo(skb)->tso_size;
 	int nr_frags = skb_shinfo(skb)->nr_frags;
-
 	int f;
-	len = skb->len - skb->data_len;
-	i = (tx_ring->next_to_use + tx_ring->count - 1) % tx_ring->count;
-	count = 0;
+	len -= skb->data_len;
 
-	offset = 0;
+	i = tx_ring->next_to_use;
 
 	while(len) {
-		i = (i + 1) % tx_ring->count;
-		size = min(len, adapter->max_data_per_txd);
+		size = min(len, E1000_MAX_DATA_PER_TXD);
 		/* Workaround for premature desc write-backs
 		 * in TSO mode.  Append 4-byte sentinel desc */
 		if(tso && !nr_frags && size == len && size > 4)
@@ -1495,6 +1480,7 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb)
 		len -= size;
 		offset += size;
 		count++;
+		if(++i == tx_ring->count) i = 0;
 	}
 
 	for(f = 0; f < nr_frags; f++) {
@@ -1505,8 +1491,7 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb)
 		offset = 0;
 
 		while(len) {
-			i = (i + 1) % tx_ring->count;
-			size = min(len, adapter->max_data_per_txd);
+			size = min(len, E1000_MAX_DATA_PER_TXD);
 			/* Workaround for premature desc write-backs
 			 * in TSO mode.  Append 4-byte sentinel desc */
 			if(tso && f == (nr_frags-1) && size == len && size > 4)
@@ -1523,8 +1508,10 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb)
 			len -= size;
 			offset += size;
 			count++;
+			if(++i == tx_ring->count) i = 0;
 		}
 	}
+	if(--i < 0) i = tx_ring->count - 1;
 	tx_ring->buffer_info[i].skb = skb;
 
 	return count;
@@ -1565,7 +1552,7 @@ e1000_tx_queue(struct e1000_adapter *adapter, int count, int tx_flags)
 		tx_desc->lower.data =
 			cpu_to_le32(txd_lower | tx_ring->buffer_info[i].length);
 		tx_desc->upper.data = cpu_to_le32(txd_upper);
-		i = (i + 1) % tx_ring->count;
+		if(++i == tx_ring->count) i = 0;
 	}
 
 	tx_desc->lower.data |= cpu_to_le32(E1000_TXD_CMD_EOP);
@@ -1580,7 +1567,6 @@ e1000_tx_queue(struct e1000_adapter *adapter, int count, int tx_flags)
 	E1000_WRITE_REG(&adapter->hw, TDT, i);
 }
 
-#define TXD_USE_COUNT(S, X) (((S) / (X)) + (((S) % (X)) ? 1 : 0))
 /**
  * 82547 workaround to avoid controller hang in half-duplex environment.
  * The workaround is to avoid queuing a large packet that would span
@@ -1629,24 +1615,14 @@ static int
 e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 {
 	struct e1000_adapter *adapter = netdev->priv;
-	int tx_flags = 0, count;
-	int f;
+	int tx_flags = 0;
 
-	count = TXD_USE_COUNT(skb->len - skb->data_len,
-	                      adapter->max_data_per_txd);
-
-	if(count == 0) {
+	if(skb->len <= 0) {
 		dev_kfree_skb_any(skb);
 		return 0;
 	}
 
-	for(f = 0; f < skb_shinfo(skb)->nr_frags; f++)
-		count += TXD_USE_COUNT(skb_shinfo(skb)->frags[f].size,
-		                       adapter->max_data_per_txd);
-	if((skb_shinfo(skb)->tso_size) || (skb->ip_summed == CHECKSUM_HW))
-		count++;
-
-	if(E1000_DESC_UNUSED(&adapter->tx_ring) < count) {
+	if(E1000_DESC_UNUSED(&adapter->tx_ring) < DESC_NEEDED) {
 		netif_stop_queue(netdev);
 		return 1;
 	}
@@ -1669,9 +1645,7 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	else if(e1000_tx_csum(adapter, skb))
 		tx_flags |= E1000_TX_FLAGS_CSUM;
 
-	count = e1000_tx_map(adapter, skb);
-
-	e1000_tx_queue(adapter, count, tx_flags);
+	e1000_tx_queue(adapter, e1000_tx_map(adapter, skb), tx_flags);
 
 	netdev->trans_start = jiffies;
 
@@ -2041,7 +2015,7 @@ e1000_clean_tx_irq(struct e1000_adapter *adapter)
 
 		tx_desc->upper.data = 0;
 
-		i = (i + 1) % tx_ring->count;
+		if(++i == tx_ring->count) i = 0;
 		tx_desc = E1000_TX_DESC(*tx_ring, i);
 	}
 
@@ -2225,7 +2199,7 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 			rx_desc->status = 0;
 			rx_ring->buffer_info[i].skb = NULL;
 
-			i = (i + 1) % rx_ring->count;
+			if(++i == rx_ring->count) i = 0;
 
 			rx_desc = E1000_RX_DESC(*rx_ring, i);
 			continue;
@@ -2253,7 +2227,7 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 				rx_desc->status = 0;
 				rx_ring->buffer_info[i].skb = NULL;
 
-				i = (i + 1) % rx_ring->count;
+				if(++i == rx_ring->count) i = 0;
 
 				rx_desc = E1000_RX_DESC(*rx_ring, i);
 				continue;
@@ -2278,7 +2252,7 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 		rx_desc->status = 0;
 		rx_ring->buffer_info[i].skb = NULL;
 
-		i = (i + 1) % rx_ring->count;
+		if(++i == rx_ring->count) i = 0;
 
 		rx_desc = E1000_RX_DESC(*rx_ring, i);
 	}
@@ -2302,10 +2276,8 @@ e1000_alloc_rx_buffers(struct e1000_adapter *adapter)
 	struct pci_dev *pdev = adapter->pdev;
 	struct e1000_rx_desc *rx_desc;
 	struct sk_buff *skb;
-	int reserve_len;
+	int reserve_len = 2;
 	int i;
-
-	reserve_len = 2;
 
 	i = rx_ring->next_to_use;
 
@@ -2337,7 +2309,7 @@ e1000_alloc_rx_buffers(struct e1000_adapter *adapter)
 
 		rx_desc->buffer_addr = cpu_to_le64(rx_ring->buffer_info[i].dma);
 
-		if(!(i % E1000_RX_BUFFER_WRITE)) {
+		if((i & ~(E1000_RX_BUFFER_WRITE - 1)) == i) {
 			/* Force memory writes to complete before letting h/w
 			 * know there are new descriptors to fetch.  (Only
 			 * applicable for weak-ordered memory model archs,
@@ -2347,7 +2319,7 @@ e1000_alloc_rx_buffers(struct e1000_adapter *adapter)
 			E1000_WRITE_REG(&adapter->hw, RDT, i);
 		}
 
-		i = (i + 1) % rx_ring->count;
+		if(++i == rx_ring->count) i = 0;
 	}
 
 	rx_ring->next_to_use = i;
