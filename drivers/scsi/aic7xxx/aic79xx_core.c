@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#156 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#161 $
  *
  * $FreeBSD$
  */
@@ -1249,6 +1249,14 @@ ahd_handle_scsiint(struct ahd_softc *ahd, u_int intstat)
 		ahd_outb(ahd, CLRSINT3, status3);
 	} else if ((lqistat1 & (LQIPHASE_LQ|LQIPHASE_NLQ)) != 0) {
 		ahd_handle_lqiphase_error(ahd, lqistat1);
+	} else if ((lqistat1 & LQICRCI_NLQ) != 0) {
+		/*
+		 * This status can be delayed during some
+		 * streaming operations.  The SCSIPHASE
+		 * handler has already dealt with this case
+		 * so just clear the error.
+		 */
+		ahd_outb(ahd, CLRLQIINT1, CLRLQICRCI_NLQ);
 	} else if ((status & BUSFREE) != 0) {
 		u_int lqostat1;
 		int   restart;
@@ -1627,21 +1635,22 @@ ahd_handle_pkt_busfree(struct ahd_softc *ahd, u_int busfreetime)
 		if (scb == NULL)
 		       panic("SCB not valid during LQOBUSFREE");
 		/*
-		 * Return the LQO manager to its idle loop.  It will
-		 * not do this automatically if the busfree occurs
-		 * after the first REQ of either the LQ or command
-		 * packet or between the LQ and command packet.
-		 */
-		ahd_outb(ahd, LQCTL2, ahd_inb(ahd, LQCTL2) | LQOTOIDLE);
-
-		/*
 		 * Clear the status.
 		 */
 		ahd_outb(ahd, CLRLQOINT1, CLRLQOBUSFREE);
 		if ((ahd->bugs & AHD_CLRLQO_AUTOCLR_BUG) != 0)
 			ahd_outb(ahd, CLRLQOINT1, 0);
 		ahd_outb(ahd, SCSISEQ0, ahd_inb(ahd, SCSISEQ0) & ~ENSELO);
+		ahd_flush_device_writes(ahd);
 		ahd_outb(ahd, CLRSINT0, CLRSELDO);
+
+		/*
+		 * Return the LQO manager to its idle loop.  It will
+		 * not do this automatically if the busfree occurs
+		 * after the first REQ of either the LQ or command
+		 * packet or between the LQ and command packet.
+		 */
+		ahd_outb(ahd, LQCTL2, ahd_inb(ahd, LQCTL2) | LQOTOIDLE);
 
 		/*
 		 * Update the waiting for selection queue so
@@ -1653,9 +1662,9 @@ ahd_handle_pkt_busfree(struct ahd_softc *ahd, u_int busfreetime)
 
 			ahd_outw(ahd, WAITING_TID_HEAD, scbid);
 			waiting_t = ahd_inw(ahd, WAITING_TID_TAIL);
-			next = SCB_LIST_NULL;
 			if (waiting_t == waiting_h) {
 				ahd_outw(ahd, WAITING_TID_TAIL, scbid);
+				next = SCB_LIST_NULL;
 			} else {
 				ahd_set_scbptr(ahd, waiting_h);
 				next = ahd_inw(ahd, SCB_NEXT2);
@@ -1704,6 +1713,7 @@ ahd_handle_pkt_busfree(struct ahd_softc *ahd, u_int busfreetime)
 		scb = ahd_lookup_scb(ahd, scbid);
 		ahd_print_path(ahd, scb);
 		printf("Unexpected PKT busfree condition\n");
+		ahd_dump_card_state(ahd);
 		ahd_abort_scbs(ahd, SCB_GET_TARGET(ahd, scb), 'A',
 			       SCB_GET_LUN(scb), SCB_GET_TAG(scb),
 			       ROLE_INITIATOR, CAM_UNEXP_BUSFREE);
@@ -5049,7 +5059,7 @@ ahd_reset(struct ahd_softc *ahd)
 
 	/*
 	 * If a recovery action has forced a chip reset,
-	 * re-initialize the chip to our likeing.
+	 * re-initialize the chip to our liking.
 	 */
 	if (ahd->init_level > 0)
 		ahd_chip_init(ahd);
@@ -6050,7 +6060,7 @@ ahd_chip_init(struct ahd_softc *ahd)
 	} else {
 		ahd_outb(ahd, OPTIONMODE, AUTOACKEN|BUSFREEREV|AUTO_MSGOUT_DE);
 	}
-	ahd_outb(ahd, SCSCHKN, CURRFIFODEF|WIDERESEN);
+	ahd_outb(ahd, SCSCHKN, CURRFIFODEF|WIDERESEN|SHVALIDSTDIS);
 	if ((ahd->chip & AHD_BUS_MASK) == AHD_PCIX)
 		/*
 		 * Do not issue a target abort when a split completion
@@ -6565,13 +6575,13 @@ ahd_enable_coalessing(struct ahd_softc *ahd, int enable)
 void
 ahd_pause_and_flushwork(struct ahd_softc *ahd)
 {
-	u_int intstat;
-	u_int maxloops;
-	int   paused;
+	ahd_mode_state	saved_modes;
+	u_int		intstat;
+	u_int		maxloops;
+	int		paused;
 
 	maxloops = 1000;
 	ahd->flags |= AHD_ALL_INTERRUPTS;
-	intstat = 0;
 	paused = FALSE;
 	do {
 		struct scb *waiting_scb;
@@ -6582,6 +6592,8 @@ ahd_pause_and_flushwork(struct ahd_softc *ahd)
 		ahd_pause(ahd);
 		paused = TRUE;
 		ahd_clear_critical_section(ahd);
+		saved_modes = ahd_save_modes(ahd);
+		ahd_set_modes(ahd, AHD_MODE_SCSI, AHD_MODE_SCSI);
 		if ((ahd_inb(ahd, SSTAT0) & (SELDO|SELINGO)) == 0)
 			ahd_outb(ahd, SCSISEQ0,
 				 ahd_inb(ahd, SCSISEQ0) & ~ENSELO);
@@ -6598,10 +6610,10 @@ ahd_pause_and_flushwork(struct ahd_softc *ahd)
 			ahd_outb(ahd, SCSISEQ0,
 				 ahd_inb(ahd, SCSISEQ0) | ENSELO);
 
-		if (intstat == 0xFF && (ahd->features & AHD_REMOVABLE) != 0)
-			break;
+		intstat = ahd_inb(ahd, INTSTAT);
 	} while (--maxloops
-	      && (((intstat = ahd_inb(ahd, INTSTAT)) & INT_PEND) != 0
+	      && (intstat != 0xFF || (ahd->features & AHD_REMOVABLE) == 0)
+	      && ((intstat & INT_PEND) != 0
 	       || (ahd_inb(ahd, SSTAT0) & (SELDO|SELINGO))));
 	if (maxloops == 0) {
 		printf("Infinite interrupt loop, INTSTAT = %x",
@@ -6612,6 +6624,7 @@ ahd_pause_and_flushwork(struct ahd_softc *ahd)
 
 	ahd_platform_flushwork(ahd);
 	ahd->flags &= ~AHD_ALL_INTERRUPTS;
+	ahd_restore_modes(ahd, saved_modes);
 }
 
 int

@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#179 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#188 $
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -995,9 +995,13 @@ ahc_linux_queue(Scsi_Cmnd * cmd, void (*scsi_done) (Scsi_Cmnd *))
 	dev = ahc_linux_get_device(ahc, cmd->device->channel, cmd->device->id,
 				   cmd->device->lun, /*alloc*/TRUE);
 	if (dev == NULL) {
+		ahc_cmd_set_transaction_status(cmd, CAM_RESRC_UNAVAIL);
+		ahc_linux_queue_cmd_complete(ahc, cmd);
+		ahc_schedule_completeq(ahc, NULL);
 		ahc_midlayer_entrypoint_unlock(ahc, &flags);
-		printf("aic7xxx_linux_queue: Unable to allocate device!\n");
-		return (-ENOMEM);
+		printf("%s: aic7xxx_linux_queue - Unable to allocate device!\n",
+		       ahc_name(ahc));
+		return (0);
 	}
 	cmd->result = CAM_REQ_INPROG << 16;
 	TAILQ_INSERT_TAIL(&dev->busyq, (struct ahc_cmd *)cmd, acmd_links.tqe);
@@ -1892,6 +1896,20 @@ ahc_linux_register_host(struct ahc_softc *ahc, Scsi_Host_Template *template)
 		if (target > 7
 		 && (ahc->features & AHC_TWIN) != 0)
 			channel = 1;
+		/*
+		 * Skip our own ID.  Some Compaq/HP storage devices
+		 * have enclosure management devices that respond to
+		 * single bit selection (i.e. selecting ourselves).
+		 * It is expected that either an external application
+		 * or a modified kernel will be used to probe this
+		 * ID if it is appropriate.  To accomodate these installations,
+		 * ahc_linux_alloc_target() will allocate for our ID if
+		 * asked to do so.
+		 */
+		if ((channel == 0 && target == ahc->our_id)
+		 || (channel == 1 && target == ahc->our_id_b))
+			continue;
+
 		ahc_linux_alloc_target(ahc, channel, target);
 	}
 	ahc_intr_enable(ahc, TRUE);
@@ -2360,7 +2378,17 @@ ahc_linux_dv_thread(void *data)
 	 * Complete thread creation.
 	 */
 	lock_kernel();
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+	/*
+	 * Don't care about any signals.
+	 */
+	siginitsetinv(&current->blocked, 0);
+
+	daemonize();
+	sprintf(current->comm, "ahc_dv_%d", ahc->unit);
+#else
 	daemonize("ahc_dv_%d", ahc->unit);
+#endif
 	unlock_kernel();
 
 	while (1) {
@@ -3993,15 +4021,6 @@ ahc_linux_alloc_target(struct ahc_softc *ahc, u_int channel, u_int target)
 	target_offset = target;
 	if (channel != 0)
 		target_offset += 8;
-	/*
-	 * Never allow allocation of a target object for
-	 * our own SCSIID.
-	 */
-	if ((channel == 0 && target == ahc->our_id)
-	 || (channel == 1 && target == ahc->our_id_b)) {
-		ahc->platform_data->targets[target_offset] = NULL;
-		return (NULL);
-	}
 
 	targ = malloc(sizeof(*targ), M_DEVBUG, M_NOWAIT);
 	if (targ == NULL)
@@ -4272,6 +4291,14 @@ ahc_done(struct ahc_softc *ahc, struct scb *scb)
 #endif
 			ahc_set_transaction_status(scb, CAM_UNCOR_PARITY);
 		} else if (amount_xferred < scb->io_ctx->underflow) {
+			u_int i;
+
+			ahc_print_path(ahc, scb);
+			printf("CDB:");
+			for (i = 0; i < scb->io_ctx->cmd_len; i++)
+				printf(" 0x%x", scb->io_ctx->cmnd[i]);
+			printf("\n");
+			ahc_print_path(ahc, scb);
 			printf("Saw underflow (%ld of %ld bytes). "
 			       "Treated as error\n",
 				ahc_get_residual(scb),
@@ -4813,6 +4840,7 @@ ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag)
 	u_int  active_scb_index;
 	u_int  last_phase;
 	u_int  saved_scsiid;
+	u_int  cdb_byte;
 	int    retval;
 	int    paused;
 	int    wait;
@@ -4828,6 +4856,11 @@ ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag)
 	       ahc_name(ahc), cmd->device->channel,
 	       cmd->device->id, cmd->device->lun,
 	       flag == SCB_ABORT ? "n ABORT" : " TARGET RESET");
+
+	printf("CDB:");
+	for (cdb_byte = 0; cdb_byte < cmd->cmd_len; cdb_byte++)
+		printf(" 0x%x", cmd->cmnd[cdb_byte]);
+	printf("\n");
 
 	/*
 	 * In all versions of Linux, we have to work around
