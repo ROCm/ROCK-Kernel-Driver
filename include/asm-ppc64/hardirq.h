@@ -10,6 +10,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/cache.h>
 #include <linux/preempt.h>
 
 typedef struct {
@@ -104,12 +105,4 @@ do {									\
 
 #endif /* __KERNEL__ */
 	
-#define show_stack(SP)				\
-do {						\
-	if (SP)					\
-		print_backtrace(SP);		\
-	else					\
-		print_backtrace(_get_SP());	\
-} while (0)
-
 #endif /* __ASM_HARDIRQ_H */

@@ -67,7 +67,6 @@ void die(const char *str, struct pt_regs *regs, long err)
 	bust_spinlocks(1);
 	printk("Oops: %s, sig: %ld\n", str, err);
 	show_regs(regs);
-	print_backtrace((unsigned long *)regs->gpr[1]);
 	bust_spinlocks(0);
 	spin_unlock_irq(&die_lock);
 
@@ -188,7 +187,6 @@ MachineCheckException(struct pt_regs *regs)
 		printk("Machine check in kernel mode.\n");
 		printk("Caused by (from SRR1=%lx): ", regs->msr);
 		show_regs(regs);
-		print_backtrace((unsigned long *)regs->gpr[1]);
 		bust_spinlocks(0);
 		spin_unlock_irq(&die_lock);
 		panic("Unrecoverable Machine Check");

@@ -103,6 +103,8 @@ __switch_to(struct task_struct *prev, struct task_struct *new)
 	local_irq_restore(flags);
 }
 
+static void show_tsk_stack(struct task_struct *p, unsigned long sp);
+
 void show_regs(struct pt_regs * regs)
 {
 	int i;
@@ -114,32 +116,26 @@ void show_regs(struct pt_regs * regs)
 	       regs->msr & MSR_FP ? 1 : 0,regs->msr&MSR_ME ? 1 : 0,
 	       regs->msr&MSR_IR ? 1 : 0,
 	       regs->msr&MSR_DR ? 1 : 0);
+	if (regs->trap == 0x300 || regs->trap == 0x380 || regs->trap == 0x600)
+		printk("DAR: %016lx, DSISR: %016lx\n", regs->dar, regs->dsisr);
 	printk("TASK = %p[%d] '%s' ",
 	       current, current->pid, current->comm);
-	printk("\nlast math %p ", last_task_used_math);
-	
+
 #ifdef CONFIG_SMP
-	/* printk(" CPU: %d last CPU: %d", current->processor,current->last_processor); */
+	printk(" CPU: %d", smp_processor_id());
 #endif /* CONFIG_SMP */
-	
-	printk("\n");
-	for (i = 0;  i < 32;  i++)
-	{
+
+	for (i = 0; i < 32; i++) {
 		long r;
-		if ((i % 4) == 0)
-		{
-			printk("GPR%02d: ", i);
+		if ((i % 4) == 0) {
+			printk("\n" KERN_INFO "GPR%02d: ", i);
 		}
-
-		if ( __get_user(r, &(regs->gpr[i])) )
+		if (__get_user(r, &(regs->gpr[i])))
 		    return;
-
 		printk("%016lX ", r);
-		if ((i % 4) == 3)
-		{
-			printk("\n");
-		}
 	}
+	printk("\n");
+	show_tsk_stack(current, regs->gpr[1]);
 }
 
 void exit_thread(void)
@@ -338,7 +334,7 @@ void initialize_paca_hardware_interrupt_stack(void)
 		if (!cpu_possible(i))
 			continue;
 		/* Carve out storage for the hardware interrupt stack */
-		stack = __get_free_pages(GFP_KERNEL, get_order(8*PAGE_SIZE));
+		stack = __get_free_pages(GFP_ATOMIC, get_order(8*PAGE_SIZE));
 
 		if ( !stack ) {     
 			printk("ERROR, cannot find space for hardware stack.\n");
@@ -413,26 +409,6 @@ char * ppc_find_proc_name( unsigned * p, char * buf, unsigned buflen )
 	return buf;
 }
 
-void
-print_backtrace(unsigned long *sp)
-{
-	int cnt = 0;
-	unsigned long i;
-	char name_buf[256];
-
-	printk("Call backtrace: \n");
-	while (sp) {
-		if (__get_user( i, &sp[2] ))
-			break;
-		printk("%016lX ", i);
-		printk("%s\n", ppc_find_proc_name( (unsigned *)i, name_buf, 256 ));
-		if (cnt > 32) break;
-		if (__get_user(sp, (unsigned long **)sp))
-			break;
-	}
-	printk("\n");
-}
-
 /*
  * These bracket the sleeping functions..
  */
@@ -467,31 +443,41 @@ unsigned long get_wchan(struct task_struct *p)
 	return 0;
 }
 
-void show_trace_task(struct task_struct *p)
+static void show_tsk_stack(struct task_struct *p, unsigned long sp)
 {
-	unsigned long ip, sp;
+	unsigned long ip;
 	unsigned long stack_page = (unsigned long)p->thread_info;
 	int count = 0;
+	char name_buf[256];
 
 	if (!p)
 		return;
 
 	printk("Call Trace: ");
-	sp = p->thread.ksp;
 	do {
-		sp = *(unsigned long *)sp;
+		if (__get_user(sp, (unsigned long *)sp))
+			break;
 		if (sp < (stack_page + sizeof(struct thread_struct)) ||
 		    sp >= (stack_page + THREAD_SIZE))
 			break;
 		if (count > 0) {
-			ip = *(unsigned long *)(sp + 16);
+			if (__get_user(ip, (unsigned long *)(sp + 16)))
+				break;
 			printk("[%016lx] ", ip);
+			printk("%s\n", ppc_find_proc_name((unsigned *)ip,
+			       name_buf, 256 ));
 		}
-	} while (count++ < 16);
-	printk("\n");
+	} while (count++ < 32);
 }
+
+extern unsigned long *_get_SP(void);
 
 void dump_stack(void)
 {
-	show_stack(NULL);
+	show_tsk_stack(current, (unsigned long)_get_SP());
+}
+
+void show_trace_task(struct task_struct *tsk)
+{
+	show_tsk_stack(tsk, tsk->thread.ksp);
 }

@@ -12,8 +12,9 @@
 #include <linux/types.h>
 #include <linux/threads.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/irq.h>
+#include <linux/smp.h>
+#include <linux/interrupt.h>
 #include <asm/prom.h>
 #include <asm/io.h>
 #include <asm/pgtable.h>

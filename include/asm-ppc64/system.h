@@ -79,7 +79,6 @@ extern int xmon_dabr_match(struct pt_regs *regs);
 extern void (*xmon_fault_handler)(struct pt_regs *regs);
 #endif
 
-extern void print_backtrace(unsigned long *);
 extern void show_regs(struct pt_regs * regs);
 extern void flush_instruction_cache(void);
 extern int _get_PVR(void);

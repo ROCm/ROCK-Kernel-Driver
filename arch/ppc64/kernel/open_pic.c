@@ -11,9 +11,10 @@
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/init.h>
 #include <linux/irq.h>
+#include <linux/smp.h>
+#include <linux/interrupt.h>
 #include <asm/ptrace.h>
 #include <asm/signal.h>
 #include <asm/io.h>
@@ -114,11 +115,11 @@ extern unsigned long* _get_SP(void);
 #define check_arg_irq(irq) \
     if (irq < open_pic_irq_offset || irq >= (NumSources+open_pic_irq_offset)){ \
       printk(KERN_ERR "open_pic.c:%d: illegal irq %d\n", __LINE__, irq); \
-      print_backtrace(_get_SP()); }
+      dump_stack(); }
 #define check_arg_cpu(cpu) \
     if (cpu < 0 || cpu >= OPENPIC_MAX_PROCESSORS){ \
 	printk(KERN_ERR "open_pic.c:%d: illegal cpu %d\n", __LINE__, cpu); \
-	print_backtrace(_get_SP()); }
+	dump_stack(); }
 #else
 #define check_arg_ipi(ipi)	do {} while (0)
 #define check_arg_timer(timer)	do {} while (0)
