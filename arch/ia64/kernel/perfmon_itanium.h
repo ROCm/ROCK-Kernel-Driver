@@ -59,12 +59,12 @@ static pfm_reg_desc_t pfm_ita_pmd_desc[PMU_MAX_PMDS]={
  * impl_pmcs, impl_pmds are computed at runtime to minimize errors!
  */
 static pmu_config_t pmu_conf={
-	disabled:	1,
-	ovfl_val:	(1UL << 32) - 1,
-	num_ibrs:	8,
-	num_dbrs:	8,
-	pmd_desc:	pfm_ita_pmd_desc,
-	pmc_desc:	pfm_ita_pmc_desc
+	.disabled = 1,
+	.ovfl_val = (1UL << 32) - 1,
+	.num_ibrs = 8,
+	.num_dbrs = 8,
+	.pmd_desc = pfm_ita_pmd_desc,
+	.pmc_desc = pfm_ita_pmc_desc
 };
 
 

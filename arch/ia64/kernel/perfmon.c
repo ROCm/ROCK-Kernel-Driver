@@ -3972,6 +3972,11 @@ pfm_inherit(struct task_struct *task, struct pt_regs *regs)
 
 	sema_init(&nctx->ctx_restart_sem, 0); /* reset this semaphore to locked */
 
+	/*
+	 * propagate kernel psr in new context (used for first ctxsw in
+	 */
+	nctx->ctx_saved_psr = pfm_get_psr();
+
 	/* link with new task */
 	thread->pfm_context = nctx;
 
@@ -4268,8 +4273,8 @@ pfm_cleanup_notifiers(struct task_struct *task)
 
 static struct irqaction perfmon_irqaction = {
 	.handler =	pfm_interrupt_handler,
-	.flags =	SA_INTERRUPT,
-	.name =		"perfmon"
+	.flags   =	SA_INTERRUPT,
+	.name    =	"perfmon"
 };
 
 int
