@@ -34,18 +34,9 @@ struct symbol *modules_sym;
 
 void sym_add_default(struct symbol *sym, const char *def)
 {
-	struct property *prop = create_prop(P_DEFAULT);
-	struct property **propp;
+	struct property *prop = prop_alloc(P_DEFAULT, sym);
 
-	prop->sym = sym;
-	prop->def = sym_lookup(def, 1);
-
-	/* append property to the prop list of symbol */
-	if (prop->sym) {
-		for (propp = &prop->sym->prop; *propp; propp = &(*propp)->next)
-			;
-		*propp = prop;
-	}
+	prop->expr = expr_alloc_symbol(sym_lookup(def, 1));
 }
 
 void sym_init(void)
@@ -139,7 +130,7 @@ struct property *sym_get_default_prop(struct symbol *sym)
 	return NULL;
 }
 
-void sym_calc_visibility(struct symbol *sym)
+static void sym_calc_visibility(struct symbol *sym)
 {
 	struct property *prop;
 	tristate visible, oldvisible;
@@ -157,11 +148,46 @@ void sym_calc_visibility(struct symbol *sym)
 	}
 }
 
+static struct symbol *sym_calc_choice(struct symbol *sym)
+{
+	struct symbol *def_sym;
+	struct property *prop;
+	struct expr *e;
+
+	/* is the user choice visible? */
+	def_sym = sym->user.val;
+	if (def_sym) {
+		sym_calc_visibility(def_sym);
+		if (def_sym->visible != no)
+			return def_sym;
+	}
+
+	/* any of the defaults visible? */
+	for_all_defaults(sym, prop) {
+		prop->visible.tri = expr_calc_value(prop->visible.expr);
+		if (prop->visible.tri == no)
+			continue;
+		def_sym = prop_get_symbol(prop);
+		sym_calc_visibility(def_sym);
+		if (def_sym->visible != no)
+			return def_sym;
+	}
+
+	/* just get the first visible value */
+	prop = sym_get_choice_prop(sym);
+	for (e = prop->expr; e; e = e->left.expr) {
+		def_sym = e->right.sym;
+		sym_calc_visibility(def_sym);
+		if (def_sym->visible != no)
+			return def_sym;
+	}
+	return NULL;
+}
+
 void sym_calc_value(struct symbol *sym)
 {
 	struct symbol_value newval, oldval;
-	struct property *prop, *def_prop;
-	struct symbol *def_sym;
+	struct property *prop;
 	struct expr *e;
 
 	if (!sym)
@@ -196,36 +222,56 @@ void sym_calc_value(struct symbol *sym)
 	/* set default if recursively called */
 	sym->curr = newval;
 
-	if (sym->visible != no) {
-		sym->flags |= SYMBOL_WRITE;
-		if (!sym_has_value(sym)) {
-			if (!sym_is_choice(sym)) {
-				prop = sym_get_default_prop(sym);
-				if (prop) {
-					sym_calc_value(prop->def);
-					newval = prop->def->curr;
-				}
-			} else
-				newval.tri = sym->user.tri;
-		} else
-			newval = sym->user;
-
-		newval.tri = E_AND(newval.tri, sym->visible);
-		/* if the symbol is visible and not optionial,
-		 * possibly ignore old user choice. */
-		if (!sym_is_optional(sym) && newval.tri == no)
-			newval.tri = sym->visible;
+	switch (sym_get_type(sym)) {
+	case S_BOOLEAN:
+	case S_TRISTATE:
 		if (sym_is_choice_value(sym) && sym->visible == yes) {
 			prop = sym_get_choice_prop(sym);
-			newval.tri = (prop->def->curr.val == sym) ? yes : no;
+			newval.tri = (prop_get_symbol(prop)->curr.val == sym) ? yes : no;
+		} else if (sym->visible != no) {
+			sym->flags |= SYMBOL_WRITE;
+			if (sym_has_value(sym))
+				newval.tri = sym->user.tri;
+			else if (!sym_is_choice(sym)) {
+				prop = sym_get_default_prop(sym);
+				if (prop)
+					newval.tri = expr_calc_value(prop->expr);
+			}
+			newval.tri = E_AND(newval.tri, sym->visible);
+			/* if the symbol is visible and not optionial,
+			 * possibly ignore old user choice. */
+			if (!sym_is_optional(sym) && newval.tri == no)
+				newval.tri = sym->visible;
+		} else if (!sym_is_choice(sym)) {
+			prop = sym_get_default_prop(sym);
+			if (prop) {
+				sym->flags |= SYMBOL_WRITE;
+				newval.tri = expr_calc_value(prop->expr);
+			}
 		}
-	} else {
+		break;
+	case S_STRING:
+	case S_HEX:
+	case S_INT:
+		if (sym->visible != no) {
+			sym->flags |= SYMBOL_WRITE;
+			if (sym_has_value(sym)) {
+				newval.val = sym->user.val;
+				break;
+			}
+		}
 		prop = sym_get_default_prop(sym);
 		if (prop) {
-			sym->flags |= SYMBOL_WRITE;
-			sym_calc_value(prop->def);
-			newval = prop->def->curr;
+			struct symbol *ds = prop_get_symbol(prop);
+			if (ds) {
+				sym->flags |= SYMBOL_WRITE;
+				sym_calc_value(ds);
+				newval.val = ds->curr.val;
+			}
 		}
+		break;
+	default:
+		;
 	}
 
 	switch (sym_get_type(sym)) {
@@ -246,44 +292,11 @@ void sym_calc_value(struct symbol *sym)
 
 out:
 	sym->curr = newval;
+	if (sym_is_choice(sym) && newval.tri == yes)
+		sym->curr.val = sym_calc_choice(sym);
 
-	if (sym_is_choice(sym) && newval.tri == yes) {
-		def_sym = sym->user.val;
-		if (def_sym) {
-			sym_calc_visibility(def_sym);
-			if (def_sym->visible == no)
-				def_sym = NULL;
-		}
-		if (!def_sym) {
-			for_all_defaults(sym, def_prop) {
-				def_prop->visible.tri = expr_calc_value(def_prop->visible.expr);
-				if (def_prop->visible.tri == no)
-					continue;
-				sym_calc_visibility(def_prop->def);
-				if (def_prop->def->visible != no) {
-					def_sym = def_prop->def;
-					break;
-				}
-			}
-		}
-
-		if (!def_sym) {
-			prop = sym_get_choice_prop(sym);
-			for (e = prop->expr; e; e = e->left.expr) {
-				sym_calc_visibility(e->right.sym);
-				if (e->right.sym->visible != no) {
-					def_sym = e->right.sym;
-					break;
-				}
-			}
-		}
-
-		newval.val = def_sym;
-	}
-
-	if (memcmp(&oldval, &newval, sizeof(newval)))
+	if (memcmp(&oldval, &sym->curr, sizeof(oldval)))
 		sym_set_changed(sym);
-	sym->curr = newval;
 
 	if (sym_is_choice(sym)) {
 		int flags = sym->flags & (SYMBOL_CHANGED | SYMBOL_WRITE);
@@ -363,10 +376,10 @@ bool sym_set_tristate_value(struct symbol *sym, tristate val)
 		sym_set_changed(sym);
 	}
 	if (sym_is_choice_value(sym) && val == yes) {
-		struct property *prop = sym_get_choice_prop(sym);
+		struct symbol *cs = prop_get_symbol(sym_get_choice_prop(sym));
 
-		prop->def->user.val = sym;
-		prop->def->flags &= ~SYMBOL_NEW;
+		cs->user.val = sym;
+		cs->flags &= ~SYMBOL_NEW;
 	}
 
 	sym->user.tri = val;
@@ -605,6 +618,36 @@ struct symbol *sym_find(const char *name)
 	}
 
 	return symbol;
+}
+
+struct property *prop_alloc(enum prop_type type, struct symbol *sym)
+{
+	struct property *prop;
+	struct property **propp;
+
+	prop = malloc(sizeof(*prop));
+	memset(prop, 0, sizeof(*prop));
+	prop->type = type;
+	prop->sym = sym;
+	prop->file = current_file;
+	prop->lineno = zconf_lineno();
+
+	/* append property to the prop list of symbol */
+	if (sym) {
+		for (propp = &sym->prop; *propp; propp = &(*propp)->next)
+			;
+		*propp = prop;
+	}
+
+	return prop;
+}
+
+struct symbol *prop_get_symbol(struct property *prop)
+{
+	if (prop->expr && (prop->expr->type == E_SYMBOL ||
+			   prop->expr->type == E_CHOICE))
+		return prop->expr->left.sym;
+	return NULL;
 }
 
 const char *prop_get_type_name(enum prop_type type)

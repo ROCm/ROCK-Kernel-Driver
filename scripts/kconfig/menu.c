@@ -99,38 +99,20 @@ void menu_set_type(int type)
 		sym->name ? sym->name : "<choice>", sym_type_name(sym->type), sym_type_name(type));
 }
 
-struct property *create_prop(enum prop_type type)
+struct property *menu_add_prop(enum prop_type type, char *prompt, struct expr *expr, struct expr *dep)
 {
-	struct property *prop;
+	struct property *prop = prop_alloc(type, current_entry->sym);
 
-	prop = malloc(sizeof(*prop));
-	memset(prop, 0, sizeof(*prop));
-	prop->type = type;
-	prop->file = current_file;
-	prop->lineno = zconf_lineno();
-
-	return prop;
-}
-
-struct property *menu_add_prop(enum prop_type type, char *prompt, struct symbol *def, struct expr *dep)
-{
-	struct property *prop = create_prop(type);
-	struct property **propp;
-
-	prop->sym = current_entry->sym;
 	prop->menu = current_entry;
 	prop->text = prompt;
-	prop->def = def;
+	prop->expr = expr;
 	prop->visible.expr = menu_check_dep(dep);
 
-	if (prompt)
+	if (prompt) {
+		if (current_entry->prompt)
+			fprintf(stderr, "%s:%d: prompt redefined\n",
+				current_entry->file->name, current_entry->lineno);
 		current_entry->prompt = prop;
-
-	/* append property to the prop list of symbol */
-	if (prop->sym) {
-		for (propp = &prop->sym->prop; *propp; propp = &(*propp)->next)
-			;
-		*propp = prop;
 	}
 
 	return prop;
@@ -138,12 +120,17 @@ struct property *menu_add_prop(enum prop_type type, char *prompt, struct symbol 
 
 void menu_add_prompt(enum prop_type type, char *prompt, struct expr *dep)
 {
-	current_entry->prompt = menu_add_prop(type, prompt, NULL, dep);
+	menu_add_prop(type, prompt, NULL, dep);
 }
 
-void menu_add_default(enum prop_type type, struct symbol *def, struct expr *dep)
+void menu_add_expr(enum prop_type type, struct expr *expr, struct expr *dep)
 {
-	current_entry->prompt = menu_add_prop(type, NULL, def, dep);
+	menu_add_prop(type, NULL, expr, dep);
+}
+
+void menu_add_symbol(enum prop_type type, struct symbol *sym, struct expr *dep)
+{
+	menu_add_prop(type, NULL, expr_alloc_symbol(sym), dep);
 }
 
 void menu_finalize(struct menu *parent)
@@ -231,8 +218,8 @@ void menu_finalize(struct menu *parent)
 			menu->sym->flags |= SYMBOL_CHOICEVAL;
 			current_entry = menu;
 			menu_set_type(sym->type);
-			menu_add_prop(P_CHOICE, NULL, parent->sym, NULL);
-			prop = sym_get_choice_prop(parent->sym);
+			menu_add_symbol(P_CHOICE, sym, NULL);
+			prop = sym_get_choice_prop(sym);
 			prop->expr = expr_alloc_one(E_CHOICE, prop->expr);
 			prop->expr->right.sym = menu->sym;
 		}

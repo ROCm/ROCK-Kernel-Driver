@@ -105,7 +105,6 @@ struct property {
 	struct symbol *sym;
 	enum prop_type type;
 	const char *text;
-	struct symbol *def;
 	struct expr_value visible;
 	struct expr *expr;
 	struct menu *menu;

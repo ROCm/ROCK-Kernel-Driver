@@ -165,6 +165,8 @@ config_option: T_TRISTATE prompt_stmt_opt T_EOL
 
 config_option: T_DEF_TRISTATE expr if_expr T_EOL
 {
+	menu_add_expr(P_DEFAULT, $2, $3);
+	menu_set_type(S_TRISTATE);
 	printd(DEBUG_PARSE, "%s:%d:def_boolean\n", zconf_curname(), zconf_lineno());
 };
 
@@ -176,6 +178,8 @@ config_option: T_BOOLEAN prompt_stmt_opt T_EOL
 
 config_option: T_DEF_BOOLEAN expr if_expr T_EOL
 {
+	menu_add_expr(P_DEFAULT, $2, $3);
+	menu_set_type(S_BOOLEAN);
 	printd(DEBUG_PARSE, "%s:%d:def_boolean\n", zconf_curname(), zconf_lineno());
 };
 
@@ -199,13 +203,13 @@ config_option: T_STRING prompt_stmt_opt T_EOL
 
 config_option: T_PROMPT prompt if_expr T_EOL
 {
-	menu_add_prop(P_PROMPT, $2, NULL, $3);
+	menu_add_prompt(P_PROMPT, $2, $3);
 	printd(DEBUG_PARSE, "%s:%d:prompt\n", zconf_curname(), zconf_lineno());
 };
 
-config_option: T_DEFAULT symbol if_expr T_EOL
+config_option: T_DEFAULT expr if_expr T_EOL
 {
-	menu_add_prop(P_DEFAULT, NULL, $2, $3);
+	menu_add_expr(P_DEFAULT, $2, $3);
 	printd(DEBUG_PARSE, "%s:%d:default\n", zconf_curname(), zconf_lineno());
 };
 
@@ -226,7 +230,7 @@ choice: T_CHOICE T_EOL
 	struct symbol *sym = sym_lookup(NULL, 0);
 	sym->flags |= SYMBOL_CHOICE;
 	menu_add_entry(sym);
-	menu_add_prop(P_CHOICE, NULL, NULL, NULL);
+	menu_add_expr(P_CHOICE, NULL, NULL);
 	printd(DEBUG_PARSE, "%s:%d:choice\n", zconf_curname(), zconf_lineno());
 };
 
@@ -262,7 +266,7 @@ choice_option_list:
 
 choice_option: T_PROMPT prompt if_expr T_EOL
 {
-	menu_add_prop(P_PROMPT, $2, NULL, $3);
+	menu_add_prompt(P_PROMPT, $2, $3);
 	printd(DEBUG_PARSE, "%s:%d:prompt\n", zconf_curname(), zconf_lineno());
 };
 
@@ -286,7 +290,7 @@ choice_option: T_OPTIONAL T_EOL
 
 choice_option: T_DEFAULT T_WORD if_expr T_EOL
 {
-	menu_add_prop(P_DEFAULT, NULL, sym_lookup($2, 0), $3);
+	menu_add_symbol(P_DEFAULT, sym_lookup($2, 0), $3);
 	printd(DEBUG_PARSE, "%s:%d:default\n", zconf_curname(), zconf_lineno());
 };
 
@@ -593,7 +597,7 @@ void print_symbol(FILE *out, struct menu *menu)
 			break;
 		case P_DEFAULT:
 			fputs( "  default ", out);
-			print_quoted_string(out, prop->def->name);
+			expr_fprint(prop->expr, out);
 			if (!expr_is_yes(prop->visible.expr)) {
 				fputs(" if ", out);
 				expr_fprint(prop->visible.expr, out);

@@ -198,21 +198,21 @@ int conf_read(const char *name)
 				;
 			}
 			if (sym_is_choice_value(sym)) {
-				prop = sym_get_choice_prop(sym);
+				struct symbol *cs = prop_get_symbol(sym_get_choice_prop(sym));
 				switch (sym->user.tri) {
 				case mod:
-					if (prop->def->user.tri == yes)
+					if (cs->user.tri == yes)
 						/* warn? */;
 					break;
 				case yes:
-					if (prop->def->user.tri != no)
+					if (cs->user.tri != no)
 						/* warn? */;
-					prop->def->user.val = sym;
+					cs->user.val = sym;
 					break;
 				case no:
 					break;
 				}
-				prop->def->user.tri = sym->user.tri;
+				cs->user.tri = sym->user.tri;
 			}
 			break;
 		case '\n':
