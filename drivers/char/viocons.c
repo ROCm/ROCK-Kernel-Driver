@@ -9,7 +9,7 @@
  *           Colin Devilbiss <devilbis@us.ibm.com>
  *           Stephen Rothwell <sfr@au1.ibm.com>
  *
- * (C) Copyright 2000, 2001, 2002, 2003 IBM Corporation
+ * (C) Copyright 2000, 2001, 2002, 2003, 2004 IBM Corporation
  *
  * This program is free software;  you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -57,7 +57,9 @@
 
 #define VIOTTY_MAGIC (0x0DCB)
 #define VTTY_PORTS 10
-#define VIOTTY_SERIAL_START 65
+
+#define VIOCONS_KERN_WARN	KERN_WARNING "viocons: "
+#define VIOCONS_KERN_INFO	KERN_INFO "viocons: "
 
 static spinlock_t consolelock = SPIN_LOCK_UNLOCKED;
 static spinlock_t consoleloglock = SPIN_LOCK_UNLOCKED;
@@ -138,7 +140,6 @@ static struct port_info {
 static void initDataEvent(struct viocharlpevent *viochar, HvLpIndex lp);
 
 static struct tty_driver *viotty_driver;
-static struct tty_driver *viottyS_driver;
 
 void hvlog(char *fmt, ...)
 {
@@ -189,10 +190,10 @@ void hvlogOutput(const char *buf, int count)
 static inline int viotty_paranoia_check(struct port_info *pi,
 					char *name, const char *routine)
 {
-	static const char *bad_pi_addr = KERN_WARNING_VIO
-		"Warning: bad address for port_info struct (%s) in %s\n";
-	static const char *badmagic = KERN_WARNING_VIO
-		"Warning: bad magic number for port_info struct (%s) in %s\n";
+	static const char *bad_pi_addr = VIOCONS_KERN_WARN
+		"warning: bad address for port_info struct (%s) in %s\n";
+	static const char *badmagic = VIOCONS_KERN_WARN
+		"warning: bad magic number for port_info struct (%s) in %s\n";
 
 	if ((pi < &port_info[0]) || (viochar_port(pi) > VTTY_PORTS)) {
 		printk(bad_pi_addr, name, routine);
@@ -395,8 +396,8 @@ static void send_buffers(struct port_info *pi)
 			vio_free_event_buffer(viomajorsubtype_chario, viochar);
 			spin_unlock_irqrestore(&consolelock, flags);
 
-			printk(KERN_WARNING_VIO
-			       "console error sending event! return code %d\n",
+			printk(VIOCONS_KERN_WARN
+			       "error sending event! return code %d\n",
 			       (int)hvrc);
 			return;
 		}
@@ -655,14 +656,14 @@ static struct tty_driver *viocons_device(struct console *c, int *index)
  * console device I/O methods
  */
 static struct console viocons_early = {
-	.name = "ttyS",
+	.name = "viocons",
 	.write = viocons_write_early,
 	.flags = CON_PRINTBUFFER,
 	.index = -1,
 };
 
 static struct console viocons = {
-	.name = "ttyS",
+	.name = "viocons",
 	.write = viocons_write,
 	.device = viocons_device,
 	.flags = CON_PRINTBUFFER,
@@ -680,9 +681,6 @@ static int viotty_open(struct tty_struct *tty, struct file *filp)
 
 	port = tty->index;
 
-	if (port >= VIOTTY_SERIAL_START)
-		port -= VIOTTY_SERIAL_START;
-
 	if ((port < 0) || (port >= VTTY_PORTS))
 		return -ENODEV;
 
@@ -692,8 +690,8 @@ static int viotty_open(struct tty_struct *tty, struct file *filp)
 	/* If some other TTY is already connected here, reject the open */
 	if ((pi->tty) && (pi->tty != tty)) {
 		spin_unlock_irqrestore(&consolelock, flags);
-		printk(KERN_WARNING_VIO
-		       "console attempt to open device twice from different ttys\n");
+		printk(VIOCONS_KERN_WARN
+		       "attempt to open device twice from different ttys\n");
 		return -EBUSY;
 	}
 	tty->driver_data = pi;
@@ -820,13 +818,6 @@ static void viotty_put_char(struct tty_struct *tty, unsigned char ch)
 }
 
 /*
- * TTY flush_chars method
- */
-static void viotty_flush_chars(struct tty_struct *tty)
-{
-}
-
-/*
  * TTY write_room method
  */
 static int viotty_write_room(struct tty_struct *tty)
@@ -864,15 +855,11 @@ static int viotty_write_room(struct tty_struct *tty)
 }
 
 /*
- * TTY chars_in_buffer_room method
+ * TTY chars_in_buffer method
  */
 static int viotty_chars_in_buffer(struct tty_struct *tty)
 {
 	return 0;
-}
-
-static void viotty_flush_buffer(struct tty_struct *tty)
-{
 }
 
 static int viotty_ioctl(struct tty_struct *tty, struct file *file,
@@ -892,43 +879,6 @@ static int viotty_ioctl(struct tty_struct *tty, struct file *file,
 	}
 
 	return n_tty_ioctl(tty, file, cmd, arg);
-}
-
-static void viotty_throttle(struct tty_struct *tty)
-{
-}
-
-static void viotty_unthrottle(struct tty_struct *tty)
-{
-}
-
-static void viotty_set_termios(struct tty_struct *tty,
-		struct termios *old_termios)
-{
-}
-
-static void viotty_stop(struct tty_struct *tty)
-{
-}
-
-static void viotty_start(struct tty_struct *tty)
-{
-}
-
-static void viotty_hangup(struct tty_struct *tty)
-{
-}
-
-static void viotty_break(struct tty_struct *tty, int break_state)
-{
-}
-
-static void viotty_send_xchar(struct tty_struct *tty, char ch)
-{
-}
-
-static void viotty_wait_until_sent(struct tty_struct *tty, int timeout)
-{
 }
 
 /*
@@ -964,23 +914,22 @@ static void vioHandleOpenEvent(struct HvLpEvent *event)
 
 		spin_unlock_irqrestore(&consolelock, flags);
 		if (event->xRc != HvLpEvent_Rc_Good)
-			printk(KERN_WARNING_VIO
-			       "viocons: event->xRc != HvLpEvent_Rc_Good, event->xRc == (%d).\n",
+			printk(VIOCONS_KERN_WARN
+			       "handle_open_event: event->xRc == (%d).\n",
 			       event->xRc);
 
 		if (event->xCorrelationToken != 0) {
 			atomic_t *aptr= (atomic_t *)event->xCorrelationToken;
 			atomic_set(aptr, 1);
 		} else
-			printk(KERN_WARNING_VIO
-			       "viocons: wierd...got open ack without atomic\n");
+			printk(VIOCONS_KERN_WARN
+			       "wierd...got open ack without atomic\n");
 		return;
 	}
 
 	/* This had better require an ack, otherwise complain */
 	if (event->xFlags.xAckInd != HvLpEvent_AckInd_DoAck) {
-		printk(KERN_WARNING_VIO
-		       "console: viocharopen without ack bit!\n");
+		printk(VIOCONS_KERN_WARN "viocharopen without ack bit!\n");
 		return;
 	}
 
@@ -1019,11 +968,10 @@ static void vioHandleOpenEvent(struct HvLpEvent *event)
 	spin_unlock_irqrestore(&consolelock, flags);
 
 	if (reject == 1)
-		printk(KERN_WARNING_VIO
-			"viocons: console open rejected : bad virtual tty.\n");
+		printk(VIOCONS_KERN_WARN "open rejected: bad virtual tty.\n");
 	else if (reject == 2)
-		printk(KERN_WARNING_VIO
-			"viocons: console open rejected : console in exclusive use by another partition.\n");
+		printk(VIOCONS_KERN_WARN
+			"open rejected: console in exclusive use by another partition.\n");
 
 	/* Return the acknowledgement */
 	HvCallEvent_ackLpEvent(event);
@@ -1050,7 +998,8 @@ static void vioHandleCloseEvent(struct HvLpEvent *event)
 
 	if (event->xFlags.xFunction == HvLpEvent_Function_Int) {
 		if (port >= VTTY_PORTS) {
-			printk(KERN_WARNING_VIO "viocons: close message from invalid virtual device.\n");
+			printk(VIOCONS_KERN_WARN
+					"close message from invalid virtual device.\n");
 			return;
 		}
 
@@ -1062,11 +1011,10 @@ static void vioHandleCloseEvent(struct HvLpEvent *event)
 			port_info[port].lp = HvLpIndexInvalid;
 
 		spin_unlock_irqrestore(&consolelock, flags);
-		printk(KERN_INFO_VIO
-		       "console close from %d\n", event->xSourceLp);
+		printk(VIOCONS_KERN_INFO "close from %d\n", event->xSourceLp);
 	} else
-		printk(KERN_WARNING_VIO
-		       "console got unexpected close acknowlegement\n");
+		printk(VIOCONS_KERN_WARN
+				"got unexpected close acknowlegement\n");
 }
 
 /*
@@ -1079,12 +1027,11 @@ static void vioHandleConfig(struct HvLpEvent *event)
 	HvCall_writeLogBuffer(cevent->data, cevent->len);
 
 	if (cevent->data[0] == 0x01)
-		printk(KERN_INFO_VIO
-		       "console window resized to %d: %d: %d: %d\n",
+		printk(VIOCONS_KERN_INFO "window resized to %d: %d: %d: %d\n",
 		       cevent->data[1], cevent->data[2],
 		       cevent->data[3], cevent->data[4]);
 	else
-		printk(KERN_WARNING_VIO "console unknown config event\n");
+		printk(VIOCONS_KERN_WARN "unknown config event\n");
 }
 
 /*
@@ -1100,8 +1047,8 @@ static void vioHandleData(struct HvLpEvent *event)
 	u8 port = cevent->virtual_device;
 
 	if (port >= VTTY_PORTS) {
-		printk(KERN_WARNING_VIO
-		       "console data on invalid virtual device %d\n", port);
+		printk(VIOCONS_KERN_WARN "data on invalid virtual device %d\n",
+				port);
 		return;
 	}
 
@@ -1130,13 +1077,14 @@ static void vioHandleData(struct HvLpEvent *event)
 	tty = pi->tty;
 	if (tty == NULL) {
 		spin_unlock_irqrestore(&consolelock, flags);
-		printk(KERN_WARNING_VIO "no tty for virtual device %d\n", port);
+		printk(VIOCONS_KERN_WARN "no tty for virtual device %d\n",
+				port);
 		return;
 	}
 
 	if (tty->magic != TTY_MAGIC) {
 		spin_unlock_irqrestore(&consolelock, flags);
-		printk(KERN_WARNING_VIO "tty bad magic\n");
+		printk(VIOCONS_KERN_WARN "tty bad magic\n");
 		return;
 	}
 
@@ -1186,8 +1134,7 @@ static void vioHandleData(struct HvLpEvent *event)
 		 * have room for because it would fail without indication.
 		 */
 		if ((tty->flip.count + 1) > TTY_FLIPBUF_SIZE) {
-			printk(KERN_WARNING_VIO
-					"console input buffer overflow!\n");
+			printk(VIOCONS_KERN_WARN "input buffer overflow!\n");
 			break;
 		}
 		tty_insert_flip_char(tty, cevent->data[index], TTY_NORMAL);
@@ -1209,8 +1156,7 @@ static void vioHandleAck(struct HvLpEvent *event)
 	u8 port = cevent->virtual_device;
 
 	if (port >= VTTY_PORTS) {
-		printk(KERN_WARNING_VIO
-		       "viocons: data on invalid virtual device\n");
+		printk(VIOCONS_KERN_WARN "data on invalid virtual device\n");
 		return;
 	}
 
@@ -1278,20 +1224,9 @@ static struct tty_operations serial_ops = {
 	.close = viotty_close,
 	.write = viotty_write,
 	.put_char = viotty_put_char,
-	.flush_chars = viotty_flush_chars,
 	.write_room = viotty_write_room,
 	.chars_in_buffer = viotty_chars_in_buffer,
-	.flush_buffer = viotty_flush_buffer,
 	.ioctl = viotty_ioctl,
-	.throttle = viotty_throttle,
-	.unthrottle = viotty_unthrottle,
-	.set_termios = viotty_set_termios,
-	.stop = viotty_stop,
-	.start = viotty_start,
-	.hangup = viotty_hangup,
-	.break_ctl = viotty_break,
-	.send_xchar = viotty_send_xchar,
-	.wait_until_sent = viotty_wait_until_sent,
 };
 
 static int __init viocons_init2(void)
@@ -1299,14 +1234,11 @@ static int __init viocons_init2(void)
 	atomic_t wait_flag;
 	int rc;
 
-	/* Now open to the primary LP */
-	printk(KERN_INFO_VIO "console open path to primary\n");
 	/* +2 for fudge */
 	rc = viopath_open(HvLpConfig_getPrimaryLpIndex(),
 			viomajorsubtype_chario, VIOCHAR_WINDOW + 2);
 	if (rc)
-		printk(KERN_WARNING_VIO "console error opening to primary %d\n",
-				rc);
+		printk(VIOCONS_KERN_WARN "error opening to primary %d\n", rc);
 
 	if (viopath_hostLp == HvLpIndexInvalid)
 		vio_set_hostlp();
@@ -1317,30 +1249,28 @@ static int __init viocons_init2(void)
 	 */
 	if ((viopath_hostLp != HvLpIndexInvalid) &&
 	    (viopath_hostLp != HvLpConfig_getPrimaryLpIndex())) {
-		printk(KERN_INFO_VIO "console open path to hosting (%d)\n",
+		printk(VIOCONS_KERN_INFO "open path to hosting (%d)\n",
 				viopath_hostLp);
 		rc = viopath_open(viopath_hostLp, viomajorsubtype_chario,
 				VIOCHAR_WINDOW + 2);	/* +2 for fudge */
 		if (rc)
-			printk(KERN_WARNING_VIO
-				"console error opening to partition %d: %d\n",
+			printk(VIOCONS_KERN_WARN
+				"error opening to partition %d: %d\n",
 				viopath_hostLp, rc);
 	}
 
 	if (vio_setHandler(viomajorsubtype_chario, vioHandleCharEvent) < 0)
-		printk(KERN_WARNING_VIO
-				"Error seting handler for console events!\n");
+		printk(VIOCONS_KERN_WARN
+				"error seting handler for console events!\n");
 
-	printk(KERN_INFO_VIO "console major number is %d\n", TTY_MAJOR);
-
-	/* First, try to open the console to the hosting lp.
+	/*
+	 * First, try to open the console to the hosting lp.
 	 * Wait on a semaphore for the response.
 	 */
 	atomic_set(&wait_flag, 0);
 	if ((viopath_isactive(viopath_hostLp)) &&
 	    (send_open(viopath_hostLp, (void *)&wait_flag) == 0)) {
-		printk(KERN_INFO_VIO
-			"opening console to hosting partition %d\n",
+		printk(VIOCONS_KERN_INFO "hosting partition %d\n",
 			viopath_hostLp);
 		while (atomic_read(&wait_flag) == 0)
 			mb();
@@ -1354,7 +1284,7 @@ static int __init viocons_init2(void)
 	    (viopath_isactive(HvLpConfig_getPrimaryLpIndex())) &&
 	    (send_open(HvLpConfig_getPrimaryLpIndex(), (void *)&wait_flag)
 	     == 0)) {
-		printk(KERN_INFO_VIO "opening console to primary partition\n");
+		printk(VIOCONS_KERN_INFO "opening console to primary partition\n");
 		while (atomic_read(&wait_flag) == 0)
 			mb();
 	}
@@ -1374,29 +1304,10 @@ static int __init viocons_init2(void)
 	viotty_driver->flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_RESET_TERMIOS;
 	tty_set_operations(viotty_driver, &serial_ops);
 
-	viottyS_driver = alloc_tty_driver(VTTY_PORTS);
-	viottyS_driver->owner = THIS_MODULE;
-	viottyS_driver->driver_name = "vioconsole";
-	viottyS_driver->devfs_name = "tts/";
-	viottyS_driver->name = "ttyS";
-	viottyS_driver->major = TTY_MAJOR;
-	viottyS_driver->minor_start = VIOTTY_SERIAL_START;
-	viottyS_driver->type = TTY_DRIVER_TYPE_SERIAL;
-	viottyS_driver->subtype = 1;
-	viottyS_driver->init_termios = tty_std_termios;
-	viottyS_driver->flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_RESET_TERMIOS;
-	tty_set_operations(viottyS_driver, &serial_ops);
-
 	if (tty_register_driver(viotty_driver)) {
-		printk(KERN_WARNING_VIO "Couldn't register console driver\n");
+		printk(VIOCONS_KERN_WARN "couldn't register console driver\n");
 		put_tty_driver(viotty_driver);
 		viotty_driver = NULL;
-	}
-
-	if (tty_register_driver(viottyS_driver)) {
-		printk(KERN_WARNING_VIO "Couldn't register console S driver\n");
-		put_tty_driver(viottyS_driver);
-		viottyS_driver = NULL;
 	}
 
 	viocons_init_cfu_buffer();
@@ -1411,7 +1322,7 @@ static int __init viocons_init(void)
 {
 	int i;
 
-	printk(KERN_INFO_VIO "registering console\n");
+	printk(VIOCONS_KERN_INFO "registering console\n");
 	for (i = 0; i < VTTY_PORTS; i++) {
 		port_info[i].lp = HvLpIndexInvalid;
 		port_info[i].magic = VIOTTY_MAGIC;

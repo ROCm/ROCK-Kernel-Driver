@@ -24,7 +24,6 @@
 #define DM_DEC	0x00008000
 #define SM_INC	0x00001000
 #define SM_DEC	0x00002000
-#define RS_DUAL	0x00000000
 #define RS_IN	0x00000200
 #define RS_OUT	0x00000300
 #define TM_BURST 0x0000080
@@ -36,6 +35,11 @@
 #define CHCR_DE 0x00000001
 #define CHCR_TE 0x00000002
 #define CHCR_IE 0x00000004
+
+/* Define the default configuration for dual address memory-memory transfer.
+ * The 0x400 value represents auto-request, external->external.
+ */
+#define RS_DUAL	(DM_INC | SM_INC | 0x400 | TS_32)
 
 #define DMAOR_COD	0x00000008
 #define DMAOR_AE	0x00000004

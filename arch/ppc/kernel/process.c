@@ -45,7 +45,6 @@
 #include <asm/prom.h>
 #include <asm/hardirq.h>
 
-int dump_fpu(struct pt_regs *regs, elf_fpregset_t *fpregs);
 extern unsigned long _get_SP(void);
 
 struct task_struct *last_task_used_math = NULL;
@@ -189,11 +188,11 @@ enable_kernel_fp(void)
 }
 
 int
-dump_fpu(struct pt_regs *regs, elf_fpregset_t *fpregs)
+dump_task_fpu(struct task_struct *tsk, elf_fpregset_t *fpregs)
 {
-	if (regs->msr & MSR_FP)
-		giveup_fpu(current);
-	memcpy(fpregs, &current->thread.fpr[0], sizeof(*fpregs));
+	if (tsk->thread.regs && tsk->thread.regs->msr & MSR_FP)
+		giveup_fpu(tsk);
+	memcpy(fpregs, &tsk->thread.fpr[0], sizeof(*fpregs));
 	return 1;
 }
 

@@ -1563,14 +1563,20 @@ static int pmz_detach(struct macio_dev *mdev)
 static int pmz_suspend(struct macio_dev *mdev, u32 pm_state)
 {
 	struct uart_pmac_port *uap = dev_get_drvdata(&mdev->ofdev.dev);
-	struct uart_state *state = pmz_uart_reg.state + uap->port.line;
+	struct uart_state *state;
 	unsigned long flags;
 
-	if (uap == NULL)
+	if (uap == NULL) {
+		printk("HRM... pmz_suspend with NULL uap\n");
 		return 0;
+	}
 
 	if (pm_state == mdev->ofdev.dev.power_state || pm_state < 2)
 		return 0;
+
+	pmz_debug("suspend, switching to state %d\n", pm_state);
+
+	state = pmz_uart_reg.state + uap->port.line;
 
 	down(&pmz_irq_sem);
 	down(&state->sem);
@@ -1607,6 +1613,8 @@ static int pmz_suspend(struct macio_dev *mdev, u32 pm_state)
 	up(&state->sem);
 	up(&pmz_irq_sem);
 
+	pmz_debug("suspend, switching complete\n");
+
 	mdev->ofdev.dev.power_state = pm_state;
 
 	return 0;
@@ -1616,9 +1624,9 @@ static int pmz_suspend(struct macio_dev *mdev, u32 pm_state)
 static int pmz_resume(struct macio_dev *mdev)
 {
 	struct uart_pmac_port *uap = dev_get_drvdata(&mdev->ofdev.dev);
-	struct uart_state *state = pmz_uart_reg.state + uap->port.line;
+	struct uart_state *state;
 	unsigned long flags;
-	int pwr_delay;
+	int pwr_delay = 0;
 
 	if (uap == NULL)
 		return 0;
@@ -1626,6 +1634,10 @@ static int pmz_resume(struct macio_dev *mdev)
 	if (mdev->ofdev.dev.power_state == 0)
 		return 0;
 	
+	pmz_debug("resume, switching to state 0\n");
+
+	state = pmz_uart_reg.state + uap->port.line;
+
 	down(&pmz_irq_sem);
 	down(&state->sem);
 
@@ -1658,6 +1670,7 @@ static int pmz_resume(struct macio_dev *mdev)
 		enable_irq(uap->port.irq);
 	}
 
+ bail:
 	up(&state->sem);
 	up(&pmz_irq_sem);
 
@@ -1670,7 +1683,8 @@ static int pmz_resume(struct macio_dev *mdev)
 		schedule_timeout((pwr_delay * HZ)/1000);
 	}
 
- bail:
+	pmz_debug("resume, switching complete\n");
+
 	mdev->ofdev.dev.power_state = 0;
 
 	return 0;

@@ -113,3 +113,5 @@ EXPORT_SYMBOL(__down_trylock);
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(synchronize_irq);
 #endif
+
+EXPORT_SYMBOL(csum_partial);

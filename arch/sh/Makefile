@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.32 2003/10/26 23:33:49 lethal Exp $
+# $Id: Makefile,v 1.34 2004/03/21 17:31:06 lethal Exp $
 #
 # This file is subject to the terms and conditions of the GNU General Public
 # License.  See the file "COPYING" in the main directory of this archive
@@ -35,7 +35,6 @@ cflags-$(CONFIG_CPU_SH4)		+= -m4 \
 
 cflags-$(CONFIG_SH_DSP)			+= -Wa,-dsp
 cflags-$(CONFIG_SH_KGDB)		+= -g
-cflags-$(CONFIG_EMBEDDED)		+= -Os
 
 cflags-$(CONFIG_MORE_COMPILE_OPTIONS)	+= \
 	$(shell echo $(CONFIG_COMPILE_OPTIONS) | sed -e 's/"//g')
@@ -134,19 +133,7 @@ compressed: zImage
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)
 
-defconfig-%:
-	@echo '  Copying arch/sh/configs/$@ -> .config'
-	@if [ -e .config ]; then mv -f .config .config.old; fi
-	@cp -f arch/sh/configs/$@ .config
-	@chmod 644 .config
-
 define archhelp
-	@echo '  zImage		  - Compressed kernel image (arch/sh/boot/zImage)'
-	for board in arch/sh/configs/*; \
-	do \
-		 echo -n ' ' $$board | sed -e 's|arch/sh/configs/||g' ; \
-		 echo -n '  	  - Build for ' ; \
-		 echo -e $$board | sed -e 's|.*-||g'; \
-	done
+	@echo '  zImage 	           - Compressed kernel image (arch/sh/boot/zImage)'
 endef
 

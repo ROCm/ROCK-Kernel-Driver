@@ -92,10 +92,11 @@ CONFIG_CPU_LITTLE_ENDIAN=y
 CONFIG_SH_PCLK_FREQ=1193182
 # CONFIG_CPU_FREQ is not set
 # CONFIG_SH_DMA is not set
+CONFIG_HD6446X_SERIES=y
 CONFIG_HD64461=y
 # CONFIG_HD64465 is not set
 CONFIG_HD64461_IRQ=36
-CONFIG_HD64461_ENABLER=y
+# CONFIG_HD64461_ENABLER is not set
 
 #
 # Bus options (PCI, PCMCIA, EISA, MCA, ISA)
@@ -155,6 +156,7 @@ CONFIG_BLK_DEV_IDEDISK=y
 #
 # IDE chipset support/bugfixes
 #
+CONFIG_IDE_GENERIC=y
 # CONFIG_BLK_DEV_IDEDMA is not set
 # CONFIG_IDEDMA_AUTO is not set
 # CONFIG_DMA_NONPCI is not set
@@ -236,12 +238,9 @@ CONFIG_SERIO=y
 CONFIG_VT=y
 CONFIG_VT_CONSOLE=y
 CONFIG_HW_CONSOLE=y
-# CONFIG_SERIAL is not set
-CONFIG_SH_SCI=y
-# CONFIG_SERIAL_CONSOLE is not set
 
 #
-# Unix 98 PTY support
+# Unix98 PTY support
 #
 # CONFIG_UNIX98_PTYS is not set
 # CONFIG_PSMOUSE is not set
@@ -266,19 +265,6 @@ CONFIG_SH_SCI=y
 # I2C support
 #
 # CONFIG_I2C is not set
-
-#
-# I2C Algorithms
-#
-
-#
-# I2C Hardware Bus support
-#
-
-#
-# I2C Hardware Sensors Chip support
-#
-# CONFIG_I2C_SENSOR is not set
 
 #
 # File systems
@@ -395,6 +381,10 @@ CONFIG_FONT_PEARL_8x8=y
 
 #
 # USB support
+#
+
+#
+# USB Gadget Support
 #
 # CONFIG_USB_GADGET is not set
 

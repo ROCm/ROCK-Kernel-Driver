@@ -1423,8 +1423,10 @@ static int dtSplitPage(tid_t tid, struct inode *ip, struct dtsplit * split,
 	 */
 	if (nextbn != 0) {
 		DT_GETPAGE(ip, nextbn, mp, PSIZE, p, rc);
-		if (rc)
+		if (rc) {
+			discard_metapage(rmp);
 			return rc;
+		}
 
 		BT_MARK_DIRTY(mp, ip);
 		/*
@@ -2235,8 +2237,10 @@ static int dtDeleteUp(tid_t tid, struct inode *ip,
 	pxdlock->index = 1;
 
 	/* update sibling pointers */
-	if ((rc = dtRelink(tid, ip, fp)))
+	if ((rc = dtRelink(tid, ip, fp))) {
+		BT_PUTPAGE(fmp);
 		return rc;
+	}
 
 	xlen = lengthPXD(&fp->header.self);
 	ip->i_blocks -= LBLK2PBLK(ip->i_sb, xlen);
@@ -2307,8 +2311,10 @@ static int dtDeleteUp(tid_t tid, struct inode *ip,
 				pxdlock->index = 1;
 
 				/* update sibling pointers */
-				if ((rc = dtRelink(tid, ip, p)))
+				if ((rc = dtRelink(tid, ip, p))) {
+					DT_PUTPAGE(mp);
 					return rc;
+				}
 
 				xlen = lengthPXD(&p->header.self);
 				ip->i_blocks -= LBLK2PBLK(ip->i_sb, xlen);
@@ -2621,8 +2627,10 @@ static int dtSearchNode(struct inode *ip, s64 lmxaddr, pxd_t * kpxd,
 		/*
 		 * descend down to leftmost child page
 		 */
-		if (p->header.flag & BT_LEAF)
+		if (p->header.flag & BT_LEAF) {
+			DT_PUTPAGE(mp);
 			return -ESTALE;
+		}
 
 		/* get the leftmost entry */
 		stbl = DT_GETSTBL(p);

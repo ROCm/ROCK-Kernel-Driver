@@ -1,4 +1,4 @@
-/* $Id: io.c,v 1.4 2003/08/03 03:05:10 lethal Exp $
+/* $Id: io.c,v 1.5 2004/02/22 23:08:43 kkojima Exp $
  *
  * linux/arch/sh/kernel/io_se.c
  *
@@ -134,25 +134,27 @@ void se_outl(unsigned int value, unsigned long port)
 void se_insb(unsigned long port, void *addr, unsigned long count)
 {
 	volatile __u16 *p = port2adr(port);
+	__u8 *ap = addr;
 
 	if (sh_pcic_io_start <= port && port <= sh_pcic_io_stop) {
 		volatile __u8 *bp = (__u8 *) (sh_pcic_io_wbase + 0x40000 + port); 
 		while (count--)
-			*((__u8 *) addr)++ = *bp;
+			*ap++ = *bp;
 	} else if (shifted_port(port)) {
 		while (count--)
-			*((__u8 *) addr)++ = *p >> 8;
+			*ap++ = *p >> 8;
 	} else {
 		while (count--)
-			*((__u8 *) addr)++ = *p;
+			*ap++ = *p;
 	}
 }
 
 void se_insw(unsigned long port, void *addr, unsigned long count)
 {
 	volatile __u16 *p = port2adr(port);
+	__u16 *ap = addr;
 	while (count--)
-		*((__u16 *) addr)++ = *p;
+		*ap++ = *p;
 }
 
 void se_insl(unsigned long port, void *addr, unsigned long count)
@@ -163,25 +165,27 @@ void se_insl(unsigned long port, void *addr, unsigned long count)
 void se_outsb(unsigned long port, const void *addr, unsigned long count)
 {
 	volatile __u16 *p = port2adr(port);
+	const __u8 *ap = addr;
 
 	if (sh_pcic_io_start <= port && port <= sh_pcic_io_stop) {
 		volatile __u8 *bp = (__u8 *) (sh_pcic_io_wbase + port); 
 		while (count--)
-			*bp = *((__u8 *) addr)++;
+			*bp = *ap++;
 	} else if (shifted_port(port)) {
 		while (count--)
-			*p = *((__u8 *) addr)++ << 8;
+			*p = *ap++ << 8;
 	} else {
 		while (count--)
-			*p = *((__u8 *) addr)++;
+			*p = *ap++;
 	}
 }
 
 void se_outsw(unsigned long port, const void *addr, unsigned long count)
 {
 	volatile __u16 *p = port2adr(port);
+	const __u16 *ap = addr;
 	while (count--)
-		*p = *((__u16 *) addr)++;
+		*p = *ap++;
 }
 
 void se_outsl(unsigned long port, const void *addr, unsigned long count)

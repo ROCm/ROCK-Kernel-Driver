@@ -1,7 +1,7 @@
 #
 # Serial device configuration
 #
-# $Id: Config.in,v 1.15 2002/07/06 17:16:24 rmk Exp $
+# $Id: Kconfig,v 1.11 2004/03/11 18:08:04 lethal Exp $
 #
 
 menu "Serial drivers"
@@ -501,6 +501,16 @@ config SERIAL98
 config SERIAL98_CONSOLE
         bool "Support for console on PC-9800 standard serial port"
         depends on SERIAL98=y
+	select SERIAL_CORE_CONSOLE
+
+config SERIAL_SH_SCI
+	tristate "SH SCI(F) serial port support"
+	depends on SUPERH
+	select SERIAL_CORE
+
+config SERIAL_SH_SCI_CONSOLE
+	bool "Support for console on SH SCI(F)"
+	depends on SERIAL_SH_SCI=y
 	select SERIAL_CORE_CONSOLE
 
 config SERIAL_AU1X00

@@ -14,6 +14,7 @@ config PCI
 config SH_PCIDMA_NONCOHERENT
 	bool "Cache and PCI noncoherent"
 	depends on PCI
+	default y
 	help
 	  Enable this option if your platform does not have a CPU cache which
 	  remains coherent with PCI DMA. It is safest to say 'Y', although you
@@ -38,9 +39,4 @@ config PCI_AUTO_UPDATE_RESOURCES
 	  for some reason, you have a board that simply refuses to work
 	  with its resources updated beyond what they are when the device
 	  is powered up, set this to N. Everyone else will want this as Y.
-
-config PCI_DMA
-	bool
-	depends on PCI
-	default y if !SH_DREAMCAST
 

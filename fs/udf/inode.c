@@ -84,9 +84,9 @@ void udf_put_inode(struct inode * inode)
 {
 	if (!(inode->i_sb->s_flags & MS_RDONLY))
 	{
-		down(&inode->i_sem);
+		lock_kernel();
 		udf_discard_prealloc(inode);
-		up(&inode->i_sem);
+		unlock_kernel();
 	}
 }
 

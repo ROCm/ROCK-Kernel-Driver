@@ -1,4 +1,4 @@
-/* $Id: cf-enabler.c,v 1.3 2003/05/04 19:29:52 lethal Exp $
+/* $Id: cf-enabler.c,v 1.4 2004/02/22 22:44:36 kkojima Exp $
  *
  *  linux/drivers/block/cf-enabler.c
  *
@@ -88,7 +88,7 @@ static int __init cf_init_default(void)
 }
 
 #if defined(CONFIG_SH_SOLUTION_ENGINE)
-#include <asm/hitachi_se.h>
+#include <asm/se/se.h>
 
 /*
  * SolutionEngine

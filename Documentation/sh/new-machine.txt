@@ -288,22 +288,22 @@ for reference instead of trying to guess what settings are supposed to be
 used on it.
 
 Also, as soon as you have copied over a sample .config for your new board
-(assume arch/sh/configs/defconfig-vapor), you can also use this directly as a
+(assume arch/sh/configs/vapor_defconfig), you can also use this directly as a
 build target, and it will be implicitly listed as such in the help text.
 
 Looking at the 'make help' output, you should now see something like:
 
 Architecture specific targets (sh):
   zImage                  - Compressed kernel image (arch/sh/boot/zImage)
-  defconfig-adx           - Build for adx
-  defconfig-cqreek        - Build for cqreek
-  defconfig-dreamcast     - Build for dreamcast
+  adx_defconfig           - Build for adx
+  cqreek_defconfig        - Build for cqreek
+  dreamcast_defconfig     - Build for dreamcast
 ...
-  defconfig-vapor         - Build for vapor
+  vapor_defconfig         - Build for vapor
 
 which then allows you to do:
 
-$ make ARCH=sh CROSS_COMPILE=sh4-linux- defconfig-vapor vmlinux
+$ make ARCH=sh CROSS_COMPILE=sh4-linux- vapor_defconfig vmlinux
 
 which will in turn copy the defconfig for this board, run it through
 oldconfig (prompting you for any new options since the time of creation),

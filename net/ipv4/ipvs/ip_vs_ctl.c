@@ -898,8 +898,15 @@ ip_vs_edit_dest(struct ip_vs_service *svc, struct ip_vs_dest_user *udest)
 
 	__ip_vs_update_dest(svc, dest, udest);
 
+	write_lock_bh(&__ip_vs_svc_lock);
+
+	/* Wait until all other svc users go away */
+	while (atomic_read(&svc->usecnt) > 1) {};
+
 	/* call the update_service, because server weight may be changed */
 	svc->scheduler->update_service(svc);
+
+	write_unlock_bh(&__ip_vs_svc_lock);
 
 	LeaveFunction(2);
 

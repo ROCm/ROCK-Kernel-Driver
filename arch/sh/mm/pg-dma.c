@@ -21,7 +21,7 @@
 #include <asm/io.h>
 
 /* Channel to use for page ops, must be dual-address mode capable. */
-static int dma_channel = 3;
+static int dma_channel = CONFIG_DMA_PAGE_OPS_CHANNEL;
 
 static void copy_page_dma(void *to, void *from)
 {

@@ -391,24 +391,24 @@ int show_stat(struct seq_file *p, void *v)
 		(unsigned long long)jiffies_64_to_clock_t(irq),
 		(unsigned long long)jiffies_64_to_clock_t(softirq));
 	for_each_cpu(i) {
-		/* two separate calls here to work around gcc-2.95.3 ICE */
-		seq_printf(p, "cpu%d %llu %llu %llu ",
+
+		/* Copy values here to work around gcc-2.95.3, gcc-2.96 */
+		user = kstat_cpu(i).cpustat.user;
+		nice = kstat_cpu(i).cpustat.nice;
+		system = kstat_cpu(i).cpustat.system;
+		idle = kstat_cpu(i).cpustat.idle;
+		iowait = kstat_cpu(i).cpustat.iowait;
+		irq = kstat_cpu(i).cpustat.irq;
+		softirq = kstat_cpu(i).cpustat.softirq;
+		seq_printf(p, "cpu%d %llu %llu %llu %llu %llu %llu %llu\n",
 			i,
-			(unsigned long long)
-			  jiffies_64_to_clock_t(kstat_cpu(i).cpustat.user),
-			(unsigned long long)
-			  jiffies_64_to_clock_t(kstat_cpu(i).cpustat.nice),
-			(unsigned long long)
-			  jiffies_64_to_clock_t(kstat_cpu(i).cpustat.system));
-		seq_printf(p, "%llu %llu %llu %llu\n",
-			(unsigned long long)
-			  jiffies_64_to_clock_t(kstat_cpu(i).cpustat.idle),
-			(unsigned long long)
-			  jiffies_64_to_clock_t(kstat_cpu(i).cpustat.iowait),
-			(unsigned long long)
-			  jiffies_64_to_clock_t(kstat_cpu(i).cpustat.irq),
-			(unsigned long long)
-			  jiffies_64_to_clock_t(kstat_cpu(i).cpustat.softirq));
+			(unsigned long long)jiffies_64_to_clock_t(user),
+			(unsigned long long)jiffies_64_to_clock_t(nice),
+			(unsigned long long)jiffies_64_to_clock_t(system),
+			(unsigned long long)jiffies_64_to_clock_t(idle),
+			(unsigned long long)jiffies_64_to_clock_t(iowait),
+			(unsigned long long)jiffies_64_to_clock_t(irq),
+			(unsigned long long)jiffies_64_to_clock_t(softirq));
 	}
 	seq_printf(p, "intr %llu", (unsigned long long)sum);
 

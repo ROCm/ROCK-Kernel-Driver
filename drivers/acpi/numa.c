@@ -32,12 +32,19 @@
 #include <acpi/acpi_bus.h>
 #include <acpi/acmacros.h>
 
+#define ACPI_NUMA	0x80000000
+#define _COMPONENT	ACPI_NUMA
+	ACPI_MODULE_NAME ("numa")
+
 extern int __init acpi_table_parse_madt_family (enum acpi_table_id id, unsigned long madt_size, int entry_id, acpi_madt_entry_handler handler, unsigned int max_entries);
 
 void __init
 acpi_table_print_srat_entry (
 	acpi_table_entry_header	*header)
 {
+
+	ACPI_FUNCTION_NAME ("acpi_table_print_srat_entry");
+
 	if (!header)
 		return;
 
@@ -47,7 +54,7 @@ acpi_table_print_srat_entry (
 	{
 		struct acpi_table_processor_affinity *p =
 			(struct acpi_table_processor_affinity*) header;
-		ACPI_DEBUG_PRINT((ACPI_DB_INFO "SRAT Processor (id[0x%02x] eid[0x%02x]) in proximity domain %d %s\n",
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "SRAT Processor (id[0x%02x] eid[0x%02x]) in proximity domain %d %s\n",
 		       p->apic_id, p->lsapic_eid, p->proximity_domain,
 		       p->flags.enabled?"enabled":"disabled"));
 	}
@@ -57,7 +64,7 @@ acpi_table_print_srat_entry (
 	{
 		struct acpi_table_memory_affinity *p =
 			(struct acpi_table_memory_affinity*) header;
-		ACPI_DEBUG_PRINT((ACPI_DB_INFO "SRAT Memory (0x%08x%08x length 0x%08x%08x type 0x%x) in proximity domain %d %s%s\n",
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "SRAT Memory (0x%08x%08x length 0x%08x%08x type 0x%x) in proximity domain %d %s%s\n",
 		       p->base_addr_hi, p->base_addr_lo, p->length_hi, p->length_lo,
 		       p->memory_type, p->proximity_domain,
 		       p->flags.enabled ? "enabled" : "disabled",

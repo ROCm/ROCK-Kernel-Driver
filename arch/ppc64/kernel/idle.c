@@ -172,16 +172,16 @@ int dedicated_idle(void)
 		oldval = test_and_clear_thread_flag(TIF_NEED_RESCHED);
 		if (!oldval) {
 			set_thread_flag(TIF_POLLING_NRFLAG);
-			start_snooze = __get_tb();
+			start_snooze = __get_tb() +
+				naca->smt_snooze_delay*tb_ticks_per_usec;
 			while (!need_resched()) {
 				/* need_resched could be 1 or 0 at this 
 				 * point.  If it is 0, set it to 0, so
 				 * an IPI/Prod is sent.  If it is 1, keep
 				 * it that way & schedule work.
 				 */
-				if (__get_tb() < 
-				    (start_snooze + 
-				     naca->smt_snooze_delay*tb_ticks_per_usec)) {  
+				if (naca->smt_snooze_delay == 0 ||
+				    __get_tb() < start_snooze) {
 					HMT_low(); /* Low thread priority */
 					continue;
 				}

@@ -104,6 +104,11 @@ void dma_wait_for_completion(unsigned int chan)
 {
 	struct dma_info *info = get_dma_info(chan);
 
+	if (info->tei_capable) {
+		wait_event(info->wait_queue, (info->ops->get_residue(info) == 0));
+		return;
+	}
+
 	while (info->ops->get_residue(info))
 		cpu_relax();
 }
@@ -161,6 +166,7 @@ int __init register_dmac(struct dma_ops *ops)
 		info->chan = i;
 
 		init_MUTEX(&info->sem);
+		init_waitqueue_head(&info->wait_queue);
 	}
 
 	return 0;

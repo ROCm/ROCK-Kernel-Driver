@@ -221,7 +221,7 @@ static const char *masq_proto_name(u_int16_t protonum)
 	case IPPROTO_TCP: return "TCP";
 	case IPPROTO_UDP: return "UDP";
 	case IPPROTO_ICMP: return "ICMP";
-	default: return "MORE-CAFFIENE-FOR-RUSTY";
+	default: return "MORE-CAFFEINE-FOR-RUSTY";
 	}
 }
 

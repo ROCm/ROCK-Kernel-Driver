@@ -1153,3 +1153,11 @@ config SOUND_AD1980
 	tristate "AD1980 front/back switch plugin"
 	depends on SOUND_PRIME!=n
 
+config SOUND_SH_DAC_AUDIO
+	tristate "SuperH DAC audio support"
+	depends on SOUND_PRIME!=n && SOUND && CPU_SH3
+
+config SOUND_SH_DAC_AUDIO_CHANNEL
+	int "    DAC channel"
+	default "1"
+	depends on SOUND_SH_DAC_AUDIO

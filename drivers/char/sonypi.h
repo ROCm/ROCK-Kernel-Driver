@@ -396,7 +396,6 @@ struct sonypi_device {
 }
 
 #ifdef CONFIG_ACPI
-extern int acpi_disabled;
 #define SONYPI_ACPI_ACTIVE (!acpi_disabled)
 #else
 #define SONYPI_ACPI_ACTIVE 0

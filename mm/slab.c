@@ -576,7 +576,7 @@ static void __slab_error(const char *function, kmem_cache_t *cachep, char *msg)
  * Add the CPU number into the expiry time to minimize the possibility of the
  * CPUs getting into lockstep and contending for the global cache chain lock.
  */
-static void __init start_cpu_timer(int cpu)
+static void __devinit start_cpu_timer(int cpu)
 {
 	struct timer_list *rt = &per_cpu(reap_timers, cpu);
 

@@ -266,6 +266,8 @@ static const struct pnp_device_id pnp_dev_table[] = {
 	{	"RSS00A0",		0	},
 	/* Viking 56K FAX INT */
 	{	"RSS0262",		0	},
+	/* K56 par,VV,Voice,Speakphone,AudioSpan,PnP */
+	{       "RSS0250",              0       },
 	/* SupraExpress 28.8 Data/Fax PnP modem */
 	{	"SUP1310",		0	},
 	/* SupraExpress 33.6 Data/Fax PnP modem */
@@ -283,6 +285,8 @@ static const struct pnp_device_id pnp_dev_table[] = {
 	/* 3Com Corp. */
 	/* Gateway Telepath IIvi 33.6 */
 	{	"USR0000",		0	},
+	/* U.S. Robotics Sporster 33.6K Fax INT PnP */
+	{	"USR0002",		0	},
 	/*  Sportster Vi 14.4 PnP FAX Voicemail */
 	{	"USR0004",		0	},
 	/* U.S. Robotics 33.6K Voice INT PnP */
@@ -315,6 +319,8 @@ static const struct pnp_device_id pnp_dev_table[] = {
 	{	"USR9180",		0	},
 	/* U.S. Robotics 56K Voice INT PnP*/
 	{	"USR9190",		0	},
+	/* Rockwell's (PORALiNK) 33600 INT PNP */
+	{	"WCI0003",		0	},
 	/* Unkown PnP modems */
 	{	"PNPCXXX",		UNKNOWN_DEV	},
 	/* More unkown PnP modems */

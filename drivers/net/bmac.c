@@ -1312,10 +1312,8 @@ static int __devinit bmac_probe(struct macio_dev *mdev, const struct of_match *m
 	bmwrite(dev, INTDISABLE, DisableAll);
 
 	rev = addr[0] == 0 && addr[1] == 0xA0;
-	for (j = 0; j < 6; ++j) {
+	for (j = 0; j < 6; ++j)
 		dev->dev_addr[j] = rev? bitrev(addr[j]): addr[j];
-		printk("%c%.2x", (j? ':': ' '), dev->dev_addr[j]);
-	}
 
 	/* Enable chip without interrupts for now */
 	bmac_enable_and_reset_chip(dev);
@@ -1380,6 +1378,8 @@ static int __devinit bmac_probe(struct macio_dev *mdev, const struct of_match *m
 	}
 
 	printk(KERN_INFO "%s: BMAC%s at", dev->name, (is_bmac_plus? "+": ""));
+	for (j = 0; j < 6; ++j)
+		printk("%c%.2x", (j? ':': ' '), dev->dev_addr[j]);
 	XXDEBUG((", base_addr=%#0lx", dev->base_addr));
 	printk("\n");
 	

@@ -525,9 +525,38 @@ prom_initialize_naca(unsigned long mem)
 	return mem;
 }
 
-#ifdef CONFIG_PMAC_DART
-static int dart_force_on;
+static int iommu_force_on;
+int ppc64_iommu_off;
+
+static void early_cmdline_parse(void)
+{
+	unsigned long offset = reloc_offset();
+	char *opt;
+#ifndef CONFIG_PMAC_DART
+	struct systemcfg *_systemcfg = RELOC(systemcfg);
 #endif
+
+	opt = strstr(RELOC(cmd_line), RELOC("iommu="));
+	if (opt) {
+		prom_print(RELOC("opt is:"));
+		prom_print(opt);
+		prom_print(RELOC("\n"));
+		opt += 6;
+		while (*opt && *opt == ' ')
+			opt++;
+		if (!strncmp(opt, RELOC("off"), 3))
+			RELOC(ppc64_iommu_off) = 1;
+		else if (!strncmp(opt, RELOC("force"), 5))
+			RELOC(iommu_force_on) = 1;
+	}
+
+#ifndef CONFIG_PMAC_DART
+	if (_systemcfg->platform == PLATFORM_POWERMAC) {
+		RELOC(ppc64_iommu_off) = 1;
+		prom_print(RELOC("DART disabled on PowerMac !\n"));
+	}
+#endif
+}
 
 static unsigned long __init
 prom_initialize_lmb(unsigned long mem)
@@ -540,30 +569,6 @@ prom_initialize_lmb(unsigned long mem)
 	union lmb_reg_property reg;
 	unsigned long lmb_base, lmb_size;
 	unsigned long num_regs, bytes_per_reg = (_prom->encode_phys_size*2)/8;
-	int nodart = 0;
-
-#ifdef CONFIG_PMAC_DART
-	char *opt;
-
-	opt = strstr(RELOC(cmd_line), RELOC("iommu="));
-	if (opt) {
-		prom_print(RELOC("opt is:"));
-		prom_print(opt);
-		prom_print(RELOC("\n"));
-		opt += 6;
-		while (*opt && *opt == ' ')
-			opt++;
-		if (!strncmp(opt, RELOC("off"), 3))
-			nodart = 1;
-		else if (!strncmp(opt, RELOC("force"), 5))
-			RELOC(dart_force_on) = 1;
-	}
-#else
-	nodart = 1;
-#endif /* CONFIG_PMAC_DART */
-
-	if (nodart)
-		prom_print(RELOC("DART disabled on PowerMac !\n"));
 
 	lmb_init();
 
@@ -589,11 +594,6 @@ prom_initialize_lmb(unsigned long mem)
 				lmb_base = ((unsigned long)reg.addrPM[i].address_hi) << 32;
 				lmb_base |= (unsigned long)reg.addrPM[i].address_lo;
 				lmb_size = reg.addrPM[i].size;
-				if (nodart && lmb_base > 0x80000000ull) {
-					prom_print(RELOC("Skipping memory above 2Gb for "
-							 "now, DART support disabled\n"));
-					continue;
-				}
 			} else if (_prom->encode_phys_size == 32) {
 				lmb_base = reg.addr32[i].address;
 				lmb_size = reg.addr32[i].size;
@@ -602,7 +602,16 @@ prom_initialize_lmb(unsigned long mem)
 				lmb_size = reg.addr64[i].size;
 			}
 
-			if ( lmb_add(lmb_base, lmb_size) < 0 )
+			/* We limit memory to 2GB if the IOMMU is off */
+			if (RELOC(ppc64_iommu_off)) {
+				if (lmb_base >= 0x80000000UL)
+					continue;
+
+				if ((lmb_base + lmb_size) > 0x80000000UL)
+					lmb_size = 0x80000000UL - lmb_base;
+			}
+
+			if (lmb_add(lmb_base, lmb_size) < 0)
 				prom_print(RELOC("Too many LMB's, discarding this one...\n"));
 		}
 
@@ -780,7 +789,7 @@ void prom_initialize_dart_table(void)
 	/* Only reserve DART space if machine has more than 2GB of RAM
 	 * or if requested with iommu=on on cmdline.
 	 */
-	if (lmb_end_of_DRAM() <= 0x80000000ull && !RELOC(dart_force_on))
+	if (lmb_end_of_DRAM() <= 0x80000000ull && !RELOC(iommu_force_on))
 		return;
 
 	/* 512 pages is max DART tablesize. */
@@ -810,6 +819,9 @@ prom_initialize_tce_table(void)
 	unsigned int minalign, minsize;
 	struct of_tce_table *prom_tce_table = RELOC(of_tce_table);
 	unsigned long tce_entry, *tce_entryp;
+
+	if (RELOC(ppc64_iommu_off))
+		return;
 
 #ifdef DEBUG_PROM
 	prom_print(RELOC("starting prom_initialize_tce_table\n"));
@@ -930,16 +942,15 @@ prom_initialize_tce_table(void)
                              path, sizeof(path)-1) <= 0) {
                         prom_print(RELOC("package-to-path failed\n"));
                 } else {
-                        prom_print(RELOC("opened "));
+                        prom_print(RELOC("opening PHB "));
                         prom_print(path);
-                        prom_print_nl();
                 }
 
                 phb_node = (ihandle)call_prom(RELOC("open"), 1, 1, path);
                 if ( (long)phb_node <= 0) {
-                        prom_print(RELOC("open failed\n"));
+                        prom_print(RELOC("... failed\n"));
                 } else {
-                        prom_print(RELOC("open success\n"));
+                        prom_print(RELOC("... done\n"));
                 }
                 call_prom(RELOC("call-method"), 6, 0,
                              RELOC("set-64-bit-addressing"),
@@ -1136,7 +1147,7 @@ prom_hold_cpus(unsigned long mem)
 			prom_print_hex(cpuid);
 			prom_print(RELOC(" : starting cpu "));
 			prom_print(path);
-			prom_print(RELOC("..."));
+			prom_print(RELOC("... "));
 			call_prom(RELOC("start-cpu"), 3, 0, node, 
 				  secondary_hold, cpuid);
 
@@ -1144,7 +1155,7 @@ prom_hold_cpus(unsigned long mem)
 			      (*acknowledge == ((unsigned long)-1)); i++ ) ;
 
 			if (*acknowledge == cpuid) {
-				prom_print(RELOC("ok\n"));
+				prom_print(RELOC("... done\n"));
 				/* We have to get every CPU out of OF,
 				 * even if we never start it. */
 				if (cpuid >= NR_CPUS)
@@ -1157,10 +1168,9 @@ prom_hold_cpus(unsigned long mem)
 				cpu_set(cpuid, RELOC(cpu_present_at_boot));
 #endif
 			} else {
-				prom_print(RELOC("failed: "));
+				prom_print(RELOC("... failed: "));
 				prom_print_hex(*acknowledge);
 				prom_print_nl();
-				/* prom_panic(RELOC("cpu failed to start")); */
 			}
 		}
 #ifdef CONFIG_SMP
@@ -1583,6 +1593,8 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 			strlcpy(RELOC(cmd_line), p, sizeof(cmd_line));
 	}
 
+	early_cmdline_parse();
+
 	mem = prom_initialize_lmb(mem);
 
 	mem = prom_bi_rec_reserve(mem);
@@ -1691,7 +1703,7 @@ check_display(unsigned long mem)
 
 	prom_print(RELOC("Looking for displays\n"));
 	if (RELOC(of_stdout_device) != 0) {
-		prom_print(RELOC("OF stdout is   : "));
+		prom_print(RELOC("OF stdout is    : "));
 		prom_print(PTRRELOC(RELOC(of_stdout_device)));
 		prom_print(RELOC("\n"));
 	}
@@ -1751,7 +1763,7 @@ check_display(unsigned long mem)
 			continue;
 		}
 
-		prom_print(RELOC("... ok\n"));
+		prom_print(RELOC("... done\n"));
 
 		/* Setup a useable color table when the appropriate
 		 * method is available. Should update this to set-colors */

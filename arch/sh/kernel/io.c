@@ -16,10 +16,11 @@
  */
 void  memcpy_fromio(void * to, unsigned long from, unsigned long count)
 {
+	char *p = to;
         while (count) {
                 count--;
-                *(char *) to = readb(from);
-                ((char *) to)++;
+                *p = readb(from);
+                p++;
                 from++;
         }
 }
@@ -30,10 +31,11 @@ void  memcpy_fromio(void * to, unsigned long from, unsigned long count)
  */
 void  memcpy_toio(unsigned long to, const void * from, unsigned long count)
 {
+	const char *p = from;
         while (count) {
                 count--;
-                writeb(*(char *) from, to);
-                ((char *) from)++;
+                writeb(*p, to);
+                p++;
                 to++;
         }
 }

@@ -20,7 +20,7 @@
 
 #include <asm/system.h>
 #include <asm/io.h>
-#include <asm/hitachi_se.h>
+#include <asm/se/se.h>
 #include <asm/machvec.h>
 #ifdef CONFIG_SH_STANDARD_BIOS 
 #include <asm/sh_bios.h>
