@@ -101,7 +101,9 @@ enum {
 	EV_STAT_BHUP,
 	EV_STAT_CINF,
 	EV_STAT_BSENT,
-	EV_CMD_DIAL,
+	EV_DO_DIAL,
+	EV_DO_CALLBACK,
+	EV_DO_ACCEPT,
 };
 
 static char *isdn_net_ev_str[] = {
@@ -117,7 +119,9 @@ static char *isdn_net_ev_str[] = {
 	"EV_STAT_BHUP",
 	"EV_STAT_CINF",
 	"EV_STAT_BSENT",
-	"EV_CMD_DIAL",
+	"EV_DO_DIAL",
+	"EV_DO_CALLBACK",
+	"EV_DO_ACCEPT",
 };
 
 /* ====================================================================== */
@@ -1234,22 +1238,26 @@ isdn_net_dial(isdn_net_dev *idev)
 
 	if (isdn_net_bind_channel(idev, slot) < 0)
 		goto err;
-
+	
+	// FIXME do the above in state machine
 	/* Initiate dialing */
-	fsm_event(&idev->fi, EV_CMD_DIAL, NULL);
+	fsm_event(&idev->fi, EV_DO_DIAL, NULL);
 	return 0;
 
  err:
 	return -EAGAIN;
 }
 
-int
-isdn_net_accept(isdn_net_dev *idev, int slot, char *nr)
+static int
+accept_icall(struct fsm_inst *fi, int pr, void *arg)
 {
+	isdn_net_dev *idev = fi->userdata;
 	isdn_net_local *mlp = idev->mlp;
 	isdn_ctrl cmd;
+	int slot = (int) arg;
 
-	strcpy(isdn_slot_num(slot), nr);
+	// FIXME this really should be done in generic code
+//	strcpy(isdn_slot_num(slot), nr);
 	isdn_slot_set_usage(slot, (isdn_slot_usage(slot) & ISDN_USAGE_EXCLUSIVE) | ISDN_USAGE_NET);
 	
 	isdn_net_bind_channel(idev, slot);
@@ -1271,19 +1279,17 @@ isdn_net_accept(isdn_net_dev *idev, int slot, char *nr)
 	return 0;
 }
 
-int
-isdn_net_do_callback(isdn_net_dev *idev)
+static int
+do_callback(struct fsm_inst *fi, int pr, void *arg)
 {
+	isdn_net_dev *idev = fi->userdata;
 	isdn_net_local *mlp = idev->mlp;
 	int slot;
-	/*
-	 * Is the state MANUAL?
-	 * If so, no callback can be made,
-	 * so reject actively.
-	 */
+	/* Is the state MANUAL?
+	 * If so, no callback can be made */
 	if (ISDN_NET_DIALMODE(*mlp) == ISDN_NET_DM_OFF) {
-		printk(KERN_INFO "incoming call for callback, interface %s `off' -> rejected\n",
-		       idev->name);
+		printk(KERN_INFO "incoming call for callback, "
+		       "interface %s `off' -> rejected\n", idev->name);
 		return 3;
 	}
 	printk(KERN_DEBUG "%s: start callback\n", idev->name);
@@ -1305,15 +1311,15 @@ isdn_net_do_callback(isdn_net_dev *idev)
 	add_timer(&idev->dial_timer);
 	fsm_change_state(&idev->fi, ST_WAIT_BEFORE_CB);
 
-	/* Initiate dialing by returning 2 or 4 */
-	return (mlp->flags & ISDN_NET_CBHUP) ? 2 : 4;
+	return 0;
 
  err:
-	return 0;
+	return -EBUSY;
 }
 
-static int isdn_net_dev_icall(isdn_net_dev *idev, int di, int ch, int si1,
-			      char *eaz, char *nr)
+static int
+isdn_net_dev_icall(isdn_net_dev *idev, int di, int ch, int si1,
+		   char *eaz, char *nr)
 {
 	isdn_net_local *mlp = idev->mlp;
 	struct isdn_net_phone *ph;
@@ -1374,14 +1380,18 @@ static int isdn_net_dev_icall(isdn_net_dev *idev, int di, int ch, int si1,
 	}
 	/* check callback */
 	if (mlp->flags & ISDN_NET_CALLBACK) {
-		/* FIXME go via state machine, convert retval */
-		return isdn_net_do_callback(idev);
+		if (fsm_event(&idev->fi, EV_DO_CALLBACK, NULL))
+			return 0;
+		/* Initiate dialing by returning 2 or 4 */
+		return (mlp->flags & ISDN_NET_CBHUP) ? 2 : 4;
 	}
 	printk(KERN_INFO "%s: call from %s -> %s accepted\n",
 	       idev->name, nr, eaz);
 
-	/* FIXME go via state machine, convert retval */
-	return isdn_net_accept(idev, slot, nr);
+	if (fsm_event(&idev->fi, EV_DO_ACCEPT, (void *) slot))
+		return 0;
+
+	return 1; // accepted
 }
 
 /*
@@ -1435,7 +1445,6 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
         /* Accept DATA and VOICE calls at this stage
 	   local eaz is checked later for allowed call types */
         if ((si1 != 7) && (si1 != 1)) {
-                restore_flags(flags);
                 if (dev->net_verbose > 1)
                         printk(KERN_INFO "isdn_net: "
 			       "Service-Indicator not 1 or 7, ignored\n");
@@ -1463,7 +1472,7 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 			break;
 		
 	}
-	spin_unlock_irqsave(&running_devs_lock, flags);
+	spin_unlock_irqrestore(&running_devs_lock, flags);
 	if (!retval) {
 		if (dev->net_verbose)
 			printk(KERN_INFO "isdn_net: call "
@@ -1812,7 +1821,9 @@ got_bsent(struct fsm_inst *fi, int pr, void *arg)
 }
 
 static struct fsm_node isdn_net_fn_tbl[] = {
-	{ ST_NULL,           EV_CMD_DIAL,        dialout_first },
+	{ ST_NULL,           EV_DO_DIAL,         dialout_first },
+	{ ST_NULL,           EV_DO_ACCEPT,       accept_icall  },
+	{ ST_NULL,           EV_DO_CALLBACK,     do_callback   },
 
 	{ ST_OUT_WAIT_DCONN, EV_TIMER_DIAL,      dial_timeout  },
 	{ ST_OUT_WAIT_DCONN, EV_STAT_DCONN,      out_dconn     },
