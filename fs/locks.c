@@ -134,6 +134,7 @@
 
 int leases_enable = 1;
 int lease_break_time = 45;
+int check_deadlocks = 1;
 
 #define for_each_lock(inode, lockp) \
 	for (lockp = &inode->i_flock; *lockp != NULL; lockp = &(*lockp)->fl_next)
@@ -749,7 +750,7 @@ static int __posix_lock_file(struct inode *inode, struct file_lock *request)
 			if (!(request->fl_flags & FL_SLEEP))
 				goto out;
 			error = -EDEADLK;
-			if (posix_locks_deadlock(request, fl))
+			if (check_deadlocks && posix_locks_deadlock(request, fl))
 				goto out;
 			error = -EAGAIN;
 			locks_insert_block(fl, request);

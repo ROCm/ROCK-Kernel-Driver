@@ -133,6 +133,8 @@ int proc_dol2crvec(ctl_table *table, int write, struct file *filp,
 extern int acct_parm[];
 #endif
 
+extern int check_deadlocks;
+
 static int parse_table(int __user *, int, void __user *, size_t __user *, void __user *, size_t,
 		       ctl_table *, void **);
 static int proc_doutsstring(ctl_table *table, int write, struct file *filp,
@@ -579,6 +581,14 @@ static ctl_table kern_table[] = {
 		.child		= pty_table,
 	},
 #endif
+	{
+		.ctl_name 	= 998,
+		.procname	= "check_deadlocks",
+		.data		= &check_deadlocks,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
 	{
 		.ctl_name	= KERN_OVERFLOWUID,
 		.procname	= "overflowuid",
