@@ -419,13 +419,36 @@ queue:
 static int sr_block_open(struct inode *inode, struct file *file)
 {
 	struct scsi_cd *cd = scsi_cd(inode->i_bdev->bd_disk);
-	return cdrom_open(&cd->cdi, inode, file);
+	struct scsi_device *sdev = cd->device;
+	int retval;
+
+	retval = scsi_device_get(sdev);
+	if (retval)
+		return retval;
+	
+	retval = cdrom_open(&cd->cdi, inode, file);
+	if (retval)
+		scsi_device_put(sdev);
+
+	return retval;
+}
+
+static void sr_cleanup(struct scsi_cd *cd)
+{
+	if (!unregister_cdrom(&cd->cdi)) {
+		scsi_device_put(cd->device);
+		kfree(cd);
+	}
 }
 
 static int sr_block_release(struct inode *inode, struct file *file)
 {
 	struct scsi_cd *cd = scsi_cd(inode->i_bdev->bd_disk);
-	return cdrom_release(&cd->cdi, file);
+	int ret;
+
+	ret = cdrom_release(&cd->cdi, file);
+	sr_cleanup(cd);
+	return ret;
 }
 
 static int sr_block_ioctl(struct inode *inode, struct file *file, unsigned cmd,
@@ -467,10 +490,6 @@ static int sr_open(struct cdrom_device_info *cdi, int purpose)
 	struct scsi_device *sdev = cd->device;
 	int retval;
 
-	retval = scsi_device_get(sdev);
-	if (retval)
-		return retval;
-	
 	/*
 	 * If the device is in error recovery, wait until it is done.
 	 * If the device is offline, then disallow any access to it.
@@ -499,8 +518,6 @@ static void sr_release(struct cdrom_device_info *cdi)
 
 	if (cd->device->sector_size > 2048)
 		sr_set_blocklength(cd, 2048);
-
-	scsi_device_put(cd->device);
 }
 
 static int sr_probe(struct device *dev)
@@ -874,8 +891,8 @@ static int sr_remove(struct device *dev)
 	spin_unlock(&sr_index_lock);
 
 	put_disk(cd->disk);
-	unregister_cdrom(&cd->cdi);
-	kfree(cd);
+
+	sr_cleanup(cd);
 
 	return 0;
 }

@@ -379,6 +379,8 @@ int register_cdrom(struct cdrom_device_info *cdi)
 #endif /* CONFIG_SYSCTL */ 
 	}
 
+	atomic_set(&cdi->all_use, 1);
+
 	ENSURE(drive_status, CDC_DRIVE_STATUS );
 	ENSURE(media_changed, CDC_MEDIA_CHANGED);
 	ENSURE(tray_move, CDC_CLOSE_TRAY | CDC_OPEN_TRAY);
@@ -424,6 +426,9 @@ int unregister_cdrom(struct cdrom_device_info *unreg)
 {
 	struct cdrom_device_info *cdi, *prev;
 	cdinfo(CD_OPEN, "entering unregister_cdrom\n"); 
+
+	if (!atomic_dec_and_test(&unreg->all_use))
+		return -EBUSY;
 
 	prev = NULL;
 	spin_lock(&cdrom_lock);
@@ -891,6 +896,8 @@ int cdrom_open(struct cdrom_device_info *cdi, struct inode *ip, struct file *fp)
 	if (ret)
 		goto err;
 
+	atomic_inc(&cdi->all_use);
+
 	cdinfo(CD_OPEN, "Use count for \"/dev/%s\" now %d\n",
 			cdi->name, cdi->use_count);
 	/* Do this on open.  Don't wait for mount, because they might
@@ -1096,6 +1103,7 @@ int cdrom_release(struct cdrom_device_info *cdi, struct file *fp)
 		    cdi->options & CDO_AUTO_EJECT && CDROM_CAN(CDC_OPEN_TRAY))
 			cdo->tray_move(cdi, 1);
 	}
+
 	return 0;
 }
 
