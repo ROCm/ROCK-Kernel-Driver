@@ -42,7 +42,7 @@ static void select_instrument(snd_gus_card_t * gus, snd_gus_voice_t * v)
 	instr = snd_seq_instr_find(gus->gf1.ilist, &v->instr, 0, 1);
 	if (instr != NULL) {
 		if (instr->ops) {
-			if (instr->ops->instr_type == snd_seq_simple_id)
+			if (!strcmp(instr->ops->instr_type, SNDRV_SEQ_INSTR_ID_SIMPLE))
 				snd_gf1_simple_init(v);
 		}
 		snd_seq_instr_free_use(gus->gf1.ilist, instr);
