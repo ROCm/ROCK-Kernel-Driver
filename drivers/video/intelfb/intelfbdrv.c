@@ -1234,14 +1234,17 @@ intelfb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 static int
 intelfb_set_par(struct fb_info *info)
 {
-	struct intelfb_hwstate hw;
-
+ 	struct intelfb_hwstate *hw;
         struct intelfb_info *dinfo = GET_DINFO(info);
 
 	if (FIXED_MODE(dinfo)) {
 		ERR_MSG("Changing the video mode is not supported.\n");
 		return -EINVAL;
 	}
+
+ 	hw = kmalloc(sizeof(*hw), GFP_ATOMIC);
+ 	if (!hw)
+ 		return -ENOMEM;
 
 	DBG_MSG("intelfb_set_par (%dx%d-%d)\n", info->var.xres,
 		info->var.yres, info->var.bits_per_pixel);
@@ -1251,15 +1254,15 @@ intelfb_set_par(struct fb_info *info)
 	if (dinfo->accel)
 		intelfbhw_2d_stop(dinfo);
 
-	hw = dinfo->save_state;
-	if (intelfbhw_mode_to_hw(dinfo, &hw, &info->var))
-		return -EINVAL;
-	if (intelfbhw_program_mode(dinfo, &hw, 0))
-		return -EINVAL;
+ 	memcpy(hw, &dinfo->save_state, sizeof(*hw));
+ 	if (intelfbhw_mode_to_hw(dinfo, hw, &info->var))
+ 		goto invalid_mode;
+ 	if (intelfbhw_program_mode(dinfo, hw, 0))
+ 		goto invalid_mode;
 
 #if REGDUMP > 0
-	intelfbhw_read_hw_state(dinfo, &hw, 0);
-	intelfbhw_print_hw_state(dinfo, &hw);
+ 	intelfbhw_read_hw_state(dinfo, hw, 0);
+ 	intelfbhw_print_hw_state(dinfo, hw);
 #endif
 
 	update_dinfo(dinfo, &info->var);
@@ -1278,7 +1281,11 @@ intelfb_set_par(struct fb_info *info)
 	} else {
 		info->flags = FBINFO_DEFAULT | FBINFO_HWACCEL_YPAN;
 	}
+	kfree(hw);
 	return 0;
+invalid_mode:
+	kfree(hw);
+	return -EINVAL;
 }
 
 static int
