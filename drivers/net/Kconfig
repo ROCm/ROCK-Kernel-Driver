@@ -234,7 +234,7 @@ config BMAC
 
 config OAKNET
 	tristate "National DP83902AV (Oak ethernet) support"
-	depends on NET_ETHERNET && PPC
+	depends on NET_ETHERNET && PPC && BROKEN
 	select CRC32
 	help
 	  Say Y if your machine has this type of Ethernet network card.
