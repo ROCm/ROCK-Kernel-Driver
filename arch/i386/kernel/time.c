@@ -307,7 +307,31 @@ unsigned long get_cmos_time(void)
 	return retval;
 }
 
+static long clock_cmos_diff;
+
+static int time_suspend(struct sys_device *dev, u32 state)
+{
+	/*
+	 * Estimate time zone so that set_time can update the clock
+	 */
+	clock_cmos_diff = -get_cmos_time();
+	clock_cmos_diff += get_seconds();
+	return 0;
+}
+
+static int time_resume(struct sys_device *dev)
+{
+	unsigned long sec = get_cmos_time() + clock_cmos_diff;
+	write_seqlock_irq(&xtime_lock);
+	xtime.tv_sec = sec;
+	xtime.tv_nsec = 0;
+	write_sequnlock_irq(&xtime_lock);
+	return 0;
+}
+
 static struct sysdev_class pit_sysclass = {
+	.resume = time_resume,
+	.suspend = time_suspend,
 	set_kset_name("pit"),
 };
 

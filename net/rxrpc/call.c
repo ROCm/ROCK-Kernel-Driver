@@ -699,7 +699,7 @@ static int rxrpc_call_generate_ACK(struct rxrpc_call *call,
 
 		timo = rxrpc_call_dfr_ack_timeout + jiffies;
 
-		_debug("START ACKR TIMER for cj=%lu", timo-call->cjif);
+		_debug("START ACKR TIMER for cj=%lu", timo - call->cjif);
 
 		spin_lock(&call->lock);
 		mod_timer(&call->ackr_dfr_timo, timo);
@@ -722,7 +722,8 @@ static int rxrpc_call_generate_ACK(struct rxrpc_call *call,
 
 		/* fill out the appropriate form */
 		ack.bufferSpace	= htons(RXRPC_CALL_ACK_WINDOW_SIZE);
-		ack.maxSkew	= htons(min(call->ackr_high_seq - seq,65535U));
+		ack.maxSkew	= htons(min(call->ackr_high_seq - seq,
+					    65535U));
 		ack.firstPacket	= htonl(call->ackr_win_bot);
 		ack.previousPacket = call->ackr_prev_seq;
 		ack.serial	= hdr->serial;
@@ -825,7 +826,7 @@ void rxrpc_call_do_stuff(struct rxrpc_call *call)
 
 	_leave("");
 
-} /* end rxrpc_call_do_timeout() */
+} /* end rxrpc_call_do_stuff() */
 
 /*****************************************************************************/
 /*
@@ -1061,7 +1062,7 @@ static void rxrpc_call_receive_data_packet(struct rxrpc_call *call,
 		_debug("Call add packet %d to unreadyq", msg->seq);
 
 		/* insert in seq order */
-		list_for_each(_p,&call->app_unreadyq) {
+		list_for_each(_p, &call->app_unreadyq) {
 			pmsg = list_entry(_p, struct rxrpc_message, link);
 			if (pmsg->seq > msg->seq)
 				break;
@@ -2095,7 +2096,8 @@ int rxrpc_call_flush(struct rxrpc_call *call)
 
 		if (msg->hdr.flags & RXRPC_LAST_PACKET) {
 			msg->hdr.flags &= ~RXRPC_MORE_PACKETS;
-			msg->hdr.flags |= RXRPC_REQUEST_ACK;
+			if (call->app_call_state != RXRPC_CSTATE_CLNT_SND_ARGS)
+				msg->hdr.flags |= RXRPC_REQUEST_ACK;
 		}
 		else {
 			msg->hdr.flags |= RXRPC_MORE_PACKETS;

@@ -53,8 +53,7 @@ struct rxrpc_message
 extern void __rxrpc_put_message(struct rxrpc_message *msg);
 static inline void rxrpc_put_message(struct rxrpc_message *msg)
 {
-	if (atomic_read(&msg->usage)<=0)
-		BUG();
+	BUG_ON(atomic_read(&msg->usage)<=0);
 	if (atomic_dec_and_test(&msg->usage))
 		__rxrpc_put_message(msg);
 }

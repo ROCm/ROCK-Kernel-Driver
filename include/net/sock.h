@@ -473,8 +473,8 @@ static __inline__ void sk_set_owner(struct sock *sk, struct module *owner)
 	 * change the ownership of this struct sock, with one not needed
 	 * transient sk_set_owner call.
 	 */
-	if (unlikely(sk->sk_owner != NULL))
-		BUG();
+	BUG_ON(sk->sk_owner != NULL);
+
 	sk->sk_owner = owner;
 	__module_get(owner);
 }

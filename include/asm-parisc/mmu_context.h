@@ -19,8 +19,7 @@ extern void free_sid(unsigned long);
 static inline int
 init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 {
-	if (atomic_read(&mm->mm_users) != 1)
-	    BUG();
+	BUG_ON(atomic_read(&mm->mm_users) != 1);
 
 	mm->context = alloc_sid();
 	return 0;
@@ -64,7 +63,7 @@ static inline void activate_mm(struct mm_struct *prev, struct mm_struct *next)
 	 * already, so we should be OK.
 	 */
 
-	if (next == &init_mm) BUG(); /* Should never happen */
+	BUG_ON(next == &init_mm); /* Should never happen */
 
 	if (next->context == 0)
 	    next->context = alloc_sid();

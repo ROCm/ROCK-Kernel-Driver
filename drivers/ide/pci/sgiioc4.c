@@ -23,7 +23,6 @@
  * http://oss.sgi.com/projects/GenInfo/NoticeExplan
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/pci.h>
@@ -686,7 +685,7 @@ sgiioc4_ide_setup_pci_device(struct pci_dev *dev, ide_pci_device_t * d)
 			"0x%p to 0x%p ALREADY in use\n",
 		       __FUNCTION__, hwif->name, (void *) base,
 		       (void *) base + IOC4_CMD_CTL_BLK_SIZE);
-		return 1;
+		return -ENOMEM;
 	}
 
 	if (hwif->io_ports[IDE_DATA_OFFSET] != base) {
@@ -726,20 +725,21 @@ typedef enum pciio_endian_e {
 	PCIDMA_ENDIAN_BIG,
 	PCIDMA_ENDIAN_LITTLE
 } pciio_endian_t;
-pciio_endian_t __attribute__ ((weak)) snia_pciio_endian_set(struct pci_dev
-					    *pci_dev, pciio_endian_t device_end,
-					    pciio_endian_t desired_end);
+pciio_endian_t snia_pciio_endian_set(struct pci_dev
+				     *pci_dev, pciio_endian_t device_end,
+				     pciio_endian_t desired_end);
 
 static unsigned int __init
 pci_init_sgiioc4(struct pci_dev *dev, ide_pci_device_t * d)
 {
 	unsigned int class_rev;
+	pciio_endian_t endian_status;
 
 	if (pci_enable_device(dev)) {
 		printk(KERN_ERR
 		       "Failed to enable device %s at slot %s\n",
 		       d->name, dev->slot_name);
-		return 1;
+		return -ENODEV;
 	}
 	pci_set_master(dev);
 
@@ -751,18 +751,17 @@ pci_init_sgiioc4(struct pci_dev *dev, ide_pci_device_t * d)
 		printk(KERN_ERR "Skipping %s IDE controller in slot %s: "
 			"firmware is obsolete - please upgrade to revision"
 			"46 or higher\n", d->name, dev->slot_name);
-		return 1;
+		return -ENODEV;
 	}
 
 	/* Enable Byte Swapping in the PIC... */
-	if (snia_pciio_endian_set) {
-		snia_pciio_endian_set(dev, PCIDMA_ENDIAN_LITTLE,
-				      PCIDMA_ENDIAN_BIG);
-	} else {
+	endian_status = snia_pciio_endian_set(dev, PCIDMA_ENDIAN_LITTLE,
+					      PCIDMA_ENDIAN_BIG);
+	if (endian_status != PCIDMA_ENDIAN_BIG) {
 		printk(KERN_ERR
 		       "Failed to set endianness for device %s at slot %s\n",
 		       d->name, dev->slot_name);
-		return 1;
+		return -ENODEV;
 	}
 
 	return sgiioc4_ide_setup_pci_device(dev, d);

@@ -51,6 +51,7 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		local_irq_save(flags);
 		/* Ensure clock and real-time-mode-register are accessible */
 		rtc->ctrl = RTC_READ;
+		memset(&wtime, 0, sizeof(struct rtc_time));
 		wtime.tm_sec =  BCD2BIN(rtc->bcd_sec);
 		wtime.tm_min =  BCD2BIN(rtc->bcd_min);
 		wtime.tm_hour = BCD2BIN(rtc->bcd_hr);

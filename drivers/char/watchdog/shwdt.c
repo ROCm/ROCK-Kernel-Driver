@@ -36,7 +36,7 @@
 /*
  * Default clock division ratio is 5.25 msecs. For an additional table of
  * values, consult the asm-sh/watchdog.h. Overload this at module load
- * time. 
+ * time.
  *
  * In order for this to work reliably we need to have HZ set to 1000 or
  * something quite higher than 100 (or we need a proper high-res timer
@@ -122,7 +122,7 @@ static void sh_wdt_start(void)
 	csr = sh_wdt_read_rstcsr();
 	csr &= ~RSTCSR_RSTS;
 	sh_wdt_write_rstcsr(csr);
-#endif	
+#endif
 }
 
 /**
@@ -202,7 +202,7 @@ static int sh_wdt_close(struct inode *inode, struct file *file)
 
 	clear_bit(0, &shwdt_is_open);
 	shwdt_expect_close = 0;
-	
+
 	return 0;
 }
 
@@ -264,7 +264,7 @@ static int sh_wdt_ioctl(struct inode *inode, struct file *file,
 					  sizeof(sh_wdt_info))) {
 				return -EFAULT;
 			}
-			
+
 			break;
 		case WDIOC_GETSTATUS:
 		case WDIOC_GETBOOTSTATUS:
@@ -299,11 +299,11 @@ static int sh_wdt_ioctl(struct inode *inode, struct file *file,
 				sh_wdt_start();
 				retval = 0;
 			}
-			
+
 			return retval;
 		}
 		default:
-			return -ENOTTY;
+			return -ENOIOCTLCMD;
 	}
 
 	return 0;
@@ -311,7 +311,7 @@ static int sh_wdt_ioctl(struct inode *inode, struct file *file,
 
 /**
  * 	sh_wdt_notify_sys - Notifier Handler
- * 	
+ *
  * 	@this: notifier block
  * 	@code: notifier event
  * 	@unused: unused
