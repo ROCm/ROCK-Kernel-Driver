@@ -287,6 +287,9 @@ int __cpu_disable(void)
 	/* FIXME: go put this in a header somewhere */
 	extern void xics_migrate_irqs_away(void);
 
+	if (systemcfg->platform != PLATFORM_PSERIES_LPAR)
+		return -ENOSYS;
+
 	systemcfg->processorCount--;
 
 	/*fix boot_cpuid here*/
@@ -473,6 +476,18 @@ static inline void look_for_more_cpus(void)
 	/* Make those cpus (which might appear later) possible too. */
 	for (i = 0; i < maxcpus; i++)
 		cpu_set(i, cpu_possible_map);
+}
+
+int cpu_is_hotpluggable(struct cpu *cpu)
+{
+	/*
+	 * Instead of just checking the platform, we should
+	 * actually go look up the OpenFirmware node for the
+	 * CPU and make sure that this is OK.  Not all LPARs
+	 * support CPU hotplug.
+	 */
+	if (systemcfg->platform != PLATFORM_PSERIES_LPAR)
+		return 0;
 }
 #else /* ... CONFIG_HOTPLUG_CPU */
 static inline int __devinit smp_startup_cpu(unsigned int lcpu)
@@ -928,6 +943,10 @@ int __devinit __cpu_up(unsigned int cpu)
 	/* At boot, don't bother with non-present cpus -JSCHOPP */
 	if (system_state == SYSTEM_BOOTING && !cpu_present_at_boot(cpu))
 		return -ENOENT;
+
+	if (system_state != SYSTEM_BOOTING &&
+	    systemcfg->platform != PLATFORM_PSERIES_LPAR)
+		return -ENOSYS;
 
 	paca[cpu].prof_counter = 1;
 	paca[cpu].prof_multiplier = 1;

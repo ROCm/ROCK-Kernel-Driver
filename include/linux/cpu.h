@@ -65,6 +65,7 @@ extern struct semaphore cpucontrol;
 	register_cpu_notifier(&fn##_nb);			\
 }
 int cpu_down(unsigned int cpu);
+extern int cpu_is_hotpluggable(struct cpu *cpu);
 #define cpu_is_offline(cpu) unlikely(!cpu_online(cpu))
 #else
 #define lock_cpu_hotplug()	do { } while (0)
@@ -74,6 +75,7 @@ int cpu_down(unsigned int cpu);
 
 /* CPUs don't go offline once they're online w/o CONFIG_HOTPLUG_CPU */
 #define cpu_is_offline(cpu) 0
+#define cpu_is_hotpluggable(cpu) 0
 #endif
 
 #endif /* _LINUX_CPU_H_ */

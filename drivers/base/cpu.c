@@ -48,7 +48,8 @@ static SYSDEV_ATTR(online, 0600, show_online, store_online);
 
 static void __init register_cpu_control(struct cpu *cpu)
 {
-	sysdev_create_file(&cpu->sysdev, &attr_online);
+	if (cpu_is_hotpluggable(cpu))
+		sysdev_create_file(&cpu->sysdev, &attr_online);
 }
 #else /* ... !CONFIG_HOTPLUG_CPU */
 static inline void register_cpu_control(struct cpu *cpu)
