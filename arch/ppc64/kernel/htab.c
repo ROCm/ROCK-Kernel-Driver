@@ -1073,25 +1073,6 @@ void flush_hash_page(unsigned long context, unsigned long ea, pte_t pte)
 		/* HPTE matches */
 		ppc_md.hpte_invalidate(slot);	
 	}
-	else {
-		unsigned k;
-		/* Temporarily lets check for the hpte in all possible slots */
-		for ( secondary = 0; secondary < 2; ++secondary ) {
-			hash = hpt_hash(vpn, 0);
-			if ( secondary )
-				hash = ~hash;
-			slot = (hash & htab_data.htab_hash_mask) * HPTES_PER_GROUP;
-			for ( k=0; k<8; ++k ) {
-				hpte_dw0.d = ppc_md.hpte_getword0( slot+k );
-				if ( ( hpte_dw0.h.avpn == (vpn >> 11) ) &&
-				     ( hpte_dw0.h.v ) &&
-				     ( hpte_dw0.h.h == secondary ) ) {
-					while (1) ;
-				}
-			}
-		}
-		
-	}
 	spin_unlock_irqrestore( &hash_table_lock, flags );
 }
 
