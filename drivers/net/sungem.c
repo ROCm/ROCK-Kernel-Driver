@@ -973,7 +973,7 @@ static int gem_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (!spin_trylock(&gp->tx_lock)) {
 		/* Tell upper layer to requeue */
 		local_irq_restore(flags);
-		return -1;
+		return NETDEV_TX_LOCKED;
 	}
 
 	/* This is a hard error, log it. */
@@ -982,7 +982,7 @@ static int gem_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		spin_unlock_irqrestore(&gp->tx_lock, flags);
 		printk(KERN_ERR PFX "%s: BUG! Tx Ring full when queue awake!\n",
 		       dev->name);
-		return 1;
+		return NETDEV_TX_BUSY;
 	}
 
 	entry = gp->tx_new;
@@ -1070,7 +1070,7 @@ static int gem_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	dev->trans_start = jiffies;
 
-	return 0;
+	return NETDEV_TX_OK;
 }
 
 /* Jumbo-grams don't seem to work :-( */
@@ -2742,23 +2742,6 @@ use_random:
 }
 #endif /* not Sparc and not PPC */
 
-#ifdef CONFIG_NET_POLL_CONTROLLER
-/*
- * Polling 'interrupt' - used by things like netconsole to send skbs
- * without having to re-enable interrupts. It's not called while
- * the interrupt routine is executing.
- */
-static void gem_netpoll(struct net_device *netdev)
-{
-	struct gem *gp = netdev->priv;
-	if (!gp->pdev)
-		return;
-	disable_irq(gp->pdev->irq);
-	gem_interrupt(gp->pdev->irq, netdev, NULL);
-	enable_irq(gp->pdev->irq);
-}
-#endif
-
 static int __devinit gem_get_device_address(struct gem *gp)
 {
 #if defined(__sparc__) || defined(CONFIG_PPC_PMAC)
@@ -2957,9 +2940,6 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	dev->set_multicast_list = gem_set_multicast;
 	dev->do_ioctl = gem_ioctl;
 	dev->poll = gem_poll;
-#ifdef CONFIG_NET_POLL_CONTROLLER
-	dev->poll_controller = gem_netpoll;
-#endif
 	dev->weight = 64;
 	dev->ethtool_ops = &gem_ethtool_ops;
 	dev->tx_timeout = gem_tx_timeout;
@@ -2968,7 +2948,7 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	dev->irq = pdev->irq;
 	dev->dma = 0;
 #ifdef CONFIG_NET_POLL_CONTROLLER
-        dev->poll_controller = gem_poll_controller;
+	dev->poll_controller = gem_poll_controller;
 #endif
 
 	if (register_netdev(dev)) {

@@ -551,7 +551,7 @@ int tw_aen_read_queue(TW_Device_Extension *tw_dev, int request_id)
 	/* Now post the command packet */
 	if ((status_reg_value & TW_STATUS_COMMAND_QUEUE_FULL) == 0) {
 		dprintk(KERN_WARNING "3w-xxxx: tw_aen_read_queue(): Post succeeded.\n");
-		tw_dev->srb[request_id] = 0; /* Flag internal command */
+		tw_dev->srb[request_id] = NULL; /* Flag internal command */
 		tw_dev->state[request_id] = TW_S_POSTED;
 		outl(command_que_value, command_que_addr);
 	} else {
@@ -718,7 +718,7 @@ static int tw_chrdev_ioctl(struct inode *inode, struct file *file, unsigned int 
 			tw_state_request_start(tw_dev, &request_id);
 
 			/* Flag internal command */
-			tw_dev->srb[request_id] = 0;
+			tw_dev->srb[request_id] = NULL;
 
 			/* Flag chrdev ioctl */
 			tw_dev->chrdev_request_id = request_id;
@@ -2692,7 +2692,7 @@ int tw_scsi_release(struct Scsi_Host *tw_host)
 	/* Fake like we just shut down, so notify the card that
 	 * we "shut down cleanly".
 	 */
-	tw_halt(0, 0, 0);  // parameters aren't actually used
+	tw_halt(NULL, 0, NULL);  // parameters aren't actually used
 
 	/* Free up the IO region */
 	release_region((tw_dev->tw_pci_dev->resource[0].start), TW_IO_ADDRESS_RANGE);

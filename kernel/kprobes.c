@@ -25,6 +25,8 @@
  *		hlists and exceptions notifier as suggested by Andi Kleen.
  * 2004-July	Suparna Bhattacharya <suparna@in.ibm.com> added jumper probes
  *		interface to access function arguments.
+ * 2004-Sep	Prasanna S Panchamukhi <prasanna@in.ibm.com> Changed Kprobes
+ *		exceptions notifier to be first on the priority list.
  */
 #include <linux/kprobes.h>
 #include <linux/spinlock.h>
@@ -108,6 +110,7 @@ void unregister_kprobe(struct kprobe *p)
 
 static struct notifier_block kprobe_exceptions_nb = {
 	.notifier_call = kprobe_exceptions_notify,
+	.priority = 0x7fffffff /* we need to notified first */
 };
 
 int register_jprobe(struct jprobe *jp)

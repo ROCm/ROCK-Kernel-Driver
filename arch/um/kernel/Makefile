@@ -3,7 +3,7 @@
 # Licensed under the GPL
 #
 
-extra-y := vmlinux.lds uml.lds dyn.lds
+extra-y := vmlinux.lds
 
 # Descend into ../util for make clean.  This is here because it doesn't work
 # in arch/um/Makefile.
@@ -47,7 +47,7 @@ QUOTE = 'my $$config=`cat $(TOPDIR)/.config`; $$config =~ s/"/\\"/g ; $$config =
 
 $(obj)/config.o : $(obj)/config.c
 
-quiet_cmd_quote = QUOTE $@
+quiet_cmd_quote = QUOTE   $@
 cmd_quote = $(PERL) -e $(QUOTE) < $< > $@
 
 targets += config.c

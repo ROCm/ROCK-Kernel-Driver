@@ -139,7 +139,7 @@ sclp_vt220_process_queue(struct sclp_vt220_request *request)
 	wake_up(&sclp_vt220_waitq);
 	/* Check if the tty needs a wake up call */
 	if (sclp_vt220_tty != NULL) {
-		tty_wakeup(tty);
+		tty_wakeup(sclp_vt220_tty);
 	}
 }
 

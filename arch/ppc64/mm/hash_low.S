@@ -172,9 +172,9 @@ htab_insert_pte:
 	li	r9,0
 _GLOBAL(htab_call_hpte_insert1)
 	bl	.			/* Will be patched by htab_finish_init() */
-	cmpi	0,r3,0
+	cmpdi	0,r3,0
 	bge	htab_pte_insert_ok	/* Insertion successful */
-	cmpi	0,r3,-2			/* Critical failure */
+	cmpdi	0,r3,-2			/* Critical failure */
 	beq-	htab_pte_insert_failure
 
 	/* Now try secondary slot */
@@ -194,9 +194,9 @@ _GLOBAL(htab_call_hpte_insert1)
 	li	r9,0
 _GLOBAL(htab_call_hpte_insert2)
 	bl	.			/* Will be patched by htab_finish_init() */
-	cmpi	0,r3,0
+	cmpdi	0,r3,0
 	bge+	htab_pte_insert_ok	/* Insertion successful */
-	cmpi	0,r3,-2			/* Critical failure */
+	cmpdi	0,r3,-2			/* Critical failure */
 	beq-	htab_pte_insert_failure
 
 	/* Both are full, we need to evict something */

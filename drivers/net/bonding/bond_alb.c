@@ -1285,7 +1285,7 @@ int bond_alb_xmit(struct sk_buff *skb, struct net_device *bond_dev)
 	int res = 1;
 
 	skb->mac.raw = (unsigned char *)skb->data;
-	eth_data = (struct ethhdr *)skb->data;
+	eth_data = eth_hdr(skb);
 
 	/* make sure that the curr_active_slave and the slaves list do
 	 * not change during tx

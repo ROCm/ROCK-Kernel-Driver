@@ -26,8 +26,6 @@
 #include <asm/hardware.h>
 #include <asm/arch/regs-serial.h>
 
-#include <asm/mach-types.h>
-
 #if 0
 #include <asm/debug-ll.h>
 #define dbg(x...) llprintk(x)
@@ -677,7 +675,7 @@ serial_s3c2410_get_options(struct uart_port *port, int *baud,
 
 		default:
 		case S3C2410_LCON_PNONE:
-			/* nothing */
+			*parity = 'n';
 		}
 
 		/* now calculate the baud rate */

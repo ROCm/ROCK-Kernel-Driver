@@ -1738,11 +1738,13 @@ not_found:
 	 * correctly yet as we do not know what @ctx->attr will be set to by
 	 * the call to ntfs_attr_find() below.
 	 */
+	if (ni != base_ni)
+		unmap_extent_mft_record(ni);
 	ctx->mrec = ctx->base_mrec;
 	ctx->attr = (ATTR_RECORD*)((u8*)ctx->mrec +
 			le16_to_cpu(ctx->mrec->attrs_offset));
 	ctx->is_first = TRUE;
-	ctx->ntfs_ino = ctx->base_ntfs_ino;
+	ctx->ntfs_ino = base_ni;
 	ctx->base_ntfs_ino = NULL;
 	ctx->base_mrec = NULL;
 	ctx->base_attr = NULL;
@@ -1861,6 +1863,11 @@ void ntfs_attr_reinit_search_ctx(ntfs_attr_search_ctx *ctx)
 		/* Sanity checks are performed elsewhere. */
 		ctx->attr = (ATTR_RECORD*)((u8*)ctx->mrec +
 				le16_to_cpu(ctx->mrec->attrs_offset));
+		/*
+		 * This needs resetting due to ntfs_external_attr_find() which
+		 * can leave it set despite having zeroed ctx->base_ntfs_ino.
+		 */
+		ctx->al_entry = NULL;
 		return;
 	} /* Attribute list. */
 	if (ctx->ntfs_ino != ctx->base_ntfs_ino)

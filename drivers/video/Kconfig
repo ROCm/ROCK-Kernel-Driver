@@ -775,6 +775,7 @@ config FB_SIS_315
 config FB_NEOMAGIC
 	tristate "NeoMagic display support"
 	depends on FB && PCI
+	select FB_MODE_HELPERS
 	help
 	  This driver supports notebooks with NeoMagic PCI chips.
 	  Say Y if you have such a graphics card. 

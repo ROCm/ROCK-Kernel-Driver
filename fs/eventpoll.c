@@ -148,6 +148,9 @@
 /* Get the "struct epitem" from an epoll queue wrapper */
 #define EP_ITEM_FROM_EPQUEUE(p) (container_of(p, struct ep_pqueue, pt)->epi)
 
+/* Tells if the epoll_ctl(2) operation needs an event copy from userspace */
+#define EP_OP_HASH_EVENT(op) ((op) != EPOLL_CTL_DEL)
+
 
 struct epoll_filefd {
 	struct file *file;
@@ -531,7 +534,8 @@ sys_epoll_ctl(int epfd, int op, int fd, struct epoll_event __user *event)
 		     current, epfd, op, fd, event));
 
 	error = -EFAULT;
-	if (copy_from_user(&epds, event, sizeof(struct epoll_event)))
+	if (EP_OP_HASH_EVENT(op) &&
+	    copy_from_user(&epds, event, sizeof(struct epoll_event)))
 		goto eexit_1;
 
 	/* Get the "struct file *" for the eventpoll file */

@@ -2435,8 +2435,7 @@ EXPORT_SYMBOL(__kmalloc);
 /**
  * __alloc_percpu - allocate one copy of the object for every present
  * cpu in the system, zeroing them.
- * Objects should be dereferenced using per_cpu_ptr/get_cpu_ptr
- * macros only.
+ * Objects should be dereferenced using the per_cpu_ptr macro only.
  *
  * @size: how many bytes of memory are required.
  * @align: the alignment, which can't be greater than SMP_CACHE_BYTES.

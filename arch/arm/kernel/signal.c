@@ -409,6 +409,7 @@ static inline void __user *
 get_sigframe(struct k_sigaction *ka, struct pt_regs *regs, int framesize)
 {
 	unsigned long sp = regs->ARM_sp;
+	void __user *frame;
 
 #ifdef CONFIG_IWMMXT
 	if (test_thread_flag(TIF_USING_IWMMXT))
@@ -424,7 +425,15 @@ get_sigframe(struct k_sigaction *ka, struct pt_regs *regs, int framesize)
 	/*
 	 * ATPCS B01 mandates 8-byte alignment
 	 */
-	return (void __user *)((sp - framesize) & ~7);
+	frame = (void __user *)((sp - framesize) & ~7);
+
+	/*
+	 * Check that we can actually write to the signal frame.
+	 */
+	if (!access_ok(VERIFY_WRITE, frame, framesize))
+		frame = NULL;
+
+	return frame;
 }
 
 static int
@@ -493,7 +502,7 @@ setup_frame(int usig, struct k_sigaction *ka, sigset_t *set, struct pt_regs *reg
 	struct sigframe __user *frame = get_sigframe(ka, regs, sizeof(*frame));
 	int err = 0;
 
-	if (!access_ok(VERIFY_WRITE, frame, sizeof (*frame)))
+	if (!frame)
 		return 1;
 
 	err |= setup_sigcontext(&frame->sc, /*&frame->fpstate,*/ regs, set->sig[0]);
@@ -522,7 +531,7 @@ setup_rt_frame(int usig, struct k_sigaction *ka, siginfo_t *info,
 	stack_t stack;
 	int err = 0;
 
-	if (!access_ok(VERIFY_WRITE, frame, sizeof (*frame)))
+	if (!frame)
 		return 1;
 
 	__put_user_error(&frame->info, &frame->pinfo, err);

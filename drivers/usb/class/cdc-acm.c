@@ -142,7 +142,7 @@ static void acm_ctrl_irq(struct urb *urb, struct pt_regs *regs)
 
 		case ACM_IRQ_LINE_STATE:
 
-			newctrl = le16_to_cpu(get_unaligned((__u16 *) data));
+			newctrl = le16_to_cpu(get_unaligned((__le16 *) data));
 
 			if (acm->tty && !acm->clocal && (acm->ctrlin & ~newctrl & ACM_CTRL_DCD)) {
 				dbg("calling hangup");

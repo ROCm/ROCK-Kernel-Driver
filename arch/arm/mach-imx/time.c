@@ -25,7 +25,7 @@
 #define TIMER_BASE IMX_TIM1_BASE
 
 /*
- * Returns number of ms since last clock interrupt.  Note that interrupts
+ * Returns number of us since last clock interrupt.  Note that interrupts
  * will have been disabled by do_gettimeoffset()
  */
 static unsigned long
@@ -39,7 +39,7 @@ imx_gettimeoffset(void)
 	 * an interrupt.  We get around this by ensuring that the
 	 * counter has not reloaded between our two reads.
 	 */
-	ticks = IMX_TCR(TIMER_BASE);
+	ticks = IMX_TCN(TIMER_BASE);
 
 	/*
 	 * Interrupt pending?  If so, we've reloaded once already.
@@ -84,7 +84,7 @@ imx_init_time(void)
 	 */
 	IMX_TCTL(TIMER_BASE) = 0;
 	IMX_TPRER(TIMER_BASE) = 0;
-	IMX_TCMP(TIMER_BASE) = LATCH;
+	IMX_TCMP(TIMER_BASE) = LATCH - 1;
 	IMX_TCTL(TIMER_BASE) = TCTL_CLK_32 | TCTL_IRQEN | TCTL_TEN;
 
 	/*

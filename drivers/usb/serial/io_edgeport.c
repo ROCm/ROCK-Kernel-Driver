@@ -479,7 +479,7 @@ static void get_boot_desc		(struct edgeport_serial *edge_serial);
 static void load_application_firmware	(struct edgeport_serial *edge_serial);
 
 
-static void unicode_to_ascii		(char *string, short *unicode, int unicode_size);
+static void unicode_to_ascii		(char *string, __le16 *unicode, int unicode_size);
 
 
 
@@ -504,7 +504,7 @@ static void update_edgeport_E2PROM (struct edgeport_serial *edge_serial)
 	__u32 BootNewVer;
 	__u8 BootMajorVersion;                  
 	__u8 BootMinorVersion;                  
-	__u16 BootBuildNumber;
+	__le16 BootBuildNumber;
 	__u8 *BootImage;      
 	__u32 BootSize;
 	struct edge_firmware_image_record *record;
@@ -2742,7 +2742,7 @@ static void change_port_settings (struct edgeport_port *edge_port, struct termio
  *	ASCII range, but it's only for debugging...
  *	NOTE: expects the unicode in LE format
  ****************************************************************************/
-static void unicode_to_ascii (char *string, short *unicode, int unicode_size)
+static void unicode_to_ascii (char *string, __le16 *unicode, int unicode_size)
 {
 	int i;
 	for (i = 0; i < unicode_size; ++i) {

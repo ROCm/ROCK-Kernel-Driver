@@ -15,7 +15,7 @@
 
 int hfsplus_cat_cmp_key(hfsplus_btree_key *k1, hfsplus_btree_key *k2)
 {
-	u32 k1p, k2p;
+	__be32 k1p, k2p;
 
 	k1p = k1->cat.parent;
 	k2p = k2->cat.parent;
@@ -34,8 +34,10 @@ void hfsplus_cat_build_key(hfsplus_btree_key *key, u32 parent,
 	if (str) {
 		hfsplus_asc2uni(&key->cat.name, str->name, str->len);
 		len = be16_to_cpu(key->cat.name.length);
-	} else
-		len = key->cat.name.length = 0;
+	} else {
+		key->cat.name.length = 0;
+		len = 0;
+	}
 	key->key_len = cpu_to_be16(6 + 2 * len);
 }
 

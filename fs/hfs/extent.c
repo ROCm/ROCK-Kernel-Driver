@@ -279,13 +279,13 @@ int hfs_free_fork(struct super_block *sb, struct hfs_cat_file *file, int type)
 	int res, i;
 
 	if (type == HFS_FK_DATA) {
-		total_blocks = file->PyLen;
+		total_blocks = be32_to_cpu(file->PyLen);
 		extent = file->ExtRec;
 	} else {
-		total_blocks = file->RPyLen;
+		total_blocks = be32_to_cpu(file->RPyLen);
 		extent = file->RExtRec;
 	}
-	total_blocks = be32_to_cpu(total_blocks) / HFS_SB(sb)->alloc_blksz;
+	total_blocks /= HFS_SB(sb)->alloc_blksz;
 	if (!total_blocks)
 		return 0;
 

@@ -13,6 +13,8 @@ READELF := $(CROSS_COMPILE)readelf
 
 export AWK
 
+CHECKFLAGS	+= -m64 -D__ia64=1 -D__ia64__=1 -D_LP64 -D__LP64__
+
 OBJCOPYFLAGS	:= --strip-all
 LDFLAGS_vmlinux	:= -static
 LDFLAGS_MODULE	+= -T $(srctree)/arch/ia64/module.lds
@@ -24,8 +26,8 @@ cflags-y	:= -pipe $(EXTRA) -ffixed-r13 -mfixed-range=f12-f15,f32-f127 \
 CFLAGS_KERNEL	:= -mconstant-gp
 
 GCC_VERSION     := $(call cc-version)
-GAS_STATUS	= $(shell $(srctree)/arch/ia64/scripts/check-gas $(CC) $(OBJDUMP))
-CPPFLAGS += $(shell $(srctree)/arch/ia64/scripts/toolchain-flags $(CC) $(OBJDUMP) $(READELF))
+GAS_STATUS	= $(shell $(srctree)/arch/ia64/scripts/check-gas "$(CC)" "$(OBJDUMP)")
+CPPFLAGS += $(shell $(srctree)/arch/ia64/scripts/toolchain-flags "$(CC)" "$(OBJDUMP)" "$(READELF)")
 
 ifeq ($(GAS_STATUS),buggy)
 $(error Sorry, you need a newer version of the assember, one that is built from	\

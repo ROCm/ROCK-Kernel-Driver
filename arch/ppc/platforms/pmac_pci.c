@@ -316,6 +316,10 @@ u3_ht_read_config(struct pci_bus *bus, unsigned int devfn, int offset,
 	unsigned int addr;
 	int i;
 
+	struct device_node *np = pci_busdev_to_OF_node(bus, devfn);
+	if (np == NULL)
+		return PCIBIOS_DEVICE_NOT_FOUND;
+
 	/*
 	 * When a device in K2 is powered down, we die on config
 	 * cycle accesses. Fix that here.
@@ -363,6 +367,9 @@ u3_ht_write_config(struct pci_bus *bus, unsigned int devfn, int offset,
 	unsigned int addr;
 	int i;
 
+	struct device_node *np = pci_busdev_to_OF_node(bus, devfn);
+	if (np == NULL)
+		return PCIBIOS_DEVICE_NOT_FOUND;
 	/*
 	 * When a device in K2 is powered down, we die on config
 	 * cycle accesses. Fix that here.

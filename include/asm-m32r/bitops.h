@@ -1,17 +1,14 @@
 #ifndef _ASM_M32R_BITOPS_H
 #define _ASM_M32R_BITOPS_H
 
-/* $Id$ */
-
 /*
  *  linux/include/asm-m32r/bitops.h
- *    orig : i386 2.4.10
  *
  *  Copyright 1992, Linus Torvalds.
  *
  *  M32R version:
  *    Copyright (C) 2001, 2002  Hitoshi Yamamoto
- *    Copyright (C) 2004  Hirokazu Takata
+ *    Copyright (C) 2004  Hirokazu Takata <takata at linux-m32r.org>
  */
 
 #include <linux/config.h>
@@ -50,24 +47,25 @@
  * Note that @nr may be almost arbitrarily large; this function is not
  * restricted to acting on a single-word quantity.
  */
-static __inline__ void set_bit(int nr, volatile void * addr)
+static inline void set_bit(int nr, volatile void * addr)
 {
 	__u32 mask;
 	volatile __u32 *a = addr;
-	unsigned long  flags;
+	unsigned long flags;
+	unsigned long tmp;
 
 	a += (nr >> 5);
 	mask = (1 << (nr & 0x1F));
 
 	local_irq_save(flags);
 	__asm__ __volatile__ (
-		DCACHE_CLEAR("r4", "r6", "%0")
-		LOAD"	r4, @%0;		\n\t"
-		"or	r4, %1;			\n\t"
-		STORE"	r4, @%0;		\n\t"
-		: /* no outputs */
+		DCACHE_CLEAR("%0", "r6", "%1")
+		LOAD"	%0, @%1;		\n\t"
+		"or	%0, %2;			\n\t"
+		STORE"	%0, @%1;		\n\t"
+		: "=&r" (tmp)
 		: "r" (a), "r" (mask)
-		: "memory", "r4"
+		: "memory"
 #ifdef CONFIG_CHIP_M32700_TS1
 		, "r6"
 #endif	/* CONFIG_CHIP_M32700_TS1 */
@@ -84,7 +82,7 @@ static __inline__ void set_bit(int nr, volatile void * addr)
  * If it's called on the same region of memory simultaneously, the effect
  * may be that only one operation succeeds.
  */
-static __inline__ void __set_bit(int nr, volatile void * addr)
+static inline void __set_bit(int nr, volatile void * addr)
 {
 	__u32 mask;
 	volatile __u32 *a = addr;
@@ -104,11 +102,12 @@ static __inline__ void __set_bit(int nr, volatile void * addr)
  * you should call smp_mb__before_clear_bit() and/or smp_mb__after_clear_bit()
  * in order to ensure changes are visible on other processors.
  */
-static __inline__ void clear_bit(int nr, volatile void * addr)
+static inline void clear_bit(int nr, volatile void * addr)
 {
 	__u32 mask;
 	volatile __u32 *a = addr;
-	unsigned long  flags;
+	unsigned long flags;
+	unsigned long tmp;
 
 	a += (nr >> 5);
 	mask = (1 << (nr & 0x1F));
@@ -116,13 +115,13 @@ static __inline__ void clear_bit(int nr, volatile void * addr)
 	local_irq_save(flags);
 
 	__asm__ __volatile__ (
-		DCACHE_CLEAR("r4", "r6", "%0")
-		LOAD"	r4, @%0;		\n\t"
-		"and	r4, %1;			\n\t"
-		STORE"	r4, @%0;		\n\t"
-		: /* no outputs */
+		DCACHE_CLEAR("%0", "r6", "%1")
+		LOAD"	%0, @%1;		\n\t"
+		"and	%0, %2;			\n\t"
+		STORE"	%0, @%1;		\n\t"
+		: "=&r" (tmp)
 		: "r" (a), "r" (~mask)
-		: "memory", "r4"
+		: "memory"
 #ifdef CONFIG_CHIP_M32700_TS1
 		, "r6"
 #endif	/* CONFIG_CHIP_M32700_TS1 */
@@ -130,7 +129,7 @@ static __inline__ void clear_bit(int nr, volatile void * addr)
 	local_irq_restore(flags);
 }
 
-static __inline__ void __clear_bit(int nr, volatile unsigned long * addr)
+static inline void __clear_bit(int nr, volatile unsigned long * addr)
 {
 	unsigned long mask;
 	volatile unsigned long *a = addr;
@@ -152,7 +151,7 @@ static __inline__ void __clear_bit(int nr, volatile unsigned long * addr)
  * If it's called on the same region of memory simultaneously, the effect
  * may be that only one operation succeeds.
  */
-static __inline__ void __change_bit(int nr, volatile void * addr)
+static inline void __change_bit(int nr, volatile void * addr)
 {
 	__u32 mask;
 	volatile __u32 *a = addr;
@@ -171,24 +170,25 @@ static __inline__ void __change_bit(int nr, volatile void * addr)
  * Note that @nr may be almost arbitrarily large; this function is not
  * restricted to acting on a single-word quantity.
  */
-static __inline__ void change_bit(int nr, volatile void * addr)
+static inline void change_bit(int nr, volatile void * addr)
 {
 	__u32  mask;
 	volatile __u32  *a = addr;
-	unsigned long  flags;
+	unsigned long flags;
+	unsigned long tmp;
 
 	a += (nr >> 5);
 	mask = (1 << (nr & 0x1F));
 
 	local_irq_save(flags);
 	__asm__ __volatile__ (
-		DCACHE_CLEAR("r4", "r6", "%0")
-		LOAD"	r4, @%0;		\n\t"
-		"xor	r4, %1;			\n\t"
-		STORE"	r4, @%0;		\n\t"
-		: /* no outputs */
+		DCACHE_CLEAR("%0", "r6", "%1")
+		LOAD"	%0, @%1;		\n\t"
+		"xor	%0, %2;			\n\t"
+		STORE"	%0, @%1;		\n\t"
+		: "=&r" (tmp)
 		: "r" (a), "r" (mask)
-		: "memory", "r4"
+		: "memory"
 #ifdef CONFIG_CHIP_M32700_TS1
 		, "r6"
 #endif	/* CONFIG_CHIP_M32700_TS1 */
@@ -204,28 +204,30 @@ static __inline__ void change_bit(int nr, volatile void * addr)
  * This operation is atomic and cannot be reordered.
  * It also implies a memory barrier.
  */
-static __inline__ int test_and_set_bit(int nr, volatile void * addr)
+static inline int test_and_set_bit(int nr, volatile void * addr)
 {
 	__u32 mask, oldbit;
 	volatile __u32 *a = addr;
-	unsigned long  flags;
+	unsigned long flags;
+	unsigned long tmp;
 
 	a += (nr >> 5);
 	mask = (1 << (nr & 0x1F));
 
 	local_irq_save(flags);
 	__asm__ __volatile__ (
-		DCACHE_CLEAR("%0", "r4", "%1")
-		LOAD"	%0, @%1;		\n\t"
-		"mv	r4, %0;			\n\t"
-		"and	%0, %2;			\n\t"
-		"or	r4, %2;			\n\t"
-		STORE"	r4, @%1;		\n\t"
-		: "=&r" (oldbit)
+		DCACHE_CLEAR("%0", "%1", "%2")
+		LOAD"	%0, @%2;		\n\t"
+		"mv	%1, %0;			\n\t"
+		"and	%0, %3;			\n\t"
+		"or	%1, %3;			\n\t"
+		STORE"	%1, @%2;		\n\t"
+		: "=&r" (oldbit), "=&r" (tmp)
 		: "r" (a), "r" (mask)
-		: "memory", "r4"
+		: "memory"
 	);
 	local_irq_restore(flags);
+
 	return (oldbit != 0);
 }
 
@@ -238,7 +240,7 @@ static __inline__ int test_and_set_bit(int nr, volatile void * addr)
  * If two examples of this operation race, one can appear to succeed
  * but actually fail.  You must protect multiple accesses with a lock.
  */
-static __inline__ int __test_and_set_bit(int nr, volatile void * addr)
+static inline int __test_and_set_bit(int nr, volatile void * addr)
 {
 	__u32 mask, oldbit;
 	volatile __u32 *a = addr;
@@ -259,11 +261,12 @@ static __inline__ int __test_and_set_bit(int nr, volatile void * addr)
  * This operation is atomic and cannot be reordered.
  * It also implies a memory barrier.
  */
-static __inline__ int test_and_clear_bit(int nr, volatile void * addr)
+static inline int test_and_clear_bit(int nr, volatile void * addr)
 {
 	__u32 mask, oldbit;
 	volatile __u32 *a = addr;
-	unsigned long  flags;
+	unsigned long flags;
+	unsigned long tmp;
 
 	a += (nr >> 5);
 	mask = (1 << (nr & 0x1F));
@@ -271,16 +274,16 @@ static __inline__ int test_and_clear_bit(int nr, volatile void * addr)
 	local_irq_save(flags);
 
 	__asm__ __volatile__ (
-		DCACHE_CLEAR("%0", "r4", "%2")
-		LOAD"	%0, @%2;		\n\t"
-		"mv      r4, %0; \n\t"
-		"and     %0, %1; \n\t"
-		"not     %1, %1; \n\t"
-		"and     r4, %1; \n\t"
-		STORE"	r4, @%2;		\n\t"
-		: "=&r" (oldbit), "+r" (mask)
+		DCACHE_CLEAR("%0", "%1", "%3")
+		LOAD"	%0, @%3;		\n\t"
+		"mv	%1, %0; \n\t"
+		"and	%0, %2; \n\t"
+		"not	%2, %2; \n\t"
+		"and	%1, %2; \n\t"
+		STORE"	%1, @%3;		\n\t"
+		: "=&r" (oldbit), "=&r" (tmp), "+r" (mask)
 		: "r" (a)
-		: "memory", "r4"
+		: "memory"
 	);
 	local_irq_restore(flags);
 
@@ -296,7 +299,7 @@ static __inline__ int test_and_clear_bit(int nr, volatile void * addr)
  * If two examples of this operation race, one can appear to succeed
  * but actually fail.  You must protect multiple accesses with a lock.
  */
-static __inline__ int __test_and_clear_bit(int nr, volatile void * addr)
+static inline int __test_and_clear_bit(int nr, volatile void * addr)
 {
 	__u32 mask, oldbit;
 	volatile __u32 *a = addr;
@@ -310,7 +313,7 @@ static __inline__ int __test_and_clear_bit(int nr, volatile void * addr)
 }
 
 /* WARNING: non atomic and it can be reordered! */
-static __inline__ int __test_and_change_bit(int nr, volatile void * addr)
+static inline int __test_and_change_bit(int nr, volatile void * addr)
 {
 	__u32 mask, oldbit;
 	volatile __u32 *a = addr;
@@ -331,28 +334,30 @@ static __inline__ int __test_and_change_bit(int nr, volatile void * addr)
  * This operation is atomic and cannot be reordered.
  * It also implies a memory barrier.
  */
-static __inline__ int test_and_change_bit(int nr, volatile void * addr)
+static inline int test_and_change_bit(int nr, volatile void * addr)
 {
 	__u32 mask, oldbit;
 	volatile __u32 *a = addr;
-	unsigned long  flags;
+	unsigned long flags;
+	unsigned long tmp;
 
 	a += (nr >> 5);
 	mask = (1 << (nr & 0x1F));
 
 	local_irq_save(flags);
 	__asm__ __volatile__ (
-		DCACHE_CLEAR("%0", "r4", "%1")
-		LOAD"	%0, @%1;		\n\t"
-		"mv	r4, %0;			\n\t"
-		"and	%0, %2;			\n\t"
-		"xor	r4, %2;			\n\t"
-		STORE"	r4, @%1;		\n\t"
-		: "=&r" (oldbit)
+		DCACHE_CLEAR("%0", "%1", "%2")
+		LOAD"	%0, @%2;		\n\t"
+		"mv	%1, %0;			\n\t"
+		"and	%0, %3;			\n\t"
+		"xor	%1, %3;			\n\t"
+		STORE"	%1, @%2;		\n\t"
+		: "=&r" (oldbit), "=&r" (tmp)
 		: "r" (a), "r" (mask)
-		: "memory", "r4"
+		: "memory"
 	);
 	local_irq_restore(flags);
+
 	return (oldbit != 0);
 }
 
@@ -365,7 +370,7 @@ static __inline__ int test_and_change_bit(int nr, volatile void * addr)
 static int test_bit(int nr, const volatile void * addr);
 #endif
 
-static __inline__ int test_bit(int nr, const volatile void * addr)
+static inline int test_bit(int nr, const volatile void * addr)
 {
 	__u32 mask;
 	const volatile __u32 *a = addr;
@@ -382,7 +387,7 @@ static __inline__ int test_bit(int nr, const volatile void * addr)
  *
  * Undefined if no zero exists, so code should check against ~0UL first.
  */
-static __inline__ unsigned long ffz(unsigned long word)
+static inline unsigned long ffz(unsigned long word)
 {
 	int k;
 
@@ -415,7 +420,7 @@ static __inline__ unsigned long ffz(unsigned long word)
  * @offset: The bitnumber to start searching at
  * @size: The maximum size to search
  */
-static __inline__ int find_next_zero_bit(void *addr, int size, int offset)
+static inline int find_next_zero_bit(void *addr, int size, int offset)
 {
 	unsigned long *p = ((unsigned long *) addr) + (offset >> 5);
 	unsigned long result = offset & ~31UL;
@@ -457,7 +462,7 @@ found_middle:
  *
  * Undefined if no bit exists, so code should check against 0 first.
  */
-static __inline__ unsigned long __ffs(unsigned long word)
+static inline unsigned long __ffs(unsigned long word)
 {
 	int k = 0;
 
@@ -483,7 +488,7 @@ static __inline__ unsigned long __ffs(unsigned long word)
  * unlikely to be set. It's guaranteed that at least one of the 140
  * bits is cleared.
  */
-static __inline__ int sched_find_first_bit(unsigned long *b)
+static inline int sched_find_first_bit(unsigned long *b)
 {
 	if (unlikely(b[0]))
 		return __ffs(b[0]);
@@ -502,7 +507,7 @@ static __inline__ int sched_find_first_bit(unsigned long *b)
  * @offset: The bitnumber to start searching at
  * @size: The maximum size to search
  */
-static __inline__ unsigned long find_next_bit(const unsigned long *addr,
+static inline unsigned long find_next_bit(const unsigned long *addr,
 	unsigned long size, unsigned long offset)
 {
 	unsigned int *p = ((unsigned int *) addr) + (offset >> 5);
@@ -589,7 +594,7 @@ found_middle:
 #define ext2_find_first_zero_bit	find_first_zero_bit
 #define ext2_find_next_zero_bit		find_next_zero_bit
 #else
-static __inline__ int ext2_set_bit(int nr, volatile void * addr)
+static inline int ext2_set_bit(int nr, volatile void * addr)
 {
 	__u8 mask, oldbit;
 	volatile __u8 *a = addr;
@@ -602,7 +607,7 @@ static __inline__ int ext2_set_bit(int nr, volatile void * addr)
 	return (oldbit != 0);
 }
 
-static __inline__ int ext2_clear_bit(int nr, volatile void * addr)
+static inline int ext2_clear_bit(int nr, volatile void * addr)
 {
 	__u8 mask, oldbit;
 	volatile __u8 *a = addr;
@@ -615,7 +620,7 @@ static __inline__ int ext2_clear_bit(int nr, volatile void * addr)
 	return (oldbit != 0);
 }
 
-static __inline__ int ext2_test_bit(int nr, const volatile void * addr)
+static inline int ext2_test_bit(int nr, const volatile void * addr)
 {
 	__u32 mask;
 	const volatile __u8 *a = addr;
@@ -629,7 +634,7 @@ static __inline__ int ext2_test_bit(int nr, const volatile void * addr)
 #define ext2_find_first_zero_bit(addr, size) \
 	ext2_find_next_zero_bit((addr), (size), 0)
 
-static __inline__ unsigned long ext2_find_next_zero_bit(void *addr,
+static inline unsigned long ext2_find_next_zero_bit(void *addr,
 	unsigned long size, unsigned long offset)
 {
 	unsigned long *p = ((unsigned long *) addr) + (offset >> 5);
@@ -709,4 +714,3 @@ found_middle:
 #endif /* __KERNEL__ */
 
 #endif /* _ASM_M32R_BITOPS_H */
-

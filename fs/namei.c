@@ -1825,13 +1825,12 @@ asmlinkage long sys_unlink(const char __user * pathname)
 		dput(dentry);
 	}
 	up(&nd.dentry->d_inode->i_sem);
+	if (inode)
+		iput(inode);	/* truncate the inode here */
 exit1:
 	path_release(&nd);
 exit:
 	putname(name);
-
-	if (inode)
-		iput(inode);	/* truncate the inode here */
 	return error;
 
 slashes:

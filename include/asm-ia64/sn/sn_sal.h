@@ -34,6 +34,7 @@
 #define  SN_SAL_NO_FAULT_ZONE_PHYSICAL		   0x02000011
 #define  SN_SAL_PRINT_ERROR			   0x02000012
 #define  SN_SAL_SET_ERROR_HANDLING_FEATURES	   0x0200001a	// reentrant
+#define  SN_SAL_GET_FIT_COMPT			   0x0200001b	// reentrant
 #define  SN_SAL_CONSOLE_PUTC                       0x02000021
 #define  SN_SAL_CONSOLE_GETC                       0x02000022
 #define  SN_SAL_CONSOLE_PUTS                       0x02000023
@@ -107,12 +108,13 @@
 
 
 /*
- * SN_SAL_GET_PARTITION_ADDR return constants
+ * SAL Error Codes
  */
 #define SALRET_MORE_PASSES	1
 #define SALRET_OK		0
-#define SALRET_INVALID_ARG	-2
-#define SALRET_ERROR		-3
+#define SALRET_NOT_IMPLEMENTED	(-1)
+#define SALRET_INVALID_ARG	(-2)
+#define SALRET_ERROR		(-3)
 
 /*
  * SN_SAL_SET_ERROR_HANDLING_FEATURES bit settings
@@ -827,6 +829,34 @@ ia64_sn_irtr_intr_disable(nasid_t nasid, int subch, u64 intr)
 	SAL_CALL_REENTRANT(rv, SN_SAL_IROUTER_OP, SAL_IROUTER_INTR_OFF,
 			   (u64) nasid, (u64) subch, intr, 0, 0, 0);
 	return (int) rv.v0;
+}
+
+/**
+ * ia64_sn_get_fit_compt - read a FIT entry from the PROM header
+ * @nasid: NASID of node to read
+ * @index: FIT entry index to be retrieved (0..n)
+ * @fitentry: 16 byte buffer where FIT entry will be stored.
+ * @banbuf: optional buffer for retrieving banner
+ * @banlen: length of banner buffer
+ *
+ * Access to the physical PROM chips needs to be serialized since reads and
+ * writes can't occur at the same time, so we need to call into the SAL when
+ * we want to look at the FIT entries on the chips.
+ *
+ * Returns:
+ *	%SALRET_OK if ok
+ *	%SALRET_INVALID_ARG if index too big
+ *	%SALRET_NOT_IMPLEMENTED if running on older PROM
+ *	??? if nasid invalid OR banner buffer not large enough
+ */
+static inline int
+ia64_sn_get_fit_compt(u64 nasid, u64 index, void *fitentry, void *banbuf,
+		      u64 banlen)
+{
+	struct ia64_sal_retval rv;
+	SAL_CALL_NOLOCK(rv, SN_SAL_GET_FIT_COMPT, nasid, index, fitentry,
+			banbuf, banlen, 0, 0);
+	return (int) rv.status;
 }
 
 /*

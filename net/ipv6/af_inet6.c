@@ -191,7 +191,6 @@ static int inet6_create(struct socket *sock, int protocol)
 	}
 
 	sk->sk_destruct		= inet6_sock_destruct;
-	sk->sk_zapped		= 0;
 	sk->sk_family		= PF_INET6;
 	sk->sk_protocol		= protocol;
 

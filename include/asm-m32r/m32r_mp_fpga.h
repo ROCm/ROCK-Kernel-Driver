@@ -2,11 +2,11 @@
 #define _ASM_M32R_M32R_MP_FPGA_
 
 /*
- * Mitsubishi M32R-MP-FPGA
- * Copyright (c) 2002 [Hitoshi Yamamoto] All rights reserved.
+ * Renesas M32R-MP-FPGA
+ *
+ * Copyright (c) 2002  Hitoshi Yamamoto
+ * Copyright (c) 2003, 2004  Renesas Technology Corp.
  */
-
-/* $Id$ */
 
 /*
  * ========================================================

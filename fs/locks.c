@@ -1766,7 +1766,12 @@ void locks_remove_flock(struct file *filp)
 
 	while ((fl = *before) != NULL) {
 		if (fl->fl_file == filp) {
-			if (IS_FLOCK(fl)) {
+			/*
+			 * We might have a POSIX lock that was created at the same time
+			 * the filp was closed for the last time. Just remove that too,
+			 * regardless of ownership, since nobody can own it.
+			 */
+			if (IS_FLOCK(fl) || IS_POSIX(fl)) {
 				locks_delete_lock(before);
 				continue;
 			}
@@ -1774,9 +1779,7 @@ void locks_remove_flock(struct file *filp)
 				lease_modify(before, F_UNLCK);
 				continue;
 			}
-			/* FL_POSIX locks of this process have already been
-			 * removed in filp_close->locks_remove_posix.
-			 */
+			/* What? */
 			BUG();
  		}
 		before = &fl->fl_next;

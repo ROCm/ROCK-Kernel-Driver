@@ -1675,7 +1675,6 @@ cbq_dump_class(struct Qdisc *sch, unsigned long arg,
 	cl->xstats.undertime = 0;
 	if (!PSCHED_IS_PASTPERFECT(cl->undertime))
 		cl->xstats.undertime = PSCHED_TDIFF(cl->undertime, q->now);
-	q->link.xstats.avgidle = q->link.avgidle;
 	if (cbq_copy_xstats(skb, &cl->xstats)) {
 		spin_unlock_bh(&sch->dev->queue_lock);
 		goto rtattr_failure;

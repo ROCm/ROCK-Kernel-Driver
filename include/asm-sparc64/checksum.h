@@ -40,7 +40,7 @@ extern unsigned int csum_partial(const unsigned char * buff, int len, unsigned i
  */
 extern unsigned int csum_partial_copy_sparc64(const char *src, char *dst, int len, unsigned int sum);
 			
-static __inline__ unsigned int 
+static inline unsigned int 
 csum_partial_copy_nocheck (const char *src, char *dst, int len, 
 			   unsigned int sum)
 {
@@ -52,22 +52,23 @@ csum_partial_copy_nocheck (const char *src, char *dst, int len,
 	return ret;
 }
 
-static __inline__ unsigned int 
-csum_partial_copy_from_user(const char *src, char *dst, int len, 
+static inline unsigned int 
+csum_partial_copy_from_user(const char __user *src, char *dst, int len, 
 			    unsigned int sum, int *err)
 {
 	__asm__ __volatile__ ("stx	%0, [%%sp + 0x7ff + 128]"
 			      : : "r" (err));
-	return csum_partial_copy_sparc64(src, dst, len, sum);
+	return csum_partial_copy_sparc64((__force const char *) src,
+					 dst, len, sum);
 }
 
 /* 
  *	Copy and checksum to user
  */
 #define HAVE_CSUM_COPY_USER
-extern unsigned int csum_partial_copy_user_sparc64(const char *src, char *dst, int len, unsigned int sum);
+extern unsigned int csum_partial_copy_user_sparc64(const char *src, char __user *dst, int len, unsigned int sum);
 
-static __inline__ unsigned int 
+static inline unsigned int 
 csum_and_copy_to_user(const char *src, char __user *dst, int len, 
 		      unsigned int sum, int *err)
 {
@@ -83,7 +84,7 @@ extern unsigned short ip_fast_csum(__const__ unsigned char *iph,
 				   unsigned int ihl);
 
 /* Fold a partial checksum without adding pseudo headers. */
-static __inline__ unsigned short csum_fold(unsigned int sum)
+static inline unsigned short csum_fold(unsigned int sum)
 {
 	unsigned int tmp;
 
@@ -98,11 +99,11 @@ static __inline__ unsigned short csum_fold(unsigned int sum)
 	return (sum & 0xffff);
 }
 
-static __inline__ unsigned long csum_tcpudp_nofold(unsigned long saddr,
-						   unsigned long daddr,
-						   unsigned int len,
-						   unsigned short proto,
-						   unsigned int sum)
+static inline unsigned long csum_tcpudp_nofold(unsigned long saddr,
+					       unsigned long daddr,
+					       unsigned int len,
+					       unsigned short proto,
+					       unsigned int sum)
 {
 	__asm__ __volatile__(
 "	addcc		%1, %0, %0\n"
@@ -130,11 +131,11 @@ static inline unsigned short int csum_tcpudp_magic(unsigned long saddr,
 
 #define _HAVE_ARCH_IPV6_CSUM
 
-static __inline__ unsigned short int csum_ipv6_magic(struct in6_addr *saddr,
-						     struct in6_addr *daddr,
-						     __u32 len,
-						     unsigned short proto,
-						     unsigned int sum) 
+static inline unsigned short int csum_ipv6_magic(struct in6_addr *saddr,
+						 struct in6_addr *daddr,
+						 __u32 len,
+						 unsigned short proto,
+						 unsigned int sum) 
 {
 	__asm__ __volatile__ (
 "	addcc		%3, %4, %%g7\n"
@@ -165,7 +166,7 @@ static __inline__ unsigned short int csum_ipv6_magic(struct in6_addr *saddr,
 }
 
 /* this routine is used for miscellaneous IP-like checksums, mainly in icmp.c */
-static __inline__ unsigned short ip_compute_csum(unsigned char * buff, int len)
+static inline unsigned short ip_compute_csum(unsigned char * buff, int len)
 {
 	return csum_fold(csum_partial(buff, len, 0));
 }

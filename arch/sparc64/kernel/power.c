@@ -141,8 +141,7 @@ found:
 		printk("powerd running.\n");
 
 		if (request_irq(edev->irqs[0],
-				power_handler, SA_SHIRQ, "power",
-				(void *) power_reg) < 0)
+				power_handler, SA_SHIRQ, "power", NULL) < 0)
 			printk("power: Error, cannot register IRQ handler.\n");
 	} else {
 		printk("not using powerd.\n");

@@ -7,10 +7,6 @@
  *                                  Hitoshi Yamamoto
  */
 
-static char *rcsid =
-"$Id$";
-static void use_rcsid(void) {rcsid = rcsid; use_rcsid();}
-
 #include <linux/config.h>
 #include <linux/irq.h>
 #include <linux/kernel.h>

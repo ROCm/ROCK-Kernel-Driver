@@ -66,8 +66,8 @@ static void kbtab_irq(struct urb *urb, struct pt_regs *regs)
 		goto exit;
 	}
 
-	kbtab->x = le16_to_cpu(get_unaligned((u16 *) &data[1]));
-	kbtab->y = le16_to_cpu(get_unaligned((u16 *) &data[3]));
+	kbtab->x = le16_to_cpu(get_unaligned((__le16 *) &data[1]));
+	kbtab->y = le16_to_cpu(get_unaligned((__le16 *) &data[3]));
 
 	kbtab->pressure = (data[5]);
 

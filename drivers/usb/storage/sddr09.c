@@ -1489,11 +1489,11 @@ int sddr09_transport(struct scsi_cmnd *srb, struct us_data *us)
 
 		capacity = (info->lbact << info->blockshift) - 1;
 
-		((u32 *) ptr)[0] = cpu_to_be32(capacity);
+		((__be32 *) ptr)[0] = cpu_to_be32(capacity);
 
 		// Report page size
 
-		((u32 *) ptr)[1] = cpu_to_be32(info->pagesize);
+		((__be32 *) ptr)[1] = cpu_to_be32(info->pagesize);
 		usb_stor_set_xfer_buf(ptr, 8, srb);
 
 		return USB_STOR_TRANSPORT_GOOD;
@@ -1510,7 +1510,7 @@ int sddr09_transport(struct scsi_cmnd *srb, struct us_data *us)
 				  "mode page 0x%x\n", modepage);
 
 			memcpy(ptr, mode_page_01, sizeof(mode_page_01));
-			((u16*)ptr)[0] = cpu_to_be16(sizeof(mode_page_01) - 2);
+			((__be16*)ptr)[0] = cpu_to_be16(sizeof(mode_page_01) - 2);
 			ptr[3] = (info->flags & SDDR09_WP) ? 0x80 : 0;
 			usb_stor_set_xfer_buf(ptr, sizeof(mode_page_01), srb);
 			return USB_STOR_TRANSPORT_GOOD;

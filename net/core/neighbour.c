@@ -406,12 +406,6 @@ struct neighbour *neigh_create(struct neigh_table *tbl, const void *pkey,
 		goto out;
 	}
 
-	if (tbl->entries > (tbl->hash_mask + 1)) {
-		write_lock_bh(&tbl->lock);
-		neigh_hash_grow(tbl, (tbl->hash_mask + 1) << 1);
-		write_unlock_bh(&tbl->lock);
-	}
-
 	memcpy(n->primary_key, pkey, key_len);
 	n->dev = dev;
 	dev_hold(dev);
@@ -432,6 +426,9 @@ struct neighbour *neigh_create(struct neigh_table *tbl, const void *pkey,
 	n->confirmed = jiffies - (n->parms->base_reachable_time << 1);
 
 	write_lock_bh(&tbl->lock);
+
+	if (tbl->entries > (tbl->hash_mask + 1))
+		neigh_hash_grow(tbl, (tbl->hash_mask + 1) << 1);
 
 	hash_val = tbl->hash(pkey, dev) & tbl->hash_mask;
 
@@ -496,8 +493,12 @@ struct pneigh_entry * pneigh_lookup(struct neigh_table *tbl, const void *pkey,
 
 	memcpy(n->key, pkey, key_len);
 	n->dev = dev;
+	if (dev)
+		dev_hold(dev);
 
 	if (tbl->pconstructor && tbl->pconstructor(n)) {
+		if (dev)
+			dev_put(dev);
 		kfree(n);
 		n = NULL;
 		goto out;
@@ -532,6 +533,8 @@ int pneigh_delete(struct neigh_table *tbl, const void *pkey,
 			write_unlock_bh(&tbl->lock);
 			if (tbl->pdestructor)
 				tbl->pdestructor(n);
+			if (n->dev)
+				dev_put(n->dev);
 			kfree(n);
 			return 0;
 		}
@@ -552,6 +555,8 @@ static int pneigh_ifdown(struct neigh_table *tbl, struct net_device *dev)
 				*np = n->next;
 				if (tbl->pdestructor)
 					tbl->pdestructor(n);
+				if (n->dev)
+					dev_put(n->dev);
 				kfree(n);
 				continue;
 			}
@@ -805,9 +810,15 @@ static void neigh_timer_handler(unsigned long arg)
 		add_timer(&neigh->timer);
 	}
 	if (neigh->nud_state & (NUD_INCOMPLETE | NUD_PROBE)) {
+		struct sk_buff *skb = skb_peek(&neigh->arp_queue);
+		/* keep skb alive even if arp_queue overflows */
+		if (skb)
+			skb_get(skb);
 		write_unlock(&neigh->lock);
-		neigh->ops->solicit(neigh, skb_peek(&neigh->arp_queue));
+		neigh->ops->solicit(neigh, skb);
 		atomic_inc(&neigh->probes);
+		if (skb)
+			kfree_skb(skb);
 	} else {
 out:
 		write_unlock(&neigh->lock);

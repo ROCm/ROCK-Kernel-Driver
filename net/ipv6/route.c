@@ -1357,6 +1357,8 @@ int ip6_pkt_discard(struct sk_buff *skb)
 
 int ip6_pkt_discard_out(struct sk_buff **pskb)
 {
+	(*pskb)->dev = (*pskb)->dst->dev;
+	BUG_ON(!(*pskb)->dev);
 	return ip6_pkt_discard(*pskb);
 }
 

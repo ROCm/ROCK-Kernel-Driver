@@ -992,6 +992,16 @@ ENTRY(sys_call_table)
         .long sys_mq_notify
         .long sys_mq_getsetattr
         .long sys_ni_syscall            /* reserved for kexec */
+	.long sys_waitid
+	.long sys_perfctr_info
+	.long sys_vperfctr_open
+	.long sys_vperfctr_control
+	.long sys_vperfctr_unlink
+	.long sys_vperfctr_iresume
+	.long sys_vperfctr_read		/* 290 */
+	.long sys_add_key
+	.long sys_request_key
+	.long sys_keyctl
 
 syscall_table_size=(.-sys_call_table)
 

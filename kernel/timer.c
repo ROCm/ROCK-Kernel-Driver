@@ -36,6 +36,7 @@
 #include <asm/unistd.h>
 #include <asm/div64.h>
 #include <asm/timex.h>
+#include <asm/io.h>
 
 #ifdef CONFIG_TIME_INTERPOLATION
 static void time_interpolator_update(long delta_nsec);
@@ -1624,13 +1625,13 @@ EXPORT_SYMBOL(msleep);
  */
 unsigned long msleep_interruptible(unsigned int msecs)
 {
-       unsigned long timeout = msecs_to_jiffies(msecs);
+	unsigned long timeout = msecs_to_jiffies(msecs);
 
-       while (timeout && !signal_pending(current)) {
-               set_current_state(TASK_INTERRUPTIBLE);
-               timeout = schedule_timeout(timeout);
-       }
-       return jiffies_to_msecs(timeout);
+	while (timeout && !signal_pending(current)) {
+		set_current_state(TASK_INTERRUPTIBLE);
+		timeout = schedule_timeout(timeout);
+	}
+	return jiffies_to_msecs(timeout);
 }
 
 EXPORT_SYMBOL(msleep_interruptible);

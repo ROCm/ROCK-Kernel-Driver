@@ -28,7 +28,7 @@ static struct _nvidia_private {
 	struct pci_dev *dev_1;
 	struct pci_dev *dev_2;
 	struct pci_dev *dev_3;
-	volatile u32 *aperture;
+	volatile u32 __iomem *aperture;
 	int num_active_entries;
 	off_t pg_offset;
 	u32 wbc_mask;
@@ -154,7 +154,7 @@ static int nvidia_configure(void)
 
 	/* map aperture */
 	nvidia_private.aperture =
-		(volatile u32 *) ioremap(apbase, 33 * PAGE_SIZE);
+		(volatile u32 __iomem *) ioremap(apbase, 33 * PAGE_SIZE);
 
 	return 0;
 }
@@ -173,7 +173,7 @@ static void nvidia_cleanup(void)
 	pci_write_config_dword(nvidia_private.dev_2, NVIDIA_2_GARTCTRL, temp & ~(0x11));
 
 	/* unmap aperture */
-	iounmap((void *) nvidia_private.aperture);
+	iounmap((void __iomem *) nvidia_private.aperture);
 
 	/* restore previous aperture size */
 	previous_size = A_SIZE_8(agp_bridge->previous_size);
@@ -206,7 +206,7 @@ static int nvidia_insert_memory(struct agp_memory *mem, off_t pg_start, int type
 		return -EINVAL;
 	
 	for(j = pg_start; j < (pg_start + mem->page_count); j++) {
-		if (!PGE_EMPTY(agp_bridge, agp_bridge->gatt_table[nvidia_private.pg_offset + j]))
+		if (!PGE_EMPTY(agp_bridge, readl(agp_bridge->gatt_table+nvidia_private.pg_offset+j)))
 			return -EBUSY;
 	}
 
@@ -215,9 +215,8 @@ static int nvidia_insert_memory(struct agp_memory *mem, off_t pg_start, int type
 		mem->is_flushed = TRUE;
 	}
 	for (i = 0, j = pg_start; i < mem->page_count; i++, j++)
-		agp_bridge->gatt_table[nvidia_private.pg_offset + j] =
-				agp_bridge->driver->mask_memory(mem->memory[i], mem->type);
-
+		writel(agp_bridge->driver->mask_memory(mem->memory[i], mem->type),
+			agp_bridge->gatt_table+nvidia_private.pg_offset+j);
 	agp_bridge->driver->tlb_flush(mem);
 	return 0;
 }
@@ -229,11 +228,9 @@ static int nvidia_remove_memory(struct agp_memory *mem, off_t pg_start, int type
 
 	if ((type != 0) || (mem->type != 0))
 		return -EINVAL;
-	
-	for (i = pg_start; i < (mem->page_count + pg_start); i++) {
-		agp_bridge->gatt_table[nvidia_private.pg_offset + i] =
-		    (unsigned long) agp_bridge->scratch_page;
-	}
+
+	for (i = pg_start; i < (mem->page_count + pg_start); i++)
+		writel(agp_bridge->scratch_page, agp_bridge->gatt_table+nvidia_private.pg_offset+i);
 
 	agp_bridge->driver->tlb_flush(mem);
 	return 0;
@@ -265,9 +262,9 @@ static void nvidia_tlbflush(struct agp_memory *mem)
 
 	/* flush TLB entries */
 	for(i = 0; i < 32 + 1; i++)
-		temp = nvidia_private.aperture[i * PAGE_SIZE / sizeof(u32)];
+		temp = readl(nvidia_private.aperture+(i * PAGE_SIZE / sizeof(u32)));
 	for(i = 0; i < 32 + 1; i++)
-		temp = nvidia_private.aperture[i * PAGE_SIZE / sizeof(u32)];
+		temp = readl(nvidia_private.aperture+(i * PAGE_SIZE / sizeof(u32)));
 }
 
 

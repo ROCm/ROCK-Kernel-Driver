@@ -162,6 +162,25 @@ typedef struct { unsigned long pgd; } pgd_t;
 #define __pgd(x)        ((pgd_t) { (x) } )
 #define __pgprot(x)     ((pgprot_t) { (x) } )
 
+/* default storage key used for all pages */
+extern unsigned int default_storage_key;
+
+static inline void
+page_set_storage_key(unsigned long addr, unsigned int skey)
+{
+	asm volatile ( "sske %0,%1" : : "d" (skey), "a" (addr) );
+}
+
+static inline unsigned int
+page_get_storage_key(unsigned long addr)
+{
+	unsigned int skey;
+
+	asm volatile ( "iske %0,%1" : "=d" (skey) : "a" (addr), "0" (0) );
+
+	return skey;
+}
+
 #endif /* !__ASSEMBLY__ */
 
 /* to align the pointer to the (next) page boundary */

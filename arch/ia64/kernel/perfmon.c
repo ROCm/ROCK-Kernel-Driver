@@ -1513,7 +1513,7 @@ exit_pfm_fs(void)
 }
 
 static ssize_t
-pfm_read(struct file *filp, char *buf, size_t size, loff_t *ppos)
+pfm_read(struct file *filp, char __user *buf, size_t size, loff_t *ppos)
 {
 	pfm_context_t *ctx;
 	pfm_msg_t *msg;
@@ -1606,7 +1606,7 @@ abort:
 }
 
 static ssize_t
-pfm_write(struct file *file, const char *ubuf,
+pfm_write(struct file *file, const char __user *ubuf,
 			  size_t size, loff_t *ppos)
 {
 	DPRINT(("pfm_write called\n"));
@@ -1678,7 +1678,6 @@ static int
 pfm_fasync(int fd, struct file *filp, int on)
 {
 	pfm_context_t *ctx;
-	unsigned long flags;
 	int ret;
 
 	if (PFM_IS_FILE(filp) == 0) {
@@ -1691,18 +1690,20 @@ pfm_fasync(int fd, struct file *filp, int on)
 		printk(KERN_ERR "perfmon: pfm_fasync NULL ctx [%d]\n", current->pid);
 		return -EBADF;
 	}
-
-
-	PROTECT_CTX(ctx, flags);
-
+	/*
+	 * we cannot mask interrupts during this call because this may
+	 * may go to sleep if memory is not readily avalaible.
+	 *
+	 * We are protected from the conetxt disappearing by the get_fd()/put_fd()
+	 * done in caller. Serialization of this function is ensured by caller.
+	 */
 	ret = pfm_do_fasync(fd, filp, ctx, on);
+
 
 	DPRINT(("pfm_fasync called on ctx_fd=%d on=%d async_queue=%p ret=%d\n",
 		fd,
 		on,
 		ctx->ctx_async_queue, ret));
-
-	UNPROTECT_CTX(ctx, flags);
 
 	return ret;
 }
@@ -2286,7 +2287,7 @@ pfm_smpl_buffer_alloc(struct task_struct *task, pfm_context_t *ctx, unsigned lon
 	 * if ((mm->total_vm << PAGE_SHIFT) + len> task->rlim[RLIMIT_AS].rlim_cur)
 	 * 	return -ENOMEM;
 	 */
-	if (size > task->rlim[RLIMIT_MEMLOCK].rlim_cur) return -EAGAIN;
+	if (size > task->rlim[RLIMIT_MEMLOCK].rlim_cur) return -ENOMEM;
 
 	/*
 	 * We do the easy to undo allocations first.
@@ -2601,7 +2602,7 @@ pfm_task_incompatible(pfm_context_t *ctx, struct task_struct *task)
 	 */
 	if (task == current) return 0;
 
-	if (task->state != TASK_STOPPED) {
+	if ((task->state != TASK_STOPPED) && (task->state != TASK_TRACED)) {
 		DPRINT(("cannot attach to non-stopped task [%d] state=%ld\n", task->pid, task->state));
 		return -EBUSY;
 	}
@@ -4755,7 +4756,7 @@ recheck:
 	 * the task must be stopped.
 	 */
 	if (PFM_CMD_STOPPED(cmd)) {
-		if (task->state != TASK_STOPPED) {
+		if ((task->state != TASK_STOPPED) && (task->state != TASK_TRACED)) {
 			DPRINT(("[%d] task not in stopped state\n", task->pid));
 			return -EBUSY;
 		}
@@ -4796,7 +4797,7 @@ recheck:
  * system-call entry point (must return long)
  */
 asmlinkage long
-sys_perfmonctl (int fd, int cmd, void *arg, int count, long arg5, long arg6, long arg7,
+sys_perfmonctl (int fd, int cmd, void __user *arg, int count, long arg5, long arg6, long arg7,
 		long arg8, long stack)
 {
 	struct pt_regs *regs = (struct pt_regs *)&stack;

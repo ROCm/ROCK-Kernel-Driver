@@ -47,7 +47,8 @@
 #define IRQ_DEBUG	0
 
 /* default base addr of IPI table */
-unsigned long ipi_base_addr = (__IA64_UNCACHED_OFFSET | IA64_IPI_DEFAULT_BASE_ADDR);
+void __iomem *ipi_base_addr = ((void __iomem *)
+			       (__IA64_UNCACHED_OFFSET | IA64_IPI_DEFAULT_BASE_ADDR));
 
 /*
  * Legacy IRQ to IA-64 vector translation table.
@@ -254,7 +255,7 @@ init_IRQ (void)
 void
 ia64_send_ipi (int cpu, int vector, int delivery_mode, int redirect)
 {
-	unsigned long ipi_addr;
+	void __iomem *ipi_addr;
 	unsigned long ipi_data;
 	unsigned long phys_cpu_id;
 
@@ -269,7 +270,7 @@ ia64_send_ipi (int cpu, int vector, int delivery_mode, int redirect)
 	 */
 
 	ipi_data = (delivery_mode << 8) | (vector & 0xff);
-	ipi_addr = ipi_base_addr | (phys_cpu_id << 4) | ((redirect & 1)  << 3);
+	ipi_addr = ipi_base_addr + ((phys_cpu_id << 4) | ((redirect & 1) << 3));
 
 	writeq(ipi_data, ipi_addr);
 }

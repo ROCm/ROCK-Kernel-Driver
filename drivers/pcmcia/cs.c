@@ -427,8 +427,6 @@ static int send_event(struct pcmcia_socket *s, event_t event, int priority)
     return ret;
 } /* send_event */
 
-#define cs_to_timeout(cs) (((cs) * HZ + 99) / 100)
-
 static void socket_remove_drivers(struct pcmcia_socket *skt)
 {
 	client_t *client;
@@ -448,8 +446,7 @@ static void socket_shutdown(struct pcmcia_socket *skt)
 
 	socket_remove_drivers(skt);
 	skt->state &= SOCKET_INUSE|SOCKET_PRESENT;
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(cs_to_timeout(shutdown_delay));
+	msleep(shutdown_delay * 10);
 	skt->state &= SOCKET_INUSE;
 	shutdown_socket(skt);
 }
@@ -467,8 +464,7 @@ static int socket_reset(struct pcmcia_socket *skt)
 	skt->socket.flags &= ~SS_RESET;
 	skt->ops->set_socket(skt, &skt->socket);
 
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(cs_to_timeout(unreset_delay));
+	msleep(unreset_delay * 10);
 	for (i = 0; i < unreset_limit; i++) {
 		skt->ops->get_status(skt, &status);
 
@@ -478,8 +474,7 @@ static int socket_reset(struct pcmcia_socket *skt)
 		if (status & SS_READY)
 			return CS_SUCCESS;
 
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(cs_to_timeout(unreset_check));
+		msleep(unreset_check * 10);
 	}
 
 	cs_err(skt, "time out after reset.\n");
@@ -496,8 +491,7 @@ static int socket_setup(struct pcmcia_socket *skt, int initial_delay)
 	if (!(status & SS_DETECT))
 		return CS_NO_CARD;
 
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(cs_to_timeout(initial_delay));
+	msleep(initial_delay * 10);
 
 	for (i = 0; i < 100; i++) {
 		skt->ops->get_status(skt, &status);
@@ -507,8 +501,7 @@ static int socket_setup(struct pcmcia_socket *skt, int initial_delay)
 		if (!(status & SS_PENDING))
 			break;
 
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(cs_to_timeout(10));
+		msleep(100);
 	}
 
 	if (status & SS_PENDING) {
@@ -541,8 +534,7 @@ static int socket_setup(struct pcmcia_socket *skt, int initial_delay)
 	/*
 	 * Wait "vcc_settle" for the supply to stabilise.
 	 */
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(cs_to_timeout(vcc_settle));
+	msleep(vcc_settle * 10);
 
 	skt->ops->get_status(skt, &status);
 	if (!(status & SS_POWERON)) {
@@ -659,10 +651,8 @@ static void socket_detect_change(struct pcmcia_socket *skt)
 	if (!(skt->state & SOCKET_SUSPEND)) {
 		int status;
 
-		if (!(skt->state & SOCKET_PRESENT)) {
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(cs_to_timeout(2));
-		}
+		if (!(skt->state & SOCKET_PRESENT))
+			msleep(20);
 
 		skt->ops->get_status(skt, &status);
 		if ((skt->state & SOCKET_PRESENT) &&

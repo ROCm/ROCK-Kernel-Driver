@@ -80,7 +80,7 @@
 #define CAN_SCHEDULE_FRAMES	1000	/* how far future frames can be scheduled */
 
 struct uhci_frame_list {
-	u32 frame[UHCI_NUMFRAMES];
+	__le32 frame[UHCI_NUMFRAMES];
 
 	void *frame_cpu[UHCI_NUMFRAMES];
 
@@ -105,8 +105,8 @@ struct urb_priv;
  */
 struct uhci_qh {
 	/* Hardware fields */
-	u32 link;			/* Next queue */
-	u32 element;			/* Queue element pointer */
+	__le32 link;			/* Next queue */
+	__le32 element;			/* Queue element pointer */
 
 	/* Software fields */
 	dma_addr_t dma_handle;
@@ -185,10 +185,10 @@ struct uhci_qh {
  */
 struct uhci_td {
 	/* Hardware fields */
-	u32 link;
-	u32 status;
-	u32 token;
-	u32 buffer;
+	__le32 link;
+	__le32 status;
+	__le32 token;
+	__le32 buffer;
 
 	/* Software fields */
 	dma_addr_t dma_handle;

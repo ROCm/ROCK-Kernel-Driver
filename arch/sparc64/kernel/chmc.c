@@ -72,7 +72,7 @@ struct mctrl_info {
 	struct obp_mem_layout	layout_prop;
 	int			layout_size;
 
-	void			*regs;
+	void __iomem		*regs;
 
 	u64			timing_control1;
 	u64			timing_control2;

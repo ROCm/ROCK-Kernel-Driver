@@ -1,3 +1,11 @@
+Release Date	: Mon Sep 27 22:15:07 EDT 2004 - Atul Mukker <atulm@lsil.com>
+Current Version	: 2.20.4.0 (scsi module), 2.20.2.0 (cmm module)
+Older Version	: 2.20.3.1 (scsi module), 2.20.2.0 (cmm module)
+
+i.	Fix data corruption. Because of a typo in the driver, the IO packets
+	were wrongly shared by the ioctl path. This causes a whole IO command
+	to be replaced by an incoming ioctl command.
+
 Release Date	: Tue Aug 24 09:43:35 EDT 2004 - Atul Mukker <atulm@lsil.com>
 Current Version	: 2.20.3.1 (scsi module), 2.20.2.0 (cmm module)
 Older Version	: 2.20.3.0 (scsi module), 2.20.2.0 (cmm module)

@@ -597,17 +597,13 @@ ptep_establish(struct vm_area_struct *vma,
  * should therefore only be called if it is not mapped in any
  * address space.
  */
-#define page_test_and_clear_dirty(page)					  \
+#define page_test_and_clear_dirty(_page)				  \
 ({									  \
-	struct page *__page = (page);					  \
+	struct page *__page = (_page);					  \
 	unsigned long __physpage = __pa((__page-mem_map) << PAGE_SHIFT);  \
-	int __skey;							  \
-	asm volatile ("iske %0,%1" : "=d" (__skey) : "a" (__physpage));   \
-	if (__skey & _PAGE_CHANGED) {					  \
-		asm volatile ("sske %0,%1"				  \
-			      : : "d" (__skey & ~_PAGE_CHANGED),	  \
-			          "a" (__physpage));			  \
-	}								  \
+	int __skey = page_get_storage_key(__physpage);			  \
+	if (__skey & _PAGE_CHANGED)					  \
+		page_set_storage_key(__physpage, __skey & ~_PAGE_CHANGED);\
 	(__skey & _PAGE_CHANGED);					  \
 })
 
@@ -655,11 +651,10 @@ static inline pte_t mk_pte_phys(unsigned long physpage, pgprot_t pgprot)
 })
 
 #define SetPageUptodate(_page) \
-	do {								  \
-		struct page *__page = (_page);				  \
-		if (!test_and_set_bit(PG_uptodate, &__page->flags))	  \
-			asm volatile ("sske %0,%1" : : "d" (0),		  \
-			      "a" (__pa((__page-mem_map) << PAGE_SHIFT)));\
+	do {								      \
+		struct page *__page = (_page);				      \
+		if (!test_and_set_bit(PG_uptodate, &__page->flags))	      \
+			page_test_and_clear_dirty(_page);		      \
 	} while (0)
 
 #ifdef __s390x__

@@ -494,9 +494,9 @@ static void aiptek_irq(struct urb *urb, struct pt_regs *regs)
 		} else {
 			input_regs(inputdev, regs);
 
-			x = le16_to_cpu(get_unaligned((__u16 *) (data + 1)));
-			y = le16_to_cpu(get_unaligned((__u16 *) (data + 3)));
-			z = le16_to_cpu(get_unaligned((__u16 *) (data + 6)));
+			x = le16_to_cpu(get_unaligned((__le16 *) (data + 1)));
+			y = le16_to_cpu(get_unaligned((__le16 *) (data + 3)));
+			z = le16_to_cpu(get_unaligned((__le16 *) (data + 6)));
 
 			p = (data[5] & 0x01) != 0 ? 1 : 0;
 			dv = (data[5] & 0x02) != 0 ? 1 : 0;
@@ -573,8 +573,8 @@ static void aiptek_irq(struct urb *urb, struct pt_regs *regs)
 			aiptek->diagnostic = AIPTEK_DIAGNOSTIC_TOOL_DISALLOWED;
 		} else {
 			input_regs(inputdev, regs);
-			x = le16_to_cpu(get_unaligned((__u16 *) (data + 1)));
-			y = le16_to_cpu(get_unaligned((__u16 *) (data + 3)));
+			x = le16_to_cpu(get_unaligned((__le16 *) (data + 1)));
+			y = le16_to_cpu(get_unaligned((__le16 *) (data + 3)));
 
 			jitterable = data[5] & 0x1c;
 
@@ -632,7 +632,7 @@ static void aiptek_irq(struct urb *urb, struct pt_regs *regs)
 		pck = (data[1] & aiptek->curSetting.stylusButtonUpper) != 0 ? 1 : 0;
 
 		macro = data[3];
-		z = le16_to_cpu(get_unaligned((__u16 *) (data + 4)));
+		z = le16_to_cpu(get_unaligned((__le16 *) (data + 4)));
 
 		if (dv != 0) {
 			input_regs(inputdev, regs);
@@ -729,7 +729,7 @@ static void aiptek_irq(struct urb *urb, struct pt_regs *regs)
 	 * hat switches (which just so happen to be the macroKeys.)
 	 */
 	else if (data[0] == 6) {
-		macro = le16_to_cpu(get_unaligned((__u16 *) (data + 1)));
+		macro = le16_to_cpu(get_unaligned((__le16 *) (data + 1)));
 		input_regs(inputdev, regs);
 
 		if (macro > 0) {
@@ -930,7 +930,7 @@ aiptek_query(struct aiptek *aiptek, unsigned char command, unsigned char data)
 		    buf[0], buf[1], buf[2]);
 		ret = -EIO;
 	} else {
-		ret = le16_to_cpu(get_unaligned((__u16 *) (buf + 1)));
+		ret = le16_to_cpu(get_unaligned((__le16 *) (buf + 1)));
 	}
 	kfree(buf);
 	return ret;

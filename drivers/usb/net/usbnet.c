@@ -937,8 +937,8 @@ struct ether_desc {
 
 	u8	iMACAddress;
 	u32	bmEthernetStatistics;
-	u16	wMaxSegmentSize;
-	u16	wNumberMCFilters;
+	__le16	wMaxSegmentSize;
+	__le16	wNumberMCFilters;
 	u8	bNumberPowerFilters;
 } __attribute__ ((packed));
 
@@ -1074,7 +1074,7 @@ static int generic_cdc_bind (struct usbnet *dev, struct usb_interface *intf)
 					info->u->bLength);
 				goto bad_desc;
 			}
-			dev->net->mtu = cpu_to_le16p (
+			dev->net->mtu = le16_to_cpup (
 						&info->ether->wMaxSegmentSize)
 					- ETH_HLEN;
 			/* because of Zaurus, we may be ignoring the host

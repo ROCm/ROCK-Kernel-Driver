@@ -2175,8 +2175,14 @@ get_req:
 		sk	  = sk_next(st->syn_wait_sk);
 		st->state = TCP_SEQ_STATE_LISTENING;
 		read_unlock_bh(&tp->syn_wait_lock);
-	} else
+	} else {
+	       	tp = tcp_sk(sk);
+		read_lock_bh(&tp->syn_wait_lock);
+		if (tp->listen_opt && tp->listen_opt->qlen)
+			goto start_req;
+		read_unlock_bh(&tp->syn_wait_lock);
 		sk = sk_next(sk);
+	}
 get_sk:
 	sk_for_each_from(sk, node) {
 		if (sk->sk_family == st->family) {
@@ -2186,6 +2192,7 @@ get_sk:
 	       	tp = tcp_sk(sk);
 		read_lock_bh(&tp->syn_wait_lock);
 		if (tp->listen_opt && tp->listen_opt->qlen) {
+start_req:
 			st->uid		= sock_i_uid(sk);
 			st->syn_wait_sk = sk;
 			st->state	= TCP_SEQ_STATE_OPENREQ;

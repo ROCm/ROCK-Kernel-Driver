@@ -642,7 +642,7 @@ void start_thread32(struct pt_regs* regs, unsigned long nip, unsigned long sp)
 		unsigned long childregs = (unsigned long)current->thread_info +
 						THREAD_SIZE;
 		childregs -= sizeof(struct pt_regs);
-		current->thread.regs = childregs;
+		current->thread.regs = (struct pt_regs *)childregs;
 	}
 
 	/*

@@ -60,8 +60,8 @@ chars_in_buffer() -	Report the number of bytes in the buffer.
 
 set_termios()	-	Called on termios structure changes. The caller
 			passes the old termios data and the current data
-			is in the tty. Called under the termios lock so
-			may not sleep. Serialized against itself only.
+			is in the tty. Called under the termios semaphore so
+			allowed to sleep. Serialized against itself only.
 
 read()		-	Move data from the line discipline to the user.
 			Multiple read calls may occur in parallel and the
@@ -158,8 +158,8 @@ write_room()	-	Return the number of characters tht can be stuffed
 
 ioctl()		-	Called when an ioctl may be for the driver
 
-set_termios()	-	Called on termios change, may get parallel calls,
-			may block for now (may change that)
+set_termios()	-	Called on termios change, serialized against
+			itself by a semaphore. May sleep.
 
 set_ldisc()	-	Notifier for discipline change. At the point this 
 			is done the discipline is not yet usable. Can now

@@ -85,7 +85,8 @@ int hfs_brec_find(struct hfs_find_data *fd)
 {
 	struct hfs_btree *tree;
 	struct hfs_bnode *bnode;
-	u32 data, nidx, parent;
+	u32 nidx, parent;
+	__be32 data;
 	int height, res;
 
 	tree = fd->tree;

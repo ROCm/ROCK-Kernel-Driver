@@ -253,8 +253,6 @@ config NUMA
 	depends on SMP
 	default n
 
-source "arch/m32r/drivers/Kconfig"
-
 # turning this on wastes a bunch of space.
 # Summit needs it only when NUMA is on
 config BOOT_IOREMAP

@@ -2,10 +2,11 @@
 #define _M32102_H_
 
 /*
- * Mitsubishi M32R 32102 group
- * Copyright (c) 2001 [Hitoshi Yamamoto] All rights reserved.
+ * Renesas M32R 32102 group
+ *
+ * Copyright (c) 2001  Hitoshi Yamamoto
+ * Copyright (c) 2003, 2004  Renesas Technology Corp.
  */
-/* $Id$ */
 
 /*======================================================================*
  * Special Function Register

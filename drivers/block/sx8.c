@@ -242,7 +242,7 @@ struct carm_request {
 
 struct carm_host {
 	unsigned long			flags;
-	void				*mmio;
+	void				__iomem *mmio;
 	void				*shm;
 	dma_addr_t			shm_dma;
 
@@ -283,13 +283,13 @@ struct carm_host {
 };
 
 struct carm_response {
-	u32 ret_handle;
-	u32 status;
+	__le32 ret_handle;
+	__le32 status;
 }  __attribute__((packed));
 
 struct carm_msg_sg {
-	u32 start;
-	u32 len;
+	__le32 start;
+	__le32 len;
 }  __attribute__((packed));
 
 struct carm_msg_rw {
@@ -297,10 +297,10 @@ struct carm_msg_rw {
 	u8 id;
 	u8 sg_count;
 	u8 sg_type;
-	u32 handle;
-	u32 lba;
-	u16 lba_count;
-	u16 lba_high;
+	__le32 handle;
+	__le32 lba;
+	__le16 lba_count;
+	__le16 lba_high;
 	struct carm_msg_sg sg[32];
 }  __attribute__((packed));
 
@@ -309,15 +309,15 @@ struct carm_msg_allocbuf {
 	u8 subtype;
 	u8 n_sg;
 	u8 sg_type;
-	u32 handle;
-	u32 addr;
-	u32 len;
-	u32 evt_pool;
-	u32 n_evt;
-	u32 rbuf_pool;
-	u32 n_rbuf;
-	u32 msg_pool;
-	u32 n_msg;
+	__le32 handle;
+	__le32 addr;
+	__le32 len;
+	__le32 evt_pool;
+	__le32 n_evt;
+	__le32 rbuf_pool;
+	__le32 n_rbuf;
+	__le32 msg_pool;
+	__le32 n_msg;
 	struct carm_msg_sg sg[8];
 }  __attribute__((packed));
 
@@ -326,8 +326,8 @@ struct carm_msg_ioctl {
 	u8 subtype;
 	u8 array_id;
 	u8 reserved1;
-	u32 handle;
-	u32 data_addr;
+	__le32 handle;
+	__le32 data_addr;
 	u32 reserved2;
 }  __attribute__((packed));
 
@@ -335,48 +335,48 @@ struct carm_msg_sync_time {
 	u8 type;
 	u8 subtype;
 	u16 reserved1;
-	u32 handle;
+	__le32 handle;
 	u32 reserved2;
-	u32 timestamp;
+	__le32 timestamp;
 }  __attribute__((packed));
 
 struct carm_msg_get_fw_ver {
 	u8 type;
 	u8 subtype;
 	u16 reserved1;
-	u32 handle;
-	u32 data_addr;
+	__le32 handle;
+	__le32 data_addr;
 	u32 reserved2;
 }  __attribute__((packed));
 
 struct carm_fw_ver {
-	u32 version;
+	__le32 version;
 	u8 features;
 	u8 reserved1;
 	u16 reserved2;
 }  __attribute__((packed));
 
 struct carm_array_info {
-	u32 size;
+	__le32 size;
 
-	u16 size_hi;
-	u16 stripe_size;
+	__le16 size_hi;
+	__le16 stripe_size;
 
-	u32 mode;
+	__le32 mode;
 
-	u16 stripe_blk_sz;
-	u16 reserved1;
+	__le16 stripe_blk_sz;
+	__le16 reserved1;
 
-	u16 cyl;
-	u16 head;
+	__le16 cyl;
+	__le16 head;
 
-	u16 sect;
+	__le16 sect;
 	u8 array_id;
 	u8 reserved2;
 
 	char name[40];
 
-	u32 array_status;
+	__le32 array_status;
 
 	/* device list continues beyond this point? */
 }  __attribute__((packed));
@@ -451,7 +451,7 @@ static inline int carm_lookup_bucket(u32 msg_size)
 	return -ENOENT;
 }
 
-static void carm_init_buckets(void *mmio)
+static void carm_init_buckets(void __iomem *mmio)
 {
 	unsigned int i;
 
@@ -474,7 +474,7 @@ static inline dma_addr_t carm_ref_msg_dma(struct carm_host *host,
 static int carm_send_msg(struct carm_host *host,
 			 struct carm_request *crq)
 {
-	void *mmio = host->mmio;
+	void __iomem *mmio = host->mmio;
 	u32 msg = (u32) carm_ref_msg_dma(host, crq->tag);
 	u32 cm_bucket = crq->msg_bucket;
 	u32 tmp;
@@ -965,7 +965,7 @@ static void carm_handle_array_info(struct carm_host *host,
 	port = &host->port[cur_port];
 
 	lo = (u64) le32_to_cpu(desc->size);
-	hi = (u64) le32_to_cpu(desc->size_hi);
+	hi = (u64) le16_to_cpu(desc->size_hi);
 
 	port->capacity = lo | (hi << 32);
 	port->dev_geom_head = le16_to_cpu(desc->head);
@@ -1060,7 +1060,7 @@ static inline void carm_handle_rw(struct carm_host *host,
 }
 
 static inline void carm_handle_resp(struct carm_host *host,
-				    u32 ret_handle_le, u32 status)
+				    __le32 ret_handle_le, u32 status)
 {
 	u32 handle = le32_to_cpu(ret_handle_le);
 	unsigned int msg_idx;
@@ -1158,7 +1158,7 @@ err_out:
 
 static inline void carm_handle_responses(struct carm_host *host)
 {
-	void *mmio = host->mmio;
+	void __iomem *mmio = host->mmio;
 	struct carm_response *resp = (struct carm_response *) host->shm;
 	unsigned int work = 0;
 	unsigned int idx = host->resp_idx % RMSG_Q_LEN;
@@ -1176,7 +1176,7 @@ static inline void carm_handle_responses(struct carm_host *host)
 		else if ((status & (1 << 31)) == 0) {
 			VPRINTK("handling msg response on index %u\n", idx);
 			carm_handle_resp(host, resp[idx].ret_handle, status);
-			resp[idx].status = 0xffffffff;
+			resp[idx].status = cpu_to_le32(0xffffffff);
 		}
 
 		/* asynchronous events the hardware throws our way */
@@ -1185,7 +1185,7 @@ static inline void carm_handle_responses(struct carm_host *host)
 			u8 evt_type = *evt_type_ptr;
 			printk(KERN_WARNING DRV_NAME "(%s): unhandled event type %d\n",
 			       pci_name(host->pdev), (int) evt_type);
-			resp[idx].status = 0xffffffff;
+			resp[idx].status = cpu_to_le32(0xffffffff);
 		}
 
 		idx = NEXT_RESP(idx);
@@ -1199,7 +1199,7 @@ static inline void carm_handle_responses(struct carm_host *host)
 static irqreturn_t carm_interrupt(int irq, void *__host, struct pt_regs *regs)
 {
 	struct carm_host *host = __host;
-	void *mmio;
+	void __iomem *mmio;
 	u32 mask;
 	int handled = 0;
 	unsigned long flags;
@@ -1364,7 +1364,7 @@ static void carm_fsm_task (void *_data)
 		schedule_work(&host->fsm_task);
 }
 
-static int carm_init_wait(void *mmio, u32 bits, unsigned int test_bit)
+static int carm_init_wait(void __iomem *mmio, u32 bits, unsigned int test_bit)
 {
 	unsigned int i;
 
@@ -1390,19 +1390,19 @@ static int carm_init_wait(void *mmio, u32 bits, unsigned int test_bit)
 
 static void carm_init_responses(struct carm_host *host)
 {
-	void *mmio = host->mmio;
+	void __iomem *mmio = host->mmio;
 	unsigned int i;
 	struct carm_response *resp = (struct carm_response *) host->shm;
 
 	for (i = 0; i < RMSG_Q_LEN; i++)
-		resp[i].status = 0xffffffff;
+		resp[i].status = cpu_to_le32(0xffffffff);
 
 	writel(0, mmio + CARM_RESP_IDX);
 }
 
 static int carm_init_host(struct carm_host *host)
 {
-	void *mmio = host->mmio;
+	void __iomem *mmio = host->mmio;
 	u32 tmp;
 	u8 tmp8;
 	int rc;

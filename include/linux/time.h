@@ -208,6 +208,8 @@ static inline unsigned int jiffies_to_usecs(const unsigned long j)
 
 static inline unsigned long msecs_to_jiffies(const unsigned int m)
 {
+	if (m > jiffies_to_msecs(MAX_JIFFY_OFFSET))
+		return MAX_JIFFY_OFFSET;
 #if HZ <= 1000 && !(1000 % HZ)
 	return (m + (1000 / HZ) - 1) / (1000 / HZ);
 #elif HZ > 1000 && !(HZ % 1000)

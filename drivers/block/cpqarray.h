@@ -90,7 +90,7 @@ struct ctlr_info {
 	__u32	board_id;
 	char	*product_name;	
 
-	void *vaddr;
+	void __iomem *vaddr;
 	unsigned long paddr;
 	unsigned long io_mem_addr;
 	unsigned long io_mem_length;

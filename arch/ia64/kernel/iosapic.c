@@ -104,7 +104,7 @@ static spinlock_t iosapic_lock = SPIN_LOCK_UNLOCKED;
 /* These tables map IA-64 vectors to the IOSAPIC pin that generates this vector. */
 
 static struct iosapic_intr_info {
-	char		*addr;		/* base address of IOSAPIC */
+	char __iomem	*addr;		/* base address of IOSAPIC */
 	u32		low32;		/* current value of low word of Redirection table entry */
 	unsigned int	gsi_base;	/* first GSI assigned to this IOSAPIC */
 	char		rte_index;	/* IOSAPIC RTE index (-1 => not an IOSAPIC interrupt) */
@@ -114,7 +114,7 @@ static struct iosapic_intr_info {
 } iosapic_intr_info[IA64_NUM_VECTORS];
 
 static struct iosapic {
-	char		*addr;		/* base address of IOSAPIC */
+	char __iomem	*addr;		/* base address of IOSAPIC */
 	unsigned int 	gsi_base;	/* first GSI assigned to this IOSAPIC */
 	unsigned short 	num_rte;	/* number of RTE in this IOSAPIC */
 #ifdef CONFIG_NUMA
@@ -179,7 +179,7 @@ set_rte (unsigned int vector, unsigned int dest, int mask)
 {
 	unsigned long pol, trigger, dmode, flags;
 	u32 low32, high32;
-	char *addr;
+	char __iomem *addr;
 	int rte_index;
 	char redir;
 
@@ -237,7 +237,7 @@ static void
 mask_irq (unsigned int irq)
 {
 	unsigned long flags;
-	char *addr;
+	char __iomem *addr;
 	u32 low32;
 	int rte_index;
 	ia64_vector vec = irq_to_vector(irq);
@@ -261,7 +261,7 @@ static void
 unmask_irq (unsigned int irq)
 {
 	unsigned long flags;
-	char *addr;
+	char __iomem *addr;
 	u32 low32;
 	int rte_index;
 	ia64_vector vec = irq_to_vector(irq);
@@ -287,7 +287,7 @@ iosapic_set_affinity (unsigned int irq, cpumask_t mask)
 	unsigned long flags;
 	u32 high32, low32;
 	int dest, rte_index;
-	char *addr;
+	char __iomem *addr;
 	int redir = (irq & IA64_IRQ_REDIRECTED) ? 1 : 0;
 	ia64_vector vec;
 
@@ -412,7 +412,7 @@ struct hw_interrupt_type irq_type_iosapic_edge = {
 };
 
 unsigned int
-iosapic_version (char *addr)
+iosapic_version (char __iomem *addr)
 {
 	/*
 	 * IOSAPIC Version Register return 32 bit structure like:
@@ -457,7 +457,7 @@ register_intr (unsigned int gsi, int vector, unsigned char delivery,
 	int rte_index;
 	int index;
 	unsigned long gsi_base;
-	char *iosapic_address;
+	void __iomem *iosapic_address;
 
 	index = find_iosapic(gsi);
 	if (index < 0) {
@@ -696,7 +696,7 @@ iosapic_init (unsigned long phys_addr, unsigned int gsi_base)
 {
 	int num_rte;
 	unsigned int isa_irq, ver;
-	char *addr;
+	char __iomem *addr;
 
 	addr = ioremap(phys_addr, 0);
 	ver = iosapic_version(addr);

@@ -1,15 +1,11 @@
 /*
  *  linux/arch/m32r/kernel/setup_mappi.c
  *
- *  Setup routines for MITSUBISHI MAPPI Board
+ *  Setup routines for Renesas MAPPI Board
  *
  *  Copyright (c) 2001, 2002  Hiroyuki Kondo, Hirokazu Takata,
  *                            Hitoshi Yamamoto
  */
-
-static char *rcsid =
-"$Id$";
-static void use_rcsid(void) {rcsid = rcsid; use_rcsid();}
 
 #include <linux/config.h>
 #include <linux/irq.h>

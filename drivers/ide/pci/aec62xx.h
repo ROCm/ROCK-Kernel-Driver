@@ -53,13 +53,6 @@ struct chipset_bus_clock_list_entry aec6xxx_34_base [] = {
 	{	0,		0x00,	0x00	}
 };
 
-
-#ifndef HIGH_4
-#define HIGH_4(H)		((H)=(H>>4))
-#endif
-#ifndef LOW_4
-#define LOW_4(L)		((L)=(L-((L>>4)<<4)))
-#endif
 #ifndef SPLIT_BYTE
 #define SPLIT_BYTE(B,H,L)	((H)=(B>>4), (L)=(B-((B>>4)<<4)))
 #endif

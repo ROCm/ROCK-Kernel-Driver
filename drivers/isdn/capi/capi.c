@@ -646,7 +646,7 @@ static void capi_recv_message(struct capi20_appl *ap, struct sk_buff *skb)
 		kfree_skb(skb);
 		(void)capiminor_del_ack(mp, datahandle);
 		if (mp->tty)
-			tty_wakeup(tty);
+			tty_wakeup(mp->tty);
 		(void)handle_minor_send(mp);
 
 	} else {

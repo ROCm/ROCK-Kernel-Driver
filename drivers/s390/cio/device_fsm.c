@@ -995,6 +995,7 @@ device_trigger_reprobe(struct subchannel *sch)
 	if ((sch->lpm & (sch->lpm - 1)) != 0)
 		sch->schib.pmcw.mp = 1;
 	sch->schib.pmcw.intparm = (__u32)(unsigned long)sch;
+	/* We should also udate ssd info, but this has to wait. */
 	ccw_device_start_id(cdev, 0);
 	spin_unlock_irqrestore(&sch->lock, flags);
 }

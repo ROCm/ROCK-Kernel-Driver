@@ -53,6 +53,7 @@ unsigned int console_devno = -1;
 unsigned int console_irq = -1;
 unsigned long memory_size = 0;
 unsigned long machine_flags = 0;
+unsigned int default_storage_key = 0;
 struct {
 	unsigned long addr, size, type;
 } memory_chunk[MEMORY_CHUNKS] = { { 0 } };

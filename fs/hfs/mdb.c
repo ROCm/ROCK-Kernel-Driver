@@ -71,7 +71,7 @@ int hfs_mdb_get(struct super_block *sb)
 	int off2, len, size, sect;
 	sector_t part_start, part_size;
 	loff_t off;
-	u16 attrib;
+	__be16 attrib;
 
 	/* set the device driver to 512-byte blocks */
 	size = sb_min_blocksize(sb, HFS_SECTOR_SIZE);
@@ -164,7 +164,7 @@ int hfs_mdb_get(struct super_block *sb)
 		hfs_warn("hfs_fs: continuing without an alternate MDB\n");
 	}
 
-	HFS_SB(sb)->bitmap = (u32 *)__get_free_pages(GFP_KERNEL, PAGE_SIZE < 8192 ? 1 : 0);
+	HFS_SB(sb)->bitmap = (__be32 *)__get_free_pages(GFP_KERNEL, PAGE_SIZE < 8192 ? 1 : 0);
 	if (!HFS_SB(sb)->bitmap)
 		goto out;
 

@@ -117,10 +117,6 @@ int DRM(irq_install)( drm_device_t *dev )
 
 	DRM_DEBUG( "%s: irq=%d\n", __FUNCTION__, dev->irq );
 
-	dev->dma->next_buffer = NULL;
-	dev->dma->next_queue = NULL;
-	dev->dma->this_buffer = NULL;
-
 	if (drm_core_check_feature(dev, DRIVER_IRQ_VBL)) {
 		init_waitqueue_head(&dev->vbl_queue);
 		

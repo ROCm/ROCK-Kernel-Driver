@@ -152,7 +152,7 @@ ia64_increment_ip (struct pt_regs *regs)
 		ri = 0;
 		regs->cr_iip += 16;
 	} else if (ri == 2) {
-		get_user(w0, (char *) regs->cr_iip + 0);
+		get_user(w0, (char __user *) regs->cr_iip + 0);
 		if (((w0 >> 1) & 0xf) == IA64_MLX_TEMPLATE) {
 			/*
 			 * rfi'ing to slot 2 of an MLX bundle causes
@@ -174,7 +174,7 @@ ia64_decrement_ip (struct pt_regs *regs)
 	if (ia64_psr(regs)->ri == 0) {
 		regs->cr_iip -= 16;
 		ri = 2;
-		get_user(w0, (char *) regs->cr_iip + 0);
+		get_user(w0, (char __user *) regs->cr_iip + 0);
 		if (((w0 >> 1) & 0xf) == IA64_MLX_TEMPLATE) {
 			/*
 			 * rfi'ing to slot 2 of an MLX bundle causes
@@ -833,7 +833,7 @@ access_uarea (struct task_struct *child, unsigned long addr, unsigned long *data
 		      case PT_CFM:
 			urbs_end = ia64_get_user_rbs_end(child, pt, &cfm);
 			if (write_access) {
-				if (((cfm ^ *data) & 0x3fffffffffU) != 0) {
+				if (((cfm ^ *data) & 0x3fffffffffUL) != 0) {
 					if (ia64_sync_user_rbs(child, sw,
 							       pt->ar_bspstore, urbs_end) < 0)
 						return -1;
@@ -997,12 +997,14 @@ access_uarea (struct task_struct *child, unsigned long addr, unsigned long *data
 }
 
 static long
-ptrace_getregs (struct task_struct *child, struct pt_all_user_regs *ppr)
+ptrace_getregs (struct task_struct *child, struct pt_all_user_regs __user *ppr)
 {
+	unsigned long psr, ec, lc, rnat, bsp, cfm, nat_bits, val;
+	struct unw_frame_info info;
+	struct ia64_fpreg fpval;
 	struct switch_stack *sw;
 	struct pt_regs *pt;
 	long ret, retval;
-	struct unw_frame_info info;
 	char nat = 0;
 	int i;
 
@@ -1023,12 +1025,21 @@ ptrace_getregs (struct task_struct *child, struct pt_all_user_regs *ppr)
 		return -EIO;
 	}
 
+	if (access_uarea(child, PT_CR_IPSR, &psr, 0) < 0
+	    || access_uarea(child, PT_AR_EC, &ec, 0) < 0
+	    || access_uarea(child, PT_AR_LC, &lc, 0) < 0
+	    || access_uarea(child, PT_AR_RNAT, &rnat, 0) < 0
+	    || access_uarea(child, PT_AR_BSP, &bsp, 0) < 0
+	    || access_uarea(child, PT_CFM, &cfm, 0)
+	    || access_uarea(child, PT_NAT_BITS, &nat_bits, 0))
+		return -EIO;
+
 	retval = 0;
 
 	/* control regs */
 
 	retval |= __put_user(pt->cr_iip, &ppr->cr_iip);
-	retval |= access_uarea(child, PT_CR_IPSR, &ppr->cr_ipsr, 0);
+	retval |= __put_user(psr, &ppr->cr_ipsr);
 
 	/* app regs */
 
@@ -1039,11 +1050,11 @@ ptrace_getregs (struct task_struct *child, struct pt_all_user_regs *ppr)
 	retval |= __put_user(pt->ar_ccv, &ppr->ar[PT_AUR_CCV]);
 	retval |= __put_user(pt->ar_fpsr, &ppr->ar[PT_AUR_FPSR]);
 
-	retval |= access_uarea(child, PT_AR_EC, &ppr->ar[PT_AUR_EC], 0);
-	retval |= access_uarea(child, PT_AR_LC, &ppr->ar[PT_AUR_LC], 0);
-	retval |= access_uarea(child, PT_AR_RNAT, &ppr->ar[PT_AUR_RNAT], 0);
-	retval |= access_uarea(child, PT_AR_BSP, &ppr->ar[PT_AUR_BSP], 0);
-	retval |= access_uarea(child, PT_CFM, &ppr->cfm, 0);
+	retval |= __put_user(ec, &ppr->ar[PT_AUR_EC]);
+	retval |= __put_user(lc, &ppr->ar[PT_AUR_LC]);
+	retval |= __put_user(rnat, &ppr->ar[PT_AUR_RNAT]);
+	retval |= __put_user(bsp, &ppr->ar[PT_AUR_BSP]);
+	retval |= __put_user(cfm, &ppr->cfm);
 
 	/* gr1-gr3 */
 
@@ -1053,7 +1064,9 @@ ptrace_getregs (struct task_struct *child, struct pt_all_user_regs *ppr)
 	/* gr4-gr7 */
 
 	for (i = 4; i < 8; i++) {
-		retval |= unw_access_gr(&info, i, &ppr->gr[i], &nat, 0);
+		if (unw_access_gr(&info, i, &val, &nat, 0) < 0)
+			return -EIO;
+		retval |= __put_user(val, &ppr->gr[i]);
 	}
 
 	/* gr8-gr11 */
@@ -1077,7 +1090,9 @@ ptrace_getregs (struct task_struct *child, struct pt_all_user_regs *ppr)
 	/* b1-b5 */
 
 	for (i = 1; i < 6; i++) {
-		retval |= unw_access_br(&info, i, &ppr->br[i], 0);
+		if (unw_access_br(&info, i, &val, 0) < 0)
+			return -EIO;
+		__put_user(val, &ppr->br[i]);
 	}
 
 	/* b6-b7 */
@@ -1088,8 +1103,9 @@ ptrace_getregs (struct task_struct *child, struct pt_all_user_regs *ppr)
 	/* fr2-fr5 */
 
 	for (i = 2; i < 6; i++) {
-		retval |= access_fr(&info, i, 0, (unsigned long *) &ppr->fr[i], 0);
-		retval |= access_fr(&info, i, 1, (unsigned long *) &ppr->fr[i] + 1, 0);
+		if (unw_get_fr(&info, i, &fpval) < 0)
+			return -EIO;
+		retval |= __copy_to_user(&ppr->fr[i], &fpval, sizeof (fpval));
 	}
 
 	/* fr6-fr11 */
@@ -1103,8 +1119,9 @@ ptrace_getregs (struct task_struct *child, struct pt_all_user_regs *ppr)
 	/* fr16-fr31 */
 
 	for (i = 16; i < 32; i++) {
-		retval |= access_fr(&info, i, 0, (unsigned long *) &ppr->fr[i], 0);
-		retval |= access_fr(&info, i, 1, (unsigned long *) &ppr->fr[i] + 1, 0);
+		if (unw_get_fr(&info, i, &fpval) < 0)
+			return -EIO;
+		retval |= __copy_to_user(&ppr->fr[i], &fpval, sizeof (fpval));
 	}
 
 	/* fph */
@@ -1118,21 +1135,24 @@ ptrace_getregs (struct task_struct *child, struct pt_all_user_regs *ppr)
 
 	/* nat bits */
 
-	retval |= access_uarea(child, PT_NAT_BITS, &ppr->nat, 0);
+	retval |= __put_user(nat_bits, &ppr->nat);
 
 	ret = retval ? -EIO : 0;
 	return ret;
 }
 
 static long
-ptrace_setregs (struct task_struct *child, struct pt_all_user_regs *ppr)
+ptrace_setregs (struct task_struct *child, struct pt_all_user_regs __user *ppr)
 {
+	unsigned long psr, ec, lc, rnat, bsp, cfm, nat_bits, val = 0;
+	struct unw_frame_info info;
 	struct switch_stack *sw;
+	struct ia64_fpreg fpval;
 	struct pt_regs *pt;
 	long ret, retval;
-	struct unw_frame_info info;
-	char nat = 0;
 	int i;
+
+	memset(&fpval, 0, sizeof(fpval));
 
 	retval = verify_area(VERIFY_READ, ppr, sizeof(struct pt_all_user_regs));
 	if (retval != 0) {
@@ -1156,7 +1176,7 @@ ptrace_setregs (struct task_struct *child, struct pt_all_user_regs *ppr)
 	/* control regs */
 
 	retval |= __get_user(pt->cr_iip, &ppr->cr_iip);
-	retval |= access_uarea(child, PT_CR_IPSR, &ppr->cr_ipsr, 1);
+	retval |= __get_user(psr, &ppr->cr_ipsr);
 
 	/* app regs */
 
@@ -1167,11 +1187,11 @@ ptrace_setregs (struct task_struct *child, struct pt_all_user_regs *ppr)
 	retval |= __get_user(pt->ar_ccv, &ppr->ar[PT_AUR_CCV]);
 	retval |= __get_user(pt->ar_fpsr, &ppr->ar[PT_AUR_FPSR]);
 
-	retval |= access_uarea(child, PT_AR_EC, &ppr->ar[PT_AUR_EC], 1);
-	retval |= access_uarea(child, PT_AR_LC, &ppr->ar[PT_AUR_LC], 1);
-	retval |= access_uarea(child, PT_AR_RNAT, &ppr->ar[PT_AUR_RNAT], 1);
-	retval |= access_uarea(child, PT_AR_BSP, &ppr->ar[PT_AUR_BSP], 1);
-	retval |= access_uarea(child, PT_CFM, &ppr->cfm, 1);
+	retval |= __get_user(ec, &ppr->ar[PT_AUR_EC]);
+	retval |= __get_user(lc, &ppr->ar[PT_AUR_LC]);
+	retval |= __get_user(rnat, &ppr->ar[PT_AUR_RNAT]);
+	retval |= __get_user(bsp, &ppr->ar[PT_AUR_BSP]);
+	retval |= __get_user(cfm, &ppr->cfm);
 
 	/* gr1-gr3 */
 
@@ -1181,11 +1201,9 @@ ptrace_setregs (struct task_struct *child, struct pt_all_user_regs *ppr)
 	/* gr4-gr7 */
 
 	for (i = 4; i < 8; i++) {
-		long ret = unw_get_gr(&info, i, &ppr->gr[i], &nat);
-		if (ret < 0) {
-			return ret;
-		}
-		retval |= unw_access_gr(&info, i, &ppr->gr[i], &nat, 1);
+		retval |= __get_user(val, &ppr->gr[i]);
+		if (unw_set_gr(&info, i, val, 0) < 0)	 /* NaT bit will be set via PT_NAT_BITS */
+			return -EIO;
 	}
 
 	/* gr8-gr11 */
@@ -1209,7 +1227,8 @@ ptrace_setregs (struct task_struct *child, struct pt_all_user_regs *ppr)
 	/* b1-b5 */
 
 	for (i = 1; i < 6; i++) {
-		retval |= unw_access_br(&info, i, &ppr->br[i], 1);
+		retval |= __get_user(val, &ppr->br[i]);
+		unw_set_br(&info, i, val);
 	}
 
 	/* b6-b7 */
@@ -1220,8 +1239,9 @@ ptrace_setregs (struct task_struct *child, struct pt_all_user_regs *ppr)
 	/* fr2-fr5 */
 
 	for (i = 2; i < 6; i++) {
-		retval |= access_fr(&info, i, 0, (unsigned long *) &ppr->fr[i], 1);
-		retval |= access_fr(&info, i, 1, (unsigned long *) &ppr->fr[i] + 1, 1);
+		retval |= __copy_from_user(&fpval, &ppr->fr[i], sizeof(fpval));
+		if (unw_set_fr(&info, i, fpval) < 0)
+			return -EIO;
 	}
 
 	/* fr6-fr11 */
@@ -1235,8 +1255,9 @@ ptrace_setregs (struct task_struct *child, struct pt_all_user_regs *ppr)
 	/* fr16-fr31 */
 
 	for (i = 16; i < 32; i++) {
-		retval |= access_fr(&info, i, 0, (unsigned long *) &ppr->fr[i], 1);
-		retval |= access_fr(&info, i, 1, (unsigned long *) &ppr->fr[i] + 1, 1);
+		retval |= __copy_from_user(&fpval, &ppr->fr[i], sizeof(fpval));
+		if (unw_set_fr(&info, i, fpval) < 0)
+			return -EIO;
 	}
 
 	/* fph */
@@ -1250,7 +1271,15 @@ ptrace_setregs (struct task_struct *child, struct pt_all_user_regs *ppr)
 
 	/* nat bits */
 
-	retval |= access_uarea(child, PT_NAT_BITS, &ppr->nat, 1);
+	retval |= __get_user(nat_bits, &ppr->nat);
+
+	retval |= access_uarea(child, PT_CR_IPSR, &psr, 1);
+	retval |= access_uarea(child, PT_AR_EC, &ec, 1);
+	retval |= access_uarea(child, PT_AR_LC, &lc, 1);
+	retval |= access_uarea(child, PT_AR_RNAT, &rnat, 1);
+	retval |= access_uarea(child, PT_AR_BSP, &bsp, 1);
+	retval |= access_uarea(child, PT_CFM, &cfm, 1);
+	retval |= access_uarea(child, PT_NAT_BITS, &nat_bits, 1);
 
 	ret = retval ? -EIO : 0;
 	return ret;
@@ -1429,11 +1458,11 @@ sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
 		goto out_tsk;
 
 	      case PTRACE_GETREGS:
-		ret = ptrace_getregs(child, (struct pt_all_user_regs*) data);
+		ret = ptrace_getregs(child, (struct pt_all_user_regs __user *) data);
 		goto out_tsk;
 
 	      case PTRACE_SETREGS:
-		ret = ptrace_setregs(child, (struct pt_all_user_regs*) data);
+		ret = ptrace_setregs(child, (struct pt_all_user_regs __user *) data);
 		goto out_tsk;
 
 	      default:

@@ -449,7 +449,7 @@ struct task_struct {
 
 	unsigned long sleep_avg;
 	long interactive_credit;
-	unsigned long long timestamp;
+	unsigned long long timestamp, last_ran;
 	int activated;
 
 	unsigned long policy;

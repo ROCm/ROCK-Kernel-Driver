@@ -45,12 +45,12 @@
 
 /* Structures used on disk */
 
-typedef u32 hfsplus_cnid;
-typedef u16 hfsplus_unichr;
+typedef __be32 hfsplus_cnid;
+typedef __be16 hfsplus_unichr;
 
 /* A "string" as used in filenames, etc. */
 struct hfsplus_unistr {
-	u16 length;
+	__be16 length;
 	hfsplus_unichr unicode[255];
 } __packed;
 
@@ -58,12 +58,12 @@ struct hfsplus_unistr {
 
 /* POSIX permissions */
 struct hfsplus_perm {
-	u32 owner;
-	u32 group;
+	__be32 owner;
+	__be32 group;
 	u8  rootflags;
 	u8  userflags;
-	u16 mode;
-	u32 dev;
+	__be16 mode;
+	__be32 dev;
 } __packed;
 
 #define HFSPLUS_FLG_NODUMP	0x01
@@ -72,46 +72,46 @@ struct hfsplus_perm {
 
 /* A single contiguous area of a file */
 struct hfsplus_extent {
-	u32 start_block;
-	u32 block_count;
+	__be32 start_block;
+	__be32 block_count;
 } __packed;
 typedef struct hfsplus_extent hfsplus_extent_rec[8];
 
 /* Information for a "Fork" in a file */
 struct hfsplus_fork_raw {
-	u64 total_size;
-	u32 clump_size;
-	u32 total_blocks;
+	__be64 total_size;
+	__be32 clump_size;
+	__be32 total_blocks;
 	hfsplus_extent_rec extents;
 } __packed;
 
 /* HFS+ Volume Header */
 struct hfsplus_vh {
-	u16 signature;
-	u16 version;
-	u32 attributes;
-	u32 last_mount_vers;
+	__be16 signature;
+	__be16 version;
+	__be32 attributes;
+	__be32 last_mount_vers;
 	u32 reserved;
 
-	u32 create_date;
-	u32 modify_date;
-	u32 backup_date;
-	u32 checked_date;
+	__be32 create_date;
+	__be32 modify_date;
+	__be32 backup_date;
+	__be32 checked_date;
 
-	u32 file_count;
-	u32 folder_count;
+	__be32 file_count;
+	__be32 folder_count;
 
-	u32 blocksize;
-	u32 total_blocks;
-	u32 free_blocks;
+	__be32 blocksize;
+	__be32 total_blocks;
+	__be32 free_blocks;
 
-	u32 next_alloc;
-	u32 rsrc_clump_sz;
-	u32 data_clump_sz;
+	__be32 next_alloc;
+	__be32 rsrc_clump_sz;
+	__be32 data_clump_sz;
 	hfsplus_cnid next_cnid;
 
-	u32 write_count;
-	u64 encodings_bmp;
+	__be32 write_count;
+	__be64 encodings_bmp;
 
 	u8 finder_info[32];
 
@@ -131,11 +131,11 @@ struct hfsplus_vh {
 
 /* HFS+ BTree node descriptor */
 struct hfs_bnode_desc {
-	u32 next;
-	u32 prev;
+	__be32 next;
+	__be32 prev;
 	s8 type;
 	u8 height;
-	u16 num_recs;
+	__be16 num_recs;
 	u16 reserved;
 } __packed;
 
@@ -147,20 +147,20 @@ struct hfs_bnode_desc {
 
 /* HFS+ BTree header */
 struct hfs_btree_header_rec {
-	u16 depth;
-	u32 root;
-	u32 leaf_count;
-	u32 leaf_head;
-	u32 leaf_tail;
-	u16 node_size;
-	u16 max_key_len;
-	u32 node_count;
-	u32 free_nodes;
+	__be16 depth;
+	__be32 root;
+	__be32 leaf_count;
+	__be32 leaf_head;
+	__be32 leaf_tail;
+	__be16 node_size;
+	__be16 max_key_len;
+	__be32 node_count;
+	__be32 free_nodes;
 	u16 reserved1;
-	u32 clump_size;
+	__be32 clump_size;
 	u8 btree_type;
 	u8 reserved2;
-	u32 attributes;
+	__be32 attributes;
 	u32 reserved3[16];
 } __packed;
 
@@ -186,7 +186,7 @@ struct hfs_btree_header_rec {
 
 /* HFS+ catalog entry key */
 struct hfsplus_cat_key {
-	u16 key_len;
+	__be16 key_len;
 	hfsplus_cnid parent;
 	struct hfsplus_unistr name;
 } __packed;
@@ -194,83 +194,83 @@ struct hfsplus_cat_key {
 
 /* Structs from hfs.h */
 struct hfsp_point {
-	u16 v;
-	u16 h;
+	__be16 v;
+	__be16 h;
 } __packed;
 
 struct hfsp_rect {
-	u16 top;
-	u16 left;
-	u16 bottom;
-	u16 right;
+	__be16 top;
+	__be16 left;
+	__be16 bottom;
+	__be16 right;
 } __packed;
 
 
 /* HFS directory info (stolen from hfs.h */
 struct DInfo {
 	struct hfsp_rect frRect;
-	u16 frFlags;
+	__be16 frFlags;
 	struct hfsp_point frLocation;
-	u16 frView;
+	__be16 frView;
 } __packed;
 
 struct DXInfo {
 	struct hfsp_point frScroll;
-	u32 frOpenChain;
-	u16 frUnused;
-	u16 frComment;
-	u32 frPutAway;
+	__be32 frOpenChain;
+	__be16 frUnused;
+	__be16 frComment;
+	__be32 frPutAway;
 } __packed;
 
 /* HFS+ folder data (part of an hfsplus_cat_entry) */
 struct hfsplus_cat_folder {
-	s16 type;
-	u16 flags;
-	u32 valence;
+	__be16 type;
+	__be16 flags;
+	__be32 valence;
 	hfsplus_cnid id;
-	u32 create_date;
-	u32 content_mod_date;
-	u32 attribute_mod_date;
-	u32 access_date;
-	u32 backup_date;
+	__be32 create_date;
+	__be32 content_mod_date;
+	__be32 attribute_mod_date;
+	__be32 access_date;
+	__be32 backup_date;
 	struct hfsplus_perm permissions;
 	struct DInfo user_info;
 	struct DXInfo finder_info;
-	u32 text_encoding;
+	__be32 text_encoding;
 	u32 reserved;
 } __packed;
 
 /* HFS file info (stolen from hfs.h) */
 struct FInfo {
-	u32 fdType;
-	u32 fdCreator;
-	u16 fdFlags;
+	__be32 fdType;
+	__be32 fdCreator;
+	__be16 fdFlags;
 	struct hfsp_point fdLocation;
-	u16 fdFldr;
+	__be16 fdFldr;
 } __packed;
 
 struct FXInfo {
-	u16 fdIconID;
+	__be16 fdIconID;
 	u8 fdUnused[8];
-	u16 fdComment;
-	u32 fdPutAway;
+	__be16 fdComment;
+	__be32 fdPutAway;
 } __packed;
 
 /* HFS+ file data (part of a cat_entry) */
 struct hfsplus_cat_file {
-	s16 type;
-	u16 flags;
+	__be16 type;
+	__be16 flags;
 	u32 reserved1;
 	hfsplus_cnid id;
-	u32 create_date;
-	u32 content_mod_date;
-	u32 attribute_mod_date;
-	u32 access_date;
-	u32 backup_date;
+	__be32 create_date;
+	__be32 content_mod_date;
+	__be32 attribute_mod_date;
+	__be32 access_date;
+	__be32 backup_date;
 	struct hfsplus_perm permissions;
 	struct FInfo user_info;
 	struct FXInfo finder_info;
-	u32 text_encoding;
+	__be32 text_encoding;
 	u32 reserved2;
 
 	struct hfsplus_fork_raw data_fork;
@@ -283,7 +283,7 @@ struct hfsplus_cat_file {
 
 /* HFS+ catalog thread (part of a cat_entry) */
 struct hfsplus_cat_thread {
-	s16 type;
+	__be16 type;
 	s16 reserved;
 	hfsplus_cnid parentID;
 	struct hfsplus_unistr nodeName;
@@ -293,7 +293,7 @@ struct hfsplus_cat_thread {
 
 /* A data record in the catalog tree */
 typedef union {
-	s16 type;
+	__be16 type;
 	struct hfsplus_cat_folder folder;
 	struct hfsplus_cat_file file;
 	struct hfsplus_cat_thread thread;
@@ -307,18 +307,18 @@ typedef union {
 
 /* HFS+ extents tree key */
 struct hfsplus_ext_key {
-	u16 key_len;
+	__be16 key_len;
 	u8 fork_type;
 	u8 pad;
 	hfsplus_cnid cnid;
-	u32 start_block;
+	__be32 start_block;
 } __packed;
 
 #define HFSPLUS_EXT_KEYLEN 12
 
 /* HFS+ generic BTree key */
 typedef union {
-	u16 key_len;
+	__be16 key_len;
 	struct hfsplus_cat_key cat;
 	struct hfsplus_ext_key ext;
 } __packed hfsplus_btree_key;

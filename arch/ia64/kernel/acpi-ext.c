@@ -62,7 +62,7 @@ acpi_find_vendor_resource(acpi_handle obj, struct acpi_vendor_descriptor *id,
 	struct acpi_vendor_info info;
 
 	info.descriptor = id;
-	info.data = 0;
+	info.data = NULL;
 
 	acpi_walk_resources(obj, METHOD_NAME__CRS, acpi_vendor_resource_match, &info);
 	if (!info.data)

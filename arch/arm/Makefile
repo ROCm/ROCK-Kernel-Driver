@@ -57,7 +57,7 @@ tune-$(CONFIG_CPU_V6)		:=-mtune=strongarm
 CFLAGS		+=-mapcs-32 $(arch-y) $(tune-y) $(call cc-option,-malignment-traps,-mshort-load-bytes) -msoft-float -Uarm
 AFLAGS		+=-mapcs-32 $(arch-y) $(tune-y) -msoft-float
 
-CHECKFLAGS	+= -D__arm__=1
+CHECKFLAGS	+= -D__arm__
 
 #Default value
 DATAADDR	:= .
@@ -95,6 +95,7 @@ textaddr-$(CONFIG_ARCH_FORTUNET)   := 0xc0008000
  machine-$(CONFIG_ARCH_LH7A40X)	   := lh7a40x
  machine-$(CONFIG_ARCH_VERSATILE_PB) := versatile
  machine-$(CONFIG_ARCH_IMX)	   := imx
+ machine-$(CONFIG_ARCH_H720X)	   := h720x
 
 ifeq ($(CONFIG_ARCH_EBSA110),y)
 # This is what happens if you forget the IOCS16 line.

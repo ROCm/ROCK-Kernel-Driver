@@ -14,8 +14,9 @@ config EDD
 	  Services real mode BIOS calls to determine which disk
 	  BIOS tries boot from.  This information is then exported via sysfs.
 
-	  This option is experimental, but believed to be safe,
-	  and most disk controller BIOS vendors do not yet implement this feature.
+	  This option is experimental and is known to fail to boot on some
+          obscure configurations. Most disk controller BIOS vendors do
+          not yet implement this feature.
 
 config EFI_VARS
 	tristate "EFI Variable Support via sysfs"
