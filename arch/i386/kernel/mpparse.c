@@ -119,16 +119,6 @@ static int MP_valid_apicid(int apicid, int version)
 }
 #endif
 
-static void MP_mark_version_physids(int version)
-{
-	int i;
-
-	for (i = 0; i < MAX_APICS; ++i) {
-		if (!MP_valid_apicid(i, version))
-			physid_set(i, phys_cpu_present_map);
-	}
-}
-
 void __init MP_processor_info (struct mpc_config_processor *m)
 {
  	int ver, apicid;
@@ -207,9 +197,7 @@ void __init MP_processor_info (struct mpc_config_processor *m)
 	num_processors++;
 	ver = m->mpc_apicver;
 
-	if (MP_valid_apicid(apicid, ver))
-		MP_mark_version_physids(ver);
-	else {
+	if (!MP_valid_apicid(apicid, ver)) {
 		printk(KERN_WARNING "Processor #%d INVALID. (Max ID: %d).\n",
 			m->mpc_apicid, MAX_APICS);
 		--num_processors;

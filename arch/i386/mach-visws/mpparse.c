@@ -75,14 +75,6 @@ void __init MP_processor_info (struct mpc_config_processor *m)
 			m->mpc_apicid);
 		ver = 0x10;
 	}
-	if (ver >= 0x14)
-		physid_set(0xff, phys_cpu_present_map);
-	else {
-		int i;
-
-		for (i = 0xf; i < MAX_APICS; ++i)
-			physid_set(i, phys_cpu_present_map);
-	}
 	apic_version[m->mpc_apicid] = ver;
 }
 
