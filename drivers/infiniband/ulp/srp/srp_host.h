@@ -228,6 +228,8 @@ struct _srp_host_driver_params {
 
     struct list_head query_list;
 
+    struct pci_dev *pdev;
+
 } srp_host_driver_params_t;
 
 

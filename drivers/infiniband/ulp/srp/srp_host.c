@@ -1701,6 +1701,7 @@ void srp_host_scsi_init( void )
     }
 
     driver_params.host = host;
+    driver_params.pdev = hca_pdev;
 
     host->this_id = 255;
     host->unique_id = 0;
@@ -2984,6 +2985,7 @@ srp_build_rdma (srp_pkt_t *srp_pkt,
     srp_host_buf_t *sr_list;
     struct scatterlist scatter_list;
     struct scatterlist *st_buffer;
+    struct pci_dev *pdev = driver_params.pdev;
     int sg_cnt;
     int num_sg_elements;
     int offset, max_phys_pages, page_offset;
@@ -2996,11 +2998,7 @@ srp_build_rdma (srp_pkt_t *srp_pkt,
 
     if (cmnd->use_sg) {
         st_buffer = (struct scatterlist *) cmnd->request_buffer;
-        #if defined(__x86_64__)
-		num_sg_elements = pci_map_sg(shpnt->pci_dev,st_buffer,cmnd->use_sg,
-        #else
-                num_sg_elements = pci_map_sg(NULL,st_buffer,cmnd->use_sg,
-        #endif
+		num_sg_elements = pci_map_sg(pdev,st_buffer,cmnd->use_sg,
 			scsi_to_pci_dma_dir(cmnd->sc_data_direction));
     } else {
 		memset(&scatter_list,0,sizeof(struct scatterlist));
@@ -3009,11 +3007,7 @@ srp_build_rdma (srp_pkt_t *srp_pkt,
         scatter_list.length = cmnd->request_bufflen;
         st_buffer = &scatter_list;
 		num_sg_elements =  /* 1 */
-        #if defined(__x86_64__)
-		pci_map_sg(shpnt->pci_dev,st_buffer,1,scsi_to_pci_dma_dir(cmnd->sc_data_direction));
-        #else
-                pci_map_sg(NULL,st_buffer,1,scsi_to_pci_dma_dir(cmnd->sc_data_direction));
-        #endif
+		pci_map_sg(pdev,st_buffer,1,scsi_to_pci_dma_dir(cmnd->sc_data_direction));
     }
 
 	if (use_srp_indirect_addressing != 0) {
