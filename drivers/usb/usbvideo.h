@@ -269,6 +269,8 @@ typedef struct {
 	int (*getFrame)(uvd_t *, int);
 	int (*procfs_read)(char *page,char **start,off_t off,int count,int *eof,void *data);
 	int (*procfs_write)(struct file *file,const char *buffer,unsigned long count,void *data);
+	int (*startDataPump)(uvd_t *uvd);
+	void (*stopDataPump)(uvd_t *uvd);
 } usbvideo_cb_t;
 
 struct s_usbvideo_t {
