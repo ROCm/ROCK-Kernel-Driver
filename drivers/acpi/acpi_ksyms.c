@@ -76,6 +76,7 @@ EXPORT_SYMBOL(acpi_acquire_global_lock);
 EXPORT_SYMBOL(acpi_release_global_lock);
 EXPORT_SYMBOL(acpi_get_current_resources);
 EXPORT_SYMBOL(acpi_get_possible_resources);
+EXPORT_SYMBOL(acpi_walk_resources);
 EXPORT_SYMBOL(acpi_set_current_resources);
 EXPORT_SYMBOL(acpi_enable_event);
 EXPORT_SYMBOL(acpi_disable_event);
@@ -86,6 +87,7 @@ EXPORT_SYMBOL(acpi_get_sleep_type_data);
 EXPORT_SYMBOL(acpi_get_register);
 EXPORT_SYMBOL(acpi_set_register);
 EXPORT_SYMBOL(acpi_enter_sleep_state);
+EXPORT_SYMBOL(acpi_enter_sleep_state_s4bios);
 EXPORT_SYMBOL(acpi_get_system_info);
 EXPORT_SYMBOL(acpi_get_devices);
 

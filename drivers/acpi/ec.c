@@ -644,15 +644,46 @@ acpi_ec_remove (
 }
 
 
+static acpi_status
+acpi_ec_io_ports (
+	struct acpi_resource	*resource,
+	void			*context)
+{
+	struct acpi_ec		*ec = (struct acpi_ec *) context;
+	struct acpi_generic_address *addr;
+
+	if (resource->id != ACPI_RSTYPE_IO) {
+		return AE_OK;
+	}
+
+	/*
+	 * The first address region returned is the data port, and
+	 * the second address region returned is the status/command
+	 * port.
+	 */
+	if (ec->data_addr.register_bit_width == 0) {
+		addr = &ec->data_addr;
+	} else if (ec->command_addr.register_bit_width == 0) {
+		addr = &ec->command_addr;
+	} else {
+		return AE_CTRL_TERMINATE;
+	}
+
+	addr->address_space_id = ACPI_ADR_SPACE_SYSTEM_IO;
+	addr->register_bit_width = 8;
+	addr->register_bit_offset = 0;
+	addr->address = resource->data.io.min_base_address;
+
+	return AE_OK;
+}
+
+
 static int
 acpi_ec_start (
 	struct acpi_device	*device)
 {
-	int			result = 0;
 	acpi_status		status = AE_OK;
 	struct acpi_ec		*ec = NULL;
-	struct acpi_buffer	buffer = {ACPI_ALLOCATE_BUFFER, NULL};
-	struct acpi_resource	*resource = NULL;
 
 	ACPI_FUNCTION_TRACE("acpi_ec_start");
 
@@ -667,33 +698,13 @@ acpi_ec_start (
 	/*
 	 * Get I/O port addresses. Convert to GAS format.
 	 */
-	status = acpi_get_current_resources(ec->handle, &buffer);
-	if (ACPI_FAILURE(status)) {
+	status = acpi_walk_resources(ec->handle, METHOD_NAME__CRS,
+		acpi_ec_io_ports, ec);
+	if (ACPI_FAILURE(status) || ec->command_addr.register_bit_width == 0) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Error getting I/O port addresses"));
 		return_VALUE(-ENODEV);
 	}
 
-	resource = (struct acpi_resource *) buffer.pointer;
-	if (!resource || (resource->id != ACPI_RSTYPE_IO)) {
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid or missing resource\n"));
-		result = -ENODEV;
-		goto end;
-	}
-	ec->data_addr.address_space_id = ACPI_ADR_SPACE_SYSTEM_IO;
-	ec->data_addr.register_bit_width = 8;
-	ec->data_addr.register_bit_offset = 0;
-	ec->data_addr.address = resource->data.io.min_base_address;
-
-	resource = ACPI_NEXT_RESOURCE(resource);
-	if (!resource || (resource->id != ACPI_RSTYPE_IO)) {
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid or missing resource\n"));
-		result = -ENODEV;
-		goto end;
-	}
-	ec->command_addr.address_space_id = ACPI_ADR_SPACE_SYSTEM_IO;
-	ec->command_addr.register_bit_width = 8;
-	ec->command_addr.register_bit_offset = 0;
-	ec->command_addr.address = resource->data.io.min_base_address;
 	ec->status_addr = ec->command_addr;
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "gpe=0x%02x, ports=0x%2x,0x%2x\n",
@@ -706,8 +717,7 @@ acpi_ec_start (
 	status = acpi_install_gpe_handler(ec->gpe_bit,
 		ACPI_EVENT_EDGE_TRIGGERED, &acpi_ec_gpe_handler, ec);
 	if (ACPI_FAILURE(status)) {
-		result = -ENODEV;
-		goto end;
+		return_VALUE(-ENODEV);
 	}
 
 	status = acpi_install_address_space_handler (ec->handle,
@@ -715,13 +725,10 @@ acpi_ec_start (
 			&acpi_ec_space_setup, ec);
 	if (ACPI_FAILURE(status)) {
 		acpi_remove_gpe_handler(ec->gpe_bit, &acpi_ec_gpe_handler);
-		result = -ENODEV;
-		goto end;
+		return_VALUE(-ENODEV);
 	}
-end:
-	acpi_os_free(buffer.pointer);
 
-	return_VALUE(result);
+	return_VALUE(AE_OK);
 }
 
 
