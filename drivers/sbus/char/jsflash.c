@@ -36,6 +36,7 @@
 #include <linux/init.h>
 #include <linux/string.h>
 #include <linux/smp_lock.h>
+#include <linux/genhd.h>
 
 /*
  * <linux/blk.h> is controlled from the outside with these definitions.
@@ -126,8 +127,8 @@ struct jsflash {
 
 /*
  */
-static int jsfd_sizes[JSF_MAX];
-static u64 jsfd_bytesizes[JSF_MAX];
+static struct gendisk jsfd_disk[JSF_MAX];
+static char names[JSF_MAX][6];
 
 /*
  * Let's pretend we may have several of these...
@@ -439,28 +440,6 @@ static int jsf_ioctl(struct inode *inode, struct file *f, unsigned int cmd,
 	return error;
 }
 
-static int jsfd_ioctl(struct inode *inode, struct file *file,
-    unsigned int cmd, unsigned long arg)
-{
-	int dev;
-
-	if (!capable(CAP_SYS_ADMIN))
-		return -EPERM;
-	if (!inode)
-		return -EINVAL;
-	if ((dev = MINOR(inode->i_rdev)) >= JSF_MAX) return -ENODEV;
-
-	switch (cmd) {
-	case BLKGETSIZE:
-		return put_user(jsfd_bytesizes[dev] >> 9, (unsigned long *) arg);
-	case BLKGETSIZE64:
-		return put_user(jsfd_bytesizes[dev], (u64 *) arg);
-
-	default: ;
-	}
-	return -ENOTTY;
-}
-
 static int jsf_mmap(struct file * file, struct vm_area_struct * vma)
 {
 	return -ENXIO;
@@ -541,10 +520,9 @@ static struct block_device_operations jsfd_fops = {
 	.owner =	THIS_MODULE,
 	.open =		jsfd_open,
 	.release =	jsfd_release,
-	.ioctl =	jsfd_ioctl,
 };
 
-int jsflash_init(void)
+static int jsflash_init(void)
 {
 	int rc;
 	struct jsflash *jsf;
@@ -632,14 +610,15 @@ int jsflash_init(void)
 	return 0;
 }
 
-int jsfd_init(void) {
+static int jsfd_init(void)
+{
+	static spinlock_t lock = SPIN_LOCK_UNLOCKED;
 	struct jsflash *jsf;
 	struct jsfd_part *jdp;
 	int i;
 
-	if (jsf0.base == 0) {
+	if (jsf0.base == 0)
 		return -ENXIO;
-	}
 
 	if (register_blkdev(JSFD_MAJOR, "jsfd", &jsfd_fops)) {
 		printk("jsfd_init: unable to get major number %d\n",
@@ -647,20 +626,25 @@ int jsfd_init(void) {
 		return -EIO;
 	}
 
-	blk_size[JSFD_MAJOR] = jsfd_sizes;
-
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), jsf_do_request);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), jsfd_do_request, &lock);
 	for (i = 0; i < JSF_MAX; i++) {
+		struct gendisk *disk = jsfd_disk + i;
 		if ((i & JSF_PART_MASK) >= JSF_NPART) continue;
 		jsf = &jsf0;	/* actually, &jsfv[i >> JSF_PART_BITS] */
 		jdp = &jsf->dv[i&JSF_PART_MASK];
 
 		jdp->refcnt = 0;
 
-		jsfd_bytesizes[i] = jdp->dsize;
-		jsfd_sizes[i] = jsfd_bytesizes[i] >> 10;
-		register_disk(NULL, MKDEV(JSFD_MAJOR, i), 1, &jsfd_fops,
-				jsfd_bytesizes[i] >> 9);
+		disk->major = JSFD_MAJOR;
+		disk->first_minor = i;
+		sprintf(names[i], "jsfd%d", i);
+		disk->major_name = names[i];
+		disk->fops = &jsfd_fops;
+		disk->minor_shift = 0;
+		add_gendisk(disk);
+		register_disk(disk, mk_kdev(disk->major, disk->first_minor),
+				1<<disk->minor_shift, disk->fops,
+				jdp->dsize >> 9);
 		set_device_ro(MKDEV(JSFD_MAJOR, i), 1);
 	}
 	return 0;
@@ -678,9 +662,14 @@ static int __init jsflash_init_module(void) {
 	return rc;
 }
 
-static void __exit jsflash_cleanup_module(void) {
+static void __exit jsflash_cleanup_module(void)
+{
+	int i;
 
-	/* for (all probed units) {  } */
+	for (i = 0; i < JSF_MAX; i++) {
+		if ((i & JSF_PART_MASK) >= JSF_NPART) continue;
+		del_gendisk(jsfd_disk + i);
+	}
 	if (jsf0.busy)
 		printk("jsf0: cleaning busy unit\n");
 	jsf0.base = 0;
