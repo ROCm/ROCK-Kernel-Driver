@@ -695,9 +695,18 @@ static void ehci_work (struct ehci_hcd *ehci, struct pt_regs *regs)
 	timer_action_done (ehci, TIMER_IO_WATCHDOG);
 	if (ehci->reclaim_ready)
 		end_unlink_async (ehci, regs);
+
+	/* another CPU may drop ehci->lock during a schedule scan while
+	 * it reports urb completions.  this flag guards against bogus
+	 * attempts at re-entrant schedule scanning.
+	 */
+	if (ehci->scanning)
+		return;
+	ehci->scanning = 1;
 	scan_async (ehci, regs);
 	if (ehci->next_uframe != -1)
 		scan_periodic (ehci, regs);
+	ehci->scanning = 0;
 
 	/* the IO watchdog guards against hardware or driver bugs that
 	 * misplace IRQs, and should let us run completely without IRQs.
