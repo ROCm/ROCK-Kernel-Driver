@@ -253,7 +253,7 @@ $u_loop:
 
 	stq_u	t0, -8(a0)	# U : save the current word
 	beq	a2, $u_eoc	# U :
-	ldq_u	t2, 0(a1)	# U : Latency=3 load high word for next time
+	ldq_u	t2, 8(a1)	# U : Latency=3 load high word for next time
 	addq	a1, 8, a1	# E :
 
 	extqh	t2, a1, t0	# U : extract low bits (2 cycle stall)
