@@ -931,11 +931,12 @@ pfx_is_sane(struct task_struct *task, pfarg_context_t *pfx)
 			DBprintk(("must have notify_pid when blocking for [%d]\n", task->pid));
 			return -EINVAL;
 		}
-
+#if 0
 		if ((ctx_flags & PFM_FL_NOTIFY_BLOCK) && pfx->ctx_notify_pid == task->pid) {
 			DBprintk(("cannot notify self when blocking for [%d]\n", task->pid));
 			return -EINVAL;
 		}
+#endif
 	}
 	/* probably more to add here */
 
