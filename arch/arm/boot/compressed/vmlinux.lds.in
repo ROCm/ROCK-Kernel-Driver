@@ -28,7 +28,7 @@ SECTIONS
     *(.glue_7)
     *(.glue_7t)
     input_data = .;
-    piggy.o
+    arch/arm/boot/compressed/piggy.o
     input_data_end = .;
     . = ALIGN(4);
   }

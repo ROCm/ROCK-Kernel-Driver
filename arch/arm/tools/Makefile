@@ -4,9 +4,9 @@
 # Copyright (C) 2001 Russell King
 #
 
-all:	$(TOPDIR)/include/asm-arm/mach-types.h
+include $(TOPDIR)/Rules.make
 
-$(TOPDIR)/include/asm-arm/mach-types.h: mach-types gen-mach-types
-	awk -f gen-mach-types mach-types > $@
+include/asm-arm/mach-types.h: $(obj)/mach-types $(obj)/gen-mach-types
+	@echo '  Generating $@'
+	@awk -f $(obj)/gen-mach-types $(obj)/mach-types > $@
 
-.PHONY:	all
