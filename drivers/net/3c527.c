@@ -218,7 +218,7 @@ static int	mc32_close(struct net_device *dev);
 static struct	net_device_stats *mc32_get_stats(struct net_device *dev);
 static void	mc32_set_multicast_list(struct net_device *dev);
 static void	mc32_reset_multicast_list(struct net_device *dev);
-static int	netdev_ioctl (struct net_device *dev, struct ifreq *rq, int cmd);
+static struct ethtool_ops netdev_ethtool_ops;
 
 /**
  * mc32_probe 	-	Search for supported boards
@@ -508,7 +508,7 @@ static int __init mc32_probe1(struct net_device *dev, int slot)
 	dev->set_multicast_list = mc32_set_multicast_list;
 	dev->tx_timeout		= mc32_timeout;
 	dev->watchdog_timeo	= HZ*5;	/* Board does all the work */
-	dev->do_ioctl		= netdev_ioctl;
+	dev->ethtool_ops	= &netdev_ethtool_ops;
 	
 	lp->xceiver_state = HALTED; 
 	
@@ -1081,14 +1081,15 @@ static int mc32_send_packet(struct sk_buff *skb, struct net_device *dev)
 	/* NP is the buffer we will be loading */
 	np=lp->tx_ring[lp->tx_ring_head].p; 
 
-	/* We will need this to flush the buffer out */
-	lp->tx_ring[lp->tx_ring_head].skb=skb;
-   	   
    	if (skb->len < ETH_ZLEN) {
    		skb = skb_padto(skb, ETH_ZLEN);
    		if (skb == NULL)
    			goto out;
    	}
+
+	/* We will need this to flush the buffer out */
+	lp->tx_ring[lp->tx_ring_head].skb = skb;
+   	   
 	np->length = (skb->len < ETH_ZLEN) ? ETH_ZLEN : skb->len; 
 			
 	np->data	= isa_virt_to_bus(skb->data);
@@ -1655,86 +1656,30 @@ static void mc32_reset_multicast_list(struct net_device *dev)
 	do_mc32_set_multicast_list(dev,1);
 }
 
-/**
- * netdev_ethtool_ioctl: Handle network interface SIOCETHTOOL ioctls
- * @dev: network interface on which out-of-band action is to be performed
- * @useraddr: userspace address to which data is to be read and returned
- *
- * Process the various commands of the SIOCETHTOOL interface.
- */
-
-static int netdev_ethtool_ioctl (struct net_device *dev, void *useraddr)
+static void netdev_get_drvinfo(struct net_device *dev,
+			       struct ethtool_drvinfo *info)
 {
-	u32 ethcmd;
-
-	/* dev_ioctl() in ../../net/core/dev.c has already checked
-	   capable(CAP_NET_ADMIN), so don't bother with that here.  */
-
-	if (get_user(ethcmd, (u32 *)useraddr))
-		return -EFAULT;
-
-	switch (ethcmd) {
-
-	case ETHTOOL_GDRVINFO: {
-		struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
-		strcpy (info.driver, DRV_NAME);
-		strcpy (info.version, DRV_VERSION);
-		sprintf(info.bus_info, "MCA 0x%lx", dev->base_addr);
-		if (copy_to_user (useraddr, &info, sizeof (info)))
-			return -EFAULT;
-		return 0;
-	}
-
-	/* get message-level */
-	case ETHTOOL_GMSGLVL: {
-		struct ethtool_value edata = {ETHTOOL_GMSGLVL};
-		edata.data = mc32_debug;
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-	/* set message-level */
-	case ETHTOOL_SMSGLVL: {
-		struct ethtool_value edata;
-		if (copy_from_user(&edata, useraddr, sizeof(edata)))
-			return -EFAULT;
-		mc32_debug = edata.data;
-		return 0;
-	}
-
-	default:
-		break;
-	}
-
-	return -EOPNOTSUPP;
+	strcpy(info->driver, DRV_NAME);
+	strcpy(info->version, DRV_VERSION);
+	sprintf(info->bus_info, "MCA 0x%lx", dev->base_addr);
 }
 
-/**
- * netdev_ioctl: Handle network interface ioctls
- * @dev: network interface on which out-of-band action is to be performed
- * @rq: user request data
- * @cmd: command issued by user
- *
- * Process the various out-of-band ioctls passed to this driver.
- */
-
-static int netdev_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
+static u32 netdev_get_msglevel(struct net_device *dev)
 {
-	int rc = 0;
-
-	switch (cmd) {
-	case SIOCETHTOOL:
-		rc = netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
-		break;
-
-	default:
-		rc = -EOPNOTSUPP;
-		break;
-	}
-
-	return rc;
+	return mc32_debug;
 }
- 
+
+static void netdev_set_msglevel(struct net_device *dev, u32 level)
+{
+	mc32_debug = level;
+}
+
+static struct ethtool_ops netdev_ethtool_ops = {
+	.get_drvinfo		= netdev_get_drvinfo,
+	.get_msglevel		= netdev_get_msglevel,
+	.set_msglevel		= netdev_set_msglevel,
+};
+
 #ifdef MODULE
 
 static struct net_device this_device;

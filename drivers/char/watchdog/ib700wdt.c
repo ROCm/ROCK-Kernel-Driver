@@ -218,7 +218,7 @@ ibwdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 static int
 ibwdt_open(struct inode *inode, struct file *file)
 {
-	if (minor(inode->i_rdev) == WATCHDOG_MINOR) {
+	if (iminor(inode) == WATCHDOG_MINOR) {
 		spin_lock(&ibwdt_lock);
 		if (ibwdt_is_open) {
 			spin_unlock(&ibwdt_lock);
@@ -240,7 +240,7 @@ ibwdt_open(struct inode *inode, struct file *file)
 static int
 ibwdt_close(struct inode *inode, struct file *file)
 {
-	if (minor(inode->i_rdev) == WATCHDOG_MINOR) {
+	if (iminor(inode) == WATCHDOG_MINOR) {
 		spin_lock(&ibwdt_lock);
 		if (expect_close)
 			outb_p(wd_times[wd_margin], WDT_STOP);

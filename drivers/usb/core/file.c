@@ -34,7 +34,7 @@ static spinlock_t minor_lock = SPIN_LOCK_UNLOCKED;
 
 static int usb_open(struct inode * inode, struct file * file)
 {
-	int minor = minor(inode->i_rdev);
+	int minor = iminor(inode);
 	struct file_operations *c;
 	int err = -ENODEV;
 	struct file_operations *old_fops, *new_fops = NULL;

@@ -793,8 +793,8 @@ out:
 
 struct address_space_operations affs_aops_ofs = {
 	.readpage = affs_readpage_ofs,
-	//writepage: affs_writepage_ofs,
-	//sync_page: affs_sync_page_ofs,
+	//.writepage = affs_writepage_ofs,
+	//.sync_page = affs_sync_page_ofs,
 	.prepare_write = affs_prepare_write_ofs,
 	.commit_write = affs_commit_write_ofs
 };

@@ -63,7 +63,6 @@
 #include <asm/irq.h>
 
 #include "ide-timing.h"
-#include "ide_modes.h"
 #include "sis5513.h"
 
 /* registers layout and init values are chipset family dependant */

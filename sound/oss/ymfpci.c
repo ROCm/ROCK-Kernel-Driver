@@ -1905,7 +1905,7 @@ static int ymf_open(struct inode *inode, struct file *file)
 	struct ymf_state *state;
 	int err;
 
-	minor = minor(inode->i_rdev);
+	minor = iminor(inode);
 	if ((minor & 0x0F) == 3) {	/* /dev/dspN */
 		;
 	} else {
@@ -2019,7 +2019,7 @@ static int ymf_release(struct inode *inode, struct file *file)
  */
 static int ymf_open_mixdev(struct inode *inode, struct file *file)
 {
-	int minor = minor(inode->i_rdev);
+	int minor = iminor(inode);
 	struct list_head *list;
 	ymfpci_t *unit;
 	int i;

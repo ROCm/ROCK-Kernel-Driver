@@ -313,7 +313,7 @@ MODULE_DEVICE_TABLE (usb, scanner_device_ids);
 #define IS_EP_BULK_OUT(ep) (IS_EP_BULK(ep) && ((ep)->bEndpointAddress & USB_ENDPOINT_DIR_MASK) == USB_DIR_OUT)
 #define IS_EP_INTR(ep) ((ep)->bmAttributes == USB_ENDPOINT_XFER_INT ? 1 : 0)
 
-#define USB_SCN_MINOR(X) minor((X)->i_rdev)
+#define USB_SCN_MINOR(X) iminor(X)
 
 #ifdef DEBUG
 #define SCN_DEBUG(X) X

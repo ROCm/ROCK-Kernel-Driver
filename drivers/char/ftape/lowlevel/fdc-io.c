@@ -1305,7 +1305,7 @@ static irqreturn_t ftape_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	} else {
 		TRACE(ft_t_bug, "Unexpected ftape interrupt");
 	}
-	return IRQ_RETVAL(handled);
+	TRACE_EXIT IRQ_RETVAL(handled);
 }
 
 int fdc_grab_irq_and_dma(void)

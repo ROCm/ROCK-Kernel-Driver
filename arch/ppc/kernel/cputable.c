@@ -154,6 +154,15 @@ struct cpu_spec	cpu_specs[] = {
 	32, 32,
 	__setup_cpu_750cx
     },
+    {	/* 750FX rev 1.x */
+    	0xffffff00, 0x70000100, "750FX",
+    	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |
+	CPU_FTR_L2CR | CPU_FTR_TAU | CPU_FTR_HPTE_TABLE | CPU_FTR_CAN_NAP |
+	CPU_FTR_DUAL_PLL_750FX | CPU_FTR_NO_DPM,
+	COMMON_PPC,
+	32, 32,
+	__setup_cpu_750
+    },
     {	/* 750FX rev 2.0 must disable HID0[DPM] */
     	0xffffffff, 0x70000200, "750FX",
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |

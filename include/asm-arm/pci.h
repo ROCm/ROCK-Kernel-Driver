@@ -96,6 +96,19 @@ pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents, int dir)
 	return dma_unmap_sg(hwdev ? &hwdev->dev : NULL, sg, nents, dir);
 }
 
+static inline dma_addr_t
+pci_map_page(struct pci_dev *hwdev, struct page *page, unsigned long offset,
+		size_t size, int dir)
+{
+	return	pci_map_single(hwdev, page_address(page) + offset, size, dir);
+}
+
+static inline void
+pci_unmap_page(struct pci_dev *hwdev, dma_addr_t handle, size_t size, int dir)
+{
+	return pci_unmap_single(hwdev, handle, size, dir);
+}
+
 static inline void
 pci_dma_sync_single(struct pci_dev *hwdev, dma_addr_t handle, size_t size, int dir)
 {

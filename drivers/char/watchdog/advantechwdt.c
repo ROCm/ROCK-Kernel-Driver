@@ -133,7 +133,7 @@ advwdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	static struct watchdog_info ident = {
 		.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
 		.firmware_version = 1,
-		.identity = "Advantech WDT"
+		.identity = "Advantech WDT",
 	};
 
 	switch (cmd) {

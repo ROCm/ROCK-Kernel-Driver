@@ -100,6 +100,9 @@
 #include <linux/proc_fs.h>
 #include <linux/stat.h>
 
+MODULE_LICENSE("Dual BSD/GPL");
+MODULE_DESCRIPTION("ipchains backwards compatibility layer");
+
 /* Understanding locking in this code: (thanks to Alan Cox for using
  * little words to explain this to me). -- PR
  *
@@ -1842,4 +1845,3 @@ int ipfw_init_or_cleanup(int init)
 #endif
 	return ret;
 }
-MODULE_LICENSE("Dual BSD/GPL");

@@ -28,8 +28,6 @@
 			Alan Cox, 30th May 1994
 */
 
-/* To have statistics (just packets sent) define this */
-
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>

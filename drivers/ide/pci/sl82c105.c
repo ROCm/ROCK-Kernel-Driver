@@ -29,7 +29,6 @@
 #include <asm/io.h>
 #include <asm/dma.h>
 
-#include "ide_modes.h"
 #include "sl82c105.h"
 
 #undef DEBUG

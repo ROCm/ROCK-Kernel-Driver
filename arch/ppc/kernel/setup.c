@@ -624,12 +624,10 @@ void __init setup_arch(char **cmdline_p)
 #if defined(CONFIG_KGDB)
 	kgdb_map_scc();
 	set_debug_traps();
-	if (strstr(cmd_line, "nokgdb"))
-		printk("kgdb default breakpoint deactivated on command line\n");
-	else {
+	if (strstr(cmd_line, "gdb")) {
 		if (ppc_md.progress)
 			ppc_md.progress("setup_arch: kgdb breakpoint", 0x4000);
-		printk("kgdb default breakpoint activated\n");
+		printk("kgdb breakpoint activated\n");
 		breakpoint();
 	}
 #endif

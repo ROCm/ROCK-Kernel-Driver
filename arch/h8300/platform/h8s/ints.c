@@ -33,23 +33,6 @@
 #include <asm/regs267x.h>
 #include <asm/errno.h>
 
-#define EXT_IRQ0 16
-#define EXT_IRQ1 17
-#define EXT_IRQ2 18
-#define EXT_IRQ3 19
-#define EXT_IRQ4 20
-#define EXT_IRQ5 21
-#define EXT_IRQ6 22
-#define EXT_IRQ7 23
-#define EXT_IRQ8 24
-#define EXT_IRQ9 25
-#define EXT_IRQ10 26
-#define EXT_IRQ11 27
-#define EXT_IRQ12 28
-#define EXT_IRQ13 29
-#define EXT_IRQ14 30
-#define EXT_IRQ15 31
-
 /*
  * This structure has only 4 elements for speed reasons
  */
@@ -95,17 +78,20 @@ static int use_kmalloc;
 
 extern unsigned long *interrupt_redirect_table;
 
+#define CPU_VECTOR ((unsigned long *)0x000000)
+#define ADDR_MASK (0xffffff)
+
 static inline unsigned long *get_vector_address(void)
 {
-	volatile unsigned long *rom_vector = (unsigned long *)0x000000;
+	volatile unsigned long *rom_vector = CPU_VECTOR;
 	unsigned long base,tmp;
 	int vec_no;
 
-	base = rom_vector[EXT_IRQ0];
+	base = rom_vector[EXT_IRQ0] & ADDR_MASK;
 	
 	/* check romvector format */
 	for (vec_no = EXT_IRQ1; vec_no <= EXT_IRQ15; vec_no++) {
-		if ((base+(vec_no - EXT_IRQ0)*4) != rom_vector[vec_no])
+		if ((base+(vec_no - EXT_IRQ0)*4) != (rom_vector[vec_no] & ADDR_MASK))
 			return NULL;
 	}
 
@@ -307,4 +293,4 @@ static int __init enable_kmalloc(void)
 	use_kmalloc = 1;
 	return 0;
 }
-__initcall(enable_kmalloc);
+core_initcall(enable_kmalloc);

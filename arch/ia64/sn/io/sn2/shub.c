@@ -243,7 +243,7 @@ shubstats_ioctl(struct inode *inode, struct file *file,
 }
 
 struct file_operations shub_mon_fops = {
-	        ioctl:          shubstats_ioctl,
+	        .ioctl          = shubstats_ioctl,
 };
 
 /*

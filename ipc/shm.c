@@ -89,7 +89,7 @@ static inline void shm_inc (int id) {
 	if(!(shp = shm_lock(id)))
 		BUG();
 	shp->shm_atim = get_seconds();
-	shp->shm_lprid = current->pid;
+	shp->shm_lprid = current->tgid;
 	shp->shm_nattch++;
 	shm_unlock(shp);
 }
@@ -136,7 +136,7 @@ static void shm_close (struct vm_area_struct *shmd)
 	/* remove from the list of attaches of the shm segment */
 	if(!(shp = shm_lock(id)))
 		BUG();
-	shp->shm_lprid = current->pid;
+	shp->shm_lprid = current->tgid;
 	shp->shm_dtim = get_seconds();
 	shp->shm_nattch--;
 	if(shp->shm_nattch == 0 &&
@@ -209,7 +209,7 @@ static int newseg (key_t key, int shmflg, size_t size)
 	if(id == -1) 
 		goto no_id;
 
-	shp->shm_cprid = current->pid;
+	shp->shm_cprid = current->tgid;
 	shp->shm_lprid = 0;
 	shp->shm_atim = shp->shm_dtim = 0;
 	shp->shm_ctim = get_seconds();

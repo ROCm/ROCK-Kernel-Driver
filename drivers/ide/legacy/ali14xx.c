@@ -54,8 +54,6 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
-
 /* port addresses for auto-detection */
 #define ALI_NUM_PORTS 4
 static int ports[ALI_NUM_PORTS] __initdata = {0x074, 0x0f4, 0x034, 0x0e4};

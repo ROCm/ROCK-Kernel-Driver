@@ -578,6 +578,8 @@ static inline void rep_nop(void)
 #define ARCH_HAS_PREFETCH
 extern inline void prefetch(const void *x)
 {
+	if (cpu_data[0].x86_vendor == X86_VENDOR_AMD)
+		return;		/* Some athlons fault if the address is bad */
 	alternative_input(ASM_NOP4,
 			  "prefetchnta (%1)",
 			  X86_FEATURE_XMM,

@@ -873,17 +873,22 @@ ext3_xattr_set(struct inode *inode, int name_index, const char *name,
 	       const void *value, size_t value_len, int flags)
 {
 	handle_t *handle;
-	int error, error2;
+	int error;
 
 	handle = ext3_journal_start(inode, EXT3_DATA_TRANS_BLOCKS);
-	if (IS_ERR(handle))
+	if (IS_ERR(handle)) {
 		error = PTR_ERR(handle);
-	else
+	} else {
+		int error2;
+
 		error = ext3_xattr_set_handle(handle, inode, name_index, name,
 					      value, value_len, flags);
-	error2 = ext3_journal_stop(handle);
+		error2 = ext3_journal_stop(handle);
+		if (error == 0)
+			error = error2;
+	}
 
-	return error ? error : error2;
+	return error;
 }
 
 /*

@@ -31,6 +31,7 @@ obj-$(CONFIG_EDD)             	+= edd.o
 obj-$(CONFIG_MODULES)		+= module.o
 obj-y				+= sysenter.o vsyscall.o
 obj-$(CONFIG_ACPI_SRAT) 	+= srat.o
+obj-$(CONFIG_HPET_TIMER) 	+= time_hpet.o
 
 EXTRA_AFLAGS   := -traditional
 

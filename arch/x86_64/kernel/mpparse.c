@@ -67,7 +67,7 @@ unsigned int boot_cpu_id = -1U;
 static unsigned int num_processors = 0;
 
 /* Bitmask of physically existing CPUs */
-cpumask_t phys_cpu_present_map = CPU_MASK_NONE;
+physid_mask_t phys_cpu_present_map = PHYSID_MASK_NONE;
 
 /* ACPI MADT entry parsing functions */
 #ifdef CONFIG_ACPI_BOOT
@@ -126,7 +126,7 @@ static void __init MP_processor_info (struct mpc_config_processor *m)
 	}
 	ver = m->mpc_apicver;
 
-	cpu_set(m->mpc_apicid, phys_cpu_present_map);
+	physid_set(m->mpc_apicid, phys_cpu_present_map);
 	/*
 	 * Validate version
 	 */

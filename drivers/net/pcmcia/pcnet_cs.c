@@ -116,7 +116,7 @@ static int pcnet_event(event_t event, int priority,
 static int pcnet_open(struct net_device *dev);
 static int pcnet_close(struct net_device *dev);
 static int ei_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
-static int do_ioctl_light(struct net_device *dev, struct ifreq *rq, int cmd);
+static struct ethtool_ops netdev_ethtool_ops;
 static irqreturn_t ei_irq_wrapper(int irq, void *dev_id, struct pt_regs *regs);
 static void ei_watchdog(u_long arg);
 static void pcnet_reset_8390(struct net_device *dev);
@@ -756,6 +756,7 @@ static void pcnet_config(dev_link_t *link)
 
     strcpy(info->node.dev_name, dev->name);
     link->dev = &info->node;
+    SET_ETHTOOL_OPS(dev, &netdev_ethtool_ops);
 
     if (info->flags & (IS_DL10019|IS_DL10022)) {
 	u_char id = inb(dev->base_addr + 0x1a);
@@ -769,7 +770,6 @@ static void pcnet_config(dev_link_t *link)
 	    printk("PNA, ");
     } else {
 	printk(KERN_INFO "%s: NE2000 Compatible: ", dev->name);
- 	dev->do_ioctl = &do_ioctl_light;	
     }
     printk("io %#3lx, irq %d,", dev->base_addr, dev->irq);
     if (info->flags & USE_SHMEM)
@@ -1205,25 +1205,15 @@ reschedule:
 
 /*====================================================================*/
 
-static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+static void netdev_get_drvinfo(struct net_device *dev,
+			       struct ethtool_drvinfo *info)
 {
-	u32 ethcmd;
-	
-	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
-		return -EFAULT;
-	
-	switch (ethcmd) {
-	case ETHTOOL_GDRVINFO: {
-		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
-		strncpy(info.driver, "pcnet_cs", sizeof(info.driver)-1);
-		if (copy_to_user(useraddr, &info, sizeof(info)))
-			return -EFAULT;
-		return 0;
-	}
-	}
-	
-	return -EOPNOTSUPP;
+	strcpy(info->driver, "pcnet_cs");
 }
+
+static struct ethtool_ops netdev_ethtool_ops = {
+	.get_drvinfo		= netdev_get_drvinfo,
+};
 
 /*====================================================================*/
 
@@ -1234,31 +1224,18 @@ static int ei_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
     u16 *data = (u16 *)&rq->ifr_data;
     ioaddr_t mii_addr = dev->base_addr + DLINK_GPIO;
     switch (cmd) {
-    case SIOCETHTOOL:
-        return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
-    case SIOCDEVPRIVATE:
+    case SIOCGMIIPHY:
 	data[0] = info->phy_id;
-    case SIOCDEVPRIVATE+1:
+    case SIOCGMIIREG:		/* Read MII PHY register. */
 	data[3] = mdio_read(mii_addr, data[0], data[1] & 0x1f);
 	return 0;
-    case SIOCDEVPRIVATE+2:
+    case SIOCSMIIREG:		/* Write MII PHY register. */
 	if (!capable(CAP_NET_ADMIN))
 	    return -EPERM;
 	mdio_write(mii_addr, data[0], data[1] & 0x1f, data[2]);
 	return 0;
     }
     return -EOPNOTSUPP;
-}
-
-/*====================================================================*/
-
-static int do_ioctl_light(struct net_device *dev, struct ifreq *rq, int cmd)
-{
-    switch (cmd) {
-        case SIOCETHTOOL:
-            return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
-    }	    
-    return -EOPNOTSUPP;    
 }
 
 /*====================================================================*/

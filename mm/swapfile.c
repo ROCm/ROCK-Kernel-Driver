@@ -1403,7 +1403,8 @@ asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 	p->max = maxpages;
 	p->pages = nr_good_pages;
 
-	if (setup_swap_extents(p))
+	error = setup_swap_extents(p);
+	if (error)
 		goto bad_swap;
 
 	swap_list_lock();

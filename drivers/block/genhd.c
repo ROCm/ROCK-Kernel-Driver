@@ -576,13 +576,10 @@ EXPORT_SYMBOL(put_disk);
 
 void set_device_ro(struct block_device *bdev, int flag)
 {
-	struct gendisk *disk = bdev->bd_disk;
-	if (bdev->bd_contains != bdev) {
-		int part = bdev->bd_dev - MKDEV(disk->major, disk->first_minor);
-		struct hd_struct *p = disk->part[part-1];
-		if (p) p->policy = flag;
-	} else
-		disk->policy = flag;
+	if (bdev->bd_contains != bdev)
+		bdev->bd_part->policy = flag;
+	else
+		bdev->bd_disk->policy = flag;
 }
 
 void set_disk_ro(struct gendisk *disk, int flag)
@@ -595,17 +592,12 @@ void set_disk_ro(struct gendisk *disk, int flag)
 
 int bdev_read_only(struct block_device *bdev)
 {
-	struct gendisk *disk;
 	if (!bdev)
 		return 0;
-	disk = bdev->bd_disk;
-	if (bdev->bd_contains != bdev) {
-		int part = bdev->bd_dev - MKDEV(disk->major, disk->first_minor);
-		struct hd_struct *p = disk->part[part-1];
-		if (p) return p->policy;
-		return 0;
-	} else
-		return disk->policy;
+	else if (bdev->bd_contains != bdev)
+		return bdev->bd_part->policy;
+	else
+		return bdev->bd_disk->policy;
 }
 
 int invalidate_partition(struct gendisk *disk, int index)

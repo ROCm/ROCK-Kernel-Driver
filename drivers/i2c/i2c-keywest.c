@@ -81,9 +81,6 @@ MODULE_PARM(debug, "i");
 int probe = 0;
 int debug = 0;
 
-static struct keywest_iface *ifaces = NULL;
-
-
 static void
 do_stop(struct keywest_iface* iface, int result)
 {
@@ -306,6 +303,7 @@ keywest_smbus_xfer(	struct i2c_adapter*	adap,
 	write_reg(reg_control, read_reg(reg_control) | KW_I2C_CTL_XADDR);
 	write_reg(reg_ier, KW_I2C_IRQ_MASK);
 
+	/* Wait interrupt operations completion */
 	wait_for_completion(&iface->complete);	
 
 	rc = iface->result;	
@@ -385,6 +383,7 @@ keywest_xfer(	struct i2c_adapter *adap,
 		write_reg(reg_control, read_reg(reg_control) | KW_I2C_CTL_XADDR);
 		write_reg(reg_ier, KW_I2C_IRQ_MASK);
 
+		/* Wait interrupt operations completion */
 		wait_for_completion(&iface->complete);	
 
 		rc = iface->result;
@@ -409,16 +408,16 @@ keywest_func(struct i2c_adapter * adapter)
 
 /* For now, we only handle combined mode (smbus) */
 static struct i2c_algorithm keywest_algorithm = {
-	name:		"Keywest i2c",
-	id:		I2C_ALGO_SMBUS,
-	smbus_xfer:	keywest_smbus_xfer,
-	master_xfer:	keywest_xfer,
-	functionality:	keywest_func,
+	.name		= "Keywest i2c",
+	.id		= I2C_ALGO_SMBUS,
+	.smbus_xfer	= keywest_smbus_xfer,
+	.master_xfer	= keywest_xfer,
+	.functionality	= keywest_func,
 };
 
 
 static int
-create_iface(struct device_node* np)
+create_iface(struct device_node *np, struct device *dev)
 {
 	unsigned long steps, *psteps, *prate;
 	unsigned bsteps, tsize, i, nchan, addroffset;
@@ -487,8 +486,8 @@ create_iface(struct device_node* np)
 			*prate);
 	}
 	
-	/* Select standard mode by default */
-	iface->cur_mode |= KW_I2C_MODE_STANDARD;
+	/* Select standard sub mode */
+	iface->cur_mode |= KW_I2C_MODE_STANDARDSUB;
 	
 	/* Write mode */
 	write_reg(reg_mode, iface->cur_mode);
@@ -506,11 +505,13 @@ create_iface(struct device_node* np)
 		return -ENODEV;
 	}
 
+	dev_set_drvdata(dev, iface);
+	
 	for (i=0; i<nchan; i++) {
 		struct keywest_chan* chan = &iface->channels[i];
 		u8 addr;
 		
-		sprintf(chan->adapter.dev.name, "%s %d", np->parent->name, i);
+		sprintf(chan->adapter.name, "%s %d", np->parent->name, i);
 		chan->iface = iface;
 		chan->chan_no = i;
 		chan->adapter.id = I2C_ALGO_SMBUS;
@@ -519,11 +520,12 @@ create_iface(struct device_node* np)
 		chan->adapter.client_register = NULL;
 		chan->adapter.client_unregister = NULL;
 		i2c_set_adapdata(&chan->adapter, chan);
+		chan->adapter.dev.parent = dev;
 
 		rc = i2c_add_adapter(&chan->adapter);
 		if (rc) {
 			printk("i2c-keywest.c: Adapter %s registration failed\n",
-				chan->adapter.dev.name);
+				chan->adapter.name);
 			i2c_set_adapdata(&chan->adapter, NULL);
 		}
 		if (probe) {
@@ -540,20 +542,18 @@ create_iface(struct device_node* np)
 	printk(KERN_INFO "Found KeyWest i2c on \"%s\", %d channel%s, stepping: %d bits\n",
 		np->parent->name, nchan, nchan > 1 ? "s" : "", bsteps);
 		
-	iface->next = ifaces;
-	ifaces = iface;
 	return 0;
 }
 
-static void
-dispose_iface(struct keywest_iface *iface)
+static int
+dispose_iface(struct device *dev)
 {
+	struct keywest_iface *iface = dev_get_drvdata(dev);
 	int i, rc;
 	
-	ifaces = iface->next;
-
 	/* Make sure we stop all activity */
 	down(&iface->sem);
+
 	spin_lock_irq(&iface->lock);
 	while (iface->state != state_idle) {
 		spin_unlock_irq(&iface->lock);
@@ -578,31 +578,76 @@ dispose_iface(struct keywest_iface *iface)
 			printk("i2c-keywest.c: i2c_del_adapter failed, that's bad !\n");
 	}
 	iounmap((void *)iface->base);
+	dev_set_drvdata(dev, NULL);
 	kfree(iface);
+
+	return 0;
 }
+
+static int
+create_iface_macio(struct macio_dev* dev, const struct of_match *match)
+{
+	return create_iface(dev->ofdev.node, &dev->ofdev.dev);
+}
+
+static int
+dispose_iface_macio(struct macio_dev* dev)
+{
+	return dispose_iface(&dev->ofdev.dev);
+}
+
+static int
+create_iface_of_platform(struct of_device* dev, const struct of_match *match)
+{
+	return create_iface(dev->node, &dev->dev);
+}
+
+static int
+dispose_iface_of_platform(struct of_device* dev)
+{
+	return dispose_iface(&dev->dev);
+}
+
+static struct of_match i2c_keywest_match[] = 
+{
+	{
+	.name 		= OF_ANY_MATCH,
+	.type		= "i2c",
+	.compatible	= "keywest"
+	},
+	{},
+};
+
+static struct macio_driver i2c_keywest_macio_driver = 
+{
+	.name 		= "i2c-keywest",
+	.match_table	= i2c_keywest_match,
+	.probe		= create_iface_macio,
+	.remove		= dispose_iface_macio
+};
+
+static struct of_platform_driver i2c_keywest_of_platform_driver = 
+{
+	.name 		= "i2c-keywest",
+	.match_table	= i2c_keywest_match,
+	.probe		= create_iface_of_platform,
+	.remove		= dispose_iface_of_platform
+};
 
 static int __init
 i2c_keywest_init(void)
 {
-	struct device_node *np;
-	int rc = -ENODEV;
-	
-	np = find_compatible_devices("i2c", "keywest");
-	while (np != 0) {
-		if (np->n_addrs >= 1 && np->n_intrs >= 1)
-			rc = create_iface(np);
-		np = np->next;
-	}
-	if (ifaces)
-		rc = 0;
-	return rc;
+	macio_register_driver(&i2c_keywest_macio_driver);
+	of_register_driver(&i2c_keywest_of_platform_driver);
+
+	return 0;
 }
 
 static void __exit
 i2c_keywest_cleanup(void)
 {
-	while(ifaces)
-		dispose_iface(ifaces);
+	macio_unregister_driver(&i2c_keywest_macio_driver);
+	of_unregister_driver(&i2c_keywest_of_platform_driver);
 }
 
 module_init(i2c_keywest_init);

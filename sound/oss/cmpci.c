@@ -1448,7 +1448,7 @@ static int mixer_ioctl(struct cm_state *s, unsigned int cmd, unsigned long arg)
 
 static int cm_open_mixdev(struct inode *inode, struct file *file)
 {
-	int minor = minor(inode->i_rdev);
+	int minor = iminor(inode);
 	struct cm_state *s = devs;
 
 	while (s && s->dev_mixer != minor)
@@ -2207,7 +2207,7 @@ static int cm_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 
 static int cm_open(struct inode *inode, struct file *file)
 {
-	int minor = minor(inode->i_rdev);
+	int minor = iminor(inode);
 	struct cm_state *s = devs;
 	unsigned char fmtm = ~0, fmts = 0;
 
@@ -2462,7 +2462,7 @@ static unsigned int cm_midi_poll(struct file *file, struct poll_table_struct *wa
 
 static int cm_midi_open(struct inode *inode, struct file *file)
 {
-	int minor = minor(inode->i_rdev);
+	int minor = iminor(inode);
 	struct cm_state *s = devs;
 	unsigned long flags;
 
@@ -2679,7 +2679,7 @@ static int cm_dmfm_ioctl(struct inode *inode, struct file *file, unsigned int cm
 
 static int cm_dmfm_open(struct inode *inode, struct file *file)
 {
-	int minor = minor(inode->i_rdev);
+	int minor = iminor(inode);
 	struct cm_state *s = devs;
 
 	while (s && s->dev_dmfm != minor)

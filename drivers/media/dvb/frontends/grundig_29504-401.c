@@ -37,15 +37,15 @@ static int debug = 0;
 
 
 struct dvb_frontend_info grundig_29504_401_info = {
-	name: "Grundig 29504-401",
-	type: FE_OFDM,
-/*	frequency_min: ???,*/
-/*	frequency_max: ???,*/
-	frequency_stepsize: 166666,
-/*      frequency_tolerance: ???,*/
-/*      symbol_rate_tolerance: ???,*/
-	notifier_delay: 0,
-	caps: FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 | 
+	.name = "Grundig 29504-401",
+	.type = FE_OFDM,
+/*	.frequency_min = ???,*/
+/*	.frequency_max = ???,*/
+	.frequency_stepsize = 166666,
+/*      .frequency_tolerance = ???,*/
+/*      .symbol_rate_tolerance = ???,*/
+	.notifier_delay = 0,
+	.caps = FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 |
 	      FE_CAN_FEC_5_6 | FE_CAN_FEC_7_8 |
 	      FE_CAN_QPSK | FE_CAN_QAM_16 | FE_CAN_QAM_64 |
 	      FE_CAN_MUTE_TS /*| FE_CAN_CLEAN_SETUP*/

@@ -28,6 +28,7 @@
  */
 #include <linux/slab.h>
 #include <linux/poll.h>
+#include <linux/fs.h>
 #include <linux/file.h>
 #include <linux/hash.h>
 #include <linux/init.h>
@@ -60,8 +61,6 @@ struct futex_q {
 /* The key for the hash is the address + index + offset within page */
 static struct list_head futex_queues[1<<FUTEX_HASHBITS];
 static spinlock_t futex_lock = SPIN_LOCK_UNLOCKED;
-
-extern void send_sigio(struct fown_struct *fown, int fd, int band);
 
 /* Futex-fs vfsmount entry: */
 static struct vfsmount *futex_mnt;

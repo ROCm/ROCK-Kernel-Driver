@@ -229,6 +229,7 @@ struct sock *llc_sk_alloc(int family, int priority)
 	if (llc_sk_init(sk))
 		goto outsk;
 	sock_init_data(NULL, sk);
+	sk_set_owner(sk, THIS_MODULE);
 #ifdef LLC_REFCNT_DEBUG
 	atomic_inc(&llc_sock_nr);
 	printk(KERN_DEBUG "LLC socket %p created in %s, now we have %d alive\n", sk,

@@ -161,11 +161,6 @@ source "drivers/parisc/Kconfig"
 
 menu "Executable file formats"
 
-config KCORE_ELF
-	bool
-	depends on PROC_FS
-	default y
-
 source "fs/Kconfig.binfmt"
 
 endmenu

@@ -3,7 +3,7 @@
  *
  *	vlsi_ir.h:	VLSI82C147 PCI IrDA controller driver for Linux
  *
- *	Version:	0.4a
+ *	Version:	0.5
  *
  *	Copyright (c) 2001-2003 Martin Diehl
  *
@@ -27,18 +27,71 @@
 #ifndef IRDA_VLSI_FIR_H
 #define IRDA_VLSI_FIR_H
 
-/*
- * #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,xx)
- *
- * missing pci-dma api call to give streaming dma buffer back to hw
- * patch floating on lkml - probably present in 2.5.26 or later
- * otherwise defining it as noop is ok, since the vlsi-ir is only
+/* ================================================================
+ * compatibility stuff
+ */
+
+/* definitions not present in pci_ids.h */
+
+#ifndef PCI_CLASS_WIRELESS_IRDA
+#define PCI_CLASS_WIRELESS_IRDA		0x0d00
+#endif
+
+#ifndef PCI_CLASS_SUBCLASS_MASK
+#define PCI_CLASS_SUBCLASS_MASK		0xffff
+#endif
+
+/* missing pci-dma api call to give streaming dma buffer back to hw
+ * patch was floating on lkml around 2.5.2x and might be present later.
+ * Defining it this way is ok, since the vlsi-ir is only
  * used on two oldish x86-based notebooks which are cache-coherent
+ * (and flush_write_buffers also handles PPro errata and C3 OOstore)
  */
-#define pci_dma_prep_single(dev, addr, size, direction)	/* nothing */
-/*
- * #endif
+#ifdef CONFIG_X86
+#include <asm-i386/io.h>
+#define pci_dma_prep_single(dev, addr, size, direction)	flush_write_buffers()
+#else
+#error missing pci dma api call
+#endif
+
+/* in recent 2.5 interrupt handlers have non-void return value */
+#ifndef IRQ_RETVAL
+typedef void irqreturn_t;
+#define IRQ_NONE
+#define IRQ_HANDLED
+#define IRQ_RETVAL(x)
+#endif
+
+/* some stuff need to check kernelversion. Not all 2.5 stuff was present
+ * in early 2.5.x - the test is merely to separate 2.4 from 2.5
  */
+#include <linux/version.h>
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+
+/* PDE() introduced in 2.5.4 */
+#ifdef CONFIG_PROC_FS
+#define PDE(inode) ((inode)->u.generic_ip)
+#endif
+
+/* irda crc16 calculation exported in 2.5.42 */
+#define irda_calc_crc16(fcs,buf,len)	(GOOD_FCS)
+
+/* we use this for unified pci device name access */
+#define PCIDEV_NAME(pdev)	((pdev)->name)
+
+#else /* 2.5 or later */
+
+/* recent 2.5/2.6 stores pci device names at varying places ;-) */
+#ifdef CONFIG_PCI_NAMES
+/* human readable name */
+#define PCIDEV_NAME(pdev)	((pdev)->pretty_name)
+#else
+/* whatever we get from the associated struct device - bus:slot:dev.fn id */
+#define PCIDEV_NAME(pdev)	(pci_name(pdev))
+#endif
+
+#endif
 
 /* ================================================================ */
 
@@ -138,7 +191,7 @@ enum vlsi_pci_clkctl {
  *	- IRMISC_UARTSEL configured
  *	- IRCFG_MASTER must be cleared
  *	- IRCFG_SIR must be set
- *	- IRENABLE_IREN must be asserted 0->1 (and hence IRENABLE_SIR_ON)
+ *	- IRENABLE_PHYANDCLOCK must be asserted 0->1 (and hence IRENABLE_SIR_ON)
  */
 
 enum vlsi_pci_irmisc {
@@ -298,7 +351,7 @@ enum vlsi_pio_irintr {
 /* notes:
  *	- not more than one SIR/MIR/FIR bit must be set at any time
  *	- SIR, MIR, FIR and CRC16 select the configuration which will
- *	  be applied on next 0->1 transition of IRENABLE_IREN (see below).
+ *	  be applied on next 0->1 transition of IRENABLE_PHYANDCLOCK (see below).
  *	- besides allowing the PCI interface to execute busmaster cycles
  *	  and therefore the ring SM to operate, the MSTR bit has side-effects:
  *	  when MSTR is cleared, the RINGPTR's get reset and the legacy UART mode
@@ -349,7 +402,7 @@ enum vlsi_pio_ircfg {
  */
 
 enum vlsi_pio_irenable {
-	IRENABLE_IREN		= 0x8000,  /* enable IR phy and gate the mode config (rw) */
+	IRENABLE_PHYANDCLOCK	= 0x8000,  /* enable IR phy and gate the mode config (rw) */
 	IRENABLE_CFGER		= 0x4000,  /* mode configuration error (ro) */
 	IRENABLE_FIR_ON		= 0x2000,  /* FIR on status (ro) */
 	IRENABLE_MIR_ON		= 0x1000,  /* MIR on status (ro) */
@@ -366,7 +419,7 @@ enum vlsi_pio_irenable {
 /* VLSI_PIO_PHYCTL: IR Physical Layer Current Control Register (u16, ro) */
 
 /* read-back of the currently applied physical layer status.
- * applied from VLSI_PIO_NPHYCTL at rising edge of IRENABLE_IREN
+ * applied from VLSI_PIO_NPHYCTL at rising edge of IRENABLE_PHYANDCLOCK
  * contents identical to VLSI_PIO_NPHYCTL (see below)
  */
 
@@ -374,7 +427,7 @@ enum vlsi_pio_irenable {
 
 /* VLSI_PIO_NPHYCTL: IR Physical Layer Next Control Register (u16, rw) */
 
-/* latched during IRENABLE_IREN=0 and applied at 0-1 transition
+/* latched during IRENABLE_PHYANDCLOCK=0 and applied at 0-1 transition
  *
  * consists of BAUD[15:10], PLSWID[9:5] and PREAMB[4:0] bits defined as follows:
  *
@@ -616,21 +669,22 @@ static inline void rd_set_addr_status(struct ring_descr *rd, dma_addr_t a, u8 s)
 	 */
 
 	if ((a & ~DMA_MASK_MSTRPAGE)>>24 != MSTRPAGE_VALUE) {
-		BUG();
+		ERROR("%s: pci busaddr inconsistency!\n", __FUNCTION__);
+		dump_stack();
 		return;
 	}
 
 	a &= DMA_MASK_MSTRPAGE;  /* clear highbyte to make sure we won't write
 				  * to status - just in case MSTRPAGE_VALUE!=0
 				  */
-	rd->hw->rd_addr = a;
+	rd->hw->rd_addr = cpu_to_le32(a);
 	wmb();
 	rd_set_status(rd, s);	 /* may pass ownership to the hardware */
 }
 
 static inline void rd_set_count(struct ring_descr *rd, u16 c)
 {
-	rd->hw->rd_count = c;
+	rd->hw->rd_count = cpu_to_le16(c);
 }
 
 static inline u8 rd_get_status(struct ring_descr *rd)
@@ -642,13 +696,13 @@ static inline dma_addr_t rd_get_addr(struct ring_descr *rd)
 {
 	dma_addr_t	a;
 
-	a = (rd->hw->rd_addr & DMA_MASK_MSTRPAGE) | (MSTRPAGE_VALUE << 24);
-	return a;
+	a = le32_to_cpu(rd->hw->rd_addr);
+	return (a & DMA_MASK_MSTRPAGE) | (MSTRPAGE_VALUE << 24);
 }
 
 static inline u16 rd_get_count(struct ring_descr *rd)
 {
-	return rd->hw->rd_count;
+	return le16_to_cpu(rd->hw->rd_count);
 }
 
 /******************************************************************/

@@ -93,7 +93,7 @@ static struct superio_struct {	/* For Super-IO chips autodetection */
 	int dma;
 } superios[NR_SUPERIOS] __devinitdata = { {0,},};
 
-static int user_specified __devinitdata = 0;
+static int user_specified;
 #if defined(CONFIG_PARPORT_PC_SUPERIO) || \
        (defined(CONFIG_PARPORT_1284) && defined(CONFIG_PARPORT_PC_FIFO))
 static int verbose_probing;

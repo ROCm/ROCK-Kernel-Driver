@@ -8,6 +8,10 @@
 #define MATCH   1
 #define NOMATCH 0
 
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Bart De Schuymer <bdschuym@pandora.be>");
+MODULE_DESCRIPTION("iptables bridge physical device match module");
+
 static int
 match(const struct sk_buff *skb,
       const struct net_device *in,
@@ -120,4 +124,3 @@ static void __exit fini(void)
 
 module_init(init);
 module_exit(fini);
-MODULE_LICENSE("GPL");

@@ -229,7 +229,7 @@ static int skel_open (struct inode *inode, struct file *file)
 
 	dbg("%s", __FUNCTION__);
 
-	subminor = minor (inode->i_rdev);
+	subminor = iminor(inode);
 
 	/* prevent disconnects */
 	down (&disconnect_sem);

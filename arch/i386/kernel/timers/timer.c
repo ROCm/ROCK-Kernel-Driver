@@ -3,10 +3,21 @@
 #include <linux/string.h>
 #include <asm/timer.h>
 
+#ifdef CONFIG_HPET_TIMER
+/*
+ * HPET memory read is slower than tsc reads, but is more dependable as it
+ * always runs at constant frequency and reduces complexity due to
+ * cpufreq. So, we prefer HPET timer to tsc based one. Also, we cannot use
+ * timer_pit when HPET is active. So, we default to timer_tsc.
+ */
+#endif
 /* list of timers, ordered by preference, NULL terminated */
 static struct timer_opts* timers[] = {
 #ifdef CONFIG_X86_CYCLONE_TIMER
 	&timer_cyclone,
+#endif
+#ifdef CONFIG_HPET_TIMER
+	&timer_hpet,
 #endif
 	&timer_tsc,
 	&timer_pit,

@@ -2122,6 +2122,7 @@ static inline struct ip_mc_list *igmp_mc_get_first(struct seq_file *seq)
 			break;
 		}
 		read_unlock(&in_dev->lock);
+		in_dev_put(in_dev);
 	}
 	return im;
 }
@@ -2181,7 +2182,9 @@ static void igmp_mc_seq_stop(struct seq_file *seq, void *v)
 	if (likely(state->in_dev != NULL)) {
 		read_unlock(&state->in_dev->lock);
 		in_dev_put(state->in_dev);
+		state->in_dev = NULL;
 	}
+	state->dev = NULL;
 	read_unlock(&dev_base_lock);
 }
 
@@ -2284,6 +2287,7 @@ static inline struct ip_sf_list *igmp_mcf_get_first(struct seq_file *seq)
 			spin_unlock_bh(&im->lock);
 		}
 		read_unlock_bh(&idev->lock);
+		in_dev_put(idev);
 	}
 	return psf;
 }
@@ -2350,12 +2354,16 @@ static void *igmp_mcf_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 static void igmp_mcf_seq_stop(struct seq_file *seq, void *v)
 {
 	struct igmp_mcf_iter_state *state = igmp_mcf_seq_private(seq);
-	if (likely(state->im != NULL))
+	if (likely(state->im != NULL)) {
 		spin_unlock_bh(&state->im->lock);
+		state->im = NULL;
+	}
 	if (likely(state->idev != NULL)) {
 		read_unlock_bh(&state->idev->lock);
 		in_dev_put(state->idev);
+		state->idev = NULL;
 	}
+	state->dev = NULL;
 	read_unlock(&dev_base_lock);
 }
 

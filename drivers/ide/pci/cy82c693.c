@@ -54,7 +54,6 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
 #include "cy82c693.h"
 
 /*
@@ -113,7 +112,7 @@ static void compute_clocks (u8 pio, pio_clocks_t *p_pclk)
 
 	/* note: we use the same values for 16bit IOR and IOW
          *	those are all the same, since I don't have other
-	 *	timings than those from ide_modes.h
+	 *	timings than those from ide-lib.c
 	 */
 
 	p_pclk->time_16r = (u8)clk1;

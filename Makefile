@@ -268,8 +268,19 @@ scripts:
 # Detect when mixed targets is specified, and make a second invocation
 # of make so .config is not included in this case either (for *config).
 
+no-dot-config-targets := clean mrproper distclean \
+			 cscope TAGS tags help %docs check%
+
 config-targets := 0
 mixed-targets  := 0
+dot-config     := 1
+
+ifneq ($(filter $(no-dot-config-targets), $(MAKECMDGOALS)),)
+	ifeq ($(filter-out $(no-dot-config-targets), $(MAKECMDGOALS)),)
+		dot-config := 0
+	endif
+endif
+
 ifneq ($(filter config %config,$(MAKECMDGOALS)),)
 	config-targets := 1
 	ifneq ($(filter-out config %config,$(MAKECMDGOALS)),)
@@ -309,7 +320,26 @@ libs-y		:= lib/
 core-y		:= usr/
 SUBDIRS		:=
 
--include .config
+ifeq ($(dot-config),1)
+# In this section, we need .config
+
+# Read in dependencies to all Kconfig* files, make sure to run
+# oldconfig if changes are detected.
+-include .config.cmd
+
+include .config
+
+# If .config needs to be updated, it will be done via the dependency
+# that autoconf has on .config.
+# To avoid any implicit rule to kick in, define an empty command
+.config: ;
+
+# If .config is newer than include/linux/autoconf.h, someone tinkered
+# with it and forgot to run make oldconfig
+include/linux/autoconf.h: scripts/fixdep .config
+	$(Q)$(MAKE) $(build)=scripts/kconfig silentoldconfig
+
+endif
 
 include arch/$(ARCH)/Makefile
 
@@ -338,15 +368,7 @@ libs-y		:= $(libs-y1) $(libs-y2)
 
 # Here goes the main Makefile
 # ---------------------------------------------------------------------------
-#
-# If the user gave a *config target, it'll be handled in another
-# section below, since in this case we cannot include .config
-# Same goes for other targets like clean/mrproper etc, which
-# don't need .config, either
 
-#	In this section, we need .config
-
--include .config.cmd
 
 ifndef CONFIG_FRAME_POINTER
 CFLAGS		+= -fomit-frame-pointer
@@ -521,13 +543,6 @@ include/config/MARKER: scripts/split-include include/linux/autoconf.h
 	@scripts/split-include include/linux/autoconf.h include/config
 	@touch $@
 
-# 	if .config is newer than include/linux/autoconf.h, someone tinkered
-# 	with it and forgot to run make oldconfig
-
-include/linux/autoconf.h: .config scripts/fixdep
-	$(Q)$(MAKE) $(build)=scripts/kconfig scripts/kconfig/conf
-	./scripts/kconfig/conf -s arch/$(ARCH)/Kconfig
-
 # Generate some files
 # ---------------------------------------------------------------------------
 
@@ -579,6 +594,11 @@ modules_install: _modinst_ _modinst_post
 
 .PHONY: _modinst_
 _modinst_:
+	@if [ -z "`$(DEPMOD) -V | grep module-init-tools`" ]; then \
+		echo "Warning: you may need to install module-init-tools"; \
+		echo "See http://www.codemonkey.org.uk/post-halloween-2.5.txt";\
+		sleep 1; \
+	fi
 	@rm -rf $(MODLIB)/kernel
 	@rm -f $(MODLIB)/build
 	@mkdir -p $(MODLIB)/kernel

@@ -67,7 +67,6 @@ struct keywest_iface
 	int			stopretry;
 	struct timer_list	timeout_timer;
 	struct completion	complete;
-	struct keywest_iface*	next;
 };
 
 enum {

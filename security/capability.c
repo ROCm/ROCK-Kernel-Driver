@@ -295,12 +295,7 @@ int cap_vm_enough_memory(long pages)
 
 	vm_acct_memory(pages);
 
-        /*
-	 * Sometimes we want to use more memory than we have
-	 */
-	if (sysctl_overcommit_memory == 1)
-		return 0;
-
+	/* We estimate memory ourselves (common case) */
 	if (sysctl_overcommit_memory == 0) {
 		free = get_page_cache_size();
 		free += nr_free_pages();
@@ -322,10 +317,16 @@ int cap_vm_enough_memory(long pages)
 
 		if (free > pages)
 			return 0;
+
 		vm_unacct_memory(pages);
 		return -ENOMEM;
 	}
 
+	/* Kernel assumes allocation */
+	if (sysctl_overcommit_memory == 1)
+		return 0;
+
+	/* sysctl_overcommit_memory must be 2 which means strict_overcommit*/
 	allowed = totalram_pages * sysctl_overcommit_ratio / 100;
 	allowed += total_swap_pages;
 

@@ -810,8 +810,7 @@ typedef int (* ioctl32_handler_t)(unsigned int, unsigned int, unsigned long, str
 #define IOCTL_TABLE_START \
 	struct ioctl_trans ioctl_start[] = {
 #define IOCTL_TABLE_END \
-	}; struct ioctl_trans ioctl_end[0];
-
+	};
 
 IOCTL_TABLE_START
 #include <linux/compat_ioctl.h>
@@ -1205,6 +1204,8 @@ COMPATIBLE_IOCTL(RTC_SET_TIME)
 COMPATIBLE_IOCTL(RTC_WKALM_SET)
 COMPATIBLE_IOCTL(RTC_WKALM_RD)
 IOCTL_TABLE_END
+
+int ioctl_table_size = ARRAY_SIZE(ioctl_start);
 
 #define NR_IOCTL_TRANS		(sizeof(ioctl_translations) /	\
 				 sizeof(ioctl_translations[0]))

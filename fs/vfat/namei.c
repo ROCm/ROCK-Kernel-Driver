@@ -200,20 +200,6 @@ static int vfat_cmp(struct dentry *dentry, struct qstr *a, struct qstr *b)
 	return 1;
 }
 
-/* MS-DOS "device special files" */
-
-static const unsigned char *reserved3_names[] = {
-	"con     ", "prn     ", "nul     ", "aux     ", NULL
-};
-
-static const unsigned char *reserved4_names[] = {
-	"com1    ", "com2    ", "com3    ", "com4    ", "com5    ",
-	"com6    ", "com7    ", "com8    ", "com9    ",
-	"lpt1    ", "lpt2    ", "lpt3    ", "lpt4    ", "lpt5    ",
-	"lpt6    ", "lpt7    ", "lpt8    ", "lpt9    ",
-	NULL };
-
-
 /* Characters that are undesirable in an MS-DOS file name */
 
 static wchar_t bad_chars[] = {
@@ -255,38 +241,31 @@ static inline int vfat_is_used_badchars(const wchar_t *s, int len)
 	return 0;
 }
 
-/* Checks the validity of a long MS-DOS filename */
-/* Returns negative number on error, 0 for a normal
- * return, and 1 for . or .. */
-
-static int vfat_valid_longname(const unsigned char *name, int len, int xlate)
+static int vfat_valid_longname(const unsigned char *name, unsigned int len)
 {
-	const unsigned char **reserved, *walk;
-	int baselen;
-
 	if (len && name[len-1] == ' ')
-		return -EINVAL;
+		return 0;
 	if (len >= 256)
-		return -EINVAL;
-	if (len < 3)
 		return 0;
 
-	for (walk = name; *walk != 0 && *walk != '.'; walk++)
-		;
-	baselen = walk - name;
-
-	if (baselen == 3) {
-		for (reserved = reserved3_names; *reserved; reserved++) {
-			if (!strnicmp(name,*reserved,baselen))
-				return -EINVAL;
-		}
-	} else if (baselen == 4) {
-		for (reserved = reserved4_names; *reserved; reserved++) {
-			if (!strnicmp(name,*reserved,baselen))
-				return -EINVAL;
+	/* MS-DOS "device special files" */
+	if (len == 3 || (len > 3 && name[3] == '.')) {	/* basename == 3 */
+		if (!strnicmp(name, "aux", 3) ||
+		    !strnicmp(name, "con", 3) ||
+		    !strnicmp(name, "nul", 3) ||
+		    !strnicmp(name, "prn", 3))
+			return 0;
+	}
+	if (len == 4 || (len > 4 && name[4] == '.')) {	/* basename == 4 */
+		/* "com1", "com2", ... */
+		if ('1' <= name[3] && name[3] <= '9') {
+			if (!strnicmp(name, "com", 3) ||
+			    !strnicmp(name, "lpt", 3))
+				return 0;
 		}
 	}
-	return 0;
+
+	return 1;
 }
 
 static int vfat_find_form(struct inode *dir, unsigned char *name)
@@ -684,9 +663,8 @@ static int vfat_build_slots(struct inode *dir, const unsigned char *name,
 	loff_t offset;
 
 	*slots = 0;
-	res = vfat_valid_longname(name, len, opts->unicode_xlate);
-	if (res < 0)
-		return res;
+	if (!vfat_valid_longname(name, len))
+		return -EINVAL;
 
 	if(!(page = __get_free_page(GFP_KERNEL)))
 		return -ENOMEM;

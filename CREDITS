@@ -1279,14 +1279,13 @@ S: Germany
 
 N: Christoph Hellwig
 E: hch@infradead.org
-E: hch@sgi.com
 D: all kinds of driver, filesystem & core kernel hacking
 D: freevxfs driver
 D: sysvfs maintainer
 D: chief codingstyle nitpicker
-S: Auweg 38
-S: 85748 Garching
-S: Germany
+S: Ampferstr. 50 / 4
+S: 6020 Innsbruck
+S: Austria
 
 N: Richard Henderson
 E: rth@twiddle.net

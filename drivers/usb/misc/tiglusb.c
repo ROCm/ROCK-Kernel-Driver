@@ -93,7 +93,7 @@ clear_pipes (struct usb_device *dev)
 static int
 tiglusb_open (struct inode *inode, struct file *filp)
 {
-	int devnum = minor (inode->i_rdev);
+	int devnum = iminor(inode);
 	ptiglusb_t s;
 
 	if (devnum < TIUSB_MINOR || devnum >= (TIUSB_MINOR + MAXTIGL))

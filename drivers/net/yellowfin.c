@@ -873,8 +873,6 @@ static int yellowfin_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	/* Calculate the next Tx descriptor entry. */
 	entry = yp->cur_tx % TX_RING_SIZE;
 
-	yp->tx_skbuff[entry] = skb;
-
 	if (gx_fix) {	/* Note: only works for paddable protocols e.g.  IP. */
 		int cacheline_end = ((unsigned long)skb->data + skb->len) % 32;
 		/* Fix GX chipset errata. */
@@ -889,6 +887,8 @@ static int yellowfin_start_xmit(struct sk_buff *skb, struct net_device *dev)
 			return 0;
 		}
 	}
+	yp->tx_skbuff[entry] = skb;
+
 #ifdef NO_TXSTATS
 	yp->tx_ring[entry].addr = cpu_to_le32(pci_map_single(yp->pci_dev, 
 		skb->data, len, PCI_DMA_TODEVICE));

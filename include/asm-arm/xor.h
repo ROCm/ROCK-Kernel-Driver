@@ -125,11 +125,11 @@ xor_arm4regs_5(unsigned long bytes, unsigned long *p1, unsigned long *p2,
 }
 
 static struct xor_block_template xor_block_arm4regs = {
-	name:	"arm4regs",
-	do_2:	xor_arm4regs_2,
-	do_3:	xor_arm4regs_3,
-	do_4:	xor_arm4regs_4,
-	do_5:	xor_arm4regs_5,
+	.name	= "arm4regs",
+	.do_2	= xor_arm4regs_2,
+	.do_3	= xor_arm4regs_3,
+	.do_4	= xor_arm4regs_4,
+	.do_5	= xor_arm4regs_5,
 };
 
 #undef XOR_TRY_TEMPLATES

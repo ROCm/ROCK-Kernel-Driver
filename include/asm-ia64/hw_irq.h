@@ -39,9 +39,9 @@ typedef u8 ia64_vector;
  * Vectors 0x10-0x1f are used for low priority interrupts, e.g. CMCI.
  */
 #define IA64_CPEP_VECTOR		0x1c	/* corrected platform error polling vector */
-#define IA64_CMCP_VECTOR		0x1d	/* correctable machine-check polling vector */
+#define IA64_CMCP_VECTOR		0x1d	/* corrected machine-check polling vector */
 #define IA64_CPE_VECTOR			0x1e	/* corrected platform error interrupt vector */
-#define IA64_CMC_VECTOR			0x1f	/* correctable machine-check interrupt vector */
+#define IA64_CMC_VECTOR			0x1f	/* corrected machine-check interrupt vector */
 /*
  * Vectors 0x20-0x2f are reserved for legacy ISA IRQs.
  */

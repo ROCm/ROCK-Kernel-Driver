@@ -36,13 +36,14 @@
  *	memory are initialised
  */
  
-void __init ipc_init (void)
+static int __init ipc_init(void)
 {
 	sem_init();
 	msg_init();
 	shm_init();
-	return;
+	return 0;
 }
+__initcall(ipc_init);
 
 /**
  *	ipc_init_ids		-	initialise IPC identifiers

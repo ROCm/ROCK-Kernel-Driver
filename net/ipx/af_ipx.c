@@ -1365,6 +1365,7 @@ static int ipx_create(struct socket *sock, int protocol)
 			atomic_read(&ipx_sock_nr));
 #endif
 	sock_init_data(sock, sk);
+	sk_set_owner(sk, THIS_MODULE);
 	sk->sk_no_check = 1;		/* Checksum off by default */
 	rc = 0;
 out:

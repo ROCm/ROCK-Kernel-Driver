@@ -267,7 +267,14 @@ static struct attribute * default_attrs[] = {
 
 extern struct subsystem block_subsys;
 
+static void part_release(struct kobject *kobj)
+{
+	struct hd_struct * p = container_of(kobj,struct hd_struct,kobj);
+	kfree(p);
+}
+
 struct kobj_type ktype_part = {
+	.release	= part_release,
 	.default_attrs	= default_attrs,
 	.sysfs_ops	= &part_sysfs_ops,
 };
@@ -279,13 +286,12 @@ void delete_partition(struct gendisk *disk, int part)
 		return;
 	if (!p->nr_sects)
 		return;
+	disk->part[part-1] = NULL;
 	p->start_sect = 0;
 	p->nr_sects = 0;
 	p->reads = p->writes = p->read_sectors = p->write_sectors = 0;
 	devfs_remove("%s/part%d", disk->devfs_name, part);
 	kobject_unregister(&p->kobj);
-	disk->part[part-1] = NULL;
-	kfree(p);
 }
 
 void add_partition(struct gendisk *disk, int part, sector_t start, sector_t len)
@@ -300,7 +306,6 @@ void add_partition(struct gendisk *disk, int part, sector_t start, sector_t len)
 	p->start_sect = start;
 	p->nr_sects = len;
 	p->partno = part;
-	disk->part[part-1] = p;
 
 	devfs_mk_bdev(MKDEV(disk->major, disk->first_minor + part),
 			S_IFBLK|S_IRUSR|S_IWUSR,
@@ -310,6 +315,7 @@ void add_partition(struct gendisk *disk, int part, sector_t start, sector_t len)
 	p->kobj.parent = &disk->kobj;
 	p->kobj.ktype = &ktype_part;
 	kobject_register(&p->kobj);
+	disk->part[part-1] = p;
 }
 
 static void disk_sysfs_symlinks(struct gendisk *disk)

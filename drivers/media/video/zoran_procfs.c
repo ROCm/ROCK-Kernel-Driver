@@ -49,11 +49,11 @@
 #include "zoran.h"
 #include "zoran_procfs.h"
 
-extern int debug;
+extern int *zr_debug;
 
 #define dprintk(num, format, args...) \
 	do { \
-		if (debug >= num) \
+		if (*zr_debug >= num) \
 			printk(format, ##args); \
 	} while (0)
 
@@ -248,6 +248,7 @@ zoran_proc_init (struct zoran *zr)
 {
 #ifdef CONFIG_PROC_FS
 	char name[8];
+
 	snprintf(name, 7, "zoran%d", zr->id);
 	if ((zr->zoran_proc = create_proc_entry(name, 0, 0))) {
 		zr->zoran_proc->read_proc = zoran_read_proc;
@@ -272,6 +273,7 @@ zoran_proc_cleanup (struct zoran *zr)
 {
 #ifdef CONFIG_PROC_FS
 	char name[8];
+
 	snprintf(name, 7, "zoran%d", zr->id);
 	if (zr->zoran_proc) {
 		remove_proc_entry(name, 0);

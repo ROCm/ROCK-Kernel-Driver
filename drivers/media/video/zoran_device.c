@@ -58,11 +58,11 @@
 extern const struct zoran_format zoran_formats[];
 extern const int zoran_num_formats;
 
-extern int debug;
+extern int *zr_debug;
 
 #define dprintk(num, format, args...) \
 	do { \
-		if (debug >= num) \
+		if (*zr_debug >= num) \
 			printk(format, ##args); \
 	} while (0)
 
@@ -170,7 +170,7 @@ post_office_read (struct zoran *zr,
 static void
 dump_guests (struct zoran *zr)
 {
-	if (debug > 2) {
+	if (*zr_debug > 2) {
 		int i, guest[8];
 
 		for (i = 1; i < 8; i++) {	// Don't read jpeg codec here
@@ -190,6 +190,7 @@ static inline unsigned long
 get_time (void)
 {
 	struct timeval tv;
+
 	do_gettimeofday(&tv);
 	return (1000000 * tv.tv_sec + tv.tv_usec);
 }
@@ -868,8 +869,8 @@ zr36057_set_jpg (struct zoran          *zr,
 void
 print_interrupts (struct zoran *zr)
 {
-	int res, noerr;
-	noerr = 0;
+	int res, noerr = 0;
+
 	printk(KERN_INFO "%s: interrupts received:", ZR_DEVNAME(zr));
 	if ((res = zr->field_counter) < -1 || res > 1) {
 		printk(" FD:%d", res);
@@ -931,6 +932,7 @@ static u32
 count_reset_interrupt (struct zoran *zr)
 {
 	u32 isr;
+
 	if ((isr = btread(ZR36057_ISR) & 0x78000000)) {
 		if (isr & ZR36057_ISR_GIRQ1) {
 			btwrite(ZR36057_ISR_GIRQ1, ZR36057_ISR);
@@ -961,6 +963,7 @@ void
 jpeg_start (struct zoran *zr)
 {
 	int reg;
+
 	zr->frame_num = 0;
 
 	/* deassert P_reset, disable code transfer, deassert Active */
@@ -1272,7 +1275,7 @@ error_handler (struct zoran *zr,
 		zr->num_errors++;
 
 		/* Report error */
-		if (debug > 1 && zr->num_errors <= 8) {
+		if (*zr_debug > 1 && zr->num_errors <= 8) {
 			long frame;
 			frame =
 			    zr->jpg_pend[zr->jpg_dma_tail & BUZ_MASK_FRAME];
@@ -1453,38 +1456,23 @@ zoran_irq (int             irq,
 					    0) {
 						/* it is finished, notify the user */
 
-						zr->v4l_buffers.buffer[zr->
-								       v4l_grab_frame].
-						    state = BUZ_STATE_DONE;
-						zr->v4l_buffers.buffer[zr->
-								       v4l_grab_frame].
-						    bs.seq =
-						    zr->v4l_grab_seq;
-						do_gettimeofday(&zr->
-								v4l_buffers.
-								buffer[zr->
-								       v4l_grab_frame].
-								bs.
-								timestamp);
-						zr->v4l_grab_frame =
-						    NO_GRAB_ACTIVE;
+						zr->v4l_buffers.buffer[zr->v4l_grab_frame].state = BUZ_STATE_DONE;
+						zr->v4l_buffers.buffer[zr->v4l_grab_frame].bs.seq = zr->v4l_grab_seq;
+						do_gettimeofday(&zr->v4l_buffers.buffer[zr->v4l_grab_frame].bs.timestamp);
+						zr->v4l_grab_frame = NO_GRAB_ACTIVE;
 						zr->v4l_pend_tail++;
 					}
 				}
 
 				if (zr->v4l_grab_frame == NO_GRAB_ACTIVE)
-					wake_up_interruptible(&zr->
-							      v4l_capq);
+					wake_up_interruptible(&zr->v4l_capq);
 
 				/* Check if there is another grab queued */
 
 				if (zr->v4l_grab_frame == NO_GRAB_ACTIVE &&
-				    zr->v4l_pend_tail !=
-				    zr->v4l_pend_head) {
+				    zr->v4l_pend_tail != zr->v4l_pend_head) {
 
-					int frame =
-					    zr->v4l_pend[zr->
-							 v4l_pend_tail &
+					int frame = zr->v4l_pend[zr->v4l_pend_tail &
 							 V4L_MASK_FRAME];
 					u32 reg;
 
@@ -1544,7 +1532,7 @@ zoran_irq (int             irq,
 
 			if (zr->codec_mode == BUZ_MODE_MOTION_DECOMPRESS ||
 			    zr->codec_mode == BUZ_MODE_MOTION_COMPRESS) {
-				if (debug > 1 &&
+				if (*zr_debug > 1 &&
 				    (!zr->frame_num || zr->JPEG_error)) {
 					printk(KERN_INFO
 					       "%s: first frame ready: state=0x%08x odd_even=%d field_per_buff=%d delay=%d\n",
@@ -1559,11 +1547,8 @@ zoran_irq (int             irq,
 						int i;
 						strcpy(sv, sc);
 						for (i = 0; i < 4; i++) {
-							if (zr->
-							    stat_com[i] &
-							    1)
-								sv[i] =
-								    '1';
+							if (zr->stat_com[i] & 1)
+								sv[i] = '1';
 						}
 						sv[4] = 0;
 						printk(KERN_INFO
@@ -1584,7 +1569,7 @@ zoran_irq (int             irq,
 						    zr->JPEG_missed;
 				}
 
-				if (debug > 2 && zr->frame_num < 6) {
+				if (*zr_debug > 2 && zr->frame_num < 6) {
 					int i;
 					printk("%s: seq=%ld stat_com:",
 					       ZR_DEVNAME(zr), zr->jpg_seq_num);
@@ -1643,10 +1628,11 @@ void
 zoran_set_pci_master (struct zoran *zr,
 		      int           set_master)
 {
-	u16 command;
 	if (set_master) {
 		pci_set_master(zr->pci_dev);
 	} else {
+		u16 command;
+
 		pci_read_config_word(zr->pci_dev, PCI_COMMAND, &command);
 		command &= ~PCI_COMMAND_MASTER;
 		pci_write_config_word(zr->pci_dev, PCI_COMMAND, command);
@@ -1657,6 +1643,7 @@ void
 zoran_init_hardware (struct zoran *zr)
 {
 	int j, zero = 0;
+
 	/* Enable bus-mastering */
 	zoran_set_pci_master(zr, 1);
 
@@ -1718,6 +1705,7 @@ void
 zr36057_init_vfe (struct zoran *zr)
 {
 	u32 reg;
+
 	reg = btread(ZR36057_VFESPFR);
 	reg |= ZR36057_VFESPFR_LittleEndian;
 	reg &= ~ZR36057_VFESPFR_VCLKPol;
@@ -1748,6 +1736,7 @@ decoder_command (struct zoran *zr,
 	if (zr->card.type == LML33 &&
 	    (cmd == DECODER_SET_NORM || DECODER_SET_INPUT)) {
 		int res;
+
 		// Bt819 needs to reset its FIFO buffer using #FRST pin and
 		// LML33 card uses GPIO(7) for that.
 		GPIO(zr, 7, 0);

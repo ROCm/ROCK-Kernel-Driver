@@ -115,8 +115,6 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
-
 /*
  * This flag is set in ide.c by the parameter:  ide0=cmd640_vlb
  */

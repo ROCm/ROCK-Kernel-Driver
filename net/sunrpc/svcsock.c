@@ -27,7 +27,6 @@
 #include <linux/inet.h>
 #include <linux/udp.h>
 #include <linux/tcp.h>
-#include <linux/version.h>
 #include <linux/unistd.h>
 #include <linux/slab.h>
 #include <linux/netdevice.h>

@@ -143,7 +143,7 @@ static int ext2_mknod (struct inode * dir, struct dentry *dentry, int mode, dev_
 	int err = PTR_ERR(inode);
 	if (!IS_ERR(inode)) {
 		init_special_inode(inode, inode->i_mode, rdev);
-#ifdef CONFIG_EXT2_FS_EXT_ATTR
+#ifdef CONFIG_EXT2_FS_XATTR
 		inode->i_op = &ext2_special_inode_operations;
 #endif
 		mark_inode_dirty(inode);

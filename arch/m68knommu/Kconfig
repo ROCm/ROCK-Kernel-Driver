@@ -490,14 +490,6 @@ endmenu
 
 menu "Executable file formats"
 
-config KCORE_AOUT
-	bool
-	default y
-
-config KCORE_ELF
-	bool
-	default y
-
 source "fs/Kconfig.binfmt"
 
 endmenu

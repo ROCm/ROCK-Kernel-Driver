@@ -388,7 +388,7 @@ struct shmid64_ds32 {
  *
  * This is really horribly ugly.
  */
-#define IPCOP_MASK(__x)	(1UL << (__x))
+#define IPCOP_MASK(__x)	(1UL << ((__x)&~IPC_64))
 static int do_sys32_semctl(int first, int second, int third, void *uptr)
 {
 	union semun fourth;
@@ -400,7 +400,7 @@ static int do_sys32_semctl(int first, int second, int third, void *uptr)
 	err = -EFAULT;
 	if (get_user (pad, (u32 *)uptr))
 		goto out;
-	if(third == SETVAL)
+	if ((third & ~IPC_64) == SETVAL)
 		fourth.val = (int)pad;
 	else
 		fourth.__pad = (void *)A(pad);
@@ -2779,3 +2779,41 @@ long sys32_lookup_dcookie(u32 cookie_high, u32 cookie_low, char *buf, size_t len
 	return sys_lookup_dcookie((u64)cookie_high << 32 | cookie_low,
 				  buf, len);
 }
+
+extern asmlinkage long
+sys_timer_create(clockid_t which_clock, struct sigevent *timer_event_spec,
+		 timer_t * created_timer_id);
+
+long
+sys32_timer_create(u32 clock, struct sigevent32 *se32, timer_t *timer_id)
+{
+	struct sigevent se;
+	mm_segment_t oldfs;
+	timer_t t;
+	long err;
+
+	if (se32 == NULL)
+		return sys_timer_create(clock, NULL, timer_id);
+
+	memset(&se, 0, sizeof(struct sigevent));
+	if (get_user(se.sigev_value.sival_int,  &se32->sigev_value.sival_int) ||
+	    __get_user(se.sigev_signo, &se32->sigev_signo) ||
+	    __get_user(se.sigev_notify, &se32->sigev_notify) ||
+	    __copy_from_user(&se._sigev_un._pad, &se32->_sigev_un._pad,
+	    sizeof(se._sigev_un._pad)))
+		return -EFAULT;
+
+	if (!access_ok(VERIFY_WRITE,timer_id,sizeof(timer_t)))
+		return -EFAULT;
+
+	oldfs = get_fs();
+	set_fs(KERNEL_DS);
+	err = sys_timer_create(clock, &se, &t);
+	set_fs(oldfs);
+
+	if (!err)
+		err = __put_user (t, timer_id);
+
+	return err;
+}
+

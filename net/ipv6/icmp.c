@@ -70,12 +70,14 @@
 DEFINE_SNMP_STAT(struct icmpv6_mib, icmpv6_statistics);
 
 /*
- *	ICMP socket(s) for flow control.
+ *	The ICMP socket(s). This is the most convenient way to flow control
+ *	our ICMP output as well as maintain a clean interface throughout
+ *	all layers. All Socketless IP sends will soon be gone.
+ *
+ *	On SMP we have one ICMP socket per-cpu.
  */
-
-/* XXX We can't use per_cpu because this can be modular... */
-static struct socket *__icmpv6_socket[NR_CPUS];
-#define icmpv6_socket	__icmpv6_socket[smp_processor_id()]
+static DEFINE_PER_CPU(struct socket *, __icmpv6_socket) = NULL;
+#define icmpv6_socket	__get_cpu_var(__icmpv6_socket)
 
 static int icmpv6_rcv(struct sk_buff **pskb, unsigned int *nhoffp);
 
@@ -93,11 +95,19 @@ struct icmpv6_msg {
 	__u32			csum;
 };
 
-static __inline__ void icmpv6_xmit_lock(void)
+static __inline__ int icmpv6_xmit_lock(void)
 {
 	local_bh_disable();
-	if (unlikely(!spin_trylock(&icmpv6_socket->sk->sk_lock.slock)))
-		BUG();
+
+	if (unlikely(!spin_trylock(&icmpv6_socket->sk->sk_lock.slock))) {
+		/* This can happen if the output path (f.e. SIT or
+		 * ip6ip6 tunnel) signals dst_link_failure() for an
+		 * outgoing ICMP6 packet.
+		 */
+		local_bh_enable();
+		return 1;
+	}
+	return 0;
 }
 
 static __inline__ void icmpv6_xmit_unlock(void)
@@ -342,7 +352,8 @@ void icmpv6_send(struct sk_buff *skb, int type, int code, __u32 info,
 	fl.fl_icmp_type = type;
 	fl.fl_icmp_code = code;
 
-	icmpv6_xmit_lock();
+	if (icmpv6_xmit_lock())
+		return;
 
 	if (!icmpv6_xrlim_allow(sk, type, &fl))
 		goto out;
@@ -432,7 +443,8 @@ static void icmpv6_echo_reply(struct sk_buff *skb)
 	fl.oif = skb->dev->ifindex;
 	fl.fl_icmp_type = ICMPV6_ECHO_REPLY;
 
-	icmpv6_xmit_lock();
+	if (icmpv6_xmit_lock())
+		return;
 
 	if (!fl.oif && ipv6_addr_is_multicast(&fl.fl6_dst))
 		fl.oif = np->mcast_oif;
@@ -657,33 +669,23 @@ discard_it:
 int __init icmpv6_init(struct net_proto_family *ops)
 {
 	struct sock *sk;
-	int i;
+	int err, i, j;
 
 	for (i = 0; i < NR_CPUS; i++) {
-		int err;
-
 		if (!cpu_possible(i))
 			continue;
 
 		err = sock_create(PF_INET6, SOCK_RAW, IPPROTO_ICMPV6,
-				  &__icmpv6_socket[i]);
+				  &per_cpu(__icmpv6_socket, i));
 		if (err < 0) {
-			int j;
-
 			printk(KERN_ERR
 			       "Failed to initialize the ICMP6 control socket "
 			       "(err %d).\n",
 			       err);
-			for (j = 0; j < i; j++) {
-				if (!cpu_possible(j))
-					continue;
-				sock_release(__icmpv6_socket[j]);
-				__icmpv6_socket[j] = NULL; /* for safety */
-			}
-			return err;
+			goto fail;
 		}
 
-		sk = __icmpv6_socket[i]->sk;
+		sk = per_cpu(__icmpv6_socket, i)->sk;
 		sk->sk_allocation = GFP_ATOMIC;
 		sk->sk_sndbuf = SK_WMEM_MAX * 2;
 		sk->sk_prot->unhash(sk);
@@ -692,16 +694,20 @@ int __init icmpv6_init(struct net_proto_family *ops)
 
 	if (inet6_add_protocol(&icmpv6_protocol, IPPROTO_ICMPV6) < 0) {
 		printk(KERN_ERR "Failed to register ICMP6 protocol\n");
-		for (i = 0; i < NR_CPUS; i++) {
-			if (!cpu_possible(i))
-				continue;
-			sock_release(__icmpv6_socket[i]);
-			__icmpv6_socket[i] = NULL;
-		}
-		return -EAGAIN;
+		err = -EAGAIN;
+		goto fail;
 	}
 
 	return 0;
+
+ fail:
+	for (j = 0; j < i; j++) {
+		if (!cpu_possible(j))
+			continue;
+		sock_release(per_cpu(__icmpv6_socket, j));
+	}
+
+	return err;
 }
 
 void icmpv6_cleanup(void)
@@ -711,8 +717,7 @@ void icmpv6_cleanup(void)
 	for (i = 0; i < NR_CPUS; i++) {
 		if (!cpu_possible(i))
 			continue;
-		sock_release(__icmpv6_socket[i]);
-		__icmpv6_socket[i] = NULL; /* For safety. */
+		sock_release(per_cpu(__icmpv6_socket, i));
 	}
 	inet6_del_protocol(&icmpv6_protocol, IPPROTO_ICMPV6);
 }

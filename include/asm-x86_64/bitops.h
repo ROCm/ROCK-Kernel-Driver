@@ -466,7 +466,7 @@ static __inline__ int ffs(int x)
 
 	__asm__("bsfl %1,%0\n\t"
 		"cmovzl %2,%0" 
-		: "=r" (r) : "g" (x), "r" (32));
+		: "=r" (r) : "g" (x), "r" (-1));
 	return r+1;
 }
 

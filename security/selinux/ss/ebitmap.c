@@ -250,8 +250,8 @@ int ebitmap_read(struct ebitmap *e, void *fp)
 	count = le32_to_cpu(buf[2]);
 
 	if (mapsize != MAPSIZE) {
-		printk(KERN_ERR "security: ebitmap: map size %d does not "
-		       "match my size %d (high bit was %d)\n", mapsize,
+		printk(KERN_ERR "security: ebitmap: map size %u does not "
+		       "match my size %Zd (high bit was %d)\n", mapsize,
 		       MAPSIZE, e->highbit);
 		goto out;
 	}
@@ -261,7 +261,7 @@ int ebitmap_read(struct ebitmap *e, void *fp)
 	}
 	if (e->highbit & (MAPSIZE - 1)) {
 		printk(KERN_ERR "security: ebitmap: high bit (%d) is not a "
-		       "multiple of the map size (%d)\n", e->highbit, MAPSIZE);
+		       "multiple of the map size (%Zd)\n", e->highbit, MAPSIZE);
 		goto bad;
 	}
 	l = NULL;
@@ -283,13 +283,13 @@ int ebitmap_read(struct ebitmap *e, void *fp)
 
 		if (n->startbit & (MAPSIZE - 1)) {
 			printk(KERN_ERR "security: ebitmap start bit (%d) is "
-			       "not a multiple of the map size (%d)\n",
+			       "not a multiple of the map size (%Zd)\n",
 			       n->startbit, MAPSIZE);
 			goto bad_free;
 		}
 		if (n->startbit > (e->highbit - MAPSIZE)) {
 			printk(KERN_ERR "security: ebitmap start bit (%d) is "
-			       "beyond the end of the bitmap (%d)\n",
+			       "beyond the end of the bitmap (%Zd)\n",
 			       n->startbit, (e->highbit - MAPSIZE));
 			goto bad_free;
 		}

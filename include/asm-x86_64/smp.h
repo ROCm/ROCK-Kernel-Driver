@@ -36,7 +36,6 @@ struct pt_regs;
  */
  
 extern void smp_alloc_memory(void);
-extern cpumask_t phys_cpu_present_map;
 extern cpumask_t cpu_online_map;
 extern volatile unsigned long smp_invalidate_needed;
 extern int pic_mode;

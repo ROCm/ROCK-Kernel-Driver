@@ -89,17 +89,24 @@ struct zone {
 
 	ZONE_PADDING(_pad2_)
 
- 	/*
-	 * measure of scanning intensity for this zone. It is calculated
-	 * as exponentially decaying average of the scanning priority
-	 * required to free enough pages in this zone
-	 * (zone_adj_pressure()).
+	/*
+	 * prev_priority holds the scanning priority for this zone.  It is
+	 * defined as the scanning priority at which we achieved our reclaim
+	 * target at the previous try_to_free_pages() or balance_pgdat()
+	 * invokation.
 	 *
-	 *     0                    --- low pressure
+	 * We use prev_priority as a measure of how much stress page reclaim is
+	 * under - it drives the swappiness decision: whether to unmap mapped
+	 * pages.
 	 *
-	 *     (DEF_PRIORITY << 10) --- high pressure
+	 * temp_priority is used to remember the scanning priority at which
+	 * this zone was successfully refilled to free_pages == pages_high.
+	 *
+	 * Access to both these fields is quite racy even on uniprocessor.  But
+	 * it is expected to average out OK.
 	 */
-	int pressure;
+	int temp_priority;
+	int prev_priority;
 
 	/*
 	 * free areas of different sizes

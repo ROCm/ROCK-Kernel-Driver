@@ -125,7 +125,7 @@ static void dtlk_timer_tick(unsigned long data);
 static ssize_t dtlk_read(struct file *file, char *buf,
 			 size_t count, loff_t * ppos)
 {
-	unsigned int minor = minor(file->f_dentry->d_inode->i_rdev);
+	unsigned int minor = iminor(file->f_dentry->d_inode);
 	char ch;
 	int i = 0, retries;
 
@@ -185,7 +185,7 @@ static ssize_t dtlk_write(struct file *file, const char *buf,
 	if (ppos != &file->f_pos)
 		return -ESPIPE;
 
-	if (minor(file->f_dentry->d_inode->i_rdev) != DTLK_MINOR)
+	if (iminor(file->f_dentry->d_inode) != DTLK_MINOR)
 		return -EINVAL;
 
 	while (1) {
@@ -304,7 +304,7 @@ static int dtlk_open(struct inode *inode, struct file *file)
 {
 	TRACE_TEXT("(dtlk_open");
 
-	switch (minor(inode->i_rdev)) {
+	switch (iminor(inode)) {
 	case DTLK_MINOR:
 		if (dtlk_busy)
 			return -EBUSY;
@@ -319,7 +319,7 @@ static int dtlk_release(struct inode *inode, struct file *file)
 {
 	TRACE_TEXT("(dtlk_release");
 
-	switch (minor(inode->i_rdev)) {
+	switch (iminor(inode)) {
 	case DTLK_MINOR:
 		break;
 

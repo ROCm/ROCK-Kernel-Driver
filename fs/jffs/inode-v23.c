@@ -1080,8 +1080,10 @@ jffs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 	struct jffs_control *c;
 	struct inode *inode;
 	int result = 0;
-	kdev_t dev = to_kdev_t(rdev);
+	u16 data;
 	int err;
+
+	data = (MAJOR(rdev) << 8) | MINOR(rdev);
 
 	D1(printk("***jffs_mknod()\n"));
 
@@ -1114,7 +1116,7 @@ jffs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 	raw_inode.mtime = raw_inode.atime;
 	raw_inode.ctime = raw_inode.atime;
 	raw_inode.offset = 0;
-	raw_inode.dsize = sizeof(kdev_t);
+	raw_inode.dsize = 2;
 	raw_inode.rsize = 0;
 	raw_inode.nsize = dentry->d_name.len;
 	raw_inode.nlink = 1;
@@ -1124,7 +1126,7 @@ jffs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 
 	/* Write the new node to the flash.  */
 	if ((err = jffs_write_node(c, node, &raw_inode, dentry->d_name.name,
-				   (unsigned char *)&dev, 0, NULL)) < 0) {
+				   (unsigned char *)&data, 0, NULL)) < 0) {
 		D(printk("jffs_mknod(): jffs_write_node() failed.\n"));
 		result = err;
 		goto jffs_mknod_err;
@@ -1530,7 +1532,7 @@ jffs_file_write(struct file *filp, const char *buf, size_t count,
 	return err;
 } /* jffs_file_write()  */
 
-static ssize_t
+static int
 jffs_prepare_write(struct file *filp, struct page *page,
                   unsigned from, unsigned to)
 {
@@ -1543,7 +1545,7 @@ jffs_prepare_write(struct file *filp, struct page *page,
 	return 0;
 } /* jffs_prepare_write() */
 
-static ssize_t
+static int
 jffs_commit_write(struct file *filp, struct page *page,
                  unsigned from, unsigned to)
 {
@@ -1732,9 +1734,10 @@ jffs_read_inode(struct inode *inode)
 		/* If the node is a device of some sort, then the number of
 		   the device should be read from the flash memory and then
 		   added to the inode's i_rdev member.  */
-		kdev_t rdev;
-		jffs_read_data(f, (char *)&rdev, 0, sizeof(kdev_t));
-		init_special_inode(inode, inode->i_mode, kdev_t_to_nr(rdev));
+		u16 val;
+		jffs_read_data(f, (char *)val, 0, 2);
+		init_special_inode(inode, inode->i_mode,
+			MKDEV((val >> 8) & 255, val & 255));
 	}
 
 	D3(printk (KERN_NOTICE "read_inode(): up biglock\n"));

@@ -33,6 +33,7 @@
 #define PMU_CPU_SPEED		0x7d	/* control CPU speed on some models */
 #define PMU_SLEEP		0x7f	/* put CPU to sleep */
 #define PMU_POWER_EVENTS	0x8f	/* Send power-event commands to PMU */
+#define PMU_I2C_CMD		0x9a	/* I2C operations */
 #define PMU_RESET		0xd0	/* reset CPU */
 #define PMU_GET_BRIGHTBUTTON	0xd9	/* report brightness up/down pos */
 #define PMU_GET_COVER		0xdc	/* report cover open/closed */
@@ -68,6 +69,20 @@
 /* Bits in the environement message (either obtained via PMU_GET_COVER,
  * or via PMU_INT_ENVIRONMENT on core99 */
 #define PMU_ENV_LID_CLOSED	0x01	/* The lid is closed */
+
+/* I2C related definitions */
+#define PMU_I2C_MODE_SIMPLE	0
+#define PMU_I2C_MODE_STDSUB	1
+#define PMU_I2C_MODE_COMBINED	2
+
+#define PMU_I2C_BUS_STATUS	0
+#define PMU_I2C_BUS_SYSCLK	1
+#define PMU_I2C_BUS_POWER	2
+
+#define PMU_I2C_STATUS_OK	0
+#define PMU_I2C_STATUS_DATAREAD	1
+#define PMU_I2C_STATUS_BUSY	0xfe
+
 
 /* Kind of PMU (model) */
 enum {
@@ -127,6 +142,8 @@ extern int pmu_request(struct adb_request *req,
 		void (*done)(struct adb_request *), int nbytes, ...);
 
 extern void pmu_poll(void);
+extern void pmu_poll_adb(void); /* For use by xmon */
+extern void pmu_wait_complete(struct adb_request *req);
 
 /* For use before switching interrupts off for a long time;
  * warning: not stackable
@@ -138,9 +155,16 @@ extern void pmu_enable_irled(int on);
 
 extern void pmu_restart(void);
 extern void pmu_shutdown(void);
+extern void pmu_unlock(void);
 
 extern int pmu_present(void);
 extern int pmu_get_model(void);
+
+extern int pmu_i2c_combined_read(int bus, int addr, int subaddr,  u8* data, int len);
+extern int pmu_i2c_stdsub_write(int bus, int addr, int subaddr,  u8* data, int len);
+extern int pmu_i2c_simple_read(int bus, int addr,  u8* data, int len);
+extern int pmu_i2c_simple_write(int bus, int addr,  u8* data, int len);
+
 
 #ifdef CONFIG_PMAC_PBOOK
 /*

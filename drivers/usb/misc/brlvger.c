@@ -432,7 +432,7 @@ brlvger_disconnect(struct usb_interface *intf)
 static int
 brlvger_open(struct inode *inode, struct file *file)
 {
-	int devnum = minor (inode->i_rdev);
+	int devnum = iminor(inode);
 	struct usb_interface *intf = NULL;
 	struct brlvger_priv *priv = NULL;
 	int n, ret;
