@@ -92,6 +92,7 @@ int reiserfs_unpack (struct inode * inode, struct file * filp)
     int retval = 0;
     int index ;
     struct page *page ;
+    struct address_space *mapping ;
     unsigned long write_from ;
     unsigned long blocksize = inode->i_sb->s_blocksize ;
     	
@@ -122,17 +123,19 @@ int reiserfs_unpack (struct inode * inode, struct file * filp)
     ** reiserfs_get_block to unpack the tail for us.
     */
     index = inode->i_size >> PAGE_CACHE_SHIFT ;
-    page = grab_cache_page(inode->i_mapping, index) ;
+    mapping = inode->i_mapping ;
+    page = grab_cache_page(mapping, index) ;
     retval = -ENOMEM;
     if (!page) {
         goto out ;
     }
-    retval = reiserfs_prepare_write(NULL, page, write_from, blocksize) ;
+    retval = mapping->a_ops->prepare_write(NULL, page, write_from, write_from) ;
     if (retval)
         goto out_unlock ;
 
     /* conversion can change page contents, must flush */
     flush_dcache_page(page) ;
+    retval = mapping->a_ops->commit_write(NULL, page, write_from, write_from) ;
     REISERFS_I(inode)->i_flags |= i_nopack_mask;
 
 out_unlock:

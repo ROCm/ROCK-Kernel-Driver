@@ -2786,7 +2786,10 @@ int journal_end(struct reiserfs_transaction_handle *th, struct super_block *p_s_
     if (cur_th->t_super != th->t_super)
       BUG() ;
 
-    memcpy(current->journal_info, th, sizeof(*th));
+    if (th != cur_th) {
+      memcpy(current->journal_info, th, sizeof(*th));
+      th->t_trans_id = 0;
+    }
     return 0; 
   } else {
     return do_journal_end(th, p_s_sb, nblocks, 0) ;

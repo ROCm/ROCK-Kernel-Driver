@@ -2319,15 +2319,40 @@ static int reiserfs_writepage (struct page * page, struct writeback_control *wbc
 int reiserfs_prepare_write(struct file *f, struct page *page, 
 			   unsigned from, unsigned to) {
     struct inode *inode = page->mapping->host ;
+    int ret;
+    int old_ref = 0;
+
     reiserfs_wait_on_write_block(inode->i_sb) ;
     fix_tail_page_for_writing(page) ;
     if (reiserfs_transaction_running(inode->i_sb)) {
 	struct reiserfs_transaction_handle *th;
         th = (struct reiserfs_transaction_handle *)current->journal_info;
+	old_ref = th->t_refcount;
 	th->t_refcount++;
     }
 
-    return block_prepare_write(page, from, to, reiserfs_get_block) ;
+    ret = block_prepare_write(page, from, to, reiserfs_get_block) ;
+    if (ret && reiserfs_transaction_running(inode->i_sb)) {
+    	struct reiserfs_transaction_handle *th = current->journal_info;
+	/* this gets a little ugly.  If reiserfs_get_block returned an
+	 * error and left a transacstion running, we've got to close it, 
+	 * and we've got to free handle if it was a persistent transaction.
+	 *
+	 * But, if we had nested into an existing transaction, we need
+	 * to just drop the ref count on the handle. 
+	 *
+	 * If old_ref == 0, the transaction is from reiserfs_get_block, 
+	 * and it was a persistent trans.  Otherwise, it was nested above.
+	 */
+	if (th->t_refcount > old_ref) {
+	    if (old_ref)
+	    	th->t_refcount--;
+	    else
+		reiserfs_end_persistent_transaction(th);
+	}
+    }
+    return ret;
+     
 }
 
 
