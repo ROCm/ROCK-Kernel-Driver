@@ -391,7 +391,7 @@ __audit_copy_from_user(struct aud_syscall_data *sc, const struct sysarg *sysarg,
 
 	case AUDIT_ARG_IPC_MSG:
 		/* Flatten the structure */
-		len = sizeof(struct msgbuf) + ((struct msg_msg *)pvalue)->m_ts;
+		len = offsetof(struct msgbuf, mtext) + ((struct msg_msg *)pvalue)->m_ts;
 		target->at_type = AUDIT_ARG_POINTER;
 		break;
 

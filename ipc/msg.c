@@ -656,15 +656,15 @@ asmlinkage long sys_msgsnd (int msqid, struct msgbuf *msgp, size_t msgsz, int ms
 	int err;
 	
 	if (msgsz > msg_ctlmax || (long) msgsz < 0 || msqid < 0)
-		return audit_intercept(AUDIT_msgsnd, msqid, NULL, msgflg), audit_result(-EINVAL);
+		return audit_intercept(AUDIT_msgsnd, msqid, NULL, msgsz, msgflg), audit_result(-EINVAL);
 	if (get_user(mtype, &msgp->mtype))
-		return audit_intercept(AUDIT_msgsnd, msqid, NULL, msgflg), audit_result(-EFAULT);
+		return audit_intercept(AUDIT_msgsnd, msqid, NULL, msgsz, msgflg), audit_result(-EFAULT);
 	if (mtype < 1)
-		return audit_intercept(AUDIT_msgsnd, msqid, NULL, msgflg), audit_result(-EINVAL);
+		return audit_intercept(AUDIT_msgsnd, msqid, NULL, msgsz, msgflg), audit_result(-EINVAL);
 
 	msg = load_msg(msgp->mtext, msgsz);
 	if(IS_ERR(msg))
-		return audit_intercept(AUDIT_msgsnd, msqid, NULL, msgflg), audit_result(PTR_ERR(msg));
+		return audit_intercept(AUDIT_msgsnd, msqid, NULL, msgsz, msgflg), audit_result(PTR_ERR(msg));
 
 	msg->m_type = mtype;
 	msg->m_ts = msgsz;
