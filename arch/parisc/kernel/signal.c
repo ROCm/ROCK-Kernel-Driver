@@ -309,7 +309,8 @@ setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	}
 #endif
 
-#if CACHE_FLUSHING_IS_NOT_BROKEN
+#undef CACHE_FLUSHING_IS_NOT_BROKEN
+#ifdef CACHE_FLUSHING_IS_NOT_BROKEN
 	flush_user_icache_range((unsigned long) &frame->tramp[0],
 			   (unsigned long) &frame->tramp[4]);
 #else

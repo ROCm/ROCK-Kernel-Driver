@@ -43,8 +43,8 @@
 #undef DEBUG_IRQ
 #undef PARISC_IRQ_CR16_COUNTS
 
-extern void timer_interrupt(int, void *, struct pt_regs *);
-extern void ipi_interrupt(int, void *, struct pt_regs *);
+extern irqreturn_t timer_interrupt(int, void *, struct pt_regs *);
+extern irqreturn_t ipi_interrupt(int, void *, struct pt_regs *);
 
 #ifdef DEBUG_IRQ
 #define DBG_IRQ(irq, x)	if ((irq) != TIMER_IRQ) printk x
@@ -583,7 +583,7 @@ struct irq_region *alloc_irq_region( int count, struct irq_region_ops *ops,
 /* FIXME: SMP, flags, bottom halves, rest */
 
 int request_irq(unsigned int irq,
-		void (*handler)(int, void *, struct pt_regs *),
+		irqreturn_t (*handler)(int, void *, struct pt_regs *),
 		unsigned long irqflags,
 		const char * devname,
 		void *dev_id)

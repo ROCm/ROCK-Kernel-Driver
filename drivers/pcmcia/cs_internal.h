@@ -173,17 +173,9 @@ int try_irq(u_int Attributes, int irq, int specific);
 void undo_irq(u_int Attributes, int irq);
 int adjust_resource_info(client_handle_t handle, adjust_t *adj);
 void release_resource_db(void);
-int proc_read_io(char *buf, char **start, off_t pos,
-		 int count, int *eof, void *data);
-int proc_read_mem(char *buf, char **start, off_t pos,
-		  int count, int *eof, void *data);
 
 extern struct rw_semaphore pcmcia_socket_list_rwsem;
 extern struct list_head pcmcia_socket_list;
-
-#ifdef CONFIG_PROC_FS
-extern struct proc_dir_entry *proc_pccard;
-#endif
 
 #ifdef PCMCIA_DEBUG
 extern int pc_debug;

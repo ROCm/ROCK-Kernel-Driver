@@ -605,7 +605,7 @@ iosapic_xlate_pin(struct iosapic_info *isi, struct pci_dev *pcidev)
 }
 
 
-static void
+static irqreturn_t
 iosapic_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct vector_info *vi = (struct vector_info *)dev_id;
@@ -623,6 +623,8 @@ iosapic_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	** I/O SAPIC must always issue EOI.
 	*/
 	IOSAPIC_EOI(vi->vi_eoi_addr, vi->vi_eoi_data);
+
+	return IRQ_HANDLED;
 }
 
 
