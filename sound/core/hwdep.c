@@ -133,8 +133,11 @@ static int snd_hwdep_open(struct inode *inode, struct file * file)
 	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&hw->open_wait, &wait);
 	if (err >= 0) {
-		file->private_data = hw;
-		hw->used++;
+		err = snd_card_file_add(hw->card, file);
+		if (err >= 0) {
+			file->private_data = hw;
+			hw->used++;
+		}
 	}
 	up(&hw->open_mutex);
 	return err;
@@ -151,6 +154,7 @@ static int snd_hwdep_release(struct inode *inode, struct file * file)
 	}
 	if (hw->used > 0)
 		hw->used--;
+	snd_card_file_remove(hw->card, file);
 	up(&hw->open_mutex);
 	return -ENXIO;	
 }
