@@ -297,20 +297,20 @@ char * partition_name(kdev_t dev)
 	return dname->name;
 }
 
-static unsigned int calc_dev_sboffset(kdev_t dev, mddev_t *mddev,
+static unsigned int calc_dev_sboffset(mdk_rdev_t *rdev, mddev_t *mddev,
 						int persistent)
 {
-	unsigned int size = (blkdev_size_in_bytes(dev) >> BLOCK_SIZE_BITS);
+	unsigned int size = rdev->bdev->bd_inode->i_size >> BLOCK_SIZE_BITS;
 	if (persistent)
 		size = MD_NEW_SIZE_BLOCKS(size);
 	return size;
 }
 
-static unsigned int calc_dev_size(kdev_t dev, mddev_t *mddev, int persistent)
+static unsigned int calc_dev_size(mdk_rdev_t *rdev, mddev_t *mddev, int persistent)
 {
 	unsigned int size;
 
-	size = calc_dev_sboffset(dev, mddev, persistent);
+	size = calc_dev_sboffset(rdev, mddev, persistent);
 	if (!mddev->sb) {
 		MD_BUG();
 		return size;
@@ -467,7 +467,7 @@ static int read_disk_sb(mdk_rdev_t * rdev)
 	 *
 	 * It also happens to be a multiple of 4Kb.
 	 */
-	sb_offset = calc_dev_sboffset(rdev->dev, rdev->mddev, 1);
+	sb_offset = calc_dev_sboffset(rdev, rdev->mddev, 1);
 	rdev->sb_offset = sb_offset;
 
 	if (!sync_page_io(rdev->bdev, sb_offset<<1, MD_SB_BYTES, rdev->sb_page, READ))
@@ -850,7 +850,7 @@ static int write_disk_sb(mdk_rdev_t * rdev)
 		return 1;
 	}
 
-	sb_offset = calc_dev_sboffset(dev, rdev->mddev, 1);
+	sb_offset = calc_dev_sboffset(rdev, rdev->mddev, 1);
 	if (rdev->sb_offset != sb_offset) {
 		printk(KERN_INFO "%s's sb offset has changed from %ld to %ld, skipping\n",
 		       partition_name(dev), rdev->sb_offset, sb_offset);
@@ -861,7 +861,7 @@ static int write_disk_sb(mdk_rdev_t * rdev)
 	 * its size has changed to zero silently, and the MD code does
 	 * not yet know that it's faulty.
 	 */
-	size = calc_dev_size(dev, rdev->mddev, 1);
+	size = calc_dev_size(rdev, rdev->mddev, 1);
 	if (size != rdev->size) {
 		printk(KERN_INFO "%s's size has changed from %ld to %ld since import, skipping\n",
 		       partition_name(dev), rdev->size, size);
@@ -1030,7 +1030,7 @@ static int md_import_device(kdev_t newdev, int on_disk)
 	rdev->desc_nr = -1;
 	rdev->faulty = 0;
 
-	size = (blkdev_size_in_bytes(newdev) >> BLOCK_SIZE_BITS);
+	size = rdev->bdev->bd_inode->i_size >> BLOCK_SIZE_BITS;
 	if (!size) {
 		printk(KERN_WARNING
 		       "md: %s has zero or unknown size, marking faulty!\n",
@@ -1463,7 +1463,7 @@ static int device_size_calculation(mddev_t * mddev)
 			MD_BUG();
 			continue;
 		}
-		rdev->size = calc_dev_size(rdev->dev, mddev, persistent);
+		rdev->size = calc_dev_size(rdev, mddev, persistent);
 		if (rdev->size < sb->chunk_size / 1024) {
 			printk(KERN_WARNING
 				"md: Dev %s smaller than chunk_size: %ldk < %dk\n",
@@ -2185,8 +2185,8 @@ static int add_new_disk(mddev_t * mddev, mdu_disk_info_t *info)
 		if (!persistent)
 			printk(KERN_INFO "md: nonpersistent superblock ...\n");
 
-		size = calc_dev_size(dev, mddev, persistent);
-		rdev->sb_offset = calc_dev_sboffset(dev, mddev, persistent);
+		size = calc_dev_size(rdev, mddev, persistent);
+		rdev->sb_offset = calc_dev_sboffset(rdev, mddev, persistent);
 
 		if (!mddev->sb->size || (mddev->sb->size > size))
 			mddev->sb->size = size;
@@ -2314,15 +2314,6 @@ static int hot_add_disk(mddev_t * mddev, kdev_t dev)
 		return -EINVAL;
 	}
 
-	persistent = !mddev->sb->not_persistent;
-	size = calc_dev_size(dev, mddev, persistent);
-
-	if (size < mddev->sb->size) {
-		printk(KERN_WARNING "md%d: disk size %d blocks < array size %d\n",
-				mdidx(mddev), size, mddev->sb->size);
-		return -ENOSPC;
-	}
-
 	rdev = find_rdev(mddev, dev);
 	if (rdev)
 		return -EBUSY;
@@ -2337,6 +2328,17 @@ static int hot_add_disk(mddev_t * mddev, kdev_t dev)
 		MD_BUG();
 		return -EINVAL;
 	}
+
+	persistent = !mddev->sb->not_persistent;
+	size = calc_dev_size(rdev, mddev, persistent);
+
+	if (size < mddev->sb->size) {
+		printk(KERN_WARNING "md%d: disk size %d blocks < array size %d\n",
+				mdidx(mddev), size, mddev->sb->size);
+		err = -ENOSPC;
+		goto abort_export;
+	}
+
 	if (rdev->faulty) {
 		printk(KERN_WARNING "md: can not hot-add faulty %s disk to md%d!\n",
 				partition_name(dev), mdidx(mddev));
@@ -2351,7 +2353,7 @@ static int hot_add_disk(mddev_t * mddev, kdev_t dev)
 	 */
 	rdev->old_dev = dev;
 	rdev->size = size;
-	rdev->sb_offset = calc_dev_sboffset(dev, mddev, persistent);
+	rdev->sb_offset = calc_dev_sboffset(rdev, mddev, persistent);
 
 	disk = mddev->sb->disks + mddev->sb->raid_disks;
 	for (i = mddev->sb->raid_disks; i < MD_SB_DISKS; i++) {
