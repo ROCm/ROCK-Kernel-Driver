@@ -158,8 +158,8 @@ static ssize_t emu10k1_audio_write(struct file *file, const char *buffer, size_t
 		spin_unlock_irqrestore(&woinst->lock, flags);
 		return -ENXIO;
 	}
-
-	if (woinst->format.passthrough) {
+	// This is for emu10k1 revs less than 7, we need to go through tram
+	if (woinst->format.passthrough == 1) {
 		int r;
 		
 		woinst->buffer.ossfragshift = PT_BLOCKSIZE_LOG2;
@@ -350,8 +350,9 @@ static int emu10k1_audio_ioctl(struct inode *inode, struct file *file, unsigned 
 
 	case SNDCTL_DSP_GETCAPS:
 		DPF(2, "SNDCTL_DSP_GETCAPS:\n");
-		return put_user(DSP_CAP_DUPLEX | DSP_CAP_REALTIME | DSP_CAP_TRIGGER | DSP_CAP_MMAP | DSP_CAP_COPROC, (int *) arg);
-
+		return put_user(DSP_CAP_DUPLEX | DSP_CAP_REALTIME |
+				DSP_CAP_TRIGGER | DSP_CAP_MMAP |
+				DSP_CAP_COPROC| DSP_CAP_MULTI, (int *) arg);
 	case SNDCTL_DSP_SPEED:
 		DPF(2, "SNDCTL_DSP_SPEED:\n");
 
@@ -528,8 +529,8 @@ static int emu10k1_audio_ioctl(struct inode *inode, struct file *file, unsigned 
 		else if (file->f_mode & FMODE_WRITE) {
 			val = AFMT_S16_LE | AFMT_U8;
 			if (emu10k1_find_control_gpr(&wave_dev->card->mgr,
-			    			     wave_dev->card->pt.patch_name, 
-			    			     wave_dev->card->pt.enable_gpr_name) >= 0)
+						     wave_dev->card->pt.patch_name, 
+						     wave_dev->card->pt.enable_gpr_name) >= 0)
 				val |= AFMT_AC3;
 		}
 		return put_user(val, (int *) arg);
@@ -789,7 +790,7 @@ static int emu10k1_audio_ioctl(struct inode *inode, struct file *file, unsigned 
 				cinfo.blocks = 0;
 			}
 
-			if(wiinst->mmapped)
+			if (wiinst->mmapped)
 				wiinst->buffer.bytestocopy %= wiinst->buffer.fragment_size;
 
 			spin_unlock_irqrestore(&wiinst->lock, flags);
@@ -811,15 +812,17 @@ static int emu10k1_audio_ioctl(struct inode *inode, struct file *file, unsigned 
 			spin_lock_irqsave(&woinst->lock, flags);
 
 			if (woinst->state & WAVE_STATE_OPEN || 
-			    (woinst->format.passthrough && wave_dev->card->pt.state)) {
+			    ((woinst->format.passthrough == 1) && wave_dev->card->pt.state)) {
 				int num_fragments;
-				if (woinst->format.passthrough) {
+
+				if (woinst->format.passthrough == 1) {
 					emu10k1_pt_waveout_update(wave_dev);
 					cinfo.bytes = woinst->total_played;
 				} else {
 					emu10k1_waveout_update(woinst);
 					cinfo.bytes = woinst->total_played;
 				}
+
 				cinfo.ptr = woinst->buffer.hw_pos;
 				num_fragments = cinfo.bytes / woinst->buffer.fragment_size;
 				cinfo.blocks = num_fragments - woinst->blocks;
@@ -899,7 +902,7 @@ static int emu10k1_audio_ioctl(struct inode *inode, struct file *file, unsigned 
 
 		if (file->f_mode & FMODE_WRITE) {
 			/* digital pass-through fragment count and size are fixed values */
-			if (woinst->state & WAVE_STATE_OPEN || woinst->format.passthrough)
+			if (woinst->state & WAVE_STATE_OPEN || (woinst->format.passthrough == 1))
 				return -EINVAL;	/* too late to change */
 
 			woinst->buffer.ossfragshift = val & 0xffff;
@@ -936,19 +939,35 @@ static int emu10k1_audio_ioctl(struct inode *inode, struct file *file, unsigned 
 				kfree (buf);
 				return -EINVAL;
 			}
+
+			if (buf->command == CMD_WRITE) {
+				
 #ifdef DBGEMU
-			if ( (buf->offs < 0) || (buf->offs + buf->len > 0x800) || (buf->len > 1000)) {
+				if ((buf->offs < 0) || (buf->offs + buf->len > 0xe00) || (buf->len > 1000)) {
 #else
-			if ( ((buf->offs < 0x100 ) || (buf->offs + buf->len > 0x800) || (buf->len > 1000))
-			     && !( ( buf->offs == DBG) && (buf->len ==1) )){
-#endif	
-				kfree(buf);
-				return -EINVAL;
-			}
+				if (((buf->offs < 0x100) || (buf->offs + buf->len > (wave_dev->card->is_audigy ? 0xe00 : 0x800)) || (buf->len > 1000)
+				) && !(
+					//any register allowed raw access to users goes here:
+					(buf->offs == DBG ||
+					  buf->offs == A_DBG)
+					&& (buf->len == 1))) {
+#endif		
+					kfree(buf);
+					return -EINVAL;
+				}
+			} else {
+				if ((buf->offs < 0) || (buf->offs + buf->len > 0xe00) || (buf->len > 1000)) {
+					kfree(buf);
+					return -EINVAL;
+				}
+			}			
+				
+			if (((unsigned)buf->flags) > 0x3f)
+				buf->flags = 0;
 
 			if (buf->command == CMD_READ) {
 				for (i = 0; i < buf->len; i++)
-					((u32 *) buf->data)[i] = sblive_readptr(wave_dev->card, buf->offs + i, 0);
+					((u32 *) buf->data)[i] = sblive_readptr(wave_dev->card, buf->offs + i, buf->flags);
 
 				if (copy_to_user((copr_buffer *) arg, buf, sizeof(copr_buffer))) {
 					kfree(buf);
@@ -956,7 +975,7 @@ static int emu10k1_audio_ioctl(struct inode *inode, struct file *file, unsigned 
 				}
 			} else {
 				for (i = 0; i < buf->len; i++)
-					sblive_writeptr(wave_dev->card, buf->offs + i, 0, ((u32 *) buf->data)[i]);
+					sblive_writeptr(wave_dev->card, buf->offs + i, buf->flags, ((u32 *) buf->data)[i]);
 			}
 
 			kfree (buf);
@@ -1244,8 +1263,9 @@ static int emu10k1_audio_release(struct inode *inode, struct file *file)
 		struct woinst *woinst = wave_dev->woinst;
 
 		spin_lock_irqsave(&woinst->lock, flags);
-
-		if (woinst->format.passthrough && card->pt.state != PT_STATE_INACTIVE) {
+		if(woinst->format.passthrough==2)
+			card->pt.state=PT_STATE_PLAYING;
+		if (woinst->format.passthrough && card->pt.state != PT_STATE_INACTIVE){
 			spin_lock(&card->pt.lock);
                         emu10k1_pt_stop(card);
 			spin_unlock(&card->pt.lock);
