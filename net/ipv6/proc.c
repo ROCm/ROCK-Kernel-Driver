@@ -30,6 +30,10 @@
 #include <net/transp_v6.h>
 #include <net/ipv6.h>
 
+#ifdef CONFIG_PROC_FS
+static struct proc_dir_entry *proc_net_devsnmp6;
+#endif
+
 static int fold_prot_inuse(struct proto *proto)
 {
 	int res = 0;
@@ -175,9 +179,15 @@ snmp6_seq_show_item(struct seq_file *seq, void **mib, struct snmp6_item *itemlis
 
 static int snmp6_seq_show(struct seq_file *seq, void *v)
 {
-	snmp6_seq_show_item(seq, (void **)ipv6_statistics, snmp6_ipv6_list);
-	snmp6_seq_show_item(seq, (void **)icmpv6_statistics, snmp6_icmp6_list);
-	snmp6_seq_show_item(seq, (void **)udp_stats_in6, snmp6_udp6_list);
+	struct inet6_dev *idev = (struct inet6_dev *)seq->private;
+
+	if (idev) {
+		seq_printf(seq, "%-32s\t%u\n", "ifIndex", idev->dev->ifindex);
+	} else {
+		snmp6_seq_show_item(seq, (void **)ipv6_statistics, snmp6_ipv6_list);
+		snmp6_seq_show_item(seq, (void **)icmpv6_statistics, snmp6_icmp6_list);
+		snmp6_seq_show_item(seq, (void **)udp_stats_in6, snmp6_udp6_list);
+	}
 	return 0;
 }
 
@@ -195,7 +205,7 @@ static struct file_operations sockstat6_seq_fops = {
 
 static int snmp6_seq_open(struct inode *inode, struct file *file)
 {
-	return single_open(file, snmp6_seq_show, NULL);
+	return single_open(file, snmp6_seq_show, PDE(inode)->data);
 }
 
 static struct file_operations snmp6_seq_fops = {
@@ -204,6 +214,51 @@ static struct file_operations snmp6_seq_fops = {
 	.llseek	 = seq_lseek,
 	.release = single_release,
 };
+
+int snmp6_register_dev(struct inet6_dev *idev)
+{
+	int err = -ENOMEM;
+#ifdef CONFIG_PROC_FS
+	struct proc_dir_entry *p;
+#endif
+
+	if (!idev || !idev->dev)
+		return -EINVAL;
+
+#ifdef CONFIG_PROC_FS
+	if (!proc_net_devsnmp6) {
+		err = -ENOENT;
+		goto err_proc;
+	}
+	p = create_proc_entry(idev->dev->name, S_IRUGO, proc_net_devsnmp6);
+	if (!p)
+		goto err_proc;
+	p->data = idev;
+	p->proc_fops = &snmp6_seq_fops;
+
+	idev->stats.proc_dir_entry = p;
+#endif
+	return 0;
+
+#ifdef CONFIG_PROC_FS
+err_proc:
+#endif
+	return err;
+}
+
+int snmp6_unregister_dev(struct inet6_dev *idev)
+{
+#ifdef CONFIG_PROC_FS
+	if (!proc_net_devsnmp6)
+		return -ENOENT;
+	if (!idev || !idev->stats.proc_dir_entry)
+		return -EINVAL;
+	remove_proc_entry(idev->stats.proc_dir_entry->name,
+			  proc_net_devsnmp6);
+#endif
+
+	return 0;
+}
 
 int __init ipv6_misc_proc_init(void)
 {
@@ -215,6 +270,9 @@ int __init ipv6_misc_proc_init(void)
 		goto proc_snmp6_fail;
 	else
 		p->proc_fops = &snmp6_seq_fops;
+	proc_net_devsnmp6 = proc_mkdir("dev_snmp6", proc_net);
+	if (!proc_net_devsnmp6)
+		goto proc_dev_snmp6_fail;
 	p = create_proc_entry("sockstat6", S_IRUGO, proc_net);
 	if (!p)
 		goto proc_sockstat6_fail;
@@ -224,6 +282,8 @@ out:
 	return rc;
 
 proc_sockstat6_fail:
+	remove_proc_entry("dev_snmp6", proc_net);
+proc_dev_snmp6_fail:
 	remove_proc_entry("snmp6", proc_net);
 proc_snmp6_fail:
 	rc = -ENOMEM;

@@ -812,6 +812,7 @@ static int __init inet6_init(void)
 #ifdef CONFIG_PROC_FS
 proc_anycast6_fail:
 	proc_net_remove("snmp6");
+	proc_net_remove("dev_snmp6");
 	proc_net_remove("sockstat6");
 proc_misc6_fail:
 	proc_net_remove("udp6");
@@ -847,6 +848,7 @@ static void inet6_exit(void)
 	proc_net_remove("tcp6");
 	proc_net_remove("udp6");
 	proc_net_remove("sockstat6");
+	proc_net_remove("dev_snmp6");
 	proc_net_remove("snmp6");
 	proc_net_remove("anycast6");
 #endif

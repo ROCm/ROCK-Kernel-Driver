@@ -152,6 +152,10 @@ struct ipv6_devconf
 	void		*sysctl;
 };
 
+struct ipv6_devstat {
+	struct proc_dir_entry	*proc_dir_entry;
+};
+
 struct inet6_dev 
 {
 	struct net_device		*dev;
@@ -185,6 +189,7 @@ struct inet6_dev
 	struct neigh_parms	*nd_parms;
 	struct inet6_dev	*next;
 	struct ipv6_devconf	cnf;
+	struct ipv6_devstat	stats;
 };
 
 extern struct ipv6_devconf ipv6_devconf;
