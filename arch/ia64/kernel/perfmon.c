@@ -2286,7 +2286,7 @@ pfm_smpl_buffer_alloc(struct task_struct *task, pfm_context_t *ctx, unsigned lon
 	 * if ((mm->total_vm << PAGE_SHIFT) + len> task->rlim[RLIMIT_AS].rlim_cur)
 	 * 	return -ENOMEM;
 	 */
-	if (size > task->rlim[RLIMIT_MEMLOCK].rlim_cur) return -EAGAIN;
+	if (size > task->rlim[RLIMIT_MEMLOCK].rlim_cur) return -ENOMEM;
 
 	/*
 	 * We do the easy to undo allocations first.
@@ -2601,7 +2601,7 @@ pfm_task_incompatible(pfm_context_t *ctx, struct task_struct *task)
 	 */
 	if (task == current) return 0;
 
-	if (task->state != TASK_STOPPED) {
+	if ((task->state != TASK_STOPPED) && (task->state != TASK_TRACED)) {
 		DPRINT(("cannot attach to non-stopped task [%d] state=%ld\n", task->pid, task->state));
 		return -EBUSY;
 	}
@@ -4755,7 +4755,7 @@ recheck:
 	 * the task must be stopped.
 	 */
 	if (PFM_CMD_STOPPED(cmd)) {
-		if (task->state != TASK_STOPPED) {
+		if ((task->state != TASK_STOPPED) && (task->state != TASK_TRACED)) {
 			DPRINT(("[%d] task not in stopped state\n", task->pid));
 			return -EBUSY;
 		}
