@@ -29,6 +29,7 @@
 #include <linux/init.h>
 #include <linux/seq_file.h>
 #include <linux/errno.h>
+#include <linux/list.h>
 
 #include <asm/irq.h>
 #include <asm/system.h>
@@ -45,6 +46,7 @@
 
 static volatile unsigned long irq_err_count;
 static spinlock_t irq_controller_lock;
+static LIST_HEAD(irq_pending);
 
 struct irqdesc irq_desc[NR_IRQS];
 void (*init_arch_irq)(void) __initdata = NULL;
@@ -69,9 +71,10 @@ static struct irqchip bad_chip = {
 };
 
 static struct irqdesc bad_irq_desc = {
-	.chip	= &bad_chip,
-	.handle = do_bad_IRQ,
-	.depth	= 1,
+	.chip		= &bad_chip,
+	.handle		= do_bad_IRQ,
+	.pend		= LIST_HEAD_INIT(bad_irq_desc.pend),
+	.disable_depth	= 1,
 };
 
 /**
@@ -90,6 +93,7 @@ void disable_irq(unsigned int irq)
 
 	spin_lock_irqsave(&irq_controller_lock, flags);
 	desc->disable_depth++;
+	list_del_init(&desc->pend);
 	spin_unlock_irqrestore(&irq_controller_lock, flags);
 }
 
@@ -122,9 +126,11 @@ void enable_irq(unsigned int irq)
 		 * from here since the caller might be in an
 		 * interrupt-protected region.
 		 */
-		if (desc->pending) {
+		if (desc->pending && list_empty(&desc->pend)) {
 			desc->pending = 0;
-			desc->chip->rerun(irq);
+			if (!desc->chip->retrigger ||
+			    desc->chip->retrigger(irq))
+				list_add(&desc->pend, &irq_pending);
 		}
 	}
 	spin_unlock_irqrestore(&irq_controller_lock, flags);
@@ -346,6 +352,40 @@ do_level_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 	}
 }
 
+static void do_pending_irqs(struct pt_regs *regs)
+{
+	struct list_head head, *l, *n;
+
+	do {
+		struct irqdesc *desc;
+
+		/*
+		 * First, take the pending interrupts off the list.
+		 * The act of calling the handlers may add some IRQs
+		 * back onto the list.
+		 */
+		head = irq_pending;
+		INIT_LIST_HEAD(&irq_pending);
+		head.next->prev = &head;
+		head.prev->next = &head;
+
+		/*
+		 * Now run each entry.  We must delete it from our
+		 * list before calling the handler.
+		 */
+		list_for_each_safe(l, n, &head) {
+			desc = list_entry(l, struct irqdesc, pend);
+			list_del_init(&desc->pend);
+			desc->handle(desc - irq_desc, desc, regs);
+		}
+
+		/*
+		 * The list must be empty.
+		 */
+		BUG_ON(!list_empty(&head));
+	} while (!list_empty(&irq_pending));
+}
+
 /*
  * do_IRQ handles all hardware IRQ's.  Decoded IRQs should not
  * come via this function.  Instead, they should provide their
@@ -365,6 +405,13 @@ asmlinkage void asm_do_IRQ(int irq, struct pt_regs *regs)
 	irq_enter();
 	spin_lock(&irq_controller_lock);
 	desc->handle(irq, desc, regs);
+
+	/*
+	 * Now re-run any pending interrupts.
+	 */
+	if (!list_empty(&irq_pending))
+		do_pending_irqs(regs);
+
 	spin_unlock(&irq_controller_lock);
 	irq_exit();
 }
@@ -740,8 +787,10 @@ void __init init_IRQ(void)
 	extern void init_dma(void);
 	int irq;
 
-	for (irq = 0, desc = irq_desc; irq < NR_IRQS; irq++, desc++)
+	for (irq = 0, desc = irq_desc; irq < NR_IRQS; irq++, desc++) {
 		*desc = bad_irq_desc;
+		INIT_LIST_HEAD(&desc->pend);
+	}
 
 	init_arch_irq();
 	init_dma();

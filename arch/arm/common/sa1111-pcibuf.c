@@ -54,7 +54,7 @@ struct safe_buffer {
 	dma_addr_t	safe_dma_addr;
 };
 
-LIST_HEAD(safe_buffers);
+static LIST_HEAD(safe_buffers);
 
 
 #define SIZE_SMALL	1024

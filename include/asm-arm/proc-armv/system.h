@@ -14,8 +14,13 @@
 
 #define set_cr(x)					\
 	__asm__ __volatile__(				\
-	"mcr	p15, 0, %0, c1, c0	@ set CR"	\
+	"mcr	p15, 0, %0, c1, c0, 0	@ set CR"	\
 	: : "r" (x))
+
+#define get_cr(x)					\
+	__asm__ __volatile__(				\
+	"mrc	p15, 0, %0, c1, c0, 0	@ get CR"	\
+	: "=r" (x))
 
 #define CR_M	(1 << 0)	/* MMU enable				*/
 #define CR_A	(1 << 1)	/* Alignment abort enable		*/
@@ -24,9 +29,9 @@
 #define CR_P	(1 << 4)	/* 32-bit exception handler		*/
 #define CR_D	(1 << 5)	/* 32-bit data address range		*/
 #define CR_L	(1 << 6)	/* Implementation defined		*/
-#define CD_B	(1 << 7)	/* Big endian				*/
+#define CR_B	(1 << 7)	/* Big endian				*/
 #define CR_S	(1 << 8)	/* System MMU protection		*/
-#define CD_R	(1 << 9)	/* ROM MMU protection			*/
+#define CR_R	(1 << 9)	/* ROM MMU protection			*/
 #define CR_F	(1 << 10)	/* Implementation defined		*/
 #define CR_Z	(1 << 11)	/* Implementation defined		*/
 #define CR_I	(1 << 12)	/* Icache enable			*/

@@ -23,7 +23,7 @@
 #define KERNEL_STACK_SIZE	PAGE_SIZE
 
 #define INIT_EXTRA_THREAD_INFO						\
-	.cpu_domain	= domain_val(DOMAIN_USER, DOMAIN_CLIENT) |	\
+	.cpu_domain	= domain_val(DOMAIN_USER, DOMAIN_MANAGER) |	\
 			  domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) |	\
 			  domain_val(DOMAIN_IO, DOMAIN_CLIENT)
 
