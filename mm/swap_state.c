@@ -16,14 +16,6 @@
 
 #include <asm/pgtable.h>
 
-/*
- * swapper_inode doesn't do anything much.  It is really only here to
- * avoid some special-casing in other parts of the kernel.
- */
-static struct inode swapper_inode = {
-	.i_mapping	= &swapper_space,
-};
-
 static struct backing_dev_info swap_backing_dev_info = {
 	.ra_pages	= 0,	/* No readahead */
 	.memory_backed	= 1,	/* Does not contribute to dirty memory */
@@ -38,7 +30,6 @@ struct address_space swapper_space = {
 	.dirty_pages	= LIST_HEAD_INIT(swapper_space.dirty_pages),
 	.io_pages	= LIST_HEAD_INIT(swapper_space.io_pages),
 	.locked_pages	= LIST_HEAD_INIT(swapper_space.locked_pages),
-	.host		= &swapper_inode,
 	.a_ops		= &swap_aops,
 	.backing_dev_info = &swap_backing_dev_info,
 	.i_mmap		= LIST_HEAD_INIT(swapper_space.i_mmap),

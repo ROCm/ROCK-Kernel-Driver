@@ -516,7 +516,9 @@ int __set_page_dirty_nobuffers(struct page *page)
 				list_add(&page->list, &mapping->dirty_pages);
 			}
 			spin_unlock(&mapping->page_lock);
-			__mark_inode_dirty(mapping->host, I_DIRTY_PAGES);
+			if (!PageSwapCache(page))
+				__mark_inode_dirty(mapping->host,
+							I_DIRTY_PAGES);
 		}
 	}
 	return ret;

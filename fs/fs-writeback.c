@@ -49,9 +49,6 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 {
 	struct super_block *sb = inode->i_sb;
 
-	if (!sb)
-		return;		/* swapper_space */
-
 	/*
 	 * Don't do this for I_DIRTY_PAGES - that doesn't actually
 	 * dirty the inode itself
@@ -90,9 +87,12 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 		 * Only add valid (hashed) inodes to the superblock's
 		 * dirty list.  Add blockdev inodes as well.
 		 */
-		if ((hlist_unhashed(&inode->i_hash) || (inode->i_state & (I_FREEING|I_CLEAR)))
-		    && !S_ISBLK(inode->i_mode))
-			goto out;
+		if (!S_ISBLK(inode->i_mode)) {
+			if (hlist_unhashed(&inode->i_hash))
+				goto out;
+			if (inode->i_state & (I_FREEING|I_CLEAR))
+				goto out;
+		}
 
 		/*
 		 * If the inode was already on s_dirty or s_io, don't
