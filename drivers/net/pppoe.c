@@ -403,7 +403,7 @@ static int pppoe_rcv(struct sk_buff *skb,
         bh_lock_sock(sk);
 
 	/* Socket state is unknown, must put skb into backlog. */
-	if (sk->lock.users != 0) {
+	if (sock_owned_by_user(sk) != 0) {
 		sk_add_backlog(sk, skb);
 		ret = NET_RX_SUCCESS;
 	} else {
@@ -444,7 +444,7 @@ static int pppoe_disc_rcv(struct sk_buff *skb,
 		 * one socket family type, we cannot (easily) distinguish
 		 * what kind of SKB it is during backlog rcv.
 		 */
-		if (sk->lock.users == 0) {
+		if (sock_owned_by_user(sk) == 0) {
 			sk->state = PPPOX_ZOMBIE;
 			pppox_unbind_sock(sk);
 		}
