@@ -81,7 +81,12 @@ static inline int tc_classify(struct sk_buff *skb, struct tcf_proto *tp, struct 
 	return -1;
 }
 
-
+static inline void tcf_destroy(struct tcf_proto *tp)
+{
+	tp->ops->destroy(tp);
+	module_put(tp->ops->owner);
+	kfree(tp);
+}
 
 extern int register_tcf_proto_ops(struct tcf_proto_ops *ops);
 extern int unregister_tcf_proto_ops(struct tcf_proto_ops *ops);
