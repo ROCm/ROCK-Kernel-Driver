@@ -520,6 +520,13 @@ static inline void scsi_proc_host_rm(struct Scsi_Host *);
 #endif /* CONFIG_PROC_FS */
 
 /*
+ * Prototypes for functions in scsi_scan.c
+ */
+extern struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *,
+			uint, uint, uint);
+extern void scsi_free_sdev(struct scsi_device *);
+
+/*
  * Prototypes for functions in constants.c
  * Some of these used to live in constants.h
  */

@@ -758,6 +758,7 @@ static void matrox_cfb8_revc(struct display* p, int xx, int yy) {
 }
 #endif
 
+#if defined(FBCON_HAS_CFB16) || defined(FBCON_HAS_CFB24) || defined(FBCON_HAS_CFB32)
 static void matrox_cfbX_revc(struct display* p, int xx, int yy) {
 	CRITFLAGS
 	MINFO_FROM_DISP(p);
@@ -778,6 +779,7 @@ static void matrox_cfbX_revc(struct display* p, int xx, int yy) {
 
 	CRITEND
 }
+#endif
 
 static void matrox_cfbX_clear_margins(struct vc_data* conp, struct display* p, int bottom_only) {
 	unsigned int bottom_height, right_width;

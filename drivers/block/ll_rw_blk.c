@@ -1038,6 +1038,16 @@ void blk_stop_queue(request_queue_t *q)
 }
 
 /**
+ * blk_run_queue - run a single device queue
+ * @q	The queue to run
+ */
+void __blk_run_queue(request_queue_t *q)
+{
+	blk_remove_plug(q);
+	q->request_fn(q);
+}
+
+/**
  * blk_run_queues - fire all plugged queues
  *
  * Description:
@@ -2198,4 +2208,5 @@ EXPORT_SYMBOL(blk_queue_invalidate_tags);
 EXPORT_SYMBOL(blk_start_queue);
 EXPORT_SYMBOL(blk_stop_queue);
 EXPORT_SYMBOL(__blk_stop_queue);
+EXPORT_SYMBOL(__blk_run_queue);
 EXPORT_SYMBOL(blk_run_queues);
