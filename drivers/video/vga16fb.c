@@ -123,7 +123,7 @@ static struct fb_fix_screeninfo vga16fb_fix __initdata = {
    suitable instruction is the x86 bitwise OR.  The following
    read-modify-write routine should optimize to one such bitwise
    OR. */
-static inline void rmw(volatile char *p)
+static inline void rmw(volatile char __iomem *p)
 {
 	readb(p);
 	writeb(1, p);
@@ -883,7 +883,7 @@ void vga_8planes_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
         char oldmask = selectmask();
         int line_ofs, height;
         char oldop, oldsr;
-        char *where;
+        char __iomem *where;
 
         dx /= 4;
         where = info->screen_base + dx + rect->dy * info->fix.line_length;
@@ -932,7 +932,7 @@ void vga_8planes_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 void vga16fb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 {
 	int x, x2, y2, vxres, vyres, width, height, line_ofs;
-	char *dst;
+	char __iomem *dst;
 
 	vxres = info->var.xres_virtual;
 	vyres = info->var.yres_virtual;
@@ -1012,7 +1012,8 @@ void vga_8planes_copyarea(struct fb_info *info, const struct fb_copyarea *area)
         char oldsr = setsr(0xf);
         int height, line_ofs, x;
 	u32 sx, dx, width;
-	char *dest, *src;
+	char __iomem *dest;
+	char __iomem *src;
 
         height = area->height;
 
@@ -1063,7 +1064,8 @@ void vga16fb_copyarea(struct fb_info *info, const struct fb_copyarea *area)
 	u32 dx = area->dx, dy = area->dy, sx = area->sx, sy = area->sy; 
 	int x, x2, y2, old_dx, old_dy, vxres, vyres;
 	int height, width, line_ofs;
-	char *dst = NULL, *src = NULL;
+	char __iomem *dst = NULL;
+	char __iomem *src = NULL;
 
 	vxres = info->var.xres_virtual;
 	vyres = info->var.yres_virtual;
@@ -1174,7 +1176,7 @@ void vga_8planes_imageblit(struct fb_info *info, const struct fb_image *image)
         char oldmask = selectmask();
         const char *cdat = image->data;
 	u32 dx = image->dx;
-        char *where;
+        char __iomem *where;
         int y;
 
         dx /= 4;
@@ -1198,10 +1200,11 @@ void vga_8planes_imageblit(struct fb_info *info, const struct fb_image *image)
 
 void vga_imageblit_expand(struct fb_info *info, const struct fb_image *image)
 {
-	char *where = info->screen_base + (image->dx/8) + 
+	char __iomem *where = info->screen_base + (image->dx/8) +
 		image->dy * info->fix.line_length;
 	struct vga16fb_par *par = (struct vga16fb_par *) info->par;
-	char *cdat = (char *) image->data, *dst;
+	char *cdat = (char *) image->data;
+	char __iomem *dst;
 	int x, y;
 
 	switch (info->fix.type) {
@@ -1265,9 +1268,11 @@ void vga_imageblit_color(struct fb_info *info, const struct fb_image *image)
 	 * Draw logo 
 	 */
 	struct vga16fb_par *par = (struct vga16fb_par *) info->par;
-	char *where = info->screen_base + image->dy * info->fix.line_length + 
+	char __iomem *where =
+		info->screen_base + image->dy * info->fix.line_length +
 		image->dx/8;
-	const char *cdat = image->data, *dst;
+	const char *cdat = image->data;
+	char __iomem *dst;
 	int x, y;
 
 	switch (info->fix.type) {
@@ -1354,7 +1359,7 @@ int __init vga16fb_init(void)
 
 	/* XXX share VGA_FB_PHYS and I/O region with vgacon and others */
 
-	vga16fb.screen_base = (void *)VGA_MAP_MEM(VGA_FB_PHYS);
+	vga16fb.screen_base = (void __iomem *)VGA_MAP_MEM(VGA_FB_PHYS);
 	if (!vga16fb.screen_base) {
 		printk(KERN_ERR "vga16fb: unable to map device\n");
 		ret = -ENOMEM;
