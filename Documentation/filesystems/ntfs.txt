@@ -247,6 +247,8 @@ ChangeLog
 
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.0.25:
+	- Minor bugfixes in error code paths and small cleanups.
 2.0.24:
 	- Small internal cleanups.
 	- Support for sendfile system call. (Christoph Hellwig)
