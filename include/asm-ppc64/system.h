@@ -86,8 +86,13 @@ extern int abs(int);
 
 struct task_struct;
 #define prepare_to_switch()	do { } while(0)
-#define switch_to(prev,next) _switch_to((prev),(next))
+#define switch_to(prev,next,last) _switch_to((prev),(next))
 extern void _switch_to(struct task_struct *, struct task_struct *);
+
+#define prepare_arch_schedule(prev)		do { } while(0)
+#define finish_arch_schedule(prev)		do { } while(0)
+#define prepare_arch_switch(rq)			do { } while(0)
+#define finish_arch_switch(rq)			spin_unlock_irq(&(rq)->lock)
 
 struct thread_struct;
 extern void _switch(struct thread_struct *prev, struct thread_struct *next);
