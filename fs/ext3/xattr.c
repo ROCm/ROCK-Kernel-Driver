@@ -1010,7 +1010,8 @@ ext3_xattr_cache_find(struct inode *inode, struct ext3_xattr_header *header)
 	if (!header->h_hash)
 		return NULL;  /* never share */
 	ea_idebug(inode, "looking for cached blocks [%x]", (int)hash);
-	ce = mb_cache_entry_find_first(ext3_xattr_cache, 0, inode->i_bdev, hash);
+	ce = mb_cache_entry_find_first(ext3_xattr_cache, 0,
+				       inode->i_sb->s_bdev, hash);
 	while (ce) {
 		struct buffer_head *bh = sb_bread(inode->i_sb, ce->e_block);
 
@@ -1030,7 +1031,7 @@ ext3_xattr_cache_find(struct inode *inode, struct ext3_xattr_header *header)
 			return bh;
 		}
 		brelse(bh);
-		ce = mb_cache_entry_find_next(ce, 0, inode->i_bdev, hash);
+		ce = mb_cache_entry_find_next(ce, 0, inode->i_sb->s_bdev, hash);
 	}
 	return NULL;
 }
