@@ -36,6 +36,7 @@ main(void)
 	DEFINE(THREAD, offsetof(struct task_struct, thread));
 	DEFINE(THREAD_INFO, offsetof(struct task_struct, thread_info));
 	DEFINE(MM, offsetof(struct task_struct, mm));
+	DEFINE(PTRACE, offsetof(struct task_struct, ptrace));
 	DEFINE(KSP, offsetof(struct thread_struct, ksp));
 	DEFINE(PGDIR, offsetof(struct thread_struct, pgdir));
 	DEFINE(LAST_SYSCALL, offsetof(struct thread_struct, last_syscall));
@@ -43,6 +44,10 @@ main(void)
 	DEFINE(THREAD_FPEXC_MODE, offsetof(struct thread_struct, fpexc_mode));
 	DEFINE(THREAD_FPR0, offsetof(struct thread_struct, fpr[0]));
 	DEFINE(THREAD_FPSCR, offsetof(struct thread_struct, fpscr));
+#ifdef CONFIG_4xx
+	DEFINE(THREAD_DBCR0, offsetof(struct thread_struct, dbcr0));
+	DEFINE(PT_PTRACED, PT_PTRACED);
+#endif
 #ifdef CONFIG_ALTIVEC
 	DEFINE(THREAD_VR0, offsetof(struct thread_struct, vr[0]));
 	DEFINE(THREAD_VRSAVE, offsetof(struct thread_struct, vrsave));

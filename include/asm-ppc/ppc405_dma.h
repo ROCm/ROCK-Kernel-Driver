@@ -1,17 +1,13 @@
 /*
+ * Author: Pete Popov <ppopov@mvista.com>
  *
- *    Copyright 2000 MontaVista Software Inc.
- *	PPC405 modifications
- * 	Author: MontaVista Software, Inc.
- *         	ppopov@mvista.com or source@mvista.com
+ * 2000 (c) MontaVista, Software, Inc.  This file is licensed under
+ * the terms of the GNU General Public License version 2.1.  This program
+ * is licensed "as is" without any warranty of any kind, whether express
+ * or implied.
  *
- *
- *    Module name: ppc405_dma.h
- *
- *    Description:
- *      Data structures specific to the IBM PowerPC 405 on-chip DMA controller
- *      and API.
- *
+ * Data structures specific to the IBM PowerPC 405 on-chip DMA controller
+ * and API.
  */
 
 #ifdef __KERNEL__

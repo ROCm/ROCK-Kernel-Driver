@@ -313,8 +313,6 @@ ProgramCheckException(struct pt_regs *regs)
 	int isbpt = esr & ESR_PTR;
 	extern int do_mathemu(struct pt_regs *regs);
 
-	if (isbpt)
-		mtspr(SPRN_DBSR, DBSR_TIE);
 #ifdef CONFIG_MATH_EMULATION
 	if (!isbpt && do_mathemu(regs) == 0)
 		return;
@@ -436,28 +434,20 @@ SoftwareEmulation(struct pt_regs *regs)
 
 #if defined(CONFIG_4xx)
 
-void DebugException(struct pt_regs *regs)
+void DebugException(struct pt_regs *regs, unsigned long debug_status)
 {
-	unsigned long debug_status;
-
-	debug_status = mfspr(SPRN_DBSR);
-
-	regs->msr &= ~MSR_DE;  /* Turn off 'debug' bit */
+#if 0
 	if (debug_status & DBSR_TIE) {		/* trap instruction*/
-
-		mtspr(SPRN_DBSR, DBSR_TIE);
-
 		if (!user_mode(regs) && debugger_bpt(regs))
 			return;
 		_exception(SIGTRAP, regs);
 
-	} else if (debug_status & DBSR_IC) {	/* instruction completion */
-
-		mtspr(SPRN_DBSR, DBSR_IC);
-		mtspr(SPRN_DBCR0, mfspr(SPRN_DBCR0) & ~DBCR0_IC);
-
+	}
+#endif
+	if (debug_status & DBSR_IC) {	/* instruction completion */
 		if (!user_mode(regs) && debugger_sstep(regs))
 			return;
+		current->thread.dbcr0 &= ~DBCR0_IC;
 		_exception(SIGTRAP, regs);
 	}
 }
