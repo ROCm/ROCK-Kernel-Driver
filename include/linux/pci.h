@@ -393,11 +393,6 @@ struct pci_dev {
 					   this if your device has broken DMA
 					   or supports 64-bit transfers.  */
 
-	u64		consistent_dma_mask;/* Like dma_mask, but for
-					       pci_alloc_consistent mappings as
-					       not all hardware supports
-					       64 bit addresses for consistent
-					       allocations such descriptors. */
 	u32             current_state;  /* Current operating state. In ACPI-speak,
 					   this is D0-D3, D0 being fully functional,
 					   and D3 being off. */
