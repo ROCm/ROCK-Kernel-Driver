@@ -792,7 +792,7 @@ static struct file_operations ppp_device_fops = {
 
 /* Called at boot time if ppp is compiled into the kernel,
    or at module load time (from init_module) if compiled as a module. */
-int __init ppp_init(void)
+static int __init ppp_init(void)
 {
 	int err;
 
@@ -801,6 +801,8 @@ int __init ppp_init(void)
 	if (!err) {
 		err = devfs_mk_cdev(MKDEV(PPP_MAJOR, 0),
 				S_IFCHR|S_IRUSR|S_IWUSR, "ppp");
+		if (err)
+			unregister_chrdev(PPP_MAJOR, "ppp");
 	}
 
 	if (err)
