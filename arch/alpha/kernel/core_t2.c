@@ -89,12 +89,11 @@
  */
 
 static int
-mk_conf_addr(struct pci_dev *dev, int where, unsigned long *pci_addr,
-	     unsigned char *type1)
+mk_conf_addr(struct pci_bus *bus_dev, unsigned int device_fn, int where,
+	     unsigned long *pci_addr, unsigned char *type1)
 {
 	unsigned long addr;
-	u8 bus = dev->bus->number;
-	u8 device_fn = dev->devfn;
+	u8 bus = bus_dev->number;
 
 	DBG(("mk_conf_addr(bus=%d, dfn=0x%x, where=0x%x,"
 	     " addr=0x%lx, type1=0x%x)\n",
@@ -238,87 +237,67 @@ conf_write(unsigned long addr, unsigned int value, unsigned char type1)
 }
 
 static int
-t2_read_config_byte(struct pci_dev *dev, int where, u8 *value)
+t2_read_config(struct pci_bus *bus, unsigned int devfn, int where,
+	       int size, u32 *value)
 {
 	unsigned long addr, pci_addr;
 	unsigned char type1;
+	int shift;
+	long mask;
 
-	if (mk_conf_addr(dev, where, &pci_addr, &type1))
+	if (mk_conf_addr(bus, devfn, where, &pci_addr, &type1))
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
-	addr = (pci_addr << 5) + 0x00 + T2_CONF;
-	*value = conf_read(addr, type1) >> ((where & 3) * 8);
+	switch (size) {
+	case 1:
+		mask = 0x00;
+		shift = (where & 3) * 8;
+		break;
+	case 2:
+		mask = 0x08;
+		shift = (where & 3) * 8;
+		break;
+	case 4:
+		mask = 0x18;
+		shift = 0;
+		break;
+	}
+	addr = (pci_addr << 5) + mask + T2_CONF;
+	*value = conf_read(addr, type1) >> (shift);
 	return PCIBIOS_SUCCESSFUL;
 }
 
 static int 
-t2_read_config_word(struct pci_dev *dev, int where, u16 *value)
+t2_write_config(struct pci_bus *bus, unsigned int devfn, int where, int size,
+		u32 value)
 {
 	unsigned long addr, pci_addr;
 	unsigned char type1;
+	long mask;
 
 	if (mk_conf_addr(dev, where, &pci_addr, &type1))
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
-	addr = (pci_addr << 5) + 0x08 + T2_CONF;
-	*value = conf_read(addr, type1) >> ((where & 3) * 8);
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int 
-t2_read_config_dword(struct pci_dev *dev, int where, u32 *value)
-{
-	unsigned long addr, pci_addr;
-	unsigned char type1;
-
-	if (mk_conf_addr(dev, where, &pci_addr, &type1))
-		return PCIBIOS_DEVICE_NOT_FOUND;
-
-	addr = (pci_addr << 5) + 0x18 + T2_CONF;
-	*value = conf_read(addr, type1);
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int 
-t2_write_config(struct pci_dev *dev, int where, u32 value, long mask)
-{
-	unsigned long addr, pci_addr;
-	unsigned char type1;
-
-	if (mk_conf_addr(dev, where, &pci_addr, &type1))
-		return PCIBIOS_DEVICE_NOT_FOUND;
-
+	switch (size) {
+	case 1:
+		mask = 0x00;
+		break;
+	case 2:
+		mask = 0x08;
+		break;
+	case 4:
+		mask = 0x18;
+		break;
+	}
 	addr = (pci_addr << 5) + mask + T2_CONF;
 	conf_write(addr, value << ((where & 3) * 8), type1);
 	return PCIBIOS_SUCCESSFUL;
 }
 
-static int 
-t2_write_config_byte(struct pci_dev *dev, int where, u8 value)
-{
-	return t2_write_config(dev, where, value, 0x00);
-}
-
-static int 
-t2_write_config_word(struct pci_dev *dev, int where, u16 value)
-{
-	return t2_write_config(dev, where, value, 0x08);
-}
-
-static int 
-t2_write_config_dword(struct pci_dev *dev, int where, u32 value)
-{
-	return t2_write_config(dev, where, value, 0x18);
-}
-
 struct pci_ops t2_pci_ops = 
 {
-	read_byte:	t2_read_config_byte,
-	read_word:	t2_read_config_word,
-	read_dword:	t2_read_config_dword,
-	write_byte:	t2_write_config_byte,
-	write_word:	t2_write_config_word,
-	write_dword:	t2_write_config_dword
+	.read =		t2_read_config,
+	.write =	t2_write_config,
 };
 
 void __init

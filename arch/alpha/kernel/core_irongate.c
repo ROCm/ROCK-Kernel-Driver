@@ -83,12 +83,11 @@
  */
 
 static int
-mk_conf_addr(struct pci_dev *dev, int where, unsigned long *pci_addr,
-	     unsigned char *type1)
+mk_conf_addr(struct pci_bus *bus_dev, unsigned int device_fn, int where,
+	     unsigned long *pci_addr, unsigned char *type1)
 {
 	unsigned long addr;
-	u8 bus = dev->bus->number;
-	u8 device_fn = dev->devfn;
+	u8 bus = bus_dev->number;
 
 	DBG_CFG(("mk_conf_addr(bus=%d ,device_fn=0x%x, where=0x%x, "
 		 "pci_addr=0x%p, type1=0x%p)\n",
@@ -105,12 +104,13 @@ mk_conf_addr(struct pci_dev *dev, int where, unsigned long *pci_addr,
 }
 
 static int
-irongate_read_config_byte(struct pci_dev *dev, int where, u8 *value)
+irongate_read_config(struct pci_bus *bus, unsigned int devfn, int where,
+		     int size, u32 *value)
 {
 	unsigned long addr;
 	unsigned char type1;
 
-	if (mk_conf_addr(dev, where, &addr, &type1))
+	if (mk_conf_addr(bus, devfn, where, &addr, &type1))
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
 	*value = __kernel_ldbu(*(vucp)addr);
@@ -118,38 +118,13 @@ irongate_read_config_byte(struct pci_dev *dev, int where, u8 *value)
 }
 
 static int
-irongate_read_config_word(struct pci_dev *dev, int where, u16 *value)
+irongate_write_config(struct pci_bus *bus, unsigned int devfn, int where,
+		      int size, u32 value)
 {
 	unsigned long addr;
 	unsigned char type1;
 
-	if (mk_conf_addr(dev, where, &addr, &type1))
-		return PCIBIOS_DEVICE_NOT_FOUND;
-
-	*value = __kernel_ldwu(*(vusp)addr);
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-irongate_read_config_dword(struct pci_dev *dev, int where, u32 *value)
-{
-	unsigned long addr;
-	unsigned char type1;
-
-	if (mk_conf_addr(dev, where, &addr, &type1))
-		return PCIBIOS_DEVICE_NOT_FOUND;
-
-	*value = *(vuip)addr;
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-irongate_write_config_byte(struct pci_dev *dev, int where, u8 value)
-{
-	unsigned long addr;
-	unsigned char type1;
-
-	if (mk_conf_addr(dev, where, &addr, &type1))
+	if (mk_conf_addr(bus, devfn, where, &addr, &type1))
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
 	__kernel_stb(value, *(vucp)addr);
@@ -158,45 +133,11 @@ irongate_write_config_byte(struct pci_dev *dev, int where, u8 value)
 	return PCIBIOS_SUCCESSFUL;
 }
 
-static int
-irongate_write_config_word(struct pci_dev *dev, int where, u16 value)
-{
-	unsigned long addr;
-	unsigned char type1;
-
-	if (mk_conf_addr(dev, where, &addr, &type1))
-		return PCIBIOS_DEVICE_NOT_FOUND;
-
-	__kernel_stw(value, *(vusp)addr);
-	mb();
-	__kernel_ldwu(*(vusp)addr);
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-irongate_write_config_dword(struct pci_dev *dev, int where, u32 value)
-{
-	unsigned long addr;
-	unsigned char type1;
-
-	if (mk_conf_addr(dev, where, &addr, &type1))
-		return PCIBIOS_DEVICE_NOT_FOUND;
-
-	*(vuip)addr = value;
-	mb();
-	*(vuip)addr;
-	return PCIBIOS_SUCCESSFUL;
-}
-
 
 struct pci_ops irongate_pci_ops =
 {
-	read_byte:	irongate_read_config_byte,
-	read_word:	irongate_read_config_word,
-	read_dword:	irongate_read_config_dword,
-	write_byte:	irongate_write_config_byte,
-	write_word:	irongate_write_config_word,
-	write_dword:	irongate_write_config_dword
+	.read =		irongate_read_config,
+	.write =	irongate_write_config,
 };
 
 #ifdef DEBUG_IRONGATE
