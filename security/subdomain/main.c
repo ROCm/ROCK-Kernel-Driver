@@ -1470,7 +1470,7 @@ int sd_symlink(struct dentry *link, const char *name, struct subdomain *sd)
 	if (error)
 		goto out;
 
-	target = lookup_hash(&nd.last, nd.dentry);
+	target = __lookup_hash(&nd.last, nd.dentry, &nd);
 	if (IS_ERR(target)) {
 		error = PTR_ERR(target);
 		goto out_release;

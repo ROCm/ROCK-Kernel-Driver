@@ -992,7 +992,7 @@ int fastcall path_lookup(const char *name, unsigned int flags, struct nameidata 
  * needs parent already locked. Doesn't follow mounts.
  * SMP-safe.
  */
-static struct dentry * __lookup_hash(struct qstr *name, struct dentry * base, struct nameidata *nd)
+struct dentry * __lookup_hash(struct qstr *name, struct dentry * base, struct nameidata *nd)
 {
 	struct dentry * dentry;
 	struct inode *inode;
@@ -1029,11 +1029,6 @@ static struct dentry * __lookup_hash(struct qstr *name, struct dentry * base, st
 	}
 out:
 	return dentry;
-}
-
-struct dentry * lookup_hash(struct qstr *name, struct dentry * base)
-{
-	return __lookup_hash(name, base, NULL);
 }
 
 /* SMP-safe */
@@ -1524,7 +1519,7 @@ struct dentry *lookup_create(struct nameidata *nd, int is_dir)
 	if (nd->last_type != LAST_NORM)
 		goto fail;
 	nd->flags &= ~LOOKUP_PARENT;
-	dentry = __lookup_hash(&nd->last, nd->dentry, nd);
+	dentry = lookup_hash(&nd->last, nd->dentry);
 	if (IS_ERR(dentry))
 		goto fail;
 	if (!is_dir && nd->last.name[nd->last.len] && !dentry->d_inode)
@@ -1760,7 +1755,7 @@ asmlinkage long sys_rmdir(const char __user * pathname)
 			goto exit1;
 	}
 	down(&nd.dentry->d_inode->i_sem);
-	dentry = lookup_hash(&nd.last, nd.dentry);
+	dentry = __lookup_hash(&nd.last, nd.dentry, &nd);
 	error = PTR_ERR(dentry);
 	if (!IS_ERR(dentry)) {
 		error = vfs_rmdir(nd.dentry->d_inode, dentry);
@@ -1829,7 +1824,7 @@ asmlinkage long sys_unlink(const char __user * pathname)
 	if (nd.last_type != LAST_NORM)
 		goto exit1;
 	down(&nd.dentry->d_inode->i_sem);
-	dentry = lookup_hash(&nd.last, nd.dentry);
+	dentry = __lookup_hash(&nd.last, nd.dentry, &nd);
 	error = PTR_ERR(dentry);
 	if (!IS_ERR(dentry)) {
 		/* Why not before? Because we want correct error value */
@@ -2178,7 +2173,7 @@ static inline int do_rename(const char * oldname, const char * newname)
 
 	trap = lock_rename(new_dir, old_dir);
 
-	old_dentry = lookup_hash(&oldnd.last, old_dir);
+	old_dentry = __lookup_hash(&oldnd.last, old_dir, &oldnd);
 	error = PTR_ERR(old_dentry);
 	if (IS_ERR(old_dentry))
 		goto exit3;
@@ -2198,7 +2193,7 @@ static inline int do_rename(const char * oldname, const char * newname)
 	error = -EINVAL;
 	if (old_dentry == trap)
 		goto exit4;
-	new_dentry = lookup_hash(&newnd.last, new_dir);
+	new_dentry = __lookup_hash(&newnd.last, new_dir, &oldnd);
 	error = PTR_ERR(new_dentry);
 	if (IS_ERR(new_dentry))
 		goto exit4;
@@ -2391,7 +2386,7 @@ EXPORT_SYMBOL(follow_up);
 EXPORT_SYMBOL(get_write_access); /* binfmt_aout */
 EXPORT_SYMBOL(getname);
 EXPORT_SYMBOL(lock_rename);
-EXPORT_SYMBOL(lookup_hash);
+EXPORT_SYMBOL(__lookup_hash);
 EXPORT_SYMBOL(lookup_one_len);
 EXPORT_SYMBOL(page_follow_link_light);
 EXPORT_SYMBOL(page_put_link);
