@@ -180,7 +180,9 @@ static int initializing;	/* set while initializing built-in drivers */
 DECLARE_MUTEX(ide_cfg_sem);
 spinlock_t ide_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
+#ifdef CONFIG_BLK_DEV_IDEPCI
 static int ide_scan_direction; /* THIS was formerly 2.2.x pci=reverse */
+#endif
 
 #ifdef CONFIG_IDEDMA_AUTO
 int noautodma = 0;
