@@ -616,8 +616,6 @@ L:	blinux-list@redhat.com
 S:	Maintained
 
 DRM DRIVERS
-P:	Rik Faith
-M:	faith@redhat.com
 L:	dri-devel@lists.sourceforge.net
 S:	Supported
 
