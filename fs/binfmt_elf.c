@@ -1218,15 +1218,8 @@ static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
 	/* Set up header */
 	fill_elf_header(&elf, segs+1); /* including notes section*/
 
-	fs = get_fs();
-	set_fs(KERNEL_DS);
-
 	has_dumped = 1;
 	current->flags |= PF_DUMPCORE;
-
-	DUMP_WRITE(&elf, sizeof(elf));
-	offset += sizeof(elf);				/* Elf header */
-	offset += (segs+1) * sizeof(struct elf_phdr);	/* Program headers */
 
 	/*
 	 * Set up the notes in similar form to SVR4 core dumps made
@@ -1254,6 +1247,13 @@ static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
 	numnote --;
 #endif	
   
+	fs = get_fs();
+	set_fs(KERNEL_DS);
+
+	DUMP_WRITE(&elf, sizeof(elf));
+	offset += sizeof(elf);				/* Elf header */
+	offset += (segs+1) * sizeof(struct elf_phdr);	/* Program headers */
+
 	/* Write notes phdr entry */
 	{
 		struct elf_phdr phdr;

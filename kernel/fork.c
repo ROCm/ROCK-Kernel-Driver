@@ -717,8 +717,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	if ((clone_flags & CLONE_DETACHED) && !(clone_flags & CLONE_THREAD))
 		return ERR_PTR(-EINVAL);
 
-	retval = security_ops->task_create(clone_flags);
-	if (retval)
+	if ((retval = security_task_create(clone_flags)))
 		goto fork_out;
 
 	retval = -ENOMEM;
@@ -795,15 +794,6 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	p->tty_old_pgrp = 0;
 	p->utime = p->stime = 0;
 	p->cutime = p->cstime = 0;
-#ifdef CONFIG_SMP
-	{
-		int i;
-
-		/* ?? should we just memset this ?? */
-		for(i = 0; i < NR_CPUS; i++)
-			p->per_cpu_utime[i] = p->per_cpu_stime[i] = 0;
-	}
-#endif
 	p->array = NULL;
 	p->lock_depth = -1;		/* -1 = no lock */
 	p->start_time = jiffies;
@@ -811,7 +801,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 
 	p->core_waiter = 0;
 	retval = -ENOMEM;
-	if (security_ops->task_alloc_security(p))
+	if (security_task_alloc(p))
 		goto bad_fork_cleanup;
 	/* copy all the process information */
 	if (copy_semundo(clone_flags, p))
@@ -964,7 +954,7 @@ bad_fork_cleanup_files:
 bad_fork_cleanup_semundo:
 	exit_semundo(p);
 bad_fork_cleanup_security:
-	security_ops->task_free_security(p);
+	security_task_free(p);
 bad_fork_cleanup:
 	if (p->pid > 0)
 		free_pidmap(p->pid);

@@ -93,6 +93,7 @@ static inline int scan_swap_map(struct swap_info_struct *si)
 			si->highest_bit = 0;
 		}
 		si->swap_map[offset] = 1;
+		si->inuse_pages++;
 		nr_swap_pages--;
 		si->cluster_next = offset+1;
 		return offset;
@@ -208,6 +209,7 @@ static int swap_entry_free(struct swap_info_struct *p, unsigned long offset)
 			if (offset > p->highest_bit)
 				p->highest_bit = offset;
 			nr_swap_pages++;
+			p->inuse_pages--;
 		}
 	}
 	return count;
@@ -668,12 +670,9 @@ static int try_to_unuse(unsigned int type)
 		 * report them; but do report if we reset SWAP_MAP_MAX.
 		 */
 		if (*swap_map == SWAP_MAP_MAX) {
-			swap_list_lock();
 			swap_device_lock(si);
-			nr_swap_pages++;
 			*swap_map = 1;
 			swap_device_unlock(si);
-			swap_list_unlock();
 			reset_overflow = 1;
 		}
 
@@ -1104,7 +1103,6 @@ static void swap_stop(struct seq_file *swap, void *v)
 static int swap_show(struct seq_file *swap, void *v)
 {
 	struct swap_info_struct *ptr = v;
-	int j, usedswap;
 	struct file *file;
 	char *path;
 
@@ -1114,20 +1112,12 @@ static int swap_show(struct seq_file *swap, void *v)
 	file = ptr->swap_file;
 	path = d_path(file->f_dentry, file->f_vfsmnt, swap->private, PAGE_SIZE);
 
-	for (j = 0, usedswap = 0; j < ptr->max; ++j)
-		switch (ptr->swap_map[j]) {
-			case SWAP_MAP_BAD:
-			case 0:
-				continue;
-			default:
-				usedswap++;
-		}
-	seq_printf(swap, "%-39s %s\t%d\t%d\t%d\n",
+	seq_printf(swap, "%-39s %s\t%d\t%ld\t%d\n",
 		       path,
 		       S_ISBLK(file->f_dentry->d_inode->i_mode) ?
 				"partition" : "file\t",
 		       ptr->pages << (PAGE_SHIFT - 10),
-		       usedswap << (PAGE_SHIFT - 10),
+		       ptr->inuse_pages << (PAGE_SHIFT - 10),
 		       ptr->prio);
 	return 0;
 }
@@ -1210,6 +1200,7 @@ asmlinkage long sys_swapon(const char * specialfile, int swap_flags)
 	p->lowest_bit = 0;
 	p->highest_bit = 0;
 	p->cluster_nr = 0;
+	p->inuse_pages = 0;
 	p->sdev_lock = SPIN_LOCK_UNLOCKED;
 	p->next = -1;
 	if (swap_flags & SWAP_FLAG_PREFER) {
@@ -1419,19 +1410,10 @@ void si_swapinfo(struct sysinfo *val)
 
 	swap_list_lock();
 	for (i = 0; i < nr_swapfiles; i++) {
-		unsigned int j;
 		if (!(swap_info[i].flags & SWP_USED) ||
 		     (swap_info[i].flags & SWP_WRITEOK))
 			continue;
-		for (j = 0; j < swap_info[i].max; ++j) {
-			switch (swap_info[i].swap_map[j]) {
-				case 0:
-				case SWAP_MAP_BAD:
-					continue;
-				default:
-					nr_to_be_unused++;
-			}
-		}
+		nr_to_be_unused += swap_info[i].inuse_pages;
 	}
 	val->freeswap = nr_swap_pages + nr_to_be_unused;
 	val->totalswap = total_swap_pages + nr_to_be_unused;

@@ -737,7 +737,7 @@ new_segment:
 }
 
 
-inline int blk_phys_contig_segment(request_queue_t *q, struct bio *bio,
+int blk_phys_contig_segment(request_queue_t *q, struct bio *bio,
 				   struct bio *nxt)
 {
 	if (!(q->queue_flags & (1 << QUEUE_FLAG_CLUSTER)))
@@ -758,7 +758,7 @@ inline int blk_phys_contig_segment(request_queue_t *q, struct bio *bio,
 	return 0;
 }
 
-inline int blk_hw_contig_segment(request_queue_t *q, struct bio *bio,
+int blk_hw_contig_segment(request_queue_t *q, struct bio *bio,
 				 struct bio *nxt)
 {
 	if (!(q->queue_flags & (1 << QUEUE_FLAG_CLUSTER)))
@@ -956,6 +956,7 @@ static int ll_merge_requests_fn(request_queue_t *q, struct request *req,
  */
 void blk_plug_device(request_queue_t *q)
 {
+	WARN_ON(!irqs_disabled());
 	if (!blk_queue_plugged(q)) {
 		spin_lock(&blk_plug_lock);
 		list_add_tail(&q->plug_list, &blk_plug_list);
@@ -967,8 +968,9 @@ void blk_plug_device(request_queue_t *q)
  * remove the queue from the plugged list, if present. called with
  * queue lock held and interrupts disabled.
  */
-inline int blk_remove_plug(request_queue_t *q)
+int blk_remove_plug(request_queue_t *q)
 {
+	WARN_ON(!irqs_disabled());
 	if (blk_queue_plugged(q)) {
 		spin_lock(&blk_plug_lock);
 		list_del_init(&q->plug_list);
@@ -1096,28 +1098,27 @@ void __blk_run_queue(request_queue_t *q)
 #define blk_plug_entry(entry) list_entry((entry), request_queue_t, plug_list)
 void blk_run_queues(void)
 {
-	struct list_head local_plug_list;
-
-	INIT_LIST_HEAD(&local_plug_list);
+	LIST_HEAD(local_plug_list);
 
 	spin_lock_irq(&blk_plug_lock);
 
 	/*
 	 * this will happen fairly often
 	 */
-	if (list_empty(&blk_plug_list)) {
-		spin_unlock_irq(&blk_plug_lock);
-		return;
-	}
+	if (list_empty(&blk_plug_list))
+		goto out;
 
 	list_splice_init(&blk_plug_list, &local_plug_list);
-	spin_unlock_irq(&blk_plug_lock);
 	
 	while (!list_empty(&local_plug_list)) {
 		request_queue_t *q = blk_plug_entry(local_plug_list.next);
 
+		spin_unlock_irq(&blk_plug_lock);
 		q->unplug_fn(q);
+		spin_lock_irq(&blk_plug_lock);
 	}
+out:
+	spin_unlock_irq(&blk_plug_lock);
 }
 
 static int __blk_cleanup_queue(struct request_list *list)
@@ -1958,7 +1959,7 @@ int submit_bio(int rw, struct bio *bio)
 	return 1;
 }
 
-inline void blk_recalc_rq_segments(struct request *rq)
+void blk_recalc_rq_segments(struct request *rq)
 {
 	struct bio *bio;
 	int nr_phys_segs, nr_hw_segs;
@@ -1981,7 +1982,7 @@ inline void blk_recalc_rq_segments(struct request *rq)
 	rq->nr_hw_segments = nr_hw_segs;
 }
 
-inline void blk_recalc_rq_sectors(struct request *rq, int nsect)
+void blk_recalc_rq_sectors(struct request *rq, int nsect)
 {
 	if (blk_fs_request(rq)) {
 		rq->hard_sector += nsect;

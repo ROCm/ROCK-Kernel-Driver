@@ -256,7 +256,7 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 
 /* Find an entry in the third-level page table.. */
 #define __pte_offset(address) \
-		((address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
+		(((address) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
 #define pte_offset_kernel(dir, address) \
 	((pte_t *) pmd_page_kernel(*(dir)) +  __pte_offset(address))
 

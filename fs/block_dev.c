@@ -703,13 +703,13 @@ int blkdev_put(struct block_device *bdev, int kind)
 	struct gendisk *disk = bdev->bd_disk;
 
 	down(&bdev->bd_sem);
-	lock_kernel();
 	switch (kind) {
 	case BDEV_FILE:
 	case BDEV_FS:
 		sync_blockdev(bd_inode->i_bdev);
 		break;
 	}
+	lock_kernel();
 	if (!--bdev->bd_openers)
 		kill_bdev(bdev);
 	if (bdev->bd_contains == bdev) {

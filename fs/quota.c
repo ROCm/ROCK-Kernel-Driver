@@ -98,7 +98,7 @@ static int check_quotactl_valid(struct super_block *sb, int type, int cmd, qid_t
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 
-	return security_ops->quotactl (cmd, type, id, sb);
+	return security_quotactl (cmd, type, id, sb);
 }
 
 /* Resolve device pathname to superblock */

@@ -597,25 +597,3 @@ out_free1:
 out:
 	return retval;
 }
-
-#ifdef CONFIG_SMP
-int proc_pid_cpu(struct task_struct *task, char * buffer)
-{
-	int i, len;
-
-	len = sprintf(buffer,
-		"cpu  %lu %lu\n",
-		jiffies_to_clock_t(task->utime),
-		jiffies_to_clock_t(task->stime));
-		
-	for (i = 0 ; i < NR_CPUS; i++) {
-		if (cpu_online(i))
-		len += sprintf(buffer + len, "cpu%d %lu %lu\n",
-			i,
-			jiffies_to_clock_t(task->per_cpu_utime[i]),
-			jiffies_to_clock_t(task->per_cpu_stime[i]));
-
-	}
-	return len;
-}
-#endif

@@ -107,14 +107,6 @@ pci_setup_bridge(struct pci_bus *bus)
 	DBGC((KERN_INFO "PCI: Bus %d, bridge: %s\n",
 			bus->number, bridge->dev.name));
 
-	/* Add bridge resources to the resource tree. */
-	if (bus->resource[0]->end > bus->resource[0]->start &&
-		request_resource(bus->resource[0], bus->resource[0]) < 0)
-			printk(KERN_ERR "PCI: failed to reserve IO for bus %d\n", bus->number);
-	if (bus->resource[1]->end > bus->resource[1]->start &&
-		request_resource(bus->resource[1], bus->resource[1]) < 0)
-			printk(KERN_ERR "PCI: failed to reserve MEM for bus %d\n", bus->number);
-
 	/* Set up the top and bottom of the PCI I/O segment for this bus. */
 	if (bus->resource[0]->flags & IORESOURCE_IO) {
 		pci_read_config_dword(bridge, PCI_IO_BASE, &l);

@@ -174,9 +174,11 @@ int filemap_fdatawrite(struct address_space *mapping)
 int filemap_fdatawait(struct address_space * mapping)
 {
 	int ret = 0;
+	int progress;
 
+restart:
+	progress = 0;
 	write_lock(&mapping->page_lock);
-
         while (!list_empty(&mapping->locked_pages)) {
 		struct page *page;
 
@@ -187,9 +189,18 @@ int filemap_fdatawait(struct address_space * mapping)
 		else
 			list_add(&page->list, &mapping->clean_pages);
 
-		if (!PageWriteback(page))
+		if (!PageWriteback(page)) {
+			if (++progress > 32) {
+				if (need_resched()) {
+					write_unlock(&mapping->page_lock);
+					__cond_resched();
+					goto restart;
+				}
+			}
 			continue;
+		}
 
+		progress = 0;
 		page_cache_get(page);
 		write_unlock(&mapping->page_lock);
 
@@ -559,6 +570,7 @@ void do_generic_mapping_read(struct address_space *mapping,
 				break;
 		}
 
+		cond_resched();
 		page_cache_readahead(mapping, ra, filp, index);
 
 		nr = nr - offset;
@@ -1770,6 +1782,7 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 		if (status < 0)
 			break;
 		balance_dirty_pages_ratelimited(mapping);
+		cond_resched();
 	} while (count);
 	*ppos = pos;
 

@@ -6,6 +6,7 @@
 #define PAGE_FLAGS_H
 
 #include <linux/percpu.h>
+#include <linux/cache.h>
 
 /*
  * Various page->flags bits:
@@ -106,7 +107,7 @@ struct page_state {
 	unsigned long kswapd_steal;
 	unsigned long pageoutrun;
 	unsigned long allocstall;
-};
+} ____cacheline_aligned;
 
 DECLARE_PER_CPU(struct page_state, page_states);
 

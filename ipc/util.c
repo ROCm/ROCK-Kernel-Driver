@@ -364,7 +364,7 @@ int ipcperms (struct kern_ipc_perm *ipcp, short flag)
 	    !capable(CAP_IPC_OWNER))
 		return -1;
 
-	return security_ops->ipc_permission(ipcp, flag);
+	return security_ipc_permission(ipcp, flag);
 }
 
 /*

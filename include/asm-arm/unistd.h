@@ -247,7 +247,7 @@
 #define __NR_madvise			(__NR_SYSCALL_BASE+220)
 #define __NR_fcntl64			(__NR_SYSCALL_BASE+221)
 					/* 222 for tux */
-#define __NR_security			(__NR_SYSCALL_BASE+223)
+					/* 223 is unused */
 #define __NR_gettid			(__NR_SYSCALL_BASE+224)
 #define __NR_readahead			(__NR_SYSCALL_BASE+225)
 #define __NR_setxattr			(__NR_SYSCALL_BASE+226)

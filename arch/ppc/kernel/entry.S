@@ -182,9 +182,7 @@ syscall_exit_cont:
 	.globl	ret_from_fork
 ret_from_fork:
 	REST_NVGPRS(r1)
-#if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
 	bl	schedule_tail
-#endif
 	li	r3,0
 	b	ret_from_syscall
 

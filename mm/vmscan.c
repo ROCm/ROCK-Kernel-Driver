@@ -155,10 +155,18 @@ static int shrink_slab(long scanned,  unsigned int gfp_mask)
 		do_div(delta, pages + 1);
 		shrinker->nr += delta;
 		if (shrinker->nr > SHRINK_BATCH) {
-			long nr = shrinker->nr;
+			long nr_to_scan = shrinker->nr;
 
 			shrinker->nr = 0;
-			(*shrinker->shrinker)(nr, gfp_mask);
+			while (nr_to_scan) {
+				long this_scan = nr_to_scan;
+
+				if (this_scan > 128)
+					this_scan = 128;
+				(*shrinker->shrinker)(this_scan, gfp_mask);
+				nr_to_scan -= this_scan;
+				cond_resched();
+			}
 		}
 	}
 	up(&shrinker_sem);
@@ -208,6 +216,8 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 	struct pagevec freed_pvec;
 	int pgactivate = 0;
 	int ret = 0;
+
+	cond_resched();
 
 	pagevec_init(&freed_pvec, 1);
 	while (!list_empty(page_list)) {

@@ -560,10 +560,8 @@ static BOOL ldm_validate_partition_table (struct block_device *bdev)
 		return FALSE;
 	}
 
-	if (*(u16*) (data + 0x01FE) != cpu_to_le16 (MSDOS_LABEL_MAGIC)) {
-		ldm_debug ("No MS-DOS partition table found.");
+	if (*(u16*) (data + 0x01FE) != cpu_to_le16 (MSDOS_LABEL_MAGIC))
 		goto out;
-	}
 
 	p = (struct partition*)(data + 0x01BE);
 	for (i = 0; i < 4; i++, p++)
@@ -573,9 +571,8 @@ static BOOL ldm_validate_partition_table (struct block_device *bdev)
 		}
 
 	if (result)
-		ldm_debug ("Parsed partition table successfully.");
-	else
-		ldm_debug ("Found an MS-DOS partition table, not a dynamic disk.");
+		ldm_debug ("Found W2K dynamic disk partition type.");
+
 out:
 	put_dev_sector (sect);
 	return result;
@@ -585,9 +582,10 @@ out:
  * ldm_get_disk_objid - Search a linked list of vblk's for a given Disk Id
  * @ldb:  Cache of the database structures
  *
- * The LDM Database contains a list of all partitions on all dynamic disks.  The
- * primary PRIVHEAD, at the beginning of the physical disk, tells us the GUID of
- * this disk.  This function searches for the GUID in a linked list of vblk's.
+ * The LDM Database contains a list of all partitions on all dynamic disks.
+ * The primary PRIVHEAD, at the beginning of the physical disk, tells us
+ * the GUID of this disk.  This function searches for the GUID in a linked
+ * list of vblk's.
  *
  * Return:  Pointer, A matching vblk was found
  *          NULL,    No match, or an error

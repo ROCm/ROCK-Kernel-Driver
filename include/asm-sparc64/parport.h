@@ -130,7 +130,7 @@ static int parport_pc_find_nonpci_ports (int autoirq, int autodma)
 				unsigned long base = edev->resource[0].start;
 				unsigned long config = edev->resource[1].start;
 
-				spin_lock_init(&sparc_ebus_dmas[count].info);
+				spin_lock_init(&sparc_ebus_dmas[count].info.lock);
 				sparc_ebus_dmas[count].info.regs =
 					edev->resource[2].start;
 				if (!sparc_ebus_dmas[count].info.regs)

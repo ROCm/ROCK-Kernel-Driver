@@ -1562,24 +1562,6 @@ static void esp_exec_cmd(struct esp *esp)
 	lun = SCptr->lun;
 	target = SCptr->target;
 
-	/*
-	 * We check that esp_dev != NULL.  If it is, we allocate it or bail.
-	 */
-	if (!esp_dev) {
-		esp_dev = kmalloc(sizeof(struct esp_device), GFP_ATOMIC);
-		if (!esp_dev) {
-			/* We're SOL.  Print a message and bail */
-			printk(KERN_WARNING "esp: no mem for esp_device %d/%d\n",
-					target, lun);
-			esp->current_SC = NULL;
-			SCptr->result = DID_ERROR << 16;
-			SCptr->done(SCptr);
-			return;
-		}
-		memset(esp_dev, 0, sizeof(struct esp_device));
-		SDptr->hostdata = esp_dev;
-	}
-
 	esp->snip = 0;
 	esp->msgout_len = 0;
 
@@ -4357,12 +4339,24 @@ static void esp_intr(int irq, void *dev_id, struct pt_regs *pregs)
 	spin_unlock_irqrestore(esp->ehost->host_lock, flags);
 }
 
-static void esp_slave_detach(Scsi_Device* SDptr)
+static int esp_slave_alloc(Scsi_Device *SDptr)
+{
+	struct esp_device *esp_dev =
+		kmalloc(sizeof(struct esp_device), GFP_ATOMIC);
+
+	if (!esp_dev)
+		return -ENOMEM;
+	memset(esp_dev, 0, sizeof(struct esp_device));
+	SDptr->hostdata = esp_dev;
+	return 0;
+}
+
+static void esp_slave_destroy(Scsi_Device *SDptr)
 {
 	struct esp *esp = (struct esp *) SDptr->host->hostdata;
+
 	esp->targets_present &= ~(1 << SDptr->id);
-	if (SDptr->hostdata)
-		kfree(SDptr->hostdata);
+	kfree(SDptr->hostdata);
 	SDptr->hostdata = NULL;
 }
 
@@ -4372,7 +4366,8 @@ static Scsi_Host_Template driver_template = {
 	.proc_info		= esp_proc_info,
 	.name			= "Sun ESP 100/100a/200",
 	.detect			= esp_detect,
-	.slave_detach		= esp_slave_detach,
+	.slave_alloc		= esp_slave_alloc,
+	.slave_destroy		= esp_slave_destroy,
 	.info			= esp_info,
 	.command		= esp_command,
 	.queuecommand		= esp_queue,

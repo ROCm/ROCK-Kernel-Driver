@@ -121,6 +121,7 @@ struct swap_info_struct {
 	int prio;			/* swap priority */
 	int pages;
 	unsigned long max;
+	unsigned long inuse_pages;
 	int next;			/* next entry on swap list */
 };
 

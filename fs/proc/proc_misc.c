@@ -602,7 +602,7 @@ void __init proc_misc_init(void)
 		proc_root_kcore->size =
 				(size_t)high_memory - PAGE_OFFSET + PAGE_SIZE;
 	}
-	if (prof_shift) {
+	if (prof_on) {
 		entry = create_proc_entry("profile", S_IWUSR | S_IRUGO, NULL);
 		if (entry) {
 			entry->proc_fops = &proc_profile_operations;

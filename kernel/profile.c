@@ -14,12 +14,16 @@ extern char _stext, _etext;
 unsigned int * prof_buffer;
 unsigned long prof_len;
 unsigned long prof_shift;
+int prof_on;
 
 int __init profile_setup(char * str)
 {
 	int par;
-	if (get_option(&str,&par))
+	if (get_option(&str,&par)) {
 		prof_shift = par;
+		prof_on = 1;
+		printk(KERN_INFO "kernel profiling enabled\n");
+	}
 	return 1;
 }
 
@@ -28,7 +32,7 @@ void __init profile_init(void)
 {
 	unsigned int size;
  
-	if (!prof_shift) 
+	if (!prof_on) 
 		return;
  
 	/* only text is profiled */

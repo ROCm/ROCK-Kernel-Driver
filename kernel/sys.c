@@ -485,8 +485,7 @@ asmlinkage long sys_setregid(gid_t rgid, gid_t egid)
 	int new_egid = old_egid;
 	int retval;
 
-	retval = security_ops->task_setgid(rgid, egid, (gid_t)-1, LSM_SETID_RE);
-	if (retval)
+	if ((retval = security_task_setgid(rgid, egid, (gid_t)-1, LSM_SETID_RE)))
 		return retval;
 
 	if (rgid != (gid_t) -1) {
@@ -531,8 +530,7 @@ asmlinkage long sys_setgid(gid_t gid)
 	int old_egid = current->egid;
 	int retval;
 
-	retval = security_ops->task_setgid(gid, (gid_t)-1, (gid_t)-1, LSM_SETID_ID);
-	if (retval)
+	if ((retval = security_task_setgid(gid, (gid_t)-1, (gid_t)-1, LSM_SETID_ID)))
 		return retval;
 
 	if (capable(CAP_SETGID))
@@ -605,8 +603,7 @@ asmlinkage long sys_setreuid(uid_t ruid, uid_t euid)
 	int old_ruid, old_euid, old_suid, new_ruid, new_euid;
 	int retval;
 
-	retval = security_ops->task_setuid(ruid, euid, (uid_t)-1, LSM_SETID_RE);
-	if (retval)
+	if ((retval = security_task_setuid(ruid, euid, (uid_t)-1, LSM_SETID_RE)))
 		return retval;
 
 	new_ruid = old_ruid = current->uid;
@@ -644,7 +641,7 @@ asmlinkage long sys_setreuid(uid_t ruid, uid_t euid)
 		current->suid = current->euid;
 	current->fsuid = current->euid;
 
-	return security_ops->task_post_setuid(old_ruid, old_euid, old_suid, LSM_SETID_RE);
+	return security_task_post_setuid(old_ruid, old_euid, old_suid, LSM_SETID_RE);
 }
 
 
@@ -666,8 +663,7 @@ asmlinkage long sys_setuid(uid_t uid)
 	int old_ruid, old_suid, new_ruid, new_suid;
 	int retval;
 
-	retval = security_ops->task_setuid(uid, (uid_t)-1, (uid_t)-1, LSM_SETID_ID);
-	if (retval)
+	if ((retval = security_task_setuid(uid, (uid_t)-1, (uid_t)-1, LSM_SETID_ID)))
 		return retval;
 
 	old_ruid = new_ruid = current->uid;
@@ -689,7 +685,7 @@ asmlinkage long sys_setuid(uid_t uid)
 	current->fsuid = current->euid = uid;
 	current->suid = new_suid;
 
-	return security_ops->task_post_setuid(old_ruid, old_euid, old_suid, LSM_SETID_ID);
+	return security_task_post_setuid(old_ruid, old_euid, old_suid, LSM_SETID_ID);
 }
 
 
@@ -704,8 +700,7 @@ asmlinkage long sys_setresuid(uid_t ruid, uid_t euid, uid_t suid)
 	int old_suid = current->suid;
 	int retval;
 
-	retval = security_ops->task_setuid(ruid, euid, suid, LSM_SETID_RES);
-	if (retval)
+	if ((retval = security_task_setuid(ruid, euid, suid, LSM_SETID_RES)))
 		return retval;
 
 	if (!capable(CAP_SETUID)) {
@@ -735,7 +730,7 @@ asmlinkage long sys_setresuid(uid_t ruid, uid_t euid, uid_t suid)
 	if (suid != (uid_t) -1)
 		current->suid = suid;
 
-	return security_ops->task_post_setuid(old_ruid, old_euid, old_suid, LSM_SETID_RES);
+	return security_task_post_setuid(old_ruid, old_euid, old_suid, LSM_SETID_RES);
 }
 
 asmlinkage long sys_getresuid(uid_t *ruid, uid_t *euid, uid_t *suid)
@@ -756,8 +751,7 @@ asmlinkage long sys_setresgid(gid_t rgid, gid_t egid, gid_t sgid)
 {
 	int retval;
 
-	retval = security_ops->task_setgid(rgid, egid, sgid, LSM_SETID_RES);
-	if (retval)
+	if ((retval = security_task_setgid(rgid, egid, sgid, LSM_SETID_RES)))
 		return retval;
 
 	if (!capable(CAP_SETGID)) {
@@ -810,8 +804,7 @@ asmlinkage long sys_setfsuid(uid_t uid)
 	int old_fsuid;
 	int retval;
 
-	retval = security_ops->task_setuid(uid, (uid_t)-1, (uid_t)-1, LSM_SETID_FS);
-	if (retval)
+	if ((retval = security_task_setuid(uid, (uid_t)-1, (uid_t)-1, LSM_SETID_FS)))
 		return retval;
 
 	old_fsuid = current->fsuid;
@@ -827,8 +820,7 @@ asmlinkage long sys_setfsuid(uid_t uid)
 		current->fsuid = uid;
 	}
 
-	retval = security_ops->task_post_setuid(old_fsuid, (uid_t)-1, (uid_t)-1, LSM_SETID_FS);
-	if (retval)
+	if ((retval = security_task_post_setuid(old_fsuid, (uid_t)-1, (uid_t)-1, LSM_SETID_FS)))
 		return retval;
 
 	return old_fsuid;
@@ -842,8 +834,7 @@ asmlinkage long sys_setfsgid(gid_t gid)
 	int old_fsgid;
 	int retval;
 
-	retval = security_ops->task_setgid(gid, (gid_t)-1, (gid_t)-1, LSM_SETID_FS);
-	if (retval)
+	if ((retval = security_task_setgid(gid, (gid_t)-1, (gid_t)-1, LSM_SETID_FS)))
 		return retval;
 
 	old_fsgid = current->fsgid;
@@ -968,8 +959,7 @@ asmlinkage long sys_getpgid(pid_t pid)
 
 		retval = -ESRCH;
 		if (p) {
-			retval = security_ops->task_getpgid(p);
-			if (!retval)
+			if (!(retval = security_task_getpgid(p)))
 				retval = p->pgrp;
 		}
 		read_unlock(&tasklist_lock);
@@ -996,8 +986,7 @@ asmlinkage long sys_getsid(pid_t pid)
 
 		retval = -ESRCH;
 		if(p) {
-			retval = security_ops->task_getsid(p);
-			if (!retval)
+			if (!(retval = security_task_getsid(p)))
 				retval = p->session;
 		}
 		read_unlock(&tasklist_lock);
@@ -1078,8 +1067,7 @@ asmlinkage long sys_setgroups(int gidsetsize, gid_t *grouplist)
 		return -EINVAL;
 	if(copy_from_user(groups, grouplist, gidsetsize * sizeof(gid_t)))
 		return -EFAULT;
-	retval = security_ops->task_setgroups(gidsetsize, groups);
-	if (retval)
+	if ((retval = security_task_setgroups(gidsetsize, groups)))
 		return retval;
 	memcpy(current->groups, groups, gidsetsize * sizeof(gid_t));
 	current->ngroups = gidsetsize;
@@ -1242,8 +1230,7 @@ asmlinkage long sys_setrlimit(unsigned int resource, struct rlimit *rlim)
 			return -EPERM;
 	}
 
-	retval = security_ops->task_setrlimit(resource, &new_rlim);
-	if (retval)
+	if ((retval = security_task_setrlimit(resource, &new_rlim)))
 		return retval;
 
 	*old_rlim = new_rlim;
@@ -1317,8 +1304,7 @@ asmlinkage long sys_prctl(int option, unsigned long arg2, unsigned long arg3,
 	int error = 0;
 	int sig;
 
-	error = security_ops->task_prctl(option, arg2, arg3, arg4, arg5);
-	if (error)
+	if ((error = security_task_prctl(option, arg2, arg3, arg4, arg5)))
 		return error;
 
 	switch (option) {

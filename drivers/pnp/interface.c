@@ -11,6 +11,7 @@
 #include <linux/errno.h>
 #include <linux/list.h>
 #include <linux/types.h>
+#include <linux/stat.h>
 
 #include "base.h"
 
