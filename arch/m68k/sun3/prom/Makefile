@@ -5,5 +5,3 @@
 
 obj-y := init.o console.o printf.o  misc.o
 #bootstr.o init.o misc.o segment.o console.o printf.o
-
-include $(TOPDIR)/Rules.make

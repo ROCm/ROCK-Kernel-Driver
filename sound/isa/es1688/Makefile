@@ -11,5 +11,3 @@ snd-es1688-objs := es1688.o
 # Toplevel Module Dependency
 obj-$(CONFIG_SND_ES1688) += snd-es1688.o snd-es1688-lib.o
 obj-$(CONFIG_SND_GUSEXTREME) += snd-es1688-lib.o
-
-include $(TOPDIR)/Rules.make

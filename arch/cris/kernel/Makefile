@@ -21,5 +21,3 @@ entryoffsets.s: entryoffsets.c
 	$(CC) $(CFLAGS) -S -c $<
 
 clean:
-
-include $(TOPDIR)/Rules.make

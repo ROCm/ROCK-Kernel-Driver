@@ -3,6 +3,7 @@
  * Released under the terms of the GNU GPL v2.0.
  */
 
+#include <sys/stat.h>
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -53,7 +54,18 @@ static char *conf_expand_value(const char *in)
 
 char *conf_get_default_confname(void)
 {
-	return conf_expand_value(conf_defname);
+	struct stat buf;
+	static char fullname[PATH_MAX+1];
+	char *env, *name;
+
+	name = conf_expand_value(conf_defname);
+	env = getenv(SRCTREE);
+	if (env) {
+		sprintf(fullname, "%s/%s", env, name);
+		if (!stat(fullname, &buf))
+			return fullname;
+	}
+	return name;
 }
 
 int conf_read(const char *name)
@@ -68,12 +80,12 @@ int conf_read(const char *name)
 	int i;
 
 	if (name) {
-		in = fopen(name, "r");
+		in = zconf_fopen(name);
 	} else {
 		const char **names = conf_confnames;
 		while ((name = *names++)) {
 			name = conf_expand_value(name);
-			in = fopen(name, "r");
+			in = zconf_fopen(name);
 			if (in) {
 				printf("#\n"
 				       "# using defaults found in %s\n"

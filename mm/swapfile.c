@@ -16,6 +16,7 @@
 #include <linux/shm.h>
 #include <linux/blkdev.h>
 #include <linux/buffer_head.h>
+#include <linux/writeback.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/init.h>
@@ -696,7 +697,11 @@ static int try_to_unuse(unsigned int type)
 		 * and now we must reincrement count to try again later.
 		 */
 		if ((*swap_map > 1) && PageDirty(page) && PageSwapCache(page)) {
-			swap_writepage(page);
+			struct writeback_control wbc = {
+				.sync_mode = WB_SYNC_NONE,
+			};
+
+			swap_writepage(page, &wbc);
 			lock_page(page);
 			wait_on_page_writeback(page);
 		}

@@ -38,5 +38,3 @@ p-$(CONFIG_CPU_ARM926T)	+= proc-arm926.o  tlb-v4wbi.o copypage-v4wb.o abort-ev5t
 p-$(CONFIG_CPU_XSCALE)	+= proc-xscale.o  tlb-v4wbi.o copypage-xscale.o abort-xscale.o minicache.o
 
 obj-y		+= $(sort $(p-y))
-
-include $(TOPDIR)/Rules.make

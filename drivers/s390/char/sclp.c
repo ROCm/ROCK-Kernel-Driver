@@ -47,7 +47,7 @@ static sccb_mask_t sclp_send_mask;
 static struct list_head sclp_reg_list;
 
 /* sccb queue */
-struct list_head sclp_req_queue;
+static struct list_head sclp_req_queue;
 
 /* sccb for unconditional read */
 static struct sclp_req sclp_read_req;
@@ -448,7 +448,7 @@ sclp_state_change(struct evbuf_header *evbuf)
 	spin_unlock_irqrestore(&sclp_lock, flags);
 }
 
-struct sclp_register sclp_state_change_event = {
+static struct sclp_register sclp_state_change_event = {
 	.receive_mask = EvTyp_StateChange_Mask,
 	.receiver_fn = sclp_state_change
 };
@@ -514,7 +514,7 @@ sclp_quiesce(struct evbuf_header *evbuf)
 	ctrl_alt_del();
 }
 
-struct sclp_register sclp_quiesce_event = {
+static struct sclp_register sclp_quiesce_event = {
 	.receive_mask = EvTyp_SigQuiesce_Mask,
 	.receiver_fn = sclp_quiesce
 };

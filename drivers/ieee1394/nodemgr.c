@@ -9,9 +9,9 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/config.h>
 #include <linux/list.h>
 #include <linux/slab.h>
-#include <asm/byteorder.h>
 #include <linux/smp_lock.h>
 #include <linux/interrupt.h>
 #include <linux/kmod.h>
@@ -20,6 +20,8 @@
 #ifdef CONFIG_PROC_FS
 #include <linux/proc_fs.h>
 #endif
+#include <asm/atomic.h>
+#include <asm/byteorder.h>
 
 #include "ieee1394_types.h"
 #include "ieee1394.h"
@@ -30,6 +32,24 @@
 #include "csr.h"
 #include "nodemgr.h"
 
+#ifdef CONFIG_IEEE1394_OUI_DB
+struct oui_list_struct {
+	int oui;
+	char *name;
+};
+
+extern struct oui_list_struct oui_list[];
+
+static char *nodemgr_find_oui_name(int oui) {
+	int i;
+
+	for (i = 0; oui_list[i].name; i++)
+		if (oui_list[i].oui == oui)
+			return oui_list[i].name;
+
+	return NULL;
+}
+#endif
 
 /* 
  * Basically what we do here is start off retrieving the bus_info block.
@@ -86,6 +106,7 @@ static int raw1394_read_proc(char *page, char **start, off_t off,
 	struct node_entry *ne;
 	int len;
 	char *out = page;
+	unsigned long flags;
 
 	if (down_interruptible(&nodemgr_serialize))
 		return -EINTR;
@@ -102,10 +123,17 @@ static int raw1394_read_proc(char *page, char **start, off_t off,
 		     NODE_BUS_ARGS(ne->nodeid), (unsigned long long)ne->guid);
 
 		/* Generic Node information */
-		PUTF("  Vendor ID: `%s' [0x%06x]\n",
-		     ne->vendor_name ?: "Unknown", ne->vendor_id);
+		PUTF("  Vendor ID   : `%s' [0x%06x]\n", ne->oui_name, ne->vendor_id);
+		if (ne->vendor_name)
+			PUTF("  Vendor text : `%s'\n", ne->vendor_name);
 		PUTF("  Capabilities: 0x%06x\n", ne->capabilities);
-		PUTF("  Bus Options:\n");
+		PUTF("  Tlabel stats:\n");
+		spin_lock_irqsave(&ne->tpool->lock, flags);
+		PUTF("    Free  : %d\n", atomic_read(&ne->tpool->count.count) + 1);
+		PUTF("    Total : %u\n", ne->tpool->allocations);
+		PUTF("    Mask  : %016Lx\n", (unsigned long long)ne->tpool->pool);
+		spin_unlock_irqrestore(&ne->tpool->lock, flags);
+		PUTF("  Bus Options :\n");
 		PUTF("    IRMC(%d) CMC(%d) ISC(%d) BMC(%d) PMC(%d) GEN(%d)\n"
 		     "    LSPD(%d) MAX_REC(%d) CYC_CLK_ACC(%d)\n",
 		     ne->busopt.irmc, ne->busopt.cmc, ne->busopt.isc, ne->busopt.bmc,
@@ -136,15 +164,21 @@ static int raw1394_read_proc(char *page, char **start, off_t off,
 			int printed = 0; // small hack
 
 			PUTF("  Unit Directory %d:\n", ud_count++);
+
+			if (ud->flags & UNIT_DIRECTORY_VENDOR_ID ||
+			    ud->flags & UNIT_DIRECTORY_MODEL_ID) {
+				PUTF("    Vendor/Model ID  : ");
+			}
 			if (ud->flags & UNIT_DIRECTORY_VENDOR_ID) {
-				PUTF("    Vendor/Model ID: %s [%06x]",
-				     ud->vendor_name ?: "Unknown", ud->vendor_id);
+				PUTF("%s [%06x]", ud->vendor_name ?: "Unknown",
+				     ud->vendor_id);
 				printed = 1;
 			}
 			if (ud->flags & UNIT_DIRECTORY_MODEL_ID) {
-				if (!printed)
-					PUTF("    Vendor/Model ID: %s [%06x]",
-					     ne->vendor_name ?: "Unknown", ne->vendor_id);
+				if (!printed) {
+					PUTF("%s [%06x]", ne->vendor_name ?: "Unknown",
+					     ne->vendor_id);
+				}
 				PUTF(" / %s [%06x]", ud->model_name ?: "Unknown", ud->model_id);
 				printed = 1;
 			}
@@ -152,11 +186,11 @@ static int raw1394_read_proc(char *page, char **start, off_t off,
 				PUTF("\n");
 
 			if (ud->flags & UNIT_DIRECTORY_SPECIFIER_ID)
-				PUTF("    Software Specifier ID: %06x\n", ud->specifier_id);
+				PUTF("    Software Spec ID : %06x\n", ud->specifier_id);
 			if (ud->flags & UNIT_DIRECTORY_VERSION)
-				PUTF("    Software Version: %06x\n", ud->version);
+				PUTF("    Software Version : %06x\n", ud->version);
 			if (ud->driver)
-				PUTF("    Driver: %s\n", ud->driver->name);
+				PUTF("    Driver           : %s\n", ud->driver->name);
 			PUTF("    Length (in quads): %d\n", ud->count);
 		}
 
@@ -297,6 +331,7 @@ static struct node_entry *nodemgr_scan_root_directory
 		code = CONFIG_ROM_KEY(quad);
 
 		if (code == CONFIG_ROM_VENDOR_ID && length > 0) {
+
 			/* Check if there is a text descriptor leaf
 			   immediately after this.  */
 			size = nodemgr_size_text_leaf(host, nodeid, generation,
@@ -305,22 +340,23 @@ static struct node_entry *nodemgr_scan_root_directory
 				address += 4;
 				length--;
 				total_size += (size + 1) * sizeof (quadlet_t);
-			}
-			else if (size < 0)
+			} else if (size < 0)
 				return NULL;
 		}
 	}
-	ne = kmalloc(total_size, SLAB_ATOMIC);
-	if (ne != NULL) {
-		if (size != 0) {
-			ne->vendor_name
-				= (const char *) &(ne->quadlets[2]);
-			ne->quadlets[size] = 0;
-		}
-		else {
-			ne->vendor_name = NULL;
-		}
+	ne = kmalloc(total_size, GFP_KERNEL);
+
+	if (!ne)
+		return NULL;
+
+	if (size != 0) {
+		ne->vendor_name
+			= (const char *) &(ne->quadlets[2]);
+		ne->quadlets[size] = 0;
+	} else {
+		ne->vendor_name = NULL;
 	}
+
 	return ne; 
 }
 
@@ -335,6 +371,9 @@ static struct node_entry *nodemgr_create_node(octlet_t guid, quadlet_t busoption
 
         INIT_LIST_HEAD(&ne->list);
 	INIT_LIST_HEAD(&ne->unit_directories);
+
+	ne->tpool = &host->tpool[nodeid & NODE_MASK];
+
         ne->host = host;
         ne->nodeid = nodeid;
         ne->guid = guid;
@@ -344,9 +383,10 @@ static struct node_entry *nodemgr_create_node(octlet_t guid, quadlet_t busoption
 
 	nodemgr_process_config_rom (ne, busoptions);
 
-	HPSB_DEBUG("%s added: Node[" NODE_BUS_FMT "]  GUID[%016Lx]  [%s]",
-		   (host->node_id == nodeid) ? "Host" : "Device",
+	HPSB_DEBUG("%s added: ID:BUS[" NODE_BUS_FMT "]  GUID[%016Lx]  [%s] (%s)",
+		   (host->node_id == nodeid) ? "Host" : "Node",
 		   NODE_BUS_ARGS(nodeid), (unsigned long long)guid,
+		   ne->oui_name,
 		   ne->vendor_name ?: "Unknown");
 
         return ne;
@@ -648,6 +688,11 @@ static void nodemgr_process_root_directory(struct node_entry *ne)
 		switch (code) {
 		case CONFIG_ROM_VENDOR_ID:
 			ne->vendor_id = value;
+#ifdef CONFIG_IEEE1394_OUI_DB
+			ne->oui_name = nodemgr_find_oui_name(value);
+#else
+			ne->oui_name = "Unknown";
+#endif
 			/* Now check if there is a vendor name text
 			   string.  */
 			if (ne->vendor_name != NULL) {
@@ -1211,6 +1256,18 @@ struct node_entry *hpsb_nodeid_get_entry(nodeid_t nodeid)
 	return ne;
 }
 
+struct node_entry *hpsb_check_nodeid(nodeid_t nodeid)
+{
+	struct node_entry *ne;
+
+	if (down_trylock(&nodemgr_serialize))
+		return NULL;
+	ne = find_entry_by_nodeid(nodeid);
+	up(&nodemgr_serialize);
+
+	return ne;
+}
+
 /* The following four convenience functions use a struct node_entry
  * for addressing a node on the bus.  They are intended for use by any
  * process context, not just the nodemgr thread, so we need to be a
@@ -1266,8 +1323,10 @@ int hpsb_node_lock(struct node_entry *ne, u64 addr,
 
 static void nodemgr_add_host(struct hpsb_host *host)
 {
-	struct host_info *hi = kmalloc (sizeof (struct host_info), GFP_KERNEL);
+	struct host_info *hi;
 	unsigned long flags;
+
+	hi = kmalloc(sizeof (struct host_info), in_interrupt() ? SLAB_ATOMIC : SLAB_KERNEL);
 
 	if (!hi) {
 		HPSB_ERR ("NodeMgr: out of memory in add host");

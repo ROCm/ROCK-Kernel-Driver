@@ -178,8 +178,9 @@ void ext2_free_blocks (struct inode * inode, unsigned long block,
 
 	lock_super (sb);
 	es = EXT2_SB(sb)->s_es;
-	if (block < le32_to_cpu(es->s_first_data_block) || 
-	    (block + count) > le32_to_cpu(es->s_blocks_count)) {
+	if (block < le32_to_cpu(es->s_first_data_block) ||
+	    block + count < block ||
+	    block + count > le32_to_cpu(es->s_blocks_count)) {
 		ext2_error (sb, "ext2_free_blocks",
 			    "Freeing blocks not in datazone - "
 			    "block = %lu, count = %lu", block, count);

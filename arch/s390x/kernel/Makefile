@@ -24,8 +24,6 @@ obj-$(CONFIG_S390_SUPPORT)	+= linux32.o signal32.o ioctl32.o wrapper32.o \
 					 exec32.o exec_domain32.o
 obj-$(CONFIG_BINFMT_ELF32)	+= binfmt_elf32.o
 
-include $(TOPDIR)/Rules.make
-
 #
 # This is just to get the dependencies...
 #

@@ -20,6 +20,7 @@ int hugetlb_prefault(struct address_space *, struct vm_area_struct *);
 void huge_page_release(struct page *);
 void hugetlb_release_key(struct hugetlb_key *);
 int hugetlb_report_meminfo(char *);
+int is_hugepage_mem_enough(size_t);
 
 extern int htlbpage_max;
 
@@ -35,6 +36,7 @@ static inline int is_vm_hugetlb_page(struct vm_area_struct *vma)
 #define zap_hugepage_range(vma, start, len)	BUG()
 #define unmap_hugepage_range(vma, start, end)	BUG()
 #define huge_page_release(page)			BUG()
+#define is_hugepage_mem_enough(size)		0
 #define hugetlb_report_meminfo(buf)		0
 
 #endif /* !CONFIG_HUGETLB_PAGE */

@@ -198,6 +198,3 @@ obj-$(CONFIG_NET_WIRELESS) += wireless/
 obj-$(CONFIG_NET_TULIP) += tulip/
 obj-$(CONFIG_HAMRADIO) += hamradio/
 obj-$(CONFIG_IRDA) += irda/
-
-include $(TOPDIR)/Rules.make
-

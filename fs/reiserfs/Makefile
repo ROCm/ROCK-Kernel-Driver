@@ -19,8 +19,6 @@ ifeq ($(CONFIG_PPC32),y)
 EXTRA_CFLAGS := -O1
 endif
 
-include $(TOPDIR)/Rules.make
-
 TAGS:
 	etags *.c
 

@@ -7,8 +7,12 @@
 #ifndef _LINUX_DM_IOCTL_H
 #define _LINUX_DM_IOCTL_H
 
-#include <linux/device-mapper.h>
 #include <linux/types.h>
+
+#define DM_DIR "mapper"	/* Slashes not supported */
+#define DM_MAX_TYPE_NAME 16
+#define DM_NAME_LEN 128
+#define DM_UUID_LEN 129
 
 /*
  * Implements a traditional ioctl interface to the device mapper.

@@ -60,8 +60,6 @@ USER_OBJS := $(filter %_user.o,$(obj-y) $(obj-m) $(USER_SINGLE_OBJS)) fd.o \
 	null.o pty.o tty.o xterm.o
 USER_OBJS := $(foreach file,$(USER_OBJS),arch/um/drivers/$(file))
 
-include $(TOPDIR)/Rules.make
-
 $(USER_OBJS) : %.o: %.c
 	$(CC) $(CFLAGS_$@) $(USER_CFLAGS) -c -o $@ $<
 

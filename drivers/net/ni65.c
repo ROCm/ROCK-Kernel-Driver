@@ -1210,7 +1210,7 @@ static void set_multicast_list(struct net_device *dev)
 }
 
 #ifdef MODULE
-static struct net_device dev_ni65 = { base_addr: 0x360, irq: 9, init: ni65_probe };
+static struct net_device dev_ni65 = { .base_addr = 0x360, .irq = 9, .init = ni65_probe };
 
 /* set: io,irq,dma or set it when calling insmod */
 static int irq;

@@ -92,6 +92,7 @@ prototypes:
 	void (*delete_inode) (struct inode *);
 	void (*put_super) (struct super_block *);
 	void (*write_super) (struct super_block *);
+	void (*sync_fs) (struct super_block *sb, int wait);
 	int (*statfs) (struct super_block *, struct statfs *);
 	int (*remount_fs) (struct super_block *, int *, char *);
 	void (*clear_inode) (struct inode *);
@@ -108,6 +109,7 @@ delete_inode:	no
 clear_inode:	no	
 put_super:	yes	yes	maybe		(see below)
 write_super:	no	yes	maybe		(see below)
+sync_fs:	no	no	maybe		(see below)
 statfs:		no	no	no
 remount_fs:	yes	yes	maybe		(see below)
 umount_begin:	yes	no	maybe		(see below)
@@ -131,10 +133,10 @@ unlocks and drops the reference.
 
 --------------------------- address_space_operations --------------------------
 prototypes:
-	int (*writepage)(struct page *);
+	int (*writepage)(struct page *page, struct writeback_control *wbc);
 	int (*readpage)(struct file *, struct page *);
 	int (*sync_page)(struct page *);
-	int (*writepages)(struct address_space *, int *nr_to_write);
+	int (*writepages)(struct address_space *, struct writeback_control *);
 	int (*set_page_dirty)(struct page *page);
 	int (*prepare_write)(struct file *, struct page *, unsigned, unsigned);
 	int (*commit_write)(struct file *, struct page *, unsigned, unsigned);
@@ -147,7 +149,7 @@ locking rules:
 	All except set_page_dirty may block
 
 			BKL	PageLocked(page)
-writepage:		no	yes, unlocks
+writepage:		no	yes, unlocks (see below)
 readpage:		no	yes, unlocks
 readpages:		no
 sync_page:		no	maybe
@@ -165,16 +167,38 @@ may be called from the request handler (/dev/loop).
 	->readpage() unlocks the page, either synchronously or via I/O
 completion.
 
-	->readpages() populates the pagecache with the passed pages and starts I/O against them.  They come unlocked upon I/O completion.
+	->readpages() populates the pagecache with the passed pages and starts
+I/O against them.  They come unlocked upon I/O completion.
 
-	->writepage() unlocks the page synchronously, before returning to
-the caller.  If the page has write I/O underway against it, writepage()
-should run SetPageWriteback() against the page prior to unlocking it.
-The write I/O completion handler should run ClearPageWriteback against
-the page.
+	->writepage() is used for two purposes: for "memory cleansing" and for
+"sync".  These are quite different operations and the behaviour may differ
+depending upon the mode.
 
-	That is: after 2.5.12, pages which are under writeout are *not*
-locked.
+If writepage is called for sync (wbc->sync_mode != WBC_SYNC_NONE) then
+it *must* start I/O against the page, even if that would involve
+blocking on in-progress I/O.
+
+If writepage is called for memory cleansing (sync_mode ==
+WBC_SYNC_NONE) then its role is to get as much writeout underway as
+possible.  So writepage should try to avoid blocking against
+currently-in-progress I/O.
+
+If the filesystem is not called for "sync" and it determines that it
+would need to block against in-progress I/O to be able to start new I/O
+against the page the filesystem shoud redirty the page (usually with
+__set_page_dirty_nobuffers()), then unlock the page and return zero. 
+This may also be done to avoid internal deadlocks, but rarely.
+
+If the filesytem is called for sync then it must wait on any
+in-progress I/O and then start new I/O.
+
+The filesystem should unlock the page synchronously, before returning
+to the caller.  If the page has write I/O underway against it,
+writepage() should run SetPageWriteback() against the page prior to
+unlocking it.  The write I/O completion handler should run
+end_page_writeback() against the page.
+
+That is: after 2.5.12, pages which are under writeout are *not* locked.
 
 	->sync_page() locking rules are not well-defined - usually it is called
 with lock on page, but that is not guaranteed. Considering the currently
@@ -187,6 +211,9 @@ sync operations.  The address_space should start I/O against at least
 written.  The address_space implementation may write more (or less) pages
 than *nr_to_write asks for, but it should try to be reasonably close.  If
 nr_to_write is NULL, all dirty pages must be written.
+
+writepages should _only_ write pages which are present on
+mapping->io_pages.
 
 	->set_page_dirty() is called from various places in the kernel
 when the target page is marked as needing writeback.  It may be called

@@ -49,8 +49,6 @@ obj-y =	__divqu.o __remqu.o __divlu.o __remlu.o \
 
 obj-$(CONFIG_SMP) += dec_and_lock.o
 
-include $(TOPDIR)/Rules.make
-
 $(obj)/__divqu.o: $(obj)/$(ev6)divide.S
 	$(CC) $(AFLAGS) -DDIV -c -o $(obj)/__divqu.o $(obj)/$(ev6)divide.S
 

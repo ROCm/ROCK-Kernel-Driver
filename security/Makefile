@@ -14,5 +14,3 @@ endif
 obj-$(CONFIG_SECURITY)			+= security.o dummy.o
 obj-$(CONFIG_SECURITY_CAPABILITIES)	+= capability.o
 obj-$(CONFIG_SECURITY_ROOTPLUG)		+= root_plug.o
-
-include $(TOPDIR)/Rules.make

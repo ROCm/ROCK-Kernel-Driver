@@ -11,7 +11,7 @@
  *			  Frank Pavlic (pavlic@de.ibm.com) and
  *		 	  Martin Schwidefsky <schwidefsky@de.ibm.com>
  *
- *    $Revision: 1.41 $	 $Date: 2002/12/06 12:42:01 $
+ *    $Revision: 1.42 $	 $Date: 2002/12/09 13:55:28 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -59,7 +59,7 @@
 /**
  * initialization string for output
  */
-#define VERSION_LCS_C  "$Revision: 1.41 $"
+#define VERSION_LCS_C  "$Revision: 1.42 $"
 
 static const char *version="LCS driver ("VERSION_LCS_C "/" VERSION_LCS_H ")";
 
@@ -1576,7 +1576,7 @@ lcs_get_frames_cb(struct lcs_channel *channel, struct lcs_buffer *buffer)
 /**
  * get network statistics for ifconfig and other user programs
  */
-struct net_device_stats *
+static struct net_device_stats *
 lcs_getstats(struct net_device *dev)
 {
 	struct lcs_card *card;
@@ -1590,7 +1590,7 @@ lcs_getstats(struct net_device *dev)
  * stop lcs device
  * This function will be called by user doing ifconfig xxx down
  */
-int
+static int
 lcs_stop_device(struct net_device *dev)
 {
 	struct lcs_card *card;
@@ -1612,7 +1612,7 @@ lcs_stop_device(struct net_device *dev)
  * start lcs device and make it runnable
  * This function will be called by user doing ifconfig xxx up
  */
-int
+static int
 lcs_open_device(struct net_device *dev)
 {
 	struct lcs_card *card;
@@ -1678,7 +1678,7 @@ static DEVICE_ATTR(portno, 0644, lcs_portno_show, lcs_portno_store);
 /**
  * lcs_probe_device is called on establishing a new ccwgroup_device.
  */
-int
+static int
 lcs_probe_device(struct ccwgroup_device *ccwgdev)
 {
 	struct lcs_card *card;
@@ -1714,7 +1714,7 @@ lcs_probe_device(struct ccwgroup_device *ccwgdev)
 /**
  * lcs_new_device will be called by setting the group device online.
  */
-int
+static int
 lcs_new_device(struct ccwgroup_device *ccwgdev)
 {
 	struct  lcs_card *card;
@@ -1794,7 +1794,7 @@ lcs_new_device(struct ccwgroup_device *ccwgdev)
 /**
  * lcs_shutdown_device, called when setting the group device offline.
  */
-int
+static int
 lcs_shutdown_device(struct ccwgroup_device *ccwgdev)
 {
 	struct lcs_card *card;
@@ -1810,7 +1810,7 @@ lcs_shutdown_device(struct ccwgroup_device *ccwgdev)
 /**
  * lcs_remove_device, free buffers and card
  */
-int
+static int
 lcs_remove_device(struct ccwgroup_device *ccwgdev)
 {
 	struct lcs_card *card;
@@ -1828,7 +1828,7 @@ lcs_remove_device(struct ccwgroup_device *ccwgdev)
 /**
  * LCS ccwgroup driver registration
  */
-struct ccwgroup_driver lcs_group_driver = {
+static struct ccwgroup_driver lcs_group_driver = {
 	.name        = "lcs",
 	.max_slaves  = 2,
 	.driver_id   = 0xD3C3E2,

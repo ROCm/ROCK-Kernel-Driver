@@ -19,6 +19,7 @@
 #define __NR_write                4
 #define __NR_open                 5
 #define __NR_close                6
+#define __NR_restart_syscall	  7
 #define __NR_creat                8
 #define __NR_link                 9
 #define __NR_unlink              10

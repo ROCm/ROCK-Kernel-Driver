@@ -1641,7 +1641,7 @@ static struct file_operations jffs_file_operations =
 	.read		= generic_file_read,
 	.write		= generic_file_write,
 	.ioctl		= jffs_ioctl,
-	.mmap		= generic_file_mmap,
+	.mmap		= generic_file_readonly_mmap,
 	.fsync		= jffs_fsync,
 	.sendfile	= generic_file_sendfile,
 };

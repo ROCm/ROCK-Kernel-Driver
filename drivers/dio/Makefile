@@ -3,5 +3,3 @@
 #
 
 obj-y := dio.o
-
-include $(TOPDIR)/Rules.make

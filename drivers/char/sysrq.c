@@ -26,6 +26,7 @@
 #include <linux/kbd_kern.h>
 #include <linux/quotaops.h>
 #include <linux/smp_lock.h>
+#include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/suspend.h>
 #include <linux/writeback.h>

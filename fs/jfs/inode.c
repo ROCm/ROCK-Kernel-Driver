@@ -277,9 +277,9 @@ static int jfs_get_block(struct inode *ip, sector_t lblock,
 	return jfs_get_blocks(ip, lblock, 1, bh_result, create);
 }
 
-static int jfs_writepage(struct page *page)
+static int jfs_writepage(struct page *page, struct writeback_control *wbc)
 {
-	return block_write_full_page(page, jfs_get_block);
+	return block_write_full_page(page, jfs_get_block, wbc);
 }
 
 static int jfs_writepages(struct address_space *mapping,

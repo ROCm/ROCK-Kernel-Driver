@@ -211,6 +211,10 @@ xdr_reserve_space(struct xdr_stream *xdr, size_t nbytes)
 	return p;
 }
 
+extern void xdr_write_pages(struct xdr_stream *xdr, struct page **pages,
+		unsigned int base, unsigned int len);
+extern void xdr_read_pages(struct xdr_stream *xdr, unsigned int len);
+
 /*
  * Initialize an xdr_stream for decoding data.
  */

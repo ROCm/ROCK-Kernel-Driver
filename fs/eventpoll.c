@@ -1573,7 +1573,7 @@ static int __init eventpoll_init(void)
 	if (IS_ERR(eventpoll_mnt))
 		goto eexit_4;
 
-	printk(KERN_INFO "[%p] eventpoll: successfully initialized.\n", current);
+	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: successfully initialized.\n", current));
 
 	return 0;
 

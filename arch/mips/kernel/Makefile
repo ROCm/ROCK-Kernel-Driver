@@ -46,5 +46,3 @@ ifdef CONFIG_PCI
 obj-$(CONFIG_NEW_PCI)          += pci.o
 obj-$(CONFIG_PCI_AUTO)         += pci_auto.o
 endif
-
-include $(TOPDIR)/Rules.make

@@ -41,5 +41,3 @@ ifeq ($(CONFIG_NET),y)
 obj-$(CONFIG_MODULES)		+= netsyms.o
 obj-$(CONFIG_SYSCTL)		+= sysctl_net.o
 endif
-
-include $(TOPDIR)/Rules.make

@@ -18,6 +18,3 @@ skfp-objs :=  skfddi.o    hwmtm.o    fplustm.o  smt.o      cfm.o     \
 #   thus simplify fixes to it), please do not clean it up!
 
 EXTRA_CFLAGS += -Idrivers/net/skfp -DPCI -DMEM_MAPPED_IO -Wno-strict-prototypes 
-
-include $(TOPDIR)/Rules.make
-

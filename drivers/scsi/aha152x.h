@@ -31,25 +31,25 @@ int aha152x_proc_info(char *buffer, char **start, off_t offset, int length, int 
 #define AHA152X_REVID "Adaptec 152x SCSI driver; $Revision: 2.5 $"
 
 /* Initial value of Scsi_Host entry */
-#define AHA152X { proc_name:			"aha152x",		\
-                  proc_info:			aha152x_proc_info,	\
-                  name:				AHA152X_REVID,		\
-                  detect:			aha152x_detect,		\
-                  command:			aha152x_command,	\
-                  queuecommand:			aha152x_queue,		\
-		  eh_abort_handler:		aha152x_abort,		\
-		  eh_device_reset_handler:	aha152x_device_reset,	\
-		  eh_bus_reset_handler:		aha152x_bus_reset,	\
-		  eh_host_reset_handler:	aha152x_host_reset,	\
-                  release:			aha152x_release,	\
-                  bios_param:			aha152x_biosparam,	\
-                  can_queue:			1,			\
-                  this_id:			7,			\
-                  sg_tablesize:			SG_ALL,			\
-                  cmd_per_lun:			1,			\
-                  present:			0,			\
-                  unchecked_isa_dma:		0,			\
-                  use_clustering:		DISABLE_CLUSTERING }
+#define AHA152X { .proc_name			= "aha152x",		\
+                  .proc_info			= aha152x_proc_info,	\
+                  .name				= AHA152X_REVID,		\
+                  .detect			= aha152x_detect,		\
+                  .command			= aha152x_command,	\
+                  .queuecommand			= aha152x_queue,		\
+		  .eh_abort_handler		= aha152x_abort,		\
+		  .eh_device_reset_handler	= aha152x_device_reset,	\
+		  .eh_bus_reset_handler		= aha152x_bus_reset,	\
+		  .eh_host_reset_handler	= aha152x_host_reset,	\
+                  .release			= aha152x_release,	\
+                  .bios_param			= aha152x_biosparam,	\
+                  .can_queue			= 1,			\
+                  .this_id			= 7,			\
+                  .sg_tablesize			= SG_ALL,			\
+                  .cmd_per_lun			= 1,			\
+                  .present			= 0,			\
+                  .unchecked_isa_dma		= 0,			\
+                  .use_clustering		= DISABLE_CLUSTERING }
 #endif
 
 

@@ -11,5 +11,3 @@ snd-opti93x-objs := opti93x.o
 obj-$(CONFIG_SND_OPTI92X_AD1848) += snd-opti92x-ad1848.o
 obj-$(CONFIG_SND_OPTI92X_CS4231) += snd-opti92x-cs4231.o
 obj-$(CONFIG_SND_OPTI93X) += snd-opti93x.o
-
-include $(TOPDIR)/Rules.make

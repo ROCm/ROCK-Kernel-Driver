@@ -31,7 +31,7 @@
 #define MAX_SCCB_ROOM (PAGE_SIZE - sizeof(struct sclp_buffer))
 
 /* Event type structure for write message and write priority message */
-struct sclp_register sclp_rw_event = {
+static struct sclp_register sclp_rw_event = {
 	.send_mask = EvTyp_Msg_Mask | EvTyp_PMsgCmd_Mask
 };
 

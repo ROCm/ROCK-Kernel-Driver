@@ -22,6 +22,3 @@ obj-$(CONFIG_M5307)	+= config.o
 ifeq ($(CONFIG_M5307),y)
 EXTRA_TARGETS := $(BOARD)/crt0_$(MODEL).o
 endif
-
-include $(TOPDIR)/Rules.make
-

@@ -7,5 +7,3 @@
 
 obj-y := setup.o
 obj-$(CONFIG_IA64_GENERIC) += machvec.o
-
-include $(TOPDIR)/Rules.make

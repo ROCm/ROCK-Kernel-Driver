@@ -38,6 +38,13 @@
 #define	KERN_INFO	"<6>"	/* informational			*/
 #define	KERN_DEBUG	"<7>"	/* debug-level messages			*/
 
+extern int console_printk[];
+
+#define console_loglevel (console_printk[0])
+#define default_message_loglevel (console_printk[1])
+#define minimum_console_loglevel (console_printk[2])
+#define default_console_loglevel (console_printk[3])
+
 struct completion;
 
 #ifdef CONFIG_DEBUG_SPINLOCK_SLEEP
@@ -71,7 +78,7 @@ extern int sscanf(const char *, const char *, ...)
 extern int vsscanf(const char *, const char *, va_list);
 
 extern int get_option(char **str, int *pint);
-extern char *get_options(char *str, int nints, int *ints);
+extern char *get_options(const char *str, int nints, int *ints);
 extern unsigned long long memparse(char *ptr, char **retptr);
 extern void dev_probe_lock(void);
 extern void dev_probe_unlock(void);
@@ -80,8 +87,6 @@ extern int session_of_pgrp(int pgrp);
 
 asmlinkage int printk(const char * fmt, ...)
 	__attribute__ ((format (printf, 1, 2)));
-
-extern int console_loglevel;
 
 static inline void console_silent(void)
 {

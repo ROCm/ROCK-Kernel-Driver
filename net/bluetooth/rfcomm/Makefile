@@ -6,5 +6,3 @@ obj-$(CONFIG_BT_RFCOMM) += rfcomm.o
 
 rfcomm-y			:= core.o sock.o crc.o
 rfcomm-$(CONFIG_BT_RFCOMM_TTY)	+= tty.o
-
-include $(TOPDIR)/Rules.make

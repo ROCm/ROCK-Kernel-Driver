@@ -68,5 +68,3 @@ ifeq ($(CONFIG_HDLC_PPP),y)
 endif
 obj-$(CONFIG_N2)		+= n2.o
 obj-$(CONFIG_C101)		+= c101.o
-
-include $(TOPDIR)/Rules.make

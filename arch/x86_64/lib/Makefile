@@ -17,5 +17,3 @@ export-objs := io.o csum-wrappers.o csum-partial.o
 
 obj-$(CONFIG_IO_DEBUG) += iodebug.o
 obj-$(CONFIG_HAVE_DEC_LOCK) += dec_and_lock.o
-
-include $(TOPDIR)/Rules.make

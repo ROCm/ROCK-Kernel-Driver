@@ -241,7 +241,7 @@ ENTRY(sys_call_table)
 	.long sys_getdents64	/* 220 */
 	.long sys_fcntl64
 	.long sys_ni_syscall	/* reserved for TUX */
-	.long sys_security	/* reserved for Security */
+	.long sys_ni_syscall
 	.long sys_gettid
 	.long sys_ni_syscall	/* 225 */ /* sys_readahead */
 	.long sys_setxattr

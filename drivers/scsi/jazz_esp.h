@@ -21,19 +21,19 @@ extern int esp_proc_info(char *buffer, char **start, off_t offset, int length,
 			 int hostno, int inout);
 
 #define SCSI_JAZZ_ESP {                                         \
-		proc_name:      "esp",				\
-		proc_info:      &esp_proc_info,			\
-		name:           "ESP 100/100a/200",		\
-		detect:         jazz_esp_detect,		\
-		info:           esp_info,			\
-		command:        esp_command,			\
-		queuecommand:   esp_queue,			\
-		abort:          esp_abort,			\
-		reset:          esp_reset,			\
-		can_queue:      7,				\
-		this_id:        7,				\
-		sg_tablesize:   SG_ALL,				\
-		cmd_per_lun:    1,				\
-		use_clustering: DISABLE_CLUSTERING, }
+		.proc_name      = "esp",				\
+		.proc_info      = &esp_proc_info,			\
+		.name           = "ESP 100/100a/200",		\
+		.detect         = jazz_esp_detect,		\
+		.info           = esp_info,			\
+		.command        = esp_command,			\
+		.queuecommand   = esp_queue,			\
+		.abort          = esp_abort,			\
+		.reset          = esp_reset,			\
+		.can_queue      = 7,				\
+		.this_id        = 7,				\
+		.sg_tablesize   = SG_ALL,				\
+		.cmd_per_lun    = 1,				\
+		.use_clustering = DISABLE_CLUSTERING, }
 
 #endif /* JAZZ_ESP_H */

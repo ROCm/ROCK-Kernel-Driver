@@ -407,80 +407,80 @@
     * Scsi_Host Template
     */
 #if LINUX_VERSION_CODE < LinuxVersionCode(2,4,0)
- #define IPS {                            \
-    module : NULL,                        \
-    proc_info : NULL,                     \
-    proc_dir : NULL,                      \
-    name : NULL,                          \
-    detect : ips_detect,                  \
-    release : ips_release,                \
-    info : ips_info,                      \
-    command : NULL,                       \
-    queuecommand : ips_queue,             \
-    eh_strategy_handler : NULL,           \
-    eh_abort_handler : ips_eh_abort,      \
-    eh_device_reset_handler : NULL,       \
-    eh_bus_reset_handler : NULL,          \
-    eh_host_reset_handler : ips_eh_reset, \
-    abort : NULL,                         \
-    reset : NULL,                         \
-    slave_attach : NULL,                  \
-    bios_param : ips_biosparam,           \
-    can_queue : 0,                        \
-    this_id: -1,                          \
-    sg_tablesize : IPS_MAX_SG,            \
-    cmd_per_lun: 3,                       \
-    present : 0,                          \
-    unchecked_isa_dma : 0,                \
-    use_clustering : ENABLE_CLUSTERING,   \
-    use_new_eh_code : 1                   \
+#define IPS {	\
+	.module				= NULL,		\
+	.proc_info			= NULL,		\
+	.proc_dir			= NULL,		\
+	.name				= NULL,		\
+	.detect				= ips_detect,	\
+	.release			= ips_release,	\
+	.info				= ips_info,	\
+	.command			= NULL,		\
+	.queuecommand			= ips_queue,	\
+	.eh_strategy_handler		= NULL,		\
+	.eh_abort_handler		= ips_eh_abort,	\
+	.eh_device_reset_handler	= NULL,		\
+	.eh_bus_reset_handler		= NULL,		\
+	.eh_host_reset_handler		= ips_eh_reset,	\
+	.abort				= NULL,		\
+	.reset				= NULL,		\
+	.slave_attach			= NULL,		\
+	.bios_param			= ips_biosparam,\
+	.can_queue			= 0,		\
+	.this_id			= -1,		\
+	.sg_tablesize			= IPS_MAX_SG,	\
+	.cmd_per_lun			= 3,		\
+	.present			= 0,		\
+	.unchecked_isa_dma		= 0,		\
+	.use_clustering			= ENABLE_CLUSTERING,	\
+	.use_new_eh_code		= 1 \
 }
 #elif LINUX_VERSION_CODE < LinuxVersionCode(2,5,0)
- #define IPS {                            \
-    module : NULL,                        \
-    proc_info : NULL,                     \
-    name : NULL,                          \
-    detect : ips_detect,                  \
-    release : ips_release,                \
-    info : ips_info,                      \
-    command : NULL,                       \
-    queuecommand : ips_queue,             \
-    eh_strategy_handler : NULL,           \
-    eh_abort_handler : ips_eh_abort,      \
-    eh_device_reset_handler : NULL,       \
-    eh_bus_reset_handler : NULL,          \
-    eh_host_reset_handler : ips_eh_reset, \
-    abort : NULL,                         \
-    reset : NULL,                         \
-    slave_attach : NULL,                  \
-    bios_param : ips_biosparam,           \
-    can_queue : 0,                        \
-    this_id: -1,                          \
-    sg_tablesize : IPS_MAX_SG,            \
-    cmd_per_lun: 3,                       \
-    present : 0,                          \
-    unchecked_isa_dma : 0,                \
-    use_clustering : ENABLE_CLUSTERING,   \
-    use_new_eh_code : 1                   \
+#define IPS{	\
+	.module				= NULL,		\
+	.proc_info			= NULL,		\
+	.name				= NULL,		\
+	.detect				= ips_detect,	\
+	.release			= ips_release,	\
+	.info				= ips_info,	\
+	.command			= NULL,		\
+	.queuecommand			= ips_queue,	\
+	.eh_strategy_handler		= NULL,		\
+	.eh_abort_handler		= ips_eh_abort,	\
+	.eh_device_reset_handler	= NULL,		\
+	.eh_bus_reset_handler		= NULL,		\
+	.eh_host_reset_handler		= ips_eh_reset,	\
+	.abort				= NULL,		\
+	.reset				= NULL,		\
+	.slave_attach			= NULL,		\
+	.bios_param			= ips_biosparam,\
+	.can_queue			= 0,		\
+	.this_id			= -1,		\
+	.sg_tablesize			= IPS_MAX_SG,	\
+	.cmd_per_lun			= 3,		\
+	.present			= 0,		\
+	.unchecked_isa_dma		= 0,		\
+	.use_clustering			= ENABLE_CLUSTERING,\
+	.use_new_eh_code		= 1 \
 }
 #else
- #define IPS {                            \
-    detect : ips_detect,                  \
-    release : ips_release,                \
-    info : ips_info,                      \
-    queuecommand : ips_queue,             \
-    eh_abort_handler : ips_eh_abort,      \
-    eh_host_reset_handler : ips_eh_reset, \
-    slave_configure : ips_slave_configure,\
-    bios_param : ips_biosparam,           \
-    can_queue : 0,                        \
-    this_id: -1,                          \
-    sg_tablesize : IPS_MAX_SG,            \
-    cmd_per_lun: 3,                       \
-    present : 0,                          \
-    unchecked_isa_dma : 0,                \
-    use_clustering : ENABLE_CLUSTERING,   \
-    highmem_io : 1                        \
+#define IPS {	\
+	.detect			= ips_detect,		\
+	.release		= ips_release,		\
+	.info			= ips_info,		\
+	.queuecommand		= ips_queue,		\
+	.eh_abort_handler	= ips_eh_abort,		\
+	.eh_host_reset_handler	= ips_eh_reset,		\
+	.slave_configure	= ips_slave_configure,	\
+	.bios_param		= ips_biosparam,	\
+	.can_queue		= 0,			\
+	.this_id		= -1,			\
+	.sg_tablesize		= IPS_MAX_SG,		\
+	.cmd_per_lun		= 3,			\
+	.present		= 0,			\
+	.unchecked_isa_dma	= 0,			\
+	.use_clustering		= ENABLE_CLUSTERING,	\
+	.highmem_io		= 1 \
 }
 #endif
 

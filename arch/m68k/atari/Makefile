@@ -10,5 +10,3 @@ obj-y		:= config.o time.o debug.o ataints.o stdma.o \
 ifeq ($(CONFIG_PCI),y)
 obj-$(CONFIG_HADES)	+= hades-pci.o
 endif
-
-include $(TOPDIR)/Rules.make

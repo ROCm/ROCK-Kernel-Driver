@@ -1849,9 +1849,14 @@ acpi_cpufreq_init (
 #ifdef CONFIG_CPU_FREQ_24_API
 	for (i=0;i<NR_CPUS;i++) {
 		driver->cpu_cur_freq[0] = pr->performance.states[current_state].core_frequency * 1000;
-		driver->cpu_min_freq[0] = pr->performance.states[pr->performance.state_count - 1].core_frequency * 1000;
 	}
 #endif
+
+	/* detect highest transition latency */
+	for (i=0;i<pr->performance.state_count;i++) {
+		if (pr->performance.states[i].transition_latency > driver->policy[0].cpuinfo.transition_latency)
+			driver->policy[0].cpuinfo.transition_latency = pr->performance.states[i].transition_latency;
+	}
 
 	driver->verify      = &acpi_cpufreq_verify;
 	driver->setpolicy   = &acpi_cpufreq_setpolicy;
@@ -1860,7 +1865,9 @@ acpi_cpufreq_init (
 		driver->policy[i].cpu    = pr->id;
 		driver->policy[i].min    = pr->performance.states[pr->performance.state_count - 1].core_frequency * 1000;
 		driver->policy[i].max    = pr->performance.states[pr->limit.state.px].core_frequency * 1000;
-		driver->policy[i].max_cpu_freq = pr->performance.states[0].core_frequency * 1000;
+		driver->policy[i].cpuinfo.max_freq = pr->performance.states[0].core_frequency * 1000;
+		driver->policy[i].cpuinfo.min_freq = pr->performance.states[pr->performance.state_count - 1].core_frequency * 1000;
+		driver->policy[i].cpuinfo.transition_latency = driver->policy[0].cpuinfo.transition_latency;
 		driver->policy[i].policy = ( pr->performance.states[current_state].core_frequency * 1000 == driver->policy[i].max) ? 
 			CPUFREQ_POLICY_PERFORMANCE : CPUFREQ_POLICY_POWERSAVE;
 	}

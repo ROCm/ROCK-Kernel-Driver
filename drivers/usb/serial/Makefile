@@ -34,6 +34,3 @@ obj-$(CONFIG_USB_SERIAL_SAFE)			+= safe_serial.o
 export-objs	:= usb-serial.o ezusb.o
 
 usbserial-objs	:= usb-serial.o generic.o bus.o $(usbserial-obj-y)
-
-include $(TOPDIR)/Rules.make
-

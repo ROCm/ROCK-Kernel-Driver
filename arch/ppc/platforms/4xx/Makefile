@@ -15,5 +15,3 @@ obj-$(CONFIG_405GP)		+= ibm405gp.o
 obj-$(CONFIG_REDWOOD_4)		+= ibmstb3.o
 obj-$(CONFIG_REDWOOD_5)		+= ibmstb4.o
 obj-$(CONFIG_NP405H)		+= ibmnp405h.o
-
-include $(TOPDIR)/Rules.make

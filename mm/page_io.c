@@ -18,6 +18,7 @@
 #include <linux/swapops.h>
 #include <linux/buffer_head.h>	/* for block_sync_page() */
 #include <linux/mpage.h>
+#include <linux/writeback.h>
 #include <asm/pgtable.h>
 
 static struct bio *
@@ -86,7 +87,7 @@ static int end_swap_bio_read(struct bio *bio, unsigned int bytes_done, int err)
  * We may have stale swap cache pages in memory: notice
  * them here and get rid of the unnecessary final write.
  */
-int swap_writepage(struct page *page)
+int swap_writepage(struct page *page, struct writeback_control *wbc)
 {
 	struct bio *bio;
 	int ret = 0;
@@ -143,6 +144,9 @@ struct address_space_operations swap_aops = {
 int rw_swap_page_sync(int rw, swp_entry_t entry, struct page *page)
 {
 	int ret;
+	struct writeback_control swap_wbc = {
+		.sync_mode = WB_SYNC_ALL,
+	};
 
 	lock_page(page);
 
@@ -154,7 +158,7 @@ int rw_swap_page_sync(int rw, swp_entry_t entry, struct page *page)
 		ret = swap_readpage(NULL, page);
 		wait_on_page_locked(page);
 	} else {
-		ret = swap_writepage(page);
+		ret = swap_writepage(page, &swap_wbc);
 		wait_on_page_writeback(page);
 	}
 	page->mapping = NULL;

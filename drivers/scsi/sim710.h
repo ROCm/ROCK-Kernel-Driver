@@ -22,20 +22,20 @@ int sim710_release(struct Scsi_Host *);
 
 #include <scsi/scsicam.h>
 
-#define SIM710_SCSI { proc_name:		"sim710",		\
-		      name:			"53c710",	 	\
-		      detect:			sim710_detect,		\
-		      release:			sim710_release,		\
-		      queuecommand:		sim710_queuecommand,	\
-		      eh_abort_handler:		sim710_abort,		\
-		      eh_device_reset_handler:	sim710_dev_reset,	\
-		      eh_bus_reset_handler:	sim710_bus_reset,	\
-		      eh_host_reset_handler:	sim710_host_reset,	\
-		      can_queue:		8,		 	\
-		      this_id:			7, 			\
-		      sg_tablesize:		128,		 	\
-		      cmd_per_lun:		1,		 	\
-		      use_clustering:		DISABLE_CLUSTERING }
+#define SIM710_SCSI { .proc_name		= "sim710",		\
+		      .name			= "53c710",	 	\
+		      .detect			= sim710_detect,		\
+		      .release			= sim710_release,		\
+		      .queuecommand		= sim710_queuecommand,	\
+		      .eh_abort_handler		= sim710_abort,		\
+		      .eh_device_reset_handler	= sim710_dev_reset,	\
+		      .eh_bus_reset_handler	= sim710_bus_reset,	\
+		      .eh_host_reset_handler	= sim710_host_reset,	\
+		      .can_queue		= 8,		 	\
+		      .this_id			= 7, 			\
+		      .sg_tablesize		= 128,		 	\
+		      .cmd_per_lun		= 1,		 	\
+		      .use_clustering		= DISABLE_CLUSTERING }
 
 #ifndef HOSTS_C
 

@@ -50,6 +50,12 @@ extern inline void wrusp(unsigned long usp)
 #define TASK_SIZE	(0xF0000000UL)
 
 /*
+ * This decides where the kernel will search for a free chunk of vm
+ * space during mmap's. We won't be using it
+ */
+#define TASK_UNMAPPED_BASE	0
+
+/*
  * Bus types
  */
 #define EISA_bus 0

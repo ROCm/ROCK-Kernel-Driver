@@ -32,14 +32,10 @@
 #endif
 
 #define SBP2_DEVICE_NAME		"sbp2"
-#define SBP2_DEVICE_NAME_SIZE		4
 
 /*
  * SBP2 specific structures and defines
  */
-
-#define ORB_FMT_CMD			0x0
-#define ORB_FMT_DUMMY			0x3
 
 #define ORB_DIRECTION_WRITE_TO_MEDIA    0x0
 #define ORB_DIRECTION_READ_FROM_MEDIA   0x1
@@ -47,18 +43,8 @@
 
 #define ORB_SET_NULL_PTR(value)			((value & 0x1) << 31)
 #define ORB_SET_NOTIFY(value)                   ((value & 0x1) << 31)
-#define ORB_SET_RQ_FMT(value)                   ((value & 0x3) << 29)
+#define ORB_SET_RQ_FMT(value)                   ((value & 0x3) << 29)	/* unused ? */
 #define ORB_SET_NODE_ID(value)			((value & 0xffff) << 16)
-
-struct sbp2_dummy_orb {
-	volatile u32 next_ORB_hi;
-	volatile u32 next_ORB_lo;
-	u32 reserved1;
-        u32 reserved2;
-	u32 notify_rq_fmt;
-	u8 command_block[12];
-};
-
 #define ORB_SET_DATA_SIZE(value)                (value & 0xffff)
 #define ORB_SET_PAGE_SIZE(value)                ((value & 0x7) << 16)
 #define ORB_SET_PAGE_TABLE_PRESENT(value)       ((value & 0x1) << 19)
@@ -253,25 +239,15 @@ struct sbp2_status_block {
  * Other misc defines
  */
 #define SBP2_128KB_BROKEN_FIRMWARE				0xa0b800
-#define SBP2_BROKEN_FIRMWARE_MAX_TRANSFER			0x20000
 
 #define SBP2_DEVICE_TYPE_LUN_UNINITIALIZED			0xffffffff
-
-/*
- * Flags for SBP-2 functions
- */
-#define SBP2_SEND_NO_WAIT					0x00000001
 
 /*
  * SCSI specific stuff
  */
 
-#define SBP2_MAX_SG_ELEMENTS		SG_ALL
-#define SBP2_CLUSTERING			ENABLE_CLUSTERING
 #define SBP2_MAX_SG_ELEMENT_LENGTH	0xf000
 #define SBP2SCSI_MAX_SCSI_IDS		16	/* Max sbp2 device instances supported */
-#define SBP2SCSI_MAX_OUTSTANDING_CMDS	8	/* Max total outstanding sbp2 commands allowed at a time! */
-#define SBP2SCSI_MAX_CMDS_PER_LUN	1 	/* Max outstanding sbp2 commands per device - tune as needed */
 #define SBP2_MAX_SECTORS		255	/* Max sectors supported */
 
 #ifndef TYPE_SDAD
@@ -314,26 +290,18 @@ static unchar sbp2scsi_direction_table[0x100] = {
 	DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN,DUN
 };
 
-#define SBP2_MAX_REQUEST_PACKETS	(sbp2_max_outstanding_cmds * 2)
-#define SBP2_MAX_COMMAND_ORBS		(sbp2_max_cmds_per_lun * 2)
-
-/*
- * Request packets structure (used for sending command and agent reset packets)
- */
-struct sbp2_request_packet {
-
-	struct list_head list;
-	struct hpsb_packet *packet;
-	struct hpsb_queue_struct tq;
-	void *hi_context;
-
-};
-
+/* This should be safe. If there's more than one LUN per node, we could
+ * saturate the tlabel's though.  */
+#define SBP2_MAX_CMDS_PER_LUN   8
+#define SBP2_MAX_SCSI_QUEUE	(SBP2_MAX_CMDS_PER_LUN * SBP2SCSI_MAX_SCSI_IDS)
+#define SBP2_MAX_COMMAND_ORBS	SBP2_MAX_SCSI_QUEUE
 
 /* This is the two dma types we use for cmd_dma below */
-#define CMD_DMA_NONE   0x0
-#define CMD_DMA_PAGE   0x1
-#define CMD_DMA_SINGLE 0x2
+enum cmd_dma_types {
+	CMD_DMA_NONE,
+	CMD_DMA_PAGE,
+	CMD_DMA_SINGLE
+};
 
 /* 
  * Encapsulates all the info necessary for an outstanding command. 
@@ -347,11 +315,11 @@ struct sbp2_command_info {
 	void (*Current_done)(Scsi_Cmnd *);
 
 	/* Also need s/g structure for each sbp2 command */
-	struct sbp2_unrestricted_page_table scatter_gather_element[SBP2_MAX_SG_ELEMENTS] ____cacheline_aligned;
+	struct sbp2_unrestricted_page_table scatter_gather_element[SG_ALL] ____cacheline_aligned;
 	dma_addr_t sge_dma ____cacheline_aligned;
 	void *sge_buffer;
 	dma_addr_t cmd_dma;
-	int dma_type;
+	enum cmd_dma_types dma_type;
 	unsigned long dma_size;
 	int dma_dir;
 
@@ -412,7 +380,6 @@ struct scsi_id_instance_data {
 	spinlock_t sbp2_command_orb_lock;
 	struct list_head sbp2_command_orb_inuse;
 	struct list_head sbp2_command_orb_completed;
-	u32 sbp2_total_command_orbs;
 
 	/* Node entry, as retrieved from NodeMgr entries */
 	struct node_entry *ne;
@@ -433,10 +400,9 @@ struct sbp2scsi_host_info {
 	struct hpsb_host *host;
 
 	/*
-	 * Spin locks for command processing and packet pool management
+	 * Spin locks for command processing
 	 */
 	spinlock_t sbp2_command_lock;
-	spinlock_t sbp2_request_packet_lock;
 
 	/*
 	 * This is the scsi host we register with the scsi mid level.
@@ -444,21 +410,6 @@ struct sbp2scsi_host_info {
 	 * when the hpsb_host is removed.
 	 */
 	struct Scsi_Host *scsi_host;
-
-	/*
-	 * Lists keeping track of inuse/free sbp2_request_packets. These structures are
-	 * used for sending out sbp2 command and agent reset packets. We initially create
-	 * a pool of request packets so that we don't have to do any kmallocs while in critical
-	 * I/O paths.
-	 */
-	struct list_head sbp2_req_inuse;
-	struct list_head sbp2_req_free;
-
-	/*
-	 * Here is the pool of request packets. All the hpsb packets (for 1394 bus transactions)
-	 * are allocated at init and simply re-initialized when needed.
-	 */
-	struct sbp2_request_packet *request_packet;
 
 	/*
 	 * SCSI ID instance data (one for each sbp2 device instance possible)
@@ -474,13 +425,6 @@ struct sbp2scsi_host_info {
 /*
  * Various utility prototypes
  */
-static int sbp2util_create_request_packet_pool(struct sbp2scsi_host_info *hi);
-static void sbp2util_remove_request_packet_pool(struct sbp2scsi_host_info *hi);
-static struct sbp2_request_packet *sbp2util_allocate_write_request_packet(struct sbp2scsi_host_info *hi,
-									  struct node_entry *ne, u64 addr,
-									  size_t data_size,
-									  quadlet_t data);
-static void sbp2util_free_request_packet(struct sbp2_request_packet *request_packet);
 static int sbp2util_create_command_orb_pool(struct scsi_id_instance_data *scsi_id, struct sbp2scsi_host_info *hi);
 static void sbp2util_remove_command_orb_pool(struct scsi_id_instance_data *scsi_id, struct sbp2scsi_host_info *hi);
 static struct sbp2_command_info *sbp2util_find_command_for_orb(struct scsi_id_instance_data *scsi_id, dma_addr_t orb);
@@ -523,7 +467,7 @@ static int sbp2_reconnect_device(struct sbp2scsi_host_info *hi, struct scsi_id_i
 static int sbp2_logout_device(struct sbp2scsi_host_info *hi, struct scsi_id_instance_data *scsi_id); 
 static int sbp2_handle_status_write(struct hpsb_host *host, int nodeid, int destid,
 				    quadlet_t *data, u64 addr, unsigned int length, u16 flags);
-static int sbp2_agent_reset(struct sbp2scsi_host_info *hi, struct scsi_id_instance_data *scsi_id, u32 flags);
+static int sbp2_agent_reset(struct sbp2scsi_host_info *hi, struct scsi_id_instance_data *scsi_id, int wait);
 static int sbp2_create_command_orb(struct sbp2scsi_host_info *hi, 
 				   struct scsi_id_instance_data *scsi_id,
 				   struct sbp2_command_info *command,
@@ -552,8 +496,7 @@ void sbp2scsi_setup(char *str, int *ints);
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,44)
 static int sbp2scsi_biosparam (struct scsi_device *sdev, struct block_device *dev, sector_t capacity, int geom[]);
 #else
-static int sbp2scsi_biosparam (struct scsi_device *sdev, 
-			struct block_device *dev, sector_t capacy, int geom[]);
+static int sbp2scsi_biosparam (Scsi_Disk *disk, kdev_t dev, int geom[]);
 #endif
 static int sbp2scsi_abort (Scsi_Cmnd *SCpnt); 
 static int sbp2scsi_reset (Scsi_Cmnd *SCpnt); 

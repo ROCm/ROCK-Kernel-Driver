@@ -559,7 +559,6 @@ munmap_back:
 	vma->vm_pgoff = pgoff;
 	vma->vm_file = NULL;
 	vma->vm_private_data = NULL;
-	vma->vm_raend = 0;
 	INIT_LIST_HEAD(&vma->shared);
 
 	if (file) {
@@ -1088,8 +1087,6 @@ int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
 		new->vm_start = addr;
 		new->vm_pgoff += ((addr - vma->vm_start) >> PAGE_SHIFT);
 	}
-
-	new->vm_raend = 0;
 
 	if (new->vm_file)
 		get_file(new->vm_file);

@@ -26,7 +26,5 @@ A_OBJS =reg_u_add.o reg_u_div.o reg_u_mul.o reg_u_sub.o \
 
 obj-y =$(C_OBJS) $(A_OBJS)
 
-include $(TOPDIR)/Rules.make
-
 proto:
 	cproto -e -DMAKING_PROTO *.c >fpu_proto.h

@@ -64,7 +64,7 @@ static inline void copy_page(void *to, void *from)
 
 #define BUG() do { \
         printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); \
-        __asm__ __volatile__(".word 0x0000"); \
+        __asm__ __volatile__(".long 0"); \
 } while (0)                                       
 
 #define PAGE_BUG(page) do { \

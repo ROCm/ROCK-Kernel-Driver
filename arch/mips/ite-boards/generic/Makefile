@@ -21,5 +21,3 @@ ifdef CONFIG_REMOTE_DEBUG
 endif
 
 EXTRA_AFLAGS := $(CFLAGS)
-
-include $(TOPDIR)/Rules.make
