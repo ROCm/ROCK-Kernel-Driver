@@ -1288,6 +1288,14 @@ struct old_serial_port *get_legacy_serial_ports(unsigned int *count)
 #endif /* CONFIG_PPC_ISERIES */
 EXPORT_SYMBOL(get_legacy_serial_ports);
 
+int check_legacy_ioport(unsigned long base_port)
+{
+	if (ppc_md.check_legacy_ioport == NULL)
+		return 0;
+	return ppc_md.check_legacy_ioport(base_port);
+}
+EXPORT_SYMBOL(check_legacy_ioport);
+
 #ifdef CONFIG_XMON
 static int __init early_xmon(char *p)
 {

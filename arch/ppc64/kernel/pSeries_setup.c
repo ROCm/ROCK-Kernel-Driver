@@ -534,6 +534,31 @@ static void __init pSeries_calibrate_decr(void)
 	setup_default_decr();
 }
 
+static int pSeries_check_legacy_ioport(unsigned int baseport)
+{
+	struct device_node *np;
+
+#define I8042_DATA_REG	0x60
+#define FDC_BASE	0x3f0
+
+
+	switch(baseport) {
+	case I8042_DATA_REG:
+		np = of_find_node_by_type(NULL, "8042");
+		if (np == NULL)
+			return -ENODEV;
+		of_node_put(np);
+		break;
+	case FDC_BASE:
+		np = of_find_node_by_type(NULL, "fdc");
+		if (np == NULL)
+			return -ENODEV;
+		of_node_put(np);
+		break;
+	}
+	return 0;
+}
+
 /*
  * Called very early, MMU is off, device-tree isn't unflattened
  */
@@ -568,4 +593,5 @@ struct machdep_calls __initdata pSeries_md = {
 	.set_rtc_time		= pSeries_set_rtc_time,
 	.calibrate_decr		= pSeries_calibrate_decr,
 	.progress		= pSeries_progress,
+	.check_legacy_ioport	= pSeries_check_legacy_ioport,
 };

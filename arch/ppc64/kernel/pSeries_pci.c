@@ -534,25 +534,12 @@ EXPORT_SYMBOL(pcibios_remove_root_bus);
 
 static void __init pSeries_request_regions(void)
 {
-	struct device_node *i8042;
-
 	request_region(0x20,0x20,"pic1");
 	request_region(0xa0,0x20,"pic2");
 	request_region(0x00,0x20,"dma1");
 	request_region(0x40,0x20,"timer");
 	request_region(0x80,0x10,"dma page reg");
 	request_region(0xc0,0x20,"dma2");
-
-#define I8042_DATA_REG 0x60
-
-	/*
-	 * Some machines have an unterminated i8042 so check the device
-	 * tree and reserve the region if it does not appear. Later on
-	 * the i8042 code will try and reserve this region and fail.
-	 */
-	if (!(i8042 = of_find_node_by_type(NULL, "8042")))
-		request_region(I8042_DATA_REG, 16, "reserved (no i8042)");
-	of_node_put(i8042);
 }
 
 void __init pSeries_final_fixup(void)

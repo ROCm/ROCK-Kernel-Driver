@@ -395,6 +395,15 @@ static void __init pmac_progress(char *s, unsigned short hex)
 #endif /* CONFIG_BOOTX_TEXT */
 }
 
+/*
+ * pmac has no legacy IO, anything calling this function has to
+ * fail or bad things will happen
+ */
+static int pmac_check_legacy_ioport(unsigned int baseport)
+{
+	return -ENODEV;
+}
+
 static int __init pmac_declare_of_platform_devices(void)
 {
 	struct device_node *np;
@@ -449,4 +458,5 @@ struct machdep_calls __initdata pmac_md = {
       	.calibrate_decr		= pmac_calibrate_decr,
 	.feature_call		= pmac_do_feature_call,
 	.progress		= pmac_progress,
+	.check_legacy_ioport	= pmac_check_legacy_ioport
 };
