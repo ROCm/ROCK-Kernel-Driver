@@ -120,7 +120,7 @@ static struct idr_layer *alloc_layer(struct idr *idp)
 		return NULL;
 	idp->id_free = p->ary[0];
 	idp->id_free_cnt--;
-	p->ary[0] = 0;
+	p->ary[0] = NULL;
 	spin_unlock(&idp->lock);
 	return(p);
 }
@@ -251,7 +251,7 @@ build_up:
 			 */
 			for (new = p; p && p != idp->top; new = p) {
 				p = p->ary[0];
-				new->ary[0] = 0;
+				new->ary[0] = NULL;
 				new->bitmap = new->count = 0;
 				free_layer(idp, new);
 			}
@@ -401,7 +401,7 @@ static  int init_id_cache(void)
 {
 	if (!idr_layer_cache)
 		idr_layer_cache = kmem_cache_create("idr_layer_cache", 
-			sizeof(struct idr_layer), 0, 0, idr_cache_ctor, 0);
+			sizeof(struct idr_layer), 0, 0, idr_cache_ctor, NULL);
 	return 0;
 }
 

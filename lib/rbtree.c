@@ -305,7 +305,7 @@ struct rb_node *rb_first(struct rb_root *root)
 
 	n = root->rb_node;
 	if (!n)
-		return 0;
+		return NULL;
 	while (n->rb_left)
 		n = n->rb_left;
 	return n;
