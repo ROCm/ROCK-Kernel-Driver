@@ -33,17 +33,6 @@
 #include	<asm/mmu.h>
 #include	<asm/processor.h>
 
-/* A paca entry is required for each logical processor.  On systems
- * that support hardware multi-threading, this is equal to twice the
- * number of physical processors.  On LPAR systems, we are required
- * to have space for the maximum number of logical processors we
- * could ever possibly have.  Currently, we are limited to allocating
- * 24 processors to a partition which gives 48 logical processors on
- * an HMT box.  Therefore, we reserve this many paca entries.
- */
-#define MAX_PROCESSORS 24
-#define MAX_PACAS MAX_PROCESSORS * 2
-
 extern struct paca_struct paca[];
 register struct paca_struct *local_paca asm("r13");
 #define get_paca()	local_paca

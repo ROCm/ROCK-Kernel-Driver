@@ -124,7 +124,7 @@ struct pci_dev *pci_find_dev_by_addr(unsigned long addr)
 	ioaddr = (addr > isa_io_base) ? addr - isa_io_base : 0;
 
 	pci_for_each_dev(dev) {
-		if ((dev->class >> 8) == PCI_BASE_CLASS_BRIDGE)
+		if ((dev->class >> 16) == PCI_BASE_CLASS_BRIDGE)
 			continue;
 		for (i = 0; i < DEVICE_COUNT_RESOURCE; i++) {
 			unsigned long start = pci_resource_start(dev,i);
