@@ -388,11 +388,11 @@ xor_vis_5:
 ");
 
 static struct xor_block_template xor_block_VIS = {
-        name: "VIS",
-        do_2: xor_vis_2,
-        do_3: xor_vis_3,
-        do_4: xor_vis_4,
-        do_5: xor_vis_5,
+        .name	= "VIS",
+        .do_2	= xor_vis_2,
+        .do_3	= xor_vis_3,
+        .do_4	= xor_vis_4,
+        .do_5	= xor_vis_5,
 };
 
 #define XOR_TRY_TEMPLATES       xor_speed(&xor_block_VIS)
