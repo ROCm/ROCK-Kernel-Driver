@@ -1643,7 +1643,7 @@ cache_alloc_debugcheck_after(kmem_cache_t *cachep,
 	if (cachep->ctor && cachep->flags & SLAB_POISON) {
 		unsigned long	ctor_flags = SLAB_CTOR_CONSTRUCTOR;
 
-		if (!flags & __GFP_WAIT)
+		if (!(flags & __GFP_WAIT))
 			ctor_flags |= SLAB_CTOR_ATOMIC;
 
 		cachep->ctor(objp, cachep, ctor_flags);
