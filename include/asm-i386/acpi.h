@@ -124,7 +124,6 @@ static inline void disable_acpi(void)
 extern int acpi_gsi_to_irq(u32 gsi, unsigned int *irq);
 #ifdef CONFIG_X86_IO_APIC
 extern int skip_ioapic_setup;
-extern int acpi_irq_to_vector(u32 irq);	/* deprecated in favor of acpi_gsi_to_irq */
 extern int acpi_skip_timer_override;
 
 static inline void disable_ioapic_setup(void)

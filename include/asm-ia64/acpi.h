@@ -96,7 +96,6 @@ static inline void disable_acpi(void) { }
 const char *acpi_get_sysname (void);
 int acpi_request_vector (u32 int_type);
 int acpi_register_irq (u32 gsi, u32 polarity, u32 trigger);
-int acpi_irq_to_vector (u32 irq); /* deprecated in favor of acpi_gsi_to_irq */
 int acpi_gsi_to_irq (u32 gsi, unsigned int *irq);
 
 #ifdef CONFIG_ACPI_NUMA

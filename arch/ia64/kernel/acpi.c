@@ -632,16 +632,6 @@ acpi_boot_init (void)
 	return 0;
 }
 
-/* deprecated in favor of acpi_gsi_to_irq */
-int
-acpi_irq_to_vector (u32 gsi)
-{
-	if (has_8259 && gsi < 16)
-		return isa_irq_to_vector(gsi);
-
-	return gsi_to_vector(gsi);
-}
-
 int
 acpi_gsi_to_irq (u32 gsi, unsigned int *irq)
 {
