@@ -482,7 +482,7 @@ static int dev_ifname32(unsigned int fd, unsigned int cmd, unsigned long arg)
 }
 #endif
 
-static inline int dev_ifconf(unsigned int fd, unsigned int cmd, unsigned long arg)
+static int dev_ifconf(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	struct ifconf32 ifc32;
 	struct ifconf ifc;
@@ -667,7 +667,44 @@ out:
 	return err;
 }
 
-static inline int dev_ifsioc(unsigned int fd, unsigned int cmd, unsigned long arg)
+static __inline__ void *alloc_user_space(long len)
+{
+	struct pt_regs *regs = current->thread.kregs;
+	unsigned long usp = regs->u_regs[UREG_I6];
+
+	if (!(current->thread.flags & SPARC_FLAG_32BIT))
+		usp += STACK_BIAS;
+
+	return (void *) (usp - len);
+}
+
+static int siocdevprivate_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	struct ifreq *u_ifreq64;
+	struct ifreq32 *u_ifreq32 = (struct ifreq32 *) arg;
+	char tmp_buf[IFNAMSIZ];
+	void *data64;
+	u32 data32;
+
+	if (copy_from_user(&tmp_buf[0], &(u_ifreq32->ifr_ifrn.ifrn_name[0]),
+			   IFNAMSIZ))
+		return -EFAULT;
+	if (__get_user(data32, &u_ifreq32->ifr_ifru.ifru_data))
+		return -EFAULT;
+	data64 = (void *) A(data32);
+
+	u_ifreq64 = alloc_user_space(sizeof(*u_ifreq64));
+
+	/* Don't check these user accesses, just let that get trapped
+	 * in the ioctl handler instead.
+	 */
+	copy_to_user(&u_ifreq64->ifr_ifrn.ifrn_name[0], &tmp_buf[0], IFNAMSIZ);
+	__put_user(data64, &u_ifreq64->ifr_ifru.ifru_data);
+
+	return sys_ioctl(fd, cmd, (unsigned long) u_ifreq64);
+}
+
+static int dev_ifsioc(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	struct ifreq ifr;
 	mm_segment_t old_fs;
@@ -684,15 +721,6 @@ static inline int dev_ifsioc(unsigned int fd, unsigned int cmd, unsigned long ar
 		err |= __get_user(ifr.ifr_map.port, &(((struct ifreq32 *)arg)->ifr_ifru.ifru_map.port));
 		if (err)
 			return -EFAULT;
-		break;
-	case SIOCGPPPSTATS:
-	case SIOCGPPPCSTATS:
-	case SIOCGPPPVER:
-		if (copy_from_user(&ifr, (struct ifreq32 *)arg, sizeof(struct ifreq32)))
-			return -EFAULT;
-		ifr.ifr_data = (__kernel_caddr_t)get_free_page(GFP_KERNEL);
-		if (!ifr.ifr_data)
-			return -EAGAIN;
 		break;
 	default:
 		if (copy_from_user(&ifr, (struct ifreq32 *)arg, sizeof(struct ifreq32)))
@@ -719,27 +747,6 @@ static inline int dev_ifsioc(unsigned int fd, unsigned int cmd, unsigned long ar
 			if (copy_to_user((struct ifreq32 *)arg, &ifr, sizeof(struct ifreq32)))
 				return -EFAULT;
 			break;
-		case SIOCGPPPSTATS:
-		case SIOCGPPPCSTATS:
-		case SIOCGPPPVER:
-		{
-			u32 data;
-			int len;
-
-			__get_user(data, &(((struct ifreq32 *)arg)->ifr_ifru.ifru_data));
-			if(cmd == SIOCGPPPVER)
-				len = strlen((char *)ifr.ifr_data) + 1;
-			else if(cmd == SIOCGPPPCSTATS)
-				len = sizeof(struct ppp_comp_stats);
-			else
-				len = sizeof(struct ppp_stats);
-
-			len = copy_to_user((char *)A(data), ifr.ifr_data, len);
-			free_page((unsigned long)ifr.ifr_data);
-			if(len)
-				return -EFAULT;
-			break;
-		}
 		case SIOCGIFMAP:
 			err = copy_to_user((struct ifreq32 *)arg, &ifr, sizeof(ifr.ifr_name));
 			err |= __put_user(ifr.ifr_map.mem_start, &(((struct ifreq32 *)arg)->ifr_ifru.ifru_map.mem_start));
@@ -750,14 +757,6 @@ static inline int dev_ifsioc(unsigned int fd, unsigned int cmd, unsigned long ar
 			err |= __put_user(ifr.ifr_map.port, &(((struct ifreq32 *)arg)->ifr_ifru.ifru_map.port));
 			if (err)
 				err = -EFAULT;
-			break;
-		}
-	} else {
-		switch (cmd) {
-		case SIOCGPPPSTATS:
-		case SIOCGPPPCSTATS:
-		case SIOCGPPPVER:
-			free_page((unsigned long)ifr.ifr_data);
 			break;
 		}
 	}
@@ -798,7 +797,7 @@ struct in6_rtmsg32 {
 
 extern struct socket *sockfd_lookup(int fd, int *err);
 
-static inline int routing_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
+static int routing_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	int ret;
 	void *r = NULL;
@@ -856,7 +855,7 @@ struct hd_geometry32 {
 	u32 start;
 };
                         
-static inline int hdio_getgeo(unsigned int fd, unsigned int cmd, unsigned long arg)
+static int hdio_getgeo(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	mm_segment_t old_fs = get_fs();
 	struct hd_geometry geo;
@@ -883,7 +882,7 @@ struct  fbcmap32 {
 #define FBIOPUTCMAP32	_IOW('F', 3, struct fbcmap32)
 #define FBIOGETCMAP32	_IOW('F', 4, struct fbcmap32)
 
-static inline int fbiogetputcmap(unsigned int fd, unsigned int cmd, unsigned long arg)
+static int fbiogetputcmap(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	struct fbcmap f;
 	int ret;
@@ -934,7 +933,7 @@ struct fbcursor32 {
 #define FBIOSCURSOR32	_IOW('F', 24, struct fbcursor32)
 #define FBIOGCURSOR32	_IOW('F', 25, struct fbcursor32)
 
-static inline int fbiogscursor(unsigned int fd, unsigned int cmd, unsigned long arg)
+static int fbiogscursor(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	struct fbcursor f;
 	int ret;
@@ -3834,8 +3833,7 @@ struct mtd_oob_buf32 {
 #define MEMWRITEOOB32 	_IOWR('M',3,struct mtd_oob_buf32)
 #define MEMREADOOB32 	_IOWR('M',4,struct mtd_oob_buf32)
 
-static inline int 
-mtd_rw_oob(unsigned int fd, unsigned int cmd, unsigned long arg)
+static int mtd_rw_oob(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	mm_segment_t 			old_fs 	= get_fs();
 	struct mtd_oob_buf32	*uarg 	= (struct mtd_oob_buf32 *)arg;
@@ -4636,9 +4634,6 @@ HANDLE_IOCTL(SIOCGIFNETMASK, dev_ifsioc)
 HANDLE_IOCTL(SIOCSIFNETMASK, dev_ifsioc)
 HANDLE_IOCTL(SIOCSIFPFLAGS, dev_ifsioc)
 HANDLE_IOCTL(SIOCGIFPFLAGS, dev_ifsioc)
-HANDLE_IOCTL(SIOCGPPPSTATS, dev_ifsioc)
-HANDLE_IOCTL(SIOCGPPPCSTATS, dev_ifsioc)
-HANDLE_IOCTL(SIOCGPPPVER, dev_ifsioc)
 HANDLE_IOCTL(SIOCGIFTXQLEN, dev_ifsioc)
 HANDLE_IOCTL(SIOCSIFTXQLEN, dev_ifsioc)
 HANDLE_IOCTL(SIOCETHTOOL, ethtool_ioctl)
@@ -4896,6 +4891,9 @@ asmlinkage int sys32_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 	if (t) {
 		handler = (void *)(long)t->handler;
 		error = handler(fd, cmd, arg, filp);
+	} else if (cmd >= SIOCDEVPRIVATE &&
+		   cmd <= (SIOCDEVPRIVATE + 15)) {
+		error = siocdevprivate_ioctl(fd, cmd, arg);
 	} else {
 		static int count;
 		if (++count <= 20)
