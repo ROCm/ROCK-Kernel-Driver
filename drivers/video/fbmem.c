@@ -948,14 +948,11 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 #endif /* CONFIG_KMOD */
 		if (!registered_fb[con2fb.framebuffer])
 		    return -EINVAL;
-		if (con2fb.console > 0 && con2fb.console < MAX_NR_CONSOLES) {
-			event.info = info;
-			event.data = &con2fb;
-			return notifier_call_chain(&fb_notifier_list,
-						   FB_EVENT_SET_CONSOLE_MAP,
-						   &event);
-		}
-		return -EINVAL;
+		event.info = info;
+		event.data = &con2fb;
+		return notifier_call_chain(&fb_notifier_list,
+					   FB_EVENT_SET_CONSOLE_MAP,
+					   &event);
 	case FBIOBLANK:
 		acquire_console_sem();
 		i = fb_blank(info, arg);
