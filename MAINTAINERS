@@ -1433,6 +1433,12 @@ M:	Kai.Makisara@metla.fi
 L:	linux-scsi@vger.kernel.org
 S:	Maintained
 
+SCx200 CPU SUPPORT
+P:	Christer Weinigel
+M:	christer@weinigel.se
+W:	http://www.weinigel.se
+S:	Supported
+
 SGI VISUAL WORKSTATION 320 AND 540
 P:	Bent Hagemark
 M:	bh@sgi.com

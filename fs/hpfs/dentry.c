@@ -28,7 +28,7 @@ int hpfs_hash_dentry(struct dentry *dentry, struct qstr *qstr)
 
 	hash = init_name_hash();
 	for (i = 0; i < l; i++)
-		hash = partial_name_hash(hpfs_upcase(dentry->d_sb->s_hpfs_cp_table,qstr->name[i]), hash);
+		hash = partial_name_hash(hpfs_upcase(hpfs_sb(dentry->d_sb)->sb_cp_table,qstr->name[i]), hash);
 	qstr->hash = end_name_hash(hash);
 
 	return 0;

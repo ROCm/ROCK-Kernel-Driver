@@ -433,6 +433,7 @@ asmlinkage void __init start_kernel(void)
 		initrd_start = 0;
 	}
 #endif
+	page_address_init();
 	mem_init();
 	kmem_cache_sizes_init();
 	pidhash_init();

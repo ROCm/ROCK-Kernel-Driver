@@ -62,7 +62,6 @@ struct zone {
 	spinlock_t		lock;
 	unsigned long		free_pages;
 	unsigned long		pages_min, pages_low, pages_high;
-	int			need_balance;
 
 	ZONE_PADDING(_pad1_)
 
@@ -120,7 +119,8 @@ struct zone {
 	 * rarely used fields:
 	 */
 	char			*name;
-	unsigned long		size;
+	unsigned long		spanned_pages;	/* total size, including holes */
+	unsigned long		present_pages;	/* amount of memory (excluding holes) */
 } ____cacheline_maxaligned_in_smp;
 
 #define ZONE_DMA		0
