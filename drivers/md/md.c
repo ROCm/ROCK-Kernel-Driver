@@ -61,7 +61,7 @@ static void autostart_arrays (int part);
 #endif
 
 static mdk_personality_t *pers[MAX_PERSONALITY];
-static spinlock_t pers_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(pers_lock);
 
 /*
  * Current RAID-1,4,5 parallel reconstruction 'guaranteed speed limit'
@@ -129,7 +129,7 @@ static struct block_device_operations md_fops;
  * all_mddevs_lock protects this list.
  */
 static LIST_HEAD(all_mddevs);
-static spinlock_t all_mddevs_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(all_mddevs_lock);
 
 
 /*
