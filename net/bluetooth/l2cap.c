@@ -770,7 +770,7 @@ static int l2cap_sock_sendmsg(struct kiocb *iocb, struct socket *sock, struct ms
 		return -EOPNOTSUPP;
 
 	/* Check outgoing MTU */
-	if (len > l2cap_pi(sk)->omtu)
+	if (sk->sk_type != SOCK_RAW && len > l2cap_pi(sk)->omtu)
 		return -EINVAL;
 
 	lock_sock(sk);
