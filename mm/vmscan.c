@@ -317,6 +317,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 			if (bdi != current->backing_dev_info &&
 					bdi_write_congested(bdi))
 				goto keep_locked;
+			write_lock(&mapping->page_lock);
 			if (test_clear_page_dirty(page)) {
 				int res;
 				struct writeback_control wbc = {
@@ -326,7 +327,6 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 					.for_reclaim = 1,
 				};
 
-				write_lock(&mapping->page_lock);
 				list_move(&page->list, &mapping->locked_pages);
 				write_unlock(&mapping->page_lock);
 
@@ -343,6 +343,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 				}
 				goto keep;
 			}
+			write_unlock(&mapping->page_lock);
 		}
 
 		/*
