@@ -431,9 +431,12 @@ static int eth1394_update(struct unit_directory *ud)
 		if (!node)
 			return -ENOMEM;
 
-
 		node_info = kmalloc(sizeof(struct eth1394_node_info),
 				    in_interrupt() ? GFP_ATOMIC : GFP_KERNEL);
+		if (!node_info) {
+			kfree(node);
+			return -ENOMEM;
+                }
 
 		spin_lock_init(&node_info->pdg.lock);
 		INIT_LIST_HEAD(&node_info->pdg.list);
