@@ -2028,8 +2028,17 @@ extern struct address_space_operations reiserfs_address_space_operations ;
 void * reiserfs_kmalloc (size_t size, int flags, struct super_block * s);
 void reiserfs_kfree (const void * vp, size_t size, struct super_block * s);
 #else
-#define reiserfs_kmalloc(x, y, z) kmalloc(x, y)
-#define reiserfs_kfree(x, y, z) kfree(x)
+static inline void *reiserfs_kmalloc(size_t size, int flags,
+					struct super_block *s)
+{
+	return kmalloc(size, flags);
+}
+
+static inline void reiserfs_kfree(const void *vp, size_t size,
+					struct super_block *s)
+{
+	kfree(vp);
+}
 #endif
 
 int fix_nodes (int n_op_mode, struct tree_balance * p_s_tb, 
