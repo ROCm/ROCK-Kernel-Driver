@@ -4,6 +4,7 @@
 
 #include <linux/init.h>
 #include <linux/acpi.h>
+#include <linux/module.h>
 
 #include <acpi/acpi_drivers.h>
 #include <acpi/acinterp.h>	/* for acpi_ex_eisa_id_to_string() */
@@ -453,6 +454,7 @@ acpi_bus_register_driver (
 
 	return_VALUE(count);
 }
+EXPORT_SYMBOL(acpi_bus_register_driver);
 
 
 /**
@@ -481,6 +483,7 @@ acpi_bus_unregister_driver (
 		error = -EINVAL;
 	return_VALUE(error);
 }
+EXPORT_SYMBOL(acpi_bus_unregister_driver);
 
 /**
  * acpi_bus_find_driver 

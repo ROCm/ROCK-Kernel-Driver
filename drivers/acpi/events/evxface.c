@@ -64,7 +64,7 @@
  * DESCRIPTION: Saves the pointer to the handler function
  *
  ******************************************************************************/
-
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_install_exception_handler (
 	acpi_exception_handler          handler)
@@ -95,6 +95,7 @@ cleanup:
 	(void) acpi_ut_release_mutex (ACPI_MTX_EVENTS);
 	return_ACPI_STATUS (status);
 }
+#endif  /*  ACPI_FUTURE_USAGE  */
 
 
 /*******************************************************************************

@@ -60,10 +60,12 @@ acpi_rs_get_crs_method_data (
 	acpi_handle                     handle,
 	struct acpi_buffer              *ret_buffer);
 
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_rs_get_prs_method_data (
 	acpi_handle                     handle,
 	struct acpi_buffer              *ret_buffer);
+#endif
 
 acpi_status
 acpi_rs_get_method_data (
@@ -95,6 +97,7 @@ acpi_rs_create_pci_routing_table (
 /*
  * Function prototypes called from acpi_rs_create*
  */
+#ifdef ACPI_FUTURE_USAGE
 void
 acpi_rs_dump_irq (
 	union acpi_resource_data        *data);
@@ -154,6 +157,7 @@ acpi_rs_dump_resource_list (
 void
 acpi_rs_dump_irq_list (
 	u8                              *route_table);
+#endif  /*  ACPI_FUTURE_USAGE  */
 
 acpi_status
 acpi_rs_get_byte_stream_start (

@@ -112,7 +112,7 @@ acpi_set_firmware_waking_vector (
  * DESCRIPTION: Access function for firmware_waking_vector field in FACS
  *
  ******************************************************************************/
-
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_get_firmware_waking_vector (
 	acpi_physical_address *physical_address)
@@ -138,6 +138,7 @@ acpi_get_firmware_waking_vector (
 
 	return_ACPI_STATUS (AE_OK);
 }
+#endif
 
 
 /******************************************************************************

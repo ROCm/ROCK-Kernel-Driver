@@ -223,7 +223,11 @@
  */
 
 #define ACPI_STRSTR(s1,s2)      strstr((s1), (s2))
+
+#ifdef ACPI_FUTURE_USAGE
 #define ACPI_STRUPR(s)          (void) acpi_ut_strupr ((s))
+#endif
+
 #define ACPI_STRLEN(s)          (acpi_size) strlen((s))
 #define ACPI_STRCPY(d,s)        (void) strcpy((d), (s))
 #define ACPI_STRNCPY(d,s,n)     (void) strncpy((d), (s), (acpi_size)(n))
@@ -287,7 +291,11 @@ typedef char *va_list;
 
 
 #define ACPI_STRSTR(s1,s2)      acpi_ut_strstr ((s1), (s2))
+
+#ifdef ACPI_FUTURE_USAGE
 #define ACPI_STRUPR(s)          (void) acpi_ut_strupr ((s))
+#endif
+
 #define ACPI_STRLEN(s)          (acpi_size) acpi_ut_strlen ((s))
 #define ACPI_STRCPY(d,s)        (void) acpi_ut_strcpy ((d), (s))
 #define ACPI_STRNCPY(d,s,n)     (void) acpi_ut_strncpy ((d), (s), (acpi_size)(n))

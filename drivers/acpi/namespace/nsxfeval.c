@@ -73,7 +73,7 @@
  *              be valid (non-null)
  *
  ******************************************************************************/
-
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_evaluate_object_typed (
 	acpi_handle                     handle,
@@ -144,6 +144,7 @@ acpi_evaluate_object_typed (
 	return_buffer->length = 0;
 	return_ACPI_STATUS (AE_TYPE);
 }
+#endif  /*  ACPI_FUTURE_USAGE  */
 
 
 /*******************************************************************************
