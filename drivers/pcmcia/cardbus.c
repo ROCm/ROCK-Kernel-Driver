@@ -146,7 +146,7 @@ void cb_release_cis_mem(socket_info_t * s)
 	}
 }
 
-static int cb_setup_cis_mem(socket_info_t * s, struct pci_dev *dev, struct resource *res)
+static int cb_setup_cis_mem(socket_info_t * s, struct resource *res)
 {
 	unsigned int start, size;
 
@@ -201,7 +201,7 @@ int read_cb_mem(socket_info_t * s, u_char fn, int space,
 	if (!res->flags)
 		goto fail;
 
-	if (cb_setup_cis_mem(s, dev, res) != 0)
+	if (cb_setup_cis_mem(s, res) != 0)
 		goto fail;
 
 	if (space == 7) {
