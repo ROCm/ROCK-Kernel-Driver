@@ -81,7 +81,7 @@ unsigned long lpEvent_count = 0;
  * this needs to be removed.
  * -- Cort
  */
-#define IRQ_KMALLOC_ENTRIES 8
+#define IRQ_KMALLOC_ENTRIES 16
 static int cache_bitmask = 0;
 static struct irqaction malloc_cache[IRQ_KMALLOC_ENTRIES];
 extern int mem_init_done;
