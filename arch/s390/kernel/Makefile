@@ -23,11 +23,6 @@ obj-$(CONFIG_BINFMT_ELF32)	+= binfmt_elf32.o
 obj-$(CONFIG_ARCH_S390_31)	+= entry.o reipl.o
 obj-$(CONFIG_ARCH_S390X)	+= entry64.o reipl64.o
 
-ifdef CONFIG_ARCH_S390X
-$(obj)%.o: $(patsubst arch/s390/%,arch/s390x/%,$(src))%.c
-	$(call if_changed_dep,cc_o_c)
-endif
-
 #
 # This is just to get the dependencies...
 #
