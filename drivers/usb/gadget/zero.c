@@ -399,7 +399,7 @@ static const struct usb_descriptor_header *hs_loopback_function [] = {
 static char				manufacturer [40];
 static char				serial [40];
 
-/* static strings, in iso 8859/1 */
+/* static strings, in UTF-8 */
 static struct usb_string		strings [] = {
 	{ STRING_MANUFACTURER, manufacturer, },
 	{ STRING_PRODUCT, longname, },
@@ -960,7 +960,8 @@ zero_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 		case USB_DT_STRING:
 			/* wIndex == language code.
 			 * this driver only handles one language, you can
-			 * add others even if they don't use iso8859/1
+			 * add string tables for other languages, using
+			 * any UTF-8 characters
 			 */
 			value = usb_gadget_get_string (&stringtab,
 					ctrl->wValue & 0xff, req->buf);
@@ -1231,6 +1232,12 @@ autoconf_fail:
 	hs_source_desc.bEndpointAddress = fs_source_desc.bEndpointAddress;
 	hs_sink_desc.bEndpointAddress = fs_sink_desc.bEndpointAddress;
 #endif
+
+	if (gadget->is_otg) {
+		otg_descriptor.bmAttributes |= USB_OTG_HNP,
+		source_sink_config.bmAttributes |= USB_CONFIG_ATT_WAKEUP;
+		loopback_config.bmAttributes |= USB_CONFIG_ATT_WAKEUP;
+	}
 
 	if (gadget->is_otg) {
 		otg_descriptor.bmAttributes |= USB_OTG_HNP,
