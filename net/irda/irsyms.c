@@ -129,18 +129,6 @@ EXPORT_SYMBOL(irlmp_get_saddr);
 EXPORT_SYMBOL(irlmp_dup);
 EXPORT_SYMBOL(lmp_reasons);
 
-/* Queue */
-EXPORT_SYMBOL(hashbin_new);
-EXPORT_SYMBOL(hashbin_insert);
-EXPORT_SYMBOL(hashbin_delete);
-EXPORT_SYMBOL(hashbin_remove);
-EXPORT_SYMBOL(hashbin_remove_this);
-EXPORT_SYMBOL(hashbin_find);
-EXPORT_SYMBOL(hashbin_lock_find);
-EXPORT_SYMBOL(hashbin_find_next);
-EXPORT_SYMBOL(hashbin_get_next);
-EXPORT_SYMBOL(hashbin_get_first);
-
 /* IrLAP */
 EXPORT_SYMBOL(irlap_open);
 EXPORT_SYMBOL(irlap_close);
