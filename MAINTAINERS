@@ -1390,6 +1390,12 @@ M:	tsbogend@alpha.franken.de
 L:	linux-net@vger.kernel.org
 S:	Maintained
 
+SOUND - ALSA
+P:	Jaroslav Kysela
+M:	perex@suse.cz
+L:	alsa-devel@alsa-project.org
+S:	Maintained
+
 SOUND
 P:	Alan Cox
 M:	alan@redhat.com

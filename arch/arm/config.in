@@ -656,7 +656,7 @@ if [ "$CONFIG_ARCH_ACORN" = "y" -o \
 
    tristate 'Sound support' CONFIG_SOUND
    if [ "$CONFIG_SOUND" != "n" ]; then
-      source drivers/sound/Config.in
+      source sound/Config.in
    fi
    endmenu
 fi

@@ -1,0 +1,1430 @@
+/*
+ * PMac DBDMA lowlevel functions
+ *
+ * Copyright (c) by Takashi Iwai <tiwai@suse.de>
+ * code based on dmasound.c.
+ *
+ *   This program is free software; you can redistribute it and/or modify
+ *   it under the terms of the GNU General Public License as published by
+ *   the Free Software Foundation; either version 2 of the License, or
+ *   (at your option) any later version.
+ *
+ *   This program is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *   GNU General Public License for more details.
+ *
+ *   You should have received a copy of the GNU General Public License
+ *   along with this program; if not, write to the Free Software
+ *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+ */
+
+
+#define __NO_VERSION__
+#include <sound/driver.h>
+#include <asm/io.h>
+#include <linux/init.h>
+#include <sound/core.h>
+#include "pmac.h"
+#include <sound/pcm_params.h>
+#ifdef CONFIG_PPC_HAS_FEATURE_CALLS
+#include <asm/pmac_feature.h>
+#else
+#include <asm/feature.h>
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
+#define pmu_suspend()	/**/
+#define pmu_resume()	/**/
+#endif
+
+
+#define chip_t pmac_t
+
+
+#if defined(CONFIG_PM) && defined(CONFIG_PMAC_PBOOK)
+static int snd_pmac_register_sleep_notifier(pmac_t *chip);
+static int snd_pmac_unregister_sleep_notifier(pmac_t *chip);
+static int snd_pmac_set_power_state(snd_card_t *card, unsigned int power_state);
+#endif
+
+
+/* fixed frequency table for awacs, screamer, burgundy, DACA (44100 max) */
+static int awacs_freqs[8] = {
+	44100, 29400, 22050, 17640, 14700, 11025, 8820, 7350
+};
+/* fixed frequency table for tumbler */
+static int tumbler_freqs[2] = {
+	48000, 44100
+};
+
+/*
+ * allocate DBDMA command arrays
+ */
+static int snd_pmac_dbdma_alloc(pmac_dbdma_t *rec, int size)
+{
+	rec->space = kmalloc(sizeof(struct dbdma_cmd) * (size + 1), GFP_KERNEL);
+	if (rec->space == NULL)
+		return -ENOMEM;
+	rec->size = size;
+	memset(rec->space, 0, sizeof(struct dbdma_cmd) * (size + 1));
+	rec->cmds = (void*)DBDMA_ALIGN(rec->space);
+	rec->addr = virt_to_bus(rec->cmds);
+	return 0;
+}
+
+static void snd_pmac_dbdma_free(pmac_dbdma_t *rec)
+{
+	if (rec && rec->space)
+		kfree(rec->space);
+}
+
+
+/*
+ * pcm stuff
+ */
+
+/*
+ * look up frequency table
+ */
+
+static unsigned int snd_pmac_rate_index(pmac_t *chip, pmac_stream_t *rec, unsigned int rate)
+{
+	int i, ok, found;
+
+	ok = rec->cur_freqs;
+	if (rate > chip->freq_table[0])
+		return 0;
+	found = 0;
+	for (i = 0; i < chip->num_freqs; i++, ok >>= 1) {
+		if (! (ok & 1)) continue;
+		found = i;
+		if (rate >= chip->freq_table[i])
+			break;
+	}
+	return found;
+}
+
+/*
+ * check whether another stream is active
+ */
+static inline int another_stream(int stream)
+{
+	return (stream == SNDRV_PCM_STREAM_PLAYBACK) ?
+		SNDRV_PCM_STREAM_CAPTURE : SNDRV_PCM_STREAM_PLAYBACK;
+}
+
+/*
+ * allocate buffers
+ */
+static int snd_pmac_pcm_hw_params(snd_pcm_substream_t *subs,
+				  snd_pcm_hw_params_t *hw_params)
+{
+	return snd_pcm_lib_malloc_pages(subs, params_buffer_bytes(hw_params));
+}
+
+/*
+ * release buffers
+ */
+static int snd_pmac_pcm_hw_free(snd_pcm_substream_t *subs)
+{
+	snd_pcm_lib_free_pages(subs);
+	return 0;
+}
+
+/*
+ * get a stream of the opposite direction
+ */
+static pmac_stream_t *snd_pmac_get_stream(pmac_t *chip, int stream)
+{
+	switch (stream) {
+	case SNDRV_PCM_STREAM_PLAYBACK:
+		return &chip->playback;
+	case SNDRV_PCM_STREAM_CAPTURE:
+		return &chip->capture;
+	default:
+		snd_BUG();
+		return NULL;
+	}
+}
+
+/*
+ * wait while run status is on
+ */
+inline static void
+snd_pmac_wait_ack(pmac_stream_t *rec)
+{
+	int timeout = 50000;
+	while ((in_le32(&rec->dma->status) & RUN) && timeout-- > 0)
+		udelay(1);
+}
+
+/*
+ * set the format and rate to the chip.
+ * call the lowlevel function if defined (e.g. for AWACS).
+ */
+static void snd_pmac_pcm_set_format(pmac_t *chip)
+{
+	/* set up frequency and format */
+	out_le32(&chip->awacs->control, chip->control_mask | (chip->rate_index << 8));
+	out_le32(&chip->awacs->byteswap, chip->format == SNDRV_PCM_FORMAT_S16_LE);
+	if (chip->set_format)
+		chip->set_format(chip);
+}
+
+/*
+ * stop the DMA transfer
+ */
+inline static void snd_pmac_dma_stop(pmac_stream_t *rec)
+{
+	out_le32(&rec->dma->control, (RUN|WAKE|FLUSH|PAUSE) << 16);
+	snd_pmac_wait_ack(rec);
+}
+
+/*
+ * set the command pointer address
+ */
+inline static void snd_pmac_dma_set_command(pmac_stream_t *rec, pmac_dbdma_t *cmd)
+{
+	out_le32(&rec->dma->cmdptr, cmd->addr);
+}
+
+/*
+ * start the DMA
+ */
+inline static void snd_pmac_dma_run(pmac_stream_t *rec, int status)
+{
+	out_le32(&rec->dma->control, status | (status << 16));
+}
+
+
+/*
+ * prepare playback/capture stream
+ */
+static int snd_pmac_pcm_prepare(pmac_t *chip, pmac_stream_t *rec, snd_pcm_substream_t *subs)
+{
+	int i;
+	volatile struct dbdma_cmd *cp;
+	unsigned long flags;
+	snd_pcm_runtime_t *runtime = subs->runtime;
+	int rate_index;
+	long offset;
+	pmac_stream_t *astr;
+	
+	rec->dma_size = snd_pcm_lib_buffer_bytes(subs);
+	rec->period_size = snd_pcm_lib_period_bytes(subs);
+	rec->nperiods = rec->dma_size / rec->period_size;
+	rec->cur_period = 0;
+	rate_index = snd_pmac_rate_index(chip, rec, runtime->rate);
+
+	/* set up constraints */
+	astr = snd_pmac_get_stream(chip, another_stream(rec->stream));
+	snd_runtime_check(astr, return -EINVAL);
+	astr->cur_freqs = 1 << rate_index;
+	astr->cur_formats = 1 << runtime->format;
+	chip->rate_index = rate_index;
+	chip->format = runtime->format;
+
+	/* We really want to execute a DMA stop command, after the AWACS
+	 * is initialized.
+	 * For reasons I don't understand, it stops the hissing noise
+	 * common to many PowerBook G3 systems (like mine :-).
+	 */
+	spin_lock_irqsave(&chip->reg_lock, flags);
+	snd_pmac_dma_stop(rec);
+	if (rec->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		st_le16(&chip->extra_dma.cmds->command, DBDMA_STOP);
+		snd_pmac_dma_set_command(rec, &chip->extra_dma);
+		snd_pmac_dma_run(rec, RUN);
+	}
+	offset = runtime->dma_addr;
+	for (i = 0, cp = rec->cmd.cmds; i < rec->nperiods; i++, cp++) {
+		st_le32(&cp->phy_addr, offset);
+		st_le16(&cp->req_count, rec->period_size);
+		/*st_le16(&cp->res_count, 0);*/
+		st_le16(&cp->xfer_status, 0);
+		offset += rec->period_size;
+	}
+	/* make loop */
+	st_le16(&cp->command, DBDMA_NOP + BR_ALWAYS);
+	st_le32(&cp->cmd_dep, rec->cmd.addr);
+
+	snd_pmac_dma_stop(rec);
+	snd_pmac_dma_set_command(rec, &rec->cmd);
+	spin_unlock_irqrestore(&chip->reg_lock, flags);
+
+	return 0;
+}
+
+
+/*
+ * stop beep if running (no spinlock!)
+ */
+static void snd_pmac_beep_stop(pmac_t *chip)
+{
+	pmac_beep_t *beep = chip->beep;
+
+	if (beep && beep->running) {
+		beep->running = 0;
+		del_timer(&beep->timer);
+		snd_pmac_dma_stop(&chip->playback);
+		st_le16(&chip->extra_dma.cmds->command, DBDMA_STOP);
+	}
+}
+
+/*
+ * PCM trigger/stop
+ */
+static int snd_pmac_pcm_trigger(pmac_t *chip, pmac_stream_t *rec,
+				snd_pcm_substream_t *subs, int cmd)
+{
+	unsigned long flags;
+	volatile struct dbdma_cmd *cp;
+	int i, command;
+
+	switch (cmd) {
+	case SNDRV_PCM_TRIGGER_START:
+	case SNDRV_PCM_TRIGGER_RESUME:
+		if (rec->running)
+			return -EBUSY;
+		command = (subs->stream == SNDRV_PCM_STREAM_PLAYBACK ?
+			   OUTPUT_MORE : INPUT_MORE) + INTR_ALWAYS;
+		spin_lock_irqsave(&chip->reg_lock, flags);
+		snd_pmac_beep_stop(chip);
+		snd_pmac_pcm_set_format(chip);
+		for (i = 0, cp = rec->cmd.cmds; i < rec->nperiods; i++, cp++)
+			out_le16(&cp->command, command);
+		snd_pmac_dma_set_command(rec, &rec->cmd);
+		(void)in_le32(&rec->dma->status);
+		snd_pmac_dma_run(rec, RUN|WAKE);
+		rec->running = 1;
+		spin_unlock_irqrestore(&chip->reg_lock, flags);
+		break;
+
+	case SNDRV_PCM_TRIGGER_STOP:
+	case SNDRV_PCM_TRIGGER_SUSPEND:
+		spin_lock_irqsave(&chip->reg_lock, flags);
+		rec->running = 0;
+		/*printk("stopped!!\n");*/
+		snd_pmac_dma_stop(rec);
+		for (i = 0, cp = rec->cmd.cmds; i < rec->nperiods; i++, cp++)
+			out_le16(&cp->command, DBDMA_STOP);
+		spin_unlock_irqrestore(&chip->reg_lock, flags);
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+/*
+ * return the current pointer
+ */
+inline
+static snd_pcm_uframes_t snd_pmac_pcm_pointer(pmac_t *chip, pmac_stream_t *rec,
+					      snd_pcm_substream_t *subs)
+{
+	int count;
+
+#if 0 /* hmm.. how can we get the current dma pointer?? */
+	if (! rec->cmd.cmds[rec->cur_period].xfer_status) {
+		count = in_le16(&rec->cmd.cmds[rec->cur_period].res_count);
+		count = rec->period_size - count;
+	} else
+#endif
+		count = 0;
+	count += rec->cur_period * rec->period_size;
+	/*printk("pointer=%d\n", count);*/
+	return bytes_to_frames(subs->runtime, count);
+}
+
+/*
+ * playback
+ */
+
+static int snd_pmac_playback_prepare(snd_pcm_substream_t *subs)
+{
+	pmac_t *chip = snd_pcm_substream_chip(subs);
+	return snd_pmac_pcm_prepare(chip, &chip->playback, subs);
+}
+
+static int snd_pmac_playback_trigger(snd_pcm_substream_t *subs,
+				     int cmd)
+{
+	pmac_t *chip = snd_pcm_substream_chip(subs);
+	return snd_pmac_pcm_trigger(chip, &chip->playback, subs, cmd);
+}
+
+static snd_pcm_uframes_t snd_pmac_playback_pointer(snd_pcm_substream_t *subs)
+{
+	pmac_t *chip = snd_pcm_substream_chip(subs);
+	return snd_pmac_pcm_pointer(chip, &chip->playback, subs);
+}
+
+
+/*
+ * capture
+ */
+
+static int snd_pmac_capture_prepare(snd_pcm_substream_t *subs)
+{
+	pmac_t *chip = snd_pcm_substream_chip(subs);
+	return snd_pmac_pcm_prepare(chip, &chip->capture, subs);
+}
+
+static int snd_pmac_capture_trigger(snd_pcm_substream_t *subs,
+				    int cmd)
+{
+	pmac_t *chip = snd_pcm_substream_chip(subs);
+	return snd_pmac_pcm_trigger(chip, &chip->capture, subs, cmd);
+}
+
+static snd_pcm_uframes_t snd_pmac_capture_pointer(snd_pcm_substream_t *subs)
+{
+	pmac_t *chip = snd_pcm_substream_chip(subs);
+	return snd_pmac_pcm_pointer(chip, &chip->capture, subs);
+}
+
+
+/*
+ * update playback/capture pointer from interrupts
+ */
+static void snd_pmac_pcm_update(pmac_t *chip, pmac_stream_t *rec)
+{
+	volatile struct dbdma_cmd *cp;
+	int c;
+	int stat;
+
+	spin_lock(&chip->reg_lock);
+	if (rec->running) {
+		cp = &rec->cmd.cmds[rec->cur_period];
+		for (c = 0; c < rec->nperiods; c++) { /* at most all fragments */
+			stat = ld_le16(&cp->xfer_status);
+			if (! (stat & ACTIVE))
+				break;
+			/*printk("update frag %d\n", rec->cur_period);*/
+			st_le16(&cp->xfer_status, 0);
+			st_le16(&cp->req_count, rec->period_size);
+			/*st_le16(&cp->res_count, 0);*/
+			rec->cur_period++;
+			if (rec->cur_period >= rec->nperiods) {
+				rec->cur_period = 0;
+				cp = rec->cmd.cmds;
+			} else
+				cp++;
+			spin_unlock(&chip->reg_lock);
+			snd_pcm_period_elapsed(rec->substream);
+			spin_lock(&chip->reg_lock);
+		}
+	}
+	spin_unlock(&chip->reg_lock);
+}
+
+
+/*
+ * hw info
+ */
+
+static snd_pcm_hardware_t snd_pmac_playback =
+{
+	info:		(SNDRV_PCM_INFO_INTERLEAVED |
+			 SNDRV_PCM_INFO_MMAP |
+			 SNDRV_PCM_INFO_MMAP_VALID |
+			 SNDRV_PCM_INFO_RESUME),
+	formats:	SNDRV_PCM_FMTBIT_S16_BE | SNDRV_PCM_FMTBIT_S16_LE,
+	rates:		SNDRV_PCM_RATE_8000_44100,
+	rate_min:	7350,
+	rate_max:	44100,
+	channels_min:	2,
+	channels_max:	2,
+	buffer_bytes_max:	32768,
+	period_bytes_min:	256,
+	period_bytes_max:	16384,
+	periods_min:		1,
+	periods_max:		PMAC_MAX_FRAGS,
+};
+
+static snd_pcm_hardware_t snd_pmac_capture =
+{
+	info:		(SNDRV_PCM_INFO_INTERLEAVED |
+			 SNDRV_PCM_INFO_MMAP |
+			 SNDRV_PCM_INFO_MMAP_VALID |
+			 SNDRV_PCM_INFO_RESUME),
+	formats:	SNDRV_PCM_FMTBIT_S16_BE | SNDRV_PCM_FMTBIT_S16_LE,
+	rates:		SNDRV_PCM_RATE_8000_44100,
+	rate_min:	7350,
+	rate_max:	44100,
+	channels_min:	2,
+	channels_max:	2,
+	buffer_bytes_max:	32768,
+	period_bytes_min:	256,
+	period_bytes_max:	16384,
+	periods_min:		1,
+	periods_max:		PMAC_MAX_FRAGS,
+};
+
+
+#if 0 // NYI
+static int snd_pmac_hw_rule_rate(snd_pcm_hw_params_t *params,
+				 snd_pcm_hw_rule_t *rule)
+{
+	pmac_t *chip = rule->private;
+	pmac_stream_t *rec = snd_pmac_get_stream(chip, rule->deps[0]);
+	int i, freq_table[8], num_freqs;
+
+	snd_runtime_check(rec, return -EINVAL);
+	num_freqs = 0;
+	for (i = chip->num_freqs - 1; i >= 0; i--) {
+		if (rec->cur_freqs & (1 << i))
+			freq_table[num_freqs++] = chip->freq_table[i];
+	}
+
+	return snd_interval_list(hw_param_interval(params, rule->var),
+				 num_freqs, freq_table, 0);
+}
+
+static int snd_pmac_hw_rule_format(snd_pcm_hw_params_t *params,
+				   snd_pcm_hw_rule_t *rule)
+{
+	pmac_t *chip = rule->private;
+	pmac_stream_t *rec = snd_pmac_get_stream(chip, rule->deps[0]);
+
+	snd_runtime_check(rec, return -EINVAL);
+	return snd_mask_refine_set(hw_param_mask(params, SNDRV_PCM_HW_PARAM_FORMAT),
+				   rec->cur_formats);
+}
+#endif // NYI
+
+static int snd_pmac_pcm_open(pmac_t *chip, pmac_stream_t *rec, snd_pcm_substream_t *subs)
+{
+	snd_pcm_runtime_t *runtime = subs->runtime;
+	int i, j, fflags;
+	static int typical_freqs[] = {
+		48000,
+		44100,
+		22050,
+		11025,
+		0,
+	};
+	static int typical_freq_flags[] = {
+		SNDRV_PCM_RATE_48000,
+		SNDRV_PCM_RATE_44100,
+		SNDRV_PCM_RATE_22050,
+		SNDRV_PCM_RATE_11025,
+		0,
+	};
+
+	/* look up frequency table and fill bit mask */
+	runtime->hw.rates = 0;
+	fflags = chip->freqs_ok;
+	for (i = 0; typical_freqs[i]; i++) {
+		for (j = 0; j < chip->num_freqs; j++) {
+			if ((chip->freqs_ok & (1 << j)) &&
+			    chip->freq_table[j] == typical_freqs[i]) {
+				runtime->hw.rates |= typical_freq_flags[i];
+				fflags &= ~(1 << j);
+				break;
+			}
+		}
+	}
+	if (fflags) /* rest */
+		runtime->hw.rates |= SNDRV_PCM_RATE_KNOT;
+
+	/* check for minimum and maximum rates */
+	for (i = 0; i < chip->num_freqs; i++) {
+		if (chip->freqs_ok & (1 << i)) {
+			runtime->hw.rate_max = chip->freq_table[i];
+			break;
+		}
+	}
+	for (i = chip->num_freqs - 1; i >= 0; i--) {
+		if (chip->freqs_ok & (1 << i)) {
+			runtime->hw.rate_min = chip->freq_table[i];
+			break;
+		}
+	}
+	runtime->hw.formats = chip->formats_ok;
+	if (chip->can_duplex)
+		runtime->hw.info |= SNDRV_PCM_INFO_JOINT_DUPLEX;
+	runtime->private_data = rec;
+	rec->substream = subs;
+
+#if 0 /* FIXME: still under development.. */
+	snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
+			    snd_pmac_hw_rule_rate, chip, rec->stream, -1);
+	snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_FORMAT,
+			    snd_pmac_hw_rule_format, chip, rec->stream, -1);
+#endif
+
+	runtime->hw.periods_max = rec->cmd.size - 1;
+
+	if (chip->can_duplex)
+		snd_pcm_set_sync(subs);
+
+	return 0;
+}
+
+static int snd_pmac_pcm_close(pmac_t *chip, pmac_stream_t *rec, snd_pcm_substream_t *subs)
+{
+	pmac_stream_t *astr;
+
+	snd_pmac_dma_stop(rec);
+
+	astr = snd_pmac_get_stream(chip, another_stream(rec->stream));
+	snd_runtime_check(astr, return -EINVAL);
+
+	/* reset constraints */
+	astr->cur_freqs = chip->freqs_ok;
+	astr->cur_formats = chip->formats_ok;
+	
+	return 0;
+}
+
+static int snd_pmac_playback_open(snd_pcm_substream_t *subs)
+{
+	pmac_t *chip = snd_pcm_substream_chip(subs);
+
+	subs->runtime->hw = snd_pmac_playback;
+	return snd_pmac_pcm_open(chip, &chip->playback, subs);
+}
+
+static int snd_pmac_capture_open(snd_pcm_substream_t *subs)
+{
+	pmac_t *chip = snd_pcm_substream_chip(subs);
+
+	subs->runtime->hw = snd_pmac_capture;
+	return snd_pmac_pcm_open(chip, &chip->capture, subs);
+}
+
+static int snd_pmac_playback_close(snd_pcm_substream_t *subs)
+{
+	pmac_t *chip = snd_pcm_substream_chip(subs);
+
+	return snd_pmac_pcm_close(chip, &chip->playback, subs);
+}
+
+static int snd_pmac_capture_close(snd_pcm_substream_t *subs)
+{
+	pmac_t *chip = snd_pcm_substream_chip(subs);
+
+	return snd_pmac_pcm_close(chip, &chip->capture, subs);
+}
+
+/*
+ */
+
+static snd_pcm_ops_t snd_pmac_playback_ops = {
+	open:		snd_pmac_playback_open,
+	close:		snd_pmac_playback_close,
+	ioctl:		snd_pcm_lib_ioctl,
+	hw_params:	snd_pmac_pcm_hw_params,
+	hw_free:	snd_pmac_pcm_hw_free,
+	prepare:	snd_pmac_playback_prepare,
+	trigger:	snd_pmac_playback_trigger,
+	pointer:	snd_pmac_playback_pointer,
+};
+
+static snd_pcm_ops_t snd_pmac_capture_ops = {
+	open:		snd_pmac_capture_open,
+	close:		snd_pmac_capture_close,
+	ioctl:		snd_pcm_lib_ioctl,
+	hw_params:	snd_pmac_pcm_hw_params,
+	hw_free:	snd_pmac_pcm_hw_free,
+	prepare:	snd_pmac_capture_prepare,
+	trigger:	snd_pmac_capture_trigger,
+	pointer:	snd_pmac_capture_pointer,
+};
+
+int __init snd_pmac_pcm_new(pmac_t *chip)
+{
+	snd_pcm_t *pcm;
+	int err;
+	int num_captures = 1;
+
+	if (! chip->can_capture)
+		num_captures = 0;
+	err = snd_pcm_new(chip->card, chip->card->driver, 0, 1, num_captures, &pcm);
+	if (err < 0)
+		return err;
+
+	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_pmac_playback_ops);
+	if (chip->can_capture)
+		snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_pmac_capture_ops);
+
+	pcm->private_data = chip;
+	pcm->info_flags = 0;
+	strcpy(pcm->name, chip->card->shortname);
+	chip->pcm = pcm;
+
+	chip->formats_ok = SNDRV_PCM_FMTBIT_S16_BE;
+	if (chip->can_byte_swap)
+		chip->formats_ok |= SNDRV_PCM_FMTBIT_S16_LE;
+
+	chip->playback.cur_formats = chip->formats_ok;
+	chip->capture.cur_formats = chip->formats_ok;
+	chip->playback.cur_freqs = chip->freqs_ok;
+	chip->capture.cur_freqs = chip->freqs_ok;
+
+	return 0;
+}
+
+
+
+/*
+ * beep stuff
+ */
+
+/*
+ * Stuff for outputting a beep.  The values range from -327 to +327
+ * so we can multiply by an amplitude in the range 0..100 to get a
+ * signed short value to put in the output buffer.
+ */
+static short beep_wform[256] = {
+	0,	40,	79,	117,	153,	187,	218,	245,
+	269,	288,	304,	316,	323,	327,	327,	324,
+	318,	310,	299,	288,	275,	262,	249,	236,
+	224,	213,	204,	196,	190,	186,	183,	182,
+	182,	183,	186,	189,	192,	196,	200,	203,
+	206,	208,	209,	209,	209,	207,	204,	201,
+	197,	193,	188,	183,	179,	174,	170,	166,
+	163,	161,	160,	159,	159,	160,	161,	162,
+	164,	166,	168,	169,	171,	171,	171,	170,
+	169,	167,	163,	159,	155,	150,	144,	139,
+	133,	128,	122,	117,	113,	110,	107,	105,
+	103,	103,	103,	103,	104,	104,	105,	105,
+	105,	103,	101,	97,	92,	86,	78,	68,
+	58,	45,	32,	18,	3,	-11,	-26,	-41,
+	-55,	-68,	-79,	-88,	-95,	-100,	-102,	-102,
+	-99,	-93,	-85,	-75,	-62,	-48,	-33,	-16,
+	0,	16,	33,	48,	62,	75,	85,	93,
+	99,	102,	102,	100,	95,	88,	79,	68,
+	55,	41,	26,	11,	-3,	-18,	-32,	-45,
+	-58,	-68,	-78,	-86,	-92,	-97,	-101,	-103,
+	-105,	-105,	-105,	-104,	-104,	-103,	-103,	-103,
+	-103,	-105,	-107,	-110,	-113,	-117,	-122,	-128,
+	-133,	-139,	-144,	-150,	-155,	-159,	-163,	-167,
+	-169,	-170,	-171,	-171,	-171,	-169,	-168,	-166,
+	-164,	-162,	-161,	-160,	-159,	-159,	-160,	-161,
+	-163,	-166,	-170,	-174,	-179,	-183,	-188,	-193,
+	-197,	-201,	-204,	-207,	-209,	-209,	-209,	-208,
+	-206,	-203,	-200,	-196,	-192,	-189,	-186,	-183,
+	-182,	-182,	-183,	-186,	-190,	-196,	-204,	-213,
+	-224,	-236,	-249,	-262,	-275,	-288,	-299,	-310,
+	-318,	-324,	-327,	-327,	-323,	-316,	-304,	-288,
+	-269,	-245,	-218,	-187,	-153,	-117,	-79,	-40,
+};
+
+#define BEEP_SRATE	22050	/* 22050 Hz sample rate */
+#define BEEP_BUFLEN	512
+#define BEEP_VOLUME	15	/* 0 - 100 */
+
+static void snd_pmac_beep_stop_callback(unsigned long data)
+{
+	pmac_t *chip = snd_magic_cast(pmac_t, (void*)data,);
+
+	spin_lock(&chip->reg_lock);
+	snd_pmac_beep_stop(chip);
+	snd_pmac_pcm_set_format(chip);
+	spin_unlock(&chip->reg_lock);
+}
+
+/* because mksound callback takes no private argument, we must keep
+   the chip pointer here as static variable.
+   This means that only one chip can beep.  Well, it's ok -
+   anyway we don't like hearing loud beeps from every chip
+   at the same time :)
+*/
+   
+static pmac_t *beeping_chip = NULL;
+
+static void snd_pmac_mksound(unsigned int hz, unsigned int ticks)
+{
+	pmac_t *chip;
+	pmac_stream_t *rec;
+	pmac_beep_t *beep;
+	unsigned long flags;
+	int beep_speed = 0;
+	int srate;
+	int period, ncycles, nsamples;
+	int i, j, f;
+	short *p;
+
+	if ((chip = beeping_chip) == NULL || (beep = chip->beep) == NULL)
+		return;
+	rec = &chip->playback;
+
+	beep_speed = snd_pmac_rate_index(chip, rec, BEEP_SRATE);
+	srate = chip->freq_table[beep_speed];
+
+	if (hz <= srate / BEEP_BUFLEN || hz > srate / 2) {
+		/* this is a hack for broken X server code */
+		hz = 750;
+		ticks = 12;
+	}
+
+	spin_lock_irqsave(&chip->reg_lock, flags);
+	if (chip->playback.running || chip->capture.running || beep->running) {
+		spin_unlock_irqrestore(&chip->reg_lock, flags);
+		return;
+	}
+	beep->running = 1;
+	spin_unlock_irqrestore(&chip->reg_lock, flags);
+
+	if (hz == beep->hz && beep->volume == beep->volume_play) {
+		nsamples = beep->nsamples;
+	} else {
+		period = srate * 256 / hz;	/* fixed point */
+		ncycles = BEEP_BUFLEN * 256 / period;
+		nsamples = (period * ncycles) >> 8;
+		f = ncycles * 65536 / nsamples;
+		j = 0;
+		p = beep->buf;
+		for (i = 0; i < nsamples; ++i, p += 2) {
+			p[0] = p[1] = beep_wform[j >> 8] * beep->volume;
+			j = (j + f) & 0xffff;
+		}
+		beep->hz = hz;
+		beep->volume_play = beep->volume;
+		beep->nsamples = nsamples;
+	}
+
+	spin_lock_irqsave(&chip->reg_lock, flags);
+	if (beep->running) {
+		if (ticks <= 0)
+			ticks = 1;
+		del_timer(&beep->timer);
+		beep->timer.expires = jiffies + ticks;
+		beep->timer.function = snd_pmac_beep_stop_callback;
+		beep->timer.data = (unsigned long)chip;
+		add_timer(&beep->timer);
+		snd_pmac_dma_stop(rec);
+		st_le16(&chip->extra_dma.cmds->req_count, nsamples * 4);
+		st_le16(&chip->extra_dma.cmds->xfer_status, 0);
+		st_le32(&chip->extra_dma.cmds->cmd_dep, chip->extra_dma.addr);
+		st_le32(&chip->extra_dma.cmds->phy_addr, beep->addr);
+		st_le16(&chip->extra_dma.cmds->command, OUTPUT_MORE + BR_ALWAYS);
+		out_le32(&chip->awacs->control,
+			 (in_le32(&chip->awacs->control) & ~0x1f00)
+			 | (beep_speed << 8));
+		out_le32(&chip->awacs->byteswap, 0);
+		snd_pmac_dma_set_command(rec, &chip->extra_dma);
+		snd_pmac_dma_run(rec, RUN);
+	}
+	spin_unlock_irqrestore(&chip->reg_lock, flags);
+}
+
+/*
+ * beep volume mixer
+ */
+static int snd_pmac_info_beep(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->count = 1;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 100;
+	return 0;
+}
+
+static int snd_pmac_get_beep(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	pmac_t *chip = snd_kcontrol_chip(kcontrol);
+	snd_runtime_check(chip->beep, return -ENXIO);
+	ucontrol->value.integer.value[0] = chip->beep->volume;
+	return 0;
+}
+
+static int snd_pmac_put_beep(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	pmac_t *chip = snd_kcontrol_chip(kcontrol);
+	int oval;
+	snd_runtime_check(chip->beep, return -ENXIO);
+	oval = chip->beep->volume;
+	chip->beep->volume = ucontrol->value.integer.value[0];
+	return oval != chip->beep->volume;
+}
+
+static snd_kcontrol_new_t snd_pmac_beep_mixer = {
+	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
+	name: "Beep Playback Volume",
+	index: 0,
+	info: snd_pmac_info_beep,
+	get: snd_pmac_get_beep,
+	put: snd_pmac_put_beep,
+};
+
+static void snd_pmac_beep_free(snd_kcontrol_t *control)
+{
+	pmac_t *chip = snd_magic_cast(pmac_t, _snd_kcontrol_chip(control),);
+	if (chip->beep) {
+		/* restore */
+		kd_mksound = chip->beep->orig_mksound;
+		kfree(chip->beep->buf);
+		kfree(chip->beep);
+		chip->beep = NULL;
+	}
+}
+
+/* Initialize beep stuff */
+int __init snd_pmac_attach_beep(pmac_t *chip)
+{
+	pmac_beep_t *beep;
+	int err;
+
+	beep = kmalloc(sizeof(*beep), GFP_KERNEL);
+	if (! beep)
+		return -ENOMEM;
+
+	beep->buf = (short *) kmalloc(BEEP_BUFLEN * 4, GFP_KERNEL);
+	if (! beep->buf) {
+		kfree(beep);
+		return -ENOMEM;
+	}
+	beep->addr = virt_to_bus(beep->buf);
+	init_timer(&beep->timer);
+	beep->timer.function = snd_pmac_beep_stop_callback;
+	beep->timer.data = (unsigned long) chip;
+	beep->orig_mksound = kd_mksound;
+	beep->volume = BEEP_VOLUME;
+	beep->running = 0;
+	beep->control = snd_ctl_new1(&snd_pmac_beep_mixer, chip);
+	if (beep->control == NULL) {
+		kfree(beep);
+		return -ENOMEM;
+	}
+	beep->control->private_free = snd_pmac_beep_free;
+	if ((err = snd_ctl_add(chip->card, beep->control)) < 0) {
+		kfree(beep);
+		return err;
+	}
+
+	/* hook */
+	beeping_chip = chip;
+	chip->beep = beep;
+	kd_mksound = snd_pmac_mksound;
+
+	return 0;
+}
+
+static void snd_pmac_dbdma_reset(pmac_t *chip)
+{
+	out_le32(&chip->playback.dma->control, (RUN|PAUSE|FLUSH|WAKE|DEAD) << 16);
+	snd_pmac_wait_ack(&chip->playback);
+	out_le32(&chip->capture.dma->control, (RUN|PAUSE|FLUSH|WAKE|DEAD) << 16);
+	snd_pmac_wait_ack(&chip->capture);
+}
+
+
+/*
+ * interrupt handlers
+ */
+static void
+snd_pmac_tx_intr(int irq, void *devid, struct pt_regs *regs)
+{
+	pmac_t *chip = snd_magic_cast(pmac_t, devid, return);
+	snd_pmac_pcm_update(chip, &chip->playback);
+}
+
+
+static void
+snd_pmac_rx_intr(int irq, void *devid, struct pt_regs *regs)
+{
+	pmac_t *chip = snd_magic_cast(pmac_t, devid, return);
+	snd_pmac_pcm_update(chip, &chip->capture);
+}
+
+
+static void
+snd_pmac_ctrl_intr(int irq, void *devid, struct pt_regs *regs)
+{
+	pmac_t *chip = snd_magic_cast(pmac_t, devid, return);
+	int ctrl = in_le32(&chip->awacs->control);
+
+	printk("pmac: control interrupt.. 0x%x\n", ctrl);
+	if (ctrl & MASK_PORTCHG) {
+		/* do something when headphone is plugged/unplugged? */
+		if (chip->port_change)
+			chip->port_change(chip);
+	}
+	if (ctrl & MASK_CNTLERR) {
+		int err = (in_le32(&chip->awacs->codec_stat) & MASK_ERRCODE) >> 16;
+		if (err && chip->model <= PMAC_SCREAMER)
+			snd_printk("error %x\n", err);
+	}
+	/* Writing 1s to the CNTLERR and PORTCHG bits clears them... */
+	out_le32(&chip->awacs->control, ctrl);
+}
+
+
+/*
+ * feature
+ */
+#if defined(CONFIG_PM) && defined(CONFIG_PMAC_PBOOK)
+static void snd_pmac_sound_feature(pmac_t *chip, int enable)
+{
+#ifdef CONFIG_PPC_HAS_FEATURE_CALLS
+	ppc_md.feature_call(PMAC_FTR_SOUND_CHIP_ENABLE, chip->node, 0, enable);
+#else
+	if (chip->is_pbook_G3) {
+		pmu_suspend();
+		feature_clear(chip->node, FEATURE_Sound_power);
+		feature_clear(chip->node, FEATURE_Sound_CLK_enable);
+		mdelay(1000); /* XXX */
+		pmu_resume();
+	}
+	if (chip->is_pbook_3400) {
+		feature_set(chip->node, FEATURE_IOBUS_enable);
+		udelay(10);
+	}
+#endif
+}
+#else /* CONFIG_PM && CONFIG_PMAC_PBOOK */
+#define snd_pmac_sound_feature(chip,enable) /**/
+#endif /* CONFIG_PM && CONFIG_PMAC_PBOOK */
+
+/*
+ * release resources
+ */
+
+static int snd_pmac_free(pmac_t *chip)
+{
+	/* stop sounds */
+	if (chip->initialized) {
+		snd_pmac_dbdma_reset(chip);
+		/* disable interrupts from awacs interface */
+		out_le32(&chip->awacs->control, in_le32(&chip->awacs->control) & 0xfff);
+	}
+
+	snd_pmac_sound_feature(chip, 0);
+#if defined(CONFIG_PM) && defined(CONFIG_PMAC_PBOOK)
+	snd_pmac_unregister_sleep_notifier(chip);
+#endif
+
+	/* clean up mixer if any */
+	if (chip->mixer_free)
+		chip->mixer_free(chip);
+
+	/* release resources */
+	if (chip->irq >= 0)
+		free_irq(chip->irq, (void*)chip);
+	if (chip->tx_irq >= 0)
+		free_irq(chip->tx_irq, (void*)chip);
+	if (chip->rx_irq >= 0)
+		free_irq(chip->rx_irq, (void*)chip);
+	snd_pmac_dbdma_free(&chip->playback.cmd);
+	snd_pmac_dbdma_free(&chip->capture.cmd);
+	snd_pmac_dbdma_free(&chip->extra_dma);
+	if (chip->macio_base)
+		iounmap(chip->macio_base);
+	if (chip->latch_base)
+		iounmap(chip->latch_base);
+	if (chip->awacs)
+		iounmap((void*)chip->awacs);
+	if (chip->playback.dma)
+		iounmap((void*)chip->playback.dma);
+	if (chip->capture.dma)
+		iounmap((void*)chip->capture.dma);
+	snd_magic_kfree(chip);
+	return 0;
+}
+
+
+/*
+ * free the device
+ */
+static int snd_pmac_dev_free(snd_device_t *device)
+{
+	pmac_t *chip = snd_magic_cast(pmac_t, device->device_data, return -ENXIO);
+	return snd_pmac_free(chip);
+}
+
+
+/*
+ * detect a sound chip
+ */
+static int __init snd_pmac_detect(pmac_t *chip)
+{
+	struct device_node *sound;
+	unsigned int *prop, l;
+
+	if (_machine != _MACH_Pmac)
+		return -ENODEV;
+
+	chip->subframe = 0;
+	chip->revision = 0;
+	chip->freqs_ok = 0xff; /* all ok */
+	chip->model = PMAC_AWACS;
+	chip->can_byte_swap = 1;
+	chip->can_duplex = 1;
+	chip->can_capture = 1;
+	chip->num_freqs = 8;
+	chip->freq_table = awacs_freqs;
+
+	chip->control_mask = MASK_IEPC | MASK_IEE | 0x11; /* default */
+
+	/* it seems the Pismo & iBook can't byte-swap in hardware. */
+	if (machine_is_compatible("PowerBook3,1") ||
+	    machine_is_compatible("PowerBook2,1"))
+		chip->can_byte_swap = 0 ;
+	if (machine_is_compatible("PowerBook2,1"))
+		chip->can_duplex = 0;
+
+	/* check machine type */
+	if (machine_is_compatible("AAPL,3400/2400")
+	    || machine_is_compatible("AAPL,3500"))
+		chip->is_pbook_3400 = 1;
+	else if (machine_is_compatible("PowerBook1,1")
+		 || machine_is_compatible("AAPL,PowerBook1998"))
+		chip->is_pbook_G3 = 1;
+	chip->node = find_devices("awacs");
+	if (chip->node)
+		return 0; /* ok */
+
+	/*
+	 * powermac G3 models have a node called "davbus"
+	 * with a child called "sound".
+	 */
+	chip->node = find_devices("davbus");
+	/*
+	 * if we didn't find a davbus device, try 'i2s-a' since
+	 * this seems to be what iBooks have
+	 */
+	if (! chip->node)
+		chip->node = find_devices("i2s-a");
+	if (! chip->node)
+		return -ENODEV;
+	sound = find_devices("sound");
+	while (sound && sound->parent != chip->node)
+		sound = sound->next;
+	if (! sound)
+		return -ENODEV;
+	prop = (unsigned int *) get_property(sound, "sub-frame", 0);
+	if (prop && *prop < 16)
+		chip->subframe = *prop;
+	/* This should be verified on older screamers */
+	if (device_is_compatible(sound, "screamer")) {
+		chip->model = PMAC_SCREAMER;
+		chip->can_byte_swap = 0;
+	}
+	if (device_is_compatible(sound, "burgundy")) {
+		chip->model = PMAC_BURGUNDY;
+		chip->control_mask = MASK_IEPC | 0x11; /* disable IEE */
+	}
+	if (device_is_compatible(sound, "daca")) {
+		chip->model = PMAC_DACA;
+		chip->can_capture = 0;  /* no capture */
+		chip->can_duplex = 0;
+		chip->can_byte_swap = 0; /* no le support */
+		chip->control_mask = MASK_IEPC | 0x11; /* disable IEE */
+	}
+	if (device_is_compatible(sound, "tumbler")) {
+		chip->model = PMAC_TUMBLER;
+		chip->can_capture = 0;  /* no capture */
+		chip->can_duplex = 0;
+		chip->can_byte_swap = 0; /* no le support */
+		chip->num_freqs = 2;
+		chip->freq_table = tumbler_freqs;
+		chip->control_mask = MASK_IEPC | 0x11; /* disable IEE */
+	}
+	prop = (unsigned int *)get_property(sound, "device-id", 0);
+	if (prop)
+		chip->device_id = *prop;
+	chip->has_iic = (find_devices("perch") != NULL);
+
+	/* look for a property saying what sample rates
+	   are available */
+	prop = (unsigned int *) get_property(sound, "sample-rates", &l);
+	if (! prop)
+		prop = (unsigned int *) get_property(sound, "output-frame-rates", &l);
+	if (prop) {
+		int i;
+		chip->freqs_ok = 0;
+		for (l /= sizeof(int); l > 0; --l) {
+			unsigned int r = *prop++;
+			/* Apple 'Fixed' format */
+			if (r >= 0x10000)
+				r >>= 16;
+			for (i = 0; i < chip->num_freqs; ++i) {
+				if (r == chip->freq_table[i]) {
+					chip->freqs_ok |= (1 << i);
+					break;
+				}
+			}
+		}
+	} else {
+		/* assume only 44.1khz */
+		chip->freqs_ok = 1;
+	}
+	return 0;
+}
+
+
+/*
+ * create and detect a pmac chip record
+ */
+int __init snd_pmac_new(snd_card_t *card, pmac_t **chip_return)
+{
+	pmac_t *chip;
+	struct device_node *np;
+	int err;
+	static snd_device_ops_t ops = {
+		dev_free:	snd_pmac_dev_free,
+	};
+
+	snd_runtime_check(chip_return, return -EINVAL);
+	*chip_return = NULL;
+
+	chip = snd_magic_kcalloc(pmac_t, 0, GFP_KERNEL);
+	if (chip == NULL)
+		return -ENOMEM;
+	chip->card = card;
+
+	spin_lock_init(&chip->reg_lock);
+	chip->irq = chip->tx_irq = chip->rx_irq = -1;
+
+	chip->playback.stream = SNDRV_PCM_STREAM_PLAYBACK;
+	chip->capture.stream = SNDRV_PCM_STREAM_CAPTURE;
+
+	if ((err = snd_pmac_detect(chip)) < 0)
+		goto __error;
+
+	if (snd_pmac_dbdma_alloc(&chip->playback.cmd, PMAC_MAX_FRAGS + 1) < 0 ||
+	    snd_pmac_dbdma_alloc(&chip->capture.cmd, PMAC_MAX_FRAGS + 1) < 0 ||
+	    snd_pmac_dbdma_alloc(&chip->extra_dma, 2) < 0) {
+		err = -ENOMEM;
+		goto __error;
+	}
+
+	np = chip->node;
+	if (np->n_addrs < 3 || np->n_intrs < 3) {
+		err = -ENODEV;
+		goto __error;
+	}
+
+	chip->awacs = (volatile struct awacs_regs *) ioremap(np->addrs[0].address, 0x1000);
+	chip->playback.dma = (volatile struct dbdma_regs *) ioremap(np->addrs[1].address, 0x100);
+	chip->capture.dma = (volatile struct dbdma_regs *) ioremap(np->addrs[2].address, 0x100);
+	if (request_irq(np->intrs[0].line, snd_pmac_ctrl_intr, 0,
+			"PMac", (void*)chip)) {
+		snd_printk("unable to grab IRQ %d\n", np->intrs[0].line);
+		err = -EBUSY;
+		goto __error;
+	}
+	chip->irq = np->intrs[0].line;
+	if (request_irq(np->intrs[1].line, snd_pmac_tx_intr, 0,
+			"PMac Output", (void*)chip)) {
+		snd_printk("unable to grab IRQ %d\n", np->intrs[1].line);
+		err = -EBUSY;
+		goto __error;
+	}
+	chip->tx_irq = np->intrs[1].line;
+	if (request_irq(np->intrs[2].line, snd_pmac_rx_intr, 0,
+			"PMac Input", (void*)chip)) {
+		snd_printk("unable to grab IRQ %d\n", np->intrs[2].line);
+		err = -EBUSY;
+		goto __error;
+	}
+	chip->rx_irq = np->intrs[2].line;
+
+	snd_pmac_sound_feature(chip, 1);
+
+	/* reset */
+	out_le32(&chip->awacs->control, 0x11);
+
+	/* Powerbooks have odd ways of enabling inputs such as
+	   an expansion-bay CD or sound from an internal modem
+	   or a PC-card modem. */
+	if (chip->is_pbook_3400) {
+		/* Enable CD and PC-card sound inputs. */
+		/* This is done by reading from address
+		 * f301a000, + 0x10 to enable the expansion-bay
+		 * CD sound input, + 0x80 to enable the PC-card
+		 * sound input.  The 0x100 enables the SCSI bus
+		 * terminator power.
+		 */
+		chip->latch_base = (unsigned char *) ioremap (0xf301a000, 0x1000);
+		in_8(chip->latch_base + 0x190);
+	} else if (chip->is_pbook_G3) {
+		struct device_node* mio;
+		for (mio = chip->node->parent; mio; mio = mio->parent) {
+			if (strcmp(mio->name, "mac-io") == 0
+			    && mio->n_addrs > 0) {
+				chip->macio_base = (unsigned char *) ioremap
+					(mio->addrs[0].address, 0x40);
+				break;
+			}
+		}
+		/* Enable CD sound input. */
+		/* The relevant bits for writing to this byte are 0x8f.
+		 * I haven't found out what the 0x80 bit does.
+		 * For the 0xf bits, writing 3 or 7 enables the CD
+		 * input, any other value disables it.  Values
+		 * 1, 3, 5, 7 enable the microphone.  Values 0, 2,
+		 * 4, 6, 8 - f enable the input from the modem.
+		 */
+		if (chip->macio_base)
+			out_8(chip->macio_base + 0x37, 3);
+	}
+
+	/* Reset dbdma channels */
+	snd_pmac_dbdma_reset(chip);
+
+#if defined(CONFIG_PM) && defined(CONFIG_PMAC_PBOOK)
+	/* add sleep notifier */
+	snd_pmac_register_sleep_notifier(chip);
+	card->set_power_state = snd_pmac_set_power_state;
+	card->power_state_private_data = chip;
+#endif
+
+	chip->initialized = 1;
+
+	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops)) < 0)
+		goto __error;
+
+	*chip_return = chip;
+	return 0;
+
+ __error:
+	snd_pmac_free(chip);
+	return err;
+}
+
+
+/*
+ * sleep notify for powerbook
+ */
+
+#if defined(CONFIG_PM) && defined(CONFIG_PMAC_PBOOK)
+
+/*
+ * Save state when going to sleep, restore it afterwards.
+ */
+
+static void snd_pmac_suspend(pmac_t *chip, int can_schedule)
+{
+	unsigned long flags;
+	snd_card_t *card = chip->card;
+
+	snd_power_lock(card, can_schedule);
+	if (card->power_state == SNDRV_CTL_POWER_D3hot)
+		goto __skip;
+
+	if (chip->suspend)
+		chip->suspend(chip);
+	snd_pcm_suspend_all(chip->pcm);
+	spin_lock_irqsave(&chip->reg_lock, flags);
+	if (chip->beep && chip->beep->running)
+		snd_pmac_beep_stop(chip);
+	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	disable_irq(chip->irq);
+	disable_irq(chip->tx_irq);
+	disable_irq(chip->rx_irq);
+	snd_pmac_sound_feature(chip, 0);
+	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
+      __skip:
+      	snd_power_unlock(card);
+}
+
+static void snd_pmac_resume(pmac_t *chip, int can_schedule)
+{
+	snd_card_t *card = chip->card;
+
+	snd_power_lock(card, can_schedule);
+	if (card->power_state == SNDRV_CTL_POWER_D0)
+		goto __skip;
+
+	snd_pmac_sound_feature(chip, 1);
+	if (chip->resume)
+		chip->resume(chip);
+	/* enable CD sound input */
+	if (chip->macio_base && chip->is_pbook_G3) {
+		out_8(chip->macio_base + 0x37, 3);
+	} else if (chip->is_pbook_3400) {
+		in_8(chip->latch_base + 0x190);
+	}
+
+	snd_pmac_pcm_set_format(chip);
+
+	enable_irq(chip->irq);
+	enable_irq(chip->tx_irq);
+	enable_irq(chip->rx_irq);
+
+	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
+      __skip:
+      	snd_power_unlock(card);
+}
+
+/* the chip is stored statically by snd_pmac_register_sleep_notifier
+ * because we can't have any private data for notify callback.
+ */
+static pmac_t *sleeping_pmac = NULL;
+
+static int snd_pmac_sleep_notify(struct pmu_sleep_notifier *self, int when)
+{
+	pmac_t *chip;
+
+	chip = sleeping_pmac;
+	snd_runtime_check(chip, return 0);
+
+	switch (when) {
+	case PBOOK_SLEEP_NOW:
+		snd_pmac_suspend(chip, 0);
+		break;
+	case PBOOK_WAKE:
+		snd_pmac_resume(chip, 0);
+		break;
+	}
+	return PBOOK_SLEEP_OK;
+}
+
+static struct pmu_sleep_notifier snd_pmac_sleep_notifier = {
+	snd_pmac_sleep_notify, SLEEP_LEVEL_SOUND,
+};
+
+static int __init snd_pmac_register_sleep_notifier(pmac_t *chip)
+{
+	/* should be protected here.. */
+	if (sleeping_pmac) {
+		snd_printd("sleep notifier already reigistered\n");
+		return -EBUSY;
+	}
+	sleeping_pmac = chip;
+	pmu_register_sleep_notifier(&snd_pmac_sleep_notifier);
+	chip->sleep_registered = 1;
+	return 0;
+}
+						    
+static int snd_pmac_unregister_sleep_notifier(pmac_t *chip)
+{
+	if (! chip->sleep_registered)
+		return 0;
+	/* should be protected here.. */
+	if (sleeping_pmac != chip)
+		return -ENODEV;
+	pmu_unregister_sleep_notifier(&snd_pmac_sleep_notifier);
+	sleeping_pmac = NULL;
+	return 0;
+}
+
+/* callback */
+static int snd_pmac_set_power_state(snd_card_t *card, unsigned int power_state)
+{
+	pmac_t *chip = snd_magic_cast(pmac_t, card->power_state_private_data, return -ENXIO);
+	switch (power_state) {
+	case SNDRV_CTL_POWER_D0:
+	case SNDRV_CTL_POWER_D1:
+	case SNDRV_CTL_POWER_D2:
+		snd_pmac_resume(chip, 1);
+		break;
+	case SNDRV_CTL_POWER_D3hot:
+	case SNDRV_CTL_POWER_D3cold:
+		snd_pmac_suspend(chip, 1);
+		break;
+	default:
+		return -EINVAL;
+	}
+	return 0;
+}
+
+#endif /* CONFIG_PM && CONFIG_PMAC_PBOOK */

@@ -1,0 +1,32 @@
+# sound/Config.in
+#
+
+mainmenu_option next_comment
+comment 'Open Sound System'
+
+tristate 'Open Sound System' CONFIG_SOUND_PRIME
+if [ "$CONFIG_SOUND_PRIME" != "n" ]; then
+  source sound/oss/Config.in
+fi
+
+endmenu
+
+mainmenu_option next_comment
+comment 'Advanced Linux Sound Architecture'
+
+tristate 'Advanced Linux Sound Architecture' CONFIG_SND
+if [ "$CONFIG_SND" != "n" ]; then
+  source sound/core/Config.in
+  source sound/drivers/Config.in
+fi
+if [ "$CONFIG_SND" != "n" -a "$CONFIG_ISA" == "y" ]; then
+  source sound/isa/Config.in
+fi
+if [ "$CONFIG_SND" != "n" -a "$CONFIG_PCI" == "y" ]; then
+  source sound/pci/Config.in
+fi
+if [ "$CONFIG_SND" != "n" -a "$CONFIG_PPC" == "y" ]; then
+  source sound/ppc/Config.in
+fi
+
+endmenu
