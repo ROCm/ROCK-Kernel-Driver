@@ -2313,11 +2313,12 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
   SB_JOURNAL_TRANS_MAX(p_s_sb)      = le32_to_cpu (jh->jh_journal.jp_journal_trans_max);
   SB_JOURNAL_MAX_BATCH(p_s_sb)      = le32_to_cpu (jh->jh_journal.jp_journal_max_batch);
   if (commit_max_age != 0) {
-	  SB_JOURNAL_MAX_COMMIT_AGE(p_s_sb) = commit_max_age;
+      SB_JOURNAL_MAX_COMMIT_AGE(p_s_sb) = commit_max_age;
+      SB_JOURNAL_MAX_TRANS_AGE(p_s_sb) = commit_max_age;
   } else {
-  SB_JOURNAL_MAX_COMMIT_AGE(p_s_sb) = le32_to_cpu (jh->jh_journal.jp_journal_max_commit_age);
+      SB_JOURNAL_MAX_COMMIT_AGE(p_s_sb) = le32_to_cpu (jh->jh_journal.jp_journal_max_commit_age);
+      SB_JOURNAL_MAX_TRANS_AGE(p_s_sb)  = JOURNAL_MAX_TRANS_AGE;
   }
-  SB_JOURNAL_MAX_TRANS_AGE(p_s_sb)  = JOURNAL_MAX_TRANS_AGE;
 
   if (SB_JOURNAL_TRANS_MAX(p_s_sb)) {
     /* make sure these parameters are available, assign it if they are not */

@@ -822,6 +822,7 @@ static int reiserfs_remount (struct super_block * s, int * mount_flags, char * a
 
   if(commit_max_age != 0) {
 	  SB_JOURNAL_MAX_COMMIT_AGE(s) = commit_max_age;
+	  SB_JOURNAL_MAX_TRANS_AGE(s) = commit_max_age;
   }
 
   if(blocks) {
