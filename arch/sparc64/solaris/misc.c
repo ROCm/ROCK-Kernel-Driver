@@ -349,8 +349,7 @@ asmlinkage int solaris_sysconf(int id)
 	case SOLARIS_CONFIG_XOPEN_VER:	return 3;
 	case SOLARIS_CONFIG_CLK_TCK:
 	case SOLARIS_CONFIG_PROF_TCK:
-		return prom_getintdefault(prom_cpu_nodes[smp_processor_id()],
-					  "clock-frequency", 167000000);
+		return sparc64_get_clock_tick(smp_processor_id());
 #ifdef CONFIG_SMP	
 	case SOLARIS_CONFIG_NPROC_CONF:	return NR_CPUS;
 	case SOLARIS_CONFIG_NPROC_ONLN:	return num_online_cpus();
