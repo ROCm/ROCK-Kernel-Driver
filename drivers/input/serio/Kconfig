@@ -83,7 +83,7 @@ config SERIO_PARKBD
 	  The module will be called parkbd.o. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
-config SERIO_ACORN
+config SERIO_RPCKBD
 	tristate "Acorn RiscPC keyboard controller"
 	depends on ARCH_ACORN && SERIO
 	help

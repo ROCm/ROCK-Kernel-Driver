@@ -551,7 +551,7 @@ static void mtd_notify_add(struct mtd_info* mtd)
 		disk->major = MAJOR_NR;
 		disk->first_minor = mtd->index;
 		disk->fops = &mtd_fops;
-		sprintf(disk->disk_name, "mtd%d", mtd->index);
+		sprintf(disk->disk_name, "mtdblock%d", mtd->index);
 
 		mtddisk[mtd->index] = disk;
 		set_capacity(disk, mtd->size / 512);
