@@ -10,7 +10,7 @@ reiserfs-objs := bitmap.o do_balan.o namei.o inode.o file.o dir.o fix_node.o \
 		 item_ops.o ioctl.o procfs.o
 
 ifeq ($(CONFIG_REISERFS_FS_XATTR),y)
-reiserfs-objs += xattr.o xattr_user.o
+reiserfs-objs += xattr.o xattr_user.o xattr_trusted.o
 endif
 
 ifeq ($(CONFIG_REISERFS_FS_POSIX_ACL),y)
