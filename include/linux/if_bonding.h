@@ -51,7 +51,7 @@
 #define BOND_STATE_ACTIVE       0   /* link is active */
 #define BOND_STATE_BACKUP       1   /* link is backup */
 
-#define MAX_BONDS               1   /* Maximum number of devices to support */
+#define BOND_DEFAULT_MAX_BONDS  1   /* Default maximum number of devices to support */
 
 typedef struct ifbond {
 	__s32 bond_mode;
@@ -76,6 +76,7 @@ typedef struct slave {
 	short  delay;
 	char   link;    /* one of BOND_LINK_XXXX */
 	char   state;   /* one of BOND_STATE_XXXX */
+	unsigned short original_flags;
 	u32 link_failure_count;
 } slave_t;
 
@@ -104,6 +105,8 @@ typedef struct bonding {
 #endif /* CONFIG_PROC_FS */
 	struct bonding *next_bond;
 	struct net_device *device;
+	struct dev_mc_list *mc_list;
+	unsigned short flags;
 } bonding_t;
 #endif /* __KERNEL__ */
 
