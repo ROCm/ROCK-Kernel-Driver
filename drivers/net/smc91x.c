@@ -306,6 +306,7 @@ static void PRINT_PKT(u_char *buf, int length)
 static void smc_reset(struct net_device *dev)
 {
 	unsigned long ioaddr = dev->base_addr;
+	struct smc_local *lp = netdev_priv(dev);
 	unsigned int ctl, cfg;
 
 	DBG(2, "%s: %s\n", dev->name, __FUNCTION__);
@@ -379,6 +380,14 @@ static void smc_reset(struct net_device *dev)
 	SMC_SELECT_BANK(2);
 	SMC_SET_MMU_CMD(MC_RESET);
 	SMC_WAIT_MMU_BUSY();
+
+	/* clear anything saved */
+	if (lp->saved_skb != NULL) {
+		dev_kfree_skb (lp->saved_skb);
+		lp->saved_skb = NULL;
+		lp->stats.tx_errors++;
+		lp->stats.tx_aborted_errors++;
+	}
 }
 
 /*
@@ -1270,13 +1279,6 @@ static void smc_timeout(struct net_device *dev)
 	if (lp->phy_type != 0)
 		schedule_work(&lp->phy_configure);
 
-	/* clear anything saved */
-	if (lp->saved_skb != NULL) {
-		dev_kfree_skb (lp->saved_skb);
-		lp->saved_skb = NULL;
-		lp->stats.tx_errors++;
-		lp->stats.tx_aborted_errors++;
-	}
 	/* We can accept TX packets again */
 	dev->trans_start = jiffies;
 	netif_wake_queue(dev);
@@ -1410,9 +1412,6 @@ smc_open(struct net_device *dev)
 		return -EINVAL;
 	}
 
-	/* clear out all the junk that was put here before... */
-	lp->saved_skb = NULL;
-
 	/* Setup the default Register Modes */
 	lp->tcr_cur_mode = TCR_DEFAULT;
 	lp->rcr_cur_mode = RCR_DEFAULT;
@@ -1464,6 +1463,11 @@ static int smc_close(struct net_device *dev)
 	if (lp->phy_type != 0) {
 		flush_scheduled_work();
 		smc_phy_powerdown(dev, lp->mii.phy_id);
+	}
+
+	if (lp->saved_skb) {
+		dev_kfree_skb(lp->saved_skb);
+		lp->saved_skb = NULL;
 	}
 
 	return 0;
