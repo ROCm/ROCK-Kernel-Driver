@@ -370,6 +370,20 @@ void blk_queue_hardsect_size(request_queue_t *q, unsigned short size)
 }
 
 /**
+ * blk_queue_stack_limits - inherit underlying queue limits for stacked drivers
+ * @t:	the stacking driver (top)
+ * @b:  the underlying device (bottom)
+ **/
+void blk_queue_stack_limits(request_queue_t *t, request_queue_t *b)
+{
+	t->max_sectors = min(t->max_sectors,b->max_sectors);
+	t->max_phys_segments = min(t->max_phys_segments,b->max_phys_segments);
+	t->max_hw_segments = min(t->max_hw_segments,b->max_hw_segments);
+	t->max_segment_size = min(t->max_segment_size,b->max_segment_size);
+	t->hardsect_size = max(t->hardsect_size,b->hardsect_size);
+}
+
+/**
  * blk_queue_segment_boundary - set boundary rules for segment merging
  * @q:  the request queue for the device
  * @mask:  the memory boundary mask
@@ -2804,6 +2818,7 @@ EXPORT_SYMBOL(blk_queue_max_phys_segments);
 EXPORT_SYMBOL(blk_queue_max_hw_segments);
 EXPORT_SYMBOL(blk_queue_max_segment_size);
 EXPORT_SYMBOL(blk_queue_hardsect_size);
+EXPORT_SYMBOL(blk_queue_stack_limits);
 EXPORT_SYMBOL(blk_queue_segment_boundary);
 EXPORT_SYMBOL(blk_queue_dma_alignment);
 EXPORT_SYMBOL(blk_rq_map_sg);
