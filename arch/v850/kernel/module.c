@@ -160,7 +160,7 @@ int apply_relocate_add (Elf32_Shdr *sechdrs, const char *strtab,
 			struct module *mod)
 {
 	unsigned int i;
-	Elf32_Rela *rela = (void *)sechdrs[relsec].sh_offset;
+	Elf32_Rela *rela = (void *)sechdrs[relsec].sh_addr;
 
 	DEBUGP ("Applying relocate section %u to %u\n", relsec,
 		sechdrs[relsec].sh_info);
@@ -168,11 +168,11 @@ int apply_relocate_add (Elf32_Shdr *sechdrs, const char *strtab,
 	for (i = 0; i < sechdrs[relsec].sh_size / sizeof (*rela); i++) {
 		/* This is where to make the change */
 		uint32_t *loc
-			= ((void *)sechdrs[sechdrs[relsec].sh_info].sh_offset
+			= ((void *)sechdrs[sechdrs[relsec].sh_info].sh_addr
 			   + rela[i].r_offset);
 		/* This is the symbol it is referring to */
 		Elf32_Sym *sym
-			= ((Elf32_Sym *)sechdrs[symindex].sh_offset
+			= ((Elf32_Sym *)sechdrs[symindex].sh_addr
 			   + ELF32_R_SYM (rela[i].r_info));
 		uint32_t val = sym->st_value;
 

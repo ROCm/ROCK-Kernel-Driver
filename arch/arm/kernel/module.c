@@ -88,7 +88,7 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
 	Elf32_Shdr *symsec = sechdrs + symindex;
 	Elf32_Shdr *relsec = sechdrs + relindex;
 	Elf32_Shdr *dstsec = sechdrs + relsec->sh_info;
-	Elf32_Rel *rel = (void *)relsec->sh_offset;
+	Elf32_Rel *rel = (void *)relsec->sh_addr;
 	unsigned int i;
 
 	for (i = 0; i < relsec->sh_size / sizeof(Elf32_Rel); i++, rel++) {
@@ -103,7 +103,7 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
 			return -ENOEXEC;
 		}
 
-		sym = ((Elf32_Sym *)symsec->sh_offset) + offset;
+		sym = ((Elf32_Sym *)symsec->sh_addr) + offset;
 		if (!sym->st_value) {
 			printk(KERN_WARNING "%s: unknown symbol %s\n",
 				module->name, strtab + sym->st_name);
@@ -118,7 +118,7 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
 			return -ENOEXEC;
 		}
 
-		loc = dstsec->sh_offset + rel->r_offset;
+		loc = dstsec->sh_addr + rel->r_offset;
 
 		switch (ELF32_R_TYPE(rel->r_info)) {
 		case R_ARM_ABS32:

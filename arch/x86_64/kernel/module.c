@@ -49,7 +49,7 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 		   struct module *me)
 {
 	unsigned int i;
-	Elf64_Rela *rel = (void *)sechdrs[relsec].sh_offset;
+	Elf64_Rela *rel = (void *)sechdrs[relsec].sh_addr;
 	Elf64_Sym *sym;
 	void *loc;
 	u64 val; 
@@ -58,11 +58,11 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 	       sechdrs[relsec].sh_info);
 	for (i = 0; i < sechdrs[relsec].sh_size / sizeof(*rel); i++) {
 		/* This is where to make the change */
-		loc = (void *)sechdrs[sechdrs[relsec].sh_info].sh_offset
+		loc = (void *)sechdrs[sechdrs[relsec].sh_info].sh_addr
 			+ rel[i].r_offset;
 
 		/* This is the symbol it is referring to */
-		sym = (Elf64_Sym *)sechdrs[symindex].sh_offset
+		sym = (Elf64_Sym *)sechdrs[symindex].sh_addr
 			+ ELF64_R_SYM(rel[i].r_info);
 		if (!sym->st_value) {
 			printk(KERN_WARNING "%s: Unknown symbol %s\n",
