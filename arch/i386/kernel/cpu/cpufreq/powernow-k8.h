@@ -73,6 +73,19 @@ struct powernow_k8_data {
 #define MSR_S_HI_MAX_WORKING_VID  0x001f0000
 #define MSR_S_HI_START_VID        0x00001f00
 #define MSR_S_HI_CURRENT_VID      0x0000001f
+#define MSR_C_HI_STP_GNT_BENIGN   0x00000001
+
+/*
+ * There are restrictions frequencies have to follow:
+ * - only 1 entry in the low fid table ( <=1.4GHz )
+ * - lowest entry in the high fid table must be >= 2 * the entry in the
+ *   low fid table
+ * - lowest entry in the high fid table must be a <= 200MHz + 2 * the entry
+ *   in the low fid table
+ * - the parts can only step at 200 MHz intervals, so 1.9 GHz is never valid
+ * - lowest frequency must be >= interprocessor hypertransport link speed
+ *   (only applies to MP systems obviously)
+ */
 
 /* fids (frequency identifiers) are arranged in 2 tables - lo and hi */
 #define LO_FID_TABLE_TOP     6
