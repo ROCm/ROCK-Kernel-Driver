@@ -1362,6 +1362,7 @@ void ndisc_send_redirect(struct sk_buff *skb, struct neighbour *neigh,
 				   1, &err);
 	if (buff == NULL) {
 		ND_PRINTK1("ndisc_send_redirect: alloc_skb failed\n");
+		dst_release(dst);
 		return;
 	}
 
