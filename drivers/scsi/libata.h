@@ -37,8 +37,8 @@ struct ata_scsi_args {
 
 
 /* libata-core.c */
-extern unsigned int ata_dev_id_string(struct ata_device *dev, unsigned char *s,
-                               unsigned int ofs, unsigned int len);
+extern void ata_dev_id_string(struct ata_device *dev, unsigned char *s,
+			      unsigned int ofs, unsigned int len);
 extern struct ata_queued_cmd *ata_qc_new_init(struct ata_port *ap,
 				      struct ata_device *dev);
 extern int ata_qc_issue(struct ata_queued_cmd *qc);

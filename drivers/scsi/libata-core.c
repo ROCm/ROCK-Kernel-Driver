@@ -439,6 +439,17 @@ u8 ata_check_status_mmio(struct ata_port *ap)
        	return readb((void *) ap->ioaddr.status_addr);
 }
 
+/**
+ *	ata_prot_to_cmd - determine which read/write opcodes to use
+ *	@protocol: ATA_PROT_xxx taskfile protocol
+ *	@lba48: true is lba48 is present
+ *
+ *	Given necessary input, determine which read/write commands
+ *	to use to transfer data.
+ *
+ *	LOCKING:
+ *	None.
+ */
 static int ata_prot_to_cmd(int protocol, int lba48)
 {
 	int rcmd = 0, wcmd = 0;
@@ -471,6 +482,19 @@ static int ata_prot_to_cmd(int protocol, int lba48)
 	return rcmd | (wcmd << 8);
 }
 
+/**
+ *	ata_dev_set_protocol - set taskfile protocol and r/w commands
+ *	@dev: device to examine and configure
+ *
+ *	Examine the device configuration, after we have
+ *	read the identify-device page and configured the
+ *	data transfer mode.  Set internal state related to
+ *	the ATA taskfile protocol (pio, pio mult, dma, etc.)
+ *	and calculate the proper read/write commands to use.
+ *
+ *	LOCKING:
+ *	caller.
+ */
 static void ata_dev_set_protocol(struct ata_device *dev)
 {
 	int pio = (dev->flags & ATA_DFLAG_PIO);
@@ -529,12 +553,21 @@ static const char *ata_udma_string(unsigned int udma_mask)
 }
 
 /**
- *	ata_pio_devchk -
- *	@ap:
- *	@device:
+ *	ata_pio_devchk - PATA device presence detection
+ *	@ap: ATA channel to examine
+ *	@device: Device to examine (starting at zero)
+ *
+ *	This technique was originally described in
+ *	Hale Landis's ATADRVR (www.ata-atapi.com), and
+ *	later found its way into the ATA/ATAPI spec.
+ *
+ *	Write a pattern to the ATA shadow registers,
+ *	and if a device is present, it will respond by
+ *	correctly storing and echoing back the
+ *	ATA shadow register contents.
  *
  *	LOCKING:
- *
+ *	caller.
  */
 
 static unsigned int ata_pio_devchk(struct ata_port *ap,
@@ -564,12 +597,21 @@ static unsigned int ata_pio_devchk(struct ata_port *ap,
 }
 
 /**
- *	ata_mmio_devchk -
- *	@ap:
- *	@device:
+ *	ata_mmio_devchk - PATA device presence detection
+ *	@ap: ATA channel to examine
+ *	@device: Device to examine (starting at zero)
+ *
+ *	This technique was originally described in
+ *	Hale Landis's ATADRVR (www.ata-atapi.com), and
+ *	later found its way into the ATA/ATAPI spec.
+ *
+ *	Write a pattern to the ATA shadow registers,
+ *	and if a device is present, it will respond by
+ *	correctly storing and echoing back the
+ *	ATA shadow register contents.
  *
  *	LOCKING:
- *
+ *	caller.
  */
 
 static unsigned int ata_mmio_devchk(struct ata_port *ap,
@@ -599,12 +641,16 @@ static unsigned int ata_mmio_devchk(struct ata_port *ap,
 }
 
 /**
- *	ata_dev_devchk -
- *	@ap:
- *	@device:
+ *	ata_dev_devchk - PATA device presence detection
+ *	@ap: ATA channel to examine
+ *	@device: Device to examine (starting at zero)
+ *
+ *	Dispatch ATA device presence detection, depending
+ *	on whether we are using PIO or MMIO to talk to the
+ *	ATA shadow registers.
  *
  *	LOCKING:
- *
+ *	caller.
  */
 
 static unsigned int ata_dev_devchk(struct ata_port *ap,
@@ -655,16 +701,24 @@ static unsigned int ata_dev_classify(struct ata_taskfile *tf)
 }
 
 /**
- *	ata_dev_try_classify -
- *	@ap:
- *	@device:
+ *	ata_dev_try_classify - Parse returned ATA device signature
+ *	@ap: ATA channel to examine
+ *	@device: Device to examine (starting at zero)
+ *
+ *	After an event -- SRST, E.D.D., or SATA COMRESET -- occurs,
+ *	an ATA/ATAPI-defined set of values is placed in the ATA
+ *	shadow registers, indicating the results of device detection
+ *	and diagnostics.
+ *
+ *	Select the ATA device, and read the values from the ATA shadow
+ *	registers.  Then parse according to the Error register value,
+ *	and the spec-defined values examined by ata_dev_classify().
  *
  *	LOCKING:
- *
+ *	caller.
  */
 
-static u8 ata_dev_try_classify(struct ata_port *ap, unsigned int device,
-			       unsigned int maybe_have_dev)
+static u8 ata_dev_try_classify(struct ata_port *ap, unsigned int device)
 {
 	struct ata_device *dev = &ap->device[device];
 	struct ata_taskfile tf;
@@ -701,44 +755,51 @@ static u8 ata_dev_try_classify(struct ata_port *ap, unsigned int device,
 }
 
 /**
- *	ata_dev_id_string -
- *	@dev:
- *	@s:
- *	@ofs:
- *	@len:
+ *	ata_dev_id_string - Convert IDENTIFY DEVICE page into string
+ *	@dev: Device whose IDENTIFY DEVICE results we will examine
+ *	@s: string into which data is output
+ *	@ofs: offset into identify device page
+ *	@len: length of string to return
+ *
+ *	The strings in the IDENTIFY DEVICE page are broken up into
+ *	16-bit chunks.  Run through the string, and output each
+ *	8-bit chunk linearly, regardless of platform.
  *
  *	LOCKING:
- *
- *	RETURNS:
- *
+ *	caller.
  */
 
-unsigned int ata_dev_id_string(struct ata_device *dev, unsigned char *s,
-			       unsigned int ofs, unsigned int len)
+void ata_dev_id_string(struct ata_device *dev, unsigned char *s,
+		       unsigned int ofs, unsigned int len)
 {
-	unsigned int c, ret = 0;
+	unsigned int c;
 
 	while (len > 0) {
 		c = dev->id[ofs] >> 8;
 		*s = c;
 		s++;
 
-		ret = c = dev->id[ofs] & 0xff;
+		c = dev->id[ofs] & 0xff;
 		*s = c;
 		s++;
 
 		ofs++;
 		len -= 2;
 	}
-
-	return ret;
 }
 
 /**
- *	ata_dev_parse_strings -
- *	@dev:
+ *	ata_dev_parse_strings - Store useful IDENTIFY DEVICE page strings
+ *	@dev: Device whose IDENTIFY DEVICE page info we use
+ *
+ *	We store 'vendor' and 'product' strings read from the device,
+ *	for later use in the SCSI simulator's INQUIRY data.
+ *
+ *	Set these strings here, in the case of 'product', using
+ *	data read from the ATA IDENTIFY DEVICE page.
  *
  *	LOCKING:
+ *	caller.
  */
 
 static void ata_dev_parse_strings(struct ata_device *dev)
@@ -751,12 +812,16 @@ static void ata_dev_parse_strings(struct ata_device *dev)
 }
 
 /**
- *	__ata_dev_select -
- *	@ap:
- *	@device:
+ *	__ata_dev_select - Select device 0/1 on ATA bus
+ *	@ap: ATA channel to manipulate
+ *	@device: ATA device (numbered from zero) to select
+ *
+ *	Use the method defined in the ATA specification to
+ *	make either device 0, or device 1, active on the
+ *	ATA channel.
  *
  *	LOCKING:
- *
+ *	caller.
  */
 
 static void __ata_dev_select (struct ata_port *ap, unsigned int device)
@@ -777,16 +842,22 @@ static void __ata_dev_select (struct ata_port *ap, unsigned int device)
 }
 
 /**
- *	ata_dev_select -
- *	@ap:
- *	@device:
- *	@wait:
- *	@can_sleep:
+ *	ata_dev_select - Select device 0/1 on ATA bus
+ *	@ap: ATA channel to manipulate
+ *	@device: ATA device (numbered from zero) to select
+ *	@wait: non-zero to wait for Status register BSY bit to clear
+ *	@can_sleep: non-zero if context allows sleeping
+ *
+ *	Use the method defined in the ATA specification to
+ *	make either device 0, or device 1, active on the
+ *	ATA channel.
+ *
+ *	This is a high-level version of __ata_dev_select(),
+ *	which additionally provides the services of inserting
+ *	the proper pauses and status polling, where needed.
  *
  *	LOCKING:
- *
- *	RETURNS:
- *
+ *	caller.
  */
 
 void ata_dev_select(struct ata_port *ap, unsigned int device,
@@ -808,10 +879,14 @@ void ata_dev_select(struct ata_port *ap, unsigned int device,
 }
 
 /**
- *	ata_dump_id -
- *	@dev:
+ *	ata_dump_id - IDENTIFY DEVICE info debugging output
+ *	@dev: Device whose IDENTIFY DEVICE page we will dump
+ *
+ *	Dump selected 16-bit words from a detected device's
+ *	IDENTIFY PAGE page.
  *
  *	LOCKING:
+ *	caller.
  */
 
 static inline void ata_dump_id(struct ata_device *dev)
@@ -1439,9 +1514,9 @@ void ata_bus_reset(struct ata_port *ap)
 	/*
 	 * determine by signature whether we have ATA or ATAPI devices
 	 */
-	err = ata_dev_try_classify(ap, 0, dev0);
+	err = ata_dev_try_classify(ap, 0);
 	if ((slave_possible) && (err != 0x81))
-		ata_dev_try_classify(ap, 1, dev1);
+		ata_dev_try_classify(ap, 1);
 
 	/* re-enable interrupts */
 	ata_irq_on(ap);
