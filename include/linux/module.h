@@ -54,7 +54,6 @@ extern struct module __this_module;
 void *__symbol_get(const char *symbol);
 void *__symbol_get_gpl(const char *symbol);
 #define symbol_get(x) ((typeof(&x))(__symbol_get(#x)))
-#define symbol_put(x) __symbol_put(#x)
 
 /* For every exported symbol, place a struct in the __ksymtab section */
 #define EXPORT_SYMBOL(sym)				\
@@ -192,7 +191,9 @@ int module_finalize(const Elf_Ehdr *hdr,
 void module_free(struct module *mod, void *module_region);
 
 #ifdef CONFIG_MODULE_UNLOAD
+
 void __symbol_put(const char *symbol);
+#define symbol_put(x) __symbol_put(#x)
 void symbol_put_addr(void *addr);
 
 /* We only need protection against local interrupts. */
@@ -259,6 +260,7 @@ do {									     \
 /* Get/put a kernel symbol (calls should be symmetric) */
 #define symbol_get(x) (&(x))
 #define symbol_put(x) do { } while(0)
+#define symbol_put_addr(x) do { } while(0)
 
 #define try_module_get(module) 1
 #define module_put(module) do { } while(0)
