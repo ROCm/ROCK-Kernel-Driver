@@ -48,6 +48,7 @@
 #include "drm_fops.h"
 #include "drm_init.h"
 #include "drm_ioctl.h"
+#include "drm_irq.h"
 #include "drm_lock.h"
 #include "drm_memory.h"
 #include "drm_proc.h"

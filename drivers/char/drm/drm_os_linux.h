@@ -62,14 +62,20 @@
 	verify_area( VERIFY_READ, uaddr, size )
 #define DRM_COPY_FROM_USER_UNCHECKED(arg1, arg2, arg3) 	\
 	__copy_from_user(arg1, arg2, arg3)
+#define DRM_COPY_TO_USER_UNCHECKED(arg1, arg2, arg3)	\
+	__copy_to_user(arg1, arg2, arg3)
 #define DRM_GET_USER_UNCHECKED(val, uaddr)		\
 	__get_user(val, uaddr)
+#define DRM_PUT_USER_UNCHECKED(uaddr, val)		\
+	__put_user(val, uaddr)
 
 
 /** 'malloc' without the overhead of DRM(alloc)() */
 #define DRM_MALLOC(x) kmalloc(x, GFP_KERNEL)
 /** 'free' without the overhead of DRM(free)() */
 #define DRM_FREE(x,size) kfree(x)
+
+#define DRM_GET_PRIV_WITH_RETURN(_priv, _filp) _priv = _filp->private_data
 
 /** 
  * Get the pointer to the SAREA.
