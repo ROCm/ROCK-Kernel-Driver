@@ -598,7 +598,7 @@ ia64_mca_cmc_vector_disable (void *dummy)
 	cmcv = (cmcv_reg_t)ia64_getreg(_IA64_REG_CR_CMCV);
 
 	cmcv.cmcv_mask = 1; /* Mask/disable interrupt */
-	ia64_setreg(_IA64_REG_CR_CMCV, cmcv.cmcv_regval)
+	ia64_setreg(_IA64_REG_CR_CMCV, cmcv.cmcv_regval);
 
 	IA64_MCA_DEBUG("%s: CPU %d corrected "
 		       "machine check vector %#x disabled.\n",
@@ -625,7 +625,7 @@ ia64_mca_cmc_vector_enable (void *dummy)
 	cmcv = (cmcv_reg_t)ia64_getreg(_IA64_REG_CR_CMCV);
 
 	cmcv.cmcv_mask = 0; /* Unmask/enable interrupt */
-	ia64_setreg(_IA64_REG_CR_CMCV, cmcv.cmcv_regval)
+	ia64_setreg(_IA64_REG_CR_CMCV, cmcv.cmcv_regval);
 
 	IA64_MCA_DEBUG("%s: CPU %d corrected "
 		       "machine check vector %#x enabled.\n",
