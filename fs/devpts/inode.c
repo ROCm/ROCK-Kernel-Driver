@@ -118,9 +118,9 @@ static int devpts_remount(struct super_block * sb, int * flags, char * data)
 	return 0;
 }
 
-struct super_block *devpts_read_super(struct super_block *s, void *data,
-				      int silent)
+static int devpts_fill_super(struct super_block *s, void *data, int silent)
 {
+	int error = -ENOMEM;
 	struct inode * inode;
 	struct devpts_sb_info *sbi;
 
@@ -136,6 +136,7 @@ struct super_block *devpts_read_super(struct super_block *s, void *data,
 	memset(sbi->inodes, 0, sizeof(struct inode *) * sbi->max_ptys);
 
 	if ( devpts_parse_options(data,sbi) && !silent) {
+		error = -EINVAL;
 		printk("devpts: called with bogus options\n");
 		goto fail_free;
 	}
@@ -160,14 +161,14 @@ struct super_block *devpts_read_super(struct super_block *s, void *data,
 
 	s->s_root = d_alloc_root(inode);
 	if (s->s_root)
-		return s;
+		return 0;
 	
 	printk("devpts: get root dentry failed\n");
 	iput(inode);
 fail_free:
 	kfree(sbi);
 fail:
-	return NULL;
+	return error;
 }
 
 static int devpts_statfs(struct super_block *sb, struct statfs *buf)
@@ -178,7 +179,17 @@ static int devpts_statfs(struct super_block *sb, struct statfs *buf)
 	return 0;
 }
 
-static DECLARE_FSTYPE(devpts_fs_type, "devpts", devpts_read_super, FS_SINGLE);
+static struct super_block *devpts_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_single(fs_type, flags, data, devpts_fill_super);
+}
+
+static struct file_system_type devpts_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"devpts",
+	get_sb:		devpts_get_sb,
+};
 
 void devpts_pty_new(int number, kdev_t device)
 {
