@@ -1143,9 +1143,8 @@ static int analyze_sbs(mddev_t * mddev)
 	 * find the freshest superblock, that one will be the superblock
 	 * that represents the whole array.
 	 */
-	if (!mddev->sb)
-		if (alloc_array_sb(mddev))
-			goto abort;
+	if (alloc_array_sb(mddev))
+		goto abort;
 	sb = mddev->sb;
 	freshest = NULL;
 
@@ -1562,7 +1561,7 @@ static int do_md_run(mddev_t * mddev)
 	/*
 	 * Analyze all RAID superblock(s)
 	 */
-	if (analyze_sbs(mddev)) {
+	if (!mddev->sb && analyze_sbs(mddev)) {
 		MD_BUG();
 		return -EINVAL;
 	}
