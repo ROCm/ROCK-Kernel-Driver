@@ -53,15 +53,14 @@ match(const struct sk_buff *skb,
       const struct net_device *out,
       const void *matchinfo,
       int offset,
-      const void *hdr,
-      u_int16_t datalen,
+      unsigned int protoff,
       int *hotdrop)
 {
-	const struct udphdr *udp = hdr;
+	const struct udphdr *udp = (const struct udphdr *)(skb->data + protoff);
 	const struct ip6t_multiport *multiinfo = matchinfo;
 
 	/* Must be big enough to read ports. */
-	if (offset == 0 && datalen < sizeof(struct udphdr)) {
+	if (offset == 0 && skb->len - protoff < sizeof(struct udphdr)) {
 		/* We've been asked to examine this packet, and we
 		   can't.  Hence, no choice but to drop. */
 			duprintf("ip6t_multiport:"
