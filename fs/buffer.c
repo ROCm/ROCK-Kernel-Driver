@@ -494,7 +494,6 @@ static void free_more_memory(void)
 	wakeup_bdflush();
 	try_to_free_pages(zone, GFP_NOFS, 0);
 	blk_run_queues();
-	__set_current_state(TASK_RUNNING);
 	yield();
 }
 

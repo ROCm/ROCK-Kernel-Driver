@@ -418,8 +418,7 @@ extern int task_prio(task_t *p);
 extern int task_nice(task_t *p);
 extern int idle_cpu(int cpu);
 
-asmlinkage long sys_sched_yield(void);
-#define yield() sys_sched_yield()
+void yield(void);
 
 /*
  * The default (Linux) execution domain.

@@ -441,7 +441,6 @@ nopage:
 		goto nopage;
 
 	/* Yield for kswapd, and try again */
-	__set_current_state(TASK_RUNNING);
 	yield();
 	goto rebalance;
 }
