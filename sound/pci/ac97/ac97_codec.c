@@ -642,7 +642,7 @@ int snd_ac97_getput_page(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontro
 		snd_ac97_update_bits(ac97, AC97_INT_PAGING, AC97_PAGE_MASK, page);
 		err = func(kcontrol, ucontrol);
 		snd_ac97_update_bits(ac97, AC97_INT_PAGING, AC97_PAGE_MASK, page_save);
-		down(&ac97->mutex); /* unlock paging */
+		up(&ac97->mutex); /* unlock paging */
 	} else
 		err = func(kcontrol, ucontrol);
 	return err;
