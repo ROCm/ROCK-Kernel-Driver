@@ -1006,7 +1006,6 @@ static int fastcall page_cache_read(struct file * file, unsigned long offset)
 	return error == -EEXIST ? 0 : error;
 }
 
-#define MMAP_READAROUND (16UL)
 #define MMAP_LOTSAMISS  (100)
 
 /*
@@ -1062,6 +1061,8 @@ retry_all:
 retry_find:
 	page = find_get_page(mapping, pgoff);
 	if (!page) {
+		unsigned long ra_pages;
+
 		if (VM_SequentialReadHint(area)) {
 			handle_ra_miss(mapping, ra, pgoff);
 			goto no_cached_page;
@@ -1084,8 +1085,15 @@ retry_find:
 			inc_page_state(pgmajfault);
 		}
 		did_readaround = 1;
-		do_page_cache_readahead(mapping, file,
-				pgoff & ~(MMAP_READAROUND-1), MMAP_READAROUND);
+		ra_pages = max_sane_readahead(file->f_ra.ra_pages);
+		if (ra_pages) {
+			long start;
+
+			start = pgoff - ra_pages / 2;
+			if (pgoff < 0)
+				pgoff = 0;
+			do_page_cache_readahead(mapping, file, pgoff, ra_pages);
+		}
 		goto retry_find;
 	}
 
