@@ -1141,7 +1141,7 @@ static void do_ftl_request(struct request_queue *q)
 		part = req->rq_disk->private_data;
 		if (part) {
 			ret = 0;
-			switch (rq_data_dir(CURRENT)) {
+			switch (rq_data_dir(req)) {
 			case READ:
 				ret = ftl_read(part, req->buffer, req->sector,
 						req->current_nr_sectors);
