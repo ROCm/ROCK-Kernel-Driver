@@ -28,22 +28,23 @@
 struct amba_kmi_port {
 	struct serio		io;
 	struct amba_kmi_port	*next;
-	unsigned long		base;
+	void			*base;
 	unsigned int		irq;
 	unsigned int		divisor;
 	char			name[32];
 	char			phys[16];
+	struct resource		*res;
 };
 
 static irqreturn_t amba_kmi_int(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct amba_kmi_port *kmi = dev_id;
-	unsigned int status = __raw_readb(KMIIR);
+	unsigned int status = readb(KMIIR);
 	int handled = IRQ_NONE;
 
 	while (status & KMIIR_RXINTR) {
-		serio_interrupt(&kmi->io, __raw_readb(KMIDATA), 0, regs);
-		status = __raw_readb(KMIIR);
+		serio_interrupt(&kmi->io, readb(KMIDATA), 0, regs);
+		status = readb(KMIIR);
 		handled = IRQ_HANDLED;
 	}
 
@@ -55,11 +56,11 @@ static int amba_kmi_write(struct serio *io, unsigned char val)
 	struct amba_kmi_port *kmi = io->driver;
 	unsigned int timeleft = 10000; /* timeout in 100ms */
 
-	while ((__raw_readb(KMISTAT) & KMISTAT_TXEMPTY) == 0 && timeleft--)
+	while ((readb(KMISTAT) & KMISTAT_TXEMPTY) == 0 && timeleft--)
 		udelay(10);
 
 	if (timeleft)
-		__raw_writeb(val, KMIDATA);
+		writeb(val, KMIDATA);
 
 	return timeleft ? 0 : SERIO_TIMEOUT;
 }
@@ -69,17 +70,17 @@ static int amba_kmi_open(struct serio *io)
 	struct amba_kmi_port *kmi = io->driver;
 	int ret;
 
-	__raw_writeb(kmi->divisor, KMICLKDIV);
-	__raw_writeb(KMICR_EN, KMICR);
+	writeb(kmi->divisor, KMICLKDIV);
+	writeb(KMICR_EN, KMICR);
 
 	ret = request_irq(kmi->irq, amba_kmi_int, 0, kmi->phys, kmi);
 	if (ret) {
 		printk(KERN_ERR "kmi: failed to claim IRQ%d\n", kmi->irq);
-		__raw_writeb(0, KMICR);
+		writeb(0, KMICR);
 		return ret;
 	}
 
-	__raw_writeb(KMICR_EN | KMICR_RXINTREN, KMICR);
+	writeb(KMICR_EN | KMICR_RXINTREN, KMICR);
 
 	return 0;
 }
@@ -88,9 +89,9 @@ static void amba_kmi_close(struct serio *io)
 {
 	struct amba_kmi_port *kmi = io->driver;
 
-	free_irq(kmi->irq, kmi);
+	writeb(0, KMICR);
 
-	__raw_writeb(0, KMICR);
+	free_irq(kmi->irq, kmi);
 }
 
 static struct amba_kmi_port *list;
@@ -113,15 +114,27 @@ static int __init amba_kmi_init_one(char *type, unsigned long base, int irq, int
 	kmi->io.phys	= kmi->phys;
 	kmi->io.driver	= kmi;
 
-	kmi->base	= base;
+	snprintf(kmi->name, sizeof(kmi->name), "AMBA KMI PS/2 %s port", type);
+	snprintf(kmi->phys, sizeof(kmi->phys), "amba/serio%d", nr);
+
+	kmi->res	= request_mem_region(base, KMI_SIZE, kmi->phys);
+	if (!kmi->res) {
+		kfree(kmi);
+		return -EBUSY;
+	}
+
+	kmi->base	= ioremap(base, KMI_SIZE);
+	if (!kmi->base) {
+		release_resource(kmi->res);
+		kfree(kmi);
+		return -ENOMEM;
+	}
+
 	kmi->irq	= irq;
 	kmi->divisor	= 24 / 8 - 1;
 
 	kmi->next	= list;
 	list		= kmi;
-
-	snprintf(kmi->name, sizeof(kmi->name), "AMBA KMI PS/2 %s port", type);
-	snprintf(kmi->phys, sizeof(kmi->phys), "amba/serio%d", nr);
 
 	serio_register_port(&kmi->io);
 	return 0;
@@ -129,8 +142,8 @@ static int __init amba_kmi_init_one(char *type, unsigned long base, int irq, int
 
 static int __init amba_kmi_init(void)
 {
-	amba_kmi_init_one("keyboard", IO_ADDRESS(KMI0_BASE), IRQ_KMIINT0, 0);
-	amba_kmi_init_one("mouse", IO_ADDRESS(KMI1_BASE), IRQ_KMIINT1, 1);
+	amba_kmi_init_one("keyboard", KMI0_BASE, IRQ_KMIINT0, 0);
+	amba_kmi_init_one("mouse", KMI1_BASE, IRQ_KMIINT1, 1);
 	return 0;
 }
 
@@ -143,6 +156,8 @@ static void __exit amba_kmi_exit(void)
 		next = kmi->next;
 
 		serio_unregister_port(&kmi->io);
+		iounmap(kmi->base);
+		release_resource(kmi->res);
 		kfree(kmi);
 
 		kmi = next;
