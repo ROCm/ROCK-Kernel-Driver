@@ -18,9 +18,30 @@
  */
 
 /*
- * Locking: see "Lock ordering" summary in filemap.c.
- * In swapout, page_map_lock is held on entry to page_referenced and
- * try_to_unmap, so they trylock for i_mmap_lock and page_table_lock.
+ * Lock ordering in mm:
+ *
+ * inode->i_sem	(while writing or truncating, not reading or faulting)
+ *   inode->i_alloc_sem
+ *
+ * When a page fault occurs in writing from user to file, down_read
+ * of mmap_sem nests within i_sem; in sys_msync, i_sem nests within
+ * down_read of mmap_sem; i_sem and down_write of mmap_sem are never
+ * taken together; in truncation, i_sem is taken outermost.
+ *
+ * mm->mmap_sem
+ *   page->flags PG_locked (lock_page)
+ *     mapping->i_mmap_lock
+ *       anon_vma->lock
+ *         mm->page_table_lock
+ *           zone->lru_lock (in mark_page_accessed)
+ *           swap_list_lock (in swap_free etc's swap_info_get)
+ *             swap_device_lock (in swap_duplicate, swap_info_get)
+ *             mapping->private_lock (in __set_page_dirty_buffers)
+ *             inode_lock (in set_page_dirty's __mark_inode_dirty)
+ *               sb_lock (within inode_lock in fs/fs-writeback.c)
+ *               mapping->tree_lock (widely used, in set_page_dirty,
+ *                         in arch-dependent flush_dcache_mmap_lock,
+ *                         within inode_lock in __sync_single_inode)
  */
 
 #include <linux/mm.h>
@@ -64,28 +85,32 @@ int anon_vma_prepare(struct vm_area_struct *vma)
 	might_sleep();
 	if (unlikely(!anon_vma)) {
 		struct mm_struct *mm = vma->vm_mm;
-		struct anon_vma *allocated = NULL;
+		struct anon_vma *allocated, *locked;
 
 		anon_vma = find_mergeable_anon_vma(vma);
-		if (!anon_vma) {
+		if (anon_vma) {
+			allocated = NULL;
+			locked = anon_vma;
+			spin_lock(&locked->lock);
+		} else {
 			anon_vma = anon_vma_alloc();
 			if (unlikely(!anon_vma))
 				return -ENOMEM;
 			allocated = anon_vma;
+			locked = NULL;
 		}
 
 		/* page_table_lock to protect against threads */
 		spin_lock(&mm->page_table_lock);
 		if (likely(!vma->anon_vma)) {
-			if (!allocated)
-				spin_lock(&anon_vma->lock);
 			vma->anon_vma = anon_vma;
 			list_add(&vma->anon_vma_node, &anon_vma->head);
-			if (!allocated)
-				spin_unlock(&anon_vma->lock);
 			allocated = NULL;
 		}
 		spin_unlock(&mm->page_table_lock);
+
+		if (locked)
+			spin_unlock(&locked->lock);
 		if (unlikely(allocated))
 			anon_vma_free(allocated);
 	}
@@ -225,8 +250,7 @@ static int page_referenced_one(struct page *page,
 	if (address == -EFAULT)
 		goto out;
 
-	if (!spin_trylock(&mm->page_table_lock))
-		goto out;
+	spin_lock(&mm->page_table_lock);
 
 	pgd = pgd_offset(mm, address);
 	if (!pgd_present(*pgd))
@@ -290,9 +314,6 @@ static int page_referenced_anon(struct page *page)
  * of references it found.
  *
  * This function is only called from page_referenced for object-based pages.
- *
- * The spinlock address_space->i_mmap_lock is tried.  If it can't be gotten,
- * assume a reference count of 0, so try_to_unmap will then have a go.
  */
 static int page_referenced_file(struct page *page)
 {
@@ -318,8 +339,7 @@ static int page_referenced_file(struct page *page)
 	 */
 	BUG_ON(!PageLocked(page));
 
-	if (!spin_trylock(&mapping->i_mmap_lock))
-		return 0;
+	spin_lock(&mapping->i_mmap_lock);
 
 	/*
 	 * i_mmap_lock does not stabilize mapcount at all, but mapcount
@@ -470,8 +490,7 @@ static int try_to_unmap_one(struct page *page, struct vm_area_struct *vma)
 	 * We need the page_table_lock to protect us from page faults,
 	 * munmap, fork, etc...
 	 */
-	if (!spin_trylock(&mm->page_table_lock))
-		goto out;
+	spin_lock(&mm->page_table_lock);
 
 	pgd = pgd_offset(mm, address);
 	if (!pgd_present(*pgd))
@@ -574,7 +593,7 @@ out:
 #define CLUSTER_SIZE	min(32*PAGE_SIZE, PMD_SIZE)
 #define CLUSTER_MASK	(~(CLUSTER_SIZE - 1))
 
-static int try_to_unmap_cluster(unsigned long cursor,
+static void try_to_unmap_cluster(unsigned long cursor,
 	unsigned int *mapcount, struct vm_area_struct *vma)
 {
 	struct mm_struct *mm = vma->vm_mm;
@@ -591,8 +610,7 @@ static int try_to_unmap_cluster(unsigned long cursor,
 	 * We need the page_table_lock to protect us from page faults,
 	 * munmap, fork, etc...
 	 */
-	if (!spin_trylock(&mm->page_table_lock))
-		return SWAP_FAIL;
+	spin_lock(&mm->page_table_lock);
 
 	address = (vma->vm_start + cursor) & CLUSTER_MASK;
 	end = address + CLUSTER_SIZE;
@@ -649,7 +667,6 @@ static int try_to_unmap_cluster(unsigned long cursor,
 
 out_unlock:
 	spin_unlock(&mm->page_table_lock);
-	return SWAP_AGAIN;
 }
 
 static int try_to_unmap_anon(struct page *page)
@@ -679,9 +696,6 @@ static int try_to_unmap_anon(struct page *page)
  * contained in the address_space struct it points to.
  *
  * This function is only called from try_to_unmap for object-based pages.
- *
- * The spinlock address_space->i_mmap_lock is tried.  If it can't be gotten,
- * return a temporary error.
  */
 static int try_to_unmap_file(struct page *page)
 {
@@ -695,9 +709,7 @@ static int try_to_unmap_file(struct page *page)
 	unsigned long max_nl_size = 0;
 	unsigned int mapcount;
 
-	if (!spin_trylock(&mapping->i_mmap_lock))
-		return ret;
-
+	spin_lock(&mapping->i_mmap_lock);
 	vma_prio_tree_foreach(vma, &iter, &mapping->i_mmap, pgoff, pgoff) {
 		ret = try_to_unmap_one(page, vma);
 		if (ret == SWAP_FAIL || !page_mapped(page))
@@ -719,8 +731,10 @@ static int try_to_unmap_file(struct page *page)
 			max_nl_size = cursor;
 	}
 
-	if (max_nl_size == 0)	/* any nonlinears locked or reserved */
+	if (max_nl_size == 0) {	/* any nonlinears locked or reserved */
+		ret = SWAP_FAIL;
 		goto out;
+	}
 
 	/*
 	 * We don't try to search for this page in the nonlinear vmas,
@@ -747,19 +761,13 @@ static int try_to_unmap_file(struct page *page)
 			while (vma->vm_mm->rss &&
 				cursor < max_nl_cursor &&
 				cursor < vma->vm_end - vma->vm_start) {
-				ret = try_to_unmap_cluster(
-						cursor, &mapcount, vma);
-				if (ret == SWAP_FAIL)
-					break;
+				try_to_unmap_cluster(cursor, &mapcount, vma);
 				cursor += CLUSTER_SIZE;
 				vma->vm_private_data = (void *) cursor;
 				if ((int)mapcount <= 0)
 					goto out;
 			}
-			if (ret != SWAP_FAIL)
-				vma->vm_private_data =
-					(void *) max_nl_cursor;
-			ret = SWAP_AGAIN;
+			vma->vm_private_data = (void *) max_nl_cursor;
 		}
 		cond_resched_lock(&mapping->i_mmap_lock);
 		max_nl_cursor += CLUSTER_SIZE;
