@@ -52,6 +52,8 @@ mmu_gather_t mmu_gathers[NR_CPUS];
 
 extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
 extern char _stext, _text, _etext, _end, __init_begin, __init_end;
+extern unsigned long phys_initrd_start;
+extern unsigned long phys_initrd_size;
 
 /*
  * The sole use of this is to pass memory configuration
@@ -254,18 +256,17 @@ find_memend_and_nodes(struct meminfo *mi, struct node_info *np)
 static int __init check_initrd(struct meminfo *mi)
 {
 	int initrd_node = -2;
-
 #ifdef CONFIG_BLK_DEV_INITRD
+	unsigned long end = phys_initrd_start + phys_initrd_size;
+
 	/*
 	 * Make sure that the initrd is within a valid area of
 	 * memory.
 	 */
-	if (initrd_start) {
-		unsigned long phys_initrd_start, phys_initrd_end;
+	if (phys_initrd_size) {
 		unsigned int i;
 
-		phys_initrd_start = __pa(initrd_start);
-		phys_initrd_end   = __pa(initrd_end);
+		initrd_node = -1;
 
 		for (i = 0; i < mi->nr_banks; i++) {
 			unsigned long bank_end;
@@ -273,7 +274,7 @@ static int __init check_initrd(struct meminfo *mi)
 			bank_end = mi->bank[i].start + mi->bank[i].size;
 
 			if (mi->bank[i].start <= phys_initrd_start &&
-			    phys_initrd_end <= bank_end)
+			    end <= bank_end)
 				initrd_node = mi->bank[i].node;
 		}
 	}
@@ -281,8 +282,8 @@ static int __init check_initrd(struct meminfo *mi)
 	if (initrd_node == -1) {
 		printk(KERN_ERR "initrd (0x%08lx - 0x%08lx) extends beyond "
 		       "physical memory - disabling initrd\n",
-		       initrd_start, initrd_end);
-		initrd_start = initrd_end = 0;
+		       phys_initrd_start, end);
+		phys_initrd_start = phys_initrd_size = 0;
 	}
 #endif
 
@@ -423,9 +424,12 @@ void __init bootmem_init(struct meminfo *mi)
 
 
 #ifdef CONFIG_BLK_DEV_INITRD
-	if (initrd_node >= 0)
-		reserve_bootmem_node(NODE_DATA(initrd_node), __pa(initrd_start),
-				     initrd_end - initrd_start);
+	if (phys_initrd_size && initrd_node >= 0) {
+		reserve_bootmem_node(NODE_DATA(initrd_node), phys_initrd_start,
+				     phys_initrd_size);
+		initrd_start = __phys_to_virt(phys_initrd_start);
+		initrd_end = initrd_start + phys_initrd_size;
+	}
 #endif
 
 	if (map_pg != bootmap_pfn + bootmap_pages)
