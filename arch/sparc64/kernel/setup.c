@@ -65,9 +65,7 @@ struct screen_info screen_info = {
  * prints out pretty messages and returns.
  */
 
-#if CONFIG_SUN_CONSOLE
 void (*prom_palette)(int);
-#endif
 void (*prom_keyboard)(void);
 asmlinkage void sys_sync(void);	/* it's really int */
 
@@ -322,9 +320,7 @@ unsigned int boot_flags = 0;
 #define BOOTME_SINGLE 0x2
 #define BOOTME_KGDB   0x4
 
-#ifdef CONFIG_SUN_CONSOLE
 static int console_fb __initdata = 0;
-#endif
 
 /* Exported for mm/init.c:paging_init. */
 unsigned long cmdline_memory_size = 0;
@@ -413,7 +409,6 @@ static void __init boot_flags_init(char *commands)
 			}
 			commands += 9;
 		} else {
-#if CONFIG_SUN_CONSOLE
 			if (!strncmp(commands, "console=", 8)) {
 				commands += 8;
 				if (!strncmp (commands, "ttya", 4)) {
@@ -434,9 +429,7 @@ static void __init boot_flags_init(char *commands)
 				} else {
 					console_fb = 1;
 				}
-			} else
-#endif
-			if (!strncmp(commands, "mem=", 4)) {
+			} else if (!strncmp(commands, "mem=", 4)) {
 				/*
 				 * "mem=XXX[kKmM]" overrides the PROM-reported
 				 * memory size.

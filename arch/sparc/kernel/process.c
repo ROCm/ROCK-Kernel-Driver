@@ -146,19 +146,15 @@ extern char reboot_command [];
 
 extern int serial_console;
 
-#ifdef CONFIG_SUN_CONSOLE
 extern void (*prom_palette)(int);
-#endif
 
 void machine_halt(void)
 {
 	sti();
 	mdelay(8);
 	cli();
-#ifdef CONFIG_SUN_CONSOLE
 	if (!serial_console && prom_palette)
 		prom_palette (1);
-#endif
 	prom_halt();
 	panic("Halt failed!");
 }
@@ -173,10 +169,8 @@ void machine_restart(char * cmd)
 
 	p = strchr (reboot_command, '\n');
 	if (p) *p = 0;
-#ifdef CONFIG_SUN_CONSOLE
 	if (!serial_console && prom_palette)
 		prom_palette (1);
-#endif
 	if (cmd)
 		prom_reboot(cmd);
 	if (*reboot_command)

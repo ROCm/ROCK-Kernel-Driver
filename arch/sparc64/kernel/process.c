@@ -109,18 +109,14 @@ int cpu_idle(void)
 
 extern char reboot_command [];
 
-#ifdef CONFIG_SUN_CONSOLE
 extern void (*prom_palette)(int);
 extern int serial_console;
-#endif
 extern void (*prom_keyboard)(void);
 
 void machine_halt(void)
 {
-#ifdef CONFIG_SUN_CONSOLE
 	if (!serial_console && prom_palette)
 		prom_palette (1);
-#endif
 	if (prom_keyboard)
 		prom_keyboard();
 	prom_halt();
@@ -129,10 +125,8 @@ void machine_halt(void)
 
 void machine_alt_power_off(void)
 {
-#ifdef CONFIG_SUN_CONSOLE
 	if (!serial_console && prom_palette)
 		prom_palette(1);
-#endif
 	if (prom_keyboard)
 		prom_keyboard();
 	prom_halt_power_off();
@@ -145,10 +139,8 @@ void machine_restart(char * cmd)
 	
 	p = strchr (reboot_command, '\n');
 	if (p) *p = 0;
-#ifdef CONFIG_SUN_CONSOLE
 	if (!serial_console && prom_palette)
 		prom_palette (1);
-#endif
 	if (prom_keyboard)
 		prom_keyboard();
 	if (cmd)

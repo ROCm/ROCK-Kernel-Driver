@@ -16,28 +16,24 @@
 #include <asm/oplib.h>
 
 /* Reset and reboot the machine with the command 'bcommand'. */
-void
-prom_reboot(char *bcommand)
+void prom_reboot(char *bcommand)
 {
-	p1275_cmd ("boot", P1275_ARG(0,P1275_ARG_IN_STRING)|
-		           P1275_INOUT(1,0), bcommand);
+	p1275_cmd("boot", P1275_ARG(0, P1275_ARG_IN_STRING) |
+		  P1275_INOUT(1, 0), bcommand);
 }
 
 /* Forth evaluate the expression contained in 'fstring'. */
-void
-prom_feval(char *fstring)
+void prom_feval(char *fstring)
 {
-	if(!fstring || fstring[0] == 0)
+	if (!fstring || fstring[0] == 0)
 		return;
-	p1275_cmd ("interpret", P1275_ARG(0,P1275_ARG_IN_STRING)|
-				P1275_INOUT(1,1), fstring);
+	p1275_cmd("interpret", P1275_ARG(0, P1275_ARG_IN_STRING) |
+		  P1275_INOUT(1, 1), fstring);
 }
 
 /* We want to do this more nicely some day. */
-#ifdef CONFIG_SUN_CONSOLE
 extern void (*prom_palette)(int);
 extern int serial_console;
-#endif
 
 #ifdef CONFIG_SMP
 extern void smp_capture(void);
@@ -47,32 +43,27 @@ extern void smp_release(void);
 /* Drop into the prom, with the chance to continue with the 'go'
  * prom command.
  */
-void
-prom_cmdline(void)
+void prom_cmdline(void)
 {
 	unsigned long flags;
 
 	local_irq_save(flags);
 
-#ifdef CONFIG_SUN_CONSOLE
-	if(!serial_console && prom_palette)
-		prom_palette (1);
-#endif
+	if (!serial_console && prom_palette)
+		prom_palette(1);
 
 #ifdef CONFIG_SMP
 	smp_capture();
 #endif
 
-	p1275_cmd ("enter", P1275_INOUT(0,0));
+	p1275_cmd("enter", P1275_INOUT(0, 0));
 
 #ifdef CONFIG_SMP
 	smp_release();
 #endif
 
-#ifdef CONFIG_SUN_CONSOLE
-	if(!serial_console && prom_palette)
-		prom_palette (0);
-#endif
+	if (!serial_console && prom_palette)
+		prom_palette(0);
 
 	local_irq_restore(flags);
 }
@@ -84,74 +75,69 @@ extern void smp_promstop_others(void);
 /* Drop into the prom, but completely terminate the program.
  * No chance of continuing.
  */
-void
-prom_halt(void)
+void prom_halt(void)
 {
 #ifdef CONFIG_SMP
 	smp_promstop_others();
 	udelay(8000);
 #endif
 again:
-	p1275_cmd ("exit", P1275_INOUT(0,0));
+	p1275_cmd("exit", P1275_INOUT(0, 0));
 	goto again; /* PROM is out to get me -DaveM */
 }
 
-void
-prom_halt_power_off(void)
+void prom_halt_power_off(void)
 {
 #ifdef CONFIG_SMP
 	smp_promstop_others();
 	udelay(8000);
 #endif
-	p1275_cmd ("SUNW,power-off", P1275_INOUT(0,0));
+	p1275_cmd("SUNW,power-off", P1275_INOUT(0, 0));
 
 	/* if nothing else helps, we just halt */
-	prom_halt ();
+	prom_halt();
 }
 
 /* Set prom sync handler to call function 'funcp'. */
-void
-prom_setcallback(callback_func_t funcp)
+void prom_setcallback(callback_func_t funcp)
 {
-	if(!funcp) return;
-	p1275_cmd ("set-callback", P1275_ARG(0,P1275_ARG_IN_FUNCTION)|
-				   P1275_INOUT(1,1), funcp);
+	if (!funcp)
+		return;
+	p1275_cmd("set-callback", P1275_ARG(0, P1275_ARG_IN_FUNCTION) |
+		  P1275_INOUT(1, 1), funcp);
 }
 
 /* Get the idprom and stuff it into buffer 'idbuf'.  Returns the
  * format type.  'num_bytes' is the number of bytes that your idbuf
  * has space for.  Returns 0xff on error.
  */
-unsigned char
-prom_get_idprom(char *idbuf, int num_bytes)
+unsigned char prom_get_idprom(char *idbuf, int num_bytes)
 {
 	int len;
 
 	len = prom_getproplen(prom_root_node, "idprom");
-	if((len>num_bytes) || (len==-1)) return 0xff;
-	if(!prom_getproperty(prom_root_node, "idprom", idbuf, num_bytes))
+	if ((len >num_bytes) || (len == -1))
+		return 0xff;
+	if (!prom_getproperty(prom_root_node, "idprom", idbuf, num_bytes))
 		return idbuf[0];
 
 	return 0xff;
 }
 
 /* Get the major prom version number. */
-int
-prom_version(void)
+int prom_version(void)
 {
 	return PROM_P1275;
 }
 
 /* Get the prom plugin-revision. */
-int
-prom_getrev(void)
+int prom_getrev(void)
 {
 	return prom_rev;
 }
 
 /* Get the prom firmware print revision. */
-int
-prom_getprev(void)
+int prom_getprev(void)
 {
 	return prom_prev;
 }
@@ -173,7 +159,7 @@ int prom_get_mmu_ihandle(void)
 
 	node = prom_finddevice("/chosen");
 	ret = prom_getint(node, "mmu");
-	if(ret == -1 || ret == 0)
+	if (ret == -1 || ret == 0)
 		mmu_ihandle_cache = -1;
 	else
 		mmu_ihandle_cache = ret;
@@ -284,7 +270,7 @@ unsigned long prom_retain(char *name,
 	/* If align is zero, the pa_low/pa_high args are passed,
 	 * else they are not.
 	 */
-	if(align == 0)
+	if (align == 0)
 		return p1275_cmd("SUNW,retain",
 				 (P1275_ARG(0, P1275_ARG_IN_BUF) | P1275_INOUT(5, 2)),
 				 name, pa_low, pa_high, size, align);
