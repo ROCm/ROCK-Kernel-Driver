@@ -697,8 +697,6 @@ static int sr_registered;
 
 static int sr_init()
 {
-	int i;
-
 	if (sr_template.dev_noticed == 0)
 		return 0;
 
@@ -723,8 +721,7 @@ static int sr_init()
 		goto cleanup_cds;
 	memset(sr_sizes, 0, sr_template.dev_max * sizeof(int));
 	return 0;
-cleanup_sizes:
-	kfree(sr_sizes);
+
 cleanup_cds:
 	kfree(scsi_CDs);
 cleanup_devfs:
