@@ -1183,6 +1183,12 @@ void unmap_mapping_range(struct address_space *mapping,
 	if (unlikely(!prio_tree_empty(&mapping->i_mmap_shared)))
 		unmap_mapping_range_list(&mapping->i_mmap_shared, &details);
 
+	/*
+	 * In nonlinear VMAs there is no correspondence between virtual address
+	 * offset and file offset.  So we must perform an exhaustive search
+	 * across *all* the pages in each nonlinear VMA, not just the pages
+	 * whose virtual address lies outside the file truncation point.
+	 */
 	if (unlikely(!list_empty(&mapping->i_mmap_nonlinear))) {
 		struct vm_area_struct *vma;
 		list_for_each_entry(vma, &mapping->i_mmap_nonlinear,
