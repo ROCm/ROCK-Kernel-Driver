@@ -40,7 +40,6 @@
 #include <linux/pci.h>
 
 #include <asm/uaccess.h>
-#include <asm/pgalloc.h>
 
 #include <asm/io.h>
 #include <asm/hardware.h>
