@@ -73,7 +73,7 @@ extern void show_registers(struct pt_regs *regs);
 int __init check_nmi_watchdog (void)
 {
 	irq_cpustat_t tmp[NR_CPUS];
-	int j, cpu;
+	int cpu;
 
 	printk(KERN_INFO "testing NMI watchdog ... ");
 
