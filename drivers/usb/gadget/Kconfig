@@ -71,8 +71,8 @@ config USB_NET2280
 	default USB_GADGET
 
 config USB_GADGET_PXA2XX
-	boolean "PXA 2xx or IXP 42x"
-	depends on ARCH_PXA || ARCH_IXP425
+	boolean "PXA 2xx or IXP 4xx"
+	depends on ARCH_PXA || ARCH_IXP4XX
 	help
 	   Intel's PXA 2xx series XScale ARM-5TE processors include
 	   an integrated full speed USB 1.1 device controller.  The
@@ -134,6 +134,34 @@ config USB_SA1100
 	depends on USB_GADGET_SA1100
 	default USB_GADGET
 
+config USB_GADGET_DUMMY_HCD
+	boolean "Dummy HCD (DEVELOPMENT)"
+	depends on USB && EXPERIMENTAL
+	select USB_GADGET_DUALSPEED
+	help
+	  This host controller driver emulates USB, looping all data transfer
+	  requests back to a USB "gadget driver" in the same host.  The host
+	  side is the master; the gadget side is the slave.  Gadget drivers
+	  can be high, full, or low speed; and they have access to endpoints
+	  like those from NET2280, PXA2xx, or SA1100 hardware.
+	  
+	  This may help in some stages of creating a driver to embed in a
+	  Linux device, since it lets you debug several parts of the gadget
+	  driver without its hardware or drivers being involved.
+	  
+	  Since such a gadget side driver needs to interoperate with a host
+	  side Linux-USB device driver, this may help to debug both sides
+	  of a USB protocol stack.
+
+	  Say "y" to link the driver statically, or "m" to build a
+	  dynamically linked module called "dummy_hcd" and force all
+	  gadget drivers to also be dynamically linked.
+
+config USB_DUMMY_HCD
+	tristate
+	depends on USB_GADGET_DUMMY_HCD
+	default USB_GADGET
+
 endchoice
 
 config USB_GADGET_DUALSPEED
@@ -191,8 +219,10 @@ config USB_ETH
 	     favor of simpler vendor-specific hardware, but is widely
 	     supported by firmware for smart network devices.
 
-	   - On hardware can't implement that protocol, a simpler approach
+	   - On hardware can't implement that protocol, a simple CDC subset
 	     is used, placing fewer demands on USB.
+
+	  RNDIS support is a third option, more demanding than that subset.
 
 	  Within the USB device, this gadget driver exposes a network device
 	  "usbX", where X depends on what other networking devices you have.
@@ -206,6 +236,19 @@ config USB_ETH
 
 	  Say "y" to link the driver statically, or "m" to build a
 	  dynamically linked module called "g_ether".
+
+config USB_ETH_RNDIS
+	bool "RNDIS support (EXPERIMENTAL)"
+	depends on USB_ETH && EXPERIMENTAL
+	default y
+	help
+	   Microsoft Windows XP bundles the "Remote NDIS" (RNDIS) protocol,
+	   and Microsoft provides redistributable binary RNDIS drivers for
+	   older versions of Windows.
+
+	   If you say "y" here, the Ethernet gadget driver will try to provide
+	   a second device configuration, supporting RNDIS to talk to such
+	   Microsoft USB hosts.
 
 config USB_GADGETFS
 	tristate "Gadget Filesystem (EXPERIMENTAL)"

@@ -182,7 +182,7 @@ they're basically souped up CHF sticks.
 
   For other joystick types (more/less axes, hats, and buttons) support
 you'll need to specify the types either on the kernel command line or on the
-module command line, when inserting analog.o into the kernel. The
+module command line, when inserting analog into the kernel. The
 parameters are:
 
 	analog.map=<type1>,<type2>,<type3>,....
@@ -503,7 +503,7 @@ and the /dev/input/jsX device should become usable.
 
 3.21 I-Force devices 
 ~~~~~~~~~~~~~~~~~~~~
-  All I-Force devices are supported by the iforce.o module. This includes:
+  All I-Force devices are supported by the iforce module. This includes:
 
 * AVB Mag Turbo Force
 * AVB Top Shot Pegasus

@@ -2401,7 +2401,7 @@ static void handle_stat0_irqs (struct net2280 *dev, u32 stat)
 			/* hw handles device features */
 			if (u.r.bRequestType != USB_RECIP_ENDPOINT)
 				goto delegate;
-			if (u.r.wValue != 0 /* HALT feature */
+			if (u.r.wValue != USB_ENDPOINT_HALT
 					|| u.r.wLength != 0)
 				goto do_stall;
 			if ((e = get_ep_by_addr (dev, u.r.wIndex)) == 0)
@@ -2418,7 +2418,7 @@ static void handle_stat0_irqs (struct net2280 *dev, u32 stat)
 			/* hw handles device features */
 			if (u.r.bRequestType != USB_RECIP_ENDPOINT)
 				goto delegate;
-			if (u.r.wValue != 0 /* HALT feature */
+			if (u.r.wValue != USB_ENDPOINT_HALT
 					|| u.r.wLength != 0)
 				goto do_stall;
 			if ((e = get_ep_by_addr (dev, u.r.wIndex)) == 0)

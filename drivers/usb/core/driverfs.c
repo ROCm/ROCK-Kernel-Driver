@@ -55,7 +55,9 @@ set_bConfigurationValue (struct device *dev, const char *buf, size_t count)
 
 	if (sscanf (buf, "%u", &config) != 1 || config > 255)
 		return -EINVAL;
+	down(&udev->serialize);
 	value = usb_set_configuration (udev, config);
+	up(&udev->serialize);
 	return (value < 0) ? value : count;
 }
 

@@ -256,8 +256,9 @@ int usb_stor_clear_halt(struct us_data *us, unsigned int pipe)
 		endp |= USB_DIR_IN;
 
 	result = usb_stor_control_msg(us, us->send_ctrl_pipe,
-		USB_REQ_CLEAR_FEATURE, USB_RECIP_ENDPOINT, 0,
-		endp, NULL, 0, 3*HZ);
+		USB_REQ_CLEAR_FEATURE, USB_RECIP_ENDPOINT,
+		USB_ENDPOINT_HALT, endp,
+		NULL, 0, 3*HZ);
 
 	/* reset the toggles and endpoint flags */
 	usb_endpoint_running(us->pusb_dev, usb_pipeendpoint(pipe),

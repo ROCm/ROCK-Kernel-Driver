@@ -20,7 +20,7 @@
 #include <asm/uaccess.h>
 
 /* Version Information */
-#define DRIVER_VERSION "v0.5.7 (2002/12/31)"
+#define DRIVER_VERSION "v0.6.1 (2004/03/13)"
 #define DRIVER_AUTHOR "Petko Manolov <petkan@users.sourceforge.net>"
 #define DRIVER_DESC "rtl8150 based usb-ethernet driver"
 
@@ -43,6 +43,8 @@
 #define	ANAR			0x0144
 #define	ANLP			0x0146
 #define	AER			0x0148
+#define CSCR			0x014C  /* This one has the link status */
+#define CSCR_LINK_STATUS	(1 << 3)
 
 #define	IDR_EEPROM		0x1202
 
@@ -58,6 +60,60 @@
 #define	RTL8150_REQ_GET_REGS	0x05
 #define	RTL8150_REQ_SET_REGS	0x05
 
+
+/* Transmit status register errors */
+#define TSR_ECOL		(1<<5)
+#define TSR_LCOL		(1<<4)
+#define TSR_LOSS_CRS		(1<<3)
+#define TSR_JBR			(1<<2)
+#define TSR_ERRORS		(TSR_ECOL | TSR_LCOL | TSR_LOSS_CRS | TSR_JBR)
+/* Receive status register errors */
+#define RSR_CRC			(1<<2)
+#define RSR_FAE			(1<<1)
+#define RSR_ERRORS		(RSR_CRC | RSR_FAE)
+
+/* Media status register definitions */
+#define MSR_DUPLEX		(1<<4)
+#define MSR_SPEED		(1<<3)
+#define MSR_LINK		(1<<2)
+
+/* Interrupt pipe data */
+#define INT_TSR			0x00
+#define INT_RSR			0x01
+#define INT_MSR			0x02
+#define INT_WAKSR		0x03
+#define INT_TXOK_CNT		0x04
+#define INT_RXLOST_CNT		0x05
+#define INT_CRERR_CNT		0x06
+#define INT_COL_CNT		0x07
+
+/* Transmit status register errors */
+#define TSR_ECOL		(1<<5)
+#define TSR_LCOL		(1<<4)
+#define TSR_LOSS_CRS		(1<<3)
+#define TSR_JBR			(1<<2)
+#define TSR_ERRORS		(TSR_ECOL | TSR_LCOL | TSR_LOSS_CRS | TSR_JBR)
+/* Receive status register errors */
+#define RSR_CRC			(1<<2)
+#define RSR_FAE			(1<<1)
+#define RSR_ERRORS		(RSR_CRC | RSR_FAE)
+
+/* Media status register definitions */
+#define MSR_DUPLEX		(1<<4)
+#define MSR_SPEED		(1<<3)
+#define MSR_LINK		(1<<2)
+
+/* Interrupt pipe data */
+#define INT_TSR			0x00
+#define INT_RSR			0x01
+#define INT_MSR			0x02
+#define INT_WAKSR		0x03
+#define INT_TXOK_CNT		0x04
+#define INT_RXLOST_CNT		0x05
+#define INT_CRERR_CNT		0x06
+#define INT_COL_CNT		0x07
+
+
 #define	RTL8150_MTU		1540
 #define	RTL8150_TX_TIMEOUT	(HZ)
 #define	RX_SKB_POOL_SIZE	4
@@ -71,9 +127,13 @@
 /* Define these values to match your device */
 #define VENDOR_ID_REALTEK		0x0bda
 #define	VENDOR_ID_MELCO			0x0411
+#define VENDOR_ID_MICRONET		0x3980
+#define	VENDOR_ID_LONGSHINE		0x07b8
 
 #define PRODUCT_ID_RTL8150		0x8150
 #define	PRODUCT_ID_LUAKTX		0x0012
+#define	PRODUCT_ID_LCS8138TX		0x401a
+#define PRODUCT_ID_SP128AR		0x0003
 
 #undef	EEPROM_WRITE
 
@@ -81,6 +141,8 @@
 static struct usb_device_id rtl8150_table[] = {
 	{USB_DEVICE(VENDOR_ID_REALTEK, PRODUCT_ID_RTL8150)},
 	{USB_DEVICE(VENDOR_ID_MELCO, PRODUCT_ID_LUAKTX)},
+	{USB_DEVICE(VENDOR_ID_MICRONET, PRODUCT_ID_SP128AR)},
+	{USB_DEVICE(VENDOR_ID_LONGSHINE, PRODUCT_ID_LCS8138TX)},
 	{}
 };
 
@@ -368,6 +430,9 @@ static void read_bulk_callback(struct urb *urb, struct pt_regs *regs)
 
 	if (!dev->rx_skb)
 		goto resched;
+	/* protect against short packets (tell me why we got some?!?) */
+	if (urb->actual_length < 4)
+		goto goon;
 
 	res = urb->actual_length;
 	rx_stat = le16_to_cpu(*(short *)(urb->transfer_buffer + res - 4));
@@ -454,6 +519,7 @@ static void write_bulk_callback(struct urb *urb, struct pt_regs *regs)
 void intr_callback(struct urb *urb, struct pt_regs *regs)
 {
 	rtl8150_t *dev;
+	__u8 *d;
 	int status;
 
 	dev = urb->context;
@@ -472,7 +538,28 @@ void intr_callback(struct urb *urb, struct pt_regs *regs)
 		goto resubmit;
 	}
 
-	/* FIXME if this doesn't do anything, don't submit the urb! */
+	d = urb->transfer_buffer;
+	if (d[0] & TSR_ERRORS) {
+		dev->stats.tx_errors++;
+		if (d[INT_TSR] & (TSR_ECOL | TSR_JBR))
+			dev->stats.tx_aborted_errors++;
+		if (d[INT_TSR] & TSR_LCOL)
+			dev->stats.tx_window_errors++;
+		if (d[INT_TSR] & TSR_LOSS_CRS)
+			dev->stats.tx_carrier_errors++;
+	}
+	/* Report link status changes to the network stack */
+	if ((d[INT_MSR] & MSR_LINK) == 0) {
+		if (netif_carrier_ok(dev->netdev)) {
+			netif_carrier_off(dev->netdev);
+			dbg("%s: LINK LOST\n", __func__);
+		}
+	} else {
+		if (!netif_carrier_ok(dev->netdev)) {
+			netif_carrier_on(dev->netdev);
+			dbg("%s: LINK CAME BACK\n", __func__);
+		}
+	}
 
 resubmit:
 	status = usb_submit_urb (urb, SLAB_ATOMIC);
@@ -481,6 +568,7 @@ resubmit:
 				dev->udev->bus->bus_name,
 				dev->udev->devpath, status);
 }
+
 
 /*
 **
@@ -538,7 +626,7 @@ static int enable_net_traffic(rtl8150_t * dev)
 		warn("%s - device reset failed", __FUNCTION__);
 	}
 	/* RCR bit7=1 attach Rx info at the end;  =0 HW CRC (which is broken) */
-	rcr = 0x9e;	/* bit7=1 attach Rx info at the end */
+	rcr = 0x9e;
 	dev->rx_creg = cpu_to_le16(rcr);
 	tcr = 0xd8;
 	cr = 0x0c;
@@ -626,6 +714,19 @@ static int rtl8150_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 	return 0;
 }
 
+
+static void set_carrier(struct net_device *netdev)
+{
+	rtl8150_t *dev = netdev->priv;
+	short tmp;
+
+	get_registers(dev, CSCR, 2, &tmp);
+	if (tmp & CSCR_LINK_STATUS)
+		netif_carrier_on(netdev);
+	else
+		netif_carrier_off(netdev);
+}
+
 static int rtl8150_open(struct net_device *netdev)
 {
 	rtl8150_t *dev;
@@ -653,6 +754,7 @@ static int rtl8150_open(struct net_device *netdev)
 		warn("%s: intr_urb submit failed: %d", __FUNCTION__, res);
 	netif_start_queue(netdev);
 	enable_net_traffic(dev);
+	set_carrier(netdev);
 
 	return res;
 }
@@ -674,7 +776,7 @@ static int rtl8150_close(struct net_device *netdev)
 	return res;
 }
 
-static int rtl8150_ethtool_ioctl(struct net_device *netdev, void __user *uaddr)
+static int rtl8150_ethtool_ioctl(struct net_device *netdev, void *uaddr)
 {
 	rtl8150_t *dev;
 	int cmd;
@@ -759,7 +861,7 @@ static int rtl8150_ioctl(struct net_device *netdev, struct ifreq *rq, int cmd)
 
 	switch (cmd) {
 	case SIOCETHTOOL:
-		res = rtl8150_ethtool_ioctl(netdev, (void __user *)rq->ifr_data);
+		res = rtl8150_ethtool_ioctl(netdev, rq->ifr_data);
 		break;
 	case SIOCDEVPRIVATE:
 		data[0] = dev->phy;
@@ -774,6 +876,7 @@ static int rtl8150_ioctl(struct net_device *netdev, struct ifreq *rq, int cmd)
 	default:
 		res = -EOPNOTSUPP;
 	}
+
 	return res;
 }
 
@@ -796,7 +899,6 @@ static int rtl8150_probe(struct usb_interface *intf,
 		kfree(dev);
 		return -ENOMEM;
 	}
-
 	netdev = alloc_etherdev(0);
 	if (!netdev) {
 		kfree(dev->intr_buff);
@@ -837,7 +939,6 @@ static int rtl8150_probe(struct usb_interface *intf,
 	info("%s: rtl8150 is detected", netdev->name);
 	
 	usb_set_intfdata(intf, dev);
-
 	SET_NETDEV_DEV(netdev, &intf->dev);
 	if (register_netdev(netdev) != 0) {
 		err("couldn't register the device");

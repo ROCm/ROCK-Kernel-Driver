@@ -212,8 +212,7 @@ static void hub_tt_kevent (void *arg)
 		spin_lock_irqsave (&hub->tt.lock, flags);
 
 		if (status)
-			err ("usb-%s-%s clear tt %d (%04x) error %d",
-				dev->bus->bus_name, dev->devpath,
+			dev_err (&dev->dev, "clear tt %d (%04x) error %d\n",
 				clear->tt, clear->devinfo, status);
 		kfree (clear);
 	}
@@ -244,8 +243,7 @@ void usb_hub_tt_clear_buffer (struct usb_device *dev, int pipe)
 	 * there can be many TTs per hub).  even if they're uncommon.
 	 */
 	if ((clear = kmalloc (sizeof *clear, SLAB_ATOMIC)) == 0) {
-		err ("can't save CLEAR_TT_BUFFER state for hub at usb-%s-%s",
-			dev->bus->bus_name, tt->hub->devpath);
+		dev_err (&dev->dev, "can't save CLEAR_TT_BUFFER state\n");
 		/* FIXME recover somehow ... RESET_TT? */
 		return;
 	}
@@ -596,7 +594,7 @@ descriptor_error:
 
 	hub = kmalloc(sizeof(*hub), GFP_KERNEL);
 	if (!hub) {
-		err("couldn't kmalloc hub struct");
+		dev_dbg (hubdev(dev), "couldn't kmalloc hub struct\n");
 		return -ENOMEM;
 	}
 
@@ -700,7 +698,7 @@ static void hub_start_disconnect(struct usb_device *dev)
 		}
 	}
 
-	err("cannot disconnect hub %s", dev->devpath);
+	dev_err(&dev->dev, "cannot disconnect hub!\n");
 }
 
 static int hub_port_status(struct usb_device *dev, int port,
@@ -1145,7 +1143,7 @@ static int hub_thread(void *__hub)
 			refrigerator(PF_IOTHREAD);
 	} while (!signal_pending(current));
 
-	dbg("hub_thread exiting");
+	pr_debug ("%s: khubd exiting\n", usbcore_name);
 	complete_and_exit(&khubd_exited, 0);
 }
 
@@ -1176,7 +1174,8 @@ int usb_hub_init(void)
 	pid_t pid;
 
 	if (usb_register(&hub_driver) < 0) {
-		err("Unable to register USB hub driver");
+		printk(KERN_ERR "%s: can't register hub driver\n",
+			usbcore_name);
 		return -1;
 	}
 
@@ -1189,7 +1188,7 @@ int usb_hub_init(void)
 
 	/* Fall through if kernel_thread failed */
 	usb_deregister(&hub_driver);
-	err("failed to start hub_thread");
+	printk(KERN_ERR "%s: can't start khubd\n", usbcore_name);
 
 	return -1;
 }
@@ -1300,33 +1299,15 @@ int usb_physical_reset_device(struct usb_device *dev)
 		kfree(descriptor);
 		usb_destroy_configuration(dev);
 
-		ret = usb_get_device_descriptor(dev, sizeof(dev->descriptor));
-		if (ret != sizeof(dev->descriptor)) {
-			if (ret < 0)
-				err("unable to get device %s descriptor "
-					"(error=%d)", dev->devpath, ret);
-			else
-				err("USB device %s descriptor short read "
-					"(expected %Zi, got %i)",
-					dev->devpath,
-					sizeof(dev->descriptor), ret);
+		/* FIXME Linux doesn't yet handle these "device morphed"
+		 * paths.  DFU variants need this to work ... and they
+		 * include the "config descriptors changed" case this
+		 * doesn't yet detect!
+		 */
+		dev->state = USB_STATE_NOTATTACHED;
+		dev_err(&dev->dev, "device morphed (DFU?), nyet supported\n");
 
-			clear_bit(dev->devnum, dev->bus->devmap.devicemap);
-			dev->devnum = -1;
-			return -EIO;
-		}
-
-		ret = usb_get_configuration(dev);
-		if (ret < 0) {
-			err("unable to get configuration (error=%d)", ret);
-			usb_destroy_configuration(dev);
-			clear_bit(dev->devnum, dev->bus->devmap.devicemap);
-			dev->devnum = -1;
-			return 1;
-		}
-
-		usb_set_configuration(dev, dev->config[0].desc.bConfigurationValue);
-		return 1;
+		return -ENODEV;
 	}
 
 	kfree(descriptor);

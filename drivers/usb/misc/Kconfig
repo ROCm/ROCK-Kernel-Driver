@@ -108,6 +108,19 @@ config USB_LED
 	  To compile this driver as a module, choose M here: the
 	  module will be called usbled.
 
+config USB_CYTHERM
+	tristate "Cypress USB thermometer driver support"
+	depends on USB
+	help
+	  Say Y here if you want to connect a Cypress USB thermometer
+	  device to your computer's USB port. This device is also known
+	  as the Cypress USB Starter kit or demo board. The Elektor
+	  magazine published a modified version of this device in issue 
+	  #291.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called cytherm.
+
 config USB_SPEEDTOUCH
 	tristate "Alcatel Speedtouch USB support"
 	depends on USB && ATM

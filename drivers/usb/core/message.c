@@ -722,7 +722,8 @@ int usb_clear_halt(struct usb_device *dev, int pipe)
 	 * this request for iso endpoints, which can't halt!
 	 */
 	result = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
-		USB_REQ_CLEAR_FEATURE, USB_RECIP_ENDPOINT, 0, endp, NULL, 0,
+		USB_REQ_CLEAR_FEATURE, USB_RECIP_ENDPOINT,
+		USB_ENDPOINT_HALT, endp, NULL, 0,
 		HZ * USB_CTRL_SET_TIMEOUT);
 
 	/* don't un-halt or force to DATA0 except on success */
@@ -928,7 +929,8 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 
 	iface = usb_ifnum_to_if(dev, interface);
 	if (!iface) {
-		warn("selecting invalid interface %d", interface);
+		dev_dbg(&dev->dev, "selecting invalid interface %d\n",
+			interface);
 		return -EINVAL;
 	}
 
@@ -946,8 +948,9 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 	 * request if the interface only has one alternate setting.
 	 */
 	if (ret == -EPIPE && iface->num_altsetting == 1) {
-		dbg("manual set_interface for dev %d, iface %d, alt %d",
-			dev->devnum, interface, alternate);
+		dev_dbg(&dev->dev,
+			"manual set_interface for iface %d, alt %d\n",
+			interface, alternate);
 		manual = 1;
 	} else if (ret < 0)
 		return ret;
@@ -1065,11 +1068,11 @@ int usb_reset_configuration(struct usb_device *dev)
 	return 0;
 }
 
-/**
+/*
  * usb_set_configuration - Makes a particular device setting be current
  * @dev: the device whose configuration is being updated
  * @configuration: the configuration being chosen.
- * Context: !in_interrupt ()
+ * Context: !in_interrupt(), caller holds dev->serialize
  *
  * This is used to enable non-default device modes.  Not all devices
  * use this kind of configurability; many devices only have one
@@ -1105,7 +1108,6 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 	struct usb_host_config *cp = NULL;
 	
 	/* dev->serialize guards all config changes */
-	down(&dev->serialize);
 
 	for (i=0; i<dev->descriptor.bNumConfigurations; i++) {
 		if (dev->config[i].desc.bConfigurationValue == configuration) {
@@ -1167,21 +1169,39 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 			intf->dev.bus = &usb_bus_type;
 			intf->dev.dma_mask = dev->dev.dma_mask;
 			intf->dev.release = release_interface;
+			device_initialize (&intf->dev);
 			sprintf (&intf->dev.bus_id[0], "%d-%s:%d.%d",
 				 dev->bus->busnum, dev->devpath,
 				 configuration,
 				 alt->desc.bInterfaceNumber);
+		}
+
+		/* Now that all interfaces are setup, probe() calls
+		 * may claim() any interface that's not yet bound.
+		 * Many class drivers need that: CDC, audio, video, etc.
+		 */
+		for (i = 0; i < cp->desc.bNumInterfaces; ++i) {
+			struct usb_interface *intf = cp->interface[i];
+			struct usb_interface_descriptor *desc;
+
+			desc = &intf->altsetting [0].desc;
 			dev_dbg (&dev->dev,
-				"registering %s (config #%d, interface %d)\n",
+				"adding %s (config #%d, interface %d)\n",
 				intf->dev.bus_id, configuration,
-				alt->desc.bInterfaceNumber);
-			device_register (&intf->dev);
+				desc->bInterfaceNumber);
+			ret = device_add (&intf->dev);
+			if (ret != 0) {
+				dev_err(&dev->dev,
+					"device_add(%s) --> %d\n",
+					intf->dev.bus_id,
+					ret);
+				continue;
+			}
 			usb_create_driverfs_intf_files (intf);
 		}
 	}
 
 out:
-	up(&dev->serialize);
 	return ret;
 }
 
@@ -1226,18 +1246,20 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
 	if (!dev->have_langid) {
 		err = usb_get_string(dev, 0, 0, tbuf, 4);
 		if (err < 0) {
-			err("error getting string descriptor 0 (error=%d)", err);
+			dev_err (&dev->dev,
+				"string descriptor 0 read error: %d\n",
+				err);
 			goto errout;
 		} else if (err < 4 || tbuf[0] < 4) {
-			err("string descriptor 0 too short");
+			dev_err (&dev->dev, "string descriptor 0 too short\n");
 			err = -EINVAL;
 			goto errout;
 		} else {
 			dev->have_langid = -1;
 			dev->string_langid = tbuf[2] | (tbuf[3]<< 8);
 				/* always use the first langid listed */
-			dbg("USB device number %d default language ID 0x%x",
-				dev->devnum, dev->string_langid);
+			dev_dbg (&dev->dev, "default language 0x%04x\n",
+				dev->string_langid);
 		}
 	}
 
@@ -1288,6 +1310,5 @@ EXPORT_SYMBOL(usb_string);
 // synchronous calls that also maintain usbcore state
 EXPORT_SYMBOL(usb_clear_halt);
 EXPORT_SYMBOL(usb_reset_configuration);
-EXPORT_SYMBOL(usb_set_configuration);
 EXPORT_SYMBOL(usb_set_interface);
 

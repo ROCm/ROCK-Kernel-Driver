@@ -21,7 +21,7 @@ config USB_HID
 	  If unsure, say Y.
 
 	  To compile this driver as a module, choose M here: the
-	  module will be called hid.
+	  module will be called usbhid.
 
 comment "Input core support is needed for USB HID input layer or HIDBP support"
 	depends on USB && INPUT=n
