@@ -355,7 +355,8 @@ static snd_card_t* usX2Y_create_card(struct usb_device* device)
 	sprintf(card->shortname, "TASCAM "NAME_ALLCAPS"");
 	sprintf(card->longname, "%s (%x:%x if %d at %03d/%03d)",
 		card->shortname, 
-		device->descriptor.idVendor, device->descriptor.idProduct,
+		le16_to_cpu(device->descriptor.idVendor),
+		le16_to_cpu(device->descriptor.idProduct),
 		0,//us428(card)->usbmidi.ifnum,
 		usX2Y(card)->chip.dev->bus->busnum, usX2Y(card)->chip.dev->devnum
 		);
@@ -368,10 +369,10 @@ static void* usX2Y_usb_probe(struct usb_device* device, struct usb_interface *in
 {
 	int		err;
 	snd_card_t*	card;
-	if (device->descriptor.idVendor != 0x1604 ||
-	    (device->descriptor.idProduct != USB_ID_US122 &&
-	     device->descriptor.idProduct != USB_ID_US224 &&
-	     device->descriptor.idProduct != USB_ID_US428) ||
+	if (le16_to_cpu(device->descriptor.idVendor) != 0x1604 ||
+	    (le16_to_cpu(device->descriptor.idProduct) != USB_ID_US122 &&
+	     le16_to_cpu(device->descriptor.idProduct) != USB_ID_US224 &&
+	     le16_to_cpu(device->descriptor.idProduct) != USB_ID_US428) ||
 	    !(card = usX2Y_create_card(device)))
 		return NULL;
 	if ((err = usX2Y_hwdep_new(card, device)) < 0  ||

@@ -659,7 +659,7 @@ static void get_product_info(struct edgeport_serial *edge_serial)
 
 	memset (product_info, 0, sizeof(struct edgeport_product_info));
 
-	product_info->ProductId		= (__u16)(edge_serial->serial->dev->descriptor.idProduct & ~ION_DEVICE_ID_80251_NETCHIP);
+	product_info->ProductId		= (__u16)(le16_to_cpu(edge_serial->serial->dev->descriptor.idProduct) & ~ION_DEVICE_ID_80251_NETCHIP);
 	product_info->NumPorts		= edge_serial->manuf_descriptor.NumPorts;
 	product_info->ProdInfoVer	= 0;
 
@@ -675,7 +675,7 @@ static void get_product_info(struct edgeport_serial *edge_serial)
 	memcpy(product_info->ManufactureDescDate, edge_serial->manuf_descriptor.DescDate, sizeof(edge_serial->manuf_descriptor.DescDate));
 
 	// check if this is 2nd generation hardware
-	if (edge_serial->serial->dev->descriptor.idProduct & ION_DEVICE_ID_80251_NETCHIP) {
+	if (le16_to_cpu(edge_serial->serial->dev->descriptor.idProduct) & ION_DEVICE_ID_80251_NETCHIP) {
 		product_info->FirmwareMajorVersion	= OperationalCodeImageVersion_GEN2.MajorVersion;
 		product_info->FirmwareMinorVersion	= OperationalCodeImageVersion_GEN2.MinorVersion;
 		product_info->FirmwareBuildNumber	= cpu_to_le16(OperationalCodeImageVersion_GEN2.BuildNumber);

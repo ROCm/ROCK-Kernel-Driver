@@ -63,8 +63,8 @@ struct usb_midi_endpoint {
 struct usb_midi_device {
 	char  *deviceName;
 
-	int    idVendor;
-	int    idProduct;
+	u16    idVendor;
+	u16    idProduct;
 	int    interface;
 	int    altSetting; /* -1: auto detect */
 

@@ -125,4 +125,5 @@ struct union_desc {
 
 #define CDC_DATA_INTERFACE_TYPE	0x0a
 
-
+/* constants describing various quirks and errors */
+#define NO_UNION_NORMAL			1

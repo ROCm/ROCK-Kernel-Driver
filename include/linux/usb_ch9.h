@@ -79,6 +79,7 @@
 #define USB_DEVICE_B_HNP_ENABLE		3	/* dev may initiate HNP */
 #define USB_DEVICE_A_HNP_SUPPORT	4	/* RH port supports HNP */
 #define USB_DEVICE_A_ALT_HNP_SUPPORT	5	/* other RH port does */
+#define USB_DEVICE_DEBUG_MODE		6	/* (special devices only) */
 
 #define USB_ENDPOINT_HALT		0	/* IN/OUT will STALL */
 
@@ -156,14 +157,14 @@ struct usb_device_descriptor {
 	__u8  bLength;
 	__u8  bDescriptorType;
 
-	__u16 bcdUSB;
+	__le16 bcdUSB;
 	__u8  bDeviceClass;
 	__u8  bDeviceSubClass;
 	__u8  bDeviceProtocol;
 	__u8  bMaxPacketSize0;
-	__u16 idVendor;
-	__u16 idProduct;
-	__u16 bcdDevice;
+	__le16 idVendor;
+	__le16 idProduct;
+	__le16 bcdDevice;
 	__u8  iManufacturer;
 	__u8  iProduct;
 	__u8  iSerialNumber;
@@ -208,7 +209,7 @@ struct usb_config_descriptor {
 	__u8  bLength;
 	__u8  bDescriptorType;
 
-	__u16 wTotalLength;
+	__le16 wTotalLength;
 	__u8  bNumInterfaces;
 	__u8  bConfigurationValue;
 	__u8  iConfiguration;
@@ -264,7 +265,7 @@ struct usb_endpoint_descriptor {
 
 	__u8  bEndpointAddress;
 	__u8  bmAttributes;
-	__u16 wMaxPacketSize;
+	__le16 wMaxPacketSize;
 	__u8  bInterval;
 
 	// NOTE:  these two are _only_ in audio endpoints.
@@ -297,7 +298,7 @@ struct usb_qualifier_descriptor {
 	__u8  bLength;
 	__u8  bDescriptorType;
 
-	__u16 bcdUSB;
+	__le16 bcdUSB;
 	__u8  bDeviceClass;
 	__u8  bDeviceSubClass;
 	__u8  bDeviceProtocol;
@@ -320,6 +321,18 @@ struct usb_otg_descriptor {
 /* from usb_otg_descriptor.bmAttributes */
 #define USB_OTG_SRP		(1 << 0)
 #define USB_OTG_HNP		(1 << 1)	/* swap host/device roles */
+
+/*-------------------------------------------------------------------------*/
+
+/* USB_DT_DEBUG:  for special highspeed devices, replacing serial console */
+struct usb_debug_descriptor {
+	__u8  bLength;
+	__u8  bDescriptorType;
+
+	/* bulk endpoints with 8 byte maxpacket */
+	__u8  bDebugInEndpoint;
+	__u8  bDebugOutEndpoint;
+};
 
 /*-------------------------------------------------------------------------*/
 

@@ -3,7 +3,7 @@
 #
 
 menu "PCMCIA network device support"
-	depends on NETDEVICES && HOTPLUG && PCMCIA!=n
+	depends on NETDEVICES && PCMCIA!=n
 
 config NET_PCMCIA
 	bool "PCMCIA network device support"
