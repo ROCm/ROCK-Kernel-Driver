@@ -140,7 +140,7 @@ int show_interrupts(struct seq_file *p, void *v)
 	seq_printf(p, "           ");
 	for (j=0; j<NR_CPUS; j++)
 		if (cpu_online(j))
-			p += seq_printf(p, "CPU%d       ",j);
+			seq_printf(p, "CPU%d       ",j);
 	seq_putc(p, '\n');
 
 	for (i = 0 ; i < NR_IRQS ; i++) {
@@ -154,8 +154,7 @@ int show_interrupts(struct seq_file *p, void *v)
 #else
 		for (j = 0; j < NR_CPUS; j++)
 			if (cpu_online(j))
-				p += seq_printf(p, "%10u ",
-					     kstat_cpu(j).irqs[i]);
+				seq_printf(p, "%10u ", kstat_cpu(j).irqs[i]);
 #endif
 		seq_printf(p, " %14s", irq_desc[i].handler->typename);
 		seq_printf(p, "  %s", action->name);
@@ -170,13 +169,13 @@ skip:
 	seq_printf(p, "NMI: ");
 	for (j = 0; j < NR_CPUS; j++)
 		if (cpu_online(j))
-			p += seq_printf(p, "%10u ", nmi_count(j));
+			seq_printf(p, "%10u ", nmi_count(j));
 	seq_putc(p, '\n');
 #if CONFIG_X86_LOCAL_APIC
 	seq_printf(p, "LOC: ");
 	for (j = 0; j < NR_CPUS; j++)
 		if (cpu_online(j))
-			p += seq_printf(p, "%10u ", irq_stat[j].apic_timer_irqs);
+			seq_printf(p, "%10u ", irq_stat[j].apic_timer_irqs);
 	seq_putc(p, '\n');
 #endif
 	seq_printf(p, "ERR: %10u\n", atomic_read(&irq_err_count));
