@@ -22,8 +22,8 @@
 #define DBG_MINIMUM  (DL_LOG + DL_FTL + DL_ERR)
 #define DBG_DEFAULT  (DBG_MINIMUM + DL_XLOG + DL_REG)
 
-static DIVA_CAPI_ADAPTER *adapter = (DIVA_CAPI_ADAPTER *) NULL;
-static APPL *application = (APPL *) NULL;
+DIVA_CAPI_ADAPTER *adapter = (DIVA_CAPI_ADAPTER *) NULL;
+APPL *application = (APPL *) NULL;
 byte max_appl = MAX_APPL;
 static CAPI_MSG *mapped_msg = (CAPI_MSG *) NULL;
 
@@ -45,7 +45,7 @@ static dword notify_handle;
 static void DIRequest(ENTITY * e);
 static DESCRIPTOR MAdapter;
 static DESCRIPTOR DAdapter;
-static byte max_adapter = 0;
+byte max_adapter = 0;
 static byte ControllerMap[MAX_DESCRIPTORS + 1];
 
 
@@ -111,7 +111,7 @@ static void no_printf(unsigned char *x, ...)
 /*
  * Controller mapping
  */
-static byte MapController(byte Controller)
+byte MapController(byte Controller)
 {
 	byte i;
 	byte MappedController = 0;

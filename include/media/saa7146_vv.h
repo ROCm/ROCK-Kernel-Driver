@@ -235,7 +235,11 @@ extern struct saa7146_use_ops saa7146_vbi_uops;
 #define SAA7146_SECAM_VALUES	V_OFFSET_SECAM, V_FIELD_SECAM, V_ACTIVE_LINES_SECAM, H_OFFSET_SECAM, H_PIXELS_SECAM, H_PIXELS_SECAM+1, V_ACTIVE_LINES_SECAM, 768
 
 /* some memory sizes */
+#if PAGE_SIZE <= 8192
 #define SAA7146_CLIPPING_MEM	(14*PAGE_SIZE)
+#else
+#define SAA7146_CLIPPING_MEM	(14*8192)
+#endif
 
 /* some defines for the various clipping-modes */
 #define SAA7146_CLIPPING_RECT		0x4
