@@ -732,17 +732,15 @@ acpi_ev_create_gpe_block (
 
 	/* Dump info about this GPE block */
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INIT, "GPE Block: [%4.4s] %X registers at %8.8X%8.8X on interrupt %d\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_INIT, "GPE %02d to %02d [%4.4s] %d regs at %8.8X%8.8X on int %d\n",
+		gpe_block->block_base_number,
+		(u32) (gpe_block->block_base_number +
+				((gpe_block->register_count * ACPI_GPE_REGISTER_WIDTH) -1)),
 		gpe_device->name.ascii,
 		gpe_block->register_count,
 		ACPI_HIDWORD (gpe_block->block_address.address),
 		ACPI_LODWORD (gpe_block->block_address.address),
 		interrupt_level));
-
-	ACPI_DEBUG_PRINT ((ACPI_DB_INIT, "GPE Block defined as GPE 0x%.2X to GPE 0x%.2X\n",
-		gpe_block->block_base_number,
-		(u32) (gpe_block->block_base_number +
-				((gpe_block->register_count * ACPI_GPE_REGISTER_WIDTH) -1))));
 
 	/* Find all GPE methods (_Lxx, _Exx) for this block */
 

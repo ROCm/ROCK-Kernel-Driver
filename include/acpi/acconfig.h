@@ -64,7 +64,7 @@
 
 /* Version string */
 
-#define ACPI_CA_VERSION                 0x20030509
+#define ACPI_CA_VERSION                 0x20030522
 
 /* Maximum objects in the various object caches */
 
@@ -132,6 +132,11 @@
 /* Maximum length of resulting string when converting from a buffer */
 
 #define ACPI_MAX_STRING_CONVERSION      200
+
+/* Length of _HID, _UID, and _CID values */
+
+#define ACPI_DEVICE_ID_LENGTH           0x09
+#define ACPI_MAX_CID_LENGTH             48
 
 /*
  * Operand Stack (in WALK_STATE), Must be large enough to contain METHOD_MAX_ARG

@@ -220,7 +220,7 @@ acpi_ev_pci_config_region_setup (
 			if (ACPI_SUCCESS (status)) {
 				/* Got a valid _HID, check if this is a PCI root */
 
-				if (!(ACPI_STRNCMP (object_hID.buffer, PCI_ROOT_HID_STRING,
+				if (!(ACPI_STRNCMP (object_hID.value, PCI_ROOT_HID_STRING,
 						   sizeof (PCI_ROOT_HID_STRING)))) {
 					/* Install a handler for this PCI root bridge */
 

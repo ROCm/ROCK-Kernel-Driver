@@ -181,7 +181,11 @@ acpi_ns_print_node_pathname (
 
 	status = acpi_ns_handle_to_pathname (node, &buffer);
 	if (ACPI_SUCCESS (status)) {
-		acpi_os_printf ("%s [%s] (Node %p)", msg, (char *) buffer.pointer, node);
+		if (msg) {
+			acpi_os_printf ("%s ", msg);
+		}
+
+		acpi_os_printf ("[%s] (Node %p)", (char *) buffer.pointer, node);
 		ACPI_MEM_FREE (buffer.pointer);
 	}
 }

@@ -228,8 +228,8 @@ acpi_evaluate_object_typed (
 
 acpi_status
 acpi_get_object_info (
-	acpi_handle                     device,
-	struct acpi_device_info         *info);
+	acpi_handle                     handle,
+	struct acpi_buffer              *return_buffer);
 
 acpi_status
 acpi_get_next_object (

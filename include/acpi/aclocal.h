@@ -856,16 +856,6 @@ struct acpi_bit_register_info
 #define ACPI_RDESC_TYPE_QWORD_ADDRESS_SPACE     0x8A
 
 
-/* String version of device HIDs and UIDs */
-
-#define ACPI_DEVICE_ID_LENGTH                   0x09
-
-struct acpi_device_id
-{
-	char                    buffer[ACPI_DEVICE_ID_LENGTH];
-};
-
-
 /*****************************************************************************
  *
  * Miscellaneous

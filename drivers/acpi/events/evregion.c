@@ -50,24 +50,32 @@
 #define _COMPONENT          ACPI_EVENTS
 	 ACPI_MODULE_NAME    ("evregion")
 
+#define ACPI_NUM_DEFAULT_SPACES     4
+
+u8                              acpi_gbl_default_address_spaces[ACPI_NUM_DEFAULT_SPACES] = {
+			 ACPI_ADR_SPACE_SYSTEM_MEMORY,
+			 ACPI_ADR_SPACE_SYSTEM_IO,
+			 ACPI_ADR_SPACE_PCI_CONFIG,
+			 ACPI_ADR_SPACE_DATA_TABLE};
+
 
 /*******************************************************************************
  *
  * FUNCTION:    acpi_ev_init_address_spaces
  *
- * PARAMETERS:
+ * PARAMETERS:  None
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Installs the core subsystem address space handlers.
+ * DESCRIPTION: Installs the core subsystem default address space handlers.
  *
  ******************************************************************************/
 
 acpi_status
 acpi_ev_init_address_spaces (
-	void)
-{
+	void) {
 	acpi_status                     status;
+	acpi_native_uint                i;
 
 
 	ACPI_FUNCTION_TRACE ("ev_init_address_spaces");
@@ -75,9 +83,11 @@ acpi_ev_init_address_spaces (
 
 	/*
 	 * All address spaces (PCI Config, EC, SMBus) are scope dependent
-	 * and registration must occur for a specific device.  In the case
-	 * system memory and IO address spaces there is currently no device
-	 * associated with the address space.  For these we use the root.
+	 * and registration must occur for a specific device.
+	 *
+	 * In the case of the system memory and IO address spaces there is currently
+	 * no device associated with the address space.  For these we use the root.
+	 *
 	 * We install the default PCI config space handler at the root so
 	 * that this space is immediately available even though the we have
 	 * not enumerated all the PCI Root Buses yet.  This is to conform
@@ -86,39 +96,27 @@ acpi_ev_init_address_spaces (
 	 * near ready to find the PCI root buses at this point.
 	 *
 	 * NOTE: We ignore AE_ALREADY_EXISTS because this means that a handler
-	 * has already been installed (via acpi_install_address_space_handler)
+	 * has already been installed (via acpi_install_address_space_handler).
+	 * Similar for AE_SAME_HANDLER.
 	 */
 
-	status = acpi_install_address_space_handler ((acpi_handle) acpi_gbl_root_node,
-			   ACPI_ADR_SPACE_SYSTEM_MEMORY,
-			   ACPI_DEFAULT_HANDLER, NULL, NULL);
-	if ((ACPI_FAILURE (status)) &&
-		(status != AE_ALREADY_EXISTS)) {
-		return_ACPI_STATUS (status);
-	}
+	for (i = 0; i < ACPI_NUM_DEFAULT_SPACES; i++) {
+		status = acpi_install_address_space_handler ((acpi_handle) acpi_gbl_root_node,
+				  acpi_gbl_default_address_spaces[i],
+				  ACPI_DEFAULT_HANDLER, NULL, NULL);
+		switch (status) {
+		case AE_OK:
+		case AE_SAME_HANDLER:
+		case AE_ALREADY_EXISTS:
 
-	status = acpi_install_address_space_handler ((acpi_handle) acpi_gbl_root_node,
-			   ACPI_ADR_SPACE_SYSTEM_IO,
-			   ACPI_DEFAULT_HANDLER, NULL, NULL);
-	if ((ACPI_FAILURE (status)) &&
-		(status != AE_ALREADY_EXISTS)) {
-		return_ACPI_STATUS (status);
-	}
+			/* These exceptions are all OK */
 
-	status = acpi_install_address_space_handler ((acpi_handle) acpi_gbl_root_node,
-			   ACPI_ADR_SPACE_PCI_CONFIG,
-			   ACPI_DEFAULT_HANDLER, NULL, NULL);
-	if ((ACPI_FAILURE (status)) &&
-		(status != AE_ALREADY_EXISTS)) {
-		return_ACPI_STATUS (status);
-	}
+			break;
 
-	status = acpi_install_address_space_handler ((acpi_handle) acpi_gbl_root_node,
-			   ACPI_ADR_SPACE_DATA_TABLE,
-			   ACPI_DEFAULT_HANDLER, NULL, NULL);
-	if ((ACPI_FAILURE (status)) &&
-		(status != AE_ALREADY_EXISTS)) {
-		return_ACPI_STATUS (status);
+		default:
+
+			return_ACPI_STATUS (status);
+		}
 	}
 
 	return_ACPI_STATUS (AE_OK);
