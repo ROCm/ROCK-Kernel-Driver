@@ -305,7 +305,7 @@ out:
 	return retval;
 fail_nomem:
 	retval = -ENOMEM;
-  fail:
+fail:
 	vm_unacct_memory(charge);
 	goto out;
 }
@@ -499,7 +499,7 @@ static int copy_mm(unsigned long clone_flags, struct task_struct * tsk)
 		goto fail_nomem;
 
 	if (init_new_context(tsk,mm))
-		goto free_pt;
+		goto fail_nocontext;
 
 	retval = dup_mmap(mm, oldmm);
 	if (retval)
@@ -513,6 +513,15 @@ good_mm:
 free_pt:
 	mmput(mm);
 fail_nomem:
+	return retval;
+
+fail_nocontext:
+	/*
+	 * If init_new_context() failed, we cannot use mmput() to free the mm
+	 * because it calls destroy_context()
+	 */
+	mm_free_pgd(mm);
+	free_mm(mm);
 	return retval;
 }
 
