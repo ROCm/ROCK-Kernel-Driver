@@ -43,6 +43,7 @@
 #include <linux/major.h>
 #include <linux/slab.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/stat.h>
 #include <linux/init.h>
@@ -73,31 +74,64 @@ extern int pmu_device_init(void);
 extern int tosh_init(void);
 extern int i8k_init(void);
 
-static int misc_read_proc(char *buf, char **start, off_t offset,
-			  int len, int *eof, void *private)
+#ifdef CONFIG_PROC_FS
+static void *misc_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	struct miscdevice *p;
-	int written;
+	loff_t off = 0;
 
-	written=0;
+	down(&misc_sem);
 	list_for_each_entry(p, &misc_list, list) {
-		if (written >= len)
-			break;
-		written += sprintf(buf+written, "%3i %s\n",p->minor, p->name ?: "");
-		if (written < offset) {
-			offset -= written;
-			written = 0;
-		}
+		if (*pos == off++) 
+			return p;
 	}
-	*start = buf + offset;
-	written -= offset;
-	if(written > len) {
-		*eof = 0;
-		return len;
-	}
-	*eof = 1;
-	return (written<0) ? 0 : written;
+	return NULL;
 }
+
+static void *misc_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	struct list_head *n = ((struct miscdevice *)v)->list.next;
+
+	++*pos;
+
+	return (n != &misc_list) ? list_entry(n, struct miscdevice, list)
+		 : NULL;
+}
+
+static void misc_seq_stop(struct seq_file *seq, void *v)
+{
+	up(&misc_sem);
+}
+
+static int misc_seq_show(struct seq_file *seq, void *v)
+{
+	const struct miscdevice *p = v;
+
+	seq_printf(seq, "%3i %s\n", p->minor, p->name ? p->name : "");
+	return 0;
+}
+
+
+static struct seq_operations misc_seq_ops = {
+	.start = misc_seq_start,
+	.next  = misc_seq_next,
+	.stop  = misc_seq_stop,
+	.show  = misc_seq_show,
+};
+
+static int misc_seq_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &misc_seq_ops);
+}
+
+static struct file_operations misc_proc_fops = {
+	.owner	 = THIS_MODULE,
+	.open    = misc_seq_open,
+	.read    = seq_read,
+	.llseek  = seq_lseek,
+	.release = seq_release,
+};
+#endif
 
 static int misc_open(struct inode * inode, struct file * file)
 {
@@ -245,7 +279,13 @@ EXPORT_SYMBOL(misc_deregister);
 
 int __init misc_init(void)
 {
-	create_proc_read_entry("misc", 0, 0, misc_read_proc, NULL);
+#ifdef CONFIG_PROC_FS
+	struct proc_dir_entry *ent;
+
+	ent = create_proc_entry("misc", 0, NULL);
+	if (ent)
+		ent->proc_fops = &misc_proc_fops;
+#endif
 #ifdef CONFIG_MVME16x
 	rtc_MK48T08_init();
 #endif
