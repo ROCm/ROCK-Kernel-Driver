@@ -259,22 +259,6 @@ struct shortname_info {
 	(x)->valid = 1;				\
 } while (0)
 
-static inline unsigned char
-shortname_info_to_lcase(struct shortname_info *base,
-			struct shortname_info *ext)
-{
-	unsigned char lcase = 0;
-
-	if (base->valid && ext->valid) {
-		if (!base->upper && base->lower && (ext->lower || ext->upper))
-			lcase |= CASE_LOWER_BASE;
-		if (!ext->upper && ext->lower && (base->lower || base->upper))
-			lcase |= CASE_LOWER_EXT;
-	}
-
-	return lcase;
-}
-
 static inline int to_shortname_char(struct nls_table *nls,
 				    unsigned char *buf, int buf_size, wchar_t *src,
 				    struct shortname_info *info)
@@ -452,10 +436,12 @@ static int vfat_create_shortname(struct inode *dir, struct nls_table *nls,
 		if (opt_shortname & VFAT_SFN_CREATE_WIN95) {
 			return (base_info.upper && ext_info.upper);
 		} else if (opt_shortname & VFAT_SFN_CREATE_WINNT) {
-			if ((base_info.upper || base_info.lower)
-			    && (ext_info.upper || ext_info.lower)) {
-				*lcase = shortname_info_to_lcase(&base_info,
-								 &ext_info);
+			if ((base_info.upper || base_info.lower) &&
+			    (ext_info.upper || ext_info.lower)) {
+				if (!base_info.upper && base_info.lower)
+					*lcase |= CASE_LOWER_BASE;
+				if (!ext_info.upper && ext_info.lower)
+					*lcase |= CASE_LOWER_EXT;
 				return 1;
 			}
 			return 0;
