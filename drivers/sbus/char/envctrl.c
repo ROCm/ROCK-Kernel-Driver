@@ -14,6 +14,9 @@
  *
  * EB - Added support for CP1500 Global Address and PS/Voltage monitoring.
  * 		Eric Brower <ebrower@usa.net>
+ *
+ * DB - Audit every copy_to_user in envctrl_read.
+ *              Daniele Bellucci <bellucda@tiscali.it>
  */
 
 #include <linux/config.h>
@@ -571,7 +574,8 @@ envctrl_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 
 		data[0] = (unsigned char)(warning_temperature);
 		ret = 1;
-		copy_to_user((unsigned char *)buf, data, ret);
+		if (copy_to_user((unsigned char *)buf, data, ret))
+			ret = -EFAULT;
 		break;
 
 	case ENVCTRL_RD_SHUTDOWN_TEMPERATURE:
@@ -580,14 +584,16 @@ envctrl_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 
 		data[0] = (unsigned char)(shutdown_temperature);
 		ret = 1;
-		copy_to_user((unsigned char *)buf, data, ret);
+		if (copy_to_user((unsigned char *)buf, data, ret))
+			ret = -EFAULT;
 		break;
 
 	case ENVCTRL_RD_MTHRBD_TEMPERATURE:
 		if (!(pchild = envctrl_get_i2c_child(ENVCTRL_MTHRBDTEMP_MON)))
 			return 0;
 		ret = envctrl_read_noncpu_info(pchild, ENVCTRL_MTHRBDTEMP_MON, data);
-		copy_to_user((unsigned char *)buf, data, ret);
+		if (copy_to_user((unsigned char *)buf, data, ret))
+			ret = -EFAULT;
 		break;
 
 	case ENVCTRL_RD_CPU_TEMPERATURE:
@@ -596,7 +602,8 @@ envctrl_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 		ret = envctrl_read_cpu_info(read_cpu, pchild, ENVCTRL_CPUTEMP_MON, data);
 
 		/* Reset cpu to the default cpu0. */
-		copy_to_user((unsigned char *)buf, data, ret);
+		if (copy_to_user((unsigned char *)buf, data, ret))
+			ret = -EFAULT;
 		break;
 
 	case ENVCTRL_RD_CPU_VOLTAGE:
@@ -605,21 +612,24 @@ envctrl_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 		ret = envctrl_read_cpu_info(read_cpu, pchild, ENVCTRL_CPUVOLTAGE_MON, data);
 
 		/* Reset cpu to the default cpu0. */
-		copy_to_user((unsigned char *)buf, data, ret);
+		if (copy_to_user((unsigned char *)buf, data, ret))
+			ret = -EFAULT;
 		break;
 
 	case ENVCTRL_RD_SCSI_TEMPERATURE:
 		if (!(pchild = envctrl_get_i2c_child(ENVCTRL_SCSITEMP_MON)))
 			return 0;
 		ret = envctrl_read_noncpu_info(pchild, ENVCTRL_SCSITEMP_MON, data);
-		copy_to_user((unsigned char *)buf, data, ret);
+		if (copy_to_user((unsigned char *)buf, data, ret))
+			ret = -EFAULT;
 		break;
 
 	case ENVCTRL_RD_ETHERNET_TEMPERATURE:
 		if (!(pchild = envctrl_get_i2c_child(ENVCTRL_ETHERTEMP_MON)))
 			return 0;
 		ret = envctrl_read_noncpu_info(pchild, ENVCTRL_ETHERTEMP_MON, data);
-		copy_to_user((unsigned char *)buf, data, ret);
+		if (copy_to_user((unsigned char *)buf, data, ret))
+			ret = -EFAULT;
 		break;
 
 	case ENVCTRL_RD_FAN_STATUS:
@@ -627,7 +637,8 @@ envctrl_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 			return 0;
 		data[0] = envctrl_i2c_read_8574(pchild->addr);
 		ret = envctrl_i2c_fan_status(pchild,data[0], data);
-		copy_to_user((unsigned char *)buf, data, ret);
+		if (copy_to_user((unsigned char *)buf, data, ret))
+			ret = -EFAULT;
 		break;
 	
 	case ENVCTRL_RD_GLOBALADDRESS:
@@ -635,7 +646,8 @@ envctrl_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 			return 0;
 		data[0] = envctrl_i2c_read_8574(pchild->addr);
 		ret = envctrl_i2c_globaladdr(pchild, data[0], data);
-		copy_to_user((unsigned char *)buf, data, ret);
+		if (copy_to_user((unsigned char *)buf, data, ret))
+			ret = -EFAULT;
 		break;
 
 	case ENVCTRL_RD_VOLTAGE_STATUS:
@@ -645,7 +657,8 @@ envctrl_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 				return 0;
 		data[0] = envctrl_i2c_read_8574(pchild->addr);
 		ret = envctrl_i2c_voltage_status(pchild, data[0], data);
-		copy_to_user((unsigned char *)buf, data, ret);
+		if (copy_to_user((unsigned char *)buf, data, ret))
+			ret = -EFAULT;
 		break;
 
 	default:
