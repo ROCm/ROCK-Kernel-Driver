@@ -1144,18 +1144,20 @@ int snd_emu10k1_proc_init(emu10k1_t * emu);
 #define CC_REG_NONZERO	C_00000100
 
 /* FX buses */
-#define FXBUS_PCM_LEFT		0x00
-#define FXBUS_PCM_RIGHT		0x01
+#define FXBUS_WAVE_LEFT		0x00
+#define FXBUS_WAVE_RIGHT	0x01
 #define FXBUS_PCM_LEFT_REAR	0x02
 #define FXBUS_PCM_RIGHT_REAR	0x03
 #define FXBUS_MIDI_LEFT		0x04
 #define FXBUS_MIDI_RIGHT	0x05
 #define FXBUS_PCM_CENTER	0x06
 #define FXBUS_PCM_LFE		0x07
-#define FXBUS_PT_LEFT		20
-#define FXBUS_PT_RIGHT		21
+#define FXBUS_PCM_LEFT		0x08
+#define FXBUS_PCM_RIGHT		0x09
 #define FXBUS_MIDI_REVERB	0x0c
 #define FXBUS_MIDI_CHORUS	0x0d
+#define FXBUS_PT_LEFT		0x14
+#define FXBUS_PT_RIGHT		0x15
 
 /* Inputs */
 #define EXTIN_AC97_L	   0x00	/* AC'97 capture channel - left */
@@ -1249,8 +1251,8 @@ int snd_emu10k1_proc_init(emu10k1_t * emu);
 #define A_C_4f1bbcdc	0xd3
 #define A_C_5a7ef9db	0xd4
 #define A_C_00100000	0xd5
-/* 0xd6 = 0x7fffffff  (?) ACCUM? */
-/* 0xd7 = 0x0000000   CCR */
+#define A_GPR_ACCU	0xd6		/* ACCUM, accumulator */
+#define A_GPR_COND	0xd7		/* CCR, condition register */
 /* 0xd8 = noise1 */
 /* 0xd9 = noise2 */
 
