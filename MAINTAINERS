@@ -1995,6 +1995,20 @@ L:	linux-visws-devel@lists.sf.net
 W:	http://linux-visws.sf.net
 S:	Maintained for 2.6.
 
+SIMTEC EB110ATX (Chalice CATS)
+P:	Ben Dooks
+P:	Vincent Sanders
+M:	support@simtec.co.uk
+W:	http://www.simtec.co.uk/products/EB110ATX/
+S:	Supported
+
+SIMTEC EB2410ITX (BAST)
+P:	Ben Dooks
+P:	Vincent Sanders
+M:	support@simtec.co.uk
+W:	http://www.simtec.co.uk/products/EB2410ITX/
+S:	Supported
+
 SIS 5513 IDE CONTROLLER DRIVER
 P:	Lionel Bouton
 M:	Lionel.Bouton@inet6.fr
