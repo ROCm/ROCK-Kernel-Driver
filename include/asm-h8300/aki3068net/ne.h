@@ -1,6 +1,9 @@
 /* AE-3068 (aka. aki3068net) RTL8019AS Config */
 
-#define NE2000_ADDR		CONFIG_NE_BASE
+#ifndef __H8300_AKI3068NET_NE__
+#define __H8300_AKI3068NET_NE__
+
+#define NE2000_ADDR		0x200000
 #define NE2000_IRQ              5
 #define NE2000_IRQ_VECTOR	(12 + NE2000_IRQ)
 #define	NE2000_BYTE		volatile unsigned short
@@ -21,3 +24,5 @@ do {                                     \
 	wordlength = 1;                  \
         outb_p(0x48, ioaddr + EN0_DCFG); \
 } while(0)
+
+#endif

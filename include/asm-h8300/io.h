@@ -41,15 +41,15 @@ static inline unsigned int _swapl(volatile unsigned long v)
 }
 
 #define readb(addr) \
-    ({ unsigned char __v = (*(volatile unsigned char *) (addr)); __v; })
+    ({ unsigned char __v = (*(volatile unsigned char *) (addr & 0x00ffffff)); __v; })
 #define readw(addr) \
-    ({ unsigned short __v = (*(volatile unsigned short *) (addr)); __v; })
+    ({ unsigned short __v = (*(volatile unsigned short *) (addr & 0x00ffffff)); __v; })
 #define readl(addr) \
-    ({ unsigned int __v = (*(volatile unsigned int *) (addr)); __v; })
+    ({ unsigned int __v = (*(volatile unsigned int *) (addr & 0x00ffffff)); __v; })
 
-#define writeb(b,addr) (void)((*(volatile unsigned char *) (addr)) = (b))
-#define writew(b,addr) (void)((*(volatile unsigned short *) (addr)) = (b))
-#define writel(b,addr) (void)((*(volatile unsigned int *) (addr)) = (b))
+#define writeb(b,addr) (void)((*(volatile unsigned char *) (addr & 0x00ffffff)) = (b))
+#define writew(b,addr) (void)((*(volatile unsigned short *) (addr & 0x00ffffff)) = (b))
+#define writel(b,addr) (void)((*(volatile unsigned int *) (addr & 0x00ffffff)) = (b))
 
 /*
  * The following are some defines we need for MTD with our
@@ -146,7 +146,7 @@ static inline void io_insl(unsigned int addr, void *buf, int len)
 #define insw(a,b,l) io_insw(a,b,l)
 #define insl(a,b,l) io_insl(a,b,l)
 
-#define IO_SPACE_LIMIT 0xffff
+#define IO_SPACE_LIMIT 0xffffff
 
 
 /* Values for nocacheflag and cmode */
