@@ -344,6 +344,74 @@ int sys32_ptrace(long request, long pid, unsigned long addr, unsigned long data)
 		ret = ptrace_detach(child, data);
 		break;
 
+	case PPC_PTRACE_GETREGS: { /* Get GPRs 0 - 31. */
+		int i;
+		unsigned long *reg = &((unsigned long *)child->thread.regs)[0];
+		unsigned int *tmp = (unsigned int *)addr;
+
+		for (i = 0; i < 32; i++) {
+			ret = put_user(*reg, tmp);
+			if (ret)
+				break;
+			reg++;
+			tmp++;
+		}
+		break;
+	}
+
+	case PPC_PTRACE_SETREGS: { /* Set GPRs 0 - 31. */
+		int i;
+		unsigned long *reg = &((unsigned long *)child->thread.regs)[0];
+		unsigned int *tmp = (unsigned int *)addr;
+
+		for (i = 0; i < 32; i++) {
+			ret = get_user(*reg, tmp);
+			if (ret)
+				break;
+			reg++;
+			tmp++;
+		}
+		break;
+	}
+
+	case PPC_PTRACE_GETFPREGS: { /* Get FPRs 0 - 31. */
+		int i;
+		unsigned long *reg = &((unsigned long *)child->thread.fpr)[0];
+		unsigned int *tmp = (unsigned int *)addr;
+
+		if (child->thread.regs->msr & MSR_FP)
+			giveup_fpu(child);
+
+		for (i = 0; i < 32; i++) {
+			ret = put_user(*reg, tmp);
+			if (ret)
+				break;
+			reg++;
+			tmp++;
+		}
+		break;
+	}
+
+	case PPC_PTRACE_SETFPREGS: { /* Get FPRs 0 - 31. */
+		int i;
+		unsigned long *reg = &((unsigned long *)child->thread.fpr)[0];
+		unsigned int *tmp = (unsigned int *)addr;
+
+		if (child->thread.regs->msr & MSR_FP)
+			giveup_fpu(child);
+
+		for (i = 0; i < 32; i++) {
+			ret = get_user(*reg, tmp);
+			if (ret)
+				break;
+			reg++;
+			tmp++;
+		}
+		break;
+	}
+
+
+
 	default:
 		ret = -EIO;
 		break;
