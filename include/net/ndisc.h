@@ -45,6 +45,11 @@ struct nd_msg {
 	__u8		opt[0];
 };
 
+struct rs_msg {
+	struct icmp6hdr	icmph;
+	__u8		opt[0];
+};
+
 struct ra_msg {
         struct icmp6hdr		icmph;
 	__u32			reachable_time;
