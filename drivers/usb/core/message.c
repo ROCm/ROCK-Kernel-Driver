@@ -471,9 +471,13 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 		return 0;
 	}
 
+	if (alternate < 0 || alternate >= iface->num_altsetting)
+		return -EINVAL;
+
 	if ((ret = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
-	    USB_REQ_SET_INTERFACE, USB_RECIP_INTERFACE, alternate,
-	    interface, NULL, 0, HZ * 5)) < 0)
+				   USB_REQ_SET_INTERFACE, USB_RECIP_INTERFACE,
+				   iface->altsetting[alternate].bAlternateSetting,
+				   interface, NULL, 0, HZ * 5)) < 0)
 		return ret;
 
 	iface->act_altsetting = alternate;
