@@ -80,6 +80,7 @@ avmcard *b1_alloc_card(int nr_controllers)
 
 	card->ctrlinfo = cinfo;
 	for (i = 0; i < nr_controllers; i++) {
+		INIT_LIST_HEAD(&cinfo[i].ncci_head);
 		cinfo[i].card = card;
 	}
 	spin_lock_init(&card->lock);
@@ -331,6 +332,7 @@ void b1_reset_ctr(struct capi_ctr *ctrl)
 	b1_reset(port);
 
 	memset(cinfo->version, 0, sizeof(cinfo->version));
+	capilib_release(&cinfo->ncci_head);
 	ctrl->reseted(ctrl);
 }
 
@@ -366,6 +368,8 @@ void b1_release_appl(struct capi_ctr *ctrl, u16 appl)
 	unsigned int port = card->port;
 	unsigned long flags;
 
+	capilib_release_appl(&cinfo->ncci_head, appl);
+
 	save_flags(flags);
 	cli();
 	b1_put_byte(port, SEND_RELEASE);
@@ -373,7 +377,7 @@ void b1_release_appl(struct capi_ctr *ctrl, u16 appl)
 	restore_flags(flags);
 }
 
-void b1_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
+u16 b1_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
 {
 	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
 	avmcard *card = cinfo->card;
@@ -382,20 +386,36 @@ void b1_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
 	u16 len = CAPIMSG_LEN(skb->data);
 	u8 cmd = CAPIMSG_COMMAND(skb->data);
 	u8 subcmd = CAPIMSG_SUBCOMMAND(skb->data);
+	u16 dlen, retval;
 
-	save_flags(flags);
-	cli();
 	if (CAPICMD(cmd, subcmd) == CAPI_DATA_B3_REQ) {
-		u16 dlen = CAPIMSG_DATALEN(skb->data);
+		retval = capilib_data_b3_req(&cinfo->ncci_head,
+					     CAPIMSG_APPID(skb->data),
+					     CAPIMSG_NCCI(skb->data),
+					     CAPIMSG_MSGID(skb->data));
+		if (retval != CAPI_NOERROR) 
+			goto out;
+
+		dlen = CAPIMSG_DATALEN(skb->data);
+
+		save_flags(flags);
+		cli();
 		b1_put_byte(port, SEND_DATA_B3_REQ);
 		b1_put_slice(port, skb->data, len);
 		b1_put_slice(port, skb->data + len, dlen);
+		restore_flags(flags);
 	} else {
+		retval = CAPI_NOERROR;
+
+		save_flags(flags);
+		cli();
 		b1_put_byte(port, SEND_MESSAGE);
 		b1_put_slice(port, skb->data, len);
+		restore_flags(flags);
 	}
-	restore_flags(flags);
+ out:
 	dev_kfree_skb_any(skb);
+	return retval;
 }
 
 /* ------------------------------------------------------------- */
@@ -525,6 +545,11 @@ void b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 					card->name);
 		} else {
 			memcpy(skb_put(skb, MsgLen), card->msgbuf, MsgLen);
+			if (CAPIMSG_CMD(skb->data) == CAPI_DATA_B3_CONF)
+				capilib_data_b3_conf(&cinfo->ncci_head, ApplId,
+						     CAPIMSG_NCCI(skb->data),
+						     CAPIMSG_MSGID(skb->data));
+
 			ctrl->handle_capimsg(ctrl, ApplId, skb);
 		}
 		break;
@@ -535,7 +560,7 @@ void b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 		NCCI = b1_get_word(card->port);
 		WindowSize = b1_get_word(card->port);
 
-		ctrl->new_ncci(ctrl, ApplId, NCCI, WindowSize);
+		capilib_new_ncci(&cinfo->ncci_head, ApplId, NCCI, WindowSize);
 
 		break;
 
@@ -545,8 +570,8 @@ void b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 		NCCI = b1_get_word(card->port);
 
 		if (NCCI != 0xffffffff)
-			ctrl->free_ncci(ctrl, ApplId, NCCI);
-
+			capilib_free_ncci(&cinfo->ncci_head, ApplId, NCCI);
+	       
 		break;
 
 	case RECEIVE_START:

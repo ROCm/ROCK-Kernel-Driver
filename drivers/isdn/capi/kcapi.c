@@ -55,23 +55,6 @@ MODULE_PARM(showcapimsgs, "i");
 
 /* ------------------------------------------------------------- */
 
-struct msgidqueue {
-	struct msgidqueue *next;
-	u16 msgid;
-};
-
-struct capi_ncci {
-	struct capi_ncci *next;
-	u16 applid;
-	u32 ncci;
-	u32 winsize;
-	int   nmsg;
-	struct msgidqueue *msgidqueue;
-	struct msgidqueue *msgidlast;
-	struct msgidqueue *msgidfree;
-	struct msgidqueue msgidpool[CAPI_MAXDATAWINDOW];
-};
-
 struct capi_appl {
 	u16 applid;
 	capi_register_params rparam;
@@ -234,45 +217,6 @@ static int proc_applications_read_proc(char *page, char **start, off_t off,
 		} else {
 			if (len-off > count)
 				goto endloop;
-		}
-	}
-endloop:
-	*start = page+off;
-	if (len < count)
-		*eof = 1;
-	if (len>count) len = count;
-	if (len<0) len = 0;
-	return len;
-}
-
-/*
- * /proc/capi/ncci:
- *	applid ncci winsize nblk
- */
-static int proc_ncci_read_proc(char *page, char **start, off_t off,
-                                       int count, int *eof, void *data)
-{
-	struct capi_appl *ap;
-	struct capi_ncci *np;
-	int i;
-	int len = 0;
-
-	for (i=1; i <= CAPI_MAXAPPL; i++) {
-		ap = get_capi_appl_by_nr(i);
-		if (!ap) continue;
-		for (np = ap->nccilist; np; np = np->next) {
-			len += sprintf(page+len, "%d 0x%x %d %d\n",
-				np->applid,
-				np->ncci,
-				np->winsize,
-				np->nmsg);
-			if (len <= off) {
-				off -= len;
-				len = 0;
-			} else {
-				if (len-off > count)
-					goto endloop;
-			}
 		}
 	}
 endloop:
@@ -477,7 +421,6 @@ static struct procfsentries {
 } procfsentries[] = {
    { "capi",		  S_IFDIR, 0 },
    { "capi/applications", 0	 , proc_applications_read_proc },
-   { "capi/ncci", 	  0	 , proc_ncci_read_proc },
    { "capi/driver",       0	 , proc_driver_read_proc },
    { "capi/users", 	  0	 , proc_users_read_proc },
    { "capi/controller",   0	 , proc_controller_read_proc },
@@ -525,26 +468,9 @@ static void register_appl(struct capi_ctr *card, u16 applid, capi_register_param
 
 static void release_appl(struct capi_ctr *card, u16 applid)
 {
-	struct capi_appl *ap = get_capi_appl_by_nr(applid);
-	struct capi_ncci **pp, **nextpp;
+	DBG("applid %#x", applid);
 	
-	DBG("");
-	
-	for (pp = &ap->nccilist; *pp; pp = nextpp) {
-		if (NCCI2CTRL((*pp)->ncci) == card->cnr) {
-			struct capi_ncci *np = *pp;
-			*pp = np->next;
-			printk(KERN_INFO "kcapi: appl %d ncci 0x%x down!\n", applid, np->ncci);
-			kfree(np);
-			ap->nncci--;
-			nextpp = pp;
-		} else {
-			nextpp = &(*pp)->next;
-		}
-	}
-
 	card->driver->release_appl(card, applid);
-
 	capi_ctr_put(card);
 }
 
@@ -679,130 +605,12 @@ static void notify_handler(void *dummy)
 	MOD_DEC_USE_COUNT;
 }
 	
-/* -------- NCCI Handling ------------------------------------- */
-
-static inline void mq_init(struct capi_ncci * np)
-{
-	int i;
-	np->msgidqueue = 0;
-	np->msgidlast = 0;
-	np->nmsg = 0;
-	memset(np->msgidpool, 0, sizeof(np->msgidpool));
-	np->msgidfree = &np->msgidpool[0];
-	for (i = 1; i < np->winsize; i++) {
-		np->msgidpool[i].next = np->msgidfree;
-		np->msgidfree = &np->msgidpool[i];
-	}
-}
-
-static inline int mq_enqueue(struct capi_ncci * np, u16 msgid)
-{
-	struct msgidqueue *mq;
-	if ((mq = np->msgidfree) == 0)
-		return 0;
-	np->msgidfree = mq->next;
-	mq->msgid = msgid;
-	mq->next = 0;
-	if (np->msgidlast)
-		np->msgidlast->next = mq;
-	np->msgidlast = mq;
-	if (!np->msgidqueue)
-		np->msgidqueue = mq;
-	np->nmsg++;
-	return 1;
-}
-
-static inline int mq_dequeue(struct capi_ncci * np, u16 msgid)
-{
-	struct msgidqueue **pp;
-	for (pp = &np->msgidqueue; *pp; pp = &(*pp)->next) {
-		if ((*pp)->msgid == msgid) {
-			struct msgidqueue *mq = *pp;
-			*pp = mq->next;
-			if (mq == np->msgidlast)
-				np->msgidlast = 0;
-			mq->next = np->msgidfree;
-			np->msgidfree = mq;
-			np->nmsg--;
-			return 1;
-		}
-	}
-	return 0;
-}
-
-/*
- * ncci management
- */
-
-static void controllercb_new_ncci(struct capi_ctr * card,
-					u16 appl, u32 ncci, u32 winsize)
-{
-	struct capi_ncci *np;
-	struct capi_appl *ap = get_capi_appl_by_nr(appl);
-
-	if (!ap) {
-		printk(KERN_ERR "avmb1_handle_new_ncci: illegal appl %d\n", appl);
-		return;
-	}
-	if ((np = (struct capi_ncci *) kmalloc(sizeof(struct capi_ncci), GFP_ATOMIC)) == 0) {
-		printk(KERN_ERR "capi_new_ncci: alloc failed ncci 0x%x\n", ncci);
-		return;
-	}
-	if (winsize > CAPI_MAXDATAWINDOW) {
-		printk(KERN_ERR "capi_new_ncci: winsize %d too big, set to %d\n",
-		       winsize, CAPI_MAXDATAWINDOW);
-		winsize = CAPI_MAXDATAWINDOW;
-	}
-	np->applid = appl;
-	np->ncci = ncci;
-	np->winsize = winsize;
-	mq_init(np);
-	np->next = ap->nccilist;
-	ap->nccilist = np;
-	ap->nncci++;
-	printk(KERN_INFO "kcapi: appl %d ncci 0x%x up\n", appl, ncci);
-}
-
-static void controllercb_free_ncci(struct capi_ctr * card,
-				u16 appl, u32 ncci)
-{
-	struct capi_ncci **pp;
-	struct capi_appl *ap = get_capi_appl_by_nr(appl);
-	if (!ap) {
-		printk(KERN_ERR "free_ncci: illegal appl %d\n", appl);
-		return;
-	}
-	for (pp = &ap->nccilist; *pp; pp = &(*pp)->next) {
-		if ((*pp)->ncci == ncci) {
-			struct capi_ncci *np = *pp;
-			*pp = np->next;
-			kfree(np);
-			ap->nncci--;
-			printk(KERN_INFO "kcapi: appl %d ncci 0x%x down\n", appl, ncci);
-			return;
-		}
-	}
-	printk(KERN_ERR "free_ncci: ncci 0x%x not found\n", ncci);
-}
-
-
-static struct capi_ncci *find_ncci(struct capi_appl * app, u32 ncci)
-{
-	struct capi_ncci *np;
-	for (np = app->nccilist; np; np = np->next) {
-		if (np->ncci == ncci)
-			return np;
-	}
-	return 0;
-}
-
 /* -------- Receiver ------------------------------------------ */
 
 static void recv_handler(void *dummy)
 {
 	struct sk_buff *skb;
 	struct capi_appl *ap;
-	struct capi_ncci *np;
 
 	while ((skb = skb_dequeue(&recv_queue)) != 0) {
 		ap = get_capi_appl_by_nr(CAPIMSG_APPID(skb->data));
@@ -817,13 +625,6 @@ static void recv_handler(void *dummy)
 			       ap->applid);
 			kfree_skb(skb);
 			continue;
-		}
-		if (   CAPIMSG_COMMAND(skb->data) == CAPI_DATA_B3
-		    && CAPIMSG_SUBCOMMAND(skb->data) == CAPI_CONF
-	            && (np = find_ncci(ap, CAPIMSG_NCCI(skb->data))) != 0
-		    && mq_dequeue(np, CAPIMSG_MSGID(skb->data)) == 0) {
-			printk(KERN_ERR "kcapi: msgid %hu ncci 0x%x not on queue\n",
-				CAPIMSG_MSGID(skb->data), np->ncci);
 		}
 		if (   CAPIMSG_COMMAND(skb->data) == CAPI_DATA_B3
 		    && CAPIMSG_SUBCOMMAND(skb->data) == CAPI_IND) {
@@ -917,22 +718,9 @@ static void controllercb_reseted(struct capi_ctr * card)
 
 	for (appl = 1; appl <= CAPI_MAXAPPL; appl++) {
 		struct capi_appl *ap = get_capi_appl_by_nr(appl);
-		struct capi_ncci **pp, **nextpp;
-
 		if (!ap)
 			continue;
 
-		for (pp = &ap->nccilist; *pp; pp = nextpp) {
-			if (NCCI2CTRL((*pp)->ncci) == card->cnr) {
-				struct capi_ncci *np = *pp;
-				*pp = np->next;
-				printk(KERN_INFO "kcapi: appl %d ncci 0x%x forced down!\n", appl, np->ncci);
-				kfree(np);
-				nextpp = pp;
-			} else {
-				nextpp = &(*pp)->next;
-			}
-		}
 		capi_ctr_put(card);
 	}
 
@@ -993,8 +781,6 @@ attach_capi_ctr(struct capi_driver *driver, char *name, void *driverdata)
         card->suspend_output = controllercb_suspend_output;
         card->resume_output = controllercb_resume_output;
         card->handle_capimsg = controllercb_handle_capimsg;
-        card->new_ncci = controllercb_new_ncci;
-        card->free_ncci = controllercb_free_ncci;
 
 	list_add_tail(&card->driver_list, &driver->contr_head);
 	driver->ncontroller++;
@@ -1185,7 +971,6 @@ static u16 capi_put_message(u16 applid, struct sk_buff *skb)
 {
 	struct capi_ctr *card;
 	struct capi_appl *ap;
-	struct capi_ncci *np;
 	int showctl = 0;
 	u8 cmd, subcmd;
 
@@ -1213,9 +998,6 @@ static u16 capi_put_message(u16 applid, struct sk_buff *skb)
         subcmd = CAPIMSG_SUBCOMMAND(skb->data);
 
 	if (cmd == CAPI_DATA_B3 && subcmd== CAPI_REQ) {
-	    	if ((np = find_ncci(ap, CAPIMSG_NCCI(skb->data))) != 0
-	            && mq_enqueue(np, CAPIMSG_MSGID(skb->data)) == 0)
-			return CAPI_SENDQUEUEFULL;
 		card->nsentdatapkt++;
 		ap->nsentdatapkt++;
 	        if (card->traceflag > 2) showctl |= 2;
@@ -1239,8 +1021,7 @@ static u16 capi_put_message(u16 applid, struct sk_buff *skb)
 		}
 
 	}
-	card->driver->send_message(card, skb);
-	return CAPI_NOERROR;
+	return card->driver->send_message(card, skb);
 }
 
 static u16 capi_get_message(u16 applid, struct sk_buff **msgp)
