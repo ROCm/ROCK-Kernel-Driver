@@ -37,6 +37,16 @@
  * 2003/05/01 - Shmulik Hen <shmulik.hen at intel dot com>
  *	- Renamed bond_3ad_link_status_changed() to
  *	  bond_3ad_handle_link_change() for compatibility with TLB.
+ *
+ * 2003/05/20 - Amir Noam <amir.noam at intel dot com>
+ *	- Fix long fail over time when releasing last slave of an active
+ *	  aggregator - send LACPDU on unbind of slave to tell partner this
+ *	  port is no longer aggregatable.
+ *
+ * 2003/06/25 - Tsippy Mendelson <tsippy.mendelson at intel dot com>
+ *	- Send LACPDU as highest priority packet to further fix the above
+ *	  problem on very high Tx traffic load where packets may get dropped
+ *	  by the slave.
  */
 
 #include <linux/skbuff.h>
@@ -45,6 +55,7 @@
 #include <linux/spinlock.h>
 #include <linux/ethtool.h>
 #include <linux/if_bonding.h>
+#include <linux/pkt_sched.h>
 #include "bonding.h"
 #include "bond_3ad.h"
 
@@ -905,6 +916,7 @@ static int ad_lacpdu_send(struct port *port)
 	skb->mac.raw = skb->data;
 	skb->nh.raw = skb->data + ETH_HLEN;
 	skb->protocol = PKT_TYPE_LACPDU;
+	skb->priority = TC_PRIO_CONTROL;
 
 	lacpdu_header = (struct lacpdu_header *)skb_put(skb, length);
 
