@@ -60,7 +60,7 @@ static u_int8_t ip6_nexthdr(u_int8_t currenthdr, u_int8_t **hdrptr)
 		repeatedly...with a large stick...no, an even LARGER
 		stick...no, you're still not thinking big enough */
 			nexthdr = **hdrptr;
-			hdrlen = *hdrptr[1] * 4 + 8;
+			hdrlen = (*hdrptr)[1] * 4 + 8;
 			*hdrptr = *hdrptr + hdrlen;
 			break;
 		/*stupid rfc2402 */
@@ -68,7 +68,7 @@ static u_int8_t ip6_nexthdr(u_int8_t currenthdr, u_int8_t **hdrptr)
 		case IPPROTO_ROUTING:
 		case IPPROTO_HOPOPTS:
 			nexthdr = **hdrptr;
-			hdrlen = *hdrptr[1] * 8 + 8;
+			hdrlen = (*hdrptr)[1] * 8 + 8;
 			*hdrptr = *hdrptr + hdrlen;
 			break;
 		case IPPROTO_FRAGMENT:
