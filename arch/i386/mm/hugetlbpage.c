@@ -235,22 +235,55 @@ void huge_page_release(struct page *page)
 	free_huge_page(page);
 }
 
+static void
+free_rsrc(struct inode * inode)
+{
+	int i;
+	spin_lock(&htlbpage_lock);
+	for (i=0;i<MAX_ID;i++) 
+		if (htlbpagek[i].key == inode->i_ino) {
+			htlbpagek[i].key = 0;
+			htlbpagek[i].in = NULL;
+			break;
+		}
+	spin_unlock(&htlbpage_lock);
+	kfree(inode);
+}
+
 void unmap_hugepage_range(struct vm_area_struct *vma, unsigned long start, unsigned long end)
 {
 	struct mm_struct *mm = vma->vm_mm;
 	unsigned long address;
 	pte_t *pte;
 	struct page *page;
+	int free_more = 0;
+	struct inode *inode = NULL;
 
 	BUG_ON(start & (HPAGE_SIZE - 1));
 	BUG_ON(end & (HPAGE_SIZE - 1));
 
+	if (start < end) {
+		pte = huge_pte_offset(mm, start);
+		page = pte_page(*pte);
+		if ((page->mapping != NULL) && (page_count(page) == 2) &&
+			((inode=page->mapping->host)->i_mapping->a_ops == NULL)) 
+			free_more = 1;
+	}
 	for (address = start; address < end; address += HPAGE_SIZE) {
 		pte = huge_pte_offset(mm, address);
 		page = pte_page(*pte);
+		if (free_more) {
+			ClearPageDirty(page);
+			SetPageLocked(page);
+			remove_from_page_cache(page);
+			ClearPageLocked(page);
+			set_page_count(page, 1);
+		}
 		huge_page_release(page);
 		pte_clear(pte);
 	}
+	if (free_more)
+		free_rsrc(inode);
 	mm->rss -= (end - start) >> PAGE_SHIFT;
 	flush_tlb_range(vma, start, end);
 }
