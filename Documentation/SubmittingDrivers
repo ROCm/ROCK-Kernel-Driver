@@ -2,9 +2,8 @@ Submitting Drivers For The Linux Kernel
 ---------------------------------------
 
 This document is intended to explain how to submit device drivers to the
-Linux 2.2 and 2.4 kernel trees. Note that if you are interested in video
-card drivers you should probably talk to XFree86 (http://www.xfree86.org) 
-instead.
+various kernel trees. Note that if you are interested in video card drivers
+you should probably talk to XFree86 (http://www.xfree86.org) instead.
 
 Also read the Documentation/SubmittingPatches document.
 
@@ -35,21 +34,23 @@ Linux 2.2:
 	maintainer then please contact Alan Cox <alan@lxorguk.ukuu.org.uk>
 
 Linux 2.4:
-	This kernel tree is under active development. The same rules apply
-	as 2.2 but you may wish to submit your driver via linux-kernel (see
-	resources) and follow that list to track changes in API's. These
-	should no longer be occuring as we are now in a code freeze.
-	The final contact point for Linux 2.4 submissions is 	
-	<torvalds@transmeta.com>.
+	The same rules apply as 2.2 but this kernel tree is under active
+	development. The final contact point for Linux 2.4 submissions is
+	Marcelo Tosatti <marcelo@conectiva.com.br>.
+
+Linux 2.5:
+	The same rules apply as 2.4 except that you should follow linux-kernel
+	to track changes in API's. The final contact point for Linux 2.5
+	submissions is Linus Torvalds <torvalds@transmeta.com>.
 
 What Criteria Determine Acceptance
 ----------------------------------
 
-Licensing:	The code must be released to us under the GNU General Public License. 
-		We don't insist on any kind of exclusively GPL licensing,
-		and if you wish the driver to be useful to other communities
-		such as BSD you may well wish to release under multiple
-		licenses.
+Licensing:	The code must be released to us under the
+		GNU General Public License. We don't insist on any kind
+		of exclusively GPL licensing, and if you wish the driver
+		to be useful to other communities such as BSD you may well
+		wish to release under multiple licenses.
 
 Interfaces:	If your driver uses existing interfaces and behaves like
 		other drivers in the same class it will be much more likely
@@ -64,12 +65,13 @@ Code:		Please use the Linux style of code formatting as documented
 		maintain them just once seperate them out nicely and note
 		this fact.
 
-Portability:	Pointers are not always 32bits, people do not all have
-		floating point and you shouldn't use inline x86 assembler in 
-		your driver without careful thought. Pure x86 drivers
-		generally are not popular. If you only have x86 hardware it 
-		is hard to test portability but it is easy to make sure the
-		code can easily be made portable.
+Portability:	Pointers are not always 32bits, not all computers are little
+		endian, people do not all have floating point and you
+		shouldn't use inline x86 assembler in your driver without
+		careful thought. Pure x86 drivers generally are not popular.
+		If you only have x86 hardware it is hard to test portability
+		but it is easy to make sure the code can easily be made
+		portable.
 
 Clarity:	It helps if anyone can see how to fix the driver. It helps
 		you because you get patches not bug reports. If you submit a
