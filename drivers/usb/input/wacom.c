@@ -321,13 +321,13 @@ struct wacom_features wacom_features[] = {
 };
 
 struct usb_device_id wacom_ids[] = {
-	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x10), driver_info: 0 },
-	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x20), driver_info: 1 },
-	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x21), driver_info: 2 },
-	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x22), driver_info: 3 },
-	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x23), driver_info: 4 },
-	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x24), driver_info: 5 },
-	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x31), driver_info: 6 },
+	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x10), .driver_info = 0 },
+	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x20), .driver_info = 1 },
+	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x21), .driver_info = 2 },
+	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x22), .driver_info = 3 },
+	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x23), .driver_info = 4 },
+	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x24), .driver_info = 5 },
+	{ USB_DEVICE(USB_VENDOR_ID_WACOM, 0x31), .driver_info = 6 },
 	{ }
 };
 
