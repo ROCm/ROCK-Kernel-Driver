@@ -506,7 +506,8 @@ static void end_buffer_async_read(struct buffer_head *bh, int uptodate)
 		set_buffer_uptodate(bh);
 	} else {
 		clear_buffer_uptodate(bh);
-		buffer_io_error(bh);
+		if (!(current->flags & PF_READAHEAD))
+			buffer_io_error(bh);
 		SetPageError(page);
 	}
 
