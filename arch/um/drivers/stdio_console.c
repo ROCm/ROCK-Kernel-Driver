@@ -203,7 +203,7 @@ static void console_write(struct console *console, const char *string,
 		up(&line->sem);
 }
 
-static struct tty_driver *console_device(struct console *c, int *index)
+static struct tty_driver *um_console_device(struct console *c, int *index)
 {
 	*index = c->index;
 	return console_driver;
@@ -217,7 +217,7 @@ static int console_setup(struct console *co, char *options)
 static struct console stdiocons = {
 	name:		"tty",
 	write:		console_write,
-	device:		console_device,
+	device:		um_console_device,
 	setup:		console_setup,
 	flags:		CON_PRINTBUFFER,
 	index:		-1,
