@@ -289,7 +289,8 @@ static int do_umount(struct vfsmount *mnt, int flags)
 	struct super_block * sb = mnt->mnt_sb;
 	int retval = 0;
 
-	if ((retval = security_sb_umount(mnt, flags)))
+	retval = security_sb_umount(mnt, flags);
+	if (retval)
 		return retval;
 
 	/*
@@ -470,7 +471,8 @@ static int graft_tree(struct vfsmount *mnt, struct nameidata *nd)
 	if (IS_DEADDIR(nd->dentry->d_inode))
 		goto out_unlock;
 
-	if ((err = security_sb_check_sb(mnt, nd)))
+	err = security_sb_check_sb(mnt, nd);
+	if (err)
 		goto out_unlock;
 
 	spin_lock(&dcache_lock);
@@ -740,7 +742,8 @@ long do_mount(char * dev_name, char * dir_name, char *type_page,
 	if (retval)
 		return retval;
 
-	if ((retval = security_sb_mount(dev_name, &nd, type_page, flags, data_page)))
+	retval = security_sb_mount(dev_name, &nd, type_page, flags, data_page);
+	if (retval)
 		goto dput_out;
 
 	if (flags & MS_REMOUNT)
@@ -985,7 +988,8 @@ asmlinkage long sys_pivot_root(const char *new_root, const char *put_old)
 	if (error)
 		goto out1;
 
-	if ((error = security_sb_pivotroot(&old_nd, &new_nd))) {
+	error = security_sb_pivotroot(&old_nd, &new_nd);
+	if (error) {
 		path_release(&old_nd);
 		goto out1;
 	}
