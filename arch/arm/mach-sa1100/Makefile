@@ -26,8 +26,8 @@ obj-$(CONFIG_SA1100_PT_SYSTEM3)		+= cpu-sa1110.o
 endif
 
 # Next, the SA1111 stuff.
-obj-$(CONFIG_SA1111)		+= sa1111.o
-obj-$(CONFIG_USB_OHCI_SA1111)	+= sa1111-pcibuf.o pcipool.o
+obj-$(CONFIG_SA1111)			+= sa1111.o
+obj-$(CONFIG_USB_OHCI_HCD)		+= sa1111-pcibuf.o pcipool.o
 
 # Specific board support
 obj-$(CONFIG_SA1100_ADSBITSY)		+= adsbitsy.o
