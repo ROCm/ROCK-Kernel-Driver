@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC79xx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#157 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#159 $
  *
  * --------------------------------------------------------------------------
  * Copyright (c) 1994-2000 Justin T. Gibbs.
@@ -1292,6 +1292,7 @@ ahd_linux_abort(Scsi_Cmnd *cmd)
 	u_int  last_phase;
 	u_int  cdb_byte;
 	int    retval;
+	int    was_paused;
 	int    paused;
 	int    wait;
 	int    disconnected;
@@ -1394,6 +1395,7 @@ ahd_linux_abort(Scsi_Cmnd *cmd)
 	 * didn't "just" miss an interrupt that would
 	 * affect this cmd.
 	 */
+	was_paused = ahd_is_paused(ahd);
 	ahd_pause_and_flushwork(ahd);
 	paused = TRUE;
 
@@ -1404,11 +1406,13 @@ ahd_linux_abort(Scsi_Cmnd *cmd)
 		goto no_cmd;
 	}
 
+	printf("%s: At time of recovery, card was %spaused\n",
+	       was_paused ? "" : "not ");
 	ahd_dump_card_state(ahd);
 
 	disconnected = TRUE;
 	if (ahd_search_qinfifo(ahd, cmd->device->id, cmd->device->channel + 'A',
-			       cmd->device->lun, pending_scb->hscb->tag,
+			       cmd->device->lun, SCB_GET_TAG(pending_scb),
 			       ROLE_INITIATOR, CAM_REQ_ABORTED,
 			       SEARCH_COMPLETE) > 0) {
 		printf("%s:%d:%d:%d: Cmd aborted from QINFIFO\n",
@@ -1437,7 +1441,7 @@ ahd_linux_abort(Scsi_Cmnd *cmd)
 	 * bus or is in the disconnected state.
 	 */
 	if (last_phase != P_BUSFREE
-	 && pending_scb->hscb->tag == active_scbptr) {
+	 && SCB_GET_TAG(pending_scb) == active_scbptr) {
 
 		/*
 		 * We're active on the bus, so assert ATN
@@ -1458,7 +1462,7 @@ ahd_linux_abort(Scsi_Cmnd *cmd)
 		 * to select the device before it reconnects.
 		 */
 		pending_scb->flags |= SCB_RECOVERY_SCB|SCB_ABORT;
-		ahd_set_scbptr(ahd, pending_scb->hscb->tag);
+		ahd_set_scbptr(ahd, SCB_GET_TAG(pending_scb));
 		pending_scb->hscb->cdb_len = 0;
 		pending_scb->hscb->task_attribute = 0;
 		pending_scb->hscb->task_management = SIU_TASKMGMT_ABORT_TASK;
@@ -4448,13 +4452,12 @@ ahd_done(struct ahd_softc *ahd, struct scb *scb)
 	Scsi_Cmnd *cmd;
 	struct	  ahd_linux_device *dev;
 
-	LIST_REMOVE(scb, pending_links);
-
 	if ((scb->flags & SCB_ACTIVE) == 0) {
-		printf("SCB %d done'd twice\n", scb->hscb->tag);
+		printf("SCB %d done'd twice\n", SCB_GET_TAG(scb));
 		ahd_dump_card_state(ahd);
 		panic("Stopping for safety");
 	}
+	LIST_REMOVE(scb, pending_links);
 	cmd = scb->io_ctx;
 	dev = scb->platform_data->dev;
 	dev->active--;

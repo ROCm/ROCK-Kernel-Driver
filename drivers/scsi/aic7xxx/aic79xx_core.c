@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#189 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#190 $
  *
  * $FreeBSD$
  */
@@ -1052,7 +1052,7 @@ ahd_handle_seqint(struct ahd_softc *ahd, u_int intstat)
 
 			switch (scb->hscb->task_management) {
 			case SIU_TASKMGMT_ABORT_TASK:
-				tag = scb->hscb->tag;
+				tag = SCB_GET_TAG(scb);
 			case SIU_TASKMGMT_ABORT_TASK_SET:
 			case SIU_TASKMGMT_CLEAR_TASK_SET:
 				lun = scb->hscb->lun;
@@ -1116,7 +1116,7 @@ ahd_handle_seqint(struct ahd_softc *ahd, u_int intstat)
 			ahd_outb(ahd, SCB_TASK_MANAGEMENT, 0);
 			ahd_search_qinfifo(ahd, SCB_GET_TARGET(ahd, scb),
 					   SCB_GET_CHANNEL(ahd, scb),  
-					   SCB_GET_LUN(scb), scb->hscb->tag, 
+					   SCB_GET_LUN(scb), SCB_GET_TAG(scb), 
 					   ROLE_INITIATOR, /*status*/0,   
 					   SEARCH_REMOVE);
 		}
@@ -5517,7 +5517,7 @@ ahd_free_scb(struct ahd_softc *ahd, struct scb *scb)
 	/* Clean up for the next user */
 	scb->flags = SCB_FLAG_NONE;
 	scb->hscb->control = 0;
-	ahd->scb_data.scbindex[scb->hscb->tag] = NULL;
+	ahd->scb_data.scbindex[SCB_GET_TAG(scb)] = NULL;
 
 	if (scb->col_scb == NULL) {
 
@@ -5930,7 +5930,7 @@ ahd_init(struct ahd_softc *ahd)
 	 * specially from the DMA safe memory chunk used for the QOUTFIFO.
 	 */
 	ahd->next_queued_hscb = (struct hardware_scb *)next_vaddr;
-	ahd->next_queued_hscb->hscb_busaddr = next_baddr;
+	ahd->next_queued_hscb->hscb_busaddr = ahd_htole32(next_baddr);
 
 	ahd->init_level++;
 
