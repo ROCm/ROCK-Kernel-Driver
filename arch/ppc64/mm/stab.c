@@ -20,51 +20,26 @@
 #include <asm/naca.h>
 #include <asm/cputable.h>
 
-static int make_ste(unsigned long stab, unsigned long esid,
-		    unsigned long vsid);
-
-void slb_initialize(void);
-
-/*
- * Build an entry for the base kernel segment and put it into
- * the segment table or SLB.  All other segment table or SLB
- * entries are faulted in.
- */
-void stab_initialize(unsigned long stab)
-{
-	unsigned long vsid = get_kernel_vsid(KERNELBASE);
-
-	if (cur_cpu_spec->cpu_features & CPU_FTR_SLB) {
-		slb_initialize();
-	} else {
-		asm volatile("isync; slbia; isync":::"memory");
-		make_ste(stab, GET_ESID(KERNELBASE), vsid);
-
-		/* Order update */
-		asm volatile("sync":::"memory");
-	}
-}
-
 /* Both the segment table and SLB code uses the following cache */
 #define NR_STAB_CACHE_ENTRIES 8
 DEFINE_PER_CPU(long, stab_cache_ptr);
 DEFINE_PER_CPU(long, stab_cache[NR_STAB_CACHE_ENTRIES]);
 
 /*
- * Segment table stuff
- */
-
-/*
  * Create a segment table entry for the given esid/vsid pair.
  */
 static int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid)
 {
+	unsigned long esid_data, vsid_data;
 	unsigned long entry, group, old_esid, castout_entry, i;
 	unsigned int global_entry;
 	struct stab_entry *ste, *castout_ste;
-	unsigned long kernel_segment = (REGION_ID(esid << SID_SHIFT) !=
-					USER_REGION_ID);
-	unsigned long esid_data;
+	unsigned long kernel_segment = (esid << SID_SHIFT) >= KERNELBASE;
+
+	vsid_data = vsid << STE_VSID_SHIFT;
+	esid_data = esid << SID_SHIFT | STE_ESID_KP | STE_ESID_V;
+	if (! kernel_segment)
+		esid_data |= STE_ESID_KS;
 
 	/* Search the primary group first. */
 	global_entry = (esid & 0x1f) << 3;
@@ -74,12 +49,8 @@ static int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid)
 	for (group = 0; group < 2; group++) {
 		for (entry = 0; entry < 8; entry++, ste++) {
 			if (!(ste->esid_data & STE_ESID_V)) {
-				ste->vsid_data = vsid << STE_VSID_SHIFT;
+				ste->vsid_data = vsid_data;
 				asm volatile("eieio":::"memory");
-				esid_data = esid << SID_SHIFT;
-				esid_data |= STE_ESID_KP | STE_ESID_V;
-				if (! kernel_segment)
-					esid_data |= STE_ESID_KS;
 				ste->esid_data = esid_data;
 				return (global_entry | entry);
 			}
@@ -124,14 +95,8 @@ static int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid)
 
 	asm volatile("sync" : : : "memory");    /* Order update */
 
-	castout_ste->vsid_data = vsid << STE_VSID_SHIFT;
-
+	castout_ste->vsid_data = vsid_data;
 	asm volatile("eieio" : : : "memory");   /* Order update */
-
-	esid_data = esid << SID_SHIFT;
-	esid_data |= STE_ESID_KP | STE_ESID_V;
-	if (!kernel_segment)
-		esid_data |= STE_ESID_KS;
 	castout_ste->esid_data = esid_data;
 
 	asm volatile("slbie  %0" : : "r" (old_esid << SID_SHIFT));
@@ -145,11 +110,10 @@ static inline void __ste_allocate(unsigned long esid, unsigned long vsid)
 {
 	unsigned char stab_entry;
 	unsigned long offset;
-	int region_id = REGION_ID(esid << SID_SHIFT);
 
 	stab_entry = make_ste(get_paca()->stab_addr, esid, vsid);
 
-	if (region_id != USER_REGION_ID)
+	if ((esid << SID_SHIFT) >= KERNELBASE)
 		return;
 
 	offset = __get_cpu_var(stab_cache_ptr);
@@ -165,27 +129,23 @@ static inline void __ste_allocate(unsigned long esid, unsigned long vsid)
  */
 int ste_allocate(unsigned long ea)
 {
-	unsigned long vsid, esid;
-	mm_context_t context;
+	unsigned long vsid;
 
 	/* Check for invalid effective addresses. */
 	if (!IS_VALID_EA(ea))
 		return 1;
 
 	/* Kernel or user address? */
-	if (REGION_ID(ea) >= KERNEL_REGION_ID) {
+	if (ea >= KERNELBASE) {
 		vsid = get_kernel_vsid(ea);
-		context = KERNEL_CONTEXT(ea);
 	} else {
 		if (!current->mm)
 			return 1;
 
-		context = current->mm->context;
-		vsid = get_vsid(context.id, ea);
+		vsid = get_vsid(current->mm->context.id, ea);
 	}
 
-	esid = GET_ESID(ea);
-	__ste_allocate(esid, vsid);
+	__ste_allocate(GET_ESID(ea), vsid);
 	/* Order update */
 	asm volatile("sync":::"memory");
 
@@ -200,9 +160,6 @@ static void preload_stab(struct task_struct *tsk, struct mm_struct *mm)
 	unsigned long pc = KSTK_EIP(tsk);
 	unsigned long stack = KSTK_ESP(tsk);
 	unsigned long unmapped_base;
-	unsigned long pc_esid = GET_ESID(pc);
-	unsigned long stack_esid = GET_ESID(stack);
-	unsigned long unmapped_base_esid;
 	unsigned long vsid;
 
 	if (test_tsk_thread_flag(tsk, TIF_32BIT))
@@ -210,29 +167,27 @@ static void preload_stab(struct task_struct *tsk, struct mm_struct *mm)
 	else
 		unmapped_base = TASK_UNMAPPED_BASE_USER64;
 
-	unmapped_base_esid = GET_ESID(unmapped_base);
-
-	if (!IS_VALID_EA(pc) || (REGION_ID(pc) >= KERNEL_REGION_ID))
+	if (!IS_VALID_EA(pc) || (pc >= KERNELBASE))
 		return;
 	vsid = get_vsid(mm->context.id, pc);
-	__ste_allocate(pc_esid, vsid);
+	__ste_allocate(GET_ESID(pc), vsid);
 
-	if (pc_esid == stack_esid)
+	if (GET_ESID(pc) == GET_ESID(stack))
 		return;
 
-	if (!IS_VALID_EA(stack) || (REGION_ID(stack) >= KERNEL_REGION_ID))
+	if (!IS_VALID_EA(stack) || (stack >= KERNELBASE))
 		return;
 	vsid = get_vsid(mm->context.id, stack);
-	__ste_allocate(stack_esid, vsid);
+	__ste_allocate(GET_ESID(stack), vsid);
 
-	if (pc_esid == unmapped_base_esid || stack_esid == unmapped_base_esid)
+	if ((GET_ESID(pc) == GET_ESID(unmapped_base))
+	    || (GET_ESID(stack) == GET_ESID(unmapped_base)))
 		return;
 
-	if (!IS_VALID_EA(unmapped_base) ||
-	    (REGION_ID(unmapped_base) >= KERNEL_REGION_ID))
+	if (!IS_VALID_EA(unmapped_base) || (unmapped_base >= KERNELBASE))
 		return;
 	vsid = get_vsid(mm->context.id, unmapped_base);
-	__ste_allocate(unmapped_base_esid, vsid);
+	__ste_allocate(GET_ESID(unmapped_base), vsid);
 
 	/* Order update */
 	asm volatile("sync" : : : "memory");
@@ -279,4 +234,26 @@ void flush_stab(struct task_struct *tsk, struct mm_struct *mm)
 	__get_cpu_var(stab_cache_ptr) = 0;
 
 	preload_stab(tsk, mm);
+}
+
+extern void slb_initialize(void);
+
+/*
+ * Build an entry for the base kernel segment and put it into
+ * the segment table or SLB.  All other segment table or SLB
+ * entries are faulted in.
+ */
+void stab_initialize(unsigned long stab)
+{
+	unsigned long vsid = get_kernel_vsid(KERNELBASE);
+
+	if (cur_cpu_spec->cpu_features & CPU_FTR_SLB) {
+		slb_initialize();
+	} else {
+		asm volatile("isync; slbia; isync":::"memory");
+		make_ste(stab, GET_ESID(KERNELBASE), vsid);
+
+		/* Order update */
+		asm volatile("sync":::"memory");
+	}
 }
