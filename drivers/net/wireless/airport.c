@@ -275,14 +275,10 @@ init_airport(void)
 
 	printk(KERN_DEBUG "%s\n", version);
 
-	MOD_INC_USE_COUNT;
-
 	/* Lookup card in device tree */
 	airport_node = find_devices("radio");
 	if (airport_node && !strcmp(airport_node->parent->name, "mac-io"))
 		airport_dev = airport_attach(airport_node);
-
-	MOD_DEC_USE_COUNT;
 
 	return airport_dev ? 0 : -ENODEV;
 }
