@@ -77,10 +77,6 @@
 
 #define BOND_DEFAULT_MAX_BONDS  1   /* Default maximum number of devices to support */
 
-#define BOND_MULTICAST_DISABLED 0
-#define BOND_MULTICAST_ACTIVE   1
-#define BOND_MULTICAST_ALL      2
-
 typedef struct ifbond {
 	__s32 bond_mode;
 	__s32 num_slaves;

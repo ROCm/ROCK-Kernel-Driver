@@ -537,16 +537,6 @@ static struct bond_parm_tbl bond_mode_tbl[] = {
 {	NULL,			-1},
 };
 
-static int multicast_mode	= BOND_MULTICAST_ALL;
-static char *multicast		= NULL;
-
-static struct bond_parm_tbl bond_mc_tbl[] = {
-{	"disabled",		BOND_MULTICAST_DISABLED},
-{	"active",		BOND_MULTICAST_ACTIVE},
-{	"all",			BOND_MULTICAST_ALL},
-{	NULL,			-1},
-};
-
 static int lacp_fast		= 0;
 static char *lacp_rate		= NULL;
 
@@ -579,8 +569,6 @@ MODULE_PARM(downdelay, "i");
 MODULE_PARM_DESC(downdelay, "Delay before considering link down, in milliseconds");
 MODULE_PARM(primary, "s");
 MODULE_PARM_DESC(primary, "Primary network device to use");
-MODULE_PARM(multicast, "s");
-MODULE_PARM_DESC(multicast, "Mode for multicast support : 0 for none, 1 for active slave, 2 for all slaves (default)");
 MODULE_PARM(lacp_rate, "s");
 MODULE_PARM_DESC(lacp_rate, "LACPDU tx rate to request from 802.3ad partner (slow/fast)");
 
@@ -640,21 +628,6 @@ bond_mode_name(void)
 	case BOND_MODE_ALB:
 		return "adaptive load balancing";
 	default:
-		return "unknown";
-	}
-}
-
-static const char *
-multicast_mode_name(void)
-{
-	switch(multicast_mode) {
-	case BOND_MULTICAST_DISABLED :
-		return "disabled";
-	case BOND_MULTICAST_ACTIVE :
-		return "active slave only";
-	case BOND_MULTICAST_ALL :
-		return "all slaves";
-	default :
 		return "unknown";
 	}
 }
@@ -1080,44 +1053,36 @@ static void bond_mc_list_destroy(struct bonding *bond)
 }
 
 /*
- * Add a Multicast address to every slave in the bonding group
+ * Add a Multicast address to slaves
+ * according to mode
  */
 static void bond_mc_add(struct bonding *bond, void *addr, int alen)
 { 
-	struct slave *slave;
-	switch (multicast_mode) {
-	case BOND_MULTICAST_ACTIVE :
+	if (USES_PRIMARY(bond_mode)) {
 		/* write lock already acquired */
 		if (bond->current_slave != NULL)
 			dev_mc_add(bond->current_slave->dev, addr, alen, 0);
-		break;
-	case BOND_MULTICAST_ALL :
+	} else { 
+		struct slave *slave;
 		for (slave = bond->prev; slave != (struct slave *)bond; slave = slave->prev)
 			dev_mc_add(slave->dev, addr, alen, 0);
-		break;
-	case BOND_MULTICAST_DISABLED :
-		break;
 	}
 } 
 
 /*
- * Remove a multicast address from every slave in the bonding group
+ * Remove a multicast address from slave
+ * according to mode
  */
 static void bond_mc_delete(struct bonding *bond, void *addr, int alen)
 { 
-	struct slave *slave; 
-	switch (multicast_mode) {
-	case BOND_MULTICAST_ACTIVE :
+	if (USES_PRIMARY(bond_mode)) {
 		/* write lock already acquired */
 		if (bond->current_slave != NULL)
 			dev_mc_delete(bond->current_slave->dev, addr, alen, 0);
-		break;
-	case BOND_MULTICAST_ALL :
+	} else { 
+		struct slave *slave;
 		for (slave = bond->prev; slave != (struct slave *)bond; slave = slave->prev)
 			dev_mc_delete(slave->dev, addr, alen, 0);
-		break;
-	case BOND_MULTICAST_DISABLED :
-		break;
 	}
 } 
 
@@ -1161,14 +1126,14 @@ static inline int dmi_same(struct dev_mc_list *dmi1, struct dev_mc_list *dmi2)
  */
 static void bond_set_promiscuity(struct bonding *bond, int inc)
 { 
-	struct slave *slave; 
-
 	if (USES_PRIMARY(bond_mode)) {
+		/* write lock already acquired */
 		if (bond->current_slave) {
 			dev_set_promiscuity(bond->current_slave->dev, inc);
 		}
 
 	} else { 
+		struct slave *slave; 
 		for (slave = bond->prev; slave != (struct slave *)bond;
 		     slave = slave->prev) {
 			dev_set_promiscuity(slave->dev, inc);
@@ -1181,19 +1146,14 @@ static void bond_set_promiscuity(struct bonding *bond, int inc)
  */
 static void bond_set_allmulti(struct bonding *bond, int inc)
 { 
-	struct slave *slave; 
-	switch (multicast_mode) {
-	case BOND_MULTICAST_ACTIVE : 
+	if (USES_PRIMARY(bond_mode)) {
 		/* write lock already acquired */
 		if (bond->current_slave != NULL)
 			dev_set_allmulti(bond->current_slave->dev, inc);
-		break;
-	case BOND_MULTICAST_ALL :
+	} else { 
+		struct slave *slave; 
 		for (slave = bond->prev; slave != (struct slave *)bond; slave = slave->prev)
 			dev_set_allmulti(slave->dev, inc);
-		break;
-	case BOND_MULTICAST_DISABLED :
-		break;
 	}
 } 
 
@@ -1228,12 +1188,6 @@ static void set_multicast_list(struct net_device *master)
 
 	if ( !(master->flags & IFF_PROMISC) && (bond->flags & IFF_PROMISC) ) 
 		bond_set_promiscuity(bond, -1); 
-
-	if (multicast_mode == BOND_MULTICAST_DISABLED) {
-		bond->flags = master->flags;
-		write_unlock_bh(&bond->lock);
-		return;
-	}
 
 	/* set allmulti flag to slaves */ 
 	if ( (master->flags & IFF_ALLMULTI) && !(bond->flags & IFF_ALLMULTI) ) 
@@ -1273,39 +1227,35 @@ static void bond_mc_update(struct bonding *bond, struct slave *new, struct slave
 {
 	struct dev_mc_list *dmi;
 
-	if (USES_PRIMARY(bond_mode)) {
+	if (!USES_PRIMARY(bond_mode)) {
+		/* nothing to do -  mc list is already up-to-date on 
+		 * all slaves
+		 */
+		return;
+	}
+
+	if (old) {
 		if (bond->device->flags & IFF_PROMISC) {
-			if (old)
-				dev_set_promiscuity(old->dev, -1);
-			if (new)
-				dev_set_promiscuity(new->dev, 1);
+			dev_set_promiscuity(old->dev, -1);
+		}
+		if (bond->device->flags & IFF_ALLMULTI) {
+			dev_set_allmulti(old->dev, -1);
+		}
+		for (dmi = bond->device->mc_list; dmi != NULL; dmi = dmi->next) {
+			dev_mc_delete(old->dev, dmi->dmi_addr, dmi->dmi_addrlen, 0);
 		}
 	}
 
-	switch(multicast_mode) {
-	case BOND_MULTICAST_ACTIVE :		
+	if (new) {
+		if (bond->device->flags & IFF_PROMISC) {
+			dev_set_promiscuity(new->dev, 1);
+		}
 		if (bond->device->flags & IFF_ALLMULTI) {
-			if (old)
-				dev_set_allmulti(old->dev, -1);
-			if (new)
-				dev_set_allmulti(new->dev, 1);
+			dev_set_allmulti(new->dev, 1);
 		}
-		/* first remove all mc addresses from old slave if any,
-		   and _then_ add them to new active slave */
-		if (old) {
-			for (dmi = bond->device->mc_list; dmi != NULL; dmi = dmi->next)
-				dev_mc_delete(old->dev, dmi->dmi_addr, dmi->dmi_addrlen, 0);
+		for (dmi = bond->device->mc_list; dmi != NULL; dmi = dmi->next) {
+			dev_mc_add(new->dev, dmi->dmi_addr, dmi->dmi_addrlen, 0);
 		}
-		if (new) {
-			for (dmi = bond->device->mc_list; dmi != NULL; dmi = dmi->next)
-				dev_mc_add(new->dev, dmi->dmi_addr, dmi->dmi_addrlen, 0);
-		}
-		break;
-	case BOND_MULTICAST_ALL :
-		/* nothing to do: mc list is already up-to-date on all slaves */
-		break;
-	case BOND_MULTICAST_DISABLED :
-		break;
 	}
 }
 
@@ -1444,19 +1394,16 @@ static int bond_enslave(struct net_device *master_dev,
 		}
 	}
 
-	/* set promiscuity level to new slave */ 
-	if (master_dev->flags & IFF_PROMISC) {
-		/* If the mode USES_PRIMARY, then the new slave gets the
-		 * master's promisc (and mc) settings only if it becomes the
-		 * current_slave, and that is taken care of later when calling
-		 * bond_change_active()
-		 */
-		if (!USES_PRIMARY(bond_mode)) {
+	/* If the mode USES_PRIMARY, then the new slave gets the
+	 * master's promisc (and mc) settings only if it becomes the
+	 * current_slave, and that is taken care of later when calling
+	 * bond_change_active()
+	 */
+	if (!USES_PRIMARY(bond_mode)) {
+		/* set promiscuity level to new slave */ 
+		if (master_dev->flags & IFF_PROMISC) {
 			dev_set_promiscuity(slave_dev, 1); 
 		}
-	}
- 
-	if (multicast_mode == BOND_MULTICAST_ALL) {
 		/* set allmulti level to new slave */
 		if (master_dev->flags & IFF_ALLMULTI) 
 			dev_set_allmulti(slave_dev, 1); 
@@ -2006,25 +1953,21 @@ static int bond_release(struct net_device *master, struct net_device *slave)
 		return -EINVAL;
 	}
 
-	/* unset promiscuity level from slave */
-	if (master->flags & IFF_PROMISC) {
-		/* If the mode USES_PRIMARY, then we should only remove its
-		 * promisc settings if it was the current_slave, but that was
-		 * already taken care of above when we detached the slave
-		 */
-		if (!USES_PRIMARY(bond_mode)) {
+	/* If the mode USES_PRIMARY, then we should only remove its
+	 * promisc and mc settings if it was the current_slave, but that was
+	 * already taken care of above when we detached the slave
+	 */
+	if (!USES_PRIMARY(bond_mode)) {
+		/* unset promiscuity level from slave */
+		if (master->flags & IFF_PROMISC) {
 			dev_set_promiscuity(slave, -1); 
 		}
-	}
-
-	/* undo settings and restore original values */
-	if (multicast_mode == BOND_MULTICAST_ALL) {
-		/* flush master's mc_list from slave */ 
-		bond_mc_list_flush (slave, master); 
-
 		/* unset allmulti level from slave */ 
 		if (master->flags & IFF_ALLMULTI)
 			dev_set_allmulti(slave, -1); 
+
+		/* flush master's mc_list from slave */ 
+		bond_mc_list_flush (slave, master); 
 	}
 
 	netdev_set_master(slave, NULL);
@@ -2107,20 +2050,21 @@ static int bond_release_all(struct net_device *master)
 		 */
 		write_unlock_bh(&bond->lock);
 
-		/* unset promiscuity level from slave */
-		if (master->flags & IFF_PROMISC) {
-			if (!USES_PRIMARY(bond_mode)) {
+		/* If the mode USES_PRIMARY, then we should only remove its
+		 * promisc and mc settings if it was the current_slave, but that was
+		 * already taken care of above when we detached the slave
+		 */
+		if (!USES_PRIMARY(bond_mode)) {
+			/* unset promiscuity level from slave */
+			if (master->flags & IFF_PROMISC) {
 				dev_set_promiscuity(slave_dev, -1); 
 			}
-		}
-
-		if (multicast_mode == BOND_MULTICAST_ALL) {
-			/* flush master's mc_list from slave */ 
-			bond_mc_list_flush (slave_dev, master); 
-
 			/* unset allmulti level from slave */ 
 			if (master->flags & IFF_ALLMULTI)
-				dev_set_allmulti(slave_dev, -1); 
+				dev_set_allmulti(slave_dev, -1);
+
+			/* flush master's mc_list from slave */ 
+			bond_mc_list_flush (slave_dev, master); 
 		}
 
 		netdev_set_master(slave_dev, NULL);
@@ -3343,7 +3287,6 @@ static void bond_info_show_master(struct seq_file *seq, struct bonding *bond)
 	seq_printf(seq, "MII Polling Interval (ms): %d\n", miimon);
 	seq_printf(seq, "Up Delay (ms): %d\n", updelay * miimon);
 	seq_printf(seq, "Down Delay (ms): %d\n", downdelay * miimon);
-	seq_printf(seq, "Multicast Mode: %s\n", multicast_mode_name());
 
 	if (bond_mode == BOND_MODE_8023AD) {
 		struct ad_info ad_info;
@@ -3942,22 +3885,6 @@ static int bond_check_params(void)
 		}
 	}
 
-	if (USES_PRIMARY(bond_mode)) {
-		multicast_mode = BOND_MULTICAST_ACTIVE;
-	} else {
-		multicast_mode = BOND_MULTICAST_ALL;
-	}
-
-	if (multicast) {
-		multicast_mode = bond_parse_parm(multicast, bond_mc_tbl);
-		if (multicast_mode == -1) {
-			printk(KERN_ERR DRV_NAME
-			       ": Error: Invalid multicast mode \"%s\"\n",
-			       multicast == NULL ? "NULL" : multicast);
-			return -EINVAL;
-		}
-	}
-
 	if (lacp_rate) {
 		if (bond_mode != BOND_MODE_8023AD) {
 			printk(KERN_INFO DRV_NAME
@@ -4026,14 +3953,6 @@ static int bond_check_params(void)
 			printk(KERN_WARNING "Forcing miimon to 100msec\n");
 			miimon = 100;
 		}
-
-		if (multicast_mode != BOND_MULTICAST_ALL) {
-			printk(KERN_WARNING DRV_NAME
-			       ": Warning: Multicast mode must be set to ALL "
-			       "for 802.3ad\n");
-			printk(KERN_WARNING "Forcing Multicast mode to ALL\n");
-			multicast_mode = BOND_MULTICAST_ALL;
-		}
 	}
 
 	/* reset values for TLB/ALB */
@@ -4047,15 +3966,6 @@ static int bond_check_params(void)
 			       "for TLB/ALB load balancing\n");
 			printk(KERN_WARNING "Forcing miimon to 100msec\n");
 			miimon = 100;
-		}
-
-		if (multicast_mode != BOND_MULTICAST_ACTIVE) {
-			printk(KERN_WARNING DRV_NAME
-			       ": Warning: Multicast mode must be set to "
-			       "ACTIVE for TLB/ALB\n");
-			printk(KERN_WARNING "Forcing Multicast mode to "
-			       "ACTIVE\n");
-			multicast_mode = BOND_MULTICAST_ACTIVE;
 		}
 	}
 

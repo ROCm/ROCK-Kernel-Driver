@@ -368,20 +368,6 @@ mode
 		fails it's hw address is swapped with the new current_slave
 		that was chosen.
 
-multicast
-
-        Option specifying the mode of operation for multicast support.
-        Possible values are:
-
-	disabled or 0
-		Disabled (no multicast support)
-
-        active or 1
-		Enabled on active slave only, useful in active-backup mode
-
-	all or 2
-		Enabled on all slaves, this is the default
-
 primary
 
         A string (eth0, eth2, etc) to equate to a primary device. If this
