@@ -473,6 +473,25 @@ extern void * nfs_root_data(void);
 #define NFS_JUKEBOX_RETRY_TIME (5 * HZ)
 
 #ifdef CONFIG_NFS_V4
+struct nfs4_client {
+        atomic_t                cl_count;       /* refcount */
+        u64                     cl_clientid;    /* constant */
+	 nfs4_verifier           cl_confirm;     
+
+        /*
+         * Starts a list of lockowners, linked through lo_list.
+	 */
+        struct list_head        cl_lockowners;  /* protected by state_spinlock */
+};
+
+/* nfs4proc.c */
+extern int nfs4_proc_renew(struct nfs_server *server);
+
+/* nfs4renewd.c */
+extern int nfs4_init_renewd(struct nfs_server *server);
+#endif /* CONFIG_NFS_V4 */
+
+#ifdef CONFIG_NFS_V4
 
 extern struct nfs4_client *nfs4_get_client(void);
 extern void nfs4_put_client(struct nfs4_client *clp);

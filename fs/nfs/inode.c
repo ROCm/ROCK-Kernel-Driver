@@ -77,8 +77,13 @@ static struct rpc_version *	nfs_version[] = {
 	NULL,
 	NULL,
 	&nfs_version2,
-#ifdef CONFIG_NFS_V3
+#if defined(CONFIG_NFS_V3)
 	&nfs_version3,
+#elif defined(CONFIG_NFS_V4)
+	NULL,
+#endif
+#if defined(CONFIG_NFS_V4)
+	&nfs_version4,
 #endif
 };
 
