@@ -626,7 +626,7 @@ struct quota_info {
 	struct semaphore dqoff_sem;		/* serialize quota_off() and quota_on() on device */
 	struct file *files[MAXQUOTAS];		/* fp's to quotafiles */
 	struct mem_dqinfo info[MAXQUOTAS];	/* Information for each quota type */
-	struct quota_format_ops *ops[MAXQUOTAS];	/* Operations for each format */
+	struct quota_format_ops *ops[MAXQUOTAS];	/* Operations for each type */
 };
 
 /*
@@ -659,6 +659,7 @@ struct super_block {
 	struct file_system_type	*s_type;
 	struct super_operations	*s_op;
 	struct dquot_operations	*dq_op;
+ 	struct quotactl_ops	*s_qcop;
 	struct export_operations *s_export_op;
 	unsigned long		s_flags;
 	unsigned long		s_magic;
@@ -877,16 +878,6 @@ static inline void mark_inode_dirty_sync(struct inode *inode)
 {
 	__mark_inode_dirty(inode, I_DIRTY_SYNC);
 }
-
-struct dquot_operations {
-	void (*initialize) (struct inode *, short);
-	void (*drop) (struct inode *);
-	int (*alloc_space) (struct inode *, qsize_t, int);
-	int (*alloc_inode) (const struct inode *, unsigned long);
-	void (*free_space) (struct inode *, qsize_t);
-	void (*free_inode) (const struct inode *, unsigned long);
-	int (*transfer) (struct inode *, struct iattr *);
-};
 
 
 /**

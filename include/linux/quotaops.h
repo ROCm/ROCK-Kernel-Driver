@@ -20,10 +20,10 @@
 /*
  * declaration of quota_function calls in kernel.
  */
+extern int sync_dquots(kdev_t dev, short type);
+
 extern void dquot_initialize(struct inode *inode, short type);
 extern void dquot_drop(struct inode *inode);
-extern int  quota_off(struct super_block *sb, short type);
-extern int  sync_dquots(struct super_block *sb, short type);
 
 extern int  dquot_alloc_space(struct inode *inode, qsize_t number, int prealloc);
 extern int  dquot_alloc_inode(const struct inode *inode, unsigned long number);
@@ -36,7 +36,11 @@ extern int  dquot_transfer(struct inode *inode, struct iattr *iattr);
 /*
  * Operations supported for diskquotas.
  */
-#define sb_any_quota_enabled(sb) ((sb)->s_dquot.flags & (DQUOT_USR_ENABLED | DQUOT_GRP_ENABLED))
+extern struct dquot_operations dquot_operations;
+extern struct quotactl_ops vfs_quotactl_ops;
+
+#define sb_dquot_ops (&dquot_operations)
+#define sb_quotactl_ops (&vfs_quotactl_ops)
 
 static __inline__ void DQUOT_INIT(struct inode *inode)
 {
@@ -160,13 +164,25 @@ static __inline__ int DQUOT_TRANSFER(struct inode *inode, struct iattr *iattr)
 }
 
 #define DQUOT_SYNC(sb)	sync_dquots(sb, -1)
-#define DQUOT_OFF(sb)	quota_off(sb, -1)
+
+static __inline__ int DQUOT_OFF(struct super_block *sb)
+{
+	int ret = -ENOSYS;
+
+	lock_kernel();
+	if (sb->s_qcop && sb->s_qcop->quota_off)
+		ret = sb->s_qcop->quota_off(sb, -1);
+	unlock_kernel();
+	return ret;
+}
 
 #else
 
 /*
  * NO-OP when quota not configured.
  */
+#define sb_dquot_ops				(NULL)
+#define sb_quotactl_ops				(NULL)
 #define DQUOT_INIT(inode)			do { } while(0)
 #define DQUOT_DROP(inode)			do { } while(0)
 #define DQUOT_ALLOC_INODE(inode)		(0)

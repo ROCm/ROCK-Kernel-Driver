@@ -70,9 +70,6 @@ typedef __u64 qsize_t;          /* Type in which we store sizes */
 	"undefined", \
 };
 
-#define QUOTAFILENAME "quota"
-#define QUOTAGROUP "staff"
-
 /*
  * Command definitions for the 'quotactl' system call.
  * The commands are broken into a main command defined below
@@ -83,7 +80,61 @@ typedef __u64 qsize_t;          /* Type in which we store sizes */
 #define SUBCMDSHIFT 8
 #define QCMD(cmd, type)  (((cmd) << SUBCMDSHIFT) | ((type) & SUBCMDMASK))
 
-#define Q_SYNC     0x0600	/* sync disk copy of a filesystems quotas */
+#define Q_SYNC     0x800001	/* sync disk copy of a filesystems quotas */
+#define Q_QUOTAON  0x800002	/* turn quotas on */
+#define Q_QUOTAOFF 0x800003	/* turn quotas off */
+#define Q_GETFMT   0x800004	/* get quota format used on given filesystem */
+#define Q_GETINFO  0x800005	/* get information about quota files */
+#define Q_SETINFO  0x800006	/* set information about quota files */
+#define Q_GETQUOTA 0x800007	/* get user quota structure */
+#define Q_SETQUOTA 0x800008	/* set user quota structure */
+
+/*
+ * Quota structure used for communication with userspace via quotactl
+ * Following flags are used to specify which fields are valid
+ */
+#define QIF_BLIMITS	1
+#define QIF_SPACE	2
+#define QIF_ILIMITS	4
+#define QIF_INODES	8
+#define QIF_BTIME	16
+#define QIF_ITIME	32
+#define QIF_LIMITS	(QIF_BLIMITS | QIF_ILIMITS)
+#define QIF_USAGE	(QIF_SPACE | QIF_INODES)
+#define QIF_TIMES	(QIF_BTIME | QIF_ITIME)
+#define QIF_ALL		(QIF_LIMITS | QIF_USAGE | QIF_TIMES)
+
+struct if_dqblk {
+	__u64 dqb_bhardlimit;
+	__u64 dqb_bsoftlimit;
+	__u64 dqb_curspace;
+	__u64 dqb_ihardlimit;
+	__u64 dqb_isoftlimit;
+	__u64 dqb_curinodes;
+	__u64 dqb_btime;
+	__u64 dqb_itime;
+	__u32 dqb_valid;
+};
+
+/*
+ * Structure used for setting quota information about file via quotactl
+ * Following flags are used to specify which fields are valid
+ */
+#define IIF_BGRACE	1
+#define IIF_IGRACE	2
+#define IIF_FLAGS	4
+#define IIF_ALL		(IIF_BGRACE | IIF_IGRACE | IIF_FLAGS)
+
+struct if_dqinfo {
+	__u64 dqi_bgrace;
+	__u64 dqi_igrace;
+	__u32 dqi_flags;
+	__u32 dqi_valid;
+};
+
+#ifdef __KERNEL__
+
+#include <linux/xqm.h>
 
 /*
  * Data for one user/group kept in memory
@@ -105,15 +156,13 @@ struct mem_dqblk {
 struct quota_format_type;
 
 struct mem_dqinfo {
-	struct quota_format_type * dqi_format;
+	struct quota_format_type *dqi_format;
 	int dqi_flags;
 	unsigned int dqi_bgrace;
 	unsigned int dqi_igrace;
 	union {
 	} u;
 };
-
-#ifdef __KERNEL__
 
 #define DQF_MASK 0xffff		/* Mask for format specific flags */
 #define DQF_INFO_DIRTY 0x10000  /* Is info dirty? */
@@ -126,24 +175,6 @@ extern inline void mark_info_dirty(struct mem_dqinfo *info)
 #define info_dirty(info) ((info)->dqi_flags & DQF_INFO_DIRTY)
 
 #define sb_dqopt(sb) (&(sb)->s_dquot)
-
-#endif  /* __KERNEL__ */
-
-/*
- * Shorthand notation.
- */
-#define	dq_bhardlimit	dq_dqb.dqb_bhardlimit
-#define	dq_bsoftlimit	dq_dqb.dqb_bsoftlimit
-#define	dq_curspace	dq_dqb.dqb_curspace
-#define	dq_ihardlimit	dq_dqb.dqb_ihardlimit
-#define	dq_isoftlimit	dq_dqb.dqb_isoftlimit
-#define	dq_curinodes	dq_dqb.dqb_curinodes
-#define	dq_btime	dq_dqb.dqb_btime
-#define	dq_itime	dq_dqb.dqb_itime
-
-#define dqoff(UID)      ((loff_t)((UID) * sizeof (struct dqblk)))
-
-#ifdef __KERNEL__
 
 extern int nr_dquots, nr_free_dquots;
 
@@ -203,25 +234,70 @@ extern inline void mark_dquot_dirty(struct dquot *dquot)
 /* Operations which must be implemented by each quota format */
 struct quota_format_ops {
 	int (*check_quota_file)(struct super_block *sb, int type);	/* Detect whether file is in our format */
-	int (*read_file_info)(struct super_block *sb, int type);	/* Read main info about file */
+	int (*read_file_info)(struct super_block *sb, int type);	/* Read main info about file - called on quotaon() */
 	int (*write_file_info)(struct super_block *sb, int type);	/* Write main info about file */
 	int (*free_file_info)(struct super_block *sb, int type);	/* Called on quotaoff() */
 	int (*read_dqblk)(struct dquot *dquot);		/* Read structure for one user */
 	int (*commit_dqblk)(struct dquot *dquot);	/* Write (or delete) structure for one user */
 };
 
+/* Operations working with dquots */
+struct dquot_operations {
+	void (*initialize) (struct inode *, short);
+	void (*drop) (struct inode *);
+	int (*alloc_space) (struct inode *, qsize_t, int);
+	int (*alloc_inode) (const struct inode *, unsigned long);
+	void (*free_space) (struct inode *, qsize_t);
+	void (*free_inode) (const struct inode *, unsigned long);
+	int (*transfer) (struct inode *, struct iattr *);
+};
+
+/* Operations handling requests from userspace */
+struct quotactl_ops {
+	int (*quota_on)(struct super_block *, int, int, char *);
+	int (*quota_off)(struct super_block *, int);
+	int (*quota_sync)(struct super_block *, int);
+	int (*get_info)(struct super_block *, int, struct if_dqinfo *);
+	int (*set_info)(struct super_block *, int, struct if_dqinfo *);
+	int (*get_dqblk)(struct super_block *, int, qid_t, struct if_dqblk *);
+	int (*set_dqblk)(struct super_block *, int, qid_t, struct if_dqblk *);
+	int (*get_xstate)(struct super_block *, struct fs_quota_stat *);
+	int (*set_xstate)(struct super_block *, unsigned int, int);
+	int (*get_xquota)(struct super_block *, int, qid_t, struct fs_disk_quota *);
+	int (*set_xquota)(struct super_block *, int, qid_t, struct fs_disk_quota *);
+};
+
 struct quota_format_type {
 	int qf_fmt_id;	/* Quota format id */
 	struct quota_format_ops *qf_ops;	/* Operations of format */
+	struct module *qf_owner;		/* Module implementing quota format */
 	struct quota_format_type *qf_next;
 };
+
+static inline int is_enabled(struct quota_info *dqopt, int type)
+{
+	switch (type) {
+		case USRQUOTA:
+			return dqopt->flags & DQUOT_USR_ENABLED;
+		case GRPQUOTA:
+			return dqopt->flags & DQUOT_GRP_ENABLED;
+	}
+	return 0;
+}
+
+#define sb_any_quota_enabled(sb) (is_enabled(sb_dqopt(sb), USRQUOTA) | is_enabled(sb_dqopt(sb), GRPQUOTA))
+
+#define sb_has_quota_enabled(sb, type) (is_enabled(sb_dqopt(sb), type))
+
+int register_quota_format(struct quota_format_type *fmt);
+void unregister_quota_format(struct quota_format_type *fmt);
 
 #else
 
 # /* nodep */ include <sys/cdefs.h>
 
 __BEGIN_DECLS
-long quotactl __P ((int, const char *, int, caddr_t));
+long quotactl __P ((unsigned int, const char *, int, caddr_t));
 __END_DECLS
 
 #endif /* __KERNEL__ */

@@ -889,62 +889,6 @@ asmlinkage long sys32_fcntl64(unsigned int fd, unsigned int cmd, unsigned long a
 	return sys32_fcntl(fd, cmd, arg);
 }
 
-struct dqblk32 {
-    __u32 dqb_bhardlimit;
-    __u32 dqb_bsoftlimit;
-    __u32 dqb_curblocks;
-    __u32 dqb_ihardlimit;
-    __u32 dqb_isoftlimit;
-    __u32 dqb_curinodes;
-    __kernel_time_t32 dqb_btime;
-    __kernel_time_t32 dqb_itime;
-};
-                                
-extern asmlinkage int sys_quotactl(int cmd, const char *special, int id, caddr_t addr);
-
-asmlinkage int sys32_quotactl(int cmd, const char *special, int id, unsigned long addr)
-{
-	int cmds = cmd >> SUBCMDSHIFT;
-	int err;
-	struct dqblk d;
-	mm_segment_t old_fs;
-	char *spec;
-	
-	switch (cmds) {
-	case Q_GETQUOTA:
-		break;
-	case Q_SETQUOTA:
-	case Q_SETUSE:
-	case Q_SETQLIM:
-		if (copy_from_user (&d, (struct dqblk32 *)addr,
-				    sizeof (struct dqblk32)))
-			return -EFAULT;
-		d.dqb_itime = ((struct dqblk32 *)&d)->dqb_itime;
-		d.dqb_btime = ((struct dqblk32 *)&d)->dqb_btime;
-		break;
-	default:
-		return sys_quotactl(cmd, special,
-				    id, (caddr_t)addr);
-	}
-	spec = getname (special);
-	err = PTR_ERR(spec);
-	if (IS_ERR(spec)) return err;
-	old_fs = get_fs ();
-	set_fs (KERNEL_DS);
-	err = sys_quotactl(cmd, (const char *)spec, id, (caddr_t)&d);
-	set_fs (old_fs);
-	putname (spec);
-	if (cmds == Q_GETQUOTA) {
-		__kernel_time_t b = d.dqb_btime, i = d.dqb_itime;
-		((struct dqblk32 *)&d)->dqb_itime = i;
-		((struct dqblk32 *)&d)->dqb_btime = b;
-		if (copy_to_user ((struct dqblk32 *)addr, &d,
-				  sizeof (struct dqblk32)))
-			return -EFAULT;
-	}
-	return err;
-}
-
 static inline int put_statfs (struct statfs32 *ubuf, struct statfs *kbuf)
 {
 	int err;
