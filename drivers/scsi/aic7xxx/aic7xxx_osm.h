@@ -53,7 +53,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#142 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#147 $
  *
  */
 #ifndef _AIC7XXX_LINUX_H_
@@ -305,7 +305,7 @@ ahc_scb_timer_reset(struct scb *scb, u_int usec)
 #define AHC_SCSI_HAS_HOST_LOCK 0
 #endif
 
-#define AIC7XXX_DRIVER_VERSION "6.2.33"
+#define AIC7XXX_DRIVER_VERSION "6.2.35"
 
 /**************************** Front End Queues ********************************/
 /*
@@ -1165,7 +1165,7 @@ void	ahc_platform_set_tags(struct ahc_softc *ahc,
 int	ahc_platform_abort_scbs(struct ahc_softc *ahc, int target,
 				char channel, int lun, u_int tag,
 				role_t role, uint32_t status);
-AIC_LINUX_IRQRETURN_T
+irqreturn_t
 	ahc_linux_isr(int irq, void *dev_id, struct pt_regs * regs);
 void	ahc_platform_flushwork(struct ahc_softc *ahc);
 int	ahc_softc_comp(struct ahc_softc *, struct ahc_softc *);
