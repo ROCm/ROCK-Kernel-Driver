@@ -214,5 +214,7 @@ static __inline__ int is_write_locked(rwlock_t *rw)
 
 #define rwlock_init(x)         do { *(x) = RW_LOCK_UNLOCKED; } while(0)
 
+#define rwlock_is_locked(x)	((x)->lock)
+
 #endif /* __KERNEL__ */
 #endif /* __ASM_SPINLOCK_H */
