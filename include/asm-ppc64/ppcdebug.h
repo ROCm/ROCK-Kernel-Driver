@@ -95,24 +95,11 @@ extern char *trace_names[64];
 #define ppcdebugset(FLAGS) (udbg_ifdebug(FLAGS))
 #define PPCDBG_BINFMT (test_thread_flag(TIF_32BIT) ? PPCDBG_BINFMT32 : PPCDBG_BINFMT64)
 
-#ifdef CONFIG_XMON
-#define PPCDBG_ENTER_DEBUGGER() xmon(0)
-#define PPCDBG_ENTER_DEBUGGER_REGS(X) xmon(X)
-#endif
-
 #else
 #define PPCDBG(...) do {;} while (0)
 #define PPCDBGCALL(FLAGS,FUNCTION) do {;} while (0)
 #define ifppcdebug(...) if (0)
 #define ppcdebugset(FLAGS) (0)
 #endif /* CONFIG_PPCDBG */
-
-#ifndef PPCDBG_ENTER_DEBUGGER
-#define PPCDBG_ENTER_DEBUGGER() do {;} while(0)
-#endif
-
-#ifndef PPCDBG_ENTER_DEBUGGER_REGS
-#define PPCDBG_ENTER_DEBUGGER_REGS(A) do {;} while(0)
-#endif
 
 #endif /*__PPCDEBUG_H */

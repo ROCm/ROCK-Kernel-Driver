@@ -589,7 +589,7 @@ acpi_boot_init (void)
 	smp_boot_data.cpu_count = available_cpus;
 
 	smp_build_cpu_map();
-# ifdef CONFIG_NUMA
+# ifdef CONFIG_ACPI_NUMA
 	if (srat_num_cpus == 0) {
 		int cpu, i = 1;
 		for (cpu = 0; cpu < smp_boot_data.cpu_count; cpu++)

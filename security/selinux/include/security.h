@@ -62,11 +62,13 @@ int security_netif_sid(char *name, u32 *if_sid,
 int security_node_sid(u16 domain, void *addr, u32 addrlen,
 	u32 *out_sid);
 
-#define SECURITY_FS_USE_XATTR 1 /* use xattr */
-#define SECURITY_FS_USE_TRANS 2 /* use transition SIDs, e.g. devpts/tmpfs */
-#define SECURITY_FS_USE_TASK  3 /* use task SIDs, e.g. pipefs/sockfs */
-#define SECURITY_FS_USE_GENFS 4 /* use the genfs support */
-#define SECURITY_FS_USE_NONE  5 /* no labeling support */
+#define SECURITY_FS_USE_XATTR		1 /* use xattr */
+#define SECURITY_FS_USE_TRANS		2 /* use transition SIDs, e.g. devpts/tmpfs */
+#define SECURITY_FS_USE_TASK		3 /* use task SIDs, e.g. pipefs/sockfs */
+#define SECURITY_FS_USE_GENFS		4 /* use the genfs support */
+#define SECURITY_FS_USE_NONE		5 /* no labeling support */
+#define SECURITY_FS_USE_MNTPOINT	6 /* use mountpoint labeling */
+
 int security_fs_use(const char *fstype, unsigned int *behavior,
 	u32 *sid);
 

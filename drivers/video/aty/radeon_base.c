@@ -99,6 +99,8 @@
 #include "ati_ids.h"
 #include "radeonfb.h"		    
 
+#define MAX_MAPPED_VRAM	(2048*2048*4)
+#define MIN_MAPPED_VRAM	(1024*768*1)
 
 #define CHIP_DEF(id, family, flags)					\
 	{ PCI_VENDOR_ID_ATI, id, PCI_ANY_ID, PCI_ANY_ID, 0, 0, (flags) | (CHIP_FAMILY_##family) }
@@ -210,7 +212,7 @@ typedef struct {
 /* these common regs are cleared before mode setting so they do not
  * interfere with anything
  */
-reg_val common_regs[] = {
+static reg_val common_regs[] = {
 	{ OVR_CLR, 0 },	
 	{ OVR_WID_LEFT_RIGHT, 0 },
 	{ OVR_WID_TOP_BOTTOM, 0 },
@@ -222,7 +224,7 @@ reg_val common_regs[] = {
 	{ CAP0_TRIG_CNTL, 0 },
 };
 
-reg_val common_regs_m6[] = {
+static reg_val common_regs_m6[] = {
 	{ OVR_CLR,      0 },
 	{ OVR_WID_LEFT_RIGHT,   0 },
 	{ OVR_WID_TOP_BOTTOM,   0 },
@@ -566,8 +568,9 @@ static int __devinit radeon_probe_pll_params(struct radeonfb_info *rinfo)
 		break;
 	}
 
-	do_div(vclk, 1000);
-	xtal = (xtal * denom) / num;
+	vclk *= denom;
+	do_div(vclk, 1000 * num);
+	xtal = vclk;
 
 	if ((xtal > 26900) && (xtal < 27100))
 		xtal = 2700;
@@ -825,6 +828,9 @@ static int radeonfb_check_var (struct fb_var_screeninfo *var, struct fb_info *in
 		v.xres_virtual = (pitch << 6) / ((v.bits_per_pixel + 1) / 8);
 	}
 
+	if (((v.xres_virtual * v.yres_virtual * nom) / den) > rinfo->mapped_vram)
+		return -EINVAL;
+
 	if (v.xres_virtual < v.xres)
 		v.xres = v.xres_virtual;
 
@@ -941,7 +947,7 @@ static int radeonfb_ioctl (struct inode *inode, struct file *file, unsigned int 
 static int radeon_screen_blank (struct radeonfb_info *rinfo, int blank)
 {
         u32 val = INREG(CRTC_EXT_CNTL);
-	u32 val2;
+	u32 val2 = 0;
 
 	if (rinfo->mon1_type == MT_LCD)
 		val2 = INREG(LVDS_GEN_CNTL) & ~LVDS_DISPLAY_DIS;
@@ -1022,7 +1028,7 @@ static int radeonfb_setcolreg (unsigned regno, unsigned red, unsigned green,
         pindex = regno;
 
         if (!rinfo->asleep) {
-        	u32 dac_cntl2, vclk_cntl;
+        	u32 dac_cntl2, vclk_cntl = 0;
         	
 		if (rinfo->is_mobility) {
 			vclk_cntl = INPLL(VCLK_ECP_CNTL);
@@ -1316,7 +1322,7 @@ static void radeon_calc_pll_regs(struct radeonfb_info *rinfo, struct radeon_regs
 		{ 12, 7 },
 		{ 0,  0 },
 	};
-	int fb_div, pll_output_freq;
+	int fb_div, pll_output_freq = 0;
 	int uses_dvo = 0;
 
 	/* Check if the DVO port is enabled and sourced from the primary CRTC. I'm
@@ -1441,7 +1447,7 @@ int radeonfb_set_par(struct fb_info *info)
 			nopllcalc = 1;
 			newmode.ppll_div_3 = rinfo->panel_info.fbk_divider |
 				(rinfo->panel_info.post_divider << 16);
-			newmode.ppll_ref_div = rinfo->pll.ref_div;
+			newmode.ppll_ref_div = rinfo->panel_info.ref_divider;
 		}
 	}
 	dotClock = 1000000000 / pixClock;
@@ -1685,6 +1691,67 @@ int radeonfb_set_par(struct fb_info *info)
 
 
 
+static ssize_t radeonfb_read(struct file *file, char *buf, size_t count, loff_t *ppos)
+{
+	unsigned long p = *ppos;
+	struct inode *inode = file->f_dentry->d_inode;
+	int fbidx = iminor(inode);
+	struct fb_info *info = registered_fb[fbidx];
+	struct radeonfb_info *rinfo = info->par;
+	
+	if (p >= rinfo->mapped_vram)
+	    return 0;
+	if (count >= rinfo->mapped_vram)
+	    count = rinfo->mapped_vram;
+	if (count + p > rinfo->mapped_vram)
+		count = rinfo->mapped_vram - p;
+	radeonfb_sync(info);
+	if (count) {
+	    char *base_addr;
+
+	    base_addr = info->screen_base;
+	    count -= copy_to_user(buf, base_addr+p, count);
+	    if (!count)
+		return -EFAULT;
+	    *ppos += count;
+	}
+	return count;
+}
+
+static ssize_t radeonfb_write(struct file *file, const char *buf, size_t count,
+			      loff_t *ppos)
+{
+	unsigned long p = *ppos;
+	struct inode *inode = file->f_dentry->d_inode;
+	int fbidx = iminor(inode);
+	struct fb_info *info = registered_fb[fbidx];
+	struct radeonfb_info *rinfo = info->par;
+	int err;
+
+	if (p > rinfo->mapped_vram)
+	    return -ENOSPC;
+	if (count >= rinfo->mapped_vram)
+	    count = rinfo->mapped_vram;
+	err = 0;
+	if (count + p > rinfo->mapped_vram) {
+	    count = rinfo->mapped_vram - p;
+	    err = -ENOSPC;
+	}
+	radeonfb_sync(info);
+	if (count) {
+	    char *base_addr;
+
+	    base_addr = info->screen_base;
+	    count -= copy_from_user(base_addr+p, buf, count);
+	    *ppos += count;
+	    err = -EFAULT;
+	}
+	if (count)
+		return count;
+	return err;
+}
+
+
 static struct fb_ops radeonfb_ops = {
 	.owner			= THIS_MODULE,
 	.fb_check_var		= radeonfb_check_var,
@@ -1697,6 +1764,8 @@ static struct fb_ops radeonfb_ops = {
 	.fb_fillrect		= radeonfb_fillrect,
 	.fb_copyarea		= radeonfb_copyarea,
 	.fb_imageblit		= radeonfb_imageblit,
+	.fb_read		= radeonfb_read,
+	.fb_write		= radeonfb_write,
 	.fb_cursor		= soft_cursor,
 };
 
@@ -2121,11 +2190,27 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 
 	RTRACE("radeonfb: probed %s %ldk videoram\n", (rinfo->ram_type), (rinfo->video_ram/1024));
 
-	rinfo->fb_base = (unsigned long) ioremap (rinfo->fb_base_phys, rinfo->video_ram);
+	rinfo->mapped_vram = MAX_MAPPED_VRAM;
+	if (rinfo->video_ram < rinfo->mapped_vram)
+		rinfo->mapped_vram = rinfo->video_ram;
+	for (;;) {
+		rinfo->fb_base = (unsigned long) ioremap (rinfo->fb_base_phys,
+							  rinfo->mapped_vram);
+		if (rinfo->fb_base == 0 && rinfo->mapped_vram > MIN_MAPPED_VRAM) {
+			rinfo->mapped_vram /= 2;
+			continue;
+		}
+		break;
+	}
+
 	if (!rinfo->fb_base) {
 		printk (KERN_ERR "radeonfb: cannot map FB\n");
 		goto unmap_rom;
 	}
+
+	RTRACE("radeonfb: mapped %ldk videoram\n", rinfo->mapped_vram/1024);
+
+
 	/* Argh. Scary arch !!! */
 #ifdef CONFIG_PPC64
 	rinfo->fb_base = IO_TOKEN_TO_ADDR(rinfo->fb_base);
@@ -2291,7 +2376,7 @@ static void __devexit radeonfb_pci_unregister (struct pci_dev *pdev)
 #ifdef CONFIG_FB_RADEON_I2C
 	radeon_delete_i2c_busses(rinfo);
 #endif        
-        kfree (rinfo);
+        framebuffer_release(info);
 }
 
 
@@ -2331,7 +2416,7 @@ int __init radeonfb_setup (char *options)
 			continue;
 
 		if (!strncmp(this_opt, "noaccel", 7)) {
-			radeonfb_noaccel = 1;
+			noaccel = radeonfb_noaccel = 1;
 		} else if (!strncmp(this_opt, "mirror", 6)) {
 			mirror = 1;
 		} else if (!strncmp(this_opt, "force_dfp", 9)) {

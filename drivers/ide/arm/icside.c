@@ -341,12 +341,6 @@ static int icside_dma_off_quietly(ide_drive_t *drive)
 	return icside_dma_host_off(drive);
 }
 
-static int icside_dma_off(ide_drive_t *drive)
-{
-	printk("%s: DMA disabled\n", drive->name);
-	return icside_dma_off_quietly(drive);
-}
-
 static int icside_dma_host_on(ide_drive_t *drive)
 {
 	return 0;
@@ -426,11 +420,6 @@ static int icside_dma_begin(ide_drive_t *drive)
 	BUG_ON(dma_channel_active(hwif->hw.dma));
 	enable_dma(hwif->hw.dma);
 	return 0;
-}
-
-static int icside_dma_count(ide_drive_t *drive)
-{
-	return icside_dma_begin(drive);
 }
 
 /*
@@ -648,12 +637,10 @@ static int icside_dma_init(ide_hwif_t *hwif)
 	hwif->ide_dma_check	= icside_dma_check;
 	hwif->ide_dma_host_off	= icside_dma_host_off;
 	hwif->ide_dma_off_quietly = icside_dma_off_quietly;
-	hwif->ide_dma_off	= icside_dma_off;
 	hwif->ide_dma_host_on	= icside_dma_host_on;
 	hwif->ide_dma_on	= icside_dma_on;
 	hwif->ide_dma_read	= icside_dma_read;
 	hwif->ide_dma_write	= icside_dma_write;
-	hwif->ide_dma_count	= icside_dma_count;
 	hwif->ide_dma_begin	= icside_dma_begin;
 	hwif->ide_dma_end	= icside_dma_end;
 	hwif->ide_dma_test_irq	= icside_dma_test_irq;

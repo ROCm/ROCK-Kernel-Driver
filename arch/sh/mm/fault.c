@@ -1,4 +1,4 @@
-/* $Id: fault.c,v 1.13 2003/08/11 11:44:50 lethal Exp $
+/* $Id: fault.c,v 1.14 2004/01/13 05:52:11 kkojima Exp $
  *
  *  linux/arch/sh/mm/fault.c
  *  Copyright (C) 1999  Niibe Yutaka
@@ -242,7 +242,12 @@ asmlinkage int __do_page_fault(struct pt_regs *regs, unsigned long writeaccess,
 	 * So, we need to flush the entry by ourselves.
 	 */
 
-	__flush_tlb_page(get_asid(), address&PAGE_MASK);
+	{
+		unsigned long flags;
+		local_irq_save(flags);
+		__flush_tlb_page(get_asid(), address&PAGE_MASK);
+		local_irq_restore(flags);
+	}
 #endif
 
 	set_pte(pte, entry);

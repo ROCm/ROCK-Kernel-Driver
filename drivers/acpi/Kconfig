@@ -143,7 +143,7 @@ config ACPI_NUMA
 	bool "NUMA support"
 	depends on ACPI_INTERPRETER
 	depends on NUMA
-	depends on !X86_64
+	depends on IA64
 	default y if IA64_GENERIC || IA64_SGI_SN2
 
 config ACPI_ASUS

@@ -60,6 +60,31 @@ typedef struct board_info {
 	unsigned int	 bi_busfreq;		/* Bus speed, in Hz */
 } bd_t;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+extern void		 oak_init(unsigned long r3,
+				  unsigned long ird_start,
+				  unsigned long ird_end,
+				  unsigned long cline_start,
+				  unsigned long cline_end);
+extern void		 oak_setup_arch(void);
+extern int		 oak_setup_residual(char *buffer);
+extern void		 oak_init_IRQ(void);
+extern int		 oak_get_irq(struct pt_regs *regs);
+extern void		 oak_restart(char *cmd);
+extern void		 oak_power_off(void);
+extern void		 oak_halt(void);
+extern void		 oak_time_init(void);
+extern int		 oak_set_rtc_time(unsigned long now);
+extern unsigned long	 oak_get_rtc_time(void);
+extern void		 oak_calibrate_decr(void);
+
+#ifdef __cplusplus
+}
+#endif
+
 /* Some 4xx parts use a different timebase frequency from the internal clock.
 */
 #define bi_tbfreq bi_intfreq

@@ -1615,8 +1615,9 @@ static int __devinit riva_set_fbinfo(struct fb_info *info)
 }
 
 #ifdef CONFIG_PPC_OF
-static int riva_get_EDID_OF(struct riva_par *par, struct pci_dev *pd)
+static int riva_get_EDID_OF(struct fb_info *info, struct pci_dev *pd)
 {
+	struct riva_par *par = (struct riva_par *) info->par;
 	struct device_node *dp;
 	unsigned char *pedid = NULL;
 

@@ -1,7 +1,7 @@
 /*
  *  sata_promise.c - Promise SATA
  *
- *  Copyright 2003 Red Hat, Inc.
+ *  Copyright 2003-2004 Red Hat, Inc.
  *
  *  The contents of this file are subject to the Open
  *  Software License version 1.1 that can be found at
