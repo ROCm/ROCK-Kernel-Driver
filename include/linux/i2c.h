@@ -176,7 +176,7 @@ static inline void *i2c_get_clientdata (struct i2c_client *dev)
 
 static inline void i2c_set_clientdata (struct i2c_client *dev, void *data)
 {
-	return dev_set_drvdata (&dev->dev, data);
+	dev_set_drvdata (&dev->dev, data);
 }
 
 #define I2C_DEVNAME(str)   .dev = { .name = str }
@@ -261,7 +261,7 @@ static inline void *i2c_get_adapdata (struct i2c_adapter *dev)
 
 static inline void i2c_set_adapdata (struct i2c_adapter *dev, void *data)
 {
-	return dev_set_drvdata (&dev->dev, data);
+	dev_set_drvdata (&dev->dev, data);
 }
 
 /*flags for the driver struct: */

@@ -47,6 +47,21 @@ config SENSORS_LM75
 	  in the lm_sensors package, which you can download at 
 	  http://www.lm-sensors.nu
 	  
+config SENSORS_LM85
+	tristate "  National Semiconductors LM85 and compatibles"
+	depends on I2C && EXPERIMENTAL
+	help
+	  If you say yes here you get support for National Semiconductor LM85
+	  sensor chips and clones: ADT7463 and ADM1027.
+	  This can also be built as a module which can be inserted and
+	  removed while the kernel is running.
+
+	  The module will be called lm85.
+
+	  You will also need the latest user-space utilties: you can find them
+	  in the lm_sensors package, which you can download at 
+	  http://www.lm-sensors.nu
+	  
 config SENSORS_VIA686A
 	tristate "  VIA686A"
 	depends on I2C && EXPERIMENTAL
@@ -76,8 +91,8 @@ config SENSORS_W83781D
 
 config I2C_SENSOR
 	tristate
-	default y if SENSORS_ADM1021=y || SENSORS_IT87=y || SENSORS_LM75=y || SENSORS_VIA686A=y || SENSORS_W83781D=y
-	default m if SENSORS_ADM1021=m || SENSORS_IT87=m || SENSORS_LM75=m || SENSORS_VIA686A=m || SENSORS_W83781D=m
+	default y if SENSORS_ADM1021=y || SENSORS_IT87=y || SENSORS_LM75=y || SENSORS_VIA686A=y || SENSORS_W83781D=y || SENSORS_LM85=y
+	default m if SENSORS_ADM1021=m || SENSORS_IT87=m || SENSORS_LM75=m || SENSORS_VIA686A=m || SENSORS_W83781D=m || SENSORS_LM85=m
 	default n
 
 endmenu
