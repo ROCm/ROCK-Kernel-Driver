@@ -735,7 +735,7 @@ xfs_page_state_convert(
 
 	/* Are we off the end of the file ? */
 	end_index = i_size_read(inode) >> PAGE_CACHE_SHIFT;
-	last_index = (inode->i_size - 1) >> PAGE_CACHE_SHIFT;
+	last_index = (i_size_read(inode) - 1) >> PAGE_CACHE_SHIFT;
 	if (page->index >= end_index) {
 		if ((page->index >= end_index + 1) ||
 		    !(i_size_read(inode) & (PAGE_CACHE_SIZE - 1))) {
