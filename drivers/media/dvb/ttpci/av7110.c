@@ -320,7 +320,7 @@ static void debiirq (unsigned long data)
         case DATA_PIPING:
                 if (av7110->handle2filter[handle]) 
                         DvbDmxFilterCallback((u8 *)av7110->debi_virt, 
-                                             av7110->debilen, 0, 0, 
+                                             av7110->debilen, NULL, 0, 
                                              av7110->handle2filter[handle], 
                                              DMX_OK, av7110); 
                 spin_lock(&av7110->debilock);
@@ -651,7 +651,7 @@ static struct file_operations dvb_osd_fops = {
 };
 
 static struct dvb_device dvbdev_osd = {
-	.priv		= 0,
+	.priv		= NULL,
 	.users		= 1,
 	.writers	= 1,
 	.fops		= &dvb_osd_fops,
@@ -928,7 +928,7 @@ static int av7110_stop_feed(struct dvb_demux_feed *feed)
 			    !demux->pesfilter[feed->pes_type])
 				return -EINVAL;
 			demux->pids[feed->pes_type] |= 0x8000;
-			demux->pesfilter[feed->pes_type] = 0;
+			demux->pesfilter[feed->pes_type] = NULL;
 		}
 		if (feed->ts_type & TS_DECODER &&
 		    feed->pes_type < DMX_TS_PES_OTHER) {
@@ -1402,7 +1402,7 @@ static int av7110_attach(struct saa7146_dev* dev, struct saa7146_pci_extension_d
 
         /* ARM "watchdog" */
 	init_waitqueue_head(&av7110->arm_wait);
-        av7110->arm_thread=0;
+        av7110->arm_thread=NULL;
      
         /* allocate and init buffers */
         av7110->debi_virt = pci_alloc_consistent(dev->pci, 8192,

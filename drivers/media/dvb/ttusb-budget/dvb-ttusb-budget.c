@@ -1125,7 +1125,7 @@ static int ttusb_probe(struct usb_interface *intf, const struct usb_device_id *i
 
 	ttusb->dvb_demux.dmx.capabilities =
 	    DMX_TS_FILTERING | DMX_SECTION_FILTERING;
-	ttusb->dvb_demux.priv = 0;
+	ttusb->dvb_demux.priv = NULL;
 #ifdef TTUSB_HWSECTIONS
 	ttusb->dvb_demux.filternum = TTUSB_MAXFILTER;
 #else
@@ -1134,7 +1134,7 @@ static int ttusb_probe(struct usb_interface *intf, const struct usb_device_id *i
 	ttusb->dvb_demux.feednum = TTUSB_MAXCHANNEL;
 	ttusb->dvb_demux.start_feed = ttusb_start_feed;
 	ttusb->dvb_demux.stop_feed = ttusb_stop_feed;
-	ttusb->dvb_demux.write_to_decoder = 0;
+	ttusb->dvb_demux.write_to_decoder = NULL;
 
 	if ((result = dvb_dmx_init(&ttusb->dvb_demux)) < 0) {
 		printk("ttusb_dvb: dvb_dmx_init failed (errno = %d)\n",

@@ -208,7 +208,7 @@ static int flex_i2c_write4(struct adapter *adapter, u32 device, u32 chip_addr, u
 
 	i2c_main_setup(device, chip_addr, 0, addr, buf[0], len, &command);
 
-	return i2c_main_write_for_flex2(adapter, command, 0, 100000);
+	return i2c_main_write_for_flex2(adapter, command, NULL, 100000);
 }
 
 static void fixchipaddr(u32 device, u32 bus, u32 addr, u32 *ret)
@@ -1681,7 +1681,7 @@ static void init_dma_queue(struct adapter *adapter)
 
 	adapter->dmaq1.head = 0;
 	adapter->dmaq1.tail = 0;
-	adapter->dmaq1.buffer = 0;
+	adapter->dmaq1.buffer = NULL;
 
 	adapter->dmaq1.buffer = pci_alloc_consistent(adapter->pdev, SIZE_OF_BUF_DMA1 + 0x80, &dma_addr);
 
@@ -1707,7 +1707,7 @@ static void init_dma_queue(struct adapter *adapter)
 
 	adapter->dmaq2.head = 0;
 	adapter->dmaq2.tail = 0;
-	adapter->dmaq2.buffer = 0;
+	adapter->dmaq2.buffer = NULL;
 
 	adapter->dmaq2.buffer = pci_alloc_consistent(adapter->pdev, SIZE_OF_BUF_DMA2 + 0x80, &dma_addr);
 
@@ -1738,7 +1738,7 @@ static void free_dma_queue(struct adapter *adapter)
 		adapter->dmaq1.head = 0;
 		adapter->dmaq1.tail = 0;
 		adapter->dmaq1.buffer_size = 0;
-		adapter->dmaq1.buffer = 0;
+		adapter->dmaq1.buffer = NULL;
 	}
 
 	if (adapter->dmaq2.buffer != 0) {
@@ -1748,7 +1748,7 @@ static void free_dma_queue(struct adapter *adapter)
 		adapter->dmaq2.head = 0;
 		adapter->dmaq2.tail = 0;
 		adapter->dmaq2.buffer_size = 0;
-		adapter->dmaq2.buffer = 0;
+		adapter->dmaq2.buffer = NULL;
 	}
 }
 
@@ -2272,7 +2272,7 @@ static int skystar2_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	dvbdemux->feednum = N_PID_SLOTS;
 	dvbdemux->start_feed = dvb_start_feed;
 	dvbdemux->stop_feed = dvb_stop_feed;
-	dvbdemux->write_to_decoder = 0;
+	dvbdemux->write_to_decoder = NULL;
 	dvbdemux->dmx.capabilities = (DMX_TS_FILTERING | DMX_SECTION_FILTERING | DMX_MEMORY_BASED_FILTERING);
 
 	dvb_dmx_init(&adapter->demux);

@@ -110,9 +110,9 @@ void ci_ll_flush(struct dvb_ringbuffer *cirbuf, struct dvb_ringbuffer *ciwbuf)
 void ci_ll_release(struct dvb_ringbuffer *cirbuf, struct dvb_ringbuffer *ciwbuf)
 {
 	vfree(cirbuf->data);
-	cirbuf->data = 0;
+	cirbuf->data = NULL;
 	vfree(ciwbuf->data);
-	ciwbuf->data = 0;
+	ciwbuf->data = NULL;
 }
 
 int ci_ll_reset(struct dvb_ringbuffer *cibuf, struct file *file,
@@ -350,7 +350,7 @@ static struct file_operations dvb_ca_fops = {
 };
 
 static struct dvb_device dvbdev_ca = {
-	.priv		= 0,
+	.priv		= NULL,
 	.users		= 1,
 	.writers	= 1,
 	.fops		= &dvb_ca_fops,

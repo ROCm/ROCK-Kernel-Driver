@@ -538,7 +538,7 @@ static int tda1004x_fwupload(struct dvb_i2c_bus *i2c, struct tda1004x_state *tda
 
 static int tda10045h_init(struct dvb_i2c_bus *i2c, struct tda1004x_state *tda_state)
 {
-        struct i2c_msg tuner_msg = {.addr = 0,.flags = 0,.buf = 0,.len = 0 };
+        struct i2c_msg tuner_msg = {.addr = 0,.flags = 0,.buf = NULL,.len = 0 };
         static u8 disable_mc44BC374c[] = { 0x1d, 0x74, 0xa0, 0x68 };
 
         dprintk("%s\n", __FUNCTION__);
@@ -576,7 +576,7 @@ static int tda10045h_init(struct dvb_i2c_bus *i2c, struct tda1004x_state *tda_st
 
 static int tda10046h_init(struct dvb_i2c_bus *i2c, struct tda1004x_state *tda_state)
 {
-        struct i2c_msg tuner_msg = {.addr = 0,.flags = 0,.buf = 0,.len = 0 };
+        struct i2c_msg tuner_msg = {.addr = 0,.flags = 0,.buf = NULL,.len = 0 };
         static u8 disable_mc44BC374c[] = { 0x1d, 0x74, 0xa0, 0x68 };
 
         dprintk("%s\n", __FUNCTION__);
@@ -1393,7 +1393,7 @@ static int tda1004x_attach(struct dvb_i2c_bus *i2c, void **data)
         int tuner_type = -1;
 	struct tda1004x_state tda_state;
 	struct tda1004x_state* ptda_state;
-	struct i2c_msg tuner_msg = {.addr=0, .flags=0, .buf=0, .len=0 };
+	struct i2c_msg tuner_msg = {.addr=0, .flags=0, .buf=NULL, .len=0 };
         static u8 td1344_init[] = { 0x0b, 0xf5, 0x88, 0xab };
         static u8 td1316_init[] = { 0x0b, 0xf5, 0x85, 0xab };
         static u8 td1316_init_tda10046h[] = { 0x0b, 0xf5, 0x80, 0xab };
