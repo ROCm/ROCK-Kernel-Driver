@@ -182,6 +182,12 @@ struct page {
 };
 
 /*
+ * FIXME: take this include out, include page-flags.h in
+ * files which need it (119 of them)
+ */
+#include <linux/page-flags.h>
+
+/*
  * Methods to modify the page usage count.
  *
  * What counts for a page usage:
@@ -202,13 +208,15 @@ struct page {
 	})
 #define page_count(p)		atomic_read(&(p)->count)
 #define set_page_count(p,v) 	atomic_set(&(p)->count, v)
+
 extern void FASTCALL(__page_cache_release(struct page *));
-#define put_page(p)							\
-	do {								\
-		if (!PageReserved(p) && put_page_testzero(p))		\
-			__page_cache_release(p);			\
-	} while (0)
 void FASTCALL(__free_pages_ok(struct page *page, unsigned int order));
+
+static inline void put_page(struct page *page)
+{
+	if (!PageReserved(page) && put_page_testzero(page))
+		__page_cache_release(page);
+}
 
 /*
  * Multiple processes may "see" the same page. E.g. for untouched
@@ -258,12 +266,6 @@ void FASTCALL(__free_pages_ok(struct page *page, unsigned int order));
  * - private pages which have been modified may need to be swapped out
  *   to swap space and (later) to be read back into memory.
  */
-
-/*
- * FIXME: take this include out, include page-flags.h in
- * files which need it (119 of them)
- */
-#include <linux/page-flags.h>
 
 /*
  * The zone field is never updated after free_area_init_core()

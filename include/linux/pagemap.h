@@ -22,13 +22,8 @@
 #define PAGE_CACHE_MASK		PAGE_MASK
 #define PAGE_CACHE_ALIGN(addr)	(((addr)+PAGE_CACHE_SIZE-1)&PAGE_CACHE_MASK)
 
-#define page_cache_get(x)	get_page(x)
-
-static inline void page_cache_release(struct page *page)
-{
-	if (!PageReserved(page) && put_page_testzero(page))
-		__page_cache_release(page);
-}
+#define page_cache_get(page)		get_page(page)
+#define page_cache_release(page)	put_page(page)
 
 static inline struct page *page_cache_alloc(struct address_space *x)
 {
