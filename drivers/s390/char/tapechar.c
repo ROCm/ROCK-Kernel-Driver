@@ -63,7 +63,9 @@ int tapechar_major = TAPECHAR_MAJOR;
 devfs_handle_t
 tapechar_mkdevfstree (tape_dev_t* td) {
     devfs_handle_t rc=NULL;
-    rc=td->char_data.devfs_char_dir=devfs_mk_dir (td->devfs_dir, "char", td);
+    char name[15];
+    sprintf (name, "tape/%04x/char", td->devinfo.devno);
+    rc=td->char_data.devfs_char_dir=devfs_mk_dir (NULL, name, NULL);
     if (rc==NULL) goto out_undo;
     rc=td->char_data.devfs_nonrewinding=devfs_register(td->char_data.devfs_char_dir, 
 						    "nonrewinding",

@@ -303,13 +303,13 @@ register_with_devfs(void)
 	/* FIXME: don't forget /dev/pci/mem & /dev/pci/io */
 
 	pci_for_each_dev(dev) {
-		sprintf(devfs_path, "%02x/%02x.%x",
+		sprintf(devfs_path, "pci/%02x/%02x.%x",
 			dev->bus->number,
 			PCI_SLOT(dev->devfn),
 			PCI_FUNC(dev->devfn));
     
 		device_dir_handle =
-			devfs_mk_dir(pciba_devfs_handle, devfs_path, NULL);
+			devfs_mk_dir(NULL, devfs_path, NULL);
 		if (device_dir_handle == NULL)
 			return failure;
 

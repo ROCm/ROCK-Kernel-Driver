@@ -161,9 +161,9 @@ devfs_handle_t tape_devfs_root_entry;
 static inline devfs_handle_t
 tape_mkdevfsroot (tape_dev_t* td) 
 {
-    char devno [5];
-    sprintf (devno,"%04x",td->devinfo.devno);
-    return (td->devfs_dir=devfs_mk_dir (tape_devfs_root_entry, devno, td));
+    char devno [10];
+    sprintf (devno,"tape/%04x",td->devinfo.devno);
+    return (td->devfs_dir=devfs_mk_dir (NULL, devno, NULL));
 }
 
 /*
