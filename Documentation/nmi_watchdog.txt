@@ -12,7 +12,7 @@ This can be used to debug hard kernel lockups.  By executing periodic
 NMI interrupts, the kernel can monitor whether any CPU has locked up,
 and print out debugging messages if so.  
 
-In order to use the NMI watchdoc, you need to have APIC support in your
+In order to use the NMI watchdog, you need to have APIC support in your
 kernel. For SMP kernels, APIC support gets compiled in automatically. For
 UP, enable either CONFIG_X86_UP_APIC (Processor type and features -> Local
 APIC support on uniprocessors) or CONFIG_X86_UP_IOAPIC (Processor type and

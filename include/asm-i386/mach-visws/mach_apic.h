@@ -1,6 +1,8 @@
 #ifndef __ASM_MACH_APIC_H
 #define __ASM_MACH_APIC_H
 
+#include <mach_apicdef.h>
+
 #define APIC_DFR_VALUE	(APIC_DFR_FLAT)
 
 #define no_balance_irq (0)

@@ -80,6 +80,8 @@ static inline int apicid_to_node(int logical_apicid)
 extern u8 cpu_2_logical_apicid[];
 static inline int cpu_to_logical_apicid(int cpu)
 {
+       if (cpu >= NR_CPUS)
+	       return BAD_APICID;
 	return (int)cpu_2_logical_apicid[cpu];
 }
 

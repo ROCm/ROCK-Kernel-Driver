@@ -1284,6 +1284,7 @@ static int make_indexed_dir(handle_t *handle, struct dentry *dentry,
 	unsigned	blocksize;
 	struct dx_hash_info hinfo;
 	u32		block;
+	struct fake_dirent *fde;
 
 	blocksize =  dir->i_sb->s_blocksize;
 	dxtrace(printk("Creating index\n"));
@@ -1304,7 +1305,8 @@ static int make_indexed_dir(handle_t *handle, struct dentry *dentry,
 	data1 = bh2->b_data;
 
 	/* The 0th block becomes the root, move the dirents out */
-	de = (struct ext3_dir_entry_2 *) &root->info;
+	fde = &root->dotdot;
+	de = (struct ext3_dir_entry_2 *)((char *)fde + fde->rec_len);
 	len = ((char *) root) + blocksize - (char *) de;
 	memcpy (data1, de, len);
 	de = (struct ext3_dir_entry_2 *) data1;
@@ -2006,9 +2008,9 @@ static int ext3_rmdir (struct inode * dir, struct dentry *dentry)
 	 * recovery. */
 	inode->i_size = 0;
 	ext3_orphan_add(handle, inode);
+	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 	ext3_mark_inode_dirty(handle, inode);
 	dir->i_nlink--;
-	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 	ext3_update_dx_flag(dir);
 	ext3_mark_inode_dirty(handle, dir);
 
@@ -2060,8 +2062,8 @@ static int ext3_unlink(struct inode * dir, struct dentry *dentry)
 	inode->i_nlink--;
 	if (!inode->i_nlink)
 		ext3_orphan_add(handle, inode);
-	ext3_mark_inode_dirty(handle, inode);
 	inode->i_ctime = dir->i_ctime;
+	ext3_mark_inode_dirty(handle, inode);
 	retval = 0;
 
 end_unlink:
@@ -2220,7 +2222,6 @@ static int ext3_rename (struct inode * old_dir, struct dentry *old_dentry,
 			goto end_rename;
 	} else {
 		BUFFER_TRACE(new_bh, "get write access");
-		BUFFER_TRACE(new_bh, "get_write_access");
 		ext3_journal_get_write_access(handle, new_bh);
 		new_de->inode = le32_to_cpu(old_inode->i_ino);
 		if (EXT3_HAS_INCOMPAT_FEATURE(new_dir->i_sb,

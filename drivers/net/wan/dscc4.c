@@ -112,6 +112,11 @@ static const char version[] = "$Id: dscc4.c,v 1.159 2002/04/10 22:05:17 romieu E
 static int debug;
 static int quartz;
 
+#ifdef CONFIG_DSCC4_PCI_RST
+static DECLARE_MUTEX(dscc4_sem);
+static u32 dscc4_pci_config_store[16];
+#endif
+
 #define	DRV_NAME	"dscc4"
 
 #undef DSCC4_POLLING
@@ -172,7 +177,7 @@ struct RxFD {
  */
 #define TO_STATE_TX(len)	cpu_to_le32(((len) & TxSizeMax) << 16)
 #define TO_STATE_RX(len)	cpu_to_le32((RX_MAX(len) % RxSizeMax) << 16)
-#define RX_MAX(len)		((((len) >> 5) + 1) << 5)
+#define RX_MAX(len)		((((len) >> 5) + 1) << 5)	/* Cf RLCR */
 #define SCC_REG_START(dpriv)	(SCC_START+(dpriv->dev_id)*SCC_OFFSET)
 
 struct dscc4_pci_priv {
@@ -263,6 +268,10 @@ struct dscc4_dev_priv {
 #define IMR     0x54
 #define ISR     0x58
 
+#define GPDIR	0x0400
+#define GPDATA	0x0404
+#define GPIM	0x0408
+
 /* Bit masks */
 #define EncodingMask	0x00700000
 #define CrcMask		0x00000003
@@ -291,6 +300,7 @@ struct dscc4_dev_priv {
 #define Hold		0x40000000
 #define SccBusy		0x10000000
 #define PowerUp		0x80000000
+#define Vis		0x00001000
 #define FrameOk		(FrameVfr | FrameCrc)
 #define FrameVfr	0x80
 #define FrameRdo	0x40
@@ -327,10 +337,19 @@ struct dscc4_dev_priv {
 #define Arf		0x00000002
 #define ArAck		0x00000001
 
-/* Misc */
+/* State flags */
+#define Ready		0x00000000
 #define NeedIDR		0x00000001
 #define NeedIDT		0x00000002
 #define RdoSet		0x00000004
+#define FakeReset	0x00000008
+
+/* Don't mask RDO. Ever. */
+#ifdef DSCC4_POLLING
+#define EventsMask	0xfffeef7f
+#else
+#define EventsMask	0xfffa8f7a
+#endif
 
 /* Functions prototypes */
 static inline void dscc4_rx_irq(struct dscc4_pci_priv *, struct dscc4_dev_priv *);
@@ -495,9 +514,9 @@ inline int try_get_rx_skb(struct dscc4_dev_priv *dpriv, struct net_device *dev)
 	skb = dev_alloc_skb(len);
 	dpriv->rx_skbuff[dirty] = skb;
 	if (skb) {
-	skb->dev = dev;
-	skb->protocol = hdlc_type_trans(skb, dev);
-	skb->mac.raw = skb->data;
+		skb->dev = dev;
+		skb->protocol = hdlc_type_trans(skb, dev);
+		skb->mac.raw = skb->data;
 		rx_fd->data = pci_map_single(dpriv->pci_priv->pdev, skb->data,
 					     len, PCI_DMA_FROMDEVICE);
 	} else {
@@ -574,15 +593,18 @@ static inline int dscc4_xpr_ack(struct dscc4_dev_priv *dpriv)
 	return (i >= 0 ) ? i : -EAGAIN;
 }
 
-/* Requires protection against interrupt */
 static void dscc4_rx_reset(struct dscc4_dev_priv *dpriv, struct net_device *dev)
 {
+	unsigned long flags;
+
+	spin_lock_irqsave(&dpriv->pci_priv->lock, flags);
 	/* Cf errata DS5 p.6 */
 	writel(0x00000000, dev->base_addr + CH0LRDA + dpriv->dev_id*4);
-	scc_writel(~PowerUp & scc_readl(dpriv, CCR0), dpriv, dev, CCR0);
+	scc_patchl(PowerUp, 0, dpriv, dev, CCR0);
 	readl(dev->base_addr + CH0LRDA + dpriv->dev_id*4);
 	writel(MTFi|Rdr, dev->base_addr + dpriv->dev_id*0x0c + CH0CFG);
 	writel(Action, dev->base_addr + GCMDR);
+	spin_unlock_irqrestore(&dpriv->pci_priv->lock, flags);
 }
 
 static void dscc4_tx_reset(struct dscc4_dev_priv *dpriv, struct net_device *dev)
@@ -590,7 +612,7 @@ static void dscc4_tx_reset(struct dscc4_dev_priv *dpriv, struct net_device *dev)
 	u16 i = 0;
 
 	/* Cf errata DS5 p.7 */
-	scc_writel(~PowerUp & scc_readl(dpriv, CCR0), dpriv, dev, CCR0);
+	scc_patchl(PowerUp, 0, dpriv, dev, CCR0);
 	scc_writel(0x00050000, dpriv, dev, CCR2);
 	/*
 	 * Must be longer than the time required to fill the fifo.
@@ -815,7 +837,8 @@ err_out:
 static void dscc4_init_registers(struct dscc4_dev_priv *dpriv,
 				 struct net_device *dev)
 {
-	scc_writel(0x80001000, dpriv, dev, CCR0);
+	/* No interrupts, SCC core disabled. Let's relax */
+	scc_writel(0x00000000, dpriv, dev, CCR0);
 
 	scc_writel(LengthCheck | (HDLC_MAX_MRU >> 5), dpriv, dev, RLCR);
 
@@ -823,22 +846,14 @@ static void dscc4_init_registers(struct dscc4_dev_priv *dpriv,
 	 * No address recognition/crc-CCITT/cts enabled
 	 * Shared flags transmission disabled - cf errata DS5 p.11
 	 * Carrier detect disabled - cf errata p.14
+	 * FIXME: carrier detection/polarity may be handled more gracefully.
 	 */
-	scc_writel(0x021c8000, dpriv, dev, CCR1);
+	scc_writel(0x02408000, dpriv, dev, CCR1);
 
 	/* crc not forwarded - Cf errata DS5 p.11 */
 	scc_writel(0x00050008 & ~RxActivate, dpriv, dev, CCR2);
 	// crc forwarded
 	//scc_writel(0x00250008 & ~RxActivate, dpriv, dev, CCR2);
-
-	/* Don't mask RDO. Ever. */
-#ifdef DSCC4_POLLING
-	scc_writel(0xfffeef7f, dpriv, dev, IMR); /* Interrupt mask */
-#else
-	//scc_writel(0xfffaef7f, dpriv, dev, IMR); /* Interrupt mask */
-	//scc_writel(0xfffaef7e, dpriv, dev, IMR); /* Interrupt mask */
-	scc_writel(0xfffa8f7a, dpriv, dev, IMR); /* Interrupt mask */
-#endif
 }
 
 static int dscc4_found1(struct pci_dev *pdev, unsigned long ioaddr)
@@ -894,6 +909,10 @@ static int dscc4_found1(struct pci_dev *pdev, unsigned long ioaddr)
 		dscc4_init_registers(dpriv, d);
 		dpriv->parity = PARITY_CRC16_PR0_CCITT;
 		dpriv->encoding = ENCODING_NRZ;
+		if (dscc4_init_ring(d)) {
+			unregister_hdlc_device(hdlc);
+			goto err_unregister;
+		}
 	}
 	if (dscc4_set_quartz(root, quartz) < 0)
 		goto err_unregister;
@@ -903,8 +922,10 @@ static int dscc4_found1(struct pci_dev *pdev, unsigned long ioaddr)
 	return 0;
 
 err_unregister:
-	while (--i >= 0)
+	while (--i >= 0) {
+		dscc4_release_ring(root + i);
 		unregister_hdlc_device(&root[i].hdlc);
+	}
 	kfree(ppriv);
 err_free_dev:
 	kfree(root);
@@ -943,6 +964,46 @@ static int dscc4_loopback_check(struct dscc4_dev_priv *dpriv)
 	return 0;
 }
 
+#ifdef CONFIG_DSCC4_PCI_RST
+/*
+ * Some DSCC4-based cards wires the GPIO port and the PCI #RST pin together
+ * so as to provide a safe way to reset the asic while not the whole machine
+ * rebooting.
+ *
+ * This code doesn't need to be efficient. Keep It Simple
+ */
+static void dscc4_pci_reset(struct pci_dev *pdev, u32 ioaddr)
+{
+	int i;
+
+	down(&dscc4_sem);
+	for (i = 0; i < 16; i++)
+		pci_read_config_dword(pdev, i << 2, dscc4_pci_config_store + i);
+
+	/* Maximal LBI clock divider (who cares ?) and whole GPIO range. */
+	writel(0x001c0000, ioaddr + GMODE);
+	/* Configure GPIO port as output */
+	writel(0x0000ffff, ioaddr + GPDIR);
+	/* Disable interruption */
+	writel(0x0000ffff, ioaddr + GPIM);
+
+	writel(0x0000ffff, ioaddr + GPDATA);
+	writel(0x00000000, ioaddr + GPDATA);
+
+	/* Flush posted writes */
+	readl(ioaddr + GSTAR);
+
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout(10);
+
+	for (i = 0; i < 16; i++)
+		pci_write_config_dword(pdev, i << 2, dscc4_pci_config_store[i]);
+	up(&dscc4_sem);
+}
+#else
+#define dscc4_pci_reset(pdev,ioaddr)	do {} while (0)
+#endif /* CONFIG_DSCC4_PCI_RST */
+
 static int dscc4_open(struct net_device *dev)
 {
 	struct dscc4_dev_priv *dpriv = dscc4_priv(dev);
@@ -958,11 +1019,28 @@ static int dscc4_open(struct net_device *dev)
 
 	ppriv = dpriv->pci_priv;
 
-	if ((ret = dscc4_init_ring(dev)))
-		goto err_out;
+	/*
+	 * Due to various bugs, there is no way to reliably reset a
+	 * specific port (manufacturer's dependant special PCI #RST wiring
+	 * apart: it affects all ports). Thus the device goes in the best
+	 * silent mode possible at dscc4_close() time and simply claims to
+	 * be up if it's opened again. It still isn't possible to change
+	 * the HDLC configuration without rebooting but at least the ports
+	 * can be up/down ifconfig'ed without killing the host.
+	 */
+	if (dpriv->flags & FakeReset) {
+		dpriv->flags &= ~FakeReset;
+		scc_patchl(0, PowerUp, dpriv, dev, CCR0);
+		scc_patchl(0, 0x00050000, dpriv, dev, CCR2);
+		scc_writel(EventsMask, dpriv, dev, IMR);
+		printk(KERN_INFO "%s: up again.\n", dev->name);
+		goto done;
+	}
 
 	/* IDT+IDR during XPR */
 	dpriv->flags = NeedIDR | NeedIDT;
+
+	scc_patchl(0, PowerUp | Vis, dpriv, dev, CCR0);
 
 	/*
 	 * The following is a bit paranoid...
@@ -974,15 +1052,17 @@ static int dscc4_open(struct net_device *dev)
 	if (scc_readl_star(dpriv, dev) & SccBusy) {
 		printk(KERN_ERR "%s busy. Try later\n", dev->name);
 		ret = -EAGAIN;
-		goto err_free_ring;
+		goto err_out;
 	} else
 		printk(KERN_INFO "%s: available. Good\n", dev->name);
+
+	scc_writel(EventsMask, dpriv, dev, IMR);
 
 	/* Posted write is flushed in the wait_ack loop */
 	scc_writel(TxSccRes | RxSccRes, dpriv, dev, CMDR);
 
 	if ((ret = dscc4_wait_ack_cec(dpriv, dev, "Cec")) < 0)
-		goto err_free_ring;
+		goto err_disable_scc_events;
 
 	/*
 	 * I would expect XPR near CE completion (before ? after ?).
@@ -993,12 +1073,13 @@ static int dscc4_open(struct net_device *dev)
 	 */
 	if ((ret = dscc4_xpr_ack(dpriv)) < 0) {
 		printk(KERN_ERR "%s: %s timeout\n", DRV_NAME, "XPR");
-		goto err_free_ring;
+		goto err_disable_scc_events;
 	}
 	
 	if (debug > 2)
 		dscc4_tx_print(dev, dpriv, "Open");
 
+done:
 	netif_start_queue(dev);
 
         init_timer(&dpriv->timer);
@@ -1010,7 +1091,10 @@ static int dscc4_open(struct net_device *dev)
 
 	return 0;
 
+err_disable_scc_events:
+	scc_writel(0xffffffff, dpriv, dev, IMR);
 err_free_ring:
+	scc_patchl(PowerUp | Vis, 0, dpriv, dev, CCR0);
 	dscc4_release_ring(dpriv);
 err_out:
 	hdlc_close(hdlc);
@@ -1066,21 +1150,19 @@ static int dscc4_close(struct net_device *dev)
 {
 	struct dscc4_dev_priv *dpriv = dscc4_priv(dev);
 	hdlc_device *hdlc = dev_to_hdlc(dev);
-	unsigned long flags;
 
 	del_timer_sync(&dpriv->timer);
 	netif_stop_queue(dev);
 
-	spin_lock_irqsave(&dpriv->pci_priv->lock, flags);
-	dscc4_rx_reset(dpriv, dev);
-	spin_unlock_irqrestore(&dpriv->pci_priv->lock, flags);
+	scc_patchl(PowerUp | Vis, 0, dpriv, dev, CCR0);
+	scc_patchl(0x00050000, 0, dpriv, dev, CCR2);
+	scc_writel(0xffffffff, dpriv, dev, IMR);
 
-	dscc4_tx_reset(dpriv, dev);
+	dpriv->flags |= FakeReset;
 
 	hdlc_close(hdlc);
 	dscc4_release_ring(dpriv);
 
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -1088,13 +1170,56 @@ static inline int dscc4_check_clock_ability(int port)
 {
 	int ret = 0;
 
-#ifdef CONFIG_DSCC4_CLOCK_ON_TWO_PORTS_ONLY
+#ifdef CONFIG_DSCC4_PCISYNC
 	if (port >= 2)
 		ret = -1;
 #endif
 	return ret;
 }
 
+/*
+ * DS1 p.137: "There are a total of 13 different clocking modes..."
+ *                                  ^^
+ * Design choices:
+ * - by default, assume a clock is provided on pin RxClk/TxClk (clock mode 0a).
+ *   Clock mode 3b _should_ work but the testing seems to make this point
+ *   dubious (DIY testing requires setting CCR0 at 0x00000033).
+ *   This is supposed to provide least surprise "DTE like" behavior.
+ * - if line rate is specified, clocks are assumed to be locally generated.
+ *   A quartz must be available (on pin XTAL1). Modes 6b/7b are used. Choosing
+ *   between these it automagically done according on the required frequency
+ *   scaling. Of course some rounding may take place.
+ * - no high speed mode (40Mb/s). May be trivial to do but I don't have an
+ *   appropriate external clocking device for testing.
+ * - no time-slot/clock mode 5: shameless lazyness.
+ *
+ * The clock signals wiring can be (is ?) manufacturer dependant. Good luck.
+ *
+ * BIG FAT WARNING: if the device isn't provided enough clocking signal, it
+ * won't pass the init sequence. For example, straight back-to-back DTE without
+ * external clock will fail when dscc4_open() (<- 'ifconfig hdlcx xxx') is
+ * called.
+ *
+ * Typos lurk in datasheet (missing divier in clock mode 7a figure 51 p.153
+ * DS0 for example)
+ *
+ * Clock mode related bits of CCR0:
+ *     +------------ TOE: output TxClk (0b/2b/3a/3b/6b/7a/7b only)
+ *     | +---------- SSEL: sub-mode select 0 -> a, 1 -> b
+ *     | | +-------- High Speed: say 0
+ *     | | | +-+-+-- Clock Mode: 0..7
+ *     | | | | | |
+ * -+-+-+-+-+-+-+-+
+ * x|x|5|4|3|2|1|0| lower bits
+ *
+ * Division factor of BRR: k = (N+1)x2^M (total divider = 16xk in mode 6b)
+ *            +-+-+-+------------------ M (0..15)
+ *            | | | |     +-+-+-+-+-+-- N (0..63)
+ *    0 0 0 0 | | | | 0 0 | | | | | |
+ * ...-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *    f|e|d|c|b|a|9|8|7|6|5|4|3|2|1|0| lower bits
+ *
+ */
 static int dscc4_set_clock(struct net_device *dev, u32 *bps, u32 *state)
 {
 	struct dscc4_dev_priv *dpriv = dscc4_priv(dev);
@@ -1131,13 +1256,13 @@ static int dscc4_set_clock(struct net_device *dev, u32 *bps, u32 *state)
 		}
 		brr = (m << 8) | n;
 		divider = n << m;
-		if (!(*state & 0x00000001)) /* Clock mode 6b */
+		if (!(*state & 0x00000001)) /* ?b mode mask => clock mode 6b */
 			divider <<= 4;
 		*bps = xtal / divider;
 	} else {
 		/*
 		 * External clock - DTE
-		 * "state" already reflects Clock mode 0a.
+		 * "state" already reflects Clock mode 0a (CCR0 = 0xzzzzzz00).
 		 * Nothing more to be done
 		 */
 		brr = 0;
@@ -1176,6 +1301,11 @@ static int dscc4_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
 
+		if (dpriv->flags & FakeReset) {
+			printk(KERN_INFO "%s: please reset the device"
+			       " before this command\n", dev->name);
+			return -EPERM;
+		}
 		if (copy_from_user(&dpriv->settings, line, size))
 			return -EFAULT;
 		ret = dscc4_set_iface(dpriv, dev);
@@ -1234,7 +1364,7 @@ static int dscc4_clock_setting(struct dscc4_dev_priv *dpriv,
 			settings->clock_rate = bps;
 		}
 	} else { /* DTE */
-		state = 0x80001000;
+		state |= PowerUp | Vis;
 		printk(KERN_DEBUG "%s: external RxClk (DTE)\n", dev->name);
 	}
 	scc_writel(state, dpriv, dev, CCR0);
@@ -1342,6 +1472,8 @@ static irqreturn_t dscc4_irq(int irq, void *token, struct pt_regs *ptregs)
 		handled = 0;
 		goto out;
 	}
+	if (debug > 3)
+		printk(KERN_DEBUG "%s: GSTAR = 0x%08x\n", DRV_NAME, state);
 	writel(state, ioaddr + GSTAR);
 
 	if (state & Arf) {
@@ -1388,6 +1520,9 @@ try:
 	cur = dpriv->iqtx_current%IRQ_RING_SIZE;
 	state = dpriv->iqtx[cur];
 	if (!state) {
+		if (debug > 4)
+			printk(KERN_DEBUG "%s: Tx ISR = 0x%08x\n", dev->name,
+			       state);
 		if ((debug > 1) && (loop > 1))
 			printk(KERN_DEBUG "%s: Tx irq loop=%d\n", dev->name, loop);
 		if (loop && netif_queue_stopped(dev))
@@ -1474,9 +1609,19 @@ try:
 		}
 		if (state & Xpr) {
 			u32 scc_addr, ring;
+			int i;
 
-			if (scc_readl_star(dpriv, dev) & SccBusy)
-				printk(KERN_ERR "%s busy. Fatal\n", dev->name);
+			/*
+			 * - the busy condition happens (sometimes);
+			 * - it doesn't seem to make the handler unreliable.
+			 */
+			for (i = 1; i; i <<= 1) {
+				if (!(scc_readl_star(dpriv, dev) & SccBusy))
+					break;
+			}
+			if (!i)
+				printk(KERN_INFO "%s busy in irq\n", dev->name);
+
 			scc_addr = dev->base_addr + 0x0c*dpriv->dev_id;
 			/* Keep this order: IDT before IDR */
 			if (dpriv->flags & NeedIDT) {
@@ -1511,7 +1656,8 @@ try:
 				goto try;
 		}
 		if (state & Cd) {
-			printk(KERN_INFO "%s: CD transition\n", dev->name);
+			if (debug > 0)
+				printk(KERN_INFO "%s: CD transition\n", dev->name);
 			if (!(state &= ~Cd)) /* DEBUG */
 				goto try;
 		}
@@ -1553,6 +1699,9 @@ try:
 	if (!(state & SccEvt)){
 		struct RxFD *rx_fd;
 
+		if (debug > 4)
+			printk(KERN_DEBUG "%s: Rx ISR = 0x%08x\n", dev->name,
+			       state);
 		state &= 0x00ffffff;
 		if (state & Err) { /* Hold or reset */
 			printk(KERN_DEBUG "%s: Rx ERR\n", dev->name);
@@ -1807,12 +1956,16 @@ static void __devexit dscc4_remove_one(struct pci_dev *pdev)
 	root = ppriv->root;
 
 	ioaddr = hdlc_to_dev(&root->hdlc)->base_addr;
+
+	dscc4_pci_reset(pdev, ioaddr);
+
 	free_irq(pdev->irq, root);
 	pci_free_consistent(pdev, IRQ_RING_SIZE*sizeof(u32), ppriv->iqcfg,
 			    ppriv->iqcfg_dma);
 	for (i = 0; i < dev_per_card; i++) {
 		struct dscc4_dev_priv *dpriv = root + i;
 
+		dscc4_release_ring(dpriv);
 		pci_free_consistent(pdev, IRQ_RING_SIZE*sizeof(u32),
 				    dpriv->iqrx, dpriv->iqrx_dma);
 		pci_free_consistent(pdev, IRQ_RING_SIZE*sizeof(u32),
