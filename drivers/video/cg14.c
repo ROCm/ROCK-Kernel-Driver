@@ -34,6 +34,7 @@ static int cg14_setcolreg(unsigned, unsigned, unsigned, unsigned,
 static int cg14_mmap(struct fb_info *, struct file *, struct vm_area_struct *);
 static int cg14_ioctl(struct inode *, struct file *, unsigned int,
 		      unsigned long, struct fb_info *);
+static int cg14_pan_display(struct fb_var_screeninfo *, struct fb_info *);
 
 /*
  *  Frame buffer operations
@@ -42,6 +43,7 @@ static int cg14_ioctl(struct inode *, struct file *, unsigned int,
 static struct fb_ops cg14_ops = {
 	.owner			= THIS_MODULE,
 	.fb_setcolreg		= cg14_setcolreg,
+	.fb_pan_display		= cg14_pan_display,
 	.fb_fillrect		= cfb_fillrect,
 	.fb_copyarea		= cfb_copyarea,
 	.fb_imageblit		= cfb_imageblit,
@@ -213,6 +215,23 @@ static void __cg14_reset(struct cg14_par *par)
 	val = sbus_readb(&regs->mcr);
 	val &= ~(CG14_MCR_PIXMODE_MASK);
 	sbus_writeb(val, &regs->mcr);
+}
+
+static int cg14_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
+{
+	struct cg14_par *par = (struct cg14_par *) info->par;
+	unsigned long flags;
+
+	/* We just use this to catch switches out of
+	 * graphics mode.
+	 */
+	spin_lock_irqsave(&par->lock, flags);
+	__cg14_reset(par);
+	spin_unlock_irqrestore(&par->lock, flags);
+
+	if (var->xoffset || var->yoffset || var->vmode)
+		return -EINVAL;
+	return 0;
 }
 
 /**
