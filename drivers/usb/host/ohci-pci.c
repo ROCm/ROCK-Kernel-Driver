@@ -242,6 +242,7 @@ static const struct hc_driver ohci_pci_hc_driver = {
 	.hub_suspend =		ohci_hub_suspend,
 	.hub_resume =		ohci_hub_resume,
 #endif
+	.start_port_reset =	ohci_start_port_reset,
 };
 
 /*-------------------------------------------------------------------------*/
@@ -276,7 +277,7 @@ static int __init ohci_hcd_pci_init (void)
 	if (usb_disabled())
 		return -ENODEV;
 
-	printk (KERN_DEBUG "%s: block sizes: ed %Zd td %Zd\n", hcd_name,
+	pr_debug ("%s: block sizes: ed %Zd td %Zd\n", hcd_name,
 		sizeof (struct ed), sizeof (struct td));
 	return pci_module_init (&ohci_pci_driver);
 }

@@ -31,6 +31,7 @@
 #include <linux/time.h>
 #include <linux/delay.h>
 #include <linux/stddef.h>
+#include <linux/compiler.h>
 #include <linux/ioctl.h>
 #include <linux/poll.h>
 #include <linux/stat.h>
@@ -1731,13 +1732,15 @@ static int sn9c102_v4l2_ioctl(struct inode* inode, struct file* filp,
 		rect->width &= ~15L;
 		rect->height &= ~15L;
 
-		{ /* calculate the actual scaling factor */
+		if (SN9C102_PRESERVE_IMGSCALE) {
+			/* Calculate the actual scaling factor */
 			u32 a, b;
 			a = rect->width * rect->height;
 			b = pix_format->width * pix_format->height;
 			scale = b ? (u8)((a / b) < 4 ? 1 :
 		                        ((a / b) < 16 ? 2 : 4)) : 1;
-		}
+		} else
+			scale = 1;
 
 		if (cam->stream == STREAM_ON) {
 			cam->stream = STREAM_INTERRUPT;
@@ -2111,7 +2114,7 @@ static int sn9c102_v4l2_ioctl(struct inode* inode, struct file* filp,
 		spin_lock_irqsave(&cam->queue_lock, lock_flags);
 		f = list_entry(cam->outqueue.next, struct sn9c102_frame_t,
 		               frame);
-		list_del(&cam->outqueue);
+		list_del(cam->outqueue.next);
 		spin_unlock_irqrestore(&cam->queue_lock, lock_flags);
 
 		f->state = F_UNUSED;

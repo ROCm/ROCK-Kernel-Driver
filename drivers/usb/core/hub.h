@@ -190,8 +190,8 @@ struct usb_hub {
 	struct usb_device	*hdev;
 	struct urb		*urb;		/* for interrupt polling pipe */
 
-	/* buffer for urb ... 1 bit each for hub and children, rounded up */
-	char			(*buffer)[(USB_MAXCHILDREN + 1 + 7) / 8];
+	/* buffer for urb ... with extra space in case of babble */
+	char			(*buffer)[8];
 	dma_addr_t		buffer_dma;	/* DMA address for buffer */
 	union {
 		struct usb_hub_status	hub;

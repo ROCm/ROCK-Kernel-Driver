@@ -790,6 +790,8 @@ int usb_register_root_hub (struct usb_device *usb_dev, struct device *parent_dev
 	usb_dev->epmaxpacketin[0] = usb_dev->epmaxpacketout[0] = 64;
 	retval = usb_get_device_descriptor(usb_dev, USB_DT_DEVICE_SIZE);
 	if (retval != sizeof usb_dev->descriptor) {
+		usb_dev->bus->root_hub = NULL;
+		up (&usb_bus_list_lock);
 		dev_dbg (parent_dev, "can't read %s device descriptor %d\n",
 				usb_dev->dev.bus_id, retval);
 		return (retval < 0) ? retval : -EMSGSIZE;
@@ -1399,6 +1401,45 @@ static int hcd_hub_resume (struct usb_bus *bus)
 		return hcd->driver->hub_resume (hcd);
 	return 0;
 }
+
+#endif
+
+/*-------------------------------------------------------------------------*/
+
+#ifdef	CONFIG_USB_OTG
+
+/**
+ * usb_bus_start_enum - start immediate enumeration (for OTG)
+ * @bus: the bus (must use hcd framework)
+ * @port: 1-based number of port; usually bus->otg_port
+ * Context: in_interrupt()
+ *
+ * Starts enumeration, with an immediate reset followed later by
+ * khubd identifying and possibly configuring the device.
+ * This is needed by OTG controller drivers, where it helps meet
+ * HNP protocol timing requirements for starting a port reset.
+ */
+int usb_bus_start_enum(struct usb_bus *bus, unsigned port_num)
+{
+	struct usb_hcd		*hcd;
+	int			status = -EOPNOTSUPP;
+
+	/* NOTE: since HNP can't start by grabbing the bus's address0_sem,
+	 * boards with root hubs hooked up to internal devices (instead of
+	 * just the OTG port) may need more attention to resetting...
+	 */
+	hcd = container_of (bus, struct usb_hcd, self);
+	if (port_num && hcd->driver->start_port_reset)
+		status = hcd->driver->start_port_reset(hcd, port_num);
+
+	/* run khubd shortly after (first) root port reset finishes;
+	 * it may issue others, until at least 50 msecs have passed.
+	 */
+	if (status == 0)
+		mod_timer(&hcd->rh_timer, jiffies + msecs_to_jiffies(10));
+	return status;
+}
+EXPORT_SYMBOL (usb_bus_start_enum);
 
 #endif
 
