@@ -411,7 +411,7 @@ static void neigh_add_path(struct sk_buff *skb, struct net_device *dev)
 
 	/*
 	 * We can only be called from ipoib_start_xmit, so we're
-	 * inside dev->xmit_lock -- no need to save/restore flags.
+	 * inside tx_lock -- no need to save/restore flags.
 	 */
 	spin_lock(&priv->lock);
 
@@ -483,7 +483,7 @@ static void unicast_arp_send(struct sk_buff *skb, struct net_device *dev,
 
 	/*
 	 * We can only be called from ipoib_start_xmit, so we're
-	 * inside dev->xmit_lock -- no need to save/restore flags.
+	 * inside tx_lock -- no need to save/restore flags.
 	 */
 	spin_lock(&priv->lock);
 
@@ -526,11 +526,27 @@ static void unicast_arp_send(struct sk_buff *skb, struct net_device *dev,
 	spin_unlock(&priv->lock);
 }
 
-/* Called with dev->xmit_lock held and IRQs disabled.  */
 static int ipoib_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct ipoib_dev_priv *priv = netdev_priv(dev);
 	struct ipoib_neigh *neigh;
+	unsigned long flags;
+
+	local_irq_save(flags);
+	if (!spin_trylock(&priv->tx_lock)) {
+		local_irq_restore(flags);
+		return NETDEV_TX_LOCKED;
+	}
+
+	/*
+	 * Check if our queue is stopped.  Since we have the LLTX bit
+	 * set, we can't rely on netif_stop_queue() preventing our
+	 * xmit function from being called with a full queue.
+	 */
+	if (unlikely(netif_queue_stopped(dev))) {
+		spin_unlock_irqrestore(&priv->tx_lock, flags);
+		return NETDEV_TX_BUSY;
+	}
 
 	if (skb->dst && skb->dst->neighbour) {
 		if (unlikely(!*to_ipoib_neigh(skb->dst->neighbour))) {
@@ -585,6 +601,7 @@ static int ipoib_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 out:
+	spin_unlock_irqrestore(&priv->tx_lock, flags);
 
 	return NETDEV_TX_OK;
 }
@@ -780,7 +797,7 @@ static void ipoib_setup(struct net_device *dev)
 	dev->addr_len 		 = INFINIBAND_ALEN;
 	dev->type 		 = ARPHRD_INFINIBAND;
 	dev->tx_queue_len 	 = IPOIB_TX_RING_SIZE * 2;
-	dev->features            = NETIF_F_VLAN_CHALLENGED;
+	dev->features            = NETIF_F_VLAN_CHALLENGED | NETIF_F_LLTX;
 
 	/* MTU will be reset when mcast join happens */
 	dev->mtu 		 = IPOIB_PACKET_SIZE - IPOIB_ENCAP_LEN;
@@ -795,6 +812,7 @@ static void ipoib_setup(struct net_device *dev)
 	priv->dev = dev;
 
 	spin_lock_init(&priv->lock);
+	spin_lock_init(&priv->tx_lock);
 
 	init_MUTEX(&priv->mcast_mutex);
 	init_MUTEX(&priv->vlan_mutex);
