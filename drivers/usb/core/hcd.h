@@ -196,11 +196,6 @@ struct hc_driver {
 					int mem_flags);
 	int	(*urb_dequeue) (struct usb_hcd *hcd, struct urb *urb);
 
-	// frees configuration resources -- allocated as needed during
-	// urb_enqueue, and not freed by urb_dequeue
-	void		(*free_config) (struct usb_hcd *hcd,
-				struct usb_device *dev);
-
 	/* hw synch, freeing endpoint resources that urb_dequeue can't */
 	void 	(*endpoint_disable)(struct usb_hcd *hcd,
 			struct hcd_dev *dev, int bEndpointAddress);
