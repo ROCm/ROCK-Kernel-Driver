@@ -78,8 +78,6 @@ static int ip6_rt_min_advmss = IPV6_MIN_MTU - 20 - 40;
 
 static struct rt6_info * ip6_rt_copy(struct rt6_info *ort);
 static struct dst_entry	*ip6_dst_check(struct dst_entry *dst, u32 cookie);
-static struct dst_entry	*ip6_dst_reroute(struct dst_entry *dst,
-					 struct sk_buff *skb);
 static struct dst_entry *ip6_negative_advice(struct dst_entry *);
 static int		 ip6_dst_gc(void);
 
@@ -93,7 +91,6 @@ static struct dst_ops ip6_dst_ops = {
 
         ip6_dst_gc,
 	ip6_dst_check,
-	ip6_dst_reroute,
 	NULL,
 	ip6_negative_advice,
 	ip6_link_failure,
@@ -507,16 +504,6 @@ static struct dst_entry *ip6_dst_check(struct dst_entry *dst, u32 cookie)
 		return dst;
 
 	dst_release(dst);
-	return NULL;
-}
-
-static struct dst_entry *ip6_dst_reroute(struct dst_entry *dst, struct sk_buff *skb)
-{
-	/*
-	 *	FIXME
-	 */
-	RDBG(("ip6_dst_reroute(%p,%p)[%p] (AIEEE)\n", dst, skb,
-	      __builtin_return_address(0)));
 	return NULL;
 }
 

@@ -130,8 +130,6 @@ static struct timer_list rt_periodic_timer;
  */
 
 static struct dst_entry *ipv4_dst_check(struct dst_entry *dst, u32 cookie);
-static struct dst_entry *ipv4_dst_reroute(struct dst_entry *dst,
-					   struct sk_buff *skb);
 static void		 ipv4_dst_destroy(struct dst_entry *dst);
 static struct dst_entry *ipv4_negative_advice(struct dst_entry *dst);
 static void		 ipv4_link_failure(struct sk_buff *skb);
@@ -143,7 +141,6 @@ struct dst_ops ipv4_dst_ops = {
 	.protocol =		__constant_htons(ETH_P_IP),
 	.gc =			rt_garbage_collect,
 	.check =		ipv4_dst_check,
-	.reroute =		ipv4_dst_reroute,
 	.destroy =		ipv4_dst_destroy,
 	.negative_advice =	ipv4_negative_advice,
 	.link_failure =		ipv4_link_failure,
@@ -1109,12 +1106,6 @@ void ip_rt_update_pmtu(struct dst_entry *dst, unsigned mtu)
 static struct dst_entry *ipv4_dst_check(struct dst_entry *dst, u32 cookie)
 {
 	dst_release(dst);
-	return NULL;
-}
-
-static struct dst_entry *ipv4_dst_reroute(struct dst_entry *dst,
-					  struct sk_buff *skb)
-{
 	return NULL;
 }
 

@@ -100,7 +100,6 @@ static unsigned long dn_rt_deadline = 0;
 
 static int dn_dst_gc(void);
 static struct dst_entry *dn_dst_check(struct dst_entry *, __u32);
-static struct dst_entry *dn_dst_reroute(struct dst_entry *, struct sk_buff *skb);
 static struct dst_entry *dn_dst_negative_advice(struct dst_entry *);
 static void dn_dst_link_failure(struct sk_buff *);
 static int dn_route_input(struct sk_buff *);
@@ -119,7 +118,6 @@ static struct dst_ops dn_dst_ops = {
 	.gc_thresh =		128,
 	.gc =			dn_dst_gc,
 	.check =		dn_dst_check,
-	.reroute =		dn_dst_reroute,
 	.negative_advice =	dn_dst_negative_advice,
 	.link_failure =		dn_dst_link_failure,
 	.entry_size =		sizeof(struct dn_route),
@@ -199,12 +197,6 @@ static int dn_dst_gc(void)
 static struct dst_entry *dn_dst_check(struct dst_entry *dst, __u32 cookie)
 {
 	dst_release(dst);
-	return NULL;
-}
-
-static struct dst_entry *dn_dst_reroute(struct dst_entry *dst,
-					struct sk_buff *skb)
-{
 	return NULL;
 }
 

@@ -78,8 +78,6 @@ struct dst_ops
 
 	int			(*gc)(void);
 	struct dst_entry *	(*check)(struct dst_entry *, __u32 cookie);
-	struct dst_entry *	(*reroute)(struct dst_entry *,
-					   struct sk_buff *);
 	void			(*destroy)(struct dst_entry *);
 	struct dst_entry *	(*negative_advice)(struct dst_entry *);
 	void			(*link_failure)(struct sk_buff *);
