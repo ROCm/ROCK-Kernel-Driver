@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/char/serial_anakin.c
+ *  linux/drivers/char/anakin.c
  *
  *  Based on driver for AMBA serial ports, by ARM Limited,
  *  Deep Blue Solutions Ltd., Linus Torvalds and Theodore Ts'o.
@@ -19,7 +19,7 @@
  *   			SA_INTERRUPT. Works reliably now. No longer requires
  *   			changes to the serial_core API.
  *
- *  $Id: serial_anakin.c,v 1.27 2002/07/20 17:10:03 rmk Exp $
+ *  $Id: anakin.c,v 1.29 2002/07/22 15:27:32 rmk Exp $
  */
 
 #include <linux/config.h>
@@ -106,10 +106,6 @@ anakin_transmit_x_char(struct uart_port *port)
 static void
 anakin_start_tx(struct uart_port *port, unsigned int tty_start)
 {
-	unsigned int flags;
-
-	spin_lock_irqsave(&port->lock, flags);
-
 	// is it this... or below
 	if (!txenable[port->irq]) {
 		txenable[port->irq] = TXENABLE;
@@ -118,8 +114,6 @@ anakin_start_tx(struct uart_port *port, unsigned int tty_start)
 		    anakin_transmit_buffer(port);
 		}
 	}
-
-	spin_unlock_irqrestore(&port->lock, flags);
 }
 
 static void
@@ -524,7 +518,7 @@ anakin_init(void)
 {
 	int ret;
 
-	printk(KERN_INFO "Serial: Anakin driver $Revision: 1.27 $\n");
+	printk(KERN_INFO "Serial: Anakin driver $Revision: 1.29 $\n");
 
 	ret = uart_register_driver(&anakin_reg);
 	if (ret == 0) {

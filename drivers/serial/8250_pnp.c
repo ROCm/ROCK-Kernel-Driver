@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/char/serial_8250_pnp.c
+ *  linux/drivers/char/8250_pnp.c
  *
  *  Probe module for 8250/16550-type ISAPNP serial ports.
  *
@@ -11,7 +11,7 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License.
  *
- *  $Id: serial_8250_pnp.c,v 1.9 2002/02/18 19:20:29 rmk Exp $
+ *  $Id: 8250_pnp.c,v 1.10 2002/07/21 21:32:30 rmk Exp $
  */
 #include <linux/module.h>
 #include <linux/init.h>
@@ -26,7 +26,7 @@
 #include <asm/byteorder.h>
 #include <asm/serial.h>
 
-#include "serial_8250.h"
+#include "8250.h"
 
 struct pnpbios_device_id
 {

@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/char/serial_sa1100.c
+ *  linux/drivers/char/sa1100.c
  *
  *  Driver for SA11x0 serial ports
  *
@@ -21,7 +21,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- *  $Id: serial_sa1100.c,v 1.41 2002/07/21 08:57:55 rmk Exp $
+ *  $Id: sa1100.c,v 1.43 2002/07/22 15:27:32 rmk Exp $
  *
  */
 #include <linux/config.h>
@@ -155,26 +155,17 @@ static void sa1100_timeout(unsigned long data)
 	}
 }
 
-static void __sa1100_stop_tx(struct sa1100_port *sport)
-{
-	u32 utcr3;
-
-	utcr3 = UART_GET_UTCR3(sport);
-	UART_PUT_UTCR3(sport, utcr3 & ~UTCR3_TIE);
-	sport->port.read_status_mask &= ~UTSR0_TO_SM(UTSR0_TFS);
-}
-
 /*
  * interrupts disabled on entry
  */
 static void sa1100_stop_tx(struct uart_port *port, unsigned int tty_stop)
 {
 	struct sa1100_port *sport = (struct sa1100_port *)port;
-	unsigned long flags;
+	u32 utcr3;
 
-	spin_lock_irqsave(&sport->port.lock, flags);
-	__sa1100_stop_tx(sport);
-	spin_unlock_irqrestore(&sport->port.lock, flags);
+	utcr3 = UART_GET_UTCR3(sport);
+	UART_PUT_UTCR3(sport, utcr3 & ~UTCR3_TIE);
+	sport->port.read_status_mask &= ~UTSR0_TO_SM(UTSR0_TFS);
 }
 
 /*
@@ -315,7 +306,7 @@ static void sa1100_tx_chars(struct sa1100_port *sport)
 	sa1100_mctrl_check(sport);
 
 	if (uart_circ_empty(xmit) || uart_tx_stopped(&sport->port)) {
-		__sa1100_stop_tx(sport);
+		sa1100_stop_tx(&sport->port, 0);
 		return;
 	}
 
@@ -335,7 +326,7 @@ static void sa1100_tx_chars(struct sa1100_port *sport)
 		uart_event(&sport->port, EVT_WRITE_WAKEUP);
 
 	if (uart_circ_empty(xmit))
-		__sa1100_stop_tx(sport);
+		sa1100_stop_tx(&sport->port, 0);
 }
 
 static void sa1100_int(int irq, void *dev_id, struct pt_regs *regs)
@@ -866,7 +857,7 @@ static int __init sa1100_serial_init(void)
 {
 	int ret;
 
-	printk(KERN_INFO "Serial: SA11x0 driver $Revision: 1.41 $\n");
+	printk(KERN_INFO "Serial: SA11x0 driver $Revision: 1.43 $\n");
 
 	sa1100_init_ports();
 	ret = uart_register_driver(&sa1100_reg);
@@ -895,5 +886,5 @@ module_exit(sa1100_serial_exit);
 EXPORT_NO_SYMBOLS;
 
 MODULE_AUTHOR("Deep Blue Solutions Ltd");
-MODULE_DESCRIPTION("SA1100 generic serial port driver $Revision: 1.41 $");
+MODULE_DESCRIPTION("SA1100 generic serial port driver $Revision: 1.43 $");
 MODULE_LICENSE("GPL");

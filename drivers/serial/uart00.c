@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/char/serial_uart00.c
+ *  linux/drivers/char/uart00.c
  *
  *  Driver for UART00 serial ports
  *
@@ -21,7 +21,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- *  $Id: serial_uart00.c,v 1.32 2002/07/20 17:10:04 rmk Exp $
+ *  $Id: uart00.c,v 1.33 2002/07/21 21:32:31 rmk Exp $
  *
  */
 #include <linux/config.h>
@@ -755,7 +755,7 @@ static int __init uart00_init(void)
 {
 	int result;
 
-	printk(KERN_INFO "Serial: UART00 driver $Revision: 1.32 $\n");
+	printk(KERN_INFO "Serial: UART00 driver $Revision: 1.33 $\n");
 
 	printk(KERN_WARNING "serial_uart00:Using temporary major/minor pairs"
 		" - these WILL change in the future\n");

@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/char/serial_clps711x.c
+ *  linux/drivers/char/clps711x.c
  *
  *  Driver for CLPS711x serial ports
  *
@@ -22,7 +22,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- *  $Id: serial_clps711x.c,v 1.38 2002/07/21 08:57:55 rmk Exp $
+ *  $Id: clps711x.c,v 1.40 2002/07/22 15:27:32 rmk Exp $
  *
  */
 #include <linux/config.h>
@@ -95,7 +95,7 @@
 #define tx_enabled(port)	((port)->unused[0])
 
 static void
-__clps711xuart_stop_tx(struct uart_port *port)
+clps711xuart_stop_tx(struct uart_port *port, unsigned int tty_stop)
 {
 	if (tx_enabled(port)) {
 		disable_irq(TX_IRQ(port));
@@ -104,26 +104,12 @@ __clps711xuart_stop_tx(struct uart_port *port)
 }
 
 static void
-clps711xuart_stop_tx(struct uart_port *port, unsigned int tty_stop)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&port->lock, flags);
-	__clps711xuart_stop_tx(port);
-	spin_unlock_irqrestore(&port->lock, flags);
-}
-
-static void
 clps711xuart_start_tx(struct uart_port *port, unsigned int tty_start)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&port->lock, flags);
 	if (!tx_enabled(port)) {
 		enable_irq(TX_IRQ(port));
 		tx_enabled(port) = 1;
 	}
-	spin_unlock_irqrestore(&port->lock, flags);
 }
 
 static void clps711xuart_stop_rx(struct uart_port *port)
@@ -224,7 +210,7 @@ static void clps711xuart_int_tx(int irq, void *dev_id, struct pt_regs *regs)
 		return;
 	}
 	if (uart_circ_empty(xmit) || uart_tx_stopped(port)) {
-		__clps711xuart_stop_tx(port);
+		clps711xuart_stop_tx(port);
 		return;
 	}
 
@@ -241,7 +227,7 @@ static void clps711xuart_int_tx(int irq, void *dev_id, struct pt_regs *regs)
 		uart_event(port, EVT_WRITE_WAKEUP);
 
 	if (uart_circ_empty(xmit))
-		__clps711xuart_stop_tx(port);
+		clps711xuart_stop_tx(port);
 }
 
 static unsigned int clps711xuart_tx_empty(struct uart_port *port)
@@ -611,7 +597,7 @@ static int __init clps711xuart_init(void)
 {
 	int ret, i;
 
-	printk(KERN_INFO "Serial: CLPS711x driver $Revision: 1.38 $\n");
+	printk(KERN_INFO "Serial: CLPS711x driver $Revision: 1.40 $\n");
 
 	ret = uart_register_driver(&clps711x_reg);
 	if (ret)
@@ -639,5 +625,5 @@ module_exit(clps711xuart_exit);
 EXPORT_NO_SYMBOLS;
 
 MODULE_AUTHOR("Deep Blue Solutions Ltd");
-MODULE_DESCRIPTION("CLPS-711x generic serial driver $Revision: 1.38 $");
+MODULE_DESCRIPTION("CLPS-711x generic serial driver $Revision: 1.40 $");
 MODULE_LICENSE("GPL");

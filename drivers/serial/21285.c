@@ -1,11 +1,11 @@
 /*
- * linux/drivers/char/serial_21285.c
+ * linux/drivers/char/21285.c
  *
  * Driver for the serial port on the 21285 StrongArm-110 core logic chip.
  *
  * Based on drivers/char/serial.c
  *
- *  $Id: serial_21285.c,v 1.32 2002/07/21 08:57:55 rmk Exp $
+ *  $Id: 21285.c,v 1.34 2002/07/22 15:27:32 rmk Exp $
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -65,7 +65,8 @@ static const char serial21285_name[] = "Footbridge UART";
  *  int((BAUD_BASE - (baud >> 1)) / baud)
  */
 
-static void __serial21285_stop_tx(struct uart_port *port)
+static void
+serial21285_stop_tx(struct uart_port *port, unsigned int tty_stop)
 {
 	if (tx_enabled(port)) {
 		disable_irq(IRQ_CONTX);
@@ -74,26 +75,12 @@ static void __serial21285_stop_tx(struct uart_port *port)
 }
 
 static void
-serial21285_stop_tx(struct uart_port *port, unsigned int tty_stop)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&port->lock, flags);
-	__serial21285_stop_tx(port);
-	spin_unlock_irqrestore(&port->lock, flags);
-}
-
-static void
 serial21285_start_tx(struct uart_port *port, unsigned int tty_start)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&port->lock, flags);
 	if (!tx_enabled(port)) {
 		enable_irq(IRQ_CONTX);
 		tx_enabled(port) = 1;
 	}
-	spin_unlock_irqrestore(&port->lock, flags);
 }
 
 static void serial21285_stop_rx(struct uart_port *port)
@@ -185,7 +172,7 @@ static void serial21285_tx_chars(int irq, void *dev_id, struct pt_regs *regs)
 		return;
 	}
 	if (uart_circ_empty(xmit) || uart_tx_stopped(port)) {
-		__serial21285_stop_tx(port);
+		serial21285_stop_tx(port, 0);
 		return;
 	}
 
@@ -201,7 +188,7 @@ static void serial21285_tx_chars(int irq, void *dev_id, struct pt_regs *regs)
 		uart_event(port, EVT_WRITE_WAKEUP);
 
 	if (uart_circ_empty(xmit))
-		__serial21285_stop_tx(port);
+		serial21285_stop_tx(port, 0);
 }
 
 static unsigned int serial21285_tx_empty(struct uart_port *port)
@@ -527,7 +514,7 @@ static int __init serial21285_init(void)
 {
 	int ret;
 
-	printk(KERN_INFO "Serial: 21285 driver $Revision: 1.32 $\n");
+	printk(KERN_INFO "Serial: 21285 driver $Revision: 1.34 $\n");
 
 	serial21285_setup_ports();
 
@@ -550,4 +537,4 @@ module_exit(serial21285_exit);
 EXPORT_NO_SYMBOLS;
 
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("Intel Footbridge (21285) serial driver $Revision: 1.32 $");
+MODULE_DESCRIPTION("Intel Footbridge (21285) serial driver $Revision: 1.34 $");
