@@ -86,6 +86,13 @@ extern struct task_struct *__switch_to(struct thread_info *, struct thread_info 
 #define clf()			__clf()
 #define stf()			__stf()
 
+#define irqs_disabled()			\
+({					\
+	unsigned long flags;		\
+	local_save_flags(flags);	\
+	flags & PSR_I_BIT;		\
+})
+
 #endif /* CONFIG_SMP */
 
 #endif /* __KERNEL__ */

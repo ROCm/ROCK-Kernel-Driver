@@ -16,4 +16,6 @@
 		 __section__(".data.cacheline_aligned")))
 #endif
 
+#define L1_CACHE_SHIFT_MAX 5	/* largest L1 which this arch supports */
+
 #endif
