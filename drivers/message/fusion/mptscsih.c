@@ -2867,6 +2867,40 @@ mptscsih_slave_destroy(struct scsi_device *device)
 	return;
 }
 
+static void
+mptscsih_set_queue_depth(struct scsi_device *device, MPT_SCSI_HOST *hd,
+	VirtDevice *pTarget, int qdepth)
+{
+	int	max_depth;
+	int	tagged;
+
+	if ( hd->is_spi ) {
+		if (pTarget->tflags & MPT_TARGET_FLAGS_VALID_INQUIRY) {
+			if (!(pTarget->tflags & MPT_TARGET_FLAGS_Q_YES))
+				max_depth = 1;
+			else if (((pTarget->inq_data[0] & 0x1f) == 0x00) &&
+			         (pTarget->minSyncFactor <= MPT_ULTRA160 ))
+				max_depth = MPT_SCSI_CMD_PER_DEV_HIGH;
+			else
+				max_depth = MPT_SCSI_CMD_PER_DEV_LOW;
+		} else {
+			/* error case - No Inq. Data */
+			max_depth = 1;
+		}
+	} else
+		max_depth = MPT_SCSI_CMD_PER_DEV_HIGH;
+
+	if (qdepth > max_depth)
+		qdepth = max_depth;
+	if (qdepth == 1)
+		tagged = 0;
+	else
+		tagged = MSG_SIMPLE_TAG;
+
+	scsi_adjust_queue_depth(device, tagged, qdepth);
+}
+
+
 /*
  *	OS entry point to adjust the queue_depths on a per-device basis.
  *	Called once per device the bus scan. Use it to force the queue_depth
@@ -2916,24 +2950,7 @@ mptscsih_slave_configure(struct scsi_device *device)
 
 	mptscsih_initTarget(hd, device->channel, device->id, device->lun,
 		device->inquiry, device->inquiry_len );
-	scsi_adjust_queue_depth(device, MSG_SIMPLE_TAG,
-		MPT_SCSI_CMD_PER_DEV_HIGH);
-	if ( hd->is_spi ) {
-		if (pTarget->tflags & MPT_TARGET_FLAGS_VALID_INQUIRY) {
-			if (!(pTarget->tflags & MPT_TARGET_FLAGS_Q_YES))
-				scsi_adjust_queue_depth(device, 0, 1);
-			else if (((pTarget->inq_data[0] & 0x1f) == 0x00)
-			  && (pTarget->minSyncFactor <= MPT_ULTRA160 ))
-				scsi_adjust_queue_depth(device, MSG_SIMPLE_TAG,
-					MPT_SCSI_CMD_PER_DEV_HIGH);
-			else
-				scsi_adjust_queue_depth(device, MSG_SIMPLE_TAG,
-					MPT_SCSI_CMD_PER_DEV_LOW);
-		} else {
-			/* error case - No Inq. Data */
-			scsi_adjust_queue_depth(device, 0, 1);
-		}
-	}
+	mptscsih_set_queue_depth(device, hd, pTarget, MPT_SCSI_CMD_PER_DEV_HIGH);
 
 	dsprintk((MYIOC_s_INFO_FMT
 		"Queue depth=%d, tflags=%x\n",
@@ -2951,6 +2968,25 @@ slave_configure_exit:
 		device->ordered_tags));
 
 	return 0;
+}
+
+static ssize_t
+mptscsih_store_queue_depth(struct device *dev, const char *buf, size_t count)
+{
+	int			 depth;
+	struct scsi_device	*sdev = to_scsi_device(dev);
+	MPT_SCSI_HOST		*hd = (MPT_SCSI_HOST *) sdev->host->hostdata;
+	VirtDevice		*pTarget;
+
+	depth = simple_strtoul(buf, NULL, 0);
+	if (depth == 0)
+		return -EINVAL;
+	pTarget = hd->Targets[sdev->id];
+	if (pTarget == NULL)
+		return -EINVAL;
+	mptscsih_set_queue_depth(sdev, (MPT_SCSI_HOST *) sdev->host->hostdata,
+		pTarget, depth);
+	return count;
 }
 
 
@@ -3280,6 +3316,19 @@ mptscsih_event_process(MPT_ADAPTER *ioc, EventNotificationReply_t *pEvReply)
 	return 1;		/* currently means nothing really */
 }
 
+static struct device_attribute mptscsih_queue_depth_attr = {
+	.attr = {
+		.name = 	"queue_depth",
+		.mode =		S_IWUSR,
+	},
+	.store = mptscsih_store_queue_depth,
+};
+
+static struct device_attribute *mptscsih_dev_attrs[] = {
+	&mptscsih_queue_depth_attr,
+	NULL,
+};
+
 static struct scsi_host_template driver_template = {
 	.proc_name			= "mptscsih",
 	.proc_info			= mptscsih_proc_info,
@@ -3300,6 +3349,7 @@ static struct scsi_host_template driver_template = {
 	.max_sectors			= 8192,
 	.cmd_per_lun			= 7,
 	.use_clustering			= ENABLE_CLUSTERING,
+	.sdev_attrs			= mptscsih_dev_attrs,
 };
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
