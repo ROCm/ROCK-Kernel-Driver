@@ -711,6 +711,7 @@ gss_marshal(struct rpc_task *task, u32 *p, int ruid)
 	/* set verifier flavor*/
 	*p++ = htonl(RPC_AUTH_GSS);
 
+	bufout.data = (u8 *)(p + 1);
 	maj_stat = gss_get_mic(ctx->gc_gss_ctx,
 			       GSS_C_QOP_DEFAULT, 
 			       &bufin, &bufout);
@@ -719,9 +720,9 @@ gss_marshal(struct rpc_task *task, u32 *p, int ruid)
 		       maj_stat);
 		goto out_put_ctx;
 	}
-	p = xdr_encode_netobj(p, &bufout);
+	*p++ = htonl(bufout.len);
+	p += XDR_QUADLEN(bufout.len);
 	gss_put_ctx(ctx);
-	kfree(bufout.data);
 	return p;
 out_put_ctx:
 	gss_put_ctx(ctx);

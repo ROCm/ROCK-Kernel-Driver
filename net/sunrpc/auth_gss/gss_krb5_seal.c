@@ -93,8 +93,6 @@ krb5_make_token(struct krb5_ctx *ctx, int qop_req,
 
 	now = jiffies;
 
-	token->data = NULL;
-
 	if (qop_req != 0)
 		goto out_err;
 
@@ -122,8 +120,6 @@ krb5_make_token(struct krb5_ctx *ctx, int qop_req,
 	}
 
 	token->len = g_token_size(&ctx->mech_used, 22 + tmsglen);
-	if ((token->data = kmalloc(token->len, GFP_KERNEL)) == NULL)
-		goto out_err;
 
 	ptr = token->data;
 	g_make_token_header(&ctx->mech_used, 22 + tmsglen, &ptr, toktype);
