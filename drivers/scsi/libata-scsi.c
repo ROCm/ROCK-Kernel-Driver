@@ -340,6 +340,7 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
  *	@dev: ATA device to which the command is addressed
  *	@cmd: SCSI command to execute
  *	@done: SCSI command completion function
+ *	@xlat_func: Actor which translates @cmd to an ATA taskfile
  *
  *	Our ->queuecommand() function has decided that the SCSI
  *	command issued can be directly translated into an ATA
