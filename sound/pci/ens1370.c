@@ -111,8 +111,11 @@ MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 #define ES_REG_CONTROL	0x00	/* R/W: Interrupt/Chip select control register */
 #define   ES_1370_ADC_STOP	(1<<31)		/* disable capture buffer transfers */
 #define   ES_1370_XCTL1 	(1<<30)		/* general purpose output bit */
-#define   ES_1373_TEST_BIT	(1<<29)		/* should be set to 0 for normal operation */
-#define   ES_1373_RECEN_B	(1<<28)		/* mix record with playback for I2S/SPDIF out */
+#define   ES_1373_BYPASS_P1	(1<<31)		/* bypass SRC for PB1 */
+#define   ES_1373_BYPASS_P2	(1<<30)		/* bypass SRC for PB2 */
+#define   ES_1373_BYPASS_R	(1<<29)		/* bypass SRC for REC */
+#define   ES_1373_TEST_BIT	(1<<28)		/* should be set to 0 for normal operation */
+#define   ES_1373_RECEN_B	(1<<27)		/* mix record with playback for I2S/SPDIF out */
 #define   ES_1373_SPDIF_THRU	(1<<26)		/* 0 = SPDIF thru mode, 1 = SPDIF == dig out */
 #define   ES_1371_JOY_ASEL(o)	(((o)&0x03)<<24)/* joystick port mapping */
 #define   ES_1371_JOY_ASELM	(0x03<<24)	/* mask for above */
@@ -739,8 +742,10 @@ static int snd_ensoniq_trigger(snd_pcm_substream_t *substream, int cmd)
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 	{
 		unsigned int what = 0;
-		snd_pcm_substream_t *s = substream;
-		do {
+		struct list_head *pos;
+		snd_pcm_substream_t *s;
+		snd_pcm_group_for_each(pos, substream) {
+			s = snd_pcm_group_substream_entry(pos);
 			if (s == ensoniq->playback1_substream) {
 				what |= ES_P1_PAUSE;
 				snd_pcm_trigger_done(s, substream);
@@ -749,8 +754,7 @@ static int snd_ensoniq_trigger(snd_pcm_substream_t *substream, int cmd)
 				snd_pcm_trigger_done(s, substream);
 			} else if (s == ensoniq->capture_substream)
 				return -EINVAL;
-			s = s->link_next;
-		} while (s != substream);
+		}
 		spin_lock(&ensoniq->reg_lock);
 		if (cmd == SNDRV_PCM_TRIGGER_PAUSE_PUSH)
 			ensoniq->sctrl |= what;
@@ -764,8 +768,10 @@ static int snd_ensoniq_trigger(snd_pcm_substream_t *substream, int cmd)
 	case SNDRV_PCM_TRIGGER_STOP:
 	{
 		unsigned int what = 0;
-		snd_pcm_substream_t *s = substream;
-		do {
+		struct list_head *pos;
+		snd_pcm_substream_t *s;
+		snd_pcm_group_for_each(pos, substream) {
+			s = snd_pcm_group_substream_entry(pos);
 			if (s == ensoniq->playback1_substream) {
 				what |= ES_DAC1_EN;
 				snd_pcm_trigger_done(s, substream);
@@ -776,8 +782,7 @@ static int snd_ensoniq_trigger(snd_pcm_substream_t *substream, int cmd)
 				what |= ES_ADC_EN;
 				snd_pcm_trigger_done(s, substream);
 			}
-			s = s->link_next;
-		} while (s != substream);
+		}
 		spin_lock(&ensoniq->reg_lock);
 		if (cmd == SNDRV_PCM_TRIGGER_START)
 			ensoniq->ctrl |= what;
@@ -1509,6 +1514,7 @@ static int snd_ensoniq_1371_mixer(ensoniq_t * ensoniq)
 	ac97.read = snd_es1371_codec_read;
 	ac97.private_data = ensoniq;
 	ac97.private_free = snd_ensoniq_mixer_free_ac97;
+	ac97.scaps = AC97_SCAP_AUDIO;
 	if ((err = snd_ac97_mixer(card, &ac97, &ensoniq->u.es1371.ac97)) < 0)
 		return err;
 	for (idx = 0; es1371_spdif_present[idx].vid != (unsigned short)PCI_ANY_ID; idx++)

@@ -161,7 +161,7 @@ static int check_mapped_name(mixer_build_t *state, int unitid, int control, char
 		return 0;
 
 	for (p = state->map; p->id; p++) {
-		if (p->id == unitid &&
+		if (p->id == unitid && p->name &&
 		    (! control || ! p->control || control == p->control)) {
 			buflen--;
 			return strlcpy(buf, p->name, buflen);
@@ -170,6 +170,22 @@ static int check_mapped_name(mixer_build_t *state, int unitid, int control, char
 	return 0;
 }
 
+/* check whether the control should be ignored */
+static int check_ignored_ctl(mixer_build_t *state, int unitid, int control)
+{
+	const struct usbmix_name_map *p;
+
+	if (! state->map)
+		return 0;
+	for (p = state->map; p->id; p++) {
+		if (p->id == unitid && ! p->name &&
+		    (! control || ! p->control || control == p->control)) {
+			// printk("ignored control %d:%d\n", unitid, control);
+			return 1;
+		}
+	}
+	return 0;
+}
 
 /*
  * find an audio control unit with the given unit id
@@ -762,6 +778,9 @@ static void build_feature_ctl(mixer_build_t *state, unsigned char *desc,
 		return;
 	}
 
+	if (check_ignored_ctl(state, unitid, control))
+		return;
+
 	cval = snd_magic_kcalloc(usb_mixer_elem_info_t, 0, GFP_KERNEL);
 	if (! cval) {
 		snd_printk(KERN_ERR "cannot malloc kcontrol\n");
@@ -927,6 +946,9 @@ static void build_mixer_unit_ctl(mixer_build_t *state, unsigned char *desc,
 	unsigned int i, len;
 	snd_kcontrol_t *kctl;
 	usb_audio_term_t iterm;
+
+	if (check_ignored_ctl(state, unitid, 0))
+		return;
 
 	cval = snd_magic_kcalloc(usb_mixer_elem_info_t, 0, GFP_KERNEL);
 	if (! cval)
@@ -1156,6 +1178,8 @@ static int build_audio_procunit(mixer_build_t *state, int unitid, unsigned char 
 		/* FIXME: bitmap might be longer than 8bit */
 		if (! (dsc[12 + num_ins] & (1 << (valinfo->control - 1))))
 			continue;
+		if (check_ignored_ctl(state, unitid, valinfo->control))
+			continue;
 		cval = snd_magic_kcalloc(usb_mixer_elem_info_t, 0, GFP_KERNEL);
 		if (! cval) {
 			snd_printk(KERN_ERR "cannot malloc kcontrol\n");
@@ -1169,7 +1193,14 @@ static int build_audio_procunit(mixer_build_t *state, int unitid, unsigned char 
 		cval->channels = 1;
 
 		/* get min/max values */
-		get_min_max(cval, valinfo->min_value);
+		if (type == USB_PROC_UPDOWN && cval->control == USB_PROC_UPDOWN_MODE_SEL) {
+			/* FIXME: hard-coded */
+			cval->min = 1;
+			cval->max = dsc[15];
+			cval->res = 1;
+			cval->initialized = 1;
+		} else
+			get_min_max(cval, valinfo->min_value);
 
 		kctl = snd_ctl_new1(&mixer_procunit_ctl, cval);
 		if (! kctl) {
@@ -1326,6 +1357,9 @@ static int parse_audio_selector_unit(mixer_build_t *state, int unitid, unsigned 
 		snd_printk(KERN_ERR "invalid SELECTOR UNIT descriptor %d\n", unitid);
 		return -EINVAL;
 	}
+
+	if (check_ignored_ctl(state, unitid, 0))
+		return 0;
 
 	for (i = 0; i < num_ins; i++) {
 		if ((err = parse_audio_unit(state, desc[5 + i])) < 0)

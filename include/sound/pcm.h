@@ -317,8 +317,8 @@ struct _snd_pcm_runtime {
 	snd_pcm_uframes_t silence_size;	/* Silence filling size */
 	snd_pcm_uframes_t boundary;	/* pointers wrap point */
 
-	snd_pcm_uframes_t silenced_start;
-	snd_pcm_uframes_t silenced_size;
+	snd_pcm_uframes_t silence_start; /* starting pointer to silence area */
+	snd_pcm_uframes_t silence_filled; /* size filled with silence */
 
 	snd_pcm_sync_id_t sync;		/* hardware synchronization ID */
 
@@ -328,7 +328,6 @@ struct _snd_pcm_runtime {
 	atomic_t mmap_count;
 
 	/* -- locking / scheduling -- */
-	spinlock_t lock;
 	wait_queue_head_t sleep;
 	struct timer_list tick_timer;
 	struct fasync_struct *fasync;
@@ -360,6 +359,11 @@ struct _snd_pcm_runtime {
 #endif
 };
 
+typedef struct _snd_pcm_group {		/* keep linked substreams */
+	spinlock_t lock;
+	struct list_head substreams;
+} snd_pcm_group_t;
+
 struct _snd_pcm_substream {
 	snd_pcm_t *pcm;
 	snd_pcm_str_t *pstr;
@@ -383,8 +387,10 @@ struct _snd_pcm_substream {
 	/* -- next substream -- */
 	snd_pcm_substream_t *next;
 	/* -- linked substreams -- */
-	snd_pcm_substream_t *link_next;
-	snd_pcm_substream_t *link_prev;
+	struct list_head link_list;	/* linked list member */
+	snd_pcm_group_t self_group;	/* fake group for non linked substream (with substream lock inside) */
+	snd_pcm_group_t *group;		/* pointer to current group */
+	/* -- assigned files -- */
 	snd_pcm_file_t *file;
 	struct file *ffile;
 #if defined(CONFIG_SND_PCM_OSS) || defined(CONFIG_SND_PCM_OSS_MODULE)
@@ -467,6 +473,8 @@ int snd_pcm_notify(snd_pcm_notify_t *notify, int nfree);
 /*
  *  Native I/O
  */
+
+extern rwlock_t snd_pcm_link_rwlock;
 
 int snd_pcm_info(snd_pcm_substream_t * substream, snd_pcm_info_t *info);
 int snd_pcm_info_user(snd_pcm_substream_t * substream, snd_pcm_info_t *info);
@@ -567,6 +575,53 @@ static inline void div64_32(u_int64_t *n, u_int32_t div, u_int32_t *rem)
 /*
  *  PCM library
  */
+
+static inline int snd_pcm_stream_linked(snd_pcm_substream_t *substream)
+{
+	return substream->group != &substream->self_group;
+}
+
+static inline void snd_pcm_stream_lock(snd_pcm_substream_t *substream)
+{
+	read_lock(&snd_pcm_link_rwlock);
+	spin_lock(&substream->self_group.lock);
+}
+
+static inline void snd_pcm_stream_unlock(snd_pcm_substream_t *substream)
+{
+	spin_unlock(&substream->self_group.lock);
+	read_unlock(&snd_pcm_link_rwlock);
+}
+
+static inline void snd_pcm_stream_lock_irq(snd_pcm_substream_t *substream)
+{
+	read_lock_irq(&snd_pcm_link_rwlock);
+	spin_lock(&substream->self_group.lock);
+}
+
+static inline void snd_pcm_stream_unlock_irq(snd_pcm_substream_t *substream)
+{
+	spin_unlock(&substream->self_group.lock);
+	read_unlock_irq(&snd_pcm_link_rwlock);
+}
+
+#define snd_pcm_stream_lock_irqsave(substream, flags) \
+do { \
+	read_lock_irqsave(&snd_pcm_link_rwlock, (flags)); \
+	spin_lock(&substream->self_group.lock); \
+} while (0)
+
+#define snd_pcm_stream_unlock_irqrestore(substream, flags) \
+do { \
+	spin_unlock(&substream->self_group.lock); \
+	read_unlock_irqrestore(&snd_pcm_link_rwlock, (flags)); \
+} while (0)
+
+#define snd_pcm_group_for_each(pos, substream) \
+	list_for_each(pos, &substream->group->substreams)
+
+#define snd_pcm_group_substream_entry(pos) \
+	list_entry(pos, snd_pcm_substream_t, link_list)
 
 static inline int snd_pcm_running(snd_pcm_substream_t *substream)
 {
