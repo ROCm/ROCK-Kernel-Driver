@@ -2096,7 +2096,7 @@ static ssize_t cs_read(struct file *file, char __user *buffer, size_t count, lof
 	unsigned copied=0;
 
 	CS_DBGOUT(CS_WAVE_READ | CS_FUNCTION, 4, 
-		printk("cs46xx: cs_read()+ %d\n",count) );
+		printk("cs46xx: cs_read()+ %zd\n",count) );
 	state = (struct cs_state *)card->states[0];
 	if(!state)
 		return -ENODEV;
@@ -2157,9 +2157,9 @@ static ssize_t cs_read(struct file *file, char __user *buffer, size_t count, lof
 		}
 
 		CS_DBGOUT(CS_WAVE_READ, 2, printk(KERN_INFO 
-			"_read() copy_to cnt=%d count=%d ", cnt,count) );
+			"_read() copy_to cnt=%d count=%zd ", cnt,count) );
 		CS_DBGOUT(CS_WAVE_READ, 8, printk(KERN_INFO 
-			" .dmasize=%d .count=%d buffer=%p ret=%d\n",
+			" .dmasize=%d .count=%d buffer=%p ret=%zd\n",
 			dmabuf->dmasize,dmabuf->count,buffer,ret) );
 
                 if (cs_copy_to_user(state, buffer, 
@@ -2184,7 +2184,7 @@ out2:
 	up(&state->sem);
 	set_current_state(TASK_RUNNING);
 	CS_DBGOUT(CS_WAVE_READ | CS_FUNCTION, 4, 
-		printk("cs46xx: cs_read()- %d\n",ret) );
+		printk("cs46xx: cs_read()- %zd\n",ret) );
 	return ret;
 }
 
@@ -2202,7 +2202,7 @@ static ssize_t cs_write(struct file *file, const char __user *buffer, size_t cou
 	int cnt;
 
 	CS_DBGOUT(CS_WAVE_WRITE | CS_FUNCTION, 4,
-		printk("cs46xx: cs_write called, count = %d\n", count) );
+		printk("cs46xx: cs_write called, count = %zd\n", count) );
 	state = (struct cs_state *)card->states[1];
 	if(!state)
 		return -ENODEV;
@@ -2309,7 +2309,7 @@ out:
 	set_current_state(TASK_RUNNING);
 
 	CS_DBGOUT(CS_WAVE_WRITE | CS_FUNCTION, 2, 
-		printk("cs46xx: cs_write()- ret=0x%x\n", ret) );
+		printk("cs46xx: cs_write()- ret=%zd\n", ret) );
 	return ret;
 }
 
