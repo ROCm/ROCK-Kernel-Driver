@@ -60,6 +60,8 @@ extern void qlogicfas_preset(int port, int irq);
 extern struct Scsi_Host *__qlogicfas_detect(Scsi_Host_Template *);
 extern int qlogicfas_bus_reset(Scsi_Cmnd *);
 
+static char *qlogic_name = "qlogic_cs";
+
 #ifdef PCMCIA_DEBUG
 static int pc_debug = PCMCIA_DEBUG;
 MODULE_PARM(pc_debug, "i");
@@ -244,9 +246,11 @@ static void qlogic_config(dev_link_t * link)
 	else
 		qlogicfas_preset(link->io.BasePort1, link->irq.AssignedIRQ);
 
+	qlogicfas_driver_template.name = qlogic_name;
+	qlogicfas_driver_template.proc_name = qlogic_name;
 	host = __qlogicfas_detect(&qlogicfas_driver_template);
 	if (!host) {
-		printk(KERN_INFO "qlogic_cs: no SCSI devices found\n");
+		printk(KERN_INFO "%s: no SCSI devices found\n", qlogic_name);
 		goto out;
 	}
 
@@ -337,7 +341,7 @@ static int qlogic_event(event_t event, int priority, event_callback_args_t * arg
 static struct pcmcia_driver qlogic_cs_driver = {
 	.owner		= THIS_MODULE,
 	.drv		= {
-		.name	= "qlogic_cs",
+	.name		= "qlogic_cs",
 	},
 	.attach		= qlogic_attach,
 	.detach		= qlogic_detach,
