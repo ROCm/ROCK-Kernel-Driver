@@ -315,11 +315,17 @@ $(MODVERDIR)/%.ver: %.c FORCE
 	@if [ -r $@ ] && cmp -s $@ $@.tmp; then \
 	  rm -f $@.tmp; \
 	else \
+	  touch $(TOPDIR)/include/linux/modversions.h; \
 	  mv -f $@.tmp $@; \
 	fi
 
 # updates .ver files but not modversions.h
 fastdep: $(addprefix $(MODVERDIR)/,$(export-objs:.o=.ver))
+ifneq ($(export-objs),)
+	@mkdir -p $(TOPDIR)/.tmp_export-objs/modules/$(RELDIR)
+	@touch $(addprefix $(TOPDIR)/.tmp_export-objs/modules/$(RELDIR)/,$(export-objs:.o=.ver))
+endif
+
 
 endif # export-objs 
 

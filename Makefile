@@ -245,15 +245,14 @@ $(sort $(vmlinux-objs)): $(SUBDIRS) ;
 # 	Handle descending into subdirectories listed in $(SUBDIRS)
 
 .PHONY: $(SUBDIRS)
-$(SUBDIRS): prepare
+$(SUBDIRS): .hdepend prepare include/config/MARKER
 	@$(MAKE) -C $@
 
-#	Things we need done before we even start the actual build.
-#	The dependency on .hdepend will in turn take care of
-#	include/asm, include/linux/version etc.
+#	Things we need done before we descend to build or make
+#	module versions are listed in "prepare"
 
 .PHONY: prepare
-prepare: .hdepend include/config/MARKER
+prepare: include/linux/version.h include/asm
 
 # Single targets
 # ---------------------------------------------------------------------------
@@ -326,39 +325,29 @@ scripts:
 
 depend dep: .hdepend
 
+#	.hdepend is our (misnomed) marker for whether we've run
+#	generated module versions and made archdep
+
+.hdepend: $(if $(filter dep depend,$(MAKECMDGOALS)),FORCE)
+	@$(MAKE) archdep include/linux/modversions.h
+	@touch $@
+
 ifdef CONFIG_MODVERSIONS
-
-#	Before descending for the actual build, we need module
-#	versions done. - Still using the old, illogical name
-#	.hdepend
-
-#	.hdepend only indicates if we have generated module
-#	version checksums before now. For now, if they've
-#	been generated once, no rechecking will be done unless
-#	explicitly asked for using "make dep".
-
-.hdepend: scripts/fixdep include/linux/version.h include/asm \
-	  $(if $(filter dep depend,$(MAKECMDGOALS)),FORCE)
-	touch $@
-	@$(MAKE) $(patsubst %,_sfdep_%,$(SUBDIRS))
-	@$(MAKE) include/linux/modversions.h
-	@$(MAKE) archdep
-
-$(patsubst %,_sfdep_%,$(SUBDIRS)): FORCE
-	@$(MAKE) -C $(patsubst _sfdep_%, %, $@) fastdep
 
 # 	Update modversions.h, but only if it would change.
 
-include/linux/modversions.h: FORCE
-	@(echo "#ifndef _LINUX_MODVERSIONS_H";\
-	  echo "#define _LINUX_MODVERSIONS_H"; \
-	  echo "#include <linux/modsetver.h>"; \
-	  cd $(TOPDIR)/include/linux; \
-	  for f in `find modules -name \*.ver`; do \
-	    echo "#include <linux/$${f}>"; \
-	  done; \
-	  echo "#endif"; \
+include/linux/modversions.h: scripts/fixdep prepare FORCE
+	@rm -rf .tmp_export-objs
+	@$(MAKE) $(patsubst %,_sfdep_%,$(SUBDIRS))
+	@( echo "#ifndef _LINUX_MODVERSIONS_H";\
+	   echo "#define _LINUX_MODVERSIONS_H"; \
+	   echo "#include <linux/modsetver.h>"; \
+	   for f in `cd .tmp_export-objs; find modules -name \*.ver -print`; do \
+	     echo "#include <linux/$${f}>"; \
+	   done; \
+	   echo "#endif"; \
 	) > $@.tmp
+	@rm -rf .tmp_export-objs
 	@if [ -r $@ ] && cmp -s $@ $@.tmp; then \
 		echo $@ was not updated; \
 		rm -f $@.tmp; \
@@ -367,12 +356,14 @@ include/linux/modversions.h: FORCE
 		mv -f $@.tmp $@; \
 	fi
 
+$(patsubst %,_sfdep_%,$(SUBDIRS)): FORCE
+	@$(MAKE) -C $(patsubst _sfdep_%, %, $@) fastdep
+
 else # !CONFIG_MODVERSIONS
 
-.hdepend: include/linux/version.h include/asm \
-	  $(if $(filter dep depend,$(MAKECMDGOALS)),FORCE)
-	touch $@
-	@$(MAKE) archdep
+.PHONY: include/linux/modversions.h
+
+include/linux/modversions.h:
 
 endif # CONFIG_MODVERSIONS
 
