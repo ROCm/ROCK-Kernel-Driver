@@ -648,7 +648,10 @@ int lm78_detect(struct i2c_adapter *adapter, int address, int kind)
 	if ((err = i2c_attach_client(new_client)))
 		goto ERROR2;
 
-	/* register sysfs hooks */
+	/* Initialize the LM78 chip */
+	lm78_init_client(new_client);
+
+	/* Register sysfs hooks */
 	device_create_file(&new_client->dev, &dev_attr_in_input0);
 	device_create_file(&new_client->dev, &dev_attr_in_min0);
 	device_create_file(&new_client->dev, &dev_attr_in_max0);
@@ -685,8 +688,6 @@ int lm78_detect(struct i2c_adapter *adapter, int address, int kind)
 	device_create_file(&new_client->dev, &dev_attr_alarms);
 	device_create_file(&new_client->dev, &dev_attr_vid);
 
-	/* Initialize the LM78 chip */
-	lm78_init_client(new_client);
 	return 0;
 
 ERROR2:

@@ -204,11 +204,14 @@ static int lm75_detect(struct i2c_adapter *adapter, int address, int kind)
 	if ((err = i2c_attach_client(new_client)))
 		goto exit_free;
 
+	/* Initialize the LM75 chip */
+	lm75_init_client(new_client);
+	
+	/* Register sysfs hooks */
 	device_create_file(&new_client->dev, &dev_attr_temp_max);
 	device_create_file(&new_client->dev, &dev_attr_temp_min);
 	device_create_file(&new_client->dev, &dev_attr_temp_input);
 
-	lm75_init_client(new_client);
 	return 0;
 
 exit_free:

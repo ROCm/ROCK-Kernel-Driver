@@ -49,6 +49,7 @@ struct i2c_dev {
 	int minor;
 	struct i2c_adapter *adap;
 	struct class_device class_dev;
+	struct completion released;	/* FIXME, we need a class_device_unregister() */
 };
 #define to_i2c_dev(d) container_of(d, struct i2c_dev, class_dev)
 
@@ -112,7 +113,6 @@ static void return_i2c_dev(struct i2c_dev *i2c_dev)
 	spin_lock(&i2c_dev_array_lock);
 	i2c_dev_array[i2c_dev->minor] = NULL;
 	spin_unlock(&i2c_dev_array_lock);
-	kfree(i2c_dev);
 }
 
 static ssize_t show_dev(struct class_device *class_dev, char *buf)
@@ -421,8 +421,15 @@ static struct file_operations i2cdev_fops = {
 	.release	= i2cdev_release,
 };
 
+static void release_i2c_dev(struct class_device *dev)
+{
+	struct i2c_dev *i2c_dev = to_i2c_dev(dev);
+	complete(&i2c_dev->released);
+}
+
 static struct class i2c_dev_class = {
-	.name	= "i2c-dev",
+	.name		= "i2c-dev",
+	.release	= &release_i2c_dev,
 };
 
 static int i2cdev_attach_adapter(struct i2c_adapter *adap)
@@ -453,6 +460,7 @@ static int i2cdev_attach_adapter(struct i2c_adapter *adap)
 	return 0;
 error:
 	return_i2c_dev(i2c_dev);
+	kfree(i2c_dev);
 	return retval;
 }
 
@@ -464,9 +472,12 @@ static int i2cdev_detach_adapter(struct i2c_adapter *adap)
 	if (!i2c_dev)
 		return -ENODEV;
 
-	class_device_unregister(&i2c_dev->class_dev);
+	init_completion(&i2c_dev->released);
 	devfs_remove("i2c/%d", i2c_dev->minor);
 	return_i2c_dev(i2c_dev);
+	class_device_unregister(&i2c_dev->class_dev);
+	wait_for_completion(&i2c_dev->released);
+	kfree(i2c_dev);
 
 	dev_dbg(&adap->dev, "Adapter unregistered\n");
 	return 0;
