@@ -1,10 +1,9 @@
 # -*- shell-script -*-
 
-menu "IEEE 1394 (FireWire) support (EXPERIMENTAL)"
-	depends on EXPERIMENTAL
+menu "IEEE 1394 (FireWire) support"
 
 config IEEE1394
-	tristate "IEEE 1394 (FireWire) support (EXPERIMENTAL)"
+	tristate "IEEE 1394 (FireWire) support"
 	help
 	  IEEE 1394 describes a high performance serial bus, which is also
 	  known as FireWire(tm) or i.Link(tm) and is used for connecting all
@@ -108,7 +107,7 @@ config IEEE1394_SBP2_PHYS_DMA
 
 config IEEE1394_ETH1394
 	tristate "Ethernet over 1394"
-	depends on IEEE1394
+	depends on IEEE1394 && EXPERIMENTAL
 	help
 	  This driver implements a functional majority of RFC 2734: IPv4 over
 	  1394.  It will provide IP connectivity with implementations of RFC
