@@ -242,6 +242,7 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 	q->backing_dev_info.state = 0;
 	blk_queue_max_sectors(q, MAX_SECTORS);
 	blk_queue_hardsect_size(q, 512);
+	blk_queue_dma_alignment(q, 511);
 
 	/*
 	 * by default assume old behaviour and bounce for any highmem page
@@ -406,6 +407,21 @@ void blk_queue_segment_boundary(request_queue_t *q, unsigned long mask)
 	}
 
 	q->seg_boundary_mask = mask;
+}
+
+/**
+ * blk_queue_dma_alignment - set dma length and memory alignment
+ * @q:  the request queue for the device
+ * @dma_mask:  alignment mask
+ *
+ * description:
+ *    set required memory and length aligment for direct dma transactions.
+ *    this is used when buiding direct io requests for the queue.
+ *
+ **/
+void blk_queue_dma_alignment(request_queue_t *q, int mask)
+{
+	q->dma_alignment = mask;
 }
 
 void blk_queue_assign_lock(request_queue_t *q, spinlock_t *lock)
@@ -2124,6 +2140,7 @@ EXPORT_SYMBOL(blk_queue_max_hw_segments);
 EXPORT_SYMBOL(blk_queue_max_segment_size);
 EXPORT_SYMBOL(blk_queue_hardsect_size);
 EXPORT_SYMBOL(blk_queue_segment_boundary);
+EXPORT_SYMBOL(blk_queue_dma_alignment);
 EXPORT_SYMBOL(blk_rq_map_sg);
 EXPORT_SYMBOL(blk_nohighio);
 EXPORT_SYMBOL(blk_dump_rq_flags);
