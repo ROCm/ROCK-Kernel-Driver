@@ -257,6 +257,8 @@ u32 ethtool_op_get_link(struct net_device *dev);
 u32 ethtool_op_get_tx_csum(struct net_device *dev);
 u32 ethtool_op_get_sg(struct net_device *dev);
 int ethtool_op_set_sg(struct net_device *dev, u32 data);
+u32 ethtool_op_get_tso(struct net_device *dev);
+int ethtool_op_set_tso(struct net_device *dev, u32 data);
 
 /**
  * &ethtool_ops - Alter and report network device settings

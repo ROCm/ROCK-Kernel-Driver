@@ -45,6 +45,21 @@ int ethtool_op_set_sg(struct net_device *dev, u32 data)
 	return 0;
 }
 
+u32 ethtool_op_get_tso(struct net_device *dev)
+{
+	return (dev->features & NETIF_F_TSO) != 0;
+}
+
+int ethtool_op_set_tso(struct net_device *dev, u32 data)
+{
+	if (data)
+		dev->features |= NETIF_F_TSO;
+	else
+		dev->features &= ~NETIF_F_TSO;
+
+	return 0;
+}
+
 /* Handlers for each ethtool command */
 
 static int ethtool_get_settings(struct net_device *dev, void *useraddr)
