@@ -174,7 +174,7 @@ c_flags = -Wp,-MD,$(depfile) $(CFLAGS) $(NOSTDINC_FLAGS) \
 # files (fix-dep filters them), so touch modversions.h if any of the .ver
 # files changes
 
-quiet_cmd_cc_ver_c = MKVER  include/linux/modules/$(RELDIR)/$*.ver
+quiet_cmd_cc_ver_c = MKVER   include/linux/modules/$(RELDIR)/$*.ver
 cmd_cc_ver_c = $(CPP) $(c_flags) $< | $(GENKSYMS) $(genksyms_smp_prefix) \
 		 -k $(VERSION).$(PATCHLEVEL).$(SUBLEVEL) > $@.tmp
 
@@ -271,26 +271,26 @@ c_flags = -Wp,-MD,$(depfile) $(CFLAGS) $(NOSTDINC_FLAGS) \
 	  -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) \
 	  $(export_flags) 
 
-quiet_cmd_cc_s_c = CC     $(echo_target)
+quiet_cmd_cc_s_c = CC      $(echo_target)
 cmd_cc_s_c       = $(CC) $(c_flags) -S -o $@ $< 
 
 %.s: %.c FORCE
 	$(call if_changed_dep,cc_s_c)
 
-quiet_cmd_cc_i_c = CPP    $(echo_target)
+quiet_cmd_cc_i_c = CPP     $(echo_target)
 cmd_cc_i_c       = $(CPP) $(c_flags)   -o $@ $<
 
 %.i: %.c FORCE
 	$(call if_changed_dep,cc_i_c)
 
-quiet_cmd_cc_o_c = CC     $(echo_target)
+quiet_cmd_cc_o_c = CC      $(echo_target)
 cmd_cc_o_c       = $(CC) $(c_flags) -c -o $@ $<
 
 %.o: %.c FORCE
 	$(call if_changed_dep,cc_o_c)
 
-quiet_cmd_cc_lst_c = '  Generating $(echo_target)'
-cmd_cc_lst_c     = $(CC) $(c_flags) -g -c -o $*.o $< && $(TOPDIR)/scripts/makelst $*.o $(TOPDIR)/System.map $(OBJDUMP) > $@
+quiet_cmd_cc_lst_c = MKLST   $(echo_target)
+cmd_cc_lst_c       = $(CC) $(c_flags) -g -c -o $*.o $< && $(TOPDIR)/scripts/makelst $*.o $(TOPDIR)/System.map $(OBJDUMP) > $@
 
 %.lst: %.c FORCE
 	$(call if_changed_dep,cc_lst_c)
@@ -306,13 +306,13 @@ $(real-objs-m:.o=.s): modkern_aflags := $(AFLAGS_MODULE)
 a_flags = -Wp,-MD,$(depfile) $(AFLAGS) $(NOSTDINC_FLAGS) \
 	  $(modkern_aflags) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
 
-quiet_cmd_as_s_S = CPP    $(echo_target)
+quiet_cmd_as_s_S = CPP     $(echo_target)
 cmd_as_s_S       = $(CPP) $(a_flags)   -o $@ $< 
 
 %.s: %.S FORCE
 	$(call if_changed_dep,as_s_S)
 
-quiet_cmd_as_o_S = AS     $(echo_target)
+quiet_cmd_as_o_S = AS      $(echo_target)
 cmd_as_o_S       = $(CC) $(a_flags) -c -o $@ $<
 
 %.o: %.S FORCE
@@ -330,7 +330,7 @@ $(sort $(subdir-obj-y)): sub_dirs ;
 # Rule to compile a set of .o files into one .o file
 #
 ifdef O_TARGET
-quiet_cmd_link_o_target = LD     $(echo_target)
+quiet_cmd_link_o_target = LD      $(echo_target)
 # If the list of objects to link is empty, just create an empty O_TARGET
 cmd_link_o_target = $(if $(strip $(obj-y)),\
 		      $(LD) $(LDFLAGS) $(EXTRA_LDFLAGS) -r -o $@ $(filter $(obj-y), $^),\
@@ -346,7 +346,7 @@ endif # O_TARGET
 # Rule to compile a set of .o files into one .a file
 #
 ifdef L_TARGET
-quiet_cmd_link_l_target = AR     $(echo_target)
+quiet_cmd_link_l_target = AR      $(echo_target)
 cmd_link_l_target = rm -f $@; $(AR) $(EXTRA_ARFLAGS) rcs $@ $(obj-y)
 
 $(L_TARGET): $(obj-y) FORCE
@@ -359,7 +359,7 @@ endif
 # Rule to link composite objects
 #
 
-quiet_cmd_link_multi = LD     $(echo_target)
+quiet_cmd_link_multi = LD      $(echo_target)
 cmd_link_multi = $(LD) $(LDFLAGS) $(EXTRA_LDFLAGS) -r -o $@ $(filter $($(basename $@)-objs),$^)
 
 # We would rather have a list of rules like
@@ -381,7 +381,7 @@ host-progs-single     := $(foreach m,$(host-progs),$(if $($(m)-objs),,$(m)))
 host-progs-multi      := $(foreach m,$(host-progs),$(if $($(m)-objs),$(m)))
 host-progs-multi-objs := $(foreach m,$(host-progs-multi),$($(m)-objs))
 
-quiet_cmd_host_cc__c  = HOSTCC $(echo_target)
+quiet_cmd_host_cc__c  = HOSTCC  $(echo_target)
 cmd_host_cc__c        = $(HOSTCC) -Wp,-MD,$(depfile) \
 			$(HOSTCFLAGS) $(HOST_EXTRACFLAGS) \
 			$(HOST_LOADLIBES) -o $@ $<
@@ -389,14 +389,14 @@ cmd_host_cc__c        = $(HOSTCC) -Wp,-MD,$(depfile) \
 $(host-progs-single): %: %.c FORCE
 	$(call if_changed_dep,host_cc__c)
 
-quiet_cmd_host_cc_o_c = HOSTCC $(echo_target)
+quiet_cmd_host_cc_o_c = HOSTCC  $(echo_target)
 cmd_host_cc_o_c       = $(HOSTCC) -Wp,-MD,$(depfile) \
 			$(HOSTCFLAGS) $(HOST_EXTRACFLAGS) -c -o $@ $<
 
 $(host-progs-multi-objs): %.o: %.c FORCE
 	$(call if_changed_dep,host_cc_o_c)
 
-quiet_cmd_host_cc__o  = HOSTLD $(echo_target)
+quiet_cmd_host_cc__o  = HOSTLD  $(echo_target)
 cmd_host_cc__o        = $(HOSTCC) $(HOSTLDFLAGS) -o $@ $($@-objs) \
 			$(HOST_LOADLIBES)
 
@@ -411,9 +411,11 @@ endif # ! fastdep
 # Shipped files
 # ===========================================================================
 
+quiet_cmd_shipped = SHIPPED $(echo_target)
+cmd_shipped = cp $< $@
+
 %:: %_shipped
-	@echo '  CP     $(echo_target)'
-	@cp $< $@
+	$(call cmd,shipped)
 
 # Commands useful for building a boot image
 # ===========================================================================
@@ -421,7 +423,7 @@ endif # ! fastdep
 #	Use as following:
 #
 #	target: source(s) FORCE
-#		$(if_changed,ld/objcopy)
+#		$(if_changed,ld/objcopy/gzip)
 #
 #	and add target to EXTRA_TARGETS so that we know we have to
 #	read in the saved command line
@@ -429,20 +431,20 @@ endif # ! fastdep
 # Linking
 # ---------------------------------------------------------------------------
 
-quiet_cmd_ld = LD     $(echo_target)
+quiet_cmd_ld = LD      $(echo_target)
 cmd_ld = $(LD) $(LDFLAGS) $(EXTRA_LDFLAGS) $(LDFLAGS_$@) \
 	       $(filter-out FORCE,$^) -o $@ 
 
 # Objcopy
 # ---------------------------------------------------------------------------
 
-quiet_cmd_objcopy = OBJCPY $(echo_target)
+quiet_cmd_objcopy = OBJCOPY $(echo_target)
 cmd_objcopy = $(OBJCOPY) $(OBJCOPYFLAGS) $< $@
 
 # Gzip
 # ---------------------------------------------------------------------------
 
-quiet_cmd_gzip = GZIP   $(echo_target)
+quiet_cmd_gzip = GZIP    $(echo_target)
 cmd_gzip = gzip -f -9 < $< > $@
 
 # ===========================================================================
