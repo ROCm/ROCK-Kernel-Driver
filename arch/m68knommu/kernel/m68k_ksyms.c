@@ -21,7 +21,7 @@
 #include <asm/current.h>
 
 extern void dump_thread(struct pt_regs *, struct user *);
-extern int dump_fpu(elf_fpregset_t *);
+extern int dump_fpu(struct pt_regs *, elf_fpregset_t *);
 
 /* platform dependent support */
 
