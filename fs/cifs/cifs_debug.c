@@ -125,7 +125,7 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 		tcon = list_entry(tmp, struct cifsTconInfo, cifsConnectionList);
 		length =
 		    sprintf(buf,
-			    "\n%d) %s Uses: %d on FS: %s with characteristics: 0x%x Attributes: 0x%x\n\tPathComponentMax: %d Status: %d",
+			    "\n%d) %s Uses: %d on FS: %s with characteristics: 0x%x Attributes: 0x%x\nPathComponentMax: %d Status: %d",
 			    i, tcon->treeName,
 			    atomic_read(&tcon->useCount),
 			    tcon->nativeFileSystem,
@@ -144,6 +144,17 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 		buf += length;
 		if(tcon->tidStatus == CifsNeedReconnect)
 			buf += sprintf(buf, "\tDISCONNECTED ");
+#ifdef CONFIG_CIFS_STATS
+		length = sprintf(buf,
+			"\nTotal SMBs: %d Reads: %d BytesRead %lld Writes: %d BytesWritten %lld",
+			atomic_read(&tcon->num_smbs_sent),
+			atomic_read(&tcon->num_reads),
+			(long long)(tcon->bytes_read),
+			atomic_read(&tcon->num_writes),
+			(long long)(tcon->bytes_written));
+		buf += length;
+#endif
+
 	}
 	read_unlock(&GlobalSMBSeslock);
 

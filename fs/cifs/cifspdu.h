@@ -1687,7 +1687,7 @@ struct data_blob {
 	void (*free) (struct data_blob * data_blob);
 };
 
-#ifdef CIFS_POSIX
+#ifdef CONFIG_CIFS_POSIX
 /* 
 	For better POSIX semantics from Linux client, (even better
 	than the existing CIFS Unix Extensions) we need updated PDUs for:

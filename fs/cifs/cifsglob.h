@@ -197,6 +197,14 @@ struct cifsTconInfo {
 	__u16 Flags;		/* optional support bits */
 	enum statusEnum tidStatus;
 	atomic_t useCount;	/* how many mounts (explicit or implicit) to this share */
+#ifdef CONFIG_CIFS_STATS
+	atomic_t num_smbs_sent;
+	atomic_t num_writes;
+	atomic_t num_reads;
+	__u64    bytes_read;
+	__u64    bytes_written;
+	spinlock_t stat_lock;
+#endif
 	FILE_SYSTEM_DEVICE_INFO fsDevInfo;
 	FILE_SYSTEM_ATTRIBUTE_INFO fsAttrInfo;	/* ok if file system name truncated */
 	FILE_SYSTEM_UNIX_INFO fsUnixInfo;

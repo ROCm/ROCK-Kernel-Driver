@@ -628,12 +628,21 @@ cifs_write(struct file * file, const char *write_data,
 		long_op = FALSE; /* subsequent writes fast - 15 seconds is plenty */
 	}
 
+#ifdef CONFIG_CIFS_STATS
+	if(total_written > 0) {
+		atomic_inc(&pTcon->num_writes);
+		spin_lock(&pTcon->stat_lock);
+		pTcon->bytes_written += total_written;
+		spin_unlock(&pTcon->stat_lock);
+	}
+#endif		
+
 	/* since the write may have blocked check these pointers again */
 	if(file->f_dentry) {
 		if(file->f_dentry->d_inode) {
 			file->f_dentry->d_inode->i_ctime = file->f_dentry->d_inode->i_mtime =
 				CURRENT_TIME;
-			if (bytes_written > 0) {
+			if (total_written > 0) {
 				if (*poffset > file->f_dentry->d_inode->i_size)
 					i_size_write(file->f_dentry->d_inode, *poffset);
 			}
@@ -939,10 +948,15 @@ cifs_read(struct file * file, char *read_data, size_t read_size,
 				return rc;
 			}
 		} else {
+#ifdef CONFIG_CIFS_STATS
+			atomic_inc(&pTcon->num_reads);
+			spin_lock(&pTcon->stat_lock);
+			pTcon->bytes_read += total_read;
+			spin_unlock(&pTcon->stat_lock);
+#endif
 			*poffset += bytes_read;
 		}
 	}
-
 	FreeXid(xid);
 	return total_read;
 }
@@ -1104,7 +1118,12 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 				le16_to_cpu(pSMBr->DataOffset), &lru_pvec);
 
 			i +=  bytes_read >> PAGE_CACHE_SHIFT;
-
+#ifdef CONFIG_CIFS_STATS
+			atomic_inc(&pTcon->num_reads);
+			spin_lock(&pTcon->stat_lock);
+			pTcon->bytes_read += bytes_read;
+			spin_unlock(&pTcon->stat_lock);
+#endif
 			if((int)(bytes_read & PAGE_CACHE_MASK) != bytes_read) {
 				cFYI(1,("Partial page %d of %d read to cache",i++,num_pages));
 

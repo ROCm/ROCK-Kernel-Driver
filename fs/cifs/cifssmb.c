@@ -37,7 +37,7 @@
 #include "cifs_unicode.h"
 #include "cifs_debug.h"
 
-#ifdef CIFS_POSIX
+#ifdef CONFIG_CIFS_POSIX
 static struct {
 	int index;
 	char *name;
@@ -155,6 +155,7 @@ smb_init(int smb_command, int wct, struct cifsTconInfo *tcon,
 
 	*request_buf = cifs_buf_get();
 	if (*request_buf == 0) {
+		/* BB should we add a retry in here if not a writepage? */
 		return -ENOMEM;
 	}
     /* Although the original thought was we needed the response buf for  */
@@ -165,6 +166,12 @@ smb_init(int smb_command, int wct, struct cifsTconInfo *tcon,
 
 	header_assemble((struct smb_hdr *) *request_buf, smb_command, tcon,
 			wct /*wct */ );
+
+#ifdef CONFIG_CIFS_STATS
+        if(tcon != NULL) {
+                atomic_inc(&tcon->num_smbs_sent);
+        }
+#endif
 	return rc;
 }
 
