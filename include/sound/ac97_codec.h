@@ -268,6 +268,14 @@ struct _snd_ac97 {
 };
 
 /* conditions */
+static inline int ac97_is_audio(ac97_t * ac97)
+{
+	return (ac97->scaps & AC97_SCAP_AUDIO);
+}
+static inline int ac97_is_modem(ac97_t * ac97)
+{
+	return (ac97->scaps & AC97_SCAP_MODEM);
+}
 static inline int ac97_is_rev22(ac97_t * ac97)
 {
 	return (ac97->ext_id & AC97_EI_REV_MASK) == AC97_EI_REV_22;
@@ -278,7 +286,8 @@ static inline int ac97_can_amap(ac97_t * ac97)
 }
 
 /* functions */
-int snd_ac97_mixer(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97);
+int snd_ac97_mixer(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97);	/* create mixer controls */
+int snd_ac97_modem(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97);	/* create modem controls */
 
 void snd_ac97_write(ac97_t *ac97, unsigned short reg, unsigned short value);
 unsigned short snd_ac97_read(ac97_t *ac97, unsigned short reg);
@@ -296,6 +305,7 @@ enum { AC97_TUNE_HP_ONLY, AC97_TUNE_SWAP_HP };
 struct ac97_quirk {
 	unsigned short vendor;
 	unsigned short device;
+	const char *name;
 	int type;
 };
 

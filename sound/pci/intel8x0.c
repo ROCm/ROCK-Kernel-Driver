@@ -1508,12 +1508,16 @@ static struct _ac97_ali_rate_regs {
 	{ ALID_SPDIFIN, { 0, 0, 0 }, -1 },
 };
 
+static struct ac97_quirk ac97_quirks[] = {
+	{ 0x1028, 0x0126, "Dell Optiplex GX260", AC97_TUNE_HP_ONLY },
+	{ } /* terminator */
+};
 
 static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 {
 	ac97_t ac97, *x97;
 	ichdev_t *ichdev;
-	int err, i, channels = 2, codecs;
+	int err, i, num, channels = 2, codecs, _codecs;
 	unsigned int glob_sta = 0;
 
 	for (i = 0; i <= ICHD_LAST; i++) {
@@ -1589,6 +1593,7 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 	if ((err = snd_ac97_mixer(chip->card, &ac97, &x97)) < 0)
 		return err;
 	chip->ac97[0] = x97;
+	snd_ac97_tune_hardware(chip->ac97[0], chip->pci, ac97_quirks);
 	chip->ichd[ICHD_PCMOUT].ac97 = x97;
 	chip->ichd[ICHD_PCMIN].ac97 = x97;
 	if (x97->ext_id & AC97_EI_VRM)
@@ -1604,20 +1609,20 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 		snd_ac97_update_bits(x97, AC97_EXTENDED_ID, AC97_EI_DACS_SLOT_MASK, 0);
 	/* AnalogDevices CNR boards uses special codec chaining */
 	/* skip standard test method for secondary codecs in this case */
-	if (x97->flags & AC97_AD_MULTI) {
+	if (x97->flags & AC97_AD_MULTI)
 		codecs = 1;
-		goto __skip_secondary;
-	}
 	if (codecs < 2)
 		goto __skip_secondary;
-	for (i = 1; i < codecs; i++) {
-		ac97.num = i;
+	for (i = 1, num = 1, _codecs = codecs; num < _codecs; num++) {
+		ac97.num = num;
 		if ((err = snd_ac97_mixer(chip->card, &ac97, &x97)) < 0) {
 			snd_printk("Unable to initialize codec #%i [device = %i, GLOB_STA = 0x%x]\n", i, chip->device_type, glob_sta);
-			codecs = i;
-			break;
+			codecs--;
+			continue;
 		}
-		chip->ac97[i] = x97;
+		chip->ac97[i++] = x97;
+		if (!ac97_is_audio(x97))
+			continue;
 		switch (chip->device_type) {
 		case DEVICE_INTEL_ICH4:
 			if (chip->ichd[ICHD_PCM2IN].ac97 == NULL)
@@ -1656,14 +1661,16 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 		}
 		iputbyte(chip, ICHREG(SDM), tmp);
 	}
-      	for (i = 0; i < 3; i++) {
-		if ((x97 = chip->ac97[i]) == NULL)
+      	for (i = 0; i < codecs; i++) {
+		x97 = chip->ac97[i];
+		if (!ac97_is_audio(x97))
 			continue;
 		if (x97->scaps & AC97_SCAP_SURROUND_DAC)
 			chip->multi4 = 1;
 	}
-      	for (i = 0; i < 3 && chip->multi4; i++) {
-		if ((x97 = chip->ac97[i]) == NULL)
+      	for (i = 0; i < codecs && chip->multi4; i++) {
+		x97 = chip->ac97[i];
+		if (!ac97_is_audio(x97))
 			continue;
 		if (x97->scaps & AC97_SCAP_CENTER_LFE_DAC)
 			chip->multi6 = 1;
@@ -1674,7 +1681,10 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 		if (chip->multi4)
 			goto __6ch;
 		for ( ; i < codecs; i++) {
-			if (ac97_is_rev22(x97 = chip->ac97[i])) {
+			x97 = chip->ac97[i];
+			if (!ac97_is_audio(x97))
+				continue;
+			if (ac97_is_rev22(x97)) {
 				snd_ac97_update_bits(x97, AC97_EXTENDED_ID, AC97_EI_DACS_SLOT_MASK, 1);
 				chip->multi4 = 1;
 				break;
@@ -1682,7 +1692,10 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 		}
 	      __6ch:
 		for ( ; i < codecs && chip->multi4; i++) {
-			if (ac97_is_rev22(x97 = chip->ac97[i])) {
+			x97 = chip->ac97[i];
+			if (!ac97_is_audio(x97))
+				continue;
+			if (ac97_is_rev22(x97)) {
 				snd_ac97_update_bits(x97, AC97_EXTENDED_ID, AC97_EI_DACS_SLOT_MASK, 2);
 				chip->multi6 = 1;
 				break;
@@ -1691,7 +1704,10 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 		/* ok, some older codecs might support only AMAP */
 		if (!chip->multi4) {
 			for (i = 1; i < codecs; i++) {
-				if (ac97_can_amap(x97 = chip->ac97[i])) {
+				x97 = chip->ac97[i];
+				if (!ac97_is_audio(x97))
+					continue;
+				if (ac97_can_amap(x97)) {
 					if (x97->addr == 1) {
 						chip->multi4 = 1;
 						break;
@@ -1699,7 +1715,9 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 				}
 			}
 			for ( ; i < codecs && chip->multi4; i++) {
-				if (ac97_can_amap(x97 = chip->ac97[i])) {
+				if (!ac97_is_audio(x97))
+					continue;
+				if (ac97_can_amap(x97)) {
 					if (x97->addr == 2) {
 						chip->multi6 = 1;
 						break;

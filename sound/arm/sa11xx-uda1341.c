@@ -13,9 +13,48 @@
  * 2002-03-29   Tomas Kasparek  basic capture is working (native ALSA)
  * 2002-03-29   Tomas Kasparek  capture is working (OSS emulation)
  * 2002-04-04   Tomas Kasparek  better rates handling (allow non-standard rates)
+ * 2003-02-14   Brian Avery     fixed full duplex mode, other updates
+ * 2003-02-20   Tomas Kasparek  merged updates by Brian (except HAL)
  */
 
-/* $Id: sa11xx-uda1341.c,v 1.7 2003/02/13 19:19:18 perex Exp $ */
+/* $Id: sa11xx-uda1341.c,v 1.8 2003/02/25 12:48:15 perex Exp $ */
+
+/***************************************************************************************************
+*
+* To understand what Alsa Drivers should be doing look at "Writing an Alsa Driver" by Takashi Iwai
+* available in the Alsa doc section on the website		
+* 
+* A few notes to make things clearer. The UDA1341 is hooked up to Serial port 4 on the SA1100.
+* We are using  SSP mode to talk to the UDA1341. The UDA1341 bit & wordselect clocks are generated
+* by this UART. Unfortunately, the clock only runs if the transmit buffer has something in it.
+* So, if we are just recording, we feed the transmit DMA stream a bunch of 0x0000 so that the
+* transmit buffer is full and the clock keeps going. The zeroes come from FLUSH_BASE_PHYS which
+* is a mem loc that always decodes to 0's w/ no off chip access.
+*
+* Some alsa terminology:
+*	frame => num_channels * sample_size  e.g stereo 16 bit is 2 * 16 = 32 bytes
+*	period => the least number of bytes that will generate an interrupt e.g. we have a 1024 byte
+*             buffer and 4 periods in the runtime structure this means we'll get an int every 256
+*             bytes or 4 times per buffer.
+*             A number of the sizes are in frames rather than bytes, use frames_to_bytes and
+*             bytes_to_frames to convert.  The easiest way to tell the units is to look at the
+*             type i.e. runtime-> buffer_size is in frames and its type is snd_pcm_uframes_t
+*             
+*	Notes about the pointer fxn:
+*	The pointer fxn needs to return the offset into the dma buffer in frames.
+*	Interrupts must be blocked before calling the dma_get_pos fxn to avoid race with interrupts.
+*
+*	Notes about pause/resume
+*	Implementing this would be complicated so it's skipped.  The problem case is:
+*	A full duplex connection is going, then play is paused. At this point you need to start xmitting
+*	0's to keep the record active which means you cant just freeze the dma and resume it later you'd
+*	need to	save off the dma info, and restore it properly on a resume.  Yeach!
+*
+*	Notes about transfer methods:
+*	The async write calls fail.  I probably need to implement something else to support them?
+* 
+***************************************************************************************************/
+
 
 #include <sound/driver.h>
 #include <linux/module.h>
@@ -53,8 +92,6 @@ MODULE_PARM_DESC(id, "ID string for SA1100/SA1111 + UDA1341TS soundcard.");
 
 #define chip_t sa11xx_uda1341_t
 
-#define SHIFT_16_STEREO         2
-
 typedef enum stream_id_t{
 	PLAYBACK=0,
 	CAPTURE,
@@ -62,22 +99,21 @@ typedef enum stream_id_t{
 }stream_id_t;
 
 typedef struct audio_stream {
-	char *id;		/* identification string */
+	char *id;				/* identification string */
+	int  stream_id;			/* numeric identification */	
 	dma_device_t dma_dev;	/* device identifier for DMA */
 	dma_regs_t *dma_regs;	/* points to our DMA registers */
 
-	int active:1;		/* we are using this stream for transfer now */
+	int active:1;			/* we are using this stream for transfer now */
 
 	int sent_periods;       /* # of sent periods from actual DMA buffer */
 	int sent_total;         /* # of sent periods total (just for info & debug) */
 
 	int sync;               /* are we recoding - flag used to do DMA trans. for sync */
+	spinlock_t dma_lock;	/* for locking in DMA operations (see dma-sa1100.c in the kernel) */
         
 	snd_pcm_substream_t *stream;
 }audio_stream_t;
-
-/* I do not want to have substream = NULL when syncing - ALSA does not like it */
-#define SYNC_SUBSTREAM ((void *) -1)
 
 typedef struct snd_card_sa11xx_uda1341 {
 	struct pm_dev *pm_dev;        
@@ -85,9 +121,7 @@ typedef struct snd_card_sa11xx_uda1341 {
 	struct l3_client *uda1341;
 
 	long samplerate;
-
 	audio_stream_t *s[MAX_STREAMS];
-	snd_info_entry_t *proc_entry;
 }sa11xx_uda1341_t;
 
 static struct snd_card_sa11xx_uda1341 *sa11xx_uda1341 = NULL;
@@ -217,7 +251,9 @@ static void sa11xx_uda1341_set_samplerate(sa11xx_uda1341_t *sa11xx_uda1341, long
 		break;
 	}
 
+	/* FMT setting should be moved away when other FMTs are added (FIXME) */
 	l3_command(sa11xx_uda1341->uda1341, CMD_FORMAT, (void *)LSB16);
+	
 	l3_command(sa11xx_uda1341->uda1341, CMD_FS, (void *)clk);        
 	Ser4SSCR0 = (Ser4SSCR0 & ~0xff00) + clk_div + SSCR0_SSE;
 	DEBUG(KERN_DEBUG "set_samplerate done (new rate: %ld)\n", rate);
@@ -237,11 +273,13 @@ static void sa11xx_uda1341_audio_init(sa11xx_uda1341_t *sa11xx_uda1341)
 	/* Setup DMA stuff */
 	if (sa11xx_uda1341->s[PLAYBACK]) {
 		sa11xx_uda1341->s[PLAYBACK]->id = "UDA1341 out";
+		sa11xx_uda1341->s[PLAYBACK]->stream_id = PLAYBACK;
 		sa11xx_uda1341->s[PLAYBACK]->dma_dev = DMA_Ser4SSPWr;
 	}
 
 	if (sa11xx_uda1341->s[CAPTURE]) {
 		sa11xx_uda1341->s[CAPTURE]->id = "UDA1341 in";
+		sa11xx_uda1341->s[CAPTURE]->stream_id = CAPTURE;
 		sa11xx_uda1341->s[CAPTURE]->dma_dev = DMA_Ser4SSPRd;
 	}
 
@@ -255,22 +293,24 @@ static void sa11xx_uda1341_audio_init(sa11xx_uda1341_t *sa11xx_uda1341)
 	Ser4SSCR0 = SSCR0_DataSize(16) + SSCR0_TI + SSCR0_SerClkDiv(8);
 	Ser4SSCR1 = SSCR1_SClkIactL + SSCR1_SClk1P + SSCR1_ExtClk;
 	Ser4SSCR0 |= SSCR0_SSE;
+	local_irq_restore(flags);
 
 	/* Enable the audio power */
 	clr_sa11xx_uda1341_egpio(IPAQ_EGPIO_CODEC_NRESET);
 	set_sa11xx_uda1341_egpio(IPAQ_EGPIO_AUDIO_ON);
 	set_sa11xx_uda1341_egpio(IPAQ_EGPIO_QMUTE);
-	local_irq_restore(flags);
         
 	/* Initialize the UDA1341 internal state */
 	l3_open(sa11xx_uda1341->uda1341);
-
-	/* external clock configuration */
-	sa11xx_uda1341_set_samplerate(sa11xx_uda1341, 44100); /* default sample rate */                
+	
+	/* external clock configuration (after l3_open - regs must be
+	 * initialized */
+	sa11xx_uda1341_set_samplerate(sa11xx_uda1341, AUDIO_RATE_DEFAULT);
 
 	/* Wait for the UDA1341 to wake up */
 	set_sa11xx_uda1341_egpio(IPAQ_EGPIO_CODEC_NRESET);
 	mdelay(1);
+	
 
 	/* make the left and right channels unswapped (flip the WS latch ) */
 	Ser4SSDR = 0;
@@ -280,11 +320,16 @@ static void sa11xx_uda1341_audio_init(sa11xx_uda1341_t *sa11xx_uda1341)
 
 static void sa11xx_uda1341_audio_shutdown(sa11xx_uda1341_t *sa11xx_uda1341)
 {
+	/* mute on */
+	set_sa11xx_uda1341_egpio(IPAQ_EGPIO_QMUTE);
+	
 	/* disable the audio power and all signals leading to the audio chip */
 	l3_close(sa11xx_uda1341->uda1341);
 	Ser4SSCR0 = 0;
 	clr_sa11xx_uda1341_egpio(IPAQ_EGPIO_CODEC_NRESET);
+	/* power off */
 	clr_sa11xx_uda1341_egpio(IPAQ_EGPIO_AUDIO_ON);
+	/* mute off */
 	clr_sa11xx_uda1341_egpio(IPAQ_EGPIO_QMUTE);
 }
 
@@ -292,26 +337,29 @@ static void sa11xx_uda1341_audio_shutdown(sa11xx_uda1341_t *sa11xx_uda1341)
 
 /* {{{ DMA staff */
 
-#define SYNC_ADDR		(dma_addr_t)FLUSH_BASE_PHYS
-#define SYNC_SIZE		4096 // was 2048
-
-#define DMA_REQUEST(s, cb)	sa1100_request_dma((s)->dma_dev, (s)->id, cb, s, \
-                                                   &((s)->dma_regs))
-#define DMA_FREE(s)		{sa1100_free_dma((s)->dma_regs); (s)->dma_regs = 0;}
-#define DMA_START(s, d, l)	sa1100_start_dma((s)->dma_regs, d, l)
-#define DMA_STOP(s)		sa1100_stop_dma((s)->dma_regs)
-#define DMA_CLEAR(s)		sa1100_clear_dma((s)->dma_regs)
-#define DMA_RESET(s)		sa1100_reset_dma((s)->dma_regs)
-#define DMA_POS(s)              sa1100_get_dma_pos((s)->dma_regs)
+/*
+ * these are the address and sizes used to fill the xmit buffer
+ * so we can get a clock in record only mode
+ */
+#define FORCE_CLOCK_ADDR		(dma_addr_t)FLUSH_BASE_PHYS
+#define FORCE_CLOCK_SIZE		4096 // was 2048
 
 static void audio_dma_request(audio_stream_t *s, void (*callback)(void *))
 {
-	DMA_REQUEST(s, callback);
+	int ret;
+
+	DEBUG_NAME(KERN_DEBUG "audio_dma_request");
+
+	DEBUG("\t request id <%s>\n", s->id);
+	DEBUG("\t  request dma_dev = 0x%x \n", s->dma_dev);
+	ret = sa1100_request_dma((s)->dma_dev, (s)->id, callback, s, &((s)->dma_regs));
+	DEBUG("\t  request ret = %d\n", ret);
 }
 
 static void audio_dma_free(audio_stream_t *s)
 {
-	DMA_FREE(s);
+	sa1100_free_dma((s)->dma_regs);
+	(s)->dma_regs = 0;
 }
 
 static u_int audio_get_dma_pos(audio_stream_t *s)
@@ -319,12 +367,17 @@ static u_int audio_get_dma_pos(audio_stream_t *s)
 	snd_pcm_substream_t * substream = s->stream;
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	unsigned int offset;
-        
+	unsigned long flags;
+	
 	DEBUG_NAME(KERN_DEBUG "get_dma_pos");
         
-	offset = DMA_POS(s) - substream->runtime->dma_addr;
+	// this must be called w/ interrupts locked out see dma-sa1100.c in the kernel
+	spin_lock_irqsave(&s->dma_lock, flags);
+	offset = sa1100_get_dma_pos((s)->dma_regs) - runtime->dma_addr;
+	spin_unlock_irqrestore(&s->dma_lock, flags);
+	
 	DEBUG(" %d ->", offset);
-	offset >>= SHIFT_16_STEREO;                
+	offset = bytes_to_frames(runtime,offset);
 	DEBUG(" %d [fr]\n", offset);
         
 	if (offset >= runtime->buffer_size){
@@ -339,26 +392,32 @@ static u_int audio_get_dma_pos(audio_stream_t *s)
 	return offset;
 }
 
-
+/*
+ * this stops the dma and clears the dma ptrs
+ */
 static void audio_stop_dma(audio_stream_t *s)
 {
 	long flags;
 
 	DEBUG_NAME(KERN_DEBUG "stop_dma\n");
         
-	if (!s->stream)
+	/*
+	 * zero filling streams (sync=1) don;t have alsa streams attached 
+	 * but the 0 fill dma xfer still needs to be stopped
+	 */
+	if (!(s->stream || s->sync))
 		return;
 
-	local_irq_save(flags);
+	spin_lock_irqsave(&(s->dma_lock), flags);	
 	s->active = 0;
 	s->sent_periods = 0;
-	s->sent_total = 0;        
+	s->sent_total = 0;
+	s->sync = 0;
 
-	DMA_STOP(s);
-	DMA_CLEAR(s);
-	local_irq_restore(flags);
+	/* this stops the dma channel and clears the buffer ptrs */
+	sa1100_clear_dma((s)->dma_regs);	
+	spin_unlock_irqrestore(&(s->dma_lock), flags);
 }
-
 
 static void audio_reset(audio_stream_t *s)
 {
@@ -375,40 +434,58 @@ static void audio_process_dma(audio_stream_t *s)
 {
 	snd_pcm_substream_t * substream = s->stream;
 	snd_pcm_runtime_t *runtime;
-	int ret,i;
+	int ret;
                 
 	DEBUG_NAME(KERN_DEBUG "process_dma\n");
 
-	if(!s->active){
-		DEBUG("!!!want to process DMA when stopped!!!\n");
-		return;
-	}
-
 	/* we are requested to process synchronization DMA transfer */
-	if (s->sync) {
+	if(!s->active && s->sync){
+		snd_assert(s->stream_id == PLAYBACK,return);		
+		/* fill the xmit dma buffers and return */
 		while (1) {
-			DEBUG(KERN_DEBUG "sent sync period (dma_size[B]: %d)\n", SYNC_SIZE);
-			ret = DMA_START(s, SYNC_ADDR, SYNC_SIZE);
+			DEBUG(KERN_DEBUG "sent zero dma period (dma_size[B]: %d)\n", FORCE_CLOCK_SIZE);
+			ret = sa1100_start_dma((s)->dma_regs, FORCE_CLOCK_ADDR, FORCE_CLOCK_SIZE);			
 			if (ret)
 				return;   
 		}
 	}
 
-	/* must be set here - for sync there is no runtime struct */
+	/* must be set here - only valid for running streams, not for forced_clock dma fills  */
 	runtime = substream->runtime;
-        
-	while(1) {       
-		unsigned int  dma_size = runtime->period_size << SHIFT_16_STEREO;
-		unsigned int offset = dma_size * s->sent_periods;
                 
+	DEBUG("audio_process_dma hw_ptr_base = 0x%x w_ptr_interrupt = 0x%x "
+		  "period_size = %d  periods  = %d buffer_size = %d sync=0x%x  dma_area = 0x%x\n",
+	       runtime->hw_ptr_base,
+	       runtime->hw_ptr_interrupt,
+	       runtime->period_size,
+	       runtime->periods,
+	       runtime->buffer_size,
+	       runtime->sync,
+	       runtime->dma_area);
+
+	DEBUG("audio_process_dma sent_total = %d  sent_period = %d\n",
+	       s->sent_total,
+	       s->sent_periods);
+	
+	while(s->active) {       
+		unsigned int  dma_size;		
+		unsigned int offset ;
+   
+		dma_size = frames_to_bytes(runtime,runtime->period_size) ;
+		offset = dma_size * s->sent_periods;
 		if (dma_size > MAX_DMA_SIZE){
 			/* this should not happen! */
-			DEBUG(KERN_DEBUG "-----> cut dma_size: %d -> ", dma_size);
+			printk(KERN_ERR "---> cut dma_size: %d -> ", dma_size);
 			dma_size = CUT_DMA_SIZE;
-			DEBUG("%d <-----\n", dma_size);
+			printk("%d <---\n", dma_size);
 		}
 
-		ret = DMA_START(s, runtime->dma_addr + offset, dma_size);
+		/*
+		 * the first time this while loop will run 3 times, i.e. it'll fill the 2 dma
+		 * buffers then get a -EBUSY, every other time it'll refill the completed buffer
+		 * and then get the -EBUSY so it'll just run twice
+		 */
+		ret = sa1100_start_dma((s)->dma_regs, runtime->dma_addr + offset, dma_size);
 		if (ret)
 			return;
 
@@ -429,7 +506,6 @@ static void audio_process_dma(audio_stream_t *s)
 	}
 }
 
-
 static void audio_dma_callback(void *data)
 {
 	audio_stream_t *s = data;
@@ -438,24 +514,26 @@ static void audio_dma_callback(void *data)
         
 	DEBUG_NAME(KERN_DEBUG "dma_callback\n");
 
-	/* when syncing we do not have any real stream from ALSA! */
-	if (!s->sync) {
-		snd_pcm_period_elapsed(s->stream);
-		DEBUG(KERN_DEBUG "----> period done <----\n");
+	DEBUG(KERN_DEBUG "----> period done <----\n");
+
 #ifdef DEBUG_MODE
-		printk(KERN_DEBUG "  dma_area:");
-		buf = (char *)s->stream->runtime->dma_addr +
-			((s->sent_periods - 1 ) *
-			 (s->stream->runtime->period_size << SHIFT_16_STEREO));
-		for (i=0; i < 32; i++) {
-			printk(" %02x", *(char *)(buf + i));
-		}
-		printk("\n");
-#endif                      
+	printk(KERN_DEBUG "  dma_area:");
+	buf = (char *)s->stream->runtime->dma_addr + ((s->sent_periods - 1 ) *
+ 		  frames_to_bytes( s->stream->runtime, s->stream->runtime->period_size));	
+	for (i=0; i < 32; i++) {
+		printk(" %02x", *(char *)(buf + i));
 	}
+	printk("\n");
+#endif                      
         
-	if (s->active)
-		audio_process_dma(s);
+   /* 
+	* If we are getting a callback for an active stream then we inform
+	* the PCM middle layer we've finished a period
+	*/
+ 	if (s->active)
+		snd_pcm_period_elapsed(s->stream);
+
+	audio_process_dma(s);
 }
 
 /* }}} */
@@ -491,18 +569,21 @@ static int snd_card_sa11xx_uda1341_pcm_trigger(stream_id_t stream_id,
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-		/* want to capture and have no playback - run DMA syncing */
+		/* now we need to make sure a record only stream has a clock */
 		if (stream_id == CAPTURE && !chip->s[PLAYBACK]->active) {
-			/* we need synchronization DMA transfer (zeros) */
-			DEBUG(KERN_DEBUG "starting synchronization DMA transfer\n");
+			/* we need to force fill the xmit DMA  with zeros */
+			DEBUG(KERN_DEBUG "starting zero fill  DMA transfer\n");
 			chip->s[PLAYBACK]->sync = 1;
-			chip->s[PLAYBACK]->active = 1;
-			chip->s[PLAYBACK]->stream = SYNC_SUBSTREAM; /* not really used! */
 			audio_process_dma(chip->s[PLAYBACK]);
 		}
-		/* want to playback and have capture - stop syncing */
-		if(stream_id == PLAYBACK && chip->s[PLAYBACK]->sync) {
-			chip->s[PLAYBACK]->sync = 0;
+		/* this case is when you were recording then you turn on a
+		 * playback stream so we
+		 * stop (also clears it) the dma first, clear the sync flag
+		 * and then we let it get turned on
+		 */		
+		else if (stream_id == PLAYBACK && chip->s[PLAYBACK]->sync) {
+ 			chip->s[PLAYBACK]->sync = 0;
+			audio_stop_dma(chip->s[PLAYBACK]);
 		}
 
 		/* requested stream startup */
@@ -512,27 +593,30 @@ static int snd_card_sa11xx_uda1341_pcm_trigger(stream_id_t stream_id,
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-		/* want to stop capture and use syncing - stop DMA syncing */
-		if (stream_id == CAPTURE && chip->s[PLAYBACK]->sync) {
-			/* we do not need synchronization DMA transfer now */
-			DEBUG(KERN_DEBUG "stopping synchronization DMA transfer\n");
-			chip->s[PLAYBACK]->sync = 0;
-			chip->s[PLAYBACK]->active = 0;
-			audio_stop_dma(chip->s[PLAYBACK]);
-		}
-		/* want to stop playback and have capture - run DMA syncing */
-		if(stream_id == PLAYBACK && chip->s[CAPTURE]->active) {
-			/* we need synchronization DMA transfer (zeros) */
-			DEBUG(KERN_DEBUG "starting synchronization DMA transfer\n");
-			chip->s[PLAYBACK]->sync = 1;
-			chip->s[PLAYBACK]->active = 1;
-			chip->s[PLAYBACK]->stream = SYNC_SUBSTREAM; /* not really used! */
-			audio_process_dma(chip->s[PLAYBACK]);
-		}
-
 		/* requested stream shutdown */
 		chip->s[stream_id]->active = 0;
 		audio_stop_dma(chip->s[stream_id]);
+		
+		/*
+		 * now we need to make sure a record only stream has a clock
+		 * so if we're stopping a playback with an active capture
+		 * we need to turn the 0 fill dma on for the xmit side
+		 */
+		if (stream_id == PLAYBACK && chip->s[CAPTURE]->active) {
+			/* we need to force fill the xmit DMA  with zeros */
+			DEBUG(KERN_DEBUG "starting zero fill  DMA transfer\n");
+			chip->s[PLAYBACK]->sync = 1;
+			chip->s[PLAYBACK]->active = 0;
+			audio_process_dma(chip->s[PLAYBACK]);
+		}
+		/*
+		 * we killed a capture only stream, so we should also kill
+		 * the zero fill transmit
+		 */
+		else if (stream_id == CAPTURE  && chip->s[PLAYBACK]->sync) {
+			audio_stop_dma(chip->s[PLAYBACK]);
+		}
+		
 		break;
 	default:
 		return -EINVAL;
@@ -601,7 +685,11 @@ static int snd_card_sa11xx_uda1341_playback_open(snd_pcm_substream_t * substream
 	chip->s[PLAYBACK]->sent_periods = 0;
 	chip->s[PLAYBACK]->sent_total = 0;
         
-	audio_reset(chip->s[PLAYBACK]);
+	/* no reset here since we may be zero filling the DMA
+	 * if we are, the dma stream will get reset in the pcm_trigger
+	 * i.e. when it actually starts to play
+	 */
+	/* audio_reset(chip->s[PLAYBACK]); */
  
 	runtime->hw = snd_sa11xx_uda1341_playback;
 	if ((err = snd_pcm_hw_constraint_integer(runtime, SNDRV_PCM_HW_PARAM_PERIODS)) < 0)
@@ -652,10 +740,13 @@ static int snd_card_sa11xx_uda1341_playback_trigger(snd_pcm_substream_t * substr
 
 static snd_pcm_uframes_t snd_card_sa11xx_uda1341_playback_pointer(snd_pcm_substream_t * substream)
 {
+	snd_pcm_uframes_t pos;
 	sa11xx_uda1341_t *chip = snd_pcm_substream_chip(substream);
 
 	DEBUG_NAME(KERN_DEBUG "playback_pointer\n");        
-	return audio_get_dma_pos(chip->s[PLAYBACK]);
+	
+	pos = audio_get_dma_pos(chip->s[PLAYBACK]);
+	return pos;
 }
 
 /* }}} */
@@ -674,7 +765,7 @@ static int snd_card_sa11xx_uda1341_capture_open(snd_pcm_substream_t * substream)
 	chip->s[CAPTURE]->sent_periods = 0;
 	chip->s[CAPTURE]->sent_total = 0;
         
-	audio_reset(chip->s[PLAYBACK]);        
+	audio_reset(chip->s[CAPTURE]);        
 
 	runtime->hw = snd_sa11xx_uda1341_capture;
 	if ((err = snd_pcm_hw_constraint_integer(runtime, SNDRV_PCM_HW_PARAM_PERIODS)) < 0)
@@ -725,10 +816,12 @@ static int snd_card_sa11xx_uda1341_capture_trigger(snd_pcm_substream_t * substre
 
 static snd_pcm_uframes_t snd_card_sa11xx_uda1341_capture_pointer(snd_pcm_substream_t * substream)
 {
+	snd_pcm_uframes_t pos;
 	sa11xx_uda1341_t *chip = snd_pcm_substream_chip(substream);
 
 	DEBUG_NAME(KERN_DEBUG "record_pointer\n");        
-	return audio_get_dma_pos(chip->s[CAPTURE]);
+	pos = audio_get_dma_pos(chip->s[CAPTURE]);
+	return pos;
 }
 
 /* }}} */
@@ -784,6 +877,13 @@ static int __init snd_card_sa11xx_uda1341_pcm(sa11xx_uda1341_t *sa11xx_uda1341, 
 			       substreams, substreams, &pcm)) < 0)
 		return err;
 
+	/*
+	 * this sets up our initial buffers and sets the dma_type to isa.
+	 * isa works but I'm not sure why (or if) it's the right choice
+	 * this may be too large, trying it for now
+	 */
+	snd_pcm_lib_preallocate_isa_pages_for_all(pcm, 64*1024, 64*1024);
+
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_card_sa11xx_uda1341_playback_ops);
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_card_sa11xx_uda1341_capture_ops);
 	pcm->private_data = sa11xx_uda1341;
@@ -815,6 +915,10 @@ static int sa11xx_uda1341_pm_callback(struct pm_dev *pm_dev, pm_request_t req, v
 	int stopstate;
 
 	DEBUG_NAME(KERN_DEBUG "pm_callback\n");
+
+	/* pause resume is broken  see note */
+	printk("Pause/Resume support currently broken... \n");	
+        return -1;
 
 	is = sa11xx_uda1341->s[PLAYBACK];
 	os = sa11xx_uda1341->s[CAPTURE];

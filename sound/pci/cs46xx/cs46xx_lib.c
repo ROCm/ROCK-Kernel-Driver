@@ -672,28 +672,21 @@ static void snd_cs46xx_set_capture_sample_rate(cs46xx_t *chip, unsigned int rate
  *  PCM part
  */
 
-static int snd_cs46xx_playback_transfer(snd_pcm_substream_t *substream, 
-					snd_pcm_uframes_t frames)
+static int snd_cs46xx_playback_transfer(snd_pcm_substream_t *substream)
 {
 	/* cs46xx_t *chip = snd_pcm_substream_chip(substream); */
 	snd_pcm_runtime_t *runtime = substream->runtime;
+	cs46xx_pcm_t * cpcm = snd_magic_cast(cs46xx_pcm_t, runtime->private_data, return -ENXIO);
 	snd_pcm_uframes_t appl_ptr = runtime->control->appl_ptr;
-	snd_pcm_sframes_t diff;
-	cs46xx_pcm_t * cpcm;
-	int buffer_size;
+	snd_pcm_sframes_t diff = appl_ptr - cpcm->appl_ptr;
+	int buffer_size = runtime->period_size * CS46XX_FRAGS << cpcm->shift;
 
-	cpcm = snd_magic_cast(cs46xx_pcm_t, substream->runtime->private_data, return -ENXIO);
-
-	buffer_size = runtime->period_size * CS46XX_FRAGS << cpcm->shift;
-
-	diff = appl_ptr - cpcm->appl_ptr;
 	if (diff) {
 		if (diff < -(snd_pcm_sframes_t) (runtime->boundary / 2))
 			diff += runtime->boundary;
-		frames += diff;
+		cpcm->sw_ready += diff * (1 << cpcm->shift);
+		cpcm->appl_ptr = appl_ptr;
 	}
-	cpcm->sw_ready += frames << cpcm->shift;
-	cpcm->appl_ptr = appl_ptr + frames;
 	while (cpcm->hw_ready < buffer_size && 
 	       cpcm->sw_ready > 0) {
 		size_t hw_to_end = buffer_size - cpcm->hw_data;
@@ -720,21 +713,20 @@ static int snd_cs46xx_playback_transfer(snd_pcm_substream_t *substream,
 	return 0;
 }
 
-static int snd_cs46xx_capture_transfer(snd_pcm_substream_t *substream, 
-				       snd_pcm_uframes_t frames)
+static int snd_cs46xx_capture_transfer(snd_pcm_substream_t *substream)
 {
 	cs46xx_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	snd_pcm_uframes_t appl_ptr = runtime->control->appl_ptr;
 	snd_pcm_sframes_t diff = appl_ptr - chip->capt.appl_ptr;
 	int buffer_size = runtime->period_size * CS46XX_FRAGS << chip->capt.shift;
+
 	if (diff) {
 		if (diff < -(snd_pcm_sframes_t) (runtime->boundary / 2))
 			diff += runtime->boundary;
-		frames += diff;
+		chip->capt.sw_ready -= diff * (1 << chip->capt.shift);
+		chip->capt.appl_ptr = appl_ptr;
 	}
-	chip->capt.sw_ready -= frames << chip->capt.shift;
-	chip->capt.appl_ptr = appl_ptr + frames;
 	while (chip->capt.hw_ready > 0 && 
 	       chip->capt.sw_ready < (int)chip->capt.sw_bufsize) {
 		size_t hw_to_end = buffer_size - chip->capt.hw_data;
@@ -802,7 +794,7 @@ static snd_pcm_uframes_t snd_cs46xx_playback_indirect_pointer(snd_pcm_substream_
 	cpcm->sw_io += bytes;
 	if (cpcm->sw_io >= cpcm->sw_bufsize)
 		cpcm->sw_io -= cpcm->sw_bufsize;
-	snd_cs46xx_playback_transfer(substream, 0);
+	snd_cs46xx_playback_transfer(substream);
 	return cpcm->sw_io >> cpcm->shift;
 }
 
@@ -827,57 +819,10 @@ static snd_pcm_uframes_t snd_cs46xx_capture_indirect_pointer(snd_pcm_substream_t
 	chip->capt.sw_io += bytes;
 	if (chip->capt.sw_io >= chip->capt.sw_bufsize)
 		chip->capt.sw_io -= chip->capt.sw_bufsize;
-	snd_cs46xx_capture_transfer(substream, 0);
+	snd_cs46xx_capture_transfer(substream);
 	return chip->capt.sw_io >> chip->capt.shift;
 }
 
-static int snd_cs46xx_playback_copy(snd_pcm_substream_t *substream,
-				    int channel,
-				    snd_pcm_uframes_t hwoff,
-				    void *src,
-				    snd_pcm_uframes_t frames)
-{
-	snd_pcm_runtime_t *runtime = substream->runtime;
-	/*cs46xx_t *chip = snd_pcm_substream_chip(substream); */
-	size_t hwoffb;
-	size_t bytes;
-	char *hwbuf;
-	cs46xx_pcm_t *cpcm = snd_magic_cast(cs46xx_pcm_t, substream->runtime->private_data, return -ENXIO);
-
-	snd_assert(runtime->dma_area, return -EINVAL);
-
-	hwoffb = hwoff << cpcm->shift;
-	bytes = frames << cpcm->shift;
-	hwbuf = runtime->dma_area + hwoffb;
-
-	if (copy_from_user(hwbuf, src, bytes))
-		return -EFAULT;
-
-	spin_lock_irq(&runtime->lock);
-	snd_cs46xx_playback_transfer(substream, frames);
-	spin_unlock_irq(&runtime->lock);
-	return 0;
-}
-	
-static int snd_cs46xx_capture_copy(snd_pcm_substream_t *substream,
-				   int channel,
-				   snd_pcm_uframes_t hwoff,
-				   void *dst,
-				   snd_pcm_uframes_t frames)
-{
-	snd_pcm_runtime_t *runtime = substream->runtime;
-	cs46xx_t *chip = snd_pcm_substream_chip(substream);
-	size_t hwoffb = hwoff << chip->capt.shift;
-	size_t bytes = frames << chip->capt.shift;
-	char *hwbuf = runtime->dma_area + hwoffb;
-	if (copy_to_user(dst, hwbuf, bytes))
-		return -EFAULT;
-	spin_lock_irq(&runtime->lock);
-	snd_cs46xx_capture_transfer(substream, frames);
-	spin_unlock_irq(&runtime->lock);
-	return 0;
-}
-	
 static int snd_cs46xx_playback_trigger(snd_pcm_substream_t * substream,
 				       int cmd)
 {
@@ -909,10 +854,10 @@ static int snd_cs46xx_playback_trigger(snd_pcm_substream_t * substream,
 			cs46xx_dsp_pcm_link(chip,cpcm->pcm_channel);
 
 		if (substream->runtime->periods != CS46XX_FRAGS)
-			snd_cs46xx_playback_transfer(substream, 0);
+			snd_cs46xx_playback_transfer(substream);
 #else
 		if (substream->runtime->periods != CS46XX_FRAGS)
-			snd_cs46xx_playback_transfer(substream, 0);
+			snd_cs46xx_playback_transfer(substream);
 		{ unsigned int tmp;
 		tmp = snd_cs46xx_peek(chip, BA1_PCTL);
 		tmp &= 0x0000ffff;
@@ -1587,8 +1532,8 @@ snd_pcm_ops_t snd_cs46xx_playback_indirect_rear_ops = {
 	.hw_free =		snd_cs46xx_playback_hw_free,
 	.prepare =		snd_cs46xx_playback_prepare,
 	.trigger =		snd_cs46xx_playback_trigger,
-	.copy =			snd_cs46xx_playback_copy,
 	.pointer =		snd_cs46xx_playback_indirect_pointer,
+	.ack =			snd_cs46xx_playback_transfer,
 };
 
 snd_pcm_ops_t snd_cs46xx_playback_iec958_ops = {
@@ -1610,8 +1555,8 @@ snd_pcm_ops_t snd_cs46xx_playback_indirect_iec958_ops = {
 	.hw_free =		snd_cs46xx_playback_hw_free,
 	.prepare =		snd_cs46xx_playback_prepare,
 	.trigger =		snd_cs46xx_playback_trigger,
-	.copy =			snd_cs46xx_playback_copy,
 	.pointer =		snd_cs46xx_playback_indirect_pointer,
+	.ack =			snd_cs46xx_playback_transfer,
 };
 
 #endif
@@ -1635,8 +1580,8 @@ snd_pcm_ops_t snd_cs46xx_playback_indirect_ops = {
 	.hw_free =		snd_cs46xx_playback_hw_free,
 	.prepare =		snd_cs46xx_playback_prepare,
 	.trigger =		snd_cs46xx_playback_trigger,
-	.copy =			snd_cs46xx_playback_copy,
 	.pointer =		snd_cs46xx_playback_indirect_pointer,
+	.ack =			snd_cs46xx_playback_transfer,
 };
 
 snd_pcm_ops_t snd_cs46xx_capture_ops = {
@@ -1658,8 +1603,8 @@ snd_pcm_ops_t snd_cs46xx_capture_indirect_ops = {
 	.hw_free =		snd_cs46xx_capture_hw_free,
 	.prepare =		snd_cs46xx_capture_prepare,
 	.trigger =		snd_cs46xx_capture_trigger,
-	.copy =			snd_cs46xx_capture_copy,
 	.pointer =		snd_cs46xx_capture_indirect_pointer,
+	.ack =			snd_cs46xx_capture_transfer,
 };
 
 static void snd_cs46xx_pcm_free(snd_pcm_t *pcm)
@@ -2505,9 +2450,6 @@ int __devinit snd_cs46xx_mixer(cs46xx_t *chip)
 	strcpy(id.name, "External Amplifier Power Down");
 	chip->eapd_switch = snd_ctl_find_id(chip->card, &id);
     
-	/* turn on amplifier */
-	chip->amplifier_ctrl(chip, 1);
-
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
 	/* do soundcard specific mixer setup */
 	if (chip->mixer_init) {
@@ -2515,6 +2457,9 @@ int __devinit snd_cs46xx_mixer(cs46xx_t *chip)
 		chip->mixer_init(chip);
 	}
 #endif
+
+ 	/* turn on amplifier */
+	chip->amplifier_ctrl(chip, 1);
     
 	return 0;
 }

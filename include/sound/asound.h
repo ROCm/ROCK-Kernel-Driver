@@ -93,7 +93,7 @@ struct sndrv_aes_iec958 {
  *                                                                          *
  ****************************************************************************/
 
-#define SNDRV_HWDEP_VERSION		SNDRV_PROTOCOL_VERSION(1, 0, 0)
+#define SNDRV_HWDEP_VERSION		SNDRV_PROTOCOL_VERSION(1, 0, 1)
 
 enum sndrv_hwdep_iface {
 	SNDRV_HWDEP_IFACE_OPL2 = 0,
@@ -104,9 +104,10 @@ enum sndrv_hwdep_iface {
 	SNDRV_HWDEP_IFACE_YSS225,	/* Yamaha FX processor */
 	SNDRV_HWDEP_IFACE_ICS2115,	/* Wavetable synth */
 	SNDRV_HWDEP_IFACE_SSCAPE,	/* Ensoniq SoundScape ISA card (MC68EC000) */
+	SNDRV_HWDEP_IFACE_VX,		/* Digigram VX cards */
 
 	/* Don't forget to change the following: */
-	SNDRV_HWDEP_IFACE_LAST = SNDRV_HWDEP_IFACE_SSCAPE,
+	SNDRV_HWDEP_IFACE_LAST = SNDRV_HWDEP_IFACE_VX,
 };
 
 struct sndrv_hwdep_info {
@@ -118,9 +119,29 @@ struct sndrv_hwdep_info {
 	unsigned char reserved[64];	/* reserved for future */
 };
 
+/* generic DSP loader */
+struct sndrv_hwdep_dsp_status {
+	unsigned int version;		/* R: driver-specific version */
+	unsigned char id[32];		/* R: driver-specific ID string */
+	unsigned int num_dsps;		/* R: number of DSP images to transfer */
+	unsigned int dsp_loaded;	/* R: bit flags indicating the loaded DSPs */
+	unsigned int chip_ready;	/* R: 1 = initialization finished */
+	unsigned char reserved[16];	/* reserved for future use */
+};
+
+struct sndrv_hwdep_dsp_image {
+	unsigned int index;		/* W: DSP index */
+	unsigned char name[64];		/* W: ID (e.g. file name) */
+	unsigned char *image;		/* W: binary image */
+	size_t length;			/* W: size of image in bytes */
+	unsigned long driver_data;	/* W: driver-specific data */
+};
+
 enum {
 	SNDRV_HWDEP_IOCTL_PVERSION = _IOR ('H', 0x00, int),
 	SNDRV_HWDEP_IOCTL_INFO = _IOR ('H', 0x01, struct sndrv_hwdep_info),
+	SNDRV_HWDEP_IOCTL_DSP_STATUS = _IOR('H', 0x02, struct sndrv_hwdep_dsp_status),
+	SNDRV_HWDEP_IOCTL_DSP_LOAD   = _IOW('H', 0x03, struct sndrv_hwdep_dsp_image)
 };
 
 /*****************************************************************************
@@ -129,7 +150,7 @@ enum {
  *                                                                           *
  *****************************************************************************/
 
-#define SNDRV_PCM_VERSION		SNDRV_PROTOCOL_VERSION(2, 0, 3)
+#define SNDRV_PCM_VERSION		SNDRV_PROTOCOL_VERSION(2, 0, 4)
 
 typedef unsigned long sndrv_pcm_uframes_t;
 typedef long sndrv_pcm_sframes_t;
@@ -434,6 +455,7 @@ enum {
 	SNDRV_PCM_IOCTL_REWIND = _IOW('A', 0x46, sndrv_pcm_uframes_t),
 	SNDRV_PCM_IOCTL_RESUME = _IO('A', 0x47),
 	SNDRV_PCM_IOCTL_XRUN = _IO('A', 0x48),
+	SNDRV_PCM_IOCTL_FORWARD = _IOW('A', 0x49, sndrv_pcm_uframes_t),
 	SNDRV_PCM_IOCTL_WRITEI_FRAMES = _IOW('A', 0x50, struct sndrv_xferi),
 	SNDRV_PCM_IOCTL_READI_FRAMES = _IOR('A', 0x51, struct sndrv_xferi),
 	SNDRV_PCM_IOCTL_WRITEN_FRAMES = _IOW('A', 0x52, struct sndrv_xfern),

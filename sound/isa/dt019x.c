@@ -379,7 +379,7 @@ module_exit(alsa_card_dt019x_exit)
 
 #ifndef MODULE
 
-/* format is: snd-dt019x=enable,index,id,snd_isapnp,
+/* format is: snd-dt019x=enable,index,id,
 			  port,mpu_port,fm_port,
 			  irq,mpu_irq,dma8,dma8_size */
 

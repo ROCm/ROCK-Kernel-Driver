@@ -1051,7 +1051,7 @@ static int set_format(snd_usb_substream_t *subs, snd_pcm_runtime_t *runtime)
 	}
 
 	/* create a data pipe */
-	ep = get_endpoint(alts, 0)->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
+	ep = fmt->endpoint & USB_ENDPOINT_NUMBER_MASK;
 	if (is_playback)
 		subs->datapipe = usb_sndisocpipe(dev, ep);
 	else
@@ -1062,9 +1062,16 @@ static int set_format(snd_usb_substream_t *subs, snd_pcm_runtime_t *runtime)
 	subs->fill_max = 0;
 
 	/* we need a sync pipe in async OUT or adaptive IN mode */
-	attr = get_endpoint(alts, 0)->bmAttributes & EP_ATTR_MASK;
+	attr = fmt->ep_attr & EP_ATTR_MASK;
 	if ((is_playback && attr == EP_ATTR_ASYNC) ||
 	    (! is_playback && attr == EP_ATTR_ADAPTIVE)) {
+		/*
+		 * QUIRK: plantronics headset has adaptive-in
+		 * although it's really not...
+		 */
+		if (dev->descriptor.idVendor == 0x047f &&
+		    dev->descriptor.idProduct == 0x0ca1)
+			goto _ok;
 		/* check endpoint */
 		if (altsd->bNumEndpoints < 2 ||
 		    get_endpoint(alts, 1)->bmAttributes != 0x01 ||
@@ -1088,6 +1095,7 @@ static int set_format(snd_usb_substream_t *subs, snd_pcm_runtime_t *runtime)
 		subs->syncinterval = get_endpoint(alts, 1)->bRefresh;
 	}
 
+ _ok:
 	if ((err = init_usb_pitch(dev, subs->interface, alts, fmt)) < 0 ||
 	    (err = init_usb_sample_rate(dev, subs->interface, alts, fmt,
 					runtime->rate)) < 0)
@@ -1651,7 +1659,7 @@ static void proc_dump_substream_formats(snd_usb_substream_t *subs, snd_info_buff
 			    fp->endpoint & USB_DIR_IN ? "IN" : "OUT",
 			    sync_types[(fp->ep_attr & EP_ATTR_MASK) >> 2]);
 		if (fp->rates & SNDRV_PCM_RATE_CONTINUOUS) {
-			snd_iprintf(buffer, "    Rates: %d - %d (continous)\n",
+			snd_iprintf(buffer, "    Rates: %d - %d (continuous)\n",
 				    fp->rate_min, fp->rate_max);
 		} else {
 			unsigned int i;

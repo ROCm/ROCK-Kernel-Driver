@@ -1982,6 +1982,106 @@ snd_pcm_sframes_t snd_pcm_capture_rewind(snd_pcm_substream_t *substream, snd_pcm
 	return ret;
 }
 
+snd_pcm_sframes_t snd_pcm_playback_forward(snd_pcm_substream_t *substream, snd_pcm_uframes_t frames)
+{
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	snd_pcm_sframes_t appl_ptr;
+	snd_pcm_sframes_t ret;
+	snd_pcm_sframes_t avail;
+
+	if (frames == 0)
+		return 0;
+
+	spin_lock_irq(&runtime->lock);
+	switch (runtime->status->state) {
+	case SNDRV_PCM_STATE_PREPARED:
+	case SNDRV_PCM_STATE_PAUSED:
+		break;
+	case SNDRV_PCM_STATE_DRAINING:
+	case SNDRV_PCM_STATE_RUNNING:
+		if (snd_pcm_update_hw_ptr(substream) >= 0)
+			break;
+		/* Fall through */
+	case SNDRV_PCM_STATE_XRUN:
+		ret = -EPIPE;
+		goto __end;
+	default:
+		ret = -EBADFD;
+		goto __end;
+	}
+
+	avail = snd_pcm_playback_avail(runtime);
+	if (avail <= 0) {
+		ret = 0;
+		goto __end;
+	}
+	if (frames > (snd_pcm_uframes_t)avail)
+		frames = avail;
+	else
+		frames -= frames % runtime->xfer_align;
+	appl_ptr = runtime->control->appl_ptr + frames;
+	if (appl_ptr >= runtime->boundary)
+		appl_ptr -= runtime->boundary;
+	runtime->control->appl_ptr = appl_ptr;
+	if (runtime->status->state == SNDRV_PCM_STATE_RUNNING &&
+	    runtime->sleep_min)
+		snd_pcm_tick_prepare(substream);
+	ret = frames;
+ __end:
+	spin_unlock_irq(&runtime->lock);
+	return ret;
+}
+
+snd_pcm_sframes_t snd_pcm_capture_forward(snd_pcm_substream_t *substream, snd_pcm_uframes_t frames)
+{
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	snd_pcm_sframes_t appl_ptr;
+	snd_pcm_sframes_t ret;
+	snd_pcm_sframes_t avail;
+
+	if (frames == 0)
+		return 0;
+
+	spin_lock_irq(&runtime->lock);
+	switch (runtime->status->state) {
+	case SNDRV_PCM_STATE_PREPARED:
+	case SNDRV_PCM_STATE_DRAINING:
+	case SNDRV_PCM_STATE_PAUSED:
+		break;
+	case SNDRV_PCM_STATE_RUNNING:
+		if (snd_pcm_update_hw_ptr(substream) >= 0)
+			break;
+		/* Fall through */
+	case SNDRV_PCM_STATE_XRUN:
+		ret = -EPIPE;
+		goto __end;
+	default:
+		ret = -EBADFD;
+		goto __end;
+	}
+
+	avail = snd_pcm_capture_avail(runtime);
+	if (avail <= 0) {
+		ret = 0;
+		goto __end;
+	}
+	if (frames > (snd_pcm_uframes_t)avail)
+		frames = avail;
+	else
+		frames -= frames % runtime->xfer_align;
+	appl_ptr = runtime->control->appl_ptr + frames;
+	if (appl_ptr >= runtime->boundary)
+		appl_ptr -= runtime->boundary;
+	runtime->control->appl_ptr = appl_ptr;
+	if (runtime->status->state == SNDRV_PCM_STATE_RUNNING &&
+	    runtime->sleep_min)
+		snd_pcm_tick_prepare(substream);
+	ret = frames;
+ __end:
+	spin_unlock_irq(&runtime->lock);
+	return ret;
+}
+
 static int snd_pcm_hwsync(snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
@@ -2169,6 +2269,18 @@ static int snd_pcm_playback_ioctl1(snd_pcm_substream_t *substream,
 		__put_user(result, _frames);
 		return result < 0 ? result : 0;
 	}
+	case SNDRV_PCM_IOCTL_FORWARD:
+	{
+		snd_pcm_uframes_t frames, *_frames = arg;
+		snd_pcm_sframes_t result;
+		if (get_user(frames, _frames))
+			return -EFAULT;
+		if (put_user(0, _frames))
+			return -EFAULT;
+		result = snd_pcm_playback_forward(substream, frames);
+		__put_user(result, _frames);
+		return result < 0 ? result : 0;
+	}
 	case SNDRV_PCM_IOCTL_PAUSE:
 	{
 		int res;
@@ -2241,6 +2353,18 @@ static int snd_pcm_capture_ioctl1(snd_pcm_substream_t *substream,
 		if (put_user(0, _frames))
 			return -EFAULT;
 		result = snd_pcm_capture_rewind(substream, frames);
+		__put_user(result, _frames);
+		return result < 0 ? result : 0;
+	}
+	case SNDRV_PCM_IOCTL_FORWARD:
+	{
+		snd_pcm_uframes_t frames, *_frames = arg;
+		snd_pcm_sframes_t result;
+		if (get_user(frames, _frames))
+			return -EFAULT;
+		if (put_user(0, _frames))
+			return -EFAULT;
+		result = snd_pcm_capture_forward(substream, frames);
 		__put_user(result, _frames);
 		return result < 0 ? result : 0;
 	}

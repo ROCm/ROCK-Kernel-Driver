@@ -522,9 +522,6 @@ EXPORT_SYMBOL(snd_verbose_printk);
 #if defined(CONFIG_SND_DEBUG) && defined(CONFIG_SND_VERBOSE_PRINTK)
 EXPORT_SYMBOL(snd_verbose_printd);
 #endif
-#if defined(CONFIG_SND_DEBUG) && !defined(CONFIG_SND_VERBOSE_PRINTK)
-EXPORT_SYMBOL(snd_printd);
-#endif
   /* wrappers */
 #ifdef CONFIG_SND_DEBUG_MEMORY
 EXPORT_SYMBOL(snd_wrapper_kmalloc);

@@ -1377,6 +1377,8 @@
 
   module_init(alsa_card_mychip_init)
   module_exit(alsa_card_mychip_exit)
+
+  EXPORT_NO_SYMBOLS; /* for old kernels only */
 ]]>
           </programlisting>
         </example>
@@ -2756,6 +2758,17 @@
         linkend="buffer-and-memory"><citetitle>Buffer and Memory
         Management</citetitle></link>. 
         </para>
+      </section>
+
+      <section id="pcm-interface-operators-ack">
+        <title>ack callback</title>
+        <para>
+          This callback is also not mandatory. This callback is called
+        when the appl_ptr is updated in read or write operations.
+        Some drivers like emu10k1-fx and cs46xx need to track the
+	current appl_ptr for the internal buffer, and this callback
+	is useful only for such a purpose.
+	</para>
       </section>
 
       <section id="pcm-interface-operators-page-callback">

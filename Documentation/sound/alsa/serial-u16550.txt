@@ -2,7 +2,7 @@
 			Serial UART 16450/16550 MIDI driver
 			===================================
 
-The snd_adaptor module parameter allows you to select either:
+The adaptor module parameter allows you to select either:
 
   0 - Roland Soundcanvas support (default)
   1 - Midiator MS-124T support (1)
@@ -24,37 +24,35 @@ send the F5 NN command sequence at all; perhaps it ought to.
 Usage example for simple serial converter:
 
 	/sbin/setserial /dev/ttyS0 none
-	/sbin/modprobe snd-serial-u16550 snd_port=0x3f8 snd_irq=4 \
-			snd_speed=115200
+	/sbin/modprobe snd-serial-u16550 port=0x3f8 irq=4 speed=115200
 
 Usage example for Roland SoundCanvas with 4 MIDI ports:
 
 	/sbin/setserial /dev/ttyS0 none
-	/sbin/modprobe snd-serial-u16550 snd_port=0x3f8 snd_irq=4 snd_outs=4
+	/sbin/modprobe snd-serial-u16550 port=0x3f8 irq=4 outs=4
 
-In MS-124T mode, one raw MIDI substream is supported (midiCnD0); the snd_outs
+In MS-124T mode, one raw MIDI substream is supported (midiCnD0); the outs
 module parameter is automatically set to 1. The driver sends the same data to
-all four MIDI Out connectors.  Set the A-B switch and the snd_speed module
+all four MIDI Out connectors.  Set the A-B switch and the speed module
 parameter to match (A=19200, B=9600).
 
 Usage example for MS-124T, with A-B switch in A position:
 
 	/sbin/setserial /dev/ttyS0 none
-	/sbin/modprobe snd-serial-u16550 snd_port=0x3f8 snd_irq=4 \
-			snd_adaptor=1 snd_speed=19200
+	/sbin/modprobe snd-serial-u16550 port=0x3f8 irq=4 adaptor=1 \
+			speed=19200
 
 In MS-124W S/A mode, one raw MIDI substream is supported (midiCnD0);
-the snd_outs module parameter is automatically set to 1. The driver sends
+the outs module parameter is automatically set to 1. The driver sends
 the same data to all four MIDI Out connectors at full MIDI speed.
 
 Usage example for S/A mode:
 
 	/sbin/setserial /dev/ttyS0 none
-	/sbin/modprobe snd-serial-u16550 snd_port=0x3f8 snd_irq=4 \
-			snd_adaptor=2
+	/sbin/modprobe snd-serial-u16550 port=0x3f8 irq=4 adaptor=2
 
 In MS-124W M/B mode, the driver supports 16 ALSA raw MIDI substreams;
-the snd_outs module parameter is automatically set to 16.  The substream
+the outs module parameter is automatically set to 16.  The substream
 number gives a bitmask of which MIDI Out connectors the data should be
 sent to, with midiCnD1 sending to Out 1, midiCnD2 to Out 2, midiCnD4 to
 Out 3, and midiCnD8 to Out 4.  Thus midiCnD15 sends the data to all 4 ports.
@@ -67,8 +65,7 @@ one byte every 320 us per port.
 Usage example for M/B mode:
 
 	/sbin/setserial /dev/ttyS0 none
-	/sbin/modprobe snd-serial-u16550 snd_port=0x3f8 snd_irq=4 \
-			snd_adaptor=3
+	/sbin/modprobe snd-serial-u16550 port=0x3f8 irq=4 adaptor=3
 
 The MS-124W hardware's M/A mode is currently not supported. This mode allows
 the MIDI Outs to act independently at double the aggregate throughput of M/B,
@@ -88,4 +85,4 @@ The Generic driver supports multiple input and output substreams over a single
 serial port.  Similar to Roland Soundcanvas mode, F5 NN is used to select the
 appropriate input or output stream (depending on the data direction).
 Additionally, the CTS signal is used to regulate the data flow.  The number of
-inputs is specified by the snd_ins parameter.
+inputs is specified by the ins parameter.
