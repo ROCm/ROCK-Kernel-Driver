@@ -372,6 +372,10 @@ void VISenter(void);
 /* RAID code needs this */
 EXPORT_SYMBOL_NOVERS(VISenter);
 
+extern void batten_down_hatches(void);
+/* for input/keybdev */
+EXPORT_SYMBOL(batten_down_hatches);
+
 #ifdef CONFIG_DEBUG_BUGVERBOSE
 EXPORT_SYMBOL(do_BUG);
 #endif
