@@ -30,33 +30,9 @@ config PNP_DEBUG
 comment "Protocols"
 	depends on PNP
 
-config ISAPNP
-	bool "ISA Plug and Play support (EXPERIMENTAL)"
-	depends on PNP && EXPERIMENTAL
-	help
-	  Say Y here if you would like support for ISA Plug and Play devices.
-	  Some information is in <file:Documentation/isapnp.txt>.
+source "drivers/pnp/isapnp/Kconfig"
 
-	  If unsure, say Y.
-
-config PNPBIOS
-	bool "Plug and Play BIOS support (EXPERIMENTAL)"
-	depends on PNP && EXPERIMENTAL
-	---help---
-	  Linux uses the PNPBIOS as defined in "Plug and Play BIOS
-	  Specification Version 1.0A May 5, 1994" to autodetect built-in
-	  mainboard resources (e.g. parallel port resources).
-
-	  Some features (e.g. event notification, docking station information,
-	  ISAPNP services) are not used.
-
-	  Note: ACPI is expected to supersede PNPBIOS some day, currently it
-	  co-exists nicely.
-
-	  See latest pcmcia-cs (stand-alone package) for a nice "lspnp" tools,
-	  or have a look at /proc/bus/pnp.
-
-	  If unsure, say Y.
+source "drivers/pnp/pnpbios/Kconfig"
 
 endmenu
 
