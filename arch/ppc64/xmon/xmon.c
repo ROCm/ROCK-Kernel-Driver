@@ -181,6 +181,7 @@ Commands:\n\
   T	Enable/Disable PPCDBG flags\n\
   x	exit monitor\n\
   z	reboot\n\
+  Z	halt\n\
 ";
 
 static int xmon_trace[NR_CPUS];
@@ -620,7 +621,12 @@ cmds(struct pt_regs *excp)
 		}
 		switch (cmd) {
 		case 'z':
+			printf("Rebooting machine now...");
 			machine_restart(NULL);
+			break;
+		case 'Z':
+			printf("Halting machine now...");
+			machine_halt();
 			break;
 		case 'm':
 			cmd = inchar();
