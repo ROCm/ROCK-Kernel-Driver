@@ -1195,6 +1195,14 @@ out:
     return res;
 }
 
+static ssize_t reiserfs_aio_write(struct kiocb *iocb, const char __user *buf,
+			       size_t count, loff_t pos)
+{
+    return generic_file_aio_write(iocb, buf, count, pos);
+}
+
+
+
 struct file_operations reiserfs_file_operations = {
     .read	= generic_file_read,
     .write	= reiserfs_file_write,
@@ -1203,6 +1211,8 @@ struct file_operations reiserfs_file_operations = {
     .release	= reiserfs_file_release,
     .fsync	= reiserfs_sync_file,
     .sendfile	= generic_file_sendfile,
+    .aio_read   = generic_file_aio_read,
+    .aio_write  = reiserfs_aio_write,
 };
 
 
