@@ -502,6 +502,8 @@ add_device(void)
 		proc = create_proc_read_entry(item->name,
 			S_IFREG | S_IRUGO | S_IWUSR,
 			toshiba_proc_dir, (read_proc_t*)dispatch_read, item);
+		if (proc)
+			proc->owner = THIS_MODULE;
 		if (proc && item->write_func)
 			proc->write_proc = (write_proc_t*)dispatch_write;
 	}
@@ -547,6 +549,7 @@ toshiba_acpi_init(void)
 	if (!toshiba_proc_dir) {
 		status = AE_ERROR;
 	} else {
+		toshiba_proc_dir->owner = THIS_MODULE;
 		status = add_device();
 		if (ACPI_FAILURE(status))
 			remove_proc_entry(PROC_TOSHIBA, acpi_root_dir);

@@ -625,6 +625,7 @@ acpi_battery_add_fs (
 			acpi_battery_dir);
 		if (!acpi_device_dir(device))
 			return_VALUE(-ENODEV);
+		acpi_device_dir(device)->owner = THIS_MODULE;
 	}
 
 	/* 'info' [R] */
@@ -637,6 +638,7 @@ acpi_battery_add_fs (
 	else {
 		entry->read_proc = acpi_battery_read_info;
 		entry->data = acpi_driver_data(device);
+		entry->owner = THIS_MODULE;
 	}
 
 	/* 'status' [R] */
@@ -649,6 +651,7 @@ acpi_battery_add_fs (
 	else {
 		entry->read_proc = acpi_battery_read_state;
 		entry->data = acpi_driver_data(device);
+		entry->owner = THIS_MODULE;
 	}
 
 	/* 'alarm' [R/W] */
@@ -662,6 +665,7 @@ acpi_battery_add_fs (
 		entry->read_proc = acpi_battery_read_alarm;
 		entry->write_proc = acpi_battery_write_alarm;
 		entry->data = acpi_driver_data(device);
+		entry->owner = THIS_MODULE;
 	}
 
 	return_VALUE(0);
@@ -813,6 +817,7 @@ acpi_battery_init (void)
 	acpi_battery_dir = proc_mkdir(ACPI_BATTERY_CLASS, acpi_root_dir);
 	if (!acpi_battery_dir)
 		return_VALUE(-ENODEV);
+	acpi_battery_dir->owner = THIS_MODULE;
 
 	result = acpi_bus_register_driver(&acpi_battery_driver);
 	if (result < 0) {
