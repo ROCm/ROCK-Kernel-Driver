@@ -51,9 +51,6 @@ static int __init divert_init(void)
      printk(KERN_WARNING "dss1_divert: error %d registering module, not loaded\n",i);
      return(-EIO);
    } 
-#if (LINUX_VERSION_CODE < 0x020111)
-  register_symtab(0);
-#endif
   printk(KERN_INFO "dss1_divert module successfully installed\n");
   return(0);
 }
