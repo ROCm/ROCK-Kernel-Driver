@@ -311,7 +311,7 @@ static inline int pmd_large(pmd_t pte) {
 
 /* PGD - Level3 access */
 /* to find an entry in a page-table-directory. */
-#define pgd_index(address) ((address >> PGDIR_SHIFT) & (PTRS_PER_PGD-1))
+#define pgd_index(address) (((address) >> PGDIR_SHIFT) & (PTRS_PER_PGD-1))
 static inline pgd_t *__pgd_offset_k(pgd_t *pgd, unsigned long address)
 { 
 	return pgd + pgd_index(address);
