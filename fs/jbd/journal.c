@@ -152,63 +152,91 @@ int kjournald(void *arg)
 
 	printk(KERN_INFO "kjournald starting.  Commit interval %ld seconds\n",
 			journal->j_commit_interval / HZ);
+
+	lock_kernel();
 	list_add(&journal->j_all_journals, &all_journals);
+	unlock_kernel();
 
-	/* And now, wait forever for commit wakeup events. */
-	while (1) {
-		if (journal->j_flags & JFS_UNMOUNT)
-			break;
+	/*
+	 * And now, wait forever for commit wakeup events.
+	 */
+	spin_lock(&journal->j_state_lock);
 
-		jbd_debug(1, "commit_sequence=%d, commit_request=%d\n",
-			journal->j_commit_sequence, journal->j_commit_request);
+loop:
+	jbd_debug(1, "commit_sequence=%d, commit_request=%d\n",
+		journal->j_commit_sequence, journal->j_commit_request);
 
-		spin_lock(&journal->j_state_lock);
-		if (journal->j_commit_sequence != journal->j_commit_request) {
-			jbd_debug(1, "OK, requests differ\n");
-			if (journal->j_commit_timer_active) {
-				journal->j_commit_timer_active = 0;
-				del_timer(journal->j_commit_timer);
-			}
-			spin_unlock(&journal->j_state_lock);
-			journal_commit_transaction(journal);
-			continue;
+	if (journal->j_commit_sequence != journal->j_commit_request) {
+		jbd_debug(1, "OK, requests differ\n");
+		if (journal->j_commit_timer_active) {
+			journal->j_commit_timer_active = 0;
+			del_timer(journal->j_commit_timer);
 		}
 		spin_unlock(&journal->j_state_lock);
-
-		wake_up(&journal->j_wait_done_commit);
-		if (current->flags & PF_FREEZE) {
-			/*
-			 * The simpler the better. Flushing journal isn't a
-			 * good idea, because that depends on threads that may
-			 * be already stopped.
-			 */
-			jbd_debug(1, "Now suspending kjournald\n");
-			refrigerator(PF_IOTHREAD);
-			jbd_debug(1, "Resuming kjournald\n");						
-		} else {
-			/*
-			 * We assume on resume that commits are already there,
-			 * so we don't sleep
-			 */
-			interruptible_sleep_on(&journal->j_wait_commit);
-		}
-
-		jbd_debug(1, "kjournald wakes\n");
-
-		/* Were we woken up by a commit wakeup event? */
-		if ((transaction = journal->j_running_transaction) != NULL &&
-		    time_after_eq(jiffies, transaction->t_expires)) {
-			journal->j_commit_request = transaction->t_tid;
-			jbd_debug(1, "woke because of timeout\n");
-		}
+		journal_commit_transaction(journal);
+		spin_lock(&journal->j_state_lock);
+		goto loop;
 	}
+
+	wake_up(&journal->j_wait_done_commit);
+	if (current->flags & PF_FREEZE) {
+		/*
+		 * The simpler the better. Flushing journal isn't a
+		 * good idea, because that depends on threads that may
+		 * be already stopped.
+		 */
+		jbd_debug(1, "Now suspending kjournald\n");
+		spin_unlock(&journal->j_state_lock);
+		refrigerator(PF_IOTHREAD);
+		spin_lock(&journal->j_state_lock);
+		jbd_debug(1, "Resuming kjournald\n");						
+	} else {
+		/*
+		 * We assume on resume that commits are already there,
+		 * so we don't sleep
+		 */
+		DEFINE_WAIT(wait);
+		int should_sleep = 1;
+
+		prepare_to_wait(&journal->j_wait_commit, &wait,
+				TASK_INTERRUPTIBLE);		
+		if (journal->j_commit_sequence != journal->j_commit_request)
+			should_sleep = 0;
+		transaction = journal->j_running_transaction;
+		if (transaction && time_after_eq(jiffies,
+						transaction->t_expires))
+			should_sleep = 0;
+		if (should_sleep) {
+			spin_unlock(&journal->j_state_lock);
+			schedule();
+			spin_lock(&journal->j_state_lock);
+		}
+		finish_wait(&journal->j_wait_commit, &wait);
+	}
+
+	jbd_debug(1, "kjournald wakes\n");
+
+	/*
+	 * Were we woken up by a commit wakeup event?
+	 */
+	transaction = journal->j_running_transaction;
+	if (transaction && time_after_eq(jiffies, transaction->t_expires)) {
+		journal->j_commit_request = transaction->t_tid;
+		jbd_debug(1, "woke because of timeout\n");
+	}
+
+	if (!(journal->j_flags & JFS_UNMOUNT))
+		goto loop;
 
 	if (journal->j_commit_timer_active) {
 		journal->j_commit_timer_active = 0;
 		del_timer_sync(journal->j_commit_timer);
 	}
+	spin_unlock(&journal->j_state_lock);
 
+	lock_kernel();
 	list_del(&journal->j_all_journals);
+	unlock_kernel();
 
 	journal->j_task = NULL;
 	wake_up(&journal->j_wait_done_commit);
@@ -430,7 +458,7 @@ int __log_space_left(journal_t *journal)
 }
 
 /*
- * This function must be non-allocating for PF_MEMALLOC tasks
+ * Called under j_state_lock.
  */
 static tid_t __log_start_commit(journal_t *journal, transaction_t *transaction)
 {
@@ -491,11 +519,13 @@ int log_wait_commit(journal_t *journal, tid_t tid)
 	lock_kernel();
 #ifdef CONFIG_JBD_DEBUG
 	lock_journal(journal);
+	spin_lock(&journal->j_state_lock);
 	if (!tid_geq(journal->j_commit_request, tid)) {
 		printk(KERN_EMERG
 		       "%s: error: j_commit_request=%d, tid=%d\n",
 		       __FUNCTION__, journal->j_commit_request, tid);
 	}
+	spin_unlock(&journal->j_state_lock);
 	unlock_journal(journal);
 #endif
 	spin_lock(&journal->j_state_lock);
