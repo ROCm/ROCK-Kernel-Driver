@@ -214,8 +214,6 @@ static void __init check_sysemu(void)
 	sysemu_supported = 0;
 	pid = start_ptraced_child(&stack);
 	if(ptrace(PTRACE_SYSEMU, pid, 0, 0) >= 0) {
-		struct user_regs_struct regs;
-
 		CATCH_EINTR(n = waitpid(pid, &status, WUNTRACED));
 		if (n < 0)
 			panic("check_ptrace : wait failed, errno = %d", errno);
@@ -223,18 +221,16 @@ static void __init check_sysemu(void)
 			panic("check_ptrace : expected SIGTRAP, "
 			      "got status = %d", status);
 
-		if (ptrace(PTRACE_GETREGS, pid, 0, &regs) < 0)
-			panic("check_ptrace : failed to read child "
-			      "registers, errno = %d", errno);
-		regs.orig_eax = pid;
-		if (ptrace(PTRACE_SETREGS, pid, 0, &regs) < 0)
-			panic("check_ptrace : failed to modify child "
-			      "registers, errno = %d", errno);
+		n = ptrace(PTRACE_POKEUSER, pid, PT_SYSCALL_RET_OFFSET,
+			   os_getpid());
+		if(n < 0)
+			panic("check_ptrace : failed to modify system "
+			      "call return, errno = %d", errno);
 
 		stop_ptraced_child(pid, stack, 0);
 
 		sysemu_supported = 1;
-		printk("found\n");
+		printk("OK\n");
 	}
 	else
 	{
