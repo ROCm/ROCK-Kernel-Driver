@@ -746,8 +746,22 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	 */
 	if ((clone_flags & CLONE_THREAD) && !(clone_flags & CLONE_SIGHAND))
 		return ERR_PTR(-EINVAL);
-	if ((clone_flags & CLONE_DETACHED) && !(clone_flags & CLONE_THREAD))
+
+	/*
+	 * CLONE_DETACHED must match CLONE_THREAD: it's a historical
+	 * thing.
+	 */
+	if (!(clone_flags & CLONE_DETACHED) != !(clone_flags & CLONE_THREAD)) {
+		/* Warn about the old no longer supported case so that we see it */
+		if (clone_flags & CLONE_THREAD) {
+			static int count;
+			if (count < 5) {
+				count++;
+				printk(KERN_WARNING "%s trying to use CLONE_THREAD without CLONE_DETACH\n", current->comm);
+			}
+		}
 		return ERR_PTR(-EINVAL);
+	}
 
 	retval = security_task_create(clone_flags);
 	if (retval)
@@ -877,10 +891,7 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	p->parent_exec_id = p->self_exec_id;
 
 	/* ok, now we should be set up.. */
-	if (clone_flags & CLONE_DETACHED)
-		p->exit_signal = -1;
-	else
-		p->exit_signal = clone_flags & CSIGNAL;
+	p->exit_signal = (clone_flags & CLONE_THREAD) ? -1 : (clone_flags & CSIGNAL);
 	p->pdeath_signal = 0;
 
 	/*
