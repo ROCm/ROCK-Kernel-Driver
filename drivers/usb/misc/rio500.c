@@ -146,7 +146,7 @@ ioctl_rio(struct inode *inode, struct file *file, unsigned int cmd,
 			retval = -EFAULT;
 			goto err_out;
 		}
-		if (rio_cmd.length > PAGE_SIZE) {
+		if (rio_cmd.length < 0 || rio_cmd.length > PAGE_SIZE) {
 			retval = -EINVAL;
 			goto err_out;
 		}
@@ -216,7 +216,7 @@ ioctl_rio(struct inode *inode, struct file *file, unsigned int cmd,
 			retval = -EFAULT;
 			goto err_out;
 		}
-		if (rio_cmd.length > PAGE_SIZE) {
+		if (rio_cmd.length < 0 || rio_cmd.length > PAGE_SIZE) {
 			retval = -EINVAL;
 			goto err_out;
 		}
