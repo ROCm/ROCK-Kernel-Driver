@@ -487,11 +487,6 @@ static int __init ns_init_card(int i, struct pci_dev *pcidev)
    card->atmdev = NULL;
    card->pcidev = pcidev;
    card->membase = pci_resource_start(pcidev, 1);
-#ifdef __powerpc__
-   /* Compensate for different memory map between host CPU and PCI bus.
-      Shouldn't we use a macro for this? */
-   card->membase += KERNELBASE;
-#endif /* __powerpc__ */
    card->membase = (unsigned long) ioremap(card->membase, NS_IOREMAP_SIZE);
    if (card->membase == 0)
    {
@@ -2315,6 +2310,7 @@ static void dequeue_rx(ns_dev *card, ns_rsqe *rsqe)
          {
             push_rxbufs(card, BUF_SM, (u32) skb, (u32) virt_to_bus(skb->data),
                         0, 0);
+            atomic_inc(&vcc->stats->rx_drop);
          }
          else
 	 {
@@ -2342,6 +2338,7 @@ static void dequeue_rx(ns_dev *card, ns_rsqe *rsqe)
             {
                push_rxbufs(card, BUF_SM, (u32) sb, (u32) virt_to_bus(sb->data),
                            0, 0);
+               atomic_inc(&vcc->stats->rx_drop);
             }
             else
 	    {
@@ -2366,6 +2363,7 @@ static void dequeue_rx(ns_dev *card, ns_rsqe *rsqe)
             {
                push_rxbufs(card, BUF_LG, (u32) skb,
                            (u32) virt_to_bus(skb->data), 0, 0);
+               atomic_inc(&vcc->stats->rx_drop);
             }
             else
             {
@@ -2450,6 +2448,7 @@ static void dequeue_rx(ns_dev *card, ns_rsqe *rsqe)
             }
 	    else
 	       dev_kfree_skb_any(hb);
+	    atomic_inc(&vcc->stats->rx_drop);
          }
          else
 	 {
