@@ -546,8 +546,8 @@ void do_syscall_trace(struct pt_regs *regs, int entryexit)
 		return;
 	/* the 0x80 provides a way for the tracing parent to distinguish
 	   between a syscall stop and SIGTRAP delivery */
-	ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
-				 ? 0x80 : 0));
+	ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD) &&
+				 !test_thread_flag(TIF_SINGLESTEP) ? 0x80 : 0));
 
 	/*
 	 * this isn't the same as continuing with a signal, but it will do
