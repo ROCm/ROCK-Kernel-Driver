@@ -256,7 +256,7 @@ static int alps_passthrough_mode(struct psmouse *psmouse, int enable)
 	return 0;
 }
 
-static int alps_magic_knock(struct psmouse *psmouse)
+static int alps_absolute_mode(struct psmouse *psmouse)
 {
 	struct ps2dev *ps2dev = &psmouse->ps2dev;
 
@@ -266,25 +266,6 @@ static int alps_magic_knock(struct psmouse *psmouse)
 	    ps2_command(ps2dev, NULL, PSMOUSE_CMD_DISABLE) ||
 	    ps2_command(ps2dev, NULL, PSMOUSE_CMD_DISABLE) ||
 	    ps2_command(ps2dev, NULL, PSMOUSE_CMD_ENABLE))
-		return -1;
-	return 0;
-}
-
-static int alps_absolute_mode(struct psmouse *psmouse)
-{
-	if (ps2_command(&psmouse->ps2dev, NULL, PSMOUSE_CMD_RESET_DIS))
-		return -1;
-
-	if (alps_passthrough_mode(psmouse, 1))
-		return -1;
-
-	if (alps_magic_knock(psmouse))
-		return -1;
-
-	if (alps_passthrough_mode(psmouse, 0))
-		return -1;
-
-	if (alps_magic_knock(psmouse))
 		return -1;
 
 	/*
@@ -319,31 +300,23 @@ static int alps_get_status(struct psmouse *psmouse, char *param)
  * is controlled separately (0xE6 0xE6 0xE6 0xF3 0x14|0x0A) but
  * we don't fiddle with it.
  */
-static int alps_tap_mode(struct psmouse *psmouse, int model, int enable)
+static int alps_tap_mode(struct psmouse *psmouse, int enable)
 {
-	int rc = 0;
 	struct ps2dev *ps2dev = &psmouse->ps2dev;
 	int cmd = enable ? PSMOUSE_CMD_SETRATE : PSMOUSE_CMD_SETRES;
 	unsigned char tap_arg = enable ? 0x0A : 0x00;
 	unsigned char param[4];
 
-	if (model == ALPS_MODEL_DUALPOINT && alps_passthrough_mode(psmouse, 1))
-		return -1;
-
 	if (ps2_command(ps2dev, param, PSMOUSE_CMD_GETINFO) ||
 	    ps2_command(ps2dev, NULL, PSMOUSE_CMD_DISABLE) ||
 	    ps2_command(ps2dev, NULL, PSMOUSE_CMD_DISABLE) ||
 	    ps2_command(ps2dev, &tap_arg, cmd))
-		rc = -1;
-
-	if (model == ALPS_MODEL_DUALPOINT && alps_passthrough_mode(psmouse, 0))
 		return -1;
 
 	if (alps_get_status(psmouse, param))
 		return -1;
 
-
-	return rc;
+	return 0;
 }
 
 static int alps_reconnect(struct psmouse *psmouse)
@@ -354,16 +327,22 @@ static int alps_reconnect(struct psmouse *psmouse)
 	if ((model = alps_get_model(psmouse)) < 0)
 		return -1;
 
+	if (model == ALPS_MODEL_DUALPOINT && alps_passthrough_mode(psmouse, 1))
+		return -1;
+
 	if (alps_get_status(psmouse, param))
 		return -1;
 
-	if ((model == ALPS_MODEL_DUALPOINT ? param[2] : param[0]) & 0x04)
-		alps_tap_mode(psmouse, model, 0);
+	if (param[0] & 0x04)
+		alps_tap_mode(psmouse, 0);
 
 	if (alps_absolute_mode(psmouse)) {
 		printk(KERN_ERR "alps.c: Failed to enable absolute mode\n");
 		return -1;
 	}
+
+	if (model == ALPS_MODEL_DUALPOINT && alps_passthrough_mode(psmouse, 0))
+		return -1;
 
 	return 0;
 }
@@ -381,17 +360,20 @@ int alps_init(struct psmouse *psmouse)
 	if ((model = alps_get_model(psmouse)) < 0)
 		return -1;
 
+	printk(KERN_INFO "ALPS Touchpad (%s) detected\n",
+		model == ALPS_MODEL_GLIDEPOINT ? "Glidepoint" : "Dualpoint");
+
+	if (model == ALPS_MODEL_DUALPOINT && alps_passthrough_mode(psmouse, 1))
+		return -1;
+
 	if (alps_get_status(psmouse, param)) {
 		printk(KERN_ERR "alps.c: touchpad status report request failed\n");
 		return -1;
 	}
 
-	printk(KERN_INFO "ALPS Touchpad (%s) detected\n",
-		model == ALPS_MODEL_GLIDEPOINT ? "Glidepoint" : "Dualpoint");
-
-	if ((model == ALPS_MODEL_DUALPOINT ? param[2] : param[0]) & 0x04) {
+	if (param[0] & 0x04) {
 		printk(KERN_INFO "  Disabling hardware tapping\n");
-		if (alps_tap_mode(psmouse, model, 0))
+		if (alps_tap_mode(psmouse, 0))
 			printk(KERN_WARNING "alps.c: Failed to disable hardware tapping\n");
 	}
 
@@ -399,6 +381,9 @@ int alps_init(struct psmouse *psmouse)
 		printk(KERN_ERR "alps.c: Failed to enable absolute mode\n");
 		return -1;
 	}
+
+	if (model == ALPS_MODEL_DUALPOINT && alps_passthrough_mode(psmouse, 0))
+		return -1;
 
 	psmouse->dev.evbit[LONG(EV_REL)] |= BIT(EV_REL);
 	psmouse->dev.relbit[LONG(REL_X)] |= BIT(REL_X);
