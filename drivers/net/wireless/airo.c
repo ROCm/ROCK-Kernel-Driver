@@ -2944,7 +2944,6 @@ static u16 setup_card(struct airo_info *ai, u8 *mac)
 		ai->config.opmode = adhoc ? MODE_STA_IBSS : MODE_STA_ESS;
 		ai->config.authType = AUTH_OPEN;
 		ai->config.modulation = MOD_CCK;
-		ai->config._reserved1a[0] = 2; /* ??? */
 
 #ifdef MICSUPPORT
 		if ((cap_rid.len>=sizeof(cap_rid)) && (cap_rid.extSoftCap&1) &&
