@@ -170,6 +170,8 @@ STATIC int NCR_700_host_reset(Scsi_Cmnd * SCpnt);
 STATIC int NCR_700_proc_directory_info(char *, char **, off_t, int, int, int);
 STATIC void NCR_700_chip_setup(struct Scsi_Host *host);
 STATIC void NCR_700_chip_reset(struct Scsi_Host *host);
+STATIC int NCR_700_slave_attach(Scsi_Device *SDpnt);
+STATIC void NCR_700_slave_detach(Scsi_Device *SDpnt);
 
 static char *NCR_700_phase[] = {
 	"",
@@ -280,9 +282,11 @@ NCR_700_detect(Scsi_Host_Template *tpnt,
 	tpnt->eh_host_reset_handler = NCR_700_host_reset;
 	tpnt->can_queue = NCR_700_COMMAND_SLOTS_PER_HOST;
 	tpnt->sg_tablesize = NCR_700_SG_SEGMENTS;
-	tpnt->cmd_per_lun = NCR_700_MAX_TAGS;
+	tpnt->cmd_per_lun = NCR_700_CMD_PER_LUN;
 	tpnt->use_clustering = DISABLE_CLUSTERING;
 	tpnt->proc_info = NCR_700_proc_directory_info;
+	tpnt->slave_attach = NCR_700_slave_attach;
+	tpnt->slave_detach = NCR_700_slave_detach;
 	tpnt->use_blk_tcq = 1;
 	tpnt->highmem_io = 1;
 	
@@ -891,8 +895,8 @@ process_message(struct Scsi_Host *host,	struct NCR_700_Host_Parameters *hostdata
 			printk(KERN_WARNING "scsi%d (%d:%d) Rejected first tag queue attempt, turning off tag queueing\n", host->host_no, pun, lun);
 			NCR_700_clear_flag(SCp->device, NCR_700_DEV_BEGIN_TAG_QUEUEING);
 			hostdata->tag_negotiated &= ~(1<<SCp->target);
-			SCp->device->tagged_queue = 0;
 			SCp->device->tagged_supported = 0;
+			scsi_deactivate_tcq(SCp->device);
 		} else {
 			printk(KERN_WARNING "scsi%d (%d:%d) Unexpected REJECT Message %s\n",
 			       host->host_no, pun, lun,
@@ -1739,7 +1743,7 @@ NCR_700_proc_directory_info(char *proc_buf, char **startp,
 Target	Depth  Active  Next Tag\n\
 ======	=====  ======  ========\n");
 	for(SDp = host->host_queue; SDp != NULL; SDp = SDp->next) {
-		len += sprintf(&buf[len]," %2d:%2d   %4d    %4d      %4d\n", SDp->id, SDp->lun, SDp->queue_depth, NCR_700_get_depth(SDp), SDp->current_tag);
+		len += sprintf(&buf[len]," %2d:%2d   %4d    %4d      %4d\n", SDp->id, SDp->lun, SDp->current_queue_depth, NCR_700_get_depth(SDp), SDp->current_tag);
 	}
 	if((len -= offset) <= 0)
 		return 0;
@@ -1776,13 +1780,13 @@ NCR_700_queuecommand(Scsi_Cmnd *SCp, void (*done)(Scsi_Cmnd *))
 		DEBUG((KERN_ERR "scsi%d (%d:%d) has non zero depth %d\n",
 		       SCp->host->host_no, SCp->target, SCp->lun,
 		       NCR_700_get_depth(SCp->device)));
-		return 1;
+		return SCSI_MLQUEUE_DEVICE_BUSY;
 	}
 	if(NCR_700_get_depth(SCp->device) >= NCR_700_MAX_TAGS) {
 		DEBUG((KERN_ERR "scsi%d (%d:%d) has max tag depth %d\n",
 		       SCp->host->host_no, SCp->target, SCp->lun,
 		       NCR_700_get_depth(SCp->device)));
-		return 1;
+		return SCSI_MLQUEUE_DEVICE_BUSY;
 	}
 	NCR_700_set_depth(SCp->device, NCR_700_get_depth(SCp->device) + 1);
 
@@ -1996,6 +2000,25 @@ NCR_700_host_reset(Scsi_Cmnd * SCp)
 	NCR_700_internal_bus_reset(SCp->host);
 	NCR_700_chip_reset(SCp->host);
 	return SUCCESS;
+}
+
+STATIC int
+NCR_700_slave_attach(Scsi_Device *SDp)
+{
+	/* to do here: allocate memory; build a queue_full list */
+	if(SDp->tagged_supported) {
+		/* do TCQ stuff here */
+	} else {
+		/* initialise to default depth */
+		scsi_adjust_queue_depth(SDp, 0, SDp->host->cmd_per_lun);
+	}
+	return 0;
+}
+
+STATIC void
+NCR_700_slave_detach(Scsi_Device *SDp)
+{
+	/* to do here: deallocate memory */
 }
 
 EXPORT_SYMBOL(NCR_700_detect);
