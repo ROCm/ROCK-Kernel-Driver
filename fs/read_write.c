@@ -76,14 +76,12 @@ loff_t remote_llseek(struct file *file, loff_t offset, int origin)
 	unlock_kernel();
 	return retval;
 }
-
 EXPORT_SYMBOL(remote_llseek);
 
 loff_t no_llseek(struct file *file, loff_t offset, int origin)
 {
 	return -ESPIPE;
 }
-
 EXPORT_SYMBOL(no_llseek);
 
 loff_t default_llseek(struct file *file, loff_t offset, int origin)
@@ -109,10 +107,9 @@ loff_t default_llseek(struct file *file, loff_t offset, int origin)
 	unlock_kernel();
 	return retval;
 }
-
 EXPORT_SYMBOL(default_llseek);
 
-static inline loff_t llseek(struct file *file, loff_t offset, int origin)
+loff_t vfs_llseek(struct file *file, loff_t offset, int origin)
 {
 	loff_t (*fn)(struct file *, loff_t, int);
 
@@ -121,6 +118,7 @@ static inline loff_t llseek(struct file *file, loff_t offset, int origin)
 		fn = file->f_op->llseek;
 	return fn(file, offset, origin);
 }
+EXPORT_SYMBOL(vfs_llseek);
 
 asmlinkage off_t sys_lseek(unsigned int fd, off_t offset, unsigned int origin)
 {
@@ -135,7 +133,7 @@ asmlinkage off_t sys_lseek(unsigned int fd, off_t offset, unsigned int origin)
 
 	retval = -EINVAL;
 	if (origin <= 2) {
-		loff_t res = llseek(file, offset, origin);
+		loff_t res = vfs_llseek(file, offset, origin);
 		retval = res;
 		if (res != (loff_t)retval)
 			retval = -EOVERFLOW;	/* LFS: should only happen on 32 bit platforms */
@@ -165,7 +163,7 @@ asmlinkage long sys_llseek(unsigned int fd, unsigned long offset_high,
 	if (origin > 2)
 		goto out_putf;
 
-	offset = llseek(file, ((loff_t) offset_high << 32) | offset_low,
+	offset = vfs_llseek(file, ((loff_t) offset_high << 32) | offset_low,
 			origin);
 
 	retval = (int)offset;

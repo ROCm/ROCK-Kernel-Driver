@@ -1341,6 +1341,8 @@ extern ino_t find_inode_number(struct dentry *, struct qstr *);
 /* needed for stackable file system support */
 extern loff_t default_llseek(struct file *file, loff_t offset, int origin);
 
+extern loff_t vfs_llseek(struct file *file, loff_t offset, int origin);
+
 extern void inode_init_once(struct inode *);
 extern void iput(struct inode *);
 extern struct inode * igrab(struct inode *);
