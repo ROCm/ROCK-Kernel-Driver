@@ -3495,7 +3495,17 @@ s64 xtTruncate(tid_t tid, struct inode *ip, s64 newsize, int flag)
 	 * a page that was formerly to the right, let's make sure that the
 	 * next pointer is zero.
 	 */
-	p->header.next = 0;
+	if (p->header.next) {
+		if (log)
+			/*
+			 * Make sure this change to the header is logged.
+			 * If we really truncate this leaf, the flag
+			 * will be changed to tlckTRUNCATE
+			 */
+			tlck = txLock(tid, ip, mp, tlckXTREE|tlckGROW);
+		BT_MARK_DIRTY(mp, ip);
+		p->header.next = 0;
+	}
 
 	freed = 0;
 
