@@ -178,7 +178,7 @@ static int (*mangle[])(struct sk_buff **, u_int32_t, u_int16_t,
     [IP_CT_FTP_EPSV] = mangle_epsv_packet
 };
 
-static int ftp_data_fixup(const struct ip_ct_ftp_expect *ct_ftp_info,
+static int ftp_data_fixup(const struct ip_ct_ftp_expect *exp_ftp_info,
 			  struct ip_conntrack *ct,
 			  struct sk_buff **pskb,
 			  enum ip_conntrack_info ctinfo,
@@ -192,13 +192,13 @@ static int ftp_data_fixup(const struct ip_ct_ftp_expect *ct_ftp_info,
 
 	MUST_BE_LOCKED(&ip_ftp_lock);
 	DEBUGP("FTP_NAT: seq %u + %u in %u\n",
-	       expect->seq, ct_ftp_info->len,
+	       expect->seq, exp_ftp_info->len,
 	       ntohl(tcph->seq));
 
 	/* Change address inside packet to match way we're mapping
 	   this connection. */
-	if (ct_ftp_info->ftptype == IP_CT_FTP_PASV
-	    || ct_ftp_info->ftptype == IP_CT_FTP_EPSV) {
+	if (exp_ftp_info->ftptype == IP_CT_FTP_PASV
+	    || exp_ftp_info->ftptype == IP_CT_FTP_EPSV) {
 		/* PASV/EPSV response: must be where client thinks server
 		   is */
 		newip = ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.ip;
@@ -220,7 +220,7 @@ static int ftp_data_fixup(const struct ip_ct_ftp_expect *ct_ftp_info,
 	newtuple.src.u.tcp.port = expect->tuple.src.u.tcp.port;
 
 	/* Try to get same port: if not, try to change it. */
-	for (port = ct_ftp_info->port; port != 0; port++) {
+	for (port = exp_ftp_info->port; port != 0; port++) {
 		newtuple.dst.u.tcp.port = htons(port);
 
 		if (ip_conntrack_change_expect(expect, &newtuple) == 0)
@@ -229,9 +229,9 @@ static int ftp_data_fixup(const struct ip_ct_ftp_expect *ct_ftp_info,
 	if (port == 0)
 		return 0;
 
-	if (!mangle[ct_ftp_info->ftptype](pskb, newip, port,
+	if (!mangle[exp_ftp_info->ftptype](pskb, newip, port,
 					  expect->seq - ntohl(tcph->seq),
-					  ct_ftp_info->len, ct, ctinfo))
+					  exp_ftp_info->len, ct, ctinfo))
 		return 0;
 
 	return 1;
@@ -248,12 +248,12 @@ static unsigned int help(struct ip_conntrack *ct,
 	struct tcphdr *tcph = (void *)iph + iph->ihl*4;
 	unsigned int datalen;
 	int dir;
-	struct ip_ct_ftp_expect *ct_ftp_info;
+	struct ip_ct_ftp_expect *exp_ftp_info;
 
 	if (!exp)
 		DEBUGP("ip_nat_ftp: no exp!!");
 
-	ct_ftp_info = &exp->help.exp_ftp_info;
+	exp_ftp_info = &exp->help.exp_ftp_info;
 
 	/* Only mangle things once: original direction in POST_ROUTING
 	   and reply direction on PRE_ROUTING. */
@@ -271,10 +271,10 @@ static unsigned int help(struct ip_conntrack *ct,
 	datalen = (*pskb)->len - iph->ihl * 4 - tcph->doff * 4;
 	LOCK_BH(&ip_ftp_lock);
 	/* If it's in the right range... */
-	if (between(exp->seq + ct_ftp_info->len,
+	if (between(exp->seq + exp_ftp_info->len,
 		    ntohl(tcph->seq),
 		    ntohl(tcph->seq) + datalen)) {
-		if (!ftp_data_fixup(ct_ftp_info, ct, pskb, ctinfo, exp)) {
+		if (!ftp_data_fixup(exp_ftp_info, ct, pskb, ctinfo, exp)) {
 			UNLOCK_BH(&ip_ftp_lock);
 			return NF_DROP;
 		}
@@ -283,7 +283,7 @@ static unsigned int help(struct ip_conntrack *ct,
 		   It's a cracker being funky. */
 		if (net_ratelimit()) {
 			printk("FTP_NAT: partial packet %u/%u in %u/%u\n",
-			       exp->seq, ct_ftp_info->len,
+			       exp->seq, exp_ftp_info->len,
 			       ntohl(tcph->seq),
 			       ntohl(tcph->seq) + datalen);
 		}
