@@ -724,26 +724,29 @@ int driverfs_create_symlink(struct driver_dir_entry * parent,
  */
 void driverfs_remove_file(struct driver_dir_entry * dir, const char * name)
 {
-	struct list_head * node;
+	struct dentry * dentry;
+	struct qstr qstr;
 
 	if (!dir->dentry)
 		return;
 
 	down(&dir->dentry->d_inode->i_sem);
+	qstr.name = name;
+	qstr.len = strlen(name);
+	qstr.hash = full_name_hash(name,qstr.len);
+	dentry = lookup_hash(&qstr,dir->dentry);
 
-	node = dir->files.next;
-	while (node != &dir->files) {
-		struct driver_file_entry * entry = NULL;
+	if (!IS_ERR(dentry)) {
+		struct driver_file_entry * entry = dentry->d_fsdata;
 
-		entry = list_entry(node,struct driver_file_entry,node);
-		if (!strcmp(entry->name,name)) {
-			list_del_init(node);
-			driverfs_unlink(entry->dentry->d_parent->d_inode,entry->dentry);
-			dput(entry->dentry);
+		/* make sure dentry is really there */
+		if (dentry->d_inode && 
+		    (dentry->d_parent->d_inode == dir->dentry->d_inode)) {
+			list_del_init(&entry->node);
+			driverfs_unlink(dir->dentry->d_inode,dentry);
+			dput(dir->dentry);
 			put_mount();
-			break;
 		}
-		node = node->next;
 	}
 	up(&dir->dentry->d_inode->i_sem);
 }
