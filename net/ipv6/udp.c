@@ -436,7 +436,10 @@ try_again:
 				sin6->sin6_scope_id = IP6CB(skb)->iif;
 		}
   	}
+
 	err = copied;
+	if (flags & MSG_TRUNC)
+		err = skb->len - sizeof(struct udphdr);
 
 out_free:
 	skb_free_datagram(sk, skb);
