@@ -814,8 +814,6 @@ int scsi_prep_fn(struct request_queue *q, struct request *req)
 		SRpnt = (Scsi_Request *) req->special;
 		
 		if (SRpnt->sr_magic == SCSI_REQ_MAGIC) {
-			if (SDpnt->device_busy >= SDpnt->queue_depth)
-				return BLKPREP_DEFER;
 			SCpnt = scsi_get_command(SRpnt->sr_device, GFP_ATOMIC);
 			if (!SCpnt)
 				return BLKPREP_DEFER;
@@ -827,8 +825,6 @@ int scsi_prep_fn(struct request_queue *q, struct request *req)
 		 * Now try and find a command block that we can use.
 		 */
 		if (!req->special) {
-			if (SDpnt->device_busy >= SDpnt->queue_depth)
-				return BLKPREP_DEFER;
 			SCpnt = scsi_get_command(SDpnt, GFP_ATOMIC);
 			if (unlikely(!SCpnt))
 				return BLKPREP_DEFER;
@@ -950,6 +946,9 @@ void scsi_request_fn(request_queue_t * q)
 		 * lower down.
 		 */
 		req = elv_next_request(q);
+
+		if (SDpnt->device_busy >= SDpnt->queue_depth)
+			break;
 
 		if(SHpnt->host_busy == 0 && SHpnt->host_blocked) {
 			/* unblock after host_blocked iterates to zero */
