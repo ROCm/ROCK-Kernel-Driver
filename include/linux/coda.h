@@ -59,7 +59,7 @@ Mellon the rights to redistribute these changes without encumbrance.
 #ifndef _CODA_HEADER_
 #define _CODA_HEADER_
 
-
+#include <linux/config.h>
 
 /* Catch new _KERNEL defn for NetBSD and DJGPP/__CYGWIN32__ */
 #if defined(__NetBSD__) || \
@@ -194,11 +194,17 @@ struct venus_dirent {
 
 #endif
 
+#ifndef _VUID_T_
+#define _VUID_T_
+typedef u_int32_t vuid_t;
+typedef u_int32_t vgid_t;
+#endif /*_VUID_T_ */
+
+#ifdef CODA_FS_OLD_API
 struct CodaFid {
 	u_int32_t opaque[3];
 };
 
-#ifdef __linux__
 static __inline__ ino_t  coda_f2i(struct CodaFid *fid)
 {
 	if ( ! fid ) 
@@ -208,26 +214,22 @@ static __inline__ ino_t  coda_f2i(struct CodaFid *fid)
 	else
 		return (fid->opaque[2] + (fid->opaque[1]<<10) + (fid->opaque[0]<<20));
 }
-	
-#else
-#define coda_f2i(fid)\
-	((fid) ? ((fid)->opaque[2] + ((fid)->opaque[1]<<10) + ((fid)->opaque[0]<<20)) : 0)
-#endif
 
-
-#ifndef _VUID_T_
-#define _VUID_T_
-typedef u_int32_t vuid_t;
-typedef u_int32_t vgid_t;
-#endif /*_VUID_T_ */
-
-#ifndef _CODACRED_T_
-#define _CODACRED_T_
 struct coda_cred {
     vuid_t cr_uid, cr_euid, cr_suid, cr_fsuid; /* Real, efftve, set, fs uid*/
     vgid_t cr_groupid, cr_egid, cr_sgid, cr_fsgid; /* same for groups */
 };
-#endif 
+
+#else /* not defined(CODA_FS_OLD_API) */
+
+struct CodaFid {
+	u_int32_t opaque[4];
+};
+
+#define coda_f2i(fid)\
+	(fid ? (fid->opaque[3] ^ (fid->opaque[2]<<10) ^ (fid->opaque[1]<<20) ^ fid->opaque[0]) : 0)
+
+#endif
 
 #ifndef _VENUS_VATTR_T_
 #define _VENUS_VATTR_T_
@@ -316,7 +318,11 @@ struct coda_statfs {
 #define CODA_KERNEL_VERSION 0 /* don't care about kernel version number */
 #define CODA_KERNEL_VERSION 1 /* The old venus 4.6 compatible interface */
 #endif
-#define CODA_KERNEL_VERSION 2 /* venus_lookup gets an extra parameter */
+#ifdef CODA_FS_OLD_API
+#define CODA_KERNEL_VERSION 2 /* venus_lookup got an extra parameter */
+#else
+#define CODA_KERNEL_VERSION 3 /* 128-bit file identifiers */
+#endif
 
 /*
  *        Venus <-> Coda  RPC arguments
@@ -324,10 +330,16 @@ struct coda_statfs {
 struct coda_in_hdr {
     u_int32_t opcode;
     u_int32_t unique;	    /* Keep multiple outstanding msgs distinct */
+#ifdef CODA_FS_OLD_API
     u_int16_t pid;	    /* Common to all */
     u_int16_t pgid;	    /* Common to all */
     u_int16_t sid;          /* Common to all */
     struct coda_cred cred;  /* Common to all */
+#else
+    pid_t pid;
+    pid_t pgid;
+    vuid_t uid;
+#endif
 };
 
 /* Really important that opcode and unique are 1st two fields! */
@@ -602,7 +614,11 @@ struct coda_vget_out {
 /* CODA_PURGEUSER is a venus->kernel call */
 struct coda_purgeuser_out {
     struct coda_out_hdr oh;
+#ifdef CODA_FS_OLD_API
     struct coda_cred cred;
+#else
+    vuid_t uid;
+#endif
 };
 
 /* coda_zapfile: */

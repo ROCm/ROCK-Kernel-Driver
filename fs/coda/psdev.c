@@ -384,7 +384,13 @@ static int __init init_coda(void)
 {
 	int status;
 	int i;
-	printk(KERN_INFO "Coda Kernel/Venus communications, v5.3.15, coda@cs.cmu.edu\n");
+	printk(KERN_INFO "Coda Kernel/Venus communications, "
+#ifdef CODA_FS_OLD_API
+	       "v5.3.20"
+#else
+	       "v6.0.0"
+#endif
+	       ", coda@cs.cmu.edu\n");
 
 	status = coda_init_inodecache();
 	if (status)
