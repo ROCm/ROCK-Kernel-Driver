@@ -29,7 +29,6 @@
 #include <linux/serial.h>
 #include <linux/serialP.h>
 #include <linux/delay.h>
-#include <linux/8250.h>
 
 #include <asm/serial.h>
 #include <asm/io.h>
@@ -41,6 +40,7 @@
 #endif
 
 #include <linux/serial_core.h>
+#include "8250.h"
 
 /*
  * Debugging.
