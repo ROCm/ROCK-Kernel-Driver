@@ -63,7 +63,7 @@ config IP_NF_AMANDA
 	tristate "Amanda backup protocol support"
 	depends on IP_NF_CONNTRACK
 	help
-	  If you are running the Amanda backup package (http://www.amanda.org/)
+	  If you are running the Amanda backup package <http://www.amanda.org/>
 	  on this machine or machines that will be MASQUERADED through this
 	  machine, then you may want to enable this feature.  This allows the
 	  connection tracking and natting code to allow the sub-channels that
@@ -157,6 +157,19 @@ config IP_NF_MATCH_TOS
 	help
 	  TOS matching allows you to match packets based on the Type Of
 	  Service fields of the IP packet.
+
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+config IP_NF_MATCH_RECENT
+	tristate "recent match support"
+	depends on IP_NF_IPTABLES
+	help
+	  This match is used for creating one or many lists of recently
+	  used addresses and then matching against that/those list(s).
+
+	  Short options are available by using 'iptables -m recent -h'
+	  Official Website: <http://snowman.net/projects/ipt_recent/>
 
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  If unsure, say `N'.
