@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2004, R. Byron Moore
+ * Copyright (C) 2000 - 2005, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -218,6 +218,10 @@ acpi_ex_opcode_3A_1T_1R (
 			return_desc->string.pointer = buffer;
 			return_desc->string.length = (u32) length;
 		}
+
+		/* Mark buffer initialized */
+
+		return_desc->buffer.flags |= AOPOBJ_DATA_VALID;
 		break;
 
 

@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2004, R. Byron Moore
+ * Copyright (C) 2000 - 2005, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -420,6 +420,12 @@ acpi_ns_init_one_device (
 		status = AE_OK;
 	}
 	else {
+		/* Delete any return object (especially if implicit_return is enabled) */
+
+		if (pinfo.return_object) {
+			acpi_ut_remove_reference (pinfo.return_object);
+		}
+
 		/* Count of successful INIs */
 
 		info->num_INI++;

@@ -54,7 +54,6 @@
 #include <asm/uaccess.h>
 #include <asm/atomic.h>
 #include "nicstar.h"
-#include "nicstarmac.h"
 #ifdef CONFIG_ATM_NICSTAR_USE_SUNI
 #include "suni.h"
 #endif /* CONFIG_ATM_NICSTAR_USE_SUNI */

@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2004, R. Byron Moore
+ * Copyright (C) 2000 - 2005, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -219,6 +219,8 @@ const char                          *acpi_gbl_valid_osi_strings[ACPI_NUM_OSI_STR
  * NOTES:
  * 1) _SB_ is defined to be a device to allow \_SB_._INI to be run
  *    during the initialization sequence.
+ * 2) _TZ_ is defined to be a thermal zone in order to allow ASL code to
+ *    perform a Notify() operation on it.
  */
 const struct acpi_predefined_names      acpi_gbl_pre_defined_names[] =
 { {"_GPE",    ACPI_TYPE_LOCAL_SCOPE,      NULL},
@@ -226,12 +228,12 @@ const struct acpi_predefined_names      acpi_gbl_pre_defined_names[] =
 	{"_SB_",    ACPI_TYPE_DEVICE,           NULL},
 	{"_SI_",    ACPI_TYPE_LOCAL_SCOPE,      NULL},
 	{"_TZ_",    ACPI_TYPE_THERMAL,          NULL},
-	{"_REV",    ACPI_TYPE_INTEGER,          "2"},
+	{"_REV",    ACPI_TYPE_INTEGER,          (char *) ACPI_CA_SUPPORT_LEVEL},
 	{"_OS_",    ACPI_TYPE_STRING,           ACPI_OS_NAME},
-	{"_GL_",    ACPI_TYPE_MUTEX,            "0"},
+	{"_GL_",    ACPI_TYPE_MUTEX,            (char *) 1},
 
 #if !defined (ACPI_NO_METHOD_EXECUTION) || defined (ACPI_CONSTANT_EVAL_ONLY)
-	{"_OSI",    ACPI_TYPE_METHOD,           "1"},
+	{"_OSI",    ACPI_TYPE_METHOD,           (char *) 1},
 #endif
 	{NULL,      ACPI_TYPE_ANY,              NULL}              /* Table terminator */
 };

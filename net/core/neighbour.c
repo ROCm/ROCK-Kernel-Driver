@@ -109,7 +109,7 @@ static int neigh_blackhole(struct sk_buff *skb)
 
 unsigned long neigh_rand_reach_time(unsigned long base)
 {
-	return (net_random() % base) + (base >> 1);
+	return (base ? (net_random() % base) + (base >> 1) : 0);
 }
 
 

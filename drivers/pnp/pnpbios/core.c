@@ -538,10 +538,11 @@ int __init pnpbios_init(void)
 		return -ENODEV;
 	}
 
-#ifdef CONFIG_ACPI
-	if (!acpi_disabled) {
+#ifdef CONFIG_PNPACPI
+	extern int pnpacpi_disabled;
+	if (!acpi_disabled && !pnpacpi_disabled) {
 		pnpbios_disabled = 1;
-		printk(KERN_INFO "PnPBIOS: Disabled by ACPI\n");
+		printk(KERN_INFO "PnPBIOS: Disabled by ACPI PNP\n");
 		return -ENODEV;
 	}
 #endif /* CONFIG_ACPI */

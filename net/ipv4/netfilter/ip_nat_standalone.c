@@ -195,7 +195,7 @@ ip_nat_out(unsigned int hooknum,
 	   I'm starting to have nightmares about fragments.  */
 
 	if ((*pskb)->nh.iph->frag_off & htons(IP_MF|IP_OFFSET)) {
-		*pskb = ip_ct_gather_frags(*pskb);
+		*pskb = ip_ct_gather_frags(*pskb, IP_DEFRAG_NAT_OUT);
 
 		if (!*pskb)
 			return NF_STOLEN;

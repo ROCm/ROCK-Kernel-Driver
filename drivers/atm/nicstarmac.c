@@ -7,6 +7,8 @@
  * Read this ForeRunner's MAC address from eprom/eeprom
  */
 
+typedef void __iomem *virt_addr_t;
+
 #define CYCLE_DELAY 5
 
 /* This was the original definition
@@ -213,7 +215,7 @@ read_eprom_byte(virt_addr_t base, u_int8_t offset)
 }
 
 
-void
+static void
 nicstar_init_eprom( virt_addr_t base )
 {
     u_int32_t val;
@@ -246,7 +248,7 @@ nicstar_init_eprom( virt_addr_t base )
  * above.
  */ 
 
-void
+static void
 nicstar_read_eprom(
     virt_addr_t	base,
     u_int8_t	prom_offset,

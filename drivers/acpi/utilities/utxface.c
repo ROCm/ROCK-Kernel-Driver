@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2004, R. Byron Moore
+ * Copyright (C) 2000 - 2005, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -514,10 +514,12 @@ acpi_purge_cached_objects (void)
 	ACPI_FUNCTION_TRACE ("acpi_purge_cached_objects");
 
 
+#ifdef ACPI_ENABLE_OBJECT_CACHE
 	acpi_ut_delete_generic_state_cache ();
 	acpi_ut_delete_object_cache ();
 	acpi_ds_delete_walk_state_cache ();
 	acpi_ps_delete_parse_cache ();
+#endif
 
 	return_ACPI_STATUS (AE_OK);
 }

@@ -31,7 +31,8 @@
 #define HCI_IGNORE		0x01
 #define HCI_RESET		0x02
 #define HCI_DIGIANSWER		0x04
-#define HCI_BROKEN_ISOC		0x08
+#define HCI_SNIFFER		0x08
+#define HCI_BROKEN_ISOC		0x10
 
 #define HCI_MAX_IFACE_NUM	3
 

@@ -1779,7 +1779,7 @@ fore200e_send(struct atm_vcc *vcc, struct sk_buff *skb)
 
 	    /* retry once again? */
 	    if (--retry > 0) {
-		schedule();
+		udelay(50);
 		goto retry_here;
 	    }
 

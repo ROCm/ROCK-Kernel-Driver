@@ -818,6 +818,30 @@ static inline void hci_link_key_notify_evt(struct hci_dev *hdev, struct sk_buff 
 {
 }
 
+/* Clock Offset */
+static inline void hci_clock_offset_evt(struct hci_dev *hdev, struct sk_buff *skb)
+{
+	struct hci_ev_clock_offset *ev = (struct hci_ev_clock_offset *) skb->data;
+	struct hci_conn *conn = NULL;
+	__u16 handle = __le16_to_cpu(ev->handle);
+
+	BT_DBG("%s status %d", hdev->name, ev->status);
+
+	hci_dev_lock(hdev);
+
+	conn = hci_conn_hash_lookup_handle(hdev, handle);
+	if (conn && !ev->status) {
+		struct inquiry_entry *ie;
+
+		if ((ie = hci_inquiry_cache_lookup(hdev, &conn->dst))) {
+			ie->data.clock_offset = ev->clock_offset;
+			ie->timestamp = jiffies;
+		}
+	}
+
+	hci_dev_unlock(hdev);
+}
+
 void hci_event_packet(struct hci_dev *hdev, struct sk_buff *skb)
 {
 	struct hci_event_hdr *hdr = (struct hci_event_hdr *) skb->data;
@@ -884,6 +908,10 @@ void hci_event_packet(struct hci_dev *hdev, struct sk_buff *skb)
 
 	case HCI_EV_LINK_KEY_NOTIFY:
 		hci_link_key_notify_evt(hdev, skb);
+		break;
+
+	case HCI_EV_CLOCK_OFFSET:
+		hci_clock_offset_evt(hdev, skb);
 		break;
 
 	case HCI_EV_CMD_STATUS:

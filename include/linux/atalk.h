@@ -229,7 +229,7 @@ extern void atalk_unregister_sysctl(void);
 extern int atalk_proc_init(void);
 extern void atalk_proc_exit(void);
 #else
-#define atalk_proc_init()	0
+#define atalk_proc_init()	({ 0; })
 #define atalk_proc_exit()	do { } while(0)
 #endif /* CONFIG_PROC_FS */
 

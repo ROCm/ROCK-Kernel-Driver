@@ -60,6 +60,15 @@ module_param(max_cstate, uint, 0644);
 static unsigned int nocst = 0;
 module_param(nocst, uint, 0000);
 
+/*
+ * bm_history -- bit-mask with a bit per jiffy of bus-master activity
+ * 1000 HZ: 0xFFFFFFFF: 32 jiffies = 32ms
+ * 800 HZ: 0xFFFFFFFF: 32 jiffies = 40ms
+ * 100 HZ: 0x0000000F: 4 jiffies = 40ms
+ * reduce history for more aggressive entry into C3
+ */
+static unsigned int bm_history = (HZ >= 800 ? 0xFFFFFFFF : ((1U << (HZ / 25)) - 1));
+module_param(bm_history, uint, 0644);
 /* --------------------------------------------------------------------------
                                 Power Management
    -------------------------------------------------------------------------- */
@@ -193,8 +202,18 @@ static void acpi_processor_idle (void)
 	 */
 	if (pr->flags.bm_check) {
 		u32		bm_status = 0;
+		unsigned long	diff = jiffies - pr->power.bm_check_timestamp;
 
-		pr->power.bm_activity <<= 1;
+		if (diff > 32)
+			diff = 32;
+
+		while (diff) {
+			/* if we didn't get called, assume there was busmaster activity */
+			diff--;
+			if (diff)
+				pr->power.bm_activity |= 0x1;
+			pr->power.bm_activity <<= 1;
+		}
 
 		acpi_get_register(ACPI_BITREG_BUS_MASTER_STATUS,
 			&bm_status, ACPI_MTX_DO_NOT_LOCK);
@@ -213,6 +232,9 @@ static void acpi_processor_idle (void)
 				|| (inb_p(errata.piix4.bmisx + 0x0A) & 0x01))
 				pr->power.bm_activity++;
 		}
+
+		pr->power.bm_check_timestamp = jiffies;
+
 		/*
 		 * Apply bus mastering demotion policy.  Automatically demote
 		 * to avoid a faulty transition.  Note that the processor
@@ -425,7 +447,7 @@ acpi_processor_set_power_policy (
 			cx->demotion.threshold.ticks = cx->latency_ticks;
 			cx->demotion.threshold.count = 1;
 			if (cx->type == ACPI_STATE_C3)
-				cx->demotion.threshold.bm = 0x0F;
+				cx->demotion.threshold.bm = bm_history;
 		}
 
 		lower = cx;
@@ -445,7 +467,7 @@ acpi_processor_set_power_policy (
 			else
 				cx->promotion.threshold.count = 10;
 			if (higher->type == ACPI_STATE_C3)
-				cx->promotion.threshold.bm = 0x0F;
+				cx->promotion.threshold.bm = bm_history;
 		}
 
 		higher = cx;
