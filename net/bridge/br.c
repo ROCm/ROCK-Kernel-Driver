@@ -32,7 +32,7 @@ int (*br_should_route_hook) (struct sk_buff **pskb) = NULL;
 
 static int __init br_init(void)
 {
-#if defined(CONFIG_INET) && defined(CONFIG_NETFILTER)
+#ifdef CONFIG_BRIDGE_NETFILTER
 	if (br_netfilter_init())
 		return 1;
 #endif
@@ -50,7 +50,7 @@ static int __init br_init(void)
 
 static void __exit br_deinit(void)
 {
-#if defined(CONFIG_INET) && defined(CONFIG_NETFILTER)
+#ifdef CONFIG_BRIDGE_NETFILTER
 	br_netfilter_fini();
 #endif
 	unregister_netdevice_notifier(&br_device_notifier);
