@@ -117,17 +117,18 @@ static int alpha_core_agp_remove_memory(struct agp_memory *mem, off_t pg_start,
 
 struct agp_bridge_driver alpha_core_agp_driver = {
 	.owner			= THIS_MODULE,
-	.aperture_sizes		= aper_size,
-	.current_size		= aper_size,	/* only one entry */
-	.size_type		= FIXED_APER_SIZE,
+	.aperture_sizes		= alpha_core_agp_sizes,
 	.num_aperture_sizes	= 1,
-	.configure		= alpha_core_agp_configure,
+	.size_type		= FIXED_APER_SIZE,
+	.cant_use_aperture	= 1,
+	.masks			= NULL,
+	
 	.fetch_size		= alpha_core_agp_fetch_size,
+	.configure		= alpha_core_agp_configure,
+	.agp_enable		= alpha_core_agp_enable,
 	.cleanup		= alpha_core_agp_cleanup,
 	.tlb_flush		= alpha_core_agp_tlbflush,
 	.mask_memory		= agp_generic_mask_memory,
-	.masks			= NULL,
-	.agp_enable		= alpha_core_agp_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= alpha_core_agp_nop,
 	.free_gatt_table	= alpha_core_agp_nop,
@@ -137,9 +138,6 @@ struct agp_bridge_driver alpha_core_agp_driver = {
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.mode			= agp->capability.lw,
-	.cant_use_aperture	= 1,
-	.vm_ops			= &alpha_core_agp_vm_ops,
 };
 
 struct agp_bridge_data *alpha_bridge;
@@ -160,11 +158,9 @@ alpha_core_agp_setup(void)
 	 * Build the aperture size descriptor
 	 */
 	aper_size = alpha_core_agp_sizes;
-	if (!aper_size)
-		return -ENOMEM;
 	aper_size->size = agp->aperture.size / (1024 * 1024);
 	aper_size->num_entries = agp->aperture.size / PAGE_SIZE;
-	aper_size->page_order = ffs(aper_size->num_entries / 1024) - 1;
+	aper_size->page_order = __ffs(aper_size->num_entries / 1024);
 
 	/*
 	 * Build a fake pci_dev struct
@@ -181,8 +177,11 @@ alpha_core_agp_setup(void)
 		goto fail;
 
 	alpha_bridge->driver = &alpha_core_agp_driver;
+	alpha_bridge->vm_ops = &alpha_core_agp_vm_ops;
+	alpha_bridge->current_size = aper_size; /* only 1 size */
 	alpha_bridge->dev_private_data = agp;
 	alpha_bridge->dev = pdev;
+	alpha_bridge->mode = agp->capability.lw;
 
 	printk(KERN_INFO "Detected AGP on hose %d\n", agp->hose->index);
 	return agp_add_bridge(alpha_bridge);
