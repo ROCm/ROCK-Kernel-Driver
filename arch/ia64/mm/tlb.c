@@ -41,6 +41,8 @@ struct ia64_ctx ia64_ctx = {
 	.max_ctx =	~0U
 };
 
+u8 ia64_need_tlb_flush __per_cpu_data;
+
 /*
  * Acquire the ia64_ctx.lock before calling this function!
  */
@@ -79,7 +81,7 @@ wrap_mmu_context (struct mm_struct *mm)
 	}
 	read_unlock(&tasklist_lock);
 	/* can't call flush_tlb_all() here because of race condition with O(1) scheduler [EF] */
-	for (i = 0; i < smp_num_cpus; ++i)
+	for (i = 0; i < NR_CPUS; ++i)
 		if (i != smp_processor_id())
 			per_cpu(ia64_need_tlb_flush, i) = 1;
 	__flush_tlb_all();

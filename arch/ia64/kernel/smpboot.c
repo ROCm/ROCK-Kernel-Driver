@@ -1,10 +1,14 @@
 /*
  * SMP boot-related support
  *
- * Copyright (C) 2001 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998-2002 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * 01/05/16 Rohit Seth <rohit.seth@intel.com>	Moved SMP booting functions from smp.c to here.
  * 01/04/27 David Mosberger <davidm@hpl.hp.com>	Added ITC synching code.
+ * 02/07/31 David Mosberger <davidm@hpl.hp.com>	Switch over to hotplug-CPU boot-sequence.
+ *						smp_boot_cpus()/smp_commence() is replaced by
+ *						smp_prepare_cpus()/__cpu_up()/smp_cpus_done().
  */
 
 
@@ -66,18 +70,16 @@ static volatile unsigned long go[SLAVE + 1];
 
 #define DEBUG_ITC_SYNC	0
 
-extern void __init calibrate_delay(void);
-extern void start_ap(void);
+extern void __init calibrate_delay (void);
+extern void start_ap (void);
 extern unsigned long ia64_iobase;
 
 int cpucount;
 task_t *task_for_booting_cpu;
 
-/* Setup configured maximum number of CPUs to activate */
-static int max_cpus = -1;
-
 /* Bitmask of currently online CPUs */
 volatile unsigned long cpu_online_map;
+unsigned long phys_cpu_present_map;
 
 /* which logical CPU number maps to which CPU (physical APIC ID) */
 volatile int ia64_cpu_to_sapicid[NR_CPUS];
@@ -86,43 +88,11 @@ static volatile unsigned long cpu_callin_map;
 
 struct smp_boot_data smp_boot_data __initdata;
 
-/* Set when the idlers are all forked */
-volatile int smp_threads_ready;
-
 unsigned long ap_wakeup_vector = -1; /* External Int use to wakeup APs */
 
 char __initdata no_int_routing;
 
 unsigned char smp_int_redirect; /* are INT and IPI redirectable by the chipset? */
-
-/*
- * Setup routine for controlling SMP activation
- *
- * Command-line option of "nosmp" or "maxcpus=0" will disable SMP
- * activation entirely (the MPS table probe still happens, though).
- *
- * Command-line option of "maxcpus=<NUM>", where <NUM> is an integer
- * greater than 0, limits the maximum number of CPUs activated in
- * SMP mode to <NUM>.
- */
-
-static int __init
-nosmp (char *str)
-{
-	max_cpus = 0;
-	return 1;
-}
-
-__setup("nosmp", nosmp);
-
-static int __init
-maxcpus (char *str)
-{
-	get_option(&str, &max_cpus);
-	return 1;
-}
-
-__setup("maxcpus=", maxcpus);
 
 static int __init
 nointroute (char *str)
@@ -299,7 +269,7 @@ smp_setup_percpu_timer (void)
 
 static volatile atomic_t smp_commenced = ATOMIC_INIT(0);
 
-void __init
+static void __init
 smp_commence (void)
 {
 	/*
@@ -308,7 +278,7 @@ smp_commence (void)
 	Dprintk("Setting commenced=1, go go go\n");
 
 	wmb();
-	atomic_set(&smp_commenced,1);
+	atomic_set(&smp_commenced, 1);
 }
 
 
@@ -405,6 +375,9 @@ do_boot_cpu (int sapicid)
 	int timeout, cpu;
 
 	cpu = ++cpucount;
+
+	set_bit(cpu, &phys_cpu_present_map);
+
 	/*
 	 * We can't use kernel_thread since we must avoid to
 	 * reschedule the child.
@@ -466,8 +439,8 @@ smp_tune_scheduling (void)
 /*
  * Cycle through the APs sending Wakeup IPIs to boot each.
  */
-void __init
-smp_boot_cpus (void)
+static void __init
+smp_boot_cpus (unsigned int max_cpus)
 {
 	int sapicid, cpu;
 	int boot_cpu_id = hard_smp_processor_id();
@@ -486,13 +459,13 @@ smp_boot_cpus (void)
 	 */
 	set_bit(0, &cpu_online_map);
 	set_bit(0, &cpu_callin_map);
+	set_bit(0, &phys_cpu_present_map);
 
 	local_cpu_data->loops_per_jiffy = loops_per_jiffy;
 	ia64_cpu_to_sapicid[0] = boot_cpu_id;
 
 	printk("Boot processor id 0x%x/0x%x\n", 0, boot_cpu_id);
 
-	global_irq_holder = NO_PROC_ID;
 	current_thread_info()->cpu = 0;
 	smp_tune_scheduling();
 
@@ -552,6 +525,29 @@ smp_boot_cpus (void)
 	;
 }
 
+void __init
+smp_prepare_cpus (unsigned int max_cpus)
+{
+ 	smp_boot_cpus(max_cpus);
+}
+
+int __devinit
+__cpu_up (unsigned int cpu)
+{
+	/*
+	 * Yeah, that's cheesy, but it will do until there is real hotplug support and in
+	 * the meantime, this gives time for the interface changes to settle down...
+	 */
+	smp_commence();
+	return 0;
+}
+
+void __init
+smp_cpus_done (unsigned int max_cpus)
+{
+	/* nuthing... */
+}
+
 /*
  * Assume that CPU's have been discovered by some platform-dependant interface.  For
  * SoftSDV/Lion, that would be ACPI.
@@ -571,9 +567,6 @@ init_smp_config(void)
 	ap_startup = (struct fptr *) start_ap;
 	sal_ret = ia64_sal_set_vectors(SAL_VECTOR_OS_BOOT_RENDEZ,
 				       __pa(ap_startup->fp), __pa(ap_startup->gp), 0, 0, 0, 0);
-	if (sal_ret < 0) {
-		printk("SMP: Can't set SAL AP Boot Rendezvous: %s\n     Forcing UP mode\n",
-		       ia64_sal_strerror(sal_ret));
-		max_cpus = 0;
-	}
+	if (sal_ret < 0)
+		printk("SMP: Can't set SAL AP Boot Rendezvous: %s\n", ia64_sal_strerror(sal_ret));
 }

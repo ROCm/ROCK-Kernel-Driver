@@ -13,7 +13,7 @@ AWK := awk
 
 export AWK
 
-OBJCOPYFLAGS := --strip-all 
+OBJCOPYFLAGS := --strip-all
 LDFLAGS_vmlinux := -static -T arch/$(ARCH)/vmlinux.lds
 AFLAGS_KERNEL := -mconstant-gp
 EXTRA	=

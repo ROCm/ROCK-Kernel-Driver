@@ -1,18 +1,19 @@
 /*
  * Platform dependent support for HP simulator.
  *
- * Copyright (C) 1998, 1999 Hewlett-Packard Co
- * Copyright (C) 1998, 1999 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998, 1999, 2002 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  * Copyright (C) 1999 Vijay Chander <vijay@engr.sgi.com>
  */
+#include <linux/console.h>
 #include <linux/init.h>
+#include <linux/kdev_t.h>
 #include <linux/kernel.h>
+#include <linux/major.h>
 #include <linux/param.h>
+#include <linux/root_dev.h>
 #include <linux/string.h>
 #include <linux/types.h>
-#include <linux/kdev_t.h>
-#include <linux/console.h>
-#include <linux/root_dev.h>
 
 #include <asm/delay.h>
 #include <asm/irq.h>
@@ -55,5 +56,5 @@ hpsim_setup (char **cmdline_p)
 {
 	ROOT_DEV = Root_SDA1;		/* default to first SCSI drive */
 
-	register_console (&hpsim_cons);
+	register_console(&hpsim_cons);
 }

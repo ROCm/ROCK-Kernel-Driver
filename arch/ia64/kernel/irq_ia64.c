@@ -54,6 +54,11 @@ __u8 isa_irq_to_vector_map[16] = {
 	0x28, 0x27, 0x26, 0x25, 0x24, 0x23, 0x22, 0x21
 };
 
+/*
+ * GSI to IA-64 vector translation table.
+ */
+__u8 gsi_to_vector_map[255];
+
 int
 ia64_alloc_irq (void)
 {

@@ -422,6 +422,7 @@ register_irq (u32 global_vector, int vector, int pin, unsigned char delivery,
 	irq_desc_t *idesc;
 	struct hw_interrupt_type *irq_type;
 
+	gsi_to_vector(global_vector) = vector;
 	iosapic_irq[vector].pin	= pin;
 	iosapic_irq[vector].polarity = polarity ? IOSAPIC_POL_HIGH : IOSAPIC_POL_LOW;
 	iosapic_irq[vector].dmode    = delivery;
@@ -640,7 +641,7 @@ iosapic_init_pci_irq (void)
 	unsigned int irq;
 	char *addr;
 
-	if (0 != acpi_get_prt(&pci_irq.route, &pci_irq.num_routes))
+	if (acpi_get_prt(&pci_irq.route, &pci_irq.num_routes))
 		return;
 
 	for (i = 0; i < pci_irq.num_routes; i++) {

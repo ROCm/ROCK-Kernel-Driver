@@ -21,7 +21,7 @@
 #define PCIBIOS_MIN_MEM		0x10000000
 
 void pcibios_config_init(void);
-struct pci_bus * pcibios_scan_root(int seg, int bus);
+struct pci_bus * pcibios_scan_root(int bus);
 extern int (*pci_config_read)(int seg, int bus, int dev, int fn, int reg, int len, u32 *value);
 extern int (*pci_config_write)(int seg, int bus, int dev, int fn, int reg, int len, u32 value);
 

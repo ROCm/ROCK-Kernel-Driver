@@ -12,8 +12,10 @@ LINKFLAGS = -static -T bootloader.lds
 
 OBJECTS	= bootloader.o
 
-targets-$(CONFIG_IA64_HP_SIM) += bootloader
-targets-$(CONFIG_IA64_GENERIC) += bootloader
+targets-$(CONFIG_IA64_HP_SIM)	+= bootloader
+targets-$(CONFIG_IA64_GENERIC)	+= bootloader
+
+CFLAGS	:= $(CFLAGS) $(CFLAGS_KERNEL)
 
 all:	$(targets-y)
 

@@ -616,7 +616,7 @@ pfm_remove_smpl_mapping(struct task_struct *task)
 
 	down_write(&task->mm->mmap_sem);
 
-	r = do_munmap(task->mm, ctx->ctx_smpl_vaddr, psb->psb_size);
+	r = do_munmap(task->mm, ctx->ctx_smpl_vaddr, psb->psb_size, 0);
 
 	up_write(&task->mm->mmap_sem);
 	if (r !=0) {

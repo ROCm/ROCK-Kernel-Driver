@@ -102,7 +102,6 @@ tristate 'Kernel support for MISC binaries' CONFIG_BINFMT_MISC
 if [ "$CONFIG_IA64_HP_SIM" = "n" ]; then
   source drivers/acpi/Config.in
 
-
   bool 'PCI support' CONFIG_PCI
   source drivers/pci/Config.in
 
@@ -124,18 +123,26 @@ if [ "$CONFIG_NET" = "y" ]; then
 fi
 
 if [ "$CONFIG_IA64_HP_SIM" = "n" ]; then
+  source drivers/mtd/Config.in
+  source drivers/pnp/Config.in
+  source drivers/block/Config.in
+  source drivers/ieee1394/Config.in
+  source drivers/message/i2o/Config.in
+  source drivers/md/Config.in
+  source drivers/message/fusion/Config.in
 
+  mainmenu_option next_comment
+  comment 'ATA/ATAPI/MFM/RLL support'
 
+  tristate 'ATA/ATAPI/MFM/RLL support' CONFIG_IDE
 
-
-
-
-
-
-
-
-
-
+  if [ "$CONFIG_IDE" != "n" ]; then
+    source drivers/ide/Config.in
+  else
+    define_bool CONFIG_BLK_DEV_HD n
+  fi
+  endmenu
+fi
 
 mainmenu_option next_comment
 comment 'SCSI support'
@@ -157,43 +164,55 @@ if [ "$CONFIG_IA64_HP_SIM" = "n" ]; then
       source drivers/net/Config.in
     fi
     endmenu
-
-
-
-
-
-
-
-
-
   fi
-bool 'Support non-SCSI/IDE/ATAPI CDROM drives' CONFIG_CD_NO_IDESCSI
-fi # !HP_SIM
+  source net/ax25/Config.in
+  source drivers/isdn/Config.in
 
-#
-# input before char - char/joystick depends on it. As does USB.
-#
-source drivers/input/Config.in
-source drivers/char/Config.in
+  mainmenu_option next_comment
+  comment 'CD-ROM drivers (not for SCSI or IDE/ATAPI drives)'
 
-#source drivers/misc/Config.in
+  bool 'Support non-SCSI/IDE/ATAPI CDROM drives' CONFIG_CD_NO_IDESCSI
+  if [ "$CONFIG_CD_NO_IDESCSI" != "n" ]; then
+    source drivers/cdrom/Config.in
+  fi
+  endmenu
 
-source drivers/media/Config.in
+  #
+  # input before char - char/joystick depends on it. As does USB.
+  #
+  source drivers/input/Config.in
+  source drivers/char/Config.in
+
+  #source drivers/misc/Config.in
+
+  source drivers/media/Config.in
+else # HP_SIM
+
+  mainmenu_option next_comment
+  comment 'Block devices'
+  tristate 'Loopback device support' CONFIG_BLK_DEV_LOOP
+  dep_tristate 'Network block device support' CONFIG_BLK_DEV_NBD $CONFIG_NET
+
+  tristate 'RAM disk support' CONFIG_BLK_DEV_RAM
+  if [ "$CONFIG_BLK_DEV_RAM" = "y" -o "$CONFIG_BLK_DEV_RAM" = "m" ]; then
+    int '  Default RAM disk size' CONFIG_BLK_DEV_RAM_SIZE 4096
+  fi
+  endmenu
+fi # HP_SIM
 
 source fs/Config.in
 
-if [ "$CONFIG_VT" = "y" ]; then
-  mainmenu_option next_comment
-  comment 'Console drivers'
-  bool 'VGA text console' CONFIG_VGA_CONSOLE
-  source drivers/video/Config.in
-  if [ "$CONFIG_FB" = "y" ]; then
-    define_bool CONFIG_PCI_CONSOLE y
-  fi
-  endmenu
-fi
-
 if [ "$CONFIG_IA64_HP_SIM" = "n" ]; then
+  if [ "$CONFIG_VT" = "y" ]; then
+    mainmenu_option next_comment
+    comment 'Console drivers'
+    bool 'VGA text console' CONFIG_VGA_CONSOLE
+    source drivers/video/Config.in
+    if [ "$CONFIG_FB" = "y" ]; then
+      define_bool CONFIG_PCI_CONSOLE y
+    fi
+    endmenu
+  fi
 
   mainmenu_option next_comment
   comment 'Sound'
@@ -210,9 +229,8 @@ if [ "$CONFIG_IA64_HP_SIM" = "n" ]; then
 fi # !HP_SIM
 
 if [ "$CONFIG_IA64_HP_SIM" != "n" -o "$CONFIG_IA64_GENERIC" != "n" ]; then
-  source arch/ia64/hp/Config.in
+  source arch/ia64/hp/sim/Config.in
 fi
-
 
 mainmenu_option next_comment
 comment 'Kernel hacking'

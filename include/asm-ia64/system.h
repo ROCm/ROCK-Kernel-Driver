@@ -17,6 +17,7 @@
 
 #include <asm/kregs.h>
 #include <asm/page.h>
+#include <asm/pal.h>
 
 #define KERNEL_START		(PAGE_OFFSET + 68*1024*1024)
 
@@ -103,6 +104,8 @@ ia64_insn_group_barrier (void)
 #define set_mb(var, value)	do { (var) = (value); mb(); } while (0)
 #define set_wmb(var, value)	do { (var) = (value); mb(); } while (0)
 
+#define safe_halt()         ia64_pal_halt(1)                /* PAL_HALT */
+
 /*
  * The group barrier in front of the rsm & ssm are necessary to ensure
  * that none of the previous instructions in the same group are
@@ -169,27 +172,7 @@ do {										\
 #endif /* !CONFIG_IA64_DEBUG_IRQ */
 
 #define local_irq_enable()	__asm__ __volatile__ (";; ssm psr.i;; srlz.d" ::: "memory")
-
-#define local_irq_disable()			local_irq_disable ()
 #define local_save_flags(flags)	__asm__ __volatile__ ("mov %0=psr" : "=r" (flags) :: "memory")
-#define local_irq_save(flags)	local_irq_save(flags)
-#define save_and_cli(flags)	local_irq_save(flags)
-
-#ifdef CONFIG_SMP
-  extern void __global_cli (void);
-  extern void __global_sti (void);
-  extern unsigned long __global_save_flags (void);
-  extern void __global_restore_flags (unsigned long);
-# define cli()			__global_cli()
-# define sti()			__global_sti()
-# define save_flags(flags)	((flags) = __global_save_flags())
-# define restore_flags(flags)	__global_restore_flags(flags)
-#else /* !CONFIG_SMP */
-# define cli()			local_irq_disable()
-# define sti()			local_irq_enable()
-# define save_flags(flags)	local_save_flags(flags)
-# define restore_flags(flags)	local_irq_restore(flags)
-#endif /* !CONFIG_SMP */
 
 /*
  * Force an unresolved reference if someone tries to use
@@ -377,7 +360,7 @@ static inline void ia32_load_state(struct task_struct *t __attribute__((unused))
  * newly created thread returns directly to
  * ia64_ret_from_syscall_clear_r8.
  */
-extern void ia64_switch_to (void *next_task);
+extern struct task_struct *ia64_switch_to (void *next_task);
 
 struct task_struct;
 
@@ -391,14 +374,14 @@ extern void ia64_load_extra (struct task_struct *task);
 # define PERFMON_IS_SYSWIDE() (0)
 #endif
 
-#define __switch_to(prev,next) do {							\
+#define __switch_to(prev,next,last) do {							\
 	if (((prev)->thread.flags & (IA64_THREAD_DBG_VALID|IA64_THREAD_PM_VALID))	\
 	    || IS_IA32_PROCESS(ia64_task_regs(prev)) || PERFMON_IS_SYSWIDE())		\
 		ia64_save_extra(prev);							\
 	if (((next)->thread.flags & (IA64_THREAD_DBG_VALID|IA64_THREAD_PM_VALID))	\
 	    || IS_IA32_PROCESS(ia64_task_regs(next)) || PERFMON_IS_SYSWIDE())		\
 		ia64_load_extra(next);							\
-	ia64_switch_to((next));								\
+	(last) = ia64_switch_to((next));						\
 } while (0)
 
 #ifdef CONFIG_SMP
@@ -413,19 +396,19 @@ extern void ia64_load_extra (struct task_struct *task);
  * task->thread.fph, avoiding the complication of having to fetch
  * the latest fph state from another CPU.
  */
-# define switch_to(prev,next) do {						\
+# define switch_to(prev,next,last) do {						\
 	if (ia64_psr(ia64_task_regs(prev))->mfh) {				\
 		ia64_psr(ia64_task_regs(prev))->mfh = 0;			\
 		(prev)->thread.flags |= IA64_THREAD_FPH_VALID;			\
 		__ia64_save_fpu((prev)->thread.fph);				\
 	}									\
 	ia64_psr(ia64_task_regs(prev))->dfh = 1;				\
-	__switch_to(prev,next);							\
+	__switch_to(prev,next,last);						\
   } while (0)
 #else
-# define switch_to(prev,next) do {						\
+# define switch_to(prev,next,last) do {						\
 	ia64_psr(ia64_task_regs(next))->dfh = (ia64_get_fpu_owner() != (next));	\
-	__switch_to(prev,next);							\
+	__switch_to(prev,next,last);						\
 } while (0)
 #endif
 

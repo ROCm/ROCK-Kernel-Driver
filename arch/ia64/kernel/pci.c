@@ -165,7 +165,7 @@ struct pci_ops pci_sal_ops = {
  */
 
 struct pci_bus *
-pcibios_scan_root(int seg, int bus)
+pcibios_scan_root(int bus)
 {
 	struct list_head *list = NULL;
 	struct pci_bus *pci_bus = NULL;
@@ -174,12 +174,12 @@ pcibios_scan_root(int seg, int bus)
 		pci_bus = pci_bus_b(list);
 		if (pci_bus->number == bus) {
 			/* Already scanned */
-			printk("PCI: Bus (%02x:%02x) already probed\n", seg, bus);
+			printk("PCI: Bus (%02x) already probed\n", bus);
 			return pci_bus;
 		}
 	}
 
-	printk("PCI: Probing PCI hardware on bus (%02x:%02x)\n", seg, bus);
+	printk("PCI: Probing PCI hardware on bus (%02x)\n", bus);
 
 	return pci_scan_bus(bus, pci_root_ops, NULL);
 }

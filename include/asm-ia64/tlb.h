@@ -22,7 +22,7 @@
  * unmapping a portion of the virtual address space, these hooks are called according to
  * the following template:
  *
- *	tlb <- tlb_gather_mmu(mm);		// start unmap for address space MM
+ *	tlb <- tlb_gather_mmu(mm, full_mm_flush);	// start unmap for address space MM
  *	{
  *	  for each vma that needs a shootdown do {
  *	    tlb_start_vma(tlb, vma);
@@ -45,7 +45,7 @@
 
 #ifdef CONFIG_SMP
 # define FREE_PTE_NR		2048
-# define tlb_fast_mode(tlb)	((tlb)->nr == ~0UL)
+# define tlb_fast_mode(tlb)	((tlb)->nr == ~0U)
 #else
 # define FREE_PTE_NR		0
 # define tlb_fast_mode(tlb)	(1)
@@ -53,7 +53,8 @@
 
 typedef struct {
 	struct mm_struct	*mm;
-	unsigned long		nr;	/* == ~0UL => fast mode */
+	unsigned int		nr;	/* == ~0U => fast mode */
+	unsigned int		fullmm;	/* non-zero means full mm flush */
 	unsigned long		freed;	/* number of pages freed */
 	unsigned long		start_addr;
 	unsigned long		end_addr;
@@ -70,10 +71,17 @@ extern mmu_gather_t	mmu_gathers[NR_CPUS];
 static inline void
 ia64_tlb_flush_mmu (mmu_gather_t *tlb, unsigned long start, unsigned long end)
 {
-	unsigned long nr;
+	unsigned int nr;
 
-	if (unlikely (end - start >= 1024*1024*1024*1024UL
-		      || rgn_index(start) != rgn_index(end - 1)))
+	if (tlb->fullmm) {
+		/*
+		 * Tearing down the entire address space.  This happens both as a result
+		 * of exit() and execve().  The latter case necessitates the call to
+		 * flush_tlb_mm() here.
+		 */
+		flush_tlb_mm(tlb->mm);
+	} else if (unlikely (end - start >= 1024*1024*1024*1024UL
+		      || REGION_NUMBER(start) != REGION_NUMBER(end - 1)))
 	{
 		/*
 		 * If we flush more than a tera-byte or across regions, we're probably
@@ -110,16 +118,21 @@ ia64_tlb_flush_mmu (mmu_gather_t *tlb, unsigned long start, unsigned long end)
  * Return a pointer to an initialized mmu_gather_t.
  */
 static inline mmu_gather_t *
-tlb_gather_mmu (struct mm_struct *mm)
+tlb_gather_mmu (struct mm_struct *mm, unsigned int full_mm_flush)
 {
 	mmu_gather_t *tlb = &mmu_gathers[smp_processor_id()];
 
 	tlb->mm = mm;
+	tlb->nr = 0;
+	if (full_mm_flush || num_online_cpus() == 1)
+		/*
+		 * Use fast mode if only 1 CPU is online or if we're tearing down the
+		 * entire address space.
+		 */
+		tlb->nr =  ~0U;
+	tlb->fullmm = full_mm_flush;
 	tlb->freed = 0;
 	tlb->start_addr = ~0UL;
-
-	/* Use fast mode if only one CPU is online */
-	tlb->nr = smp_num_cpus > 1 ? 0UL : ~0UL;
 	return tlb;
 }
 
@@ -152,7 +165,7 @@ tlb_finish_mmu (mmu_gather_t *tlb, unsigned long start, unsigned long end)
  * PTE, not just those pointing to (normal) physical memory.
  */
 static inline void
-tlb_remove_tlb_entry (mmu_gather_t *tlb, pte_t pte, unsigned long address)
+tlb_remove_tlb_entry (mmu_gather_t *tlb, pte_t *ptep, unsigned long address)
 {
 	if (tlb->start_addr == ~0UL)
 		tlb->start_addr = address;

@@ -626,9 +626,12 @@ ia64_mca_wakeup_all(void)
 void
 ia64_mca_rendez_int_handler(int rendez_irq, void *arg, struct pt_regs *ptregs)
 {
-	int flags, cpu = 0;
+	unsigned long flags;
+	int cpu = 0;
+
 	/* Mask all interrupts */
-	save_and_cli(flags);
+#warning XXX fix me: this used to be: save_and_cli(flags);
+	local_irq_save(flags);
 
 #ifdef CONFIG_SMP
 	cpu = cpu_logical_id(hard_smp_processor_id());
@@ -646,7 +649,7 @@ ia64_mca_rendez_int_handler(int rendez_irq, void *arg, struct pt_regs *ptregs)
 	ia64_mca_wakeup_ipi_wait();
 
 	/* Enable all interrupts */
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 

@@ -27,6 +27,7 @@
 #include "../drivers/acpi/include/acstruct.h"
 #include "../drivers/acpi/include/acnamesp.h"
 #include "../drivers/acpi/include/acutils.h"
+#include "../drivers/acpi/acpi_bus.h"
 
 #define PFX "hpzx1: "
 
@@ -109,7 +110,7 @@ static int hp_cfg_write##sz (struct pci_dev *dev, int where, u##bits value) \
 	\
 	switch (where) { \
 	case PCI_BASE_ADDRESS_0: \
-		if (value == ~0) \
+		if (value == (u##bits) ~0) \
 			fake_dev->sizing = 1; \
 		break; \
 	default: \
@@ -177,7 +178,7 @@ hpzx1_fake_pci_dev(unsigned long addr, unsigned int bus, unsigned int size)
 	 * Drivers should ioremap what they need, but we have to do
 	 * it here, too, so PCI config accesses work.
 	 */
-	dev->mapped_csrs = ioremap(dev->csr_base, dev->csr_size);
+	dev->mapped_csrs = (unsigned long) ioremap(dev->csr_base, dev->csr_size);
 
 	return dev;
 }
@@ -303,7 +304,7 @@ hpzx1_lba_probe(acpi_handle obj, u32 depth, void *context, void **ret)
 	if ((dev = hpzx1_fake_pci_dev(csr_base, busnum, csr_length)))
 		printk(KERN_INFO PFX "%s LBA at 0x%lx, _BBN 0x%02x; "
 			"pci dev %02x:%02x.%d\n",
-			name, csr_base, busnum, dev->bus,
+			name, csr_base, (unsigned int) busnum, dev->bus,
 			PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
 
 	return AE_OK;

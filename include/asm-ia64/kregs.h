@@ -64,7 +64,7 @@
 #define IA64_PSR_RI_BIT		41
 #define IA64_PSR_ED_BIT		43
 #define IA64_PSR_BN_BIT		44
-#define IA64_PSR_IA	(__IA64_UL(1) << IA64_PSR_IA_BIT)
+#define IA64_PSR_IA_BIT		45
 
 /* A mask of PSR bits that we generally don't want to inherit across a clone2() or an
    execve().  Only list flags here that need to be cleared/set for BOTH clone2() and
@@ -94,6 +94,7 @@
 #define IA64_PSR_TB	(__IA64_UL(1) << IA64_PSR_TB_BIT)
 #define IA64_PSR_RT	(__IA64_UL(1) << IA64_PSR_RT_BIT)
 /* The following are not affected by save_flags()/restore_flags(): */
+#define IA64_PSR_CPL	(__IA64_UL(3) << IA64_PSR_CPL0_BIT)
 #define IA64_PSR_IS	(__IA64_UL(1) << IA64_PSR_IS_BIT)
 #define IA64_PSR_MC	(__IA64_UL(1) << IA64_PSR_MC_BIT)
 #define IA64_PSR_IT	(__IA64_UL(1) << IA64_PSR_IT_BIT)
@@ -104,6 +105,7 @@
 #define IA64_PSR_RI	(__IA64_UL(3) << IA64_PSR_RI_BIT)
 #define IA64_PSR_ED	(__IA64_UL(1) << IA64_PSR_ED_BIT)
 #define IA64_PSR_BN	(__IA64_UL(1) << IA64_PSR_BN_BIT)
+#define IA64_PSR_IA	(__IA64_UL(1) << IA64_PSR_IA_BIT)
 
 /* User mask bits: */
 #define IA64_PSR_UM	(IA64_PSR_BE | IA64_PSR_UP | IA64_PSR_AC | IA64_PSR_MFL | IA64_PSR_MFH)

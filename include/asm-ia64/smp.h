@@ -17,6 +17,7 @@
 #include <linux/threads.h>
 #include <linux/kernel.h>
 
+#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/param.h>
 #include <asm/processor.h>
@@ -36,6 +37,7 @@ extern struct smp_boot_data {
 
 extern char no_int_routing __initdata;
 
+extern unsigned long phys_cpu_present_map;
 extern volatile unsigned long cpu_online_map;
 extern unsigned long ipi_base_addr;
 extern unsigned char smp_int_redirect;
@@ -45,23 +47,26 @@ extern volatile int ia64_cpu_to_sapicid[];
 
 extern unsigned long ap_wakeup_vector;
 
-#define cpu_online(cpu) (cpu_online_map & (1<<(cpu)))
-extern inline unsigned int num_online_cpus(void)
+#define cpu_possible(cpu)	(phys_cpu_present_map & (1UL << (cpu)))
+#define cpu_online(cpu)		(cpu_online_map & (1UL << (cpu)))
+
+static inline unsigned int
+num_online_cpus (void)
 {
 	return hweight64(cpu_online_map);
 }
 
-extern inline int any_online_cpu(unsigned int mask)
+static inline int
+any_online_cpu (unsigned int mask)
 {
 	if (mask & cpu_online_map)
 		return __ffs(mask & cpu_online_map);
-
 	return -1;
 }
 
 /*
- * Function to map hard smp processor id to logical id.  Slow, so
- * don't use this in performance-critical code.
+ * Function to map hard smp processor id to logical id.  Slow, so don't use this in
+ * performance-critical code.
  */
 static inline int
 cpu_logical_id (int cpuid)
@@ -120,11 +125,9 @@ hard_smp_processor_id (void)
 }
 
 /* Upping and downing of CPUs */
-extern int __cpu_disable(void);
-extern void __cpu_die(unsigned int cpu);
-extern int __cpu_up(unsigned int cpu);
-
-#define NO_PROC_ID		0xffffffff	/* no processor magic marker */
+extern int __cpu_disable (void);
+extern void __cpu_die (unsigned int cpu);
+extern int __cpu_up (unsigned int cpu);
 
 extern void __init init_smp_config (void);
 extern void smp_do_timer (struct pt_regs *regs);
