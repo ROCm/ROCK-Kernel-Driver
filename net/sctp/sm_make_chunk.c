@@ -47,6 +47,7 @@
  *    Dajiang Zhang	    <dajiang.zhang@nokia.com>
  *    Sridhar Samudrala	    <sri@us.ibm.com>
  *    Daisy Chang	    <daisyc@us.ibm.com>
+ *    Ardelle Fan	    <ardelle.fan@intel.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -835,6 +836,53 @@ sctp_chunk_t *sctp_make_abort_no_data(const sctp_association_t *asoc,
 		retval->transport = chunk->transport;
 
 no_mem:
+	return retval;
+}
+
+/* Helper to create ABORT with a SCTP_ERROR_USER_ABORT error.  */
+sctp_chunk_t *sctp_make_abort_user(const sctp_association_t *asoc,
+				   const sctp_chunk_t *chunk,
+				   const struct msghdr *msg)
+{
+	sctp_chunk_t *retval;
+	void *payload = NULL, *payoff;
+	size_t paylen;
+	struct iovec *iov = msg->msg_iov;
+	int iovlen = msg->msg_iovlen;
+
+	paylen = get_user_iov_size(iov, iovlen);
+	retval = sctp_make_abort(asoc, chunk, sizeof(sctp_errhdr_t) + paylen);
+	if (!retval)
+		goto err_chunk;
+
+	if (paylen) {
+		/* Put the msg_iov together into payload.  */
+		payload = kmalloc(paylen, GFP_ATOMIC);
+		if (!payload)
+			goto err_payload;
+		payoff = payload;
+
+		for (; iovlen > 0; --iovlen) {
+			if (copy_from_user(payoff, iov->iov_base, iov->iov_len))
+				goto err_copy;
+			payoff += iov->iov_len;
+			iov++;
+		}
+	}
+
+	sctp_init_cause(retval, SCTP_ERROR_USER_ABORT, payload, paylen);
+
+	if (paylen)
+		kfree(payload);
+
+	return retval;
+
+err_copy:
+	kfree(payload);
+err_payload:
+	sctp_free_chunk(retval);
+	retval = NULL;
+err_chunk:
 	return retval;
 }
 

@@ -66,7 +66,8 @@ static void sctp_do_ecn_cwr_work(sctp_association_t *asoc,
 static void sctp_do_8_2_transport_strike(sctp_association_t *asoc,
 					 sctp_transport_t *transport);
 static void sctp_cmd_init_failed(sctp_cmd_seq_t *, sctp_association_t *asoc);
-static void sctp_cmd_assoc_failed(sctp_cmd_seq_t *, sctp_association_t *asoc);
+static void sctp_cmd_assoc_failed(sctp_cmd_seq_t *, sctp_association_t *asoc,
+				  sctp_event_t event_type, sctp_chunk_t *chunk);
 static void sctp_cmd_process_init(sctp_cmd_seq_t *, sctp_association_t *asoc,
 				  sctp_chunk_t *chunk,
 				  sctp_init_chunk_t *peer_init,
@@ -251,7 +252,7 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 	int force;
 	sctp_cmd_t *command;
 	sctp_chunk_t *new_obj;
-	sctp_chunk_t *chunk;
+	sctp_chunk_t *chunk = NULL;
 	sctp_packet_t *packet;
 	struct list_head *pos;
 	struct timer_list *timer;
@@ -259,7 +260,8 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 	sctp_transport_t *t;
 	sctp_sackhdr_t sackh;
 
-	chunk = (sctp_chunk_t *) event_arg;
+	if(SCTP_EVENT_T_TIMEOUT != event_type)
+		chunk = (sctp_chunk_t *) event_arg;
 
 	/* Note:  This whole file is a huge candidate for rework.
 	 * For example, each command could either have its own handler, so
@@ -504,7 +506,8 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 			break;
 
 		case SCTP_CMD_ASSOC_FAILED:
-			sctp_cmd_assoc_failed(commands, asoc);
+			sctp_cmd_assoc_failed(commands, asoc, event_type,
+					      chunk);
 			break;
 
 		case SCTP_CMD_COUNTER_INC:
@@ -1038,14 +1041,26 @@ static void sctp_cmd_init_failed(sctp_cmd_seq_t *commands,
 
 /* Worker routine to handle SCTP_CMD_ASSOC_FAILED.  */
 static void sctp_cmd_assoc_failed(sctp_cmd_seq_t *commands,
-				  sctp_association_t *asoc)
+				  sctp_association_t *asoc,
+				  sctp_event_t event_type,
+				  sctp_chunk_t *chunk)
 {
 	sctp_ulpevent_t *event;
+	__u16 error = 0;
+
+	if (event_type == SCTP_EVENT_T_PRIMITIVE)
+		error = SCTP_ERROR_USER_ABORT;
+	
+	if (chunk && (SCTP_CID_ABORT == chunk->chunk_hdr->type) &&
+	    (ntohs(chunk->chunk_hdr->length) >= (sizeof(struct sctp_chunkhdr) +
+				 		 sizeof(struct sctp_errhdr)))) {
+		error = ((sctp_errhdr_t *)chunk->skb->data)->cause;
+	}
 
 	event = sctp_ulpevent_make_assoc_change(asoc,
 						0,
 						SCTP_COMM_LOST,
-						0, 0, 0,
+						error, 0, 0,
 						GFP_ATOMIC);
 
 	if (event)

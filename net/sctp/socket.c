@@ -804,10 +804,12 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	SCTP_DEBUG_PRINTK("msg_len: %Zd, sinfo_flags: 0x%x\n",
 			  msg_len, sinfo_flags);
 
-	/* If MSG_EOF|MSG_ABORT is set, no data can be sent.  Disallow
-	 * sending 0-length messages when MSG_EOF|MSG_ABORT is not set.
-	 */
-	if (((sinfo_flags & (MSG_EOF|MSG_ABORT)) && (msg_len > 0)) ||
+	/* If MSG_EOF is set, no data can be sent. Disallow sending zero
+	 * length messages when MSG_EOF|MSG_ABORT is not set.
+	 * If MSG_ABORT is set, the message length could be non zero with
+	 * the msg_iov set to the user abort reason.
+ 	 */
+	if (((sinfo_flags & MSG_EOF) && (msg_len > 0)) ||
 	    (!(sinfo_flags & (MSG_EOF|MSG_ABORT)) && (msg_len == 0))) {
 		err = -EINVAL;
 		goto out_nounlock;
@@ -879,7 +881,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 		}
 		if (sinfo_flags & MSG_ABORT) {
 			SCTP_DEBUG_PRINTK("Aborting association: %p\n", asoc);
-			sctp_primitive_ABORT(asoc, NULL);
+			sctp_primitive_ABORT(asoc, msg);
 			err = 0;
 			goto out_unlock;
 		}
