@@ -19,6 +19,7 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/fs.h> 
+#include <linux/fshooks.h>
 #include <linux/mm.h> 
 #include <linux/file.h> 
 #include <linux/signal.h>
@@ -60,6 +61,7 @@
 #include <linux/compat.h>
 #include <linux/ptrace.h>
 #include <linux/aio_abi.h>
+#include <linux/audit.h>
 
 #include <asm/types.h>
 #include <asm/ipc.h>
@@ -1824,9 +1826,12 @@ static int do_execve32(char * filename, u32 * argv, u32 * envp, struct pt_regs *
 
 	file = open_exec(filename);
 
+	/* don't do this prior to open_exec, as that will invoke an FS hook */
+	audit_intercept(AUDIT_execve|AUDIT_32, filename, argv, envp);
+
 	retval = PTR_ERR(file);
 	if (IS_ERR(file))
-		return retval;
+		return audit_result(retval);
 
 	bprm.p = PAGE_SIZE*MAX_ARG_PAGES-sizeof(void *);
 	memset(bprm.page, 0, MAX_ARG_PAGES * sizeof(bprm.page[0]));
@@ -1880,7 +1885,7 @@ static int do_execve32(char * filename, u32 * argv, u32 * envp, struct pt_regs *
 	if (retval >= 0) {
 		/* execve success */
 		security_bprm_free(&bprm);
-		return retval;
+		return audit_result(retval);
 	}
 
 out:
@@ -1903,7 +1908,7 @@ out_file:
 		allow_write_access(bprm.file);
 		fput(bprm.file);
 	}
-	return retval;
+	return audit_result(retval);
 }
 
 long sys32_execve(unsigned long a0, unsigned long a1, unsigned long a2,
@@ -2212,31 +2217,34 @@ off_t ppc32_lseek(unsigned int fd, u32 offset, unsigned int origin)
  * This is just a version for 32-bit applications which does
  * not force O_LARGEFILE on.
  */
-long sys32_open(const char * filename, int flags, int mode)
+long sys32_open(const char __user * filename, int flags, int mode)
 {
 	char * tmp;
-	int fd, error;
+	int fd;
 
 	tmp = getname(filename);
 	fd = PTR_ERR(tmp);
 	if (!IS_ERR(tmp)) {
+
+		FSHOOK_BEGIN(open, fd, .filename = tmp, .flags = flags, .mode = mode)
+
 		fd = get_unused_fd();
 		if (fd >= 0) {
-			struct file * f = filp_open(tmp, flags, mode);
-			error = PTR_ERR(f);
-			if (IS_ERR(f))
-				goto out_error;
-			fd_install(fd, f);
+			struct file *f = filp_open(tmp, flags, mode);
+
+			if (!IS_ERR(f))
+				fd_install(fd, f);
+			else {
+				put_unused_fd(fd);
+				fd = PTR_ERR(f);
+			}
 		}
-out:
+
+		FSHOOK_END(open, fd)
+
 		putname(tmp);
 	}
 	return fd;
-
-out_error:
-	put_unused_fd(fd);
-	fd = error;
-	goto out;
 }
 
 /* Note: it is necessary to treat bufsiz as an unsigned int,

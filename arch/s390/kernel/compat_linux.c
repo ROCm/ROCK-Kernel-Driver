@@ -58,6 +58,7 @@
 #include <linux/compat.h>
 #include <linux/vfs.h>
 #include <linux/ptrace.h>
+#include <linux/audit.h>
 
 #include <asm/types.h>
 #include <asm/ipc.h>
@@ -235,20 +236,23 @@ asmlinkage long sys32_setgroups16(int gidsetsize, u16 *grouplist)
 	int retval;
 
 	if (!capable(CAP_SETGID))
-		return -EPERM;
+		return audit_intercept(AUDIT_setgroups, NULL), audit_result(-EPERM);
 	if ((unsigned)gidsetsize > NGROUPS_MAX)
-		return -EINVAL;
+		return audit_intercept(AUDIT_setgroups, NULL), audit_result(-EINVAL);
 
 	group_info = groups_alloc(gidsetsize);
 	if (!group_info)
-		return -ENOMEM;
+		return audit_intercept(AUDIT_setgroups, NULL), audit_result(-ENOMEM);
 	retval = groups16_from_user(group_info, grouplist);
 	if (retval) {
 		put_group_info(group_info);
-		return retval;
+		audit_intercept(AUDIT_setgroups, NULL);
+		return audit_result(retval);
 	}
 
-	retval = set_current_groups(group_info);
+	audit_intercept(AUDIT_setgroups, group_info);
+
+	(void)audit_result(retval = set_current_groups(group_info));
 	put_group_info(group_info);
 
 	return retval;
@@ -1146,9 +1150,12 @@ do_execve32(char * filename, u32 * argv, u32 * envp, struct pt_regs * regs)
 
 	file = open_exec(filename);
 
+	/* don't do this prior to open_exec, as that will invoke an FS hook */
+	audit_intercept(AUDIT_execve|AUDIT_32, filename, argv, envp);
+
 	retval = PTR_ERR(file);
 	if (IS_ERR(file))
-		return retval;
+		return audit_result(retval);
 
 	bprm.p = PAGE_SIZE*MAX_ARG_PAGES-sizeof(void *);
 	memset(bprm.page, 0, MAX_ARG_PAGES * sizeof(bprm.page[0]));
@@ -1199,7 +1206,7 @@ do_execve32(char * filename, u32 * argv, u32 * envp, struct pt_regs * regs)
 	if (retval >= 0) {
 		/* execve success */
 		security_bprm_free(&bprm);
-		return retval;
+		return audit_result(retval);
 	}
 
 out:
@@ -1223,7 +1230,7 @@ out_file:
 		fput(bprm.file);
 	}
 
-	return retval;
+	return audit_result(retval);
 }
 
 /*

@@ -71,6 +71,7 @@
 #include <linux/time.h>
 #include <linux/smp_lock.h>
 #include <linux/security.h>
+#include <linux/audit.h>
 #include <asm/uaccess.h>
 #include "util.h"
 
@@ -207,8 +208,10 @@ asmlinkage long sys_semget (key_t key, int nsems, int semflg)
 	int id, err = -EINVAL;
 	struct sem_array *sma;
 
+	audit_intercept(AUDIT_semget, key, nsems, semflg);
+
 	if (nsems < 0 || nsems > sc_semmsl)
-		return -EINVAL;
+		return audit_result(-EINVAL);
 	down(&sem_ids.sem);
 	
 	if (key == IPC_PRIVATE) {
@@ -238,7 +241,7 @@ asmlinkage long sys_semget (key_t key, int nsems, int semflg)
 	}
 
 	up(&sem_ids.sem);
-	return err;
+	return audit_result(err);
 }
 
 /* doesn't acquire the sem_lock on error! */
@@ -833,8 +836,10 @@ asmlinkage long sys_semctl (int semid, int semnum, int cmd, union semun arg)
 	int err = -EINVAL;
 	int version;
 
+	audit_intercept(AUDIT_semctl, semid, semnum, cmd, arg);
+
 	if (semid < 0)
-		return -EINVAL;
+		return audit_result(-EINVAL);
 
 	version = ipc_parse_version(&cmd);
 
@@ -843,7 +848,7 @@ asmlinkage long sys_semctl (int semid, int semnum, int cmd, union semun arg)
 	case SEM_INFO:
 	case SEM_STAT:
 		err = semctl_nolock(semid,semnum,cmd,version,arg);
-		return err;
+		return audit_result(err);
 	case GETALL:
 	case GETVAL:
 	case GETPID:
@@ -853,15 +858,15 @@ asmlinkage long sys_semctl (int semid, int semnum, int cmd, union semun arg)
 	case SETVAL:
 	case SETALL:
 		err = semctl_main(semid,semnum,cmd,version,arg);
-		return err;
+		return audit_result(err);
 	case IPC_RMID:
 	case IPC_SET:
 		down(&sem_ids.sem);
 		err = semctl_down(semid,semnum,cmd,version,arg);
 		up(&sem_ids.sem);
-		return err;
+		return audit_result(err);
 	default:
-		return -EINVAL;
+		return audit_result(-EINVAL);
 	}
 }
 
@@ -1022,26 +1027,35 @@ asmlinkage long sys_semtimedop(int semid, struct sembuf __user *tsops,
 	int undos = 0, decrease = 0, alter = 0, max;
 	struct sem_queue queue;
 	unsigned long jiffies_left = 0;
+	struct timespec _timeout;
 
-	if (nsops < 1 || semid < 0)
-		return -EINVAL;
-	if (nsops > sc_semopm)
-		return -E2BIG;
+	if (nsops < 1 || semid < 0) {
+		audit_intercept(timeout ? AUDIT_semtimedop : AUDIT_semop, semid, NULL, nsops, NULL);
+		return audit_result(-EINVAL);
+	}
+	if (nsops > sc_semopm) {
+		audit_intercept(timeout ? AUDIT_semtimedop : AUDIT_semop, semid, NULL, nsops, NULL);
+		return audit_result(-E2BIG);
+	}
 	if(nsops > SEMOPM_FAST) {
 		sops = kmalloc(sizeof(*sops)*nsops,GFP_KERNEL);
-		if(sops==NULL)
-			return -ENOMEM;
+		if(sops==NULL) {
+			audit_intercept(timeout ? AUDIT_semtimedop : AUDIT_semop, semid, NULL, nsops, NULL);
+			return audit_result(-ENOMEM);
+		}
 	}
 	if (copy_from_user (sops, tsops, nsops * sizeof(*tsops))) {
 		error=-EFAULT;
+		audit_intercept(timeout ? AUDIT_semtimedop : AUDIT_semop, semid, NULL, nsops, NULL);
 		goto out_free;
 	}
 	if (timeout) {
-		struct timespec _timeout;
 		if (copy_from_user(&_timeout, timeout, sizeof(*timeout))) {
 			error = -EFAULT;
+			audit_intercept(AUDIT_semtimedop, semid, sops, nsops, NULL);
 			goto out_free;
 		}
+		audit_intercept(AUDIT_semtimedop, semid, sops, nsops, &_timeout);
 		if (_timeout.tv_sec < 0 || _timeout.tv_nsec < 0 ||
 			_timeout.tv_nsec >= 1000000000L) {
 			error = -EINVAL;
@@ -1049,6 +1063,8 @@ asmlinkage long sys_semtimedop(int semid, struct sembuf __user *tsops,
 		}
 		jiffies_left = timespec_to_jiffies(&_timeout);
 	}
+	else
+		audit_intercept(AUDIT_semop, semid, sops, nsops);
 	max = 0;
 	for (sop = sops; sop < sops + nsops; sop++) {
 		if (sop->sem_num >= max)
@@ -1171,6 +1187,7 @@ update:
 out_unlock_free:
 	sem_unlock(sma);
 out_free:
+	(void)audit_result(error);
 	if(sops != fast_sops)
 		kfree(sops);
 	return error;

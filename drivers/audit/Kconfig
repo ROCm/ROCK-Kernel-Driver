@@ -1,0 +1,6 @@
+config AUDIT
+	tristate "Auditing subsystem"
+	depends on FSHOOKS
+	default y
+	---help---
+	  //todo.

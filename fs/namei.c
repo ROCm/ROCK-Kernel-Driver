@@ -18,6 +18,7 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/fs.h>
+#include <linux/fshooks.h>
 #include <linux/namei.h>
 #include <linux/quotaops.h>
 #include <linux/pagemap.h>
@@ -971,15 +972,18 @@ access:
  * that namei follows links, while lnamei does not.
  * SMP-safe
  */
-int fastcall __user_walk(const char __user *name, unsigned flags, struct nameidata *nd)
+int fastcall __user_walk(const char __user *name, unsigned flags, struct nameidata *nd, const char **pname)
 {
 	char *tmp = getname(name);
 	int err = PTR_ERR(tmp);
 
 	if (!IS_ERR(tmp)) {
 		err = path_lookup(tmp, flags, nd);
-		putname(tmp);
+		if (!pname)
+			putname(tmp);
 	}
+	if (pname)
+		*pname = tmp;
 	return err;
 }
 
@@ -1467,6 +1471,8 @@ asmlinkage long sys_mknod(const char __user * filename, int mode, unsigned dev)
 	if (IS_ERR(tmp))
 		return PTR_ERR(tmp);
 
+	FSHOOK_BEGIN(mknod, error, .path = tmp, .mode = mode, .dev = dev)
+
 	error = path_lookup(tmp, LOOKUP_PARENT, &nd);
 	if (error)
 		goto out;
@@ -1499,6 +1505,8 @@ asmlinkage long sys_mknod(const char __user * filename, int mode, unsigned dev)
 	path_release(&nd);
 out:
 	putname(tmp);
+
+	FSHOOK_END(mknod, error)
 
 	return error;
 }
@@ -1535,6 +1543,9 @@ asmlinkage long sys_mkdir(const char __user * pathname, int mode)
 	tmp = getname(pathname);
 	error = PTR_ERR(tmp);
 	if (!IS_ERR(tmp)) {
+
+		FSHOOK_BEGIN(mkdir, error, .dirname = tmp, .mode = mode)
+
 		struct dentry *dentry;
 		struct nameidata nd;
 
@@ -1552,6 +1563,9 @@ asmlinkage long sys_mkdir(const char __user * pathname, int mode)
 		up(&nd.dentry->d_inode->i_sem);
 		path_release(&nd);
 out:
+
+		FSHOOK_END(mkdir, error)
+
 		putname(tmp);
 	}
 
@@ -1635,6 +1649,8 @@ asmlinkage long sys_rmdir(const char __user * pathname)
 	if(IS_ERR(name))
 		return PTR_ERR(name);
 
+	FSHOOK_BEGIN(rmdir, error, .dirname = name)
+
 	error = path_lookup(name, LOOKUP_PARENT, &nd);
 	if (error)
 		goto exit;
@@ -1661,6 +1677,9 @@ asmlinkage long sys_rmdir(const char __user * pathname)
 exit1:
 	path_release(&nd);
 exit:
+
+	FSHOOK_END(rmdir, error)
+
 	putname(name);
 	return error;
 }
@@ -1713,6 +1732,8 @@ asmlinkage long sys_unlink(const char __user * pathname)
 	if(IS_ERR(name))
 		return PTR_ERR(name);
 
+	FSHOOK_BEGIN(unlink, error, .filename = name)
+
 	error = path_lookup(name, LOOKUP_PARENT, &nd);
 	if (error)
 		goto exit;
@@ -1737,6 +1758,9 @@ asmlinkage long sys_unlink(const char __user * pathname)
 exit1:
 	path_release(&nd);
 exit:
+
+	FSHOOK_END(unlink, error)
+
 	putname(name);
 
 	if (inode)
@@ -1784,6 +1808,9 @@ asmlinkage long sys_symlink(const char __user * oldname, const char __user * new
 	to = getname(newname);
 	error = PTR_ERR(to);
 	if (!IS_ERR(to)) {
+
+		FSHOOK_BEGIN(symlink, error, .oldpath = from, .newpath = to)
+
 		struct dentry *dentry;
 		struct nameidata nd;
 
@@ -1799,6 +1826,9 @@ asmlinkage long sys_symlink(const char __user * oldname, const char __user * new
 		up(&nd.dentry->d_inode->i_sem);
 		path_release(&nd);
 out:
+
+		FSHOOK_END(symlink, error)
+
 		putname(to);
 	}
 	putname(from);
@@ -1865,9 +1895,13 @@ asmlinkage long sys_link(const char __user * oldname, const char __user * newnam
 	if (IS_ERR(to))
 		return PTR_ERR(to);
 
-	error = __user_walk(oldname, 0, &old_nd);
-	if (error)
-		goto exit;
+	FSHOOK_BEGIN_USER_PATH_WALK_LINK(link,
+		error,
+		oldname,
+		old_nd,
+		oldpath,
+		.newpath = to)
+
 	error = path_lookup(to, LOOKUP_PARENT, &nd);
 	if (error)
 		goto out;
@@ -1885,7 +1919,9 @@ out_release:
 	path_release(&nd);
 out:
 	path_release(&old_nd);
-exit:
+
+	FSHOOK_END_USER_WALK(link, error, oldpath)
+
 	putname(to);
 
 	return error;
@@ -2127,7 +2163,13 @@ asmlinkage long sys_rename(const char __user * oldname, const char __user * newn
 	to = getname(newname);
 	error = PTR_ERR(to);
 	if (!IS_ERR(to)) {
+
+		FSHOOK_BEGIN(rename, error, .oldpath = from, .newpath = to)
+
 		error = do_rename(from,to);
+
+		FSHOOK_END(rename, error)
+
 		putname(to);
 	}
 	putname(from);

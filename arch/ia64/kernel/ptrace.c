@@ -17,6 +17,7 @@
 #include <linux/smp_lock.h>
 #include <linux/user.h>
 #include <linux/security.h>
+#include <linux/audit.h>
 
 #include <asm/pgtable.h>
 #include <asm/processor.h>
@@ -1281,6 +1282,8 @@ sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
 	struct switch_stack *sw;
 	long ret;
 
+	audit_intercept(AUDIT_ptrace, request, pid, addr, data);
+
 	lock_kernel();
 	ret = -EPERM;
 	if (request == PTRACE_TRACEME) {
@@ -1444,7 +1447,7 @@ sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
 	put_task_struct(child);
   out:
 	unlock_kernel();
-	return ret;
+	return audit_result(ret);
 }
 
 /* "asmlinkage" so the input arguments are preserved... */

@@ -12,6 +12,7 @@
 #include <linux/smp_lock.h>
 #include <linux/highuid.h>
 #include <linux/fs.h>
+#include <linux/fshooks.h>
 #include <linux/namei.h>
 #include <linux/security.h>
 
@@ -66,11 +67,13 @@ int vfs_stat(char __user *name, struct kstat *stat)
 	struct nameidata nd;
 	int error;
 
-	error = user_path_walk(name, &nd);
-	if (!error) {
+	FSHOOK_BEGIN_USER_PATH_WALK(stat, error, name, nd, path, .link = false)
+
 		error = vfs_getattr(nd.mnt, nd.dentry, stat);
 		path_release(&nd);
-	}
+
+	FSHOOK_END_USER_WALK(stat, error, path)
+
 	return error;
 }
 
@@ -81,11 +84,13 @@ int vfs_lstat(char __user *name, struct kstat *stat)
 	struct nameidata nd;
 	int error;
 
-	error = user_path_walk_link(name, &nd);
-	if (!error) {
+	FSHOOK_BEGIN_USER_PATH_WALK_LINK(stat, error, name, nd, path, .link = true)
+
 		error = vfs_getattr(nd.mnt, nd.dentry, stat);
 		path_release(&nd);
-	}
+
+	FSHOOK_END_USER_WALK(stat, error, path)
+
 	return error;
 }
 
@@ -93,13 +98,20 @@ EXPORT_SYMBOL(vfs_lstat);
 
 int vfs_fstat(unsigned int fd, struct kstat *stat)
 {
-	struct file *f = fget(fd);
-	int error = -EBADF;
+	int error;
 
+	FSHOOK_BEGIN(fstat, error, .fd = fd)
+
+	struct file *f = fget(fd);
+
+	error = -EBADF;
 	if (f) {
 		error = vfs_getattr(f->f_vfsmnt, f->f_dentry, stat);
 		fput(f);
 	}
+
+	FSHOOK_END(fstat, error)	
+
 	return error;
 }
 
@@ -264,8 +276,8 @@ asmlinkage long sys_readlink(const char __user * path, char __user * buf, int bu
 	if (bufsiz <= 0)
 		return -EINVAL;
 
-	error = user_path_walk_link(path, &nd);
-	if (!error) {
+	FSHOOK_BEGIN_USER_PATH_WALK_LINK(readlink, error, path, nd, path)
+
 		struct inode * inode = nd.dentry->d_inode;
 
 		error = -EINVAL;
@@ -277,7 +289,9 @@ asmlinkage long sys_readlink(const char __user * path, char __user * buf, int bu
 			}
 		}
 		path_release(&nd);
-	}
+
+	FSHOOK_END_USER_WALK(readlink, error, path)
+
 	return error;
 }
 

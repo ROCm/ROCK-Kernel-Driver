@@ -43,6 +43,8 @@ obj-y				+= partitions/
 obj-y				+= sysfs/
 obj-y				+= devpts/
 
+obj-$(CONFIG_FSHOOKS)		+= fshooks.o
+
 obj-$(CONFIG_PROFILING)		+= dcookies.o
  
 # Do not add any filesystems before this line

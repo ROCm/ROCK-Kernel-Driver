@@ -18,6 +18,7 @@
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/blkdev.h>
+#include <linux/audit.h>
 
 #include <asm/pgalloc.h>
 #include <asm/uaccess.h>
@@ -204,24 +205,26 @@ asmlinkage unsigned long sys_brk(unsigned long brk)
 {
 	struct mm_struct *mm = current->mm;
 
+	audit_intercept(AUDIT_brk, brk);
+
 	if (brk < mm->end_code || brk < mm->start_brk || brk > mm->context.end_brk)
-		return mm->brk;
+		return audit_lresult(mm->brk);
 
 	if (mm->brk == brk)
-		return mm->brk;
+		return audit_lresult(mm->brk);
 
 	/*
 	 * Always allow shrinking brk
 	 */
 	if (brk <= mm->brk) {
 		mm->brk = brk;
-		return brk;
+		return audit_lresult(brk);
 	}
 
 	/*
 	 * Ok, looks good - let it rip.
 	 */
-	return mm->brk = brk;
+	return audit_lresult(mm->brk = brk);
 }
 
 /*

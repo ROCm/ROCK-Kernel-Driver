@@ -15,6 +15,7 @@
 #include <linux/stddef.h>
 #include <linux/slab.h>
 #include <linux/thread_info.h>
+#include <linux/audit.h>
 
 /* Set EXTENT bits starting at BASE in BITMAP to value TURN_ON. */
 static void set_bitmap(unsigned long *bitmap, unsigned int base, unsigned int extent, int new_value)
@@ -60,10 +61,12 @@ asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 	struct tss_struct * tss;
 	unsigned long *bitmap;
 
+	audit_intercept(AUDIT_ioperm, from, num, turn_on);
+
 	if ((from + num <= from) || (from + num > IO_BITMAP_BITS))
-		return -EINVAL;
+		return audit_result(-EINVAL);
 	if (turn_on && !capable(CAP_SYS_RAWIO))
-		return -EPERM;
+		return audit_result(-EPERM);
 
 	/*
 	 * If it's the first ioperm() call in this thread's lifetime, set the
@@ -73,7 +76,7 @@ asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 	if (!t->io_bitmap_ptr) {
 		bitmap = kmalloc(IO_BITMAP_BYTES, GFP_KERNEL);
 		if (!bitmap)
-			return -ENOMEM;
+			return audit_result(-ENOMEM);
 
 		memset(bitmap, 0xff, IO_BITMAP_BYTES);
 		t->io_bitmap_ptr = bitmap;
@@ -91,7 +94,7 @@ asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 		tss->io_bitmap_base = IO_BITMAP_OFFSET; /* Activate it in the TSS */
 	}
 	put_cpu();
-	return 0;
+	return audit_result(0);
 }
 
 /*
@@ -111,15 +114,17 @@ asmlinkage long sys_iopl(unsigned long unused)
 	unsigned int level = regs->ebx;
 	unsigned int old = (regs->eflags >> 12) & 3;
 
+	audit_intercept(AUDIT_iopl, level);
+
 	if (level > 3)
-		return -EINVAL;
+		return audit_result(-EINVAL);
 	/* Trying to gain more privileges? */
 	if (level > old) {
 		if (!capable(CAP_SYS_RAWIO))
-			return -EPERM;
+			return audit_result(-EPERM);
 	}
 	regs->eflags = (regs->eflags &~ 0x3000UL) | (level << 12);
 	/* Make sure we return the long way (not sysenter) */
 	set_thread_flag(TIF_IRET);
-	return 0;
+	return audit_result(0);
 }

@@ -26,6 +26,7 @@
 #include <linux/ptrace.h>
 #include <linux/user.h>
 #include <linux/security.h>
+#include <linux/audit.h>
 
 #include <asm/uaccess.h>
 #include <asm/page.h>
@@ -42,6 +43,8 @@ int sys32_ptrace(long request, long pid, unsigned long addr, unsigned long data)
 {
 	struct task_struct *child;
 	int ret = -EPERM;
+
+	audit_intercept(AUDIT_ptrace, request, pid, addr, data);
 
 	lock_kernel();
 	if (request == PTRACE_TRACEME) {
@@ -420,5 +423,5 @@ out_tsk:
 	put_task_struct(child);
 out:
 	unlock_kernel();
-	return ret;
+	return audit_result(ret);
 }

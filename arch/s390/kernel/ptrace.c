@@ -31,6 +31,7 @@
 #include <linux/ptrace.h>
 #include <linux/user.h>
 #include <linux/security.h>
+#include <linux/audit.h>
 
 #include <asm/segment.h>
 #include <asm/page.h>
@@ -653,6 +654,8 @@ sys_ptrace(long request, long pid, long addr, long data)
 	struct task_struct *child;
 	int ret;
 
+	audit_intercept(AUDIT_ptrace, request, pid, addr, data);
+
 	lock_kernel();
 
 	if (request == PTRACE_TRACEME) {
@@ -686,7 +689,7 @@ sys_ptrace(long request, long pid, long addr, long data)
 	put_task_struct(child);
 out:
 	unlock_kernel();
-	return ret;
+	return audit_result(ret);
 }
 
 asmlinkage void
