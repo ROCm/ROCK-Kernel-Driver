@@ -127,9 +127,6 @@ struct hpsb_packet *hpsb_alloc_packet(size_t data_size)
         if (packet == NULL)
                 return NULL;
 
-        memset(packet, 0, sizeof(struct hpsb_packet));
-        packet->header = packet->embedded_header;
-
         if (data_size) {
                 data = kmalloc(data_size + 8, GFP_ATOMIC);
                 if (data == NULL) {
@@ -141,11 +138,6 @@ struct hpsb_packet *hpsb_alloc_packet(size_t data_size)
                 packet->data_size = data_size;
         }
 
-	INIT_LIST_HEAD(&packet->list);
-	packet->state = hpsb_unused;
-	packet->generation = -1;
-	atomic_set(&packet->refcnt, 1);
-
 	return packet;
 }
 
@@ -154,8 +146,7 @@ struct hpsb_packet *hpsb_alloc_packet(size_t data_size)
  * hpsb_free_packet - free packet and data associated with it
  * @packet: packet to free (is NULL safe)
  *
- * This function will free packet->data, packet->header and finally the packet
- * itself.
+ * This function will free packet->data and finally the packet itself.
  */
 void hpsb_free_packet(struct hpsb_packet *packet)
 {
@@ -1039,6 +1030,21 @@ static int hpsbpkt_thread(void *__hi)
 	complete_and_exit(&khpsbpkt_complete, 0);
 }
 
+
+static void hpsb_packet_ctor(void *__packet, kmem_cache_t *hpsb_pkt_cache, unsigned long flags)
+{
+	struct hpsb_packet *packet = __packet;
+
+	memset(packet, 0, sizeof(*packet));
+
+	packet->header = packet->embedded_header;
+
+	INIT_LIST_HEAD(&packet->list);
+	packet->state = hpsb_unused;
+	packet->generation = -1;
+	atomic_set(&packet->refcnt, 1);
+}
+
 static int __init ieee1394_init(void)
 {
 	int i;
@@ -1059,7 +1065,7 @@ static int __init ieee1394_init(void)
 	devfs_mk_dir("ieee1394");
 
 	hpsb_packet_cache = kmem_cache_create("hpsb_packet", sizeof(struct hpsb_packet),
-					      0, 0, NULL, NULL);
+					      0, 0, hpsb_packet_ctor, NULL);
 
 	bus_register(&ieee1394_bus_type);
 	for (i = 0; fw_bus_attrs[i]; i++)
