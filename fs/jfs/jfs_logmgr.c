@@ -66,6 +66,7 @@
 #include <linux/completion.h>
 #include <linux/buffer_head.h>		/* for sync_blockdev() */
 #include <linux/bio.h>
+#include <linux/suspend.h>
 #include "jfs_incore.h"
 #include "jfs_filsys.h"
 #include "jfs_metapage.h"
@@ -2141,12 +2142,17 @@ int jfsIOWait(void *arg)
 			lbmStartIO(bp);
 			spin_lock_irq(&log_redrive_lock);
 		}
-		add_wait_queue(&jfs_IO_thread_wait, &wq);
-		set_current_state(TASK_INTERRUPTIBLE);
-		spin_unlock_irq(&log_redrive_lock);
-		schedule();
-		current->state = TASK_RUNNING;
-		remove_wait_queue(&jfs_IO_thread_wait, &wq);
+		if (current->flags & PF_FREEZE) {
+			spin_unlock_irq(&log_redrive_lock);
+			refrigerator(PF_IOTHREAD);
+		} else {
+			add_wait_queue(&jfs_IO_thread_wait, &wq);
+			set_current_state(TASK_INTERRUPTIBLE);
+			spin_unlock_irq(&log_redrive_lock);
+			schedule();
+			current->state = TASK_RUNNING;
+			remove_wait_queue(&jfs_IO_thread_wait, &wq);
+		}
 	} while (!jfs_stop_threads);
 
 	jFYI(1,("jfsIOWait being killed!\n"));
