@@ -1309,7 +1309,7 @@ static int pcic_init(struct pcmcia_socket *s)
 	int i;
 	struct resource res = { .start = 0, .end = 0x1000 };
 	pccard_io_map io = { 0, 0, 0, 0, 1 };
-	pccard_mem_map mem = { .res = &res, .sys_stop = 0x1000, };
+	pccard_mem_map mem = { .res = &res, };
 
 	for (i = 0; i < 2; i++) {
 		io.map = i;

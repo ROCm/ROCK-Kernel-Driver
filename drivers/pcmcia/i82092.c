@@ -422,7 +422,7 @@ static int i82092aa_init(struct pcmcia_socket *sock)
 	int i;
 	struct resource res = { .start = 0, .end = 0x0fff };
         pccard_io_map io = { 0, 0, 0, 0, 1 };
-	pccard_mem_map mem = { .res = &res, .sys_stop = 0x0fff, };
+	pccard_mem_map mem = { .res = &res, };
         
         enter("i82092aa_init");
                         
