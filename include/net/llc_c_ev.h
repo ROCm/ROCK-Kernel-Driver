@@ -11,6 +11,9 @@
  *
  * See the GNU General Public License for more details.
  */
+
+#include <net/sock.h>
+
 /* Connection component state transition event qualifiers */
 /* Types of events (possible values in 'ev->type') */
 #define LLC_CONN_EV_TYPE_SIMPLE		 1
@@ -293,4 +296,10 @@ extern int llc_conn_ev_qlfy_set_status_conflict(struct sock *sk,
 						struct sk_buff *skb);
 extern int llc_conn_ev_qlfy_set_status_rst_done(struct sock *sk,
 						struct sk_buff *skb);
+
+static __inline__ int llc_conn_space(struct sock *sk, struct sk_buff *skb)
+{
+	return atomic_read(&sk->rmem_alloc) + skb->truesize <
+	       (unsigned)sk->rcvbuf;
+}
 #endif /* LLC_C_EV_H */
