@@ -3972,17 +3972,16 @@ static inline int stli_initecp(stlibrd_t *brdp)
 	printk(KERN_DEBUG "stli_initecp(brdp=%x)\n", (int) brdp);
 #endif
 
-/*
- *	Do a basic sanity check on the IO and memory addresses.
- */
+	if (!request_region(brdp->iobase, brdp->iosize, name))
+		return -EIO;
+	
 	if ((brdp->iobase == 0) || (brdp->memaddr == 0))
+	{
+		release_region(brdp->iobase, brdp->iosize);
 		return(-ENODEV);
+	}
 
 	brdp->iosize = ECP_IOSIZE;
-	if (check_region(brdp->iobase, brdp->iosize))
-		printk(KERN_ERR "STALLION: Warning, board %d I/O address %x "
-				"conflicts with another device\n",
-				brdp->brdnr, brdp->iobase);
 
 /*
  *	Based on the specific board type setup the common vars to access
@@ -4047,6 +4046,7 @@ static inline int stli_initecp(stlibrd_t *brdp)
 		break;
 
 	default:
+		release_region(brdp->iobase, brdp->iosize);
 		return(-EINVAL);
 	}
 
@@ -4060,7 +4060,10 @@ static inline int stli_initecp(stlibrd_t *brdp)
 
 	brdp->membase = ioremap(brdp->memaddr, brdp->memsize);
 	if (brdp->membase == (void *) NULL)
+	{
+		release_region(brdp->iobase, brdp->iosize);
 		return(-ENOMEM);
+	}
 
 /*
  *	Now that all specific code is set up, enable the shared memory and
@@ -4082,7 +4085,10 @@ static inline int stli_initecp(stlibrd_t *brdp)
 #endif
 
 	if (sig.magic != ECP_MAGIC)
+	{
+		release_region(brdp->iobase, brdp->iosize);
 		return(-ENODEV);
+	}
 
 /*
  *	Scan through the signature looking at the panels connected to the
@@ -4103,7 +4109,7 @@ static inline int stli_initecp(stlibrd_t *brdp)
 		brdp->nrpanels++;
 	}
 
-	request_region(brdp->iobase, brdp->iosize, name);
+
 	brdp->state |= BST_FOUND;
 	return(0);
 }
@@ -4133,10 +4139,9 @@ static inline int stli_initonb(stlibrd_t *brdp)
 		return(-ENODEV);
 
 	brdp->iosize = ONB_IOSIZE;
-	if (check_region(brdp->iobase, brdp->iosize))
-		printk(KERN_ERR "STALLION: Warning, board %d I/O address %x "
-				"conflicts with another device\n",
-				brdp->brdnr, brdp->iobase);
+	
+	if (!request_region(brdp->iobase, brdp->iosize, name))
+		return -EIO;
 
 /*
  *	Based on the specific board type setup the common vars to access
@@ -4211,6 +4216,7 @@ static inline int stli_initonb(stlibrd_t *brdp)
 		break;
 
 	default:
+		release_region(brdp->iobase, brdp->iosize);
 		return(-EINVAL);
 	}
 
@@ -4224,7 +4230,10 @@ static inline int stli_initonb(stlibrd_t *brdp)
 
 	brdp->membase = ioremap(brdp->memaddr, brdp->memsize);
 	if (brdp->membase == (void *) NULL)
+	{
+		release_region(brdp->iobase, brdp->iosize);
 		return(-ENOMEM);
+	}
 
 /*
  *	Now that all specific code is set up, enable the shared memory and
@@ -4244,7 +4253,10 @@ static inline int stli_initonb(stlibrd_t *brdp)
 
 	if ((sig.magic0 != ONB_MAGIC0) || (sig.magic1 != ONB_MAGIC1) ||
 	    (sig.magic2 != ONB_MAGIC2) || (sig.magic3 != ONB_MAGIC3))
+	{
+		release_region(brdp->iobase, brdp->iosize);
 		return(-ENODEV);
+	}
 
 /*
  *	Scan through the signature alive mask and calculate how many ports
@@ -4262,7 +4274,7 @@ static inline int stli_initonb(stlibrd_t *brdp)
 	}
 	brdp->panels[0] = brdp->nrports;
 
-	request_region(brdp->iobase, brdp->iosize, name);
+
 	brdp->state |= BST_FOUND;
 	return(0);
 }

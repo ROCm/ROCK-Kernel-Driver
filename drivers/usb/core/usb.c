@@ -904,7 +904,8 @@ static void usb_find_drivers(struct usb_device *dev)
 		
 		/* register this interface with driverfs */
 		interface->dev.parent = &dev->dev;
-		sprintf (&interface->dev.bus_id[0], "%03d", ifnum);
+		interface->dev.bus = &usb_bus_type;
+		sprintf (&interface->dev.bus_id[0], "%03d%03d", dev->devnum,ifnum);
 		sprintf (&interface->dev.name[0], "figure out some name...");
 		device_register (&interface->dev);
 
@@ -2757,12 +2758,16 @@ struct list_head *usb_bus_get_list(void)
 }
 #endif
 
+struct bus_type usb_bus_type = {
+	name:	"usb",
+};
 
 /*
  * Init
  */
 static int __init usb_init(void)
 {
+	bus_register(&usb_bus_type);
 	usb_major_init();
 	usbfs_init();
 	usb_hub_init();
@@ -2775,6 +2780,7 @@ static int __init usb_init(void)
  */
 static void __exit usb_exit(void)
 {
+	put_bus(&usb_bus_type);
 	usb_major_cleanup();
 	usbfs_cleanup();
 	usb_hub_cleanup();

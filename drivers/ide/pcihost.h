@@ -105,13 +105,12 @@ typedef struct ide_pci_enablebit_s {
 #define ATA_F_DMA	0x001
 #define ATA_F_NODMA	0x002	/* no DMA mode supported at all */
 #define ATA_F_NOADMA	0x004	/* DMA has to be enabled explicitely */
-#define ATA_F_FDMA	0x008	/* force autodma */
-#define ATA_F_FIXIRQ	0x010	/* fixed irq wiring */
-#define ATA_F_SER	0x020	/* serialize on first and second channel interrupts */
-#define ATA_F_IRQ	0x040	/* trust IRQ information from config */
-#define ATA_F_PHACK	0x080	/* apply PROMISE hacks */
-#define ATA_F_HPTHACK	0x100	/* apply HPT366 hacks */
-#define ATA_F_SIMPLEX	0x200	/* force treatment as simple device */
+#define ATA_F_FIXIRQ	0x008	/* fixed irq wiring */
+#define ATA_F_SER	0x010	/* serialize on first and second channel interrupts */
+#define ATA_F_IRQ	0x020	/* trust IRQ information from config */
+#define ATA_F_PHACK	0x040	/* apply PROMISE hacks */
+#define ATA_F_HPTHACK	0x080	/* apply HPT366 hacks */
+#define ATA_F_SIMPLEX	0x100	/* force treatment as simple device */
 
 
 struct ata_pci_device {

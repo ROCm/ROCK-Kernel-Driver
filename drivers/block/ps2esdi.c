@@ -69,7 +69,7 @@ static void reset_ctrl(void);
 
 int ps2esdi_init(void);
 
-static void ps2esdi_geninit(void);
+static int ps2esdi_geninit(void);
 
 static void do_ps2esdi_request(request_queue_t * q);
 
@@ -168,6 +168,8 @@ static struct gendisk ps2esdi_gendisk =
 int __init ps2esdi_init(void)
 {
 
+	int error = 0;
+
 	/* register the device - pass the name, major number and operations
 	   vector .                                                 */
 	if (devfs_register_blkdev(MAJOR_NR, "ed", &ps2esdi_fops)) {
@@ -180,7 +182,16 @@ int __init ps2esdi_init(void)
 
 	/* some minor housekeeping - setup the global gendisk structure */
 	add_gendisk(&ps2esdi_gendisk);
-	ps2esdi_geninit();
+	error = ps2esdi_geninit();
+	if (error) {
+		printk(KERN_WARNING "PS2ESDI: error initialising"
+			" device, releasing resources\n");
+		devfs_unregister_blkdev(MAJOR_NR, "ed");
+		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+		del_gendisk(&ps2esdi_gendisk);
+		blk_clear(MAJOR_NR);
+		return error;
+	}
 	return 0;
 }				/* ps2esdi_init */
 
@@ -225,7 +236,7 @@ cleanup_module(void) {
 	}
 	release_region(io_base, 4);
 	free_dma(dma_arb_level);
-  	free_irq(PS2ESDI_IRQ, NULL);
+	free_irq(PS2ESDI_IRQ, &ps2esdi_gendisk);
 	devfs_unregister_blkdev(MAJOR_NR, "ed");
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 	del_gendisk(&ps2esdi_gendisk);
@@ -289,7 +300,7 @@ static int ps2esdi_getinfo(char *buf, int slot, void *d)
 }
 
 /* ps2 esdi specific initialization - called thru the gendisk chain */
-static void __init ps2esdi_geninit(void)
+static int __init ps2esdi_geninit(void)
 {
 	/*
 	   The first part contains the initialization code
@@ -307,6 +318,7 @@ static void __init ps2esdi_geninit(void)
 	int slot = 0, i, reset_start, reset_end;
 	u_char status;
 	unsigned short adapterID;
+	int error = 0;
 
 	if ((slot = mca_find_adapter(INTG_ESDI_ID, 0)) != MCA_NOTFOUND) {
 		adapterID = INTG_ESDI_ID;
@@ -321,7 +333,7 @@ static void __init ps2esdi_geninit(void)
 		       DEVICE_NAME, slot+1);
 		mca_set_adapter_name(slot, "PS/2 ESDI");
 	} else {
-		return;
+		return -ENODEV;
 	}
 
 	ps2esdi_slot = slot;
@@ -347,7 +359,8 @@ static void __init ps2esdi_geninit(void)
 	/* is it enabled ? */
 	if (!(status & STATUS_ENABLED)) {
 		printk("%s: ESDI adapter disabled\n", DEVICE_NAME);
-		return;
+		error = -ENODEV;
+		goto err_out1;
 	}
 	/* try to grab IRQ, and try to grab a slow IRQ if it fails, so we can
 	   share with the SCSI driver */
@@ -357,7 +370,8 @@ static void __init ps2esdi_geninit(void)
 			   SA_SHIRQ, "PS/2 ESDI", &ps2esdi_gendisk)
 	    ) {
 		printk("%s: Unable to get IRQ %d\n", DEVICE_NAME, PS2ESDI_IRQ);
-		return;
+		error = -EBUSY;
+		goto err_out1;
 	}
 	if (status & STATUS_ALTERNATE)
 		io_base = ALT_IO_BASE;
@@ -366,8 +380,8 @@ static void __init ps2esdi_geninit(void)
 
 	if (!request_region(io_base, 4, "ed")) {
 		printk(KERN_WARNING"Unable to request region 0x%x\n", io_base);
-		free_irq(PS2ESDI_IRQ, &ps2esdi_gendisk);
-		return;
+		error = -EBUSY;
+		goto err_out2;
 	}
 	/* get the dma arbitration level */
 	dma_arb_level = (status >> 2) & 0xf;
@@ -417,8 +431,12 @@ static void __init ps2esdi_geninit(void)
 
 	ps2esdi_gendisk.nr_real = ps2esdi_drives;
 
-	request_dma(dma_arb_level, "ed");
-
+	if (request_dma(dma_arb_level, "ed") !=0) {
+		printk(KERN_WARNING "PS2ESDI: Can't request dma-channel %d\n"
+			,(int) dma_arb_level);
+		error = -EBUSY;
+		goto err_out3;
+	}
 	blk_queue_max_sectors(BLK_DEFAULT_QUEUE(MAJOR_NR), 128);
 
 	for (i = 0; i < ps2esdi_drives; i++) {
@@ -428,6 +446,18 @@ static void __init ps2esdi_geninit(void)
 				ps2esdi_info[i].cyl);
 		ps2esdi_valid[i] = 1;
 	}
+	return 0;
+
+err_out3:
+	release_region(io_base, 4);
+err_out2:
+	free_irq(PS2ESDI_IRQ, &ps2esdi_gendisk);
+err_out1:
+	if(ps2esdi_slot) {
+		mca_mark_as_unused(ps2esdi_slot);
+		mca_set_adapter_procfn(ps2esdi_slot, NULL, NULL);
+	}
+	return error;
 }
 
 static void __init ps2esdi_get_device_cfg(void)

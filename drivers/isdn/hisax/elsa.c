@@ -598,15 +598,13 @@ check_arcofi(struct IsdnCardState *cs)
 				Elsa_Types[cs->subtyp],
 				cs->hw.elsa.base+8);
 			release_region(cs->hw.elsa.base, 8);
-			if (check_region(cs->hw.elsa.base, 16)) {
+			if (!request_region(cs->hw.elsa.base, 16,"elsa isdn modem")) {
 				printk(KERN_WARNING
 				"HiSax: %s config port %lx-%lx already in use\n",
 				Elsa_Types[cs->subtyp],
 				cs->hw.elsa.base + 8,
 				cs->hw.elsa.base + 16);
-			} else
-				request_region(cs->hw.elsa.base, 16,
-					"elsa isdn modem");
+			}
 		} else if (cs->subtyp==ELSA_PCC16) {
 			cs->subtyp = ELSA_PCF;
 			printk(KERN_INFO
@@ -614,15 +612,13 @@ check_arcofi(struct IsdnCardState *cs)
 				Elsa_Types[cs->subtyp],
 				cs->hw.elsa.base+8);
 			release_region(cs->hw.elsa.base, 8);
-			if (check_region(cs->hw.elsa.base, 16)) {
+			if (!request_region(cs->hw.elsa.base, 16,"elsa isdn modem")) {
 				printk(KERN_WARNING
 				"HiSax: %s config port %lx-%lx already in use\n",
 				Elsa_Types[cs->subtyp],
 				cs->hw.elsa.base + 8,
 				cs->hw.elsa.base + 16);
-			} else
-				request_region(cs->hw.elsa.base, 16,
-					"elsa isdn modem");
+			}
 		} else
 			printk(KERN_INFO
 				"Elsa: %s detected modem at 0x%lx\n",
@@ -1066,18 +1062,18 @@ setup_elsa(struct IsdnCard *card)
 	/* In case of the elsa pcmcia card, this region is in use,
 	   reserved for us by the card manager. So we do not check it
 	   here, it would fail. */
-	if (cs->typ != ISDN_CTYPE_ELSA_PCMCIA && check_region(cs->hw.elsa.base, bytecnt)) {
-		printk(KERN_WARNING
-		       "HiSax: %s config port %#lx-%#lx already in use\n",
-		       CardType[card->typ],
-		       cs->hw.elsa.base,
-		       cs->hw.elsa.base + bytecnt);
-		return (0);
-	} else {
-		request_region(cs->hw.elsa.base, bytecnt, "elsa isdn");
-	}
+	if (cs->typ != ISDN_CTYPE_ELSA_PCMCIA)
+		if (!request_region(cs->hw.elsa.base, bytecnt, "elsa isdn")) {		
+			printk(KERN_WARNING
+			       "HiSax: %s config port %#lx-%#lx already in use\n",
+			       CardType[card->typ],
+			       cs->hw.elsa.base,
+			       cs->hw.elsa.base + bytecnt);
+			return (0);
+		}
+	
 	if ((cs->subtyp == ELSA_QS1000PCI) || (cs->subtyp == ELSA_QS3000PCI)) {
-		if (check_region(cs->hw.elsa.cfg, 0x80)) {
+		if (!pci_request_region(cs->hw.elsa.cfg, 0x80, "elsa isdn pci")) {
 			printk(KERN_WARNING
 			       "HiSax: %s pci port %x-%x already in use\n",
 				CardType[card->typ],
@@ -1085,8 +1081,6 @@ setup_elsa(struct IsdnCard *card)
 				cs->hw.elsa.cfg + 0x80);
 			release_region(cs->hw.elsa.base, bytecnt);
 			return (0);
-		} else {
-			request_region(cs->hw.elsa.cfg, 0x80, "elsa isdn pci");
 		}
 	}
 #if ARCOFI_USE

@@ -132,7 +132,7 @@ __adfs_block_map(struct super_block *sb, unsigned int object_id,
 		unsigned int off;
 
 		off = (object_id & 255) - 1;
-		block += off << sb->u.adfs_sb.s_log2sharesize;
+		block += off << ADFS_SB(sb)->s_log2sharesize;
 	}
 
 	return adfs_map_lookup(sb, object_id >> 8, block);

@@ -89,108 +89,10 @@ static unsigned char amd_enabled;
 static unsigned int amd_80w;
 
 static unsigned char amd_cyc2udma[] = { 6, 6, 5, 4, 0, 1, 1, 2, 2, 3, 3 };
+#if 0
 static unsigned char amd_udma2cyc[] = { 4, 6, 8, 10, 3, 2, 1, 1 };
-static char *amd_dma[] = { "MWDMA16", "UDMA33", "UDMA66", "UDMA100" };
-
-/*
- * AMD /proc entry.
- */
-
-#if 0 && defined(CONFIG_PROC_FS)
-
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
-
-byte amd74xx_proc;
-int amd_base;
-static struct pci_dev *bmide_dev;
-extern int (*amd74xx_display_info)(char *, char **, off_t, int); /* ide-proc.c */
-
-#define amd_print(format, arg...) p += sprintf(p, format "\n" , ## arg)
-#define amd_print_drive(name, format, arg...)\
-	p += sprintf(p, name); for (i = 0; i < 4; i++) p += sprintf(p, format, ## arg); p += sprintf(p, "\n");
-
-static int amd_get_info(char *buffer, char **addr, off_t offset, int count)
-{
-	int speed[4], cycle[4], setup[4], active[4], recover[4], den[4],
-		 uen[4], udma[4], active8b[4], recover8b[4];
-	struct pci_dev *dev = bmide_dev;
-	unsigned int v, u, i;
-	unsigned short c, w;
-	unsigned char t;
-	char *p = buffer;
-
-	amd_print("----------AMD BusMastering IDE Configuration----------------");
-
-	amd_print("Driver Version:                     2.8");
-	amd_print("South Bridge:                       %s", bmide_dev->name);
-
-	pci_read_config_byte(dev, PCI_REVISION_ID, &t);
-	amd_print("Revision:                           IDE %#x", t);
-	amd_print("Highest DMA rate:                   %s", amd_dma[amd_config->flags & AMD_UDMA]);
-
-	amd_print("BM-DMA base:                        %#x", amd_base);
-	amd_print("PCI clock:                          %d.%dMHz", system_bus_speed / 1000, system_bus_speed / 100 % 10);
-	
-	amd_print("-----------------------Primary IDE-------Secondary IDE------");
-
-	pci_read_config_byte(dev, AMD_IDE_CONFIG, &t);
-	amd_print("Prefetch Buffer:       %10s%20s", (t & 0x80) ? "yes" : "no", (t & 0x20) ? "yes" : "no");
-	amd_print("Post Write Buffer:     %10s%20s", (t & 0x40) ? "yes" : "no", (t & 0x10) ? "yes" : "no");
-
-	pci_read_config_byte(dev, AMD_IDE_ENABLE, &t);
-	amd_print("Enabled:               %10s%20s", (t & 0x02) ? "yes" : "no", (t & 0x01) ? "yes" : "no");
-
-	c = inb(amd_base + 0x02) | (inb(amd_base + 0x0a) << 8);
-	amd_print("Simplex only:          %10s%20s", (c & 0x80) ? "yes" : "no", (c & 0x8000) ? "yes" : "no");
-
-	amd_print("Cable Type:            %10s%20s", (amd_80w & 1) ? "80w" : "40w", (amd_80w & 2) ? "80w" : "40w");
-
-	if (!system_bus_speed)
-                return p - buffer;
-
-	amd_print("-------------------drive0----drive1----drive2----drive3-----");
-
-	pci_read_config_byte(dev, AMD_ADDRESS_SETUP, &t);
-	pci_read_config_dword(dev, AMD_DRIVE_TIMING, &v);
-	pci_read_config_word(dev, AMD_8BIT_TIMING, &w);
-	pci_read_config_dword(dev, AMD_UDMA_TIMING, &u);
-
-	for (i = 0; i < 4; i++) {
-		setup[i]     = ((t >> ((3 - i) << 1)) & 0x3) + 1;
-		recover8b[i] = ((w >> ((1 - (i >> 1)) << 3)) & 0xf) + 1;
-		active8b[i]  = ((w >> (((1 - (i >> 1)) << 3) + 4)) & 0xf) + 1;
-		active[i]    = ((v >> (((3 - i) << 3) + 4)) & 0xf) + 1;
-		recover[i]   = ((v >> ((3 - i) << 3)) & 0xf) + 1;
-
-		udma[i] = amd_udma2cyc[((u >> ((3 - i) << 3)) & 0x7)];
-		uen[i]  = ((u >> ((3 - i) << 3)) & 0x40) ? 1 : 0;
-		den[i]  = (c & ((i & 1) ? 0x40 : 0x20) << ((i & 2) << 2));
-
-		if (den[i] && uen[i] && udma[i] == 1) {
-			speed[i] = system_bus_speed * 3;
-			cycle[i] = 666666 / system_bus_speed;
-			continue;
-		}
-
-		speed[i] = 4 * system_bus_speed / ((den[i] && uen[i]) ? udma[i] : (active[i] + recover[i]) * 2);
-		cycle[i] = 1000000 * ((den[i] && uen[i]) ? udma[i] : (active[i] + recover[i]) * 2) / system_bus_speed / 2;
-	}
-
-	amd_print_drive("Transfer Mode: ", "%10s", den[i] ? (uen[i] ? "UDMA" : "DMA") : "PIO");
-
-	amd_print_drive("Address Setup: ", "%8dns", 1000000 * setup[i] / system_bus_speed);
-	amd_print_drive("Cmd Active:    ", "%8dns", 1000000 * active8b[i] / system_bus_speed);
-	amd_print_drive("Cmd Recovery:  ", "%8dns", 1000000 * recover8b[i] / system_bus_speed);
-	amd_print_drive("Data Active:   ", "%8dns", 1000000 * active[i] / system_bus_speed);
-	amd_print_drive("Data Recovery: ", "%8dns", 1000000 * recover[i] / system_bus_speed);
-	amd_print_drive("Cycle Time:    ", "%8dns", cycle[i]);
-	amd_print_drive("Transfer Rate: ", "%4d.%dMB/s", speed[i] / 1000, speed[i] / 100 % 10);
-
-	return p - buffer;	/* hoping it is less than 4K... */
-}
-
 #endif
+static char *amd_dma[] = { "MWDMA16", "UDMA33", "UDMA66", "UDMA100" };
 
 /*
  * amd_set_speed() writes timing values to the chipset registers
@@ -361,19 +263,6 @@ static unsigned int __init amd74xx_init_chipset(struct pci_dev *dev)
 	pci_read_config_byte(dev, PCI_REVISION_ID, &t);
 	printk(KERN_INFO "AMD_IDE: %s (rev %02x) %s controller on pci%s\n",
 		dev->name, t, amd_dma[amd_config->flags & AMD_UDMA], dev->slot_name);
-
-/*
- * Register /proc/ide/amd74xx entry
- */
-
-#if 0 && defined(CONFIG_PROC_FS)
-	if (!amd74xx_proc) {
-		amd_base = pci_resource_start(dev, 4);
-		bmide_dev = dev;
-		amd74xx_display_info = &amd_get_info;
-		amd74xx_proc = 1;
-	}
-#endif
 
 	return 0;
 }

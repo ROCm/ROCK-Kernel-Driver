@@ -271,11 +271,21 @@ ibwdt_init(void)
 
 	ibwdt_validate_timeout();
 	spin_lock_init(&ibwdt_lock);
-	misc_register(&ibwdt_miscdev);
+	if (misc_register(&ibwdt_miscdev))
+		return -ENODEV;
 #if WDT_START != WDT_STOP
-	request_region(WDT_STOP, 1, "IB700 WDT");
+	if (!request_region(WDT_STOP, 1, "IB700 WDT")) {
+		misc_deregister(&ibwdt_miscdev);
+		return -EIO;
+	}
 #endif
-	request_region(WDT_START, 1, "IB700 WDT");
+	if (!request_region(WDT_START, 1, "IB700 WDT")) {
+#if WDT_START != WDT_STOP
+		release_region(WDT_STOP, 1);
+#endif
+		misc_deregister(&ibwdt_miscdev);
+		return -EIO;
+	}
 	register_reboot_notifier(&ibwdt_notifier);
 	return 0;
 }

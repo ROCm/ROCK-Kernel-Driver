@@ -247,11 +247,15 @@ static int __init mixcomwd_init(void)
 		return -ENODEV;
 	}
 
-	request_region(watchdog_port,1,"MixCOM watchdog");
+	if (!request_region(watchdog_port,1,"MixCOM watchdog"))
+		return -EIO;
 		
 	ret = misc_register(&mixcomwd_miscdev);
 	if (ret)
+	{
+		release_region(watchdog_port, 1);
 		return ret;
+	}
 	
 	printk(KERN_INFO "MixCOM watchdog driver v%s, watchdog port at 0x%3x\n",VERSION,watchdog_port);
 

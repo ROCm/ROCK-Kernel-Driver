@@ -649,3 +649,4 @@ static void __exit exit_hpfs_fs(void)
 
 module_init(init_hpfs_fs)
 module_exit(exit_hpfs_fs)
+MODULE_LICENSE("GPL");

@@ -25,7 +25,8 @@
 #include <linux/fcntl.h>
 #include <linux/time.h>
 #include <linux/stat.h>
-#include <linux/buffer_head.h>		/* for file_fsync() */
+#include <linux/buffer_head.h>			/* for file_fsync() */
+#include <linux/adfs_fs.h>
 
 #include "adfs.h"
 
