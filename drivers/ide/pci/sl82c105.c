@@ -25,6 +25,7 @@
 #include <asm/dma.h>
 
 #include "ide_modes.h"
+#include "sl82c105.h"
 
 /*
  * Convert a PIO mode and cycle time to the required on/off
@@ -60,21 +61,14 @@ static void config_for_pio(ide_drive_t *drive, int pio, int report)
 	ide_hwif_t *hwif = HWIF(drive);
 	struct pci_dev *dev = hwif->pci_dev;
 	ide_pio_data_t p;
-	unsigned short drv_ctrl = 0x909;
+	u16 drv_ctrl = 0x909;
 	unsigned int xfer_mode, reg;
 
 	reg = (hwif->channel ? 0x4c : 0x44) + (drive->select.b.unit ? 4 : 0);
 
 	pio = ide_get_best_pio_mode(drive, pio, 5, &p);
 
-	switch (pio) {
-	default:
-	case 0:		xfer_mode = XFER_PIO_0;		break;
-	case 1:		xfer_mode = XFER_PIO_1;		break;
-	case 2:		xfer_mode = XFER_PIO_2;		break;
-	case 3:		xfer_mode = XFER_PIO_3;		break;
-	case 4:		xfer_mode = XFER_PIO_4;		break;
-	}
+	xfer_mode = XFER_PIO_0 + pio;
 
 	if (ide_config_drive_speed(drive, xfer_mode) == 0)
 		drv_ctrl = get_timing_sl82c105(&p);
@@ -97,11 +91,11 @@ static void config_for_pio(ide_drive_t *drive, int pio, int report)
 /*
  * Configure the drive and the chipset for DMA
  */
-static int config_for_dma(ide_drive_t *drive)
+static int config_for_dma (ide_drive_t *drive)
 {
 	ide_hwif_t *hwif = HWIF(drive);
 	struct pci_dev *dev = hwif->pci_dev;
-	unsigned short drv_ctrl = 0x909;
+	u16 drv_ctrl = 0x909;
 	unsigned int reg;
 
 	reg = (hwif->channel ? 0x4c : 0x44) + (drive->select.b.unit ? 4 : 0);
@@ -118,68 +112,62 @@ static int config_for_dma(ide_drive_t *drive)
  * Check to see if the drive and
  * chipset is capable of DMA mode
  */
-static int sl82c105_check_drive(ide_drive_t *drive)
-{
-	ide_dma_action_t dma_func = ide_dma_off_quietly;
 
+static int sl82c105_check_drive (ide_drive_t *drive)
+{
+	ide_hwif_t *hwif	= HWIF(drive);
 	do {
 		struct hd_driveid *id = drive->id;
-		ide_hwif_t *hwif = HWIF(drive);
 
-		if (!hwif->autodma)
+		if (!drive->autodma)
 			break;
 
 		if (!id || !(id->capability & 1))
 			break;
 
 		/* Consult the list of known "bad" drives */
-		if (ide_dmaproc(ide_dma_bad_drive, drive)) {
-			dma_func = ide_dma_off;
+		if (hwif->ide_dma_bad_drive(drive))
 			break;
-		}
 
 		if (id->field_valid & 2) {
-			if  (id->dma_mword & 7 || id->dma_1word & 7)
-				dma_func = ide_dma_on;
-			break;
+			if ((id->dma_mword & hwif->mwdma_mask) ||
+			    (id->dma_1word & hwif->swdma_mask))
+				return hwif->ide_dma_on(drive);
 		}
 
-		if (ide_dmaproc(ide_dma_good_drive, drive)) {
-			dma_func = ide_dma_on;
-			break;
-		}
+		if (hwif->ide_dma_good_drive(drive))
+			return hwif->ide_dma_on(drive);
 	} while (0);
 
-	return HWIF(drive)->dmaproc(dma_func, drive);
+	return hwif->ide_dma_off_quietly(drive);
 }
 
-/*
- * Our own dmaproc, only to intercept ide_dma_check
- */
-static int sl82c105_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
+static int sl82c105_ide_dma_on (ide_drive_t *drive)
 {
-	switch (func) {
-	case ide_dma_check:
-		return sl82c105_check_drive(drive);
-	case ide_dma_on:
-		if (config_for_dma(drive))
-			func = ide_dma_off;
-		/* fall through */
-	case ide_dma_off_quietly:
-	case ide_dma_off:
+	if (config_for_dma(drive)) {
 		config_for_pio(drive, 4, 0);
-		break;
-	default:
-		break;
+		return HWIF(drive)->ide_dma_off_quietly(drive);
 	}
-	return ide_dmaproc(func, drive);
+	return __ide_dma_on(drive);
+}
+
+static int sl82c105_ide_dma_off (ide_drive_t *drive)
+{
+	config_for_pio(drive, 4, 0);
+	return __ide_dma_off(drive);
+}
+
+static int sl82c105_ide_dma_off_quietly (ide_drive_t *drive)
+{
+	config_for_pio(drive, 4, 0);
+	return __ide_dma_off_quietly(drive);
 }
 
 /*
  * We only deal with PIO mode here - DMA mode 'using_dma' is not
  * initialised at the point that this function is called.
  */
-static void tune_sl82c105(ide_drive_t *drive, byte pio)
+static void tune_sl82c105(ide_drive_t *drive, u8 pio)
 {
 	config_for_pio(drive, pio, 1);
 
@@ -198,7 +186,7 @@ static void tune_sl82c105(ide_drive_t *drive, byte pio)
 static unsigned int sl82c105_bridge_revision(struct pci_dev *dev)
 {
 	struct pci_dev *bridge;
-	unsigned char rev;
+	u8 rev;
 
 	bridge = pci_find_device(PCI_VENDOR_ID_WINBOND, PCI_DEVICE_ID_WINBOND_83C553, NULL);
 
@@ -223,9 +211,9 @@ static unsigned int sl82c105_bridge_revision(struct pci_dev *dev)
 /*
  * Enable the PCI device
  */
-unsigned int __init pci_init_sl82c105(struct pci_dev *dev, const char *msg)
+static unsigned int __init init_chipset_sl82c105(struct pci_dev *dev, const char *msg)
 {
-	unsigned char ctrl_stat;
+	u8 ctrl_stat;
 
 	/*
 	 * Enable the ports
@@ -236,15 +224,19 @@ unsigned int __init pci_init_sl82c105(struct pci_dev *dev, const char *msg)
 	return dev->irq;
 }
 
-void __init dma_init_sl82c105(ide_hwif_t *hwif, unsigned long dma_base)
+static void __init init_dma_sl82c105(ide_hwif_t *hwif, unsigned long dma_base)
 {
 	unsigned int rev;
-	byte dma_state;
+	u8 dma_state;
 
-	dma_state = IN_BYTE(dma_base + 2);
+	hwif->autodma = 0;
+
+	if (!dma_base)
+		return;
+
+	dma_state = hwif->INB(dma_base + 2);
 	rev = sl82c105_bridge_revision(hwif->pci_dev);
 	if (rev <= 5) {
-		hwif->autodma = 0;
 		hwif->drives[0].autotune = 1;
 		hwif->drives[1].autotune = 1;
 		printk("    %s: Winbond 553 bridge revision %d, BM-DMA disabled\n",
@@ -252,21 +244,63 @@ void __init dma_init_sl82c105(ide_hwif_t *hwif, unsigned long dma_base)
 		dma_state &= ~0x60;
 	} else {
 		dma_state |= 0x60;
-		hwif->autodma = 1;
+		if (!noautodma)
+			hwif->autodma = 1;
 	}
-	OUT_BYTE(dma_state, dma_base + 2);
+	hwif->OUTB(dma_state, dma_base + 2);
 
-	hwif->dmaproc = NULL;
 	ide_setup_dma(hwif, dma_base, 8);
-	if (hwif->dmaproc)
-		hwif->dmaproc = sl82c105_dmaproc;
 }
 
 /*
  * Initialise the chip
  */
-void __init ide_init_sl82c105(ide_hwif_t *hwif)
+
+static void __init init_hwif_sl82c105(ide_hwif_t *hwif)
 {
 	hwif->tuneproc = tune_sl82c105;
+
+	if (!hwif->dma_base)
+		return;
+
+	hwif->atapi_dma = 1;
+	hwif->mwdma_mask = 0x07;
+	hwif->swdma_mask = 0x07;
+
+#ifdef CONFIG_BLK_DEV_IDEDMA
+	hwif->ide_dma_check = &sl82c105_check_drive;
+	hwif->ide_dma_on = &sl82c105_ide_dma_on;
+	hwif->ide_dma_off = &sl82c105_ide_dma_off;
+	hwif->ide_dma_off_quietly = &sl82c105_ide_dma_off_quietly;
+	if (!noautodma)
+		hwif->autodma = 1;
+	hwif->drives[0].autodma = hwif->autodma;
+	hwif->drives[1].autodma = hwif->autodma;
+#endif /* CONFIG_BLK_DEV_IDEDMA */
+}
+
+extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
+
+static void __init init_setup_sl82c105 (struct pci_dev *dev, ide_pci_device_t *d)
+{
+	ide_setup_pci_device(dev, d);
+}
+
+int __init sl82c105_scan_pcidev (struct pci_dev *dev)
+{
+	ide_pci_device_t *d;
+
+	if (dev->vendor != PCI_VENDOR_ID_WINBOND)
+		return 0;
+
+	for (d = sl82c105_chipsets; d && d->vendor && d->device; ++d) {
+		if (((d->vendor == dev->vendor) &&
+		     (d->device == dev->device)) &&
+		    (d->init_setup)) {
+			d->init_setup(dev, d);
+			return 1;
+		}
+	}
+	return 0;
 }
 
