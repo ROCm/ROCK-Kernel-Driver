@@ -106,8 +106,8 @@ static int do_isofs_readdir(struct inode *inode, struct file *filp,
 {
 	unsigned long bufsize = ISOFS_BUFFER_SIZE(inode);
 	unsigned char bufbits = ISOFS_BUFFER_BITS(inode);
-	unsigned int block, offset;
-	int inode_number = 0;	/* Quiet GCC */
+	unsigned long block, offset;
+	unsigned long inode_number = 0;	/* Quiet GCC */
 	struct buffer_head *bh = NULL;
 	int len;
 	int map;
@@ -130,7 +130,7 @@ static int do_isofs_readdir(struct inode *inode, struct file *filp,
 
 		de = (struct iso_directory_record *) (bh->b_data + offset);
 		if (first_de)
-			inode_number = (bh->b_blocknr << bufbits) + offset;
+			inode_number = isofs_get_ino(de);
 
 		de_len = *(unsigned char *) de;
 
