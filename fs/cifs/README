@@ -110,8 +110,13 @@ after -o the following cifs vfs specific options are supported:
   pass=<password>
   domain=<domain name>
   
-TCP names (in addition to ip addresses) will be available when the mount helper
-(mount.cifs) is complete
+Other cifs mount options are described below.  Use of TCP names (in addition to
+ip addresses) is available if the mount helper (mount.cifs) is installed. If
+you do not trust the server to which are mounted, or if you do not have
+cifs signing enabled (and the physical network is insecure), consider use
+of the standard mount options "noexec" and "nosuid" to reduce the risk of 
+running an altered binary on your local system (downloaded from a hostile server
+or altered by a hostile router).
 
 Restrictions
 ============
@@ -203,7 +208,7 @@ LinuxExtensionsEnabled	If set to one then the client will attempt to
 			extensions but do not want to use symbolic link
 			support and want to map the uid and gid fields 
 			to values supplied at mount (rather than the 
-			actual values, then set this to zero. (deafult 1)
+			actual values, then set this to zero. (default 1)
 
 These experimental features and tracing can be enabled by changing flags in 
 /proc/fs/cifs (after the cifs module has been installed or built into the 
