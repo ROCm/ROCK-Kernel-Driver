@@ -202,6 +202,10 @@ __break_step:
 	setlo		%lo(__entry_kernel_external_interrupt),gr3
 	subcc		gr2,gr3,gr0,icc0
 	beq		icc0,#2,__break_step_kernel_external_interrupt
+	sethi.p		%hi(__entry_uspace_external_interrupt),gr3
+	setlo		%lo(__entry_uspace_external_interrupt),gr3
+	subcc		gr2,gr3,gr0,icc0
+	beq		icc0,#2,__break_step_uspace_external_interrupt
 
 	LEDS		0x2007,gr2
 
@@ -483,6 +487,9 @@ __break_no_user_sstep:
 	movgs		gr2,bpsr
 
 	# return through remainder of the exception prologue
+	# - need to load gr23 with return handler address
+	sethi.p		%hi(__entry_return_from_user_exception),gr23
+	setlo		%lo(__entry_return_from_user_exception),gr23
 	sethi.p		%hi(__entry_common),gr3
 	setlo		%lo(__entry_common),gr3
 	movgs		gr3,bpcsr

@@ -358,7 +358,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		break;
 	}
 out_tsk:
-	free_task_struct(child);
+	put_task_struct(child);
 out:
 	unlock_kernel();
 	return ret;
