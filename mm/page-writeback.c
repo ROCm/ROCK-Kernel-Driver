@@ -175,10 +175,6 @@ static int wb_writeback_jifs = 5 * HZ;
  * just walks the superblock inode list, writing back any inodes which are
  * older than a specific point in time.
  *
- * Spot the bug: at jiffies wraparound, the attempt to set the inode's dirtying
- * time won't work, because zero means not-dirty.  That's OK. The data will get
- * written out later by the VM (at least).
- *
  * We also limit the number of pages which are written out, to avoid writing
  * huge amounts of data against a single file, which would cause memory
  * allocators to block for too long.
@@ -328,7 +324,6 @@ int generic_writeback_mapping(struct address_space *mapping, int *nr_to_write)
 
 	list_splice(&mapping->dirty_pages, &mapping->io_pages);
 	INIT_LIST_HEAD(&mapping->dirty_pages);
-	mapping->dirtied_when = 0;
 
         while (!list_empty(&mapping->io_pages) && !done) {
 		struct page *page = list_entry(mapping->io_pages.prev,
