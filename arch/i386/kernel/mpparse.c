@@ -857,7 +857,7 @@ struct mp_ioapic_routing {
 } mp_ioapic_routing[MAX_IO_APICS];
 
 
-static int __init mp_find_ioapic (
+static int mp_find_ioapic (
 	int			gsi)
 {
 	int			i = 0;
