@@ -176,10 +176,14 @@ GLOBAL_ENTRY(ia64_pal_call_phys_static)
 	andcm r16=loc3,r16		// removes bits to clear from psr
 	br.call.sptk.many rp=ia64_switch_mode_phys
 .ret1:	mov rp = r8			// install return address (physical)
+	mov loc5 = r19
+	mov loc6 = r20
 	br.cond.sptk.many b7
 1:
 	mov ar.rsc=0			// put RSE in enforced lazy, LE mode
 	mov r16=loc3			// r16= original psr
+	mov r19=loc5
+	mov r20=loc6
 	br.call.sptk.many rp=ia64_switch_mode_virt // return to virtual mode
 .ret2:
 	mov psr.l = loc3		// restore init PSR
@@ -201,7 +205,7 @@ END(ia64_pal_call_phys_static)
  */
 GLOBAL_ENTRY(ia64_pal_call_phys_stacked)
 	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(5)
-	alloc	loc1 = ar.pfs,5,5,86,0
+	alloc	loc1 = ar.pfs,5,7,4,0
 	movl	loc2 = pal_entry_point
 1:	{
 	  mov r28  = in0		// copy procedure index
@@ -230,10 +234,14 @@ GLOBAL_ENTRY(ia64_pal_call_phys_stacked)
 	andcm r16=loc3,r16		// removes bits to clear from psr
 	br.call.sptk.many rp=ia64_switch_mode_phys
 .ret6:
+	mov loc5 = r19
+	mov loc6 = r20
 	br.call.sptk.many rp=b7		// now make the call
 .ret7:
 	mov ar.rsc=0			// put RSE in enforced lazy, LE mode
 	mov r16=loc3			// r16= original psr
+	mov r19=loc5
+	mov r20=loc6
 	br.call.sptk.many rp=ia64_switch_mode_virt	// return to virtual mode
 
 .ret8:	mov psr.l  = loc3		// restore init PSR
