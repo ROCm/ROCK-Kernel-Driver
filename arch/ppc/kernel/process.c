@@ -197,7 +197,7 @@ dump_fpu(struct pt_regs *regs, elf_fpregset_t *fpregs)
 	return 1;
 }
 
-void switch_to(struct task_struct *prev, struct task_struct *new)
+void __switch_to(struct task_struct *prev, struct task_struct *new)
 {
 	struct thread_struct *new_thread, *old_thread;
 	unsigned long s;

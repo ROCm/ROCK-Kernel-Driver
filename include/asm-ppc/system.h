@@ -57,10 +57,14 @@ extern void hard_reset_now(void);
 extern void poweroff_now(void);
 #ifdef CONFIG_6xx
 extern long _get_L2CR(void);
+extern long _get_L3CR(void);
 extern void _set_L2CR(unsigned long);
+extern void _set_L3CR(unsigned long);
 #else
 #define _get_L2CR()	0L
+#define _get_L3CR()	0L
 #define _set_L2CR(val)	do { } while(0)
+#define _set_L3CR(val)	do { } while(0)
 #endif
 extern void via_cuda_init(void);
 extern void pmac_nvram_init(void);
@@ -79,9 +83,14 @@ extern void cacheable_memzero(void *p, unsigned int nb);
 struct device_node;
 extern void note_scsi_host(struct device_node *, void *);
 
+#define prepare_arch_schedule(prev)		do { } while(0)
+#define finish_arch_schedule(prev)		do { } while(0)
+#define prepare_arch_switch(rq)			do { } while(0)
+#define finish_arch_switch(rq)			spin_unlock_irq(&(rq)->lock)
+
 struct task_struct;
-#define prepare_to_switch()	do { } while(0)
-extern void switch_to(struct task_struct *, struct task_struct *);
+extern void __switch_to(struct task_struct *, struct task_struct *);
+#define switch_to(prev, next, last)	__switch_to((prev), (next))
 
 struct thread_struct;
 extern struct task_struct *_switch(struct thread_struct *prev,
