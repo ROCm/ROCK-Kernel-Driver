@@ -29,6 +29,9 @@
  *     -       Eliminate fop_llseek
  *     -       Change CONFIG_WATCHDOG_NOWAYOUT semantics
  *     -       Add KERN_* tags to printks
+ *     -       fix possible wdt_is_open race
+ *     -       Report proper capabilities in watchdog_info
+ *     -       Add WDIOC_{GETSTATUS, GETBOOTSTATUS, SETOPTIONS} ioctls
  *     09/8 - 2003 Changes by Wim Van Sebroeck <wim@iguana.be>
  *     -       cleanup of trailing spaces
  *     -       added extra printk's for startup problems
@@ -100,7 +103,8 @@ static void wdt_timer_ping(unsigned long);
 static struct timer_list timer;
 static unsigned long next_heartbeat;
 static unsigned long wdt_is_open;
-static int wdt_expect_close;
+static char wdt_expect_close;
+static spinlock_t wdt_spinlock;
 
 #ifdef CONFIG_WATCHDOG_NOWAYOUT
 static int nowayout = 1;
@@ -111,7 +115,6 @@ static int nowayout = 0;
 module_param(nowayout, int, 0);
 MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
 
-static spinlock_t wdt_spinlock;
 /*
  *	Whack the dog
  */
@@ -192,62 +195,56 @@ static ssize_t fop_write(struct file * file, const char * buf, size_t count, lof
 	if(ppos != &file->f_pos)
 		return -ESPIPE;
 
-	/* See if we got the magic character */
+	/* See if we got the magic character 'V' and reload the timer */
 	if(count)
 	{
-		size_t ofs;
+		if (!nowayout)
+		{
+			size_t ofs;
 
-		/* note: just in case someone wrote the magic character
-		 * five months ago... */
-		wdt_expect_close = 0;
+			/* note: just in case someone wrote the magic character
+			 * five months ago... */
+			wdt_expect_close = 0;
 
-		/* now scan */
-		for(ofs = 0; ofs != count; ofs++) {
-			char c;
-			if (get_user(c, buf + ofs))
-				return -EFAULT;
-			if(c == 'V')
-				wdt_expect_close = 1;
+			/* now scan */
+			for(ofs = 0; ofs != count; ofs++) {
+				char c;
+				if (get_user(c, buf + ofs))
+					return -EFAULT;
+				if(c == 'V')
+					wdt_expect_close = 42;
+			}
 		}
 
 		/* Well, anyhow someone wrote to us, we should return that favour */
 		next_heartbeat = jiffies + WDT_HEARTBEAT;
-		return 1;
 	}
-	return 0;
+	return count;
 }
 
 static int fop_open(struct inode * inode, struct file * file)
 {
-	switch(minor(inode->i_rdev))
-	{
-		case WATCHDOG_MINOR:
-			/* Just in case we're already talking to someone... */
-			if(test_and_set_bit(0, &wdt_is_open))
-				return -EBUSY;
-			/* Good, fire up the show */
-			wdt_startup();
-			if (nowayout)
-				__module_get(THIS_MODULE);
+	/* Just in case we're already talking to someone... */
+	if(test_and_set_bit(0, &wdt_is_open))
+		return -EBUSY;
+	if (nowayout)
+		__module_get(THIS_MODULE);
 
-			return 0;
-		default:
-			return -ENODEV;
-	}
+	/* Good, fire up the show */
+	wdt_startup();
+	return 0;
 }
 
 static int fop_close(struct inode * inode, struct file * file)
 {
-	if(minor(inode->i_rdev) == WATCHDOG_MINOR)
-	{
-		if(wdt_expect_close)
-			wdt_turnoff();
-		else {
-			del_timer(&timer);
-			printk(KERN_CRIT PFX "device file closed unexpectedly. Will not stop the WDT!\n");
-		}
+	if(wdt_expect_close == 42)
+		wdt_turnoff();
+	else {
+		del_timer(&timer);
+		printk(KERN_CRIT PFX "device file closed unexpectedly. Will not stop the WDT!\n");
 	}
 	clear_bit(0, &wdt_is_open);
+	wdt_expect_close = 0;
 	return 0;
 }
 
@@ -256,7 +253,7 @@ static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 {
 	static struct watchdog_info ident=
 	{
-		.options = WDIOF_MAGICCLOSE,
+		.options = WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE,
 		.firmware_version = 1,
 		.identity = "SC520",
 	};
@@ -267,9 +264,31 @@ static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			return -ENOIOCTLCMD;
 		case WDIOC_GETSUPPORT:
 			return copy_to_user((struct watchdog_info *)arg, &ident, sizeof(ident))?-EFAULT:0;
+		case WDIOC_GETSTATUS:
+		case WDIOC_GETBOOTSTATUS:
+			return put_user(0, (int *)arg);
 		case WDIOC_KEEPALIVE:
 			next_heartbeat = jiffies + WDT_HEARTBEAT;
 			return 0;
+		case WDIOC_SETOPTIONS:
+		{
+			int new_options, retval = -EINVAL;
+
+			if(get_user(new_options, (int *)arg))
+				return -EFAULT;
+
+			if(new_options & WDIOS_DISABLECARD) {
+				wdt_turnoff();
+				retval = 0;
+			}
+
+			if(new_options & WDIOS_ENABLECARD) {
+				wdt_startup();
+				retval = 0;
+			}
+
+			return retval;
+		}
 	}
 }
 
@@ -370,7 +389,8 @@ static int __init sc520_wdt_init(void)
 
 	wdtmrctl = (__u16 *)((char *)wdtmrctl + OFFS_WDTMRCTL);
 	wdtmrctl = ioremap((unsigned long)wdtmrctl, 2);
-	printk(KERN_INFO PFX "WDT driver for SC520 initialised.\n");
+	printk(KERN_INFO PFX "WDT driver for SC520 initialised. (nowayout=%d)\n",
+		nowayout);
 
 	return 0;
 
