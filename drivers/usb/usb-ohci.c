@@ -205,6 +205,7 @@ static void urb_rm_priv_locked (struct urb * urb)
 		urb_free_priv ((struct ohci *)urb->dev->bus->hcpriv, urb_priv);
 		usb_dec_dev_use (urb->dev);
 		urb->dev = NULL;
+		usb_put_urb (urb);
 	}
 }
 
@@ -553,6 +554,9 @@ static int sohci_submit_urb (struct urb * urb, int mem_flags)
 //	if(usb_endpoint_halted (urb->dev, usb_pipeendpoint (pipe), usb_pipeout (pipe))) 
 //		return -EPIPE;
 	
+	/* increment the reference count of the urb, as we now also control it */
+	urb = usb_get_urb (urb);
+
 	usb_inc_dev_use (urb->dev);
 	ohci = (ohci_t *) urb->dev->bus->hcpriv;
 	
@@ -568,12 +572,14 @@ static int sohci_submit_urb (struct urb * urb, int mem_flags)
 	 * such as powering down ports */
 	if (ohci->disabled) {
 		usb_dec_dev_use (urb->dev);	
+		usb_put_urb (urb);
 		return -ESHUTDOWN;
 	}
 
 	/* every endpoint has a ed, locate and fill it */
 	if (!(ed = ep_add_ed (urb->dev, pipe, urb->interval, 1, mem_flags))) {
 		usb_dec_dev_use (urb->dev);	
+		usb_put_urb (urb);
 		return -ENOMEM;
 	}
 
@@ -595,6 +601,7 @@ static int sohci_submit_urb (struct urb * urb, int mem_flags)
 			size = urb->number_of_packets;
 			if (size <= 0) {
 				usb_dec_dev_use (urb->dev);	
+				usb_put_urb (urb);
 				return -EINVAL;
 			}
 			for (i = 0; i < urb->number_of_packets; i++) {
@@ -615,6 +622,7 @@ static int sohci_submit_urb (struct urb * urb, int mem_flags)
 	urb_priv = kmalloc (sizeof (urb_priv_t) + size * sizeof (td_t *), mem_flags);
 	if (!urb_priv) {
 		usb_dec_dev_use (urb->dev);	
+		usb_put_urb (urb);
 		return -ENOMEM;
 	}
 	memset (urb_priv, 0, sizeof (urb_priv_t) + size * sizeof (td_t *));
@@ -632,6 +640,7 @@ static int sohci_submit_urb (struct urb * urb, int mem_flags)
 			urb_free_priv (ohci, urb_priv);
 			spin_unlock_irqrestore (&usb_ed_lock, flags);
 			usb_dec_dev_use (urb->dev);	
+			usb_put_urb (urb);
 			return -ENOMEM;
 		}
 	}	
@@ -640,6 +649,7 @@ static int sohci_submit_urb (struct urb * urb, int mem_flags)
 		urb_free_priv (ohci, urb_priv);
 		spin_unlock_irqrestore (&usb_ed_lock, flags);
 		usb_dec_dev_use (urb->dev);	
+		usb_put_urb (urb);
 		return -EINVAL;
 	}
 	
@@ -662,6 +672,7 @@ static int sohci_submit_urb (struct urb * urb, int mem_flags)
 				urb_free_priv (ohci, urb_priv);
 				spin_unlock_irqrestore (&usb_ed_lock, flags);
 				usb_dec_dev_use (urb->dev);	
+				usb_put_urb (urb);
 				return bustime;
 			}
 			usb_claim_bandwidth (urb->dev, urb, bustime, usb_pipeisoc (urb->pipe));
@@ -2100,6 +2111,7 @@ static int rh_submit_urb (struct urb * urb)
 	urb->dev = NULL;
 	if (urb->complete)
 	    	urb->complete (urb);
+	usb_put_urb (urb);
 	return 0;
 }
 
@@ -2123,6 +2135,7 @@ static int rh_unlink_urb (struct urb * urb)
 				urb->complete (urb);
 		} else
 			urb->status = -ENOENT;
+		usb_put_urb (urb);
 	}
 	return 0;
 }

@@ -1217,6 +1217,7 @@ _static int uhci_unlink_urb_sync (uhci_t *s, struct urb *urb)
 			urb->complete ((struct urb *) urb);
 		}
 		usb_dec_dev_use (usb_dev);
+		usb_put_urb (urb);
 	}
 	else
 		spin_unlock_irqrestore (&s->urb_list_lock, flags);
@@ -1305,7 +1306,7 @@ _static void uhci_cleanup_unlink(uhci_t *s, int force)
 #else
 			kfree (urb_priv);
 #endif
-
+			usb_put_urb (urb);
 		}
 	}
 }
@@ -1650,6 +1651,9 @@ _static int uhci_submit_urb (struct urb *urb, int mem_flags)
 		return -EINVAL;
 	}
 
+	/* increment the reference count of the urb, as we now also control it */
+	urb = usb_get_urb (urb);
+
 	usb_inc_dev_use (urb->dev);
 
 	spin_lock_irqsave (&s->urb_list_lock, flags);
@@ -1665,6 +1669,7 @@ _static int uhci_submit_urb (struct urb *urb, int mem_flags)
 		     (!(urb->transfer_flags & USB_QUEUE_BULK) || !(queued_urb->transfer_flags & USB_QUEUE_BULK)))) {
 			spin_unlock_irqrestore (&s->urb_list_lock, flags);
 			usb_dec_dev_use (urb->dev);
+			usb_put_urb (urb);
 			err("ENXIO %08x, flags %x, urb %p, burb %p",urb->pipe,urb->transfer_flags,urb,queued_urb);
 			return -ENXIO;	// urb already queued
 		}
@@ -1678,6 +1683,7 @@ _static int uhci_submit_urb (struct urb *urb, int mem_flags)
 	if (!urb_priv) {
 		usb_dec_dev_use (urb->dev);
 		spin_unlock_irqrestore (&s->urb_list_lock, flags);
+		usb_put_urb (urb);
 		return -ENOMEM;
 	}
 
@@ -1766,6 +1772,7 @@ _static int uhci_submit_urb (struct urb *urb, int mem_flags)
 #else
 		kfree (urb_priv);
 #endif
+		usb_put_urb (urb);
 		return ret;
 	}
 
@@ -2730,6 +2737,7 @@ _static int process_urb (uhci_t *s, struct list_head *p)
 			}
 			
 			usb_dec_dev_use (usb_dev);
+			usb_put_urb (urb);
 		}
 	}
 
