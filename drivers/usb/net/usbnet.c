@@ -1,6 +1,6 @@
 /*
- * USB Host-to-Host Links
- * Copyright (C) 2000-2002 by David Brownell <dbrownell@users.sourceforge.net>
+ * USB Networking Links
+ * Copyright (C) 2000-2003 by David Brownell <dbrownell@users.sourceforge.net>
  * Copyright (C) 2002 Pavel Machek <pavel@ucw.cz>
  * Copyright (C) 2003 David Hollis <dhollis@davehollis.com>
  * Copyright (c) 2002-2003 TiVo Inc.
@@ -21,63 +21,38 @@
  */
 
 /*
- * This is used for "USB networking", connecting USB hosts as peers.
+ * This is a generic "USB networking" framework that works with several
+ * kinds of full and high speed networking devices:
  *
- * It can be used with USB "network cables", for IP-over-USB communications;
- * Ethernet speeds without the Ethernet.  USB devices (including some PDAs)
- * can support such links directly, replacing device-specific protocols
- * with Internet standard ones.
- *
- * The links can be bridged using the Ethernet bridging (net/bridge)
- * support as appropriate.  Devices currently supported include:
- *
+ *   + USB host-to-host "network cables", used for IP-over-USB links.
+ *     These are often used for Laplink style connectivity products.
  *	- AnchorChip 2720
  *	- Belkin, eTEK (interops with Win32 drivers)
- *	- EPSON USB clients
  *	- GeneSys GL620USB-A
  *	- NetChip 1080 (interoperates with NetChip Win32 drivers)
  *	- Prolific PL-2301/2302 (replaces "plusb" driver)
- *	- PXA-250 or SA-1100 Linux PDAs like iPaq, Yopy, and Zaurus
+ *
+ *   + Smart USB devices can support such links directly, using Internet
+ *     standard protocols instead of proprietary host-to-device links.
+ *	- Linux PDAs like iPaq, Yopy, and Zaurus
+ *	- The BLOB boot loader (for diskless booting)
+ *	- Linux "gadgets", perhaps using PXA-2xx or Net2280 controllers
+ *	- Devices using EPSON's sample USB firmware
+ *	- CDC-Ethernet class devices, such as many cable modems
+ *
+ *   + Adapters to networks such as Ethernet.
+ *	- AX8817X based USB 2.0 products
+ *
+ * Links to these devices can be bridged using Linux Ethernet bridging.
+ * With minor exceptions, these all use similar USB framing for network
+ * traffic, but need different protocols for control traffic.
  *
  * USB devices can implement their side of this protocol at the cost
  * of two bulk endpoints; it's not restricted to "cable" applications.
  * See the SA1110, Zaurus, or EPSON device/client support in this driver;
- * slave/target drivers such as "usb-eth" (on most SA-1100 PDAs) are
- * used inside USB slave/target devices.
- *
- * 
- * Status:
- *
- * - AN2720 ... not widely available, but reportedly works well
- *
- * - Belkin/eTEK ... no known issues
- *
- * - Both GeneSys and PL-230x use interrupt transfers for driver-to-driver
- *   handshaking; it'd be worth implementing those as "carrier detect".
- *   Prefer generic hooks, not minidriver-specific hacks.
- *
- * - For Netchip, should use keventd to poll via control requests to detect
- *   hardware level "carrier detect". 
- *
- * - PL-230x ... the initialization protocol doesn't seem to match chip data
- *   sheets, sometimes it's not needed and sometimes it hangs.  Prolific has
- *   not responded to repeated support/information requests.
- *
- * - SA-1100 PDAs ... the standard ARM Linux SA-1100 support works nicely,
- *   as found in www.handhelds.org and other kernels.  The Sharp/Lineo
- *   kernels use different drivers, which also talk to this code.
- *
- * Interop with more Win32 drivers may be a good thing.
- *
- * Seems like reporting "peer connected" (carrier present) events may end
- * up going through the netlink event system, not hotplug ... so new links
- * would likely be handled with a link monitoring thread in some daemon.
- *
- * There are reports that bridging gives lower-than-usual throughput.
- *
- * Need smarter hotplug policy scripts ... ones that know how to arrange
- * bridging with "brctl", and can handle static and dynamic ("pump") setups.
- * Use those eventual "peer connected" events, and zeroconf.
+ * slave/target drivers such as "usb-eth" (on most SA-1100 PDAs) or
+ * "g_ether" (in the Linux "gadget" framework) implement that behavior
+ * within devices.
  *
  *
  * CHANGELOG:
@@ -128,6 +103,7 @@
  * 		vs pxa25x, and CDC Ethernet.  Throttle down log floods on
  * 		disconnect; other cleanups. (db)  Flush net1080 fifos
  * 		after several sequential framing errors. (Johannes Erdfelt)
+ * 22-aug-2003	AX8817X support (Dave Hollis).
  *
  *-------------------------------------------------------------------------*/
 
@@ -141,16 +117,10 @@
 #include <linux/random.h>
 #include <linux/ethtool.h>
 #include <linux/workqueue.h>
+#include <linux/mii.h>
 #include <asm/uaccess.h>
 #include <asm/unaligned.h>
 
-#ifdef CONFIG_USB_AX8817X
-#define NEED_MII
-#endif
-
-#ifdef NEED_MII
-#include <linux/mii.h>
-#endif
 
 // #define	DEBUG			// error path messages, extra info
 // #define	VERBOSE			// more; success messages
@@ -167,7 +137,7 @@
 #include <linux/dma-mapping.h>
 
 
-#define DRIVER_VERSION		"25-Apr-2003"
+#define DRIVER_VERSION		"25-Aug-2003"
 
 /*-------------------------------------------------------------------------*/
 
@@ -228,9 +198,7 @@ struct usbnet {
 	int			msg_level;
 	unsigned long		data [5];
 
-#ifdef NEED_MII
 	struct mii_if_info	mii;
-#endif
 
 	// various kinds of pending driver work
 	struct sk_buff_head	rxq;
@@ -415,6 +383,7 @@ static const struct driver_info	an2720_info = {
 
 
 #ifdef CONFIG_USB_AX8817X
+#define NEED_MII
 /* ASIX AX8817X based USB 2.0 Ethernet Devices */
 
 #define HAVE_HARDWARE
@@ -752,7 +721,7 @@ struct ether_desc {
 	u8	bNumberPowerFilters;
 } __attribute__ ((packed));
 
-struct cdc_info {
+struct cdc_state {
 	struct header_desc	*header;
 	struct union_desc	*u;
 	struct ether_desc	*ether;
@@ -795,7 +764,7 @@ static int cdc_bind (struct usbnet *dev, struct usb_interface *intf)
 	u8				*buf = intf->altsetting->extra;
 	int				len = intf->altsetting->extralen;
 	struct usb_interface_descriptor	*d;
-	struct cdc_info			*info = (void *) &dev->data;
+	struct cdc_state		*info = (void *) &dev->data;
 	int				status;
 
 	if (sizeof dev->data < sizeof *info)
@@ -906,7 +875,7 @@ bad_desc:
 
 static void cdc_unbind (struct usbnet *dev, struct usb_interface *intf)
 {
-	struct cdc_info			*info = (void *) &dev->data;
+	struct cdc_state		*info = (void *) &dev->data;
 
 	/* disconnect master --> disconnect slave */
 	if (intf == info->control && info->data) {
@@ -2373,16 +2342,23 @@ static int usbnet_open (struct net_device *net)
 	}
 
 	netif_start_queue (net);
-	if (dev->msg_level >= 2)
+	if (dev->msg_level >= 2) {
+		char	*framing;
+
+		if (dev->driver_info->flags & FLAG_FRAMING_NC)
+			framing = "NetChip";
+		else if (dev->driver_info->flags & FLAG_FRAMING_GL)
+			framing = "GeneSys";
+		else if (dev->driver_info->flags & FLAG_FRAMING_Z)
+			framing = "Zaurus";
+		else
+			framing = "simple";
+
 		devinfo (dev, "open: enable queueing "
 				"(rx %d, tx %d) mtu %d %s framing",
 			RX_QLEN (dev), TX_QLEN (dev), dev->net->mtu,
-			(info->flags & (FLAG_FRAMING_NC | FLAG_FRAMING_GL))
-			    ? ((info->flags & FLAG_FRAMING_NC)
-				? "NetChip"
-				: "GeneSys")
-			    : "raw"
-			);
+			framing);
+	}
 
 	// delay posting reads until we're fully open
 	tasklet_schedule (&dev->bh);
@@ -2462,7 +2438,9 @@ static int usbnet_ioctl (struct net_device *net, struct ifreq *rq, int cmd)
 	struct usbnet *dev = (struct usbnet *)net->priv;
 
 	if (dev->mii.mdio_read != NULL && dev->mii.mdio_write != NULL)
-		return generic_mii_ioctl(&dev->mii, (struct mii_ioctl_data *) &rq->ifr_data, cmd, NULL);
+		return generic_mii_ioctl(&dev->mii,
+				(struct mii_ioctl_data *) &rq->ifr_data,
+				cmd, NULL);
 #endif
 	return -EOPNOTSUPP;
 }
@@ -3144,9 +3122,13 @@ static struct usb_driver usbnet_driver = {
 
 static int __init usbnet_init (void)
 {
-	// compiler should optimize this out
-	if (sizeof (((struct sk_buff *)0)->cb) < sizeof (struct skb_data))
-		BUG ();
+	// compiler should optimize these out
+	BUG_ON (sizeof (((struct sk_buff *)0)->cb)
+			< sizeof (struct skb_data));
+#ifdef	CONFIG_USB_CDCETHER
+	BUG_ON ((sizeof (((struct usbnet *)0)->data)
+			< sizeof (struct cdc_state)));
+#endif
 
 	get_random_bytes (node_id, sizeof node_id);
 	node_id [0] &= 0xfe;	// clear multicast bit
