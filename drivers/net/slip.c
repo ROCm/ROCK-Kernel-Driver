@@ -1138,6 +1138,7 @@ static int slip_ioctl(struct tty_struct *tty, struct file *file, unsigned int cm
 {
 	struct slip *sl = (struct slip *) tty->disc_data;
 	unsigned int tmp;
+	int __user *p = (int __user *)arg;
 
 	/* First make sure we're connected. */
 	if (!sl || sl->magic != SLIP_MAGIC) {
@@ -1147,17 +1148,17 @@ static int slip_ioctl(struct tty_struct *tty, struct file *file, unsigned int cm
 	switch(cmd) {
 	 case SIOCGIFNAME:
 		tmp = strlen(sl->dev->name) + 1;
-		if (copy_to_user((void *)arg, sl->dev->name, tmp))
+		if (copy_to_user((void __user *)arg, sl->dev->name, tmp))
 			return -EFAULT;
 		return 0;
 
 	case SIOCGIFENCAP:
-		if (put_user(sl->mode, (int *)arg))
+		if (put_user(sl->mode, p))
 			return -EFAULT;
 		return 0;
 
 	case SIOCSIFENCAP:
-		if (get_user(tmp,(int *)arg))
+		if (get_user(tmp, p))
 			return -EFAULT;
 #ifndef SL_INCLUDE_CSLIP
 		if (tmp & (SL_MODE_CSLIP|SL_MODE_ADAPTIVE))  {
@@ -1185,7 +1186,7 @@ static int slip_ioctl(struct tty_struct *tty, struct file *file, unsigned int cm
 #ifdef CONFIG_SLIP_SMART
 	/* VSV changes start here */
         case SIOCSKEEPALIVE:
-		if (get_user(tmp,(int *)arg))
+		if (get_user(tmp, p))
 			return -EFAULT;
                 if (tmp > 255) /* max for unchar */
 			return -EINVAL;
@@ -1205,12 +1206,12 @@ static int slip_ioctl(struct tty_struct *tty, struct file *file, unsigned int cm
 		return 0;
 
         case SIOCGKEEPALIVE:
-		if (put_user(sl->keepalive, (int *)arg))
+		if (put_user(sl->keepalive, p))
 			return -EFAULT;
 		return 0;
 
         case SIOCSOUTFILL:
-		if (get_user(tmp,(int *)arg))
+		if (get_user(tmp, p))
 			return -EFAULT;
                 if (tmp > 255) /* max for unchar */
 			return -EINVAL;
@@ -1229,7 +1230,7 @@ static int slip_ioctl(struct tty_struct *tty, struct file *file, unsigned int cm
                 return 0;
 
         case SIOCGOUTFILL:
-		if (put_user(sl->outfill, (int *)arg))
+		if (put_user(sl->outfill, p))
 			return -EFAULT;
 		return 0;
 	/* VSV changes end */
@@ -1254,6 +1255,7 @@ static int slip_ioctl(struct tty_struct *tty, struct file *file, unsigned int cm
 static int sl_ioctl(struct net_device *dev,struct ifreq *rq,int cmd)
 {
 	struct slip *sl = (struct slip*)(dev->priv);
+	unsigned long *p = (unsigned long *)&rq->ifr_ifru;
 
 	if (sl == NULL)		/* Allocation failed ?? */
 		return -ENODEV;
@@ -1268,11 +1270,11 @@ static int sl_ioctl(struct net_device *dev,struct ifreq *rq,int cmd)
 	switch(cmd){
         case SIOCSKEEPALIVE:
 		/* max for unchar */
-                if (((unsigned int)((unsigned long)rq->ifr_data)) > 255) {
+                if ((unsigned)*p > 255) {
 			spin_unlock_bh(&sl->lock);
 			return -EINVAL;
 		}
-		sl->keepalive = (unchar) ((unsigned long)rq->ifr_data);
+		sl->keepalive = (unchar) *p;
 		if (sl->keepalive != 0) {
 			sl->keepalive_timer.expires=jiffies+sl->keepalive*HZ;
 			mod_timer(&sl->keepalive_timer, jiffies+sl->keepalive*HZ);
@@ -1283,15 +1285,15 @@ static int sl_ioctl(struct net_device *dev,struct ifreq *rq,int cmd)
 		break;
 
         case SIOCGKEEPALIVE:
-		rq->ifr_data=(caddr_t)((unsigned long)sl->keepalive);
+		*p = sl->keepalive;
 		break;
 
         case SIOCSOUTFILL:
-                if (((unsigned)((unsigned long)rq->ifr_data)) > 255) { /* max for unchar */
+                if ((unsigned)*p > 255) { /* max for unchar */
 			spin_unlock_bh(&sl->lock);
 			return -EINVAL;
 		}
-                if ((sl->outfill = (unchar)((unsigned long) rq->ifr_data)) != 0){
+                if ((sl->outfill = (unchar)*p) != 0){
 			mod_timer(&sl->outfill_timer, jiffies+sl->outfill*HZ);
 			set_bit(SLF_OUTWAIT, &sl->flags);
 		} else {
@@ -1300,7 +1302,7 @@ static int sl_ioctl(struct net_device *dev,struct ifreq *rq,int cmd)
                 break;
 
         case SIOCGOUTFILL:
-		rq->ifr_data=(caddr_t)((unsigned long)sl->outfill);
+		*p = sl->outfill;
 		break;
 
         case SIOCSLEASE:
@@ -1312,12 +1314,12 @@ static int sl_ioctl(struct net_device *dev,struct ifreq *rq,int cmd)
 			return -EPERM;
 		}
 		sl->leased = 0;
-                if ((unsigned long)rq->ifr_data)
+                if (*p)
 			sl->leased = 1;
                 break;
 
         case SIOCGLEASE:
-		rq->ifr_data=(caddr_t)((unsigned long)sl->leased);
+		*p = sl->leased;
 	};
 	spin_unlock_bh(&sl->lock);
 	return 0;

@@ -1030,7 +1030,7 @@ static int pegasus_ethtool_ioctl(struct net_device *net, void __user *uaddr)
 	int cmd;
 
 	pegasus = net->priv;
-	if (get_user(cmd, (int *) uaddr))
+	if (get_user(cmd, (int __user *) uaddr))
 		return -EFAULT;
 	switch (cmd) {
 	case ETHTOOL_GDRVINFO:{
@@ -1107,7 +1107,7 @@ static int pegasus_ethtool_ioctl(struct net_device *net, void __user *uaddr)
 #endif
 static int pegasus_ioctl(struct net_device *net, struct ifreq *rq, int cmd)
 {
-	__u16 *data = (__u16 *) & rq->ifr_data;
+	__u16 *data = (__u16 *) & rq->ifr_ifru;
 	pegasus_t *pegasus = net->priv;
 	int res;
 
