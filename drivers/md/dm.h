@@ -31,8 +31,6 @@
 
 #define SECTOR_SHIFT 9
 
-extern struct block_device_operations dm_blk_dops;
-
 /*
  * List of devices that a metadevice uses and should open/close.
  */

@@ -93,7 +93,7 @@ struct mapped_device {
 static kmem_cache_t *_io_cache;
 static kmem_cache_t *_tio_cache;
 
-static __init int local_init(void)
+static int __init local_init(void)
 {
 	int r;
 
@@ -663,6 +663,8 @@ static int next_free_minor(unsigned int *minor)
 	return r;
 }
 
+static struct block_device_operations dm_blk_dops;
+
 /*
  * Allocate and initialise a blank device with a given minor.
  */
@@ -1077,7 +1079,7 @@ int dm_suspended(struct mapped_device *md)
 	return test_bit(DMF_SUSPENDED, &md->flags);
 }
 
-struct block_device_operations dm_blk_dops = {
+static struct block_device_operations dm_blk_dops = {
 	.open = dm_blk_open,
 	.release = dm_blk_close,
 	.owner = THIS_MODULE
