@@ -382,7 +382,7 @@ void icmpv6_send(struct sk_buff *skb, int type, int code, __u32 info,
 	msg.skb = skb;
 	msg.offset = skb->nh.raw - skb->data;
 
-	len = skb->len;
+	len = skb->len - msg.offset;
 	len = min_t(unsigned int, len, IPV6_MIN_MTU - sizeof(struct ipv6hdr) -sizeof(struct icmp6hdr));
 	if (len < 0) {
 		if (net_ratelimit())
