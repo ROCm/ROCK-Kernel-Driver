@@ -59,15 +59,6 @@
 #include <net/sock.h>
 #include <net/compat.h>
 
-/* Use this to get at 32-bit user passed pointers. */
-#define A(__x)				\
-({	unsigned long __ret;		\
-	__asm__ ("srl	%0, 0, %0"	\
-		 : "=r" (__ret)		\
-		 : "0" (__x));		\
-	__ret;				\
-})
-
 #define SUNOS_NR_OPEN	256
 
 asmlinkage u32 sunos_mmap(u32 addr, u32 len, u32 prot, u32 flags, u32 fd, u32 off)
@@ -308,13 +299,12 @@ static int sunos_filldir(void * __buf, const char * name, int namlen,
 	return 0;
 }
 
-asmlinkage int sunos_getdents(unsigned int fd, u32 u_dirent, int cnt)
+asmlinkage int sunos_getdents(unsigned int fd, void __user *dirent, int cnt)
 {
 	struct file * file;
 	struct sunos_dirent __user *lastdirent;
 	struct sunos_dirent_callback buf;
 	int error = -EBADF;
-	void __user *dirent = (void __user *)A(u_dirent);
 
 	if (fd >= SUNOS_NR_OPEN)
 		goto out;
@@ -389,11 +379,11 @@ static int sunos_filldirentry(void * __buf, const char * name, int namlen,
 	return 0;
 }
 
-asmlinkage int sunos_getdirentries(unsigned int fd, u32 u_dirent,
-				   int cnt, u32 u_basep)
+asmlinkage int sunos_getdirentries(unsigned int fd,
+				   void __user *dirent,
+				   int cnt,
+				   unsigned int __user *basep)
 {
-	void __user *dirent = (void __user *) A(u_dirent);
-	unsigned int __user *basep = (unsigned int __user *)A(u_basep);
 	struct file * file;
 	struct sunos_direntry __user *lastdirent;
 	int error = -EBADF;
@@ -813,13 +803,12 @@ asmlinkage int sunos_setpgrp(pid_t pid, pid_t pgid)
 extern long compat_sys_wait4(compat_pid_t, compat_uint_t *, int,
 			     struct compat_rusage *);
 
-asmlinkage int sunos_wait4(compat_pid_t pid, u32 stat_addr, int options, u32 ru)
+asmlinkage int sunos_wait4(compat_pid_t pid, compat_uint_t __user *stat_addr, int options, struct compat_rusage __user *ru)
 {
 	int ret;
 
 	ret = compat_sys_wait4((pid ? pid : ((compat_pid_t)-1)),
-			       (compat_uint_t *)A(stat_addr), options,
-			       (struct compat_rusage *)A(ru));
+			       stat_addr, options, ru);
 	return ret;
 }
 
@@ -893,7 +882,7 @@ asmlinkage s32 sunos_sysconf (int name)
 	return ret;
 }
 
-asmlinkage int sunos_semsys(int op, u32 arg1, u32 arg2, u32 arg3, u32 ptr)
+asmlinkage int sunos_semsys(int op, u32 arg1, u32 arg2, u32 arg3, void __user *ptr)
 {
 	union semun arg4;
 	int ret;
@@ -919,7 +908,7 @@ asmlinkage int sunos_semsys(int op, u32 arg1, u32 arg2, u32 arg3, u32 ptr)
 		}
 		/* sys_semctl(): */
 		/* value to modify semaphore to */
-		arg4.__pad=(void __user *)A(ptr);
+		arg4.__pad = ptr;
 		ret = sys_semctl((int)arg1, (int)arg2, (int)arg3, arg4);
 		break;
 	case 1:
@@ -928,7 +917,7 @@ asmlinkage int sunos_semsys(int op, u32 arg1, u32 arg2, u32 arg3, u32 ptr)
 		break;
 	case 2:
 		/* sys_semop(): */
-		ret = sys_semop((int)arg1, (struct sembuf __user *)A(arg2),
+		ret = sys_semop((int)arg1, (struct sembuf __user *)(unsigned long)arg2,
 				(unsigned int) arg3);
 		break;
 	default:
@@ -1041,13 +1030,13 @@ asmlinkage int sunos_msgsys(int op, u32 arg1, u32 arg2, u32 arg3, u32 arg4)
 		rval = sys_msgget((key_t)arg1, (int)arg2);
 		break;
 	case 1:
-		if (!sunos_msqid_get((struct msqid_ds32 __user *)A(arg3), &kds)) {
+		if (!sunos_msqid_get((struct msqid_ds32 __user *)(unsigned long)arg3, &kds)) {
 			set_fs(KERNEL_DS);
 			rval = sys_msgctl((int)arg1, (int)arg2,
-					  (struct msqid_ds __user *)A(arg3));
+					  (struct msqid_ds __user *)(unsigned long)arg3);
 			set_fs(old_fs);
 			if (!rval)
-				rval = sunos_msqid_put((struct msqid_ds32 __user *)A(arg3),
+				rval = sunos_msqid_put((struct msqid_ds32 __user *)(unsigned long)arg3,
 						       &kds);
 		} else
 			rval = -EFAULT;
@@ -1071,7 +1060,7 @@ asmlinkage int sunos_msgsys(int op, u32 arg1, u32 arg2, u32 arg3, u32 arg4)
 				  (long)arg4, (int)arg5);
 		set_fs(old_fs);
 		if (!rval)
-			rval = sunos_msgbuf_put((struct msgbuf32 __user *)A(arg2),
+			rval = sunos_msgbuf_put((struct msgbuf32 __user *)(unsigned long)arg2,
 						kmbuf, arg3);
 		kfree(kmbuf);
 		break;
@@ -1079,7 +1068,7 @@ asmlinkage int sunos_msgsys(int op, u32 arg1, u32 arg2, u32 arg3, u32 arg4)
 		rval = -EFAULT;
 		kmbuf = (struct msgbuf *)kmalloc(sizeof(struct msgbuf) + arg3,
 						 GFP_KERNEL);
-		if (!kmbuf || sunos_msgbuf_get((struct msgbuf32 __user *)A(arg2),
+		if (!kmbuf || sunos_msgbuf_get((struct msgbuf32 __user *)(unsigned long)arg2,
 					       kmbuf, arg3))
 			break;
 		set_fs(KERNEL_DS);
@@ -1154,26 +1143,26 @@ asmlinkage int sunos_shmsys(int op, u32 arg1, u32 arg2, u32 arg3)
 	switch(op) {
 	case 0:
 		/* do_shmat(): attach a shared memory area */
-		rval = do_shmat((int)arg1,(char __user *)A(arg2),(int)arg3,&raddr);
+		rval = do_shmat((int)arg1,(char __user *)(unsigned long)arg2,(int)arg3,&raddr);
 		if (!rval)
 			rval = (int) raddr;
 		break;
 	case 1:
 		/* sys_shmctl(): modify shared memory area attr. */
-		if (!sunos_shmid_get((struct shmid_ds32 __user *)A(arg3), &ksds)) {
+		if (!sunos_shmid_get((struct shmid_ds32 __user *)(unsigned long)arg3, &ksds)) {
 			set_fs(KERNEL_DS);
 			rval = sys_shmctl((int) arg1,(int) arg2,
 					  (struct shmid_ds __user *) &ksds);
 			set_fs(old_fs);
 			if (!rval)
-				rval = sunos_shmid_put((struct shmid_ds32 __user *)A(arg3),
+				rval = sunos_shmid_put((struct shmid_ds32 __user *)(unsigned long)arg3,
 						       &ksds);
 		} else
 			rval = -EFAULT;
 		break;
 	case 2:
 		/* sys_shmdt(): detach a shared memory area */
-		rval = sys_shmdt((char __user *)A(arg1));
+		rval = sys_shmdt((char __user *)(unsigned long)arg1);
 		break;
 	case 3:
 		/* sys_shmget(): get a shared memory area */
@@ -1215,66 +1204,60 @@ static inline int check_nonblock(int ret, int fd)
 	return ret;
 }
 
-asmlinkage int sunos_read(unsigned int fd, u32 buf, u32 count)
+asmlinkage int sunos_read(unsigned int fd, char __user *buf, u32 count)
 {
 	int ret;
 
-	ret = check_nonblock(sys_read(fd, (char __user *)A(buf), count), fd);
+	ret = check_nonblock(sys_read(fd, buf, count), fd);
 	return ret;
 }
 
-asmlinkage int sunos_readv(u32 fd, u32 vector, s32 count)
+asmlinkage int sunos_readv(u32 fd, void __user *vector, s32 count)
 {
 	int ret;
 
-	ret = check_nonblock(compat_sys_readv(fd, (void __user *) A(vector),
-					      count), fd);
+	ret = check_nonblock(compat_sys_readv(fd, vector, count), fd);
 	return ret;
 }
 
-asmlinkage int sunos_write(unsigned int fd, u32 buf, u32 count)
+asmlinkage int sunos_write(unsigned int fd, char __user *buf, u32 count)
 {
 	int ret;
 
-	ret = check_nonblock(sys_write(fd, (char __user *)A(buf), count), fd);
+	ret = check_nonblock(sys_write(fd, buf, count), fd);
 	return ret;
 }
 
-asmlinkage int sunos_writev(u32 fd, u32 vector, s32 count)
+asmlinkage int sunos_writev(u32 fd, void __user *vector, s32 count)
 {
 	int ret;
 
-	ret = check_nonblock(compat_sys_writev(fd, (void __user *)A(vector),
-					       count), fd);
+	ret = check_nonblock(compat_sys_writev(fd, vector, count), fd);
 	return ret;
 }
 
-asmlinkage int sunos_recv(int fd, u32 ubuf, int size, unsigned flags)
+asmlinkage int sunos_recv(u32 __fd, void __user *ubuf, int size, unsigned flags)
 {
-	int ret;
+	int ret, fd = (int) __fd;
 
-	ret = check_nonblock(sys_recv(fd, (void __user *)A(ubuf),
-				      size, flags), fd);
+	ret = check_nonblock(sys_recv(fd, ubuf, size, flags), fd);
 	return ret;
 }
 
-asmlinkage int sunos_send(int fd, u32 buff, int len, unsigned flags)
+asmlinkage int sunos_send(u32 __fd, void __user *buff, int len, unsigned flags)
 {
-	int ret;
+	int ret, fd = (int) __fd;
 
-	ret = check_nonblock(sys_send(fd, (void __user *)A(buff),
-				      len, flags), fd);
+	ret = check_nonblock(sys_send(fd, buff, len, flags), fd);
 	return ret;
 }
 
-asmlinkage int sunos_accept(int fd, u32 sa, u32 addrlen)
+asmlinkage int sunos_accept(u32 __fd, struct sockaddr __user *sa, int __user *addrlen)
 {
-	int ret;
+	int ret, fd = (int) __fd;
 
 	while (1) {
-		ret = check_nonblock(sys_accept(fd,
-						(struct sockaddr __user *)A(sa),
-						(int __user *)A(addrlen)), fd);
+		ret = check_nonblock(sys_accept(fd, sa, addrlen), fd);
 		if (ret != -ENETUNREACH && ret != -EHOSTUNREACH)
 			break;
 	}
@@ -1283,7 +1266,9 @@ asmlinkage int sunos_accept(int fd, u32 sa, u32 addrlen)
 
 #define SUNOS_SV_INTERRUPT 2
 
-asmlinkage int sunos_sigaction (int sig, u32 act, u32 oact)
+asmlinkage int sunos_sigaction (int sig,
+				struct old_sigaction32 __user *act,
+				struct old_sigaction32 __user *oact)
 {
 	struct k_sigaction new_ka, old_ka;
 	int ret;
@@ -1292,11 +1277,11 @@ asmlinkage int sunos_sigaction (int sig, u32 act, u32 oact)
 		compat_old_sigset_t mask;
 		u32 u_handler;
 
-		if (get_user(u_handler, &((struct old_sigaction32 __user *)A(act))->sa_handler) ||
-		    __get_user(new_ka.sa.sa_flags, &((struct old_sigaction32 __user *)A(act))->sa_flags))
+		if (get_user(u_handler, &act->sa_handler) ||
+		    __get_user(new_ka.sa.sa_flags, &act->sa_flags))
 			return -EFAULT;
 		new_ka.sa.sa_handler = (void *) (long) u_handler;
-		__get_user(mask, &((struct old_sigaction32 __user *)A(act))->sa_mask);
+		__get_user(mask, &act->sa_mask);
 		new_ka.sa.sa_restorer = NULL;
 		new_ka.ka_restorer = NULL;
 		siginitset(&new_ka.sa.sa_mask, mask);
@@ -1307,18 +1292,22 @@ asmlinkage int sunos_sigaction (int sig, u32 act, u32 oact)
 
 	if (!ret && oact) {
 		old_ka.sa.sa_flags ^= SUNOS_SV_INTERRUPT;
-		if (put_user((long)old_ka.sa.sa_handler, &((struct old_sigaction32 __user *)A(oact))->sa_handler) ||
-		    __put_user(old_ka.sa.sa_flags, &((struct old_sigaction32 __user *)A(oact))->sa_flags))
+		if (put_user((long)old_ka.sa.sa_handler, &oact->sa_handler) ||
+		    __put_user(old_ka.sa.sa_flags, &oact->sa_flags))
 			return -EFAULT;
-		__put_user(old_ka.sa.sa_mask.sig[0], &((struct old_sigaction32 __user *)A(oact))->sa_mask);
+		__put_user(old_ka.sa.sa_mask.sig[0], &oact->sa_mask);
 	}
 
 	return ret;
 }
 
-asmlinkage int sunos_setsockopt(int fd, int level, int optname, u32 optval,
-				int optlen)
+asmlinkage int sunos_setsockopt(u32 __fd, u32 __level, u32 __optname,
+				char __user *optval, u32 __optlen)
 {
+	int fd = (int) __fd;
+	int level = (int) __level;
+	int optname = (int) __optname;
+	int optlen = (int) __optlen;
 	int tr_opt = optname;
 	int ret;
 
@@ -1328,13 +1317,16 @@ asmlinkage int sunos_setsockopt(int fd, int level, int optname, u32 optval,
 			tr_opt += 30;
 	}
 	ret = sys_setsockopt(fd, level, tr_opt,
-			     (char __user *)A(optval), optlen);
+			     optval, optlen);
 	return ret;
 }
 
-asmlinkage int sunos_getsockopt(int fd, int level, int optname,
-				u32 optval, u32 optlen)
+asmlinkage int sunos_getsockopt(u32 __fd, u32 __level, u32 __optname,
+				char __user *optval, int __user *optlen)
 {
+	int fd = (int) __fd;
+	int level = (int) __level;
+	int optname = (int) __optname;
 	int tr_opt = optname;
 	int ret;
 
@@ -1344,7 +1336,6 @@ asmlinkage int sunos_getsockopt(int fd, int level, int optname,
 			tr_opt += 30;
 	}
 	ret = compat_sys_getsockopt(fd, level, tr_opt,
-				    (void __user *)(unsigned long) optval,
-				    (void __user *)(unsigned long) optlen);
+				    optval, optlen);
 	return ret;
 }

@@ -1349,7 +1349,7 @@ out:
 	return ret;
 }
 
-asmlinkage int do_sys32_sigaltstack(u32 ussa, u32 uossa, unsigned long sp)
+asmlinkage long do_sys32_sigaltstack(u32 ussa, u32 uossa, unsigned long sp)
 {
 	stack_t uss, uoss;
 	u32 u_ss_sp = 0;
