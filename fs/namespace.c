@@ -755,6 +755,9 @@ long do_mount(char * dev_name, char * dir_name, char *type_page,
 	if (dev_name && !memchr(dev_name, 0, PAGE_SIZE))
 		return -EINVAL;
 
+	if (data_page)
+		((char *)data_page)[PAGE_SIZE - 1] = 0;
+
 	/* Separate the per-mountpoint flags */
 	if (flags & MS_NOSUID)
 		mnt_flags |= MNT_NOSUID;
