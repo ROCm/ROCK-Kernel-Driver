@@ -1379,15 +1379,20 @@ static char *vmstat_text[] = {
 	"pswpin",
 	"pswpout",
 	"pgalloc",
+
 	"pgfree",
 	"pgactivate",
 	"pgdeactivate",
 	"pgfault",
 	"pgmajfault",
+
 	"pgscan",
 	"pgrefill",
 	"pgsteal",
+	"pginodesteal",
 	"kswapd_steal",
+
+	"kswapd_inodesteal",
 	"pageoutrun",
 	"allocstall",
 	"pgrotated",

@@ -64,24 +64,25 @@ truncate_complete_page(struct address_space *mapping, struct page *page)
  * ->page_lock.  That provides exclusion against the __set_page_dirty
  * functions.
  */
-static void
+static int
 invalidate_complete_page(struct address_space *mapping, struct page *page)
 {
 	if (page->mapping != mapping)
-		return;
+		return 0;
 
 	if (PagePrivate(page) && !try_to_release_page(page, 0))
-		return;
+		return 0;
 
 	write_lock(&mapping->page_lock);
 	if (PageDirty(page)) {
 		write_unlock(&mapping->page_lock);
-	} else {
-		__remove_from_page_cache(page);
-		write_unlock(&mapping->page_lock);
-		ClearPageUptodate(page);
-		page_cache_release(page);	/* pagecache ref */
+		return 0;
 	}
+	__remove_from_page_cache(page);
+	write_unlock(&mapping->page_lock);
+	ClearPageUptodate(page);
+	page_cache_release(page);	/* pagecache ref */
+	return 1;
 }
 
 /**
@@ -189,11 +190,12 @@ void truncate_inode_pages(struct address_space *mapping, loff_t lstart)
  * invalidate pages which are dirty, locked, under writeback or mapped into
  * pagetables.
  */
-void invalidate_mapping_pages(struct address_space *mapping,
+unsigned long invalidate_mapping_pages(struct address_space *mapping,
 				pgoff_t start, pgoff_t end)
 {
 	struct pagevec pvec;
 	pgoff_t next = start;
+	unsigned long ret = 0;
 	int i;
 
 	pagevec_init(&pvec, 0);
@@ -213,18 +215,19 @@ void invalidate_mapping_pages(struct address_space *mapping,
 				goto unlock;
 			if (page_mapped(page))
 				goto unlock;
-			invalidate_complete_page(mapping, page);
+			ret += invalidate_complete_page(mapping, page);
 unlock:
 			unlock_page(page);
 		}
 		pagevec_release(&pvec);
 		cond_resched();
 	}
+	return ret;
 }
 
-void invalidate_inode_pages(struct address_space *mapping)
+unsigned long invalidate_inode_pages(struct address_space *mapping)
 {
-	invalidate_mapping_pages(mapping, 0, ~0UL);
+	return invalidate_mapping_pages(mapping, 0, ~0UL);
 }
 
 /**
