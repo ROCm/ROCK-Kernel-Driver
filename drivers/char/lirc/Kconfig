@@ -1,0 +1,114 @@
+# LIRC http://lirc.sf.net/
+# Kernel patch by Flameeyes <dgp85@users.sf.net>
+# Check for new patch at http://flameeyes.web.ctonet.it
+#
+# Thanks to Koos Vriezen <koos.vriezen@xs4all.nl> for the Homebrew support.
+# Thanks to Jeff Clark <jeff@tmtrading.com> for support when I wasn't able
+# to update it and for his patch (found at http://www.clarkmania.com/~jclark/
+# Thanks to Bernhard Rosenkraenzer <bero@arklinux.org> for SMP patch.
+# Thanks to Vince <fuzzy77@free.fr> for the temporary lirc_atiusb driver.
+# Thanks to Paul Miller <pmiller9@users.sourceforge.net> for the new working
+# lirc_atiusb driver.
+
+menu "Linux InfraRed Controller"
+
+config LIRC_SUPPORT
+	tristate "Linux InfraRed Controller"
+
+	config LIRC_MAX_DEV
+		int "Maximum LIRC devices"
+		default "2"
+		depends on LIRC_SUPPORT
+
+#	config LIRC_I2C
+#		tristate "I2C Driver"
+#		depends on LIRC_SUPPORT && VIDEO_BT848 && I2C && I2C_ALGOBIT
+#		help
+#		  Say Y here if you need support for the following cards:
+#
+#		  Pixelview IR
+#		  Hauppauage IR
+#		  PV951 IR
+#		  TV-Box IR
+#		  KNC ONE IR
+#
+#		  If these dont make sense to you, then dont use the module.
+#			-- obsoleted by ir-kbd-i2c
+
+#	config LIRC_GPIO
+#		tristate "GPIO Driver"
+#		depends on LIRC_SUPPORT && VIDEO_BT848
+#			-- obsoleted by ir-kbd-gpio
+
+	config LIRC_BT829
+		tristate "BT829 Driver"
+		depends on LIRC_SUPPORT
+
+	config LIRC_IT87
+		tristate "IT87 Driver"
+		depends on LIRC_SUPPORT
+
+	config LIRC_ATIUSB
+		tristate "ATI USB Driver"
+		depends on LIRC_SUPPORT && USB
+
+#	config LIRC_MCEUSB
+#		tristate "MCE USB Driver"
+#		depends on LIRC_SUPPORT && USB
+#			- doesn't build
+
+	config LIRC_PARALLEL
+		tristate "Parallel Driver"
+		depends on LIRC_SUPPORT && !SMP && PARPORT
+
+		# simply default to lpt1, can be overritten with insmod
+		# options anyway ...
+		config LIRC_PORT_PARALLEL
+			hex
+			default "0x378"
+			depends on LIRC_PARALLEL
+
+		config LIRC_IRQ_PARALLEL
+			hex
+			default "7"
+			depends on LIRC_PARALLEL
+
+		config LIRC_TIMER
+			int
+			default "65535"
+			depends on LIRC_PARALLEL
+
+	config LIRC_SERIAL
+		tristate "Serial Driver"
+		depends on LIRC_SUPPORT && SERIAL_8250
+
+		config LIRC_HOMEBREW
+			bool
+			default yes
+
+		config LIRC_PORT_SERIAL
+			hex
+			default "0x3f8"
+			depends on LIRC_SERIAL
+
+		config LIRC_IRQ_SERIAL
+			hex
+			default "4"
+			depends on LIRC_SERIAL
+
+	config LIRC_SIR
+		tristate "SIR Driver"
+		depends on LIRC_SUPPORT
+		select LIRC_SIR_IRDA
+
+		config LIRC_PORT_SIR
+			hex
+			default "0x3f8"
+			depends on LIRC_SIR
+
+		config LIRC_IRQ_SIR
+			hex
+			default "4"
+			depends on LIRC_SIR
+
+endmenu

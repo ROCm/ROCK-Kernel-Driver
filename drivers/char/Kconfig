@@ -1019,3 +1019,5 @@ config VTUNE
 
 endmenu
 
+source "drivers/char/lirc/Kconfig"
+
