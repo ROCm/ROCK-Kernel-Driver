@@ -8,7 +8,9 @@
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
  *
- * Thanks to Traverse Technologie Australia for documents and information
+ * Thanks to Traverse Technologies Australia for documents and information
+ *
+ * 16-Apr-2002 - led code added - Guy Ellis (guy@traverse.com.au)
  *
  */
 
@@ -133,6 +135,7 @@ void
 mode_tiger(struct BCState *bcs, int mode, int bc)
 {
 	struct IsdnCardState *cs = bcs->cs;
+        u_char led;
 
 	if (cs->debug & L1_DEB_HSCX)
 		debugl1(cs, "Tiger mode %d bchan %d/%d",
@@ -154,6 +157,15 @@ mode_tiger(struct BCState *bcs, int mode, int bc)
 					cs->hw.njet.dmactrl);
 				byteout(cs->hw.njet.base + NETJET_IRQMASK0, 0);
 			}
+                        if (cs->typ == ISDN_CTYPE_NETJET_S)
+                        {
+                                // led off
+                                led = bc & 0x01;
+                                led = 0x01 << (6 + led); // convert to mask
+                                led = ~led;
+                                cs->hw.njet.auxd &= led;
+                                byteout(cs->hw.njet.auxa, cs->hw.njet.auxd);
+                        }
 			break;
 		case (L1_MODE_TRANS):
 			break;
@@ -179,6 +191,14 @@ mode_tiger(struct BCState *bcs, int mode, int bc)
 			bcs->hw.tiger.sendp = bcs->hw.tiger.send;
 			bcs->hw.tiger.free = NETJET_DMA_TXSIZE;
 			test_and_set_bit(BC_FLG_EMPTY, &bcs->Flag);
+                        if (cs->typ == ISDN_CTYPE_NETJET_S)
+                        {
+                                // led on
+                                led = bc & 0x01;
+                                led = 0x01 << (6 + led); // convert to mask
+                                cs->hw.njet.auxd |= led;
+                                byteout(cs->hw.njet.auxa, cs->hw.njet.auxd);
+                        }
 			break;
 	}
 	if (cs->debug & L1_DEB_HSCX)
