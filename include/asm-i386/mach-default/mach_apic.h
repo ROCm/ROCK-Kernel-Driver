@@ -1,6 +1,8 @@
 #ifndef __ASM_MACH_APIC_H
 #define __ASM_MACH_APIC_H
 
+#include <mach_apicdef.h>
+
 #define APIC_DFR_VALUE	(APIC_DFR_FLAT)
 
 static inline unsigned long target_cpus(void)
@@ -104,15 +106,6 @@ static inline int check_phys_apicid_present(int boot_cpu_physical_apicid)
 {
 	return test_bit(boot_cpu_physical_apicid, &phys_cpu_present_map);
 }
-
-#define		APIC_ID_MASK		(0xF<<24)
-
-static inline unsigned get_apic_id(unsigned long x) 
-{ 
-	return (((x)>>24)&0xF);
-} 
-
-#define		GET_APIC_ID(x)	get_apic_id(x)
 
 static inline int apic_id_registered(void)
 {
