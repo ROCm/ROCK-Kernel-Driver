@@ -310,11 +310,11 @@ struct xfrm_algo_desc *xfrm_ealg_get_byidx(unsigned int idx)
  */
 void xfrm_probe_algs(void)
 {
+#ifdef CONFIG_CRYPTO
 	int i, status;
 	
 	BUG_ON(in_softirq());
 
-#ifdef CONFIG_CRYPTO
 	for (i = 0; i < aalg_entries(); i++) {
 		status = crypto_alg_available(aalg_list[i].name, 0);
 		if (aalg_list[i].available != status)
