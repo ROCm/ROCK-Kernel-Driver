@@ -21,6 +21,13 @@ ToDo/Notes:
 	- Enable the code for setting the NT4 compatibility flag when we start
 	  making NTFS 1.2 specific modifications.
 
+2.1.20 - Fix a stupid bug in ntfs_attr_reinit_search_ctx().
+
+	- Fix stupid bug in fs/ntfs/attrib.c::ntfs_attr_reinit_search_ctx()
+	  where we did not clear ctx->al_entry but it was still set due to
+	  changes in ntfs_attr_lookup() and ntfs_external_attr_find() in
+	  particular.
+
 2.1.19 - Many cleanups, improvements, and a minor bug fix.
 
 	- Update ->setattr (fs/ntfs/inode.c::ntfs_setattr()) to refuse to
