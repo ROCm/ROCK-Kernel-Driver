@@ -1,17 +1,18 @@
-/***********************************************************************
- *	FILE NAME : TMSCSIM.C					       *
- *	     BY   : C.L. Huang,  ching@tekram.com.tw		       *
- *	Description: Device Driver for Tekram DC-390(T) PCI SCSI       *
- *		     Bus Master Host Adapter			       *
- * (C)Copyright 1995-1996 Tekram Technology Co., Ltd.		       *
- ***********************************************************************/
-/* (C) Copyright: put under GNU GPL in 10/96  (see README.tmscsim)	*
-*************************************************************************/
-/* $Id: tmscsim.c,v 2.60.2.30 2000/12/20 01:07:12 garloff Exp $		*/
-/*	Enhancements and bugfixes by					*
+/************************************************************************
+ *	FILE NAME : TMSCSIM.C						*
+ *	     BY   : C.L. Huang,  ching@tekram.com.tw			*
+ *	Description: Device Driver for Tekram DC-390(T) PCI SCSI	*
+ *		     Bus Master Host Adapter				*
+ * (C)Copyright 1995-1996 Tekram Technology Co., Ltd.			*
+ ************************************************************************
+ * (C) Copyright: put under GNU GPL in 10/96				*
+ *				(see Documentation/scsi/tmscsim.txt)	*
+ ************************************************************************
+ * $Id: tmscsim.c,v 2.60.2.30 2000/12/20 01:07:12 garloff Exp $		*
+ *	Enhancements and bugfixes by					*
  *	Kurt Garloff <kurt@garloff.de>	<garloff@suse.de>		*
- ***********************************************************************/
-/*	HISTORY:							*
+ ************************************************************************
+ *	HISTORY:							*
  *									*
  *	REV#	DATE	NAME	DESCRIPTION				*
  *	1.00  96/04/24	CLH	First release				*
@@ -1521,7 +1522,7 @@ void dc390_dumpinfo (PACB pACB, PDCB pDCB, PSRB pSRB)
     DC390_write32 (DMA_ScsiBusCtrl, EN_INT_ON_PCI_ABORT);
     PDEVSET1; PCI_READ_CONFIG_WORD(PDEV, PCI_STATUS, &pstat);
     printk ("DC390: Register dump: PCI Status: %04x\n", pstat);
-    printk ("DC390: In case of driver trouble read linux/drivers/scsi/README.tmscsim\n");
+    printk ("DC390: In case of driver trouble read linux/Documentation/scsi/tmscsim.txt\n");
 };
 
 

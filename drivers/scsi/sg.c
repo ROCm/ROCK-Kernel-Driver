@@ -111,7 +111,6 @@ static int sg_allow_dio = SG_ALLOW_DIO_DEF;
 #define SG_DEV_ARR_LUMP 6	/* amount to over allocate sg_dev_arr by */
 
 static int sg_attach(Scsi_Device *);
-static int sg_detect(Scsi_Device *);
 static void sg_detach(Scsi_Device *);
 
 static Scsi_Request *dummy_cmdp;	/* only used for sizeof */
@@ -125,7 +124,6 @@ static struct Scsi_Device_Template sg_template = {
 	.name = "generic",
 	.tag = "sg",
 	.scsi_type = 0xff,
-	.detect = sg_detect,
 	.attach = sg_attach,
 	.detach = sg_detach
 };
@@ -234,7 +232,6 @@ static int sg_last_dev(void);
 #endif
 
 static Sg_device **sg_dev_arr = NULL;
-static int sg_dev_noticed;
 static int sg_dev_max;
 static int sg_nr_dev;
 
@@ -1333,13 +1330,6 @@ static struct file_operations sg_fops = {
 	.fasync = sg_fasync,
 };
 
-static int
-sg_detect(Scsi_Device * scsidp)
-{
-	sg_dev_noticed++;
-	return 1;
-}
-
 #ifndef MODULE
 static int __init
 sg_def_reserved_size_setup(char *str)
@@ -1553,7 +1543,6 @@ sg_detach(Scsi_Device * scsidp)
 		}
 		scsi_slave_detach(scsidp);
 		sg_nr_dev--;
-		sg_dev_noticed--;	/* from <dan@lectra.fr> */
 		break;
 	}
 	write_unlock_irqrestore(&sg_dev_arr_lock, iflags);

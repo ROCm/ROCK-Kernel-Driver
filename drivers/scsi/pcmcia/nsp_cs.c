@@ -1224,6 +1224,9 @@ static int nsp_detect(Scsi_Host_Template *sht)
 
 	request_region(data->BaseAddress, data->NumAddress, "nsp_cs");
 	host		  = scsi_register(sht, 0);
+	if(host == NULL)
+		return 0;
+
 	host->unique_id	  = data->BaseAddress;
 	host->io_port	  = data->BaseAddress;
 	host->n_io_port	  = data->NumAddress;

@@ -1621,7 +1621,7 @@ static	struct script script0 __initdata = {
 	**	Possible data corruption during Memory Write and Invalidate.
 	**	This work-around resets the addressing logic prior to the 
 	**	start of the first MOVE of a DATA IN phase.
-	**	(See README.ncr53c8xx for more information)
+	**	(See Documentation/scsi/ncr53c8xx.txt for more information)
 	*/
 	SCR_JUMPR ^ IFFALSE (IF (SCR_DATA_IN)),
 		20,

@@ -488,7 +488,7 @@ config SCSI
 	  inserted in and removed from the running kernel whenever you want).
 	  The module will be called scsi_mod.o.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt> and
-	  <file:Documentation/scsi.txt>.  However, do not compile this as a
+	  <file:Documentation/scsi/scsi.txt>.  However, do not compile this as a
 	  module if your root file system (the one containing the directory /)
 	  is located on a SCSI device.
 

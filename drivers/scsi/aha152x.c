@@ -216,7 +216,7 @@
  *
  **************************************************************************
  
- see README.aha152x for configuration details
+ see Documentation/scsi/aha152x.txt for configuration details
 
  **************************************************************************/
 
@@ -1859,7 +1859,7 @@ int aha152x_biosparam(struct scsi_device *sdev, struct block_device *bdev,
 				       "aha152x: unable to verify geometry for disk with >1GB.\n"
 				       "         Using default translation. Please verify yourself.\n"
 				       "         Perhaps you need to enable extended translation in the driver.\n"
-				       "         See /usr/src/linux/drivers/scsi/README.aha152x for details.\n");
+				       "         See /usr/src/linux/Documentation/scsi/aha152x.txt for details.\n");
 			}
 		} else {
 			info_array[0] = info[0];
