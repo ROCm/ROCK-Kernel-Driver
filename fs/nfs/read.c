@@ -452,18 +452,8 @@ nfs_readpage_result(struct rpc_task *task)
 int
 nfs_readpage(struct file *file, struct page *page)
 {
-	struct inode *inode;
+	struct inode *inode = page->mapping->host;
 	int		error;
-
-	if (!file) {
-		struct address_space *mapping = page->mapping;
-		if (!mapping)
-			BUG();
-		inode = mapping->host;
-	} else
-		inode = file->f_dentry->d_inode;
-	if (!inode)
-		BUG();
 
 	dprintk("NFS: nfs_readpage (%p %ld@%lu)\n",
 		page, PAGE_CACHE_SIZE, page->index);

@@ -239,17 +239,11 @@ nfs_writepage_async(struct file *file, struct inode *inode, struct page *page,
 int
 nfs_writepage(struct page *page)
 {
-	struct inode *inode;
+	struct inode *inode = page->mapping->host;
 	unsigned long end_index;
 	unsigned offset = PAGE_CACHE_SIZE;
 	int err;
-	struct address_space *mapping = page->mapping;
 
-	if (!mapping)
-		BUG();
-	inode = mapping->host;
-	if (!inode)
-		BUG();
 	end_index = inode->i_size >> PAGE_CACHE_SHIFT;
 
 	/* Ensure we've flushed out any previous writes */
@@ -769,7 +763,7 @@ nfs_strategy(struct inode *inode)
 int
 nfs_flush_incompatible(struct file *file, struct page *page)
 {
-	struct inode	*inode = file->f_dentry->d_inode;
+	struct inode	*inode = page->mapping->host;
 	struct nfs_page	*req;
 	int		status = 0;
 	/*
@@ -799,7 +793,7 @@ int
 nfs_updatepage(struct file *file, struct page *page, unsigned int offset, unsigned int count)
 {
 	struct dentry	*dentry = file->f_dentry;
-	struct inode	*inode = dentry->d_inode;
+	struct inode	*inode = page->mapping->host;
 	struct nfs_page	*req;
 	loff_t		end;
 	int		status = 0;
