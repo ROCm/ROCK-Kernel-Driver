@@ -192,7 +192,7 @@ int hpsb_node_lock(struct node_entry *ne, u64 addr,
 int nodemgr_for_each_host(void *__data, int (*cb)(struct hpsb_host *, void *));
 
 
-void init_ieee1394_nodemgr(void);
+int init_ieee1394_nodemgr(void);
 void cleanup_ieee1394_nodemgr(void);
 
 
