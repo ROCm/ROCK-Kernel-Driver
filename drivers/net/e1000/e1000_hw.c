@@ -3344,6 +3344,7 @@ e1000_spi_eeprom_ready(struct e1000_hw *hw)
         udelay(5);
         retry_count += 5;
 
+        e1000_standby_eeprom(hw);
     } while(retry_count < EEPROM_MAX_RETRY_SPI);
 
     /* ATMEL SPI write time could vary from 0-20mSec on 3.3V devices (and
