@@ -1347,10 +1347,10 @@ static int __devinit snd_intel8x0m_probe(struct pci_dev *pci,
 
 	switch (pci_id->driver_data) {
 	case DEVICE_NFORCE:
-		strcpy(card->driver, "NFORCE");
+		strcpy(card->driver, "NFORCE-MODEM");
 		break;
 	default:
-		strcpy(card->driver, "ICH");
+		strcpy(card->driver, "ICH-MODEM");
 		break;
 	}
 
