@@ -200,8 +200,9 @@ static int mousedev_release(struct inode * inode, struct file * file)
 
 	if (!--list->mousedev->open) {
 		if (list->mousedev->minor == MOUSEDEV_MIX) {
-			struct input_handle *handle = mousedev_handler.handle;
-			while (handle) {
+			struct list_head * node;
+			list_for_each(node,&mousedev_handler.h_list) {
+				struct input_handle *handle = to_handle_h(node);
 				struct mousedev *mousedev = handle->private;
 				if (!mousedev->open) {
 					if (mousedev->exist) {
@@ -212,7 +213,6 @@ static int mousedev_release(struct inode * inode, struct file * file)
 						kfree(mousedev);
 					}
 				}
-				handle = handle->hnext;
 			}
 		} else {
 			if (!mousedev_mix.open) {
@@ -258,13 +258,13 @@ static int mousedev_open(struct inode * inode, struct file * file)
 
 	if (!list->mousedev->open++) {
 		if (list->mousedev->minor == MOUSEDEV_MIX) {
-			struct input_handle *handle = mousedev_handler.handle;
-			while (handle) {
+			struct list_head * node;
+			list_for_each(node,&mousedev_handler.h_list) {
+				struct input_handle *handle = to_handle_h(node);
 				struct mousedev *mousedev = handle->private;
 				if (!mousedev->open)
 					if (mousedev->exist)	
 						input_open_device(handle);
-				handle = handle->hnext;
 			}
 		} else {
 			if (!mousedev_mix.open)

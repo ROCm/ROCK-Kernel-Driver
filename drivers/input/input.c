@@ -58,8 +58,9 @@ EXPORT_SYMBOL(input_event);
 #define INPUT_MAJOR	13
 #define INPUT_DEVICES	256
 
-static struct input_dev *input_dev;
-static struct input_handler *input_handler;
+static LIST_HEAD(input_dev_list);
+static LIST_HEAD(input_handler_list);
+
 static struct input_handler *input_table[8];
 static devfs_handle_t input_devfs_handle;
 
@@ -69,9 +70,10 @@ DECLARE_WAIT_QUEUE_HEAD(input_devices_poll_wait);
 static int input_devices_state;
 #endif
 
+
 void input_event(struct input_dev *dev, unsigned int type, unsigned int code, int value)
 {
-	struct input_handle *handle = dev->handle;
+	struct list_head * node;
 
 	if (dev->pm_dev)
 		pm_access(dev->pm_dev);
@@ -190,10 +192,10 @@ void input_event(struct input_dev *dev, unsigned int type, unsigned int code, in
 	if (type != EV_SYN) 
 		dev->sync = 0;
 
-	while (handle) {
+	list_for_each(node,&dev->h_list) {
+		struct input_handle *handle = to_handle(node);
 		if (handle->open)
 			handle->handler->event(handle, type, code, value);
-		handle = handle->dnext;
 	}
 }
 
@@ -247,41 +249,8 @@ void input_close_device(struct input_handle *handle)
 
 static void input_link_handle(struct input_handle *handle)
 {
-	handle->dnext = handle->dev->handle;
-	handle->hnext = handle->handler->handle;
-	handle->dev->handle = handle;
-	handle->handler->handle = handle;
-}
-
-/**
- *     input_find_and_remove - Find and remove node
- *
- *     @type:          data type
- *     @initval:       initial value
- *     @targ:          node to find
- *     @next:          next node in the list
- *
- *     Searches the linked list for the target node @targ. If the node
- *     is found, it is removed from the list.
- *
- *     If the node is not found, the end of the list will be hit,
- *     indicating that it wasn't in the list to begin with.
- *
- *     Returns nothing.
- */
-
-#define input_find_and_remove(type, initval, targ, next)		\
-	do {								\
-		type **ptr;						\
-		for (ptr = &initval; *ptr; ptr = &((*ptr)->next))	\
-			if (*ptr == targ) break;			\
-		if (*ptr) *ptr = (*ptr)->next;				\
-	} while (0)
-
-static void input_unlink_handle(struct input_handle *handle)
-{
-	input_find_and_remove(struct input_handle, handle->dev->handle, handle, dnext);
-        input_find_and_remove(struct input_handle, handle->handler->handle, handle, hnext);
+	list_add_tail(&handle->d_node,&handle->dev->h_list);
+	list_add_tail(&handle->h_node,&handle->handler->h_list);
 }
 
 #define MATCH_BIT(bit, max) \
@@ -442,7 +411,7 @@ static void input_call_hotplug(char *verb, struct input_dev *dev)
 
 void input_register_device(struct input_dev *dev)
 {
-	struct input_handler *handler = input_handler;
+	struct list_head * node;
 	struct input_handle *handle;
 	struct input_device_id *id;
 
@@ -465,19 +434,17 @@ void input_register_device(struct input_dev *dev)
 /*
  * Add the device.
  */
-
-	dev->next = input_dev;	
-	input_dev = dev;
+	INIT_LIST_HEAD(&dev->h_list);
+	list_add_tail(&dev->node,&input_dev_list);
 
 /*
  * Notify handlers.
  */
-
-	while (handler) {
+	list_for_each(node,&input_handler_list) {
+		struct input_handler *handler = to_handler(node);
 		if ((id = input_match_device(handler->id_table, dev)))
 			if ((handle = handler->connect(handler, dev, id)))
 				input_link_handle(handle);
-		handler = handler->next;
 	}
 
 /*
@@ -500,8 +467,7 @@ void input_register_device(struct input_dev *dev)
 
 void input_unregister_device(struct input_dev *dev)
 {
-	struct input_handle *handle = dev->handle;
-	struct input_handle *dnext;
+	struct list_head * node, * next;
 
 	if (!dev) return;
 
@@ -521,11 +487,11 @@ void input_unregister_device(struct input_dev *dev)
  * Notify handlers.
  */
 
-	while (handle) {
-		dnext = handle->dnext;
-		input_unlink_handle(handle);
+	list_for_each_safe(node,next,&dev->h_list) {
+		struct input_handle * handle = to_handle(node);
+		list_del_init(&handle->d_node);
+		list_del_init(&handle->h_node);
 		handle->handler->disconnect(handle);
-		handle = dnext;
 	}
 
 /*
@@ -539,7 +505,7 @@ void input_unregister_device(struct input_dev *dev)
 /*
  * Remove the device.
  */
-	input_find_and_remove(struct input_dev, input_dev, dev, next);
+	list_del_init(&dev->node);
 
 /*
  * Notify /proc.
@@ -553,12 +519,13 @@ void input_unregister_device(struct input_dev *dev)
 
 void input_register_handler(struct input_handler *handler)
 {
-	struct input_dev *dev = input_dev;
+	struct list_head * node;
 	struct input_handle *handle;
 	struct input_device_id *id;
 
 	if (!handler) return;
 
+	INIT_LIST_HEAD(&handler->h_list);
 /*
  * Add minors if needed.
  */
@@ -569,19 +536,17 @@ void input_register_handler(struct input_handler *handler)
 /*
  * Add the handler.
  */
-
-	handler->next = input_handler;	
-	input_handler = handler;
+	list_add_tail(&handler->node,&input_handler_list);
 	
 /*
  * Notify it about all existing devices.
  */
 
-	while (dev) {
+	list_for_each(node,&input_dev_list) {
+		struct input_dev *dev = to_dev(node);
 		if ((id = input_match_device(handler->id_table, dev)))
 			if ((handle = handler->connect(handler, dev, id)))
 				input_link_handle(handle);
-		dev = dev->next;
 	}
 
 /*
@@ -596,25 +561,23 @@ void input_register_handler(struct input_handler *handler)
 
 void input_unregister_handler(struct input_handler *handler)
 {
-	struct input_handle *handle = handler->handle;
-	struct input_handle *hnext;
+	struct list_head * node, * next;
+
 
 /*
  * Tell the handler to disconnect from all devices it keeps open.
  */
-
-	while (handle) {
-		hnext = handle->hnext;
-		input_unlink_handle(handle);
+	list_for_each_safe(node,next,&handler->h_list) {
+		struct input_handle * handle = to_handle_h(node);
+		list_del_init(&handle->h_node);
+		list_del_init(&handle->d_node);
 		handler->disconnect(handle);
-		handle = hnext;
 	}
 
 /*
  * Remove it.
  */
-	input_find_and_remove(struct input_handler, input_handler, handler,
-				next);
+	list_del_init(&handler->node);
 
 /*
  * Remove minors.
@@ -715,13 +678,14 @@ static unsigned int input_devices_poll(struct file *file, poll_table *wait)
 
 static int input_devices_read(char *buf, char **start, off_t pos, int count, int *eof, void *data)
 {
-	struct input_dev *dev = input_dev;
-	struct input_handle *handle;
+	struct list_head * node;
 
 	off_t at = 0;
 	int i, len, cnt = 0;
 
-	while (dev) {
+	list_for_each(node,&input_dev_list) {
+		struct input_dev * dev = to_dev(node);
+		struct list_head * hnode;
 
 		len = sprintf(buf, "I: Bus=%04x Vendor=%04x Product=%04x Version=%04x\n",
 			dev->id.bustype, dev->id.vendor, dev->id.product, dev->id.version);
@@ -730,11 +694,9 @@ static int input_devices_read(char *buf, char **start, off_t pos, int count, int
 		len += sprintf(buf + len, "P: Phys=%s\n", dev->phys ? dev->phys : "");
 		len += sprintf(buf + len, "D: Drivers=");
 
-		handle = dev->handle;
-
-		while (handle) {
+		list_for_each(hnode,&dev->h_list) {
+			struct input_handle * handle = to_handle(hnode);
 			len += sprintf(buf + len, "%s ", handle->name);
-			handle = handle->dnext;
 		}
 
 		len += sprintf(buf + len, "\n");
@@ -761,24 +723,24 @@ static int input_devices_read(char *buf, char **start, off_t pos, int count, int
 			if (cnt >= count)
 				break;
 		}
-
-		dev = dev->next;
 	}
 
-	if (!dev) *eof = 1;
+	if (node == &input_dev_list)
+		*eof = 1;
 
 	return (count > cnt) ? cnt : count;
 }
 
 static int input_handlers_read(char *buf, char **start, off_t pos, int count, int *eof, void *data)
 {
-	struct input_handler *handler = input_handler;
+	struct list_head * node;
 
 	off_t at = 0;
 	int len = 0, cnt = 0;
 	int i = 0;
 
-	while (handler) {
+	list_for_each(node,&input_handler_list) {
+		struct input_handler *handler = to_handler(node);
 
 		if (handler->fops)
 			len = sprintf(buf, "N: Number=%d Name=%s Minor=%d\n",
@@ -798,11 +760,9 @@ static int input_handlers_read(char *buf, char **start, off_t pos, int count, in
 			if (cnt >= count)
 				break;
 		}
-
-		handler = handler->next;
 	}
-
-	if (!handler) *eof = 1;
+	if (node == &input_handler_list)
+		*eof = 1;
 
 	return (count > cnt) ? cnt : count;
 }

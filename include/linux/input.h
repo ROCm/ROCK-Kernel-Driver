@@ -811,8 +811,8 @@ struct input_dev {
 	int (*upload_effect)(struct input_dev *dev, struct ff_effect *effect);
 	int (*erase_effect)(struct input_dev *dev, int effect_id);
 
-	struct input_handle *handle;
-	struct input_dev *next;
+	struct list_head	h_list;
+	struct list_head	node;
 };
 
 /*
@@ -856,6 +856,8 @@ struct input_device_id {
 	unsigned long driver_info;
 };
 
+struct input_handle;
+
 struct input_handler {
 
 	void *private;
@@ -870,8 +872,8 @@ struct input_handler {
 
 	struct input_device_id *id_table;
 
-	struct input_handle *handle;
-	struct input_handler *next;
+	struct list_head	h_list;
+	struct list_head	node;
 };
 
 struct input_handle {
@@ -884,9 +886,14 @@ struct input_handle {
 	struct input_dev *dev;
 	struct input_handler *handler;
 
-	struct input_handle *dnext;
-	struct input_handle *hnext;
+	struct list_head	d_node;
+	struct list_head	h_node;
 };
+
+#define to_dev(n) container_of(n,struct input_dev,node)
+#define to_handler(n) container_of(n,struct input_handler,node);
+#define to_handle(n) container_of(n,struct input_handle,d_node)
+#define to_handle_h(n) container_of(n,struct input_handle,h_node)
 
 void input_register_device(struct input_dev *);
 void input_unregister_device(struct input_dev *);
