@@ -186,15 +186,18 @@ asmlinkage long sys_remap_file_pages(unsigned long start, unsigned long size,
 	/*
 	 * Make sure the vma is shared, that it supports prefaulting,
 	 * and that the remapped range is valid and fully within
-	 * the single existing vma:
+	 * the single existing vma.  vm_private_data is used as a
+	 * swapout cursor in a VM_NONLINEAR vma (unless VM_RESERVED
+	 * or VM_LOCKED, but VM_LOCKED could be revoked later on).
 	 */
 	if (vma && (vma->vm_flags & VM_SHARED) &&
+		(!vma->vm_private_data || (vma->vm_flags & VM_RESERVED)) &&
 		vma->vm_ops && vma->vm_ops->populate &&
 			end > start && start >= vma->vm_start &&
 				end <= vma->vm_end) {
 
 		/* Must set VM_NONLINEAR before any pages are populated. */
-		if (pgoff != ((start - vma->vm_start) >> PAGE_SHIFT) + vma->vm_pgoff)
+		if (pgoff != linear_page_index(vma, start))
 			vma->vm_flags |= VM_NONLINEAR;
 
 		/* ->populate can take a long time, so downgrade the lock. */
