@@ -27,6 +27,7 @@
 #include <linux/slab.h>
 #include <asm/irq.h>
 #include <asm/io.h>
+#include <asm/idals.h>
 #include <linux/console.h>
 #include <linux/interrupt.h>
 #include <asm/ebcdic.h>
@@ -81,10 +82,17 @@
 #define TAT_CHARS 0x43
 #define TAT_TRANS 0x46
 
+/* Extended-Highlighting Bytes */
+#define TAX_RESET 0x00
+#define TAX_BLINK 0xf1
+#define TAX_REVER 0xf2
+#define TAX_UNDER 0xf4
+
 /* Reset value */
 #define TAR_RESET 0x00
 
 /* Color values */
+#define TAC_RESET 0x00
 #define TAC_BLUE 0xf1
 #define TAC_RED 0xf2
 #define TAC_PINK 0xf3
@@ -220,7 +228,7 @@ typedef struct tub_s {
 	devstat_t       devstat;
 	ccw1_t          rccw;
 	ccw1_t          wccw;
-	void            *wbuf;
+	addr_t		*wbuf;
 	int             cswl;
 	void            (*intv)(struct tub_s *, devstat_t *);
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
@@ -242,12 +250,13 @@ typedef struct tub_s {
 
 	/* Stuff for tty-driver support */
 	struct tty_struct *tty;
-	char tty_input[GEOM_MAXINPLEN]; /* tty input area */
+	char *tty_input;		/* tty input area */
 	int tty_inattr;         	/* input-area field attribute */
 #define TTY_OUTPUT_SIZE 1024
 	bcb_t tty_bcb;			/* Output buffer control info */
 	int tty_oucol;                  /* Kludge */
 	int tty_nextlogx;               /* next screen-log position */
+	int tty_savecursor;		/* saved cursor position */
 	int tty_scrolltime;             /* scrollforward wait time, sec */
 	struct timer_list tty_stimer;   /* timer for scrolltime */
 	aid_t tty_aid[64];              /* Aid descriptors */

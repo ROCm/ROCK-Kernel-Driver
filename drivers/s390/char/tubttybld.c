@@ -15,10 +15,12 @@
 extern int tty3270_io(tub_t *);
 static void tty3270_set_status_area(tub_t *, char **);
 static int tty3270_next_char(tub_t *);
+static void tty3270_unnext_char(tub_t *, char);
 static void tty3270_update_log_area(tub_t *, char **);
-static void tty3270_update_log_area_esc(tub_t *, char **);
+static int tty3270_update_log_area_esc(tub_t *, char **, int *);
 static void tty3270_clear_log_area(tub_t *, char **);
 static void tty3270_tub_bufadr(tub_t *, int, char **);
+static void tty3270_set_bufadr(tub_t *, char **, int *);
 
 /*
  * tty3270_clear_log_area(tub_t *tubp, char **cpp)
@@ -47,69 +49,73 @@ tty3270_update_log_area(tub_t *tubp, char **cpp)
 	int sba_needed = 1;
 	char *overrun = &(*tubp->ttyscreen)[tubp->ttyscreenl - TS_LENGTH];
 
+	/* Check for possible ESC sequence work to do */
+	if (tubp->tty_escx != 0) {
+		/* If compiling new escape sequence */
+		if (tubp->tty_esca[0] == 0x1b) {
+			if (tty3270_update_log_area_esc(tubp, cpp, &sba_needed))
+				return;
+		/* If esc seq needs refreshing after a write */
+		} else if (tubp->tty_esca[0] == TO_SA) {
+			tty3270_set_bufadr(tubp, cpp, &sba_needed);
+			for (i = 0; i < tubp->tty_escx; i++)
+				*(*cpp)++ = tubp->tty_esca[i];
+		} else {
+			printk(KERN_WARNING "tty3270_update_log_area esca "
+			"character surprising:  %.2x\n", tubp->tty_esca[0]);
+		}
+	}
+
 	/* Place characters */
 	while (tubp->tty_bcb.bc_cnt != 0) {
-		if (tubp->tty_nextlogx >= lastx) {
-			if (sba_needed == 0 || tubp->stat == TBS_RUNNING) {
-				tubp->stat = TBS_MORE;
-				tty3270_set_status_area(tubp, cpp);
-				tty3270_scl_settimer(tubp);
-			}
-			break;
-		}
-
-		/* Check for room for another char + possible ESCs */
-		if (&(*cpp)[tubp->tty_escx + 1] >= overrun)
+		/* Check for room.  TAB could take up to 4 chars. */
+		if (&(*cpp)[4] >= overrun)
 			break;
 
 		/* Fetch a character */
 		if ((c = tty3270_next_char(tubp)) == -1)
 			break;
 
-		/* Add a Set-Buffer-Address Order if we haven't */
-		if (sba_needed) {
-			sba_needed = 0;
-			*(*cpp)++ = TO_SBA;
-			TUB_BUFADR(tubp->tty_nextlogx, cpp);
-		}
-
 		switch(c) {
 		default:
-			if (c < ' ')    /* Blank it if we don't know it */
-				c = ' ';
-			for (i = 0; i < tubp->tty_escx; i++)
-				*(*cpp)++ = tubp->tty_esca[i];
-			tubp->tty_escx = 0;
-			*(*cpp)++ = tub_ascebc[(int)c];
+			if (tubp->tty_nextlogx >= lastx) {
+				if (sba_needed == 0 ||
+				    tubp->stat == TBS_RUNNING) {
+					tty3270_unnext_char(tubp, c);
+					tubp->stat = TBS_MORE;
+					tty3270_set_status_area(tubp, cpp);
+					tty3270_scl_settimer(tubp);
+				}
+				goto do_return;
+			}
+			tty3270_set_bufadr(tubp, cpp, &sba_needed);
+			/* Use blank if we don't know the character */
+			*(*cpp)++ = tub_ascebc[(int)(c < ' '? ' ': c)];
 			tubp->tty_nextlogx++;
 			tubp->tty_oucol++;
 			break;
 		case 0x1b:              /* ESC */
-			tty3270_update_log_area_esc(tubp, cpp);
+			tubp->tty_escx = 0;
+			if (tty3270_update_log_area_esc(tubp, cpp, &sba_needed))
+				return;
 			break;
-		case '\r':
-			break;          /* completely ignore 0x0d = CR. */
-		case '\n':
+		case '\r':		/* 0x0d -- Carriage Return */
+			tubp->tty_nextlogx -=
+				tubp->tty_nextlogx % GEOM_COLS;
+			sba_needed = 1;
+			break;
+		case '\n':		/* 0x0a -- New Line */
 			if (tubp->tty_oucol == GEOM_COLS) {
 				tubp->tty_oucol = 0;
 				break;
 			}
 			next = (tubp->tty_nextlogx + GEOM_COLS) /
 				GEOM_COLS * GEOM_COLS;
-			next = MIN(next, lastx);
-			fill = next - tubp->tty_nextlogx;
-			if (fill < 5) {
-				for (i = 0; i < fill; i++)
-					*(*cpp)++ = tub_ascebc[' '];
-			} else {
-				*(*cpp)++ = TO_RA;
-				TUB_BUFADR(next, cpp);
-				*(*cpp)++ = tub_ascebc[' '];
-			}
 			tubp->tty_nextlogx = next;
 			tubp->tty_oucol = 0;
+			sba_needed = 1;
 			break;
-		case '\t':
+		case '\t':		/* 0x09 -- Tabulate */
 			fill = (tubp->tty_nextlogx % GEOM_COLS) % 8;
 			for (; fill < 8; fill++) {
 				if (tubp->tty_nextlogx >= lastx)
@@ -119,72 +125,116 @@ tty3270_update_log_area(tub_t *tubp, char **cpp)
 				tubp->tty_oucol++;
 			}
 			break;
-		case '\a':
+		case '\a':		/* 0x07 -- Alarm */
 			tubp->flags |= TUB_ALARM;
 			break;
-		case '\f':
+		case '\f':		/* 0x0c -- Form Feed */
 			tty3270_clear_log_area(tubp, cpp);
+			break;
+		case 0xf:	/* SuSE "exit alternate mode" */
 			break;
 		}
 	}
+do_return:
 }
 
 #define NUMQUANT 8
-static void
-tty3270_update_log_area_esc(tub_t *tubp, char **cpp)
+static int
+tty3270_update_log_area_esc(tub_t *tubp, char **cpp, int *sba_needed)
 {
-	int lastx = GEOM_INPUT;
 	int c;
-	int i;
-	int start, next, fill;
+	int i, j;
+	int start, end, next;
 	int quant[NUMQUANT];
+	char *overrun = &(*tubp->ttyscreen)[tubp->ttyscreenl - TS_LENGTH];
+	char sabuf[NUMQUANT*3], *sap = sabuf, *cp;
 
-	if ((c = tty3270_next_char(tubp)) != '[') {
-		return;
+	/* If starting a sequence, stuff ESC at [0] */
+	if (tubp->tty_escx == 0)
+		tubp->tty_esca[tubp->tty_escx++] = 0x1b;
+
+	/* Now that sequence is started, see if room in buffer */
+	if (&(*cpp)[NUMQUANT * 3] >= overrun)
+		return tubp->tty_escx;
+
+	/* Gather the rest of the sequence's characters */
+	while (tubp->tty_escx < sizeof tubp->tty_esca) {
+		if ((c = tty3270_next_char(tubp)) == -1)
+			return tubp->tty_escx;
+		if (tubp->tty_escx == 1) {
+			switch(c) {
+			case '[':
+				tubp->tty_esca[tubp->tty_escx++] = c;
+				continue;
+			case '7':
+				tubp->tty_savecursor = tubp->tty_nextlogx;
+				goto done_return;
+			case '8':
+				next = tubp->tty_savecursor;
+				goto do_setcur;
+			default:
+				goto error_return;
+			}
+		}
+		tubp->tty_esca[tubp->tty_escx++] = c;
+		if (c != ';' && (c < '0' || c > '9'))
+			break;
 	}
 
-	/*
-	 * Parse potentially empty string "nn;nn;nn..."
-	 */
+	/* Check for overrun */
+	if (tubp->tty_escx == sizeof tubp->tty_esca)
+		goto error_return;
+
+	/* Parse potentially empty string "nn;nn;nn..." */
 	i = -1;
+	j = 2;		/* skip ESC, [ */
 	c = ';';
 	do {
 		if (c == ';') {
 			if (++i == NUMQUANT)
-				break;
+				goto error_return;
 			quant[i] = 0;
 		} else if (c < '0' || c > '9') {
 			break;
 		} else {
 			quant[i] = quant[i] * 10 + c - '0';
 		}
-	} while ((c = tty3270_next_char(tubp)) != -1);
-	if (c == -1) {
-		return;
-	}
-	if (i >= NUMQUANT) {
-		return;
-	}
+		c = tubp->tty_esca[j];
+	} while (j++ < tubp->tty_escx);
+
+	/* Add 3270 data stream output to execute the sequence */
 	switch(c) {
-	case -1:
-		return;
 	case 'm':		/* Set Attribute */
 		for (next = 0; next <= i; next++) {
 			int type = -1, value = 0;
 
-			if (tubp->tty_escx + 3 > MAX_TTY_ESCA)
-				break;
 			switch(quant[next]) {
 			case 0:		/* Reset */
-				tubp->tty_esca[tubp->tty_escx++] = TO_SA;
-				tubp->tty_esca[tubp->tty_escx++] = TAT_RESET;
-				tubp->tty_esca[tubp->tty_escx++] = TAR_RESET;
+				next = tubp->tty_nextlogx;
+				tty3270_set_bufadr(tubp, cpp, sba_needed);
+				*(*cpp)++ = TO_SA;
+				*(*cpp)++ = TAT_EXTHI;
+				*(*cpp)++ = TAX_RESET;
+				*(*cpp)++ = TO_SA;
+				*(*cpp)++ = TAT_COLOR;
+				*(*cpp)++ = TAC_RESET;
+				tubp->tty_nextlogx = next;
+				*sba_needed = 1;
+				sap = sabuf;
 				break;
 			case 1:		/* Bright */
+				break;
 			case 2:		/* Dim */
+				break;
 			case 4:		/* Underscore */
+				type = TAT_EXTHI; value = TAX_UNDER;
+				break;
 			case 5:		/* Blink */
+				type = TAT_EXTHI; value = TAX_BLINK;
+				break;
 			case 7:		/* Reverse */
+				type = TAT_EXTHI; value = TAX_REVER;
+				break;
 			case 8:		/* Hidden */
 				break;		/* For now ... */
 			/* Foreground Colors */
@@ -230,52 +280,109 @@ tty3270_update_log_area_esc(tub_t *tubp, char **cpp)
 				break;
 			}
 			if (type != -1) {
-				tubp->tty_esca[tubp->tty_escx++] = TO_SA;
-				tubp->tty_esca[tubp->tty_escx++] = type;
-				tubp->tty_esca[tubp->tty_escx++] = value;
+				tty3270_set_bufadr(tubp, cpp, sba_needed);
+				*(*cpp)++ = TO_SA;
+				*(*cpp)++ = type;
+				*(*cpp)++ = value;
+				*sap++ = TO_SA;
+				*sap++ = type;
+				*sap++ = value;
 			}
 		}
 		break;
+
 	case 'H':		/* Cursor Home */
 	case 'f':		/* Force Cursor Position */
-		return;
+		if (quant[0]) quant[0]--;
+		if (quant[1]) quant[1]--;
+		next = quant[0] * GEOM_COLS + quant[1];
+		goto do_setcur;
 	case 'A':		/* Cursor Up */
-		return;
+		if (quant[i] == 0) quant[i] = 1;
+		next = tubp->tty_nextlogx - GEOM_COLS * quant[i];
+		goto do_setcur;
 	case 'B':		/* Cursor Down */
-		return;
+		if (quant[i] == 0) quant[i] = 1;
+		next = tubp->tty_nextlogx + GEOM_COLS * quant[i];
+		goto do_setcur;
 	case 'C':		/* Cursor Forward */
+		if (quant[i] == 0) quant[i] = 1;
 		next = tubp->tty_nextlogx % GEOM_COLS;
 		start = tubp->tty_nextlogx - next;
 		next = start + MIN(next + quant[i], GEOM_COLS - 1);
-		next = MIN(next, lastx);
-do_fill:
-		fill = next - tubp->tty_nextlogx;
-		if (fill < 5) {
-			for (i = 0; i < fill; i++)
-				*(*cpp)++ = tub_ascebc[' '];
-		} else {
-			*(*cpp)++ = TO_RA;
-			TUB_BUFADR(next, cpp);
-			*(*cpp)++ = tub_ascebc[' '];
-		}
+		goto do_setcur;
+	case 'D':		/* Cursor Backward */
+		if (quant[i] == 0) quant[i] = 1;
+		next = MIN(quant[i], tubp->tty_nextlogx % GEOM_COLS);
+		next = tubp->tty_nextlogx - next;
+		goto do_setcur;
+	case 'G':
+		if (quant[0]) quant[0]--;
+		next = tubp->tty_nextlogx / GEOM_COLS * GEOM_COLS + quant[0];
+do_setcur:
+		if (next < 0)
+			break;
 		tubp->tty_nextlogx = next;
 		tubp->tty_oucol = tubp->tty_nextlogx % GEOM_COLS;
+		*sba_needed = 1;
 		break;
-	case 'D':		/* Cursor Backward */
-		next = MIN(quant[i], tubp->tty_nextlogx % GEOM_COLS);
-		tubp->tty_nextlogx -= next;
-		tubp->tty_oucol = tubp->tty_nextlogx % GEOM_COLS;
+
+	case 'r':		/* Define scroll area */
+		start = quant[0];
+		if (start <= 0) start = 1;
+		if (start > GEOM_ROWS - 2) start = GEOM_ROWS - 2;
+		tubp->tty_nextlogx = (start - 1) * GEOM_COLS;
+		tubp->tty_oucol = 0;
+		*sba_needed = 1;
+		break;
+
+	case 'X':		/* Erase for n chars from cursor */
+		start = tubp->tty_nextlogx;
+		end = start + (quant[0]?: 1);
+		goto do_fill;
+	case 'J':		/* Erase to screen end from cursor */
+		*(*cpp)++ = TO_SBA;
+		TUB_BUFADR(tubp->tty_nextlogx, cpp);
+		*(*cpp)++ = TO_RA;
+		TUB_BUFADR(GEOM_INPUT, cpp);
+		*(*cpp)++ = tub_ascebc[' '];
 		*(*cpp)++ = TO_SBA;
 		TUB_BUFADR(tubp->tty_nextlogx, cpp);
 		break;
-	case 'G':
-		start = tubp->tty_nextlogx / GEOM_COLS * GEOM_COLS;
-		next = MIN(quant[i], GEOM_COLS - 1) + start;
-		next = MIN(next, lastx);
-		goto do_fill;
+	case 'K':
+		start = tubp->tty_nextlogx;
+		end = (start + GEOM_COLS) / GEOM_COLS * GEOM_COLS;
+do_fill:
+		if (start >= GEOM_INPUT)
+			break;
+		if (end > GEOM_INPUT)
+			end = GEOM_INPUT;
+		if (end <= start)
+			break;
+		*(*cpp)++ = TO_SBA;
+		TUB_BUFADR(start, cpp);
+		if (end - start > 4) {
+			*(*cpp)++ = TO_RA;
+			TUB_BUFADR(end, cpp);
+			*(*cpp)++ = tub_ascebc[' '];
+		} else while (start++ < end) {
+			*(*cpp)++ = tub_ascebc[' '];
+		}
+		tubp->tty_nextlogx = end;
+		tubp->tty_oucol = tubp->tty_nextlogx % GEOM_COLS;
+		*sba_needed = 1;
+		break;
 	}
+done_return:
+	tubp->tty_escx = 0;
+	cp = sabuf;
+	while (cp != sap)
+		tubp->tty_esca[tubp->tty_escx++] = *cp++;
+	return 0;
+error_return:
+	tubp->tty_escx = 0;
+	return 0;
 }
-
 
 static int
 tty3270_next_char(tub_t *tubp)
@@ -291,6 +398,18 @@ tty3270_next_char(tub_t *tubp)
 		ib->bc_rd = 0;
 	ib->bc_cnt--;
 	return c;
+}
+
+static void
+tty3270_unnext_char(tub_t *tubp, char c)
+{
+	bcb_t *ib;
+
+	ib = &tubp->tty_bcb;
+	if (ib->bc_rd == 0)
+		ib->bc_rd = ib->bc_len;
+	ib->bc_buf[--ib->bc_rd] = c;
+	ib->bc_cnt++;
 }
 
 
@@ -451,4 +570,18 @@ tty3270_tub_bufadr(tub_t *tubp, int adr, char **cpp)
 		*(*cpp)++ = tub_ebcgraf[(adr >> 6) & 0x3f];
 		*(*cpp)++ = tub_ebcgraf[adr & 0x3f];
 	}
+}
+
+static void
+tty3270_set_bufadr(tub_t *tubp, char **cpp, int *sba_needed)
+{
+	if (!*sba_needed)
+		return;
+	if (tubp->tty_nextlogx >= GEOM_INPUT) {
+		tubp->tty_nextlogx = GEOM_INPUT - 1;
+		tubp->tty_oucol = tubp->tty_nextlogx % GEOM_COLS;
+	}
+	*(*cpp)++ = TO_SBA;
+	TUB_BUFADR(tubp->tty_nextlogx, cpp);
+	*sba_needed = 0;
 }
