@@ -11,6 +11,8 @@
 #include <asm/uaccess.h>
 #include <asm/unaligned.h>
 #include <linux/buffer_head.h>
+#include <linux/mpage.h>
+#include <linux/writeback.h>
 
 /* args for the create parameter of reiserfs_get_block */
 #define GET_BLOCK_NO_CREATE 0 /* don't create new blocks or convert tails */
@@ -262,7 +264,10 @@ research:
 	blocknr = get_block_num(ind_item, path.pos_in_item) ;
 	ret = 0 ;
 	if (blocknr) {
-		map_bh(bh_result, inode->i_sb, blocknr);
+	    map_bh(bh_result, inode->i_sb, blocknr);
+	    if (path.pos_in_item == ((ih_item_len(ih) / UNFM_P_SIZE) - 1)) {
+		set_buffer_boundary(bh_result);
+	    }
 	} else 
 	    // We do not return -ENOENT if there is a hole but page is uptodate, because it means
 	    // That there is some MMAPED data associated with it that is yet to  be written to disk.
@@ -286,7 +291,7 @@ research:
 	return -ENOENT;
     }
 
-    /* if we've got a direct item, and the buffer was uptodate,
+    /* if we've got a direct item, and the buffer or page was uptodate,
     ** we don't want to pull data off disk again.  skip to the
     ** end, where we map the buffer and return
     */
@@ -367,7 +372,9 @@ research:
 
 finished:
     pathrelse (&path);
-    /* I _really_ doubt that you want it.  Chris? */
+    /* this buffer has valid data, but isn't valid for io.  mapping it to
+     * block #0 tells the rest of reiserfs it just has a tail in it
+     */
     map_bh(bh_result, inode->i_sb, 0);
     set_buffer_uptodate (bh_result);
     return 0;
@@ -842,6 +849,12 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
     return retval;
 }
 
+static int
+reiserfs_readpages(struct file *file, struct address_space *mapping,
+		struct list_head *pages, unsigned nr_pages)
+{
+    return mpage_readpages(mapping, pages, nr_pages, reiserfs_get_block);
+}
 
 //
 // BAD: new directories have stat data of new type and all other items
@@ -1809,13 +1822,19 @@ static int map_block_for_writepage(struct inode *inode,
     int use_get_block = 0 ;
     int bytes_copied = 0 ;
     int copy_size ;
+    int trans_running = 0;
+
+    /* catch places below that try to log something without starting a trans */
+    th.t_trans_id = 0;
+
+    if (!buffer_uptodate(bh_result)) {
+        buffer_error();
+	return -EIO;
+    }
 
     kmap(bh_result->b_page) ;
 start_over:
     reiserfs_write_lock(inode->i_sb);
-    journal_begin(&th, inode->i_sb, jbegin_count) ;
-    reiserfs_update_inode_transaction(inode) ;
-
     make_cpu_key(&key, inode, byte_offset, TYPE_ANY, 3) ;
 
 research:
@@ -1841,7 +1860,6 @@ research:
 	    goto out ;
 	}
 	set_block_dev_mapped(bh_result, get_block_num(item,pos_in_item),inode);
-        set_buffer_uptodate(bh_result);
     } else if (is_direct_le_ih(ih)) {
         char *p ; 
         p = page_address(bh_result->b_page) ;
@@ -1850,7 +1868,20 @@ research:
 
 	fs_gen = get_generation(inode->i_sb) ;
 	copy_item_head(&tmp_ih, ih) ;
+
+	if (!trans_running) {
+	    /* vs-3050 is gone, no need to drop the path */
+	    journal_begin(&th, inode->i_sb, jbegin_count) ;
+	    reiserfs_update_inode_transaction(inode) ;
+	    trans_running = 1;
+	    if (fs_changed(fs_gen, inode->i_sb) && item_moved(&tmp_ih, &path)) {
+		reiserfs_restore_prepared_buffer(inode->i_sb, bh) ;
+		goto research;
+	    }
+	}
+
 	reiserfs_prepare_for_journal(inode->i_sb, bh, 1) ;
+
 	if (fs_changed (fs_gen, inode->i_sb) && item_moved (&tmp_ih, &path)) {
 	    reiserfs_restore_prepared_buffer(inode->i_sb, bh) ;
 	    goto research;
@@ -1861,7 +1892,6 @@ research:
 	journal_mark_dirty(&th, inode->i_sb, bh) ;
 	bytes_copied += copy_size ;
 	set_block_dev_mapped(bh_result, 0, inode);
-        set_buffer_uptodate(bh_result);
 
 	/* are there still bytes left? */
         if (bytes_copied < bh_result->b_size && 
@@ -1878,7 +1908,10 @@ research:
     
 out:
     pathrelse(&path) ;
-    journal_end(&th, inode->i_sb, jbegin_count) ;
+    if (trans_running) {
+	journal_end(&th, inode->i_sb, jbegin_count) ;
+	trans_running = 0;
+    }
     reiserfs_write_unlock(inode->i_sb);
 
     /* this is where we fill in holes in the file. */
@@ -1894,49 +1927,77 @@ out:
 	}
     }
     kunmap(bh_result->b_page) ;
+
+    if (!retval && buffer_mapped(bh_result) && bh_result->b_blocknr == 0) {
+	/* we've copied data from the page into the direct item, so the
+	 * buffer in the page is now clean, mark it to reflect that.
+	 */
+        lock_buffer(bh_result);
+	clear_buffer_dirty(bh_result);
+	unlock_buffer(bh_result);
+    }
     return retval ;
 }
 
-/* helper func to get a buffer head ready for writepage to send to
-** ll_rw_block
-*/
-static inline void submit_bh_for_writepage(struct buffer_head **bhp, int nr) {
-    struct buffer_head *bh ;
-    int i;
-    for(i = 0 ; i < nr ; i++) {
-        bh = bhp[i] ;
-	lock_buffer(bh) ;
-	mark_buffer_async_write(bh) ;
-	/* submit_bh doesn't care if the buffer is dirty, but nobody
-	** later on in the call chain will be cleaning it.  So, we
-	** clean the buffer here, it still gets written either way.
-	*/
-	clear_buffer_dirty(bh) ;
-	set_buffer_uptodate(bh) ;
-	submit_bh(WRITE, bh) ;
+/*
+ * does the right thing for deciding when to lock a buffer and
+ * mark it for io during a writepage.  make sure the buffer is
+ * dirty before sending it here though.
+ */
+static void lock_buffer_for_writepage(struct page *page, 
+                                      struct writeback_control *wbc, 
+			              struct buffer_head *bh)
+{
+    if (wbc->sync_mode != WB_SYNC_NONE) {
+	lock_buffer(bh);
+    } else {
+	if (test_set_buffer_locked(bh)) {
+	    __set_page_dirty_nobuffers(page);
+	    return;
+	}
+    }
+    if (test_clear_buffer_dirty(bh)) {
+	if (!buffer_uptodate(bh))
+	    buffer_error();
+	mark_buffer_async_write(bh);
+    } else {
+	unlock_buffer(bh);
     }
 }
 
+/* 
+ * mason@suse.com: updated in 2.5.54 to follow the same general io 
+ * start/recovery path as __block_write_full_page, along with special
+ * code to handle reiserfs tails.
+ */
 static int reiserfs_write_full_page(struct page *page, struct writeback_control *wbc) {
     struct inode *inode = page->mapping->host ;
     unsigned long end_index = inode->i_size >> PAGE_CACHE_SHIFT ;
-    unsigned last_offset = PAGE_CACHE_SIZE;
     int error = 0;
     unsigned long block ;
-    unsigned cur_offset = 0 ;
-    struct buffer_head *head, *bh ;
+    struct buffer_head *head, *bh;
     int partial = 0 ;
-    struct buffer_head *arr[PAGE_CACHE_SIZE/512] ;
-    int nr = 0 ;
+    int nr = 0;
 
-    if (!page_has_buffers(page))
-        block_prepare_write(page, 0, 0, NULL) ;
+    /* The page dirty bit is cleared before writepage is called, which
+     * means we have to tell create_empty_buffers to make dirty buffers
+     * The page really should be up to date at this point, so tossing
+     * in the BH_Uptodate is just a sanity check.
+     */
+    if (!page_has_buffers(page)) {
+	if (!PageUptodate(page))
+	    buffer_error();
+	create_empty_buffers(page, inode->i_sb->s_blocksize, 
+	                    (1 << BH_Dirty) | (1 << BH_Uptodate));
+    }
+    head = page_buffers(page) ;
 
     /* last page in the file, zero out any contents past the
     ** last byte in the file
     */
     if (page->index >= end_index) {
 	char *kaddr;
+	unsigned last_offset;
 
         last_offset = inode->i_size & (PAGE_CACHE_SIZE - 1) ;
 	/* no file contents in this page */
@@ -1949,66 +2010,107 @@ static int reiserfs_write_full_page(struct page *page, struct writeback_control 
 	flush_dcache_page(page) ;
 	kunmap_atomic(kaddr, KM_USER0) ;
     }
-    head = page_buffers(page) ;
     bh = head ;
     block = page->index << (PAGE_CACHE_SHIFT - inode->i_sb->s_blocksize_bits) ;
     do {
-	/* if this offset in the page is outside the file */
-	if (cur_offset >= last_offset) {
-	    if (!buffer_uptodate(bh))
-	        partial = 1 ;
-	} else {
-	    /* fast path, buffer mapped to an unformatted node */
+	get_bh(bh);
+	if (buffer_dirty(bh)) {
 	    if (buffer_mapped(bh) && bh->b_blocknr != 0) {
-		arr[nr++] = bh ;
+		/* buffer mapped to an unformatted node */
+		lock_buffer_for_writepage(page, wbc, bh);
 	    } else {
-		/* buffer not mapped yet, or points to a direct item.
-		** search and dirty or log
-		*/
+		/* not mapped yet, or it points to a direct item, search
+		 * the btree for the mapping info, and log any direct
+		 * items found
+		 */
 		if ((error = map_block_for_writepage(inode, bh, block))) {
 		    goto fail ;
 		}
-		/* map_block_for_writepage either found an unformatted node
-		** and mapped it for us, or it found a direct item
-		** and logged the changes.  
-		*/
-		if (buffer_mapped(bh) && bh->b_blocknr != 0) {
-		    arr[nr++] = bh ;
-		}
+		if (buffer_mapped(bh) && bh->b_blocknr != 0)  {
+		    lock_buffer_for_writepage(page, wbc, bh);
+		} 
 	    }
 	}
-        bh = bh->b_this_page ;
-	cur_offset += bh->b_size ;
-	block++ ;
+        bh = bh->b_this_page;
+	block++;
     } while(bh != head) ;
 
-    if (!partial)
-        SetPageUptodate(page) ;
     BUG_ON(PageWriteback(page));
     SetPageWriteback(page);
     unlock_page(page);
 
-    /* if this page only had a direct item, it is very possible for
-    ** nr == 0 without there being any kind of error.
-    */
-    if (nr) {
-        submit_bh_for_writepage(arr, nr) ;
-    } else {
-        end_page_writeback(page) ;
-    }
+    /*
+     * since any buffer might be the only dirty buffer on the page, 
+     * the first submit_bh can bring the page out of writeback.
+     * be careful with the buffers.
+     */
+    do {
+        struct buffer_head *next = bh->b_this_page;
+	if (buffer_async_write(bh)) {
+	    submit_bh(WRITE, bh);
+	    nr++;
+	}
+	put_bh(bh);
+	bh = next;
+    } while(bh != head);
 
-    return 0 ;
+    error = 0;
+done:
+    if (nr == 0) {
+        /*
+         * if this page only had a direct item, it is very possible for
+         * no io to be required without there being an error.  Or, 
+	 * someone else could have locked them and sent them down the 
+	 * pipe without locking the page
+	 */
+	do {
+	    if (!buffer_uptodate(bh)) {
+	        partial = 1;
+		break;
+	    }
+	} while(bh != head);
+	if (!partial)
+	    SetPageUptodate(page);
+	end_page_writeback(page);
+    }
+    return error;
 
 fail:
-    if (nr) {
-        SetPageWriteback(page);
-        unlock_page(page);
-        submit_bh_for_writepage(arr, nr) ;
-    } else {
-        unlock_page(page) ;
-    }
-    ClearPageUptodate(page) ;
-    return error ;
+    /* catches various errors, we need to make sure any valid dirty blocks
+     * get to the media.  The page is currently locked and not marked for 
+     * writeback
+     */
+    ClearPageUptodate(page);
+    bh = head;
+    do {
+	get_bh(bh);
+	if (buffer_mapped(bh) && buffer_dirty(bh) && bh->b_blocknr) {
+	    lock_buffer(bh);
+	    mark_buffer_async_write(bh);
+	} else {
+	    /*
+	     * clear any dirty bits that might have come from getting
+	     * attached to a dirty page
+	     */
+	     clear_buffer_dirty(bh);
+	}
+        bh = bh->b_this_page;
+    } while(bh != head);
+    SetPageError(page);
+    BUG_ON(PageWriteback(page));
+    SetPageWriteback(page);
+    unlock_page(page);
+    do {
+        struct buffer_head *next = bh->b_this_page;
+	if (buffer_async_write(bh)) {
+	    clear_buffer_dirty(bh);
+	    submit_bh(WRITE, bh);
+	    nr++;
+	}
+	put_bh(bh);
+	bh = next;
+    } while(bh != head);
+    goto done;
 }
 
 
@@ -2115,6 +2217,7 @@ static int reiserfs_releasepage(struct page *page, int unused_gfp_flags)
 struct address_space_operations reiserfs_address_space_operations = {
     .writepage = reiserfs_writepage,
     .readpage = reiserfs_readpage, 
+    .readpages = reiserfs_readpages, 
     .releasepage = reiserfs_releasepage,
     .sync_page = block_sync_page,
     .prepare_write = reiserfs_prepare_write,

@@ -207,19 +207,34 @@ static void set_ioapic_affinity (unsigned int irq, unsigned long mask)
 	spin_unlock_irqrestore(&ioapic_lock, flags);
 }
 
-#if CONFIG_SMP
-
-typedef struct {
-	unsigned int cpu;
-	unsigned long timestamp;
-} ____cacheline_aligned irq_balance_t;
-
-static irq_balance_t irq_balance[NR_IRQS] __cacheline_aligned
-			= { [ 0 ... NR_IRQS-1 ] = { 0, 0 } };
+#if defined(CONFIG_SMP)
+# include <asm/processor.h>	/* kernel_thread() */
+# include <linux/kernel_stat.h>	/* kstat */
+# include <linux/slab.h>		/* kmalloc() */
+# include <linux/timer.h>	/* time_after() */
+ 
+# if CONFIG_BALANCED_IRQ_DEBUG
+#  define TDprintk(x...) do { printk("<%ld:%s:%d>: ", jiffies, __FILE__, __LINE__); printk(x); } while (0)
+#  define Dprintk(x...) do { TDprintk(x); } while (0)
+# else
+#  define TDprintk(x...) 
+#  define Dprintk(x...) 
+# endif
 
 extern unsigned long irq_affinity [NR_IRQS];
+unsigned long __cacheline_aligned irq_balance_mask [NR_IRQS];
+static int irqbalance_disabled __initdata = 0;
+static int physical_balance = 0;
 
-#endif
+struct irq_cpu_info {
+	unsigned long * last_irq;
+	unsigned long * irq_delta;
+	unsigned long irq;
+} irq_cpu_data[NR_CPUS];
+
+#define CPU_IRQ(cpu)		(irq_cpu_data[cpu].irq)
+#define LAST_CPU_IRQ(cpu,irq)   (irq_cpu_data[cpu].last_irq[irq])
+#define IRQ_DELTA(cpu,irq) 	(irq_cpu_data[cpu].irq_delta[irq])
 
 #define IDLE_ENOUGH(cpu,now) \
 		(idle_cpu(cpu) && ((now) - irq_stat[(cpu)].idle_timestamp > 1))
@@ -227,10 +242,224 @@ extern unsigned long irq_affinity [NR_IRQS];
 #define IRQ_ALLOWED(cpu,allowed_mask) \
 		((1 << cpu) & (allowed_mask))
 
-#if CONFIG_SMP
+#define CPU_TO_PACKAGEINDEX(i) \
+		((physical_balance && i > cpu_sibling_map[i]) ? cpu_sibling_map[i] : i)
 
-#define IRQ_BALANCE_INTERVAL (HZ/50)
+#define MAX_BALANCED_IRQ_INTERVAL	(5*HZ)
+#define MIN_BALANCED_IRQ_INTERVAL	(HZ/2)
+#define BALANCED_IRQ_MORE_DELTA		(HZ/10)
+#define BALANCED_IRQ_LESS_DELTA		(HZ)
+
+long balanced_irq_interval = MAX_BALANCED_IRQ_INTERVAL;
+					 
+static inline void balance_irq(int cpu, int irq);
+
+static inline void rotate_irqs_among_cpus(unsigned long useful_load_threshold)
+{
+	int i, j;
+	Dprintk("Rotating IRQs among CPUs.\n");
+	for (i = 0; i < NR_CPUS; i++) {
+		for (j = 0; cpu_online(i) && (j < NR_IRQS); j++) {
+			if (!irq_desc[j].action)
+				continue;
+			/* Is it a significant load ?  */
+			if (IRQ_DELTA(CPU_TO_PACKAGEINDEX(i),j) < useful_load_threshold)
+				continue;
+			balance_irq(i, j);
+		}
+	}
+	balanced_irq_interval = max((long)MIN_BALANCED_IRQ_INTERVAL,
+		balanced_irq_interval - BALANCED_IRQ_LESS_DELTA);	
+	return;
+}
+
+static void do_irq_balance(void)
+{
+	int i, j;
+	unsigned long max_cpu_irq = 0, min_cpu_irq = (~0);
+	unsigned long move_this_load = 0;
+	int max_loaded = 0, min_loaded = 0;
+	unsigned long useful_load_threshold = balanced_irq_interval + 10;
+	int selected_irq;
+	int tmp_loaded, first_attempt = 1;
+	unsigned long tmp_cpu_irq;
+	unsigned long imbalance = 0;
+	unsigned long allowed_mask;
+	unsigned long target_cpu_mask;
+
+	for (i = 0; i < NR_CPUS; i++) {
+		int package_index;
+		CPU_IRQ(i) = 0;
+		if (!cpu_online(i))
+			continue;
+		package_index = CPU_TO_PACKAGEINDEX(i);
+		for (j = 0; j < NR_IRQS; j++) {
+			unsigned long value_now, delta;
+			/* Is this an active IRQ? */
+			if (!irq_desc[j].action)
+				continue;
+			if ( package_index == i )
+				IRQ_DELTA(package_index,j) = 0;
+			/* Determine the total count per processor per IRQ */
+			value_now = (unsigned long) kstat_cpu(i).irqs[j];
+
+			/* Determine the activity per processor per IRQ */
+			delta = value_now - LAST_CPU_IRQ(i,j);
+
+			/* Update last_cpu_irq[][] for the next time */
+			LAST_CPU_IRQ(i,j) = value_now;
+
+			/* Ignore IRQs whose rate is less than the clock */
+			if (delta < useful_load_threshold)
+				continue;
+			/* update the load for the processor or package total */
+			IRQ_DELTA(package_index,j) += delta;
+
+			/* Keep track of the higher numbered sibling as well */
+			if (i != package_index)
+				CPU_IRQ(i) += delta;
+			/*
+			 * We have sibling A and sibling B in the package
+			 *
+			 * cpu_irq[A] = load for cpu A + load for cpu B
+			 * cpu_irq[B] = load for cpu B
+			 */
+			CPU_IRQ(package_index) += delta;
+		}
+	}
+	/* Find the least loaded processor package */
+	for (i = 0; i < NR_CPUS; i++) {
+		if (!cpu_online(i))
+			continue;
+		if (physical_balance && i > cpu_sibling_map[i])
+			continue;
+		if (min_cpu_irq > CPU_IRQ(i)) {
+			min_cpu_irq = CPU_IRQ(i);
+			min_loaded = i;
+		}
+	}
+	max_cpu_irq = ULONG_MAX;
+
+tryanothercpu:
+	/* Look for heaviest loaded processor.
+	 * We may come back to get the next heaviest loaded processor.
+	 * Skip processors with trivial loads.
+	 */
+	tmp_cpu_irq = 0;
+	tmp_loaded = -1;
+	for (i = 0; i < NR_CPUS; i++) {
+		if (!cpu_online(i))
+			continue;
+		if (physical_balance && i > cpu_sibling_map[i])
+			continue;
+		if (max_cpu_irq <= CPU_IRQ(i)) 
+			continue;
+		if (tmp_cpu_irq < CPU_IRQ(i)) {
+			tmp_cpu_irq = CPU_IRQ(i);
+			tmp_loaded = i;
+		}
+	}
+
+	if (tmp_loaded == -1) {
+ 	 /* In the case of small number of heavy interrupt sources, 
+	  * loading some of the cpus too much. We use Ingo's original 
+	  * approach to rotate them around.
+	  */
+		if (!first_attempt && imbalance >= useful_load_threshold) {
+			rotate_irqs_among_cpus(useful_load_threshold);
+			return;
+		}
+		goto not_worth_the_effort;
+	}
 	
+	first_attempt = 0;		/* heaviest search */
+	max_cpu_irq = tmp_cpu_irq;	/* load */
+	max_loaded = tmp_loaded;	/* processor */
+	imbalance = (max_cpu_irq - min_cpu_irq) / 2;
+	
+	Dprintk("max_loaded cpu = %d\n", max_loaded);
+	Dprintk("min_loaded cpu = %d\n", min_loaded);
+	Dprintk("max_cpu_irq load = %ld\n", max_cpu_irq);
+	Dprintk("min_cpu_irq load = %ld\n", min_cpu_irq);
+	Dprintk("load imbalance = %lu\n", imbalance);
+
+	/* if imbalance is less than approx 10% of max load, then
+	 * observe diminishing returns action. - quit
+	 */
+	if (imbalance < (max_cpu_irq >> 3)) {
+		Dprintk("Imbalance too trivial\n");
+		goto not_worth_the_effort;
+	}
+
+tryanotherirq:
+	/* if we select an IRQ to move that can't go where we want, then
+	 * see if there is another one to try.
+	 */
+	move_this_load = 0;
+	selected_irq = -1;
+	for (j = 0; j < NR_IRQS; j++) {
+		/* Is this an active IRQ? */
+		if (!irq_desc[j].action)
+			continue;
+		if (imbalance <= IRQ_DELTA(max_loaded,j))
+			continue;
+		/* Try to find the IRQ that is closest to the imbalance
+		 * without going over.
+		 */
+		if (move_this_load < IRQ_DELTA(max_loaded,j)) {
+			move_this_load = IRQ_DELTA(max_loaded,j);
+			selected_irq = j;
+		}
+	}
+	if (selected_irq == -1) {
+		goto tryanothercpu;
+	}
+
+	imbalance = move_this_load;
+	
+	/* For physical_balance case, we accumlated both load
+	 * values in the one of the siblings cpu_irq[],
+	 * to use the same code for physical and logical processors
+	 * as much as possible. 
+	 *
+	 * NOTE: the cpu_irq[] array holds the sum of the load for
+	 * sibling A and sibling B in the slot for the lowest numbered
+	 * sibling (A), _AND_ the load for sibling B in the slot for
+	 * the higher numbered sibling.
+	 *
+	 * We seek the least loaded sibling by making the comparison
+	 * (A+B)/2 vs B
+	 */
+	if (physical_balance && (CPU_IRQ(min_loaded) >> 1) > CPU_IRQ(cpu_sibling_map[min_loaded]))
+		min_loaded = cpu_sibling_map[min_loaded];
+
+	allowed_mask = cpu_online_map & irq_affinity[selected_irq];
+	target_cpu_mask = 1 << min_loaded;
+
+	if (target_cpu_mask & allowed_mask) {
+		irq_desc_t *desc = irq_desc + selected_irq;
+		Dprintk("irq = %d moved to cpu = %d\n", selected_irq, min_loaded);
+		/* mark for change destination */
+		spin_lock(&desc->lock);
+		irq_balance_mask[selected_irq] = target_cpu_mask;
+		spin_unlock(&desc->lock);
+		/* Since we made a change, come back sooner to 
+		 * check for more variation.
+		 */
+		balanced_irq_interval = max((long)MIN_BALANCED_IRQ_INTERVAL,
+			balanced_irq_interval - BALANCED_IRQ_LESS_DELTA);	
+		return;
+	}
+	goto tryanotherirq;
+
+not_worth_the_effort:
+	/* if we did not find an IRQ to move, then adjust the time interval upward */
+	balanced_irq_interval = min((long)MAX_BALANCED_IRQ_INTERVAL,
+		balanced_irq_interval + BALANCED_IRQ_MORE_DELTA);	
+	Dprintk("IRQ worth rotating not found\n");
+	return;
+}
+
 static unsigned long move(int curr_cpu, unsigned long allowed_mask, unsigned long now, int direction)
 {
 	int search_idle = 1;
@@ -257,34 +486,113 @@ inside:
 	return cpu;
 }
 
-static inline void balance_irq(int irq)
+static inline void balance_irq (int cpu, int irq)
 {
-	irq_balance_t *entry = irq_balance + irq;
 	unsigned long now = jiffies;
-
+	unsigned long allowed_mask;
+	unsigned int new_cpu;
+		
 	if (no_balance_irq)
 		return;
 
-	if (unlikely(time_after(now, entry->timestamp + IRQ_BALANCE_INTERVAL))) {
-		unsigned long allowed_mask;
-		unsigned int new_cpu;
-		int random_number;
-
-		rdtscl(random_number);
-		random_number &= 1;
-
-		allowed_mask = cpu_online_map & irq_affinity[irq];
-		entry->timestamp = now;
-		new_cpu = move(entry->cpu, allowed_mask, now, random_number);
-		if (entry->cpu != new_cpu) {
-			entry->cpu = new_cpu;
-			set_ioapic_affinity(irq, cpu_to_logical_apicid(new_cpu));
-		}
+	allowed_mask = cpu_online_map & irq_affinity[irq];
+	new_cpu = move(cpu, allowed_mask, now, 1);
+	if (cpu != new_cpu) {
+		irq_desc_t *desc = irq_desc + irq;
+		spin_lock(&desc->lock);
+		irq_balance_mask[irq] = cpu_to_logical_apicid(new_cpu);
+		spin_unlock(&desc->lock);
 	}
 }
+
+int balanced_irq(void *unused)
+{
+	int i;
+	unsigned long prev_balance_time = jiffies;
+	long time_remaining = balanced_irq_interval;
+	daemonize();
+	sigfillset(&current->blocked);
+	sprintf(current->comm, "kirqd");
+	
+	/* push everything to CPU 0 to give us a starting point.  */
+	for (i = 0 ; i < NR_IRQS ; i++)
+		irq_balance_mask[i] = 1 << 0;
+	for (;;) {
+		set_current_state(TASK_INTERRUPTIBLE);
+		time_remaining = schedule_timeout(time_remaining);
+		if (time_after(jiffies, prev_balance_time+balanced_irq_interval)) {
+			Dprintk("balanced_irq: calling do_irq_balance() %lu\n", jiffies);
+			do_irq_balance();
+			prev_balance_time = jiffies;
+			time_remaining = balanced_irq_interval;
+		}
+        }
+}
+
+static int __init balanced_irq_init(void)
+{
+	int i;
+	struct cpuinfo_x86 *c;
+        c = &boot_cpu_data;
+	if (irqbalance_disabled)
+		return 0;
+	/* Enable physical balance only if more than 1 physical processor is present */
+	if (smp_num_siblings > 1 && cpu_online_map >> 2)
+		physical_balance = 1;
+
+	for (i = 0; i < NR_CPUS; i++) {
+		if (!cpu_online(i))
+			continue;
+		irq_cpu_data[i].irq_delta = kmalloc(sizeof(unsigned long) * NR_IRQS, GFP_KERNEL);
+		irq_cpu_data[i].last_irq = kmalloc(sizeof(unsigned long) * NR_IRQS, GFP_KERNEL);
+		if (irq_cpu_data[i].irq_delta == NULL || irq_cpu_data[i].last_irq == NULL) {
+			printk(KERN_ERR "balanced_irq_init: out of memory");
+			goto failed;
+		}
+		memset(irq_cpu_data[i].irq_delta,0,sizeof(unsigned long) * NR_IRQS);
+		memset(irq_cpu_data[i].last_irq,0,sizeof(unsigned long) * NR_IRQS);
+	}
+	
+	printk(KERN_INFO "Starting balanced_irq\n");
+	if (kernel_thread(balanced_irq, NULL, CLONE_KERNEL) >= 0) 
+		return 0;
+	else 
+		printk(KERN_ERR "balanced_irq_init: failed to spawn balanced_irq");
+failed:
+	for (i = 0; i < NR_CPUS; i++) {
+		if(irq_cpu_data[i].irq_delta)
+			kfree(irq_cpu_data[i].irq_delta);
+		if(irq_cpu_data[i].last_irq)
+			kfree(irq_cpu_data[i].last_irq);
+	}
+	return 0;
+}
+
+static int __init irqbalance_disable(char *str)
+{
+	irqbalance_disabled = 1;
+	return 0;
+}
+
+__setup("noirqbalance", irqbalance_disable);
+
+static void set_ioapic_affinity (unsigned int irq, unsigned long mask);
+
+static inline void move_irq(int irq)
+{
+	/* note - we hold the desc->lock */
+	if (unlikely(irq_balance_mask[irq])) {
+		set_ioapic_affinity(irq, irq_balance_mask[irq]);
+		irq_balance_mask[irq] = 0;
+	}
+}
+
+__initcall(balanced_irq_init);
+
 #else /* !SMP */
-static inline void balance_irq(int irq) { }
-#endif
+static inline void move_irq(int irq) { }
+#endif /* defined(CONFIG_SMP) */
+
 
 /*
  * support for broken MP BIOSs, enables hand-redirection of PIRQ0-7 to
@@ -1307,7 +1615,7 @@ static unsigned int startup_edge_ioapic_irq(unsigned int irq)
  */
 static void ack_edge_ioapic_irq(unsigned int irq)
 {
-	balance_irq(irq);
+	move_irq(irq);
 	if ((irq_desc[irq].status & (IRQ_PENDING | IRQ_DISABLED))
 					== (IRQ_PENDING | IRQ_DISABLED))
 		mask_IO_APIC_irq(irq);
@@ -1347,7 +1655,7 @@ static void end_level_ioapic_irq (unsigned int irq)
 	unsigned long v;
 	int i;
 
-	balance_irq(irq);
+	move_irq(irq);
 /*
  * It appears there is an erratum which affects at least version 0x11
  * of I/O APIC (that's the 82093AA and cores integrated into various

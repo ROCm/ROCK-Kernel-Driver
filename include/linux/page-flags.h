@@ -72,7 +72,8 @@
 
 #define PG_direct		16	/* ->pte_chain points directly at pte */
 #define PG_mappedtodisk		17	/* Has blocks allocated on-disk */
-#define PG_reclaim		18	/* To be recalimed asap */
+#define PG_reclaim		18	/* To be reclaimed asap */
+#define PG_compound		19	/* Part of a compound page */
 
 /*
  * Global page accounting.  One instance per CPU.  Only unsigned longs are
@@ -250,6 +251,10 @@ extern void get_full_page_state(struct page_state *ret);
 #define SetPageReclaim(page)	set_bit(PG_reclaim, &(page)->flags)
 #define ClearPageReclaim(page)	clear_bit(PG_reclaim, &(page)->flags)
 #define TestClearPageReclaim(page) test_and_clear_bit(PG_reclaim, &(page)->flags)
+
+#define PageCompound(page)	test_bit(PG_compound, &(page)->flags)
+#define SetPageCompound(page)	set_bit(PG_compound, &(page)->flags)
+#define ClearPageCompound(page)	clear_bit(PG_compound, &(page)->flags)
 
 /*
  * The PageSwapCache predicate doesn't use a PG_flag at this time,

@@ -439,7 +439,6 @@ struct arraycache_init initarray_generic __initdata = { { 0, BOOT_CPUCACHE_ENTRI
 static kmem_cache_t cache_cache = {
 	.lists		= LIST3_INIT(cache_cache.lists),
 	/* Allow for boot cpu != 0 */
-	.array		= { [0 ... NR_CPUS-1] = &initarray_cache.cache },
 	.batchcount	= 1,
 	.limit		= BOOT_CPUCACHE_ENTRIES,
 	.objsize	= sizeof(kmem_cache_t),
@@ -611,6 +610,7 @@ void __init kmem_cache_init(void)
 	init_MUTEX(&cache_chain_sem);
 	INIT_LIST_HEAD(&cache_chain);
 	list_add(&cache_cache.next, &cache_chain);
+	cache_cache.array[smp_processor_id()] = &initarray_cache.cache;
 
 	cache_estimate(0, cache_cache.objsize, 0,
 			&left_over, &cache_cache.num);

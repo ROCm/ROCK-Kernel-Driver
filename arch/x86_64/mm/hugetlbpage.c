@@ -25,7 +25,6 @@ static long    htlbpagemem;
 int     htlbpage_max;
 static long    htlbzone_pages;
 
-struct vm_operations_struct hugetlb_vm_ops;
 static LIST_HEAD(htlbpage_freelist);
 static spinlock_t htlbpage_lock = SPIN_LOCK_UNLOCKED;
 
@@ -134,6 +133,7 @@ back1:
 		page = pte_page(pte);
 		if (pages) {
 			page += ((start & ~HPAGE_MASK) >> PAGE_SHIFT);
+			get_page(page);
 			pages[i] = page;
 		}
 		if (vmas)
@@ -204,6 +204,7 @@ void zap_hugepage_range(struct vm_area_struct *vma, unsigned long start, unsigne
 int hugetlb_prefault(struct address_space *mapping, struct vm_area_struct *vma)
 {
 	struct mm_struct *mm = current->mm;
+	struct inode = mapping->host;
 	unsigned long addr;
 	int ret = 0;
 
@@ -227,6 +228,8 @@ int hugetlb_prefault(struct address_space *mapping, struct vm_area_struct *vma)
 			+ (vma->vm_pgoff >> (HPAGE_SHIFT - PAGE_SHIFT));
 		page = find_get_page(mapping, idx);
 		if (!page) {
+			loff_t i_size;
+
 			page = alloc_hugetlb_page();
 			if (!page) {
 				ret = -ENOMEM;
@@ -238,6 +241,9 @@ int hugetlb_prefault(struct address_space *mapping, struct vm_area_struct *vma)
 				free_huge_page(page);
 				goto out;
 			}
+			i_size = (loff_t)(idx + 1) * HPAGE_SIZE;
+			if (i_size > inode->i_size)
+				inode->i_size = i_size;
 		}
 		set_huge_pte(mm, vma, page, pte, vma->vm_flags & VM_WRITE);
 	}
@@ -263,11 +269,6 @@ int set_hugetlb_mem_size(int count)
 			page = alloc_pages(__GFP_HIGHMEM, HUGETLB_PAGE_ORDER);
 			if (page == NULL)
 				break;
-			map = page;
-			for (j = 0; j < (HPAGE_SIZE / PAGE_SIZE); j++) {
-				SetPageReserved(map);
-				map++;
-			}
 			spin_lock(&htlbpage_lock);
 			list_add(&page->list, &htlbpage_freelist);
 			htlbpagemem++;
@@ -286,8 +287,9 @@ int set_hugetlb_mem_size(int count)
 		spin_unlock(&htlbpage_lock);
 		map = page;
 		for (j = 0; j < (HPAGE_SIZE / PAGE_SIZE); j++) {
-			map->flags &= ~(1 << PG_locked | 1 << PG_error | 1 << PG_referenced |
-					1 << PG_dirty | 1 << PG_active | 1 << PG_reserved |
+			map->flags &= ~(1 << PG_locked | 1 << PG_error |
+					1 << PG_referenced |
+					1 << PG_dirty | 1 << PG_active |
 					1 << PG_private | 1<< PG_writeback);
 			set_page_count(map, 0);
 			map++;
@@ -346,7 +348,8 @@ int hugetlb_report_meminfo(char *buf)
 			HPAGE_SIZE/1024);
 }
 
-static struct page * hugetlb_nopage(struct vm_area_struct * area, unsigned long address, int unused)
+static struct page *
+hugetlb_nopage(struct vm_area_struct *vma, unsigned long address, int unused)
 {
 	BUG();
 	return NULL;

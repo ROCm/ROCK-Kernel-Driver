@@ -201,7 +201,9 @@ struct mm_struct {
 	unsigned long swap_address;
 
 	unsigned dumpable:1;
-
+#ifdef CONFIG_HUGETLB_PAGE
+	int used_hugetlb;
+#endif
 	/* Architecture-specific MM context */
 	mm_context_t context;
 

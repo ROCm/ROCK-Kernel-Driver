@@ -18,7 +18,6 @@
 #include <asm/tlb.h>
 #include <asm/tlbflush.h>
 
-static struct vm_operations_struct hugetlb_vm_ops;
 struct list_head htlbpage_freelist;
 spinlock_t htlbpage_lock = SPIN_LOCK_UNLOCKED;
 extern long htlbpagemem;
@@ -227,6 +226,7 @@ back1:
 		page = pte_page(pte);
 		if (pages) {
 			page += ((start & ~HPAGE_MASK) >> PAGE_SHIFT);
+			get_page(page);
 			pages[i] = page;
 		}
 		if (vmas)
@@ -303,11 +303,6 @@ set_hugetlb_mem_size (int count)
 			page = alloc_pages(__GFP_HIGHMEM, HUGETLB_PAGE_ORDER);
 			if (page == NULL)
 				break;
-			map = page;
-			for (j = 0; j < (HPAGE_SIZE / PAGE_SIZE); j++) {
-				SetPageReserved(map);
-				map++;
-			}
 			spin_lock(&htlbpage_lock);
 			list_add(&page->list, &htlbpage_freelist);
 			htlbpagemem++;
@@ -327,7 +322,7 @@ set_hugetlb_mem_size (int count)
 		map = page;
 		for (j = 0; j < (HPAGE_SIZE / PAGE_SIZE); j++) {
 			map->flags &= ~(1 << PG_locked | 1 << PG_error | 1 << PG_referenced |
-					1 << PG_dirty | 1 << PG_active | 1 << PG_reserved |
+					1 << PG_dirty | 1 << PG_active |
 					1 << PG_private | 1<< PG_writeback);
 			map++;
 		}
@@ -337,6 +332,14 @@ set_hugetlb_mem_size (int count)
 	return (int) htlbzone_pages;
 }
 
+static struct page *
+hugetlb_nopage(struct vm_area_struct *vma, unsigned long address, int unused)
+{
+	BUG();
+	return NULL;
+}
+
 static struct vm_operations_struct hugetlb_vm_ops = {
-	.close =	zap_hugetlb_resources
+	.nopage =	hugetlb_nopage,
+	.close =	zap_hugetlb_resources,
 };
