@@ -28,6 +28,7 @@ enum {
 	LINUX_RAID_PARTITION = 0xfd,	/* autodetect RAID partition */
 
 	SOLARIS_X86_PARTITION =	LINUX_SWAP_PARTITION,
+	NEW_SOLARIS_X86_PARTITION = 0xbf,
 
 	DM6_AUX1PARTITION = 0x51,	/* no DDO:  use xlated geom */
 	DM6_AUX3PARTITION = 0x53,	/* no DDO:  use xlated geom */
