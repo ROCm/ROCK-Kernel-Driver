@@ -1293,6 +1293,10 @@ unsigned long __init bootmem_init(unsigned long *pages_avail)
 	unsigned long bootmap_pfn, bytes_avail, size;
 	int i;
 
+#ifdef CONFIG_DEBUG_BOOTMEM
+	prom_printf("bootmem_init: Scan sp_banks, ");
+#endif
+
 	bytes_avail = 0UL;
 	for (i = 0; sp_banks[i].num_bytes != 0; i++) {
 		end_of_phys_memory = sp_banks[i].base_addr +
@@ -1359,14 +1363,24 @@ unsigned long __init bootmem_init(unsigned long *pages_avail)
 	/* Initialize the boot-time allocator. */
 	max_pfn = max_low_pfn = end_pfn;
 	min_low_pfn = pfn_base;
+
+#ifdef CONFIG_DEBUG_BOOTMEM
+	prom_printf("init_bootmem(spfn[%lx], bpfn[%lx], mlpfn[%lx])\n",
+		    start_pfn, bootmap_pfn, max_low_pfn);
+#endif
 	bootmap_size = init_bootmem_node(NODE_DATA(0), bootmap_pfn, pfn_base, end_pfn);
 
 	/* Now register the available physical memory with the
 	 * allocator.
 	 */
-	for (i = 0; sp_banks[i].num_bytes != 0; i++)
+	for (i = 0; sp_banks[i].num_bytes != 0; i++) {
+#ifdef CONFIG_DEBUG_BOOTMEM
+		prom_printf("free_bootmem(sp_banks:%d): base[%lx] size[%lx]\n",
+			    i, sp_banks[i].base_addr, sp_banks[i].num_bytes);
+#endif
 		free_bootmem(sp_banks[i].base_addr,
 			     sp_banks[i].num_bytes);
+	}
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (initrd_start) {
@@ -1382,6 +1396,9 @@ unsigned long __init bootmem_init(unsigned long *pages_avail)
 #endif
 	/* Reserve the kernel text/data/bss. */
 	size = (start_pfn << PAGE_SHIFT) - phys_base;
+#ifdef CONFIG_DEBUG_BOOTMEM
+	prom_printf("reserve_bootmem(kernel): base[%lx] size[%lx]\n", phys_base, size);
+#endif
 	reserve_bootmem(phys_base, size);
 	*pages_avail -= PAGE_ALIGN(size) >> PAGE_SHIFT;
 
@@ -1390,6 +1407,10 @@ unsigned long __init bootmem_init(unsigned long *pages_avail)
 	 * in free_all_bootmem.
 	 */
 	size = bootmap_size;
+#ifdef CONFIG_DEBUG_BOOTMEM
+	prom_printf("reserve_bootmem(bootmap): base[%lx] size[%lx]\n",
+		    (bootmap_pfn << PAGE_SHIFT), size);
+#endif
 	reserve_bootmem((bootmap_pfn << PAGE_SHIFT), size);
 	*pages_avail -= PAGE_ALIGN(size) >> PAGE_SHIFT;
 
@@ -1714,6 +1735,9 @@ void __init mem_init(void)
 	max_mapnr = last_valid_pfn - pfn_base;
 	high_memory = __va(last_valid_pfn << PAGE_SHIFT);
 
+#ifdef CONFIG_DEBUG_BOOTMEM
+	prom_printf("mem_init: Calling free_all_bootmem().\n");
+#endif
 	totalram_pages = num_physpages = free_all_bootmem() - 1;
 
 	/*
