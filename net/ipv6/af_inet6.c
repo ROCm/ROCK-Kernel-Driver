@@ -547,7 +547,6 @@ int ipv6_unload(void)
 }
 #endif
 #endif
-#endif
 
 #if defined(MODULE) && defined(CONFIG_SYSCTL)
 extern void ipv6_sysctl_register(void);
