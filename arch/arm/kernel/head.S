@@ -11,6 +11,7 @@
  */
 #include <linux/config.h>
 #include <linux/linkage.h>
+#include <linux/init.h>
 
 #include <asm/assembler.h>
 #include <asm/mach-types.h>
@@ -68,7 +69,7 @@
  * crap here - that's what the boot loader (or in extreme, well justified
  * circumstances, zImage) is for.
  */
-	.section ".text.init",#alloc,#execinstr
+	__INIT
 	.type	stext, #function
 ENTRY(stext)
 	mov	r12, r0

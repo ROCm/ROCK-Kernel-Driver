@@ -26,6 +26,7 @@
  */
 #include <linux/linkage.h>
 #include <linux/config.h>
+#include <linux/init.h>
 #include <asm/assembler.h>
 #include <asm/constants.h>
 #include <asm/procinfo.h>
@@ -430,7 +431,7 @@ ENTRY(cpu_arm926_name)
 	.ascii	"\0"
 	.align
 
-	.section ".text.init", #alloc, #execinstr
+	__INIT
 
 __arm926_setup:
 	mov	r0, #0
