@@ -901,30 +901,12 @@ int hash_page(unsigned long ea, unsigned long access)
  *	There is no HPTE for this page.
  */
 
-	/*
-	 * Check if pte might have an hpte, but we have
-	 * no slot information
-	 */
-	if ( pte_val(old_pte) & _PAGE_HPTENOIX ) {
-		unsigned long slot;	
-		pte_val(old_pte) &= ~_PAGE_HPTEFLAGS;
-		slot = ppc_md.hpte_find( vpn );
-		if ( slot != -1 ) {
-			if ( slot < 0 ) {
-				pte_val(old_pte) |= _PAGE_SECONDARY;
-				slot = -slot;
-			}
-			pte_val(old_pte) |= ((slot << 12) & _PAGE_GROUP_IX) | _PAGE_HASHPTE;
-			
-		}
-	}
 
 	/* User has appropriate access rights. */
 	new_pte = old_pte;
 	/* If the attempted access was a store */
 	if ( access & _PAGE_RW )
-		pte_val(new_pte) |= _PAGE_ACCESSED |
-			_PAGE_DIRTY;
+		pte_val(new_pte) |= _PAGE_ACCESSED | _PAGE_DIRTY;
 	else
 		pte_val(new_pte) |= _PAGE_ACCESSED;
 
@@ -985,9 +967,12 @@ int hash_page(unsigned long ea, unsigned long access)
 		pte_val(new_pte) |= hash_ind << 15;
 		pte_val(new_pte) |= (slot<<12) & _PAGE_GROUP_IX;
 		pte_val(new_pte) |= _PAGE_HASHPTE;
-		/* No need to use ldarx/stdcx here because all
-		 * who might be updating the pte will hold the page_table_lock
-		 * or the hash_table_lock (we hold both)
+
+		/*
+		 * No need to use ldarx/stdcx here because all who
+		 * might be updating the pte will hold the
+		 * page_table_lock or the hash_table_lock
+		 * (we hold both)
 		 */
 		*ptep = new_pte;
 			
@@ -995,8 +980,8 @@ int hash_page(unsigned long ea, unsigned long access)
 		hpteflags = (pte_val(new_pte) & 0x1f8) | newpp;
 
 		/* Create the HPTE */
-		ppc_md.hpte_create_valid(slot, vpn, prpn, hash_ind, ptep, hpteflags, 0);
-
+		ppc_md.hpte_create_valid(slot, vpn, prpn, hash_ind, ptep,
+					 hpteflags, 0);
 	}
 
 	spin_unlock(&hash_table_lock);
