@@ -274,6 +274,13 @@ int __exit agp_unregister_driver(void)
 
 int __init agp_init(void)
 {
+	static int already_initialised=0;
+
+	if (already_initialised!=0)
+		return 0;
+
+	already_initialised = 1;
+
 	memset(&agp_bridge, 0, sizeof(struct agp_bridge_data));
 	agp_bridge.type = NOT_SUPPORTED;
 
