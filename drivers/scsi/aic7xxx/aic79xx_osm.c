@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC79xx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#160 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#166 $
  *
  * --------------------------------------------------------------------------
  * Copyright (c) 1994-2000 Justin T. Gibbs.
@@ -61,11 +61,6 @@
 #endif
 
 #include <linux/mm.h>		/* For fetching system memory size */
-
-#define __KERNEL_SYSCALLS__
-
-#include <linux/unistd.h>
-static int errno;
 
 /*
  * Lock protecting manipulation of the ahd softc list.
@@ -755,31 +750,11 @@ ahd_linux_map_seg(struct ahd_softc *ahd, struct scb *scb,
 	consumed = 1;
 	sg->addr = ahd_htole32(addr & 0xFFFFFFFF);
 	scb->platform_data->xfer_len += len;
+
 	if (sizeof(bus_addr_t) > 4
-	 && (ahd->flags & AHD_39BIT_ADDRESSING) != 0) {
-		/*
-		 * Due to DAC restrictions, we can't
-		 * cross a 4GB boundary.
-		 */
-		if ((addr ^ (addr + len - 1)) & ~0xFFFFFFFF) {
-			struct	 ahd_dma_seg *next_sg;
-			uint32_t next_len;
+	 && (ahd->flags & AHD_39BIT_ADDRESSING) != 0)
+		len |= (addr >> 8) & AHD_SG_HIGH_ADDR_MASK;
 
-			printf("Crossed Seg\n");
-			if ((scb->sg_count + 2) > AHD_NSEG)
-				panic("Too few segs for dma mapping.  "
-				      "Increase AHD_NSEG\n");
-
-			consumed++;
-			next_sg = sg + 1;
-			next_sg->addr = 0;
-			next_len = 0x100000000 - (addr & 0xFFFFFFFF);
-			len -= next_len;
-			next_len |= ((addr >> 8) + 0x1000000) & 0x7F000000;
-			next_sg->len = ahd_htole32(next_len);
-		}
-		len |= (addr >> 8) & 0x7F000000;
-	}
 	sg->len = ahd_htole32(len);
 	return (consumed);
 }
@@ -796,13 +771,17 @@ static int	   ahd_linux_queue(Scsi_Cmnd *, void (*)(Scsi_Cmnd *));
 static int	   ahd_linux_slave_alloc(Scsi_Device *);
 static int	   ahd_linux_slave_configure(Scsi_Device *);
 static void	   ahd_linux_slave_destroy(Scsi_Device *);
+#if defined(__i386__)
 static int	   ahd_linux_biosparam(struct scsi_device*,
 				       struct block_device*, sector_t, int[]);
+#endif
 #else
 static int	   ahd_linux_release(struct Scsi_Host *);
 static void	   ahd_linux_select_queue_depth(struct Scsi_Host *host,
 						Scsi_Device *scsi_devs);
+#if defined(__i386__)
 static int	   ahd_linux_biosparam(Disk *, kdev_t, int[]);
+#endif
 #endif
 static int	   ahd_linux_bus_reset(Scsi_Cmnd *);
 static int	   ahd_linux_dev_reset(Scsi_Cmnd *);
@@ -1211,6 +1190,7 @@ ahd_linux_select_queue_depth(struct Scsi_Host * host,
 }
 #endif
 
+#if defined(__i386__)
 /*
  * Return the disk geometry for the given SCSI device.
  */
@@ -1273,6 +1253,7 @@ ahd_linux_biosparam(Disk *disk, kdev_t dev, int geom[])
 	geom[2] = cylinders;
 	return (0);
 }
+#endif
 
 /*
  * Abort the current SCSI command(s).
@@ -4211,7 +4192,7 @@ ahd_linux_run_device_queue(struct ahd_softc *ahd, struct ahd_linux_device *dev)
 /*
  * SCSI controller interrupt handler.
  */
-AIC_LINUX_IRQRETURN_T
+irqreturn_t
 ahd_linux_isr(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct	ahd_softc *ahd;
@@ -4225,7 +4206,7 @@ ahd_linux_isr(int irq, void *dev_id, struct pt_regs * regs)
 		ahd_schedule_runq(ahd);
 	ahd_linux_run_complete_queue(ahd);
 	ahd_unlock(ahd, &flags);
-	AIC_LINUX_IRQRETURN(ours);
+	return IRQ_RETVAL(ours);
 }
 
 void
