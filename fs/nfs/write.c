@@ -327,7 +327,7 @@ nfs_writepages(struct address_space *mapping, struct writeback_control *wbc)
 	err = generic_writepages(mapping, wbc);
 	if (err)
 		goto out;
-	err = nfs_flush_file(inode, NULL, 0, 0, 0);
+	err = nfs_flush_inode(inode, 0, 0, 0);
 	if (err < 0)
 		goto out;
 	if (wbc->sync_mode == WB_SYNC_HOLD)
@@ -335,7 +335,7 @@ nfs_writepages(struct address_space *mapping, struct writeback_control *wbc)
 	if (is_sync && wbc->sync_mode == WB_SYNC_ALL) {
 		err = nfs_wb_all(inode);
 	} else
-		nfs_commit_file(inode, NULL, 0, 0, 0);
+		nfs_commit_inode(inode, 0, 0, 0);
 out:
 	return err;
 }
@@ -465,7 +465,7 @@ nfs_mark_request_commit(struct nfs_page *req)
  * Interruptible by signals only if mounted with intr flag.
  */
 static int
-nfs_wait_on_requests(struct inode *inode, struct file *file, unsigned long idx_start, unsigned int npages)
+nfs_wait_on_requests(struct inode *inode, unsigned long idx_start, unsigned int npages)
 {
 	struct nfs_inode *nfsi = NFS_I(inode);
 	struct nfs_page *req;
@@ -485,8 +485,6 @@ nfs_wait_on_requests(struct inode *inode, struct file *file, unsigned long idx_s
 			break;
 
 		next = req->wb_index + 1;
-		if (file && req->wb_file != file)
-			continue;
 		if (!NFS_WBACK_BUSY(req))
 			continue;
 
@@ -497,7 +495,6 @@ nfs_wait_on_requests(struct inode *inode, struct file *file, unsigned long idx_s
 		if (error < 0)
 			return error;
 		spin_lock(&nfs_wreq_lock);
-		next = idx_start;
 		res++;
 	}
 	spin_unlock(&nfs_wreq_lock);
@@ -508,7 +505,6 @@ nfs_wait_on_requests(struct inode *inode, struct file *file, unsigned long idx_s
  * nfs_scan_dirty - Scan an inode for dirty requests
  * @inode: NFS inode to scan
  * @dst: destination list
- * @file: if set, ensure we match requests from this file
  * @idx_start: lower bound of page->index to scan.
  * @npages: idx_start + npages sets the upper bound to scan.
  *
@@ -516,11 +512,11 @@ nfs_wait_on_requests(struct inode *inode, struct file *file, unsigned long idx_s
  * The requests are *not* checked to ensure that they form a contiguous set.
  */
 static int
-nfs_scan_dirty(struct inode *inode, struct list_head *dst, struct file *file, unsigned long idx_start, unsigned int npages)
+nfs_scan_dirty(struct inode *inode, struct list_head *dst, unsigned long idx_start, unsigned int npages)
 {
 	struct nfs_inode *nfsi = NFS_I(inode);
 	int	res;
-	res = nfs_scan_list(&nfsi->dirty, dst, file, idx_start, npages);
+	res = nfs_scan_list(&nfsi->dirty, dst, idx_start, npages);
 	nfsi->ndirty -= res;
 	sub_page_state(nr_dirty,res);
 	if ((nfsi->ndirty == 0) != list_empty(&nfsi->dirty))
@@ -533,7 +529,6 @@ nfs_scan_dirty(struct inode *inode, struct list_head *dst, struct file *file, un
  * nfs_scan_commit - Scan an inode for commit requests
  * @inode: NFS inode to scan
  * @dst: destination list
- * @file: if set, ensure we collect requests from this file only.
  * @idx_start: lower bound of page->index to scan.
  * @npages: idx_start + npages sets the upper bound to scan.
  *
@@ -541,11 +536,11 @@ nfs_scan_dirty(struct inode *inode, struct list_head *dst, struct file *file, un
  * The requests are *not* checked to ensure that they form a contiguous set.
  */
 static int
-nfs_scan_commit(struct inode *inode, struct list_head *dst, struct file *file, unsigned long idx_start, unsigned int npages)
+nfs_scan_commit(struct inode *inode, struct list_head *dst, unsigned long idx_start, unsigned int npages)
 {
 	struct nfs_inode *nfsi = NFS_I(inode);
 	int	res;
-	res = nfs_scan_list(&nfsi->commit, dst, file, idx_start, npages);
+	res = nfs_scan_list(&nfsi->commit, dst, idx_start, npages);
 	nfsi->ncommit -= res;
 	if ((nfsi->ncommit == 0) != list_empty(&nfsi->commit))
 		printk(KERN_ERR "NFS: desynchronized value of nfs_i.ncommit.\n");
@@ -1074,7 +1069,7 @@ nfs_commit_done(struct rpc_task *task)
 }
 #endif
 
-int nfs_flush_file(struct inode *inode, struct file *file, unsigned long idx_start,
+int nfs_flush_inode(struct inode *inode, unsigned long idx_start,
 		   unsigned int npages, int how)
 {
 	LIST_HEAD(head);
@@ -1082,7 +1077,7 @@ int nfs_flush_file(struct inode *inode, struct file *file, unsigned long idx_sta
 				error = 0;
 
 	spin_lock(&nfs_wreq_lock);
-	res = nfs_scan_dirty(inode, &head, file, idx_start, npages);
+	res = nfs_scan_dirty(inode, &head, idx_start, npages);
 	spin_unlock(&nfs_wreq_lock);
 	if (res)
 		error = nfs_flush_list(&head, NFS_SERVER(inode)->wpages, how);
@@ -1092,7 +1087,7 @@ int nfs_flush_file(struct inode *inode, struct file *file, unsigned long idx_sta
 }
 
 #if defined(CONFIG_NFS_V3) || defined(CONFIG_NFS_V4)
-int nfs_commit_file(struct inode *inode, struct file *file, unsigned long idx_start,
+int nfs_commit_inode(struct inode *inode, unsigned long idx_start,
 		    unsigned int npages, int how)
 {
 	LIST_HEAD(head);
@@ -1100,9 +1095,9 @@ int nfs_commit_file(struct inode *inode, struct file *file, unsigned long idx_st
 				error = 0;
 
 	spin_lock(&nfs_wreq_lock);
-	res = nfs_scan_commit(inode, &head, file, idx_start, npages);
+	res = nfs_scan_commit(inode, &head, idx_start, npages);
 	if (res) {
-		res += nfs_scan_commit(inode, &head, NULL, 0, 0);
+		res += nfs_scan_commit(inode, &head, 0, 0);
 		spin_unlock(&nfs_wreq_lock);
 		error = nfs_commit_list(&head, how);
 	} else
@@ -1113,7 +1108,7 @@ int nfs_commit_file(struct inode *inode, struct file *file, unsigned long idx_st
 }
 #endif
 
-int nfs_sync_file(struct inode *inode, struct file *file, unsigned long idx_start,
+int nfs_sync_inode(struct inode *inode, unsigned long idx_start,
 		  unsigned int npages, int how)
 {
 	int	error,
@@ -1122,18 +1117,15 @@ int nfs_sync_file(struct inode *inode, struct file *file, unsigned long idx_star
 	wait = how & FLUSH_WAIT;
 	how &= ~FLUSH_WAIT;
 
-	if (!inode && file)
-		inode = file->f_dentry->d_inode;
-
 	do {
 		error = 0;
 		if (wait)
-			error = nfs_wait_on_requests(inode, file, idx_start, npages);
+			error = nfs_wait_on_requests(inode, idx_start, npages);
 		if (error == 0)
-			error = nfs_flush_file(inode, file, idx_start, npages, how);
+			error = nfs_flush_inode(inode, idx_start, npages, how);
 #if defined(CONFIG_NFS_V3) || defined(CONFIG_NFS_V4)
 		if (error == 0)
-			error = nfs_commit_file(inode, file, idx_start, npages, how);
+			error = nfs_commit_inode(inode, idx_start, npages, how);
 #endif
 	} while (error > 0);
 	return error;
