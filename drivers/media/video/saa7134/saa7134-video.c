@@ -1,5 +1,5 @@
 /*
- * $Id: saa7134-video.c,v 1.19 2004/11/07 14:44:59 kraxel Exp $
+ * $Id: saa7134-video.c,v 1.25 2004/12/10 12:33:39 kraxel Exp $
  *
  * device driver for philips saa7134 based TV cards
  * video4linux video interface
@@ -24,6 +24,7 @@
 #include <linux/init.h>
 #include <linux/list.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
 
@@ -443,11 +444,10 @@ void res_free(struct saa7134_dev *dev, struct saa7134_fh *fh, unsigned int bits)
 
 static void set_tvnorm(struct saa7134_dev *dev, struct saa7134_tvnorm *norm)
 {
-	int luma_control,sync_control,mux,nosignal;
+	int luma_control,sync_control,mux;
 
 	dprintk("set tv norm = %s\n",norm->name);
 	dev->tvnorm = norm;
-        nosignal = (0 == (saa_readb(SAA7134_STATUS_VIDEO1) & 0x03));
 
 	mux = card_in(dev,dev->ctl_input).vmux;
 	luma_control = norm->luma_control;
@@ -455,7 +455,7 @@ static void set_tvnorm(struct saa7134_dev *dev, struct saa7134_tvnorm *norm)
 
 	if (mux > 5)
 		luma_control |= 0x80; /* svideo */
-	if (noninterlaced || nosignal)
+	if (noninterlaced || dev->nosignal)
 		sync_control |= 0x20;
 
 	/* setup cropping */
@@ -1359,6 +1359,9 @@ static int video_release(struct inode *inode, struct file *file)
 		res_free(dev,fh,RESOURCE_VBI);
 	}
 
+	/* free stuff */
+	videobuf_mmap_free(&fh->cap);
+	videobuf_mmap_free(&fh->vbi);
 	saa7134_pgtable_free(dev->pci,&fh->pt_cap);
 	saa7134_pgtable_free(dev->pci,&fh->pt_vbi);
 
@@ -1472,6 +1475,7 @@ int saa7134_try_fmt(struct saa7134_dev *dev, struct saa7134_fh *fh,
 			f->fmt.pix.width = maxw;
 		if (f->fmt.pix.height > maxh)
 			f->fmt.pix.height = maxh;
+		f->fmt.pix.width &= ~0x03;
 		f->fmt.pix.bytesperline =
 			(f->fmt.pix.width * fmt->depth) >> 3;
 		f->fmt.pix.sizeimage =
@@ -2267,7 +2271,7 @@ int saa7134_video_init1(struct saa7134_dev *dev)
 	dev->ctl_hue        = ctrl_by_id(V4L2_CID_HUE)->default_value;
 	dev->ctl_saturation = ctrl_by_id(V4L2_CID_SATURATION)->default_value;
 	dev->ctl_volume     = ctrl_by_id(V4L2_CID_AUDIO_VOLUME)->default_value;
-	dev->ctl_mute       = ctrl_by_id(V4L2_CID_AUDIO_MUTE)->default_value;
+	dev->ctl_mute       = 1; // ctrl_by_id(V4L2_CID_AUDIO_MUTE)->default_value;
 	dev->ctl_invert     = ctrl_by_id(V4L2_CID_PRIVATE_INVERT)->default_value;
 	dev->ctl_automute   = ctrl_by_id(V4L2_CID_PRIVATE_AUTOMUTE)->default_value;
 
@@ -2317,24 +2321,31 @@ int saa7134_video_fini(struct saa7134_dev *dev)
 void saa7134_irq_video_intl(struct saa7134_dev *dev)
 {
 	static const char *st[] = {
-		"no signal", "found NTSC", "found PAL", "found SECAM" };
-	int norm;
+		"(no signal)", "NTSC", "PAL", "SECAM" };
+	u32 st1,st2;
 
-	norm = saa_readb(SAA7134_STATUS_VIDEO1) & 0x03;
-	dprintk("DCSDT: %s\n",st[norm]);
+	st1 = saa_readb(SAA7134_STATUS_VIDEO1);
+	st2 = saa_readb(SAA7134_STATUS_VIDEO2);
+	dprintk("DCSDT: pll: %s, sync: %s, norm: %s\n",
+		(st1 & 0x40) ? "not locked" : "locked",
+		(st2 & 0x40) ? "no"         : "yes",
+		st[st1 & 0x03]);
+	dev->nosignal = (st1 & 0x40) || (st2 & 0x40);
 
-	if (0 != norm) {
-		/* wake up tvaudio audio carrier scan thread */
-		saa7134_tvaudio_do_scan(dev);
-		if (!noninterlaced)
-			saa_clearb(SAA7134_SYNC_CTRL, 0x20);
-	} else {
+	if (dev->nosignal) {
 		/* no video signal -> mute audio */
 		if (dev->ctl_automute)
 			dev->automute = 1;
 		saa7134_tvaudio_setmute(dev);
 		saa_setb(SAA7134_SYNC_CTRL, 0x20);
+	} else {
+		/* wake up tvaudio audio carrier scan thread */
+		saa7134_tvaudio_do_scan(dev);
+		if (!noninterlaced)
+			saa_clearb(SAA7134_SYNC_CTRL, 0x20);
 	}
+	if (dev->mops && dev->mops->signal_change)
+		dev->mops->signal_change(dev);
 }
 
 void saa7134_irq_video_done(struct saa7134_dev *dev, unsigned long status)

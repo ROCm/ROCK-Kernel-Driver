@@ -1,5 +1,5 @@
 /*
- * $Id: saa7134-i2c.c,v 1.7 2004/11/07 13:17:15 kraxel Exp $
+ * $Id: saa7134-i2c.c,v 1.9 2004/12/10 12:33:39 kraxel Exp $
  *
  * device driver for philips saa7134 based TV cards
  * i2c interface support
@@ -24,6 +24,7 @@
 #include <linux/init.h>
 #include <linux/list.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
@@ -248,13 +249,24 @@ static int saa7134_i2c_xfer(struct i2c_adapter *i2c_adap,
 		if (!i2c_reset(dev))
 			return -EIO;
 
+	d2printk("start xfer\n");
 	d1printk(KERN_DEBUG "%s: i2c xfer:",dev->name);
 	for (i = 0; i < num; i++) {
 		if (!(msgs[i].flags & I2C_M_NOSTART) || 0 == i) {
 			/* send address */
+			d2printk("send address\n");
 			addr  = msgs[i].addr << 1;
 			if (msgs[i].flags & I2C_M_RD)
 				addr |= 1;
+			if (i > 0 && msgs[i].flags & I2C_M_RD) {
+				/* workaround for a saa7134 i2c bug
+				 * needed to talk to the mt352 demux
+				 * thanks to pinnacle for the hint */
+				int quirk = 0xfd;
+				d1printk(" [%02x quirk]",quirk);
+				i2c_send_byte(dev,START,quirk);
+				i2c_recv_byte(dev);
+			}
 			d1printk(" < %02x", addr);
 			rc = i2c_send_byte(dev,START,addr);
 			if (rc < 0)
@@ -262,6 +274,7 @@ static int saa7134_i2c_xfer(struct i2c_adapter *i2c_adap,
 		}
 		if (msgs[i].flags & I2C_M_RD) {
 			/* read bytes */
+			d2printk("read bytes\n");
 			for (byte = 0; byte < msgs[i].len; byte++) {
 				d1printk(" =");
 				rc = i2c_recv_byte(dev);
@@ -272,6 +285,7 @@ static int saa7134_i2c_xfer(struct i2c_adapter *i2c_adap,
 			}
 		} else {
 			/* write bytes */
+			d2printk("write bytes\n");
 			for (byte = 0; byte < msgs[i].len; byte++) {
 				data = msgs[i].buf[byte];
 				d1printk(" %02x", data);
@@ -281,6 +295,7 @@ static int saa7134_i2c_xfer(struct i2c_adapter *i2c_adap,
 			}
 		}
 	}
+	d2printk("xfer done\n");
 	d1printk(" >");
 	i2c_set_attr(dev,STOP);
 	rc = -EIO;
@@ -313,18 +328,6 @@ static u32 functionality(struct i2c_adapter *adap)
 	return I2C_FUNC_SMBUS_EMUL;
 }
 
-#ifndef I2C_PEC
-static void inc_use(struct i2c_adapter *adap)
-{
-	MOD_INC_USE_COUNT;
-}
-
-static void dec_use(struct i2c_adapter *adap)
-{
-	MOD_DEC_USE_COUNT;
-}
-#endif
-
 static int attach_inform(struct i2c_client *client)
 {
         struct saa7134_dev *dev = client->adapter->algo_data;
@@ -345,12 +348,7 @@ static struct i2c_algorithm saa7134_algo = {
 };
 
 static struct i2c_adapter saa7134_adap_template = {
-#ifdef I2C_PEC
 	.owner         = THIS_MODULE,
-#else
-	.inc_use       = inc_use,
-	.dec_use       = dec_use,
-#endif
 #ifdef I2C_CLASS_TV_ANALOG
 	.class         = I2C_CLASS_TV_ANALOG,
 #endif

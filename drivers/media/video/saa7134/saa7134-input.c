@@ -1,5 +1,5 @@
 /*
- * $Id: saa7134-input.c,v 1.12 2004/11/07 13:17:15 kraxel Exp $
+ * $Id: saa7134-input.c,v 1.16 2004/12/10 12:33:39 kraxel Exp $
  *
  * handle saa7134 IR remotes via linux kernel input layer.
  *
@@ -20,6 +20,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/sched.h>
@@ -258,6 +259,55 @@ static IR_KEYTAB_TYPE md2819_codes[IR_KEYTAB_SIZE] = {
 	[ 17 ] = KEY_CHANNELDOWN,	// CHANNEL/PAGE-
 	[ 49 ] = KEY_CHANNELUP		// CHANNEL/PAGE+
 };
+
+static IR_KEYTAB_TYPE videomate_tv_pvr_codes[IR_KEYTAB_SIZE] = {
+	[ 20 ] = KEY_MUTE,
+	[ 36 ] = KEY_ZOOM,
+
+	[  1 ] = KEY_DVD,
+	[ 35 ] = KEY_RADIO,
+	[  0 ] = KEY_TV,
+
+	[ 10 ] = KEY_REWIND,
+	[  8 ] = KEY_PLAYPAUSE,
+	[ 15 ] = KEY_FORWARD,
+
+	[  2 ] = KEY_PREVIOUS,
+	[  7 ] = KEY_STOP,
+	[  6 ] = KEY_NEXT,
+
+	[ 12 ] = KEY_UP,
+	[ 14 ] = KEY_DOWN,
+	[ 11 ] = KEY_LEFT,
+	[ 13 ] = KEY_RIGHT,
+	[ 17 ] = KEY_OK,
+
+	[  3 ] = KEY_MENU,
+	[  9 ] = KEY_SETUP,
+	[  5 ] = KEY_VIDEO,
+	[ 34 ] = KEY_CHANNEL,
+
+	[ 18 ] = KEY_VOLUMEUP,
+	[ 21 ] = KEY_VOLUMEDOWN,
+	[ 16 ] = KEY_CHANNELUP,
+	[ 19 ] = KEY_CHANNELDOWN,
+
+	[  4 ] = KEY_RECORD,
+
+	[ 22 ] = KEY_KP1,
+	[ 23 ] = KEY_KP2,
+	[ 24 ] = KEY_KP3,
+	[ 25 ] = KEY_KP4,
+	[ 26 ] = KEY_KP5,
+	[ 27 ] = KEY_KP6,
+	[ 28 ] = KEY_KP7,
+	[ 29 ] = KEY_KP8,
+	[ 30 ] = KEY_KP9,
+	[ 31 ] = KEY_KP0,
+
+	[ 32 ] = KEY_LANGUAGE,
+	[ 33 ] = KEY_SLEEP,
+};
 /* ---------------------------------------------------------------------- */
 
 static int build_key(struct saa7134_dev *dev)
@@ -335,6 +385,7 @@ int saa7134_input_init1(struct saa7134_dev *dev)
 		break;
 	case SAA7134_BOARD_CINERGY400:
 	case SAA7134_BOARD_CINERGY600:
+	case SAA7134_BOARD_CINERGY600_MK3:
 		ir_codes     = cinergy_codes;
 		mask_keycode = 0x00003f;
 		mask_keyup   = 0x040000;
@@ -353,6 +404,7 @@ int saa7134_input_init1(struct saa7134_dev *dev)
 		polling      = 50; // ms
 		break;
 	case SAA7134_BOARD_MD2819:
+	case SAA7134_BOARD_AVERMEDIA_305:
 	case SAA7134_BOARD_AVERMEDIA_307:
 		ir_codes     = md2819_codes;
 		mask_keycode = 0x0007C8;
@@ -361,6 +413,12 @@ int saa7134_input_init1(struct saa7134_dev *dev)
 		/* Set GPIO pin2 to high to enable the IR controller */
 		saa_setb(SAA7134_GPIO_GPMODE0, 0x4);
 		saa_setb(SAA7134_GPIO_GPSTATUS0, 0x4);
+		break;
+	case SAA7134_BOARD_VIDEOMATE_TV_PVR:
+		ir_codes     = videomate_tv_pvr_codes;
+		mask_keycode = 0x00003F;
+		mask_keyup   = 0x400000;
+		polling      = 50; // ms
 		break;
 	}
 	if (NULL == ir_codes) {

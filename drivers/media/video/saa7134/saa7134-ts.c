@@ -1,5 +1,5 @@
 /*
- * $Id: saa7134-ts.c,v 1.12 2004/11/07 13:17:15 kraxel Exp $
+ * $Id: saa7134-ts.c,v 1.13 2004/12/10 12:33:39 kraxel Exp $
  *
  * device driver for philips saa7134 based TV cards
  * video4linux video interface
@@ -24,6 +24,7 @@
 #include <linux/init.h>
 #include <linux/list.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/delay.h>

@@ -110,10 +110,12 @@
 #define  TDA9887_SET_CONFIG          _IOW('t',5,int)
 /* tv card specific */
 # define TDA9887_PRESENT             (1<<0)
-# define TDA9887_PORT1               (1<<1)
-# define TDA9887_PORT2               (1<<2)
+# define TDA9887_PORT1_INACTIVE      (1<<1)
+# define TDA9887_PORT2_INACTIVE      (1<<2)
 # define TDA9887_QSS                 (1<<3)
 # define TDA9887_INTERCARRIER        (1<<4)
+# define TDA9887_PORT1_ACTIVE        (1<<5)
+# define TDA9887_PORT2_ACTIVE        (1<<6)
 /* config options */
 # define TDA9887_DEEMPHASIS_MASK     (3<<16)
 # define TDA9887_DEEMPHASIS_NONE     (1<<16)

@@ -41,13 +41,12 @@
 #include "mt352.h"
 
 struct mt352_state {
-
 	struct i2c_adapter* i2c;
-
 	struct dvb_frontend_ops ops;
 
 	/* configuration settings */
 	const struct mt352_config* config;
+	int status,s0,s1,s3;
 
 	struct dvb_frontend frontend;
 };
@@ -63,18 +62,27 @@ int mt352_write(struct dvb_frontend* fe, u8* ibuf, int ilen)
 	struct mt352_state* state = (struct mt352_state*) fe->demodulator_priv;
 	struct i2c_msg msg = { .addr = state->config->demod_address, .flags = 0,
 			       .buf = ibuf, .len = ilen };
+	if (debug) {
+		int i;
+		printk("%s:",__FUNCTION__);
+		for (i = 0; i < ilen; i++)
+			printk(" %02x",ibuf[i]);
+		printk("\n");
+	}
+	
 	int err = i2c_transfer(state->i2c, &msg, 1);
 	if (err != 1) {
-		dprintk("mt352_write() failed (err = %d)!\n", err);
+		printk(KERN_WARNING
+		       "mt352_write() failed (err = %d)!\n", err);
 		return err;
-}
+	}
 
 	return 0;
 }
 
-static u8 mt352_read_register(struct mt352_state* state, u8 reg)
+static int mt352_read_register(struct mt352_state* state, u8 reg)
 {
-	int ret;
+	int ret,i;
 	u8 b0 [] = { reg };
 	u8 b1 [] = { 0 };
 	struct i2c_msg msg [] = { { .addr = state->config->demod_address,
@@ -84,42 +92,91 @@ static u8 mt352_read_register(struct mt352_state* state, u8 reg)
 				    .flags = I2C_M_RD,
 				    .buf = b1, .len = 1 } };
 
-	ret = i2c_transfer(state->i2c, msg, 2);
+	for (i = 0; i < 5; i++) {
+		ret = i2c_transfer(state->i2c, msg, 2);
+		if (2 == ret)
+			break;
+		msleep(10);
+		dprintk("%s: readreg error #%d, retrying\n",
+			__FUNCTION__, i+1);
+	}
 
-	if (ret != 2)
-		dprintk("%s: readreg error (ret == %i)\n", __FUNCTION__, ret);
+	if (ret != 2) {
+		printk(KERN_WARNING
+		       "%s: readreg error (ret == %i)\n", __FUNCTION__, ret);
+		return -1;
+	}
 
 	return b1[0];
 }
-
-
-
-
-
-
-
-
-
-
-
 
 static int mt352_sleep(struct dvb_frontend* fe)
 {
 	static u8 mt352_softdown[] = { CLOCK_CTL, 0x20, 0x08 };
 
 	mt352_write(fe, mt352_softdown, sizeof(mt352_softdown));
-
 	return 0;
+}
+
+static void mt352_calc_nominal_rate(struct mt352_state* state,
+				    enum fe_bandwidth bandwidth,
+				    unsigned char *buf)
+{
+	u32 adc_clock = 20480; /* 20.340 MHz */
+	u32 bw,value;
+
+	switch (bandwidth) {
+	case BANDWIDTH_6_MHZ:
+		bw = 6;
+		break;
+	case BANDWIDTH_7_MHZ:
+		bw = 7;
+		break;
+	case BANDWIDTH_8_MHZ:
+	default:
+		bw = 8;
+		break;
+	}
+	if (state->config->adc_clock)
+		adc_clock = state->config->adc_clock;
+
+	value = 64 * bw * (1<<16) / (7 * 8);
+	value = value * 1000 / adc_clock;
+	dprintk("%s: bw %d, adc_clock %d => 0x%x\n",
+		__FUNCTION__, bw, adc_clock, value);
+	buf[0] = msb(value);
+	buf[1] = lsb(value);
+}
+
+static void mt352_calc_input_freq(struct mt352_state* state,
+				  unsigned char *buf)
+{
+	int adc_clock = 20480; /* 20.480000 MHz */
+	int if2       = 36167; /* 36.166667 MHz */
+	int ife,value;
+
+	if (state->config->adc_clock)
+		adc_clock = state->config->adc_clock;
+	if (state->config->if2)
+		if2 = state->config->if2;
+
+	ife = (2*adc_clock - if2);
+	value = -16374 * ife / adc_clock;
+	dprintk("%s: if2 %d, ife %d, adc_clock %d => %d / 0x%x\n",
+		__FUNCTION__, if2, ife, adc_clock, value, value & 0x3fff);
+	buf[0] = msb(value);
+	buf[1] = lsb(value);
 }
 
 static int mt352_set_parameters(struct dvb_frontend* fe,
 				struct dvb_frontend_parameters *param)
 {
 	struct mt352_state* state = (struct mt352_state*) fe->demodulator_priv;
-	unsigned char buf[14];
+	unsigned char buf[13];
+	static unsigned char tuner_go[] = { 0x5d, 0x01 };
+	static unsigned char fsm_go[]   = { 0x5e, 0x01 };
 	unsigned int tps = 0;
 	struct dvb_ofdm_parameters *op = &param->u.ofdm;
-	int i;
 
 	switch (op->code_rate_HP) {
 		case FEC_2_3:
@@ -230,39 +287,33 @@ static int mt352_set_parameters(struct dvb_frontend* fe,
 	buf[1] = msb(tps);      /* TPS_GIVEN_(1|0) */
 	buf[2] = lsb(tps);
 
-	buf[3] = 0x50;
+	buf[3] = 0x50;  // old
+//	buf[3] = 0xf4;  // pinnacle
 
-	/**
-	 *  these settings assume 20.48MHz f_ADC, for other tuners you might
-	 *  need other values. See p. 33 in the MT352 Design Manual.
-	 */
-	if (op->bandwidth == BANDWIDTH_8_MHZ) {
-		buf[4] = 0x72;  /* TRL_NOMINAL_RATE_(1|0) */
-		buf[5] = 0x49;
-	} else if (op->bandwidth == BANDWIDTH_7_MHZ) {
-		buf[4] = 0x64;
-		buf[5] = 0x00;
-	} else {		/* 6MHz */
-		buf[4] = 0x55;
-		buf[5] = 0xb7;
-	}
-
-	buf[6] = 0x31;  /* INPUT_FREQ_(1|0), 20.48MHz clock, 36.166667MHz IF */
-	buf[7] = 0x05;  /* see MT352 Design Manual page 32 for details */
-
+	mt352_calc_nominal_rate(state, op->bandwidth, buf+4);
+	mt352_calc_input_freq(state, buf+6);
 	state->config->pll_set(fe, param, buf+8);
 
-	buf[13] = 0x01; /* TUNER_GO!! */
-
+#if 0 /* FIXME: should be catched elsewhere ... */
 	/* Only send the tuning request if the tuner doesn't have the requested
 	 * parameters already set.  Enhances tuning time and prevents stream
 	 * breakup when retuning the same transponder. */
 	for (i = 1; i < 13; i++)
-		if (buf[i] != mt352_read_register(state, i + 0x50)) {
-			mt352_write(fe, buf, sizeof(buf));
+		if (buf[i] != mt352_read_register(state, i + 0x50))
 			break;
-		}
+	if (13 == i)
+		/* no changes */
+		return 0;
+#endif
 
+	mt352_write(fe, buf, sizeof(buf));
+	if (state->config->no_tuner) {
+		/* start decoding */
+		mt352_write(fe, fsm_go, 2);
+	} else {
+		/* start tuning */
+		mt352_write(fe, tuner_go, 2);
+	}
 	return 0;
 }
 
@@ -384,28 +435,49 @@ static int mt352_get_parameters(struct dvb_frontend* fe,
 static int mt352_read_status(struct dvb_frontend* fe, fe_status_t* status)
 {
 	struct mt352_state* state = (struct mt352_state*) fe->demodulator_priv;
-	u8 r;
+	int val;
 
-		*status = 0;
-	r = mt352_read_register (state, STATUS_0);
-		if (r & (1 << 4))
-			*status = FE_HAS_CARRIER;
-		if (r & (1 << 1))
-			*status |= FE_HAS_VITERBI;
-		if (r & (1 << 5))
-			*status |= FE_HAS_LOCK;
+	if (0 != mt352_read_register(state, INTERRUPT_0)) {
+		val = mt352_read_register(state, STATUS_0);
+		if (-1 != val)
+			state->s0 = val;
+		val = mt352_read_register(state, STATUS_1);
+		if (-1 != val)
+			state->s1 = val;
+		val = mt352_read_register(state, STATUS_3);
+		if (-1 != val)
+			state->s3 = val;
+	}
 
-	r = mt352_read_register (state, STATUS_1);
-		if (r & (1 << 1))
-			*status |= FE_HAS_SYNC;
-
-	r = mt352_read_register (state, STATUS_3);
-		if (r & (1 << 6))
-			*status |= FE_HAS_SIGNAL;
+	*status = 0;
+	if (state->s0 & (1 << 4))
+		*status |= FE_HAS_CARRIER;
+	if (state->s0 & (1 << 1))
+		*status |= FE_HAS_VITERBI;
+	if (state->s0 & (1 << 5))
+		*status |= FE_HAS_LOCK;
+	if (state->s1 & (1 << 1))
+		*status |= FE_HAS_SYNC;
+	if (state->s3 & (1 << 6))
+		*status |= FE_HAS_SIGNAL;
 
 	if ((*status & (FE_HAS_CARRIER | FE_HAS_VITERBI | FE_HAS_SYNC)) !=
 		      (FE_HAS_CARRIER | FE_HAS_VITERBI | FE_HAS_SYNC))
 		*status &= ~FE_HAS_LOCK;
+
+	if (debug && state->status != *status) {
+		/* log status bit changes */
+		printk("%s:%s%s%s%s%s | r0=0x%02x r1=0x%02x r3=0x%02x\n",
+		       __FUNCTION__,
+		       *status & FE_HAS_CARRIER ? " CARRIER" : "",
+		       *status & FE_HAS_VITERBI ? " VITERBI" : "",
+		       *status & FE_HAS_LOCK    ? " LOCK"    : "",
+		       *status & FE_HAS_SYNC    ? " SYNC"    : "",
+		       *status & FE_HAS_SIGNAL  ? " SIGNAL"  : "",
+		       state->s0, state->s1, state->s3);
+			
+	}
+	state->status = *status;
 
 	return 0;
 }
@@ -459,7 +531,7 @@ static int mt352_get_tune_settings(struct dvb_frontend* fe, struct dvb_frontend_
 	fe_tune_settings->max_drift = 0;
 
 	return 0;
-	}
+}
 
 static int mt352_init(struct dvb_frontend* fe)
 {
@@ -467,22 +539,24 @@ static int mt352_init(struct dvb_frontend* fe)
 
 	static u8 mt352_reset_attach [] = { RESET, 0xC0 };
 
+	dprintk("%s: hello\n",__FUNCTION__);
+
 	if ((mt352_read_register(state, CLOCK_CTL) & 0x10) == 0 ||
 	    (mt352_read_register(state, CONFIG) & 0x20) == 0) {
 
-	/* Do a "hard" reset */
+		/* Do a "hard" reset */
 		mt352_write(fe, mt352_reset_attach, sizeof(mt352_reset_attach));
 		return state->config->demod_init(fe);
 	}
 
 	return 0;
-	}
+}
 
 static void mt352_release(struct dvb_frontend* fe)
 {
 	struct mt352_state* state = (struct mt352_state*) fe->demodulator_priv;
-		kfree(state);
-	}
+	kfree(state);
+}
 
 static struct dvb_frontend_ops mt352_ops;
 
@@ -494,6 +568,7 @@ struct dvb_frontend* mt352_attach(const struct mt352_config* config,
 	/* allocate memory for the internal state */
 	state = (struct mt352_state*) kmalloc(sizeof(struct mt352_state), GFP_KERNEL);
 	if (state == NULL) goto error;
+	memset(state,0,sizeof(*state));
 
 	/* setup the state */
 	state->config = config;
@@ -556,3 +631,9 @@ MODULE_LICENSE("GPL");
 
 EXPORT_SYMBOL(mt352_attach);
 EXPORT_SYMBOL(mt352_write);
+/*
+ * Local variables:
+ * c-basic-offset: 8
+ * compile-command: "make DVB=1"
+ * End:
+ */

@@ -1,5 +1,5 @@
 /*
-    $Id: cx88-tvaudio.c,v 1.27 2005/01/07 13:11:19 kraxel Exp $
+    $Id: cx88-tvaudio.c,v 1.28 2005/01/20 12:54:46 kraxel Exp $
 
     cx88x-audio.c - Conexant CX23880/23881 audio downstream driver driver
 
@@ -337,128 +337,129 @@ static void set_audio_standard_NICAM(struct cx88_core *core)
         set_audio_finish(core);
 }
 
-static void set_audio_standard_NICAM_L(struct cx88_core *core)
+static void set_audio_standard_NICAM_L(struct cx88_core *core, int stereo)
 {
-	/* This is officially weird.. register dumps indicate windows
-	 * uses audio mode 4.. A2. Let's operate and find out. */
+        /* This is probably weird..
+         * Let's operate and find out. */
 
-	static const struct rlist nicam_l[] = {
-		// setup QAM registers
-		{ AUD_PDF_DDS_CNST_BYTE2,	   0x48 },
-		{ AUD_PDF_DDS_CNST_BYTE1,          0x3d },
-		{ AUD_PDF_DDS_CNST_BYTE0,          0xf5 },
-		{ AUD_QAM_MODE,                    0x00 },
-		{ AUD_PHACC_FREQ_8MSB,             0x3a },
-		{ AUD_PHACC_FREQ_8LSB,             0x4a },
+        static const struct rlist nicam_l_mono[] = {
+                { AUD_ERRLOGPERIOD_R,     0x00000064 },
+                { AUD_ERRINTRPTTHSHLD1_R, 0x00000FFF },
+                { AUD_ERRINTRPTTHSHLD2_R, 0x0000001F },
+                { AUD_ERRINTRPTTHSHLD3_R, 0x0000000F },
 
-		{ AUD_POLY0_DDS_CONSTANT,          0x000e4db2 },
-		{ AUD_IIR1_0_SEL,                  0x00000000 },
-		{ AUD_IIR1_1_SEL,                  0x00000002 },
-		{ AUD_IIR1_2_SEL,                  0x00000023 },
-		{ AUD_IIR1_3_SEL,                  0x00000004 },
-		{ AUD_IIR1_4_SEL,                  0x00000005 },
-		{ AUD_IIR1_5_SEL,                  0x00000007 },
-		{ AUD_IIR1_0_SHIFT,                0x00000007 },
-		{ AUD_IIR1_1_SHIFT,                0x00000000 },
-		{ AUD_IIR1_2_SHIFT,                0x00000000 },
-		{ AUD_IIR1_3_SHIFT,                0x00000007 },
-		{ AUD_IIR1_4_SHIFT,                0x00000007 },
-		{ AUD_IIR1_5_SHIFT,                0x00000007 },
-		{ AUD_IIR2_0_SEL,                  0x00000002 },
-		{ AUD_IIR2_1_SEL,                  0x00000003 },
-		{ AUD_IIR2_2_SEL,                  0x00000004 },
-		{ AUD_IIR2_3_SEL,                  0x00000005 },
-		{ AUD_IIR3_0_SEL,                  0x00000007 },
-		{ AUD_IIR3_1_SEL,                  0x00000023 },
-		{ AUD_IIR3_2_SEL,                  0x00000016 },
-		{ AUD_IIR4_0_SHIFT,                0x00000000 },
-		{ AUD_IIR4_1_SHIFT,                0x00000000 },
-		{ AUD_IIR3_2_SHIFT,                0x00000002 },
-		{ AUD_IIR4_0_SEL,                  0x0000001d },
-		{ AUD_IIR4_1_SEL,                  0x00000019 },
-		{ AUD_IIR4_2_SEL,                  0x00000008 },
-		{ AUD_IIR4_0_SHIFT,                0x00000000 },
-		{ AUD_IIR4_1_SHIFT,                0x00000007 },
-		{ AUD_IIR4_2_SHIFT,                0x00000007 },
-		{ AUD_IIR4_0_CA0,                  0x0003e57e },
-		{ AUD_IIR4_0_CA1,                  0x00005e11 },
-		{ AUD_IIR4_0_CA2,                  0x0003a7cf },
-		{ AUD_IIR4_0_CB0,                  0x00002368 },
-		{ AUD_IIR4_0_CB1,                  0x0003bf1b },
-		{ AUD_IIR4_1_CA0,                  0x00006349 },
-		{ AUD_IIR4_1_CA1,                  0x00006f27 },
-		{ AUD_IIR4_1_CA2,                  0x0000e7a3 },
-		{ AUD_IIR4_1_CB0,                  0x00005653 },
-		{ AUD_IIR4_1_CB1,                  0x0000cf97 },
-		{ AUD_IIR4_2_CA0,                  0x00006349 },
-		{ AUD_IIR4_2_CA1,                  0x00006f27 },
-		{ AUD_IIR4_2_CA2,                  0x0000e7a3 },
-		{ AUD_IIR4_2_CB0,                  0x00005653 },
-		{ AUD_IIR4_2_CB1,                  0x0000cf97 },
-		{ AUD_HP_MD_IIR4_1,                0x00000001 },
-		{ AUD_HP_PROG_IIR4_1,              0x0000001a },
-		{ AUD_DN0_FREQ,                    0x00000000 },
-		{ AUD_DN1_FREQ,                    0x00003318 },
-		{ AUD_DN1_SRC_SEL,                 0x00000017 },
-		{ AUD_DN1_SHFT,                    0x00000007 },
-		{ AUD_DN1_AFC,                     0x00000000 },
-		{ AUD_DN1_FREQ_SHIFT,              0x00000000 },
-		{ AUD_DN2_FREQ,                    0x00003551 },
-		{ AUD_DN2_SRC_SEL,                 0x00000001 },
-		{ AUD_DN2_SHFT,                    0x00000000 },
-		{ AUD_DN2_AFC,                     0x00000002 },
-		{ AUD_DN2_FREQ_SHIFT,              0x00000000 },
-		{ AUD_PDET_SRC,                    0x00000014 },
-		{ AUD_PDET_SHIFT,                  0x00000000 },
-		{ AUD_DEEMPH0_SRC_SEL,             0x00000011 },
-		{ AUD_DEEMPH1_SRC_SEL,             0x00000011 },
-		{ AUD_DEEMPH0_SHIFT,               0x00000000 },
-		{ AUD_DEEMPH1_SHIFT,               0x00000000 },
-		{ AUD_DEEMPH0_G0,                  0x00007000 },
-		{ AUD_DEEMPH0_A0,                  0x00000000 },
-		{ AUD_DEEMPH0_B0,                  0x00000000 },
-		{ AUD_DEEMPH0_A1,                  0x00000000 },
-		{ AUD_DEEMPH0_B1,                  0x00000000 },
-		{ AUD_DEEMPH1_G0,                  0x00007000 },
-		{ AUD_DEEMPH1_A0,                  0x00000000 },
-		{ AUD_DEEMPH1_B0,                  0x00000000 },
-		{ AUD_DEEMPH1_A1,                  0x00000000 },
-		{ AUD_DEEMPH1_B1,                  0x00000000 },
-		{ AUD_DMD_RA_DDS,                  0x00f5c285 },
-		{ AUD_RATE_ADJ1,                   0x00000100 },
-		{ AUD_RATE_ADJ2,                   0x00000200 },
-		{ AUD_RATE_ADJ3,                   0x00000300 },
-		{ AUD_RATE_ADJ4,                   0x00000400 },
-		{ AUD_RATE_ADJ5,                   0x00000500 },
-		{ AUD_C2_UP_THR,                   0x00005400 },
-		{ AUD_C2_LO_THR,                   0x00003000 },
-		{ AUD_C1_UP_THR,                   0x00007000 },
-		{ AUD_C2_LO_THR,                   0x00005400 },
-		{ AUD_CTL,                         0x0000100c },
-		{ AUD_DCOC_0_SRC,                  0x00000021 },
-		{ AUD_DCOC_1_SRC,                  0x00000003 },
-		{ AUD_DCOC1_SHIFT,                 0x00000000 },
-		{ AUD_DCOC_1_SHIFT_IN0,            0x0000000a },
-		{ AUD_DCOC_1_SHIFT_IN1,            0x00000008 },
-		{ AUD_DCOC_PASS_IN,                0x00000000 },
-		{ AUD_DCOC_2_SRC,                  0x0000001b },
-		{ AUD_IIR4_0_SEL,                  0x0000001d },
-		{ AUD_POLY0_DDS_CONSTANT,          0x000e4db2 },
-		{ AUD_PHASE_FIX_CTL,               0x00000000 },
-		{ AUD_CORDIC_SHIFT_1,              0x00000007 },
-		{ AUD_PLL_EN,                      0x00000000 },
-		{ AUD_PLL_PRESCALE,                0x00000002 },
-		{ AUD_PLL_INT,                     0x0000001e },
-		{ AUD_OUT1_SHIFT,                  0x00000000 },
+                { AUD_PDF_DDS_CNST_BYTE2, 0x48 },
+                { AUD_PDF_DDS_CNST_BYTE1, 0x3D },
+                { AUD_QAM_MODE,           0x00 },
+                { AUD_PDF_DDS_CNST_BYTE0, 0xf5 },
+                { AUD_PHACC_FREQ_8MSB,    0x3a },
+                { AUD_PHACC_FREQ_8LSB,    0x4a },
 
-		{ /* end of list */ },
-	};
+                { AUD_DEEMPHGAIN_R, 0x6680 },
+                { AUD_DEEMPHNUMER1_R, 0x353DE },
+                { AUD_DEEMPHNUMER2_R, 0x1B1 },
+                { AUD_DEEMPHDENOM1_R, 0x0F3D0 },
+                { AUD_DEEMPHDENOM2_R, 0x0 },
+                { AUD_FM_MODE_ENABLE, 0x7 },
+                { AUD_POLYPH80SCALEFAC, 0x3 },
+                { AUD_AFE_12DB_EN, 0x1 },
+                { AAGC_GAIN, 0x0 },
+                { AAGC_HYST, 0x18 },
+                { AAGC_DEF, 0x20 },
+                { AUD_DN0_FREQ, 0x0 },
+                { AUD_POLY0_DDS_CONSTANT, 0x0E4DB2 },
+                { AUD_DCOC_0_SRC, 0x21 },
+                { AUD_IIR1_0_SEL, 0x0 },
+                { AUD_IIR1_0_SHIFT, 0x7 },
+                { AUD_IIR1_1_SEL, 0x2 },
+                { AUD_IIR1_1_SHIFT, 0x0 },
+                { AUD_DCOC_1_SRC, 0x3 },
+                { AUD_DCOC1_SHIFT, 0x0 },
+                { AUD_DCOC_PASS_IN, 0x0 },
+                { AUD_IIR1_2_SEL, 0x23 },
+                { AUD_IIR1_2_SHIFT, 0x0 },
+                { AUD_IIR1_3_SEL, 0x4 },
+                { AUD_IIR1_3_SHIFT, 0x7 },
+                { AUD_IIR1_4_SEL, 0x5 },
+                { AUD_IIR1_4_SHIFT, 0x7 },
+                { AUD_IIR3_0_SEL, 0x7 },
+                { AUD_IIR3_0_SHIFT, 0x0 },
+                { AUD_DEEMPH0_SRC_SEL, 0x11 },
+                { AUD_DEEMPH0_SHIFT, 0x0 },
+                { AUD_DEEMPH0_G0, 0x7000 },
+                { AUD_DEEMPH0_A0, 0x0 },
+                { AUD_DEEMPH0_B0, 0x0 },
+                { AUD_DEEMPH0_A1, 0x0 },
+                { AUD_DEEMPH0_B1, 0x0 },
+                { AUD_DEEMPH1_SRC_SEL, 0x11 },
+                { AUD_DEEMPH1_SHIFT, 0x0 },
+                { AUD_DEEMPH1_G0, 0x7000 },
+                { AUD_DEEMPH1_A0, 0x0 },
+                { AUD_DEEMPH1_B0, 0x0 },
+                { AUD_DEEMPH1_A1, 0x0 },
+                { AUD_DEEMPH1_B1, 0x0 },
+                { AUD_OUT0_SEL, 0x3F },
+                { AUD_OUT1_SEL, 0x3F },
+                { AUD_DMD_RA_DDS, 0x0F5C285 },
+                { AUD_PLL_INT, 0x1E },
+                { AUD_PLL_DDS, 0x0 },
+                { AUD_PLL_FRAC, 0x0E542 },
 
-	dprintk("%s (status: unknown)\n",__FUNCTION__);
-        set_audio_start(core, 0x0004,
-			0 /* FIXME */);
-	set_audio_registers(core, nicam_l);
+                // setup QAM registers
+                { AUD_RATE_ADJ1,      0x00000100 },
+                { AUD_RATE_ADJ2,      0x00000200 },
+                { AUD_RATE_ADJ3,      0x00000300 },
+                { AUD_RATE_ADJ4,      0x00000400 },
+                { AUD_RATE_ADJ5,      0x00000500 },
+                { AUD_RATE_THRES_DMD, 0x000000C0 },
+                { /* end of list */ },
+        };
+
+        static const struct rlist nicam_l[] = {
+                // setup QAM registers
+                { AUD_RATE_ADJ1, 0x00000060 },
+                { AUD_RATE_ADJ2, 0x000000F9 },
+                { AUD_RATE_ADJ3, 0x000001CC },
+                { AUD_RATE_ADJ4, 0x000002B3 },
+                { AUD_RATE_ADJ5, 0x00000726 },
+                { AUD_DEEMPHDENOM1_R, 0x0000F3D0 },
+                { AUD_DEEMPHDENOM2_R, 0x00000000 },
+                { AUD_ERRLOGPERIOD_R, 0x00000064 },
+                { AUD_ERRINTRPTTHSHLD1_R, 0x00000FFF },
+                { AUD_ERRINTRPTTHSHLD2_R, 0x0000001F },
+                { AUD_ERRINTRPTTHSHLD3_R, 0x0000000F },
+                { AUD_POLYPH80SCALEFAC, 0x00000003 },
+                { AUD_DMD_RA_DDS, 0x00C00000 },
+                { AUD_PLL_INT, 0x0000001E },
+                { AUD_PLL_DDS, 0x00000000 },
+                { AUD_PLL_FRAC, 0x0000E542 },
+                { AUD_START_TIMER, 0x00000000 },
+                { AUD_DEEMPHNUMER1_R, 0x000353DE },
+                { AUD_DEEMPHNUMER2_R, 0x000001B1 },
+                { AUD_PDF_DDS_CNST_BYTE2, 0x06 },
+                { AUD_PDF_DDS_CNST_BYTE1, 0x82 },
+                { AUD_QAM_MODE, 0x05 },
+                { AUD_PDF_DDS_CNST_BYTE0, 0x12 },
+                { AUD_PHACC_FREQ_8MSB, 0x34 },
+                { AUD_PHACC_FREQ_8LSB, 0x4C },
+                { AUD_DEEMPHGAIN_R, 0x00006680 },
+                { AUD_RATE_THRES_DMD, 0x000000C0  },
+                { /* end of list */ },
+        } ;
+        dprintk("%s (status: devel), stereo : %d\n",__FUNCTION__,stereo);
+
+        if (!stereo) {
+		/* AM mono sound */
+                set_audio_start(core, 0x0004,
+				0x100c /* FIXME again */);
+                set_audio_registers(core, nicam_l_mono);
+        } else {
+                set_audio_start(core, 0x0010,
+                        0x1924 /* FIXME again */);
+                set_audio_registers(core, nicam_l);
+        }
         set_audio_finish(core);
+
 }
 
 static void set_audio_standard_A2(struct cx88_core *core)
@@ -517,6 +518,40 @@ static void set_audio_standard_A2(struct cx88_core *core)
 		{ /* end of list */ },
 	};
 
+       static const struct rlist a2_pal_i_mono[] = {
+               // PAL-I (differences from dscaler CX2388xCard_Audio.cpp 1.30)
+               { AUD_PHACC_FREQ_8MSB,  0x3a },
+               { AUD_PHACC_FREQ_8LSB,  0x93 },
+               { AAGC_HYST,            0x0000000a },
+               { AUD_MODE_CHG_TIMER,   0x00000060 },
+               { AUD_START_TIMER,      0x00000000 },
+               { AUD_AFE_12DB_EN,      0x00000001 },
+               { AUD_DMD_RA_DDS,       0x002a4f2f },
+               { AUD_PLL_INT,          0x0000001e },
+               { AUD_C1_UP_THR,        0x00007000 },
+               { AUD_C1_LO_THR,        0x00005400 },
+               { AUD_C2_UP_THR,        0x00005400 },
+               { AUD_C2_LO_THR,        0x00003000 },
+               { AUD_DN0_FREQ,         0x000035a3 },
+               { AUD_DN2_FREQ,         0x000029c7 },
+               { AUD_IIR1_0_SEL,       0x00000001 },
+               { AUD_IIR1_1_SEL,       0x00000000 },
+               { AUD_IIR3_2_SEL,       0x00000003 },
+               { AUD_IIR3_2_SHIFT,     0x00000000 },
+               { AUD_IIR3_0_SEL,       0x00000002 },
+               { AUD_IIR2_0_SEL,       0x00000021 },
+               { AUD_IIR2_0_SHIFT,     0x00000002 },
+               { AUD_DEEMPH0_SRC_SEL,  0x0000000b },
+               { AUD_DEEMPH1_SRC_SEL,  0x0000000b },
+               { AUD_PLL_DDS,          0x00000004 },
+               { AUD_PLL_FRAC,         0x0000e542 },
+               { AUD_CRDC0_SRC_SEL,    0x00000511 },
+               { AUD_DEEMPHGAIN_R,     0x000011e1 },
+               { AUD_DEEMPHNUMER1_R,   0x0002a7bc },
+               { AUD_DEEMPHNUMER2_R,   0x0003023c },
+               { /* end of list */ },
+       };
+
 	static const struct rlist a2_table1[] = {
 		// PAL-BG
 		{ AUD_DMD_RA_DDS,	0x002a73bd },
@@ -557,8 +592,8 @@ static void set_audio_standard_A2(struct cx88_core *core)
 	case WW_NICAM_I:
 		/* gives at least mono according to the dscaler guys */
 		/* so use use that while nicam is broken ...         */
-		dprintk("%s PAL-I mono (status: unknown)\n",__FUNCTION__);
-		set_audio_registers(core, a2_table1);
+		dprintk("%s PAL-I mono (status: works, but noisy)\n",__FUNCTION__);
+		set_audio_registers(core, a2_pal_i_mono);
 		cx_write(AUD_CTL, EN_A2_FORCE_MONO1);
 		break;
 	case WW_A2_BG:
@@ -664,7 +699,7 @@ void cx88_set_tvaudio(struct cx88_core *core)
 		set_audio_standard_FM(core);
 		break;
 	case WW_SYSTEM_L_AM:
-		set_audio_standard_NICAM_L(core);
+		set_audio_standard_NICAM_L(core, 1);
 		break;
 	case WW_NONE:
 	default:
@@ -725,6 +760,12 @@ void cx88_get_stereo(struct cx88_core *core, struct v4l2_tuner *t)
 		if (0 == mode)
 			t->audmode = V4L2_TUNER_MODE_STEREO;
 		break;
+        case WW_SYSTEM_L_AM:
+                if (0x0 == mode)
+                        t->audmode = V4L2_TUNER_MODE_STEREO;
+                else
+                        t->audmode = V4L2_TUNER_MODE_MONO;
+                break ;
 	default:
 		t->rxsubchans = V4L2_TUNER_SUB_MONO;
 		t->audmode    = V4L2_TUNER_MODE_MONO;
@@ -733,10 +774,17 @@ void cx88_get_stereo(struct cx88_core *core, struct v4l2_tuner *t)
 	return;
 }
 
-void cx88_set_stereo(struct cx88_core *core, u32 mode)
+void cx88_set_stereo(struct cx88_core *core, u32 mode, int manual)
 {
 	u32 ctl  = UNSET;
 	u32 mask = UNSET;
+
+	if (manual) {
+		core->audiomode = mode;
+	} else {
+		if (UNSET != core->audiomode)
+			return;
+	}
 
 	switch (core->tvaudio) {
 	case WW_BTSC:
@@ -790,6 +838,19 @@ void cx88_set_stereo(struct cx88_core *core, u32 mode)
 			break;
 		}
 		break;
+        case WW_SYSTEM_L_AM:
+                switch (mode) {
+                case V4L2_TUNER_MODE_MONO:
+                        set_audio_standard_NICAM_L(core, 0);
+                        break;
+                case V4L2_TUNER_MODE_LANG1:  /* FIXME */
+                        set_audio_standard_NICAM_L(core, 0);
+                        break;
+                case V4L2_TUNER_MODE_STEREO:
+                        set_audio_standard_NICAM_L(core, 1);
+                        break;
+                }
+                break;
 	case WW_FM:
 		switch (mode) {
 		case V4L2_TUNER_MODE_MONO:
@@ -805,9 +866,6 @@ void cx88_set_stereo(struct cx88_core *core, u32 mode)
 	}
 
 	if (UNSET != ctl) {
-		cx_write(AUD_SOFT_RESET, 0x0001);
-		cx_andor(AUD_CTL, mask,  ctl);
-		cx_write(AUD_SOFT_RESET, 0x0000);
 		dprintk("cx88_set_stereo: mask 0x%x, ctl 0x%x "
 			"[status=0x%x,ctl=0x%x,vol=0x%x]\n",
 			mask, ctl, cx_read(AUD_STATUS),
@@ -820,16 +878,33 @@ int cx88_audio_thread(void *data)
 {
 	struct cx88_core *core = data;
 	struct v4l2_tuner t;
+	u32 mode = 0, lastmode = 0;
 
 	dprintk("cx88: tvaudio thread started\n");
 	for (;;) {
+		msleep_interruptible(1000);
 		if (kthread_should_stop())
 			break;
 
 		/* just monitor the audio status for now ... */
 		memset(&t,0,sizeof(t));
 		cx88_get_stereo(core,&t);
-		msleep_interruptible(1000);
+
+		if (UNSET == core->audiomode)
+			/* manually set, don't do anything. */
+			continue;
+
+		/* monitor signal */
+		if (t.rxsubchans & V4L2_TUNER_SUB_STEREO)
+			mode = V4L2_TUNER_MODE_STEREO;
+		else
+			mode = V4L2_TUNER_MODE_MONO;
+		if (mode == lastmode)
+			continue;
+
+		/* automatically switch to best available mode */
+		lastmode = mode;
+		cx88_set_stereo(core, mode, 0);
 	}
 
 	dprintk("cx88: tvaudio thread exiting\n");

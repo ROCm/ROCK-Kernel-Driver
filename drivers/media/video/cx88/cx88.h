@@ -1,5 +1,5 @@
 /*
- * $Id: cx88.h,v 1.47 2004/12/14 15:33:30 kraxel Exp $
+ * $Id: cx88.h,v 1.49 2005/01/20 12:54:46 kraxel Exp $
  *
  * v4l2 device driver for cx2388x based TV cards
  *
@@ -140,7 +140,7 @@ extern struct sram_channel cx88_sram_channels[];
 #define CX88_BOARD_GDI                      2
 #define CX88_BOARD_PIXELVIEW                3
 #define CX88_BOARD_ATI_WONDER_PRO           4
-#define CX88_BOARD_WINFAST2000XP            5
+#define CX88_BOARD_WINFAST2000XP_EXPERT     5
 #define CX88_BOARD_AVERTV_303               6
 #define CX88_BOARD_MSI_TVANYWHERE_MASTER    7
 #define CX88_BOARD_WINFAST_DV2000           8
@@ -264,6 +264,7 @@ struct cx88_core {
 	struct task_struct         *kthread;
 	struct cx88_tvnorm         *tvnorm;
 	u32                        tvaudio;
+	u32                        audiomode;
 	u32                        input;
 	u32                        astat;
 
@@ -513,7 +514,7 @@ extern void cx88_card_setup(struct cx88_core *core);
 
 void cx88_set_tvaudio(struct cx88_core *core);
 void cx88_get_stereo(struct cx88_core *core, struct v4l2_tuner *t);
-void cx88_set_stereo(struct cx88_core *core, u32 mode);
+void cx88_set_stereo(struct cx88_core *core, u32 mode, int manual);
 int cx88_audio_thread(void *data);
 
 /* ----------------------------------------------------------- */

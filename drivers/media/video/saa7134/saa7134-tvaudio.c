@@ -1,5 +1,5 @@
 /*
- * $Id: saa7134-tvaudio.c,v 1.17 2004/11/07 13:17:15 kraxel Exp $
+ * $Id: saa7134-tvaudio.c,v 1.22 2005/01/07 13:11:19 kraxel Exp $
  *
  * device driver for philips saa7134 based TV cards
  * tv audio decoder (fm stereo, nicam, ...)
@@ -24,6 +24,7 @@
 #include <linux/init.h>
 #include <linux/list.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
@@ -237,13 +238,14 @@ static void mute_input_7134(struct saa7134_dev *dev)
 
 	if (PCI_DEVICE_ID_PHILIPS_SAA7134 == dev->pci->device)
 		/* 7134 mute */
-		saa_writeb(SAA7134_AUDIO_MUTE_CTRL, mute ? 0xff : 0xbb);
+		saa_writeb(SAA7134_AUDIO_MUTE_CTRL, mute ? 0xbf : 0xbb);
 
 	/* switch internal audio mux */
 	switch (in->amux) {
-	case TV:    ausel=0xc0; ics=0x00; ocs=0x02; break;
-	case LINE1: ausel=0x80; ics=0x00; ocs=0x00; break;
-	case LINE2: ausel=0x80; ics=0x08; ocs=0x01; break;
+	case TV:         ausel=0xc0; ics=0x00; ocs=0x02; break;
+	case LINE1:      ausel=0x80; ics=0x00; ocs=0x00; break;
+	case LINE2:      ausel=0x80; ics=0x08; ocs=0x01; break;
+	case LINE2_LEFT: ausel=0x80; ics=0x08; ocs=0x05; break;
 	}
 	saa_andorb(SAA7134_AUDIO_FORMAT_CTRL, 0xc0, ausel);
 	saa_andorb(SAA7134_ANALOG_IO_SELECT, 0x08, ics);
@@ -437,14 +439,15 @@ static int tvaudio_getstereo(struct saa7134_dev *dev, struct saa7134_tvaudio *au
 		nicam = saa_readb(SAA7134_NICAM_STATUS);
 		dprintk("getstereo: nicam=0x%x\n",nicam);
 		switch (nicam & 0x0b) {
-		case 0x08:
-			retval = V4L2_TUNER_SUB_MONO;
-			break;
 		case 0x09:
 			retval = V4L2_TUNER_SUB_LANG1 | V4L2_TUNER_SUB_LANG2;
 			break;
 		case 0x0a:
 			retval = V4L2_TUNER_SUB_MONO | V4L2_TUNER_SUB_STEREO;
+			break;
+		case 0x08:
+		default:
+			retval = V4L2_TUNER_SUB_MONO;
 			break;
 		}
 		break;
@@ -748,9 +751,16 @@ static int mute_input_7133(struct saa7134_dev *dev)
 	int mask;
 
 	switch (dev->input->amux) {
-	case TV:    reg = 0x02; break;
-	case LINE1: reg = 0x00; break;
-	case LINE2: reg = 0x01; break;
+	case TV:
+		reg = 0x02;
+		break;
+	case LINE1:
+		reg = 0x00;
+		break;
+	case LINE2:
+	case LINE2_LEFT:
+		reg = 0x01;
+		break;
 	}
 	if (dev->ctl_mute)
 		reg = 0x07;
@@ -869,6 +879,21 @@ static int tvaudio_thread_ddep(void *data)
 /* ------------------------------------------------------------------ */
 /* common stuff + external entry points                               */
 
+static void saa7134_enable_i2s(struct saa7134_dev *dev)
+{
+	int i2s_format;
+
+	if (!card_is_empress(dev))
+		return;
+	i2s_format = (dev->input->amux == TV) ? 0x00 : 0x01;
+
+	/* enable I2S audio output for the mpeg encoder */
+	saa_writeb(SAA7134_I2S_OUTPUT_SELECT,  0x80);
+	saa_writeb(SAA7134_I2S_OUTPUT_FORMAT,  i2s_format);
+	saa_writeb(SAA7134_I2S_OUTPUT_LEVEL,   0x0F);
+	saa_writeb(SAA7134_I2S_AUDIO_OUTPUT,   0x01);
+}
+
 int saa7134_tvaudio_rx2mode(u32 rx)
 {
 	u32 mode;
@@ -911,6 +936,7 @@ void saa7134_tvaudio_setinput(struct saa7134_dev *dev,
 		mute_input_7133(dev);
 		break;
 	}
+	saa7134_enable_i2s(dev);
 }
 
 void saa7134_tvaudio_setvolume(struct saa7134_dev *dev, int level)
@@ -946,18 +972,6 @@ int saa7134_tvaudio_init2(struct saa7134_dev *dev)
 	DECLARE_MUTEX_LOCKED(sem);
 	int (*my_thread)(void *data) = NULL;
 
-	/* enable I2S audio output */
-	if (card_is_empress(dev)) {
-		int i2sform = (48000 == dev->oss.rate)
-			? 0x01 : 0x00;
-
-		/* enable I2S output */
-		saa_writeb(SAA7134_I2S_OUTPUT_SELECT,  0x80);
-		saa_writeb(SAA7134_I2S_OUTPUT_FORMAT,  i2sform);
-		saa_writeb(SAA7134_I2S_OUTPUT_LEVEL,   0x0F);
-		saa_writeb(SAA7134_I2S_AUDIO_OUTPUT,   0x01);
-	}
-
 	switch (dev->pci->device) {
 	case PCI_DEVICE_ID_PHILIPS_SAA7134:
 		my_thread = tvaudio_thread;
@@ -977,9 +991,10 @@ int saa7134_tvaudio_init2(struct saa7134_dev *dev)
 		if (dev->thread.pid < 0)
 			printk(KERN_WARNING "%s: kernel_thread() failed\n",
 			       dev->name);
-		wake_up_interruptible(&dev->thread.wq);
+		saa7134_tvaudio_do_scan(dev);
 	}
 
+	saa7134_enable_i2s(dev);
 	return 0;
 }
 

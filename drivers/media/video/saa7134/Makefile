@@ -8,3 +8,4 @@ obj-$(CONFIG_VIDEO_SAA7134_DVB) += saa7134-dvb.o
 
 EXTRA_CFLAGS += -I$(src)/..
 EXTRA_CFLAGS += -I$(srctree)/drivers/media/dvb/dvb-core
+EXTRA_CFLAGS += -I$(srctree)/drivers/media/dvb/frontends

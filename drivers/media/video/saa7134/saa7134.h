@@ -1,5 +1,5 @@
 /*
- * $Id: saa7134.h,v 1.27 2004/11/04 11:03:52 kraxel Exp $
+ * $Id: saa7134.h,v 1.35 2005/01/13 17:22:33 kraxel Exp $
  *
  * v4l2 device driver for philips saa7134 based TV cards
  *
@@ -64,6 +64,7 @@ enum saa7134_audio_in {
 	TV    = 1,
 	LINE1 = 2,
 	LINE2 = 3,
+	LINE2_LEFT,
 };
 
 enum saa7134_video_out {
@@ -156,7 +157,7 @@ struct saa7134_format {
 #define SAA7134_BOARD_AVACSSMARTTV     32
 #define SAA7134_BOARD_AVERMEDIA_DVD_EZMAKER 33
 #define SAA7134_BOARD_NOVAC_PRIMETV7133 34
-#define SAA7134_BOARD_AVERMEDIA_305    35
+#define SAA7134_BOARD_AVERMEDIA_STUDIO_305 35
 #define SAA7133_BOARD_UPMOST_PURPLE_TV 36
 #define SAA7134_BOARD_ITEMS_MTV005     37
 #define SAA7134_BOARD_CINERGY200       38
@@ -169,6 +170,11 @@ struct saa7134_format {
 #define SAA7134_BOARD_AVERMEDIA_307    45
 #define SAA7134_BOARD_AVERMEDIA_CARDBUS 46
 #define SAA7134_BOARD_CINERGY400_CARDBUS 47
+#define SAA7134_BOARD_CINERGY600_MK3   48
+#define SAA7134_BOARD_VIDEOMATE_GOLD_PLUS 49
+#define SAA7134_BOARD_PINNACLE_300I_DVBT_PAL 50
+#define SAA7134_BOARD_PROVIDEO_PV952   51
+#define SAA7134_BOARD_AVERMEDIA_305    52
 
 #define SAA7134_MAXBOARDS 8
 #define SAA7134_INPUT_MAX 8
@@ -355,6 +361,7 @@ struct saa7134_mpeg_ops {
 	struct list_head           next;
 	int                        (*init)(struct saa7134_dev *dev);
 	int                        (*fini)(struct saa7134_dev *dev);
+	void                       (*signal_change)(struct saa7134_dev *dev);
 };
 
 /* global device status */
@@ -390,6 +397,7 @@ struct saa7134_dev {
 	unsigned int               tuner_type;
 	unsigned int               tda9887_conf;
 	unsigned int               gpio_value;
+	unsigned int               irq2_mask;
 
 	/* i2c i/o */
 	struct i2c_adapter         i2c_adap;
@@ -437,6 +445,7 @@ struct saa7134_dev {
 	struct saa7134_input       *hw_input;
 	unsigned int               hw_mute;
 	int                        last_carrier;
+	int                        nosignal;
 
 	/* SAA7134_MPEG_* */
 	struct saa7134_ts          ts;
@@ -447,6 +456,8 @@ struct saa7134_dev {
 	struct video_device        *empress_dev;
 	struct videobuf_queue      empress_tsq;
 	unsigned int               empress_users;
+	struct work_struct         empress_workqueue;
+	int                        empress_started;
 
 	/* SAA7134_MPEG_DVB only */
 	struct videobuf_dvb        dvb;
@@ -476,7 +487,6 @@ struct saa7134_dev {
 /* saa7134-core.c                                              */
 
 extern struct list_head  saa7134_devlist;
-extern unsigned int      saa7134_devcount;
 
 void saa7134_print_ioctl(char *name, unsigned int cmd);
 void saa7134_track_gpio(struct saa7134_dev *dev, char *msg);

@@ -1,5 +1,5 @@
 /*
- * $Id: tuner.c,v 1.34 2005/01/04 16:31:20 kraxel Exp $
+ * $Id: tuner.c,v 1.36 2005/01/14 13:29:40 kraxel Exp $
  */
 
 #include <linux/module.h>
@@ -62,7 +62,7 @@ struct tuner {
 	v4l2_std_id  std;
 	int          using_v4l2;
 
-	unsigned int radio;
+	enum v4l2_tuner_type mode;
 	unsigned int input;
 
 	// only for MT2032
@@ -694,9 +694,10 @@ static void mt2050_set_if_freq(struct i2c_client *c,unsigned int freq, unsigned 
 	div2a=(lo2/8)-1;
 	div2b=lo2-(div2a+1)*8;
 
-	dprintk("lo1 lo2 = %d %d\n", lo1, lo2);
-        dprintk("num1 num2 div1a div1b div2a div2b= %x %x %x %x %x %x\n",num1,num2,div1a,div1b,div2a,div2b);
-
+	if (debug > 1) {
+		printk("lo1 lo2 = %d %d\n", lo1, lo2);
+		printk("num1 num2 div1a div1b div2a div2b= %x %x %x %x %x %x\n",num1,num2,div1a,div1b,div2a,div2b);
+	}
 
 	buf[0]=1;
 	buf[1]= 4*div1b + num1;
@@ -708,7 +709,7 @@ static void mt2050_set_if_freq(struct i2c_client *c,unsigned int freq, unsigned 
 	buf[5]=div2a;
 	if(num2!=0) buf[5]=buf[5]|0x40;
 
-	if(debug) {
+	if (debug > 1) {
 		int i;
 		printk("bufs is: ");
 		for(i=0;i<6;i++)
@@ -733,10 +734,10 @@ static void mt2050_set_tv_freq(struct i2c_client *c, unsigned int freq)
                 // PAL
                 if2 = 38900*1000;
         }
-#if 0
-	// testing for DVB ...
-	if2 = 36166667;
-#endif
+	if (V4L2_TUNER_DIGITAL_TV == t->mode) {
+		// testing for DVB ...
+		if2 = 36150*1000;
+	}
 	mt2050_set_if_freq(c, freq*62500, if2);
 	mt2050_set_antenna(c, tv_antenna);
 }
@@ -1079,14 +1080,18 @@ static void set_freq(struct i2c_client *c, unsigned long freq)
 {
 	struct tuner *t = i2c_get_clientdata(c);
 
-	if (t->radio) {
+	switch (t->mode) {
+	case V4L2_TUNER_RADIO:
 		dprintk("tuner: radio freq set to %lu.%02lu\n",
 			freq/16,freq%16*100/16);
 		set_radio_freq(c,freq);
-	} else {
+		break;
+	case V4L2_TUNER_ANALOG_TV:
+	case V4L2_TUNER_DIGITAL_TV:
 		dprintk("tuner: tv freq set to %lu.%02lu\n",
 			freq/16,freq%16*100/16);
 		set_tv_freq(c, freq);
+		break;
 	}
 	t->freq = freq;
 }
@@ -1247,9 +1252,9 @@ tuner_command(struct i2c_client *client, unsigned int cmd, void *arg)
 		set_type(client,*iarg,client->adapter->name);
 		break;
 	case AUDC_SET_RADIO:
-		if (!t->radio) {
+		if (V4L2_TUNER_RADIO != t->mode) {
 			set_tv_freq(client,400 * 16);
-			t->radio = 1;
+			t->mode = V4L2_TUNER_RADIO;
 		}
 		break;
 	case AUDC_CONFIG_PINNACLE:
@@ -1281,7 +1286,7 @@ tuner_command(struct i2c_client *client, unsigned int cmd, void *arg)
 		struct video_channel *vc = arg;
 
 		CHECK_V4L2;
-		t->radio = 0;
+		t->mode = V4L2_TUNER_ANALOG_TV;
 		if (vc->norm < ARRAY_SIZE(map))
 			t->std = map[vc->norm];
 		tuner_fixup_std(t);
@@ -1302,7 +1307,7 @@ tuner_command(struct i2c_client *client, unsigned int cmd, void *arg)
 		struct video_tuner *vt = arg;
 
 		CHECK_V4L2;
-		if (t->radio)
+		if (V4L2_TUNER_RADIO == t->mode)
 			vt->signal = tuner_signal(client);
 		return 0;
 	}
@@ -1311,7 +1316,7 @@ tuner_command(struct i2c_client *client, unsigned int cmd, void *arg)
 		struct video_audio *va = arg;
 
 		CHECK_V4L2;
-		if (t->radio)
+		if (V4L2_TUNER_RADIO == t->mode)
 			va->mode = (tuner_stereo(client) ? VIDEO_SOUND_STEREO : VIDEO_SOUND_MONO);
 		return 0;
 	}
@@ -1321,7 +1326,7 @@ tuner_command(struct i2c_client *client, unsigned int cmd, void *arg)
 		v4l2_std_id *id = arg;
 
 		SWITCH_V4L2;
-		t->radio = 0;
+		t->mode = V4L2_TUNER_ANALOG_TV;
 		t->std = *id;
 		tuner_fixup_std(t);
 		if (t->freq)
@@ -1333,15 +1338,10 @@ tuner_command(struct i2c_client *client, unsigned int cmd, void *arg)
 		struct v4l2_frequency *f = arg;
 
 		SWITCH_V4L2;
-		if (V4L2_TUNER_ANALOG_TV == f->type) {
-			t->radio = 0;
-		}
-		if (V4L2_TUNER_RADIO == f->type) {
-			if (!t->radio) {
-				set_tv_freq(client,400*16);
-				t->radio = 1;
-			}
-		}
+		if (V4L2_TUNER_RADIO == f->type &&
+		    V4L2_TUNER_RADIO != t->mode)
+			set_tv_freq(client,400*16);
+		t->mode  = f->type;
 		t->freq  = f->frequency;
 		set_freq(client,t->freq);
 		break;
@@ -1351,7 +1351,7 @@ tuner_command(struct i2c_client *client, unsigned int cmd, void *arg)
 		struct v4l2_tuner *tuner = arg;
 
 		SWITCH_V4L2;
-		if (t->radio)
+		if (V4L2_TUNER_RADIO == t->mode)
 			tuner->signal = tuner_signal(client);
 		break;
 	}

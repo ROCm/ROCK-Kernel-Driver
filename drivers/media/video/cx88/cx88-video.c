@@ -1,5 +1,5 @@
 /*
- * $Id: cx88-video.c,v 1.52 2005/01/04 13:34:11 kraxel Exp $
+ * $Id: cx88-video.c,v 1.53 2005/01/20 12:54:46 kraxel Exp $
  *
  * device driver for Conexant 2388x based TV cards
  * video4linux video interface
@@ -995,7 +995,7 @@ static int video_open(struct inode *inode, struct file *file)
 		cx_write(MO_GP3_IO, cx88_boards[board].radio.gpio3);
 		dev->core->tvaudio = WW_FM;
 		cx88_set_tvaudio(core);
-		cx88_set_stereo(core,V4L2_TUNER_MODE_STEREO);
+		cx88_set_stereo(core,V4L2_TUNER_MODE_STEREO,1);
 		cx88_call_i2c_clients(dev->core,AUDC_SET_RADIO,NULL);
 	}
 
@@ -1432,6 +1432,7 @@ static int video_do_ioctl(struct inode *inode, struct file *file,
 		if (*i >= 4)
 			return -EINVAL;
 		down(&dev->lock);
+		dev->core->audiomode = UNSET; 
 		video_mux(dev,*i);
 		up(&dev->lock);
 		return 0;
@@ -1563,7 +1564,7 @@ static int video_do_ioctl(struct inode *inode, struct file *file,
 			return -EINVAL;
 		if (0 != t->index)
 			return -EINVAL;
-		cx88_set_stereo(core, t->audmode);
+		cx88_set_stereo(core, t->audmode, 1);
 		return 0;
 	}
 	case VIDIOC_G_FREQUENCY:
@@ -1593,6 +1594,7 @@ static int video_do_ioctl(struct inode *inode, struct file *file,
 			return -EINVAL;
 		down(&dev->lock);
 		dev->freq = f->frequency;
+		dev->core->audiomode = UNSET; 
 #ifdef V4L2_I2C_CLIENTS
 		cx88_call_i2c_clients(dev->core,VIDIOC_S_FREQUENCY,f);
 #else

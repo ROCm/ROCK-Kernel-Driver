@@ -1,5 +1,5 @@
 /*
- * $Id: cx88-cards.c,v 1.55 2005/01/03 18:56:19 kraxel Exp $
+ * $Id: cx88-cards.c,v 1.56 2005/01/13 17:22:33 kraxel Exp $
  *
  * device driver for Conexant 2388x based TV cards
  * card-specific stuff.
@@ -127,7 +127,7 @@ struct cx88_board cx88_boards[] = {
                         .gpio0  = 0x03fe,
 		}},
 	},
-        [CX88_BOARD_WINFAST2000XP] = {
+        [CX88_BOARD_WINFAST2000XP_EXPERT] = {
                 .name           = "Leadtek Winfast 2000XP Expert",
                 .tuner_type     = 44,
 		.tda9887_conf   = TDA9887_PRESENT,
@@ -506,11 +506,11 @@ struct cx88_subid cx88_subids[] = {
 	},{
                 .subvendor = 0x107d,
                 .subdevice = 0x6611,
-                .card      = CX88_BOARD_WINFAST2000XP,
+                .card      = CX88_BOARD_WINFAST2000XP_EXPERT,
 	},{
                 .subvendor = 0x107d,
                 .subdevice = 0x6613,	/* NTSC */
-                .card      = CX88_BOARD_WINFAST2000XP,
+                .card      = CX88_BOARD_WINFAST2000XP_EXPERT,
 	},{
 		.subvendor = 0x107d,
                 .subdevice = 0x6620,
@@ -588,7 +588,7 @@ const unsigned int cx88_idcount = ARRAY_SIZE(cx88_subids);
 
 static void __devinit leadtek_eeprom(struct cx88_core *core, u8 *eeprom_data)
 {
-	/* This is just for the Winfast 2000 XP board ATM; I don't have data on
+	/* This is just for the "Winfast 2000XP Expert" board ATM; I don't have data on
 	 * any others.
 	 *
 	 * Byte 0 is 1 on the NTSC board.
@@ -605,109 +605,21 @@ static void __devinit leadtek_eeprom(struct cx88_core *core, u8 *eeprom_data)
 	core->has_radio  = 1;
 	core->tuner_type = (eeprom_data[6] == 0x13) ? 43 : 38;
 
-	printk(KERN_INFO "%s: Leadtek Winfast 2000 XP config: "
+	printk(KERN_INFO "%s: Leadtek Winfast 2000XP Expert config: "
 	       "tuner=%d, eeprom[0]=0x%02x\n",
 	       core->name, core->tuner_type, eeprom_data[0]);
 }
 
 
 /* ----------------------------------------------------------------------- */
-/* some hauppauge specific stuff                                           */
-
-static struct {
-        int  id;
-        char *name;
-} hauppauge_tuner[] __devinitdata = {
-        { TUNER_ABSENT,        "" },
-        { TUNER_ABSENT,        "External" },
-        { TUNER_ABSENT,        "Unspecified" },
-        { TUNER_PHILIPS_PAL,   "Philips FI1216" },
-        { TUNER_PHILIPS_SECAM, "Philips FI1216MF" },
-        { TUNER_PHILIPS_NTSC,  "Philips FI1236" },
-        { TUNER_PHILIPS_PAL_I, "Philips FI1246" },
-        { TUNER_PHILIPS_PAL_DK,"Philips FI1256" },
-        { TUNER_PHILIPS_PAL,   "Philips FI1216 MK2" },
-        { TUNER_PHILIPS_SECAM, "Philips FI1216MF MK2" },
-        { TUNER_PHILIPS_NTSC,  "Philips FI1236 MK2" },
-        { TUNER_PHILIPS_PAL_I, "Philips FI1246 MK2" },
-        { TUNER_PHILIPS_PAL_DK,"Philips FI1256 MK2" },
-        { TUNER_TEMIC_NTSC,    "Temic 4032FY5" },
-        { TUNER_TEMIC_PAL,     "Temic 4002FH5" },
-        { TUNER_TEMIC_PAL_I,   "Temic 4062FY5" },
-        { TUNER_PHILIPS_PAL,   "Philips FR1216 MK2" },
-        { TUNER_PHILIPS_SECAM, "Philips FR1216MF MK2" },
-        { TUNER_PHILIPS_NTSC,  "Philips FR1236 MK2" },
-        { TUNER_PHILIPS_PAL_I, "Philips FR1246 MK2" },
-        { TUNER_PHILIPS_PAL_DK,"Philips FR1256 MK2" },
-        { TUNER_PHILIPS_PAL,   "Philips FM1216" },
-        { TUNER_PHILIPS_SECAM, "Philips FM1216MF" },
-        { TUNER_PHILIPS_NTSC,  "Philips FM1236" },
-        { TUNER_PHILIPS_PAL_I, "Philips FM1246" },
-        { TUNER_PHILIPS_PAL_DK,"Philips FM1256" },
-        { TUNER_TEMIC_4036FY5_NTSC, "Temic 4036FY5" },
-        { TUNER_ABSENT,        "Samsung TCPN9082D" },
-        { TUNER_ABSENT,        "Samsung TCPM9092P" },
-        { TUNER_TEMIC_4006FH5_PAL, "Temic 4006FH5" },
-        { TUNER_ABSENT,        "Samsung TCPN9085D" },
-        { TUNER_ABSENT,        "Samsung TCPB9085P" },
-        { TUNER_ABSENT,        "Samsung TCPL9091P" },
-        { TUNER_TEMIC_4039FR5_NTSC, "Temic 4039FR5" },
-        { TUNER_PHILIPS_FQ1216ME,   "Philips FQ1216 ME" },
-        { TUNER_TEMIC_4066FY5_PAL_I, "Temic 4066FY5" },
-        { TUNER_PHILIPS_NTSC,        "Philips TD1536" },
-        { TUNER_PHILIPS_NTSC,        "Philips TD1536D" },
-	{ TUNER_PHILIPS_NTSC,  "Philips FMR1236" }, /* mono radio */
-        { TUNER_ABSENT,        "Philips FI1256MP" },
-        { TUNER_ABSENT,        "Samsung TCPQ9091P" },
-        { TUNER_TEMIC_4006FN5_MULTI_PAL, "Temic 4006FN5" },
-        { TUNER_TEMIC_4009FR5_PAL, "Temic 4009FR5" },
-        { TUNER_TEMIC_4046FM5,     "Temic 4046FM5" },
-	{ TUNER_TEMIC_4009FN5_MULTI_PAL_FM, "Temic 4009FN5" },
-	{ TUNER_ABSENT,        "Philips TD1536D_FH_44"},
-	{ TUNER_LG_NTSC_FM,    "LG TPI8NSR01F"},
-	{ TUNER_LG_PAL_FM,     "LG TPI8PSB01D"},
-	{ TUNER_LG_PAL,        "LG TPI8PSB11D"},
-	{ TUNER_LG_PAL_I_FM,   "LG TAPC-I001D"},
-	{ TUNER_LG_PAL_I,      "LG TAPC-I701D"},
-	{ TUNER_THOMSON_DTT7610,  "DTT-7610"}
-};
 
 static void hauppauge_eeprom(struct cx88_core *core, u8 *eeprom_data)
 {
-#if 0
-	unsigned int blk2,tuner,radio,model;
-
-	if (eeprom_data[0] != 0x84 || eeprom_data[2] != 0) {
-		printk(KERN_WARNING "%s: Hauppauge eeprom: invalid\n",
-		       core->name);
-		return;
-	}
-
-	/* Block 2 starts after len+3 bytes header */
-	blk2 = eeprom_data[1] + 3;
-
-	/* decode + use some config infos */
-	model = eeprom_data[12] << 8 | eeprom_data[11];
-	tuner = eeprom_data[9];
-	radio = eeprom_data[blk2-1] & 0x01;
-
-        if (tuner < ARRAY_SIZE(hauppauge_tuner))
-                core->tuner_type = hauppauge_tuner[tuner].id;
-	if (radio)
-		core->has_radio = 1;
-
-	printk(KERN_INFO "%s: hauppauge eeprom: model=%d, "
-	       "tuner=%s (%d), radio=%s\n",
-	       core->name, model, (tuner < ARRAY_SIZE(hauppauge_tuner)
-				   ? hauppauge_tuner[tuner].name : "?"),
-	       core->tuner_type, radio ? "yes" : "no");
-#else
 	struct tveeprom tv;
 
 	tveeprom_hauppauge_analog(&tv, eeprom_data);
 	core->tuner_type = tv.tuner_type;
 	core->has_radio  = tv.has_radio;
-#endif
 }
 
 #ifdef WITH_DVB
@@ -848,7 +760,7 @@ void cx88_card_setup(struct cx88_core *core)
 		if (0 == core->i2c_rc)
 			gdi_eeprom(core,eeprom);
 		break;
-	case CX88_BOARD_WINFAST2000XP:
+	case CX88_BOARD_WINFAST2000XP_EXPERT:
 		if (0 == core->i2c_rc)
 			leadtek_eeprom(core,eeprom);
 		break;

@@ -1,5 +1,5 @@
 /*
- * $Id: saa7134-oss.c,v 1.11 2004/11/07 13:17:15 kraxel Exp $
+ * $Id: saa7134-oss.c,v 1.13 2004/12/10 12:33:39 kraxel Exp $
  *
  * device driver for philips saa7134 based TV cards
  * oss dsp interface
@@ -24,6 +24,7 @@
 #include <linux/init.h>
 #include <linux/list.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/soundcard.h>
@@ -543,6 +544,7 @@ mixer_recsrc_7134(struct saa7134_dev *dev)
 		break;
 	case LINE1:
 	case LINE2:
+	case LINE2_LEFT:
 		analog_io = (LINE1 == dev->oss.input) ? 0x00 : 0x08;
 		rate = (32000 == dev->oss.rate) ? 0x01 : 0x03;
 		saa_andorb(SAA7134_ANALOG_IO_SELECT,  0x08, analog_io);
@@ -566,6 +568,7 @@ mixer_recsrc_7133(struct saa7134_dev *dev)
 		value = 0xbbbb32;  /* AUX1 */
 		break;
 	case LINE2:
+	case LINE2_LEFT:
 		value = 0xbbbb54;  /* AUX2 */
 		break;
 	}
@@ -608,6 +611,7 @@ mixer_level(struct saa7134_dev *dev, enum saa7134_audio_in src, int level)
 				   (100 == level) ? 0x00 : 0x10);
 			break;
 		case LINE2:
+		case LINE2_LEFT:
 			saa_andorb(SAA7134_ANALOG_IO_SELECT,  0x20,
 				   (100 == level) ? 0x00 : 0x20);
 			break;

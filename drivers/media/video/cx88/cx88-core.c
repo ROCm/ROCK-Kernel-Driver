@@ -1,5 +1,5 @@
 /*
- * $Id: cx88-core.c,v 1.23 2005/01/04 13:34:11 kraxel Exp $
+ * $Id: cx88-core.c,v 1.24 2005/01/19 12:01:55 kraxel Exp $
  *
  * device driver for Conexant 2388x based TV cards
  * driver core
@@ -905,8 +905,8 @@ static int set_tvaudio(struct cx88_core *core)
 	cx88_set_tvaudio(core);
 	// cx88_set_stereo(dev,V4L2_TUNER_MODE_STEREO);
 
-	cx_write(MO_AUDD_LNGTH, 128/8);  /* fifo size */
-	cx_write(MO_AUDR_LNGTH, 128/8);  /* fifo size */
+	cx_write(MO_AUDD_LNGTH,    128); /* fifo size */
+	cx_write(MO_AUDR_LNGTH,    128); /* fifo size */
 	cx_write(MO_AUD_DMACNTRL, 0x03); /* need audio fifo */
 	return 0;
 }

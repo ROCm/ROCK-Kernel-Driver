@@ -248,7 +248,9 @@ config VIDEO_SAA7134
 
 config VIDEO_SAA7134_DVB
 	tristate "DVB Support for saa7134 based TV cards"
-	depends on VIDEO_SAA7134 && DVB_CORE && BROKEN
+	depends on VIDEO_SAA7134 && DVB_CORE
+	select VIDEO_BUF_DVB
+	select DVB_MT352
 	---help---
 	  This adds support for DVB cards based on the
 	  Philips saa7134 chip.
@@ -323,6 +325,8 @@ config VIDEO_CX88_DVB
 	tristate "DVB Support for cx2388x based TV cards"
 	depends on VIDEO_CX88 && DVB_CORE
 	select VIDEO_BUF_DVB
+	select DVB_CX22702
+	select DVB_MT352
 	---help---
 	  This adds support for DVB cards based on the
 	  Connexant 2388x chip.

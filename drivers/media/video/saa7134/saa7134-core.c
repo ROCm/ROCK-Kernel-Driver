@@ -1,5 +1,5 @@
 /*
- * $Id: saa7134-core.c,v 1.15 2004/11/07 14:44:59 kraxel Exp $
+ * $Id: saa7134-core.c,v 1.23 2004/12/17 14:18:49 kraxel Exp $
  *
  * device driver for philips saa7134 based TV cards
  * driver core
@@ -24,6 +24,7 @@
 #include <linux/init.h>
 #include <linux/list.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/kmod.h>
@@ -87,7 +88,7 @@ MODULE_PARM_DESC(card,     "card type");
 static DECLARE_MUTEX(devlist_lock);
 LIST_HEAD(saa7134_devlist);
 static LIST_HEAD(mops_list);
-unsigned int saa7134_devcount;
+static unsigned int saa7134_devcount;
 
 #define dprintk(fmt, arg...)	if (core_debug) \
 	printk(KERN_DEBUG "%s/core: " fmt, dev->name , ## arg)
@@ -619,7 +620,7 @@ static irqreturn_t saa7134_irq(int irq, void *dev_id, struct pt_regs *regs)
 			dump_statusregs(dev);
 #endif
 
-		if (report & SAA7134_IRQ_REPORT_INTL)
+		if (report & SAA7134_IRQ_REPORT_RDCAP /* _INTL */)
 			saa7134_irq_video_intl(dev);
 
 		if ((report & SAA7134_IRQ_REPORT_DONE_RA0) &&
@@ -641,8 +642,8 @@ static irqreturn_t saa7134_irq(int irq, void *dev_id, struct pt_regs *regs)
 			       SAA7134_IRQ_REPORT_GPIO18)) &&
 		    dev->remote)
 			saa7134_input_irq(dev);
+	}
 
-	};
 	if (10 == loop) {
 		print_irqstatus(dev,loop,report,status);
 		if (report & SAA7134_IRQ_REPORT_PE) {
@@ -650,6 +651,13 @@ static irqreturn_t saa7134_irq(int irq, void *dev_id, struct pt_regs *regs)
 			printk(KERN_WARNING "%s/irq: looping -- "
 			       "clearing PE (parity error!) enable bit\n",dev->name);
 			saa_clearl(SAA7134_IRQ2,SAA7134_IRQ2_INTE_PE);
+		} else if (report & (SAA7134_IRQ_REPORT_GPIO16 |
+				     SAA7134_IRQ_REPORT_GPIO18)) {
+			/* disable gpio IRQs */
+			printk(KERN_WARNING "%s/irq: looping -- "
+			       "clearing GPIO enable bits\n",dev->name);
+			saa_clearl(SAA7134_IRQ2, (SAA7134_IRQ2_INTE_GPIO16 |
+						  SAA7134_IRQ2_INTE_GPIO18));
 		} else {
 			/* disable all irqs */
 			printk(KERN_WARNING "%s/irq: looping -- "
@@ -673,7 +681,7 @@ static int saa7134_hwinit1(struct saa7134_dev *dev)
 	saa_writel(SAA7134_IRQ1, 0);
 	saa_writel(SAA7134_IRQ2, 0);
         init_MUTEX(&dev->lock);
-	dev->slock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&dev->slock);
 
 	saa7134_track_gpio(dev,"pre-init");
 	saa7134_video_init1(dev);
@@ -724,20 +732,7 @@ static int saa7134_hwinit2(struct saa7134_dev *dev)
 
 	/* enable IRQ's */
 	saa_writel(SAA7134_IRQ1, 0);
-	saa_writel(SAA7134_IRQ2,
-		   SAA7134_IRQ2_INTE_GPIO18  |
-		   SAA7134_IRQ2_INTE_GPIO18A |
-		   SAA7134_IRQ2_INTE_GPIO16  |
-		   SAA7134_IRQ2_INTE_SC2     |
-		   SAA7134_IRQ2_INTE_SC1     |
-		   SAA7134_IRQ2_INTE_SC0     |
-		   /* SAA7134_IRQ2_INTE_DEC5    |  FIXME: TRIG_ERR ??? */
-		   SAA7134_IRQ2_INTE_DEC3    |
-		   SAA7134_IRQ2_INTE_DEC2    |
-		   /* SAA7134_IRQ2_INTE_DEC1    | */
-		   SAA7134_IRQ2_INTE_DEC0    |
-		   SAA7134_IRQ2_INTE_PE      |
-		   SAA7134_IRQ2_INTE_AR);
+	saa_writel(SAA7134_IRQ2, dev->irq2_mask);
 
 	return 0;
 }
@@ -958,6 +953,13 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 	}
 
 	/* initialize hardware #1 */
+   	dev->irq2_mask =
+		SAA7134_IRQ2_INTE_DEC3    |
+		SAA7134_IRQ2_INTE_DEC2    |
+		SAA7134_IRQ2_INTE_DEC1    |
+		SAA7134_IRQ2_INTE_DEC0    |
+		SAA7134_IRQ2_INTE_PE      |
+		SAA7134_IRQ2_INTE_AR;
 	saa7134_board_init1(dev);
 	saa7134_hwinit1(dev);
 
@@ -1059,6 +1061,9 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 	}
 	list_add_tail(&dev->devlist,&saa7134_devlist);
 	up(&devlist_lock);
+
+	/* check for signal */
+	saa7134_irq_video_intl(dev);
 	return 0;
 
  fail5:
@@ -1206,6 +1211,8 @@ static int saa7134_init(void)
 
 static void saa7134_fini(void)
 {
+	if (pending_registered)
+		unregister_module_notifier(&pending_notifier);
 	pci_unregister_driver(&saa7134_pci_driver);
 }
 

@@ -376,8 +376,8 @@ static int tda9887_set_tvnorm(struct tda9887 *t, char *buf)
 	return 0;
 }
 
-static unsigned int port1  = 1;
-static unsigned int port2  = 1;
+static unsigned int port1  = UNSET;
+static unsigned int port2  = UNSET;
 static unsigned int qss    = UNSET;
 static unsigned int adjust = 0x10;
 module_param(port1, int, 0644);
@@ -387,10 +387,19 @@ module_param(adjust, int, 0644);
 
 static int tda9887_set_insmod(struct tda9887 *t, char *buf)
 {
-	if (port1)
-		buf[1] |= cOutputPort1Inactive;
-	if (port2)
-		buf[1] |= cOutputPort2Inactive;
+	if (UNSET != port1) {
+		if (port1)
+			buf[1] |= cOutputPort1Inactive;
+		else
+			buf[1] &= ~cOutputPort1Inactive;
+	}
+	if (UNSET != port2) {
+		if (port2)
+			buf[1] |= cOutputPort2Inactive;
+		else
+			buf[1] &= ~cOutputPort2Inactive;
+	}
+
 	if (UNSET != qss) {
 		if (qss)
 			buf[1] |= cQSS;
@@ -405,10 +414,15 @@ static int tda9887_set_insmod(struct tda9887 *t, char *buf)
 
 static int tda9887_set_config(struct tda9887 *t, char *buf)
 {
-	if (t->config & TDA9887_PORT1)
+	if (t->config & TDA9887_PORT1_ACTIVE)
+		buf[1] &= ~cOutputPort1Inactive;
+	if (t->config & TDA9887_PORT1_INACTIVE)
 		buf[1] |= cOutputPort1Inactive;
-	if (t->config & TDA9887_PORT2)
+	if (t->config & TDA9887_PORT2_ACTIVE)
+		buf[1] &= ~cOutputPort2Inactive;
+	if (t->config & TDA9887_PORT2_INACTIVE)
 		buf[1] |= cOutputPort2Inactive;
+
 	if (t->config & TDA9887_QSS)
 		buf[1] |= cQSS;
 	if (t->config & TDA9887_INTERCARRIER)
@@ -531,6 +545,8 @@ static int tda9887_configure(struct tda9887 *t)
 	int rc;
 
 	memset(buf,0,sizeof(buf));
+	buf[1] |= cOutputPort1Inactive;
+	buf[1] |= cOutputPort2Inactive;
 	tda9887_set_tvnorm(t,buf);
 	if (UNSET != t->pinnacle_id) {
 		tda9887_set_pinnacle(t,buf);
