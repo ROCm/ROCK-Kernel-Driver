@@ -50,35 +50,12 @@ struct mip_reg		*mip_reg;
 struct mip_reg		*host_reg;
 int 			mip_port;
 unsigned long		mip_addr, host_addr;
-extern int (*platform_rename_gsi)();
-
-static int __init
-es7000_rename_gsi(int ioapic, int gsi)
-{
-	if (ioapic)
-		return gsi;
-	else {
-	if (gsi == 0)
-		return 13;
-	if (gsi == 1)
-		return 16;
-	if (gsi == 4)
-		return 17;
-	if (gsi == 6)
-		return 18;
-	if (gsi == 7)
-		return 19;
-	if (gsi == 8)
-		return 20;
-	return gsi;
-        }
-}
 
 /*
  * Parse the OEM Table
  */
 
-int __init
+void __init
 parse_unisys_oem (char *oemptr, int oem_entries)
 {
 	int                     i;
@@ -106,7 +83,6 @@ parse_unisys_oem (char *oemptr, int oem_entries)
 			host = (struct mip_reg *)val;
 			host_reg = __va(host);
 			val = MIP_RD_LO(mi->mip_reg);
-			mip_port = MIP_PORT(mi->mip_info);
 			mip_addr = val;
 			mip = (struct mip_reg *)val;
 			mip_reg = __va(mip);
@@ -139,9 +115,8 @@ parse_unisys_oem (char *oemptr, int oem_entries)
 	} else {
 		printk("\nEnabling ES7000 specific features...\n");
 		es7000_plat = 1;
-		platform_rename_gsi = es7000_rename_gsi;
 	}
-	return es7000_plat;
+	return;
 }
 
 int __init 

@@ -13,7 +13,6 @@
 #include <linux/kernel_stat.h>
 #include <linux/sysdev.h>
 
-#include <asm/acpi.h>
 #include <asm/atomic.h>
 #include <asm/system.h>
 #include <asm/io.h>
@@ -491,6 +490,5 @@ void __init init_IRQ(void)
 	 */
 	setup_timer();
 
-	if (!acpi_ioapic)
-		setup_irq(2, &irq2);
+	setup_irq(2, &irq2);
 }

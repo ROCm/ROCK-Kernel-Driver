@@ -6,7 +6,6 @@
 #include <linux/init.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>
-#include <asm/acpi.h>
 #include <asm/arch_hooks.h>
 
 void __init pre_intr_init_hook(void)
@@ -25,8 +24,7 @@ void __init intr_init_hook(void)
 	smp_intr_init();
 #endif
 
-	if (!acpi_ioapic)
-		setup_irq(2, &irq2);
+	setup_irq(2, &irq2);
 }
 
 void __init pre_setup_arch_hook(void)

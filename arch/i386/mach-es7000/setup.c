@@ -1,5 +1,5 @@
 /*
- *	Machine specific setup for generic
+ *	Machine specific setup for es7000
  */
 
 #include <linux/config.h>
@@ -101,4 +101,5 @@ void __init mca_nmi_hook(void)
 
 	printk("NMI generated from unknown source!\n");
 }
+
 #endif
