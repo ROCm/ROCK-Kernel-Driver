@@ -38,6 +38,7 @@
 #define ACPI_BUTTON_DRIVER_NAME		"ACPI Button Driver"
 #define ACPI_BUTTON_CLASS		"button"
 #define ACPI_BUTTON_FILE_INFO		"info"
+#define ACPI_BUTTON_FILE_STATE		"state"
 #define ACPI_BUTTON_TYPE_UNKNOWN	0x00
 #define ACPI_BUTTON_NOTIFY_STATUS	0x80
 
@@ -70,7 +71,8 @@ MODULE_LICENSE("GPL");
 
 int acpi_button_add (struct acpi_device *device);
 int acpi_button_remove (struct acpi_device *device, int type);
-static int acpi_button_open_fs(struct inode *inode, struct file *file);
+static int acpi_button_info_open_fs(struct inode *inode, struct file *file);
+static int acpi_button_state_open_fs(struct inode *inode, struct file *file);
 
 static struct acpi_driver acpi_button_driver = {
 	.name =		ACPI_BUTTON_DRIVER_NAME,
@@ -89,24 +91,30 @@ struct acpi_button {
 	unsigned long		pushed;
 };
 
-static struct file_operations acpi_button_fops = {
-	.open		= acpi_button_open_fs,
+static struct file_operations acpi_button_info_fops = {
+	.open		= acpi_button_info_open_fs,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
 	.release	= single_release,
 };
 
+static struct file_operations acpi_button_state_fops = {
+	.open		= acpi_button_state_open_fs,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
 /* --------------------------------------------------------------------------
                               FS Interface (/proc)
    -------------------------------------------------------------------------- */
 
 static struct proc_dir_entry	*acpi_button_dir = NULL;
 
-static int acpi_button_seq_show(struct seq_file *seq, void *offset)
+static int acpi_button_info_seq_show(struct seq_file *seq, void *offset)
 {
 	struct acpi_button	*button = (struct acpi_button *) seq->private;
 
-	ACPI_FUNCTION_TRACE("acpi_button_seq_show");
+	ACPI_FUNCTION_TRACE("acpi_button_info_seq_show");
 
 	if (!button || !button->device)
 		return 0;
@@ -117,11 +125,38 @@ static int acpi_button_seq_show(struct seq_file *seq, void *offset)
 	return 0;
 }
 
-static int acpi_button_open_fs(struct inode *inode, struct file *file)
+static int acpi_button_info_open_fs(struct inode *inode, struct file *file)
 {
-	return single_open(file, acpi_button_seq_show, PDE(inode)->data);
+	return single_open(file, acpi_button_info_seq_show, PDE(inode)->data);
 }
 	
+static int acpi_button_state_seq_show(struct seq_file *seq, void *offset)
+{
+	struct acpi_button	*button = (struct acpi_button *) seq->private;
+	acpi_status		status;
+	unsigned long		state;
+
+	ACPI_FUNCTION_TRACE("acpi_button_state_seq_show");
+
+	if (!button || !button->device)
+		return 0;
+
+	status = acpi_evaluate_integer(button->handle,"_LID",NULL,&state);
+	if (ACPI_FAILURE(status)) {
+		seq_printf(seq, "state:      unsupported\n");
+	}
+	else{
+		seq_printf(seq, "state:      %lu\n", state); 
+	}
+
+	return 0;
+}
+
+static int acpi_button_state_open_fs(struct inode *inode, struct file *file)
+{
+	return single_open(file, acpi_button_state_seq_show, PDE(inode)->data);
+}
+
 static int
 acpi_button_add_fs (
 	struct acpi_device	*device)
@@ -165,8 +200,22 @@ acpi_button_add_fs (
 			"Unable to create '%s' fs entry\n",
 			ACPI_BUTTON_FILE_INFO));
 	else {
-		entry->proc_fops = &acpi_button_fops;
+		entry->proc_fops = &acpi_button_info_fops;
 		entry->data = acpi_driver_data(device);
+	}
+
+	/* show lid state [R] */
+	if (button->type == ACPI_BUTTON_TYPE_LID) {
+		entry = create_proc_entry(ACPI_BUTTON_FILE_STATE,
+			S_IRUGO, acpi_device_dir(device));
+		if (!entry)
+			ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
+				"Unable to create '%s' fs entry\n",
+				ACPI_BUTTON_FILE_INFO));
+		else {
+			entry->proc_fops = &acpi_button_state_fops;
+			entry->data = acpi_driver_data(device);
+		}
 	}
 
 	return_VALUE(0);
