@@ -87,13 +87,13 @@
  * Data:           None
  */
 
-typedef enum {
+enum ftdi_type {
 	sio = 1,
 	F8U232AM = 2,
-} ftdi_type_t;
+};
 
 
-typedef enum {
+enum {
  ftdi_sio_b300 = 0, 
  ftdi_sio_b600 = 1, 
  ftdi_sio_b1200 = 2,
@@ -104,10 +104,10 @@ typedef enum {
  ftdi_sio_b38400 = 7,
  ftdi_sio_b57600 = 8,
  ftdi_sio_b115200 = 9
-} FTDI_SIO_baudrate_t ;
+};
 
 
-typedef enum {
+enum {
   ftdi_8U232AM_12MHz_b300 = 0x09c4,
   ftdi_8U232AM_12MHz_b600 = 0x04E2,
   ftdi_8U232AM_12MHz_b1200 = 0x0271,
@@ -119,9 +119,9 @@ typedef enum {
   ftdi_8U232AM_12MHz_b57600 = 0x000d,
   ftdi_8U232AM_12MHz_b115200 = 0x4006,
   ftdi_8U232AM_12MHz_b230400 = 0x8003,
-} FTDI_8U232AM_12MHz_baudrate_t;
+};
 /* Apparently all devices are 48MHz */
-typedef enum {
+enum {
   ftdi_8U232AM_48MHz_b300 = 0x2710,
   ftdi_8U232AM_48MHz_b600 = 0x1388,
   ftdi_8U232AM_48MHz_b1200 = 0x09c4,
@@ -136,7 +136,7 @@ typedef enum {
   ftdi_8U232AM_48MHz_b460800 = 0x4006,
   ftdi_8U232AM_48MHz_b921600 = 0x8003,
 
-} FTDI_8U232AM_48MHz_baudrate_t;
+};
 
 #define FTDI_SIO_SET_DATA_REQUEST FTDI_SIO_SET_DATA
 #define FTDI_SIO_SET_DATA_REQUEST_TYPE 0x40

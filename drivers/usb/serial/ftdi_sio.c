@@ -154,7 +154,7 @@ MODULE_DEVICE_TABLE (usb, id_table_combined);
 
 
 struct ftdi_private {
-	ftdi_type_t ftdi_type;
+	enum ftdi_type ftdi_type;
 	__u16 last_set_data_urb_value ; /* the last data state set - needed for doing a break */
         int write_offset;
 };
@@ -652,7 +652,7 @@ static void ftdi_sio_read_bulk_callback (struct urb *urb)
 } /* ftdi_sio_serial_read_bulk_callback */
 
 
-static __u16 translate_baudrate_to_ftdi(unsigned int cflag, ftdi_type_t ftdi_type) 
+static __u16 translate_baudrate_to_ftdi(unsigned int cflag, enum ftdi_type ftdi_type) 
 { /* translate_baudrate_to_ftdi */
 	
 	__u16 urb_value = ftdi_sio_b9600;
