@@ -37,6 +37,12 @@
 #ifndef GET_FPEMU_CTL
 # define GET_FPEMU_CTL(a,b)	(-EINVAL)
 #endif
+#ifndef SET_FPEXC_CTL
+# define SET_FPEXC_CTL(a,b)	(-EINVAL)
+#endif
+#ifndef GET_FPEXC_CTL
+# define GET_FPEXC_CTL(a,b)	(-EINVAL)
+#endif
 
 /*
  * this is where the system-wide overflow UID and GID are defined, for
@@ -1283,6 +1289,13 @@ asmlinkage long sys_prctl(int option, unsigned long arg2, unsigned long arg3,
 		case PR_GET_FPEMU:
 			error = GET_FPEMU_CTL(current, arg2);
 			break;
+		case PR_SET_FPEXC:
+			error = SET_FPEXC_CTL(current, arg2);
+			break;
+		case PR_GET_FPEXC:
+			error = GET_FPEXC_CTL(current, arg2);
+			break;
+
 
 		case PR_GET_KEEPCAPS:
 			if (current->keep_capabilities)
