@@ -124,14 +124,6 @@ static void dbg_kfree(void * v, int line) {
  */
 
 /*
- * 	Kernel loadable module interface.
- */
-#ifdef MODULE
-int init_module (void);
-void cleanup_module (void);
-#endif
-
-/*
  *	WAN device IOCTL handlers
  */
 
