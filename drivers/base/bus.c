@@ -174,8 +174,8 @@ static void device_detach(struct device * dev)
 
 static void driver_detach(struct device_driver * drv)
 {
-	struct list_head * entry;
-	list_for_each(entry,&drv->devices) {
+	struct list_head * entry, * next;
+	list_for_each_safe(entry,next,&drv->devices) {
 		struct device * dev = container_of(entry,struct device,driver_list);
 		if (get_device(dev)) {
 			detach(dev,drv);
