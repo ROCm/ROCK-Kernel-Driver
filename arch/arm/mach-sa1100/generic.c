@@ -18,6 +18,7 @@
 #include <linux/cpufreq.h>
 #include <linux/ioport.h>
 
+#include <asm/div64.h>
 #include <asm/hardware.h>
 #include <asm/system.h>
 #include <asm/pgtable.h>
@@ -110,6 +111,21 @@ unsigned int cpufreq_get(unsigned int cpu)
 }
 EXPORT_SYMBOL(cpufreq_get);
 #endif
+
+/*
+ * This is the SA11x0 sched_clock implementation.  This has
+ * a resolution of 271ns, and a maximum value of 1165s.
+ *  ( * 1E9 / 3686400 => * 78125 / 288)
+ */
+unsigned long long sched_clock(void)
+{
+	unsigned long long v;
+
+	v = (unsigned long long)OSCR * 78125;
+	do_div(v, 288);
+
+	return v;
+}
 
 /*
  * Default power-off for SA1100
