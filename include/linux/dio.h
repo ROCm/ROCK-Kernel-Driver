@@ -99,14 +99,14 @@
 #define DIO_DESC_FHPIB "98625A/98625B fast HPIB"
 #define DIO_ID_NHPIB    0x01 /* 98624A HP-IB (normal ie slow) */
 #define DIO_DESC_NHPIB "98624A HPIB"
-#define DIO_ID_SCSI0    0x07 /* 98625A SCSI */
-#define DIO_DESC_SCSI0 "98625A SCSI0"
+#define DIO_ID_SCSI0    0x07 /* 98265A SCSI */
+#define DIO_DESC_SCSI0 "98265A SCSI0"
 #define DIO_ID_SCSI1    0x27 /* ditto */
-#define DIO_DESC_SCSI1 "98625A SCSI1"
+#define DIO_DESC_SCSI1 "98265A SCSI1"
 #define DIO_ID_SCSI2    0x47 /* ditto */
-#define DIO_DESC_SCSI2 "98625A SCSI2"
+#define DIO_DESC_SCSI2 "98265A SCSI2"
 #define DIO_ID_SCSI3    0x67 /* ditto */
-#define DIO_DESC_SCSI3 "98625A SCSI3"
+#define DIO_DESC_SCSI3 "98265A SCSI3"
 #define DIO_ID_FBUFFER  0x39 /* framebuffer: flavour is distinguished by secondary ID */
 #define DIO_DESC_FBUFFER "bitmapped display"
 /* the NetBSD kernel source is a bit unsure as to what these next IDs actually do :-> */
