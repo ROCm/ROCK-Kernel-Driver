@@ -2,6 +2,7 @@
  * Implement the default iomap interfaces
  */
 #include <linux/pci.h>
+#include <linux/module.h>
 #include <asm/io.h>
 
 /*
@@ -55,6 +56,9 @@ unsigned int fastcall ioread32(void __iomem *addr)
 {
 	IO_COND(addr, return inl(port), return readl(addr));
 }
+EXPORT_SYMBOL(ioread8);
+EXPORT_SYMBOL(ioread16);
+EXPORT_SYMBOL(ioread32);
 
 void fastcall iowrite8(u8 val, void __iomem *addr)
 {
@@ -68,6 +72,9 @@ void fastcall iowrite32(u32 val, void __iomem *addr)
 {
 	IO_COND(addr, outl(val,port), writel(val, addr));
 }
+EXPORT_SYMBOL(iowrite8);
+EXPORT_SYMBOL(iowrite16);
+EXPORT_SYMBOL(iowrite32);
 
 /* Create a virtual mapping cookie for an IO port range */
 void __iomem *ioport_map(unsigned int port, unsigned int nr)
@@ -81,6 +88,8 @@ void ioport_unmap(void __iomem *addr)
 {
 	/* Nothing to do */
 }
+EXPORT_SYMBOL(ioport_map);
+EXPORT_SYMBOL(ioport_unmap);
 
 /* Create a virtual mapping cookie for a PCI BAR (memory or IO) */
 void __iomem *pci_iomap(struct pci_dev *dev, int bar, unsigned long maxlen)
@@ -108,3 +117,5 @@ void pci_iounmap(struct pci_dev *dev, void __iomem * addr)
 {
 	IO_COND(addr, /* nothing */, iounmap(addr));
 }
+EXPORT_SYMBOL(pci_iomap);
+EXPORT_SYMBOL(pci_iounmap);
