@@ -291,15 +291,15 @@ static inline int solaris_sockmod(unsigned int fd, unsigned int cmd, u32 arg)
 {
 	struct inode *ino;
 	/* I wonder which of these tests are superfluous... --patrik */
-	read_lock(&current->files->file_lock);
+	spin_lock(&current->files->file_lock);
 	if (! current->files->fd[fd] ||
 	    ! current->files->fd[fd]->f_dentry ||
 	    ! (ino = current->files->fd[fd]->f_dentry->d_inode) ||
 	    ! ino->i_sock) {
-		read_unlock(&current->files->file_lock);
+		spin_unlock(&current->files->file_lock);
 		return TBADF;
 	}
-	read_unlock(&current->files->file_lock);
+	spin_unlock(&current->files->file_lock);
 	
 	switch (cmd & 0xff) {
 	case 109: /* SI_SOCKPARAMS */
