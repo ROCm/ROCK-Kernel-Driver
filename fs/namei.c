@@ -1590,21 +1590,16 @@ int vfs_unlink(struct inode *dir, struct dentry *dentry)
 
 	DQUOT_INIT(dir);
 
-	dget(dentry);
 	down(&dentry->d_inode->i_sem);
 	if (d_mountpoint(dentry))
 		error = -EBUSY;
-	else {
+	else
 		error = dir->i_op->unlink(dir, dentry);
-		if (!error)
-			d_delete(dentry);
-	}
 	up(&dentry->d_inode->i_sem);
-	dput(dentry);
-
-	if (!error)
+	if (!error) {
+		d_delete(dentry);
 		inode_dir_notify(dir, DN_DELETE);
-
+	}
 	return error;
 }
 
