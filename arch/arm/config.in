@@ -546,7 +546,7 @@ endmenu
 mainmenu_option next_comment
 comment 'SCSI support'
 
-tristate 'SCSI support?' CONFIG_SCSI
+tristate 'SCSI support' CONFIG_SCSI
 
 if [ "$CONFIG_SCSI" != "n" ]; then
    source drivers/scsi/Config.in
