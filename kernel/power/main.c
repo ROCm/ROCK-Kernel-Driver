@@ -67,7 +67,11 @@ static int suspend_prepare(u32 state)
 			goto Thaw;
 	}
 
-	if ((error = device_suspend(state)))
+	/* FIXME: this is suspend confusion biting us. If we pass
+	   state, we'll pass 2 in suspend-to-RAM case; EHCI will
+	   actually break suspend, because it interprets 2 as PCI_D2
+	   state. Oops. */
+	if ((error = device_suspend(3)))
 		goto Finish;
 	return 0;
  Finish:
@@ -86,7 +90,8 @@ static int suspend_enter(u32 state)
 	unsigned long flags;
 
 	local_irq_save(flags);
-	if ((error = device_power_down(state)))
+	/* FIXME: see suspend_prepare */
+	if ((error = device_power_down(3)))
 		goto Done;
 	error = pm_ops->enter(state);
 	device_power_up();
