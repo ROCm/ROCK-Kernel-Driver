@@ -163,13 +163,12 @@ static int __init pxm_to_nasid(int pxm)
 
 void __init early_sn_setup(void)
 {
-	void ia64_sal_handler_init(void *entry_point, void *gpval);
 	efi_system_table_t *efi_systab;
 	efi_config_table_t *config_tables;
 	struct ia64_sal_systab *sal_systab;
 	struct ia64_sal_desc_entry_point *ep;
 	char *p;
-	int i;
+	int i, j;
 
 	/*
 	 * Parse enough of the SAL tables to locate the SAL entry point. Since, console
@@ -185,19 +184,21 @@ void __init early_sn_setup(void)
 		    0) {
 			sal_systab = __va(config_tables[i].table);
 			p = (char *)(sal_systab + 1);
-			for (i = 0; i < sal_systab->entry_count; i++) {
+			for (j = 0; j < sal_systab->entry_count; j++) {
 				if (*p == SAL_DESC_ENTRY_POINT) {
 					ep = (struct ia64_sal_desc_entry_point
 					      *)p;
 					ia64_sal_handler_init(__va
 							      (ep->sal_proc),
 							      __va(ep->gp));
-					break;
+					return;
 				}
 				p += SAL_DESC_SIZE(*p);
 			}
 		}
 	}
+	/* Uh-oh, SAL not available?? */
+	printk(KERN_ERR "failed to find SAL entry point\n");
 }
 
 extern int platform_intr_list[];

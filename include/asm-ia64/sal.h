@@ -833,6 +833,8 @@ extern int ia64_sal_oemcall_nolock(struct ia64_sal_retval *, u64, u64, u64,
 extern int ia64_sal_oemcall_reentrant(struct ia64_sal_retval *, u64, u64, u64,
 				      u64, u64, u64, u64, u64);
 
+extern void ia64_sal_handler_init(void *entry_point, void *gpval);
+
 #endif /* __ASSEMBLY__ */
 
 #endif /* _ASM_IA64_SAL_H */
