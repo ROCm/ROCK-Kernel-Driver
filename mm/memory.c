@@ -355,6 +355,9 @@ static void zap_pte_range(mmu_gather_t *tlb, pmd_t * pmd, unsigned long address,
 				if (!PageReserved(page)) {
 					if (pte_dirty(pte))
 						set_page_dirty(page);
+					if (page->mapping && pte_young(pte) &&
+							!PageSwapCache(page))
+						mark_page_accessed(page);
 					tlb->freed++;
 					page_remove_rmap(page, ptep);
 					tlb_remove_page(tlb, page);
