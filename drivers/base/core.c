@@ -180,6 +180,7 @@ void device_remove_file(struct device * dev, struct device_attribute * attr)
 
 void device_initialize(struct device *dev)
 {
+	kobj_set_kset_s(dev,devices_subsys);
 	kobject_init(&dev->kobj);
 	INIT_LIST_HEAD(&dev->node);
 	INIT_LIST_HEAD(&dev->children);
@@ -214,7 +215,6 @@ int device_add(struct device *dev)
 
 	/* first, register with generic layer. */
 	strncpy(dev->kobj.name,dev->bus_id,KOBJ_NAME_LEN);
-	kobj_set_kset_s(dev,devices_subsys);
 	if (parent)
 		dev->kobj.parent = &parent->kobj;
 
