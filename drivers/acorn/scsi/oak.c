@@ -138,12 +138,12 @@ oakscsi_probe(struct expansion_card *ec, const struct ecard_id *id)
 	struct Scsi_Host *host;
 	int ret = -ENOMEM;
 
-        host = scsi_register (tpnt, sizeof(struct NCR5380_hostdata));
+	host = scsi_register(&oakscsi_template, sizeof(struct NCR5380_hostdata));
 	if (!host)
 		goto out;
 
-        host->io_port = ecard_address(ec, ECARD_MEMC, 0)
-        host->irq = IRQ_NONE;
+	host->io_port = ecard_address(ec, ECARD_MEMC, 0);
+	host->irq = IRQ_NONE;
 	host->n_io_port = 255;
 
 	ret = -EBUSY;
@@ -155,7 +155,7 @@ oakscsi_probe(struct expansion_card *ec, const struct ecard_id *id)
 	printk("scsi%d: at port 0x%08lx irqs disabled",
 		host->host_no, host->io_port);
 	printk(" options CAN_QUEUE=%d  CMD_PER_LUN=%d release=%d",
-	    tpnt->can_queue, tpnt->cmd_per_lun, OAKSCSI_PUBLIC_RELEASE);
+		host->can_queue, host->cmd_per_lun, OAKSCSI_PUBLIC_RELEASE);
 	printk("\nscsi%d:", host->host_no);
 	NCR5380_print_options(host);
 	printk("\n");

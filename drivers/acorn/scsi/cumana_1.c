@@ -260,12 +260,12 @@ static Scsi_Host_Template cumanascsi_template = {
 };
 
 static int __devinit
-cumanascsi1_probe(struct expansion_card *ec, struct ecard_ids *id)
+cumanascsi1_probe(struct expansion_card *ec, const struct ecard_id *id)
 {
 	struct Scsi_Host *host;
 	int ret = -ENOMEM;
 
-	host = scsi_register (tpnt, sizeof(struct NCR5380_hostdata));
+	host = scsi_register(&cumanascsi_template, sizeof(struct NCR5380_hostdata));
 	if (!host)
 		goto out;
 
@@ -294,7 +294,7 @@ cumanascsi1_probe(struct expansion_card *ec, struct ecard_ids *id)
 	printk("scsi%d: at port 0x%08lx irq %d",
 		host->host_no, host->io_port, host->irq);
 	printk(" options CAN_QUEUE=%d CMD_PER_LUN=%d release=%d",
-	    tpnt->can_queue, tpnt->cmd_per_lun, CUMANASCSI_PUBLIC_RELEASE);
+		host->can_queue, host->cmd_per_lun, CUMANASCSI_PUBLIC_RELEASE);
 	printk("\nscsi%d:", host->host_no);
 	NCR5380_print_options(host);
 	printk("\n");
@@ -321,10 +321,10 @@ static void __devexit cumanascsi1_remove(struct expansion_card *ec)
 	scsi_remove_host(host);
 	free_irq(host->irq, host);
 	release_region(host->io_port, host->n_io_port);
-	scsi_remove(host);
+	scsi_unregister(host);
 }
 
-static const struct ecard_ids cumanascsi1_cids[] = {
+static const struct ecard_id cumanascsi1_cids[] = {
 	{ MANU_CUMANA, PROD_CUMANA_SCSI_1 },
 	{ 0xffff, 0xffff }
 };
