@@ -1752,6 +1752,14 @@ int reiserfs_add_tail_list(struct inode *inode, struct buffer_head *bh);
 int reiserfs_add_ordered_list(struct inode *inode, struct buffer_head *bh);
 int journal_mark_dirty(struct reiserfs_transaction_handle *, struct super_block *, struct buffer_head *bh) ;
 
+static inline int
+reiserfs_file_data_log(struct inode *inode) {
+    if (reiserfs_data_log(inode->i_sb) ||
+       (REISERFS_I(inode)->i_flags & i_data_log))
+        return 1 ;
+    return 0 ;
+}
+
 static inline int reiserfs_transaction_running(struct super_block *s) {
     struct reiserfs_transaction_handle *th = current->journal_info ;
     if (th && th->t_super == s)

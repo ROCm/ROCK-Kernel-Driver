@@ -1495,6 +1495,41 @@ void reiserfs_delete_object (struct reiserfs_transaction_handle *th, struct inod
     reiserfs_delete_solid_item (th, inode, INODE_PKEY (inode));
 }
 
+static void
+unmap_buffers(struct page *page, loff_t pos) {
+    struct buffer_head *bh ;
+    struct buffer_head *head ;
+    struct buffer_head *next ;
+    unsigned long tail_index ;
+    unsigned long cur_index ;
+
+    if (page) {
+	if (page_has_buffers(page)) {
+	    tail_index = pos & (PAGE_CACHE_SIZE - 1) ;
+	    cur_index = 0 ;
+	    head = page_buffers(page) ;
+	    bh = head ;
+	    do {
+		next = bh->b_this_page ;
+
+		/* we want to unmap the buffers that contain the tail, and
+		** all the buffers after it (since the tail must be at the
+		** end of the file).  We don't want to unmap file data
+		** before the tail, since it might be dirty and waiting to
+		** reach disk
+		*/
+		cur_index += bh->b_size ;
+		if (cur_index > tail_index) {
+		    reiserfs_unmap_buffer(bh) ;
+		}
+		bh = next ;
+	    } while (bh != head) ;
+	    if ( PAGE_SIZE == bh->b_size ) {
+		clear_page_dirty(page);
+	    }
+	}
+    }
+}
 
 static int maybe_indirect_to_direct (struct reiserfs_transaction_handle *th, 
 			      struct inode * p_s_inode,
@@ -1587,7 +1622,7 @@ int reiserfs_cut_from_item (struct reiserfs_transaction_handle *th,
     char                c_mode;            /* Mode of the balance. */
     int retval2 = -1;
     int quota_cut_bytes;
-    
+    loff_t tail_pos = 0;
     
     init_tb_struct(th, &s_cut_balance, p_s_inode->i_sb, p_s_path, n_cut_size);
 
@@ -1627,6 +1662,7 @@ int reiserfs_cut_from_item (struct reiserfs_transaction_handle *th,
       	    set_cpu_key_k_type (p_s_item_key, TYPE_INDIRECT);
 	    p_s_item_key->key_length = 4;
 	    n_new_file_size -= (n_new_file_size & (p_s_sb->s_blocksize - 1));
+	    tail_pos = n_new_file_size;
 	    set_cpu_key_k_offset (p_s_item_key, n_new_file_size + 1);
 	    if ( search_for_position_by_key(p_s_sb, p_s_item_key, p_s_path) == POSITION_NOT_FOUND ){
 		print_block (PATH_PLAST_BUFFER (p_s_path), 3, PATH_LAST_POSITION (p_s_path) - 1, PATH_LAST_POSITION (p_s_path) + 1);
@@ -1724,9 +1760,10 @@ int reiserfs_cut_from_item (struct reiserfs_transaction_handle *th,
     if ( n_is_inode_locked ) {
 	/* we've done an indirect->direct conversion.  when the data block
 	** was freed, it was removed from the list of blocks that must
-	** be flushed before the transaction commits, so we don't need to
-	** deal with it here.
+	** be flushed before the transaction commits, make sure to
+	** unmap and invalidate it
 	*/
+	unmap_buffers(page, tail_pos);
 	REISERFS_I(p_s_inode)->i_flags &= ~i_pack_on_close_mask ;
     }
 #ifdef REISERQUOTA_DEBUG

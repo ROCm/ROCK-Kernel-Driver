@@ -1024,7 +1024,6 @@ static int flush_commit_list(struct super_block *s, struct reiserfs_journal_list
   up(&jl->j_commit_lock);
 put_jl:
   put_journal_list(s, jl);
-
   return 0 ;
 }
 
@@ -1544,14 +1543,18 @@ static int flush_used_journal_lists(struct super_block *s,
     unsigned long cur_len;
     int ret;
     int i;
+    int limit = 256;
     struct reiserfs_journal_list *tjl;
     struct reiserfs_journal_list *flush_jl;
     unsigned long trans_id;
 
     flush_jl = tjl = jl;
 
-    /* flush for 256 transactions or 256 blocks, whichever comes first */
-    for(i = 0 ; i < 256 && len < 256 ; i++) {
+    /* in data logging mode, try harder to flush a lot of blocks */
+    if (reiserfs_data_log(s))
+	limit = 1024;
+    /* flush for 256 transactions or limit blocks, whichever comes first */
+    for(i = 0 ; i < 256 && len < limit ; i++) {
 	if (atomic_read(&tjl->j_commit_left) ||
 	    tjl->j_trans_id < jl->j_trans_id) {
 	    break;
@@ -3482,10 +3485,16 @@ static int do_journal_end(struct reiserfs_transaction_handle *th, struct super_b
     /* copy all the real blocks into log area.  dirty log blocks */
     if (test_bit(BH_JDirty, &cn->bh->b_state)) {
       struct buffer_head *tmp_bh ;
+      char *addr;
+      struct page *page;
       tmp_bh =  journal_getblk(p_s_sb, SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb) + 
 		       ((cur_write_start + jindex) % SB_ONDISK_JOURNAL_SIZE(p_s_sb))) ;
       set_buffer_uptodate(tmp_bh);
-      memcpy(tmp_bh->b_data, cn->bh->b_data, cn->bh->b_size) ;  
+      page = cn->bh->b_page;
+      addr = kmap(page);
+      memcpy(tmp_bh->b_data, addr + offset_in_page(cn->bh->b_data),
+             cn->bh->b_size);
+      kunmap(page);
       mark_buffer_dirty(tmp_bh);
       jindex++ ;
       set_bit(BH_JDirty_wait, &(cn->bh->b_state)) ; 

@@ -2147,6 +2147,11 @@ static int reiserfs_write_full_page(struct page *page, struct writeback_control 
     struct buffer_head *head, *bh;
     int partial = 0 ;
     int nr = 0;
+    int checked = PageChecked(page);
+    struct reiserfs_transaction_handle th;
+    struct super_block *s = inode->i_sb;
+    int bh_per_page = PAGE_CACHE_SIZE / s->s_blocksize;
+    th.t_trans_id = 0;
 
     /* The page dirty bit is cleared before writepage is called, which
      * means we have to tell create_empty_buffers to make dirty buffers
@@ -2154,7 +2159,7 @@ static int reiserfs_write_full_page(struct page *page, struct writeback_control 
      * in the BH_Uptodate is just a sanity check.
      */
     if (!page_has_buffers(page)) {
-	create_empty_buffers(page, inode->i_sb->s_blocksize, 
+	create_empty_buffers(page, s->s_blocksize,
 	                    (1 << BH_Dirty) | (1 << BH_Uptodate));
     }
     head = page_buffers(page) ;
@@ -2178,10 +2183,10 @@ static int reiserfs_write_full_page(struct page *page, struct writeback_control 
 	kunmap_atomic(kaddr, KM_USER0) ;
     }
     bh = head ;
-    block = page->index << (PAGE_CACHE_SHIFT - inode->i_sb->s_blocksize_bits) ;
+    block = page->index << (PAGE_CACHE_SHIFT - s->s_blocksize_bits) ;
     /* first map all the buffers, logging any direct items we find */
     do {
-	if (buffer_dirty(bh) && (!buffer_mapped(bh) ||
+	if ((checked || buffer_dirty(bh)) && (!buffer_mapped(bh) ||
 	   (buffer_mapped(bh) && bh->b_blocknr == 0))) {
 	    /* not mapped yet, or it points to a direct item, search
 	     * the btree for the mapping info, and log any direct
@@ -2195,6 +2200,18 @@ static int reiserfs_write_full_page(struct page *page, struct writeback_control 
 	block++;
     } while(bh != head) ;
 
+    /*
+     * we start the transaction after map_block_for_writepage,
+     * because it can create holes in the file (an unbounded operation).
+     * starting it here, we can make a reliable estimate for how many
+     * blocks we're going to log
+     */
+    if (checked) {
+	ClearPageChecked(page);
+	reiserfs_write_lock(s);
+	journal_begin(&th, s, bh_per_page + 1);
+	reiserfs_update_inode_transaction(inode);
+    }
     /* now go through and lock any dirty buffers on the page */
     do {
 	get_bh(bh);
@@ -2203,6 +2220,11 @@ static int reiserfs_write_full_page(struct page *page, struct writeback_control 
 	if (buffer_mapped(bh) && bh->b_blocknr == 0)
 	    continue;
 
+	if (checked) {
+	    reiserfs_prepare_for_journal(s, bh, 1);
+	    journal_mark_dirty(&th, s, bh);
+	    continue;
+	}
 	/* from this point on, we know the buffer is mapped to a
 	 * real block and not a direct item
 	 */
@@ -2221,6 +2243,10 @@ static int reiserfs_write_full_page(struct page *page, struct writeback_control 
 	}
     } while((bh = bh->b_this_page) != head);
 
+    if (checked) {
+	journal_end(&th, s, bh_per_page + 1);
+	reiserfs_write_unlock(s);
+    }
     BUG_ON(PageWriteback(page));
     set_page_writeback(page);
     unlock_page(page);
@@ -2480,17 +2506,15 @@ static int invalidatepage_can_drop(struct inode *inode, struct buffer_head *bh)
     /* the page is locked, and the only places that log a data buffer
      * also lock the page.
      */
-#if 0
     if (reiserfs_file_data_log(inode)) {
-	/* very conservative, leave the buffer pinned if anyone might need it.
-	** this should be changed to drop the buffer if it is only in the
-	** current transaction
-	*/
+	/*
+	 * very conservative, leave the buffer pinned if
+	 * anyone might need it.
+	 */
         if (buffer_journaled(bh) || buffer_journal_dirty(bh)) {
 	    ret = 0 ;
 	}
     } else
-#endif
     if (buffer_dirty(bh) || buffer_locked(bh)) {
 	struct reiserfs_journal_list *jl;
 	struct reiserfs_jh *jh = bh->b_private;
@@ -2528,6 +2552,10 @@ static int reiserfs_invalidatepage(struct page *page, unsigned long offset)
     int ret = 1;
 
     BUG_ON(!PageLocked(page));
+
+    if (offset == 0)
+	ClearPageChecked(page);
+
     if (!page_has_buffers(page))
 	goto out;
 
@@ -2561,6 +2589,15 @@ out:
     return ret;
 }
 
+static int reiserfs_set_page_dirty(struct page *page) {
+    struct inode *inode = page->mapping->host;
+    if (reiserfs_file_data_log(inode)) {
+	SetPageChecked(page);
+	return __set_page_dirty_nobuffers(page);
+    }
+    return __set_page_dirty_buffers(page);
+}
+
 /*
  * Returns 1 if the page's buffers were dropped.  The page is locked.
  *
@@ -2578,6 +2615,7 @@ static int reiserfs_releasepage(struct page *page, int unused_gfp_flags)
     struct buffer_head *bh ;
     int ret = 1 ;
 
+    WARN_ON(PageChecked(page));
     spin_lock(&j->j_dirty_buffers_lock) ;
     head = page_buffers(page) ;
     bh = head ;
@@ -2683,5 +2721,6 @@ struct address_space_operations reiserfs_address_space_operations = {
     .prepare_write = reiserfs_prepare_write,
     .commit_write = reiserfs_commit_write,
     .bmap = reiserfs_aop_bmap,
-    .direct_IO = reiserfs_direct_IO
+    .direct_IO = reiserfs_direct_IO,
+    .set_page_dirty = reiserfs_set_page_dirty,
 } ;
