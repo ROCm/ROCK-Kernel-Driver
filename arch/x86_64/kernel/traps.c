@@ -197,16 +197,6 @@ void show_trace(unsigned long *stack)
 	printk("\n");
 }
 
-void show_trace_task(struct task_struct *tsk)
-{
-	unsigned long rsp = tsk->thread.rsp;
-
-	/* User space on another CPU? */
-	if ((rsp ^ (unsigned long)tsk->thread_info) & (PAGE_MASK<<1))
-		return;
-	show_trace((unsigned long *)rsp);
-}
-
 void show_stack(struct task_struct *tsk, unsigned long * rsp)
 {
 	unsigned long *stack;

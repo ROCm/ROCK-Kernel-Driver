@@ -234,10 +234,3 @@ unsigned long get_wchan (struct task_struct *p)
 
 	return 0;
 }
-
-void show_trace_task (struct task_struct *t)
-{
-        /* blarg XXX */
-	printk ("show_trace_task: KSP = 0x%lx, USP = 0x%lx, UPC = 0x%lx\n",
-		t->thread.ksp, KSTK_ESP (t), KSTK_EIP (t));
-}

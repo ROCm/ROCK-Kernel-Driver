@@ -126,11 +126,6 @@ void show_trace(struct task_struct *task, unsigned long *stack)
 	printk("\n");
 }
 
-void show_trace_task(struct task_struct *tsk)
-{
-	show_trace(tsk, (long *)tsk->thread.reg29);
-}
-
 /*
  * The architecture-independent dump_stack generator
  */
