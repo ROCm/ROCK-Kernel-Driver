@@ -321,13 +321,14 @@ struct scan_control {
 	/* Incremented by the number of pages reclaimed */
 	unsigned long nr_reclaimed;
 
+	unsigned long nr_mapped;	/* From page_state */
+
 	/* Ask shrink_caches, or shrink_zone to scan at this priority */
 	unsigned int priority;
 
 	/* This context's GFP mask */
 	unsigned int gfp_mask;
 
-	struct page_state ps;
 	int may_writepage;
 };
 
@@ -687,7 +688,7 @@ refill_inactive_zone(struct zone *zone, struct scan_control *sc)
 	 * mapped memory instead of just pagecache.  Work out how much memory
 	 * is mapped.
 	 */
-	mapped_ratio = (sc->ps.nr_mapped * 100) / total_memory;
+	mapped_ratio = (sc->nr_mapped * 100) / total_memory;
 
 	/*
 	 * Now decide how much we really want to unmap some pages.  The mapped
@@ -909,7 +910,7 @@ int try_to_free_pages(struct zone **zones,
 		zones[i]->temp_priority = DEF_PRIORITY;
 
 	for (priority = DEF_PRIORITY; priority >= 0; priority--) {
-		get_page_state(&sc.ps);
+		sc.nr_mapped = read_page_state(nr_mapped);
 		sc.nr_scanned = 0;
 		sc.nr_reclaimed = 0;
 		sc.priority = priority;
@@ -986,7 +987,7 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages)
 
 	sc.gfp_mask = GFP_KERNEL;
 	sc.may_writepage = 0;
-	get_page_state(&sc.ps);
+	sc.nr_mapped = read_page_state(nr_mapped);
 
 	inc_page_state(pageoutrun);
 
