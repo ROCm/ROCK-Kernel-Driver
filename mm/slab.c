@@ -161,10 +161,9 @@
  * is less than 512 (PAGE_SIZE<<3), but greater than 256.
  */
 
-#define BUFCTL_END	0xffffFFFF
-#define BUFCTL_FREE	0xffffFFFE
-#define	SLAB_LIMIT	0xffffFFFD
-typedef unsigned int kmem_bufctl_t;
+#define BUFCTL_END	(((kmem_bufctl_t)(~0U))-0)
+#define BUFCTL_FREE	(((kmem_bufctl_t)(~0U))-1)
+#define	SLAB_LIMIT	(((kmem_bufctl_t)(~0U))-2)
 
 /* Max number of objs-per-slab for caches which use off-slab slabs.
  * Needed to avoid a possible looping condition in cache_grow().

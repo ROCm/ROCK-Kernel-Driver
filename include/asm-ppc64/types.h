@@ -73,6 +73,8 @@ typedef struct {
 } func_descr_t;
 #endif /* __ASSEMBLY__ */
 
+typedef unsigned int kmem_bufctl_t;
+
 #endif /* __KERNEL__ */
 
 #endif /* _PPC64_TYPES_H */
