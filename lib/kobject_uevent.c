@@ -168,7 +168,7 @@ core_initcall(kobject_uevent_init);
 
 #else
 static inline int send_uevent(const char *signal, const char *obj,
-			      const void *buf, int buflen, int gfp_mask)
+			      char **envp, int gfp_mask)
 {
 	return 0;
 }
