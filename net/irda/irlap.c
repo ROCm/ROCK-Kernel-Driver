@@ -48,7 +48,7 @@
 #include <net/irda/timer.h>
 #include <net/irda/qos.h>
 
-hashbin_t *irlap = NULL;
+static hashbin_t *irlap = NULL;
 int sysctl_slot_timeout = SLOT_TIMEOUT * 1000 / HZ;
 
 /* This is the delay of missed pf period before generating an event

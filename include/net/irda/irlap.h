@@ -208,8 +208,6 @@ struct irlap_cb {
 	int    next_bofs;     /* Negotiated extra BOFs after next frame */
 };
 
-extern hashbin_t *irlap;
-
 /* 
  *  Function prototypes 
  */
