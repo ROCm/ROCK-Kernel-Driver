@@ -1241,7 +1241,8 @@ static int pfkey_add(struct sock *sk, struct sk_buff *skb, struct sadb_msg *hdr,
 		}
 	}
 
-	if (x1 && x1->id.spi && hdr->sadb_msg_type == SADB_ADD) {
+	if (x1 && ((x1->id.spi && hdr->sadb_msg_type == SADB_ADD) ||
+	     (hdr->sadb_msg_type == SADB_UPDATE && xfrm_state_kern(x1)))) {
 		x->km.state = XFRM_STATE_DEAD;
 		xfrm_state_put(x);
 		xfrm_state_put(x1);
@@ -1286,6 +1287,11 @@ static int pfkey_delete(struct sock *sk, struct sk_buff *skb, struct sadb_msg *h
 	if (x == NULL)
 		return -ESRCH;
 
+	if (xfrm_state_kern(x)) {
+		xfrm_state_put(x);
+		return -EPERM;
+	}
+	
 	xfrm_state_delete(x);
 	xfrm_state_put(x);
 

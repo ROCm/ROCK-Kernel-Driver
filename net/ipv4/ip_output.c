@@ -685,16 +685,6 @@ skb_can_coalesce(struct sk_buff *skb, int i, struct page *page, int off)
 	return 0;
 }
 
-static void
-skb_fill_page_desc(struct sk_buff *skb, int i, struct page *page, int off, int size)
-{
-	skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
-	frag->page = page;
-	frag->page_offset = off;
-	frag->size = size;
-	skb_shinfo(skb)->nr_frags = i+1;
-}
-
 static inline unsigned int
 csum_page(struct page *page, int offset, int copy)
 {

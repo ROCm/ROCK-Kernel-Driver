@@ -40,7 +40,6 @@
 #include <linux/mm.h>
 #include <linux/capability.h>
 #include <linux/highuid.h>
-#include <linux/brlock.h>
 #include <linux/fs.h>
 #include <linux/uio.h>
 #include <linux/tty.h>
@@ -428,17 +427,6 @@ EXPORT_SYMBOL(probe_irq_off);
 EXPORT_SYMBOL(del_timer_sync);
 #endif
 EXPORT_SYMBOL(mod_timer);
-
-#ifdef CONFIG_SMP
-
-/* Big-Reader lock implementation */
-EXPORT_SYMBOL(__brlock_array);
-#ifndef __BRLOCK_USE_ATOMICS
-EXPORT_SYMBOL(__br_write_locks);
-#endif
-EXPORT_SYMBOL(__br_write_lock);
-EXPORT_SYMBOL(__br_write_unlock);
-#endif
 
 #ifdef HAVE_DISABLE_HLT
 EXPORT_SYMBOL(disable_hlt);

@@ -172,6 +172,7 @@ struct xfrm_state *xfrm_state_alloc(void)
 	if (x) {
 		memset(x, 0, sizeof(struct xfrm_state));
 		atomic_set(&x->refcnt, 1);
+		atomic_set(&x->tunnel_users, 0);
 		INIT_LIST_HEAD(&x->bydst);
 		INIT_LIST_HEAD(&x->byspi);
 		init_timer(&x->timer);
@@ -234,6 +235,7 @@ static void __xfrm_state_delete(struct xfrm_state *x)
 
 void xfrm_state_delete(struct xfrm_state *x)
 {
+	xfrm_state_delete_tunnel(x);
 	spin_lock_bh(&x->lock);
 	__xfrm_state_delete(x);
 	spin_unlock_bh(&x->lock);
@@ -248,7 +250,8 @@ void xfrm_state_flush(u8 proto)
 	for (i = 0; i < XFRM_DST_HSIZE; i++) {
 restart:
 		list_for_each_entry(x, xfrm_state_bydst+i, bydst) {
-			if (proto == IPSEC_PROTO_ANY || x->id.proto == proto) {
+			if (!xfrm_state_kern(x) &&
+			    (proto == IPSEC_PROTO_ANY || x->id.proto == proto)) {
 				xfrm_state_hold(x);
 				spin_unlock_bh(&xfrm_state_lock);
 
@@ -788,6 +791,20 @@ void xfrm_state_put_afinfo(struct xfrm_state_afinfo *afinfo)
 	if (unlikely(afinfo == NULL))
 		return;
 	read_unlock(&afinfo->lock);
+}
+
+/* Temporarily located here until net/xfrm/xfrm_tunnel.c is created */
+void xfrm_state_delete_tunnel(struct xfrm_state *x)
+{
+	if (x->tunnel) {
+		struct xfrm_state *t = x->tunnel;
+
+		if (atomic_read(&t->tunnel_users) == 2)
+			xfrm_state_delete(t);
+		atomic_dec(&t->tunnel_users);
+		xfrm_state_put(t);
+		x->tunnel = NULL;
+	}
 }
 
 void __init xfrm_state_init(void)

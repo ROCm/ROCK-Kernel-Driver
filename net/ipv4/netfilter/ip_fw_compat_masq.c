@@ -25,6 +25,7 @@
 #include <linux/netfilter_ipv4/ip_nat.h>
 #include <linux/netfilter_ipv4/ip_nat_core.h>
 #include <linux/netfilter_ipv4/listhelp.h>
+#include "ip_fw_compat.h"
 
 #if 0
 #define DEBUGP printk
