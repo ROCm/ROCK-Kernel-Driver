@@ -283,7 +283,6 @@ xfs_read(
 	ip = XFS_BHVTOI(bdp);
 	vp = BHV_TO_VNODE(bdp);
 	mp = ip->i_mount;
-	vn_trace_entry(vp, "xfs_read", (inst_t *)__return_address);
 
 	XFS_STATS_INC(xs_read_calls);
 
@@ -330,23 +329,28 @@ xfs_read(
 	 * does not really happen here, but is scheduled 
 	 * later?
 	 */
-	xfs_ilock(ip, XFS_IOLOCK_SHARED);
+	if (!(ioflags & IO_ISLOCKED))
+		xfs_ilock(ip, XFS_IOLOCK_SHARED);
 
 	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) &&
 	    !(ioflags & IO_INVIS)) {
-		int error;
 		vrwlock_t locktype = VRWLOCK_READ;
 
-		error = XFS_SEND_DATA(mp, DM_EVENT_READ, BHV_TO_VNODE(bdp), *offset, size,
-				      FILP_DELAY_FLAG(file), &locktype);
-		if (error) {
-			xfs_iunlock(ip, XFS_IOLOCK_SHARED);
-			return -error;
+		ret = XFS_SEND_DATA(mp, DM_EVENT_READ,
+					BHV_TO_VNODE(bdp), *offset, size,
+					FILP_DELAY_FLAG(file), &locktype);
+		if (ret) {
+			if (!(ioflags & IO_ISLOCKED))
+				xfs_iunlock(ip, XFS_IOLOCK_SHARED);
+			return -ret;
 		}
 	}
 
+	xfs_rw_enter_trace(XFS_READ_ENTER, &ip->i_iocore,
+				iovp, segs, *offset, ioflags);
 	ret = __generic_file_aio_read(iocb, iovp, segs, offset);
-	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
+	if (!(ioflags & IO_ISLOCKED))
+		xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
 	if (ret > 0)
 		XFS_STATS_ADD(xs_read_bytes, ret);
@@ -377,7 +381,6 @@ xfs_sendfile(
 	ip = XFS_BHVTOI(bdp);
 	vp = BHV_TO_VNODE(bdp);
 	mp = ip->i_mount;
-	vn_trace_entry(vp, "xfs_sendfile", (inst_t *)__return_address);
 
 	XFS_STATS_INC(xs_read_calls);
 
@@ -391,7 +394,8 @@ xfs_sendfile(
 	if (XFS_FORCED_SHUTDOWN(ip->i_mount))
 		return -EIO;
 
-	xfs_ilock(ip, XFS_IOLOCK_SHARED);
+	if (!(ioflags & IO_ISLOCKED))
+		xfs_ilock(ip, XFS_IOLOCK_SHARED);
 
 	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) &&
 	    (!(ioflags & IO_INVIS))) {
@@ -401,12 +405,16 @@ xfs_sendfile(
 		error = XFS_SEND_DATA(mp, DM_EVENT_READ, BHV_TO_VNODE(bdp), *offset, count,
 				      FILP_DELAY_FLAG(filp), &locktype);
 		if (error) {
-			xfs_iunlock(ip, XFS_IOLOCK_SHARED);
+			if (!(ioflags & IO_ISLOCKED))
+				xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 			return -error;
 		}
 	}
+	xfs_rw_enter_trace(XFS_SENDFILE_ENTER, &ip->i_iocore,
+				target, count, *offset, ioflags);
 	ret = generic_file_sendfile(filp, offset, count, actor, target);
-	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
+	if (!(ioflags & IO_ISLOCKED))
+		xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
 	XFS_STATS_ADD(xs_read_bytes, ret);
 	xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
@@ -658,7 +666,6 @@ xfs_write(
 	XFS_STATS_INC(xs_write_calls);
 
 	vp = BHV_TO_VNODE(bdp);
-	vn_trace_entry(vp, "xfs_write", (inst_t *)__return_address);
 	xip = XFS_BHVTOI(bdp);
 
 	/* START copy & waste from filemap.c */
@@ -678,7 +685,7 @@ xfs_write(
 	if (size == 0)
 		return 0;
 
-	io = &(xip->i_iocore);
+	io = &xip->i_iocore;
 	mp = io->io_mount;
 
 	xfs_check_frozen(mp, bdp, XFS_FREEZE_WRITE);
@@ -702,6 +709,9 @@ xfs_write(
 		iolock = XFS_IOLOCK_EXCL;
 		locktype = VRWLOCK_WRITE;
 	}
+
+	if (ioflags & IO_ISLOCKED)
+		iolock = 0;
 
 	xfs_ilock(xip, XFS_ILOCK_EXCL|iolock);
 
@@ -735,7 +745,7 @@ start:
 				      *offset, size,
 				      FILP_DELAY_FLAG(file), &locktype);
 		if (error) {
-			xfs_iunlock(xip, iolock);
+			if (iolock) xfs_iunlock(xip, iolock);
 			return -error;
 		}
 		xfs_ilock(xip, XFS_ILOCK_EXCL);
@@ -928,7 +938,9 @@ retry:
 		}
 	} /* (ioflags & O_SYNC) */
 
-	xfs_rwunlock(bdp, locktype);
+	if (iolock)
+		xfs_rwunlock(bdp, locktype);
+
 	return(ret);
 }
 

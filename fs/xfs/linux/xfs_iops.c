@@ -82,9 +82,14 @@ validate_fields(
 
 	va.va_mask = XFS_AT_NLINK|XFS_AT_SIZE|XFS_AT_NBLOCKS;
 	VOP_GETATTR(vp, &va, ATTR_LAZY, NULL, error);
-	ip->i_nlink = va.va_nlink;
-	ip->i_size = va.va_size;
-	ip->i_blocks = va.va_nblocks;
+	if (likely(!error)) {
+		ip->i_nlink = va.va_nlink;
+		ip->i_blocks = va.va_nblocks;
+
+		/* we're under i_sem so i_size can't change under us */
+		if (i_size_read(ip) != va.va_size)
+			i_size_write(ip, va.va_size);
+	}
 }
 
 /*
@@ -536,6 +541,7 @@ linvfs_setattr(
 	if (error)
 		return(-error);	/* Positive error up from XFS */
 	if (ia_valid & ATTR_SIZE) {
+		i_size_write(inode, vattr.va_size);
 		error = vmtruncate(inode, attr->ia_size);
 	}
 

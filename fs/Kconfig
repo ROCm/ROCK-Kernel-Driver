@@ -362,7 +362,7 @@ config XFS_RT
 	  If unsure, say N.
 
 config XFS_QUOTA
-	bool "Quota support"
+	tristate "Quota support"
 	depends on XFS_FS
 	help
 	  If you say Y here, you will be able to set limits for disk usage on
@@ -401,6 +401,46 @@ config XFS_POSIX_ACL
 	  Linux website <http://acl.bestbits.at/>.
 
 	  If you don't know what Access Control Lists are, say N.
+
+config XFS_DMAPI
+	tristate "DMAPI support"
+	depends on XFS_FS
+	help
+	  The Data Management API is a system interface used to implement
+	  the interface defined in the X/Open document:
+	    "Systems Management: Data Storage Management (XDSM) API",
+	  dated February 1997.  This interface is used by hierarchical
+	  storage management systems.
+
+	  If unsure, say N.
+
+config XFS_DEBUG
+	bool "Debugging support (EXPERIMENTAL)"
+	depends on XFS_FS && EXPERIMENTAL
+	help
+	  Say Y here to get an XFS build with many debugging features,
+	  including ASSERT checks, function wrappers around macros,
+	  and extra sanity-checking functions in various code paths.
+
+	  Note that the resulting code will be HUGE and SLOW, and probably
+	  not useful unless you are debugging a particular problem.
+
+	  Say N unless you are an XFS developer, or you play one on TV.
+
+config XFS_TRACE
+	bool "Tracing support (EXPERIMENTAL)"
+	depends on XFS_FS && EXPERIMENTAL
+	help
+	  Say Y here to get an XFS build with activity tracing enabled.
+	  Enabling this option will attach historical information to XFS
+	  inodes, pagebufs, certain locks, the log, the IO path, and a      
+	  few other key areas within XFS.  These traces can be examined
+	  using the kdb kernel debugger.
+
+	  Note that for the pagebuf traces, you will also have to enable
+	  the sysctl in /proc/sys/vm/pagebuf/debug for this to work.
+                                                              
+	  Say N unless you are an XFS developer.              
 
 config MINIX_FS
 	tristate "Minix fs support"

@@ -178,7 +178,7 @@ vn_get(
 	if (inode->i_state & I_FREEING)
 		return NULL;
 
-	inode = ilookup(vmap->v_vfsp->vfs_super, vmap->v_ino);
+	inode = VFS_GET_INODE(vmap->v_vfsp, vmap->v_ino, IGET_NOALLOC);
 	if (!inode)	/* Inode not present */
 		return NULL;
 
@@ -213,7 +213,6 @@ vn_revalidate(
 		inode->i_mtime	    = va.va_mtime;
 		inode->i_ctime	    = va.va_ctime;
 		inode->i_atime	    = va.va_atime;
-		i_size_write(inode, va.va_size);
 		if (va.va_xflags & XFS_XFLAG_IMMUTABLE)
 			inode->i_flags |= S_IMMUTABLE;
 		else

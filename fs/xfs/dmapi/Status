@@ -1,0 +1,128 @@
+Jan21,04 - dm_get_bulkall is now implemented.  roehrich
+
+for linux:
+
+
+68 external interfaces in libdm
+
+   56 of those interfaces go through to dmi(), the kernel side of DMAPI
+
+
+
+Functions known to work
+----------------------------------------------
+
+dm_create_session
+dm_create_userevent
+dm_destroy_session
+dm_getall_sessions
+dm_getall_tokens
+dm_get_allocinfo
+dm_get_bulkall
+dm_get_bulkattr
+dm_get_config_events
+dm_get_dmattr
+dm_get_eventlist
+dm_get_events
+dm_get_fileattr
+dm_get_region
+dm_handle_free
+dm_init_attrloc
+dm_init_service
+dm_obj_ref_hold
+dm_obj_ref_query
+dm_obj_ref_rele
+dm_path_to_fshandle
+dm_path_to_handle
+dm_punch_hole
+dm_query_session
+dm_read_invis
+dm_remove_dmattr
+dm_respond_event
+dm_send_msg
+dm_set_disp
+dm_set_dmattr
+dm_set_eventlist
+dm_set_fileattr
+dm_set_region
+dm_sync_by_handle
+dm_write_invis
+35
+
+Functions that seem to work (would like more rigorous test case)
+------------------------------------------
+
+dm_pending
+dm_probe_hole		- one test case of test_hole.c fails
+dm_request_right
+3
+
+Functions untested but probably work
+----------------------------------------------
+
+dm_find_eventmsg
+dm_handle_cmp
+dm_handle_to_fshandle
+dm_handle_to_ino
+dm_release_right
+5
+
+Functions that do not work
+-----------------------------------------
+
+dm_get_dioinfo		- directio not implemented
+1
+
+Functions not supported in SGI DMAPI
+-------------------------------------------------------------
+
+dm_clear_inherit
+dm_create_by_handle
+dm_getall_inherit
+dm_mkdir_by_handle
+dm_set_inherit
+dm_symlink_by_handle
+
+
+
+
+Functions that seem to work (would like more rigorous test case)
+----------------------------------------------------------------
+
+dm_get_config
+dm_downgrade_right
+dm_get_mountinfo
+dm_set_return_on_destory
+dm_upgrade_right
+
+
+
+Functions that do not work
+-----------------------------------------------------------------
+
+dm_fd_to_handle		- Irix getf not implemented on linux
+dm_get_dirattrs		- null pointer reference
+dm_handle_to_path
+dm_getall_dmattr	- needs a copy_from_user in place of useracc
+
+
+Functions that are untested, but probably work
+-----------------------------------------------------------------
+
+dm_getall_disp
+dm_handle_hash
+dm_handle_is_valid
+dm_handle_to_fsid
+dm_handle_to_igen
+dm_make_fshandle
+dm_make_handle
+dm_move_event
+dm_query_right
+
+
+
+Other things not working
+----------------------------------
+
+- read/write events for memory-mapped I/O?
+

@@ -59,14 +59,8 @@
 #include <linux/suspend.h>
 #include <linux/percpu.h>
 
-#include <support/ktrace.h>
-#include <support/debug.h>
-#include "kmem.h"
+#include "xfs_linux.h"
 
-#include "xfs_types.h"
-#include "xfs_cred.h"
-#include "xfs_lrw.h"
-#include "xfs_buf.h"
 
 #define BBSHIFT		9
 #define BN_ALIGN_MASK	((1 << (PAGE_CACHE_SHIFT - BBSHIFT)) - 1)
@@ -86,60 +80,6 @@ STATIC struct workqueue_struct *pagebuf_logio_workqueue;
 STATIC struct workqueue_struct *pagebuf_dataio_workqueue;
 
 /*
- * Pagebuf module configuration parameters, exported via
- * /proc/sys/vm/pagebuf
- */
-
-typedef struct pb_sysctl_val {
-	int	min;
-	int	val;
-	int	max;
-} pb_sysctl_val_t;
-
-struct {
-	pb_sysctl_val_t	flush_interval;	/* interval between runs of the
-					 * delwri flush daemon.  */
-	pb_sysctl_val_t	age_buffer;	/* time for buffer to age before
-					 * we flush it.  */
-	pb_sysctl_val_t	stats_clear;	/* clear the pagebuf stats */
-	pb_sysctl_val_t	debug;		/* debug tracing on or off */
-} pb_params = {
-			  /*	MIN	DFLT	MAX	*/
-	.flush_interval	= {	HZ/2,	HZ,	30*HZ	},
-	.age_buffer	= {	1*HZ,	15*HZ,	300*HZ	},
-	.stats_clear	= {	0,	0,	1	},
-	.debug		= {	0,	0,	1	},
-};
-
-enum {
-	PB_FLUSH_INT = 1,
-	PB_FLUSH_AGE = 2,
-	PB_STATS_CLEAR = 3,
-	PB_DEBUG = 4,
-};
-
-/*
- * Pagebuf statistics variables
- */
-
-struct pbstats {
-	u_int32_t	pb_get;
-	u_int32_t	pb_create;
-	u_int32_t	pb_get_locked;
-	u_int32_t	pb_get_locked_waited;
-	u_int32_t	pb_busy_locked;
-	u_int32_t	pb_miss_locked;
-	u_int32_t	pb_page_retries;
-	u_int32_t	pb_page_found;
-	u_int32_t	pb_get_read;
-} pbstats;
-DEFINE_PER_CPU(struct pbstats, pbstats);
-
-/* We don't disable preempt, not too worried about poking the
- * wrong cpu's stat for now */
-#define PB_STATS_INC(count)	(__get_cpu_var(pbstats).count++)
-
-/*
  * Pagebuf debugging
  */
 
@@ -151,8 +91,6 @@ pagebuf_trace(
 	void		*data,
 	void		*ra)
 {
-	if (!pb_params.debug.val)
-		return;
 	ktrace_enter(pagebuf_trace_buf,
 		pb, id,
 		(void *)(unsigned long)pb->pb_flags,
@@ -326,7 +264,7 @@ _pagebuf_initialize(
 	atomic_set(&pb->pb_pin_count, 0);
 	init_waitqueue_head(&pb->pb_waiters);
 
-	PB_STATS_INC(pb_create);
+	XFS_STATS_INC(pb_create);
 	PB_TRACE(pb, "initialize", target);
 }
 
@@ -513,13 +451,13 @@ _pagebuf_lookup_pages(
 					       "possibly deadlocking in %s\n",
 					       __FUNCTION__);
 				}
-				PB_STATS_INC(pb_page_retries);
+				XFS_STATS_INC(pb_page_retries);
 				pagebuf_daemon_wakeup();
 				current->state = TASK_UNINTERRUPTIBLE;
 				schedule_timeout(10);
 				goto retry;
 			}
-			PB_STATS_INC(pb_page_found);
+			XFS_STATS_INC(pb_page_found);
 			mark_page_accessed(page);
 			pb->pb_pages[pi] = page;
 		} else {
@@ -667,7 +605,7 @@ _pagebuf_find(				/* find buffer for block	*/
 		new_pb->pb_hash_index = hval;
 		list_add(&new_pb->pb_hash_list, &h->pb_hash);
 	} else {
-		PB_STATS_INC(pb_miss_locked);
+		XFS_STATS_INC(pb_miss_locked);
 	}
 
 	spin_unlock(&h->pb_hash_lock);
@@ -686,7 +624,7 @@ found:
 			/* wait for buffer ownership */
 			PB_TRACE(pb, "get_lock", 0);
 			pagebuf_lock(pb);
-			PB_STATS_INC(pb_get_locked_waited);
+			XFS_STATS_INC(pb_get_locked_waited);
 		} else {
 			/* We asked for a trylock and failed, no need
 			 * to look at file offset and length here, we
@@ -696,7 +634,7 @@ found:
 			 */
 
 			pagebuf_rele(pb);
-			PB_STATS_INC(pb_busy_locked);
+			XFS_STATS_INC(pb_busy_locked);
 			return (NULL);
 		}
 	} else {
@@ -711,7 +649,7 @@ found:
 				_PBF_MEM_ALLOCATED | \
 				_PBF_MEM_SLAB;
 	PB_TRACE(pb, "got_lock", 0);
-	PB_STATS_INC(pb_get_locked);
+	XFS_STATS_INC(pb_get_locked);
 	return (pb);
 }
 
@@ -767,7 +705,7 @@ pagebuf_get(				/* allocate a buffer		*/
 			return (NULL);
 	}
 
-	PB_STATS_INC(pb_get);
+	XFS_STATS_INC(pb_get);
 
 	/* fill in any missing pages */
 	error = _pagebuf_lookup_pages(pb, pb->pb_target->pbr_mapping, flags);
@@ -787,7 +725,7 @@ pagebuf_get(				/* allocate a buffer		*/
 	if (flags & PBF_READ) {
 		if (PBF_NOT_DONE(pb)) {
 			PB_TRACE(pb, "get_read", (unsigned long)flags);
-			PB_STATS_INC(pb_get_read);
+			XFS_STATS_INC(pb_get_read);
 			pagebuf_iostart(pb, flags);
 		} else if (flags & PBF_ASYNC) {
 			PB_TRACE(pb, "get_read_async", (unsigned long)flags);
@@ -1655,7 +1593,7 @@ pagebuf_delwri_queue(
 	}
 
 	list_add_tail(&pb->pb_list, &pbd_delwrite_queue);
-	pb->pb_flushtime = jiffies + pb_params.age_buffer.val;
+	pb->pb_flushtime = jiffies + xfs_age_buffer;
 	spin_unlock(&pbd_delwrite_lock);
 
 	if (unlock)
@@ -1717,7 +1655,7 @@ pagebuf_daemon(
 			refrigerator(PF_IOTHREAD);
 
 		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(pb_params.flush_interval.val);
+		schedule_timeout(xfs_flush_interval);
 
 		spin_lock(&pbd_delwrite_lock);
 
@@ -1876,112 +1814,6 @@ pagebuf_daemon_stop(void)
 	destroy_workqueue(pagebuf_dataio_workqueue);
 }
 
-
-/*
- * Pagebuf sysctl interface
- */
-
-STATIC int
-pb_stats_clear_handler(
-	ctl_table		*ctl,
-	int			write,
-	struct file		*filp,
-	void			*buffer,
-	size_t			*lenp)
-{
-	int			c, ret;
-	int			*valp = ctl->data;
-
-	ret = proc_dointvec_minmax(ctl, write, filp, buffer, lenp);
-
-	if (!ret && write && *valp) {
-		printk("XFS Clearing pbstats\n");
-		for (c = 0; c < NR_CPUS; c++) {
-			if (!cpu_possible(c)) continue;
-				memset(&per_cpu(pbstats, c), 0,
-				       sizeof(struct pbstats));
-		}
-		pb_params.stats_clear.val = 0;
-	}
-
-	return ret;
-}
-
-STATIC struct ctl_table_header *pagebuf_table_header;
-
-STATIC ctl_table pagebuf_table[] = {
-	{PB_FLUSH_INT, "flush_int", &pb_params.flush_interval.val,
-	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
-	&sysctl_intvec, NULL,
-	&pb_params.flush_interval.min, &pb_params.flush_interval.max},
-
-	{PB_FLUSH_AGE, "flush_age", &pb_params.age_buffer.val,
-	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
-	&sysctl_intvec, NULL, 
-	&pb_params.age_buffer.min, &pb_params.age_buffer.max},
-
-	{PB_STATS_CLEAR, "stats_clear", &pb_params.stats_clear.val,
-	sizeof(int), 0644, NULL, &pb_stats_clear_handler,
-	&sysctl_intvec, NULL, 
-	&pb_params.stats_clear.min, &pb_params.stats_clear.max},
-
-#ifdef PAGEBUF_TRACE
-	{PB_DEBUG, "debug", &pb_params.debug.val,
-	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
-	&sysctl_intvec, NULL, 
-	&pb_params.debug.min, &pb_params.debug.max},
-#endif
-	{0}
-};
-
-STATIC ctl_table pagebuf_dir_table[] = {
-	{VM_PAGEBUF, "pagebuf", NULL, 0, 0555, pagebuf_table},
-	{0}
-};
-
-STATIC ctl_table pagebuf_root_table[] = {
-	{CTL_VM, "vm",  NULL, 0, 0555, pagebuf_dir_table},
-	{0}
-};
-
-#ifdef CONFIG_PROC_FS
-STATIC int
-pagebuf_readstats(
-	char			*buffer,
-	char			**start,
-	off_t			offset,
-	int			count,
-	int			*eof,
-	void			*data)
-{
-	int			c, i, len, val;
-
-	len = 0;
-	len += sprintf(buffer + len, "pagebuf");
-	for (i = 0; i < sizeof(struct pbstats) / sizeof(u_int32_t); i++) {
-		val = 0;
-		for (c = 0 ; c < NR_CPUS; c++) {
-			if (!cpu_possible(c)) continue;
-			val += *(((u_int32_t*)&per_cpu(pbstats, c) + i));
-		}
-		len += sprintf(buffer + len, " %u", val);
-	}
-	buffer[len++] = '\n';
-
-	if (offset >= len) {
-		*start = buffer;
-		*eof = 1;
-		return 0;
-	}
-	*start = buffer + offset;
-	if ((len -= offset) > count)
-		return count;
-	*eof = 1;
-
-	return len;
-}
-#endif  /* CONFIG_PROC_FS */
-
 /*
  *	Initialization and Termination
  */
@@ -1990,14 +1822,6 @@ int __init
 pagebuf_init(void)
 {
 	int			i;
-
-	pagebuf_table_header = register_sysctl_table(pagebuf_root_table, 1);
-
-#ifdef CONFIG_PROC_FS
-	if (proc_mkdir("fs/pagebuf", 0))
-		create_proc_read_entry(
-			"fs/pagebuf/stat", 0, 0, pagebuf_readstats, NULL);
-#endif
 
 	pagebuf_cache = kmem_cache_create("page_buf_t", sizeof(page_buf_t), 0,
 			SLAB_HWCACHE_ALIGN, NULL, NULL);
@@ -2036,10 +1860,4 @@ pagebuf_terminate(void)
 #endif
 
 	kmem_cache_destroy(pagebuf_cache);
-
-	unregister_sysctl_table(pagebuf_table_header);
-#ifdef  CONFIG_PROC_FS
-	remove_proc_entry("fs/pagebuf/stat", NULL);
-	remove_proc_entry("fs/pagebuf", NULL);
-#endif
 }

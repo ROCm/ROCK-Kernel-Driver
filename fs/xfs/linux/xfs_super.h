@@ -32,26 +32,6 @@
 #ifndef __XFS_SUPER_H__
 #define __XFS_SUPER_H__
 
-#ifdef CONFIG_XFS_DMAPI
-# define vfs_insertdmapi(vfs)	vfs_insertops(vfsp, &xfs_dmops)
-# define vfs_initdmapi()	dmapi_init()
-# define vfs_exitdmapi()	dmapi_uninit()
-#else
-# define vfs_insertdmapi(vfs)	do { } while (0)
-# define vfs_initdmapi()	do { } while (0)
-# define vfs_exitdmapi()	do { } while (0)
-#endif
-
-#ifdef CONFIG_XFS_QUOTA
-# define vfs_insertquota(vfs)	vfs_insertops(vfsp, &xfs_qmops)
-# define vfs_initquota()	xfs_qm_init()
-# define vfs_exitquota()	xfs_qm_exit()
-#else
-# define vfs_insertquota(vfs)	do { } while (0)
-# define vfs_initquota()	do { } while (0)
-# define vfs_exitquota()	do { } while (0)
-#endif
-
 #ifdef CONFIG_XFS_POSIX_ACL
 # define XFS_ACL_STRING		"ACLs, "
 # define set_posix_acl_flag(sb)	((sb)->s_flags |= MS_POSIXACL)
@@ -61,7 +41,7 @@
 #endif
 
 #ifdef CONFIG_XFS_SECURITY
-# define XFS_SECURITY_STRING	"security attrs, "
+# define XFS_SECURITY_STRING	"security attributes, "
 # define ENOSECURITY		0
 #else
 # define XFS_SECURITY_STRING
@@ -115,6 +95,7 @@ struct block_device;
 
 extern __uint64_t xfs_max_file_offset(unsigned int);
 
+extern struct inode *xfs_get_inode(bhv_desc_t *, xfs_ino_t, int);
 extern void xfs_initialize_vnode(bhv_desc_t *, vnode_t *, bhv_desc_t *, int);
 
 extern void xfs_flush_inode(struct xfs_inode *);

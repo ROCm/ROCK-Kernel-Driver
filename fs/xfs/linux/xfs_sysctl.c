@@ -103,6 +103,21 @@ STATIC ctl_table xfs_table[] = {
 	&sysctl_intvec, NULL, 
 	&xfs_params.sync_interval.min, &xfs_params.sync_interval.max},
 
+	{XFS_PROBE_DMAPI, "probe_dmapi", &xfs_params.probe_dmapi.val,
+	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
+	&sysctl_intvec, NULL,
+	&xfs_params.probe_dmapi.min, &xfs_params.probe_dmapi.max},
+
+	{XFS_PROBE_IOOPS, "probe_ioops", &xfs_params.probe_ioops.val,
+	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
+	&sysctl_intvec, NULL,
+	&xfs_params.probe_ioops.min, &xfs_params.probe_ioops.max},
+
+	{XFS_PROBE_QUOTA, "probe_quota", &xfs_params.probe_quota.val,
+	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
+	&sysctl_intvec, NULL,
+	&xfs_params.probe_quota.min, &xfs_params.probe_quota.max},
+
 	{XFS_INHERIT_SYNC, "inherit_sync", &xfs_params.inherit_sync.val,
 	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
 	&sysctl_intvec, NULL,
@@ -117,6 +132,16 @@ STATIC ctl_table xfs_table[] = {
 	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
 	&sysctl_intvec, NULL,
 	&xfs_params.inherit_noatim.min, &xfs_params.inherit_noatim.max},
+	
+	{XFS_FLUSH_INTERVAL, "flush_interval", &xfs_params.flush_interval.val,
+	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
+	&sysctl_intvec, NULL,
+	&xfs_params.flush_interval.min, &xfs_params.flush_interval.max},
+
+	{XFS_AGE_BUFFER, "age_buffer", &xfs_params.age_buffer.val,
+	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
+	&sysctl_intvec, NULL,
+	&xfs_params.age_buffer.min, &xfs_params.age_buffer.max},
 
 	/* please keep this the last entry */
 #ifdef CONFIG_PROC_FS
