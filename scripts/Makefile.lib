@@ -262,7 +262,7 @@ if_changed_rule = $(if $(strip $? \
 
 # If quiet is set, only print short version of command
 
-cmd = @$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))' &&) $(cmd_$(1))
+cmd = @$(if $($(quiet)cmd_$(1)),echo '  $(subst ','\'',$($(quiet)cmd_$(1)))' &&) $(cmd_$(1))
 
 #	$(call descend,<dir>,<target>)
 #	Recursively call a sub-make in <dir> with target <target> 
