@@ -257,7 +257,7 @@ static __inline__ u16 tcp_select_window(struct sock *sk)
  * We are working here with either a clone of the original
  * SKB, or a fresh unique copy made by the retransmit engine.
  */
-int tcp_transmit_skb(struct sock *sk, struct sk_buff *skb)
+static int tcp_transmit_skb(struct sock *sk, struct sk_buff *skb)
 {
 	if (skb != NULL) {
 		struct inet_opt *inet = inet_sk(sk);
@@ -422,8 +422,7 @@ void tcp_push_one(struct sock *sk, unsigned cur_mss)
 	}
 }
 
-void tcp_set_skb_tso_factor(struct sk_buff *skb, unsigned int mss,
-			    unsigned int mss_std)
+void tcp_set_skb_tso_factor(struct sk_buff *skb, unsigned int mss_std)
 {
 	if (skb->len <= mss_std) {
 		/* Avoid the costly divide in the normal
@@ -434,7 +433,7 @@ void tcp_set_skb_tso_factor(struct sk_buff *skb, unsigned int mss,
 		unsigned int factor;
 
 		factor = skb->len + (mss_std - 1);
-		factor /= mss;
+		factor /= mss_std;
 		TCP_SKB_CB(skb)->tso_factor = factor;
 	}
 }
@@ -501,8 +500,8 @@ static int tcp_fragment(struct sock *sk, struct sk_buff *skb, u32 len)
 	TCP_SKB_CB(buff)->when = TCP_SKB_CB(skb)->when;
 
 	/* Fix up tso_factor for both original and new SKB.  */
-	tcp_set_skb_tso_factor(skb, tp->mss_cache, tp->mss_cache_std);
-	tcp_set_skb_tso_factor(buff, tp->mss_cache, tp->mss_cache_std);
+	tcp_set_skb_tso_factor(skb, tp->mss_cache_std);
+	tcp_set_skb_tso_factor(buff, tp->mss_cache_std);
 
 	/* Link BUFF into the send queue. */
 	__skb_append(skb, buff);
@@ -1561,7 +1560,7 @@ int tcp_write_wakeup(struct sock *sk)
 					tp->mss_cache = tp->mss_cache_std;
 				}
 			} else if (!TCP_SKB_CB(skb)->tso_factor)
-				tcp_set_skb_tso_factor(skb, mss, tp->mss_cache_std);
+				tcp_set_skb_tso_factor(skb, tp->mss_cache_std);
 
 			TCP_SKB_CB(skb)->flags |= TCPCB_FLAG_PSH;
 			TCP_SKB_CB(skb)->when = tcp_time_stamp;
@@ -1624,6 +1623,5 @@ EXPORT_SYMBOL(tcp_make_synack);
 EXPORT_SYMBOL(tcp_send_synack);
 EXPORT_SYMBOL(tcp_simple_retransmit);
 EXPORT_SYMBOL(tcp_sync_mss);
-EXPORT_SYMBOL(tcp_transmit_skb);
 EXPORT_SYMBOL(tcp_write_wakeup);
 EXPORT_SYMBOL(tcp_write_xmit);
