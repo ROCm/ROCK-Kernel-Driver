@@ -70,7 +70,6 @@ extern struct zft_cmpr_ops *zft_cmpr_ops;
 /* zftape-init.c defined global functions.
  */
 extern int                  zft_cmpr_register(struct zft_cmpr_ops *new_ops);
-extern struct zft_cmpr_ops *zft_cmpr_unregister(void);
 extern int                  zft_cmpr_lock(int try_to_load);
 
 #endif

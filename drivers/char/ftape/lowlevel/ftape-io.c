@@ -350,7 +350,7 @@ int ftape_command_wait(qic117_cmd_t command, unsigned int timeout, int *status)
 	return result;
 }
 
-int ftape_parameter_wait(unsigned int parm, unsigned int timeout, int *status)
+static int ftape_parameter_wait(unsigned int parm, unsigned int timeout, int *status)
 {
 	int result;
 
@@ -503,16 +503,6 @@ int ftape_report_error(unsigned int *error,
 	TRACE_EXIT 0;
 }
 
-int ftape_in_error_state(int status)
-{
-	TRACE_FUN(ft_t_any);
-
-	if ((status & QIC_STATUS_READY) && (status & QIC_STATUS_ERROR)) {
-		TRACE_ABORT(1, ft_t_warn, "warning: error status set!");
-	}
-	TRACE_EXIT 0;
-}
-
 int ftape_report_configuration(qic_model *model,
 			       unsigned int *rate,
 			       int *qic_std,
@@ -617,7 +607,7 @@ int ftape_report_configuration(qic_model *model,
 	TRACE_EXIT (result < 0) ? -EIO : 0;
 }
 
-int ftape_report_rom_version(int *version)
+static int ftape_report_rom_version(int *version)
 {
 
 	if (ftape_report_operation(version, QIC_REPORT_ROM_VERSION, 8) < 0) {
@@ -625,16 +615,6 @@ int ftape_report_rom_version(int *version)
 	} else {
 		return 0;
 	}
-}
-
-int ftape_report_signature(int *signature)
-{
-	int result;
-
-	result = ftape_command(28);
-	result = ftape_report_operation(signature, 9, 8);
-	result = ftape_command(30);
-	return (result < 0) ? -EIO : 0;
 }
 
 void ftape_report_vendor_id(unsigned int *id)

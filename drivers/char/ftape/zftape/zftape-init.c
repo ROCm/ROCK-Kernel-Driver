@@ -46,10 +46,6 @@
 #include "../zftape/zftape-ctl.h"
 #include "../zftape/zftape-buffers.h"
 
-char zft_src[] __initdata = "$Source: /homes/cvs/ftape-stacked/ftape/zftape/zftape-init.c,v $";
-char zft_rev[] __initdata = "$Revision: 1.8 $";
-char zft_dat[] __initdata = "$Date: 1997/11/06 00:48:56 $";
-
 MODULE_AUTHOR("(c) 1996, 1997 Claus-Justus Heine "
 	      "(claus@momo.math.rwth-aachen.de)");
 MODULE_DESCRIPTION(ZFTAPE_VERSION " - "
@@ -276,15 +272,6 @@ int zft_cmpr_register(struct zft_cmpr_ops *new_ops)
 		zft_cmpr_ops = new_ops;
 		TRACE_EXIT 0;
 	}
-}
-
-struct zft_cmpr_ops *zft_cmpr_unregister(void)
-{
-	struct zft_cmpr_ops *old_ops = zft_cmpr_ops;
-	TRACE_FUN(ft_t_flow);
-
-	zft_cmpr_ops = NULL;
-	TRACE_EXIT old_ops;
 }
 
 /*  lock the zft-compressor() module.
