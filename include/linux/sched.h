@@ -150,7 +150,7 @@ extern void trap_init(void);
 extern void update_process_times(int user);
 extern void update_one_process(struct task_struct *p, unsigned long user,
 			       unsigned long system, int cpu);
-extern void scheduler_tick(struct task_struct *p);
+extern void scheduler_tick(int user_tick, int system);
 extern void sched_task_migrated(struct task_struct *p);
 extern void smp_migrate_task(int cpu, task_t *task);
 extern unsigned long cache_decay_ticks;
@@ -241,18 +241,16 @@ struct task_struct {
 
 	int lock_depth;		/* Lock depth */
 
-	int prio;
-	long __nice;
+	int prio, static_prio;
 	list_t run_list;
 	prio_array_t *array;
-
-	unsigned int time_slice;
 
 	unsigned long sleep_avg;
 	unsigned long sleep_timestamp;
 
 	unsigned long policy;
 	unsigned long cpus_allowed;
+	unsigned int time_slice;
 
 	struct task_struct *next_task, *prev_task;
 
@@ -385,66 +383,12 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
  */
 #define _STK_LIM	(8*1024*1024)
 
-/*
- * RT priorites go from 0 to 99, but internally we max
- * them out at 128 to make it easier to search the
- * scheduler bitmap.
- */
-#define MAX_RT_PRIO		128
-/*
- * The lower the priority of a process, the more likely it is
- * to run. Priority of a process goes from 0 to 167. The 0-99
- * priority range is allocated to RT tasks, the 128-167 range
- * is for SCHED_OTHER tasks.
- */
-#define MAX_PRIO		(MAX_RT_PRIO + 40)
-
-/*
- * Scales user-nice values [ -20 ... 0 ... 19 ]
- * to static priority [ 128 ... 167 (MAX_PRIO-1) ]
- *
- * User-nice value of -20 == static priority 128, and
- * user-nice value 19 == static priority 167. The lower
- * the priority value, the higher the task's priority.
- */
-#define NICE_TO_PRIO(n)		(MAX_RT_PRIO + (n) + 20)
-#define DEF_USER_NICE		0
-
-/*
- * Default timeslice is 150 msecs, maximum is 300 msecs.
- * Minimum timeslice is 10 msecs.
- *
- * These are the 'tuning knobs' of the scheduler:
- */
-#define MIN_TIMESLICE		( 10 * HZ / 1000)
-#define MAX_TIMESLICE		(300 * HZ / 1000)
-#define CHILD_FORK_PENALTY	95
-#define PARENT_FORK_PENALTY	100
-#define EXIT_WEIGHT		3
-#define PRIO_INTERACTIVE_RATIO	20
-#define PRIO_CPU_HOG_RATIO	60
-#define PRIO_BONUS_RATIO	70
-#define INTERACTIVE_DELTA	3
-#define MAX_SLEEP_AVG		(2*HZ)
-#define STARVATION_LIMIT	(2*HZ)
-
-#define USER_PRIO(p)		((p)-MAX_RT_PRIO)
-#define MAX_USER_PRIO		(USER_PRIO(MAX_PRIO))
-
-/*
- * NICE_TO_TIMESLICE scales nice values [ -20 ... 19 ]
- * to time slice values.
- *
- * The higher a process's priority, the bigger timeslices
- * it gets during one round of execution. But even the lowest
- * priority process gets MIN_TIMESLICE worth of execution time.
- */
-
-#define NICE_TO_TIMESLICE(n) (MIN_TIMESLICE + \
-	((MAX_TIMESLICE - MIN_TIMESLICE) * (19-(n))) / 39)
-
 extern void set_cpus_allowed(task_t *p, unsigned long new_mask);
 extern void set_user_nice(task_t *p, long nice);
+extern int task_prio(task_t *p);
+extern int task_nice(task_t *p);
+extern int idle_cpu(int cpu);
+
 asmlinkage long sys_sched_yield(void);
 #define yield() sys_sched_yield()
 
@@ -526,6 +470,7 @@ extern long FASTCALL(interruptible_sleep_on_timeout(wait_queue_head_t *q,
 						    signed long timeout));
 extern int FASTCALL(wake_up_process(struct task_struct * tsk));
 extern void FASTCALL(wake_up_forked_process(struct task_struct * tsk));
+extern void FASTCALL(sched_exit(task_t * p));
 
 #define wake_up(x)			__wake_up((x),TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, 1)
 #define wake_up_nr(x, nr)		__wake_up((x),TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, nr)

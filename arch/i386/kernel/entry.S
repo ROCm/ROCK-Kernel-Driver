@@ -190,9 +190,11 @@ ENTRY(lcall27)
 
 
 ENTRY(ret_from_fork)
+#if CONFIG_SMP
 	pushl %ebx
 	call SYMBOL_NAME(schedule_tail)
 	addl $4, %esp
+#endif
 	GET_THREAD_INFO(%ebx)
 	jmp syscall_exit
 

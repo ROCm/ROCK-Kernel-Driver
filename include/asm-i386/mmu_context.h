@@ -8,14 +8,10 @@
 
 /*
  * Every architecture must define this function. It's the fastest
- * way of searching a 168-bit bitmap where the first 128 bits are
- * unlikely to be set. It's guaranteed that at least one of the 168
+ * way of searching a 140-bit bitmap where the first 100 bits are
+ * unlikely to be set. It's guaranteed that at least one of the 140
  * bits is cleared.
  */
-#if MAX_RT_PRIO != 128 || MAX_PRIO != 168
-# error update this function.
-#endif
-
 static inline int sched_find_first_bit(unsigned long *b)
 {
 	if (unlikely(b[0]))
@@ -24,11 +20,9 @@ static inline int sched_find_first_bit(unsigned long *b)
 		return __ffs(b[1]) + 32;
 	if (unlikely(b[2]))
 		return __ffs(b[2]) + 64;
-	if (unlikely(b[3]))
+	if (b[3])
 		return __ffs(b[3]) + 96;
-	if (b[4])
-		return __ffs(b[4]) + 128;
-	return __ffs(b[5]) + 32 + 128;
+	return __ffs(b[4]) + 128;
 }
 /*
  * possibly do the LDT unload here?
