@@ -14,12 +14,13 @@
 #include <linux/errno.h>
 #include <linux/ptrace.h>
 #include <linux/user.h>
+#include <linux/personality.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
 #include <asm/system.h>
 #include <asm/processor.h>
-#include <asm/offset.h>
+#include <asm/offsets.h>
 
 /* These are used in entry.S, syscall_restore_rfi.  We need to record the
  * current stepping mode somewhere other than in PSW, because there is no
@@ -30,6 +31,47 @@
  */
 #define PT_SINGLESTEP	0x10000
 #define PT_BLOCKSTEP	0x20000
+
+/* PSW bits we allow the debugger to modify */
+#define USER_PSW_BITS	(PSW_N | PSW_V | PSW_CB)
+
+#undef DEBUG_PTRACE
+
+#ifdef DEBUG_PTRACE
+#define DBG(x)	printk x
+#else
+#define DBG(x)
+#endif
+
+#ifdef __LP64__
+
+#define CHILD_IS_32BIT	(child->personality == PER_LINUX_32BIT)
+
+/* This function is needed to translate 32 bit pt_regs offsets in to
+ * 64 bit pt_regs offsets.  For example, a 32 bit gdb under a 64 bit kernel
+ * will request offset 12 if it wants gr3, but the lower 32 bits of
+ * the 64 bit kernels view of gr3 will be at offset 28 (3*8 + 4).
+ * This code relies on a 32 bit pt_regs being comprised of 32 bit values
+ * except for the fp registers which (a) are 64 bits, and (b) follow
+ * the gr registers at the start of pt_regs.  The 32 bit pt_regs should
+ * be half the size of the 64 bit pt_regs, plus 32*4 to allow for fr[]
+ * being 64 bit in both cases.
+ */
+
+static long translate_usr_offset(long offset)
+{
+	if (offset < 0)
+		return -1;
+	else if (offset <= 32*4)	/* gr[0..31] */
+		return offset * 2 + 4;
+	else if (offset <= 32*4+32*8)	/* gr[0..31] + fr[0..31] */
+		return offset + 32*4;
+	else if (offset < sizeof(struct pt_regs)/2 + 32*4)
+		return offset * 2 + 4 - 32*8;
+	else
+		return -1;
+}
+#endif
 
 /*
  * Called by kernel/ptrace.c when detaching..
@@ -49,6 +91,9 @@ long sys_ptrace(long request, pid_t pid, long addr, long data)
 {
 	struct task_struct *child;
 	long ret;
+#ifdef DEBUG_PTRACE
+	long oaddr=addr, odata=data;
+#endif
 
 	lock_kernel();
 	ret = -EPERM;
@@ -78,27 +123,41 @@ long sys_ptrace(long request, pid_t pid, long addr, long data)
 		ret = ptrace_attach(child);
 		goto out_tsk;
 	}
-	ret = -ESRCH;
-	if (!(child->ptrace & PT_PTRACED))
-		goto out_tsk;
-	if (child->state != TASK_STOPPED) {
-		if (request != PTRACE_KILL)
-			goto out_tsk;
-	}
-	if (child->p_pptr != current)
+
+	ret = ptrace_check_attach(child, request == PTRACE_KILL);
+	if (ret < 0)
 		goto out_tsk;
 
 	switch (request) {
 	case PTRACE_PEEKTEXT: /* read word at location addr. */ 
 	case PTRACE_PEEKDATA: {
-		unsigned long tmp;
 		int copied;
 
-		copied = access_process_vm(child, addr, &tmp, sizeof(tmp), 0);
-		ret = -EIO;
-		if (copied != sizeof(tmp))
-			goto out_tsk;
-		ret = put_user(tmp,(unsigned long *) data);
+#ifdef __LP64__
+		if (CHILD_IS_32BIT) {
+			unsigned int tmp;
+
+			addr &= 0xffffffffL;
+			copied = access_process_vm(child, addr, &tmp, sizeof(tmp), 0);
+			ret = -EIO;
+			if (copied != sizeof(tmp))
+				goto out_tsk;
+			ret = put_user(tmp,(unsigned int *) data);
+			DBG(("sys_ptrace(PEEK%s, %d, %lx, %lx) returning %ld, data %x\n",
+				request == PTRACE_PEEKTEXT ? "TEXT" : "DATA",
+				pid, oaddr, odata, ret, tmp));
+		}
+		else
+#endif
+		{
+			unsigned long tmp;
+
+			copied = access_process_vm(child, addr, &tmp, sizeof(tmp), 0);
+			ret = -EIO;
+			if (copied != sizeof(tmp))
+				goto out_tsk;
+			ret = put_user(tmp,(unsigned long *) data);
+		}
 		goto out_tsk;
 	}
 
@@ -106,22 +165,53 @@ long sys_ptrace(long request, pid_t pid, long addr, long data)
 	case PTRACE_POKETEXT: /* write the word at location addr. */
 	case PTRACE_POKEDATA:
 		ret = 0;
-		if (access_process_vm(child, addr, &data, sizeof(data), 1) == sizeof(data))
-			goto out_tsk;
+#ifdef __LP64__
+		if (CHILD_IS_32BIT) {
+			unsigned int tmp = (unsigned int)data;
+			DBG(("sys_ptrace(POKE%s, %d, %lx, %lx)\n",
+				request == PTRACE_POKETEXT ? "TEXT" : "DATA",
+				pid, oaddr, odata));
+			addr &= 0xffffffffL;
+			if (access_process_vm(child, addr, &tmp, sizeof(tmp), 1) == sizeof(tmp))
+				goto out_tsk;
+		}
+		else
+#endif
+		{
+			if (access_process_vm(child, addr, &data, sizeof(data), 1) == sizeof(data))
+				goto out_tsk;
+		}
 		ret = -EIO;
 		goto out_tsk;
 
-	/* Read the word at location addr in the USER area.  This will need
-	   to change when the kernel no longer saves all regs on a syscall. */
+	/* Read the word at location addr in the USER area.  For ptraced
+	   processes, the kernel saves all regs on a syscall. */
 	case PTRACE_PEEKUSR: {
-		unsigned long tmp;
-
 		ret = -EIO;
-		if ((addr & 3) || (unsigned long) addr >= sizeof(struct pt_regs))
-			goto out_tsk;
+#ifdef __LP64__
+		if (CHILD_IS_32BIT) {
+			unsigned int tmp;
 
-		tmp = *(unsigned long *) ((char *) task_regs(child) + addr);
-		ret = put_user(tmp, (unsigned long *) data);
+			if (addr & (sizeof(int)-1))
+				goto out_tsk;
+			if ((addr = translate_usr_offset(addr)) < 0)
+				goto out_tsk;
+
+			tmp = *(unsigned int *) ((char *) task_regs(child) + addr);
+			ret = put_user(tmp, (unsigned int *) data);
+			DBG(("sys_ptrace(PEEKUSR, %d, %lx, %lx) returning %ld, addr %lx, data %x\n",
+				pid, oaddr, odata, ret, addr, tmp));
+		}
+		else
+#endif
+		{
+			unsigned long tmp;
+
+			if ((addr & (sizeof(long)-1)) || (unsigned long) addr >= sizeof(struct pt_regs))
+				goto out_tsk;
+			tmp = *(unsigned long *) ((char *) task_regs(child) + addr);
+			ret = put_user(tmp, (unsigned long *) data);
+		}
 		goto out_tsk;
 	}
 
@@ -133,32 +223,81 @@ long sys_ptrace(long request, pid_t pid, long addr, long data)
 	   exit. */
 	case PTRACE_POKEUSR:
 		ret = -EIO;
-		if ((addr & 3) || (unsigned long) addr >= sizeof(struct pt_regs))
-			goto out_tsk;
-		/* XXX This test probably needs adjusting.  We probably want to
-		 * allow writes to some bits of PSW, and may want to block writes
-		 * to (some) space registers.  Some register values written here
-		 * may be ignored in entry.S:syscall_restore_rfi; e.g. iaoq is
-		 * written with r31/r31+4, and not with the values in pt_regs.
+		/* Some register values written here may be ignored in
+		 * entry.S:syscall_restore_rfi; e.g. iaoq is written with
+		 * r31/r31+4, and not with the values in pt_regs.
 		 */
-		/* Allow writing of gr1-gr31, fr*, sr*, iasq*, iaoq*, sar */
-		if (addr == PT_PSW || (addr > PT_IAOQ1 && addr != PT_SAR))
+		 /* PT_PSW=0, so this is valid for 32 bit processes under 64
+		 * bit kernels.
+		 */
+		if (addr == PT_PSW) {
+			/* PT_PSW=0, so this is valid for 32 bit processes
+			 * under 64 bit kernels.
+			 *
+			 * Allow writing to Nullify, Divide-step-correction,
+			 * and carry/borrow bits.
+			 * BEWARE, if you set N, and then single step, it wont
+			 * stop on the nullified instruction.
+			 */
+			DBG(("sys_ptrace(POKEUSR, %d, %lx, %lx)\n",
+				pid, oaddr, odata));
+			data &= USER_PSW_BITS;
+			task_regs(child)->gr[0] &= ~USER_PSW_BITS;
+			task_regs(child)->gr[0] |= data;
+			ret = 0;
 			goto out_tsk;
-
-		*(unsigned long *) ((char *) task_regs(child) + addr) = data;
-		ret = 0;
-		goto out_tsk;
+		}
+#ifdef __LP64__
+		if (CHILD_IS_32BIT) {
+			if (addr & (sizeof(int)-1))
+				goto out_tsk;
+			if ((addr = translate_usr_offset(addr)) < 0)
+				goto out_tsk;
+			DBG(("sys_ptrace(POKEUSR, %d, %lx, %lx) addr %lx\n",
+				pid, oaddr, odata, addr));
+			if (addr >= PT_FR0 && addr <= PT_FR31) {
+				/* Special case, fp regs are 64 bits anyway */
+				*(unsigned int *) ((char *) task_regs(child) + addr) = data;
+				ret = 0;
+			}
+			else if ((addr >= PT_GR1+4 && addr <= PT_GR31+4) ||
+					addr == PT_IAOQ0+4 || addr == PT_IAOQ1+4 ||
+					addr == PT_SAR+4) {
+				/* Zero the top 32 bits */
+				*(unsigned int *) ((char *) task_regs(child) + addr - 4) = 0;
+				*(unsigned int *) ((char *) task_regs(child) + addr) = data;
+				ret = 0;
+			}
+			goto out_tsk;
+		}
+		else
+#endif
+		{
+			if ((addr & (sizeof(long)-1)) || (unsigned long) addr >= sizeof(struct pt_regs))
+				goto out_tsk;
+			if ((addr >= PT_GR1 && addr <= PT_GR31) ||
+					addr == PT_IAOQ0 || addr == PT_IAOQ1 ||
+					(addr >= PT_FR0 && addr <= PT_FR31) ||
+					addr == PT_SAR) {
+				*(unsigned long *) ((char *) task_regs(child) + addr) = data;
+				ret = 0;
+			}
+			goto out_tsk;
+		}
 
 	case PTRACE_SYSCALL: /* continue and stop at next (return from) syscall */
 	case PTRACE_CONT:
 		ret = -EIO;
+		DBG(("sys_ptrace(%s)\n",
+			request == PTRACE_SYSCALL ? "SYSCALL" : "CONT"));
 		if ((unsigned long) data > _NSIG)
 			goto out_tsk;
 		child->ptrace &= ~(PT_SINGLESTEP|PT_BLOCKSTEP);
-		if (request == PTRACE_SYSCALL)
-			child->ptrace |= PT_TRACESYS;
-		else
-			child->ptrace &= ~PT_TRACESYS;
+		if (request == PTRACE_SYSCALL) {
+			set_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
+		} else {
+			clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
+		}		
 		child->exit_code = data;
 		goto out_wake_notrap;
 
@@ -168,16 +307,19 @@ long sys_ptrace(long request, pid_t pid, long addr, long data)
 		 * sigkill.  perhaps it should be put in the status
 		 * that it wants to exit.
 		 */
+		DBG(("sys_ptrace(KILL)\n"));
 		if (child->state == TASK_ZOMBIE)	/* already dead */
 			goto out_tsk;
 		child->exit_code = SIGKILL;
 		goto out_wake_notrap;
 
 	case PTRACE_SINGLEBLOCK:
+		DBG(("sys_ptrace(SINGLEBLOCK)\n"));
 		ret = -EIO;
 		if ((unsigned long) data > _NSIG)
 			goto out_tsk;
-		child->ptrace &= ~(PT_TRACESYS|PT_SINGLESTEP);
+		clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
+		child->ptrace &= ~PT_SINGLESTEP;
 		child->ptrace |= PT_BLOCKSTEP;
 		child->exit_code = data;
 
@@ -189,10 +331,12 @@ long sys_ptrace(long request, pid_t pid, long addr, long data)
 		goto out_wake;
 
 	case PTRACE_SINGLESTEP:
+		DBG(("sys_ptrace(SINGLESTEP)\n"));
 		ret = -EIO;
 		if ((unsigned long) data > _NSIG)
 			goto out_tsk;
-		child->ptrace &= ~(PT_TRACESYS|PT_BLOCKSTEP);
+		clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
+		child->ptrace &= ~PT_BLOCKSTEP;
 		child->ptrace |= PT_SINGLESTEP;
 		child->exit_code = data;
 
@@ -208,10 +352,7 @@ long sys_ptrace(long request, pid_t pid, long addr, long data)
 			pa_psw(child)->y = 0;
 			pa_psw(child)->z = 0;
 			pa_psw(child)->b = 0;
-			pa_psw(child)->r = 0;
-			pa_psw(child)->t = 0;
-			pa_psw(child)->h = 0;
-			pa_psw(child)->l = 0;
+			ptrace_disable(child);
 			/* Don't wake up the child, but let the
 			   parent know something happened. */
 			si.si_code = TRAP_TRACE;
@@ -249,25 +390,24 @@ long sys_ptrace(long request, pid_t pid, long addr, long data)
 	}
 
 out_wake_notrap:
-	/* make sure the trap bits are not set */
-	pa_psw(child)->r = 0;
-	pa_psw(child)->t = 0;
-	pa_psw(child)->h = 0;
-	pa_psw(child)->l = 0;
+	ptrace_disable(child);
 out_wake:
 	wake_up_process(child);
 	ret = 0;
 out_tsk:
-	free_task_struct(child);
+	put_task_struct(child);
 out:
 	unlock_kernel();
+	DBG(("sys_ptrace(%ld, %d, %lx, %lx) returning %ld\n",
+		request, pid, oaddr, odata, ret));
 	return ret;
 }
 
 void syscall_trace(void)
 {
-	if ((current->ptrace & (PT_PTRACED|PT_TRACESYS)) !=
-			(PT_PTRACED|PT_TRACESYS))
+	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+		return;
+	if (!(current->ptrace & PT_PTRACED))
 		return;
 	current->exit_code = SIGTRAP;
 	current->state = TASK_STOPPED;

@@ -43,7 +43,6 @@
 	.level		1.1
 	.data
 
-#define __ASSEMBLY__
 #include <asm/assembly.h>
 #include <asm/pdc.h>
 
@@ -262,12 +261,10 @@ os_hpmc_5:
 	mtsp	%r0, %sr6
 	mtsp	%r0, %sr7
 
-	tovirt  %r30        /* make sp virtual */
+	tovirt_r1 %r30      /* make sp virtual */
 
 	rsm 8,%r0           /* Clear Q bit */
-	ldi     1,%r1
-	mtctl   %r1,%cr29   /* Set trap code to "1" for HPMC */
-	mtctl   %r0,%cr30   /* Force interruptions to use hpmc stack */
+	ldi     1,%r8       /* Set trap code to "1" for HPMC */
 	ldil    L%PA(intr_save), %r1
 	ldo     R%PA(intr_save)(%r1), %r1
 	be      0(%sr7,%r1)
