@@ -6,12 +6,6 @@ Patrick Mochel	<mochel@osdl.org>
 10 January 2003
 
 
-Note (17 Oct 2002): the name has just been changed from sysfs to
-sysfs. Updates to the documentation will come soon; after the
-conversion to use it is completely finished.
-
-
-
 What it is:
 ~~~~~~~~~~~
 
@@ -271,8 +265,8 @@ for devices on that particular bus (this assmumes that drivers do not
 span multiple bus types).
 
 
-More information can device-model specific features can be found in
-Documentation/device-model/. 
+More information can driver-model specific features can be found in
+Documentation/driver-model/. 
 
 
 TODO: Finish this section.

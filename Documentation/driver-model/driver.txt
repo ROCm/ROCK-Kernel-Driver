@@ -49,14 +49,14 @@ driver. This declaration is hypothetical only; it relies on the driver
 being converted completely to the new model. 
 
 static struct device_driver eepro100_driver = {
-       name:		"eepro100",
-       bus:		&pci_bus_type,
-       devclass:	&ethernet_devclass,	/* when it's implemented */
+       .name		= "eepro100",
+       .bus		= &pci_bus_type,
+       .devclass	= &ethernet_devclass,	/* when it's implemented */
        
-       probe:		eepro100_probe,
-       remove:		eepro100_remove,
-       suspend:		eepro100_suspend,
-       resume:		eepro100_resume,
+       .probe		= eepro100_probe,
+       .remove		= eepro100_remove,
+       .suspend		= eepro100_suspend,
+       .resume		= eepro100_resume,
 };
 
 Most drivers will not be able to be converted completely to the new
@@ -81,15 +81,15 @@ A definition that included bus-specific fields would look something
 like (using the eepro100 driver again):
 
 static struct pci_driver eepro100_driver = {
-       id_table:       eepro100_pci_tbl,
-       driver:	       {
-		name:		"eepro100",
-		bus:		&pci_bus_type,
-		devclass:	&ethernet_devclass,	/* when it's implemented */
-		probe:		eepro100_probe,
-		remove:		eepro100_remove,
-		suspend:		eepro100_suspend,
-		resume:		eepro100_resume,
+       .id_table       = eepro100_pci_tbl,
+       .driver	       = {
+		.name		= "eepro100",
+		.bus		= &pci_bus_type,
+		.devclass	= &ethernet_devclass,	/* when it's implemented */
+		.probe		= eepro100_probe,
+		.remove		= eepro100_remove,
+		.suspend	= eepro100_suspend,
+		.resume		= eepro100_resume,
        },
 };
 
