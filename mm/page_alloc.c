@@ -1080,7 +1080,6 @@ static void __init build_zonelists(pg_data_t *pgdat)
 	int i, j, k, node, local_node;
 
 	local_node = pgdat->node_id;
-	printk("Building zonelist for node : %d\n", local_node);
 	for (i = 0; i < MAX_NR_ZONES; i++) {
 		struct zonelist *zonelist;
 
@@ -1118,6 +1117,7 @@ void __init build_all_zonelists(void)
 
 	for(i = 0 ; i < numnodes ; i++)
 		build_zonelists(NODE_DATA(i));
+	printk("Built %i zonelists\n", numnodes);
 }
 
 /*
