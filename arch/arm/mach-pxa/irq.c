@@ -86,19 +86,6 @@ static int pxa_gpio_irq_type(unsigned int irq, unsigned int type)
 }
 
 /*
- * Since we can't actually physically mask edge triggered interrupts
- * without the risk of missing transitions, we therefore logically mask
- * them and defer their processing through tis function.
- */
-
-static void pxa_manual_rerun(unsigned int irq)
-{
-	struct pt_regs regs;
-	memset(&regs, 0, sizeof(regs));
-	irq_desc[irq].handle(irq, &irq_desc[irq], &regs);
-}
-
-/*
  * GPIO IRQs must be acknoledged.  This is for GPIO 0 and 1.
  */
 
@@ -111,7 +98,6 @@ static struct irqchip pxa_low_gpio_chip = {
 	.ack		= pxa_ack_low_gpio,
 	.mask		= pxa_mask_irq,
 	.unmask		= pxa_unmask_irq,
-	.rerun		= pxa_manual_rerun,
 	.type		= pxa_gpio_irq_type,
 };
 

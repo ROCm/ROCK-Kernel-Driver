@@ -15,6 +15,7 @@
  */
 #include <linux/init.h>
 #include <linux/interrupt.h>
+#include <linux/list.h>
 
 #include <asm/mach/irq.h>
 #include <asm/irq.h>
