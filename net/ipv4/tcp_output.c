@@ -143,6 +143,65 @@ static __inline__ void tcp_event_ack_sent(struct sock *sk)
 	tcp_clear_xmit_timer(sk, TCP_TIME_DACK);
 }
 
+/* Determine a window scaling and initial window to offer.
+ * Based on the assumption that the given amount of space
+ * will be offered. Store the results in the tp structure.
+ * NOTE: for smooth operation initial space offering should
+ * be a multiple of mss if possible. We assume here that mss >= 1.
+ * This MUST be enforced by all callers.
+ */
+void tcp_select_initial_window(int __space, __u32 mss,
+			       __u32 *rcv_wnd, __u32 *window_clamp,
+			       int wscale_ok, __u8 *rcv_wscale)
+{
+	unsigned int space = (__space < 0 ? 0 : __space);
+
+	/* If no clamp set the clamp to the max possible scaled window */
+	if (*window_clamp == 0)
+		(*window_clamp) = (65535 << 14);
+	space = min(*window_clamp, space);
+
+	/* Quantize space offering to a multiple of mss if possible. */
+	if (space > mss)
+		space = (space / mss) * mss;
+
+	/* NOTE: offering an initial window larger than 32767
+	 * will break some buggy TCP stacks. We try to be nice.
+	 * If we are not window scaling, then this truncates
+	 * our initial window offering to 32k. There should also
+	 * be a sysctl option to stop being nice.
+	 */
+	(*rcv_wnd) = min(space, MAX_TCP_WINDOW);
+	(*rcv_wscale) = 0;
+	if (wscale_ok) {
+		/* Set window scaling on max possible window
+		 * See RFC1323 for an explanation of the limit to 14 
+		 */
+		space = max_t(u32, sysctl_tcp_rmem[2], sysctl_rmem_max);
+		while (space > 65535 && (*rcv_wscale) < 14) {
+			space >>= 1;
+			(*rcv_wscale)++;
+		}
+	}
+
+	/* Set initial window to value enough for senders,
+	 * following RFC1414. Senders, not following this RFC,
+	 * will be satisfied with 2.
+	 */
+	if (mss > (1<<*rcv_wscale)) {
+		int init_cwnd = 4;
+		if (mss > 1460*3)
+			init_cwnd = 2;
+		else if (mss > 1460)
+			init_cwnd = 3;
+		if (*rcv_wnd > init_cwnd*mss)
+			*rcv_wnd = init_cwnd*mss;
+	}
+
+	/* Set the clamp no higher than max representable value */
+	(*window_clamp) = min(65535U << (*rcv_wscale), *window_clamp);
+}
+
 /* Chose a new window to advertise, update state in tcp_opt for the
  * socket, and return result with RFC1323 scaling applied.  The return
  * value can be stuffed directly into th->window for an outgoing
