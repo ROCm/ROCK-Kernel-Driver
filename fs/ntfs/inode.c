@@ -24,6 +24,178 @@
 
 #include "ntfs.h"
 #include "dir.h"
+#include "inode.h"
+#include "attrib.h"
+
+/**
+ * ntfs_attr - ntfs in memory attribute structure
+ * @mft_no:	mft record number of the base mft record of this attribute
+ * @name:	Unicode name of the attribute (NULL if unnamed)
+ * @name_len:	length of @name in Unicode characters (0 if unnamed)
+ * @type:	attribute type (see layout.h)
+ *
+ * This structure exists only to provide a small structure for the
+ * ntfs_iget()/ntfs_test_inode()/ntfs_init_locked_inode() mechanism.
+ *
+ * NOTE: Elements are ordered by size to make the structure as compact as
+ * possible on all architectures.
+ */
+typedef struct {
+	unsigned long mft_no;
+	uchar_t *name;
+	u32 name_len;
+	ATTR_TYPES type;
+} ntfs_attr;
+
+/**
+ * ntfs_test_inode - compare two (possibly fake) inodes for equality
+ * @vi:		vfs inode which to test
+ * @na:		ntfs attribute which is being tested with
+ *
+ * Compare the ntfs attribute embedded in the ntfs specific part of the vfs
+ * inode @vi for equality with the ntfs attribute @na.
+ *
+ * If searching for the normal file/directory inode, set @na->type to AT_UNUSED.
+ * @na->name and @na->name_len are then ignored.
+ *
+ * Return 1 if the attributes match and 0 if not.
+ *
+ * NOTE: This function runs with the inode_lock spin lock held so it is not
+ * allowed to sleep.
+ */
+static int ntfs_test_inode(struct inode *vi, ntfs_attr *na)
+{
+	ntfs_inode *ni;
+
+	if (vi->i_ino != na->mft_no)
+		return 0;
+	ni = NTFS_I(vi);
+	/* If !NInoAttr(ni), @vi is a normal file or directory inode. */
+	if (likely(!NInoAttr(ni))) {
+		/* If not looking for a normal inode this is a mismatch. */
+		if (unlikely(na->type != AT_UNUSED))
+			return 0;
+	} else {
+		/* A fake inode describing an attribute. */
+		if (ni->type != na->type)
+			return 0;
+		if (ni->name_len != na->name_len)
+			return 0;
+		if (na->name_len && memcmp(ni->name, na->name,
+				na->name_len * sizeof(uchar_t)))
+			return 0;
+	}
+	/* Match! */
+	return 1;
+}
+
+/**
+ * ntfs_init_locked_inode - initialize an inode
+ * @vi:		vfs inode to initialize
+ * @na:		ntfs attribute which to initialize @vi to
+ *
+ * Initialize the vfs inode @vi with the values from the ntfs attribute @na in
+ * order to enable ntfs_test_inode() to do its work.
+ *
+ * If initializing the normal file/directory inode, set @na->type to AT_UNUSED.
+ * In that case, @na->name and @na->name_len should be set to NULL and 0,
+ * respectively. Although that is not strictly necessary as
+ * ntfs_read_inode_locked() will fill them in later.
+ *
+ * Return 0 on success and -errno on error.
+ *
+ * NOTE: This function runs with the inode_lock spin lock held so it is not
+ * allowed to sleep. (Hence the GFP_ATOMIC allocation.)
+ */
+static int ntfs_init_locked_inode(struct inode *vi, ntfs_attr *na)
+{
+	ntfs_inode *ni = NTFS_I(vi);
+
+	vi->i_ino = na->mft_no;
+	ni->type = na->type;
+	ni->name = na->name;
+	ni->name_len = na->name_len;
+	/* If initializing a normal inode, we are done. */
+	if (likely(na->type == AT_UNUSED))
+		return 0;
+	/* It is a fake inode. */
+	NInoSetAttr(ni);
+	/*
+	 * We have I30 global constant as an optimization as it is the name
+	 * in >99.9% of named attributes! The other <0.1% incur a GFP_ATOMIC
+	 * allocation but that is ok. And most attributes are unnamed anyway,
+	 * thus the fraction of named attributes with name != I30 is actually
+	 * absolutely tiny.
+	 */
+	if (na->name && na->name_len && na->name != I30) {
+		unsigned int i;
+
+		i = na->name_len * sizeof(uchar_t);
+		ni->name = (uchar_t*)kmalloc(i + sizeof(uchar_t), GFP_ATOMIC);
+		if (!ni->name)
+			return -ENOMEM;
+		memcpy(ni->name, na->name, i);
+		ni->name[i] = cpu_to_le16('\0');
+	}
+	return 0;
+}
+
+typedef int (*test_t)(struct inode *, void *);
+typedef int (*set_t)(struct inode *, void *);
+static void ntfs_read_locked_inode(struct inode *vi);
+
+/**
+ * ntfs_iget - obtain a struct inode corresponding to a specific normal inode
+ * @sb:		super block of mounted volume
+ * @mft_no:	mft record number / inode number to obtain
+ *
+ * Obtain the struct inode corresponding to a specific normal inode (i.e. a
+ * file or directory).
+ *
+ * If the inode is in the cache, it is just returned with an increased
+ * reference count. Otherwise, a new struct inode is allocated and initialized,
+ * and finally ntfs_read_locked_inode() is called to read in the inode and
+ * fill in the remainder of the inode structure.
+ *
+ * Return the struct inode on success. Check the return value with IS_ERR() and
+ * if true, the function failed and the error code is obtained from PTR_ERR().
+ */
+struct inode *ntfs_iget(struct super_block *sb, unsigned long mft_no)
+{
+	struct inode *vi;
+	ntfs_attr na;
+
+	na.mft_no = mft_no;
+	na.type = AT_UNUSED;
+	na.name = NULL;
+	na.name_len = 0;
+
+	vi = iget5_locked(sb, mft_no, (test_t)ntfs_test_inode,
+			(set_t)ntfs_init_locked_inode, &na);
+	if (!vi)
+		return ERR_PTR(-ENOMEM);
+
+	/* If this is a freshly allocated inode, need to read it now. */
+	if (vi->i_state & I_NEW) {
+		ntfs_read_locked_inode(vi);
+		unlock_new_inode(vi);
+	}
+#if 0
+	// TODO: Enable this and do the follow up cleanup, i.e. remove all the
+	// bad inode checks. -- BUT: Do we actually want to do this? -- It may
+	// result in repeated attemps to read a bad inode which is not
+	// desirable. (AIA)
+	/*
+	 * There is no point in keeping bad inodes around. This also simplifies
+	 * things in that we never need to check for bad inodes elsewhere.
+	 */
+	if (is_bad_inode(vi)) {
+		iput(vi);
+		vi = ERR_PTR(-EIO);
+	}
+#endif
+	return vi;
+}
 
 struct inode *ntfs_alloc_big_inode(struct super_block *sb)
 {
@@ -32,12 +204,12 @@ struct inode *ntfs_alloc_big_inode(struct super_block *sb)
 	ntfs_debug("Entering.");
 	ni = (ntfs_inode *)kmem_cache_alloc(ntfs_big_inode_cache,
 			SLAB_NOFS);
-	if (!ni) {
-		ntfs_error(sb, "Allocation of NTFS big inode structure "
-				"failed.");
-		return NULL;
+	if (likely(ni != NULL)) {
+		ni->state = 0;
+		return VFS_I(ni);
 	}
-	return VFS_I(ni);
+	ntfs_error(sb, "Allocation of NTFS big inode structure failed.");
+	return NULL;
 }
 
 void ntfs_destroy_big_inode(struct inode *inode)
@@ -49,17 +221,20 @@ void ntfs_destroy_big_inode(struct inode *inode)
 	kmem_cache_free(ntfs_big_inode_cache, NTFS_I(inode));
 }
 
-ntfs_inode *ntfs_alloc_inode(void)
+static ntfs_inode *ntfs_alloc_extent_inode(void)
 {
 	ntfs_inode *ni = (ntfs_inode *)kmem_cache_alloc(ntfs_inode_cache,
 			SLAB_NOFS);
 	ntfs_debug("Entering.");
-	if (unlikely(!ni))
-		ntfs_error(NULL, "Allocation of NTFS inode structure failed.");
-	return ni;
+	if (likely(ni != NULL)) {
+		ni->state = 0;
+		return ni;
+	}
+	ntfs_error(NULL, "Allocation of NTFS inode structure failed.");
+	return NULL;
 }
 
-void ntfs_destroy_inode(ntfs_inode *ni)
+void ntfs_destroy_extent_inode(ntfs_inode *ni)
 {
 	ntfs_debug("Entering.");
 	BUG_ON(atomic_read(&ni->mft_count) || !atomic_dec_and_test(&ni->count));
@@ -68,27 +243,42 @@ void ntfs_destroy_inode(ntfs_inode *ni)
 
 /**
  * __ntfs_init_inode - initialize ntfs specific part of an inode
+ * @sb:		super block of mounted volume
+ * @ni:		freshly allocated ntfs inode which to initialize
  *
  * Initialize an ntfs inode to defaults.
+ *
+ * NOTE: ni->mft_no, ni->state, ni->type, ni->name, and ni->name_len are left
+ * untouched. Make sure to initialize them elsewhere.
  *
  * Return zero on success and -ENOMEM on error.
  */
 static void __ntfs_init_inode(struct super_block *sb, ntfs_inode *ni)
 {
 	ntfs_debug("Entering.");
-	memset(ni, 0, sizeof(ntfs_inode));
+	ni->initialized_size = ni->allocated_size = 0;
+	ni->seq_no = 0;
 	atomic_set(&ni->count, 1);
-	ni->vol = NULL;
+	ni->vol = NTFS_SB(sb);
 	init_run_list(&ni->run_list);
 	init_rwsem(&ni->mrec_lock);
 	atomic_set(&ni->mft_count, 0);
 	ni->page = NULL;
+	ni->page_ofs = 0;
+	ni->attr_list_size = 0;
 	ni->attr_list = NULL;
 	init_run_list(&ni->attr_list_rl);
+	ni->_IDM(index_block_size) = 0;
+	ni->_IDM(index_vcn_size) = 0;
+	ni->_IDM(bmp_size) = 0;
+	ni->_IDM(bmp_initialized_size) = 0;
+	ni->_IDM(bmp_allocated_size) = 0;
 	init_run_list(&ni->_IDM(bmp_rl));
+	ni->_IDM(index_block_size_bits) = 0;
+	ni->_IDM(index_vcn_size_bits) = 0;
 	init_MUTEX(&ni->extent_lock);
+	ni->nr_extents = 0;
 	ni->_INE(base_ntfs_ino) = NULL;
-	ni->vol = NTFS_SB(sb);
 	return;
 }
 
@@ -102,13 +292,18 @@ static void ntfs_init_big_inode(struct inode *vi)
 	return;
 }
 
-ntfs_inode *ntfs_new_inode(struct super_block *sb)
+ntfs_inode *ntfs_new_extent_inode(struct super_block *sb, unsigned long mft_no)
 {
-	ntfs_inode *ni = ntfs_alloc_inode();
+	ntfs_inode *ni = ntfs_alloc_extent_inode();
 
 	ntfs_debug("Entering.");
-	if (ni)
+	if (likely(ni != NULL)) {
 		__ntfs_init_inode(sb, ni);
+		ni->mft_no = mft_no;
+		ni->type = AT_UNUSED;
+		ni->name = NULL;
+		ni->name_len = 0;
+	}
 	return ni;
 }
 
@@ -189,18 +384,20 @@ err_corrupt_attr:
 }
 
 /**
- * ntfs_read_inode - read an inode from its device
+ * ntfs_read_locked_inode - read an inode from its device
  * @vi:		inode to read
  *
- * ntfs_read_inode() is called from the VFS iget() function to read the inode
+ * ntfs_read_locked_inode() is called from the ntfs_iget() to read the inode
  * described by @vi into memory from the device.
  *
  * The only fields in @vi that we need to/can look at when the function is
  * called are i_sb, pointing to the mounted device's super block, and i_ino,
- * the number of the inode to load.
+ * the number of the inode to load. If this is a fake inode, i.e. NInoAttr(),
+ * then the fields type, name, and name_len are also valid, and describe the
+ * attribute which this fake inode represents.
  *
- * ntfs_read_inode() maps, pins and locks the mft record number i_ino for
- * reading and sets up the necessary @vi fields as well as initializing
+ * ntfs_read_locked_inode() maps, pins and locks the mft record number i_ino
+ * for reading and sets up the necessary @vi fields as well as initializing
  * the ntfs inode.
  *
  * Q: What locks are held when the function is called?
@@ -209,9 +406,9 @@ err_corrupt_attr:
  *    i_flags is set to 0 and we have no business touching it. Only an ioctl()
  *    is allowed to write to them. We should of course be honouring them but
  *    we need to do that using the IS_* macros defined in include/linux/fs.h.
- *    In any case ntfs_read_inode() has nothing to do with i_flags at all.
+ *    In any case ntfs_read_locked_inode() has nothing to do with i_flags.
  */
-void ntfs_read_inode(struct inode *vi)
+static void ntfs_read_locked_inode(struct inode *vi)
 {
 	ntfs_volume *vol = NTFS_SB(vi->i_sb);
 	ntfs_inode *ni;
@@ -239,7 +436,8 @@ void ntfs_read_inode(struct inode *vi)
 
 	/*
 	 * Initialize the ntfs specific part of @vi special casing
-	 * FILE_MFT which we need to do at mount time.
+	 * FILE_MFT which we need to do at mount time. This also sets
+	 * ni->mft_no to vi->i_ino.
 	 */
 	if (vi->i_ino != FILE_MFT)
 		ntfs_init_big_inode(vi);
@@ -358,13 +556,14 @@ void ntfs_read_inode(struct inode *vi)
 		if (vi->i_ino == FILE_MFT)
 			goto skip_attr_list_load;
 		ntfs_debug("Attribute list found in inode 0x%lx.", vi->i_ino);
-		ni->state |= 1 << NI_AttrList;
+		NInoSetAttrList(ni);
 		if (ctx->attr->flags & ATTR_IS_ENCRYPTED ||
-				ctx->attr->flags & ATTR_COMPRESSION_MASK) {
+				ctx->attr->flags & ATTR_COMPRESSION_MASK ||
+				ctx->attr->flags & ATTR_IS_SPARSE) {
 			ntfs_error(vi->i_sb, "Attribute list attribute is "
-					"compressed/encrypted. Not allowed. "
-					"Corrupt inode. You should run "
-					"chkdsk.");
+					"compressed/encrypted/sparse. Not "
+					"allowed. Corrupt inode. You should "
+					"run chkdsk.");
 			goto put_unm_err_out;
 		}
 		/* Now allocate memory for the attribute list. */
@@ -377,7 +576,7 @@ void ntfs_read_inode(struct inode *vi)
 			goto ec_put_unm_err_out;
 		}
 		if (ctx->attr->non_resident) {
-			ni->state |= 1 << NI_AttrListNonResident;
+			NInoSetAttrListNonResident(ni);
 			if (ctx->attr->_ANR(lowest_vcn)) {
 				ntfs_error(vi->i_sb, "Attribute list has non "
 						"zero lowest_vcn. Inode is "
@@ -459,7 +658,7 @@ skip_attr_list_load:
 		 * encrypted.
 		 */
 		if (ctx->attr->flags & ATTR_COMPRESSION_MASK)
-			ni->state |= 1 << NI_Compressed;
+			NInoSetCompressed(ni);
 		if (ctx->attr->flags & ATTR_IS_ENCRYPTED) {
 			if (ctx->attr->flags & ATTR_COMPRESSION_MASK) {
 				ntfs_error(vi->i_sb, "Found encrypted and "
@@ -467,8 +666,10 @@ skip_attr_list_load:
 						"allowed.");
 				goto put_unm_err_out;
 			}
-			ni->state |= 1 << NI_Encrypted;
+			NInoSetEncrypted(ni);
 		}
+		if (ctx->attr->flags & ATTR_IS_SPARSE)
+			NInoSetSparse(ni);
 		ir = (INDEX_ROOT*)((char*)ctx->attr +
 				le16_to_cpu(ctx->attr->_ARA(value_offset)));
 		ir_end = (char*)ir + le32_to_cpu(ctx->attr->_ARA(value_length));
@@ -530,12 +731,19 @@ skip_attr_list_load:
 			ni->_IDM(index_vcn_size) = vol->sector_size;
 			ni->_IDM(index_vcn_size_bits) = vol->sector_size_bits;
 		}
+
+		/* Setup the index allocation attribute, even if not present. */
+		NInoSetMstProtected(ni);
+		ni->type = AT_INDEX_ALLOCATION;
+		ni->name = I30;
+		ni->name_len = 4;
+
 		if (!(ir->index.flags & LARGE_INDEX)) {
 			/* No index allocation. */
 			vi->i_size = ni->initialized_size = 0;
 			goto skip_large_dir_stuff;
 		} /* LARGE_INDEX: Index allocation present. Setup state. */
-		ni->state |= 1 << NI_NonResident;
+		NInoSetIndexAllocPresent(ni);
 		/* Find index allocation attribute. */
 		reinit_attr_search_ctx(ctx);
 		if (!lookup_attr(AT_INDEX_ALLOCATION, I30, 4, CASE_SENSITIVE,
@@ -553,6 +761,11 @@ skip_attr_list_load:
 		if (ctx->attr->flags & ATTR_IS_ENCRYPTED) {
 			ntfs_error(vi->i_sb, "$INDEX_ALLOCATION attribute "
 					"is encrypted.");
+			goto put_unm_err_out;
+		}
+		if (ctx->attr->flags & ATTR_IS_SPARSE) {
+			ntfs_error(vi->i_sb, "$INDEX_ALLOCATION attribute "
+					"is sparse.");
 			goto put_unm_err_out;
 		}
 		if (ctx->attr->flags & ATTR_COMPRESSION_MASK) {
@@ -581,13 +794,13 @@ skip_attr_list_load:
 			goto put_unm_err_out;
 		}
 		if (ctx->attr->flags & (ATTR_COMPRESSION_MASK |
-				ATTR_IS_ENCRYPTED)) {
+				ATTR_IS_ENCRYPTED | ATTR_IS_SPARSE)) {
 			ntfs_error(vi->i_sb, "$BITMAP attribute is compressed "
-					"and/or encrypted.");
+					"and/or encrypted and/or sparse.");
 			goto put_unm_err_out;
 		}
 		if (ctx->attr->non_resident) {
-			ni->state |= 1 << NI_BmpNonResident;
+			NInoSetBmpNonResident(ni);
 			if (ctx->attr->_ANR(lowest_vcn)) {
 				ntfs_error(vi->i_sb, "First extent of $BITMAP "
 						"attribute has non zero "
@@ -645,8 +858,15 @@ skip_large_dir_stuff:
 		vi->i_fop = &ntfs_dir_ops;
 		vi->i_mapping->a_ops = &ntfs_dir_aops;
 	} else {
-		/* It is a file: find first extent of unnamed data attribute. */
+		/* It is a file. */
 		reinit_attr_search_ctx(ctx);
+
+		/* Setup the data attribute, even if not present. */
+		ni->type = AT_DATA;
+		ni->name = NULL;
+		ni->name_len = 0;
+
+		/* Find first extent of the unnamed data attribute. */
 		if (!lookup_attr(AT_DATA, NULL, 0, 0, 0, NULL, 0, ctx)) {
 			vi->i_size = ni->initialized_size =
 					ni->allocated_size = 0LL;
@@ -675,9 +895,9 @@ skip_large_dir_stuff:
 		}
 		/* Setup the state. */
 		if (ctx->attr->non_resident) {
-			ni->state |= 1 << NI_NonResident;
+			NInoSetNonResident(ni);
 			if (ctx->attr->flags & ATTR_COMPRESSION_MASK) {
-				ni->state |= 1 << NI_Compressed;
+				NInoSetCompressed(ni);
 				if (vol->cluster_size > 4096) {
 					ntfs_error(vi->i_sb, "Found "
 						"compressed data but "
@@ -707,8 +927,9 @@ skip_large_dir_stuff:
 					goto ec_put_unm_err_out;
 				}
 				ni->_ICF(compression_block_size) = 1U << (
-					       ctx->attr->_ANR(compression_unit)
-						+ vol->cluster_size_bits);
+						ctx->attr->_ANR(
+						compression_unit) +
+						vol->cluster_size_bits);
 				ni->_ICF(compression_block_size_bits) = ffs(
 					ni->_ICF(compression_block_size)) - 1;
 			}
@@ -718,8 +939,10 @@ skip_large_dir_stuff:
 							"and compressed data.");
 					goto put_unm_err_out;
 				}
-				ni->state |= 1 << NI_Encrypted;
+				NInoSetEncrypted(ni);
 			}
+			if (ctx->attr->flags & ATTR_IS_SPARSE)
+				NInoSetSparse(ni);
 			if (ctx->attr->_ANR(lowest_vcn)) {
 				ntfs_error(vi->i_sb, "First extent of $DATA "
 						"attribute has non zero "
@@ -852,14 +1075,23 @@ void ntfs_read_inode_mount(struct inode *vi)
 
 	ntfs_debug("Entering.");
 
-	/* Initialize the ntfs specific part of @vi. */
-	ntfs_init_big_inode(vi);
-	ni = NTFS_I(vi);
 	if (vi->i_ino != FILE_MFT) {
 		ntfs_error(sb, "Called for inode 0x%lx but only inode %d "
 				"allowed.", vi->i_ino, FILE_MFT);
 		goto err_out;
 	}
+
+	/* Initialize the ntfs specific part of @vi. */
+	ntfs_init_big_inode(vi);
+
+	ni = NTFS_I(vi);
+
+	/* Setup the data attribute. It is special as it is mst protected. */
+	NInoSetNonResident(ni);
+	NInoSetMstProtected(ni);
+	ni->type = AT_DATA;
+	ni->name = NULL;
+	ni->name_len = 0;
 
 	/*
 	 * This sets up our little cheat allowing us to reuse the async io
@@ -930,13 +1162,14 @@ void ntfs_read_inode_mount(struct inode *vi)
 		u8 *al_end;
 
 		ntfs_debug("Attribute list attribute found in $MFT.");
-		ni->state |= 1 << NI_AttrList;
+		NInoSetAttrList(ni);
 		if (ctx->attr->flags & ATTR_IS_ENCRYPTED ||
-				ctx->attr->flags & ATTR_COMPRESSION_MASK) {
+				ctx->attr->flags & ATTR_COMPRESSION_MASK ||
+				ctx->attr->flags & ATTR_IS_SPARSE) {
 			ntfs_error(sb, "Attribute list attribute is "
-					"compressed/encrypted. Not allowed. "
-					"$MFT is corrupt. You should run "
-					"chkdsk.");
+					"compressed/encrypted/sparse. Not "
+					"allowed. $MFT is corrupt. You should "
+					"run chkdsk.");
 			goto put_err_out;
 		}
 		/* Now allocate memory for the attribute list. */
@@ -948,7 +1181,7 @@ void ntfs_read_inode_mount(struct inode *vi)
 			goto put_err_out;
 		}
 		if (ctx->attr->non_resident) {
-			ni->state |= 1 << NI_AttrListNonResident;
+			NInoSetAttrListNonResident(ni);
 			if (ctx->attr->_ANR(lowest_vcn)) {
 				ntfs_error(sb, "Attribute list has non zero "
 						"lowest_vcn. $MFT is corrupt. "
@@ -1071,11 +1304,13 @@ void ntfs_read_inode_mount(struct inode *vi)
 		}
 		/* $MFT must be uncompressed and unencrypted. */
 		if (attr->flags & ATTR_COMPRESSION_MASK ||
-				attr->flags & ATTR_IS_ENCRYPTED) {
-			ntfs_error(sb, "$MFT must be uncompressed and "
-					"unencrypted but a compressed/"
-					"encrypted extent was found. "
-					"$MFT is corrupt. Run chkdsk.");
+				attr->flags & ATTR_IS_ENCRYPTED ||
+				attr->flags & ATTR_IS_SPARSE) {
+			ntfs_error(sb, "$MFT must be uncompressed, "
+					"non-sparse, and unencrypted but a "
+					"compressed/sparse/encrypted extent "
+					"was found. $MFT is corrupt. Run "
+					"chkdsk.");
 			goto put_err_out;
 		}
 		/*
@@ -1123,7 +1358,7 @@ void ntfs_read_inode_mount(struct inode *vi)
 				ntfs_error(sb, "$MFT is too big! Aborting.");
 				goto put_err_out;
 			}
-			vol->_VMM(nr_mft_records) = ll;
+			vol->nr_mft_records = ll;
 			/*
 			 * We have got the first extent of the run_list for
 			 * $MFT which means it is now relatively safe to call
@@ -1149,7 +1384,7 @@ void ntfs_read_inode_mount(struct inode *vi)
 			 * ntfs_read_inode() on extents of $MFT/$DATA. But lets
 			 * hope this never happens...
 			 */
-			ntfs_read_inode(vi);
+			ntfs_read_locked_inode(vi);
 			if (is_bad_inode(vi)) {
 				ntfs_error(sb, "ntfs_read_inode() of $MFT "
 						"failed. BUG or corrupt $MFT. "
@@ -1296,29 +1531,42 @@ void __ntfs_clear_inode(ntfs_inode *ni)
 
 		// FIXME: Handle dirty case for each extent inode!
 		for (i = 0; i < ni->nr_extents; i++)
-			ntfs_destroy_inode(ni->_INE(extent_ntfs_inos)[i]);
+			ntfs_clear_extent_inode(ni->_INE(extent_ntfs_inos)[i]);
 		kfree(ni->_INE(extent_ntfs_inos));
 	}
 	/* Free all alocated memory. */
 	down_write(&ni->run_list.lock);
-	ntfs_free(ni->run_list.rl);
-	ni->run_list.rl = NULL;
+	if (ni->run_list.rl) {
+		ntfs_free(ni->run_list.rl);
+		ni->run_list.rl = NULL;
+	}
 	up_write(&ni->run_list.lock);
 
-	ntfs_free(ni->attr_list);
+	if (ni->attr_list) {
+		ntfs_free(ni->attr_list);
+		ni->attr_list = NULL;
+	}
 
 	down_write(&ni->attr_list_rl.lock);
-	ntfs_free(ni->attr_list_rl.rl);
-	ni->attr_list_rl.rl = NULL;
+	if (ni->attr_list_rl.rl) {
+		ntfs_free(ni->attr_list_rl.rl);
+		ni->attr_list_rl.rl = NULL;
+	}
 	up_write(&ni->attr_list_rl.lock);
+
+	if (ni->name_len && ni->name != I30) {
+		/* Catch bugs... */
+		BUG_ON(!ni->name);
+		kfree(ni->name);
+	}
 }
 
-void ntfs_clear_inode(ntfs_inode *ni)
+void ntfs_clear_extent_inode(ntfs_inode *ni)
 {
 	__ntfs_clear_inode(ni);
 
 	/* Bye, bye... */
-	ntfs_destroy_inode(ni);
+	ntfs_destroy_extent_inode(ni);
 }
 
 /**
@@ -1339,7 +1587,8 @@ void ntfs_clear_big_inode(struct inode *vi)
 
 	if (S_ISDIR(vi->i_mode)) {
 		down_write(&ni->_IDM(bmp_rl).lock);
-		ntfs_free(ni->_IDM(bmp_rl).rl);
+		if (ni->_IDM(bmp_rl).rl)
+			ntfs_free(ni->_IDM(bmp_rl).rl);
 		up_write(&ni->_IDM(bmp_rl).lock);
 	}
 	return;

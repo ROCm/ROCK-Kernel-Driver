@@ -31,6 +31,8 @@
 #define __NO_VERSION__
 #include "radeon.h"
 #include "drmP.h"
+#include "drm.h"
+#include "radeon_drm.h"
 #include "radeon_drv.h"
 
 #include <linux/interrupt.h>	/* For task queue support */
@@ -38,7 +40,7 @@
 
 #define RADEON_FIFO_DEBUG	0
 
-#if defined(__alpha__)
+#if defined(__alpha__) || defined(__powerpc__)
 # define PCIGART_ENABLED
 #else
 # undef PCIGART_ENABLED
@@ -631,7 +633,11 @@ static void radeon_cp_init_ring_buffer( drm_device_t *dev,
 	}
 
 	/* Set ring buffer size */
+#ifdef __BIG_ENDIAN
+	RADEON_WRITE( RADEON_CP_RB_CNTL, dev_priv->ring.size_l2qw | RADEON_BUF_SWAP_32BIT );
+#else
 	RADEON_WRITE( RADEON_CP_RB_CNTL, dev_priv->ring.size_l2qw );
+#endif
 
 	radeon_do_wait_for_idle( dev_priv );
 

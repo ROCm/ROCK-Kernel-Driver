@@ -53,41 +53,6 @@ typedef enum {
 	NTFS_MAX_NAME_LEN	= 255,
 } NTFS_CONSTANTS;
 
-/*
- * Defined bits for the state field in the ntfs_inode structure.
- * (f) = files only, (d) = directories only
- */
-typedef enum {
-	NI_Dirty,		/* 1: Mft record needs to be written to disk. */
-	NI_AttrList,		/* 1: Mft record contains an attribute list. */
-	NI_AttrListNonResident,	/* 1: Attribute list is non-resident. Implies
-				      NI_AttrList is set. */
-	NI_NonResident,		/* 1: Unnamed data attr is non-resident (f).
-				   1: $I30 index alloc attr is present (d). */
-	NI_Compressed,		/* 1: Unnamed data attr is compressed (f).
-				   1: Create compressed files by default (d). */
-	NI_Encrypted,		/* 1: Unnamed data attr is encrypted (f).
-				   1: Create encrypted files by default (d). */
-	NI_BmpNonResident,	/* 1: $I30 bitmap attr is non resident (d). */
-} ntfs_inode_state_bits;
-
-/*
- * NOTE: We should be adding dirty mft records to a list somewhere and they
- * should be independent of the (ntfs/vfs) inode structure so that an inode can
- * be removed but the record can be left dirty for syncing later.
- */
-
-#define NInoDirty(n_ino)	  test_bit(NI_Dirty, &(n_ino)->state)
-#define NInoSetDirty(n_ino)	  set_bit(NI_Dirty, &(n_ino)->state)
-#define NInoClearDirty(n_ino)	  clear_bit(NI_Dirty, &(n_ino)->state)
-
-#define NInoAttrList(n_ino)	  test_bit(NI_AttrList, &(n_ino)->state)
-#define NInoNonResident(n_ino)	  test_bit(NI_NonResident, &(n_ino)->state)
-#define NInoIndexAllocPresent(n_ino) test_bit(NI_NonResident, &(n_ino)->state)
-#define NInoCompressed(n_ino)	  test_bit(NI_Compressed, &(n_ino)->state)
-#define NInoEncrypted(n_ino)	  test_bit(NI_Encrypted, &(n_ino)->state)
-#define NInoBmpNonResident(n_ino) test_bit(NI_BmpNonResident, &(n_ino)->state)
-
 /* Global variables. */
 
 /* Slab caches (from super.c). */
