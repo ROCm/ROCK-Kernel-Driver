@@ -2078,6 +2078,7 @@ static inline struct ifmcaddr6 *igmp6_mc_get_first(struct seq_file *seq)
 			break;
 		}
 		read_unlock_bh(&idev->lock);
+		in6_dev_put(idev);
 	}
 	return im;
 }
@@ -2135,7 +2136,9 @@ static void igmp6_mc_seq_stop(struct seq_file *seq, void *v)
 	if (likely(state->idev != NULL)) {
 		read_unlock_bh(&state->idev->lock);
 		in6_dev_put(state->idev);
+		state->idev = NULL;
 	}
+	state->dev = NULL;
 	read_unlock(&dev_base_lock);
 }
 
@@ -2225,6 +2228,7 @@ static inline struct ip6_sf_list *igmp6_mcf_get_first(struct seq_file *seq)
 			spin_unlock_bh(&im->mca_lock);
 		}
 		read_unlock_bh(&idev->lock);
+		in6_dev_put(idev);
 	}
 	return psf;
 }
@@ -2291,12 +2295,16 @@ static void *igmp6_mcf_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 static void igmp6_mcf_seq_stop(struct seq_file *seq, void *v)
 {
 	struct igmp6_mcf_iter_state *state = igmp6_mcf_seq_private(seq);
-	if (likely(state->im != NULL))
+	if (likely(state->im != NULL)) {
 		spin_unlock_bh(&state->im->mca_lock);
+		state->im = NULL;
+	}
 	if (likely(state->idev != NULL)) {
 		read_unlock_bh(&state->idev->lock);
 		in6_dev_put(state->idev);
+		state->idev = NULL;
 	}
+	state->dev = NULL;
 	read_unlock(&dev_base_lock);
 }
 
