@@ -214,6 +214,7 @@ ehci_urb_done (struct ehci_hcd *ehci, struct urb *urb, struct pt_regs *regs)
 		COUNT (ehci->stats.unlink);
 		break;
 	}
+	smp_wmb();
 	spin_unlock (&urb->lock);
 
 #ifdef EHCI_URB_TRACE
