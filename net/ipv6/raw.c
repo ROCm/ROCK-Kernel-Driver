@@ -11,6 +11,7 @@
  *
  *	Fixes:
  *	Hideaki YOSHIFUJI	:	sin6_scope_id support
+ *	YOSHIFUJI,H.@USAGI	:	raw checksum (RFC2292(bis) compliance) 
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -487,11 +488,18 @@ static int rawv6_frag_cksum(const void *data, struct in6_addr *addr,
 		hdr->cksum = csum_ipv6_magic(addr, daddr, hdr->len,
 					     hdr->proto, hdr->cksum);
 		
-		if (opt->offset < len) {
+		if (opt->offset + 1 < len) {
 			__u16 *csum;
 
 			csum = (__u16 *) (buff + opt->offset);
-			*csum = hdr->cksum;
+			if (*csum) {
+				/* in case cksum was not initialized */
+				__u32 sum = hdr->cksum;
+				sum += *csum;
+				*csum = hdr->cksum = (sum + (sum>>16));
+			} else {
+				*csum = hdr->cksum;
+			}
 		} else {
 			if (net_ratelimit())
 				printk(KERN_DEBUG "icmp: cksum offset too big\n");
@@ -720,6 +728,10 @@ static int rawv6_setsockopt(struct sock *sk, int level, int optname,
 
 	switch (optname) {
 		case IPV6_CHECKSUM:
+			/* You may get strange result with a positive odd offset;
+			   RFC2292bis agrees with me. */
+			if (val > 0 && (val&1))
+				return(-EINVAL);
 			if (val < 0) {
 				opt->checksum = 0;
 			} else {
@@ -817,6 +829,11 @@ static void rawv6_close(struct sock *sk, long timeout)
 
 static int rawv6_init_sk(struct sock *sk)
 {
+	if (sk->num == IPPROTO_ICMPV6){
+		struct raw6_opt *opt = raw6_sk(sk);
+		opt->checksum = 1;
+		opt->offset = 2;
+	}
 	return(0);
 }
 
