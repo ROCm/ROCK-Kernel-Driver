@@ -6,8 +6,6 @@
 # This file is GPL. See other files for the full Blurb. I'm lazy today. 
 #
 
-O_TARGET := built-in.o
-
 obj-$(CONFIG_RIO) += rio.o
 
 rio-objs := rio_linux.o rioinit.o rioboot.o riocmd.o rioctrl.o riointr.o \

@@ -4,8 +4,6 @@
 # See the README file in this directory for more info. <paulsch@us.ibm.com>
 #
 
-O_TARGET := built-in.o
-
 obj-$(CONFIG_MWAVE) += mwave.o
 
 mwave-objs := mwavedd.o smapi.o tp3780i.o 3780i.o

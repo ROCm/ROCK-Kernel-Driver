@@ -1,17 +1,7 @@
 #
 # Makefile for drivers/net/tokenring
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
-#
 
-O_TARGET := built-in.o
-
-obj-y   :=
-obj-n   :=
-obj-m   :=
-obj-    :=
 export-objs := tms380tr.o
 
 obj-$(CONFIG_IBMTR) 	+= ibmtr.o

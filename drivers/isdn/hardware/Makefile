@@ -1,9 +1,5 @@
 # Makefile for the CAPI hardware drivers
 
-# The target object and module list name.
-
-O_TARGET	:= built-in.o
-
 # Object files in subdirectories
 
 mod-subdirs			:= avm

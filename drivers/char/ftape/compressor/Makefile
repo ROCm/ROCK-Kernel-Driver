@@ -24,8 +24,6 @@
 #      Linux.
 #
 
-O_TARGET := built-in.o
-
 obj-$(CONFIG_ZFT_COMPRESSOR) += zft-compressor.o
 
 zft-compressor-objs := zftape-compress.o lzrw3.o

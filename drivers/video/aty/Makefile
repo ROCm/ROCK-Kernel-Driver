@@ -1,6 +1,4 @@
 
-O_TARGET := built-in.o
-
 export-objs    :=  atyfb_base.o mach64_accel.o
 
 obj-$(CONFIG_FB_ATY) += atyfb.o

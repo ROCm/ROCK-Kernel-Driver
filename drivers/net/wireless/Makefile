@@ -1,15 +1,6 @@
 #
-# drivers/net/wireless/Makefile
-#
 # Makefile for the Linux Wireless network device drivers.
 #
-
-O_TARGET := built-in.o
-
-obj-y		:=
-obj-m		:=
-obj-n		:=
-obj-		:=
 
 # Things that need to export symbols
 export-objs	:= airo.o orinoco.o hermes.o

@@ -1,8 +1,8 @@
 # Makefile for the hysdn ISDN device driver
 
-# The target object and module list name.
+# Each configuration option enables a list of files.
 
-O_TARGET	:= built-in.o
+obj-$(CONFIG_HYSDN)	+= hysdn.o
 
 # Multipart objects.
 
@@ -14,9 +14,5 @@ hysdn-objs	:= hysdn_procconf.o hysdn_proclog.o boardergo.o hysdn_boot.o \
 hysdn-objs-$(CONFIG_HYSDN_CAPI) += hycapi.o
 
 hysdn-objs 	+= $(hysdn-objs-y)
-
-# Each configuration option enables a list of files.
-
-obj-$(CONFIG_HYSDN)	+= hysdn.o
 
 include $(TOPDIR)/Rules.make

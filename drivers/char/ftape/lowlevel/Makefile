@@ -23,8 +23,6 @@
 #      driver for Linux.
 #
 
-O_TARGET := built-in.o
-
 export-objs := ftape_syms.o
 
 obj-$(CONFIG_FTAPE) += ftape.o

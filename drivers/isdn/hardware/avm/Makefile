@@ -1,9 +1,5 @@
 # Makefile for the AVM ISDN device drivers
 
-# The target object and module list name.
-
-O_TARGET	:= built-in.o
-
 # Objects that export symbols.
 
 export-objs	:= b1dma.o b1pcmcia.o b1.o
