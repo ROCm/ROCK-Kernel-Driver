@@ -78,6 +78,8 @@ extern rwlock_t qla_hostlist_lock;
 
 extern char *qla2x00_get_fw_version_str(struct scsi_qla_host *, char *);
 
+extern void qla2x00_cmd_timeout(srb_t *);
+
 extern int qla2x00_queuecommand(struct scsi_cmnd *,
     void (*)(struct scsi_cmnd *));
 
@@ -295,16 +297,8 @@ extern void qla2x00_cancel_io_descriptors(scsi_qla_host_t *);
 /*
  * Global Function Prototypes in qla_xioctl.c source file.
  */
-#ifdef CONFIG_SCSI_QLA2XXX_IOCTL
-extern void qla2x00_enqueue_aen(scsi_qla_host_t *, uint16_t, void *);
-extern int qla2x00_alloc_ioctl_mem(scsi_qla_host_t *);
-extern void qla2x00_free_ioctl_mem(scsi_qla_host_t *);
-extern int qla2x00_get_ioctl_scrap_mem(scsi_qla_host_t *, void **, uint32_t);
-extern void qla2x00_free_ioctl_scrap_mem(scsi_qla_host_t *);
-#else
 #define qla2x00_enqueue_aen(ha, cmd, mode)	do { } while (0)
 #define qla2x00_alloc_ioctl_mem(ha)		(0)
 #define qla2x00_free_ioctl_mem(ha)		do { } while (0)
-#endif
 
 #endif /* _QLA_GBL_H */

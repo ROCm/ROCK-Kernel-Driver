@@ -216,55 +216,7 @@ qla2x00_stop_timer(scsi_qla_host_t *ha)
 	ha->timer_active = 0;
 }
 
-
-static void qla2x00_cmd_timeout(srb_t *sp);
-static __inline__ void qla2x00_add_timer_to_cmd(srb_t *sp, int timeout);
-static __inline__ void qla2x00_delete_timer_from_cmd(srb_t *sp);
-
-/**************************************************************************
-*   qla2x00_add_timer_to_cmd
-*
-* Description:
-*       Creates a timer for the specified command. The timeout is usually
-*       the command time from kernel minus 2 secs.
-*
-* Input:
-*     sp - pointer to validate
-*
-* Returns:
-*     None.
-**************************************************************************/
-static inline void
-qla2x00_add_timer_to_cmd(srb_t *sp, int timeout)
-{
-	init_timer(&sp->timer);
-	sp->timer.expires = jiffies + timeout * HZ;
-	sp->timer.data = (unsigned long) sp;
-	sp->timer.function = (void (*) (unsigned long))qla2x00_cmd_timeout;
-	add_timer(&sp->timer);
-}
-
-/**************************************************************************
-*   qla2x00_delete_timer_from_cmd
-*
-* Description:
-*       Delete the timer for the specified command.
-*
-* Input:
-*     sp - pointer to validate
-*
-* Returns:
-*     None.
-**************************************************************************/
-static inline void 
-qla2x00_delete_timer_from_cmd(srb_t *sp)
-{
-	if (sp->timer.function != NULL) {
-		del_timer(&sp->timer);
-		sp->timer.function =  NULL;
-		sp->timer.data = (unsigned long) NULL;
-	}
-}
+void qla2x00_cmd_timeout(srb_t *);
 
 static __inline__ void qla2x00_callback(scsi_qla_host_t *, struct scsi_cmnd *);
 static __inline__ void sp_put(struct scsi_qla_host * ha, srb_t *sp);
@@ -3592,7 +3544,7 @@ qla2x00_rst_aen(scsi_qla_host_t *ha)
 
 
 /*
- * This routine will alloacte SP from the free queue
+ * This routine will allocate SP from the free queue
  * input:
  *        scsi_qla_host_t *
  * output:
@@ -3908,7 +3860,7 @@ qla2x00_extend_timeout(struct scsi_cmnd *cmd, int timeout)
 * None.
 * Note:Need to add the support for if( sp->state == SRB_FAILOVER_STATE).
 **************************************************************************/
-static void
+void
 qla2x00_cmd_timeout(srb_t *sp)
 {
 	int t, l;
@@ -3916,9 +3868,6 @@ qla2x00_cmd_timeout(srb_t *sp)
 	scsi_qla_host_t *vis_ha, *dest_ha;
 	struct scsi_cmnd *cmd;
 	ulong      flags;
-#if defined(QL_DEBUG_LEVEL_3)
-	ulong      cpu_flags;
-#endif
 	fc_port_t	*fcport;
 
 	cmd = sp->cmd;
@@ -4013,55 +3962,7 @@ qla2x00_cmd_timeout(srb_t *sp)
 
 		 return;
 	}
-/* TODO: Remove this code!!! */
-#if defined(QL_DEBUG_LEVEL_3)
-	spin_lock_irqsave(&dest_ha->list_lock, cpu_flags);
-	if (sp->state == SRB_DONE_STATE) {
-		/* IO in done_q  -- leave it */
-		DEBUG(printk("scsi(%ld): Found in Done queue pid %ld sp=%p.\n",
-		    dest_ha->host_no, cmd->serial_number, sp));
-	} else if (sp->state == SRB_SUSPENDED_STATE) {
-		DEBUG(printk("scsi(%ld): Found SP %p in suspended state  "
-		    "- pid %ld:\n",
-		    dest_ha->host_no, sp, cmd->serial_number));
-		DEBUG(qla2x00_dump_buffer((uint8_t *)sp, sizeof(srb_t));)
-	} else if (sp->state == SRB_ACTIVE_STATE) {
-		/*
-		 * IO is with ISP find the command in our active list.
-		 */
-		spin_unlock_irqrestore(&dest_ha->list_lock, cpu_flags);
-		spin_lock_irqsave(&dest_ha->hardware_lock, flags);
-		if (sp ==
-		    dest_ha->outstanding_cmds[(u_long)sp->cmd->host_scribble]) {
 
-			DEBUG(printk("cmd_timeout: Found in ISP \n");)
-
-			sp->state = SRB_ACTIVE_TIMEOUT_STATE;
-			spin_unlock_irqrestore(&dest_ha->hardware_lock, flags);
-		} else {
-			spin_unlock_irqrestore(&dest_ha->hardware_lock, flags);
-			printk(KERN_INFO 
-				"qla_cmd_timeout: State indicates it is with "
-				"ISP, But not in active array\n");
-		}
-		spin_lock_irqsave(&dest_ha->list_lock, cpu_flags); 	/* 01/03 */
-	} else if (sp->state == SRB_ACTIVE_TIMEOUT_STATE) {
-		DEBUG(printk("qla2100%ld: Found in Active timeout state"
-				"pid %ld, State = %x., \n",
-				dest_ha->host_no,
-				sp->cmd->serial_number, sp->state);)
-	} else {
-		/* EMPTY */
-		DEBUG2(printk("cmd_timeout%ld: LOST command state = "
-				"0x%x, sp=%p\n",
-				vis_ha->host_no, sp->state,sp);)
-
-		qla_printk(KERN_INFO, vis_ha,
-			"cmd_timeout: LOST command state = 0x%x\n", sp->state);
-	}
-	spin_unlock_irqrestore(&dest_ha->list_lock, cpu_flags);
-#endif
-	
 	DEBUG3(printk("cmd_timeout: Leaving\n");)
 }
 
@@ -4472,12 +4373,6 @@ qla2x00_down_timeout(struct semaphore *sema, unsigned long timeout)
 static int __init
 qla2x00_module_init(void)
 {
-	/* Derive version string. */
-	strcpy(qla2x00_version_str, QLA2XXX_VERSION);
-#if DEBUG_QLA2100
-	strcat(qla2x00_version_str, "-debug");
-#endif
-
 	/* Allocate cache for SRBs. */
 	sprintf(srb_cachep_name, "qla2xxx_srbs");
 	srb_cachep = kmem_cache_create(srb_cachep_name, sizeof(srb_t), 0,
@@ -4487,6 +4382,12 @@ qla2x00_module_init(void)
 		    "qla2xxx: Unable to allocate SRB cache...Failing load!\n");
 		return -ENOMEM;
 	}
+
+	/* Derive version string. */
+	strcpy(qla2x00_version_str, QLA2XXX_VERSION);
+#if DEBUG_QLA2100
+	strcat(qla2x00_version_str, "-debug");
+#endif
 
 	printk(KERN_INFO
 	    "QLogic Fibre Channel HBA Driver (%p)\n", qla2x00_set_info);

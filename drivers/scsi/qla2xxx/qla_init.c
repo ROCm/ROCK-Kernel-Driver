@@ -2103,6 +2103,7 @@ qla2x00_cfg_lun(scsi_qla_host_t *ha, fc_port_t *fcport, uint16_t lun,
 	case TYPE_MEDIUM_CHANGER:
 	case TYPE_ENCLOSURE:
 	case 0x20:
+	case 0x0C:
 		break;
 	case TYPE_TAPE:
 		fcport->flags |= FCF_TAPE_PRESENT;
@@ -3175,7 +3176,6 @@ qla2x00_restart_queues(scsi_qla_host_t *ha, uint8_t flush)
 		qla2x00_done(ha);
 }
 
-//FIXME - Document
 void
 qla2x00_rescan_fcports(scsi_qla_host_t *ha)
 {
@@ -3194,8 +3194,9 @@ qla2x00_rescan_fcports(scsi_qla_host_t *ha)
 	}
 
 	/* Update OS target and lun structures if necessary. */
-	if (rescan_done)
+	if (rescan_done) {
 		qla2x00_config_os(ha);
+	}
 }
 
 
@@ -3222,7 +3223,7 @@ qla2x00_config_os(scsi_qla_host_t *ha)
 		if ((tq = TGT_Q(ha, tgt)) == NULL)
 			continue;
 
-		tq->flags &= ~TQF_ONLINE;
+		clear_bit(TQF_ONLINE, &tq->flags);
 	}
 
 	list_for_each_entry(fcport, &ha->fcports, list) {
@@ -3324,7 +3325,7 @@ qla2x00_fcport_bind(scsi_qla_host_t *ha, fc_port_t *fcport)
 		fcport->tgt_queue = tq;
 		fcport->flags |= FCF_PERSISTENT_BOUND;
 		tq->fcport = fcport;
-		tq->flags |= TQF_ONLINE;
+		set_bit(TQF_ONLINE, &tq->flags);
 		tq->port_down_retry_count = ha->port_down_retry_count;
 
 #if 0
