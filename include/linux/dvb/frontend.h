@@ -23,8 +23,8 @@
  *
  */
 
-#ifndef _FRONTEND_H_
-#define _FRONTEND_H_
+#ifndef _DVBFRONTEND_H_
+#define _DVBFRONTEND_H_
 
 #ifdef __KERNEL__
 #include <linux/types.h>
@@ -33,14 +33,14 @@
 #endif
 
 
-typedef enum {
+typedef enum fe_type {
         FE_QPSK,
         FE_QAM,
         FE_OFDM
 } fe_type_t;
 
 
-typedef enum {
+typedef enum fe_caps {
 	FE_IS_STUPID                  = 0,
 	FE_CAN_INVERSION_AUTO         = 0x1,
 	FE_CAN_FEC_1_2                = 0x2,
@@ -63,6 +63,8 @@ typedef enum {
 	FE_CAN_BANDWIDTH_AUTO         = 0x40000,
 	FE_CAN_GUARD_INTERVAL_AUTO    = 0x80000,
 	FE_CAN_HIERARCHY_AUTO         = 0x100000,
+	FE_CAN_RECOVER                = 0x20000000,
+	FE_CAN_CLEAN_SETUP            = 0x40000000,
 	FE_CAN_MUTE_TS                = 0x80000000
 } fe_caps_t;
 
@@ -99,25 +101,25 @@ struct dvb_diseqc_slave_reply {
 };                              /*  errorcode when no message was received  */
 
 
-typedef enum {
+typedef enum fe_sec_voltage {
         SEC_VOLTAGE_13,
         SEC_VOLTAGE_18
 } fe_sec_voltage_t;
 
 
-typedef enum {
+typedef enum fe_sec_tone_mode {
         SEC_TONE_ON,
         SEC_TONE_OFF
 } fe_sec_tone_mode_t;
 
 
-typedef enum {
+typedef enum fe_sec_mini_cmd {
         SEC_MINI_A,
         SEC_MINI_B
 } fe_sec_mini_cmd_t;
 
 
-typedef enum {
+typedef enum fe_status {
 	FE_HAS_SIGNAL     = 0x01,   /*  found something above the noise level */
 	FE_HAS_CARRIER    = 0x02,   /*  found a DVB signal  */
 	FE_HAS_VITERBI    = 0x04,   /*  FEC is stable  */
@@ -125,17 +127,17 @@ typedef enum {
 	FE_HAS_LOCK       = 0x10,   /*  everything's working... */
 	FE_TIMEDOUT       = 0x20,   /*  no lock within the last ~2 seconds */
 	FE_REINIT         = 0x40    /*  frontend was reinitialized,  */
-} fe_status_t;                      /*  application is recommned to reset */
+} fe_status_t;                      /*  application is recommended to reset */
                                     /*  DiSEqC, tone and parameters */
 
-typedef enum {
+typedef enum fe_spectral_inversion {
         INVERSION_OFF,
         INVERSION_ON,
         INVERSION_AUTO
 } fe_spectral_inversion_t;
 
 
-typedef enum {
+typedef enum fe_code_rate {
         FEC_NONE = 0,
         FEC_1_2,
         FEC_2_3,
@@ -149,7 +151,7 @@ typedef enum {
 } fe_code_rate_t;
 
 
-typedef enum {
+typedef enum fe_modulation {
         QPSK,
         QAM_16,
         QAM_32,
@@ -160,13 +162,13 @@ typedef enum {
 } fe_modulation_t;
 
 
-typedef enum {
+typedef enum fe_transmit_mode {
 	TRANSMISSION_MODE_2K,
 	TRANSMISSION_MODE_8K,
 	TRANSMISSION_MODE_AUTO
 } fe_transmit_mode_t;
 
-typedef enum {
+typedef enum fe_bandwidth {
 	BANDWIDTH_8_MHZ,
 	BANDWIDTH_7_MHZ,
 	BANDWIDTH_6_MHZ,
@@ -174,7 +176,7 @@ typedef enum {
 } fe_bandwidth_t;
 
 
-typedef enum {
+typedef enum fe_guard_interval {
 	GUARD_INTERVAL_1_32,
 	GUARD_INTERVAL_1_16,
 	GUARD_INTERVAL_1_8,
@@ -183,7 +185,7 @@ typedef enum {
 } fe_guard_interval_t;
 
 
-typedef enum {
+typedef enum fe_hierarchy {
 	HIERARCHY_NONE,
 	HIERARCHY_1,
 	HIERARCHY_2,
@@ -257,5 +259,5 @@ struct dvb_frontend_event {
 #define FE_GET_EVENT               _IOR('o', 78, struct dvb_frontend_event)
 
 
-#endif /*_FRONTEND_H_*/
+#endif /*_DVBFRONTEND_H_*/
 
