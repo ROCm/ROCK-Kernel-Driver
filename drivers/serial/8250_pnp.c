@@ -437,7 +437,7 @@ static struct pnp_driver serial_pnp_driver = {
 	.name		= "serial",
 	.id_table	= pnp_dev_table,
 	.probe		= serial_pnp_probe,
-	.remove		= serial_pnp_remove,
+	.remove		= __devexit_p(serial_pnp_remove),
 };
 
 static int __init serial8250_pnp_init(void)
