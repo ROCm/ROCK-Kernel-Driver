@@ -1206,7 +1206,7 @@ void blk_start_queue(request_queue_t *q)
 		clear_bit(QUEUE_FLAG_REENTER, &q->queue_flags);
 	} else {
 		blk_plug_device(q);
-		schedule_work(&q->unplug_work);
+		kblockd_schedule_work(&q->unplug_work);
 	}
 }
 
