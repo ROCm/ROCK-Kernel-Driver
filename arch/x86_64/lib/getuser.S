@@ -30,7 +30,7 @@
 #include <asm/thread_info.h>
 
 	.text
-	.p2align
+	.p2align 4
 .globl __get_user_1
 __get_user_1:	
 	GET_THREAD_INFO(%rbx)
@@ -40,7 +40,7 @@ __get_user_1:
 	xorq %rax,%rax
 	ret
 
-	.p2align	
+	.p2align 4
 .globl __get_user_2
 __get_user_2:
 	GET_THREAD_INFO(%rbx) 
@@ -52,7 +52,7 @@ __get_user_2:
 	xorq %rax,%rax
 	ret
 
-	.p2align
+	.p2align 4
 .globl __get_user_4
 __get_user_4:
 	GET_THREAD_INFO(%rbx) 
@@ -64,7 +64,7 @@ __get_user_4:
 	xorq %rax,%rax
 	ret
 
-	.p2align
+	.p2align 4
 .globl __get_user_8
 __get_user_8:
 	GET_THREAD_INFO(%rbx) 

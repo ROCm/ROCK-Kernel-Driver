@@ -1261,8 +1261,8 @@ siginfo64to32(siginfo_t32 *d, siginfo_t *s)
 	if (s->si_signo >= SIGRTMIN) {
 		d->si_pid = s->si_pid;
 		d->si_uid = s->si_uid;
-		/* XXX: Ouch, how to find this out??? */
-		d->si_int = s->si_int;
+		memcpy(&d->si_int, &s->si_int, 
+                       sizeof(siginfo_t) - offsetof(siginfo_t,si_int));
 	} else switch (s->si_signo) {
 	/* XXX: What about POSIX1.b timers */
 	case SIGCHLD:
@@ -1299,8 +1299,9 @@ siginfo32to64(siginfo_t *d, siginfo_t32 *s)
 	if (s->si_signo >= SIGRTMIN) {
 		d->si_pid = s->si_pid;
 		d->si_uid = s->si_uid;
-		/* XXX: Ouch, how to find this out??? */
-		d->si_int = s->si_int;
+		memcpy(&d->si_int,
+                       &s->si_int,
+                       sizeof(siginfo_t) - offsetof(siginfo_t, si_int)); 
 	} else switch (s->si_signo) {
 	/* XXX: What about POSIX1.b timers */
 	case SIGCHLD:

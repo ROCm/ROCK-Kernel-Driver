@@ -78,9 +78,11 @@ struct pt_regs {
 #define PTRACE_GETFPXREGS         18
 #define PTRACE_SETFPXREGS         19
 
+/* only useful for access 32bit programs */
 #define PTRACE_GET_THREAD_AREA    25
 #define PTRACE_SET_THREAD_AREA    26
 
+#define PTRACE_ARCH_PRCTL	  30	/* arch_prctl for child */
 
 #if defined(__KERNEL__) && !defined(__ASSEMBLY__) 
 #define user_mode(regs) (!!((regs)->cs & 3))

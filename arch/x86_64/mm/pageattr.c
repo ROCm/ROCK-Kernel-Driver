@@ -53,7 +53,7 @@ static struct page *split_large_page(unsigned long address, pgprot_t prot)
 
 static void flush_kernel_map(void *address) 
 {
-	if (address && cpu_has_clflush) {
+	if (0 && address && cpu_has_clflush) {
 		/* is this worth it? */ 
 		int i;
 		for (i = 0; i < PAGE_SIZE; i += boot_cpu_data.x86_clflush_size) 

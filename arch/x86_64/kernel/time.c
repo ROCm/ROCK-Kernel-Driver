@@ -30,7 +30,7 @@
 #include <asm/apic.h>
 #endif
 
-u64 jiffies_64;
+u64 jiffies_64 = INITIAL_JIFFIES;
 
 extern int using_apic_timer;
 
@@ -47,8 +47,8 @@ int hpet_report_lost_ticks;				/* command line option */
 
 struct hpet_data __hpet __section_hpet;			/* address, quotient, trigger, hz */
 
-volatile unsigned long __jiffies __section_jiffies;
-unsigned long __wall_jiffies __section_wall_jiffies;
+volatile unsigned long __jiffies __section_jiffies = INITIAL_JIFFIES;
+unsigned long __wall_jiffies __section_wall_jiffies = INITIAL_JIFFIES;
 struct timespec __xtime __section_xtime;
 struct timezone __sys_tz __section_sys_tz;
 

@@ -829,13 +829,6 @@ gdt:
 	.word	0x9200				# data read/write
 	.word	0x00CF				# granularity = 4096, 386
 						#  (+5th nibble of limit)
-# this is 64bit descriptor for code
-	.word	0xFFFF
-	.word	0
-	.word	0x9A00				# code read/exec
-	.word	0x00AF				# as above, but it is long mode and with D=0
-						# it does not seem to do the trick.
-
 idt_48:
 	.word	0				# idt limit = 0
 	.word	0, 0				# idt base = 0L

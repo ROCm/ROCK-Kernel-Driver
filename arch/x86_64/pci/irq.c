@@ -109,7 +109,7 @@ static void __init pirq_peer_trick(void)
 		 */
 		if (busmap[i] && pci_scan_bus(i, pci_root_bus->ops, NULL))
 			printk(KERN_INFO "PCI: Discovered primary peer bus %02x [IRQ]\n", i);
-	pcibios_last_bus = -1;
+	//pcibios_last_bus = -1;
 }
 
 /*
@@ -291,14 +291,14 @@ static int pirq_amd756_get(struct pci_dev *router, struct pci_dev *dev, int pirq
 	{
 		irq = read_config_nybble(router, 0x56, pirq - 1);
 	}
-	printk(KERN_INFO "AMD: dev %04x:%04x, router pirq : %d get irq : %2d\n",
+	printk(KERN_INFO "AMD756: dev %04x:%04x, router pirq : %d get irq : %2d\n",
 		dev->vendor, dev->device, pirq, irq);
 	return irq;
 }
 
 static int pirq_amd756_set(struct pci_dev *router, struct pci_dev *dev, int pirq, int irq)
 {
-	printk(KERN_INFO "AMD: dev %04x:%04x, router pirq : %d SET irq : %2d\n", 
+	printk(KERN_INFO "AMD756: dev %04x:%04x, router pirq : %d SET irq : %2d\n", 
 		dev->vendor, dev->device, pirq, irq);
 	if (pirq <= 4)
 	{

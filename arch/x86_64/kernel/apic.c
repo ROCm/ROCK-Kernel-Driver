@@ -981,9 +981,6 @@ void smp_apic_timer_interrupt(struct pt_regs *regs)
 asmlinkage void smp_spurious_interrupt(void)
 {
 	unsigned int v;
-	static unsigned long last_warning; 
-	static unsigned long skipped; 
-
 	irq_enter();
 	/*
 	 * Check if this really is a spurious interrupt and ACK it
@@ -994,8 +991,12 @@ asmlinkage void smp_spurious_interrupt(void)
 	if (v & (1 << (SPURIOUS_APIC_VECTOR & 0x1f)))
 		ack_APIC_irq();
 
+#if 0
+	static unsigned long last_warning; 
+	static unsigned long skipped; 
+
 	/* see sw-dev-man vol 3, chapter 7.4.13.5 */
-	if (last_warning+30*HZ < jiffies) { 
+	if (time_before(last_warning+30*HZ,jiffies)) { 
 		printk(KERN_INFO "spurious APIC interrupt on CPU#%d, %ld skipped.\n",
 		       smp_processor_id(), skipped);
 		last_warning = jiffies; 
@@ -1003,6 +1004,7 @@ asmlinkage void smp_spurious_interrupt(void)
 	} else { 
 		skipped++; 
 	} 
+#endif 
 	irq_exit();
 }
 
