@@ -1596,7 +1596,7 @@ xfs_initialize_vnode(
 	 * and unlock the inode.
 	 */
 	if (unlock && (inode->i_state & I_NEW)) {
-		linvfs_set_inode_ops(inode);
+		xfs_set_inodeops(inode);
 		unlock_new_inode(inode);
 	}
 }

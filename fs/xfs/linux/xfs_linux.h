@@ -60,6 +60,7 @@
 #include <linux/xfs_super.h>
 #include <linux/xfs_globals.h>
 #include <linux/xfs_fs_subr.h>
+#include <linux/xfs_lrw.h>
 
 #include <pagebuf/page_buf.h>
 

@@ -81,7 +81,7 @@
 
 
 extern void
-linvfs_set_inode_ops(
+xfs_set_inodeops(
 	struct inode	*inode);
 
 #endif	/* __XFS_SUPER_H__ */

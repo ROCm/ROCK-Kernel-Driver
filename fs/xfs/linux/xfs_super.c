@@ -371,6 +371,32 @@ xfs_showargs(
 	return 0;
 }
 
+void
+xfs_set_inodeops(
+	struct inode		*inode)
+{
+	vnode_t			*vp = LINVFS_GET_VP(inode);
+
+	if (vp->v_type == VNON) {
+		make_bad_inode(inode);
+	} else if (S_ISREG(inode->i_mode)) {
+		inode->i_op = &linvfs_file_inode_operations;
+		inode->i_fop = &linvfs_file_operations;
+		inode->i_mapping->a_ops = &linvfs_aops;
+	} else if (S_ISDIR(inode->i_mode)) {
+		inode->i_op = &linvfs_dir_inode_operations;
+		inode->i_fop = &linvfs_dir_operations;
+	} else if (S_ISLNK(inode->i_mode)) {
+		inode->i_op = &linvfs_symlink_inode_operations;
+		if (inode->i_blocks)
+			inode->i_mapping->a_ops = &linvfs_aops;
+	} else {
+		inode->i_op = &linvfs_file_inode_operations;
+		init_special_inode(inode, inode->i_mode,
+					kdev_t_to_nr(inode->i_rdev));
+	}
+}
+
 
 STATIC kmem_cache_t * linvfs_inode_cachep;
 
@@ -542,32 +568,6 @@ fail_vfsop:
 out_null:
 	kfree(args);
 	return -error;
-}
-
-void
-linvfs_set_inode_ops(
-	struct inode		*inode)
-{
-	vnode_t			*vp = LINVFS_GET_VP(inode);
-
-	if (vp->v_type == VNON) {
-		make_bad_inode(inode);
-	} else if (S_ISREG(inode->i_mode)) {
-		inode->i_op = &linvfs_file_inode_operations;
-		inode->i_fop = &linvfs_file_operations;
-		inode->i_mapping->a_ops = &linvfs_aops;
-	} else if (S_ISDIR(inode->i_mode)) {
-		inode->i_op = &linvfs_dir_inode_operations;
-		inode->i_fop = &linvfs_dir_operations;
-	} else if (S_ISLNK(inode->i_mode)) {
-		inode->i_op = &linvfs_symlink_inode_operations;
-		if (inode->i_blocks)
-			inode->i_mapping->a_ops = &linvfs_aops;
-	} else {
-		inode->i_op = &linvfs_file_inode_operations;
-		init_special_inode(inode, inode->i_mode,
-					kdev_t_to_nr(inode->i_rdev));
-	}
 }
 
 /*
