@@ -45,7 +45,7 @@ static int users=0;
 static int curtuner=0;
 static int tunestat=0;
 static int sigstrength=0;
-static wait_queue_head_t readq;
+static wait_queue_head_t read_queue;
 struct timer_list tunertimer,rdstimer,readtimer;
 static __u8 rdsin=0,rdsout=0,rdsstat=0;
 static unsigned char rdsbuf[RDS_BUFFER];
@@ -309,7 +309,7 @@ void cadet_handler(unsigned long data)
 	 * Service pending read
 	 */
 	if( rdsin!=rdsout)
-	        wake_up_interruptible(&readq);
+	        wake_up_interruptible(&read_queue);
 
 	/* 
 	 * Clean up and exit
@@ -343,7 +343,7 @@ static ssize_t cadet_read(struct file *file, char *data,
 	if(rdsin==rdsout) {
   	        if (file->f_flags & O_NONBLOCK)
 		        return -EWOULDBLOCK;
-	        interruptible_sleep_on(&readq);
+	        interruptible_sleep_on(&read_queue);
 	}		
 	while( i<count && rdsin!=rdsout)
 	        readbuf[i++]=rdsbuf[rdsout++];
@@ -473,7 +473,7 @@ static int cadet_open(struct inode *inode, struct file *file)
 	if(users)
 		return -EBUSY;
 	users++;
-	init_waitqueue_head(&readq);
+	init_waitqueue_head(&read_queue);
 	return 0;
 }
 

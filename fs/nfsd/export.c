@@ -899,7 +899,7 @@ exp_rootfh(svc_client *clp, char *path, struct knfsd_fh *f, int maxsize)
 	 * fh must be initialized before calling fh_compose
 	 */
 	fh_init(&fh, maxsize);
-	if (fh_compose(&fh, exp, dget(nd.dentry), NULL))
+	if (fh_compose(&fh, exp, nd.dentry, NULL))
 		err = -EINVAL;
 	else
 		err = 0;
@@ -932,7 +932,6 @@ exp_pseudoroot(struct auth_domain *clp, struct svc_fh *fhp,
 	if (!fsid_key || IS_ERR(fsid_key))
 		return nfserr_perm;
 
-	dget(fsid_key->ek_export->ex_dentry);
 	rv = fh_compose(fhp, fsid_key->ek_export, 
 			  fsid_key->ek_export->ex_dentry, NULL);
 	expkey_put(&fsid_key->h, &svc_expkey_cache);

@@ -545,16 +545,6 @@ static inline void blk_run_address_space(struct address_space *mapping)
 		blk_run_backing_dev(mapping->backing_dev_info, NULL);
 }
 
-static inline void blk_run_page(struct page *page)
-{
-	struct address_space *mapping;
-
-	smp_mb();
-	mapping = page->mapping;
-	if (mapping)
-		blk_run_backing_dev(mapping->backing_dev_info, page);
-}
-
 /*
  * end_request() and friends. Must be called with the request queue spinlock
  * acquired. All functions called within end_request() _must_be_ atomic.

@@ -110,7 +110,7 @@ $(if $(wildcard $(KBUILD_OUTPUT)),, \
 $(filter-out _all,$(MAKECMDGOALS)) _all:
 	$(if $(KBUILD_VERBOSE:1=),@)$(MAKE) -C $(KBUILD_OUTPUT)		\
 	KBUILD_SRC=$(CURDIR)	     KBUILD_VERBOSE=$(KBUILD_VERBOSE)	\
-	KBUILD_CHECK=$(KBUILD_CHECK) KBUILD_EXTMOD=$(KBUILD_EXTMOD)     \
+	KBUILD_CHECK=$(KBUILD_CHECK) KBUILD_EXTMOD="$(KBUILD_EXTMOD)"	\
         -f $(CURDIR)/Makefile $@
 
 # Leave processing to above invocation of make
@@ -325,7 +325,7 @@ export AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
 # When compiling out-of-tree modules, put MODVERDIR in the module
 # tree rather than in the kernel tree. The kernel tree might
 # even be read-only.
-export MODVERDIR := $(if $(KBUILD_EXTMOD),$(KBUILD_EXTMOD)/).tmp_versions
+export MODVERDIR := $(if $(KBUILD_EXTMOD),$(firstword $(KBUILD_EXTMOD))/).tmp_versions
 
 # The temporary file to save gcc -MD generated dependencies must not
 # contain a comma
@@ -952,15 +952,15 @@ else # KBUILD_EXTMOD
 # We are always building modules
 KBUILD_MODULES := 1
 .PHONY: crmodverdir
-crmodverdir: FORCE
+crmodverdir:
 	$(Q)mkdir -p $(MODVERDIR)
 
-.PHONY: $(KBUILD_EXTMOD)
-$(KBUILD_EXTMOD): crmodverdir FORCE
-	$(Q)$(MAKE) $(build)=$@
+module-dirs := $(addprefix _module_,$(KBUILD_EXTMOD))
+.PHONY: $(module-dirs) modules
+$(module-dirs): crmodverdir
+	$(Q)$(MAKE) $(build)=$(patsubst _module_%,%,$@)
 
-.PHONY: modules
-modules: $(KBUILD_EXTMOD)
+modules: $(module-dirs)
 	@echo '  Building modules, stage 2.';
 	$(Q)$(MAKE) -rR -f $(srctree)/scripts/Makefile.modpost
 
@@ -968,7 +968,7 @@ modules: $(KBUILD_EXTMOD)
 modules_install:
 	$(Q)$(MAKE) -rR -f $(srctree)/scripts/Makefile.modinst
 
-clean-dirs := _clean_$(KBUILD_EXTMOD)
+clean-dirs := $(addprefix _clean_,$(KBUILD_EXTMOD))
 
 .PHONY: $(clean-dirs) clean
 $(clean-dirs):

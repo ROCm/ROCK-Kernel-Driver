@@ -431,7 +431,7 @@ static int adpt_queue(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
 			cmd->scsi_done(cmd);
 			return 0;
 		}
-		(struct adpt_device*)(cmd->device->hostdata) = pDev;
+		cmd->device->hostdata = pDev;
 	}
 	pDev->pScsi_dev = cmd->device;
 
@@ -2158,7 +2158,7 @@ static s32 adpt_scsi_register(adpt_hba* pHba,Scsi_Host_Template * sht)
 		printk ("%s: scsi_register returned NULL\n",pHba->name);
 		return -1;
 	}
-	(adpt_hba*)(host->hostdata[0]) = pHba;
+	host->hostdata[0] = (unsigned long)pHba;
 	pHba->host = host;
 
 	host->irq = pHba->pDev->irq;

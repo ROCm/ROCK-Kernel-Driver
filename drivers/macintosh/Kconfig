@@ -127,7 +127,7 @@ config MAC_FLOPPY
 
 config MAC_SERIAL
 	tristate "Support for PowerMac serial ports (OBSOLETE DRIVER)"
-	depends on PPC_PMAC
+	depends on PPC_PMAC && BROKEN
 	help
 	  This driver is obsolete. Use CONFIG_SERIAL_PMACZILOG in
 	  "Character devices --> Serial drivers --> PowerMac z85c30" option.

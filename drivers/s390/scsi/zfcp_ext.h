@@ -31,7 +31,7 @@
 #ifndef ZFCP_EXT_H
 #define ZFCP_EXT_H
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_EXT_REVISION "$Revision: 1.49 $"
+#define ZFCP_EXT_REVISION "$Revision: 1.50 $"
 
 #include "zfcp_def.h"
 
@@ -141,7 +141,6 @@ extern int zfcp_scsi_command_sync(struct zfcp_unit *unit,
 extern void zfcp_erp_modify_adapter_status(struct zfcp_adapter *, u32, int);
 extern int  zfcp_erp_adapter_reopen(struct zfcp_adapter *, int);
 extern int  zfcp_erp_adapter_shutdown(struct zfcp_adapter *, int);
-extern int  zfcp_erp_adapter_shutdown_all(void);
 extern void zfcp_erp_adapter_failed(struct zfcp_adapter *);
 
 extern void zfcp_erp_modify_port_status(struct zfcp_port *, u32, int);
@@ -169,7 +168,4 @@ extern void zfcp_cmd_dbf_event_fsf(const char *, struct zfcp_fsf_req *,
 extern void zfcp_cmd_dbf_event_scsi(const char *, struct scsi_cmnd *);
 extern void zfcp_in_els_dbf_event(struct zfcp_adapter *, const char *,
 				  struct fsf_status_read_buffer *, int);
-#ifdef ZFCP_STAT_REQSIZES
-extern int  zfcp_statistics_inc(struct list_head *, u32);
-#endif
 #endif	/* ZFCP_EXT_H */

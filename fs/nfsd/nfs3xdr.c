@@ -799,6 +799,7 @@ compose_entry_fh(struct nfsd3_readdirres *cd, struct svc_fh *fhp,
 {
 	struct svc_export	*exp;
 	struct dentry		*dparent, *dchild;
+	int rv = 0;
 
 	dparent = cd->fh.fh_dentry;
 	exp  = cd->fh.fh_export;
@@ -813,11 +814,12 @@ compose_entry_fh(struct nfsd3_readdirres *cd, struct svc_fh *fhp,
 		dchild = lookup_one_len(name, dparent, namlen);
 	if (IS_ERR(dchild))
 		return 1;
-	if (d_mountpoint(dchild))
-		return 1;
-	if (fh_compose(fhp, exp, dchild, &cd->fh) != 0 || !dchild->d_inode)
-		return 1;
-	return 0;
+	if (d_mountpoint(dchild) ||
+	    fh_compose(fhp, exp, dchild, &cd->fh) != 0 ||
+	    !dchild->d_inode)
+		rv = 1;
+	dput(dchild);
+	return rv;
 }
 
 /*

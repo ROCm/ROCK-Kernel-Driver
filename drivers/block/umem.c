@@ -278,7 +278,7 @@ static void dump_dmastat(struct cardinfo *card, unsigned int dmastat)
  * Whenever IO on the active page completes, the Ready page is activated
  * and the ex-Active page is clean out and made Ready.
  * Otherwise the Ready page is only activated when it becomes full, or
- * when mm_unplug_device is called via blk_run_queues().
+ * when mm_unplug_device is called via the unplug_io_fn.
  *
  * If a request arrives while both pages a full, it is queued, and b_rdev is
  * overloaded to record whether it was a read or a write.

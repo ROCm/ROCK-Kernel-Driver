@@ -723,9 +723,6 @@ page_ok:
 		break;
 
 page_not_up_to_date:
-		if (PageUptodate(page))
-			goto page_ok;
-
 		/* Get exclusive access to the page ... */
 		lock_page(page);
 

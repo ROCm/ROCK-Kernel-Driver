@@ -29,7 +29,7 @@
  */
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_AUX_REVISION "$Revision: 1.107 $"
+#define ZFCP_AUX_REVISION "$Revision: 1.108 $"
 
 #include "zfcp_ext.h"
 
@@ -47,12 +47,6 @@ int zfcp_reboot_handler(struct notifier_block *, unsigned long, void *);
 static void zfcp_ns_gid_pn_handler(unsigned long);
 
 /* miscellaneous */
-#ifdef ZFCP_STAT_REQSIZES
-static int zfcp_statistics_init_all(void);
-static int zfcp_statistics_clear_all(void);
-static int zfcp_statistics_clear(struct list_head *);
-static int zfcp_statistics_new(struct list_head *, u32);
-#endif
 
 static inline int zfcp_sg_list_alloc(struct zfcp_sg_list *, size_t);
 static inline int zfcp_sg_list_free(struct zfcp_sg_list *);
@@ -135,96 +129,6 @@ _zfcp_hex_dump(char *addr, int count)
 /****************************************************************/
 
 #define ZFCP_LOG_AREA			ZFCP_LOG_AREA_OTHER
-
-#ifdef ZFCP_STAT_REQSIZES
-
-static int
-zfcp_statistics_clear(struct list_head *head)
-{
-	int retval = 0;
-	unsigned long flags;
-	struct zfcp_statistics *stat, *tmp;
-
-	write_lock_irqsave(&zfcp_data.stat_lock, flags);
-	list_for_each_entry_safe(stat, tmp, head, list) {
-		list_del(&stat->list);
-		kfree(stat);
-	}
-	write_unlock_irqrestore(&zfcp_data.stat_lock, flags);
-
-	return retval;
-}
-
-/* Add new statistics entry */
-static int
-zfcp_statistics_new(struct list_head *head, u32 num)
-{
-	int retval = 0;
-	struct zfcp_statistics *stat;
-
-	stat = kmalloc(sizeof (struct zfcp_statistics), GFP_ATOMIC);
-	if (stat) {
-		memset(stat, 0, sizeof (struct zfcp_statistics));
-		stat->num = num;
-		stat->occurrence = 1;
-		list_add_tail(&stat->list, head);
-	} else
-		zfcp_data.stat_errors++;
-
-	return retval;
-}
-
-int
-zfcp_statistics_inc(struct list_head *head, u32 num)
-{
-	int retval = 0;
-	unsigned long flags;
-	struct zfcp_statistics *stat;
-
-	write_lock_irqsave(&zfcp_data.stat_lock, flags);
-	list_for_each_entry(stat, head, list) {
-		if (stat->num == num) {
-			stat->occurrence++;
-			goto unlock;
-		}
-	}
-	/* occurrence must be initialized to 1 */
-	zfcp_statistics_new(head, num);
- unlock:
-	write_unlock_irqrestore(&zfcp_data.stat_lock, flags);
-	return retval;
-}
-
-static int
-zfcp_statistics_init_all(void)
-{
-	int retval = 0;
-
-	rwlock_init(&zfcp_data.stat_lock);
-	INIT_LIST_HEAD(&zfcp_data.read_req_head);
-	INIT_LIST_HEAD(&zfcp_data.write_req_head);
-	INIT_LIST_HEAD(&zfcp_data.read_sg_head);
-	INIT_LIST_HEAD(&zfcp_data.write_sg_head);
-	INIT_LIST_HEAD(&zfcp_data.read_sguse_head);
-	INIT_LIST_HEAD(&zfcp_data.write_sguse_head);
-	return retval;
-}
-
-static int
-zfcp_statistics_clear_all(void)
-{
-	int retval = 0;
-
-	zfcp_statistics_clear(&zfcp_data.read_req_head);
-	zfcp_statistics_clear(&zfcp_data.write_req_head);
-	zfcp_statistics_clear(&zfcp_data.read_sg_head);
-	zfcp_statistics_clear(&zfcp_data.write_sg_head);
-	zfcp_statistics_clear(&zfcp_data.read_sguse_head);
-	zfcp_statistics_clear(&zfcp_data.write_sguse_head);
-	return retval;
-}
-
-#endif /* ZFCP_STAT_REQSIZES */
 
 static inline int
 zfcp_fsf_req_is_scsi_cmnd(struct zfcp_fsf_req *fsf_req)
@@ -406,10 +310,6 @@ zfcp_module_init(void)
 	/* initialize adapters to be removed list head */
 	INIT_LIST_HEAD(&zfcp_data.adapter_remove_lh);
 
-#ifdef ZFCP_STAT_REQSIZES
-	zfcp_statistics_init_all();
-#endif
-
 #ifdef CONFIG_S390_SUPPORT
 	retval = register_ioctl32_conversion(zfcp_ioctl_trans.cmd,
 					     zfcp_ioctl_trans.handler);
@@ -459,9 +359,6 @@ zfcp_module_init(void)
 #ifdef CONFIG_S390_SUPPORT
 	unregister_ioctl32_conversion(zfcp_ioctl_trans.cmd);
  out_ioctl32:
-#endif
-#ifdef ZFCP_STAT_REQSIZES
-	zfcp_statistics_clear_all();
 #endif
 
  out:

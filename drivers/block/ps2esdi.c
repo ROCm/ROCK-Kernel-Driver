@@ -180,7 +180,7 @@ static int sect[MAX_HD] = {-1, -1};
 MODULE_PARM(tp720esdi, "i");
 MODULE_PARM(cyl, "i");
 MODULE_PARM(head, "i");
-MODULE_PARM(track, "i");
+MODULE_PARM(sect, "i");
 MODULE_LICENSE("GPL");
 
 int init_module(void) {

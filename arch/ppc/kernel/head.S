@@ -412,9 +412,7 @@ DataAccess:
 1:	stw	r10,_DSISR(r11)
 	mr	r5,r10
 	mfspr	r4,DAR
-	stw	r4,_DAR(r11)
-	addi	r3,r1,STACK_FRAME_OVERHEAD
-	EXC_XFER_EE_LITE(0x300, do_page_fault)
+	EXC_XFER_EE_LITE(0x300, handle_page_fault)
 
 #ifdef CONFIG_PPC64BRIDGE
 /* SLB fault on data access. */
@@ -436,10 +434,9 @@ InstructionAccess:
 	li	r3,0			/* into the hash table */
 	mr	r4,r12			/* SRR0 is fault address */
 	bl	hash_page
-1:	addi	r3,r1,STACK_FRAME_OVERHEAD
-	mr	r4,r12
+1:	mr	r4,r12
 	mr	r5,r9
-	EXC_XFER_EE_LITE(0x400, do_page_fault)
+	EXC_XFER_EE_LITE(0x400, handle_page_fault)
 
 #ifdef CONFIG_PPC64BRIDGE
 /* SLB fault on instruction access. */

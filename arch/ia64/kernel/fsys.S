@@ -857,7 +857,7 @@ fsyscall_table:
 	data8 0				// mq_timedreceive	// 1265
 	data8 0				// mq_notify
 	data8 0				// mq_getsetattr
-	data8 0
+	data8 0				// kexec_load
 	data8 0
 	data8 0							// 1270
 	data8 0

@@ -22,6 +22,7 @@
 #include <linux/skbuff.h>
 #include <linux/netlink.h>
 #include <linux/ptrace.h>
+#include <linux/moduleparam.h>
 
 static struct security_operations capability_ops = {
 	.ptrace =			cap_ptrace,
@@ -52,9 +53,16 @@ static struct security_operations capability_ops = {
 /* flag to keep track of how we were registered */
 static int secondary;
 
+static int capability_disable;
+module_param_named(disable, capability_disable, int, 0);
+MODULE_PARM_DESC(disable, "To disable capabilities module set disable = 1");
 
 static int __init capability_init (void)
 {
+	if (capability_disable) {
+		printk(KERN_INFO "Capabilities disabled at initialization\n");
+		return 0;
+	}
 	/* register ourselves with the security framework */
 	if (register_security (&capability_ops)) {
 		/* try registering with primary module */
@@ -72,6 +80,8 @@ static int __init capability_init (void)
 
 static void __exit capability_exit (void)
 {
+	if (capability_disable)
+		return;
 	/* remove ourselves from the security framework */
 	if (secondary) {
 		if (mod_unreg_security (MY_NAME, &capability_ops))

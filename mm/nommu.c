@@ -34,6 +34,9 @@ atomic_t vm_committed_space = ATOMIC_INIT(0);
 int sysctl_overcommit_memory; /* default is heuristic overcommit */
 int sysctl_overcommit_ratio = 50; /* default is 50% */
 
+int sysctl_max_map_count = DEFAULT_MAX_MAP_COUNT;
+EXPORT_SYMBOL(sysctl_max_map_count);
+
 /*
  * Handle all mappings that got truncated by a "truncate()"
  * system call.
@@ -486,7 +489,7 @@ int do_munmap(struct mm_struct * mm, unsigned long addr, size_t len)
 	show_process_blocks();
 #endif	  
 
-	return -EINVAL;
+	return 0;
 }
 
 /* Release all mmaps. */
