@@ -954,6 +954,13 @@ int usb_stor_Bulk_transport(struct scsi_cmnd *srb, struct us_data *us)
 	int result;
 	int fake_sense = 0;
 	unsigned int cswlen;
+	unsigned int cbwlen = US_BULK_CB_WRAP_LEN;
+
+	/* Take care of BULK32 devices; set extra byte to 0 */
+	if ( unlikely(us->flags & US_FL_BULK32)) {
+		cbwlen = 32;
+		us->iobuf[31] = 0;
+	}
 
 	/* set up the command wrapper */
 	bcb->Signature = cpu_to_le32(US_BULK_CB_SIGN);
@@ -976,7 +983,7 @@ int usb_stor_Bulk_transport(struct scsi_cmnd *srb, struct us_data *us)
 			(bcb->Lun >> 4), (bcb->Lun & 0x0F), 
 			bcb->Length);
 	result = usb_stor_bulk_transfer_buf(us, us->send_bulk_pipe,
-				bcb, US_BULK_CB_WRAP_LEN, NULL);
+				bcb, cbwlen, NULL);
 	US_DEBUGP("Bulk command transfer result=%d\n", result);
 	if (result != USB_STOR_XFER_GOOD)
 		return USB_STOR_TRANSPORT_ERROR;

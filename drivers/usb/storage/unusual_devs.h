@@ -249,6 +249,17 @@ UNUSUAL_DEV(  0x04e6, 0x0101, 0x0200, 0x0200,
 		"CD-RW Device",
 		US_SC_8020, US_PR_CB, NULL, 0),
 
+/* Entry and supporting patch by Theodore Kilgore <kilgota@auburn.edu>.
+ * Device uses standards-violating 32-byte Bulk Command Block Wrappers and
+ * reports itself as "Proprietary SCSI Bulk." Cf. device entry 0x084d:0x0011.
+ */
+
+UNUSUAL_DEV(  0x04fc, 0x80c2, 0x0100, 0x0100,
+		"Kobian Mercury",
+		"Binocam DCB-132",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_BULK32),
+
 /* Reported by Bob Sass <rls@vectordb.com> -- only rev 1.33 tested */
 UNUSUAL_DEV(  0x050d, 0x0115, 0x0133, 0x0133,
 		"Belkin",
@@ -714,6 +725,19 @@ UNUSUAL_DEV( 0x0839, 0x000a, 0x0001, 0x0001,
 		"Digimax 410",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY),
+
+/* Entry and supporting patch by Theodore Kilgore <kilgota@auburn.edu>.
+ * Flag will support Bulk devices which use a standards-violating 32-byte
+ * Command Block Wrapper. Here, the "DC2MEGA" cameras (several brands) with
+ * Grandtech GT892x chip, which request "Proprietary SCSI Bulk" support.
+ */
+
+UNUSUAL_DEV(  0x084d, 0x0011, 0x0110, 0x0110,
+		"Grandtech",
+		"DC2MEGA",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_BULK32),
+
 
 /* Aiptek PocketCAM 3Mega
  * Nicolas DUPEUX <nicolas@dupeux.net> 
