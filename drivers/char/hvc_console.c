@@ -279,7 +279,7 @@ int __init hvc_init(void)
 	for (i = 0; i < hvc_driver.num; i++) {
 		hvc_struct[i].lock = SPIN_LOCK_UNLOCKED;
 		hvc_struct[i].index = i;
-		tty_register_devfs(&hvc_driver, 0, hvc_driver.minor_start + i);
+		tty_register_device(&hvc_driver, hvc_driver.minor_start + i);
 	}
 
 	if (tty_register_driver(&hvc_driver))
