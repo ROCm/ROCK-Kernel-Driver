@@ -110,6 +110,8 @@ vmlinux: arch/i386/vmlinux.lds
 .PHONY: zImage bzImage compressed zlilo bzlilo zdisk bzdisk install \
 		clean archclean archmrproper
 
+all: bzImage
+
 zImage: vmlinux
 	@$(MAKEBOOT) zImage
 

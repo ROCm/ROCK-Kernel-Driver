@@ -33,12 +33,8 @@ ifeq ($(CONFIG_AIC7XXX_BUILD_FIRMWARE),y)
 aic7xxx_seq.h aic7xxx_reg.h: aic7xxx.seq aic7xxx.reg aicasm/aicasm
 	aicasm/aicasm -I. -r aic7xxx_reg.h -o aic7xxx_seq.h aic7xxx.seq
 
-else
-
-aic7xxx_seq.h aic7xxx_reg.h: %.h : shipped_%.h
-	cp $< $@
+aicasm/aicasm: aicasm/*.[chyl]
+	$(MAKE) -C aicasm
 
 endif
 
-aicasm/aicasm: aicasm/*.[chyl]
-	$(MAKE) -C aicasm
