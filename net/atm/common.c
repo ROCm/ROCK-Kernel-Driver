@@ -157,6 +157,38 @@ EXPORT_SYMBOL(br2684_ioctl_hook);
 #endif
 
 
+struct sock *vcc_sklist;
+rwlock_t vcc_sklist_lock = RW_LOCK_UNLOCKED;
+
+void __vcc_insert_socket(struct sock *sk)
+{
+	sk->sk_next = vcc_sklist;
+	if (sk->sk_next)
+		vcc_sklist->sk_pprev = &sk->sk_next;
+	vcc_sklist = sk;
+	sk->sk_pprev = &vcc_sklist;
+}
+
+void vcc_insert_socket(struct sock *sk)
+{
+	write_lock_irq(&vcc_sklist_lock);
+	__vcc_insert_socket(sk);
+	write_unlock_irq(&vcc_sklist_lock);
+}
+
+void vcc_remove_socket(struct sock *sk)
+{
+	write_lock_irq(&vcc_sklist_lock);
+	if (sk->sk_pprev) {
+		if (sk->sk_next)
+			sk->sk_next->sk_pprev = sk->sk_pprev;
+		*sk->sk_pprev = sk->sk_next;
+		sk->sk_pprev = NULL;
+	}
+	write_unlock_irq(&vcc_sklist_lock);
+}
+
+
 static struct sk_buff *alloc_tx(struct atm_vcc *vcc,unsigned int size)
 {
 	struct sk_buff *skb;
@@ -175,16 +207,45 @@ static struct sk_buff *alloc_tx(struct atm_vcc *vcc,unsigned int size)
 }
 
 
-int atm_create(struct socket *sock,int protocol,int family)
+EXPORT_SYMBOL(vcc_sklist);
+EXPORT_SYMBOL(vcc_sklist_lock);
+EXPORT_SYMBOL(vcc_insert_socket);
+EXPORT_SYMBOL(vcc_remove_socket);
+
+static void vcc_sock_destruct(struct sock *sk)
+{
+	struct atm_vcc *vcc = atm_sk(sk);
+
+	if (atomic_read(&vcc->sk->sk_rmem_alloc))
+		printk(KERN_DEBUG "vcc_sock_destruct: rmem leakage (%d bytes) detected.\n", atomic_read(&sk->sk_rmem_alloc));
+
+	if (atomic_read(&vcc->sk->sk_wmem_alloc))
+		printk(KERN_DEBUG "vcc_sock_destruct: wmem leakage (%d bytes) detected.\n", atomic_read(&sk->sk_wmem_alloc));
+
+	kfree(sk->sk_protinfo);
+}
+ 
+int vcc_create(struct socket *sock, int protocol, int family)
 {
 	struct sock *sk;
 	struct atm_vcc *vcc;
 
 	sock->sk = NULL;
-	if (sock->type == SOCK_STREAM) return -EINVAL;
-	if (!(sk = alloc_atm_vcc_sk(family))) return -ENOMEM;
-	vcc = atm_sk(sk);
-	memset(&vcc->flags,0,sizeof(vcc->flags));
+	if (sock->type == SOCK_STREAM)
+		return -EINVAL;
+	sk = sk_alloc(family, GFP_KERNEL, 1, NULL);
+	if (!sk)
+		return -ENOMEM;
+	sock_init_data(NULL, sk);
+
+	vcc = atm_sk(sk) = kmalloc(sizeof(*vcc), GFP_KERNEL);
+	if (!vcc) {
+		sk_free(sk);
+		return -ENOMEM;
+	}
+
+	memset(vcc, 0, sizeof(*vcc));
+	vcc->sk = sk;
 	vcc->dev = NULL;
 	vcc->callback = NULL;
 	memset(&vcc->local,0,sizeof(struct sockaddr_atmsvc));
@@ -199,42 +260,49 @@ int atm_create(struct socket *sock,int protocol,int family)
 	vcc->atm_options = vcc->aal_options = 0;
 	init_waitqueue_head(&vcc->sleep);
 	sk->sk_sleep = &vcc->sleep;
+	sk->sk_destruct = vcc_sock_destruct;
 	sock->sk = sk;
 	return 0;
 }
 
 
-void atm_release_vcc_sk(struct sock *sk,int free_sk)
+static void vcc_destroy_socket(struct sock *sk)
 {
 	struct atm_vcc *vcc = atm_sk(sk);
 	struct sk_buff *skb;
 
-	clear_bit(ATM_VF_READY,&vcc->flags);
+	clear_bit(ATM_VF_READY, &vcc->flags);
 	if (vcc->dev) {
-		if (vcc->dev->ops->close) vcc->dev->ops->close(vcc);
-		if (vcc->push) vcc->push(vcc,NULL); /* atmarpd has no push */
+		if (vcc->dev->ops->close)
+			vcc->dev->ops->close(vcc);
+		if (vcc->push)
+			vcc->push(vcc, NULL); /* atmarpd has no push */
+
+		vcc_remove_socket(sk);	/* no more receive */
+
 		while ((skb = skb_dequeue(&vcc->sk->sk_receive_queue))) {
 			atm_return(vcc,skb->truesize);
 			kfree_skb(skb);
 		}
 
 		module_put(vcc->dev->ops->owner);
-		atm_dev_release(vcc->dev);
-		if (atomic_read(&vcc->sk->sk_rmem_alloc))
-			printk(KERN_WARNING "atm_release_vcc: strange ... "
-			    "rmem_alloc == %d after closing\n",
-			    atomic_read(&vcc->sk->sk_rmem_alloc));
-		bind_vcc(vcc,NULL);
+		atm_dev_put(vcc->dev);
 	}
-
-	if (free_sk) free_atm_vcc_sk(sk);
 }
 
 
-int atm_release(struct socket *sock)
+int vcc_release(struct socket *sock)
 {
-	if (sock->sk)
-		atm_release_vcc_sk(sock->sk,1);
+	struct sock *sk = sock->sk;
+
+	if (sk) {
+		sock_orphan(sk);
+		lock_sock(sk);
+		vcc_destroy_socket(sock->sk);
+		release_sock(sk);
+		sock_put(sk);
+	}
+
 	return 0;
 }
 
@@ -289,7 +357,8 @@ static int __vcc_connect(struct atm_vcc *vcc, struct atm_dev *dev, int vpi,
 	if (vci > 0 && vci < ATM_NOT_RSV_VCI && !capable(CAP_NET_BIND_SERVICE))
 		return -EPERM;
 	error = 0;
-	bind_vcc(vcc,dev);
+	vcc->dev = dev;
+	vcc_insert_socket(vcc->sk);
 	switch (vcc->qos.aal) {
 		case ATM_AAL0:
 			error = atm_init_aal0(vcc);
@@ -313,7 +382,7 @@ static int __vcc_connect(struct atm_vcc *vcc, struct atm_dev *dev, int vpi,
 	if (!error) error = adjust_tp(&vcc->qos.txtp,vcc->qos.aal);
 	if (!error) error = adjust_tp(&vcc->qos.rxtp,vcc->qos.aal);
 	if (error) {
-		bind_vcc(vcc,NULL);
+		vcc_remove_socket(vcc->sk);
 		return error;
 	}
 	DPRINTK("VCC %d.%d, AAL %d\n",vpi,vci,vcc->qos.aal);
@@ -327,7 +396,7 @@ static int __vcc_connect(struct atm_vcc *vcc, struct atm_dev *dev, int vpi,
 		error = dev->ops->open(vcc,vpi,vci);
 		if (error) {
 			module_put(dev->ops->owner);
-			bind_vcc(vcc,NULL);
+			vcc_remove_socket(vcc->sk);
 			return error;
 		}
 	}
@@ -371,7 +440,7 @@ int vcc_connect(struct socket *sock, int itf, short vpi, int vci)
 		dev = atm_dev_lookup(itf);
 		error = __vcc_connect(vcc, dev, vpi, vci);
 		if (error) {
-			atm_dev_release(dev);
+			atm_dev_put(dev);
 			return error;
 		}
 	} else {
@@ -385,7 +454,7 @@ int vcc_connect(struct socket *sock, int itf, short vpi, int vci)
 			spin_unlock(&atm_dev_lock);
 			if (!__vcc_connect(vcc, dev, vpi, vci))
 				break;
-			atm_dev_release(dev);
+			atm_dev_put(dev);
 			dev = NULL;
 			spin_lock(&atm_dev_lock);
 		}
