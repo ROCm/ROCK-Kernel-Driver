@@ -252,11 +252,10 @@ unsigned int speedstep_detect_processor (void)
 			 * specific.
 			 * M-P4-Ms may have either ebx=0xe or 0xf [see above]
 			 * M-P4/533 have either ebx=0xe or 0xf. [25317607.pdf]
-			 * So, how to distinguish all those processors with
-			 * ebx=0xf? I don't know. Sort them out, and wait
-			 * for someone to complain.
+			 * also, M-P4M HTs have ebx=0x8, too
+			 * For now, they are distinguished by the model_id string
 			 */
-			if (ebx == 0x0e)
+		        if ((ebx == 0x0e) || (strstr(c->x86_model_id,"Mobile Intel(R) Pentium(R) 4") != NULL)) 
 				return SPEEDSTEP_PROCESSOR_P4M;
 			break;
 		default:
