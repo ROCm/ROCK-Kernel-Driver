@@ -188,6 +188,27 @@ sal_desc_ap_wakeup (void *p)
 		break;
 	}
 }
+
+static void __init
+chk_nointroute_opt(void)
+{
+	char *cp;
+	extern char saved_command_line[];
+
+	for (cp = saved_command_line; *cp; ) {
+		if (memcmp(cp, "nointroute", 10) == 0) {
+			no_int_routing = 1;
+			printk ("no_int_routing on\n");
+			break;
+		} else {
+			while (*cp != ' ' && *cp)
+				++cp;
+			while (*cp == ' ')
+				++cp;
+		}
+	}
+}
+
 #else
 static void __init sal_desc_ap_wakeup(void *p) { }
 #endif
@@ -207,6 +228,9 @@ ia64_sal_init (struct ia64_sal_systab *systab)
 		printk(KERN_ERR "bad signature in system table!");
 
 	check_versions(systab);
+#ifdef CONFIG_SMP
+	chk_nointroute_opt();
+#endif
 
 	/* revisions are coded in BCD, so %x does the job for us */
 	printk(KERN_INFO "SAL %x.%x: %.32s %.32s%sversion %x.%x\n",
