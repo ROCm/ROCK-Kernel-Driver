@@ -85,14 +85,18 @@ nfs_cred(struct inode *inode, struct file *filp)
  */
 static int
 nfs3_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
-		   struct nfs_fattr *fattr)
+		   struct nfs_fsinfo *info)
 {
 	int	status;
 
-	dprintk("NFS call  getroot\n");
-	fattr->valid = 0;
-	status = rpc_call(server->client, NFS3PROC_GETATTR, fhandle, fattr, 0);
-	dprintk("NFS reply getroot\n");
+	dprintk("%s: call  fsinfo\n", __FUNCTION__);
+	info->fattr->valid = 0;
+	status = rpc_call(server->client_sys, NFS3PROC_FSINFO, fhandle, info, 0);
+	dprintk("%s: reply fsinfo %d\n", __FUNCTION__, status);
+	if (!(info->fattr->valid & NFS_ATTR_FATTR)) {
+		status = rpc_call(server->client_sys, NFS3PROC_GETATTR, fhandle, info->fattr, 0);
+		dprintk("%s: reply getattr %d\n", __FUNCTION__, status);
+	}
 	return status;
 }
 

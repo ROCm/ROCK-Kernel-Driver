@@ -54,6 +54,7 @@
 #define GET_OP(cp,name)		&cp->ops[cp->req_nops].u.name
 #define OPNUM(cp)		cp->ops[cp->req_nops].opnum
 
+static int nfs4_proc_fsinfo(struct nfs_server *, struct nfs_fh *, struct nfs_fsinfo *);
 static int nfs4_async_handle_error(struct rpc_task *, struct nfs_server *);
 extern u32 *nfs4_decode_dirent(u32 *p, struct nfs_entry *entry, int plus);
 extern struct rpc_procinfo nfs4_procedures[];
@@ -822,10 +823,11 @@ nfs4_open_revalidate(struct inode *dir, struct dentry *dentry, int openflags)
 
 static int
 nfs4_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
-		   struct nfs_fattr *fattr)
+		   struct nfs_fsinfo *info)
 {
 	struct nfs4_compound	compound;
 	struct nfs4_op		ops[4];
+	struct nfs_fattr *	fattr = info->fattr;
 	unsigned char *		p;
 	struct qstr		q;
 	int			status;
@@ -869,7 +871,9 @@ nfs4_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
 		break;
 	}
 out:
-	return status;
+	if (status)
+		return status;
+	return nfs4_proc_fsinfo(server, fhandle, info);
 }
 
 static int
@@ -1458,7 +1462,6 @@ nfs4_proc_statfs(struct nfs_server *server, struct nfs_fh *fhandle,
 	struct nfs4_compound compound;
 	struct nfs4_op ops[2];
 
-	memset(fsstat, 0, sizeof(*fsstat));
 	nfs4_setup_compound(&compound, ops, server, "statfs");
 	nfs4_setup_putfh(&compound, fhandle);
 	nfs4_setup_statfs(&compound, fsstat);
@@ -1475,7 +1478,6 @@ nfs4_proc_fsinfo(struct nfs_server *server, struct nfs_fh *fhandle,
 		.rpc_resp = fsinfo,
 	};
 
-	memset(fsinfo, 0, sizeof(*fsinfo));
 	return rpc_call_sync(server->client, &msg, 0);
 }
 
@@ -1486,7 +1488,6 @@ nfs4_proc_pathconf(struct nfs_server *server, struct nfs_fh *fhandle,
 	struct nfs4_compound compound;
 	struct nfs4_op ops[2];
 
-	memset(pathconf, 0, sizeof(*pathconf));
 	nfs4_setup_compound(&compound, ops, server, "statfs");
 	nfs4_setup_putfh(&compound, fhandle);
 	nfs4_setup_pathconf(&compound, pathconf);

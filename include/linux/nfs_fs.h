@@ -176,7 +176,6 @@ struct nfs_inode {
 #define NFS_INO_INVALID_ATTR	0x0008		/* cached attrs are invalid */
 #define NFS_INO_INVALID_DATA	0x0010		/* cached data is invalid */
 #define NFS_INO_INVALID_ATIME	0x0020		/* cached atime is invalid */
-#define NFS_INO_FAKE_ROOT	0x0080		/* root inode placeholder */
 
 static inline struct nfs_inode *NFS_I(struct inode *inode)
 {
@@ -204,7 +203,6 @@ static inline struct nfs_inode *NFS_I(struct inode *inode)
 #define NFS_FLAGS(inode)		(NFS_I(inode)->flags)
 #define NFS_REVALIDATING(inode)		(NFS_FLAGS(inode) & NFS_INO_REVALIDATING)
 #define NFS_STALE(inode)		(NFS_FLAGS(inode) & NFS_INO_STALE)
-#define NFS_FAKE_ROOT(inode)		(NFS_FLAGS(inode) & NFS_INO_FAKE_ROOT)
 
 #define NFS_FILEID(inode)		(NFS_I(inode)->fileid)
 

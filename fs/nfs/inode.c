@@ -231,50 +231,23 @@ nfs_block_size(unsigned long bsize, unsigned char *nrbitsp)
 /*
  * Obtain the root inode of the file system.
  */
-static int
-nfs_get_root(struct inode **rooti, rpc_authflavor_t authflavor, struct super_block *sb, struct nfs_fh *rootfh)
+static struct inode *
+nfs_get_root(struct super_block *sb, struct nfs_fh *rootfh, struct nfs_fsinfo *fsinfo)
 {
 	struct nfs_server	*server = NFS_SB(sb);
-	struct nfs_fattr	fattr = { };
+	struct inode *rooti;
 	int			error;
 
-	error = server->rpc_ops->getroot(server, rootfh, &fattr);
-	if (error == -EACCES && authflavor > RPC_AUTH_MAXFLAVOR) {
-		/*
-		 * Some authentication types (gss/krb5, most notably)
-		 * are such that root won't be able to present a
-		 * credential for GETATTR (ie, getroot()).
-		 *
-		 * We still want the mount to succeed.
-		 * 
-		 * So we fake the attr values and mark the inode as such.
-		 * On the first succesful traversal, we fix everything.
-		 * The auth type test isn't quite correct, but whatever.
-		 */
-		dfprintk(VFS, "NFS: faking root inode\n");
-
-		fattr.fileid = 1;
-		fattr.nlink = 2;	/* minimum for a dir */
-		fattr.type = NFDIR;
-		fattr.mode = S_IFDIR|S_IRUGO|S_IXUGO;
-		fattr.size = 4096;
-		fattr.du.nfs3.used = 1;
-		fattr.valid = NFS_ATTR_FATTR|NFS_ATTR_FATTR_V3;
-	} else if (error < 0) {
+	error = server->rpc_ops->getroot(server, rootfh, fsinfo);
+	if (error < 0) {
 		printk(KERN_NOTICE "nfs_get_root: getattr error = %d\n", -error);
-		*rooti = NULL;	/* superfluous ... but safe */
-		return error;
+		return ERR_PTR(error);
 	}
 
-	*rooti = nfs_fhget(sb, rootfh, &fattr);
-	if (error == -EACCES && authflavor > RPC_AUTH_MAXFLAVOR) {
-		if (*rooti) {
-			NFS_FLAGS(*rooti) |= NFS_INO_FAKE_ROOT;
-			NFS_CACHEINV((*rooti));
-			error = 0;
-		}
-	}
-	return error;
+	rooti = nfs_fhget(sb, rootfh, fsinfo->fattr);
+	if (!rooti)
+		return ERR_PTR(-ENOMEM);
+	return rooti;
 }
 
 /*
@@ -284,7 +257,7 @@ static int
 nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 {
 	struct nfs_server	*server;
-	struct inode		*root_inode = NULL;
+	struct inode		*root_inode;
 	struct nfs_fattr	fattr;
 	struct nfs_fsinfo	fsinfo = {
 					.fattr = &fattr,
@@ -300,8 +273,9 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 
 	sb->s_magic      = NFS_SUPER_MAGIC;
 
+	root_inode = nfs_get_root(sb, &server->fh, &fsinfo);
 	/* Did getting the root inode fail? */
-	if (nfs_get_root(&root_inode, authflavor, sb, &server->fh) < 0)
+	if (IS_ERR(root_inode))
 		goto out_no_root;
 	sb->s_root = d_alloc_root(root_inode);
 	if (!sb->s_root)
@@ -310,10 +284,6 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 	sb->s_root->d_op = server->rpc_ops->dentry_ops;
 
 	/* Get some general file system info */
-        if (server->rpc_ops->fsinfo(server, &server->fh, &fsinfo) < 0) {
-		printk(KERN_NOTICE "NFS: cannot retrieve file system info.\n");
-		goto out_no_root;
-        }
 	if (server->namelen == 0 &&
 	    server->rpc_ops->pathconf(server, &server->fh, &pathinfo) >= 0)
 		server->namelen = pathinfo.max_namelen;
@@ -369,13 +339,11 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 	rpc_setbufsize(server->client, server->wsize + 100, server->rsize + 100);
 	return 0;
 	/* Yargs. It didn't work out. */
-out_free_all:
-	if (root_inode)
-		iput(root_inode);
-	return -EINVAL;
 out_no_root:
 	printk("nfs_read_super: get root inode failed\n");
-	goto out_free_all;
+	if (!IS_ERR(root_inode))
+		iput(root_inode);
+	return -EINVAL;
 }
 
 /*
@@ -1159,13 +1127,6 @@ static int nfs_update_inode(struct inode *inode, struct nfs_fattr *fattr, unsign
 
 	if ((fattr->valid & NFS_ATTR_FATTR) == 0)
 		return 0;
-
-	/* First successful call after mount, fill real data. */
-	if (NFS_FAKE_ROOT(inode)) {
-		dfprintk(VFS, "NFS: updating fake root\n");
-		nfsi->fileid = fattr->fileid;
-		NFS_FLAGS(inode) &= ~NFS_INO_FAKE_ROOT;
-	}
 
 	if (nfsi->fileid != fattr->fileid) {
 		printk(KERN_ERR "%s: inode number mismatch\n"

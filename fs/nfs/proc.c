@@ -66,15 +66,33 @@ nfs_cred(struct inode *inode, struct file *filp)
  */
 static int
 nfs_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
-		  struct nfs_fattr *fattr)
+		  struct nfs_fsinfo *info)
 {
-	int		status;
+	struct nfs_fattr *fattr = info->fattr;
+	struct nfs2_fsstat fsinfo;
+	int status;
 
-	dprintk("NFS call  getroot\n");
+	dprintk("%s: call getattr\n", __FUNCTION__);
 	fattr->valid = 0;
-	status = rpc_call(server->client, NFSPROC_GETATTR, fhandle, fattr, 0);
-	dprintk("NFS reply getroot\n");
-	return status;
+	status = rpc_call(server->client_sys, NFSPROC_GETATTR, fhandle, fattr, 0);
+	dprintk("%s: reply getattr %d\n", __FUNCTION__, status);
+	if (status)
+		return status;
+	dprintk("%s: call statfs\n", __FUNCTION__);
+	status = rpc_call(server->client_sys, NFSPROC_STATFS, fhandle, &fsinfo, 0);
+	dprintk("%s: reply statfs %d\n", __FUNCTION__, status);
+	if (status)
+		return status;
+	info->rtmax  = NFS_MAXDATA;
+	info->rtpref = fsinfo.tsize;
+	info->rtmult = fsinfo.bsize;
+	info->wtmax  = NFS_MAXDATA;
+	info->wtpref = fsinfo.tsize;
+	info->wtmult = fsinfo.bsize;
+	info->dtpref = fsinfo.tsize;
+	info->maxfilesize = 0x7FFFFFFF;
+	info->lease_time = 0;
+	return 0;
 }
 
 /*
