@@ -40,6 +40,7 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/highmem.h>
+#include <linux/ptrace.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>

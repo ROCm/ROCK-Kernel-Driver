@@ -704,8 +704,8 @@ clean: archclean $(clean-dirs)
 	$(call cmd,rmclean)
 	@find . $(RCS_FIND_IGNORE) \
 	 	\( -name '*.[oas]' -o -name '*.ko' -o -name '.*.cmd' \
-		-o -name '.*.d' -o -name '.*.tmp' \) -type f \
-		-print | xargs rm -f
+		-o -name '.*.d' -o -name '.*.tmp' -o -name '*.mod.c' \) \
+		-type f -print | xargs rm -f
 
 # mrproper - delete configuration + modules + core files
 #

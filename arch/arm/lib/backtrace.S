@@ -82,11 +82,20 @@ ENTRY(c_backtrace)
 		teq	r3, r2
 		bleq	.Ldumpstm
 
-		teq	frame, next
-		movne	frame, next
-		teqne	frame, #0
-		bne	3b
-		LOADREGS(fd, sp!, {r4 - r8, pc})
+		/*
+		 * A zero next framepointer means we're done.
+		 */
+		teq	next, #0
+		LOADREGS(eqfd, sp!, {r4 - r8, pc})
+
+		/*
+		 * The next framepointer must be above the
+		 * current framepointer.
+		 */
+		cmp	next, frame
+		mov	frame, next
+		bhi	3b
+		b	1007f
 
 /*
  * Fixup for LDMDB

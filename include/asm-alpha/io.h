@@ -462,6 +462,9 @@ extern void outsl (unsigned long port, const void *src, unsigned long count);
 #define eth_io_copy_and_sum(skb,src,len,unused) \
   memcpy_fromio((skb)->data,(src),(len))
 
+#define isa_eth_io_copy_and_sum(skb,src,len,unused) \
+  isa_memcpy_fromio((skb)->data,(src),(len))
+
 static inline int
 check_signature(unsigned long io_addr, const unsigned char *signature,
 		int length)

@@ -31,6 +31,7 @@
 #include <linux/kallsyms.h>
 #include <linux/mount.h>
 #include <linux/security.h>
+#include <linux/ptrace.h>
 
 /*
  * For hysterical raisins we keep the same inumbers as in the old procfs.

@@ -15,6 +15,7 @@
  *   16-Mar-1999 RMK	Added autodetect of ISA PICs
  */
 #include <linux/ioport.h>
+#include <linux/list.h>
 #include <linux/init.h>
 
 #include <asm/mach/irq.h>

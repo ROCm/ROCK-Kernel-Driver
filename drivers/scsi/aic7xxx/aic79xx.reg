@@ -3725,7 +3725,7 @@ scratch_ram {
 
 	/*
 	 * The minimum number of commands still outstanding required
-	 * to continue coalessing (2's compliment of value).
+	 * to continue coalessing (2's complement of value).
 	 */
 	INT_COALESSING_MINCMDS {
 		size		1

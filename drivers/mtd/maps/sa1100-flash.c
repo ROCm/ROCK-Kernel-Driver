@@ -773,14 +773,15 @@ static struct mtd_partition stork_partitions[] = {
 #ifdef CONFIG_SA1100_TRIZEPS
 static struct mtd_partition trizeps_partitions[] = {
 	{
-		.name		= "Bootloader & the kernel",
-		.size		= 0x00200000,
+		.name		= "Bootloader",
+		.size		= 0x00100000,
 		.offset		= 0,
 	}, {
-		.name		= "Data",
-		.size		= 0x00400000,
+		.name		= "Kernel",
+		.size		= 0x00100000,
 		.offset		= MTDPART_OFS_APPEND,
 	}, {
+		.name		= "root",
 		.size		= MTDPART_SIZ_FULL,
 		.offset		= MTDPART_OFS_APPEND,
 	}
@@ -937,7 +938,7 @@ static int __init sa1100_static_partitions(struct mtd_partition **parts)
 #ifdef CONFIG_SA1100_TRIZEPS
 	if (machine_is_trizeps()) {
 		*parts       = trizeps_partitions;
-		nb_parts     = ARRAY_SIZE(trizeps_parititons);
+		nb_parts     = ARRAY_SIZE(trizeps_partitions);
 	}
 #endif
 #ifdef CONFIG_SA1100_YOPY

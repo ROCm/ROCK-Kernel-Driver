@@ -336,7 +336,7 @@ DECLARE_WORK(fd1772_tq, (void *)fd1772_checkint, NULL);
  */
 static int Probing = 0;
 
-/* This flag is set when a dummy seek is necesary to make the WP
+/* This flag is set when a dummy seek is necessary to make the WP
  * status bit accessible.
  */
 static int NeedSeek = 0;

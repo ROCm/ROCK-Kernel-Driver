@@ -83,7 +83,7 @@ static void vm_region_dump(struct vm_region *head, char *fn)
 	struct vm_region *c;
 
 	printk("Consistent Allocation Map (%s):\n", fn);
-	list_for_each_entry(c, &head->list, vm_list) {
+	list_for_each_entry(c, &head->vm_list, vm_list) {
 		printk(" %p:  %08lx - %08lx   (0x%08x)\n", c,
 		       c->vm_start, c->vm_end, c->vm_end - c->vm_start);
 	}

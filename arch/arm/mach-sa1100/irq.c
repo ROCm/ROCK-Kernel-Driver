@@ -13,6 +13,7 @@
 #include <linux/module.h>
 #include <linux/ioport.h>
 #include <linux/ptrace.h>
+#include <linux/device.h>
 
 #include <asm/hardware.h>
 #include <asm/irq.h>
@@ -24,19 +25,11 @@
 /*
  * SA1100 GPIO edge detection for IRQs:
  * IRQs are generated on Falling-Edge, Rising-Edge, or both.
- * This must be called *before* the appropriate IRQ is registered.
  * Use this instead of directly setting GRER/GFER.
  */
 static int GPIO_IRQ_rising_edge;
 static int GPIO_IRQ_falling_edge;
 static int GPIO_IRQ_mask = (1 << 11) - 1;
-
-static void sa1100_manual_rerun(unsigned int irq)
-{
-	struct pt_regs regs;
-	memset(&regs, 0, sizeof(regs));
-	irq_desc[irq].handle(irq, &irq_desc[irq], &regs);
-}
 
 /*
  * To get the GPIO number from an IRQ number
@@ -105,7 +98,6 @@ static struct irqchip sa1100_low_gpio_chip = {
 	.ack		= sa1100_low_gpio_ack,
 	.mask		= sa1100_low_gpio_mask,
 	.unmask		= sa1100_low_gpio_unmask,
-	.rerun		= sa1100_manual_rerun,
 	.type		= sa1100_gpio_type,
 	.wake		= sa1100_low_gpio_wake,
 };
@@ -189,7 +181,6 @@ static struct irqchip sa1100_high_gpio_chip = {
 	.ack		= sa1100_high_gpio_ack,
 	.mask		= sa1100_high_gpio_mask,
 	.unmask		= sa1100_high_gpio_unmask,
-	.rerun		= sa1100_manual_rerun,
 	.type		= sa1100_gpio_type,
 	.wake		= sa1100_high_gpio_wake,
 };
@@ -212,7 +203,6 @@ static struct irqchip sa1100_normal_chip = {
 	.ack		= sa1100_mask_irq,
 	.mask		= sa1100_mask_irq,
 	.unmask		= sa1100_unmask_irq,
-	/* rerun should never be called */
 };
 
 static struct resource irq_resource = {
@@ -267,10 +257,4 @@ void __init sa1100_init_irq(void)
 	 */
 	set_irq_chip(IRQ_GPIO11_27, &sa1100_normal_chip);
 	set_irq_chained_handler(IRQ_GPIO11_27, sa1100_high_gpio_handler);
-
-	/*
-	 * We generally don't want the LCD IRQ being
-	 * enabled as soon as we request it.
-	 */
-	set_irq_flags(IRQ_LCD, IRQF_VALID/* | IRQF_NOAUTOEN*/);
 }

@@ -102,7 +102,7 @@ Version 0.6 (2001-12-15)
 	The option is, simply enough, 'debug'. 
 	(super.c, debug.c) [WD]
 
-* Removed notion of btree handle from btree.c. It was unessisary, as the 
+* Removed notion of btree handle from btree.c. It was unnecessary, as the
 	linux VFS doesn't allow us to keep any state between calls. Updated 
 	dir.c, namei.c befs_fs.h to account for it. [WD]
 
@@ -312,9 +312,9 @@ Version 0.4 (2001-10-28)
 ==========
 * Fixed a misunderstanding of the inode fields. 
 	This fixed the problmem with wrong file sizes from du and others.
-	The i_blocks field of the inode struct is not the nuber of blocks for the 
+	The i_blocks field of the inode struct is not the number of blocks for the
 	inode, it is the number of blocks for the file.	Also, i_blksize is not
-	nessisarily the size of the inode, although in  practice it works out.
+	necessarily the size of the inode, although in  practice it works out.
 	Changed to blocksize of filesystem.
 	(fs/befs/inode.c)
 

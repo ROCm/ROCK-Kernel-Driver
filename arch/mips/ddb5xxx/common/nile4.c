@@ -109,7 +109,7 @@ ddb_set_pdar(u32 pdar, u32 phys, u32 size, int width,
          * When programming a PDAR, the register should be read immediately
          * after writing it. This ensures that address decoders are properly
          * configured.
-	 * [jsun] is this really necesary?
+	 * [jsun] is this really necessary?
          */
         ddb_in32(pdar);
         ddb_in32(pdar + 4);

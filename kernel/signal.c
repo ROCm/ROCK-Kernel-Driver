@@ -19,6 +19,7 @@
 #include <linux/tty.h>
 #include <linux/binfmts.h>
 #include <linux/security.h>
+#include <linux/ptrace.h>
 #include <asm/param.h>
 #include <asm/uaccess.h>
 #include <asm/siginfo.h>
@@ -1108,21 +1109,31 @@ static int kill_something_info(int sig, struct siginfo *info, int pid)
  * These are for backward compatibility with the rest of the kernel source.
  */
 
+/*
+ * XXX should probably nix these interfaces and update the kernel
+ * to specify explicitly whether the signal is a group signal or
+ * specific to a thread.
+ */
 int
 send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 {
 	int ret;
 
-	/* XXX should nix these interfaces and update the kernel */
+	/*
+	 * We need the tasklist lock even for the specific
+	 * thread case (when we don't need to follow the group
+	 * lists) in order to avoid races with "p->sighand"
+	 * going away or changing from under us.
+	 */
+	read_lock(&tasklist_lock);  
 	if (T(sig, SIG_KERNEL_BROADCAST_MASK)) {
-		read_lock(&tasklist_lock);
 		ret = group_send_sig_info(sig, info, p);
-		read_unlock(&tasklist_lock);
 	} else {
 		spin_lock_irq(&p->sighand->siglock);
 		ret = specific_send_sig_info(sig, info, p);
 		spin_unlock_irq(&p->sighand->siglock);
 	}
+	read_unlock(&tasklist_lock);
 	return ret;
 }
 

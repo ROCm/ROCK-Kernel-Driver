@@ -58,6 +58,7 @@
 #include <linux/binfmts.h>
 #include <linux/compat.h>
 #include <linux/vfs.h>
+#include <linux/ptrace.h>
 
 #include <asm/types.h>
 #include <asm/ipc.h>

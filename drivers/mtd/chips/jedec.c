@@ -754,7 +754,7 @@ static int flash_write(struct mtd_info *mtd, loff_t start, size_t len,
 		       size_t *retlen, const u_char *buf)
 {
    /* Does IO to the currently selected chip. It takes the bank addressing
-      base (which is divisable by the chip size) adds the necesary lower bits
+      base (which is divisible by the chip size) adds the necessary lower bits
       of addrshift (interleve index) and then adds the control register index. */
    #define flread(x) map->read8(map,base+(off&((1<<chip->addrshift)-1))+((x)<<chip->addrshift))
    #define flwrite(v,x) map->write8(map,v,base+(off&((1<<chip->addrshift)-1))+((x)<<chip->addrshift))

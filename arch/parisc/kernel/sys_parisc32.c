@@ -53,6 +53,7 @@
 #include <linux/binfmts.h>
 #include <linux/namei.h>
 #include <linux/vfs.h>
+#include <linux/ptrace.h>
 
 #include <asm/types.h>
 #include <asm/uaccess.h>

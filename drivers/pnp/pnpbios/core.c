@@ -602,7 +602,7 @@ static int pnp_dock_event(int dock, struct pnp_docking_station_info *info)
 		info->location_id, info->serial, info->capabilities);
 	envp[i] = 0;
 	
-	value = call_usermodehelper (argv [0], argv, envp);
+	value = call_usermodehelper (argv [0], argv, envp, 0);
 	kfree (buf);
 	kfree (envp);
 	return 0;

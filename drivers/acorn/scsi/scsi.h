@@ -92,8 +92,8 @@ static inline void init_SCp(Scsi_Cmnd *SCpnt)
 
 		if (SCpnt->request_bufflen != len)
 			printk(KERN_WARNING "scsi%d.%c: bad request buffer "
-			       "length %d, should be %ld\n", SCpnt->host->host_no,
-			       '0' + SCpnt->target, SCpnt->request_bufflen, len);
+			       "length %d, should be %ld\n", SCpnt->device->host->host_no,
+			       '0' + SCpnt->device->id, SCpnt->request_bufflen, len);
 		SCpnt->request_bufflen = len;
 #endif
 	} else {

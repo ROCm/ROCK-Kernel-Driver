@@ -10,7 +10,7 @@ Overview of Document:
 This document is intended to give an good overview of how to debug 
 Linux for s/390 & z/Architecture it isn't intended as a complete reference & not a
 tutorial on the fundamentals of C & assembly, it dosen't go into
-390 IO in any detail. It is intended to compliment the documents in the
+390 IO in any detail. It is intended to complement the documents in the
 reference section below & any other worthwhile references you get.
 
 It is intended like the Enterprise Systems Architecture/390 Reference Summary

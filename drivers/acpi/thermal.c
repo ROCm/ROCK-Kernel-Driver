@@ -436,7 +436,7 @@ acpi_thermal_call_usermode (
 	envp[0] = "HOME=/";
 	envp[1] = "PATH=/sbin:/bin:/usr/sbin:/usr/bin";
 	
-	call_usermodehelper(argv[0], argv, envp);
+	call_usermodehelper(argv[0], argv, envp, 0);
 
 	return_VALUE(0);
 }

@@ -410,7 +410,7 @@ register struct DownLoad *rbp;
 		** compatible with the whole Tp family. (lies, damn lies, it'll never
 		** work in a month of Sundays).
 		**
-		** The nfix nyble is the 1s compliment of the nyble value you
+		** The nfix nyble is the 1s complement of the nyble value you
 		** want to load - in this case we wanted 'F' so we nfix loaded '0'.
 		*/
 

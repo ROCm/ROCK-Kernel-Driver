@@ -52,9 +52,14 @@ static const char *handler[]= { "prefetch abort", "data abort", "address excepti
 
 void dump_backtrace_entry(unsigned long where, unsigned long from)
 {
+#ifdef CONFIG_KALLSYMS
+	printk("[<%08lx>] ", where);
+	print_symbol("(%s) ", where);
+	printk("from [<%08lx>] ", from);
+	print_symbol("(%s)\n", from);
+#else
 	printk("Function entered at [<%08lx>] from [<%08lx>]\n", where, from);
-	print_symbol("  %s", where);
-	printk("\n");
+#endif
 }
 
 /*
@@ -503,11 +508,11 @@ baddataabort(int code, unsigned long instr, struct pt_regs *regs)
 	die_if_kernel("unknown data abort code", regs, instr);
 }
 
-void __bug(const char *file, int line, void *data)
+volatile void __bug(const char *file, int line, void *data)
 {
 	printk(KERN_CRIT"kernel BUG at %s:%d!", file, line);
 	if (data)
-		printk(KERN_CRIT" - extra data = %p", data);
+		printk(" - extra data = %p", data);
 	printk("\n");
 	*(int *)0 = 0;
 }
