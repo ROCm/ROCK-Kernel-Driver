@@ -19,7 +19,7 @@
 
 static void init(struct crypto_tfm *tfm)
 {
-	tfm->__crt_alg->cra_digest.dia_init(tfm->crt_ctx);
+	tfm->__crt_alg->cra_digest.dia_init(crypto_tfm_ctx(tfm));
 }
 
 static void update(struct crypto_tfm *tfm,
@@ -29,7 +29,7 @@ static void update(struct crypto_tfm *tfm,
 	
 	for (i = 0; i < nsg; i++) {
 		char *p = crypto_kmap(sg[i].page, 0) + sg[i].offset;
-		tfm->__crt_alg->cra_digest.dia_update(tfm->crt_ctx,
+		tfm->__crt_alg->cra_digest.dia_update(crypto_tfm_ctx(tfm),
 		                                      p, sg[i].length);
 		crypto_kunmap(p, 0);
 		crypto_yield(tfm);
@@ -38,7 +38,7 @@ static void update(struct crypto_tfm *tfm,
 
 static void final(struct crypto_tfm *tfm, u8 *out)
 {
-	tfm->__crt_alg->cra_digest.dia_final(tfm->crt_ctx, out);
+	tfm->__crt_alg->cra_digest.dia_final(crypto_tfm_ctx(tfm), out);
 }
 
 static void digest(struct crypto_tfm *tfm,
@@ -50,7 +50,7 @@ static void digest(struct crypto_tfm *tfm,
 		
 	for (i = 0; i < nsg; i++) {
 		char *p = crypto_kmap(sg[i].page, 0) + sg[i].offset;
-		tfm->__crt_alg->cra_digest.dia_update(tfm->crt_ctx,
+		tfm->__crt_alg->cra_digest.dia_update(crypto_tfm_ctx(tfm),
 		                                      p, sg[i].length);
 		crypto_kunmap(p, 0);
 		crypto_yield(tfm);

@@ -223,14 +223,14 @@ static void cbc_process(struct crypto_tfm *tfm,
 		
 	if (enc) {
 		tfm->crt_u.cipher.cit_xor_block(iv, src);
-		fn(tfm->crt_ctx, dst, iv);
+		fn(crypto_tfm_ctx(tfm), dst, iv);
 		memcpy(iv, dst, crypto_tfm_alg_blocksize(tfm));
 	} else {
 		const int need_stack = (src == dst);
 		u8 stack[need_stack ? crypto_tfm_alg_blocksize(tfm) : 0];
 		u8 *buf = need_stack ? stack : dst;
 		
-		fn(tfm->crt_ctx, buf, src);
+		fn(crypto_tfm_ctx(tfm), buf, src);
 		tfm->crt_u.cipher.cit_xor_block(buf, iv);
 		memcpy(iv, src, crypto_tfm_alg_blocksize(tfm));
 		if (buf != dst)
@@ -241,7 +241,7 @@ static void cbc_process(struct crypto_tfm *tfm,
 static void ecb_process(struct crypto_tfm *tfm, u8 *dst, u8 *src,
                         cryptfn_t fn, int enc, void *info)
 {
-	fn(tfm->crt_ctx, dst, src);
+	fn(crypto_tfm_ctx(tfm), dst, src);
 }
 
 static int setkey(struct crypto_tfm *tfm, const u8 *key, unsigned int keylen)
@@ -252,7 +252,7 @@ static int setkey(struct crypto_tfm *tfm, const u8 *key, unsigned int keylen)
 		tfm->crt_flags |= CRYPTO_TFM_RES_BAD_KEY_LEN;
 		return -EINVAL;
 	} else
-		return cia->cia_setkey(tfm->crt_ctx, key, keylen,
+		return cia->cia_setkey(crypto_tfm_ctx(tfm), key, keylen,
 		                       &tfm->crt_flags);
 }
 

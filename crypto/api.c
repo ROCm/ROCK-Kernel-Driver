@@ -128,8 +128,6 @@ struct crypto_tfm *crypto_alloc_tfm(const char *name, u32 flags)
 
 	memset(tfm, 0, sizeof(*tfm));
 	
-	tfm->crt_ctx = (void*) &tfm[1];
-
 	tfm->__crt_alg = alg;
 	
 	if (crypto_init_flags(tfm, flags))

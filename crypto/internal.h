@@ -46,6 +46,11 @@ static inline u32 crypto_cipher_flags(u32 flags)
 	return flags & (CRYPTO_TFM_MODE_MASK|CRYPTO_TFM_REQ_WEAK_KEY);
 }
 
+static inline void *crypto_tfm_ctx(struct crypto_tfm *tfm)
+{
+	return (void *)&tfm[1];
+}
+
 struct crypto_alg *crypto_alg_lookup(const char *name);
 
 #ifdef CONFIG_KMOD
