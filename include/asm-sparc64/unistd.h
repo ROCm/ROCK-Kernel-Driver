@@ -16,6 +16,7 @@
  * Copyright (C) 1995 Adrian M. Rodriguez (adrian@remus.rutgers.edu)
  */
 
+#define __NR_restart_syscall      0 /* Linux Specific				   */
 #define __NR_exit                 1 /* Common                                      */
 #define __NR_fork                 2 /* Common                                      */
 #define __NR_read                 3 /* Common                                      */

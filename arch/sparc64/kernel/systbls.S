@@ -19,7 +19,7 @@
 
 	.globl sys_call_table32
 sys_call_table32:
-/*0*/	.word sys_nis_syscall, sparc_exit, sys_fork, sys_read, sys_write
+/*0*/	.word sys_restart_syscall, sparc_exit, sys_fork, sys_read, sys_write
 /*5*/	.word sparc32_open, sys_close, sys32_wait4, sys_creat, sys_link
 /*10*/  .word sys_unlink, sunos_execv, sys_chdir, sys32_chown16, sys32_mknod
 /*15*/	.word sys32_chmod, sys32_lchown16, sparc_brk, sys_perfctr, sys32_lseek
@@ -78,7 +78,7 @@ sys_call_table32:
 	.globl sys_call_table64, sys_call_table
 sys_call_table64:
 sys_call_table:
-/*0*/	.word sys_nis_syscall, sparc_exit, sys_fork, sys_read, sys_write
+/*0*/	.word sys_restart_syscall, sparc_exit, sys_fork, sys_read, sys_write
 /*5*/	.word sys_open, sys_close, sys_wait4, sys_creat, sys_link
 /*10*/  .word sys_unlink, sunos_execv, sys_chdir, sys_chown, sys_mknod
 /*15*/	.word sys_chmod, sys_lchown, sparc_brk, sys_perfctr, sys_lseek
