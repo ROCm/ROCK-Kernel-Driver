@@ -22,14 +22,14 @@ void slirp_init(struct net_device *dev, void *data)
 	private = dev->priv;
 	spri = (struct slirp_data *) private->user;
 	*spri = ((struct slirp_data)
-		{ argw :	init->argw,
-		  pid : 	-1,
-		  slave : 	-1,
-		  ibuf : 	{ '\0' },
-		  obuf : 	{ '\0' },
-		  pos :		0,
-		  esc :		0,
-		  dev :		dev });
+		{ .argw 	= init->argw,
+		  .pid  	= -1,
+		  .slave  	= -1,
+		  .ibuf  	= { '\0' },
+		  .obuf  	= { '\0' },
+		  .pos 		= 0,
+		  .esc 		= 0,
+		  .dev 		= dev });
 
 	dev->init = NULL;
 	dev->hard_header_len = 0;
@@ -64,10 +64,10 @@ static int slirp_write(int fd, struct sk_buff **skb,
 }
 
 struct net_kern_info slirp_kern_info = {
-	init:			slirp_init,
-	protocol:		slirp_protocol,
-	read:			slirp_read,
-	write:			slirp_write,
+	.init			= slirp_init,
+	.protocol		= slirp_protocol,
+	.read			= slirp_read,
+	.write			= slirp_write,
 };
 
 static int slirp_setup(char *str, char **mac_out, void *data)
@@ -103,13 +103,13 @@ static int slirp_setup(char *str, char **mac_out, void *data)
 }
 
 static struct transport slirp_transport = {
-	list :		LIST_HEAD_INIT(slirp_transport.list),
-	name :		"slirp",
-	setup : 	slirp_setup,
-	user :		&slirp_user_info,
-	kern :		&slirp_kern_info,
-	private_size :	sizeof(struct slirp_data),
-	setup_size :	sizeof(struct slirp_init),
+	.list 		= LIST_HEAD_INIT(slirp_transport.list),
+	.name 		= "slirp",
+	.setup  	= slirp_setup,
+	.user 		= &slirp_user_info,
+	.kern 		= &slirp_kern_info,
+	.private_size 	= sizeof(struct slirp_data),
+	.setup_size 	= sizeof(struct slirp_init),
 };
 
 static int register_slirp(void)

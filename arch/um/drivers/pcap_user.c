@@ -106,8 +106,8 @@ static void handler(u_char *data, const struct pcap_pkthdr *header,
 int pcap_user_read(int fd, void *buffer, int len, struct pcap_data *pri)
 {
 	struct pcap_handler_data hdata = ((struct pcap_handler_data)
-		                          { buffer : 	buffer,
-					    len :	len });
+		                          { .buffer  	= buffer,
+					    .len 	= len });
 	int n;
 
 	n = pcap_dispatch(pri->pcap, 1, handler, (u_char *) &hdata);
@@ -121,14 +121,14 @@ int pcap_user_read(int fd, void *buffer, int len, struct pcap_data *pri)
 }
 
 struct net_user_info pcap_user_info = {
-	init:		pcap_user_init,
-	open:		pcap_open,
-	close:	 	NULL,
-	remove:	 	pcap_remove,
-	set_mtu:	NULL,
-	add_address:	NULL,
-	delete_address: NULL,
-	max_packet:	MAX_PACKET - ETH_HEADER_OTHER
+	.init		= pcap_user_init,
+	.open		= pcap_open,
+	.close	 	= NULL,
+	.remove	 	= pcap_remove,
+	.set_mtu	= NULL,
+	.add_address	= NULL,
+	.delete_address = NULL,
+	.max_packet	= MAX_PACKET - ETH_HEADER_OTHER
 };
 
 /*

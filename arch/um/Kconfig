@@ -164,6 +164,14 @@ config KERNEL_HALF_GIGS
 config HIGHMEM
 	bool "Highmem support"
 
+config KERNEL_STACK_ORDER
+	int "Kernel stack size order"
+	default 2
+	help
+	This option determines the size of UML kernel stacks.  They will
+	be 1 << order pages.  The default is OK unless you're running Valgrind
+	on UML, in which case, set this to 3.
+
 endmenu
 
 
