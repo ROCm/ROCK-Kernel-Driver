@@ -1105,7 +1105,7 @@ void do_notify_parent(struct task_struct *tsk, int sig)
 	struct siginfo info;
 	int why, status;
 
-	if (delay_group_leader(tsk))
+	if (!tsk->ptrace && delay_group_leader(tsk))
 		return;
 	if (sig == -1)
 		BUG();

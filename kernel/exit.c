@@ -770,11 +770,6 @@ repeat:
 			if (!ret)
 				continue;
 			flag = 1;
-			/*
-			 * Eligible but we cannot release it yet:
-			 */
-			if (ret == 2)
-				continue;
 
 			switch (p->state) {
 			case TASK_STOPPED:
@@ -798,6 +793,11 @@ repeat:
 				}
 				goto end_wait4;
 			case TASK_ZOMBIE:
+				/*
+				 * Eligible but we cannot release it yet:
+				 */
+				if (ret == 2)
+					continue;
 				read_unlock(&tasklist_lock);
 				retval = ru ? getrusage(p, RUSAGE_BOTH, ru) : 0;
 				if (!retval && stat_addr) {
