@@ -262,6 +262,8 @@ struct sctp_pf {
 			  struct sctp_opt *);
 	int  (*bind_verify) (struct sctp_opt *, union sctp_addr *);
 	int  (*supported_addrs)(const struct sctp_opt *, __u16 *);
+	struct sock *(*create_accept_sk) (struct sock *sk,
+					  struct sctp_association *asoc);
 	struct sctp_af *af;
 };
 

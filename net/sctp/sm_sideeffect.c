@@ -1223,13 +1223,28 @@ static void sctp_cmd_setup_t2(sctp_cmd_seq_t *cmds, sctp_association_t *asoc,
 static void sctp_cmd_new_state(sctp_cmd_seq_t *cmds, sctp_association_t *asoc,
 			       sctp_state_t state)
 {
+
+	struct sock *sk = asoc->base.sk;
+	struct sctp_opt *sp = sctp_sk(sk);
+
 	asoc->state = state;
 	asoc->state_timestamp = jiffies;
 
-	/* Wake up any process waiting for the association to
-	 * get established.
-	 */
-	if ((SCTP_STATE_ESTABLISHED == asoc->state) &&
-	    (waitqueue_active(&asoc->wait)))
-		wake_up_interruptible(&asoc->wait);
+	if ((SCTP_STATE_ESTABLISHED == asoc->state) ||
+	    (SCTP_STATE_CLOSED == asoc->state)) { 
+		/* Wake up any processes waiting in the asoc's wait queue in
+		 * sctp_wait_for_connect() or sctp_wait_for_sndbuf(). 
+	 	 */
+		if (waitqueue_active(&asoc->wait))
+			wake_up_interruptible(&asoc->wait);
+
+		/* Wake up any processes waiting in the sk's sleep queue of
+		 * a tcp-style or udp-style peeled-off socket in
+		 * sctp_wait_for_accept() or sctp_wait_for_packet().
+		 * For a udp-style socket, the waiters are woken up by the
+		 * notifications.
+		 */
+		if (sp->type != SCTP_SOCKET_UDP)
+			sk->state_change(sk);
+	}
 }

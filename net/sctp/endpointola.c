@@ -195,6 +195,8 @@ void sctp_endpoint_destroy(sctp_endpoint_t *ep)
 {
 	SCTP_ASSERT(ep->base.dead, "Endpoint is not dead", return);
 
+	ep->base.sk->state = SCTP_SS_CLOSED;
+
 	/* Unlink this endpoint, so we can't find it again! */
 	sctp_unhash_endpoint(ep);
 

@@ -88,11 +88,14 @@ static int sctp_wait_for_sndbuf(struct sctp_association *, long *timeo_p,
 				int msg_len);
 static int sctp_wait_for_packet(struct sock * sk, int *err, long *timeo_p);
 static int sctp_wait_for_connect(struct sctp_association *, long *timeo_p);
+static int sctp_wait_for_accept(struct sock *sk, long timeo);
 static inline int sctp_verify_addr(struct sock *, union sctp_addr *, int);
 static int sctp_bindx_add(struct sock *, struct sockaddr_storage *, int);
 static int sctp_bindx_rem(struct sock *, struct sockaddr_storage *, int);
 static int sctp_do_bind(struct sock *, union sctp_addr *, int);
 static int sctp_autobind(struct sock *sk);
+static void sctp_sock_migrate(struct sock *, struct sock *,
+			      struct sctp_association *, sctp_socket_type_t);
 
 /* Look up the association by its id.  If this is not a UDP-style
  * socket, the ID field is always ignored.
@@ -1151,6 +1154,13 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr 
 			  "flags", flags, "addr_len", addr_len);
 
 	sctp_lock_sock(sk);
+
+	if ((SCTP_SOCKET_TCP == sp->type) &&
+	    (SCTP_SS_ESTABLISHED != sk->state)) {
+		err = -ENOTCONN;
+		goto out;
+	}
+	
 	skb = sctp_skb_recv_datagram(sk, flags, noblock, &err);
 	if (!skb)
 		goto out;
@@ -1563,6 +1573,8 @@ SCTP_STATIC int sctp_connect(struct sock *sk, struct sockaddr *uaddr,
 	if (err)
 		goto out_unlock;
 
+	if (addr_len > sizeof(to))
+		addr_len = sizeof(to);
 	memcpy(&to, uaddr, addr_len);
 	to.v4.sin_port = ntohs(to.v4.sin_port);
 
@@ -1635,13 +1647,63 @@ SCTP_STATIC int sctp_disconnect(struct sock *sk, int flags)
 	return -EOPNOTSUPP; /* STUB */
 }
 
-/* FIXME: Write comments. */
+/* 4.1.4 accept() - TCP Style Syntax
+ *
+ * Applications use accept() call to remove an established SCTP
+ * association from the accept queue of the endpoint.  A new socket
+ * descriptor will be returned from accept() to represent the newly
+ * formed association.
+ */
 SCTP_STATIC struct sock *sctp_accept(struct sock *sk, int flags, int *err)
 {
-	int error = -EOPNOTSUPP;
+	struct sctp_opt *sp;
+	struct sctp_endpoint *ep;
+	struct sock *newsk = NULL;
+	struct sctp_association *assoc;
+	long timeo;
+	int error = 0;
+ 
+	sctp_lock_sock(sk);
 
-	*err = error;
-	return NULL;
+	sp = sctp_sk(sk);
+	ep = sp->ep;
+
+	if (SCTP_SOCKET_TCP != sp->type) {
+		error = -EOPNOTSUPP;
+		goto out;
+	}
+
+	if (SCTP_SS_LISTENING != sk->state) {
+		error = -EINVAL;
+		goto out;
+	}
+
+	timeo = sock_rcvtimeo(sk, sk->socket->file->f_flags & O_NONBLOCK);
+
+	error = sctp_wait_for_accept(sk, timeo);
+	if (error)
+		goto out;
+
+	/* We treat the list of associations on the endpoint as the accept 
+	 * queue and pick the first association on the list. 
+	 */
+	assoc = list_entry(ep->asocs.next, struct sctp_association, asocs);
+
+	newsk = sp->pf->create_accept_sk(sk, assoc); 
+	if (!newsk) {
+		error = -ENOMEM;
+		goto out;
+	}
+
+	/* Populate the fields of the newsk from the oldsk and migrate the
+	 * assoc to the newsk.
+	 */ 
+	sctp_sock_migrate(sk, newsk, assoc, SCTP_SOCKET_TCP);
+
+out:
+	sctp_release_sock(sk);
+ 	*err = error;
+	return newsk;
 }
 
 /* FIXME: Write Comments. */
@@ -1667,7 +1729,16 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 	sp = sctp_sk(sk);
 
 	/* Initialize the SCTP per socket area.  */
-	sp->type = SCTP_SOCKET_UDP;
+	switch (sk->type) {
+	case SOCK_SEQPACKET:
+		sp->type = SCTP_SOCKET_UDP;
+		break;
+	case SOCK_STREAM:
+		sp->type = SCTP_SOCKET_TCP;
+		break;
+	default:
+		return -ESOCKTNOSUPPORT;
+	}
 
 	/* FIXME:  The next draft (04) of the SCTP Sockets Extensions
 	 * should include a socket option for manipulating these
@@ -1878,11 +1949,6 @@ SCTP_STATIC int sctp_do_peeloff(sctp_association_t *assoc, struct socket **newso
 	struct sock *oldsk = assoc->base.sk;
 	struct sock *newsk;
 	struct socket *tmpsock;
-	sctp_endpoint_t *newep;
-	struct sctp_opt *oldsp = sctp_sk(oldsk);
-	struct sctp_opt *newsp;
-	struct sk_buff *skb, *tmp;
-	struct sctp_ulpevent *event;
 	int err = 0;
 
 	/* An association cannot be branched off from an already peeled-off
@@ -1892,81 +1958,17 @@ SCTP_STATIC int sctp_do_peeloff(sctp_association_t *assoc, struct socket **newso
 		return -EOPNOTSUPP;
 
 	/* Create a new socket.  */
-	err = sock_create(PF_INET, SOCK_SEQPACKET, IPPROTO_SCTP, &tmpsock);
+	err = sock_create(oldsk->family, SOCK_SEQPACKET, IPPROTO_SCTP,
+			  &tmpsock);
 	if (err < 0)
 		return err;
 
 	newsk = tmpsock->sk;
-	newsp = sctp_sk(newsk);
-	newep = newsp->ep;
 
-	/* Migrate socket buffer sizes and all the socket level options to the
-	 * new socket.
-	 */
-	newsk->sndbuf = oldsk->sndbuf;
-	newsk->rcvbuf = oldsk->rcvbuf;
-	*newsp = *oldsp;
-
-	/* Restore the ep value that was overwritten with the above structure
-	 * copy.
-	 */
-	newsp->ep = newep;
-
-	/* Move any messages in the old socket's receive queue that are for the
-	 * peeled off association to the new socket's receive queue.
-	 */
-	sctp_skb_for_each(skb, &oldsk->receive_queue, tmp) {
-		event = sctp_skb2event(skb);
-		if (event->asoc == assoc) {
-			__skb_unlink(skb, skb->list);
-			__skb_queue_tail(&newsk->receive_queue, skb);
-		}
-	}
-
-	/* Clean up an messages pending delivery due to partial
-	 * delivery.   Three cases:
-	 * 1) No partial deliver;  no work.
-	 * 2) Peeling off partial delivery; keep pd_lobby in new pd_lobby.
-	 * 3) Peeling off non-partial delivery; move pd_lobby to recieve_queue.
-	 */
-	skb_queue_head_init(&newsp->pd_lobby);
-	sctp_sk(newsk)->pd_mode = assoc->ulpq.pd_mode;;
-
-	if (sctp_sk(oldsk)->pd_mode) {
-		struct sk_buff_head *queue;
-
-		/* Decide which queue to move pd_lobby skbs to. */
-		if (assoc->ulpq.pd_mode) {
-			queue = &newsp->pd_lobby;
-		} else
-			queue = &newsk->receive_queue;
-
-		/* Walk through the pd_lobby, looking for skbs that
-		 * need moved to the new socket.
-		 */
-		sctp_skb_for_each(skb, &oldsp->pd_lobby, tmp) {
-			event = sctp_skb2event(skb);
-			if (event->asoc == assoc) {
-				__skb_unlink(skb, skb->list);
-				__skb_queue_tail(queue, skb);
-			}
-		}
-
-		/* Clear up any skbs waiting for the partial
-		 * delivery to finish.
-		 */
-		if (assoc->ulpq.pd_mode)
-			sctp_clear_pd(oldsk);
-
-	}
-
-	/* Set the type of socket to indicate that it is peeled off from the
-	 * original socket.
-	 */
-	newsp->type = SCTP_SOCKET_UDP_HIGH_BANDWIDTH;
-
-	/* Migrate the association to the new socket.  */
-	sctp_assoc_migrate(assoc, newsk);
+	/* Populate the fields of the newsk from the oldsk and migrate the
+	 * assoc to the newsk.
+	 */ 
+	sctp_sock_migrate(oldsk, newsk, assoc, SCTP_SOCKET_UDP_HIGH_BANDWIDTH);
 
 	*newsock = tmpsock;
 
@@ -2614,6 +2616,9 @@ SCTP_STATIC int sctp_seqpacket_listen(struct sock *sk, int backlog)
 	if (SCTP_SOCKET_UDP != sp->type)
 		return -EINVAL;
 
+	if (sk->state == SCTP_SS_LISTENING)
+		return 0;
+
 	/*
 	 * If a bind() or sctp_bindx() is not called prior to a listen()
 	 * call that allows new associations to be accepted, the system
@@ -2629,6 +2634,40 @@ SCTP_STATIC int sctp_seqpacket_listen(struct sock *sk, int backlog)
 			return -EAGAIN;
 	}
 	sk->state = SCTP_SS_LISTENING;
+	sctp_hash_endpoint(ep);
+	return 0;
+}
+
+/*
+ * 4.1.3 listen() - TCP Style Syntax
+ *
+ *   Applications uses listen() to ready the SCTP endpoint for accepting 
+ *   inbound associations.
+ */
+SCTP_STATIC int sctp_stream_listen(struct sock *sk, int backlog)
+{
+	struct sctp_opt *sp = sctp_sk(sk);
+	sctp_endpoint_t *ep = sp->ep;
+
+	if (sk->state == SCTP_SS_LISTENING)
+		return 0;
+
+	/*
+	 * If a bind() or sctp_bindx() is not called prior to a listen()
+	 * call that allows new associations to be accepted, the system
+	 * picks an ephemeral port and will choose an address set equivalent
+	 * to binding with a wildcard address.
+	 *
+	 * This is not currently spelled out in the SCTP sockets
+	 * extensions draft, but follows the practice as seen in TCP
+	 * sockets.
+	 */
+	if (!ep->base.bind_addr.port) {
+		if (sctp_autobind(sk))
+			return -EAGAIN;
+	}
+	sk->state = SCTP_SS_LISTENING;
+	sk->max_ack_backlog = backlog;
 	sctp_hash_endpoint(ep);
 	return 0;
 }
@@ -2652,8 +2691,8 @@ int sctp_inet_listen(struct socket *sock, int backlog)
 		break;
 
 	case SOCK_STREAM:
-		/* FIXME for TCP-style sockets. */
-		err = -EOPNOTSUPP;
+		err = sctp_stream_listen(sk, backlog);
+		break;
 
 	default:
 		goto out;
@@ -3284,7 +3323,7 @@ out:
 	return err;
 
 do_error:
-	err = -ECONNABORTED;
+	err = -ECONNREFUSED;
 	goto out;
 
 do_interrupted:
@@ -3296,6 +3335,131 @@ do_nonblock:
 	goto out;
 }
 
+static int sctp_wait_for_accept(struct sock *sk, long timeo)
+{
+	struct sctp_endpoint *ep;
+	int err = 0;
+	DECLARE_WAITQUEUE(wait, current);
+
+	ep = sctp_sk(sk)->ep;
+
+	add_wait_queue_exclusive(sk->sleep, &wait);
+
+	for (;;) {
+		__set_current_state(TASK_INTERRUPTIBLE);
+		if (list_empty(&ep->asocs)) {
+			sctp_release_sock(sk);
+			timeo = schedule_timeout(timeo);
+			sctp_lock_sock(sk);
+		}
+
+		err = -EINVAL;
+		if (sk->state != SCTP_SS_LISTENING)
+			break;
+
+		err = 0;
+		if (!list_empty(&ep->asocs))
+			break;
+
+		err = sock_intr_errno(timeo);
+		if (signal_pending(current))
+			break;
+
+		err = -EAGAIN;
+		if (!timeo)
+			break;
+	}
+
+	remove_wait_queue(sk->sleep, &wait);
+	__set_current_state(TASK_RUNNING);
+
+	return err;
+}
+
+/* Populate the fields of the newsk from the oldsk and migrate the assoc 
+ * and its messages to the newsk.
+ */ 
+void sctp_sock_migrate(struct sock *oldsk, struct sock *newsk,
+		  struct sctp_association *assoc, sctp_socket_type_t type)
+{
+	struct sctp_opt *oldsp = sctp_sk(oldsk);
+	struct sctp_opt *newsp = sctp_sk(newsk);
+	sctp_endpoint_t *newep = newsp->ep;
+	struct sk_buff *skb, *tmp;
+	struct sctp_ulpevent *event;
+
+	/* Migrate socket buffer sizes and all the socket level options to the
+	 * new socket.
+	 */
+	newsk->sndbuf = oldsk->sndbuf;
+	newsk->rcvbuf = oldsk->rcvbuf;
+	*newsp = *oldsp;
+
+	/* Restore the ep value that was overwritten with the above structure
+	 * copy.
+	 */
+	newsp->ep = newep;
+
+	/* Move any messages in the old socket's receive queue that are for the
+	 * peeled off association to the new socket's receive queue.
+	 */
+	sctp_skb_for_each(skb, &oldsk->receive_queue, tmp) {
+		event = sctp_skb2event(skb);
+		if (event->asoc == assoc) {
+			__skb_unlink(skb, skb->list);
+			__skb_queue_tail(&newsk->receive_queue, skb);
+		}
+	}
+
+	/* Clean up any messages pending delivery due to partial
+	 * delivery.   Three cases:
+	 * 1) No partial deliver;  no work.
+	 * 2) Peeling off partial delivery; keep pd_lobby in new pd_lobby.
+	 * 3) Peeling off non-partial delivery; move pd_lobby to recieve_queue.
+	 */
+	skb_queue_head_init(&newsp->pd_lobby);
+	sctp_sk(newsk)->pd_mode = assoc->ulpq.pd_mode;;
+
+	if (sctp_sk(oldsk)->pd_mode) {
+		struct sk_buff_head *queue;
+
+		/* Decide which queue to move pd_lobby skbs to. */
+		if (assoc->ulpq.pd_mode) {
+			queue = &newsp->pd_lobby;
+		} else
+			queue = &newsk->receive_queue;
+
+		/* Walk through the pd_lobby, looking for skbs that
+		 * need moved to the new socket.
+		 */
+		sctp_skb_for_each(skb, &oldsp->pd_lobby, tmp) {
+			event = sctp_skb2event(skb);
+			if (event->asoc == assoc) {
+				__skb_unlink(skb, skb->list);
+				__skb_queue_tail(queue, skb);
+			}
+		}
+
+		/* Clear up any skbs waiting for the partial
+		 * delivery to finish.
+		 */
+		if (assoc->ulpq.pd_mode)
+			sctp_clear_pd(oldsk);
+
+	}
+
+	/* Set the type of socket to indicate that it is peeled off from the
+	 * original UDP-style socket or created with the accept() call on a
+	 * TCP-style socket..
+	 */
+	newsp->type = type;
+
+	/* Migrate the association to the new socket. */
+	sctp_assoc_migrate(assoc, newsk);
+
+	newsk->state = SCTP_SS_ESTABLISHED;
+}
+ 
 /* This proto struct describes the ULP interface for SCTP.  */
 struct proto sctp_prot = {
 	.name        =	"SCTP",

@@ -480,6 +480,61 @@ void sctp_v4_get_saddr(sctp_association_t *asoc,
 
 }
 
+/* Create and initialize a new sk for the socket returned by accept(). */ 
+struct sock *sctp_v4_create_accept_sk(struct sock *sk,
+				      struct sctp_association *asoc)
+{
+	struct sock *newsk;
+	struct inet_opt *inet = inet_sk(sk);
+	struct inet_opt *newinet;
+
+	newsk = sk_alloc(PF_INET, GFP_KERNEL, sizeof(struct sctp_sock),
+			 sk->slab);
+	if (!newsk)
+		goto out;
+
+	sock_init_data(NULL, newsk);
+
+	newsk->type = SOCK_STREAM;
+
+	newsk->prot = sk->prot;
+	newsk->no_check = sk->no_check;
+	newsk->reuse = sk->reuse;
+
+	newsk->destruct = inet_sock_destruct;
+	newsk->zapped = 0;
+	newsk->family = PF_INET;
+	newsk->protocol = IPPROTO_SCTP;
+	newsk->backlog_rcv = sk->prot->backlog_rcv;
+	
+	newinet = inet_sk(newsk);
+	newinet->sport = inet->sport;
+	newinet->saddr = inet->saddr;
+	newinet->rcv_saddr = inet->saddr;
+	newinet->dport = asoc->peer.port;
+	newinet->daddr = asoc->peer.primary_addr.v4.sin_addr.s_addr;
+	newinet->pmtudisc = inet->pmtudisc;
+      	newinet->id = 0;
+	
+	newinet->ttl = sysctl_ip_default_ttl;
+	newinet->mc_loop = 1;
+	newinet->mc_ttl = 1;
+	newinet->mc_index = 0;
+	newinet->mc_list = NULL;
+
+#ifdef INET_REFCNT_DEBUG
+	atomic_inc(&inet_sock_nr);
+#endif
+
+	if (0 != newsk->prot->init(newsk)) {
+		inet_sock_release(newsk);
+		newsk = NULL;
+	}
+
+out:
+	return newsk;
+}
+
 /* Event handler for inet address addition/deletion events.
  * Basically, whenever there is an event, we re-build our local address list.
  */
@@ -664,6 +719,7 @@ static struct sctp_pf sctp_pf_inet = {
 	.cmp_addr      = sctp_inet_cmp_addr,
 	.bind_verify   = sctp_inet_bind_verify,
 	.supported_addrs = sctp_inet_supported_addrs,
+	.create_accept_sk = sctp_v4_create_accept_sk,
 	.af            = &sctp_ipv4_specific,
 };
 
@@ -694,8 +750,17 @@ struct proto_ops inet_seqpacket_ops = {
 };
 
 /* Registration with AF_INET family.  */
-struct inet_protosw sctp_protosw = {
+static struct inet_protosw sctp_seqpacket_protosw = {
 	.type       = SOCK_SEQPACKET,
+	.protocol   = IPPROTO_SCTP,
+	.prot       = &sctp_prot,
+	.ops        = &inet_seqpacket_ops,
+	.capability = -1,
+	.no_check   = 0,
+	.flags      = SCTP_PROTOSW_FLAG
+};
+static struct inet_protosw sctp_stream_protosw = {
+	.type       = SOCK_STREAM,
 	.protocol   = IPPROTO_SCTP,
 	.prot       = &sctp_prot,
 	.ops        = &inet_seqpacket_ops,
@@ -809,8 +874,9 @@ __init int sctp_init(void)
 	if (inet_add_protocol(&sctp_protocol, IPPROTO_SCTP) < 0)
 		return -EAGAIN;
 
-	/* Add SCTP to inetsw linked list.  */
-	inet_register_protosw(&sctp_protosw);
+	/* Add SCTP(TCP and UDP style) to inetsw linked list.  */
+	inet_register_protosw(&sctp_seqpacket_protosw);
+	inet_register_protosw(&sctp_stream_protosw);
 
 	/* Allocate and initialise sctp mibs.  */
 	status = init_sctp_mibs();
@@ -956,7 +1022,8 @@ err_ahash_alloc:
 	cleanup_sctp_mibs();
 err_init_mibs:
 	inet_del_protocol(&sctp_protocol, IPPROTO_SCTP);
-	inet_unregister_protosw(&sctp_protosw);
+	inet_unregister_protosw(&sctp_seqpacket_protosw);
+	inet_unregister_protosw(&sctp_stream_protosw);
 	return status;
 }
 
@@ -989,7 +1056,8 @@ __exit void sctp_exit(void)
 	cleanup_sctp_mibs();
 
 	inet_del_protocol(&sctp_protocol, IPPROTO_SCTP);
-	inet_unregister_protosw(&sctp_protosw);
+	inet_unregister_protosw(&sctp_seqpacket_protosw);
+	inet_unregister_protosw(&sctp_stream_protosw);
 }
 
 module_init(sctp_init);
