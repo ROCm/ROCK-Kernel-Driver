@@ -5890,7 +5890,7 @@ int __devinit dc395x_init_one(struct pci_dev *dev,
 	pci_set_drvdata(dev, scsi_host);
 
 	/* get the scsi mid level to scan for new devices on the bus */
-	scsi_add_host(scsi_host, &pdev->dev);	/* XXX handle failure */
+	scsi_add_host(scsi_host, &dev->dev);	/* XXX handle failure */
 	scsi_scan_host(scsi_host);
 
 	return 0;
