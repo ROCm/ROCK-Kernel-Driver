@@ -14,6 +14,7 @@
  *		an array-switch method of distributing timeslices
  *		and per-CPU runqueues.  Cleanups and useful suggestions
  *		by Davide Libenzi, preemptible kernel bits by Robert Love.
+ *  2003-09-03	Interactivity tuning by Con Kolivas.
  */
 
 #include <linux/mm.h>
@@ -58,6 +59,14 @@
 #define USER_PRIO(p)		((p)-MAX_RT_PRIO)
 #define TASK_USER_PRIO(p)	USER_PRIO((p)->static_prio)
 #define MAX_USER_PRIO		(USER_PRIO(MAX_PRIO))
+#define AVG_TIMESLICE	(MIN_TIMESLICE + ((MAX_TIMESLICE - MIN_TIMESLICE) *\
+			(MAX_PRIO-1-NICE_TO_PRIO(0))/(MAX_USER_PRIO - 1)))
+
+/*
+ * Some helpers for converting nanosecond timing to jiffy resolution
+ */
+#define NS_TO_JIFFIES(TIME)	((TIME) / (1000000000 / HZ))
+#define JIFFIES_TO_NS(TIME)	((TIME) * (1000000000 / HZ))
 
 /*
  * These are the 'tuning knobs' of the scheduler:
@@ -68,16 +77,18 @@
  */
 #define MIN_TIMESLICE		( 10 * HZ / 1000)
 #define MAX_TIMESLICE		(200 * HZ / 1000)
-#define TIMESLICE_GRANULARITY	(HZ/40 ?: 1)
 #define ON_RUNQUEUE_WEIGHT	30
 #define CHILD_PENALTY		95
 #define PARENT_PENALTY		100
 #define EXIT_WEIGHT		3
 #define PRIO_BONUS_RATIO	25
+#define MAX_BONUS		(MAX_USER_PRIO * PRIO_BONUS_RATIO / 100)
 #define INTERACTIVE_DELTA	2
-#define MAX_SLEEP_AVG		(1*1000000000)
-#define STARVATION_LIMIT	HZ
+#define MAX_SLEEP_AVG		(AVG_TIMESLICE * MAX_BONUS)
+#define STARVATION_LIMIT	(MAX_SLEEP_AVG)
+#define NS_MAX_SLEEP_AVG	(JIFFIES_TO_NS(MAX_SLEEP_AVG))
 #define NODE_THRESHOLD		125
+#define CREDIT_LIMIT		100
 
 /*
  * If a task is 'interactive' then we reinsert it in the active
@@ -107,6 +118,19 @@
  * too hard.
  */
 
+#define CURRENT_BONUS(p) \
+	(NS_TO_JIFFIES((p)->sleep_avg) * MAX_BONUS / \
+		MAX_SLEEP_AVG)
+
+#ifdef CONFIG_SMP
+#define TIMESLICE_GRANULARITY(p)	(MIN_TIMESLICE * \
+		(1 << (((MAX_BONUS - CURRENT_BONUS(p)) ? : 1) - 1)) * \
+			num_online_cpus())
+#else
+#define TIMESLICE_GRANULARITY(p)	(MIN_TIMESLICE * \
+		(1 << (((MAX_BONUS - CURRENT_BONUS(p)) ? : 1) - 1)))
+#endif
+
 #define SCALE(v1,v1_max,v2_max) \
 	(v1) * (v2_max) / (v1_max)
 
@@ -117,10 +141,18 @@
 #define TASK_INTERACTIVE(p) \
 	((p)->prio <= (p)->static_prio - DELTA(p))
 
+#define JUST_INTERACTIVE_SLEEP(p) \
+	(JIFFIES_TO_NS(MAX_SLEEP_AVG * \
+		(MAX_BONUS / 2 + DELTA((p)) + 1) / MAX_BONUS - 1))
+
+#define HIGH_CREDIT(p) \
+	((p)->interactive_credit > CREDIT_LIMIT)
+
+#define LOW_CREDIT(p) \
+	((p)->interactive_credit < -CREDIT_LIMIT)
+
 #define TASK_PREEMPTS_CURR(p, rq) \
-	((p)->prio < (rq)->curr->prio || \
-		((p)->prio == (rq)->curr->prio && \
-			(p)->time_slice > (rq)->curr->time_slice * 2))
+	((p)->prio < (rq)->curr->prio)
 
 /*
  * BASE_TIMESLICE scales user-nice values [ -20 ... 19 ]
@@ -325,8 +357,7 @@ static int effective_prio(task_t *p)
 	if (rt_task(p))
 		return p->prio;
 
-	bonus = MAX_USER_PRIO*PRIO_BONUS_RATIO*(p->sleep_avg/1024)/(MAX_SLEEP_AVG/1024)/100;
-	bonus -= MAX_USER_PRIO*PRIO_BONUS_RATIO/100/2;
+	bonus = CURRENT_BONUS(p) - MAX_BONUS / 2;
 
 	prio = p->static_prio - bonus;
 	if (prio < MAX_RT_PRIO)
@@ -350,37 +381,75 @@ static void recalc_task_prio(task_t *p, unsigned long long now)
 	unsigned long long __sleep_time = now - p->timestamp;
 	unsigned long sleep_time;
 
-	if (__sleep_time > MAX_SLEEP_AVG)
-		sleep_time = MAX_SLEEP_AVG;
+	if (__sleep_time > NS_MAX_SLEEP_AVG)
+		sleep_time = NS_MAX_SLEEP_AVG;
 	else
 		sleep_time = (unsigned long)__sleep_time;
 
-	if (sleep_time > 0) {
-		unsigned long long sleep_avg;
-
+	if (likely(sleep_time > 0)) {
 		/*
-		 * This code gives a bonus to interactive tasks.
-		 *
-		 * The boost works by updating the 'average sleep time'
-		 * value here, based on ->timestamp. The more time a task
-		 * spends sleeping, the higher the average gets - and the
-		 * higher the priority boost gets as well.
+		 * User tasks that sleep a long time are categorised as
+		 * idle and will get just interactive status to stay active &
+		 * prevent them suddenly becoming cpu hogs and starving
+		 * other processes.
 		 */
-		sleep_avg = p->sleep_avg + sleep_time;
+		if (p->mm && p->activated != -1 &&
+			sleep_time > JUST_INTERACTIVE_SLEEP(p)){
+				p->sleep_avg = JIFFIES_TO_NS(MAX_SLEEP_AVG -
+						AVG_TIMESLICE);
+				if (!HIGH_CREDIT(p))
+					p->interactive_credit++;
+		} else {
+			/*
+			 * The lower the sleep avg a task has the more
+			 * rapidly it will rise with sleep time.
+			 */
+			sleep_time *= (MAX_BONUS - CURRENT_BONUS(p)) ? : 1;
 
-		/*
-		 * 'Overflow' bonus ticks go to the waker as well, so the
-		 * ticks are not lost. This has the effect of further
-		 * boosting tasks that are related to maximum-interactive
-		 * tasks.
-		 */
-		if (sleep_avg > MAX_SLEEP_AVG)
-			sleep_avg = MAX_SLEEP_AVG;
-		if (p->sleep_avg != sleep_avg) {
-			p->sleep_avg = sleep_avg;
-			p->prio = effective_prio(p);
+			/*
+			 * Tasks with low interactive_credit are limited to
+			 * one timeslice worth of sleep avg bonus.
+			 */
+			if (LOW_CREDIT(p) &&
+				sleep_time > JIFFIES_TO_NS(task_timeslice(p)))
+					sleep_time =
+						JIFFIES_TO_NS(task_timeslice(p));
+
+			/*
+			 * Non high_credit tasks waking from uninterruptible
+			 * sleep are limited in their sleep_avg rise as they
+			 * are likely to be cpu hogs waiting on I/O
+			 */
+			if (p->activated == -1 && !HIGH_CREDIT(p) && p->mm){
+				if (p->sleep_avg >= JUST_INTERACTIVE_SLEEP(p))
+					sleep_time = 0;
+				else if (p->sleep_avg + sleep_time >=
+					JUST_INTERACTIVE_SLEEP(p)){
+						p->sleep_avg =
+							JUST_INTERACTIVE_SLEEP(p);
+						sleep_time = 0;
+					}
+			}
+
+			/*
+			 * This code gives a bonus to interactive tasks.
+			 *
+			 * The boost works by updating the 'average sleep time'
+			 * value here, based on ->timestamp. The more time a task
+			 * spends sleeping, the higher the average gets - and the
+			 * higher the priority boost gets as well.
+			 */
+			p->sleep_avg += sleep_time;
+
+			if (p->sleep_avg > NS_MAX_SLEEP_AVG){
+				p->sleep_avg = NS_MAX_SLEEP_AVG;
+				if (!HIGH_CREDIT(p))
+					p->interactive_credit++;
+			}
 		}
 	}
+
+	p->prio = effective_prio(p);
 }
 
 /*
@@ -396,20 +465,26 @@ static inline void activate_task(task_t *p, runqueue_t *rq)
 	recalc_task_prio(p, now);
 
 	/*
-	 * Tasks which were woken up by interrupts (ie. hw events)
-	 * are most likely of interactive nature. So we give them
-	 * the credit of extending their sleep time to the period
-	 * of time they spend on the runqueue, waiting for execution
-	 * on a CPU, first time around:
+	 * This checks to make sure it's not an uninterruptible task
+	 * that is now waking up.
 	 */
-	if (in_interrupt())
-		p->activated = 2;
-	else
-	/*
-	 * Normal first-time wakeups get a credit too for on-runqueue time,
-	 * but it will be weighted down:
-	 */
-		p->activated = 1;
+	if (!p->activated){
+		/*
+		 * Tasks which were woken up by interrupts (ie. hw events)
+		 * are most likely of interactive nature. So we give them
+		 * the credit of extending their sleep time to the period
+		 * of time they spend on the runqueue, waiting for execution
+		 * on a CPU, first time around:
+		 */
+		if (in_interrupt())
+			p->activated = 2;
+		else
+		/*
+		 * Normal first-time wakeups get a credit too for on-runqueue
+		 * time, but it will be weighted down:
+		 */
+			p->activated = 1;
+		}
 	p->timestamp = now;
 
 	__activate_task(p, rq);
@@ -532,8 +607,14 @@ repeat_lock_task:
 				task_rq_unlock(rq, &flags);
 				goto repeat_lock_task;
 			}
-			if (old_state == TASK_UNINTERRUPTIBLE)
+			if (old_state == TASK_UNINTERRUPTIBLE){
 				rq->nr_uninterruptible--;
+				/*
+				 * Tasks on involuntary sleep don't earn
+				 * sleep_avg beyond just interactive state.
+				 */
+				p->activated = -1;
+			}
 			if (sync)
 				__activate_task(p, rq);
 			else {
@@ -587,8 +668,14 @@ void wake_up_forked_process(task_t * p)
 	 * and children as well, to keep max-interactive tasks
 	 * from forking tasks that are max-interactive.
 	 */
-	current->sleep_avg = current->sleep_avg / 100 * PARENT_PENALTY;
-	p->sleep_avg = p->sleep_avg / 100 * CHILD_PENALTY;
+	current->sleep_avg = JIFFIES_TO_NS(CURRENT_BONUS(current) *
+		PARENT_PENALTY / 100 * MAX_SLEEP_AVG / MAX_BONUS);
+
+	p->sleep_avg = JIFFIES_TO_NS(CURRENT_BONUS(p) *
+		CHILD_PENALTY / 100 * MAX_SLEEP_AVG / MAX_BONUS);
+
+	p->interactive_credit = 0;
+
 	p->prio = effective_prio(p);
 	set_task_cpu(p, smp_processor_id());
 
@@ -629,7 +716,9 @@ void sched_exit(task_t * p)
 	 * the sleep_avg of the parent as well.
 	 */
 	if (p->sleep_avg < p->parent->sleep_avg)
-		p->parent->sleep_avg = p->parent->sleep_avg / (EXIT_WEIGHT + 1) * EXIT_WEIGHT + p->sleep_avg / (EXIT_WEIGHT + 1);
+		p->parent->sleep_avg = p->parent->sleep_avg /
+		(EXIT_WEIGHT + 1) * EXIT_WEIGHT + p->sleep_avg /
+		(EXIT_WEIGHT + 1);
 }
 
 /**
@@ -1036,6 +1125,29 @@ static inline void pull_task(runqueue_t *src_rq, prio_array_t *src_array, task_t
 }
 
 /*
+ * Previously:
+ *
+ * #define CAN_MIGRATE_TASK(p,rq,this_cpu)	\
+ *	((!idle || (NS_TO_JIFFIES(now - (p)->timestamp) > \
+ *		cache_decay_ticks)) && !task_running(rq, p) && \
+ *			cpu_isset(this_cpu, (p)->cpus_allowed))
+ */
+
+static inline int
+can_migrate_task(task_t *tsk, runqueue_t *rq, int this_cpu, int idle)
+{
+	unsigned long delta = sched_clock() - tsk->timestamp;
+
+	if (!idle && (delta <= JIFFIES_TO_NS(cache_decay_ticks)))
+		return 0;
+	if (task_running(rq, tsk))
+		return 0;
+	if (!cpu_isset(this_cpu, tsk->cpus_allowed))
+		return 0;
+	return 1;
+}
+
+/*
  * Current runqueue is empty, or rebalance tick: if there is an
  * inbalance (current runqueue is too short) then pull from
  * busiest runqueue(s).
@@ -1049,14 +1161,12 @@ static void load_balance(runqueue_t *this_rq, int idle, cpumask_t cpumask)
 	runqueue_t *busiest;
 	prio_array_t *array;
 	struct list_head *head, *curr;
-	unsigned long long now;
 	task_t *tmp;
 
 	busiest = find_busiest_queue(this_rq, this_cpu, idle, &imbalance, cpumask);
 	if (!busiest)
 		goto out;
 
-	now = sched_clock();
 	/*
 	 * We only want to steal a number of tasks equal to 1/2 the imbalance,
 	 * otherwise we'll just shift the imbalance to the new queue:
@@ -1102,14 +1212,9 @@ skip_queue:
 	 * 3) are cache-hot on their current CPU.
 	 */
 
-#define CAN_MIGRATE_TASK(p,rq,this_cpu)					\
-	((idle || (((now - (p)->timestamp)>>10) > cache_decay_ticks)) &&\
-		!task_running(rq, p) &&					\
-			cpu_isset(this_cpu, (p)->cpus_allowed))
-
 	curr = curr->prev;
 
-	if (!CAN_MIGRATE_TASK(tmp, busiest, this_cpu)) {
+	if (!can_migrate_task(tmp, busiest, this_cpu, idle)) {
 		if (curr != head)
 			goto skip_queue;
 		idx++;
@@ -1220,7 +1325,8 @@ EXPORT_PER_CPU_SYMBOL(kstat);
  */
 #define EXPIRED_STARVING(rq) \
 		(STARVATION_LIMIT && ((rq)->expired_timestamp && \
-		(jiffies - (rq)->expired_timestamp >= STARVATION_LIMIT)))
+		(jiffies - (rq)->expired_timestamp >= \
+			STARVATION_LIMIT * ((rq)->nr_running) + 1)))
 
 /*
  * This function gets called by the timer code, with HZ frequency.
@@ -1317,9 +1423,15 @@ void scheduler_tick(int user_ticks, int sys_ticks)
 		 * requeue this task to the end of the list on this priority
 		 * level, which is in essence a round-robin of tasks with
 		 * equal priority.
+		 *
+		 * This only applies to tasks in the interactive
+		 * delta range with at least TIMESLICE_GRANULARITY to requeue.
 		 */
-		if (!((task_timeslice(p) - p->time_slice) % TIMESLICE_GRANULARITY) &&
-			       		(p->array == rq->active)) {
+		if (TASK_INTERACTIVE(p) && !((task_timeslice(p) -
+			p->time_slice) % TIMESLICE_GRANULARITY(p)) &&
+			(p->time_slice >= TIMESLICE_GRANULARITY(p)) &&
+			(p->array == rq->active)) {
+
 			dequeue_task(p, rq->active);
 			set_tsk_need_resched(p);
 			p->prio = effective_prio(p);
@@ -1366,10 +1478,19 @@ need_resched:
 
 	release_kernel_lock(prev);
 	now = sched_clock();
-	if (likely(now - prev->timestamp < MAX_SLEEP_AVG))
+	if (likely(now - prev->timestamp < NS_MAX_SLEEP_AVG))
 		run_time = now - prev->timestamp;
 	else
-		run_time = MAX_SLEEP_AVG;
+		run_time = NS_MAX_SLEEP_AVG;
+
+	/*
+	 * Tasks with interactive credits get charged less run_time
+	 * at high sleep_avg to delay them losing their interactive
+	 * status
+	 */
+	if (HIGH_CREDIT(prev))
+		run_time /= (CURRENT_BONUS(prev) ? : 1);
+
 	spin_lock_irq(&rq->lock);
 
 	/*
@@ -1419,26 +1540,29 @@ pick_next_task:
 	queue = array->queue + idx;
 	next = list_entry(queue->next, task_t, run_list);
 
-	if (next->activated) {
+	if (next->activated > 0) {
 		unsigned long long delta = now - next->timestamp;
 
 		if (next->activated == 1)
 			delta = delta * (ON_RUNQUEUE_WEIGHT * 128 / 100) / 128;
 
-		next->activated = 0;
 		array = next->array;
 		dequeue_task(next, array);
 		recalc_task_prio(next, next->timestamp + delta);
 		enqueue_task(next, array);
 	}
+	next->activated = 0;
 switch_tasks:
 	prefetch(next);
 	clear_tsk_need_resched(prev);
 	RCU_qsctr(task_cpu(prev))++;
 
 	prev->sleep_avg -= run_time;
-	if ((long)prev->sleep_avg < 0)
+	if ((long)prev->sleep_avg <= 0){
 		prev->sleep_avg = 0;
+		if (!(HIGH_CREDIT(prev) || LOW_CREDIT(prev)))
+			prev->interactive_credit--;
+	}
 	prev->timestamp = now;
 
 	if (likely(prev != next)) {
