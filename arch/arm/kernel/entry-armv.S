@@ -26,28 +26,27 @@
 /*
  * Invalid mode handlers
  */
-__pabt_invalid:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
-		stmia	sp, {r0 - lr}			@ Save XXX r0 - lr
-		ldr	r4, .LCabt
-		mov	r1, #BAD_PREFETCH
+	.macro	inv_entry, sym, reason
+	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
+	stmia	sp, {r0 - lr}			@ Save XXX r0 - lr
+	ldr	r4, .LC\sym
+	mov	r1, #\reason
+	.endm
+
+__pabt_invalid:
+		inv_entry abt, BAD_PREFETCH
 		b	1f
 
-__dabt_invalid:	sub	sp, sp, #S_FRAME_SIZE
-		stmia	sp, {r0 - lr}			@ Save SVC r0 - lr [lr *should* be intact]
-		ldr	r4, .LCabt
-		mov	r1, #BAD_DATA
+__dabt_invalid:
+		inv_entry abt, BAD_DATA
 		b	1f
 
-__irq_invalid:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate space on stack for frame
-		stmfd	sp, {r0 - lr}			@ Save r0 - lr
-		ldr	r4, .LCirq
-		mov	r1, #BAD_IRQ
+__irq_invalid:
+		inv_entry irq, BAD_IRQ
 		b	1f
 
-__und_invalid:	sub	sp, sp, #S_FRAME_SIZE
-		stmia	sp, {r0 - lr}
-		ldr	r4, .LCund
-		mov	r1, #BAD_UNDEFINSTR		@ int reason
+__und_invalid:
+		inv_entry und, BAD_UNDEFINSTR
 
 1:		zero_fp
 		ldmia	r4, {r5 - r7}			@ Get XXX pc, cpsr, old_r0
