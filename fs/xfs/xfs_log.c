@@ -2188,7 +2188,8 @@ xlog_state_do_callback(
 			 *              LOG_LOCK
 			 * IOERROR - give up hope all ye who enter here
 			 */
-			if (iclog->ic_state == XLOG_STATE_SYNCING ||
+			if (iclog->ic_state == XLOG_STATE_WANT_SYNC ||
+			    iclog->ic_state == XLOG_STATE_SYNCING ||
 			    iclog->ic_state == XLOG_STATE_DONE_SYNC ||
 			    iclog->ic_state == XLOG_STATE_IOERROR )
 				break;
