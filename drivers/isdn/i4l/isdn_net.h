@@ -122,7 +122,7 @@ isdn_net_rm_from_bundle(isdn_net_dev *idev)
 	unsigned long flags;
 
 	spin_lock_irqsave(&mlp->online_lock, flags);
-	list_del(&idev->online);
+	//	list_del(&idev->online); FIXME
 	spin_unlock_irqrestore(&mlp->online_lock, flags);
 }
 

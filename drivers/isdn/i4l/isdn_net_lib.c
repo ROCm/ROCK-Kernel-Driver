@@ -244,9 +244,6 @@ isdn_net_addif(char *name, isdn_net_local *mlp)
 	idev->ppp_slot = -1;
 	idev->pppbind = -1;
 
-	idev->dialstarted = 0;   /* Jiffies of last dial-start */
-	idev->dialwait_timer = 0;  /* Jiffies of earliest next dial-start */
-
 	init_timer(&idev->dial_timer);
 	idev->dial_timer.data = (unsigned long) idev;
 	idev->dial_timer.function = isdn_net_dial_timer;
@@ -274,9 +271,9 @@ isdn_net_addif(char *name, isdn_net_local *mlp)
 		mlp->onhtime = 10;
 		mlp->dialmax = 1;
 		mlp->flags = ISDN_NET_CBHUP | ISDN_NET_DM_MANUAL;
-		mlp->cbdelay = 5 * HZ;	/* Wait 5 secs before Callback */
-		mlp->dialtimeout = -1;  /* Infinite Dial-Timeout */
-		mlp->dialwait = 5 * HZ; /* Wait 5 sec. after failed dial */
+		mlp->cbdelay = 5 * HZ;	  /* Wait 5 secs before Callback */
+		mlp->dialtimeout = 60 * HZ;/* Wait 1 min for connection  */
+		mlp->dialwait = 5 * HZ;   /* Wait 5 sec. after failed dial */
 		INIT_LIST_HEAD(&mlp->phone[0]);
 		INIT_LIST_HEAD(&mlp->phone[1]);
 		dev = &mlp->dev;

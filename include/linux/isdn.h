@@ -371,8 +371,6 @@ typedef struct isdn_net_dev_s {
   int                    dialstate;    /* State for dialing                */
   int                    dial;         /* # of phone number just dialed    */
   int                    outgoing;     /* Flag: outgoing call              */
-  unsigned long		 dialstarted;	/* first dialing-attempt           */
-  unsigned long		 dialwait_timer;/* earliest next dialing-attempt   */
   int                    dialretry;    /* Counter for Dialout-retries      */
 
   int                    cps;          /* current speed of this interface  */
