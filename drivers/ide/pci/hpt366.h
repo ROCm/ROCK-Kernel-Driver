@@ -470,6 +470,15 @@ static ide_pci_device_t hpt366_chipsets[] __devinitdata = {
 		.channels	= 2,	/* 4 */
 		.autodma	= AUTODMA,
 		.bootable	= OFF_BOARD,
+	},{	/* 5 */
+		.name		= "HPT372N",
+		.init_setup	= init_setup_hpt37x,
+		.init_chipset	= init_chipset_hpt366,
+		.init_hwif	= init_hwif_hpt366,
+		.init_dma	= init_dma_hpt366,
+		.channels	= 2,	/* 4 */
+		.autodma	= AUTODMA,
+		.bootable	= OFF_BOARD,
 	}
 };
 
