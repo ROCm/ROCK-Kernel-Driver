@@ -104,12 +104,12 @@
 #define PCIX_66MHZ_ECC		0x5
 #define PCIX_100MHZ_ECC		0x6
 #define PCIX_133MHZ_ECC		0x7
-#define PCIX_66MHZ_266		0x8
-#define PCIX_100MHZ_266		0x9
-#define PCIX_133MHZ_266		0x0a
-#define PCIX_66MHZ_533		0x0b
-#define PCIX_100MHZ_533		0x0c
-#define PCIX_133MHZ_533		0x0d
+#define PCIX_66MHZ_266		0x9
+#define PCIX_100MHZ_266		0xa
+#define PCIX_133MHZ_266		0xb
+#define PCIX_66MHZ_533		0x11
+#define PCIX_100MHZ_533		0x12
+#define PCIX_133MHZ_533		0x13
 
 /* Slot Configuration */
 #define SLOT_NUM		0x0000001F
@@ -464,7 +464,8 @@ static int hpc_get_latch_status(struct slot *slot, u8 *status)
 	slot_reg = readl(php_ctlr->creg + SLOT1 + 4*(slot->hp_slot));
 	slot_status = (u16)slot_reg;
 
-	*status = ((slot_status & 0x0100) == 0) ? 1 : 0;
+	*status = ((slot_status & 0x0100) == 0) ? 0 : 1;   /* 0 -> close; 1 -> open */
+
 
 	DBG_LEAVE_ROUTINE 
 	return 0;
@@ -1441,6 +1442,7 @@ int shpc_init(struct controller * ctrl,
 			err("%s : shpc_cap_offset == 0\n", __FUNCTION__);
 			goto abort_free_ctlr;
 		}
+		dbg("%s: shpc_cap_offset = %x\n", __FUNCTION__, shpc_cap_offset);	
 	
 		rc = pci_write_config_byte(pdev, (u8)shpc_cap_offset + DWORD_SELECT , BASE_OFFSET);
 		if (rc) {
@@ -1547,15 +1549,13 @@ int shpc_init(struct controller * ctrl,
 		start_int_poll_timer( php_ctlr, 10 );   /* start with 10 second delay */
 	} else {
 		/* Installs the interrupt handler */
-#ifdef CONFIG_PCI_USE_VECTOR 
 		rc = pci_enable_msi(pdev);
 		if (rc) {
-			err("Can't get msi for the hotplug controller\n");
+			info("Can't get msi for the hotplug controller\n");
+			info("Use INTx for the hotplug controller\n");
 			dbg("%s: rc = %x\n", __FUNCTION__, rc);
-			goto abort_free_ctlr;
-		}
-		php_ctlr->irq = pdev->irq;
-#endif
+		} else
+			php_ctlr->irq = pdev->irq;
 		
 		rc = request_irq(php_ctlr->irq, shpc_isr, SA_SHIRQ, MY_NAME, (void *) ctrl);
 		dbg("%s: request_irq %d for hpc%d (returns %d)\n", __FUNCTION__, php_ctlr->irq, ctlr_seq_num, rc);

@@ -1243,40 +1243,38 @@ int acpiphp_disable_slot(struct acpiphp_slot *slot)
 
 /**
  * acpiphp_check_bridge - re-enumerate devices
+ *
+ * Iterate over all slots under this bridge and make sure that if a
+ * card is present they are enabled, and if not they are disabled.
  */
 int acpiphp_check_bridge(struct acpiphp_bridge *bridge)
 {
 	struct acpiphp_slot *slot;
-	unsigned int sta;
 	int retval = 0;
 	int enabled, disabled;
 
 	enabled = disabled = 0;
 
 	for (slot = bridge->slots; slot; slot = slot->next) {
-		sta = get_slot_status(slot);
+		unsigned int status = get_slot_status(slot);
 		if (slot->flags & SLOT_ENABLED) {
-			/* if enabled but not present, disable */
-			if (sta != ACPI_STA_ALL) {
-				retval = acpiphp_disable_slot(slot);
-				if (retval) {
-					err("Error occurred in enabling\n");
-					up(&slot->crit_sect);
-					goto err_exit;
-				}
-				disabled++;
+			if (status == ACPI_STA_ALL)
+				continue;
+			retval = acpiphp_disable_slot(slot);
+			if (retval) {
+				err("Error occurred in disabling\n");
+				goto err_exit;
 			}
+			disabled++;
 		} else {
-			/* if disabled but present, enable */
-			if (sta == ACPI_STA_ALL) {
-				retval = acpiphp_enable_slot(slot);
-				if (retval) {
-					err("Error occurred in enabling\n");
-					up(&slot->crit_sect);
-					goto err_exit;
-				}
-				enabled++;
+			if (status != ACPI_STA_ALL)
+				continue;
+			retval = acpiphp_enable_slot(slot);
+			if (retval) {
+				err("Error occurred in enabling\n");
+				goto err_exit;
 			}
+			enabled++;
 		}
 	}
 

@@ -111,21 +111,15 @@ static int __pci_bus_find_cap(struct pci_bus *bus, unsigned int devfn, u8 hdr_ty
  * support it.  Possible values for @cap:
  *
  *  %PCI_CAP_ID_PM           Power Management 
- *
  *  %PCI_CAP_ID_AGP          Accelerated Graphics Port 
- *
  *  %PCI_CAP_ID_VPD          Vital Product Data 
- *
  *  %PCI_CAP_ID_SLOTID       Slot Identification 
- *
  *  %PCI_CAP_ID_MSI          Message Signalled Interrupts
- *
  *  %PCI_CAP_ID_CHSWP        CompactPCI HotSwap 
- *
  *  %PCI_CAP_ID_PCIX         PCI-X
+ *  %PCI_CAP_ID_EXP          PCI Express
  */
-int
-pci_find_capability(struct pci_dev *dev, int cap)
+int pci_find_capability(struct pci_dev *dev, int cap)
 {
 	return __pci_bus_find_cap(dev->bus, dev->devfn, dev->hdr_type, cap);
 }
@@ -150,6 +144,54 @@ int pci_bus_find_capability(struct pci_bus *bus, unsigned int devfn, int cap)
 	pci_bus_read_config_byte(bus, devfn, PCI_HEADER_TYPE, &hdr_type);
 
 	return __pci_bus_find_cap(bus, devfn, hdr_type & 0x7f, cap);
+}
+
+/**
+ * pci_find_ext_capability - Find an extended capability
+ * @dev: PCI device to query
+ * @cap: capability code
+ *
+ * Returns the address of the requested extended capability structure
+ * within the device's PCI configuration space or 0 if the device does
+ * not support it.  Possible values for @cap:
+ *
+ *  %PCI_EXT_CAP_ID_ERR		Advanced Error Reporting
+ *  %PCI_EXT_CAP_ID_VC		Virtual Channel
+ *  %PCI_EXT_CAP_ID_DSN		Device Serial Number
+ *  %PCI_EXT_CAP_ID_PWR		Power Budgeting
+ */
+int pci_find_ext_capability(struct pci_dev *dev, int cap)
+{
+	u32 header;
+	int ttl = 480; /* 3840 bytes, minimum 8 bytes per capability */
+	int pos = 0x100;
+
+	if (dev->cfg_size <= 256)
+		return 0;
+
+	if (pci_read_config_dword(dev, pos, &header) != PCIBIOS_SUCCESSFUL)
+		return 0;
+
+	/*
+	 * If we have no capabilities, this is indicated by cap ID,
+	 * cap version and next pointer all being 0.
+	 */
+	if (header == 0)
+		return 0;
+
+	while (ttl-- > 0) {
+		if (PCI_EXT_CAP_ID(header) == cap)
+			return pos;
+
+		pos = PCI_EXT_CAP_NEXT(header);
+		if (pos < 0x100)
+			break;
+
+		if (pci_read_config_dword(dev, pos, &header) != PCIBIOS_SUCCESSFUL)
+			break;
+	}
+
+	return 0;
 }
 
 /**
@@ -658,6 +700,10 @@ pci_clear_mwi(struct pci_dev *dev)
 	}
 }
 
+#ifndef HAVE_ARCH_PCI_SET_DMA_MASK
+/*
+ * These can be overridden by arch-specific implementations
+ */
 int
 pci_set_dma_mask(struct pci_dev *dev, u64 mask)
 {
@@ -690,6 +736,7 @@ pci_set_consistent_dma_mask(struct pci_dev *dev, u64 mask)
 
 	return 0;
 }
+#endif
      
 static int __devinit pci_init(void)
 {

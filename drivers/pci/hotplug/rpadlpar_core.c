@@ -79,25 +79,18 @@ static struct device_node *find_php_slot_pci_node(char *drc_name)
 	return np;
 }
 
-static inline struct hotplug_slot *find_php_slot(char *drc_name)
-{
-	struct kobject *k;
-
-	k = kset_find_obj(&pci_hotplug_slots_subsys.kset, drc_name);
-	if (!k)
-		return NULL;
-
-	return to_hotplug_slot(k);
-}
-
 static struct slot *find_slot(char *drc_name)
 {
-	struct hotplug_slot *php_slot = find_php_slot(drc_name);
+	struct list_head *tmp, *n;
+	struct slot *slot;
 
-	if (!php_slot)
-		return NULL;
+        list_for_each_safe(tmp, n, &rpaphp_slot_head) {
+                slot = list_entry(tmp, struct slot, rpaphp_slot_list);
+                if (strcmp(slot->location, drc_name) == 0)
+                        return slot;
+        }
 
-	return (struct slot *) php_slot->private;
+        return NULL;
 }
 
 static void rpadlpar_claim_one_bus(struct pci_bus *b)

@@ -246,17 +246,14 @@ static int get_cur_bus_speed(struct hotplug_slot *hotplug_slot, enum pci_bus_spe
 int rpaphp_remove_slot(struct slot *slot)
 {
 	int retval = 0;
-	char *rm_link;
+	struct hotplug_slot *php_slot = slot->hotplug_slot;
 
-	dbg("%s - Entry: slot[%s]\n", __FUNCTION__, slot->name);
-	if (slot->dev_type == PCI_DEV)
-		rm_link = pci_name(slot->bridge);
-	else
-		rm_link = strstr(slot->dn->full_name, "@");
-
-	sysfs_remove_link(slot->hotplug_slot->kobj.parent, rm_link);
 	list_del(&slot->rpaphp_slot_list);
-	retval = pci_hp_deregister(slot->hotplug_slot);
+	
+	/* remove "php_location" file */
+	rpaphp_sysfs_remove_attr_location(php_slot);
+
+	retval = pci_hp_deregister(php_slot);
 	if (retval)
 		err("Problem unregistering a slot %s\n", slot->name);
 
@@ -380,14 +377,7 @@ static void cleanup_slots(void)
 	 */
 
 	list_for_each_safe(tmp, n, &rpaphp_slot_head) {
-		char *rm_link;
-
 		slot = list_entry(tmp, struct slot, rpaphp_slot_list);
-		if (slot->dev_type == PCI_DEV)
-			rm_link = pci_name(slot->bridge);
-		else
-			rm_link = strstr(slot->dn->full_name, "@");
-		sysfs_remove_link(slot->hotplug_slot->kobj.parent, rm_link);
 		list_del(&slot->rpaphp_slot_list);
 		pci_hp_deregister(slot->hotplug_slot);
 	}
@@ -478,3 +468,4 @@ module_exit(rpaphp_exit);
 
 EXPORT_SYMBOL_GPL(rpaphp_add_slot);
 EXPORT_SYMBOL_GPL(rpaphp_remove_slot);
+EXPORT_SYMBOL_GPL(rpaphp_slot_head);

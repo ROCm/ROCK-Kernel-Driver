@@ -305,18 +305,89 @@
 #define  PCI_X_CMD_ERO		0x0002	/* Enable Relaxed Ordering */
 #define  PCI_X_CMD_MAX_READ	0x000c	/* Max Memory Read Byte Count */
 #define  PCI_X_CMD_MAX_SPLIT	0x0070	/* Max Outstanding Split Transactions */
-#define PCI_X_DEVFN		4	/* A copy of devfn. */
-#define PCI_X_BUSNR		5	/* Bus segment number */
-#define PCI_X_STATUS		6	/* PCI-X capabilities */
-#define  PCI_X_STATUS_64BIT	0x0001	/* 64-bit device */
-#define  PCI_X_STATUS_133MHZ	0x0002	/* 133 MHz capable */
-#define  PCI_X_STATUS_SPL_DISC	0x0004	/* Split Completion Discarded */
-#define  PCI_X_STATUS_UNX_SPL	0x0008	/* Unexpected Split Completion */
-#define  PCI_X_STATUS_COMPLEX	0x0010	/* Device Complexity */
-#define  PCI_X_STATUS_MAX_READ	0x0060	/* Designed Maximum Memory Read Count */
-#define  PCI_X_STATUS_MAX_SPLIT	0x0380	/* Design Max Outstanding Split Trans */
-#define  PCI_X_STATUS_MAX_CUM	0x1c00	/* Designed Max Cumulative Read Size */
-#define  PCI_X_STATUS_SPL_ERR	0x2000	/* Rcvd Split Completion Error Msg */
+#define  PCI_X_CMD_VERSION(x) 	(((x) >> 12) & 3) /* Version */
+#define PCI_X_STATUS		4	/* PCI-X capabilities */
+#define  PCI_X_STATUS_DEVFN	0x000000ff	/* A copy of devfn */
+#define  PCI_X_STATUS_BUS	0x0000ff00	/* A copy of bus nr */
+#define  PCI_X_STATUS_64BIT	0x00010000	/* 64-bit device */
+#define  PCI_X_STATUS_133MHZ	0x00020000	/* 133 MHz capable */
+#define  PCI_X_STATUS_SPL_DISC	0x00040000	/* Split Completion Discarded */
+#define  PCI_X_STATUS_UNX_SPL	0x00080000	/* Unexpected Split Completion */
+#define  PCI_X_STATUS_COMPLEX	0x00100000	/* Device Complexity */
+#define  PCI_X_STATUS_MAX_READ	0x00600000	/* Designed Max Memory Read Count */
+#define  PCI_X_STATUS_MAX_SPLIT	0x03800000	/* Designed Max Outstanding Split Transactions */
+#define  PCI_X_STATUS_MAX_CUM	0x1c000000	/* Designed Max Cumulative Read Size */
+#define  PCI_X_STATUS_SPL_ERR	0x20000000	/* Rcvd Split Completion Error Msg */
+#define  PCI_X_STATUS_266MHZ	0x40000000	/* 266 MHz capable */
+#define  PCI_X_STATUS_533MHZ	0x80000000	/* 533 MHz capable */
+
+/* Extended Capabilities (PCI-X 2.0 and Express) */
+#define PCI_EXT_CAP_ID(header)		(header & 0x0000ffff)
+#define PCI_EXT_CAP_VER(header)		((header >> 16) & 0xf)
+#define PCI_EXT_CAP_NEXT(header)	((header >> 20) & 0xffc)
+
+#define PCI_EXT_CAP_ID_ERR	1
+#define PCI_EXT_CAP_ID_VC	2
+#define PCI_EXT_CAP_ID_DSN	3
+#define PCI_EXT_CAP_ID_PWR	4
+
+/* Advanced Error Reporting */
+#define PCI_ERR_UNCOR_STATUS	4	/* Uncorrectable Error Status */
+#define  PCI_ERR_UNC_TRAIN	0x00000001	/* Training */
+#define  PCI_ERR_UNC_DLP	0x00000010	/* Data Link Protocol */
+#define  PCI_ERR_UNC_POISON_TLP	0x00001000	/* Poisoned TLP */
+#define  PCI_ERR_UNC_FCP	0x00002000	/* Flow Control Protocol */
+#define  PCI_ERR_UNC_COMP_TIME	0x00004000	/* Completion Timeout */
+#define  PCI_ERR_UNC_COMP_ABORT	0x00008000	/* Completer Abort */
+#define  PCI_ERR_UNC_UNX_COMP	0x00010000	/* Unexpected Completion */
+#define  PCI_ERR_UNC_RX_OVER	0x00020000	/* Receiver Overflow */
+#define  PCI_ERR_UNC_MALF_TLP	0x00040000	/* Malformed TLP */
+#define  PCI_ERR_UNC_ECRC	0x00080000	/* ECRC Error Status */
+#define  PCI_ERR_UNC_UNSUP	0x00100000	/* Unsupported Request */
+#define PCI_ERR_UNCOR_MASK	8	/* Uncorrectable Error Mask */
+	/* Same bits as above */
+#define PCI_ERR_UNCOR_SEVER	12	/* Uncorrectable Error Severity */
+	/* Same bits as above */
+#define PCI_ERR_COR_STATUS	16	/* Correctable Error Status */
+#define  PCI_ERR_COR_RCVR	0x00000001	/* Receiver Error Status */
+#define  PCI_ERR_COR_BAD_TLP	0x00000040	/* Bad TLP Status */
+#define  PCI_ERR_COR_BAD_DLLP	0x00000080	/* Bad DLLP Status */
+#define  PCI_ERR_COR_REP_ROLL	0x00000100	/* REPLAY_NUM Rollover */
+#define  PCI_ERR_COR_REP_TIMER	0x00001000	/* Replay Timer Timeout */
+#define PCI_ERR_COR_MASK	20	/* Correctable Error Mask */
+	/* Same bits as above */
+#define PCI_ERR_CAP		24	/* Advanced Error Capabilities */
+#define  PCI_ERR_CAP_FEP(x)	((x) & 31)	/* First Error Pointer */
+#define  PCI_ERR_CAP_ECRC_GENC	0x00000020	/* ECRC Generation Capable */
+#define  PCI_ERR_CAP_ECRC_GENE	0x00000040	/* ECRC Generation Enable */
+#define  PCI_ERR_CAP_ECRC_CHKC	0x00000080	/* ECRC Check Capable */
+#define  PCI_ERR_CAP_ECRC_CHKE	0x00000100	/* ECRC Check Enable */
+#define PCI_ERR_HEADER_LOG	28	/* Header Log Register (16 bytes) */
+#define PCI_ERR_ROOT_COMMAND	44	/* Root Error Command */
+#define PCI_ERR_ROOT_STATUS	48
+#define PCI_ERR_ROOT_COR_SRC	52
+#define PCI_ERR_ROOT_SRC	54
+
+/* Virtual Channel */
+#define PCI_VC_PORT_REG1	4
+#define PCI_VC_PORT_REG2	8
+#define PCI_VC_PORT_CTRL	12
+#define PCI_VC_PORT_STATUS	14
+#define PCI_VC_RES_CAP		16
+#define PCI_VC_RES_CTRL		20
+#define PCI_VC_RES_STATUS	26
+
+/* Power Budgeting */
+#define PCI_PWR_DSR		4	/* Data Select Register */
+#define PCI_PWR_DATA		8	/* Data Register */
+#define  PCI_PWR_DATA_BASE(x)	((x) & 0xff)	    /* Base Power */
+#define  PCI_PWR_DATA_SCALE(x)	(((x) >> 8) & 3)    /* Data Scale */
+#define  PCI_PWR_DATA_PM_SUB(x)	(((x) >> 10) & 7)   /* PM Sub State */
+#define  PCI_PWR_DATA_PM_STATE(x) (((x) >> 13) & 3) /* PM State */
+#define  PCI_PWR_DATA_TYPE(x)	(((x) >> 15) & 7)   /* Type */
+#define  PCI_PWR_DATA_RAIL(x)	(((x) >> 18) & 7)   /* Power Rail */
+#define PCI_PWR_CAP		12	/* Capability */
+#define  PCI_PWR_CAP_BUDGET(x)	((x) & 1)	/* Included in system budget */
 
 /* Include the ID list */
 
@@ -402,6 +473,8 @@ struct pci_dev {
 	/* device is compatible with these IDs */
 	unsigned short vendor_compatible[DEVICE_COUNT_COMPATIBLE];
 	unsigned short device_compatible[DEVICE_COUNT_COMPATIBLE];
+
+	int		cfg_size;	/* Size of configuration space */
 
 	/*
 	 * Instead of touching interrupt line and base address registers
@@ -602,6 +675,7 @@ struct pci_dev *pci_find_subsys (unsigned int vendor, unsigned int device,
 struct pci_dev *pci_find_class (unsigned int class, const struct pci_dev *from);
 struct pci_dev *pci_find_slot (unsigned int bus, unsigned int devfn);
 int pci_find_capability (struct pci_dev *dev, int cap);
+int pci_find_ext_capability (struct pci_dev *dev, int cap);
 struct pci_bus * pci_find_next_bus(const struct pci_bus *from);
 
 struct pci_dev *pci_get_device (unsigned int vendor, unsigned int device, struct pci_dev *from);
@@ -774,6 +848,7 @@ static inline int pci_assign_resource(struct pci_dev *dev, int i) { return -EBUS
 static inline int pci_register_driver(struct pci_driver *drv) { return 0;}
 static inline void pci_unregister_driver(struct pci_driver *drv) { }
 static inline int pci_find_capability (struct pci_dev *dev, int cap) {return 0; }
+static inline int pci_find_ext_capability (struct pci_dev *dev, int cap) {return 0; }
 static inline const struct pci_device_id *pci_match_device(const struct pci_device_id *ids, const struct pci_dev *dev) { return NULL; }
 
 /* Power management related routines */

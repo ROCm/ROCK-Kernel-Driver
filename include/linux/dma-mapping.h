@@ -10,6 +10,9 @@ enum dma_data_direction {
 	DMA_NONE = 3,
 };
 
+#define DMA_64BIT_MASK	0xffffffffffffffffULL
+#define DMA_32BIT_MASK	0x00000000ffffffffULL
+
 #include <asm/dma-mapping.h>
 
 /* Backwards compat, remove in 2.7.x */
