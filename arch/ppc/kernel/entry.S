@@ -200,9 +200,6 @@ ret_from_syscall:
 	andi.	r11,r11,_TIF_FORCE_NOERROR
 	bne	30f
 	neg	r3,r3
-	cmpi	0,r3,ERESTARTNOHAND
-	bne	22f
-	li	r3,EINTR
 22:	lwz	r10,_CCR(r1)	/* Set SO bit in CR */
 	oris	r10,r10,0x1000
 	stw	r10,_CCR(r1)
