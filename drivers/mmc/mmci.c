@@ -196,7 +196,7 @@ static int mmci_pio_read(struct mmci_host *host, struct request *req, u32 status
 	int ret = 0;
 
 	do {
-		unsigned int count;
+		unsigned long flags;
 		char *buffer;
 
 		/*
@@ -205,18 +205,27 @@ static int mmci_pio_read(struct mmci_host *host, struct request *req, u32 status
 		if (!(status & MCI_RXDATAAVLBL))
 			break;
 
-		buffer = req->buffer;
-		count = host->size - (readl(base + MMCIFIFOCNT) << 2);
+		/*
+		 * Map the BIO buffer.
+		 */
+		buffer = bio_kmap_irq(req->bio, &flags);
 
-		if (count > 0) {
-			ret = 1;
-			readsl(base + MMCIFIFO, buffer + host->offset, count >> 2);
-			host->offset += count;
-			host->size -= count;
-		}
+		do {
+			int count = host->size - (readl(base + MMCIFIFOCNT) << 2);
 
-		status = readl(base + MMCISTATUS);
-	} while (status & MCI_RXDATAAVLBL);
+			if (count > 0) {
+				ret = 1;
+				readsl(base + MMCIFIFO, buffer + host->offset, count >> 2);
+				host->offset += count;
+				host->size -= count;
+			}
+
+			status = readl(base + MMCISTATUS);
+		} while (status & MCI_RXDATAAVLBL && host->size);
+
+		bio_kunmap_irq(buffer, &flags);
+		break;
+	} while (1);
 
 	return ret;
 }
@@ -227,7 +236,7 @@ static int mmci_pio_write(struct mmci_host *host, struct request *req, u32 statu
 	int ret = 0;
 
 	do {
-		unsigned int count, maxcnt;
+		unsigned long flags;
 		char *buffer;
 
 		/*
@@ -238,20 +247,30 @@ static int mmci_pio_write(struct mmci_host *host, struct request *req, u32 statu
 		if (!(status & MCI_TXFIFOHALFEMPTY))
 			break;
 
-		buffer = req->buffer;
-		maxcnt = status & MCI_TXFIFOEMPTY ?
-			 MCI_FIFOSIZE : MCI_FIFOHALFSIZE;
-		count = min(host->size, maxcnt);
+		/*
+		 * Map the BIO buffer.
+		 */
+		buffer = bio_kmap_irq(req->bio, &flags);
 
-		writesl(base + MMCIFIFO, buffer + host->offset, count >> 2);
+		do {
+			unsigned int count, maxcnt;
 
-		host->offset += count;
-		host->size -= count;
+			maxcnt = status & MCI_TXFIFOEMPTY ?
+				 MCI_FIFOSIZE : MCI_FIFOHALFSIZE;
+			count = min(host->size, maxcnt);
 
-		ret = 1;
+			writesl(base + MMCIFIFO, buffer + host->offset, count >> 2);
+			host->offset += count;
+			host->size -= count;
 
-		status = readl(base + MMCISTATUS);
-	} while (status & MCI_TXFIFOHALFEMPTY);
+			ret = 1;
+
+			status = readl(base + MMCISTATUS);
+		} while (status & MCI_TXFIFOHALFEMPTY && host->size);
+
+		bio_kunmap_irq(buffer, &flags);
+		break;
+	} while (1);
 
 	return ret;
 }
