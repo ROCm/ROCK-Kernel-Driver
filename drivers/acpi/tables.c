@@ -494,6 +494,15 @@ acpi_table_get_sdt (
 		}
 	}
 
+	/* 
+	 * The DSDT is *not* in the RSDT (why not? no idea.) but we want
+	 * to print its info, because this is what people usually blacklist
+	 * against. Unfortunately, we don't know the phys_addr, so just
+	 * print 0. Maybe no one will notice.
+	 */
+	if(!acpi_get_table_header_early(ACPI_DSDT, &header))
+		acpi_table_print(header, 0);
+
 	return 0;
 }
 
