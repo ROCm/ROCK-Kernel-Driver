@@ -342,8 +342,18 @@ static struct dentry * real_lookup(struct dentry * parent, struct qstr * name, i
 	 *
 	 * FIXME! This could use version numbering or similar to
 	 * avoid unnecessary cache lookups.
+	 *
+	 * The "dcache_lock" is purely to protect the RCU list walker
+	 * from concurrent renames at this point (we mustn't get false
+	 * negatives from the RCU list walk here, unlike the optimistic
+	 * fast walk).
+	 *
+	 * We really should do a sequence number thing to avoid this
+	 * all.
 	 */
+	spin_lock(&dcache_lock);
 	result = d_lookup(parent, name);
+	spin_unlock(&dcache_lock);
 	if (!result) {
 		struct dentry * dentry = d_alloc(parent, name);
 		result = ERR_PTR(-ENOMEM);

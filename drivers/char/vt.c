@@ -2443,7 +2443,7 @@ static void vc_init(unsigned int currcons, unsigned int rows, unsigned int cols,
 struct tty_driver console_driver;
 static int console_refcount;
 
-static void __init con_init(void)
+static int __init con_init(void)
 {
 	const char *display_desc = NULL;
 	unsigned int currcons = 0;
@@ -2452,7 +2452,7 @@ static void __init con_init(void)
 		display_desc = conswitchp->con_startup();
 	if (!display_desc) {
 		fg_console = 0;
-		return;
+		return 0;
 	}
 
 	init_timer(&console_timer);
@@ -2491,6 +2491,7 @@ static void __init con_init(void)
 #ifdef CONFIG_VT_CONSOLE
 	register_console(&vt_console_driver);
 #endif
+	return 0;
 }
 console_initcall(con_init);
 
