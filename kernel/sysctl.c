@@ -852,7 +852,16 @@ asmlinkage long sys_sysctl(struct __sysctl_args __user *args)
 
 	if (copy_from_user(&tmp, args, sizeof(tmp)))
 		return -EFAULT;
-		
+	
+	if (tmp.nlen != 2 || tmp.name[0] != CTL_KERN ||
+	    tmp.name[1] != KERN_VERSION) { 
+		int i;
+		printk(KERN_INFO "%s: numerical sysctl ", current->comm); 
+		for (i = 0; i < tmp.nlen; i++) 
+			printk("%d ", tmp.name[i]); 
+		printk("is obsolete.\n");
+	} 
+
 	lock_kernel();
 	error = do_sysctl(tmp.name, tmp.nlen, tmp.oldval, tmp.oldlenp,
 			  tmp.newval, tmp.newlen);
