@@ -294,6 +294,9 @@
 #define SPRN_SPRG7	0x117	/* Special Purpose Register General 7 */
 #define SPRN_SRR0	0x01A	/* Save/Restore Register 0 */
 #define SPRN_SRR1	0x01B	/* Save/Restore Register 1 */
+#ifndef SPRN_SVR
+#define SPRN_SVR	0x11E	/* System Version Register */
+#endif
 #define SPRN_THRM1	0x3FC		/* Thermal Management Register 1 */
 /* these bits were defined in inverted endian sense originally, ugh, confusing */
 #define THRM1_TIN	(1 << 31)
@@ -400,6 +403,7 @@
 #define SRR1	SPRN_SRR1	/* Save and Restore Register 1 */
 #define SRR2	SPRN_SRR2	/* Save and Restore Register 2 */
 #define SRR3	SPRN_SRR3	/* Save and Restore Register 3 */
+#define SVR	SPRN_SVR	/* System Version Register */
 #define ICTC	SPRN_ICTC	/* Instruction Cache Throttling Control Reg */
 #define THRM1	SPRN_THRM1	/* Thermal Management Register 1 */
 #define THRM2	SPRN_THRM2	/* Thermal Management Register 2 */
@@ -462,6 +466,8 @@
 #define PVR_7400	0x000C0000
 #define PVR_7410	0x800C0000
 #define PVR_7450	0x80000000
+#define PVR_8540	0x80200000
+#define PVR_8560	0x80200000
 /*
  * For the 8xx processors, all of them report the same PVR family for
  * the PowerPC core. The various versions of these processors must be
@@ -475,6 +481,12 @@
 #define PVR_8240	0x00810100
 #define PVR_8245	0x80811014
 #define PVR_8260	PVR_8240
+
+/* System Version Numbers */
+#define SVR_8540	0x80300000
+#define SVR_8541E	0x807A0000
+#define SVR_8555E	0x80790000
+#define SVR_8560	0x80700000
 
 /* Segment Registers */
 #define SR0	0

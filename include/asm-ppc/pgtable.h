@@ -222,6 +222,43 @@ extern unsigned long ioremap_bot, ioremap_base;
 /* ERPN in a PTE never gets cleared, ignore it */
 #define _PTE_NONE_MASK	0xffffffff00000000ULL
 
+#elif defined(CONFIG_E500)
+
+/*
+   MMU Assist Register 3:
+
+   32 33 34 35 36  ... 50 51 52 53 54 55 56 57 58 59 60 61 62 63
+   RPN......................  0  0 U0 U1 U2 U3 UX SX UW SW UR SR
+
+   - PRESENT *must* be in the bottom three bits because swap cache
+     entries use the top 29 bits.
+
+   - FILE *must* be in the bottom three bits because swap cache
+     entries use the top 29 bits.
+*/
+
+/* Definitions for e500 core */
+#define _PAGE_PRESENT	0x001	/* S: PTE contains a translation */
+#define _PAGE_USER	0x002	/* S: User page (maps to UR) */
+#define _PAGE_FILE	0x002	/* S: when !present: nonlinear file mapping */
+#define _PAGE_ACCESSED	0x004	/* S: Page referenced */
+#define _PAGE_HWWRITE	0x008	/* H: Dirty & RW, set in exception */
+#define _PAGE_RW	0x010	/* S: Write permission */
+#define _PAGE_HWEXEC	0x020	/* H: UX permission */
+
+#define _PAGE_ENDIAN	0x040	/* H: E bit */
+#define _PAGE_GUARDED	0x080	/* H: G bit */
+#define _PAGE_COHERENT	0x100	/* H: M bit */
+#define _PAGE_NO_CACHE	0x200	/* H: I bit */
+#define _PAGE_WRITETHRU	0x400	/* H: W bit */
+#define _PAGE_DIRTY	0x800	/* S: Page dirty */
+
+#define _PMD_PRESENT	0
+#define _PMD_PRESENT_MASK (PAGE_MASK)
+#define _PMD_BAD	(~PAGE_MASK)
+
+#define NUM_TLBCAMS	(16)
+
 #elif defined(CONFIG_8xx)
 /* Definitions for 8xx embedded chips. */
 #define _PAGE_PRESENT	0x0001	/* Page is valid */

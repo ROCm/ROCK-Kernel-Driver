@@ -63,6 +63,11 @@ static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
 #define LAST_CONTEXT    	255
 #define FIRST_CONTEXT    	1
 
+#elif CONFIG_E500
+#define NO_CONTEXT      	256
+#define LAST_CONTEXT    	255
+#define FIRST_CONTEXT    	1
+
 #else
 
 /* PPC 6xx, 7xx CPUs */

@@ -34,7 +34,8 @@ extern void __setup_cpu_8xx(unsigned long offset, int cpu_nr, struct cpu_spec* s
 extern void __setup_cpu_generic(unsigned long offset, int cpu_nr, struct cpu_spec* spec);
 
 #define CLASSIC_PPC (!defined(CONFIG_8xx) && !defined(CONFIG_4xx) && \
-		     !defined(CONFIG_POWER3) && !defined(CONFIG_POWER4))
+		     !defined(CONFIG_POWER3) && !defined(CONFIG_POWER4) && \
+		     !defined(CONFIG_BOOKE))
 
 /* This table only contains "desktop" CPUs, it need to be filled with embedded
  * ones as well...
@@ -561,6 +562,16 @@ struct cpu_spec	cpu_specs[] = {
         0, /*__setup_cpu_440 */
     },
 #endif /* CONFIG_44x */
+#ifdef CONFIG_E500
+    { /* e500 */
+        0xffff0000, 0x80200000, "e500",
+	/* xxx - galak: add CPU_FTR_CAN_DOZE */
+        CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB,
+        PPC_FEATURE_32 | PPC_FEATURE_HAS_MMU,
+        32, 32,
+        0, /*__setup_cpu_e500 */
+    },
+#endif
 #if !CLASSIC_PPC
     {	/* default match */
     	0x00000000, 0x00000000, "(generic PPC)",

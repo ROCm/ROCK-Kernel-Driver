@@ -28,7 +28,7 @@
 
 #include "open_pic_defs.h"
 
-#ifdef CONFIG_PRPMC800
+#if defined(CONFIG_PRPMC800) || defined(CONFIG_85xx)
 #define OPENPIC_BIG_ENDIAN
 #endif
 
