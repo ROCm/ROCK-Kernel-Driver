@@ -121,6 +121,8 @@ extern int sun3fb_init(void);
 extern int sun3fb_setup(char *);
 extern int sgivwfb_init(void);
 extern int sgivwfb_setup(char*);
+extern int gbefb_init(void);
+extern int gbefb_setup(char*);
 extern int rivafb_init(void);
 extern int rivafb_setup(char*);
 extern int tdfxfb_init(void);
@@ -306,6 +308,9 @@ static struct {
 
 #ifdef CONFIG_FB_SGIVW
 	{ "sgivwfb", sgivwfb_init, sgivwfb_setup },
+#endif
+#ifdef CONFIG_FB_GBE
+	{ "gbefb", gbefb_init, gbefb_setup },
 #endif
 #ifdef CONFIG_FB_ACORN
 	{ "acornfb", acornfb_init, acornfb_setup },
