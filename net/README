@@ -1,0 +1,25 @@
+
+Maintainers and developers for networking code sections
+
+Code Section		Bug Report Contact
+-------------------+-------------------------------------------
+802 [other	]	alan@lxorguk.ukuu.org.uk	
+    [token ring	]	p.norton@computer.org
+appletalk		jschlst@turbolinux.com
+ax25			g4klx@g4klx.demon.co.uk
+bridge			buytenh@gnu.org
+core			alan@lxorguk.ukuu.org.uk
+decnet			SteveW@ACM.org
+ethernet		alan@lxorguk.ukuu.org.uk
+ipv4			davem@caip.rutgers.edu,Eric.Schenk@dna.lth.se
+ipv6			davem@caip.rutgers.edu,Eric.Schenk@dna.lth.se
+ipx/spx			jschlst@turbolinux.com
+irda                    dagb@cs.uit.no
+lapb			g4klx@g4klx.demon.co.uk
+netrom			g4klx@g4klx.demon.co.uk
+rose			g4klx@g4klx.demon.co.uk
+wanrouter		gene@compuserve.com, jaspreet@sangoma and dm@sangoma.com
+unix			alan@lxorguk.ukuu.org.uk
+x25			g4klx@g4klx.demon.co.uk
+
+

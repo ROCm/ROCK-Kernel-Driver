@@ -1,0 +1,42 @@
+
+Network Devices, the Kernel, and You!
+
+
+Introduction
+============
+The following is a random collection of documentation regarding
+network devices.
+
+
+
+struct net_device synchronization rules
+=======================================
+dev->open:
+	Locking: Inside rtnl_lock() semaphore.
+	Sleeping: OK
+
+dev->stop:
+	Locking: Inside rtnl_lock() semaphore.
+	Sleeping: OK
+
+dev->do_ioctl:
+	Locking: Inside rtnl_lock() semaphore.
+	Sleeping: OK
+
+dev->get_stats:
+	Locking: Inside dev_base_lock spinlock.
+	Sleeping: NO
+
+dev->hard_start_xmit:
+	Locking: Inside dev->xmit_lock spinlock.
+	Sleeping: NO
+
+dev->tx_timeout:
+	Locking: Inside dev->xmit_lock spinlock.
+	Sleeping: NO
+
+dev->set_multicast_list:
+	Locking: Inside dev->xmit_lock spinlock.
+	Sleeping: NO
+
+

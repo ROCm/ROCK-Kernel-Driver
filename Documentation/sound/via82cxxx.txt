@@ -1,0 +1,176 @@
+			Via motherboard audio driver
+	Copyright 1999,2000 Jeff Garzik <jgarzik@mandrakesoft.com>
+
+Driver software and documentation distributed under the GNU GENERAL
+PUBLIC LICENSE (GPL) Version 2. See the "COPYING" file distributed with
+this software for more info.
+
+
+
+Introduction
+------------------------------------------------------------------------
+The via82cxxx audio driver found in the drivers/sound directory
+of the kernel source tree is a PCI audio driver for audio chips
+found on Via-based motherboards, such as the MVP4.
+
+Currently the driver exports the following features:
+
+	* /dev/dsp and /dev/audio support
+	* 16-bit stereo PCM output channel
+	* AC97 mixer
+
+Please send bug reports to the mailing list linux-via@gtf.org.
+To subscribe, e-mail majordomo@gtf.org with "subscribe linux-via" in the
+body of the message.
+
+
+Thanks
+------------------------------------------------------------------------
+Via for providing e-mail support, specs, and NDA'd source code.
+
+MandrakeSoft for providing hacking time.
+
+AC97 mixer interface fixes and debugging by Ron Cemer <roncemer@gte.net>
+
+
+
+Installation
+------------------------------------------------------------------------
+If the driver is being statically compiled into the kernel, no
+configuration should be necessary.
+
+If the driver is being compiled as a module, generally one line must
+be added to your /etc/conf.modules (or /etc/modules.conf) file:
+
+	alias sound via82cxxx_audio
+
+
+
+Driver notes
+------------------------------------------------------------------------
+Two /proc pseudo-files provide diagnostic information.  This is generally
+not useful to most users.  Power users can disable VIA_PROC_FS macro in the 
+driver source code, and remove the /proc support code.  In any case, once
+version 2.0.0 is released, the /proc support code will be disabled by
+default.  Available /proc pseudo-files:
+
+	/proc/driver/via/0/info
+	/proc/driver/via/0/ac97
+
+This driver by default supports all PCI audio devices which report
+a vendor id of 0x1106, and a device id of 0x3058.  Subsystem vendor
+and device ids are not examined.
+
+Only supports a single sound chip, as this is a motherboard chipset.
+Some architecture remains for multiple cards, feel free to submit
+a patch to clean some of that up.  Ideally, 
+
+No consideration for SMP, this chipset is not known to be found on
+any SMP motherboards.  However, spin_locks must be used anyway in order
+to handle interrupts correctly.
+
+GNU indent formatting options:  -kr -i8 -pcs
+
+
+
+Tested Hardware
+------------------------------------------------------------------------
+The following is an _incomplete_ list of motherboards supported by this
+audio driver.  If your motherboard (or notebook) is not listed here,
+please e-mail the maintainer with details.
+
+	AOpen MX59 Pro
+	Compaq Presario 1247
+
+
+
+Random Developer Notes / Comments
+------------------------------------------------------------------------
+Via has graciously donated e-mail support and source code to help further
+the development of this driver.  Their assistance has been invaluable
+in the design and coding of the next major version of this driver.
+
+The Via audio chip apparently provides a second PCM scatter-gather
+DMA channel just for FM data, but does not have a full hardware MIDI
+processor.  I haven't put much thought towards a solution here, but it
+might involve using SoftOSS midi wave table, or simply disabling MIDI
+support altogether and using the FM PCM channel as a second (input? output?)
+
+
+
+General To-do List (patches/suggestions welcome)
+------------------------------------------------------------------------
+Recording support
+
+mmap support
+
+Other advanced ioctls
+
+Better docs
+
+Code review
+
+Native MIDI driver, as described above
+
+
+
+Known bugs (patches/suggestions welcome)
+------------------------------------------------------------------------
+1) Volume too low on many systems.  Workaround:  use mixer program
+such as xmixer to increase volume.
+
+2) RealPlayer output very scratchy.  Workaround:  use esd, and
+configure RealPlayer to output to esd.
+
+3) Applications which attempt to open the sound device in read/write
+mode (O_RDWR) will fail.  This is incorrect OSS behavior, but since
+this driver will eventually support recording as well as playback,
+we will be able to (in the future) support even broken programs which
+unconditionally use O_RDWR.
+
+
+
+Submitting a bug report
+------------------------------------------------------------------------
+Describe the application you were using to play/record sound, and how
+to reproduce the problem.
+
+Obtain the via-audio-diag diagnostics program from
+http://gtf.org/garzik/drivers/via82cxxx/ and provide a dump of the
+audio chip's registers while the problem is occurring.  Sample command line:
+	./via-audio-diag -aps > diag-output.txt
+
+Define "VIA_DEBUG" at the beginning of the driver, then capture and email
+the kernel log output.  This can be viewed in the system kernel log (if
+enabled), or via the 'dmesg' program.
+
+If you wish to increase the size of the buffer displayed by 'dmesg', then
+change the LOG_BUF_LEN macro at the top of linux/kernel/printk.c, recompile
+your kernel, and pass the "-s <size>" option to 'dmesg'.
+
+
+
+Change history
+------------------------------------------------------------------------
+Version 1.1.7:
+* Fix module unload bug where mixer device left registered
+  after driver exit
+
+Version 1.1.6:
+* Rewrite via_set_rate to mimic ALSA basic AC97 rate setting
+* Remove much dead code
+* Complete spin_lock_irqsave -> spin_lock_irq conversion in via_dsp_ioctl
+* Fix build problem in via_dsp_ioctl
+* Optimize included headers to eliminate headers found in linux/drivers/sound
+
+Version 1.1.5:
+* Disable some overly-verbose debugging code
+* Remove unnecessary sound locks
+* Fix some ioctls for better time resolution
+* Begin spin_lock_irqsave -> spin_lock_irq conversion in via_dsp_ioctl
+
+Version 1.1.4:
+* Completed rewrite of driver.  Eliminated SoundBlaster compatibility
+  completely, and now uses the much-faster scatter-gather DMA engine.
+
+

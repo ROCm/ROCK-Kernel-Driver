@@ -1,0 +1,227 @@
+
+Computone Intelliport II/Plus Multiport Serial Driver
+-----------------------------------------------------
+
+Release Notes For Linux Kernel 2.2
+These notes have been tested on Linux kernels 2.0 and 2.2.
+
+Please refer to Documentation/computone.txt for information on the driver
+that is included with the kernel sources.
+
+
+Version: 1.2.9
+Date: 04/12/2000
+Fixes and Updates: Doug McNash 
+Historical Author: Andrew Manison 
+Kernel Integration: Mike Warfield <mhw@wittsend.com>
+
+1. INTRODUCTION
+
+This driver supports the entire family of Intelliport II/Plus controllers
+with the exception of the MicroChannel controllers. 
+
+This driver was developed on the v2.0.x Linux source tree and has been 
+tested up to v2.2.14; it will probably not work with earlier v1.X kernels, 
+and has not yet been tested on the v2.1.x tree. The most likely problems 
+will be in patching the kernel sources to support the driver. For this
+reason there are 2 different patch files for 2.0.XX and 2.2.XX kernels.
+Make sure you use the right one!
+Note that a version (1.2.5) is included in the 2.2.12+ kernels so this
+will not be a new install but and upgrade.
+
+
+2. QUICK INSTALLATION
+
+Hardware - If you have an ISA card, find a free interrupt and io port. 
+		   List those in use with `cat /proc/interrupts` and 
+		   `cat /proc/ioports`.  Set the card dip switches to that free 
+		   address.  You may need to configure your BIOS to reserve the
+		   irq for the ISA card.  PCI and EISA parameters are set
+		   automagically and need only be set to nonzero values.
+		   Insert card into computer with the power off before or after
+		   driver installation.
+
+Software - New Installation
+
+Module installation:
+
+a) Obtain driver-kernel patch file
+b) Copy to the linux source tree root, Run ip2build (if not patch)
+c) Determine free irq/address to use if any (configure BIOS if need be)
+d) Run "make config" or "make menuconfig" or "make xconfig"
+   Select (m) module for CONFIG_COMPUTONE under character
+   devices.  CONFIG_PCI and CONFIG_MODULES also may need to be set.
+e) Set address on ISA cards then:
+   edit /usr/src/linux/drivers/char/ip2/ip2.h if needed 
+	or
+   edit /etc/modules.conf if needed (module).
+	or both to match this setting.
+f) Run "make dep"
+g) Run "make modules"
+h) Run "make modules_install"
+i) Run "/sbin/depmod -a"
+i) install driver using `modprobe ip2 <options>` (options listed below)
+j) run mkip2dev
+
+
+Kernel installation:
+
+a) Obtain driver-kernel patch file
+b) Copy to the linux source tree root, Run ip2build (if not patch)
+c) Determine free irq/address to use if any (configure BIOS if need be)
+d) Run "make config" or "make menuconfig" or "make xconfig"
+   Select (y) kernel for CONFIG_COMPUTONE under character
+   devices.  CONFIG_PCI may need to be set if you have PCI bus.
+e) Set address on ISA cards then:
+	   edit /usr/src/linux/drivers/char/ip2/ip2.h  
+f) Run "make dep"
+g) Run "make zImage" or whatever target you prefer.
+h) mv /usr/src/linux/arch/i386/boot/zImage to /boot.
+i) add new config for this kernel into /etc/lilo.conf, run "lilo"
+j) reboot using this kernel
+k) make and run ip2/mkip2dev
+
+Software - Upgrades
+
+a) Install new sources in proper location, usually /usr/src/linux/drivers/char
+b) Follow steps above to create new kernel or modules
+
+3. INSTALLATION
+
+Previously, the driver sources were packaged with a set of patch files
+to update the character drivers' makefile and configuration file, and other 
+kernel source files. A build script (ip2build) was included which applies 
+the patches if needed, and build any utilities needed.
+What you recieve may be a single patch file in conventional kernel
+patch format build script. That form can also be applied by
+running patch -p1 < ThePatchFile.  Otherwise the drivers source may be
+a tar file, then untar and run ip2build if a new installation.
+ 
+The driver can be installed as a module (recommended) or built into the 
+kernel. This is selected as for other drivers through the `make config`
+command from the root of the Linux source tree. If the driver is built 
+into the kernel you will need to edit the file ip2.h to match the boards 
+you are installing. See that file for instructions. If the driver is 
+installed as a module the configuration can also be specified on the
+modprobe command line as follows:
+
+	modprobe ip2 irq=irq1,irq2,irq3,irq4 io=addr1,addr2,addr3,addr4
+
+where irqnum is one of the valid Intelliport II interrupts (3,4,5,7,10,11,
+12,15) and addr1-4 are the base addresses for up to four controllers. If 
+the irqs are not specified the driver uses the default in ip2/ip2.h (which 
+selects polled mode). The io addresses are set to io=1 for PCI cards,i
+io=2 for EISA cards or io=[some valid ISA address] for ISA cards.  If no
+base addresses are specified the defaults in ip2.h are used. If you are
+autoloading the driver module with kerneld or kmod the base addresses and
+interrupt number must also be set in ip2/ip2.h and recompile or just insert
+an options line in /etc/modules.conf or both.  The command line takes
+precidence over the options line which takes precidence over the defaults
+in ip2.h. 
+
+command line sample:
+	
+	modprobe ip2 io=1,0x328 irq=1,10
+
+/etc/modules.conf sample:
+
+	options ip2 io=1,0x328 irq=1,10
+	alias char-major-71 ip2
+	alias char-major-72 ip2
+	alias char-major-73 ip2
+
+the equivelant ip2.h:
+
+static ip2config_t ip2config =
+{
+	{1,10,0,0},
+	{
+		0x0001,    // Board 0, ttyF0   - ttyF63		/* PCI card */
+		0x0328,    // Board 1, ttyF64  - ttyF127	/* ISA card */
+		0x0000,    // Board 2, ttyF128 - ttyF191	/* empty */
+		0x0000     // Board 3, ttyF192 - ttyF255	/* empty */
+	}
+};
+
+Specifying an invalid or in-use ISA irq will default the driver into
+running in polled mode for that card.  If all irq entries are 0 then
+all cards will operate in polled mode.  Note that the PCI will be
+assigned it's irq by the BIOS and may not match what you specify.
+It must be non-zero otherwise it will be polled.
+
+Tarball Install:
+
+The whole tarfile should be untarred in the /usr/src/linux/drivers/char/
+directory. Most files required for the driver are placed in the ip2
+subdirectory. Then execute the script (for a new install only)
+
+	ip2build
+
+which will patch the files.
+
+Kernel Patch Install:
+
+	cd to the Linux source root, run patch -p1 < ThePatchFile. 
+
+Now return to the root directory of the Linux
+source tree and run make config or make menuconfig. You will be prompted
+for the Computone drivers, either as a module or part of the kernel. 
+If you have a PCI card you many need to select PCI bios support (CONFIG_PCI)
+if not enabled already.  Ditto for CONFIG_MODULES if you use modules.
+
+If you select the driver as part of the kernel run :
+
+	make depend
+	make bzImage(,zlilo or whatever you do to create a bootable kernel)
+
+If you selected a module run :
+
+	make modules && make modules_install
+
+The utility ip2mkdev creates all the device nodes required by the driver.
+For a device to be created it must be configured in the driver and the 
+board must be installed. Only devices corresponding to real IntelliPort II 
+ports are created. With multiple boards and expansion boxes this will 
+leave gaps in the sequence of device names. ip2mkdev uses Linux tty naming 
+conventions: ttyF0 - ttyF255 for normal devices, and cuf0 - cuf255 for 
+callout devices.  Note that the callout devices are going away in the
+future and that is what the warning messages are trying to tell you.
+
+4. USING THE DRIVERS
+
+As noted above, the driver implements the ports in accordance with Linux
+conventions, and the devices should be interchangeable with the standard
+serial devices. (This is a key point for problem reporting: please make
+sure that what you are trying do works on the ttySx/cuax ports first; then 
+tell us what went wrong with the ip2 ports!)
+
+Higher speeds can be obtained using the setserial utility which remaps 
+38,400 bps (extb) to 57,600 bps, 115,200 bps, or a custom speed. 
+Intelliport II installations using the PowerPort expansion module can
+use the custom speed setting to select the highest speeds: 153,600 bps,
+230,400 bps, 307,200 bps, 460,800bps and 921,600 bps. The base for
+custom baud rate configuration is fixed at 921,600 for cards/expantion
+modules with ST654's and 115200 for those with Cirrus CD1400's.  This
+corresponds to the maximum bit rates those chips are capable.  
+For example if the baud base is 921600 and the baud divisor is 18 then
+the custom rate is 921600/18 = 51200 bps.  See the setserial man page for
+complete details. Of course, if stty accepts the higher rates now you can
+use that as well as the standard ioctls().
+
+5. NOTES
+
+This is a release version of the driver, but it is impossible to test it
+in all configurations of Linux. If there is any anomalous behaviour that 
+does not match the standard serial port's behaviour please let us know.
+
+Some installations report that characters fail to echo immediatly at a
+terminal if the kernel/modules are compiled with the CONFIG_M386 and
+the card is run in polling mode on a pentium class machine.  Compiling
+with a more appropriate processor flag or running on interrupt would be
+the fix as well as the wise thing to do.
+
+
+
+Author:  dougm@computone.com
+Testing: larryg@computone.com
+Support: support@computone.com

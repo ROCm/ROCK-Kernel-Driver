@@ -1,0 +1,46 @@
+The Intel Assabet (SA-1110 evaluation) board
+============================================
+
+Please see:
+http://developer.intel.com/design/strong/quicklist/eval-plat/sa-1110.htm
+http://developer.intel.com/design/strong/guides/278278.htm
+
+Also some notes from John G Dorsey <jd5q@andrew.cmu.edu>:
+http://www.cs.cmu.edu/~wearable/software/assabet.html
+
+
+To build the kernel:
+
+	make assabet_config
+	make config
+	[accept all defaults]
+	make dep
+	make zImage
+
+Typically, you'll need angelboot to load the kernel.
+The following angelboot.opt file should be used:
+
+----- begin angelboot.opt -----
+base 0xc0008000
+entry 0xc0008000
+r0 0x00000000
+r1 0x00000019
+device /dev/ttyS1
+options "9600 8N1"
+baud 115200
+otherfile ramdisk_img.gz
+otherbase 0xc0800000
+exec minicom
+----- end angelboot.opt -----
+
+Then load the kernel and ramdisk with:
+
+	angelboot -f angelboot.opt zImage
+
+Here it is assumed that your Assabet is connected to ttyS1 and that
+minicom is preconfigured with /dev/ttyS1, 9600 baud, 8N1, no flow control
+by default.
+
+This is work in progress...
+
+Please send any patches to nico@cam.org.

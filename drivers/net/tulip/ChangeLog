@@ -1,0 +1,34 @@
+2000-12-17  Alan Cox <alan@redhat.com>
+
+	* merge support for the Davicom's quirks into the main tulip. Patch
+	  by Tobias Ringstrom
+
+2000-11-02  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* tulip_core.c (set_rx_mode): This is synchronized via
+	dev->xmit_lock, so only the queueing of the setup frame needs to
+	be locked, against tulip_interrupt.
+
+2000-11-02  Alexey Kuznetov  <kuznet@ms2.inr.ac.ru>
+
+	* timer.c (tulip_timer): Call netif_carrier_{on,off} to report
+	link state to the rest of the kernel, and userspace.
+	* interrupt.c (tulip_interrupt): Remove tx_full.
+	* tulip.h: Likewise.
+	* tulip_core.c (tulip_init_ring, tulip_start_xmit, set_rx_mode):
+	Likewise.
+
+2000-10-18  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* tulip_core.c: (tulip_init_one) Print out ethernet interface
+	on error.  Print out a message when pci_enable_device fails.
+	Handle DMA alloc failure.
+
+2000-10-18  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* Makefile: New file.
+	* tulip_core.c (tulip_init_one): Correct error messages
+	on PIO/MMIO region reserve failure.
+	(tulip_init_one) Add new check to ensure that PIO region is
+	sufficient for our needs.
+

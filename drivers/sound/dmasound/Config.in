@@ -1,0 +1,27 @@
+# drivers/sound/dmasound/Config.in
+
+if [ "$CONFIG_ATARI" = "y" ]; then
+   dep_tristate '  Atari DMA sound support' CONFIG_DMASOUND_ATARI $CONFIG_SOUND
+fi
+if [ "$CONFIG_ALL_PPC" = "y" ]; then
+   dep_tristate '  PowerMac DMA sound support' CONFIG_DMASOUND_AWACS $CONFIG_SOUND
+fi
+if [ "$CONFIG_AMIGA" = "y" -o "$CONFIG_APUS" = "y" ]; then
+   dep_tristate '  Amiga DMA sound support' CONFIG_DMASOUND_PAULA $CONFIG_SOUND
+fi
+if [ "$CONFIG_Q40" = "y" ]; then
+   dep_tristate '  Q40 sound support' CONFIG_DMASOUND_Q40 $CONFIG_SOUND
+fi
+if [ "$CONFIG_DMASOUND_ATARI" = "y" -o \
+     "$CONFIG_DMASOUND_AWACS" = "y" -o \
+     "$CONFIG_DMASOUND_PAULA" = "y" -o \
+     "$CONFIG_DMASOUND_Q40" = "y" ]; then
+   define_tristate CONFIG_DMASOUND y
+else
+   if [ "$CONFIG_DMASOUND_ATARI" = "m" -o \
+	"$CONFIG_DMASOUND_AWACS" = "m" -o \
+	"$CONFIG_DMASOUND_PAULA" = "m" -o \
+	"$CONFIG_DMASOUND_Q40" = "m" ]; then
+      define_tristate CONFIG_DMASOUND m
+   fi
+fi

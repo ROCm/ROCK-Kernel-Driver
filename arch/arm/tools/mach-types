@@ -1,0 +1,60 @@
+# Database of machine macros and numbers
+#
+# Please do not send patches to this file; it is automatically generated!
+# To add an entry into this database, please see Documentation/arm/README,
+# or contact rmk@arm.linux.org.uk
+#
+# Last update: Mon Nov 20 22:59:11 2000
+#
+# machine_is_xxx	CONFIG_xxxx		MACH_TYPE_xxx		number
+#
+ebsa110			ARCH_EBSA110		EBSA110			0
+riscpc			ARCH_RPC		RISCPC			1
+nexuspci		ARCH_NEXUSPCI		NEXUSPCI		3
+ebsa285			ARCH_EBSA285		EBSA285			4
+netwinder		ARCH_NETWINDER		NETWINDER		5
+cats			ARCH_CATS		CATS			6
+tbox			ARCH_TBOX		TBOX			7
+co285			ARCH_CO285		CO285			8
+clps7110		ARCH_CLPS7110		CLPS7110		9
+archimedes		ARCH_ARC		ARCHIMEDES		10
+a5k			ARCH_A5K		A5K			11
+etoile			ARCH_ETOILE		ETOILE			12
+lacie_nas		ARCH_LACIE_NAS		LACIE_NAS		13
+clps7500		ARCH_CLPS7500		CLPS7500		14
+shark			ARCH_SHARK		SHARK			15
+brutus			SA1100_BRUTUS		BRUTUS			16
+personal_server		ARCH_PERSONAL_SERVER	PERSONAL_SERVER		17
+itsy			SA1100_ITSY		ITSY			18
+l7200			ARCH_L7200		L7200			19
+pleb			SA1100_PLEB		PLEB			20
+integrator		ARCH_INTEGRATOR		INTEGRATOR		21
+bitsy			SA1100_BITSY		BITSY			22
+ixp1200			ARCH_IXP1200		IXP1200			23
+p720t			ARCH_P720T		P720T			24
+assabet			SA1100_ASSABET		ASSABET			25
+victor			SA1100_VICTOR		VICTOR			26
+lart			SA1100_LART		LART			27
+ranger			ARCH_RANGER		RANGER			28
+graphicsclient		SA1100_GRAPHICSCLIENT	GRAPHICSCLIENT		29
+xp860			SA1100_XP860		XP860			30
+cerf			SA1100_CERF		CERF			31
+nanoengine		SA1100_NANOENGINE	NANOENGINE		32
+fpic			SA1100_FPIC		FPIC			33
+extenex1		SA1100_EXTENEX1		EXTENEX1		34
+sherman			SA1100_SHERMAN		SHERMAN			35
+accelent_sa		SA1100_ACCELENT		ACCELENT_SA		36
+accelent_l7200		ARCH_L7200_ACCELENT	ACCELENT_L7200		37
+netport			SA1100_NETPORT		NETPORT			38
+pangolin		SA1100_PANGOLIN		PANGOLIN		39
+yopy			SA1100_YOPY		YOPY			40
+sa1100			SA1100_SA1100		SA1100			41
+huw_webpanel		ARCH_HUW_WEBPANEL	HUW_WEBPANEL		42
+spotme			ARCH_SPOTME		SPOTME			43
+freebird		ARCH_FREEBIRD		FREEBIRD		44
+ti925			ARCH_TI925		TI925			45
+riscstation		ARCH_RISCSTATION	RISCSTATION		46
+cavy			SA1100_CAVY		CAVY			47
+
+# The following are unallocated
+empeg			SA1100_EMPEG		EMPEG

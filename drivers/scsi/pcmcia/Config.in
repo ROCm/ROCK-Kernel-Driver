@@ -1,0 +1,23 @@
+#
+# PCMCIA SCSI adapter configuration
+#
+
+mainmenu_option next_comment
+comment 'PCMCIA SCSI adapter support'
+
+bool 'PCMCIA SCSI adapter support' CONFIG_SCSI_PCMCIA
+if [ "$CONFIG_SCSI_PCMCIA" = "y" ]; then
+   dep_tristate '  Adaptec AHA152X PCMCIA support' CONFIG_PCMCIA_AHA152X m
+   dep_tristate '  Qlogic PCMCIA support' CONFIG_PCMCIA_QLOGIC m
+   dep_tristate '  Future Domain PCMCIA support' CONFIG_PCMCIA_FDOMAIN m
+   if [ "$CONFIG_CARDBUS" = "y" ]; then
+      dep_tristate '  Adaptec APA1480 CardBus support' CONFIG_PCMCIA_APA1480 m
+   fi
+fi
+
+if [ "$CONFIG_PCMCIA_QLOGIC" = "y" -o "$CONFIG_PCMCIA_AHA152X" = "y" -o \
+     "$CONFIG_PCMCIA_FDOMAIN" = "y" -o "$CONFIG_PCMCIA_APA1480" = "y" ]; then
+   define_bool CONFIG_PCMCIA_SCSICARD y
+fi
+
+endmenu

@@ -1,0 +1,36 @@
+NTFS Overview
+=============
+
+To mount an NTFS volume, use the filesystem type 'ntfs'. The driver
+currently works only in read-only mode, with no fault-tolerance
+supported.  If you enable the experimental write support, make sure
+you can recover from a complete loss of data and also always run
+chkdsk from within Microsoft Windows NT after performing a write to
+a NTFS partition from Linux to detect any problems as early as 
+possible. For ftdisk support, limited success was reported with 
+volume sets on top of the md driver, although mirror and stripe 
+sets should work as well - if the md driver can be talked into 
+using the same layout as Windows NT.
+
+Please note that the experimental write support is limited to
+Windows NT4 and earlier versions.
+
+The ntfs driver supports the following mount options:
+iocharset=name      Character set to use when returning file names.
+                    Unlike VFAT, NTFS suppresses names that contain
+		    unconvertible characters
+utf8=<bool>	    Use UTF-8 for converting file names
+uni_xlate=<bool>,2  Use the VFAT-style encoding for file names outside
+		    the current character set. A boolean value will
+		    enable the feature, a value of 2 will enable the
+		    encoding as documented in vfat.txt:
+		    ':', (u & 0x3f), ((u>>6) & 0x3f), (u>>12),
+uid=
+gid=
+umask=              These options work as documented in mount(8).
+		    By default, the files are owned by root and
+		    not readable by somebody else.
+posix=<bool>	    If enabled, the file system distinguishes between
+		    upper and lower case. The 8.3 alias names are presented
+		    as hard links instead of being suppressed.
+

@@ -1,0 +1,81 @@
+#
+# For a description of the syntax of this configuration file,
+# see Documentation/kbuild/config-language.txt.
+#
+
+define_bool CONFIG_ISA n
+define_bool CONFIG_EISA n
+define_bool CONFIG_MCA n
+define_bool CONFIG_UID16 y
+
+mainmenu_name "Linux Kernel Configuration"
+define_bool CONFIG_ARCH_S390 y
+
+mainmenu_option next_comment
+comment 'Code maturity level options'
+bool 'Prompt for development and/or incomplete code/drivers' CONFIG_EXPERIMENTAL
+endmenu
+
+mainmenu_option next_comment
+comment 'Loadable module support'
+bool 'Enable loadable module support' CONFIG_MODULES
+if [ "$CONFIG_MODULES" = "y" ]; then
+   bool '  Set version information on all module symbols' CONFIG_MODVERSIONS
+   bool '  Kernel module loader' CONFIG_KMOD
+fi
+endmenu
+
+mainmenu_option next_comment
+comment 'Processor type and features'
+bool 'Symmetric multi-processing support' CONFIG_SMP
+bool 'IEEE FPU emulation' CONFIG_IEEEFPU_EMULATION
+endmenu
+
+mainmenu_option next_comment
+comment 'General setup'
+bool 'Fast IRQ handling' CONFIG_FAST_IRQ
+bool 'Builtin IPL record support' CONFIG_IPL
+if [ "$CONFIG_IPL" = "y" ]; then
+  choice 'IPL method generated into head.S' \
+          "tape                   CONFIG_IPL_TAPE \
+           vm_reader              CONFIG_IPL_VM" tape
+fi
+bool 'Networking support' CONFIG_NET
+bool 'System V IPC' CONFIG_SYSVIPC
+bool 'BSD Process Accounting' CONFIG_BSD_PROCESS_ACCT
+bool 'Sysctl support' CONFIG_SYSCTL
+tristate 'Kernel support for ELF binaries' CONFIG_BINFMT_ELF
+
+endmenu
+
+source drivers/s390/Config.in
+
+mainmenu_option next_comment
+comment 'Character devices'
+bool 'Unix98 PTY support' CONFIG_UNIX98_PTYS
+if [ "$CONFIG_UNIX98_PTYS" = "y" ]; then
+  int 'Maximum number of Unix98 PTYs in use (0-2048)' CONFIG_UNIX98_PTY_COUNT 256
+fi
+
+endmenu
+
+if [ "$CONFIG_NET" = "y" ]; then
+  source net/Config.in
+fi
+
+source fs/Config.in
+
+# source drivers/char/Config.in
+
+# source drivers/media/Config.in
+
+mainmenu_option next_comment
+comment 'Kernel hacking'
+
+#bool 'Debug kmalloc/kfree' CONFIG_DEBUG_MALLOC
+if [ "$CONFIG_CTC" = "y" ]; then
+  bool 'Remote GDB kernel debugging' CONFIG_REMOTE_DEBUG
+fi
+# this does not work. bool 'Magic SysRq key' CONFIG_MAGIC_SYSRQ
+endmenu
+

@@ -1,0 +1,497 @@
+(C)Copyright 1999-2000 SysKonnect.
+===========================================================================
+
+sk98lin.txt created 12-Sept-2000
+
+Readme File for sk98lin.o v3.05
+SK-NET Gigabit Ethernet Adapter SK-98xx Driver for Linux
+
+This file contains
+(1) OVERVIEW
+(2) REQUIRED FILES
+(3) INSTALLATION
+(4) INCLUSION OF THE ADAPTER AT SYSTEM START
+(5) DRIVER PARAMETERS
+(6) LARGE FRAME SUPPORT
+(7) TROUBLESHOOTING
+(8) HISTORY
+
+===========================================================================
+
+
+
+(1) OVERVIEW
+============
+
+The sk98lin driver supports the SysKonnect SK-NET Gigabit Ethernet
+Adapter SK-98xx family on Linux 2.2.x and above.
+It has been tested with Linux on Intel/x86, ALPHA and UltraSPARC machines.
+From v3.02 on, the driver is integrated in the linux kernel source.
+***
+
+
+(2) REQUIRED FILES
+==================
+
+The linux kernel source.
+No additional files required.
+***
+
+
+(3) INSTALLATION
+================
+
+The following steps describe the actions that are required to install
+the driver and to start it manually. These steps should be carried
+out for the initial driver setup. Once confirmed to be ok, they can
+be included in the system start which is described in the next
+chapter.
+
+NOTE 1: You must have 'root' access to the system to perform
+        the following tasks.
+NOTE 2:	IMPORTANT: In case of problems, please read the section
+	"Troubleshooting" below.
+
+1) The driver can either be integrated into the kernel or it can
+   be compiled as a module.
+   Select the appropriate option during the kernel configuration.
+   For use as a module, your kernel must have
+   'loadable module support' enabled.
+   For automatic driver start, you also need 'Kernel module loader'
+   enabled.
+   Configure those options, build and install the new kernel. If you
+   choose to use the driver as a module, do "make modules" and
+   "make modules_install".
+   Reboot your system.
+
+4) Load the module manually by entering:
+       insmod sk98lin.o
+   If the SysKonnect SK-98xx adapter is installed in your
+   computer and you have a /proc filesystem, running the command
+   'more /proc/net/dev' should produce an output containing a
+   line with the following format:
+       eth0:    0    0 ...
+   which means that your adapter has been found and initialized.
+   
+   NOTE 1: If you have more than one SysKonnect SK-98xx adapter, the
+           adapters will be listed as 'eth0', 'eth1', 'eth2', etc.
+           For each adapter, repeat the steps 5) and 6).
+   NOTE 2: If you have other Ethernet adapters installed,
+           your SysKonnect SK-98xx adapter can be mapped to 'eth1' or
+	   'eth2' ...
+	   The module installation message (in system logfile or
+	   on console, depending on /etc/syslog.conf) prints a line
+	   for each adapter that is found, containing the
+	   corresponding 'ethX'.
+
+5) Select an IP address and assign it to the respective adapter by
+   entering:
+       ifconfig eth0 <ip-address>
+   This causes the adapter to connect to the ethernet. The solitary
+   yellow LED at the adapter is now active, the link status LED of
+   the primary port is on and the link status LED of the secondary
+   port (on dual port adapters) is blinking (only if the laters are
+   connected to a switch or hub).
+   You will also get a status message on the console saying
+   "ethX: network connection up using port Y" and indicating
+   the selected connection parameters.
+   
+   NOTE: If you are in doubt about IP addresses, ask your network
+         administrator for assistance.
+
+6) Your adapter should now be fully operational.
+   Use 'ping <otherstation>' to verify the connection to other
+   computers on your network.
+   By entering 'ifconfig', you can check the number of packets sent
+   and received by your adapter and additional some other information
+   regarding the adapter configuration.
+
+7) The driver module can be stopped and unloaded using the following
+   commands:
+       ifconfig eth0 down
+       rmmod sk98lin
+***
+
+
+(4) INCLUSION OF THE ADAPTER AT SYSTEM START
+============================================
+
+Since a large number of different Linux distributions are 
+available, we are unable to describe a general installation procedure
+for the driver module.
+Because the driver is now integrated in the kernel, installation should
+be easy, using the standard mechanism of your distribution.
+Refer to the distribution's manual for installation of ethernet adapters.
+***
+
+
+(5) DRIVER PARAMETERS
+=====================
+
+Parameters can be set at the command line while loading the
+module with 'insmod'. The configuration tools of some distributions
+can also give parameters to the driver module.
+If you use the kernel module loader, you can set driver parameters
+in the file /etc/modules.conf (or old name: /etc/conf.modules).
+Insert a line of the form:
+
+options sk98lin ...
+
+For "...", use the same syntax as described below for the command
+line parameters of insmod.
+You either have to reboot your computer or unload and reload
+the driver to activate the new parameters.
+The syntax of the driver parameters is:
+
+insmod sk98lin parameter=value1[,value2[,value3...]]
+
+value1 is for the first adapter, value2 for the second one etc.
+All Parameters are case sensitive, so write them exactly as
+shown below.
+
+Sample: Suppose you have two adapters. You want to set AutoNegotiation
+	on Port A of the first adapter to ON and on Port A of the
+	second adapter to OFF.
+	You also want to set DuplexCapabilities on Port A of the first
+	adapter to FULL and on Port A of the second adapter to HALF.
+	You must enter:
+
+	insmod sk98lin.o AutoNeg_A=On,Off DupCap_A=Full,Half
+
+NOTE: The number of adapters that can be configured this way is
+      limited in the driver (file skge.c, constant SK_MAX_CARD_PARAM).
+      The current limit is 16. If you happen to install
+      more adapters, adjust this and recompile.
+
+
+5.1 Per-Port Parameters
+-----------------------
+Those setting are available for each port on the adapter.
+In the following description, '?' stands for the port for
+which you set the parameter (A or B).
+
+- Auto Negotiation
+  Parameter:	AutoNeg_?
+  Values:	On, Off, Sense
+  Default:	Sense
+  
+  The "Sense"-mode finds out automatically whether the link
+  partner supports autonegotiation or not.
+
+- Duplex Capabilities
+  Parameter:	DupCap_?
+  Values:	Half, Full, Both
+  Default:	Both
+
+  This parameters is relevant only if autonegotiation for
+  this port is not "Sense". If autonegotiation is "On", all
+  three values are possible. If it is "Off", only "Full" and
+  "Half" are allowed.
+  It is useful if your link partner does not support all
+  possible combinations.
+
+- Flow Control
+  Parameter:	FlowCtrl_?
+  Values:	Sym, SymOrRem, LocSend, None
+  Default:	SymOrRem
+
+  This parameter can be used to set the flow control capabilities
+  that the port reports during autonegotiation.
+  The meaning of the different modes is:
+-- Sym = Symetric: both link partners are allowed to send PAUSE frames
+-- SymOrRem = SymetricOrRemote: both or only remote partner are allowed
+   to send PAUSE frames
+-- LocSend = LocalSend: only local link partner is allowed to send
+   PAUSE frames
+-- None: no link partner is allowed to send PAUSE frames
+  
+  NOTE: This parameter is ignored if autonegotiation is set to "Off".
+
+- Role in Master-Slave-Negotiation (1000Base-T only).
+  Parameter:    Role_?
+  Values:       Auto, Master, Slave
+  Default:      Auto
+  
+  This parameter is only valid for the SK-9821 and SK-9822 adapters.
+  For two 1000Base-T ports to communicate, one must take the role as
+  master (providing timing information), while the other must be slave.
+  Normally, this is negotiated between the two ports during link 
+  establishment. If this should ever fail, you can force a port to a
+  specific setting with this parameter.
+  
+
+5.2 Per-Adapter Parameters
+--------------------------
+
+- Preferred Port
+  Parameter:	PrefPort
+  Values:	A, B
+  Default:	A
+
+  This is used to force the preferred port to A or B (on two-port NICs).
+  The preferred port is the one that is used if both are detected as
+  fully functional.
+
+- RLMT (Redundant Link Management Technology) Mode
+  Parameter:	RlmtMode
+  Values:	CheckLinkState,CheckLocalPort, CheckSeg
+  Default:	CheckLinkState
+
+  RLMT (the driver part that decides which port to use) knows three
+  ways of checking if a port is available for use:
+
+-- CheckLinkState = Check link state only: RLMT uses the link state
+   reported by the adapter hardware for each individual port to determine
+   whether a port can be used for all network traffic or not.
+
+-- CheckLocalPort - Check other port on adapter: RLMT sends test frames
+   from each port to each other port and checks if they are received by
+   the other port, respectively. Thus, the ports must be connected to the
+   network such that LLC test frames can be exchanged between them
+   (i.e. there must be no routers between the ports).
+
+-- CheckSeg - Check other port and segmentation: RLMT checks the other port
+   and in addition requests information from the Gigabit Ethernet
+   switch next to each port to see if the network is segmented between
+   the ports. Thus, this mode is only to be used if you have Gigabit
+   Ethernet switches installed in your network that have been configured
+   to use the Spanning Tree protocol.
+
+  NOTE: The modes CheckLocalPort and CheckSeg are meant to operate in
+        configurations where a network path between the ports on one
+        adapter exists. Especially, they are not designed to work where
+        adapters are connected back-to-back.
+***
+
+
+(6) LARGE FRAME SUPPORT
+=======================
+
+Large frames (also called jumbo frames) are now supported by the
+driver. This can result in a greatly improved throughput if
+transferring large amounts of data.
+To enable large frames, set the MTU (maximum transfer unit)
+of the interface to the value you wish (up to 9000). The command
+for this is:
+  ifconfig eth0 mtu 9000
+This will only work if you have two adapters connected back-to-back
+or if you use a switch that supports large frames. When using a
+switch, it should be configured to allow large frames, without
+autonegotiating for them.
+The setting must be done on all adapters that can be reached by
+the large frames. If one adapter is not set to receive large frames,
+it will simply drop them.
+
+You can switch back to the standard ethernet frame size with:
+  ifconfig eth0 mtu 1500
+
+To make this setting persistent, add a script with the 'ifconfig'
+line to the system startup sequence (named something like "S99sk98lin"
+in /etc/rc.d/rc2.d).
+***
+
+
+(7) TROUBLESHOOTING
+===================
+
+If you run into problems during installation, check those items:
+
+Problem:  The SK-98xx adapter can not be found by the driver.
+Reason:   Look in /proc/pci for the following entry:
+             'Ethernet controller: SysKonnect SK-98xx ...'
+	  If this entry exists, then the SK-98xx adapter has been
+	  found by the system and should be able to be used.
+	  If this entry does not exist or if the file '/proc/pci'
+	  is not there, then you may have a hardware problem or PCI
+	  support may not be enabled in your kernel.
+	  The adapter can be checked using the diagnostic program
+	  which is available from the SysKonnect web site:
+	      www.syskonnect.de
+	  Some COMPAQ machines have a problem with PCI under
+	  Linux. This is described in the 'PCI howto' document
+	  (included in some distributions or available from the
+	  www, e.g. at 'www.linux.org'). This might be fixed in the
+	  2.2.x kernel series (I've not tested it).
+
+Problem:  Programs such as 'ifconfig' or 'route' can not be found or
+          you get an error message 'Operation not permitted'.
+Reason:   You are not logged in as user 'root'. Logout and 
+          login as root or change to root via 'su'.
+
+Problem:  Using the command 'ping <address>', you get a message
+          "ping: sendto: Network is unreachable".
+Reason:   Your route is not set up correct.
+	  If you are using RedHat, you probably forgot
+	  to set up the route in 'network configuration'.
+	  Check the existing routes with the 'route' command
+	  and check if there is an entry for 'eth0' and if
+	  it is correct.
+
+Problem:  The driver can be started, the adapter is connected
+          to the network, but you can not receive or transmit
+          any packet; e.g. 'ping' does not work.
+Reason:   You have an incorrect route in your routing table.
+          Check the routing table with the command 'route' and
+	  read the manual pages about route ('man route').
+NOTE:	  Although the 2.2.x kernel versions generate the routing
+	  entry automatically, you may have problems of this kind
+	  here, too. We found a case where the driver started correct
+	  at system boot, but after removing and reloading the driver,
+	  the route of the adapter's network pointed to the 'dummy0'
+	  device and had to be corrected manually.
+	  
+Problem:  You want to use your computer as a router between
+          multiple IP subnetworks (using multiple adapters), but
+	  you can not reach computers in other subnetworks.
+Reason:   Either the router's kernel is not configured for IP
+	  forwarding or there is a problem with the routing table
+	  and gateway configuration in at least one of the
+	  computers.
+
+Problem:  At the start of the driver, you get an error message:
+	  "eth0: -- ERROR --
+	   Class: internal Software error
+	   Nr: 0xcc
+	   Msg: SkGeInitPort() cannot init running ports"
+Reason:	  You are using a driver compiled for single processor
+	  machines on an multiprocessor machine with SMP (Symetric
+	  MultiProcessor) kernel.
+	  Configure your kernel appropriate and recompile the kernel or
+	  the modules.
+
+If your problem is not listed here, please contact SysKonnect's technical
+support for help (linux@syskonnect.de).
+When contacting our technical support, please ensure that the
+following information is available:
+- System Manufacturer and Model
+- Boards in your system
+- Distribution
+- Kernel version
+***
+
+
+(8) HISTORY
+===========
+
+VERSION 3.05 (In-Kernel version)
+Problems fixed:
+- Failed for multiple adapters in kernel 2.4.0
+New features:
+- New versions of several common modules
+
+VERSION 3.04 (In-Kernel version)
+Problems fixed:
+- Driver start failed on UltraSPARC
+- Rx checksum calculation for big endian machines did not work
+- Jumbo frames were counted as input-errors in netstat
+
+VERSION 3.03 (Standalone version)
+Problems fixed:
+- Compilation did not find script "printver.sh" if "." not in PATH
+Known limitations:
+- None
+
+VERSION 3.02 (In-Kernel version)
+Problems fixed:
+- None
+New Features:
+- Integration in Linux kernel source (2.2.14 and 2.3.29) 
+Known limitations:
+- None
+
+VERSION 3.01
+Problems fixed:
+- None
+New Features:
+- Full source release
+Known limitations:
+- None
+
+VERSION 3.00
+Problems fixed:
+- None
+New Features:
+- Support for 1000Base-T adapters (SK-9821 and SK-9822)
+Known limitations:
+- None
+
+VERSION 1.07
+Problems fixed:
+- RlmtMode parameter value strings were wrong (#10437)
+- Driver sent too many RLMT frames (#10439)
+- Driver did not recognize network segmentation (#10440)
+- RLMT switched too often on segmented network (#10441)
+Known limitations:
+- None
+
+VERSION 1.06
+Problems fixed:
+- System panic'ed after some time when running with 
+  RlmtMode=CheckOtherLink or RlmtMode=CheckSeg (#10421)
+  Panic message: "Kernel panic: skput: over ... dev: eth0"
+- Driver did not switch back to default port when connected
+  back-to-back (#10422).
+Changes:
+- RlmtMode parameter names have changed
+New features:
+- There is now a version for ALPHA processors
+Known limitations:
+- None
+
+VERSION 1.05
+Problems fixed:
+- Driver failed to load on kernels with version information
+  for module symbols enabled
+Known limitations:
+- None
+
+VERSION 1.04
+Problems fixed:
+- Large frame support does work now (no autonegotiation
+  support for large frames, just manually selectable)
+New Features:
+- Receive checksumming in hardware
+- Performance optimizations
+  Some numbers (on two PII-400 machines, back-to-back):
+  netpipe: 300 MBit/sec, with large frames: 470 MBit/sec
+  ttcp:  38 MByte/sec, with large frames: 60 MByte/sec
+  ttcp (UDP send): 66 MByte/sec, with large frames: 106 MByte/sec
+Known limitations:
+- None
+
+VERSION 1.03
+Problems fixed:
+- Unloading with "rmmod" caused segmentation fault (#10415)
+- The link LED flickered from time to time, if no link was
+  established (#10402)
+- Installation problems with RedHat 6.0 (#10409)
+New Features:
+- Connection state ouput at "network connection up"
+Known limitations:
+- None
+
+VERSION 1.02
+Problems fixed:
+- Failed with multiple adapters
+- Failed with Single Port adapters
+- Startup string was only displayed if adapter found
+- No link could be established on certain switches when the switches were
+  rebooted. (#10377)
+Known limitations:
+- Segmentation fault at "rmmod" with kernel 2.2.3 on some machines
+
+VERSION 1.01
+Problems fixed:
+- Sensor status was not set back to 'ok' after 'warning/error'. (#10386)
+Changes:
+- improved parallelism in driver
+
+VERSION 1.00
+Known limitations:
+- not tested with all kernel versions (I don't have that much time :-)
+- only x86 version available (if you need others, ask for it)
+- source code not completely available
+
+***End of Readme File***
+
+

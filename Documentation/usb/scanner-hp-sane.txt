@@ -1,0 +1,81 @@
+Copyright (C) 1999, 2000 David E. Nelson
+
+April 26, 2000
+
+CHANGES
+
+- Amended for Linux-2.3.99-pre6-3
+- Updated for multiple scanner support
+
+INTRODUCTION
+
+This document will hopefully provide enough info on how to get SANE
+working with a Hewlett Packard USB capable scanner using the USB
+interface.  The majority of HP Scanners support the Scanner Control
+Language (SCL) which is both published by HP and supported by SANE.
+The only HP Scanners that I'm aware of that do not support SCL are the
+4200C ,3300C, and the PhotoSmart S20.  All other HP scanners with USB
+interfaces should work (4100C, 5200C, 6200C, and 6300C) as do models
+that are derived from the models above. ie the 6350C which is a 6300C
+with a transparency adaptor included with the scanner at time of
+purchase.  Of course as HP releases new scanners this information may
+change.
+
+
+REQUIREMENTS
+
+In order to get this running you'll need USB support in your kernel in
+addition to USB Scanner support.  Please refer to scanner.txt for
+issues pertaining to Linux USB and USB Scanner support.
+
+An installed version of SANE which is available from
+http://www.mostang.com/sane/.  Testing has been performed using
+version SANE-1.0.1.  For instructions on building and installing SANE,
+refer to the various README files within the SANE distribution.
+
+The latest SANE HP backend is available from http://www.kirchgessner.net.
+At the time of this writing, version 0.83 was available.
+
+
+OK, I'VE INSTALLED SANE. SO WHAT DO I DO NOW?
+
+NOTE: $INSTALL_DIR is the location where SANE is installed.  It may be
+/usr/local, /usr, /opt or somewhere else.  If you don't know, ask your
+system administrator.
+
+1) Make sure that you have the libsane-hp.* libraries under the
+$INSTALL_DIR/lib/sane/ directory.  If you don't, then the HP backend
+was either not compiled or installed properly.
+
+2) Under the directory $INSTALL_DIR/etc/sane.d/ edit the following
+files: dll.conf, hp.conf.
+
+  dll.conf:  Make sure that the 'hp' entry is present and uncommented.
+
+  hp.conf: This should contain two lines:
+
+    /dev/usbscanner
+    option connect-device
+
+NOTE: If you are using multiple scanners, make sure to have the correct
+device, ie /dev/usbscanner0.  See scanner.txt for more info.
+
+3) You should now be able to use SANE (xscanimage or scanimage).
+
+Don't forget to read any relevant man pages regarding the usage of
+SANE.  If you have other entries uncommented in 'dll.conf', you may
+have to specify the device to (x)scanimage.  Again, `man` is your
+friend.  The xscanimage (1) man page has info on how to get 'The Gimp'
+to work with xscanimage.  Note that Gimp support must be compiled into
+SANE for it to work.  If you are dealing with a RedHat system, this
+means that you'll also need to install the gimp-devel rpm package
+prior to compiling SANE.
+
+NOTE: The issues regarding core dumping by (x)scanimage have (or seem
+to be thus far) been resolved with version 0.2+ of the USB scanner
+driver which should be available in linux-2.3.23.  If you notice
+otherwise, please contact me.
+
+David /\/elson
+dnelson@jump.net
+http://www.jump.net/~dnelson

@@ -1,0 +1,31 @@
+
+The current state of Linux/PA-RISC mm is BROKEN.
+
+Someone needs to sit down and thoroughly rewrite all the cache flushing
+macro definitions.  Here are some of the problems, followed by what I
+think needs to be done about them.
+
+(1) We're using fdce / fice everywhere.  This has to stop (except in
+the routines which flush the entire cache).  The right instructions to
+be using are fdc/fic.
+
+(2) fdc/fic will throw exceptions if the address they reference isn't
+mapped.  Therefore we need to check the page is mapped before flushing
+(we're guaranteed not to have the page dirty if we don't have a software
+mapping for it any longer, right?)
+
+(3) the flush macros are right now tunnelled down to one routine to flush
+the data cache and one routine to flush the insn cache.  this is wrong.
+we should take hints from how we're called and optimise our routines
+accordingly.
+
+(4) fdc/fic actually take space register arguments.  fic takes an 3-bit sr
+argument and fdc takes a 2-bit sr argument.  right now, there's a lot of
+pissing about with %sr1 and all the macros use %sr1.  This is crazy.  We
+normally _know_ what's being referred to, and it's the current task.  So
+if we want to flush that, just use %sr3.  If it happens to be kernel,
+use %sr0 for fdc and %sr4 for fic.
+
+(5) we need to write flush_kernel_dcache_range and use it on kernel
+addresses.  all the macros are defined to work on the _current task's_
+virtual address space.

@@ -1,0 +1,17 @@
+In Documentation/sound/README.OSS was a remark saying noone was sure the
+mixer on the PCM1-pro worked with the ACI driver. Well, it does.
+I've been using the drivers for the MAD16 and the driver for the mixer
+since kernel 2.0.32 with a MiroSound PCM1-pro and it works great.
+
+I've got it working with the following configuration:
+
+MAD16 audio I/O base = 530
+MAD16  audio IRQ = 7
+MAD16 Audio DMA = 1
+MAD16 MIDI I/O = 330
+MAD16 MIDI IRQ = 9
+
+And I've enabled the ACI mixer (miro PCM12) .
+
+
+Bas van der Linden.

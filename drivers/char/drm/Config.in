@@ -1,0 +1,15 @@
+#
+# drm device configuration
+#
+# This driver provides support for the
+# Direct Rendering Infrastructure (DRI) in XFree86 4.x.
+#
+
+bool 'Direct Rendering Manager (XFree86 DRI support)' CONFIG_DRM
+if [ "$CONFIG_DRM" != "n" ]; then
+    tristate '  3dfx Banshee/Voodoo3+' CONFIG_DRM_TDFX
+    tristate '  3dlabs GMX 2000' CONFIG_DRM_GAMMA
+    tristate '  ATI Rage 128' CONFIG_DRM_R128
+    dep_tristate '  Intel I810' CONFIG_DRM_I810 $CONFIG_AGP
+    dep_tristate '  Matrox g200/g400' CONFIG_DRM_MGA $CONFIG_AGP
+fi

@@ -1,0 +1,30 @@
+#
+# USB Serial device configuration
+#
+mainmenu_option next_comment
+comment 'USB Serial Converter support'
+
+tristate 'USB Serial Converter support' CONFIG_USB_SERIAL $CONFIG_USB
+if [ "$CONFIG_USB_SERIAL" != "n" ]; then
+  bool '  USB Serial Converter verbose debug' CONFIG_USB_SERIAL_DEBUG
+  bool '  USB Generic Serial Driver' CONFIG_USB_SERIAL_GENERIC
+  dep_tristate '  USB Belkin and Peracom Single Port Serial Driver (EXPERIMENTAL)' CONFIG_USB_SERIAL_BELKIN $CONFIG_USB_SERIAL $CONFIG_EXPERIMENTAL
+  dep_tristate '  USB ConnectTech WhiteHEAT Serial Driver (EXPERIMENTAL)' CONFIG_USB_SERIAL_WHITEHEAT $CONFIG_USB_SERIAL $CONFIG_EXPERIMENTAL
+  dep_tristate '  USB Digi International AccelePort USB Serial Driver' CONFIG_USB_SERIAL_DIGI_ACCELEPORT $CONFIG_USB_SERIAL
+  dep_tristate '  USB Empeg empeg-car Mark I/II Driver (EXPERIMENTAL)' CONFIG_USB_SERIAL_EMPEG $CONFIG_USB_SERIAL $CONFIG_EXPERIMENTAL
+  dep_tristate '  USB FTDI Single Port Serial Driver (EXPERIMENTAL)' CONFIG_USB_SERIAL_FTDI_SIO $CONFIG_USB_SERIAL $CONFIG_EXPERIMENTAL
+  dep_tristate '  USB Handspring Visor Driver' CONFIG_USB_SERIAL_VISOR $CONFIG_USB_SERIAL
+  dep_tristate '  USB Keyspan PDA Single Port Serial Driver (EXPERIMENTAL)' CONFIG_USB_SERIAL_KEYSPAN_PDA $CONFIG_USB_SERIAL $CONFIG_EXPERIMENTAL
+  dep_tristate '  USB Keyspan USA-xxx Serial Driver (EXPERIMENTAL)' CONFIG_USB_SERIAL_KEYSPAN $CONFIG_USB_SERIAL $CONFIG_EXPERIMENTAL
+  if [ "$CONFIG_USB_SERIAL_KEYSPAN" != "n" ]; then
+     bool '    USB Keyspan USA-28 Firmware' CONFIG_USB_SERIAL_KEYSPAN_USA28
+     bool '    USB Keyspan USA-28X Firmware' CONFIG_USB_SERIAL_KEYSPAN_USA28X
+     bool '    USB Keyspan USA-19 Firmware' CONFIG_USB_SERIAL_KEYSPAN_USA19
+     bool '    USB Keyspan USA-18X Firmware' CONFIG_USB_SERIAL_KEYSPAN_USA18X
+     bool '    USB Keyspan USA-19W Firmware' CONFIG_USB_SERIAL_KEYSPAN_USA19W
+  fi
+  dep_tristate '  USB MCT Single Port Serial Driver (EXPERIMENTAL)' CONFIG_USB_SERIAL_MCT_U232 $CONFIG_USB_SERIAL $CONFIG_EXPERIMENTAL
+  dep_tristate '  USB ZyXEL omni.net LCD Plus Driver (EXPERIMENTAL)' CONFIG_USB_SERIAL_OMNINET $CONFIG_USB_SERIAL $CONFIG_EXPERIMENTAL
+fi
+
+endmenu

@@ -1,0 +1,233 @@
+------------------------------------------------------------------------------
+WAN Router for Linux Operating System
+------------------------------------------------------------------------------
+Version 2.1.1 - Nov 08, 1999
+Version 2.0.8 - Nov 02, 1999
+Version 2.0.7 - Aug 26, 1999
+Version 2.0.6 - Aug 17, 1999
+Version 2.0.5 - Aug 12, 1999
+Version 2.0.4 - Nov 26, 1998
+Version 2.0.3 - Aug 25, 1998
+Version 2.0.2 - Dec 09, 1997
+Version 2.0.1 - Nov 28, 1997
+Version 2.0.0 - Nov 06, 1997
+Version 1.0.3 - June 3, 1997
+Version 1.0.1 - January 30, 1997
+Author: Nenad Corbic <ncorbic@sangoma.com>
+Copyright (c) 1995-1999 Sangoma Technologies Inc.
+------------------------------------------------------------------------------
+
+
+WARNING:  This Version of WANPIPE supports only the S508 and S508/FT1 cards.  
+IF YOU OWN A S502E OR A S508 CARD THEN PLEASE CONTACT SANGOMA TECHNOLOGIES FOR 
+AN UPGRADE.  ONLY THE BiSYNC STREAMING CODE IS SUPPORTED ON S502E/S503 cards. 
+
+INTRODUCTION
+
+Wide Area Networks (WANs) are used to interconnect Local Area Networks (LANs)
+and/or stand-alone hosts over vast distances with data transfer rates
+significantly higher than those achievable with commonly used dial-up
+connections.
+
+Usually an external device called `WAN router' sitting on your local network
+or connected to your machine's serial port provides physical connection to
+WAN.  Although router's job may be as simple as taking your local network
+traffic, converting it to WAN format and piping it through the WAN link, these
+devices are notoriously expensive, with prices as much as 2 - 5 times higher
+then the price of a typical PC box.
+
+Alternatively, considering robustness and multitasking capabilities of Linux,
+an internal router can be built (most routers use some sort of stripped down
+Unix-like operating system anyway). With a number of relatively inexpensive WAN
+interface cards available on the market, a perfectly usable router can be
+built for less than half a price of an external router.  Yet a Linux box
+acting as a router can still be used for other purposes, such as firewalling,
+running FTP, WWW or DNS server, etc.
+
+This kernel module introduces the notion of a WAN Link Driver (WLD) to Linux
+operating system and provides generic hardware-independent services for such
+drivers.  Why can existing Linux network device interface not be used for
+this purpose?  Well, it can.  However, there are a few key differences between
+a typical network interface (e.g. Ethernet) and a WAN link.
+
+Many WAN protocols, such as X.25 and frame relay, allow for multiple logical
+connections (known as `virtual circuits' in X.25 terminology) over a single
+physical link.  Each such virtual circuit may (and almost always does) lead
+to a different geographical location and, therefore, different network.  As a
+result, it is the virtual circuit, not the physical link, that represents a
+route and, therefore, a network interface in Linux terms.
+
+To further complicate things, virtual circuits are usually volatile in nature
+(excluding so called `permanent' virtual circuits or PVCs).  With almost no
+time required to set up and tear down a virtual circuit, it is highly desirable
+to implement on-demand connections in order to minimize network charges.  So
+unlike a typical network driver, the WAN driver must be able to handle multiple
+network interfaces and cope as multiple virtual circuits come into existence
+and go away dynamically.
+ 
+Last, but not least, WAN configuration is much more complex than that of say
+Ethernet and may well amount to several dozens of parameters.  Some of them
+are "link-wide"  while others are virtual circuit-specific.  The same holds
+true for WAN statistics which is by far more extensive and extremely useful
+when troubleshooting WAN connections.  Extending the ifconfig utility to suit
+these needs may be possible, but does not seem quite reasonable.  Therefore, a
+WAN configuration utility and corresponding application programmer's interface
+is needed for this purpose.
+
+Most of these problems are taken care of by this module.  Its goal is to
+provide a user with more-or-less standard look and feel for all WAN devices and
+assist a WAN device driver writer by providing common services, such as:
+
+ o User-level interface via /proc file system
+ o Centralized configuration
+ o Device management (setup, shutdown, etc.)
+ o Network interface management (dynamic creation/destruction)
+ o Protocol encapsulation/decapsulation
+
+To ba able to use the Linux WAN Router you will also need a WAN Tools package
+available from
+
+	ftp.sangoma.com/pub/linux/vX.Y.Z/wantools-X.Y.Z.tgz
+			or
+	ftp.sangoma.com/pub/linux/vX.Y.Z/wanpipe-X.Y.Z.tgz
+
+where vX.Y.Z represent the Linux kernel version number.
+
+For technical questions and/or comments regarding this product please e-mail
+to jaspreet@sangoma.com or dm@sangoma.com.
+
+
+
+COPYRIGHT AND LICENSING INFORMATION
+
+This program is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation; either version 2, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+this program; if not, write to the Free Software Foundation, Inc., 675 Mass
+Ave, Cambridge, MA 02139, USA.
+
+
+
+ACKNOWLEDGMENTS
+
+This product is based on the WANPIPE(tm) Multiprotocol WAN Router developed
+by Sangoma Technologies Inc. for Linux 1.2.x.  Release of Linux 2.0 in summer
+1996 commanded adequate changes to the WANPIPE code to take full advantage of
+new Linux features.  Instead of continuing developing proprietary interface
+specific to Sangoma WAN cards, we decided to put all hardware-independent code
+into a separate module and define two levels of interfaces - one for user-
+level applications and another for kernel-level WAN drivers.
+
+Many useful ideas concerning hardware-independent interface implementation
+were given by Mike McLagan <mike.mclagan@linux.org> and his implementation
+of the Frame Relay router and drivers for Sangoma cards (dlci/sdla).
+
+Special thanks to all the WANPIPE users who performed field-testing, reported
+bugs and made valuable comments and suggestions that help us to improve this
+product.
+
+
+
+REVISION HISTORY
+
+2.1.1   Nov 09, 1999 		- New code for S514PCI card
+                                - Completely redesigned drivers
+                                  fully tested and optimized.
+
+2.0.8   Nov 02, 1999            - Fixed up the X25API code.
+                                - Clear call bug fixed.i
+                                - Enabled driver for multi-card
+                                  operation.                                
+
+2.0.7   Aug 26, 1999		- Merged X25API code into WANPIPE.
+				- Fixed a memory leak for X25API
+				- Updated the X25API code for 2.2.X kernels.
+				- Improved NEM handling.
+
+2.0.6   Aug 17, 1999            - Kernel patch works for both 2.2.10 and 2.2.11 kernels
+                                - Fixed up 2.0.5 installation bugs
+                                - No functional difference between 2.0.6 and 2.0.5         
+
+2.0.5   Aug 12, 1999            - NEW PPP, interrupt drive code
+				- NEW X25 Xpipmon debugger
+				- Comments added to setup scripts
+				- Numerous bug fixes
+
+2.0.4	Nov 26, 1998		- NEW Cisco Dual Port support. 
+				- NEW support for BiSync Streaming API.
+				- NEW support for HDLC (LAPB) API.
+				- WANPIPE provides an API for application 
+				  development using the BSD socket interface.
+
+2.0.3 	Aug 25, 1998		- NEW support for Cisco HDLC, with cpipemon 
+				  utility for monitoring
+				- CIR support for Frame-relay
+				- Support for PAP and CHAP for ppp has been 
+				  implemented
+				- Dynamic IP assignment for PPP
+				- Multiple channel IPX support for Frame-relay 
+				  and X25
+				- Inverse Arp support for Frame-relay
+				- FT1 Configuration utility for linux
+				- Man Pages for router.conf, router, sdladump,
+				  cfgft1, fpipemon, ppipemon and cpipemon
+
+2.0.2	Dev 09, 1997	      - Implemented PAP and CHAP for ppp.
+
+2.0.1	Nov 28, 1997	      -	Protection of "enable_irq()" while
+                                "disable_irq()" has been enabled from any other
+                                routine (for Frame Relay, PPP and X25).
+			      - Added additional Stats for Fpipemon and Ppipemon
+                              - Improved Load Sharing for multiple boards.
+
+2.0.0   Nov 07, 1997          - Implemented protection of RACE conditions by
+                                critical flags for FRAME RELAY and PPP.
+                              - DLCI List interrupt mode implemented.
+                              - IPX support in FRAME RELAY and PPP.
+                              - IPX Server Support (MARS)
+                              - More driver specific stats included in FPIPEMON
+                                and PIPEMON.
+
+1.0.5   July 28, 1997         - Configurable T391,T392,N391,N392,N393 for Frame
+                                Relay in router.conf.
+                              - Configurable Memory Address through router.conf
+                                for Frame Relay, PPP and X.25. (commenting this
+                                out enables auto-detection).
+                              - Fixed freeing up received buffers using kfree()
+                                for Frame Relay and X.25.
+                              - Protect sdla_peek() by calling save_flags(),
+                                cli() and restore_flags().
+                              - Changed number of Trace elements from 32 to 20
+                              - Added DLCI specific data monitoring in FPIPEMON.
+
+1.0.4   July 10, 1997         - S508/FT1 monitoring capability in fpipemon and
+                                ppipemon utilities.
+                              - Configurable TTL for UDP packets.
+                              - Multicast and Broadcast IP source addresses are
+                                silently discarded.
+
+1.0.3	June 3, 1997
+	 		      -	UDP port for multiple boards (Frame relay, PPP)
+	 			Continuous Transmission of Configure Request 
+			      -	Packet for PPP (this support is only added for 
+			   	508 cards)
+	 		      -	Connection Timeout for PPP changed from 900 to 0
+	 	              -	Flow Control for multiple boards and multiple 
+				channels (Frame Relay)
+
+1.0.1	January 30, 1997
+
+			      -	Implemented user-readable status and statistics
+				via /proc filesystem
+
+1.0.0	December 31, 1996
+
+			      -	Initial version
+
+>>>>>> END <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<

@@ -1,0 +1,7 @@
+00-INDEX
+	- this file
+framebuffer.txt
+	- info about the Linux/m68k frame buffer device
+kernel-options.txt
+	- command line options for Linux/m68k
+

@@ -1,0 +1,11 @@
+
+bool '  IrLAP compression' CONFIG_IRDA_COMPRESSION
+
+if [ "$CONFIG_IRDA_COMPRESSION" != "n" ]; then
+   comment '    IrDA compressors'
+   if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+      dep_tristate '    Deflate compression (EXPERIMENTAL)' CONFIG_IRDA_DEFLATE $CONFIG_IRDA
+   fi
+#   tristate '    BZIP2 compression' CONFIG_IRDA_BZIP2
+#   tristate '    BSD compression' CONFIG_IRDA_BSD
+fi

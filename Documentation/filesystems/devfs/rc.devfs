@@ -1,0 +1,104 @@
+#! /bin/sh
+#
+#  /etc/rc.d/rc.devfs
+#
+#  Linux Boot Scripts by  Richard Gooch <rgooch@atnf.csiro.au>
+#  Copyright 1993-1999 under GNU Copyleft version 2.0. See /etc/rc for
+#  copyright notice.
+#
+#  Save and restore devfs ownerships and permissions
+#
+#	Written by	Richard Gooch   11-JAN-1998
+#
+#	Updated by	Richard Gooch	23-JAN-1998: Added "start" and "stop".
+#
+#	Updated by	Richard Gooch	5-AUG-1998: Robustness improvements by
+# Roderich Schupp.
+#
+#	Updated by	Richard Gooch	9-AUG-1998: Took account of change from
+# ".epoch" to ".devfsd".
+#
+#	Updated by	Richard Gooch	19-AUG-1998: Test and tty pattern patch
+# by Roderich Schupp.
+#
+#	Updated by	Richard Gooch	24-MAY-1999: Use sed instead of tr.
+#
+#	Last updated by	Richard Gooch	25-MAY-1999: Don't save /dev/log.
+#
+#
+# Usage:  rc.devfs save|restore [savedir] [devfsdir]
+#
+# Note: "start" is a synonym for "restore" and "stop" is a synonym for "save".
+
+# Set VERBOSE to "no" if you would like a more quiet operation.
+VERBOSE=yes
+
+# Set TAROPTS to "v" or even "vv" to see which files get saved/restored.
+TAROPTS=
+
+option="$1"
+
+case "$option" in
+    save|restore) ;;
+    start)  option=restore ;;
+    stop)   option=save ;;
+    *)      echo "No save or restore option given" ; exit 1 ;;
+esac
+
+if [ "$2" = "" ]; then
+    savedir=/var/state
+else
+    savedir=$2
+fi
+
+if [ ! -d $savedir ]; then
+    echo "Directory: $savedir does not exist"
+    exit 1
+fi
+
+if [ "$3" = "" ]; then
+    if [ -d /devfs ]; then
+	devfs=/devfs
+    else
+	devfs=/dev
+    fi
+else
+    devfs=$3
+fi
+
+grep devfs /proc/filesystems >/dev/null || exit 0
+
+if [ ! -d $devfs ]; then
+    echo "Directory: $devfs does not exist"
+    exit 1
+elif [ ! -c $devfs/.devfsd ]; then
+    echo "Directory: $devfs is not the root of a devfs filesystem"
+    exit 1
+fi
+
+savefile=`echo $devfs | sed 's*/*_*g'`
+tarfile=${savedir}/devfssave.${savefile}.tar.gz
+
+cd $devfs
+
+case "$option" in
+    save)
+	[ "$VERBOSE" != no ] && echo "Saving $devfs permissions..."
+	
+	# You might want to adjust the pattern below to control
+	# which file's permissions will be saved.
+	# The sample pattern exludes all virtual consoles
+	# as well as old and new style pseudo terminals.
+	files=`find * -noleaf -cnewer .devfsd \
+	       ! -regex 'tty[0-9]+\|vc/.*\|vcsa?[0-9]+\|vcc/.*\|[pt]ty[a-z][0-9a-f]\|pt[ms]/.*\|log' -print`
+	rm -f $tarfile
+	[ -n "$files" ] && tar cz${TAROPTS}f $tarfile $files
+	;;
+
+    restore)
+	[ "$VERBOSE" != no ] && echo "Restoring $devfs permissions..."
+	[ -f $tarfile ] && tar xpz${TAROPTS}f $tarfile
+	;;
+esac
+
+exit 0

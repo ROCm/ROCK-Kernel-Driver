@@ -1,0 +1,64 @@
+mainmenu_option next_comment
+comment 'S/390 block device drivers'
+
+tristate 'Loopback device support' CONFIG_BLK_DEV_LOOP
+if [ "$CONFIG_NET" = "y" ]; then
+  tristate 'Network block device support' CONFIG_BLK_DEV_NBD
+fi
+source drivers/md/Config.in
+tristate 'RAM disk support' CONFIG_BLK_DEV_RAM
+if [ "$CONFIG_BLK_DEV_RAM" = "y" ]; then
+  bool '   Initial RAM disk (initrd) support' CONFIG_BLK_DEV_INITRD
+fi
+
+bool 'Support for VM minidisk (VM only)' CONFIG_MDISK
+if [ "$CONFIG_MDISK" = "y" ]; then
+  bool '   Support for synchronous read-write' CONFIG_MDISK_SYNC
+fi
+
+tristate 'Support for DASD devices' CONFIG_DASD
+if [ "$CONFIG_DASD" != "n"  ]; then
+  comment 'DASD disciplines'
+  bool '   Support for ECKD Disks' CONFIG_DASD_ECKD
+#  bool '   Support for CKD  Disks' CONFIG_DASD_CKD
+  bool '   Support for DIAG access to CMS reserved Disks' CONFIG_DASD_MDSK
+fi
+
+endmenu
+
+#menu_option next_comment
+#endmenu
+
+if [ "$CONFIG_NET" = "y" ]; then
+  mainmenu_option next_comment
+  comment 'S/390 Network device support'
+  bool 'Channel Device Configuration (Temporary Option)' CONFIG_CHANDEV
+  bool 'Network device support' CONFIG_NETDEVICES
+  if [ "$CONFIG_NETDEVICES" = "y" ]; then
+    mainmenu_option next_comment
+    comment 'S390 Network devices'
+    bool 'CTC device support' CONFIG_CTC
+    bool 'IUCV device support (VM only)' CONFIG_IUCV
+    tristate 'Dummy net driver support' CONFIG_DUMMY
+    bool 'Ethernet (10 or 100Mbit)' CONFIG_NET_ETHERNET
+    bool 'Token Ring driver support' CONFIG_TR
+    bool 'FDDI driver support' CONFIG_FDDI
+    endmenu
+  fi
+  endmenu
+fi
+
+mainmenu_option next_comment
+comment 'S/390 Terminal and Console options'
+
+bool 'Support for 3215 line mode terminal' CONFIG_3215
+if [ "$CONFIG_3215" = "y" ]; then
+  bool 'Support for console on 3215 line mode terminal' CONFIG_3215_CONSOLE
+fi
+
+bool 'Support for HWC line mode terminal' CONFIG_HWC
+if [ "$CONFIG_HWC" = "y" ]; then
+  bool 'console on HWC line mode terminal' CONFIG_HWC_CONSOLE
+fi
+endmenu
+

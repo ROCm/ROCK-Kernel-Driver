@@ -1,0 +1,3 @@
+#!/bin/sh
+X=`$TOPDIR/scripts/gen-all-syms "$*"`
+$TOPDIR/scripts/docproc $X

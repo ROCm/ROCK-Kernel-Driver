@@ -1,0 +1,259 @@
+mainmenu_name "Kernel configuration of Linux for IA-64 machines"
+
+mainmenu_option next_comment
+ comment 'Code maturity level options'
+ bool 'Prompt for development and/or incomplete code/drivers' CONFIG_EXPERIMENTAL
+endmenu
+
+mainmenu_option next_comment
+comment 'Loadable module support'
+bool 'Enable loadable module support' CONFIG_MODULES
+if [ "$CONFIG_MODULES" = "y" ]; then
+   bool '  Set version information on all module symbols' CONFIG_MODVERSIONS
+   bool '  Kernel module loader' CONFIG_KMOD
+fi
+endmenu
+
+mainmenu_option next_comment
+comment 'General setup'
+
+define_bool CONFIG_IA64 y
+
+define_bool CONFIG_ISA n
+define_bool CONFIG_EISA n
+define_bool CONFIG_MCA n
+define_bool CONFIG_SBUS n
+
+choice 'IA-64 system type'					\
+	"generic		CONFIG_IA64_GENERIC		\
+	 DIG-compliant		CONFIG_IA64_DIG			\
+	 HP-simulator		CONFIG_IA64_HP_SIM		\
+	 SGI-SN1		CONFIG_IA64_SGI_SN1" generic
+
+choice 'Kernel page size'						\
+	"4KB			CONFIG_IA64_PAGE_SIZE_4KB		\
+	 8KB			CONFIG_IA64_PAGE_SIZE_8KB		\
+	 16KB			CONFIG_IA64_PAGE_SIZE_16KB		\
+	 64KB			CONFIG_IA64_PAGE_SIZE_64KB" 16KB
+
+if [ "$CONFIG_IA64_DIG" = "y" ]; then
+	define_bool CONFIG_ITANIUM y
+	define_bool CONFIG_IA64_BRL_EMU y
+	bool '  Enable Itanium A-step specific code' CONFIG_ITANIUM_ASTEP_SPECIFIC
+	bool '  Enable Itanium B-step specific code' CONFIG_ITANIUM_BSTEP_SPECIFIC
+	if [ "$CONFIG_ITANIUM_BSTEP_SPECIFIC" = "y" ]; then
+	  bool '   Enable Itanium B0-step specific code' CONFIG_ITANIUM_B0_SPECIFIC
+	  bool '   Enable Itanium B1-step specific code' CONFIG_ITANIUM_B1_SPECIFIC
+	  bool '   Enable Itanium B2-step specific code' CONFIG_ITANIUM_B2_SPECIFIC
+	fi
+	bool '  Enable Itanium C-step specific code' CONFIG_ITANIUM_CSTEP_SPECIFIC
+	if [ "$CONFIG_ITANIUM_CSTEP_SPECIFIC" = "y" ]; then
+	  bool '   Enable Itanium C0-step specific code' CONFIG_ITANIUM_C0_SPECIFIC
+	fi
+	bool '  Force interrupt redirection' CONFIG_IA64_HAVE_IRQREDIR
+	bool '  Enable use of global TLB purge instruction (ptc.g)' CONFIG_ITANIUM_PTCG
+	bool '  Enable SoftSDV hacks' CONFIG_IA64_SOFTSDV_HACKS
+	bool '  Enable AzusA hacks' CONFIG_IA64_AZUSA_HACKS
+	bool '  Enable IA-64 Machine Check Abort' CONFIG_IA64_MCA
+	bool '  Enable ACPI 2.0 with errata 1.3' CONFIG_ACPI20
+	bool '  ACPI kernel configuration manager (EXPERIMENTAL)' CONFIG_ACPI_KERNEL_CONFIG
+	if [ "$CONFIG_ACPI_KERNEL_CONFIG" = "y" ]; then
+	  define_bool CONFIG_PM y
+	  define_bool CONFIG_ACPI y
+	  define_bool CONFIG_ACPI_INTERPRETER y
+	fi
+fi
+
+if [ "$CONFIG_IA64_SGI_SN1" = "y" ]; then
+	bool '  Enable use of global TLB purge instruction (ptc.g)' CONFIG_ITANIUM_PTCG
+	bool '  Enable Itanium B-step specific code' CONFIG_ITANIUM_BSTEP_SPECIFIC
+	if [ "$CONFIG_ITANIUM_BSTEP_SPECIFIC" = "y" ]; then
+	  bool '    Enable Itanium B0-step specific code' CONFIG_ITANIUM_B0_SPECIFIC
+	fi
+	bool '  Enable SGI Medusa Simulator Support' CONFIG_IA64_SGI_SN1_SIM n
+	define_bool CONFIG_DEVFS_DEBUG y
+	define_bool CONFIG_DEVFS_FS y
+	define_bool CONFIG_IA64_BRL_EMU y
+	define_bool CONFIG_IA64_MCA y
+	define_bool CONFIG_ITANIUM y
+	define_bool CONFIG_SGI_IOC3_ETH y
+	define_bool CONFIG_PERCPU_IRQ y
+	define_int  CONFIG_CACHE_LINE_SHIFT 7
+	bool '  Enable DISCONTIGMEM support' CONFIG_DISCONTIGMEM y
+	bool '	Enable NUMA support' CONFIG_NUMA y
+fi
+
+define_bool CONFIG_KCORE_ELF y	# On IA-64, we always want an ELF /proc/kcore.
+
+bool 'SMP support' CONFIG_SMP
+bool 'Performance monitor support' CONFIG_PERFMON
+bool '/proc/pal support' CONFIG_IA64_PALINFO
+
+bool 'Networking support' CONFIG_NET
+bool 'System V IPC' CONFIG_SYSVIPC
+bool 'BSD Process Accounting' CONFIG_BSD_PROCESS_ACCT
+bool 'Sysctl support' CONFIG_SYSCTL
+tristate 'Kernel support for ELF binaries' CONFIG_BINFMT_ELF
+tristate 'Kernel support for MISC binaries' CONFIG_BINFMT_MISC
+
+if [ "$CONFIG_IA64_HP_SIM" = "n" ]; then
+
+bool 'PCI support' CONFIG_PCI
+source drivers/pci/Config.in
+
+bool 'Support for hot-pluggable devices' CONFIG_HOTPLUG
+if [ "$CONFIG_HOTPLUG" = "y" ]; then
+   source drivers/pcmcia/Config.in
+else
+   define_bool CONFIG_PCMCIA n
+fi
+
+source drivers/parport/Config.in
+
+fi # !HP_SIM
+
+endmenu
+
+if [ "$CONFIG_NET" = "y" ]; then
+  source net/Config.in
+fi
+
+if [ "$CONFIG_IA64_HP_SIM" = "n" ]; then
+
+source drivers/mtd/Config.in
+source drivers/pnp/Config.in
+source drivers/block/Config.in
+source drivers/i2o/Config.in
+source drivers/md/Config.in
+
+mainmenu_option next_comment
+comment 'ATA/IDE/MFM/RLL support'
+
+tristate 'ATA/IDE/MFM/RLL support' CONFIG_IDE
+
+if [ "$CONFIG_IDE" != "n" ]; then
+  source drivers/ide/Config.in
+else
+  define_bool CONFIG_BLK_DEV_IDE_MODES n
+  define_bool CONFIG_BLK_DEV_HD n
+fi
+endmenu
+
+fi # !HP_SIM
+
+mainmenu_option next_comment
+comment 'SCSI support'
+
+tristate 'SCSI support' CONFIG_SCSI
+
+if [ "$CONFIG_SCSI" != "n" ]; then
+  source drivers/scsi/Config.in
+fi
+endmenu
+
+if [ "$CONFIG_IA64_HP_SIM" = "n" ]; then
+
+if [ "$CONFIG_NET" = "y" ]; then
+  mainmenu_option next_comment
+  comment 'Network device support'
+
+  bool 'Network device support' CONFIG_NETDEVICES
+  if [ "$CONFIG_NETDEVICES" = "y" ]; then
+    source drivers/net/Config.in
+  fi
+  endmenu
+fi
+
+source net/ax25/Config.in
+
+mainmenu_option next_comment
+comment 'ISDN subsystem'
+
+tristate 'ISDN support' CONFIG_ISDN
+if [ "$CONFIG_ISDN" != "n" ]; then
+  source drivers/isdn/Config.in
+fi
+endmenu
+
+mainmenu_option next_comment
+comment 'CD-ROM drivers (not for SCSI or IDE/ATAPI drives)'
+
+bool 'Support non-SCSI/IDE/ATAPI drives' CONFIG_CD_NO_IDESCSI
+if [ "$CONFIG_CD_NO_IDESCSI" != "n" ]; then
+  source drivers/cdrom/Config.in
+fi
+endmenu
+
+fi # !HP_SIM
+
+#
+# input before char - char/joystick depends on it. As does USB.
+#
+source drivers/input/Config.in
+source drivers/char/Config.in
+
+#source drivers/misc/Config.in
+
+source drivers/media/Config.in
+
+source fs/Config.in
+
+if [ "$CONFIG_VT" = "y" ]; then
+  mainmenu_option next_comment
+  comment 'Console drivers'
+  bool 'VGA text console' CONFIG_VGA_CONSOLE
+  source drivers/video/Config.in
+  if [ "$CONFIG_FB" = "y" ]; then
+    define_bool CONFIG_PCI_CONSOLE y
+  fi
+  endmenu
+fi
+
+if [ "$CONFIG_IA64_HP_SIM" = "n" ]; then
+
+mainmenu_option next_comment
+comment 'Sound'
+
+tristate 'Sound card support' CONFIG_SOUND
+if [ "$CONFIG_SOUND" != "n" ]; then
+  source drivers/sound/Config.in
+fi
+endmenu
+
+source drivers/usb/Config.in
+
+fi # !HP_SIM
+
+if [ "$CONFIG_IA64_HP_SIM" != "n" -o "$CONFIG_IA64_GENERIC" != "n" ]; then
+  mainmenu_option next_comment
+  comment 'Simulated drivers'
+
+  tristate 'Simulated Ethernet ' CONFIG_SIMETH
+  bool 'Simulated serial driver support' CONFIG_SIM_SERIAL
+  if [ "$CONFIG_SCSI" != "n" ]; then
+    bool 'Simulated SCSI disk' CONFIG_SCSI_SIM
+  fi
+  endmenu
+fi
+
+
+mainmenu_option next_comment
+comment 'Kernel hacking'
+
+#bool 'Debug kmalloc/kfree' CONFIG_DEBUG_MALLOC
+if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+  tristate 'Kernel support for IA-32 emulation' CONFIG_IA32_SUPPORT
+  tristate 'Kernel FP software completion' CONFIG_MATHEMU
+else
+  define_bool CONFIG_MATHEMU y
+fi
+
+bool 'Magic SysRq key' CONFIG_MAGIC_SYSRQ
+bool 'Early printk support (requires VGA!)' CONFIG_IA64_EARLY_PRINTK
+bool 'Turn on compare-and-exchange bug checking (slow!)' CONFIG_IA64_DEBUG_CMPXCHG
+bool 'Turn on irq debug checks (slow!)' CONFIG_IA64_DEBUG_IRQ
+bool 'Print possible IA64 hazards to console' CONFIG_IA64_PRINT_HAZARDS
+bool 'Enable new unwind support' CONFIG_IA64_NEW_UNWIND
+bool 'Disable VHPT' CONFIG_DISABLE_VHPT
+
+endmenu

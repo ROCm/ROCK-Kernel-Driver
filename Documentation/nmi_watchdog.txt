@@ -1,0 +1,33 @@
+
+Is your SMP system locking up unpredictably? No keyboard activity, just
+a frustrating complete hard lockup? Do you want to help us debugging
+such lockups? If all yes then this document is definitely for you.
+
+on Intel SMP hardware there is a feature that enables us to generate
+'watchdog NMI interrupts'. (NMI: Non Maskable Interrupt - these get
+executed even if the system is otherwise locked up hard) This can be
+used to debug hard kernel lockups. By executing periodic NMI interrupts,
+the kernel can monitor whether any CPU has locked up, and print out
+debugging messages if so.  You can enable/disable the NMI watchdog at boot
+time with the 'nmi_watchdog=1' boot parameter. Eg. the relevant
+lilo.conf entry:
+
+        append="nmi_watchdog=1"
+
+A 'lockup' is the following scenario: if any CPU in the system does not
+execute the period local timer interrupt for more than 5 seconds, then
+the NMI handler generates an oops and kills the process. This
+'controlled crash' (and the resulting kernel messages) can be used to
+debug the lockup. Thus whenever the lockup happens, wait 5 seconds and
+the oops will show up automatically. If the kernel produces no messages
+then the system has crashed so hard (eg. hardware-wise) that either it
+cannot even accept NMI interrupts, or the crash has made the kernel
+unable to print messages.
+
+NOTE: currently the NMI-oopser is enabled unconditionally on x86 SMP
+boxes.
+
+[ feel free to send bug reports, suggestions and patches to
+  Ingo Molnar <mingo@redhat.com> or the Linux SMP mailing
+  list at <linux-smp@vger.kernel.org> ]
+

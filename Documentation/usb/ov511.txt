@@ -1,0 +1,234 @@
+-------------------------------------------------------------------------------
+Readme for Linux device driver for the OmniVision OV511 USB to camera bridge IC
+-------------------------------------------------------------------------------
+
+Author: Mark McClelland
+Homepage: http://alpha.dyndns.org/ov511
+
+INTRODUCTION:
+
+This is a driver for the OV511, a USB-only chip used in many "webcam" devices.
+Any camera using the OV511/OV511+ and the OV7610/20/20AE CCD should work. It 
+supports streaming and capture of color or monochrome video via the Video4Linux
+API. Most V4L apps are compatible with it, but a few video-conferencing programs
+do not work yet. The following resolutions are supported: 640x480, 448x336,
+384x288, 352x288, and 320x240.
+
+If you need more information, please visit the OV511 homepage at the above URL.
+
+WHAT YOU NEED:
+
+- If you want to help with the development, get the chip's specification docs at
+  http://www.ovt.com/omniusbp.html
+
+- A Video4Linux compatible frame grabber program (I recommend vidcat and xawtv)
+    vidcat is part of the w3cam package:  http://www.hdk-berlin.de/~rasca/w3cam/
+    xawtv is available at:  http://www.in-berlin.de/User/kraxel/xawtv.html
+
+HOW TO USE IT:
+
+You must have first compiled USB support, support for your specific USB host
+controller (UHCI or OHCI), and Video4Linux support for your kernel (I recommend
+making them modules.)
+
+Next, (as root) from your appropriate modules directory (lib/modules/2.3.XX):
+
+	insmod usb/usbcore.o
+	insmod usb/usb-uhci.o  <OR>  insmod usb/ohci-hcd.o
+	insmod misc/videodev.o
+	insmod usb/ov511.o
+
+If it is not already there (it usually is), create the video device:
+
+	mknod /dev/video c 81 0
+
+Sometimes /dev/video is a symlink to /dev/video0
+
+You will have to set permissions on this device to allow you to read/write
+from it:
+
+	chmod 666 /dev/video
+	chmod 666 /dev/video0 (if necessary)
+	
+Now you are ready to run a video app! Both vidcat and xawtv work well for me
+at 640x480.
+	
+[Using vidcat:]
+
+	vidcat -s 640x480 > test.jpg
+	xview test.jpg
+	
+[Using xawtv:]
+
+You must make some modifications to the source and compile it before you use it.
+(Note: this may not be applicable to versions other than 3.06)
+
+In src/Xawtv.ad, change xawtv.tv.width to 640 and xawtv.tv.height to 480. Next,
+in src/grab-v4l.c, change SYNC_TIMEOUT from 1 to 2. Then, from the main xawtv
+directory:
+
+	make clean
+	./configure
+	make
+	make install
+
+Now you should be able to run xawtv. Right click for the options dialog. If
+you get a scrambled image it is likely that you made a mistake in Xawtv.ad.
+Try setting the size to 320x240 if all else fails.
+
+MODULE PARAMETERS:
+
+  You can set these with:  insmod ov511 NAME=VALUE
+  There is currently no way to set these on a per-camera basis.
+
+  NAME: autoadjust
+  TYPE: integer (boolean)
+  DEFAULT: 1
+  DESC: The camera normally adjusts exposure, gain, and hue automatically. This
+        can be set to 0 to disable this automatic adjustment. Note that there is
+        currently no way to set these parameters manually once autoadjust is
+        disabled.
+
+  NAME: debug
+  TYPE: integer (0-6)
+  DEFAULT: 3
+  DESC: Sets the threshold for printing debug messages. The higher the value,
+        the more is printed. The levels are cumulative, and are as follows:
+          0=no debug messages
+          1=init/detection/unload and other significant messages
+          2=some warning messages
+          3=config/control function calls
+          4=most function calls and data parsing messages
+          5=highly repetitive mesgs
+
+  NAME: fix_rgb_offset
+  TYPE: integer (boolean)
+  DEFAULT: 0
+  DESC: Some people have reported that the blue component of the image is one
+        or so lines higher than the red component. This is only apparent in 
+        images with white objects on black backgrounds at 640x480. Setting this
+        to 1 will realign the color planes correctly. NOTE: This is still
+        experimental and very buggy. You will likely need a fast (500 MHz) CPU.
+
+  NAME: snapshot
+  TYPE: integer (boolean)
+  DEFAULT: 0
+  DESC: Set to 1 to enable snapshot mode. read() will block until the snapshot
+        button is pressed. Note that this does not yet work with most apps,
+        including xawtv and vidcat. NOTE: See the section "TODO" for more info.
+
+  NAME: sensor
+  TYPE: integer ([0, 1, 3])
+  DEFAULT: [varies]
+  DESC: If you know that your camera sensor is not detected correctly, set this
+        parameter. This is a global option for all attached OV511 cameras. You
+        will probably never need to set this, but if you do, valid values are:
+        	0 for OV7620
+        	1 for OV7620AE
+        	3 for OV7610
+
+  NAME: i2c_detect_tries
+  TYPE: integer (don't set it insanely high!)
+  DEFAULT: 5
+  DESC: This is the number of times the driver will try to sync and detect the
+        internal i2c bus (which connects the OV511 and sensor). If you are
+        getting intermittent detection failures ("Failed to read sensor ID...")
+        you should increase this by a modest amount. If setting it to 20 or so
+        doesn't fix things, look elsewhere for the cause of the problem.
+
+  NAME: aperture
+  TYPE: integer (0 - 15)
+  DEFAULT: [varies by sensor]
+  DESC: For legal values, see the OV7610/7620 specs under register Common F.
+        This setting affects the upper nybble of that reg (bits 4-7). This is
+        for if you want to play with the camera's pixel saturation.
+
+  NAME: force_rgb
+  TYPE: integer (boolean)
+  DEFAULT: 0
+  DESC: Force image to be read in RGB instead of BGR. This option allow
+        programs that expect RGB data (e.g. gqcam) to work with this driver. If
+        your colors look VERY wrong, you may want to change this.
+
+  NAME: buf_timeout
+  TYPE: integer
+  DEFAULT: 5 (seconds)
+  DESC: Number of seconds before unused frame buffers are deallocated.
+        Previously, memory was allocated upon open() and deallocated upon
+        close(). Deallocation now occurs only if the driver is closed and this
+        timeout is reached. If you are capturing frames less frequently than
+        the default timeout, increase this. This will not make any difference
+        with programs that capture multiple frames during an open/close cycle.
+
+  NAME: cams
+  TYPE: integer (1-4 for OV511, 1-31 for OV511+)
+  DEFAULT: 1
+  DESC: Number of cameras allowed to stream simultaneously on a single bus.
+        Values higher than 1 reduce the data rate of each camera, allowing two
+        or more to be used at once. If you have a complicated setup involving
+        both OV511 and OV511+ cameras, trial-and-error may be necessary for
+        finding the optimum setting.
+
+  NAME: retry_sync
+  TYPE: boolean
+  DEFAULT: 0
+  DESC: Prevent apps from timing out if frame is not done in time. This is
+        useful if you are having problems with Xawtv getting "stuck" on a frame
+        when your system is under heavy load.
+
+  NAME: sensor_gbr
+  TYPE: boolean
+  DEFAULT: 0
+  DESC: This makes the sensor output GBR422 instead of YUV420. This saves the
+        driver the trouble of converting YUV to RGB, but it currently does not
+        work very well (the colors are not quite right)
+
+WORKING FEATURES:
+ o Color streaming/capture at 640x480, 448x336, 384x288, 352x288, and 320x240
+ o RGB24, RGB565, YUV420, YUV422, YUYV, and YUV422P color
+ o Monochrome
+ o Setting/getting of saturation, contrast, brightness, and hue (only some of
+   them work the OV7620 and OV7620AE)
+ o /proc status reporting
+
+EXPERIMENTAL FEATURES:
+ o fix_rgb_offset: Sometimes works, but other times causes errors with xawtv and
+   corrupted frames. If you have a very fast CPU, you can try it.
+ o Snapshot mode (only works with some read() based apps; see below for more)
+ o OV6620 sensor support
+ o GBR422 parsing
+ o 160x120
+
+TODO:
+ o Fix the noise / grainy image problem.
+ o Get compression working. It would be a nice addition as it improves
+   frame rate quite a bit. OmniVision wouldn't tell me how the algorithm works,
+   so we can't really work on that yet. Please kindly inform OmniVision that you
+   would like them to release their specifications to the Linux community.
+ o YUV422
+ o Fix fixFrameRGBoffset(). It is not stable yet with streaming video.
+ o V4L2 support (Probably not until it goes into the kernel)
+ o Get rid of the memory management functions (put them in videodev.c??)
+ o Setting of contrast and brightness not working with 7620/7620AE
+ o Driver/camera state save/restore for when USB supports suspend/resume
+ o Unstable on SMP systems
+ o OV7620/OV6620 experience frame corruption with moving objects
+ o OV6620 is too dark
+ o 176x144 support
+ o Driver sometimes hangs upon close() with OHCI
+ o The image should always be written properly to the mmap'ed buffer as long as
+   the requested image size is at least the minimum size. This will likely
+   require a rewrite of all the parsing code.
+
+HOW TO CONTACT ME:
+
+You can email me at mwm@i.am . Please prefix the subject line
+with "OV511: " so that I am certain to notice your message.
+
+CREDITS:
+
+The code is based in no small part on the CPiA driver by Johannes Erdfelt,
+Randy Dunlap, and others. Big thanks to them for their pioneering work on that
+and the USB stack. Thanks to Bret Wallach for getting camera reg IO, ISOC, and
+image capture working. Thanks to Orion Sky Lawlor, Kevin Moore, and Claudio
+Matsuoka for their work as well.

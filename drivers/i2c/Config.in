@@ -1,0 +1,29 @@
+#
+# Character device configuration
+#
+mainmenu_option next_comment
+comment 'I2C support'
+
+tristate 'I2C support' CONFIG_I2C
+
+if [ "$CONFIG_I2C" != "n" ]; then
+
+   dep_tristate 'I2C bit-banging interfaces'  CONFIG_I2C_ALGOBIT $CONFIG_I2C
+   if [ "$CONFIG_I2C_ALGOBIT" != "n" ]; then
+      dep_tristate '  Philips style parallel port adapter' CONFIG_I2C_PHILIPSPAR $CONFIG_I2C_ALGOBIT $CONFIG_PARPORT
+      dep_tristate '  ELV adapter' CONFIG_I2C_ELV $CONFIG_I2C_ALGOBIT
+      dep_tristate '  Velleman K9000 adapter' CONFIG_I2C_VELLEMAN $CONFIG_I2C_ALGOBIT
+   fi
+
+   dep_tristate 'I2C PCF 8584 interfaces' CONFIG_I2C_ALGOPCF $CONFIG_I2C
+   if [ "$CONFIG_I2C_ALGOPCF" != "n" ]; then
+      dep_tristate '  Elektor ISA card' CONFIG_I2C_ELEKTOR $CONFIG_I2C_ALGOPCF
+   fi
+
+# This is needed for automatic patch generation: sensors code starts here
+# This is needed for automatic patch generation: sensors code ends here
+
+   dep_tristate 'I2C device interface' CONFIG_I2C_CHARDEV $CONFIG_I2C
+
+fi
+endmenu

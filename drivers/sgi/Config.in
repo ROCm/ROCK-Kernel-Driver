@@ -1,0 +1,17 @@
+#
+# Character device configuration
+#
+mainmenu_option next_comment
+comment 'SGI devices'
+
+bool 'SGI Zilog85C30 serial support' CONFIG_SGI_SERIAL
+if [ "$CONFIG_SGI_SERIAL" = "y" ]; then
+   bool '  Support for console on serial port' CONFIG_SERIAL_CONSOLE
+fi
+bool 'SGI DS1286  RTC support' CONFIG_SGI_DS1286
+
+if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then  
+   tristate 'SGI Newport Graphics support' CONFIG_SGI_NEWPORT_GFX
+fi
+
+endmenu

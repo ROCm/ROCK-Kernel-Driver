@@ -1,0 +1,24 @@
+#
+# PCMCIA bus subsystem configuration
+#
+# Right now the non-CardBus choices are not supported
+# by the integrated kernel driver.
+#
+mainmenu_option next_comment
+comment 'PCMCIA/CardBus support'
+
+#dep_tristate 'CardBus support' CONFIG_PCMCIA $CONFIG_PCI
+#if [ "$CONFIG_PCMCIA" != "n" ]; then
+#  define_bool CONFIG_CARDBUS y
+#fi
+
+tristate 'PCMCIA/CardBus support' CONFIG_PCMCIA
+if [ "$CONFIG_PCMCIA" != "n" ]; then
+   if [ "$CONFIG_PCI" != "n" ]; then
+      bool '  CardBus support' CONFIG_CARDBUS
+   fi
+   bool '  i82365 compatible bridge support' CONFIG_I82365
+   bool '  Databook TCIC host bridge support' CONFIG_TCIC
+fi
+
+endmenu

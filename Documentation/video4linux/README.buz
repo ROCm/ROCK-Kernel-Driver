@@ -1,0 +1,212 @@
+Iomega Buz Driver for Linux
+===========================
+
+by Rainer Johanni <Rainer@Johanni.de>
+
+Compiling and Loading the Driver
+================================
+
+You must run a 2.2.x kernel in order to use this driver.
+
+To compile the driver, just type make.
+
+Besides the files in this directory, the driver needs the
+'videodev' and the 'i2c' module from the Linux kernel.
+In order to get these modules available, enable module support
+for VIDEODEV and BTTV (which implies i2c) in your kernel
+configuration. You find these devices in the menu
+"Character Devices" in your Kernel Configuration.
+
+Before you load the driver you must have a video device
+at major device node 81. If you don't have it yet, do the
+following (as root!):
+
+cd /dev
+mknod video0 c 81 0
+ln -s video0 video
+
+Edit the 'update' script if you want to give the driver
+special options and then type (as root)
+
+./update
+
+to insert all the necessary modules into the kernel.
+
+If you want to make full use of the Video for Linux uncompressed
+grabbing facilities, you must either
+
+- obtain and install the "big_physarea patch" for your kernel and
+  set aside the necessary memory during boot time.
+  There seem to be several versions of this patch against
+  various kernel versions floating around in the net,
+  you may obtain one e.g. from:
+  http://www.polyware.nl/~middelin/patch/bigphysarea-2.2.1.tar.gz
+  You also have to compile your driver AFTER installing that patch
+  in order to get it working
+
+  or
+
+- start your kernel with the mem=xxx option, where xxx is your
+  real memory minus the memory needed for the buffers.
+  For doing this add an entry in lilo.conf (if you use lilo):
+    append "mem=xxxM"
+  or add a line in your linux.par file (if you use loadlin):
+    mem=xxxM
+
+The second method is by far easier, however it is dangerous
+if more than one driver at a time has the idea to use the memory
+leftover by setting the mem=xxx parameter below the actual
+memory size.
+
+Read also below how to use this memory!
+
+
+
+Driver Options
+==============
+
+You are able to customize the behavior of the driver by giving
+it some options at start time.
+
+default_input, default_norm
+---------------------------
+
+As soon as the driver is loaded, the Buz samples video signals
+from one of its input ports and displays it on its output.
+The driver uses the Composite Input and the video norm PAL for this.
+If you want to change this default behavior, set default_input=1
+(for S-VHS input) or default_norm=1 for NTSC.
+
+v4l_nbufs, v4l_bufsize
+----------------------
+
+In order to make to make full use of the Video for Linux picture
+grabbing facilities of the driver (which are needed by many
+Video for Linux applications), the driver needs a set of
+physically contiguous buffers for grabbing. These parameters
+determine how many buffers of which size the driver will
+allocate at open (the open will fail if it is unable to do so!).
+
+These values do not affect the MJPEG grabbing facilities of the driver,
+they are needed for uncompressed image grabbing only!!!
+
+v4l_nbufs is the number of buffers to allocate, a value of 2 (the default)
+should be sufficient in almost all cases. Only special applications
+(streaming captures) will need more buffers and then mostly the
+MJPEG capturing features of the Buz will be more appropriate.
+So leave this parameter at it's default unless you know what you do.
+
+The things for v4l_bufsize are more complicated:
+v4l_bufsize is set by default to 128 [KB] which is the maximum
+amount of physically contiguous memory Linux is able to allocate
+without kernel changes. This is sufficient for grabbing 24 bit color images
+up to sizes of approx. 240x180 pixels (240*180*3 = 129600, 128 KB = 131072).
+
+In order to be able to capture bigger images you have either to
+- obtain and install the "big_physarea patch" and set aside
+  the necessary memory during boot time or
+- start your kernel with the mem=xxx option, where xxx is your
+  real memory minus the memory needed for the buffers.
+In that case, useful settings for v4l_bufsize are
+- 1296 [Kb] for grabbing 24 bit images of max size 768*576
+- 1728 [Kb] for 32bit images of same size (4*768*576 = 1728 Kb!)
+You may reduce these numbers accordingly if you know you are only
+grabbing 720 pixels wide images or NTSC images (max height 480).
+
+In some cases it may happen that Linux isn't even able to obtain
+the default 128 KB buffers. If you don't need uncompressed image
+grabbing at all, set v4l_bufsize to an arbitrary small value (e.g. 4)
+in order to be able to open the video device.
+
+vidmem
+------
+
+The video mem address of the video card.
+The driver has a little database for some videocards
+to determine it from there. If your video card is not in there
+you have either to give it to the driver as a parameter
+or set in in a VIDIOCSFBUF ioctl
+
+The videocard database is contained in the file "videocards.h"
+Gernot Ziegler wants to keep an actual version of that file.
+If your card is not contained in that file, look at
+http://www.lysator.liu.se/~gz/buz/ for an actual version of
+"videocards.h".
+
+triton, natoma
+--------------
+
+The driver tries to detect if you have a triton or natome chipset
+in order to take special measures for these chipsets.
+If this detection fails but you are sure you have such a chipset,
+set the corresponding variable to 1.
+This is a very special option and may go away in the future.
+
+
+
+Programming interface
+=====================
+
+This driver should be fully compliant to Video for Linux, so all
+tools working with Video for Linux should work with (hopefully)
+no problems.
+
+A description of the Video for Linux programming interface can be found at:
+http://roadrunner.swansea.linux.org.uk/v4lapi.shtml
+
+Besides the Video for Linux interface, the driver has a "proprietary"
+interface for accessing the Buz's MJPEG capture and playback facilities.
+
+The ioctls for that interface are as follows:
+
+BUZIOC_G_PARAMS
+BUZIOC_S_PARAMS
+
+Get and set the parameters of the buz. The user should always
+do a BUZIOC_G_PARAMS (with a struct buz_params) to obtain the default
+settings, change what he likes and then make a BUZIOC_S_PARAMS call.
+A typical application should at least set the members
+input, norm and decimation of the struct buz_params.
+For a full description of all members see "buz.h"
+
+BUZIOC_REQBUFS
+
+Before being able to capture/playback, the user has to request
+the buffers he is wanting to use. Fill the structure
+buz_requestbuffers with the size (recommended: 256*1024) and
+the number (recommended 32 up to 256). There are no such restrictions
+as for the Video for Linux buffers, you should LEAVE SUFFICIENT
+MEMORY for your system however, else strange things will happen ....
+On return, the buz_requestbuffers structure contains number and
+size of the actually allocated buffers.
+You should use these numbers for doing a mmap of the buffers
+into the user space.
+The BUZIOC_REQBUFS ioctl also makes it happen, that the next mmap
+maps the MJPEG buffer instead of the V4L buffers.
+
+BUZIOC_QBUF_CAPT
+BUZIOC_QBUF_PLAY
+
+Queue a buffer for capture or playback. The first call also starts
+streaming capture. When streaming capture is going on, you may
+only queue further buffers or issue syncs until streaming
+capture is switched off again with a argument of -1 to
+a BUZIOC_QBUF_CAPT/BUZIOC_QBUF_PLAY ioctl.
+
+BUZIOC_SYNC
+
+Issue this ioctl when all buffers are queued. This ioctl will
+block until the first buffer becomes free for saving its
+data to disk (after BUZIOC_QBUF_CAPT) or for reuse (after BUZIOC_QBUF_PLAY).
+
+BUZIOC_G_STATUS
+
+Get the status of the input lines (video source connected/norm).
+This ioctl may be subject to change.
+
+
+
+
+
+See the examples directory delivered with this driver
+for actual coding examples!

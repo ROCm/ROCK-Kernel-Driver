@@ -1,0 +1,74 @@
+.TH DASDFMT 8 "Tue Jan 25 2000"
+.UC 4
+.SH NAME
+dasdfmt \- formatting of DSAD (ECKD) disk drives.
+.SH SYNOPSIS
+\fBdasdfmt\fR [-tvyV] [-b \fIblockSize\fR] [\fIblockRange\fI]
+	\fIdiskSpec\fR
+.SH DESCRIPTION
+\fBdasdfmt\fR formats a DASD (ECKD) disk drive to prepare it
+for usage with Linux for S/390. \fBWARNING\fR: Incautious usage of
+\fBdasdfmt\fR can result in \fBLOSS OF DATA\fR.
+
+.SH OPTIONS
+.TP
+\fB-t\fR
+Disables any modification of the disk drive. \fBdasdfmt\fR just prints
+out, what it \fBwould\fR do.
+
+.TP
+\fB-v\fR
+Increases verbosity.
+
+.TP
+\fB-y\fR 
+Start formatting without further user-confirmation.
+
+.TP
+\fB-V\fR 
+Print version number and exit.
+
+.TP
+\fB-b\fR \fIblockSize\fR
+Specify blocksize to be used. \fIblocksize\fR must be a positive integer
+and always be a power of two. Due due some limitations in the driver,
+it is \fBstrongly\fR recommended to use a \fIblockSize\fR of \fI4096\fR.
+
+.TP
+\fIblockRange\fR
+This parameter specifies the number of the first and last block to be
+formatted. If this parameter is \fBomitted\fR, formatting the \fBwhole\fR disk
+is assumed. The \fIblockRange\fR can be specified in two different formats:
+.sp
+	\fB-s\fR \fIstartBlock\fR \fB-e\fR \fIendBlock\fR
+.br
+or
+.br
+	\fB-r\fR \fIstartBlock\fR-\fIendBlock\fR
+.sp
+If \fIstartBlock\fR is omitted, block \fB0\fR is assumed. If
+\fIendBlock\fR is omitted, the last block of the disk is assumed.
+
+.TP
+\fIdiskSpec\fR
+This parameter specified the device to be formatted. It also can be
+given in two variants:
+.sp
+	\fB-f\fR \fB/dev/dd\fR\fIX\fR
+.br
+or
+.br
+	\fB-n\fR \fIdevnum\fR
+.sp
+The first form uses the commonly used
+.SM UNIX
+device notation where \fIX\fR is a single lowercase letter.
+The second form uses simply the VM vdev number.
+
+.SH BUGS
+None so far ;-)
+
+.SH AUTHOR
+.nf
+This man-page was written by Fritz Elfert <felfert@to.com>
+.fi

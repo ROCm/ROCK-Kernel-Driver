@@ -1,0 +1,208 @@
+#
+# For a description of the syntax of this configuration file,
+# see the Configure script.
+#
+
+mainmenu_name "Linux Kernel Configuration"
+
+define_bool CONFIG_PARISC y
+define_bool CONFIG_UID16 n
+
+mainmenu_option next_comment
+comment 'Code maturity level options'
+bool 'Prompt for development and/or incomplete code/drivers' CONFIG_EXPERIMENTAL
+endmenu
+
+mainmenu_option next_comment
+comment 'General options'
+
+# bool 'Symmetric multi-processing support' CONFIG_SMP
+define_bool CONFIG_SMP n
+
+bool 'Kernel Debugger support' CONFIG_KWDB
+# define_bool CONFIG_KWDB n
+
+# bool 'GSC/Gecko bus support' CONFIG_GSC y
+define_bool CONFIG_GSC y
+
+bool 'U2/Uturn I/O MMU' CONFIG_IOMMU_CCIO y
+bool 'LASI I/O support' CONFIG_GSC_LASI y
+
+bool 'PCI bus support' CONFIG_PCI y
+
+if [ "$CONFIG_PCI" = "y" ]; then
+	bool 'GSCtoPCI/DINO PCI support' CONFIG_GSC_DINO y
+	bool 'LBA/Elroy PCI support' CONFIG_PCI_LBA n
+fi 
+
+if [ "$CONFIG_PCI_LBA" = "y" ]; then
+	define_bool CONFIG_IOSAPIC y
+	define_bool CONFIG_IOMMU_SBA y
+fi
+
+#
+# if [ "$CONFIG_PCI_EPIC" = "y" ]; then...
+#
+
+endmenu
+
+mainmenu_option next_comment
+comment 'Loadable module support'
+bool 'Enable loadable module support' CONFIG_MODULES
+if [ "$CONFIG_MODULES" = "y" ]; then
+  bool 'Set version information on all symbols for modules' CONFIG_MODVERSIONS
+  bool 'Kernel module loader' CONFIG_KMOD
+fi
+endmenu
+
+mainmenu_option next_comment
+comment 'General setup'
+
+bool 'Networking support' CONFIG_NET
+
+bool 'System V IPC' CONFIG_SYSVIPC
+bool 'BSD Process Accounting' CONFIG_BSD_PROCESS_ACCT
+bool 'Sysctl support' CONFIG_SYSCTL
+tristate 'Kernel support for SOM binaries' CONFIG_BINFMT_SOM
+tristate 'Kernel support for ELF binaries' CONFIG_BINFMT_ELF
+tristate 'Kernel support for MISC binaries' CONFIG_BINFMT_MISC
+if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+  tristate 'Kernel support for JAVA binaries (obsolete)' CONFIG_BINFMT_JAVA
+fi
+
+endmenu
+
+##source drivers/parport/Config.in
+mainmenu_option next_comment
+comment 'Parallel port support'
+
+tristate 'Parallel port support' CONFIG_PARPORT
+if [ "$CONFIG_PARPORT" != "n" ]; then
+   if [ "$CONFIG_PCI" = "y" ]; then
+     dep_tristate '  PC-style hardware' CONFIG_PARPORT_PC $CONFIG_PARPORT
+     if [ "$CONFIG_PARPORT_PC" != "n" ]; then
+        bool '    Use FIFO/DMA if available' CONFIG_PARPORT_PC_FIFO
+        if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+           bool '    SuperIO chipset support (EXPERIMENTAL)' CONFIG_PARPORT_PC_SUPERIO
+        fi
+     fi
+   fi
+   if [ "$CONFIG_GSC_LASI" = "y" ]; then
+      dep_tristate '  LASI/ASP builtin parallel-port' CONFIG_PARPORT_GSC $CONFIG_PARPORT
+   else
+      define_tristate CONFIG_PARPORT_GSC n
+   fi
+
+   # If exactly one hardware type is selected then parport will optimise away
+   # support for loading any others.  Defeat this if the user is keen.
+   bool '  Support foreign hardware' CONFIG_PARPORT_OTHER
+
+   bool '  IEEE 1284 transfer modes' CONFIG_PARPORT_1284
+fi
+endmenu
+
+
+source drivers/block/Config.in
+
+if [ "$CONFIG_NET" = "y" ]; then
+  source net/Config.in
+fi
+
+mainmenu_option next_comment
+comment 'SCSI support'
+
+tristate 'SCSI support' CONFIG_SCSI
+
+if [ "$CONFIG_SCSI" != "n" ]; then
+  comment 'SCSI support type (disk, tape, CDrom)'
+
+  dep_tristate 'SCSI disk support' CONFIG_BLK_DEV_SD $CONFIG_SCSI
+  if [ "$CONFIG_BLK_DEV_SD" != "n" ]; then
+    int  'Maximum number of SCSI disks that can be loaded as modules' CONFIG_SD_EXTRA_DEVS 40
+  fi
+
+  dep_tristate 'SCSI tape support' CONFIG_CHR_DEV_ST $CONFIG_SCSI
+  dep_tristate 'SCSI CDROM support' CONFIG_BLK_DEV_SR $CONFIG_SCSI
+  if [ "$CONFIG_BLK_DEV_SR" != "n" ]; then
+    bool '  Enable vendor-specific extensions (for SCSI CDROM)' CONFIG_BLK_DEV_SR_VENDOR
+    int  'Maximum number of CDROM devices that can be loaded as modules' CONFIG_SR_EXTRA_DEVS 2
+  fi
+  dep_tristate 'SCSI generic support' CONFIG_CHR_DEV_SG $CONFIG_SCSI
+
+  comment 'Some SCSI devices (e.g. CD jukebox) support multiple LUNs'
+  bool 'Probe all LUNs on each SCSI device' CONFIG_SCSI_MULTI_LUN
+  bool 'Verbose SCSI error reporting (kernel size +=12K)' CONFIG_SCSI_CONSTANTS
+
+  mainmenu_option next_comment
+  comment 'SCSI low-level drivers'
+  if [ "$CONFIG_GSC_LASI" = "y" ]; then
+    dep_tristate 'Lasi SCSI support' CONFIG_SCSI_LASI $CONFIG_SCSI
+    dep_tristate 'Zalon SCSI support' CONFIG_SCSI_ZALON $CONFIG_SCSI
+  fi
+  if [ "$CONFIG_PCI" = "y" ]; then
+    dep_tristate 'SYM53C8XX SCSI support' CONFIG_SCSI_SYM53C8XX $CONFIG_SCSI
+  fi
+  if [ "$CONFIG_SCSI_ZALON" != "n" -o "$CONFIG_SCSI_SYM53C8XX" != "n" ]; then
+    int  '  default tagged command queue depth' CONFIG_SCSI_NCR53C8XX_DEFAULT_TAGS 8
+    int  '  maximum number of queued commands' CONFIG_SCSI_NCR53C8XX_MAX_TAGS 32
+    int  '  synchronous transfers frequency in MHz' CONFIG_SCSI_NCR53C8XX_SYNC 20
+    bool '  enable profiling' CONFIG_SCSI_NCR53C8XX_PROFILE
+    bool '  use normal IO' CONFIG_SCSI_NCR53C8XX_IOMAPPED
+  fi
+  endmenu
+fi
+endmenu
+
+if [ "$CONFIG_NET" = "y" ]; then
+  mainmenu_option next_comment
+  comment 'Network device support'
+
+  bool 'Network device support' CONFIG_NETDEVICES
+
+  if [ "$CONFIG_NETDEVICES" = "y" ]; then
+    if [ "$CONFIG_GSC_LASI" = "y" ]; then
+      tristate 'Lasi ethernet' CONFIG_LASI_82596
+    fi
+    source drivers/net/Config.in
+  fi
+  endmenu
+fi
+
+source drivers/char/Config.in
+
+source fs/Config.in
+
+mainmenu_option next_comment
+comment 'Sound Drivers'
+tristate 'Sound card support' CONFIG_SOUND
+if [ "$CONFIG_SOUND" != "n" ]; then
+   source drivers/sound/Config.in
+fi
+endmenu
+
+if [ "$CONFIG_VT" = "y" ]; then
+  mainmenu_option next_comment
+  comment 'Console drivers'
+  source drivers/video/Config.in
+
+#  bool 'IODC console' CONFIG_IODC_CONSOLE
+  bool 'STI console' CONFIG_STI_CONSOLE
+  if [ "$CONFIG_IODC_CONSOLE" = "n" ]; then
+    if [ "$CONFIG_GSC_PS2" = "y" ]; then
+      define_bool CONFIG_DUMMY_CONSOLE y
+    fi
+  fi
+  if [ "$CONFIG_STI_CONSOLE" = "y" ]; then
+    define_bool CONFIG_DUMMY_CONSOLE y
+  fi
+  endmenu
+fi
+# endmenu
+
+mainmenu_option next_comment
+comment 'Kernel hacking'
+
+#bool 'Debug kmalloc/kfree' CONFIG_DEBUG_MALLOC
+bool 'Magic SysRq key' CONFIG_MAGIC_SYSRQ
+endmenu
+

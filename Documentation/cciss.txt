@@ -1,0 +1,47 @@
+This driver is for Compaq's SMART Array Controllers.
+
+Supported Cards:
+----------------
+
+This driver is known to work with the following cards:
+
+	* SA 5300
+
+If notes are not already created in the /dev/cciss directory
+
+# mkdev.cciss [ctlrs]
+
+Where ctlrs is the number of controllers you have (defaults to 1 if not
+specified).
+
+Device Naming:
+--------------
+
+You need some entries in /dev for the cciss device.  The mkdev.cciss script
+can make device nodes for you automatically.  Currently the device setup
+is as follows:
+
+Major numbers:
+	104	cciss0	
+	105	cciss1	
+	106	cciss2 
+	etc...
+
+Minor numbers:
+        b7 b6 b5 b4 b3 b2 b1 b0
+        |----+----| |----+----|
+             |           |
+             |           +-------- Partition ID (0=wholedev, 1-15 partition)
+             |
+             +-------------------- Logical Volume number
+
+The suggested device naming scheme is:
+/dev/cciss/c0d0			Controller 0, disk 0, whole device
+/dev/cciss/c0d0p1		Controller 0, disk 0, partition 1
+/dev/cciss/c0d0p2		Controller 0, disk 0, partition 2
+/dev/cciss/c0d0p3		Controller 0, disk 0, partition 3
+
+/dev/cciss/c1d1			Controller 1, disk 1, whole device
+/dev/cciss/c1d1p1		Controller 1, disk 1, partition 1
+/dev/cciss/c1d1p2		Controller 1, disk 1, partition 2
+/dev/cciss/c1d1p3		Controller 1, disk 1, partition 3

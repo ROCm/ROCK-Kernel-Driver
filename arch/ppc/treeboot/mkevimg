@@ -1,0 +1,437 @@
+#!/usr/bin/perl
+
+#
+#    Copyright (c) 1998-1999 TiVo, Inc.
+#    All rights reserved.
+#
+#    Copyright (c) 1999 Grant Erickson <grant@lcse.umn.edu>
+#      Major syntactic and usability rework.
+#
+#    Module name: mkevimg
+#
+#    Description:
+#      Converts an ELF output file from the linker into the format used by
+#      the IBM evaluation board ROM Monitor to load programs from a host
+#      onto the evaluation board. The ELF file must be an otherwise execut-
+#      able file (with the text and data addresses bound at link time) and
+#      have space reserved after the entry point for the load information
+#      block:
+#
+#      typedef struct boot_block {
+#        unsigned long magic;	        0x0052504F
+#	 unsigned long dest;	        Target address of the image
+#	 unsigned long num_512blocks;   Size, rounded-up, in 512 byte blocks
+#	 unsigned long debug_flag;      Run the debugger or image after load
+#        unsigned long entry_point;	The image address to jump to after load
+#	 unsigned long reserved[3];
+#      } boot_block_t;
+#
+#   
+
+use File::Basename;
+use Getopt::Std;
+
+#
+# usage()
+#
+# Description:
+#   This routine prints out the proper command line usage for this program
+#
+# Input(s):
+#   status - Flag determining what usage information will be printed and what
+#            the exit status of the program will be after the information is
+#            printed.
+#
+# Output(s):
+#   N/A
+#
+# Returns:
+#   This subroutine does not return.
+#
+
+sub usage {
+  my($status);
+  $status = $_[0];
+
+  printf("Usage: %s [-hlvV] <ELF input file> <Evaluation board output file>\n",
+	$program);
+
+  if ($status != 0) {
+    printf("Try `%s -h' for more information.\n", $program);
+  }
+
+  if ($status != 1) {
+    print("  -h         Print out this message and exit.\n");
+    print("  -l         Linux mode; if present, copy 'image' and 'initrd' sections.\n");
+    print("  -v         Verbose. Print out lots of ELF information.\n");
+    print("  -V         Print out version information and exit.\n");
+  }
+
+  exit($status);
+}
+
+#
+# version()
+#
+# Description:
+#   This routine prints out program version information
+#
+# Input(s):
+#   N/A
+#
+# Output(s):
+#   N/A
+#
+# Returns:
+#   This subroutine does not return.
+#
+
+sub version {
+  print("mkevimg Version 1.1.0\n");
+  print("Copyright (c) 1998-1999 TiVo, Inc.\n");
+  print("Copyright (c) 1999 Grant Erickson <grant\@lcse.umn.edu>\n");
+
+  exit (0);
+}
+
+#
+# file_check()
+#
+# Description:
+#   This routine checks an input file to ensure that it exists, is a
+#   regular file, and is readable.
+#
+# Input(s):
+#   file - Input file to be checked.
+#
+# Output(s):
+#   N/A
+#
+# Returns:
+#   0 if the file exists, is a regular file, and is readable, otherwise -1.
+#
+
+sub file_check {
+  my($file);
+  $file = $_[0];
+
+  if (!(-e $file)) {
+    printf("The file \"%s\" does not exist.\n", $file);
+    return (-1);
+  } elsif (!(-f $file)) {
+    printf("The file \"%s\" is not a regular file.\n", $file);
+    return (-1);
+  } elsif (!(-r $file)) {
+    printf("The file \"%s\" is not readable.\n", $file);
+    return (-1);
+  }
+
+  return (0);
+}
+
+#
+# decode_options()
+#
+# Description:
+#   This routine steps through the command-line arguments, parsing out
+#   recognzied options.
+#
+# Input(s):
+#   N/A
+#
+# Output(s):
+#   N/A
+#
+# Returns:
+#   N/A
+#
+
+sub decode_options {
+
+  if (!getopts("hlvV")) {
+    usage(1);
+  }
+
+  if ($opt_h) {
+    usage(0);
+  }
+
+  if ($opt_l) {
+    $linux = 1;
+  }
+
+  if ($opt_V) {
+    version();
+    exit (0);
+  }
+
+  if ($opt_v) {
+    $verbose = 1;
+  }
+
+  if (!($ifile = shift(@ARGV))) {
+    usage(1);
+  }
+
+  if (!($ofile = shift(@ARGV))) {
+    usage (1);
+  }
+
+  if (file_check($ifile)) {
+    exit(1);
+  }
+
+}
+
+#
+# ELF file and section header field numbers
+#
+
+require 'elf.pl';
+
+#
+# Main program body
+#
+
+{
+  $program = basename($0);
+
+  decode_options();
+
+  open(ELF, "<$ifile") || die "Cannot open input file";
+
+  $ifilesize = (-s $ifile);
+
+  if ($verbose) {
+    print("Output file: $ofile\n");
+    print("Input file: $ifile, $ifilesize bytes.\n");
+  }
+
+  if (read(ELF, $ibuf, $ifilesize) != $ifilesize) {
+    print("Failed to read input file!\n");
+    exit(1);
+  }
+
+  # 
+  # Parse ELF header
+  #
+
+  @eh = unpack("a16n2N5n6", $ibuf);
+
+  #
+  # Make sure this is actually a PowerPC ELF file.
+  #
+
+  if (substr($eh[$e_ident], 0, 4) ne "\177ELF") {
+    printf("The file \"%s\" is not an ELF file.\n", $ifile);
+    exit (1);
+  } elsif ($eh[$e_machine] != 20) {
+    printf("The file \"%s\" is not a PowerPC ELF file.\n", $ifile);
+    exit (1);
+  }
+
+  if ($verbose) {
+    print("File header:\n");
+    printf("  Identifier:            %s\n",	$eh[$e_ident]);
+    printf("  Type:                  %d\n",	$eh[$e_type]);
+    printf("  Machine:               %d\n",	$eh[$e_machine]);
+    printf("  Version:               %d\n",	$eh[$e_version]);
+    printf("  Entry point:           0x%08x\n", $eh[$e_entry]);
+    printf("  Program header offset: 0x%x\n",	$eh[$e_phoff]);
+    printf("  Section header offset: 0x%x\n",	$eh[$e_shoff]);
+    printf("  Flags:                 0x%08x\n", $eh[$e_flags]);
+    printf("  Header size:           %d\n", $eh[$e_ehsize]);
+    printf("  Program entry size:    %d\n", $eh[$e_phentsize]);
+    printf("  Program table entries: %d\n", $eh[$e_phnum]);
+    printf("  Section header size:   %d\n", $eh[$e_shentsize]);
+    printf("  Section table entries: %d\n", $eh[$e_shnum]);
+    printf("  String table section:  %d\n", $eh[$e_shstrndx]);
+  }
+
+  #
+  # Find the section header for the string table.
+  #
+
+  $strtable_section_offset =  $eh[$e_shoff] +
+    $eh[$e_shstrndx] * $eh[$e_shentsize];
+
+  if ($verbose) {
+    printf("String table section header offset: 0x%x\n",
+	   $strtable_section_offset);
+  }
+  
+  #
+  # Find the start of the string table.
+  #
+
+  @strh = unpack("N10", substr($ibuf, $strtable_section_offset, 
+			       $eh[$e_shentsize]));
+
+  if ($verbose) {
+    printf("Section name strings start at: 0x%x, %d bytes.\n",
+	   $strh[$sh_offset], $strh[$sh_size]);
+  }
+
+  $names = substr($ibuf, $strh[$sh_offset], $strh[$sh_size]);
+
+  # Grab each section header and find '.text' and '.bss' sections in
+  # particular.
+
+  if ($verbose) {
+  print("Section headers:\n");
+  print("Idx  Name                      Size      Address   File off  Algn\n");
+  print("---  ------------------------  --------  --------  --------  ----\n");
+  }
+
+  $off = $eh[$e_shoff];
+
+  for($i = 0; $i < $eh[$e_shnum]; $i++, $off += $eh[$e_shentsize]) {
+    @sh = unpack("N10", substr($ibuf, $off, $eh[$e_shentsize]));
+
+    # Take the first section name from the array returned by split.
+
+    ($name) = split(/\000/, substr($names, $sh[$sh_name]));
+    
+    if ($verbose) {
+      printf("%3d  %-24s  %8x  %08x  %08x  %4d\n", 
+	     $i, $name, $sh[$sh_size], $sh[$sh_addr], 
+	     $sh[$sh_offset], $sh[$sh_addralign]);
+    }
+
+    # Attempt to find the .text and .bss sections
+
+    if ($name =~ /^\.bss$/) {
+      ($bss_addr, $bss_offset, $bss_size) =
+	($sh[$sh_addr], $sh[$sh_offset], $sh[$sh_size]);
+
+    } elsif ($name =~ /^\.text$/) {
+      ($text_addr, $text_offset, $text_size) = 
+	($sh[$sh_addr], $sh[$sh_offset], $sh[$sh_size]);
+
+    } elsif ($linux && ($name =~ /^\image$/)) {
+      $image_found = 1;
+
+      ($image_addr, $image_offset, $image_size) = 
+	($sh[$sh_addr], $sh[$sh_offset], $sh[$sh_size]);
+
+    } elsif ($linux && ($name =~ /^\initrd$/)) {
+      $initrd_found = 1;
+
+      ($initrd_addr, $initrd_offset, $initrd_size) = 
+	($sh[$sh_addr], $sh[$sh_offset], $sh[$sh_size]);
+
+    }
+  }
+
+  printf("Text section   - Address: 0x%08x, Size: 0x%08x\n",
+	 $text_addr, $text_size);
+  printf("Bss  section   - Address: 0x%08x, Size: 0x%08x\n",
+	 $bss_addr, $bss_size);
+
+  if ($linux) {
+    if ($image_found) {
+      printf("Image section  - Address: 0x%08x, Size: 0x%08x\n",
+	     $image_addr, $image_size);
+    }
+
+    if ($initrd_found) {
+      printf("Initrd section - Address: 0x%08x, Size: 0x%08x\n",
+	     $initrd_addr, $initrd_size);
+    }
+  }
+
+  #
+  # Open output file
+  #
+
+  open(BOOT, ">$ofile") || die "Cannot open output file";
+
+  #
+  # Compute image size
+  #
+
+  $output_size = $bss_offset - $text_offset + $bss_size;
+
+  if ($linux && $image_found) {
+    $output_size += $image_size;
+  }
+
+  if ($linux && $initrd_found) {
+    $output_size += $initrd_size;
+  }
+
+  $num_blocks = $output_size / 512 + 1;
+
+  #
+  # Write IBM PowerPC evaluation board boot_block_t header
+  #
+
+  $header = pack("H8N7", "0052504f", $text_addr, $num_blocks, 0,
+		 $text_addr, 0, 0, 0);
+
+  $bytes = length($header);
+  
+  if (($resid = syswrite(BOOT, $header, $bytes)) != $bytes) {
+    die("Could not write boot image header to output file.");
+  }
+
+  printf("Entry point = 0x%08x\n", $text_addr);
+  printf("Image size  = 0x%08x (%d bytes) (%d blocks).\n", 
+	 $output_size, $output_size, $num_blocks);
+
+  #
+  # Write image starting after ELF and program headers and 
+  # continuing to beginning of bss
+  #
+
+  $bytes = $bss_offset - $text_offset + $bss_size;
+
+  if (($resid = syswrite(BOOT, $ibuf, $bytes, $text_offset)) != $bytes) {
+    die("Could not write boot image to output file.\n");
+  }
+
+  #
+  # If configured, write out the image and initrd sections as well
+  #
+
+  if ($linux) {
+    if ($image_found) {
+      $bytes = $image_size;
+      if (($resid = syswrite(BOOT, $ibuf, $bytes, $image_offset)) != $bytes) {
+	die("Could not write boot image to output file.\n");
+      }
+    }
+
+    if ($initrd_found) {
+      $bytes = $initrd_size;
+      if (($resid = syswrite(BOOT, $ibuf, $bytes, $initrd_offset)) != $bytes) {
+	die("Could not write boot image to output file.\n");
+      }
+    }
+  }
+
+  #
+  # Pad to a multiple of 512 bytes
+  #
+
+  $pad_size = 512 - (length($header) + $output_size) % 512;
+
+  if ($verbose) {
+    print("Padding boot image by an additional $pad_size bytes.\n");
+  }
+
+  $pad_string = pack(("H8","deadbeef") x 128);
+
+  syswrite(BOOT, $pad_string, $pad_size) or
+    die "Could not pad boot image in output file.\n";
+
+  #
+  # Clean-up and leave
+  #
+
+  close(BOOT);
+
+  print("\nBoot image file \"$ofile\" built successfuly.\n\n");
+
+  exit(0);
+}

@@ -1,0 +1,25 @@
+Pangolin is a StrongARM 1110-based evaluation  platform produced
+by Dialogue Technoloy (http://www.dialogue.com.tw/).
+It has EISA slots for ease of configuration with SDRAM/Flash
+memory card, USB/Serial/Audio card, Compact Flash card,
+and TFT-LCD card.
+This platform is currently under development.
+
+To compile for Pangolin, you must issue the following commands:
+
+	make pangolin_config
+	make config
+	[accept all defaults]
+	make dep
+	make zImage
+
+Supported peripherals:
+- SA1110 serial port
+- flash memory access
+
+Testing:
+- pcmcia driver
+- sound driver
+
+To do:
+- MQ-200 driver

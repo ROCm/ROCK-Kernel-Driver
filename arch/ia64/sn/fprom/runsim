@@ -1,0 +1,372 @@
+#!/bin/sh
+
+# Script for running PROMs and LINUX kernwls on medusa. 
+# Type "sim -H" for instructions.
+
+MEDUSA=${MEDUSA:-/home/rickc/official_medusa/medusa}
+
+# ------------------ err -----------------------
+err() {
+	echo "ERROR - $1"
+	exit 1
+}
+
+# ----------------  help ----------------------
+help() {
+cat <<END
+Script for running a PROM or LINUX kernel under medusa.
+This script creates a control file, creates links to the appropriate
+linux/prom files, and/or calls medusa to make simulation runs.
+
+Usage:  
+   Initial setup:
+   	sim [-c <config_file>] <-p> | <-k>  [<work_dir>]
+		-p	Create PROM control file & links
+		-k	Create LINUX control file & links
+		-c<cf>	Control file name				[Default: cf]
+		<work_dir> Path to directory that contains the linux or PROM files.
+		    The directory can be any of the following:
+		       (linux simulations)
+		       		worktree
+				worktree/linux
+				any directory with vmlinux, vmlinux.sym & fprom files
+			(prom simulations)
+				worktree
+				worktree/stand/arcs/IP37prom/dev
+				any directory with fw.bin & fw.sim files
+
+    Simulations:
+	sim  [-X <n>] [-o <output>] [-M] [<config_file>]
+		-c<cf>	Control file name				[Default: cf]
+		-M	Pipe output thru fmtmedusa
+		-o	Output filename (copy of all commands/output)	[Default: simout]
+		-X	Specifies number of instructions to execute	[Default: 0]
+			(Used only in auto test mode - not described here)
+
+Examples:
+	sim -p <promtree>	# create control file (cf) & links for prom simulations
+	sim -k <linuxtree>	# create control file (cf) & links for linux simulations
+	sim -p -c cfprom	# create a prom control file (cfprom) only. No links are made.
+
+	sim			# run medusa using previously created links &
+				#   control file (cf).
+END
+exit 1
+}
+
+# ----------------------- create control file header --------------------
+create_cf_header() {
+cat <<END >>$CF
+#
+# Template for a control file for running linux kernels under medusa. 
+# You probably want to make mods here but this is a good starting point.
+#
+
+# Preferences
+setenv cpu_stepping A
+setenv exceptionPrint off
+setenv interrupt_messages off
+setenv lastPCsize 100000
+setenv low_power_mode on
+setenv partialIntelChipSet on
+setenv printIntelMessages off
+setenv prom_write_action halt
+setenv prom_write_messages on
+setenv step_quantum 100
+setenv swizzling on
+setenv tsconsole on
+setenv uart_echo on
+symbols on
+
+# IDE disk params
+setenv diskCylinders 611
+setenv bootDrive C
+setenv diskHeads 16
+setenv diskPath idedisk
+setenv diskPresent 1
+setenv diskSpt 63
+
+# Hardware config
+setenv coherency_type nasid
+setenv cpu_cache_type default
+setenv synergy_cache_type syn_cac_64m_8w
+
+# Numalink config
+setenv route_enable on
+setenv network_type xbar		# Select [xbar|router]
+setenv network_warning 0xff
+
+END
+}
+
+
+# ------------------ create control file entries for linux simulations -------------
+create_cf_linux() {
+cat <<END >>$CF
+# Kernel specific options
+setenv mca_on_memory_failure off
+setenv LOADPC 0x00100000		# FPROM load address/entry point (8 digits!)
+sr g 9 0xe000000000520000		# Kernel entry point
+setenv symbol_table vmlinux.sym
+load fprom
+load vmlinux
+
+# Useful breakpoints to always have set. Add more if desired.
+break 0xe000000000505e00	all	# dispatch_to_fault_handler
+break panic			all	# stop on panic
+break die_if_kernel		all	# may as well stop
+
+END
+}
+
+# ------------------ create control file entries for prom simulations ---------------
+create_cf_prom() {
+	SYM2=""
+	ADDR="0x80000000ff800000"
+	[ "$EMBEDDED_LINUX" != "0" ] || SYM2="setenv symbol_table2 vmlinux.sym"
+	[ "$SIZE" = "8MB" ] || ADDR="0x80000000ffc00000"
+	cat <<END >>$CF
+# PROM specific options
+setenv mca_on_memory_failure on
+setenv LOADPC 0x80000000ffffffb0
+setenv promFile fw.bin
+setenv promAddr $ADDR
+setenv symbol_table fw.sym
+$SYM2
+
+# Useful breakpoints to always have set. Add more if desired.
+break Pr_ivt_gexx 		all
+break Pr_ivt_brk		all
+break Pr_PROM_Panic_Spin	all
+break Pr_PROM_Panic		all
+break Pr_PROM_C_Panic		all
+break Pr_fled_die		all
+break Pr_ResetNow		all
+break Pr_zzzbkpt		all
+
+END
+}
+
+
+# ------------------ create control file entries for memory configuration -------------
+create_cf_memory() {
+cat <<END >>$CF
+# CPU/Memory map format:
+#	setenv nodeN_memory_config 0xBSBSBSBS
+#		B=banksize (0=unused, 1=64M, 2=128M, .., 5-1G, c=8M, d=16M, e=32M)
+#		S=bank enable (0=both disable, 3=both enable, 2=bank1 enable, 1=bank0 enable)
+#		  rightmost digits are for bank 0, the lowest address.
+#	setenv nodeN_nasid <nasid>
+#		specifies the NASID for the node. This is used ONLY if booting the kernel.
+#		On PROM configurations, set to 0 - PROM will change it later.
+#	setenv nodeN_cpu_config <cpu_mask>
+#		Set bit number N to 1 to enable cpu N. Ex., a value of 5 enables cpu 0 & 2.
+#
+# Repeat the above 3 commands for each node.
+#
+# For kernel, default to 32MB. Although this is not a valid hardware configuration,
+# it runs faster on medusa. For PROM, 64MB is smallest allowed value.
+
+setenv node0_cpu_config		0x1	# Enable only cpu 0 on the node
+END
+
+if [ $LINUX -eq 1 ] ; then
+cat <<END >>$CF
+setenv node0_nasid		0	# cnode 0 has NASID 0
+setenv node0_memory_config 	0xe1	# 32MB
+END
+else
+cat <<END >>$CF
+setenv node0_memory_config 	0x11	# 64MB
+END
+fi
+}
+
+# -------------------- set links to linux files -------------------------
+set_linux_links() {
+	if [ -d $D/linux/arch ] ; then
+		D=$D/linux
+	elif [ -d $D/arch -o -e vmlinux.sym ] ; then
+		D=$D
+	else
+		err "cant determine directory for linux binaries"
+	fi
+	rm -rf vmlinux vmlinux.sym fprom
+	ln -s $D/vmlinux vmlinux
+	ln -s $D/vmlinux.sym vmlinux.sym
+	if [ -d $D/arch ] ; then
+		ln -s $D/arch/ia64/sn/fprom/fprom fprom
+	else
+		ln -s $D/fprom fprom
+	fi
+	echo "  .. Created links to linux files"	
+}
+
+# -------------------- set links to prom files -------------------------
+set_prom_links() {
+	if [ -d $D/stand ] ; then
+		D=$D/stand/arcs/IP37prom/dev
+	elif [ -d $D/sal ] ; then
+		D=$D
+	else
+		err "cant determine directory for PROM binaries"
+	fi
+	SETUP="$D/../../../../.setup"
+	grep -q '^ *setenv *PROMSIZE *8MB' $SETUP
+	if [ $? -eq 0 ] ; then
+		SIZE="8MB"
+	else
+		SIZE="4MB"
+	fi
+	grep -q '^ *setenv *LAUNCH_VMLINUX' $SETUP
+	EMBEDDED_LINUX=$?
+	rm -f fw.bin fw.map fw.sym vmlinux vmlinux.sym fprom
+	SDIR="SN1IA${SIZE}.O"
+	BIN="SN1IAip37prom${SIZE}"
+	ln -s $D/$SDIR/$BIN.bin fw.bin
+	ln -s $D/$SDIR/$BIN.map fw.map
+	ln -s $D/$SDIR/$BIN.sym fw.sym
+	echo "  .. Created links to $SIZE prom files"
+	if [ $EMBEDDED_LINUX -eq 0 ] ; then
+		ln -s $D/linux/vmlinux vmlinux
+		ln -s $D/linux/vmlinux.sym vmlinux.sym
+		if [ -d linux/arch ] ; then
+			ln -s $D/linux/arch/ia64/sn/fprom/fprom fprom
+		else
+			ln -s $D/linux/fprom fprom
+		fi
+		echo "  .. Created links to embedded linux files in prom tree"
+	fi
+}
+
+# --------------- start of shell script --------------------------------
+OUT="simout"
+FMTMED=0
+STEPCNT=0
+PROM=0
+LINUX=0
+NCF="cf"
+while getopts "HMX:c:o:pk" c ; do
+        case ${c} in
+                H) help;;
+		M) FMTMED=1;;
+		X) STEPCNT=${OPTARG};;
+		c) NCF=${OPTARG};;
+		k) PROM=0;LINUX=1;;
+		p) PROM=1;LINUX=0;;
+		o) OUT=${OPTARG};;
+                \?) exit 1;;
+        esac
+done
+shift `expr ${OPTIND} - 1`
+
+# Check if command is for creating control file and/or links to images.
+if [ $PROM -eq 1 -o $LINUX -eq 1 ] ; then
+	CF=$NCF
+	[ ! -f $CF ] || err "wont overwrite an existing control file ($CF)"
+	if [ $# -gt 0 ] ; then
+		D=$1
+		[ -d $D ] || err "cannot find directory $D"
+		[ $PROM -eq 0 ]  || set_prom_links
+		[ $LINUX -eq 0 ] || set_linux_links
+	fi
+	create_cf_header
+	[ $PROM -eq 0 ]  || create_cf_prom
+	[ $LINUX -eq 0 ] || create_cf_linux
+	create_cf_memory
+	echo "  .. Basic control file created (in $CF). You might want to edit"
+	echo "     this file (at least, look at it)."
+	exit 0
+fi
+
+# Verify that the control file exists
+CF=${1:-$NCF}
+[ -f $CF ] || err "No control file exists. For help, type: $0 -H"
+
+# Build the .cf files from the user control file. The .cf file is
+# identical except that the actual start & load addresses are inserted
+# into the file. In addition, the FPROM commands for configuring memory
+# and LIDs are generated. 
+
+rm -f .cf .cf1 .cf2
+awk '
+function strtonum(n) {
+	 if (substr(n,1,2) != "0x")
+	 	return int(n)
+	 n = substr(n,3)
+	 r=0
+	 while (length(n) > 0) {
+	 	r = r*16+(index("0123456789abcdef", substr(n,1,1))-1)
+		n = substr(n,2)
+	 }
+	 return r
+	}
+/^#/   	{next}
+/^$/	{next}
+/^setenv *LOADPC/               {loadpc = $3; next}
+/^setenv *node._cpu_config/	{n=int(substr($2,5,1)); cpuconf[n] = strtonum($3); print; next}
+/^setenv *node._memory_config/	{n=int(substr($2,5,1)); memconf[n] = strtonum($3); print; next}
+/^setenv *node._nasid/		{n=int(substr($2,5,1)); nasid[n] = strtonum($3); print; next}
+		{print}
+END	{
+	 # Generate the memmap info that starts at the beginning of
+	 # the node the kernel was loaded on.
+	 loadnasid = nasid[0]
+	 cnode = 0
+	 for (i=0; i<128; i++) {
+		if (memconf[i] != "") {
+			printf "sm 0x%x%08x 0x%x%04x%04x\n", 
+				2*loadnasid, 8*cnodes+8, memconf[i], cpuconf[i], nasid[i]
+			cnodes++
+			cpus += substr("0112122312232334", cpuconf[i]+1,1)
+		}
+	 }
+	 printf "sm 0x%x00000000 0x%x%08x\n", 2*loadnasid, cnodes, cpus
+	 printf "setenv number_of_nodes %d\n", cnodes
+
+	 # Now set the starting PC for each cpu.
+	 cnode = 0
+	 lowcpu=-1
+	 for (i=0; i<128; i++) {
+		if (memconf[i] != "") {
+			printf "setnode %d\n", cnode
+			conf = cpuconf[i]
+			for (j=0; j<4; j++) {
+				if (conf != int(conf/2)*2) {
+	 				printf "setcpu %d\n", j
+					if (length(loadpc) == 18)
+						printf "sr pc %s\n", loadpc
+					else
+						printf "sr pc 0x%x%s\n", 2*loadnasid, substr(loadpc,3)
+					if (lowcpu == -1)
+						lowcpu = j
+				}
+				conf = int(conf/2)
+			}
+			cnode++
+		}
+	 }
+	 printf "setnode 0\n"
+	 printf "setcpu %d\n", lowcpu
+	}
+' <$CF >.cf
+
+# Now build the .cf1 & .cf2 control files.
+CF2_LINES="^sm |^break |^run |^si |^quit |^symbols "
+egrep  "$CF2_LINES" .cf >.cf2
+egrep -v "$CF2_LINES" .cf >.cf1
+if [ $STEPCNT -ne 0 ] ; then
+	echo "s $STEPCNT" >>.cf2
+	echo "lastpc 1000" >>.cf2
+	echo "q" >>.cf2
+fi
+echo "script-on $OUT" >>.cf2
+
+# Now start medusa....
+if [ $FMTMED -ne 0 ] ; then
+	$MEDUSA -system mpsn1 -c .cf1 -i .cf2 |  fmtmedusa
+elif [ $STEPCNT -eq 0 ] ; then
+	$MEDUSA -system mpsn1 -c .cf1 -i .cf2 
+else
+	$MEDUSA -system mpsn1 -c .cf1 -i .cf2 2>&1 
+fi

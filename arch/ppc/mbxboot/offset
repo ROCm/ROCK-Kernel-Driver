@@ -1,0 +1,4 @@
+#!/bin/bash
+
+OFFSET=`$1 -h $2  | grep $3 | grep -v zvmlinux| awk '{print $6}'`
+echo "0x"$OFFSET

@@ -1,0 +1,269 @@
+# $Id: config.in,v 1.19 2000/03/27 01:44:45 ralf Exp $
+#
+# For a description of the syntax of this configuration file,
+# see Documentation/kbuild/config-language.txt.
+#
+mainmenu_name "Linux Kernel Configuration"
+
+mainmenu_option next_comment
+comment 'Code maturity level options'
+bool 'Prompt for development and/or incomplete code/drivers' CONFIG_EXPERIMENTAL
+endmenu
+
+mainmenu_option next_comment
+comment 'Machine selection'
+bool 'Support for SGI IP22' CONFIG_SGI_IP22
+bool 'Support for SGI IP27' CONFIG_SGI_IP27
+if [ "$CONFIG_SGI_IP27" = "y" ]; then
+   bool '  IP27 N-Mode' CONFIG_SGI_SN0_N_MODE
+   bool '  Discontiguous Memory Support' CONFIG_DISCONTIGMEM
+   bool '  NUMA support' CONFIG_NUMA
+   bool '  Mapped kernel support' CONFIG_MAPPED_KERNEL
+   bool '  Kernel text replication support' CONFIG_REPLICATE_KTEXT
+   bool '  Exception handler replication support' CONFIG_REPLICATE_EXHANDLERS
+   bool '  Multi-Processing support' CONFIG_SMP
+   #bool '  IP27 XXL' CONFIG_SGI_SN0_XXL
+fi
+endmenu
+
+#
+# Select some configuration options automatically based on user selections
+#
+unset CONFIG_ARC32
+unset CONFIG_ARC64
+unset CONFIG_BINFMT_ELF32
+unset CONFIG_BOARD_SCACHE
+unset CONFIG_BOOT_ELF32
+unset CONFIG_BOOT_ELF64
+unset CONFIG_COHERENT_IO
+unset CONFIG_ISA
+unset CONFIG_PCI
+
+if [ "$CONFIG_SGI_IP22" = "y" ]; then
+   define_bool CONFIG_BOOT_ELF32 y
+   define_bool CONFIG_ARC32 y
+   define_bool CONFIG_BOARD_SCACHE y
+   define_bool CONFIG_ARC_MEMORY y
+   define_bool CONFIG_SGI y
+fi
+
+if [ "$CONFIG_SGI_IP27" = "y" ]; then
+   define_bool CONFIG_BOOT_ELF64 y
+   define_bool CONFIG_ARC64 y
+   define_bool CONFIG_COHERENT_IO y
+   define_bool CONFIG_PCI y
+   define_bool CONFIG_QL_ISP_A64 y
+fi
+
+if [ "$CONFIG_ISA" != "y" ]; then
+   define_bool CONFIG_ISA n
+   define_bool CONFIG_EISA n
+else
+   define_bool CONFIG_EISA y
+fi
+
+if [ "$CONFIG_PCI" != "y" ]; then
+   define_bool CONFIG_PCI n
+fi
+
+define_bool CONFIG_MCA n
+define_bool CONFIG_SBUS n
+
+mainmenu_option next_comment
+comment 'CPU selection'
+
+choice 'CPU type'				\
+	"R4300 CONFIG_CPU_R4300			\
+	 R4x00 CONFIG_CPU_R4X00			\
+	 R5000 CONFIG_CPU_R5000			\
+	 R56x0 CONFIG_CPU_NEVADA		\
+	 R8000 CONFIG_CPU_R8000			\
+	 R10000 CONFIG_CPU_R10000" R4x00
+endmenu
+
+mainmenu_option next_comment
+comment 'General setup'
+
+if [ "$CONFIG_CPU_R10000" = "y" ]; then
+   bool 'Support for large 64-bit configurations' CONFIG_MIPS_INSANE_LARGE
+fi
+bool 'Generate little endian code' CONFIG_CPU_LITTLE_ENDIAN
+
+bool 'Networking support' CONFIG_NET
+
+source drivers/pci/Config.in
+
+bool 'Support for hot-pluggable devices' CONFIG_HOTPLUG
+
+if [ "$CONFIG_HOTPLUG" = "y" ] ; then
+   source drivers/pcmcia/Config.in
+else
+   define_bool CONFIG_PCMCIA n
+fi
+
+bool 'System V IPC' CONFIG_SYSVIPC
+bool 'BSD Process Accounting' CONFIG_BSD_PROCESS_ACCT
+bool 'Sysctl support' CONFIG_SYSCTL
+tristate 'Kernel support for 64-bit ELF binaries' CONFIG_BINFMT_ELF
+bool 'Kernel support for Linux/MIPS 32-bit binary compatibility' CONFIG_MIPS32_COMPAT
+if [ "$CONFIG_MIPS32_COMPAT" = "y" ]; then
+   define_bool CONFIG_BINFMT_ELF32 y
+fi
+tristate 'Kernel support for MISC binaries' CONFIG_BINFMT_MISC
+
+endmenu
+
+mainmenu_option next_comment
+comment 'Loadable module support'
+bool 'Enable loadable module support' CONFIG_MODULES
+if [ "$CONFIG_MODULES" = "y" ]; then
+   bool 'Set version information on all symbols for modules' CONFIG_MODVERSIONS
+   bool 'Kernel module loader' CONFIG_KMOD
+fi
+
+source drivers/pci/Config.in
+
+if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+   bool 'Support for frame buffer devices (EXPERIMENTAL)' CONFIG_FB
+fi
+
+endmenu
+
+source drivers/mtd/Config.in
+
+source drivers/block/Config.in
+
+source drivers/md/Config.in
+
+if [ "$CONFIG_NET" = "y" ]; then
+   source net/Config.in
+fi
+
+source drivers/telephony/Config.in
+
+mainmenu_option next_comment
+comment 'ATA/IDE/MFM/RLL support'
+
+tristate 'ATA/IDE/MFM/RLL support' CONFIG_IDE
+
+if [ "$CONFIG_IDE" != "n" ]; then
+  source drivers/ide/Config.in
+else
+  define_bool CONFIG_BLK_DEV_IDE_MODES n
+  define_bool CONFIG_BLK_DEV_HD n
+fi
+endmenu
+
+mainmenu_option next_comment
+comment 'SCSI support'
+
+tristate 'SCSI support' CONFIG_SCSI
+
+if [ "$CONFIG_SCSI" != "n" ]; then
+   source drivers/scsi/Config.in
+fi
+endmenu
+
+source drivers/i2o/Config.in
+
+if [ "$CONFIG_NET" = "y" ]; then
+   mainmenu_option next_comment
+   comment 'Network device support'
+
+   bool 'Network device support' CONFIG_NETDEVICES
+   if [ "$CONFIG_NETDEVICES" = "y" ]; then
+      source drivers/net/Config.in
+      if [ "$CONFIG_SGI_IP22" = "y" ]; then
+	 bool 'SGI Seeq ethernet controller support' CONFIG_SGISEEQ
+      fi
+      if [ "$CONFIG_DECSTATION" = "y" ]; then
+	 bool 'DEC LANCE ethernet controller support' CONFIG_DECLANCE
+      fi
+      if [ "$CONFIG_BAGET_MIPS" = "y" ]; then
+	 tristate 'Baget AMD LANCE support' CONFIG_BAGETLANCE
+	 tristate 'Baget Backplane Shared Memory support' CONFIG_BAGETBSM
+      fi
+      if [ "$CONFIG_ATM" = "y" ]; then
+	 source drivers/atm/Config.in
+      fi
+   fi
+   endmenu
+fi
+
+source net/ax25/Config.in
+
+source net/irda/Config.in
+
+mainmenu_option next_comment
+comment 'ISDN subsystem'
+
+if [ "$CONFIG_NET" != "n" ]; then
+   tristate 'ISDN support' CONFIG_ISDN
+   if [ "$CONFIG_ISDN" != "n" ]; then
+      source drivers/isdn/Config.in
+   fi
+fi
+endmenu
+
+mainmenu_option next_comment
+comment 'Old CD-ROM drivers (not SCSI, not IDE)'
+
+bool 'Support non-SCSI/IDE/ATAPI CDROM drives' CONFIG_CD_NO_IDESCSI
+if [ "$CONFIG_CD_NO_IDESCSI" != "n" ]; then
+   source drivers/cdrom/Config.in
+fi
+endmenu
+
+source drivers/char/Config.in
+
+#source drivers/misc/Config.in
+
+source drivers/media/Config.in
+
+source fs/Config.in
+
+if [ "$CONFIG_VT" = "y" ]; then
+   mainmenu_option next_comment
+   comment 'Console drivers'
+   if [ "$CONFIG_SGI_IP22" = "y" ]; then
+      tristate 'SGI Newport Console support' CONFIG_SGI_NEWPORT_CONSOLE
+      if [ "$CONFIG_SGI_NEWPORT_CONSOLE" != "y" ]; then
+	 define_bool CONFIG_DUMMY_CONSOLE y
+      else
+	 define_bool CONFIG_FONT_8x16 y
+      fi
+   fi
+  endmenu
+fi
+
+if [ "$CONFIG_PROC_FS" = "y" ]; then
+   define_bool CONFIG_KCORE_ELF y
+fi
+
+mainmenu_option next_comment
+comment 'Sound'
+
+tristate 'Sound card support' CONFIG_SOUND
+if [ "$CONFIG_SOUND" != "n" ]; then
+   source drivers/sound/Config.in
+fi
+endmenu
+
+if [ "$CONFIG_SGI_IP22" = "y" ]; then
+   source drivers/sgi/Config.in
+fi
+
+source drivers/usb/Config.in
+source drivers/input/Config.in
+
+mainmenu_option next_comment
+comment 'Kernel hacking'
+
+#bool 'Debug kmalloc/kfree' CONFIG_DEBUG_MALLOC
+bool 'Are you using a crosscompiler' CONFIG_CROSSCOMPILE
+if [ "$CONFIG_MODULES" = "y" ]; then
+   bool ' Build fp execption handler module' CONFIG_MIPS_FPE_MODULE
+fi
+bool 'Remote GDB kernel debugging' CONFIG_REMOTE_DEBUG
+bool 'Magic SysRq key' CONFIG_MAGIC_SYSRQ
+endmenu

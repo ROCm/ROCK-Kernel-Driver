@@ -1,0 +1,30 @@
+Name       : QNX4 TODO list
+Last update: 1999-12-23
+
+    - Writing is still unsupported (it may compile, but it certainly won't
+      bring you any joy).
+
+    - qnx4_checkroot (inode.c), currently there's a look for the '/' in
+      the root direntry, if so then the current mounted device is a qnx4
+      partition. This has to be rewritten with a look for 'QNX4' in the
+      bootblock, it seems to me the savest way to ensure that the mounted
+      device is in fact a QNX4 partition.
+      Done 20-06-1998, Frank. But some disks (like QNX install floppies)
+      don't have 'QNX4' in their bootblock.
+      
+    - Bitmap functions. To find out the free space, largest free block, etc.
+      Partly done (RO), Richard, 05/06/1998. Optimized 20-06-1998, Frank.
+    
+    - Complete write, unlink and truncate functions : the bitmap should be
+updated.
+
+    - Porting to linux 2.1.99+ with dcache support. 20-06-1998, Frank.
+    
+    - Don't rewrite the file_read function : use the generic_file_read hook,
+      and write readpage instead. Done on 21-06-1998, Frank.
+
+    - Write dinit and dcheck.
+
+    - Solving the bugs.
+    
+    - Use le32_to_cpu and vice-versa for portability.

@@ -1,0 +1,44 @@
+--------------- Things That Need Doing Before 2.2 ------------------
+
+o	insw_and_csum
+
+-------------------------- Bugs to fix ------------------------------
+
+o	Should unix domain connect never block ?
+o	Screend loadable firewall module
+o	Remove kernel RARP and replace with user mode daemon.
+o	Merge ARM half word trap fixes for ethernet headers
+o	Stop route addition to downed interfaces
+o	Make sure route add window functionality is back or documented
+	equivalences are clear
+o	Merge ATM 
+o	Merge IRDA
+
+Possible projects for victim^H^H^H^H^Holunteers
+
+9.	Implementing streams. Not as a blind slow SYS5.4 style copy but actually
+working out how to do it so it runs like greased lightning. Quite a big
+problem. [See the LiS project]
+
+11.	IP over SCSI. [worked on]
+
+14.	Bidirectional PLIP. Also PLIP for the newer style parallel ports.
+
+15.	802.2LLC and thus Netbeui sockets. Becoming less important since the
+rumour is microsoft are phasing out netbeui for netbios/IP. Microsoft have
+gone for netbios/funny-ipx-variant it seems in Win95, but TCP is selectable.
+
+17.	PPP multilink. Another nasty job.
+
+19.	IPv4 IP-AH and IP-ESP.
+
+20.	(userspace) GUI interface to the bandwidth allocators so mere
+	mortals can do this
+
+
+BTW: Don't let the magic words 'kernel programming' worry you. Its like DOS
+- you make a mistake you have to reboot. You do at least get dumps and a
+kernel logger that is reliable. There is now a loadable module allowing
+use of gdb on the kernel (no breakpoints though!). No magic involved.
+
+Alan

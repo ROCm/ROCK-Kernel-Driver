@@ -1,0 +1,1289 @@
+Linux Kernel Makefiles
+2000-September-14
+Michael Elizabeth Chastain, <mec@shout.net>
+
+
+
+=== Table of Contents
+
+This document describes the Linux kernel Makefiles.
+
+  1  Overview
+  2  Who does what
+  3  Makefile language
+  4  Variables passed down from the top
+  5  The structure of an arch Makefile
+     5.1  Architecture-specific variables
+     5.2  Vmlinux build variables
+     5.3  Post-vmlinux goals
+     5.4  Mandatory arch-specific goals
+  6  The structure of a subdirectory Makefile
+     6.1  Comments
+     6.2  Goal definitions
+     6.3  Adapter section
+     6.4  Rules.make section
+     6.5  Special rules
+  7  Rules.make variables
+     7.1  Subdirectories
+     7.2  Object file goals
+     7.3  Library file goals
+     7.4  Loadable module goals
+     7.5  Multi-part modules
+     7.6  Compilation flags
+     7.7  Miscellaneous variables
+  8  New-style variables
+     8.1  New variables
+     8.2  Converting to old-style
+  9  Compatibility with Linux Kernel 2.2
+ 10  Credits
+
+
+=== 1 Overview
+
+The Makefiles have five parts:
+
+    Makefile: the top Makefile.
+    .config: the kernel configuration file.
+    arch/*/Makefile: the arch Makefiles.
+    Subdirectory Makefiles: there are about 300 of these.
+    Rules.make: the common rules for all subdirectory Makefiles.
+
+The top Makefile reads the .config file, which comes from the
+kernel configuration process.
+
+The top Makefile is responsible for building two major products: vmlinux
+(the resident kernel image) and modules (any module files).  It builds
+these goals by recursively descending into the subdirectories of the
+kernel source tree.  The list of subdirectories which are visited depends
+upon the kernel configuration.
+
+The top Makefile textually includes an arch Makefile with the name
+arch/$(ARCH)/Makefile.  The arch Makefile supplies architecture-specific
+information to the top Makefile.
+
+Each subdirectory has a Makefile which carries out the commands passed
+down from above.  The subdirectory Makefile uses information from the
+.config file to construct various file lists, and then it textually
+includes the common rules in Rules.make.
+
+Rules.make defines rules which are common to all the subdirectory
+Makefiles.  It has a public interface in the form of certain variable
+lists.  It then declares rules based on those lists.
+
+
+
+=== 2 Who does what
+
+People have four different relationships with the kernel Makefiles.
+
+*Users* are people who build kernels.  These people type commands such as
+"make menuconfig" or "make bzImage".  They usually do not read or edit
+any kernel Makefiles (or any other source files).
+
+*Normal developers* are people who work on features such as device
+drivers, file systems, and network protocols.  These people need to
+maintain the subdirectory Makefiles for the subsystem that they are
+working on.  In order to do this effectively, they need some overall
+knowledge about the kernel Makefiles, plus detailed knowledge about the
+public interface for Rules.make.
+
+*Arch developers* are people who work on an entire architecture, such
+as sparc or ia64.  Arch developers need to know about the arch Makefiles
+as well as subdirectory Makefiles.
+
+*Kbuild developers* are people who work on the kernel build system itself.
+These people need to know about all aspects of the kernel Makefiles.
+
+This document is aimed towards normal developers and arch developers.
+
+
+
+=== 3 Makefile language
+
+The kernel Makefiles are designed to run with Gnu Make.  The Makefiles
+use only the documented features of Gnu Make, but they do use many
+Gnu extensions.
+
+Gnu Make supports elementary list-processing functions.  The kernel
+Makefiles use a novel style of list building and manipulation with few
+"if" statements.
+
+Gnu Make has two assignment operators, ":=" and "=".  ":=" performs
+immediate evaluation of the right-hand side and stores an actual string
+into the left-hand side.  "=" is like a formula definition; it stores the
+right-hand side in an unevaluated form and then evaluates this form each
+time the left-hand side is used.
+
+There are some cases where "=" is appropriate.  Usually, though, ":="
+is the right choice.
+
+All of the examples in this document were drawn from actual kernel
+sources.  The examples have been reformatted (white space changed, lines
+split), but are otherwise exactly the same.
+
+
+
+=== 4 Variables passed down from the top
+
+The top Makefile exports the following variables:
+
+    VERSION, PATCHLEVEL, SUBLEVEL, EXTRAVERSION
+
+	These variables define the current kernel version.  A few arch
+	Makefiles actually use these values directly; they should use
+	$(KERNELRELEASE) instead.
+
+	$(VERSION), $(PATCHLEVEL), and $(SUBLEVEL) define the basic
+	three-part version number, such as "2", "4", and "0".  These three
+	values are always numeric.
+
+	$(EXTRAVERSION) defines an even tinier sublevel for pre-patches
+	or additional patches.	It is usually some non-numeric string
+	such as "-pre4", and is often blank.
+
+    KERNELRELEASE
+
+	$(KERNELRELEASE) is a single string such as "2.4.0-pre4", suitable
+	for constructing installation directory names or showing in
+	version strings.  Some arch Makefiles use it for this purpose.
+
+    ARCH
+
+	This variable defines the target architecture, such as "i386",
+	"arm", or "sparc".   Many subdirectory Makefiles test $(ARCH)
+	to determine which files to compile.
+
+	By default, the top Makefile sets $(ARCH) to be the same as the
+	host system system architecture.  For a cross build, a user may
+	override the value of $(ARCH) on the command line:
+
+	    make ARCH=m68k ...
+
+    TOPDIR, HPATH
+	
+	$(TOPDIR) is the path to the top of the kernel source tree.
+	Subdirectory Makefiles need this so that they can include
+	$(TOPDIR)/Rules.make.
+
+	$(HPATH) is equal to $(TOPDIR)/include.  A few arch Makefiles
+	need to use this to do special things using include files.
+
+    SUBDIRS
+
+	$(SUBDIRS) is a list of directories which the top Makefile
+	enters in order to build either vmlinux or modules.  The actual
+	directories in $(SUBDIRS) depend on the kernel configuration.
+	The top Makefile defines this variable, and the arch Makefile
+	extends it.
+
+    HEAD, CORE_FILES, NETWORKS, DRIVERS, LIBS
+    LINKFLAGS
+
+	$(HEAD), $(CORE_FILES), $(NETWORKS), $(DRIVERS), and $(LIBS)
+	specify lists of object files and libraries to be linked into
+	vmlinux.
+	
+	The files in $(HEAD) are linked first in vmlinux.
+
+	$(LINKFLAGS) specifies the flags to build vmlinux.
+
+	The top Makefile and the arch Makefile jointly define these
+	variables.  The top Makefile defines $(CORE_FILES), $(NETWORKS),
+	$(DRIVERS), and $(LIBS).  The arch Makefile defines $(HEAD)
+	and $(LINKFLAGS), and extends $(CORE_FILES) and $(LIBS).
+
+	Note: there are more names here than necessary.  $(NETWORKS),
+	$(DRIVERS), and even $(LIBS) could be subsumed into $(CORE_FILES).
+
+    CPP, CC, AS, LD, AR, NM, STRIP, OBJCOPY, OBJDUMP
+    CPPFLAGS, CFLAGS, CFLAGS_KERNEL, MODFLAGS, AFLAGS, LDFLAGS
+    PERL
+    GENKSYMS
+
+	These variables specify the commands and flags that Rules.make
+	uses to build goal files from source files.
+
+	$(CFLAGS_KERNEL) contains extra C compiler flags used to compile
+	resident kernel code.
+
+	$(MODFLAGS) contains extra C compiler flags used to compile code
+	for loadable kernel modules.  In the future, this flag may be
+	renamed to the more regular name $(CFLAGS_MODULE).
+
+	$(AFLAGS) contains assembler flags.
+
+	$(GENKSYMS) contains the command used to generate kernel symbol
+	signatures when CONFIG_MODVERSIONS is enabled.	The genksyms
+	command comes from the modutils package.
+
+    CROSS_COMPILE
+
+	This variable is a prefix path for other variables such as $(CC),
+	$(AS), and $(LD).  The arch Makefiles sometimes use and set this
+	variable explicitly.  Subdirectory Makefiles don't need to worry
+	about it.
+
+	The user may override $(CROSS_COMPILE) on the command line if
+	desired.
+
+    HOSTCC, HOSTCFLAGS
+
+	These variables define the C compiler and C compiler flags to
+	be used for compiling host side programs.  These are separate
+	variables because the target architecture can be different from
+	the host architecture.
+
+	If your Makefile compiles and runs a program that is executed
+	during the course of building the kernel, then it should use
+	$(HOSTCC) and $(HOSTCFLAGS).
+
+	For example, the subdirectory drivers/pci has a helper program
+	named gen-devlist.c.  This program reads a list of PCI ID's and
+	generates C code in the output files classlist.h and devlist.h.
+
+	Suppose that a user has an i386 computer and wants to build a
+	kernel for an ia64 machine.  Then the user would use an ia64
+	cross-compiler for most of the compilation, but would use a
+	native i386 host compiler to compile drivers/pci/gen-devlist.c.
+
+	For another example, kbuild helper programs such as
+	scripts/mkdep.c and scripts/lxdialog/*.c are compiled with
+	$(HOSTCC) rather than $(CC).
+
+    ROOT_DEV, SVGA_MODE, RAMDISK
+
+	End users edit these variables to specify certain information
+	about the configuration of their kernel.  These variables
+	are ancient!  They are also specific to the i386 architecture.
+	They really should be replaced with CONFIG_* options.
+
+    MAKEBOOT
+
+	This variable is defined and used only inside the main arch
+	Makefiles.  The top Makefile should not export it.
+
+    INSTALL_PATH
+
+	This variable defines a place for the arch Makefiles to install
+	the resident kernel image and System.map file.
+
+    INSTALL_MOD_PATH, MODLIB
+
+	$(INSTALL_MOD_PATH) specifies a prefix to $(MODLIB) for module
+	installation.  This variable is not defined in the Makefile but
+	may be passed in by the user if desired.
+
+	$(MODLIB) specifies the directory for module installation.
+	The top Makefile defines $(MODLIB) to
+	$(INSTALL_MOD_PATH)/lib/modules/$(KERNELRELEASE).  The user may
+	override this value on the command line if desired.
+
+    CONFIG_SHELL
+
+	This variable is private between Makefile and Rules.make.
+	Arch makefiles and subdirectory Makefiles should never use this.
+
+    MODVERFILE
+
+	An internal variable.  This doesn't need to be exported, as it
+	is never used outside of the top Makefile.
+
+    MAKE, MAKEFILES
+
+	Some variables internal to Gnu Make.
+
+	$(MAKEFILES) in particular is used to force the arch Makefiles
+	and subdirectory Makefiles to read $(TOPDIR)/.config without
+	including it explicitly.  (This was an implementation hack and
+	could be fixed).
+
+
+
+=== 5 The structure of an arch Makefile
+
+
+
+--- 5.1 Architecture-specific variables
+
+The top Makefile includes one arch Makefile file, arch/$(ARCH)/Makefile.
+This section describes the functions of the arch Makefile.
+
+An arch Makefile extends some of the top Makefile's variables with
+architecture-specific values.
+
+    SUBDIRS
+
+	The top Makefile defines $(SUBDIRS).  The arch Makefile extends
+	$(SUBDIRS) with a list of architecture-specific directories.
+
+	Example:
+
+		# arch/alpha/Makefile
+
+		SUBDIRS := $(SUBDIRS) arch/alpha/kernel arch/alpha/mm \
+		           arch/alpha/lib arch/alpha/math-emu
+
+	This list may depend on the configuration:
+
+		# arch/arm/Makefile
+
+		ifeq ($(CONFIG_ARCH_ACORN),y)
+		SUBDIRS         += drivers/acorn
+		...
+		endif
+
+    CPP, CC, AS, LD, AR, NM, STRIP, OBJCOPY, OBJDUMP
+    CPPFLAGS, CFLAGS, CFLAGS_KERNEL, MODFLAGS, AFLAGS, LDFLAGS
+
+	The top Makefile defines these variables, and the arch Makefile
+	extends them.
+
+	Many arch Makefiles dynamically run the target C compiler to
+	probe what options it supports:
+
+		# arch/i386/Makefile
+
+		# prevent gcc from keeping the stack 16 byte aligned
+		CFLAGS += $(shell if $(CC) -mpreferred-stack-boundary=2 \
+			  -S -o /dev/null -xc /dev/null >/dev/null 2>&1; \
+			  then echo "-mpreferred-stack-boundary=2"; fi)
+
+	And, of course, $(CFLAGS) can depend on the configuration:
+
+		# arch/i386/Makefile
+
+		ifdef CONFIG_M386
+		CFLAGS += -march=i386
+		endif
+
+		ifdef CONFIG_M486
+		CFLAGS += -march=i486
+		endif
+
+		ifdef CONFIG_M586
+		CFLAGS += -march=i586
+		endif
+
+	Some arch Makefiles redefine the compilation commands in order
+	to add architecture-specific flags:
+
+		# arch/s390/Makefile
+
+		LD=$(CROSS_COMPILE)ld -m elf_s390
+		OBJCOPY=$(CROSS_COMPILE)objcopy -O binary -R .note -R .comment -S
+
+
+
+--- 5.2 Vmlinux build variables
+
+An arch Makefile co-operates with the top Makefile to define variables
+which specify how to build the vmlinux file.  Note that there is no
+corresponding arch-specific section for modules; the module-building
+machinery is all architecture-independent.
+
+    HEAD, CORE_FILES, LIBS
+    LINKFLAGS
+
+	The top Makefile defines the architecture-independent core of
+	thse variables, and the arch Makefile extends them.  Note that the
+	arch Makefile defines (not just extends) $(HEAD) and $(LINKFLAGS).
+
+	Example:
+
+		# arch/m68k/Makefile
+
+		ifndef CONFIG_SUN3
+		LINKFLAGS = -T $(TOPDIR)/arch/m68k/vmlinux.lds
+		else
+		LINKFLAGS = -T $(TOPDIR)/arch/m68k/vmlinux-sun3.lds -N
+		endif
+
+		...
+
+		ifndef CONFIG_SUN3
+		HEAD := arch/m68k/kernel/head.o
+		else
+		HEAD := arch/m68k/kernel/sun3-head.o
+		endif
+
+		SUBDIRS += arch/m68k/kernel arch/m68k/mm arch/m68k/lib
+		CORE_FILES := arch/m68k/kernel/kernel.o arch/m68k/mm/mm.o $(CORE_FILES)
+		LIBS += arch/m68k/lib/lib.a
+
+
+
+--- 5.3 Post-vmlinux goals
+
+An arch Makefile specifies goals that take the vmlinux file, compress
+it, wrap it in bootstrapping code, and copy the resulting files somewhere.
+This includes various kinds of installation commands.
+
+These post-vmlinux goals are not standardized across different
+architectures.  Here is a list of these goals and the architectures
+that support each of them (as of kernel version 2.4.0-test6-pre5):
+
+    balo		mips
+    bootimage		alpha
+    bootpfile		alpha, ia64
+    bzImage		i386, m68k
+    bzdisk		i386
+    bzlilo		i386
+    compressed		i386, m68k, mips, mips64, sh
+    dasdfmt		s390
+    Image		arm
+    image		s390
+    install		arm, i386
+    lilo		m68k
+    msb			alpha, ia64
+    my-special-boot	alpha, ia64
+    orionboot		mips
+    rawboot		alpha
+    silo		s390
+    srmboot		alpha
+    tftpboot.img	sparc, sparc64
+    vmlinux.64		mips64
+    vmlinux.aout	sparc64
+    zImage		arm, i386, m68k, mips, mips64, ppc, sh
+    zImage.initrd	ppc
+    zdisk		i386, mips, mips64, sh
+    zinstall		arm
+    zlilo		i386
+    znetboot.initrd	ppc
+
+
+
+--- 5.4 Mandatory arch-specific goals
+
+An arch Makefile must define the following arch-specific goals.
+These goals provide arch-specific actions for the corresponding goals
+in the top Makefile:
+
+    archclean		clean
+    archdep		dep
+    archmrproper	mrproper
+
+
+
+=== 6 The structure of a subdirectory Makefile
+
+A subdirectory Makefile has five sections.
+
+
+
+--- 6.1 Comments
+
+The first section is a comment header.  Just write what you would
+write if you were editing a C source file, but use "# ..." instead of
+"/* ... */".  Historically, many anonymous people have edited kernel
+Makefiles without leaving any change histories in the header; comments
+from them would have been valuable.
+
+
+
+--- 6.2 Goal definitions
+
+The second section is a bunch of definitions that are the heart of the
+subdirectory Makefile.  These lines define the files to be built, any
+special compilation options, and any subdirectories to be recursively
+entered.  The declarations in these lines depend heavily on the kernel
+configuration variables (CONFIG_* symbols).
+
+In some Makefiles ("old-style Makefiles"), the second section looks
+like this:
+
+	# drivers/parport/Makefile
+	ifeq ($(CONFIG_PARPORT_PC),y)
+	  LX_OBJS += parport_pc.o
+	else
+	  ifeq ($(CONFIG_PARPORT_PC),m)
+	    MX_OBJS += parport_pc.o
+	  endif
+	endif
+
+In most Makefiles ("new-style Makefiles"), the second section looks
+like this:
+
+	# drivers/block/Makefile
+	obj-$(CONFIG_MAC_FLOPPY)	+= swim3.o
+	obj-$(CONFIG_BLK_DEV_FD)	+= floppy.o
+	obj-$(CONFIG_AMIGA_FLOPPY)	+= amiflop.o
+	obj-$(CONFIG_ATARI_FLOPPY)	+= ataflop.o
+
+The new-style Makefiles are more compact and easier to get correct
+for certain features (such as CONFIG_* options that enable more than
+one file).  If you have a choice, please write a new-style Makefile.
+
+
+
+--- 6.3 Adapter section
+
+The third section is an adapter section.  In old-style Makefiles, this
+third section is not present.  In new-style Makefiles, the third section
+contains boilerplate code which converts from new-style variables to
+old-style variables.  This is because Rules.make processes only the
+old-style variables.
+
+See section 8.2 ("Converting to old-style") for examples.
+
+
+
+--- 6.4 Rules.make section
+
+The fourth section is the single line:
+
+	include $(TOPDIR)/Rules.make
+
+
+
+--- 6.5 Special rules
+
+The fifth section contains any special Makefile rules needed that are
+not available through the common rules in Rules.make.
+
+
+
+=== 7 Rules.make variables
+
+The public interface of Rules.make consists of the following variables:
+
+
+
+--- 7.1 Subdirectories
+
+    ALL_SUB_DIRS, SUB_DIRS, MOD_IN_SUB_DIRS, MOD_SUB_DIRS
+
+	$(ALL_SUB_DIRS) is an unconditional list of *all* the
+	subdirectories in a given directory.  This list should not depend
+	on the kernel configuration.
+
+	$(SUB_DIRS) is a list of subdirectories which may contribute code
+	to vmlinux.  This list may depend on the kernel configuration.
+
+	$(MOD_SUB_DIRS) and $(MOD_IN_SUB_DIRS) are lists of subdirectories
+	which may build kernel modules.  Both names have exactly the
+	same meaning.  (In version 2.2 and earlier kernels, these
+	variables had different meanings -- hence the different names).
+
+	For new code, $(MOD_SUB_DIRS) is recommended and $(MOD_IN_SUB_DIRS)
+	is deprecated.
+
+	Example:
+
+		# fs/Makefile
+		ALL_SUB_DIRS = coda minix ext2 fat msdos vfat proc isofs nfs \
+			       umsdos ntfs hpfs sysv smbfs ncpfs ufs efs affs \
+			       romfs autofs hfs lockd nfsd nls devpts devfs \
+			       adfs partitions qnx4 udf bfs cramfs openpromfs \
+			       autofs4 ramfs jffs
+		SUB_DIRS :=
+
+		...
+
+		ifeq ($(CONFIG_EXT2_FS),y)
+		SUB_DIRS += ext2
+		else
+		  ifeq ($(CONFIG_EXT2_FS),m)
+		  MOD_SUB_DIRS += ext2
+		  endif
+		endif
+
+		ifeq ($(CONFIG_CRAMFS),y)
+		SUB_DIRS += cramfs
+		else
+		  ifeq ($(CONFIG_CRAMFS),m)
+		  MOD_SUB_DIRS += cramfs
+		  endif
+		endif
+
+	Example:
+
+		# drivers/net/Makefile
+		SUB_DIRS     := 
+		MOD_SUB_DIRS :=
+		MOD_IN_SUB_DIRS :=
+		ALL_SUB_DIRS := $(SUB_DIRS) fc hamradio irda pcmcia tokenring \
+				wan sk98lin arcnet skfp tulip appletalk
+
+		...
+
+		ifeq ($(CONFIG_IRDA),y)
+		SUB_DIRS += irda
+		MOD_IN_SUB_DIRS += irda
+		else
+		  ifeq ($(CONFIG_IRDA),m)
+		  MOD_IN_SUB_DIRS += irda
+		  endif
+		endif
+
+		ifeq ($(CONFIG_TR),y)
+		SUB_DIRS += tokenring
+		MOD_IN_SUB_DIRS += tokenring
+		else
+		  ifeq ($(CONFIG_TR),m)
+		  MOD_IN_SUB_DIRS += tokenring
+		  endif
+		endif
+
+
+
+--- 7.2 Object file goals
+
+    O_TARGET, O_OBJS, OX_OBJS
+
+	The subdirectory Makefile specifies object files for vmlinux in
+	the lists $(O_OBJS) and $(OX_OBJS).  These lists depend on the
+	kernel configuration.
+
+	The "X" in "OX_OBJS" stands for "eXport".  Files in $(OX_OBJS)
+	may use the EXPORT_SYMBOL macro to define public symbols which
+	loadable kernel modules can see.  Files in $(O_OBJS) may not use
+	EXPORT_SYMBOL (and you will get a funky error message if you try).
+
+	[Yes, it's kludgy to do this by hand.  Yes, you can define all
+	your objects as $(OX_OBJS) whether they define symbols or not;
+	but then you will notice a lot of extra compiles when you edit
+	any source file.  Blame CONFIG_MODVERSIONS for this.]
+
+	Data that is passed to other objects via registration functions
+	(e.g. pci_register_driver, pm_register) does not need to be marked
+	as EXPORT_SYMBOL.  The objects that pass data via registration
+	functions do not need to be marked as OX_OBJS, unless they also have
+	exported symbols.
+
+	Rules.make compiles all the $(O_OBJS) and $(OX_OBJS) files.
+	It then calls "$(LD) -r" to merge these files into one .o file
+	with the name $(O_TARGET).  This $(O_TARGET) name also appears
+	in the top Makefile.
+
+	The order of files in $(O_OBJS) and $(OX_OBJS) is significant.
+	All $(OX_OBJS) files come first, in the order listed, followed by
+	all $(O_OBJS) files, in the order listed.  Duplicates in the lists
+	are allowed: the first instance will be linked into $(O_TARGET)
+	and succeeding instances will be ignored.  (Note: Rules.make may
+	emit warning messages for duplicates, but this is harmless).
+
+	Example:
+
+		# arch/alpha/kernel/Makefile
+		O_TARGET := kernel.o
+		O_OBJS   := entry.o traps.o process.o osf_sys.o irq.o \
+			    irq_alpha.o signal.o setup.o ptrace.o time.o \
+			    semaphore.o
+		OX_OBJS  := alpha_ksyms.o
+
+		ifdef CONFIG_SMP
+		O_OBJS   += smp.o irq_smp.o
+		endif
+
+		ifdef CONFIG_PCI
+		O_OBJS   += pci.o pci_iommu.o
+		endif
+
+	Even if a subdirectory Makefile has an $(O_TARGET), the .config
+	options still control whether or not its $(O_TARGET) goes into
+	vmlinux.  See the $(M_OBJS) example below.
+
+	Sometimes the ordering of all $(OX_OBJS) files before all
+	$(O_OBJS) files can be a problem, particularly if both
+	$(O_OBJS) files and $(OX_OBJS) files contain __initcall
+	declarations where order is important.   To avoid this imposed
+	ordering, the use of $(OX_OBJS) can be dropped altogether and
+	$(MIX_OBJS) used instead.
+
+	If this approach is used, then:
+	 - All objects to be linked into vmlinux should be listed in
+	   $(O_OBJS) in the desired order.
+	 - All objects to be created as modules should be listed in
+	   $(M_OBJS)
+	 - All objects that export symbols should also be listed in
+	   $(MIX_OBJS).
+
+	This has the same effect as maintaining the
+	exported/non-exported split, except that there is more control
+	over the ordering of object files in vmlinux.
+	
+
+
+--- 7.3 Library file goals
+
+    L_TARGET, L_OBJS, LX_OBJS
+
+	These names are similar to the O_* names.  Once again, $(L_OBJS)
+	and $(LX_OBJS) specify object files for the resident kernel;
+	once again, the lists depend on the current configuration; and
+	once again, the files that call EXPORT_SYMBOL go on the "X" list.
+
+	The difference is that "L" stands for "Library".  After making
+	$(L_OBJS) and $(LX_OBJS), Rules.make uses the "$(AR) rcs" command
+	to put these files into an archive file (a library) with the
+	name $(L_TARGET).  This name also appears in the top Makefile.
+
+	Example:
+
+		# arch/i386/lib/Makefile
+		L_TARGET = lib.a
+		L_OBJS  = checksum.o old-checksum.o delay.o \
+			usercopy.o getuser.o putuser.o iodebug.o
+
+		ifdef CONFIG_X86_USE_3DNOW
+		L_OBJS += mmx.o
+		endif
+
+		ifdef CONFIG_HAVE_DEC_LOCK
+		L_OBJS += dec_and_lock.o
+		endif
+
+	The order of files in $(L_OBJS) and $(LX_OBJS) is not significant.
+	Duplicates in the lists are allowed.  (Note: Rules.make may emit
+	warning messages for duplicates, but this is harmless).
+
+	A subdirectory Makefile can specify either an $(O_TARGET),
+	an $(L_TARGET), or both.  Here is a discussion of the differences.
+
+	All of the files in an $(O_TARGET) are guaranteed to appear in
+	the resident vmlinux image.  In an $(L_TARGET), only the files
+	that satisfy undefined symbol references from other files will
+	appear in vmlinux.
+
+	In a conventional link process, the linker processes some
+	object files and creates a list of unresolved external symbols.
+	The linker then looks in a set of libraries to resolve these
+	symbols.  Indeed, the Linux kernel used to be linked this way,
+	with the bulk of the code stored in libraries.
+
+	But vmlinux contains two types of object files that cannot be
+	fetched out of libraries this way:
+
+	    (1) object files that are purely EXPORT_SYMBOL definitions
+	    (2) object files that use module_init or __initcall initializers
+		(instead of an initialization routine called externally)
+
+	These files contain autonomous initializer sections which provide
+	code and data without being explicitly called.	If these files
+	were stored in $(L_TARGET) libraries, the linker would fail
+	to include them in vmlinux.  Thus, most subdirectory Makefiles
+	specify an $(O_TARGET) and do not use $(L_TARGET).
+
+	Other considerations: $(O_TARGET) leads to faster re-link times
+	during development activity, but $(L_TARGET) gives better error
+	messages for unresolved symbols.
+
+
+
+--- 7.4 Loadable module goals
+
+    M_OBJS, MX_OBJS
+
+	$(M_OBJS) and $(MX_OBJS) specify object files which are built
+	as loadable kernel modules.  As usual, the "X" in $(MX_OBJS)
+	stands for "eXport"; source files that use EXPORT_SYMBOL must
+	appear on an $(MX_OBJS) list.
+
+	A module may be built from one source file or several source
+	files.	In the case of one source file, the subdirectory
+	Makefile simply adds the file to either $(M_OBJS) or $(MX_OBJS),
+	as appropriate.
+
+	Example:
+
+		# drivers/net/irda/Makefile
+		ifeq ($(CONFIG_IRTTY_SIR),y)
+		L_OBJS += irtty.o
+		else
+		  ifeq ($(CONFIG_IRTTY_SIR),m)
+		  M_OBJS += irtty.o
+		  endif
+		endif
+
+		ifeq ($(CONFIG_IRPORT_SIR),y)
+		LX_OBJS += irport.o
+		else
+		  ifeq ($(CONFIG_IRPORT_SIR),m)
+		  MX_OBJS += irport.o
+		  endif
+		endif
+
+	If a kernel module is built from several source files, there
+	are two ways to specify the set of source files.  One way is to
+	build a single module for the entire subdirectory.  This way is
+	popular in the file system and network protocol stacks.
+
+	Example:
+
+		# fs/ext2/Makefile
+		O_TARGET := ext2.o
+		O_OBJS   := acl.o balloc.o bitmap.o dir.o file.o fsync.o \
+			    ialloc.o inode.o ioctl.o namei.o super.o symlink.o \
+			    truncate.o
+		M_OBJS   := $(O_TARGET)
+
+	In this example, the module name will be ext2.o.  Because this
+	file has the same name has $(O_TARGET), Rules.make will use
+	the $(O_TARGET) rule to build ext2.o: it will run "$(LD) -r"
+	on the list of $(O_OBJS) files.
+
+	Note that this subdirectory Makefile defines both an $(O_TARGET)
+	and an $(M_OBJS).  The control code, up in fs/Makefile, will
+	select between these two.  If CONFIG_EXT2_FS=y, then fs/Makefile
+	will build $(O_TARGET); and if CONFIG_EXT_FS=m, then fs/Makefile
+	will build $(M_OBJS) instead.  (Yes, this is a little delicate
+	and a little confusing).
+
+
+
+--- 7.5 Multi-part modules
+
+    MI_OBJS, MIX_OBJS
+
+	Some kernel modules are composed of several object files
+	linked together, but do not include every object file in their
+	subdirectory.  $(MI_OBJS) and $(MIX_OBJS) are for this case.
+
+	"M" stands for Module.
+	"I" stands for Intermediate.
+	"X", as usual, stands for "eXport symbol".
+
+	Example:
+
+		# drivers/sound/Makefile
+		gus-objs  := gus_card.o gus_midi.o gus_vol.o gus_wave.o ics2101.o
+		pas2-objs := pas2_card.o pas2_midi.o pas2_mixer.o pas2_pcm.o
+		sb-objs	  := sb_card.o
+
+		gus.o: $(gus-objs)
+			$(LD) -r -o $@ $(gus-objs)
+
+		pas2.o: $(pas2-objs)
+			$(LD) -r -o $@ $(pas2-objs)
+
+		sb.o: $(sb-objs)
+			$(LD) -r -o $@ $(sb-objs)
+
+	The kernel modules gus.o, pas2.o, and sb.o are the *composite
+	files*.  The object files gus_card.o, gus_midi.o, gus_vol.o,
+	gus_wave.o, ics2101.o, pas2_card.o, pas2_midi.o, pas2_mixer.o,
+	pas2_pcm.o, and sb_card.o are *component files*.  The component
+	files are also called *intermediate files*.
+
+	In another part of drivers/sound/Makefile (not shown), all of
+	the component files are split out.  For the resident drivers:
+	the component object files go onto $(O_OBJS) and $(OX_OBJS)
+	lists, depending on whether they export symbols or not; and the
+	composite files are never built.  For the kernel modules: the
+	component object files go onto $(MI_OBJS) and $(MIX_OBJS);
+	the composite files go onto $(M_OBJS).
+
+	The subdirectory Makefile must also specify the linking rule
+	for a multi-object-file module:
+
+		# drivers/sound/Makefile
+
+		gus.o: $(gus-objs)
+			$(LD) -r -o $@ $(gus-objs)
+
+		pas2.o: $(pas2-objs)
+			$(LD) -r -o $@ $(pas2-objs)
+
+		sb.o: $(sb-objs)
+			$(LD) -r -o $@ $(sb-objs)
+
+
+	As is mentioned in section 7.2 ("Object file goals"),
+	$(MIX_OBJS) can also be used simply to list all objects that
+	export any symbols.  If this approach is taken, then
+	$(O_OBJS), $(L_OBJS), $(M_OBJS) and $(MI_OBJS) should simply
+	lists all of the vmlinux object files, library object files,
+	module object files and intermediate module files
+	respectively.  Duplication between $(MI_OBJS) and $(MIX_OBJS)
+	is not a problem.
+
+--- 7.6 Compilation flags
+
+    EXTRA_CFLAGS, EXTRA_AFLAGS, EXTRA_LDFLAGS, EXTRA_ARFLAGS
+
+	$(EXTRA_CFLAGS) specifies options for compiling C files with
+	$(CC).	The options in this variable apply to all $(CC) commands
+	for files in the current directory.
+
+	Example:
+
+		# drivers/sound/emu10k1/Makefile
+		EXTRA_CFLAGS += -I.
+		ifdef DEBUG
+		    EXTRA_CFLAGS += -DEMU10K1_DEBUG
+		endif
+
+	$(EXTRA_CFLAGS) does not apply to subdirectories of the current
+	directory.  Also, it does not apply to files compiled with
+	$(HOSTCC).
+
+	This variable is necessary because the top Makefile owns the
+	variable $(CFLAGS) and uses it for compilation flags for the
+	entire tree.
+
+	$(EXTRA_AFLAGS) is a similar string for per-directory options
+	when compiling assembly language source.
+
+	Example: at the time of writing, there were no examples of
+	$(EXTRA_AFLAGS) in the kernel corpus.
+
+	$(EXTRA_LDFLAGS) and $(EXTRA_ARFLAGS) are similar strings for
+	per-directory options to $(LD) and $(AR).
+
+	Example: at the time of writing, there were no examples of
+	$(EXTRA_LDFLAGS) or $(EXTRA_ARFLAGS) in the kernel corpus.
+
+    CFLAGS_$@, AFLAGS_$@
+
+	$(CFLAGS_$@) specifies per-file options for $(CC).  The $@
+	part has a literal value which specifies the file that it's for.
+
+	Example:
+
+		# drivers/scsi/Makefile
+		CFLAGS_aha152x.o =   -DAHA152X_STAT -DAUTOCONF
+		CFLAGS_gdth.o    = # -DDEBUG_GDTH=2 -D__SERIAL__ -D__COM2__ \
+				     -DGDTH_STATISTICS
+		CFLAGS_seagate.o =   -DARBITRATE -DPARITY -DSEAGATE_USE_ASM
+
+	These three lines specify compilation flags for aha152x.o,
+	gdth.o, and seagate.o
+
+	$(AFLAGS_$@) is a similar feature for source files in assembly
+	languages.
+
+	Example:
+
+		# arch/arm/kernel/Makefile
+		AFLAGS_head-armv.o := -DTEXTADDR=$(TEXTADDR) -traditional
+		AFLAGS_head-armo.o := -DTEXTADDR=$(TEXTADDR) -traditional
+
+	Rules.make has a feature where an object file depends on the
+	value of $(CFLAGS_$@) that was used to compile it.  (It also
+	depends on the values of $(CFLAGS) and $(EXTRA_CFLAGS)).  Thus,
+	if you change the value of $(CFLAGS_$@) for a file, either by
+	editing the Makefile or overriding the value some other way,
+	Rules.make will do the right thing and re-compile your source
+	file with the new options.
+
+	Note: because of a deficiency in Rules.make, assembly language
+	files do not have flag dependencies.  If you edit $(AFLAGS_$@)
+	for such a file, you will have to remove the object file in order
+	to re-build from source.
+
+    LD_RFLAG
+
+	This variable is used, but never defined.  It appears to be a
+	vestige of some abandoned experiment.
+
+
+
+--- 7.7 Miscellaneous variables
+
+    IGNORE_FLAGS_OBJS
+
+	$(IGNORE_FLAGS_OBJS) is a list of object files which will not have
+	their flag dependencies automatically tracked.	This is a hackish
+	feature, used to kludge around a problem in the implementation
+	of flag dependencies.  (The problem is that flag dependencies
+	assume that a %.o file is built from a matching %.S or %.c file.
+	This is sometimes not true).
+
+    USE_STANDARD_AS_RULE
+
+	This is a transition variable.	If $(USE_STANDARD_AS_RULE)
+	is defined, then Rules.make will provide standard rules for
+	assembling %.S files into %.o files or %.s files (%.s files
+	are useful only to developers).
+
+	If $(USE_STANDARD_AS_RULE) is not defined, then Rules.make
+	will not provide these standard rules.	In this case, the
+	subdirectory Makefile must provide its own private rules for
+	assembling %.S files.
+
+	In the past, all Makefiles provided private %.S rules.	Newer
+	Makefiles should define USE_STANDARD_AS_RULE and use the standard
+	Rules.make rules.  As soon as all the Makefiles across all
+	architectures have been converted to USE_STANDARD_AS_RULE, then
+	Rules.make can drop the conditional test on USE_STANDARD_AS_RULE.
+	After that, all the other Makefiles can drop the definition of
+	USE_STANDARD_AS_RULE.
+
+
+
+=== 8 New-style variables
+
+The "new-style variables" are simpler and more powerful than the
+"old-style variables".  As a result, many subdirectory Makefiles shrank
+more than 60%.  This author hopes that, in time, all arch Makefiles and
+subdirectory Makefiles will convert to the new style.
+
+Rules.make does not understand new-style variables.  Thus, each new-style
+Makefile has a section of boilerplate code that converts the new-style
+variables into old-style variables.  There is also some mixing, where
+people define most variables using "new style" but then fall back to
+"old style" for a few lines.
+
+--- 8.1 New variables
+
+    obj-y obj-m obj-n obj-
+
+	These variables replace $(O_OBJS), $(OX_OBJS), $(M_OBJS),
+	and $(MX_OBJS).
+
+	Example:
+
+		# drivers/block/Makefile
+		obj-$(CONFIG_MAC_FLOPPY)        += swim3.o
+		obj-$(CONFIG_BLK_DEV_FD)        += floppy.o
+		obj-$(CONFIG_AMIGA_FLOPPY)      += amiflop.o
+		obj-$(CONFIG_ATARI_FLOPPY)      += ataflop.o
+
+	Notice the use of $(CONFIG_...) substitutions on the left hand
+	side of an assignment operator.  This gives Gnu Make the power
+	of associative indexing!  Each of these assignments replaces
+	eight lines of code in an old-style Makefile.
+
+	After executing all of the assignments, the subdirectory
+	Makefile has built up four lists: $(obj-y), $(obj-m), $(obj-n),
+	and $(obj-).
+
+	$(obj-y) is a list of files to include in vmlinux.
+	$(obj-m) is a list of files to build as single-file modules.
+	$(obj-n) and $(obj-) are ignored.
+
+	Each list may contain duplicates items; duplicates are
+	automatically removed later.  Also, if a file appears in both
+	$(obj-y) and $(obj-m), it will automatically be removed from
+	the $(obj-m) list.
+
+	Example:
+
+		# drivers/net/Makefile
+
+		...
+		obj-$(CONFIG_OAKNET) += oaknet.o 8390.o
+		...
+		obj-$(CONFIG_NE2K_PCI) += ne2k-pci.o 8390.o
+		...
+		obj-$(CONFIG_STNIC) += stnic.o 8390.o
+		...
+		obj-$(CONFIG_MAC8390) += daynaport.o 8390.o
+		...
+
+	In this example, four different drivers require the code in
+	8390.o.  If one or more of these four drivers are built into
+	vmlinux, then 8390.o will also be built into vmlinux, and will
+	*not* be built as a module -- even if another driver which needs
+	8390.o is built as a module.  (The modular driver is able to
+	use services of the 8390.o code in the resident vmlinux image).
+
+    export-objs
+
+	$(export-objs) is a list of all the files in the subdirectory
+	which potentially export symbols.  The canonical way to construct
+	this list is:
+
+	    grep -l EXPORT_SYMBOL *.c
+
+	(but watch out for sneaky files that call EXPORT_SYMBOL from an
+	included header file!)
+
+	This is a potential list, independent of the kernel configuration.
+	All files that export symbols go into $(export-objs).  The
+	boilerplate code then uses the $(export-objs) list to separate
+	the real file lists into $(*_OBJS) and $(*X_OBJS).
+
+	Experience has shown that maintaining the proper X's in an
+	old-style Makefile is difficult and error-prone.  Maintaining the
+	$(export-objs) list in a new-style Makefile is simpler and easier
+	to audit.
+
+    list-multi
+    $(foo)-objs
+
+	Some kernel modules are composed of multiple object files linked
+	together.  $(list-multi) is a list of such kernel modules.
+	This is a static list; it does not depend on the configuration.
+
+	For each kernel module in $(list-multi) there is another list
+	of all the object files which make up that module.  For a kernel
+	module named foo.o, its object file list is foo-objs.
+
+	Example:
+
+		# drivers/scsi/Makefile
+		list-multi	:= scsi_mod.o sr_mod.o initio.o a100u2w.o
+
+		...
+
+		scsi_mod-objs	:= hosts.o scsi.o scsi_ioctl.o constants.o \
+				   scsicam.o scsi_proc.o scsi_error.o \
+				   scsi_obsolete.o scsi_queue.o scsi_lib.o \
+				   scsi_merge.o scsi_dma.o scsi_scan.o \
+				   scsi_syms.o
+		sr_mod-objs	:= sr.o sr_ioctl.o sr_vendor.o
+		initio-objs	:= ini9100u.o i91uscsi.o
+		a100u2w-objs	:= inia100.o i60uscsi.o
+
+	The subdirectory Makefile puts the modules onto obj-* lists in
+	the usual configuration-dependent way:
+
+		obj-$(CONFIG_SCSI)		+= scsi_mod.o
+		obj-$(CONFIG_BLK_DEV_SR)	+= sr_mod.o
+		obj-$(CONFIG_SCSI_INITIO)	+= initio.o
+		obj-$(CONFIG_SCSI_INIA100)	+= a100u2w.o
+
+	Suppose that CONFIG_SCSI=y.  Then vmlinux needs to link in all
+	14 components of scsi_mod.o, so these components will go onto
+	$(O_OBJS) and $(OX_OBJS).  The composite file scsi_mod.o will
+	never be created.  The boilerplate conversion code produces this
+	result with a few lines of list processing commands.
+
+	Suppose that CONFIG_BLK_DEV_SR=m.  Then the 3 components
+	of sr_mod.o will linked together with "$(LD) -r" to make the
+	kernel module sr_mod.o, so these 3 components need to go onto
+	the $(MI_OBJS) and $(MIX_OBJS) lists; the composite file sr_mod.o
+	goes onto $(M_OBJS).  The boilerplate conversion code takes care
+	of this, too.
+
+	And suppose CONFIG_SCSI_INITIO=n.  Then initio.o goes onto the
+	$(obj-n) list and that's the end of it.  Its component files
+	are not compiled, and the composite file is not created.
+
+	Finally, the subdirectory Makefile needs to define rules to
+	build each multi-object kernel module from its component list.
+	Example:
+
+		# drivers/scsi/Makefile
+
+		scsi_mod.o: $(scsi_mod-objs)
+			$(LD) -r -o $@ $(scsi_mod-objs)
+
+		sr_mod.o: $(sr_mod-objs)
+			$(LD) -r -o $@ $(sr_mod-objs)
+
+		initio.o: $(initio-objs)
+			$(LD) -r -o $@ $(initio-objs)
+
+		a100u2w.o: $(a100u2w-objs)
+			$(LD) -r -o $@ $(a100u2w-objs)
+
+	These rules are very regular; it would be nice for the boilerplate
+	code or Rules.make to synthesize these rules automatically.
+	But until that happens, the subdirectory Makefile needs to define
+	these rules explicitly.
+
+    subdir-y subdir-m subdir-n subdir-
+
+	These variables replace $(ALL_SUB_DIRS), $(SUB_DIRS) and
+	$(MOD_SUB_DIRS).
+
+	Example:
+
+		# drivers/Makefile
+		subdir-$(CONFIG_PCI)		+= pci
+		subdir-$(CONFIG_PCMCIA)		+= pcmcia
+		subdir-$(CONFIG_MTD)		+= mtd
+		subdir-$(CONFIG_SBUS)		+= sbus
+
+	These variables work similar to obj-*, but are used for
+	subdirectories instead of object files.
+
+	After executing all of the assignments, the subdirectory
+	Makefile has built up four lists: $(subdir-y), $(subdir-m),
+	$(subdir-n), and $(subdir-).
+
+	$(subdir-y) is a list of directories that should be entered
+		for making vmlinux.
+	$(subdir-m) is a list of directories that should be entered
+		for making modules.
+	$(subdir-n) and $(subdir-) are only used for collecting a list
+		of all subdirectories of this directory.
+
+	Each list besides subdir-y may contain duplicates items; duplicates
+	are automatically removed later.
+
+    mod-subdirs
+
+	$(mod-subdirs) is a list of all the the subdirectories that should
+	be added to $(subdir-m), too if they appear in $(subdir-y)
+
+	Example:
+
+		# fs/Makefile
+		mod-subdirs :=	nls
+
+	This means nls should be added to (subdir-y) and $(subdir-m) if
+	CONFIG_NFS = y.
+
+--- 8.2 Converting to old-style
+
+	The following example is taken from drivers/usb/Makefile.
+	Note that this uses MIX_OBJS to avoid the need for OX_OBJS and
+	MX_OBJS and thus to maintain the ordering of objects in $(obj-y)
+
+		# Translate to Rules.make lists.
+		multi-used	:= $(filter $(list-multi), $(obj-y) $(obj-m))
+		multi-objs	:= $(foreach m, $(multi-used), $($(basename $(m))-objs))
+		active-objs	:= $(sort $(multi-objs) $(obj-y) $(obj-m))
+
+		O_OBJS		:= $(obj-y)
+		M_OBJS		:= $(obj-m)
+		MIX_OBJS	:= $(filter $(export-objs), $(active-objs))
+
+	An example for libraries from drivers/acorn/scsi/Makefile:
+
+		# Translate to Rules.make lists.
+
+		L_OBJS		:= $(filter-out $(export-objs), $(obj-y))
+		LX_OBJS		:= $(filter     $(export-objs), $(obj-y))
+		M_OBJS		:= $(sort $(filter-out $(export-objs), $(obj-m)))
+		MX_OBJS		:= $(sort $(filter     $(export-objs), $(obj-m)))
+
+	As ordering is not so important in libraries, this still uses
+	LX_OBJS and MX_OBJS, though (presumably) it could be changed to
+	use MIX_OBJS as follows:
+
+		active-objs	:= $(sort $(obj-y) $(obj-m))
+		L_OBJS		:= $(obj-y)
+		M_OBJS		:= $(obj-m)
+		MIX_OBJS	:= $(filter $(export-objs), $(active-objs))
+		
+
+	which is clearly shorted and arguably clearer.
+
+=== 9 Compatibility with Linux Kernel 2.2
+
+Most of the information in this document also applies to 2.2, although
+there is no indication of which things have changed when.  Here are some
+hints for writing subdirectory Makefiles that are compatible with Linux
+kernel 2.2.
+
+You can write either an old-style Makefile or a new-style Makefile
+with a boilerplate adapter section.  See the 2.2 version of
+drivers/sound/Makefile for a copy of the boilerplate code.
+
+In 2.2, Rules.make makes a distinction between $(MOD_SUB_DIRS)
+and $(MOD_IN_SUB_DIRS).  If you have a single directory with no
+subdirectories, this will not matter to you.  If you have a whole
+tree, then you need to know the difference between $(MOD_SUB_DIRS)
+and $(MOD_IN_SUB_DIRS).  For example code: $(MOD_SUB_DIRS) is used
+extensively in fs/Makefile; $(MOD_IN_SUB_DIRS) is used extensively in
+drivers/net/Makefile.
+
+If you are already using MOD_LIST_NAME, go ahead and keep using it.
+If you don't already have a MOD_LIST_NAME, go ahead and keep not using
+one; your module will be a 'misc' module in 2.2.
+
+Assembly language rules were a mess in 2.2.  If you have assembly language
+files, this author recommends that you write your own explicit rules
+for each file by name.
+
+
+
+=== 10 Credits
+
+Thanks to the members of the linux-kbuild mailing list for reviewing
+drafts of this document, with particular thanks to Peter Samuelson
+and Thomas Molina.

@@ -1,0 +1,273 @@
+/proc/bus/usb filesystem output
+===============================
+(version 2000.08.15)
+
+
+The /proc filesystem for USB devices generates
+/proc/bus/usb/drivers and /proc/bus/usb/devices.
+
+/proc/bus/usb/drivers lists the registered drivers,
+one per line, with each driver's USB minor dev node
+number range if applicable.
+
+**NOTE**: If /proc/bus/usb appears empty, you need
+          to mount the filesystem, issue the command (as root):
+
+      mount -t usbdevfs none /proc/bus/usb
+
+	  An alternative and more permanent method would be to add
+
+      none  /proc/bus/usb  usbdevfs  defaults  0  0
+
+	  to /etc/fstab.  This will mount usbdevfs at each reboot.
+	  You can then issue `cat /proc/bus/usb/devices` to extract
+	  USB device information.
+
+For more information on mounting the usbdevfs file system, see the
+"USB Device Filesystem" section of the USB Guide. The latest copy 
+of the USB Guide can be found at http://www.linux-usb.org/
+
+In /proc/bus/usb/devices, each device's output has multiple
+lines of ASCII output.
+I made it ASCII instead of binary on purpose, so that someone
+can obtain some useful data from it without the use of an
+auxiliary program.  However, with an auxiliary program, the numbers
+in the first 4 columns of each "T:" line (topology info:
+Lev, Prnt, Port, Cnt) can be used to build a USB topology diagram.
+(I think.  I haven't proved this, but I have tested it with 3
+different topo/connections and it looked possible.)
+
+Each line is tagged with a one-character ID for that line:
+
+T = Topology (etc.)
+B = Bandwidth (applies only to USB host controllers, which are
+    virtualized as root hubs)
+D = Device descriptor info.
+P = Product ID info. (from Device descriptor, but they won't fit
+    together on one line)
+S = String descriptors.
+C = Configuration descriptor info. (* = active configuration)
+I = Interface descriptor info.
+E = Endpoint descriptor info.
+
+=======================================================================
+
+/proc/bus/usb/devices output format:
+
+Legend:
+  d = decimal number (may have leading spaces or 0's)
+  x = hexadecimal number (may have leading spaces or 0's)
+  s = string
+
+
+Topology info:
+
+T:  Bus=dd Lev=dd Prnt=dd Port=dd Cnt=dd Dev#=ddd Spd=ddd MxCh=dd
+|   |      |      |       |       |      |        |       |__MaxChildren
+|   |      |      |       |       |      |        |__Device Speed in Mbps
+|   |      |      |       |       |      |__DeviceNumber
+|   |      |      |       |       |__Count of devices at this level
+|   |      |      |       |__Connector/Port on Parent for this device
+|   |      |      |__Parent DeviceNumber
+|   |      |__Level in topology for this bus
+|   |__Bus number
+|__Topology info tag
+
+
+Bandwidth info:
+B:  Alloc=ddd/ddd us (xx%), #Int=ddd, #Iso=ddd
+|   |                       |         |__Number if isochronous requests
+|   |                       |__Number of interrupt requests
+|   |__Total Bandwidth allocated to this bus
+|__Bandwidth info tag
+
+
+Device descriptor info & Product ID info:
+
+D:  Ver=x.xx Cls=xx(s) Sub=xx Prot=xx MxPS=dd #Cfgs=dd
+P:  Vendor=xxxx ProdID=xxxx Rev=xx.xx
+
+where
+D:  Ver=x.xx Cls=xx(sssss) Sub=xx Prot=xx MxPS=dd #Cfgs=dd
+|   |        |             |      |       |       |__NumberConfigurations
+|   |        |             |      |       |__MaxPacketSize of Default Endpoint
+|   |        |             |      |__DeviceProtocol
+|   |        |             |__DeviceSubClass
+|   |        |__DeviceClass
+|   |__Device USB version
+|__Device info tag #1
+
+where
+P:  Vendor=xxxx ProdID=xxxx Rev=xx.xx
+|   |           |           |__Product revision number
+|   |           |__Product ID code
+|   |__Vendor ID code
+|__Device info tag #2
+
+
+String descriptor info:
+
+S:  Manufacturer=ssss
+|   |__Manufacturer of this device as read from the device.
+|__String info tag
+
+S:  Product=ssss
+|   |__Product description of this device as read from the device,
+|      except that it is a generated string for USB host controllers
+|      (virtual root hubs), in the form "USB *HCI Root Hub".
+|__String info tag
+
+S:  SerialNumber=ssss
+|   |__Serial Number of this device as read from the device,
+|      except that it is a generated string for USB host controllers
+|      (virtual root hubs), and represents the host controller's
+|      unique identification in the system (currently I/O or
+|      memory-mapped base address).
+|__String info tag
+
+
+Configuration descriptor info:
+
+C:  #Ifs=dd Cfg#=dd Atr=xx MPwr=dddmA
+|   |       |       |      |__MaxPower in mA
+|   |       |       |__Attributes
+|   |       |__ConfiguratioNumber
+|   |__NumberOfInterfaces
+|__Config info tag
+
+
+Interface descriptor info (can be multiple per Config):
+
+I:  If#=dd Alt=dd #EPs=dd Cls=xx(sssss) Sub=xx Prot=xx Driver=ssss
+|   |      |      |       |             |      |       |__Driver name
+|   |      |      |       |             |      |__InterfaceProtocol
+|   |      |      |       |             |__InterfaceSubClass
+|   |      |      |       |__InterfaceClass
+|   |      |      |__NumberOfEndpoints
+|   |      |__AlternateSettingNumber
+|   |__InterfaceNumber
+|__Interface info tag
+
+
+Endpoint descriptor info (can be multiple per Interface):
+
+E:  Ad=xx(s) Atr=xx(ssss) MxPS=dddd Ivl=dddms
+E:  Ad=xx(s) Atr=xx(ssss) MxPS=dddd Ivl=dddms
+|   |        |            |         |__Interval
+|   |        |            |__EndpointMaxPacketSize
+|   |        |__Attributes(EndpointType)
+|   |__EndpointAddress(I=In,O=Out)
+|__Endpoint info tag
+
+=======================================================================
+
+
+If a user or script is interested only in Topology info, for
+example, use something like "grep ^T: /proc/bus/usb/devices"
+for only the Topology lines.  A command like
+"grep -i ^[tdp]: /proc/bus/usb/devices" can be used to list
+only the lines that begin with the characters in square brackets,
+where the valid characters are TDPCIE.  With a slightly more able
+script, it can display any selected lines (for example, only T, D,
+and P lines) and change their output format.  (The "procusb"
+Perl script is the beginning of this idea.  It will list only
+selected lines [selected from TBDPSCIE] or "All" lines from
+/proc/bus/usb/devices.)
+
+The Topology lines can be used to generate a graphic/pictorial
+of the USB devices on a system's root hub.  (See more below
+on how to do this.)
+
+The Interface lines can be used to determine what driver is
+being used for each device.
+
+The Configuration lines could be used to list maximum power
+(in milliamps) that a system's USB devices are using.
+For example, "grep ^C: /proc/bus/usb/devices".
+
+
+Here's an example, from a system which has a UHCI root hub,
+an external hub connected to the root hub, and a mouse and
+a serial converter connected to the external hub.
+
+T:  Bus=00 Lev=00 Prnt=00 Port=00 Cnt=00 Dev#=  1 Spd=12  MxCh= 2
+B:  Alloc= 28/900 us ( 3%), #Int=  2, #Iso=  0
+D:  Ver= 1.00 Cls=09(hub  ) Sub=00 Prot=00 MxPS= 8 #Cfgs=  1
+P:  Vendor=0000 ProdID=0000 Rev= 0.00
+S:  Product=USB UHCI Root Hub
+S:  SerialNumber=dce0
+C:* #Ifs= 1 Cfg#= 1 Atr=40 MxPwr=  0mA
+I:  If#= 0 Alt= 0 #EPs= 1 Cls=09(hub  ) Sub=00 Prot=00 Driver=hub
+E:  Ad=81(I) Atr=03(Int.) MxPS=   8 Ivl=255ms
+T:  Bus=00 Lev=01 Prnt=01 Port=00 Cnt=01 Dev#=  2 Spd=12  MxCh= 4
+D:  Ver= 1.00 Cls=09(hub  ) Sub=00 Prot=00 MxPS= 8 #Cfgs=  1
+P:  Vendor=0451 ProdID=1446 Rev= 1.00
+C:* #Ifs= 1 Cfg#= 1 Atr=e0 MxPwr=100mA
+I:  If#= 0 Alt= 0 #EPs= 1 Cls=09(hub  ) Sub=00 Prot=00 Driver=hub
+E:  Ad=81(I) Atr=03(Int.) MxPS=   1 Ivl=255ms
+T:  Bus=00 Lev=02 Prnt=02 Port=00 Cnt=01 Dev#=  3 Spd=1.5 MxCh= 0
+D:  Ver= 1.00 Cls=00(>ifc ) Sub=00 Prot=00 MxPS= 8 #Cfgs=  1
+P:  Vendor=04b4 ProdID=0001 Rev= 0.00
+C:* #Ifs= 1 Cfg#= 1 Atr=80 MxPwr=100mA
+I:  If#= 0 Alt= 0 #EPs= 1 Cls=03(HID  ) Sub=01 Prot=02 Driver=mouse
+E:  Ad=81(I) Atr=03(Int.) MxPS=   3 Ivl= 10ms
+T:  Bus=00 Lev=02 Prnt=02 Port=02 Cnt=02 Dev#=  4 Spd=12  MxCh= 0
+D:  Ver= 1.00 Cls=00(>ifc ) Sub=00 Prot=00 MxPS= 8 #Cfgs=  1
+P:  Vendor=0565 ProdID=0001 Rev= 1.08
+S:  Manufacturer=Peracom Networks, Inc.
+S:  Product=Peracom USB to Serial Converter
+C:* #Ifs= 1 Cfg#= 1 Atr=a0 MxPwr=100mA
+I:  If#= 0 Alt= 0 #EPs= 3 Cls=00(>ifc ) Sub=00 Prot=00 Driver=serial
+E:  Ad=81(I) Atr=02(Bulk) MxPS=  64 Ivl= 16ms
+E:  Ad=01(O) Atr=02(Bulk) MxPS=  16 Ivl= 16ms
+E:  Ad=82(I) Atr=03(Int.) MxPS=   8 Ivl=  8ms
+
+
+Selecting only the "T:" and "I:" lines from this (for example, by using
+"procusb ti"), we have:
+
+T:  Bus=00 Lev=00 Prnt=00 Port=00 Cnt=00 Dev#=  1 Spd=12  MxCh= 2
+T:  Bus=00 Lev=01 Prnt=01 Port=00 Cnt=01 Dev#=  2 Spd=12  MxCh= 4
+I:  If#= 0 Alt= 0 #EPs= 1 Cls=09(hub  ) Sub=00 Prot=00 Driver=hub
+T:  Bus=00 Lev=02 Prnt=02 Port=00 Cnt=01 Dev#=  3 Spd=1.5 MxCh= 0
+I:  If#= 0 Alt= 0 #EPs= 1 Cls=03(HID  ) Sub=01 Prot=02 Driver=mouse
+T:  Bus=00 Lev=02 Prnt=02 Port=02 Cnt=02 Dev#=  4 Spd=12  MxCh= 0
+I:  If#= 0 Alt= 0 #EPs= 3 Cls=00(>ifc ) Sub=00 Prot=00 Driver=serial
+
+
+Physically this looks like (or could be converted to):
+
+                      +------------------+
+                      |  PC/root_hub (12)|   Dev# = 1
+                      +------------------+   (nn) is Mbps.
+    Level 0           |  CN.0   |  CN.1  |   [CN = connector/port #]
+                      +------------------+
+                          /
+                         /
+            +-----------------------+
+  Level 1   | Dev#2: 4-port hub (12)|
+            +-----------------------+
+            |CN.0 |CN.1 |CN.2 |CN.3 |
+            +-----------------------+
+                \           \____________________
+                 \_____                          \
+                       \                          \
+               +--------------------+      +--------------------+
+  Level 2      | Dev# 3: mouse (1.5)|      | Dev# 4: serial (12)|
+               +--------------------+      +--------------------+
+
+
+
+Or, in a more tree-like structure (ports [Connectors] without
+connections could be omitted):
+
+PC:  Dev# 1, root hub, 2 ports, 12 Mbps
+|_ CN.0:  Dev# 2, hub, 4 ports, 12 Mbps
+     |_ CN.0:  Dev #3, mouse, 1.5 Mbps
+     |_ CN.1:
+     |_ CN.2:  Dev #4, serial, 12 Mbps
+     |_ CN.3:
+|_ CN.1:
+
+
+                         ### END ###

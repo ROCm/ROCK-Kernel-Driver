@@ -1,0 +1,141 @@
+Documentation for the OPL3-SA2, SA3, and SAx driver (opl3sa2.o)
+---------------------------------------------------------------
+
+Scott Murray, scott@spiteful.org
+January 5, 1999
+
+NOTE: All trade-marked terms mentioned below are properties of their
+      respective owners.
+
+This driver is for PnP soundcards based on the following Yamaha audio
+controller chipsets:
+
+YMF711 aka OPL3-SA2
+YMF715 aka OPL3-SA3
+YMF719 aka OPL3-SAx (?)
+
+I'm a little fuzzy on what exactly is classified a SAx, as I've seen
+the label used to refer to the whole 7xx family and as a specific
+identifier for the 719 on my no-name soundcard.  To make matters
+worse, there seem to be several revisions of the 715 chipset.
+
+Anyways, all of these chipsets implement the following devices:
+
+OPL3 FM synthesizer
+Soundblaster Pro
+Microsoft/Windows Sound System
+MPU401 MIDI interface
+
+Note that this driver uses the MSS device, and to my knowledge these
+chipsets enforce an either/or situation with the Soundblaster Pro
+device and the MSS device.  Since the MSS device has better
+capabilities, I have implemented the driver to use it.
+
+Being PnP cards, some configuration is required.  There are two ways
+of doing this.  The most common is to use the isapnptools package to
+initialize the card, and use the kernel module form of the sound
+subsystem and sound drivers.  Alternatively, some BIOS's allow manual
+configuration of installed PnP devices in a BIOS menu, which should
+allow using the non-modular sound drivers, i.e. built into the kernel.
+
+I personally use isapnp and modules, and do not have access to a PnP
+BIOS machine to test.  If you have such a beast, try building both the
+MSS driver and this driver into the kernel (appropriately configured,
+of course).  I have received reports of this working, so it should be
+possible for most people with PnP BIOS.  If it does not work for you,
+then email me if you are willing to experiment in an effort to make it
+work.
+
+************************************************************************
+* I have now had two such machines, and I have fixed this to work
+* properly when built into the kernel.  The Toshiba Libretto series, or
+* at least models 70CT and 110CT which I have owned, use a Yamaha
+* OPL3-SAx (OPL3-SA3 according to documentation) sound chip, IRQ 5,
+* IO addresses 220/530/388/330/370 and DMA 1,0 (_not_ 0,1).  All these
+* configuration settings can be gathered by booting another OS which
+* recognizes the card already.
+*
+* I have made things 'just work' for the non-modular case on such
+* machines when configured properly.
+*
+* David Luyer <luyer@ucs.uwa.edu.au>
+************************************************************************
+
+If you are using isapnp, follow the directions in its documentation to
+produce a configuration file.  Here is the relevant excerpt I use for
+my SAx card from my isapnp.conf:
+
+(CONFIGURE YMH0800/-1 (LD 0
+
+# Instead of (IO 0 (BASE 0x0220)), disable SB:
+(IO 0 (BASE 0x0000))
+(IO 1 (BASE 0x0530))
+(IO 2 (BASE 0x0388))
+(IO 3 (BASE 0x0330))
+(IO 4 (BASE 0x0370))
+(INT 0 (IRQ 7 (MODE +E)))
+(DMA 0 (CHANNEL 0))
+(DMA 1 (CHANNEL 3))
+
+Here, note that:
+
+Port  Acceptable Range  Purpose
+----  ----------------  -------
+IO 0  0x0220 - 0x0280   SB base address, I set to 0 just to be safe.
+IO 1  0x0530 - 0x0F48   MSS base address
+IO 2  0x0388 - 0x03F8   OPL3 base address
+IO 3  0x0300 - 0x0334   MPU base address
+IO 4  0x0100 - 0x0FFE   card's own base address for its control I/O ports
+
+The IRQ and DMA values can be any that considered acceptable for a
+MSS.  Assuming you've got isapnp all happy, then you should be able to
+do something like the following (which matches up with the isapnp
+configuration above):
+
+insmod mpu401
+insmod ad1848
+insmod opl3sa2 io=0x370 mss_io=0x530 mpu_io=0x330 irq=7 dma=0 dma2=3
+insmod opl3 io=0x388
+
+Remember that the opl3sa2 module's io argument is for it's own control
+port, which handles the card's master mixer for volume (on all cards),
+and bass and treble (on SA3 and SAx cards).
+
+If all goes well and you see no error messages, you should be able to
+start using the sound capabilities of your system.  If you get an
+error message while trying to insert the opl3sa2 module, then make
+sure that the values of the various arguments match what you specified
+in your isapnp configuration file, and that there is no conflict with
+another device for an I/O port or interrupt.  Checking the contents of
+/proc/ioports and /proc/interrupts can be useful to see if you're
+butting heads with another device.
+
+If you still cannot get the module to load, look at the contents of
+your system log file, usually /var/log/messages.  If you see the
+message "Unknown Yamaha audio controller version", then you have a
+different chipset than I've encountered so far.  Look for a line in
+the log file that says "opl3sa2.c: chipset version = <some number>".
+If you want me to add support for your card, send me the number from
+this line and any information you have on the make and chipset of your
+sound card, and I should be able to work up a permanent fix.
+
+If you do not see the chipset version message, and none of the other
+messages present in the system log are helpful, email me some details
+and I'll try my best to help.
+
+Lastly, if you're using modules and want to set up automatic module
+loading with kmod, the kernel module loader, here is the section I
+currently use in my modules.conf file:
+
+# Sound
+alias char-major-14 opl3sa2
+pre-install opl3sa2 modprobe "-k" "ad1848"
+post-install opl3sa2 modprobe "-k" "opl3"
+options opl3sa2 io=0x370 mss_io=0x530 mpu_io=0x330 irq=7 dma=0 dma2=3
+options opl3 io=0x388
+
+That's all it currently takes to get an OPL3-SAx card working on my
+system.  Once again, if you have any other problems, email me at the
+address listed above.
+
+Scott

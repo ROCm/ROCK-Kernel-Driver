@@ -1,0 +1,30 @@
+#
+# PCMCIA character device configuration
+#
+
+if [ "$CONFIG_SERIAL" = "n" ]; then
+   define_tristate CONFIG_PCMCIA_SERIAL n
+else
+   if [ "$CONFIG_SERIAL" = "m" -o "$CONFIG_PCMCIA" = "m" ]; then
+      define_tristate CONFIG_PCMCIA_SERIAL m
+   else
+      define_tristate CONFIG_PCMCIA_SERIAL y
+   fi
+fi
+
+if [ "$CONFIG_PCMCIA_SERIAL" != "n" ]; then
+   mainmenu_option next_comment
+   comment 'PCMCIA character device support'
+
+   dep_tristate 'PCMCIA serial device support' CONFIG_PCMCIA_SERIAL_CS $CONFIG_PCMCIA_SERIAL
+   if [ "$CONFIG_CARDBUS" = "y" ]; then
+      dep_tristate 'CardBus serial device support' CONFIG_PCMCIA_SERIAL_CB $CONFIG_PCMCIA_SERIAL
+   fi
+
+   if [ "$CONFIG_PCMCIA_SERIAL_CS" = "y" -o \
+        "$CONFIG_PCMCIA_SERIAL_CB" = "y" ]; then
+      define_bool CONFIG_PCMCIA_CHRDEV y
+   fi
+
+   endmenu
+fi

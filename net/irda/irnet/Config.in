@@ -1,0 +1,1 @@
+dep_tristate '  IrNET protocol' CONFIG_IRNET $CONFIG_IRDA

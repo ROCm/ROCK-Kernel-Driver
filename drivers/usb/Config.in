@@ -1,0 +1,76 @@
+#
+# USB device configuration
+#
+mainmenu_option next_comment
+comment 'USB support'
+
+tristate 'Support for USB' CONFIG_USB
+if [ ! "$CONFIG_USB" = "n" ]; then
+   bool '  USB verbose debug messages' CONFIG_USB_DEBUG
+
+comment 'Miscellaneous USB options'
+   bool '  Preliminary USB device filesystem' CONFIG_USB_DEVICEFS
+   if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+      bool '  Enforce USB bandwidth allocation (EXPERIMENTAL)' CONFIG_USB_BANDWIDTH
+   else
+      define_bool CONFIG_USB_BANDWIDTH n
+   fi
+
+comment 'USB Controllers'
+   if [ "$CONFIG_USB_UHCI_ALT" != "y" ]; then
+      dep_tristate '  UHCI (Intel PIIX4, VIA, ...) support' CONFIG_USB_UHCI $CONFIG_USB
+   fi
+   if [ "$CONFIG_USB_UHCI" != "y" ]; then
+      dep_tristate '  UHCI Alternate Driver (JE) support' CONFIG_USB_UHCI_ALT $CONFIG_USB
+   fi
+   dep_tristate '  OHCI (Compaq, iMacs, OPTi, SiS, ALi, ...) support' CONFIG_USB_OHCI $CONFIG_USB
+
+   comment 'USB Device Class drivers'
+   dep_tristate '  USB Audio support' CONFIG_USB_AUDIO $CONFIG_USB $CONFIG_SOUND
+   dep_tristate '  USB Bluetooth support (EXPERIMENTAL)' CONFIG_USB_BLUETOOTH $CONFIG_USB $CONFIG_EXPERIMENTAL
+   dep_tristate '  USB Mass Storage support' CONFIG_USB_STORAGE $CONFIG_USB $CONFIG_SCSI
+   if [ "$CONFIG_USB_STORAGE" != "n" ]; then
+      bool '    USB Mass Storage verbose debug' CONFIG_USB_STORAGE_DEBUG
+      bool '    Freecom USB/ATAPI Bridge support' CONFIG_USB_STORAGE_FREECOM
+   fi
+   dep_tristate '  USB Modem (CDC ACM) support' CONFIG_USB_ACM $CONFIG_USB
+   dep_tristate '  USB Printer support' CONFIG_USB_PRINTER $CONFIG_USB
+
+   comment 'USB Human Interface Devices (HID)'
+   if [ "$CONFIG_INPUT" = "n" ]; then
+      comment '  Input core support is needed for USB HID'
+   else
+      dep_tristate '  USB Human Interface Device (full HID) support' CONFIG_USB_HID $CONFIG_USB $CONFIG_INPUT
+      if [ "$CONFIG_USB_HID" != "y" ]; then
+         dep_tristate '  USB HIDBP Keyboard (basic) support' CONFIG_USB_KBD $CONFIG_USB $CONFIG_INPUT
+         dep_tristate '  USB HIDBP Mouse (basic) support' CONFIG_USB_MOUSE $CONFIG_USB $CONFIG_INPUT
+      fi
+      dep_tristate '  Wacom Intuos/Graphire tablet support' CONFIG_USB_WACOM $CONFIG_USB $CONFIG_INPUT
+   fi
+
+   comment 'USB Imaging devices'
+   dep_tristate '  USB Kodak DC-2xx Camera support' CONFIG_USB_DC2XX $CONFIG_USB
+   dep_tristate '  USB Mustek MDC800 Digital Camera support (EXPERIMENTAL)' CONFIG_USB_MDC800 $CONFIG_USB $CONFIG_EXPERIMENTAL
+   dep_tristate '  USB Scanner support' CONFIG_USB_SCANNER $CONFIG_USB
+   dep_tristate '  Microtek X6USB scanner support (EXPERIMENTAL)' CONFIG_USB_MICROTEK $CONFIG_USB $CONFIG_SCSI $CONFIG_EXPERIMENTAL
+
+   comment 'USB Multimedia devices'
+   dep_tristate '  USB IBM (Xirlink) C-it Camera support' CONFIG_USB_IBMCAM $CONFIG_USB $CONFIG_VIDEO_DEV
+   dep_tristate '  USB OV511 Camera support' CONFIG_USB_OV511 $CONFIG_USB $CONFIG_VIDEO_DEV
+   dep_tristate '  D-Link USB FM radio support (EXPERIMENTAL)' CONFIG_USB_DSBR $CONFIG_USB $CONFIG_VIDEO_DEV $CONFIG_EXPERIMENTAL
+   dep_tristate '  DABUSB driver' CONFIG_USB_DABUSB $CONFIG_USB
+
+   comment 'USB Network adaptors'
+   dep_tristate '  PLUSB Prolific USB-Network driver (EXPERIMENTAL)' CONFIG_USB_PLUSB $CONFIG_USB $CONFIG_NET $CONFIG_EXPERIMENTAL
+   dep_tristate '  USB ADMtek Pegasus-based ethernet device support (EXPERIMENTAL)' CONFIG_USB_PEGASUS $CONFIG_USB $CONFIG_NET $CONFIG_EXPERIMENTAL
+   dep_tristate '  NetChip 1080-based USB Host-to-Host Link (EXPERIMENTAL)' CONFIG_USB_NET1080 $CONFIG_USB $CONFIG_NET $CONFIG_EXPERIMENTAL
+
+   comment 'USB port drivers'
+   dep_tristate '  USS720 parport driver' CONFIG_USB_USS720 $CONFIG_USB $CONFIG_PARPORT
+   source drivers/usb/serial/Config.in
+
+   comment 'USB misc drivers'
+   dep_tristate '  USB Diamond Rio500 support (EXPERIMENTAL)' CONFIG_USB_RIO500 $CONFIG_USB $CONFIG_EXPERIMENTAL
+fi
+
+endmenu

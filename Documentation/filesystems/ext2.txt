@@ -1,0 +1,224 @@
+
+The Second Extended Filesystem
+==============================
+
+ext2 was originally released in January 1993.  Written by R\'emy Card,
+Theodore Ts'o and Stephen Tweedie, it was a major rewrite of the
+Extended Filesystem.  It is currently (February 1999) the predominant
+filesystem in use by Linux.  There are also implementations available
+for NetBSD, FreeBSD, the GNU HURD, Windows 95/98/NT, OS/2 and RISC OS.
+
+Options
+=======
+
+When mounting an ext2 filesystem, the following options are accepted.
+Defaults are marked with (*).
+
+bsddf			(*)	Makes `df' act like BSD.
+minixdf				Makes `df' act like Minix.
+
+check=none, nocheck		Perform no checks upon the filesystem.
+check=normal		(*)	Perform normal checks on the filesystem.
+check=strict			Perform extra checks on the filesystem.
+
+debug				For developers only.
+
+errors=continue		(*)	Keep going on a filesystem error.
+errors=remount-ro		Remount the filesystem read-only on an error.
+errors=panic			Panic and halt the machine if an error occurs.
+
+grpid, bsdgroups		Give objects the same group ID as their parent.
+nogrpid, sysvgroups	(*)	New objects have the group ID of their creator.
+
+resuid=n			The user which may use the reserved blocks.
+resgid=n			The group which may use the reserved blocks. 
+
+sb=n				Use alternate superblock at this location.
+
+grpquota,noquota,quota,usrquota	Quota options are silently ignored by ext2.
+
+
+Specification
+=============
+
+ext2 shares many properties with traditional Unix filesystems.  It has
+the concepts of blocks, inodes and directories.  It has space in the
+specification for Access Control Lists (ACLs), fragments, undeletion and
+compression though these are not yet implemented (some are available as
+separate patches).  There is also a versioning mechanism to allow new
+features (such as journalling) to be added in a maximally compatible
+manner.
+
+Blocks
+------
+
+The space in the device or file is split up into blocks.  These are
+a fixed size, of 1024, 2048 or 4096 bytes, which is decided when the
+filesystem is created.  Smaller blocks mean less wasted space per file,
+but require slightly more accounting overhead.
+
+Blocks are clustered into block groups in order to reduce fragmentation
+and minimise the amount of head seeking when reading a large amount of
+consecutive data.  Each block group has a descriptor and the array of
+descriptors is stored immediately after the superblock.  Two blocks at
+the start of each group are reserved for the block usage bitmap and
+the inode usage bitmap which show which blocks and inodes are used.
+Since each bitmap fits in a block, this means that the maximum size of
+a block group is 8 times the size of a block.
+
+The first (non-reserved) blocks in the block group are designated as
+the inode table for the block and the remainder are the data blocks.
+The block allocation algorithm attempts to allocate data blocks in the
+same block group as the inode which contains them.
+
+The Superblock
+--------------
+
+The superblock contains all the information about the configuration of
+the filing system.  It is stored in block 1 of the filesystem (numbering
+from 0) and it is essential to mounting it.  Since it is so important,
+backup copies of the superblock are stored in block groups throughout
+the filesystem.  The first revision of ext2 stores a copy at the start
+of every block group.  Later revisions can store a copy in only some
+block groups to reduce the amount of redundancy on large filesystems.
+The groups chosen are 0, 1 and powers of 3, 5 and 7.
+
+The information in the superblock contains fields such as how many
+inodes and blocks are in the filesystem and how many are unused, how
+many inodes and blocks are in a block group, when the filesystem was
+mounted, when it was modified, what version of the filesystem it is
+(see the Revisions section below) and which OS created it.
+
+If the revision of the filesystem is recent enough then there are extra
+fields, such as a volume name, a unique identifier, the inode size,
+support for compression, block preallocation and creating fewer backup
+superblocks.
+
+All fields in the superblock (as in all other ext2 structures) are stored
+on the disc in little endian format, so a filesystem is portable between
+machines without having to know what machine it was created on.
+
+Inodes
+------
+
+The inode (index node) is the fundamental concept in the ext2 filesystem.
+Each object in the filesystem is represented by an inode.  The inode
+structure contains pointers to the filesystem blocks which contain the
+data held in the object and all of the metadata about an object except
+its name.  The metadata about an object includes the permissions, owner,
+group, flags, size, number of blocks used, access time, change time,
+modification time, deletion time, number of links, fragments, version
+(for NFS) and ACLs.
+
+There are several reserved fields which are currently unused in the inode
+structure and several which are overloaded.  One field is used for the
+directory ACL if the inode is a directory and for the top 32 bits of
+the file size if the inode is a regular file.  The translator field is
+unused under Linux, but is used by the HURD to reference the inode of
+a program which will be used to interpret this object.  The HURD also
+has larger permissions, owner and group fields, so it uses some of the
+other unused by Linux fields to store the extra bits.
+
+There are pointers to the first 12 blocks which contain the file's data
+in the inode.  There is a pointer to an indirect block (which contains
+pointers to the next set of blocks), a pointer to a doubly-indirect
+block (which contains pointers to indirect blocks) and a pointer to a
+trebly-indirect block (which contains pointers to doubly-indirect blocks).
+
+The flags field contains some ext2-specific flags which aren't catered
+for by the standard chmod flags.  These flags can be listed with
+lsattr and changed with the chattr command.  There are flags for secure
+deletion, undeletable, compression, synchronous updates, immutability,
+append-only, dumpable, no-atime, and btree directories.  Not all of
+these are supported yet.
+
+Directories
+-----------
+
+A directory is a filesystem object and has an inode just like a file.
+It is a specially formatted file containing records which associate
+each name with an inode number.  Later revisions of the filesystem also
+encode the type of the object (file, directory, symlink, device, fifo,
+socket) in the directory entry for speed.  The current implementation
+of ext2 uses a linked list in directories; a planned enhancement will
+use btrees instead.  The current implementation also never shrinks
+directories once they have grown to accommodate more files.
+
+Special files
+-------------
+
+Symbolic links are also filesystem objects with inodes.  They deserve
+special mention because the data for them is stored within the inode
+itself if the symlink is less than 60 bytes long.  It uses the fields
+which would normally be used to store the pointers to blocks to store
+the data.  This is a worthwhile optimisation to make as it does not then
+take up a block, and most symlinks are less than 60 characters long.
+
+Character and block special devices never have data blocks assigned to
+them.  Instead, their device number is stored in the inode, again reusing
+the fields which would be used to point to the blocks.
+
+Revisions
+---------
+
+The revisioning mechanism used in ext2 is sophisticated.  The revisioning
+mechanism is not supported by version 0 (EXT2_GOOD_OLD_REV) of ext2 but
+was introduced in version 1.  There are three 32-bit fields, one for
+compatible features, one for read-only compatible features and one for
+incompatible features.
+
+Reserved Space
+--------------
+
+In ext2, there is a mechanism for reserving a certain number of blocks
+for a particular user (normally the super-user).  This is intended to
+allow for the system to continue functioning even if a user fills up
+all the available space.  It also keeps the filesystem from filling up
+entirely which helps combat fragmentation.
+
+Filesystem check
+----------------
+
+At boot time, most systems run a consistency check (e2fsck) on their
+filesystems.  The superblock of the ext2 filesystem contains several
+fields which indicate whether fsck should actually run (since checking
+the filesystem at boot can take a long time if it is large).  fsck will
+run if the filesystem was not unmounted without errors, if the maximum
+mount count has been exceeded or if the maximum time between checks has
+been exceeded.
+
+Metadata
+--------
+
+It is frequently claimed that the ext2 implementation of writing
+asynchronous metadata is faster than the ffs synchronous metadata
+scheme but less reliable.  Both methods are equally resolvable by their
+respective fsck programs.
+
+If you're exceptionally paranoid, there are 3 ways of making metadata
+writes synchronous:
+
+per-file if you have the source: use the O_SYNC argument to open()
+per-file if you don't have the source: use chattr +S
+per-filesystem: mount -o sync
+
+the first and last are not ext2 specific but do force the metadata to
+be written synchronously.
+
+References
+==========
+
+The kernel source	file:/usr/src/linux/fs/ext2/
+Design & Implementation	http://khg.redhat.com/HyperNews/get/fs/ext2intro.html
+Compression		http://debs.fuller.edu/e2compr/
+ACL support		ftp://tsx-11.mit.edu/pub/linux/ALPHA/ext2fs
+updated ACL work	http://aerobee.informatik.uni-bremen.de/acl_eng.html
+e2fsprogs 		ftp://tsx-11.mit.edu/pub/linux/packages/ext2fs
+
+Implementations for:
+OS/2			http://perso.wanadoo.fr/matthieu.willm/ext2-os2/
+Windows 95		http://www.yipton.demon.co.uk/
+Windows NT		http://www.cyco.nl/~andreys/ext2fsnt/
+			http://uranus.it.swin.edu.au/~jn/linux/Explore2fs.htm
+DOS client		ftp://metalab.unc.edu/pub/Linux/system/filesystems/ext2/
+RISC OS client		ftp://ftp.barnet.ac.uk/pub/acorn/armlinux/iscafs/

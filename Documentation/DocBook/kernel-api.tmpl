@@ -1,0 +1,169 @@
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook V3.1//EN"[]>
+<book id="LinuxKernelAPI">
+ <bookinfo>
+  <title>The Linux Kernel API</title>
+  
+  <legalnotice>
+   <para>
+     This documentation is free software; you can redistribute
+     it and/or modify it under the terms of the GNU General Public
+     License as published by the Free Software Foundation; either
+     version 2 of the License, or (at your option) any later
+     version.
+   </para>
+      
+   <para>
+     This program is distributed in the hope that it will be
+     useful, but WITHOUT ANY WARRANTY; without even the implied
+     warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+     See the GNU General Public License for more details.
+   </para>
+      
+   <para>
+     You should have received a copy of the GNU General Public
+     License along with this program; if not, write to the Free
+     Software Foundation, Inc., 59 Temple Place, Suite 330, Boston,
+     MA 02111-1307 USA
+   </para>
+      
+   <para>
+     For more details see the file COPYING in the source
+     distribution of Linux.
+   </para>
+  </legalnotice>
+ </bookinfo>
+
+<toc></toc>
+  <chapter id="adt">
+     <title>Data Types</title>
+     <sect1><title>Doubly Linked Lists</title>
+!Iinclude/linux/list.h
+     </sect1>
+  </chapter>
+
+  <chapter id="mm">
+     <title>Memory Management in Linux</title>
+     <sect1><title>The Slab Cache</title>
+!Emm/slab.c
+      </sect1>
+  </chapter>
+
+  <chapter id="vfs">
+     <title>The Linux VFS</title>
+     <sect1><title>The Directory Cache</title>
+!Efs/dcache.c
+!Iinclude/linux/dcache.h
+     </sect1>
+     <sect1><title>Inode Handling</title>
+!Efs/inode.c
+!Efs/bad_inode.c
+     </sect1>
+     <sect1><title>Registration and Superblocks</title>
+!Efs/super.c
+     </sect1>
+     <sect1><title>File Locks</title>
+!Efs/locks.c
+!Ifs/locks.c
+     </sect1>
+  </chapter>
+
+  <chapter id="netcore">
+     <title>Linux Networking</title>
+     <sect1><title>Socket Buffer Functions</title>
+!Iinclude/linux/skbuff.h
+!Enet/core/skbuff.c
+     </sect1>
+     <sect1><title>Socket Filter</title>
+!Enet/core/filter.c
+     </sect1>
+  </chapter>
+
+  <chapter id="netdev">
+     <title>Network device support</title>
+     <sect1><title>Driver Support</title>
+!Edrivers/net/net_init.c
+!Enet/core/dev.c
+     </sect1>
+     <sect1><title>8390 Based Network Cards</title>
+!Edrivers/net/8390.c
+     </sect1>
+     <sect1><title>Synchronous PPP</title>
+!Edrivers/net/wan/syncppp.c
+     </sect1>
+  </chapter>
+
+  <chapter id="modload">
+     <title>Module Loading</title>
+!Ekernel/kmod.c
+  </chapter>
+
+  <chapter id="hardware">
+     <title>Hardware Interfaces</title>
+     <sect1><title>Interrupt Handling</title>
+!Iarch/i386/kernel/irq.c
+     </sect1>
+
+     <sect1><title>MTRR Handling</title>
+!Earch/i386/kernel/mtrr.c
+     </sect1>
+     <sect1><title>PCI Support Library</title>
+!Edrivers/pci/pci.c
+     </sect1>
+     <sect1><title>MCA Architecture</title>
+	<sect2><title>MCA Device Functions</title>
+!Earch/i386/kernel/mca.c
+	</sect2>
+	<sect2><title>MCA Bus DMA</title>
+!Iinclude/asm-i386/mca_dma.h
+	</sect2>
+     </sect1>
+  </chapter>
+
+  <chapter id="devfs">
+     <title>The Device File System</title>
+!Efs/devfs/base.c
+  </chapter>
+
+  <chapter id="pmfuncs">
+     <title>Power Management</title>
+!Ekernel/pm.c
+  </chapter>
+
+  <chapter id="blkdev">
+     <title>Block Devices</title>
+!Edrivers/block/ll_rw_blk.c
+  </chapter>
+
+  <chapter id="miscdev">
+     <title>Miscellaneous Devices</title>
+!Edrivers/char/misc.c
+  </chapter>
+
+  <chapter id="viddev">
+     <title>Video4Linux</title>
+!Edrivers/media/video/videodev.c
+  </chapter>
+
+  <chapter id="snddev">
+     <title>Sound Devices</title>
+!Edrivers/sound/sound_core.c
+!Idrivers/sound/sound_firmware.c
+  </chapter>
+
+  <chapter id="usb">
+     <title>USB Devices</title>
+!Edrivers/usb/usb.c
+  </chapter>
+
+  <chapter id="uart16x50">
+     <title>16x50 UART Driver</title>
+!Edrivers/char/serial.c
+  </chapter>
+
+  <chapter id="z85230">
+     <title>Z85230 Support Library</title>
+!Edrivers/net/wan/z85230.c
+  </chapter>
+
+
+</book>

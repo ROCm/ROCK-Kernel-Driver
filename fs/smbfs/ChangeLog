@@ -1,0 +1,55 @@
+ChangeLog for smbfs.
+
+2000-08-14 Urban Widmark <urban@svenskatest.se>
+
+	* dir.c: support case sensitive shares
+	* inode.c: ascii mount options
+	* proc.c: check length of paths to avoid buffer overflow
+	* proc.c: don't do interruptable_sleep in smb_retry to avoid signal
+	  problem/race.
+	* proc.c: O_RDONLY & smb_revalidate_inode fix (tail -f)
+	* proc.c: add nls support
+	* sock.c: attempt to fix smb_data_callback (avoid infinite loop)
+
+2000-07-25 Urban Widmark <urban@svenskatest.se>
+
+	* proc.c: fix 3 places where bad server responses could cause an Oops.
+
+2000-07-15 Urban Widmark <urban@svenskatest.se>
+
+	* *.c: more debug (%.*s) & indent fixes
+
+2000-06-24: Matt Maynard <matthewm@corel.com>
+
+	* dir.c: dentry->d_inode->i_mtime isn't updated for all servers
+	  (NT?) and all operations (mv oldfile.txt newfile.txt) Removed for
+	  less efficient but better working directory cache.
+	* proc.c: included aDIR smbclient fix for renaming directories on
+	  OS/2 servers (win95/98?) (orig by John Janosik)
+
+2000-07-01 Urban Widmark <urban@svenskatest.se>
+
+	* *.c: replace ugly #ifdef's with less ugly debug macros.
+
+2000-01-?? cpg@aladdin.de
+
+	* proc.c: added posix semantics for unlink
+
+1999-11-16 Andrew Tridgell
+
+	* proc.c: use level 260 for most conns, or level 1 for <NT1
+	* proc.c: don't sleep every time with win95 on a FINDNEXT
+	* proc.c: fixed loop_count bug
+	* proc.c: got rid of resume_key
+
+[there are a few missing here :) ]
+
+1997-09-28 Riccardo Facchetti
+
+	* proc.c: Fixed smb_d_path [now smb_build_path()] to be non-recursive
+
+1996-06-28 Yuri Per
+
+	* proc.c: Fixed long file name support (smb_proc_readdir_long)
+
+You are in the wrong end for adding new entries. New entries at the top.

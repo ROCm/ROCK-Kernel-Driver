@@ -1,0 +1,256 @@
+2001-01-04  Peter Osterlund  <peter.osterlund@mailbox.swipnet.se>
+
+	* ieee1284.c (parport_negotiate): Fix missing printk argument.
+
+2001-01-03  Paul Schleger  <Paul.Schleger@t-online.de>
+
+	* probe.c (parse_data): Get rid of trailing blanks in values.
+	Needed for XEROX XJ8C printer.
+
+2001-01-03  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc.c (parport_pc_probe_port): Say something when probes
+	are omitted.
+
+2001-01-03  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc.c (sio_via_686a_probe): Correct dma=255 fix.
+
+2000-11-21  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc.c (parport_pc_ecp_write_block_pio): Fix
+	reverse-to-forward logic.  Spotted by Roland Kuck
+	<rci@cityweb.de>.
+
+2000-09-16  Cesar Eduardo Barros  <cesarb@nitnet.com.br>
+
+	* parport_pc.c (sio_via_686a_probe): Handle case
+	where hardware returns 255 for IRQ or DMA.
+
+2000-07-20  Eddie C. Dost  <ecd@skynet.be>
+
+	* share.c (attach_driver_chain): attach[i](port) needs to be
+	replaced by attach[count](port).
+
+2000-07-20  Eddie C. Dost  <ecd@skynet.be>
+
+	* daisy.c (add_dev): kmalloc args are in wrong order.
+
+2000-07-12  Tim Waugh  <twaugh@redhat.com>
+
+	* share.c: Documentation for parport_{get,port}_port,
+	parport_find_{number,base}.
+
+2000-07-12  Tim Waugh  <twaugh@redhat.com>
+
+	* share.c (parport_unregister_device): Remove unneeded locking
+	(test cad==dev).
+	(parport_claim): Likewise.
+	(parport_find_number): New function.
+
+2000-07-12  Tim Waugh  <twaugh@redhat.com>
+
+	* share.c (parport_register_port): Hold the parportlist_lock while
+	looking for a free parport number.
+	(parport_register_driver): Make sure that attach can block.
+	(attach_driver_chain): Likewise.
+
+2000-07-12  Tim Waugh  <twaugh@redhat.com>
+
+	* share.c (call_driver_chain): Do reference counting things.
+	(parport_get_port): New function.
+	(parport_put_port): New function.
+	(parport_register_port): Initialise reference count to zero.
+	(parport_unregister_port): Check reference count rather than
+	driver list to see if we can free the port.
+
+2000-07-12  Tim Waugh  <twaugh@redhat.com>
+
+	* share.c: Clarifications in doc comments.
+
+2000-07-12  Tim Waugh  <twaugh@redhat.com>
+
+	* share.c (parport_unregister_port): Fix typo in comment.
+
+2000-07-11  Gunther Mayer  <gunther.mayer@braunschweig.okersurf.de>
+
+	* parport_pc.c: Support for the full range of Timedia cards.
+
+2000-07-08  Tim Waugh  <twaugh@redhat.com>
+
+	* daisy.c: License block comments as part of parportbook.
+	* ieee1284.c: Likewise.
+	* share.c: Likewise.
+
+2000-06-30  Petr Vandrovec  <vandrove@vc.cvut.cz>
+
+	* procfs.c (do_hardware_modes): Generated string can be up to 34
+	chars long.
+
+2000-06-20  Gunther Mayer  <gunther.mayer@braunschweig.okersurf.de>
+
+	* parport_pc.c (parport_pc_compat_write_block_pio): Warn about
+	change_mode failures.
+	(parport_pc_ecp_write_block_pio): Likewise.
+	(parport_pc_ecp_read_block_pio): Likewise.
+
+2000-06-20  Gunther Mayer  <gunther.mayer@braunschweig.okersurf.de>
+
+	* parport_pc.c (parport_SPP_supported): Warn more about possibly
+	incorrect parameters.
+
+2000-06-15  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc.c (parport_ECP_supported): Set PARPORT_MODE_COMPAT
+	for ECP ports, since they can all do hardware accelerated
+	compatibility mode (I assume).
+
+2000-06-13  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc.c (cleanup_module): Remark about possible bugs.
+
+2000-06-13  Tim Waugh  <twaugh@redhat.com>
+
+	* procfs.c: Break 'hardware' out into separate files.
+
+2000-05-28  Gunther Mayer  <gunther.mayer@braunschweig.okersurf.de>
+
+	* Fix PCI ID printk for non-superio PCI cards.
+
+2000-05-28  Tim Waugh  <twaugh@redhat.com>
+
+	* share.c (call_driver_chain): Get the driverlist_lock.
+	(parport_register_device): Make sure that port->devices always
+	looks consistent.
+	(parport_register_driver): Ensure that parport drivers are given
+	parameters that are valid for the duration of the callback by
+	locking the portlist against changes.
+	(parport_unregister_driver): Likewise.
+	(parport_claim): Don't overwrite flags.
+
+2000-05-28  Tim Waugh  <twaugh@redhat.com>
+
+	* daisy.c (assign_addrs): Avoid double-probing daisy-chain devices
+	if the first probe succeeds.
+
+2000-05-16  Tim Waugh  <twaugh@redhat.com>
+
+	* share.c (parport_claim): Fix SMP race.
+
+2000-05-15  Gunther Mayer  <gunther.mayer@braunschweig.okersurf.de>
+
+	* parport_pc.c (parport_pc_compat_write_block_pio): Check for
+	timeouts.
+	(parport_pc_ecp_write_block_pio): Likewise.
+	(parport_pc_ecp_read_block_pio): Likewise.
+
+2000-05-02  Gunther Mayer  <gunther.mayer@braunschweig.okersurf.de>
+
+	* parport_pc.c: PCI SYBA patch and verbose PCI detection.
+
+2000-05-02  Gunther Mayer  <gunther.mayer@braunschweig.okersurf.de>
+
+	* parport_pc.c (decode_smsc): Fix SMSC 665/666 identification.
+
+2000-04-28  Tim Waugh  <twaugh@redhat.com>
+
+	* ieee1284.c: Short function descriptions can't be multiline.
+
+	* daisy.c: Short function descriptions can't be multiline.
+
+2000-04-19  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc.c (parport_pc_fifo_write_block_dma): Make maxlen
+	calculation a bit clearer.
+
+	* ieee1284.c (parport_negotiate): Turn on data line drivers.
+
+	* ieee1284_ops.c (parport_ieee1284_read_byte): Turn off data line
+	drivers.
+	(parport_ieee1284_write_compat): Turn on data line drivers.
+
+	* daisy.c (assign_addrs): Turn on data line drivers.
+	(cpp_mux): Likewise.
+	(cpp_daisy): Likewise.
+
+2000-04-04  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc.c: Add support for another PCI card.
+
+2000-04-04  Tim Waugh  <twaugh@redhat.com>
+
+	* daisy.c: Documentation in kernel-doc format.
+
+	* ieee1284.c: Likewise.
+
+	* share.c: Likewise.
+
+2000-04-01  Tim Waugh  <twaugh@redhat.com>
+
+	* share.c (parport_register_device): Need to hold the module
+	reference counts before sleeping.
+
+2000-03-27  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc.c (parport_pc_ecp_read_block_pio): Correct operation
+	when peripheral is trying to send data when we stop listening.
+
+2000-03-22  Tim Waugh  <twaugh@redhat.com>
+
+	* init.c (parport_setup): Fix return value.
+
+2000-03-21  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc.c (parport_pc_pci_probe): Fix return value; call
+	pci_enable_device.
+
+2000-03-16  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc.c (parport_ECP_supported): This seems to trigger on
+	machines that don't have an IRQ conflict; toned down the warning
+	message accordingly.
+
+2000-03-16  Gunther Mayer  <gunther.mayer@braunschweig.netsurf.de>
+
+	* parport_pc.c (show_parconfig_smsc37c669): Fix typo.
+	(decode_winbond): More IDs.
+	(winbond_check): Protect against false positives.
+	(winbond_check2): Likewise.
+	(smsc_check): Likewise.
+
+2000-03-15  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc.c (cleanup_module): Don't call pci_unregister_driver
+	if we didn't call pci_register_driver first.
+
+2000-03-13  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc.c (parport_pc_init): Moved from asm/parport.h.
+
+	* Config.in: CONFIG_PARPORT_PC_SUPERIO: new option.
+
+	* parport_pc.c (show_parconfig_smsc37c669): Make __devinit.
+	(show_parconfig_winbond): Likewise.
+	(decode_winbond): Likewise.
+	(decode_smsc): Likewise.
+	(winbond_check): Likewise.
+	(winbond_check2): Likewise.
+	(smsc_check): Likewise.
+	(detect_and_report_winbond): Likewise.
+	(detect_and_report_smsc): Likewise.
+	(get_superio_dma): Likewise.
+	(get_superio_irq): Likewise.
+	(parport_pc_find_isa_ports): New function.
+	(parport_pc_find_ports): New function.
+	(init_module): Make superio a config option, not a parameter.
+
+2000-03-10  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc.c (decode_winbond): Use correct 83877ATF chip ID.
+	(decode_winbond): Fix typo.
+
+2000-03-09  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc.c: Integrate SuperIO PCI probe with normal PCI card
+	probe, so that the MODULE_DEVICE_TABLE is complete.
+

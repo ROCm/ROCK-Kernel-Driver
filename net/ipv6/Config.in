@@ -1,0 +1,18 @@
+#
+# IPv6 configuration
+# 
+bool '    IPv6: enable EUI-64 token format' CONFIG_IPV6_EUI64
+if [ "$CONFIG_IPV6_EUI64" = "y" ]; then
+   bool '      IPv6: disable provider based addresses' CONFIG_IPV6_NO_PB
+fi
+if [ "$CONFIG_NETLINK" = "y" ]; then
+   if [ "$CONFIG_RTNETLINK" = "n" ]; then
+      bool '    IPv6: routing messages via old netlink' CONFIG_IPV6_NETLINK
+   fi
+fi
+#bool '    IPv6: flow policy support' CONFIG_RT6_POLICY
+#bool '    IPv6: firewall support' CONFIG_IPV6_FIREWALL
+
+if [ "$CONFIG_NETFILTER" != "n" ]; then
+   source net/ipv6/netfilter/Config.in
+fi

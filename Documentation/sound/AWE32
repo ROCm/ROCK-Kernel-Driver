@@ -1,0 +1,105 @@
+	Installing and using Creative AWE midi sound under Linux.
+
+This documentation is devoted to the Creative Sound Blaster AWE32, AWE64 and 
+SB32.
+
+1) Make sure you have an ORIGINAL Creative SB32, AWE32 or AWE64 card. This is 
+important, because the driver works only with real Creative cards.
+
+2) If your card is NOT "Plug-n-Play" then go to 5th step now. In the other case
+proceed to step 3.
+
+3) You should compile in kernel ISAPnP support or you should obtain isapnptools.
+If you choose kernel level ISAPnP skip to step 5. I looked through other PnP 
+packages for Linux, but all they are either in deep unstable beta/alpha releases
+or they are much worse than isapnptools. In my case isapnptools were included in
+a Linux distribution (Red Hat 5.x). If you also already have them then go to 
+step 4.
+
+The latest copy of isapnptools-1.17 is available from 
+ftp://sunsite.unc.edu/pub/Linux/system/hardware/isapnptools-1.17.tgz
+You should gunzip/untar it to something like /usr/local/ 
+(cp isapnptools-1.17.tgz /usr/local/; cd /usr/local/;
+tar -xzf isapnptools-1.17.tgz). 
+
+Compile the package (make) and install it (make install).
+If something goes wrong check the INSTALL file in isapnptools-1.15 directory.
+
+4) Now do a "pnpdump > /etc/isapnp.conf". File /etc/isapnp.conf will contain 
+info about PnP devices you may have. If you want you can read the manual page
+about isapnp.conf file (man isapnp.conf). Most lines of your isapnp.conf file are 
+commented. You should uncomment lines which don't conflict with your 
+configuration.
+
+ATTENTION! Device Audio should have 1 IRQ, 2 DMA and 3 base I/O resources.
+If you don't have such a configuration you should manually add the resources to
+the isapnp.conf file. After editing I got these lines in the Audio device
+section (I ripped out all the comments):
+
+"(CONFIGURE CTL0044/1132685 (LD 0 (INT 0 (IRQ 5 (MODE +E))) (DMA 0 (CHANNEL 1))
+ (DMA 1 (CHANNEL 5)) (IO 0 (BASE 0x220)) (IO 1 (BASE 0x330)) (IO 2 (BASE 0x388))
+ (ACT Y)))"
+
+(In your case CTL044/1132685 numbers may be other)
+
+Don't forget to uncomment (ACT Y)!
+
+The next device is the on-board IDE controller. You may enable it if you wish,
+but it will not effect sound.
+
+Then WaveTable goes. For some reason Plug-n-Play detects only one I/O port,
+but the wavetable needs THREE! My working string is:
+
+"(CONFIGURE CTL044/1132685 (LD 2 (IO 0 (BASE 0x0620)) (IO 1 (BASE 0x0A20)) 
+(IO 2 (BASE 0x0E20)) (ACT Y) ))"
+
+Resources 0x0620, 0x0A20 and 0x0E20 should work. Other on-board devices: 
+Gameport and StereoEnhance are not required to be initialized.
+
+Now you can execute "isapnp /etc/isapnp.conf". No errors should be reported.
+If you correctly installed isapnptools, then isapnp will run every boot time.
+
+5) Now you should recompile the kernel.
+
+In "make (x,menu)config" select in "Sound":
+"Sound card support", "100% Sound Blaster compatibles (SB16/32/64, ESS, Jazz16) support",
+"Generic OPL2/OPL3 FM synthesizer support" and "FM synthesizer (YM3812/OPL-3) 
+support" as <M> (module).
+
+In "make (x,menu)config" select in "Sound":
+select "OSS sound modules" as <M> (module)
+select "AWE32 Synth" as <M> (module)
+
+Now recompile the kernel (make dep; make (b)zImage, b(z)lilo, etc...;
+make modules; make modules_install), update your boot loader (if required) and
+boot new kernel.
+
+6) If awesfx program is not included in your distribution, then download it 
+from http://bahamut.mm.t.u-tokyo.ac.jp/~iwai/awedrv/index.html#Latest.
+Compile it. Copy sfxload program to /usr/bin. To enable AWE general midi
+synthesis you should also get the sound bank file for general midi from
+http://members.xoom.com/yar/synthgm.sbk.gz. Copy it to /usr and gunzip it there.
+
+7) Edit /etc/modules.conf, inserting at the end of the file:
+
+alias midi awe_wave
+post-install awe_wave /usr/bin/sfxload /usr/synthfm.sbk
+
+That will enable the Sound Blaster and AWE wave synthesis.
+
+To play midi files you should get one of these programs:
+
+Playmidi 2.4 or higher: http://playmidi.openprojects.net
+Drvmidi: http://bahamut.mm.t.u-tokyo.ac.jp/~iwai/awedrv/index.html#Latest
+
+(These are available at all major Linux FTP sites and may already be
+ in your distribution)
+Remember to use -a switch if you have playmidi as a compiled binary (ex. RPM)
+
+If something goes wrong please e-mail me. All comments and suggestions are
+welcome.
+
+			    Yaroslav Rosomakho (alons55@dialup.ptt.ru)
+				    http://www.yar.opennet.ru
+
+Last Updated: 10Apr2000

@@ -1,0 +1,24 @@
+#
+# Token Ring driver configuration
+#
+
+mainmenu_option next_comment
+comment 'Token Ring devices'
+
+bool 'Token Ring driver support' CONFIG_TR
+if [ "$CONFIG_TR" != "n" ]; then
+   dep_tristate '  IBM Tropic chipset based adapter support' CONFIG_IBMTR $CONFIG_TR
+   dep_tristate '  IBM Olympic chipset PCI adapter support' CONFIG_IBMOL $CONFIG_TR
+   dep_tristate '  IBM Lanstreamer chipset PCI adapter support' CONFIG_IBMLS $CONFIG_TR
+   dep_tristate '  Generic TMS380 Token Ring ISA/PCI adapter support' CONFIG_TMS380TR $CONFIG_TR
+   if [ "$CONFIG_TMS380TR" != "n" ]; then
+      dep_tristate '    Generic TMS380 PCI support' CONFIG_TMSPCI $CONFIG_TMS380TR
+      dep_tristate '    Madge Smart 16/4 PCI Mk2 support' CONFIG_ABYSS $CONFIG_TMS380TR
+      if [ "$CONFIG_MCA" = "y" ]; then 
+         dep_tristate '    Madge Smart 16/4 Ringnode MicroChannel' CONFIG_MADGEMC $CONFIG_TMS380TR
+      fi
+   fi
+   dep_tristate '  SMC ISA/MCA adapter support' CONFIG_SMCTR $CONFIG_TR
+fi
+
+endmenu

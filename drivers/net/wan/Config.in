@@ -1,0 +1,93 @@
+#
+# wan devices configuration
+#
+
+mainmenu_option next_comment
+comment 'Wan interfaces'
+
+bool 'Wan interfaces support' CONFIG_WAN
+if [ "$CONFIG_WAN" = "y" ]; then
+# There is no way to detect a comtrol sv11 - force it modular for now.
+
+   dep_tristate '  Comtrol Hostess SV-11 support' CONFIG_HOSTESS_SV11 m
+
+# The COSA/SRP driver has not been tested as non-modular yet.
+
+   dep_tristate '  COSA/SRP sync serial boards support' CONFIG_COSA m
+
+#
+# COMX drivers
+#
+
+   tristate '  MultiGate (COMX) synchronous serial boards support' CONFIG_COMX
+   if [ "$CONFIG_COMX" != "n" ]; then
+      dep_tristate '    Support for COMX/CMX/HiCOMX boards' CONFIG_COMX_HW_COMX $CONFIG_COMX
+      dep_tristate '    Support for LoCOMX board' CONFIG_COMX_HW_LOCOMX $CONFIG_COMX
+      dep_tristate '    Support for MixCOM board' CONFIG_COMX_HW_MIXCOM $CONFIG_COMX
+      dep_tristate '    Support for HDLC and syncPPP protocols on MultiGate boards' CONFIG_COMX_PROTO_PPP $CONFIG_COMX
+      if [ "$CONFIG_LAPB" = "y" ]; then
+	 dep_tristate '    Support for LAPB protocol on MultiGate boards' CONFIG_COMX_PROTO_LAPB $CONFIG_COMX
+      fi
+      if [ "$CONFIG_LAPB" = "m" ]; then
+	 dep_tristate '    Support for LAPB protocol on MultiGate boards' CONFIG_COMX_PROTO_LAPB $CONFIG_LAPB
+      fi
+      dep_tristate '    Support for Frame Relay on MultiGate boards' CONFIG_COMX_PROTO_FR $CONFIG_COMX
+   fi
+
+#
+# Lan Media's board. Currently 1000, 1200, 5200, 5245
+#
+
+   tristate '  LanMedia Corp. SSI/V.35, T1/E1, HSSI, T3 boards' CONFIG_LANMEDIA
+
+# There is no way to detect a Sealevel board. Force it modular
+
+   dep_tristate '  Sealevel Systems 4021 support' CONFIG_SEALEVEL_4021 m
+
+   dep_tristate '  SyncLink HDLC/SYNCPPP support' CONFIG_SYNCLINK_SYNCPPP m
+
+   tristate '  Frame relay DLCI support' CONFIG_DLCI
+   if [ "$CONFIG_DLCI" != "n" ]; then
+      int '    Max open DLCI' CONFIG_DLCI_COUNT 24
+      int '    Max DLCI per device' CONFIG_DLCI_MAX 8
+      dep_tristate '    SDLA (Sangoma S502/S508) support' CONFIG_SDLA $CONFIG_DLCI
+   fi
+
+# Wan router core.
+
+   if [ "$CONFIG_WAN_ROUTER" != "n" ]; then
+      bool '  WAN router drivers' CONFIG_WAN_ROUTER_DRIVERS
+      if [ "$CONFIG_WAN_ROUTER_DRIVERS" = "y" ]; then
+	 dep_tristate '    Sangoma WANPIPE(tm) multiprotocol cards' CONFIG_VENDOR_SANGOMA $CONFIG_WAN_ROUTER_DRIVERS
+	 if [ "$CONFIG_VENDOR_SANGOMA" != "n" ]; then
+	    int '      Maximum number of cards' CONFIG_WANPIPE_CARDS 1
+	    bool '      WANPIPE Cisco HDLC support' CONFIG_WANPIPE_CHDLC
+	    if [ "$CONFIG_OBSOLETE" = "y" ]; then
+	       bool '      WANPIPE Frame Relay support (OBSOLETE)' CONFIG_WANPIPE_FR
+	       bool '      WANPIPE X.25 support (OBSOLETE)' CONFIG_WANPIPE_X25
+	    fi
+	    bool '      WANPIPE PPP support' CONFIG_WANPIPE_PPP
+	 fi
+	 if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+	    dep_tristate '    Cyclom 2X(tm) cards (EXPERIMENTAL)' CONFIG_CYCLADES_SYNC $CONFIG_WAN_ROUTER_DRIVERS
+	    if [ "$CONFIG_CYCLADES_SYNC" != "n" ]; then
+	       bool '      Cyclom 2X X.25 support' CONFIG_CYCLOMX_X25
+	    fi
+	 fi
+      fi
+   fi
+
+
+# X.25 network drivers
+
+   if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+      dep_tristate '  LAPB over Ethernet driver (EXPERIMENTAL)' CONFIG_LAPBETHER $CONFIG_LAPB $CONFIG_X25
+      dep_tristate '  X.25 async driver (EXPERIMENTAL)' CONFIG_X25_ASY $CONFIG_LAPB $CONFIG_X25
+   fi
+
+   if [ "$CONFIG_X86" = "y" ]; then
+      tristate '  SBNI12-xx support' CONFIG_SBNI
+   fi
+fi
+
+endmenu

@@ -1,0 +1,50 @@
+
+IP-Aliasing:
+============
+
+
+o For IP aliasing you must have IP_ALIAS support included by static
+  linking.
+
+o Alias creation.
+  Alias creation is done by 'magic' iface naming: eg. to create a
+  200.1.1.1 alias for eth0 ...
+  
+    # ifconfig eth0:0 200.1.1.1  etc,etc....
+                   ~~ -> request alias #0 creation (if not yet exists) for eth0
+    and routing stuff also ...
+    # route add -host 200.1.1.1 dev eth0:0  (if same IP network as
+					    main device)
+   
+    # route add -net 200.1.1.0 dev eth0:0   (if completely new network wanted
+					    for eth0:0)
+
+o Alias deletion.
+  Also done by shutting the interface down:
+
+    # ifconfig eth0:0 down
+                 ~~~~~~~~~~ -> will delete alias
+
+  		   		   
+Alias (re-)configuring
+
+  Aliases are not real devices, but programs` should be able to configure and
+  refer to them as usual (ifconfig, route, etc).
+
+Relationship with main device
+-----------------------------
+
+  - the main device is an alias itself like additional aliases and can
+    be shut down without deleting other aliases.
+
+Contact
+-------
+Please finger or e-mail me:
+   Juan Jose Ciarlante <jjciarla@raiz.uncu.edu.ar>
+
+Updated by Erik Schoenfelder <schoenfr@gaertner.DE>
+
+; local variables:
+; mode: indented-text
+; mode: auto-fill
+; end:
