@@ -305,8 +305,12 @@ static int stv0299_readregs (struct dvb_i2c_bus *i2c, u8 reg1, u8 *b, u8 len)
 static int pll_write (struct dvb_i2c_bus *i2c, u8 addr, u8 *data, int len)
 {
 	int ret;
-	struct i2c_msg msg = { addr: addr, .flags = 0, .buf = data, .len = len };
-
+	struct i2c_msg msg = {
+		.addr = addr,
+		.flags = 0,
+		.buf = data,
+		.len = len
+	};
 
 	stv0299_writereg(i2c, 0x05, 0xb5);	/*  enable i2c repeater on stv0299  */
 
@@ -1154,12 +1158,48 @@ static long probe_tuner (struct dvb_i2c_bus *i2c)
         u8 stat [] = { 0 };
 	u8 tda6100_buf [] = { 0, 0 };
 	int ret;
-	struct i2c_msg msg1 [] = {{ .addr = 0x68, .flags = 0, .buf = rpt,  len: 2 },
-                           { .addr = 0x60, .flags = I2C_M_RD, .buf = stat, .len = 1 }};
-	struct i2c_msg msg2 [] = {{ .addr = 0x68, .flags = 0, .buf = rpt,  len: 2 },
-                           { .addr = 0x61, .flags = I2C_M_RD, .buf = stat, .len = 1 }};
-	struct i2c_msg msg3 [] = {{ .addr = 0x68, .flags = 0, .buf = rpt,  len: 2 },
-			   { .addr = 0x60, .flags = 0, .buf = tda6100_buf, .len = 2 }};
+	struct i2c_msg msg1 [] = {
+		{
+			.addr	= 0x68,
+			.flags	= 0,
+			.buf	= rpt,
+			.len	= 2
+		},
+		{
+			.addr	= 0x60,
+			.flags	= I2C_M_RD,
+			.buf	= stat,
+			.len	= 1
+		}
+	};
+	struct i2c_msg msg2 [] = {
+		{
+			.addr	= 0x68,
+			.flags	= 0,
+			.buf	= rpt,
+			.len	= 2
+		},
+		{
+			.addr	= 0x61,
+			.flags	= I2C_M_RD,
+			.buf	= stat,
+			.len	= 1
+		}
+	};
+	struct i2c_msg msg3 [] = {
+		{
+			.addr	= 0x68,
+			.flags	= 0,
+			.buf	= rpt,
+			.len	= 2
+		},
+		{
+			.addr	= 0x60,
+			.flags	= 0,
+			.buf	= tda6100_buf,
+			.len	= 2
+		}
+	};
 
 	stv0299_writereg (i2c, 0x01, 0x15);
 	stv0299_writereg (i2c, 0x02, 0x30);
