@@ -1275,14 +1275,14 @@ sctp_cookie_param_t *sctp_pack_cookie(const struct sctp_endpoint *ep,
 				      const __u8 *raw_addrs, int addrs_len)
 {
 	sctp_cookie_param_t *retval;
-	sctp_signed_cookie_t *cookie;
+	struct sctp_signed_cookie *cookie;
 	struct scatterlist sg;
 	int headersize, bodysize;
 	unsigned int keylen;
 	char *key;
 
 	headersize = sizeof(sctp_paramhdr_t) + SCTP_SECRET_SIZE;
-	bodysize = sizeof(sctp_cookie_t)
+	bodysize = sizeof(struct sctp_cookie)
 		+ ntohs(init_chunk->chunk_hdr->length) + addrs_len;
 
 	/* Pad out the cookie to a multiple to make the signature
@@ -1304,7 +1304,7 @@ sctp_cookie_param_t *sctp_pack_cookie(const struct sctp_endpoint *ep,
 	 * out on the network.
 	 */
 	memset(retval, 0x00, *cookie_len);
-	cookie = (sctp_signed_cookie_t *) retval->body;
+	cookie = (struct sctp_signed_cookie *) retval->body;
 
 	/* Set up the parameter header.  */
 	retval->p.type = SCTP_PARAM_STATE_COOKIE;
@@ -1351,8 +1351,8 @@ struct sctp_association *sctp_unpack_cookie(
 	int *error, struct sctp_chunk **errp)
 {
 	struct sctp_association *retval = NULL;
-	sctp_signed_cookie_t *cookie;
-	sctp_cookie_t *bear_cookie;
+	struct sctp_signed_cookie *cookie;
+	struct sctp_cookie *bear_cookie;
 	int headersize, bodysize, fixed_size;
 	__u8 digest[SCTP_SIGNATURE_SIZE];
 	struct scatterlist sg;
@@ -1363,7 +1363,7 @@ struct sctp_association *sctp_unpack_cookie(
 
 	headersize = sizeof(sctp_chunkhdr_t) + SCTP_SECRET_SIZE;
 	bodysize = ntohs(chunk->chunk_hdr->length) - headersize;
-	fixed_size = headersize + sizeof(sctp_cookie_t);
+	fixed_size = headersize + sizeof(struct sctp_cookie);
 
 	/* Verify that the chunk looks like it even has a cookie.
 	 * There must be enough room for our cookie and our peer's

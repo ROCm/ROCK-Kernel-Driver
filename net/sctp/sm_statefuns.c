@@ -538,7 +538,7 @@ sctp_disposition_t sctp_sf_do_5_1D_ce(const struct sctp_endpoint *ep,
 	 * are in good shape.
 	 */
         chunk->subh.cookie_hdr =
-		(sctp_signed_cookie_t *)chunk->skb->data;
+		(struct sctp_signed_cookie *)chunk->skb->data;
 	skb_pull(chunk->skb,
 		 ntohs(chunk->chunk_hdr->length) - sizeof(sctp_chunkhdr_t));
 
@@ -1619,7 +1619,7 @@ sctp_disposition_t sctp_sf_do_5_2_4_dupcook(const struct sctp_endpoint *ep,
 	/* "Decode" the chunk.  We have no optional parameters so we
 	 * are in good shape.
 	 */
-        chunk->subh.cookie_hdr = (sctp_signed_cookie_t *)chunk->skb->data;
+        chunk->subh.cookie_hdr = (struct sctp_signed_cookie *)chunk->skb->data;
 	skb_pull(chunk->skb, ntohs(chunk->chunk_hdr->length) -
 		 sizeof(sctp_chunkhdr_t));
 
@@ -4568,7 +4568,7 @@ void sctp_send_stale_cookie_err(const struct sctp_endpoint *ep,
 	if (err_chunk) {
 		packet = sctp_ootb_pkt_new(asoc, chunk);
 		if (packet) {
-			sctp_signed_cookie_t *cookie;
+			struct sctp_signed_cookie *cookie;
 
 			/* Override the OOTB vtag from the cookie. */
 			cookie = chunk->subh.cookie_hdr;
