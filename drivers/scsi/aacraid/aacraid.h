@@ -14,6 +14,8 @@
 #define AAC_MAX_TARGET (MAXIMUM_NUM_CONTAINERS+1)
 #define AAC_MAX_LUN	(8)
 
+#define AAC_MAX_HOSTPHYSMEMPAGES (0xfffff)
+
 /*
  * These macros convert from physical channels to virtual channels
  */
