@@ -494,6 +494,10 @@ static void audit_log_move(struct audit_buffer *ab)
 	char		*start;
 	int		extra = ab->nlh ? 0 : NLMSG_SPACE(0);
 
+	/* possible resubmission */
+	if (ab->len == 0)
+		return;
+
 	skb = skb_peek(&ab->sklist);
 	if (!skb || skb_tailroom(skb) <= ab->len + extra) {
 		skb = alloc_skb(2 * ab->len + extra, GFP_ATOMIC);
@@ -535,6 +539,7 @@ static inline int audit_log_drain(struct audit_buffer *ab)
 		}
 		if (retval == -EAGAIN && ab->count < 5) {
 			++ab->count;
+			skb_queue_tail(&ab->sklist, skb);
 			audit_log_end_irq(ab);
 			return 1;
 		}
