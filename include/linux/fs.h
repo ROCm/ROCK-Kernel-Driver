@@ -21,6 +21,7 @@
 #include <linux/cache.h>
 #include <linux/stddef.h>
 #include <linux/string.h>
+#include <linux/radix-tree.h>
 
 #include <asm/atomic.h>
 #include <asm/bitops.h>
@@ -370,6 +371,8 @@ struct address_space_operations {
 };
 
 struct address_space {
+	struct radix_tree_root	page_tree;	/* radix tree of all pages */
+	rwlock_t		page_lock;	/* and rwlock protecting it */
 	struct list_head	clean_pages;	/* list of clean pages */
 	struct list_head	dirty_pages;	/* list of dirty pages */
 	struct list_head	locked_pages;	/* list of locked pages */

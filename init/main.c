@@ -69,6 +69,7 @@ extern void sbus_init(void);
 extern void sysctl_init(void);
 extern void signals_init(void);
 
+extern void radix_tree_init(void);
 extern void free_initmem(void);
 
 #ifdef CONFIG_TC
@@ -392,7 +393,7 @@ asmlinkage void __init start_kernel(void)
 	proc_caches_init();
 	vfs_caches_init(mempages);
 	buffer_init(mempages);
-	page_cache_init(mempages);
+	radix_tree_init();
 #if defined(CONFIG_ARCH_S390)
 	ccwcache_init();
 #endif
