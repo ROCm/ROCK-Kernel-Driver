@@ -12,12 +12,11 @@
  *   10-Oct-1996	RMK	Brought up to date with arch-sa110eval
  *   04-Dec-1997	RMK	Updated for new arch/arm/time.c
  */
-#include <linux/interrupt.h>
+#include <linux/timex.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>
 #include <asm/io.h>
-#include <asm/irq.h>
 #include <asm/hardware/ioc.h>
 
 extern unsigned long (*gettimeoffset)(void);

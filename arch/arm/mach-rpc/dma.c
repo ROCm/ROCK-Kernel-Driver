@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/kernel/dma-rpc.c
+ *  linux/arch/arm/mach-rpc/dma.c
  *
  *  Copyright (C) 1998 Russell King
  *
@@ -12,6 +12,7 @@
 #include <linux/slab.h>
 #include <linux/mman.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/pci.h>
 
 #include <asm/page.h>

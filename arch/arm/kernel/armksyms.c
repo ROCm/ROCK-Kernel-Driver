@@ -82,12 +82,9 @@ extern void fp_init(union fp_state *);
 extern void __do_softirq(void);
 
 #define EXPORT_SYMBOL_ALIAS(sym,orig)		\
- const char __kstrtab_##sym[]			\
-  __attribute__((section(".kstrtab"))) =	\
-    __MODULE_STRING(sym);			\
- const struct module_symbol __ksymtab_##sym	\
+ const struct kernel_symbol __ksymtab_##sym	\
   __attribute__((section("__ksymtab"))) =	\
-    { (unsigned long)&orig, __kstrtab_##sym };
+    { (unsigned long)&orig, #sym };
 
 /*
  * floating point math emulator support.
@@ -107,6 +104,7 @@ EXPORT_SYMBOL(kd_mksound);
 #endif
 
 EXPORT_SYMBOL_NOVERS(__do_softirq);
+EXPORT_SYMBOL_NOVERS(__backtrace);
 
 	/* platform dependent support */
 EXPORT_SYMBOL(dump_thread);
@@ -129,6 +127,7 @@ EXPORT_SYMBOL(enable_irq);
 EXPORT_SYMBOL(disable_irq);
 EXPORT_SYMBOL(probe_irq_mask);
 EXPORT_SYMBOL(set_irq_type);
+EXPORT_SYMBOL(set_irq_wake);
 EXPORT_SYMBOL(pm_idle);
 EXPORT_SYMBOL(pm_power_off);
 EXPORT_SYMBOL(fp_init);
