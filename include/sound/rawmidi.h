@@ -23,6 +23,9 @@
  */
 
 #include <sound/asound.h>
+#include <linux/spinlock.h>
+#include <linux/wait.h>
+#include <asm/semaphore.h>
 
 #if defined(CONFIG_SND_SEQUENCER) || defined(CONFIG_SND_SEQUENCER_MODULE)
 #include "seq_device.h"

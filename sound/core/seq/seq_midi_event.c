@@ -22,6 +22,7 @@
 #include <sound/driver.h>
 #include <linux/slab.h>
 #include <linux/errno.h>
+#include <linux/string.h>
 #include <sound/core.h>
 #include <sound/seq_kernel.h>
 #include <sound/seq_midi_event.h>
