@@ -116,8 +116,7 @@ tiglusb_open (struct inode *inode, struct file *filp)
 			return -EBUSY;
 		}
 
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout (HZ / 2);
+		msleep_interruptible(500);
 
 		if (signal_pending (current)) {
 			return -EAGAIN;
