@@ -8,6 +8,7 @@
  * Author: Deepak Saxena <dsaxena@plexity.net>
  */
 
+#include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/device.h>
 #include <linux/serial.h>

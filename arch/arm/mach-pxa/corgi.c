@@ -68,8 +68,14 @@ static struct platform_device corgiscoop_device = {
 	.resource	= corgi_scoop_resources,
 };
 
+static struct platform_device corgissp_device = {
+	.name		= "corgi-ssp",
+	.id		= -1,
+};
+
 static struct platform_device *devices[] __initdata = {
 	&corgiscoop_device,
+	&corgissp_device,
 };
 
 static struct sharpsl_flash_param_info sharpsl_flash_param;

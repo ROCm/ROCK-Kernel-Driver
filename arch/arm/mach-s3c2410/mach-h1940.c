@@ -21,6 +21,7 @@
  *     18-Oct-2004 BJD  Updated new board structure name
  *     04-Nov-2004 BJD  Change for new serial clock
  *     04-Jan-2005 BJD  Updated uart init call
+ *     10-Jan-2005 BJD  Removed include of s3c2410.h
 */
 
 #include <linux/kernel.h>
@@ -45,7 +46,6 @@
 
 #include <linux/serial_core.h>
 
-#include "s3c2410.h"
 #include "clock.h"
 #include "devs.h"
 #include "cpu.h"
@@ -109,7 +109,7 @@ void __init h1940_map_io(void)
 
 void __init h1940_init_irq(void)
 {
-	s3c2410_init_irq();
+	s3c24xx_init_irq();
 
 }
 
@@ -119,5 +119,5 @@ MACHINE_START(H1940, "IPAQ-H1940")
      BOOT_PARAMS(S3C2410_SDRAM_PA + 0x100)
      MAPIO(h1940_map_io)
      INITIRQ(h1940_init_irq)
-     .timer		= &s3c2410_timer,
+	.timer		= &s3c24xx_timer,
 MACHINE_END
