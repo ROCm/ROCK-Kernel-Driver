@@ -158,10 +158,10 @@ static int i801_setup(struct pci_dev *dev)
 		}
 	}
 
-	if (check_region(i801_smba, (isich4 ? 16 : 8))) {
+	if (!request_region(i801_smba, (isich4 ? 16 : 8), "i801-smbus")) {
 		dev_err(&dev->dev, "I801_smb region 0x%x already in use!\n",
 			i801_smba);
-		error_return = -ENODEV;
+		error_return = -EBUSY;
 		goto END;
 	}
 
@@ -180,8 +180,6 @@ static int i801_setup(struct pci_dev *dev)
 		pci_write_config_byte(I801_dev, SMBHSTCFG, temp | 1);
 		dev_warn(&dev->dev, "enabling SMBus device\n");
 	}
-
-	request_region(i801_smba, (isich4 ? 16 : 8), "i801-smbus");
 
 	if (temp & 0x02)
 		dev_dbg(&dev->dev, "I801 using Interrupt SMI# for SMBus.\n");
