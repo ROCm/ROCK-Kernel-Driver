@@ -485,7 +485,7 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
         msg->icmph.icmp6_override  = !!override;
 
         /* Set the target address. */
-	ipv6_addr_copy(&msg->target, src_addr);
+	ipv6_addr_copy(&msg->target, solicited_addr);
 
 	if (inc_opt)
 		ndisc_fill_option(msg->opt, ND_OPT_TARGET_LL_ADDR, dev->dev_addr, dev->addr_len);
@@ -861,7 +861,8 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 		struct inet6_dev *in6_dev = in6_dev_get(dev);
 
 		if (in6_dev && in6_dev->cnf.forwarding &&
-		    (addr_type & IPV6_ADDR_UNICAST) &&
+		    (addr_type & IPV6_ADDR_UNICAST ||
+		     addr_type == IPV6_ADDR_ANY) &&
 		    pneigh_lookup(&nd_tbl, &msg->target, dev, 0)) {
 			int inc = ipv6_addr_type(daddr)&IPV6_ADDR_MULTICAST;
 
@@ -874,12 +875,20 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 				else
 					nd_tbl.stats.rcv_probes_ucast++;
 					
-				neigh = neigh_event_ns(&nd_tbl, lladdr, saddr, dev);
+				if (addr_type & IPV6_ADDR_UNICAST) {
+					neigh = neigh_event_ns(&nd_tbl, lladdr, saddr, dev);
 
-				if (neigh) {
-					ndisc_send_na(dev, neigh, saddr, &msg->target,
-						      0, 1, 0, 1);
-					neigh_release(neigh);
+					if (neigh) {
+						ndisc_send_na(dev, neigh, saddr, &msg->target,
+							      0, 1, 0, 1);
+						neigh_release(neigh);
+					}
+				} else {
+					/* proxy should also protect against DAD */
+					struct in6_addr maddr;
+					ipv6_addr_all_nodes(&maddr);
+					ndisc_send_na(dev, NULL, &maddr, &msg->target, 
+						      0, 0, 0, 1);
 				}
 			} else {
 				struct sk_buff *n = skb_clone(skb, GFP_ATOMIC);

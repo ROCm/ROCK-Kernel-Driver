@@ -228,8 +228,10 @@ int vlan_proc_rem_dev(struct net_device *vlandev)
 #endif
 
 	/** NOTE:  This will consume the memory pointed to by dent, it seems. */
-	remove_proc_entry(VLAN_DEV_INFO(vlandev)->dent->name, proc_vlan_dir);
-	VLAN_DEV_INFO(vlandev)->dent = NULL;
+	if (VLAN_DEV_INFO(vlandev)->dent) {
+		remove_proc_entry(VLAN_DEV_INFO(vlandev)->dent->name, proc_vlan_dir);
+		VLAN_DEV_INFO(vlandev)->dent = NULL;
+	}
 
 	return 0;
 }
