@@ -153,7 +153,9 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 	}
 
 
-	/* BB add processing for setting the equivalent of mode - e.g. via CreateX with ACLs */
+	/* BB add processing to set equivalent of mode - e.g. via CreateX with ACLs */
+	if (!oplockEnabled)
+		oplock = REQ_OPLOCK;
 
 	rc = CIFSSMBOpen(xid, pTcon, full_path, FILE_OVERWRITE_IF,
 			 desiredAccess, CREATE_NOT_DIR,
