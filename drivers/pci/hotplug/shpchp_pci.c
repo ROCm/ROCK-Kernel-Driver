@@ -53,10 +53,11 @@ int shpchp_configure_device (struct controller* ctrl, struct pci_func* func)
 	/* Still NULL ? Well then scan for it ! */
 	if (func->pci_dev == NULL) {
 		num = pci_scan_slot(ctrl->pci_dev->subordinate, PCI_DEVFN(func->device, func->function));
-		if (num)
+		if (num) {
 			dbg("%s: subordiante %p number %x\n", __FUNCTION__, ctrl->pci_dev->subordinate,
 				ctrl->pci_dev->subordinate->number);
-			pci_bus_add_devices(ctrl->pci_dev->subordinate);		
+			pci_bus_add_devices(ctrl->pci_dev->subordinate);
+		}
 		
 		func->pci_dev = pci_find_slot(func->bus, PCI_DEVFN(func->device, func->function));
 		if (func->pci_dev == NULL) {
