@@ -282,7 +282,7 @@ static int tvmixer_clients(struct i2c_client *client)
 		return -1;
 
 	/* everything is fine, register */
-	if ((minor = register_sound_mixer(&tvmixer_fops,devnr,&client->dev)) < 0) {
+	if ((minor = register_sound_mixer(&tvmixer_fops,devnr)) < 0) {
 		printk(KERN_ERR "tvmixer: cannot allocate mixer device\n");
 		return -1;
 	}
