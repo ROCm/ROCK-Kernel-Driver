@@ -304,35 +304,22 @@ typedef struct s_usbvideo_t usbvideo_t;
 #define	VALID_CALLBACK(uvd,cbName) ((((uvd) != NULL) && \
 		((uvd)->handle != NULL)) ? GET_CALLBACK(uvd,cbName) : NULL)
 
-void RingQueue_Initialize(RingQueue_t *rq);
-void RingQueue_Allocate(RingQueue_t *rq, int rqLen);
-int  RingQueue_IsAllocated(const RingQueue_t *rq);
-void RingQueue_Free(RingQueue_t *rq);
 int  RingQueue_Dequeue(RingQueue_t *rq, unsigned char *dst, int len);
 int  RingQueue_Enqueue(RingQueue_t *rq, const unsigned char *cdata, int n);
 int  RingQueue_GetLength(const RingQueue_t *rq);
-void RingQueue_InterruptibleSleepOn(RingQueue_t *rq);
 void RingQueue_WakeUpInterruptible(RingQueue_t *rq);
 
-void usbvideo_CollectRawData(uvd_t *uvd, usbvideo_frame_t *frame);
 void usbvideo_DrawLine(
 	usbvideo_frame_t *frame,
 	int x1, int y1,
 	int x2, int y2,
 	unsigned char cr, unsigned char cg, unsigned char cb);
 void usbvideo_HexDump(const unsigned char *data, int len);
-void usbvideo_OverlayChar(uvd_t *uvd, usbvideo_frame_t *frame, int x, int y, int ch);
-void usbvideo_OverlayString(uvd_t *uvd, usbvideo_frame_t *frame, int x, int y, const char *str);
-void usbvideo_OverlayStats(uvd_t *uvd, usbvideo_frame_t *frame);
-void usbvideo_ReportStatistics(const uvd_t *uvd);
 void usbvideo_SayAndWait(const char *what);
 void usbvideo_TestPattern(uvd_t *uvd, int fullframe, int pmode);
-void usbvideo_VideosizeToString(char *buf, int bufLen, videosize_t vs);
 
 /* Memory allocation routines */
 unsigned long usbvideo_kvirt_to_pa(unsigned long adr);
-void *usbvideo_rvmalloc(unsigned long size);
-void usbvideo_rvfree(void *mem, unsigned long size);
 
 int usbvideo_register(
 	usbvideo_t **pCams,
@@ -344,24 +331,10 @@ int usbvideo_register(
 uvd_t *usbvideo_AllocateDevice(usbvideo_t *cams);
 int usbvideo_RegisterVideoDevice(uvd_t *uvd);
 void usbvideo_Deregister(usbvideo_t **uvt);
-void usbvideo_Disconnect(struct usb_device *dev, void *ptr);
-void usbvideo_CameraRelease(uvd_t *uvd);
 
-int usbvideo_v4l_close(struct inode *inode, struct file *file);
 int usbvideo_v4l_initialize(struct video_device *dev);
-int usbvideo_v4l_ioctl(struct inode *inode, struct file *file,
-		       unsigned int cmd, unsigned long arg);
-int usbvideo_v4l_mmap(struct file *file, struct vm_area_struct *vma);
-int usbvideo_v4l_open(struct inode *inode, struct file *file);
-int usbvideo_v4l_read(struct file *file, char *buf,
-		      size_t count, loff_t *ppos);
 
-int usbvideo_GetFrame(uvd_t *uvd, int frameNum);
-int usbvideo_NewFrame(uvd_t *uvd, int framenum);
-int usbvideo_StartDataPump(uvd_t *uvd);
-void usbvideo_StopDataPump(uvd_t *uvd);
 void usbvideo_DeinterlaceFrame(uvd_t *uvd, usbvideo_frame_t *frame);
-void usbvideo_SoftwareContrastAdjustment(uvd_t *uvd, usbvideo_frame_t *frame);
 
 /*
  * This code performs bounds checking - use it when working with
