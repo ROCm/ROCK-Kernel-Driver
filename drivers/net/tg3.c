@@ -5927,7 +5927,7 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 		tp->tg3_flags2 |= TG3_FLG2_SUN_5704;
 #endif
 
-	/* If we have an AMD 762 or Intel ICH/ICH0 chipset, write
+	/* If we have an AMD 762 or Intel ICH/ICH0/ICH2 chipset, write
 	 * reordering to the mailbox registers done by the host
 	 * controller can cause major troubles.  We read back from
 	 * every mailbox register write to force the writes to be
@@ -5937,6 +5937,10 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 			    PCI_DEVICE_ID_INTEL_82801AA_8, NULL) ||
 	    pci_find_device(PCI_VENDOR_ID_INTEL,
 			    PCI_DEVICE_ID_INTEL_82801AB_8, NULL) ||
+	    pci_find_device(PCI_VENDOR_ID_INTEL,
+			    PCI_DEVICE_ID_INTEL_82801BA_11, NULL) ||
+	    pci_find_device(PCI_VENDOR_ID_INTEL,
+			    PCI_DEVICE_ID_INTEL_82801BA_6, NULL) ||
 	    pci_find_device(PCI_VENDOR_ID_AMD,
 			    PCI_DEVICE_ID_AMD_FE_GATE_700C, NULL))
 		tp->tg3_flags |= TG3_FLAG_MBOX_WRITE_REORDER;
