@@ -1429,7 +1429,7 @@ static irqreturn_t smsc_ircc_interrupt(int irq, void *dev_id, struct pt_regs *re
 	}
 
 	if (iir & IRCC_IIR_ACTIVE_FRAME) {
-		/*printk(KERN_WARNING __FUNCTION__ "(): Active Frame\n");*/
+		/*printk(KERN_WARNING "%s(): Active Frame\n", __FUNCTION__);*/
 	}
 
 	/* Enable interrupts again */
@@ -1995,7 +1995,7 @@ static int __init smsc_ircc_look_for_chips(void)
 	while(address->cfg_base){
 		cfg_base = address->cfg_base;
 		
-		/*printk(KERN_WARNING __FUNCTION__ "(): probing: 0x%02x for: 0x%02x\n", cfg_base, address->type);*/
+		/*printk(KERN_WARNING "%s(): probing: 0x%02x for: 0x%02x\n", __FUNCTION__, cfg_base, address->type);*/
 		
 		if( address->type & SMSCSIO_TYPE_FDC){
 			type = "FDC";
@@ -2040,7 +2040,7 @@ static int __init smsc_superio_flat(const smsc_chip_t *chips, unsigned short cfg
 	outb(SMSCSIOFLAT_UARTMODE0C_REG, cfgbase);
 	mode = inb(cfgbase+1);
 	
-	/*printk(KERN_WARNING __FUNCTION__ "(): mode: 0x%02x\n", mode);*/
+	/*printk(KERN_WARNING "%s(): mode: 0x%02x\n", __FUNCTION__, mode);*/
 	
 	if(!(mode & SMSCSIOFLAT_UART2MODE_VAL_IRDA))
 		WARNING("%s(): IrDA not enabled\n", __FUNCTION__);

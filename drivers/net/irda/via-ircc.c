@@ -360,7 +360,7 @@ static __devinit int via_ircc_open(int i, chipio_t * info, unsigned int id)
 
 	/* Reserve the ioports that we need */
 	if (!request_region(self->io.fir_base, self->io.fir_ext, driver_name)) {
-//              WARNING(__FUNCTION__ "(), can't get iobase of 0x%03x\n",self->io.fir_base);
+//              WARNING("%s(), can't get iobase of 0x%03x\n", __FUNCTION__, self->io.fir_base);
 		err = -ENODEV;
 		goto err_out1;
 	}
