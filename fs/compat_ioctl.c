@@ -70,8 +70,10 @@
 
 #include <net/sock.h>          /* siocdevprivate_ioctl */
 #include <net/bluetooth/bluetooth.h>
-#include <net/bluetooth/rfcomm.h>
 #include <net/bluetooth/hci.h>
+#include <net/bluetooth/rfcomm.h>
+
+#include <linux/capi.h>
 
 #include <scsi/scsi.h>
 /* Ugly hack. */

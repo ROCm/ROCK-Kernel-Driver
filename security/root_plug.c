@@ -90,7 +90,7 @@ static struct security_operations rootplug_security_ops = {
 	.capset_set =			cap_capset_set,
 	.capable =			cap_capable,
 
-	.bprm_compute_creds =		cap_bprm_compute_creds,
+	.bprm_apply_creds =		cap_bprm_apply_creds,
 	.bprm_set_security =		cap_bprm_set_security,
 
 	.task_post_setuid =		cap_task_post_setuid,

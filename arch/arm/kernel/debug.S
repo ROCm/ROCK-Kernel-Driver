@@ -550,6 +550,35 @@
 1002:		@ exit busyuart
 		.endm
 
+
+#elif defined(CONFIG_ARCH_VERSATILE_PB)
+
+#include <asm/hardware/amba_serial.h>
+
+		.macro	addruart,rx
+		mrc	p15, 0, \rx, c1, c0
+		tst	\rx, #1			@ MMU enabled?
+		moveq	\rx,      #0x10000000
+		movne	\rx,      #0xf1000000	@ virtual base
+		orr	\rx, \rx, #0x001F0000
+		orr	\rx, \rx, #0x00001000
+		.endm
+
+		.macro	senduart,rd,rx
+		strb	\rd, [\rx, #UART01x_DR]
+		.endm
+
+		.macro	waituart,rd,rx
+1001:		ldr	\rd, [\rx, #0x18]	@ UARTFLG
+		tst	\rd, #1 << 5		@ UARTFLGUTXFF - 1 when full
+		bne	1001b
+		.endm
+
+		.macro	busyuart,rd,rx
+1001:		ldr	\rd, [\rx, #0x18]	@ UARTFLG
+		tst	\rd, #1 << 3		@ UARTFLGUBUSY - 1 when busy
+		bne	1001b
+		.endm
 #else
 #error Unknown architecture
 #endif

@@ -1695,6 +1695,7 @@ static int idedisk_cleanup (ide_drive_t *drive)
 	if (ide_unregister_subdriver(drive))
 		return 1;
 	del_gendisk(g);
+	drive->devfs_name[0] = '\0';
 	g->fops = ide_fops;
 	return 0;
 }

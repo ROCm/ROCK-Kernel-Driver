@@ -205,7 +205,7 @@ config SERIAL_AMBA_PL011
 	depends on ARM_AMBA
 	select SERIAL_CORE
 	help
-	  This selects the ARM(R) AMBA(R) PrimeCell PL010 UART.  If you have
+	  This selects the ARM(R) AMBA(R) PrimeCell PL011 UART.  If you have
 	  an Integrator/PP2, Integrator/CP or Versatile platform, say Y or M
 	  here.
 

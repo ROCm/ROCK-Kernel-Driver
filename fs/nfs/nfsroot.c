@@ -117,11 +117,16 @@ static int mount_port __initdata = 0;		/* Mount daemon port number */
  ***************************************************************************/
 
 enum {
+	/* Options that take integer arguments */
 	Opt_port, Opt_rsize, Opt_wsize, Opt_timeo, Opt_retrans, Opt_acregmin,
-	Opt_acregmax, Opt_acdirmin, Opt_acdirmax, Opt_soft, Opt_hard, Opt_intr,
+	Opt_acregmax, Opt_acdirmin, Opt_acdirmax,
+	/* Options that take no arguments */
+	Opt_soft, Opt_hard, Opt_intr,
 	Opt_nointr, Opt_posix, Opt_noposix, Opt_cto, Opt_nocto, Opt_ac, 
 	Opt_noac, Opt_lock, Opt_nolock, Opt_v2, Opt_v3, Opt_udp, Opt_tcp,
-	Opt_broken_suid, Opt_err,
+	Opt_broken_suid,
+	/* Error token */
+	Opt_err
 };
 
 static match_table_t __initdata tokens = {
@@ -146,9 +151,13 @@ static match_table_t __initdata tokens = {
 	{Opt_noac, "noac"},
 	{Opt_lock, "lock"},
 	{Opt_nolock, "nolock"},
+	{Opt_v2, "nfsvers=2"},
 	{Opt_v2, "v2"},
+	{Opt_v3, "nfsvers=3"},
 	{Opt_v3, "v3"},
+	{Opt_udp, "proto=udp"},
 	{Opt_udp, "udp"},
+	{Opt_tcp, "proto=tcp"},
 	{Opt_tcp, "tcp"},
 	{Opt_broken_suid, "broken_suid"},
 	{Opt_err, NULL}
@@ -169,18 +178,19 @@ static int __init root_nfs_parse(char *name, char *buf)
 	if (!name)
 		return 1;
 
-	if (name[0] && strcmp(name, "default")){
-		strlcpy(buf, name, NFS_MAXPATHLEN);
-		return 1;
-	}
+	/* Set the NFS remote path */
+	p = strsep(&name, ",");
+	if (p[0] != '\0' && strcmp(p, "default") != 0)
+		strlcpy(buf, p, NFS_MAXPATHLEN);
+
 	while ((p = strsep (&name, ",")) != NULL) {
 		int token; 
 		if (!*p)
 			continue;
 		token = match_token(p, tokens, args);
 
-		/* %u tokens only */
-		if (match_int(&args[0], &option))
+		/* %u tokens only. Beware if you add new tokens! */
+		if (token < Opt_soft && match_int(&args[0], &option))
 			return 0;
 		switch (token) {
 			case Opt_port:
@@ -265,6 +275,7 @@ static int __init root_nfs_parse(char *name, char *buf)
 				return 0;
 		}
 	}
+
 	return 1;
 }
 
@@ -273,7 +284,7 @@ static int __init root_nfs_parse(char *name, char *buf)
  */
 static int __init root_nfs_name(char *name)
 {
-	static char buf[NFS_MAXPATHLEN];
+	static char buf[NFS_MAXPATHLEN] __initdata;
 	char *cp;
 
 	/* Set some default values */
@@ -283,9 +294,6 @@ static int __init root_nfs_name(char *name)
 	nfs_data.flags    = NFS_MOUNT_NONLM;	/* No lockd in nfs root yet */
 	nfs_data.rsize    = NFS_DEF_FILE_IO_BUFFER_SIZE;
 	nfs_data.wsize    = NFS_DEF_FILE_IO_BUFFER_SIZE;
-	nfs_data.bsize	  = 0;
-	nfs_data.timeo    = 7;
-	nfs_data.retrans  = 3;
 	nfs_data.acregmin = 3;
 	nfs_data.acregmax = 60;
 	nfs_data.acdirmin = 30;
