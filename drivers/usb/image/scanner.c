@@ -374,6 +374,8 @@
  *      (Daniele Bellucci).
  *    - Report back return codes of usb_register and usb_usbmit_urb instead of -1 or
  *      -ENONMEM (Daniele Bellucci).
+ *    - Balancing usb_register_dev/usb_deregister_dev in probe_scanner when a fail 
+ *      condition occours (Daniele Bellucci).
  *
  *
  * TODO
@@ -1050,6 +1052,7 @@ probe_scanner(struct usb_interface *intf,
 
 	scn->scn_irq = usb_alloc_urb(0, GFP_KERNEL);
 	if (!scn->scn_irq) {
+		usb_deregister_dev(intf, &scanner_class);
 		kfree(scn);
 		up(&scn_mutex);
 		return -ENOMEM;
@@ -1071,6 +1074,7 @@ probe_scanner(struct usb_interface *intf,
 		retval = usb_submit_urb(scn->scn_irq, GFP_KERNEL);
 		if (retval) {
 			err("probe_scanner(%d): Unable to allocate INT URB.", intf->minor);
+			usb_deregister_dev(intf, &scanner_class);
                 	kfree(scn);
 			up(&scn_mutex);
                 	return retval;
@@ -1084,6 +1088,7 @@ probe_scanner(struct usb_interface *intf,
 		if (have_intr)
 			usb_unlink_urb(scn->scn_irq);
 		usb_free_urb(scn->scn_irq);
+		usb_deregister_dev(intf, &scanner_class);
 		kfree(scn);
 		up(&scn_mutex);
 		return -ENOMEM;
@@ -1095,6 +1100,7 @@ probe_scanner(struct usb_interface *intf,
 		if (have_intr)
 			usb_unlink_urb(scn->scn_irq);
 		usb_free_urb(scn->scn_irq);
+		usb_deregister_dev(intf, &scanner_class);
 		kfree(scn->obuf);
 		kfree(scn);
 		up(&scn_mutex);
