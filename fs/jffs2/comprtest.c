@@ -1,4 +1,4 @@
-/* $Id: comprtest.c,v 1.4 2001/02/21 14:03:20 dwmw2 Exp $ */
+/* $Id: comprtest.c,v 1.5 2002/01/03 15:20:44 dwmw2 Exp $ */
 
 #include <linux/kernel.h>
 #include <linux/string.h>
@@ -266,13 +266,13 @@ static unsigned char comprbuf[TESTDATA_LEN];
 static unsigned char decomprbuf[TESTDATA_LEN];
 
 int jffs2_decompress(unsigned char comprtype, unsigned char *cdata_in, 
-		     unsigned char *data_out, __u32 cdatalen, __u32 datalen);
+		     unsigned char *data_out, uint32_t cdatalen, uint32_t datalen);
 unsigned char jffs2_compress(unsigned char *data_in, unsigned char *cpage_out, 
-			     __u32 *datalen, __u32 *cdatalen);
+			     uint32_t *datalen, uint32_t *cdatalen);
 
 int init_module(void ) {
 	unsigned char comprtype;
-	__u32 c, d;
+	uint32_t c, d;
 	int ret;
 
 	printk("Original data: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",

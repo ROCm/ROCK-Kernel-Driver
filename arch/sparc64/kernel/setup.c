@@ -160,11 +160,16 @@ int prom_callback(long *args)
 			pmdp = pmd_offset(pgdp, va);
 			if (pmd_none(*pmdp))
 				goto done;
-			ptep = pte_offset(pmdp, va);
-			if (!pte_present(*ptep))
-				goto done;
-			tte = pte_val(*ptep);
-			res = PROM_TRUE;
+
+			/* Preemption implicitly disabled by virtue of
+			 * being called from inside OBP.
+			 */
+			ptep = pte_offset_map(pmdp, va);
+			if (pte_present(*ptep)) {
+				tte = pte_val(*ptep);
+				res = PROM_TRUE;
+			}
+			pte_unmap(ptep);
 			goto done;
 		}
 
@@ -210,11 +215,15 @@ int prom_callback(long *args)
 			pmdp = pmd_offset(pgdp, va);
 			if (pmd_none(*pmdp))
 				goto done;
-			ptep = pte_offset(pmdp, va);
-			if (!pte_present(*ptep))
-				goto done;
-			tte = pte_val(*ptep);
-			res = PROM_TRUE;
+
+			/* Preemption implicitly disabled by virtue of
+			 * being called from inside OBP.
+			 */
+			ptep = pte_offset_kernel(pmdp, va);
+			if (pte_present(*ptep)) {
+				tte = pte_val(*ptep);
+				res = PROM_TRUE;
+			}
 			goto done;
 		}
 
@@ -530,7 +539,7 @@ void __init setup_arch(char **cmdline_p)
 	if (!root_flags)
 		root_mountflags &= ~MS_RDONLY;
 	ROOT_DEV = to_kdev_t(root_dev);
-#ifdef CONFIG_BLK_DEV_RAM
+#ifdef CONFIG_BLK_DEV_INITRD
 	rd_image_start = ram_flags & RAMDISK_IMAGE_START_MASK;
 	rd_prompt = ((ram_flags & RAMDISK_PROMPT_FLAG) != 0);
 	rd_doload = ((ram_flags & RAMDISK_LOAD_FLAG) != 0);	

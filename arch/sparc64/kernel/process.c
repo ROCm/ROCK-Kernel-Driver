@@ -106,9 +106,11 @@ void kpreempt_maybe(void)
 	int cpu = smp_processor_id();
 
 	if (local_irq_count(cpu) == 0 &&
-	    local_bh_count(cpu) == 0)
-		preempt_schedule();
-	current_thread_info()->preempt_count--;
+	    local_bh_count(cpu) == 0 &&
+	    test_thread_flag(TIF_NEED_RESCHED)) {
+		current->state = TASK_RUNNING;
+		schedule();
+	}
 }
 #endif
 

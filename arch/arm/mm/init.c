@@ -1,7 +1,7 @@
 /*
  *  linux/arch/arm/mm/init.c
  *
- *  Copyright (C) 1995-2000 Russell King
+ *  Copyright (C) 1995-2002 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -46,7 +46,7 @@
 #define TABLE_OFFSET	0
 #endif
 
-#define TABLE_SIZE	((TABLE_OFFSET + PTRS_PER_PTE) * sizeof(void *))
+#define TABLE_SIZE	((TABLE_OFFSET + PTRS_PER_PTE) * sizeof(pte_t))
 
 static unsigned long totalram_pages;
 extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
@@ -319,7 +319,7 @@ static __init void reserve_node_zero(unsigned int bootmap_pfn, unsigned int boot
 	 * and can only be in node 0.
 	 */
 	reserve_bootmem_node(pgdat, __pa(swapper_pg_dir),
-			     PTRS_PER_PGD * sizeof(void *));
+			     PTRS_PER_PGD * sizeof(pgd_t));
 #endif
 	/*
 	 * And don't forget to reserve the allocator bitmap,

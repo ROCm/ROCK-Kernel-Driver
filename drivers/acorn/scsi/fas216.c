@@ -2137,7 +2137,7 @@ int fas216_command(Scsi_Cmnd *SCpnt)
 	 * However, we must re-enable interrupts, or else we'll be
 	 * waiting forever.
 	 */
-	spin_unlock_irq(&io_request_lock);
+	spin_unlock_irq(info->host->host_lock);
 
 	while (!info->internal_done) {
 		/*
@@ -2149,13 +2149,13 @@ int fas216_command(Scsi_Cmnd *SCpnt)
 		 * to be some time (eg, disconnected).
 		 */
 		if (inb(REG_STAT(info)) & STAT_INT) {
-			spin_lock_irq(&io_request_lock);
+			spin_lock_irq(info->host->host_lock);
 			fas216_intr(info->host);
-			spin_unlock_irq(&io_request_lock);
+			spin_unlock_irq(info->host->host_lock);
 		}
 	}
 
-	spin_lock_irq(&io_request_lock);
+	spin_lock_irq(info->host->host_lock);
 
 	return SCpnt->result;
 }
@@ -2459,13 +2459,13 @@ int fas216_eh_host_reset(Scsi_Cmnd *SCpnt)
 
 	/*
 	 * Ugly ugly ugly!
-	 * We need to release the io_request_lock and enable
+	 * We need to release the host_lock and enable
 	 * IRQs if we sleep, but we must relock and disable
 	 * IRQs after the sleep.
 	 */
-	spin_unlock_irq(&io_request_lock);
+	spin_unlock_irq(info->host->host_lock);
 	scsi_sleep(25*HZ/100);
-	spin_lock_irq(&io_request_lock);
+	spin_lock_irq(info->host->host_lock);
 
 	/*
 	 * Release the SCSI reset.
@@ -2628,9 +2628,9 @@ int fas216_init(struct Scsi_Host *instance)
 	/*
 	 * scsi standard says wait 250ms
 	 */
-	spin_unlock_irq(&io_request_lock);
+	spin_unlock_irq(info->host->host_lock);
 	scsi_sleep(25*HZ/100);
-	spin_lock_irq(&io_request_lock);
+	spin_lock_irq(info->host->host_lock);
 
 	outb(info->scsi.cfg[0], REG_CNTL1(info));
 	inb(REG_INST(info));

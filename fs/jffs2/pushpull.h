@@ -1,7 +1,7 @@
 /*
  * JFFS2 -- Journalling Flash File System, Version 2.
  *
- * Copyright (C) 2001 Red Hat, Inc.
+ * Copyright (C) 2001, 2002 Red Hat, Inc.
  *
  * Created by David Woodhouse <dwmw2@cambridge.redhat.com>
  *
@@ -31,12 +31,15 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: pushpull.h,v 1.5 2001/09/23 10:04:15 rmk Exp $
+ * $Id: pushpull.h,v 1.7 2002/03/06 12:37:08 dwmw2 Exp $
  *
  */
 
 #ifndef __PUSHPULL_H__
 #define __PUSHPULL_H__
+
+#include <linux/errno.h>
+
 struct pushpull {
 	unsigned char *buf;
 	unsigned int buflen;
@@ -44,9 +47,36 @@ struct pushpull {
 	unsigned int reserve;
 };
 
-void init_pushpull(struct pushpull *, char *, unsigned, unsigned, unsigned);
-int pushbit(struct pushpull *pp, int bit, int use_reserved);
-int pushedbits(struct pushpull *pp);
+
+static inline void init_pushpull(struct pushpull *pp, char *buf, unsigned buflen, unsigned ofs, unsigned reserve)
+{
+	pp->buf = buf;
+	pp->buflen = buflen;
+	pp->ofs = ofs;
+	pp->reserve = reserve;
+}
+
+static inline int pushbit(struct pushpull *pp, int bit, int use_reserved)
+{
+	if (pp->ofs >= pp->buflen - (use_reserved?0:pp->reserve)) {
+		return -ENOSPC;
+	}
+
+	if (bit) {
+		pp->buf[pp->ofs >> 3] |= (1<<(7-(pp->ofs &7)));
+	}
+	else {
+		pp->buf[pp->ofs >> 3] &= ~(1<<(7-(pp->ofs &7)));
+	}
+	pp->ofs++;
+
+	return 0;
+}
+
+static inline int pushedbits(struct pushpull *pp)
+{
+	return pp->ofs;
+}
 
 static inline int pullbit(struct pushpull *pp)
 {

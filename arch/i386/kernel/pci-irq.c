@@ -570,6 +570,10 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 	 * reported by the device if possible.
 	 */
 	newirq = dev->irq;
+	if (!((1 << newirq) & mask)) {
+		if ( pci_probe & PCI_USE_PIRQ_MASK) newirq = 0;
+		else printk(KERN_WARNING "PCI: IRQ %i for device %s doesn't match PIRQ mask - try pci=usepirqmask\n", newirq, dev->slot_name);
+	}
 	if (!newirq && assign) {
 		for (i = 0; i < 16; i++) {
 			if (!(mask & (1 << i)))
@@ -588,7 +592,8 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 		irq = pirq & 0xf;
 		DBG(" -> hardcoded IRQ %d\n", irq);
 		msg = "Hardcoded";
-	} else if (r->get && (irq = r->get(pirq_router_dev, dev, pirq))) {
+	} else if ( r->get && (irq = r->get(pirq_router_dev, dev, pirq)) && \
+	((!(pci_probe & PCI_USE_PIRQ_MASK)) || ((1 << irq) & mask)) ) {
 		DBG(" -> got IRQ %d\n", irq);
 		msg = "Found";
 	} else if (newirq && r->set && (dev->class >> 8) != PCI_CLASS_DISPLAY_VGA) {
@@ -622,7 +627,9 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 			continue;
 		if (info->irq[pin].link == pirq) {
 			/* We refuse to override the dev->irq information. Give a warning! */
-		    	if (dev2->irq && dev2->irq != irq) {
+		    	if ( dev2->irq && dev2->irq != irq && \
+			(!(pci_probe & PCI_USE_PIRQ_MASK) || \
+			((1 << dev2->irq) & mask)) ) {
 		    		printk(KERN_INFO "IRQ routing conflict for %s, have irq %d, want irq %d\n",
 				       dev2->slot_name, dev2->irq, irq);
 		    		continue;

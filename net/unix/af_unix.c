@@ -1767,7 +1767,7 @@ static int unix_read_proc(char *buffer, char **start, off_t offset,
 		struct unix_sock *u = unix_sk(s);
 		unix_state_rlock(s);
 
-		len+=sprintf(buffer+len,"%p: %08X %08X %08X %04X %02X %5ld",
+		len+=sprintf(buffer+len,"%p: %08X %08X %08X %04X %02X %5lu",
 			s,
 			atomic_read(&s->refcnt),
 			0,

@@ -32,7 +32,7 @@
 #define MINIX_V1		0x0001		/* original minix fs */
 #define MINIX_V2		0x0002		/* minix V2 fs */
 
-#define INODE_VERSION(inode)	inode->i_sb->u.minix_sb.s_version
+#define INODE_VERSION(inode)	minix_sb(inode->i_sb)->s_version
 
 /*
  * This is the original minix inode layout on disk.
@@ -90,6 +90,7 @@ struct minix_dir_entry {
 #ifdef __KERNEL__
 
 #include <linux/minix_fs_i.h>
+#include <linux/minix_fs_sb.h>
 
 /*
  * change the define below to 0 if you want names > info->s_namelen chars to be
@@ -130,6 +131,11 @@ extern struct inode_operations minix_dir_inode_operations;
 extern struct file_operations minix_file_operations;
 extern struct file_operations minix_dir_operations;
 extern struct dentry_operations minix_dentry_operations;
+
+static inline struct minix_sb_info *minix_sb(struct super_block *sb)
+{
+	return sb->u.generic_sbp;
+}
 
 static inline struct minix_inode_info *minix_i(struct inode *inode)
 {

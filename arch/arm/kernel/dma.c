@@ -286,3 +286,5 @@ EXPORT_SYMBOL(set_dma_page);
 EXPORT_SYMBOL(get_dma_residue);
 EXPORT_SYMBOL(set_dma_sg);
 EXPORT_SYMBOL(set_dma_speed);
+
+EXPORT_SYMBOL(dma_spin_lock);

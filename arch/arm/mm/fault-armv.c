@@ -181,7 +181,7 @@ bad_pmd:
 static void
 make_coherent(struct vm_area_struct *vma, unsigned long addr, struct page *page)
 {
-	struct vm_area_struct *mpnt;
+	struct list_head *l;
 	struct mm_struct *mm = vma->vm_mm;
 	unsigned long pgoff = (addr - vma->vm_start) >> PAGE_SHIFT;
 	int aliases = 0;
@@ -191,9 +191,11 @@ make_coherent(struct vm_area_struct *vma, unsigned long addr, struct page *page)
 	 * space, then we need to handle them specially to maintain
 	 * cache coherency.
 	 */
-	for (mpnt = page->mapping->i_mmap_shared; mpnt;
-	     mpnt = mpnt->vm_next_share) {
+	list_for_each(l, &page->mapping->i_mmap_shared) {
+		struct vm_area_struct *mpnt;
 		unsigned long off;
+
+		mpnt = list_entry(l, struct vm_area_struct, shared);
 
 		/*
 		 * If this VMA is not in our MM, we can ignore it.

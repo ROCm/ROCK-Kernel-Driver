@@ -1,7 +1,7 @@
 /*
  * JFFS2 -- Journalling Flash File System, Version 2.
  *
- * Copyright (C) 2001 Red Hat, Inc.
+ * Copyright (C) 2001, 2002 Red Hat, Inc.
  *
  * Created by David Woodhouse <dwmw2@cambridge.redhat.com>
  *
@@ -31,45 +31,47 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: gc.c,v 1.52.2.2 2002/02/23 14:25:36 dwmw2 Exp $
+ * $Id: gc.c,v 1.68 2002/03/08 15:11:24 dwmw2 Exp $
  *
  */
 
 #include <linux/kernel.h>
 #include <linux/mtd/mtd.h>
 #include <linux/slab.h>
-#include <linux/jffs2.h>
-#include <linux/time.h>
 #include <linux/interrupt.h>
 #include <linux/pagemap.h>
 #include <linux/crc32.h>
 #include "nodelist.h"
 
 static int jffs2_garbage_collect_metadata(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb, 
-					struct inode *inode, struct jffs2_full_dnode *fd);
+					struct jffs2_inode_info *f, struct jffs2_full_dnode *fd);
 static int jffs2_garbage_collect_dirent(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb, 
-					struct inode *inode, struct jffs2_full_dirent *fd);
+					struct jffs2_inode_info *f, struct jffs2_full_dirent *fd);
 static int jffs2_garbage_collect_deletion_dirent(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb, 
-					struct inode *inode, struct jffs2_full_dirent *fd);
+					struct jffs2_inode_info *f, struct jffs2_full_dirent *fd);
 static int jffs2_garbage_collect_hole(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb,
-				      struct inode *indeo, struct jffs2_full_dnode *fn,
-				      __u32 start, __u32 end);
+				      struct jffs2_inode_info *f, struct jffs2_full_dnode *fn,
+				      uint32_t start, uint32_t end);
 static int jffs2_garbage_collect_dnode(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb,
-				       struct inode *inode, struct jffs2_full_dnode *fn,
-				       __u32 start, __u32 end);
+				       struct jffs2_inode_info *f, struct jffs2_full_dnode *fn,
+				       uint32_t start, uint32_t end);
 
 /* Called with erase_completion_lock held */
 static struct jffs2_eraseblock *jffs2_find_gc_block(struct jffs2_sb_info *c)
 {
 	struct jffs2_eraseblock *ret;
 	struct list_head *nextlist = NULL;
+	int n = jiffies % 128;
 
 	/* Pick an eraseblock to garbage collect next. This is where we'll
 	   put the clever wear-levelling algorithms. Eventually.  */
 	if (!list_empty(&c->bad_used_list) && c->nr_free_blocks > JFFS2_RESERVED_BLOCKS_GCBAD) {
 		D1(printk(KERN_DEBUG "Picking block from bad_used_list to GC next\n"));
 		nextlist = &c->bad_used_list;
-	} else if (jiffies % 100 && !list_empty(&c->dirty_list)) {
+	} else if (n < 100 && !list_empty(&c->erasable_list)) {
+		D1(printk(KERN_DEBUG "Picking block from erasable_list to GC next\n"));
+		nextlist = &c->erasable_list;
+	} else if (n < 126 && !list_empty(&c->dirty_list)) {
 		/* Most of the time, pick one off the dirty list */
 		D1(printk(KERN_DEBUG "Picking block from dirty_list to GC next\n"));
 		nextlist = &c->dirty_list;
@@ -80,9 +82,13 @@ static struct jffs2_eraseblock *jffs2_find_gc_block(struct jffs2_sb_info *c)
 		D1(printk(KERN_DEBUG "Picking block from dirty_list to GC next (clean_list was empty)\n"));
 
 		nextlist = &c->dirty_list;
+	} else if (!list_empty(&c->erasable_list)) {
+		D1(printk(KERN_DEBUG "Picking block from erasable_list to GC next (clean_list and dirty_list were empty)\n"));
+
+		nextlist = &c->erasable_list;
 	} else {
 		/* Eep. Both were empty */
-		printk(KERN_NOTICE "jffs2: No clean _or_ dirty blocks to GC from! Where are they all?\n");
+		printk(KERN_NOTICE "jffs2: No clean, dirty _or_ erasable blocks to GC from! Where are they all?\n");
 		return NULL;
 	}
 
@@ -109,8 +115,8 @@ int jffs2_garbage_collect_pass(struct jffs2_sb_info *c)
 	struct jffs2_node_frag *frag;
 	struct jffs2_full_dnode *fn = NULL;
 	struct jffs2_full_dirent *fd;
-	__u32 start = 0, end = 0, nrfrags = 0;
-	__u32 inum;
+	uint32_t start = 0, end = 0, nrfrags = 0;
+	uint32_t inum;
 	struct inode *inode;
 	int ret = 0;
 
@@ -154,6 +160,8 @@ int jffs2_garbage_collect_pass(struct jffs2_sb_info *c)
 	D1(printk(KERN_DEBUG "Going to garbage collect node at 0x%08x\n", raw->flash_offset &~3));
 	if (!raw->next_in_ino) {
 		/* Inode-less node. Clean marker, snapshot or something like that */
+		/* FIXME: If it's something that needs to be copied, including something
+		   we don't grok that has JFFS2_NODETYPE_RWCOMPAT_COPY, we should do so */
 		spin_unlock_bh(&c->erase_completion_lock);
 		jffs2_mark_node_obsolete(c, raw);
 		goto eraseit_lock;
@@ -177,6 +185,7 @@ int jffs2_garbage_collect_pass(struct jffs2_sb_info *c)
 
 	f = JFFS2_INODE_INFO(inode);
 	down(&f->sem);
+
 	/* Now we have the lock for this inode. Check that it's still the one at the head
 	   of the list. */
 
@@ -188,7 +197,7 @@ int jffs2_garbage_collect_pass(struct jffs2_sb_info *c)
 	/* OK. Looks safe. And nobody can get us now because we have the semaphore. Move the block */
 	if (f->metadata && f->metadata->raw == raw) {
 		fn = f->metadata;
-		ret = jffs2_garbage_collect_metadata(c, jeb, inode, fn);
+		ret = jffs2_garbage_collect_metadata(c, jeb, f, fn);
 		goto upnout;
 	}
 	
@@ -206,10 +215,10 @@ int jffs2_garbage_collect_pass(struct jffs2_sb_info *c)
 		/* We found a datanode. Do the GC */
 		if((start >> PAGE_CACHE_SHIFT) < ((end-1) >> PAGE_CACHE_SHIFT)) {
 			/* It crosses a page boundary. Therefore, it must be a hole. */
-			ret = jffs2_garbage_collect_hole(c, jeb, inode, fn, start, end);
+			ret = jffs2_garbage_collect_hole(c, jeb, f, fn, start, end);
 		} else {
 			/* It could still be a hole. But we GC the page this way anyway */
-			ret = jffs2_garbage_collect_dnode(c, jeb, inode, fn, start, end);
+			ret = jffs2_garbage_collect_dnode(c, jeb, f, fn, start, end);
 		}
 		goto upnout;
 	}
@@ -221,11 +230,12 @@ int jffs2_garbage_collect_pass(struct jffs2_sb_info *c)
 	}
 
 	if (fd && fd->ino) {
-		ret = jffs2_garbage_collect_dirent(c, jeb, inode, fd);
+		ret = jffs2_garbage_collect_dirent(c, jeb, f, fd);
 	} else if (fd) {
-		ret = jffs2_garbage_collect_deletion_dirent(c, jeb, inode, fd);
+		ret = jffs2_garbage_collect_deletion_dirent(c, jeb, f, fd);
 	} else {
-		printk(KERN_WARNING "Raw node at 0x%08x wasn't in node lists for ino #%lu\n", raw->flash_offset&~3, inode->i_ino);
+		printk(KERN_WARNING "Raw node at 0x%08x wasn't in node lists for ino #%u\n",
+		       raw->flash_offset&~3, f->inocache->ino);
 		if (raw->flash_offset & 1) {
 			printk(KERN_WARNING "But it's obsolete so we don't mind too much\n");
 		} else {
@@ -256,24 +266,25 @@ int jffs2_garbage_collect_pass(struct jffs2_sb_info *c)
 }
 
 static int jffs2_garbage_collect_metadata(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb, 
-					struct inode *inode, struct jffs2_full_dnode *fn)
+					struct jffs2_inode_info *f, struct jffs2_full_dnode *fn)
 {
-	struct jffs2_inode_info *f = JFFS2_INODE_INFO(inode);
 	struct jffs2_full_dnode *new_fn;
 	struct jffs2_raw_inode ri;
 	unsigned short dev;
 	char *mdata = NULL, mdatalen = 0;
-	__u32 alloclen, phys_ofs;
+	uint32_t alloclen, phys_ofs;
 	int ret;
 
-	if (S_ISBLK(inode->i_mode) || S_ISCHR(inode->i_mode)) {
+	if (S_ISBLK(JFFS2_F_I_MODE(f)) ||
+	    S_ISCHR(JFFS2_F_I_MODE(f)) ) {
 		/* For these, we don't actually need to read the old node */
-		dev =  (major(inode->i_rdev) << 8) | 
-			minor(inode->i_rdev);
+		/* FIXME: for minor or major > 255. */
+		dev =  ((JFFS2_F_I_RDEV_MAJ(f) << 8) | 
+			JFFS2_F_I_RDEV_MIN(f));
 		mdata = (char *)&dev;
 		mdatalen = sizeof(dev);
 		D1(printk(KERN_DEBUG "jffs2_garbage_collect_metadata(): Writing %d bytes of kdev_t\n", mdatalen));
-	} else if (S_ISLNK(inode->i_mode)) {
+	} else if (S_ISLNK(JFFS2_F_I_MODE(f))) {
 		mdatalen = fn->size;
 		mdata = kmalloc(fn->size, GFP_KERNEL);
 		if (!mdata) {
@@ -303,15 +314,15 @@ static int jffs2_garbage_collect_metadata(struct jffs2_sb_info *c, struct jffs2_
 	ri.totlen = sizeof(ri) + mdatalen;
 	ri.hdr_crc = crc32(0, &ri, sizeof(struct jffs2_unknown_node)-4);
 
-	ri.ino = inode->i_ino;
+	ri.ino = f->inocache->ino;
 	ri.version = ++f->highest_version;
-	ri.mode = inode->i_mode;
-	ri.uid = inode->i_uid;
-	ri.gid = inode->i_gid;
-	ri.isize = inode->i_size;
-	ri.atime = inode->i_atime;
-	ri.ctime = inode->i_ctime;
-	ri.mtime = inode->i_mtime;
+	ri.mode = JFFS2_F_I_MODE(f);
+	ri.uid = JFFS2_F_I_UID(f);
+	ri.gid = JFFS2_F_I_GID(f);
+	ri.isize = JFFS2_F_I_SIZE(f);
+	ri.atime = JFFS2_F_I_ATIME(f);
+	ri.ctime = JFFS2_F_I_CTIME(f);
+	ri.mtime = JFFS2_F_I_MTIME(f);
 	ri.offset = 0;
 	ri.csize = mdatalen;
 	ri.dsize = mdatalen;
@@ -319,7 +330,7 @@ static int jffs2_garbage_collect_metadata(struct jffs2_sb_info *c, struct jffs2_
 	ri.node_crc = crc32(0, &ri, sizeof(ri)-8);
 	ri.data_crc = crc32(0, mdata, mdatalen);
 
-	new_fn = jffs2_write_dnode(inode, &ri, mdata, mdatalen, phys_ofs, NULL);
+	new_fn = jffs2_write_dnode(c, f, &ri, mdata, mdatalen, phys_ofs, NULL);
 
 	if (IS_ERR(new_fn)) {
 		printk(KERN_WARNING "Error writing new dnode: %ld\n", PTR_ERR(new_fn));
@@ -330,18 +341,17 @@ static int jffs2_garbage_collect_metadata(struct jffs2_sb_info *c, struct jffs2_
 	jffs2_free_full_dnode(fn);
 	f->metadata = new_fn;
  out:
-	if (S_ISLNK(inode->i_mode))
+	if (S_ISLNK(JFFS2_F_I_MODE(f)))
 		kfree(mdata);
 	return ret;
 }
 
 static int jffs2_garbage_collect_dirent(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb, 
-					struct inode *inode, struct jffs2_full_dirent *fd)
+					struct jffs2_inode_info *f, struct jffs2_full_dirent *fd)
 {
-	struct jffs2_inode_info *f = JFFS2_INODE_INFO(inode);
 	struct jffs2_full_dirent *new_fd;
 	struct jffs2_raw_dirent rd;
-	__u32 alloclen, phys_ofs;
+	uint32_t alloclen, phys_ofs;
 	int ret;
 
 	rd.magic = JFFS2_MAGIC_BITMASK;
@@ -350,10 +360,10 @@ static int jffs2_garbage_collect_dirent(struct jffs2_sb_info *c, struct jffs2_er
 	rd.totlen = sizeof(rd) + rd.nsize;
 	rd.hdr_crc = crc32(0, &rd, sizeof(struct jffs2_unknown_node)-4);
 
-	rd.pino = inode->i_ino;
+	rd.pino = f->inocache->ino;
 	rd.version = ++f->highest_version;
 	rd.ino = fd->ino;
-	rd.mctime = max(inode->i_mtime, inode->i_ctime);
+	rd.mctime = max(JFFS2_F_I_MTIME(f), JFFS2_F_I_CTIME(f));
 	rd.type = fd->type;
 	rd.node_crc = crc32(0, &rd, sizeof(rd)-8);
 	rd.name_crc = crc32(0, fd->name, rd.nsize);
@@ -364,7 +374,7 @@ static int jffs2_garbage_collect_dirent(struct jffs2_sb_info *c, struct jffs2_er
 		       sizeof(rd)+rd.nsize, ret);
 		return ret;
 	}
-	new_fd = jffs2_write_dirent(inode, &rd, fd->name, rd.nsize, phys_ofs, NULL);
+	new_fd = jffs2_write_dirent(c, f, &rd, fd->name, rd.nsize, phys_ofs, NULL);
 
 	if (IS_ERR(new_fd)) {
 		printk(KERN_WARNING "jffs2_write_dirent in garbage_collect_dirent failed: %ld\n", PTR_ERR(new_fd));
@@ -375,19 +385,119 @@ static int jffs2_garbage_collect_dirent(struct jffs2_sb_info *c, struct jffs2_er
 }
 
 static int jffs2_garbage_collect_deletion_dirent(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb, 
-					struct inode *inode, struct jffs2_full_dirent *fd)
+					struct jffs2_inode_info *f, struct jffs2_full_dirent *fd)
 {
-	struct jffs2_inode_info *f = JFFS2_INODE_INFO(inode);
 	struct jffs2_full_dirent **fdp = &f->dents;
 	int found = 0;
 
-	/* FIXME: When we run on NAND flash, we need to work out whether
-	   this deletion dirent is still needed to actively delete a
-	   'real' dirent with the same name that's still somewhere else
-	   on the flash. For now, we know that we've actually obliterated
-	   all the older dirents when they became obsolete, so we didn't
-	   really need to write the deletion to flash in the first place.
-	*/
+	/* On a medium where we can't actually mark nodes obsolete
+	   pernamently, such as NAND flash, we need to work out
+	   whether this deletion dirent is still needed to actively
+	   delete a 'real' dirent with the same name that's still
+	   somewhere else on the flash. */
+	if (!jffs2_can_mark_obsolete(c)) {
+		struct jffs2_raw_dirent rd;
+		struct jffs2_raw_node_ref *raw;
+		int ret;
+		size_t retlen;
+		int name_len = strlen(fd->name);
+		uint32_t name_crc = crc32(0, fd->name, name_len);
+		char *namebuf = NULL;
+
+		/* Prevent the erase code from nicking the obsolete node refs while
+		   we're looking at them. I really don't like this extra lock but
+		   can't see any alternative. Suggestions on a postcard to... */
+		down(&c->erase_free_sem);
+
+		for (raw = f->inocache->nodes; raw != (void *)f->inocache; raw = raw->next_in_ino) {
+			/* We only care about obsolete ones */
+			if (!(raw->flash_offset & 1))
+				continue;
+
+			/* Doesn't matter if there's one in the same erase block. We're going to 
+			   delete it too at the same time. */
+			if ((raw->flash_offset & ~(c->sector_size-1)) ==
+			    (fd->raw->flash_offset & ~(c->sector_size-1)))
+				continue;
+
+			/* This is an obsolete node belonging to the same directory */
+			ret = jffs2_flash_read(c, raw->flash_offset & ~3, sizeof(struct jffs2_unknown_node), &retlen, (char *)&rd);
+			if (ret) {
+				printk(KERN_WARNING "jffs2_g_c_deletion_dirent(): Read error (%d) reading header from obsolete node at %08x\n", ret, raw->flash_offset & ~3);
+				/* If we can't read it, we don't need to continune to obsolete it. Continue */
+				continue;
+			}
+			if (retlen != sizeof(struct jffs2_unknown_node)) {
+				printk(KERN_WARNING "jffs2_g_c_deletion_dirent(): Short read (%d not %d) reading header from obsolete node at %08x\n",
+				       retlen, sizeof(struct jffs2_unknown_node), raw->flash_offset & ~3);
+				continue;
+			}
+			if (rd.nodetype != JFFS2_NODETYPE_DIRENT ||
+			    PAD(rd.totlen) != PAD(sizeof(rd) + name_len))
+				continue;
+
+			/* OK, it's a dirent node, it's the right length. We have to take a 
+			   closer look at it... */
+			ret = jffs2_flash_read(c, raw->flash_offset & ~3, sizeof(rd), &retlen, (char *)&rd);
+			if (ret) {
+				printk(KERN_WARNING "jffs2_g_c_deletion_dirent(): Read error (%d) reading from obsolete node at %08x\n", ret, raw->flash_offset & ~3);
+				/* If we can't read it, we don't need to continune to obsolete it. Continue */
+				continue;
+			}
+			if (retlen != sizeof(struct jffs2_unknown_node)) {
+				printk(KERN_WARNING "jffs2_g_c_deletion_dirent(): Short read (%d not %d) reading from obsolete node at %08x\n",
+				       retlen, sizeof(struct jffs2_unknown_node), raw->flash_offset & ~3);
+				continue;
+			}
+
+			/* If the name CRC doesn't match, skip */
+			if (rd.name_crc != name_crc)
+				continue;
+			/* If the name length doesn't match, or it's another deletion dirent, skip */
+			if (rd.nsize != name_len || !rd.ino)
+				continue;
+
+			/* OK, check the actual name now */
+			if (!namebuf) {
+				namebuf = kmalloc(name_len + 1, GFP_KERNEL);
+				if (!namebuf) {
+					up(&c->erase_free_sem);
+					return -ENOMEM;
+				}
+			}
+			/* We read the extra byte before it so it's a word-aligned read */
+			ret = jffs2_flash_read(c, (raw->flash_offset & ~3)+sizeof(rd)-1, name_len+1, &retlen, namebuf);
+			if (ret) {
+				printk(KERN_WARNING "jffs2_g_c_deletion_dirent(): Read error (%d) reading name from obsolete node at %08x\n", ret, raw->flash_offset & ~3);
+				/* If we can't read it, we don't need to continune to obsolete it. Continue */
+				continue;
+			}
+			if (retlen != sizeof(rd)) {
+				printk(KERN_WARNING "jffs2_g_c_deletion_dirent(): Short read (%d not %d) reading name from obsolete node at %08x\n",
+				       retlen, name_len, raw->flash_offset & ~3);
+				continue;
+			}
+			if (memcmp(namebuf+1, fd->name, name_len))
+				continue;
+
+			/* OK. The name really does match. There really is still an older node on
+			   the flash which our deletion dirent obsoletes. So we have to write out
+			   a new deletion dirent to replace it */
+			
+			if (namebuf)
+				kfree(namebuf);
+
+			up(&c->erase_free_sem);
+			return jffs2_garbage_collect_dirent(c, jeb, f, fd);
+		}
+
+		up(&c->erase_free_sem);
+
+		if (namebuf) 
+			kfree(namebuf);
+	}
+
+	/* No need for it any more. Just mark it obsolete and remove it from the list */
 	while (*fdp) {
 		if ((*fdp) == fd) {
 			found = 1;
@@ -397,7 +507,7 @@ static int jffs2_garbage_collect_deletion_dirent(struct jffs2_sb_info *c, struct
 		fdp = &(*fdp)->next;
 	}
 	if (!found) {
-		printk(KERN_WARNING "Deletion dirent \"%s\" not found in list for ino #%lu\n", fd->name, inode->i_ino);
+		printk(KERN_WARNING "Deletion dirent \"%s\" not found in list for ino #%u\n", fd->name, f->inocache->ino);
 	}
 	jffs2_mark_node_obsolete(c, fd->raw);
 	jffs2_free_full_dirent(fd);
@@ -405,27 +515,26 @@ static int jffs2_garbage_collect_deletion_dirent(struct jffs2_sb_info *c, struct
 }
 
 static int jffs2_garbage_collect_hole(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb,
-				      struct inode *inode, struct jffs2_full_dnode *fn,
-				      __u32 start, __u32 end)
+				      struct jffs2_inode_info *f, struct jffs2_full_dnode *fn,
+				      uint32_t start, uint32_t end)
 {
-	struct jffs2_inode_info *f = JFFS2_INODE_INFO(inode);
 	struct jffs2_raw_inode ri;
 	struct jffs2_node_frag *frag;
 	struct jffs2_full_dnode *new_fn;
-	__u32 alloclen, phys_ofs;
+	uint32_t alloclen, phys_ofs;
 	int ret;
 
-	D1(printk(KERN_DEBUG "Writing replacement hole node for ino #%lu from offset 0x%x to 0x%x\n",
-		  inode->i_ino, start, end));
+	D1(printk(KERN_DEBUG "Writing replacement hole node for ino #%u from offset 0x%x to 0x%x\n",
+		  f->inocache->ino, start, end));
 	
 	memset(&ri, 0, sizeof(ri));
 
 	if(fn->frags > 1) {
 		size_t readlen;
-		__u32 crc;
+		uint32_t crc;
 		/* It's partially obsoleted by a later write. So we have to 
 		   write it out again with the _same_ version as before */
-		ret = c->mtd->read(c->mtd, fn->raw->flash_offset & ~3, sizeof(ri), &readlen, (char *)&ri);
+		ret = jffs2_flash_read(c, fn->raw->flash_offset & ~3, sizeof(ri), &readlen, (char *)&ri);
 		if (readlen != sizeof(ri) || ret) {
 			printk(KERN_WARNING "Node read failed in jffs2_garbage_collect_hole. Ret %d, retlen %d. Data will be lost by writing new hold node\n", ret, readlen);
 			goto fill;
@@ -445,14 +554,14 @@ static int jffs2_garbage_collect_hole(struct jffs2_sb_info *c, struct jffs2_eras
 			printk(KERN_WARNING "jffs2_garbage_collect_hole: Node at 0x%08x had CRC 0x%08x which doesn't match calculated CRC 0x%08x\n",
 			       fn->raw->flash_offset & ~3, ri.node_crc, crc);
 			/* FIXME: We could possibly deal with this by writing new holes for each frag */
-			printk(KERN_WARNING "Data in the range 0x%08x to 0x%08x of inode #%lu will be lost\n", 
-			       start, end, inode->i_ino);
+			printk(KERN_WARNING "Data in the range 0x%08x to 0x%08x of inode #%u will be lost\n", 
+			       start, end, f->inocache->ino);
 			goto fill;
 		}
 		if (ri.compr != JFFS2_COMPR_ZERO) {
 			printk(KERN_WARNING "jffs2_garbage_collect_hole: Node 0x%08x wasn't a hole node!\n", fn->raw->flash_offset & ~3);
-			printk(KERN_WARNING "Data in the range 0x%08x to 0x%08x of inode #%lu will be lost\n", 
-			       start, end, inode->i_ino);
+			printk(KERN_WARNING "Data in the range 0x%08x to 0x%08x of inode #%u will be lost\n", 
+			       start, end, f->inocache->ino);
 			goto fill;
 		}
 	} else {
@@ -462,20 +571,20 @@ static int jffs2_garbage_collect_hole(struct jffs2_sb_info *c, struct jffs2_eras
 		ri.totlen = sizeof(ri);
 		ri.hdr_crc = crc32(0, &ri, sizeof(struct jffs2_unknown_node)-4);
 
-		ri.ino = inode->i_ino;
+		ri.ino = f->inocache->ino;
 		ri.version = ++f->highest_version;
 		ri.offset = start;
 		ri.dsize = end - start;
 		ri.csize = 0;
 		ri.compr = JFFS2_COMPR_ZERO;
 	}
-	ri.mode = inode->i_mode;
-	ri.uid = inode->i_uid;
-	ri.gid = inode->i_gid;
-	ri.isize = inode->i_size;
-	ri.atime = inode->i_atime;
-	ri.ctime = inode->i_ctime;
-	ri.mtime = inode->i_mtime;
+	ri.mode = JFFS2_F_I_MODE(f);
+	ri.uid = JFFS2_F_I_UID(f);
+	ri.gid = JFFS2_F_I_GID(f);
+	ri.isize = JFFS2_F_I_SIZE(f);
+	ri.atime = JFFS2_F_I_ATIME(f);
+	ri.ctime = JFFS2_F_I_CTIME(f);
+	ri.mtime = JFFS2_F_I_MTIME(f);
 	ri.data_crc = 0;
 	ri.node_crc = crc32(0, &ri, sizeof(ri)-8);
 
@@ -485,7 +594,7 @@ static int jffs2_garbage_collect_hole(struct jffs2_sb_info *c, struct jffs2_eras
 		       sizeof(ri), ret);
 		return ret;
 	}
-	new_fn = jffs2_write_dnode(inode, &ri, NULL, 0, phys_ofs, NULL);
+	new_fn = jffs2_write_dnode(c, f, &ri, NULL, 0, phys_ofs, NULL);
 
 	if (IS_ERR(new_fn)) {
 		printk(KERN_WARNING "Error writing new hole node: %ld\n", PTR_ERR(new_fn));
@@ -525,23 +634,22 @@ static int jffs2_garbage_collect_hole(struct jffs2_sb_info *c, struct jffs2_eras
 }
 
 static int jffs2_garbage_collect_dnode(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb,
-				       struct inode *inode, struct jffs2_full_dnode *fn,
-				       __u32 start, __u32 end)
+				       struct jffs2_inode_info *f, struct jffs2_full_dnode *fn,
+				       uint32_t start, uint32_t end)
 {
-	struct jffs2_inode_info *f = JFFS2_INODE_INFO(inode);
 	struct jffs2_full_dnode *new_fn;
 	struct jffs2_raw_inode ri;
-	__u32 alloclen, phys_ofs, offset, orig_end;	
+	uint32_t alloclen, phys_ofs, offset, orig_end;	
 	int ret = 0;
 	unsigned char *comprbuf = NULL, *writebuf;
 	struct page *pg;
 	unsigned char *pg_ptr;
-
+	/* FIXME: */ struct inode *inode = OFNI_EDONI_2SFFJ(f);
 
 	memset(&ri, 0, sizeof(ri));
 
-	D1(printk(KERN_DEBUG "Writing replacement dnode for ino #%lu from offset 0x%x to 0x%x\n",
-		  inode->i_ino, start, end));
+	D1(printk(KERN_DEBUG "Writing replacement dnode for ino #%u from offset 0x%x to 0x%x\n",
+		  f->inocache->ino, start, end));
 
 	orig_end = end;
 
@@ -561,7 +669,7 @@ static int jffs2_garbage_collect_dnode(struct jffs2_sb_info *c, struct jffs2_era
 		/* Shitloads of space */
 		/* FIXME: Integrate this properly with GC calculations */
 		start &= ~(PAGE_CACHE_SIZE-1);
-		end = min_t(__u32, start + PAGE_CACHE_SIZE, inode->i_size);
+		end = min_t(uint32_t, start + PAGE_CACHE_SIZE, JFFS2_F_I_SIZE(f));
 		D1(printk(KERN_DEBUG "Plenty of free space, so expanding to write from offset 0x%x to 0x%x\n",
 			  start, end));
 		if (end < orig_end) {
@@ -588,8 +696,8 @@ static int jffs2_garbage_collect_dnode(struct jffs2_sb_info *c, struct jffs2_era
 
 	offset = start;
 	while(offset < orig_end) {
-		__u32 datalen;
-		__u32 cdatalen;
+		uint32_t datalen;
+		uint32_t cdatalen;
 		char comprtype = JFFS2_COMPR_NONE;
 
 		ret = jffs2_reserve_space_gc(c, sizeof(ri) + JFFS2_MIN_DATA_LEN, &phys_ofs, &alloclen);
@@ -617,15 +725,15 @@ static int jffs2_garbage_collect_dnode(struct jffs2_sb_info *c, struct jffs2_era
 		ri.totlen = sizeof(ri) + cdatalen;
 		ri.hdr_crc = crc32(0, &ri, sizeof(struct jffs2_unknown_node)-4);
 
-		ri.ino = inode->i_ino;
+		ri.ino = f->inocache->ino;
 		ri.version = ++f->highest_version;
-		ri.mode = inode->i_mode;
-		ri.uid = inode->i_uid;
-		ri.gid = inode->i_gid;
-		ri.isize = inode->i_size;
-		ri.atime = inode->i_atime;
-		ri.ctime = inode->i_ctime;
-		ri.mtime = inode->i_mtime;
+		ri.mode = JFFS2_F_I_MODE(f);
+		ri.uid = JFFS2_F_I_UID(f);
+		ri.gid = JFFS2_F_I_GID(f);
+		ri.isize = JFFS2_F_I_SIZE(f);
+		ri.atime = JFFS2_F_I_ATIME(f);
+		ri.ctime = JFFS2_F_I_CTIME(f);
+		ri.mtime = JFFS2_F_I_MTIME(f);
 		ri.offset = offset;
 		ri.csize = cdatalen;
 		ri.dsize = datalen;
@@ -633,7 +741,7 @@ static int jffs2_garbage_collect_dnode(struct jffs2_sb_info *c, struct jffs2_era
 		ri.node_crc = crc32(0, &ri, sizeof(ri)-8);
 		ri.data_crc = crc32(0, writebuf, cdatalen);
 	
-		new_fn = jffs2_write_dnode(inode, &ri, writebuf, cdatalen, phys_ofs, NULL);
+		new_fn = jffs2_write_dnode(c, f, &ri, writebuf, cdatalen, phys_ofs, NULL);
 
 		if (IS_ERR(new_fn)) {
 			printk(KERN_WARNING "Error writing new dnode: %ld\n", PTR_ERR(new_fn));

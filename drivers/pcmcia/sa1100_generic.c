@@ -83,6 +83,68 @@ static struct timer_list poll_timer;
 static struct tq_struct sa1100_pcmcia_task;
 
 /*
+ * sa1100_pcmcia_default_mecr_timing
+ * ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ *
+ * Calculate MECR clock wait states for given CPU clock
+ * speed and command wait state. This function can be over-
+ * written by a board specific version.
+ *
+ * The default is to simply calculate the BS values as specified in
+ * the INTEL SA1100 development manual
+ * "Expansion Memory (PCMCIA) Configuration Register (MECR)"
+ * that's section 10.2.5 in _my_ version of the manuial ;)
+ */
+static int sa1100_pcmcia_default_mecr_timing(unsigned int sock, unsigned int cpu_speed,
+		unsigned int cmd_time )
+{
+	return sa1100_pcmcia_mecr_bs( cmd_time, cpu_speed );
+}
+
+/* sa1100_pcmcia_set_mecr()
+ * ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ *
+ * set MECR value for socket <sock> based on this sockets
+ * io, mem and attribute space access speed.
+ * Call board specific BS value calculation to allow boards
+ * to tweak the BS values.
+ */
+static int sa1100_pcmcia_set_mecr( int sock )
+{
+	struct sa1100_pcmcia_socket *skt;
+	u32 mecr;
+	int clock;
+	long flags;
+	unsigned int bs;
+
+	if ( sock<0 || sock>SA1100_PCMCIA_MAX_SOCK )
+		return -1;
+
+	skt = PCMCIA_SOCKET( sock );
+
+	local_irq_save(flags);
+
+	clock = cpufreq_get(0);
+	bs = pcmcia_low_level->socket_get_timing( sock, clock, skt->speed_io);
+
+	mecr = MECR;
+	MECR_FAST_SET(mecr, sock, 0);
+	MECR_BSIO_SET(mecr, sock, bs );
+	MECR_BSA_SET(mecr, sock, bs );
+	MECR_BSM_SET(mecr, sock, bs );
+	MECR = mecr;
+
+	local_irq_restore(flags);
+
+    DEBUG(4, "%s(): FAST%u %lx  BSM%u %lx  BSA%u %lx  BSIO%u %lx\n",
+	  __FUNCTION__, sock, MECR_FAST_GET(mecr, sock), sock,
+	  MECR_BSM_GET(mecr, sock), sock, MECR_BSA_GET(mecr, sock),
+	  sock, MECR_BSIO_GET(mecr, sock));
+
+	return 0;
+}
+
+/*
  * sa1100_pcmcia_state_to_config
  * ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
  *
@@ -586,26 +648,10 @@ sa1100_pcmcia_set_io_map(unsigned int sock, struct pccard_io_map *map)
   }
 
   if (map->flags & MAP_ACTIVE) {
-    unsigned int clock, speed = map->speed;
-    unsigned long mecr;
+    if ( map->speed == 0)
+       map->speed = SA1100_PCMCIA_IO_ACCESS;
 
-    if (speed == 0)
-      speed = SA1100_PCMCIA_IO_ACCESS;
-
-    clock = cpufreq_get(0);
-
-    mecr = MECR;
-
-    MECR_BSIO_SET(mecr, sock, sa1100_pcmcia_mecr_bs(speed, clock));
-
-    skt->speed_io = speed;
-
-    DEBUG(4, "%s(): FAST%u %lx  BSM%u %lx  BSA%u %lx  BSIO%u %lx\n",
-	  __FUNCTION__, sock, MECR_FAST_GET(mecr, sock), sock,
-	  MECR_BSM_GET(mecr, sock), sock, MECR_BSA_GET(mecr, sock), 
-	  sock, MECR_BSIO_GET(mecr, sock));
-
-    MECR = mecr;
+	sa1100_pcmcia_set_mecr( sock );
   }
 
   if (map->stop == 1)
@@ -683,39 +729,19 @@ sa1100_pcmcia_set_mem_map(unsigned int sock, struct pccard_mem_map *map)
   }
 
   if (map->flags & MAP_ACTIVE) {
-    unsigned int clock, speed = map->speed;
-    unsigned long mecr;
+	  /*
+	   * When clients issue RequestMap, the access speed is not always
+	   * properly configured.  Choose some sensible defaults.
+	   */
+	  if (map->speed == 0) {
+		  if (skt->cs_state.Vcc == 33)
+			  map->speed = SA1100_PCMCIA_3V_MEM_ACCESS;
+		  else
+			  map->speed = SA1100_PCMCIA_5V_MEM_ACCESS;
+	  }
 
-    /*
-     * When clients issue RequestMap, the access speed is not always
-     * properly configured.  Choose some sensible defaults.
-     */
-    if (speed == 0) {
-      if (skt->cs_state.Vcc == 33)
-	speed = SA1100_PCMCIA_3V_MEM_ACCESS;
-      else
-	speed = SA1100_PCMCIA_5V_MEM_ACCESS;
-    }
+	  sa1100_pcmcia_set_mecr( sock );
 
-    clock = cpufreq_get(0);
-
-    /* Fixme: MECR is not pre-empt safe. */
-    mecr = MECR;
-
-    if (map->flags & MAP_ATTRIB) {
-      MECR_BSA_SET(mecr, sock, sa1100_pcmcia_mecr_bs(speed, clock));
-      skt->speed_attr = speed;
-    } else {
-      MECR_BSM_SET(mecr, sock, sa1100_pcmcia_mecr_bs(speed, clock));
-      skt->speed_mem = speed;
-    }
-
-    DEBUG(4, "%s(): FAST%u %lx  BSM%u %lx  BSA%u %lx  BSIO%u %lx\n",
-	  __FUNCTION__, sock, MECR_FAST_GET(mecr, sock), sock,
-	  MECR_BSM_GET(mecr, sock), sock, MECR_BSA_GET(mecr, sock), 
-	  sock, MECR_BSIO_GET(mecr, sock));
-
-    MECR = mecr;
   }
 
   start = (map->flags & MAP_ATTRIB) ? skt->phys_attr : skt->phys_mem;
@@ -857,20 +883,10 @@ static struct pccard_operations sa1100_pcmcia_operations = {
 static void sa1100_pcmcia_update_mecr(unsigned int clock)
 {
   unsigned int sock;
-  unsigned long mecr = MECR;
 
-  for(sock = 0; sock < SA1100_PCMCIA_MAX_SOCK; ++sock){
-    struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
-
-    MECR_BSIO_SET(mecr, sock,
-		  sa1100_pcmcia_mecr_bs(skt->speed_io, clock));
-    MECR_BSA_SET(mecr, sock,
-		 sa1100_pcmcia_mecr_bs(skt->speed_attr, clock));
-    MECR_BSM_SET(mecr, sock,
-		 sa1100_pcmcia_mecr_bs(skt->speed_mem, clock));
+  for (sock = 0; sock < SA1100_PCMCIA_MAX_SOCK; ++sock) {
+	  sa1100_pcmcia_set_mecr( sock );
   }
-
-  MECR = mecr;
 }
 
 /* sa1100_pcmcia_notifier()
@@ -929,8 +945,7 @@ int sa1100_register_pcmcia(struct pcmcia_low_level *ops)
 	struct pcmcia_init pcmcia_init;
 	struct pcmcia_state state[SA1100_PCMCIA_MAX_SOCK];
 	struct pcmcia_state_array state_array;
-	unsigned int i, clock;
-	unsigned long mecr;
+	unsigned int i;
 	int ret;
 
 	/*
@@ -940,6 +955,13 @@ int sa1100_register_pcmcia(struct pcmcia_low_level *ops)
 		return -EBUSY;
 
 	pcmcia_low_level = ops;
+
+	/*
+	 * set default MECR calculation if the board specific
+	 * code did not specify one...
+	 */
+	if (!pcmcia_low_level->socket_get_timing)
+		pcmcia_low_level->socket_get_timing = sa1100_pcmcia_default_mecr_timing;
 
 	pcmcia_init.handler = sa1100_pcmcia_interrupt;
 	ret = ops->init(&pcmcia_init);
@@ -967,10 +989,6 @@ int sa1100_register_pcmcia(struct pcmcia_low_level *ops)
 	 * We initialize the MECR to default values here, because we are
 	 * not guaranteed to see a SetIOMap operation at runtime.
 	 */
-	mecr = 0;
-
-	clock = cpufreq_get(0);
-
 	for (i = 0; i < sa1100_pcmcia_socket_count; i++) {
 		struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(i);
 		struct pcmcia_irq_info irq_info;
@@ -1000,13 +1018,9 @@ int sa1100_register_pcmcia(struct pcmcia_low_level *ops)
 			goto out_err;
 		}
 
-		MECR_FAST_SET(mecr, i, 0);
-		MECR_BSIO_SET(mecr, i, sa1100_pcmcia_mecr_bs(skt->speed_io, clock));
-		MECR_BSA_SET(mecr, i, sa1100_pcmcia_mecr_bs(skt->speed_attr, clock));
-		MECR_BSM_SET(mecr, i, sa1100_pcmcia_mecr_bs(skt->speed_mem, clock));
+		sa1100_pcmcia_set_mecr( i );
 	}
 
-	MECR = mecr;
 
 	/* Only advertise as many sockets as we can detect */
 	ret = register_ss_entry(sa1100_pcmcia_socket_count,

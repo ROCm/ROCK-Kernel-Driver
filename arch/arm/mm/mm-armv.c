@@ -1,7 +1,7 @@
 /*
  *  linux/arch/arm/mm/mm-armv.c
  *
- *  Copyright (C) 1998-2000 Russell King
+ *  Copyright (C) 1998-2002 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -82,9 +82,6 @@ pgd_t *get_pgd_slow(struct mm_struct *mm)
 	init_pgd = pgd_offset_k(0);
 
 	if (vectors_base() == 0) {
-		init_pmd = pmd_offset(init_pgd, 0);
-		init_pte = pte_offset(init_pmd, 0);
-
 		/*
 		 * This lock is here just to satisfy pmd_alloc and pte_lock
 		 */
@@ -172,11 +169,14 @@ free:
 static inline void
 alloc_init_section(unsigned long virt, unsigned long phys, int prot)
 {
-	pmd_t pmd;
+	pmd_t *pmdp, pmd;
+
+	pmdp = pmd_offset(pgd_offset_k(virt), virt);
+	if (virt & (1 << PMD_SHIFT))
+		pmdp++;
 
 	pmd_val(pmd) = phys | prot;
-
-	set_pmd(pmd_offset(pgd_offset_k(virt), virt), pmd);
+	set_pmd(pmdp, pmd);
 }
 
 /*
@@ -189,18 +189,19 @@ alloc_init_section(unsigned long virt, unsigned long phys, int prot)
 static inline void
 alloc_init_page(unsigned long virt, unsigned long phys, int domain, int prot)
 {
-	pmd_t *pmdp;
+	pmd_t *pmdp, pmd;
 	pte_t *ptep;
 
 	pmdp = pmd_offset(pgd_offset_k(virt), virt);
 
 	if (pmd_none(*pmdp)) {
-		pte_t *ptep = alloc_bootmem_low_pages(2 * PTRS_PER_PTE *
-						      sizeof(pte_t));
+		ptep = alloc_bootmem_low_pages(2 * PTRS_PER_PTE *
+					       sizeof(pte_t));
 
-		ptep += PTRS_PER_PTE;
-
-		set_pmd(pmdp, __mk_pmd(ptep, PMD_TYPE_TABLE | PMD_DOMAIN(domain)));
+		pmd_val(pmd) = __pa(ptep) | PMD_TYPE_TABLE | PMD_DOMAIN(domain);
+		set_pmd(pmdp, pmd);
+		pmd_val(pmd) += 256 * sizeof(pte_t);
+		set_pmd(pmdp + 1, pmd);
 	}
 	ptep = pte_offset_kernel(pmdp, virt);
 
@@ -266,11 +267,11 @@ static void __init create_mapping(struct map_desc *md)
 		length -= PAGE_SIZE;
 	}
 
-	while (length >= PGDIR_SIZE) {
+	while (length >= (PGDIR_SIZE / 2)) {
 		alloc_init_section(virt, virt + off, prot_sect);
 
-		virt   += PGDIR_SIZE;
-		length -= PGDIR_SIZE;
+		virt   += (PGDIR_SIZE / 2);
+		length -= (PGDIR_SIZE / 2);
 	}
 
 	while (length >= PAGE_SIZE) {
@@ -462,42 +463,4 @@ void __init create_memmap_holes(struct meminfo *mi)
 
 	for (node = 0; node < numnodes; node++)
 		free_unused_memmap_node(node, mi);
-}
-
-/*
- * PTE table allocation cache.
- *
- * This is a move away from our custom 2K page allocator.  We now use the
- * slab cache to keep track of these objects.
- *
- * With this, it is questionable as to whether the PGT cache gains us
- * anything.  We may be better off dropping the PTE stuff from our PGT
- * cache implementation.
- */
-kmem_cache_t *pte_cache;
-
-/*
- * The constructor gets called for each object within the cache when the
- * cache page is created.  Note that if slab tries to misalign the blocks,
- * we BUG() loudly.
- */
-static void pte_cache_ctor(void *pte, kmem_cache_t *cache, unsigned long flags)
-{
-	unsigned long block = (unsigned long)pte;
-
-	if (block & 2047)
-		BUG();
-
-	memzero(pte, 2 * PTRS_PER_PTE * sizeof(pte_t));
-	cpu_cache_clean_invalidate_range(block, block +
-			PTRS_PER_PTE * sizeof(pte_t), 0);
-}
-
-void __init pgtable_cache_init(void)
-{
-	pte_cache = kmem_cache_create("pte-cache",
-				2 * PTRS_PER_PTE * sizeof(pte_t), 0, 0,
-				pte_cache_ctor, NULL);
-	if (!pte_cache)
-		BUG();
 }

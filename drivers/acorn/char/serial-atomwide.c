@@ -20,7 +20,4 @@
 #define MY_PORT_ADDRESS(port,cardaddr) \
 	((cardaddr) + 0x200 - (port) * 0x100)
 
-#define INIT serial_card_atomwide_init
-#define EXIT serial_card_atomwide_exit
-
 #include "serial-card.c"

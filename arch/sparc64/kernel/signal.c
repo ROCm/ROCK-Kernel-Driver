@@ -713,9 +713,11 @@ static int do_signal(sigset_t *oldset, struct pt_regs * regs,
 
 		if ((current->ptrace & PT_PTRACED) && signr != SIGKILL) {
 			current->exit_code = signr;
+			preempt_disable();
 			current->state = TASK_STOPPED;
 			notify_parent(current, SIGCHLD);
 			schedule();
+			preempt_enable();
 			if (!(signr = current->exit_code))
 				continue;
 			current->exit_code = 0;
@@ -766,16 +768,20 @@ static int do_signal(sigset_t *oldset, struct pt_regs * regs,
 				if (is_orphaned_pgrp(current->pgrp))
 					continue;
 
-			case SIGSTOP:
-				if (current->ptrace & PT_PTRACED)
-					continue;
-				current->state = TASK_STOPPED;
+			case SIGSTOP: {
+				struct signal_struct *sig;
+
 				current->exit_code = signr;
-				if (!(current->p_pptr->sig->action[SIGCHLD-1].sa.sa_flags &
+				sig = current->p_pptr->sig;
+				preempt_disable();
+				current->state = TASK_STOPPED;
+				if (sig && !(sig->action[SIGCHLD-1].sa.sa_flags &
 				      SA_NOCLDSTOP))
 					notify_parent(current, SIGCHLD);
 				schedule();
+				preempt_enable();
 				continue;
+			}
 
 			case SIGQUIT: case SIGILL: case SIGTRAP:
 			case SIGABRT: case SIGFPE: case SIGSEGV:

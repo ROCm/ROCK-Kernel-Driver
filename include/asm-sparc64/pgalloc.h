@@ -10,95 +10,6 @@
 #include <asm/spitfire.h>
 #include <asm/pgtable.h>
 
-/* Cache and TLB flush operations. */
-
-/* These are the same regardless of whether this is an SMP kernel or not. */
-#define flush_cache_mm(__mm) \
-	do { if ((__mm) == current->mm) flushw_user(); } while(0)
-extern void flush_cache_range(struct vm_area_struct *, unsigned long, unsigned long);
-#define flush_cache_page(vma, page) \
-	flush_cache_mm((vma)->vm_mm)
-
-/* This is unnecessary on the SpitFire since D-CACHE is write-through. */
-#define flush_page_to_ram(page)			do { } while (0)
-
-/* 
- * On spitfire, the icache doesn't snoop local stores and we don't
- * use block commit stores (which invalidate icache lines) during
- * module load, so we need this.
- */
-extern void flush_icache_range(unsigned long start, unsigned long end);
-
-extern void __flush_dcache_page(void *addr, int flush_icache);
-extern void __flush_icache_page(unsigned long);
-extern void flush_dcache_page_impl(struct page *page);
-#ifdef CONFIG_SMP
-extern void smp_flush_dcache_page_impl(struct page *page, int cpu);
-extern void flush_dcache_page_all(struct mm_struct *mm, struct page *page);
-#else
-#define smp_flush_dcache_page_impl(page,cpu) flush_dcache_page_impl(page)
-#define flush_dcache_page_all(mm,page) flush_dcache_page_impl(page)
-#endif
-
-extern void flush_dcache_page(struct page *page);
-
-extern void __flush_dcache_range(unsigned long start, unsigned long end);
-
-extern void __flush_cache_all(void);
-
-extern void __flush_tlb_all(void);
-extern void __flush_tlb_mm(unsigned long context, unsigned long r);
-extern void __flush_tlb_range(unsigned long context, unsigned long start,
-			      unsigned long r, unsigned long end,
-			      unsigned long pgsz, unsigned long size);
-extern void __flush_tlb_page(unsigned long context, unsigned long page, unsigned long r);
-
-#ifndef CONFIG_SMP
-
-#define flush_cache_all()	__flush_cache_all()
-#define flush_tlb_all()		__flush_tlb_all()
-
-#define flush_tlb_mm(__mm) \
-do { if(CTX_VALID((__mm)->context)) \
-	__flush_tlb_mm(CTX_HWBITS((__mm)->context), SECONDARY_CONTEXT); \
-} while(0)
-
-#define flush_tlb_range(__vma, start, end) \
-do { if(CTX_VALID((__vma)->vm_mm->context)) { \
-	unsigned long __start = (start)&PAGE_MASK; \
-	unsigned long __end = PAGE_ALIGN(end); \
-	__flush_tlb_range(CTX_HWBITS((__vma)->vm_mm->context), __start, \
-			  SECONDARY_CONTEXT, __end, PAGE_SIZE, \
-			  (__end - __start)); \
-     } \
-} while(0)
-
-#define flush_tlb_page(vma, page) \
-do { struct mm_struct *__mm = (vma)->vm_mm; \
-     if(CTX_VALID(__mm->context)) \
-	__flush_tlb_page(CTX_HWBITS(__mm->context), (page)&PAGE_MASK, \
-			 SECONDARY_CONTEXT); \
-} while(0)
-
-#else /* CONFIG_SMP */
-
-extern void smp_flush_cache_all(void);
-extern void smp_flush_tlb_all(void);
-extern void smp_flush_tlb_mm(struct mm_struct *mm);
-extern void smp_flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
-				unsigned long end);
-extern void smp_flush_tlb_page(struct mm_struct *mm, unsigned long page);
-
-#define flush_cache_all()	smp_flush_cache_all()
-#define flush_tlb_all()		smp_flush_tlb_all()
-#define flush_tlb_mm(mm)	smp_flush_tlb_mm(mm)
-#define flush_tlb_range(vma, start, end) \
-	smp_flush_tlb_range(vma, start, end)
-#define flush_tlb_page(vma, page) \
-	smp_flush_tlb_page((vma)->vm_mm, page)
-
-#endif /* ! CONFIG_SMP */
-
 #define VPTE_BASE_SPITFIRE	0xfffffffe00000000
 #if 1
 #define VPTE_BASE_CHEETAH	VPTE_BASE_SPITFIRE
@@ -106,7 +17,7 @@ extern void smp_flush_tlb_page(struct mm_struct *mm, unsigned long page);
 #define VPTE_BASE_CHEETAH	0xffe0000000000000
 #endif
 
-extern __inline__ void flush_tlb_pgtables(struct mm_struct *mm, unsigned long start,
+static __inline__ void flush_tlb_pgtables(struct mm_struct *mm, unsigned long start,
 					  unsigned long end)
 {
 	/* Note the signed type.  */
@@ -154,7 +65,7 @@ extern struct pgtable_cache_struct {
 
 #ifndef CONFIG_SMP
 
-extern __inline__ void free_pgd_fast(pgd_t *pgd)
+static __inline__ void free_pgd_fast(pgd_t *pgd)
 {
 	struct page *page = virt_to_page(pgd);
 
@@ -169,7 +80,7 @@ extern __inline__ void free_pgd_fast(pgd_t *pgd)
 	preempt_enable();
 }
 
-extern __inline__ pgd_t *get_pgd_fast(void)
+static __inline__ pgd_t *get_pgd_fast(void)
 {
         struct page *ret;
 
@@ -212,7 +123,7 @@ extern __inline__ pgd_t *get_pgd_fast(void)
 
 #else /* CONFIG_SMP */
 
-extern __inline__ void free_pgd_fast(pgd_t *pgd)
+static __inline__ void free_pgd_fast(pgd_t *pgd)
 {
 	preempt_disable();
 	*(unsigned long *)pgd = (unsigned long) pgd_quicklist;
@@ -221,7 +132,7 @@ extern __inline__ void free_pgd_fast(pgd_t *pgd)
 	preempt_enable();
 }
 
-extern __inline__ pgd_t *get_pgd_fast(void)
+static __inline__ pgd_t *get_pgd_fast(void)
 {
 	unsigned long *ret;
 
@@ -240,7 +151,7 @@ extern __inline__ pgd_t *get_pgd_fast(void)
 	return (pgd_t *)ret;
 }
 
-extern __inline__ void free_pgd_slow(pgd_t *pgd)
+static __inline__ void free_pgd_slow(pgd_t *pgd)
 {
 	free_page((unsigned long)pgd);
 }
@@ -257,23 +168,15 @@ extern __inline__ void free_pgd_slow(pgd_t *pgd)
 
 #define pgd_populate(MM, PGD, PMD)	pgd_set(PGD, PMD)
 
-extern __inline__ pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long address)
-{
-	pmd_t *pmd = (pmd_t *)__get_free_page(GFP_KERNEL);
-	if (pmd)
-		memset(pmd, 0, PAGE_SIZE);
-	return pmd;
-}
-
-extern __inline__ pmd_t *pmd_alloc_one_fast(struct mm_struct *mm, unsigned long address)
+static __inline__ pmd_t *pmd_alloc_one_fast(struct mm_struct *mm, unsigned long address)
 {
 	unsigned long *ret;
 	int color = 0;
 
+	preempt_disable();
 	if (pte_quicklist[color] == NULL)
 		color = 1;
 
-	preempt_disable();
 	if((ret = (unsigned long *)pte_quicklist[color]) != NULL) {
 		pte_quicklist[color] = (unsigned long *)(*ret);
 		ret[0] = 0;
@@ -284,7 +187,20 @@ extern __inline__ pmd_t *pmd_alloc_one_fast(struct mm_struct *mm, unsigned long 
 	return (pmd_t *)ret;
 }
 
-extern __inline__ void free_pmd_fast(pmd_t *pmd)
+static __inline__ pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long address)
+{
+	pmd_t *pmd;
+
+	pmd = pmd_alloc_one_fast(mm, address);
+	if (!pmd) {
+		pmd = (pmd_t *)__get_free_page(GFP_KERNEL);
+		if (pmd)
+			memset(pmd, 0, PAGE_SIZE);
+	}
+	return pmd;
+}
+
+static __inline__ void free_pmd_fast(pmd_t *pmd)
 {
 	unsigned long color = DCACHE_COLOR((unsigned long)pmd);
 
@@ -295,16 +211,19 @@ extern __inline__ void free_pmd_fast(pmd_t *pmd)
 	preempt_enable();
 }
 
-extern __inline__ void free_pmd_slow(pmd_t *pmd)
+static __inline__ void free_pmd_slow(pmd_t *pmd)
 {
 	free_page((unsigned long)pmd);
 }
 
-#define pmd_populate(MM, PMD, PTE)	pmd_set(PMD, PTE)
+#define pmd_populate_kernel(MM, PMD, PTE)	pmd_set(PMD, PTE)
+#define pmd_populate(MM,PMD,PTE_PAGE)		\
+	pmd_populate_kernel(MM,PMD,page_address(PTE_PAGE))
 
-extern pte_t *pte_alloc_one(struct mm_struct *mm, unsigned long address);
+extern pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address);
+#define pte_alloc_one(MM,ADDR)	virt_to_page(pte_alloc_one_kernel(MM,ADDR))
 
-extern __inline__ pte_t *pte_alloc_one_fast(struct mm_struct *mm, unsigned long address)
+static __inline__ pte_t *pte_alloc_one_fast(struct mm_struct *mm, unsigned long address)
 {
 	unsigned long color = VPTE_COLOR(address);
 	unsigned long *ret;
@@ -319,7 +238,7 @@ extern __inline__ pte_t *pte_alloc_one_fast(struct mm_struct *mm, unsigned long 
 	return (pte_t *)ret;
 }
 
-extern __inline__ void free_pte_fast(pte_t *pte)
+static __inline__ void free_pte_fast(pte_t *pte)
 {
 	unsigned long color = DCACHE_COLOR((unsigned long)pte);
 
@@ -330,16 +249,15 @@ extern __inline__ void free_pte_fast(pte_t *pte)
 	preempt_enable();
 }
 
-extern __inline__ void free_pte_slow(pte_t *pte)
+static __inline__ void free_pte_slow(pte_t *pte)
 {
 	free_page((unsigned long)pte);
 }
 
-#define pte_free(pte)		free_pte_fast(pte)
+#define pte_free_kernel(pte)	free_pte_fast(pte)
+#define pte_free(pte)		free_pte_fast(page_address(pte))
 #define pmd_free(pmd)		free_pmd_fast(pmd)
 #define pgd_free(pgd)		free_pgd_fast(pgd)
 #define pgd_alloc(mm)		get_pgd_fast()
-
-extern int do_check_pgt_cache(int, int);
 
 #endif /* _SPARC64_PGALLOC_H */

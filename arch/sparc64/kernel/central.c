@@ -247,6 +247,55 @@ static void probe_clock_board(struct linux_central *central,
 	       (central->clkver ? upa_readb(central->clkver) : 0x00));
 }
 
+static void init_all_fhc_hw(void)
+{
+	struct linux_fhc *fhc;
+
+	for(fhc = fhc_list; fhc != NULL; fhc = fhc->next) {
+		u32 tmp;
+
+		/* Clear all of the interrupt mapping registers
+		 * just in case OBP left them in a foul state.
+		 */
+#define ZAP(ICLR, IMAP) \
+do {	u32 imap_tmp; \
+	upa_writel(0, (ICLR)); \
+	upa_readl(ICLR); \
+	imap_tmp = upa_readl(IMAP); \
+	imap_tmp &= ~(0x80000000); \
+	upa_writel(imap_tmp, (IMAP)); \
+	upa_readl(IMAP); \
+} while (0)
+
+		ZAP(fhc->fhc_regs.ffregs + FHC_FFREGS_ICLR,
+		    fhc->fhc_regs.ffregs + FHC_FFREGS_IMAP);
+		ZAP(fhc->fhc_regs.sregs + FHC_SREGS_ICLR,
+		    fhc->fhc_regs.sregs + FHC_SREGS_IMAP);
+		ZAP(fhc->fhc_regs.uregs + FHC_UREGS_ICLR,
+		    fhc->fhc_regs.uregs + FHC_UREGS_IMAP);
+		ZAP(fhc->fhc_regs.tregs + FHC_TREGS_ICLR,
+		    fhc->fhc_regs.tregs + FHC_TREGS_IMAP);
+
+#undef ZAP
+
+		/* Setup FHC control register. */
+		tmp = upa_readl(fhc->fhc_regs.pregs + FHC_PREGS_CTRL);
+
+		/* All non-central boards have this bit set. */
+		if(! IS_CENTRAL_FHC(fhc))
+			tmp |= FHC_CONTROL_IXIST;
+
+		/* For all FHCs, clear the firmware synchronization
+		 * line and both low power mode enables.
+		 */
+		tmp &= ~(FHC_CONTROL_AOFF | FHC_CONTROL_BOFF | FHC_CONTROL_SLINE);
+
+		upa_writel(tmp, fhc->fhc_regs.pregs + FHC_PREGS_CTRL);
+		upa_readl(fhc->fhc_regs.pregs + FHC_PREGS_CTRL);
+	}
+
+}
+
 void central_probe(void)
 {
 	struct linux_prom_registers fpregs[6];
@@ -341,6 +390,8 @@ void central_probe(void)
 	       ((err & FHC_ID_MANUF) >> 1));
 
 	probe_other_fhcs();
+
+	init_all_fhc_hw();
 }
 
 static __inline__ void fhc_ledblink(struct linux_fhc *fhc, int on)
@@ -398,55 +449,11 @@ static void sunfire_timer(unsigned long __ignored)
 void firetruck_init(void)
 {
 	struct linux_central *central = central_bus;
-	struct linux_fhc *fhc;
 	u8 ctrl;
 
 	/* No central bus, nothing to do. */
 	if (central == NULL)
 		return;
-
-	for(fhc = fhc_list; fhc != NULL; fhc = fhc->next) {
-		u32 tmp;
-
-		/* Clear all of the interrupt mapping registers
-		 * just in case OBP left them in a foul state.
-		 */
-#define ZAP(ICLR, IMAP) \
-do {	u32 imap_tmp; \
-	upa_writel(0, (ICLR)); \
-	upa_readl(ICLR); \
-	imap_tmp = upa_readl(IMAP); \
-	imap_tmp &= ~(0x80000000); \
-	upa_writel(imap_tmp, (IMAP)); \
-	upa_readl(IMAP); \
-} while (0)
-
-		ZAP(fhc->fhc_regs.ffregs + FHC_FFREGS_ICLR,
-		    fhc->fhc_regs.ffregs + FHC_FFREGS_IMAP);
-		ZAP(fhc->fhc_regs.sregs + FHC_SREGS_ICLR,
-		    fhc->fhc_regs.sregs + FHC_SREGS_IMAP);
-		ZAP(fhc->fhc_regs.uregs + FHC_UREGS_ICLR,
-		    fhc->fhc_regs.uregs + FHC_UREGS_IMAP);
-		ZAP(fhc->fhc_regs.tregs + FHC_TREGS_ICLR,
-		    fhc->fhc_regs.tregs + FHC_TREGS_IMAP);
-
-#undef ZAP
-
-		/* Setup FHC control register. */
-		tmp = upa_readl(fhc->fhc_regs.pregs + FHC_PREGS_CTRL);
-
-		/* All non-central boards have this bit set. */
-		if(! IS_CENTRAL_FHC(fhc))
-			tmp |= FHC_CONTROL_IXIST;
-
-		/* For all FHCs, clear the firmware synchronization
-		 * line and both low power mode enables.
-		 */
-		tmp &= ~(FHC_CONTROL_AOFF | FHC_CONTROL_BOFF | FHC_CONTROL_SLINE);
-
-		upa_writel(tmp, fhc->fhc_regs.pregs + FHC_PREGS_CTRL);
-		upa_readl(fhc->fhc_regs.pregs + FHC_PREGS_CTRL);
-	}
 
 	/* OBP leaves it on, turn it off so clock board timer LED
 	 * is in sync with FHC ones.

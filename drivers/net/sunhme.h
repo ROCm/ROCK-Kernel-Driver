@@ -431,7 +431,7 @@ struct happy_meal {
 	unsigned long	bigmacregs;     /* BIGMAC core regs		     */
 	unsigned long	tcvregs;        /* MIF transceiver regs              */
 
-	__u32                     hblock_dvma;    /* DVMA visible address happy block  */
+	dma_addr_t                hblock_dvma;    /* DVMA visible address happy block  */
 	unsigned int              happy_flags;    /* Driver state flags                */
 	enum happy_transceiver    tcvr_type;      /* Kind of transceiver in use        */
 	unsigned int              happy_bursts;   /* Get your mind out of the gutter   */

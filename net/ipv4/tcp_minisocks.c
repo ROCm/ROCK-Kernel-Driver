@@ -75,17 +75,16 @@ void tcp_timewait_kill(struct tcp_tw_bucket *tw)
 	/* Disassociate with bind bucket. */
 	bhead = &tcp_bhash[tcp_bhashfn(tw->num)];
 	spin_lock(&bhead->lock);
-	if ((tb = tw->tb) != NULL) {
-		if(tw->bind_next)
-			tw->bind_next->bind_pprev = tw->bind_pprev;
-		*(tw->bind_pprev) = tw->bind_next;
-		tw->tb = NULL;
-		if (tb->owners == NULL) {
-			if (tb->next)
-				tb->next->pprev = tb->pprev;
-			*(tb->pprev) = tb->next;
-			kmem_cache_free(tcp_bucket_cachep, tb);
-		}
+	tb = tw->tb;
+	if(tw->bind_next)
+		tw->bind_next->bind_pprev = tw->bind_pprev;
+	*(tw->bind_pprev) = tw->bind_next;
+	tw->tb = NULL;
+	if (tb->owners == NULL) {
+		if (tb->next)
+			tb->next->pprev = tb->pprev;
+		*(tb->pprev) = tb->next;
+		kmem_cache_free(tcp_bucket_cachep, tb);
 	}
 	spin_unlock(&bhead->lock);
 
@@ -304,9 +303,23 @@ static void __tcp_tw_hashdance(struct sock *sk, struct tcp_tw_bucket *tw)
 	struct tcp_bind_hashbucket *bhead;
 	struct sock **head, *sktw;
 
+	/* Step 1: Put TW into bind hash. Original socket stays there too.
+	   Note, that any socket with inet_sk(sk)->num != 0 MUST be bound in
+	   binding cache, even if it is closed.
+	 */
+	bhead = &tcp_bhash[tcp_bhashfn(inet_sk(sk)->num)];
+	spin_lock(&bhead->lock);
+	tw->tb = (struct tcp_bind_bucket *)sk->prev;
+	BUG_TRAP(sk->prev!=NULL);
+	if ((tw->bind_next = tw->tb->owners) != NULL)
+		tw->tb->owners->bind_pprev = &tw->bind_next;
+	tw->tb->owners = (struct sock*)tw;
+	tw->bind_pprev = &tw->tb->owners;
+	spin_unlock(&bhead->lock);
+
 	write_lock(&ehead->lock);
 
-	/* Step 1: Remove SK from established hash. */
+	/* Step 2: Remove SK from established hash. */
 	if (sk->pprev) {
 		if(sk->next)
 			sk->next->pprev = sk->pprev;
@@ -315,7 +328,7 @@ static void __tcp_tw_hashdance(struct sock *sk, struct tcp_tw_bucket *tw)
 		sock_prot_dec_use(sk->prot);
 	}
 
-	/* Step 2: Hash TW into TIMEWAIT half of established hash table. */
+	/* Step 3: Hash TW into TIMEWAIT half of established hash table. */
 	head = &(ehead + tcp_ehash_size)->chain;
 	sktw = (struct sock *)tw;
 	if((sktw->next = *head) != NULL)
@@ -325,20 +338,6 @@ static void __tcp_tw_hashdance(struct sock *sk, struct tcp_tw_bucket *tw)
 	atomic_inc(&tw->refcnt);
 
 	write_unlock(&ehead->lock);
-
-	/* Step 3: Put TW into bind hash. Original socket stays there too.
-	   Note, that any socket with sk->num!=0 MUST be bound in binding
-	   cache, even if it is closed.
-	 */
-	bhead = &tcp_bhash[tcp_bhashfn(sk->num)];
-	spin_lock(&bhead->lock);
-	tw->tb = (struct tcp_bind_bucket *)sk->prev;
-	BUG_TRAP(sk->prev!=NULL);
-	if ((tw->bind_next = tw->tb->owners) != NULL)
-		tw->tb->owners->bind_pprev = &tw->bind_next;
-	tw->tb->owners = (struct sock*)tw;
-	tw->bind_pprev = &tw->tb->owners;
-	spin_unlock(&bhead->lock);
 }
 
 /* 
@@ -357,17 +356,18 @@ void tcp_time_wait(struct sock *sk, int state, int timeo)
 		tw = kmem_cache_alloc(tcp_timewait_cachep, SLAB_ATOMIC);
 
 	if(tw != NULL) {
+		struct inet_opt *inet = inet_sk(sk);
 		int rto = (tp->rto<<2) - (tp->rto>>1);
 
 		/* Give us an identity. */
-		tw->daddr	= sk->daddr;
-		tw->rcv_saddr	= sk->rcv_saddr;
+		tw->daddr	= inet->daddr;
+		tw->rcv_saddr	= inet->rcv_saddr;
 		tw->bound_dev_if= sk->bound_dev_if;
-		tw->num		= sk->num;
+		tw->num		= inet->num;
 		tw->state	= TCP_TIME_WAIT;
 		tw->substate	= state;
-		tw->sport	= sk->sport;
-		tw->dport	= sk->dport;
+		tw->sport	= inet->sport;
+		tw->dport	= inet->dport;
 		tw->family	= sk->family;
 		tw->reuse	= sk->reuse;
 		tw->rcv_wscale	= tp->rcv_wscale;
@@ -660,7 +660,7 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 		newsk->prev = NULL;
 
 		/* Clone the TCP header template */
-		newsk->dport = req->rmt_port;
+		inet_sk(newsk)->dport = req->rmt_port;
 
 		sock_lock_init(newsk);
 		bh_lock_sock(newsk);

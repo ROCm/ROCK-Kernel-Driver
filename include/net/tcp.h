@@ -53,7 +53,7 @@ struct tcp_ehash_bucket {
  *	2) If all sockets have sk->reuse set, and none of them are in
  *	   TCP_LISTEN state, the port may be shared.
  *	   Failing that, goto test 3.
- *	3) If all sockets are bound to a specific sk->rcv_saddr local
+ *	3) If all sockets are bound to a specific inet_sk(sk)->rcv_saddr local
  *	   address, and none of them are the same, the port may be
  *	   shared.
  *	   Failing this, the port cannot be shared.
@@ -162,23 +162,26 @@ struct tcp_tw_bucket {
 	 * XXX Yes I know this is gross, but I'd have to edit every single
 	 * XXX networking file if I created a "struct sock_header". -DaveM
 	 */
-	__u32			daddr;
-	__u32			rcv_saddr;
-	__u16			dport;
-	unsigned short		num;
+	volatile unsigned char	state,		/* Connection state	      */
+				substate;	/* "zapped" -> "substate"     */
+	unsigned char		reuse;		/* SO_REUSEADDR setting       */
+	unsigned char		rcv_wscale;	/* also TW bucket specific    */
 	int			bound_dev_if;
+	/* Main hash linkage for various protocol lookup tables. */
 	struct sock		*next;
 	struct sock		**pprev;
 	struct sock		*bind_next;
 	struct sock		**bind_pprev;
-	unsigned char		state,
-				substate; /* "zapped" is replaced with "substate" */
-	__u16			sport;
-	unsigned short		family;
-	unsigned char		reuse,
-				rcv_wscale; /* It is also TW bucket specific */
 	atomic_t		refcnt;
-
+	unsigned short		family;
+	/* End of struct sock/struct tcp_tw_bucket shared layout */
+	__u16			sport;
+	/* Socket demultiplex comparisons on incoming packets. */
+	/* these five are in inet_opt */
+	__u32			daddr;
+	__u32			rcv_saddr;
+	__u16			dport;
+	__u16			num;
 	/* And these are ours. */
 	int			hashent;
 	int			timeout;
@@ -236,20 +239,20 @@ extern void tcp_tw_deschedule(struct tcp_tw_bucket *tw);
 	__u64 __name = (((__u64)(__daddr))<<32)|((__u64)(__saddr));
 #endif /* __BIG_ENDIAN */
 #define TCP_IPV4_MATCH(__sk, __cookie, __saddr, __daddr, __ports, __dif)\
-	(((*((__u64 *)&((__sk)->daddr)))== (__cookie))	&&		\
-	 ((*((__u32 *)&((__sk)->dport)))== (__ports))   &&		\
+	(((*((__u64 *)&(inet_sk(__sk)->daddr)))== (__cookie))	&&	\
+	 ((*((__u32 *)&(inet_sk(__sk)->dport)))== (__ports))   &&	\
 	 (!((__sk)->bound_dev_if) || ((__sk)->bound_dev_if == (__dif))))
 #else /* 32-bit arch */
 #define TCP_V4_ADDR_COOKIE(__name, __saddr, __daddr)
 #define TCP_IPV4_MATCH(__sk, __cookie, __saddr, __daddr, __ports, __dif)\
-	(((__sk)->daddr			== (__saddr))	&&		\
-	 ((__sk)->rcv_saddr		== (__daddr))	&&		\
-	 ((*((__u32 *)&((__sk)->dport)))== (__ports))   &&		\
+	((inet_sk(__sk)->daddr			== (__saddr))	&&	\
+	 (inet_sk(__sk)->rcv_saddr		== (__daddr))	&&	\
+	 ((*((__u32 *)&(inet_sk(__sk)->dport)))== (__ports))	&&	\
 	 (!((__sk)->bound_dev_if) || ((__sk)->bound_dev_if == (__dif))))
 #endif /* 64-bit arch */
 
 #define TCP_IPV6_MATCH(__sk, __saddr, __daddr, __ports, __dif)	   \
-	(((*((__u32 *)&((__sk)->dport)))== (__ports))   	&& \
+	(((*((__u32 *)&(inet_sk(__sk)->dport)))== (__ports))   	&& \
 	 ((__sk)->family		== AF_INET6)		&& \
 	 !ipv6_addr_cmp(&inet6_sk(__sk)->daddr, (__saddr))	&& \
 	 !ipv6_addr_cmp(&inet6_sk(__sk)->rcv_saddr, (__daddr))	&& \
@@ -263,7 +266,7 @@ static __inline__ int tcp_lhashfn(unsigned short num)
 
 static __inline__ int tcp_sk_listen_hashfn(struct sock *sk)
 {
-	return tcp_lhashfn(sk->num);
+	return tcp_lhashfn(inet_sk(sk)->num);
 }
 
 #define MAX_TCP_HEADER	(128 + MAX_HEADER)

@@ -85,7 +85,7 @@ void __exit jffs2_zlib_exit(void)
 	vfree(inflate_workspace);
 }
 
-int zlib_compress(unsigned char *data_in, unsigned char *cpage_out, 
+int jffs2_zlib_compress(unsigned char *data_in, unsigned char *cpage_out, 
 		   uint32_t *sourcelen, uint32_t *dstlen)
 {
 	z_stream strm;
@@ -145,7 +145,7 @@ int zlib_compress(unsigned char *data_in, unsigned char *cpage_out,
 	return 0;
 }
 
-void zlib_decompress(unsigned char *data_in, unsigned char *cpage_out,
+void jffs2_zlib_decompress(unsigned char *data_in, unsigned char *cpage_out,
 		      uint32_t srclen, uint32_t destlen)
 {
 	z_stream strm;

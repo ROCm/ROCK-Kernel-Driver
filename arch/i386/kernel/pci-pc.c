@@ -1343,6 +1343,9 @@ char * __devinit  pcibios_setup(char *str)
 	} else if (!strcmp(str, "assign-busses")) {
 		pci_probe |= PCI_ASSIGN_ALL_BUSSES;
 		return NULL;
+	} else if (!strcmp(str, "usepirqmask")) {
+		pci_probe |= PCI_USE_PIRQ_MASK;
+		return NULL;
 	} else if (!strncmp(str, "irqmask=", 8)) {
 		pcibios_irq_mask = simple_strtol(str+8, NULL, 0);
 		return NULL;

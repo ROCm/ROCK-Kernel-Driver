@@ -1,7 +1,7 @@
 /* Rubin encoder/decoder header       */
 /* work started at   : aug   3, 1994  */
 /* last modification : aug  15, 1994  */
-/* $Id: compr_rubin.h,v 1.5 2001/02/26 13:50:01 dwmw2 Exp $ */
+/* $Id: compr_rubin.h,v 1.6 2002/01/25 01:49:26 dwmw2 Exp $ */
 
 #include "pushpull.h"
 
@@ -19,10 +19,3 @@ struct rubin_state {
 	int bit_divider;
 	int bits[8];
 };
-
-
-void init_rubin (struct rubin_state *rs, int div, int *bits);
-int encode (struct rubin_state *, long, long, int);
-void end_rubin (struct rubin_state *);
-void init_decode (struct rubin_state *, int div, int *bits);
-int decode (struct rubin_state *, long, long);

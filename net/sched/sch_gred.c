@@ -7,7 +7,7 @@
  *              as published by the Free Software Foundation; either version
  *              2 of the License, or (at your option) any later version.
  *
- * Authors:    J Hadi Salim (hadi@nortelnetworks.com) 1998,1999
+ * Authors:    J Hadi Salim (hadi@cyberus.ca) 1998-2002
  *
  *             991129: -  Bug fix with grio mode
  *		       - a better sing. AvgQ mode with Grio(WRED)
@@ -436,7 +436,7 @@ static int gred_change(struct Qdisc *sch, struct rtattr *opt)
 		if (table->tab[table->def] == NULL) {
 			table->tab[table->def]=
 				kmalloc(sizeof(struct gred_sched_data), GFP_KERNEL);
-			if (NULL == table->tab[ctl->DP])
+			if (NULL == table->tab[table->def])
 				return -ENOMEM;
 
 			memset(table->tab[table->def], 0,
@@ -498,7 +498,7 @@ static int gred_dump(struct Qdisc *sch, struct sk_buff *skb)
 {
 	unsigned long qave;
 	struct rtattr *rta;
-	struct tc_gred_qopt *opt;
+	struct tc_gred_qopt *opt = NULL ;
 	struct tc_gred_qopt *dst;
 	struct gred_sched *table = (struct gred_sched *)sch->data;
 	struct gred_sched_data *q;
@@ -520,7 +520,6 @@ static int gred_dump(struct Qdisc *sch, struct sk_buff *skb)
 
 	if (!table->initd) {
 		DPRINTK("NO GRED Queues setup!\n");
-		return -1;
 	}
 
 	for (i=0;i<MAX_DPs;i++) {
@@ -577,9 +576,12 @@ static int gred_dump(struct Qdisc *sch, struct sk_buff *skb)
 	RTA_PUT(skb, TCA_GRED_PARMS, sizeof(struct tc_gred_qopt)*MAX_DPs, opt);
 	rta->rta_len = skb->tail - b;
 
+	kfree(opt);
 	return skb->len;
 
 rtattr_failure:
+	if (opt)
+		kfree(opt);
 	DPRINTK("gred_dump: FAILURE!!!!\n");
 
 /* also free the opt struct here */
