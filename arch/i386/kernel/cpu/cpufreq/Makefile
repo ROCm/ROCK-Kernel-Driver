@@ -11,9 +11,3 @@ obj-$(CONFIG_X86_SPEEDSTEP_LIB) += speedstep-lib.o
 obj-$(CONFIG_X86_SPEEDSTEP_SMI) += speedstep-smi.o
 obj-$(CONFIG_X86_ACPI_CPUFREQ)	+= acpi-cpufreq.o
 obj-$(CONFIG_X86_P4_CLOCKMOD)	+= p4-clockmod.o
-
-ifdef CONFIG_X86_ACPI_CPUFREQ
-  ifdef CONFIG_ACPI_DEBUG
-    EXTRA_CFLAGS += -DACPI_DEBUG_OUTPUT
-  endif
-endif
