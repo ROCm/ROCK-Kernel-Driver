@@ -31,6 +31,12 @@
 #include <asm/kdebug.h>
 #include <asm/proto.h>
 
+#ifdef CONFIG_PCI_NAMES
+#define pci_pretty_name(dev) ((dev)->pretty_name)
+#else
+#define pci_pretty_name(dev) ""
+#endif
+
 dma_addr_t bad_dma_address;
 
 unsigned long iommu_bus_base;	/* GART remapping area (physical) */
@@ -270,7 +276,7 @@ static void iommu_full(struct pci_dev *dev, size_t size, int dir)
 	
 	printk(KERN_ERR 
   "PCI-DMA: Out of IOMMU space for %lu bytes at device %s[%s]\n",
-	       size, dev ? dev->dev.name : "?", dev ? dev->slot_name : "?");
+	       size, dev ? pci_pretty_name(dev) : "", dev ? dev->slot_name : "?");
 
 	if (size > PAGE_SIZE*EMERGENCY_PAGES) {
 		if (dir == PCI_DMA_FROMDEVICE || dir == PCI_DMA_BIDIRECTIONAL)

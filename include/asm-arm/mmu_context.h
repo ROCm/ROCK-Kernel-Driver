@@ -15,7 +15,45 @@
 
 #include <asm/proc-fns.h>
 
+#if __LINUX_ARM_ARCH__ >= 6
+
+/*
+ * On ARMv6, we have the following structure in the Context ID:
+ *
+ * 31                         7          0
+ * +-------------------------+-----------+
+ * |      process ID         |   ASID    |
+ * +-------------------------+-----------+
+ * |              context ID             |
+ * +-------------------------------------+
+ *
+ * The ASID is used to tag entries in the CPU caches and TLBs.
+ * The context ID is used by debuggers and trace logic, and
+ * should be unique within all running processes.
+ */
+#define ASID_BITS	8
+#define ASID_MASK	((~0) << ASID_BITS)
+
+extern unsigned int cpu_last_asid;
+
+void __init_new_context(struct task_struct *tsk, struct mm_struct *mm);
+void __new_context(struct mm_struct *mm);
+
+static inline void check_context(struct mm_struct *mm)
+{
+	if (unlikely((mm->context.id ^ cpu_last_asid) >> ASID_BITS))
+		__new_context(mm);
+}
+
+#define init_new_context(tsk,mm)	(__init_new_context(tsk,mm),0)
+
+#else
+
+#define check_context(mm)		do { } while (0)
 #define init_new_context(tsk,mm)	0
+
+#endif
+
 #define destroy_context(mm)		do { } while(0)
 
 /*
@@ -43,6 +81,7 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
 	  struct task_struct *tsk)
 {
 	if (prev != next) {
+		check_context(next);
 		cpu_switch_mm(next->pgd, next);
 	}
 }
@@ -51,6 +90,7 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
 
 static inline void activate_mm(struct mm_struct *prev, struct mm_struct *next)
 {
+	check_context(next);
 	cpu_switch_mm(next->pgd, next);
 }
 

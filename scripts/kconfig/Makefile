@@ -65,12 +65,20 @@ host-progs	:= conf mconf qconf gconf
 conf-objs	:= conf.o  libkconfig.so
 mconf-objs	:= mconf.o libkconfig.so
 
-ifeq ($(MAKECMDGOALS),$(obj)/qconf)
+ifeq ($(MAKECMDGOALS),xconfig)
+	qconf-target := 1
+endif
+ifeq ($(MAKECMDGOALS),gconfig)
+	gconf-target := 1
+endif
+
+
+ifeq ($(qconf-target),1)
 qconf-cxxobjs	:= qconf.o
 qconf-objs	:= kconfig_load.o
 endif
 
-ifeq ($(MAKECMDGOALS),$(obj)/gconf)
+ifeq ($(gconf-target),1)
 gconf-objs	:= gconf.o kconfig_load.o
 endif
 
@@ -91,7 +99,7 @@ $(obj)/conf.o $(obj)/mconf.o $(obj)/qconf.o $(obj)/gconf.o: $(obj)/zconf.tab.h
 
 $(obj)/qconf.o: $(obj)/.tmp_qtcheck
 
-ifeq ($(MAKECMDGOALS),$(obj)/qconf)
+ifeq ($(qconf-target),1)
 MOC = $(QTDIR)/bin/moc
 -include $(obj)/.tmp_qtcheck
 
@@ -121,7 +129,7 @@ endif
 
 $(obj)/gconf.o: $(obj)/.tmp_gtkcheck
 
-ifeq ($(MAKECMDGOALS),$(obj)/gconf)
+ifeq ($(gconf-target),1)
 -include $(obj)/.tmp_gtkcheck
 
 # GTK needs some extra effort, too...

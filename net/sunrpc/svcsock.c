@@ -147,6 +147,8 @@ svc_sock_enqueue(struct svc_sock *svsk)
 	if (!(svsk->sk_flags &
 	      ( (1<<SK_CONN)|(1<<SK_DATA)|(1<<SK_CLOSE)|(1<<SK_DEFERRED)) ))
 		return;
+	if (test_bit(SK_DEAD, &svsk->sk_flags))
+		return;
 
 	spin_lock_bh(&serv->sv_lock);
 
@@ -351,6 +353,9 @@ svc_sendto(struct svc_rqst *rqstp, struct xdr_buf *xdr)
 	struct svc_sock	*svsk = rqstp->rq_sock;
 	struct socket	*sock = svsk->sk_sock;
 	int		slen;
+	struct { struct cmsghdr cmh;
+		struct in_pktinfo pki;
+	} cm;
 	int		len = 0;
 	int		result;
 	int		size;
@@ -362,15 +367,21 @@ svc_sendto(struct svc_rqst *rqstp, struct xdr_buf *xdr)
 	slen = xdr->len;
 
 	if (rqstp->rq_prot == IPPROTO_UDP) {
-		/* set the destination */
+		/* set the source and destination */
 		struct msghdr	msg;
 		msg.msg_name    = &rqstp->rq_addr;
 		msg.msg_namelen = sizeof(rqstp->rq_addr);
 		msg.msg_iov     = NULL;
 		msg.msg_iovlen  = 0;
-		msg.msg_control = NULL;
-		msg.msg_controllen = 0;
 		msg.msg_flags	= MSG_MORE;
+
+		msg.msg_control = &cm;
+		msg.msg_controllen = sizeof(cm);
+		cm.cmh.cmsg_len = sizeof(cm);
+		cm.cmh.cmsg_level = SOL_IP;
+		cm.cmh.cmsg_type = IP_PKTINFO;
+		cm.pki.ipi_ifindex = 0;
+		cm.pki.ipi_spec_dst.s_addr = rqstp->rq_daddr;
 
 		if (sock_sendmsg(sock, &msg, 0) < 0)
 			goto out;
@@ -581,7 +592,13 @@ svc_udp_recvfrom(struct svc_rqst *rqstp)
 		/* possibly an icmp error */
 		dprintk("svc: recvfrom returned error %d\n", -err);
 	}
+	svsk->sk_sk->sk_stamp = skb->stamp;
 	set_bit(SK_DATA, &svsk->sk_flags); /* there may be more data... */
+
+	/*
+	 * Maybe more packets - kick another thread ASAP.
+	 */
+	svc_sock_received(svsk);
 
 	len  = skb->len - sizeof(struct udphdr);
 	rqstp->rq_arg.len = len;
@@ -592,8 +609,7 @@ svc_udp_recvfrom(struct svc_rqst *rqstp)
 	rqstp->rq_addr.sin_family = AF_INET;
 	rqstp->rq_addr.sin_port = skb->h.uh->source;
 	rqstp->rq_addr.sin_addr.s_addr = skb->nh.iph->saddr;
-
-	svsk->sk_sk->sk_stamp = skb->stamp;
+	rqstp->rq_daddr = skb->nh.iph->daddr;
 
 	if (skb_is_nonlinear(skb)) {
 		/* we have to copy */
@@ -602,7 +618,6 @@ svc_udp_recvfrom(struct svc_rqst *rqstp)
 			local_bh_enable();
 			/* checksum error */
 			skb_free_datagram(svsk->sk_sk, skb);
-			svc_sock_received(svsk);
 			return 0;
 		}
 		local_bh_enable();
@@ -614,7 +629,6 @@ svc_udp_recvfrom(struct svc_rqst *rqstp)
 		if (skb->ip_summed != CHECKSUM_UNNECESSARY) {
 			if ((unsigned short)csum_fold(skb_checksum(skb, 0, skb->len, skb->csum))) {
 				skb_free_datagram(svsk->sk_sk, skb);
-				svc_sock_received(svsk);
 				return 0;
 			}
 			skb->ip_summed = CHECKSUM_UNNECESSARY;
@@ -633,9 +647,6 @@ svc_udp_recvfrom(struct svc_rqst *rqstp)
 
 	if (serv->sv_stats)
 		serv->sv_stats->netudpcnt++;
-
-	/* One down, maybe more to go... */
-	svc_sock_received(svsk);
 
 	return len;
 }
@@ -1028,6 +1039,9 @@ svc_tcp_sendto(struct svc_rqst *rqstp)
 	 */
 	reclen = htonl(0x80000000|((xbufp->len ) - 4));
 	memcpy(xbufp->head[0].iov_base, &reclen, 4);
+
+	if (test_bit(SK_DEAD, &rqstp->rq_sock->sk_flags))
+		return -ENOTCONN;
 
 	sent = svc_sendto(rqstp, &rqstp->rq_res);
 	if (sent != xbufp->len) {

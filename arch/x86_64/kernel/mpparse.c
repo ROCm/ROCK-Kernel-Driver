@@ -886,6 +886,8 @@ void __init mp_parse_prt (void)
 	int			ioapic_pin = 0;
 	int			irq = 0;
 	int			idx, bit = 0;
+	int			edge_level = 0;
+	int			active_high_low = 0;
 
 	/*
 	 * Parsing through the PCI Interrupt Routing Table (PRT) and program
@@ -896,12 +898,19 @@ void __init mp_parse_prt (void)
 
 		/* Need to get irq for dynamic entry */
 		if (entry->link.handle) {
-			irq = acpi_pci_link_get_irq(entry->link.handle, entry->link.index);
+			irq = acpi_pci_link_get_irq(entry->link.handle, entry->link.index, &edge_level, &active_high_low);
 			if (!irq)
-			continue;
+				continue;
+		} else {
+			/* Hardwired IRQ. Assume PCI standard settings */
+			irq = entry->link.index;
+			edge_level = 1;
+			active_high_low = 1;
 		}
-		else
-		irq = entry->link.index;
+
+		/* Don't set up the ACPI SCI because it's already set up */
+		if (acpi_fadt.sci_int == irq)
+			continue;
 
 		ioapic = mp_find_ioapic(irq);
 		if (ioapic < 0)
@@ -930,7 +939,7 @@ void __init mp_parse_prt (void)
 
 		mp_ioapic_routing[ioapic].pin_programmed[idx] |= (1<<bit);
 
-		vector = io_apic_set_pci_routing(ioapic, ioapic_pin, irq);
+		vector = io_apic_set_pci_routing(ioapic, ioapic_pin, irq, edge_level, active_high_low);
 		if (vector)
 			entry->irq = irq;
 

@@ -20,10 +20,6 @@ ifeq ($(CONFIG_FRAME_POINTER),y)
 CFLAGS		+=-fno-omit-frame-pointer -mapcs -mno-sched-prolog
 endif
 
-ifeq ($(CONFIG_DEBUG_INFO),y)
-CFLAGS		+=-g
-endif
-
 ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
 CFLAGS		+= -mbig-endian
 AS		+= -EB

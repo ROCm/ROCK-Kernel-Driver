@@ -822,7 +822,7 @@ void __init trap_init(void)
 	set_intr_gate(19,&simd_coprocessor_error);
 
 #ifdef CONFIG_IA32_EMULATION
-	set_intr_gate(IA32_SYSCALL_VECTOR, ia32_syscall);
+	set_system_gate(IA32_SYSCALL_VECTOR, ia32_syscall);
 #endif
        
 	set_intr_gate(KDB_VECTOR, call_debug);
