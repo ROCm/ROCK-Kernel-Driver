@@ -113,8 +113,9 @@ source drivers/i2c/Config.in
 
 mainmenu_option next_comment
 comment 'Mice'
-tristate 'Bus Mouse Support' CONFIG_BUSMOUSE
-bool 'PS/2 mouse (aka "auxiliary device") support' CONFIG_PSMOUSE
+   tristate 'Bus Mouse Support' CONFIG_BUSMOUSE
+   bool 'PS/2 mouse (aka "auxiliary device") support' CONFIG_PSMOUSE
+endmenu
 
 tristate 'QIC-02 tape support' CONFIG_QIC02_TAPE
 if [ "$CONFIG_QIC02_TAPE" != "n" ]; then
