@@ -87,7 +87,7 @@ irq_desc_t _irq_desc[NR_IRQS] __cacheline_aligned = {
 /*
  * This is updated when the user sets irq affinity via /proc
  */
-cpumask_t    __cacheline_aligned pending_irq_cpumask[NR_IRQS];
+static cpumask_t __cacheline_aligned pending_irq_cpumask[NR_IRQS];
 static unsigned long pending_irq_redir[BITS_TO_LONGS(NR_IRQS)];
 
 #ifdef CONFIG_IA64_GENERIC
@@ -1029,12 +1029,13 @@ void move_irq(int irq)
 	/* note - we hold desc->lock */
 	cpumask_t tmp;
 	irq_desc_t *desc = irq_descp(irq);
-	int irq_with_redir = test_bit(irq, pending_irq_redir) ? (irq | IA64_IRQ_REDIRECTED) : irq;
+	int redir = test_bit(irq, pending_irq_redir);
 
 	if (!cpus_empty(pending_irq_cpumask[irq])) {
 		cpus_and(tmp, pending_irq_cpumask[irq], cpu_online_map);
 		if (unlikely(!cpus_empty(tmp))) {
-			desc->handler->set_affinity(irq_with_redir, pending_irq_cpumask[irq]);
+			desc->handler->set_affinity(irq | (redir ? IA64_IRQ_REDIRECTED : 0),
+						    pending_irq_cpumask[irq]);
 		}
 		cpus_clear(pending_irq_cpumask[irq]);
 	}
