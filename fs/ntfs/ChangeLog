@@ -25,6 +25,9 @@ ToDo:
 
 2.0.8 - Major updates for handling of case sensitivity and dcache aliasing.
 
+	Big thanks go to Al Viro and other inhabitants of #kernel for investing
+	their time to discuss the case sensitivity and dcache aliasing issues.
+
 	- Remove unused source file fs/ntfs/attraops.c.
 	- Remove show_inodes mount option(s), thus dropping support for
 	  displaying of short file names.
@@ -38,13 +41,18 @@ ToDo:
 	- Remove really dumb logic bug in boot sector recovery code.
 	- Fix dcache aliasing issues wrt short/long file names via changes
 	  to fs/ntfs/dir.c::ntfs_lookup_inode_by_name() and
-	  fs/ntfs/namei.c::ntfs_lookup(). (The latter is still TODO:)
-	- Add additional argument to ntfs_lookup_inode_by_name() in which we
-	  return information about the matching file name if the case is not
-	  matching or the match is a short file name. See comments above the
-	  function definition for details.
+	  fs/ntfs/namei.c::ntfs_lookup():
+	  - Add additional argument to ntfs_lookup_inode_by_name() in which we
+	    return information about the matching file name if the case is not
+	    matching or the match is a short file name. See comments above the
+	    function definition for details.
+	  - Change ntfs_lookup() to only create dcache entries for the correctly
+	    cased file name and only for the WIN32 namespace counterpart of DOS
+	    namespace file names. This ensures we have only one dentry per
+	    directory and also removes all dcache aliasing issues between short
+	    and long file names once we add write support. See comments above
+	    function for details.
 	- Fix potential 1 byte overflow in fs/ntfs/unistr.c::ntfs_ucstonls().
-	- TODO: (AIA) Change ntfs_lookup()...
 
 2.0.7 - Minor cleanups and updates for changes in core kernel code.
 
