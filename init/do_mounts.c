@@ -279,6 +279,7 @@ static int __init mount_nfs_root(void)
 {
 	void *data = nfs_root_data();
 
+	create_dev("/dev/root", ROOT_DEV, NULL);
 	if (data &&
 	    do_mount_root("/dev/root", "nfs", root_mountflags, data) == 0)
 		return 1;
@@ -327,19 +328,19 @@ void __init mount_root(void)
 		ROOT_DEV = Root_FD0;
 	}
 #endif
-	create_dev("/dev/root", ROOT_DEV, root_device_name);
 #ifdef CONFIG_BLK_DEV_FD
 	if (MAJOR(ROOT_DEV) == FLOPPY_MAJOR) {
 		/* rd_doload is 2 for a dual initrd/ramload setup */
 		if (rd_doload==2) {
 			if (rd_load_disk(1)) {
 				ROOT_DEV = Root_RAM1;
-				create_dev("/dev/root", ROOT_DEV, NULL);
+				root_device_name = NULL;
 			}
 		} else
 			change_floppy("root floppy");
 	}
 #endif
+	create_dev("/dev/root", ROOT_DEV, root_device_name);
 	mount_block_root("/dev/root", root_mountflags);
 }
 
@@ -362,8 +363,6 @@ void __init prepare_namespace(void)
 	}
 
 	is_floppy = MAJOR(ROOT_DEV) == FLOPPY_MAJOR;
-
-	create_dev("/dev/root", ROOT_DEV, NULL);
 
 	/* This has to be before mounting root, because even readonly mount of reiserfs would replay
 	   log corrupting stuff */
