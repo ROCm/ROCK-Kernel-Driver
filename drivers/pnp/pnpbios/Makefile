@@ -4,4 +4,4 @@
 
 pnpbios-proc-$(CONFIG_PROC_FS) = proc.o
 
-obj-y := core.o $(pnpbios-proc-y)
+obj-y := core.o rsparser.o $(pnpbios-proc-y)

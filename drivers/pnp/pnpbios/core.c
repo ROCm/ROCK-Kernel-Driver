@@ -65,6 +65,8 @@
 #include <asm/system.h>
 #include <asm/byteorder.h>
 
+#include "pnpbios.h"
+
 
 /*
  *
@@ -743,80 +745,6 @@ static int pnp_dock_thread(void * unused)
 
 #endif   /* CONFIG_HOTPLUG */
 
-/* pnp EISA ids */
-
-#define HEX(id,a) hex[((id)>>a) & 15]
-#define CHAR(id,a) (0x40 + (((id)>>a) & 31))
-//
-
-static inline void pnpid32_to_pnpid(u32 id, char *str)
-{
-	const char *hex = "0123456789abcdef";
-
-	id = be32_to_cpu(id);
-	str[0] = CHAR(id, 26);
-	str[1] = CHAR(id, 21);
-	str[2] = CHAR(id,16);
-	str[3] = HEX(id, 12);
-	str[4] = HEX(id, 8);
-	str[5] = HEX(id, 4);
-	str[6] = HEX(id, 0);
-	str[7] = '\0';
-
-	return;
-}
-//
-#undef CHAR
-#undef HEX
-
-static void node_id_data_to_dev(unsigned char *p, struct pnp_bios_node *node, struct pnp_dev *dev)
-{
-	int len;
-	char id[8];
-	struct pnp_id *dev_id;
-
-	if ((char *)p == NULL)
-		return;
-        while ( (char *)p < ((char *)node->data + node->size )) {
-
-                if( p[0] & 0x80 ) {
-			len = (p[2] << 8) | p[1];
-			if ((p[0] & 0x7f) == 0x02) /* human readable name */
-			{
-				int size = *(short *) &p[1];
-				memcpy(dev->dev.name, p + 3, len >= 80 ? 79 : size);
-				break;
-			}
-			p += len + 3;
-			continue;
-		}
-		len = p[0] & 0x07;
-		switch ((p[0]>>3) & 0x0f) {
-		case 0x0f: /* end tag */
-		{
-        		return;
-			break;
-		}
-		case 0x03: /* compatible ID */
-		{
-			if (len != 4)
-				goto __skip;
-			dev_id =  pnpbios_kmalloc(sizeof (struct pnp_id), GFP_KERNEL);
-			if (!dev_id)
-				return;
-			memset(dev_id, 0, sizeof(struct pnp_id));
-			pnpid32_to_pnpid(p[1] | p[2] << 8 | p[3] << 16 | p[4] << 24,id);
-			memcpy(&dev_id->id, id, 7);
-			pnp_add_id(dev_id, dev);
-			break;
-		}
-		}
-		__skip:
-		p += len + 1;
-
-	}
-}
-
 static int pnpbios_get_resources(struct pnp_dev * dev, struct pnp_resource_table * res)
 {
 	u8 nodenum = dev->number;
@@ -833,7 +761,7 @@ static int pnpbios_get_resources(struct pnp_dev * dev, struct pnp_resource_table
 		kfree(node);
 		return -ENODEV;
 	}
-	pnp_parse_current_resources((char *)node->data,(char *)node->data + node->size,res);
+	pnpbios_read_resources_from_node(res, node);
 	dev->active = pnp_is_active(dev);
 	kfree(node);
 	return 0;
@@ -854,7 +782,7 @@ static int pnpbios_set_resources(struct pnp_dev * dev, struct pnp_resource_table
 		return -1;
 	if (pnp_bios_get_dev_node(&nodenum, (char )PNPMODE_STATIC, node))
 		return -ENODEV;
-	if(!pnp_write_resources((char *)node->data,(char *)node->data + node->size,res)){
+	if(pnpbios_write_resources_to_node(res, node)<0) {
 		kfree(node);
 		return -1;
 	}
@@ -869,7 +797,7 @@ static int pnpbios_disable_resources(struct pnp_dev *dev)
 {
 	struct pnp_bios_node * node;
 	int ret;
-	
+
 	/* just in case */
 	if(dev->flags & PNPBIOS_NO_DISABLE || !pnpbios_is_dynamic(dev))
 		return -EPERM;
@@ -897,7 +825,6 @@ struct pnp_protocol pnpbios_protocol = {
 static int insert_device(struct pnp_dev *dev, struct pnp_bios_node * node)
 {
 	struct list_head * pos;
-	unsigned char * p;
 	struct pnp_dev * pnp_dev;
 	struct pnp_id *dev_id;
 	char id[8];
@@ -917,11 +844,7 @@ static int insert_device(struct pnp_dev *dev, struct pnp_bios_node * node)
 	pnpid32_to_pnpid(node->eisa_id,id);
 	memcpy(dev_id->id,id,7);
 	pnp_add_id(dev_id, dev);
-	p = pnp_parse_current_resources((char *)node->data,
-		(char *)node->data + node->size,&dev->res);
-	p = pnp_parse_possible_resources((char *)p,
-		(char *)node->data + node->size,dev);
-	node_id_data_to_dev(p,node,dev);
+	pnpbios_parse_data_stream(dev, node);
 	dev->active = pnp_is_active(dev);
 	dev->flags = node->flags;
 	if (!(dev->flags & PNPBIOS_NO_CONFIG))
