@@ -46,13 +46,58 @@ ENTRY(fsys_getpid)
 	add r8=IA64_TASK_TGID_OFFSET,r16
 	;;
 	and r9=TIF_ALLWORK_MASK,r9
-	ld4 r8=[r8]
+	ld4 r8=[r8]				// r8 = current->tgid
 	;;
 	cmp.ne p8,p0=0,r9
 (p8)	br.spnt.many fsys_fallback_syscall
 	MCKINLEY_E9_WORKAROUND
 	br.ret.sptk.many b6
 END(fsys_getpid)
+
+ENTRY(fsys_getppid)
+	add r17=IA64_TASK_GROUP_LEADER_OFFSET,r16
+	;;
+	ld8 r17=[r17]				// r17 = current->group_leader
+	add r9=TI_FLAGS+IA64_TASK_SIZE,r16
+	;;
+
+	ld4 r9=[r9]
+	add r17=IA64_TASK_REAL_PARENT_OFFSET,r17 // r17 = &current->group_leader->real_parent
+	;;
+	and r9=TIF_ALLWORK_MASK,r9
+
+1:	ld8 r18=[r17]				// r18 = current->group_leader->real_parent
+	;;
+	cmp.ne p8,p0=0,r9
+	add r8=IA64_TASK_TGID_OFFSET,r18	// r8 = &current->group_leader->real_parent->tgid
+	;;
+
+	/*
+	 * The .acq is needed to ensure that the read of tgid has returned its data before
+	 * we re-check "real_parent".
+	 */
+	ld4.acq r8=[r8]				// r8 = current->group_leader->real_parent->tgid
+#ifdef CONFIG_SMP
+	/*
+	 * Re-read current->group_leader->real_parent.
+	 */
+	ld8 r19=[r17]				// r19 = current->group_leader->real_parent
+(p8)	br.spnt.many fsys_fallback_syscall
+	;;
+	cmp.ne p6,p0=r18,r19			// did real_parent change?
+	mov r19=0			// i must not leak kernel bits...
+(p6)	br.cond.spnt.few 1b			// yes -> redo the read of tgid and the check
+	;;
+	mov r17=0			// i must not leak kernel bits...
+	mov r18=0			// i must not leak kernel bits...
+#else
+	mov r17=0			// i must not leak kernel bits...
+	mov r18=0			// i must not leak kernel bits...
+	mov r19=0			// i must not leak kernel bits...
+#endif
+	MCKINLEY_E9_WORKAROUND
+	br.ret.sptk.many b6
+END(fsys_getppid)
 
 ENTRY(fsys_set_tid_address)
 	add r9=TI_FLAGS+IA64_TASK_SIZE,r16
@@ -72,8 +117,8 @@ ENTRY(fsys_set_tid_address)
 (p7)	st8 [r18]=r17
 (p8)	br.spnt.many fsys_fallback_syscall
 	;;
-	mov r17=0			// don't leak kernel bits...
-	mov r18=0			// don't leak kernel bits...
+	mov r17=0			// i must not leak kernel bits...
+	mov r18=0			// i must not leak kernel bits...
 	MCKINLEY_E9_WORKAROUND
 	br.ret.sptk.many b6
 END(fsys_set_tid_address)
@@ -100,7 +145,7 @@ fsyscall_table:
 	data8 fsys_fallback_syscall	// chown
 	data8 fsys_fallback_syscall	// lseek		// 1040
 	data8 fsys_getpid
-	data8 fsys_fallback_syscall	// getppid
+	data8 fsys_getppid		// getppid
 	data8 fsys_fallback_syscall	// mount
 	data8 fsys_fallback_syscall	// umount
 	data8 fsys_fallback_syscall	// setuid		// 1045

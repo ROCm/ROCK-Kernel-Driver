@@ -54,6 +54,13 @@ SECTIONS
 	  __stop___ex_table = .;
 	}
 
+  __mckinley_e9_bundles : AT(ADDR(__mckinley_e9_bundles) - PAGE_OFFSET)
+	{
+	  __start___mckinley_e9_bundles = .;
+	  *(__mckinley_e9_bundles)
+	  __end___mckinley_e9_bundles = .;
+	}
+
   /* Global data */
   _data = .;
 

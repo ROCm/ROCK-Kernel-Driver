@@ -1,7 +1,7 @@
 /*
  * Architecture-specific setup.
  *
- * Copyright (C) 1998-2001 Hewlett-Packard Co
+ * Copyright (C) 1998-2001, 2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *	Stephane Eranian <eranian@hpl.hp.com>
  * Copyright (C) 2000, Rohit Seth <rohit.seth@intel.com>
@@ -748,10 +748,39 @@ cpu_init (void)
 	}
 
 	if (ia64_pal_rse_info(&num_phys_stacked, 0) != 0) {
-		printk ("cpu_init: PAL RSE info failed, assuming 96 physical stacked regs\n");
+		printk(KERN_WARNING"cpu_init: PAL RSE info failed; assuming 96 physical "
+		       "stacked regs\n");
 		num_phys_stacked = 96;
 	}
 	/* size of physical stacked register partition plus 8 bytes: */
 	__get_cpu_var(ia64_phys_stacked_size_p8) = num_phys_stacked*8 + 8;
 	platform_cpu_init();
+}
+
+void
+check_bugs (void)
+{
+	extern int __start___mckinley_e9_bundles[];
+	extern int __end___mckinley_e9_bundles[];
+	u64 *bundle;
+	int *wp;
+
+	if (local_cpu_data->family == 0x1f && local_cpu_data->model == 0)
+		printk(KERN_INFO"check_bugs: leaving McKinley Errata 9 workaround enabled\n");
+	else {
+		printk(KERN_INFO"check_bugs: McKinley Errata 9 workaround not needed; "
+		       "disabling it\n");
+		for (wp = __start___mckinley_e9_bundles; wp < __end___mckinley_e9_bundles; ++wp) {
+			bundle = (u64 *) ((char *) wp + *wp);
+			/* install a bundle of NOPs: */
+			bundle[0] = 0x0000000100000000;
+			bundle[1] = 0x0004000000000200;
+			ia64_fc(bundle);
+		}
+		ia64_insn_group_barrier();
+		ia64_sync_i();
+		ia64_insn_group_barrier();
+		ia64_srlz_i();
+		ia64_insn_group_barrier();
+	}
 }

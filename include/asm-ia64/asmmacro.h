@@ -59,10 +59,22 @@ name:
   99:	x
 #endif
 
-#ifdef CONFIG_MCKINLEY
+/*
+ * For now, we always put in the McKinley E9 workaround.  On CPUs that don't need it,
+ * we'll patch out the work-around bundles with NOPs, so their impact is minimal.
+ */
+#define DO_MCKINLEY_E9_WORKAROUND
+#ifdef DO_MCKINLEY_E9_WORKAROUND
+	.section "__mckinley_e9_bundles", "a"
+	.previous
 /* workaround for Itanium 2 Errata 9: */
 # define MCKINLEY_E9_WORKAROUND			\
+	.xdata4 "__mckinley_e9_bundles", 1f-.;	\
+1:{ .mib;					\
+	nop.m 0;				\
+	nop.i 0;				\
 	br.call.sptk.many b7=1f;;		\
+  };						\
 1:
 #else
 # define MCKINLEY_E9_WORKAROUND
