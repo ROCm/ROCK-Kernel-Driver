@@ -67,6 +67,10 @@ unsigned int num_io_spaces;
 
 unsigned char aux_device_present = 0xaa;        /* XXX remove this when legacy I/O is gone */
 
+#ifdef CONFIG_PCI
+int pci_dma_bus_is_phys = 1;	/* default to direct mapping, unless we detect hw I/O MMU */
+#endif
+
 #define COMMAND_LINE_SIZE	512
 
 char saved_command_line[COMMAND_LINE_SIZE]; /* used in proc filesystem */
@@ -103,11 +107,11 @@ static unsigned long bootmap_start; /* physical address where the bootmem map is
 static int
 find_max_pfn (unsigned long start, unsigned long end, void *arg)
 {
-	unsigned long *max_pfn = arg, pfn;
+	unsigned long *max_pfnp = arg, pfn;
 
 	pfn = (PAGE_ALIGN(end - 1) - PAGE_OFFSET) >> PAGE_SHIFT;
-	if (pfn > *max_pfn)
-		*max_pfn = pfn;
+	if (pfn > *max_pfnp)
+		*max_pfnp = pfn;
 	return 0;
 }
 
@@ -268,7 +272,6 @@ find_memory (void)
 {
 #	define KERNEL_END	(&_end)
 	unsigned long bootmap_size;
-	unsigned long max_pfn;
 	int n = 0;
 
 	/*

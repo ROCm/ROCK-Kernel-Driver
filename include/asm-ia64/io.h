@@ -413,4 +413,8 @@ extern void __ia64_memset_c_io (unsigned long, unsigned long, long);
 
 # endif /* __KERNEL__ */
 
+/* Argh, another magic macro... ;-( */
+extern int pci_dma_bus_is_phys;
+#define BIO_VMERGE_BOUNDARY	(pci_dma_bus_is_phys ? 0 : PAGE_SIZE)
+
 #endif /* _ASM_IA64_IO_H */

@@ -1933,6 +1933,7 @@ static struct acpi_driver acpi_sba_ioc_driver = {
 static int __init
 sba_init(void)
 {
+	pci_dma_bus_is_phys = 0;	/* suppress bounce buffer in block/net layers */
 	MAX_DMA_ADDRESS = ~0UL;
 
 	acpi_bus_register_driver(&acpi_sba_ioc_driver);
