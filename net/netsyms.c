@@ -314,6 +314,7 @@ EXPORT_SYMBOL(xfrm_state_put_afinfo);
 EXPORT_SYMBOL(xfrm_replay_check);
 EXPORT_SYMBOL(xfrm_replay_advance);
 EXPORT_SYMBOL(xfrm_check_selectors);
+EXPORT_SYMBOL(xfrm_check_output);
 EXPORT_SYMBOL(__secpath_destroy);
 EXPORT_SYMBOL(xfrm_get_acqseq);
 EXPORT_SYMBOL(xfrm_parse_spi);

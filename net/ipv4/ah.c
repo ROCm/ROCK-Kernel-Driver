@@ -72,12 +72,8 @@ static int ah_output(struct sk_buff *skb)
 	}
 
 	spin_lock_bh(&x->lock);
-	if ((err = xfrm_state_check_expire(x)) != 0)
-		goto error;
-	if (x->props.mode)
-		if ((err = xfrm4_tunnel_check_size(skb)) != 0)
-			goto error;
-	if ((err = xfrm_state_check_space(x, skb)) != 0)
+	err = xfrm_check_output(x, skb, AF_INET);
+	if (err)
 		goto error;
 
 	iph = skb->nh.iph;
