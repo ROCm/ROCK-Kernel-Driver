@@ -639,7 +639,7 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	
 	/* Find endpoints that we need */
 
-	ifn = MIN(udev->actconfig->bNumInterfaces, HCI_MAX_IFACE_NUM);
+	ifn = min_t(unsigned int, udev->actconfig->bNumInterfaces, HCI_MAX_IFACE_NUM);
 	for (i = 0; i < ifn; i++) {
 		iface = &udev->actconfig->interface[i];
 		for (a = 0; a < iface->num_altsetting; a++) {

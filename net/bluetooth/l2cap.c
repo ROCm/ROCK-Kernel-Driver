@@ -682,7 +682,7 @@ static int l2cap_sock_setsockopt(struct socket *sock, int level, int optname, ch
 
 	switch (optname) {
 	case L2CAP_OPTIONS:
-		len = MIN(sizeof(opts), optlen);
+		len = min_t(unsigned int, sizeof(opts), optlen);
 		if (copy_from_user((char *)&opts, optval, len)) {
 			err = -EFAULT;
 			break;
@@ -727,7 +727,7 @@ static int l2cap_sock_getsockopt(struct socket *sock, int level, int optname, ch
 		opts.omtu     = l2cap_pi(sk)->omtu;
 		opts.flush_to = l2cap_pi(sk)->flush_to;
 
-		len = MIN(len, sizeof(opts));
+		len = min_t(unsigned int, len, sizeof(opts));
 		if (copy_to_user(optval, (char *)&opts, len))
 			err = -EFAULT;
 
@@ -746,7 +746,7 @@ static int l2cap_sock_getsockopt(struct socket *sock, int level, int optname, ch
 
 		cinfo.hci_handle = l2cap_pi(sk)->conn->hcon->handle;
 
-		len = MIN(len, sizeof(cinfo));
+		len = min_t(unsigned int, len, sizeof(cinfo));
 		if (copy_to_user(optval, (char *)&cinfo, len))
 			err = -EFAULT;
 
@@ -1017,7 +1017,7 @@ static int l2cap_chan_send(struct sock *sk, struct msghdr *msg, int len)
 	else
 		hlen = L2CAP_HDR_SIZE;
 
-	count = MIN(conn->mtu - hlen, len);
+	count = min_t(unsigned int, (conn->mtu - hlen), len);
 
 	skb = bt_skb_send_alloc(sk, hlen + count,
 			msg->msg_flags & MSG_DONTWAIT, &err);
@@ -1043,7 +1043,7 @@ static int l2cap_chan_send(struct sock *sk, struct msghdr *msg, int len)
 	/* Continuation fragments (no L2CAP header) */
 	frag = &skb_shinfo(skb)->frag_list;
 	while (len) {
-		count = MIN(conn->mtu, len);
+		count = min_t(unsigned int, conn->mtu, len);
 
 		*frag = bt_skb_send_alloc(sk, count, msg->msg_flags & MSG_DONTWAIT, &err);
 		if (!*frag)
@@ -1103,7 +1103,7 @@ static struct sk_buff *l2cap_build_cmd(struct l2cap_conn *conn,
 	BT_DBG("conn %p, code 0x%2.2x, ident 0x%2.2x, len %d", conn, code, ident, dlen);
 
 	len = L2CAP_HDR_SIZE + L2CAP_CMD_HDR_SIZE + dlen;
-	count = MIN(conn->mtu, len);
+	count = min_t(unsigned int, conn->mtu, len);
 	
 	skb = bt_skb_alloc(count, GFP_ATOMIC);
 	if (!skb)
@@ -1129,7 +1129,7 @@ static struct sk_buff *l2cap_build_cmd(struct l2cap_conn *conn,
 	/* Continuation fragments (no L2CAP header) */
 	frag = &skb_shinfo(skb)->frag_list;
 	while (len) {
-		count = MIN(conn->mtu, len);
+		count = min_t(unsigned int, conn->mtu, len);
 
 		*frag = bt_skb_alloc(count, GFP_ATOMIC);
 		if (!*frag)

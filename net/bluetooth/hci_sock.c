@@ -454,7 +454,7 @@ int hci_sock_setsockopt(struct socket *sock, int level, int optname, char *optva
 		break;
 
 	case HCI_FILTER:
-		len = MIN(len, sizeof(uf));
+		len = min_t(unsigned int, len, sizeof(uf));
 		if (copy_from_user(&uf, optval, len)) {
 			err = -EFAULT;
 			break;
@@ -525,7 +525,7 @@ int hci_sock_getsockopt(struct socket *sock, int level, int optname, char *optva
 			uf.event_mask[1] = *((u32 *) f->event_mask + 1);
 		}
 
-		len = MIN(len, sizeof(uf));
+		len = min_t(unsigned int, len, sizeof(uf));
 		if (copy_to_user(optval, &uf, len))
 			return -EFAULT;
 		break;

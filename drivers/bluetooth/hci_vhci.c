@@ -172,7 +172,7 @@ static inline ssize_t hci_vhci_put_user(struct hci_vhci_struct *hci_vhci,
 	int len = count, total = 0;
 	char *ptr = buf;
 
-	len = MIN(skb->len, len); 
+	len = min_t(unsigned int, skb->len, len);
 	if (copy_to_user(ptr, skb->data, len))
 		return -EFAULT;
 	total += len;

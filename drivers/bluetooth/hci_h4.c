@@ -160,7 +160,7 @@ static int h4_recv(struct hci_uart *hu, void *data, int count)
 	ptr = data;
 	while (count) {
 		if (h4->rx_count) {
-			len = MIN(h4->rx_count, count);
+			len = min_t(unsigned int, h4->rx_count, count);
 			memcpy(skb_put(h4->rx_skb, len), ptr, len);
 			h4->rx_count -= len; count -= len; ptr += len;
 

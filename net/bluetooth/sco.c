@@ -258,7 +258,7 @@ static inline int sco_send_frame(struct sock *sk, struct msghdr *msg, int len)
 
 	BT_DBG("sk %p len %d", sk, len);
 
-	count = MIN(conn->mtu, len);
+	count = min_t(unsigned int, conn->mtu, len);
 	if (!(skb = bt_skb_send_alloc(sk, count, msg->msg_flags & MSG_DONTWAIT, &err)))
 		return err;
 
@@ -699,7 +699,7 @@ int sco_sock_getsockopt(struct socket *sock, int level, int optname, char *optva
 
 		BT_INFO("mtu %d", opts.mtu);
 
-		len = MIN(len, sizeof(opts));
+		len = min_t(unsigned int, len, sizeof(opts));
 		if (copy_to_user(optval, (char *)&opts, len))
 			err = -EFAULT;
 
@@ -713,7 +713,7 @@ int sco_sock_getsockopt(struct socket *sock, int level, int optname, char *optva
 
 		cinfo.hci_handle = sco_pi(sk)->conn->hcon->handle;
 
-		len = MIN(len, sizeof(cinfo));
+		len = min_t(unsigned int, len, sizeof(cinfo));
 		if (copy_to_user(optval, (char *)&cinfo, len))
 			err = -EFAULT;
 

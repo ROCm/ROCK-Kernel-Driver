@@ -42,10 +42,6 @@
 /* Reserv for core and drivers use */
 #define BT_SKB_RESERVE       8
 
-#ifndef MIN
-#define MIN(a,b) ((a) < (b) ? (a) : (b))
-#endif
-
 #define BTPROTO_L2CAP   0
 #define BTPROTO_HCI     1
 #define BTPROTO_SCO   	2
