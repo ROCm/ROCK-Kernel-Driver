@@ -25,29 +25,34 @@
 #ifndef _FDOMAIN_H
 #define _FDOMAIN_H
 
-int        fdomain_16x0_detect( Scsi_Host_Template * );
-int        fdomain_16x0_command( Scsi_Cmnd * );
-int        fdomain_16x0_abort( Scsi_Cmnd * );
-const char *fdomain_16x0_info( struct Scsi_Host * );
-int        fdomain_16x0_reset( Scsi_Cmnd *, unsigned int ); 
-int        fdomain_16x0_queue( Scsi_Cmnd *, void (*done)(Scsi_Cmnd *) );
-int        fdomain_16x0_biosparam( Disk *, struct block_device *, int * );
-int        fdomain_16x0_proc_info( char *buffer, char **start, off_t offset,
+static int        fdomain_16x0_detect( Scsi_Host_Template *);
+static int        fdomain_16x0_command( Scsi_Cmnd *);
+static int        fdomain_16x0_abort(Scsi_Cmnd *);
+static const char *fdomain_16x0_info(struct Scsi_Host *);
+static int        fdomain_16x0_bus_reset(Scsi_Cmnd *); 
+static int        fdomain_16x0_host_reset(Scsi_Cmnd *); 
+static int        fdomain_16x0_device_reset(Scsi_Cmnd *); 
+static int        fdomain_16x0_queue(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
+static int        fdomain_16x0_biosparam(Disk *, struct block_device *, int * );
+static int        fdomain_16x0_proc_info(char *buffer, char **start, off_t offset,
 				   int length, int hostno, int inout );
-int        fdomain_16x0_release( struct Scsi_Host *shpnt );
+static int        fdomain_16x0_release(struct Scsi_Host *shpnt);
 
-#define FDOMAIN_16X0 { proc_info:      fdomain_16x0_proc_info,           \
-		       detect:         fdomain_16x0_detect,              \
-		       info:           fdomain_16x0_info,                \
-		       command:        fdomain_16x0_command,             \
-		       queuecommand:   fdomain_16x0_queue,               \
-		       abort:          fdomain_16x0_abort,               \
-		       reset:          fdomain_16x0_reset,               \
-		       bios_param:     fdomain_16x0_biosparam,           \
-		       release:        fdomain_16x0_release,		 \
-		       can_queue:      1, 				 \
-		       this_id:        6, 				 \
-		       sg_tablesize:   64, 				 \
-		       cmd_per_lun:    1, 				 \
-		       use_clustering: DISABLE_CLUSTERING }
+#define FDOMAIN_16X0 { proc_info:      		fdomain_16x0_proc_info,           \
+		       detect:         		fdomain_16x0_detect,              \
+		       info:           		fdomain_16x0_info,                \
+		       command:        		fdomain_16x0_command,             \
+		       queuecommand:   		fdomain_16x0_queue,               \
+		       eh_abort_handler:	fdomain_16x0_abort,               \
+		       eh_bus_reset_handler:	fdomain_16x0_bus_reset,           \
+		       eh_device_reset_handler:	fdomain_16x0_device_reset,        \
+		       eh_host_reset_handler:	fdomain_16x0_host_reset,          \
+		       bios_param:		fdomain_16x0_biosparam,           \
+		       release:			fdomain_16x0_release,		  \
+		       can_queue:		1, 				  \
+		       this_id:  		6, 				  \
+		       sg_tablesize:		64, 				  \
+		       cmd_per_lun:		1, 				  \
+		       use_clustering:		DISABLE_CLUSTERING		  \
+}
 #endif
