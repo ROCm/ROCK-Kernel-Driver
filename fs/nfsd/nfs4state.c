@@ -1275,6 +1275,20 @@ out:
 	return status;
 }
 
+/* decrement seqid on successful reclaim, it will be bumped in encode_open */
+static void
+nfs4_set_claim_prev(struct nfsd4_open *open, int *status)
+{
+	if (open->op_claim_type == NFS4_OPEN_CLAIM_PREVIOUS) {
+		if (*status)
+			*status = nfserr_reclaim_bad;
+		else {
+			open->op_stateowner->so_confirmed = 1;
+			open->op_stateowner->so_seqid--;
+		}
+	}
+}
+
 /*
  * called with nfs4_lock_state() held.
  */
@@ -1370,17 +1384,8 @@ out:
 	if (fp && list_empty(&fp->fi_perfile))
 		release_file(fp);
 
-	if (open->op_claim_type == NFS4_OPEN_CLAIM_PREVIOUS) {
-		if (status)
-			status = nfserr_reclaim_bad;
-		else {
-		/* successful reclaim. so_seqid is decremented because
-		* it will be bumped in encode_open
-		*/
-			open->op_stateowner->so_confirmed = 1;
-			open->op_stateowner->so_seqid--;
-		}
-	}
+	/* CLAIM_PREVIOUS has different error returns */
+	nfs4_set_claim_prev(open, &status);
 	/*
 	* To finish the open response, we just need to set the rflags.
 	*/
