@@ -64,7 +64,7 @@ static void nsp_message_out(Scsi_Cmnd *SCpnt, nsp_hw_data *data)
 	DEBUG(0, " msgout loop\n");
 	do {
 		if (nsp_xfer(SCpnt, data, BUSPHASE_MESSAGE_OUT)) {
-			printk(KERN_DEBUG " %s msgout: xfer short\n", __FUNCTION__);
+			printk(KERN_DEBUG " %s: msgout: xfer short\n", __FUNCTION__);
 		}
 
 		/* catch a next signal */

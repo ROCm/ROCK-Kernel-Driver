@@ -25,7 +25,7 @@
 
 ***********************************************************************/
 
-/* $Id: nsp_cs.c,v 1.4 2002/10/15 15:57:01 elca Exp $ */
+/* $Id: nsp_cs.c,v 1.5 2002/11/05 12:06:29 elca Exp $ */
 
 #ifdef NSP_KERNEL_2_2
 #include <pcmcia/config.h>
@@ -67,7 +67,7 @@
 #include "nsp_cs.h"
 
 MODULE_AUTHOR("YOKOTA Hiroshi <yokota@netlab.is.tsukuba.ac.jp>");
-MODULE_DESCRIPTION("WorkBit NinjaSCSI-3 / NinjaSCSI-32Bi(16bit) PCMCIA SCSI host adapter module $Revision: 1.4 $");
+MODULE_DESCRIPTION("WorkBit NinjaSCSI-3 / NinjaSCSI-32Bi(16bit) PCMCIA SCSI host adapter module $Revision: 1.5 $");
 MODULE_SUPPORTED_DEVICE("sd,sr,sg,st");
 #ifdef MODULE_LICENSE
 MODULE_LICENSE("GPL");
@@ -77,7 +77,7 @@ MODULE_LICENSE("GPL");
 static int pc_debug = PCMCIA_DEBUG;
 MODULE_PARM(pc_debug, "i");
 MODULE_PARM_DESC(pc_debug, "set debug level");
-static char *version = "$Id: nsp_cs.c,v 1.4 2002/10/15 15:57:01 elca Exp $";
+static char *version = "$Id: nsp_cs.c,v 1.5 2002/11/05 12:06:29 elca Exp $";
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
 #else
 #define DEBUG(n, args...) /* */
@@ -129,37 +129,30 @@ MODULE_PARM_DESC(free_ports, "Release IO ports after configuration? (default: 0 
 
 /* /usr/src/linux/drivers/scsi/hosts.h */
 static Scsi_Host_Template driver_template = {
-/*	.next			 = NULL,*/
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0))
 	.proc_name	         = "nsp_cs",      /* kernel 2.4 */
 #else
 	.proc_dir	         = &proc_scsi_nsp, /* kernel 2.2 */
 #endif
 	.proc_info		 = nsp_proc_info,
-	.name			 = "WorkBit NinjaSCSI-3/32Bi",
+	.name			 = "WorkBit NinjaSCSI-3/32Bi(16bit)",
 	.detect			 = nsp_detect,
 	.release		 = nsp_release,
 	.info			 = nsp_info,
-/*	.command		 = NULL,*/
 	.queuecommand		 = nsp_queuecommand,
 /*	.eh_strategy_handler	 = nsp_eh_strategy,*/
 /*	.eh_abort_handler	 = nsp_eh_abort,*/
 /*	.eh_device_reset_handler = nsp_eh_device_reset,*/
 	.eh_bus_reset_handler	 = nsp_eh_bus_reset,
 	.eh_host_reset_handler	 = nsp_eh_host_reset,
-/*	.slave_attach		 = NULL,*/
-/*	.bios_param		 = NULL,*/
 	.can_queue		 = 1,
 	.this_id		 = NSP_INITIATOR_ID,
 	.sg_tablesize		 = SG_ALL,
 	.cmd_per_lun		 = 1,
-/*	.present		 = 0,*/
-/*	.unchecked_isa_dma	 = 0,*/
 	.use_clustering		 = DISABLE_CLUSTERING,
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,2))
 	.use_new_eh_code	 = 1,
 #endif
-/*	.emulated		 = 0,*/
 };
 
 static dev_link_t *dev_list = NULL;
@@ -178,12 +171,12 @@ static int nsp_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 #endif
 	nsp_hw_data *data = &nsp_data;
 
-	DEBUG(0, "%s() SCpnt=0x%p target=%d lun=%d buff=0x%p bufflen=%d use_sg=%d\n",
-	      __FUNCTION__,  SCpnt, target, SCpnt->lun, SCpnt->request_buffer, SCpnt->request_bufflen, SCpnt->use_sg);
+	DEBUG(0, "%s: SCpnt=0x%p target=%d lun=%d buff=0x%p bufflen=%d use_sg=%d\n",
+	      __FUNCTION__, SCpnt, target, SCpnt->lun, SCpnt->request_buffer, SCpnt->request_bufflen, SCpnt->use_sg);
 	//DEBUG(0, " before CurrentSC=0x%p\n", data->CurrentSC);
 
 	if(data->CurrentSC != NULL) {
-		printk(KERN_DEBUG " %s() CurrentSC!=NULL cannot happen!\n", __FUNCTION__);
+		printk(KERN_DEBUG " %s: CurrentSC!=NULL this can't be happen\n", __FUNCTION__);
 		data->CurrentSC = NULL;
 		SCpnt->result   = DID_BAD_TARGET << 16;
 		done(SCpnt);
@@ -229,7 +222,7 @@ static int nsp_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	}
 
 
-	//DEBUG(0, __func__ "() out\n");
+	//DEBUG(0, "%s: out\n", __FUNCTION__);
 	return 0;
 }
 
@@ -241,7 +234,7 @@ static void nsp_setup_fifo(nsp_hw_data *data, int enabled)
 	unsigned int  base = data->BaseAddress;
 	unsigned char transfer_mode_reg;
 
-	//DEBUG(0, __func__ "() enabled=%d\n", enabled);
+	//DEBUG(0, "%s: enabled=%d\n", __FUNCTION__, enabled);
 
 	if (enabled != FALSE) {
 		transfer_mode_reg = TRANSFER_GO | BRAIND;
@@ -263,7 +256,7 @@ static void nsphw_init_sync(nsp_hw_data *data)
 	int i;
 
 	/* setup sync data */
-	for ( i = 0; i < N_TARGET; i++ ) {
+	for ( i = 0; i < NUMBER(data->Sync); i++ ) {
 		data->Sync[i] = tmp_sync;
 	}
 }
@@ -275,7 +268,7 @@ static int nsphw_init(nsp_hw_data *data)
 {
 	unsigned int base     = data->BaseAddress;
 
-	DEBUG(0, "%s() in base=0x%x\n", __FUNCTION__, base);
+	DEBUG(0, "%s: in base=0x%x\n", __FUNCTION__, base);
 
 	data->ScsiClockDiv = CLOCK_40M | FAST_20;
 	data->CurrentSC    = NULL;
@@ -338,7 +331,7 @@ static unsigned int nsphw_start_selection(Scsi_Cmnd   *SCpnt,
 	int	      time_out;
 	unsigned char phase, arbit;
 
-	//DEBUG(0, __func__ "()in\n");
+	//DEBUG(0, "%s:in\n", __FUNCTION__);
 
 	phase = nsp_index_read(base, SCSIBUSMON);
 	if(phase != BUSMON_BUS_FREE) {
@@ -420,7 +413,7 @@ static int nsp_msg(Scsi_Cmnd *SCpnt, nsp_hw_data *data)
 	int		       i;
 
 
-	DEBUG(0, "%s()\n", __FUNCTION__);
+	DEBUG(0, "%s:\n", __FUNCTION__);
 
 	period = sync->SyncPeriod;
 	offset = sync->SyncOffset;
@@ -471,7 +464,7 @@ static void nsp_start_timer(Scsi_Cmnd *SCpnt, nsp_hw_data *data, int time)
 {
 	unsigned int base = SCpnt->host->io_port;
 
-	//DEBUG(0, __func__ "() in SCpnt=0x%p, time=%d\n", SCpnt, time);
+	//DEBUG(0, "%s: in SCpnt=0x%p, time=%d\n", __FUNCTION__, SCpnt, time);
 	data->TimerCount = time;
 	nsp_index_write(base, TIMERCOUNT, time);
 }
@@ -485,7 +478,7 @@ static int nsp_negate_signal(Scsi_Cmnd *SCpnt, unsigned char mask, char *str)
 	unsigned char reg;
 	int	      time_out;
 
-	//DEBUG(0, __func__ "()\n");
+	//DEBUG(0, "%s:\n", __FUNCTION__);
 
 	time_out = 100;
 
@@ -497,7 +490,7 @@ static int nsp_negate_signal(Scsi_Cmnd *SCpnt, unsigned char mask, char *str)
 	} while ((time_out-- != 0) && (reg & mask) != 0);
 
 	if (time_out == 0) {
-		printk(KERN_DEBUG "%s: %s signal off timeut\n", __FUNCTION__, str);
+		printk(KERN_DEBUG "%s:: %s signal off timeut\n", __FUNCTION__, str);
 	}
 
 	return 0;
@@ -514,7 +507,7 @@ static int nsp_expect_signal(Scsi_Cmnd	   *SCpnt,
 	int	      time_out;
 	unsigned char phase, i_src;
 
-	//DEBUG(0, __func__ "() current_phase=0x%x, mask=0x%x\n", current_phase, mask);
+	//DEBUG(0, "%s: current_phase=0x%x, mask=0x%x\n", __FUNCTION__, current_phase, mask);
 
 	time_out = 100;
 	do {
@@ -534,7 +527,7 @@ static int nsp_expect_signal(Scsi_Cmnd	   *SCpnt,
 		}
 	} while(time_out-- != 0);
 
-	//DEBUG(0, __func__ " : " __func__ " timeout\n");
+	//DEBUG(0, "%s: timeout\n", __FUNCTION__);
 	return -1;
 }
 
@@ -549,7 +542,7 @@ static int nsp_xfer(Scsi_Cmnd *SCpnt, nsp_hw_data *data, int phase)
 	int	      ptr;
 	int	      ret;
 
-	//DEBUG(0, __func__ "()\n");
+	//DEBUG(0, "%s:\n", __FUNCTION__);
 	for (ptr = 0; len > 0; len --, ptr ++) {
 
 		ret = nsp_expect_signal(SCpnt, phase, BUSMON_REQ);
@@ -584,7 +577,7 @@ static int nsp_dataphase_bypass(Scsi_Cmnd *SCpnt, nsp_hw_data *data)
 {
 	unsigned int count;
 
-	//DEBUG(0, __func__ "()\n");
+	//DEBUG(0, "%s:\n", __FUNCTION__);
 
 	if (SCpnt->SCp.have_data_in != IO_IN) {
 		return 0;
@@ -616,7 +609,7 @@ static int nsp_reselected(Scsi_Cmnd *SCpnt, nsp_hw_data *data)
 	unsigned int  base = SCpnt->host->io_port;
 	unsigned char reg;
 
-	//DEBUG(0, __func__ "()\n");
+	//DEBUG(0, "%s:\n", __FUNCTION__);
 
 	nsp_negate_signal(SCpnt, BUSMON_SEL, "reselect<SEL>");
 
@@ -646,7 +639,7 @@ static int nsp_fifo_count(Scsi_Cmnd *SCpnt)
 
 	count = (h << 16) | (m << 8) | (l << 0);
 
-	//DEBUG(0, __func__ "() =0x%x\n", count);
+	//DEBUG(0, "%s: =0x%x\n", __FUNCTION__, count);
 
 	return count;
 }
@@ -668,8 +661,8 @@ static void nsp_pio_read(Scsi_Cmnd *SCpnt, nsp_hw_data *data)
 
 	ocount = data->FifoCount;
 
-	DEBUG(0, "%s() in SCpnt=0x%p resid=%d ocount=%d ptr=0x%p this_residual=%d buffers=0x%p nbuf=%d\n", 
-		__FUNCTION__, SCpnt, RESID, ocount, SCpnt->SCp.ptr, SCpnt->SCp.this_residual, SCpnt->SCp.buffer, SCpnt->SCp.buffers_residual);
+	DEBUG(0, "%s: in SCpnt=0x%p resid=%d ocount=%d ptr=0x%p this_residual=%d buffers=0x%p nbuf=%d\n",
+	      __FUNCTION__, SCpnt, RESID, ocount, SCpnt->SCp.ptr, SCpnt->SCp.this_residual, SCpnt->SCp.buffer, SCpnt->SCp.buffers_residual);
 
 	time_out = 1000;
 
@@ -742,8 +735,8 @@ static void nsp_pio_read(Scsi_Cmnd *SCpnt, nsp_hw_data *data)
 	data->FifoCount = ocount;
 
 	if (time_out == 0) {
-		printk(KERN_DEBUG "%s() pio read timeout resid=%d this_residual=%d buffers_residual=%d\n", 
-			__FUNCTION__, RESID, SCpnt->SCp.this_residual, SCpnt->SCp.buffers_residual);
+		printk(KERN_DEBUG "%s: pio read timeout resid=%d this_residual=%d buffers_residual=%d\n",
+		       __FUNCTION__, RESID, SCpnt->SCp.this_residual, SCpnt->SCp.buffers_residual);
 	}
 	DEBUG(0, " read ocount=0x%x\n", ocount);
 }
@@ -761,7 +754,8 @@ static void nsp_pio_write(Scsi_Cmnd *SCpnt, nsp_hw_data *data)
 
 	ocount	 = data->FifoCount;
 
-	DEBUG(0,  "%s() in fifocount=%d ptr=0x%p this_residual=%d buffers=0x%p nbuf=%d resid=0x%x\n", __FUNCTION__, data->FifoCount, SCpnt->SCp.ptr, SCpnt->SCp.this_residual, SCpnt->SCp.buffer, SCpnt->SCp.buffers_residual, RESID);
+	DEBUG(0, "%s: in fifocount=%d ptr=0x%p this_residual=%d buffers=0x%p nbuf=%d resid=0x%x\n",
+	      __FUNCTION__, data->FifoCount, SCpnt->SCp.ptr, SCpnt->SCp.this_residual, SCpnt->SCp.buffer, SCpnt->SCp.buffers_residual, RESID);
 
 	time_out = 1000;
 
@@ -831,7 +825,7 @@ static void nsp_pio_write(Scsi_Cmnd *SCpnt, nsp_hw_data *data)
 	data->FifoCount = ocount;
 
 	if (time_out == 0) {
-		printk(KERN_DEBUG "%s() pio write timeout resid=0x%x\n", __FUNCTION__, RESID);
+		printk(KERN_DEBUG "%s: pio write timeout resid=0x%x\n", __FUNCTION__, RESID);
 	}
 	DEBUG(0, " write ocount=0x%x\n", ocount);
 }
@@ -849,7 +843,7 @@ static int nsp_nexus(Scsi_Cmnd *SCpnt, nsp_hw_data *data)
 //	unsigned char  lun    = SCpnt->lun;
 	sync_data     *sync   = &(data->Sync[target]);
 
-	//DEBUG(0, __func__ "() in SCpnt=0x%p\n", SCpnt);
+	//DEBUG(0, "%s: in SCpnt=0x%p\n", __FUNCTION__, SCpnt);
 
 	/* setup synch transfer registers */
 	nsp_index_write(base, SYNCREG,	sync->SyncRegister);
@@ -946,7 +940,7 @@ static void nspintr(int irq, void *dev_id, struct pt_regs *regs)
 	nsp_write(base, IRQCONTROL, IRQCONTROL_TIMER_CLEAR | IRQCONTROL_FIFO_CLEAR);
 
 	if (data->CurrentSC == NULL) {
-		printk(KERN_DEBUG "%s: CurrentSC==NULL irq_status=0x%x phase=0x%x irq_phase=0x%x cannot happen\n", __FUNCTION__, i_src, phase, irq_phase);
+		printk(KERN_DEBUG "%s: CurrentSC==NULL irq_status=0x%x phase=0x%x irq_phase=0x%x this can't be happen\n", __FUNCTION__, i_src, phase, irq_phase);
 		return;
 	} else {
 		tmpSC    = data->CurrentSC;
@@ -960,7 +954,7 @@ static void nspintr(int irq, void *dev_id, struct pt_regs *regs)
 	 */
 	if ((i_src & IRQSTATUS_SCSI) != 0) {
 		if ((irq_phase & SCSI_RESET_IRQ) != 0) {
-			printk(KERN_DEBUG " %s() bus reset (power off?)\n", __FUNCTION__);
+			printk(KERN_DEBUG " %s: bus reset (power off?)\n", __FUNCTION__);
 			*sync_neg          = SYNC_NOT_YET;
 			data->CurrentSC    = NULL;
 			tmpSC->result	   = (DID_RESET                   << 16) |
@@ -1062,7 +1056,7 @@ static void nspintr(int irq, void *dev_id, struct pt_regs *regs)
 
 	/* check unexpected bus free state */
 	if (phase == 0) {
-		printk(KERN_DEBUG "%s: unexpected bus free. i_src=0x%x, phase=0x%x, irq_phase=0x%x\n", __FUNCTION__, i_src, phase, irq_phase);
+		printk(KERN_DEBUG " %s: unexpected bus free. i_src=0x%x, phase=0x%x, irq_phase=0x%x\n", __FUNCTION__, i_src, phase, irq_phase);
 
 		*sync_neg       = SYNC_NOT_YET;
 		data->CurrentSC = NULL;
@@ -1206,7 +1200,7 @@ static void nspintr(int irq, void *dev_id, struct pt_regs *regs)
 		break;
 	}
 
-	//DEBUG(0, __func__ "() out\n");
+	//DEBUG(0, "%s: out\n", __FUNCTION__);
 	return;	
 
 timer_out:
@@ -1244,7 +1238,7 @@ static int nsp_detect(Scsi_Host_Template *sht)
 
 	snprintf(data->nspinfo,
 		 sizeof(data->nspinfo),
-		 "NinjaSCSI-3/32Bi Driver $Revision: 1.4 $ IO:0x%04lx-0x%04lx MMIO(virt addr):0x%04lx IRQ:%02d",
+		 "NinjaSCSI-3/32Bi Driver $Revision: 1.5 $ IO:0x%04lx-0x%04lx MMIO(virt addr):0x%04lx IRQ:%02d",
 		 host->io_port, host->io_port + host->n_io_port - 1,
 		 host->base,
 		 host->irq);
@@ -1301,16 +1295,28 @@ static int nsp_proc_info(char  *buffer,
 	int speed;
 	unsigned long flags;
 	nsp_hw_data *data = &nsp_data;
-	struct Scsi_Host *host;
+	struct Scsi_Host *host = NULL;
 
 	if (inout) {
 		return -EINVAL;
 	}
 
+	/* search this HBA host */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,45))
 	host = scsi_host_hn_get(hostno);
+#else
+	for (host=scsi_hostlist; host; host=host->next) {
+                if (host->host_no == hostno) {
+                        break;
+                }
+        }
+#endif
+	if (host == NULL) {
+		return -ESRCH;
+	}
 
 	SPRINTF("NinjaSCSI status\n\n");
-	SPRINTF("Driver version:        $Revision: 1.4 $\n");
+	SPRINTF("Driver version:        $Revision: 1.5 $\n");
 	SPRINTF("SCSI host No.:         %d\n",          hostno);
 	SPRINTF("IRQ:                   %d\n",          host->irq);
 	SPRINTF("IO:                    0x%lx-0x%lx\n", host->io_port, host->io_port + host->n_io_port - 1);
@@ -1419,7 +1425,7 @@ static int nsp_eh_bus_reset(Scsi_Cmnd *SCpnt)
 	unsigned int base = SCpnt->host->io_port;
 	int	     i;
 
-	DEBUG(0, "%s() SCpnt=0x%p base=0x%x\n", __FUNCTION__, SCpnt, base);
+	DEBUG(0, "%s: SCpnt=0x%p base=0x%x\n", __FUNCTION__, SCpnt, base);
 
 	nsp_write(base, IRQCONTROL, IRQCONTROL_ALLMASK);
 
@@ -1441,7 +1447,7 @@ static int nsp_eh_host_reset(Scsi_Cmnd *SCpnt)
 {
 	nsp_hw_data *data = &nsp_data;
 
-	DEBUG(0, "%s\n", __FUNCTION__);
+	DEBUG(0, "%s:\n", __FUNCTION__);
 
 	nsphw_init(data);
 
@@ -1476,7 +1482,7 @@ static dev_link_t *nsp_cs_attach(void)
 	dev_link_t   *link;
 	int	      ret, i;
 
-	DEBUG(0, "%s()\n", __FUNCTION__);
+	DEBUG(0, "%s:\n", __FUNCTION__);
 
 	/* Create new SCSI device */
 	info = kmalloc(sizeof(*info), GFP_KERNEL);
@@ -1566,7 +1572,7 @@ static void nsp_cs_detach(dev_link_t *link)
 		return;
 	}
 
-	del_timer_sync(&link->release);
+	del_timer(&link->release);
 	if (link->state & DEV_CONFIG) {
 		nsp_cs_release((u_long)link);
 		if (link->state & DEV_STALE_CONFIG) {
@@ -1618,7 +1624,7 @@ static void nsp_cs_config(dev_link_t *link)
 	nsp_hw_data      *data = &nsp_data;
 
 
-	DEBUG(0, "%s() in\n", __FUNCTION__);
+	DEBUG(0, "%s: in\n", __FUNCTION__);
 
 	tuple.DesiredTuple    = CISTPL_CONFIG;
 	tuple.Attributes      = 0;
@@ -1723,7 +1729,7 @@ static void nsp_cs_config(dev_link_t *link)
 		break;
 
 	next_entry:
-		DEBUG(0, "%s next\n", __FUNCTION__);
+		DEBUG(0, "%s: next\n", __FUNCTION__);
 
 		if (link->io.NumPorts1)
 			CardServices(ReleaseIO, link->handle, &link->io);
@@ -1746,9 +1752,8 @@ static void nsp_cs_config(dev_link_t *link)
 	data->NumAddress             = link->io.NumPorts1;
 	data->IrqNumber              = link->irq.AssignedIRQ;
 
-	DEBUG(0, "%s I/O[0x%x+0x%x] IRQ %d\n",
-		__FUNCTION__,
-	      data->BaseAddress, data->NumAddress, data->IrqNumber);
+	DEBUG(0, "%s: I/O[0x%x+0x%x] IRQ %d\n",
+	      __FUNCTION__, data->BaseAddress, data->NumAddress, data->IrqNumber);
 
 	if(nsphw_init(data) == FALSE) {
 		goto cs_failed;
@@ -1763,8 +1768,13 @@ static void nsp_cs_config(dev_link_t *link)
 	DEBUG(0, "GET_SCSI_INFO\n");
 	tail = &link->dev;
 	info->ndev = 0;
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,45))
 	for (host = scsi_host_get_next(NULL); host;
 	     host = scsi_host_get_next(host)) {
+#else
+	for (host = scsi_hostlist; host != NULL; host = host->next) {
+#endif
 		if (host->hostt == &driver_template) {
 			for (dev = host->host_queue; dev != NULL; dev = dev->next) {
 				u_long arg[2], id;
@@ -1957,7 +1967,7 @@ static int nsp_cs_event(event_t		       event,
 		DEBUG(0, " event: unknown\n");
 		break;
 	}
-	DEBUG(0, "%s end\n", __FUNCTION__);
+	DEBUG(0, "%s: end\n", __FUNCTION__);
 	return 0;
 } /* nsp_cs_event */
 
@@ -1968,7 +1978,7 @@ static int __init nsp_cs_init(void)
 {
 	servinfo_t serv;
 
-	DEBUG(0, "%s() in\n", __FUNCTION__);
+	DEBUG(0, "%s: in\n", __FUNCTION__);
 	DEBUG(0, "%s\n", version);
 	CardServices(GetCardServicesInfo, &serv);
 	if (serv.Revision != CS_RELEASE_CODE) {
@@ -1978,14 +1988,14 @@ static int __init nsp_cs_init(void)
 	}
 	register_pcmcia_driver(&dev_info, &nsp_cs_attach, &nsp_cs_detach);
 
-	DEBUG(0, "%s() out\n", __FUNCTION__);
+	DEBUG(0, "%s: out\n", __FUNCTION__);
 	return 0;
 }
 
 
 static void __exit nsp_cs_cleanup(void)
 {
-	DEBUG(0, "%s() unloading\n", __FUNCTION__);
+	DEBUG(0, "%s: unloading\n", __FUNCTION__);
 	unregister_pcmcia_driver(&dev_info);
 	while (dev_list != NULL) {
 		if (dev_list->state & DEV_CONFIG) {

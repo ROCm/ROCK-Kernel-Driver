@@ -10,7 +10,7 @@
 
 =========================================================*/
 
-/* $Id: nsp_cs.h,v 1.3 2002/10/10 11:07:52 elca Exp $ */
+/* $Id: nsp_cs.h,v 1.4 2002/11/05 12:06:29 elca Exp $ */
 
 #ifndef  __nsp_cs__
 #define  __nsp_cs__
@@ -26,7 +26,7 @@
 /************************************
  * Some useful macros...
  */
-#define Number(arr) ((int) (sizeof(arr) / sizeof(arr[0])))
+#define NUMBER(arr) ((int) (sizeof(arr) / sizeof(arr[0]))) /* from XtNumber() in /usr/X11R6/include/X11/Intrinsic.h */
 #define BIT(x)      (1L << (x))
 #define MIN(a,b)    ((a) > (b) ? (b) : (a))
 
@@ -270,10 +270,10 @@ typedef struct _nsp_hw_data {
 
 
 
-static void nsp_cs_release(u_long arg);
-static int nsp_cs_event(event_t event, int priority, event_callback_args_t *args);
+static void        nsp_cs_release(u_long arg);
+static int         nsp_cs_event(event_t event, int priority, event_callback_args_t *args);
 static dev_link_t *nsp_cs_attach(void);
-static void nsp_cs_detach(dev_link_t *);
+static void        nsp_cs_detach(dev_link_t *);
 
 static unsigned int nsphw_start_selection(Scsi_Cmnd *SCpnt, nsp_hw_data *data);
 static void nsp_start_timer(Scsi_Cmnd *SCpnt, nsp_hw_data *data, int time);
@@ -284,7 +284,6 @@ static const char *nsp_info(struct Scsi_Host *shpnt);
 static int nsp_proc_info(char *buffer, char **start, off_t offset,
 			 int length, int hostno, int inout);
 static int nsp_queuecommand(Scsi_Cmnd *, void (* done)(Scsi_Cmnd *));
-
 
 /*static int nsp_eh_abort(Scsi_Cmnd * SCpnt);*/
 /*static int nsp_eh_device_reset(Scsi_Cmnd *SCpnt);*/
