@@ -93,12 +93,13 @@ typedef enum page_buf_flags_e {		/* pb_flags values */
 	_PBF_PRIVATE_BH = (1 << 17), /* do not use public buffer heads	   */
 	_PBF_ALL_PAGES_MAPPED = (1 << 18), /* all pages in range mapped	   */
 	_PBF_ADDR_ALLOCATED = (1 << 19), /* pb_addr space was allocated	   */
-	_PBF_MEM_ALLOCATED = (1 << 20), /* pb_mem+underlying pages alloc'd */
+	_PBF_MEM_ALLOCATED = (1 << 20), /* underlying pages are allocated  */
+	_PBF_MEM_SLAB = (1 << 21), /* underlying pages are slab allocated  */
 
-	PBF_FORCEIO = (1 << 21),
-	PBF_FLUSH = (1 << 22),	/* flush disk write cache		   */
-	PBF_READ_AHEAD = (1 << 23),
-	PBF_RUN_QUEUES = (1 << 24), /* run block device task queue	   */
+	PBF_FORCEIO = (1 << 22), /* ignore any cache state		   */
+	PBF_FLUSH = (1 << 23),	/* flush disk write cache		   */
+	PBF_READ_AHEAD = (1 << 24), /* asynchronous read-ahead		   */
+	PBF_RUN_QUEUES = (1 << 25), /* run block device task queue	   */
 
 } page_buf_flags_t;
 

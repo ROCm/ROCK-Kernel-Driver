@@ -372,9 +372,6 @@ _pagebuf_freepages(
 			page_cache_release(page);
 		}
 	}
-
-	if (pb->pb_pages != pb->pb_page_array)
-		kfree(pb->pb_pages);
 }
 
 /*
@@ -413,20 +410,17 @@ _pagebuf_free_object(
 		if (pb->pb_flags & _PBF_MEM_ALLOCATED) {
 			if (pb->pb_pages) {
 				/* release the pages in the address list */
-				if (pb->pb_pages[0] &&
-				    PageSlab(pb->pb_pages[0])) {
-					/*
-					 * This came from the slab
-					 * allocator free it as such
-					 */
+				if ((pb->pb_pages[0]) &&
+				    (pb->pb_flags & _PBF_MEM_SLAB)) {
 					kfree(pb->pb_addr);
 				} else {
 					_pagebuf_freepages(pb);
 				}
-
+				if (pb->pb_pages != pb->pb_page_array)
+					kfree(pb->pb_pages);
 				pb->pb_pages = NULL;
 			}
-			pb->pb_flags &= ~_PBF_MEM_ALLOCATED;
+			pb->pb_flags &= ~(_PBF_MEM_ALLOCATED|_PBF_MEM_SLAB);
 		}
 	}
 
@@ -718,7 +712,8 @@ found:
 				_PBF_LOCKABLE | \
 				_PBF_ALL_PAGES_MAPPED | \
 				_PBF_ADDR_ALLOCATED | \
-				_PBF_MEM_ALLOCATED;
+				_PBF_MEM_ALLOCATED | \
+				_PBF_MEM_SLAB;
 	PB_TRACE(pb, "got_lock", 0);
 	PB_STATS_INC(pb_get_locked);
 	return (pb);
@@ -947,8 +942,8 @@ pagebuf_get_no_daddr(
 	page_buf_t		*pb;
 	size_t			tlen = 0;
 
-	if (len > 0x20000)
-		return(NULL);
+	if (unlikely(len > 0x20000))
+		return NULL;
 
 	pb = pagebuf_allocate(flags);
 	if (!pb)
@@ -975,7 +970,7 @@ pagebuf_get_no_daddr(
 		return NULL;
 	}
 	/* otherwise pagebuf_free just ignores it */
-	pb->pb_flags |= _PBF_MEM_ALLOCATED;
+	pb->pb_flags |= (_PBF_MEM_ALLOCATED | _PBF_MEM_SLAB);
 	PB_CLEAR_OWNER(pb);
 	up(&pb->pb_sema);	/* Return unlocked pagebuf */
 
