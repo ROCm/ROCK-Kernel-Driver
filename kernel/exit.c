@@ -36,7 +36,6 @@ static inline void __unhash_process(struct task_struct *p)
 	nr_threads--;
 	unhash_pid(p);
 	REMOVE_LINKS(p);
-	list_del(&p->thread_group);
 	p->pid = 0;
 	proc_dentry = p->proc_dentry;
 	if (unlikely(proc_dentry != NULL)) {
@@ -73,6 +72,7 @@ static void release_task(struct task_struct * p)
 	}
 	BUG_ON(!list_empty(&p->ptrace_list) || !list_empty(&p->ptrace_children));
 	unhash_process(p);
+	exit_sighand(p);
 
 	release_thread(p);
 	if (p != current) {
@@ -244,7 +244,8 @@ void daemonize(void)
 static void reparent_thread(task_t *p, task_t *reaper, task_t *child_reaper)
 {
 	/* We dont want people slaying init */
-	p->exit_signal = SIGCHLD;
+	if (p->exit_signal != -1)
+		p->exit_signal = SIGCHLD;
 	p->self_exec_id++;
 
 	/* Make sure we're not reparenting to ourselves */
@@ -412,18 +413,15 @@ void exit_mm(struct task_struct *tsk)
  */
 static inline void forget_original_parent(struct task_struct * father)
 {
-	struct task_struct *p, *reaper;
+	struct task_struct *p, *reaper = father;
 	struct list_head *_p;
 
-	read_lock(&tasklist_lock);
+	write_lock_irq(&tasklist_lock);
 
-	/* Next in our thread group, if they're not already exiting */
-	reaper = father;
-	do {
-		reaper = next_thread(reaper);
-		if (!(reaper->flags & PF_EXITING))
-			break;
-	} while (reaper != father);
+	if (father->exit_signal != -1)
+		reaper = prev_thread(reaper);
+	else
+		reaper = child_reaper;
 
 	if (reaper == father)
 		reaper = child_reaper;
@@ -444,7 +442,7 @@ static inline void forget_original_parent(struct task_struct * father)
 		p = list_entry(_p,struct task_struct,ptrace_list);
 		reparent_thread(p, reaper, child_reaper);
 	}
-	read_unlock(&tasklist_lock);
+	write_unlock_irq(&tasklist_lock);
 }
 
 static inline void zap_thread(task_t *p, task_t *father, int traced)
@@ -604,7 +602,6 @@ fake_volatile:
 	__exit_files(tsk);
 	__exit_fs(tsk);
 	exit_namespace(tsk);
-	exit_sighand(tsk);
 	exit_thread();
 
 	if (current->leader)
@@ -763,6 +760,8 @@ repeat:
 		if (options & __WNOTHREAD)
 			break;
 		tsk = next_thread(tsk);
+		if (tsk->sig != current->sig)
+			BUG();
 	} while (tsk != current);
 	read_unlock(&tasklist_lock);
 	if (flag) {

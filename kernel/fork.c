@@ -630,6 +630,9 @@ static inline int copy_sighand(unsigned long clone_flags, struct task_struct * t
 	spin_lock_init(&sig->siglock);
 	atomic_set(&sig->count, 1);
 	memcpy(tsk->sig->action, current->sig->action, sizeof(tsk->sig->action));
+	sig->curr_target = NULL;
+	init_sigpending(&sig->shared_pending);
+
 	return 0;
 }
 
@@ -663,6 +666,12 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 
 	if ((clone_flags & (CLONE_NEWNS|CLONE_FS)) == (CLONE_NEWNS|CLONE_FS))
 		return ERR_PTR(-EINVAL);
+
+	/*
+	 * Thread groups must share signals as well:
+	 */
+	if (clone_flags & CLONE_THREAD)
+		clone_flags |= CLONE_SIGHAND;
 
 	retval = security_ops->task_create(clone_flags);
 	if (retval)
@@ -843,8 +852,10 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	p->parent = p->real_parent;
 
 	if (clone_flags & CLONE_THREAD) {
+		spin_lock(&current->sig->siglock);
 		p->tgid = current->tgid;
 		list_add(&p->thread_group, &current->thread_group);
+		spin_unlock(&current->sig->siglock);
 	}
 
 	SET_LINKS(p);
