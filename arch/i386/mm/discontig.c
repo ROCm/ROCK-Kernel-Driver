@@ -417,15 +417,15 @@ void __init zone_sizes_init(void)
 		 * remapped KVA area - mbligh
 		 */
 		if (!nid)
-			free_area_init_node(nid, NODE_DATA(nid), 0, 
-				zones_size, start, zholes_size);
+			free_area_init_node(nid, NODE_DATA(nid),
+					zones_size, start, zholes_size);
 		else {
 			unsigned long lmem_map;
 			lmem_map = (unsigned long)node_remap_start_vaddr[nid];
 			lmem_map += sizeof(pg_data_t) + PAGE_SIZE - 1;
 			lmem_map &= PAGE_MASK;
-			free_area_init_node(nid, NODE_DATA(nid), 
-				(struct page *)lmem_map, zones_size, 
+			NODE_DATA(nid)->node_mem_map = (struct page *)lmem_map;
+			free_area_init_node(nid, NODE_DATA(nid), zones_size,
 				start, zholes_size);
 		}
 	}

@@ -495,7 +495,7 @@ void __init paging_init(struct meminfo *mi, struct machine_desc *mdesc)
 		 */
 		arch_adjust_zones(node, zone_size, zhole_size);
 
-		free_area_init_node(node, pgdat, NULL, zone_size,
+		free_area_init_node(node, pgdat, zone_size,
 				bdata->node_boot_start >> PAGE_SHIFT, zhole_size);
 	}
 

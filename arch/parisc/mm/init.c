@@ -804,7 +804,7 @@ void __init paging_init(void)
 		   ZONE_DMA zone. */
 		zones_size[ZONE_DMA] = pmem_ranges[i].pages;
 
-		free_area_init_node(i,NODE_DATA(i),NULL,zones_size,
+		free_area_init_node(i, NODE_DATA(i), zones_size,
 				pmem_ranges[i].start_pfn, 0);
 
 #ifdef CONFIG_DISCONTIGMEM
