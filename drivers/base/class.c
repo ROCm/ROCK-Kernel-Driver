@@ -81,29 +81,55 @@ void devclass_remove_device(struct device * dev)
 	}
 }
 
+struct device_class * get_devclass(struct device_class * cls)
+{
+	struct device_class * ret = cls;
+	spin_lock(&device_lock);
+	if (cls && cls->present && atomic_read(&cls->refcount) > 0)
+		atomic_inc(&cls->refcount);
+	else
+		ret = NULL;
+	spin_unlock(&device_lock);
+	return ret;
+}
+
+void put_devclass(struct device_class * cls)
+{
+	if (atomic_dec_and_lock(&cls->refcount,&device_lock)) {
+		list_del_init(&cls->node);
+		spin_unlock(&device_lock);
+		devclass_remove_dir(cls);
+	}
+}
+
+
 int devclass_register(struct device_class * cls)
 {
 	INIT_LIST_HEAD(&cls->drivers);
 	INIT_LIST_HEAD(&cls->intf_list);
-
-	pr_debug("registering device class '%s'\n",cls->name);
+	atomic_set(&cls->refcount,2);
+	cls->present = 1;
+	pr_debug("device class '%s': registering\n",cls->name);
 
 	spin_lock(&device_lock);
 	list_add_tail(&cls->node,&class_list);
 	spin_unlock(&device_lock);
 	devclass_make_dir(cls);
+	put_devclass(cls);
 	return 0;
 }
 
 void devclass_unregister(struct device_class * cls)
 {
-	pr_debug("unregistering device class '%s'\n",cls->name);
-	devclass_remove_dir(cls);
 	spin_lock(&device_lock);
-	list_del_init(&class_list);
+	cls->present = 0;
 	spin_unlock(&device_lock);
+	pr_debug("device class '%s': unregistering\n",cls->name);
+	put_devclass(cls);
 }
 
 EXPORT_SYMBOL(devclass_register);
 EXPORT_SYMBOL(devclass_unregister);
+EXPORT_SYMBOL(get_devclass);
+EXPORT_SYMBOL(put_devclass);
 

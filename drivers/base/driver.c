@@ -39,6 +39,43 @@ int driver_for_each_dev(struct device_driver * drv, void * data,
 	return error;
 }
 
+struct device_driver * get_driver(struct device_driver * drv)
+{
+	struct device_driver * ret = drv;
+	spin_lock(&device_lock);
+	if (drv && drv->present && atomic_read(&drv->refcount) > 0)
+		atomic_inc(&drv->refcount);
+	else
+		ret = NULL;
+	spin_unlock(&device_lock);
+	return ret;
+}
+
+
+void remove_driver(struct device_driver * drv)
+{
+	BUG();
+}
+
+/**
+ * put_driver - decrement driver's refcount and clean up if necessary
+ * @drv:	driver in question
+ */
+void put_driver(struct device_driver * drv)
+{
+	struct bus_type * bus = drv->bus;
+	if (!atomic_dec_and_lock(&drv->refcount,&device_lock))
+		return;
+	list_del_init(&drv->bus_list);
+	spin_unlock(&device_lock);
+	BUG_ON(drv->present);
+	driver_detach(drv);
+	driver_remove_dir(drv);
+	if (drv->release)
+		drv->release(drv);
+	put_bus(bus);
+}
+
 /**
  * driver_register - register driver with bus
  * @drv:	driver to register
@@ -50,12 +87,13 @@ int driver_register(struct device_driver * drv)
 	if (!drv->bus)
 		return -EINVAL;
 
-	pr_debug("Registering driver '%s' with bus '%s'\n",drv->name,drv->bus->name);
+	pr_debug("driver %s:%s: registering\n",drv->bus->name,drv->name);
 
 	get_bus(drv->bus);
 	atomic_set(&drv->refcount,2);
 	rwlock_init(&drv->lock);
 	INIT_LIST_HEAD(&drv->devices);
+	drv->present = 1;
 	spin_lock(&device_lock);
 	list_add(&drv->bus_list,&drv->bus->drivers);
 	spin_unlock(&device_lock);
@@ -65,39 +103,17 @@ int driver_register(struct device_driver * drv)
 	return 0;
 }
 
-static void __remove_driver(struct device_driver * drv)
-{
-	pr_debug("Unregistering driver '%s' from bus '%s'\n",drv->name,drv->bus->name);
-	driver_detach(drv);
-	driver_remove_dir(drv);
-	if (drv->release)
-		drv->release(drv);
-	put_bus(drv->bus);
-}
-
-void remove_driver(struct device_driver * drv)
+void driver_unregister(struct device_driver * drv)
 {
 	spin_lock(&device_lock);
-	atomic_set(&drv->refcount,0);
-	list_del_init(&drv->bus_list);
+	drv->present = 0;
 	spin_unlock(&device_lock);
-	__remove_driver(drv);
-}
-
-/**
- * put_driver - decrement driver's refcount and clean up if necessary
- * @drv:	driver in question
- */
-void put_driver(struct device_driver * drv)
-{
-	if (!atomic_dec_and_lock(&drv->refcount,&device_lock))
-		return;
-	list_del_init(&drv->bus_list);
-	spin_unlock(&device_lock);
-	__remove_driver(drv);
+	pr_debug("driver %s:%s: unregistering\n",drv->bus->name,drv->name);
+	put_driver(drv);
 }
 
 EXPORT_SYMBOL(driver_for_each_dev);
 EXPORT_SYMBOL(driver_register);
+EXPORT_SYMBOL(driver_unregister);
+EXPORT_SYMBOL(get_driver);
 EXPORT_SYMBOL(put_driver);
-EXPORT_SYMBOL(remove_driver);

@@ -54,8 +54,9 @@ struct device_class;
 
 struct bus_type {
 	char			* name;
-	rwlock_t		lock;
+	struct rw_semaphore	rwsem;
 	atomic_t		refcount;
+	u32			present;
 
 	struct list_head	node;
 	struct list_head	devices;
@@ -73,14 +74,9 @@ struct bus_type {
 
 
 extern int bus_register(struct bus_type * bus);
+extern void bus_unregister(struct bus_type * bus);
 
-static inline struct bus_type * get_bus(struct bus_type * bus)
-{
-	BUG_ON(!atomic_read(&bus->refcount));
-	atomic_inc(&bus->refcount);
-	return bus;
-}
-
+extern struct bus_type * get_bus(struct bus_type * bus);
 extern void put_bus(struct bus_type * bus);
 
 extern int bus_for_each_dev(struct bus_type * bus, void * data, 
@@ -114,6 +110,7 @@ struct device_driver {
 
 	rwlock_t		lock;
 	atomic_t		refcount;
+	u32			present;
 
 	struct list_head	bus_list;
 	struct list_head	class_list;
@@ -131,16 +128,10 @@ struct device_driver {
 };
 
 
-
 extern int driver_register(struct device_driver * drv);
+extern void driver_unregister(struct device_driver * drv);
 
-static inline struct device_driver * get_driver(struct device_driver * drv)
-{
-	BUG_ON(!atomic_read(&drv->refcount));
-	atomic_inc(&drv->refcount);
-	return drv;
-}
-
+extern struct device_driver * get_driver(struct device_driver * drv);
 extern void put_driver(struct device_driver * drv);
 extern void remove_driver(struct device_driver * drv);
 
@@ -172,6 +163,9 @@ extern void driver_remove_file(struct device_driver *, struct driver_attribute *
  */
 struct device_class {
 	char			* name;
+	atomic_t		refcount;
+	u32			present;
+
 	u32			devnum;
 
 	struct list_head	node;
@@ -188,6 +182,9 @@ struct device_class {
 
 extern int devclass_register(struct device_class *);
 extern void devclass_unregister(struct device_class *);
+
+extern struct device_class * get_devclass(struct device_class *);
+extern void put_devclass(struct device_class *);
 
 
 struct devclass_attribute {
