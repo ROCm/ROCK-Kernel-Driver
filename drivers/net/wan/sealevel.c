@@ -211,8 +211,6 @@ static struct slvl_board *slvl_init(int iobase, int irq, int txdma, int rxdma, i
 	struct z8530_dev *dev;
 	struct slvl_device *sv;
 	struct slvl_board *b;
-	
-	unsigned long flags;
 	int u;
 	
 	/*
