@@ -113,45 +113,6 @@ pb_trace_func(
 }
 #endif	/* PAGEBUF_TRACE */
 
-#ifdef PAGEBUF_TRACKING
-#define MAX_PB	10000
-page_buf_t	*pb_array[MAX_PB];
-EXPORT_SYMBOL(pb_array);
-
-void
-pb_tracking_get(
-	page_buf_t	*pb)
-{
-	int		i;
-
-	for (i = 0; (pb_array[i] != 0) && (i < MAX_PB); i++) { }
-	if (i == MAX_PB)
-		printk("pb 0x%p not recorded in pb_array\n", pb);
-	else {
-		//printk("pb_get 0x%p in pb_array[%d]\n", pb, i);
-		pb_array[i] = pb;
-	}
-}
-
-void
-pb_tracking_free(
-	page_buf_t	*pb)
-{
-	int		i;
-
-	for (i = 0; (pb_array[i] != pb) && (i < MAX_PB); i++) { }
-	if (i < MAX_PB) {
-		//printk("pb_free 0x%p from pb_array[%d]\n", pb, i);
-		pb_array[i] = NULL;
-	}
-	else
-		printk("Freed unmonitored pagebuf 0x%p\n", pb);
-}
-#else
-#define pb_tracking_get(pb)	do { } while (0)
-#define pb_tracking_free(pb)	do { } while (0)
-#endif	/* PAGEBUF_TRACKING */
-
 /*
  *	File wide globals
  */
@@ -314,8 +275,6 @@ _pagebuf_initialize(
 	 */
 	flags &= ~(PBF_LOCK|PBF_MAPPED|PBF_DONT_BLOCK|PBF_READ_AHEAD);
 
-	pb_tracking_get(pb);
-
 	memset(pb, 0, sizeof(page_buf_private_t));
 	atomic_set(&pb->pb_hold, 1);
 	init_MUTEX_LOCKED(&pb->pb_iodonesema);
@@ -444,7 +403,6 @@ _pagebuf_free_object(
 		}
 	}
 
-	pb_tracking_free(pb);
 	pagebuf_deallocate(pb);
 }
 
@@ -1743,8 +1701,7 @@ pagebuf_daemon(
 
 		spin_unlock(&pb_daemon->pb_delwrite_lock);
 		while (!list_empty(&tmp)) {
-			pb = list_entry(tmp.next,
-							page_buf_t, pb_list);
+			pb = list_entry(tmp.next, page_buf_t, pb_list);
 			list_del_init(&pb->pb_list);
 			pb->pb_flags &= ~PBF_DELWRI;
 			pb->pb_flags |= PBF_WRITE;
@@ -2029,14 +1986,8 @@ pagebuf_init(void)
 	}
 
 #ifdef PAGEBUF_TRACE
-# if 1
 	pb_trace.buf = (pagebuf_trace_t *)kmalloc(
 			PB_TRACE_BUFSIZE * sizeof(pagebuf_trace_t), GFP_KERNEL);
-# else
-	/* Alternatively, for really really long trace bufs */
-	pb_trace.buf = (pagebuf_trace_t *)vmalloc(
-			PB_TRACE_BUFSIZE * sizeof(pagebuf_trace_t));
-# endif
 	memset(pb_trace.buf, 0, PB_TRACE_BUFSIZE * sizeof(pagebuf_trace_t));
 	pb_trace.start = 0;
 	pb_trace.end = PB_TRACE_BUFSIZE - 1;

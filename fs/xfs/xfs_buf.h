@@ -107,8 +107,8 @@ static inline void xfs_buf_undelay(page_buf_t *pb)
 #define XFS_BUF_UNWRITE(x)	((x)->pb_flags &= ~PBF_WRITE)
 #define XFS_BUF_ISWRITE(x)	((x)->pb_flags & PBF_WRITE)
 
-#define XFS_BUF_ISUNINITIAL(x)	 ((x)->pb_flags & PBF_UNINITIAL)
-#define XFS_BUF_UNUNINITIAL(x)	 ((x)->pb_flags &= ~PBF_UNINITIAL)
+#define XFS_BUF_ISUNINITIAL(x)	 (0)
+#define XFS_BUF_UNUNINITIAL(x)	 (0)
 
 #define XFS_BUF_BP_ISMAPPED(bp)	 1
 

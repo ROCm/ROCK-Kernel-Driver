@@ -56,7 +56,8 @@ STATIC int _xfs_imap_to_bmap(xfs_iocore_t *, xfs_off_t, xfs_bmbt_irec_t *,
 
 
 int
-xfs_strategy(xfs_inode_t *ip,
+xfs_strategy(
+	xfs_inode_t	*ip,
 	xfs_off_t	offset,
 	ssize_t		count,
 	int		flags,
@@ -74,13 +75,13 @@ xfs_strategy(xfs_inode_t *ip,
 	xfs_bmap_free_t free_list;
 	xfs_filblks_t	count_fsb;
 	int		committed, i, loops, nimaps;
-	int		is_xfs = 1; /* This will be a variable at some point */
+	int		is_xfs;
 	xfs_bmbt_irec_t imap[XFS_MAX_RW_NBMAPS];
 	xfs_trans_t	*tp;
 
-	io = &ip->i_iocore;
 	mp = ip->i_mount;
-	/* is_xfs = IO_IS_XFS(io); */
+	io = &ip->i_iocore;
+	is_xfs = IO_IS_XFS(io);
 	ASSERT((ip->i_d.di_mode & IFMT) == IFREG);
 	ASSERT(((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) != 0) ==
 	       ((io->io_flags & XFS_IOCORE_RT) != 0));
@@ -238,14 +239,19 @@ xfs_strategy(xfs_inode_t *ip,
 		 */
 
 		offset_fsb = XFS_B_TO_FSBT(mp, offset);
-		for(i = 0; i < nimaps; i++) {
-			int maps;
-			if (offset_fsb >= imap[i].br_startoff &&
-				(offset_fsb < (imap[i].br_startoff + imap[i].br_blockcount))) {
-				XFS_IUNLOCK(mp, io, XFS_ILOCK_EXCL | XFS_EXTSIZE_WR);
+		for (i = 0; i < nimaps; i++) {
+			int	maps;
+
+			if ((offset_fsb >= imap[i].br_startoff) &&
+			    (offset_fsb <
+			     (imap[i].br_startoff + imap[i].br_blockcount))) {
+
+				XFS_IUNLOCK(mp, io,
+						XFS_ILOCK_EXCL|XFS_EXTSIZE_WR);
 				maps = min(nimaps, *npbmaps);
-				*npbmaps = _xfs_imap_to_bmap(io, offset, &imap[i],
-					pbmapp, maps, *npbmaps);
+				*npbmaps = _xfs_imap_to_bmap(io, offset,
+							     &imap[i], pbmapp,
+							     maps, *npbmaps);
 				XFS_STATS_INC(xfsstats.xs_xstrat_quick);
 				return 0;
 			}
@@ -260,9 +266,11 @@ xfs_strategy(xfs_inode_t *ip,
 
 		nimaps--; /* Index of last entry  */
 		ASSERT(nimaps >= 0);
-		ASSERT(offset_fsb >= imap[nimaps].br_startoff + imap[nimaps].br_blockcount);
+		ASSERT(offset_fsb >=
+			imap[nimaps].br_startoff + imap[nimaps].br_blockcount);
 		ASSERT(count_fsb);
-		offset_fsb = imap[nimaps].br_startoff + imap[nimaps].br_blockcount;
+		offset_fsb =
+			imap[nimaps].br_startoff + imap[nimaps].br_blockcount;
 		map_start_fsb = offset_fsb;
 		XFS_STATS_INC(xfsstats.xs_xstrat_split);
 		XFS_IUNLOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_WR);
@@ -397,10 +405,9 @@ _xfs_imap_to_bmap(
 	if (io->io_new_size > nisize)
 		nisize = io->io_new_size;
 
-	for (im=0, pbm=0; im < imaps && pbm < pbmaps; im++,pbmapp++,imap++,pbm++) {
+	for (im=pbm=0; im < imaps && pbm < pbmaps; im++,pbmapp++,imap++,pbm++) {
 		pbmapp->pbm_target = io->io_flags & XFS_IOCORE_RT ?
-			mp->m_rtdev_targp :
-			mp->m_ddev_targp;
+			mp->m_rtdev_targp : mp->m_ddev_targp;
 		pbmapp->pbm_offset = XFS_FSB_TO_B(mp, imap->br_startoff);
 		pbmapp->pbm_delta = offset - pbmapp->pbm_offset;
 		pbmapp->pbm_bsize = XFS_FSB_TO_B(mp, imap->br_blockcount);
@@ -415,8 +422,9 @@ _xfs_imap_to_bmap(
 			pbmapp->pbm_flags = PBMF_DELAY;
 		} else {
 			pbmapp->pbm_bn = XFS_FSB_TO_DB_IO(io, start_block);
-			if (imap->br_state == XFS_EXT_UNWRITTEN)
+			if (ISUNWRITTEN(imap)) {
 				pbmapp->pbm_flags |= PBMF_UNWRITTEN;
+			}
 		}
 
 		if ((pbmapp->pbm_offset + pbmapp->pbm_bsize) >= nisize) {
@@ -425,7 +433,7 @@ _xfs_imap_to_bmap(
 
 		offset += pbmapp->pbm_bsize - pbmapp->pbm_delta;
 	}
-	return(pbm);	/* Return the number filled */
+	return pbm;	/* Return the number filled */
 }
 
 STATIC int
@@ -475,7 +483,7 @@ xfs_iomap_read(
  *	2 must allocate.
  *	There are 3 cases when we allocate:
  *		delay allocation (doesn't really allocate or use transactions)
- *		direct allocation (no previous delay allocation
+ *		direct allocation (no previous delay allocation)
  *		convert delay to real allocations
  */
 
@@ -716,17 +724,14 @@ xfs_iomap_write_direct(
 	if (io->io_new_size > isize)
 		isize = io->io_new_size;
 
-	if ((offset + count) > isize) {
-		aeof = 1;
-	} else {
-		aeof = 0;
-	}
+	aeof = ((offset + count) > isize) ? 1 : 0;
 
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
 	last_fsb = XFS_B_TO_FSB(mp, ((xfs_ufsize_t)(offset + count)));
 	count_fsb = last_fsb - offset_fsb;
 	if (found && (pbmapp->pbm_flags & PBMF_HOLE)) {
 		xfs_fileoff_t	map_last_fsb;
+
 		map_last_fsb = XFS_B_TO_FSB(mp,
 			(pbmapp->pbm_bsize + pbmapp->pbm_offset));
 
@@ -742,15 +747,15 @@ xfs_iomap_write_direct(
 	 * is greater that 512K and we are allocating past the allocation eof
 	 */
 	if (!found && mp->m_dalign && (isize >= 524288) && aeof) {
-		int eof;
-		xfs_fileoff_t new_last_fsb;
+		int		eof;
+		xfs_fileoff_t	new_last_fsb;
+
 		new_last_fsb = roundup_64(last_fsb, mp->m_dalign);
 		printk("xfs_iomap_write_direct: about to XFS_BMAP_EOF %Ld\n",
 			new_last_fsb);
 		error = XFS_BMAP_EOF(mp, io, new_last_fsb, XFS_DATA_FORK, &eof);
-		if (error) {
+		if (error)
 			goto error_out;
-		}
 		if (eof)
 			last_fsb = new_last_fsb;
 	}
@@ -867,13 +872,14 @@ xfs_iomap_write_direct(
 	maps = min(nimaps, maps);
 	*npbmaps = _xfs_imap_to_bmap(io, offset, &imap[0], pbmapp, maps,
 								*npbmaps);
-	if(*npbmaps) {
+	if (*npbmaps) {
 		/*
 		 * this is new since xfs_iomap_read
 		 * didn't find it.
 		 */
 		if (*npbmaps != 1) {
-			printk("NEED MORE WORK FOR MULTIPLE BMAPS (which are new)\n");
+			/* NEED MORE WORK FOR MULTIPLE BMAPS (which are new) */
+			BUG();
 		}
 	}
 	goto out;
@@ -889,4 +895,3 @@ error_out:
 out:	/* Just return error and any tracing at end of routine */
 	return XFS_ERROR(error);
 }
-

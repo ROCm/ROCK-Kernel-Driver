@@ -321,10 +321,9 @@ xfs_zero_last_block(
 		return 0;
 	}
 	/*
-	 * Get a pagebuf for the last block, zero the part beyond the
-	 * EOF, and write it out sync.	We need to drop the ilock
-	 * while we do this so we don't deadlock when the buffer cache
-	 * calls back to us.
+	 * Zero the part of the last block beyond the EOF, and write it
+	 * out sync.  We need to drop the ilock while we do this so we
+	 * don't deadlock when the buffer cache calls back to us.
 	 */
 	XFS_IUNLOCK(mp, io, XFS_ILOCK_EXCL| XFS_EXTSIZE_RD);
 	loff = XFS_FSB_TO_B(mp, last_fsb);
@@ -401,7 +400,6 @@ xfs_zero_eof(
 	last_fsb = isize ? XFS_B_TO_FSBT(mp, isize - 1) : (xfs_fileoff_t)-1;
 	start_zero_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)isize);
 	end_zero_fsb = XFS_B_TO_FSBT(mp, offset - 1);
-
 	ASSERT((xfs_sfiloff_t)last_fsb < (xfs_sfiloff_t)start_zero_fsb);
 	if (last_fsb == end_zero_fsb) {
 		/*
@@ -414,10 +412,6 @@ xfs_zero_eof(
 	ASSERT(start_zero_fsb <= end_zero_fsb);
 	prev_zero_fsb = NULLFILEOFF;
 	prev_zero_count = 0;
-	/*
-	 * Maybe change this loop to do the bmapi call and
-	 * loop while we split the mappings into pagebufs?
-	 */
 	while (start_zero_fsb <= end_zero_fsb) {
 		nimaps = 1;
 		zero_count_fsb = end_zero_fsb - start_zero_fsb + 1;
@@ -792,7 +786,6 @@ retry:
 	return(ret);
 }
 
-
 /*
  * All xfs metadata buffers except log state machine buffers
  * get this attached as their b_bdstrat callback function.
@@ -822,6 +815,7 @@ xfs_bdstrat_cb(struct xfs_buf *bp)
 			return (xfs_bioerror(bp));
 	}
 }
+
 /*
  * Wrapper around bdstrat so that we can stop data
  * from going to disk in case we are shutting down the filesystem.
