@@ -675,7 +675,6 @@ void __init setup_arch(char **cmdline_p)
 	if ( ppc_md.progress ) ppc_md.progress("arch: exit", 0x3eab);
 
 	paging_init();
-	sort_exception_table();
 
 	/* this is for modules since _machine can be a define -- Cort */
 	ppc_md.ppc_machine = _machine;
