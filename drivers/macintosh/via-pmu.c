@@ -195,7 +195,7 @@ static int proc_get_batt(char *page, char **start, off_t off,
 #endif /* CONFIG_PMAC_PBOOK */
 static int proc_read_options(char *page, char **start, off_t off,
 			int count, int *eof, void *data);
-static int proc_write_options(struct file *file, const char *buffer,
+static int proc_write_options(struct file *file, const char __user *buffer,
 			unsigned long count, void *data);
 
 #ifdef CONFIG_ADB
@@ -290,7 +290,7 @@ static struct backlight_controller pmu_backlight_controller = {
 #endif /* CONFIG_PMAC_BACKLIGHT */
 
 int __openfirmware
-find_via_pmu()
+find_via_pmu(void)
 {
 	if (via != 0)
 		return 1;
@@ -371,7 +371,7 @@ find_via_pmu()
 
 #ifdef CONFIG_ADB
 static int __openfirmware
-pmu_probe()
+pmu_probe(void)
 {
 	return vias == NULL? -ENODEV: 0;
 }
@@ -510,7 +510,7 @@ static int __init via_pmu_dev_init(void)
 device_initcall(via_pmu_dev_init);
 
 static int __openfirmware
-init_pmu()
+init_pmu(void)
 {
 	int timeout;
 	struct adb_request req;
@@ -815,7 +815,7 @@ proc_read_options(char *page, char **start, off_t off,
 }
 			
 static int __pmac
-proc_write_options(struct file *file, const char *buffer,
+proc_write_options(struct file *file, const char __user *buffer,
 			unsigned long count, void *data)
 {
 	char tmp[33];
@@ -1112,7 +1112,7 @@ pmu_done(struct adb_request *req)
 }
 
 static void __pmac
-pmu_start()
+pmu_start(void)
 {
 	struct adb_request *req;
 
@@ -1136,7 +1136,7 @@ pmu_start()
 }
 
 void __openfirmware
-pmu_poll()
+pmu_poll(void)
 {
 	if (!via)
 		return;
@@ -2402,7 +2402,7 @@ pmu_open(struct inode *inode, struct file *file)
 }
 
 static ssize_t  __pmac
-pmu_read(struct file *file, char *buf,
+pmu_read(struct file *file, char __user *buf,
 			size_t count, loff_t *ppos)
 {
 	struct pmu_private *pp = file->private_data;
@@ -2455,7 +2455,7 @@ pmu_read(struct file *file, char *buf,
 }
 
 static ssize_t __pmac
-pmu_write(struct file *file, const char *buf,
+pmu_write(struct file *file, const char __user *buf,
 			 size_t count, loff_t *ppos)
 {
 	return 0;

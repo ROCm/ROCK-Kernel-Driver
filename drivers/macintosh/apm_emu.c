@@ -180,7 +180,7 @@ static int check_apm_user(struct apm_user *as, const char *func)
 	return 0;
 }
 
-static ssize_t do_read(struct file *fp, char *buf, size_t count, loff_t *ppos)
+static ssize_t do_read(struct file *fp, char __user *buf, size_t count, loff_t *ppos)
 {
 	struct apm_user *	as;
 	size_t			i;

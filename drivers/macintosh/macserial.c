@@ -1694,7 +1694,7 @@ static void rs_unthrottle(struct tty_struct * tty)
  */
 
 static int get_serial_info(struct mac_serial * info,
-			   struct serial_struct * retinfo)
+			   struct serial_struct __user * retinfo)
 {
 	struct serial_struct tmp;
   
@@ -1716,7 +1716,7 @@ static int get_serial_info(struct mac_serial * info,
 }
 
 static int set_serial_info(struct mac_serial * info,
-			   struct serial_struct * new_info)
+			   struct serial_struct __user * new_info)
 {
 	struct serial_struct new_serial;
 	struct mac_serial old_info;
@@ -1876,15 +1876,15 @@ static int rs_ioctl(struct tty_struct *tty, struct file * file,
 			return set_modem_info(info, cmd, (unsigned int *) arg);
 		case TIOCGSERIAL:
 			return get_serial_info(info,
-					       (struct serial_struct *) arg);
+					(struct serial_struct __user *) arg);
 		case TIOCSSERIAL:
 			return set_serial_info(info,
-					       (struct serial_struct *) arg);
+					(struct serial_struct __user *) arg);
 		case TIOCSERGETLSR: /* Get line status register */
 			return get_lsr_info(info, (unsigned int *) arg);
 
 		case TIOCSERGSTRUCT:
-			if (copy_to_user((struct mac_serial *) arg,
+			if (copy_to_user((struct mac_serial __user *) arg,
 					 info, sizeof(struct mac_serial)))
 				return -EFAULT;
 			return 0;
@@ -2432,7 +2432,7 @@ done:
 
 /* Ask the PROM how many Z8530s we have and initialize their zs_channels */
 static void
-probe_sccs()
+probe_sccs(void)
 {
 	struct device_node *dev, *ch;
 	struct mac_serial **pp;
