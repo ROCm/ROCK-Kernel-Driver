@@ -1144,16 +1144,16 @@ int snd_emu10k1_proc_init(emu10k1_t * emu);
 #define CC_REG_NONZERO	C_00000100
 
 /* FX buses */
-#define FXBUS_WAVE_LEFT		0x00
-#define FXBUS_WAVE_RIGHT	0x01
+#define FXBUS_PCM_LEFT		0x00
+#define FXBUS_PCM_RIGHT		0x01
 #define FXBUS_PCM_LEFT_REAR	0x02
 #define FXBUS_PCM_RIGHT_REAR	0x03
 #define FXBUS_MIDI_LEFT		0x04
 #define FXBUS_MIDI_RIGHT	0x05
 #define FXBUS_PCM_CENTER	0x06
 #define FXBUS_PCM_LFE		0x07
-#define FXBUS_PCM_LEFT		0x08
-#define FXBUS_PCM_RIGHT		0x09
+#define FXBUS_PCM_LEFT_FRONT	0x08
+#define FXBUS_PCM_RIGHT_FRONT	0x09
 #define FXBUS_MIDI_REVERB	0x0c
 #define FXBUS_MIDI_CHORUS	0x0d
 #define FXBUS_PT_LEFT		0x14
