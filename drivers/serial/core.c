@@ -58,7 +58,7 @@ static DECLARE_MUTEX(port_sem);
 
 #define HIGH_BITS_OFFSET	((sizeof(long)-sizeof(int))*8)
 
-static void uart_change_speed(struct uart_info *info, struct termios *old_termios);
+static void uart_change_speed(struct uart_state *state, struct termios *old_termios);
 static void uart_wait_until_sent(struct tty_struct *tty, int timeout);
 
 /*
@@ -140,9 +140,10 @@ uart_update_mctrl(struct uart_port *port, unsigned int set, unsigned int clear)
  * Startup the port.  This will be called once per open.  All calls
  * will be serialised by the global port semaphore.
  */
-static int uart_startup(struct uart_info *info, int init_hw)
+static int uart_startup(struct uart_state *state, int init_hw)
 {
-	struct uart_port *port = info->port;
+	struct uart_info *info = state->info;
+	struct uart_port *port = state->port;
 	unsigned long page;
 	int retval = 0;
 
@@ -183,7 +184,7 @@ static int uart_startup(struct uart_info *info, int init_hw)
 			/*
 			 * Initialise the hardware port settings.
 			 */
-			uart_change_speed(info, NULL);
+			uart_change_speed(state, NULL);
 
 			/*
 			 * Setup the RTS and DTR signals once the
@@ -210,9 +211,10 @@ static int uart_startup(struct uart_info *info, int init_hw)
  * DTR is dropped if the hangup on close termio flag is on.  Calls to
  * uart_shutdown are serialised by port_sem.
  */
-static void uart_shutdown(struct uart_info *info)
+static void uart_shutdown(struct uart_state *state)
 {
-	struct uart_port *port = info->port;
+	struct uart_info *info = state->info;
+	struct uart_port *port = state->port;
 
 	if (!(info->flags & UIF_INITIALIZED))
 		return;
@@ -413,10 +415,10 @@ uart_get_divisor(struct uart_port *port, unsigned int baud)
 EXPORT_SYMBOL(uart_get_divisor);
 
 static void
-uart_change_speed(struct uart_info *info, struct termios *old_termios)
+uart_change_speed(struct uart_state *state, struct termios *old_termios)
 {
-	struct tty_struct *tty = info->tty;
-	struct uart_port *port = info->port;
+	struct tty_struct *tty = state->info->tty;
+	struct uart_port *port = state->port;
 	struct termios *termios;
 
 	/*
@@ -432,14 +434,14 @@ uart_change_speed(struct uart_info *info, struct termios *old_termios)
 	 * Set flags based on termios cflag
 	 */
 	if (termios->c_cflag & CRTSCTS)
-		info->flags |= UIF_CTS_FLOW;
+		state->info->flags |= UIF_CTS_FLOW;
 	else
-		info->flags &= ~UIF_CTS_FLOW;
+		state->info->flags &= ~UIF_CTS_FLOW;
 
 	if (termios->c_cflag & CLOCAL)
-		info->flags &= ~UIF_CHECK_CD;
+		state->info->flags &= ~UIF_CHECK_CD;
 	else
-		info->flags |= UIF_CHECK_CD;
+		state->info->flags |= UIF_CHECK_CD;
 
 	port->ops->set_termios(port, termios, old_termios);
 }
@@ -837,10 +839,10 @@ uart_set_info(struct uart_state *state, struct serial_struct *newinfo)
 				       current->comm, state->info->tty->driver.name, 
 				       state->port->line);
 			}
-			uart_change_speed(state->info, NULL);
+			uart_change_speed(state, NULL);
 		}
 	} else
-		retval = uart_startup(state->info, 1);
+		retval = uart_startup(state, 1);
  exit:
 	up(&port_sem);
 	return retval;
@@ -959,7 +961,7 @@ static int uart_do_autoconfig(struct uart_state *state)
 		 */
 		port->ops->config_port(port, flags);
 
-		ret = uart_startup(state->info, 1);
+		ret = uart_startup(state, 1);
 	}
 	up(&port_sem);
 	return ret;
@@ -1139,7 +1141,7 @@ static void uart_set_termios(struct tty_struct *tty, struct termios *old_termios
 	    RELEVANT_IFLAG(tty->termios->c_iflag ^ old_termios->c_iflag) == 0)
 		return;
 
-	uart_change_speed(state->info, old_termios);
+	uart_change_speed(state, old_termios);
 
 	/* Handle transition to B0 status */
 	if ((old_termios->c_cflag & CBAUD) && !(cflag & CBAUD))
@@ -1380,14 +1382,14 @@ static void uart_hangup(struct tty_struct *tty)
  * kernel settings, and the settings init adopts when it opens the port
  * for the first time.
  */
-static void uart_update_termios(struct uart_info *info)
+static void uart_update_termios(struct uart_state *state)
 {
-	struct tty_struct *tty = info->tty;
+	struct tty_struct *tty = state->info->tty;
 
 #ifdef CONFIG_SERIAL_CORE_CONSOLE
-	struct console *c = info->port->cons;
+	struct console *c = state->port->cons;
 
-	if (c && c->cflag && c->index == info->port->line) {
+	if (c && c->cflag && c->index == state->port->line) {
 		tty->termios->c_cflag = c->cflag;
 		c->cflag = 0;
 	}
@@ -1402,13 +1404,13 @@ static void uart_update_termios(struct uart_info *info)
 		/*
 		 * Make termios settings take effect.
 		 */
-		uart_change_speed(info, NULL);
+		uart_change_speed(state, NULL);
 
 		/*
 		 * And finally enable the RTS and DTR signals.
 		 */
 		if (tty->termios->c_cflag & CBAUD)
-			uart_set_mctrl(info->port, TIOCM_DTR | TIOCM_RTS);
+			uart_set_mctrl(state->port, TIOCM_DTR | TIOCM_RTS);
 	}
 }
 
@@ -1525,8 +1527,6 @@ static struct uart_state *uart_get(struct uart_driver *drv, int line)
 			 * Link the info into the other structures.
 			 */
 			state->port->info = state->info;
-			state->info->port = state->port;
-			state->info->state = state;
 
 			tasklet_init(&state->info->tlet, uart_tasklet_action,
 				     (unsigned long)state);
@@ -1620,7 +1620,7 @@ static int uart_open(struct tty_struct *tty, struct file *filp)
 	 * we sleep while requesting an IRQ.
 	 */
 	down(&port_sem);
-	retval = uart_startup(state->info, 0);
+	retval = uart_startup(state, 0);
 	up(&port_sem);
 	if (retval)
 		goto fail;
@@ -1636,7 +1636,7 @@ static int uart_open(struct tty_struct *tty, struct file *filp)
 	if (retval == 0 && !(state->info->flags & UIF_NORMAL_ACTIVE)) {
 		state->info->flags |= UIF_NORMAL_ACTIVE;
 
-		uart_update_termios(state->info);
+		uart_update_termios(state);
 	}
 
  fail:
@@ -1913,7 +1913,7 @@ static int uart_pm_set_state(struct uart_state *state, int pm_state, int oldstat
 			 */
 			ops->set_mctrl(port, 0);
 			ops->startup(port);
-			uart_change_speed(state->info, NULL);
+			uart_change_speed(state, NULL);
 			spin_lock_irq(&port->lock);
 			ops->set_mctrl(port, port->mctrl);
 			ops->start_tx(port, 0);

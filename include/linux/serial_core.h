@@ -224,8 +224,6 @@ struct uart_state {
  * stuff here.
  */
 struct uart_info {
-	struct uart_port	*port;
-	struct uart_state	*state;
 	struct tty_struct	*tty;
 	struct circ_buf		xmit;
 	unsigned int		flags;
