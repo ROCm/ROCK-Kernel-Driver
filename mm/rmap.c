@@ -14,8 +14,8 @@
 /*
  * Locking:
  * - the page->pte.chain is protected by the PG_chainlock bit,
- *   which nests within the zone->lru_lock, then the
- *   mm->page_table_lock, and then the page lock.
+ *   which nests within the the mm->page_table_lock,
+ *   which nests within the page lock.
  * - because swapout locking is opposite to the locking order
  *   in the page fault path, the swapout path uses trylocks
  *   on the mm->page_table_lock
@@ -287,9 +287,8 @@ out_unlock:
  * table entry mapping a page. Because locking order here is opposite
  * to the locking order used by the page fault path, we use trylocks.
  * Locking:
- *	zone->lru_lock			page_launder()
- *	    page lock			page_launder(), trylock
- *		pte_chain_lock		page_launder()
+ *	    page lock			shrink_list(), trylock
+ *		pte_chain_lock		shrink_list()
  *		    mm->page_table_lock	try_to_unmap_one(), trylock
  */
 static int FASTCALL(try_to_unmap_one(struct page *, pte_addr_t));
@@ -376,8 +375,8 @@ out_unlock:
  * @page: the page to get unmapped
  *
  * Tries to remove all the page table entries which are mapping this
- * page, used in the pageout path.  Caller must hold zone->lru_lock
- * and the page lock.  Return values are:
+ * page, used in the pageout path.  Caller must hold the page lock
+ * and its pte chain lock.  Return values are:
  *
  * SWAP_SUCCESS	- we succeeded in removing all mappings
  * SWAP_AGAIN	- we missed a trylock, try again later
