@@ -317,6 +317,7 @@ typedef struct isdn_net_local_s {
                                        /*   0 = Transparent                */
   int                    huptimer;     /* Timeout-counter for auto-hangup  */
   int                    charge;       /* Counter for charging units       */
+  int                    charge_state; /* ChargeInfo state machine         */
   ulong                  chargetime;   /* Timer for Charging info          */
   int                    hupflags;     /* Flags for charge-unit-hangup:    */
 				       /* bit0: chargeint is invalid       */

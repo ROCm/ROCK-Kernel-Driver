@@ -12,8 +12,6 @@
  */
 
 			      /* Definitions for hupflags:                */
-#define ISDN_WAITCHARGE  1      /* did not get a charge info yet            */
-#define ISDN_HAVECHARGE  2      /* We know a charge info                    */
 #define ISDN_CHARGEHUP   4      /* We want to use the charge mechanism      */
 #define ISDN_INHUP       8      /* Even if incoming, close after huptimeout */
 #define ISDN_MANCHARGE  16      /* Charge Interval manually set             */
