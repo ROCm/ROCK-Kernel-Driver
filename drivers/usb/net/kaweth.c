@@ -493,7 +493,7 @@ static void int_callback(struct urb *u)
 /****************************************************************
  *     kaweth_resubmit_rx_urb
  ****************************************************************/
-static void kaweth_resubmit_rx_urb(struct kaweth_device *kaweth,
+static int kaweth_resubmit_rx_urb(struct kaweth_device *kaweth,
 						int mem_flags)
 {
 	int result;
@@ -513,6 +513,8 @@ static void kaweth_resubmit_rx_urb(struct kaweth_device *kaweth,
 	} else {
 		kaweth->suspend_lowmem = 0;
 	}
+	
+	return result;
 }
 
 static void kaweth_async_set_rx_mode(struct kaweth_device *kaweth);
@@ -592,14 +594,15 @@ static void kaweth_usb_receive(struct urb *urb)
 static int kaweth_open(struct net_device *net)
 {
 	struct kaweth_device *kaweth = (struct kaweth_device *)net->priv;
+	int res;
 
 	kaweth_dbg("Dev usage: %d", kaweth->dev->refcnt.counter);
 
 	kaweth_dbg("Opening network device.");
 
-	MOD_INC_USE_COUNT;
-
-	kaweth_resubmit_rx_urb(kaweth, GFP_KERNEL);
+	res = kaweth_resubmit_rx_urb(kaweth, GFP_KERNEL);
+	if (res)
+		return -EIO;
 
 	FILL_INT_URB(
 		kaweth->irq_urb,
@@ -611,7 +614,11 @@ static int kaweth_open(struct net_device *net)
 		kaweth,
 		HZ/4);
 
-	usb_submit_urb(kaweth->irq_urb, GFP_KERNEL);
+	res = usb_submit_urb(kaweth->irq_urb, GFP_KERNEL);
+	if (res) {
+		usb_unlink_urb(kaweth->rx_urb);
+		return -EIO;
+	}
 
 	netif_start_queue(net);
 
@@ -635,7 +642,6 @@ static int kaweth_close(struct net_device *net)
 
 	kaweth->status &= ~KAWETH_STATUS_CLOSING;
 
-	MOD_DEC_USE_COUNT;
 
 	printk("Dev usage: %d", kaweth->dev->refcnt.counter);
 
