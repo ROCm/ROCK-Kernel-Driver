@@ -382,6 +382,20 @@ nfsd4_lookup(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_loo
 }
 
 static inline int
+access_bits_permit_read(unsigned long access_bmap)
+{
+	return test_bit(NFS4_SHARE_ACCESS_READ, &access_bmap) ||
+		test_bit(NFS4_SHARE_ACCESS_BOTH, &access_bmap);
+}
+
+static inline int
+access_bits_permit_write(unsigned long access_bmap)
+{
+	return test_bit(NFS4_SHARE_ACCESS_WRITE, &access_bmap) ||
+		test_bit(NFS4_SHARE_ACCESS_BOTH, &access_bmap);
+}
+
+static inline int
 nfsd4_read(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_read *read)
 {
 	struct nfs4_stateid *stp;
@@ -419,7 +433,7 @@ nfsd4_read(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_read 
 		goto out;
 	}
 	status = nfserr_openmode;
-	if (!(stp->st_share_access & NFS4_SHARE_ACCESS_READ)) {
+	if (!access_bits_permit_read(stp->st_access_bmap)) {
 		dprintk("NFSD: nfsd4_read: file not opened for read!\n");
 		goto out;
 	}
@@ -527,7 +541,7 @@ nfsd4_setattr(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_se
 			goto out;
 		}
 		status = nfserr_openmode;
-		if (!(stp->st_share_access & NFS4_SHARE_ACCESS_WRITE)) {
+		if (!access_bits_permit_write(stp->st_access_bmap)) {
 			dprintk("NFSD: nfsd4_setattr: not opened for write!\n");
 			goto out;
 		}
@@ -568,7 +582,7 @@ nfsd4_write(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_writ
 	}
 
 	status = nfserr_openmode;
-	if (!(stp->st_share_access & NFS4_SHARE_ACCESS_WRITE)) {
+	if (!access_bits_permit_write(stp->st_access_bmap)) {
 		dprintk("NFSD: nfsd4_write: file not open for write!\n");
 		goto out;
 	}

@@ -170,8 +170,8 @@ struct nfs4_file {
 * 	st_perfile: file_hashtbl[] entry.
 * 	st_perfile_state: nfs4_stateowner->so_perfilestate
 *       st_perlockowner: (open stateid) list of lock nfs4_stateowners
-* 	st_share_access: used only for open stateid
-* 	st_share_deny: used only for open stateid
+* 	st_access_bmap: used only for open stateid
+* 	st_deny_bmap: used only for open stateid
 */
 
 struct nfs4_stateid {
@@ -184,8 +184,8 @@ struct nfs4_stateid {
 	stateid_t                     st_stateid;
 	struct file                   st_vfs_file;
 	int                           st_vfs_set;
-	unsigned int                  st_share_access;
-	unsigned int                  st_share_deny;
+	unsigned long                 st_access_bmap;
+	unsigned long                 st_deny_bmap;
 };
 
 /* flags for preprocess_seqid_op() */
