@@ -61,7 +61,7 @@ o  pcmcia-cs              3.1.21                  # cardmgr -V
 o  PPP                    2.4.0                   # pppd --version
 o  isdn4k-utils           3.1pre1                 # isdnctrl 2>&1|grep version
 o  procps                 2.0.9                   # ps --version
-o  oprofile               0.5                     # oprofiled --version
+o  oprofile               0.5.3                   # oprofiled --version
 o  nfs-utils              1.0.3                   # showmount --version
 
 Kernel compilation
@@ -367,7 +367,7 @@ o  <ftp://ftp.inr.ac.ru/ip-routing/iproute2-2.2.4-now-ss991023.tar.gz>
 
 OProfile
 --------
-o  <http://oprofile.sf.net/download.php3>
+o  <http://oprofile.sf.net/download/>
  
 Suggestions and corrections
 ===========================
