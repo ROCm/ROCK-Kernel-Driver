@@ -578,7 +578,7 @@ static int __init xics_setup_i8259(void)
 				no_action, 0, "8259 cascade", NULL))
 			printk(KERN_ERR "xics_setup_i8259: couldn't get 8259 "
 					"cascade\n");
-		i8259_init();
+		i8259_init(0);
 	}
 	return 0;
 }

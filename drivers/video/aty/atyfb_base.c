@@ -2344,9 +2344,9 @@ int __init atyfb_do_init(void)
 		info->screen_base = ioremap(phys_vmembase[m64_num],
 					 		   phys_size[m64_num]);	
 		info->fix.smem_start = (unsigned long)info->screen_base;	/* Fake! */
-		default_par->ati_regbase = (unsigned long)ioremap(phys_guiregbase[m64_num],
-							  0x10000) + 0xFC00ul;
-		info->fix.mmio_start = default_par->ati_regbase; /* Fake! */
+		default_par->ati_regbase = ioremap(phys_guiregbase[m64_num],
+						   0x10000) + 0xFC00ul;
+		info->fix.mmio_start = (unsigned long)default_par->ati_regbase; /* Fake! */
 
 		aty_st_le32(CLOCK_CNTL, 0x12345678, default_par);
 		clock_r = aty_ld_le32(CLOCK_CNTL, default_par);

@@ -23,13 +23,13 @@
 #include <linux/delay.h>
 #include <linux/tty.h>
 #include <linux/serial_core.h>
-#include <linux/8250_pci.h>
 #include <linux/bitops.h>
+#include <linux/8250.h>
+#include <linux/8250_pci.h>
 
 #include <asm/byteorder.h>
 #include <asm/io.h>
 
-#include "8250.h"
 
 /*
  * Definitions for PCI support.

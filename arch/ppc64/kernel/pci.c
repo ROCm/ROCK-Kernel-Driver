@@ -11,6 +11,8 @@
  *      2 of the License, or (at your option) any later version.
  */
 
+#undef DEBUG
+
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/pci.h>
@@ -38,6 +40,12 @@
 #include <asm/machdep.h>
 
 #include "pci.h"
+
+#ifdef DEBUG
+#define DBG(fmt...) udbg_printf(fmt)
+#else
+#define DBG(fmt...)
+#endif
 
 unsigned long pci_probe_only = 1;
 unsigned long pci_assign_all_buses = 0;
@@ -106,11 +114,11 @@ static void fixup_windbond_82c105(struct pci_dev* dev)
 			dev->resource[i].flags &= ~IORESOURCE_IO;
 	}
 }
-DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_WINBOND, PCI_DEVICE_ID_WINBOND_82C105, fixup_windbond_82c105);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_WINBOND, PCI_DEVICE_ID_WINBOND_82C105,
+			 fixup_windbond_82c105);
 
-void 
-pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
-			struct resource *res)
+void  pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
+			      struct resource *res)
 {
 	unsigned long offset = 0;
 	struct pci_controller *hose = PCI_GET_PHB_PTR(dev);
@@ -215,8 +223,7 @@ static void phb_set_model(struct pci_controller *hose,
 /*
  * Allocate pci_controller(phb) initialized common variables.
  */
-struct pci_controller * __init
-pci_alloc_pci_controller(enum phb_types controller_type)
+struct pci_controller * __init pci_alloc_pci_controller(enum phb_types controller_type)
 {
 	struct pci_controller *hose;
 
@@ -246,8 +253,7 @@ pci_alloc_pci_controller(enum phb_types controller_type)
 /*
  * Dymnamically allocate pci_controller(phb), initialize common variables.
  */
-struct pci_controller *
-pci_alloc_phb_dynamic(enum phb_types controller_type)
+struct pci_controller * pci_alloc_phb_dynamic(enum phb_types controller_type)
 {
 	struct pci_controller *hose;
 
@@ -430,9 +436,9 @@ int pci_name_bus(char *name, struct pci_bus *bus)
  *
  * Returns negative error code on failure, zero on success.
  */
-static __inline__ int
-__pci_mmap_make_offset(struct pci_dev *dev, struct vm_area_struct *vma,
-		       enum pci_mmap_state mmap_state)
+static __inline__ int __pci_mmap_make_offset(struct pci_dev *dev,
+					     struct vm_area_struct *vma,
+					     enum pci_mmap_state mmap_state)
 {
 	struct pci_controller *hose = PCI_GET_PHB_PTR(dev);
 	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
@@ -487,9 +493,9 @@ __pci_mmap_make_offset(struct pci_dev *dev, struct vm_area_struct *vma,
  * Set vm_flags of VMA, as appropriate for this architecture, for a pci device
  * mapping.
  */
-static __inline__ void
-__pci_mmap_set_flags(struct pci_dev *dev, struct vm_area_struct *vma,
-		     enum pci_mmap_state mmap_state)
+static __inline__ void __pci_mmap_set_flags(struct pci_dev *dev,
+					    struct vm_area_struct *vma,
+					    enum pci_mmap_state mmap_state)
 {
 	vma->vm_flags |= VM_SHM | VM_LOCKED | VM_IO;
 }
@@ -498,9 +504,10 @@ __pci_mmap_set_flags(struct pci_dev *dev, struct vm_area_struct *vma,
  * Set vm_page_prot of VMA, as appropriate for this architecture, for a pci
  * device mapping.
  */
-static __inline__ void
-__pci_mmap_set_pgprot(struct pci_dev *dev, struct vm_area_struct *vma,
-		      enum pci_mmap_state mmap_state, int write_combine)
+static __inline__ void __pci_mmap_set_pgprot(struct pci_dev *dev,
+					     struct vm_area_struct *vma,
+					     enum pci_mmap_state mmap_state,
+					     int write_combine)
 {
 	long prot = pgprot_val(vma->vm_page_prot);
 
@@ -578,9 +585,11 @@ static void __devinit pci_process_ISA_OF_ranges(struct device_node *isa_node,
 	int rlen = 0;
 
 	range = (struct isa_range *) get_property(isa_node, "ranges", &rlen);
-	if (rlen < sizeof(struct isa_range)) {
-		printk(KERN_ERR "unexpected isa range size: %s\n", 
-				__FUNCTION__);
+	if (range == NULL || (rlen < sizeof(struct isa_range))) {
+		printk(KERN_ERR "no ISA ranges or unexpected isa range size,"
+		       "mapping 64k\n");
+		__ioremap_explicit(phb_io_base_phys, (unsigned long)phb_io_base_virt, 
+				   0x10000, _PAGE_NO_CACHE);
 		return;	
 	}
 	
@@ -613,7 +622,7 @@ static void __devinit pci_process_ISA_OF_ranges(struct device_node *isa_node,
 }
 
 void __devinit pci_process_bridge_OF_ranges(struct pci_controller *hose,
-					struct device_node *dev)
+					    struct device_node *dev)
 {
 	unsigned int *ranges;
 	unsigned long size;
@@ -645,8 +654,7 @@ void __devinit pci_process_bridge_OF_ranges(struct pci_controller *hose,
 			cpu_phys_addr = cpu_phys_addr << 32 | ranges[4];
 
 		size = (unsigned long)ranges[na+3] << 32 | ranges[na+4];
-
-		switch (ranges[0] >> 24) {
+		switch ((ranges[0] >> 24) & 0x3) {
 		case 1:		/* I/O space */
 			hose->io_base_phys = cpu_phys_addr;
 			hose->pci_io_size = size;
@@ -654,6 +662,8 @@ void __devinit pci_process_bridge_OF_ranges(struct pci_controller *hose,
 			res = &hose->io_resource;
 			res->flags = IORESOURCE_IO;
 			res->start = pci_addr;
+			DBG("phb%d: IO 0x%lx -> 0x%lx\n", hose->global_number,
+				    res->start, res->start + size - 1);
 			break;
 		case 2:		/* memory space */
 			memno = 0;
@@ -666,6 +676,8 @@ void __devinit pci_process_bridge_OF_ranges(struct pci_controller *hose,
 				res = &hose->mem_resources[memno];
 				res->flags = IORESOURCE_MEM;
 				res->start = cpu_phys_addr;
+				DBG("phb%d: MEM 0x%lx -> 0x%lx\n", hose->global_number,
+					    res->start, res->start + size - 1);
 			}
 			break;
 		}
@@ -851,6 +863,9 @@ int pcibios_scan_all_fns(struct pci_bus *bus, int devfn)
        else
                busdn = bus->sysdata;   /* must be a phb */
 
+       if (busdn == NULL)
+	       return 0;
+
        /*
         * Check to see if there is any of the 8 functions are in the
         * device tree.  If they are then we need to scan all the
@@ -873,7 +888,8 @@ void __devinit pcibios_fixup_device_resources(struct pci_dev *dev,
 
 	for (i = 0; i < PCI_NUM_RESOURCES; i++) {
 		if (dev->resource[i].flags & IORESOURCE_IO) {
-			unsigned long offset = (unsigned long)hose->io_base_virt - pci_io_base;
+			unsigned long offset = (unsigned long)hose->io_base_virt
+				- pci_io_base;
                         unsigned long start, end, mask;
 
                         start = dev->resource[i].start += offset;

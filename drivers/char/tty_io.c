@@ -168,8 +168,7 @@ static struct tty_struct *alloc_tty_struct(void)
 
 static inline void free_tty_struct(struct tty_struct *tty)
 {
-	if (tty->write_buf)
-		kfree(tty->write_buf);
+	kfree(tty->write_buf);
 	kfree(tty);
 }
 
@@ -1060,6 +1059,7 @@ static inline ssize_t do_tty_write(
 			up(&tty->atomic_write);
 			return -ENOMEM;
 		}
+		kfree(tty->write_buf);
 		tty->write_cnt = chunk;
 		tty->write_buf = buf;
 	}

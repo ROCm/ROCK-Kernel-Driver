@@ -10,7 +10,7 @@
  * 2 of the License, or (at your option) any later version.
  */
 
-void udbg_init_uart(void *comport);
+void udbg_init_uart(void *comport, unsigned int speed);
 void udbg_putc(unsigned char c);
 unsigned char udbg_getc(void);
 int udbg_getc_poll(void);

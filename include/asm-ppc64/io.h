@@ -1,4 +1,4 @@
-#ifndef _PPC64_IO_H
+ #ifndef _PPC64_IO_H
 #define _PPC64_IO_H
 
 /* 
@@ -435,6 +435,10 @@ out:
 #define dma_cache_inv(_start,_size)		do { } while (0)
 #define dma_cache_wback(_start,_size)		do { } while (0)
 #define dma_cache_wback_inv(_start,_size)	do { } while (0)
+
+/* Check of existence of legacy devices */
+extern int check_legacy_ioport(unsigned long base_port);
+
 
 #endif /* __KERNEL__ */
 
