@@ -83,6 +83,7 @@ int __init k8_scan_nodes(unsigned long start, unsigned long end)
 
 		limit >>= 16; 
 		limit <<= 24; 
+		limit |= (1<<24)-1;
 
 		if (limit > end_pfn_map << PAGE_SHIFT) 
 			limit = end_pfn_map << PAGE_SHIFT; 

@@ -82,13 +82,17 @@ cstar_sysret:
 	GET_THREAD_INFO(%r10)
 	cli
 	testl $_TIF_ALLWORK_MASK,threadinfo_flags(%r10)
-	jnz int_ret_from_sys_call
+	jnz 1f
 	RESTORE_ARGS 1,-ARG_SKIP,1,1
 	movl RIP-ARGOFFSET(%rsp),%ecx
 	movl EFLAGS-ARGOFFSET(%rsp),%r11d	
 	movl RSP-ARGOFFSET(%rsp),%esp
 	swapgs
 	sysretl
+	
+1:
+	btc   $TIF_IRET,threadinfo_flags(%r10) 
+	jmp   int_ret_from_sys_call
 	
 cstar_tracesys:	
 	SAVE_REST
@@ -121,7 +125,7 @@ cstar_badarg:
  * Arguments are zero extended. For system calls that want sign extension and
  * take long arguments a wrapper is needed. Most calls can just be called
  * directly.
- * Assumes it is only called from user space and entered with interrups off.	
+ * Assumes it is only called from user space and entered with interrupts off.	
  */ 				
 
 ENTRY(ia32_syscall)
