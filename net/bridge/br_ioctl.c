@@ -91,9 +91,15 @@ int br_ioctl_device(struct net_bridge *br, unsigned int cmd,
 
 	case BRCTL_GET_PORT_LIST:
 	{
-		int num = arg1 ? arg1 : 256;	/* compatiablity */
-		int ret = 0;
-		int *indices;
+		int num, *indices;
+
+		num = arg1;
+		if (num < 0)
+			return -EINVAL;
+		if (num == 0)
+			num = 256;
+		if (num > BR_MAX_PORTS)
+			num = BR_MAX_PORTS;
 
 		indices = kmalloc(num*sizeof(int), GFP_KERNEL);
 		if (indices == NULL)
@@ -103,9 +109,9 @@ int br_ioctl_device(struct net_bridge *br, unsigned int cmd,
 
 		br_get_port_ifindices(br, indices, num);
 		if (copy_to_user((void *)arg0, indices, num*sizeof(int)))
-			ret =  -EFAULT;
+			num =  -EFAULT;
 		kfree(indices);
-		return ret;
+		return num;
 	}
 
 	case BRCTL_SET_BRIDGE_FORWARD_DELAY:
@@ -204,6 +210,9 @@ int br_ioctl_device(struct net_bridge *br, unsigned int cmd,
 
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
+
+		if (arg1 >= (1<<(16-BR_PORT_BITS)))
+			return -ERANGE;
 
 		spin_lock_bh(&br->lock);
 		if ((p = br_get_port(br, arg0)) == NULL) 

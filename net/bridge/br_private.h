@@ -24,6 +24,9 @@
 
 #define BR_HOLD_TIME (1*HZ)
 
+#define BR_PORT_BITS	10
+#define BR_MAX_PORTS	(1<<BR_PORT_BITS)
+
 typedef struct bridge_id bridge_id;
 typedef struct mac_addr mac_addr;
 typedef __u16 port_id;

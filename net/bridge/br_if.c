@@ -24,9 +24,6 @@
 
 #include "br_private.h"
 
-/* Limited to 256 ports because of STP protocol pdu */
-#define  BR_MAX_PORTS	256
-
 /*
  * Determine initial path cost based on speed.
  * using recommendations from 802.1d standard
@@ -166,23 +163,27 @@ static struct net_bridge *new_nb(const char *name)
 	return br;
 }
 
-static int free_port(struct net_bridge *br)
+/* find an available port number */
+static int find_portno(struct net_bridge *br)
 {
 	int index;
 	struct net_bridge_port *p;
-	long inuse[BR_MAX_PORTS/(sizeof(long)*8)];
+	unsigned long *inuse;
 
-	/* find free port number */
-	memset(inuse, 0, sizeof(inuse));
+	inuse = kmalloc(BITS_TO_LONGS(BR_MAX_PORTS)*sizeof(unsigned long),
+			GFP_ATOMIC);
+	if (!inuse)
+		return -ENOMEM;
+
+	CLEAR_BITMAP(inuse, BR_MAX_PORTS);
+	set_bit(0, inuse);	/* zero is reserved */
 	list_for_each_entry(p, &br->port_list, list) {
 		set_bit(p->port_no, inuse);
 	}
-
 	index = find_first_zero_bit(inuse, BR_MAX_PORTS);
-	if (index >= BR_MAX_PORTS)
-		return -EXFULL;
+	kfree(inuse);
 
-	return index;
+	return (index >= BR_MAX_PORTS) ? -EXFULL : index;
 }
 
 /* called under bridge lock */
@@ -193,7 +194,7 @@ static struct net_bridge_port *new_nbp(struct net_bridge *br,
 	int index;
 	struct net_bridge_port *p;
 	
-	index = free_port(br);
+	index = find_portno(br);
 	if (index < 0)
 		return ERR_PTR(index);
 
@@ -206,7 +207,7 @@ static struct net_bridge_port *new_nbp(struct net_bridge *br,
 	dev_hold(dev);
 	p->dev = dev;
 	p->path_cost = cost;
-	p->priority = 0x80;
+ 	p->priority = 0x8000 >> BR_PORT_BITS;
 	dev->br_port = p;
 	p->port_no = index;
 	br_init_port(p);
