@@ -160,6 +160,17 @@ CONFIG_IP_NF_NAT
   If you want to compile it as a module, say M here and read
   <file:Documentation/modules.txt>.  If unsure, say `N'.
 
+CONFIG_IP_NF_NAT_LOCAL
+  This option enables support for NAT of locally originated connections. 
+  Enable this if you need to use destination NAT on connections
+  originating from local processes on the nat box itself.
+
+  Please note that you will need a recent version (>= 1.2.6a)
+  of the iptables userspace program in order to use this feature.
+  See http://www.iptables.org/ for download instructions.
+
+  If unsure, say 'N'.
+
 CONFIG_IP_NF_TARGET_MASQUERADE
   Masquerading is a special case of NAT: all outgoing connections are
   changed to seem to come from a particular interface's address, and
