@@ -99,9 +99,18 @@ struct gendisk {
 	int policy;
 
 	unsigned sync_io;		/* RAID */
+	unsigned read_sectors, write_sectors;
 	unsigned reads, writes;
-	unsigned rio, wio;
+	unsigned read_merges, write_merges;
+	unsigned read_ticks, write_ticks;
+	unsigned io_ticks;
+	int in_flight;
+	unsigned long stamp, stamp_idle;
+	unsigned time_in_queue;
 };
+
+/* drivers/block/ll_rw_blk.c */
+extern void disk_round_stats(struct gendisk *disk);
 
 /* drivers/block/genhd.c */
 extern void add_disk(struct gendisk *disk);

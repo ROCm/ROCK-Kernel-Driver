@@ -39,6 +39,7 @@ struct request {
 	struct gendisk *rq_disk;
 	int errors;
 	sector_t sector;
+	unsigned long start_time;
 	unsigned long nr_sectors;
 	sector_t hard_sector;		/* the hard_* are block layer
 					 * internals, no driver should

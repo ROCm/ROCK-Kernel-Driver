@@ -2768,7 +2768,7 @@ static int is_mddev_idle(mddev_t *mddev)
 	idle = 1;
 	ITERATE_RDEV(mddev,rdev,tmp) {
 		struct gendisk *disk = rdev->bdev->bd_disk;
-		curr_events = disk->reads + disk->writes - disk->sync_io;
+		curr_events = disk->read_sectors + disk->write_sectors - disk->sync_io;
 		if ((curr_events - rdev->last_events) > 32) {
 			rdev->last_events = curr_events;
 			idle = 0;

@@ -1414,11 +1414,17 @@ void drive_stat_acct(struct request *rq, int nr_sectors, int new_io)
 		return;
 
 	if (rw == READ) {
-		rq->rq_disk->rio += new_io;
-		rq->rq_disk->reads += nr_sectors;
+		rq->rq_disk->read_sectors += nr_sectors;
+		if (!new_io)
+			rq->rq_disk->read_merges++;
 	} else if (rw == WRITE) {
-		rq->rq_disk->wio += new_io;
-		rq->rq_disk->writes += nr_sectors;
+		rq->rq_disk->write_sectors += nr_sectors;
+		if (!new_io)
+			rq->rq_disk->write_merges++;
+	}
+	if (new_io) {
+		disk_round_stats(rq->rq_disk);
+		rq->rq_disk->in_flight++;
 	}
 
 	index = rq->rq_disk->first_minor >> rq->rq_disk->minor_shift;
@@ -1452,6 +1458,33 @@ static inline void add_request(request_queue_t * q, struct request * req,
 	 * inserted at elevator_merge time
 	 */
 	__elv_add_request_pos(q, req, insert_here);
+}
+ 
+/*
+ * disk_round_stats()	- Round off the performance stats on a struct
+ * disk_stats.
+ *
+ * The average IO queue length and utilisation statistics are maintained
+ * by observing the current state of the queue length and the amount of
+ * time it has been in this state for.
+ *
+ * Normally, that accounting is done on IO completion, but that can result
+ * in more than a second's worth of IO being accounted for within any one
+ * second, leading to >100% utilisation.  To deal with that, we call this
+ * function to do a round-off before returning the results when reading
+ * /proc/diskstats.  This accounts immediately for all queue usage up to
+ * the current jiffies and restarts the counters again.
+ */
+void disk_round_stats(struct gendisk *disk)
+{
+	unsigned long now = jiffies;
+
+	disk->time_in_queue += disk->in_flight * (now - disk->stamp);
+	disk->stamp = now;
+
+	if (disk->in_flight)
+		disk->io_ticks += (now - disk->stamp_idle);
+	disk->stamp_idle = now;
 }
 
 void __blk_put_request(request_queue_t *q, struct request *req)
@@ -1566,6 +1599,11 @@ static void attempt_merge(request_queue_t *q, struct request *req,
 		req->nr_sectors = req->hard_nr_sectors += next->hard_nr_sectors;
 
 		elv_merge_requests(q, req, next);
+
+		if (req->rq_disk) {
+			disk_round_stats(req->rq_disk);
+			req->rq_disk->in_flight--;
+		}
 
 		blkdev_dequeue_request(next);
 		__blk_put_request(q, next);
@@ -1758,6 +1796,7 @@ get_rq:
 	req->bio = req->biotail = bio;
 	req->rq_dev = to_kdev_t(bio->bi_bdev->bd_dev);
 	req->rq_disk = bio->bi_bdev->bd_disk;
+	req->start_time = jiffies;
 	add_request(q, req, insert_here);
 out:
 	if (freereq)
@@ -2096,9 +2135,25 @@ int end_that_request_chunk(struct request *req, int uptodate, int nr_bytes)
  */
 void end_that_request_last(struct request *req)
 {
+	struct gendisk *disk = req->rq_disk;
 	if (req->waiting)
 		complete(req->waiting);
 
+	if (disk) {
+		unsigned long duration = jiffies - req->start_time;
+		switch (rq_data_dir(req)) {
+		    case WRITE:
+			disk->writes++;
+			disk->write_ticks += duration;
+			break;
+		    case READ:
+			disk->reads++;
+			disk->read_ticks += duration;
+			break;
+		}
+		disk_round_stats(disk);
+		disk->in_flight--;
+	}
 	__blk_put_request(req->q, req);
 }
 
