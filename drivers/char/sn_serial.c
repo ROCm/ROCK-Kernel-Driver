@@ -952,6 +952,7 @@ static void
 sn_sal_console_write(struct console *co, const char *s, unsigned count)
 {
 	unsigned long flags;
+	const char *s1;
 
 	BUG_ON(!sn_sal_is_asynch);
 
@@ -959,15 +960,36 @@ sn_sal_console_write(struct console *co, const char *s, unsigned count)
 	 * oops, kdb, panic, etc.  make sure they get it. */
 	if (spin_is_locked(&sn_sal_lock)) {
 		synch_flush_xmit();
+		/* Output '\r' before each '\n' */
+		while ((s1 = memchr(s, '\n', count)) != NULL) {
+			sn_func->sal_puts(s, s1 - s);
+			sn_func->sal_puts("\r\n", 2);
+			count -= s1 + 1 - s;
+			s = s1 + 1;
+		}
 		sn_func->sal_puts(s, count);
 	}
 	else if (in_interrupt()) {
 		spin_lock_irqsave(&sn_sal_lock, flags);
 		synch_flush_xmit();
 		spin_unlock_irqrestore(&sn_sal_lock, flags);
+		/* Output '\r' before each '\n' */
+		while ((s1 = memchr(s, '\n', count)) != NULL) {
+			sn_func->sal_puts(s, s1 - s);
+			sn_func->sal_puts("\r\n", 2);
+			count -= s1 + 1 - s;
+			s = s1 + 1;
+		}
 		sn_func->sal_puts(s, count);
 	}
 	else
+		/* Output '\r' before each '\n' */
+		while ((s1 = memchr(s, '\n', count)) != NULL) {
+			sn_sal_write(NULL, 0, s, s1 - s);
+			sn_sal_write(NULL, 0, "\r\n", 2);
+			count -= s1 + 1 - s;
+			s = s1 + 1;
+		}
 		sn_sal_write(NULL, 0, s, count);
 }
 
