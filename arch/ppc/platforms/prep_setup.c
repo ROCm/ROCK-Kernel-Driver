@@ -458,10 +458,6 @@ prep_calibrate_decr(void)
 
 	/* If we didn't get it from the residual data, try this. */
 	if ( res ) {
-		unsigned long flags;
-
-		save_flags(flags);
-
 #define TIMER0_COUNT 0x40
 #define TIMER_CONTROL 0x43
 		/* set timer to periodic mode */
@@ -476,7 +472,7 @@ prep_calibrate_decr(void)
 		/* wait for calibrate */
 		while ( calibrate_steps )
 			;
-		restore_flags(flags);
+		local_irq_disable();
 		free_irq( 0, NULL);
 	}
 }
@@ -581,11 +577,8 @@ prep_restart(char *cmd)
 static void __prep
 prep_halt(void)
 {
-	unsigned long flags;
-	local_irq_disable();
 	/* set exception prefix high - to the prom */
-	save_flags( flags );
-	restore_flags( flags|MSR_IP );
+	_nmask_and_or_msr(MSR_EE, MSR_IP);
 
 	/* make sure bit 0 (reset) is a 0 */
 	outb( inb(0x92) & ~1L , 0x92 );
@@ -648,11 +641,8 @@ static void __prep
 prep_power_off(void)
 {
 	if ( _prep_type == _PREP_IBM) {
-		unsigned long flags;
-		local_irq_disable();
 		/* set exception prefix high - to the prom */
-		save_flags( flags );
-		restore_flags( flags|MSR_IP );
+		_nmask_and_or_msr(MSR_EE, MSR_IP);
 
 		utah_sig87c750_setbit(21, 5, 1); /* set bit 21.5, "PMEXEC_OFF" */
 
@@ -762,37 +752,6 @@ static struct smp_ops_t prep_smp_ops __prepdata = {
 #endif /* CONFIG_SMP */
 
 /*
- * This finds the amount of physical ram and does necessary
- * setup for prep.  This is pretty architecture specific so
- * this will likely stay separate from the pmac.
- * -- Cort
- */
-static unsigned long __init
-prep_find_end_of_memory(void)
-{
-	unsigned long total = 0;
-	extern unsigned int boot_mem_size;
-
-#ifdef CONFIG_PREP_RESIDUAL	
-	total = res->TotalMemory;
-#endif	
-
-	if (total == 0 && boot_mem_size != 0)
-		total = boot_mem_size;
-	else if (total == 0) {
-		/*
-		 * I need a way to probe the amount of memory if the residual
-		 * data doesn't contain it. -- Cort
-		 */
-		total = 0x02000000;
-		printk(KERN_INFO "Ramsize from residual data was 0"
-			 " -- defaulting to %ldM\n", total>>20);
-	}
-
-	return (total);
-}
-
-/*
  * Setup the bat mappings we're going to load that cover
  * the io areas.  RAM was mapped by mapin_ram().
  * -- Cort
@@ -807,13 +766,15 @@ prep_map_io(void)
 static int __init
 prep_request_io(void)
 {
+	if (_machine == _MACH_prep) {
 #ifdef CONFIG_NVRAM
-	request_region(PREP_NVRAM_AS0, 0x8, "nvram");
+		request_region(PREP_NVRAM_AS0, 0x8, "nvram");
 #endif
-	request_region(0x00,0x20,"dma1");
-	request_region(0x40,0x20,"timer");
-	request_region(0x80,0x10,"dma page reg");
-	request_region(0xc0,0x20,"dma2");
+		request_region(0x00,0x20,"dma1");
+		request_region(0x40,0x20,"timer");
+		request_region(0x80,0x10,"dma page reg");
+		request_region(0xc0,0x20,"dma2");
+	}
 
 	return 0;
 }
@@ -879,7 +840,6 @@ prep_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		ppc_md.time_init      = mk48t59_init;
 	}
 
-	ppc_md.find_end_of_memory = prep_find_end_of_memory;
 	ppc_md.setup_io_mappings = prep_map_io;
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)

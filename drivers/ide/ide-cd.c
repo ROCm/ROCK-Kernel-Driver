@@ -2875,19 +2875,8 @@ int ide_cdrom_check_media_change(struct ata_device *drive)
 static
 void ide_cdrom_revalidate(struct ata_device *drive)
 {
-	struct cdrom_info *info = drive->driver_data;
-	struct atapi_toc *toc;
 	struct request_sense sense;
-
 	cdrom_read_toc(drive, &sense);
-
-	if (!CDROM_STATE_FLAGS(drive)->toc_valid)
-		return;
-
-	toc = info->toc;
-
-	/* for general /dev/cdrom like mounting, one big disc */
-	drive->part[0].nr_sects = toc->capacity * SECTORS_PER_FRAME;
 }
 
 static sector_t ide_cdrom_capacity(struct ata_device *drive)
@@ -2946,6 +2935,7 @@ static void ide_cdrom_attach(struct ata_device *drive)
 	struct cdrom_info *info;
 	char *req;
 	struct ata_channel *channel;
+	struct gendisk *disk;
 	int unit;
 
 	if (drive->type != ATA_ROM)
@@ -2983,8 +2973,12 @@ static void ide_cdrom_attach(struct ata_device *drive)
 
 	channel = drive->channel;
 	unit = drive - channel->drives;
-
-	ata_revalidate(mk_kdev(channel->major, unit << PARTN_BITS));
+	disk = channel->gd[unit];
+	disk->minor_shift = 0;
+	ide_cdrom_revalidate(drive);
+	register_disk(disk, mk_kdev(disk->major, disk->first_minor),
+			1<<disk->minor_shift, disk->fops,
+			ide_cdrom_capacity(drive));
 }
 
 MODULE_PARM(ignore, "s");

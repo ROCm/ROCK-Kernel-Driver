@@ -68,7 +68,7 @@ spinlock_t pagemap_lru_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
  * sure the page is locked and that nobody else uses it - or that usage
  * is safe.  The caller must hold a write_lock on the mapping's page_lock.
  */
-void __remove_inode_page(struct page *page)
+void __remove_from_page_cache(struct page *page)
 {
 	struct address_space *mapping = page->mapping;
 
@@ -83,7 +83,7 @@ void __remove_inode_page(struct page *page)
 	dec_page_state(nr_pagecache);
 }
 
-void remove_inode_page(struct page *page)
+void remove_from_page_cache(struct page *page)
 {
 	struct address_space *mapping = page->mapping;
 
@@ -91,7 +91,7 @@ void remove_inode_page(struct page *page)
 		PAGE_BUG(page);
 
 	write_lock(&mapping->page_lock);
-	__remove_inode_page(page);
+	__remove_from_page_cache(page);
 	write_unlock(&mapping->page_lock);
 }
 
@@ -143,7 +143,7 @@ void invalidate_inode_pages(struct inode * inode)
 			goto unlock;
 
 		__lru_cache_del(page);
-		__remove_inode_page(page);
+		__remove_from_page_cache(page);
 		unlock_page(page);
 		page_cache_release(page);
 		continue;
@@ -186,7 +186,7 @@ static void truncate_complete_page(struct page *page)
 
 	ClearPageDirty(page);
 	ClearPageUptodate(page);
-	remove_inode_page(page);
+	remove_from_page_cache(page);
 	page_cache_release(page);
 }
 
@@ -807,15 +807,6 @@ repeat:
 		page_cache_release(cached_page);
 	return page;
 }
-
-/*
- * Returns locked page at given index in given cache, creating it if needed.
- */
-struct page *grab_cache_page(struct address_space *mapping, unsigned long index)
-{
-	return find_or_create_page(mapping, index, mapping->gfp_mask);
-}
-
 
 /*
  * Same as grab_cache_page, but do not wait if the page is unavailable.

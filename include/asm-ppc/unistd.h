@@ -231,6 +231,8 @@
 #define __NR_futex		221
 #define __NR_sched_setaffinity	222
 #define __NR_sched_getaffinity	223
+#define __NR_security		224
+#define __NR_tuxcall		225
 
 #define __NR(n)	#n
 

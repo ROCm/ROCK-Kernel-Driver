@@ -236,7 +236,8 @@ ppc405_uic_end(unsigned int irq)
 		}
 	}
 
-	if (!(irq_desc[irq].status & (IRQ_DISABLED | IRQ_INPROGRESS))) {
+	if (!(irq_desc[irq].status & (IRQ_DISABLED | IRQ_INPROGRESS))
+	    && irq_desc[irq].action) {
 		ppc_cached_irq_mask[word] |= 1 << (31 - bit);
 		switch (word){
 			case 0:

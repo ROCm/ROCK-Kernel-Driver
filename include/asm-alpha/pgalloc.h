@@ -2,6 +2,7 @@
 #define _ALPHA_PGALLOC_H
 
 #include <linux/config.h>
+#include <linux/mm.h>
 
 /*      
  * Allocate and free page tables. The xxx_kernel() versions are

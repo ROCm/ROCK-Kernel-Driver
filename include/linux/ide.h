@@ -1161,7 +1161,7 @@ extern int idescsi_init(void);
 
 extern int ata_register_device(struct ata_device *, struct ata_operations *);
 extern int ata_unregister_device(struct ata_device *drive);
-extern int ata_revalidate(kdev_t i_rdev);
+extern int ide_revalidate(kdev_t i_rdev);
 extern void ide_driver_module(void);
 
 #ifdef CONFIG_PCI

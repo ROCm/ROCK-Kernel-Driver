@@ -19,7 +19,7 @@ struct thread_info {
 
 	struct exec_domain	*exec_domain;	/* execution domain */
 	mm_segment_t		addr_limit;	/* thread address space */
-	int			cpu;		/* current CPU */
+	long			cpu;		/* current CPU */
 	int			preempt_count; /* 0 => preemptable, <0 => BUG */
 
 	int bpt_nsaved;
@@ -54,7 +54,7 @@ register struct thread_info *__current_thread_info __asm__("$8");
 
 #endif /* __ASSEMBLY__ */
 
-#define PREEMPT_ACTIVE		0x4000000
+#define PREEMPT_ACTIVE		0x40000000
 
 /*
  * Thread information flags:

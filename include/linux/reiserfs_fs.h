@@ -79,9 +79,9 @@
 /** always check a condition and panic if it's false. */
 #define RASSERT( cond, format, args... )					\
 if( !( cond ) ) 								\
-  reiserfs_panic( 0, "reiserfs[%i]: assertion " #cond " failed at "		\
-		  __FILE__ ":%i:" __FUNCTION__ ": " format "\n",		\
-		  in_interrupt() ? -1 : current -> pid, __LINE__ , ##args )
+  reiserfs_panic( 0, "reiserfs[%i]: assertion " #cond " failed at "	\
+		  __FILE__ ":%i:%s: " format "\n",		\
+		  in_interrupt() ? -1 : current -> pid, __LINE__ , __FUNCTION__ , ##args )
 
 #if defined( CONFIG_REISERFS_CHECK )
 #define RFALSE( cond, format, args... ) RASSERT( !( cond ), format, ##args )

@@ -14,10 +14,6 @@
 #include "proto.h"
 #include "irq_impl.h"
 
-#ifndef CONFIG_SMP
-unsigned long __irq_attempt[NR_IRQS];
-#endif
-
 /* Hack minimum IPL during interrupt processing for broken hardware.  */
 #ifdef CONFIG_ALPHA_BROKEN_IRQ_MASK
 int __min_ipl;
@@ -63,7 +59,6 @@ do_entInt(unsigned long type, unsigned long vector, unsigned long la_ptr,
 		smp_percpu_timer_interrupt(&regs);
 		cpu = smp_processor_id();
 		if (cpu != boot_cpuid) {
-		        irq_attempt(cpu, RTC_IRQ)++;
 		        kstat.irqs[cpu][RTC_IRQ]++;
 		} else {
 			handle_irq(RTC_IRQ, &regs);

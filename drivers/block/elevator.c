@@ -482,5 +482,6 @@ EXPORT_SYMBOL(elevator_noop);
 EXPORT_SYMBOL(__elv_add_request);
 EXPORT_SYMBOL(elv_next_request);
 EXPORT_SYMBOL(elv_remove_request);
+EXPORT_SYMBOL(elv_queue_empty);
 EXPORT_SYMBOL(elevator_exit);
 EXPORT_SYMBOL(elevator_init);

@@ -31,15 +31,15 @@ extern int format_mft_record(ntfs_inode *ni, MFT_RECORD *m);
 //extern int format_mft_record2(struct super_block *vfs_sb,
 //		const unsigned long inum, MFT_RECORD *m);
 
-extern MFT_RECORD *map_mft_record(const int rw, ntfs_inode *ni);
-extern void unmap_mft_record(const int rw, ntfs_inode *ni);
+extern MFT_RECORD *map_mft_record(ntfs_inode *ni);
+extern void unmap_mft_record(ntfs_inode *ni);
 
 extern MFT_RECORD *map_extent_mft_record(ntfs_inode *base_ni, MFT_REF mref,
 		ntfs_inode **ntfs_ino);
 
 static inline void unmap_extent_mft_record(ntfs_inode *ni)
 {
-	unmap_mft_record(READ, ni);
+	unmap_mft_record(ni);
 	return;
 }
 

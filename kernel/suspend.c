@@ -619,8 +619,8 @@ static void free_some_memory(void)
 /* Make disk drivers accept operations, again */
 static void drivers_unsuspend(void)
 {
-	device_resume(RESUME_ENABLE);
 	device_resume(RESUME_RESTORE_STATE);
+	device_resume(RESUME_ENABLE);
 }
 
 /* Called from process context */
@@ -647,8 +647,8 @@ static int drivers_suspend(void)
 static void drivers_resume(int flags)
 {
 	if (flags & RESUME_PHASE1) {
-		device_resume(RESUME_ENABLE);
 		device_resume(RESUME_RESTORE_STATE);
+		device_resume(RESUME_ENABLE);
 	}
   	if (flags & RESUME_PHASE2) {
 		if(pm_suspend_state) {

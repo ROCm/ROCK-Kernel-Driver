@@ -602,8 +602,7 @@ int __debug_serinit( void )
 {
 	unsigned long flags;
 
-	save_flags (flags);
-	cli();
+	local_irq_save(flags);
 
 	/* turn off Rx and Tx interrupts */
 	custom.intena = IF_RBF | IF_TBE;
@@ -611,7 +610,7 @@ int __debug_serinit( void )
 	/* clear any pending interrupt */
 	custom.intreq = IF_RBF | IF_TBE;
 
-	restore_flags (flags);
+	local_irq_restore(flags);
 
 	/*
 	 * set the appropriate directions for the modem control flags,

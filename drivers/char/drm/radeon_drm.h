@@ -89,7 +89,47 @@
 #define RADEON_EMIT_SE_ZBIAS_FACTOR                 18 /* zbias/2 */
 #define RADEON_EMIT_SE_TCL_OUTPUT_VTX_FMT           19 /* tcl/11 */
 #define RADEON_EMIT_SE_TCL_MATERIAL_EMMISSIVE_RED   20 /* material/17 */
-#define RADEON_MAX_STATE_PACKETS                    21
+#define R200_EMIT_PP_TXCBLEND_0                     21 /* tex0/4 */
+#define R200_EMIT_PP_TXCBLEND_1                     22 /* tex1/4 */
+#define R200_EMIT_PP_TXCBLEND_2                     23 /* tex2/4 */
+#define R200_EMIT_PP_TXCBLEND_3                     24 /* tex3/4 */
+#define R200_EMIT_PP_TXCBLEND_4                     25 /* tex4/4 */
+#define R200_EMIT_PP_TXCBLEND_5                     26 /* tex5/4 */
+#define R200_EMIT_PP_TXCBLEND_6                     27 /* /4 */
+#define R200_EMIT_PP_TXCBLEND_7                     28 /* /4 */
+#define R200_EMIT_TCL_LIGHT_MODEL_CTL_0             29 /* tcl/7 */
+#define R200_EMIT_TFACTOR_0                         30 /* tf/7 */
+#define R200_EMIT_VTX_FMT_0                         31 /* vtx/5 */
+#define R200_EMIT_VAP_CTL                           32 /* vap/1 */
+#define R200_EMIT_MATRIX_SELECT_0                   33 /* msl/5 */
+#define R200_EMIT_TEX_PROC_CTL_2                    34 /* tcg/5 */
+#define R200_EMIT_TCL_UCP_VERT_BLEND_CTL            35 /* tcl/1 */
+#define R200_EMIT_PP_TXFILTER_0                     36 /* tex0/6 */
+#define R200_EMIT_PP_TXFILTER_1                     37 /* tex1/6 */
+#define R200_EMIT_PP_TXFILTER_2                     38 /* tex2/6 */
+#define R200_EMIT_PP_TXFILTER_3                     39 /* tex3/6 */
+#define R200_EMIT_PP_TXFILTER_4                     40 /* tex4/6 */
+#define R200_EMIT_PP_TXFILTER_5                     41 /* tex5/6 */
+#define R200_EMIT_PP_TXOFFSET_0                     42 /* tex0/1 */
+#define R200_EMIT_PP_TXOFFSET_1                     43 /* tex1/1 */
+#define R200_EMIT_PP_TXOFFSET_2                     44 /* tex2/1 */
+#define R200_EMIT_PP_TXOFFSET_3                     45 /* tex3/1 */
+#define R200_EMIT_PP_TXOFFSET_4                     46 /* tex4/1 */
+#define R200_EMIT_PP_TXOFFSET_5                     47 /* tex5/1 */
+#define R200_EMIT_VTE_CNTL                          48 /* vte/1 */
+#define R200_EMIT_OUTPUT_VTX_COMP_SEL               49 /* vtx/1 */
+#define R200_EMIT_PP_TAM_DEBUG3                     50 /* tam/1 */
+#define R200_EMIT_PP_CNTL_X                         51 /* cst/1 */
+#define R200_EMIT_RB3D_DEPTHXY_OFFSET               52 /* cst/1 */
+#define R200_EMIT_RE_AUX_SCISSOR_CNTL               53 /* cst/1 */
+#define R200_EMIT_RE_SCISSOR_TL_0                   54 /* cst/2 */
+#define R200_EMIT_RE_SCISSOR_TL_1                   55 /* cst/2 */
+#define R200_EMIT_RE_SCISSOR_TL_2                   56 /* cst/2 */
+#define R200_EMIT_SE_VAP_CNTL_STATUS                57 /* cst/1 */
+#define R200_EMIT_SE_VTX_STATE_CNTL                 58 /* cst/1 */
+#define R200_EMIT_RE_POINTSIZE                      59 /* cst/1 */
+#define R200_EMIT_TCL_INPUT_VTX_VECTOR_ADDR_0       60 /* cst/4 */
+#define RADEON_MAX_STATE_PACKETS                    61
 
 
 /* Commands understood by cmd_buffer ioctl.  More can be added but
@@ -101,24 +141,25 @@
 #define RADEON_CMD_DMA_DISCARD 4 /* discard current dma buf */
 #define RADEON_CMD_PACKET3     5 /* emit hw packet */
 #define RADEON_CMD_PACKET3_CLIP 6 /* emit hw packet wrapped in cliprects */
+#define RADEON_CMD_SCALARS2     7 /* r200 stopgap */
 
 
 typedef union {
 	int i;
 	struct { 
-		char cmd_type, pad0, pad1, pad2;
+		unsigned char cmd_type, pad0, pad1, pad2;
 	} header;
 	struct { 
-		char cmd_type, packet_id, pad0, pad1;
+		unsigned char cmd_type, packet_id, pad0, pad1;
 	} packet;
 	struct { 
-		char cmd_type, offset, stride, count; 
+		unsigned char cmd_type, offset, stride, count; 
 	} scalars;
 	struct { 
-		char cmd_type, offset, stride, count; 
+		unsigned char cmd_type, offset, stride, count; 
 	} vectors;
 	struct { 
-		char cmd_type, buf_idx, pad0, pad1; 
+		unsigned char cmd_type, buf_idx, pad0, pad1; 
 	} dma;
 } drm_radeon_cmd_header_t;
 
@@ -327,7 +368,8 @@ typedef struct {
 typedef struct drm_radeon_init {
 	enum {
 		RADEON_INIT_CP    = 0x01,
-		RADEON_CLEANUP_CP = 0x02
+		RADEON_CLEANUP_CP = 0x02,
+		RADEON_INIT_R200_CP = 0x03,	
 	} func;
 	unsigned long sarea_priv_offset;
 	int is_pci;
@@ -458,6 +500,9 @@ typedef struct drm_radeon_indirect {
  * client any other way.  
  */
 #define RADEON_PARAM_AGP_BUFFER_OFFSET 0x1
+#define RADEON_PARAM_LAST_FRAME 0x2
+#define RADEON_PARAM_LAST_DISPATCH 0x3
+#define RADEON_PARAM_LAST_CLEAR 0x4
 
 typedef struct drm_radeon_getparam {
 	int param;

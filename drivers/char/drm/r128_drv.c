@@ -37,45 +37,6 @@
 #include "r128_drv.h"
 #include "ati_pcigart.h"
 
-#define DRIVER_AUTHOR		"Gareth Hughes, VA Linux Systems Inc."
-
-#define DRIVER_NAME		"r128"
-#define DRIVER_DESC		"ATI Rage 128"
-#define DRIVER_DATE		"20010917"
-
-#define DRIVER_MAJOR		2
-#define DRIVER_MINOR		2
-#define DRIVER_PATCHLEVEL	0
-
-#define DRIVER_IOCTLS							    \
-   [DRM_IOCTL_NR(DRM_IOCTL_DMA)]             = { r128_cce_buffers,  1, 0 }, \
-   [DRM_IOCTL_NR(DRM_IOCTL_R128_INIT)]       = { r128_cce_init,     1, 1 }, \
-   [DRM_IOCTL_NR(DRM_IOCTL_R128_CCE_START)]  = { r128_cce_start,    1, 1 }, \
-   [DRM_IOCTL_NR(DRM_IOCTL_R128_CCE_STOP)]   = { r128_cce_stop,     1, 1 }, \
-   [DRM_IOCTL_NR(DRM_IOCTL_R128_CCE_RESET)]  = { r128_cce_reset,    1, 1 }, \
-   [DRM_IOCTL_NR(DRM_IOCTL_R128_CCE_IDLE)]   = { r128_cce_idle,     1, 0 }, \
-   [DRM_IOCTL_NR(DRM_IOCTL_R128_RESET)]      = { r128_engine_reset, 1, 0 }, \
-   [DRM_IOCTL_NR(DRM_IOCTL_R128_FULLSCREEN)] = { r128_fullscreen,   1, 0 }, \
-   [DRM_IOCTL_NR(DRM_IOCTL_R128_SWAP)]       = { r128_cce_swap,     1, 0 }, \
-   [DRM_IOCTL_NR(DRM_IOCTL_R128_CLEAR)]      = { r128_cce_clear,    1, 0 }, \
-   [DRM_IOCTL_NR(DRM_IOCTL_R128_VERTEX)]     = { r128_cce_vertex,   1, 0 }, \
-   [DRM_IOCTL_NR(DRM_IOCTL_R128_INDICES)]    = { r128_cce_indices,  1, 0 }, \
-   [DRM_IOCTL_NR(DRM_IOCTL_R128_BLIT)]       = { r128_cce_blit,     1, 0 }, \
-   [DRM_IOCTL_NR(DRM_IOCTL_R128_DEPTH)]      = { r128_cce_depth,    1, 0 }, \
-   [DRM_IOCTL_NR(DRM_IOCTL_R128_STIPPLE)]    = { r128_cce_stipple,  1, 0 }, \
-   [DRM_IOCTL_NR(DRM_IOCTL_R128_INDIRECT)]   = { r128_cce_indirect, 1, 1 },
-
-
-#if 0
-/* GH: Count data sent to card via ring or vertex/indirect buffers.
- */
-#define __HAVE_COUNTERS         3
-#define __HAVE_COUNTER6         _DRM_STAT_IRQ
-#define __HAVE_COUNTER7         _DRM_STAT_PRIMARY
-#define __HAVE_COUNTER8         _DRM_STAT_SECONDARY
-#endif
-
-
 #include "drm_agpsupport.h"
 #include "drm_auth.h"
 #include "drm_bufs.h"
@@ -83,26 +44,6 @@
 #include "drm_dma.h"
 #include "drm_drawable.h"
 #include "drm_drv.h"
-
-#ifndef MODULE
-/* DRM(options) is called by the kernel to parse command-line options
- * passed via the boot-loader (e.g., LILO).  It calls the insmod option
- * routine, drm_parse_drm.
- */
-
-/* JH- We have to hand expand the string ourselves because of the cpp.  If
- * anyone can think of a way that we can fit into the __setup macro without
- * changing it, then please send the solution my way.
- */
-static int __init r128_options( char *str )
-{
-	DRM(parse_options)( str );
-	return 1;
-}
-
-__setup( DRIVER_NAME "=", r128_options );
-#endif
-
 #include "drm_fops.h"
 #include "drm_init.h"
 #include "drm_ioctl.h"

@@ -20,7 +20,7 @@
  * Furthermore, v0, a3-a5, t11, and t12 are untouched.
  */
 
-#include <alpha/regdef.h>
+#include <asm/regdef.h>
 
 	.set noat
 	.set noreorder

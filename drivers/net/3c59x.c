@@ -418,7 +418,8 @@ enum {	IS_VORTEX=1, IS_BOOMERANG=2, IS_CYCLONE=4, IS_TORNADO=8,
 	EEPROM_8BIT=0x10,	/* AKPM: Uses 0x230 as the base bitmaps for EEPROM reads */
 	HAS_PWR_CTRL=0x20, HAS_MII=0x40, HAS_NWAY=0x80, HAS_CB_FNS=0x100,
 	INVERT_MII_PWR=0x200, INVERT_LED_PWR=0x400, MAX_COLLISION_RESET=0x800,
-	EEPROM_OFFSET=0x1000, HAS_HWCKSM=0x2000, WNO_XCVR_PWR=0x4000 };
+	EEPROM_OFFSET=0x1000, HAS_HWCKSM=0x2000, WNO_XCVR_PWR=0x4000,
+	EXTRA_PREAMBLE=0x8000, };
 
 enum vortex_chips {
 	CH_3C590 = 0,
@@ -504,7 +505,7 @@ static struct vortex_chip_info {
 	{"3c905 Boomerang 100baseT4",
 	 PCI_USES_IO|PCI_USES_MASTER, IS_BOOMERANG|HAS_MII, 64, },
 	{"3c905B Cyclone 100baseTx",
-	 PCI_USES_IO|PCI_USES_MASTER, IS_CYCLONE|HAS_NWAY|HAS_HWCKSM, 128, },
+	 PCI_USES_IO|PCI_USES_MASTER, IS_CYCLONE|HAS_NWAY|HAS_HWCKSM|EXTRA_PREAMBLE, 128, },
 
 	{"3c905B Cyclone 10/100/BNC",
 	 PCI_USES_IO|PCI_USES_MASTER, IS_CYCLONE|HAS_NWAY|HAS_HWCKSM, 128, },
@@ -1281,6 +1282,8 @@ static int __devinit vortex_probe1(struct pci_dev *pdev,
 		int phy, phy_idx = 0;
 		EL3WINDOW(4);
 		mii_preamble_required++;
+		if (vp->drv_flags & EXTRA_PREAMBLE)
+			mii_preamble_required++;
 		mdio_sync(ioaddr, 32);
 		mdio_read(dev, 24, 1);
 		for (phy = 0; phy < 32 && phy_idx < 1; phy++) {
@@ -1297,8 +1300,8 @@ static int __devinit vortex_probe1(struct pci_dev *pdev,
 			else
 				phyx = phy;
 			mii_status = mdio_read(dev, phyx, 1);
-		printk("phy=%d, phyx=%d, mii_status=0x%04x\n",
-			phy, phyx, mii_status);
+			printk("phy=%d, phyx=%d, mii_status=0x%04x\n",
+				phy, phyx, mii_status);
 			if (mii_status  &&  mii_status != 0xffff) {
 				vp->phys[phy_idx++] = phyx;
 				if (print_info) {

@@ -1313,11 +1313,11 @@ exit_reiserfs_fs ( void )
 }
 
 static struct file_system_type reiserfs_fs_type = {
-	owner: THIS_MODULE,
-	name: "reiserfs",
-	get_sb: get_super_block,
-	kill_sb: kill_block_super,
-	fs_flags: FS_REQUIRES_DEV,
+	.owner		= THIS_MODULE,
+	.name		= "reiserfs",
+	.get_sb		= get_super_block,
+	.kill_sb	= kill_block_super,
+	.fs_flags	= FS_REQUIRES_DEV,
 };
 
 MODULE_DESCRIPTION ("ReiserFS journaled filesystem");

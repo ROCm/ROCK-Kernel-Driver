@@ -382,7 +382,6 @@ static void finish_fdc_done( int dummy );
 static __inline__ void copy_buffer( void *from, void *to);
 static void setup_req_params( int drive );
 static void redo_fd_request( void);
-static int invalidate_drive(kdev_t rdev);
 static int fd_ioctl( struct inode *inode, struct file *filp, unsigned int
                      cmd, unsigned long param);
 static void fd_probe( int drive );
@@ -1531,16 +1530,6 @@ void do_fd_request(request_queue_t * q)
 	atari_enable_irq( IRQ_MFP_FDC );
 }
 
-
-static int invalidate_drive(kdev_t rdev)
-{
-	/* invalidate the buffer track to force a reread */
-	BufferDrive = -1;
-	set_bit(minor(rdev) & 3, &fake_change);
-	check_disk_change(rdev);
-	return 0;
-}
-
 static int fd_ioctl(struct inode *inode, struct file *filp,
 		    unsigned int cmd, unsigned long param)
 {
@@ -1719,12 +1708,16 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 		/* MSch: invalidate default_params */
 		default_params[drive].blocks  = 0;
 		floppy_sizes[drive] = MAX_DISK_SIZE;
-		return invalidate_drive (device);
 	case FDFMTEND:
 	case FDFLUSH:
-		return invalidate_drive(device);
+		/* invalidate the buffer track to force a reread */
+		BufferDrive = -1;
+		set_bit(drive, &fake_change);
+		check_disk_change(inode->i_bdev);
+		return 0;
+	default:
+		return -EINVAL;
 	}
-	return -EINVAL;
 }
 
 
@@ -1901,7 +1894,7 @@ static int floppy_open( struct inode *inode, struct file *filp )
 		return 0;
 
 	if (filp->f_mode & 3) {
-		check_disk_change(inode->i_rdev);
+		check_disk_change(inode->i_bdev);
 		if (filp->f_mode & 2) {
 			if (UD.wpstat) {
 				floppy_release(inode, filp);

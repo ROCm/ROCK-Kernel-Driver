@@ -659,7 +659,7 @@ static int idedisk_open(struct inode *inode, struct file *__fp, struct ata_devic
 {
 	MOD_INC_USE_COUNT;
 	if (drive->removable && drive->usage == 1) {
-		check_disk_change(inode->i_rdev);
+		check_disk_change(inode->i_bdev);
 
 		/*
 		 * Ignore the return code from door_lock, since the open() has
@@ -1462,6 +1462,7 @@ static void idedisk_attach(struct ata_device *drive)
 {
 	char *req;
 	struct ata_channel *channel;
+	struct gendisk *disk;
 	int unit;
 
 	if (drive->type != ATA_DISK)
@@ -1485,8 +1486,10 @@ static void idedisk_attach(struct ata_device *drive)
 
 	channel = drive->channel;
 	unit = drive - channel->drives;
-
-	ata_revalidate(mk_kdev(channel->major, unit << PARTN_BITS));
+	disk = channel->gd[unit];
+	disk->minor_shift = PARTN_BITS;
+	register_disk(disk, mk_kdev(disk->major, disk->first_minor),
+			1<<disk->minor_shift, disk->fops, drive->capacity);
 }
 
 static void __exit idedisk_exit(void)

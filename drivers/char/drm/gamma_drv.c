@@ -36,32 +36,6 @@
 #include "gamma_drm.h"
 #include "gamma_drv.h"
 
-#define DRIVER_AUTHOR		"VA Linux Systems Inc."
-
-#define DRIVER_NAME		"gamma"
-#define DRIVER_DESC		"3DLabs gamma"
-#define DRIVER_DATE		"20010624"
-
-#define DRIVER_MAJOR		2
-#define DRIVER_MINOR		0
-#define DRIVER_PATCHLEVEL	0
-
-#define DRIVER_IOCTLS							  \
-	[DRM_IOCTL_NR(DRM_IOCTL_DMA)]	     = { gamma_dma,	  1, 0 }, \
-	[DRM_IOCTL_NR(DRM_IOCTL_GAMMA_INIT)] = { gamma_dma_init,  1, 1 }, \
-	[DRM_IOCTL_NR(DRM_IOCTL_GAMMA_COPY)] = { gamma_dma_copy,  1, 1 }
-
-#define IOCTL_TABLE_NAME	DRM(ioctls)
-#define IOCTL_FUNC_NAME 	DRM(ioctl)
-
-#define __HAVE_COUNTERS		5
-#define __HAVE_COUNTER6		_DRM_STAT_IRQ
-#define __HAVE_COUNTER7		_DRM_STAT_DMA
-#define __HAVE_COUNTER8		_DRM_STAT_PRIMARY
-#define __HAVE_COUNTER9		_DRM_STAT_SPECIAL
-#define __HAVE_COUNTER10	_DRM_STAT_MISSED
-
-
 #include "drm_auth.h"
 #include "drm_agpsupport.h"
 #include "drm_bufs.h"
@@ -69,25 +43,6 @@
 #include "drm_dma.h"
 #include "drm_drawable.h"
 #include "drm_drv.h"
-
-#ifndef MODULE
-/* DRM(options) is called by the kernel to parse command-line options
- * passed via the boot-loader (e.g., LILO).  It calls the insmod option
- * routine, drm_parse_drm.
- */
-
-/* JH- We have to hand expand the string ourselves because of the cpp.  If
- * anyone can think of a way that we can fit into the __setup macro without
- * changing it, then please send the solution my way.
- */
-static int __init gamma_options( char *str )
-{
-	DRM(parse_options)( str );
-	return 1;
-}
-
-__setup( DRIVER_NAME "=", gamma_options );
-#endif
 
 #include "drm_fops.h"
 #include "drm_init.h"

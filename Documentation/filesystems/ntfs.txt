@@ -247,6 +247,17 @@ ChangeLog
 
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.0.24:
+	- Small internal cleanups.
+	- Support for sendfile system call. (Christoph Hellwig)
+2.0.23:
+	- Massive internal locking changes to mft record locking. Fixes
+	  various race conditions and deadlocks.
+	- Fix ntfs over loopback for compressed files by adding an
+	  optimization barrier. (gcc was screwing up otherwise ?)
+	Thanks go to Christoph Hellwig for pointing these two out:
+	- Remove now unused function fs/ntfs/malloc.h::vmalloc_nofs().
+	- Fix ntfs_free() for ia64 and parisc.
 2.0.22:
 	- Small internal cleanups.
 2.0.21:

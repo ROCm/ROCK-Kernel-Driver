@@ -438,6 +438,12 @@ CONFIG_BINFMT_AOUT
   because some crucial programs on your system might still be in A.OUT
   format.
 
+OSF/1 v4 readv/writev compatibility
+CONFIG_OSF4_COMPAT
+  Say Y if you are using OSF/1 binaries (like Netscape and Acrobat)
+  with v4 shared libraries freely available from Compaq. If you're
+  going to use shared libraries from Tru64 version 5.0 or later, say N.
+
 CONFIG_BINFMT_EM86
   Say Y here if you want to be able to execute Linux/Intel ELF
   binaries just like native Alpha binaries on your Alpha machine. For

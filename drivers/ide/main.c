@@ -260,65 +260,25 @@ struct ata_device *get_info_ptr(kdev_t i_rdev)
  * usage == 1 (we need an open channel to use an ioctl :-), so this
  * is our limit.
  */
-int ata_revalidate(kdev_t i_rdev)
+int ide_revalidate(kdev_t dev)
 {
-	kdev_t device = mk_kdev(major(i_rdev), minor(i_rdev) & ~PARTN_MASK);
 	struct ata_device *drive;
-	int res;
+	struct ata_channel *channel;
+	struct gendisk *disk;
+	int unit;
 
-	if ((drive = get_info_ptr(device)) == NULL)
+	if ((drive = get_info_ptr(dev)) == NULL)
 		return -ENODEV;
-
-	MOD_INC_USE_COUNT;
-
-	res = dev_lock_part(device);
-	if (res < 0) {
-		MOD_DEC_USE_COUNT;
-		return res;
+	if (ata_ops(drive) && ata_ops(drive)->revalidate) {
+		ata_get(ata_ops(drive));
+		ata_ops(drive)->revalidate(drive);
+		ata_put(ata_ops(drive));
 	}
-
-	res = wipe_partitions(device);
-	if (!res) {
-		if (ata_ops(drive) && ata_ops(drive)->revalidate) {
-			ata_get(ata_ops(drive));
-
-			/* This is expected to be a no-op for tapes and SCSI
-			 * based access.
-			 */
-			ata_ops(drive)->revalidate(drive);
-			ata_put(ata_ops(drive));
-		} else
-			grok_partitions(device, ata_capacity(drive));
-	}
-
-	dev_unlock_part(device);
-	MOD_DEC_USE_COUNT;
-	return res;
-}
-
-/*
- * FIXME: this is most propably just totally unnecessary.
- *
- * Look again for all drives in the system on all interfaces.
- */
-static void revalidate_drives(void)
-{
-	int i;
-
-	for (i = 0; i < MAX_HWIFS; ++i) {
-		int unit;
-		struct ata_channel *ch = &ide_hwifs[i];
-
-		for (unit = 0; unit < MAX_DRIVES; ++unit) {
-			struct ata_device *drive = &ch->drives[unit];
-
-			if (drive->revalidate) {
-				drive->revalidate = 0;
-				if (!initializing)
-					ata_revalidate(mk_kdev(ch->major, unit<<PARTN_BITS));
-			}
-		}
-	}
+	channel = drive->channel;
+	unit = drive - channel->drives;
+	disk = channel->gd[unit];
+	disk->part[0].nr_sects = ata_capacity(drive);
+	return 0;
 }
 
 void ide_driver_module(void)
@@ -328,13 +288,10 @@ void ide_driver_module(void)
 	/* Don't reinit the probe if there is already one channel detected. */
 	for (i = 0; i < MAX_HWIFS; ++i) {
 		if (ide_hwifs[i].present)
-			goto revalidate;
+			return;
 	}
 
 	ideprobe_init();
-
-revalidate:
-	revalidate_drives();
 }
 
 /*
@@ -493,6 +450,7 @@ void ide_unregister(struct ata_channel *ch)
 		int i;
 		for (i = 0; i < MAX_DRIVES; i++)
 			del_gendisk(gd + i);
+		kfree(gd->major_name);
 		kfree(gd->part);
 		if (gd->de_arr)
 			kfree (gd->de_arr);
@@ -613,7 +571,6 @@ found:
 
 	if (!initializing) {
 		ideprobe_init();
-		revalidate_drives();
 		/* FIXME: Do we really have to call it second time here?! */
 		ide_driver_module();
 	}
@@ -1093,8 +1050,6 @@ int ata_register_device(struct ata_device *drive, struct ata_operations *driver)
 			drive->dsc_overlap = 0;
 
 	}
-	drive->revalidate = 1;
-
 	return 0;
 }
 
@@ -1169,8 +1124,6 @@ void unregister_ata_driver(struct ata_operations *driver)
 	}
 }
 
-EXPORT_SYMBOL(unregister_ata_driver);
-
 EXPORT_SYMBOL(ide_hwifs);
 EXPORT_SYMBOL(ide_lock);
 
@@ -1178,7 +1131,6 @@ devfs_handle_t ide_devfs_handle;
 
 EXPORT_SYMBOL(ata_register_device);
 EXPORT_SYMBOL(ata_unregister_device);
-EXPORT_SYMBOL(ata_revalidate);
 EXPORT_SYMBOL(ide_register_hw);
 EXPORT_SYMBOL(ide_unregister);
 EXPORT_SYMBOL(get_info_ptr);

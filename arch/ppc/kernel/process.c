@@ -44,6 +44,7 @@
 #include <asm/processor.h>
 #include <asm/mmu.h>
 #include <asm/prom.h>
+#include <asm/hardirq.h>
 #ifdef CONFIG_PPC_ISERIES
 #include <asm/iSeries/Paca.h>
 #endif
@@ -293,7 +294,7 @@ void show_regs(struct pt_regs * regs)
 			break;
 	}
 	printk("\n");
-	print_backtrace((unsigned long *)regs->gpr[1]);
+	show_stack((unsigned long *)regs->gpr[1]);
 }
 
 void exit_thread(void)
@@ -418,7 +419,6 @@ void start_thread(struct pt_regs *regs, unsigned long nip, unsigned long sp)
 #endif /* CONFIG_ALTIVEC */
 }
 
-#if 0
 int set_fpexc_mode(struct task_struct *tsk, unsigned int val)
 {
 	struct pt_regs *regs = tsk->thread.regs;
@@ -431,7 +431,14 @@ int set_fpexc_mode(struct task_struct *tsk, unsigned int val)
 			| tsk->thread.fpexc_mode;
 	return 0;
 }
-#endif
+
+int get_fpexc_mode(struct task_struct *tsk, unsigned long adr)
+{
+	unsigned int val;
+
+	val = __unpack_fe01(tsk->thread.fpexc_mode);
+	return put_user(val, (unsigned int *) adr);
+}
 
 int sys_clone(int p1, int p2, int p3, int p4, int p5, int p6,
 	      struct pt_regs *regs)
@@ -486,20 +493,25 @@ out:
 }
 
 void
-print_backtrace(unsigned long *sp)
+show_stack(unsigned long *sp)
 {
 	int cnt = 0;
 	unsigned long i;
 
+	if (sp == NULL)
+		sp = (unsigned long *)_get_SP();
 	printk("Call backtrace: ");
-	while (sp) {
-		if (__get_user( i, &sp[1] ))
+	for (;;) {
+		if (__get_user(sp, (unsigned long **)sp))
+			break;
+		if (sp == NULL)
+			break;
+		if (__get_user(i, &sp[1]))
 			break;
 		if (cnt++ % 7 == 0)
 			printk("\n");
 		printk("%08lX ", i);
-		if (cnt > 32) break;
-		if (__get_user(sp, (unsigned long **)sp))
+		if (cnt > 32)
 			break;
 	}
 	printk("\n");
