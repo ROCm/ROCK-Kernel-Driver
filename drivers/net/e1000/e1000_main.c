@@ -1536,19 +1536,24 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb,
 	struct e1000_buffer *buffer_info;
 	unsigned int len = skb->len, max_per_txd = E1000_MAX_DATA_PER_TXD;
 	unsigned int offset = 0, size, count = 0, i;
+#ifdef NETIF_F_TSO
+	unsigned int mss;
+#endif
+	unsigned int nr_frags;
+	unsigned int f;
 
 #ifdef NETIF_F_TSO
-	unsigned int mss = skb_shinfo(skb)->tso_size;
+	mss = skb_shinfo(skb)->tso_size;
 	/* The controller does a simple calculation to 
 	 * make sure there is enough room in the FIFO before
 	 * initiating the DMA for each buffer.  The calc is:
 	 * 4 = ceil(buffer len/mss).  To make sure we don't
 	 * overrun the FIFO, adjust the max buffer len if mss
 	 * drops. */
-	if(mss) max_per_txd = min(mss << 2, max_per_txd);
+	if (mss)
+		max_per_txd = min(mss << 2, max_per_txd);
 #endif
-	unsigned int nr_frags = skb_shinfo(skb)->nr_frags;
-	unsigned int f;
+	nr_frags = skb_shinfo(skb)->nr_frags;
 	len -= skb->data_len;
 
 	i = tx_ring->next_to_use;
