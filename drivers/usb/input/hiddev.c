@@ -403,7 +403,8 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 	struct hiddev_collection_info cinfo;
 	struct hiddev_report_info rinfo;
 	struct hiddev_field_info finfo;
-	struct hiddev_usage_ref uref;
+	struct hiddev_usage_ref_multi uref_multi;
+	struct hiddev_usage_ref *uref = &uref_multi.uref;
 	struct hiddev_devinfo dinfo;
 	struct hid_report *report;
 	struct hid_field *field;
@@ -575,68 +576,98 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		return 0;
 
 	case HIDIOCGUCODE:
-		if (copy_from_user(&uref, (void *) arg, sizeof(uref)))
+		if (copy_from_user(uref, (void *) arg, sizeof(*uref)))
 			return -EFAULT;
 
-		rinfo.report_type = uref.report_type;
-		rinfo.report_id = uref.report_id;
+		rinfo.report_type = uref->report_type;
+		rinfo.report_id = uref->report_id;
 		if ((report = hiddev_lookup_report(hid, &rinfo)) == NULL)
 			return -EINVAL;
 
-		if (uref.field_index >= report->maxfield)
+		if (uref->field_index >= report->maxfield)
 			return -EINVAL;
 
-		field = report->field[uref.field_index];
-		if (uref.usage_index >= field->maxusage)
+		field = report->field[uref->field_index];
+		if (uref->usage_index >= field->maxusage)
 			return -EINVAL;
 
-		uref.usage_code = field->usage[uref.usage_index].hid;
+		uref->usage_code = field->usage[uref->usage_index].hid;
 
-		if (copy_to_user((void *) arg, &uref, sizeof(uref)))
+		if (copy_to_user((void *) arg, uref, sizeof(*uref)))
 			return -EFAULT;
 
 		return 0;
 
 	case HIDIOCGUSAGE:
 	case HIDIOCSUSAGE:
+	case HIDIOCGUSAGES:
+	case HIDIOCSUSAGES:
 	case HIDIOCGCOLLECTIONINDEX:
-		if (copy_from_user(&uref, (void *) arg, sizeof(uref)))
-			return -EFAULT;
+		if (cmd == HIDIOCGUSAGES || cmd == HIDIOCSUSAGES) {
+			if (copy_from_user(&uref_multi, (void *) arg, 
+					   sizeof(uref_multi)))
+				return -EFAULT;
+		} else {
+			if (copy_from_user(uref, (void *) arg, sizeof(*uref)))
+				return -EFAULT;
+		}
 
-		if (cmd != HIDIOCGUSAGE && uref.report_type == HID_REPORT_TYPE_INPUT)
-				return -EINVAL;
+		if (cmd != HIDIOCGUSAGE && 
+		    cmd != HIDIOCGUSAGES &&
+		    uref->report_type == HID_REPORT_TYPE_INPUT)
+			return -EINVAL;
 
-		if (uref.report_id == HID_REPORT_ID_UNKNOWN) {
-			field = hiddev_lookup_usage(hid, &uref);
+		if (uref->report_id == HID_REPORT_ID_UNKNOWN) {
+			field = hiddev_lookup_usage(hid, uref);
 			if (field == NULL)
 				return -EINVAL;
 		} else {
-			rinfo.report_type = uref.report_type;
-			rinfo.report_id = uref.report_id;
+			rinfo.report_type = uref->report_type;
+			rinfo.report_id = uref->report_id;
 			if ((report = hiddev_lookup_report(hid, &rinfo)) == NULL)
 				return -EINVAL;
 
-			if (uref.field_index >= report->maxfield)
+			if (uref->field_index >= report->maxfield)
 				return -EINVAL;
 
-			field = report->field[uref.field_index];
-			if (uref.usage_index >= field->maxusage)
+			field = report->field[uref->field_index];
+			if (uref->usage_index >= field->maxusage)
 				return -EINVAL;
+
+			if (cmd == HIDIOCGUSAGES || cmd == HIDIOCSUSAGES) {
+				if (uref_multi.num_values >= HID_MAX_USAGES || 
+				    uref->usage_index >= field->maxusage || 
+				   (uref->usage_index + uref_multi.num_values) >= field->maxusage)
+					return -EINVAL;
+			}
 		}
 
 		switch (cmd) {
 			case HIDIOCGUSAGE:
-				uref.value = field->value[uref.usage_index];
-				if (copy_to_user((void *) arg, &uref, sizeof(uref)))
+				uref->value = field->value[uref->usage_index];
+				if (copy_to_user((void *) arg, uref, sizeof(*uref)))
 					return -EFAULT;
 				return 0;
 
 			case HIDIOCSUSAGE:
-				field->value[uref.usage_index] = uref.value;
+				field->value[uref->usage_index] = uref->value;
 				return 0;
 
 			case HIDIOCGCOLLECTIONINDEX:
-				return field->usage[uref.usage_index].collection_index;
+				return field->usage[uref->usage_index].collection_index;
+			case HIDIOCGUSAGES:
+				for (i = 0; i < uref_multi.num_values; i++)
+					uref_multi.values[i] = 
+					    field->value[uref->usage_index + i];
+				if (copy_to_user((void *) arg, &uref_multi, 
+						 sizeof(uref_multi)))
+					return -EFAULT;
+				return 0;
+			case HIDIOCSUSAGES:
+				for (i = 0; i < uref_multi.num_values; i++)
+					field->value[uref->usage_index + i] = 
+				  	    uref_multi.values[i];
+				return 0;
 		}
 
 		return 0;
