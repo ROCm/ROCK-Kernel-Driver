@@ -742,7 +742,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, int good_sectors,
 	if (good_sectors >= 0) {
 		SCSI_LOG_HLCOMPLETE(1, printk("%ld sectors total, %d sectors done.\n",
 					      req->nr_sectors, good_sectors));
-		SCSI_LOG_HLCOMPLETE(1, printk("use_sg is %d\n ", cmd->use_sg));
+		SCSI_LOG_HLCOMPLETE(1, printk("use_sg is %d\n", cmd->use_sg));
 
 		if (clear_errors)
 			req->errors = 0;
