@@ -279,90 +279,9 @@ static int suspend_save_image(void)
 
 /* More restore stuff */
 
-static struct block_device * resume_bdev;
-
-
-/**
- *	Using bio to read from swap.
- *	This code requires a bit more work than just using buffer heads
- *	but, it is the recommended way for 2.5/2.6.
- *	The following are to signal the beginning and end of I/O. Bios
- *	finish asynchronously, while we want them to happen synchronously.
- *	A simple atomic_t, and a wait loop take care of this problem.
- */
-
-static atomic_t io_done = ATOMIC_INIT(0);
-
-static void start_io(void)
-{
-	atomic_set(&io_done,1);
-}
-
-static int end_io(struct bio * bio, unsigned int num, int err)
-{
-	atomic_set(&io_done,0);
-	return 0;
-}
-
-static void wait_io(void)
-{
-	while(atomic_read(&io_done))
-		io_schedule();
-}
-
-
-/**
- *	submit - submit BIO request.
- *	@rw:	READ or WRITE.
- *	@off	physical offset of page.
- *	@page:	page we're reading or writing.
- *
- *	Straight from the textbook - allocate and initialize the bio.
- *	If we're writing, make sure the page is marked as dirty.
- *	Then submit it and wait.
- */
-
-static int submit(int rw, pgoff_t page_off, void * page)
-{
-	int error = 0;
-	struct bio * bio;
-
-	bio = bio_alloc(GFP_ATOMIC,1);
-	if (!bio)
-		return -ENOMEM;
-	bio->bi_sector = page_off * (PAGE_SIZE >> 9);
-	bio_get(bio);
-	bio->bi_bdev = resume_bdev;
-	bio->bi_end_io = end_io;
-
-	if (bio_add_page(bio, virt_to_page(page), PAGE_SIZE, 0) < PAGE_SIZE) {
-		printk("pmdisk: ERROR: adding page to bio at %ld\n",page_off);
-		error = -EFAULT;
-		goto Done;
-	}
-
-	if (rw == WRITE)
-		bio_set_pages_dirty(bio);
-	start_io();
-	submit_bio(rw | (1 << BIO_RW_SYNC), bio);
-	wait_io();
- Done:
-	bio_put(bio);
-	return error;
-}
-
-static int
-read_page(pgoff_t page_off, void * page)
-{
-	return submit(READ,page_off,page);
-}
-
-static int
-write_page(pgoff_t page_off, void * page)
-{
-	return submit(WRITE,page_off,page);
-}
-
+extern struct block_device * resume_bdev;
+extern int bio_read_page(pgoff_t page_off, void * page);
+extern int bio_write_page(pgoff_t page_off, void * page);
 
 extern dev_t __init name_to_dev_t(const char *line);
 
@@ -372,7 +291,7 @@ static int __init check_sig(void)
 	int error;
 
 	memset(&pmdisk_header,0,sizeof(pmdisk_header));
-	if ((error = read_page(0,&pmdisk_header)))
+	if ((error = bio_read_page(0,&pmdisk_header)))
 		return error;
 	if (!memcmp(PMDISK_SIG,pmdisk_header.sig,10)) {
 		memcpy(pmdisk_header.sig,pmdisk_header.orig_sig,10);
@@ -380,7 +299,7 @@ static int __init check_sig(void)
 		/*
 		 * Reset swap signature now.
 		 */
-		error = write_page(0,&pmdisk_header);
+		error = bio_write_page(0,&pmdisk_header);
 	} else { 
 		pr_debug(KERN_ERR "pmdisk: Invalid partition type.\n");
 		return -EINVAL;
@@ -424,7 +343,7 @@ static int __init check_header(void)
 
 	init_header();
 
-	if ((error = read_page(swp_offset(pmdisk_header.pmdisk_info), 
+	if ((error = bio_read_page(swp_offset(pmdisk_header.pmdisk_info), 
 			       &pmdisk_info)))
 		return error;
 
@@ -456,7 +375,7 @@ static int __init read_pagedir(void)
 	for (i = 0; i < n && !error; i++, addr += PAGE_SIZE) {
 		unsigned long offset = swp_offset(pmdisk_info.pagedir[i]);
 		if (offset)
-			error = read_page(offset, (void *)addr);
+			error = bio_read_page(offset, (void *)addr);
 		else
 			error = -EFAULT;
 	}
@@ -483,7 +402,7 @@ static int __init read_image_data(void)
 	for(i = 0, p = pagedir_nosave; i < nr_copy_pages && !error; i++, p++) {
 		if (!(i%100))
 			printk( "." );
-		error = read_page(swp_offset(p->swap_address),
+		error = bio_read_page(swp_offset(p->swap_address),
 				  (void *)p->address);
 	}
 	printk(" %d done.\n",i);
