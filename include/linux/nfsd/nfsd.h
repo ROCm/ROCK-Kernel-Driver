@@ -117,6 +117,17 @@ int		nfsd_notify_change(struct inode *, struct iattr *);
 int		nfsd_permission(struct svc_export *, struct dentry *, int);
 
 
+/* 
+ * NFSv4 State
+ */
+#ifdef CONFIG_NFSD_V4
+void nfs4_state_init(void);
+void nfs4_state_shutdown(void);
+#else
+void static inline nfs4_state_init(void){}
+void static inline nfs4_state_shutdown(void){}
+#endif
+
 /*
  * lockd binding
  */
@@ -162,6 +173,7 @@ void		nfsd_lockd_shutdown(void);
 #define	nfserr_bad_cookie	__constant_htonl(NFSERR_BAD_COOKIE)
 #define	nfserr_same		__constant_htonl(NFSERR_SAME)
 #define	nfserr_clid_inuse	__constant_htonl(NFSERR_CLID_INUSE)
+#define	nfserr_stale_clientid	__constant_htonl(NFSERR_STALE_CLIENTID)
 #define	nfserr_resource		__constant_htonl(NFSERR_RESOURCE)
 #define	nfserr_nofilehandle	__constant_htonl(NFSERR_NOFILEHANDLE)
 #define	nfserr_minor_vers_mismatch	__constant_htonl(NFSERR_MINOR_VERS_MISMATCH)
