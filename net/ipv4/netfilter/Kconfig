@@ -148,6 +148,14 @@ config IP_NF_MATCH_ECN
 config IP_NF_MATCH_DSCP
 	tristate "DSCP match support"
 	depends on IP_NF_IPTABLES
+	help
+	  This option adds a `DSCP' match, which allows you to match against
+	  the IPv4 header DSCP field (DSCP codepoint).
+
+	  The DSCP codepoint can have any value between 0x0 and 0x4f.
+
+	  If you want to compile it as a module, say M here and read
+	  Documentation/modules.txt.  If unsure, say `N'.
 
 config IP_NF_MATCH_AH_ESP
 	tristate "AH/ESP match support"

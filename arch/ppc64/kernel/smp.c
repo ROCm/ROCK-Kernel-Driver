@@ -494,8 +494,10 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 	while (atomic_read(&data.started) != cpus) {
 		HMT_low();
 		if (--timeout == 0) {
+#ifdef CONFIG_DEBUG_KERNEL
 			if (debugger)
 				debugger(0);
+#endif
 			printk("smp_call_function on cpu %d: other cpus not "
 			       "responding (%d)\n", smp_processor_id(),
 			       atomic_read(&data.started));
@@ -508,8 +510,10 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 		while (atomic_read(&data.finished) != cpus) {
 			HMT_low();
 			if (--timeout == 0) {
+#ifdef CONFIG_DEBUG_KERNEL
 				if (debugger)
 					debugger(0);
+#endif
 				printk("smp_call_function on cpu %d: other "
 				       "cpus not finishing (%d/%d)\n",
 				       smp_processor_id(),

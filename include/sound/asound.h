@@ -32,7 +32,6 @@
 #include <linux/types.h>
 #include <linux/time.h>
 #include <asm/byteorder.h>
-#include <linux/interrupt.h>
 
 #if  __LITTLE_ENDIAN == 1234
 #define SNDRV_LITTLE_ENDIAN

@@ -115,9 +115,10 @@
 
 
 /* Globals */
-static struct proc_dir_entry *proc_rtas;
+extern struct proc_dir_entry *proc_rtas;
+
 static struct rtas_sensors sensors;
-static struct device_node *rtas_node;
+static struct device_node *rtas_node = NULL;
 static unsigned long power_on_time = 0; /* Save the time the user set */
 static char progress_led[MAX_LINELENGTH];
 
@@ -200,13 +201,18 @@ void proc_rtas_init(void)
 	struct proc_dir_entry *entry;
 
 	rtas_node = find_devices("rtas");
-	if ((rtas_node == 0) || (naca->platform == PLATFORM_ISERIES_LPAR)) {
+	if ((rtas_node == NULL) || (naca->platform == PLATFORM_ISERIES_LPAR)) {
 		return;
 	}
 	
-	proc_rtas = proc_mkdir("rtas", 0);
-	if (proc_rtas == 0)
+	if (proc_rtas == NULL) {
+		proc_rtas = proc_mkdir("rtas", 0);
+	}
+
+	if (proc_rtas == NULL) {
+		printk(KERN_ERR "Failed to create /proc/rtas in proc_rtas_init\n");
 		return;
+	}
 
 	/* /proc/rtas entries */
 
@@ -405,10 +411,14 @@ static int ppc_rtas_sensor_read(char * buf, char ** start, off_t off,
 		j = sensors.sensor[i].quant;
 		/* A sensor may have multiple instances */
 		while (j >= 0) {
+
 			error =	rtas_call(get_sensor_state, 2, 2, &ret, 
-				  sensors.sensor[i].token, sensors.sensor[i].quant-j);
+				  	  sensors.sensor[i].token, 
+				  	  sensors.sensor[i].quant - j);
+
 			state = (int) ret;
-			n += ppc_rtas_process_sensor(sensors.sensor[i], state, error, buffer+n );
+			n += ppc_rtas_process_sensor(sensors.sensor[i], state, 
+					     	     error, buffer+n );
 			n += sprintf (buffer+n, "\n");
 			j--;
 		} /* while */
@@ -426,6 +436,7 @@ return_string:
 		n = count;
 	else
 		*eof = 1;
+
 	memcpy(buf, buffer + off, n);
 	*start = buf;
 	kfree(buffer);
@@ -436,10 +447,10 @@ return_string:
 
 int ppc_rtas_find_all_sensors (void)
 {
-	unsigned long *utmp;
-	int len, i, j;
+	unsigned int *utmp;
+	int len, i;
 
-	utmp = (unsigned long *) get_property(rtas_node, "rtas-sensors", &len);
+	utmp = (unsigned int *) get_property(rtas_node, "rtas-sensors", &len);
 	if (utmp == NULL) {
 		printk (KERN_ERR "error: could not get rtas-sensors\n");
 		return 1;
@@ -447,9 +458,9 @@ int ppc_rtas_find_all_sensors (void)
 
 	sensors.quant = len / 8;      /* int + int */
 
-	for (i=0, j=0; j<sensors.quant; i+=2, j++) {
-		sensors.sensor[j].token = utmp[i];
-		sensors.sensor[j].quant = utmp[i+1];
+	for (i=0; i<sensors.quant; i++) {
+		sensors.sensor[i].token = *utmp++;
+		sensors.sensor[i].quant = *utmp++;
 	}
 	return 0;
 }
@@ -515,6 +526,7 @@ int ppc_rtas_process_sensor(struct individual_sensor s, int state,
 	int n = 0;
 
 	/* What kind of sensor do we have here? */
+	
 	switch (s.token) {
 		case KEY_SWITCH:
 			n += sprintf(buf+n, "Key switch:\t");
@@ -698,9 +710,9 @@ int get_location_code(struct individual_sensor s, char * buffer)
 	ret = (char *) get_property(rtas_node, rstr, &llen);
 
 	n=0;
-	if (ret[0] == '\0')
+	if (ret == NULL || ret[0] == '\0') {
 		n += sprintf ( buffer+n, "--- ");/* does not have a location */
-	else {
+	} else {
 		char t[50];
 		ret += pos;
 

@@ -155,8 +155,6 @@ static struct net_bridge_port *new_nbp(struct net_bridge *br, struct net_device 
 	p->path_cost = br_initial_port_cost(dev);
 	p->priority = 0x80;
 
-	dev->br_port = p;
-
 	for (i=1;i<255;i++)
 		if (br_get_port(br, i) == NULL)
 			break;
@@ -165,6 +163,8 @@ static struct net_bridge_port *new_nbp(struct net_bridge *br, struct net_device 
 		kfree(p);
 		return NULL;
 	}
+
+	dev->br_port = p;
 
 	p->port_no = i;
 	br_init_port(p);

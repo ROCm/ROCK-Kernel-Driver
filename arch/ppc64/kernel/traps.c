@@ -81,8 +81,10 @@ static void
 _exception(int signr, siginfo_t *info, struct pt_regs *regs)
 {
 	if (!user_mode(regs)) {
+#ifdef CONFIG_DEBUG_KERNEL
 		if (debugger)
 			debugger(regs);
+#endif
 		die("Exception in kernel mode\n", regs, signr);
 	}
 
@@ -133,8 +135,10 @@ SystemResetException(struct pt_regs *regs)
 		FWNMI_release_errinfo();
 	}
 
+#ifdef CONFIG_DEBUG_KERNEL
 	if (debugger)
 		debugger(regs);
+#endif
 
 #ifdef PANIC_ON_ERROR
 	panic("System Reset");
@@ -174,13 +178,14 @@ MachineCheckException(struct pt_regs *regs)
 				return;
 		}
 
+#ifdef CONFIG_DEBUG_KERNEL
 		if (debugger_fault_handler) {
 			debugger_fault_handler(regs);
 			return;
 		}
 		if (debugger)
 			debugger(regs);
-
+#endif
 		console_verbose();
 		spin_lock_irq(&die_lock);
 		bust_spinlocks(1);
@@ -223,9 +228,10 @@ InstructionBreakpointException(struct pt_regs *regs)
 {
 	siginfo_t info;
 
+#ifdef CONFIG_DEBUG_KERNEL
 	if (debugger_iabr_match && debugger_iabr_match(regs))
 		return;
-
+#endif
 	info.si_signo = SIGTRAP;
 	info.si_errno = 0;
 	info.si_code = TRAP_BRKPT;
@@ -292,9 +298,10 @@ ProgramCheckException(struct pt_regs *regs)
 	} else if (regs->msr & 0x20000) {
 		/* trap exception */
 
+#ifdef CONFIG_DEBUG_KERNEL
 		if (debugger_bpt && debugger_bpt(regs))
 			return;
-
+#endif
 		info.si_signo = SIGTRAP;
 		info.si_errno = 0;
 		info.si_code = TRAP_BRKPT;
@@ -318,9 +325,10 @@ SingleStepException(struct pt_regs *regs)
 
 	regs->msr &= ~MSR_SE;  /* Turn off 'trace' bit */
 
+#ifdef CONFIG_DEBUG_KERNEL
 	if (debugger_sstep && debugger_sstep(regs))
 		return;
-
+#endif
 	info.si_signo = SIGTRAP;
 	info.si_errno = 0;
 	info.si_code = TRAP_TRACE;

@@ -18,10 +18,10 @@ CONFIG_EXPERIMENTAL=y
 #
 # General setup
 #
-CONFIG_NET=y
 CONFIG_SYSVIPC=y
 # CONFIG_BSD_PROCESS_ACCT is not set
 CONFIG_SYSCTL=y
+CONFIG_LOG_BUF_SHIFT=15
 
 #
 # Loadable module support
@@ -41,6 +41,7 @@ CONFIG_NR_CPUS=32
 # CONFIG_HMT is not set
 # CONFIG_DISCONTIGMEM is not set
 # CONFIG_RTAS_FLASH is not set
+CONFIG_PPC_RTAS=y
 
 #
 # General setup
@@ -50,6 +51,7 @@ CONFIG_KCORE_ELF=y
 CONFIG_BINFMT_ELF=y
 CONFIG_BINFMT_ELF32=y
 # CONFIG_BINFMT_MISC is not set
+CONFIG_PCI_LEGACY_PROC=y
 CONFIG_PCI_NAMES=y
 # CONFIG_HOTPLUG is not set
 CONFIG_PROC_DEVICETREE=y
@@ -182,6 +184,11 @@ CONFIG_MD_RAID5=y
 # CONFIG_I2O is not set
 
 #
+# Networking support
+#
+CONFIG_NET=y
+
+#
 # Networking options
 #
 CONFIG_PACKET=y
@@ -233,10 +240,6 @@ CONFIG_IPV6_SCTP__=y
 # Network testing
 #
 # CONFIG_NET_PKTGEN is not set
-
-#
-# Network device support
-#
 CONFIG_NETDEVICES=y
 
 #
@@ -258,8 +261,6 @@ CONFIG_NET_ETHERNET=y
 # CONFIG_SUNGEM is not set
 CONFIG_NET_VENDOR_3COM=y
 CONFIG_VORTEX=y
-# CONFIG_NET_VENDOR_SMC is not set
-# CONFIG_NET_VENDOR_RACAL is not set
 
 #
 # Tulip family network device support
@@ -268,6 +269,7 @@ CONFIG_VORTEX=y
 # CONFIG_HP100 is not set
 CONFIG_NET_PCI=y
 CONFIG_PCNET32=y
+# CONFIG_AMD8111_ETH is not set
 # CONFIG_ADAPTEC_STARFIRE is not set
 # CONFIG_B44 is not set
 # CONFIG_DGRS is not set
@@ -283,7 +285,6 @@ CONFIG_E100=y
 # CONFIG_SUNDANCE is not set
 # CONFIG_TLAN is not set
 # CONFIG_VIA_RHINE is not set
-# CONFIG_NET_POCKET is not set
 
 #
 # Ethernet (1000 Mbit)
@@ -429,6 +430,11 @@ CONFIG_HVC_CONSOLE=y
 # CONFIG_QIC02_TAPE is not set
 
 #
+# IPMI
+#
+# CONFIG_IPMI_HANDLER is not set
+
+#
 # Watchdog Cards
 #
 # CONFIG_WATCHDOG is not set
@@ -516,6 +522,7 @@ CONFIG_NFSD_V3=y
 # CONFIG_NFSD_V4 is not set
 CONFIG_NFSD_TCP=y
 CONFIG_SUNRPC=y
+# CONFIG_SUNRPC_GSS is not set
 CONFIG_LOCKD=y
 CONFIG_LOCKD_V4=y
 CONFIG_EXPORTFS=y
@@ -580,6 +587,7 @@ CONFIG_FB=y
 # CONFIG_FB_CLGEN is not set
 # CONFIG_FB_PM2 is not set
 # CONFIG_FB_CYBER2000 is not set
+CONFIG_FB_OF=y
 # CONFIG_FB_CT65550 is not set
 # CONFIG_FB_IMSTT is not set
 # CONFIG_FB_S3TRIO is not set

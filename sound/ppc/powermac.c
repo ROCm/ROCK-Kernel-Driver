@@ -129,8 +129,10 @@ static int __init snd_pmac_probe(void)
 		goto __error;
 
 	chip->initialized = 1;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 	if (enable_beep)
 		snd_pmac_attach_beep(chip);
+#endif
 
 	if ((err = snd_card_register(card)) < 0)
 		goto __error;

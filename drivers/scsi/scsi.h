@@ -571,9 +571,8 @@ struct scsi_device {
 	struct Scsi_Host *host;
 	request_queue_t *request_queue;
 	volatile unsigned short device_busy;	/* commands actually active on low-level */
-	struct list_head free_cmnds;    /* list of available Scsi_Cmnd structs */
-	struct list_head busy_cmnds;    /* list of Scsi_Cmnd structs in use */
-	Scsi_Cmnd *device_queue;	/* queue of SCSI Command structures */
+	spinlock_t list_lock;
+	struct list_head cmd_list;	/* queue of in use SCSI Command structures */
         Scsi_Cmnd *current_cmnd;	/* currently active command */
 	unsigned short queue_depth;	/* How deep of a queue we want */
 	unsigned short last_queue_full_depth; /* These two are used by */
@@ -724,7 +723,6 @@ struct scsi_cmnd {
 	unsigned short state;
 	unsigned short owner;
 	Scsi_Request *sc_request;
-	struct scsi_cmnd *next;
 	struct scsi_cmnd *reset_chain;
 
 	struct list_head list;  /* scsi_cmnd participates in queue lists */

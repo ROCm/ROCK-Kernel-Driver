@@ -1379,24 +1379,16 @@ config SCSI_SEAGATE
 # definitely looks note 64bit safe:
 config SCSI_SIM710
 	tristate "Simple 53c710 SCSI support (Compaq, NCR machines)"
-	depends on (ISA || MCA && !X86_64) && SCSI
+	depends on (EISA || MCA && !X86_64) && SCSI
 	---help---
-	  This is a simple driver for NCR53c710 based SCSI host adapters.
+	  This driver for NCR53c710 based SCSI host adapters.
 
-	  More complex drivers for this chip are available ("NCR53c7,8xx SCSI
-	  support", above), but they require that the scsi chip be able to do
-	  DMA block moves between memory and on-chip registers, which can
-	  cause problems under certain conditions.  This driver is designed to
-	  avoid these problems and is intended to work with any Intel machines
-	  using 53c710 chips, including various Compaq and NCR machines.
+	  It currently supports Compaq EISA cards and NCR MCA cards
 
-	  Please read the comments at the top of the file
-	  <file:drivers/scsi/sim710.c> for more information.
-
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called sim710.o.
+config 53C700_IO_MAPPED
+	bool
+	depends on SCSI_SIM710
+	default y
 
 config SCSI_SYM53C416
 	tristate "Symbios 53c416 SCSI support"

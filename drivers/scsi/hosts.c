@@ -205,13 +205,15 @@ static int scsi_check_device_busy(struct scsi_device *sdev)
 {
 	struct Scsi_Host *shost = sdev->host;
 	struct scsi_cmnd *scmd;
+	unsigned long flags;
 
 	/*
 	 * Loop over all of the commands associated with the
 	 * device.  If any of them are busy, then set the state
 	 * back to inactive and bail.
 	 */
-	for (scmd = sdev->device_queue; scmd; scmd = scmd->next) {
+	spin_lock_irqsave(&sdev->list_lock, flags);
+	list_for_each_entry(scmd, &sdev->cmd_list, list) {
 		if (scmd->request && scmd->request->rq_status != RQ_INACTIVE)
 			goto active;
 
@@ -223,6 +225,7 @@ static int scsi_check_device_busy(struct scsi_device *sdev)
 		if (scmd->request)
 			scmd->request->rq_status = RQ_SCSI_DISCONNECTING;
 	}
+	spin_unlock_irqrestore(&sdev->list_lock, flags);
 
 	return 0;
 
@@ -233,12 +236,13 @@ active:
 			scmd->pid, scmd->state, scmd->owner);
 
 	list_for_each_entry(sdev, &shost->my_devices, siblings) {
-		for (scmd = sdev->device_queue; scmd; scmd = scmd->next) {
+		list_for_each_entry(scmd, &sdev->cmd_list, list) {
 			if (scmd->request->rq_status == RQ_SCSI_DISCONNECTING)
 				scmd->request->rq_status = RQ_INACTIVE;
 		}
 	}
 
+	spin_unlock_irqrestore(&sdev->list_lock, flags);
 	printk(KERN_ERR "Device busy???\n");
 	return 1;
 }

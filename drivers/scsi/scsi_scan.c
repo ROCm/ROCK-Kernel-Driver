@@ -449,6 +449,8 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 		sdev->online = TRUE;
 		INIT_LIST_HEAD(&sdev->siblings);
 		INIT_LIST_HEAD(&sdev->same_target_siblings);
+		INIT_LIST_HEAD(&sdev->cmd_list);
+		spin_lock_init(&sdev->list_lock);
 		/*
 		 * Some low level driver could use device->type
 		 */

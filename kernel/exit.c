@@ -254,6 +254,29 @@ void reparent_to_init(void)
 	write_unlock_irq(&tasklist_lock);
 }
 
+void __set_special_pids(pid_t session, pid_t pgrp)
+{
+	struct task_struct *curr = current;
+
+	if (curr->session != session) {
+		detach_pid(curr, PIDTYPE_SID);
+		curr->session = session;
+		attach_pid(curr, PIDTYPE_SID, session);
+	}
+	if (curr->pgrp != pgrp) {
+		detach_pid(curr, PIDTYPE_PGID);
+		curr->pgrp = pgrp;
+		attach_pid(curr, PIDTYPE_PGID, pgrp);
+	}
+}
+
+void set_special_pids(pid_t session, pid_t pgrp)
+{
+	write_lock_irq(&tasklist_lock);
+	__set_special_pids(session, pgrp);
+	write_unlock_irq(&tasklist_lock);
+}
+
 /*
  *	Put all the gunge required to become a kernel thread without
  *	attached user resources in one place where it belongs.
@@ -271,8 +294,7 @@ void daemonize(void)
 	 */
 	exit_mm(current);
 
-	current->session = 1;
-	current->pgrp = 1;
+	set_special_pids(1, 1);
 	current->tty = NULL;
 
 	/* Become as one with the init task */

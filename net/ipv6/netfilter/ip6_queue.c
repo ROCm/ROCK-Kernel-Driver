@@ -538,10 +538,10 @@ ipq_rcv_skb(struct sk_buff *skb)
 		
 	if (type <= IPQM_BASE)
 		return;
-		
-	if(!cap_raised(NETLINK_CB(skb).eff_cap, CAP_NET_ADMIN))
-		RCV_SKB_FAIL(-EPERM);
 	
+	if (security_netlink_recv(skb))
+		RCV_SKB_FAIL(-EPERM);	
+
 	write_lock_bh(&queue_lock);
 	
 	if (peer_pid) {

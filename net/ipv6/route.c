@@ -1548,14 +1548,14 @@ int inet6_rtm_getroute(struct sk_buff *in_skb, struct nlmsghdr* nlh, void *arg)
 {
 	struct rtattr **rta = arg;
 	int iif = 0;
-	int err;
+	int err = -ENOBUFS;
 	struct sk_buff *skb;
 	struct flowi fl;
 	struct rt6_info *rt;
 
 	skb = alloc_skb(NLMSG_GOODSIZE, GFP_KERNEL);
 	if (skb == NULL)
-		return -ENOBUFS;
+		goto out;
 
 	/* Reserve room for dummy headers, this skb can pass
 	   through good chunk of routing engine.
@@ -1579,8 +1579,10 @@ int inet6_rtm_getroute(struct sk_buff *in_skb, struct nlmsghdr* nlh, void *arg)
 	if (iif) {
 		struct net_device *dev;
 		dev = __dev_get_by_index(iif);
-		if (!dev)
-			return -ENODEV;
+		if (!dev) {
+			err = -ENODEV;
+			goto out_free;
+		}
 	}
 
 	fl.oif = 0;
@@ -1597,13 +1599,19 @@ int inet6_rtm_getroute(struct sk_buff *in_skb, struct nlmsghdr* nlh, void *arg)
 			    fl.nl_u.ip6_u.saddr,
 			    iif,
 			    RTM_NEWROUTE, NETLINK_CB(in_skb).pid, nlh->nlmsg_seq);
-	if (err < 0)
-		return -EMSGSIZE;
+	if (err < 0) {
+		err = -EMSGSIZE;
+		goto out_free;
+	}
 
 	err = netlink_unicast(rtnl, skb, NETLINK_CB(in_skb).pid, MSG_DONTWAIT);
-	if (err < 0)
-		return err;
-	return 0;
+	if (err > 0)
+		err = 0;
+out:
+	return err;
+out_free:
+	kfree_skb(skb);
+	goto out;	
 }
 
 void inet6_rt_notify(int event, struct rt6_info *rt)

@@ -136,6 +136,20 @@ static unsigned long get_stubs_size(const Elf64_Ehdr *hdr,
 	return relocs * sizeof(struct ppc64_stub_entry);
 }
 
+/* Undefined symbols which refer to .funcname, hack to funcname */
+static void dedotify(Elf64_Sym *syms, unsigned int numsyms, char *strtab)
+{
+	unsigned int i;
+
+	for (i = 1; i < numsyms; i++) {
+		if (syms[i].st_shndx == SHN_UNDEF) {
+			char *name = strtab + syms[i].st_name;
+			if (name[0] == '.')
+				memmove(name, name+1, strlen(name));
+		}
+	}
+}
+
 int module_frob_arch_sections(Elf64_Ehdr *hdr,
 			      Elf64_Shdr *sechdrs,
 			      char *secstrings,
@@ -143,7 +157,7 @@ int module_frob_arch_sections(Elf64_Ehdr *hdr,
 {
 	unsigned int i;
 
-	/* Find .toc and .stubs sections */
+	/* Find .toc and .stubs sections, symtab and strtab */
 	for (i = 1; i < hdr->e_shnum; i++) {
 		char *p;
 		if (strcmp(secstrings + sechdrs[i].sh_name, ".stubs") == 0)
@@ -154,6 +168,12 @@ int module_frob_arch_sections(Elf64_Ehdr *hdr,
 		/* We don't handle .init for the moment: rename to _init */
 		while ((p = strstr(secstrings + sechdrs[i].sh_name, ".init")))
 			p[0] = '_';
+
+		if (sechdrs[i].sh_type == SHT_SYMTAB)
+			dedotify((void *)hdr + sechdrs[i].sh_offset,
+				 sechdrs[i].sh_size / sizeof(Elf64_Sym),
+				 (void *)hdr
+				 + sechdrs[sechdrs[i].sh_link].sh_offset);
 	}
 	if (!me->arch.stubs_section || !me->arch.toc_section) {
 		printk("%s: doesn't contain .toc or .stubs.\n", me->name);
@@ -175,6 +195,14 @@ int apply_relocate(Elf64_Shdr *sechdrs,
 	return -ENOEXEC;
 }
 
+/* r2 is the TOC pointer: it actually points 0x8000 into the TOC (this
+   gives the value maximum span in an instruction which uses a signed
+   offset) */
+static inline unsigned long my_r2(Elf64_Shdr *sechdrs, struct module *me)
+{
+	return sechdrs[me->arch.toc_section].sh_addr + 0x8000;
+}
+
 /* Both low and high 16 bits are added as SIGNED additions, so if low
    16 bits has high bit set, high 16 bits must be adjusted.  These
    macros do that (stolen from binutils). */
@@ -183,10 +211,10 @@ int apply_relocate(Elf64_Shdr *sechdrs,
 #define PPC_HA(v) PPC_HI ((v) + 0x8000)
 
 /* Patch stub to reference function and correct r2 value. */
-static inline int create_stub(struct ppc64_stub_entry *entry,
-			      unsigned long my_r2,
-			      unsigned long func,
-			      unsigned long r2)
+static inline int create_stub(Elf64_Shdr *sechdrs,
+			      struct ppc64_stub_entry *entry,
+			      struct ppc64_opd_entry *opd,
+			      struct module *me)
 {
 	Elf64_Half *loc1, *loc2;
 	long reladdr;
@@ -196,71 +224,31 @@ static inline int create_stub(struct ppc64_stub_entry *entry,
 	loc1 = (Elf64_Half *)&entry->jump[2];
 	loc2 = (Elf64_Half *)&entry->jump[6];
 
-	/* Stub uses address relative to r2, which is set to the TOC +
-           0x8000. */
-	reladdr = (unsigned long)entry - my_r2;
+	/* Stub uses address relative to r2. */
+	reladdr = (unsigned long)entry - my_r2(sechdrs, me);
 	if (reladdr > 0x7FFFFFFF || reladdr < -(0x80000000L)) {
-		printk("Address %p of stub out of range of %p.\n",
-		       (void *)reladdr, (void *)my_r2);
+		printk("%s: Address %p of stub out of range of %p.\n",
+		       me->name, (void *)reladdr, (void *)my_r2);
 		return 0;
 	}
 	DEBUGP("Stub %p get data from reladdr %li\n", entry, reladdr);
 
 	*loc1 = PPC_HA(reladdr);
 	*loc2 = PPC_LO(reladdr);
-	entry->opd.funcaddr = func;
-	entry->opd.r2 = r2;
-
-	DEBUGP("Stub: %08X %08X %08X %08X %08X %08X %08X: %p %p\n",
-	       ((unsigned int *)entry->jump)[0],
-	       ((unsigned int *)entry->jump)[1],
-	       ((unsigned int *)entry->jump)[2],
-	       ((unsigned int *)entry->jump)[3],
-	       ((unsigned int *)entry->jump)[4],
-	       ((unsigned int *)entry->jump)[5],
-	       ((unsigned int *)entry->jump)[6],
-	       (void *)entry->opd.funcaddr,
-	       (void *)entry->opd.r2);
+	entry->opd.funcaddr = opd->funcaddr;
+	entry->opd.r2 = opd->r2;
 	return 1;
 }
 
-/* Given ".function" reference, return address of "function" opd entry */
-static struct ppc64_opd_entry *find_function(const char *name,
-					     Elf64_Shdr *sechdrs,
-					     unsigned int symindex,
-					     const char *strtab,
-					     struct module *me,
-					     struct kernel_symbol_group **ksg)
-{
-	unsigned long val;
-
-	if (name[0] != '.')
-		return 0;
-
-	val = find_symbol_internal(sechdrs, symindex, strtab, name+1, me, ksg);
-
-	DEBUGP("Function %s is at %p\n", name+1, (void *)val);
-	return (void *)val;
-}
-
-/* r2 is the TOC pointer: it actually points 0x8000 into the TOC (this
-   gives the value maximum span in an instruction which uses a signed
-   offset) */
-static inline unsigned long my_r2(Elf64_Shdr *sechdrs, struct module *me)
-{
-	return sechdrs[me->arch.toc_section].sh_addr + 0x8000;
-}
-
-/* Create stub for this OPD address */
+/* Create stub to jump to function described in this OPD: we need the
+   stub to set up the TOC ptr (r2) for the function. */
 static unsigned long stub_for_addr(Elf64_Shdr *sechdrs,
-				   unsigned long addr,
-				   unsigned long r2,
+				   unsigned long opdaddr,
 				   struct module *me)
 {
 	struct ppc64_stub_entry *stubs;
+	struct ppc64_opd_entry *opd = (void *)opdaddr;
 	unsigned int i, num_stubs;
-
-	DEBUGP("Looking for stub for %p\n", (void *)addr);
 
 	num_stubs = sechdrs[me->arch.stubs_section].sh_size / sizeof(*stubs);
 
@@ -269,50 +257,23 @@ static unsigned long stub_for_addr(Elf64_Shdr *sechdrs,
 	for (i = 0; stubs[i].opd.funcaddr; i++) {
 		BUG_ON(i >= num_stubs);
 
-		if (stubs[i].opd.funcaddr == addr) {
-			DEBUGP("Reusing stub %u (%p) for %p\n",
-			       i, &stubs[i], (void *)addr);
+		if (stubs[i].opd.funcaddr == opd->funcaddr)
 			return (unsigned long)&stubs[i];
-		}
 	}
-	DEBUGP("Here for %p\n", (void *)addr);
 
-	if (!create_stub(&stubs[i], my_r2(sechdrs, me), addr, r2))
-		return (unsigned long)-EINVAL;
-
-	DEBUGP("CREATED stub %u for %p\n", i, (void *)addr);
+	if (!create_stub(sechdrs, &stubs[i], opd, me))
+		return 0;
 
 	return (unsigned long)&stubs[i];
 }
 
-/* We need a stub to set the toc ptr when we make external calls. */
-static unsigned long do_stub_call(Elf64_Shdr *sechdrs,
-				  const char *strtab,
-				  unsigned int symindex,
-				  void *location,
-				  const char *funcname,
-				  struct module *me)
-{
-	struct ppc64_opd_entry *opd;
-	struct kernel_symbol_group *ksg;
-
-	DEBUGP("Doing stub for %lu (%s)\n",
-	       (unsigned long)location, funcname);
-	opd = find_function(funcname, sechdrs, symindex, strtab, me, &ksg);
-	if (!opd) {
-		printk("%s: Can't find function `%s'\n", me->name, funcname);
-		return (unsigned long)-ENOENT;
-	}
-
-	return stub_for_addr(sechdrs, opd->funcaddr, opd->r2, me);
-}
-
 /* We expect a noop next: if it is, replace it with instruction to
    restore r2. */
-static int restore_r2(u32 *instruction)
+static int restore_r2(u32 *instruction, struct module *me)
 {
 	if (*instruction != 0x60000000) {
-		printk("Expect noop after relocate, got %08x\n", *instruction);
+		printk("%s: Expect noop after relocate, got %08x\n",
+		       me->name, *instruction);
 		return 0;
 	}
 	*instruction = 0xe8410028;	/* ld r2,40(r1) */
@@ -346,31 +307,18 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 		       strtab + sym->st_name, (unsigned long)sym->st_value,
 		       (long)rela[i].r_addend);
 
-		/* REL24 references to (external) .function won't
-                   resolve; deal with that below */
-		if (!sym->st_value
-		    && ELF64_R_TYPE(rela[i].r_info) != R_PPC_REL24) {
-			printk("%s: Unknown symbol %s (index %u)\n",
-			       me->name, strtab + sym->st_name,
-			       sym->st_shndx);
-			return -ENOENT;
-		}
 		/* `Everything is relative'. */
 		value = sym->st_value + rela[i].r_addend;
 
 		switch (ELF64_R_TYPE(rela[i].r_info)) {
 		case R_PPC64_ADDR32:
 			/* Simply set it */
-			DEBUGP("Setting location %p to 32-bit value %u\n",
-			       location, (unsigned int)value);
 			*(u32 *)location = value;
 			break;
 			
 		case R_PPC64_ADDR64:
 			/* Simply set it */
 			*(unsigned long *)location = value;
-			DEBUGP("Setting location %p to 64-bit value %p\n",
-			       location, (void *)value);
 			break;
 
 		case R_PPC64_TOC:
@@ -381,37 +329,31 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 			/* Subtact TOC pointer */
 			value -= my_r2(sechdrs, me);
 			if ((value & 3) != 0 || value + 0x8000 > 0xffff) {
-				DEBUGP("%s: bad TOC16_DS relocation (%lu)\n",
+				printk("%s: bad TOC16_DS relocation (%lu)\n",
 				       me->name, value);
 				return -ENOEXEC;
 			}
 			*((uint16_t *) location)
 				= (*((uint16_t *) location) & ~0xfffc)
 				| (value & 0xfffc);
-			DEBUGP("Modifying location %p by TOC (%p) => %i\n",
-			       location, 
-			       (void *)my_r2(sechdrs, me),
-			       *(uint16_t *)location);
 			break;
 
 		case R_PPC_REL24:
 			/* FIXME: Handle weak symbols here --RR */
 			if (sym->st_shndx == SHN_UNDEF) {
-				value = do_stub_call(sechdrs, strtab,
-						     symindex, location,
-						     strtab+sym->st_name, me);
-				if (IS_ERR((void *)value))
-					return value;
-				value += rela[i].r_addend;
-				if (!restore_r2((u32 *)location + 1))
+				/* External: go via stub */
+				value = stub_for_addr(sechdrs, value, me);
+				if (!value)
+					return -ENOENT;
+				if (!restore_r2((u32 *)location + 1, me))
 					return -ENOEXEC;
 			}
 
 			/* Convert value to relative */
 			value -= (unsigned long)location;
 			if (value + 0x2000000 > 0x3ffffff || (value & 3) != 0){
-				printk("REL24 relocation %li out of range!\n",
-				       (long int)value);
+				printk("%s: REL24 %li out of range!\n",
+				       me->name, (long int)value);
 				return -ENOEXEC;
 			}
 
@@ -422,7 +364,8 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 			break;
 
 		default:
-			printk("Unknown ADD relocation: %lu\n",
+			printk("%s: Unknown ADD relocation: %lu\n",
+			       me->name,
 			       (unsigned long)ELF64_R_TYPE(rela[i].r_info));
 			return -ENOEXEC;
 		}
@@ -439,25 +382,6 @@ int module_finalize(const Elf_Ehdr *hdr,
 		    const Elf_Shdr *sechdrs,
 		    struct module *me)
 {
-	struct ppc64_stub_entry *stubs;
-	unsigned int i;
-
-	/* Here is where we copy the OPD entry into the stub: we don't
-           do it ealier in case it's actually in the same module, and
-           hasn't been relocated yet. */
-	stubs = (void *)sechdrs[me->arch.stubs_section].sh_addr;
-	for (i = 0; stubs[i].opd.funcaddr; i++) {
-		struct ppc64_opd_entry *opd;
-
-		/* We mark opd pointers by setting r2 to 0: otherwise
-                   it's a function pointer already. */
-		if (stubs[i].opd.r2 == 0) {
-			/* We put the opd entry ptr in the funcaddr member. */
-			opd = (void *)stubs[i].opd.funcaddr;
-			stubs[i].opd = *opd;
-		}
-	}
-
 	sort_ex_table(me->extable.entry,
 		      me->extable.entry + me->extable.num_entries);
 	return 0;

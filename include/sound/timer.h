@@ -23,6 +23,7 @@
  */
 
 #include <sound/asound.h>
+#include <linux/interrupt.h>
 
 typedef enum sndrv_timer_class snd_timer_class_t;
 typedef enum sndrv_timer_slave_class snd_timer_slave_class_t;

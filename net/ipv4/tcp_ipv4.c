@@ -1697,12 +1697,6 @@ static int tcp_v4_checksum_init(struct sk_buff *skb)
  */
 int tcp_v4_do_rcv(struct sock *sk, struct sk_buff *skb)
 {
-#ifdef CONFIG_FILTER
-	struct sk_filter *filter = sk->filter;
-	if (filter && sk_filter(skb, filter))
-		goto discard;
-#endif /* CONFIG_FILTER */
-
 	if (sk->state == TCP_ESTABLISHED) { /* Fast path */
 		TCP_CHECK_TIMER(sk);
 		if (tcp_rcv_established(sk, skb, skb->h.th, skb->len))
@@ -1803,6 +1797,9 @@ process:
 		goto do_time_wait;
 
 	if (!xfrm_policy_check(sk, XFRM_POLICY_IN, skb))
+		goto discard_and_relse;
+
+	if (sk_filter(sk, skb, 0))
 		goto discard_and_relse;
 
 	skb->dev = NULL;

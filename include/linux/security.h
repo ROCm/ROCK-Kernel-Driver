@@ -31,7 +31,8 @@
 #include <linux/shm.h>
 #include <linux/msg.h>
 #include <linux/sched.h>
-
+#include <linux/skbuff.h>
+#include <linux/netlink.h>
 
 /*
  * These functions are in security/capability.c and are used
@@ -48,6 +49,20 @@ extern int cap_task_post_setuid (uid_t old_ruid, uid_t old_euid, uid_t old_suid,
 extern void cap_task_kmod_set_label (void);
 extern void cap_task_reparent_to_init (struct task_struct *p);
 
+static inline int cap_netlink_send (struct sk_buff *skb)
+{
+	NETLINK_CB (skb).eff_cap = current->cap_effective;
+	return 0;
+}
+
+static inline int cap_netlink_recv (struct sk_buff *skb)
+{
+	if (!cap_raised (NETLINK_CB (skb).eff_cap, CAP_NET_ADMIN))
+		return -EPERM;
+	return 0;
+}
+
+
 /*
  * Values used in the task_security_ops calls
  */
@@ -63,15 +78,12 @@ extern void cap_task_reparent_to_init (struct task_struct *p);
 /* setfsuid or setfsgid, id0 == fsuid or fsgid */
 #define LSM_SETID_FS	8
 
-
-#ifdef CONFIG_SECURITY
-
 /* forward declares to avoid warnings */
-struct sk_buff;
-struct net_device;
 struct nfsctl_arg;
 struct sched_param;
 struct swap_info_struct;
+
+#ifdef CONFIG_SECURITY
 
 /**
  * struct security_operations - main security structure
@@ -586,6 +598,149 @@ struct swap_info_struct;
  * 	is being reparented to the init task.
  *	@p contains the task_struct for the kernel thread.
  *
+ * Security hooks for Netlink messaging.
+ *
+ * @netlink_send:
+ *	Save security information for a netlink message so that permission
+ *	checking can be performed when the message is processed.  The security
+ *	information can be saved using the eff_cap field of the
+ *      netlink_skb_parms structure.
+ *	@skb contains the sk_buff structure for the netlink message.
+ *	Return 0 if the information was successfully saved.
+ * @netlink_recv:
+ *	Check permission before processing the received netlink message in
+ *	@skb.
+ *	@skb contains the sk_buff structure for the netlink message.
+ *	Return 0 if permission is granted.
+ *
+ * Security hooks for Unix domain networking.
+ *
+ * @unix_stream_connect:
+ *	Check permissions before establishing a Unix domain stream connection
+ *	between @sock and @other.
+ *	@sock contains the socket structure.
+ *	@other contains the peer socket structure.
+ *	Return 0 if permission is granted.
+ * @unix_may_send:
+ *	Check permissions before connecting or sending datagrams from @sock to
+ *	@other.
+ *	@sock contains the socket structure.
+ *	@sock contains the peer socket structure.
+ *	Return 0 if permission is granted.
+ *
+ * The @unix_stream_connect and @unix_may_send hooks were necessary because
+ * Linux provides an alternative to the conventional file name space for Unix
+ * domain sockets.  Whereas binding and connecting to sockets in the file name
+ * space is mediated by the typical file permissions (and caught by the mknod
+ * and permission hooks in inode_security_ops), binding and connecting to
+ * sockets in the abstract name space is completely unmediated.  Sufficient
+ * control of Unix domain sockets in the abstract name space isn't possible
+ * using only the socket layer hooks, since we need to know the actual target
+ * socket, which is not looked up until we are inside the af_unix code.
+ *
+ * Security hooks for socket operations.
+ *
+ * @socket_create:
+ *	Check permissions prior to creating a new socket.
+ *	@family contains the requested protocol family.
+ *	@type contains the requested communications type.
+ *	@protocol contains the requested protocol.
+ *	Return 0 if permission is granted.
+ * @socket_post_create:
+ *	This hook allows a module to update or allocate a per-socket security
+ *	structure. Note that the security field was not added directly to the
+ *	socket structure, but rather, the socket security information is stored
+ *	in the associated inode.  Typically, the inode alloc_security hook will
+ *	allocate and and attach security information to
+ *	sock->inode->i_security.  This hook may be used to update the
+ *	sock->inode->i_security field with additional information that wasn't
+ *	available when the inode was allocated.
+ *	@sock contains the newly created socket structure.
+ *	@family contains the requested protocol family.
+ *	@type contains the requested communications type.
+ *	@protocol contains the requested protocol.
+ * @socket_bind:
+ *	Check permission before socket protocol layer bind operation is
+ *	performed and the socket @sock is bound to the address specified in the
+ *	@address parameter.
+ *	@sock contains the socket structure.
+ *	@address contains the address to bind to.
+ *	@addrlen contains the length of address.
+ *	Return 0 if permission is granted.  
+ * @socket_connect:
+ *	Check permission before socket protocol layer connect operation
+ *	attempts to connect socket @sock to a remote address, @address.
+ *	@sock contains the socket structure.
+ *	@address contains the address of remote endpoint.
+ *	@addrlen contains the length of address.
+ *	Return 0 if permission is granted.  
+ * @socket_listen:
+ *	Check permission before socket protocol layer listen operation.
+ *	@sock contains the socket structure.
+ *	@backlog contains the maximum length for the pending connection queue.
+ *	Return 0 if permission is granted.
+ * @socket_accept:
+ *	Check permission before accepting a new connection.  Note that the new
+ *	socket, @newsock, has been created and some information copied to it,
+ *	but the accept operation has not actually been performed.
+ *	@sock contains the listening socket structure.
+ *	@newsock contains the newly created server socket for connection.
+ *	Return 0 if permission is granted.
+ * @socket_post_accept:
+ *	This hook allows a security module to copy security
+ *	information into the newly created socket's inode.
+ *	@sock contains the listening socket structure.
+ *	@newsock contains the newly created server socket for connection.
+ * @socket_sendmsg:
+ *	Check permission before transmitting a message to another socket.
+ *	@sock contains the socket structure.
+ *	@msg contains the message to be transmitted.
+ *	@size contains the size of message.
+ *	Return 0 if permission is granted.
+ * @socket_recvmsg:
+ *	Check permission before receiving a message from a socket.
+ *	@sock contains the socket structure.
+ *	@msg contains the message structure.
+ *	@size contains the size of message structure.
+ *	@flags contains the operational flags.
+ *	Return 0 if permission is granted.  
+ * @socket_getsockname:
+ *	Check permission before the local address (name) of the socket object
+ *	@sock is retrieved.
+ *	@sock contains the socket structure.
+ *	Return 0 if permission is granted.
+ * @socket_getpeername:
+ *	Check permission before the remote address (name) of a socket object
+ *	@sock is retrieved.
+ *	@sock contains the socket structure.
+ *	Return 0 if permission is granted.
+ * @socket_getsockopt:
+ *	Check permissions before retrieving the options associated with socket
+ *	@sock.
+ *	@sock contains the socket structure.
+ *	@level contains the protocol level to retrieve option from.
+ *	@optname contains the name of option to retrieve.
+ *	Return 0 if permission is granted.
+ * @socket_setsockopt:
+ *	Check permissions before setting the options associated with socket
+ *	@sock.
+ *	@sock contains the socket structure.
+ *	@level contains the protocol level to set options for.
+ *	@optname contains the name of the option to set.
+ *	Return 0 if permission is granted.  
+ * @socket_shutdown:
+ *	Checks permission before all or part of a connection on the socket
+ *	@sock is shut down.
+ *	@sock contains the socket structure.
+ *	@how contains the flag indicating how future sends and receives are handled.
+ *	Return 0 if permission is granted.
+ * @socket_sock_rcv_skb:
+ *	Check permissions on incoming network packets.  This hook is distinct
+ *	from Netfilter's IP input hooks since it is the first time that the
+ *	incoming sk_buff @skb has been associated with a particular socket, @sk.
+ *	@sk contains the sock (not socket) associated with the incoming sk_buff.
+ *	@skb contains the incoming network data.
+ *
  * Security hooks affecting all System V IPC operations.
  *
  * @ipc_permission:
@@ -947,11 +1102,42 @@ struct security_operations {
 	int (*sem_semop) (struct sem_array * sma, 
 			  struct sembuf * sops, unsigned nsops, int alter);
 
+	int (*netlink_send) (struct sk_buff * skb);
+	int (*netlink_recv) (struct sk_buff * skb);
+
 	/* allow module stacking */
 	int (*register_security) (const char *name,
 	                          struct security_operations *ops);
 	int (*unregister_security) (const char *name,
 	                            struct security_operations *ops);
+
+#ifdef CONFIG_SECURITY_NETWORK
+	int (*unix_stream_connect) (struct socket * sock,
+				    struct socket * other, struct sock * newsk);
+	int (*unix_may_send) (struct socket * sock, struct socket * other);
+
+	int (*socket_create) (int family, int type, int protocol);
+	void (*socket_post_create) (struct socket * sock, int family,
+				    int type, int protocol);
+	int (*socket_bind) (struct socket * sock,
+			    struct sockaddr * address, int addrlen);
+	int (*socket_connect) (struct socket * sock,
+			       struct sockaddr * address, int addrlen);
+	int (*socket_listen) (struct socket * sock, int backlog);
+	int (*socket_accept) (struct socket * sock, struct socket * newsock);
+	void (*socket_post_accept) (struct socket * sock,
+				    struct socket * newsock);
+	int (*socket_sendmsg) (struct socket * sock,
+			       struct msghdr * msg, int size);
+	int (*socket_recvmsg) (struct socket * sock,
+			       struct msghdr * msg, int size, int flags);
+	int (*socket_getsockname) (struct socket * sock);
+	int (*socket_getpeername) (struct socket * sock);
+	int (*socket_getsockopt) (struct socket * sock, int level, int optname);
+	int (*socket_setsockopt) (struct socket * sock, int level, int optname);
+	int (*socket_shutdown) (struct socket * sock, int how);
+	int (*socket_sock_rcv_skb) (struct sock * sk, struct sk_buff * skb);
+#endif	/* CONFIG_SECURITY_NETWORK */
 };
 
 /* global variables */
@@ -1543,6 +1729,16 @@ static inline int security_sem_semop (struct sem_array * sma,
 	return security_ops->sem_semop(sma, sops, nsops, alter);
 }
 
+static inline int security_netlink_send(struct sk_buff * skb)
+{
+	return security_ops->netlink_send(skb);
+}
+
+static inline int security_netlink_recv(struct sk_buff * skb)
+{
+	return security_ops->netlink_recv(skb);
+}
+
 /* prototypes */
 extern int security_scaffolding_startup	(void);
 extern int register_security	(struct security_operations *ops);
@@ -2104,7 +2300,228 @@ static inline int security_sem_semop (struct sem_array * sma,
 	return 0;
 }
 
+/*
+ * The netlink capability defaults need to be used inline by default
+ * (rather than hooking into the capability module) to reduce overhead
+ * in the networking code.
+ */
+static inline int security_netlink_send (struct sk_buff *skb)
+{
+	return cap_netlink_send (skb);
+}
+
+static inline int security_netlink_recv (struct sk_buff *skb)
+{
+	return cap_netlink_recv (skb);
+}
+
 #endif	/* CONFIG_SECURITY */
+
+#ifdef CONFIG_SECURITY_NETWORK
+static inline int security_unix_stream_connect(struct socket * sock,
+					       struct socket * other, 
+					       struct sock * newsk)
+{
+	return security_ops->unix_stream_connect(sock, other, newsk);
+}
+
+
+static inline int security_unix_may_send(struct socket * sock, 
+					 struct socket * other)
+{
+	return security_ops->unix_may_send(sock, other);
+}
+
+static inline int security_socket_create (int family, int type, int protocol)
+{
+	return security_ops->socket_create(family, type, protocol);
+}
+
+static inline void security_socket_post_create(struct socket * sock, 
+					       int family,
+					       int type, 
+					       int protocol)
+{
+	security_ops->socket_post_create(sock, family, type, protocol);
+}
+
+static inline int security_socket_bind(struct socket * sock, 
+				       struct sockaddr * address, 
+				       int addrlen)
+{
+	return security_ops->socket_bind(sock, address, addrlen);
+}
+
+static inline int security_socket_connect(struct socket * sock, 
+					  struct sockaddr * address, 
+					  int addrlen)
+{
+	return security_ops->socket_connect(sock, address, addrlen);
+}
+
+static inline int security_socket_listen(struct socket * sock, int backlog)
+{
+	return security_ops->socket_listen(sock, backlog);
+}
+
+static inline int security_socket_accept(struct socket * sock, 
+					 struct socket * newsock)
+{
+	return security_ops->socket_accept(sock, newsock);
+}
+
+static inline void security_socket_post_accept(struct socket * sock, 
+					       struct socket * newsock)
+{
+	security_ops->socket_post_accept(sock, newsock);
+}
+
+static inline int security_socket_sendmsg(struct socket * sock, 
+					  struct msghdr * msg, int size)
+{
+	return security_ops->socket_sendmsg(sock, msg, size);
+}
+
+static inline int security_socket_recvmsg(struct socket * sock, 
+					  struct msghdr * msg, int size, 
+					  int flags)
+{
+	return security_ops->socket_recvmsg(sock, msg, size, flags);
+}
+
+static inline int security_socket_getsockname(struct socket * sock)
+{
+	return security_ops->socket_getsockname(sock);
+}
+
+static inline int security_socket_getpeername(struct socket * sock)
+{
+	return security_ops->socket_getpeername(sock);
+}
+
+static inline int security_socket_getsockopt(struct socket * sock, 
+					     int level, int optname)
+{
+	return security_ops->socket_getsockopt(sock, level, optname);
+}
+
+static inline int security_socket_setsockopt(struct socket * sock, 
+					     int level, int optname)
+{
+	return security_ops->socket_setsockopt(sock, level, optname);
+}
+
+static inline int security_socket_shutdown(struct socket * sock, int how)
+{
+	return security_ops->socket_shutdown(sock, how);
+}
+
+static inline int security_sock_rcv_skb (struct sock * sk, 
+					 struct sk_buff * skb)
+{
+	return security_ops->socket_sock_rcv_skb (sk, skb);
+}
+#else	/* CONFIG_SECURITY_NETWORK */
+static inline int security_unix_stream_connect(struct socket * sock,
+					       struct socket * other, 
+					       struct sock * newsk)
+{
+	return 0;
+}
+
+static inline int security_unix_may_send(struct socket * sock, 
+					 struct socket * other)
+{
+	return 0;
+}
+
+static inline int security_socket_create (int family, int type, int protocol)
+{
+	return 0;
+}
+
+static inline void security_socket_post_create(struct socket * sock, 
+					       int family,
+					       int type, 
+					       int protocol)
+{
+}
+
+static inline int security_socket_bind(struct socket * sock, 
+				       struct sockaddr * address, 
+				       int addrlen)
+{
+	return 0;
+}
+
+static inline int security_socket_connect(struct socket * sock, 
+					  struct sockaddr * address, 
+					  int addrlen)
+{
+	return 0;
+}
+
+static inline int security_socket_listen(struct socket * sock, int backlog)
+{
+	return 0;
+}
+
+static inline int security_socket_accept(struct socket * sock, 
+					 struct socket * newsock)
+{
+	return 0;
+}
+
+static inline void security_socket_post_accept(struct socket * sock, 
+					       struct socket * newsock)
+{
+}
+
+static inline int security_socket_sendmsg(struct socket * sock, 
+					  struct msghdr * msg, int size)
+{
+	return 0;
+}
+
+static inline int security_socket_recvmsg(struct socket * sock, 
+					  struct msghdr * msg, int size, 
+					  int flags)
+{
+	return 0;
+}
+
+static inline int security_socket_getsockname(struct socket * sock)
+{
+	return 0;
+}
+
+static inline int security_socket_getpeername(struct socket * sock)
+{
+	return 0;
+}
+
+static inline int security_socket_getsockopt(struct socket * sock, 
+					     int level, int optname)
+{
+	return 0;
+}
+
+static inline int security_socket_setsockopt(struct socket * sock, 
+					     int level, int optname)
+{
+	return 0;
+}
+
+static inline int security_socket_shutdown(struct socket * sock, int how)
+{
+	return 0;
+}
+static inline int security_sock_rcv_skb (struct sock * sk, 
+					 struct sk_buff * skb)
+{
+	return 0;
+}
+#endif	/* CONFIG_SECURITY_NETWORK */
 
 #endif /* ! __LINUX_SECURITY_H */
 

@@ -77,4 +77,11 @@ struct compat_statfs {
 	int		f_spare[6];
 };
 
+typedef u32		compat_old_sigset_t;
+
+#define _COMPAT_NSIG		64
+#define _COMPAT_NSIG_BPW	32
+
+typedef u32		compat_sigset_word;
+
 #endif /* _ASM_PPC64_COMPAT_H */

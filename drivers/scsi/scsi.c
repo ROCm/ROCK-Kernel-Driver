@@ -403,12 +403,17 @@ struct scsi_cmnd *scsi_get_command(struct scsi_device *dev, int gfp_mask)
 	struct scsi_cmnd *cmd = __scsi_get_command(dev->host, gfp_mask);
 
 	if (likely(cmd != NULL)) {
+		unsigned long flags;
+
 		memset(cmd, 0, sizeof(*cmd));
 		cmd->device = dev;
 		cmd->state = SCSI_STATE_UNUSED;
 		cmd->owner = SCSI_OWNER_NOBODY;
 		init_timer(&cmd->eh_timeout);
 		INIT_LIST_HEAD(&cmd->list);
+		spin_lock_irqsave(&dev->list_lock, flags);
+		list_add_tail(&cmd->list, &dev->cmd_list);
+		spin_unlock_irqrestore(&dev->list_lock, flags);
 	}
 
 	return cmd;
@@ -430,7 +435,13 @@ void scsi_put_command(struct scsi_cmnd *cmd)
 	struct Scsi_Host *shost = cmd->device->host;
 	unsigned long flags;
 	
-	spin_lock_irqsave(&shost->free_list_lock, flags);
+	/* serious error if the command hasn't come from a device list */
+	spin_lock_irqsave(&cmd->device->list_lock, flags);
+	BUG_ON(list_empty(&cmd->list));
+	list_del_init(&cmd->list);
+	spin_unlock(&cmd->device->list_lock);
+	/* changing locks here, don't need to restore the irq state */
+	spin_lock(&shost->free_list_lock);
 	if (unlikely(list_empty(&shost->free_list))) {
 		list_add(&cmd->list, &shost->free_list);
 		cmd = NULL;

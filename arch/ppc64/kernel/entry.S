@@ -57,6 +57,7 @@ show_syscalls_task:
  * Handle a system call.
  */
 _GLOBAL(DoSyscall)
+	std	r3,ORIG_GPR3(r1)
 	ld	r11,_CCR(r1)	/* Clear SO bit in CR */
 	lis	r10,0x1000
 	andc	r11,r11,r10
@@ -226,6 +227,10 @@ _GLOBAL(ppc32_sigreturn)
 
 _GLOBAL(ppc32_rt_sigreturn)
 	bl	.sys32_rt_sigreturn
+	b	80f
+
+_GLOBAL(ppc64_sigreturn)
+	bl	.sys_sigreturn
 	b	80f
 
 _GLOBAL(ppc64_rt_sigreturn)

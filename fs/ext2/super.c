@@ -673,7 +673,7 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 		if(!bh) {
 			printk("EXT2-fs: Couldn't read superblock on "
 			       "2nd try.\n");
-			goto failed_mount;
+			goto failed_sbi;
 		}
 		es = (struct ext2_super_block *) (((char *)bh->b_data) + offset);
 		sbi->s_es = es;

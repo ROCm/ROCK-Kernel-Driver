@@ -23,9 +23,10 @@ obj-$(CONFIG_PPC_PSERIES) += pSeries_pci.o pSeries_lpar.o pSeries_hvCall.o \
 
 # Change this to pSeries only once we've got iSeries up to date
 obj-y			  += open_pic.o xics.o pSeries_htab.o rtas.o \
-			     rtas-proc.o chrp_setup.o i8259.o ras.o prom.o 
+			     chrp_setup.o i8259.o ras.o prom.o 
 
 obj-$(CONFIG_RTAS_FLASH)	+= rtas_flash.o
 obj-$(CONFIG_SMP)		+= smp.o
 obj-$(CONFIG_PROFILING)		+= profile.o
 obj-$(CONFIG_MODULES)		+= module.o ppc_ksyms.o
+obj-$(CONFIG_PPC_RTAS)		+= rtas-proc.o
