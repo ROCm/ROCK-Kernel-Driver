@@ -55,6 +55,7 @@ MODULE_PARM_DESC(resetafter, "Reset device after so many bad packets (0 = never)
 PSMOUSE_DEFINE_ATTR(rate);
 PSMOUSE_DEFINE_ATTR(resolution);
 PSMOUSE_DEFINE_ATTR(resetafter);
+PSMOUSE_DEFINE_ATTR(proto);
 
 __obsolete_setup("psmouse_noext");
 __obsolete_setup("psmouse_resolution=");
@@ -63,6 +64,7 @@ __obsolete_setup("psmouse_resetafter=");
 __obsolete_setup("psmouse_rate=");
 
 static char *psmouse_protocols[] = { "None", "PS/2", "PS2++", "ThinkPS/2", "GenPS/2", "ImPS/2", "ImExPS/2", "SynPS/2", "AlpsPS/2" };
+static char *psmouse_proto_abbrev[] = { NULL, "bare", NULL, NULL, NULL, "imps", "exps", NULL, NULL, NULL };
 
 /*
  * psmouse_process_byte() analyzes the PS/2 data stream and reports
@@ -413,8 +415,7 @@ static int ps2bare_detect(struct psmouse *psmouse, int set_properties)
  * the mouse may have.
  */
 
-static int psmouse_extensions(struct psmouse *psmouse,
-			      unsigned int max_proto, int set_properties)
+static int psmouse_extensions(struct psmouse *psmouse, int set_properties)
 {
 	int synaptics_hardware = 0;
 
@@ -423,16 +424,16 @@ static int psmouse_extensions(struct psmouse *psmouse,
  * upsets the thinkingmouse).
  */
 
-	if (max_proto > PSMOUSE_IMEX && thinking_detect(psmouse, set_properties) == 0)
+	if (psmouse_max_proto > PSMOUSE_IMEX && thinking_detect(psmouse, set_properties) == 0)
 		return PSMOUSE_THINKPS;
 
 /*
  * Try Synaptics TouchPad
  */
-	if (max_proto > PSMOUSE_PS2 && synaptics_detect(psmouse, set_properties) == 0) {
+	if (psmouse_max_proto > PSMOUSE_PS2 && synaptics_detect(psmouse, set_properties) == 0) {
 		synaptics_hardware = 1;
 
-		if (max_proto > PSMOUSE_IMEX) {
+		if (psmouse_max_proto > PSMOUSE_IMEX) {
 			if (!set_properties || synaptics_init(psmouse) == 0)
 				return PSMOUSE_SYNAPTICS;
 /*
@@ -440,7 +441,7 @@ static int psmouse_extensions(struct psmouse *psmouse,
  * Unfortunately Logitech/Genius probes confuse some firmware versions so
  * we'll have to skip them.
  */
-			max_proto = PSMOUSE_IMEX;
+			psmouse_max_proto = PSMOUSE_IMEX;
 		}
 /*
  * Make sure that touchpad is in relative mode, gestures (taps) are enabled
@@ -451,7 +452,7 @@ static int psmouse_extensions(struct psmouse *psmouse,
 /*
  * Try ALPS TouchPad
  */
-	if (max_proto > PSMOUSE_IMEX) {
+	if (psmouse_max_proto > PSMOUSE_IMEX) {
 		ps2_command(&psmouse->ps2dev, NULL, PSMOUSE_CMD_RESET_DIS);
 		if (alps_detect(psmouse, set_properties) == 0) {
 			if (!set_properties || alps_init(psmouse) == 0)
@@ -459,14 +460,14 @@ static int psmouse_extensions(struct psmouse *psmouse,
 /*
  * Init failed, try basic relative protocols
  */
-			max_proto = PSMOUSE_IMEX;
+			psmouse_max_proto = PSMOUSE_IMEX;
 		}
 	}
 
-	if (max_proto > PSMOUSE_IMEX && genius_detect(psmouse, set_properties) == 0)
+	if (psmouse_max_proto > PSMOUSE_IMEX && genius_detect(psmouse, set_properties) == 0)
 		return PSMOUSE_GENPS;
 
-	if (max_proto > PSMOUSE_IMEX && ps2pp_init(psmouse, set_properties) == 0)
+	if (psmouse_max_proto > PSMOUSE_IMEX && ps2pp_init(psmouse, set_properties) == 0)
 		return PSMOUSE_PS2PP;
 
 /*
@@ -475,10 +476,10 @@ static int psmouse_extensions(struct psmouse *psmouse,
  */
 	ps2_command(&psmouse->ps2dev, NULL, PSMOUSE_CMD_RESET_DIS);
 
-	if (max_proto >= PSMOUSE_IMEX && im_explorer_detect(psmouse, set_properties) == 0)
+	if (psmouse_max_proto >= PSMOUSE_IMEX && im_explorer_detect(psmouse, set_properties) == 0)
 		return PSMOUSE_IMEX;
 
-	if (max_proto >= PSMOUSE_IMPS && intellimouse_detect(psmouse, set_properties) == 0)
+	if (psmouse_max_proto >= PSMOUSE_IMPS && intellimouse_detect(psmouse, set_properties) == 0)
 		return PSMOUSE_IMPS;
 
 /*
@@ -650,6 +651,7 @@ static void psmouse_disconnect(struct serio *serio)
 	device_remove_file(&serio->dev, &psmouse_attr_rate);
 	device_remove_file(&serio->dev, &psmouse_attr_resolution);
 	device_remove_file(&serio->dev, &psmouse_attr_resetafter);
+	device_remove_file(&serio->dev, &psmouse_attr_proto);
 
 	psmouse = serio_get_drvdata(serio);
 	psmouse_set_state(psmouse, PSMOUSE_CMD_MODE);
@@ -731,7 +733,7 @@ static int psmouse_connect(struct serio *serio, struct serio_driver *drv)
 	psmouse->protocol_handler = psmouse_process_byte;
 	psmouse->pktsize = 3;
 
-	psmouse->type = psmouse_extensions(psmouse, psmouse_max_proto, 1);
+	psmouse->type = psmouse_extensions(psmouse, 1);
 
 	sprintf(psmouse->devname, "%s %s %s",
 		psmouse_protocols[psmouse->type], psmouse->vendor, psmouse->name);
@@ -757,6 +759,7 @@ static int psmouse_connect(struct serio *serio, struct serio_driver *drv)
 	device_create_file(&serio->dev, &psmouse_attr_rate);
 	device_create_file(&serio->dev, &psmouse_attr_resolution);
 	device_create_file(&serio->dev, &psmouse_attr_resetafter);
+	device_create_file(&serio->dev, &psmouse_attr_proto);
 
 	psmouse_activate(psmouse);
 
@@ -794,7 +797,7 @@ static int psmouse_reconnect(struct serio *serio)
 		if (psmouse->reconnect(psmouse))
 			goto out;
 	} else if (psmouse_probe(psmouse) < 0 ||
-		   psmouse->type != psmouse_extensions(psmouse, psmouse_max_proto, 0))
+		   psmouse->type != psmouse_extensions(psmouse, 0))
 		goto out;
 
 	/* ok, the device type (and capabilities) match the old one,
@@ -848,6 +851,19 @@ static struct serio_driver psmouse_drv = {
 	.disconnect	= psmouse_disconnect,
 	.cleanup	= psmouse_cleanup,
 };
+
+static inline int psmouse_parse_proto(const char *name)
+{
+	int i;
+
+	if (name)
+		for (i = 0; i < ARRAY_SIZE(psmouse_proto_abbrev); i++)
+			if (psmouse_proto_abbrev[i] &&
+				!strncmp(name, psmouse_proto_abbrev[i],
+				strlen(psmouse_proto_abbrev[i])))
+					return i;
+	return -1U;
+}
 
 ssize_t psmouse_attr_show_helper(struct device *dev, char *buf,
 				 ssize_t (*handler)(struct psmouse *, char *))
@@ -959,23 +975,23 @@ static ssize_t psmouse_attr_set_resetafter(struct psmouse *psmouse, const char *
 	return count;
 }
 
-static inline void psmouse_parse_proto(void)
+static ssize_t psmouse_attr_show_proto(struct psmouse *psmouse, char *buf)
 {
-	if (psmouse_proto) {
-		if (!strcmp(psmouse_proto, "bare"))
-			psmouse_max_proto = PSMOUSE_PS2;
-		else if (!strcmp(psmouse_proto, "imps"))
-			psmouse_max_proto = PSMOUSE_IMPS;
-		else if (!strcmp(psmouse_proto, "exps"))
-			psmouse_max_proto = PSMOUSE_IMEX;
-		else
-			printk(KERN_ERR "psmouse: unknown protocol type '%s'\n", psmouse_proto);
-	}
+	return sprintf(buf, "%s\n",
+		psmouse_max_proto < ARRAY_SIZE(psmouse_proto_abbrev) ?
+		psmouse_proto_abbrev[psmouse_max_proto] :
+		"any");
+}
+
+static ssize_t psmouse_attr_set_proto(struct psmouse *psmouse, const char *buf, size_t count)
+{
+	psmouse_max_proto = psmouse_parse_proto(buf);
+	return count;
 }
 
 static int __init psmouse_init(void)
 {
-	psmouse_parse_proto();
+	psmouse_max_proto = psmouse_parse_proto(psmouse_proto);
 	serio_register_driver(&psmouse_drv);
 	return 0;
 }

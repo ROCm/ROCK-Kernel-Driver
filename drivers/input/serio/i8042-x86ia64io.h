@@ -214,7 +214,7 @@ static int i8042_pnp_init(void)
 	}
 
 	if (((i8042_pnp_command_reg & ~0xf) == (i8042_command_reg & ~0xf) &&
-	      i8042_pnp_command_reg != i8042_command_reg) || !i8042_pnp_data_reg) {
+	      i8042_pnp_command_reg != i8042_command_reg) || !i8042_pnp_command_reg) {
 		printk(KERN_WARNING "PNP: PS/2 controller has invalid command port %#x; using default %#x\n",
 			i8042_pnp_command_reg, i8042_command_reg);
 		i8042_pnp_command_reg = i8042_command_reg;
@@ -241,7 +241,7 @@ static int i8042_pnp_init(void)
 	i8042_aux_irq = i8042_pnp_aux_irq;
 
 	printk(KERN_INFO "PNP: PS/2 Controller [%s%s%s] at %#x,%#x irq %d%s%d\n",
-		i8042_pnp_kbd_name, (result_kbd > 0 || result_aux > 0) ? "," : "", i8042_pnp_aux_name,
+		i8042_pnp_kbd_name, (result_kbd > 0 && result_aux > 0) ? "," : "", i8042_pnp_aux_name,
 		i8042_data_reg, i8042_command_reg, i8042_kbd_irq,
 		(result_aux > 0) ? "," : "", i8042_aux_irq);
 
