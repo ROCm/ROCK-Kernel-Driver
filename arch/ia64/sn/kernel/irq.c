@@ -72,7 +72,7 @@ sn_enable_irq(unsigned int irq)
 {
 }
 
-static inline void move_irq(int irq)
+static inline void sn_move_irq(int irq)
 {
 	/* note - we hold desc->lock */
 	cpumask_t tmp;
@@ -110,7 +110,7 @@ sn_ack_irq(unsigned int irq)
 	}
 	HUB_S((unsigned long *)GLOBAL_MMR_ADDR(nasid, SH_EVENT_OCCURRED_ALIAS), mask );
 	__set_bit(irq, (volatile void *)pda->sn_in_service_ivecs);
-	move_irq(irq);
+	sn_move_irq(irq);
 }
 
 static void
