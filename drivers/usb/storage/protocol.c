@@ -44,6 +44,7 @@
  * 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include <linux/highmem.h>
 #include "protocol.h"
 #include "usb.h"
 #include "debug.h"
@@ -54,48 +55,36 @@
  * Helper routines
  ***********************************************************************/
 
-static void *
-find_data_location(Scsi_Cmnd *srb) {
-	if (srb->use_sg) {
-		/*
-		 * This piece of code only works if the first page is
-		 * big enough to hold more than 3 bytes -- which is
-		 * _very_ likely.
-		 */
-		struct scatterlist *sg;
-
-		sg = (struct scatterlist *) srb->request_buffer;
-		return (void *) sg_address(sg[0]);
-	} else
-		return (void *) srb->request_buffer;
-}
-
 /*
  * Fix-up the return data from an INQUIRY command to show 
  * ANSI SCSI rev 2 so we don't confuse the SCSI layers above us
  */
 static void fix_inquiry_data(Scsi_Cmnd *srb)
 {
-	unsigned char *data_ptr;
+	unsigned char databuf[3];
+	unsigned int index, offset;
 
 	/* verify that it's an INQUIRY command */
 	if (srb->cmnd[0] != INQUIRY)
 		return;
 
-	/* oddly short buffer -- bail out */
-	if (srb->request_bufflen < 3)
+	index = offset = 0;
+	if (usb_stor_access_xfer_buf(databuf, sizeof(databuf), srb,
+			&index, &offset, FROM_XFER_BUF) != sizeof(databuf))
 		return;
 
-	data_ptr = find_data_location(srb);
-
-	if ((data_ptr[2] & 7) == 2)
+	if ((databuf[2] & 7) == 2)
 		return;
 
 	US_DEBUGP("Fixing INQUIRY data to show SCSI rev 2 - was %d\n",
-		  data_ptr[2] & 7);
+		  databuf[2] & 7);
 
 	/* Change the SCSI revision number */
-	data_ptr[2] = (data_ptr[2] & ~7) | 2;
+	databuf[2] = (databuf[2] & ~7) | 2;
+
+	index = offset = 0;
+	usb_stor_access_xfer_buf(databuf, sizeof(databuf), srb,
+			&index, &offset, TO_XFER_BUF);
 }
 
 /*
@@ -104,23 +93,27 @@ static void fix_inquiry_data(Scsi_Cmnd *srb)
  */
 static void fix_read_capacity(Scsi_Cmnd *srb)
 {
-	unsigned char *dp;
+	unsigned int index, offset;
+	u32 c;
 	unsigned long capacity;
 
 	/* verify that it's a READ CAPACITY command */
 	if (srb->cmnd[0] != READ_CAPACITY)
 		return;
 
-	dp = find_data_location(srb);
+	index = offset = 0;
+	if (usb_stor_access_xfer_buf((unsigned char *) &c, 4, srb,
+			&index, &offset, FROM_XFER_BUF) != 4)
+		return;
 
-	capacity = (dp[0]<<24) + (dp[1]<<16) + (dp[2]<<8) + (dp[3]);
+	capacity = be32_to_cpu(c);
 	US_DEBUGP("US: Fixing capacity: from %ld to %ld\n",
 	       capacity+1, capacity);
-	capacity--;
-	dp[0] = (capacity >> 24);
-	dp[1] = (capacity >> 16);
-	dp[2] = (capacity >> 8);
-	dp[3] = (capacity);
+	c = cpu_to_be32(capacity - 1);
+
+	index = offset = 0;
+	usb_stor_access_xfer_buf((unsigned char *) &c, 4, srb,
+			&index, &offset, TO_XFER_BUF);
 }
 
 /***********************************************************************
@@ -233,4 +226,72 @@ void usb_stor_transparent_scsi_command(Scsi_Cmnd *srb, struct us_data *us)
 		if (us->flags & US_FL_FIX_CAPACITY)
 			fix_read_capacity(srb);
 	}
+}
+
+/***********************************************************************
+ * Scatter-gather transfer buffer access routines
+ ***********************************************************************/
+
+/* Copy a buffer of length buflen to/from the srb's transfer buffer.
+ * Update the index and offset variables so that the next copy will
+ * pick up from where this one left off. */
+
+unsigned int usb_stor_access_xfer_buf(unsigned char *buffer,
+	unsigned int buflen, Scsi_Cmnd *srb, unsigned int *index,
+	unsigned int *offset, enum xfer_buf_dir dir)
+{
+	unsigned int cnt;
+
+	if (srb->use_sg == 0) {
+		if (*offset >= srb->request_bufflen)
+			return 0;
+		cnt = min(buflen, srb->request_bufflen - *offset);
+		if (dir == TO_XFER_BUF)
+			memcpy((unsigned char *) srb->request_buffer + *offset,
+					buffer, cnt);
+		else
+			memcpy(buffer, (unsigned char *) srb->request_buffer +
+					*offset, cnt);
+		*offset += cnt;
+
+	} else {
+		struct scatterlist *sg =
+				(struct scatterlist *) srb->request_buffer
+				+ *index;
+
+		cnt = 0;
+		while (cnt < buflen && *index < srb->use_sg) {
+			struct page *page = sg->page +
+					((sg->offset + *offset) >> PAGE_SHIFT);
+			unsigned int poff =
+					(sg->offset + *offset) & (PAGE_SIZE-1);
+			unsigned int sglen = sg->length - *offset;
+
+			if (sglen > buflen - cnt) {
+				sglen = buflen - cnt;
+				*offset += sglen;
+			} else {
+				*offset = 0;
+				++sg;
+				++*index;
+			}
+
+			while (sglen > 0) {
+				unsigned int plen = min(sglen, (unsigned int)
+						PAGE_SIZE - poff);
+				unsigned char *ptr = kmap(page);
+
+				if (dir == TO_XFER_BUF)
+					memcpy(ptr + poff, buffer + cnt, plen);
+				else
+					memcpy(buffer + cnt, ptr + poff, plen);
+				kunmap(page);
+				poff = 0;
+				++page;
+				cnt += plen;
+				sglen -= plen;
+			}
+		}
+	}
+	return cnt;
 }
