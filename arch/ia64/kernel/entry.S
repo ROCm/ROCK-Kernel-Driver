@@ -713,17 +713,6 @@ GLOBAL_ENTRY(ia64_leave_syscall)
 	br.cond.sptk.many rbs_switch
 END(ia64_leave_syscall)
 
-GLOBAL_ENTRY(ia64_ret_from_execve_syscall)
-	PT_REGS_UNWIND_INFO(0)
-	cmp.ge p6,p7=r8,r0			// syscall executed successfully?
-	adds r2=PT(R8)+16,sp			// r2 = &pt_regs.r8
-	adds r3=PT(R10)+16,sp			// r3 = &pt_regs.r10
-	;;
-.mem.offset 0,0; (p6) st8.spill [r2]=r8	// store return value in slot for r8 and set unat bit
-.mem.offset 8,0; (p6) st8.spill [r3]=r0	// clear error indication in slot for r10 and set unat bit
-(p7)	br.cond.spnt handle_syscall_error	// handle potential syscall failure
-END(ia64_ret_from_execve_syscall)
-	// fall through
 GLOBAL_ENTRY(ia64_leave_kernel)
 	PT_REGS_UNWIND_INFO(0)
 	/*

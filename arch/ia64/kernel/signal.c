@@ -470,8 +470,8 @@ setup_frame (int sig, struct k_sigaction *ka, siginfo_t *info, sigset_t *set,
 	scr->scratch_unat = 0; /* ensure NaT bits of r12 is clear */
 
 #if DEBUG_SIG
-	printk("SIG deliver (%s:%d): sig=%d sp=%lx ip=%lx handler=%lx\n",
-	       current->comm, current->pid, sig, scr->pt.r12, scr->pt.cr_iip, scr->pt.r3);
+	printk("SIG deliver (%s:%d): sig=%d sp=%lx ip=%lx handler=%p\n",
+	       current->comm, current->pid, sig, scr->pt.r12, frame->sc.sc_ip, frame->handler);
 #endif
 	return 1;
 
