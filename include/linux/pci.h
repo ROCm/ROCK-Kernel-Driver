@@ -807,7 +807,7 @@ extern int pci_pci_problems;
  */
 
 #ifndef CONFIG_PCI_DOMAINS
-#define pci_domain_nr(bus)	0
+static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
 #endif
 
 #endif /* __KERNEL__ */
