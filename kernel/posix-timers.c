@@ -182,8 +182,7 @@ init_posix_timers(void)
 
 __initcall(init_posix_timers);
 
-static inline int
-tstojiffie(struct timespec *tp, int res, u64 *jiff)
+static void tstojiffie(struct timespec *tp, int res, u64 *jiff)
 {
 	unsigned long sec = tp->tv_sec;
 	long nsec = tp->tv_nsec + res - 1;
@@ -212,17 +211,14 @@ tstojiffie(struct timespec *tp, int res, u64 *jiff)
 	 * Split to jiffie and sub jiffie
 	 */
 	*jiff += nsec / (NSEC_PER_SEC / HZ);
-	/*
-	 * We trust that the optimizer will use the remainder from the 
-	 * above div in the following operation as long as they are close. 
-	 */
-	return 0;
 }
+
 static void
 tstotimer(struct itimerspec *time, struct k_itimer *timer)
 {
 	u64 result;
 	int res = posix_clocks[timer->it_clock].res;
+
 	tstojiffie(&time->it_value, res, &result);
 	timer->it_timer.expires = (unsigned long)result;
 	tstojiffie(&time->it_interval, res, &result);
@@ -1195,6 +1191,7 @@ sys_clock_nanosleep(clockid_t which_clock, int flags,
 	return ret;
 
 }
+
 long
 do_clock_nanosleep(clockid_t which_clock, int flags, struct timespec *tsave)
 {
@@ -1225,41 +1222,40 @@ do_clock_nanosleep(clockid_t which_clock, int flags, struct timespec *tsave)
 		rq_time = (rq_time << 32) + restart_block->arg2;
 		if (!rq_time)
 			return -EINTR;
-		if (rq_time <= get_jiffies_64())
-			return 0;
+		left = rq_time - get_jiffies_64();
+		if (left <= 0LL)
+			return 0;	/* Already passed */
 	}
 
 	if (abs && (posix_clocks[which_clock].clock_get !=
 		    posix_clocks[CLOCK_MONOTONIC].clock_get)) {
 		add_wait_queue(&nanosleep_abs_wqueue, &abs_wqueue);
 	}
+
 	do {
 		t = *tsave;
-		if (abs || !rq_time){
+		if (abs || !rq_time) {
 			adjust_abs_time(&posix_clocks[which_clock], &t, abs);
-
 			tstojiffie(&t, posix_clocks[which_clock].res, &rq_time);
 		}
-#if (BITS_PER_LONG < 64)
-		if ((rq_time - get_jiffies_64()) > MAX_JIFFY_OFFSET){
-			new_timer.expires = MAX_JIFFY_OFFSET;
-		}else
-#endif
-		{
-			new_timer.expires = (long)rq_time;
-		}
-		current->state = TASK_INTERRUPTIBLE;
+
+		left = rq_time - get_jiffies_64();
+		if (left >= MAX_JIFFY_OFFSET)
+			left = MAX_JIFFY_OFFSET;
+		if (left < 0)
+			break;
+
+		new_timer.expires = jiffies + left;
+		__set_current_state(TASK_INTERRUPTIBLE);
 		add_timer(&new_timer);
 
 		schedule();
 
 		del_timer_sync(&new_timer);
 		left = rq_time - get_jiffies_64();
-	}
-	while ( (left > 0)  &&
-		!test_thread_flag(TIF_SIGPENDING));
+	} while (left > 0 && !test_thread_flag(TIF_SIGPENDING));
 
-	if( abs_wqueue.task_list.next)
+	if (abs_wqueue.task_list.next)
 		finish_wait(&nanosleep_abs_wqueue, &abs_wqueue);
 
 	if (left > 0) {
