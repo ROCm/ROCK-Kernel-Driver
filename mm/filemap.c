@@ -805,7 +805,7 @@ __generic_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
 				nr_segs = iov_shorten((struct iovec *)iov,
 							nr_segs, count);
 			}
-			retval = generic_file_direct_IO(READ, filp,
+			retval = generic_file_direct_IO(READ, iocb,
 					iov, pos, nr_segs);
 			if (retval > 0)
 				*ppos = pos + retval;
@@ -1532,9 +1532,10 @@ filemap_set_next_iovec(const struct iovec **iovp, size_t *basep, size_t bytes)
  *							okir@monad.swb.de
  */
 ssize_t
-generic_file_write_nolock(struct file *file, const struct iovec *iov,
+generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 				unsigned long nr_segs, loff_t *ppos)
 {
+	struct file *file = iocb->ki_filp;
 	struct address_space * mapping = file->f_dentry->d_inode->i_mapping;
 	struct address_space_operations *a_ops = mapping->a_ops;
 	size_t ocount;		/* original count */
@@ -1674,7 +1675,7 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 		if (count != ocount)
 			nr_segs = iov_shorten((struct iovec *)iov,
 						nr_segs, count);
-		written = generic_file_direct_IO(WRITE, file,
+		written = generic_file_direct_IO(WRITE, iocb,
 					iov, pos, nr_segs);
 		if (written > 0) {
 			loff_t end = pos + written;
@@ -1786,12 +1787,39 @@ out:
 	return err;
 }
 
+ssize_t
+generic_file_write_nolock(struct file *file, const struct iovec *iov,
+				unsigned long nr_segs, loff_t *ppos)
+{
+	struct kiocb kiocb;
+	ssize_t ret;
+
+	init_sync_kiocb(&kiocb, file);
+	ret = generic_file_aio_write_nolock(&kiocb, iov, nr_segs, ppos);
+	if (-EIOCBQUEUED == ret)
+		ret = wait_on_sync_kiocb(&kiocb);
+	return ret;
+}
+
 ssize_t generic_file_aio_write(struct kiocb *iocb, const char *buf,
 			       size_t count, loff_t pos)
 {
-	return generic_file_write(iocb->ki_filp, buf, count, &iocb->ki_pos);
+	struct file *file = iocb->ki_filp;
+	struct inode *inode = file->f_dentry->d_inode->i_mapping->host;
+	int err;
+	struct iovec local_iov = { .iov_base = (void *)buf, .iov_len = count };
+
+	BUG_ON(iocb->ki_pos != pos);
+
+	down(&inode->i_sem);
+	err = generic_file_aio_write_nolock(iocb, &local_iov, 1, 
+						&iocb->ki_pos);
+	up(&inode->i_sem);
+
+	return err;
 }
 EXPORT_SYMBOL(generic_file_aio_write);
+EXPORT_SYMBOL(generic_file_aio_write_nolock);
 
 ssize_t generic_file_write(struct file *file, const char *buf,
 			   size_t count, loff_t *ppos)
@@ -1830,4 +1858,27 @@ ssize_t generic_file_writev(struct file *file, const struct iovec *iov,
 	ret = generic_file_write_nolock(file, iov, nr_segs, ppos);
 	up(&inode->i_sem);
 	return ret;
+}
+
+ssize_t
+generic_file_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
+	loff_t offset, unsigned long nr_segs)
+{
+	struct file *file = iocb->ki_filp;
+	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
+	ssize_t retval;
+
+	if (mapping->nrpages) {
+		retval = filemap_fdatawrite(mapping);
+		if (retval == 0)
+			retval = filemap_fdatawait(mapping);
+		if (retval)
+			goto out;
+	}
+
+	retval = mapping->a_ops->direct_IO(rw, iocb, iov, offset, nr_segs);
+	if (rw == WRITE && mapping->nrpages)
+		invalidate_inode_pages2(mapping);
+out:
+	return retval;
 }

@@ -845,9 +845,9 @@ direct_io_worker(int rw, struct inode *inode, const struct iovec *iov,
  * This is a library function for use by filesystem drivers.
  */
 int
-generic_direct_IO(int rw, struct inode *inode, struct block_device *bdev, 
-	const struct iovec *iov, loff_t offset, unsigned long nr_segs, 
-	get_blocks_t get_blocks)
+blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode, 
+	struct block_device *bdev, const struct iovec *iov, loff_t offset, 
+	unsigned long nr_segs, get_blocks_t get_blocks)
 {
 	int seg;
 	size_t size;
@@ -883,28 +883,6 @@ generic_direct_IO(int rw, struct inode *inode, struct block_device *bdev,
 
 	retval = direct_io_worker(rw, inode, iov, offset, 
 				nr_segs, blkbits, get_blocks);
-out:
-	return retval;
-}
-
-ssize_t
-generic_file_direct_IO(int rw, struct file *file, const struct iovec *iov,
-	loff_t offset, unsigned long nr_segs)
-{
-	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
-	ssize_t retval;
-
-	if (mapping->nrpages) {
-		retval = filemap_fdatawrite(mapping);
-		if (retval == 0)
-			retval = filemap_fdatawait(mapping);
-		if (retval)
-			goto out;
-	}
-
-	retval = mapping->a_ops->direct_IO(rw, file, iov, offset, nr_segs);
-	if (rw == WRITE && mapping->nrpages)
-		invalidate_inode_pages2(mapping);
 out:
 	return retval;
 }
