@@ -57,8 +57,6 @@ struct capi_ctr {
         void (*resume_output)(struct capi_ctr * card);
         void (*handle_capimsg)(struct capi_ctr * card,
 			   	__u16 appl, struct sk_buff *skb);
-	void (*appl_registered)(struct capi_ctr * card, __u16 appl);
-	void (*appl_released)(struct capi_ctr * card, __u16 appl);
 
         void (*new_ncci)(struct capi_ctr * card,
 			   	__u16 appl, __u32 ncci, __u32 winsize);

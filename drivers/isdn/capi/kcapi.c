@@ -72,7 +72,6 @@ struct capi_ncci {
 struct capi_appl {
 	u16 applid;
 	capi_register_params rparam;
-	int releasing;
 	void *param;
 	void (*signal) (u16 applid, void *param);
 	struct sk_buff_head recv_queue;
@@ -470,6 +469,35 @@ static void proc_capi_exit(void)
     }
 }
 
+/* ------------------------------------------------------------ */
+
+static void register_appl(struct capi_ctr *card, u16 applid, capi_register_params *rparam)
+{
+	card->driver->register_appl(card, applid, rparam);
+}
+
+
+static void release_appl(struct capi_ctr *card, u16 applid)
+{
+	struct capi_ncci **pp, **nextpp;
+
+	for (pp = &APPL(applid)->nccilist; *pp; pp = nextpp) {
+		if (NCCI2CTRL((*pp)->ncci) == card->cnr) {
+			struct capi_ncci *np = *pp;
+			*pp = np->next;
+			printk(KERN_INFO "kcapi: appl %d ncci 0x%x down!\n", applid, np->ncci);
+			kfree(np);
+			APPL(applid)->nncci--;
+			nextpp = pp;
+		} else {
+			nextpp = &(*pp)->next;
+		}
+	}
+
+	card->driver->release_appl(card, applid);
+}
+
+
 /* -------- Notifier handling --------------------------------- */
 
 static struct capi_notifier_list{
@@ -685,32 +713,6 @@ static inline int mq_dequeue(struct capi_ncci * np, u16 msgid)
 	return 0;
 }
 
-static void controllercb_appl_registered(struct capi_ctr * card, u16 appl)
-{
-}
-
-static void controllercb_appl_released(struct capi_ctr * card, u16 appl)
-{
-	struct capi_ncci **pp, **nextpp;
-	for (pp = &APPL(appl)->nccilist; *pp; pp = nextpp) {
-		if (NCCI2CTRL((*pp)->ncci) == card->cnr) {
-			struct capi_ncci *np = *pp;
-			*pp = np->next;
-			printk(KERN_INFO "kcapi: appl %d ncci 0x%x down!\n", appl, np->ncci);
-			kfree(np);
-			APPL(appl)->nncci--;
-			nextpp = pp;
-		} else {
-			nextpp = &(*pp)->next;
-		}
-	}
-	APPL(appl)->releasing--;
-	if (APPL(appl)->releasing <= 0) {
-		APPL(appl)->signal = 0;
-		APPL_MARK_FREE(appl);
-		printk(KERN_INFO "kcapi: appl %d down\n", appl);
-	}
-}
 /*
  * ncci management
  */
@@ -868,8 +870,7 @@ static void controllercb_ready(struct capi_ctr * card)
 
 	for (appl = 1; appl <= CAPI_MAXAPPL; appl++) {
 		if (!VALID_APPLID(appl)) continue;
-		if (APPL(appl)->releasing) continue;
-		card->driver->register_appl(card, appl, &APPL(appl)->rparam);
+		register_appl(card, appl, &APPL(appl)->rparam);
 	}
 
         printk(KERN_NOTICE "kcapi: card %d \"%s\" ready.\n",
@@ -961,8 +962,6 @@ drivercb_attach_ctr(struct capi_driver *driver, char *name, void *driverdata)
         card->suspend_output = controllercb_suspend_output;
         card->resume_output = controllercb_resume_output;
         card->handle_capimsg = controllercb_handle_capimsg;
-	card->appl_registered = controllercb_appl_registered;
-	card->appl_released = controllercb_appl_released;
         card->new_ncci = controllercb_new_ncci;
         card->free_ncci = controllercb_free_ncci;
 
@@ -1122,8 +1121,7 @@ static u16 capi_register(capi_register_params * rparam, u16 * applidp)
 	for (i = 0; i < CAPI_MAXCONTR; i++) {
 		if (cards[i].cardstate != CARD_RUNNING)
 			continue;
-		cards[i].driver->register_appl(&cards[i], appl,
-						&APPL(appl)->rparam);
+		register_appl(&cards[i], appl, &APPL(appl)->rparam);
 	}
 	*applidp = appl;
 	printk(KERN_INFO "kcapi: appl %d up\n", appl);
@@ -1135,22 +1133,18 @@ static u16 capi_release(u16 applid)
 {
 	int i;
 
-	if (!VALID_APPLID(applid) || APPL(applid)->releasing)
+	if (!VALID_APPLID(applid))
 		return CAPI_ILLAPPNR;
-	APPL(applid)->releasing++;
 	skb_queue_purge(&APPL(applid)->recv_queue);
 	for (i = 0; i < CAPI_MAXCONTR; i++) {
 		if (cards[i].cardstate != CARD_RUNNING)
 			continue;
-		APPL(applid)->releasing++;
-		cards[i].driver->release_appl(&cards[i], applid);
+		release_appl(&cards[i], applid);
 	}
-	APPL(applid)->releasing--;
-	if (APPL(applid)->releasing <= 0) {
-	        APPL(applid)->signal = 0;
-		APPL_MARK_FREE(applid);
-		printk(KERN_INFO "kcapi: appl %d down\n", applid);
-	}
+	APPL(applid)->signal = 0;
+	APPL_MARK_FREE(applid);
+	printk(KERN_INFO "kcapi: appl %d down\n", applid);
+
 	return CAPI_NOERROR;
 }
 

@@ -199,7 +199,7 @@ static void t1isa_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 
 			if (NCCI != 0xffffffff)
 				ctrl->free_ncci(ctrl, ApplId, NCCI);
-			else ctrl->appl_released(ctrl, ApplId);
+
 			break;
 
 		case RECEIVE_START:

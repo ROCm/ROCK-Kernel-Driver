@@ -357,8 +357,6 @@ void b1_register_appl(struct capi_ctr *ctrl,
 	b1_put_word(port, rp->datablkcnt);
 	b1_put_word(port, rp->datablklen);
 	restore_flags(flags);
-
-	ctrl->appl_registered(ctrl, appl);
 }
 
 void b1_release_appl(struct capi_ctr *ctrl, u16 appl)
@@ -548,7 +546,7 @@ void b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 
 		if (NCCI != 0xffffffff)
 			ctrl->free_ncci(ctrl, ApplId, NCCI);
-		else ctrl->appl_released(ctrl, ApplId);
+
 		break;
 
 	case RECEIVE_START:

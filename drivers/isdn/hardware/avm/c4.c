@@ -587,12 +587,6 @@ static void c4_handle_rx(avmcard *card)
 			ctrl = card->ctrlinfo[cidx].capi_ctrl;
 			if (ctrl)
 				ctrl->free_ncci(ctrl, ApplId, NCCI);
-		} else {
-			for (cidx=0; cidx < 4; cidx++) {
-				ctrl = card->ctrlinfo[cidx].capi_ctrl;
-				if (ctrl)
-					ctrl->appl_released(ctrl, ApplId);
-			}
 		}
 		break;
 
@@ -973,8 +967,6 @@ void c4_register_appl(struct capi_ctr *ctrl,
 		skb_queue_tail(&card->dma->send_queue, skb);
 		c4_dispatch_tx(card);
 	}
-
-	ctrl->appl_registered(ctrl, appl);
 }
 
 /* ------------------------------------------------------------- */
