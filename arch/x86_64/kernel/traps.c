@@ -351,9 +351,24 @@ void oops_end(void)
 
 void __die(const char * str, struct pt_regs * regs, long err)
 {
+	int nl = 0;
 	static int die_counter;
 	printk(KERN_EMERG "%s: %04lx [%u]\n", str, err & 0xffff,++die_counter);
 	notify_die(DIE_OOPS, (char *)str, regs, err, 255, SIGSEGV);
+#ifdef CONFIG_PREEMPT
+	printk("PREEMPT ");
+	nl = 1;
+#endif
+#ifdef CONFIG_SMP
+	printk("SMP ");
+	nl = 1;
+#endif
+#ifdef CONFIG_DEBUG_PAGEALLOC
+	printk("DEBUG_PAGEALLOC");
+	nl = 1;
+#endif
+	if (nl)
+		printk("\n");
 	show_registers(regs);
 	/* Executive summary in case the oops scrolled away */
 	printk("RIP "); 
