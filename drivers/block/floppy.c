@@ -243,6 +243,7 @@ static int irqdma_allocated;
 #include <linux/blk.h>
 #include <linux/blkpg.h>
 #include <linux/cdrom.h> /* for the compatibility eject ioctl */
+#include <linux/completion.h>
 
 #ifndef fd_get_dma_residue
 #define fd_get_dma_residue() get_dma_residue(FLOPPY_DMA)
@@ -3853,6 +3854,74 @@ static int check_floppy_change(kdev_t dev)
 	return 0;
 }
 
+/*
+ * This implements "read block 0" for floppy_revalidate().
+ * Needed for format autodetection, checking whether there is
+ * a disk in the drive, and whether that disk is writable.
+ */
+
+static void floppy_rb0_complete(struct bio *bio)
+{
+	complete((struct completion*)bio->bi_private);
+}
+
+static int __floppy_read_block_0(struct block_device *bdev)
+{
+	struct bio bio;
+	struct bio_vec bio_vec;
+	struct completion complete;
+	struct page *page;
+	size_t size;
+
+	page = alloc_page(GFP_NOIO);
+	if (!page) {
+		process_fd_request();
+		return -ENOMEM;
+	}
+
+	size = bdev->bd_block_size;
+	if (!size)
+		size = 1024;
+
+	bio_init(&bio);
+	bio.bi_io_vec = &bio_vec;
+	bio_vec.bv_page = page;
+	bio_vec.bv_len = size;
+	bio_vec.bv_offset = 0;
+	bio.bi_vcnt = 1;
+	bio.bi_idx = 0;
+	bio.bi_size = size;
+	bio.bi_bdev = bdev;
+	bio.bi_sector = 0;
+	init_completion(&complete);
+	bio.bi_private = &complete;
+	bio.bi_end_io = floppy_rb0_complete;
+
+	submit_bio(READ, &bio);
+	run_task_queue(&tq_disk);
+	process_fd_request();
+	wait_for_completion(&complete);
+
+	__free_page(page);
+
+	return 0;
+}
+
+static int floppy_read_block_0(kdev_t dev)
+{
+	struct block_device *bdev;
+	int ret;
+
+	bdev = bdget(kdev_t_to_nr(dev));
+	if (!bdev) {
+		printk("No block device for %s\n", __bdevname(dev));
+		BUG();
+	}
+	ret = __floppy_read_block_0(bdev);
+	atomic_dec(&bdev->bd_count);
+	return ret;
+}
+
 /* revalidate the floppy disk, i.e. trigger format autodetection by reading
  * the bootblock (block 0). "Autodetection" is also needed to check whether
  * there is a disk in the drive at all... Thus we also do it for fixed
@@ -3860,9 +3929,6 @@ static int check_floppy_change(kdev_t dev)
 static int floppy_revalidate(kdev_t dev)
 {
 #define NO_GEOM (!current_type[drive] && !TYPE(dev))
-#if 0
-	struct buffer_head * bh;
-#endif
 	int drive=DRIVE(dev);
 	int cf;
 
@@ -3889,29 +3955,8 @@ static int floppy_revalidate(kdev_t dev)
 		if (cf)
 			UDRS->generation++;
 		if (NO_GEOM){
-#if 0
-	/*
-	 * What the devil is going on here?  We are not guaranteed to do
-	 * any IO and ENXIO case is nothing but ENOMEM in disguise - it
-	 * happens if and only if buffer cache is out of memory.  WTF?
-	 */
 			/* auto-sensing */
-			int size = floppy_blocksizes[minor(dev)];
-			if (!size)
-				size = 1024;
-			if (!(bh = getblk(dev,0,size))){
-				process_fd_request();
-				return -ENXIO;
-			}
-			if (bh && !buffer_uptodate(bh))
-				ll_rw_block(READ, 1, &bh);
-			process_fd_request();
-			wait_on_buffer(bh);
-			brelse(bh);
-			return 0;
-#endif
-			process_fd_request();
-			return 0;
+			return floppy_read_block_0(dev);
 		}
 		if (cf)
 			poll_drive(0, FD_RAW_NEED_DISK);
