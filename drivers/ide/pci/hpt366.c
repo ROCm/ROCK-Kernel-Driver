@@ -1106,13 +1106,10 @@ static void __init init_setup_hpt374 (struct pci_dev *dev, ide_pci_device_t *d)
 		    ((findev->devfn - dev->devfn) == 1) &&
 		    (PCI_FUNC(findev->devfn) & 1)) {
 			u8 irq = 0, irq2 = 0;
-			pci_read_config_byte(dev, PCI_INTERRUPT_LINE, &irq);
-			pci_read_config_byte(findev, PCI_INTERRUPT_LINE, &irq2);
-			if (irq != irq2) {
-				pci_write_config_byte(findev,
-						PCI_INTERRUPT_LINE, irq);
+			if (findev->irq != dev->irq) {
+				/* FIXME: we need a core pci_set_interrupt() */
 				findev->irq = dev->irq;
-				printk("%s: pci-config space interrupt "
+				printk(KERN_WARNING "%s: pci-config space interrupt "
 					"fixed.\n", d->name);
 			}
 			ide_setup_pci_devices(dev, findev, d);
