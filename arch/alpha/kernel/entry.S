@@ -7,42 +7,16 @@
 #include <linux/config.h>
 #include <asm/system.h>
 #include <asm/cache.h>
+#include <asm/asm_offsets.h>
+#include <asm/thread_info.h>
 
-#define SIGCHLD 20
-
-#define NR_SYSCALLS 378
-
-/*
- * These offsets must match with alpha_mv in <asm/machvec.h>.
- */
-#define HAE_CACHE	0
-#define HAE_REG		8
+#define NR_SYSCALLS 381
 
 /*
  * stack offsets
  */
-#define SP_OFF		184
-
-#define SWITCH_STACK_SIZE 320
-
-/*
- * task structure offsets
- */
-#define TASK_STATE		0
-#define TASK_FLAGS		8
-#error #define TASK_SIGPENDING		16
-#define TASK_ADDR_LIMIT		24
-#define TASK_EXEC_DOMAIN	32
-#error #define TASK_NEED_RESCHED	40
-#error #define TASK_PTRACE		48
-#define TASK_PROCESSOR		100
-
-/*
- * task flags (must match include/linux/sched.h):
- */
-#define	PT_PTRACED	0x00000001
-
-#define CLONE_VM        0x00000100 
+#define SP_OFF			184
+#define SWITCH_STACK_SIZE	320
 
 /*
  * This defines the normal kernel pt-regs layout.
@@ -55,7 +29,7 @@
  */
 
 #define SAVE_ALL			\
-	subq	$30,184,$30;		\
+	subq	$30,SP_OFF,$30;		\
 	stq	$0,0($30);		\
 	stq	$1,8($30);		\
 	stq	$2,16($30);		\
@@ -98,12 +72,8 @@
 	ldq	$8,64($30);		\
 	beq	$20,99f;		\
 	ldq	$20,HAE_REG($19);	\
-	addq	$31,7,$16;		\
-	call_pal PAL_swpipl;		\
 	stq	$21,HAE_CACHE($19);	\
 	stq	$21,0($20);		\
-	mov	$0,$16;			\
-	call_pal PAL_swpipl;		\
 	ldq	$0,0($30);		\
 	ldq	$1,8($30);		\
 99:;					\
@@ -117,13 +87,10 @@
 	ldq	$26,128($30);		\
 	ldq	$27,136($30);		\
 	ldq	$28,144($30);		\
-	addq	$30,184,$30
+	addq	$30,SP_OFF,$30
 
 .text
 .set noat
-#if defined(__linux__) && !defined(__ELF__)
-  .set singlegp
-#endif
 
 .align 3
 .globl	entInt
@@ -203,68 +170,57 @@ entDbg:
 
 
 /*
- * Fork() is one of the special system calls: it needs to
- * save the callee-saved regs so that the regs can be found
- * for the new process.. We save them in the "context switch"
- * stack format (see arch/alpha/kernel/process.c).
- *
- * Also, for the kernel fork, we need to fake the system call
- * stack buildup, as we can't do system calls from kernel space.
- */
-.align 3
-.ent	kernel_clone
-kernel_clone:
-	.frame $30, 0, $26
-	.prologue 0
-	subq	$30,6*8,$30
-	stq	$31,0($30)
-	stq	$26,8($30)
-	stq	$29,16($30)
-	stq	$16,24($30)
-	stq	$17,32($30)
-	stq	$18,40($30)
-	bis	$31,2,$0	/* Register v0: syscall nr for fork() */
-	SAVE_ALL
-	bsr	$26,sys_clone
-	stq	$0,0($30)
-	br	ret_from_sys_call
-.end	kernel_clone
-
-/*
  * kernel_thread(fn, arg, clone_flags)
  */
-.align 3
-.globl	kernel_thread
-.ent	kernel_thread
+	.align 4
+	.globl	kernel_thread
+	.ent	kernel_thread
 kernel_thread:
 	ldgp	$29,0($27)	/* we can be called from a module */
-	.frame $30, 4*8, $26
-	subq	$30,4*8,$30
-	stq	$10,16($30)
-	stq	$9,8($30)
-	lda	$0,CLONE_VM
-	stq	$26,0($30)
 	.prologue 1
-	mov	$16,$9		/* save fn */		
-	mov	$17,$10		/* save arg */
-	or	$18,$0,$16	/* shuffle flags to front; add CLONE_VM.  */
-	bsr	$26,kernel_clone
-	bne	$20,1f		/* $20 is non-zero in child */
-	ldq	$26,0($30)
-	ldq	$9,8($30)
-	ldq	$10,16($30)
-	addq	$30,4*8,$30
-	ret	$31,($26),1
-/* this is in child: look out as we don't have any stack here.. */
-1:	mov	$9,$27		/* get fn */
-	lda	$8,0x3fff
-	mov	$10,$16		/* get arg */
-	bic	$30,$8,$8	/* get current */
-	jsr	$26,($27)
-	ldgp	$29,0($26)
-	mov	$0,$16
-	mov	$31,$26
-	jsr	$31,sys_exit
+	subq	$30,SP_OFF+6*8,$30
+	br	$1, 2f		/* load start address */
+
+	/* We've now "returned" from a fake system call.  */
+	unop
+	blt	$0, 1f		/* error?  */
+	ldi	$1, 0x3fff
+	beq	$20, 1f		/* parent or child?  */
+
+	bic	$30, $1, $8	/* in child.  */
+	jsr	$26, ($27)
+	ldgp	$29, 0($26)
+	mov	$0, $16
+	mov	$31, $26
+	jmp	$31, sys_exit
+
+1:	ret			/* in parent.  */
+
+	.align 4
+2:	/* Fake a system call stack frame, as we can't do system calls
+	   from kernel space.  Note that we store FN and ARG as they 
+	   need to be set up in the child for the call.  Also store $8
+	   and $26 for use in the parent.  */
+	stq	$31, SP_OFF($30)	/* ps */
+	stq	$1, SP_OFF+8($30)	/* pc */
+	stq	$29, SP_OFF+16($30)	/* gp */
+	stq	$16, 136($30)		/* $27; FN for child */
+	stq	$17, SP_OFF+24($30)	/* $16; ARG for child */
+	stq	$8, 64($30)		/* $8 */
+	stq	$26, 128($30)		/* $26 */
+	/* Avoid the HAE being gratuitously wrong, to avoid restoring it.  */
+	ldq	$2, alpha_mv+HAE_CACHE
+	stq	$2, 152($30)		/* HAE */
+
+	/* Shuffle FLAGS to the front; add CLONE_VM.  */
+	ldi	$1, CLONE_VM
+	or	$18, $1, $16
+	bsr	$26, sys_clone
+
+	/* We don't actually care for a3 success widgetry in the kernel.
+	   Not for positive errno values.  */
+	stq	$0, 0($30)		/* $0 */
+	br	restore_all
 .end	kernel_thread
 
 /*
@@ -535,9 +491,20 @@ alpha_switch_to:
 	call_pal PAL_swpctx
 	unop
 	bsr	$1,undo_switch_stack
+	lda	$8,0x3fff
 	mov	$17,$0
+	bic	$30,$8,$8
 	ret	$31,($26),1
 .end alpha_switch_to
+
+.globl  ret_from_fork
+.align 3
+.ent ret_from_fork
+ret_from_fork:
+	lda	$26,ret_from_sys_call
+	mov	$0,$16
+	jmp	$31,schedule_tail
+.end ret_from_fork
 
 /*
  * Oh, well.. Disassembling OSF/1 binaries to find out how the
@@ -559,12 +526,11 @@ entSys:
 	lda	$5,sys_call_table
 	lda	$27,sys_ni_syscall
 	cmpult	$0,$4,$4
-	ldq	$3,TASK_PTRACE($8)
+	ldl	$3,TI_FLAGS($8)
 	stq	$17,SP_OFF+32($30)
 	s8addq	$0,$5,$5
-	and     $3,PT_PTRACED,$3
 	stq	$18,SP_OFF+40($30)
-	bne     $3,strace
+	blbs	$3,strace
 	beq	$4,1f
 	ldq	$27,0($5)
 1:	jsr	$26,($27),alpha_ni_syscall
@@ -580,34 +546,65 @@ ret_from_sys_call:
 	and	$0,8,$0
 	beq	$0,restore_all
 ret_from_reschedule:
-#error	ldq	$2,TASK_NEED_RESCHED($8)
-	lda	$4,init_task_union
-	bne	$2,reschedule
-	xor	$4,$8,$4
-#error	ldl	$5,TASK_SIGPENDING($8)
-	beq	$4,restore_all
-	bne	$5,signal_return
+	/* Make sure need_resched and sigpending don't change between
+		sampling and the rti.  */
+	lda	$16,7
+	call_pal PAL_swpipl
+	ldl	$5,TI_FLAGS($8)
+	and	$5,_TIF_WORK_MASK,$2
+	bne	$5,work_pending
 restore_all:
 	RESTORE_ALL
 	call_pal PAL_rti
 
+work_pending:
+	and	$5,_TIF_NEED_RESCHED,$2
+	beq	$2,work_notifysig
+
+work_resched:
+	subq	$30,16,$30
+	stq	$19,0($30)              /* save syscall nr */
+	stq	$20,8($30)              /* and error indication (a3) */
+	jsr	$26,schedule
+	ldq	$19,0($30)
+	ldq	$20,8($30)
+	addq	$30,16,$30
+	/* Make sure need_resched and sigpending don't change between
+		sampling and the rti.  */
+	lda	$16,7
+	call_pal PAL_swpipl
+	ldl	$5,TI_FLAGS($8)
+	and	$5,_TIF_WORK_MASK,$2
+	beq	$2,restore_all
+	and	$5,_TIF_NEED_RESCHED,$2
+	bne	$2,work_resched
+
+work_notifysig:
+	mov	$30,$17
+	br	$1,do_switch_stack
+	mov	$5,$21
+	mov	$30,$18
+	mov	$31,$16
+	jsr	$26,do_notify_resume
+	bsr	$1,undo_switch_stack
+	br	restore_all
 
 /* PTRACE syscall handler */
 .align 3
 strace:
 	/* set up signal stack, call syscall_trace */
 	bsr	$1,do_switch_stack
-	jsr     $26,syscall_trace
+	jsr	$26,syscall_trace
 	bsr	$1,undo_switch_stack
 
 	/* get the system call number and the arguments back.. */
-	ldq     $0,0($30)
-	ldq     $16,SP_OFF+24($30)
-	ldq     $17,SP_OFF+32($30)
-	ldq     $18,SP_OFF+40($30)
-	ldq     $19,72($30)
-	ldq     $20,80($30)
-	ldq     $21,88($30)
+	ldq	$0,0($30)
+	ldq	$16,SP_OFF+24($30)
+	ldq	$17,SP_OFF+32($30)
+	ldq	$18,SP_OFF+40($30)
+	ldq	$19,72($30)
+	ldq	$20,80($30)
+	ldq	$21,88($30)
 
 	/* get the system call pointer.. */
 	lda	$1,NR_SYSCALLS($31)
@@ -627,11 +624,11 @@ strace_success:
 	stq	$0,0($30)		/* save return value */
 
 	bsr	$1,do_switch_stack
-	jsr     $26,syscall_trace
+	jsr	$26,syscall_trace
 	bsr	$1,undo_switch_stack
 	br	$31,ret_from_sys_call
 
-	.align  3
+	.align	3
 strace_error:
 	ldq	$19,0($30)	/* old syscall nr (zero if success) */
 	beq	$19,strace_success
@@ -645,7 +642,7 @@ strace_error:
 	bsr	$1,do_switch_stack
 	mov	$19,$9		/* save old syscall number */
 	mov	$20,$10		/* save old a3 */
-	jsr     $26,syscall_trace
+	jsr	$26,syscall_trace
 	mov	$9,$19
 	mov	$10,$20
 	bsr	$1,undo_switch_stack
@@ -677,39 +674,7 @@ ret_success:
 	stq	$0,0($30)
 	stq	$31,72($30)	/* a3=0 => no error */
 	br	ret_from_sys_call
-
-.align 3
-signal_return:
-	mov	$30,$17
-	br	$1,do_switch_stack
-	mov	$30,$18
-	mov	$31,$16
-	jsr	$26,do_signal
-	bsr	$1,undo_switch_stack
-	br	restore_all
 .end entSys
-
-        .globl  ret_from_fork
-.align 3
-.ent ret_from_fork
-ret_from_fork:
-	lda	$26,ret_from_sys_call
-	mov	$17,$16
-	jsr	$31,schedule_tail
-.end ret_from_fork
-
-.align 3
-.ent reschedule
-reschedule:
-	subq	$30,16,$30
-	stq	$19,0($30)	/* save syscall nr */
-	stq	$20,8($30)	/* and error indication (a3) */
-	jsr	$26,schedule
-	ldq	$19,0($30)
-	ldq	$20,8($30)
-	addq	$30,16,$30
-	br	ret_from_reschedule
-.end reschedule
 
 .align 3
 .ent sys_sigreturn

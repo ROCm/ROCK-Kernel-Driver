@@ -114,7 +114,7 @@ alpha_fp_emul (unsigned long pc)
 	mode   = (insn >> 11) & 0x3;
 	
 	fpcr = rdfpcr();
-	swcr = swcr_update_status(current->thread.flags, fpcr);
+	swcr = swcr_update_status(current_thread_info()->ieee_state, fpcr);
 
 	if (mode == 3) {
 		/* Dynamic -- get rounding mode from fpcr.  */
@@ -297,7 +297,8 @@ done:
 	if (_fex) {
 		/* Record exceptions in software control word.  */
 		swcr |= (_fex << IEEE_STATUS_TO_EXCSUM_SHIFT);
-		current->thread.flags |= (_fex << IEEE_STATUS_TO_EXCSUM_SHIFT);
+		current_thread_info()->ieee_state
+		  |= (_fex << IEEE_STATUS_TO_EXCSUM_SHIFT);
 
 		/* Update hardware control register.  */
 		fpcr &= (~FPCR_MASK | FPCR_DYN_MASK);

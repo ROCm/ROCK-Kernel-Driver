@@ -236,7 +236,7 @@ end_b:
 	 * entry point.
 	 */
 .align 4
-	.ent __memset
+	.ent __constant_c_memset
 __constant_c_memset:
 	.frame $30,0,$26,0
 	.prologue 0

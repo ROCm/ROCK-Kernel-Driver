@@ -21,8 +21,34 @@
 #include <asm/io.h>
 #endif
 
+/* ??? This does not belong here.  */
+/*
+ * Every architecture must define this function. It's the fastest
+ * way of searching a 168-bit bitmap where the first 128 bits are
+ * unlikely to be set. It's guaranteed that at least one of the 168
+ * bits is set.
+ */
+#if MAX_RT_PRIO != 128 || MAX_PRIO > 192
+# error update this function.
+#endif
+
+static inline int
+sched_find_first_bit(unsigned long *b)
+{
+	unsigned long b0 = b[0], b1 = b[1], b2 = b[2];
+	unsigned long offset = 128;
+
+	if (unlikely(b0 | b1)) {
+		b2 = (b0 ? b0 : b1);
+		offset = (b0 ? 0 : 64);
+	}
+
+	return __ffs(b2) + offset;
+}
+
+
 extern inline unsigned long
-__reload_thread(struct thread_struct *pcb)
+__reload_thread(struct pcb_struct *pcb)
 {
 	register unsigned long a0 __asm__("$16");
 	register unsigned long v0 __asm__("$0");
@@ -153,7 +179,7 @@ ev5_switch_mm(struct mm_struct *prev_mm, struct mm_struct *next_mm,
 	/* Always update the PCB ASN.  Another thread may have allocated
 	   a new mm->context (via flush_tlb_mm) without the ASN serial
 	   number wrapping.  We have no way to detect when this is needed.  */
-	next->thread.asn = mmc & HARDWARE_ASN_MASK;
+	next->thread_info->pcb.asn = mmc & HARDWARE_ASN_MASK;
 }
 
 __EXTERN_INLINE void
@@ -228,7 +254,8 @@ init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 
 	for (i = 0; i < smp_num_cpus; i++)
 		mm->context[cpu_logical_map(i)] = 0;
-        tsk->thread.ptbr = ((unsigned long)mm->pgd - IDENT_ADDR) >> PAGE_SHIFT;
+        tsk->thread_info->pcb.ptbr
+	  = ((unsigned long)mm->pgd - IDENT_ADDR) >> PAGE_SHIFT;
 	return 0;
 }
 
@@ -241,7 +268,8 @@ destroy_context(struct mm_struct *mm)
 static inline void
 enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
 {
-	tsk->thread.ptbr = ((unsigned long)mm->pgd - IDENT_ADDR) >> PAGE_SHIFT;
+	tsk->thread_info->pcb.ptbr
+	  = ((unsigned long)mm->pgd - IDENT_ADDR) >> PAGE_SHIFT;
 }
 
 #ifdef __MMU_EXTERN_INLINE

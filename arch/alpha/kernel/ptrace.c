@@ -101,7 +101,7 @@ get_reg_addr(struct task_struct * task, unsigned long regno)
 	long *addr;
 
 	if (regno == 30) {
-		addr = &task->thread.usp;
+		addr = &task->thread_info->pcb.usp;
 	} else if (regno == 31 || regno > 64) {
 		zero = 0;
 		addr = &zero;
@@ -120,7 +120,8 @@ get_reg(struct task_struct * task, unsigned long regno)
 	/* Special hack for fpcr -- combine hardware and software bits.  */
 	if (regno == 63) {
 		unsigned long fpcr = *get_reg_addr(task, regno);
-		unsigned long swcr = task->thread.flags & IEEE_SW_MASK;
+		unsigned long swcr
+		  = task->thread_info->ieee_state & IEEE_SW_MASK;
 		swcr = swcr_update_status(swcr, fpcr);
 		return fpcr | swcr;
 	}
@@ -134,8 +135,9 @@ static int
 put_reg(struct task_struct *task, unsigned long regno, long data)
 {
 	if (regno == 63) {
-		task->thread.flags = ((task->thread.flags & ~IEEE_SW_MASK)
-				      | (data & IEEE_SW_MASK));
+		task->thread_info->ieee_state
+		  = ((task->thread_info->ieee_state & ~IEEE_SW_MASK)
+		     | (data & IEEE_SW_MASK));
 		data = (data & FPCR_DYN_MASK) | ieee_swcr_to_fpcr(data);
 	}
 	*get_reg_addr(task, regno) = data;
@@ -182,31 +184,34 @@ ptrace_set_bpt(struct task_struct * child)
 		 * branch (emulation can be tricky for fp branches).
 		 */
 		displ = ((s32)(insn << 11)) >> 9;
-		child->thread.bpt_addr[nsaved++] = pc + 4;
+		child->thread_info->bpt_addr[nsaved++] = pc + 4;
 		if (displ)		/* guard against unoptimized code */
-			child->thread.bpt_addr[nsaved++] = pc + 4 + displ;
+			child->thread_info->bpt_addr[nsaved++]
+			  = pc + 4 + displ;
 		DBG(DBG_BPT, ("execing branch\n"));
 	} else if (op_code == 0x1a) {
 		reg_b = (insn >> 16) & 0x1f;
-		child->thread.bpt_addr[nsaved++] = get_reg(child, reg_b);
+		child->thread_info->bpt_addr[nsaved++] = get_reg(child, reg_b);
 		DBG(DBG_BPT, ("execing jump\n"));
 	} else {
-		child->thread.bpt_addr[nsaved++] = pc + 4;
+		child->thread_info->bpt_addr[nsaved++] = pc + 4;
 		DBG(DBG_BPT, ("execing normal insn\n"));
 	}
 
 	/* install breakpoints: */
 	for (i = 0; i < nsaved; ++i) {
-		res = read_int(child, child->thread.bpt_addr[i], &insn);
+		res = read_int(child, child->thread_info->bpt_addr[i], &insn);
 		if (res < 0)
 			return res;
-		child->thread.bpt_insn[i] = insn;
-		DBG(DBG_BPT, ("    -> next_pc=%lx\n", child->thread.bpt_addr[i]));
-		res = write_int(child, child->thread.bpt_addr[i], BREAKINST);
+		child->thread_info->bpt_insn[i] = insn;
+		DBG(DBG_BPT, ("    -> next_pc=%lx\n",
+			      child->thread_info->bpt_addr[i]));
+		res = write_int(child, child->thread_info->bpt_addr[i],
+				BREAKINST);
 		if (res < 0)
 			return res;
 	}
-	child->thread.bpt_nsaved = nsaved;
+	child->thread_info->bpt_nsaved = nsaved;
 	return 0;
 }
 
@@ -217,9 +222,9 @@ ptrace_set_bpt(struct task_struct * child)
 int
 ptrace_cancel_bpt(struct task_struct * child)
 {
-	int i, nsaved = child->thread.bpt_nsaved;
+	int i, nsaved = child->thread_info->bpt_nsaved;
 
-	child->thread.bpt_nsaved = 0;
+	child->thread_info->bpt_nsaved = 0;
 
 	if (nsaved > 2) {
 		printk("ptrace_cancel_bpt: bogus nsaved: %d!\n", nsaved);
@@ -227,8 +232,8 @@ ptrace_cancel_bpt(struct task_struct * child)
 	}
 
 	for (i = 0; i < nsaved; ++i) {
-		write_int(child, child->thread.bpt_addr[i],
-			  child->thread.bpt_insn[i]);
+		write_int(child, child->thread_info->bpt_addr[i],
+			  child->thread_info->bpt_insn[i]);
 	}
 	return (nsaved != 0);
 }
@@ -335,9 +340,9 @@ sys_ptrace(long request, long pid, long addr, long data,
 		if ((unsigned long) data > _NSIG)
 			goto out;
 		if (request == PTRACE_SYSCALL)
-			child->ptrace |= PT_TRACESYS;
+			set_thread_flag(TIF_SYSCALL_TRACE);
 		else
-			child->ptrace &= ~PT_TRACESYS;
+			clear_thread_flag(TIF_SYSCALL_TRACE);
 		child->exit_code = data;
 		wake_up_process(child);
 		/* make sure single-step breakpoint is gone. */
@@ -364,8 +369,9 @@ sys_ptrace(long request, long pid, long addr, long data,
 		ret = -EIO;
 		if ((unsigned long) data > _NSIG)
 			goto out;
-		child->thread.bpt_nsaved = -1;	/* mark single-stepping */
-		child->ptrace &= ~PT_TRACESYS;
+		/* Mark single stepping.  */
+		child->thread_info->bpt_nsaved = -1;
+		clear_thread_flag(TIF_SYSCALL_TRACE);
 		wake_up_process(child);
 		child->exit_code = data;
 		/* give it a chance to run. */
@@ -381,7 +387,7 @@ sys_ptrace(long request, long pid, long addr, long data,
 		goto out;
 	}
  out:
-	free_task_struct(child);
+	put_task_struct(child);
  out_notsk:
 	unlock_kernel();
 	return ret;
@@ -390,8 +396,9 @@ sys_ptrace(long request, long pid, long addr, long data,
 asmlinkage void
 syscall_trace(void)
 {
-	if ((current->ptrace & (PT_PTRACED|PT_TRACESYS))
-	    != (PT_PTRACED|PT_TRACESYS))
+	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+		return;
+	if (!(current->ptrace & PT_PTRACED))
 		return;
 	current->exit_code = SIGTRAP;
 	current->state = TASK_STOPPED;
