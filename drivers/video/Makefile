@@ -48,7 +48,7 @@ obj-$(CONFIG_FB_RETINAZ3)         += retz3fb.o
 obj-$(CONFIG_FB_CLGEN)            += clgenfb.o
 obj-$(CONFIG_FB_TRIDENT)	  += tridentfb.o
 obj-$(CONFIG_FB_S3TRIO)           += S3triofb.o
-obj-$(CONFIG_FB_TGA)              += tgafb.o
+obj-$(CONFIG_FB_TGA)              += tgafb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o 
 obj-$(CONFIG_FB_VESA)             += vesafb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o 
 obj-$(CONFIG_FB_VGA16)            += vga16fb.o cfbfillrect.o cfbcopyarea.o \
 	                             cfbimgblt.o vgastate.o 
