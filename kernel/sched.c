@@ -25,6 +25,7 @@
 #include <linux/highmem.h>
 #include <linux/smp_lock.h>
 #include <asm/mmu_context.h>
+#include <asm/tlb.h>
 #include <linux/interrupt.h>
 #include <linux/completion.h>
 #include <linux/kernel_stat.h>
@@ -1001,6 +1002,13 @@ static void sched_migrate_task(task_t *p, int dest_cpu)
 		task_rq_unlock(rq, &flags);
 		wake_up_process(rq->migration_thread);
 		wait_for_completion(&req.done);
+
+		/*
+		 * we want a new context here. This eliminates TLB
+		 * flushes on the cpus where the process executed prior to
+		 * the migration.
+		 */
+		tlb_migrate_prepare(current->mm);
 
 		/* If we raced with sys_sched_setaffinity, don't
 		 * restore mask. */
