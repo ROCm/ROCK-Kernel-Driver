@@ -1123,6 +1123,7 @@ static void init_inode (struct inode * inode, struct path * path)
 	inode->i_mapping->a_ops = &reiserfs_address_space_operations;
     } else {
 	inode->i_blocks = 0;
+	inode->i_op = &reiserfs_special_inode_operations;
 	init_special_inode(inode, inode->i_mode, new_decode_dev(rdev));
     }
 }
@@ -2350,8 +2351,11 @@ int reiserfs_prepare_write(struct file *f, struct page *page,
 	if (th->t_refcount > old_ref) {
 	    if (old_ref)
 	    	th->t_refcount--;
-	    else
+	    else {
+		reiserfs_write_lock(inode->i_sb);
 		reiserfs_end_persistent_transaction(th);
+		reiserfs_write_unlock(inode->i_sb);
+	    }
 	}
     }
     return ret;

@@ -1935,6 +1935,7 @@ done:
 		if (uptodate)
 			SetPageUptodate(page);
 		end_page_writeback(page);
+		wbc->pages_skipped++;	/* We didn't write this page */
 	}
 	return err;
 

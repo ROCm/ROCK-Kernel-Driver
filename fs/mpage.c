@@ -610,6 +610,9 @@ mpage_writepages(struct address_space *mapping,
 	struct pagevec pvec;
 	int nr_pages;
 	pgoff_t index;
+	pgoff_t end = -1;		/* Inclusive */
+	int scanned = 0;
+	int is_range = 0;
 
 	if (wbc->nonblocking && bdi_write_congested(bdi)) {
 		wbc->encountered_congestion = 1;
@@ -621,11 +624,26 @@ mpage_writepages(struct address_space *mapping,
 		writepage = mapping->a_ops->writepage;
 
 	pagevec_init(&pvec, 0);
-	index = 0;
-	while (!done && (nr_pages = pagevec_lookup_tag(&pvec, mapping, &index,
-					PAGECACHE_TAG_DIRTY, PAGEVEC_SIZE))) {
+	if (wbc->sync_mode == WB_SYNC_NONE) {
+		index = mapping->writeback_index; /* Start from prev offset */
+	} else {
+		index = 0;			  /* whole-file sweep */
+		scanned = 1;
+	}
+	if (wbc->start || wbc->end) {
+		index = wbc->start >> PAGE_CACHE_SHIFT;
+		end = wbc->end >> PAGE_CACHE_SHIFT;
+		is_range = 1;
+		scanned = 1;
+	}
+retry:
+	while (!done && (index <= end) && 
+			(nr_pages = pagevec_lookup_tag(&pvec, mapping, &index,
+			PAGECACHE_TAG_DIRTY,
+			min(end - index, (pgoff_t)PAGEVEC_SIZE-1) + 1))) {
 		unsigned i;
 
+		scanned = 1;
 		for (i = 0; i < nr_pages; i++) {
 			struct page *page = pvec.pages[i];
 
@@ -639,40 +657,61 @@ mpage_writepages(struct address_space *mapping,
 
 			lock_page(page);
 
+			if (unlikely(page->mapping != mapping)) {
+				unlock_page(page);
+				continue;
+			}
+
+			if (unlikely(is_range) && page->index > end) {
+				done = 1;
+				unlock_page(page);
+				continue;
+			}
+
 			if (wbc->sync_mode != WB_SYNC_NONE)
 				wait_on_page_writeback(page);
 
-			if (page->mapping == mapping && !PageWriteback(page) &&
-						clear_page_dirty_for_io(page)) {
-				if (writepage) {
-					ret = (*writepage)(page, wbc);
-					if (ret) {
-						if (ret == -ENOSPC)
-							set_bit(AS_ENOSPC,
-							  &mapping->flags);
-						else
-							set_bit(AS_EIO,
-							  &mapping->flags);
-					}
-				} else {
-					bio = mpage_writepage(bio, page,
-						get_block, &last_block_in_bio,
-						&ret, wbc);
-				}
-				if (ret || (--(wbc->nr_to_write) <= 0))
-					done = 1;
-				if (wbc->nonblocking &&
-						bdi_write_congested(bdi)) {
-					wbc->encountered_congestion = 1;
-					done = 1;
+			if (PageWriteback(page) ||
+					!clear_page_dirty_for_io(page)) {
+				unlock_page(page);
+				continue;
+			}
+
+			if (writepage) {
+				ret = (*writepage)(page, wbc);
+				if (ret) {
+					if (ret == -ENOSPC)
+						set_bit(AS_ENOSPC,
+							&mapping->flags);
+					else
+						set_bit(AS_EIO,
+							&mapping->flags);
 				}
 			} else {
-				unlock_page(page);
+				bio = mpage_writepage(bio, page, get_block,
+						&last_block_in_bio, &ret, wbc);
+			}
+			if (ret || (--(wbc->nr_to_write) <= 0))
+				done = 1;
+			if (wbc->nonblocking && bdi_write_congested(bdi)) {
+				wbc->encountered_congestion = 1;
+				done = 1;
 			}
 		}
 		pagevec_release(&pvec);
 		cond_resched();
 	}
+	if (!scanned && !done) {
+		/*
+		 * We hit the last page and there is more work to be done: wrap
+		 * back to the start of the file
+		 */
+		scanned = 1;
+		index = 0;
+		goto retry;
+	}
+	if (!is_range)
+		mapping->writeback_index = index;
 	if (bio)
 		mpage_bio_submit(WRITE, bio);
 	return ret;

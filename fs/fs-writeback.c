@@ -252,6 +252,7 @@ sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 						struct inode, i_list);
 		struct address_space *mapping = inode->i_mapping;
 		struct backing_dev_info *bdi = mapping->backing_dev_info;
+		long pages_skipped;
 
 		if (bdi->memory_backed) {
 			if (sb == blockdev_superblock) {
@@ -299,6 +300,7 @@ sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 
 		BUG_ON(inode->i_state & I_FREEING);
 		__iget(inode);
+		pages_skipped = wbc->pages_skipped;
 		__writeback_single_inode(inode, wbc);
 		if (wbc->sync_mode == WB_SYNC_HOLD) {
 			inode->dirtied_when = jiffies;
@@ -306,6 +308,13 @@ sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 		}
 		if (current_is_pdflush())
 			writeback_release(bdi);
+		if (wbc->pages_skipped != pages_skipped) {
+			/*
+			 * writeback is not making progress due to locked
+			 * buffers.  Skip this inode for now.
+			 */
+			list_move(&inode->i_list, &sb->s_dirty);
+		}
 		spin_unlock(&inode_lock);
 		iput(inode);
 		cond_resched();

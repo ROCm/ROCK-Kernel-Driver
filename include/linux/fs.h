@@ -328,6 +328,7 @@ struct address_space {
 	struct radix_tree_root	page_tree;	/* radix tree of all pages */
 	spinlock_t		tree_lock;	/* and spinlock protecting it */
 	unsigned long		nrpages;	/* number of total pages */
+	pgoff_t			writeback_index;/* writeback starts here */
 	struct address_space_operations *a_ops;	/* methods */
 	struct prio_tree_root	i_mmap;		/* tree of private mappings */
 	struct prio_tree_root	i_mmap_shared;	/* tree of shared mappings */
@@ -793,6 +794,11 @@ extern int vfs_rename(struct inode *, struct dentry *, struct inode *, struct de
 #define DT_LNK		10
 #define DT_SOCK		12
 #define DT_WHT		14
+
+#define OSYNC_METADATA	(1<<0)
+#define OSYNC_DATA	(1<<1)
+#define OSYNC_INODE	(1<<2)
+int generic_osync_inode(struct inode *, struct address_space *, int);
 
 /*
  * This is the "filldir" function type, used by readdir() to let
