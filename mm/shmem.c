@@ -1301,7 +1301,7 @@ shmem_file_write(struct file *file, const char __user *buf, size_t count, loff_t
 	struct inode	*inode = file->f_dentry->d_inode;
 	loff_t		pos;
 	unsigned long	written;
-	int		err;
+	ssize_t		err;
 
 	if ((ssize_t) count < 0)
 		return -EINVAL;
