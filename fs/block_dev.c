@@ -37,14 +37,6 @@ static unsigned long max_block(struct block_device *bdev)
 	return retval;
 }
 
-static loff_t blkdev_size(kdev_t dev)
-{
-	loff_t sz = blkdev_size_in_bytes(dev);
-	if (sz)
-		return sz;
-	return ~0ULL;
-}
-
 /* Kill _all_ buffers, dirty or not.. */
 static void kill_bdev(struct block_device *bdev)
 {
@@ -538,17 +530,23 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 	int ret = -ENXIO;
 	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	struct module *owner = NULL;
+	struct block_device_operations *ops, *current_ops;
 
-	down(&bdev->bd_sem);
 	lock_kernel();
-	if (!bdev->bd_op) {
-		bdev->bd_op = get_blkfops(major(dev));
-		if (!bdev->bd_op)
-			goto out;
-		owner = bdev->bd_op->owner;
+	ops = get_blkfops(major(dev));
+	if (ops) {
+		owner = ops->owner;
 		if (owner)
 			__MOD_INC_USE_COUNT(owner);
 	}
+
+	down(&bdev->bd_sem);
+	if (!bdev->bd_op)
+		current_ops = ops;
+	else
+		current_ops = bdev->bd_op;
+	if (!current_ops)
+		goto out;
 	if (!bdev->bd_contains) {
 		unsigned minor = minor(dev);
 		struct gendisk *g = get_gendisk(dev);
@@ -569,15 +567,30 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 			}
 		}
 	}
-	if (bdev->bd_op->open) {
-		ret = bdev->bd_op->open(inode, file);
+	if (current_ops->open) {
+		ret = current_ops->open(inode, file);
 		if (ret)
 			goto out2;
 	}
-	bdev->bd_inode->i_size = blkdev_size(dev);
+	if (!bdev->bd_op)
+		bdev->bd_op = ops;
+	else if (owner)
+		__MOD_DEC_USE_COUNT(owner);
 	if (!bdev->bd_openers) {
 		struct blk_dev_struct *p = blk_dev + major(dev);
+		struct gendisk *g = get_gendisk(dev);
 		unsigned bsize = bdev_hardsect_size(bdev);
+
+		bdev->bd_offset = 0;
+		if (g) {
+			bdev->bd_inode->i_size =
+				(loff_t) g->part[minor(dev)].nr_sects << 9;
+			bdev->bd_offset = g->part[minor(dev)].start_sect;
+		} else if (blk_size[major(dev)])
+			bdev->bd_inode->i_size =
+				(loff_t) blk_size[major(dev)][minor(dev)] << 10;
+		else
+			bdev->bd_inode->i_size = 0;
 		while (bsize < PAGE_CACHE_SIZE) {
 			if (bdev->bd_inode->i_size & bsize)
 				break;
@@ -601,14 +614,12 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 		}
 	}
 	bdev->bd_openers++;
-	unlock_kernel();
 	up(&bdev->bd_sem);
+	unlock_kernel();
 	return 0;
 
 out2:
 	if (!bdev->bd_openers) {
-		bdev->bd_op = NULL;
-		bdev->bd_queue = NULL;
 		bdev->bd_inode->i_data.backing_dev_info = &default_backing_dev_info;
 		if (bdev != bdev->bd_contains) {
 			blkdev_put(bdev->bd_contains, BDEV_RAW);
@@ -619,8 +630,8 @@ out1:
 	if (owner)
 		__MOD_DEC_USE_COUNT(owner);
 out:
-	unlock_kernel();
 	up(&bdev->bd_sem);
+	unlock_kernel();
 	if (ret)
 		bdput(bdev);
 	return ret;
@@ -679,9 +690,9 @@ int blkdev_put(struct block_device *bdev, int kind)
 		kill_bdev(bdev);
 	if (bdev->bd_op->release)
 		ret = bdev->bd_op->release(bd_inode, NULL);
-	if (bdev->bd_op->owner)
-		__MOD_DEC_USE_COUNT(bdev->bd_op->owner);
 	if (!bdev->bd_openers) {
+		if (bdev->bd_op->owner)
+			__MOD_DEC_USE_COUNT(bdev->bd_op->owner);
 		bdev->bd_op = NULL;
 		bdev->bd_queue = NULL;
 		bdev->bd_inode->i_data.backing_dev_info = &default_backing_dev_info;

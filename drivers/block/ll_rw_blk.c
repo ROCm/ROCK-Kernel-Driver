@@ -1573,16 +1573,10 @@ end_io:
 static inline void blk_partition_remap(struct bio *bio)
 {
 	struct block_device *bdev = bio->bi_bdev;
-	struct gendisk *g;
-
 	if (bdev == bdev->bd_contains)
 		return;
 
-	g = get_gendisk(to_kdev_t(bdev->bd_dev));
-	if (!g)
-		BUG();
-
-	bio->bi_sector += g->part[minor(to_kdev_t((bdev->bd_dev)))].start_sect;
+	bio->bi_sector += bdev->bd_offset;
 	bio->bi_bdev = bdev->bd_contains;
 	/* lots of checks are possible */
 }

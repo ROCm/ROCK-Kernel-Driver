@@ -389,20 +389,6 @@ extern inline unsigned int block_size(struct block_device *bdev)
 	return bdev->bd_block_size;
 }
 
-static inline loff_t blkdev_size_in_bytes(kdev_t dev)
-{
-#if 0
-	if (blk_size_in_bytes[major(dev)])
-		return blk_size_in_bytes[major(dev)][minor(dev)];
-	else
-#endif
-	if (blk_size[major(dev)])
-		return (loff_t) blk_size[major(dev)][minor(dev)]
-			<< BLOCK_SIZE_BITS;
-	else
-		return 0;
-}
-
 typedef struct {struct page *v;} Sector;
 
 unsigned char *read_dev_sector(struct block_device *, unsigned long, Sector *);
