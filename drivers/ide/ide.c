@@ -803,8 +803,7 @@ void ide_end_drive_cmd(ide_drive_t *drive, byte stat, byte err)
 				args->hobfile.high_cylinder = IN_BYTE(IDE_HCYL_REG);
 			}
 		}
-		if (ar->ar_flags & ATA_AR_RETURN)
-			ata_ar_put(drive, ar);
+		ata_ar_put(drive, ar);
 	}
 
 	blkdev_dequeue_request(rq);

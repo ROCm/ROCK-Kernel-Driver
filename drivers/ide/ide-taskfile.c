@@ -413,6 +413,20 @@ ide_startstop_t ata_taskfile(ide_drive_t *drive,
 	struct hd_driveid *id = drive->id;
 	u8 HIHI = (drive->addressing) ? 0xE0 : 0xEF;
 
+#if 0
+	printk("ata_taskfile ... %p\n", args->handler);
+
+	printk("   sector feature          %02x\n", args->taskfile.feature);
+	printk("   sector count            %02x\n", args->taskfile.sector_count);
+	printk("   drive/head              %02x\n", args->taskfile.device_head);
+	printk("   command                 %02x\n", args->taskfile.command);
+
+	if (rq)
+		printk("   rq->nr_sectors          %2li\n",  rq->nr_sectors);
+	else
+		printk("   rq->                   = null\n");
+#endif
+ 
 	/* (ks/hs): Moved to start, do not use for multiple out commands */
 	if (args->handler != task_mulout_intr) {
 		if (IDE_CONTROL_REG)
@@ -577,18 +591,22 @@ static ide_startstop_t task_in_intr (ide_drive_t *drive)
 	ata_read(drive, pBuf, SECTOR_WORDS);
 	ide_unmap_rq(rq, pBuf, &flags);
 
+	/*
+	 * first segment of the request is complete. note that this does not
+	 * necessarily mean that the entire request is done!! this is only
+	 * true if ide_end_request() returns 0.
+	 */
 	if (--rq->current_nr_sectors <= 0) {
-		/* (hs): swapped next 2 lines */
 		DTF("Request Ended stat: %02x\n", GET_STAT());
-		if (ide_end_request(drive, 1)) {
-			ide_set_handler(drive, &task_in_intr,  WAIT_CMD, NULL);
-			return ide_started;
-		}
-	} else {
-		ide_set_handler(drive, &task_in_intr,  WAIT_CMD, NULL);
-		return ide_started;
+		if (!ide_end_request(drive, 1))
+			return ide_stopped;
 	}
-	return ide_stopped;
+
+	/*
+	 * still data left to transfer
+	 */
+	ide_set_handler(drive, &task_in_intr,  WAIT_CMD, NULL);
+	return ide_started;
 }
 
 static ide_startstop_t pre_task_out_intr(ide_drive_t *drive, struct request *rq)
@@ -874,7 +892,6 @@ void ide_cmd_type_parser(struct ata_taskfile *args)
 			return;
 
 		case WIN_NOP:
-
 			args->command_type = IDE_DRIVE_TASK_NO_DATA;
 			return;
 
@@ -904,11 +921,6 @@ int ide_raw_taskfile(ide_drive_t *drive, struct ata_taskfile *args, byte *buf)
 	struct ata_request star;
 
 	ata_ar_init(drive, &star);
-
-	/* Don't put this request on free_req list after usage.
-	 */
-	star.ar_flags |= ATA_AR_STATIC;
-
 	init_taskfile_request(&rq);
 	rq.buffer = buf;
 

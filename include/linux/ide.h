@@ -968,10 +968,9 @@ extern void revalidate_drives(void);
 /*
  * ata_request flag bits
  */
-#define ATA_AR_QUEUED	1
-#define ATA_AR_SETUP	2
-#define ATA_AR_RETURN	4
-#define ATA_AR_STATIC	8
+#define ATA_AR_QUEUED	1	/* was queued */
+#define ATA_AR_SETUP	2	/* dma table mapped */
+#define ATA_AR_POOL	4	/* originated from drive pool */
 
 /*
  * if turn-around time is longer than this, halve queue depth
@@ -1003,8 +1002,10 @@ static inline struct ata_request *ata_ar_get(ide_drive_t *drive)
 
 	if (!list_empty(&drive->free_req)) {
 		ar = list_ata_entry(drive->free_req.next);
+
 		list_del(&ar->ar_queue);
 		ata_ar_init(drive, ar);
+		ar->ar_flags |= ATA_AR_POOL;
 	}
 
 	return ar;
@@ -1012,8 +1013,8 @@ static inline struct ata_request *ata_ar_get(ide_drive_t *drive)
 
 static inline void ata_ar_put(ide_drive_t *drive, struct ata_request *ar)
 {
-	if (!(ar->ar_flags & ATA_AR_STATIC))
-	    list_add(&ar->ar_queue, &drive->free_req);
+	if (ar->ar_flags & ATA_AR_POOL)
+		list_add(&ar->ar_queue, &drive->free_req);
 
 	if (ar->ar_flags & ATA_AR_QUEUED) {
 		/* clear the tag */
