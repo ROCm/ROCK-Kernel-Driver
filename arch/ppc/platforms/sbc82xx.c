@@ -17,11 +17,13 @@
 
 #include <linux/config.h>
 #include <linux/seq_file.h>
+#include <linux/stddef.h>
 
 #include <asm/mpc8260.h>
 #include <asm/machdep.h>
 #include <asm/io.h>
 #include <asm/todc.h>
+#include <asm/immap_8260.h>
 
 static void (*callback_setup_arch)(void);
 
@@ -40,8 +42,8 @@ sbc82xx_show_cpuinfo(struct seq_file *m)
 	seq_printf(m, "vendor\t\t: Wind River\n"
 		      "machine\t\t: SBC PowerQUICC II\n"
 		      "\n"
-		      "mem size\t\t: 0x%08x\n"
-		      "console baud\t\t: %d\n"
+		      "mem size\t\t: 0x%08lx\n"
+		      "console baud\t\t: %ld\n"
 		      "\n",
 		      binfo->bi_memsize,
 		      binfo->bi_baudrate);
@@ -65,7 +67,14 @@ TODC_ALLOC();
 #ifdef CONFIG_GEN_RTC
 static void sbc82xx_time_init(void)
 {
+	volatile memctl8260_t *mc = &immr->im_memctl;
 	TODC_INIT(TODC_TYPE_MK48T59, 0, 0, SBC82xx_TODC_NVRAM_ADDR, 0);
+
+	/* Set up CS11 for RTC chip */
+	mc->memc_br11=0;
+	mc->memc_or11=0xffff0836;
+	mc->memc_br11=0x80000801;
+
 	todc_info->nvram_data =
 		(unsigned int)ioremap(todc_info->nvram_data, 0x2000);
 	BUG_ON(!todc_info->nvram_data);
@@ -84,8 +93,11 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	/* Generic 8260 platform initialization */
 	m8260_init(r3, r4, r5, r6, r7);
 
-	/* Anything special for this platform */
+	/* u-boot may be using one of the FCC Ethernet devices.
+	   Use the MAC address to the SCC. */
+	__res[offsetof(bd_t, bi_enetaddr[5])] &= ~3;
 
+	/* Anything special for this platform */
 	ppc_md.show_cpuinfo	= sbc82xx_show_cpuinfo;
 
 	callback_setup_arch	= ppc_md.setup_arch;

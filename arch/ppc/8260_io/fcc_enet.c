@@ -1627,17 +1627,23 @@ init_fcc_param(fcc_info_t *fip, struct net_device *dev,
 	eap = (unsigned char *)&(ep->fen_paddrh);
 	for (i=5; i>=0; i--) {
 #ifdef CONFIG_SBC82xx
-		*eap++ = dev->dev_addr[i] = bd->bi_enetaddrs[fip->fc_fccnum+1][i];
+		if (i == 5) {
+			/* bd->bi_enetaddr holds the SCC0 address; the FCC
+			   devices count up from there */
+			dev->dev_addr[i] = bd->bi_enetaddr[i] & ~3;
+			dev->dev_addr[i] += 1 + fip->fc_fccnum;
+			*eap++ = dev->dev_addr[i];
+		}
 #else
 		if (i == 3) {
 			dev->dev_addr[i] = bd->bi_enetaddr[i];
 			dev->dev_addr[i] |= (1 << (7 - fip->fc_fccnum));
 			*eap++ = dev->dev_addr[i];
 		}
+#endif
 		else {
 			*eap++ = dev->dev_addr[i] = bd->bi_enetaddr[i];
 		}
-#endif
 	}
 
 	ep->fen_taddrh = 0;

@@ -503,29 +503,17 @@ embed_config(bd_t **bdp)
 	bd->bi_memsize = 256 * 1024 * 1024;	/* just a guess */
 
 	cp = (void*)SBC82xx_MACADDR_NVRAM_SCC1;
-	for (i=0; i<6; i++) {
-		bd->bi_enetaddrs[0][i] = *cp++;
-	}
-	cp = (void*)SBC82xx_MACADDR_NVRAM_FCC1;
-	for (i=0; i<6; i++) {
-		bd->bi_enetaddrs[1][i] = *cp++;
-	}
-	cp = (void*)SBC82xx_MACADDR_NVRAM_FCC2;
-	for (i=0; i<6; i++) {
-		bd->bi_enetaddrs[2][i] = *cp++;
-	}
-	cp = (void*)SBC82xx_MACADDR_NVRAM_FCC3;
-	for (i=0; i<6; i++) {
-		bd->bi_enetaddrs[3][i] = *cp++;
-	}
+	memcpy(bd->bi_enetaddr, cp, 6);
 
 	/* can busfreq be calculated? */
-	bd->bi_busfreq = 100000000;
 	pvr = mfspr(PVR);
-	if ((pvr & 0xffff0000) == 0x80820000)
+	if ((pvr & 0xffff0000) == 0x80820000) {
+		bd->bi_busfreq = 100000000;
 		clk_8280(bd);
-	else
+	} else {
+		bd->bi_busfreq = 66000000;
 		clk_8260(bd);
+	}
 
 }
 #endif /* SBC82xx */
