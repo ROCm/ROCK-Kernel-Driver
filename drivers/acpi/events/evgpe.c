@@ -217,8 +217,8 @@ acpi_ev_gpe_detect (
 					gpe_number = (i * ACPI_GPE_REGISTER_WIDTH) + j;
 
 					int_status |= acpi_ev_gpe_dispatch (
-							  &gpe_block->event_info[gpe_number],
-							  gpe_number + gpe_block->register_info[gpe_number].base_gpe_number);
+							&gpe_block->event_info[gpe_number],
+							j + gpe_register_info->base_gpe_number);
 				}
 			}
 		}

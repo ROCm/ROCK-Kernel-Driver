@@ -327,9 +327,11 @@ setup_arch (char **cmdline_p)
 	 * because we don't *really* know whether there's anything there, but we hope that
 	 * all new boxes will implement HCDP.
 	 */
-	extern unsigned char acpi_legacy_devices;
-	if (!efi.hcdp && acpi_legacy_devices)
-		setup_serial_legacy();
+	{
+		extern unsigned char acpi_legacy_devices;
+		if (!efi.hcdp && acpi_legacy_devices)
+			setup_serial_legacy();
+	}
 #endif
 
 #ifdef CONFIG_VT

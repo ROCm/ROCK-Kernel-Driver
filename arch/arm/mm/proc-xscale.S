@@ -670,7 +670,7 @@ __80200_proc_info:
 	.type	__80321_proc_info,#object
 __80321_proc_info:
 	.long	0x69052420
-	.long	0xfffffff0
+	.long	0xfffff7e0
 	.long	0x00000c0e
 	b	__xscale_setup
 	.long	cpu_arch_name

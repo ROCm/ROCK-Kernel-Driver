@@ -78,8 +78,14 @@
  */
 #ifdef CONFIG_X86_IO_APIC
 #define NR_IRQS 224
+# if (224 >= 32 * NR_CPUS)
+# define NR_IRQ_VECTORS NR_IRQS
+# else
+# define NR_IRQ_VECTORS (32 * NR_CPUS)
+# endif
 #else
 #define NR_IRQS 16
+#define NR_IRQ_VECTORS NR_IRQS
 #endif
 
 #define FPU_IRQ			13

@@ -93,17 +93,17 @@ default_init(struct task_struct *task, void *buf, unsigned int flags, int cpu, v
 
 	hdr->hdr_version      = PFM_DEFAULT_SMPL_VERSION;
 	hdr->hdr_buf_size     = arg->buf_size;
-	hdr->hdr_cur_pos      = (void *)((unsigned long)buf)+sizeof(*hdr);
-	hdr->hdr_last_pos     = (void *)((unsigned long)buf)+arg->buf_size;
+	hdr->hdr_cur_offs     = sizeof(*hdr);
 	hdr->hdr_overflows    = 0UL;
 	hdr->hdr_count        = 0UL;
 
-	DPRINT(("[%d] buffer=%p buf_size=%lu hdr_size=%lu hdr_version=%u\n",
+	DPRINT(("[%d] buffer=%p buf_size=%lu hdr_size=%lu hdr_version=%u cur_offs=%lu\n",
 		task->pid,
 		buf,
 		hdr->hdr_buf_size,
 		sizeof(*hdr),
-		hdr->hdr_version));
+		hdr->hdr_version,
+		hdr->hdr_cur_offs));
 
 	return 0;
 }
@@ -125,8 +125,8 @@ default_handler(struct task_struct *task, void *buf, pfm_ovfl_arg_t *arg, struct
 	}
 
 	hdr         = (pfm_default_smpl_hdr_t *)buf;
-	cur         = hdr->hdr_cur_pos;
-	last        = hdr->hdr_last_pos;
+	cur         = buf+hdr->hdr_cur_offs;
+	last        = buf+hdr->hdr_buf_size;
 	ovfl_pmd    = arg->ovfl_pmd;
 	ovfl_notify = arg->ovfl_notify;
 
@@ -191,7 +191,7 @@ default_handler(struct task_struct *task, void *buf, pfm_ovfl_arg_t *arg, struct
 	/*
 	 * update position for next entry
 	 */
-	hdr->hdr_cur_pos = cur + sizeof(*ent) + (npmds << 3);
+	hdr->hdr_cur_offs += sizeof(*ent) + (npmds << 3);
 
 	/*
 	 * keep same ovfl_pmds, ovfl_notify
@@ -212,10 +212,9 @@ full:
 	hdr->hdr_overflows++;
 
 	/*
-	 * if no notification is needed, then we saturate the buffer
+	 * if no notification requested, then we saturate the buffer
 	 */
 	if (ovfl_notify == 0) {
-		hdr->hdr_count = 0UL;
 		arg->ovfl_ctrl.bits.notify_user     = 0;
 		arg->ovfl_ctrl.bits.block_task      = 0;
 		arg->ovfl_ctrl.bits.mask_monitoring = 1;
@@ -236,8 +235,8 @@ default_restart(struct task_struct *task, pfm_ovfl_ctrl_t *ctrl, void *buf, stru
 
 	hdr = (pfm_default_smpl_hdr_t *)buf;
 
-	hdr->hdr_count   = 0UL;
-	hdr->hdr_cur_pos = (void *)((unsigned long)buf)+sizeof(*hdr);
+	hdr->hdr_count    = 0UL;
+	hdr->hdr_cur_offs = sizeof(*hdr);
 
 	ctrl->bits.mask_monitoring = 0;
 	ctrl->bits.reset_ovfl_pmds = 1; /* uses long-reset values */

@@ -247,6 +247,34 @@ acpi_parse_nmi_src (
 
 #endif /*CONFIG_X86_IO_APIC*/
 
+#ifdef	CONFIG_ACPI_BUS
+/*
+ * Set specified PIC IRQ to level triggered mode.
+ *
+ * Port 0x4d0-4d1 are ECLR1 and ECLR2, the Edge/Level Control Registers
+ * for the 8259 PIC.  bit[n] = 1 means irq[n] is Level, otherwise Edge.
+ * ECLR1 is IRQ's 0-7 (IRQ 0, 1, 2 must be 0)
+ * ECLR2 is IRQ's 8-15 (IRQ 8, 13 must be 0)
+ *
+ * As the BIOS should have done this for us,
+ * print a warning if the IRQ wasn't already set to level.
+ */
+
+void acpi_pic_set_level_irq(unsigned int irq)
+{
+	unsigned char mask = 1 << (irq & 7);
+	unsigned int port = 0x4d0 + (irq >> 3);
+	unsigned char val = inb(port);
+
+	if (!(val & mask)) {
+		printk(KERN_WARNING PREFIX "IRQ %d was Edge Triggered, "
+			"setting to Level Triggerd\n", irq);
+		outb(val | mask, port);
+	}
+}
+#endif /* CONFIG_ACPI_BUS */
+
+
 
 static unsigned long __init
 acpi_scan_rsdp (

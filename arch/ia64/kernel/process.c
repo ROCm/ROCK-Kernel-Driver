@@ -685,11 +685,15 @@ machine_restart (char *restart_cmd)
 	(*efi.reset_system)(EFI_RESET_WARM, 0, 0, 0);
 }
 
+EXPORT_SYMBOL(machine_restart);
+
 void
 machine_halt (void)
 {
 	cpu_halt();
 }
+
+EXPORT_SYMBOL(machine_halt);
 
 void
 machine_power_off (void)
@@ -698,3 +702,5 @@ machine_power_off (void)
 		pm_power_off();
 	machine_halt();
 }
+
+EXPORT_SYMBOL(machine_power_off);

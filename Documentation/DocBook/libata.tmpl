@@ -1,0 +1,91 @@
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook V3.1//EN"[]>
+
+<book id="libataDevGuide">
+ <bookinfo>
+  <title>libATA Developer's Guide</title>
+  
+  <authorgroup>
+   <author>
+    <firstname>Jeff</firstname>
+    <surname>Garzik</surname>
+   </author>
+  </authorgroup>
+
+  <copyright>
+   <year>2003</year>
+   <holder>Jeff Garzik</holder>
+  </copyright>
+
+  <legalnotice>
+   <para>
+   The contents of this file are subject to the Open
+   Software License version 1.1 that can be found at
+   <ulink url="http://www.opensource.org/licenses/osl-1.1.txt">http://www.opensource.org/licenses/osl-1.1.txt</ulink> and is included herein
+   by reference.
+   </para>
+
+   <para>
+   Alternatively, the contents of this file may be used under the terms
+   of the GNU General Public License version 2 (the "GPL") as distributed
+   in the kernel source COPYING file, in which case the provisions of
+   the GPL are applicable instead of the above.  If you wish to allow
+   the use of your version of this file only under the terms of the
+   GPL and not to allow others to use your version of this file under
+   the OSL, indicate your decision by deleting the provisions above and
+   replace them with the notice and other provisions required by the GPL.
+   If you do not delete the provisions above, a recipient may use your
+   version of this file under either the OSL or the GPL.
+   </para>
+
+  </legalnotice>
+ </bookinfo>
+
+<toc></toc>
+
+  <chapter id="libataThanks">
+     <title>Thanks</title>
+  <para>
+  The bulk of the ATA knowledge comes thanks to long conversations with
+  Andre Hedrick (www.linux-ide.org).
+  </para>
+  <para>
+  Thanks to Alan Cox for pointing out similarities 
+  between SATA and SCSI, and in general for motivation to hack on
+  libata.
+  </para>
+  <para>
+  libata's device detection
+  method, ata_pio_devchk, and in general all the early probing was
+  based on extensive study of Hale Landis's probe/reset code in his
+  ATADRVR driver (www.ata-atapi.com).
+  </para>
+  </chapter>
+
+  <chapter id="libataExt">
+     <title>libata Library</title>
+!Edrivers/scsi/libata-core.c
+!Edrivers/scsi/libata-scsi.c
+  </chapter>
+
+  <chapter id="libataInt">
+     <title>libata Internals</title>
+!Idrivers/scsi/libata-core.c
+!Idrivers/scsi/libata-scsi.c
+  </chapter>
+
+  <chapter id="PiixInt">
+     <title>ata_piix Internals</title>
+!Idrivers/scsi/ata_piix.c
+  </chapter>
+
+  <chapter id="SILInt">
+     <title>ata_sil Internals</title>
+!Idrivers/scsi/sata_sil.c
+  </chapter>
+
+  <chapter id="VIAInt">
+     <title>ata_via Internals</title>
+!Idrivers/scsi/sata_via.c
+  </chapter>
+
+</book>
