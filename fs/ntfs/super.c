@@ -152,9 +152,9 @@ static BOOL parse_options(ntfs_volume *vol, char *opt)
 				on_errors_arr)
 		else NTFS_GETOPT_OPTIONS_ARRAY("show_inodes", readdir_opts,
 				readdir_opts_arr)
-		else if (!strcmp(p, "show_system_files")) {
+		else if (!strcmp(p, "show_sys_files")) {
 			BOOL val = FALSE;
-			ntfs_warning(vol->sb, "Option show_system_files is "
+			ntfs_warning(vol->sb, "Option show_sys_files is "
 				   "deprecated. Please use option "
 				   "show_inodes=system in the future.");
 			if (!v || !*v)

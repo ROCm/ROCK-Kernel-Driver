@@ -14,6 +14,9 @@ number of sectors.
 Supported mount options
 =======================
 
+iocharset=name		Deprecated option. Still supported but please use
+			nls=name in the future. See description for nls=name.
+
 nls=name		Character set to use when returning file names.
 			Unlike VFAT, NTFS suppresses names that contain
 			unconvertible characters. Note that most character
@@ -22,6 +25,11 @@ nls=name		Character set to use when returning file names.
 			be sure you are not missing any files, you are advised
 			to use nls=utf8 which is capable of representing all
 			Unicode characters.
+
+utf8=<bool>		Option no longer supported. Currently mapped to
+			nls=utf8 but please use nls=utf8 in the future and
+			make sure utf8 is compiled either as module or into
+			the kernel. See description for nls=name.
 
 uid=
 gid=
@@ -39,21 +47,13 @@ sloppy=<BOOL>		If sloppy is specified, ignore unknown mount options.
 			Otherwise the default behaviour is to abort mount if
 			any unknown options are found.
 
-errors=opt		What to do when critical file system errors are found.
-			Following values can be used for "opt":
-			  continue: DEFAULT, try to clean-up as much as
-				    possible, e.g. marking a corrupt inode as
-				    bad so it is no longer accessed, and then
-				    continue.
-			  recover:  At present only supported is recovery of
-				    the boot sector from the backup copy. If a
-				    read-only mount, the recovery is done in
-				    memory only and not written to disk.
-			Note that the options are additive, i.e. specifying:
-			   errors=continue,errors=recover
-			This means the driver will attempt to recover and if
-			that fails it will clean-up as much as possible and
-			continue.
+posix=<bool>		Deprecated option. Still supported but please use
+			show_inodes=posix in the future. See description for
+			show_inodes=opt.
+
+show_sys_files=<bool>	Deprecated option. Still supported but please use
+			show_inodes=system in the future. See description for
+			show_inodes=opt.
 
 show_inodes=opt		Allows choice of which types of inode names readdir()
 			returns, i.e. this affects what "ls" shows. Following
@@ -94,6 +94,22 @@ show_inodes=opt		Allows choice of which types of inode names readdir()
 			names are case sensitive and they can only be accessed
 			given the correct case.
 
+errors=opt		What to do when critical file system errors are found.
+			Following values can be used for "opt":
+			  continue: DEFAULT, try to clean-up as much as
+				    possible, e.g. marking a corrupt inode as
+				    bad so it is no longer accessed, and then
+				    continue.
+			  recover:  At present only supported is recovery of
+				    the boot sector from the backup copy. If a
+				    read-only mount, the recovery is done in
+				    memory only and not written to disk.
+			Note that the options are additive, i.e. specifying:
+			   errors=continue,errors=recover
+			This means the driver will attempt to recover and if
+			that fails it will clean-up as much as possible and
+			continue.
+
 mft_zone_multiplier=	Set the MFT zone multiplier for the volume (this
 			setting is not persistent across mounts and can be
 			changed from mount to mount but cannot be changed on
@@ -117,8 +133,17 @@ mft_zone_multiplier=	Set the MFT zone multiplier for the volume (this
 Features
 ========
 
-- Implementation of NTFS read support functionally equivalent to the old ntfs
-  driver.
+- This is a complete rewrite of the NTFS driver that used to be in the kernel.
+  This new driver implementats NTFS read support and is functionally equivalent
+  to the old ntfs driver. And in addition the new driver has full support for
+  sparse files on NTFS 3.x volumes which the old driver isn't happy with.
+- A comparison of the two drivers using:
+	time find . -type f -exec md5sum "{}" \;
+  run three times in sequence with each driver (after a reboot) on a 1.4GiB
+  NTFS partition, showed the new driver to be 20% faster in total time elapsed
+  (from 9:43 minutes on average down to 7:53). The time spent in user space
+  was unchanged but the time spent in the kernel was decreased by a factor of
+  2.5 (from 85 CPU seconds down to 33).
 
 Known bugs and (mis-)features
 =============================
@@ -133,6 +158,6 @@ ChangeLog
 
 Note that a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
-TNG-0.0.8:
+2.0.0:
 	- Started ChangeLog.
 

@@ -27,7 +27,7 @@ ToDo:
 	  quite big. Modularising them a bit, e.g. a-la get_block(), will make
 	  them cleaner and make code reuse easier.
 
-tng-0.0.9 - Work in progress
+2.0.0 - New version number. Remove TNG from the name. Now in the kernel.
 
 	- Add kill_super, just keeping up with the vfs changes in the kernel.
 	- Repeat some changes from tng-0.0.8 that somehow got lost on the way
@@ -41,6 +41,7 @@ tng-0.0.9 - Work in progress
 	  clean up compress.c a little, removing some uncommented/unused debug
 	  code.
 	- Tidy up dir.c a little bit.
+	- Don't bother getting the run list in inode.c::ntfs_read_inode().
 	- Merge mft.c::ntfs_mft_readpage() and aops.c::ntfs_index_readpage()
 	  creating aops.c::ntfs_mst_readpage(), improving the handling of
 	  holes and overflow in the process and implementing the correct
@@ -58,8 +59,9 @@ tng-0.0.9 - Work in progress
 	- Complete implementation of proper handling of allocated_size vs
 	  initialized_size vs data_size (i.e. i_size) in whole driver.
 	  Basically aops.c is now completely rewritten.
-
-- Don't bother getting the run list in inode.c::ntfs_read_inode().
+	- Change NTFS driver name to just NTFS and set version number to 2.0.0
+	  to make a clear distinction from the old driver which is still on
+	  version 1.1.22.
 
 tng-0.0.8 - 08/03/2002 - Now using BitKeeper, http://linux-ntfs.bkbits.net/
 
