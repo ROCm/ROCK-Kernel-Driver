@@ -3,7 +3,7 @@
  *
  */
 
-#ifndef _KOBJECT_H_
+#if defined(__KERNEL__) && !defined(_KOBJECT_H_)
 #define _KOBJECT_H_
 
 #include <linux/types.h>
