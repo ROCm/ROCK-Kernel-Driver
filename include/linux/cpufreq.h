@@ -241,4 +241,27 @@ enum {
 
 #endif /* CONFIG_CPU_FREQ_24_API */
 
+/*********************************************************************
+ *                     FREQUENCY TABLE HELPERS                       *
+ *********************************************************************/
+
+#define CPUFREQ_ENTRY_INVALID ~0
+#define CPUFREQ_TABLE_END     ~1
+
+struct cpufreq_frequency_table {
+	unsigned int	index;     /* any */
+	unsigned int	frequency; /* kHz - doesn't need to be in ascending
+				    * order */
+};
+
+int cpufreq_frequency_table_cpuinfo(struct cpufreq_policy *policy,
+				    struct cpufreq_frequency_table *table);
+
+int cpufreq_frequency_table_verify(struct cpufreq_policy *policy,
+				   struct cpufreq_frequency_table *table);
+
+int cpufreq_frequency_table_setpolicy(struct cpufreq_policy *policy,
+				      struct cpufreq_frequency_table *table,
+				      unsigned int *index);
+
 #endif /* _LINUX_CPUFREQ_H */

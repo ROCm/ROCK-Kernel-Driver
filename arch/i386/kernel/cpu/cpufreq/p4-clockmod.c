@@ -141,38 +141,26 @@ static int cpufreq_p4_setdc(unsigned int cpu, unsigned int newstate)
 }
 
 
+static struct cpufreq_frequency_table p4clockmod_table[] = {
+	{DC_RESV, CPUFREQ_ENTRY_INVALID},
+	{DC_DFLT, 0},
+	{DC_25PT, 0},
+	{DC_38PT, 0},
+	{DC_50PT, 0},
+	{DC_64PT, 0},
+	{DC_75PT, 0},
+	{DC_88PT, 0},
+	{DC_DISABLE, 0},
+	{DC_RESV, CPUFREQ_TABLE_END},
+};
+
+
 static int cpufreq_p4_setpolicy(struct cpufreq_policy *policy)
 {
-	unsigned int    i;
-	unsigned int    newstate = 0;
-	unsigned int    number_states = 0;
-	unsigned int    minstate = 1;
+	unsigned int    newstate = DC_RESV;
 
-	if (!cpufreq_p4_driver || !stock_freq || 
-	    !policy || !cpu_online(policy->cpu))
+	if (cpufreq_frequency_table_setpolicy(policy, &p4clockmod_table[0], &newstate))
 		return -EINVAL;
-
-	if (has_N44_O17_errata)
-		minstate = 3;
-
-	if (policy->policy == CPUFREQ_POLICY_POWERSAVE)
-	{
-		for (i=8; i>=minstate; i--)
-			if ((policy->min <= ((stock_freq / 8) * i)) &&
-			    (policy->max >= ((stock_freq / 8) * i))) 
-			{
-				newstate = i;
-				number_states++;
-			}
-	} else {
-		for (i=minstate; i<=8; i++)
-			if ((policy->min <= ((stock_freq / 8) * i)) &&
-			    (policy->max >= ((stock_freq / 8) * i))) 
-			{
-				newstate = i;
-				number_states++;
-			}
-	}
 
 	cpufreq_p4_setdc(policy->cpu, newstate);
 
@@ -182,34 +170,7 @@ static int cpufreq_p4_setpolicy(struct cpufreq_policy *policy)
 
 static int cpufreq_p4_verify(struct cpufreq_policy *policy)
 {
-	unsigned int    number_states = 0;
-	unsigned int    i = 1;
-
-	if (!cpufreq_p4_driver || !stock_freq || 
-	    !policy || !cpu_online(policy->cpu))
-		return -EINVAL;
-
-	cpufreq_verify_within_limits(policy, 
-				     policy->cpuinfo.min_freq, 
-				     policy->cpuinfo.max_freq);
-
-	if (has_N44_O17_errata)
-		i = 3;
-
-	/* is there at least one state within the limit? */
-	for (; i<=8; i++)
-		if ((policy->min <= ((stock_freq / 8) * i)) &&
-		    (policy->max >= ((stock_freq / 8) * i)))
-			number_states++;
-
-	if (number_states)
-		return 0;
-
-	policy->max = (stock_freq / 8) * (((unsigned int) ((policy->max * 8) / stock_freq)) + 1);
-	cpufreq_verify_within_limits(policy, 
-				     policy->cpuinfo.min_freq, 
-				     policy->cpuinfo.max_freq);
-	return 0;
+	return cpufreq_frequency_table_verify(policy, &p4clockmod_table[0]);
 }
 
 
@@ -262,6 +223,15 @@ static int __init cpufreq_p4_init(void)
 
 	driver->policy = (struct cpufreq_policy *) (driver + 1);
 
+	/* table init */
+	for (i=1; (p4clockmod_table[i].frequency != CPUFREQ_TABLE_END); i++) {
+		if ((i<2) && (has_N44_O17_errata))
+			p4clockmod_table[i].frequency = CPUFREQ_ENTRY_INVALID;
+		else
+			p4clockmod_table[i].frequency = (stock_freq * i)/8;
+	}
+	
+
 #ifdef CONFIG_CPU_FREQ_24_API
 	for (i=0;i<NR_CPUS;i++) {
 		driver->cpu_cur_freq[i] = stock_freq;
@@ -272,17 +242,14 @@ static int __init cpufreq_p4_init(void)
 	driver->setpolicy     = &cpufreq_p4_setpolicy;
 
 	for (i=0;i<NR_CPUS;i++) {
-		if (has_N44_O17_errata)
-			driver->policy[i].min    = (stock_freq * 3) / 8;
-		else
-			driver->policy[i].min    = stock_freq / 8;
-		driver->policy[i].max    = stock_freq;
-		driver->policy[i].policy = CPUFREQ_POLICY_PERFORMANCE;
-		driver->policy[i].cpuinfo.min_freq  = driver->policy[i].min;
-		driver->policy[i].cpuinfo.max_freq  = stock_freq;
-		driver->policy[i].cpuinfo.transition_latency = CPUFREQ_ETERNAL;
-
 		driver->policy[i].cpu    = i;
+		ret = cpufreq_frequency_table_cpuinfo(&driver->policy[i], &p4clockmod_table[0]);
+		if (ret) {
+			kfree(driver);
+			return ret;
+		}
+		driver->policy[i].policy = CPUFREQ_POLICY_PERFORMANCE;
+		driver->policy[i].cpuinfo.transition_latency = CPUFREQ_ETERNAL;
 	}
 
 	cpufreq_p4_driver = driver;

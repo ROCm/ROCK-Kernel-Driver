@@ -58,11 +58,17 @@ static int                              speedstep_coppermine = 0;
  *   There are only two frequency states for each processor. Values
  * are in kHz for the time being.
  */
-static unsigned int                     speedstep_low_freq;
-static unsigned int                     speedstep_high_freq;
-
 #define SPEEDSTEP_HIGH                  0x00000000
 #define SPEEDSTEP_LOW                   0x00000001
+
+static struct cpufreq_frequency_table speedstep_freqs[] = {
+	{SPEEDSTEP_HIGH, 	0},
+	{SPEEDSTEP_LOW,		0},
+	{0,			CPUFREQ_TABLE_END},
+};
+
+#define speedstep_low_freq	speedstep_freqs[SPEEDSTEP_LOW].frequency
+#define speedstep_high_freq	speedstep_freqs[SPEEDSTEP_HIGH].frequency
 
 
 /* DEBUG
@@ -569,22 +575,13 @@ static int speedstep_detect_speeds (void)
  */
 static int speedstep_setpolicy (struct cpufreq_policy *policy)
 {
-	if (!speedstep_driver || !policy)
+	unsigned int    newstate = 0;
+
+	if (cpufreq_frequency_table_setpolicy(policy, &speedstep_freqs[0], &newstate))
 		return -EINVAL;
 
-	if (policy->min > speedstep_low_freq) 
-		speedstep_set_state(SPEEDSTEP_HIGH, 1);
-	else {
-		if (policy->max < speedstep_high_freq)
-			speedstep_set_state(SPEEDSTEP_LOW, 1);
-		else {
-			/* both frequency states are allowed */
-			if (policy->policy == CPUFREQ_POLICY_POWERSAVE)
-				speedstep_set_state(SPEEDSTEP_LOW, 1);
-			else
-				speedstep_set_state(SPEEDSTEP_HIGH, 1);
-		}
-	}
+	speedstep_set_state(newstate, 1);
+
 	return 0;
 }
 
@@ -598,19 +595,7 @@ static int speedstep_setpolicy (struct cpufreq_policy *policy)
  */
 static int speedstep_verify (struct cpufreq_policy *policy)
 {
-	if (!policy || !speedstep_driver || 
-	    !speedstep_low_freq || !speedstep_high_freq)
-		return -EINVAL;
-
-	policy->cpu = 0; /* UP only */
-
-	cpufreq_verify_within_limits(policy, speedstep_low_freq, speedstep_high_freq);
-
-	if ((policy->min > speedstep_low_freq) && 
-	    (policy->max < speedstep_high_freq))
-		policy->max = speedstep_high_freq;
-	
-	return 0;
+	return cpufreq_frequency_table_verify(policy, &speedstep_freqs[0]);
 }
 
 
@@ -692,6 +677,13 @@ static int __init speedstep_init(void)
 
 	driver->policy = (struct cpufreq_policy *) (driver + 1);
 
+	driver->policy[0].cpu    = 0;
+	result = cpufreq_frequency_table_cpuinfo(&driver->policy[0], &speedstep_freqs[0]);
+	if (result) {
+		kfree(driver);
+		return result;
+	}
+
 #ifdef CONFIG_CPU_FREQ_24_API
 	driver->cpu_cur_freq[0] = speed;
 #endif
@@ -699,11 +691,6 @@ static int __init speedstep_init(void)
 	driver->verify      = &speedstep_verify;
 	driver->setpolicy   = &speedstep_setpolicy;
 
-	driver->policy[0].cpu    = 0;
-	driver->policy[0].min    = speedstep_low_freq;
-	driver->policy[0].max    = speedstep_high_freq;
-	driver->policy[0].cpuinfo.min_freq = speedstep_low_freq;
-	driver->policy[0].cpuinfo.max_freq = speedstep_high_freq;
 	driver->policy[0].cpuinfo.transition_latency = CPUFREQ_ETERNAL;
 
 	driver->policy[0].policy = (speed == speedstep_low_freq) ? 

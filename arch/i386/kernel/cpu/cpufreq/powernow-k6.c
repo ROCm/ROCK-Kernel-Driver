@@ -31,15 +31,16 @@ static unsigned int                     max_multiplier;
 
 
 /* Clock ratio multiplied by 10 - see table 27 in AMD#23446 */
-static int clock_ratio[8] = {
-	45,  /* 000 -> 4.5x */
-	50,  /* 001 -> 5.0x */
-	40,  /* 010 -> 4.0x */
-	55,  /* 011 -> 5.5x */
-	20,  /* 100 -> 2.0x */
-	30,  /* 101 -> 3.0x */
-	60,  /* 110 -> 6.0x */
-	35   /* 111 -> 3.5x */
+static struct cpufreq_frequency_table clock_ratio[] = {
+	{45,  /* 000 -> 4.5x */ 0},
+	{50,  /* 001 -> 5.0x */ 0},
+	{40,  /* 010 -> 4.0x */ 0},
+	{55,  /* 011 -> 5.5x */ 0},
+	{20,  /* 100 -> 2.0x */ 0},
+	{30,  /* 101 -> 3.0x */ 0},
+	{60,  /* 110 -> 6.0x */ 0},
+	{35,  /* 111 -> 3.5x */ 0},
+	{0, CPUFREQ_TABLE_END}
 };
 
 
@@ -60,7 +61,7 @@ static int powernow_k6_get_cpu_multiplier(void)
 	msrval = POWERNOW_IOPORT + 0x0;
 	wrmsr(MSR_K6_EPMR, msrval, 0); /* disable it again */
 
-	return clock_ratio[(invalue >> 5)&7];
+	return clock_ratio[(invalue >> 5)&7].index;
 }
 
 
@@ -82,7 +83,7 @@ static void powernow_k6_set_state (unsigned int best_i)
 	}
 
 	freqs.old = busfreq * powernow_k6_get_cpu_multiplier();
-	freqs.new = busfreq * clock_ratio[best_i];
+	freqs.new = busfreq * clock_ratio[best_i].index;
 	freqs.cpu = 0; /* powernow-k6.c is UP only driver */
 	
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
@@ -115,39 +116,7 @@ static void powernow_k6_set_state (unsigned int best_i)
  */
 static int powernow_k6_verify(struct cpufreq_policy *policy)
 {
-	unsigned int    number_states = 0;
-	unsigned int    i, j;
-
-	if (!policy || !busfreq)
-		return -EINVAL;
-
-	policy->cpu = 0;
-	cpufreq_verify_within_limits(policy, (20 * busfreq),
-				     (max_multiplier * busfreq));
-
-	for (i=0; i<8; i++)
-		if ((policy->min <= (busfreq * clock_ratio[i])) &&
-		    (policy->max >= (busfreq * clock_ratio[i])))
-			number_states++;
-
-	if (number_states)
-		return 0;
-
-	/* no state is available within range -- find next larger state */
-
-	j = 6;
-
-	for (i=0; i<8; i++)
-		if (((clock_ratio[i] * busfreq) >= policy->min) &&
-		    (clock_ratio[i] < clock_ratio[j]))
-			j = i;
-
-	policy->max = clock_ratio[j] * busfreq;
-
-	cpufreq_verify_within_limits(policy, (20 * busfreq),
-				     (max_multiplier * busfreq));
-
-	return 0;
+	return cpufreq_frequency_table_verify(policy, &clock_ratio[0]);
 }
 
 
@@ -159,43 +128,12 @@ static int powernow_k6_verify(struct cpufreq_policy *policy)
  */
 static int powernow_k6_setpolicy (struct cpufreq_policy *policy)
 {
-	unsigned int    i;
-	unsigned int    optimal;
+	unsigned int    newstate = 0;
 
-	if (!powernow_driver || !policy || policy->cpu)
+	if (cpufreq_frequency_table_setpolicy(policy, &clock_ratio[0], &newstate))
 		return -EINVAL;
 
-	switch(policy->policy) {
-	case CPUFREQ_POLICY_POWERSAVE:
-		optimal = 6;
-		break;
-	case CPUFREQ_POLICY_PERFORMANCE:
-		optimal = max_multiplier;
-		break;
-	default:
-		return -EINVAL;
-	}
-
-	for (i=0;i<8;i++) {
-		unsigned int freq = busfreq * clock_ratio[i];
-		if (clock_ratio[i] > max_multiplier)
-			continue;
-		if ((freq > policy->max) ||
-		    (freq < policy->min))
-			continue;
-		switch(policy->policy) {
-		case CPUFREQ_POLICY_POWERSAVE:
-			if (freq < (clock_ratio[optimal] * busfreq))
-				optimal = i;
-			break;
-		case CPUFREQ_POLICY_PERFORMANCE:
-			if (freq > (clock_ratio[optimal] * busfreq))
-				optimal = i;
-			break;
-		}
-	}
-
-	powernow_k6_set_state(optimal);
+	powernow_k6_set_state(newstate);
 
 	return 0;
 }
@@ -213,6 +151,7 @@ static int __init powernow_k6_init(void)
 	struct cpuinfo_x86      *c = cpu_data;
 	struct cpufreq_driver   *driver;
 	unsigned int            result;
+	unsigned int            i;
 
 	if ((c->x86_vendor != X86_VENDOR_AMD) || (c->x86 != 5) ||
 		((c->x86_model != 12) && (c->x86_model != 13)))
@@ -235,20 +174,29 @@ static int __init powernow_k6_init(void)
 	}
 	driver->policy = (struct cpufreq_policy *) (driver + 1);
 
-#ifdef CONFIG_CPU_FREQ_24_API
-	driver->cpu_cur_freq[0]  = busfreq * max_multiplier;
-#endif
+	/* table init */
+ 	for (i=0; (clock_ratio[i].frequency != CPUFREQ_TABLE_END); i++) {
+		if (clock_ratio[i].index > max_multiplier)
+			clock_ratio[i].frequency = CPUFREQ_ENTRY_INVALID;
+		else
+			clock_ratio[i].frequency = busfreq * clock_ratio[i].index;
+	}
 
 	driver->verify        = &powernow_k6_verify;
 	driver->setpolicy     = &powernow_k6_setpolicy;
 
+	/* cpuinfo and default policy values */
 	driver->policy[0].cpu    = 0;
-	driver->policy[0].min    = busfreq * 20;
-	driver->policy[0].max    = busfreq * max_multiplier;
-	driver->policy[0].policy = CPUFREQ_POLICY_PERFORMANCE;
-	driver->policy[0].cpuinfo.max_freq = busfreq * max_multiplier;
-	driver->policy[0].cpuinfo.min_freq = busfreq * 20;
 	driver->policy[0].cpuinfo.transition_latency = CPUFREQ_ETERNAL;
+	driver->policy[0].policy = CPUFREQ_POLICY_PERFORMANCE;
+#ifdef CONFIG_CPU_FREQ_24_API
+	driver->cpu_cur_freq[0]  = busfreq * max_multiplier;
+#endif
+	result = cpufreq_frequency_table_cpuinfo(&driver->policy[0], &clock_ratio[0]);
+	if (result) {
+		kfree(driver);
+		return result;
+	}
 
 	powernow_driver = driver;
 
@@ -274,7 +222,7 @@ static void __exit powernow_k6_exit(void)
 
 	if (powernow_driver) {
 		for (i=0;i<8;i++)
-			if (clock_ratio[i] == max_multiplier)
+			if (clock_ratio[i].index == max_multiplier)
 				powernow_k6_set_state(i);		
 		cpufreq_unregister();
 		kfree(powernow_driver);
