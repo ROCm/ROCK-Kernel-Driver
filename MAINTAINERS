@@ -168,10 +168,8 @@ S:	Supported
 
 AACRAID SCSI RAID DRIVER
 P:	Adaptec OEM Raid Solutions
-M:	linux-aacraid-devel@dell.com
-L:	linux-aacraid-devel@dell.com
-L:	linux-aacraid-announce@dell.com
-W:	http://domsch.com/linux
+L:	linux-scsi@vger.kernel.org
+W:	http://linux.dell.com/storage.shtml
 S:	Supported
 
 ACPI
