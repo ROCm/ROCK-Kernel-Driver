@@ -124,8 +124,8 @@ extern inline void __flush_page_to_ram(void *vaddr)
 	}
 }
 
-#define flush_dcache_page(page)	__flush_page_to_ram(page_address(page))
-#define flush_icache_page(vma,pg)              do { } while (0)
+#define flush_dcache_page(page)		__flush_page_to_ram(page_address(page))
+#define flush_icache_page(vma, page)	__flush_page_to_ram(page_address(page))
 #define flush_icache_user_range(vma,pg,adr,len)	do { } while (0)
 
 /* Push n pages at kernel virtual address and clear the icache */
