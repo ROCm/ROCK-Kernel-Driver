@@ -493,7 +493,7 @@ void scsi_run_host_queues(struct Scsi_Host *shost)
  *		at some point during this call.
  */
 static struct scsi_cmnd *scsi_end_request(struct scsi_cmnd *cmd, int uptodate,
-					  int sectors, int requeue)
+					  int bytes, int requeue)
 {
 	request_queue_t *q = cmd->device->request_queue;
 	struct request *req = cmd->request;
@@ -503,12 +503,15 @@ static struct scsi_cmnd *scsi_end_request(struct scsi_cmnd *cmd, int uptodate,
 	 * If there are blocks left over at the end, set up the command
 	 * to queue the remainder of them.
 	 */
-	if (end_that_request_first(req, uptodate, sectors)) {
-		int leftover = req->hard_nr_sectors - sectors;
+	if (end_that_request_chunk(req, uptodate, bytes)) {
+		int leftover = (req->hard_nr_sectors << 9) - bytes;
+
+		if (blk_pc_request(req))
+			leftover = req->data_len - bytes;
 
 		/* kill remainder if no retrys */
 		if (!uptodate && blk_noretry_request(req))
-			end_that_request_first(req, 0, leftover);
+			end_that_request_chunk(req, 0, leftover);
 		else {
 			if (requeue)
 				/*
@@ -649,11 +652,11 @@ static void scsi_release_buffers(struct scsi_cmnd *cmd)
  *		b) We can just use scsi_requeue_command() here.  This would
  *		   be used if we just wanted to retry, for example.
  */
-void scsi_io_completion(struct scsi_cmnd *cmd, int good_sectors,
-			int block_sectors)
+void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
+			unsigned int block_bytes)
 {
 	int result = cmd->result;
-	int this_count = cmd->bufflen >> 9;
+	int this_count = cmd->bufflen;
 	request_queue_t *q = cmd->device->request_queue;
 	struct request *req = cmd->request;
 	int clear_errors = 1;
@@ -705,9 +708,9 @@ void scsi_io_completion(struct scsi_cmnd *cmd, int good_sectors,
 	 * Next deal with any sectors which we were able to correctly
 	 * handle.
 	 */
-	if (good_sectors >= 0) {
-		SCSI_LOG_HLCOMPLETE(1, printk("%ld sectors total, %d sectors done.\n",
-					      req->nr_sectors, good_sectors));
+	if (good_bytes >= 0) {
+		SCSI_LOG_HLCOMPLETE(1, printk("%ld sectors total, %d bytes done.\n",
+					      req->nr_sectors, good_bytes));
 		SCSI_LOG_HLCOMPLETE(1, printk("use_sg is %d\n", cmd->use_sg));
 
 		if (clear_errors)
@@ -717,13 +720,13 @@ void scsi_io_completion(struct scsi_cmnd *cmd, int good_sectors,
 		 * they will have been finished off by the first command.
 		 * If not, then we have a multi-buffer command.
 		 *
-		 * If block_sectors != 0, it means we had a medium error
+		 * If block_bytes != 0, it means we had a medium error
 		 * of some sort, and that we want to mark some number of
 		 * sectors as not uptodate.  Thus we want to inhibit
 		 * requeueing right here - we will requeue down below
 		 * when we handle the bad sectors.
 		 */
-		cmd = scsi_end_request(cmd, 1, good_sectors, result == 0);
+		cmd = scsi_end_request(cmd, 1, good_bytes, result == 0);
 
 		/*
 		 * If the command completed without error, then either finish off the
@@ -808,7 +811,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, int good_sectors,
 			       (int) cmd->device->id, (int) cmd->device->lun);
 			print_command(cmd->data_cmnd);
 			print_sense("", cmd);
-			cmd = scsi_end_request(cmd, 0, block_sectors, 1);
+			cmd = scsi_end_request(cmd, 0, block_bytes, 1);
 			return;
 		default:
 			break;
@@ -837,8 +840,10 @@ void scsi_io_completion(struct scsi_cmnd *cmd, int good_sectors,
 		 * We sometimes get this cruft in the event that a medium error
 		 * isn't properly reported.
 		 */
-		cmd = scsi_end_request(cmd, 0, req->current_nr_sectors, 1);
-		return;
+		block_bytes = req->hard_cur_sectors << 9;
+		if (!block_bytes)
+			block_bytes = req->data_len;
+		cmd = scsi_end_request(cmd, 0, block_bytes, 1);
 	}
 }
 
