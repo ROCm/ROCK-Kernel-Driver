@@ -274,7 +274,7 @@ NOSTDINC_FLAGS  = -nostdinc -iwithprefix include
 
 CPPFLAGS        := -D__KERNEL__ -Iinclude \
 		   $(if $(KBUILD_SRC),-Iinclude2 -I$(srctree)/include) \
-		   $(if $(CONFIG_CFGNAME),-DCONFIG_FLAVOR_$(shell echo $(CONFIG_CFGNAME) |tr a-z A-Z))
+		   $(if $(ARCH_FLAVOR),-DARCH_FLAVOR_$(shell echo $(ARCH_FLAVOR) | tr a-z- A-Z_))
 
 CFLAGS 		:= -Wall -Wstrict-prototypes -Wno-trigraphs \
 	  	   -fno-strict-aliasing -fno-common

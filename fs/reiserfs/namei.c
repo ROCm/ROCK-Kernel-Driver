@@ -589,9 +589,19 @@ static int reiserfs_create (struct inode * dir, struct dentry *dentry, int mode,
     if (retval)
         return retval;
 
+    locked = reiserfs_cache_default_acl (dir);
+
     reiserfs_write_lock(dir->i_sb);
+
+    if (locked)
+        reiserfs_write_lock_xattrs (dir->i_sb);
+
     journal_begin(&th, dir->i_sb, jbegin_count) ;
     retval = reiserfs_new_inode (&th, dir, mode, 0, 0/*i_size*/, dentry, inode);
+
+    if (locked)
+        reiserfs_write_unlock_xattrs (dir->i_sb);
+
     if (retval) {
         goto out_failed;
     }
