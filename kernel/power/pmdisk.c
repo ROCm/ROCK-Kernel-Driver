@@ -350,138 +350,9 @@ static void copy_pages(void)
 }
 
 
-/**
- *	free_image_pages - Free each page allocated for snapshot.
- */
 
-static void free_image_pages(void)
-{
-	struct pbe * p;
-	int i;
-
-	for (i = 0, p = pagedir_save; i < nr_copy_pages; i++, p++) {
-		ClearPageNosave(virt_to_page(p->address));
-		free_page(p->address);
-	}
-}
-
-
-/**
- *	free_pagedir - Free the page directory.
- */
-
-static void free_pagedir(void)
-{
-	free_image_pages();
-	free_pages((unsigned long)pagedir_save, pagedir_order);
-}
-
-
-static void calc_order(void)
-{
-	int diff;
-	int order;
-
-	order = get_bitmask_order(SUSPEND_PD_PAGES(nr_copy_pages));
-	nr_copy_pages += 1 << order;
-	do {
-		diff = get_bitmask_order(SUSPEND_PD_PAGES(nr_copy_pages)) - order;
-		if (diff) {
-			order += diff;
-			nr_copy_pages += 1 << diff;
-		}
-	} while(diff);
-	pagedir_order = order;
-}
-
-
-/**
- *	alloc_pagedir - Allocate the page directory.
- *
- *	First, determine exactly how many contiguous pages we need, 
- *	allocate them, then mark each 'unsavable'.
- */
-
-static int alloc_pagedir(void)
-{
-	calc_order();
-	pagedir_save = (suspend_pagedir_t *)__get_free_pages(GFP_ATOMIC | __GFP_COLD, 
-							     pagedir_order);
-	if(!pagedir_save)
-		return -ENOMEM;
-	memset(pagedir_save,0,(1 << pagedir_order) * PAGE_SIZE);
-	pagedir_nosave = pagedir_save;
-	return 0;
-}
-
-
-/**
- *	alloc_image_pages - Allocate pages for the snapshot.
- *
- */
-
-static int alloc_image_pages(void)
-{
-	struct pbe * p;
-	int i;
-
-	for (i = 0, p = pagedir_save; i < nr_copy_pages; i++, p++) {
-		p->address = get_zeroed_page(GFP_ATOMIC | __GFP_COLD);
-		if(!p->address)
-			goto Error;
-		SetPageNosave(virt_to_page(p->address));
-	}
-	return 0;
- Error:
-	do { 
-		if (p->address)
-			free_page(p->address);
-		p->address = 0;
-	} while (p-- > pagedir_save);
-	return -ENOMEM;
-}
-
-
-/**
- *	enough_free_mem - Make sure we enough free memory to snapshot.
- *
- *	Returns TRUE or FALSE after checking the number of available 
- *	free pages.
- */
-
-static int enough_free_mem(void)
-{
-	if(nr_free_pages() < (nr_copy_pages + PAGES_FOR_IO)) {
-		pr_debug("pmdisk: Not enough free pages: Have %d\n",
-			 nr_free_pages());
-		return 0;
-	}
-	return 1;
-}
-
-
-/**
- *	enough_swap - Make sure we have enough swap to save the image.
- *
- *	Returns TRUE or FALSE after checking the total amount of swap 
- *	space avaiable.
- *
- *	FIXME: si_swapinfo(&i) returns all swap devices information.
- *	We should only consider resume_device. 
- */
-
-static int enough_swap(void)
-{
-	struct sysinfo i;
-
-	si_swapinfo(&i);
-	if (i.freeswap < (nr_copy_pages + PAGES_FOR_IO))  {
-		pr_debug("pmdisk: Not enough swap. Need %ld\n",i.freeswap);
-		return 0;
-	}
-	return 1;
-}
-
+extern int swsusp_alloc(void);
+extern void free_suspend_pagedir(unsigned long);
 
 /**
  *	pmdisk_suspend - Atomically snapshot the system.
@@ -503,33 +374,11 @@ int pmdisk_suspend(void)
 		return error;
 
 	drain_local_pages();
-
-	pagedir_nosave = NULL;
 	pr_debug("pmdisk: Counting pages to copy.\n" );
 	count_pages();
+
+	error = swsusp_alloc();
 	
-	pr_debug("pmdisk: (pages needed: %d + %d free: %d)\n",
-		 nr_copy_pages,PAGES_FOR_IO,nr_free_pages());
-
-	if (!enough_free_mem())
-		return -ENOMEM;
-
-	if (!enough_swap())
-		return -ENOSPC;
-
-	if ((error = alloc_pagedir())) {
-		pr_debug("pmdisk: Allocating pagedir failed.\n");
-		return error;
-	}
-	if ((error = alloc_image_pages())) {
-		pr_debug("pmdisk: Allocating image pages failed.\n");
-		free_pagedir();
-		return error;
-	}
-
-	nr_copy_pages_check = nr_copy_pages;
-	pagedir_order_check = pagedir_order;
-
 	/* During allocating of suspend pagedir, new cold pages may appear. 
 	 * Kill them 
 	 */
@@ -931,7 +780,7 @@ int __init pmdisk_restore(void)
 int pmdisk_free(void)
 {
 	pr_debug( "Freeing prev allocated pagedir\n" );
-	free_pagedir();
+	free_suspend_pagedir((unsigned long)pagedir_save);
 	return 0;
 }
 
