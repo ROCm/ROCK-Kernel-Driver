@@ -409,7 +409,7 @@ int __init init_mtd(void)
 {
 #ifdef CONFIG_PROC_FS
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)
-	if ((proc_mtd = create_proc_entry( "mtd", 0, 0 )))
+	if ((proc_mtd = create_proc_entry( "mtd", 0, NULL )))
 	  proc_mtd->read_proc = mtd_read_proc;
 #else
         proc_register_dynamic(&proc_root,&mtd_proc_entry);
@@ -438,7 +438,7 @@ static void __exit cleanup_mtd(void)
 #ifdef CONFIG_PROC_FS
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)
         if (proc_mtd)
-          remove_proc_entry( "mtd", 0);
+          remove_proc_entry( "mtd", NULL);
 #else
         proc_unregister(&proc_root,mtd_proc_entry.low_ino);
 #endif

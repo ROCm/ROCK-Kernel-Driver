@@ -966,7 +966,7 @@ out:
 static int nand_writev (struct mtd_info *mtd, const struct kvec *vecs, unsigned long count, 
 		loff_t to, size_t * retlen)
 {
-	return (nand_writev_ecc (mtd, vecs, count, to, retlen, NULL, 0));	
+	return (nand_writev_ecc (mtd, vecs, count, to, retlen, NULL, NULL));	
 }
 
 static int nand_writev_ecc (struct mtd_info *mtd, const struct kvec *vecs, unsigned long count, 

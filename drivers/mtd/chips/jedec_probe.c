@@ -1480,7 +1480,7 @@ static int cfi_jedec_setup(struct cfi_private *p_cfi, int index)
 	for (i=0; i<num_erase_regions; i++){
 		p_cfi->cfiq->EraseRegionInfo[i] = jedec_table[index].regions[i];
 	}
-	p_cfi->cmdset_priv = 0;
+	p_cfi->cmdset_priv = NULL;
 
 	/* This may be redundant for some cases, but it doesn't hurt */
 	p_cfi->mfr = jedec_table[index].mfr_id;

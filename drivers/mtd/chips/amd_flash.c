@@ -718,7 +718,7 @@ static struct mtd_info *amd_flash_probe(struct map_info *map)
 		       "memory for MTD erase region info\n", map->name);
 		kfree(mtd);
 		map->fldrv_priv = NULL;
-		return 0;
+		return NULL;
 	}
 
 	reg_idx = 0;
