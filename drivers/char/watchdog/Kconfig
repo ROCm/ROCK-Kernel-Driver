@@ -336,6 +336,20 @@ config INDYDOG
 	  timer expired and no process has written to /dev/watchdog during
 	  that time.
 
+# S390 Architecture
+
+config ZVM_WATCHDOG
+	tristate "z/VM Watchdog Timer"
+	depends on WATCHDOG && ARCH_S390
+	help
+	  IBM s/390 and zSeries machines running under z/VM 5.1 or later
+	  provide a virtual watchdog timer to their guest that cause a
+	  user define Control Program command to be executed after a
+	  timeout.
+
+	  To compile this driver as a module, choose M here. The module
+	  will be called vmwatchdog.
+
 # SUPERH Architecture
 
 config SH_WDT

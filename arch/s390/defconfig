@@ -192,6 +192,11 @@ CONFIG_UNIX98_PTYS=y
 CONFIG_UNIX98_PTY_COUNT=2048
 
 #
+# Watchdog Cards
+#
+# CONFIG_WATCHDOG is not set
+
+#
 # S/390 character device drivers
 #
 CONFIG_TN3270=y

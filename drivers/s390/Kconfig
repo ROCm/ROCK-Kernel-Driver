@@ -51,6 +51,8 @@ config UNIX98_PTY_COUNT
 	  When not in use, each additional set of 256 PTYs occupy
 	  approximately 8 KB of kernel memory on 32-bit architectures.
 
+source "drivers/char/watchdog/Kconfig"
+
 comment "S/390 character device drivers"
 
 config TN3270
