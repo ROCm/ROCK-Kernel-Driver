@@ -106,7 +106,6 @@ ifeq ($(CONFIG_SLIP_COMPRESSED),y)
   obj-$(CONFIG_SLIP) += slhc.o
 endif
 
-obj-$(CONFIG_STRIP) += strip.o
 obj-$(CONFIG_DUMMY) += dummy.o
 obj-$(CONFIG_BONDING) += bonding.o
 obj-$(CONFIG_DE600) += de600.o
@@ -131,7 +130,6 @@ obj-$(CONFIG_EEXPRESS) += eexpress.o
 obj-$(CONFIG_EEXPRESS_PRO) += eepro.o
 obj-$(CONFIG_8139CP) += 8139cp.o mii.o
 obj-$(CONFIG_8139TOO) += 8139too.o mii.o
-obj-$(CONFIG_ARLAN) += arlan.o arlan-proc.o
 obj-$(CONFIG_ZNET) += znet.o
 obj-$(CONFIG_LAN_SAA9730) += saa9730.o
 obj-$(CONFIG_DEPCA) += depca.o

@@ -2376,77 +2376,7 @@ config SLIP_MODE_SLIP6
 	  end of the link as well. It's good enough, for example, to run IP
 	  over the async ports of a Camtec JNT Pad. If unsure, say N.
 
-
-menu "Wireless LAN (non-hamradio)"
-	depends on NETDEVICES
-
-config NET_RADIO
-	bool "Wireless LAN (non-hamradio)"
-	---help---
-	  Support for wireless LANs and everything having to do with radio,
-	  but not with amateur radio or FM broadcasting.
-
-	  Saying Y here also enables the Wireless Extensions (creates
-	  /proc/net/wireless and enables ifconfig access). The Wireless
-	  Extension is a generic API allowing a driver to expose to the user
-	  space configuration and statistics specific to common Wireless LANs.
-	  The beauty of it is that a single set of tool can support all the
-	  variations of Wireless LANs, regardless of their type (as long as
-	  the driver supports Wireless Extension). Another advantage is that
-	  these parameters may be changed on the fly without restarting the
-	  driver (or Linux). If you wish to use Wireless Extensions with
-	  wireless PCMCIA (PC-) cards, you need to say Y here; you can fetch
-	  the tools from
-	  <http://www.hpl.hp.com/personal/Jean_Tourrilhes/Linux/Tools.html>.
-
-	  Some user-level drivers for scarab devices which don't require
-	  special kernel support are available from
-	  <ftp://shadow.cabi.net/pub/Linux/>.
-
-config STRIP
-	tristate "STRIP (Metricom starmode radio IP)"
-	depends on NET_RADIO && INET
-	---help---
-	  Say Y if you have a Metricom radio and intend to use Starmode Radio
-	  IP. STRIP is a radio protocol developed for the MosquitoNet project
-	  (on the WWW at <http://mosquitonet.stanford.edu/>) to send Internet
-	  traffic using Metricom radios.  Metricom radios are small, battery
-	  powered, 100kbit/sec packet radio transceivers, about the size and
-	  weight of a cellular telephone. (You may also have heard them called
-	  "Metricom modems" but we avoid the term "modem" because it misleads
-	  many people into thinking that you can plug a Metricom modem into a
-	  phone line and use it as a modem.)
-
-	  You can use STRIP on any Linux machine with a serial port, although
-	  it is obviously most useful for people with laptop computers. If you
-	  think you might get a Metricom radio in the future, there is no harm
-	  in saying Y to STRIP now, except that it makes the kernel a bit
-	  bigger.
-
-	  You can also compile this as a module ( = code which can be inserted
-	  in and removed from the running kernel whenever you want), say M
-	  here and read <file:Documentation/modules.txt>.  The module will be
-	  called strip.
-
-config ARLAN
-	tristate "Aironet Arlan 655 & IC2200 DS support"
-	depends on NET_RADIO && ISA
-	---help---
-	  Aironet makes Arlan, a class of wireless LAN adapters. These use the
-	  www.Telxon.com chip, which is also used on several similar cards.
-	  This driver is tested on the 655 and IC2200 series cards. Look at
-	  <http://www.ylenurme.ee/~elmer/655/> for the latest information.
-
-	  The driver is built as two modules, arlan and arlan-proc. The latter
-	  is the /proc interface and is not needed most of time.
-
-	  On some computers the card ends up in non-valid state after some
-	  time. Use a ping-reset script to clear it.
-
-# New directory for Wireless LAN devices - cards above will move there
 source "drivers/net/wireless/Kconfig"
-
-endmenu
 
 source "drivers/net/tokenring/Kconfig"
 
