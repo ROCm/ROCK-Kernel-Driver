@@ -65,7 +65,7 @@
 #endif
 
 #ifdef MINSTATE_PHYS
-# define MINSTATE_GET_CURRENT(reg)	mov reg=IA64_KR(CURRENT);; dep reg=0,reg,61,3
+# define MINSTATE_GET_CURRENT(reg)	mov reg=IA64_KR(CURRENT);; tpa reg=reg
 # define MINSTATE_START_SAVE_MIN	MINSTATE_START_SAVE_MIN_PHYS
 # define MINSTATE_END_SAVE_MIN		MINSTATE_END_SAVE_MIN_PHYS
 #endif
