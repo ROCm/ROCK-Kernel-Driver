@@ -636,5 +636,9 @@ config IP_NF_MATCH_SCTP
 	tristate  'SCTP protocol match support'
 	depends on IP_NF_IPTABLES
 
+config IP_NF_CT_PROTO_SCTP
+	tristate  'SCTP protocol connection tracking support (EXPERIMENTAL)'
+	depends on IP_NF_CONNTRACK && EXPERIMENTAL
+
 endmenu
 

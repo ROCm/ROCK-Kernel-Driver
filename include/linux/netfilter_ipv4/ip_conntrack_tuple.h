@@ -25,6 +25,9 @@ union ip_conntrack_manip_proto
 	struct {
 		u_int16_t id;
 	} icmp;
+	struct {
+		u_int16_t port;
+	} sctp;
 };
 
 /* The manipulable part of the tuple. */
@@ -55,6 +58,9 @@ struct ip_conntrack_tuple
 			struct {
 				u_int8_t type, code;
 			} icmp;
+			struct {
+				u_int16_t port;
+			} sctp;
 		} u;
 
 		/* The protocol. */
