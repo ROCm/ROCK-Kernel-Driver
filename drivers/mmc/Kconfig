@@ -29,4 +29,14 @@ config MMC_BLOCK
 	  mount the filesystem. Almost everyone wishing MMC support
 	  should say Y or M here.
 
+config MMC_ARMMMCI
+	tristate "ARM AMBA Multimedia Card Interface support"
+	depends on ARM_AMBA && MMC
+	help
+	  This selects the ARM(R) AMBA(R) PrimeCell Multimedia Card
+	  Interface (PL180 and PL181) support.  If you have an ARM(R)
+	  platform with a Multimedia Card slot, say Y or M here.
+
+	  If unsure, say N.
+
 endmenu
