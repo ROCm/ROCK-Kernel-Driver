@@ -1121,7 +1121,6 @@ void exit_mmap(struct mm_struct * mm)
 		unsigned long end = mpnt->vm_end;
 
 		mm->map_count--;
-		remove_shared_vm_struct(mpnt);
 		unmap_page_range(tlb, mpnt, start, end);
 		mpnt = mpnt->vm_next;
 	}
@@ -1148,6 +1147,7 @@ void exit_mmap(struct mm_struct * mm)
 	 */
 	while (mpnt) {
 		struct vm_area_struct * next = mpnt->vm_next;
+		remove_shared_vm_struct(mpnt);
 		if (mpnt->vm_ops) {
 			if (mpnt->vm_ops->close)
 				mpnt->vm_ops->close(mpnt);
