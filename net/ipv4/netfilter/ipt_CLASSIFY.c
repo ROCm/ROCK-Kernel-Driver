@@ -41,7 +41,7 @@ checkentry(const char *tablename,
            unsigned int hook_mask)
 {
 	if (targinfosize != IPT_ALIGN(sizeof(struct ipt_classify_target_info))){
-		printk(KERN_ERR "CLASSIFY: invalid size (%u != %u).\n",
+		printk(KERN_ERR "CLASSIFY: invalid size (%u != %Zu).\n",
 		       targinfosize,
 		       IPT_ALIGN(sizeof(struct ipt_classify_target_info)));
 		return 0;
