@@ -127,6 +127,28 @@ config MAC_EMUMOUSEBTN
 
 	  If you have an Apple machine with a 1-button mouse, say Y here.
 
+config THERM_WINDTUNNEL
+	tristate "Support for thermal management on Windtunnel G4s"
+	depends on I2C && I2C_KEYWEST && !POWER4
+	help
+	  This driver provides some thermostat and fan control for the desktop
+	  G4 "Windtunnel"
+
+config THERM_ADT7467
+	tristate "Support for thermal mgmnt on laptops with ADT 7467 chipset"
+	depends on I2C && I2C_KEYWEST && !POWER4
+	help
+	  This driver provides some thermostat and fan control for the
+          iBook G4, and the ATI based aluminium PowerBooks, allowing slighlty
+	  better fan behaviour by default, and some manual control.
+
+config THERM_PM72
+	tristate "Support for thermal management on PowerMac G5"
+	depends on I2C && I2C_KEYWEST && POWER4
+	help
+	  This driver provides thermostat and fan control for the desktop
+	  G5 machines. 
+
 config ANSLCD
 	bool "Support for ANS LCD display"
 	depends on ADB_CUDA
