@@ -484,6 +484,23 @@ board_serial_number_get(lboard_t *board,char *serial_number)
 
 /*
  * Format a module id for printing.
+ *
+ * There are three possible formats:
+ *
+ *   MODULE_FORMAT_BRIEF	is the brief 6-character format, including
+ *				the actual brick-type as recorded in the 
+ *				moduleid_t, eg. 002c15 for a C-brick, or
+ *				101#17 for a PX-brick.
+ *
+ *   MODULE_FORMAT_LONG		is the hwgraph format, eg. rack/002/bay/15
+ *				of rack/101/bay/17 (note that the brick
+ *				type does not appear in this format).
+ *
+ *   MODULE_FORMAT_LCD		is like MODULE_FORMAT_BRIEF, except that it
+ *				ensures that the module id provided appears
+ *				exactly as it would on the LCD display of
+ *				the corresponding brick, eg. still 002c15
+ *				for a C-brick, but 101p17 for a PX-brick.
  */
 void
 format_module_id(char *buffer, moduleid_t m, int fmt)
@@ -495,9 +512,25 @@ format_module_id(char *buffer, moduleid_t m, int fmt)
 	ASSERT(MODULE_GET_BTYPE(m) < MAX_BRICK_TYPES);
 	brickchar = MODULE_GET_BTCHAR(m);
 
+	if (fmt == MODULE_FORMAT_LCD) {
+	    /* Be sure we use the same brick type character as displayed
+	     * on the brick's LCD
+	     */
+	    switch (brickchar) 
+	    {
+	    case L1_BRICKTYPE_PX:
+		brickchar = L1_BRICKTYPE_P;
+		break;
+
+	    case L1_BRICKTYPE_IX:
+		brickchar = L1_BRICKTYPE_I;
+		break;
+	    }
+	}
+
 	position = MODULE_GET_BPOS(m);
 
-	if (fmt == MODULE_FORMAT_BRIEF) {
+	if ((fmt == MODULE_FORMAT_BRIEF) || (fmt == MODULE_FORMAT_LCD)) {
 	    /* Brief module number format, eg. 002c15 */
 
 	    /* Decompress the rack number */

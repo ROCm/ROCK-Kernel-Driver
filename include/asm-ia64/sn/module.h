@@ -30,6 +30,7 @@ extern "C" {
 /* parameter for format_module_id() */
 #define MODULE_FORMAT_BRIEF	1
 #define MODULE_FORMAT_LONG	2
+#define MODULE_FORMAT_LCD	3
 
 /*
  *	Module id format
