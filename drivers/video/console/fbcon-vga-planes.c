@@ -105,10 +105,9 @@ void fbcon_vga_planes_setup(struct display *p)
 void fbcon_vga_planes_bmove(struct display *p, int sy, int sx, int dy, int dx,
 		   int height, int width)
 {
-	char *src;
-	char *dest;
-	int line_ofs;
-	int x;
+	struct fb_info *info = p->fb_info;
+	char *dest, *src;
+	int line_ofs, x;
 
 	setmode(1);
 	setop(0);
@@ -119,9 +118,9 @@ void fbcon_vga_planes_bmove(struct display *p, int sy, int sx, int dy, int dx,
 	height *= fontheight(p);
 
 	if (dy < sy || (dy == sy && dx < sx)) {
-		line_ofs = p->fb_info->fix.line_length - width;
-		dest = p->fb_info->screen_base + dx + dy * p->fb_info->fix.line_length;
-		src = p->fb_info->screen_base + sx + sy * p->fb_info->fix.line_length;
+		line_ofs = info->fix.line_length - width;
+		dest = info->screen_base + dx + dy * info->fix.line_length;
+		src = info->screen_base + sx + sy * info->fix.line_length;
 		while (height--) {
 			for (x = 0; x < width; x++) {
 				readb(src);
@@ -133,9 +132,9 @@ void fbcon_vga_planes_bmove(struct display *p, int sy, int sx, int dy, int dx,
 			dest += line_ofs;
 		}
 	} else {
-		line_ofs = p->fb_info->fix.line_length - width;
-		dest = p->fb_info->screen_base + dx + width + (dy + height - 1) * p->fb_info->fix.line_length;
-		src = p->fb_info->screen_base + sx + width + (sy + height - 1) * p->fb_info->fix.line_length;
+		line_ofs = info->fix.line_length - width;
+		dest = info->screen_base + dx + width + (dy + height - 1) * info->fix.line_length;
+		src = info->screen_base + sx + width + (sy + height - 1) * info->fix.line_length;
 		while (height--) {
 			for (x = 0; x < width; x++) {
 				dest--;
@@ -177,137 +176,48 @@ void fbcon_vga_planes_clear(struct vc_data *conp, struct display *p, int sy, int
 	}
 }
 
-void fbcon_ega_planes_putc(struct vc_data *conp, struct display *p, int c, int yy, int xx)
+void fbcon_accel_putc(struct vc_data *vc, struct display *p, int c, int yy,
+                      int xx)
 {
-	int fg = attr_fgcol(p,c);
-	int bg = attr_bgcol(p,c);
+        struct fb_info *info = p->fb_info;
+        unsigned short charmask = p->charmask;
+        unsigned int width = ((fontwidth(p)+7)>>3);
+        struct fb_image image;
 
-	int y;
-	u8 *cdat = p->fontdata + (c & p->charmask) * fontheight(p);
-	char *where = p->fb_info->screen_base + xx + yy * p->fb_info->fix.line_length * fontheight(p);
+        image.fg_color = attr_fgcol(p, c);
+        image.bg_color = attr_bgcol(p, c);
+        image.dx = xx * fontwidth(p);
+        image.dy = yy * fontheight(p);
+        image.width = fontwidth(p);
+        image.height = fontheight(p);
+        image.depth = 1;
+        image.data = p->fontdata + (c & charmask)*fontheight(p)*width;
 
-	setmode(0);
-	setop(0);
-	setsr(0xf);
-	setcolor(bg);
-	selectmask();
-
-	setmask(0xff);
-	for (y = 0; y < fontheight(p); y++, where += p->fb_info->fix.line_length) 
-		rmw(where);
-
-	where -= p->fb_info->fix.line_length * y;
-	setcolor(fg);
-	selectmask();
-	for (y = 0; y < fontheight(p); y++, where += p->fb_info->fix.line_length) 
-		if (cdat[y]) {
-			setmask(cdat[y]);
-			rmw(where);
-		}
+        info->fbops->fb_imageblit(info, &image);
 }
 
-void fbcon_vga_planes_putc(struct vc_data *conp, struct display *p, int c, int yy, int xx)
+void fbcon_accel_putcs(struct vc_data *vc, struct display *p,
+                       const unsigned short *s, int count, int yy, int xx)
 {
-	int fg = attr_fgcol(p,c);
-	int bg = attr_bgcol(p,c);
+        struct fb_info *info = p->fb_info;
+        unsigned short charmask = p->charmask;
+        unsigned int width = ((fontwidth(p)+7)>>3);
+        struct fb_image image;
 
-	int y;
-	u8 *cdat = p->fontdata + (c & p->charmask) * fontheight(p);
-	char *where = p->fb_info->screen_base + xx + yy * p->fb_info->fix.line_length * fontheight(p);
+        image.fg_color = attr_fgcol(p, *s);
+        image.bg_color = attr_bgcol(p, *s);
+        image.dx = xx * fontwidth(p);
+        image.dy = yy * fontheight(p);
+        image.width = fontwidth(p);
+        image.height = fontheight(p);
+        image.depth = 1;
 
-	setmode(2);
-	setop(0);
-	setsr(0xf);
-	setcolor(fg);
-	selectmask();
-
-	setmask(0xff);
-	writeb(bg, where);
-	rmb();
-	readb(where); /* fill latches */
-	setmode(3);
-	wmb();
-	for (y = 0; y < fontheight(p); y++, where += p->fb_info->fix.line_length) 
-		writeb(cdat[y], where);
-	wmb();
-}
-
-/* 28.50 in my test */
-void fbcon_ega_planes_putcs(struct vc_data *conp, struct display *p, const unsigned short *s,
-		   int count, int yy, int xx)
-{
-	u16 c = scr_readw(s);
-	int fg = attr_fgcol(p, c);
-	int bg = attr_bgcol(p, c);
-
-	char *where;
-	int n;
-
-	setmode(2);
-	setop(0);
-	selectmask();
-
-	setmask(0xff);
-	where = p->fb_info->screen_base + xx + yy * p->fb_info->fix.line_length * fontheight(p);
-	writeb(bg, where);
-	rmb();
-	readb(where); /* fill latches */
-	wmb();
-	selectmask();
-	for (n = 0; n < count; n++) {
-		int c = scr_readw(s++) & p->charmask;
-		u8 *cdat = p->fontdata + c * fontheight(p);
-		u8 *end = cdat + fontheight(p);
-
-		while (cdat < end) {
-			outb(*cdat++, GRAPHICS_DATA_REG);	
-			wmb();
-			writeb(fg, where);
-			where += p->fb_info->fix.line_length;
-		}
-		where += 1 - p->fb_info->fix.line_length * fontheight(p);
-	}
-	
-	wmb();
-}
-
-/* 6.96 in my test */
-void fbcon_vga_planes_putcs(struct vc_data *conp, struct display *p, const unsigned short *s,
-		   int count, int yy, int xx)
-{
-	u16 c = scr_readw(s);
-	int fg = attr_fgcol(p, c);
-	int bg = attr_bgcol(p, c);
-
-	char *where;
-	int n;
-
-	setmode(2);
-	setop(0);
-	setsr(0xf);
-	setcolor(fg);
-	selectmask();
-
-	setmask(0xff);
-	where = p->fb_info->screen_base + xx + yy * p->fb_info->fix.line_length * fontheight(p);
-	writeb(bg, where);
-	rmb();
-	readb(where); /* fill latches */
-	setmode(3);	
-	wmb();
-	for (n = 0; n < count; n++) {
-		int y;
-		int c = scr_readw(s++) & p->charmask;
-		u8 *cdat = p->fontdata + (c & p->charmask) * fontheight(p);
-
-		for (y = 0; y < fontheight(p); y++, cdat++) {
-			writeb (*cdat, where);
-			where += p->fb_info->fix.line_length;
-		}
-		where += 1 - p->fb_info->fix.line_length * fontheight(p);
-	}
-	
-	wmb();
+        while (count--) {
+                image.data = p->fontdata +
+                        (scr_readw(s++) & charmask) * fontheight(p) * width;
+                info->fbops->fb_imageblit(info, &image);
+                image.dx += fontwidth(p);
+        }
 }
 
 void fbcon_vga_planes_revc(struct display *p, int xx, int yy)
@@ -332,18 +242,8 @@ struct display_switch fbcon_vga_planes = {
     setup:		fbcon_vga_planes_setup,
     bmove:		fbcon_vga_planes_bmove,
     clear:		fbcon_vga_planes_clear,
-    putc:		fbcon_vga_planes_putc,
-    putcs:		fbcon_vga_planes_putcs,
-    revc:		fbcon_vga_planes_revc,
-    fontwidthmask:	FONTWIDTH(8)
-};
-
-struct display_switch fbcon_ega_planes = {
-    setup:		fbcon_vga_planes_setup,
-    bmove:		fbcon_vga_planes_bmove,
-    clear:		fbcon_vga_planes_clear,
-    putc:		fbcon_ega_planes_putc,
-    putcs:		fbcon_ega_planes_putcs,
+    putc:		fbcon_accel_putc,
+    putcs:		fbcon_accel_putcs,
     revc:		fbcon_vga_planes_revc,
     fontwidthmask:	FONTWIDTH(8)
 };
@@ -369,13 +269,7 @@ EXPORT_SYMBOL(fbcon_vga_planes);
 EXPORT_SYMBOL(fbcon_vga_planes_setup);
 EXPORT_SYMBOL(fbcon_vga_planes_bmove);
 EXPORT_SYMBOL(fbcon_vga_planes_clear);
-EXPORT_SYMBOL(fbcon_vga_planes_putc);
-EXPORT_SYMBOL(fbcon_vga_planes_putcs);
 EXPORT_SYMBOL(fbcon_vga_planes_revc);
-
-EXPORT_SYMBOL(fbcon_ega_planes);
-EXPORT_SYMBOL(fbcon_ega_planes_putc);
-EXPORT_SYMBOL(fbcon_ega_planes_putcs);
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

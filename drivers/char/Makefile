@@ -100,8 +100,6 @@ obj-$(CONFIG_SH_WDT) += shwdt.o
 obj-$(CONFIG_EUROTECH_WDT) += eurotechwdt.o
 obj-$(CONFIG_SOFT_WATCHDOG) += softdog.o
 obj-$(CONFIG_MWAVE) += mwave/
-obj-$(CONFIG_AGP) += agp/
-obj-$(CONFIG_DRM) += drm/
 obj-$(CONFIG_PCMCIA) += pcmcia/
 
 # Files generated that shall be removed upon make clean

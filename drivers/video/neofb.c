@@ -67,7 +67,6 @@
 #include <asm/mtrr.h>
 #endif
 
-#include <video/fbcon.h>
 #include <video/neomagic.h>
 
 #define NEOFB_VERSION "0.3.3"
@@ -1165,10 +1164,9 @@ static void neofb_update_start(struct fb_info *info,
 /*
  *    Pan or Wrap the Display
  */
-static int neofb_pan_display(struct fb_var_screeninfo *var, int con,
-			     struct fb_info *fb)
+static int neofb_pan_display(struct fb_var_screeninfo *var,
+			     struct fb_info *info)
 {
-	struct fb_info *info = (struct fb_info *) fb;
 	u_int y_bottom;
 
 	y_bottom = var->yoffset;
@@ -1389,9 +1387,6 @@ static struct fb_ops neofb_ops = {
 	.owner		= THIS_MODULE,
 	.fb_check_var	= neofb_check_var,
 	.fb_set_par	= neofb_set_par,
-	.fb_set_var	= gen_set_var,
-	.fb_get_cmap	= gen_get_cmap,
-	.fb_set_cmap	= gen_set_cmap,
 	.fb_setcolreg	= neofb_setcolreg,
 	.fb_pan_display	= neofb_pan_display,
 	.fb_blank	= neofb_blank,
@@ -1750,18 +1745,17 @@ static struct fb_info *__devinit neo_alloc_fb_info(struct pci_dev *dev, const st
 	struct fb_info *info;
 	struct neofb_par *par;
 
-	info = kmalloc(sizeof(struct fb_info) + sizeof(struct display) +
-		       sizeof(u32) * 16, GFP_KERNEL);
+	info = kmalloc(sizeof(struct fb_info) + 
+		       sizeof(u32) * 17, GFP_KERNEL);
 
 	if (!info)
 		return NULL;
 
-	memset(info, 0, sizeof(struct fb_info) + sizeof(struct display));
+	memset(info, 0, sizeof(struct fb_info) + sizeof(u32) * 17);
 
 	par = &default_par;
 	memset(par, 0, sizeof(struct neofb_par));
 
-	info->currcon = -1;
 	info->fix.accel = id->driver_data;
 
 	par->pci_burst = !nopciburst;
@@ -1818,16 +1812,11 @@ static struct fb_info *__devinit neo_alloc_fb_info(struct pci_dev *dev, const st
 	info->var.width = -1;
 	info->var.accel_flags = 0;
 
-	strcpy(info->modename, info->fix.id);
-
 	info->fbops = &neofb_ops;
-	info->changevar = NULL;
-	info->switch_con = gen_switch;
 	info->updatevar = gen_update_var;
 	info->flags = FBINFO_FLAG_DEFAULT;
 	info->par = par;
-	info->disp = (struct display *) (info + 1);
-	info->pseudo_palette = (void *) (info->disp + 1);
+	info->pseudo_palette = (void *) (info + 1);
 
 	fb_alloc_cmap(&info->cmap, NR_PALETTE, 0);
 
@@ -1880,8 +1869,6 @@ static int __devinit neofb_probe(struct pci_dev *dev,
 	err = neo_map_video(info, dev, video_len);
 	if (err)
 		goto failed;
-
-	gen_set_var(neofb_var, -1, info);
 
 	/*
 	 * Calculate the hsync and vsync frequencies.  Note that

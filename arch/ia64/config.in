@@ -229,16 +229,7 @@ fi # HP_SIM
 source fs/Config.in
 
 if [ "$CONFIG_IA64_HP_SIM" = "n" ]; then
-  if [ "$CONFIG_VT" = "y" ]; then
-    mainmenu_option next_comment
-    comment 'Console drivers'
-    bool 'VGA text console' CONFIG_VGA_CONSOLE
-    source drivers/video/Config.in
-    if [ "$CONFIG_FB" = "y" ]; then
-      define_bool CONFIG_PCI_CONSOLE y
-    fi
-    endmenu
-  fi
+  source drivers/video/Config.in
 
   mainmenu_option next_comment
   comment 'Sound'

@@ -60,14 +60,7 @@ source drivers/parport/Config.in
 dep_tristate '  Parallel printer support' CONFIG_PRINTER $CONFIG_PARPORT
 endmenu
 
-mainmenu_option next_comment
-comment 'Console drivers'
-bool 'PROM console' CONFIG_PROM_CONSOLE
-if [ "$CONFIG_PROM_CONSOLE" != "y" ]; then
-   define_bool CONFIG_DUMMY_CONSOLE y
-fi
 source drivers/video/Config.in
-endmenu
 
 source drivers/mtd/Config.in
 

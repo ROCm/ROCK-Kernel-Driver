@@ -199,20 +199,7 @@ source drivers/media/Config.in
 
 source fs/Config.in
 
-if [ "$CONFIG_VT" = "y" ]; then
-   mainmenu_option next_comment
-   comment 'Console drivers'
-   source drivers/video/Config.in
-   if [ "$CONFIG_SGI_IP22" = "y" ]; then
-      tristate 'SGI Newport Console support' CONFIG_SGI_NEWPORT_CONSOLE
-      if [ "$CONFIG_SGI_NEWPORT_CONSOLE" != "y" ]; then
-	 define_bool CONFIG_DUMMY_CONSOLE y
-      else
-	 define_bool CONFIG_FONT_8x16 y
-      fi
-   fi
-  endmenu
-fi
+source drivers/video/Config.in
 
 if [ "$CONFIG_PROC_FS" = "y" ]; then
    define_bool CONFIG_KCORE_ELF y
