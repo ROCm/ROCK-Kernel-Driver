@@ -38,6 +38,13 @@ static struct saa7146_format formats[] = {
 		.depth		= 32,
 		.flags		= 0,
 	}, {
+		.name 		= "RGB-32 (R-G-B)",
+		.pixelformat	= V4L2_PIX_FMT_RGB32,
+		.trans 		= RGB32_COMPOSED,
+		.depth		= 32,
+		.flags		= 0,
+		.swap		= 0x2,
+	}, {
 		.name 		= "Greyscale-8",
 		.pixelformat	= V4L2_PIX_FMT_GREY,
 		.trans 		= Y8,
@@ -634,7 +641,7 @@ static int saa7146_pgtable_build(struct saa7146_dev *dev, struct saa7146_buf *bu
 		/* walk all pages, copy all page addresses to ptr1 */
 		for (i = 0; i < length; i++, list++) {
 			for (p = 0; p * 4096 < list->length; p++, ptr1++) {
-				*ptr1 = sg_dma_address(list) - list->offset;
+				*ptr1 = cpu_to_le32(sg_dma_address(list) - list->offset);
 			}
 		}
 /*
