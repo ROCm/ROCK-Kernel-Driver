@@ -56,7 +56,7 @@
 #include <linux/ioport.h>
 #include <linux/init.h>
 #include <linux/i2c.h>
-
+#include <asm/io.h>
 
 /* SIS630 SMBus registers */
 #define SMB_STS			0x80	/* status */

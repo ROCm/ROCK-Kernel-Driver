@@ -37,6 +37,7 @@
 #include <linux/pci.h>
 #include <linux/i2c.h>
 #include <linux/i2c-algo-bit.h>
+#include <asm/io.h>
 
 /* 3DFX defines */
 #define PCI_CHIP_SAVAGE3D	0x8A20
