@@ -484,7 +484,9 @@ static struct bio *loop_get_buffer(struct loop_device *lo, struct bio *rbh)
 
 		current->flags &= ~PF_MEMALLOC;
 		bio = loop_copy_bio(rbh);
-		current->flags = flags;
+		if (flags & PF_MEMALLOC)
+			current->flags |= PF_MEMALLOC;
+
 		if (bio == NULL)
 			blk_congestion_wait(WRITE, HZ/10);
 	} while (bio == NULL);
