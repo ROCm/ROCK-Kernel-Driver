@@ -912,6 +912,37 @@ linvfs_get_parent(
 	return parent;
 }
 
+STATIC struct dentry *
+linvfs_get_dentry(
+	struct super_block	*sb,
+	void			*data)
+{
+	vnode_t			*vp;
+	struct inode		*inode;
+	struct dentry		*result;
+	xfs_fid2_t		xfid;
+	vfs_t			*vfsp = LINVFS_GET_VFS(sb);
+	int			error;
+
+	xfid.fid_len = sizeof(xfs_fid2_t) - sizeof(xfid.fid_len);
+	xfid.fid_pad = 0;
+	xfid.fid_gen = ((__u32 *)data)[1];
+	xfid.fid_ino = ((__u32 *)data)[0];
+
+	VFS_VGET(vfsp, &vp, (fid_t *)&xfid, error);
+	if (error || vp == NULL)
+		return ERR_PTR(-ESTALE) ;
+
+	inode = LINVFS_GET_IP(vp);
+	result = d_alloc_anon(inode);
+        if (!result) {
+		iput(inode);
+		return ERR_PTR(-ENOMEM);
+	}
+	result->d_vfs_flags |= DCACHE_REFERENCED;
+	return result;
+}
+
 STATIC struct super_block *
 linvfs_get_sb(
 	struct file_system_type	*fs_type,
@@ -922,10 +953,6 @@ linvfs_get_sb(
 	return get_sb_bdev(fs_type, flags, dev_name, data, linvfs_fill_super);
 }
 
-STATIC struct export_operations linvfs_export_ops = {
-	.get_parent		= linvfs_get_parent,
-};
-
 STATIC int
 linvfs_show_options(
 	struct seq_file		*m,
@@ -935,6 +962,11 @@ linvfs_show_options(
 
 	return xfs_showargs(vfsp, m);
 }
+
+STATIC struct export_operations linvfs_export_ops = {
+	.get_parent		= linvfs_get_parent,
+	.get_dentry		= linvfs_get_dentry,
+};
 
 STATIC struct super_operations linvfs_sops = {
 	.alloc_inode		= linvfs_alloc_inode,
