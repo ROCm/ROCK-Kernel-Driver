@@ -158,6 +158,7 @@ struct pci_pbm_info {
 	struct linux_prom_pci_intmap	pbm_intmap[PROM_PCIIMAP_MAX];
 	int				num_pbm_intmap;
 	struct linux_prom_pci_intmask	pbm_intmask;
+	u64				ino_bitmap;
 
 	/* PBM I/O and Memory space resources. */
 	struct resource			io_space;
