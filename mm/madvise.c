@@ -31,7 +31,9 @@ static long madvise_behavior(struct vm_area_struct * vma, unsigned long start,
 			return -EAGAIN;
 	}
 
-	spin_lock(&mm->page_table_lock);
+	/*
+	 * vm_flags is protected by the mmap_sem held in write mode.
+	 */
 	VM_ClearReadHint(vma);
 
 	switch (behavior) {
@@ -44,7 +46,6 @@ static long madvise_behavior(struct vm_area_struct * vma, unsigned long start,
 	default:
 		break;
 	}
-	spin_unlock(&mm->page_table_lock);
 
 	return 0;
 }
