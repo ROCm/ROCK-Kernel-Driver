@@ -878,8 +878,7 @@ static void close(struct tty_struct *tty, struct file *filp)
 
 	if (info->blocked_open) {
 		if (info->close_delay) {
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout(info->close_delay);
+			msleep_interruptible(jiffies_to_msecs(info->close_delay));
 		}
 		wake_up_interruptible(&info->open_wait);
 	}
@@ -1164,8 +1163,7 @@ static void wait_until_sent(struct tty_struct *tty, int timeout)
 
 	if ( info->params.mode == MGSL_MODE_HDLC ) {
 		while (info->tx_active) {
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout(char_time);
+			msleep_interruptible(jiffies_to_msecs(char_time));
 			if (signal_pending(current))
 				break;
 			if (timeout && time_after(jiffies, orig_jiffies + timeout))
@@ -1175,8 +1173,7 @@ static void wait_until_sent(struct tty_struct *tty, int timeout)
 		//TODO: determine if there is something similar to USC16C32
 		// 	TXSTATUS_ALL_SENT status
 		while ( info->tx_active && info->tx_enabled) {
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout(char_time);
+			msleep_interruptible(jiffies_to_msecs(char_time));
 			if (signal_pending(current))
 				break;
 			if (timeout && time_after(jiffies, orig_jiffies + timeout))
@@ -5209,8 +5206,7 @@ int irq_test(SLMP_INFO *info)
 
 	timeout=100;
 	while( timeout-- && !info->irq_occurred ) {
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(msecs_to_jiffies(10));
+		msleep_interruptible(10);
 	}
 
 	spin_lock_irqsave(&info->lock,flags);
@@ -5360,8 +5356,7 @@ int loopback_test(SLMP_INFO *info)
 	/* wait for receive complete */
 	/* Set a timeout for waiting for interrupt. */
 	for ( timeout = 100; timeout; --timeout ) {
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(msecs_to_jiffies(10));
+		msleep_interruptible(10);
 
 		if (rx_get_frame(info)) {
 			rc = TRUE;

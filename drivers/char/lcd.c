@@ -24,6 +24,7 @@
 #include <linux/mc146818rtc.h>
 #include <linux/netdevice.h>
 #include <linux/sched.h>
+#include <linux/delay.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
@@ -583,8 +584,7 @@ static long lcd_read(struct inode *inode, struct file *file, char *buf,
 	lcd_waiters++;
 	while (((buttons_now = (long) button_pressed()) == 0) &&
 	       !(signal_pending(current))) {
-		current->state = TASK_INTERRUPTIBLE;
-		schedule_timeout(2 * HZ);
+		msleep_interruptible(2000);
 	}
 	lcd_waiters--;
 

@@ -1112,8 +1112,7 @@ static void rp_close(struct tty_struct *tty, struct file *filp)
 
 	if (info->blocked_open) {
 		if (info->close_delay) {
-			current->state = TASK_INTERRUPTIBLE;
-			schedule_timeout(info->close_delay);
+			msleep_interruptible(jiffies_to_msecs(info->close_delay));
 		}
 		wake_up_interruptible(&info->open_wait);
 	} else {
@@ -1538,8 +1537,7 @@ static void rp_wait_until_sent(struct tty_struct *tty, int timeout)
 #ifdef ROCKET_DEBUG_WAIT_UNTIL_SENT
 		printk(KERN_INFO "txcnt = %d (jiff=%lu,check=%d)...", txcnt, jiffies, check_time);
 #endif
-		current->state = TASK_INTERRUPTIBLE;
-		schedule_timeout(check_time);
+		msleep_interruptible(jiffies_to_msecs(check_time));
 		if (signal_pending(current))
 			break;
 	}

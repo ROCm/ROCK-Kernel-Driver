@@ -57,6 +57,7 @@
 #include <linux/ioport.h>
 #include <linux/mm.h>
 #include <linux/init.h>
+#include <linux/delay.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
@@ -2066,8 +2067,7 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 
 	if (info->blocked_open) {
 		if (info->close_delay) {
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout(info->close_delay);
+			msleep_interruptible(jiffies_to_msecs(info->close_delay));
 		}
 		wake_up_interruptible(&info->open_wait);
 	}
@@ -2098,8 +2098,7 @@ static void rs_wait_until_sent(struct tty_struct *tty, int timeout)
 
 	while ((serial_in(info, UART_ESI_STAT1) != 0x03) ||
 		(serial_in(info, UART_ESI_STAT2) != 0xff)) {
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(char_time);
+		msleep_interruptible(jiffies_to_msecs(char_time));
 
 		if (signal_pending(current))
 			break;
