@@ -56,6 +56,10 @@ static int max_cpus = -1;
 /* Total count of live CPUs */
 int smp_num_cpus = 1;
 
+/* Number of siblings per CPU package */
+int smp_num_siblings = 1;
+int __initdata phys_proc_id[NR_CPUS]; /* Package ID of each logical CPU */
+
 /* Bitmask of currently online CPUs */
 unsigned long cpu_online_map;
 
@@ -971,6 +975,8 @@ static int boot_cpu_logical_apicid;
 /* Where the IO area was mapped on multiquad, always 0 otherwise */
 void *xquad_portio = NULL;
 
+int cpu_sibling_map[NR_CPUS] __cacheline_aligned;
+
 void __init smp_boot_cpus(void)
 {
 	int apicid, cpu, bit;
@@ -1162,6 +1168,34 @@ void __init smp_boot_cpus(void)
 		printk(KERN_WARNING "WARNING: SMP operation may be unreliable with B stepping processors.\n");
 	Dprintk("Boot done.\n");
 
+	/*
+	 * If Hyper-Threading is avaialble, construct cpu_sibling_map[], so
+	 * that we can tell the sibling CPU efficiently.
+	 */
+	if (test_bit(X86_FEATURE_HT, boot_cpu_data.x86_capability)
+	    && smp_num_siblings > 1) {
+		for (cpu = 0; cpu < NR_CPUS; cpu++)
+			cpu_sibling_map[cpu] = NO_PROC_ID;
+		
+		for (cpu = 0; cpu < smp_num_cpus; cpu++) {
+			int 	i;
+			
+			for (i = 0; i < smp_num_cpus; i++) {
+				if (i == cpu)
+					continue;
+				if (phys_proc_id[cpu] == phys_proc_id[i]) {
+					cpu_sibling_map[cpu] = i;
+					printk("cpu_sibling_map[%d] = %d\n", cpu, cpu_sibling_map[cpu]);
+					break;
+				}
+			}
+			if (cpu_sibling_map[cpu] == NO_PROC_ID) {
+				smp_num_siblings = 1;
+				printk(KERN_WARNING "WARNING: No sibling found for CPU %d.\n", cpu);
+			}
+		}
+	}
+	     
 #ifndef CONFIG_VISWS
 	/*
 	 * Here we can be sure that there is an IO-APIC in the system. Let's

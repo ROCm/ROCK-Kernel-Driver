@@ -21,6 +21,7 @@
 #include <linux/kernel.h>
 #include <linux/major.h>
 #include <linux/slab.h>
+#include <linux/mm.h>
 #include <linux/mman.h>
 #include <linux/tty.h>
 #include <linux/console.h>

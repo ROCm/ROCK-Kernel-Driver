@@ -158,6 +158,7 @@ extern void mcheck_init(struct cpuinfo_x86 *c);
 extern int root_mountflags;
 extern char _text, _etext, _edata, _end;
 extern int blk_nohighio;
+void __init visws_get_board_type_and_rev(void);
 
 static int disable_x86_serial_nr __initdata = 1;
 static int disable_x86_fxsr __initdata = 0;
@@ -190,131 +191,6 @@ int enable_acpi_smp_table;
 #define RAMDISK_IMAGE_START_MASK  	0x07FF
 #define RAMDISK_PROMPT_FLAG		0x8000
 #define RAMDISK_LOAD_FLAG		0x4000	
-
-#ifdef	CONFIG_VISWS
-char visws_board_type = -1;
-char visws_board_rev = -1;
-
-#define	PIIX_PM_START		0x0F80
-
-#define	SIO_GPIO_START		0x0FC0
-
-#define	SIO_PM_START		0x0FC8
-
-#define	PMBASE			PIIX_PM_START
-#define	GPIREG0			(PMBASE+0x30)
-#define	GPIREG(x)		(GPIREG0+((x)/8))
-#define	PIIX_GPI_BD_ID1		18
-#define	PIIX_GPI_BD_REG		GPIREG(PIIX_GPI_BD_ID1)
-
-#define	PIIX_GPI_BD_SHIFT	(PIIX_GPI_BD_ID1 % 8)
-
-#define	SIO_INDEX	0x2e
-#define	SIO_DATA	0x2f
-
-#define	SIO_DEV_SEL	0x7
-#define	SIO_DEV_ENB	0x30
-#define	SIO_DEV_MSB	0x60
-#define	SIO_DEV_LSB	0x61
-
-#define	SIO_GP_DEV	0x7
-
-#define	SIO_GP_BASE	SIO_GPIO_START
-#define	SIO_GP_MSB	(SIO_GP_BASE>>8)
-#define	SIO_GP_LSB	(SIO_GP_BASE&0xff)
-
-#define	SIO_GP_DATA1	(SIO_GP_BASE+0)
-
-#define	SIO_PM_DEV	0x8
-
-#define	SIO_PM_BASE	SIO_PM_START
-#define	SIO_PM_MSB	(SIO_PM_BASE>>8)
-#define	SIO_PM_LSB	(SIO_PM_BASE&0xff)
-#define	SIO_PM_INDEX	(SIO_PM_BASE+0)
-#define	SIO_PM_DATA	(SIO_PM_BASE+1)
-
-#define	SIO_PM_FER2	0x1
-
-#define	SIO_PM_GP_EN	0x80
-
-static void __init visws_get_board_type_and_rev(void)
-{
-	int raw;
-
-	visws_board_type = (char)(inb_p(PIIX_GPI_BD_REG) & PIIX_GPI_BD_REG)
-							 >> PIIX_GPI_BD_SHIFT;
-/*
- * Get Board rev.
- * First, we have to initialize the 307 part to allow us access
- * to the GPIO registers.  Let's map them at 0x0fc0 which is right
- * after the PIIX4 PM section.
- */
-	outb_p(SIO_DEV_SEL, SIO_INDEX);
-	outb_p(SIO_GP_DEV, SIO_DATA);	/* Talk to GPIO regs. */
-    
-	outb_p(SIO_DEV_MSB, SIO_INDEX);
-	outb_p(SIO_GP_MSB, SIO_DATA);	/* MSB of GPIO base address */
-
-	outb_p(SIO_DEV_LSB, SIO_INDEX);
-	outb_p(SIO_GP_LSB, SIO_DATA);	/* LSB of GPIO base address */
-
-	outb_p(SIO_DEV_ENB, SIO_INDEX);
-	outb_p(1, SIO_DATA);		/* Enable GPIO registers. */
-    
-/*
- * Now, we have to map the power management section to write
- * a bit which enables access to the GPIO registers.
- * What lunatic came up with this shit?
- */
-	outb_p(SIO_DEV_SEL, SIO_INDEX);
-	outb_p(SIO_PM_DEV, SIO_DATA);	/* Talk to GPIO regs. */
-
-	outb_p(SIO_DEV_MSB, SIO_INDEX);
-	outb_p(SIO_PM_MSB, SIO_DATA);	/* MSB of PM base address */
-    
-	outb_p(SIO_DEV_LSB, SIO_INDEX);
-	outb_p(SIO_PM_LSB, SIO_DATA);	/* LSB of PM base address */
-
-	outb_p(SIO_DEV_ENB, SIO_INDEX);
-	outb_p(1, SIO_DATA);		/* Enable PM registers. */
-    
-/*
- * Now, write the PM register which enables the GPIO registers.
- */
-	outb_p(SIO_PM_FER2, SIO_PM_INDEX);
-	outb_p(SIO_PM_GP_EN, SIO_PM_DATA);
-    
-/*
- * Now, initialize the GPIO registers.
- * We want them all to be inputs which is the
- * power on default, so let's leave them alone.
- * So, let's just read the board rev!
- */
-	raw = inb_p(SIO_GP_DATA1);
-	raw &= 0x7f;	/* 7 bits of valid board revision ID. */
-
-	if (visws_board_type == VISWS_320) {
-		if (raw < 0x6) {
-			visws_board_rev = 4;
-		} else if (raw < 0xc) {
-			visws_board_rev = 5;
-		} else {
-			visws_board_rev = 6;
-	
-		}
-	} else if (visws_board_type == VISWS_540) {
-			visws_board_rev = 2;
-		} else {
-			visws_board_rev = raw;
-		}
-
-		printk(KERN_INFO "Silicon Graphics %s (rev %d)\n",
-			visws_board_type == VISWS_320 ? "320" :
-			(visws_board_type == VISWS_540 ? "540" :
-					"unknown"),
-					visws_board_rev);
-	}
-#endif
 
 
 static char command_line[COMMAND_LINE_SIZE];
@@ -1289,8 +1165,24 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 			}
 			break;
 
-		case 6:	/* An Athlon/Duron. We can trust the BIOS probably */
-			break;		
+		case 6: /* An Athlon/Duron */
+ 
+			/* Bit 15 of Athlon specific MSR 15, needs to be 0
+ 			 * to enable SSE on Palomino/Morgan CPU's.
+			 * If the BIOS didn't enable it already, enable it
+			 * here.
+			 */
+			if (c->x86_model == 6 || c->x86_model == 7) {
+				if (!test_bit(X86_FEATURE_XMM, &c->x86_capability)) {
+					printk(KERN_INFO "Enabling disabled K7/SSE Support.\n");
+					rdmsr(MSR_K7_HWCR, l, h);
+					l &= ~0x00008000;
+					wrmsr(MSR_K7_HWCR, l, h);
+					set_bit(X86_FEATURE_XMM, &c->x86_capability);
+				}
+			}
+			break;
+
 	}
 
 	display_cacheinfo(c);
@@ -2200,6 +2092,56 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 
 	if ( p )
 		strcpy(c->x86_model_id, p);
+	
+#ifdef CONFIG_SMP
+	if (test_bit(X86_FEATURE_HT, &c->x86_capability)) {
+		extern	int phys_proc_id[NR_CPUS];
+		
+		u32 	eax, ebx, ecx, edx;
+		int 	index_lsb, index_msb, tmp;
+		int	initial_apic_id;
+		int 	cpu = smp_processor_id();
+
+		cpuid(1, &eax, &ebx, &ecx, &edx);
+		smp_num_siblings = (ebx & 0xff0000) >> 16;
+
+		if (smp_num_siblings == 1) {
+			printk(KERN_INFO  "CPU: Hyper-Threading is disabled\n");
+		} else if (smp_num_siblings > 1 ) {
+			index_lsb = 0;
+			index_msb = 31;
+			/*
+			 * At this point we only support two siblings per
+			 * processor package.
+			 */
+#define NR_SIBLINGS	2
+			if (smp_num_siblings != NR_SIBLINGS) {
+				printk(KERN_WARNING "CPU: Unsupported number of the siblings %d", smp_num_siblings);
+				smp_num_siblings = 1;
+				goto too_many_siblings;
+			}
+			tmp = smp_num_siblings;
+			while ((tmp & 1) == 0) {
+				tmp >>=1 ;
+				index_lsb++;
+			}
+			tmp = smp_num_siblings;
+			while ((tmp & 0x80000000 ) == 0) {
+				tmp <<=1 ;
+				index_msb--;
+			}
+			if (index_lsb != index_msb )
+				index_msb++;
+			initial_apic_id = ebx >> 24 & 0xff;
+			phys_proc_id[cpu] = initial_apic_id >> index_msb;
+
+			printk(KERN_INFO  "CPU: Physical Processor ID: %d\n",
+                               phys_proc_id[cpu]);
+		}
+
+	}
+too_many_siblings:
+#endif
 }
 
 void __init get_cpu_vendor(struct cpuinfo_x86 *c)
@@ -2706,7 +2648,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	        "fpu", "vme", "de", "pse", "tsc", "msr", "pae", "mce",
 	        "cx8", "apic", NULL, "sep", "mtrr", "pge", "mca", "cmov",
 	        "pat", "pse36", "pn", "clflush", NULL, "dts", "acpi", "mmx",
-	        "fxsr", "sse", "sse2", "ss", NULL, "tm", "ia64", NULL,
+	        "fxsr", "sse", "sse2", "ss", "ht", "tm", "ia64", NULL,
 
 		/* AMD-defined */
 		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,

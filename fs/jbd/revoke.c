@@ -495,6 +495,8 @@ static void write_one_revoke_record(journal_t *journal,
 	
 	if (!descriptor) {
 		descriptor = journal_get_descriptor_buffer(journal);
+		if (!descriptor)
+			return;
 		header = (journal_header_t *) &jh2bh(descriptor)->b_data[0];
 		header->h_magic     = htonl(JFS_MAGIC_NUMBER);
 		header->h_blocktype = htonl(JFS_REVOKE_BLOCK);

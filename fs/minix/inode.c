@@ -208,7 +208,7 @@ static struct super_block *minix_read_super(struct super_block *s, void *data,
 	/* set up enough so that it can read an inode */
 	s->s_op = &minix_sops;
 	root_inode = iget(s, MINIX_ROOT_INO);
-	if (!root_inode)
+	if (!root_inode || is_bad_inode(root_inode))
 		goto out_no_root;
 
 	s->s_root = d_alloc_root(root_inode);
@@ -347,8 +347,10 @@ static void V1_minix_read_inode(struct inode * inode)
 	int i;
 
 	raw_inode = minix_V1_raw_inode(inode->i_sb, inode->i_ino, &bh);
-	if (!raw_inode)
+	if (!raw_inode) {
+		make_bad_inode(inode);
 		return;
+	}
 	inode->i_mode = raw_inode->i_mode;
 	inode->i_uid = (uid_t)raw_inode->i_uid;
 	inode->i_gid = (gid_t)raw_inode->i_gid;
@@ -372,8 +374,10 @@ static void V2_minix_read_inode(struct inode * inode)
 	int i;
 
 	raw_inode = minix_V2_raw_inode(inode->i_sb, inode->i_ino, &bh);
-	if (!raw_inode)
+	if (!raw_inode) {
+		make_bad_inode(inode);
 		return;
+	}
 	inode->i_mode = raw_inode->i_mode;
 	inode->i_uid = (uid_t)raw_inode->i_uid;
 	inode->i_gid = (gid_t)raw_inode->i_gid;

@@ -2029,10 +2029,13 @@ static void __exit idefloppy_exit (void)
 			printk ("%s: cleanup_module() called while still busy\n", drive->name);
 			failed++;
 		}
+
+#ifdef CONFIG_PROC_FS
 		/* We must remove proc entries defined in this module.
 		   Otherwise we oops while accessing these entries */
 		if (drive->proc)
 			ide_remove_proc_entries(drive->proc, idefloppy_proc);
+#endif
 	}
 	ide_unregister_module(&idefloppy_module);
 }

@@ -442,6 +442,7 @@ struct super_block * ufs_read_super (struct super_block * sb, void * data,
 	struct ufs_super_block_second * usb2;
 	struct ufs_super_block_third * usb3;
 	struct ufs_buffer_head * ubh;	
+	struct inode *inode;
 	unsigned block_size, super_block_size;
 	unsigned flags;
 
@@ -787,7 +788,13 @@ magic_found:
 		    fs32_to_cpu(sb, usb3->fs_u2.fs_44.fs_maxsymlinklen);
 	
 	sb->u.ufs_sb.s_flags = flags;
-	sb->s_root = d_alloc_root(iget(sb, UFS_ROOTINO));
+
+	inode = iget(sb, UFS_ROOTINO);
+	if (!inode || is_bad_inode(inode))
+		goto failed;
+	sb->s_root = d_alloc_root(inode);
+	if (!sb->s_root)
+		goto dalloc_failed;
 
 
 	/*
@@ -800,6 +807,8 @@ magic_found:
 	UFSD(("EXIT\n"))
 	return(sb);
 
+dalloc_failed:
+	iput(inode);
 failed:
 	if (ubh) ubh_brelse_uspi (uspi);
 	if (uspi) kfree (uspi);

@@ -46,6 +46,7 @@
 #include <linux/poll.h>
 #include <linux/init.h>
 #include <linux/list.h>
+#include <linux/termios.h>
 #include <asm/io.h>
 #include <asm/system.h>
 #include <asm/poll.h>
@@ -176,7 +177,7 @@ static ssize_t presto_psdev_write(struct file *file, const char *buf,
 
         /* move data into response buffer. */
         if (req->rq_bufsize < count) {
-                printk("psdev_write: too much cnt: %d, cnt: %d, "
+                printk("psdev_write: too much cnt: %d, cnt: %Zd, "
                        "opc: %d, uniq: %d.\n",
                        req->rq_bufsize, count, hdr.opcode, hdr.unique);
                 count = req->rq_bufsize; /* don't have more space! */
@@ -209,7 +210,7 @@ static ssize_t presto_psdev_read(struct file * file, char * buf,
                        __FUNCTION__, kdevname(dev));
         }
 
-        CDEBUG(D_PSDEV, "count %d\n", count);
+        CDEBUG(D_PSDEV, "count %Zd\n", count);
         if (list_empty(&(upccom->uc_pending))) {
                 CDEBUG(D_UPCALL, "Empty pending list in read, not good\n");
                 return -EINVAL;
@@ -228,7 +229,7 @@ static ssize_t presto_psdev_read(struct file * file, char * buf,
         }
 
         if (count < req->rq_bufsize) {
-                printk ("psdev_read: buffer too small, read %d of %d bytes\n",
+                printk ("psdev_read: buffer too small, read %Zd of %d bytes\n",
                         count, req->rq_bufsize);
         }
 
@@ -281,7 +282,7 @@ static int presto_psdev_ioctl(struct inode *inode, struct file *file,
                 error = copy_from_user(&readmount, (void *)arg,
                                        sizeof(readmount));
                 if ( error )  {
-                        printk("psdev: can't copy %d bytes from %p to %p\n",
+                        printk("psdev: can't copy %Zd bytes from %p to %p\n",
                                 sizeof(readmount), (struct readmount *) arg,
                                 &readmount);
                         EXIT;
@@ -469,7 +470,7 @@ static int presto_psdev_ioctl(struct inode *inode, struct file *file,
                 input.size = size;
                 upccom->uc_pid = saved_pid;
 
-                CDEBUG(D_PSDEV, "get_kmlsize: size = %d\n", size);
+                CDEBUG(D_PSDEV, "get_kmlsize: size = %Zd\n", size);
 
                 EXIT;
                 return copy_to_user((char *)arg, &input, sizeof(input));
@@ -621,7 +622,7 @@ static int presto_psdev_ioctl(struct inode *inode, struct file *file,
 
                 error = copy_from_user(&kopt, (void *)arg, sizeof(kopt));
                 if ( error )  {
-                        printk("psdev: can't copyin %d bytes from %p to %p\n",
+                        printk("psdev: can't copyin %Zd bytes from %p to %p\n",
                                sizeof(kopt), (struct kopt *) arg, &kopt);
                         EXIT;
                         return error;
@@ -1244,7 +1245,7 @@ static int presto_psdev_ioctl(struct inode *inode, struct file *file,
         
         default:
                 CDEBUG(D_PSDEV, "bad ioctl 0x%x, \n", cmd);
-                CDEBUG(D_PSDEV, "valid are 0x%x - 0x%x, 0x%x - 0x%x \n",
+                CDEBUG(D_PSDEV, "valid are 0x%Zx - 0x%Zx, 0x%Zx - 0x%Zx \n",
                         PRESTO_GETMOUNT, PRESTO_GET_KMLSIZE,
                         PRESTO_VFS_SETATTR, PRESTO_VFS_IOPEN);
                 EXIT;
@@ -1571,8 +1572,8 @@ int lento_upcall(int minor, int bufsize, int *rep_size, union up_args *buffer,
                req->rq_opcode, jiffies - req->rq_posttime,
                req->rq_unique, req->rq_rep_size);
         CDEBUG(D_UPCALL,
-               "..process %d woken up by Lento for req at 0x%x, data at %x\n",
-               current->pid, (int)req, (int)req->rq_data);
+               "..process %d woken up by Lento for req at 0x%p, data at %p\n",
+               current->pid, req, req->rq_data);
 
         if (upc_commp->uc_pid) {      /* i.e. Lento is still alive */
           /* Op went through, interrupt or not we go on */

@@ -31,6 +31,7 @@
 #include <linux/proc_fs.h>
 #include <linux/sysctl.h>
 #include <linux/pm.h>
+#include <linux/sched.h>
 
 #include <acpi.h>
 #include <bm.h>

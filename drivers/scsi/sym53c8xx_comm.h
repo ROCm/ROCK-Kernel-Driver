@@ -438,10 +438,10 @@ spinlock_t DRIVER_SMP_LOCK = SPIN_LOCK_UNLOCKED;
 #define	NCR_LOCK_NCB(np, flags)    spin_lock_irqsave(&np->smp_lock, flags)
 #define	NCR_UNLOCK_NCB(np, flags)  spin_unlock_irqrestore(&np->smp_lock, flags)
 
-#define	NCR_LOCK_SCSI_DONE(np, flags) \
-		spin_lock_irqsave(&io_request_lock, flags)
-#define	NCR_UNLOCK_SCSI_DONE(np, flags) \
-		spin_unlock_irqrestore(&io_request_lock, flags)
+#define	NCR_LOCK_SCSI_DONE(host, flags) \
+		spin_lock_irqsave(&(host)->host_lock, flags)
+#define	NCR_UNLOCK_SCSI_DONE(host, flags) \
+		spin_unlock_irqrestore(&((host)->host_lock), flags)
 
 #else
 
@@ -452,8 +452,8 @@ spinlock_t DRIVER_SMP_LOCK = SPIN_LOCK_UNLOCKED;
 #define	NCR_LOCK_NCB(np, flags)    do { save_flags(flags); cli(); } while (0)
 #define	NCR_UNLOCK_NCB(np, flags)  do { restore_flags(flags); } while (0)
 
-#define	NCR_LOCK_SCSI_DONE(np, flags)    do {;} while (0)
-#define	NCR_UNLOCK_SCSI_DONE(np, flags)  do {;} while (0)
+#define	NCR_LOCK_SCSI_DONE(host, flags)    do {;} while (0)
+#define	NCR_UNLOCK_SCSI_DONE(host, flags)  do {;} while (0)
 
 #endif
 

@@ -8626,9 +8626,9 @@ static void ncr53c8xx_intr(int irq, void *dev_id, struct pt_regs * regs)
      if (DEBUG_FLAGS & DEBUG_TINY) printk ("]\n");
 
      if (done_list) {
-          NCR_LOCK_SCSI_DONE(np, flags);
+          NCR_LOCK_SCSI_DONE(done_list->host, flags);
           ncr_flush_done_cmds(done_list);
-          NCR_UNLOCK_SCSI_DONE(np, flags);
+          NCR_UNLOCK_SCSI_DONE(done_list->host, flags);
      }
 }
 
@@ -8649,9 +8649,9 @@ static void ncr53c8xx_timeout(unsigned long npref)
      NCR_UNLOCK_NCB(np, flags);
 
      if (done_list) {
-          NCR_LOCK_SCSI_DONE(np, flags);
+          NCR_LOCK_SCSI_DONE(done_list->host, flags);
           ncr_flush_done_cmds(done_list);
-          NCR_UNLOCK_SCSI_DONE(np, flags);
+          NCR_UNLOCK_SCSI_DONE(done_list->host, flags);
      }
 }
 

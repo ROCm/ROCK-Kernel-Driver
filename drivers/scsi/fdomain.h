@@ -34,6 +34,7 @@ int        fdomain_16x0_queue( Scsi_Cmnd *, void (*done)(Scsi_Cmnd *) );
 int        fdomain_16x0_biosparam( Disk *, kdev_t, int * );
 int        fdomain_16x0_proc_info( char *buffer, char **start, off_t offset,
 				   int length, int hostno, int inout );
+int        fdomain_16x0_release( struct Scsi_Host *shpnt );
 
 #define FDOMAIN_16X0 { proc_info:      fdomain_16x0_proc_info,           \
 		       detect:         fdomain_16x0_detect,              \
@@ -43,6 +44,7 @@ int        fdomain_16x0_proc_info( char *buffer, char **start, off_t offset,
 		       abort:          fdomain_16x0_abort,               \
 		       reset:          fdomain_16x0_reset,               \
 		       bios_param:     fdomain_16x0_biosparam,           \
+		       release:        fdomain_16x0_release,		 \
 		       can_queue:      1, 				 \
 		       this_id:        6, 				 \
 		       sg_tablesize:   64, 				 \

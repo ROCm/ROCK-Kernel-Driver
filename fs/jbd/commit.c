@@ -47,7 +47,8 @@ void journal_commit_transaction(journal_t *journal)
 	struct buffer_head *wbuf[64];
 	int bufs;
 	int flags;
-	int blocknr;
+	int err;
+	unsigned long blocknr;
 	char *tagp = NULL;
 	journal_header_t *header;
 	journal_block_tag_t *tag = NULL;
@@ -352,6 +353,11 @@ sync_datalist_empty:
 			jbd_debug(4, "JBD: get descriptor\n");
 
 			descriptor = journal_get_descriptor_buffer(journal);
+			if (!descriptor) {
+				__journal_abort_hard(journal);
+				continue;
+			}
+			
 			bh = jh2bh(descriptor);
 			jbd_debug(4, "JBD: got buffer %ld (%p)\n",
 				bh->b_blocknr, bh->b_data);
@@ -375,7 +381,14 @@ sync_datalist_empty:
 
 		/* Where is the buffer to be written? */
 
-		blocknr = journal_next_log_block(journal);
+		err = journal_next_log_block(journal, &blocknr);
+		/* If the block mapping failed, just abandon the buffer
+		   and repeat this loop: we'll fall into the
+		   refile-on-abort condition above. */
+		if (err) {
+			__journal_abort_hard(journal);
+			continue;
+		}
 
 		/* Bump b_count to prevent truncate from stumbling over
                    the shadowed buffer!  @@@ This can go if we ever get
@@ -554,16 +567,20 @@ start_journal_io:
 
 	jbd_debug(3, "JBD: commit phase 6\n");
 
+	if (is_journal_aborted(journal))
+		goto skip_commit;
+
 	/* Done it all: now write the commit record.  We should have
 	 * cleaned up our previous buffers by now, so if we are in abort
 	 * mode we can now just skip the rest of the journal write
 	 * entirely. */
 
-	if (is_journal_aborted(journal))
-		goto skip_commit;
-
 	descriptor = journal_get_descriptor_buffer(journal);
-
+	if (!descriptor) {
+		__journal_abort_hard(journal);
+		goto skip_commit;
+	}
+	
 	/* AKPM: buglet - add `i' to tmp! */
 	for (i = 0; i < jh2bh(descriptor)->b_size; i += 512) {
 		journal_header_t *tmp =

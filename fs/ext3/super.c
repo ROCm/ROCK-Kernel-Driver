@@ -1250,8 +1250,11 @@ static journal_t *ext3_get_journal(struct super_block *sb, int journal_inum)
 	}
 
 	journal = journal_init_inode(journal_inode);
-	if (!journal)
+	if (!journal) {
+		printk(KERN_ERR "EXT3-fs: Could not load journal inode\n");
 		iput(journal_inode);
+	}
+	
 	return journal;
 }
 
@@ -1343,7 +1346,7 @@ static int ext3_load_journal(struct super_block * sb,
 	journal_t *journal;
 	int journal_inum = le32_to_cpu(es->s_journal_inum);
 	int journal_dev = le32_to_cpu(es->s_journal_dev);
-	int err;
+	int err = 0;
 	int really_read_only;
 
 	really_read_only = is_read_only(sb->s_dev);
@@ -1393,9 +1396,10 @@ static int ext3_load_journal(struct super_block * sb,
 	}
 
 	if (!EXT3_HAS_INCOMPAT_FEATURE(sb, EXT3_FEATURE_INCOMPAT_RECOVER))
-		journal_wipe(journal, !really_read_only);
+		err = journal_wipe(journal, !really_read_only);
+	if (!err)
+		err = journal_load(journal);
 
-	err = journal_load(journal);
 	if (err) {
 		printk(KERN_ERR "EXT3-fs: error loading journal.\n");
 		journal_destroy(journal);
@@ -1733,6 +1737,8 @@ static void __exit exit_ext3_fs(void)
 
 EXPORT_NO_SYMBOLS;
 
+MODULE_AUTHOR("Remy Card, Stephen Tweedie, Andrew Morton, Andreas Dilger, Theodore Ts'o and others");
+MODULE_DESCRIPTION("Second Extended Filesystem with journaling extensions");
 MODULE_LICENSE("GPL");
 module_init(init_ext3_fs)
 module_exit(exit_ext3_fs)

@@ -6,6 +6,7 @@
  *    Copyright (C) 1999, 2000 IBM Deutschland Entwicklung GmbH,
  *                             IBM Corporation
  *    Author(s): Ingo Adlung (adlung@de.ibm.com)
+ *               Cornelia Huck (cohuck@de.ibm.com) 
  *    ChangeLog: 01/07/2001 Blacklist cleanup (djbarrow@de.ibm.com,barrow_dj@yahoo.com)
  *               01/04/2001 Holger Smolinski (smolinsk@de.ibm.com)
  *                          Fixed lost interrupts and do_adapter_IO
@@ -108,7 +109,9 @@ static void init_IRQ_handler( int irq, void *dev_id, struct pt_regs *regs);
 static void s390_process_subchannels( void);
 static void s390_device_recognition_all( void);
 static void s390_device_recognition_irq( int irq);
+#ifdef CONFIG_PROC_FS
 static void s390_redo_validation(void);
+#endif
 static int  s390_validate_subchannel( int irq, int enable);
 static int  s390_SenseID( int irq, senseid_t *sid, __u8 lpm);
 static int  s390_SetPGID( int irq, __u8 lpm, pgid_t *pgid);
@@ -117,7 +120,9 @@ static int  s390_process_IRQ( unsigned int irq );
 static int  enable_subchannel( unsigned int irq);
 static int  disable_subchannel( unsigned int irq);
 
+#ifdef CONFIG_PROC_FS
 static int chan_proc_init( void );
+#endif 
 
 static inline void do_adapter_IO( __u32 intparm );
 
@@ -666,6 +671,7 @@ static int __init cio_notoper_setup(char *parm)
 	
 __setup("cio_notoper_msg=", cio_notoper_setup);
 
+#ifdef CONFIG_PROC_FS
 static int __init cio_proc_devinfo_setup(char *parm)
 {
 	if (!strcmp(parm, "yes")) {
@@ -673,13 +679,14 @@ static int __init cio_proc_devinfo_setup(char *parm)
 	} else if (!strcmp(parm, "no")) {
 		cio_proc_devinfo = 0;
 	} else {
-		printk("cio_proc_devinfo_setup: invalid parameter '%s'\n",parm);
+		printk( KERN_ERR "cio_proc_devinfo_setup: invalid parameter '%s'\n",parm);
 	}
 
 	return 1;
 }
 
 __setup("cio_proc_devinfo=", cio_proc_devinfo_setup);
+#endif
 
 /*
  * register for adapter interrupts
@@ -4779,10 +4786,12 @@ void s390_redo_validation(void)
 						
 					} 
 				}
+#ifdef CONFIG_PROC_FS
 				if (cio_proc_devinfo) 
 					if (irq < MAX_CIO_PROCFS_ENTRIES) {
 						cio_procfs_device_create(ioinfo[irq]->devno);
 				}
+#endif
 			}
 		}
 		irq++;
@@ -6523,10 +6532,11 @@ void s390_do_crw_pending( crwe_t *pcrwe )
 				if ( ioinfo[irq]->ui.flags.oper == 0 )
 				{
 					 not_oper_handler_func_t nopfunc=ioinfo[irq]->nopfunc;
-					 
+#ifdef CONFIG_PROC_FS					 
 					 /* remove procfs entry */
 					 if (cio_proc_devinfo)
 						 cio_procfs_device_remove(dev_no);
+#endif
 					/*
 					 * If the device has gone
 					 *  call not oper handler        	
@@ -6573,12 +6583,13 @@ void s390_do_crw_pending( crwe_t *pcrwe )
 								pdevreg->oper_func( irq, pdevreg );
 
 						} /* endif */
-
+#ifdef CONFIG_PROC_FS
 						/* add new procfs entry */
 						if (cio_proc_devinfo) 
 							if (highest_subchannel < MAX_CIO_PROCFS_ENTRIES) {
 								cio_procfs_device_create(ioinfo[irq]->devno);
 							}
+#endif
 					}
 					/*
 					 * ... it is and was operational, but
@@ -6586,23 +6597,26 @@ void s390_do_crw_pending( crwe_t *pcrwe )
 					 */
 					else if ((ioinfo[irq]->devno != dev_no) && ( ioinfo[irq]->nopfunc != NULL ))   					
 					{
+#ifdef CONFIG_PROC_FS
 						int devno_old = ioinfo[irq]->devno;
+#endif
 						ioinfo[irq]->nopfunc( irq,
 						                      DEVSTAT_REVALIDATE );				
-
+#ifdef CONFIG_PROC_FS
 						/* remove old entry, add new */
 						if (cio_proc_devinfo) {
 							cio_procfs_device_remove(devno_old);
 							cio_procfs_device_create(ioinfo[irq]->devno);
 						}
+#endif
 					} /* endif */
 
 				} /* endif */
-
+#ifdef CONFIG_PROC_FS
 				/* get rid of dead procfs entries */
 				if (cio_proc_devinfo) 
 					cio_procfs_device_purge();
-
+#endif
 			} /* endif */
 
 			break;
@@ -6756,6 +6770,7 @@ int cio_debug_init( void )
 
 __initcall(cio_debug_init);
 
+#ifdef CONFIG_PROC_FS
 /* 
  * Display info on subchannels in /proc/subchannels. 
  * Adapted from procfs stuff in dasd.c by Cornelia Huck, 02/28/01.      
@@ -7163,19 +7178,19 @@ int cio_procfs_device_create(int devno)
 				entry->cio_chpid_entry = create_proc_entry( "chpids", S_IFREG|S_IRUGO, entry->cio_device_entry);
 				entry->cio_chpid_entry->proc_fops = &cio_chpid_entry_file_ops;
 			} else {
-				printk("Error, could not allocate procfs structure!\n");
+				printk( KERN_WARNING "Error, could not allocate procfs structure!\n");
 				remove_proc_entry(buf, cio_procfs_deviceinfo_root);
 				kfree(entry);
 				rc = -ENOMEM;
 			}
 		} else {
-			printk("Error, could not allocate procfs structure!\n");
+			printk( KERN_WARNING "Error, could not allocate procfs structure!\n");
 			kfree(entry);
 			rc = -ENOMEM;
 		}
 
 	} else {
-		printk("Error, could not allocate procfs structure!\n");
+		printk( KERN_WARNING "Error, could not allocate procfs structure!\n");
 		rc = -ENOMEM;
 	}
 	return rc;
@@ -7370,7 +7385,7 @@ static ssize_t cio_ignore_proc_write (struct file *file, const char *user_buf,
 	}
 	buffer[user_len]='\0';
 #ifdef CIO_DEBUG_IO
-	printk ("/proc/cio_ignore: '%s'\n", buffer);
+	printk ( KERN_DEBUG "/proc/cio_ignore: '%s'\n", buffer);
 #endif /* CIO_DEBUG_IO */
 	if (cio_debug_initialized)
 		debug_sprintf_event(cio_debug_msg_id, 2, "/proc/cio_ignore: '%s'\n",buffer);
@@ -7491,6 +7506,7 @@ static int cio_irq_proc_init(void)
 __initcall(cio_irq_proc_init);	
 
 /* end of procfs stuff */
+#endif
 
 schib_t *s390_get_schib( int irq )
 {

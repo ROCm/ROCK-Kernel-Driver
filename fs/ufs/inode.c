@@ -486,13 +486,13 @@ void ufs_read_inode (struct inode * inode)
 	if (inode->i_ino < UFS_ROOTINO || 
 	    inode->i_ino > (uspi->s_ncg * uspi->s_ipg)) {
 		ufs_warning (sb, "ufs_read_inode", "bad inode number (%lu)\n", inode->i_ino);
-		return;
+		goto bad_inode;
 	}
 	
 	bh = sb_bread(sb, uspi->s_sbbase + ufs_inotofsba(inode->i_ino));
 	if (!bh) {
 		ufs_warning (sb, "ufs_read_inode", "unable to read inode %lu\n", inode->i_ino);
-		return;
+		goto bad_inode;
 	}
 	ufs_inode = (struct ufs_inode *) (bh->b_data + sizeof(struct ufs_inode) * ufs_inotofsbo(inode->i_ino));
 
@@ -557,6 +557,11 @@ void ufs_read_inode (struct inode * inode)
 	brelse (bh);
 
 	UFSD(("EXIT\n"))
+	return;
+
+bad_inode:
+	make_bad_inode(inode);
+	return;
 }
 
 static int ufs_update_inode(struct inode * inode, int do_sync)

@@ -9,7 +9,7 @@
 
 O_TARGET := ext3.o
 
-obj-y    := acl.o balloc.o bitmap.o dir.o file.o fsync.o ialloc.o inode.o \
+obj-y    := balloc.o bitmap.o dir.o file.o fsync.o ialloc.o inode.o \
 		ioctl.o namei.o super.o symlink.o
 obj-m    := $(O_TARGET)
 

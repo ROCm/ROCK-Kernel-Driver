@@ -433,6 +433,7 @@ struct task_struct {
 #define PF_MEMALLOC	0x00000800	/* Allocating memory */
 #define PF_MEMDIE	0x00001000	/* Killed for out-of-memory */
 #define PF_FREE_PAGES	0x00002000	/* per process page freeing */
+#define PF_NOIO		0x00004000	/* avoid generating further I/O */
 
 #define PF_USEDFPU	0x00100000	/* task used FPU this quantum (SMP) */
 

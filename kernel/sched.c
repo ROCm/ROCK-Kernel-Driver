@@ -265,6 +265,21 @@ send_now_idle:
 		 * a problem.
 		 */
 		if (tsk == idle_task(cpu)) {
+#if defined(__i386__) && defined(CONFIG_SMP)
+                        /*
+			 * Check if two siblings are idle in the same
+			 * physical package. Use them if found.
+			 */
+			if (smp_num_siblings == 2) {
+				if (cpu_curr(cpu_sibling_map[cpu]) == 
+			            idle_task(cpu_sibling_map[cpu])) {
+					oldest_idle = last_schedule(cpu);
+					target_tsk = tsk;
+					break;
+				}
+				
+                        }
+#endif		
 			if (last_schedule(cpu) < oldest_idle) {
 				oldest_idle = last_schedule(cpu);
 				target_tsk = tsk;

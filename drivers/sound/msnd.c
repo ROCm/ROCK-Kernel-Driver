@@ -39,6 +39,7 @@
 #  include <linux/major.h>
 #  include <linux/fs.h>
 #  include <linux/sound.h>
+#  include <asm/segment.h>
 #  include "sound_config.h"
 #else
 #  include <linux/init.h>

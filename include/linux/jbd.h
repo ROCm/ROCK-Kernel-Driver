@@ -221,7 +221,7 @@ void buffer_assertion_failure(struct buffer_head *bh);
 #endif
 
 #else
-#define J_ASSERT(assert)
+#define J_ASSERT(assert)	do { } while (0)
 #endif		/* JBD_ASSERTIONS */
 
 enum jbd_state_bits {
@@ -564,7 +564,7 @@ extern void __journal_clean_data_list(transaction_t *transaction);
 
 /* Log buffer allocation */
 extern struct journal_head * journal_get_descriptor_buffer(journal_t *);
-extern unsigned long journal_next_log_block(journal_t *);
+int journal_next_log_block(journal_t *, unsigned long *);
 
 /* Commit management */
 extern void journal_commit_transaction(journal_t *);
@@ -664,15 +664,16 @@ extern int	   journal_load       (journal_t *journal);
 extern void	   journal_destroy    (journal_t *);
 extern int	   journal_recover    (journal_t *journal);
 extern int	   journal_wipe       (journal_t *, int);
-extern int	   journal_skip_recovery (journal_t *);
-extern void	   journal_update_superblock (journal_t *, int);
-extern void	   __journal_abort      (journal_t *);
+extern int	   journal_skip_recovery	(journal_t *);
+extern void	   journal_update_superblock	(journal_t *, int);
+extern void	   __journal_abort_hard	(journal_t *);
+extern void	   __journal_abort_soft	(journal_t *, int);
 extern void	   journal_abort      (journal_t *, int);
 extern int	   journal_errno      (journal_t *);
 extern void	   journal_ack_err    (journal_t *);
 extern int	   journal_clear_err  (journal_t *);
-extern unsigned long journal_bmap(journal_t *journal, unsigned long blocknr);
-extern int	    journal_force_commit(journal_t *journal);
+extern int	   journal_bmap(journal_t *, unsigned long, unsigned long *);
+extern int	   journal_force_commit(journal_t *);
 
 /*
  * journal_head management

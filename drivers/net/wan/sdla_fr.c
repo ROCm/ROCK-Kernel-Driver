@@ -169,6 +169,7 @@
  #include <linux/netdevice.h>
 
 #else
+ #include <asm/segment.h>
 #endif
 
 #include <net/route.h>          	/* Dynamic Route Creation */

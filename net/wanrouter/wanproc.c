@@ -40,6 +40,7 @@
  #define PROC_STATS_FORMAT "%30s: %12lu\n"
 #else
  #define PROC_STATS_FORMAT "%30s: %12u\n"
+ #include <asm/segment.h>	/* kernel <-> user copy */
 #endif
 
 

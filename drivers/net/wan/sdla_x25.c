@@ -98,6 +98,7 @@
 #if defined(LINUX_2_1) || defined(LINUX_2_4)
  #include <asm/uaccess.h>
 #else
+ #include <asm/segment.h>
  #include <net/route.h>
 #endif
 

@@ -863,8 +863,10 @@ static void __exit idedisk_exit (void)
 		}
 		/* We must remove proc entries defined in this module.
 		   Otherwise we oops while accessing these entries */
+#ifdef CONFIG_PROC_FS
 		if (drive->proc)
 			ide_remove_proc_entries(drive->proc, idedisk_proc);
+#endif
 	}
 	ide_unregister_module(&idedisk_module);
 }

@@ -952,10 +952,10 @@ static void ps2esdi_normal_interrupt_handler(u_int int_ret_code)
 		break;
 	}
 	if(ending != -1) {
-		spin_lock_irqsave(ps2esdi_LOCK, flags);
+		spin_lock_irqsave(&ps2esdi_lock, flags);
 		end_request(ending);
 		do_ps2esdi_request(BLK_DEFAULT_QUEUE(MAJOR_NR));
-		spin_unlock_irqrestore(ps2esdi_LOCK, flags);
+		spin_unlock_irqrestore(&ps2esdi_lock, flags);
 	}
 }				/* handle interrupts */
 

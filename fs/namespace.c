@@ -24,6 +24,7 @@
 struct vfsmount *do_kern_mount(const char *type, int flags, char *name, void *data);
 int do_remount_sb(struct super_block *sb, int flags, void * data);
 void kill_super(struct super_block *sb);
+int __init init_rootfs(void);
 
 static struct list_head *mount_hashtable;
 static int hash_mask, hash_bits;

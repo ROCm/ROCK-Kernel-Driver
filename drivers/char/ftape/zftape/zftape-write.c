@@ -32,6 +32,7 @@
 #if LINUX_VERSION_CODE >= KERNEL_VER(2,1,6)
 #include <asm/uaccess.h>
 #else
+#include <asm/segment.h>
 #endif
 
 #include "../zftape/zftape-init.h"

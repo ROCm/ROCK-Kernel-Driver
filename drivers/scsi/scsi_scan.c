@@ -155,11 +155,14 @@ static struct dev_info device_list[] =
 	{"EMC", "SYMMETRIX", "*", BLIST_SPARSELUN},
 	{"CMD", "CRA-7280", "*", BLIST_SPARSELUN},   // CMD RAID Controller
 	{"CNSI", "G7324", "*", BLIST_SPARSELUN},     // Chaparral G7324 RAID
+	{"CNSi", "G8324", "*", BLIST_SPARSELUN},     // Chaparral G8324 RAID
 	{"Zzyzx", "RocketStor 500S", "*", BLIST_SPARSELUN},
 	{"Zzyzx", "RocketStor 2000", "*", BLIST_SPARSELUN},
 	{"SONY", "TSL",       "*", BLIST_FORCELUN},  // DDS3 & DDS4 autoloaders
 	{"DELL", "PERCRAID", "*", BLIST_FORCELUN},
 	{"HP", "NetRAID-4M", "*", BLIST_FORCELUN},
+	{"ADAPTEC", "AACRAID", "*", BLIST_FORCELUN},
+	{"ADAPTEC", "Adaptec 5400S", "*", BLIST_FORCELUN},
 
 	/*
 	 * Must be at end of list...

@@ -323,7 +323,7 @@ static int complete_read_super(struct super_block *sb, int silent, int size)
 	/* set up enough so that it can read an inode */
 	sb->s_op = &sysv_sops;
 	root_inode = iget(sb,SYSV_ROOT_INO);
-	if (!root_inode) {
+	if (!root_inode || is_bad_inode(root_inode)) {
 		printk("SysV FS: get root inode failed\n");
 		return 0;
 	}

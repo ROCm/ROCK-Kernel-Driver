@@ -50,6 +50,7 @@
 #if LINUX_VERSION_CODE >= 0x20100
 #include <asm/uaccess.h>
 #else
+#include <asm/segment.h>
 #include <linux/mm.h>
 
 #undef put_user

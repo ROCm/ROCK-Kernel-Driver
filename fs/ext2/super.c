@@ -29,6 +29,8 @@
 #include <asm/uaccess.h>
 
 
+static void ext2_sync_super(struct super_block *sb,
+			    struct ext2_super_block *es);
 
 static char error_buf[1024];
 
@@ -36,13 +38,13 @@ void ext2_error (struct super_block * sb, const char * function,
 		 const char * fmt, ...)
 {
 	va_list args;
+	struct ext2_super_block *es = EXT2_SB(sb)->s_es;
 
 	if (!(sb->s_flags & MS_RDONLY)) {
 		sb->u.ext2_sb.s_mount_state |= EXT2_ERROR_FS;
-		sb->u.ext2_sb.s_es->s_state =
-			cpu_to_le16(le16_to_cpu(sb->u.ext2_sb.s_es->s_state) | EXT2_ERROR_FS);
-		mark_buffer_dirty(sb->u.ext2_sb.s_sbh);
-		sb->s_dirt = 1;
+		es->s_state =
+			cpu_to_le16(le16_to_cpu(es->s_state) | EXT2_ERROR_FS);
+		ext2_sync_super(sb, es);
 	}
 	va_start (args, fmt);
 	vsprintf (error_buf, fmt, args);
@@ -125,8 +127,10 @@ void ext2_put_super (struct super_block * sb)
 	int i;
 
 	if (!(sb->s_flags & MS_RDONLY)) {
-		sb->u.ext2_sb.s_es->s_state = le16_to_cpu(sb->u.ext2_sb.s_mount_state);
-		mark_buffer_dirty(sb->u.ext2_sb.s_sbh);
+		struct ext2_super_block *es = EXT2_SB(sb)->s_es;
+
+		es->s_state = le16_to_cpu(EXT2_SB(sb)->s_mount_state);
+		ext2_sync_super(sb, es);
 	}
 	db_count = EXT2_SB(sb)->s_gdb_count;
 	for (i = 0; i < db_count; i++)
@@ -306,13 +310,10 @@ static int ext2_setup_super (struct super_block * sb,
 		(le32_to_cpu(es->s_lastcheck) + le32_to_cpu(es->s_checkinterval) <= CURRENT_TIME))
 		printk ("EXT2-fs warning: checktime reached, "
 			"running e2fsck is recommended\n");
-	es->s_state = cpu_to_le16(le16_to_cpu(es->s_state) & ~EXT2_VALID_FS);
 	if (!(__s16) le16_to_cpu(es->s_max_mnt_count))
 		es->s_max_mnt_count = (__s16) cpu_to_le16(EXT2_DFL_MAX_MNT_COUNT);
 	es->s_mnt_count=cpu_to_le16(le16_to_cpu(es->s_mnt_count) + 1);
-	es->s_mtime = cpu_to_le32(CURRENT_TIME);
-	mark_buffer_dirty(sb->u.ext2_sb.s_sbh);
-	sb->s_dirt = 1;
+	ext2_write_super(sb);
 	if (test_opt (sb, DEBUG))
 		printk ("[EXT II FS %s, %s, bs=%lu, fs=%lu, gc=%lu, "
 			"bpg=%lu, ipg=%lu, mo=%04lx]\n",
@@ -659,6 +660,15 @@ static void ext2_commit_super (struct super_block * sb,
 	sb->s_dirt = 0;
 }
 
+static void ext2_sync_super(struct super_block *sb, struct ext2_super_block *es)
+{
+	es->s_wtime = cpu_to_le32(CURRENT_TIME);
+	mark_buffer_dirty(EXT2_SB(sb)->s_sbh);
+	ll_rw_block(WRITE, 1, &EXT2_SB(sb)->s_sbh);
+	wait_on_buffer(EXT2_SB(sb)->s_sbh);
+	sb->s_dirt = 0;
+}
+
 /*
  * In the second extended file system, it is not necessary to
  * write the super block since we use a mapping of the
@@ -677,13 +687,14 @@ void ext2_write_super (struct super_block * sb)
 	if (!(sb->s_flags & MS_RDONLY)) {
 		es = sb->u.ext2_sb.s_es;
 
-		ext2_debug ("setting valid to 0\n");
-
 		if (le16_to_cpu(es->s_state) & EXT2_VALID_FS) {
-			es->s_state = cpu_to_le16(le16_to_cpu(es->s_state) & ~EXT2_VALID_FS);
+			ext2_debug ("setting valid to 0\n");
+			es->s_state = cpu_to_le16(le16_to_cpu(es->s_state) &
+						  ~EXT2_VALID_FS);
 			es->s_mtime = cpu_to_le32(CURRENT_TIME);
-		}
-		ext2_commit_super (sb, es);
+			ext2_sync_super(sb, es);
+		} else
+			ext2_commit_super (sb, es);
 	}
 	sb->s_dirt = 0;
 }
@@ -720,11 +731,7 @@ int ext2_remount (struct super_block * sb, int * flags, char * data)
 		 */
 		es->s_state = cpu_to_le16(sb->u.ext2_sb.s_mount_state);
 		es->s_mtime = cpu_to_le32(CURRENT_TIME);
-		mark_buffer_dirty(sb->u.ext2_sb.s_sbh);
-		sb->s_dirt = 1;
-		ext2_commit_super (sb, es);
-	}
-	else {
+	} else {
 		int ret;
 		if ((ret = EXT2_HAS_RO_COMPAT_FEATURE(sb,
 					       ~EXT2_FEATURE_RO_COMPAT_SUPP))) {
@@ -742,6 +749,7 @@ int ext2_remount (struct super_block * sb, int * flags, char * data)
 		if (!ext2_setup_super (sb, es, 0))
 			sb->s_flags &= ~MS_RDONLY;
 	}
+	ext2_sync_super(sb, es);
 	return 0;
 }
 

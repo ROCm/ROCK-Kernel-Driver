@@ -983,7 +983,7 @@ int fdomain_16x0_detect( Scsi_Host_Template *tpnt )
       /* Register the IRQ with the kernel */
 
       retcode = request_irq( interrupt_level,
-			     do_fdomain_16x0_intr, pdev?SA_SHIRQ:0, "fdomain", NULL);
+			     do_fdomain_16x0_intr, pdev?SA_SHIRQ:0, "fdomain", shpnt);
 
       if (retcode < 0) {
 	 if (retcode == -EINVAL) {
@@ -2033,6 +2033,15 @@ int fdomain_16x0_biosparam( Scsi_Disk *disk, kdev_t dev, int *info_array )
    }
    
    return 0;
+}
+
+int fdomain_16x0_release(struct Scsi_Host *shpnt)
+{
+	if (shpnt->irq)
+		free_irq(shpnt->irq, shpnt);
+	if (shpnt->io_port && shpnt->n_io_port)
+		release_region(shpnt->io_port, shpnt->n_io_port);
+
 }
 
 MODULE_LICENSE("GPL");

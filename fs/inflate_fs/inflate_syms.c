@@ -19,3 +19,4 @@ EXPORT_SYMBOL(zlib_fs_inflateSync);
 EXPORT_SYMBOL(zlib_fs_inflateReset);
 EXPORT_SYMBOL(zlib_fs_adler32);
 EXPORT_SYMBOL(zlib_fs_inflateSyncPoint);
+MODULE_LICENSE("GPL");

@@ -36,8 +36,8 @@
 /*
  * The second extended file system version
  */
-#define EXT3FS_DATE		"06 Nov 2001"
-#define EXT3FS_VERSION		"2.4-0.9.15"
+#define EXT3FS_DATE		"02 Dec 2001"
+#define EXT3FS_VERSION		"2.4-0.9.16"
 
 /*
  * Debug code
@@ -577,10 +577,6 @@ struct ext3_dir_entry_2 {
 					 ~EXT3_DIR_ROUND)
 
 #ifdef __KERNEL__
-
-/* Filesize hard limits for 64-bit file offsets */
-extern long long ext3_max_sizes[];
-
 /*
  * Describe an inode's exact location on disk and in memory
  */
@@ -603,9 +599,6 @@ struct ext3_iloc
 # define ATTRIB_NORET  __attribute__((noreturn))
 # define NORET_AND     noreturn,
 
-/* acl.c */
-extern int ext3_permission (struct inode *, int);
-
 /* balloc.c */
 extern int ext3_bg_has_super(struct super_block *sb, int group);
 extern unsigned long ext3_bg_num_gdb(struct super_block *sb, int group);
@@ -619,16 +612,10 @@ extern struct ext3_group_desc * ext3_get_group_desc(struct super_block * sb,
 						    unsigned int block_group,
 						    struct buffer_head ** bh);
 
-/* bitmap.c */
-extern unsigned long ext3_count_free (struct buffer_head *, unsigned);
-
 /* dir.c */
 extern int ext3_check_dir_entry(const char *, struct inode *,
 				struct ext3_dir_entry_2 *, struct buffer_head *,
 				unsigned long);
-
-/* file.c */
-
 /* fsync.c */
 extern int ext3_sync_file (struct file *, struct dentry *, int);
 
@@ -638,9 +625,9 @@ extern void ext3_free_inode (handle_t *, struct inode *);
 extern struct inode * ext3_orphan_get (struct super_block *, ino_t);
 extern unsigned long ext3_count_free_inodes (struct super_block *);
 extern void ext3_check_inodes_bitmap (struct super_block *);
+extern unsigned long ext3_count_free (struct buffer_head *, unsigned);
 
 /* inode.c */
-
 extern struct buffer_head * ext3_getblk (handle_t *, struct inode *, long, int, int *);
 extern struct buffer_head * ext3_bread (handle_t *, struct inode *, int, int, int *);
 
@@ -654,13 +641,13 @@ extern int  ext3_sync_inode (handle_t *, struct inode *);
 extern void ext3_discard_prealloc (struct inode *);
 extern void ext3_dirty_inode(struct inode *);
 extern int ext3_change_inode_journal_flag(struct inode *, int);
+extern void ext3_truncate (struct inode *);
 
 /* ioctl.c */
 extern int ext3_ioctl (struct inode *, struct file *, unsigned int,
 		       unsigned long);
 
 /* namei.c */
-extern struct inode_operations ext3_dir_inode_operations;
 extern int ext3_orphan_add(handle_t *, struct inode *);
 extern int ext3_orphan_del(handle_t *, struct inode *);
 
@@ -684,9 +671,6 @@ extern int ext3_remount (struct super_block *, int *, char *);
 extern struct super_block * ext3_read_super (struct super_block *,void *,int);
 extern int ext3_statfs (struct super_block *, struct statfs *);
 
-/* truncate.c */
-extern void ext3_truncate (struct inode *);
-
 #define ext3_std_error(sb, errno)				\
 do {								\
 	if ((errno))						\
@@ -705,10 +689,15 @@ extern struct file_operations ext3_dir_operations;
 extern struct inode_operations ext3_file_inode_operations;
 extern struct file_operations ext3_file_operations;
 
+/* inode.c */
+extern struct address_space_operations ext3_aops;
+
+/* namei.c */
+extern struct inode_operations ext3_dir_inode_operations;
+
 /* symlink.c */
 extern struct inode_operations ext3_fast_symlink_inode_operations;
 
-extern struct address_space_operations ext3_aops;
 
 #endif	/* __KERNEL__ */
 

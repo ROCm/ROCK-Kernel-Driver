@@ -196,9 +196,22 @@ __ext3_journal_dirty_metadata(const char *where,
  */
 static inline handle_t *ext3_journal_start(struct inode *inode, int nblocks)
 {
+	journal_t *journal;
+	
 	if (inode->i_sb->s_flags & MS_RDONLY)
 		return ERR_PTR(-EROFS);
-	return journal_start(EXT3_JOURNAL(inode), nblocks);
+
+	/* Special case here: if the journal has aborted behind our
+	 * backs (eg. EIO in the commit thread), then we still need to
+	 * take the FS itself readonly cleanly. */
+	journal = EXT3_JOURNAL(inode);
+	if (is_journal_aborted(journal)) {
+		ext3_abort(inode->i_sb, __FUNCTION__,
+			   "Detected aborted journal");
+		return ERR_PTR(-EROFS);
+	}
+	
+	return journal_start(journal, nblocks);
 }
 
 static inline handle_t *

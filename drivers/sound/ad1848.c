@@ -134,7 +134,7 @@ static int timer_installed = -1;
 
 static int loaded;
 
-static int ad_format_mask[10 /*devc->model */ ] =
+static int ad_format_mask[13 /*devc->model */ ] =
 {
 	0,
 	AFMT_U8 | AFMT_S16_LE | AFMT_MU_LAW | AFMT_A_LAW,
@@ -145,7 +145,10 @@ static int ad_format_mask[10 /*devc->model */ ] =
 	AFMT_U8 | AFMT_S16_LE | AFMT_MU_LAW | AFMT_A_LAW | AFMT_S16_BE | AFMT_IMA_ADPCM,
 	AFMT_U8 | AFMT_S16_LE | AFMT_MU_LAW | AFMT_A_LAW | AFMT_S16_BE | AFMT_IMA_ADPCM,
 	AFMT_U8 | AFMT_S16_LE /* CS4235 */,
-	AFMT_U8 | AFMT_S16_LE | AFMT_MU_LAW | AFMT_A_LAW	/* Ensoniq Soundscape*/
+	AFMT_U8 | AFMT_S16_LE | AFMT_MU_LAW | AFMT_A_LAW	/* Ensoniq Soundscape*/,
+	AFMT_U8 | AFMT_S16_LE | AFMT_MU_LAW | AFMT_A_LAW | AFMT_S16_BE | AFMT_IMA_ADPCM,
+	AFMT_U8 | AFMT_S16_LE | AFMT_MU_LAW | AFMT_A_LAW | AFMT_S16_BE | AFMT_IMA_ADPCM,
+	AFMT_U8 | AFMT_S16_LE | AFMT_MU_LAW | AFMT_A_LAW | AFMT_S16_BE | AFMT_IMA_ADPCM
 };
 
 static ad1848_info adev_info[MAX_AUDIO_DEV];
@@ -2965,6 +2968,10 @@ static struct {
         	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
 		ISAPNP_VENDOR('Y','M','H'), ISAPNP_FUNCTION(0x0021),
                 1, 0, 0, 1, 1},
+	{"Advanced Gravis InterWave Audio",
+		ISAPNP_VENDOR('G','R','V'), ISAPNP_DEVICE(0x0001),
+		ISAPNP_VENDOR('G','R','V'), ISAPNP_FUNCTION(0x0000),
+		0, 0, 0, 1, 0},
 	{0}
 };
 
@@ -2977,6 +2984,8 @@ static struct isapnp_device_id id_table[] __devinitdata = {
 		ISAPNP_VENDOR('C','S','C'), ISAPNP_FUNCTION(0x0100), 0 },
         {       ISAPNP_ANY_ID, ISAPNP_ANY_ID,
 		ISAPNP_VENDOR('Y','M','H'), ISAPNP_FUNCTION(0x0021), 0 },
+	{	ISAPNP_VENDOR('G','R','V'), ISAPNP_DEVICE(0x0001),
+		ISAPNP_VENDOR('G','R','V'), ISAPNP_FUNCTION(0x0000), 0 },
 	{0}
 };
 

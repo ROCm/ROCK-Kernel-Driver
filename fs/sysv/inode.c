@@ -152,13 +152,13 @@ static void sysv_read_inode(struct inode *inode)
 		printk("Bad inode number on dev %s"
 		       ": %d is out of range\n",
 		       kdevname(inode->i_dev), ino);
-		return;
+		goto bad_inode;
 	}
 	raw_inode = sysv_raw_inode(sb, ino, &bh);
 	if (!raw_inode) {
 		printk("Major problem: unable to read inode from dev %s\n",
 		       bdevname(inode->i_dev));
-		return;
+		goto bad_inode;
 	}
 	/* SystemV FS: kludge permissions if ino==SYSV_ROOT_INO ?? */
 	inode->i_mode = fs16_to_cpu(sb, raw_inode->i_mode);
@@ -178,6 +178,11 @@ static void sysv_read_inode(struct inode *inode)
 		rdev = (u16)fs32_to_cpu(sb, inode->u.sysv_i.i_data[0]);
 	inode->u.sysv_i.i_dir_start_lookup = 0;
 	sysv_set_inode(inode, rdev);
+	return;
+
+bad_inode:
+	make_bad_inode(inode);
+	return;
 }
 
 static struct buffer_head * sysv_update_inode(struct inode * inode)
