@@ -22,37 +22,22 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- *  $Id: clps711x.c,v 1.40 2002/07/22 15:27:32 rmk Exp $
+ *  $Id: clps711x.c,v 1.42 2002/07/28 10:03:28 rmk Exp $
  *
  */
 #include <linux/config.h>
 #include <linux/module.h>
-#include <linux/errno.h>
-#include <linux/signal.h>
-#include <linux/sched.h>
-#include <linux/interrupt.h>
 #include <linux/tty.h>
-#include <linux/tty_flip.h>
-#include <linux/major.h>
-#include <linux/string.h>
-#include <linux/fcntl.h>
-#include <linux/ptrace.h>
 #include <linux/ioport.h>
-#include <linux/mm.h>
-#include <linux/slab.h>
 #include <linux/init.h>
-#include <linux/circ_buf.h>
 #include <linux/serial.h>
 #include <linux/console.h>
 #include <linux/sysrq.h>
 #include <linux/spinlock.h>
 
-#include <asm/bitops.h>
 #include <asm/hardware.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-#include <asm/system.h>
-#include <asm/uaccess.h>
 
 #if defined(CONFIG_SERIAL_CLPS711X_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
 #define SUPPORT_SYSRQ
@@ -597,7 +582,7 @@ static int __init clps711xuart_init(void)
 {
 	int ret, i;
 
-	printk(KERN_INFO "Serial: CLPS711x driver $Revision: 1.40 $\n");
+	printk(KERN_INFO "Serial: CLPS711x driver $Revision: 1.42 $\n");
 
 	ret = uart_register_driver(&clps711x_reg);
 	if (ret)
@@ -625,5 +610,5 @@ module_exit(clps711xuart_exit);
 EXPORT_NO_SYMBOLS;
 
 MODULE_AUTHOR("Deep Blue Solutions Ltd");
-MODULE_DESCRIPTION("CLPS-711x generic serial driver $Revision: 1.40 $");
+MODULE_DESCRIPTION("CLPS-711x generic serial driver $Revision: 1.42 $");
 MODULE_LICENSE("GPL");

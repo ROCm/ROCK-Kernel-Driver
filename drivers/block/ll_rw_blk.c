@@ -1253,7 +1253,7 @@ struct request *__blk_get_request(request_queue_t *q, int rw)
  *    host that is unable to accept a particular command.
  */
 void blk_insert_request(request_queue_t *q, struct request *rq,
-		int at_head, void *data)
+			int at_head, void *data)
 {
 	unsigned long flags;
 
@@ -1262,15 +1262,18 @@ void blk_insert_request(request_queue_t *q, struct request *rq,
 	 * must not attempt merges on this) and that it acts as a soft
 	 * barrier
 	 */
-	rq->flags &= REQ_QUEUED;
 	rq->flags |= REQ_SPECIAL | REQ_BARRIER;
 
 	rq->special = data;
 
 	spin_lock_irqsave(q->queue_lock, flags);
-	/* If command is tagged, release the tag */
-	if(blk_rq_tagged(rq))
+
+	/*
+	 * If command is tagged, release the tag
+	 */
+	if (blk_rq_tagged(rq))
 		blk_queue_end_tag(q, rq);
+
 	_elv_add_request(q, rq, !at_head, 0);
 	q->request_fn(q);
 	spin_unlock_irqrestore(q->queue_lock, flags);

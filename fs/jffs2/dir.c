@@ -5,33 +5,9 @@
  *
  * Created by David Woodhouse <dwmw2@cambridge.redhat.com>
  *
- * The original JFFS, from which the design for JFFS2 was derived,
- * was designed and implemented by Axis Communications AB.
+ * For licensing information, see the file 'LICENCE' in this directory.
  *
- * The contents of this file are subject to the Red Hat eCos Public
- * License Version 1.1 (the "Licence"); you may not use this file
- * except in compliance with the Licence.  You may obtain a copy of
- * the Licence at http://www.redhat.com/
- *
- * Software distributed under the Licence is distributed on an "AS IS"
- * basis, WITHOUT WARRANTY OF ANY KIND, either express or implied.
- * See the Licence for the specific language governing rights and
- * limitations under the Licence.
- *
- * The Original Code is JFFS2 - Journalling Flash File System, version 2
- *
- * Alternatively, the contents of this file may be used under the
- * terms of the GNU General Public License version 2 (the "GPL"), in
- * which case the provisions of the GPL are applicable instead of the
- * above.  If you wish to allow the use of your version of this file
- * only under the terms of the GPL and not to allow others to use your
- * version of this file under the RHEPL, indicate your decision by
- * deleting the provisions above and replace them with the notice and
- * other provisions required by the GPL.  If you do not delete the
- * provisions above, a recipient may use your version of this file
- * under either the RHEPL or the GPL.
- *
- * $Id: dir.c,v 1.68 2002/03/11 12:36:59 dwmw2 Exp $
+ * $Id: dir.c,v 1.71 2002/07/23 17:00:45 dwmw2 Exp $
  *
  */
 
@@ -45,7 +21,6 @@
 #include <linux/jffs2_fs_i.h>
 #include <linux/jffs2_fs_sb.h>
 #include <linux/time.h>
-#include <linux/smp_lock.h>
 #include "nodelist.h"
 
 static int jffs2_readdir (struct file *, void *, filldir_t);
@@ -63,25 +38,25 @@ static int jffs2_rename (struct inode *, struct dentry *,
 
 struct file_operations jffs2_dir_operations =
 {
-	read:		generic_read_dir,
-	readdir:	jffs2_readdir,
-	ioctl:		jffs2_ioctl,
-	fsync:		jffs2_fsync
+	.read =		generic_read_dir,
+	.readdir =	jffs2_readdir,
+	.ioctl =	jffs2_ioctl,
+	.fsync =	jffs2_fsync
 };
 
 
 struct inode_operations jffs2_dir_inode_operations =
 {
-	create:		jffs2_create,
-	lookup:		jffs2_lookup,
-	link:		jffs2_link,
-	unlink:		jffs2_unlink,
-	symlink:	jffs2_symlink,
-	mkdir:		jffs2_mkdir,
-	rmdir:		jffs2_rmdir,
-	mknod:		jffs2_mknod,
-	rename:		jffs2_rename,
-	setattr:	jffs2_setattr,
+	.create =	jffs2_create,
+	.lookup =	jffs2_lookup,
+	.link =		jffs2_link,
+	.unlink =	jffs2_unlink,
+	.symlink =	jffs2_symlink,
+	.mkdir =	jffs2_mkdir,
+	.rmdir =	jffs2_rmdir,
+	.mknod =	jffs2_mknod,
+	.rename =	jffs2_rename,
+	.setattr =	jffs2_setattr,
 };
 
 /***********************************************************************/
@@ -144,8 +119,6 @@ static int jffs2_readdir(struct file *filp, void *dirent, filldir_t filldir)
 
 	D1(printk(KERN_DEBUG "jffs2_readdir() for dir_i #%lu\n", filp->f_dentry->d_inode->i_ino));
 
-	lock_kernel();
-
 	f = JFFS2_INODE_INFO(inode);
 	c = JFFS2_SB_INFO(inode->i_sb);
 
@@ -189,7 +162,6 @@ static int jffs2_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	up(&f->sem);
  out:
 	filp->f_pos = offset;
-	unlock_kernel();
 	return 0;
 }
 
@@ -744,7 +716,29 @@ static int jffs2_rename (struct inode *old_dir_i, struct dentry *old_dentry,
 {
 	int ret;
 	struct jffs2_sb_info *c = JFFS2_SB_INFO(old_dir_i->i_sb);
+	struct jffs2_inode_info *victim_f = NULL;
 	uint8_t type;
+
+	/* The VFS will check for us and prevent trying to rename a 
+	 * file over a directory and vice versa, but if it's a directory,
+	 * the VFS can't check whether the victim is empty. The filesystem
+	 * needs to do that for itself.
+	 */
+	if (new_dentry->d_inode) {
+		victim_f = JFFS2_INODE_INFO(new_dentry->d_inode);
+		if (S_ISDIR(new_dentry->d_inode->i_mode)) {
+			struct jffs2_full_dirent *fd;
+
+			down(&victim_f->sem);
+			for (fd = victim_f->dents; fd; fd = fd->next) {
+				if (fd->ino) {
+					up(&victim_f->sem);
+					return -ENOTEMPTY;
+				}
+			}
+			up(&victim_f->sem);
+		}
+	}
 
 	/* XXX: We probably ought to alloc enough space for
 	   both nodes at the same time. Writing the new link, 
@@ -764,7 +758,21 @@ static int jffs2_rename (struct inode *old_dir_i, struct dentry *old_dentry,
 	if (ret)
 		return ret;
 
-	if (S_ISDIR(old_dentry->d_inode->i_mode))
+	if (victim_f) {
+		/* There was a victim. Kill it off nicely */
+		new_dentry->d_inode->i_nlink--;
+		/* Don't oops if the victim was a dirent pointing to an
+		   inode which didn't exist. */
+		if (victim_f->inocache) {
+			down(&victim_f->sem);
+			victim_f->inocache->nlink--;
+			up(&victim_f->sem);
+		}
+	}
+
+	/* If it was a directory we moved, and there was no victim, 
+	   increase i_nlink on its new parent */
+	if (S_ISDIR(old_dentry->d_inode->i_mode) && !victim_f)
 		new_dir_i->i_nlink++;
 
 	/* Unlink the original */

@@ -16,7 +16,6 @@
 #include <linux/mm.h>
 #include <linux/kernel_stat.h>
 #include <linux/swap.h>
-#include <linux/swapctl.h>
 #include <linux/pagemap.h>
 #include <linux/init.h>
 
@@ -26,12 +25,6 @@
 
 /* How many pages do we try to swap or page in/out together? */
 int page_cluster;
-
-pager_daemon_t pager_daemon = {
-	512,	/* base number for calculating the number of tries */
-	SWAP_CLUSTER_MAX,	/* minimum number of tries */
-	8,	/* do swap I/O in clusters of this size */
-};
 
 /*
  * Move an inactive page to the active list.
