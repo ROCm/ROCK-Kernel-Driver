@@ -43,7 +43,7 @@ obj-$(CONFIG_SCSI_MAC_ESP)	+= mac_esp.o	NCR53C9x.o
 obj-$(CONFIG_SUN3_SCSI)		+= sun3_scsi.o  sun3_scsi_vme.o
 obj-$(CONFIG_MVME16x_SCSI)	+= mvme16x.o	53c7xx.o
 obj-$(CONFIG_BVME6000_SCSI)	+= bvme6000.o	53c7xx.o
-obj-$(CONFIG_SCSI_SIM710)	+= sim710.o
+obj-$(CONFIG_SCSI_SIM710)	+= sim710.o	53c700.o
 obj-$(CONFIG_SCSI_ADVANSYS)	+= advansys.o
 obj-$(CONFIG_SCSI_PCI2000)	+= pci2000.o
 obj-$(CONFIG_SCSI_PCI2220I)	+= pci2220i.o
@@ -78,7 +78,6 @@ obj-$(CONFIG_SCSI_FD_8xx)	+= seagate.o
 obj-$(CONFIG_SCSI_T128)		+= t128.o
 obj-$(CONFIG_SCSI_DMX3191D)	+= dmx3191d.o
 obj-$(CONFIG_SCSI_DTC3280)	+= dtc.o
-obj-$(CONFIG_SCSI_NCR53C7xx)	+= 53c7,8xx.o 
 obj-$(CONFIG_SCSI_SYM53C8XX_2)	+= sym53c8xx_2/
 obj-$(CONFIG_SCSI_SYM53C8XX)	+= sym53c8xx.o 
 obj-$(CONFIG_SCSI_NCR53C8XX)	+= ncr53c8xx.o 
@@ -139,12 +138,10 @@ cpqfc-objs	:= cpqfcTSinit.o cpqfcTScontrol.o cpqfcTSi2c.o \
 		   cpqfcTSworker.o cpqfcTStrigger.o
 
 # Files generated that shall be removed upon make clean
-clean-files :=	53c8xx_d.h  53c7xx_d.h sim710_d.h  53c700_d.h	\
-		53c8xx_u.h  53c7xx_u.h sim710_u.h 53c700_u.h
+clean-files :=	53c7xx_d.h 53c700_d.h	\
+		53c7xx_u.h 53c700_u.h
 
-$(obj)/53c7,8xx.o: $(obj)/53c8xx_d.h $(obj)/53c8xx_u.h
 $(obj)/53c7xx.o:   $(obj)/53c7xx_d.h $(obj)/53c7xx_u.h
-$(obj)/sim710.o:   $(obj)/sim710_d.h
 $(obj)/53c700.o $(MODVERDIR)/$(obj)/53c700.ver: $(obj)/53c700_d.h
 
 # If you want to play with the firmware, uncomment
@@ -152,20 +149,10 @@ $(obj)/53c700.o $(MODVERDIR)/$(obj)/53c700.ver: $(obj)/53c700_d.h
 
 ifdef GENERATE_FIRMWARE
 
-$(obj)/53c8xx_d.h: $(src)/53c7,8xx.scr $(src)/script_asm.pl
-	$(CPP) -traditional -DCHIP=810 - < $< | grep -v '^#' | $(PERL) $(src)/script_asm.pl $@ $(@:_d.h=_u.h)
-
-$(obj)/53c8xx_u.h: $(obj)/53c8xx_d.h
-
 $(obj)/53c7xx_d.h: $(src)/53c7xx.scr $(src)/script_asm.pl
 	$(CPP) -traditional -DCHIP=710 - < $< | grep -v '^#' | $(PERL) -s $(src)/script_asm.pl -ncr7x0_family $@ $(@:_d.h=_u.h)
 
 $(obj)/53c7xx_u.h: $(obj)/53c7xx_d.h
-
-$(obj)/sim710_d.h: $(src)/sim710.scr $(src)/script_asm.pl
-	$(CPP) -traditional -DCHIP=710 - < $< | grep -v '^#' | $(PERL) -s $(src)/script_asm.pl -ncr7x0_family $@ $(@:_d.h=_u.h)
-
-$(obj)/sim710_u.h: $(obj)/sim710_d.h
 
 $(obj)/53c700_d.h: $(src)/53c700.scr $(src)/script_asm.pl
 	$(PERL) -s $(src)/script_asm.pl -ncr7x0_family $@ $(@:_d.h=_u.h) < $<

@@ -2510,13 +2510,16 @@ static void adpt_fail_posted_scbs(adpt_hba* pHba)
 	Scsi_Device* 	d = NULL;
 
 	list_for_each_entry(d, &pHba->host->my_devices, siblings) {
-		for(cmd = d->device_queue; cmd ; cmd = cmd->next){
+		unsigned long flags;
+		spin_lock_irqsave(&d->list_lock, flags);
+		list_for_each_entry(cmd, &d->cmd_list, list) {
 			if(cmd->serial_number == 0){
 				continue;
 			}
 			cmd->result = (DID_OK << 16) | (QUEUE_FULL <<1);
 			cmd->scsi_done(cmd);
 		}
+		spin_unlock_irqrestore(&d->list_lock, flags);
 	}
 }
 
