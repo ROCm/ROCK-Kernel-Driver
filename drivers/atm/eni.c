@@ -2019,8 +2019,7 @@ static int eni_change_qos(struct atm_vcc *vcc,struct atm_qos *qos,int flgs)
 	 * segmentation buffer descriptors of this VCC.
 	 */
 	tasklet_disable(&eni_dev->task);
-	for (skb = eni_dev->tx_queue.next; skb !=
-	    (struct sk_buff *) &eni_dev->tx_queue; skb = skb->next) {
+	skb_queue_walk(&eni_dev->tx_queue, skb) {
 		unsigned long dsc;
 
 		if (ATM_SKB(skb)->vcc != vcc) continue;
