@@ -37,7 +37,7 @@ static char fw_mem[(  sizeof(struct ia64_boot_param)
 		    + NUM_MEM_DESCS*(sizeof(efi_memory_desc_t))
 		    + 1024)] __attribute__ ((aligned (8)));
 
-#ifdef CONFIG_IA64_HP_SIM
+#if defined(CONFIG_IA64_HP_SIM) || defined(CONFIG_IA64_GENERIC)
 
 /* Simulator system calls: */
 
@@ -233,7 +233,7 @@ asm (
 static efi_status_t
 efi_get_time (efi_time_t *tm, efi_time_cap_t *tc)
 {
-#ifdef CONFIG_IA64_HP_SIM
+#if defined(CONFIG_IA64_HP_SIM) || defined(CONFIG_IA64_GENERIC)
 	struct {
 		int tv_sec;	/* must be 32bits to work */
 		int tv_usec;
@@ -255,7 +255,7 @@ efi_get_time (efi_time_t *tm, efi_time_cap_t *tc)
 static void
 efi_reset_system (int reset_type, efi_status_t status, unsigned long data_size, efi_char16_t *data)
 {
-#ifdef CONFIG_IA64_HP_SIM
+#if defined(CONFIG_IA64_HP_SIM) || defined(CONFIG_IA64_GENERIC)
 	ssc(status, 0, 0, 0, SSC_EXIT);
 #else
 #	error Not implemented yet...

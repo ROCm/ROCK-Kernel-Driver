@@ -75,6 +75,8 @@ struct pt_regs {
 
 #define instruction_pointer(regs) ((regs)->cp0_epc)
 
+#define force_successful_syscall_return()	do { } while (0)
+
 extern void show_regs(struct pt_regs *);
 #endif /* !(_LANGUAGE_ASSEMBLY) */
 

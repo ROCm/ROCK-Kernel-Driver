@@ -77,6 +77,7 @@ struct pt_regs
 
 #define instruction_pointer(regs)	((regs)->pc)
 #define user_mode(regs)			(!(regs)->kernel_mode)
+#define force_successful_syscall_return()	do { } while (0)
 
 /* When a struct pt_regs is used to save user state for a system call in
    the kernel, the system call is stored in the space for R0 (since it's

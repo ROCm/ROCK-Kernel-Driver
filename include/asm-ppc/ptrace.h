@@ -48,6 +48,7 @@ struct pt_regs {
 #ifndef __ASSEMBLY__
 #define instruction_pointer(regs) ((regs)->nip)
 #define user_mode(regs) (((regs)->msr & MSR_PR) != 0)
+#define force_successful_syscall_return()	do { } while (0)
 
 /*
  * We use the least-significant bit of the trap field to indicate

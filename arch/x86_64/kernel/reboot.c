@@ -5,10 +5,10 @@
 #include <linux/kernel.h>
 #include <linux/ctype.h>
 #include <linux/string.h>
+#include <linux/irq.h>
 #include <asm/io.h>
 #include <asm/kdebug.h>
 #include <asm/delay.h>
-#include <asm/hw_irq.h>
 
 
 /*

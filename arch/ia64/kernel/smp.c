@@ -2,7 +2,7 @@
  * SMP Support
  *
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
- * Copyright (C) 1999, 2001 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1999, 2001, 2003 David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * Lots of stuff stolen from arch/alpha/kernel/smp.c
  *
@@ -87,7 +87,7 @@ stop_this_cpu (void)
 	cpu_halt();
 }
 
-void
+irqreturn_t
 handle_IPI (int irq, void *dev_id, struct pt_regs *regs)
 {
 	int this_cpu = get_cpu();
@@ -147,10 +147,11 @@ handle_IPI (int irq, void *dev_id, struct pt_regs *regs)
 		mb();	/* Order data access and bit testing. */
 	}
 	put_cpu();
+	return IRQ_HANDLED;
 }
 
 /*
- * Called with preeemption disabled 
+ * Called with preeemption disabled.
  */
 static inline void
 send_IPI_single (int dest_cpu, int op)
@@ -160,12 +161,12 @@ send_IPI_single (int dest_cpu, int op)
 }
 
 /*
- * Called with preeemption disabled 
+ * Called with preeemption disabled.
  */
 static inline void
 send_IPI_allbutself (int op)
 {
-	int i;
+	unsigned int i;
 
 	for (i = 0; i < NR_CPUS; i++) {
 		if (cpu_online(i) && i != smp_processor_id())
@@ -174,7 +175,7 @@ send_IPI_allbutself (int op)
 }
 
 /*
- * Called with preeemption disabled 
+ * Called with preeemption disabled.
  */
 static inline void
 send_IPI_all (int op)
@@ -187,7 +188,7 @@ send_IPI_all (int op)
 }
 
 /*
- * Called with preeemption disabled 
+ * Called with preeemption disabled.
  */
 static inline void
 send_IPI_self (int op)
@@ -196,7 +197,7 @@ send_IPI_self (int op)
 }
 
 /*
- * Called with preeemption disabled 
+ * Called with preeemption disabled.
  */
 void
 smp_send_reschedule (int cpu)

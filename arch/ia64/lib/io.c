@@ -51,84 +51,79 @@ __ia64_memset_c_io (unsigned long dst, unsigned long c, long count)
 
 #ifdef CONFIG_IA64_GENERIC
 
+#undef __ia64_inb
+#undef __ia64_inw
+#undef __ia64_inl
+#undef __ia64_outb
+#undef __ia64_outw
+#undef __ia64_outl
+#undef __ia64_readb
+#undef __ia64_readw
+#undef __ia64_readl
+#undef __ia64_readq
+#undef __ia64_writeb
+#undef __ia64_writew
+#undef __ia64_writel
+#undef __ia64_writeq
+
 unsigned int
-ia64_inb (unsigned long port)
+__ia64_inb (unsigned long port)
 {
-	return __ia64_inb(port);
+	return ___ia64_inb(port);
 }
 
 unsigned int
-ia64_inw (unsigned long port)
+__ia64_inw (unsigned long port)
 {
-	return __ia64_inw(port);
+	return ___ia64_inw(port);
 }
 
 unsigned int
-ia64_inl (unsigned long port)
+__ia64_inl (unsigned long port)
 {
-	return __ia64_inl(port);
+	return ___ia64_inl(port);
 }
 
 void
-ia64_outb (unsigned char val, unsigned long port)
+__ia64_outb (unsigned char val, unsigned long port)
 {
-	__ia64_outb(val, port);
+	___ia64_outb(val, port);
 }
 
 void
-ia64_outw (unsigned short val, unsigned long port)
+__ia64_outw (unsigned short val, unsigned long port)
 {
-	__ia64_outw(val, port);
+	___ia64_outw(val, port);
 }
 
 void
-ia64_outl (unsigned int val, unsigned long port)
+__ia64_outl (unsigned int val, unsigned long port)
 {
-	__ia64_outl(val, port);
+	___ia64_outl(val, port);
 }
 
 unsigned char
-ia64_readb (void *addr)
+__ia64_readb (void *addr)
 {
-	return __ia64_readb (addr);
+	return ___ia64_readb (addr);
 }
 
 unsigned short
-ia64_readw (void *addr)
+__ia64_readw (void *addr)
 {
-	return __ia64_readw (addr);
+	return ___ia64_readw (addr);
 }
 
 unsigned int
-ia64_readl (void *addr)
+__ia64_readl (void *addr)
 {
-	return __ia64_readl (addr);
+	return ___ia64_readl (addr);
 }
 
 unsigned long
-ia64_readq (void *addr)
+__ia64_readq (void *addr)
 {
-	return __ia64_readq (addr)
+	return ___ia64_readq (addr);
 }
-
-
-/* define aliases: */
-
-asm (".global __ia64_inb, __ia64_inw, __ia64_inl");
-asm ("__ia64_inb = ia64_inb");
-asm ("__ia64_inw = ia64_inw");
-asm ("__ia64_inl = ia64_inl");
-
-asm (".global __ia64_outb, __ia64_outw, __ia64_outl");
-asm ("__ia64_outb = ia64_outb");
-asm ("__ia64_outw = ia64_outw");
-asm ("__ia64_outl = ia64_outl");
-
-asm (".global __ia64_readb, __ia64_readw, __ia64_readl, __ia64_readq");
-asm ("__ia64_readb = ia64_readb");
-asm ("__ia64_readw = ia64_readw");
-asm ("__ia64_readl = ia64_readl");
-asm ("__ia64_readq = ia64_readq");
-
 
 #endif /* CONFIG_IA64_GENERIC */

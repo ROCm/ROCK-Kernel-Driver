@@ -71,6 +71,7 @@ struct pt_regs32 {
 
 #define instruction_pointer(regs) ((regs)->nip)
 #define user_mode(regs) ((((regs)->msr) >> MSR_PR_LG) & 0x1)
+#define force_successful_syscall_return()	do { } while (0)
 
 /*
  * Offsets used by 'ptrace' system call interface.

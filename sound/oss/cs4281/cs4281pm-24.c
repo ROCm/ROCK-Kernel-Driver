@@ -46,8 +46,8 @@ int cs4281_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
 	struct cs4281_state *state;
 
 	CS_DBGOUT(CS_PM, 2, printk(KERN_INFO 
-		"cs4281: cs4281_pm_callback dev=0x%x rqst=0x%x state=%d\n",
-			(unsigned)dev,(unsigned)rqst,(unsigned)data));
+		"cs4281: cs4281_pm_callback dev=%p rqst=0x%x state=%p\n",
+			dev,(unsigned)rqst,data));
 	state = (struct cs4281_state *) dev->data;
 	if (state) {
 		switch(rqst) {

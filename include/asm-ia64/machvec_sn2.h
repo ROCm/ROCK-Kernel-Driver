@@ -51,15 +51,15 @@ extern ia64_mv_readb_t __sn_readb;
 extern ia64_mv_readw_t __sn_readw;
 extern ia64_mv_readl_t __sn_readl;
 extern ia64_mv_readq_t __sn_readq;
-extern ia64_mv_pci_alloc_consistent	sn_pci_alloc_consistent;
-extern ia64_mv_pci_free_consistent	sn_pci_free_consistent;
-extern ia64_mv_pci_map_single		sn_pci_map_single;
-extern ia64_mv_pci_unmap_single		sn_pci_unmap_single;
-extern ia64_mv_pci_map_sg		sn_pci_map_sg;
-extern ia64_mv_pci_unmap_sg		sn_pci_unmap_sg;
-extern ia64_mv_pci_dma_sync_single	sn_pci_dma_sync_single;
-extern ia64_mv_pci_dma_sync_sg		sn_pci_dma_sync_sg;
-extern ia64_mv_pci_dma_supported	sn_pci_dma_supported;
+extern ia64_mv_dma_alloc_coherent	sn_dma_alloc_coherent;
+extern ia64_mv_dma_free_coherent	sn_dma_free_coherent;
+extern ia64_mv_dma_map_single		sn_dma_map_single;
+extern ia64_mv_dma_unmap_single		sn_dma_unmap_single;
+extern ia64_mv_dma_map_sg		sn_dma_map_sg;
+extern ia64_mv_dma_unmap_sg		sn_dma_unmap_sg;
+extern ia64_mv_dma_sync_single		sn_dma_sync_single;
+extern ia64_mv_dma_sync_sg		sn_dma_sync_sg;
+extern ia64_mv_dma_supported		sn_dma_supported;
 
 /*
  * This stuff has dual use!
@@ -88,15 +88,15 @@ extern ia64_mv_pci_dma_supported	sn_pci_dma_supported;
 #define platform_irq_desc		sn_irq_desc
 #define platform_irq_to_vector		sn_irq_to_vector
 #define platform_local_vector_to_irq	sn_local_vector_to_irq
-#define platform_pci_dma_init		machvec_noop
-#define platform_pci_alloc_consistent	sn_pci_alloc_consistent
-#define platform_pci_free_consistent	sn_pci_free_consistent
-#define platform_pci_map_single		sn_pci_map_single
-#define platform_pci_unmap_single	sn_pci_unmap_single
-#define platform_pci_map_sg		sn_pci_map_sg
-#define platform_pci_unmap_sg		sn_pci_unmap_sg
-#define platform_pci_dma_sync_single	sn_pci_dma_sync_single
-#define platform_pci_dma_sync_sg	sn_pci_dma_sync_sg
-#define platform_pci_dma_supported	sn_pci_dma_supported
+#define platform_dma_init		machvec_noop
+#define platform_dma_alloc_coherent	sn_dma_alloc_coherent
+#define platform_dma_free_coherent	sn_dma_free_coherent
+#define platform_dma_map_single		sn_dma_map_single
+#define platform_dma_unmap_single	sn_dma_unmap_single
+#define platform_dma_map_sg		sn_dma_map_sg
+#define platform_dma_unmap_sg		sn_dma_unmap_sg
+#define platform_dma_sync_single	sn_dma_sync_single
+#define platform_dma_sync_sg		sn_dma_sync_sg
+#define platform_dma_supported		sn_dma_supported
 
 #endif /* _ASM_IA64_MACHVEC_SN2_H */

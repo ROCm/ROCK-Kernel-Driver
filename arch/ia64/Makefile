@@ -23,6 +23,7 @@ cflags-y	:= -pipe $(EXTRA) -ffixed-r13 -mfixed-range=f10-f15,f32-f127 \
 CFLAGS_KERNEL	:= -mconstant-gp
 
 GCC_VERSION=$(shell $(CC) -v 2>&1 | fgrep 'gcc version' | cut -f3 -d' ' | cut -f1 -d'.')
+GCC_MINOR_VERSION=$(shell $(CC) -v 2>&1 | fgrep 'gcc version' | cut -f3 -d' ' | cut -f2 -d'.')
 
 GAS_STATUS=$(shell arch/ia64/scripts/check-gas $(CC) $(OBJDUMP))
 
@@ -35,7 +36,14 @@ $(error Sorry, you need a newer version of the assember, one that is built from	
 endif
 
 ifneq ($(GCC_VERSION),2)
-	cflags-y += -frename-registers --param max-inline-insns=5000
+	cflags-$(CONFIG_ITANIUM) += -frename-registers
+endif
+
+ifeq ($(GCC_VERSION),3)
+ ifeq ($(GCC_MINOR_VERSION),4)
+	cflags-$(CONFIG_ITANIUM) += -mtune=merced
+	cflags-$(CONFIG_MCKINLEY) += -mtune=mckinley
+ endif
 endif
 
 cflags-$(CONFIG_ITANIUM_BSTEP_SPECIFIC)	+= -mb-step
@@ -48,14 +56,14 @@ libs-y				+= arch/ia64/lib/
 core-y				+= arch/ia64/kernel/ arch/ia64/mm/
 core-$(CONFIG_IA32_SUPPORT)	+= arch/ia64/ia32/
 core-$(CONFIG_IA64_DIG) 	+= arch/ia64/dig/
-core-$(CONFIG_IA64_GENERIC) 	+= arch/ia64/dig/ arch/ia64/hp/common/ arch/ia64/hp/zx1/ \
-				   arch/ia64/hp/sim/
+core-$(CONFIG_IA64_GENERIC) 	+= arch/ia64/dig/
 core-$(CONFIG_IA64_HP_ZX1)	+= arch/ia64/dig/
 core-$(CONFIG_IA64_SGI_SN)	+= arch/ia64/sn/
 
 drivers-$(CONFIG_PCI)		+= arch/ia64/pci/
 drivers-$(CONFIG_IA64_HP_SIM)	+= arch/ia64/hp/sim/
 drivers-$(CONFIG_IA64_HP_ZX1)	+= arch/ia64/hp/common/ arch/ia64/hp/zx1/
+drivers-$(CONFIG_IA64_GENERIC)	+= arch/ia64/hp/common/ arch/ia64/hp/zx1/ arch/ia64/hp/sim/
 
 boot := arch/ia64/boot
 tools := arch/ia64/tools

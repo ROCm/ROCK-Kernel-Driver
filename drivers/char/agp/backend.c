@@ -252,7 +252,9 @@ int agp_register_driver (struct agp_driver *drv)
 	/* FIXME: What to do with this? */
 	inter_module_register("drm_agp", THIS_MODULE, &drm_agp);
 
+#if 0
 	pm_register(PM_PCI_DEV, PM_PCI_ID(agp_bridge->dev), agp_power);
+#endif
 	agp_count++;
 	return 0;
 

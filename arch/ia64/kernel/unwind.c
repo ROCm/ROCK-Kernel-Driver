@@ -682,7 +682,7 @@ finish_prologue (struct unw_state_record *sr)
 	 * First, resolve implicit register save locations (see Section "11.4.2.3 Rules
 	 * for Using Unwind Descriptors", rule 3):
 	 */
-	for (i = 0; i < (int) sizeof(unw.save_order)/sizeof(unw.save_order[0]); ++i) {
+	for (i = 0; i < (int) ARRAY_SIZE(unw.save_order); ++i) {
 		reg = sr->curr.reg + unw.save_order[i];
 		if (reg->where == UNW_WHERE_GR_SAVE) {
 			reg->where = UNW_WHERE_GR;
@@ -698,7 +698,7 @@ finish_prologue (struct unw_state_record *sr)
 	 */
 	if (sr->imask) {
 		unsigned char kind, mask = 0, *cp = sr->imask;
-		unsigned long t;
+		int t;
 		static const unsigned char limit[3] = {
 			UNW_REG_F31, UNW_REG_R7, UNW_REG_B5
 		};
@@ -1214,13 +1214,13 @@ script_new (unsigned long ip)
 	spin_unlock(&unw.lock);
 
 	/*
-	 * XXX We'll deadlock here if we interrupt a thread that is
-	 * holding a read lock on script->lock.  A try_write_lock()
-	 * might be mighty handy here...  Alternatively, we could
-	 * disable interrupts whenever we hold a read-lock, but that
-	 * seems silly.
+	 * We'd deadlock here if we interrupted a thread that is holding a read lock on
+	 * script->lock.  Thus, if the write_trylock() fails, we simply bail out.  The
+	 * alternative would be to disable interrupts whenever we hold a read-lock, but
+	 * that seems silly.
 	 */
-	write_lock(&script->lock);
+	if (!write_trylock(&script->lock))
+		return NULL;
 
 	spin_lock(&unw.lock);
 	{
@@ -1888,22 +1888,21 @@ unw_unwind_to_user (struct unw_frame_info *info)
 	return -1;
 }
 
-void
-unw_init_frame_info (struct unw_frame_info *info, struct task_struct *t, struct switch_stack *sw)
+static void
+init_frame_info (struct unw_frame_info *info, struct task_struct *t,
+		 struct switch_stack *sw, unsigned long stktop)
 {
-	unsigned long rbslimit, rbstop, stklimit, stktop, sol;
+	unsigned long rbslimit, rbstop, stklimit;
 	STAT(unsigned long start, flags;)
 
 	STAT(local_irq_save(flags); ++unw.stat.api.inits; start = ia64_get_itc());
 
 	/*
-	 * Subtle stuff here: we _could_ unwind through the
-	 * switch_stack frame but we don't want to do that because it
-	 * would be slow as each preserved register would have to be
-	 * processed.  Instead, what we do here is zero out the frame
-	 * info and start the unwind process at the function that
-	 * created the switch_stack frame.  When a preserved value in
-	 * switch_stack needs to be accessed, run_script() will
+	 * Subtle stuff here: we _could_ unwind through the switch_stack frame but we
+	 * don't want to do that because it would be slow as each preserved register would
+	 * have to be processed.  Instead, what we do here is zero out the frame info and
+	 * start the unwind process at the function that created the switch_stack frame.
+	 * When a preserved value in switch_stack needs to be accessed, run_script() will
 	 * initialize the appropriate pointer on demand.
 	 */
 	memset(info, 0, sizeof(*info));
@@ -1914,7 +1913,6 @@ unw_init_frame_info (struct unw_frame_info *info, struct task_struct *t, struct 
 		rbstop = rbslimit;
 
 	stklimit = (unsigned long) t + IA64_STK_OFFSET;
-	stktop   = (unsigned long) sw - 16;
 	if (stktop <= rbstop)
 		stktop = rbstop;
 
@@ -1924,34 +1922,58 @@ unw_init_frame_info (struct unw_frame_info *info, struct task_struct *t, struct 
 	info->memstk.top   = stktop;
 	info->task = t;
 	info->sw  = sw;
-	info->sp = info->psp = (unsigned long) (sw + 1) - 16;
-	info->pt = 0;
+	info->sp = info->psp = stktop;
+	info->pr = sw->pr;
+	UNW_DPRINT(3, "unwind.%s:\n"
+		   "  task   0x%lx\n"
+		   "  rbs = [0x%lx-0x%lx)\n"
+		   "  stk = [0x%lx-0x%lx)\n"
+		   "  pr     0x%lx\n"
+		   "  sw     0x%lx\n"
+		   "  sp     0x%lx\n",
+		   __FUNCTION__, (unsigned long) t, rbslimit, rbstop, stktop, stklimit,
+		   info->pr, (unsigned long) info->sw, info->sp);
+	STAT(unw.stat.api.init_time += ia64_get_itc() - start; local_irq_restore(flags));
+}
+
+void
+unw_init_from_interruption (struct unw_frame_info *info, struct task_struct *t,
+			    struct pt_regs *pt, struct switch_stack *sw)
+{
+	unsigned long sof;
+
+	init_frame_info(info, t, sw, pt->r12);
+	info->cfm_loc = &pt->cr_ifs;
+	info->unat_loc = &pt->ar_unat;
+	info->pfs_loc = &pt->ar_pfs;
+	sof = *info->cfm_loc & 0x7f;
+	info->bsp = (unsigned long) ia64_rse_skip_regs((unsigned long *) info->regstk.top, -sof);
+	info->ip = pt->cr_iip + ia64_psr(pt)->ri;
+	info->pt = (unsigned long) pt;
+	UNW_DPRINT(3, "unwind.%s:\n"
+		   "  bsp    0x%lx\n"
+		   "  sof    0x%lx\n"
+		   "  ip     0x%lx\n",
+		   __FUNCTION__, info->bsp, sof, info->ip);
+	find_save_locs(info);
+}
+
+void
+unw_init_frame_info (struct unw_frame_info *info, struct task_struct *t, struct switch_stack *sw)
+{
+	unsigned long sol;
+
+	init_frame_info(info, t, sw, (unsigned long) (sw + 1) - 16);
 	info->cfm_loc = &sw->ar_pfs;
 	sol = (*info->cfm_loc >> 7) & 0x7f;
 	info->bsp = (unsigned long) ia64_rse_skip_regs((unsigned long *) info->regstk.top, -sol);
 	info->ip = sw->b0;
-	info->pr = sw->pr;
-	UNW_DPRINT(3,
-			"unwind.%s\n"
-			"  rbslimit 0x%lx\n"
-			"  rbstop   0x%lx\n"
-			"  stklimit 0x%lx\n"
-			"  stktop   0x%lx\n"
-			"  task     0x%lx\n"
-			"  sw       0x%lx\n",
-			__FUNCTION__, rbslimit, rbstop, stklimit, stktop,
-			(unsigned long)(info->task),
-			(unsigned long)(info->sw));
-	UNW_DPRINT(3,
-			"  sp/psp   0x%lx\n"
-			"  sol      0x%lx\n"
-			"  bsp      0x%lx\n"
-			"  ip       0x%lx\n"
-			"  pr       0x%lx\n",
-			info->sp, sol, info->bsp, info->ip, info->pr);
-
+	UNW_DPRINT(3, "unwind.%s:\n"
+		   "  bsp    0x%lx\n"
+		   "  sol    0x%lx\n"
+		   "  ip     0x%lx\n",
+		   __FUNCTION__, info->bsp, sol, info->ip);
 	find_save_locs(info);
-	STAT(unw.stat.api.init_time += ia64_get_itc() - start; local_irq_restore(flags));
 }
 
 void

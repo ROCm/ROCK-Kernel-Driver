@@ -107,12 +107,12 @@ struct page *DRM(vm_nopage)(struct vm_area_struct *vma,
                  * Get the page, inc the use count, and return it
                  */
 		offset = (baddr - agpmem->bound) >> PAGE_SHIFT;
-		agpmem->memory->memory[offset] &= dev->agp->page_mask;
 		page = virt_to_page(__va(agpmem->memory->memory[offset]));
 		get_page(page);
 
-		DRM_DEBUG("baddr = 0x%lx page = 0x%p, offset = 0x%lx\n",
-			  baddr, __va(agpmem->memory->memory[offset]), offset);
+		DRM_DEBUG("baddr = 0x%lx page = 0x%p, offset = 0x%lx, count=%d\n",
+			  baddr, __va(agpmem->memory->memory[offset]), offset,
+			  atomic_read(&page->count));
 
 		return page;
         }
@@ -206,7 +206,7 @@ void DRM(vm_shm_close)(struct vm_area_struct *vma)
 					DRM_DEBUG("mtrr_del = %d\n", retcode);
 				}
 #endif
-				DRM(ioremapfree)(map->handle, map->size);
+				DRM(ioremapfree)(map->handle, map->size, dev);
 				break;
 			case _DRM_SHM:
 				vfree(map->handle);
@@ -420,15 +420,16 @@ int DRM(mmap)(struct file *filp, struct vm_area_struct *vma)
 
 	switch (map->type) {
         case _DRM_AGP:
-#if defined(__alpha__)
+#if __REALLY_HAVE_AGP
+	  if (dev->agp->cant_use_aperture) {
                 /*
-                 * On Alpha we can't talk to bus dma address from the
-                 * CPU, so for memory of type DRM_AGP, we'll deal with
-                 * sorting out the real physical pages and mappings
-                 * in nopage()
+                 * On some platforms we can't talk to bus dma address from the CPU, so for
+                 * memory of type DRM_AGP, we'll deal with sorting out the real physical
+                 * pages and mappings in nopage()
                  */
                 vma->vm_ops = &DRM(vm_ops);
                 break;
+	  }
 #endif
                 /* fall through to _DRM_FRAME_BUFFER... */        
 	case _DRM_FRAME_BUFFER:
@@ -439,15 +440,15 @@ int DRM(mmap)(struct file *filp, struct vm_area_struct *vma)
 				pgprot_val(vma->vm_page_prot) |= _PAGE_PCD;
 				pgprot_val(vma->vm_page_prot) &= ~_PAGE_PWT;
 			}
-#elif defined(__ia64__)
-			if (map->type != _DRM_AGP)
-				vma->vm_page_prot =
-					pgprot_writecombine(vma->vm_page_prot);
 #elif defined(__powerpc__)
 			pgprot_val(vma->vm_page_prot) |= _PAGE_NO_CACHE | _PAGE_GUARDED;
 #endif
 			vma->vm_flags |= VM_IO;	/* not in core dump */
 		}
+#if defined(__ia64__)
+		if (map->type != _DRM_AGP)
+			vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
+#endif
 		offset = DRIVER_GET_REG_OFS();
 #ifdef __sparc__
 		if (io_remap_page_range(DRM_RPR_ARG(vma) vma->vm_start,

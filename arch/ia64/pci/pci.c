@@ -5,6 +5,7 @@
  *
  * Copyright (C) 2002 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
+ *	Bjorn Helgaas <bjorn_helgaas@hp.com>
  *
  * Note: Above list of copyright holders is incomplete...
  */
@@ -116,31 +117,10 @@ pci_acpi_init (void)
 
 subsys_initcall(pci_acpi_init);
 
-static void __init
-pcibios_fixup_resource(struct resource *res, u64 offset)
-{
-	res->start += offset;
-	res->end += offset;
-}
-
-void __init
-pcibios_fixup_device_resources(struct pci_dev *dev, struct pci_bus *bus)
-{
-	int i;
-
-	for (i = 0; i < PCI_NUM_RESOURCES; i++) {
-		if (!dev->resource[i].start)
-			continue;
-		if (dev->resource[i].flags & IORESOURCE_MEM)
-			pcibios_fixup_resource(&dev->resource[i],
-			                       PCI_CONTROLLER(dev)->mem_offset);
-	}
-}
-
 /* Called by ACPI when it finds a new root bus.  */
 
 static struct pci_controller *
-alloc_pci_controller(int seg)
+alloc_pci_controller (int seg)
 {
 	struct pci_controller *controller;
 
@@ -153,8 +133,8 @@ alloc_pci_controller(int seg)
 	return controller;
 }
 
-struct pci_bus *
-scan_root_bus(int bus, struct pci_ops *ops, void *sysdata)
+static struct pci_bus *
+scan_root_bus (int bus, struct pci_ops *ops, void *sysdata)
 {
 	struct pci_bus *b;
 
@@ -184,23 +164,185 @@ scan_root_bus(int bus, struct pci_ops *ops, void *sysdata)
 	return b;
 }
 
-struct pci_bus *
-pcibios_scan_root(void *handle, int seg, int bus)
+static int
+alloc_resource (char *name, struct resource *root, unsigned long start, unsigned long end, unsigned long flags)
 {
+	struct resource *res;
+
+	res = kmalloc(sizeof(*res), GFP_KERNEL);
+	if (!res)
+		return -ENOMEM;
+
+	memset(res, 0, sizeof(*res));
+	res->name = name;
+	res->start = start;
+	res->end = end;
+	res->flags = flags;
+
+	if (request_resource(root, res))
+		return -EBUSY;
+
+	return 0;
+}
+
+static u64
+add_io_space (struct acpi_resource_address64 *addr)
+{
+	u64 offset;
+	int sparse = 0;
+	int i;
+
+	if (addr->address_translation_offset == 0)
+		return IO_SPACE_BASE(0);	/* part of legacy IO space */
+
+	if (addr->attribute.io.translation_attribute == ACPI_SPARSE_TRANSLATION)
+		sparse = 1;
+
+	offset = (u64) ioremap(addr->address_translation_offset, 0);
+	for (i = 0; i < num_io_spaces; i++)
+		if (io_space[i].mmio_base == offset &&
+		    io_space[i].sparse == sparse)
+			return IO_SPACE_BASE(i);
+
+	if (num_io_spaces == MAX_IO_SPACES) {
+		printk("Too many IO port spaces\n");
+		return ~0;
+	}
+
+	i = num_io_spaces++;
+	io_space[i].mmio_base = offset;
+	io_space[i].sparse = sparse;
+
+	return IO_SPACE_BASE(i);
+}
+
+static acpi_status
+count_window (struct acpi_resource *resource, void *data)
+{
+	unsigned int *windows = (unsigned int *) data;
+	struct acpi_resource_address64 addr;
+	acpi_status status;
+
+	status = acpi_resource_to_address64(resource, &addr);
+	if (ACPI_SUCCESS(status))
+		if (addr.resource_type == ACPI_MEMORY_RANGE ||
+		    addr.resource_type == ACPI_IO_RANGE)
+			(*windows)++;
+
+	return AE_OK;
+}
+
+struct pci_root_info {
 	struct pci_controller *controller;
-	u64 base, size, offset;
+	char *name;
+};
+
+static acpi_status
+add_window (struct acpi_resource *res, void *data)
+{
+	struct pci_root_info *info = (struct pci_root_info *) data;
+	struct pci_window *window;
+	struct acpi_resource_address64 addr;
+	acpi_status status;
+	unsigned long flags, offset = 0;
+	struct resource *root;
+
+	status = acpi_resource_to_address64(res, &addr);
+	if (ACPI_SUCCESS(status)) {
+		if (addr.resource_type == ACPI_MEMORY_RANGE) {
+			flags = IORESOURCE_MEM;
+			root = &iomem_resource;
+			offset = addr.address_translation_offset;
+		} else if (addr.resource_type == ACPI_IO_RANGE) {
+			flags = IORESOURCE_IO;
+			root = &ioport_resource;
+			offset = add_io_space(&addr);
+			if (offset == ~0)
+				return AE_OK;
+		} else
+			return AE_OK;
+
+		window = &info->controller->window[info->controller->windows++];
+		window->resource.flags |= flags;
+		window->resource.start  = addr.min_address_range;
+		window->resource.end    = addr.max_address_range;
+		window->offset		= offset;
+
+		if (alloc_resource(info->name, root, addr.min_address_range + offset,
+			addr.max_address_range + offset, flags))
+			printk(KERN_ERR "alloc 0x%lx-0x%lx from %s for %s failed\n",
+				addr.min_address_range + offset, addr.max_address_range + offset,
+				root->name, info->name);
+	}
+
+	return AE_OK;
+}
+
+struct pci_bus *
+pcibios_scan_root (void *handle, int seg, int bus)
+{
+	struct pci_root_info info;
+	struct pci_controller *controller;
+	unsigned int windows = 0;
+	char *name;
 
 	printk("PCI: Probing PCI hardware on bus (%02x:%02x)\n", seg, bus);
 	controller = alloc_pci_controller(seg);
 	if (!controller)
-		return NULL;
+		goto out1;
 
 	controller->acpi_handle = handle;
 
-	acpi_get_addr_space(handle, ACPI_MEMORY_RANGE, &base, &size, &offset);
-	controller->mem_offset = offset;
+	acpi_walk_resources(handle, METHOD_NAME__CRS, count_window, &windows);
+	controller->window = kmalloc(sizeof(*controller->window) * windows, GFP_KERNEL);
+	if (!controller->window)
+		goto out2;
+
+	name = kmalloc(16, GFP_KERNEL);
+	if (!name)
+		goto out3;
+
+	sprintf(name, "PCI Bus %02x:%02x", seg, bus);
+	info.controller = controller;
+	info.name = name;
+	acpi_walk_resources(handle, METHOD_NAME__CRS, add_window, &info);
 
 	return scan_root_bus(bus, pci_root_ops, controller);
+
+out3:
+	kfree(controller->window);
+out2:
+	kfree(controller);
+out1:
+	return NULL;
+}
+
+void __init
+pcibios_fixup_device_resources (struct pci_dev *dev, struct pci_bus *bus)
+{
+	struct pci_controller *controller = PCI_CONTROLLER(dev);
+	struct pci_window *window;
+	int i, j;
+
+	for (i = 0; i < PCI_NUM_RESOURCES; i++) {
+		if (!dev->resource[i].start)
+			continue;
+
+#define contains(win, res)	((res)->start >= (win)->start && \
+				 (res)->end   <= (win)->end)
+
+		for (j = 0; j < controller->windows; j++) {
+			window = &controller->window[j];
+			if (((dev->resource[i].flags & IORESOURCE_MEM &&
+			      window->resource.flags & IORESOURCE_MEM) ||
+			     (dev->resource[i].flags & IORESOURCE_IO &&
+			      window->resource.flags & IORESOURCE_IO)) &&
+			    contains(&window->resource, &dev->resource[i])) {
+				dev->resource[i].start += window->offset;
+				dev->resource[i].end   += window->offset;
+			}
+		}
+	}
 }
 
 /*

@@ -114,6 +114,7 @@ struct switch_stack {
 /* bit 8 is user-mode flag */
 #define user_mode(regs) (((regs)->dccr & 0x100) != 0)
 #define instruction_pointer(regs) ((regs)->irp)
+#define force_successful_syscall_return()	do { } while (0)
 extern void show_regs(struct pt_regs *);
 #endif
 
