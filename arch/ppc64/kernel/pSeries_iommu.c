@@ -211,6 +211,7 @@ static void iommu_table_setparms(struct pci_controller *phb,
 	tbl->it_index = 0;
 	tbl->it_entrysize = sizeof(union tce_entry);
 	tbl->it_blocksize = 16;
+	tbl->it_type = TCE_PCI;
 }
 
 /*
@@ -246,6 +247,7 @@ static void iommu_table_setparms_lpar(struct pci_controller *phb,
 	tbl->it_index  = dma_window[0];
 	tbl->it_entrysize = sizeof(union tce_entry);
 	tbl->it_blocksize  = 16;
+	tbl->it_type = TCE_PCI;
 }
 
 
