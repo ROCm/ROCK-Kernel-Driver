@@ -146,15 +146,6 @@ struct scsi_host_template {
 	enum scsi_eh_timer_return (* eh_timed_out)(struct scsi_cmnd *);
 
 	/*
-	 * Old EH handlers, no longer used. Make them warn the user of old
-	 * drivers by using a wrong type
-	 *
-	 * Status: MORE THAN OBSOLETE
-	 */
-	int (* abort)(int);
-	int (* reset)(int, int);
-
-	/*
 	 * Before the mid layer attempts to scan for a new device where none
 	 * currently exists, it will call this entry in your driver.  Should
 	 * your driver need to allocate any structs or perform any other init
