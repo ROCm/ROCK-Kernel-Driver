@@ -152,10 +152,14 @@ struct sctp_transport *sctp_addr_id2transport(struct sock *sk,
 {
 	struct sctp_association *addr_asoc = NULL, *id_asoc = NULL;
 	struct sctp_transport *transport;
+	union sctp_addr *laddr = (union sctp_addr *)addr;
 
+	laddr->v4.sin_port = ntohs(laddr->v4.sin_port);
 	addr_asoc = sctp_endpoint_lookup_assoc(sctp_sk(sk)->ep,
 					       (union sctp_addr *)addr,
 					       &transport);
+	laddr->v4.sin_port = htons(laddr->v4.sin_port);
+
 	if (!addr_asoc)
 		return NULL;
 
@@ -3008,9 +3012,13 @@ static int sctp_getsockopt_primary_addr(struct sock *sk, int len,
 
 	if (!asoc->peer.primary_path)
 		return -ENOTCONN;
-
+	
+	asoc->peer.primary_path->ipaddr.v4.sin_port =
+		htons(asoc->peer.primary_path->ipaddr.v4.sin_port);
 	memcpy(&prim.ssp_addr, &asoc->peer.primary_path->ipaddr,
 	       sizeof(union sctp_addr));
+	asoc->peer.primary_path->ipaddr.v4.sin_port =
+		ntohs(asoc->peer.primary_path->ipaddr.v4.sin_port);
 
 	sctp_get_pf_specific(sk->sk_family)->addr_v4map(sp,
 			(union sctp_addr *)&prim.ssp_addr);
