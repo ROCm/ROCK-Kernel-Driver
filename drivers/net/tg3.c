@@ -3073,6 +3073,7 @@ out:
 static void tg3_chip_reset(struct tg3 *tp)
 {
 	u32 val;
+	u32 flags_save;
 
 	/* Force NVRAM to settle.
 	 * This deals with a chip bug which can result in EEPROM
@@ -3089,7 +3090,20 @@ static void tg3_chip_reset(struct tg3 *tp)
 		}
 	}
 
+	/*
+	 * We must avoid the readl() that normally takes place.
+	 * It locks machines, causes machine checks, and other
+	 * fun things.  So, temporarily disable the 5701
+	 * hardware workaround, while we do the reset.
+	 */
+	flags_save = tp->tg3_flags;
+	tp->tg3_flags &= ~TG3_FLAG_5701_REG_WRITE_BUG;
+
+	/* do the reset */
 	tw32(GRC_MISC_CFG, GRC_MISC_CFG_CORECLK_RESET);
+
+	/* restore 5701 hardware bug workaround flag */
+	tp->tg3_flags = flags_save;
 
 	/* Flush PCI posted writes.  The normal MMIO registers
 	 * are inaccessible at this time so this is the only
