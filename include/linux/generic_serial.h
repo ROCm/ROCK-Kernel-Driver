@@ -45,7 +45,7 @@ struct gs_port {
   int                     count;
   int                     blocked_open;
   struct tty_struct       *tty;
-  int                     event;
+  unsigned long           event;
   unsigned short          closing_wait;
   int                     close_delay;
   struct real_driver      *rd;
