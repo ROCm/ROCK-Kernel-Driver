@@ -19,6 +19,7 @@
 #ifndef _H_JFS_INCORE
 #define _H_JFS_INCORE
 
+#include <linux/rwsem.h>
 #include <linux/slab.h>
 #include <asm/bitops.h>
 #include "jfs_types.h"
@@ -29,14 +30,6 @@
  * JFS magic number
  */
 #define JFS_SUPER_MAGIC 0x3153464a /* "JFS1" */
-
-/*
- * Due to header ordering problems this can't be in jfs_lock.h
- */
-typedef struct	jfs_rwlock {
-	struct rw_semaphore rw_sem;
-	atomic_t in_use;	/* for hacked implementation of trylock */
-} jfs_rwlock_t;
 
 /*
  * JFS-private inode information
@@ -62,7 +55,19 @@ struct jfs_inode_info {
 	lid_t	atltail;	/* anonymous tlock list tail	*/
 	struct list_head anon_inode_list; /* inodes having anonymous txns */
 	struct list_head mp_list; /* metapages in inode's address space */
-	jfs_rwlock_t rdwrlock;	/* read/write lock	*/
+	/*
+	 * rdwrlock serializes xtree between reads & writes and synchronizes
+	 * changes to special inodes.  It's use would be redundant on
+	 * directories since the i_sem taken in the VFS is sufficient.
+	 */
+	struct rw_semaphore rdwrlock;
+	/*
+	 * commit_sem serializes transaction processing on an inode.
+	 * It must be taken after beginning a transaction (txBegin), since
+	 * dirty inodes may be committed while a new transaction on the
+	 * inode is blocked in txBegin or TxBeginAnon
+	 */
+	struct semaphore commit_sem;
 	lid_t	xtlid;		/* lid of xtree lock on directory */
 	union {
 		struct {
@@ -86,6 +91,12 @@ struct jfs_inode_info {
 #define i_dirtable u.dir._table
 #define i_dtroot u.dir._dtroot
 #define i_inline u.link._inline
+
+
+#define IREAD_LOCK(ip)		down_read(&JFS_IP(ip)->rdwrlock)
+#define IREAD_UNLOCK(ip)	up_read(&JFS_IP(ip)->rdwrlock)
+#define IWRITE_LOCK(ip)		down_write(&JFS_IP(ip)->rdwrlock)
+#define IWRITE_UNLOCK(ip)	up_write(&JFS_IP(ip)->rdwrlock)
 
 /*
  * cflag

@@ -24,63 +24,7 @@
 
 /*
  *	jfs_lock.h
- *
- * JFS lock definition for globally referenced locks
  */
-
-/* readers/writer lock: thread-thread */
-
-/*
- * RW semaphores do not currently have a trylock function.  Since the
- * implementation varies by platform, I have implemented a platform-independent
- * wrapper around the rw_semaphore routines.  If this turns out to be the best
- * way of avoiding our locking problems, I will push to get a trylock
- * implemented in the kernel, but I'd rather find a way to avoid having to
- * use it.
- */
-#define RDWRLOCK_T jfs_rwlock_t
-static inline void RDWRLOCK_INIT(jfs_rwlock_t * Lock)
-{
-	init_rwsem(&Lock->rw_sem);
-	atomic_set(&Lock->in_use, 0);
-}
-static inline void READ_LOCK(jfs_rwlock_t * Lock)
-{
-	atomic_inc(&Lock->in_use);
-	down_read(&Lock->rw_sem);
-}
-static inline void READ_UNLOCK(jfs_rwlock_t * Lock)
-{
-	up_read(&Lock->rw_sem);
-	atomic_dec(&Lock->in_use);
-}
-static inline void WRITE_LOCK(jfs_rwlock_t * Lock)
-{
-	atomic_inc(&Lock->in_use);
-	down_write(&Lock->rw_sem);
-}
-
-static inline int WRITE_TRYLOCK(jfs_rwlock_t * Lock)
-{
-	if (atomic_read(&Lock->in_use))
-		return 0;
-	WRITE_LOCK(Lock);
-	return 1;
-}
-static inline void WRITE_UNLOCK(jfs_rwlock_t * Lock)
-{
-	up_write(&Lock->rw_sem);
-	atomic_dec(&Lock->in_use);
-}
-
-#define IREAD_LOCK(ip)		READ_LOCK(&JFS_IP(ip)->rdwrlock)
-#define IREAD_UNLOCK(ip)	READ_UNLOCK(&JFS_IP(ip)->rdwrlock)
-#define IWRITE_LOCK(ip)		WRITE_LOCK(&JFS_IP(ip)->rdwrlock)
-#define IWRITE_TRYLOCK(ip)	WRITE_TRYLOCK(&JFS_IP(ip)->rdwrlock)
-#define IWRITE_UNLOCK(ip)	WRITE_UNLOCK(&JFS_IP(ip)->rdwrlock)
-#define IWRITE_LOCK_LIST	iwritelocklist
-
-extern void iwritelocklist(int, ...);
 
 /*
  * Conditional sleep where condition is protected by spinlock

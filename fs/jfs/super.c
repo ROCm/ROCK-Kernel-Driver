@@ -387,7 +387,8 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 	    SLAB_CTOR_CONSTRUCTOR) {
 		INIT_LIST_HEAD(&jfs_ip->anon_inode_list);
 		INIT_LIST_HEAD(&jfs_ip->mp_list);
-		RDWRLOCK_INIT(&jfs_ip->rdwrlock);
+		init_rwsem(&jfs_ip->rdwrlock);
+		init_MUTEX(&jfs_ip->commit_sem);
 		inode_init_once(&jfs_ip->vfs_inode);
 	}
 }

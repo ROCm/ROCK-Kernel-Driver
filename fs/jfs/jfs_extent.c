@@ -96,6 +96,9 @@ extAlloc(struct inode *ip, s64 xlen, s64 pno, xad_t * xp, boolean_t abnr)
 	/* This blocks if we are low on resources */
 	txBeginAnon(ip->i_sb);
 
+	/* Avoid race with jfs_commit_inode() */
+	down(&JFS_IP(ip)->commit_sem);
+
 	/* validate extent length */
 	if (xlen > MAXXLEN)
 		xlen = MAXXLEN;
@@ -138,8 +141,8 @@ extAlloc(struct inode *ip, s64 xlen, s64 pno, xad_t * xp, boolean_t abnr)
 	 * is smaller than the number of blocks per page.
 	 */
 	nxlen = xlen;
-	if ((rc =
-	     extBalloc(ip, hint ? hint : INOHINT(ip), &nxlen, &nxaddr))) {
+	if ((rc = extBalloc(ip, hint ? hint : INOHINT(ip), &nxlen, &nxaddr))) {
+		up(&JFS_IP(ip)->commit_sem);
 		return (rc);
 	}
 
@@ -160,6 +163,7 @@ extAlloc(struct inode *ip, s64 xlen, s64 pno, xad_t * xp, boolean_t abnr)
 	 */
 	if (rc) {
 		dbFree(ip, nxaddr, nxlen);
+		up(&JFS_IP(ip)->commit_sem);
 		return (rc);
 	}
 
@@ -174,6 +178,7 @@ extAlloc(struct inode *ip, s64 xlen, s64 pno, xad_t * xp, boolean_t abnr)
 
 	mark_inode_dirty(ip);
 
+	up(&JFS_IP(ip)->commit_sem);
 	/*
 	 * COMMIT_SyncList flags an anonymous tlock on page that is on
 	 * sync list.
@@ -217,6 +222,7 @@ int extRealloc(struct inode *ip, s64 nxlen, xad_t * xp, boolean_t abnr)
 	/* This blocks if we are low on resources */
 	txBeginAnon(ip->i_sb);
 
+	down(&JFS_IP(ip)->commit_sem);
 	/* validate extent length */
 	if (nxlen > MAXXLEN)
 		nxlen = MAXXLEN;
@@ -235,7 +241,7 @@ int extRealloc(struct inode *ip, s64 nxlen, xad_t * xp, boolean_t abnr)
 	if ((xp->flag & XAD_NOTRECORDED) && !abnr) {
 		xp->flag = 0;
 		if ((rc = xtUpdate(0, ip, xp)))
-			return (rc);
+			goto exit;
 	}
 
 	/* try to allocated the request number of blocks for the
@@ -247,7 +253,7 @@ int extRealloc(struct inode *ip, s64 nxlen, xad_t * xp, boolean_t abnr)
 	 * space as to satisfy the extend page.
 	 */
 	if ((rc = extBrealloc(ip, xaddr, xlen, &nxlen, &nxaddr)))
-		return (rc);
+		goto exit;
 
 	delta = nxlen - xlen;
 
@@ -284,7 +290,7 @@ int extRealloc(struct inode *ip, s64 nxlen, xad_t * xp, boolean_t abnr)
 		/* extend the extent */
 		if ((rc = xtExtend(0, ip, xoff + xlen, (int) nextend, 0))) {
 			dbFree(ip, xaddr + xlen, delta);
-			return (rc);
+			goto exit;
 		}
 	} else {
 		/*
@@ -294,7 +300,7 @@ int extRealloc(struct inode *ip, s64 nxlen, xad_t * xp, boolean_t abnr)
 		 */
 		if ((rc = xtTailgate(0, ip, xoff, (int) ntail, nxaddr, 0))) {
 			dbFree(ip, nxaddr, nxlen);
-			return (rc);
+			goto exit;
 		}
 	}
 
@@ -325,8 +331,9 @@ int extRealloc(struct inode *ip, s64 nxlen, xad_t * xp, boolean_t abnr)
 	xp->flag = xflag;
 
 	mark_inode_dirty(ip);
-
-	return (0);
+exit:
+	up(&JFS_IP(ip)->commit_sem);
+	return (rc);
 }
 
 
@@ -423,19 +430,13 @@ int extRecord(struct inode *ip, xad_t * xp)
 
 	txBeginAnon(ip->i_sb);
 
+	down(&JFS_IP(ip)->commit_sem);
+
 	/* update the extent */
-	if ((rc = xtUpdate(0, ip, xp)))
-		return (rc);
+	rc = xtUpdate(0, ip, xp);
 
-#ifdef _STILL_TO_PORT
-	/* no longer abnr */
-	cp->cm_abnr = FALSE;
-
-	/* mark the cbuf as modified */
-	cp->cm_modified = TRUE;
-#endif				/*  _STILL_TO_PORT */
-
-	return (0);
+	up(&JFS_IP(ip)->commit_sem);
+	return (rc);
 }
 
 
