@@ -245,6 +245,9 @@ static int __init e21_probe1(struct net_device *dev, int ioaddr)
 	ei_status.get_8390_hdr = &e21_get_8390_hdr;
 	dev->open = &e21_open;
 	dev->stop = &e21_close;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller = ei_poll;
+#endif
 	NS8390_init(dev, 0);
 
 	return 0;

@@ -481,6 +481,9 @@ static int __init ne2_probe1(struct net_device *dev, int slot)
 	
 	dev->open = &ne_open;
 	dev->stop = &ne_close;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller = ei_poll;
+#endif
 	NS8390_init(dev, 0);
 	return 0;
 out:

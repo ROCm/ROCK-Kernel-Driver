@@ -132,6 +132,9 @@ int __init stnic_probe(void)
   dev->irq = IRQ_STNIC;
   dev->open = &stnic_open;
   dev->stop = &stnic_close;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+  dev->poll_controller = ei_poll;
+#endif
 
   /* Snarf the interrupt now.  There's no point in waiting since we cannot
      share and the board will usually be enabled. */

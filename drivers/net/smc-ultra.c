@@ -122,6 +122,14 @@ MODULE_DEVICE_TABLE(isapnp, ultra_device_ids);
 #define ULTRA_IO_EXTENT 32
 #define EN0_ERWCNT		0x08	/* Early receive warning count. */
 
+#ifdef CONFIG_NET_POLL_CONTROLLER
+static void ultra_poll(struct net_device *dev)
+{
+	disable_irq(dev->irq);
+	ei_interrupt(dev->irq, dev, NULL);
+	enable_irq(dev->irq);
+}
+#endif
 /*	Probe for the Ultra.  This looks like a 8013 with the station
 	address PROM at I/O ports <base>+8 to <base>+13, with a checksum
 	following.
@@ -134,6 +142,9 @@ int __init ultra_probe(struct net_device *dev)
 
 	SET_MODULE_OWNER(dev);
 
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller = &ultra_poll;
+#endif
 	if (base_addr > 0x1ff)		/* Check a single specified location. */
 		return ultra_probe1(dev, base_addr);
 	else if (base_addr != 0)	/* Don't probe at all. */
@@ -270,6 +281,9 @@ static int __init ultra_probe1(struct net_device *dev, int ioaddr)
 	ei_status.reset_8390 = &ultra_reset_8390;
 	dev->open = &ultra_open;
 	dev->stop = &ultra_close_card;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller = ei_poll;
+#endif
 	NS8390_init(dev, 0);
 
 	return 0;

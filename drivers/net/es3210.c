@@ -270,6 +270,9 @@ static int __init es_probe1(struct net_device *dev, int ioaddr)
 
 	dev->open = &es_open;
 	dev->stop = &es_close;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller = ei_poll;
+#endif
 	NS8390_init(dev, 0);
 	return 0;
 out1:

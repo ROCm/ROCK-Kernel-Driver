@@ -105,6 +105,7 @@
 #include <linux/kmod.h>
 #include <linux/module.h>
 #include <linux/kallsyms.h>
+#include <linux/netpoll.h>
 #ifdef CONFIG_NET_RADIO
 #include <linux/wireless.h>		/* Note : will define WIRELESS_EXT */
 #include <net/iw_handler.h>
@@ -1473,6 +1474,13 @@ int netif_rx(struct sk_buff *skb)
 	struct softnet_data *queue;
 	unsigned long flags;
 
+#ifdef CONFIG_NETPOLL_RX
+	if (skb->dev->netpoll_rx && netpoll_rx(skb)) {
+		kfree_skb(skb);
+		return NET_RX_DROP;
+	}
+#endif
+
 	if (!skb->stamp.tv_sec)
 		do_gettimeofday(&skb->stamp);
 
@@ -1627,6 +1635,13 @@ int netif_receive_skb(struct sk_buff *skb)
 	struct packet_type *ptype, *pt_prev;
 	int ret = NET_RX_DROP;
 	unsigned short type = skb->protocol;
+
+#ifdef CONFIG_NETPOLL_RX
+	if (skb->dev->netpoll_rx && skb->dev->poll && netpoll_rx(skb)) {
+		kfree_skb(skb);
+		return NET_RX_DROP;
+	}
+#endif
 
 	if (!skb->stamp.tv_sec)
 		do_gettimeofday(&skb->stamp);

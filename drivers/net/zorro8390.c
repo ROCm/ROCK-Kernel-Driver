@@ -227,6 +227,9 @@ static int __init zorro8390_init(struct net_device *dev, unsigned long board,
     ei_status.reg_offset = zorro8390_offsets;
     dev->open = &zorro8390_open;
     dev->stop = &zorro8390_close;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+    dev->poll_controller = ei_poll;
+#endif
 #ifdef MODULE
     ei_status.priv = (unsigned long)root_zorro8390_dev;
     root_zorro8390_dev = dev;
