@@ -38,7 +38,12 @@
  * After a CPU has dirtied this many pages, balance_dirty_pages_ratelimited
  * will look to see if it needs to force writeback or throttling.
  */
-static int ratelimit_pages = 32;
+static long ratelimit_pages = 32;
+
+/*
+ * The total number of pages in the machine.
+ */
+static long total_pages;
 
 /*
  * When balance_dirty_pages decides that the caller needs to perform some
@@ -60,17 +65,17 @@ static inline int sync_writeback_pages(void)
 /*
  * Start background writeback (via pdflush) at this level
  */
-int dirty_background_ratio = 40;
+int dirty_background_ratio = 10;
 
 /*
  * The generator of dirty data starts async writeback at this level
  */
-int dirty_async_ratio = 50;
+int dirty_async_ratio = 40;
 
 /*
  * The generator of dirty data performs sync writeout at this level
  */
-int dirty_sync_ratio = 60;
+int dirty_sync_ratio = 50;
 
 /*
  * The interval between `kupdate'-style writebacks, in centiseconds
@@ -107,18 +112,17 @@ static void background_writeout(unsigned long _min_pages);
  */
 void balance_dirty_pages(struct address_space *mapping)
 {
-	const int tot = nr_free_pagecache_pages();
 	struct page_state ps;
-	int background_thresh, async_thresh, sync_thresh;
+	long background_thresh, async_thresh, sync_thresh;
 	unsigned long dirty_and_writeback;
 	struct backing_dev_info *bdi;
 
 	get_page_state(&ps);
 	dirty_and_writeback = ps.nr_dirty + ps.nr_writeback;
 
-	background_thresh = (dirty_background_ratio * tot) / 100;
-	async_thresh = (dirty_async_ratio * tot) / 100;
-	sync_thresh = (dirty_sync_ratio * tot) / 100;
+	background_thresh = (dirty_background_ratio * total_pages) / 100;
+	async_thresh = (dirty_async_ratio * total_pages) / 100;
+	sync_thresh = (dirty_sync_ratio * total_pages) / 100;
 	bdi = mapping->backing_dev_info;
 
 	if (dirty_and_writeback > sync_thresh) {
@@ -171,12 +175,13 @@ void balance_dirty_pages_ratelimited(struct address_space *mapping)
  */
 static void background_writeout(unsigned long _min_pages)
 {
-	const int tot = nr_free_pagecache_pages();
-	const int background_thresh = (dirty_background_ratio * tot) / 100;
 	long min_pages = _min_pages;
+	long background_thresh;
 	int nr_to_write;
 
 	CHECK_EMERGENCY_SYNC
+
+	background_thresh = (dirty_background_ratio * total_pages) / 100;
 
 	do {
 		struct page_state ps;
@@ -269,7 +274,7 @@ static void wb_timer_fn(unsigned long unused)
 
 static void set_ratelimit(void)
 {
-	ratelimit_pages = nr_free_pagecache_pages() / (num_online_cpus() * 32);
+	ratelimit_pages = total_pages / (num_online_cpus() * 32);
 	if (ratelimit_pages < 16)
 		ratelimit_pages = 16;
 	if (ratelimit_pages * PAGE_CACHE_SIZE > 4096 * 1024)
@@ -288,8 +293,29 @@ static struct notifier_block ratelimit_nb = {
 	.next		= NULL,
 };
 
+/*
+ * If the machine has a large highmem:lowmem ratio then scale back the default
+ * dirty memory thresholds: allowing too much dirty highmem pins an excessive
+ * number of buffer_heads.
+ */
 static int __init page_writeback_init(void)
 {
+	long buffer_pages = nr_free_buffer_pages();
+	long correction;
+
+	total_pages = nr_free_pagecache_pages();
+
+	correction = (100 * 4 * buffer_pages) / total_pages;
+
+	if (correction < 100) {
+		dirty_background_ratio *= correction;
+		dirty_background_ratio /= 100;
+		dirty_async_ratio *= correction;
+		dirty_async_ratio /= 100;
+		dirty_sync_ratio *= correction;
+		dirty_sync_ratio /= 100;
+	}
+
 	init_timer(&wb_timer);
 	wb_timer.expires = jiffies + (dirty_writeback_centisecs * HZ) / 100;
 	wb_timer.data = 0;
