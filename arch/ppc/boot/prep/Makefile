@@ -46,10 +46,18 @@ zImage.initrd: initrd := .initrd
 zImage.initrd: $(images)/zImage.initrd.prep
 	@echo '  kernel: $@ is ready ($<)'
 
+ifdef CONFIG_PPC_INITRD_PER_IMAGE
+PREP_INITRD	:= ramdisk.image.prep.gz
+PREP_IMAGE	:= image.initrd.prep.o
+else
+PREP_INITRD	:= ramdisk.image.gz
+PREP_IMAGE	:= image.initrd.o
+
 $(images)/ramdisk.image.gz:
 	@echo '  MISSING $@'
 	@echo '          RAM disk image must be provided separately'
 	@/bin/false
+endif
 
 OBJCOPYFLAGS_image.o   := \
 	--add-section=.image=$(images)/vmlinux.gz \
@@ -59,12 +67,12 @@ $(obj)/image.o: $(obj)/dummy.o $(images)/vmlinux.gz
 	$(call if_changed,objcopy)
 
 OBJCOPYFLAGS_image.initrd.o    := \
-	--add-section=.ramdisk=$(images)/ramdisk.image.gz \
+	--add-section=.ramdisk=$(images)/$(PREP_INITRD) \
 	--set-section-flags=.ramdisk=contents,alloc,load,readonly,data \
 	--add-section=.image=$(images)/vmlinux.gz \
 	--set-section-flags=.image=contents,alloc,load,readonly,data
-targets	+= image.initrd.o
-$(obj)/image.initrd.o: $(obj)/dummy.o $(images)/vmlinux.gz $(images)/ramdisk.image.gz
+targets	+= $(PREP_IMAGE)
+$(obj)/$(PREP_IMAGE): $(obj)/dummy.o $(images)/vmlinux.gz $(images)/$(PREP_INITRD)
 	$(call if_changed,objcopy)
 
 LDFLAGS_zImage.bin		:= -Ttext 0x00800000 -Bstatic -T
@@ -73,7 +81,7 @@ targets += zImage.bin
 $(obj)/zImage.bin: $(boot)/ld.script $(OBJS) $(obj)/image.o $(LIBS)
 	$(call if_changed,ld)
 targets += zImage.initrd.bin
-$(obj)/zImage.initrd.bin: $(boot)/ld.script $(OBJS) $(obj)/image.initrd.o $(LIBS)
+$(obj)/zImage.initrd.bin: $(boot)/ld.script $(OBJS) $(obj)/$(PREP_IMAGE) $(LIBS)
 	$(call if_changed,ld)
 
 OBJCOPYFLAGS_zImage		:= -R .comment -R .stab -R .stabstr

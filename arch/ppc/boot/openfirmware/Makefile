@@ -47,11 +47,34 @@ ifdef CONFIG_PPC64BRIDGE
 END += .64
 endif
 
+ifdef CONFIG_PPC_INITRD_PER_IMAGE
+CHRP_INITRD	:= ramdisk.image.chrp.gz
+CHRP_IMAGE	:= image.initrd.chrp.o
+MIBOOT_INITRD	:= ramdisk.image.miboot.gz
+MIBOOT_IMAGE	:= image.initrd.miboot.o
+COFF_INITRD	:= ramdisk.image.coff.gz
+COFF_IMAGE	:= image.initrd.coff.o
+NEWWORLD_INITRD	:= ramdisk.image.newworld.gz
+NEWWORLD_IMAGE	:= image.initrd.newworld.o
+PREP_INITRD	:= ramdisk.image.prep.gz
+PREP_IMAGE	:= image.initrd.prep.o
+else
+CHRP_INITRD	:= ramdisk.image.gz
+CHRP_IMAGE	:= image.initrd.o
+MIBOOT_INITRD	:= ramdisk.image.gz
+MIBOOT_IMAGE	:= image.initrd.o
+COFF_INITRD	:= ramdisk.image.gz
+COFF_IMAGE	:= image.initrd.o
+NEWWORLD_INITRD	:= ramdisk.image.gz
+NEWWORLD_IMAGE	:= image.initrd.o
+PREP_INITRD	:= ramdisk.image.gz
+PREP_IMAGE	:= image.initrd.o
 
 $(images)/ramdisk.image.gz:
 	@echo '  MISSING $@'
 	@echo '          RAM disk image must be provided separately'
 	@/bin/false
+endif
 
 objcpxmon-$(CONFIG_XMON) := --add-section=.sysmap=System.map \
 	--set-section-flags=.sysmap=contents,alloc,load,readonly,data
@@ -68,11 +91,25 @@ $(obj)/image.o: $(obj)/dummy.o $(images)/vmlinux.gz FORCE
 # Place the ramdisk in the initrd image.
 quiet_cmd_genimage-initrd = GEN     $@
       cmd_genimage-initrd = $(OBJCOPY) $< $@ \
-	--add-section=.ramdisk=$(images)/ramdisk.image.gz \
+	--add-section=.ramdisk=$(images)/$2 \
 	--set-section-flags=.ramdisk=contents,alloc,load,readonly,data
+ifdef CONFIG_PPC_INITRD_PER_IMAGE
+targets += $(CHRP_IMAGE) $(MIBOOT_IMAGE) $(COFF_IMAGE) $(NEWWORLD_IMAGE)
+$(obj)/$(CHRP_IMAGE): $(obj)/image.o $(images)/$(CHRP_INITRD) FORCE
+	$(call if_changed,genimage-initrd,$(CHRP_INITRD))
+$(obj)/$(MIBOOT_IMAGE): $(obj)/image.o $(images)/$(MIBOOT_INITRD) FORCE
+	$(call if_changed,genimage-initrd,$(MIBOOT_INITRD))
+$(obj)/$(COFF_IMAGE): $(obj)/image.o $(images)/$(COFF_INITRD) FORCE
+	$(call if_changed,genimage-initrd,$(COFF_INITRD))
+$(obj)/$(NEWWORLD_IMAGE): $(obj)/image.o $(images)/$(NEWWORLD_INITRD) FORCE
+	$(call if_changed,genimage-initrd,$(NEWWORLD_INITRD))
+$(obj)/$(PREP_IMAGE): $(obj)/image.o $(images)/$(PREP_INITRD) FORCE
+	$(call if_changed,genimage-initrd,$(PREP_INITRD))
+else
 targets += image.initrd.o
 $(obj)/image.initrd.o: $(obj)/image.o $(images)/ramdisk.image.gz FORCE
-	$(call if_changed,genimage-initrd)
+	$(call if_changed,genimage-initrd,ramdisk.image.gz)
+endif
 
 # Create the note section for New-World PowerMacs.
 quit_cmd_mknote  = MKNOTE  $@
@@ -95,7 +132,7 @@ targets += coffboot
 $(obj)/coffboot: $(COFFOBJS) $(obj)/image.o $(LIBS) FORCE
 	$(call if_changed,gencoffb)
 targets += coffboot.initrd
-$(obj)/coffboot.initrd: $(COFFOBJS) $(obj)/image.initrd.o $(LIBS) FORCE
+$(obj)/coffboot.initrd: $(COFFOBJS) $(obj)/$(COFF_IMAGE) $(LIBS) FORCE
 	$(call if_changed,gencoffb)
 
 
@@ -118,7 +155,7 @@ quiet_cmd_gen-elf-pmac = ELF     $@
 
 $(images)/vmlinux.elf-pmac: $(obj)/image.o $(NEWWORLDOBJS) $(LIBS) $(obj)/note $(boot)/ld.script
 	$(call cmd,gen-elf-pmac)
-$(images)/vmlinux.initrd.elf-pmac: $(obj)/image.initrd.o $(NEWWORLDOBJS) \
+$(images)/vmlinux.initrd.elf-pmac: $(obj)/$(NEWWORLD_IMAGE) $(NEWWORLDOBJS) \
 				   $(LIBS) $(obj)/note $(boot)/ld.script
 	$(call cmd,gen-elf-pmac)
 
@@ -128,7 +165,7 @@ quiet_cmd_gen-chrp = CHRP    $@
 
 $(images)/zImage.chrp: $(CHRPOBJS) $(obj)/image.o $(LIBS) $(boot)/ld.script
 	$(call cmd,gen-chrp)
-$(images)/zImage.initrd.chrp: $(CHRPOBJS) $(obj)/image.initrd.o $(LIBS) $(boot)/ld.script
+$(images)/zImage.initrd.chrp: $(CHRPOBJS) $(obj)/$(CHRP_IMAGE) $(LIBS) $(boot)/ld.script
 	$(call cmd,gen-chrp)
 
 quiet_cmd_addnote = ADDNOTE $@
@@ -143,7 +180,7 @@ quiet_cmd_gen-miboot = GEN     $@
 $(images)/miboot.image: $(obj)/dummy.o $(images)/vmlinux.gz
 	$(call cmd,gen-miboot,image)
 
-$(images)/miboot.initrd.image: $(images)/miboot.image $(images)/ramdisk.image.gz
+$(images)/miboot.initrd.image: $(images)/miboot.image $(images)/$(MIBOOT_INITRD)
 	$(call cmd,gen-miboot,initrd)
 
 # The targets used on the make command-line

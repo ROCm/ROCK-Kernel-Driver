@@ -782,6 +782,15 @@ config CMDLINE
 	  some command-line options at build time by entering them here.  In
 	  most cases you will need to specify the root device here.
 
+config PPC_INITRD_PER_IMAGE
+	bool "use separate initrd.gz for each boot file"
+	depends on PPC_MULTIPLATFORM
+	default y
+	help
+	  A generic initrd is too large for all supported boards.
+	  This option requires a ramdisk.image.board.gz instead of ramdisk.image.gz
+	  If in doubt, say N
+
 config AMIGA
 	bool
 	depends on APUS
