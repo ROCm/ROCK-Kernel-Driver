@@ -158,8 +158,6 @@ adir_halt(void)
 	adir_restart(NULL);
 }
 
-extern unsigned int boot_mem_size;
-
 static unsigned long __init
 adir_find_end_of_memory(void)
 {

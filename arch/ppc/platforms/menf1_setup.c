@@ -150,11 +150,6 @@ menf1_init_IRQ(void)
 	i8259_init(NULL);
 }
 
-static int menf1_get_irq(struct pt_regs *regs)
-{
-	return i8259_poll();
-}
-
 /*
  * Set BAT 3 to map 0xF0000000.
  */
@@ -259,7 +254,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.setup_arch	= menf1_setup_arch;
 	ppc_md.show_cpuinfo	= menf1_show_cpuinfo;
 	ppc_md.init_IRQ		= menf1_init_IRQ;
-	ppc_md.get_irq		= menf1_get_irq;
+	ppc_md.get_irq		= i8259_irq;
 
 	ppc_md.find_end_of_memory = menf1_find_end_of_memory;
 	ppc_md.setup_io_mappings = menf1_map_io;

@@ -118,7 +118,7 @@ adir_init_IRQ(void)
 }
 
 int
-adir_get_irq(void)
+adir_get_irq(struct pt_regs *regs)
 {
 	int	irq;
 
@@ -126,7 +126,7 @@ adir_get_irq(void)
 		return irq;
 
 	if (irq == ADIR_IRQ_VT82C686_INTR)
-		irq = i8259_poll();
+		irq = i8259_irq(regs);
 
 	return irq;
 }

@@ -224,12 +224,6 @@ pplus_irq_cannonicalize(u_int irq)
 	}
 }
 
-static int
-pplus_get_irq(struct pt_regs *regs)
-{
-	return i8259_poll();
-}		
-
 static void __init
 pplus_init_IRQ(void)
 {
@@ -484,7 +478,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.irq_cannonicalize = pplus_irq_cannonicalize;
 	ppc_md.init_IRQ       = pplus_init_IRQ;
 	/* this gets changed later on if we have an OpenPIC -- Cort */
-	ppc_md.get_irq        = pplus_get_irq;
+	ppc_md.get_irq        = i8259_irq;
 	ppc_md.init           = pplus_init2;
 
 	ppc_md.restart        = pplus_restart;

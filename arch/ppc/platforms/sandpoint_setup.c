@@ -336,7 +336,7 @@ sandpoint_get_irq(struct pt_regs *regs)
 	irq = openpic_irq();
 
 	if (irq == SANDPOINT_SIO_IRQ) {
-		cascade_irq = i8259_poll();
+		cascade_irq = i8259_irq(regs);
 
 		if (cascade_irq != -1) {
 			irq = cascade_irq;

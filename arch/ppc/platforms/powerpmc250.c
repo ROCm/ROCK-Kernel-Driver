@@ -193,12 +193,6 @@ powerpmc250_power_off(void)
 	powerpmc250_halt();
 }
 
-/* Resolves the open_pic.c build without including i8259.c */
-int i8259_poll(void)
-{
-	return 0;
-}
-
 static void __init
 powerpmc250_init_IRQ(void)
 {

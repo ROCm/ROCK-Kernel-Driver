@@ -196,12 +196,6 @@ prpmc800_power_off(void)
 	prpmc800_halt();
 }
 
-/* Resolves the open_pic.c build without including i8259.c */
-int i8259_poll()
-{
-	return 0;
-}
-
 static void __init
 prpmc800_init_IRQ(void)
 {
