@@ -13,6 +13,7 @@
 #define _CRYPTO_INTERNAL_H
 #include <linux/mm.h>
 #include <linux/highmem.h>
+#include <linux/init.h>
 #include <asm/hardirq.h>
 #include <asm/softirq.h>
 
