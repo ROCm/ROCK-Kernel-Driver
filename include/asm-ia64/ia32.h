@@ -6,7 +6,7 @@
 #include <asm/ptrace.h>
 #include <asm/signal.h>
 
-#define IA32_NR_syscalls		275 /* length of syscall table */
+#define IA32_NR_syscalls		283 /* length of syscall table */
 
 #ifndef __ASSEMBLY__
 
