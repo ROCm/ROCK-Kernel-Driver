@@ -548,9 +548,11 @@ static inline int __sock_sendmsg(struct kiocb *iocb, struct socket *sock,
 int sock_sendmsg(struct socket *sock, struct msghdr *msg, size_t size)
 {
 	struct kiocb iocb;
+	struct sock_iocb siocb;
 	int ret;
 
 	init_sync_kiocb(&iocb, NULL);
+	iocb.private = &siocb;
 	ret = __sock_sendmsg(&iocb, sock, msg, size);
 	if (-EIOCBQUEUED == ret)
 		ret = wait_on_sync_kiocb(&iocb);
@@ -581,13 +583,20 @@ int sock_recvmsg(struct socket *sock, struct msghdr *msg,
 		 size_t size, int flags)
 {
 	struct kiocb iocb;
+	struct sock_iocb siocb;
 	int ret;
 
         init_sync_kiocb(&iocb, NULL);
+	iocb.private = &siocb;
 	ret = __sock_recvmsg(&iocb, sock, msg, size, flags);
 	if (-EIOCBQUEUED == ret)
 		ret = wait_on_sync_kiocb(&iocb);
 	return ret;
+}
+
+static void sock_aio_dtor(struct kiocb *iocb)
+{
+	kfree(iocb->private);
 }
 
 /*
@@ -598,7 +607,7 @@ int sock_recvmsg(struct socket *sock, struct msghdr *msg,
 static ssize_t sock_aio_read(struct kiocb *iocb, char __user *ubuf,
 			 size_t size, loff_t pos)
 {
-	struct sock_iocb *x = kiocb_to_siocb(iocb);
+	struct sock_iocb *x, siocb;
 	struct socket *sock;
 	int flags;
 
@@ -607,6 +616,16 @@ static ssize_t sock_aio_read(struct kiocb *iocb, char __user *ubuf,
 	if (size==0)		/* Match SYS5 behaviour */
 		return 0;
 
+	if (is_sync_kiocb(iocb))
+		x = &siocb;
+	else {
+		x = kmalloc(sizeof(struct sock_iocb), GFP_KERNEL);
+		if (!x)
+			return -ENOMEM;
+		iocb->ki_dtor = sock_aio_dtor;
+	}
+	iocb->private = x;
+	x->kiocb = iocb;
 	sock = SOCKET_I(iocb->ki_filp->f_dentry->d_inode); 
 
 	x->async_msg.msg_name = NULL;
@@ -631,7 +650,7 @@ static ssize_t sock_aio_read(struct kiocb *iocb, char __user *ubuf,
 static ssize_t sock_aio_write(struct kiocb *iocb, const char __user *ubuf,
 			  size_t size, loff_t pos)
 {
-	struct sock_iocb *x = kiocb_to_siocb(iocb);
+	struct sock_iocb *x, siocb;
 	struct socket *sock;
 	
 	if (pos != 0)
@@ -639,6 +658,16 @@ static ssize_t sock_aio_write(struct kiocb *iocb, const char __user *ubuf,
 	if(size==0)		/* Match SYS5 behaviour */
 		return 0;
 
+	if (is_sync_kiocb(iocb))
+		x = &siocb;
+	else {
+		x = kmalloc(sizeof(struct sock_iocb), GFP_KERNEL);
+		if (!x)
+			return -ENOMEM;
+		iocb->ki_dtor = sock_aio_dtor;
+	}
+	iocb->private = x;
+	x->kiocb = iocb;
 	sock = SOCKET_I(iocb->ki_filp->f_dentry->d_inode); 
 
 	x->async_msg.msg_name = NULL;
