@@ -59,7 +59,7 @@
 
 char e1000_driver_name[] = "e1000";
 char e1000_driver_string[] = "Intel(R) PRO/1000 Network Driver";
-char e1000_driver_version[] = "4.4.19-k2";
+char e1000_driver_version[] = "4.4.19-k3";
 char e1000_copyright[] = "Copyright (c) 1999-2002 Intel Corporation.";
 
 /* e1000_pci_tbl - PCI Device ID Table
@@ -1810,7 +1810,10 @@ e1000_intr(int irq, void *data, struct pt_regs *regs)
 	
 #ifdef CONFIG_E1000_NAPI
 	if (netif_rx_schedule_prep(netdev)) {
-		e1000_irq_disable(adapter);
+		/* Disable interrupts and enable polling */
+		atomic_inc(&adapter->irq_sem);
+		E1000_WRITE_REG(&adapter->hw, IMC, ~0);
+		E1000_WRITE_FLUSH(&adapter->hw);
 		__netif_rx_schedule(netdev);
 	}
 #else
