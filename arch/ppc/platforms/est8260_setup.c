@@ -22,26 +22,8 @@
 
 static void (*callback_setup_arch)(void);
 
-extern unsigned char __res[sizeof(bd_t)];
-
 extern void m8260_init(unsigned long r3, unsigned long r4,
 	unsigned long r5, unsigned long r6, unsigned long r7);
-
-static int
-est8260_show_cpuinfo(struct seq_file *m)
-{
-	bd_t	*binfo = (bd_t *)__res;
-
-	seq_printf(m, "vendor\t\t: EST Corporation\n"
-		      "machine\t\t: SBC8260 PowerPC\n"
-		      "\n"
-		      "mem size\t\t: 0x%08x\n"
-		      "console baud\t\t: %d\n"
-		      "\n",
-		      binfo->bi_memsize,
-		      binfo->bi_baudrate);
-	return 0;
-}
 
 static void __init
 est8260_setup_arch(void)
@@ -58,8 +40,6 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	m8260_init(r3, r4, r5, r6, r7);
 
 	/* Anything special for this platform */
-	ppc_md.show_cpuinfo	= est8260_show_cpuinfo;
-
 	callback_setup_arch	= ppc_md.setup_arch;
 	ppc_md.setup_arch	= est8260_setup_arch;
 }

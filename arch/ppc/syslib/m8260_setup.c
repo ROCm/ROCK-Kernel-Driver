@@ -1,5 +1,5 @@
 /*
- *  arch/ppc/kernel/setup.c
+ *  arch/ppc/syslib/m8260_setup.c
  *
  *  Copyright (C) 1995  Linus Torvalds
  *  Adapted from 'alpha' version by Gary Thomas
@@ -11,7 +11,6 @@
 /*
  * bootup setup stuff..
  */
-
 #include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
@@ -145,18 +144,24 @@ m8260_power_off(void)
 }
 
 static int
-m8260_show_percpuinfo(struct seq_file *m, int i)
+m8260_show_cpuinfo(struct seq_file *m)
 {
 	bd_t	*bp;
 
 	bp = (bd_t *)__res;
 
-	seq_printf(m, "core clock\t: %ld MHz\n"
-		   "CPM  clock\t: %ld MHz\n"
-		   "bus  clock\t: %ld MHz\n",
-		   bp->bi_intfreq / 1000000,
-		   bp->bi_cpmfreq / 1000000,
-		   bp->bi_busfreq / 1000000);
+	seq_printf(m, "vendor\t\t: %s\n"
+		   "machine\t\t: %s\n"
+		   "\n"
+		   "mem size\t\t: 0x%08x\n"
+		   "console baud\t\t: %d\n"
+		   "\n"
+		   "core clock\t: %u MHz\n"
+		   "CPM  clock\t: %u MHz\n"
+		   "bus  clock\t: %u MHz\n",
+		   CPUINFO_VENDOR, CPUINFO_MACHINE, bp->bi_memsize,
+		   bp->bi_baudrate, bp->bi_intfreq / 1000000,
+		   bp->bi_cpmfreq / 1000000, bp->bi_busfreq / 1000000);
 	return 0;
 }
 
@@ -250,7 +255,7 @@ m8260_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	}
 
 	ppc_md.setup_arch		= m8260_setup_arch;
-	ppc_md.show_percpuinfo		= m8260_show_percpuinfo;
+	ppc_md.show_cpuinfo		= m8260_show_cpuinfo;
 	ppc_md.irq_canonicalize	= NULL;
 	ppc_md.init_IRQ			= m8260_init_IRQ;
 	ppc_md.get_irq			= cpm2_get_irq;

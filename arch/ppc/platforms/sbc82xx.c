@@ -38,22 +38,6 @@ extern void m8260_init(unsigned long r3, unsigned long r4,
 
 extern void (*late_time_init)(void);
 
-static int
-sbc82xx_show_cpuinfo(struct seq_file *m)
-{
-	bd_t	*binfo = (bd_t *)__res;
-
-	seq_printf(m, "vendor\t\t: Wind River\n"
-		      "machine\t\t: SBC PowerQUICC II\n"
-		      "\n"
-		      "mem size\t\t: 0x%08lx\n"
-		      "console baud\t\t: %ld\n"
-		      "\n",
-		      binfo->bi_memsize,
-		      binfo->bi_baudrate);
-	return 0;
-}
-
 static void __init
 sbc82xx_setup_arch(void)
 {
@@ -250,8 +234,6 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	__res[offsetof(bd_t, bi_enetaddr[5])] &= ~3;
 
 	/* Anything special for this platform */
-	ppc_md.show_cpuinfo	= sbc82xx_show_cpuinfo;
-
 	callback_setup_arch	= ppc_md.setup_arch;
 	callback_init_IRQ	= ppc_md.init_IRQ;
 

@@ -23,23 +23,8 @@
 
 static void (*callback_setup_arch)(void);
 
-extern unsigned char __res[sizeof(bd_t)];
-
 extern void m8260_init(unsigned long r3, unsigned long r4,
 	unsigned long r5, unsigned long r6, unsigned long r7);
-
-static int
-tqm8260_show_cpuinfo(struct seq_file *m)
-{
-	bd_t	*binfo = (bd_t *)__res;
-
-	seq_printf(m, "vendor\t\t: IN2 Systems\n"
-		      "machine\t\t: TQM8260 PowerPC\n"
-		      "mem size\t\t: 0x%08x\n"
-		      "\n",
-		      binfo->bi_memsize);
-	return 0;
-}
 
 static int
 tqm8260_set_rtc_time(unsigned long time)
@@ -71,7 +56,6 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	m8260_init(r3, r4, r5, r6, r7);
 
 	/* Anything special for this platform */
-	ppc_md.show_cpuinfo	= tqm8260_show_cpuinfo;
 	ppc_md.set_rtc_time	= tqm8260_set_rtc_time;
 	ppc_md.get_rtc_time	= tqm8260_get_rtc_time;
 

@@ -18,6 +18,10 @@
 #define SBC82xx_MACADDR_NVRAM_FCC2	0x220000d5	/* JP7A */
 #define SBC82xx_MACADDR_NVRAM_FCC3	0x220000db	/* JP7B */
 
+/* For our show_cpuinfo hooks. */
+#define CPUINFO_VENDOR		"Wind River"
+#define CPUINFO_MACHINE		"SBC PowerQUICC II"
+
 #define BOOTROM_RESTART_ADDR      ((uint)0x40000104)
 
 #define SBC82xx_PC_IRQA (NR_SIU_INTS+0)
