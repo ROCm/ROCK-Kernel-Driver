@@ -2723,16 +2723,17 @@ static int sbp2scsi_abort (Scsi_Cmnd *SCpnt)
 				command->Current_SCpnt->result = DID_ABORT << 16;
 				done (command->Current_SCpnt);
 			}
+			return SUCCESS;
 		}
 
+		
 		/*
-		 * Initiate a fetch agent reset. 
+		 * Don't reset the bus here; let the SCSI escalation take
+		 * care of it in sbp2scsi_reset.
 		 */
-		sbp2_agent_reset(scsi_id, 0);
-		sbp2scsi_complete_all_commands(scsi_id, DID_BUS_BUSY);		
+		
 	}
-
-	return(SUCCESS);
+	return FAILED;
 }
 
 /*
@@ -2748,9 +2749,10 @@ static int sbp2scsi_reset (Scsi_Cmnd *SCpnt)
 	if (scsi_id) {
 		SBP2_ERR("Generating sbp2 fetch agent reset");
 		sbp2_agent_reset(scsi_id, 0);
+		sbp2scsi_complete_all_commands(scsi_id, DID_RESET);
 	}
 
-	return(SUCCESS);
+	return SUCCESS;
 }
 
 static const char *sbp2scsi_info (struct Scsi_Host *host)
