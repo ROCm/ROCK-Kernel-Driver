@@ -73,6 +73,7 @@
  *    inside a macro, the way we do the other calls.
  */
 
+#include <linux/kernel.h>
 #include <linux/threads.h>
 #include <linux/bitmap.h>
 #include <asm/bug.h>
@@ -207,13 +208,13 @@ static inline void __cpus_shift_left(cpumask_t *dstp,
 #define first_cpu(src) __first_cpu(&(src), NR_CPUS)
 static inline int __first_cpu(const cpumask_t *srcp, int nbits)
 {
-	return find_first_bit(srcp->bits, nbits);
+	return min_t(int, nbits, find_first_bit(srcp->bits, nbits));
 }
 
 #define next_cpu(n, src) __next_cpu((n), &(src), NR_CPUS)
 static inline int __next_cpu(int n, const cpumask_t *srcp, int nbits)
 {
-	return find_next_bit(srcp->bits, nbits, n+1);
+	return min_t(int, nbits, find_next_bit(srcp->bits, nbits, n+1));
 }
 
 #define cpumask_of_cpu(cpu)						\
