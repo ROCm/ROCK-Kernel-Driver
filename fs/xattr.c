@@ -53,7 +53,8 @@ xattr_free(void *ptr, size_t size)
  * Extended attribute SET operations
  */
 static long
-setxattr(struct dentry *d, char *name, void *value, size_t size, int flags)
+setxattr(struct dentry *d, char __user *name, void __user *value,
+	 size_t size, int flags)
 {
 	int error;
 	void *kvalue;
@@ -94,7 +95,8 @@ out:
 }
 
 asmlinkage long
-sys_setxattr(char *path, char *name, void *value, size_t size, int flags)
+sys_setxattr(char __user *path, char __user *name, void __user *value,
+	     size_t size, int flags)
 {
 	struct nameidata nd;
 	int error;
@@ -108,7 +110,8 @@ sys_setxattr(char *path, char *name, void *value, size_t size, int flags)
 }
 
 asmlinkage long
-sys_lsetxattr(char *path, char *name, void *value, size_t size, int flags)
+sys_lsetxattr(char __user *path, char __user *name, void __user *value,
+	      size_t size, int flags)
 {
 	struct nameidata nd;
 	int error;
@@ -122,7 +125,8 @@ sys_lsetxattr(char *path, char *name, void *value, size_t size, int flags)
 }
 
 asmlinkage long
-sys_fsetxattr(int fd, char *name, void *value, size_t size, int flags)
+sys_fsetxattr(int fd, char __user *name, void __user *value,
+	      size_t size, int flags)
 {
 	struct file *f;
 	int error = -EBADF;
@@ -139,7 +143,7 @@ sys_fsetxattr(int fd, char *name, void *value, size_t size, int flags)
  * Extended attribute GET operations
  */
 static ssize_t
-getxattr(struct dentry *d, char *name, void *value, size_t size)
+getxattr(struct dentry *d, char __user *name, void __user *value, size_t size)
 {
 	ssize_t error;
 	void *kvalue;
@@ -172,7 +176,8 @@ out:
 }
 
 asmlinkage ssize_t
-sys_getxattr(char *path, char *name, void *value, size_t size)
+sys_getxattr(char __user *path, char __user *name, void __user *value,
+	     size_t size)
 {
 	struct nameidata nd;
 	ssize_t error;
@@ -186,7 +191,8 @@ sys_getxattr(char *path, char *name, void *value, size_t size)
 }
 
 asmlinkage ssize_t
-sys_lgetxattr(char *path, char *name, void *value, size_t size)
+sys_lgetxattr(char __user *path, char __user *name, void __user *value,
+	      size_t size)
 {
 	struct nameidata nd;
 	ssize_t error;
@@ -200,7 +206,7 @@ sys_lgetxattr(char *path, char *name, void *value, size_t size)
 }
 
 asmlinkage ssize_t
-sys_fgetxattr(int fd, char *name, void *value, size_t size)
+sys_fgetxattr(int fd, char __user *name, void __user *value, size_t size)
 {
 	struct file *f;
 	ssize_t error = -EBADF;
@@ -217,7 +223,7 @@ sys_fgetxattr(int fd, char *name, void *value, size_t size)
  * Extended attribute LIST operations
  */
 static ssize_t
-listxattr(struct dentry *d, char *list, size_t size)
+listxattr(struct dentry *d, char __user *list, size_t size)
 {
 	ssize_t error;
 	char *klist;
@@ -243,7 +249,7 @@ out:
 }
 
 asmlinkage ssize_t
-sys_listxattr(char *path, char *list, size_t size)
+sys_listxattr(char __user *path, char __user *list, size_t size)
 {
 	struct nameidata nd;
 	ssize_t error;
@@ -257,7 +263,7 @@ sys_listxattr(char *path, char *list, size_t size)
 }
 
 asmlinkage ssize_t
-sys_llistxattr(char *path, char *list, size_t size)
+sys_llistxattr(char __user *path, char __user *list, size_t size)
 {
 	struct nameidata nd;
 	ssize_t error;
@@ -271,7 +277,7 @@ sys_llistxattr(char *path, char *list, size_t size)
 }
 
 asmlinkage ssize_t
-sys_flistxattr(int fd, char *list, size_t size)
+sys_flistxattr(int fd, char __user *list, size_t size)
 {
 	struct file *f;
 	ssize_t error = -EBADF;
@@ -288,7 +294,7 @@ sys_flistxattr(int fd, char *list, size_t size)
  * Extended attribute REMOVE operations
  */
 static long
-removexattr(struct dentry *d, char *name)
+removexattr(struct dentry *d, char __user *name)
 {
 	int error;
 	char kname[XATTR_NAME_MAX + 1];
@@ -313,7 +319,7 @@ out:
 }
 
 asmlinkage long
-sys_removexattr(char *path, char *name)
+sys_removexattr(char __user *path, char __user *name)
 {
 	struct nameidata nd;
 	int error;
@@ -327,7 +333,7 @@ sys_removexattr(char *path, char *name)
 }
 
 asmlinkage long
-sys_lremovexattr(char *path, char *name)
+sys_lremovexattr(char __user *path, char __user *name)
 {
 	struct nameidata nd;
 	int error;
@@ -341,7 +347,7 @@ sys_lremovexattr(char *path, char *name)
 }
 
 asmlinkage long
-sys_fremovexattr(int fd, char *name)
+sys_fremovexattr(int fd, char __user *name)
 {
 	struct file *f;
 	int error = -EBADF;
