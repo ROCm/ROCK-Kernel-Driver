@@ -5,18 +5,6 @@
 menu "I2C Hardware Bus support"
 	depends on I2C
 
-config I2C_ALI1563
-	tristate "ALI 1563"
-	depends on I2C && PCI && EXPERIMENTAL
-	help
-	  If you say yes to this option, support will be included for the SMB
-	  Host controller on Acer Labs Inc. (ALI) M1563 South Bridges.  The SMB
-	  controller is part of the 7101 device, which is an ACPI-compliant
-	  Power Management Unit (PMU).
-
-	  This driver can also be built as a module.  If so, the module
-	  will be called i2c-ali1563.
-
 config I2C_ALI1535
 	tristate "ALI 1535"
 	depends on I2C && PCI && EXPERIMENTAL
@@ -28,6 +16,18 @@ config I2C_ALI1535
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-ali1535.
+
+config I2C_ALI1563
+	tristate "ALI 1563"
+	depends on I2C && PCI && EXPERIMENTAL
+	help
+	  If you say yes to this option, support will be included for the SMB
+	  Host controller on Acer Labs Inc. (ALI) M1563 South Bridges.  The SMB
+	  controller is part of the 7101 device, which is an ACPI-compliant
+	  Power Management Unit (PMU).
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-ali1563.
 
 config I2C_ALI15X3
 	tristate "ALI 15x3"
