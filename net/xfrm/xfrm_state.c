@@ -60,9 +60,12 @@ static void xfrm_state_gc_destroy(struct xfrm_state *x)
 		kfree(x->calg);
 	if (x->encap)
 		kfree(x->encap);
-	if (x->type)
+	if (x->type) {
+		x->type->destructor(x);
 		xfrm_put_type(x->type);
+	}
 	kfree(x);
+	wake_up(&km_waitq);
 }
 
 static void xfrm_state_gc_task(void *data)
@@ -196,11 +199,8 @@ void __xfrm_state_destroy(struct xfrm_state *x)
 
 static void __xfrm_state_delete(struct xfrm_state *x)
 {
-	int kill = 0;
-
 	if (x->km.state != XFRM_STATE_DEAD) {
 		x->km.state = XFRM_STATE_DEAD;
-		kill = 1;
 		spin_lock(&xfrm_state_lock);
 		list_del(&x->bydst);
 		atomic_dec(&x->refcnt);
@@ -219,22 +219,17 @@ static void __xfrm_state_delete(struct xfrm_state *x)
 		 */
 		if (atomic_read(&x->refcnt) > 2)
 			xfrm_flush_bundles(x);
+
+		/* All xfrm_state objects are created by one of two possible
+		 * paths:
+		 *
+		 * 2) xfrm_state_lookup --> xfrm_state_insert
+		 *
+		 * The xfrm_state_lookup or xfrm_state_alloc call gives a
+		 * reference, and that is what we are dropping here.
+		 */
+		atomic_dec(&x->refcnt);
 	}
-
-	/* All xfrm_state objects are created by one of two possible
-	 * paths:
-	 *
-	 * 1) xfrm_state_alloc --> xfrm_state_insert
-	 * 2) xfrm_state_lookup --> xfrm_state_insert
-	 *
-	 * The xfrm_state_lookup or xfrm_state_alloc call gives a
-	 * reference, and that is what we are dropping here.
-	 */
-	atomic_dec(&x->refcnt);
-
-	if (kill && x->type)
-		x->type->destructor(x);
-	wake_up(&km_waitq);
 }
 
 void xfrm_state_delete(struct xfrm_state *x)
