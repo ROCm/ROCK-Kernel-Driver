@@ -165,7 +165,7 @@ typedef struct xfs_flock64 {
 	__s64		l_start;
 	__s64		l_len;		/* len == 0 means until end of file */
 	__s32		l_sysid;
-	pid_t		l_pid;
+	__u32		l_pid;
 	__s32		l_pad[4];	/* reserve area			    */
 } xfs_flock64_t;
 
