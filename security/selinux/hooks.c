@@ -110,7 +110,7 @@ static struct security_operations *secondary_ops = NULL;
 /* Lists of inode and superblock security structures initialized
    before the policy was loaded. */
 static LIST_HEAD(superblock_security_head);
-static spinlock_t sb_security_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(sb_security_lock);
 
 /* Allocate and free functions for each kind of security blob. */
 
