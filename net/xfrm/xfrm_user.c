@@ -784,9 +784,8 @@ static int xfrm_get_policy(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfr
 					      NETLINK_CB(skb).pid,
 					      MSG_DONTWAIT);
 		}
+		xfrm_pol_put(xp);
 	}
-
-	xfrm_pol_put(xp);
 
 	return err;
 }

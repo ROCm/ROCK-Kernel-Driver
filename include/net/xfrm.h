@@ -266,6 +266,7 @@ struct xfrm_tmpl
 struct xfrm_policy
 {
 	struct xfrm_policy	*next;
+	struct list_head	list;
 
 	/* This lock only affects elements except for entry. */
 	rwlock_t		lock;

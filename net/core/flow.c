@@ -12,8 +12,12 @@
 #include <linux/random.h>
 #include <linux/init.h>
 #include <linux/slab.h>
+#include <linux/interrupt.h>
+#include <linux/smp.h>
+#include <linux/completion.h>
 #include <net/flow.h>
 #include <asm/atomic.h>
+#include <asm/semaphore.h>
 
 struct flow_cache_entry {
 	struct flow_cache_entry	*next;
@@ -48,6 +52,14 @@ static struct flow_percpu_info flow_hash_info[NR_CPUS];
 static struct timer_list flow_hash_rnd_timer;
 
 #define FLOW_HASH_RND_PERIOD	(10 * 60 * HZ)
+
+struct flow_flush_info {
+	void *object;
+	atomic_t cpuleft;
+	struct completion completion;
+};
+static struct tasklet_struct flow_flush_tasklets[NR_CPUS];
+static DECLARE_MUTEX(flow_flush_sem);
 
 static void flow_cache_new_hashrnd(unsigned long arg)
 {
@@ -170,6 +182,22 @@ void *flow_cache_lookup(struct flowi *key, u16 family, u8 dir,
 		}
 	}
 
+	if (!fle) {
+		if (flow_count(cpu) > flow_hwm)
+			flow_cache_shrink(cpu);
+
+		fle = kmem_cache_alloc(flow_cachep, SLAB_ATOMIC);
+		if (fle) {
+			fle->next = *head;
+			*head = fle;
+			fle->family = family;
+			fle->dir = dir;
+			memcpy(&fle->key, key, sizeof(*key));
+			fle->object = NULL;
+			flow_count(cpu)++;
+		}
+	}
+
 	{
 		void *obj;
 		atomic_t *obj_ref;
@@ -186,30 +214,67 @@ void *flow_cache_lookup(struct flowi *key, u16 family, u8 dir,
 			fle->object_ref = obj_ref;
 			if (obj)
 				atomic_inc(fle->object_ref);
-		} else {
-			if (flow_count(cpu) > flow_hwm)
-				flow_cache_shrink(cpu);
-
-			fle = kmem_cache_alloc(flow_cachep, SLAB_ATOMIC);
-			if (fle) {
-				fle->next = *head;
-				*head = fle;
-				fle->family = family;
-				fle->dir = dir;
-				memcpy(&fle->key, key, sizeof(*key));
-				fle->genid = atomic_read(&flow_cache_genid);
-				fle->object = obj;
-				fle->object_ref = obj_ref;
-				if (obj)
-					atomic_inc(fle->object_ref);
-
-				flow_count(cpu)++;
-			}
 		}
 		local_bh_enable();
 
 		return obj;
 	}
+}
+
+static void flow_cache_flush_tasklet(unsigned long data)
+{
+	struct flow_flush_info *info = (void *)data;
+	void *object = info->object;
+	int i;
+	int cpu;
+
+	cpu = smp_processor_id();
+	for (i = 0; i < flow_hash_size; i++) {
+		struct flow_cache_entry *fle, **flp;
+
+		flp = &flow_table[(cpu << flow_hash_shift) + i];
+		for (; (fle = *flp) != NULL; flp = &fle->next) {
+			if (fle->object != object)
+				continue;
+			fle->object = NULL;
+			atomic_dec(fle->object_ref);
+		}
+	}
+
+	if (atomic_dec_and_test(&info->cpuleft))
+		complete(&info->completion);
+}
+
+static void flow_cache_flush_per_cpu(void *data)
+{
+	struct flow_flush_info *info = data;
+	int cpu;
+	struct tasklet_struct *tasklet;
+
+	cpu = smp_processor_id();
+	tasklet = &flow_flush_tasklets[cpu];
+	tasklet_init(tasklet, flow_cache_flush_tasklet, (unsigned long)info);
+	tasklet_schedule(tasklet);
+}
+
+void flow_cache_flush(void *object)
+{
+	struct flow_flush_info info;
+
+	info.object = object;
+	atomic_set(&info.cpuleft, num_online_cpus());
+	init_completion(&info.completion);
+
+	down(&flow_flush_sem);
+
+	smp_call_function(flow_cache_flush_per_cpu, &info, 1, 0);
+	local_bh_disable();
+	flow_cache_flush_per_cpu(&info);
+	local_bh_enable();
+
+	wait_for_completion(&info.completion);
+
+	up(&flow_flush_sem);
 }
 
 static int __init flow_cache_init(void)
