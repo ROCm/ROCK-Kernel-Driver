@@ -524,6 +524,10 @@ static int is_leaf (char * buf, int blocksize, struct buffer_head * bh)
     ih = (struct item_head *)(buf + BLKH_SIZE);
     prev_location = blocksize;
     for (i = 0; i < nr; i ++, ih ++) {
+	if ( le_ih_k_type(ih) == TYPE_ANY) {
+	    reiserfs_warning ("is_leaf: wrong item type for item %h\n",ih);
+	    return 0;
+	}
 	if (ih_location (ih) >= blocksize || ih_location (ih) < IH_SIZE * nr) {
 	    reiserfs_warning ("is_leaf: item location seems wrong: %h\n", ih);
 	    return 0;
