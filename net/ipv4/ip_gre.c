@@ -603,13 +603,24 @@ int ipgre_rcv(struct sk_buff *skb)
 	if ((tunnel = ipgre_tunnel_lookup(iph->saddr, iph->daddr, key)) != NULL) {
 		secpath_reset(skb);
 
+		skb->protocol = *(u16*)(h + 2);
+		/* WCCP version 1 and 2 protocol decoding.
+		 * - Change protocol to IP
+		 * - When dealing with WCCPv2, Skip extra 4 bytes in GRE header
+		 */
+		if (flags == 0 &&
+		    skb->protocol == __constant_htons(ETH_P_WCCP)) {
+			skb->protocol = __constant_htons(ETH_P_IP);
+			if ((*(h + offset) & 0xF0) != 0x40) 
+				offset += 4;
+		}
+
 		skb->mac.raw = skb->nh.raw;
 		skb->nh.raw = __pskb_pull(skb, offset);
 		memset(&(IPCB(skb)->opt), 0, sizeof(struct ip_options));
 		if (skb->ip_summed == CHECKSUM_HW)
 			skb->csum = csum_sub(skb->csum,
 					     csum_partial(skb->mac.raw, skb->nh.raw-skb->mac.raw, 0));
-		skb->protocol = *(u16*)(h + 2);
 		skb->pkt_type = PACKET_HOST;
 #ifdef CONFIG_NET_IPGRE_BROADCAST
 		if (MULTICAST(iph->daddr)) {
