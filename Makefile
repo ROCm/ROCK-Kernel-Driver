@@ -181,7 +181,7 @@ vmlinux: include/linux/version.h $(CONFIGURATION) init/main.o init/version.o ini
 linuxsubdirs: $(patsubst %, _dir_%, $(SUBDIRS))
 
 $(patsubst %, _dir_%, $(SUBDIRS)) : dummy include/linux/version.h include/config/MARKER
-	$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" -C $(patsubst _dir_%, %, $@)
+	$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" AFLAGS="$(AFLAGS) $(AFLAGS_KERNEL)" -C $(patsubst _dir_%, %, $@)
 
 # Configuration
 # ---------------------------------------------------------------------------
@@ -473,7 +473,7 @@ tags: dummy
 # FIXME: anybody still using this?
 
 fs lib mm ipc kernel drivers net sound: dummy
-	$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" $(subst $@, _dir_$@, $@)
+	$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" AFLAGS="$(AFLAGS) $(AFLAGS_KERNEL)" $(subst $@, _dir_$@, $@)
 
 # Make a backup
 # FIXME anybody still using this?
