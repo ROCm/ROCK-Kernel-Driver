@@ -1323,8 +1323,14 @@ static int tg3_setup_copper_phy(struct tg3 *tp, int force_reset)
 	current_speed = SPEED_INVALID;
 	current_duplex = DUPLEX_INVALID;
 
-	tg3_readphy(tp, MII_BMSR, &bmsr);
-	tg3_readphy(tp, MII_BMSR, &bmsr);
+	bmsr = 0;
+	for (i = 0; i < 100; i++) {
+		tg3_readphy(tp, MII_BMSR, &bmsr);
+		tg3_readphy(tp, MII_BMSR, &bmsr);
+		if (bmsr & BMSR_LSTATUS)
+			break;
+		udelay(40);
+	}
 
 	if (bmsr & BMSR_LSTATUS) {
 		u32 aux_stat, bmcr;
@@ -1340,8 +1346,16 @@ static int tg3_setup_copper_phy(struct tg3 *tp, int force_reset)
 		tg3_aux_stat_to_speed_duplex(tp, aux_stat,
 					     &current_speed,
 					     &current_duplex);
-		tg3_readphy(tp, MII_BMCR, &bmcr);
-		tg3_readphy(tp, MII_BMCR, &bmcr);
+
+		bmcr = 0;
+		for (i = 0; i < 200; i++) {
+			tg3_readphy(tp, MII_BMCR, &bmcr);
+			tg3_readphy(tp, MII_BMCR, &bmcr);
+			if (bmcr && bmcr != 0x7fff)
+				break;
+			udelay(10);
+		}
+
 		if (tp->link_config.autoneg == AUTONEG_ENABLE) {
 			if (bmcr & BMCR_ANENABLE) {
 				u32 gig_ctrl;
