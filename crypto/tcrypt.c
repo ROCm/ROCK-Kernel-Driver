@@ -174,6 +174,51 @@ static void test_md5(void)
 	crypto_free_tfm(tfm);
 }
 
+static void test_md4(void)
+{
+	char *p;
+	int i;
+	struct scatterlist sg[1];
+	char result[128];
+	struct crypto_tfm *tfm;
+	struct md4_testvec *md4_tv;
+	size_t tsize;
+
+	printk("\ntesting md4\n");
+	
+	tsize = sizeof(md4_tv_template);
+	if (tsize > TVMEMSIZE) {
+		printk("template (%Zd) too big for tvmem (%d)\n", tsize, TVMEMSIZE);
+		return;
+	}
+	
+	memcpy(tvmem, md4_tv_template, tsize);
+	md4_tv = (void *)tvmem;
+	
+	tfm = crypto_alloc_tfm(CRYPTO_ALG_MD4);
+	if (tfm == NULL) {
+		printk("failed to load transform for CRYPTO_ALG_MD4\n");
+		return;
+	}
+	
+	for (i = 0; i < MD4_TEST_VECTORS; i++) {
+		printk("test %d:\n", i + 1);
+		memset(result, 0, sizeof(result));
+		
+		p = md4_tv[i].plaintext;
+		sg[0].page = virt_to_page(p);
+		sg[0].offset = ((long)p & ~PAGE_MASK);
+		sg[0].length = strlen(md4_tv[i].plaintext);
+
+		crypto_digest_digest(tfm, sg, 1, result);
+		
+		hexdump(result, crypto_tfm_digestsize(tfm));
+		printk("%s\n", memcmp(result, md4_tv[i].digest, crypto_tfm_digestsize(tfm)) ? "fail" : "pass");
+	}
+	
+	crypto_free_tfm(tfm);
+}
+
 static void test_sha1(void)
 {
 	char *p;
@@ -239,7 +284,6 @@ static void test_sha1(void)
 	memset(result, 0, sizeof(result));
 	crypto_digest_digest(tfm, sg, 2, result);
 	hexdump(result, crypto_tfm_digestsize(tfm));
-	
 	printk("%s\n", memcmp(result, sha1_tv[1].digest, crypto_tfm_digestsize(tfm)) ? "fail" : "pass");
 
 	printk("\ntesting hmac_sha1\n");
@@ -1213,6 +1257,7 @@ static void do_test(void)
 		test_sha1();
 		test_des();
 		test_des3_ede();
+		test_md4();
 		break;
 
 	case 1:
@@ -1229,6 +1274,10 @@ static void do_test(void)
 		
 	case 4:
 		test_des3_ede();
+		break;
+	
+	case 5:
+		test_md4();
 		break;
 		
 	default:

@@ -19,7 +19,6 @@
 #include <linux/module.h>
 #include <linux/string.h>
 #include <linux/crypto.h>
-
 #include <asm/byteorder.h>
 
 #define MD5_DIGEST_SIZE		16
@@ -43,7 +42,7 @@ struct md5_ctx {
 
 static inline void md5_transform(u32 *hash, u32 const *in)
 {
-	register u32 a, b, c, d;
+	u32 a, b, c, d;
 
 	a = hash[0];
 	b = hash[1];

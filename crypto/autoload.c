@@ -25,10 +25,11 @@ static struct {
 } alg_modmap[] = {
 	{ CRYPTO_ALG_DES,	"des"	},
 	{ CRYPTO_ALG_DES3_EDE,	"des"	},
+	{ CRYPTO_ALG_MD4,	"md4"	},
 	{ CRYPTO_ALG_MD5,	"md5"	},
 	{ CRYPTO_ALG_SHA1,	"sha1"	},
 };
-#define ALG_MAX_MODMAP 4
+#define ALG_MAX_MODMAP 5
 
 void crypto_alg_autoload(u32 algid)
 {

@@ -3,6 +3,9 @@
 #
 CONFIG_CRYPTO
   This option provides the core Cryptographic API.
+
+CONFIG_CRYPTO_MD4
+  MD4 message digest algorithm (RFC1320), including HMAC (RFC2104).
   
 CONFIG_CRYPTO_MD5
   MD5 message digest algorithm (RFC1321), including HMAC (RFC2104, RFC2403).
