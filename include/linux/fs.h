@@ -133,14 +133,13 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 
 #define S_SYNC		1	/* Writes are synced at once */
 #define S_NOATIME	2	/* Do not update access times */
-#define S_QUOTA		4	/* Quota initialized for file */
-#define S_APPEND	8	/* Append-only file */
-#define S_IMMUTABLE	16	/* Immutable file */
-#define S_DEAD		32	/* removed, but still open directory */
-#define S_NOQUOTA	64	/* Inode is not counted to quota */
-#define S_DIRSYNC	128	/* Directory modifications are synchronous */
-#define S_NOCMTIME	256	/* Do not update file c/mtime */
-#define S_SWAPFILE	512	/* Do not truncate: swapon got its bmaps */
+#define S_APPEND	4	/* Append-only file */
+#define S_IMMUTABLE	8	/* Immutable file */
+#define S_DEAD		16	/* removed, but still open directory */
+#define S_NOQUOTA	32	/* Inode is not counted to quota */
+#define S_DIRSYNC	64	/* Directory modifications are synchronous */
+#define S_NOCMTIME	128	/* Do not update file c/mtime */
+#define S_SWAPFILE	256	/* Do not truncate: swapon got its bmaps */
 
 /*
  * Note that nosuid etc flags are inode-specific: setting some file-system
@@ -164,7 +163,6 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 					((inode)->i_flags & (S_SYNC|S_DIRSYNC)))
 #define IS_MANDLOCK(inode)	__IS_FLG(inode, MS_MANDLOCK)
 
-#define IS_QUOTAINIT(inode)	((inode)->i_flags & S_QUOTA)
 #define IS_NOQUOTA(inode)	((inode)->i_flags & S_NOQUOTA)
 #define IS_APPEND(inode)	((inode)->i_flags & S_APPEND)
 #define IS_IMMUTABLE(inode)	((inode)->i_flags & S_IMMUTABLE)
@@ -718,6 +716,7 @@ extern int send_sigurg(struct fown_struct *fown);
 
 #define MNT_FORCE	0x00000001	/* Attempt to forcibily umount */
 #define MNT_DETACH	0x00000002	/* Just detach from the tree */
+#define MNT_EXPIRE	0x00000004	/* Mark for expiry */
 
 extern struct list_head super_blocks;
 extern spinlock_t sb_lock;
@@ -1341,6 +1340,8 @@ extern ino_t find_inode_number(struct dentry *, struct qstr *);
 
 /* needed for stackable file system support */
 extern loff_t default_llseek(struct file *file, loff_t offset, int origin);
+
+extern loff_t vfs_llseek(struct file *file, loff_t offset, int origin);
 
 extern void inode_init_once(struct inode *);
 extern void iput(struct inode *);

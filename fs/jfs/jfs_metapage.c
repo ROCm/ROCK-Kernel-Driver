@@ -320,7 +320,7 @@ again:
 		atomic_set(&mp->nohomeok,0);
 		mp->mapping = mapping;
 		mp->index = lblock;
-		mp->page = 0;
+		mp->page = NULL;
 		mp->logical_size = size;
 		add_to_hash(mp, hash_ptr);
 		spin_unlock(&meta_lock);
@@ -465,7 +465,7 @@ void release_metapage(struct metapage * mp)
 		set_bit(META_stale, &mp->flag);
 		spin_unlock(&meta_lock);
 		kunmap(mp->page);
-		mp->data = 0;
+		mp->data = NULL;
 		if (test_bit(META_dirty, &mp->flag))
 			__write_metapage(mp);
 		if (test_bit(META_sync, &mp->flag)) {
@@ -491,7 +491,7 @@ void release_metapage(struct metapage * mp)
 		 */
 		log = mp->log;
 		LOGSYNC_LOCK(log);
-		mp->log = 0;
+		mp->log = NULL;
 		mp->lsn = 0;
 		mp->clsn = 0;
 		log->count--;

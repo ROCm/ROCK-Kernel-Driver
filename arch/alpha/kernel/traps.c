@@ -16,6 +16,7 @@
 #include <linux/smp_lock.h>
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/kallsyms.h>
 
 #include <asm/gentrap.h>
 #include <asm/uaccess.h>
@@ -119,7 +120,7 @@ static void
 dik_show_trace(unsigned long *sp)
 {
 	long i = 0;
-	printk("Trace:");
+	printk("Trace:\n");
 	while (0x1ff8 & (unsigned long) sp) {
 		extern char _stext[], _etext[];
 		unsigned long tmp = *sp;
@@ -128,7 +129,9 @@ dik_show_trace(unsigned long *sp)
 			continue;
 		if (tmp >= (unsigned long) &_etext)
 			continue;
-		printk("%lx%c", tmp, ' ');
+		printk("[<%lx>]", tmp);
+		print_symbol(" %s", tmp);
+		printk("\n");
 		if (i > 40) {
 			printk(" ...");
 			break;

@@ -78,9 +78,7 @@ int __init afs_fs_init(void)
 
 	_enter("");
 
-#ifdef AFS_AUTOMOUNT_SUPPORT
 	afs_timer_init(&afs_mntpt_expiry_timer, &afs_mntpt_expiry_timer_ops);
-#endif
 
 	/* create ourselves an inode cache */
 	atomic_set(&afs_count_active_inodes, 0);

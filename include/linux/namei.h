@@ -61,6 +61,7 @@ extern int FASTCALL(path_lookup(const char *, unsigned, struct nameidata *));
 extern int FASTCALL(path_walk(const char *, struct nameidata *));
 extern int FASTCALL(link_path_walk(const char *, struct nameidata *));
 extern void path_release(struct nameidata *);
+extern void path_release_on_umount(struct nameidata *);
 
 extern struct dentry * lookup_one_len(const char *, struct dentry *, int);
 extern struct dentry * lookup_hash(struct qstr *, struct dentry *);

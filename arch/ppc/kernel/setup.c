@@ -16,6 +16,7 @@
 #include <linux/seq_file.h>
 #include <linux/root_dev.h>
 #include <linux/cpu.h>
+#include <linux/console.h>
 
 #include <asm/residual.h>
 #include <asm/io.h>
@@ -473,6 +474,60 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		break;
 	}
 }
+
+#ifdef CONFIG_SERIAL_CORE_CONSOLE
+extern char *of_stdout_device;
+
+static int __init set_preferred_console(void)
+{
+	struct device_node *prom_stdout;
+	char *name;
+	int offset;
+
+	/* The user has requested a console so this is already set up. */
+	if (strstr(saved_command_line, "console="))
+		return -EBUSY;
+
+	prom_stdout = find_path_device(of_stdout_device);
+	if (!prom_stdout)
+		return -ENODEV;
+
+	name = (char *)get_property(prom_stdout, "name", NULL);
+	if (!name)
+		return -ENODEV;
+
+	if (strcmp(name, "serial") == 0) {
+		int i;
+		u32 *reg = (u32 *)get_property(prom_stdout, "reg", &i);
+		if (i > 8) {
+			switch (reg[1]) {
+				case 0x3f8:
+					offset = 0;
+					break;
+				case 0x2f8:
+					offset = 1;
+					break;
+				case 0x898:
+					offset = 2;
+					break;
+				case 0x890:
+					offset = 3;
+					break;
+				default:
+					/* We dont recognise the serial port */
+					return -ENODEV;
+			}
+		}
+	} else if (strcmp(name, "ch-a") == 0)
+		offset = 0;
+	else if (strcmp(name, "ch-b") == 0)
+		offset = 1;
+	else
+		return -ENODEV;
+	return add_preferred_console("ttyS", offset, NULL);
+}
+console_initcall(set_preferred_console);
+#endif /* CONFIG_SERIAL_CORE_CONSOLE */
 #endif /* CONFIG_PPC_MULTIPLATFORM */
 
 struct bi_record *find_bootinfo(void)

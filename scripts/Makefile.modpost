@@ -41,7 +41,7 @@ include scripts/Makefile.lib
 symverfile := $(objtree)/Module.symvers
 
 # Step 1), find all modules listed in $(MODVERDIR)/
-__modules := $(shell head -q -n1 /dev/null $(wildcard $(MODVERDIR)/*.mod))
+__modules := $(sort $(shell head -q -n1 /dev/null $(wildcard $(MODVERDIR)/*.mod)))
 modules   := $(patsubst %.o,%.ko, $(wildcard $(__modules:.ko=.o)))
 
 _modpost: $(modules)

@@ -420,17 +420,22 @@ void __init zone_sizes_init(void)
 void __init set_highmem_pages_init(int bad_ppro) 
 {
 #ifdef CONFIG_HIGHMEM
-	int nid;
+	struct zone *zone;
 
-	for (nid = 0; nid < numnodes; nid++) {
+	for_each_zone(zone) {
 		unsigned long node_pfn, node_high_size, zone_start_pfn;
 		struct page * zone_mem_map;
 		
-		node_high_size = NODE_DATA(nid)->node_zones[ZONE_HIGHMEM].spanned_pages;
-		zone_mem_map = NODE_DATA(nid)->node_zones[ZONE_HIGHMEM].zone_mem_map;
-		zone_start_pfn = NODE_DATA(nid)->node_zones[ZONE_HIGHMEM].zone_start_pfn;
+		if (!is_highmem(zone))
+			continue;
 
-		printk("Initializing highpages for node %d\n", nid);
+		printk("Initializing %s for node %d\n", zone->name,
+			zone->zone_pgdat->node_id);
+
+		node_high_size = zone->spanned_pages;
+		zone_mem_map = zone->zone_mem_map;
+		zone_start_pfn = zone->zone_start_pfn;
+
 		for (node_pfn = 0; node_pfn < node_high_size; node_pfn++) {
 			one_highpage_init((struct page *)(zone_mem_map + node_pfn),
 					  zone_start_pfn + node_pfn, bad_ppro);

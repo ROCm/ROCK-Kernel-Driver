@@ -27,7 +27,7 @@ Revision History:
 
 ---------------------------------------------------------------------------*/
 
-#include <linux/crc16.h>
+#include <linux/crc-ccitt.h>
 #include "tpam.h"
 
 #define  HDLC_CTRL_CHAR_CMPL_MASK	0x20	/* HDLC control character complement mask */
@@ -85,7 +85,7 @@ void hdlc_encode_modem(u8 *buffer_in, u32 lng_in,
 		/*
 		 *   FCS calculation
 		 */
-		fcs = crc16_byte(fcs, data);
+		fcs = crc_ccitt_byte(fcs, data);
 
 		ESCAPE_CHAR(p_data_out, data);
 	}
@@ -121,7 +121,7 @@ void hdlc_no_accm_encode(u8 *buffer_in, u32 lng_in,
 	while (lng_in--) {
 		data = *buffer_in++;
 		/* calculate FCS */
-		fcs = crc16_byte(fcs, data);
+		fcs = crc_ccitt_byte(fcs, data);
 		*p_data_out++ = data;
 	}
 
@@ -151,7 +151,7 @@ u32 hdlc_no_accm_decode(u8 *buffer_in, u32 lng_in) {
 	while (lng_in--) {
 		data = *buffer_in++;
 		/* calculate FCS */
-		fcs = crc16_byte(fcs, data);
+		fcs = crc_ccitt_byte(fcs, data);
 	}
 
 	if (fcs == HDLC_FCS_OK) 

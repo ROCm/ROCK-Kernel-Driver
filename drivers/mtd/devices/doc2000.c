@@ -599,7 +599,7 @@ static int doc_read(struct mtd_info *mtd, loff_t from, size_t len,
 		    size_t * retlen, u_char * buf)
 {
 	/* Just a special case of doc_read_ecc */
-	return doc_read_ecc(mtd, from, len, retlen, buf, NULL, 0);
+	return doc_read_ecc(mtd, from, len, retlen, buf, NULL, NULL);
 }
 
 static int doc_read_ecc(struct mtd_info *mtd, loff_t from, size_t len,
@@ -748,7 +748,7 @@ static int doc_write(struct mtd_info *mtd, loff_t to, size_t len,
 		     size_t * retlen, const u_char * buf)
 {
 	char eccbuf[6];
-	return doc_write_ecc(mtd, to, len, retlen, buf, eccbuf, 0);
+	return doc_write_ecc(mtd, to, len, retlen, buf, eccbuf, NULL);
 }
 
 static int doc_write_ecc(struct mtd_info *mtd, loff_t to, size_t len,

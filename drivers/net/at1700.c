@@ -89,7 +89,7 @@ static unsigned at1700_probe_list[] __initdata = {
 /*
  *	MCA
  */
-#ifdef CONFIG_MCA	
+#ifdef CONFIG_MCA_LEGACY
 static int at1700_ioaddr_pattern[] __initdata = {
 	0x00, 0x04, 0x01, 0x05, 0x02, 0x06, 0x03, 0x07
 };
@@ -174,7 +174,7 @@ static void set_rx_mode(struct net_device *dev);
 static void net_tx_timeout (struct net_device *dev);
 
 
-#ifdef CONFIG_MCA
+#ifdef CONFIG_MCA_LEGACY
 struct at1720_mca_adapters_struct {
 	char* name;
 	int id;
@@ -202,7 +202,7 @@ static int irq;
 
 static void cleanup_card(struct net_device *dev)
 {
-#ifdef CONFIG_MCA	
+#ifdef CONFIG_MCA_LEGACY
 	struct net_local *lp = netdev_priv(dev);
 	if (lp->mca_slot >= 0)
 		mca_mark_as_unused(lp->mca_slot);
@@ -288,7 +288,7 @@ static int __init at1700_probe1(struct net_device *dev, int ioaddr)
 		   read_eeprom(ioaddr, 6), inw(ioaddr + EEPROM_Ctrl));
 #endif
 
-#ifdef CONFIG_MCA
+#ifdef CONFIG_MCA_LEGACY
 	/* rEnE (rene@bss.lu): got this from 3c509 driver source , adapted for AT1720 */
 
     /* Based on Erik Nygren's (nygren@mit.edu) 3c529 patch, heavily
@@ -359,7 +359,7 @@ static int __init at1700_probe1(struct net_device *dev, int ioaddr)
 		goto err_out;
 	}
 			
-#ifdef CONFIG_MCA
+#ifdef CONFIG_MCA_LEGACY
 found:
 #endif
 
@@ -483,7 +483,7 @@ found:
 	return 0;
 
 err_mca:
-#ifdef CONFIG_MCA
+#ifdef CONFIG_MCA_LEGACY
 	if (slot >= 0)
 		mca_mark_as_unused(slot);
 #endif
