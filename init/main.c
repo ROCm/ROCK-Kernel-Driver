@@ -222,7 +222,7 @@ void __devinit calibrate_delay(void)
 	} else {
 		loops_per_jiffy = (1<<12);
 
-		printk("Calibrating delay loop... ");
+		printk(KERN_DEBUG "Calibrating delay loop... ");
 		while ((loops_per_jiffy <<= 1) != 0) {
 			/* wait for "start of" clock tick */
 			ticks = jiffies;
