@@ -1733,8 +1733,8 @@ static int dn_data_ready(struct sock *sk, struct sk_buff_head *q, int flags, int
 }
 
 
-static int dn_recvmsg(struct socket *sock, struct msghdr *msg, int size,
-	int flags, struct scm_cookie *scm)
+static int dn_recvmsg(struct kiocb *iocb, struct socket *sock,
+	struct msghdr *msg, int size, int flags, struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
 	struct dn_scp *scp = DN_SK(sk);
@@ -1901,8 +1901,8 @@ static inline int dn_queue_too_long(struct dn_scp *scp, struct sk_buff_head *que
 	return 0;
 }
 
-static int dn_sendmsg(struct socket *sock, struct msghdr *msg, int size, 
-	   struct scm_cookie *scm)
+static int dn_sendmsg(struct kiocb *iocb, struct socket *sock,
+	   struct msghdr *msg, int size, struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
 	struct dn_scp *scp = DN_SK(sk);

@@ -207,7 +207,8 @@ struct sock *bluez_accept_dequeue(struct sock *parent, struct socket *newsock)
 	return NULL;
 }
 
-int bluez_sock_recvmsg(struct socket *sock, struct msghdr *msg, int len, int flags, struct scm_cookie *scm)
+int bluez_sock_recvmsg(struct kiocb *iocb, struct socket *sock,
+	struct msghdr *msg, int len, int flags, struct scm_cookie *scm)
 {
 	int noblock = flags & MSG_DONTWAIT;
 	struct sock *sk = sock->sk;

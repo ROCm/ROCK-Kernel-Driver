@@ -336,8 +336,8 @@ int atm_connect(struct socket *sock,int itf,short vpi,int vci)
 }
 
 
-int atm_recvmsg(struct socket *sock,struct msghdr *m,int total_len,
-    int flags,struct scm_cookie *scm)
+int atm_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
+		int total_len, int flags, struct scm_cookie *scm)
 {
 	DECLARE_WAITQUEUE(wait,current);
 	struct atm_vcc *vcc;
@@ -417,8 +417,8 @@ int atm_recvmsg(struct socket *sock,struct msghdr *m,int total_len,
 }
 
 
-int atm_sendmsg(struct socket *sock,struct msghdr *m,int total_len,
-    struct scm_cookie *scm)
+int atm_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
+		int total_len, struct scm_cookie *scm)
 {
 	DECLARE_WAITQUEUE(wait,current);
 	struct atm_vcc *vcc;

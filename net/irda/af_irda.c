@@ -1259,8 +1259,8 @@ static int irda_release(struct socket *sock)
  *    SEQPACK services. This is possible since it forces the client to
  *    fragment the message if necessary
  */
-static int irda_sendmsg(struct socket *sock, struct msghdr *msg, int len,
-			struct scm_cookie *scm)
+static int irda_sendmsg(struct kiocb *iocb, struct socket *sock,
+			struct msghdr *msg, int len, struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
 	struct irda_sock *self;
@@ -1331,8 +1331,9 @@ static int irda_sendmsg(struct socket *sock, struct msghdr *msg, int len,
  *    Try to receive message and copy it to user. The frame is discarded
  *    after being read, regardless of how much the user actually read
  */
-static int irda_recvmsg_dgram(struct socket *sock, struct msghdr *msg,
-			      int size, int flags, struct scm_cookie *scm)
+static int irda_recvmsg_dgram(struct kiocb *iocb, struct socket *sock,
+			      struct msghdr *msg, int size, int flags,
+			      struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
 	struct irda_sock *self = irda_sk(sk);

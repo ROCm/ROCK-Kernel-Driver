@@ -753,22 +753,23 @@ int inet_getname(struct socket *sock, struct sockaddr *uaddr,
 }
 
 
-
-int inet_recvmsg(struct socket *sock, struct msghdr *msg, int size,
-		 int flags, struct scm_cookie *scm)
+int inet_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg,
+		 int size, int flags, struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
 	int addr_len = 0;
-	int err = sk->prot->recvmsg(sk, msg, size, flags & MSG_DONTWAIT,
-				    flags & ~MSG_DONTWAIT, &addr_len);
+	int err;
+
+	err = sk->prot->recvmsg(iocb, sk, msg, size, flags & MSG_DONTWAIT,
+				flags & ~MSG_DONTWAIT, &addr_len);
 	if (err >= 0)
 		msg->msg_namelen = addr_len;
 	return err;
 }
 
 
-int inet_sendmsg(struct socket *sock, struct msghdr *msg, int size,
-		 struct scm_cookie *scm)
+int inet_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg,
+		 int size, struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
 
@@ -776,7 +777,7 @@ int inet_sendmsg(struct socket *sock, struct msghdr *msg, int size,
 	if (!inet_sk(sk)->num && inet_autobind(sk))
 		return -EAGAIN;
 
-	return sk->prot->sendmsg(sk, msg, size);
+	return sk->prot->sendmsg(iocb, sk, msg, size);
 }
 
 int inet_shutdown(struct socket *sock, int how)

@@ -13,10 +13,10 @@
 int atm_create(struct socket *sock,int protocol,int family);
 int atm_release(struct socket *sock);
 int atm_connect(struct socket *sock,int itf,short vpi,int vci);
-int atm_recvmsg(struct socket *sock,struct msghdr *m,int total_len,
-    int flags,struct scm_cookie *scm);
-int atm_sendmsg(struct socket *sock,struct msghdr *m,int total_len,
-  struct scm_cookie *scm);
+int atm_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
+		int total_len, int flags, struct scm_cookie *scm);
+int atm_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
+		int total_len, struct scm_cookie *scm);
 unsigned int atm_poll(struct file *file,struct socket *sock,poll_table *wait);
 int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg);
 int atm_setsockopt(struct socket *sock,int level,int optname,char *optval,
