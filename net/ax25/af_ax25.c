@@ -134,13 +134,15 @@
 #include <linux/netfilter.h>
 #include <linux/sysctl.h>
 #include <linux/init.h>
+#include <linux/spinlock.h>
 #include <net/tcp.h>
 #include <net/ip.h>
 #include <net/arp.h>
 
 
 
-ax25_cb *volatile ax25_list;
+ax25_cb *ax25_list;
+spinlock_t ax25_list_lock = SPIN_LOCK_UNLOCKED;
 
 static struct proto_ops ax25_proto_ops;
 
@@ -173,25 +175,25 @@ static void ax25_remove_socket(ax25_cb *ax25)
 	ax25_cb *s;
 	unsigned long flags;
 
-	save_flags(flags); cli();
+	spin_lock_irqsave(&ax25_list_lock, flags);
 
 	if ((s = ax25_list) == ax25) {
 		ax25_list = s->next;
-		restore_flags(flags);
+		spin_unlock_irqrestore(&ax25_list_lock, flags);
 		return;
 	}
 
 	while (s != NULL && s->next != NULL) {
 		if (s->next == ax25) {
 			s->next = ax25->next;
-			restore_flags(flags);
+			spin_unlock_irqrestore(&ax25_list_lock, flags);
 			return;
 		}
 
 		s = s->next;
 	}
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&ax25_list_lock, flags);
 }
 
 /*
@@ -199,18 +201,21 @@ static void ax25_remove_socket(ax25_cb *ax25)
  */
 static void ax25_kill_by_device(struct net_device *dev)
 {
+	unsigned long flags;
 	ax25_dev *ax25_dev;
 	ax25_cb *s;
 
 	if ((ax25_dev = ax25_dev_ax25dev(dev)) == NULL)
 		return;
 
+	spin_lock_irqsave(&ax25_list_lock, flags);
 	for (s = ax25_list; s != NULL; s = s->next) {
 		if (s->ax25_dev == ax25_dev) {
 			s->ax25_dev = NULL;
 			ax25_disconnect(s, ENETUNREACH);
 		}
 	}
+	spin_unlock_irqrestore(&ax25_list_lock, flags);
 }
 
 /*
@@ -247,13 +252,10 @@ void ax25_insert_socket(ax25_cb *ax25)
 {
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
-
+	spin_lock_irqsave(&ax25_list_lock, flags);
 	ax25->next = ax25_list;
 	ax25_list  = ax25;
-
-	restore_flags(flags);
+	spin_unlock_irqrestore(&ax25_list_lock, flags);
 }
 
 /*
@@ -265,22 +267,21 @@ struct sock *ax25_find_listener(ax25_address *addr, int digi, struct net_device 
 	unsigned long flags;
 	ax25_cb *s;
 
-	save_flags(flags);
-	cli();
-
+	spin_lock_irqsave(&ax25_list_lock, flags);
 	for (s = ax25_list; s != NULL; s = s->next) {
 		if ((s->iamdigi && !digi) || (!s->iamdigi && digi))
 			continue;
 		if (s->sk != NULL && ax25cmp(&s->source_addr, addr) == 0 && s->sk->type == type && s->sk->state == TCP_LISTEN) {
 			/* If device is null we match any device */
 			if (s->ax25_dev == NULL || s->ax25_dev->dev == dev) {
-				restore_flags(flags);
+				spin_unlock_irqrestore(&ax25_list_lock, flags);
+
 				return s->sk;
 			}
 		}
 	}
+	spin_unlock_irqrestore(&ax25_list_lock, flags);
 
-	restore_flags(flags);
 	return NULL;
 }
 
@@ -292,17 +293,15 @@ struct sock *ax25_find_socket(ax25_address *my_addr, ax25_address *dest_addr, in
 	ax25_cb *s;
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
-
+	spin_lock_irqsave(&ax25_list_lock, flags);
 	for (s = ax25_list; s != NULL; s = s->next) {
 		if (s->sk != NULL && ax25cmp(&s->source_addr, my_addr) == 0 && ax25cmp(&s->dest_addr, dest_addr) == 0 && s->sk->type == type) {
-			restore_flags(flags);
+			spin_unlock_irqrestore(&ax25_list_lock, flags);
+
 			return s->sk;
 		}
 	}
-
-	restore_flags(flags);
+	spin_unlock_irqrestore(&ax25_list_lock, flags);
 
 	return NULL;
 }
@@ -316,9 +315,7 @@ ax25_cb *ax25_find_cb(ax25_address *src_addr, ax25_address *dest_addr, ax25_digi
 	ax25_cb *s;
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
-
+	spin_lock_irqsave(&ax25_list_lock, flags);
 	for (s = ax25_list; s != NULL; s = s->next) {
 		if (s->sk != NULL && s->sk->type != SOCK_SEQPACKET)
 			continue;
@@ -334,12 +331,12 @@ ax25_cb *ax25_find_cb(ax25_address *src_addr, ax25_address *dest_addr, ax25_digi
 				if (s->digipeat != NULL && s->digipeat->ndigi != 0)
 					continue;
 			}
-			restore_flags(flags);
+			spin_unlock_irqrestore(&ax25_list_lock, flags);
+
 			return s;
 		}
 	}
-
-	restore_flags(flags);
+	spin_unlock_irqrestore(&ax25_list_lock, flags);
 
 	return NULL;
 }
@@ -352,17 +349,14 @@ struct sock *ax25_addr_match(ax25_address *addr)
 	unsigned long flags;
 	ax25_cb *s;
 
-	save_flags(flags);
-	cli();
-
+	spin_lock_irqsave(&ax25_list_lock, flags);
 	for (s = ax25_list; s != NULL; s = s->next) {
 		if (s->sk != NULL && ax25cmp(&s->source_addr, addr) == 0 && s->sk->type == SOCK_RAW) {
-			restore_flags(flags);
+			spin_unlock_irqrestore(&ax25_list_lock, flags);
 			return s->sk;
 		}
 	}
-
-	restore_flags(flags);
+	spin_unlock_irqrestore(&ax25_list_lock, flags);
 
 	return NULL;
 }
@@ -1270,27 +1264,32 @@ static int ax25_connect(struct socket *sock, struct sockaddr *uaddr, int addr_le
 	if (sk->state != TCP_ESTABLISHED && (flags & O_NONBLOCK))
 		return -EINPROGRESS;
 
-	cli();	/* To avoid races on the sleep */
+	if (sk->state == TCP_SYN_SENT) {
+		struct task_struct *tsk = current;
+		DECLARE_WAITQUEUE(wait, tsk);
 
-	/* A DM or timeout will go to closed, a UA will go to ABM */
-	while (sk->state == TCP_SYN_SENT) {
-		interruptible_sleep_on(sk->sleep);
-		if (signal_pending(current)) {
-			sti();
+		add_wait_queue(sk->sleep, &wait);
+		for (;;) {
+			set_current_state(TASK_INTERRUPTIBLE);
+			if (sk->state != TCP_SYN_SENT)
+				break;
+			if (!signal_pending(tsk)) {
+				schedule();
+				continue;
+			}
 			return -ERESTARTSYS;
 		}
+		current->state = TASK_RUNNING;
+		remove_wait_queue(sk->sleep, &wait);
 	}
 
 	if (sk->state != TCP_ESTABLISHED) {
 		/* Not in ABM, not in WAIT_UA -> failed */
-		sti();
 		sock->state = SS_UNCONNECTED;
 		return sock_error(sk);	/* Always set at this point */
 	}
 
 	sock->state = SS_CONNECTED;
-
-	sti();
 
 	return 0;
 }
@@ -1738,13 +1737,14 @@ static int ax25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 static int ax25_get_info(char *buffer, char **start, off_t offset, int length)
 {
+	unsigned long flags;
 	ax25_cb *ax25;
 	int k;
 	int len = 0;
 	off_t pos = 0;
 	off_t begin = 0;
 
-	cli();
+	spin_lock_irqsave(&ax25_list_lock, flags);
 
 	/*
 	 * New format:
@@ -1799,7 +1799,7 @@ static int ax25_get_info(char *buffer, char **start, off_t offset, int length)
 			break;
 	}
 
-	sti();
+	spin_unlock_irqrestore(&ax25_list_lock, flags);
 
 	*start = buffer + (offset - begin);
 	len   -= (offset - begin);

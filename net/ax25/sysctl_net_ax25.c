@@ -8,6 +8,7 @@
 #include <linux/config.h>
 #include <linux/mm.h>
 #include <linux/sysctl.h>
+#include <linux/spinlock.h>
 #include <net/ax25.h>
 
 static int min_ipdefmode[] = {0},	max_ipdefmode[] = {1};
@@ -102,9 +103,11 @@ static const ctl_table ax25_param_table[] = {
 
 void ax25_register_sysctl(void)
 {
+	unsigned long flags;
 	ax25_dev *ax25_dev;
 	int n, k;
 
+	spin_lock_irqsave(&ax25_dev_lock, flags);
 	for (ax25_table_size = sizeof(ctl_table), ax25_dev = ax25_dev_list; ax25_dev != NULL; ax25_dev = ax25_dev->next)
 		ax25_table_size += sizeof(ctl_table);
 
@@ -119,6 +122,7 @@ void ax25_register_sysctl(void)
 			while (n--)
 				kfree(ax25_table[n].child);
 			kfree(ax25_table);
+			spin_unlock_irqrestore(&ax25_dev_lock, flags);
 			return;
 		}
 		memcpy(child, ax25_param_table, sizeof(ax25_param_table));
@@ -144,6 +148,7 @@ void ax25_register_sysctl(void)
 
 		n++;
 	}
+	spin_unlock_irqrestore(&ax25_dev_lock, flags);
 
 	ax25_dir_table[0].child = ax25_table;
 
