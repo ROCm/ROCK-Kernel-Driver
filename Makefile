@@ -65,8 +65,6 @@ ifdef M
   endif
 endif
 
-.PHONY: modules_add
-modules_add : modules_install
 
 # kbuild supports saving output files in a separate directory.
 # To locate output files in a separate directory two syntax'es are supported.
@@ -724,6 +722,9 @@ modules_prepare: prepare-all scripts
 # Target to install modules
 .PHONY: modules_install
 modules_install: _modinst_ _modinst_post
+
+.PHONY: modules_add
+modules_add: modules_install
 
 .PHONY: _modinst_
 _modinst_:
