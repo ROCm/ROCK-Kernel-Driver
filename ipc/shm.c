@@ -33,6 +33,8 @@
 
 #define shm_flags	shm_perm.mode
 
+int shm_use_hugepages;
+
 static struct file_operations shm_file_operations;
 static struct vm_operations_struct shm_vm_ops;
 
@@ -168,6 +170,31 @@ static struct vm_operations_struct shm_vm_ops = {
 	.get_policy = shmem_get_policy,
 };
 
+#ifdef CONFIG_HUGETLBFS
+static int shm_with_hugepages(int shmflag, size_t size)
+{
+	/* flag specified explicitly */
+	if (shmflag & SHM_HUGETLB)
+		return 1;
+	/* Are we disabled? */
+	if (!shm_use_hugepages)
+		return 0;
+	/* Must be HPAGE aligned */
+	if (size & ~HPAGE_MASK)
+		return 0;
+	/* Do we have enough free huge pages? */
+	if (!is_hugepage_mem_enough(size))
+		return 0;
+	
+	return 1;
+}
+#else
+static inline int shm_with_hugepages(int shmflag, size_t size)
+{
+	return 0;
+}
+#endif
+
 static int newseg (key_t key, int shmflg, size_t size)
 {
 	int error;
@@ -197,9 +224,10 @@ static int newseg (key_t key, int shmflg, size_t size)
 		return error;
 	}
 
-	if (shmflg & SHM_HUGETLB)
+	if (shm_with_hugepages(shmflg, size)) {
+		shmflg |= SHM_HUGETLB;
 		file = hugetlb_zero_setup(size);
-	else {
+	} else {
 		sprintf (name, "SYSV%08x", key);
 		file = shmem_file_setup(name, size, VM_ACCOUNT);
 	}

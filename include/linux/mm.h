@@ -753,7 +753,7 @@ extern void exit_mmap(struct mm_struct *);
 
 extern unsigned long get_unmapped_area(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
 
-extern unsigned long __do_mmap_pgoff(struct mm_struct *mm,
+extern unsigned long __do_mmap_pgoff_hugetlb(struct mm_struct *mm,
 	struct file *file, unsigned long addr,
 	unsigned long len, unsigned long prot,
 	unsigned long flag, unsigned long pgoff);
@@ -762,7 +762,7 @@ static inline unsigned long do_mmap_pgoff(struct file *file, unsigned long addr,
 	unsigned long len, unsigned long prot,
 	unsigned long flag, unsigned long pgoff)
 {
-	return __do_mmap_pgoff(current->mm, file, addr, len,
+	return __do_mmap_pgoff_hugetlb(current->mm, file, addr, len,
 		               prot, flag, pgoff);
 }
 
