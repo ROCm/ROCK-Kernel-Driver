@@ -62,7 +62,7 @@ static int adfs_checkdiscrecord(struct adfs_discrecord *dr)
 	 * are unable to represent sector offsets in
 	 * 32 bits.  This works out at 2.0 TB.
 	 */
-	if (dr->disc_size_high >> dr->log2secsize)
+	if (le32_to_cpu(dr->disc_size_high) >> dr->log2secsize)
 		return 1;
 
 	/* idlen must be no greater than 19 v2 [1.0] */
@@ -300,8 +300,8 @@ static struct adfs_discmap *adfs_read_map(struct super_block *sb, struct adfs_di
 	i = zone - 1;
 	dm[0].dm_startblk = 0;
 	dm[0].dm_startbit = ADFS_DR_SIZE_BITS;
-	dm[i].dm_endbit   = (dr->disc_size_high << (32 - dr->log2bpmb)) +
-			    (dr->disc_size >> dr->log2bpmb) +
+	dm[i].dm_endbit   = (le32_to_cpu(dr->disc_size_high) << (32 - dr->log2bpmb)) +
+			    (le32_to_cpu(dr->disc_size) >> dr->log2bpmb) +
 			    (ADFS_DR_SIZE_BITS - i * zone_size);
 
 	if (adfs_checkmap(sb, dm))
@@ -439,7 +439,7 @@ static int adfs_fill_super(struct super_block *sb, void *data, int silent)
 	 * get the root_size from the disc record.
 	 */
 	if (asb->s_version) {
-		root_obj.size = dr->root_size;
+		root_obj.size = le32_to_cpu(dr->root_size);
 		asb->s_dir     = &adfs_fplus_dir_ops;
 		asb->s_namelen = ADFS_FPLUS_NAME_LEN;
 	} else {
