@@ -123,29 +123,6 @@ out:
 	return 0;
 }
 
-int x25_llc_receive_frame(struct sk_buff *skb, struct net_device *dev,
-			  struct packet_type *ptype)
-{
-	struct x25_neigh *nb;
-	int rc = 0;
-
-	skb->sk = NULL;
-
-	/*
-	 * Packet received from unrecognised device, throw it away.
-	 */
-	nb = x25_get_neigh(dev);
-	if (!nb) {
-		printk(KERN_DEBUG "X.25: unknown_neighbour - %s\n", dev->name);
-		kfree_skb(skb);
-	} else {
-		rc = x25_receive_data(skb, nb);
-		x25_neigh_put(nb);
-	}
-
-	return rc;
-}
-
 void x25_establish_link(struct x25_neigh *nb)
 {
 	struct sk_buff *skb;
