@@ -79,7 +79,7 @@ struct nbd_device {
 	spinlock_t queue_lock;
 	struct list_head queue_head;	/* Requests are added here...			*/
 	struct semaphore tx_lock;
-	struct gendisk disk;
+	struct gendisk *disk;
 };
 #endif
 

@@ -25,65 +25,23 @@ CFLAGS += -pipe
 # prevent gcc from keeping the stack 16 byte aligned
 CFLAGS += $(shell if $(CC) -mpreferred-stack-boundary=2 -S -o /dev/null -xc /dev/null >/dev/null 2>&1; then echo "-mpreferred-stack-boundary=2"; fi)
 
-ifdef CONFIG_M386
-CFLAGS += -march=i386
-endif
+cflags-$(CONFIG_M386)		+= -march=i386
+cflags-$(CONFIG_M486)		+= -march=i486
+cflags-$(CONFIG_M586)		+= -march=i586
+cflags-$(CONFIG_M586TSC)	+= -march=i586
+cflags-$(CONFIG_M586MMX)	+= -march=i586
+cflags-$(CONFIG_M686)		+= -march=i686
+cflags-$(CONFIG_MPENTIUMIII)	+= -march=i686
+cflags-$(CONFIG_MPENTIUM4)	+= -march=i686
+cflags-$(CONFIG_MK6)		+= $(shell if $(CC) -march=k6 -S -o /dev/null -xc /dev/null >/dev/null 2>&1; then echo "-march=k6"; else echo "-march=i586"; fi)
+cflags-$(CONFIG_MK7)		+= $(shell if $(CC) -march=athlon -S -o /dev/null -xc /dev/null >/dev/null 2>&1; then echo "-march=athlon"; else echo "-march=i686 -malign-functions=4"; fi) 
+cflags-$(CONFIG_MCRUSOE)	+= -march=i686 -malign-functions=0 -malign-jumps=0 -malign-loops=0
+cflags-$(CONFIG_MWINCHIPC6)	+= -march=i586
+cflags-$(CONFIG_MWINCHIP2)	+= -march=i586
+cflags-$(CONFIG_MWINCHIP3D)	+= -march=i586
+cflags-$(CONFIG_MCYRIXIII)	+= -march=i586
 
-ifdef CONFIG_M486
-CFLAGS += -march=i486
-endif
-
-ifdef CONFIG_M586
-CFLAGS += -march=i586
-endif
-
-ifdef CONFIG_M586TSC
-CFLAGS += -march=i586
-endif
-
-ifdef CONFIG_M586MMX
-CFLAGS += -march=i586
-endif
-
-ifdef CONFIG_M686
-CFLAGS += -march=i686
-endif
-
-ifdef CONFIG_MPENTIUMIII
-CFLAGS += -march=i686
-endif
-
-ifdef CONFIG_MPENTIUM4
-CFLAGS += -march=i686
-endif
-
-ifdef CONFIG_MK6
-CFLAGS += $(shell if $(CC) -march=k6 -S -o /dev/null -xc /dev/null >/dev/null 2>&1; then echo "-march=k6"; else echo "-march=i586"; fi)
-endif
-
-ifdef CONFIG_MK7
-CFLAGS += $(shell if $(CC) -march=athlon -S -o /dev/null -xc /dev/null >/dev/null 2>&1; then echo "-march=athlon"; else echo "-march=i686 -malign-functions=4"; fi) 
-endif
-
-ifdef CONFIG_MCRUSOE
-CFLAGS += -march=i686 -malign-functions=0 -malign-jumps=0 -malign-loops=0
-endif
-
-ifdef CONFIG_MWINCHIPC6
-CFLAGS += -march=i586
-endif
-
-ifdef CONFIG_MWINCHIP2
-CFLAGS += -march=i586
-endif
-
-ifdef CONFIG_MWINCHIP3D
-CFLAGS += -march=i586
-endif
-
-ifdef CONFIG_MCYRIXIII
-CFLAGS += -march=i586
-endif
+CFLAGS += $(cflags-y)
 
 ifdef CONFIG_VISWS
 MACHINE	:= mach-visws
@@ -94,47 +52,39 @@ endif
 HEAD := arch/i386/kernel/head.o arch/i386/kernel/init_task.o
 
 libs-y 					+= arch/i386/lib/
-core-y					+= arch/i386/kernel/ arch/i386/mm/ arch/i386/$(MACHINE)/
+core-y					+= arch/i386/kernel/ arch/i386/mm/ \
+					   arch/i386/$(MACHINE)/
 drivers-$(CONFIG_MATH_EMULATION)	+= arch/i386/math-emu/
 drivers-$(CONFIG_PCI)			+= arch/i386/pci/
 
-CFLAGS += -I$(TOPDIR)/arch/i386/$(MACHINE)
-AFLAGS += -I$(TOPDIR)/arch/i386/$(MACHINE)
+CFLAGS += -Iarch/i386/$(MACHINE)
+AFLAGS += -Iarch/i386/$(MACHINE)
 
-MAKEBOOT = +$(MAKE) -C arch/$(ARCH)/boot
+makeboot = $(call descend,arch/i386/boot,$(1))
 
 .PHONY: zImage bzImage compressed zlilo bzlilo zdisk bzdisk install \
 		clean archclean archmrproper
 
 all: bzImage
 
-zImage: vmlinux
-	@$(MAKEBOOT) zImage
+BOOTIMAGE=arch/i386/boot/bzImage
+zImage zlilo zdisk: BOOTIMAGE=arch/i386/boot/zImage
 
-bzImage: vmlinux
-	@$(MAKEBOOT) bzImage
+zImage bzImage: vmlinux
+	+@$(call makeboot,$(BOOTIMAGE))
 
 compressed: zImage
 
-zlilo: vmlinux
-	@$(MAKEBOOT) BOOTIMAGE=zImage zlilo
+zlilo bzlilo: vmlinux
+	+@$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) zlilo)
 
-tmp:
-	@$(MAKEBOOT) BOOTIMAGE=bzImage zlilo
-bzlilo: vmlinux
-	@$(MAKEBOOT) BOOTIMAGE=bzImage zlilo
-
-zdisk: vmlinux
-	@$(MAKEBOOT) BOOTIMAGE=zImage zdisk
-
-bzdisk: vmlinux
-	@$(MAKEBOOT) BOOTIMAGE=bzImage zdisk
+zdisk bzdisk: vmlinux
+	+@$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) zdisk)
 
 install: vmlinux
-	@echo 'Cleaning up (arch)'
-	@$(MAKEBOOT) BOOTIMAGE=bzImage install
+	+@$(call makeboot,BOOTIMAGE=$(BOOTIMAGE) install)
 
 archclean:
-	@$(MAKEBOOT) clean
+	+@$(call makeboot,clean)
 
 archmrproper:

@@ -26,6 +26,7 @@
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/time.h>
+#include <linux/irq.h>
 #include <sound/core.h>
 #include <sound/sb.h>
 #include <sound/ad1848.h>
@@ -110,14 +111,16 @@ static int __init snd_sgalaxy_sbdsp_command(unsigned long port, unsigned char va
 	return 0;
 }
 
+static void snd_sgalaxy_dummy_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+{
+}
+
 static int __init snd_sgalaxy_setup_wss(unsigned long port, int irq, int dma)
 {
 	static int interrupt_bits[] = {-1, -1, -1, -1, -1, -1, -1, 0x08, -1, 
 				       0x10, 0x18, 0x20, -1, -1, -1, -1};
 	static int dma_bits[] = {1, 2, 0, 3};
 	int tmp, tmp1;
-
-	unsigned long flags;
 
 	if ((tmp = inb(port + 3)) == 0xff)
 	{
@@ -140,20 +143,20 @@ static int __init snd_sgalaxy_setup_wss(unsigned long port, int irq, int dma)
 	snd_printdd("sgalaxy - setting up IRQ/DMA for WSS\n");
 #endif
 
-	save_flags(flags);
-	cli();
-
         /* initialize IRQ for WSS codec */
         tmp = interrupt_bits[irq % 16];
-        if (tmp < 0) {
-		restore_flags(flags);
+        if (tmp < 0)
                 return -EINVAL;
-	}
+
+	if (request_irq(irq, snd_sgalaxy_dummy_interrupt, SA_INTERRUPT, "sgalaxy", NULL))
+		return -EIO;
+
         outb(tmp | 0x40, port);
         tmp1 = dma_bits[dma % 4];
         outb(tmp | tmp1, port);
 
-	restore_flags(flags);
+	free_irq(irq, NULL);
+
 	return 0;
 }
 

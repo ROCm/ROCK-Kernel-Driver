@@ -63,6 +63,6 @@ int smb_follow_link(struct dentry *dentry, struct nameidata *nd)
 
 struct inode_operations smb_link_inode_operations =
 {
-	.readlink	smb_read_link,
-	.follow_link	smb_follow_link,
+	.readlink	= smb_read_link,
+	.follow_link	= smb_follow_link,
 };

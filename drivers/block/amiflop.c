@@ -1643,7 +1643,7 @@ static int floppy_open(struct inode *inode, struct file *filp)
 	unit[drive].dtype=&data_types[system];
 	unit[drive].blocks=unit[drive].type->heads*unit[drive].type->tracks*
 		data_types[system].sects*unit[drive].type->sect_mult;
-	set_capacity(&unit[drive].disk, unit[drive].blocks);
+	set_capacity(unit[drive].gendisk, unit[drive].blocks);
 
 	printk(KERN_INFO "fd%d: accessing %s-disk with %s-layout\n",drive,
 	       unit[drive].type->name, data_types[system].name);
@@ -1731,25 +1731,31 @@ static int __init fd_probe_drives(void)
 	drives=0;
 	nomem=0;
 	for(drive=0;drive<FD_MAX_UNITS;drive++) {
+		struct gendisk *disk;
 		fd_probe(drive);
-		if (unit[drive].type->code != FD_NODRIVE) {
-			struct gendisk *disk = &unit[drive].disk;
-			drives++;
-			if ((unit[drive].trackbuf = kmalloc(FLOPPY_MAX_SECTORS * 512, GFP_KERNEL)) == NULL) {
-				printk("no mem for ");
-				unit[drive].type = &drive_types[num_dr_types - 1]; /* FD_NODRIVE */
-				drives--;
-				nomem = 1;
-			}
-			printk("fd%d ",drive);
-			disk->major = MAJOR_NR;
-			disk->first_minor = drive;
-			disk->minor_shift = 0;
-			disk->fops = &floppy_fops;
-			sprintf(disk->disk_name, "fd%d", drive);
-			set_capacity(disk, 880*2);
-			add_disk(disk);
+		if (unit[drive].type->code == FD_NODRIVE)
+			continue;
+		disk = alloc_disk();
+		if (!disk) {
+			unit[drive].type->code = FD_NODRIVE;
+			continue;
 		}
+		unit[drive].gendisk = disk;
+		drives++;
+		if ((unit[drive].trackbuf = kmalloc(FLOPPY_MAX_SECTORS * 512, GFP_KERNEL)) == NULL) {
+			printk("no mem for ");
+			unit[drive].type = &drive_types[num_dr_types - 1]; /* FD_NODRIVE */
+			drives--;
+			nomem = 1;
+		}
+		printk("fd%d ",drive);
+		disk->major = MAJOR_NR;
+		disk->first_minor = drive;
+		disk->minor_shift = 0;
+		disk->fops = &floppy_fops;
+		sprintf(disk->disk_name, "fd%d", drive);
+		set_capacity(disk, 880*2);
+		add_disk(disk);
 	}
 	if ((drives > 0) || (nomem == 0)) {
 		if (drives == 0)
@@ -1766,7 +1772,7 @@ static struct gendisk *floppy_find(int minor)
 	int drive = minor & 3;
 	if (unit[drive].type->code == FD_NODRIVE)
 		return NULL;
-	return &unit[drive].disk;
+	return unit[drive].gendisk;
 }
 
 int __init amiga_floppy_init(void)
@@ -1875,7 +1881,8 @@ void cleanup_module(void)
 
 	for( i = 0; i < FD_MAX_UNITS; i++) {
 		if (unit[i].type->code != FD_NODRIVE) {
-			del_gendisk(&unit[i].disk);
+			del_gendisk(unit[i].gendisk);
+			put_disk(unit[i].gendisk);
 			kfree(unit[i].trackbuf);
 		}
 	}

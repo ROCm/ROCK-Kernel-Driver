@@ -365,12 +365,6 @@ type name (type1 arg1,type2 arg2,type3 arg3,type4 arg4,type5 arg5,type6 arg6) \
  * some others too.
  */
 #define __NR__exit __NR_exit
-static inline _syscall0(int,idle)
-static inline _syscall0(int,fork)
-static inline _syscall2(int,clone,unsigned long,flags,char *,esp)
-static inline _syscall0(int,pause)
-static inline _syscall0(int,setup)
-static inline _syscall0(int,sync)
 static inline _syscall0(pid_t,setsid)
 static inline _syscall3(int,write,int,fd,const char *,buf,off_t,count)
 static inline _syscall1(int,dup,int,fd)
@@ -384,14 +378,6 @@ static inline _syscall3(off_t,lseek,int,fd,off_t,offset,int,count)
   /* the following are just while developing the elinux port! */
 
 static inline _syscall3(int,read,int,fd,char *,buf,off_t,count)
-static inline _syscall2(int,socketcall,int,call,unsigned long *,args)
-static inline _syscall3(int,ioctl,unsigned int,fd,unsigned int,cmd,unsigned long,arg)
-static inline _syscall5(int,mount,const char *,a,const char *,b,const char *,c,unsigned long,rwflag,const void *,data)
-
-static inline pid_t wait(int * wait_stat)
-{
-	return waitpid(-1,wait_stat,0);
-}
 
 #endif
 

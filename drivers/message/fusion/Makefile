@@ -13,7 +13,7 @@
 #			# sparc64
 #EXTRA_CFLAGS += -gstabs+
 
-EXTRA_CFLAGS += -I. ${MPT_CFLAGS}
+EXTRA_CFLAGS += ${MPT_CFLAGS}
 
 # Fusion MPT drivers; recognized debug defines...
 #  MPT general:

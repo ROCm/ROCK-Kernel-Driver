@@ -27,7 +27,7 @@
  *
  * $Id: af_bluetooth.c,v 1.3 2002/04/17 17:37:15 maxk Exp $
  */
-#define VERSION "2.0"
+#define VERSION "2.2"
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -57,7 +57,7 @@
 #endif
 
 /* Bluetooth sockets */
-#define BLUEZ_MAX_PROTO	4
+#define BLUEZ_MAX_PROTO	5
 static struct net_proto_family *bluez_proto[BLUEZ_MAX_PROTO];
 
 static kmem_cache_t *bluez_sock_cache;
@@ -136,18 +136,18 @@ struct sock *bluez_sock_alloc(struct socket *sock, int proto, int pi_size, int p
 
 void bluez_sock_link(struct bluez_sock_list *l, struct sock *sk)
 {
-	write_lock(&l->lock);
+	write_lock_bh(&l->lock);
 	sk->next = l->head;
 	l->head = sk;
 	sock_hold(sk);
-	write_unlock(&l->lock);
+	write_unlock_bh(&l->lock);
 }
 
 void bluez_sock_unlink(struct bluez_sock_list *l, struct sock *sk)
 {
 	struct sock **skp;
 
-	write_lock(&l->lock);
+	write_lock_bh(&l->lock);
 	for (skp = &l->head; *skp; skp = &((*skp)->next)) {
 		if (*skp == sk) {
 			*skp = sk->next;
@@ -155,7 +155,7 @@ void bluez_sock_unlink(struct bluez_sock_list *l, struct sock *sk)
 			break;
 		}
 	}
-	write_unlock(&l->lock);
+	write_unlock_bh(&l->lock);
 }
 
 void bluez_accept_enqueue(struct sock *parent, struct sock *sk)
@@ -265,6 +265,9 @@ unsigned int bluez_sock_poll(struct file * file, struct socket *sock, poll_table
 	if (sk->state == BT_CLOSED)
 		mask |= POLLHUP;
 
+	if (sk->state == BT_CONNECT || sk->state == BT_CONNECT2)
+		return mask;
+	
 	if (sock_writeable(sk))
 		mask |= POLLOUT | POLLWRNORM | POLLWRBAND;
 	else

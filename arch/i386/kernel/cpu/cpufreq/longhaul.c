@@ -26,6 +26,7 @@
 #include <linux/init.h>
 #include <linux/cpufreq.h>
 #include <linux/slab.h>
+#include <linux/string.h>
 
 #include <asm/msr.h>
 #include <asm/timex.h>

@@ -49,6 +49,7 @@ struct dio {
 	/* Page fetching state */
 	int curr_page;			/* changes */
 	int total_pages;		/* doesn't change */
+	int pages_left;			/* approximate total IO pages */
 	unsigned long curr_user_address;/* changes */
 
 	/* Page queue */
@@ -396,7 +397,8 @@ static int dio_new_bio(struct dio *dio)
 	if (ret)
 		goto out;
 	sector = dio->next_block_in_bio << (dio->blkbits - 9);
-	nr_pages = min(dio->total_pages, BIO_MAX_PAGES);
+	nr_pages = min(dio->pages_left, bio_get_nr_vecs(dio->map_bh.b_bdev));
+	BUG_ON(nr_pages <= 0);
 	ret = dio_bio_alloc(dio, dio->map_bh.b_bdev, sector, nr_pages);
 	dio->boundary = 0;
 out:
@@ -423,6 +425,7 @@ dio_bio_add_page(struct dio *dio, struct page *page,
 		}
 	}
 	page_cache_release(page);
+	dio->pages_left--;
 out:
 	return ret;
 }
@@ -566,6 +569,10 @@ direct_io_worker(int rw, struct inode *inode, const struct iovec *iov,
 	spin_lock_init(&dio.bio_list_lock);
 	dio.bio_list = NULL;
 	dio.waiter = NULL;
+	dio.pages_left = 0;
+
+	for (seg = 0; seg < nr_segs; seg++) 
+		dio.pages_left += (iov[seg].iov_len / PAGE_SIZE) + 2; 
 
 	for (seg = 0; seg < nr_segs; seg++) {
 		user_addr = (unsigned long)iov[seg].iov_base;
@@ -620,13 +627,11 @@ generic_direct_IO(int rw, struct inode *inode, const struct iovec *iov,
 	int seg;
 	size_t size;
 	unsigned long addr;
-	struct address_space *mapping = inode->i_mapping;
 	unsigned blocksize_mask = (1 << inode->i_blkbits) - 1;
 	ssize_t retval = -EINVAL;
 
-	if (offset & blocksize_mask) {
+	if (offset & blocksize_mask)
 		goto out;
-	}
 
 	/* Check the memory alignment.  Blocks cannot straddle pages */
 	for (seg = 0; seg < nr_segs; seg++) {
@@ -634,14 +639,6 @@ generic_direct_IO(int rw, struct inode *inode, const struct iovec *iov,
 		size = iov[seg].iov_len;
 		if ((addr & blocksize_mask) || (size & blocksize_mask)) 
 			goto out;	
-	}
-
-	if (mapping->nrpages) {
-		retval = filemap_fdatawrite(mapping);
-		if (retval == 0)
-			retval = filemap_fdatawait(mapping);
-		if (retval)
-			goto out;
 	}
 
 	retval = direct_io_worker(rw, inode, iov, offset, nr_segs, get_blocks);
@@ -656,8 +653,17 @@ generic_file_direct_IO(int rw, struct inode *inode, const struct iovec *iov,
 	struct address_space *mapping = inode->i_mapping;
 	ssize_t retval;
 
+	if (mapping->nrpages) {
+		retval = filemap_fdatawrite(mapping);
+		if (retval == 0)
+			retval = filemap_fdatawait(mapping);
+		if (retval)
+			goto out;
+	}
+
 	retval = mapping->a_ops->direct_IO(rw, inode, iov, offset, nr_segs);
 	if (inode->i_mapping->nrpages)
 		invalidate_inode_pages2(inode->i_mapping);
+out:
 	return retval;
 }

@@ -167,7 +167,6 @@ dasd_gendisk_alloc(char *device_name, int devindex)
 	struct list_head *l;
 	struct major_info *mi;
 	struct gendisk *gdp;
-	struct hd_struct *gd_part;
 	int index, len, rc;
 
 	/* Make sure the major for this device exists. */
@@ -191,26 +190,15 @@ dasd_gendisk_alloc(char *device_name, int devindex)
 		}
 	}
 
-	/* Allocate genhd structure and gendisk arrays. */
-	gdp = kmalloc(sizeof(struct gendisk), GFP_KERNEL);
-	gd_part = kmalloc(sizeof (struct hd_struct) << DASD_PARTN_BITS,
-			  GFP_ATOMIC);
-
-	/* Check if one of the allocations failed. */
-	if (gdp == NULL || gd_part == NULL) {
-		/* We rely on kfree to do the != NULL check. */
-		kfree(gd_part);
-		kfree(gdp);
+	gdp = alloc_disk();
+	if (!gdp)
 		return ERR_PTR(-ENOMEM);
-	}
 
 	/* Initialize gendisk structure. */
-	memset(gdp, 0, sizeof(struct gendisk));
-	memcpy(gdp->disk_name, device_name, 16);
+	memcpy(gdp->disk_name, device_name, 16);	/* huh? -- AV */
 	gdp->major = mi->major;
 	gdp->first_minor = index << DASD_PARTN_BITS;
 	gdp->minor_shift = DASD_PARTN_BITS;
-	gdp->part = gd_part;
 	gdp->fops = &dasd_device_operations;
 
 	/*
@@ -228,22 +216,7 @@ dasd_gendisk_alloc(char *device_name, int devindex)
 			       'a' + (((devindex - 26) / 26) % 26));
 	}
 	len += sprintf(device_name + len, "%c", 'a' + (devindex % 26));
-
-	/* Initialize the gendisk arrays. */
-	memset(gd_part, 0, sizeof (struct hd_struct) << DASD_PARTN_BITS);
-
 	return gdp;
-}
-
-/*
- * Free gendisk structure for devindex.
- */
-void
-dasd_gendisk_free(struct gendisk *gdp)
-{
-	/* Free memory. */
-	kfree(gdp->part);
-	kfree(gdp);
 }
 
 /*

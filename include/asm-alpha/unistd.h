@@ -533,12 +533,6 @@ type name (type1 arg1,type2 arg2,type3 arg3,type4 arg4,type5 arg5, type6 arg6)\
 #include <linux/signal.h>
 #include <asm/ptrace.h>
 
-extern void sys_idle(void);
-static inline void idle(void)
-{
-	sys_idle();
-}
-
 extern long sys_open(const char *, int, int);
 static inline long open(const char * name, int mode, int flags)
 {
@@ -597,28 +591,11 @@ static inline long setsid(void)
 	return sys_setsid();
 }
 
-extern long sys_sync(void);
-static inline long sync(void)
-{
-	return sys_sync();
-}
-
 struct rusage;
 extern asmlinkage long sys_wait4(pid_t, unsigned int *, int, struct rusage *);
 static inline pid_t waitpid(int pid, int * wait_stat, int flags)
 {
 	return sys_wait4(pid, wait_stat, flags, NULL);
-}
-
-static inline pid_t wait(int * wait_stat)
-{
-	return waitpid(-1,wait_stat,0);
-}
-
-extern long sys_delete_module(const char *name);
-static inline long delete_module(const char *name)
-{
-	return sys_delete_module(name);
 }
 
 #endif

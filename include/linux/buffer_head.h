@@ -140,7 +140,6 @@ void end_buffer_io_sync(struct buffer_head *bh, int uptodate);
 void buffer_insert_list(spinlock_t *lock,
 			struct buffer_head *, struct list_head *);
 void mark_buffer_dirty_inode(struct buffer_head *bh, struct inode *inode);
-int write_mapping_buffers(struct address_space *mapping);
 int inode_has_buffers(struct inode *);
 void invalidate_inode_buffers(struct inode *);
 int fsync_buffers_list(spinlock_t *lock, struct list_head *);
@@ -168,6 +167,9 @@ void free_buffer_head(struct buffer_head * bh);
 void FASTCALL(unlock_buffer(struct buffer_head *bh));
 void ll_rw_block(int, int, struct buffer_head * bh[]);
 int submit_bh(int, struct buffer_head *);
+void write_boundary_block(struct block_device *bdev,
+			sector_t bblock, unsigned blocksize);
+
 extern int buffer_heads_over_limit;
 
 /*

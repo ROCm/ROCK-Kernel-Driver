@@ -2360,7 +2360,7 @@ typedef struct DAC960_Controller
   boolean MonitoringAlertMode;
   boolean SuppressEnclosureMessages;
   Timer_T MonitoringTimer;
-  struct gendisk disks[DAC960_MaxLogicalDrives];
+  struct gendisk *disks[DAC960_MaxLogicalDrives];
   DAC960_Command_T *FreeCommands;
   unsigned char *CombinedStatusBuffer;
   unsigned char *CurrentStatusBuffer;

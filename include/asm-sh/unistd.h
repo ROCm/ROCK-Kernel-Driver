@@ -347,8 +347,6 @@ __syscall_return(type,__sc0); \
  * some others too.
  */
 #define __NR__exit __NR_exit
-static __inline__ _syscall0(int,pause)
-static __inline__ _syscall0(int,sync)
 static __inline__ _syscall0(pid_t,setsid)
 static __inline__ _syscall3(int,write,int,fd,const char *,buf,off_t,count)
 static __inline__ _syscall3(int,read,int,fd,char *,buf,off_t,count)
@@ -359,12 +357,7 @@ static __inline__ _syscall3(int,open,const char *,file,int,flag,int,mode)
 static __inline__ _syscall1(int,close,int,fd)
 static __inline__ _syscall1(int,_exit,int,exitcode)
 static __inline__ _syscall3(pid_t,waitpid,pid_t,pid,int *,wait_stat,int,options)
-static __inline__ _syscall1(int,delete_module,const char *,name)
 
-static __inline__ pid_t wait(int * wait_stat)
-{
-	return waitpid(-1,wait_stat,0);
-}
 #endif
 
 /*

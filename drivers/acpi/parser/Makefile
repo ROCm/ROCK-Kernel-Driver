@@ -2,7 +2,8 @@
 # Makefile for all Linux ACPI interpreter subdirectories
 #
 
-obj-$(CONFIG_ACPI_INTERPRETER) := $(patsubst %.c,%.o,$(wildcard *.c))
+obj-y := psargs.o    psparse.o  pstree.o   pswalk.o  \
+	 psopcode.o  psscope.o  psutils.o  psxface.o
 
 EXTRA_CFLAGS += $(ACPI_CFLAGS)
 

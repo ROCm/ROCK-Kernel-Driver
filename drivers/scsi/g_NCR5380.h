@@ -48,7 +48,9 @@ int generic_NCR5380_abort(Scsi_Cmnd *);
 int generic_NCR5380_detect(Scsi_Host_Template *);
 int generic_NCR5380_release_resources(struct Scsi_Host *);
 int generic_NCR5380_queue_command(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
-int generic_NCR5380_reset(Scsi_Cmnd *, unsigned int);
+int generic_NCR5380_bus_reset(Scsi_Cmnd *);
+int generic_NCR5380_host_reset(Scsi_Cmnd *);
+int generic_NCR5380_device_reset(Scsi_Cmnd *);
 int notyet_generic_proc_info (char *buffer ,char **start, off_t offset,
                      int length, int hostno, int inout);
 const char* generic_NCR5380_info(struct Scsi_Host *);
@@ -77,8 +79,10 @@ int generic_NCR5380_proc_info(char* buffer, char** start, off_t offset, int leng
 	release:        generic_NCR5380_release_resources,		\
 	info:           (void *)generic_NCR5380_info,			\
 	queuecommand:   generic_NCR5380_queue_command,			\
-	abort:          generic_NCR5380_abort,				\
-	reset:          generic_NCR5380_reset, 				\
+	eh_abort_handler:generic_NCR5380_abort,				\
+	eh_bus_reset_handler:generic_NCR5380_bus_reset,			\
+	eh_device_reset_handler:generic_NCR5380_device_reset,		\
+	eh_host_reset_handler:generic_NCR5380_host_reset,			\
 	bios_param:     NCR5380_BIOSPARAM,				\
 	can_queue:      CAN_QUEUE,					\
         this_id:        7,						\
@@ -154,7 +158,9 @@ int generic_NCR5380_proc_info(char* buffer, char** start, off_t offset, int leng
 #define do_NCR5380_intr do_generic_NCR5380_intr
 #define NCR5380_queue_command generic_NCR5380_queue_command
 #define NCR5380_abort generic_NCR5380_abort
-#define NCR5380_reset generic_NCR5380_reset
+#define NCR5380_bus_reset generic_NCR5380_bus_reset
+#define NCR5380_device_reset generic_NCR5380_device_reset
+#define NCR5380_host_reset generic_NCR5380_host_reset
 #define NCR5380_pread generic_NCR5380_pread
 #define NCR5380_pwrite generic_NCR5380_pwrite
 #define NCR5380_proc_info notyet_generic_proc_info

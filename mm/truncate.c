@@ -35,9 +35,18 @@ static inline void truncate_partial_page(struct page *page, unsigned partial)
  * If truncate cannot remove the fs-private metadata from the page, the page
  * becomes anonymous.  It will be left on the LRU and may even be mapped into
  * user pagetables if we're racing with filemap_nopage().
+ *
+ * We need to bale out if page->mapping is no longer equal to the original
+ * mapping.  This happens a) when the VM reclaimed the page while we waited on
+ * its lock, b) when a concurrent invalidate_inode_pages got there first and
+ * c) when tmpfs swizzles a page between a tmpfs inode and swapper_space.
  */
-static void truncate_complete_page(struct page *page)
+static void
+truncate_complete_page(struct address_space *mapping, struct page *page)
 {
+	if (page->mapping != mapping)
+		return;
+
 	if (PagePrivate(page))
 		do_invalidatepage(page, 0);
 
@@ -61,6 +70,9 @@ static void truncate_complete_page(struct page *page)
  * The first pass will remove most pages, so the search cost of the second pass
  * is low.
  *
+ * When looking at page->index outside the page lock we need to be careful to
+ * copy it into a local to avoid races (it could change at any time).
+ *
  * Called under (and serialised by) inode->i_sem.
  */
 void truncate_inode_pages(struct address_space *mapping, loff_t lstart)
@@ -76,15 +88,18 @@ void truncate_inode_pages(struct address_space *mapping, loff_t lstart)
 	while (pagevec_lookup(&pvec, mapping, next, PAGEVEC_SIZE)) {
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
+			pgoff_t page_index = page->index;
 
-			next = page->index + 1;
+			if (page_index > next)
+				next = page_index;
+			next++;
 			if (TestSetPageLocked(page))
 				continue;
 			if (PageWriteback(page)) {
 				unlock_page(page);
 				continue;
 			}
-			truncate_complete_page(page);
+			truncate_complete_page(mapping, page);
 			unlock_page(page);
 		}
 		pagevec_release(&pvec);
@@ -114,8 +129,10 @@ void truncate_inode_pages(struct address_space *mapping, loff_t lstart)
 
 			lock_page(page);
 			wait_on_page_writeback(page);
-			next = page->index + 1;
-			truncate_complete_page(page);
+			if (page->index > next)
+				next = page->index;
+			next++;
+			truncate_complete_page(mapping, page);
 			unlock_page(page);
 		}
 		pagevec_release(&pvec);
@@ -150,14 +167,16 @@ void invalidate_inode_pages(struct address_space *mapping)
 				next++;
 				continue;
 			}
-			next = page->index + 1;
+			if (page->index > next)
+				next = page->index;
+			next++;
 			if (PageDirty(page) || PageWriteback(page))
 				goto unlock;
 			if (PagePrivate(page) && !try_to_release_page(page, 0))
 				goto unlock;
 			if (page_mapped(page))
 				goto unlock;
-			truncate_complete_page(page);
+			truncate_complete_page(mapping, page);
 unlock:
 			unlock_page(page);
 		}
@@ -183,18 +202,18 @@ void invalidate_inode_pages2(struct address_space *mapping)
 	int i;
 
 	pagevec_init(&pvec);
-	while (!pagevec_lookup(&pvec, mapping, next, PAGEVEC_SIZE)) {
+	while (pagevec_lookup(&pvec, mapping, next, PAGEVEC_SIZE)) {
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
 
 			lock_page(page);
-			if (page->mapping) {	/* truncate race? */
+			if (page->mapping == mapping) {	/* truncate race? */
 				wait_on_page_writeback(page);
 				next = page->index + 1;
 				if (page_mapped(page))
 					clear_page_dirty(page);
 				else
-					truncate_complete_page(page);
+					truncate_complete_page(mapping, page);
 			}
 			unlock_page(page);
 		}

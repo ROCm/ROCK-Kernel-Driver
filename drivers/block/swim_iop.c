@@ -82,9 +82,6 @@ static struct swim_iop_req *current_req;
 static int floppy_count;
 
 static struct floppy_state floppy_states[MAX_FLOPPIES];
-
-static struct gendisk disks[2];
-
 static spinlock_t swim_iop_lock = SPIN_LOCK_UNLOCKED;
 
 static char *drive_names[7] = {
@@ -190,9 +187,10 @@ int swimiop_init(void)
 	}
 	printk("SWIM-IOP: detected %d installed drives.\n", floppy_count);
 
-	do_floppy = NULL;
 	for (i = 0; i < floppy_count; i++) {
-		struct gendisk *disk = disks + i;
+		struct gendisk *disk = alloc_disk();
+		if (!disk)
+			continue;
 		disk->major = MAJOR_NR;
 		disk->first_minor = i;
 		disk->fops = &floppy_fops;

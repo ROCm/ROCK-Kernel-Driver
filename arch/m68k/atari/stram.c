@@ -1046,13 +1046,7 @@ static struct block_device_operations stram_fops = {
 	.release =	stram_release,
 };
 
-static struct gendisk stram_disk = {
-	.major = STRAM_MAJOR,
-	.first_minor = STRAM_MINOR,
-	.minor_shift = 0,
-	.fops = &stram_fops,
-	.disk_name = "stram"
-};
+static struct gendisk *stram_disk;
 
 int __init stram_device_init(void)
 {
@@ -1063,15 +1057,24 @@ int __init stram_device_init(void)
 	if (!max_swap_size)
 		/* swapping not enabled */
 		return -ENXIO;
+	stram_disk = alloc_disk();
+	if (!stram_disk)
+		return -ENOMEM;
 
 	if (register_blkdev( STRAM_MAJOR, "stram", &stram_fops)) {
 		printk(KERN_ERR "stram: Unable to get major %d\n", STRAM_MAJOR);
+		put_disk(stram_disk);
 		return -ENXIO;
 	}
 
 	blk_init_queue(BLK_DEFAULT_QUEUE(STRAM_MAJOR), do_stram_request);
-	set_capacity(&stram_disk, (swap_end - swap_start)/512);
-	add_disk(&stram_disk);
+	stram_disk->major = STRAM_MAJOR;
+	stram_disk->first_minor = STRAM_MINOR;
+	stram_disk->minor_shift = 0;
+	stram_disk->fops = &stram_fops;
+	sprintf(stram_disk->disk_name, "stram");
+	set_capacity(stram_disk, (swap_end - swap_start)/512);
+	add_disk(stram_disk);
 	return 0;
 }
 

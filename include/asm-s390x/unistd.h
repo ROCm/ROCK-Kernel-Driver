@@ -345,9 +345,6 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4,    \
  * some others too.
  */
 #define __NR__exit __NR_exit
-static inline _syscall0(int,idle)
-static inline _syscall0(int,pause)
-static inline _syscall0(int,sync)
 static inline _syscall0(pid_t,setsid)
 static inline _syscall3(int,write,int,fd,const char *,buf,off_t,count)
 static inline _syscall3(int,read,int,fd,char *,buf,off_t,count)
@@ -357,7 +354,6 @@ static inline _syscall3(int,execve,const char *,file,char **,argv,char **,envp)
 static inline _syscall3(int,open,const char *,file,int,flag,int,mode)
 static inline _syscall1(int,close,int,fd)
 static inline _syscall1(int,_exit,int,exitcode)
-static inline _syscall1(int,delete_module,const char *,name)
 static inline _syscall2(long,stat,char *,filename,struct stat *,statbuf)
 
 struct rusage;
@@ -365,11 +361,6 @@ extern long sys_wait4(pid_t, unsigned int *, int, struct rusage *);
 static inline pid_t waitpid(int pid, int *wait_stat, int flags)
 {
 	return sys_wait4(pid, wait_stat, flags, NULL);
-}
-
-static inline pid_t wait(int * wait_stat)
-{
-        return waitpid(-1,wait_stat,0);
 }
 
 #endif

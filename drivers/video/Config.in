@@ -435,6 +435,7 @@ if [ "$CONFIG_FB" = "y" ]; then
 	 fi
 	 bool '    Pearl (old m68k) console 8x8 font' CONFIG_FONT_PEARL_8x8
 	 bool '    Acorn console 8x8 font' CONFIG_FONT_ACORN_8x8
+	 bool '    Mini 4x6 font' CONFIG_FONT_MINI_4x6
       else
 	 define_bool CONFIG_FONT_8x8 y
 	 define_bool CONFIG_FONT_8x16 y

@@ -9,7 +9,7 @@ CC=$4
 # So "sudo make install" won't change the "compiled by <user>"
 # do "compiled by root"
 
-if [ -r $TARGET -a ! -O ../include/linux/autoconf.h ]; then
+if [ -r $TARGET -a ! -O include/linux/autoconf.h ]; then
   echo ' (not modified)'
   exit 0
 fi
@@ -17,11 +17,11 @@ fi
 # Do not expand names
 set -f
 
-if [ -r ../.version ]; then
-  VERSION=`cat ../.version`
+if [ -r .version ]; then
+  VERSION=`cat .version`
 else
   VERSION=0
-  echo 0 > ../.version
+  echo 0 > .version
 fi
 
 
@@ -76,4 +76,4 @@ else
    echo ' (updated)'
    mv -f .tmpcompile $TARGET
 fi
-rm -f .tmpver.1 .tmpver.2
+#rm -f .tmpver.1 .tmpver.2

@@ -436,10 +436,6 @@ extern int open(const char *file, int flag, int mode);
 extern int close(int fd);
 extern pid_t waitpid(pid_t pid, int *wait_stat, int options);
 
-static inline pid_t wait(int * wait_stat) 
-{
-	return waitpid(-1, wait_stat, 0);
-}
 #endif /* __KERNEL_SYSCALLS__ */
 
 /*

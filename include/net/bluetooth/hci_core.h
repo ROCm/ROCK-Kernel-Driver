@@ -149,7 +149,7 @@ struct hci_conn {
 
 extern struct hci_proto *hci_proto[];
 extern struct list_head hdev_list;
-extern spinlock_t hdev_list_lock;
+extern rwlock_t hdev_list_lock;
 
 /* ----- Inquiry cache ----- */
 #define INQUIRY_CACHE_AGE_MAX   (HZ*30)   // 30 seconds
@@ -339,8 +339,8 @@ static inline void hci_sched_tx(struct hci_dev *hdev)
 /* ----- HCI protocols ----- */
 struct hci_proto {
 	char 		*name;
-	__u32		id;
-	__u32		flags;
+	unsigned int	id;
+	unsigned long	flags;
 
 	void		*priv;
 
@@ -450,11 +450,10 @@ struct hci_pinfo {
 #define HCI_SFLT_MAX_OGF 4
 
 struct hci_sec_filter {
-	__u32 type_mask;
-	__u32 event_mask[2];
-	__u32 ocf_mask[HCI_SFLT_MAX_OGF + 1][4];
+	unsigned long type_mask;
+	unsigned long event_mask[2];
+	unsigned long ocf_mask[HCI_SFLT_MAX_OGF + 1][4];
 };
-
 
 /* ----- HCI requests ----- */
 #define HCI_REQ_DONE	  0

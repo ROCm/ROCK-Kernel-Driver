@@ -168,6 +168,8 @@ struct uart_port {
 #define UPF_BUGGY_UART		(1 << 14)
 #define UPF_AUTOPROBE		(1 << 15)
 #define UPF_BOOT_AUTOCONF	(1 << 28)
+#define UPF_RESOURCES		(1 << 30)
+#define UPF_IOREMAP		(1 << 31)
 
 #define UPF_FLAGS		(0x7fff)
 #define UPF_USR_MASK		(UPF_SPD_MASK|UPF_LOW_LATENCY)

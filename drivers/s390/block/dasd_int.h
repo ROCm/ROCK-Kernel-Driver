@@ -480,7 +480,6 @@ void dasd_gendisk_exit(void);
 int  dasd_gendisk_major_index(int);
 int  dasd_gendisk_index_major(int);
 struct gendisk *dasd_gendisk_alloc(char *, int);
-void dasd_gendisk_free(struct gendisk *);
 void dasd_setup_partitions(dasd_device_t *);
 void dasd_destroy_partitions(dasd_device_t *);
 
