@@ -100,12 +100,20 @@
 #  define DPRINTK(fmt, args...)
 #endif
 
+enum {
+	FBCON_LOGO_CANSHOW	= -1,	/* the logo can be shown */
+	FBCON_LOGO_DRAW		= -2,	/* draw the logo to a console */
+	FBCON_LOGO_DONTSHOW	= -3	/* do not show the logo */
+};
+
 struct display fb_display[MAX_NR_CONSOLES];
 signed char con2fb_map[MAX_NR_CONSOLES];
 signed char con2fb_map_boot[MAX_NR_CONSOLES];
 static int logo_height;
 static int logo_lines;
-static int logo_shown = -1;
+/* logo_shown is an index to vc_cons when >= 0; otherwise follows FBCON_LOGO
+   enums.  */
+static int logo_shown = FBCON_LOGO_CANSHOW;
 /* Software scrollback */
 int fbcon_softback_size = 32768;
 static unsigned long softback_buf, softback_curr;
@@ -366,7 +374,7 @@ static int fbcon_takeover(int show_logo)
 		return -ENODEV;
 
 	if (!show_logo)
-		logo_shown = -3;
+		logo_shown = FBCON_LOGO_DONTSHOW;
 
 	for (i = first_fb_vc; i <= last_fb_vc; i++)
 		con2fb_map[i] = info_idx;
@@ -448,11 +456,11 @@ static void fbcon_prepare_logo(struct vc_data *vc, struct fb_info *info,
 	}
 
 	if (logo_lines > vc->vc_bottom) {
-		logo_shown = -1;
+		logo_shown = FBCON_LOGO_CANSHOW;
 		printk(KERN_INFO
 		       "fbcon_init: disable boot-logo (boot-logo bigger than screen).\n");
-	} else if (logo_shown != -3) {
-		logo_shown = -2;
+	} else if (logo_shown != FBCON_LOGO_DONTSHOW) {
+		logo_shown = FBCON_LOGO_DRAW;
 		vc->vc_top = logo_lines;
 	}
 }
@@ -598,7 +606,7 @@ static int set_con2fb_map(int unit, int newidx, int user)
 	else
 		fbcon_preset_disp(info, unit);
 
-	if (fg_console == 0 && !user && logo_shown != -3) {
+	if (fg_console == 0 && !user && logo_shown != FBCON_LOGO_DONTSHOW) {
 		struct vc_data *vc = vc_cons[fg_console].d;
 		struct fb_info *fg_info = registered_fb[con2fb_map[fg_console]];
 
@@ -834,7 +842,7 @@ static void fbcon_init(struct vc_data *vc, int init)
 
 	if (info_idx == -1 || info == NULL)
 	    return;
-	if (vc->vc_num != display_fg || logo_shown == -3 ||
+	if (vc->vc_num != display_fg || logo_shown == FBCON_LOGO_DONTSHOW ||
 	    (info->fix.type == FB_TYPE_TEXT))
 		logo = 0;
 
@@ -1856,7 +1864,7 @@ static int fbcon_switch(struct vc_data *vc)
 		if (conp2->vc_top == logo_lines
 		    && conp2->vc_bottom == conp2->vc_rows)
 			conp2->vc_top = 0;
-		logo_shown = -1;
+		logo_shown = FBCON_LOGO_CANSHOW;
 	}
 
 	prev_console = info->currcon;
@@ -1924,7 +1932,7 @@ static int fbcon_switch(struct vc_data *vc)
 
 	if (vt_cons[vc->vc_num]->vc_mode == KD_TEXT)
 		fbcon_clear_margins(vc, 0);
-	if (logo_shown == -2) {
+	if (logo_shown == FBCON_LOGO_DRAW) {
 
 		logo_shown = fg_console;
 		/* This is protected above by initmem_freed */
@@ -2440,7 +2448,7 @@ static int fbcon_scrolldelta(struct vc_data *vc, int lines)
 				update_region(vc->vc_num, vc->vc_origin,
 					      logo_lines * vc->vc_cols);
 			}
-			logo_shown = -1;
+			logo_shown = FBCON_LOGO_CANSHOW;
 		}
 		fbcon_cursor(vc, CM_ERASE | CM_SOFTBACK);
 		fbcon_redraw_softback(vc, p, lines);
