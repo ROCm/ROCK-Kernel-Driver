@@ -413,6 +413,21 @@ static inline int sk_acceptq_is_full(struct sock *sk)
 	return sk->sk_ack_backlog > sk->sk_max_ack_backlog;
 }
 
+/*
+ * Compute minimal free write space needed to queue new packets.
+ */
+static inline int sk_stream_min_wspace(struct sock *sk)
+{
+	return sk->sk_wmem_queued / 2;
+}
+
+static inline int sk_stream_wspace(struct sock *sk)
+{
+	return sk->sk_sndbuf - sk->sk_wmem_queued;
+}
+
+extern void sk_stream_write_space(struct sock *sk);
+
 /* The per-socket spinlock must be held here. */
 #define sk_add_backlog(__sk, __skb)				\
 do {	if (!(__sk)->sk_backlog.tail) {				\
@@ -902,6 +917,11 @@ sk_dst_check(struct sock *sk, u32 cookie)
 	return dst;
 }
 
+static inline void sk_charge_skb(struct sock *sk, struct sk_buff *skb)
+{
+	sk->sk_wmem_queued   += skb->truesize;
+	sk->sk_forward_alloc -= skb->truesize;
+}
 
 /*
  * 	Queue a received datagram if it will fit. Stream and sequenced

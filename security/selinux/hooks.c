@@ -3343,13 +3343,13 @@ static int selinux_nlmsg_perm(struct sock *sk, struct sk_buff *skb)
 	struct nlmsghdr *nlh;
 	struct socket *sock = sk->sk_socket;
 	struct inode_security_struct *isec = SOCK_INODE(sock)->i_security;
-
+	
 	if (skb->len < NLMSG_SPACE(0)) {
 		err = -EINVAL;
 		goto out;
 	}
 	nlh = (struct nlmsghdr *)skb->data;
-
+	
 	err = selinux_nlmsg_lookup(isec->sclass, nlh->nlmsg_type, &perm);
 	if (err) {
 		/* Ignore */
@@ -3366,15 +3366,15 @@ out:
 static int selinux_netlink_send(struct sock *sk, struct sk_buff *skb)
 {
 	int err = 0;
-
+	
 	if (capable(CAP_NET_ADMIN))
 		cap_raise (NETLINK_CB (skb).eff_cap, CAP_NET_ADMIN);
 	else
 		NETLINK_CB(skb).eff_cap = 0;
-
+	
 	if (policydb_loaded_version >= POLICYDB_VERSION_NLCLASS)
 		err = selinux_nlmsg_perm(sk, skb);
-
+	
 	return err;
 }
 

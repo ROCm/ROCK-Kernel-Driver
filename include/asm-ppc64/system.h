@@ -279,5 +279,14 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
 				    (unsigned long)_n_, sizeof(*(ptr))); \
   })
 
+/*
+ * We handle most unaligned accesses in hardware. On the other hand 
+ * unaligned DMA can be very expensive on some ppc64 IO chips (it does
+ * powers of 2 writes until it reaches sufficient alignment).
+ *
+ * Based on this we disable the IP header alignment in network drivers.
+ */
+#define NET_IP_ALIGN   0
+
 #endif /* __KERNEL__ */
 #endif

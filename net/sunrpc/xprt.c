@@ -1086,8 +1086,8 @@ xprt_write_space(struct sock *sk)
 
 	/* Wait until we have enough socket memory */
 	if (xprt->stream) {
-		/* from net/ipv4/tcp.c:tcp_write_space */
-		if (tcp_wspace(sk) < tcp_min_write_space(sk))
+		/* from net/core/stream.c:sk_stream_write_space */
+		if (sk_stream_wspace(sk) < sk_stream_min_wspace(sk))
 			goto out;
 	} else {
 		/* from net/core/sock.c:sock_def_write_space */

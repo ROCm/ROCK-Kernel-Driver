@@ -125,7 +125,7 @@ svc_sock_wspace(struct svc_sock *svsk)
 	int wspace;
 
 	if (svsk->sk_sock->type == SOCK_STREAM)
-		wspace = tcp_wspace(svsk->sk_sk);
+		wspace = sk_stream_wspace(svsk->sk_sk);
 	else
 		wspace = sock_wspace(svsk->sk_sk);
 

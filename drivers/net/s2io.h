@@ -411,7 +411,6 @@ struct config_param {
 #define HEADER_802_2_SIZE              3
 #define HEADER_SNAP_SIZE               5
 #define HEADER_VLAN_SIZE               4
-#define HEADER_ALIGN_LAYER_3           2
 
 #define MIN_MTU                       46
 #define MAX_PYLD                    1500
