@@ -164,13 +164,11 @@ int snmp_get_info(char *buffer, char **start, off_t offset, int length)
 /* 
  *	Output /proc/net/netstat
  */
- 
-int netstat_get_info(char *buffer, char **start, off_t offset, int length)
+static int netstat_seq_show(struct seq_file *seq, void *v)
 {
-	int len, i;
+	int i;
 
-	len = sprintf(buffer,
-		      "TcpExt: SyncookiesSent SyncookiesRecv SyncookiesFailed"
+	seq_puts(seq, "TcpExt: SyncookiesSent SyncookiesRecv SyncookiesFailed"
 		      " EmbryonicRsts PruneCalled RcvPruned OfoPruned"
 		      " OutOfWindowIcmps LockDroppedIcmps ArpFilter"
 		      " TW TWRecycled TWKilled"
@@ -196,31 +194,37 @@ int netstat_get_info(char *buffer, char **start, off_t offset, int length)
 		      " TCPAbortOnMemory TCPAbortOnTimeout TCPAbortOnLinger"
 		      " TCPAbortFailed TCPMemoryPressures\n"
 		      "TcpExt:");
-	for (i=0; i<offsetof(struct linux_mib, __pad)/sizeof(unsigned long); i++)
-		len += sprintf(buffer+len, " %lu", fold_field((unsigned long*)net_statistics, sizeof(struct linux_mib), i));
-
-	len += sprintf (buffer + len, "\n");
-
-	if (offset >= len)
-	{
-		*start = buffer;
-		return 0;
-	}
-	*start = buffer + offset;
-	len -= offset;
-	if (len > length)
-		len = length;
-	if (len < 0)
-		len = 0; 
-	return len;
+	for (i = 0;
+	     i < offsetof(struct linux_mib, __pad) / sizeof(unsigned long);
+	     i++)
+		seq_printf(seq, " %lu",
+			   fold_field((unsigned long *)net_statistics,
+				      sizeof(struct linux_mib), i));
+	seq_putc(seq, '\n');
+	return 0;
 }
+
+static int netstat_seq_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, netstat_seq_show, NULL);
+}
+
+static struct file_operations netstat_seq_fops = {
+	.open	 = netstat_seq_open,
+	.read	 = seq_read,
+	.llseek	 = seq_lseek,
+	.release = single_release,
+};
 
 int __init ip_misc_proc_init(void)
 {
 	int rc = 0;
+	struct proc_dir_entry *p = create_proc_entry("netstat", S_IRUGO, proc_net);
 
-	if (!proc_net_create("netstat", 0, netstat_get_info))
+	if (!p)
 		goto out_netstat;
+	p->proc_fops = &netstat_seq_fops;
+
 	if (!proc_net_create("snmp", 0, snmp_get_info))
 		goto out_snmp;
 	if (!proc_net_create("sockstat", 0, afinet_get_info))
@@ -230,7 +234,7 @@ out:
 out_sockstat:
 	proc_net_remove("snmp");
 out_snmp:
-	proc_net_remove("netstat");
+	remove_proc_entry("netstat", proc_net);
 out_netstat:
 	rc = -ENOMEM;
 	goto out;

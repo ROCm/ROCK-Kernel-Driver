@@ -1,10 +1,12 @@
 #include <net/xfrm.h>
 #include <net/ip.h>
 
+DECLARE_MUTEX(xfrm_cfg_sem);
+
 static u32      xfrm_policy_genid;
 static rwlock_t xfrm_policy_lock = RW_LOCK_UNLOCKED;
 
-struct xfrm_policy *xfrm_policy_list[XFRM_POLICY_MAX];
+struct xfrm_policy *xfrm_policy_list[XFRM_POLICY_MAX*2];
 
 extern struct dst_ops xfrm4_dst_ops;
 
@@ -263,10 +265,13 @@ static u32 xfrm_gen_index(int dir)
 {
 	u32 idx;
 	struct xfrm_policy *p;
-	static u32 pol_id;
+	static u32 idx_generator;
 
 	for (;;) {
-		idx = (++pol_id ? : ++pol_id);
+		idx = (idx_generator | dir);
+		idx_generator += 8;
+		if (idx == 0)
+			idx = 8;
 		for (p = xfrm_policy_list[dir]; p; p = p->next) {
 			if (p->index == idx)
 				break;
@@ -300,6 +305,7 @@ int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl)
 	write_unlock_bh(&xfrm_policy_lock);
 
 	if (pol) {
+		atomic_dec(&pol->refcnt);
 		xfrm_policy_kill(pol);
 		xfrm_pol_put(pol);
 	}
@@ -328,7 +334,7 @@ struct xfrm_policy *xfrm_policy_byid(int dir, u32 id, int delete)
 	struct xfrm_policy *pol, **p;
 
 	write_lock_bh(&xfrm_policy_lock);
-	for (p = &xfrm_policy_list[dir]; (pol=*p)!=NULL; p = &pol->next) {
+	for (p = &xfrm_policy_list[id & 7]; (pol=*p)!=NULL; p = &pol->next) {
 		if (pol->index == id) {
 			if (delete)
 				*p = pol->next;
@@ -375,7 +381,7 @@ int xfrm_policy_walk(int (*func)(struct xfrm_policy *, int, int, void*),
 	int error = 0;
 
 	read_lock(&xfrm_policy_lock);
-	for (dir = 0; dir < XFRM_POLICY_MAX; dir++) {
+	for (dir = 0; dir < 2*XFRM_POLICY_MAX; dir++) {
 		for (xp = xfrm_policy_list[dir]; xp; xp = xp->next)
 			count++;
 	}
@@ -385,9 +391,9 @@ int xfrm_policy_walk(int (*func)(struct xfrm_policy *, int, int, void*),
 		goto out;
 	}
 
-	for (dir = 0; dir < XFRM_POLICY_MAX; dir++) {
+	for (dir = 0; dir < 2*XFRM_POLICY_MAX; dir++) {
 		for (xp = xfrm_policy_list[dir]; xp; xp = xp->next) {
-			error = func(xp, dir, --count, data);
+			error = func(xp, dir%XFRM_POLICY_MAX, --count, data);
 			if (error)
 				goto out;
 		}
@@ -423,16 +429,35 @@ struct xfrm_policy *xfrm_sk_policy_lookup(struct sock *sk, int dir, struct flowi
 	struct xfrm_policy *pol;
 
 	read_lock(&xfrm_policy_lock);
-	for (pol = sk->policy[dir]; pol; pol = pol->next) {
-		struct xfrm_selector *sel = &pol->selector;
-
-		if (xfrm4_selector_match(sel, fl)) {
+	if ((pol = sk->policy[dir]) != NULL) {
+		if (xfrm4_selector_match(&pol->selector, fl))
 			atomic_inc(&pol->refcnt);
-			break;
-		}
+		else
+			pol = NULL;
 	}
 	read_unlock(&xfrm_policy_lock);
 	return pol;
+}
+
+void xfrm_sk_policy_link(struct xfrm_policy *pol, int dir)
+{
+	pol->next = xfrm_policy_list[XFRM_POLICY_MAX+dir];
+	xfrm_policy_list[XFRM_POLICY_MAX+dir] = pol;
+	atomic_inc(&pol->refcnt);
+}
+
+void xfrm_sk_policy_unlink(struct xfrm_policy *pol, int dir)
+{
+	struct xfrm_policy **polp;
+
+	for (polp = &xfrm_policy_list[XFRM_POLICY_MAX+dir];
+	     *polp != NULL; polp = &(*polp)->next) {
+		if (*polp == pol) {
+			*polp = pol->next;
+			atomic_dec(&pol->refcnt);
+			return;
+		}
+	}
 }
 
 int xfrm_sk_policy_insert(struct sock *sk, int dir, struct xfrm_policy *pol)
@@ -442,6 +467,13 @@ int xfrm_sk_policy_insert(struct sock *sk, int dir, struct xfrm_policy *pol)
 	write_lock_bh(&xfrm_policy_lock);
 	old_pol = sk->policy[dir];
 	sk->policy[dir] = pol;
+	if (pol) {
+		pol->curlft.add_time = (unsigned long)xtime.tv_sec;
+		pol->index = xfrm_gen_index(XFRM_POLICY_MAX+dir);
+		xfrm_sk_policy_link(pol, dir);
+	}
+	if (old_pol)
+		xfrm_sk_policy_unlink(old_pol, dir);
 	write_unlock_bh(&xfrm_policy_lock);
 
 	if (old_pol) {
@@ -451,7 +483,7 @@ int xfrm_sk_policy_insert(struct sock *sk, int dir, struct xfrm_policy *pol)
 	return 0;
 }
 
-static struct xfrm_policy *clone_policy(struct xfrm_policy *old)
+static struct xfrm_policy *clone_policy(struct xfrm_policy *old, int dir)
 {
 	struct xfrm_policy *newp = xfrm_policy_alloc(GFP_ATOMIC);
 
@@ -462,8 +494,12 @@ static struct xfrm_policy *clone_policy(struct xfrm_policy *old)
 		newp->action = old->action;
 		newp->flags = old->flags;
 		newp->xfrm_nr = old->xfrm_nr;
+		newp->index = old->index;
 		memcpy(newp->xfrm_vec, old->xfrm_vec,
 		       newp->xfrm_nr*sizeof(struct xfrm_tmpl));
+		write_lock_bh(&xfrm_policy_lock);
+		xfrm_sk_policy_link(newp, dir);
+		write_unlock_bh(&xfrm_policy_lock);
 	}
 	return newp;
 }
@@ -475,15 +511,19 @@ int __xfrm_sk_clone_policy(struct sock *sk)
 	p1 = sk->policy[1];
 	sk->policy[0] = NULL;
 	sk->policy[1] = NULL;
-	if (p0 && (sk->policy[0] = clone_policy(p0)) == NULL)
+	if (p0 && (sk->policy[0] = clone_policy(p0, 0)) == NULL)
 		return -ENOMEM;
-	if (p1 && (sk->policy[1] = clone_policy(p1)) == NULL)
+	if (p1 && (sk->policy[1] = clone_policy(p1, 1)) == NULL)
 		return -ENOMEM;
 	return 0;
 }
 
-void __xfrm_sk_free_policy(struct xfrm_policy *pol)
+void __xfrm_sk_free_policy(struct xfrm_policy *pol, int dir)
 {
+	write_lock_bh(&xfrm_policy_lock);
+	xfrm_sk_policy_unlink(pol, dir);
+	write_unlock_bh(&xfrm_policy_lock);
+
 	xfrm_policy_kill(pol);
 	xfrm_pol_put(pol);
 }
@@ -734,12 +774,12 @@ restart:
 					goto error;
 
 				__set_task_state(tsk, TASK_INTERRUPTIBLE);
-				add_wait_queue(km_waitq, &wait);
+				add_wait_queue(&km_waitq, &wait);
 				err = xfrm_tmpl_resolve(policy, fl, xfrm);
 				if (err == -EAGAIN)
 					schedule();
 				__set_task_state(tsk, TASK_RUNNING);
-				remove_wait_queue(km_waitq, &wait);
+				remove_wait_queue(&km_waitq, &wait);
 
 				if (err == -EAGAIN && signal_pending(current)) {
 					err = -ERESTART;
@@ -888,7 +928,7 @@ int __xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb)
 
 	pol = NULL;
 	if (sk && sk->policy[dir])
-		pol =xfrm_sk_policy_lookup(sk, dir, &fl);
+		pol = xfrm_sk_policy_lookup(sk, dir, &fl);
 
 	if (!pol)
 		pol = flow_lookup(dir, &fl);
@@ -985,7 +1025,7 @@ static int xfrm4_garbage_collect(void)
 	struct dst_entry *dst, **dstp, *gc_list = NULL;
 
 	read_lock_bh(&xfrm_policy_lock);
-	for (i=0; i<XFRM_POLICY_MAX; i++) {
+	for (i=0; i<2*XFRM_POLICY_MAX; i++) {
 		for (pol = xfrm_policy_list[i]; pol; pol = pol->next) {
 			write_lock(&pol->lock);
 			dstp = &pol->bundles;
@@ -1028,7 +1068,7 @@ int xfrm_flush_bundles(struct xfrm_state *x)
 	struct dst_entry *dst, **dstp, *gc_list = NULL;
 
 	read_lock_bh(&xfrm_policy_lock);
-	for (i=0; i<XFRM_POLICY_MAX; i++) {
+	for (i=0; i<2*XFRM_POLICY_MAX; i++) {
 		for (pol = xfrm_policy_list[i]; pol; pol = pol->next) {
 			write_lock(&pol->lock);
 			dstp = &pol->bundles;

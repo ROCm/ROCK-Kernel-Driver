@@ -601,7 +601,7 @@ int udp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 				    .uli_u = { .ports =
 					       { .sport = inet->sport,
 						 .dport = dport } } };
-		err = ip_route_output_flow(&rt, &fl, sk, msg->msg_flags&MSG_DONTWAIT);
+		err = ip_route_output_flow(&rt, &fl, sk, !(msg->msg_flags&MSG_DONTWAIT));
 		if (err)
 			goto out;
 
@@ -884,7 +884,7 @@ int udp_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	err = ip_route_connect(&rt, usin->sin_addr.s_addr, saddr,
 			       RT_CONN_FLAGS(sk), oif,
 			       IPPROTO_UDP,
-			       inet->sport, usin->sin_port);
+			       inet->sport, usin->sin_port, sk);
 	if (err)
 		return err;
 	if ((rt->rt_flags&RTCF_BROADCAST) && !sk->broadcast) {
