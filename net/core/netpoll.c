@@ -231,9 +231,8 @@ void netpoll_send_udp(struct netpoll *np, const char *msg, int len)
 
 static void arp_reply(struct sk_buff *skb)
 {
-	struct in_device *in_dev = (struct in_device *) skb->dev->ip_ptr;
 	struct arphdr *arp;
-	unsigned char *arp_ptr, *sha, *tha;
+	unsigned char *arp_ptr;
 	int size, type = ARPOP_REPLY, ptype = ETH_P_ARP;
 	u32 sip, tip;
 	struct sk_buff *send_skb;
@@ -253,7 +252,7 @@ static void arp_reply(struct sk_buff *skb)
 	if (!np) return;
 
 	/* No arp on this interface */
-	if (!in_dev || skb->dev->flags & IFF_NOARP)
+	if (skb->dev->flags & IFF_NOARP)
 		return;
 
 	if (!pskb_may_pull(skb, (sizeof(struct arphdr) +
@@ -270,20 +269,14 @@ static void arp_reply(struct sk_buff *skb)
 	    arp->ar_op != htons(ARPOP_REQUEST))
 		return;
 
-	arp_ptr= (unsigned char *)(arp+1);
-	sha = arp_ptr;
-	arp_ptr += skb->dev->addr_len;
+	arp_ptr = (unsigned char *)(arp+1) + skb->dev->addr_len;
 	memcpy(&sip, arp_ptr, 4);
-	arp_ptr += 4;
-	tha = arp_ptr;
-	arp_ptr += skb->dev->addr_len;
+	arp_ptr += 4 + skb->dev->addr_len;
 	memcpy(&tip, arp_ptr, 4);
 
 	/* Should we ignore arp? */
-	if (tip != in_dev->ifa_list->ifa_address ||
-	    LOOPBACK(tip) || MULTICAST(tip))
+	if (tip != htonl(np->local_ip) || LOOPBACK(tip) || MULTICAST(tip))
 		return;
-
 
 	size = sizeof(struct arphdr) + 2 * (skb->dev->addr_len + 4);
 	send_skb = find_skb(np, size + LL_RESERVED_SPACE(np->dev),
@@ -325,7 +318,7 @@ static void arp_reply(struct sk_buff *skb)
 	arp_ptr += np->dev->addr_len;
 	memcpy(arp_ptr, &tip, 4);
 	arp_ptr += 4;
-	memcpy(arp_ptr, np->local_mac, np->dev->addr_len);
+	memcpy(arp_ptr, np->remote_mac, np->dev->addr_len);
 	arp_ptr += np->dev->addr_len;
 	memcpy(arp_ptr, &sip, 4);
 
