@@ -82,7 +82,7 @@ typedef struct {
 
 #define _raw_read_lock(rw)							\
 do {										\
-	int tmp = 0;								\
+	int __read_lock_tmp = 0;						\
 	__asm__ __volatile__ ("1:\tfetchadd4.acq %0 = [%1], 1\n"		\
 			      ";;\n"						\
 			      "tbit.nz p6,p0 = %0, 31\n"			\
@@ -97,15 +97,15 @@ do {										\
 			      "br.cond.sptk.few 1b\n"				\
 			      ";;\n"						\
 			      ".previous\n"					\
-			      : "=&r" (tmp)					\
+			      : "=&r" (__read_lock_tmp)				\
 			      : "r" (rw) : "p6", "memory");			\
 } while(0)
 
 #define _raw_read_unlock(rw)							\
 do {										\
-	int tmp = 0;								\
+	int __read_unlock_tmp = 0;						\
 	__asm__ __volatile__ ("fetchadd4.rel %0 = [%1], -1\n"			\
-			      : "=r" (tmp)					\
+			      : "=r" (__read_unlock_tmp)			\
 			      : "r" (rw)					\
 			      : "memory");					\
 } while(0)
