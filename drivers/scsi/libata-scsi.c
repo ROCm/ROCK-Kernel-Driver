@@ -620,30 +620,6 @@ unsigned int ata_scsiop_noop(struct ata_scsi_args *args, u8 *rbuf,
 }
 
 /**
- *	ata_scsiop_sync_cache - Simulate SYNCHRONIZE CACHE command
- *	@args: Port / device / SCSI command of interest.
- *	@rbuf: Response buffer, to which simulated SCSI cmd output is sent.
- *	@buflen: Response buffer length.
- *
- *	Initiates flush of device's cache.
- *
- *	TODO:
- *	Actually do this :)
- *
- *	LOCKING:
- *	spin_lock_irqsave(host_set lock)
- */
-
-unsigned int ata_scsiop_sync_cache(struct ata_scsi_args *args, u8 *rbuf,
-				  unsigned int buflen)
-{
-	VPRINTK("ENTER\n");
-
-	/* FIXME */
-	return 1;
-}
-
-/**
  *	ata_msense_push - Push data onto MODE SENSE data output buffer
  *	@ptr_io: (input/output) Location to store more output data
  *	@last: End of output data buffer
@@ -1190,13 +1166,6 @@ static void ata_scsi_simulate(struct ata_port *ap, struct ata_device *dev,
 		case MODE_SELECT:	/* unconditionally return */
 		case MODE_SELECT_10:	/* bad-field-in-cdb */
 			ata_bad_cdb(cmd, done);
-			break;
-
-		case SYNCHRONIZE_CACHE:
-			if ((dev->flags & ATA_DFLAG_WCACHE) == 0)
-				ata_bad_scsiop(cmd, done);
-			else
-				ata_scsi_rbuf_fill(&args, ata_scsiop_sync_cache);
 			break;
 
 		case READ_CAPACITY:
