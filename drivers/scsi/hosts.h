@@ -30,9 +30,6 @@
 
 #include <scsi/scsi_host.h>
 
-extern void scsi_report_bus_reset(struct Scsi_Host *, int);
-extern void scsi_report_device_reset(struct Scsi_Host *, int, int);
-
 struct scsi_driver {
 	struct module		*owner;
 	struct device_driver	gendrv;
