@@ -890,7 +890,7 @@ static int usbin_retire_desc(struct usbin *u, struct urb *urb)
 	return err ? -1 : 0;
 }
 
-static void usbin_completed(struct urb *urb)
+static void usbin_completed(struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_audiodev *as = (struct usb_audiodev *)urb->context;
 	struct usbin *u = &as->usbin;
@@ -956,7 +956,7 @@ static int usbin_sync_retire_desc(struct usbin *u, struct urb *urb)
 	return 0;
 }
 
-static void usbin_sync_completed(struct urb *urb)
+static void usbin_sync_completed(struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_audiodev *as = (struct usb_audiodev *)urb->context;
 	struct usbin *u = &as->usbin;
@@ -1250,7 +1250,7 @@ static int usbout_retire_desc(struct usbout *u, struct urb *urb)
 	return 0;
 }
 
-static void usbout_completed(struct urb *urb)
+static void usbout_completed(struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_audiodev *as = (struct usb_audiodev *)urb->context;
 	struct usbout *u = &as->usbout;
@@ -1323,7 +1323,7 @@ static int usbout_sync_retire_desc(struct usbout *u, struct urb *urb)
 	return 0;
 }
 
-static void usbout_sync_completed(struct urb *urb)
+static void usbout_sync_completed(struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_audiodev *as = (struct usb_audiodev *)urb->context;
 	struct usbout *u = &as->usbout;
