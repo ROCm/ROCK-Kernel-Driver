@@ -14,7 +14,6 @@
  * 2 of the License, or (at your option) any later version.
  */
 #include <asm/ppc_asm.h>
-#include <asm/processor.h>
 
 	.globl __div64_32
 __div64_32:
