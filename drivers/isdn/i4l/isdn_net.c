@@ -897,7 +897,6 @@ void isdn_net_writebuf_skb(isdn_net_local *lp, struct sk_buff *skb)
  error:
 	dev_kfree_skb(skb);
 	lp->stats.tx_errors++;
-
 }
 
 
@@ -1184,38 +1183,6 @@ isdn_net_rcv_skb(int idx, struct sk_buff *skb)
 	return 0;
 }
 
-/* We don't need to send arp, because we have point-to-point connections. */
-static int
-isdn_net_rebuild_header(struct sk_buff *skb)
-{
-	struct net_device *dev = skb->dev;
-	isdn_net_local *lp = dev->priv;
-	int ret = 0;
-
-	if (lp->p_encap == ISDN_NET_ENCAP_ETHER) {
-		struct ethhdr *eth = (struct ethhdr *) skb->data;
-
-		/*
-		 *      Only ARP/IP is currently supported
-		 */
-
-		if (eth->h_proto != htons(ETH_P_IP)) {
-			printk(KERN_WARNING
-			       "isdn_net: %s don't know how to resolve type %d addresses?\n",
-			       dev->name, (int) eth->h_proto);
-			memcpy(eth->h_source, dev->dev_addr, dev->addr_len);
-			return 0;
-		}
-		/*
-		 *      Try to get ARP to resolve the header.
-		 */
-#ifdef CONFIG_INET
-		ret = arp_find(eth->h_dest, skb);
-#endif
-	}
-	return ret;
-}
-
 /*
  * Interface-setup. (just after registering a new interface)
  */
@@ -1260,7 +1227,6 @@ isdn_net_init(struct net_device *ndev)
 	ndev->hard_header_len = ETH_HLEN + max_hlhdr_len;
 	ndev->stop = &isdn_net_close;
 	ndev->get_stats = &isdn_net_get_stats;
-	ndev->rebuild_header = &isdn_net_rebuild_header;
 	ndev->do_ioctl = NULL;
 	return 0;
 }
@@ -2569,6 +2535,7 @@ isdn_ether_setup(isdn_net_dev *p)
 	p->dev.hard_header = eth_header;
 	p->dev.hard_header_cache = eth_header_cache;
 	p->dev.header_cache_update = eth_header_cache_update;
+	p->dev.rebuild_header = eth_rebuild_header;
 	p->dev.flags = IFF_BROADCAST | IFF_MULTICAST;
 	p->local.receive = isdn_ether_receive;
 	p->local.connected = isdn_net_device_wake_queue;
