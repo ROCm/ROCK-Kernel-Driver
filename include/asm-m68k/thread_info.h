@@ -18,8 +18,8 @@ struct thread_info {
 
 #define INIT_THREAD_INFO(tsk)			\
 {						\
-	task:		&tsk,			\
-	exec_domain:	&default_exec_domain,	\
+	.task		= &tsk,			\
+	.exec_domain	= &default_exec_domain,	\
 }
 
 /* THREAD_SIZE should be 8k, so handle differently for 4k and 8k machines */
