@@ -1306,11 +1306,9 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 
 static int __init udsl_usb_init (void)
 {
-	struct sk_buff *skb; /* dummy for sizeof */
-
 	dbg ("udsl_usb_init: driver version " DRIVER_VERSION);
 
-	if (sizeof (struct udsl_control) > sizeof (skb->cb)) {
+	if (sizeof (struct udsl_control) > sizeof (((struct sk_buff *)0)->cb)) {
 		printk (KERN_ERR __FILE__ ": unusable with this kernel!\n");
 		return -EIO;
 	}
