@@ -406,6 +406,7 @@ struct scsi_id_instance_data {
 
 	/* Node entry, as retrieved from NodeMgr entries */
 	struct node_entry *ne;
+	struct unit_directory *ud;
 
 	/* A backlink to our host_info */
 	struct sbp2scsi_host_info *hi;

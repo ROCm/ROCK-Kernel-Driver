@@ -1532,20 +1532,31 @@ static int sbp2_set_busy_timeout(struct scsi_id_instance_data *scsi_id)
 }
 
 
-static void sbp2_prep_scsi_id(struct scsi_id_instance_data *scsi_id,
-			      struct unit_directory *ud,
-			      struct sbp2scsi_host_info *hi)
+static struct scsi_id_instance_data *sbp2_alloc_scsi_id(struct scsi_id_group *scsi_group,
+							struct unit_directory *ud,
+							struct sbp2scsi_host_info *hi)
 {
+	struct scsi_id_instance_data *scsi_id = kmalloc(sizeof(*scsi_id), GFP_KERNEL);
+
+	if (!scsi_id)
+		return NULL;
+
 	memset(scsi_id, 0, sizeof(*scsi_id));
 
 	scsi_id->ne = ud->ne;
 	scsi_id->hi = hi;
+	scsi_id->ud = ud;
 	scsi_id->speed_code = IEEE1394_SPEED_100;
 	scsi_id->max_payload_size = sbp2_speedto_max_payload[IEEE1394_SPEED_100];
 	atomic_set(&scsi_id->sbp2_login_complete, 0);
 	INIT_LIST_HEAD(&scsi_id->sbp2_command_orb_inuse);
 	INIT_LIST_HEAD(&scsi_id->sbp2_command_orb_completed);
 	scsi_id->sbp2_command_orb_lock = SPIN_LOCK_UNLOCKED;
+	scsi_id->sbp2_device_type_and_lun = SBP2_DEVICE_TYPE_LUN_UNINITIALIZED;
+
+	list_add_tail(&scsi_id->list, &scsi_group->scsi_id_list);
+
+	return scsi_id;
 }
 
 /*
@@ -1590,17 +1601,13 @@ static void sbp2_parse_unit_directory(struct scsi_id_group *scsi_group,
 				 * Device type and lun (used for
 				 * detemining type of sbp2 device)
 				 */
-				scsi_id = kmalloc(sizeof(*scsi_id), GFP_KERNEL);
+				scsi_id = sbp2_alloc_scsi_id(scsi_group, ud, hi);
 				if (!scsi_id) {
 					SBP2_ERR("Out of memory adding scsi_id, not all LUN's will be added");
 					break;
 				}
-				sbp2_prep_scsi_id(scsi_id, ud, hi);
 
 				scsi_id->sbp2_device_type_and_lun = kv->value.immediate;
-				SBP2_DEBUG("sbp2_device_type_and_lun = %x",
-					   (unsigned int) scsi_id->sbp2_device_type_and_lun);
-				list_add_tail(&scsi_id->list, &scsi_group->scsi_id_list);
 			}
 			break;
 
@@ -1689,16 +1696,11 @@ static void sbp2_parse_unit_directory(struct scsi_id_group *scsi_group,
 		/* If our list is empty, add a base scsi_id (happens in a normal
 		 * case where there is no logical_unit_number entry */
 		if (list_empty(&scsi_group->scsi_id_list)) {
-			scsi_id = kmalloc(sizeof(*scsi_id), GFP_KERNEL);
+			scsi_id = sbp2_alloc_scsi_id(scsi_group, ud, hi);
 			if (!scsi_id) {
 				SBP2_ERR("Out of memory adding scsi_id");
 				return;
 			}
-
-			sbp2_prep_scsi_id(scsi_id, ud, hi);
-
-			scsi_id->sbp2_device_type_and_lun = SBP2_DEVICE_TYPE_LUN_UNINITIALIZED;
-			list_add_tail(&scsi_id->list, &scsi_group->scsi_id_list);
 		}
 
 		/* Update the generic fields in all the LUN's */
@@ -2866,10 +2868,11 @@ static const char *sbp2scsi_info (struct Scsi_Host *host)
         return "SCSI emulation for IEEE-1394 SBP-2 Devices";
 }
 
-static ssize_t sbp2_sysfs_ieee1394_guid_show(struct device *dev, char *buf)
+static ssize_t sbp2_sysfs_ieee1394_id_show(struct device *dev, char *buf)
 {
 	struct scsi_device *sdev;
 	struct scsi_id_instance_data *scsi_id;
+	int lun;
 
 	if (!(sdev = to_scsi_device(dev)))
 		return 0;
@@ -2877,13 +2880,18 @@ static ssize_t sbp2_sysfs_ieee1394_guid_show(struct device *dev, char *buf)
 	if (!(scsi_id = sdev->hostdata))
 		return 0;
 
-	return sprintf(buf, "%016Lx\n", (unsigned long long)scsi_id->ne->guid);
-}
+	if (scsi_id->sbp2_device_type_and_lun == SBP2_DEVICE_TYPE_LUN_UNINITIALIZED)
+		lun = 0;
+	else
+		lun = ORB_SET_LUN(scsi_id->sbp2_device_type_and_lun);
 
-static DEVICE_ATTR(ieee1394_guid, S_IRUGO, sbp2_sysfs_ieee1394_guid_show, NULL);
+	return sprintf(buf, "%016Lx:%d:%d\n", (unsigned long long)scsi_id->ne->guid,
+		       scsi_id->ud->id, lun);
+}
+static DEVICE_ATTR(ieee1394_id, S_IRUGO, sbp2_sysfs_ieee1394_id_show, NULL);
 
 static struct device_attribute *sbp2_sysfs_sdev_attrs[] = {
-	&dev_attr_ieee1394_guid,
+	&dev_attr_ieee1394_id,
 	NULL
 };
 
