@@ -208,10 +208,6 @@ static void __init init_hwif_ns87415 (ide_hwif_t *hwif)
 	hwif->autodma = 0;
 	hwif->selectproc = &ns87415_selectproc;
 
-	/* Set a good latency timer and cache line size value. */
-	(void) pci_write_config_byte(dev, PCI_LATENCY_TIMER, 64);
-	/* FIXME: use pci_set_master() to ensure good latency timer value */
-
 	/*
 	 * We cannot probe for IRQ: both ports share common IRQ on INTA.
 	 * Also, leave IRQ masked during drive probing, to prevent infinite
