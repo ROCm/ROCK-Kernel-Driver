@@ -27,6 +27,7 @@
 #ifndef __ASSEMBLY__
 
 #include <asm/ptrace.h>
+#include <asm/types.h>
 
 struct task_struct;
 struct exec_domain;

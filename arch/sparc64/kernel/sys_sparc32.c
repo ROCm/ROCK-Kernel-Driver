@@ -49,6 +49,7 @@
 #include <linux/in.h>
 #include <linux/icmpv6.h>
 #include <linux/sysctl.h>
+#include <linux/binfmts.h>
 
 #include <asm/types.h>
 #include <asm/ipc.h>

@@ -5,6 +5,7 @@
  * Copyright (C) 2000 David S. Miller (davem@redhat.com)
  */
 #include <linux/config.h>
+#include <asm/thread_info.h>
 
 #ifndef CONFIG_DEBUG_SPINLOCK
 	.text
@@ -40,6 +41,11 @@ out:
 	membar	#StoreLoad | #StoreStore
 	retl
 	 mov	%g1, %o0
+#ifdef CONFIG_PREEMPT
+	ldsw	[%g6 + TI_PRE_COUNT], %g3
+	add	%g3, 1, %g3
+	stw	%g3, [%g6 + TI_PRE_COUNT]
+#endif
 to_zero:
 	ldstub	[%o1], %g3
 	brnz,pn	%g3, spin_on_lock
@@ -55,6 +61,11 @@ loop2:	cas	[%o0], %g5, %g7		/* ASSERT(g7 == 0) */
 	 nop
 	membar	#StoreStore | #LoadStore
 	stb	%g0, [%o1]
+#ifdef CONFIG_PREEMPT
+	ldsw	[%g6 + TI_PRE_COUNT], %g3
+	sub	%g3, 1, %g3
+	stw	%g3, [%g6 + TI_PRE_COUNT]
+#endif
 
 	b,pt	%xcc, nzero
 	 nop
