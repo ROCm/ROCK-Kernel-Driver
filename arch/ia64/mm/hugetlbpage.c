@@ -597,7 +597,7 @@ int __is_hugepage_mem_enough(struct mempolicy *pol, size_t size)
 			continue;
 		pm += htlbpagemem[i];
 	}
-	return (size + ~HPAGE_MASK)/HPAGE_SIZE <= pm;
+	return size/HPAGE_SIZE <= pm;
 }
 
 /* Check process policy here. VMA policy is checked in mbind. 
@@ -606,32 +606,6 @@ int __is_hugepage_mem_enough(struct mempolicy *pol, size_t size)
 int is_hugepage_mem_enough(size_t size)
 {
 	return __is_hugepage_mem_enough(NULL, size);
-}
-
-/* Count allocated huge pages in a range */
-unsigned long huge_count_pages(unsigned long addr, unsigned long end)
-{
-	unsigned long pages = 0;
-	while (addr < end) {
-		pte_t *pte;
-		pmd_t *pmd;
-		pgd_t *pgd = pgd_offset(current->mm, addr);
-		if (pgd_none(*pgd)) {
-			addr = (addr + PGDIR_SIZE) & PGDIR_MASK;
-			continue;
-		}
-		pmd = pmd_offset(pgd, addr);
-		if (pmd_none(*pmd)) {
-			addr = (addr + PMD_SIZE) & PMD_MASK;
-			continue;
-		}
-		pte = pte_offset_map(pmd, addr);
-		if (!pte_none(*pte))
-			pages++;
-		pte_unmap(pte);
-		addr += HPAGE_SIZE;
-	}
-	return pages;
 }
 
 /* Return the number pages of memory we physically have, in PAGE_SIZE units. */

@@ -31,7 +31,9 @@ struct page *follow_huge_pmd(struct mm_struct *mm, unsigned long address,
 				pmd_t *pmd, int write);
 int is_aligned_hugepage_range(unsigned long addr, unsigned long len);
 int pmd_huge(pmd_t pmd);
-unsigned long huge_count_pages(unsigned long addr, unsigned long end);
+unsigned long huge_pages_needed(struct address_space *mapping, 
+				struct vm_area_struct *vma,
+				unsigned long start, unsigned long end);
 
 extern int htlbpage_max;
 extern int sysctl_overcommit_hugepages;

@@ -34,6 +34,8 @@
 
 int sysctl_overcommit_hugepages;  /* no overcommit by default */
 
+void huge_pagevec_release(struct pagevec *pvec);
+
 static struct super_operations hugetlbfs_ops;
 static struct address_space_operations hugetlbfs_aops;
 struct file_operations hugetlbfs_file_operations;
@@ -45,17 +47,39 @@ static struct backing_dev_info hugetlbfs_backing_dev_info = {
 	.memory_backed	= 1,	/* Does not contribute to dirty memory */
 };
 
-/* Can be overwritten by architecture */
-__attribute__((weak)) unsigned long 
-huge_count_pages(unsigned long addr, unsigned long end)
-{
-	return 0;
-}
+unsigned long 
+huge_pages_needed(struct address_space *mapping, struct vm_area_struct *vma,
+		  unsigned long start, unsigned long end)
+{ 
+	int i;
+	struct pagevec pvec;
+	unsigned long hugepages = (end - start) >> HPAGE_SHIFT; 
+	pgoff_t next = vma->vm_pgoff + ((start - vma->vm_start)>>PAGE_SHIFT);
+	pgoff_t endpg = next + ((end - start) >> PAGE_SHIFT);
+
+	pagevec_init(&pvec, 0);
+	while (next < endpg) { 
+		if (!pagevec_lookup(&pvec, mapping, next, PAGEVEC_SIZE))
+			break;
+		for (i = 0; i < pagevec_count(&pvec); i++) { 
+			struct page *page = pvec.pages[i];
+			if (page->index > next)
+				next = page->index;
+			if (page->index >= endpg) 
+				break;
+			next++;			
+			hugepages--; 
+		}
+		huge_pagevec_release(&pvec);
+	}
+	return hugepages << HPAGE_SHIFT; 
+} 
 
 static int hugetlbfs_file_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	struct inode *inode = file->f_dentry->d_inode;
 	struct address_space *mapping = inode->i_mapping;
+	unsigned long bytes;
 	loff_t len, vma_len;
 	int ret;
 
@@ -68,8 +92,8 @@ static int hugetlbfs_file_mmap(struct file *file, struct vm_area_struct *vma)
 	if (vma->vm_end - vma->vm_start < HPAGE_SIZE)
 		return -EINVAL;
 
-	if (!sysctl_overcommit_hugepages && 
-	    !is_hugepage_mem_enough(vma->vm_end - vma->vm_start))
+	bytes = huge_pages_needed(mapping, vma, vma->vm_start, vma->vm_end);
+	if (!sysctl_overcommit_hugepages && !is_hugepage_mem_enough(bytes))
 		return -ENOMEM;
 	    
 	vma_len = (loff_t)(vma->vm_end - vma->vm_start);

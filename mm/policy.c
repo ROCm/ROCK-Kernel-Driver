@@ -282,11 +282,13 @@ check_range(struct mm_struct *mm, unsigned long start, unsigned long end,
 		if (is_vm_hugetlb_page(vma) && 
 		    !sysctl_overcommit_hugepages &&
 		    pol && pol->policy == MPOL_BIND) { 
+			unsigned long rend = min_t(unsigned long, end, vma->vm_end);
+			unsigned long rstart = max_t(unsigned long,start,vma->vm_start);
 			unsigned long len; 
-			len = min_t(unsigned long, end, vma->vm_end) -
-				max_t(unsigned long, start, vma->vm_start);
-			len -= huge_count_pages(start, end) * HPAGE_SIZE; 
-			if (len == 0) 
+
+			len = huge_pages_needed(vma->vm_file->f_mapping, vma,
+						rstart,	rend); 
+			if (len == 0)
 				;
 			else if (!__is_hugepage_mem_enough(pol, len)) { 
 				PDprintk("not enough huge pages (%d) (%d,%lx)\n",

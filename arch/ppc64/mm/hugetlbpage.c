@@ -555,7 +555,6 @@ int hugetlb_prefault(struct address_space *mapping, struct vm_area_struct *vma)
 
 		idx = ((addr - vma->vm_start) >> HPAGE_SHIFT)
 			+ (vma->vm_pgoff >> (HPAGE_SHIFT - PAGE_SHIFT));
-	retry:
 		page = find_get_page(mapping, idx);
 		if (!page) {
 			/* charge the fs quota first */
@@ -570,13 +569,10 @@ int hugetlb_prefault(struct address_space *mapping, struct vm_area_struct *vma)
 				goto out;
 			}
 			ret = add_to_page_cache(page, mapping, idx, GFP_ATOMIC);
-			if (!ret)
-				unlock_page(page);
+			unlock_page(page);
 			if (ret) {
 				hugetlb_put_quota(mapping);
-				huge_page_release(page);
-				if (ret == -EEXIST)
-					goto retry;
+				free_huge_page(page);
 				goto out;
 			}
 		}
@@ -1003,12 +999,6 @@ int hugetlb_report_meminfo(char *buf)
 			HPAGE_SIZE/1024);
 }
 
-/* dummy right now. Fix when you have real NUMA policy here. */
-int __is_hugepage_mem_enough(struct mempolicy *pol, size_t size)
-{
-	return is_hugepage_mem_enough(size);
-}
-
 /* This is advisory only, so we can get away with accesing
  * htlbpage_free without taking the lock. */
 int is_hugepage_mem_enough(size_t size)
@@ -1022,26 +1012,6 @@ unsigned long hugetlb_total_pages(void)
 	return htlbpage_total * (HPAGE_SIZE / PAGE_SIZE);
 }
 EXPORT_SYMBOL(hugetlb_total_pages);
-
-/* Count allocated huge pages in a range */
-unsigned long huge_count_pages(unsigned long addr, unsigned long end)
-{
-	unsigned long pages = 0;
-	while (addr < end) {
-		struct page *p;
-		hugepte_t *pte;
-		pgd_t *pgd = pgd_offset(current->mm, addr);
-		if (pgd_none(*pgd)) {
-			addr = (addr + PGDIR_SIZE) & PGDIR_MASK;
-			continue;
-		}
-		pte = (hugepte_t *)pmd_offset(pgd, addr);
-		if (!hugepte_none(*pte))
-			pages++;
-		addr += HPAGE_SIZE;
-	}
-	return pages;
-}
 
 /*
  * We cannot handle pagefaults against hugetlb pages at all.  They cause
