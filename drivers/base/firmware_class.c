@@ -339,13 +339,13 @@ fw_setup_class_device(struct firmware *fw, struct class_device **class_dev_p,
 		goto out;
 
 	fw_priv = class_get_devdata(class_dev);
-	fw_priv->fw = fw;
 
+	fw_priv->fw = fw;
 	retval = sysfs_create_bin_file(&class_dev->kobj, &fw_priv->attr_data);
 	if (retval) {
 		printk(KERN_ERR "%s: sysfs_create_bin_file failed\n",
 		       __FUNCTION__);
-		goto error_unreg_class_dev;
+		goto error_unreg;
 	}
 
 	retval = class_device_create_file(class_dev,
@@ -353,27 +353,16 @@ fw_setup_class_device(struct firmware *fw, struct class_device **class_dev_p,
 	if (retval) {
 		printk(KERN_ERR "%s: class_device_create_file failed\n",
 		       __FUNCTION__);
-		goto error_remove_data;
+		goto error_unreg;
 	}
 
 	*class_dev_p = class_dev;
 	goto out;
 
-error_remove_data:
-	sysfs_remove_bin_file(&class_dev->kobj, &fw_priv->attr_data);
-error_unreg_class_dev:
+error_unreg:
 	class_device_unregister(class_dev);
 out:
 	return retval;
-}
-static void
-fw_remove_class_device(struct class_device *class_dev)
-{
-	struct firmware_priv *fw_priv = class_get_devdata(class_dev);
-
-	class_device_remove_file(class_dev, &class_device_attr_loading);
-	sysfs_remove_bin_file(&class_dev->kobj, &fw_priv->attr_data);
-	class_device_unregister(class_dev);
 }
 
 /** 
@@ -433,7 +422,7 @@ request_firmware(const struct firmware **firmware_p, const char *name,
 	}
 	fw_priv->fw = NULL;
 	up(&fw_lock);
-	fw_remove_class_device(class_dev);
+	class_device_unregister(class_dev);
 	goto out;
 
 error_kfree_fw:
@@ -569,7 +558,6 @@ firmware_class_init(void)
 static void __exit
 firmware_class_exit(void)
 {
-	class_remove_file(&firmware_class, &class_attr_timeout);
 	class_unregister(&firmware_class);
 }
 
