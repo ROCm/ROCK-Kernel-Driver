@@ -44,12 +44,6 @@ machvec_init (const char *name)
 #endif /* CONFIG_IA64_GENERIC */
 
 void
-machvec_noop (void)
-{
-}
-EXPORT_SYMBOL(machvec_noop);
-
-void
 machvec_setup (char **arg)
 {
 }

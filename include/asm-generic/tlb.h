@@ -147,4 +147,6 @@ static inline void tlb_remove_page(struct mmu_gather *tlb, struct page *page)
 		__pmd_free_tlb(tlb, pmdp);			\
 	} while (0)
 
+#define tlb_migrate_finish(mm) do {} while (0)
+
 #endif /* _ASM_GENERIC__TLB_H */

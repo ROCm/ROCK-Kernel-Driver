@@ -1447,9 +1447,8 @@ sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
 	return ret;
 }
 
-/* "asmlinkage" so the input arguments are preserved... */
 
-asmlinkage void
+void
 syscall_trace (void)
 {
 	if (!test_thread_flag(TIF_SYSCALL_TRACE))
@@ -1471,4 +1470,39 @@ syscall_trace (void)
 		send_sig(current->exit_code, current, 1);
 		current->exit_code = 0;
 	}
+}
+
+/* "asmlinkage" so the input arguments are preserved... */
+
+asmlinkage void
+syscall_trace_enter (long arg0, long arg1, long arg2, long arg3,
+		     long arg4, long arg5, long arg6, long arg7, long stack)
+{
+	struct pt_regs *regs = (struct pt_regs *) &stack;
+	long syscall;
+
+	if (unlikely(current->audit_context)) {
+		if (IS_IA32_PROCESS(regs))
+			syscall = regs->r1;
+		else
+			syscall = regs->r15;
+
+		audit_syscall_entry(current, syscall, arg0, arg1, arg2, arg3);
+	}
+
+	if (test_thread_flag(TIF_SYSCALL_TRACE) && (current->ptrace & PT_PTRACED))
+		syscall_trace();
+}
+
+/* "asmlinkage" so the input arguments are preserved... */
+
+asmlinkage void
+syscall_trace_leave (long arg0, long arg1, long arg2, long arg3,
+		     long arg4, long arg5, long arg6, long arg7, long stack)
+{
+	if (unlikely(current->audit_context))
+		audit_syscall_exit(current, ((struct pt_regs *) &stack)->r8);
+
+	if (test_thread_flag(TIF_SYSCALL_TRACE) && (current->ptrace & PT_PTRACED))
+		syscall_trace();
 }

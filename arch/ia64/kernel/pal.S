@@ -54,7 +54,7 @@ END(ia64_pal_default_handler)
  *
  */
 GLOBAL_ENTRY(ia64_pal_call_static)
-	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(6)
+	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(5)
 	alloc loc1 = ar.pfs,5,5,0,0
 	movl loc2 = pal_entry_point
 1:	{
@@ -100,7 +100,7 @@ END(ia64_pal_call_static)
  * 	in2 - in3   Remaning PAL arguments
  */
 GLOBAL_ENTRY(ia64_pal_call_stacked)
-	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(5)
+	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(4)
 	alloc loc1 = ar.pfs,4,4,4,0
 	movl loc2 = pal_entry_point
 
@@ -147,7 +147,7 @@ END(ia64_pal_call_stacked)
 
 
 GLOBAL_ENTRY(ia64_pal_call_phys_static)
-	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(6)
+	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(4)
 	alloc loc1 = ar.pfs,4,7,0,0
 	movl loc2 = pal_entry_point
 1:	{

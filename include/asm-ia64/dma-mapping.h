@@ -6,6 +6,8 @@
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
+#include <asm/machvec.h>
+
 #define dma_alloc_coherent	platform_dma_alloc_coherent
 #define dma_alloc_noncoherent	platform_dma_alloc_coherent	/* coherent mem. is cheap */
 #define dma_free_coherent	platform_dma_free_coherent

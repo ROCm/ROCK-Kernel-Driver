@@ -165,7 +165,6 @@ ENTRY(fsys_gettimeofday)
 	add r9=TI_FLAGS+IA64_TASK_SIZE,r16
 	addl r3=THIS_CPU(cpu_info),r0
 
-	mov.m r31=ar.itc		// put time stamp into r31 (ITC) == now		(35 cyc)
 #ifdef CONFIG_SMP
 	movl r10=__per_cpu_offset
 	movl r2=sal_platform_features
@@ -240,12 +239,13 @@ EX(.fail_efault, probe.w.fault r10, 3)		// this must come _after_ NaT-check
 	;;
 
 	ldf8 f8=[r21]			// f8 now contains itm_next
+	mov.m r31=ar.itc		// put time stamp into r31 (ITC) == now
 	sub r28=r29, r28, 1		// r28 now contains "-(lost + 1)"
-	tbit.nz p9, p10=r23, 0		// p9 <- is_odd(r23), p10 <- is_even(r23)
 	;;
 
 	ld8 r2=[r19]			// r2 = sec = xtime.tv_sec
 	ld8 r29=[r20]			// r29 = nsec = xtime.tv_nsec
+	tbit.nz p9, p10=r23, 0		// p9 <- is_odd(r23), p10 <- is_even(r23)
 
 	setf.sig f6=r28			// f6 <- -(lost + 1)				(6 cyc)
 	;;
@@ -260,7 +260,6 @@ EX(.fail_efault, probe.w.fault r10, 3)		// this must come _after_ NaT-check
 	nop 0
 	;;
 
-	mov r31=ar.itc			// re-read ITC in case we .retry		(35 cyc)
 	xma.l f8=f11, f8, f12	// f8 (elapsed_cycles) <- (-1*last_tick + now) = (now - last_tick)
 	nop 0
 	;;
