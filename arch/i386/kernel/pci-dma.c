@@ -131,7 +131,7 @@ void *dma_mark_declared_memory_occupied(struct device *dev,
 					dma_addr_t device_addr, size_t size)
 {
 	struct dma_coherent_mem *mem = dev->dma_mem;
-	int pages = (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	int pages = (size + (device_addr & ~PAGE_MASK) + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	int pos, err;
 
 	if (!mem)
