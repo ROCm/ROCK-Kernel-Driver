@@ -530,7 +530,7 @@ static void via_rhine_check_duplex(struct net_device *dev);
 static void via_rhine_timer(unsigned long data);
 static void via_rhine_tx_timeout(struct net_device *dev);
 static int  via_rhine_start_tx(struct sk_buff *skb, struct net_device *dev);
-static void via_rhine_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
+static irqreturn_t via_rhine_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
 static void via_rhine_tx(struct net_device *dev);
 static void via_rhine_rx(struct net_device *dev);
 static void via_rhine_error(struct net_device *dev, int intr_status);
@@ -1330,16 +1330,19 @@ static int via_rhine_start_tx(struct sk_buff *skb, struct net_device *dev)
 
 /* The interrupt handler does all of the Rx thread work and cleans up
    after the Tx thread. */
-static void via_rhine_interrupt(int irq, void *dev_instance, struct pt_regs *rgs)
+static irqreturn_t via_rhine_interrupt(int irq, void *dev_instance, struct pt_regs *rgs)
 {
 	struct net_device *dev = dev_instance;
 	long ioaddr;
 	u32 intr_status;
 	int boguscnt = max_interrupt_work;
+	int handled = 0;
 
 	ioaddr = dev->base_addr;
 	
 	while ((intr_status = get_intr_status(dev))) {
+		handled = 1;
+
 		/* Acknowledge all of the current interrupt sources ASAP. */
 		if (intr_status & IntrTxDescRace)
 			writeb(0x08, ioaddr + IntrStatus2);
@@ -1385,6 +1388,7 @@ static void via_rhine_interrupt(int irq, void *dev_instance, struct pt_regs *rgs
 	if (debug > 3)
 		printk(KERN_DEBUG "%s: exiting interrupt, status=%8.8x.\n",
 			   dev->name, readw(ioaddr + IntrStatus));
+	return IRQ_RETVAL(handled);
 }
 
 /* This routine is logically part of the interrupt handler, but isolated

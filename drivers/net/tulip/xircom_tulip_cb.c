@@ -340,7 +340,7 @@ static void xircom_tx_timeout(struct net_device *dev);
 static void xircom_init_ring(struct net_device *dev);
 static int xircom_start_xmit(struct sk_buff *skb, struct net_device *dev);
 static int xircom_rx(struct net_device *dev);
-static void xircom_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
+static irqreturn_t xircom_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
 static int xircom_close(struct net_device *dev);
 static struct net_device_stats *xircom_get_stats(struct net_device *dev);
 static int xircom_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
@@ -355,7 +355,7 @@ static void outl_CSR6(u32 newcsr6, long ioaddr)
 	const int strict_bits =
 		TxThresh10 | TxStoreForw | TxThreshMask | EnableTxRx | FullDuplexBit;
     int csr5, csr5_22_20, csr5_19_17, currcsr6, attempts = 200;
-    long flags;
+    unsigned long flags;
     save_flags(flags);
     cli();
 	/* mask out the reserved bits that always read 0 on the Xircom cards */
@@ -1054,12 +1054,13 @@ static void check_duplex(struct net_device *dev)
 
 /* The interrupt handler does all of the Rx thread work and cleans up
    after the Tx thread. */
-static void xircom_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
+static irqreturn_t xircom_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_instance;
 	struct xircom_private *tp = dev->priv;
 	long ioaddr = dev->base_addr;
 	int csr5, work_budget = max_interrupt_work;
+	int handled = 0;
 
 	spin_lock (&tp->lock);
 
@@ -1077,6 +1078,8 @@ static void xircom_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 
 		if ((csr5 & (NormalIntr|AbnormalIntr)) == 0)
 			break;
+
+		handled = 1;
 
 		if (csr5 & (RxIntr | RxNoBuf))
 			work_budget -= xircom_rx(dev);
@@ -1185,6 +1188,7 @@ static void xircom_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 			   dev->name, inl(ioaddr + CSR5));
 
 	spin_unlock (&tp->lock);
+	return IRQ_RETVAL(handled);
 }
 
 
@@ -1461,7 +1465,7 @@ static int xircom_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	struct xircom_private *tp = dev->priv;
 	u16 *data = (u16 *)&rq->ifr_data;
 	int phy = tp->phys[0] & 0x1f;
-	long flags;
+	unsigned long flags;
 
 	switch(cmd) {
 	case SIOCETHTOOL:

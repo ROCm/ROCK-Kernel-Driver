@@ -423,7 +423,7 @@ int tulip_read_eeprom(long ioaddr, int location, int addr_len);
 /* interrupt.c */
 extern unsigned int tulip_max_interrupt_work;
 extern int tulip_rx_copybreak;
-void tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
+irqreturn_t tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
 int tulip_refill_rx(struct net_device *dev);
 
 /* media.c */

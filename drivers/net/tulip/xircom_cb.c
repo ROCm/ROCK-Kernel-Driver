@@ -111,7 +111,7 @@ struct xircom_private {
 /* Function prototypes */
 static int xircom_probe(struct pci_dev *pdev, const struct pci_device_id *id);
 static void xircom_remove(struct pci_dev *pdev);
-static void xircom_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
+static irqreturn_t xircom_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
 static int xircom_start_xmit(struct sk_buff *skb, struct net_device *dev);
 static int xircom_open(struct net_device *dev);
 static int xircom_close(struct net_device *dev);
@@ -344,7 +344,7 @@ static void __devexit xircom_remove(struct pci_dev *pdev)
 	leave("xircom_remove");
 } 
 
-static void xircom_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
+static irqreturn_t xircom_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_instance;
 	struct xircom_private *card = (struct xircom_private *) dev->priv;
@@ -388,6 +388,7 @@ static void xircom_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 	
 	spin_unlock(&card->lock);
 	leave("xircom_interrupt");
+	return IRQ_HANDLED;
 }
 
 static int xircom_start_xmit(struct sk_buff *skb, struct net_device *dev)

@@ -541,7 +541,7 @@ static int speedo_start_xmit(struct sk_buff *skb, struct net_device *dev);
 static void speedo_refill_rx_buffers(struct net_device *dev, int force);
 static int speedo_rx(struct net_device *dev);
 static void speedo_tx_buffer_gc(struct net_device *dev);
-static void speedo_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
+static irqreturn_t speedo_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
 static int speedo_close(struct net_device *dev);
 static struct net_device_stats *speedo_get_stats(struct net_device *dev);
 static int speedo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
@@ -1560,12 +1560,13 @@ static void speedo_tx_buffer_gc(struct net_device *dev)
 
 /* The interrupt handler does all of the Rx thread work and cleans up
    after the Tx thread. */
-static void speedo_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
+static irqreturn_t speedo_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *)dev_instance;
 	struct speedo_private *sp;
 	long ioaddr, boguscnt = max_interrupt_work;
 	unsigned short status;
+	unsigned int handled = 0;
 
 	ioaddr = dev->base_addr;
 	sp = (struct speedo_private *)dev->priv;
@@ -1576,7 +1577,7 @@ static void speedo_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 		printk(KERN_ERR"%s: SMP simultaneous entry of an interrupt handler.\n",
 			   dev->name);
 		sp->in_interrupt = 0;	/* Avoid halting machine. */
-		return;
+		return IRQ_NONE;
 	}
 #endif
 
@@ -1593,6 +1594,7 @@ static void speedo_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 
 		if ((status & 0xfc00) == 0)
 			break;
+		handled = 1;
 
 
 		if ((status & 0x5000) ||	/* Packet received, or Rx error. */
@@ -1654,7 +1656,7 @@ static void speedo_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 			   dev->name, inw(ioaddr + SCBStatus));
 
 	clear_bit(0, (void*)&sp->in_interrupt);
-	return;
+	return IRQ_RETVAL(handled);
 }
 
 static inline struct RxFD *speedo_rx_alloc(struct net_device *dev, int entry)

@@ -947,7 +947,7 @@ static u16 transmit_allocate(struct airo_info*, int lenPayload, int raw);
 static int transmit_802_3_packet(struct airo_info*, int len, char *pPacket);
 static int transmit_802_11_packet(struct airo_info*, int len, char *pPacket);
 
-static void airo_interrupt( int irq, void* dev_id, struct pt_regs
+static irqreturn_t airo_interrupt( int irq, void* dev_id, struct pt_regs
 			    *regs);
 static int airo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 #ifdef WIRELESS_EXT
@@ -1837,19 +1837,22 @@ static void airo_read_mic(struct airo_info *ai) {
 	}
 }
 
-static void airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs) {
+static irqreturn_t airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs) {
 	struct net_device *dev = (struct net_device *)dev_id;
 	u16 status;
 	u16 fid;
 	struct airo_info *apriv = dev->priv;
 	u16 savedInterrupts = 0;
+	int handled = 0;
 
 	if (!netif_device_present(dev))
-		return;
+		return IRQ_NONE;
 
 	for (;;) {
 		status = IN4500( apriv, EVSTAT );
 		if ( !(status & STATUS_INTS) || status == 0xffff ) break;
+
+		handled = 1;
 
 		if ( status & EV_AWAKE ) {
 			OUT4500( apriv, EVACK, EV_AWAKE );
@@ -2133,7 +2136,7 @@ static void airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs) {
 		OUT4500( apriv, EVINTEN, savedInterrupts );
 
 	/* done.. */
-	return;
+	return IRQ_RETVAL(handled);
 }
 
 /*
@@ -2494,7 +2497,7 @@ static int aux_bap_read(struct airo_info *ai, u16 *pu16Dst,
 	u16 next;
 	int words;
 	int i;
-	long flags;
+	unsigned long flags;
 
 	spin_lock_irqsave(&ai->aux_lock, flags);
 	page = IN4500(ai, SWS0+whichbap);

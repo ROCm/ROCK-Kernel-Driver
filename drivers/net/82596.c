@@ -357,7 +357,7 @@ static char init_setup[] =
 
 static int i596_open(struct net_device *dev);
 static int i596_start_xmit(struct sk_buff *skb, struct net_device *dev);
-static void i596_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t i596_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static int i596_close(struct net_device *dev);
 static struct net_device_stats *i596_get_stats(struct net_device *dev);
 static void i596_add_cmd(struct net_device *dev, struct i596_cmd *cmd);
@@ -1018,8 +1018,6 @@ static int i596_open(struct net_device *dev)
 
 	netif_start_queue(dev);
 
-	MOD_INC_USE_COUNT;
-
 	/* Initialize the 82596 memory */
 	if (init_i596_mem(dev)) {
 		res = -EAGAIN;
@@ -1218,6 +1216,7 @@ int __init i82596_probe(struct net_device *dev)
 	DEB(DEB_PROBE,printk(KERN_INFO "%s", version));
 
 	/* The 82596-specific entries in the device structure. */
+	SET_MODULE_OWNER(dev);
 	dev->open = i596_open;
 	dev->stop = i596_close;
 	dev->hard_start_xmit = i596_start_xmit;
@@ -1247,24 +1246,25 @@ int __init i82596_probe(struct net_device *dev)
 	return 0;
 }
 
-static void i596_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t i596_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_id;
 	struct i596_private *lp;
 	short ioaddr;
 	unsigned short status, ack_cmd = 0;
+	int handled = 0;
 
 #ifdef ENABLE_BVME6000_NET
 	if (MACH_IS_BVME6000) {
 		if (*(char *) BVME_LOCAL_IRQ_STAT & BVME_ETHERR) {
 			i596_error(irq, dev_id, regs);
-			return;
+			return IRQ_HANDLED;
 		}
 	}
 #endif
 	if (dev == NULL) {
 		printk(KERN_ERR "i596_interrupt(): irq %d for unknown device.\n", irq);
-		return;
+		return IRQ_NONE;
 	}
 
 	ioaddr = dev->base_addr;
@@ -1283,6 +1283,7 @@ static void i596_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if ((status & 0x8000) || (status & 0x2000)) {
 		struct i596_cmd *ptr;
 
+		handled = 1;
 		if ((status & 0x8000))
 			DEB(DEB_INTS,printk(KERN_DEBUG "%s: i596 interrupt completed command.\n", dev->name));
 		if ((status & 0x2000))
@@ -1405,7 +1406,7 @@ static void i596_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	DEB(DEB_INTS,printk(KERN_DEBUG "%s: exiting interrupt.\n", dev->name));
 
 	spin_unlock (&lp->lock);
-	return;
+	return IRQ_RETVAL(handled);
 }
 
 static int i596_close(struct net_device *dev)
@@ -1450,7 +1451,6 @@ static int i596_close(struct net_device *dev)
 
 	free_irq(dev->irq, dev);
 	remove_rx_bufs(dev);
-	MOD_DEC_USE_COUNT;
 
 	return 0;
 }

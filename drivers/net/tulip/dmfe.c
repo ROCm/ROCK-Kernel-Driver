@@ -298,7 +298,7 @@ static struct net_device_stats * dmfe_get_stats(struct DEVICE *);
 static void dmfe_set_filter_mode(struct DEVICE *);
 static int dmfe_do_ioctl(struct DEVICE *, struct ifreq *, int);
 static u16 read_srom_word(long ,int);
-static void dmfe_interrupt(int , void *, struct pt_regs *);
+static irqreturn_t dmfe_interrupt(int , void *, struct pt_regs *);
 static void dmfe_descriptor_init(struct dmfe_board_info *, unsigned long);
 static void allocate_rx_buffer(struct dmfe_board_info *);
 static void update_cr6(u32, unsigned long);
@@ -726,7 +726,7 @@ static int dmfe_stop(struct DEVICE *dev)
  *	receive the packet to upper layer, free the transmitted packet
  */
 
-static void dmfe_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t dmfe_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct DEVICE *dev = dev_id;
 	struct dmfe_board_info *db = (struct dmfe_board_info *) dev->priv;
@@ -737,7 +737,7 @@ static void dmfe_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	if (!dev) {
 		DMFE_DBUG(1, "dmfe_interrupt() without DEVICE arg", 0);
-		return;
+		return IRQ_NONE;
 	}
 
 	spin_lock_irqsave(&db->lock, flags);
@@ -747,7 +747,7 @@ static void dmfe_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	outl(db->cr5_data, ioaddr + DCR5);
 	if ( !(db->cr5_data & 0xc1) ) {
 		spin_unlock_irqrestore(&db->lock, flags);
-		return;
+		return IRQ_HANDLED;
 	}
 
 	/* Disable all interrupt in CR7 to solve the interrupt edge problem */
@@ -760,7 +760,7 @@ static void dmfe_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		db->reset_fatal++;
 		db->wait_reset = 1;	/* Need to RESET */
 		spin_unlock_irqrestore(&db->lock, flags);
-		return;
+		return IRQ_HANDLED;
 	}
 
 	 /* Received the coming packet */
@@ -786,6 +786,7 @@ static void dmfe_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	outl(db->cr7_data, ioaddr + DCR7);
 
 	spin_unlock_irqrestore(&db->lock, flags);
+	return IRQ_HANDLED;
 }
 
 

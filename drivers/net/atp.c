@@ -203,7 +203,7 @@ static void hardware_init(struct net_device *dev);
 static void write_packet(long ioaddr, int length, unsigned char *packet, int pad, int mode);
 static void trigger_send(long ioaddr, int length);
 static int	atp_send_packet(struct sk_buff *skb, struct net_device *dev);
-static void atp_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t atp_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void net_rx(struct net_device *dev);
 static void read_block(long ioaddr, int length, unsigned char *buffer, int data_mode);
 static int net_close(struct net_device *dev);
@@ -560,7 +560,7 @@ static int atp_send_packet(struct sk_buff *skb, struct net_device *dev)
 	struct net_local *lp = (struct net_local *)dev->priv;
 	long ioaddr = dev->base_addr;
 	int length;
-	long flags;
+	unsigned long flags;
 
 	length = ETH_ZLEN < skb->len ? skb->len : ETH_ZLEN;
 
@@ -596,17 +596,19 @@ static int atp_send_packet(struct sk_buff *skb, struct net_device *dev)
 
 /* The typical workload of the driver:
    Handle the network interface interrupts. */
-static void atp_interrupt(int irq, void *dev_instance, struct pt_regs * regs)
+static irqreturn_t
+atp_interrupt(int irq, void *dev_instance, struct pt_regs * regs)
 {
 	struct net_device *dev = (struct net_device *)dev_instance;
 	struct net_local *lp;
 	long ioaddr;
 	static int num_tx_since_rx;
 	int boguscount = max_interrupt_work;
+	int handled = 0;
 
 	if (dev == NULL) {
 		printk(KERN_ERR "ATP_interrupt(): irq %d for unknown device.\n", irq);
-		return;
+		return IRQ_NONE;
 	}
 	ioaddr = dev->base_addr;
 	lp = (struct net_local *)dev->priv;
@@ -626,6 +628,7 @@ static void atp_interrupt(int irq, void *dev_instance, struct pt_regs * regs)
 		if (net_debug > 5) printk("loop status %02x..", status);
 
 		if (status & (ISR_RxOK<<3)) {
+			handled = 1;
 			write_reg(ioaddr, ISR, ISR_RxOK); /* Clear the Rx interrupt. */
 			do {
 				int read_status = read_nibble(ioaddr, CMR1);
@@ -648,6 +651,7 @@ static void atp_interrupt(int irq, void *dev_instance, struct pt_regs * regs)
 					break;
 			} while (--boguscount > 0);
 		} else if (status & ((ISR_TxErr + ISR_TxOK)<<3)) {
+			handled = 1;
 			if (net_debug > 6)  printk("handling Tx done..");
 			/* Clear the Tx interrupt.  We should check for too many failures
 			   and reinitialize the adapter. */
@@ -712,7 +716,7 @@ static void atp_interrupt(int irq, void *dev_instance, struct pt_regs * regs)
 	spin_unlock(&lp->lock);
 
 	if (net_debug > 5) printk("exiting interrupt.\n");
-	return;
+	return IRQ_RETVAL(handled);
 }
 
 #ifdef TIMED_CHECKER

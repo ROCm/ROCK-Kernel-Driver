@@ -43,7 +43,7 @@ extern int ethdev_init(struct net_device *dev);
 extern void NS8390_init(struct net_device *dev, int startp);
 extern int ei_open(struct net_device *dev);
 extern int ei_close(struct net_device *dev);
-extern void ei_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+extern irqreturn_t ei_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
 /* You have one of these per-board */
 struct ei_device {

@@ -322,8 +322,8 @@ static void	BoardInitMem(SK_AC *pAC);
 static void	SetupRing(SK_AC*, void*, uintptr_t, RXD**, RXD**, RXD**,
 			int*, SK_BOOL);
 
-static void	SkGeIsr(int irq, void *dev_id, struct pt_regs *ptregs);
-static void	SkGeIsrOnePort(int irq, void *dev_id, struct pt_regs *ptregs);
+static irqreturn_t SkGeIsr(int irq, void *dev_id, struct pt_regs *ptregs);
+static irqreturn_t SkGeIsrOnePort(int irq, void *dev_id, struct pt_regs *ptregs);
 static int	SkGeOpen(struct net_device *dev);
 static int	SkGeClose(struct net_device *dev);
 static int	SkGeXmit(struct sk_buff *skb, struct net_device *dev);
@@ -470,6 +470,7 @@ static int __init skge_probe (void)
 		pNet->Up = 0;
 		dev->irq = pdev->irq;
 
+		SET_MODULE_OWNER(dev);
 		dev->open =		&SkGeOpen;
 		dev->stop =		&SkGeClose;
 		dev->hard_start_xmit =	&SkGeXmit;
@@ -1236,7 +1237,7 @@ int	PortIndex)	/* index of the port for which to re-init */
  * Returns: N/A
  *
  */
-static void SkGeIsr(int irq, void *dev_id, struct pt_regs *ptregs)
+static irqreturn_t SkGeIsr(int irq, void *dev_id, struct pt_regs *ptregs)
 {
 struct net_device *dev = (struct net_device *)dev_id;
 
@@ -1252,7 +1253,7 @@ SK_U32		IntSrc;		/* interrupts source register contents */
 	 */
 	SK_IN32(pAC->IoBase, B0_SP_ISRC, &IntSrc);
 	if (IntSrc == 0) {
-		return;
+		return IRQ_NONE;
 	}
 
 	while (((IntSrc & IRQ_MASK) & ~SPECIAL_IRQS) != 0) {
@@ -1380,7 +1381,7 @@ SK_U32		IntSrc;		/* interrupts source register contents */
 	/* IRQ is processed - Enable IRQs again*/
 	SK_OUT32(pAC->IoBase, B0_IMSK, IRQ_MASK);
 
-	return;
+	return IRQ_HANDLED;
 } /* SkGeIsr */
 
 
@@ -1397,7 +1398,7 @@ SK_U32		IntSrc;		/* interrupts source register contents */
  * Returns: N/A
  *
  */
-static void SkGeIsrOnePort(int irq, void *dev_id, struct pt_regs *ptregs)
+static irqreturn_t SkGeIsrOnePort(int irq, void *dev_id, struct pt_regs *ptregs)
 {
 struct net_device *dev = (struct net_device *)dev_id;
 DEV_NET		*pNet;
@@ -1412,7 +1413,7 @@ SK_U32		IntSrc;		/* interrupts source register contents */
 	 */
 	SK_IN32(pAC->IoBase, B0_SP_ISRC, &IntSrc);
 	if (IntSrc == 0) {
-		return;
+		return IRQ_NONE;
 	}
 
 	while (((IntSrc & IRQ_MASK) & ~SPECIAL_IRQS) != 0) {
@@ -1498,7 +1499,7 @@ SK_U32		IntSrc;		/* interrupts source register contents */
 	/* IRQ is processed - Enable IRQs again*/
 	SK_OUT32(pAC->IoBase, B0_IMSK, IRQ_MASK);
 
-	return;
+	return IRQ_HANDLED;
 } /* SkGeIsrOnePort */
 
 
@@ -1604,8 +1605,6 @@ SK_EVPARA		EvPara;		/* an event parameter union */
 	pAC->MaxPorts++;
 	pNet->Up = 1;
 
-	MOD_INC_USE_COUNT;
-
 	SK_DBG_MSG(NULL, SK_DBGMOD_DRV, SK_DBGCAT_DRV_ENTRY,
 		("SkGeOpen suceeded\n"));
 
@@ -1705,7 +1704,6 @@ SK_EVPARA		EvPara;
 
 	pAC->MaxPorts--;
 	pNet->Up = 0;
-	MOD_DEC_USE_COUNT;
 	
 	return (0);
 } /* SkGeClose */

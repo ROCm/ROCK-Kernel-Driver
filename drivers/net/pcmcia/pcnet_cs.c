@@ -315,6 +315,7 @@ static dev_link_t *pcnet_attach(void)
     link->conf.IntType = INT_MEMORY_AND_IO;
 
     ethdev_init(dev);
+    SET_MODULE_OWNER(dev);
     dev->init = &pcnet_init;
     dev->open = &pcnet_open;
     dev->stop = &pcnet_close;
@@ -1030,7 +1031,6 @@ static int pcnet_open(struct net_device *dev)
 	return -ENODEV;
 
     link->open++;
-    MOD_INC_USE_COUNT;
 
     set_misc_reg(dev);
     request_irq(dev->irq, ei_irq_wrapper, SA_SHIRQ, dev_info, dev);
@@ -1063,8 +1063,6 @@ static int pcnet_close(struct net_device *dev)
     del_timer(&info->watchdog);
     if (link->state & DEV_STALE_CONFIG)
 	mod_timer(&link->release, jiffies + HZ/20);
-
-    MOD_DEC_USE_COUNT;
 
     return 0;
 } /* pcnet_close */
