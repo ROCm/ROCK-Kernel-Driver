@@ -31,9 +31,7 @@
 #define ZFCP_LOG_AREA			ZFCP_LOG_AREA_SCSI
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_SCSI_REVISION "$Revision: 1.61 $"
-
-#include <linux/blkdev.h>
+#define ZFCP_SCSI_REVISION "$Revision: 1.62 $"
 
 #include "zfcp_ext.h"
 

@@ -626,8 +626,8 @@ config DEBUG_KERNEL
 	  identify kernel problems.
 
 config MATHEMU
-	tristate "Kernel FP software completion" if DEBUG_KERNEL
-	default y if !DEBUG_KERNEL
+	tristate "Kernel FP software completion" if DEBUG_KERNEL && !SMP
+	default y if !DEBUG_KERNEL || SMP
 	help
 	  This option is required for IEEE compliant floating point arithmetic
 	  on the Alpha. The only time you would ever not say Y is to say M in

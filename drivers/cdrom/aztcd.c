@@ -374,6 +374,7 @@ static void op_ok(void)
 }
 
 /* Wait for PA_OK = drive answers with AFL_PA_OK after receiving parameters*/
+#if 0
 # define PA_OK pa_ok()
 static void pa_ok(void)
 {
@@ -387,6 +388,7 @@ static void pa_ok(void)
 		}
 	} while (aztIndatum != AFL_PA_OK);
 }
+#endif
 
 /* Wait for STEN=Low = handshake signal 'AFL_.._OK available or command executed*/
 # define STEN_LOW  sten_low()

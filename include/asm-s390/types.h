@@ -93,6 +93,8 @@ typedef u64 sector_t;
 #define HAVE_SECTOR_T
 #endif
 
+typedef unsigned int kmem_bufctl_t;
+
 #endif /* ! __s390x__   */
 #endif /* __ASSEMBLY__  */
 #endif /* __KERNEL__    */

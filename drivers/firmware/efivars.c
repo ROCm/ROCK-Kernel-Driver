@@ -23,6 +23,10 @@
  *
  * Changelog:
  *
+ *  17 May 2004 - Matt Domsch <Matt_Domsch@dell.com>
+ *   remove check for efi_enabled in exit
+ *   add MODULE_VERSION
+ *
  *  26 Apr 2004 - Matt Domsch <Matt_Domsch@dell.com>
  *   minor bug fixes
  *
@@ -77,11 +81,13 @@
 
 #include <asm/uaccess.h>
 
+#define EFIVARS_VERSION "0.08"
+#define EFIVARS_DATE "2004-May-17"
+
 MODULE_AUTHOR("Matt Domsch <Matt_Domsch@Dell.com>");
 MODULE_DESCRIPTION("sysfs interface to EFI Variables");
 MODULE_LICENSE("GPL");
-
-#define EFIVARS_VERSION "0.07 2004-Apr-26"
+MODULE_VERSION(EFIVARS_VERSION);
 
 /*
  * efivars_lock protects two things:
@@ -667,7 +673,8 @@ efivars_init(void)
 	if (!efi_enabled)
 		return -ENODEV;
 
-	printk(KERN_INFO "EFI Variables Facility v%s\n", EFIVARS_VERSION);
+	printk(KERN_INFO "EFI Variables Facility v%s %s\n", EFIVARS_VERSION,
+	       EFIVARS_DATE);
 
 	/*
 	 * For now we'll register the efi subsys within this driver
@@ -735,9 +742,6 @@ static void __exit
 efivars_exit(void)
 {
 	struct list_head *pos, *n;
-
-	if (!efi_enabled)
-		return;
 
 	list_for_each_safe(pos, n, &efivar_list)
 		efivar_unregister(get_efivar_entry(pos));

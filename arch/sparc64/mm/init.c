@@ -1582,7 +1582,7 @@ void __init paging_init(void)
  * prom_set_traptable() call, and OBP is allocating a scratchpad
  * for saving client program register state etc.
  */
-void __init sort_memlist(struct linux_mlist_p1275 *thislist)
+static void __init sort_memlist(struct linux_mlist_p1275 *thislist)
 {
 	int swapi = 0;
 	int i, mitr;

@@ -1,5 +1,5 @@
 /* 
- * $Id: iucv.c,v 1.30 2004/05/13 09:21:23 braunu Exp $
+ * $Id: iucv.c,v 1.32 2004/05/18 09:28:43 braunu Exp $
  *
  * IUCV network driver
  *
@@ -29,7 +29,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.30 $
+ * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.32 $
  *
  */
 
@@ -285,6 +285,7 @@ typedef struct {
 		iparml_set_mask p_set_mask;
 	} param;
 	atomic_t in_use;
+	__u32    res;
 }  __attribute__ ((aligned(8))) iucv_param;
 #define PARAM_POOL_SIZE (PAGE_SIZE / sizeof(iucv_param))
 
@@ -351,7 +352,7 @@ do { \
 static void
 iucv_banner(void)
 {
-	char vbuf[] = "$Revision: 1.30 $";
+	char vbuf[] = "$Revision: 1.32 $";
 	char *version = vbuf;
 
 	if ((version = strchr(version, ':'))) {
@@ -469,17 +470,19 @@ iucv_exit(void)
 static __inline__ iucv_param *
 grab_param(void)
 {
-	iucv_param *ret;
-	static int i = 0;
+	iucv_param *ptr;
+        static int hint = 0;
 
-	while (atomic_compare_and_swap(0, 1, &iucv_param_pool[i].in_use)) {
-		i++;
-		if (i >= PARAM_POOL_SIZE)
-			i = 0;
-	}
-	ret = &iucv_param_pool[i];
-	memset(&ret->param, 0, sizeof(ret->param));
-	return ret;
+	ptr = iucv_param_pool + hint;
+	do {
+		ptr++;
+		if (ptr >= iucv_param_pool + PARAM_POOL_SIZE)
+			ptr = iucv_param_pool;
+	} while (atomic_compare_and_swap(0, 1, &ptr->in_use));
+	hint = ptr - iucv_param_pool;
+
+	memset(&ptr->param, 0, sizeof(ptr->param));
+	return ptr;
 }
 
 /**

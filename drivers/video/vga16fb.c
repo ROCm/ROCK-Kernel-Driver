@@ -1347,7 +1347,7 @@ int __init vga16fb_init(void)
 
 	/* XXX share VGA_FB_PHYS and I/O region with vgacon and others */
 
-	vga16fb.screen_base = ioremap(VGA_MAP_MEM(VGA_FB_PHYS), VGA_FB_PHYS_LEN);
+	vga16fb.screen_base = VGA_MAP_MEM(VGA_FB_PHYS);
 	if (!vga16fb.screen_base) {
 		printk(KERN_ERR "vga16fb: unable to map device\n");
 		ret = -ENOMEM;

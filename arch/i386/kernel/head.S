@@ -24,15 +24,14 @@
  * References to members of the new_cpu_data structure.
  */
 
-#define CPU_PARAMS	new_cpu_data
-#define X86		CPU_PARAMS+0
-#define X86_VENDOR	CPU_PARAMS+1
-#define X86_MODEL	CPU_PARAMS+2
-#define X86_MASK	CPU_PARAMS+3
-#define X86_HARD_MATH	CPU_PARAMS+6
-#define X86_CPUID	CPU_PARAMS+8
-#define X86_CAPABILITY	CPU_PARAMS+12
-#define X86_VENDOR_ID	CPU_PARAMS+36	/* offset dependent on NCAPINTS */
+#define X86		new_cpu_data+CPUINFO_x86
+#define X86_VENDOR	new_cpu_data+CPUINFO_x86_vendor
+#define X86_MODEL	new_cpu_data+CPUINFO_x86_model
+#define X86_MASK	new_cpu_data+CPUINFO_x86_mask
+#define X86_HARD_MATH	new_cpu_data+CPUINFO_hard_math
+#define X86_CPUID	new_cpu_data+CPUINFO_cpuid_level
+#define X86_CAPABILITY	new_cpu_data+CPUINFO_x86_capability
+#define X86_VENDOR_ID	new_cpu_data+CPUINFO_x86_vendor_id
 
 /*
  * This is how much memory *in addition to the memory covered up to

@@ -779,62 +779,7 @@ printk(KERN_INFO "my ip: %d.%d.%d.%d\n", NIPQUAD(ipaddress));
    </para>
   </sect1>
 
-  <sect1 id="routines-module-use-counters">
-   <title> <function>MOD_INC_USE_COUNT</function>/<function>MOD_DEC_USE_COUNT</function>
-    <filename class="headerfile">include/linux/module.h</filename></title>
-
-   <para>
-    These manipulate the module usage count, to protect against
-    removal (a module also can't be removed if another module uses
-    one of its exported symbols: see below).  Every reference to
-    the module from user context should be reflected by this
-    counter (e.g. for every data structure or socket) before the
-    function sleeps.  To quote Tim Waugh:
-   </para>
-
-   <programlisting>
-/* THIS IS BAD */
-foo_open (...)
-{
-        stuff..
-        if (fail)
-                return -EBUSY;
-        sleep.. (might get unloaded here)
-        stuff..
-        MOD_INC_USE_COUNT;
-        return 0;
-}
-
-/* THIS IS GOOD /
-foo_open (...)
-{
-        MOD_INC_USE_COUNT;
-        stuff..
-        if (fail) {
-                MOD_DEC_USE_COUNT;
-                return -EBUSY;
-        }
-        sleep.. (safe now)
-        stuff..
-        return 0;
-}
-   </programlisting>
-
-   <para>
-   You can often avoid having to deal with these problems by using the 
-   <structfield>owner</structfield> field of the 
-   <structname>file_operations</structname> structure. Set this field
-   as the macro <symbol>THIS_MODULE</symbol>.
-   </para>
-
-   <para>
-   For more complicated module unload locking requirements, you can set the
-   <structfield>can_unload</structfield> function pointer to your own routine,
-   which should return <returnvalue>0</returnvalue> if the module is
-   unloadable, or <returnvalue>-EBUSY</returnvalue> otherwise.
-   </para> 
-  
-  </sect1>
+ <!-- add info on new-style module refcounting here -->
  </chapter>
 
  <chapter id="queues">

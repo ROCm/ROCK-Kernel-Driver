@@ -1145,3 +1145,7 @@ static int swim3_add_device(struct device_node *swim)
 }
 
 module_init(swim3_init)
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Paul Mackerras");
+MODULE_ALIAS_BLOCKDEV_MAJOR(FLOPPY_MAJOR);

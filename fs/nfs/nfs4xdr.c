@@ -947,7 +947,8 @@ static int encode_readdir(struct xdr_stream *xdr, const struct nfs4_readdir_arg 
 static int encode_readlink(struct xdr_stream *xdr, const struct nfs4_readlink *readlink, struct rpc_rqst *req)
 {
 	struct rpc_auth *auth = req->rq_task->tk_auth;
-	int replen;
+	unsigned int count = readlink->count - 5;
+	unsigned int replen;
 	uint32_t *p;
 
 	RESERVE_SPACE(4);
@@ -958,7 +959,7 @@ static int encode_readlink(struct xdr_stream *xdr, const struct nfs4_readlink *r
 	 *      + OP_READLINK + status  = 7
 	 */
 	replen = (RPC_REPHDRSIZE + auth->au_rslack + 7) << 2;
-	xdr_inline_pages(&req->rq_rcv_buf, replen, readlink->pages, 0, readlink->count);
+	xdr_inline_pages(&req->rq_rcv_buf, replen, readlink->pages, 0, count);
 	
 	return 0;
 }
@@ -2921,10 +2922,10 @@ static int decode_readlink(struct xdr_stream *xdr, struct rpc_rqst *req)
 	 */
 	strlen = (uint32_t *) kmap_atomic(rcvbuf->pages[0], KM_USER0);
 	len = ntohl(*strlen);
-	if (len > PAGE_CACHE_SIZE - 5) {
-		printk(KERN_WARNING "nfs: server returned giant symlink!\n");
+	if (len > rcvbuf->page_len) {
+		dprintk(KERN_WARNING "nfs: server returned giant symlink!\n");
 		kunmap_atomic(strlen, KM_USER0);
-		return -EIO;
+		return -ENAMETOOLONG;
 	}
 	*strlen = len;
 

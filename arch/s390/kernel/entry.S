@@ -239,7 +239,7 @@ sysc_enter:
 sysc_do_restart:
 	tm	__TI_flags+3(%r9),(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT)
         l       %r8,sys_call_table-system_call(%r7,%r13) # get system call addr.
-        bo      BASED(sysc_tracesys)
+        bnz     BASED(sysc_tracesys)
         basr    %r14,%r8          # call sys_xxxx
         st      %r2,SP_R2(%r15)   # store return value (change R2 on stack)
                                   # ATTENTION: check sys_execve_glue before
@@ -328,7 +328,7 @@ sysc_tracego:
 	st	%r2,SP_R2(%r15)   # store return value
 sysc_tracenogo:
 	tm	__TI_flags+3(%r9),(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT)
-        bno     BASED(sysc_return)
+        bz      BASED(sysc_return)
 	l	%r1,BASED(.Ltrace)
 	la	%r2,SP_PTREGS(%r15)    # load pt_regs
 	la	%r3,1
@@ -512,7 +512,7 @@ pgm_svcper:
 pgm_svcstd:
 	tm	__TI_flags+3(%r9),(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT)
         l       %r8,sys_call_table-system_call(%r7,%r13) # get system call addr.
-        bo      BASED(pgm_tracesys)
+        bnz     BASED(pgm_tracesys)
         basr    %r14,%r8          # call sys_xxxx
         st      %r2,SP_R2(%r15)   # store return value (change R2 on stack)
                                   # ATTENTION: check sys_execve_glue before
@@ -554,7 +554,7 @@ pgm_svc_go:
         st      %r2,SP_R2(%r15)   # store return value
 pgm_svc_nogo:
 	tm	__TI_flags+3(%r9),(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT)
-        bno     BASED(pgm_svcret)
+        bz      BASED(pgm_svcret)
         l       %r1,BASED(.Ltrace)
 	la	%r2,SP_PTREGS(%r15)    # load pt_regs
 	la	%r3,1
