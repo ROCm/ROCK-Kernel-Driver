@@ -123,8 +123,9 @@ static int agp_backend_initialize(struct pci_dev *dev)
 			printk(KERN_ERR PFX "unable to get memory for scratch page.\n");
 			return -ENOMEM;
 		}
-		agp_bridge.scratch_page = virt_to_phys(addr);
-		agp_bridge.scratch_page = agp_bridge.mask_memory(agp_bridge.scratch_page, 0);
+		agp_bridge.scratch_page_real = virt_to_phys(addr);
+		agp_bridge.scratch_page =
+			agp_bridge.mask_memory(agp_bridge.scratch_page_real, 0);
 	}
 
 	size_value = agp_bridge.fetch_size();
@@ -165,8 +166,7 @@ static int agp_backend_initialize(struct pci_dev *dev)
 
 err_out:
 	if (agp_bridge.needs_scratch_page == TRUE) {
-		agp_bridge.scratch_page &= ~(0x00000fff);
-		agp_bridge.agp_destroy_page(phys_to_virt(agp_bridge.scratch_page));
+		agp_bridge.agp_destroy_page(phys_to_virt(agp_bridge.scratch_page_real));
 	}
 	if (got_gatt)
 		agp_bridge.free_gatt_table();
@@ -184,8 +184,7 @@ static void agp_backend_cleanup(void)
 	vfree(agp_bridge.key_list);
 
 	if (agp_bridge.needs_scratch_page == TRUE) {
-		agp_bridge.scratch_page &= ~(0x00000fff);
-		agp_bridge.agp_destroy_page(phys_to_virt(agp_bridge.scratch_page));
+		agp_bridge.agp_destroy_page(phys_to_virt(agp_bridge.scratch_page_real));
 	}
 }
 

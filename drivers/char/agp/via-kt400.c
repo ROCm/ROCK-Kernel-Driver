@@ -122,7 +122,6 @@ static int __init agp_via_probe (struct pci_dev *dev, const struct pci_device_id
 	agp_bridge.type = VIA_APOLLO_KT400_3;
 	agp_bridge.capndx = cap_ptr;
 	agp_bridge.masks = via_generic_masks;
-	agp_bridge.num_of_masks = 1;
 	agp_bridge.aperture_sizes = (void *) via_generic_sizes;
 	agp_bridge.size_type = U8_APER_SIZE;
 	agp_bridge.num_aperture_sizes = 7;
