@@ -240,6 +240,7 @@ static void change_speed (unsigned int index)
 	u8 fid, vid;
 	struct cpufreq_freqs freqs;
 	union msr_fidvidstatus fidvidstatus;
+	int cfid;
 
 	/* fid are the lower 8 bits of the index we stored into
 	 * the cpufreq frequency table in powernow_decode_bios,
@@ -251,8 +252,9 @@ static void change_speed (unsigned int index)
 
 	freqs.cpu = 0;
 
+	cfid = fidvidstatus.bits.CFID;
 	rdmsrl (MSR_K7_FID_VID_STATUS, fidvidstatus.val);
-	freqs.old = fsb * fid_codes[fidvidstatus.bits.CFID] * 100;
+	freqs.old = fsb * fid_codes[cfid] * 100;
 	freqs.new = powernow_table[index].frequency;
 
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
