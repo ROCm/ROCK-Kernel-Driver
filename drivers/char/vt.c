@@ -2602,6 +2602,8 @@ static struct tty_operations con_ops = {
 
 int __init vty_init(void)
 {
+	vcs_init();
+
 	console_driver = alloc_tty_driver(MAX_NR_CONSOLES);
 	if (!console_driver)
 		panic("Couldn't allocate console driver\n");
@@ -2629,7 +2631,6 @@ int __init vty_init(void)
 #ifdef CONFIG_FRAMEBUFFER_CONSOLE
 	fb_console_init();
 #endif	
-	vcs_init();
 	return 0;
 }
 
