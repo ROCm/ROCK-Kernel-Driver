@@ -986,6 +986,10 @@ static int copy_params(struct dm_ioctl *user, struct dm_ioctl **param)
 
 static int validate_params(uint cmd, struct dm_ioctl *param)
 {
+	/* Ignores parameters */
+	if (cmd == DM_REMOVE_ALL_CMD)
+		return 0;
+
 	/* Unless creating, either name of uuid but not both */
 	if (cmd != DM_DEV_CREATE_CMD) {
 		if ((!*param->uuid && !*param->name) ||
