@@ -65,13 +65,6 @@
 #define EP7212_BASE		CLPS7111_VIRT_BASE
 #include <asm/hardware/ep7212.h>
 
-#elif define (CONFIG_ARCH_CEIVA)
-#define EP7212_VIRT_BASE	CLPS7111_VIRT_BASE
-#define EP7212_BASE		CLPS7111_VIRT_BASE
-
-#include <asm/hardware/clps7111.h>
-#include <asm/hardware/ep7212.h>
-
 #endif
 
 #define SYSPLD_VIRT_BASE	0xfe000000
@@ -243,4 +236,3 @@
 #endif // #if defined (CONFIG_ARCH_CEIVA)
 
 #endif
-
