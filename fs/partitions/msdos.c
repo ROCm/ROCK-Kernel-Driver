@@ -425,6 +425,10 @@ int msdos_partition(struct parsed_partitions *state, struct block_device *bdev)
 		put_partition(state, slot, start, size);
 		if (SYS_IND(p) == LINUX_RAID_PARTITION)
 			state->parts[slot].flags = 1;
+		if (SYS_IND(p) == DM6_PARTITION)
+			printk("[DM]");
+		if (SYS_IND(p) == EZD_PARTITION)
+			printk("[EZD]");
 	}
 
 	printk("\n");

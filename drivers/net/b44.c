@@ -25,8 +25,8 @@
 
 #define DRV_MODULE_NAME		"b44"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"0.91"
-#define DRV_MODULE_RELDATE	"Oct 3, 2003"
+#define DRV_MODULE_VERSION	"0.92"
+#define DRV_MODULE_RELDATE	"Nov 4, 2003"
 
 #define B44_DEF_MSG_ENABLE	  \
 	(NETIF_MSG_DRV		| \
@@ -942,6 +942,8 @@ static int b44_change_mtu(struct net_device *dev, int new_mtu)
 	b44_init_hw(bp);
 	spin_unlock_irq(&bp->lock);
 
+	b44_enable_ints(bp);
+	
 	return 0;
 }
 
@@ -1558,6 +1560,8 @@ static int b44_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		netif_wake_queue(bp->dev);
 		spin_unlock_irq(&bp->lock);
 
+		b44_enable_ints(bp);
+		
 		return 0;
 	}
 	case ETHTOOL_GPAUSEPARAM: {
@@ -1601,6 +1605,8 @@ static int b44_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		}
 		spin_unlock_irq(&bp->lock);
 
+		b44_enable_ints(bp);
+		
 		return 0;
 	}
 	};
@@ -1752,6 +1758,7 @@ static int __devinit b44_init_one(struct pci_dev *pdev,
 	}
 
 	SET_MODULE_OWNER(dev);
+	SET_NETDEV_DEV(dev,&pdev->dev);
 
 	/* No interesting netdevice features in this card... */
 	dev->features |= 0;
@@ -1852,11 +1859,56 @@ static void __devexit b44_remove_one(struct pci_dev *pdev)
 	}
 }
 
+static int b44_suspend(struct pci_dev *pdev, u32 state)
+{
+	struct net_device *dev = pci_get_drvdata(pdev);
+	struct b44 *bp = dev->priv;
+
+        if (!netif_running(dev))
+                 return 0;
+
+	del_timer_sync(&bp->timer);
+
+	spin_lock_irq(&bp->lock); 
+
+	b44_halt(bp);
+	netif_carrier_off(bp->dev); 
+	netif_device_detach(bp->dev);
+	b44_free_rings(bp);
+
+	spin_unlock_irq(&bp->lock);
+	return 0;
+}
+
+static int b44_resume(struct pci_dev *pdev)
+{
+	struct net_device *dev = pci_get_drvdata(pdev);
+	struct b44 *bp = dev->priv;
+
+	if (!netif_running(dev))
+		return 0;
+
+	spin_lock_irq(&bp->lock);
+
+	b44_init_rings(bp);
+	b44_init_hw(bp);
+	netif_device_attach(bp->dev);
+	spin_unlock_irq(&bp->lock);
+
+	bp->timer.expires = jiffies + HZ;
+	add_timer(&bp->timer);
+
+	b44_enable_ints(bp);
+	return 0;
+}
+
 static struct pci_driver b44_driver = {
 	.name		= DRV_MODULE_NAME,
 	.id_table	= b44_pci_tbl,
 	.probe		= b44_init_one,
 	.remove		= __devexit_p(b44_remove_one),
+        .suspend        = b44_suspend,
+        .resume         = b44_resume,
 };
 
 static int __init b44_init(void)

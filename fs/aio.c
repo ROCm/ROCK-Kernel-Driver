@@ -376,6 +376,11 @@ void __put_ioctx(struct kioctx *ctx)
  *	Allocate a slot for an aio request.  Increments the users count
  * of the kioctx so that the kioctx stays around until all requests are
  * complete.  Returns NULL if no requests are free.
+ *
+ * Returns with kiocb->users set to 2.  The io submit code path holds
+ * an extra reference while submitting the i/o.
+ * This prevents races between the aio code path referencing the
+ * req (after submitting it) and aio_complete() freeing the req.
  */
 static struct kiocb *FASTCALL(__aio_get_req(struct kioctx *ctx));
 static struct kiocb *__aio_get_req(struct kioctx *ctx)
@@ -389,7 +394,7 @@ static struct kiocb *__aio_get_req(struct kioctx *ctx)
 		return NULL;
 
 	req->ki_flags = 1 << KIF_LOCKED;
-	req->ki_users = 1;
+	req->ki_users = 2;
 	req->ki_key = 0;
 	req->ki_ctx = ctx;
 	req->ki_cancel = NULL;
@@ -1009,7 +1014,7 @@ int io_submit_one(struct kioctx *ctx, struct iocb __user *user_iocb,
 	if (unlikely(!file))
 		return -EBADF;
 
-	req = aio_get_req(ctx);
+	req = aio_get_req(ctx);		/* returns with 2 references to req */
 	if (unlikely(!req)) {
 		fput(file);
 		return -EAGAIN;
@@ -1069,13 +1074,15 @@ int io_submit_one(struct kioctx *ctx, struct iocb __user *user_iocb,
 		ret = -EINVAL;
 	}
 
+	aio_put_req(req);	/* drop extra ref to req */
 	if (likely(-EIOCBQUEUED == ret))
 		return 0;
-	aio_complete(req, ret, 0);
+	aio_complete(req, ret, 0);	/* will drop i/o ref to req */
 	return 0;
 
 out_put_req:
-	aio_put_req(req);
+	aio_put_req(req);	/* drop extra ref to req */
+	aio_put_req(req);	/* drop i/o ref to req */
 	return ret;
 }
 

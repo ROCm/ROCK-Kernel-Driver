@@ -1110,6 +1110,8 @@ sys_clock_nanosleep(clockid_t which_clock, int flags,
 		    struct timespec __user *rmtp)
 {
 	struct timespec t;
+	struct restart_block *restart_block =
+	    &(current_thread_info()->restart_block);
 	int ret;
 
 	if ((unsigned) which_clock >= MAX_CLOCKS ||
@@ -1123,6 +1125,10 @@ sys_clock_nanosleep(clockid_t which_clock, int flags,
 		return -EINVAL;
 
 	ret = do_clock_nanosleep(which_clock, flags, &t);
+	/*
+	 * Do this here as do_clock_nanosleep does not have the real address
+	 */
+	restart_block->arg1 = (unsigned long)rmtp;
 
 	if ((ret == -ERESTART_RESTARTBLOCK) && rmtp &&
 					copy_to_user(rmtp, &t, sizeof (t)))
@@ -1152,7 +1158,7 @@ do_clock_nanosleep(clockid_t which_clock, int flags, struct timespec *tsave)
 	if (restart_block->fn == clock_nanosleep_restart) {
 		/*
 		 * Interrupted by a non-delivered signal, pick up remaining
-		 * time and continue.
+		 * time and continue.  Remaining time is in arg2 & 3.
 		 */
 		restart_block->fn = do_no_restart_syscall;
 
@@ -1209,9 +1215,20 @@ do_clock_nanosleep(clockid_t which_clock, int flags, struct timespec *tsave)
 		tsave->tv_sec = div_long_long_rem(left, 
 						  NSEC_PER_SEC, 
 						  &tsave->tv_nsec);
+		/*
+		 * Restart works by saving the time remaing in 
+		 * arg2 & 3 (it is 64-bits of jiffies).  The other
+		 * info we need is the clock_id (saved in arg0). 
+		 * The sys_call interface needs the users 
+		 * timespec return address which _it_ saves in arg1.
+		 * Since we have cast the nanosleep call to a clock_nanosleep
+		 * both can be restarted with the same code.
+		 */
 		restart_block->fn = clock_nanosleep_restart;
 		restart_block->arg0 = which_clock;
-		restart_block->arg1 = (unsigned long)tsave;
+		/*
+		 * Caller sets arg1
+		 */
 		restart_block->arg2 = rq_time & 0xffffffffLL;
 		restart_block->arg3 = rq_time >> 32;
 
@@ -1221,7 +1238,7 @@ do_clock_nanosleep(clockid_t which_clock, int flags, struct timespec *tsave)
 	return 0;
 }
 /*
- * This will restart clock_nanosleep. Incorrectly, btw.
+ * This will restart clock_nanosleep.
  */
 long
 clock_nanosleep_restart(struct restart_block *restart_block)

@@ -98,7 +98,7 @@ __ip_vs_get_out_rt(struct ip_vs_conn *cp, u32 rtos)
 			.oif = 0,
 			.nl_u = {
 				.ip4_u = {
-					.daddr = dest->addr,
+					.daddr = cp->daddr,
 					.saddr = 0,
 					.tos = rtos, } },
 		};

@@ -4,8 +4,8 @@
 #include <net/sock.h>
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("David S. Miller <davem@redhat.com>");
-MODULE_DESCRIPTION("arptables mangle table");
+MODULE_AUTHOR("Bart De Schuymer <bdschuym@pandora.be>");
+MODULE_DESCRIPTION("arptables arp payload mangle target");
 
 static unsigned int
 target(struct sk_buff **pskb, unsigned int hooknum, const struct net_device *in,

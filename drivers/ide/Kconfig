@@ -428,9 +428,10 @@ config BLK_DEV_IDEDMA_PCI
 
 if BLK_DEV_IDEDMA_PCI
 
+# TCQ is disabled for now
 config BLK_DEV_IDE_TCQ
 	bool "ATA tagged command queueing (EXPERIMENTAL)"
-	depends on EXPERIMENTAL
+	depends on EXPERIMENTAL && n
 	help
 	  Support for tagged command queueing on ATA disk drives. This enables
 	  the IDE layer to have multiple in-flight requests on hardware that

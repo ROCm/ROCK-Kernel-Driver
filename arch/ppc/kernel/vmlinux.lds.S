@@ -47,13 +47,17 @@ SECTIONS
 
   .fixup   : { *(.fixup) }
 
-  __start___ex_table = .;
-  __ex_table : { *(__ex_table) }
-  __stop___ex_table = .;
+	__ex_table : {
+		__start___ex_table = .;
+		*(__ex_table)
+		__stop___ex_table = .;
+	}
 
-  __start___bug_table = .;
-  __bug_table : { *(__bug_table) }
-  __stop___bug_table = .;
+	__bug_table : {
+		__start___bug_table = .;
+		*(__bug_table)
+		__stop___bug_table = .;
+	}
 
   /* Read-write section, merged into data segment: */
   . = ALIGN(4096);
