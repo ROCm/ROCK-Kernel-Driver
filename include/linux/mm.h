@@ -176,7 +176,7 @@ struct page {
 	 * Architectures with slow multiplication can define
 	 * WANT_PAGE_VIRTUAL in asm/page.h
 	 */
-#if defined(CONFIG_HIGHMEM) || defined(WANT_PAGE_VIRTUAL)
+#if defined(WANT_PAGE_VIRTUAL)
 	void *virtual;			/* Kernel virtual address (NULL if
 					   not kmapped, ie. highmem) */
 #endif /* CONFIG_HIGMEM || WANT_PAGE_VIRTUAL */
@@ -289,38 +289,34 @@ static inline void set_page_zone(struct page *page, unsigned long zone_num)
 	page->flags |= zone_num << ZONE_SHIFT;
 }
 
-/*
- * In order to avoid #ifdefs within C code itself, we define
- * set_page_address to a noop for non-highmem machines, where
- * the field isn't useful.
- * The same is true for page_address() in arch-dependent code.
- */
-#if defined(CONFIG_HIGHMEM) || defined(WANT_PAGE_VIRTUAL)
+#define lowmem_page_address(page)					\
+	__va( ( ((page) - page_zone(page)->zone_mem_map)		\
+			+ page_zone(page)->zone_start_pfn) << PAGE_SHIFT)
 
+#if defined(CONFIG_HIGHMEM) && !defined(WANT_PAGE_VIRTUAL)
+#define HASHED_PAGE_VIRTUAL
+#endif
+
+#if defined(WANT_PAGE_VIRTUAL)
+#define page_address(page) ((page)->virtual)
 #define set_page_address(page, address)			\
 	do {						\
 		(page)->virtual = (address);		\
 	} while(0)
+#define page_address_init()  do { } while(0)
+#endif
 
-#else /* CONFIG_HIGHMEM || WANT_PAGE_VIRTUAL */
+#if defined(HASHED_PAGE_VIRTUAL)
+void *page_address(struct page *page);
+void set_page_address(struct page *page, void *virtual);
+void page_address_init(void);
+#endif
+
+#if !defined(HASHED_PAGE_VIRTUAL) && !defined(WANT_PAGE_VIRTUAL)
+#define page_address(page) lowmem_page_address(page)
 #define set_page_address(page, address)  do { } while(0)
-#endif /* CONFIG_HIGHMEM || WANT_PAGE_VIRTUAL */
-
-/*
- * Permanent address of a page. Obviously must never be
- * called on a highmem page.
- */
-#if defined(CONFIG_HIGHMEM) || defined(WANT_PAGE_VIRTUAL)
-
-#define page_address(page) ((page)->virtual)
-
-#else /* CONFIG_HIGHMEM || WANT_PAGE_VIRTUAL */
-
-#define page_address(page)						\
-	__va( ( ((page) - page_zone(page)->zone_mem_map)		\
-			+ page_zone(page)->zone_start_pfn) << PAGE_SHIFT)
-
-#endif /* CONFIG_HIGHMEM || WANT_PAGE_VIRTUAL */
+#define page_address_init()  do { } while(0)
+#endif
 
 /*
  * Return true if this page is mapped into pagetables.  Subtle: test pte.direct

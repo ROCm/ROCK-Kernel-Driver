@@ -41,10 +41,8 @@
  */
 static long ratelimit_pages = 32;
 
-/*
- * The total number of pages in the machine.
- */
-static long total_pages;
+static long total_pages;	/* The total number of pages in the machine. */
+static int dirty_exceeded;	/* Dirty mem may be over limit */
 
 /*
  * When balance_dirty_pages decides that the caller needs to perform some
@@ -60,16 +58,12 @@ static inline long sync_writeback_pages(void)
 /* The following parameters are exported via /proc/sys/vm */
 
 /*
- * Dirty memory thresholds, in percentages
- */
-
-/*
- * Start background writeback (via pdflush) at this level
+ * Start background writeback (via pdflush) at this percentage
  */
 int dirty_background_ratio = 10;
 
 /*
- * The generator of dirty data starts async writeback at this level
+ * The generator of dirty data starts async writeback at this percentage
  */
 int dirty_async_ratio = 40;
 
@@ -80,7 +74,7 @@ int dirty_async_ratio = 40;
 int dirty_writeback_centisecs = 5 * 100;
 
 /*
- * The longest amount of time for which data is allowed to remain dirty
+ * The longest number of centiseconds for which data is allowed to remain dirty
  */
 int dirty_expire_centisecs = 30 * 100;
 
@@ -90,22 +84,17 @@ int dirty_expire_centisecs = 30 * 100;
 static void background_writeout(unsigned long _min_pages);
 
 /*
- * balance_dirty_pages() must be called by processes which are
- * generating dirty data.  It looks at the number of dirty pages
- * in the machine and either:
- *
- * - Starts background writeback or
- * - Causes the caller to perform async writeback or
- * - Causes the caller to perform synchronous writeback, then
- *   tells a pdflush thread to perform more writeback or
- * - Does nothing at all.
- *
- * balance_dirty_pages() can sleep.
+ * balance_dirty_pages() must be called by processes which are generating dirty
+ * data.  It looks at the number of dirty pages in the machine and will force
+ * the caller to perform writeback if the system is over `async_thresh'.
+ * If we're over `background_thresh' then pdflush is woken to perform some
+ * writeout.
  */
 void balance_dirty_pages(struct address_space *mapping)
 {
 	struct page_state ps;
-	long background_thresh, async_thresh;
+	long background_thresh;
+	long async_thresh;
 	unsigned long dirty_and_writeback;
 	struct backing_dev_info *bdi;
 
@@ -123,9 +112,13 @@ void balance_dirty_pages(struct address_space *mapping)
 			.older_than_this = NULL,
 			.nr_to_write	= sync_writeback_pages(),
 		};
-
+		if (!dirty_exceeded)
+			dirty_exceeded = 1;
 		writeback_inodes(&wbc);
 		get_page_state(&ps);
+	} else {
+		if (dirty_exceeded)
+			dirty_exceeded = 0;
 	}
 
 	if (!writeback_in_progress(bdi) && ps.nr_dirty > background_thresh)
@@ -141,17 +134,25 @@ EXPORT_SYMBOL_GPL(balance_dirty_pages);
  * which was newly dirtied.  The function will periodically check the system's
  * dirty state and will initiate writeback if needed.
  *
- * balance_dirty_pages_ratelimited() may sleep.
+ * On really big machines, get_page_state is expensive, so try to avoid calling
+ * it too often (ratelimiting).  But once we're over the dirty memory limit we
+ * decrease the ratelimiting by a lot, to prevent individual processes from
+ * overshooting the limit by (ratelimit_pages) each.
  */
 void balance_dirty_pages_ratelimited(struct address_space *mapping)
 {
 	static struct rate_limit_struct {
 		int count;
-	} ____cacheline_aligned ratelimits[NR_CPUS];
+	} ____cacheline_aligned_in_smp ratelimits[NR_CPUS];
 	int cpu;
+	long ratelimit;
+
+	ratelimit = ratelimit_pages;
+	if (dirty_exceeded)
+		ratelimit = 8;
 
 	cpu = get_cpu();
-	if (ratelimits[cpu].count++ >= ratelimit_pages) {
+	if (ratelimits[cpu].count++ >= ratelimit) {
 		ratelimits[cpu].count = 0;
 		put_cpu();
 		balance_dirty_pages(mapping);

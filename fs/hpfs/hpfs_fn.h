@@ -13,6 +13,7 @@
 #include <linux/fs.h>
 #include <linux/hpfs_fs.h>
 #include <linux/hpfs_fs_i.h>
+#include <linux/hpfs_fs_sb.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
 #include <linux/kernel.h>
@@ -56,22 +57,6 @@
 #endif
 
 typedef void nonconst; /* What this is for ? */
-
-/*
- * local time (HPFS) to GMT (Unix)
- */
-
-extern inline time_t local_to_gmt(struct super_block *s, time_t t)
-{
-	extern struct timezone sys_tz;
-	return t + sys_tz.tz_minuteswest * 60 + s->s_hpfs_timeshift;
-}
-
-extern inline time_t gmt_to_local(struct super_block *s, time_t t)
-{
-	extern struct timezone sys_tz;
-	return t - sys_tz.tz_minuteswest * 60 - s->s_hpfs_timeshift;
-}
 
 /*
  * conv= options
@@ -309,6 +294,11 @@ static inline struct hpfs_inode_info *hpfs_i(struct inode *inode)
 	return list_entry(inode, struct hpfs_inode_info, vfs_inode);
 }
 
+static inline struct hpfs_sb_info *hpfs_sb(struct super_block *sb)
+{
+	return sb->u.generic_sbp;
+}
+
 /* super.c */
 
 void hpfs_error(struct super_block *, char *, ...);
@@ -319,3 +309,20 @@ unsigned hpfs_count_one_bitmap(struct super_block *, secno);
 int hpfs_statfs(struct super_block *, struct statfs *);
 
 extern struct address_space_operations hpfs_aops;
+
+/*
+ * local time (HPFS) to GMT (Unix)
+ */
+
+extern inline time_t local_to_gmt(struct super_block *s, time_t t)
+{
+	extern struct timezone sys_tz;
+	return t + sys_tz.tz_minuteswest * 60 + hpfs_sb(s)->sb_timeshift;
+}
+
+extern inline time_t gmt_to_local(struct super_block *s, time_t t)
+{
+	extern struct timezone sys_tz;
+	return t - sys_tz.tz_minuteswest * 60 - hpfs_sb(s)->sb_timeshift;
+}
+

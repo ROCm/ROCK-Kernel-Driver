@@ -735,80 +735,22 @@ int sync_mapping_buffers(struct address_space *mapping)
 }
 EXPORT_SYMBOL(sync_mapping_buffers);
 
-/**
- * write_mapping_buffers - Start writeout of a mapping's "associated" buffers.
- * @mapping - the mapping which wants those buffers written.
- *
- * Starts I/O against dirty buffers which are on @mapping->private_list.
- * Those buffers must be backed by @mapping->assoc_mapping.
- *
- * The private_list buffers generally contain filesystem indirect blocks.
- * The idea is that the filesystem can start I/O against the indirects at
- * the same time as running generic_writepages(), so the indirect's
- * I/O will be merged with the data.
- *
- * We sneakliy write the buffers in probable tail-to-head order.  This is
- * because generic_writepages() writes in probable head-to-tail
- * order.  If the file is so huge that the data or the indirects overflow
- * the request queue we will at least get some merging this way.
- *
- * Any clean+unlocked buffers are de-listed.  clean/locked buffers must be
- * left on the list for an fsync() to wait on.
- *
- * Couldn't think of a smart way of avoiding livelock, so chose the dumb
- * way instead.
- *
- * FIXME: duplicates fsync_inode_buffers() functionality a bit.
+/*
+ * Called when we've recently written block `bblock', and it is known that
+ * `bblock' was for a buffer_boundary() buffer.  This means that the block at
+ * `bblock + 1' is probably a dirty indirect block.  Hunt it down and, if it's
+ * dirty, schedule it for IO.  So that indirects merge nicely with their data.
  */
-int write_mapping_buffers(struct address_space *mapping)
+void write_boundary_block(struct block_device *bdev,
+			sector_t bblock, unsigned blocksize)
 {
-	spinlock_t *lock;
-	struct address_space *buffer_mapping;
-	unsigned nr_to_write;	/* livelock avoidance */
-	struct list_head *lh;
-	int ret = 0;
-
-	if (list_empty(&mapping->private_list))
-		goto out;
-
-	buffer_mapping = mapping->assoc_mapping;
-	lock = &buffer_mapping->private_lock;
-	spin_lock(lock);
-	nr_to_write = 0;
-	lh = mapping->private_list.next;
-	while (lh != &mapping->private_list) {
-		lh = lh->next;
-		nr_to_write++;
+	struct buffer_head *bh = __find_get_block(bdev, bblock + 1, blocksize);
+	if (bh) {
+		if (buffer_dirty(bh))
+			ll_rw_block(WRITE, 1, &bh);
+		put_bh(bh);
 	}
-	nr_to_write *= 2;	/* Allow for some late additions */
-
-	while (nr_to_write-- && !list_empty(&mapping->private_list)) {
-		struct buffer_head *bh;
-
-		bh = BH_ENTRY(mapping->private_list.prev);
-		list_del_init(&bh->b_assoc_buffers);
-		if (!buffer_dirty(bh) && !buffer_locked(bh))
-			continue;
-		/* Stick it on the far end of the list. Order is preserved. */
-		list_add(&bh->b_assoc_buffers, &mapping->private_list);
-		if (test_set_buffer_locked(bh))
-			continue;
-		get_bh(bh);
-		spin_unlock(lock);
-		if (test_clear_buffer_dirty(bh)) {
-			bh->b_end_io = end_buffer_io_sync;
-			submit_bh(WRITE, bh);
-		} else {
-			unlock_buffer(bh);
-			put_bh(bh);
-		}
-		spin_lock(lock);
-	}
-	spin_unlock(lock);
-out:
-	return ret;
 }
-EXPORT_SYMBOL(write_mapping_buffers);
 
 void mark_buffer_dirty_inode(struct buffer_head *bh, struct inode *inode)
 {
@@ -2487,77 +2429,32 @@ int submit_bh(int rw, struct buffer_head * bh)
  * All of the buffers must be for the same device, and must also be a
  * multiple of the current approved size for the device.
  */
-void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
+void ll_rw_block(int rw, int nr, struct buffer_head *bhs[])
 {
-	unsigned int major;
-	int correct_size;
 	int i;
 
-	if (!nr)
-		return;
-
-	major = major(to_kdev_t(bhs[0]->b_bdev->bd_dev));
-
-	/* Determine correct block size for this device. */
-	correct_size = bdev_hardsect_size(bhs[0]->b_bdev);
-
-	/* Verify requested block sizes. */
-	for (i = 0; i < nr; i++) {
-		struct buffer_head *bh = bhs[i];
-		if (bh->b_size & (correct_size - 1)) {
-			printk(KERN_NOTICE "ll_rw_block: device %s: "
-			       "only %d-char blocks implemented (%u)\n",
-			       bdevname(bhs[0]->b_bdev),
-			       correct_size, bh->b_size);
-			goto sorry;
-		}
-	}
-
-	if ((rw & WRITE) && bdev_read_only(bhs[0]->b_bdev)) {
-		printk(KERN_NOTICE "Can't write to read-only device %s\n",
-		       bdevname(bhs[0]->b_bdev));
-		goto sorry;
-	}
-
 	for (i = 0; i < nr; i++) {
 		struct buffer_head *bh = bhs[i];
 
-		/* Only one thread can actually submit the I/O. */
 		if (test_set_buffer_locked(bh))
 			continue;
 
-		/* We have the buffer lock */
-		atomic_inc(&bh->b_count);
+		get_bh(bh);
 		bh->b_end_io = end_buffer_io_sync;
-
-		switch(rw) {
-		case WRITE:
-			if (!test_clear_buffer_dirty(bh))
-				/* Hmmph! Nothing to write */
-				goto end_io;
-			break;
-
-		case READA:
-		case READ:
-			if (buffer_uptodate(bh))
-				/* Hmmph! Already have it */
-				goto end_io;
-			break;
-		default:
-			BUG();
-	end_io:
-			bh->b_end_io(bh, buffer_uptodate(bh));
-			continue;
+		if (rw == WRITE) {
+			if (test_clear_buffer_dirty(bh)) {
+				submit_bh(WRITE, bh);
+				continue;
+			}
+		} else {
+			if (!buffer_uptodate(bh)) {
+				submit_bh(READ, bh);
+				continue;
+			}
 		}
-
-		submit_bh(rw, bh);
+		unlock_buffer(bh);
+		put_bh(bh);
 	}
-	return;
-
-sorry:
-	/* Make sure we don't get infinite dirty retries.. */
-	for (i = 0; i < nr; i++)
-		clear_buffer_dirty(bhs[i]);
 }
 
 /*

@@ -36,31 +36,4 @@ struct hpfs_sb_info {
 	int sb_timeshift;
 };
 
-#define s_hpfs_root u.hpfs_sb.sb_root
-#define s_hpfs_fs_size u.hpfs_sb.sb_fs_size
-#define s_hpfs_bitmaps u.hpfs_sb.sb_bitmaps
-#define s_hpfs_dirband_start u.hpfs_sb.sb_dirband_start
-#define s_hpfs_dirband_size u.hpfs_sb.sb_dirband_size
-#define s_hpfs_dmap u.hpfs_sb.sb_dmap
-#define s_hpfs_uid u.hpfs_sb.sb_uid
-#define s_hpfs_gid u.hpfs_sb.sb_gid
-#define s_hpfs_mode u.hpfs_sb.sb_mode
-#define s_hpfs_n_free u.hpfs_sb.sb_n_free
-#define s_hpfs_n_free_dnodes u.hpfs_sb.sb_n_free_dnodes
-#define s_hpfs_lowercase u.hpfs_sb.sb_lowercase
-#define s_hpfs_conv u.hpfs_sb.sb_conv
-#define s_hpfs_eas u.hpfs_sb.sb_eas
-#define s_hpfs_err u.hpfs_sb.sb_err
-#define s_hpfs_chk u.hpfs_sb.sb_chk
-#define s_hpfs_was_error u.hpfs_sb.sb_was_error
-#define s_hpfs_chkdsk u.hpfs_sb.sb_chkdsk
-/*#define s_hpfs_rd_fnode u.hpfs_sb.sb_rd_fnode*/
-#define s_hpfs_rd_inode u.hpfs_sb.sb_rd_inode
-#define s_hpfs_cp_table u.hpfs_sb.sb_cp_table
-#define s_hpfs_bmp_dir u.hpfs_sb.sb_bmp_dir
-#define s_hpfs_c_bitmap u.hpfs_sb.sb_c_bitmap
-#define s_hpfs_iget_q u.hpfs_sb.sb_iget_q
-/*#define s_hpfs_mounting u.hpfs_sb.sb_mounting*/
-#define s_hpfs_timeshift u.hpfs_sb.sb_timeshift
-
 #endif

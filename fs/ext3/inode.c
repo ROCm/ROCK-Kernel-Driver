@@ -1477,14 +1477,7 @@ struct address_space_operations ext3_aops = {
 static int
 ext3_writepages(struct address_space *mapping, struct writeback_control *wbc)
 {
-	int ret;
-	int err;
-
-	ret = write_mapping_buffers(mapping);
-	err = mpage_writepages(mapping, wbc, ext3_get_block);
-	if (!ret)
-		ret = err;
-	return ret;
+	return mpage_writepages(mapping, wbc, ext3_get_block);
 }
 #endif
 
