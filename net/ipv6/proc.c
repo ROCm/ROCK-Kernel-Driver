@@ -183,6 +183,7 @@ static int snmp6_seq_show(struct seq_file *seq, void *v)
 
 	if (idev) {
 		seq_printf(seq, "%-32s\t%u\n", "ifIndex", idev->dev->ifindex);
+		snmp6_seq_show_item(seq, (void **)idev->stats.icmpv6, snmp6_icmp6_list);
 	} else {
 		snmp6_seq_show_item(seq, (void **)ipv6_statistics, snmp6_ipv6_list);
 		snmp6_seq_show_item(seq, (void **)icmpv6_statistics, snmp6_icmp6_list);
@@ -225,6 +226,9 @@ int snmp6_register_dev(struct inet6_dev *idev)
 	if (!idev || !idev->dev)
 		return -EINVAL;
 
+	if (snmp6_mib_init((void **)idev->stats.icmpv6, sizeof(struct icmpv6_mib)) < 0)
+		goto err_icmp;
+
 #ifdef CONFIG_PROC_FS
 	if (!proc_net_devsnmp6) {
 		err = -ENOENT;
@@ -242,7 +246,9 @@ int snmp6_register_dev(struct inet6_dev *idev)
 
 #ifdef CONFIG_PROC_FS
 err_proc:
+	snmp6_mib_free((void **)idev->stats.icmpv6);
 #endif
+err_icmp:
 	return err;
 }
 
@@ -256,6 +262,7 @@ int snmp6_unregister_dev(struct inet6_dev *idev)
 	remove_proc_entry(idev->stats.proc_dir_entry->name,
 			  proc_net_devsnmp6);
 #endif
+	snmp6_mib_free((void **)idev->stats.icmpv6);
 
 	return 0;
 }

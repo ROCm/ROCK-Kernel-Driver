@@ -26,6 +26,8 @@
  *	yoshfuji		:	ensure to sent parameter problem for
  *					fragments.
  *	YOSHIFUJI Hideaki @USAGI:	added sysctl for icmp rate limit.
+ *	Randy Dunlap and
+ *	YOSHIFUJI Hideaki @USAGI:	Per-interface statistics support
  */
 
 #include <linux/module.h>
@@ -247,6 +249,7 @@ static __inline__ int opt_unrec(struct sk_buff *skb, __u32 offset)
 void icmpv6_send(struct sk_buff *skb, int type, int code, __u32 info, 
 		 struct net_device *dev)
 {
+	struct inet6_dev *idev;
 	struct ipv6hdr *hdr = skb->nh.ipv6h;
 	struct sock *sk = icmpv6_socket->sk;
 	struct in6_addr *saddr = NULL;
@@ -351,11 +354,16 @@ void icmpv6_send(struct sk_buff *skb, int type, int code, __u32 info,
 
 	msg.len = len;
 
+	idev = in6_dev_get(skb->dev);
+	
 	ip6_build_xmit(sk, icmpv6_getfrag, &msg, &fl, len, NULL, -1,
 		       MSG_DONTWAIT);
 	if (type >= ICMPV6_DEST_UNREACH && type <= ICMPV6_PARAMPROB)
-		ICMP6_INC_STATS_OFFSET_BH(Icmp6OutDestUnreachs, type-ICMPV6_DEST_UNREACH);
-	ICMP6_INC_STATS_BH(Icmp6OutMsgs);
+		ICMP6_INC_STATS_OFFSET_BH(idev, Icmp6OutDestUnreachs, type - ICMPV6_DEST_UNREACH);
+	ICMP6_INC_STATS_BH(idev, Icmp6OutMsgs);
+
+	if (likely(idev != NULL))
+		in6_dev_put(idev);
 out:
 	icmpv6_xmit_unlock();
 }
@@ -363,6 +371,7 @@ out:
 static void icmpv6_echo_reply(struct sk_buff *skb)
 {
 	struct sock *sk = icmpv6_socket->sk;
+	struct inet6_dev *idev;
 	struct icmp6hdr *icmph = (struct icmp6hdr *) skb->h.raw;
 	struct in6_addr *saddr;
 	struct icmpv6_msg msg;
@@ -394,14 +403,19 @@ static void icmpv6_echo_reply(struct sk_buff *skb)
 	fl.fl_icmp_type = ICMPV6_ECHO_REPLY;
 	fl.fl_icmp_code = 0;
 
+	idev = in6_dev_get(skb->dev);
+
 	icmpv6_xmit_lock();
 
 	ip6_build_xmit(sk, icmpv6_getfrag, &msg, &fl, msg.len, NULL, -1,
 		       MSG_DONTWAIT);
-	ICMP6_INC_STATS_BH(Icmp6OutEchoReplies);
-	ICMP6_INC_STATS_BH(Icmp6OutMsgs);
+	ICMP6_INC_STATS_BH(idev, Icmp6OutEchoReplies);
+	ICMP6_INC_STATS_BH(idev, Icmp6OutMsgs);
 
 	icmpv6_xmit_unlock();
+
+	if (likely(idev != NULL))
+		in6_dev_put(idev);
 }
 
 static void icmpv6_notify(struct sk_buff *skb, int type, int code, u32 info)
@@ -464,12 +478,13 @@ static int icmpv6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 {
 	struct sk_buff *skb = *pskb;
 	struct net_device *dev = skb->dev;
+	struct inet6_dev *idev = __in6_dev_get(dev);
 	struct in6_addr *saddr, *daddr;
 	struct ipv6hdr *orig_hdr;
 	struct icmp6hdr *hdr;
 	int type;
 
-	ICMP6_INC_STATS_BH(Icmp6InMsgs);
+	ICMP6_INC_STATS_BH(idev, Icmp6InMsgs);
 
 	saddr = &skb->nh.ipv6h->saddr;
 	daddr = &skb->nh.ipv6h->daddr;
@@ -517,9 +532,9 @@ static int icmpv6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 	type = hdr->icmp6_type;
 
 	if (type >= ICMPV6_DEST_UNREACH && type <= ICMPV6_PARAMPROB)
-		ICMP6_INC_STATS_OFFSET_BH(Icmp6InDestUnreachs, type-ICMPV6_DEST_UNREACH);
+		ICMP6_INC_STATS_OFFSET_BH(idev, Icmp6InDestUnreachs, type - ICMPV6_DEST_UNREACH);
 	else if (type >= ICMPV6_ECHO_REQUEST && type <= NDISC_REDIRECT)
-		ICMP6_INC_STATS_OFFSET_BH(Icmp6InEchos, type-ICMPV6_ECHO_REQUEST);
+		ICMP6_INC_STATS_OFFSET_BH(idev, Icmp6InEchos, type - ICMPV6_ECHO_REQUEST);
 
 	switch (type) {
 	case ICMPV6_ECHO_REQUEST:
@@ -597,7 +612,7 @@ static int icmpv6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 	return 0;
 
 discard_it:
-	ICMP6_INC_STATS_BH(Icmp6InErrors);
+	ICMP6_INC_STATS_BH(idev, Icmp6InErrors);
 	kfree_skb(skb);
 	return 0;
 }
