@@ -622,6 +622,7 @@ static void uhci_delete_queued_urb(struct uhci_hcd *uhci, struct urb *urb)
 		pqh->link = cpu_to_le32(nurbp->qh->dma_handle) | UHCI_PTR_QH;
 
 		list_add_tail(&nurbp->qh->list, &urbp->qh->list);
+		list_del_init(&urbp->qh->list);
 	} else {
 		/* We're somewhere in the middle (or end). A bit trickier */
 		/*  than the head scenario */
