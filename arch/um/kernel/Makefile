@@ -56,7 +56,7 @@ QUOTE = 'my $$config=`cat $(TOPDIR)/.config`; $$config =~ s/"/\\"/g ; while(<STD
 arch/um/kernel/config.c : arch/um/kernel/config.c.in $(TOPDIR)/.config
 	$(PERL) -e $(QUOTE) < arch/um/kernel/config.c.in > $@
 
-arch/um/kernel/config.o : config.c
+arch/um/kernel/config.o : arch/um/kernel/config.c
 
 clean:
 	rm -f config.c
