@@ -44,6 +44,7 @@ VERSION 1.2	<2002/11/30>
 #include <linux/etherdevice.h>
 #include <linux/delay.h>
 #include <linux/ethtool.h>
+#include <linux/dma-mapping.h>
 #include <linux/crc32.h>
 #include <linux/init.h>
 
