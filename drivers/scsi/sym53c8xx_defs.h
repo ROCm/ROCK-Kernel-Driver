@@ -259,17 +259,6 @@
 #endif
 
 /*
- * Vendor specific stuff
- */
-#ifdef CONFIG_SCSI_NCR53C8XX_SYMBIOS_COMPAT
-#define SCSI_NCR_SETUP_LED_PIN		(1)
-#define SCSI_NCR_SETUP_DIFF_SUPPORT	(4)
-#else
-#define SCSI_NCR_SETUP_LED_PIN		(0)
-#define SCSI_NCR_SETUP_DIFF_SUPPORT	(0)
-#endif
-
-/*
  * Settle time after reset at boot-up
  */
 #define SCSI_NCR_SETUP_SETTLE_TIME	(2)
@@ -926,10 +915,10 @@ struct ncr_driver_setup {
 	SCSI_NCR_SETUP_DEFAULT_SYNC,		\
 	0x00,					\
 	7,					\
-	SCSI_NCR_SETUP_LED_PIN,			\
+	0,					\
 	1,					\
 	SCSI_NCR_SETUP_SETTLE_TIME,		\
-	SCSI_NCR_SETUP_DIFF_SUPPORT,		\
+	0,					\
 	0,					\
 	1,					\
 	0,					\
