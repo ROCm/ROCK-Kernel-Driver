@@ -56,8 +56,8 @@
 /* ----- global variables -------------------------------------------------- */
 
 /**** lock for writing to global variables: the adapter & driver list */
-struct semaphore adap_lock;
-struct semaphore driver_lock;
+DECLARE_MUTEX(adap_lock);
+DECLARE_MUTEX(driver_lock);
 
 /**** adapter list */
 static struct i2c_adapter *adapters[I2C_ADAP_MAX];
@@ -76,11 +76,6 @@ static int i2c_debug;
  */
 
 #ifdef CONFIG_PROC_FS
-
-int __init i2cproc_init(void);
-void __exit i2cproc_exit(void);
-static int i2cproc_cleanup(void);
-
 static ssize_t i2cproc_bus_read(struct file * file, char * buf,size_t count, 
                                 loff_t *ppos);
 static int read_bus_i2c(char *buf, char **start, off_t offset, int len,
@@ -91,14 +86,6 @@ static int read_bus_i2c(char *buf, char **start, off_t offset, int len,
 static struct file_operations i2cproc_operations = {
 	.read		= i2cproc_bus_read,
 };
-
-static int i2cproc_initialized = 0;
-
-#else /* undef CONFIG_PROC_FS */
-
-#define i2cproc_init() 0
-#define i2cproc_cleanup() 0
-
 #endif /* CONFIG_PROC_FS */
 
 
@@ -136,8 +123,7 @@ int i2c_add_adapter(struct i2c_adapter *adap)
 	init_MUTEX(&adap->lock);
 
 #ifdef CONFIG_PROC_FS
-
-	if (i2cproc_initialized) {
+	{
 		char name[8];
 		struct proc_dir_entry *proc_entry;
 
@@ -155,7 +141,6 @@ int i2c_add_adapter(struct i2c_adapter *adap)
 		proc_entry->owner = THIS_MODULE;
 		adap->inode = proc_entry->low_ino;
 	}
-
 #endif /* def CONFIG_PROC_FS */
 
 	/* inform drivers of new adapters */
@@ -234,10 +219,10 @@ int i2c_del_adapter(struct i2c_adapter *adap)
 			}
 	}
 #ifdef CONFIG_PROC_FS
-	if (i2cproc_initialized) {
+	{
 		char name[8];
 		sprintf(name,"i2c-%d", i);
-		remove_proc_entry(name,proc_bus);
+		remove_proc_entry(name, proc_bus);
 	}
 #endif /* def CONFIG_PROC_FS */
 
@@ -681,41 +666,30 @@ ssize_t i2cproc_bus_read(struct file * file, char * buf,size_t count,
 	return -ENOENT;
 }
 
-int i2cproc_init(void)
+static int i2cproc_init(void)
 {
 
 	struct proc_dir_entry *proc_bus_i2c;
 
-	i2cproc_initialized = 0;
-
-	if (! proc_bus) {
-		printk(KERN_ERR "i2c-core.o: /proc/bus/ does not exist");
-		i2cproc_cleanup();
-		return -ENOENT;
- 	} 
 	proc_bus_i2c = create_proc_entry("i2c",0,proc_bus);
 	if (!proc_bus_i2c) {
 		printk(KERN_ERR "i2c-core.o: Could not create /proc/bus/i2c");
-		i2cproc_cleanup();
 		return -ENOENT;
  	}
+
 	proc_bus_i2c->read_proc = &read_bus_i2c;
 	proc_bus_i2c->owner = THIS_MODULE;
-	i2cproc_initialized += 2;
 	return 0;
 }
 
-int i2cproc_cleanup(void)
+static void __exit i2cproc_cleanup(void)
 {
 
-	if (i2cproc_initialized >= 1) {
-		remove_proc_entry("i2c",proc_bus);
-		i2cproc_initialized -= 2;
-	}
-	return 0;
+	remove_proc_entry("i2c",proc_bus);
 }
 
-
+module_init(i2cproc_init);
+module_exit(i2cproc_cleanup);
 #endif /* def CONFIG_PROC_FS */
 
 /* ----------------------------------------------------
@@ -1440,120 +1414,6 @@ int i2c_check_functionality (struct i2c_adapter *adap, u32 func)
 	return (func & adap_func) == func;
 }
 
-
-static int __init i2c_init(void)
-{
-	printk(KERN_INFO "i2c-core.o: i2c core module version %s (%s)\n", I2C_VERSION, I2C_DATE);
-	memset(adapters,0,sizeof(adapters));
-	memset(drivers,0,sizeof(drivers));
-	adap_count=0;
-	driver_count=0;
-
-	init_MUTEX(&adap_lock);
-	init_MUTEX(&driver_lock);
-	
-	i2cproc_init();
-	
-	return 0;
-}
-
-void __exit i2c_exit(void)
-{
-	i2cproc_cleanup();
-}
-
-#ifndef MODULE
-#ifdef CONFIG_I2C_CHARDEV
-	extern int i2c_dev_init(void);
-#endif
-#ifdef CONFIG_I2C_ALGOBIT
-	extern int i2c_algo_bit_init(void);
-#endif
-#ifdef CONFIG_I2C_PHILIPSPAR
-	extern int i2c_bitlp_init(void);
-#endif
-#ifdef CONFIG_I2C_ELV
-	extern int i2c_bitelv_init(void);
-#endif
-#ifdef CONFIG_I2C_VELLEMAN
-	extern int i2c_bitvelle_init(void);
-#endif
-#ifdef CONFIG_I2C_BITVIA
-	extern int i2c_bitvia_init(void);
-#endif
-
-#ifdef CONFIG_I2C_ALGOPCF
-	extern int i2c_algo_pcf_init(void);	
-#endif
-#ifdef CONFIG_I2C_ELEKTOR
-	extern int i2c_pcfisa_init(void);
-#endif
-
-#ifdef CONFIG_I2C_ALGO8XX
-	extern int i2c_algo_8xx_init(void);
-#endif
-#ifdef CONFIG_I2C_RPXLITE
-	extern int i2c_rpx_init(void);
-#endif
-#ifdef CONFIG_I2C_PROC
-	extern int sensors_init(void);
-#endif
-
-/* This is needed for automatic patch generation: sensors code starts here */
-/* This is needed for automatic patch generation: sensors code ends here   */
-
-int __init i2c_init_all(void)
-{
-	/* --------------------- global ----- */
-	i2c_init();
-
-#ifdef CONFIG_I2C_CHARDEV
-	i2c_dev_init();
-#endif
-	/* --------------------- bit -------- */
-#ifdef CONFIG_I2C_ALGOBIT
-	i2c_algo_bit_init();
-#endif
-#ifdef CONFIG_I2C_PHILIPSPAR
-	i2c_bitlp_init();
-#endif
-#ifdef CONFIG_I2C_ELV
-	i2c_bitelv_init();
-#endif
-#ifdef CONFIG_I2C_VELLEMAN
-	i2c_bitvelle_init();
-#endif
-
-	/* --------------------- pcf -------- */
-#ifdef CONFIG_I2C_ALGOPCF
-	i2c_algo_pcf_init();	
-#endif
-#ifdef CONFIG_I2C_ELEKTOR
-	i2c_pcfisa_init();
-#endif
-
-	/* --------------------- 8xx -------- */
-#ifdef CONFIG_I2C_ALGO8XX
-	i2c_algo_8xx_init();
-#endif
-#ifdef CONFIG_I2C_RPXLITE
-	i2c_rpx_init();
-#endif
-
-	/* -------------- proc interface ---- */
-#ifdef CONFIG_I2C_PROC
-	sensors_init();
-#endif
-/* This is needed for automatic patch generation: sensors code starts here */
-/* This is needed for automatic patch generation: sensors code ends here */
-
-	return 0;
-}
-
-#endif
-
-
-
 EXPORT_SYMBOL(i2c_add_adapter);
 EXPORT_SYMBOL(i2c_del_adapter);
 EXPORT_SYMBOL(i2c_add_driver);
@@ -1594,9 +1454,7 @@ EXPORT_SYMBOL(i2c_check_functionality);
 
 MODULE_AUTHOR("Simon G. Vogl <simon@tk.uni-linz.ac.at>");
 MODULE_DESCRIPTION("I2C-Bus main module");
-MODULE_PARM(i2c_debug, "i");
-MODULE_PARM_DESC(i2c_debug,"debug level");
 MODULE_LICENSE("GPL");
 
-module_init(i2c_init);
-module_exit(i2c_exit);
+MODULE_PARM(i2c_debug, "i");
+MODULE_PARM_DESC(i2c_debug,"debug level");

@@ -25,7 +25,6 @@
 #include <linux/sensors.h>
 #include <linux/init.h>
 
-MODULE_LICENSE("GPL");
 
 /* Addresses to scan */
 static unsigned short normal_i2c[] = { SENSORS_I2C_END };
@@ -66,10 +65,6 @@ struct lm75_data {
 	u16 temp, temp_os, temp_hyst;	/* Register values */
 };
 
-int __init sensors_lm75_init(void);
-void __exit sensors_lm75_exit(void);
-static int lm75_cleanup(void);
-
 static int lm75_attach_adapter(struct i2c_adapter *adapter);
 static int lm75_detect(struct i2c_adapter *adapter, int address,
 		       unsigned short flags, int kind);
@@ -109,9 +104,6 @@ static ctl_table lm75_dir_table_template[] = {
 	 &i2c_sysctl_real, NULL, &lm75_temp},
 	{0}
 };
-
-/* Used by init/cleanup */
-static int __initdata lm75_initialized = 0;
 
 static int lm75_id = 0;
 
@@ -188,10 +180,7 @@ int lm75_detect(struct i2c_adapter *adapter, int address,
 		type_name = "lm75";
 		client_name = "LM75 chip";
 	} else {
-#ifdef DEBUG
-		printk("lm75.o: Internal error: unknown kind (%d)?!?",
-		       kind);
-#endif
+		pr_debug("lm75.o: Internal error: unknown kind (%d)?!?", kind);
 		goto error1;
 	}
 
@@ -314,10 +303,7 @@ void lm75_update_client(struct i2c_client *client)
 
 	if ((jiffies - data->last_updated > HZ + HZ / 2) ||
 	    (jiffies < data->last_updated) || !data->valid) {
-
-#ifdef DEBUG
-		printk("Starting lm75 update\n");
-#endif
+		pr_debug("Starting lm75 update\n");
 
 		data->temp = lm75_read_value(client, LM75_REG_TEMP);
 		data->temp_os = lm75_read_value(client, LM75_REG_TEMP_OS);
@@ -359,45 +345,17 @@ void lm75_temp(struct i2c_client *client, int operation, int ctl_name,
 
 int __init sensors_lm75_init(void)
 {
-	int res;
-
-	printk("lm75.o version %s (%s)\n", LM_VERSION, LM_DATE);
-	lm75_initialized = 0;
-	if ((res = i2c_add_driver(&lm75_driver))) {
-		printk
-		    ("lm75.o: Driver registration failed, module not inserted.\n");
-		lm75_cleanup();
-		return res;
-	}
-	lm75_initialized++;
-	return 0;
+	return i2c_add_driver(&lm75_driver);
 }
 
-void __exit sensors_lm75_exit(void)
+static void __exit sensors_lm75_exit(void)
 {
-	lm75_cleanup();
+	i2c_del_driver(&lm75_driver);
 }
-
-static int lm75_cleanup(void)
-{
-	int res;
-
-	if (lm75_initialized >= 1) {
-		if ((res = i2c_del_driver(&lm75_driver))) {
-			printk
-			    ("lm75.o: Driver deregistration failed, module not removed.\n");
-			return res;
-		}
-		lm75_initialized--;
-	}
-
-	return 0;
-}
-
-EXPORT_NO_SYMBOLS;
 
 MODULE_AUTHOR("Frodo Looijaard <frodol@dds.nl>");
 MODULE_DESCRIPTION("LM75 driver");
+MODULE_LICENSE("GPL");
 
 module_init(sensors_lm75_init);
 module_exit(sensors_lm75_exit);

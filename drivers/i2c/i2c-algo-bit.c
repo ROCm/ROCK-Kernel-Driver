@@ -605,18 +605,9 @@ int i2c_bit_del_bus(struct i2c_adapter *adap)
 	return 0;
 }
 
-int __init i2c_algo_bit_init (void)
-{
-	printk(KERN_INFO "i2c-algo-bit.o: i2c bit algorithm module version %s (%s)\n", I2C_VERSION, I2C_DATE);
-	return 0;
-}
-
-
-
 EXPORT_SYMBOL(i2c_bit_add_bus);
 EXPORT_SYMBOL(i2c_bit_del_bus);
 
-#ifdef MODULE
 MODULE_AUTHOR("Simon G. Vogl <simon@tk.uni-linz.ac.at>");
 MODULE_DESCRIPTION("I2C-Bus bit-banging algorithm");
 MODULE_LICENSE("GPL");
@@ -629,13 +620,3 @@ MODULE_PARM_DESC(bit_test, "Test the lines of the bus to see if it is stuck");
 MODULE_PARM_DESC(bit_scan, "Scan for active chips on the bus");
 MODULE_PARM_DESC(i2c_debug,
             "debug level - 0 off; 1 normal; 2,3 more verbose; 9 bit-protocol");
-
-int init_module(void) 
-{
-	return i2c_algo_bit_init();
-}
-
-void cleanup_module(void) 
-{
-}
-#endif

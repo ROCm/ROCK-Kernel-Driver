@@ -48,10 +48,6 @@
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>
 
-int __init i2c_dev_init(void);
-void __exit i2c_dev_exit(void);
-static int dev_cleanup(void);
-
 /* struct file_operations changed too often in the 2.1 series for nice code */
 
 static ssize_t i2cdev_read (struct file *file, char *buf, size_t count, 
@@ -437,19 +433,6 @@ static int i2cdev_command(struct i2c_client *client, unsigned int cmd,
 	return -1;
 }
 
-static int dev_cleanup(void)
-{
-	int res;
-
-	if ((res = i2c_del_driver(&i2cdev_driver))) {
-		printk(KERN_ERR "i2c-dev.o: Driver deregistration failed, "
-		       "module not removed.\n");
-	}
-
-	devfs_remove("i2c");
-	unregister_chrdev(I2C_MAJOR,"i2c");
-}
-
 int __init i2c_dev_init(void)
 {
 	int res;
@@ -471,12 +454,12 @@ int __init i2c_dev_init(void)
 	return 0;
 }
 
-void __exit i2c_dev_exit(void)
+static void __exit i2c_dev_exit(void)
 {
-	dev_cleanup();
+	i2c_del_driver(&i2cdev_driver);
+	devfs_remove("i2c");
+	unregister_chrdev(I2C_MAJOR,"i2c");
 }
-
-EXPORT_NO_SYMBOLS;
 
 MODULE_AUTHOR("Frodo Looijaard <frodol@dds.nl> and Simon G. Vogl <simon@tk.uni-linz.ac.at>");
 MODULE_DESCRIPTION("I2C /dev entries driver");
