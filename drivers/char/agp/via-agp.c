@@ -167,63 +167,151 @@ static struct agp_device_ids via_agp_device_ids[] __initdata =
 		.chipset	= VIA_VP3,
 		.chipset_name	= "VP3",
 	},
+
 	{
 		.device_id	= PCI_DEVICE_ID_VIA_82C598_0,
 		.chipset	= VIA_MVP3,
 		.chipset_name	= "MVP3",
 	},
+
 	{
 		.device_id	= PCI_DEVICE_ID_VIA_8501_0,
 		.chipset	= VIA_MVP4,
 		.chipset_name	= "MVP4",
 	},
+
+	/* VT8601 */
+/*	{
+		.device_id	= PCI_DEVICE_ID_VIA_8601_0,	// 0x0601
+		.chipset	= ,
+		.chipset_name	= "PLE133 ProMedia",
+	},*/
+
+	/* VT82C693A / VT28C694T */
 	{
 		.device_id	= PCI_DEVICE_ID_VIA_82C691,
 		.chipset	= VIA_APOLLO_PRO,
-		.chipset_name	= "Apollo Pro",
+		.chipset_name	= "Apollo Pro 133",
 	},
+
 	{
 		.device_id	= PCI_DEVICE_ID_VIA_8371_0,
 		.chipset	= VIA_APOLLO_KX133,
 		.chipset_name	= "Apollo Pro KX133",
 	},
+
+	/* VT8633 */
 	{
 		.device_id	= PCI_DEVICE_ID_VIA_8633_0,
 		.chipset	= VIA_APOLLO_PRO_266,
 		.chipset_name	= "Apollo Pro 266",
 	},
+
+	/* VT8361 */
+/*	{
+		.device_id	= PCI_DEVICE_ID_VIA_8361,	// 0x3112
+		.chipset	= ?,
+		.chipset_name	= "Apollo KLE133",
+	}, */
+
+	/* VT8365 / VT8362 */
 	{
 		.device_id	= PCI_DEVICE_ID_VIA_8363_0,
 		.chipset	= VIA_APOLLO_KT133,
-		.chipset_name	= "Apollo Pro KT133",
+		.chipset_name	= "Apollo Pro KT133/KM133/TwisterK",
 	},
+
+	/* VT8366 */
 	{
 		.device_id	= PCI_DEVICE_ID_VIA_8367_0,
 		.chipset	= VIA_APOLLO_KT133,
-		.chipset_name	= "Apollo Pro KT266",
+		.chipset_name	= "Apollo Pro KT266/KT333",
 	},
+
+	/* VT8633 (for CuMine/ Celeron) */
 	{
 		.device_id	= PCI_DEVICE_ID_VIA_8653_0,
 		.chipset	= VIA_APOLLO_PRO,
 		.chipset_name	= "Apollo Pro 266T",
 	},
+
+	/* KM266 / PM266 */
+/*	{
+		.device_id	= PCI_DEVICE_ID_VIA_KM266,	// 0x3116
+		.chipset	= VIA_KM266,
+		.chipset_name	= "KM266/PM266",
+	},	*/
+
+	/* CLE266 */
+/*	{
+		.device_id	= PCI_DEVICE_ID_VIA_CLE266,	// 0x3123
+		.chipset	= VIA_CLE266,
+		.chipset_name	= "CLE266",
+	},	*/
+
 	{
 		.device_id	= PCI_DEVICE_ID_VIA_8377_0,
 		.chipset	= VIA_APOLLO_KT400,
 		.chipset_name	= "Apollo Pro KT400",
 		.chipset_setup	= via_kt400_setup,
 	},
+
+	/* VT8604 / VT8605 / VT8603 / TwisterT
+	 * (Apollo Pro133A chipset with S3 Savage4) */
 	{
-		/* VIA ProSavage PM133 (Apollo Pro133A chipset with S3 Savage4) */
 		.device_id	= PCI_DEVICE_ID_VIA_82C694X_0,
 		.chipset	= VIA_VT8605,
-		.chipset_name	= "Apollo ProSavage PM133"
+		.chipset_name	= "Apollo ProSavage PM133/PL133/PN133/Twister"
 	},
+
+	/* P4M266 */
+/*	{
+		.device_id	= PCI_DEVICE_ID_VIA_P4M266,	// 0x3148
+		.chipset	= VIA_P4M266,
+		.chipset_name	= "P4M266",
+	},	*/
+
+	/* KN266/PN266 */
+/*	{
+		.device_id	= PCI_DEVICE_ID_KN266,	// 0x3156
+		.chipset	= VIA_KN266,
+		.chipset_name	= "KN266/PN266",
+	},	*/
+
 	{
 		.device_id	= PCI_DEVICE_ID_VIA_8754,
 		.chipset	= VIA_P4X,
 		.chipset_name	= "Apollo P4X333/P4X400"
 	},
+
+	/* P4N333 */
+/*	{
+		.device_id	= PCI_DEVICE_ID_VIA_P4N333,	// 0x3178
+		.chipset	= VIA_P4N,
+		.chipset_name	= "P4N333",
+	}, */
+
+	/* P4X600 */
+/*	{
+		.device_id	= PCI_DEVICE_ID_VIA_P4X600,	// 0x0198
+		.chipset	= VIA_P4X600,
+		.chipset_name	= "P4X600",
+	},	*/
+
+	/* KM400 */
+/*	{
+		.device_id	= PCI_DEVICE_ID_VIA_KM400,	// 0x3205
+		.chipset	= VIA_KM400,
+		.chipset_name	= "KM400",
+	},	*/
+
+	/* P4M400 */
+/*	{
+		.device_id	= PCI_DEVICE_ID_VIA_P4M400,	// 0x3209
+		.chipset	= VIA_P4M400,
+		.chipset_name	= "PM400",
+	},	*/
+
 	{ }, /* dummy final entry, always present */
 };
 
