@@ -10,7 +10,7 @@
 #include "base.h"
 
 
-#define to_intf(node) container_of(node,struct device_interface,node)
+#define to_intf(node) container_of(node,struct device_interface,kobj.entry)
 
 /**
  * intf_dev_link - symlink from interface's directory to device's directory
@@ -34,22 +34,18 @@ static void intf_dev_unlink(struct intf_data * data)
 
 int interface_register(struct device_interface * intf)
 {
-	struct device_class * cls = intf->devclass;
+	struct device_class * cls = get_devclass(intf->devclass);
+	int error = 0;
 
 	if (cls) {
 		pr_debug("register interface '%s' with class '%s'\n",
 			 intf->name,cls->name);
-		kobject_init(&intf->kobj);
 		strncpy(intf->kobj.name,intf->name,KOBJ_NAME_LEN);
 		intf->kobj.subsys = &cls->subsys;
 		kobject_register(&intf->kobj);
-
-		spin_lock(&device_lock);
-		list_add_tail(&intf->node,&cls->intf_list);
-		spin_unlock(&device_lock);
-		return 0;
-	}
-	return -EINVAL;
+	} else
+		error = -EINVAL;
+	return error;
 }
 
 void interface_unregister(struct device_interface * intf)
@@ -57,9 +53,6 @@ void interface_unregister(struct device_interface * intf)
 	pr_debug("unregistering interface '%s' from class '%s'\n",
 		 intf->name,intf->devclass->name);
 	kobject_unregister(&intf->kobj);
-	spin_lock(&device_lock);
-	list_del_init(&intf->node);
-	spin_unlock(&device_lock);
 }
 
 int interface_add(struct device_class * cls, struct device * dev)
@@ -69,7 +62,7 @@ int interface_add(struct device_class * cls, struct device * dev)
 
 	pr_debug("adding '%s' to %s class interfaces\n",dev->name,cls->name);
 
-	list_for_each(node,&cls->intf_list) {
+	list_for_each(node,&cls->subsys.list) {
 		struct device_interface * intf = to_intf(node);
 		if (intf->add_device) {
 			error = intf->add_device(dev);
@@ -89,30 +82,25 @@ void interface_remove(struct device_class * cls, struct device * dev)
 
 	pr_debug("remove '%s' from %s class interfaces: ",dev->name,cls->name);
 
-	spin_lock(&device_lock);
 	list_for_each_safe(node,next,&dev->intf_list) {
 		struct intf_data * intf_data = container_of(node,struct intf_data,node);
 		list_del_init(&intf_data->node);
-		spin_unlock(&device_lock);
 
 		intf_dev_unlink(intf_data);
 		pr_debug("%s ",intf_data->intf->name);
 		if (intf_data->intf->remove_device)
 			intf_data->intf->remove_device(intf_data);
-
-		spin_lock(&device_lock);
 	}
-	spin_unlock(&device_lock);
 	pr_debug("\n");
 }
 
 int interface_add_data(struct intf_data * data)
 {
-	spin_lock(&device_lock);
+	down_write(&data->intf->devclass->subsys.rwsem);
 	list_add_tail(&data->node,&data->dev->intf_list);
-	data->intf_num = ++data->intf->devnum;
-	spin_unlock(&device_lock);
+	data->intf_num = data->intf->devnum++;
 	intf_dev_link(data);
+	up_write(&data->intf->devclass->subsys.rwsem);
 	return 0;
 }
 

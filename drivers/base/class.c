@@ -2,6 +2,8 @@
  * class.c - basic device class management
  */
 
+#undef DEBUG
+
 #include <linux/device.h>
 #include <linux/module.h>
 #include <linux/init.h>
@@ -101,12 +103,12 @@ int devclass_add_driver(struct device_driver * drv)
 {
 	struct device_class * cls = get_devclass(drv->devclass);
 	if (cls) {
-		down_write(&cls->rwsem);
+		down_write(&cls->subsys.rwsem);
 		pr_debug("device class %s: adding driver %s:%s\n",
 			 cls->name,drv->bus->name,drv->name);
 		list_add_tail(&drv->class_list,&cls->drivers);
 		devclass_drv_link(drv);
-		up_write(&cls->rwsem);
+		up_write(&cls->subsys.rwsem);
 	}
 	return 0;
 }
@@ -115,12 +117,12 @@ void devclass_remove_driver(struct device_driver * drv)
 {
 	struct device_class * cls = drv->devclass;
 	if (cls) {
-		down_write(&cls->rwsem);
+		down_write(&cls->subsys.rwsem);
 		pr_debug("device class %s: removing driver %s:%s\n",
 			 cls->name,drv->bus->name,drv->name);
 		list_del_init(&drv->class_list);
 		devclass_drv_unlink(drv);
-		up_write(&cls->rwsem);
+		up_write(&cls->subsys.rwsem);
 		put_devclass(cls);
 	}
 }
@@ -163,7 +165,7 @@ int devclass_add_device(struct device * dev)
 	if (dev->driver) {
 		cls = get_devclass(dev->driver->devclass);
 		if (cls) {
-			down_write(&cls->rwsem);
+			down_write(&cls->subsys.rwsem);
 			pr_debug("device class %s: adding device %s\n",
 				 cls->name,dev->name);
 			if (cls->add_device) 
@@ -176,7 +178,7 @@ int devclass_add_device(struct device * dev)
 			/* notify userspace (call /sbin/hotplug) */
 			class_hotplug (dev, "add");
 
-			up_write(&cls->rwsem);
+			up_write(&cls->subsys.rwsem);
 			if (error)
 				put_devclass(cls);
 		}
@@ -191,7 +193,7 @@ void devclass_remove_device(struct device * dev)
 	if (dev->driver) {
 		cls = dev->driver->devclass;
 		if (cls) {
-			down_write(&cls->rwsem);
+			down_write(&cls->subsys.rwsem);
 			pr_debug("device class %s: removing device %s\n",
 				 cls->name,dev->name);
 			interface_remove(cls,dev);
@@ -202,7 +204,7 @@ void devclass_remove_device(struct device * dev)
 
 			if (cls->remove_device)
 				cls->remove_device(dev);
-			up_write(&cls->rwsem);
+			up_write(&cls->subsys.rwsem);
 			put_devclass(cls);
 		}
 	}
@@ -210,34 +212,20 @@ void devclass_remove_device(struct device * dev)
 
 struct device_class * get_devclass(struct device_class * cls)
 {
-	struct device_class * ret = cls;
-	spin_lock(&device_lock);
-	if (cls && cls->present && atomic_read(&cls->refcount) > 0)
-		atomic_inc(&cls->refcount);
-	else
-		ret = NULL;
-	spin_unlock(&device_lock);
-	return ret;
+	return cls ? container_of(subsys_get(&cls->subsys),struct device_class,subsys) : NULL;
 }
 
 void put_devclass(struct device_class * cls)
 {
-	if (atomic_dec_and_lock(&cls->refcount,&device_lock)) {
-		list_del_init(&cls->node);
-		spin_unlock(&device_lock);
-	}
+	subsys_put(&cls->subsys);
 }
 
 
 int devclass_register(struct device_class * cls)
 {
 	INIT_LIST_HEAD(&cls->drivers);
-	INIT_LIST_HEAD(&cls->intf_list);
-	init_rwsem(&cls->rwsem);
-	atomic_set(&cls->refcount,2);
-	cls->present = 1;
-	pr_debug("device class '%s': registering\n",cls->name);
 
+	pr_debug("device class '%s': registering\n",cls->name);
 	strncpy(cls->subsys.kobj.name,cls->name,KOBJ_NAME_LEN);
 	cls->subsys.parent = &class_subsys;
 	subsystem_register(&cls->subsys);
@@ -250,23 +238,15 @@ int devclass_register(struct device_class * cls)
 	cls->drvsubsys.parent = &cls->subsys;
 	subsystem_register(&cls->drvsubsys);
 
-	spin_lock(&device_lock);
-	list_add_tail(&cls->node,&class_list);
-	spin_unlock(&device_lock);
-	put_devclass(cls);
 	return 0;
 }
 
 void devclass_unregister(struct device_class * cls)
 {
-	spin_lock(&device_lock);
-	cls->present = 0;
-	spin_unlock(&device_lock);
 	pr_debug("device class '%s': unregistering\n",cls->name);
 	subsystem_unregister(&cls->drvsubsys);
 	subsystem_unregister(&cls->devsubsys);
 	subsystem_unregister(&cls->subsys);
-	put_devclass(cls);
 }
 
 static int __init class_subsys_init(void)
@@ -276,6 +256,8 @@ static int __init class_subsys_init(void)
 
 core_initcall(class_subsys_init);
 
+EXPORT_SYMBOL(devclass_create_file);
+EXPORT_SYMBOL(devclass_remove_file);
 EXPORT_SYMBOL(devclass_register);
 EXPORT_SYMBOL(devclass_unregister);
 EXPORT_SYMBOL(get_devclass);

@@ -153,19 +153,12 @@ extern void driver_remove_file(struct device_driver *, struct driver_attribute *
  */
 struct device_class {
 	char			* name;
-	struct rw_semaphore	rwsem;
-
-	atomic_t		refcount;
-	u32			present;
-
 	u32			devnum;
 
 	struct subsystem	subsys;
 	struct subsystem	devsubsys;
 	struct subsystem	drvsubsys;
-	struct list_head	node;
 	struct list_head	drivers;
-	struct list_head	intf_list;
 
 	int	(*add_device)(struct device *);
 	void	(*remove_device)(struct device *);
@@ -215,7 +208,6 @@ struct device_interface {
 	struct device_class	* devclass;
 
 	struct kobject		kobj;
-	struct list_head	node;
 	struct list_head	devices;
 
 	u32			devnum;
