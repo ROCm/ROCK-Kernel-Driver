@@ -1108,6 +1108,8 @@ static int __init init_ipv4_mibs(void)
 		}
 	}
 
+	(void) tcp_mib_init();
+
 	return 0;
 }
 
