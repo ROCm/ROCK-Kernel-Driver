@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psparse - Parser top level AML parse routines
- *              $Revision: 128 $
+ *              $Revision: 129 $
  *
  *****************************************************************************/
 
@@ -473,7 +473,7 @@ acpi_ps_parse_loop (
 	parser_state = &walk_state->parser_state;
 	walk_state->arg_types = 0;
 
-#ifndef PARSER_ONLY
+#if (!defined (ACPI_NO_METHOD_EXECUTION) && !defined (ACPI_CONSTANT_EVAL_ONLY))
 	if (walk_state->walk_type & ACPI_WALK_METHOD_RESTART) {
 		/* We are restarting a preempted control method */
 

@@ -1,5 +1,5 @@
 /*
- *  acpi_ac.c - ACPI AC Adapter Driver ($Revision: 26 $)
+ *  acpi_ac.c - ACPI AC Adapter Driver ($Revision: 27 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -47,13 +47,13 @@ int acpi_ac_add (struct acpi_device *device);
 int acpi_ac_remove (struct acpi_device *device, int type);
 
 static struct acpi_driver acpi_ac_driver = {
-	name:			ACPI_AC_DRIVER_NAME,
-	class:			ACPI_AC_CLASS,
-	ids:			ACPI_AC_HID,
-	ops:			{
-					add:	acpi_ac_add,
-					remove:	acpi_ac_remove,
-				},
+	.name =		ACPI_AC_DRIVER_NAME,
+	.class =	ACPI_AC_CLASS,
+	.ids =		ACPI_AC_HID,
+	.ops =		{
+				.add =	acpi_ac_add,
+				.remove =	acpi_ac_remove,
+			},
 };
 
 struct acpi_ac {

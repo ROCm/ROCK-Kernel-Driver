@@ -2,7 +2,7 @@
  *
  * Module Name: dbfileio - Debugger file I/O commands.  These can't usually
  *              be used when running the debugger in Ring 0 (Kernel mode)
- *              $Revision: 64 $
+ *              $Revision: 67 $
  *
  ******************************************************************************/
 
@@ -30,7 +30,7 @@
 #include "acnamesp.h"
 #include "actables.h"
 
-#ifdef ENABLE_DEBUGGER
+#if (defined ENABLE_DEBUGGER || defined ACPI_DISASSEMBLER)
 
 #define _COMPONENT          ACPI_DEBUGGER
 	 ACPI_MODULE_NAME    ("dbfileio")
@@ -86,6 +86,7 @@ acpi_db_match_argument (
 }
 
 
+#ifdef ENABLE_DEBUGGER
 /*******************************************************************************
  *
  * FUNCTION:    Acpi_db_close_debug_file
@@ -148,6 +149,7 @@ acpi_db_open_debug_file (
 
 #endif
 }
+#endif
 
 
 #ifdef ACPI_APPLICATION
@@ -190,7 +192,7 @@ acpi_db_load_table(
 
 	status = acpi_tb_validate_table_header (&table_header);
 	if ((ACPI_FAILURE (status)) ||
-		(table_header.length > 524288)) /* 1/2 Mbyte should be enough */ {
+		(table_header.length > 0x800000)) /* 8 Mbyte should be enough */ {
 		acpi_os_printf ("Table header is invalid!\n");
 		return (AE_ERROR);
 	}
@@ -296,7 +298,7 @@ ae_local_load_table (
 	}
 
 
-#ifndef PARSER_ONLY
+#if (!defined (ACPI_NO_METHOD_EXECUTION) && !defined (ACPI_CONSTANT_EVAL_ONLY))
 	status = acpi_ns_load_table (table_info.installed_desc, acpi_gbl_root_node);
 	if (ACPI_FAILURE (status)) {
 		/* Uninstall table and free the buffer */
@@ -330,7 +332,7 @@ acpi_db_get_acpi_table (
 
 	/* Get the entire file */
 
-	acpi_os_printf ("Loading Acpi table from file %s\n", filename);
+	fprintf (stderr, "Loading Acpi table from file %s\n", filename);
 	status = acpi_db_load_table (fp, &acpi_gbl_db_table_ptr, &table_length);
 	fclose(fp);
 
@@ -383,8 +385,8 @@ acpi_db_load_acpi_table (
 		return (status);
 	}
 
-	acpi_os_printf ("%4.4s at %p successfully installed and loaded\n",
-			  acpi_gbl_db_table_ptr->signature, acpi_gbl_db_table_ptr);
+	fprintf (stderr, "Acpi table [%4.4s] successfully installed and loaded\n",
+			  acpi_gbl_db_table_ptr->signature);
 
 	acpi_gbl_acpi_hardware_present = FALSE;
 

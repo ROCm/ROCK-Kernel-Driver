@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsload - namespace loading/expanding/contracting procedures
- *              $Revision: 56 $
+ *              $Revision: 57 $
  *
  *****************************************************************************/
 
@@ -37,59 +37,7 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_load_namespace
- *
- * PARAMETERS:  None
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Load the name space from what ever is pointed to by DSDT.
- *              (DSDT points to either the BIOS or a buffer.)
- *
- ******************************************************************************/
-
-acpi_status
-acpi_ns_load_namespace (
-	void)
-{
-	acpi_status             status;
-
-
-	ACPI_FUNCTION_TRACE ("Acpi_load_name_space");
-
-
-	/* There must be at least a DSDT installed */
-
-	if (acpi_gbl_DSDT == NULL) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "DSDT is not in memory\n"));
-		return_ACPI_STATUS (AE_NO_ACPI_TABLES);
-	}
-
-	/*
-	 * Load the namespace.  The DSDT is required,
-	 * but the SSDT and PSDT tables are optional.
-	 */
-	status = acpi_ns_load_table_by_type (ACPI_TABLE_DSDT);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
-
-	/* Ignore exceptions from these */
-
-	(void) acpi_ns_load_table_by_type (ACPI_TABLE_SSDT);
-	(void) acpi_ns_load_table_by_type (ACPI_TABLE_PSDT);
-
-	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_OK,
-		"ACPI Namespace successfully loaded at root %p\n",
-		acpi_gbl_root_node));
-
-	return_ACPI_STATUS (status);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    Acpi_ns_one_parse_pass
+ * FUNCTION:    Ns_one_complete_parse
  *
  * PARAMETERS:  Pass_number             - 1 or 2
  *              Table_desc              - The table to be parsed.
@@ -203,6 +151,7 @@ acpi_ns_parse_table (
 	return_ACPI_STATUS (status);
 }
 
+#ifndef ACPI_NO_METHOD_EXECUTION
 
 /*******************************************************************************
  *
@@ -421,6 +370,58 @@ unlock_and_exit:
 
 /*******************************************************************************
  *
+ * FUNCTION:    Acpi_load_namespace
+ *
+ * PARAMETERS:  None
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Load the name space from what ever is pointed to by DSDT.
+ *              (DSDT points to either the BIOS or a buffer.)
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_ns_load_namespace (
+	void)
+{
+	acpi_status             status;
+
+
+	ACPI_FUNCTION_TRACE ("Acpi_load_name_space");
+
+
+	/* There must be at least a DSDT installed */
+
+	if (acpi_gbl_DSDT == NULL) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "DSDT is not in memory\n"));
+		return_ACPI_STATUS (AE_NO_ACPI_TABLES);
+	}
+
+	/*
+	 * Load the namespace.  The DSDT is required,
+	 * but the SSDT and PSDT tables are optional.
+	 */
+	status = acpi_ns_load_table_by_type (ACPI_TABLE_DSDT);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
+
+	/* Ignore exceptions from these */
+
+	(void) acpi_ns_load_table_by_type (ACPI_TABLE_SSDT);
+	(void) acpi_ns_load_table_by_type (ACPI_TABLE_PSDT);
+
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_OK,
+		"ACPI Namespace successfully loaded at root %p\n",
+		acpi_gbl_root_node));
+
+	return_ACPI_STATUS (status);
+}
+
+
+/*******************************************************************************
+ *
  * FUNCTION:    Acpi_ns_delete_subtree
  *
  * PARAMETERS:  Start_handle        - Handle in namespace where search begins
@@ -550,4 +551,5 @@ acpi_ns_unload_namespace (
 	return_ACPI_STATUS (status);
 }
 
+#endif
 

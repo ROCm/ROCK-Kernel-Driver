@@ -421,14 +421,14 @@ void __init early_cpu_init(void)
  */
 void __init cpu_init (void)
 {
-	int nr = smp_processor_id();
-	struct tss_struct * t = &init_tss[nr];
+	int cpu = smp_processor_id();
+	struct tss_struct * t = init_tss + cpu;
 
-	if (test_and_set_bit(nr, &cpu_initialized)) {
-		printk(KERN_WARNING "CPU#%d already initialized!\n", nr);
+	if (test_and_set_bit(cpu, &cpu_initialized)) {
+		printk(KERN_WARNING "CPU#%d already initialized!\n", cpu);
 		for (;;) local_irq_enable();
 	}
-	printk(KERN_INFO "Initializing CPU#%d\n", nr);
+	printk(KERN_INFO "Initializing CPU#%d\n", cpu);
 
 	if (cpu_has_vme || cpu_has_tsc || cpu_has_de)
 		clear_in_cr4(X86_CR4_VME|X86_CR4_PVI|X86_CR4_TSD|X86_CR4_DE);
@@ -441,7 +441,17 @@ void __init cpu_init (void)
 	}
 #endif
 
-	__asm__ __volatile__("lgdt %0": "=m" (gdt_descr));
+	/*
+	 * Initialize the per-CPU GDT with the boot GDT,
+	 * and set up the GDT descriptor:
+	 */
+	if (cpu) {
+		memcpy(cpu_gdt_table[cpu], cpu_gdt_table[0], GDT_SIZE);
+		cpu_gdt_descr[cpu].size = GDT_SIZE;
+		cpu_gdt_descr[cpu].address = (unsigned long)cpu_gdt_table[cpu];
+	}
+
+	__asm__ __volatile__("lgdt %0": "=m" (cpu_gdt_descr[cpu]));
 	__asm__ __volatile__("lidt %0": "=m" (idt_descr));
 
 	/*
@@ -450,18 +460,18 @@ void __init cpu_init (void)
 	__asm__("pushfl ; andl $0xffffbfff,(%esp) ; popfl");
 
 	/*
-	 * set up and load the per-CPU TSS and LDT
+	 * Set up and load the per-CPU TSS and LDT
 	 */
 	atomic_inc(&init_mm.mm_count);
 	current->active_mm = &init_mm;
 	if(current->mm)
 		BUG();
-	enter_lazy_tlb(&init_mm, current, nr);
+	enter_lazy_tlb(&init_mm, current, cpu);
 
 	t->esp0 = current->thread.esp0;
-	set_tss_desc(nr,t);
-	gdt_table[__TSS(nr)].b &= 0xfffffdff;
-	load_TR(nr);
+	set_tss_desc(cpu,t);
+	cpu_gdt_table[cpu][TSS_ENTRY].b &= 0xfffffdff;
+	load_TR_desc();
 	load_LDT(&init_mm.context);
 
 	/* Clear %fs and %gs. */

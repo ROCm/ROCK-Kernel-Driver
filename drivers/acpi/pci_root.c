@@ -1,5 +1,5 @@
 /*
- *  pci_root.c - ACPI PCI Root Bridge Driver ($Revision: 39 $)
+ *  pci_root.c - ACPI PCI Root Bridge Driver ($Revision: 40 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -47,13 +47,13 @@ static int acpi_pci_root_add (struct acpi_device *device);
 static int acpi_pci_root_remove (struct acpi_device *device, int type);
 
 static struct acpi_driver acpi_pci_root_driver = {
-        name:                   ACPI_PCI_ROOT_DRIVER_NAME,
-        class:                  ACPI_PCI_ROOT_CLASS,
-        ids:                    ACPI_PCI_ROOT_HID,
-        ops:                    {
-                                        add:    acpi_pci_root_add,
-                                        remove: acpi_pci_root_remove,
-                                },
+	.name =		ACPI_PCI_ROOT_DRIVER_NAME,
+	.class =	ACPI_PCI_ROOT_CLASS,
+	.ids =		ACPI_PCI_ROOT_HID,
+	.ops =		{
+				.add =		acpi_pci_root_add,
+				.remove =	acpi_pci_root_remove,
+			},
 };
 
  struct acpi_pci_root {

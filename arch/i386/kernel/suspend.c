@@ -203,14 +203,13 @@ acpi_sleep_done:
 
 void fix_processor_context(void)
 {
-	int nr = smp_processor_id();
-	struct tss_struct * t = &init_tss[nr];
+	int cpu = smp_processor_id();
+	struct tss_struct * t = init_tss + cpu;
 
-	set_tss_desc(nr,t);	/* This just modifies memory; should not be neccessary. But... This is neccessary, because 386 hardware has concept of busy tsc or some similar stupidity. */
-        gdt_table[__TSS(nr)].b &= 0xfffffdff;
+	set_tss_desc(cpu,t);	/* This just modifies memory; should not be neccessary. But... This is neccessary, because 386 hardware has concept of busy tsc or some similar stupidity. */
+        cpu_gdt_table[cpu][TSS_ENTRY].b &= 0xfffffdff;
 
-	load_TR(nr);		/* This does ltr */
-
+	load_TR_desc();				/* This does ltr */
 	load_LDT(&current->mm->context);	/* This does lldt */
 
 	/*

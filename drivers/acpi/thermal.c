@@ -1,5 +1,5 @@
 /*
- *  acpi_thermal.c - ACPI Thermal Zone Driver ($Revision: 40 $)
+ *  acpi_thermal.c - ACPI Thermal Zone Driver ($Revision: 41 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -65,13 +65,13 @@ static int acpi_thermal_add (struct acpi_device *device);
 static int acpi_thermal_remove (struct acpi_device *device, int type);
 
 static struct acpi_driver acpi_thermal_driver = {
-	name:			ACPI_THERMAL_DRIVER_NAME,
-	class:			ACPI_THERMAL_CLASS,
-	ids:			ACPI_THERMAL_HID,
-	ops:			{
-					add:	acpi_thermal_add,
-					remove:	acpi_thermal_remove,
-				},
+	.name =		ACPI_THERMAL_DRIVER_NAME,
+	.class =	ACPI_THERMAL_CLASS,
+	.ids =		ACPI_THERMAL_HID,
+	.ops =		{
+				.add =		acpi_thermal_add,
+				.remove =	acpi_thermal_remove,
+			},
 };
 
 struct acpi_thermal_state {

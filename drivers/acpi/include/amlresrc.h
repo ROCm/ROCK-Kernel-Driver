@@ -1,8 +1,8 @@
 
 /******************************************************************************
  *
- * Module Name: aslresource.h - ASL resource descriptors
- *              $Revision: 19 $
+ * Module Name: amlresrc.h - AML resource descriptors
+ *              $Revision: 20 $
  *
  *****************************************************************************/
 
@@ -25,8 +25,8 @@
  */
 
 
-#ifndef __ASLRESOURCE_H
-#define __ASLRESOURCE_H
+#ifndef __AMLRESRC_H
+#define __AMLRESRC_H
 
 
 #define ASL_RESNAME_ADDRESS                     "_ADR"
@@ -80,11 +80,13 @@ typedef struct asl_resource_node
 
 
 /*
- * Resource descriptors defined in the ACPI specification
+ * Resource descriptors defined in the ACPI specification.
+ *
+ * Alignment must be BYTE because these descriptors
+ * are used to overlay the AML byte stream.
  */
-
-
 #pragma pack(1)
+
 typedef struct asl_irq_format_desc
 {
 	u8                          descriptor_type;
@@ -94,7 +96,6 @@ typedef struct asl_irq_format_desc
 } ASL_IRQ_FORMAT_DESC;
 
 
-#pragma pack(1)
 typedef struct asl_irq_noflags_desc
 {
 	u8                          descriptor_type;
@@ -103,7 +104,6 @@ typedef struct asl_irq_noflags_desc
 } ASL_IRQ_NOFLAGS_DESC;
 
 
-#pragma pack(1)
 typedef struct asl_dma_format_desc
 {
 	u8                          descriptor_type;
@@ -113,7 +113,6 @@ typedef struct asl_dma_format_desc
 } ASL_DMA_FORMAT_DESC;
 
 
-#pragma pack(1)
 typedef struct asl_start_dependent_desc
 {
 	u8                          descriptor_type;
@@ -122,7 +121,6 @@ typedef struct asl_start_dependent_desc
 } ASL_START_DEPENDENT_DESC;
 
 
-#pragma pack(1)
 typedef struct asl_start_dependent_noprio_desc
 {
 	u8                          descriptor_type;
@@ -130,7 +128,6 @@ typedef struct asl_start_dependent_noprio_desc
 } ASL_START_DEPENDENT_NOPRIO_DESC;
 
 
-#pragma pack(1)
 typedef struct asl_end_dependent_desc
 {
 	u8                          descriptor_type;
@@ -138,7 +135,6 @@ typedef struct asl_end_dependent_desc
 } ASL_END_DEPENDENT_DESC;
 
 
-#pragma pack(1)
 typedef struct asl_io_port_desc
 {
 	u8                          descriptor_type;
@@ -151,7 +147,6 @@ typedef struct asl_io_port_desc
 } ASL_IO_PORT_DESC;
 
 
-#pragma pack(1)
 typedef struct asl_fixed_io_port_desc
 {
 	u8                          descriptor_type;
@@ -161,7 +156,6 @@ typedef struct asl_fixed_io_port_desc
 } ASL_FIXED_IO_PORT_DESC;
 
 
-#pragma pack(1)
 typedef struct asl_small_vendor_desc
 {
 	u8                          descriptor_type;
@@ -170,7 +164,6 @@ typedef struct asl_small_vendor_desc
 } ASL_SMALL_VENDOR_DESC;
 
 
-#pragma pack(1)
 typedef struct asl_end_tag_desc
 {
 	u8                          descriptor_type;
@@ -181,7 +174,6 @@ typedef struct asl_end_tag_desc
 
 /* LARGE descriptors */
 
-#pragma pack(1)
 typedef struct asl_memory_24_desc
 {
 	u8                          descriptor_type;
@@ -195,7 +187,6 @@ typedef struct asl_memory_24_desc
 } ASL_MEMORY_24_DESC;
 
 
-#pragma pack(1)
 typedef struct asl_large_vendor_desc
 {
 	u8                          descriptor_type;
@@ -205,7 +196,6 @@ typedef struct asl_large_vendor_desc
 } ASL_LARGE_VENDOR_DESC;
 
 
-#pragma pack(1)
 typedef struct asl_memory_32_desc
 {
 	u8                          descriptor_type;
@@ -219,7 +209,6 @@ typedef struct asl_memory_32_desc
 } ASL_MEMORY_32_DESC;
 
 
-#pragma pack(1)
 typedef struct asl_fixed_memory_32_desc
 {
 	u8                          descriptor_type;
@@ -231,7 +220,6 @@ typedef struct asl_fixed_memory_32_desc
 } ASL_FIXED_MEMORY_32_DESC;
 
 
-#pragma pack(1)
 typedef struct asl_qword_address_desc
 {
 	u8                          descriptor_type;
@@ -249,7 +237,6 @@ typedef struct asl_qword_address_desc
 } ASL_QWORD_ADDRESS_DESC;
 
 
-#pragma pack(1)
 typedef struct asl_dword_address_desc
 {
 	u8                          descriptor_type;
@@ -267,7 +254,6 @@ typedef struct asl_dword_address_desc
 } ASL_DWORD_ADDRESS_DESC;
 
 
-#pragma pack(1)
 typedef struct asl_word_address_desc
 {
 	u8                          descriptor_type;
@@ -285,7 +271,6 @@ typedef struct asl_word_address_desc
 } ASL_WORD_ADDRESS_DESC;
 
 
-#pragma pack(1)
 typedef struct asl_extended_xrupt_desc
 {
 	u8                          descriptor_type;
@@ -298,7 +283,6 @@ typedef struct asl_extended_xrupt_desc
 } ASL_EXTENDED_XRUPT_DESC;
 
 
-#pragma pack(1)
 typedef struct asl_general_register_desc
 {
 	u8                          descriptor_type;
@@ -311,6 +295,9 @@ typedef struct asl_general_register_desc
 
 } ASL_GENERAL_REGISTER_DESC;
 
+/* restore default alignment */
+
+#pragma pack()
 
 /* Union of all resource descriptors, sow we can allocate the worst case */
 

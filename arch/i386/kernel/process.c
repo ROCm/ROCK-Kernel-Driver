@@ -662,7 +662,8 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 {
 	struct thread_struct *prev = &prev_p->thread,
 				 *next = &next_p->thread;
-	struct tss_struct *tss = init_tss + smp_processor_id();
+	int cpu = smp_processor_id();
+	struct tss_struct *tss = init_tss + cpu;
 
 	/* never put a printk in __switch_to... printk() calls wake_up*() indirectly */
 
@@ -687,6 +688,14 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 		loadsegment(fs, next->fs);
 		loadsegment(gs, next->gs);
 	}
+
+	/*
+	 * Load the per-thread Thread-Local Storage descriptor.
+	 *
+	 * NOTE: it's faster to do the two stores unconditionally
+	 * than to branch away.
+	 */
+	load_TLS_desc(next, cpu);
 
 	/*
 	 * Now maybe reload the debug registers
@@ -818,3 +827,58 @@ unsigned long get_wchan(struct task_struct *p)
 }
 #undef last_sched
 #undef first_sched
+
+/*
+ * Set the Thread-Local Storage area:
+ */
+asmlinkage int sys_set_thread_area(unsigned int base, unsigned int limit, unsigned int flags)
+{
+	struct thread_struct *t = &current->thread;
+	int limit_in_pages = 0, writable = 0;
+	int cpu;
+
+	/* do not allow unused flags */
+	if (flags & ~TLS_FLAGS_MASK)
+		return -EINVAL;
+
+	/* check limit */
+	if (limit & 0xfff00000)
+		return -EINVAL;
+
+	/*
+	 * Clear the TLS?
+	 */
+	if (flags & TLS_FLAG_CLEAR) {
+		cpu = get_cpu();
+		t->tls_base = t->tls_limit = t->tls_flags = 0;
+        	t->tls_desc.a = t->tls_desc.b = 0;
+		load_TLS_desc(t, cpu);
+		put_cpu();
+		return 0;
+	}
+
+	if (flags & TLS_FLAG_LIMIT_IN_PAGES)
+		limit_in_pages = 1;
+	if (flags & TLS_FLAG_WRITABLE)
+		writable = 1;
+
+	/*
+	 * We must not get preempted while modifying the TLS.
+	 */
+	cpu = get_cpu();
+	t->tls_base = base;
+	t->tls_limit = limit;
+	t->tls_flags = flags;
+
+        t->tls_desc.a = ((base & 0x0000ffff) << 16) | (limit & 0x0ffff);
+
+        t->tls_desc.b = (base & 0xff000000) | ((base & 0x00ff0000) >> 16) |
+                  (limit & 0xf0000) | (writable << 9) | (1 << 15) |
+		  (1 << 22) | (limit_in_pages << 23) | 0x7000;
+
+	load_TLS_desc(t, cpu);
+	put_cpu();
+
+	return TLS_ENTRY*8 + 3;
+}
+
