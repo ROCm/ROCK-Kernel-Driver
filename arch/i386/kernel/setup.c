@@ -219,9 +219,14 @@ static struct resource standard_io_resources[] = { {
 	.end	= 0x0021,
 	.flags	= IORESOURCE_BUSY | IORESOURCE_IO
 }, {
-	.name	= "timer",
+	.name   = "timer0",
 	.start	= 0x0040,
-	.end	= 0x005f,
+	.end    = 0x0043,
+	.flags  = IORESOURCE_BUSY | IORESOURCE_IO
+}, {
+	.name   = "timer1",
+	.start  = 0x0050,
+	.end    = 0x0053,
 	.flags	= IORESOURCE_BUSY | IORESOURCE_IO
 }, {
 	.name	= "keyboard",
