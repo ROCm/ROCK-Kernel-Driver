@@ -370,45 +370,16 @@ void __init mount_root(void)
 	mount_block_root("/dev/root", root_mountflags);
 }
 
-extern int sysfs_mounted;
-extern asmlinkage long sys_access(const char * filename, int mode);
-extern asmlinkage long sys_umount(char __user * name, int flags);
-static char *kinit_command = "/sbin/kinit";
-
-static int __init kinit_setup(char *str)
-{
-	kinit_command = str;
-	return 1;
-}
-
-__setup("kinit=", kinit_setup);
-
-static int __init kinit_exec(void * shell)
-{
-	static char *argv[] = { "kinit", NULL, };
-	extern char * envp_init[];
-
-	close(0);close(1);close(2);
-	setsid();
-	(void) open("/dev/console",O_RDWR,0);
-	(void) dup(0);
-	(void) dup(0);
-	return execve(shell, argv, envp_init);
-}
 /*
  * Prepare the namespace - decide what/where to mount, load ramdisks, etc.
  */
 void __init prepare_namespace(void)
 {
 	int is_floppy;
-	int pid, i;
 
 	mount_devfs();
 
 	md_run_setup();
-
-	if (sysfs_mounted)
-		sys_umount("/sys",0);
 
 	if (saved_root_name[0]) {
 		root_device_name = saved_root_name;
@@ -421,20 +392,6 @@ void __init prepare_namespace(void)
 
 	if (initrd_load())
 		goto out;
-
-	/*
-	 * check if there is an early userspace init, if yes
-	 * let it do all the work of mounting the root fs and return
-	 */
-	if (kinit_command && sys_access(kinit_command,0) == 0) {
-		pid = kernel_thread(kinit_exec, kinit_command, SIGCHLD);
-		if (pid > 0) {
-			while (pid != waitpid(-1, &i, 0))
-				yield();
-		}
-		sys_chdir("/root");
-		goto out;
-	}
 
 	if (is_floppy && rd_doload && rd_load_disk(0))
 		ROOT_DEV = Root_RAM0;

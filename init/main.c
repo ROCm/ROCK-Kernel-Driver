@@ -304,6 +304,15 @@ static int __init init_setup(char *str)
 }
 __setup("init=", init_setup);
 
+static char *kinit_command;
+
+static int __init kinit_setup(char *str)
+{
+	kinit_command = str;
+	return 1;
+}
+__setup("kinit=", kinit_setup);
+
 extern void setup_arch(char **);
 extern void cpu_idle(void);
 
@@ -491,7 +500,6 @@ asmlinkage void __init start_kernel(void)
 }
 
 int __initdata initcall_debug;
-int __initdata sysfs_mounted;
 
 static int __init initcall_debug_setup(char *str)
 {
@@ -509,6 +517,7 @@ static void __init do_initcalls(void)
 	initcall_t *call;
 	int count = preempt_count();
 
+	printk("%s\n",__FUNCTION__);
 	for (call = &__initcall_start; call < &__initcall_end; call++) {
 		char *msg;
 
@@ -536,8 +545,9 @@ static void __init do_initcalls(void)
 	flush_scheduled_work();
 }
 
-extern int init_elf_binfmt(void);
-extern int init_elf32_binfmt(void);
+asmlinkage long sys_access(const char __user * filename, int mode);
+asmlinkage long sys_mount(char *dev_name, char *dir_name, char *type,
+		                                 unsigned long flags, void *data);
 
 /*
  * Ok, the machine is now initialized. None of the devices
@@ -548,6 +558,8 @@ extern int init_elf32_binfmt(void);
  */
 static void __init do_basic_setup(void)
 {
+	extern char hotplug_path[];
+	
 	driver_init();
 
 #ifdef CONFIG_SYSCTL
@@ -558,14 +570,12 @@ static void __init do_basic_setup(void)
 	sock_init();
 
 	init_workqueues();
-	init_elf_binfmt();
-#if defined(__powerpc64__) || \
-	defined(CONFIG_IA32_SUPPORT) || \
-	defined(CONFIG_MIPS32) || \
-	defined(CONFIG_PARISC64) || \
-	defined(CONFIG_BINFMT_ELF32)
-	init_elf32_binfmt();
-#endif
+
+	if (sys_access(hotplug_path, 0) == 0) {
+		printk(KERN_INFO "mounting sysfs on /sys");
+		sys_mount("sys", "/sys","sysfs",0,NULL);
+	}
+
 	do_initcalls();
 }
 
@@ -610,6 +620,13 @@ static int init(void * unused)
 	smp_init();
 	do_basic_setup();
 
+	/*
+	 * check if there is an early userspace init, if yes
+	 * let it do all the work
+	 */
+	if (kinit_command || sys_access("/sbin/init", 0) == 0)
+		execute_command = kinit_command ? kinit_command : 0;
+	else
 	prepare_namespace();
 
 	/*

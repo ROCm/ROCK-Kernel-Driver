@@ -483,17 +483,12 @@ extern char __initramfs_start, __initramfs_end;
 #include <linux/initrd.h>
 #endif
 
-extern int sysfs_mounted;
-
 void __init populate_rootfs(void)
 {
 	char *err = unpack_to_rootfs(&__initramfs_start,
 			 &__initramfs_end - &__initramfs_start, 0);
 	if (err)
 		panic(err);
-	sysfs_mounted = sys_mount("sys", "/sys","sysfs",NULL,NULL);
-	printk(" mount sysfs returned %ld\n", sysfs_mounted);
-	sysfs_mounted = !sysfs_mounted;
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (initrd_start) {
 		int fd;

@@ -1449,8 +1449,9 @@ cleanup:
 
 #endif		/* USE_ELF_CORE_DUMP */
 
-int init_elf_binfmt(void)
+static int __init init_elf_binfmt(void)
 {
+	printk("%s\n",__FUNCTION__);
 	return register_binfmt(&elf_format);
 }
 
@@ -1460,6 +1461,6 @@ static void __exit exit_elf_binfmt(void)
 	unregister_binfmt(&elf_format);
 }
 
-EXPORT_SYMBOL(init_elf_binfmt);
+core_initcall(init_elf_binfmt);
 module_exit(exit_elf_binfmt)
 MODULE_LICENSE("GPL");
