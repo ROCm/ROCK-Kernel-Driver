@@ -81,10 +81,10 @@
 static void *usb_dsbr100_probe(struct usb_device *dev, unsigned int ifnum,
 			 const struct usb_device_id *id);
 static void usb_dsbr100_disconnect(struct usb_device *dev, void *ptr);
-static int usb_dsbr100_ioctl(struct video_device *dev, unsigned int cmd, 
-	void *arg);
-static int usb_dsbr100_open(struct video_device *dev, int flags);
-static void usb_dsbr100_close(struct video_device *dev);
+static int usb_dsbr100_ioctl(struct inode *inode, struct file *file,
+			     unsigned int cmd, void *arg);
+static int usb_dsbr100_open(struct inode *inode, struct file *file);
+static int usb_dsbr100_close(struct inode *inode, struct file *file);
 
 static int radio_nr = -1;
 MODULE_PARM(radio_nr, "i");
@@ -99,14 +99,21 @@ typedef struct
 } usb_dsbr100;
 
 
+static struct file_operations usb_dsbr100_fops = {
+	owner:		THIS_MODULE,
+	open:		usb_dsbr100_open,
+	release:       	usb_dsbr100_close,
+	ioctl:          video_generic_ioctl,
+	llseek:         no_llseek,
+};
 static struct video_device usb_dsbr100_radio=
 {
+	owner:		THIS_MODULE,
 	name:		"D-Link DSB R-100 USB radio",
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_AZTECH,
-	open:		usb_dsbr100_open,
-	close:		usb_dsbr100_close,
-	ioctl:		usb_dsbr100_ioctl,
+	fops:           &usb_dsbr100_fops,
+	kernel_ioctl:  	usb_dsbr100_ioctl,
 };
 
 static int users = 0;
@@ -205,9 +212,10 @@ static void usb_dsbr100_disconnect(struct usb_device *dev, void *ptr)
 	unlock_kernel();
 }
 
-static int usb_dsbr100_ioctl(struct video_device *dev, unsigned int cmd, 
-	void *arg)
+static int usb_dsbr100_ioctl(struct inode *inode, struct file *file,
+			     unsigned int cmd, void *arg)
 {
+	struct video_device *dev = video_devdata(file);
 	usb_dsbr100 *radio=dev->priv;
 
 	if (!radio)
@@ -216,84 +224,68 @@ static int usb_dsbr100_ioctl(struct video_device *dev, unsigned int cmd,
 	switch(cmd)
 	{
 		case VIDIOCGCAP: {
-			struct video_capability v;
-			v.type=VID_TYPE_TUNER;
-			v.channels=1;
-			v.audios=1;
-			/* No we don't do pictures */
-			v.maxwidth=0;
-			v.maxheight=0;
-			v.minwidth=0;
-			v.minheight=0;
-			strcpy(v.name, "D-Link R-100 USB Radio");
-			if(copy_to_user(arg,&v,sizeof(v)))
-				return -EFAULT;
+			struct video_capability *v = arg;
+			memset(v,0,sizeof(*v));
+			v->type=VID_TYPE_TUNER;
+			v->channels=1;
+			v->audios=1;
+			strcpy(v->name, "D-Link R-100 USB Radio");
 			return 0;
 		}
 		case VIDIOCGTUNER: {
-			struct video_tuner v;
+			struct video_tuner *v = arg;
 			dsbr100_getstat(radio);
-			if(copy_from_user(&v, arg,sizeof(v))!=0) 
-				return -EFAULT;
-			if(v.tuner)	/* Only 1 tuner */ 
+			if(v->tuner)	/* Only 1 tuner */ 
 				return -EINVAL;
-			v.rangelow = 87*16000;
-			v.rangehigh = 108*16000;
-			v.flags = VIDEO_TUNER_LOW;
-			v.mode = VIDEO_MODE_AUTO;
-			v.signal = radio->stereo*0x7000;
+			v->rangelow = 87*16000;
+			v->rangehigh = 108*16000;
+			v->flags = VIDEO_TUNER_LOW;
+			v->mode = VIDEO_MODE_AUTO;
+			v->signal = radio->stereo*0x7000;
 				/* Don't know how to get signal strength */
-			v.flags |= VIDEO_TUNER_STEREO_ON*radio->stereo;
-			strcpy(v.name, "DSB R-100");
-			if(copy_to_user(arg,&v, sizeof(v)))
-				return -EFAULT;
+			v->flags |= VIDEO_TUNER_STEREO_ON*radio->stereo;
+			strcpy(v->name, "DSB R-100");
 			return 0;
 		}
 		case VIDIOCSTUNER: {
-			struct video_tuner v;
-			if(copy_from_user(&v, arg, sizeof(v)))
-				return -EFAULT;
-			if(v.tuner!=0)
+			struct video_tuner *v = arg;
+			if(v->tuner!=0)
 				return -EINVAL;
 			/* Only 1 tuner so no setting needed ! */
 			return 0;
 		}
-		case VIDIOCGFREQ: 
+		case VIDIOCGFREQ:
+		{
+			int *freq = arg;
 			if (radio->curfreq==-1)
 				return -EINVAL;
-			if(copy_to_user(arg, &(radio->curfreq), 
-				sizeof(radio->curfreq)))
-				return -EFAULT;
+			*freq = radio->curfreq;
 			return 0;
-
+		}
 		case VIDIOCSFREQ:
-			if(copy_from_user(&(radio->curfreq), arg,
-				sizeof(radio->curfreq)))
-				return -EFAULT;
+		{
+			int *freq = arg;
+			*freq = radio->curfreq;
 			if (dsbr100_setfreq(radio, radio->curfreq)==-1)
 				warn("set frequency failed");
 			return 0;
-
+		}
 		case VIDIOCGAUDIO: {
-			struct video_audio v;
-			memset(&v,0, sizeof(v));
-			v.flags|=VIDEO_AUDIO_MUTABLE;
-			v.mode=VIDEO_SOUND_STEREO;
-			v.volume=1;
-			v.step=1;
-			strcpy(v.name, "Radio");
-			if(copy_to_user(arg,&v, sizeof(v)))
-				return -EFAULT;
+			struct video_audio *v = arg;
+			memset(v,0, sizeof(*v));
+			v->flags|=VIDEO_AUDIO_MUTABLE;
+			v->mode=VIDEO_SOUND_STEREO;
+			v->volume=1;
+			v->step=1;
+			strcpy(v->name, "Radio");
 			return 0;			
 		}
 		case VIDIOCSAUDIO: {
-			struct video_audio v;
-			if(copy_from_user(&v, arg, sizeof(v))) 
-				return -EFAULT;	
-			if(v.audio) 
+			struct video_audio *v = arg;
+			if(v->audio) 
 				return -EINVAL;
 
-			if(v.flags&VIDEO_AUDIO_MUTE) {
+			if(v->flags&VIDEO_AUDIO_MUTE) {
 				if (dsbr100_stop(radio)==-1)
 					warn("radio did not respond properly");
 			}
@@ -308,8 +300,9 @@ static int usb_dsbr100_ioctl(struct video_device *dev, unsigned int cmd,
 }
 
 
-static int usb_dsbr100_open(struct video_device *dev, int flags)
+static int usb_dsbr100_open(struct inode *inode, struct file *file)
 {
+	struct video_device *dev = video_devdata(file);
 	usb_dsbr100 *radio=dev->priv;
 
 	if (! radio) {
@@ -322,22 +315,22 @@ static int usb_dsbr100_open(struct video_device *dev, int flags)
 		return -EBUSY;
 	}
 	users++;
-	MOD_INC_USE_COUNT;
 	if (dsbr100_start(radio)<0)
 		warn("radio did not start up properly");
 	dsbr100_setfreq(radio,radio->curfreq);
 	return 0;
 }
 
-static void usb_dsbr100_close(struct video_device *dev)
+static int usb_dsbr100_close(struct inode *inode, struct file *file)
 {
+	struct video_device *dev = video_devdata(file);
 	usb_dsbr100 *radio=dev->priv;
 
 	if (!radio)
-		return;
+		return -ENODEV;
 	users--;
 	dsbr100_stop(radio);
-	MOD_DEC_USE_COUNT;
+	return 0;
 }
 
 static int __init dsbr100_init(void)
