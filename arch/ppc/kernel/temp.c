@@ -124,27 +124,27 @@ void TAUupdate(int cpu)
 
 void TAUException(struct pt_regs * regs)
 {
-	unsigned long cpu = smp_processor_id();
+	int cpu = smp_processor_id();
 
-	hardirq_enter(cpu);
+	irq_enter();
 	tau[cpu].interrupts++;
 	
 	TAUupdate(cpu);
 
-	hardirq_exit(cpu);
-	return;
+	irq_exit();
 }
 #endif /* CONFIG_TAU_INT */
 
 static void tau_timeout(void * info)
 {
-	unsigned long cpu = smp_processor_id();
+	int cpu;
 	unsigned long flags;
 	int size;
 	int shrink;
  
 	/* disabling interrupts *should* be okay */
-	save_flags(flags); cli();
+	local_irq_save(flags);
+	cpu = smp_processor_id();
 
 #ifndef CONFIG_TAU_INT
 	TAUupdate(cpu);
@@ -186,7 +186,7 @@ static void tau_timeout(void * info)
 	 */
 	mtspr(SPRN_THRM3, THRM3_SITV(500*60) | THRM3_E);
 
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void tau_timeout_smp(unsigned long unused)

@@ -207,12 +207,6 @@ EXPORT_SYMBOL(last_task_used_altivec);
 EXPORT_SYMBOL(giveup_altivec);
 #endif /* CONFIG_ALTIVEC */
 #ifdef CONFIG_SMP
-EXPORT_SYMBOL(global_irq_lock);
-EXPORT_SYMBOL(global_irq_holder);
-EXPORT_SYMBOL(__global_cli);
-EXPORT_SYMBOL(__global_sti);
-EXPORT_SYMBOL(__global_save_flags);
-EXPORT_SYMBOL(__global_restore_flags);
 #ifdef CONFIG_DEBUG_SPINLOCK
 EXPORT_SYMBOL(_raw_spin_lock);
 EXPORT_SYMBOL(_raw_spin_unlock);

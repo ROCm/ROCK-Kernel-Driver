@@ -252,31 +252,14 @@ void __init mapin_ram(void)
 {
 	unsigned long v, p, s, f;
 
-#ifdef HAVE_BATS
-	if (!__map_without_bats)
-		bat_mapin_ram();
-#endif /* HAVE_BATS */
-
-	v = KERNELBASE;
-	p = PPC_MEMSTART;
-	for (s = 0; s < total_lowmem; s += PAGE_SIZE) {
-		/* On the MPC8xx, we want the page shared so we
-		 * don't get ASID compares on kernel space.
-		 */
-		f = _PAGE_PRESENT | _PAGE_ACCESSED | _PAGE_SHARED | _PAGE_HWEXEC;
-#if defined(CONFIG_KGDB) || defined(CONFIG_XMON)
-		/* Allows stub to set breakpoints everywhere */
-		f |= _PAGE_WRENABLE;
-#else	/* !CONFIG_KGDB && !CONFIG_XMON */
-		if ((char *) v < _stext || (char *) v >= etext)
-			f |= _PAGE_WRENABLE;
-#ifdef CONFIG_PPC_STD_MMU
+	s = mmu_mapin_ram();
+	v = KERNELBASE + s;
+	p = PPC_MEMSTART + s;
+	for (; s < total_lowmem; s += PAGE_SIZE) {
+		if ((char *) v >= _stext && (char *) v < etext)
+			f = _PAGE_RAM_TEXT;
 		else
-			/* On the powerpc (not all), no user access
-			   forces R/W kernel access */
-			f |= _PAGE_USER;
-#endif /* CONFIG_PPC_STD_MMU */
-#endif /* CONFIG_KGDB || CONFIG_XMON */
+			f = _PAGE_RAM;
 		map_page(v, p, f);
 		v += PAGE_SIZE;
 		p += PAGE_SIZE;
