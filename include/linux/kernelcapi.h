@@ -52,9 +52,31 @@ typedef struct kcapi_carddef {
 #define	KCI_CONTRUP	0	/* struct capi_profile */
 #define	KCI_CONTRDOWN	1	/* NULL */
 
+struct capi20_appl {
+	u16 applid;
+	capi_register_params rparam;
+
+	/* internal to kernelcapi.o */
+	void *param;
+	void (*signal) (u16 applid, void *param);
+	struct sk_buff_head recv_queue;
+	int nncci;
+	struct capi_ncci *nccilist;
+
+	unsigned long nrecvctlpkt;
+	unsigned long nrecvdatapkt;
+	unsigned long nsentctlpkt;
+	unsigned long nsentdatapkt;
+
+	/* ugly hack to allow for notification of added/removed
+	 * controllers. The Right Way (tm) is known. XXX
+	 */
+	void (*callback) (unsigned int cmd, __u32 contr, void *data);
+};
+
 u16 capi20_isinstalled(void);
-u16 capi20_register(capi_register_params * rparam, u16 * applidp);
-u16 capi20_release(u16 applid);
+u16 capi20_register(struct capi20_appl *ap);
+u16 capi20_release(struct capi20_appl *ap);
 u16 capi20_put_message(u16 applid, struct sk_buff *skb);
 u16 capi20_get_message(u16 applid, struct sk_buff **msgp);
 u16 capi20_set_signal(u16 applid,

@@ -125,10 +125,10 @@ struct capidrv_contr {
 
 
 struct capidrv_data {
-	u16 appid;
+	struct capi20_appl ap;
 	int ncontr;
 	struct capidrv_contr *contr_list;
-
+  
         /* statistic */
 	unsigned long nrecvctlpkt;
 	unsigned long nrecvdatapkt;
@@ -518,7 +518,7 @@ static void send_message(capidrv_contr * card, _cmsg * cmsg)
 	len = CAPIMSG_LEN(cmsg->buf);
 	skb = alloc_skb(len, GFP_ATOMIC);
 	memcpy(skb_put(skb, len), cmsg->buf, len);
-	capi20_put_message(global.appid, skb);
+	capi20_put_message(global.ap.applid, skb);
 	global.nsentctlpkt++;
 }
 
@@ -666,7 +666,7 @@ static void n0(capidrv_contr * card, capidrv_ncci * ncci)
 	isdn_ctrl cmd;
 
 	capi_fill_DISCONNECT_REQ(&cmsg,
-				 global.appid,
+				 global.ap.applid,
 				 card->msgid++,
 				 ncci->plcip->plci,
 				 0,	/* BChannelinformation */
@@ -954,7 +954,7 @@ static void handle_incoming_call(capidrv_contr * card, _cmsg * cmsg)
 				cmd.parm.setup.si2,
 				cmd.parm.setup.eazmsn);
 			capi_fill_ALERT_REQ(cmsg,
-					    global.appid,
+					    global.ap.applid,
 					    card->msgid++,
 					    plcip->plci,	/* adr */
 					    0,	/* BChannelinformation */
@@ -1094,7 +1094,7 @@ static void handle_plci(_cmsg * cmsg)
 				break;	/* $$$$ */
 			}
 			capi_fill_CONNECT_B3_REQ(cmsg,
-						 global.appid,
+						 global.ap.applid,
 						 card->msgid++,
 						 plcip->plci,	/* adr */
 						 0	/* NCPI */
@@ -1211,7 +1211,7 @@ static void handle_ncci(_cmsg * cmsg)
 			if (nccip) {
 				ncci_change_state(card, nccip, EV_NCCI_CONNECT_B3_IND);
 				capi_fill_CONNECT_B3_RESP(cmsg,
-							  global.appid,
+							  global.ap.applid,
 							  card->msgid++,
 							  nccip->ncci,	/* adr */
 							  0,	/* Reject */
@@ -1229,7 +1229,7 @@ static void handle_ncci(_cmsg * cmsg)
 			       cmsg->adr.adrNCCI);
 		}
 		capi_fill_CONNECT_B3_RESP(cmsg,
-					  global.appid,
+					  global.ap.applid,
 					  card->msgid++,
 					  cmsg->adr.adrNCCI,
 					  2,	/* Reject */
@@ -1376,7 +1376,7 @@ static void capidrv_signal(u16 applid, void *dummy)
 {
 	struct sk_buff *skb = 0;
 
-	while (capi20_get_message(global.appid, &skb) == CAPI_NOERROR) {
+	while (capi20_get_message(global.ap.applid, &skb) == CAPI_NOERROR) {
 		capi_message2cmsg(&s_cmsg, skb->data);
 		if (debugmode > 2)
 			printk(KERN_DEBUG "capidrv_signal: applid=%d %s\n",
@@ -1627,7 +1627,7 @@ static int capidrv_command(isdn_ctrl * c, capidrv_contr * card)
 			}
 
 			capi_fill_CONNECT_REQ(&cmdcmsg,
-					      global.appid,
+					      global.ap.applid,
 					      card->msgid++,
 					      card->contrnr,	/* adr */
 					  si2cip(bchan->si1, bchan->si2),	/* cipvalue */
@@ -1673,7 +1673,7 @@ static int capidrv_command(isdn_ctrl * c, capidrv_contr * card)
 			       c->arg, bchan->l2, bchan->l3);
 
 		capi_fill_CONNECT_RESP(&cmdcmsg,
-				       global.appid,
+				       global.ap.applid,
 				       card->msgid++,
 				       bchan->plcip->plci,	/* adr */
 				       0,	/* Reject */
@@ -1720,7 +1720,7 @@ static int capidrv_command(isdn_ctrl * c, capidrv_contr * card)
 		if (bchan->nccip) {
 			bchan->disconnecting = 1;
 			capi_fill_DISCONNECT_B3_REQ(&cmdcmsg,
-						    global.appid,
+						    global.ap.applid,
 						    card->msgid++,
 						    bchan->nccip->ncci,
 						    0	/* NCPI */
@@ -1741,7 +1741,7 @@ static int capidrv_command(isdn_ctrl * c, capidrv_contr * card)
 			} else if (bchan->plcip->plci) {
 				bchan->disconnecting = 1;
 				capi_fill_DISCONNECT_REQ(&cmdcmsg,
-							 global.appid,
+							 global.ap.applid,
 							 card->msgid++,
 						      bchan->plcip->plci,
 							 0,	/* BChannelinformation */
@@ -1888,7 +1888,7 @@ static int if_sendbuf(int id, int channel, int doack, struct sk_buff *skb)
 		return 0;
 	}
 	datahandle = nccip->datahandle;
-	capi_fill_DATA_B3_REQ(&sendcmsg, global.appid, card->msgid++,
+	capi_fill_DATA_B3_REQ(&sendcmsg, global.ap.applid, card->msgid++,
 			      nccip->ncci,	/* adr */
 			      (u32) skb->data,	/* Data */
 			      skb->len,		/* DataLength */
@@ -1912,7 +1912,7 @@ static int if_sendbuf(int id, int channel, int doack, struct sk_buff *skb)
 		printk(KERN_DEBUG "capidrv-%d: only %d bytes headroom, need %d\n",
 		       card->contrnr, skb_headroom(skb), msglen);
 		memcpy(skb_push(nskb, msglen), sendcmsg.buf, msglen);
-		errcode = capi20_put_message(global.appid, nskb);
+		errcode = capi20_put_message(global.ap.applid, nskb);
 		if (errcode == CAPI_NOERROR) {
 			dev_kfree_skb(skb);
 			nccip->datahandle++;
@@ -1924,7 +1924,7 @@ static int if_sendbuf(int id, int channel, int doack, struct sk_buff *skb)
 		return errcode == CAPI_SENDQUEUEFULL ? 0 : -1;
 	} else {
 		memcpy(skb_push(skb, msglen), sendcmsg.buf, msglen);
-		errcode = capi20_put_message(global.appid, skb);
+		errcode = capi20_put_message(global.ap.applid, skb);
 		if (errcode == CAPI_NOERROR) {
 			nccip->datahandle++;
 			global.nsentdatapkt++;
@@ -1992,7 +1992,7 @@ static void enable_dchannel_trace(capidrv_contr *card)
 
         if (avmversion[0] > 3 || (avmversion[0] == 3 && avmversion[1] > 5)) {
 		printk(KERN_INFO "%s: D2 trace enabled\n", card->name);
-		capi_fill_MANUFACTURER_REQ(&cmdcmsg, global.appid,
+		capi_fill_MANUFACTURER_REQ(&cmdcmsg, global.ap.applid,
 					   card->msgid++,
 					   contr,
 					   0x214D5641,  /* ManuID */
@@ -2001,7 +2001,7 @@ static void enable_dchannel_trace(capidrv_contr *card)
 					   (_cstruct)"\004\200\014\000\000");
 	} else {
 		printk(KERN_INFO "%s: D3 trace enabled\n", card->name);
-		capi_fill_MANUFACTURER_REQ(&cmdcmsg, global.appid,
+		capi_fill_MANUFACTURER_REQ(&cmdcmsg, global.ap.applid,
 					   card->msgid++,
 					   contr,
 					   0x214D5641,  /* ManuID */
@@ -2015,7 +2015,7 @@ static void enable_dchannel_trace(capidrv_contr *card)
 
 static void send_listen(capidrv_contr *card)
 {
-	capi_fill_LISTEN_REQ(&cmdcmsg, global.appid,
+	capi_fill_LISTEN_REQ(&cmdcmsg, global.ap.applid,
 			     card->msgid++,
 			     card->contrnr, /* controller */
 			     1 << 6,	/* Infomask */
@@ -2293,7 +2293,6 @@ static void __exit proc_exit(void)
 
 static int __init capidrv_init(void)
 {
-	struct capi_register_params rparam;
 	capi_profile profile;
 	char rev[32];
 	char *p;
@@ -2310,25 +2309,26 @@ static int __init capidrv_init(void)
 	} else
 		strcpy(rev, "1.0");
 
-	rparam.level3cnt = -2;  /* number of bchannels twice */
-	rparam.datablkcnt = 16;
-	rparam.datablklen = 2048;
-	errcode = capi20_register(&rparam, &global.appid);
+	global.ap.rparam.level3cnt = -2;  /* number of bchannels twice */
+	global.ap.rparam.datablkcnt = 16;
+	global.ap.rparam.datablklen = 2048;
+
+	errcode = capi20_register(&global.ap);
 	if (errcode) {
 		MOD_DEC_USE_COUNT;
 		return -EIO;
 	}
 
-	capi20_set_callback(global.appid, lower_callback);
+	capi20_set_callback(global.ap.applid, lower_callback);
 
 	errcode = capi20_get_profile(0, &profile);
 	if (errcode != CAPI_NOERROR) {
-		capi20_release(global.appid);
+		capi20_release(&global.ap);
 		MOD_DEC_USE_COUNT;
 		return -EIO;
 	}
 
-	capi20_set_signal(global.appid, capidrv_signal, 0);
+	capi20_set_signal(global.ap.applid, capidrv_signal, 0);
 
 	ncontr = profile.ncontroller;
 	for (contr = 1; contr <= ncontr; contr++) {
@@ -2358,7 +2358,7 @@ static void __exit capidrv_exit(void)
 		strcpy(rev, " ??? ");
 	}
 
-	capi20_release(global.appid);
+	capi20_release(&global.ap);
 
 	proc_exit();
 

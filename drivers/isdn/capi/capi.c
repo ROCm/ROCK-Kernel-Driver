@@ -121,7 +121,7 @@ struct capincci {
 
 struct capidev {
 	struct list_head list;
-	u16		applid;
+	struct capi20_appl ap;
 	u16		errcode;
 	unsigned        userflags;
 
@@ -309,7 +309,7 @@ static struct capincci *capincci_alloc(struct capidev *cdev, u32 ncci)
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
 	mp = 0;
 	if (cdev->userflags & CAPIFLAG_HIGHJACKING)
-		mp = np->minorp = capiminor_alloc(cdev->applid, ncci);
+		mp = np->minorp = capiminor_alloc(cdev->ap.applid, ncci);
 	if (mp) {
 		mp->nccip = np;
 #ifdef _DEBUG_REFCOUNT
@@ -399,10 +399,10 @@ static void capidev_free(struct capidev *cdev)
 {
 	unsigned long flags;
 
-	if (cdev->applid)
-		capi20_release(cdev->applid); // XXX
-	cdev->applid = 0;
-
+	if (cdev->ap.applid) {
+		capi20_release(&cdev->ap);
+		cdev->ap.applid = 0;
+	}
 	skb_queue_purge(&cdev->recvqueue);
 
 	write_lock_irqsave(&capidev_list_lock, flags);
@@ -583,7 +583,7 @@ static void capi_signal(u16 applid, void *param)
 		return;
 	}
 
-	BUG_ON(cdev->applid != applid);
+	BUG_ON(cdev->ap.applid != applid);
 		
 	if (CAPIMSG_COMMAND(skb->data) == CAPI_CONNECT_B3_CONF) {
 		u16 info = CAPIMSG_U16(skb->data, 12); // Info field
@@ -666,7 +666,7 @@ capi_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 	if (ppos != &file->f_pos)
 		return -ESPIPE;
 
-	if (!cdev->applid)
+	if (!cdev->ap.applid)
 		return -ENODEV;
 
 	if ((skb = skb_dequeue(&cdev->recvqueue)) == 0) {
@@ -717,7 +717,7 @@ capi_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
         if (ppos != &file->f_pos)
 		return -ESPIPE;
 
-	if (!cdev->applid)
+	if (!cdev->ap.applid)
 		return -ENODEV;
 
 	skb = alloc_skb(count, GFP_USER);
@@ -740,14 +740,14 @@ capi_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 			return -EINVAL;
 		}
 	}
-	CAPIMSG_SETAPPID(skb->data, cdev->applid);
+	CAPIMSG_SETAPPID(skb->data, cdev->ap.applid);
 
 	if (CAPIMSG_COMMAND(skb->data) == CAPI_DISCONNECT_B3_RESP) {
 		capincci_free(cdev, CAPIMSG_NCCI(skb->data));
 			
 	}
 
-	cdev->errcode = capi20_put_message(cdev->applid, skb);
+	cdev->errcode = capi20_put_message(cdev->ap.applid, skb);
 
 	if (cdev->errcode) {
 		kfree_skb(skb);
@@ -767,7 +767,7 @@ capi_poll(struct file *file, poll_table * wait)
 	struct capidev *cdev = (struct capidev *)file->private_data;
 	unsigned int mask = 0;
 
-	if (!cdev->applid)
+	if (!cdev->ap.applid)
 		return POLLERR;
 
 	poll_wait(file, &(cdev->recvwait), wait);
@@ -779,7 +779,7 @@ capi_poll(struct file *file, poll_table * wait)
 
 static int
 capi_ioctl(struct inode *inode, struct file *file,
-		      unsigned int cmd, unsigned long arg)
+	   unsigned int cmd, unsigned long arg)
 {
 	struct capidev *cdev = (struct capidev *)file->private_data;
 	capi_ioctl_struct data;
@@ -788,21 +788,21 @@ capi_ioctl(struct inode *inode, struct file *file,
 	switch (cmd) {
 	case CAPI_REGISTER:
 		{
-			retval = copy_from_user((void *) &data.rparams,
-						(void *) arg, sizeof(struct capi_register_params));
-			if (retval)
-				return -EFAULT;
-			if (cdev->applid)
+			if (cdev->ap.applid)
 				return -EEXIST;
-			cdev->errcode = capi20_register(&data.rparams,
-							&cdev->applid);
+
+			if (copy_from_user(&cdev->ap.rparam, (void *) arg,
+					   sizeof(struct capi_register_params)))
+				return -EFAULT;
+			
+			cdev->errcode = capi20_register(&cdev->ap);
 			if (cdev->errcode) {
-				cdev->applid = 0;
+				cdev->ap.applid = 0;
 				return -EIO;
 			}
-			capi20_set_signal(cdev->applid, capi_signal, cdev);
+			capi20_set_signal(cdev->ap.applid, capi_signal, cdev);
 		}
-		return (int)cdev->applid;
+		return (int)cdev->ap.applid;
 
 	case CAPI_GET_VERSION:
 		{
@@ -1426,7 +1426,7 @@ static int proc_capidev_read_proc(char *page, char **start, off_t off,
 	list_for_each(l, &capidev_list) {
 		cdev = list_entry(l, struct capidev, list);
 		len += sprintf(page+len, "0 %d %lu %lu %lu %lu\n",
-			cdev->applid,
+			cdev->ap.applid,
 			cdev->nrecvctlpkt,
 			cdev->nrecvdatapkt,
 			cdev->nsentctlpkt,
@@ -1466,7 +1466,7 @@ static int proc_capincci_read_proc(char *page, char **start, off_t off,
 		cdev = list_entry(l, struct capidev, list);
 		for (np=cdev->nccis; np; np = np->next) {
 			len += sprintf(page+len, "%d 0x%x\n",
-				       cdev->applid,
+				       cdev->ap.applid,
 				       np->ncci);
 			if (len <= off) {
 				off -= len;
