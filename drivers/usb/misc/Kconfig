@@ -123,6 +123,20 @@ config USB_PHIDGETSERVO
 	  To compile this driver as a module, choose M here: the
 	  module will be called phidgetservo.
 
+config USB_IDMOUSE
+	tristate "Siemens ID USB Mouse Fingerprint sensor support"
+	depends on USB
+	help
+	  Say Y here if you want to use the fingerprint sensor on
+	  the Siemens ID Mouse. There is also a Siemens ID Mouse
+	  _Professional_, which has not been tested with this driver,
+	  but uses the same sensor and may therefore work.
+
+	  This driver creates an entry "/dev/idmouseX" or "/dev/usb/idmouseX",
+	  which can be used by, e.g.,"cat /dev/idmouse0 > fingerprint.pnm".
+
+	  See also <http://www.fs.tum.de/~echtler/idmouse/>.
+
 config USB_TEST
 	tristate "USB testing driver (DEVELOPMENT)"
 	depends on USB && USB_DEVICEFS && EXPERIMENTAL
