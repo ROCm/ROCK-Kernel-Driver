@@ -40,6 +40,15 @@
 #define DO_SOFT_DISABLE
 #endif
 
+/* copy saved SOFTE bit or EE bit from saved MSR depending
+ * if we are doing soft-disable or not
+ */
+#ifdef DO_SOFT_DISABLE
+#define DO_COPY_EE()	ld	r20,SOFTE(r1)
+#else
+#define DO_COPY_EE()	rldicl	r20,r23,49,63
+#endif
+
 /*
  * hcall interface to pSeries LPAR
  */
@@ -618,11 +627,7 @@ stab_bolted_user_return:
 	ld      r4,_DAR(r1)
 	ld      r5,_DSISR(r1)
 	addi	r3,r1,STACK_FRAME_OVERHEAD
-#ifdef DO_SOFT_DISABLE
-	ld	r20,SOFTE(r1)		/* Copy saved SOFTE bit */
-#else
-	rldicl	r20,r23,49,63   	/* copy EE bit from saved MSR */
-#endif
+	DO_COPY_EE()
 	li	r6,0x300
 	bl      .save_remaining_regs
 	bl      .do_page_fault
@@ -644,12 +649,9 @@ DataAccessSLB_common:
 	or.	r3,r3,r3		/* Check return code */
 	beq     fast_exception_return   /* Return if we succeeded */
 	addi	r3,r1,STACK_FRAME_OVERHEAD
-#ifdef DO_SOFT_DISABLE
-	ld	r20,SOFTE(r1)
-#else
-	rldicl	r20,r23,49,63   	/* copy EE bit from saved MSR */
-#endif
+	DO_COPY_EE()
 	li	r6,0x380
+	li	r5,0
 	bl      .save_remaining_regs
 	bl      .do_page_fault
 	b       .ret_from_except
@@ -670,13 +672,9 @@ InstructionAccess_common:
 	bl	.do_hash_page_ISI	/* Try to handle as hpte fault */
 1:
 	mr	r4,r22
-	mr	r5,r23
+	rlwinm	r5,r23,0,4,4		/* We only care about PR in error_code */
 	addi	r3,r1,STACK_FRAME_OVERHEAD
-#ifdef DO_SOFT_DISABLE
-	ld	r20,SOFTE(r1)
-#else
-	rldicl	r20,r23,49,63   	/* copy EE bit from saved MSR */
-#endif
+	DO_COPY_EE()
 	li	r6,0x400
 	bl      .save_remaining_regs
 	bl      .do_page_fault
@@ -692,12 +690,9 @@ InstructionAccessSLB_common:
 	beq+	fast_exception_return   /* Return if we succeeded */
 
 	addi	r3,r1,STACK_FRAME_OVERHEAD
-#ifdef DO_SOFT_DISABLE
-	ld	r20,SOFTE(r1)
-#else
-	rldicl	r20,r23,49,63   	/* copy EE bit from saved MSR */
-#endif
+	DO_COPY_EE()
 	li	r6,0x480
+	li	r5,0
 	bl      .save_remaining_regs
 	bl      .do_page_fault
 	b       .ret_from_except
@@ -769,11 +764,7 @@ HardwareInterrupt_entry:
 Alignment_common:
 	EXCEPTION_PROLOG_COMMON
 	addi	r3,r1,STACK_FRAME_OVERHEAD
-#ifdef DO_SOFT_DISABLE
-	ld	r20,SOFTE(r1)
-#else
-	rldicl	r20,r23,49,63   	/* copy EE bit from saved MSR */
-#endif
+	DO_COPY_EE()
 	li	r6,0x600
 	bl      .save_remaining_regs
 	bl      .AlignmentException
@@ -783,11 +774,7 @@ Alignment_common:
 ProgramCheck_common:
 	EXCEPTION_PROLOG_COMMON
 	addi	r3,r1,STACK_FRAME_OVERHEAD
-#ifdef DO_SOFT_DISABLE
-	ld	r20,SOFTE(r1)
-#else
-	rldicl	r20,r23,49,63   	/* copy EE bit from saved MSR */
-#endif
+	DO_COPY_EE()
 	li	r6,0x700
 	bl      .save_remaining_regs
 	bl      .ProgramCheckException
@@ -798,11 +785,7 @@ FPUnavailable_common:
 	EXCEPTION_PROLOG_COMMON
 	bne	.load_up_fpu		/* if from user, just load it up */
 	addi	r3,r1,STACK_FRAME_OVERHEAD
-#ifdef DO_SOFT_DISABLE
-	ld	r20,SOFTE(r1)
-#else
-	rldicl	r20,r23,49,63   	/* copy EE bit from saved MSR */
-#endif
+	DO_COPY_EE()
 	li	r6,0x800
 	bl      .save_remaining_regs
 	bl      .KernelFPUnavailableException
@@ -818,11 +801,7 @@ SystemCall_common:
 	beq+	HardwareInterrupt_entry
 1:
 #endif
-#ifdef DO_SOFT_DISABLE
-	ld	r20,SOFTE(r1)
-#else
-	rldicl	r20,r23,49,63   	/* copy EE bit from saved MSR */
-#endif
+	DO_COPY_EE()
 	li	r6,0xC00
 	bl      .save_remaining_regs
 	bl      .DoSyscall
