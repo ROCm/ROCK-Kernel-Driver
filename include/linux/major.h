@@ -126,6 +126,9 @@
 #define COMPAQ_CISS_MAJOR6      110
 #define COMPAQ_CISS_MAJOR7      111
 
+#define VIODASD_MAJOR		112
+#define VIOCD_MAJOR		113
+
 #define ATARAID_MAJOR		114
 
 #define SCSI_DISK8_MAJOR	128
