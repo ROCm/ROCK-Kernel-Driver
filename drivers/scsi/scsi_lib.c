@@ -238,6 +238,8 @@ void scsi_wait_req(struct scsi_request *sreq, const void *cmnd, void *buffer,
 	generic_unplug_device(sreq->sr_device->request_queue);
 	wait_for_completion(&wait);
 	sreq->sr_request->waiting = NULL;
+	if (sreq->sr_request->rq_status != RQ_SCSI_DONE)
+		sreq->sr_result |= (DRIVER_ERROR << 24);
 
 	__scsi_release_request(sreq);
 }
