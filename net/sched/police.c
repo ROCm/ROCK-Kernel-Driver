@@ -245,7 +245,7 @@ override:
 	p->index = parm->index ? : tcf_police_new_index();
 #ifdef CONFIG_NET_ESTIMATOR
 	if (est)
-		qdisc_new_estimator(&p->stats, p->stats_lock, est);
+		gen_new_estimator(&p->bstats, &p->rate_est, p->stats_lock, est);
 #endif
 	h = tcf_police_hash(p->index);
 	write_lock_bh(&police_lock);
@@ -275,16 +275,6 @@ int tcf_act_police_cleanup(struct tc_action *a, int bind)
 	return 0;
 }
 
-int tcf_act_police_stats(struct sk_buff *skb, struct tc_action *a)
-{
-	struct tcf_police *p;
-	p = PRIV(a);
-	if (NULL != p) 
-		return qdisc_copy_stats(skb, &p->stats, p->stats_lock);
-
-	return 1;
-}
-
 int tcf_act_police(struct sk_buff **pskb, struct tc_action *a)
 {
 	psched_time_t now;
@@ -302,12 +292,12 @@ int tcf_act_police(struct sk_buff **pskb, struct tc_action *a)
 
 	spin_lock(&p->lock);
 
-	p->stats.bytes += skb->len;
-	p->stats.packets++;
+	p->bstats.bytes += skb->len;
+	p->bstats.packets++;
 
 #ifdef CONFIG_NET_ESTIMATOR
-	if (p->ewma_rate && p->stats.bps >= p->ewma_rate) {
-		p->stats.overlimits++;
+	if (p->ewma_rate && p->rate_est.bps >= p->ewma_rate) {
+		p->qstats.overlimits++;
 		spin_unlock(&p->lock);
 		return p->action;
 	}
@@ -343,7 +333,7 @@ int tcf_act_police(struct sk_buff **pskb, struct tc_action *a)
 		}
 	}
 
-	p->stats.overlimits++;
+	p->qstats.overlimits++;
 	spin_unlock(&p->lock);
 	return p->action;
 }
@@ -400,7 +390,6 @@ static struct tc_action_ops act_police_ops = {
 	.capab		=	TCA_CAP_NONE, 
 	.owner		=	THIS_MODULE,
 	.act		=	tcf_act_police,
-	.get_stats	=	tcf_act_police_stats,
 	.dump		=	tcf_act_police_dump,
 	.cleanup	=	tcf_act_police_cleanup,
 	.lookup		=	tcf_hash_search,
