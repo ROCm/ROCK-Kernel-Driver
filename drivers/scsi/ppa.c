@@ -201,12 +201,13 @@ static int ppa_detect(Scsi_Host_Template *host)
 			w_ecr(ppb_hi, 0x80);
 
 		/* Done configuration */
-		ppa_pb_release(dev);
 
 		if (ppa_init(dev)) {
+			ppa_pb_release(dev);
 			parport_unregister_device(dev->dev);
 			continue;
 		}
+		ppa_pb_release(dev);
 		/* now the glue ... */
 		switch (dev->mode) {
 		case PPA_NIBBLE:
@@ -629,12 +630,6 @@ static int ppa_init(ppa_struct *dev)
 	int retv;
 	unsigned short ppb = dev->base;
 
-#if defined(CONFIG_PARPORT) || defined(CONFIG_PARPORT_MODULE)
-	if (ppa_pb_claim(dev))
-		while (dev->p_busy)
-			schedule();	/* We can safe schedule here */
-#endif
-
 	ppa_disconnect(dev);
 	ppa_connect(dev, CONNECT_NORMAL);
 
@@ -657,7 +652,6 @@ static int ppa_init(ppa_struct *dev)
 	if (!retv)
 		retv = device_check(dev);
 
-	ppa_pb_release(dev);
 	return retv;
 }
 
