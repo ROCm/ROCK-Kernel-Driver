@@ -50,8 +50,8 @@ struct irqdesc {
 	irq_handler_t	handle;
 	struct irqchip	*chip;
 	struct irqaction *action;
+	unsigned int	disable_depth;
 
-	unsigned int	enabled  : 1;		/* IRQ is currently enabled   */
 	unsigned int	triggered: 1;		/* IRQ has occurred	      */
 	unsigned int	running  : 1;		/* IRQ is running             */
 	unsigned int	pending  : 1;		/* IRQ is pending	      */
@@ -59,8 +59,7 @@ struct irqdesc {
 	unsigned int	probe_ok : 1;		/* IRQ can be used for probe  */
 	unsigned int	valid    : 1;		/* IRQ claimable	      */
 	unsigned int	noautoenable : 1;	/* don't automatically enable IRQ */
-	unsigned int	unused   :23;
-	unsigned int	depth;			/* disable depth	      */
+	unsigned int	unused   :25;
 
 	/*
 	 * IRQ lock detection
