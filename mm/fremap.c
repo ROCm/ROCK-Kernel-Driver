@@ -55,6 +55,8 @@ static inline void zap_pte(struct mm_struct *mm, struct vm_area_struct *vma,
 int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		unsigned long addr, struct page *page, pgprot_t prot)
 {
+	struct inode *inode;
+	pgoff_t size;
 	int err = -ENOMEM;
 	pte_t *pte;
 	pgd_t *pgd;
@@ -76,8 +78,10 @@ int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	 * This page may have been truncated. Tell the
 	 * caller about it.
 	 */
-	err = -EAGAIN;
-	if (!page_mapping(page))
+	err = -EINVAL;
+	inode = vma->vm_file->f_mapping->host;
+	size = (i_size_read(inode) + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
+	if (!page->mapping || page->index >= size)
 		goto err_unlock;
 
 	zap_pte(mm, vma, addr, pte);
