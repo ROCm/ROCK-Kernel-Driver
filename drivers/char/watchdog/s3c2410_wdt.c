@@ -159,8 +159,6 @@ static int s3c2410wdt_set_heartbeat(int timeout)
 	if (timeout < 1)
 		return -EINVAL;
 
-	tmr_margin = timeout;
-
 	/* I think someone must have missed a divide-by-2 in the 2410,
 	 * as a divisor of 128 gives half the calculated delay...
 	 */
@@ -187,6 +185,8 @@ static int s3c2410wdt_set_heartbeat(int timeout)
 			return -EINVAL;
 		}
 	}
+
+	tmr_margin = timeout;
 
 	DBG("%s: timeout=%d, divisor=%d, count=%d (%08x)\n",
 	    __FUNCTION__, timeout, divisor, count, count/divisor);
@@ -396,7 +396,7 @@ static int s3c2410wdt_probe(struct device *dev)
 		return -EINVAL;
 	}
 
-	DBG("probe: mapped wdt_base=%px\n", wdt_base);
+	DBG("probe: mapped wdt_base=%p\n", wdt_base);
 
 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
 	if (res == NULL) {
