@@ -1730,8 +1730,12 @@ int sctp_verify_init(const struct sctp_association *asoc,
 
 	sctp_walk_params(param, peer_init, init_hdr.params) {
 
-		if (!sctp_verify_param(asoc, param, cid, chunk, errp))
-			return 1;
+		if (!sctp_verify_param(asoc, param, cid, chunk, errp)) {
+			if (SCTP_PARAM_HOST_NAME_ADDRESS == param.p->type)
+				return 0;
+			else
+				return 1;
+		}
 
 	} /* for (loop through all parameters) */
 
