@@ -302,9 +302,7 @@ FRprintk("Lookup: %u.%u.%u.%u <- %u.%u.%u.%u ",
 	for (r = fib_rules; r; r=r->r_next) {
 		if (((saddr^r->r_src) & r->r_srcmask) ||
 		    ((daddr^r->r_dst) & r->r_dstmask) ||
-#ifdef CONFIG_IP_ROUTE_TOS
 		    (r->r_tos && r->r_tos != flp->fl4_tos) ||
-#endif
 #ifdef CONFIG_IP_ROUTE_FWMARK
 		    (r->r_fwmark && r->r_fwmark != flp->fl4_fwmark) ||
 #endif
