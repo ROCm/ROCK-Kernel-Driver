@@ -26,6 +26,7 @@
 #include <linux/fcntl.h>
 #include <linux/rcupdate.h>
 #include <linux/cpu.h>
+#include <linux/moduleparam.h>
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
 #include <asm/pgalloc.h>
@@ -900,7 +901,7 @@ static struct module *load_module(void *umod,
 			/* Strings */
 			DEBUGP("String table found in section %u\n", i);
 			strindex = i;
-		} else if (strcmp(secstrings+sechdrs[i].sh_name, ".setup.init")
+		} else if (strcmp(secstrings+sechdrs[i].sh_name, "__param")
 			   == 0) {
 			/* Setup parameter info */
 			DEBUGP("Setup table found in section %u\n", i);
@@ -1048,8 +1049,7 @@ static struct module *load_module(void *umod,
 	if (err < 0)
 		goto cleanup;
 
-#if 0 /* Needs param support */
-	/* Size of section 0 is 0, so this works well */
+	/* Size of section 0 is 0, so this works well if no params */
 	err = parse_args(mod->args,
 			 (struct kernel_param *)
 			 sechdrs[setupindex].sh_offset,
@@ -1058,7 +1058,6 @@ static struct module *load_module(void *umod,
 			 NULL);
 	if (err < 0)
 		goto cleanup;
-#endif
 
 	/* Get rid of temporary copy */
 	vfree(hdr);
