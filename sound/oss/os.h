@@ -7,10 +7,6 @@
 #include <linux/module.h>
 #include <linux/version.h>
 
-#if LINUX_VERSION_CODE > 131328
-#define LINUX21X
-#endif
-
 #ifdef __KERNEL__
 #include <linux/utsname.h>
 #include <linux/string.h>
