@@ -171,7 +171,12 @@ setup_irq(unsigned int irq, struct irqaction * new)
 	if (!shared) {
 		desc->depth = 0;
 		desc->status &= ~(IRQ_DISABLED | IRQ_AUTODETECT | IRQ_WAITING);
-		unmask_irq(irq);
+		if (desc->handler) {
+			if (desc->handler->startup)
+				desc->handler->startup(irq);
+			else if (desc->handler->enable)
+				desc->handler->enable(irq);
+		}
 	}
 	spin_unlock_irqrestore(&desc->lock,flags);
 
