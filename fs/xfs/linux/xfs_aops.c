@@ -1041,6 +1041,8 @@ count_page_state(
 	do {
 		if (buffer_uptodate(bh) && !buffer_mapped(bh))
 			(*unmapped) = 1;
+		else if (buffer_unwritten(bh) && !buffer_delay(bh))
+			clear_bit(BH_Unwritten, &bh->b_state);
 		else if (buffer_unwritten(bh))
 			(*unwritten) = 1;
 		else if (buffer_delay(bh))
