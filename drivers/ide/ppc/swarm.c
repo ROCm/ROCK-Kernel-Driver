@@ -31,6 +31,9 @@
 #include <asm/irq.h>
 #include <asm/io.h>
 #include <asm/sibyte/sb1250_int.h>
+
+#define __IDE_SWARM_C
+
 #include <asm/sibyte/swarm_ide.h>
 
 void __init swarm_ide_probe(void)
@@ -62,12 +65,37 @@ void __init swarm_ide_probe(void)
 	hwif->hw.io_ports[IDE_STATUS_OFFSET]  = SWARM_IDE_REG(0x1f7);
 	hwif->hw.io_ports[IDE_CONTROL_OFFSET] = SWARM_IDE_REG(0x3f6);
 	hwif->hw.io_ports[IDE_IRQ_OFFSET]     = SWARM_IDE_REG(0x3f7);
-//	hwif->hw->ack_intr                     = swarm_ide_ack_intr;
+//	hwif->hw->ack_intr                    = swarm_ide_ack_intr;
 	hwif->hw.irq                          = SWARM_IDE_INT;
-	hwif->ideproc                         = swarm_ideproc;
-
+#if 0
+	hwif->iops                            = swarm_iops;
+#else
+	hwif->OUTB      = hwif->OUTBP         = swarm_outb;
+	hwif->OUTW      = hwif->OUTWP         = swarm_outw;
+	hwif->OUTL      = hwif->OUTLP         = swarm_outl;
+	hwif->OUTSW     = hwif->OUTSWP        = swarm_outsw;
+	hwif->OUTSL     = hwif->OUTSLP        = swarm_outsl;
+	hwif->INB       = hwif->INBP          = swarm_inb;
+	hwif->INW       = hwif->INWP          = swarm_inw;
+	hwif->INL       = hwif->INLP          = swarm_inl;
+	hwif->INSW      = hwif->INSWP         = swarm_insw;
+	hwif->INSL      = hwif->INSLP         = swarm_insl;
+#endif
+#if 0
+	hwif->pioops                          = swarm_pio_ops;
+#else
+	hwif->ata_input_data                  = swarm_ata_input_data;
+	hwif->ata_output_data                 = swarm_ata_output_data;
+	hwif->atapi_input_bytes               = swarm_atapi_input_bytes;
+	hwif->atapi_output_bytes              = swarm_atapi_output_bytes;
+#endif
 	memcpy(hwif->io_ports, hwif->hw.io_ports, sizeof(hwif->io_ports));
-	hwif->irq = hwif->hw.irq;
+	hwif->irq                             = hwif->hw.irq;
 	printk("SWARM onboard IDE configured as device %i\n", i);
+
+#ifndef HWIF_PROBE_CLASSIC_METHOD
+	probe_hwif_init(hwif->index);
+#endif /* HWIF_PROBE_CLASSIC_METHOD */
+
 }
 

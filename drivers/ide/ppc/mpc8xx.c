@@ -44,13 +44,13 @@
 #include <asm/irq.h>
 
 #include "ide_modes.h"
-static int identify  (volatile unsigned char *p);
-static void print_fixed (volatile unsigned char *p);
+static int identify  (volatile u8 *p);
+static void print_fixed (volatile u8 *p);
 static void print_funcid (int func);
 static int check_ide_device (unsigned long base);
 
 static void ide_interrupt_ack (void *dev);
-static void m8xx_ide_tuneproc(ide_drive_t *drive, byte pio);
+static void m8xx_ide_tuneproc(ide_drive_t *drive, u8 pio);
 
 typedef	struct ide_ioport_desc {
 	unsigned long	base_off;		/* Offset to PCMCIA memory	*/
@@ -433,7 +433,7 @@ void m8xx_ide_init_hwif_ports (hw_regs_t *hw,
 
 /* Calculate PIO timings */
 static void
-m8xx_ide_tuneproc(ide_drive_t *drive, byte pio)
+m8xx_ide_tuneproc(ide_drive_t *drive, u8 pio)
 {
 	ide_pio_data_t d;
 #if defined(CONFIG_IDE_8xx_PCCARD) || defined(CONFIG_IDE_8xx_DIRECT)
@@ -617,12 +617,12 @@ ide_interrupt_ack (void *dev)
 
 static int check_ide_device (unsigned long base)
 {
-	volatile unsigned char *ident = NULL;
-	volatile unsigned char *feature_p[MAX_FEATURES];
-	volatile unsigned char *p, *start;
+	volatile u8 *ident = NULL;
+	volatile u8 *feature_p[MAX_FEATURES];
+	volatile u8 *p, *start;
 	int n_features = 0;
-	unsigned char func_id = ~0;
-	unsigned char code, len;
+	u8 func_id = ~0;
+	u8 code, len;
 	unsigned short config_base = 0;
 	int found = 0;
 	int i;
@@ -630,7 +630,7 @@ static int check_ide_device (unsigned long base)
 #ifdef DEBUG
 	printk ("PCMCIA MEM: %08lX\n", base);
 #endif
-	start = p = (volatile unsigned char *) base;
+	start = p = (volatile u8 *) base;
 
 	while ((p - start) < MAX_TUPEL_SZ) {
 
@@ -642,7 +642,7 @@ static int check_ide_device (unsigned long base)
 
 		len = *p; p += 2;
 #ifdef	DEBUG_PCMCIA
-		{ volatile unsigned char *q = p;
+		{ volatile u8 *q = p;
 			printk ("\nTuple code %02x  length %d\n\tData:",
 				code, len);
 
@@ -673,7 +673,7 @@ static int check_ide_device (unsigned long base)
 
 	found = identify (ident);
 
-	if (func_id != ((unsigned char)~0)) {
+	if (func_id != ((u8)~0)) {
 		print_funcid (func_id);
 
 		if (func_id == CISTPL_FUNCID_FIXED)
@@ -692,7 +692,7 @@ static int check_ide_device (unsigned long base)
 	}
 
 	/* set level mode irq and I/O mapped device in config reg*/
-	*((unsigned char *)(base + config_base)) = 0x41;
+	*((u8 *)(base + config_base)) = 0x41;
 
 	return (0);
 }
@@ -738,14 +738,14 @@ static void print_funcid (int func)
 
 /* ------------------------------------------------------------------------- */
 
-static void print_fixed (volatile unsigned char *p)
+static void print_fixed (volatile u8 *p)
 {
 	if (p == NULL)
 		return;
 
 	switch (*p) {
 	case CISTPL_FUNCE_IDE_IFACE:
-	    {   unsigned char iface = *(p+2);
+	    {   u8 iface = *(p+2);
 
 		printk ((iface == CISTPL_IDE_INTERFACE) ? " IDE" : " unknown");
 		printk (" interface ");
@@ -753,8 +753,8 @@ static void print_fixed (volatile unsigned char *p)
 	    }
 	case CISTPL_FUNCE_IDE_MASTER:
 	case CISTPL_FUNCE_IDE_SLAVE:
-	    {   unsigned char f1 = *(p+2);
-		unsigned char f2 = *(p+4);
+	    {   u8 f1 = *(p+2);
+		u8 f2 = *(p+4);
 
 		printk ((f1 & CISTPL_IDE_SILICON) ? " [silicon]" : " [rotating]");
 
@@ -796,17 +796,17 @@ static void print_fixed (volatile unsigned char *p)
 #define MAX_IDENT_CHARS		64
 #define	MAX_IDENT_FIELDS	4
 
-static unsigned char *known_cards[] = {
+static u8 *known_cards[] = {
 	"ARGOSY PnPIDE D5",
 	NULL
 };
 
-static int identify  (volatile unsigned char *p)
+static int identify  (volatile u8 *p)
 {
-	unsigned char id_str[MAX_IDENT_CHARS];
-	unsigned char data;
-	unsigned char *t;
-	unsigned char **card;
+	u8 id_str[MAX_IDENT_CHARS];
+	u8 data;
+	u8 *t;
+	u8 **card;
 	int i, done;
 
 	if (p == NULL)
