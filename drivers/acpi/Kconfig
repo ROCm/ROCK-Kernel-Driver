@@ -113,6 +113,7 @@ config ACPI_BUTTON
 config ACPI_VIDEO
 	tristate "Video"
 	depends on ACPI_INTERPRETER
+	depends on EXPERIMENTAL
 	depends on !IA64_SGI_SN
 	default m
 	help
