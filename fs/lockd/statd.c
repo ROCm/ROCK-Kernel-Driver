@@ -1,5 +1,5 @@
 /*
- * linux/fs/lockd/nsmproc.c
+ * linux/fs/lockd/statd.c
  *
  * Kernel-based status monitor. This is an alternative to
  * the code in mon.c.
@@ -85,77 +85,77 @@ nsm_kernel_statd_init(void)
 }
 
 /*
- * Build the path name for this lockd peer.
- *
- * We keep it extremely simple. Since we can have more
- * than one nlm_host object peer (depending on whether
- * it's server or client, and what proto/version of NLM
- * we use to communicate), we cannot create a file named
- * $IPADDR and remove it when the nlm_host is unmonitored.
- * Besides, unlink() is tricky (there's no kernel_syscall
- * for it), so we just create the file and leave it.
- *
- * When we reboot, the notifier should sort the IPs by
- * descending mtime so that the most recent hosts get
- * notified first.
+ * Build the NSM file name path
  */
 static char *
-nsm_filename(struct in_addr addr)
+nsm_get_name(const char *hostname)
 {
-	char		*name;
+	char	*name;
+
+	if (strchr(hostname, '/') != NULL) {
+		printk(KERN_NOTICE "lockd: invalid characters in hostname \"%s\"\n", hostname);
+		return ERR_PTR(-EINVAL);
+	}
 
 	name = (char *) __get_free_page(GFP_KERNEL);
 	if (name == NULL)
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 
-	/* FIXME IPV6 */
-	snprintf(name, PAGE_SIZE, "%s/%u.%u.%u.%u",
-			NSM_SM_PATH, NIPQUAD(addr));
+	snprintf(name, PAGE_SIZE, "%s/%s", NSM_SM_PATH, hostname);
 	return name;
+}
+
+static void
+nsm_put_name(char *name)
+{
+	free_page((unsigned long) name);
 }
 
 /*
  * Create the NSM monitor file
  */
 static int
-nsm_create(struct in_addr addr)
+nsm_create(const char *hostname)
 {
 	struct file	*filp;
-	char		*name;
+	char		*filename;
 	int		res = 0;
 
-	if (!(name = nsm_filename(addr)))
-		return -ENOMEM;
+	dprintk("lockd: creating statd monitor file %s\n", hostname);
 
-	dprintk("lockd: creating statd monitor file %s\n", name);
-	filp = filp_open(name, O_CREAT|O_SYNC|O_RDWR, 0644);
+	filename = nsm_get_name(hostname);
+	if (IS_ERR(filename))
+		return PTR_ERR(filename);
+
+	filp = filp_open(filename, O_CREAT|O_SYNC|O_RDWR, 0644);
 	if (IS_ERR(filp)) {
 		res = PTR_ERR(filp);
 		printk(KERN_NOTICE
 			"lockd/statd: failed to create %s: err=%d\n",
-			name, res);
+			filename, res);
 	} else {
 		fsync_super(filp->f_dentry->d_inode->i_sb);
 		filp_close(filp, NULL);
 	}
 
-	free_page((long) name);
+	nsm_put_name(filename);
 	return res;
 }
 
 static int
-nsm_unlink(struct in_addr addr)
+nsm_unlink(const char *hostname)
 {
 	struct nameidata nd;
 	struct inode	*inode = NULL;
 	struct dentry	*dentry;
-	char		*name;
+	char		*filename;
 	int		res = 0;
 
-	if (!(name = nsm_filename(addr)))
-		return -ENOMEM;
+	filename = nsm_get_name(hostname);
+	if (IS_ERR(filename))
+		return PTR_ERR(filename);
 
-	if ((res = path_lookup(name, LOOKUP_PARENT, &nd)) != 0)
+	if ((res = path_lookup(filename, LOOKUP_PARENT, &nd)) != 0)
 		goto exit;
 
 	if (nd.last_type == LAST_NORM && !nd.last.name[nd.last.len]) {
@@ -180,38 +180,49 @@ exit:
 	if (res < 0) {
 		printk(KERN_NOTICE
 			"lockd/statd: failed to unlink %s: err=%d\n",
-			name, res);
+			filename, res);
 	}
 
-	free_page((long) name);
 	if (inode)
 		iput(inode);
+	nsm_put_name(filename);
 	return res;
 }
 
 /*
  * Call nsm_create/nsm_unlink with CAP_DAC_OVERRIDE
  */
+#define swap_ugid(type, var) { \
+	type tmp = current->var; current->var = var; var = tmp; \
+}
+
 static int
-with_privilege(int (*func)(struct in_addr), struct sockaddr_in *sin)
+with_privilege(int (*func)(const char *), const char *hostname)
 {
 	kernel_cap_t	cap = current->cap_effective;
 	int		res = 0, mask;
+	uid_t		fsuid = 0;
+	gid_t		fsgid = 0;
 
 	/* If we're unprivileged, a call to capable() will set the
 	 * SUPERPRIV flag */
-	mask = ~(current->flags) & PF_SUPERPRIV;
+	mask = current->flags | ~PF_SUPERPRIV;
 
-	/* Raise capability to that we're able to create/unlink the file */
+	/* Raise capability to that we're able to create/unlink the file.
+	 * Set fsuid/fsgid to 0 so the file will be owned by root. */
 	cap_raise(current->cap_effective, CAP_DAC_OVERRIDE);
+	swap_ugid(uid_t, fsuid);
+	swap_ugid(gid_t, fsgid);
 
-	res = func(sin->sin_addr);
+	res = func(hostname);
 
 	/* drop privileges */
 	current->cap_effective = cap;
+	swap_ugid(uid_t, fsuid);
+	swap_ugid(gid_t, fsgid);
 
 	/* Clear PF_SUPERPRIV unless it was set to begin with */
-	current->flags &= ~mask;
+	current->flags &= mask;
 
 	return res;
 }
@@ -231,7 +242,7 @@ __nsm_monitor(struct nlm_host *host)
 	if ((nsm = host->h_nsmhandle) == NULL)
 		BUG();
 
-	res = with_privilege(nsm_create, &nsm->sm_addr);
+	res = with_privilege(nsm_create, nsm->sm_name);
 	if (res >= 0)
 		nsm->sm_monitored = 1;
 	return res;
@@ -260,7 +271,7 @@ __nsm_unmonitor(struct nlm_host *host)
 	 && nsm->sm_monitored && !nsm->sm_sticky) {
 		dprintk("lockd: nsm_unmonitor(%s)\n", host->h_name);
 
-		res = with_privilege(nsm_unlink, &host->h_addr);
+		res = with_privilege(nsm_unlink, nsm->sm_name);
 	}
 
 	nsm_release(nsm);
@@ -288,13 +299,8 @@ static int
 nsmsvc_proc_notify(struct svc_rqst *rqstp, struct nsm_args *argp,
 				           struct nsm_res  *resp)
 {
-	struct sockaddr_in	saddr = rqstp->rq_addr;
-
 	dprintk("statd: NOTIFY        called\n");
-
-	/* FIXME - shouldn't we walk all nsm handles and compare
-	 * the mon_id instead of just using the address? */
-	nlm_host_rebooted(&saddr, argp->state);
+	nlm_host_rebooted(argp->mon_name, argp->state);
 	return rpc_success;
 }
 
@@ -329,11 +335,9 @@ nsmsvc_encode_void(struct svc_rqst *rqstp, u32 *p, void *dummy)
 static int
 nsmsvc_decode_stat_chge(struct svc_rqst *rqstp, u32 *p, struct nsm_args *argp)
 {
-	char	*mon_name;
 	__u32	mon_name_len;
 
-	/* Skip over the client's mon_name */
-	p = xdr_decode_string_inplace(p, &mon_name, &mon_name_len, SM_MAXSTRLEN);
+	p = xdr_decode_string(p, &argp->mon_name, &mon_name_len, SM_MAXSTRLEN);
 	if (p == NULL)
 		return 0;
 

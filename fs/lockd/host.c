@@ -19,12 +19,11 @@
 
 
 #define NLMDBG_FACILITY		NLMDBG_HOSTCACHE
-#define NLM_HOST_MAX		64
 #define NLM_HOST_NRHASH		32
 #define NLM_ADDRHASH(addr)	(ntohl(addr) & (NLM_HOST_NRHASH-1))
 #define NLM_HOST_REBIND		(60 * HZ)
-#define NLM_HOST_EXPIRE		((nrhosts > NLM_HOST_MAX)? 300 * HZ : 120 * HZ)
-#define NLM_HOST_COLLECT	((nrhosts > NLM_HOST_MAX)? 120 * HZ :  60 * HZ)
+#define NLM_HOST_EXPIRE		((nrhosts > nlm_max_hosts)? 300 * HZ : 120 * HZ)
+#define NLM_HOST_COLLECT	((nrhosts > nlm_max_hosts)? 120 * HZ :  60 * HZ)
 #define NLM_HOST_ADDR(sv)	(&(sv)->s_nlmclnt->cl_xprt->addr)
 
 static struct nlm_host *	nlm_hosts[NLM_HOST_NRHASH];
@@ -42,23 +41,27 @@ int				(*nsm_unmonitor)(struct nlm_host *);
 
 static void			nlm_gc_hosts(void);
 
+static struct nsm_handle *	__nsm_find(const char *);
+static void			__nsm_release(struct nsm_handle *);
+
 /*
  * Find an NLM server handle in the cache. If there is none, create it.
  */
 struct nlm_host *
-nlmclnt_lookup_host(struct sockaddr_in *sin, int proto, int version)
+nlmclnt_lookup_host(struct sockaddr_in *sin, int proto, int version, const char *hostname)
 {
-	return nlm_lookup_host(0, sin, proto, version);
+	return nlm_lookup_host(0, sin, proto, version, hostname);
 }
 
 /*
  * Find an NLM client handle in the cache. If there is none, create it.
  */
 struct nlm_host *
-nlmsvc_lookup_host(struct svc_rqst *rqstp)
+nlmsvc_lookup_host(struct svc_rqst *rqstp, const char *hostname)
 {
 	return nlm_lookup_host(1, &rqstp->rq_addr,
-			       rqstp->rq_prot, rqstp->rq_vers);
+			       rqstp->rq_prot, rqstp->rq_vers,
+			       hostname);
 }
 
 /*
@@ -66,15 +69,16 @@ nlmsvc_lookup_host(struct svc_rqst *rqstp)
  */
 struct nlm_host *
 nlm_lookup_host(int server, struct sockaddr_in *sin,
-					int proto, int version)
+					int proto, int version,
+					const char *hostname)
 {
 	struct nlm_host	*host, **hp;
 	struct nsm_handle *nsm = NULL;
-	u32		addr;
 	int		hash;
 
-	dprintk("lockd: nlm_lookup_host(%08x, p=%d, v=%d)\n",
-			(unsigned)(sin? ntohl(sin->sin_addr.s_addr) : 0), proto, version);
+	dprintk("lockd: nlm_lookup_host(%08x, p=%d, v=%d, name=%s)\n",
+			(unsigned)(sin? ntohl(sin->sin_addr.s_addr) : 0), proto, version,
+			hostname? hostname : "<none>");
 
 	hash = NLM_ADDRHASH(sin->sin_addr.s_addr);
 
@@ -108,18 +112,21 @@ nlm_lookup_host(int server, struct sockaddr_in *sin,
 		goto out;
 	}
 
-	/* Ooops, no host found, create it */
 	dprintk("lockd: creating host entry\n");
 
-	/* Allocate NLM struct and NSM handle. */
-	if ((!nsm && !(nsm = nsm_alloc(sin)))
-	 || !(host = (struct nlm_host *) kmalloc(sizeof(*host), GFP_KERNEL)))
-		goto nohost;
+	/* Sadly, the host isn't in our hash table yet. See if
+	 * we have the name at least and grab the nsm handle.
+	 * If not, create it.
+	 */
+	if (!nsm && !(nsm = __nsm_find(hostname)))
+		goto out;
+
+	if (!(host = (struct nlm_host *) kmalloc(sizeof(*host), GFP_KERNEL))) {
+		__nsm_release(nsm);
+		goto out;
+	}
 	memset(host, 0, sizeof(*host));
-
-	addr = sin->sin_addr.s_addr;
-	sprintf(host->h_name, "%u.%u.%u.%u", NIPQUAD(addr));
-
+	host->h_name	   = nsm->sm_name;
 	host->h_addr       = *sin;
 	host->h_addr.sin_port = 0;	/* ouch! */
 	host->h_version    = version;
@@ -140,20 +147,11 @@ nlm_lookup_host(int server, struct sockaddr_in *sin,
 	INIT_LIST_HEAD(&host->h_lockowners);
 	spin_lock_init(&host->h_lock);
 
-	if (++nrhosts > NLM_HOST_MAX)
+	if (++nrhosts > nlm_max_hosts)
 		next_gc = 0;
 
-out:
-	up(&nlm_host_sema);
+out:	up(&nlm_host_sema);
 	return host;
-
-nohost:
-	if (host) {
-		kfree(host);
-		host = NULL;
-	}
-	nsm_release(nsm);
-	goto out;
 }
 
 struct nlm_host *
@@ -170,6 +168,7 @@ nlm_find_client(void)
 		for (hp = &nlm_hosts[hash]; (host = *hp) != 0; hp = &host->h_next) {
 			if (host->h_server) {
 			    	*hp = host->h_next;
+				atomic_inc(&host->h_count);
 				up(&nlm_host_sema);
 				return host;
 			}
@@ -278,29 +277,34 @@ void nlm_release_host(struct nlm_host *host)
  * Given an IP address, initiate recovery and ditch all locks.
  */
 void
-nlm_host_rebooted(struct sockaddr_in *sin, u32 new_state)
+nlm_host_rebooted(const char *hostname, u32 new_state)
 {
 	struct nlm_host	*host, **hp;
 	int		hash;
 
-	dprintk("lockd: nlm_host_rebooted(%u.%u.%u.%u)\n",
-			NIPQUAD(sin->sin_addr));
-
-	hash = NLM_ADDRHASH(sin->sin_addr.s_addr);
+	dprintk("lockd: nlm_host_rebooted(\"%s\")\n", hostname);
 
 	/* Lock hash table */
 	down(&nlm_host_sema);
-	for (hp = &nlm_hosts[hash]; (host = *hp); hp = &host->h_next) {
-		if (nlm_cmp_addr(&host->h_addr, sin)) {
-			if (host->h_nsmhandle)
-				host->h_nsmhandle->sm_monitored = 0;
-			host->h_rebooted = 1;
+
+	/* Mark all matching hosts as having rebooted */
+	for (hash = 0; hash < NLM_HOST_NRHASH; hash++) {
+		for (hp = &nlm_hosts[hash]; (host = *hp); hp = &host->h_next) {
+			if (nlm_cmp_name(host->h_name, hostname)) {
+				if (host->h_nsmhandle)
+					host->h_nsmhandle->sm_monitored = 0;
+				host->h_rebooted = 1;
+			}
 		}
 	}
 
+	for (hash = 0; hash < NLM_HOST_NRHASH; hash++) {
+
 again:
-	for (hp = &nlm_hosts[hash]; (host = *hp); hp = &host->h_next) {
-		if (nlm_cmp_addr(&host->h_addr, sin) && host->h_rebooted) {
+		for (hp = &nlm_hosts[hash]; (host = *hp); hp = &host->h_next) {
+			if (!host->h_rebooted)
+				continue;
+
 			host->h_rebooted = 0;
 			atomic_inc(&host->h_count);
 			up(&nlm_host_sema);
@@ -319,7 +323,7 @@ again:
 			nlm_release_host(host);
 
 			/* Host table may have changed in the meanwhile,
-			 * start over */
+			 * start over on this hash chain */
 			goto again;
 		}
 	}
@@ -424,21 +428,74 @@ nlm_gc_hosts(void)
 }
 
 /*
- * Allocate an NSM handle
+ * Manage NSM handles
  */
+static LIST_HEAD(nsm_handles);
+
 struct nsm_handle *
-nsm_alloc(struct sockaddr_in *sin)
+__nsm_find(const char *hostname)
+{
+	struct nsm_handle *new = NULL, *result = NULL;
+	struct list_head *pos;
+
+	if (hostname == NULL)
+		return NULL;
+
+	if (strchr(hostname, '/') != NULL) {
+		printk(KERN_WARNING "Invalid hostname \"%s\" in NFS lock request\n",
+				hostname);
+		return NULL;
+	}
+
+again:
+	list_for_each(pos, &nsm_handles) {
+		struct nsm_handle *nsm;
+
+		nsm = list_entry(pos, struct nsm_handle, sm_link);
+		if (!strcmp(nsm->sm_name, hostname)) {
+			if (new)
+				kfree(new);
+			result = nsm;
+			goto out;
+		}
+	}
+
+	if (new == NULL) {
+		int	hlen = strlen(hostname) + 1;
+
+		/* Release the semaphore when calling kmalloc */
+		up(&nlm_host_sema);
+
+		new = (struct nsm_handle *) kmalloc(sizeof(*new) + hlen, GFP_KERNEL);
+		if (new == NULL)
+			return NULL;
+
+		down(&nlm_host_sema);
+		goto again;
+	}
+
+	result = new;
+
+	memset(new, 0, sizeof(*new));
+	INIT_LIST_HEAD(&new->sm_link);
+	new->sm_name = (char *) (new + 1);
+	strcpy(new->sm_name, hostname);
+	atomic_set(&new->sm_count, 0);
+
+	list_add(&new->sm_link, &nsm_handles);
+
+out:	atomic_inc(&result->sm_count);
+	return result;
+}
+
+struct nsm_handle *
+nsm_find(const char *hostname)
 {
 	struct nsm_handle *nsm;
 
-	nsm = (struct nsm_handle *) kmalloc(sizeof(*nsm), GFP_KERNEL);
-	if (nsm == NULL)
-		return NULL;
-
-	memset(nsm, 0, sizeof(*nsm));
-	memcpy(&nsm->sm_addr, sin, sizeof(nsm->sm_addr));
-	atomic_set(&nsm->sm_count, 1);
-
+	down(&nlm_host_sema);
+	nsm = __nsm_find(hostname);
+	up(&nlm_host_sema);
 	return nsm;
 }
 
@@ -446,9 +503,19 @@ nsm_alloc(struct sockaddr_in *sin)
  * Release an NSM handle
  */
 void
+__nsm_release(struct nsm_handle *nsm)
+{
+	if (nsm && atomic_dec_and_test(&nsm->sm_count)) {
+		list_del(&nsm->sm_link);
+		kfree(nsm);
+	}
+}
+
+void
 nsm_release(struct nsm_handle *nsm)
 {
-	if (nsm && atomic_dec_and_test(&nsm->sm_count))
-		kfree(nsm);
+	down(&nlm_host_sema);
+	__nsm_release(nsm);
+	up(&nlm_host_sema);
 }
 

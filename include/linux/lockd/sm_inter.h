@@ -30,6 +30,8 @@ struct nsm_args {
 	u32		vers;
 	u32		proc;
 	u32		proto;		/* protocol (udp/tcp) plus server/client flag */
+
+	char *		mon_name;
 	u32		state;		/* in NOTIFY calls */
 };
 

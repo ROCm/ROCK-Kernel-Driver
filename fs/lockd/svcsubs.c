@@ -287,10 +287,12 @@ nlmsvc_free_host_resources(struct nlm_host *host)
 {
 	dprintk("lockd: nlmsvc_free_host_resources\n");
 
-	if (nlm_traverse_files(host, NLM_ACT_UNLOCK))
+	if (nlm_traverse_files(host, NLM_ACT_UNLOCK)) {
 		printk(KERN_WARNING
-			"lockd: couldn't remove all locks held by %s",
+			"lockd: couldn't remove all locks held by %s\n",
 			host->h_name);
+		BUG();
+	}
 }
 
 /*
@@ -301,8 +303,8 @@ nlmsvc_invalidate_all(void)
 {
 	struct nlm_host *host;
 	while ((host = nlm_find_client()) != NULL) {
-		nlmsvc_free_host_resources(host);
 		host->h_expires = 0;
+		nlmsvc_free_host_resources(host);
 		/* Do not unmonitor the host */
 		if (host->h_nsmhandle)
 			host->h_nsmhandle->sm_sticky = 1;
@@ -310,8 +312,9 @@ nlmsvc_invalidate_all(void)
 			/* Whatever is holding references to this host,
 			 * it seems likely we're going to leak memory
 			 * or worse */
-			printk(KERN_WARNING "lockd: host still in use "
-				"after nlmsvc_free_host_resources!");
+			printk(KERN_WARNING "lockd: host has reference count %u "
+				"after nlmsvc_free_host_resources!\n",
+				atomic_read(&host->h_count));
 		}
 		nlm_release_host(host);
 	}

@@ -40,7 +40,7 @@ struct nlm_host {
 	struct nlm_host *	h_next;		/* linked list (hash table) */
 	struct sockaddr_in	h_addr;		/* peer address */
 	struct rpc_clnt	*	h_rpcclnt;	/* RPC client to talk to peer */
-	char			h_name[20];	/* remote hostname */
+	char *			h_name;		/* remote hostname */
 	u32			h_version;	/* interface version */
 	rpc_authflavor_t	h_authflavor;	/* RPC authentication type */
 	unsigned short		h_proto;	/* transport proto */
@@ -65,8 +65,9 @@ struct nlm_host {
  * NSM handle - used to track status of monitored hosts
  */
 struct nsm_handle {
+	struct list_head	sm_link;
 	atomic_t		sm_count;
-	struct sockaddr_in	sm_addr;
+	char *			sm_name;
 	unsigned int		sm_monitored : 1,
 				sm_sticky : 1;	/* don't unmonitor */
 };
@@ -151,6 +152,7 @@ extern struct svc_procedure	nsmsvc_procedures[];
 #endif
 extern int			nlmsvc_grace_period;
 extern unsigned long		nlmsvc_timeout;
+extern int			nlm_max_hosts;
 
 /*
  * Lockd client functions
@@ -169,17 +171,17 @@ void		  nlmclnt_freegrantargs(struct nlm_rqst *);
 /*
  * Host cache
  */
-struct nlm_host * nlmclnt_lookup_host(struct sockaddr_in *, int, int);
-struct nlm_host * nlmsvc_lookup_host(struct svc_rqst *);
-struct nlm_host * nlm_lookup_host(int server, struct sockaddr_in *, int, int);
+struct nlm_host * nlmclnt_lookup_host(struct sockaddr_in *, int, int, const char *);
+struct nlm_host * nlmsvc_lookup_host(struct svc_rqst *, const char *);
+struct nlm_host * nlm_lookup_host(int server, struct sockaddr_in *, int, int, const char *);
 struct rpc_clnt * nlm_bind_host(struct nlm_host *);
 void		  nlm_rebind_host(struct nlm_host *);
 struct nlm_host * nlm_get_host(struct nlm_host *);
 void		  nlm_release_host(struct nlm_host *);
 void		  nlm_shutdown_hosts(void);
 extern struct nlm_host *nlm_find_client(void);
-extern void	  nlm_host_rebooted(struct sockaddr_in *, u32);
-struct nsm_handle *nsm_alloc(struct sockaddr_in *);
+extern void	  nlm_host_rebooted(const char *, u32);
+struct nsm_handle *nsm_find(const char *);
 void		  nsm_release(struct nsm_handle *);
 
 /*
@@ -220,6 +222,17 @@ static __inline__ int
 nlm_cmp_addr(struct sockaddr_in *sin1, struct sockaddr_in *sin2)
 {
 	return sin1->sin_addr.s_addr == sin2->sin_addr.s_addr;
+}
+
+/*
+ * Compare two host names
+ */
+static __inline__ int
+nlm_cmp_name(const char *name1, const char *name2)
+{
+	if (!name1 || !name2)
+		return name1 == name2;
+	return !strcmp(name1, name2);
 }
 
 /*

@@ -206,7 +206,7 @@ nlmclnt_proc(struct inode *inode, int cmd, struct file_lock *fl)
 	/* Retrieve transport protocol from NFS client */
 	proto = NFS_CLIENT(inode)->cl_xprt->prot;
 
-	if (!(host = nlmclnt_lookup_host(NFS_ADDR(inode), proto, vers)))
+	if (!(host = nlmclnt_lookup_host(NFS_ADDR(inode), proto, vers, nfssrv->hostname)))
 		return -ENOLCK;
 
 	/* Create RPC client handle if not there, and copy soft

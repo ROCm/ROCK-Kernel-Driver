@@ -62,6 +62,7 @@ static unsigned long		nlm_grace_period;
 static unsigned long		nlm_timeout = LOCKD_DFLT_TIMEO;
 static int			nlm_udpport, nlm_tcpport;
 static int			nlm_use_kstatd = 1;
+int				nlm_max_hosts = 256;
 
 /*
  * Constants needed for the sysctl interface.
@@ -386,6 +387,14 @@ static ctl_table nlm_sysctls[] = {
 		.proc_handler	= &proc_dointvec_minmax,
 		.extra1		= (int *) &nlm_port_min,
 		.extra2		= (int *) &nlm_port_max,
+	},
+	{
+		.ctl_name	= CTL_UNNUMBERED,
+		.procname	= "nlm_max_hosts",
+		.data		= &nlm_max_hosts,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
 	},
 #ifdef CONFIG_STATD
 	{
