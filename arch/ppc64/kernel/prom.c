@@ -939,19 +939,10 @@ static void __init prom_hold_cpus(unsigned long mem)
 			prom_getprop(node, "reg", &reg, sizeof(reg));
 			lpaca[cpuid].hw_cpu_id = reg;
 
-#ifdef CONFIG_SMP
-			cpu_set(cpuid, RELOC(cpu_possible_map));
-			cpu_set(cpuid, RELOC(cpu_present_map));
-			if (reg == 0)
-				cpu_set(cpuid, RELOC(cpu_online_map));
-#endif /* CONFIG_SMP */
 			cpuid++;
 		}
 		return;
 	}
-
-	/* Initially, we must have one active CPU. */
-	_systemcfg->processorCount = 1;
 
 	prom_debug("prom_hold_cpus: start...\n");
 	prom_debug("    1) spinloop       = 0x%x\n", (unsigned long)spinloop);
@@ -1038,23 +1029,13 @@ static void __init prom_hold_cpus(unsigned long mem)
 				 * even if we never start it. */
 				if (cpuid >= NR_CPUS)
 					goto next;
-#ifdef CONFIG_SMP
-				/* Set the number of active processors. */
-				_systemcfg->processorCount++;
-				cpu_set(cpuid, RELOC(cpu_possible_map));
-				cpu_set(cpuid, RELOC(cpu_present_map));
-#endif
 			} else {
 				prom_printf("... failed: %x\n", *acknowledge);
 			}
 		}
 #ifdef CONFIG_SMP
-		else {
+		else
 			prom_printf("%x : booting  cpu %s\n", cpuid, path);
-			cpu_set(cpuid, RELOC(cpu_possible_map));
-			cpu_set(cpuid, RELOC(cpu_online_map));
-			cpu_set(cpuid, RELOC(cpu_present_map));
-		}
 #endif
 next:
 #ifdef CONFIG_SMP
@@ -1067,9 +1048,6 @@ next:
 			prom_printf("%x : preparing thread ... ",
 				    interrupt_server[i]);
 			if (_naca->smt_state) {
-				cpu_set(cpuid, RELOC(cpu_present_map));
-				cpu_set(cpuid, RELOC(cpu_possible_map));
-				_systemcfg->processorCount++;
 				prom_printf("available\n");
 			} else {
 				prom_printf("not available\n");
@@ -1099,11 +1077,7 @@ next:
 						pir & 0x3ff;
 				}
 			}
-/* 			cpu_set(i+1, cpu_online_map); */
-			cpu_set(i+1, RELOC(cpu_possible_map));
-			cpu_set(i+1, RELOC(cpu_present_map));
 		}
-		_systemcfg->processorCount *= 2;
 	} else {
 		prom_printf("Processor is not HMT capable\n");
 	}

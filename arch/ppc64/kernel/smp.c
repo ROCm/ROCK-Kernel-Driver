@@ -401,55 +401,10 @@ static inline int __devinit smp_startup_cpu(unsigned int lcpu)
 	}
 	return 1;
 }
-
-static inline void look_for_more_cpus(void)
-{
-	int num_addr_cell, num_size_cell, len, i, maxcpus;
-	struct device_node *np;
-	unsigned int *ireg;
-
-	/* Find the property which will tell us about how many CPUs
-	 * we're allowed to have. */
-	if ((np = find_path_device("/rtas")) == NULL) {
-		printk(KERN_ERR "Could not find /rtas in device tree!");
-		return;
-	}
-	num_addr_cell = prom_n_addr_cells(np);
-	num_size_cell = prom_n_size_cells(np);
-
-	ireg = (unsigned int *)get_property(np, "ibm,lrdr-capacity", &len);
-	if (ireg == NULL) {
-		/* FIXME: make sure not marked as lrdr_capable() */
-		return;
-	}
-
-	maxcpus = ireg[num_addr_cell + num_size_cell];
-
-	/* Double maxcpus for processors which have SMT capability */
-	if (cur_cpu_spec->cpu_features & CPU_FTR_SMT)
-		maxcpus *= 2;
-
-
-	if (maxcpus > NR_CPUS) {
-		printk(KERN_WARNING
-		       "Partition configured for %d cpus, "
-		       "operating system maximum is %d.\n", maxcpus, NR_CPUS);
-		maxcpus = NR_CPUS;
-	} else
-		printk(KERN_INFO "Partition configured for %d cpus.\n",
-		       maxcpus);
-
-	/* Make those cpus (which might appear later) possible too. */
-	for (i = 0; i < maxcpus; i++)
-		cpu_set(i, cpu_possible_map);
-}
 #else /* ... CONFIG_HOTPLUG_CPU */
 static inline int __devinit smp_startup_cpu(unsigned int lcpu)
 {
 	return 1;
-}
-static inline void look_for_more_cpus(void)
-{
 }
 #endif /* CONFIG_HOTPLUG_CPU */
 
@@ -832,8 +787,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	 */
 	do_gtod.tb_orig_stamp = tb_last_stamp;
 	systemcfg->tb_orig_stamp = tb_last_stamp;
-
-	look_for_more_cpus();
 #endif
 
 	max_cpus = smp_ops->probe();
@@ -846,19 +799,12 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	for_each_cpu(cpu)
 		if (cpu != boot_cpuid)
 			smp_create_idle(cpu);
-
-	for_each_cpu(cpu) {
-		cpu_set(cpu, cpu_sibling_map[cpu]);
-		if (cur_cpu_spec->cpu_features & CPU_FTR_SMT)
-			cpu_set(cpu ^ 0x1, cpu_sibling_map[cpu]);
-	}
 }
 
 void __devinit smp_prepare_boot_cpu(void)
 {
 	BUG_ON(smp_processor_id() != boot_cpuid);
 
-	/* cpu_possible is set up in prom.c */
 	cpu_set(boot_cpuid, cpu_online_map);
 
 	paca[boot_cpuid].__current = current;
