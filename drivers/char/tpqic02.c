@@ -94,6 +94,7 @@
 #include <linux/init.h>
 #include <linux/smp_lock.h>
 #include <linux/devfs_fs_kernel.h>
+#include <linux/device.h>
 
 #include <asm/dma.h>
 #include <asm/system.h>
@@ -228,6 +229,8 @@ static const char *format_names[] = {
 	"300",			/* untested. */
 	"600"			/* untested. */
 };
+
+static struct class_simple *tpqic02_class;
 
 
 /* `exception_list' is needed for exception status reporting.
@@ -2696,23 +2699,32 @@ int __init qic02_tape_init(void)
 		return -ENODEV;
 	}
 
+	tpqic02_class = class_simple_create(THIS_MODULE, TPQIC02_NAME);
+	class_simple_device_add(tpqic02_class, MKDEV(QIC02_TAPE_MAJOR, 2), NULL, "ntpqic11");
 	devfs_mk_cdev(MKDEV(QIC02_TAPE_MAJOR, 2),
 		       S_IFCHR|S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP, "ntpqic11");
+	class_simple_device_add(tpqic02_class, MKDEV(QIC02_TAPE_MAJOR, 3), NULL, "tpqic11");
 	devfs_mk_cdev(MKDEV(QIC02_TAPE_MAJOR, 3),
 		       S_IFCHR|S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP, "tpqic11");
 
+	class_simple_device_add(tpqic02_class, MKDEV(QIC02_TAPE_MAJOR, 4), NULL, "ntpqic24");
 	devfs_mk_cdev(MKDEV(QIC02_TAPE_MAJOR, 4),
 		       S_IFCHR|S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP, "ntpqic24");
+	class_simple_device_add(tpqic02_class, MKDEV(QIC02_TAPE_MAJOR, 5), NULL, "tpqic24");
 	devfs_mk_cdev(MKDEV(QIC02_TAPE_MAJOR, 5),
 		       S_IFCHR|S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP, "tpqic24");
 
+	class_simple_device_add(tpqic02_class, MKDEV(QIC02_TAPE_MAJOR, 6), NULL, "ntpqic20");
 	devfs_mk_cdev(MKDEV(QIC02_TAPE_MAJOR, 6),
 		       S_IFCHR|S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP, "ntpqic120");
+	class_simple_device_add(tpqic02_class, MKDEV(QIC02_TAPE_MAJOR, 7), NULL, "tpqic20");
 	devfs_mk_cdev(MKDEV(QIC02_TAPE_MAJOR, 7),
 		       S_IFCHR|S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP, "tpqic120");
 
+	class_simple_device_add(tpqic02_class, MKDEV(QIC02_TAPE_MAJOR, 8), NULL, "ntpqic50");
 	devfs_mk_cdev(MKDEV(QIC02_TAPE_MAJOR, 8),
 		       S_IFCHR|S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP, "ntpqic150");
+	class_simple_device_add(tpqic02_class, MKDEV(QIC02_TAPE_MAJOR, 9), NULL, "tpqic50");
 	devfs_mk_cdev(MKDEV(QIC02_TAPE_MAJOR, 9),
 		       S_IFCHR|S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP, "tpqic150");
 
@@ -2757,13 +2769,23 @@ static void qic02_module_exit(void)
 		qic02_release_resources();
 		
 	devfs_remove("ntpqic11");
+	class_simple_device_remove(MKDEV(QIC02_TAPE_MAJOR, 2));
 	devfs_remove("tpqic11");
+	class_simple_device_remove(MKDEV(QIC02_TAPE_MAJOR, 3));
 	devfs_remove("ntpqic24");
+	class_simple_device_remove(MKDEV(QIC02_TAPE_MAJOR, 4));
 	devfs_remove("tpqic24");
+	class_simple_device_remove(MKDEV(QIC02_TAPE_MAJOR, 5));
 	devfs_remove("ntpqic120");
+	class_simple_device_remove(MKDEV(QIC02_TAPE_MAJOR, 6));
 	devfs_remove("tpqic120");
+	class_simple_device_remove(MKDEV(QIC02_TAPE_MAJOR, 7));
 	devfs_remove("ntpqic150");
+	class_simple_device_remove(MKDEV(QIC02_TAPE_MAJOR, 8));
 	devfs_remove("tpqic150");
+	class_simple_device_remove(MKDEV(QIC02_TAPE_MAJOR, 9));
+
+	class_simple_destroy(tpqic02_class);
 }
 
 static int qic02_module_init(void)
