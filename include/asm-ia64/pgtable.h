@@ -75,6 +75,8 @@
 #define _PAGE_SIZE_16M	24
 #define _PAGE_SIZE_64M	26
 #define _PAGE_SIZE_256M	28
+#define _PAGE_SIZE_1G	30
+#define _PAGE_SIZE_4G	32
 
 #define __ACCESS_BITS		_PAGE_ED | _PAGE_A | _PAGE_P | _PAGE_MA_WB
 #define __DIRTY_BITS_NO_ED	_PAGE_A | _PAGE_P | _PAGE_D | _PAGE_MA_WB

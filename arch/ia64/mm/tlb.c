@@ -22,17 +22,8 @@
 #include <asm/pal.h>
 #include <asm/tlbflush.h>
 
-#define SUPPORTED_PGBITS (			\
-		1 << _PAGE_SIZE_256M |		\
-		1 << _PAGE_SIZE_64M  |		\
-		1 << _PAGE_SIZE_16M  |		\
-		1 << _PAGE_SIZE_4M   |		\
-		1 << _PAGE_SIZE_1M   |		\
-		1 << _PAGE_SIZE_256K |		\
-		1 << _PAGE_SIZE_64K  |		\
-		1 << _PAGE_SIZE_16K  |		\
-		1 << _PAGE_SIZE_8K   |		\
-		1 << _PAGE_SIZE_4K )
+static unsigned long purge_pgbits;
+static unsigned long max_purge_size;
 
 struct ia64_ctx ia64_ctx = {
 	.lock =		SPIN_LOCK_UNLOCKED,
@@ -154,22 +145,10 @@ flush_tlb_range (struct vm_area_struct *vma, unsigned long start, unsigned long 
 	}
 
 	nbits = ia64_fls(size + 0xfff);
-	if (((1UL << nbits) & SUPPORTED_PGBITS) == 0) {
-		if (nbits > _PAGE_SIZE_256M)
-			nbits = _PAGE_SIZE_256M;
-		else
-			/*
-			 * Some page sizes are not implemented in the
-			 * IA-64 arch, so if we get asked to clear an
-			 * unsupported page size, round up to the
-			 * nearest page size.  Note that we depend on
-			 * the fact that if page size N is not
-			 * implemented, 2*N _is_ implemented.
-			 */
-			++nbits;
-		if (((1UL << nbits) & SUPPORTED_PGBITS) == 0)
-			panic("flush_tlb_range: BUG: nbits=%lu\n", nbits);
-	}
+	while ((((1UL << nbits) & purge_pgbits) == 0) && (nbits < max_purge_size)) 
+		++nbits;
+	if (nbits > max_purge_size)
+		nbits = max_purge_size;
 	start &= ~((1UL << nbits) - 1);
 
 # ifdef CONFIG_SMP
@@ -190,6 +169,12 @@ void __init
 ia64_tlb_init (void)
 {
 	ia64_ptce_info_t ptce_info;
+	unsigned long tr_pgbits;
+	long status;
+
+	if ((status = ia64_pal_vm_page_size(&tr_pgbits, &purge_pgbits)) !=0) 
+		panic("ia64_pal_vm_page_size=%ld\n", status);
+	max_purge_size = ia64_fls(purge_pgbits);
 
 	ia64_get_ptce(&ptce_info);
 	local_cpu_data->ptce_base = ptce_info.base;
