@@ -179,7 +179,7 @@ static int ti_get_lsr(struct ti_port *tport);
 static int ti_get_serial_info(struct ti_port *tport,
 	struct serial_struct __user *ret_arg);
 static int ti_set_serial_info(struct ti_port *tport,
-	struct serial_struct *new_arg);
+	struct serial_struct __user *new_arg);
 static void ti_handle_new_msr(struct ti_port *tport, __u8 msr);
 
 static void ti_drain(struct ti_port *tport, unsigned long timeout, int flush);
@@ -200,10 +200,10 @@ static int ti_download_firmware(struct ti_device *tdev,
 
 /* circular buffer */
 static struct circ_buf *ti_buf_alloc(void);
-static inline void ti_buf_free(struct circ_buf *cb);
-static inline void ti_buf_clear(struct circ_buf *cb);
-static inline int ti_buf_data_avail(struct circ_buf *cb);
-static inline int ti_buf_space_avail(struct circ_buf *cb);
+static void ti_buf_free(struct circ_buf *cb);
+static void ti_buf_clear(struct circ_buf *cb);
+static int ti_buf_data_avail(struct circ_buf *cb);
+static int ti_buf_space_avail(struct circ_buf *cb);
 static int ti_buf_put(struct circ_buf *cb, const char *buf, int count);
 static int ti_buf_get(struct circ_buf *cb, char *buf, int count);
 
@@ -841,7 +841,7 @@ static int ti_ioctl(struct usb_serial_port *port, struct file *file,
 
 		case TIOCSSERIAL:
 			dbg("%s - (%d) TIOCSSERIAL", __FUNCTION__, port->number);
-			return ti_set_serial_info(tport, (struct serial_struct *)arg);
+			return ti_set_serial_info(tport, (struct serial_struct __user *)arg);
 			break;
 
 		case TIOCMIWAIT:
@@ -1428,7 +1428,7 @@ static int ti_get_serial_info(struct ti_port *tport,
 
 
 static int ti_set_serial_info(struct ti_port *tport,
-	struct serial_struct *new_arg)
+	struct serial_struct __user *new_arg)
 {
 	struct usb_serial_port *port = tport->tp_port;
 	struct serial_struct new_serial;
@@ -1734,7 +1734,7 @@ static struct circ_buf *ti_buf_alloc(void)
  * Free the buffer and all associated memory.
  */
 
-static inline void ti_buf_free(struct circ_buf *cb)
+static void ti_buf_free(struct circ_buf *cb)
 {
 	kfree(cb->buf);
 	kfree(cb);
@@ -1747,7 +1747,7 @@ static inline void ti_buf_free(struct circ_buf *cb)
  * Clear out all data in the circular buffer.
  */
 
-static inline void ti_buf_clear(struct circ_buf *cb)
+static void ti_buf_clear(struct circ_buf *cb)
 {
 	cb->head = cb->tail = 0;
 }
@@ -1760,7 +1760,7 @@ static inline void ti_buf_clear(struct circ_buf *cb)
  * buffer.
  */
 
-static inline int ti_buf_data_avail(struct circ_buf *cb)
+static int ti_buf_data_avail(struct circ_buf *cb)
 {
 	return CIRC_CNT(cb->head,cb->tail,TI_WRITE_BUF_SIZE);
 }
@@ -1773,7 +1773,7 @@ static inline int ti_buf_data_avail(struct circ_buf *cb)
  * buffer.
  */
 
-static inline int ti_buf_space_avail(struct circ_buf *cb)
+static int ti_buf_space_avail(struct circ_buf *cb)
 {
 	return CIRC_SPACE(cb->head,cb->tail,TI_WRITE_BUF_SIZE);
 }
