@@ -56,39 +56,12 @@ do {						\
 	flush_dcache_page(page);		\
 } while (0)
 
-/*
- * Note: the MAP_NR_*() macro can't use __pa() because MAP_NR_*(X) MUST
- * map to something >= max_mapnr if X is outside the identity mapped
- * kernel space.
- */
-
-/*
- * The dense variant can be used as long as the size of memory holes isn't
- * very big.
- */
-#define MAP_NR_DENSE(addr)	(((unsigned long) (addr) - PAGE_OFFSET) >> PAGE_SHIFT)
-
-#define page_to_pfn(page)	((unsigned long)((page) - mem_map))
 #define pfn_valid(pfn)		((pfn) < max_mapnr)
 #define virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
 #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
-
-#ifdef CONFIG_IA64_GENERIC
-# include <asm/machvec.h>
-# define virt_to_page(kaddr)	(mem_map + platform_map_nr(kaddr))
-# define page_to_pfn(page)	((unsigned long) (page - mem_map))
-# define pfn_to_page(pfn)	(mem_map + (pfn))
-#elif defined (CONFIG_IA64_SGI_SN1)
-# ifndef CONFIG_DISCONTIGMEM
-#  define virt_to_page(kaddr)	(mem_map + MAP_NR_DENSE(kaddr))
-#  define page_to_pfn(page)	XXX fix me
-#  define pfn_to_page(pfn)	XXX fix me
-# endif
-#else
-# define virt_to_page(kaddr)	(mem_map + MAP_NR_DENSE(kaddr))
-# define page_to_pfn(page)	((unsigned long) (page - mem_map))
-# define pfn_to_page(pfn)	(mem_map + (pfn))
-#endif
+#define page_to_pfn(page)	((unsigned long) (page - mem_map))
+#define pfn_to_page(pfn)	(mem_map + (pfn))
+#define page_to_phys(page)	(page_to_pfn(page) << PAGE_SHIFT)
 
 typedef union ia64_va {
 	struct {

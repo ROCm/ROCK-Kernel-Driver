@@ -24,7 +24,8 @@
  *                              /proc/irq/#/smp_affinity
  * 02/04/02	P. Diefenbaugh	Cleaned up ACPI PCI IRQ routing.
  * 02/04/18	J.I. Lee	bug fix in iosapic_init_pci_irq
- * 02/04/30	J.I. Lee	bug fix in find_iosapic to fix ACPI PCI IRQ to IOSAPIC mapping error
+ * 02/04/30	J.I. Lee	bug fix in find_iosapic to fix ACPI PCI IRQ to IOSAPIC mapping
+ *				error
  */
 /*
  * Here is what the interrupt logic between a PCI device and the CPU looks like:
@@ -631,7 +632,7 @@ iosapic_init (unsigned long phys_addr, unsigned int base_irq, int pcat_compat)
 	}
 }
 
-void __init
+static void __init
 iosapic_init_pci_irq (void)
 {
 	int i, index, vector, pin;

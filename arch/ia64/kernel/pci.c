@@ -218,9 +218,10 @@ pcibios_init (void)
 		pci_scan_bus(i, pci_root_ops, NULL);
 
 	platform_pci_fixup(1);	/* phase 1 fixups (after buses scanned) */
-
-	return;
+	return 0;
 }
+
+subsys_initcall(pcibios_init);
 
 /*
  *  Called after each bus is probed, but before its children

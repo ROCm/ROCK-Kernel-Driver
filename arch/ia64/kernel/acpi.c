@@ -3,8 +3,8 @@
  *
  *  Copyright (C) 1999 VA Linux Systems
  *  Copyright (C) 1999,2000 Walt Drummond <drummond@valinux.com>
- *  Copyright (C) 2000 Hewlett-Packard Co.
- *  Copyright (C) 2000 David Mosberger-Tang <davidm@hpl.hp.com>
+ *  Copyright (C) 2000, 2002 Hewlett-Packard Co.
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  *  Copyright (C) 2000 Intel Corp.
  *  Copyright (C) 2000,2001 J.I. Lee <jung-ik.lee@intel.com>
  *  Copyright (C) 2001 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -173,7 +173,7 @@ acpi_dispose_crs (acpi_buffer *buf)
 #define ACPI_MAX_PLATFORM_IRQS	256
 
 /* Array to record platform interrupt vectors for generic interrupt routing. */
-int platform_irq_list[ACPI_MAX_PLATFORM_IRQS];
+int platform_irq_list[ACPI_MAX_PLATFORM_IRQS] = { [0 ... ACPI_MAX_PLATFORM_IRQS - 1] = -1 };
 
 /*
  * Interrupt routing API for device drivers.  Provides interrupt vector for
@@ -421,8 +421,6 @@ acpi_parse_nmi_src (acpi_table_entry_header *header)
 static int __init
 acpi_parse_madt (unsigned long phys_addr, unsigned long size)
 {
-	int i = 0;
-
 	if (!phys_addr || !size)
 		return -EINVAL;
 
@@ -431,11 +429,6 @@ acpi_parse_madt (unsigned long phys_addr, unsigned long size)
 		printk(KERN_WARNING PREFIX "Unable to map MADT\n");
 		return -ENODEV;
 	}
-
-	/* Initialize platform interrupt vector array */
-
-	for (i = 0; i < ACPI_MAX_PLATFORM_IRQS; i++)
-		platform_irq_list[i] = -1;
 
 	/* Get base address of IPI Message Block */
 
@@ -643,7 +636,7 @@ acpi_get_prt (struct pci_vector_struct **vectors, int *count)
 	*vectors = NULL;
 	*count = 0;
 
-	if (acpi_prts.count < 0) {
+	if (acpi_prts.count <= 0) {
 		printk(KERN_ERR PREFIX "No PCI IRQ routing entries\n");
 		return -ENODEV;
 	}
@@ -661,7 +654,7 @@ acpi_get_prt (struct pci_vector_struct **vectors, int *count)
 	list_for_each(node, &acpi_prts.entries) {
 		entry = (struct acpi_prt_entry *)node;
 		vector[i].bus    = entry->id.bus;
-		vector[i].pci_id = ((u32) entry->id.dev) << 16 | 0xffff;
+		vector[i].pci_id = ((u32) entry->id.dev << 16) | 0xffff;
 		vector[i].pin    = entry->id.pin;
 		vector[i].irq    = entry->source.index;
 		i++;

@@ -395,7 +395,7 @@ show_cpuinfo (struct seq_file *m, void *v)
 
 	switch (c->family) {
 	      case 0x07:	memcpy(family, "Itanium", 8); break;
-	      case 0x1f:	memcpy(family, "Itanium 2", 9); break;
+	      case 0x1f:	memcpy(family, "Itanium 2", 10); break;
 	      default:		sprintf(family, "%u", c->family); break;
 	}
 
@@ -564,15 +564,11 @@ cpu_init (void)
 #define FEATURE_SET 16
 		struct ia64_pal_retval iprv;
 
-		if (my_cpu_data->family == 0x1f) {
-
+		if (my_cpu_info->family == 0x1f) {
 			PAL_CALL_PHYS(iprv, PAL_PROC_GET_FEATURES, 0, FEATURE_SET, 0);
-
-			if ((iprv.status == 0) && (iprv.v0 & 0x80) && (iprv.v2 & 0x80)) {
-
+			if ((iprv.status == 0) && (iprv.v0 & 0x80) && (iprv.v2 & 0x80))
 				PAL_CALL_PHYS(iprv, PAL_PROC_SET_FEATURES,
 				              (iprv.v1 | 0x80), FEATURE_SET, 0);
-			}
 		}
 	}
 #endif

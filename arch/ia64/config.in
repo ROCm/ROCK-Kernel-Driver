@@ -37,7 +37,7 @@ else
 	 8KB			CONFIG_IA64_PAGE_SIZE_8KB		\
 	 16KB			CONFIG_IA64_PAGE_SIZE_16KB		\
 	 64KB			CONFIG_IA64_PAGE_SIZE_64KB" 16KB
-endif
+fi
 
 if [ "$CONFIG_IA64_HP_SIM" = "n" ]; then
   define_bool CONFIG_ACPI y
