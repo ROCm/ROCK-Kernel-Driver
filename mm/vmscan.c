@@ -22,7 +22,8 @@
 #include <linux/writeback.h>
 #include <linux/suspend.h>
 #include <linux/blkdev.h>
-#include <linux/buffer_head.h>		/* for try_to_release_page() */
+#include <linux/buffer_head.h>	/* for try_to_release_page(),
+					buffer_heads_over_limit */
 #include <linux/mm_inline.h>
 #include <linux/pagevec.h>
 #include <linux/backing-dev.h>

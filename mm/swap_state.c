@@ -13,7 +13,6 @@
 #include <linux/init.h>
 #include <linux/pagemap.h>
 #include <linux/backing-dev.h>
-#include <linux/buffer_head.h>	/* block_sync_page() */
 
 #include <asm/pgtable.h>
 
@@ -187,7 +186,7 @@ void delete_from_swap_cache(struct page *page)
 
 	BUG_ON(!PageLocked(page));
 	BUG_ON(PageWriteback(page));
-	BUG_ON(page_has_buffers(page));
+	BUG_ON(PagePrivate(page));
   
 	entry.val = page->index;
 
@@ -236,7 +235,7 @@ int move_from_swap_cache(struct page *page, unsigned long index,
 
 	BUG_ON(!PageLocked(page));
 	BUG_ON(PageWriteback(page));
-	BUG_ON(page_has_buffers(page));
+	BUG_ON(PagePrivate(page));
 
 	entry.val = page->index;
 
