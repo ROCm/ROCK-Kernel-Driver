@@ -555,6 +555,7 @@ static void probe_hwif (ide_hwif_t *hwif)
 	 */
 	for (unit = 0; unit < MAX_DRIVES; ++unit) {
 		ide_drive_t *drive = &hwif->drives[unit];
+		drive->dn = ((hwif->channel ? 2 : 0) + unit);
 		(void) probe_for_drive (drive);
 		if (drive->present && !hwif->present) {
 			hwif->present = 1;
@@ -585,6 +586,17 @@ static void probe_hwif (ide_hwif_t *hwif)
 			if (hwif->tuneproc != NULL && drive->autotune == 1)
 				/* auto-tune PIO mode */
 				hwif->tuneproc(drive, 255);
+
+			if ((drive->autotune != 2) && hwif->dmaproc != NULL) {
+				/*
+				 * Force DMAing for the beginning of the check.
+				 * Some chipsets appear to do interesting
+				 * things, if not checked and cleared.
+				 *   PARANOIA!!!
+				 */
+				hwif->dmaproc(ide_dma_off_quietly, drive);
+				hwif->dmaproc(ide_dma_check, drive);
+			}
 		}
 	}
 }
@@ -859,7 +871,6 @@ static void init_gendisk (ide_hwif_t *hwif)
 #if 1
 		char name[64];
 		ide_add_generic_settings(hwif->drives + unit);
-		hwif->drives[unit].dn = ((hwif->channel ? 2 : 0) + unit);
 		sprintf (name, "host%d/bus%d/target%d/lun%d",
 			(hwif->channel && hwif->mate) ?
 			hwif->mate->index : hwif->index,
@@ -871,7 +882,6 @@ static void init_gendisk (ide_hwif_t *hwif)
 			char name[64];
 
 			ide_add_generic_settings(hwif->drives + unit);
-			hwif->drives[unit].dn = ((hwif->channel ? 2 : 0) + unit);
 			sprintf (name, "host%d/bus%d/target%d/lun%d",
 				 (hwif->channel && hwif->mate) ? hwif->mate->index : hwif->index,
 				 hwif->channel, unit, hwif->drives[unit].lun);
