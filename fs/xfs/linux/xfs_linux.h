@@ -201,6 +201,11 @@ static inline void set_buffer_unwritten_io(struct buffer_head *bh)
 #define howmany(x, y)	(((x)+((y)-1))/(y))
 #define roundup(x, y)	((((x)+((y)-1))/(y))*(y))
 
+static inline void xfs_stack_trace(void)
+{
+	dump_stack();
+}
+
 /* Move the kernel do_div definition off to one side */
 
 #if defined __i386__

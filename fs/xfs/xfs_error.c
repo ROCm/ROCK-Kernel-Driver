@@ -258,12 +258,6 @@ xfs_cmn_err(int panic_tag, int level, xfs_mount_t *mp, char *fmt, ...)
 }
 
 void
-xfs_stack_trace(void)
-{
-	dump_stack();
-}
-
-void
 xfs_error_report(
 	char		*tag,
 	int		level,
