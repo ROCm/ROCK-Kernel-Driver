@@ -1876,7 +1876,7 @@ end_io:
  */
 int submit_bio(int rw, struct bio *bio)
 {
-	int count = bio_sectors(bio);
+	int count = bio_sectors(bio) >> 1;
 
 	BUG_ON(!bio->bi_end_io);
 	BIO_BUG_ON(!bio->bi_size);
