@@ -302,13 +302,10 @@ void gen_set_disp(int con, struct fb_info *info)
         struct display *display = fb_display + con;
 
         if (info->fix.visual == FB_VISUAL_PSEUDOCOLOR ||
-            info->fix.visual == FB_VISUAL_DIRECTCOLOR) {
-                display->can_soft_blank = info->fbops->fb_blank ? 1 : 0;
+            info->fix.visual == FB_VISUAL_DIRECTCOLOR)
                 display->dispsw_data = NULL;
-        } else {
-                display->can_soft_blank = 0;
+        else
                 display->dispsw_data = info->pseudo_palette;
-        }
 
         /*
          * If we are setting all the virtual consoles, also set
@@ -323,6 +320,7 @@ void gen_set_disp(int con, struct fb_info *info)
         }
         */
 
+	display->can_soft_blank = info->fbops->fb_blank ? 1 : 0;
 #ifdef FBCON_HAS_ACCEL
         display->scrollmode = SCROLL_YNOMOVE;
         display->dispsw = &fbcon_accel;
