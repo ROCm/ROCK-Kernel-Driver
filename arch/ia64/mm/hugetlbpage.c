@@ -187,7 +187,6 @@ void hugetlb_free_pgtables(struct mmu_gather *tlb, struct vm_area_struct *prev,
 {
 	unsigned long first = start & HUGETLB_PGDIR_MASK;
 	unsigned long last = end + HUGETLB_PGDIR_SIZE - 1;
-	unsigned long start_index, end_index;
 	struct mm_struct *mm = tlb->mm;
 
 	if (!prev) {
@@ -212,23 +211,13 @@ void hugetlb_free_pgtables(struct mmu_gather *tlb, struct vm_area_struct *prev,
 				last = next->vm_start;
 		}
 		if (prev->vm_end > first)
-			first = prev->vm_end + HUGETLB_PGDIR_SIZE - 1;
+			first = prev->vm_end;
 		break;
 	}
 no_mmaps:
 	if (last < first)	/* for arches with discontiguous pgd indices */
 		return;
-	/*
-	 * If the PGD bits are not consecutive in the virtual address, the
-	 * old method of shifting the VA >> by PGDIR_SHIFT doesn't work.
-	 */
-
-	start_index = pgd_index(htlbpage_to_page(first));
-	end_index = pgd_index(htlbpage_to_page(last));
-
-	if (end_index > start_index) {
-		clear_page_tables(tlb, start_index, end_index - start_index);
-	}
+	clear_page_range(tlb, first, last);
 }
 
 void unmap_hugepage_range(struct vm_area_struct *vma, unsigned long start, unsigned long end)

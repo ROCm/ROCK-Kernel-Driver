@@ -100,58 +100,76 @@ static inline void copy_cow_page(struct page * from, struct page * to, unsigned 
  * Note: this doesn't free the actual pages themselves. That
  * has been handled earlier when unmapping all the memory regions.
  */
-static inline void free_one_pmd(struct mmu_gather *tlb, pmd_t * dir)
+static inline void clear_pmd_range(struct mmu_gather *tlb, pmd_t *pmd, unsigned long start, unsigned long end)
 {
 	struct page *page;
 
-	if (pmd_none(*dir))
+	if (pmd_none(*pmd))
 		return;
-	if (unlikely(pmd_bad(*dir))) {
-		pmd_ERROR(*dir);
-		pmd_clear(dir);
+	if (unlikely(pmd_bad(*pmd))) {
+		pmd_ERROR(*pmd);
+		pmd_clear(pmd);
 		return;
 	}
-	page = pmd_page(*dir);
-	pmd_clear(dir);
-	dec_page_state(nr_page_table_pages);
-	tlb->mm->nr_ptes--;
-	pte_free_tlb(tlb, page);
+	if (!(start & ~PMD_MASK) && !(end & ~PMD_MASK)) {
+		page = pmd_page(*pmd);
+		pmd_clear(pmd);
+		dec_page_state(nr_page_table_pages);
+		tlb->mm->nr_ptes--;
+		pte_free_tlb(tlb, page);
+	}
 }
 
-static inline void free_one_pgd(struct mmu_gather *tlb, pgd_t * dir)
+static inline void clear_pgd_range(struct mmu_gather *tlb, pgd_t *pgd, unsigned long start, unsigned long end)
 {
-	int j;
-	pmd_t * pmd;
+	unsigned long addr = start, next;
+	pmd_t *pmd, *__pmd;
 
-	if (pgd_none(*dir))
+	if (pgd_none(*pgd))
 		return;
-	if (unlikely(pgd_bad(*dir))) {
-		pgd_ERROR(*dir);
-		pgd_clear(dir);
+	if (unlikely(pgd_bad(*pgd))) {
+		pgd_ERROR(*pgd);
+		pgd_clear(pgd);
 		return;
 	}
-	pmd = pmd_offset(dir, 0);
-	pgd_clear(dir);
-	for (j = 0; j < PTRS_PER_PMD ; j++)
-		free_one_pmd(tlb, pmd+j);
-	pmd_free_tlb(tlb, pmd);
+
+	pmd = __pmd = pmd_offset(pgd, start);
+	do {
+		next = (addr + PMD_SIZE) & PMD_MASK;
+		if (next > end || next <= addr)
+			next = end;
+		
+		clear_pmd_range(tlb, pmd, addr, next);
+		pmd++;
+		addr = next;
+	} while (addr && (addr <= end - 1));
+
+	if (!(start & ~PGDIR_MASK) && !(end & ~PGDIR_MASK)) {
+		pgd_clear(pgd);
+		pmd_free_tlb(tlb, __pmd);
+	}
 }
 
 /*
- * This function clears all user-level page tables of a process - this
- * is needed by execve(), so that old pages aren't in the way.
+ * This function clears user-level page tables of a process.
  *
  * Must be called with pagetable lock held.
  */
-void clear_page_tables(struct mmu_gather *tlb, unsigned long first, int nr)
+void clear_page_range(struct mmu_gather *tlb, unsigned long start, unsigned long end)
 {
-	pgd_t * page_dir = tlb->mm->pgd;
+	unsigned long addr = start, next;
+	unsigned long i, nr = pgd_index(end + PGDIR_SIZE-1) - pgd_index(start);
+	pgd_t * pgd = pgd_offset(tlb->mm, start);
 
-	page_dir += first;
-	do {
-		free_one_pgd(tlb, page_dir);
-		page_dir++;
-	} while (--nr);
+	for (i = 0; i < nr; i++) {
+		next = (addr + PGDIR_SIZE) & PGDIR_MASK;
+		if (next > end || next <= addr)
+			next = end;
+		
+		clear_pgd_range(tlb, pgd, addr, next);
+		pgd++;
+		addr = next;
+	}
 }
 
 pte_t fastcall * pte_alloc_map(struct mm_struct *mm, pmd_t *pmd, unsigned long address)

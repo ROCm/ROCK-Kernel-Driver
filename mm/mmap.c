@@ -1474,7 +1474,6 @@ static void free_pgtables(struct mmu_gather *tlb, struct vm_area_struct *prev,
 {
 	unsigned long first = start & PGDIR_MASK;
 	unsigned long last = end + PGDIR_SIZE - 1;
-	unsigned long start_index, end_index;
 	struct mm_struct *mm = tlb->mm;
 
 	if (!prev) {
@@ -1499,23 +1498,18 @@ static void free_pgtables(struct mmu_gather *tlb, struct vm_area_struct *prev,
 				last = next->vm_start;
 		}
 		if (prev->vm_end > first)
-			first = prev->vm_end + PGDIR_SIZE - 1;
+			first = prev->vm_end;
 		break;
 	}
 no_mmaps:
 	if (last < first)	/* for arches with discontiguous pgd indices */
 		return;
-	/*
-	 * If the PGD bits are not consecutive in the virtual address, the
-	 * old method of shifting the VA >> by PGDIR_SHIFT doesn't work.
-	 */
-	start_index = pgd_index(first);
-	if (start_index < FIRST_USER_PGD_NR)
-		start_index = FIRST_USER_PGD_NR;
-	end_index = pgd_index(last);
-	if (end_index > start_index) {
-		clear_page_tables(tlb, start_index, end_index - start_index);
-		flush_tlb_pgtables(mm, first & PGDIR_MASK, last & PGDIR_MASK);
+	if (first < FIRST_USER_PGD_NR * PGDIR_SIZE)
+		first = FIRST_USER_PGD_NR * PGDIR_SIZE;
+	/* No point trying to free anything if we're in the same pte page */
+	if ((first & PMD_MASK) < (last & PMD_MASK)) {
+		clear_page_range(tlb, first, last);
+		flush_tlb_pgtables(mm, first, last);
 	}
 }
 
@@ -1844,7 +1838,9 @@ void exit_mmap(struct mm_struct *mm)
 					~0UL, &nr_accounted, NULL);
 	vm_unacct_memory(nr_accounted);
 	BUG_ON(mm->map_count);	/* This is just debugging */
-	clear_page_tables(tlb, FIRST_USER_PGD_NR, USER_PTRS_PER_PGD);
+	clear_page_range(tlb, FIRST_USER_PGD_NR * PGDIR_SIZE,
+			(TASK_SIZE + PGDIR_SIZE - 1) & PGDIR_MASK);
+	
 	tlb_finish_mmu(tlb, 0, MM_VM_SIZE(mm));
 
 	vma = mm->mmap;
