@@ -471,7 +471,6 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 
 		sdev->request_queue->queuedata = sdev;
 		scsi_adjust_queue_depth(sdev, 0, sdev->host->cmd_per_lun);
-		scsi_build_commandblocks(sdev);
 		if (sdev->current_queue_depth == 0) {
 			goto out_bail;
 		}
@@ -515,7 +514,6 @@ out_bail:
 	} else if (sdev->request_queue)
 		scsi_free_queue(sdev->request_queue);
 
-	scsi_release_commandblocks(sdev);
 	kfree(sdev);
 	return NULL;
 }
@@ -535,7 +533,6 @@ static void scsi_free_sdev(struct scsi_device *sdev)
 
 	if (sdev->request_queue)
 		scsi_free_queue(sdev->request_queue);
-	scsi_release_commandblocks(sdev);
 	if (sdev->host->hostt->slave_destroy)
 		sdev->host->hostt->slave_destroy(sdev);
 	if (sdev->inquiry)

@@ -1384,7 +1384,7 @@ static void scsi_eh_lock_done(struct scsi_cmnd *scmd)
 	scmd->sc_request = NULL;
 	sreq->sr_command = NULL;
 
-	scsi_release_command(scmd);
+	scsi_put_command(scmd);
 	scsi_release_request(sreq);
 }
 

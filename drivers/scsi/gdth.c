@@ -4599,7 +4599,7 @@ static void gdth_flush(int hanum)
 
 #if LINUX_VERSION_CODE >= 0x020322
     sdev = scsi_get_host_dev(gdth_ctr_tab[hanum]);
-    scp  = scsi_allocate_device(sdev, 1);
+    scp  = scsi_getset_command(sdev, GFP_KERNEL);
     scp->cmd_len = 12;
     scp->use_sg = 0;
 #else
@@ -4627,7 +4627,7 @@ static void gdth_flush(int hanum)
         }
     }
 #if LINUX_VERSION_CODE >= 0x020322
-    scsi_release_command(scp);
+    scsi_put_command(scp);
     scsi_free_host_dev(sdev);
 #endif
 }
@@ -4673,7 +4673,7 @@ void gdth_halt(void)
         memset(cmnd, 0xff, MAX_COMMAND_SIZE);
 #if LINUX_VERSION_CODE >= 0x020322
         sdev = scsi_get_host_dev(gdth_ctr_tab[hanum]);
-        scp  = scsi_allocate_device(sdev, 1);
+        scp  = scsi_getset_command(sdev, GFP_KERNEL);
         scp->cmd_len = 12;
         scp->use_sg = 0;
 #else
@@ -4690,7 +4690,7 @@ void gdth_halt(void)
         TRACE2(("gdth_halt(): reset controller %d\n", hanum));
 #if LINUX_VERSION_CODE >= 0x020322
         gdth_do_cmd(scp, &gdtcmd, cmnd, 10);
-        scsi_release_command(scp);
+        scsi_put_command(scp);
         scsi_free_host_dev(sdev);
 #else
         gdth_do_cmd(&scp, &gdtcmd, cmnd, 10);

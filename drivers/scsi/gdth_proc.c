@@ -48,7 +48,7 @@ static int gdth_set_info(char *buffer,int length,int vh,int hanum,int busnum)
 
 #if LINUX_VERSION_CODE >= 0x020322
     sdev = scsi_get_host_dev(gdth_ctr_vtab[vh]);
-    scp  = scsi_allocate_device(sdev, 1);
+    scp  = scsi_getset_command(sdev, GFP_KERNEL);
     if (!scp)
         return -ENOMEM;
     scp->cmd_len = 12;
@@ -81,7 +81,7 @@ static int gdth_set_info(char *buffer,int length,int vh,int hanum,int busnum)
         ret_val = -EINVAL;
     }
 #if LINUX_VERSION_CODE >= 0x020322
-    scsi_release_command(scp);
+    scsi_put_command(scp);
     scsi_free_host_dev(sdev);
 #endif
     return ret_val;
@@ -712,7 +712,7 @@ static int gdth_get_info(char *buffer,char **start,off_t offset,
 
 #if LINUX_VERSION_CODE >= 0x020322
     sdev = scsi_get_host_dev(gdth_ctr_vtab[vh]);
-    scp  = scsi_allocate_device(sdev, 1);
+    scp  = scsi_getset_command(sdev, GFP_KERNEL);
     if (!scp)
         return -ENOMEM;
     scp->cmd_len = 12;
@@ -1234,7 +1234,7 @@ static int gdth_get_info(char *buffer,char **start,off_t offset,
 
 stop_output:
 #if LINUX_VERSION_CODE >= 0x020322
-    scsi_release_command(scp);
+    scsi_put_command(scp);
     scsi_free_host_dev(sdev);
 #endif
     *start = buffer +(offset-begin);

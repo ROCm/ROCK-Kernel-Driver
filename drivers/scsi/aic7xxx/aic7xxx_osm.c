@@ -975,7 +975,7 @@ ahc_linux_queue(Scsi_Cmnd * cmd, void (*scsi_done) (Scsi_Cmnd *))
 	struct	 ahc_linux_device *dev;
 	u_long	 flags;
 
-	ahc = *(struct ahc_softc **)cmd->host->hostdata;
+	ahc = *(struct ahc_softc **)cmd->device->host->hostdata;
 
 	/*
 	 * Save the callback on completion function.
@@ -999,8 +999,8 @@ ahc_linux_queue(Scsi_Cmnd * cmd, void (*scsi_done) (Scsi_Cmnd *))
 		ahc_midlayer_entrypoint_unlock(ahc, &flags);
 		return (0);
 	}
-	dev = ahc_linux_get_device(ahc, cmd->channel, cmd->target,
-				   cmd->lun, /*alloc*/TRUE);
+	dev = ahc_linux_get_device(ahc, cmd->device->channel, cmd->device->id,
+				   cmd->device->lun, /*alloc*/TRUE);
 	if (dev == NULL) {
 		ahc_midlayer_entrypoint_unlock(ahc, &flags);
 		printf("aic7xxx_linux_queue: Unable to allocate device!\n");
@@ -1244,12 +1244,12 @@ ahc_linux_bus_reset(Scsi_Cmnd *cmd)
 	u_long s;
 	int    found;
 
-	ahc = *(struct ahc_softc **)cmd->host->hostdata;
+	ahc = *(struct ahc_softc **)cmd->device->host->hostdata;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 	spin_unlock_irq(&io_request_lock);
 #endif
 	ahc_midlayer_entrypoint_lock(ahc, &s);
-	found = ahc_reset_channel(ahc, cmd->channel + 'A',
+	found = ahc_reset_channel(ahc, cmd->device->channel + 'A',
 				  /*initiate reset*/TRUE);
 	acmd = TAILQ_FIRST(&ahc->platform_data->completeq);
 	TAILQ_INIT(&ahc->platform_data->completeq);
@@ -1371,10 +1371,10 @@ static int ahc_linux_halt(struct notifier_block *nb, u_long event, void *buf)
 }
 
 /******************************** Macros **************************************/
-#define BUILD_SCSIID(ahc, cmd)						\
-	((((cmd)->target << TID_SHIFT) & TID)				\
-	| (((cmd)->channel == 0) ? (ahc)->our_id : (ahc)->our_id_b)	\
-	| (((cmd)->channel == 0) ? 0 : TWIN_CHNLB))
+#define BUILD_SCSIID(ahc, cmd)						   \
+	((((cmd)->device->id << TID_SHIFT) & TID)			   \
+	| (((cmd)->device->channel == 0) ? (ahc)->our_id : (ahc)->our_id_b)\
+	| (((cmd)->device->channel == 0) ? 0 : TWIN_CHNLB))
 
 /******************************** Bus DMA *************************************/
 int
@@ -3511,7 +3511,7 @@ ahc_linux_dv_timeout(struct scsi_cmnd *cmd)
 	struct	scb *scb;
 	u_long	flags;
 
-	ahc = *((struct ahc_softc **)cmd->host->hostdata);
+	ahc = *((struct ahc_softc **)cmd->device->host->hostdata);
 	ahc_lock(ahc, &flags);
 
 #ifdef AHC_DEBUG
@@ -3539,7 +3539,7 @@ ahc_linux_dv_timeout(struct scsi_cmnd *cmd)
 		ahc_set_transaction_status(scb, CAM_AUTOSENSE_FAIL);
 	else
 		ahc_set_transaction_status(scb, CAM_CMD_TIMEOUT);
-	ahc_reset_channel(ahc, cmd->channel + 'A', /*initiate*/TRUE);
+	ahc_reset_channel(ahc, cmd->device->channel + 'A', /*initiate*/TRUE);
 
 	/*
 	 * Add a minimal bus settle delay for devices that are slow to
@@ -3589,7 +3589,7 @@ ahc_linux_dv_complete(struct scsi_cmnd *cmd)
 {
 	struct ahc_softc *ahc;
 
-	ahc = *((struct ahc_softc **)cmd->host->hostdata);
+	ahc = *((struct ahc_softc **)cmd->device->host->hostdata);
 
 	/* Delete the DV timer before it goes off! */
 	scsi_delete_timer(cmd);
@@ -3597,7 +3597,8 @@ ahc_linux_dv_complete(struct scsi_cmnd *cmd)
 #ifdef AHC_DEBUG
 	if (ahc_debug & AHC_SHOW_DV)
 		printf("%s:%d:%d: Command completed, status= 0x%x\n",
-		       ahc_name(ahc), cmd->channel, cmd->target, cmd->result);
+		       ahc_name(ahc), cmd->device->channel, cmd->device->id,
+		       cmd->result);
 #endif
 
 	/* Wake up the state machine */
@@ -3813,7 +3814,7 @@ ahc_linux_run_device_queue(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 		 */
 		hscb->control = 0;
 		hscb->scsiid = BUILD_SCSIID(ahc, cmd);
-		hscb->lun = cmd->lun;
+		hscb->lun = cmd->device->lun;
 		mask = SCB_GET_TARGET_MASK(ahc, scb);
 		tinfo = ahc_fetch_transinfo(ahc, SCB_GET_CHANNEL(ahc, scb),
 					    SCB_GET_OUR_ID(scb),
@@ -4838,11 +4839,12 @@ ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag)
 	pending_scb = NULL;
 	paused = FALSE;
 	wait = FALSE;
-	ahc = *(struct ahc_softc **)cmd->host->hostdata;
+	ahc = *(struct ahc_softc **)cmd->device->host->hostdata;
 	acmd = (struct ahc_cmd *)cmd;
 
 	printf("%s:%d:%d:%d: Attempting to queue a%s message\n",
-	       ahc_name(ahc), cmd->channel, cmd->target, cmd->lun,
+	       ahc_name(ahc), cmd->device->channel, cmd->device->id,
+	       cmd->device->lun,
 	       flag == SCB_ABORT ? "n ABORT" : " TARGET RESET");
 
 	/*
@@ -4871,8 +4873,8 @@ ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag)
 	 * at all, and the system wanted us to just abort the
 	 * command return success.
 	 */
-	dev = ahc_linux_get_device(ahc, cmd->channel, cmd->target,
-				   cmd->lun, /*alloc*/FALSE);
+	dev = ahc_linux_get_device(ahc, cmd->device->channel, cmd->device->id,
+				   cmd->device->lun, /*alloc*/FALSE);
 
 	if (dev == NULL) {
 		/*
@@ -4880,7 +4882,8 @@ ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag)
 		 * so we must not still own the command.
 		 */
 		printf("%s:%d:%d:%d: Is not an active device\n",
-		       ahc_name(ahc), cmd->channel, cmd->target, cmd->lun);
+		       ahc_name(ahc), cmd->device->channel, cmd->device->id,
+		       cmd->device->lun);
 		retval = SUCCESS;
 		goto no_cmd;
 	}
@@ -4892,7 +4895,8 @@ ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag)
 
 	if (list_acmd != NULL) {
 		printf("%s:%d:%d:%d: Command found on device queue\n",
-		       ahc_name(ahc), cmd->channel, cmd->target, cmd->lun);
+		       ahc_name(ahc), cmd->device->channel, cmd->device->id,
+		       cmd->device->lun);
 		if (flag == SCB_ABORT) {
 			TAILQ_REMOVE(&dev->busyq, list_acmd, acmd_links.tqe);
 			cmd->result = DID_ABORT << 16;
@@ -4903,11 +4907,13 @@ ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag)
 	}
 
 	if ((dev->flags & (AHC_DEV_Q_BASIC|AHC_DEV_Q_TAGGED)) == 0
-	 && ahc_search_untagged_queues(ahc, cmd, cmd->target,
-				       cmd->channel + 'A', cmd->lun,
+	 && ahc_search_untagged_queues(ahc, cmd, cmd->device->id,
+				       cmd->device->channel + 'A',
+				       cmd->device->lun,
 				       CAM_REQ_ABORTED, SEARCH_COMPLETE) != 0) {
 		printf("%s:%d:%d:%d: Command found on untagged queue\n",
-		       ahc_name(ahc), cmd->channel, cmd->target, cmd->lun);
+		       ahc_name(ahc), cmd->device->channel, cmd->device->id,
+		       cmd->device->lun);
 		retval = SUCCESS;
 		goto done;
 	}
@@ -4924,8 +4930,9 @@ ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag)
 
 		/* Any SCB for this device will do for a target reset */
 		LIST_FOREACH(pending_scb, &ahc->pending_scbs, pending_links) {
-		  	if (ahc_match_scb(ahc, pending_scb, cmd->target,
-					  cmd->channel + 'A', CAM_LUN_WILDCARD,
+		  	if (ahc_match_scb(ahc, pending_scb, cmd->device->id,
+					  cmd->device->channel + 'A',
+					  CAM_LUN_WILDCARD,
 					  SCB_LIST_NULL, ROLE_INITIATOR) == 0)
 				break;
 		}
@@ -4933,7 +4940,8 @@ ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag)
 
 	if (pending_scb == NULL) {
 		printf("%s:%d:%d:%d: Command not found\n",
-		       ahc_name(ahc), cmd->channel, cmd->target, cmd->lun);
+		       ahc_name(ahc), cmd->device->channel, cmd->device->id,
+		       cmd->device->lun);
 		goto no_cmd;
 	}
 
@@ -4957,24 +4965,24 @@ ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag)
 
 	if ((pending_scb->flags & SCB_ACTIVE) == 0) {
 		printf("%s:%d:%d:%d: Command already completed\n",
-		       ahc_name(ahc), cmd->channel, cmd->target, cmd->lun);
+		       ahc_name(ahc), cmd->device->channel, cmd->device->id, cmd->device->lun);
 		goto no_cmd;
 	}
 
 	disconnected = TRUE;
 	if (flag == SCB_ABORT) {
-		if (ahc_search_qinfifo(ahc, cmd->target, cmd->channel + 'A',
-				       cmd->lun, pending_scb->hscb->tag,
+		if (ahc_search_qinfifo(ahc, cmd->device->id, cmd->device->channel + 'A',
+				       cmd->device->lun, pending_scb->hscb->tag,
 				       ROLE_INITIATOR, CAM_REQ_ABORTED,
 				       SEARCH_COMPLETE) > 0) {
 			printf("%s:%d:%d:%d: Cmd aborted from QINFIFO\n",
-			       ahc_name(ahc), cmd->channel, cmd->target,
-					cmd->lun);
+			       ahc_name(ahc), cmd->device->channel, cmd->device->id,
+					cmd->device->lun);
 			retval = SUCCESS;
 			goto done;
 		}
-	} else if (ahc_search_qinfifo(ahc, cmd->target, cmd->channel + 'A',
-				      cmd->lun, pending_scb->hscb->tag,
+	} else if (ahc_search_qinfifo(ahc, cmd->device->id, cmd->device->channel + 'A',
+				      cmd->device->lun, pending_scb->hscb->tag,
 				      ROLE_INITIATOR, /*status*/0,
 				      SEARCH_COUNT) > 0) {
 		disconnected = FALSE;
@@ -5006,7 +5014,7 @@ ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag)
 	if (last_phase != P_BUSFREE
 	 && (pending_scb->hscb->tag == active_scb_index
 	  || (flag == SCB_DEVICE_RESET
-	   && SCSIID_TARGET(ahc, ahc_inb(ahc, SAVED_SCSIID)) == cmd->target))) {
+	   && SCSIID_TARGET(ahc, ahc_inb(ahc, SAVED_SCSIID)) == cmd->device->id))) {
 
 		/*
 		 * We're active on the bus, so assert ATN
@@ -5017,7 +5025,7 @@ ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag)
 		ahc_outb(ahc, MSG_OUT, HOST_MSG);
 		ahc_outb(ahc, SCSISIGO, last_phase|ATNO);
 		printf("%s:%d:%d:%d: Device is active, asserting ATN\n",
-		       ahc_name(ahc), cmd->channel, cmd->target, cmd->lun);
+		       ahc_name(ahc), cmd->device->channel, cmd->device->id, cmd->device->lun);
 		wait = TRUE;
 	} else if (disconnected) {
 
@@ -5047,8 +5055,8 @@ ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag)
 		 * same element in the SCB, SCB_NEXT, for
 		 * both the qinfifo and the disconnected list.
 		 */
-		ahc_search_disc_list(ahc, cmd->target, cmd->channel + 'A',
-				     cmd->lun, pending_scb->hscb->tag,
+		ahc_search_disc_list(ahc, cmd->device->id, cmd->device->channel + 'A',
+				     cmd->device->lun, pending_scb->hscb->tag,
 				     /*stop_on_first*/TRUE,
 				     /*remove*/TRUE,
 				     /*save_state*/FALSE);
@@ -5071,19 +5079,19 @@ ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag)
 		 * so we are the next SCB for this target
 		 * to run.
 		 */
-		ahc_search_qinfifo(ahc, cmd->target, cmd->channel + 'A',
-				   cmd->lun, SCB_LIST_NULL, ROLE_INITIATOR,
+		ahc_search_qinfifo(ahc, cmd->device->id, cmd->device->channel + 'A',
+				   cmd->device->lun, SCB_LIST_NULL, ROLE_INITIATOR,
 				   CAM_REQUEUE_REQ, SEARCH_COMPLETE);
 		ahc_print_path(ahc, pending_scb);
 		printf("Queuing a recovery SCB\n");
 		ahc_qinfifo_requeue_tail(ahc, pending_scb);
 		ahc_outb(ahc, SCBPTR, saved_scbptr);
 		printf("%s:%d:%d:%d: Device is disconnected, re-queuing SCB\n",
-		       ahc_name(ahc), cmd->channel, cmd->target, cmd->lun);
+		       ahc_name(ahc), cmd->device->channel, cmd->device->id, cmd->device->lun);
 		wait = TRUE;
 	} else {
 		printf("%s:%d:%d:%d: Unable to deliver message\n",
-		       ahc_name(ahc), cmd->channel, cmd->target, cmd->lun);
+		       ahc_name(ahc), cmd->device->channel, cmd->device->id, cmd->device->lun);
 		retval = FAILED;
 		goto done;
 	}

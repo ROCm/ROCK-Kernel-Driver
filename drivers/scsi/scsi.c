@@ -265,7 +265,7 @@ void scsi_release_request(Scsi_Request * req)
 {
 	if( req->sr_command != NULL )
 	{
-		scsi_release_command(req->sr_command);
+		scsi_put_command(req->sr_command);
 		req->sr_command = NULL;
 	}
 
@@ -768,7 +768,7 @@ void scsi_wait_req (Scsi_Request * SRpnt, const void *cmnd ,
 	SRpnt->sr_request->waiting = NULL;
 	if( SRpnt->sr_command != NULL )
 	{
-		scsi_release_command(SRpnt->sr_command);
+		scsi_put_command(SRpnt->sr_command);
 		SRpnt->sr_command = NULL;
 	}
 
@@ -834,7 +834,7 @@ void scsi_do_req(Scsi_Request * SRpnt, const void *cmnd,
 	 */
 	if( SRpnt->sr_command != NULL )
 	{
-		scsi_release_command(SRpnt->sr_command);
+		scsi_put_command(SRpnt->sr_command);
 		SRpnt->sr_command = NULL;
 	}
 
@@ -1506,6 +1506,12 @@ void scsi_adjust_queue_depth(Scsi_Device *SDpnt, int tagged, int tags)
 			SDpnt->new_queue_depth = tags;
 			break;
 	}
+	/* TODO FIXME This is a hack and MUST go eventually.
+	   This fixes a problem in scsi_scan.c::scsi_alloc_sdev()
+	   else we cannot ever have ANY SCSI devices.
+	*/
+	SDpnt->current_queue_depth = 1;
+
 	spin_unlock_irqrestore(&device_request_lock, flags);
 }
 
@@ -2017,6 +2023,14 @@ static int __init init_scsi(void)
 {
 	printk(KERN_INFO "SCSI subsystem driver " REVISION "\n");
 
+	scsi_core = kmalloc(sizeof(*scsi_core), GFP_KERNEL);
+	if (!scsi_core)
+		goto out_no_mem;
+	memset(scsi_core, 0, sizeof(*scsi_core));
+	
+	if (scsi_create_cmdcache(scsi_core))
+		goto out_no_mem;
+
 	scsi_init_queue();
 	scsi_init_procfs();
 	devfs_mk_dir(NULL, "scsi", NULL);
@@ -2025,6 +2039,10 @@ static int __init init_scsi(void)
 	scsi_sysfs_register();
 	open_softirq(SCSI_SOFTIRQ, scsi_softirq, NULL);
 	return 0;
+
+out_no_mem:
+	printk(KERN_CRIT "Couldn't load SCSI Core -- out of memory!\n");
+	return -ENOMEM;
 }
 
 static void __exit exit_scsi(void)
@@ -2034,6 +2052,12 @@ static void __exit exit_scsi(void)
 	devfs_remove("scsi");
 	scsi_exit_procfs();
 	scsi_exit_queue();
+
+	scsi_destroy_cmdcache(scsi_core);
+
+	if (scsi_core)
+		kfree(scsi_core);
+	scsi_core = NULL;
 }
 
 subsys_initcall(init_scsi);
