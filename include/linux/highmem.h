@@ -38,7 +38,7 @@ static inline char *bio_kmap_irq(struct bio *bio, unsigned long *flags)
 	 * it's a highmem page
 	 */
 	__cli();
-	addr = (unsigned long) kmap_atomic(bio_page(bio), KM_BIO_IRQ);
+	addr = (unsigned long) kmap_atomic(bio_page(bio), KM_BIO_SRC_IRQ);
 
 	if (addr & ~PAGE_MASK)
 		BUG();
@@ -50,7 +50,7 @@ static inline void bio_kunmap_irq(char *buffer, unsigned long *flags)
 {
 	unsigned long ptr = (unsigned long) buffer & PAGE_MASK;
 
-	kunmap_atomic((void *) ptr, KM_BIO_IRQ);
+	kunmap_atomic((void *) ptr, KM_BIO_SRC_IRQ);
 	__restore_flags(*flags);
 }
 

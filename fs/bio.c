@@ -284,8 +284,8 @@ struct bio *bio_copy(struct bio *bio, int gfp_mask, int copy)
 			vto = kmap(bbv->bv_page);
 		} else {
 			local_irq_save(flags);
-			vfrom = kmap_atomic(bv->bv_page, KM_BIO_IRQ);
-			vto = kmap_atomic(bbv->bv_page, KM_BIO_IRQ);
+			vfrom = kmap_atomic(bv->bv_page, KM_BIO_SRC_IRQ);
+			vto = kmap_atomic(bbv->bv_page, KM_BIO_DST_IRQ);
 		}
 
 		memcpy(vto + bbv->bv_offset, vfrom + bv->bv_offset, bv->bv_len);
@@ -293,8 +293,8 @@ struct bio *bio_copy(struct bio *bio, int gfp_mask, int copy)
 			kunmap(bbv->bv_page);
 			kunmap(bv->bv_page);
 		} else {
-			kunmap_atomic(vto, KM_BIO_IRQ);
-			kunmap_atomic(vfrom, KM_BIO_IRQ);
+			kunmap_atomic(vto, KM_BIO_DST_IRQ);
+			kunmap_atomic(vfrom, KM_BIO_SRC_IRQ);
 			local_irq_restore(flags);
 		}
 	}
