@@ -24,6 +24,8 @@
 
 #include <linux/time.h>
 #include <linux/fs.h>
+#include <linux/sched.h>
+#include <linux/writeback.h>
 #include <linux/jbd.h>
 #include <linux/ext3_fs.h>
 #include <linux/ext3_jbd.h>
@@ -38,29 +40,28 @@
  *
  * What we do is just kick off a commit and wait on it.  This will snapshot the
  * inode to disk.
- *
- * Note that there is a serious optimisation we can make here: if the current
- * inode is not part of j_running_transaction or j_committing_transaction
- * then we have nothing to do.  That would require implementation of t_ilist,
- * which isn't too hard.
  */
 
 int ext3_sync_file(struct file * file, struct dentry *dentry, int datasync)
 {
 	struct inode *inode = dentry->d_inode;
+	int ret = 0;
 
 	J_ASSERT(ext3_journal_current_handle() == 0);
+
+	smp_mb();		/* prepare for lockless i_state read */
+	if (!(inode->i_state & I_DIRTY))
+		goto out;
 
 	/*
 	 * data=writeback:
 	 *  The caller's filemap_fdatawrite()/wait will sync the data.
-	 *  ext3_force_commit() will sync the metadata
+	 *  sync_inode() will sync the metadata
 	 *
 	 * data=ordered:
 	 *  The caller's filemap_fdatawrite() will write the data and
-	 *  ext3_force_commit() will wait on the buffers.  Then the caller's
-	 *  filemap_fdatawait() will wait on the pages (but all IO is complete)
-	 *  Not pretty, but it works.
+	 *  sync_inode() will write the inode if it is dirty.  Then the caller's
+	 *  filemap_fdatawait() will wait on the pages.
 	 *
 	 * data=journal:
 	 *  filemap_fdatawrite won't do anything (the buffers are clean).
@@ -70,5 +71,22 @@ int ext3_sync_file(struct file * file, struct dentry *dentry, int datasync)
 	 *  (they were dirtied by commit).  But that's OK - the blocks are
 	 *  safe in-journal, which is all fsync() needs to ensure.
 	 */
-	return ext3_force_commit(inode->i_sb);
+	if (ext3_should_journal_data(inode)) {
+		ret = ext3_force_commit(inode->i_sb);
+		goto out;
+	}
+
+	/*
+	 * The VFS has written the file data.  If the inode is unaltered
+	 * then we need not start a commit.
+	 */
+	if (inode->i_state & (I_DIRTY_SYNC|I_DIRTY_DATASYNC)) {
+		struct writeback_control wbc = {
+			.sync_mode = WB_SYNC_ALL,
+			.nr_to_write = 0, /* sys_fsync did this */
+		};
+		ret = sync_inode(inode, &wbc);
+	}
+out:
+	return ret;
 }

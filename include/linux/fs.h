@@ -925,6 +925,7 @@ static inline void file_accessed(struct file *file)
 	touch_atime(file->f_vfsmnt, file->f_dentry);
 }
 
+int sync_inode(struct inode *inode, struct writeback_control *wbc);
 
 /**
  * &export_operations - for nfsd to communicate with file systems
