@@ -63,6 +63,8 @@ MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
+static const char driver_name[] = "catc";
+
 /*
  * Some defines.
  */ 
@@ -677,7 +679,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
         /* get driver info */
         case ETHTOOL_GDRVINFO: {
                 struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
-                strncpy(info.driver, SHORT_DRIVER_DESC, ETHTOOL_BUSINFO_LEN);
+                strncpy(info.driver, driver_name, ETHTOOL_BUSINFO_LEN);
                 strncpy(info.version, DRIVER_VERSION, ETHTOOL_BUSINFO_LEN);
 		usb_make_path (catc->usbdev, info.bus_info, sizeof info.bus_info);
                 if (copy_to_user(useraddr, &info, sizeof(info)))
@@ -967,7 +969,7 @@ MODULE_DEVICE_TABLE(usb, catc_id_table);
 
 static struct usb_driver catc_driver = {
 	.owner =	THIS_MODULE,
-	.name =		"catc",
+	.name =		driver_name,
 	.probe =	catc_probe,
 	.disconnect =	catc_disconnect,
 	.id_table =	catc_id_table,

@@ -114,6 +114,8 @@ MODULE_AUTHOR("Michael Zappe <zapman@interlan.net>, Stephane Alnet <stephane@u-p
 MODULE_DESCRIPTION("KL5USB101 USB Ethernet driver");
 MODULE_LICENSE("GPL");
 
+static const char driver_name[] = "kaweth";
+
 static int kaweth_probe(
 		struct usb_interface *intf,
 		const struct usb_device_id *id	/* from id_table */
@@ -169,7 +171,7 @@ MODULE_DEVICE_TABLE (usb, usb_klsi_table);
  ****************************************************************/
 static struct usb_driver kaweth_driver = {
 	.owner =	THIS_MODULE,
-	.name =		"kaweth",
+	.name =		driver_name,
 	.probe =	kaweth_probe,
 	.disconnect =	kaweth_disconnect,
 	.id_table =     usb_klsi_table,
@@ -670,7 +672,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 	switch (ethcmd) {
 	case ETHTOOL_GDRVINFO: {
 		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
-		strlcpy(info.driver, "kaweth", sizeof(info.driver));
+		strlcpy(info.driver, driver_name, sizeof(info.driver));
 		if (copy_to_user(useraddr, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;

@@ -114,9 +114,11 @@ static void rtl8150_disconnect(struct usb_interface *intf);
 static int rtl8150_probe(struct usb_interface *intf,
 			   const struct usb_device_id *id);
 
+static const char driver_name [] = "rtl8150";
+
 static struct usb_driver rtl8150_driver = {
 	.owner =	THIS_MODULE,
-	.name =		"rtl8150",
+	.name =		driver_name,
 	.probe =	rtl8150_probe,
 	.disconnect =	rtl8150_disconnect,
 	.id_table =	rtl8150_table,
@@ -690,7 +692,7 @@ static int rtl8150_ethtool_ioctl(struct net_device *netdev, void *uaddr)
 	case ETHTOOL_GDRVINFO:{
 		struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
 
-		strncpy(info.driver, DRIVER_DESC, ETHTOOL_BUSINFO_LEN);
+		strncpy(info.driver, driver_name, ETHTOOL_BUSINFO_LEN);
 		strncpy(info.version, DRIVER_VERSION, ETHTOOL_BUSINFO_LEN);
 		usb_make_path(dev->udev, info.bus_info, sizeof info.bus_info);
 		if (copy_to_user(uaddr, &info, sizeof(info)))
