@@ -659,7 +659,6 @@ EXPORT_SYMBOL(wait_on_page_writeback);
 void unlock_page(struct page *page)
 {
 	wait_queue_head_t *waitqueue = page_waitqueue(page);
-	clear_bit(PG_launder, &(page)->flags);
 	smp_mb__before_clear_bit();
 	if (!TestClearPageLocked(page))
 		BUG();
@@ -674,7 +673,7 @@ void unlock_page(struct page *page)
 void end_page_writeback(struct page *page)
 {
 	wait_queue_head_t *waitqueue = page_waitqueue(page);
-	clear_bit(PG_launder, &(page)->flags);
+	ClearPageLaunder(page);
 	smp_mb__before_clear_bit();
 	if (!TestClearPageWriteback(page))
 		BUG();

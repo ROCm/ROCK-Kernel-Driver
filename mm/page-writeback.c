@@ -354,6 +354,8 @@ int generic_writeback_mapping(struct address_space *mapping, int *nr_to_write)
 		lock_page(page);
 
 		if (TestClearPageDirty(page)) {
+			if (current->flags & PF_MEMALLOC)
+				SetPageLaunder(page);
 			err = writepage(page);
 			if (!ret)
 				ret = err;
