@@ -19,6 +19,7 @@
 #include <linux/sched.h>
 #include <linux/stat.h>
 #include <linux/in.h>
+#include <linux/seq_file.h>
 
 #include <linux/sunrpc/svc.h>
 #include <linux/nfsd/nfsd.h>
@@ -514,6 +515,67 @@ exp_getclientbyname(char *ident)
 	return NULL;
 }
 
+/* Iterator */
+
+static void *e_start(struct seq_file *m, loff_t *pos)
+{
+	loff_t n = *pos;
+	unsigned client, export;
+	svc_client *clp;
+	struct list_head *p;
+	
+	exp_readlock();
+	if (!n--)
+		return (void *)1;
+	client = n >> 32;
+	export = n & ((1LL<<32) - 1);
+	for (clp = clients; client && clp; clp = clp->cl_next, client--)
+		;
+	if (!clp)
+		return NULL;
+	list_for_each(p, &clp->cl_list)
+		if (!export--)
+			return list_entry(p, svc_export, ex_list);
+	n &= ~((1LL<<32) - 1);
+	do {
+		clp = clp->cl_next;
+		n += 1LL<<32;
+	} while(clp && list_empty(&clp->cl_list));
+	if (!clp)
+		return NULL;
+	*pos = n+1;
+	return list_entry(clp->cl_list.next, svc_export, ex_list);
+}
+
+static void *e_next(struct seq_file *m, void *p, loff_t *pos)
+{
+	svc_export *exp = p;
+	svc_client *clp;
+
+	if (p == (void *)1)
+		clp = clients;
+	else if (exp->ex_list.next == &exp->ex_client->cl_list)
+		clp = exp->ex_client->cl_next;
+	else {
+		++*pos;
+		return list_entry(exp->ex_list.next, svc_export, ex_list);
+	}
+	*pos &= ~((1LL<<32) - 1);
+	while (clp && list_empty(&clp->cl_list)) {
+		clp = clp->cl_next;
+		*pos += 1LL<<32;
+	}
+	if (!clp)
+		return NULL;
+	++*pos;
+	return list_entry(clp->cl_list.next, svc_export, ex_list);
+}
+
+static void e_stop(struct seq_file *m, void *p)
+{
+	exp_unlock();
+}
+
 struct flags {
 	int flag;
 	char *name[2];
@@ -536,128 +598,76 @@ struct flags {
 	{ 0, {"", ""}}
 };
 
-static int
-exp_flags(char *buffer, int flag)
+static void exp_flags(struct seq_file *m, int flag)
 {
-    int len = 0, first = 0;
-    struct flags *flg = expflags;
+	int first = 0;
+	struct flags *flg;
 
-    for (;flg->flag;flg++) {
-        int state = (flg->flag & flag)?0:1;
-        if (!flg->flag)
-		break;
-        if (*flg->name[state]) {
-		len += sprintf(buffer + len, "%s%s",
-                               first++?",":"", flg->name[state]);
-        }
-    }
-    return len;
+	for (flg = expflags; flg->flag; flg++) {
+		int state = (flg->flag & flag)?0:1;
+		if (*flg->name[state])
+			seq_printf(m, "%s%s", first++?",":"", flg->name[state]);
+	}
 }
 
-
-
-/* mangling borrowed from fs/super.c */
-/* Use octal escapes, like mount does, for embedded spaces etc. */
-static unsigned char need_escaping[] = { ' ', '\t', '\n', '\\' };
-
-static int
-mangle(const unsigned char *s, char *buf, int len) {
-        char *sp;
-        int n;
-
-        sp = buf;
-        while(*s && sp-buf < len-3) {
-                for (n = 0; n < sizeof(need_escaping); n++) {
-                        if (*s == need_escaping[n]) {
-                                *sp++ = '\\';
-                                *sp++ = '0' + ((*s & 0300) >> 6);
-                                *sp++ = '0' + ((*s & 070) >> 3);
-                                *sp++ = '0' + (*s & 07);
-                                goto next;
-                        }
-                }
-                *sp++ = *s;
-        next:
-                s++;
-        }
-        return sp - buf;	/* no trailing NUL */
+static inline void mangle(struct seq_file *m, const char *s)
+{
+	seq_escape(m, s, " \t\n\\");
 }
 
-#define FREEROOM	((int)PAGE_SIZE-200-len)
-#define MANGLE(s)	len += mangle((s), buffer+len, FREEROOM);
-
-int
-exp_procfs_exports(char *buffer, char **start, off_t offset,
-                             int length, int *eof, void *data)
+static int e_show(struct seq_file *m, void *p)
 {
-	struct svc_clnthash	**hp, **head, *tmp;
-	struct svc_client	*clp;
-	svc_export *exp;
-	off_t	pos = 0;
-        off_t	begin = 0;
-        int	len = 0;
-	int	j;
+	struct svc_export *exp = p;
+	struct svc_client *clp;
+	int j, first = 0;
 
-        len += sprintf(buffer, "# Version 1.1\n");
-        len += sprintf(buffer+len, "# Path Client(Flags) # IPs\n");
-
-	for (clp = clients; clp; clp = clp->cl_next) {
-		struct list_head *list = &clp->cl_list;
-		struct list_head *p;
-
-		list_for_each(p, list) {
-			int first = 0;
-
-			exp = list_entry(p, svc_export, ex_list);
-			MANGLE(exp->ex_path);
-			buffer[len++]='\t';
-			MANGLE(clp->cl_ident);
-			buffer[len++]='(';
-
-			len += exp_flags(buffer+len, exp->ex_flags);
-			len += sprintf(buffer+len, ") # ");
-			for (j = 0; j < clp->cl_naddr; j++) {
-				struct in_addr	addr = clp->cl_addr[j]; 
-
-				head = &clnt_hash[CLIENT_HASH(addr.s_addr)];
-				for (hp = head; (tmp = *hp) != NULL; hp = &(tmp->h_next)) {
-					if (tmp->h_addr.s_addr == addr.s_addr) {
-						if (first++) len += sprintf(buffer+len, "%s", " ");
-						if (tmp->h_client != clp)
-							len += sprintf(buffer+len, "(");
-						len += sprintf(buffer+len, "%d.%d.%d.%d",
-								htonl(addr.s_addr) >> 24 & 0xff,
-								htonl(addr.s_addr) >> 16 & 0xff,
-								htonl(addr.s_addr) >>  8 & 0xff,
-								htonl(addr.s_addr) >>  0 & 0xff);
-						if (tmp->h_client != clp)
-						  len += sprintf(buffer+len, ")");
-						break;
-					}
-				}
-			}
-
-			buffer[len++]='\n';
-
-			pos=begin+len;
-			if(pos<offset) {
-				len=0;
-				begin=pos;
-			}
-			if (pos > offset + length)
-				goto done;
-		}
+	if (p == (void *)1) {
+		seq_puts(m, "# Version 1.1\n");
+		seq_puts(m, "# Path Client(Flags) # IPs\n");
+		return 0;
 	}
 
-	*eof = 1;
+	clp = exp->ex_client;
 
-done:
-	*start = buffer + (offset - begin);
-	len -= (offset - begin);
-	if ( len > length )
-		len = length;
-	return len;
+	mangle(m, exp->ex_path);
+	seq_putc(m, '\t');
+	mangle(m, clp->cl_ident);
+	seq_putc(m, '(');
+	exp_flags(m, exp->ex_flags);
+	seq_puts(m, ") # ");
+	for (j = 0; j < clp->cl_naddr; j++) {
+		struct svc_clnthash **hp, **head, *tmp;
+		struct in_addr addr = clp->cl_addr[j]; 
+
+		head = &clnt_hash[CLIENT_HASH(addr.s_addr)];
+		for (hp = head; (tmp = *hp) != NULL; hp = &(tmp->h_next)) {
+			if (tmp->h_addr.s_addr == addr.s_addr)
+				break;
+		}
+		if (tmp) {
+			if (first++)
+				seq_putc(m, ' ');
+			if (tmp->h_client != clp)
+				seq_putc(m, '(');
+			seq_printf(m, "%d.%d.%d.%d",
+				htonl(addr.s_addr) >> 24 & 0xff,
+				htonl(addr.s_addr) >> 16 & 0xff,
+				htonl(addr.s_addr) >>  8 & 0xff,
+				htonl(addr.s_addr) >>  0 & 0xff);
+			if (tmp->h_client != clp)
+				seq_putc(m, ')');
+		}
+	}
+	seq_putc(m, '\n');
+	return 0;
 }
+
+struct seq_operations nfs_exports_op = {
+	start:	e_start,
+	next:	e_next,
+	stop:	e_stop,
+	show:	e_show,
+};
 
 /*
  * Add or modify a client.

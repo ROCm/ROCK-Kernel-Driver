@@ -20,6 +20,7 @@
 #include <linux/unistd.h>
 #include <linux/slab.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 
 #include <linux/nfs.h>
 #include <linux/sunrpc/svc.h>
@@ -45,16 +46,27 @@ static int	nfsctl_ugidupdate(struct nfsctl_ugidmap *data);
 
 static int	initialized;
 
-int exp_procfs_exports(char *buffer, char **start, off_t offset,
-                             int length, int *eof, void *data);
+extern struct seq_operations nfs_exports_op;
+static int exports_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &nfs_exports_op);
+}
+static struct file_operations exports_operations = {
+	open:		exports_open,
+	read:		seq_read,
+	llseek:		seq_lseek,
+	release:	seq_release,
+};
 
 void proc_export_init(void)
 {
+	struct proc_dir_entry *entry;
 	if (!proc_mkdir("fs/nfs", 0))
 		return;
-	create_proc_read_entry("fs/nfs/exports", 0, 0, exp_procfs_exports,NULL);
+	entry = create_proc_entry("fs/nfs/exports", 0, NULL);
+	if (entry)
+		entry->proc_fops =  &exports_operations;
 }
-
 
 /*
  * Initialize nfsd
