@@ -1056,7 +1056,7 @@ void ide_execute_command(ide_drive_t *drive, task_ioreg_t cmd, ide_handler_t *ha
 	hwgroup->expiry		= expiry;
 	hwgroup->timer.expires	= jiffies + timeout;
 	add_timer(&hwgroup->timer);
-	hwif->OUTBSYNC(cmd, IDE_COMMAND_REG);
+	hwif->OUTBSYNC(drive, cmd, IDE_COMMAND_REG);
 	/* Drive takes 400nS to respond, we must avoid the IRQ being
 	   serviced before that. 
 	   
