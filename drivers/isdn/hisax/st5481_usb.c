@@ -239,7 +239,7 @@ exit:
  * initialization
  */
 
-int (struct st5481_adapter *adapter)
+int st5481_setup_usb(struct st5481_adapter *adapter)
 {
 	struct usb_device *dev = adapter->usb_dev;
 	struct st5481_ctrl *ctrl = &adapter->ctrl;
