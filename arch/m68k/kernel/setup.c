@@ -525,7 +525,6 @@ int get_hardware_list(char *buffer)
 	strcpy(model, "Unknown m68k");
 
     len += sprintf(buffer+len, "Model:\t\t%s\n", model);
-    len += get_cpuinfo(buffer+len);
     for (mem = 0, i = 0; i < m68k_num_memory; i++)
 	mem += m68k_memory[i].size;
     len += sprintf(buffer+len, "System Memory:\t%ldK\n", mem>>10);
