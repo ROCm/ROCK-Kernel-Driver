@@ -1675,13 +1675,10 @@ int pop_journal_writer(int windex) ;
 int journal_transaction_should_end(struct reiserfs_transaction_handle *, int) ;
 int reiserfs_in_journal(struct super_block *p_s_sb, unsigned long bl, int searchall, unsigned long *next) ;
 int journal_begin(struct reiserfs_transaction_handle *, struct super_block *p_s_sb, unsigned long) ;
-struct super_block *reiserfs_get_super(kdev_t dev) ;
 void flush_async_commits(struct super_block *p_s_sb) ;
 
 int buffer_journaled(const struct buffer_head *bh) ;
 int mark_buffer_journal_new(struct buffer_head *bh) ;
-int reiserfs_sync_all_buffers(kdev_t dev, int wait) ;
-int reiserfs_sync_buffers(kdev_t dev, int wait) ;
 int reiserfs_add_page_to_flush_list(struct reiserfs_transaction_handle *,
                                     struct inode *, struct buffer_head *) ;
 int reiserfs_remove_page_from_flush_list(struct reiserfs_transaction_handle *,

@@ -21,16 +21,9 @@
 /*
  * swapper_inode doesn't do anything much.  It is really only here to
  * avoid some special-casing in other parts of the kernel.
- *
- * We set i_size to "infinity" to keep the page I/O functions happy.  The swap
- * block allocator makes sure that allocations are in-range.  A strange
- * number is chosen to prevent various arith overflows elsewhere.  For example,
- * `lblock' in block_read_full_page().
  */
 static struct inode swapper_inode = {
 	i_mapping:	&swapper_space,
-	i_size:		PAGE_SIZE * 0xffffffffLL,
-	i_blkbits:	PAGE_SHIFT,
 };
 
 extern struct address_space_operations swap_aops;
@@ -160,9 +153,13 @@ int move_to_swap_cache(struct page *page, swp_entry_t entry)
 
 		/* Add it to the swap cache */
 		*pslot = page;
-		page->flags &= ~(1 << PG_uptodate | 1 << PG_error
-				| 1 << PG_referenced | 1 << PG_arch_1
-				| 1 << PG_checked);
+		/*
+		 * This code used to clear PG_uptodate, PG_error, PG_arch1,
+		 * PG_referenced and PG_checked.  What _should_ it clear?
+		 */
+		ClearPageUptodate(page);
+		ClearPageReferenced(page);
+
 		SetPageLocked(page);
 		ClearPageDirty(page);
 		___add_to_page_cache(page, &swapper_space, entry.val);
@@ -205,9 +202,14 @@ int move_from_swap_cache(struct page *page, unsigned long index,
 		__delete_from_swap_cache(page);
 
 		*pslot = page;
-		page->flags &= ~(1 << PG_uptodate | 1 << PG_error |
-				 1 << PG_referenced | 1 << PG_arch_1 |
-				 1 << PG_checked);
+
+		/*
+		 * This code used to clear PG_uptodate, PG_error, PG_referenced,
+		 * PG_arch_1 and PG_checked.  It's not really clear why.
+		 */
+		ClearPageUptodate(page);
+		ClearPageReferenced(page);
+
 		/*
 		 * ___add_to_page_cache puts the page on ->clean_pages,
 		 * but it's dirty.  If it's on ->clean_pages, it will basically

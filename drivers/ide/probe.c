@@ -1143,6 +1143,7 @@ static void channel_init(struct ata_channel *ch)
 	if (!gd)
 		goto err_kmalloc_gd;
 
+	memset(gd, 0, sizeof(struct gendisk));
 	gd->sizes = kmalloc(ATA_MINORS * sizeof(int), GFP_KERNEL);
 	if (!gd->sizes)
 		goto err_kmalloc_gd_sizes;

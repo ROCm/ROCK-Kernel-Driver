@@ -136,6 +136,19 @@ static inline int list_empty(list_t *head)
 	return head->next == head;
 }
 
+static inline void __list_splice(list_t *list, list_t *head)
+{
+	list_t *first = list->next;
+	list_t *last = list->prev;
+	list_t *at = head->next;
+
+	first->prev = head;
+	head->next = first;
+
+	last->next = at;
+	at->prev = last;
+}
+
 /**
  * list_splice - join two lists
  * @list: the new list to add.
@@ -145,15 +158,22 @@ static inline void list_splice(list_t *list, list_t *head)
 {
 	list_t *first = list->next;
 
-	if (first != list) {
-		list_t *last = list->prev;
-		list_t *at = head->next;
+	if (first != list)
+		__list_splice(list, head);
+}
 
-		first->prev = head;
-		head->next = first;
-
-		last->next = at;
-		at->prev = last;
+/**
+ * list_splice_init - join two lists and reinitialise the emptied list.
+ * @list: the new list to add.
+ * @head: the place to add it in the first list.
+ *
+ * The list at @list is reinitialised
+ */
+static inline void list_splice_init(list_t *list, list_t *head)
+{
+	if (!list_empty(list)) {
+		__list_splice(list, head);
+		INIT_LIST_HEAD(list);
 	}
 }
 

@@ -302,7 +302,7 @@ void openpic_set_sources(int first_irq, int num_irqs, void *first_ISR)
 		ISR[i] = src;
 }
 
-void __init openpic_init(int main_pic, int offset, int programmer_switch_irq)
+void __init openpic_init(int linux_irq_offset)
 {
 	u_int t, i;
 	u_int timerfreq;
@@ -351,16 +351,13 @@ void __init openpic_init(int main_pic, int offset, int programmer_switch_irq)
 		printk("OpenPIC timer frequency is %d.%06d MHz\n",
 		       timerfreq / 1000000, timerfreq % 1000000);
 
-	if (!main_pic)
-		return;
-
-	open_pic_irq_offset = offset;
+	open_pic_irq_offset = linux_irq_offset;
 
 	/* Initialize timer interrupts */
 	if ( ppc_md.progress ) ppc_md.progress("openpic timer",0x3ba);
 	for (i = 0; i < OPENPIC_NUM_TIMERS; i++) {
 		/* Disabled, Priority 0 */
-		openpic_inittimer(i, 0, OPENPIC_VEC_TIMER+i+offset);
+		openpic_inittimer(i, 0, OPENPIC_VEC_TIMER+i+linux_irq_offset);
 		/* No processor */
 		openpic_maptimer(i, 0);
 	}
@@ -370,10 +367,12 @@ void __init openpic_init(int main_pic, int offset, int programmer_switch_irq)
 	if ( ppc_md.progress ) ppc_md.progress("openpic ipi",0x3bb);
 	for (i = 0; i < OPENPIC_NUM_IPI; i++) {
 		/* Disabled, Priority 10..13 */
-		openpic_initipi(i, 10+i, OPENPIC_VEC_IPI+i+offset);
+		openpic_initipi(i, 10+i, OPENPIC_VEC_IPI+i+linux_irq_offset);
 		/* IPIs are per-CPU */
-		irq_desc[OPENPIC_VEC_IPI+i+offset].status |= IRQ_PER_CPU;
-		irq_desc[OPENPIC_VEC_IPI+i+offset].handler = &open_pic_ipi;
+		irq_desc[OPENPIC_VEC_IPI+i+linux_irq_offset].status |=
+			IRQ_PER_CPU;
+		irq_desc[OPENPIC_VEC_IPI+i+linux_irq_offset].handler =
+			&open_pic_ipi;
 	}
 #endif
 
@@ -384,15 +383,14 @@ void __init openpic_init(int main_pic, int offset, int programmer_switch_irq)
 
 	/* Init all external sources, including possibly the cascade. */
 	for (i = 0; i < NumSources; i++) {
-		int pri, sense;
+		int sense;
 
 		if (ISR[i] == 0)
 			continue;
 
 		/* the bootloader may have left it enabled (bad !) */
-		openpic_disable_irq(i+offset);
+		openpic_disable_irq(i+linux_irq_offset);
 
-		pri = (i == programmer_switch_irq)? 9: 8;
 		/*
 		 * We find the vale from either the InitSenses table
 		 * or assume a negative polarity level interrupt.
@@ -400,26 +398,27 @@ void __init openpic_init(int main_pic, int offset, int programmer_switch_irq)
 		sense = (i < OpenPIC_NumInitSenses)? OpenPIC_InitSenses[i]: 1;
 
 		if ((sense & IRQ_SENSE_MASK) == 1)
-			irq_desc[i+offset].status = IRQ_LEVEL;
+			irq_desc[i+linux_irq_offset].status = IRQ_LEVEL;
 
-		/* Enabled, Priority 8 or 9 */
-		openpic_initirq(i, pri, i+offset, (sense & IRQ_POLARITY_MASK),
+		/* Enabled, Priority 8 */
+		openpic_initirq(i, 8, i + linux_irq_offset,
+				(sense & IRQ_POLARITY_MASK),
 				(sense & IRQ_SENSE_MASK));
 		/* Processor 0 */
 		openpic_mapirq(i, 1<<0, 0);
 	}
 
 	/* Init descriptors */
-	for (i = offset; i < NumSources + offset; i++)
+	for (i = linux_irq_offset; i < NumSources + linux_irq_offset; i++)
 		irq_desc[i].handler = &open_pic;
 
 	/* Initialize the spurious interrupt */
 	if (ppc_md.progress) ppc_md.progress("openpic spurious",0x3bd);
-	openpic_set_spurious(OPENPIC_VEC_SPURIOUS+offset);
+	openpic_set_spurious(OPENPIC_VEC_SPURIOUS+linux_irq_offset);
 
 	/* Initialize the cascade */
-	if (offset) {
-		if (request_irq(offset, no_action, SA_INTERRUPT,
+	if (linux_irq_offset) {
+		if (request_irq(linux_irq_offset, no_action, SA_INTERRUPT,
 				"82c59 cascade", NULL))
 			printk("Unable to get OpenPIC IRQ 0 for cascade\n");
 	}
@@ -653,6 +652,31 @@ static void __init openpic_maptimer(u_int timer, u_int cpumask)
 		      physmask(cpumask));
 }
 
+/*
+ * Initalize the interrupt source which will generate an NMI (and disable it).
+ *
+ * irq: The logical IRQ which generates an NMI.
+ */
+void __init
+openpic_init_nmi_irq(u_int irq)
+{
+	int sense;
+
+	/* If this wasn't given, assume a level, negative polarity interrupt. */
+	sense = (irq < OpenPIC_NumInitSenses) ? OpenPIC_InitSenses[irq] :
+		(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE);
+
+	openpic_safe_writefield(&ISR[irq]->Vector_Priority,
+				OPENPIC_PRIORITY_MASK | OPENPIC_VECTOR_MASK |
+				OPENPIC_SENSE_MASK | OPENPIC_POLARITY_MASK,
+				(9 << OPENPIC_PRIORITY_SHIFT) |
+				(irq + open_pic_irq_offset) |
+				((sense & IRQ_POLARITY_MASK) ?
+				 OPENPIC_POLARITY_POSITIVE :
+				 OPENPIC_POLARITY_NEGATIVE) |
+				((sense & IRQ_SENSE_MASK) ? OPENPIC_SENSE_LEVEL
+				 : OPENPIC_SENSE_EDGE));
+}
 
 /*
  *

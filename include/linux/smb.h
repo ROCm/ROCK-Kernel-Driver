@@ -10,7 +10,6 @@
 #define _LINUX_SMB_H
 
 #include <linux/types.h>
-#include <linux/kdev_t.h>
 
 enum smb_protocol { 
 	SMB_PROTOCOL_NONE, 
@@ -85,7 +84,6 @@ struct smb_fattr {
 	nlink_t		f_nlink;
 	uid_t		f_uid;
 	gid_t		f_gid;
-	kdev_t		f_rdev;
 	loff_t		f_size;
 	time_t		f_atime;
 	time_t		f_mtime;

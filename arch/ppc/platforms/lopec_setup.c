@@ -207,7 +207,7 @@ lopec_init_IRQ(void)
 	/* Skip reserved space and map Message Unit Interrupt (I2O) */
 	openpic_set_sources(19, 1, OpenPIC_Addr + 0x110C0);
 
-	openpic_init(1, NUM_8259_INTERRUPTS, -1);
+	openpic_init(NUM_8259_INTERRUPTS);
 
 	/* Map i8259 interrupts */
 	for(i = 0; i < NUM_8259_INTERRUPTS; i++)

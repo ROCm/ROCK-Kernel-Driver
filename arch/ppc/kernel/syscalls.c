@@ -117,7 +117,7 @@ sys_ipc (uint call, int first, int second, int third, void *ptr, long fifth)
 			if ((ret = verify_area (VERIFY_READ, ptr, sizeof(tmp)))
 			    || (ret = copy_from_user(&tmp,
 						(struct ipc_kludge *) ptr,
-						sizeof (tmp)) ? -EFAULT : 0)
+						sizeof (tmp)) ? -EFAULT : 0))
 				break;
 			ret = sys_msgrcv (first, tmp.msgp, second, tmp.msgtyp,
 					  third);

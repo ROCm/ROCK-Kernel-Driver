@@ -65,7 +65,6 @@ extern bd_t m8xx_board_info;
 #if defined(CONFIG_HTDMSOUND)
 #include <platforms/rpxhiox.h>
 #endif
-#endif /* !__ASSEMBLY__ */
 
 /* define IO_BASE for pcmcia */
 #define _IO_BASE 0x80000000
@@ -76,9 +75,27 @@ extern bd_t m8xx_board_info;
 # define request_irq(irq,hand,flg,dev,id)    request_8xxirq((irq),(hand),(flg),(dev),(id))
 #endif
 
+/* CPM Ethernet through SCCx.
+ *
+ * This ENET stuff is for the MPC850 with ethernet on SCC2.  Some of
+ * this may be unique to the RPX-Lite configuration.
+ * Note TENA is on Port B.
+ */
+#define PA_ENET_RXD	((ushort)0x0004)
+#define PA_ENET_TXD	((ushort)0x0008)
+#define PA_ENET_TCLK	((ushort)0x0200)
+#define PA_ENET_RCLK	((ushort)0x0800)
+#define PB_ENET_TENA	((uint)0x00002000)
+#define PC_ENET_CLSN	((ushort)0x0040)
+#define PC_ENET_RENA	((ushort)0x0080)
+
+#define SICR_ENET_MASK	((uint)0x0000ff00)
+#define SICR_ENET_CLKRT	((uint)0x00003d00)
+
 /* We don't use the 8259.
 */
 #define NR_8259_INTS	0
 
-#endif
+#endif /* !__ASSEMBLY__ */
+#endif /* __MACH_RPX_DEFS */
 #endif /* __KERNEL__ */

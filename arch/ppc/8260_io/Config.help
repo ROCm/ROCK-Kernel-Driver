@@ -22,3 +22,6 @@ CONFIG_SCC1_ENET
 CONFIG_SCC2_ENET
   Use MPC8xx serial communications controller 2 to drive Ethernet.
 
+CONFIG_DCACHE_DISABLE
+  This option allows you to run the kernel with data cache disabled.
+  Say Y if you experience CPM lock-ups.
