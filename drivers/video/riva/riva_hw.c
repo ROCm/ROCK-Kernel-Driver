@@ -1548,7 +1548,7 @@ static void LoadStateExt
         NV_WR32(chip->PGRAPH, 0x0000085C, state->pitch3);
         NV_WR32(chip->PGRAPH, 0x00000860, state->pitch3);
         NV_WR32(chip->PGRAPH, 0x00000864, state->pitch3);
-        NV_WR32(chip->PGRAPH, 0x000009A, NV_RD32(chip->PFB, 0x00000200));
+        NV_WR32(chip->PGRAPH, 0x000009A4, NV_RD32(chip->PFB, 0x00000200));
         NV_WR32(chip->PGRAPH, 0x000009A8, NV_RD32(chip->PFB, 0x00000204));
         }
             if(chip->twoHeads) {
