@@ -130,7 +130,12 @@ void		rpc_setbufsize(struct rpc_clnt *, unsigned int, unsigned int);
 static __inline__
 int rpc_call(struct rpc_clnt *clnt, u32 proc, void *argp, void *resp, int flags)
 {
-	struct rpc_message msg = { proc, argp, resp, NULL };
+	struct rpc_message msg = {
+		.rpc_proc	= proc,
+		.rpc_argp	= argp,
+		.rpc_resp	= resp,
+		.rpc_cred	= NULL
+	};
 	return rpc_call_sync(clnt, &msg, flags);
 }
 		

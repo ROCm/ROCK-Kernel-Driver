@@ -905,7 +905,12 @@ tcp_data_recv(read_descriptor_t *rd_desc, struct sk_buff *skb,
 		unsigned int offset, size_t len)
 {
 	struct rpc_xprt *xprt = (struct rpc_xprt *)rd_desc->buf;
-	skb_reader_t desc = { skb, offset, len };
+	skb_reader_t desc = {
+		.skb	= skb,
+		.offset	= offset,
+		.count	= len,
+		.csum	= 0
+       	};
 
 	dprintk("RPC:      tcp_data_recv\n");
 	do {
