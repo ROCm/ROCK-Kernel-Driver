@@ -128,3 +128,162 @@ void sctp_snmp_proc_exit(void)
 {
 	remove_proc_entry("snmp", proc_net_sctp);
 }
+
+/* Dump local addresses of an association/endpoint. */
+static void sctp_seq_dump_local_addrs(struct seq_file *seq, struct sctp_ep_common *epb)
+{
+	struct list_head *pos;
+	struct sockaddr_storage_list *laddr;
+	union sctp_addr *addr;
+	struct sctp_af *af;
+
+	list_for_each(pos, &epb->bind_addr.address_list) {
+		laddr = list_entry(pos, struct sockaddr_storage_list, list);
+		addr = (union sctp_addr *)&laddr->a;
+		af = sctp_get_af_specific(addr->sa.sa_family);
+		af->seq_dump_addr(seq, addr);
+	}
+}
+
+/* Dump remote addresses of an association. */
+static void sctp_seq_dump_remote_addrs(struct seq_file *seq, struct sctp_association *assoc)
+{
+	struct list_head *pos;
+	struct sctp_transport *transport;
+	union sctp_addr *addr;
+	struct sctp_af *af;
+
+	list_for_each(pos, &assoc->peer.transport_addr_list) {
+		transport = list_entry(pos, struct sctp_transport, transports);
+		addr = (union sctp_addr *)&transport->ipaddr;
+		af = sctp_get_af_specific(addr->sa.sa_family);
+		af->seq_dump_addr(seq, addr);
+	}
+}
+
+/* Display sctp endpoints (/proc/net/sctp/eps). */
+static int sctp_eps_seq_show(struct seq_file *seq, void *v)
+{
+	struct sctp_hashbucket *head;
+	struct sctp_ep_common *epb;
+	struct sctp_endpoint *ep;
+	struct sock *sk;
+	int hash;
+
+	seq_printf(seq, " ENDPT     SOCK   STY SST HBKT LPORT LADDRS\n");
+	for (hash = 0; hash < sctp_ep_hashsize; hash++) {
+		head = &sctp_ep_hashbucket[hash];
+		read_lock(&head->lock);
+		for (epb = head->chain; epb; epb = epb->next) {
+			ep = sctp_ep(epb);
+			sk = epb->sk;
+			seq_printf(seq, "%8p %8p %-3d %-3d %-4d %-5d ", ep, sk,
+				   sctp_sk(sk)->type, sk->state, hash,
+				   epb->bind_addr.port);
+			sctp_seq_dump_local_addrs(seq, epb);
+			seq_printf(seq, "\n");
+		}
+		read_unlock(&head->lock);
+	}
+
+	return 0;
+}
+
+/* Initialize the seq file operations for 'eps' object. */
+static int sctp_eps_seq_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, sctp_eps_seq_show, NULL);
+}
+
+static struct file_operations sctp_eps_seq_fops = {
+	.open	 = sctp_eps_seq_open,
+	.read	 = seq_read,
+	.llseek	 = seq_lseek,
+	.release = single_release,
+};
+
+/* Set up the proc fs entry for 'eps' object. */
+int __init sctp_eps_proc_init(void)
+{
+	struct proc_dir_entry *p;
+
+	p = create_proc_entry("eps", S_IRUGO, proc_net_sctp);
+	if (!p)
+		return -ENOMEM;
+
+	p->proc_fops = &sctp_eps_seq_fops;
+
+	return 0;
+}
+
+/* Cleanup the proc fs entry for 'eps' object. */
+void sctp_eps_proc_exit(void)
+{
+	remove_proc_entry("eps", proc_net_sctp);
+}
+
+/* Display sctp associations (/proc/net/sctp/assocs). */
+static int sctp_assocs_seq_show(struct seq_file *seq, void *v)
+{
+	struct sctp_hashbucket *head;
+	struct sctp_ep_common *epb;
+	struct sctp_association *assoc;
+	struct sock *sk;
+	int hash;
+
+	seq_printf(seq, " ASSOC     SOCK   STY SST ST HBKT LPORT RPORT "
+			"LADDRS <-> RADDRS\n");
+	for (hash = 0; hash < sctp_assoc_hashsize; hash++) {
+		head = &sctp_assoc_hashbucket[hash];
+		read_lock(&head->lock);
+		for (epb = head->chain; epb; epb = epb->next) {
+			assoc = sctp_assoc(epb);
+			sk = epb->sk;
+			seq_printf(seq,
+				   "%8p %8p %-3d %-3d %-2d %-4d %-5d %-5d ",
+				   assoc, sk, sctp_sk(sk)->type, sk->state,
+				   assoc->state, hash, epb->bind_addr.port,
+				   assoc->peer.port);
+			sctp_seq_dump_local_addrs(seq, epb);
+			seq_printf(seq, "<-> ");
+			sctp_seq_dump_remote_addrs(seq, assoc);
+			seq_printf(seq, "\n");
+		}
+		read_unlock(&head->lock);
+	}
+
+	return 0;
+}
+
+/* Initialize the seq file operations for 'assocs' object. */
+static int sctp_assocs_seq_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, sctp_assocs_seq_show, NULL);
+}
+
+static struct file_operations sctp_assocs_seq_fops = {
+	.open	 = sctp_assocs_seq_open,
+	.read	 = seq_read,
+	.llseek	 = seq_lseek,
+	.release = single_release,
+};
+
+/* Set up the proc fs entry for 'assocs' object. */
+int __init sctp_assocs_proc_init(void)
+{
+	struct proc_dir_entry *p;
+
+	p = create_proc_entry("assocs", S_IRUGO, proc_net_sctp);
+	if (!p)
+		return -ENOMEM;
+
+	p->proc_fops = &sctp_assocs_seq_fops;
+
+	return 0;
+}
+
+/* Cleanup the proc fs entry for 'assocs' object. */
+void sctp_assocs_proc_exit(void)
+{
+	remove_proc_entry("assocs", proc_net_sctp);
+}

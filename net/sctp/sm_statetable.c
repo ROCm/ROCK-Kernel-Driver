@@ -436,51 +436,6 @@ sctp_sm_table_entry_t chunk_event_table[SCTP_NUM_BASE_CHUNK_TYPES][SCTP_STATE_NU
 	TYPE_SCTP_SHUTDOWN_COMPLETE,
 }; /* state_fn_t chunk_event_table[][] */
 
-static sctp_sm_table_entry_t
-chunk_event_table_asconf[SCTP_STATE_NUM_STATES] = {
-	/* SCTP_STATE_EMPTY */
-	{.fn = sctp_sf_discard_chunk, .name = "sctp_sf_discard_chunk"},
-	/* SCTP_STATE_CLOSED */
-	{.fn = sctp_sf_discard_chunk, .name = "sctp_sf_discard_chunk"},
-	/* SCTP_STATE_COOKIE_WAIT */
-	{.fn = sctp_sf_discard_chunk, .name = "sctp_sf_discard_chunk"},
-	/* SCTP_STATE_COOKIE_ECHOED */
-	{.fn = sctp_sf_discard_chunk, .name = "sctp_sf_discard_chunk"},
-	/* SCTP_STATE_ESTABLISHED */
-	{.fn = sctp_sf_discard_chunk,
-	 .name = "sctp_sf_discard_chunk (will be sctp_addip_do_asconf)"},
-	/* SCTP_STATE_SHUTDOWN_PENDING */
-	{.fn = sctp_sf_discard_chunk, .name = "sctp_sf_discard_chunk"},
-	/* SCTP_STATE_SHUTDOWN_SENT */
-	{.fn = sctp_sf_discard_chunk, .name = "sctp_sf_discard_chunk"},
-	/* SCTP_STATE_SHUTDOWN_RECEIVED */
-	{.fn = sctp_sf_discard_chunk, .name = "sctp_sf_discard_chunk"},
-	/* SCTP_STATE_SHUTDOWN_ACK_SENT */
-	{.fn = sctp_sf_discard_chunk, .name = "sctp_sf_discard_chunk"},
-};	/* chunk asconf */
-
-static sctp_sm_table_entry_t
-chunk_event_table_asconf_ack[SCTP_STATE_NUM_STATES] = {
-	/* SCTP_STATE_EMPTY */
-	{.fn = sctp_sf_discard_chunk, .name = "sctp_sf_discard_chunk"},
-	/* SCTP_STATE_CLOSED */
-	{.fn = sctp_sf_discard_chunk, .name = "sctp_sf_discard_chunk"},
-	/* SCTP_STATE_COOKIE_WAIT */
-	{.fn = sctp_sf_discard_chunk, .name = "sctp_sf_discard_chunk"},
-	/* SCTP_STATE_COOKIE_ECHOED */
-	{.fn = sctp_sf_discard_chunk, .name = "sctp_sf_discard_chunk"},
-	/* SCTP_STATE_ESTABLISHED */
-	{.fn = sctp_sf_discard_chunk,
-	 .name = "sctp_sf_discard_chunk (will be sctp_addip_do_asconf_ack)"},
-	/* SCTP_STATE_SHUTDOWN_PENDING */
-	{.fn = sctp_sf_discard_chunk, .name = "sctp_sf_discard_chunk"},
-	/* SCTP_STATE_SHUTDOWN_SENT */
-	{.fn = sctp_sf_discard_chunk, .name = "sctp_sf_discard_chunk"},
-	/* SCTP_STATE_SHUTDOWN_RECEIVED */
-	{.fn = sctp_sf_discard_chunk, .name = "sctp_sf_discard_chunk"},
-	/* SCTP_STATE_SHUTDOWN_ACK_SENT */
-	{.fn = sctp_sf_discard_chunk, .name = "sctp_sf_discard_chunk"},
-};	/* chunk asconf_ack */
 
 static sctp_sm_table_entry_t
 chunk_event_table_unknown[SCTP_STATE_NUM_STATES] = {
@@ -783,7 +738,7 @@ sctp_sm_table_entry_t other_event_table[SCTP_NUM_OTHER_TYPES][SCTP_STATE_NUM_STA
 	/* SCTP_STATE_ESTABLISHED */ \
 	{.fn = sctp_sf_timer_ignore, .name = "sctp_sf_timer_ignore"}, \
 	/* SCTP_STATE_SHUTDOWN_PENDING */ \
-	{.fn = sctp_sf_timer_ignore, .name = "sctp_sf_timer_ignore"}, \
+	{.fn = sctp_sf_t5_timer_expire, .name = "sctp_sf_t5_timer_expire"}, \
 	/* SCTP_STATE_SHUTDOWN_SENT */ \
 	{.fn = sctp_sf_t5_timer_expire, .name = "sctp_sf_t5_timer_expire"}, \
 	/* SCTP_STATE_SHUTDOWN_RECEIVED */ \
@@ -877,13 +832,5 @@ sctp_sm_table_entry_t *sctp_chunk_event_lookup(sctp_cid_t cid, sctp_state_t stat
 		return &chunk_event_table[cid][state];
 	}
 
-	switch (cid) {
-	case SCTP_CID_ASCONF:
-		return &chunk_event_table_asconf[state];
-
-	case SCTP_CID_ASCONF_ACK:
-		return &chunk_event_table_asconf_ack[state];
-	default:
-		return &chunk_event_table_unknown[state];
-	}
+	return &chunk_event_table_unknown[state];
 }
