@@ -18,6 +18,8 @@
  *
  */
 
+#undef DEBUG
+
 #include <linux/mm.h>
 #include <linux/bio.h>
 #include <linux/suspend.h>
@@ -88,26 +90,6 @@ static const char name_suspend[] = "Suspend Machine: ";
 static const char name_resume[] = "Resume Machine: ";
 
 /*
- * Debug
- */
-#define	DEBUG_DEFAULT
-#undef	DEBUG_PROCESS
-#undef	DEBUG_SLOW
-#define TEST_SWSUSP 0		/* Set to 1 to reboot instead of halt machine after suspension */
-
-#ifdef DEBUG_DEFAULT
-# define PRINTK(f, a...)       printk(f, ## a)
-#else
-# define PRINTK(f, a...)
-#endif
-
-#ifdef DEBUG_SLOW
-#define MDELAY(a) mdelay(a)
-#else
-#define MDELAY(a)
-#endif
-
-/*
  * Saving part...
  */
 
@@ -139,44 +121,41 @@ static __inline__ int fill_suspend_header(struct suspend_header *sh)
 
 static unsigned short swapfile_used[MAX_SWAPFILES];
 static unsigned short root_swap;
-#define MARK_SWAP_SUSPEND 0
-#define MARK_SWAP_RESUME 2
 
-static void mark_swapfiles(swp_entry_t prev, int mode)
+static int mark_swapfiles(swp_entry_t prev)
 {
 	swp_entry_t entry;
 	union diskpage *cur;
 	struct page *page;
 
 	if (root_swap == 0xFFFF)  /* ignored */
-		return;
+		return -EINVAL;
 
 	page = alloc_page(GFP_ATOMIC);
 	if (!page)
-		panic("Out of memory in mark_swapfiles");
+		return -ENOMEM;
 	cur = page_address(page);
 	/* XXX: this is dirty hack to get first page of swap file */
 	entry = swp_entry(root_swap, 0);
 	rw_swap_page_sync(READ, entry, page);
 
-	if (mode == MARK_SWAP_RESUME) {
-	  	if (!memcmp("S1",cur->swh.magic.magic,2))
-		  	memcpy(cur->swh.magic.magic,"SWAP-SPACE",10);
-		else if (!memcmp("S2",cur->swh.magic.magic,2))
-			memcpy(cur->swh.magic.magic,"SWAPSPACE2",10);
-		else printk("%sUnable to find suspended-data signature (%.10s - misspelled?\n", 
-		      	name_resume, cur->swh.magic.magic);
-	} else {
-	  	if ((!memcmp("SWAP-SPACE",cur->swh.magic.magic,10)))
-		  	memcpy(cur->swh.magic.magic,"S1SUSP....",10);
-		else if ((!memcmp("SWAPSPACE2",cur->swh.magic.magic,10)))
-			memcpy(cur->swh.magic.magic,"S2SUSP....",10);
-		else panic("\nSwapspace is not swapspace (%.10s)\n", cur->swh.magic.magic);
-		cur->link.next = prev; /* prev is the first/last swap page of the resume area */
-		/* link.next lies *no more* in last 4/8 bytes of magic */
+	if ((!memcmp("SWAP-SPACE",cur->swh.magic.magic,10)))
+		memcpy(cur->swh.magic.magic,"S1SUSP....",10);
+	else if ((!memcmp("SWAPSPACE2",cur->swh.magic.magic,10)))
+		memcpy(cur->swh.magic.magic,"S2SUSP....",10);
+	else {
+		pr_debug("pmdisk: Partition is not swap space.\n");
+		return -ENODEV;
 	}
+
+	/* prev is the first/last swap page of the resume area */
+	cur->link.next = prev; 
+
+	/* link.next lies *no more* in last 4/8 bytes of magic */
+
 	rw_swap_page_sync(WRITE, entry, page);
 	__free_page(page);
+	return 0;
 }
 
 static void read_swapfiles(void) /* This is called before saving image */
@@ -192,7 +171,7 @@ static void read_swapfiles(void) /* This is called before saving image */
 			swapfile_used[i]=SWAPFILE_UNUSED;
 		} else {
 			if(!len) {
-	    			printk(KERN_WARNING "resume= option should be used to set suspend device" );
+				pr_debug("pmdisk: Default resume partition not set.\n");
 				if(root_swap == 0xFFFF) {
 					swapfile_used[i] = SWAPFILE_SUSPEND;
 					root_swap = i;
@@ -204,20 +183,18 @@ static void read_swapfiles(void) /* This is called before saving image */
 // FIXME				if(resume_device == swap_info[i].swap_device) {
 					swapfile_used[i] = SWAPFILE_SUSPEND;
 					root_swap = i;
-				} else {
-#if 0
-					printk( "Resume: device %s (%x != %x) ignored\n", swap_info[i].swap_file->d_name.name, swap_info[i].swap_device, resume_device );				  
-#endif
+				} else
 				  	swapfile_used[i] = SWAPFILE_IGNORED;
-				}
 			}
 		}
 	}
 	swap_list_unlock();
 }
 
-static void lock_swapdevices(void) /* This is called after saving image so modification
-				      will be lost after resume... and that's what we want. */
+
+/* This is called after saving image so modification
+   will be lost after resume... and that's what we want. */
+static void lock_swapdevices(void)
 {
 	int i;
 
@@ -297,10 +274,9 @@ static int write_suspend_image(void)
 	prev = entry;
 
 	printk( "S" );
-	mark_swapfiles(prev, MARK_SWAP_SUSPEND);
+	mark_swapfiles(prev);
 	printk( "|\n" );
 
-	MDELAY(1000);
 	free_page((unsigned long) buffer);
 	return 0;
 }
@@ -334,7 +310,7 @@ static int count_and_copy_data_pages(struct pbe *pagedir_p)
 			 */
 			if ((ADDRESS(pfn) >= (unsigned long) ADDRESS2(&__nosave_begin)) && 
 			    (ADDRESS(pfn) <  (unsigned long) ADDRESS2(&__nosave_end))) {
-				PRINTK("[nosave %lx]", ADDRESS(pfn));
+				pr_debug("[nosave %lx]", ADDRESS(pfn));
 				continue;
 			}
 			/* Hmm, perhaps copying all reserved pages is not too healthy as they may contain 
@@ -411,32 +387,33 @@ int pmdisk_suspend(void)
 	drain_local_pages();
 
 	pm_pagedir_nosave = NULL;
-	printk( "/critical section: Counting pages to copy" );
+	pr_debug("pmdisk: /critical section: Counting pages to copy.\n" );
 	pmdisk_pages = count_and_copy_data_pages(NULL);
 	nr_needed_pages = pmdisk_pages + PAGES_FOR_IO;
 	
-	printk(" (pages needed: %d+%d=%d free: %d)\n",pmdisk_pages,PAGES_FOR_IO,nr_needed_pages,nr_free_pages());
+	pr_debug("pmdisk: (pages needed: %d+%d=%d free: %d)\n",
+		 pmdisk_pages,PAGES_FOR_IO,nr_needed_pages,nr_free_pages());
 	if(nr_free_pages() < nr_needed_pages) {
-		printk(KERN_CRIT "%sCouldn't get enough free pages, on %d pages short\n",
-		       name_suspend, nr_needed_pages-nr_free_pages());
+		pr_debug("pmdisk: Not enough free pages: Need %d, Have %d\n",
+			 nr_needed_pages,nr_free_pages());
 		root_swap = 0xFFFF;
-		return 1;
+		return -ENOMEM;
 	}
 	si_swapinfo(&i);	/* FIXME: si_swapinfo(&i) returns all swap devices information.
 				   We should only consider resume_device. */
 	if (i.freeswap < nr_needed_pages)  {
-		printk(KERN_CRIT "%sThere's not enough swap space available, on %ld pages short\n",
-		       name_suspend, nr_needed_pages-i.freeswap);
-		return 1;
+		pr_debug("pmdisk: Not enough swap space. Need %d, Have %d\n",
+		       nr_needed_pages,i.freeswap);
+		return -ENOSPC;
 	}
 
-	PRINTK( "Alloc pagedir\n" ); 
+	pr_debug( "Alloc pagedir\n" ); 
 	pagedir_save = pm_pagedir_nosave = create_suspend_pagedir(pmdisk_pages);
 	if(!pm_pagedir_nosave) {
 		/* Shouldn't happen */
-		printk(KERN_CRIT "%sCouldn't allocate enough pages\n",name_suspend);
-		panic("Really should not happen");
-		return 1;
+		pr_debug("pmdisk: Couldn't allocate pagedir\n");
+		panic("pmdisk: Couldn't allocate pagedir\n");
+		return -ENOMEM;
 	}
 	nr_copy_pages_check = pmdisk_pages;
 	pagedir_order_check = pagedir_order;
@@ -451,7 +428,8 @@ int pmdisk_suspend(void)
 	 * touch swap space! Except we must write out our image of course.
 	 */
 
-	printk( "critical section/: done (%d pages copied)\n", pmdisk_pages );
+	pr_debug("pmdisk: critical section/: done (%d pages copied)\n", 
+		 pmdisk_pages );
 	return 0;
 }
 
@@ -577,10 +555,10 @@ static int __init relocate_pagedir(void)
 	void **eaten_memory = NULL;
 	void **c = eaten_memory, *m, *f;
 
-	printk("Relocating pagedir");
+	pr_debug("pmdisk: Relocating pagedir\n");
 
 	if(!does_collide_order(old_pagedir, (unsigned long)old_pagedir, pagedir_order)) {
-		printk("not necessary\n");
+		pr_debug("pmdisk: Relocation not necessary\n");
 		return 0;
 	}
 
@@ -619,7 +597,7 @@ static int __init relocate_pagedir(void)
 
 static int __init sanity_check_failed(char *reason)
 {
-	printk(KERN_ERR "%s%s\n",name_resume,reason);
+	printk(KERN_ERR "pmdisk: Resume mismatch: %s\n",reason);
 	return -EPERM;
 }
 
@@ -698,7 +676,7 @@ static int submit(int rw, pgoff_t page_off, void * page)
 	bio->bi_end_io = end_io;
 
 	if (bio_add_page(bio, virt_to_page(page), PAGE_SIZE, 0) < PAGE_SIZE) {
-		printk("ERROR: adding page to bio at %ld\n",page_off);
+		printk("pmdisk: ERROR: adding page to bio at %ld\n",page_off);
 		error = -EFAULT;
 		goto Done;
 	}
@@ -756,11 +734,11 @@ static int __init read_suspend_image(void)
 		memcpy(cur->swh.magic.magic,"SWAPSPACE2",10);
 	else if ((!memcmp("SWAP-SPACE",cur->swh.magic.magic,10)) ||
 		 (!memcmp("SWAPSPACE2",cur->swh.magic.magic,10))) {
-		printk(KERN_ERR "pmdisk: Partition is normal swap space\n");
+		pr_debug(KERN_ERR "pmdisk: Partition is normal swap space\n");
 		error = -EINVAL;
 		goto Done;
 	} else {
-		printk(KERN_ERR "pmdisk: Invalid partition type.\n");
+		pr_debug(KERN_ERR "pmdisk: Invalid partition type.\n");
 		error = -EINVAL;
 		goto Done;
 	}
@@ -771,8 +749,7 @@ static int __init read_suspend_image(void)
 	if ((error = write_page(0,cur)))
 		goto Done;
 
-	printk( "%sSignature found, resuming\n", name_resume );
-	MDELAY(1000);
+	pr_debug( "%sSignature found, resuming\n", name_resume );
 
 	if ((error = read_page(swp_offset(next), cur)))
 		goto Done;
@@ -792,7 +769,7 @@ static int __init read_suspend_image(void)
 		goto Done;
 	}
 
-	PRINTK( "%sReading pagedir, ", name_resume );
+	pr_debug( "%sReading pagedir, ", name_resume );
 
 	/* We get pages in reverse order of saving! */
 	for (i=nr_pgdir_pages-1; i>=0; i--) {
@@ -839,8 +816,8 @@ int pmdisk_save(void)
 {
 	int error;
 
-#if defined (CONFIG_HIGHMEM) || defined (COFNIG_DISCONTIGMEM)
-	printk("pmdisk is not supported with high- or discontig-mem.\n");
+#if defined (CONFIG_HIGHMEM) || defined (CONFIG_DISCONTIGMEM)
+	pr_debug("pmdisk: not supported with high- or discontig-mem.\n");
 	return -EPERM;
 #endif
 	if ((error = arch_prepare_suspend()))
@@ -875,14 +852,12 @@ int pmdisk_write(void)
 int __init pmdisk_read(void)
 {
 	int error;
-	char b[BDEVNAME_SIZE];
 
 	if (!strlen(resume_file))
 		return -ENOENT;
 
 	resume_device = name_to_dev_t(resume_file);
-	printk("pmdisk: Resume From Partition: %s, Device: %s\n", 
-	       resume_file, __bdevname(resume_device, b));
+	pr_debug("pmdisk: Resume From Partition: %s\n", resume_file);
 
 	resume_bdev = open_by_devnum(resume_device, FMODE_READ, BDEV_RAW);
 	if (!IS_ERR(resume_bdev)) {
@@ -893,10 +868,9 @@ int __init pmdisk_read(void)
 		error = PTR_ERR(resume_bdev);
 
 	if (!error)
-		PRINTK("Reading resume file was successful\n");
+		pr_debug("Reading resume file was successful\n");
 	else
-		printk( "%sError %d resuming\n", name_resume, error );
-	MDELAY(1000);
+		pr_debug( "%sError %d resuming\n", name_resume, error );
 	return error;
 }
 
@@ -921,7 +895,7 @@ int __init pmdisk_restore(void)
 
 int pmdisk_free(void)
 {
-	PRINTK( "Freeing prev allocated pagedir\n" );
+	pr_debug( "Freeing prev allocated pagedir\n" );
 	free_suspend_pagedir((unsigned long) pagedir_save);
 	return 0;
 }
