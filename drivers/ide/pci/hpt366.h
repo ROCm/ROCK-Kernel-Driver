@@ -5,8 +5,6 @@
 #include <linux/pci.h>
 #include <linux/ide.h>
 
-#define DISPLAY_HPT366_TIMINGS
-
 /* various tuning parameters */
 #define HPT_RESET_STATE_ENGINE
 #undef HPT_DELAY_INTERRUPT
