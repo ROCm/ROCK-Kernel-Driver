@@ -95,7 +95,7 @@ sctp_association_t *sctp_association_init(sctp_association_t *asoc,
 					  sctp_scope_t scope,
 					  int priority)
 {
-	sctp_opt_t *sp;
+	struct sctp_opt *sp;
 	int i;
 
 	/* Retrieve the SCTP per socket area.  */
@@ -241,8 +241,8 @@ sctp_association_t *sctp_association_init(sctp_association_t *asoc,
 	asoc->peer.sack_needed = 1;
 
 	/* Create an input queue.  */
-	sctp_inqueue_init(&asoc->base.inqueue);
-	sctp_inqueue_set_th_handler(&asoc->base.inqueue,
+	sctp_inq_init(&asoc->base.inqueue);
+	sctp_inq_set_th_handler(&asoc->base.inqueue,
 				    (void (*)(void *))sctp_assoc_bh_rcv,
 				    asoc);
 
@@ -311,7 +311,7 @@ void sctp_association_free(sctp_association_t *asoc)
 	sctp_ulpq_free(&asoc->ulpq);
 
 	/* Dispose of any pending chunks on the inqueue. */
-	sctp_inqueue_free(&asoc->base.inqueue);
+	sctp_inq_free(&asoc->base.inqueue);
 
 	/* Free ssnmap storage. */
 	sctp_ssnmap_free(asoc->ssnmap);
@@ -368,7 +368,7 @@ struct sctp_transport *sctp_assoc_add_peer(sctp_association_t *asoc,
 					   int priority)
 {
 	struct sctp_transport *peer;
-	sctp_opt_t *sp;
+	struct sctp_opt *sp;
 	unsigned short port;
 
 	/* AF_INET and AF_INET6 share common port field. */
@@ -505,7 +505,7 @@ void sctp_assoc_control_transport(sctp_association_t *asoc,
 	struct sctp_transport *t = NULL;
 	struct sctp_transport *first;
 	struct sctp_transport *second;
-	sctp_ulpevent_t *event;
+	struct sctp_ulpevent *event;
 	struct list_head *pos;
 	int spc_state = 0;
 
@@ -776,7 +776,7 @@ static void sctp_assoc_bh_rcv(sctp_association_t *asoc)
 	sctp_endpoint_t *ep;
 	sctp_chunk_t *chunk;
 	struct sock *sk;
-	sctp_inqueue_t *inqueue;
+	struct sctp_inq *inqueue;
 	int state, subtype;
 	sctp_assoc_t associd = sctp_assoc2id(asoc);
 	int error = 0;
@@ -786,7 +786,7 @@ static void sctp_assoc_bh_rcv(sctp_association_t *asoc)
 	sk = asoc->base.sk;
 
 	inqueue = &asoc->base.inqueue;
-	while (NULL != (chunk = sctp_pop_inqueue(inqueue))) {
+	while (NULL != (chunk = sctp_inq_pop(inqueue))) {
 		state = asoc->state;
 		subtype = chunk->chunk_hdr->type;
 
@@ -819,7 +819,7 @@ static void sctp_assoc_bh_rcv(sctp_association_t *asoc)
 /* This routine moves an association from its old sk to a new sk.  */
 void sctp_assoc_migrate(sctp_association_t *assoc, struct sock *newsk)
 {
-	sctp_opt_t *newsp = sctp_sk(newsk);
+	struct sctp_opt *newsp = sctp_sk(newsk);
 
 	/* Delete the association from the old endpoint's list of
 	 * associations.
@@ -996,7 +996,7 @@ void sctp_assoc_rwnd_increase(sctp_association_t *asoc, int len)
 
 	/* Send a window update SACK if the rwnd has increased by at least the
 	 * minimum of the association's PMTU and half of the receive buffer.
-	 * The algorithm used is similar to the one described in 
+	 * The algorithm used is similar to the one described in
 	 * Section 4.2.3.3 of RFC 1122.
 	 */
 	if ((asoc->state == SCTP_STATE_ESTABLISHED) &&
@@ -1006,9 +1006,9 @@ void sctp_assoc_rwnd_increase(sctp_association_t *asoc, int len)
 		SCTP_DEBUG_PRINTK("%s: Sending window update SACK- asoc: %p "
 				  "rwnd: %u a_rwnd: %u\n",
 				  __FUNCTION__, asoc, asoc->rwnd, asoc->a_rwnd);
-		sack = sctp_make_sack(asoc); 
+		sack = sctp_make_sack(asoc);
 		if (!sack)
-			return;	
+			return;
 
 		/* Update the last advertised rwnd value. */
 		asoc->a_rwnd = asoc->rwnd;
@@ -1022,7 +1022,7 @@ void sctp_assoc_rwnd_increase(sctp_association_t *asoc, int len)
 		timer = &asoc->timers[SCTP_EVENT_TIMEOUT_SACK];
 		if (timer_pending(timer) && del_timer(timer))
 			sctp_association_put(asoc);
-	} 
+	}
 }
 
 /* Decrease asoc's rwnd by len. */
