@@ -485,9 +485,7 @@ static int isd200_action( struct us_data *us, int action,
 
 	memcpy(srb->cmnd, &ata, sizeof(ata.generic));
 	srb->cmd_len = sizeof(ata.generic);
-	down(&(us->pusb_dev->serialize));
 	status = usb_stor_Bulk_transport(srb, us);
-	up(&(us->pusb_dev->serialize));
 	if (status == USB_STOR_TRANSPORT_GOOD)
 		status = ISD200_GOOD;
 	else {
@@ -547,9 +545,7 @@ static void isd200_invoke_transport( struct us_data *us,
 	/* send the command to the transport layer */
 	memcpy(srb->cmnd, ataCdb, sizeof(ataCdb->generic));
 	srb->cmd_len = sizeof(ataCdb->generic);
-	down(&(us->pusb_dev->serialize));
 	transferStatus = usb_stor_Bulk_transport(srb, us);
-	up(&(us->pusb_dev->serialize));
 
 	/* if the command gets aborted by the higher layers, we need to
 	 * short-circuit all other processing
