@@ -2568,7 +2568,7 @@ static struct file_operations tcp_seq_fops = {
 	.open		=	tcp_seq_open,
 	.read		=	seq_read,
 	.llseek		=	seq_lseek,
-	.release	=	ip_seq_release,
+	.release	=	seq_release_private,
 };
 
 int __init tcp_proc_init(void)

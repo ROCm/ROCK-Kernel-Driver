@@ -1069,7 +1069,7 @@ static struct file_operations fib_seq_fops = {
 	.open           = fib_seq_open,
 	.read           = seq_read,
 	.llseek         = seq_lseek,
-	.release	= ip_seq_release,
+	.release	= seq_release_private,
 };
 
 int __init fib_proc_init(void)
