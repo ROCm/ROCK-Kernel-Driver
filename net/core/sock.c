@@ -154,8 +154,14 @@ static int sock_set_timeout(long *timeo_p, char __user *optval, int optlen)
 
 static void sock_warn_obsolete_bsdism(const char *name)
 {
-	printk(KERN_WARNING "process `%s' is using obsolete "
-	       "%s SO_BSDCOMPAT\n", current->comm, name);
+	static int warned;
+	static char warncomm[16];
+	if (strcmp(warncomm, current->comm) && warned < 5) { 
+		strcpy(warncomm,  current->comm); 
+		printk(KERN_WARNING "process `%s' is using obsolete "
+		       "%s SO_BSDCOMPAT\n", warncomm, name);
+		warned++;
+	}
 }
 
 /*

@@ -140,29 +140,29 @@ struct ip_msfilter {
 
 struct group_req
 {
-	__u32			gr_interface;	/* interface index */
-	struct sockaddr_storage	gr_group;	/* group address */
+	__u32				 gr_interface;	/* interface index */
+	struct __kernel_sockaddr_storage gr_group;	/* group address */
 };
 
 struct group_source_req
 {
-	__u32			gsr_interface;	/* interface index */
-	struct sockaddr_storage	gsr_group;	/* group address */
-	struct sockaddr_storage	gsr_source;	/* source address */
+	__u32				 gsr_interface;	/* interface index */
+	struct __kernel_sockaddr_storage gsr_group;	/* group address */
+	struct __kernel_sockaddr_storage gsr_source;	/* source address */
 };
 
 struct group_filter
 {
-	__u32			gf_interface;	/* interface index */
-	struct sockaddr_storage	gf_group;	/* multicast address */
-	__u32			gf_fmode;	/* filter mode */
-	__u32			gf_numsrc;	/* number of sources */
-	struct sockaddr_storage	gf_slist[1];	/* interface index */
+	__u32				 gf_interface;	/* interface index */
+	struct __kernel_sockaddr_storage gf_group;	/* multicast address */
+	__u32				 gf_fmode;	/* filter mode */
+	__u32				 gf_numsrc;	/* number of sources */
+	struct __kernel_sockaddr_storage gf_slist[1];	/* interface index */
 };
 
 #define GROUP_FILTER_SIZE(numsrc) \
-	(sizeof(struct group_filter) - sizeof(struct sockaddr_storage) \
-	+ (numsrc) * sizeof(struct sockaddr_storage))
+	(sizeof(struct group_filter) - sizeof(struct __kernel_sockaddr_storage) \
+	+ (numsrc) * sizeof(struct __kernel_sockaddr_storage))
 
 struct in_pktinfo
 {
