@@ -1843,7 +1843,7 @@ config DE620
 	  The module will be called de620.
 
 config SGISEEQ
-	bool "SGI Seeq ethernet controller support"
+	tristate "SGI Seeq ethernet controller support"
 	depends on NET_ETHERNET && SGI_IP22
 	help
 	  Say Y here if you have an Seeq based Ethernet network card. This is
