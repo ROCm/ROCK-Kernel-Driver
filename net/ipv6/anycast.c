@@ -408,7 +408,7 @@ int ipv6_dev_ac_dec(struct net_device *dev, struct in6_addr *addr)
 	else
 		idev->ac_list = aca->aca_next;
 	write_unlock_bh(&idev->lock);
-	addrconf_leave_solict(dev, &aca->aca_addr);
+	addrconf_leave_solict(idev, &aca->aca_addr);
 
 	dst_hold(&aca->aca_rt->u.dst);
 	if (ip6_del_rt(aca->aca_rt, NULL, NULL))

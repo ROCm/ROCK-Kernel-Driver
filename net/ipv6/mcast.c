@@ -128,7 +128,7 @@ static rwlock_t ipv6_sk_mc_lock = RW_LOCK_UNLOCKED;
 
 static struct socket *igmp6_socket;
 
-static int __ipv6_dev_mc_dec(struct inet6_dev *idev, struct in6_addr *addr);
+int __ipv6_dev_mc_dec(struct inet6_dev *idev, struct in6_addr *addr);
 
 static void igmp6_join_group(struct ifmcaddr6 *ma);
 static void igmp6_leave_group(struct ifmcaddr6 *ma);
@@ -872,7 +872,7 @@ int ipv6_dev_mc_inc(struct net_device *dev, struct in6_addr *addr)
 /*
  *	device multicast group del
  */
-static int __ipv6_dev_mc_dec(struct inet6_dev *idev, struct in6_addr *addr)
+int __ipv6_dev_mc_dec(struct inet6_dev *idev, struct in6_addr *addr)
 {
 	struct ifmcaddr6 *ma, **map;
 

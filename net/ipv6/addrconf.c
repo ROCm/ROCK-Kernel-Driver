@@ -1060,15 +1060,15 @@ void addrconf_join_solict(struct net_device *dev, struct in6_addr *addr)
 	ipv6_dev_mc_inc(dev, &maddr);
 }
 
-void addrconf_leave_solict(struct net_device *dev, struct in6_addr *addr)
+void addrconf_leave_solict(struct inet6_dev *idev, struct in6_addr *addr)
 {
 	struct in6_addr maddr;
 
-	if (dev->flags&(IFF_LOOPBACK|IFF_NOARP))
+	if (idev->dev->flags&(IFF_LOOPBACK|IFF_NOARP))
 		return;
 
 	addrconf_addr_solict_mult(addr, &maddr);
-	ipv6_dev_mc_dec(dev, &maddr);
+	__ipv6_dev_mc_dec(idev, &maddr);
 }
 
 
@@ -2994,7 +2994,7 @@ static void ipv6_ifa_notify(int event, struct inet6_ifaddr *ifp)
 			dst_release(&ifp->rt->u.dst);
 		break;
 	case RTM_DELADDR:
-		addrconf_leave_solict(ifp->idev->dev, &ifp->addr);
+		addrconf_leave_solict(ifp->idev, &ifp->addr);
 		if (ifp->idev->cnf.forwarding) {
 			struct in6_addr addr;
 
