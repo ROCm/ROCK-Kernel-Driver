@@ -140,7 +140,6 @@ typedef unsigned char	byte;	/* used everywhere */
  */
 #define PRD_BYTES	8
 #define PRD_ENTRIES	(PAGE_SIZE / (2 * PRD_BYTES))
-#define PRD_SEGMENTS	32
 
 /*
  * Some more useful definitions
