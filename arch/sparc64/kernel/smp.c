@@ -615,6 +615,7 @@ void smp_call_function_client(int irq, struct pt_regs *regs)
 extern unsigned long xcall_flush_tlb_page;
 extern unsigned long xcall_flush_tlb_mm;
 extern unsigned long xcall_flush_tlb_range;
+extern unsigned long xcall_flush_tlb_kernel_range;
 extern unsigned long xcall_flush_tlb_all;
 extern unsigned long xcall_tlbcachesync;
 extern unsigned long xcall_flush_cache_all;
@@ -846,6 +847,18 @@ void smp_flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
 
 	local_flush_and_out:
 		__flush_tlb_range(ctx, start, SECONDARY_CONTEXT, end, PAGE_SIZE, (end-start));
+	}
+}
+
+void smp_flush_tlb_kernel_range(unsigned long start, unsigned long end)
+{
+	start &= PAGE_MASK;
+	end    = PAGE_ALIGN(end);
+	if (start != end) {
+		smp_cross_call(&xcall_flush_tlb_kernel_range,
+			       0, start, end);
+
+		__flush_tlb_kernel_range(start, end);
 	}
 }
 

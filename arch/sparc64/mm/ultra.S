@@ -201,6 +201,22 @@ __cheetah_flush_tlb_range:
 	retl
 /*IC19*/ wrpr		%g5, 0x0, %pstate
 
+	.align		32
+	.globl		__flush_tlb_kernel_range
+__flush_tlb_kernel_range:	/* %o0=start, %o1=end */
+	cmp		%o0, %o1
+	be,pn		%xcc, 2f
+	 sethi		%hi(PAGE_SIZE), %o4
+	sub		%o1, %o0, %o3
+	sub		%o3, %o4, %o3
+1:	stxa		%g0, [%o0 + %o3] ASI_DMMU_DEMAP
+	stxa		%g0, [%o0 + %o3] ASI_IMMU_DEMAP
+	membar		#Sync
+	brnz,pt		%o3, 1b
+	 sub		%o3, %o4, %o3
+2:	retl
+	 flush		%g6
+
 __spitfire_flush_tlb_mm_slow:
 	rdpr		%pstate, %g1
 	wrpr		%g1, PSTATE_IE, %pstate
@@ -482,6 +498,25 @@ xcall_flush_tlb_range:
 	 sub		%g3, %g2, %g3
 	stxa		%g7, [%g4] ASI_DMMU
 	retry
+	nop
+	nop
+
+	.globl		xcall_flush_tlb_kernel_range
+xcall_flush_tlb_kernel_range:
+	sethi		%hi(PAGE_SIZE - 1), %g2
+	or		%g2, %lo(PAGE_SIZE - 1), %g2
+	andn		%g1, %g2, %g1
+	andn		%g7, %g2, %g7
+	sub		%g7, %g1, %g3
+	add		%g2, 1, %g2
+	sub		%g3, %g2, %g3
+1:	stxa		%g0, [%g1 + %g3] ASI_DMMU_DEMAP
+	stxa		%g0, [%g1 + %g3] ASI_IMMU_DEMAP
+	membar		#Sync
+	brnz,pt		%g3, 1b
+	 sub		%g3, %g2, %g3
+	retry
+	nop
 	nop
 	nop
 

@@ -13,9 +13,13 @@ extern void __flush_tlb_range(unsigned long context, unsigned long start,
 			      unsigned long pgsz, unsigned long size);
 extern void __flush_tlb_page(unsigned long context, unsigned long page, unsigned long r);
 
+extern void __flush_tlb_kernel_range(unsigned long start, unsigned long end);
+
 #ifndef CONFIG_SMP
 
 #define flush_tlb_all()		__flush_tlb_all()
+#define flush_tlb_kernel_range(start,end) \
+	__flush_tlb_kernel_range(start,end)
 
 #define flush_tlb_mm(__mm) \
 do { if(CTX_VALID((__mm)->context)) \
@@ -45,6 +49,7 @@ extern void smp_flush_tlb_all(void);
 extern void smp_flush_tlb_mm(struct mm_struct *mm);
 extern void smp_flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
 				unsigned long end);
+extern void smp_flush_tlb_kernel_range(unsigned long start, unsigned long end);
 extern void smp_flush_tlb_page(struct mm_struct *mm, unsigned long page);
 
 #define flush_cache_all()	smp_flush_cache_all()
@@ -52,6 +57,8 @@ extern void smp_flush_tlb_page(struct mm_struct *mm, unsigned long page);
 #define flush_tlb_mm(mm)	smp_flush_tlb_mm(mm)
 #define flush_tlb_range(vma, start, end) \
 	smp_flush_tlb_range(vma, start, end)
+#define flush_tlb_kernel_range(start, end) \
+	smp_flush_tlb_kernel_range(start, end)
 #define flush_tlb_page(vma, page) \
 	smp_flush_tlb_page((vma)->vm_mm, page)
 
@@ -82,8 +89,5 @@ static __inline__ void flush_tlb_pgtables(struct mm_struct *mm, unsigned long st
 				vpte_base + (e >> (PAGE_SHIFT - 3)));
 	}
 }
-
-/* XXX For now... */
-#define flush_tlb_kernel_range(start, end)	flush_tlb_all()
 
 #endif /* _SPARC64_TLBFLUSH_H */
