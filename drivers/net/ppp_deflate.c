@@ -57,29 +57,31 @@ struct ppp_deflate_state {
 
 #define DEFLATE_OVHD	2		/* Deflate overhead/packet */
 
-static void	*z_comp_alloc __P((unsigned char *options, int opt_len));
-static void	*z_decomp_alloc __P((unsigned char *options, int opt_len));
-static void	z_comp_free __P((void *state));
-static void	z_decomp_free __P((void *state));
-static int	z_comp_init __P((void *state, unsigned char *options,
+static void	*z_comp_alloc(unsigned char *options, int opt_len);
+static void	*z_decomp_alloc(unsigned char *options, int opt_len);
+static void	z_comp_free(void *state);
+static void	z_decomp_free(void *state);
+static int	z_comp_init(void *state, unsigned char *options,
 				 int opt_len,
-				 int unit, int hdrlen, int debug));
-static int	z_decomp_init __P((void *state, unsigned char *options,
+				 int unit, int hdrlen, int debug);
+static int	z_decomp_init(void *state, unsigned char *options,
 				   int opt_len,
-				   int unit, int hdrlen, int mru, int debug));
-static int	z_compress __P((void *state, unsigned char *rptr,
+				   int unit, int hdrlen, int mru, int debug);
+static int	z_compress(void *state, unsigned char *rptr,
 				unsigned char *obuf,
-				int isize, int osize));
-static void	z_incomp __P((void *state, unsigned char *ibuf, int icnt));
-static int	z_decompress __P((void *state, unsigned char *ibuf,
-				int isize, unsigned char *obuf, int osize));
-static void	z_comp_reset __P((void *state));
-static void	z_decomp_reset __P((void *state));
-static void	z_comp_stats __P((void *state, struct compstat *stats));
+				int isize, int osize);
+static void	z_incomp(void *state, unsigned char *ibuf, int icnt);
+static int	z_decompress(void *state, unsigned char *ibuf,
+				int isize, unsigned char *obuf, int osize);
+static void	z_comp_reset(void *state);
+static void	z_decomp_reset(void *state);
+static void	z_comp_stats(void *state, struct compstat *stats);
 
-static void
-z_comp_free(arg)
-    void *arg;
+/**
+ *	z_comp_free - free the memory used by a compressor
+ *	@arg:	pointer to the private state for the compressor.
+ */
+static void z_comp_free(void *arg)
 {
 	struct ppp_deflate_state *state = (struct ppp_deflate_state *) arg;
 
@@ -91,13 +93,21 @@ z_comp_free(arg)
 	}
 }
 
-/*
- * Allocate space for a compressor.
+/**
+ *	z_comp_alloc - allocate space for a compressor.
+ *	@options: pointer to CCP option data
+ *	@opt_len: length of the CCP option at @options.
+ *
+ *	The @options pointer points to the a buffer containing the
+ *	CCP option data for the compression being negotiated.  It is
+ *	formatted according to RFC1979, and describes the window
+ *	size that the peer is requesting that we use in compressing
+ *	data to be sent to it.
+ *
+ *	Returns the pointer to the private state for the compressor,
+ *	or NULL if we could not allocate enough memory.
  */
-static void *
-z_comp_alloc(options, opt_len)
-    unsigned char *options;
-    int opt_len;
+static void *z_comp_alloc(unsigned char *options, int opt_len)
 {
 	struct ppp_deflate_state *state;
 	int w_size;
@@ -135,11 +145,23 @@ out_free:
 	return NULL;
 }
 
-static int
-z_comp_init(arg, options, opt_len, unit, hdrlen, debug)
-    void *arg;
-    unsigned char *options;
-    int opt_len, unit, hdrlen, debug;
+/**
+ *	z_comp_init - initialize a previously-allocated compressor.
+ *	@arg:	pointer to the private state for the compressor
+ *	@options: pointer to the CCP option data describing the
+ *		compression that was negotiated with the peer
+ *	@opt_len: length of the CCP option data at @options
+ *	@unit:	PPP unit number for diagnostic messages
+ *	@hdrlen: ignored (present for backwards compatibility)
+ *	@debug:	debug flag; if non-zero, debug messages are printed.
+ *
+ *	The CCP options described by @options must match the options
+ *	specified when the compressor was allocated.  The compressor
+ *	history is reset.  Returns 0 for failure (CCP options don't
+ *	match) or 1 for success.
+ */
+static int z_comp_init(void *arg, unsigned char *options, int opt_len,
+		       int unit, int hdrlen, int debug)
 {
 	struct ppp_deflate_state *state = (struct ppp_deflate_state *) arg;
 
@@ -160,9 +182,14 @@ z_comp_init(arg, options, opt_len, unit, hdrlen, debug)
 	return 1;
 }
 
-static void
-z_comp_reset(arg)
-    void *arg;
+/**
+ *	z_comp_reset - reset a previously-allocated compressor.
+ *	@arg:	pointer to private state for the compressor.
+ *
+ *	This clears the history for the compressor and makes it
+ *	ready to start emitting a new compressed stream.
+ */
+static void z_comp_reset(void *arg)
 {
 	struct ppp_deflate_state *state = (struct ppp_deflate_state *) arg;
 
@@ -170,12 +197,19 @@ z_comp_reset(arg)
 	zlib_deflateReset(&state->strm);
 }
 
-int
-z_compress(arg, rptr, obuf, isize, osize)
-    void *arg;
-    unsigned char *rptr;	/* uncompressed packet (in) */
-    unsigned char *obuf;	/* compressed packet (out) */
-    int isize, osize;
+/**
+ *	z_compress - compress a PPP packet with Deflate compression.
+ *	@arg:	pointer to private state for the compressor
+ *	@rptr:	uncompressed packet (input)
+ *	@obuf:	compressed packet (output)
+ *	@isize:	size of uncompressed packet
+ *	@osize:	space available at @obuf
+ *
+ *	Returns the length of the compressed packet, or 0 if the
+ *	packet is incompressible.
+ */
+int z_compress(void *arg, unsigned char *rptr, unsigned char *obuf,
+	       int isize, int osize)
 {
 	struct ppp_deflate_state *state = (struct ppp_deflate_state *) arg;
 	int r, proto, off, olen, oavail;
@@ -251,19 +285,24 @@ z_compress(arg, rptr, obuf, isize, osize)
 	return olen;
 }
 
-static void
-z_comp_stats(arg, stats)
-    void *arg;
-    struct compstat *stats;
+/**
+ *	z_comp_stats - return compression statistics for a compressor
+ *		or decompressor.
+ *	@arg:	pointer to private space for the (de)compressor
+ *	@stats:	pointer to a struct compstat to receive the result.
+ */
+static void z_comp_stats(void *arg, struct compstat *stats)
 {
 	struct ppp_deflate_state *state = (struct ppp_deflate_state *) arg;
 
 	*stats = state->stats;
 }
 
-static void
-z_decomp_free(arg)
-    void *arg;
+/**
+ *	z_decomp_free - Free the memory used by a decompressor.
+ *	@arg:	pointer to private space for the decompressor.
+ */
+static void z_decomp_free(void *arg)
 {
 	struct ppp_deflate_state *state = (struct ppp_deflate_state *) arg;
 
@@ -275,13 +314,21 @@ z_decomp_free(arg)
 	}
 }
 
-/*
- * Allocate space for a decompressor.
+/**
+ *	z_decomp_alloc - allocate space for a decompressor.
+ *	@options: pointer to CCP option data
+ *	@opt_len: length of the CCP option at @options.
+ *
+ *	The @options pointer points to the a buffer containing the
+ *	CCP option data for the compression being negotiated.  It is
+ *	formatted according to RFC1979, and describes the window
+ *	size that we are requesting the peer to use in compressing
+ *	data to be sent to us.
+ *
+ *	Returns the pointer to the private state for the decompressor,
+ *	or NULL if we could not allocate enough memory.
  */
-static void *
-z_decomp_alloc(options, opt_len)
-    unsigned char *options;
-    int opt_len;
+static void *z_decomp_alloc(unsigned char *options, int opt_len)
 {
 	struct ppp_deflate_state *state;
 	int w_size;
@@ -317,11 +364,24 @@ out_free:
 	return NULL;
 }
 
-static int
-z_decomp_init(arg, options, opt_len, unit, hdrlen, mru, debug)
-    void *arg;
-    unsigned char *options;
-    int opt_len, unit, hdrlen, mru, debug;
+/**
+ *	z_decomp_init - initialize a previously-allocated decompressor.
+ *	@arg:	pointer to the private state for the decompressor
+ *	@options: pointer to the CCP option data describing the
+ *		compression that was negotiated with the peer
+ *	@opt_len: length of the CCP option data at @options
+ *	@unit:	PPP unit number for diagnostic messages
+ *	@hdrlen: ignored (present for backwards compatibility)
+ *	@mru:	maximum length of decompressed packets
+ *	@debug:	debug flag; if non-zero, debug messages are printed.
+ *
+ *	The CCP options described by @options must match the options
+ *	specified when the decompressor was allocated.  The decompressor
+ *	history is reset.  Returns 0 for failure (CCP options don't
+ *	match) or 1 for success.
+ */
+static int z_decomp_init(void *arg, unsigned char *options, int opt_len,
+			 int unit, int hdrlen, int mru, int debug)
 {
 	struct ppp_deflate_state *state = (struct ppp_deflate_state *) arg;
 
@@ -343,9 +403,14 @@ z_decomp_init(arg, options, opt_len, unit, hdrlen, mru, debug)
 	return 1;
 }
 
-static void
-z_decomp_reset(arg)
-    void *arg;
+/**
+ *	z_decomp_reset - reset a previously-allocated decompressor.
+ *	@arg:	pointer to private state for the decompressor.
+ *
+ *	This clears the history for the decompressor and makes it
+ *	ready to receive a new compressed stream.
+ */
+static void z_decomp_reset(void *arg)
 {
 	struct ppp_deflate_state *state = (struct ppp_deflate_state *) arg;
 
@@ -353,8 +418,13 @@ z_decomp_reset(arg)
 	zlib_inflateReset(&state->strm);
 }
 
-/*
- * Decompress a Deflate-compressed packet.
+/**
+ *	z_decompress - decompress a Deflate-compressed packet.
+ *	@arg:	pointer to private state for the decompressor
+ *	@ibuf:	pointer to input (compressed) packet data
+ *	@isize:	length of input packet
+ *	@obuf:	pointer to space for output (decompressed) packet
+ *	@osize:	amount of space available at @obuf
  *
  * Because of patent problems, we return DECOMP_ERROR for errors
  * found by inspecting the input data and for system problems, but
@@ -369,13 +439,8 @@ z_decomp_reset(arg)
  * bug, so we return DECOMP_FATALERROR for them in order to turn off
  * compression, even though they are detected by inspecting the input.
  */
-int
-z_decompress(arg, ibuf, isize, obuf, osize)
-    void *arg;
-    unsigned char *ibuf;
-    int isize;
-    unsigned char *obuf;
-    int osize;
+int z_decompress(void *arg, unsigned char *ibuf, int isize,
+		 unsigned char *obuf, int osize)
 {
 	struct ppp_deflate_state *state = (struct ppp_deflate_state *) arg;
 	int olen, seq, r;
@@ -474,14 +539,13 @@ z_decompress(arg, ibuf, isize, obuf, osize)
 	return olen;
 }
 
-/*
- * Incompressible data has arrived - add it to the history.
+/**
+ *	z_incomp - add incompressible input data to the history.
+ *	@arg:	pointer to private state for the decompressor
+ *	@ibuf:	pointer to input packet data
+ *	@icnt:	length of input data.
  */
-static void
-z_incomp(arg, ibuf, icnt)
-    void *arg;
-    unsigned char *ibuf;
-    int icnt;
+static void z_incomp(void *arg, unsigned char *ibuf, int icnt)
 {
 	struct ppp_deflate_state *state = (struct ppp_deflate_state *) arg;
 	int proto, r;
