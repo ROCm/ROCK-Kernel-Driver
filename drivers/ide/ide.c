@@ -775,6 +775,7 @@ void ide_unregister (unsigned int index)
 	hwif->iops			= old_hwif.iops;
 #else
 	hwif->OUTB		= old_hwif.OUTB;
+	hwif->OUTBSYNC		= old_hwif.OUTBSYNC;
 	hwif->OUTW		= old_hwif.OUTW;
 	hwif->OUTL		= old_hwif.OUTL;
 	hwif->OUTSW		= old_hwif.OUTSW;
