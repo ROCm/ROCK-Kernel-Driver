@@ -376,7 +376,7 @@ static struct proc_dir_entry *proc_bus_pci_dir;
 static ssize_t pci_show_irq(struct device * dev, char * buf, size_t count, loff_t off)
 {
 	struct pci_dev * pci_dev = list_entry(dev,struct pci_dev,dev);
-	return off ? 0 : sprintf(buf,"%u",pci_dev->irq);
+	return off ? 0 : sprintf(buf,"%u\n",pci_dev->irq);
 }
 
 static struct driver_file_entry pci_irq_entry = {
