@@ -244,12 +244,13 @@ static int adb_scan_bus(void)
 static int
 adb_probe_task(void *x)
 {
+	sigset_t blocked;
+
 	strcpy(current->comm, "kadbprobe");
-	
-	spin_lock_irq(&current->sighand->siglock);
-	sigfillset(&current->blocked);
+
+	sigfillset(&blocked);
+	sicprocmask(SIG_BLOCK, &blocked, NULL);	
 	flush_signals(current);
-	spin_unlock_irq(&current->sighand->siglock);
 
 	printk(KERN_INFO "adb: starting probe task...\n");
 	do_adb_reset_bus();

@@ -233,9 +233,7 @@ int khvcd(void *unused)
 {
 	int i;
 
-	daemonize();
-	strcpy(current->comm, "khvcd");
-	sigfillset(&current->blocked);
+	daemonize("khvcd");
 
 	for (;;) {
 		if (!cpus_in_xmon) {

@@ -2246,8 +2246,7 @@ static int migration_thread(void * data)
 	runqueue_t *rq;
 	int ret;
 
-	daemonize();
-	sigfillset(&current->blocked);
+	daemonize("migration/%d", cpu);
 	set_fs(KERNEL_DS);
 
 	/*
@@ -2260,8 +2259,6 @@ static int migration_thread(void * data)
 
 	rq = this_rq();
 	rq->migration_thread = current;
-
-	sprintf(current->comm, "migration/%d", smp_processor_id());
 
 	for (;;) {
 		runqueue_t *rq_src, *rq_dest;

@@ -2444,9 +2444,7 @@ static struct block_device_operations md_fops =
 
 static inline void flush_curr_signals(void)
 {
-	spin_lock(&current->sighand->siglock);
 	flush_signals(current);
-	spin_unlock(&current->sighand->siglock);
 }
 
 int md_thread(void * arg)
@@ -2459,12 +2457,10 @@ int md_thread(void * arg)
 	 * Detach thread
 	 */
 
-	daemonize();
+	daemonize(thread->name);
 
-	sprintf(current->comm, thread->name);
 	current->exit_signal = SIGCHLD;
-	siginitsetinv(&current->blocked, sigmask(SIGKILL));
-	flush_curr_signals();
+	allow_signal(SIGKILL);
 	thread->tsk = current;
 
 	/*

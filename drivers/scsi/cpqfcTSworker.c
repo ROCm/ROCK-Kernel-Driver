@@ -165,14 +165,9 @@ void cpqfcTSWorkerThread( void *host)
   ENTER("WorkerThread");
 
   lock_kernel();
-  daemonize();
+  daemonize("cpqfcTS_wt_%d", HostAdapter->host_no);
   siginitsetinv(&current->blocked, SHUTDOWN_SIGS);
 
-
-  /*
-   * Set the name of this process.
-   */
-  sprintf(current->comm, "cpqfcTS_wt_%d", HostAdapter->host_no);
 
   cpqfcHBAdata->fcQueReady = &fcQueReady;  // primary wait point
   cpqfcHBAdata->TYOBcomplete = &fcTYOBcomplete;

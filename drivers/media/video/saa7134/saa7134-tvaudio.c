@@ -393,9 +393,7 @@ static int tvaudio_thread(void *data)
 	int i,max,carrier,audio;
 
 	lock_kernel();
-	daemonize();
-	sigfillset(&current->blocked);
-	sprintf(current->comm, "%s", dev->name);
+	daemonize("%s", dev->name);
 	dev->thread.task = current;
 	unlock_kernel();
 	if (dev->thread.notify != NULL)

@@ -349,13 +349,13 @@ static int arm_thread(void *data)
     
 	lock_kernel();
 #if 0
-	daemonize();
+	daemonize("arm_mon");
 #else
         exit_mm(current);
         current->session=current->pgrp=1;
-#endif
 	sigfillset(&current->blocked);
 	strcpy(current->comm, "arm_mon");
+#endif
 	av7110->arm_thread = current;
 	unlock_kernel();
 

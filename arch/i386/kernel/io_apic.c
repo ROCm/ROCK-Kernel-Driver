@@ -510,9 +510,8 @@ int balanced_irq(void *unused)
 	int i;
 	unsigned long prev_balance_time = jiffies;
 	long time_remaining = balanced_irq_interval;
-	daemonize();
-	sigfillset(&current->blocked);
-	sprintf(current->comm, "kirqd");
+
+	daemonize("kirqd");
 	
 	/* push everything to CPU 0 to give us a starting point.  */
 	for (i = 0 ; i < NR_IRQS ; i++)

@@ -457,8 +457,8 @@ static struct task_struct *kenvctrld_task;
 
 static int kenvctrld(void *__unused)
 {
-	daemonize();
-	strcpy(current->comm, "kenvctrld");
+	daemonize("kenvctrld");
+	allow_signal(SIGKILL);
 	kenvctrld_task = current;
 
 	printk(KERN_INFO "bbc_envctrl: kenvctrld starting...\n");

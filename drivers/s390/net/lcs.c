@@ -908,7 +908,7 @@ lcs_fix_multicast_list(void *data)
 
 	card = (struct lcs_card *) data;
 
-	daemonize();
+	daemonize("fixipm");
 	LCS_DBF_TEXT(5, trace, "fixipm");
 	spin_lock(&card->lock);
 	list_for_each_safe(l, n, &card->ipm_list) {
@@ -1370,7 +1370,7 @@ lcs_lgw_startlan_thread(void *data)
 	struct lcs_card *card;
 
 	card = (struct lcs_card *) data;
-	daemonize();
+	daemonize("lgwstpln");
 	LCS_DBF_TEXT(4, trace, "lgwstpln");
 	if (card->dev)
 		netif_stop_queue(card->dev);
@@ -1397,7 +1397,7 @@ lcs_lgw_startup_thread(void *data)
 	struct lcs_card *card;
 
 	card = (struct lcs_card *) data;
-	daemonize();
+	daemonize("lgwstpln");
 	LCS_DBF_TEXT(4, trace, "lgwstpln");
 	if (card->dev)
 		netif_stop_queue(card->dev);
@@ -1436,7 +1436,7 @@ lcs_lgw_stoplan_thread(void *data)
 	struct lcs_card *card;
 
 	card = (struct lcs_card *) data;
-	daemonize();
+	daemonize("lgwstop");
 	LCS_DBF_TEXT(4, trace, "lgwstop");
 	if (card->dev)
 		netif_stop_queue(card->dev);
