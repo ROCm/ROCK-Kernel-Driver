@@ -232,7 +232,9 @@ struct sctp_af {
 					 int saddr);
 	void            (*from_sk)      (union sctp_addr *,
 					 struct sock *sk);
-	void            (*to_sk)        (union sctp_addr *,
+	void            (*to_sk_saddr)  (union sctp_addr *,
+					 struct sock *sk);
+	void            (*to_sk_daddr)  (union sctp_addr *,
 					 struct sock *sk);
 	int             (*addr_valid)   (union sctp_addr *);
 	sctp_scope_t    (*scope) (union sctp_addr *);

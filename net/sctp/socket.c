@@ -261,7 +261,7 @@ SCTP_STATIC int sctp_do_bind(struct sock *sk, union sctp_addr *addr, int len)
 	/* Copy back into socket for getsockname() use. */
 	if (!ret) {
 		inet_sk(sk)->sport = htons(inet_sk(sk)->num);
-		af->to_sk(addr, sk);
+		af->to_sk_saddr(addr, sk);
 	}
 
 	return ret;
@@ -1574,6 +1574,7 @@ SCTP_STATIC int sctp_connect(struct sock *sk, struct sockaddr *uaddr,
 	struct sctp_association *asoc;
 	struct sctp_transport *transport;
 	union sctp_addr to;
+	struct sctp_af *af;
 	sctp_scope_t scope;
 	long timeo;
 	int err = 0;
@@ -1660,6 +1661,11 @@ SCTP_STATIC int sctp_connect(struct sock *sk, struct sockaddr *uaddr,
 		sctp_association_free(asoc);
 		goto out_unlock;
 	}
+
+	/* Initialize sk's dport and daddr for getpeername() */
+	inet_sk(sk)->dport = htons(asoc->peer.port);
+	af = sctp_get_af_specific(to.sa.sa_family);
+	af->to_sk_daddr(&to, sk); 
 
 	timeo = sock_sndtimeo(sk, sk->socket->file->f_flags & O_NONBLOCK);
 	err = sctp_wait_for_connect(asoc, &timeo);

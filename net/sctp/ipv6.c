@@ -370,9 +370,15 @@ static void sctp_v6_from_sk(union sctp_addr *addr, struct sock *sk)
 }
 
 /* Initialize sk->rcv_saddr from sctp_addr. */
-static void sctp_v6_to_sk(union sctp_addr *addr, struct sock *sk)
+static void sctp_v6_to_sk_saddr(union sctp_addr *addr, struct sock *sk)
 {
 	inet6_sk(sk)->rcv_saddr = addr->v6.sin6_addr;
+}
+
+/* Initialize sk->daddr from sctp_addr. */
+static void sctp_v6_to_sk_daddr(union sctp_addr *addr, struct sock *sk)
+{
+	inet6_sk(sk)->daddr = addr->v6.sin6_addr;
 }
 
 /* Initialize a sctp_addr from a dst_entry. */
@@ -523,10 +529,14 @@ struct sock *sctp_v6_create_accept_sk(struct sock *sk,
 
 	memcpy(newnp, np, sizeof(struct ipv6_pinfo));
 
-	ipv6_addr_copy(&newnp->daddr, &asoc->peer.primary_addr.v6.sin6_addr);
-
+	/* Initialize sk's sport, dport, rcv_saddr and daddr for getsockname()
+	 * and getpeername().
+	 */
 	newinet->sport = inet->sport;
-	newinet->dport = asoc->peer.port;
+	newnp->saddr = np->saddr;
+	newnp->rcv_saddr = np->rcv_saddr;
+	newinet->dport = htons(asoc->peer.port);
+	newnp->daddr =  asoc->peer.primary_addr.v6.sin6_addr;
 
 #ifdef INET_REFCNT_DEBUG
 	atomic_inc(&inet6_sock_nr);
@@ -799,7 +809,8 @@ static struct sctp_af sctp_ipv6_specific = {
 	.copy_addrlist   = sctp_v6_copy_addrlist,
 	.from_skb        = sctp_v6_from_skb,
 	.from_sk         = sctp_v6_from_sk,
-	.to_sk           = sctp_v6_to_sk,
+	.to_sk_saddr     = sctp_v6_to_sk_saddr,
+	.to_sk_daddr     = sctp_v6_to_sk_daddr,
 	.dst_saddr       = sctp_v6_dst_saddr,
 	.cmp_addr        = sctp_v6_cmp_addr,
 	.scope           = sctp_v6_scope,
