@@ -1027,7 +1027,6 @@ struct airo_info {
 #define FLAG_802_11	7
 #define FLAG_PENDING_XMIT 9
 #define FLAG_PENDING_XMIT11 10
-#define FLAG_PCI	11
 #define JOB_MASK	0x1ff0000
 #define JOB_DIE		16
 #define JOB_XMIT	17
@@ -4623,7 +4622,6 @@ static int __devinit airo_pci_probe(struct pci_dev *pdev,
 		return -ENODEV;
 
 	pci_set_drvdata(pdev, dev);
-	set_bit (FLAG_PCI, &((struct airo_info *)dev->priv)->flags);
 	return 0;
 }
 
@@ -4653,7 +4651,7 @@ static int __init airo_init_module( void )
 
 #ifdef CONFIG_PCI
 	printk( KERN_INFO "airo:  Probing for PCI adapters\n" );
-	pci_module_init(&airo_driver);
+	pci_register_driver(&airo_driver);
 	printk( KERN_INFO "airo:  Finished probing for PCI adapters\n" );
 #endif
 
@@ -4665,22 +4663,15 @@ static int __init airo_init_module( void )
 
 static void __exit airo_cleanup_module( void )
 {
-	int is_pci = 0;
 	while( airo_devices ) {
 		printk( KERN_INFO "airo: Unregistering %s\n", airo_devices->dev->name );
-#ifdef CONFIG_PCI
-		if (test_bit(FLAG_PCI, &((struct airo_info *)airo_devices->dev->priv)->flags))
-			is_pci = 1;
-#endif
 		stop_airo_card( airo_devices->dev, 1 );
 	}
 	remove_proc_entry("aironet", proc_root_driver);
 
-	if (is_pci) {
 #ifdef CONFIG_PCI
-		pci_unregister_driver(&airo_driver);
+	pci_unregister_driver(&airo_driver);
 #endif
-	}
 }
 
 #ifdef WIRELESS_EXT
