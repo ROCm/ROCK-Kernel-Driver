@@ -158,8 +158,6 @@ enum {
 
 extern struct ppp_channel_ops pppoe_chan_ops;
 
-extern int pppox_proto_init(struct net_proto *np);
-
 #endif /* __KERNEL__ */
 
 #endif /* !(__LINUX_IF_PPPOX_H) */

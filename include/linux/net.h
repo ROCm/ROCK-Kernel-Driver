@@ -136,16 +136,6 @@ struct net_proto_family {
 	short	encrypt_net;
 };
 
-/**
- *  struct socket - network interface with the file system
- *  @name - Protocol name
- *  @init_func - Bootstrap
- */
-struct net_proto {
-	const char *name;
-	void	  (*init_func)(struct net_proto *pro);
-};
-
 extern int	     sock_wake_async(struct socket *sk, int how, int band);
 extern int	     sock_register(struct net_proto_family *fam);
 extern int	     sock_unregister(int family);

@@ -1,6 +1,5 @@
 #ifndef __LINUX_NET_AFUNIX_H
 #define __LINUX_NET_AFUNIX_H
-extern void unix_proto_init(struct net_proto *pro);
 extern void unix_inflight(struct file *fp);
 extern void unix_notinflight(struct file *fp);
 typedef struct sock unix_socket;
