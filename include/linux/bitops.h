@@ -108,7 +108,7 @@ static inline unsigned int generic_hweight8(unsigned int w)
         return (res & 0x0F) + ((res >> 4) & 0x0F);
 }
 
-static inline unsigned long generic_hweight64(u64 w)
+static inline unsigned long generic_hweight64(__u64 w)
 {
 #if BITS_PER_LONG < 64
 	return generic_hweight32((unsigned int)(w >> 32)) +

@@ -1010,7 +1010,7 @@ static int shmem_mmap(struct file *file, struct vm_area_struct *vma)
 	struct inode *inode = file->f_dentry->d_inode;
 
 	ops = &shmem_vm_ops;
-	if (!inode->i_sb || !S_ISREG(inode->i_mode))
+	if (!S_ISREG(inode->i_mode))
 		return -EACCES;
 	update_atime(inode);
 	vma->vm_ops = ops;
