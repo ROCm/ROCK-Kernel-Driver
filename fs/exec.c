@@ -923,12 +923,12 @@ void remove_arg_zero(struct linux_binprm *bprm)
 			if (offset != PAGE_SIZE)
 				continue;
 			offset = 0;
-			kunmap(page);
+			kunmap_atomic(kaddr, KM_USER0);
 inside:
 			page = bprm->page[bprm->p/PAGE_SIZE];
-			kaddr = kmap(page);
+			kaddr = kmap_atomic(page, KM_USER0);
 		}
-		kunmap(page);
+		kunmap_atomic(kaddr, KM_USER0);
 		bprm->argc--;
 	}
 }

@@ -926,7 +926,7 @@ static int setup_swap_extents(struct swap_info_struct *sis)
 	 */
 	probe_block = 0;
 	page_no = 0;
-	last_block = inode->i_size >> blkbits;
+	last_block = i_size_read(inode) >> blkbits;
 	while ((probe_block + blocks_per_page) <= last_block &&
 			page_no < sis->max) {
 		unsigned block_in_page;
@@ -1312,7 +1312,7 @@ asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 		goto bad_swap;
 	}
 
-	swapfilesize = mapping->host->i_size >> PAGE_SHIFT;
+	swapfilesize = i_size_read(mapping->host) >> PAGE_SHIFT;
 
 	/*
 	 * Read the swap header.

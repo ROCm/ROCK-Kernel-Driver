@@ -1,9 +1,6 @@
 /* asm/bitops.h for Linux/CRIS
  *
  * TODO: asm versions if speed is needed
- *       set_bit, clear_bit and change_bit wastes cycles being only
- *       macros into test_and_set_bit etc.
- *       kernel-doc things (**) for macros are disabled
  *
  * All bit operations return 0 if the bit was cleared before the
  * operation and != 0 if it was not.
@@ -17,11 +14,8 @@
 /* Currently this is unsuitable for consumption outside the kernel.  */
 #ifdef __KERNEL__ 
 
+#include <asm/arch/bitops.h>
 #include <asm/system.h>
-
-/* We use generic_ffs so get it; include guards resolve the possible
-   mutually inclusion.  */
-#include <linux/bitops.h>
 #include <linux/compiler.h>
 
 /*
@@ -63,7 +57,7 @@ struct __dummy { unsigned long a[100]; };
 
 /*
  * change_bit - Toggle a bit in memory
- * @nr: Bit to clear
+ * @nr: Bit to change
  * @addr: Address to start counting from
  *
  * change_bit() is atomic and may not be reordered.
@@ -75,7 +69,7 @@ struct __dummy { unsigned long a[100]; };
 
 /*
  * __change_bit - Toggle a bit in memory
- * @nr: the bit to set
+ * @nr: the bit to change
  * @addr: the address to start counting from
  *
  * Unlike change_bit(), this function is non-atomic and may be reordered.
@@ -94,7 +88,7 @@ struct __dummy { unsigned long a[100]; };
  * It also implies a memory barrier.
  */
 
-static inline int test_and_set_bit(int nr, void *addr)
+extern inline int test_and_set_bit(int nr, void *addr)
 {
 	unsigned int mask, retval;
 	unsigned long flags;
@@ -102,15 +96,15 @@ static inline int test_and_set_bit(int nr, void *addr)
 	
 	adr += nr >> 5;
 	mask = 1 << (nr & 0x1f);
-	save_flags(flags);
-	cli();
+	local_save_flags(flags);
+	local_irq_disable();
 	retval = (mask & *adr) != 0;
 	*adr |= mask;
-	restore_flags(flags);
+	local_irq_restore(flags);
 	return retval;
 }
 
-static inline int __test_and_set_bit(int nr, void *addr)
+extern inline int __test_and_set_bit(int nr, void *addr)
 {
 	unsigned int mask, retval;
 	unsigned int *adr = (unsigned int *)addr;
@@ -130,14 +124,14 @@ static inline int __test_and_set_bit(int nr, void *addr)
 
 /**
  * test_and_clear_bit - Clear a bit and return its old value
- * @nr: Bit to set
+ * @nr: Bit to clear
  * @addr: Address to count from
  *
  * This operation is atomic and cannot be reordered.  
  * It also implies a memory barrier.
  */
 
-static inline int test_and_clear_bit(int nr, void *addr)
+extern inline int test_and_clear_bit(int nr, void *addr)
 {
 	unsigned int mask, retval;
 	unsigned long flags;
@@ -145,17 +139,17 @@ static inline int test_and_clear_bit(int nr, void *addr)
 	
 	adr += nr >> 5;
 	mask = 1 << (nr & 0x1f);
-	save_flags(flags);
-	cli();
+	local_save_flags(flags);
+	local_irq_disable();
 	retval = (mask & *adr) != 0;
 	*adr &= ~mask;
-	restore_flags(flags);
+	local_irq_restore(flags);
 	return retval;
 }
 
 /**
  * __test_and_clear_bit - Clear a bit and return its old value
- * @nr: Bit to set
+ * @nr: Bit to clear
  * @addr: Address to count from
  *
  * This operation is non-atomic and can be reordered.  
@@ -163,7 +157,7 @@ static inline int test_and_clear_bit(int nr, void *addr)
  * but actually fail.  You must protect multiple accesses with a lock.
  */
 
-static inline int __test_and_clear_bit(int nr, void *addr)
+extern inline int __test_and_clear_bit(int nr, void *addr)
 {
 	unsigned int mask, retval;
 	unsigned int *adr = (unsigned int *)addr;
@@ -176,31 +170,31 @@ static inline int __test_and_clear_bit(int nr, void *addr)
 }
 /**
  * test_and_change_bit - Change a bit and return its new value
- * @nr: Bit to set
+ * @nr: Bit to change
  * @addr: Address to count from
  *
  * This operation is atomic and cannot be reordered.  
  * It also implies a memory barrier.
  */
 
-static inline int test_and_change_bit(int nr, void *addr)
+extern inline int test_and_change_bit(int nr, void *addr)
 {
 	unsigned int mask, retval;
 	unsigned long flags;
 	unsigned int *adr = (unsigned int *)addr;
 	adr += nr >> 5;
 	mask = 1 << (nr & 0x1f);
-	save_flags(flags);
-	cli();
+	local_save_flags(flags);
+	local_irq_disable();
 	retval = (mask & *adr) != 0;
 	*adr ^= mask;
-	restore_flags(flags);
+	local_irq_restore(flags);
 	return retval;
 }
 
 /* WARNING: non atomic and it can be reordered! */
 
-static inline int __test_and_change_bit(int nr, void *addr)
+extern inline int __test_and_change_bit(int nr, void *addr)
 {
 	unsigned int mask, retval;
 	unsigned int *adr = (unsigned int *)addr;
@@ -221,7 +215,7 @@ static inline int __test_and_change_bit(int nr, void *addr)
  * This routine doesn't need to be atomic.
  */
 
-static inline int test_bit(int nr, const void *addr)
+extern inline int test_bit(int nr, const void *addr)
 {
 	unsigned int mask;
 	unsigned int *adr = (unsigned int *)addr;
@@ -236,63 +230,28 @@ static inline int test_bit(int nr, const void *addr)
  */
 
 /*
- * Helper functions for the core of the ff[sz] functions, wrapping the
- * syntactically awkward asms.  The asms compute the number of leading
- * zeroes of a bits-in-byte and byte-in-word and word-in-dword-swapped
- * number.  They differ in that the first function also inverts all bits
- * in the input.
+ * Since we define it "external", it collides with the built-in
+ * definition, which doesn't have the same semantics.  We don't want to
+ * use -fno-builtin, so just hide the name ffs.
  */
-static inline unsigned long cris_swapnwbrlz(unsigned long w)
-{
-	/* Let's just say we return the result in the same register as the
-	   input.  Saying we clobber the input but can return the result
-	   in another register:
-	   !  __asm__ ("swapnwbr %2\n\tlz %2,%0"
-	   !	      : "=r,r" (res), "=r,X" (dummy) : "1,0" (w));
-	   confuses gcc (sched.c, gcc from cris-dist-1.14).  */
-
-	unsigned long res;
-	__asm__ ("swapnwbr %0 \n\t"
-		 "lz %0,%0"
-		 : "=r" (res) : "0" (w));
-	return res;
-}
-
-static inline unsigned long cris_swapwbrlz(unsigned long w)
-{
-	unsigned res;
-	__asm__ ("swapwbr %0 \n\t"
-		 "lz %0,%0"
-		 : "=r" (res)
-		 : "0" (w));
-	return res;
-}
+#define ffs kernel_ffs
 
 /*
- * ffz = Find First Zero in word. Undefined if no zero exists,
- * so code should check against ~0UL first..
+ * fls: find last bit set.
  */
-static inline unsigned long ffz(unsigned long w)
-{
-	/* The generic_ffs function is used to avoid the asm when the
-	   argument is a constant.  */
-	return __builtin_constant_p (w)
-		? (~w ? (unsigned long) generic_ffs ((int) ~w) - 1 : 32)
-		: cris_swapnwbrlz (w);
-}
+
+#define fls(x) generic_fls(x)
 
 /*
- * Somewhat like ffz but the equivalent of generic_ffs: in contrast to
- * ffz we return the first one-bit *plus one*.
+ * hweightN - returns the hamming weight of a N-bit word
+ * @x: the word to weigh
+ *
+ * The Hamming Weight of a number is the total number of bits set in it.
  */
-static inline unsigned long ffs(unsigned long w)
-{
-	/* The generic_ffs function is used to avoid the asm when the
-	   argument is a constant.  */
-	return __builtin_constant_p (w)
-		? (unsigned long) generic_ffs ((int) w)
-		: w ? cris_swapwbrlz (w) + 1 : 0;
-}
+
+#define hweight32(x) generic_hweight32(x)
+#define hweight16(x) generic_hweight16(x)
+#define hweight8(x) generic_hweight8(x)
 
 /**
  * find_next_zero_bit - find the first zero bit in a memory region
@@ -300,7 +259,7 @@ static inline unsigned long ffs(unsigned long w)
  * @offset: The bitnumber to start searching at
  * @size: The maximum size to search
  */
-static inline int find_next_zero_bit (void * addr, int size, int offset)
+extern inline int find_next_zero_bit (void * addr, int size, int offset)
 {
 	unsigned long *p = ((unsigned long *) addr) + (offset >> 5);
 	unsigned long result = offset & ~31UL;
@@ -348,17 +307,6 @@ static inline int find_next_zero_bit (void * addr, int size, int offset)
 #define find_first_zero_bit(addr, size) \
         find_next_zero_bit((addr), (size), 0)
 
-/*
- * hweightN - returns the hamming weight of a N-bit word
- * @x: the word to weigh
- *
- * The Hamming Weight of a number is the total number of bits set in it.
- */
-
-#define hweight32(x) generic_hweight32(x)
-#define hweight16(x) generic_hweight16(x)
-#define hweight8(x) generic_hweight8(x)
-
 #define ext2_set_bit                 test_and_set_bit
 #define ext2_set_bit_atomic(l,n,a)   test_and_set_bit(n,a)
 #define ext2_clear_bit               test_and_clear_bit
@@ -373,44 +321,20 @@ static inline int find_next_zero_bit (void * addr, int size, int offset)
 #define minix_test_bit(nr,addr) test_bit(nr,addr)
 #define minix_find_first_zero_bit(addr,size) find_first_zero_bit(addr,size)
 
-#if 0
-/* TODO: see below */
-#define sched_find_first_zero_bit(addr) find_first_zero_bit(addr, 168)
-
-#else
-/* TODO: left out pending where to put it.. (there are .h dependencies) */
-
- /*
- * Every architecture must define this function. It's the fastest
- * way of searching a 168-bit bitmap where the first 128 bits are
- * unlikely to be set. It's guaranteed that at least one of the 168
- * bits is cleared.
- */
-#if 0
-#if MAX_RT_PRIO != 128 || MAX_PRIO != 168
-# error update this function.
-#endif
-#else
-#define MAX_RT_PRIO 128
-#define MAX_PRIO 168
-#endif
-
-static inline int sched_find_first_zero_bit(char *bitmap)
+extern inline int sched_find_first_bit(unsigned long *b)
 {
-	unsigned int *b = (unsigned int *)bitmap;
-	unsigned int rt;
-
-	rt = b[0] & b[1] & b[2] & b[3];
-	if (unlikely(rt != 0xffffffff))
-		return find_first_zero_bit(bitmap, MAX_RT_PRIO);
-
-	if (b[4] != ~0)
-		return ffz(b[4]) + MAX_RT_PRIO;
-	return ffz(b[5]) + 32 + MAX_RT_PRIO;
+	if (unlikely(b[0]))
+		return __ffs(b[0]);
+	if (unlikely(b[1]))
+		return __ffs(b[1]) + 32;
+	if (unlikely(b[2]))
+		return __ffs(b[2]) + 64;
+	if (unlikely(b[3]))
+		return __ffs(b[3]) + 96;
+	if (b[4])
+		return __ffs(b[4]) + 128;
+	return __ffs(b[5]) + 32 + 128;
 }
-#undef MAX_PRIO
-#undef MAX_RT_PRIO
-#endif
 
 #endif /* __KERNEL__ */
 

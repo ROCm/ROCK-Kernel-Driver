@@ -12,12 +12,13 @@
 #include <linux/vmalloc.h>
 #include <asm/io.h>
 #include <asm/pgalloc.h>
+#include <asm/cacheflush.h>
+#include <asm/tlbflush.h>
 
-static inline void remap_area_pte(pte_t * pte, unsigned long address, unsigned long size,
+extern inline void remap_area_pte(pte_t * pte, unsigned long address, unsigned long size,
 	unsigned long phys_addr, unsigned long flags)
 {
 	unsigned long end;
-	unsigned long pfn;
 
 	address &= ~PMD_MASK;
 	end = address + size;
@@ -25,17 +26,16 @@ static inline void remap_area_pte(pte_t * pte, unsigned long address, unsigned l
 		end = PMD_SIZE;
 	if (address >= end)
 		BUG();
-	pfn = phys_addr >> PAGE_SHIFT;
 	do {
 		if (!pte_none(*pte)) {
 			printk("remap_area_pte: page already exists\n");
 			BUG();
 		}
-		set_pte(pte, pfn_pte(pfn, __pgprot(_PAGE_PRESENT | __READABLE | 
-						   __WRITEABLE | _PAGE_GLOBAL |
-						   _PAGE_KERNEL | flags)));
+		set_pte(pte, mk_pte_phys(phys_addr, __pgprot(_PAGE_PRESENT | __READABLE | 
+							     __WRITEABLE | _PAGE_GLOBAL |
+							     _PAGE_KERNEL | flags)));
 		address += PAGE_SIZE;
-		pfn++;
+		phys_addr += PAGE_SIZE;
 		pte++;
 	} while (address && (address < end));
 }
@@ -53,7 +53,7 @@ static inline int remap_area_pmd(pmd_t * pmd, unsigned long address, unsigned lo
 	if (address >= end)
 		BUG();
 	do {
-		pte_t * pte = pte_alloc(&init_mm, pmd, address);
+		pte_t * pte = pte_alloc_kernel(&init_mm, pmd, address);
 		if (!pte)
 			return -ENOMEM;
 		remap_area_pte(pte, address, end - address, address + phys_addr, flags);
@@ -148,7 +148,7 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 	 */
 	offset = phys_addr & ~PAGE_MASK;
 	phys_addr &= PAGE_MASK;
-	size = PAGE_ALIGN(last_addr) - phys_addr;
+	size = PAGE_ALIGN(last_addr+1) - phys_addr;
 
 	/*
 	 * Ok, go for it..

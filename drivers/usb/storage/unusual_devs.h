@@ -90,12 +90,6 @@ UNUSUAL_DEV(  0x0436, 0x0005, 0x0100, 0x0100,
  		US_SC_SCSI, US_PR_DPCM_USB, NULL, 0 ),
 #endif
 
-/* Made with the help of Edd Dumbill <edd@usefulinc.com> */
-UNUSUAL_DEV(  0x0451, 0x5409, 0x0001, 0x0001,
-		"Frontier Labs",
-		"Nex II Digital",
-		US_SC_SCSI, US_PR_BULK, NULL, 0),
-
 /* Patch submitted by Philipp Friedrich <philipp@void.at> */
 UNUSUAL_DEV(  0x0482, 0x0100, 0x0100, 0x0100,
 		"Kyocera",
@@ -276,7 +270,7 @@ UNUSUAL_DEV(  0x054c, 0x002e, 0x0106, 0x0310,
 UNUSUAL_DEV(  0x054c, 0x0032, 0x0000, 0x9999,
 		"Sony",
 		"Memorystick MSC-U01N",
-		US_SC_UFI, US_PR_CB, NULL,
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_SINGLE_LUN ),
 		
 UNUSUAL_DEV(  0x054c, 0x0069, 0x0000, 0x9999,
@@ -301,7 +295,7 @@ UNUSUAL_DEV(  0x057b, 0x0000, 0x0000, 0x0299,
 UNUSUAL_DEV(  0x057b, 0x0000, 0x0300, 0x9999, 
 		"Y-E Data",
 		"Flashbuster-U",
-		US_SC_UFI,  US_PR_CBI, NULL,
+		US_SC_DEVICE,  US_PR_DEVICE, NULL,
 		US_FL_SINGLE_LUN),
 
 UNUSUAL_DEV(  0x059f, 0xa601, 0x0200, 0x0200, 

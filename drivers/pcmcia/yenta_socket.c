@@ -828,7 +828,7 @@ static int __devinit yenta_probe (struct pci_dev *dev, const struct pci_device_i
 	memset(socket, 0, sizeof(*socket));
 
 	/* prepare pcmcia_socket */
-	socket->socket.ss_entry = &yenta_socket_operations;
+	socket->socket.ops = &yenta_socket_operations;
 	socket->socket.dev.dev = &dev->dev;
 	socket->socket.driver_data = socket;
 	socket->socket.owner = THIS_MODULE;

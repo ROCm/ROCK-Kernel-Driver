@@ -237,29 +237,20 @@ config BLK_DEV_LOOP
 	  root file system inside a DOS FAT file using this loop device
 	  driver.
 
-	  The loop device driver can also be used to "hide" a file system in a
-	  disk partition, floppy, or regular file, either using encryption
+	  To use the loop device, you need the losetup utility, found in the
+	  util-linux package, see
+	  <ftp://ftp.kernel.org/pub/linux/utils/util-linux/>.
+
+	  The loop device driver can also be used to "hide" a file system in
+	  a disk partition, floppy, or regular file, either using encryption
 	  (scrambling the data) or steganography (hiding the data in the low
 	  bits of, say, a sound file). This is also safe if the file resides
-	  on a remote file server. If you want to do this, you will first have
-	  to acquire and install a kernel patch from
-	  <ftp://ftp.kerneli.org/pub/kerneli/>, and then you need to
-	  say Y to this option.
+	  on a remote file server.
 
-	  Note that alternative ways to use encrypted file systems are
-	  provided by the cfs package, which can be gotten from
-	  <ftp://ftp.kerneli.org/pub/kerneli/net-source/>, and the newer tcfs
-	  package, available at <http://tcfs.dia.unisa.it/>. You do not need
-	  to say Y here if you want to use one of these. However, using cfs
-	  requires saying Y to "NFS file system support" below while using
-	  tcfs requires applying a kernel patch. An alternative steganography
-	  solution is provided by StegFS, also available from
-	  <ftp://ftp.kerneli.org/pub/kerneli/net-source/>.
-
-	  To use the loop device, you need the losetup utility and a recent
-	  version of the mount program, both contained in the util-linux
-	  package. The location and current version number of util-linux is
-	  contained in the file <file:Documentation/Changes>.
+	  There are several ways of doing this. Some of these require kernel
+	  patches. The vanilla kernel offers the cryptoloop option. If you
+	  want to use that, say Y to both LOOP and CRYPTOLOOP, and make sure
+	  you have a recent (version 2.12 or later) version of util-linux.
 
 	  Note that this loop device has nothing to do with the loopback
 	  device used for network connections from the machine to itself.
@@ -270,6 +261,14 @@ config BLK_DEV_LOOP
 	  will be called loop.
 
 	  Most users will answer N here.
+
+config BLK_DEV_CRYPTOLOOP
+	tristate "Cryptoloop Support"
+	depends on BLK_DEV_LOOP
+	---help---
+	  Say Y here if you want to be able to use the ciphers that are 
+	  provided by the CryptoAPI as loop transformation. This might be
+	  used as hard disk encryption.
 
 config BLK_DEV_NBD
 	tristate "Network block device support"

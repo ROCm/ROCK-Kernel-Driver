@@ -805,7 +805,10 @@ static int ipip_tunnel_init(struct net_device *dev)
 
 	tunnel = (struct ip_tunnel*)dev->priv;
 	iph = &tunnel->parms.iph;
+
 	tunnel->dev = dev;
+	strcpy(tunnel->parms.name, dev->name);
+
 	memcpy(dev->dev_addr, &tunnel->parms.iph.saddr, 4);
 	memcpy(dev->broadcast, &tunnel->parms.iph.daddr, 4);
 
@@ -840,6 +843,9 @@ static int __init ipip_fb_tunnel_init(struct net_device *dev)
 {
 	struct ip_tunnel *tunnel = dev->priv;
 	struct iphdr *iph = &tunnel->parms.iph;
+
+	tunnel->dev = dev;
+	strcpy(tunnel->parms.name, dev->name);
 
 	iph->version		= 4;
 	iph->protocol		= IPPROTO_IPIP;

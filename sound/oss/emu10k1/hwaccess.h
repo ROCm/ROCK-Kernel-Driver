@@ -162,7 +162,7 @@ struct emu10k1_card
 	struct emu10k1_mididevice *seq_mididev;
 #endif
 
-	struct ac97_codec ac97;
+	struct ac97_codec *ac97;
 	int ac97_supported_mixers;
 	int ac97_stereo_mixers;
 

@@ -147,7 +147,7 @@ static int shrink_slab(long scanned, unsigned int gfp_mask)
 
 	pages = nr_used_zone_pages();
 	list_for_each_entry(shrinker, &shrinker_list, list) {
-		long long delta;
+		unsigned long long delta;
 
 		delta = scanned * shrinker->seeks;
 		delta *= (*shrinker->shrinker)(0, gfp_mask);

@@ -34,7 +34,7 @@ int __init oprofile_arch_init(struct oprofile_operations ** ops)
 }
 
 
-void __exit oprofile_arch_exit(void)
+void oprofile_arch_exit(void)
 {
 #ifdef CONFIG_X86_LOCAL_APIC
 	nmi_exit();

@@ -1,6 +1,6 @@
 #
 # For a description of the syntax of this configuration file,
-# see the Configure script.
+# see Documentation/kbuild/kconfig-language.txt.
 #
 
 mainmenu "Linux/PA-RISC Kernel Configuration"
@@ -287,13 +287,13 @@ config MAGIC_SYSRQ
 	  keys are documented in <file:Documentation/sysrq.txt>. Don't say Y
 	  unless you really know what this hack does.
 
-config KALLSYMS
-	bool "Load all symbols for debugging/kksymoops"
-	depends on DEBUG_KERNEL
+config FRAME_POINTER
+	bool "Compile the kernel with frame pointers"
 	help
-	  Say Y here to let the kernel print out symbolic crash information and
-	  symbolic stack backtraces. This increases the size of the kernel
-	  somewhat, as all symbols have to be loaded into the kernel image.
+	  If you say Y here the resulting kernel image will be slightly larger
+	  and slower, but it will give very useful debugging information.
+	  If you don't debug the kernel, you can say N, but we may not be able
+	  to solve problems without frame pointers.
 
 endmenu
 

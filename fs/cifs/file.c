@@ -52,12 +52,12 @@ cifs_open(struct inode *inode, struct file *file)
 
 	xid = GetXid();
 
-	cFYI(1, (" inode = 0x%p file flags are %x", inode, file->f_flags));
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
 
 	full_path = build_path_from_dentry(file->f_dentry);
 
+	cFYI(1, (" inode = 0x%p file flags are %x for %s", inode, file->f_flags,full_path));
 	if ((file->f_flags & O_ACCMODE) == O_RDONLY)
 		desiredAccess = GENERIC_READ;
 	else if ((file->f_flags & O_ACCMODE) == O_WRONLY)
@@ -125,6 +125,7 @@ cifs_open(struct inode *inode, struct file *file)
 					CIFSSMBUnixSetPerms(xid, pTcon, full_path, inode->i_mode,
 						(__u64)-1, 
 						(__u64)-1,
+						0 /* dev */,
 						cifs_sb->local_nls);
 				else {/* BB implement via Windows security descriptors */
 			/* eg CIFSSMBWinSetPerms(xid,pTcon,full_path,mode,-1,-1,local_nls);*/

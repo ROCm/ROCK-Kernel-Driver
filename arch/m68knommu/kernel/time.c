@@ -60,7 +60,7 @@ static inline void do_profile (unsigned long pc)
  * timer_interrupt() needs to keep up the real-time clock,
  * as well as call the "do_timer()" routine every clocktick
  */
-static void timer_interrupt(int irq, void *dummy, struct pt_regs * regs)
+static irqreturn_t timer_interrupt(int irq, void *dummy, struct pt_regs * regs)
 {
 	/* last time the cmos clock got updated */
 	static long last_rtc_update=0;
@@ -115,6 +115,7 @@ static void timer_interrupt(int irq, void *dummy, struct pt_regs * regs)
 #endif /* CONFIG_HEARTBEAT */
 
 	write_sequnlock(&xtime_lock);
+	return(IRQ_HANDLED);
 }
 
 void time_init(void)
@@ -130,6 +131,7 @@ void time_init(void)
 		year += 100;
 	xtime.tv_sec = mktime(year, mon, day, hour, min, sec);
 	xtime.tv_nsec = 0;
+	wall_to_monotonic.tv_sec = -xtime.tv_sec;
 
 	mach_sched_init(timer_interrupt);
 }
@@ -164,6 +166,9 @@ void do_gettimeofday(struct timeval *tv)
 
 int do_settimeofday(struct timespec *tv)
 {
+	time_t wtm_sec, sec = tv->tv_sec;
+	long wtm_nsec, nsec = tv->tv_nsec;
+
 	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
 		return -EINVAL;
 
@@ -176,15 +181,14 @@ int do_settimeofday(struct timespec *tv)
 	 * would have done, and then undo it!
 	 */
 	if (mach_gettimeoffset)
-		tv->tv_nsec -= (mach_gettimeoffset() * 1000);
+		nsec -= (mach_gettimeoffset() * 1000);
 
-	while (tv->tv_nsec < 0) {
-		tv->tv_nsec += NSEC_PER_SEC;
-		tv->tv_sec--;
-	}
+	wtm_sec  = wall_to_monotonic.tv_sec + (xtime.tv_sec - sec);
+	wtm_nsec = wall_to_monotonic.tv_nsec + (xtime.tv_nsec - nsec);
 
-	xtime.tv_sec = tv->tv_sec;
-	xtime.tv_nsec = tv->tv_nsec;
+	set_normalized_timespec(&xtime, sec, nsec);
+	set_normalized_timespec(&wall_to_monotonic, wtm_sec, wtm_nsec);
+
 	time_adjust = 0;		/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;

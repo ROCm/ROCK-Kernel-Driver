@@ -6,16 +6,10 @@
  ****************************************************************
  ****************************************************************
  **
- **  WARNING:  
  **  The values in this file are exported to user space via 
- **  the sysctl() binary interface.  Do *NOT* change the 
- **  numbering of any existing values here, and do not change
- **  any numbers within any one set of values.  If you have
- **  to redefine an existing interface, use a new number for it.
- **  The kernel will then return ENOTDIR to any application using
- **  the old binary interface.
- **
- **  --sct
+ **  the sysctl() binary interface.  However this interface
+ **  is unstable and deprecated and will be removed in the future. 
+ **  For a stable interface use /proc/sys.
  **
  ****************************************************************
  ****************************************************************
@@ -130,6 +124,8 @@ enum
 	KERN_PIDMAX=55,		/* int: PID # limit */
   	KERN_CORE_PATTERN=56,	/* string: pattern for core-file names */
 	KERN_PANIC_ON_OOPS=57,  /* int: whether we will panic on an oops */
+	KERN_HPPA_PWRSW=58,	/* int: hppa soft-power enable */
+	KERN_HPPA_UNALIGNED=59,	/* int: hppa unaligned-trap enable */
 };
 
 

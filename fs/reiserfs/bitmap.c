@@ -43,7 +43,7 @@
     test_bit(_ALLOC_ ## optname , &SB_ALLOC_OPTS(s))
 
 static inline void get_bit_address (struct super_block * s,
-				    unsigned long block, int * bmap_nr, int * offset)
+				    b_blocknr_t block, int * bmap_nr, int * offset)
 {
     /* It is in the bitmap block number equal to the block
      * number divided by the number of bits in a block. */
@@ -54,7 +54,7 @@ static inline void get_bit_address (struct super_block * s,
 }
 
 #ifdef CONFIG_REISERFS_CHECK
-int is_reusable (struct super_block * s, unsigned long block, int bit_value)
+int is_reusable (struct super_block * s, b_blocknr_t block, int bit_value)
 {
     int i, j;
 
@@ -107,7 +107,7 @@ int is_reusable (struct super_block * s, unsigned long block, int bit_value)
 static inline  int is_block_in_journal (struct super_block * s, int bmap, int
 off, int *next)
 {
-    unsigned long tmp;
+    b_blocknr_t tmp;
 
     if (reiserfs_in_journal (s, bmap, off, 1, &tmp)) {
 	if (tmp) {              /* hint supplied */
@@ -235,7 +235,7 @@ static int scan_bitmap_block (struct reiserfs_transaction_handle *th,
 /* Tries to find contiguous zero bit window (given size) in given region of
  * bitmap and place new blocks there. Returns number of allocated blocks. */
 static int scan_bitmap (struct reiserfs_transaction_handle *th,
-			unsigned long *start, unsigned long finish,
+			b_blocknr_t *start, b_blocknr_t finish,
 			int min, int max, int unfm, unsigned long file_block)
 {
     int nr_allocated=0;
@@ -281,7 +281,7 @@ static int scan_bitmap (struct reiserfs_transaction_handle *th,
 }
 
 static void _reiserfs_free_block (struct reiserfs_transaction_handle *th,
-				  unsigned long block)
+				  b_blocknr_t block)
 {
     struct super_block * s = th->t_super;
     struct reiserfs_super_block * rs;
@@ -327,7 +327,7 @@ static void _reiserfs_free_block (struct reiserfs_transaction_handle *th,
 }
 
 void reiserfs_free_block (struct reiserfs_transaction_handle *th, 
-                          unsigned long block)
+                          b_blocknr_t block)
 {
     struct super_block * s = th->t_super;
 
@@ -340,7 +340,7 @@ void reiserfs_free_block (struct reiserfs_transaction_handle *th,
 
 /* preallocated blocks don't need to be run through journal_mark_freed */
 void reiserfs_free_prealloc_block (struct reiserfs_transaction_handle *th, 
-                          unsigned long block) {
+                          b_blocknr_t block) {
     RFALSE(!th->t_super, "vs-4060: trying to free block on nonexistent device");
     RFALSE(is_reusable (th->t_super, block, 1) == 0, "vs-4070: can not free such block");
     _reiserfs_free_block(th, block) ;
@@ -589,15 +589,15 @@ static inline void displace_new_packing_locality (reiserfs_blocknr_hint_t *hint)
 
 static inline int old_hashed_relocation (reiserfs_blocknr_hint_t * hint)
 {
-    unsigned long border;
-    unsigned long hash_in;
+    b_blocknr_t border;
+    u32 hash_in;
     
     if (hint->formatted_node || hint->inode == NULL) {
 	return 0;
       }
 
     hash_in = le32_to_cpu((INODE_PKEY(hint->inode))->k_dir_id);
-    border = hint->beg + (unsigned long) keyed_hash(((char *) (&hash_in)), 4) % (hint->end - hint->beg - 1);
+    border = hint->beg + (u32) keyed_hash(((char *) (&hash_in)), 4) % (hint->end - hint->beg - 1);
     if (border > hint->search_start)
 	hint->search_start = border;
 
@@ -606,7 +606,7 @@ static inline int old_hashed_relocation (reiserfs_blocknr_hint_t * hint)
   
 static inline int old_way (reiserfs_blocknr_hint_t * hint)
 {
-    unsigned long border;
+    b_blocknr_t border;
     
     if (hint->formatted_node || hint->inode == NULL) {
 	return 0;
@@ -622,7 +622,7 @@ static inline int old_way (reiserfs_blocknr_hint_t * hint)
 static inline void hundredth_slices (reiserfs_blocknr_hint_t * hint)
 {
     struct key * key = &hint->key;
-    unsigned long slice_start;
+    b_blocknr_t slice_start;
 
     slice_start = (keyed_hash((char*)(&key->k_dir_id),4) % 100) * (hint->end / 100);
     if ( slice_start > hint->search_start || slice_start + (hint->end / 100) <= hint->search_start) {
@@ -910,7 +910,7 @@ void reiserfs_release_claimed_blocks(
 int reiserfs_can_fit_pages ( struct super_block *sb /* superblock of filesystem
 						       to estimate space */ )
 {
-	unsigned long space;
+	b_blocknr_t space;
 
 	spin_lock(&REISERFS_SB(sb)->bitmap_lock);
 	space = (SB_FREE_BLOCKS(sb) - REISERFS_SB(sb)->reserved_blocks) >> ( PAGE_CACHE_SHIFT - sb->s_blocksize_bits);

@@ -141,7 +141,10 @@
 #define R200_EMIT_PP_CUBIC_OFFSETS_4                70
 #define R200_EMIT_PP_CUBIC_FACES_5                  71
 #define R200_EMIT_PP_CUBIC_OFFSETS_5                72
-#define RADEON_MAX_STATE_PACKETS                    73
+#define RADEON_EMIT_PP_TEX_SIZE_0                   73
+#define RADEON_EMIT_PP_TEX_SIZE_1                   74
+#define RADEON_EMIT_PP_TEX_SIZE_2                   75
+#define RADEON_MAX_STATE_PACKETS                    76
 
 
 /* Commands understood by cmd_buffer ioctl.  More can be added but

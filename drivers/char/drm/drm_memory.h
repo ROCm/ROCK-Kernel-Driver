@@ -1,4 +1,12 @@
-/* drm_memory.h -- Memory management wrappers for DRM -*- linux-c -*-
+/** 
+ * \file drm_memory.h 
+ * Memory management wrappers for DRM
+ *
+ * \author Rickard E. (Rik) Faith <faith@valinux.com>
+ * \author Gareth Hughes <gareth@valinux.com>
+ */
+
+/* 
  * Created: Thu Feb  4 14:00:34 1999 by faith@valinux.com
  *
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
@@ -23,17 +31,14 @@
  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
- *
- * Authors:
- *    Rickard E. (Rik) Faith <faith@valinux.com>
- *    Gareth Hughes <gareth@valinux.com>
  */
 
 #include <linux/config.h>
 #include <linux/highmem.h>
 #include "drmP.h"
 
-/* Cut down version of drm_memory_debug.h, which used to be called
+/**
+ * Cut down version of drm_memory_debug.h, which used to be called
  * drm_memory.h.  If you want the debug functionality, change 0 to 1
  * below.
  */
@@ -188,22 +193,38 @@ static inline void drm_ioremapfree(void *pt, unsigned long size, drm_device_t *d
 #if DEBUG_MEMORY
 #include "drm_memory_debug.h"
 #else
+
+/** No-op. */
 void DRM(mem_init)(void)
 {
 }
 
-/* drm_mem_info is called whenever a process reads /dev/drm/mem. */
+/**
+ * Called when "/proc/dri/%dev%/mem" is read.
+ * 
+ * \param buf output buffer.
+ * \param start start of output data.
+ * \param offset requested start offset.
+ * \param len requested number of bytes.
+ * \param eof whether there is no more data to return.
+ * \param data private data.
+ * \return number of written bytes.
+ *
+ * No-op. 
+ */
 int DRM(mem_info)(char *buf, char **start, off_t offset,
 		  int len, int *eof, void *data)
 {
 	return 0;
 }
 
+/** Wrapper around kmalloc() */
 void *DRM(alloc)(size_t size, int area)
 {
 	return kmalloc(size, GFP_KERNEL);
 }
 
+/** Wrapper around kmalloc() and kfree() */
 void *DRM(realloc)(void *oldpt, size_t oldsize, size_t size, int area)
 {
 	void *pt;
@@ -216,11 +237,21 @@ void *DRM(realloc)(void *oldpt, size_t oldsize, size_t size, int area)
 	return pt;
 }
 
+/** Wrapper around kfree() */
 void DRM(free)(void *pt, size_t size, int area)
 {
 	kfree(pt);
 }
 
+/**
+ * Allocate pages.
+ *
+ * \param order size order.
+ * \param area memory area. (Not used.)
+ * \return page address on success, or zero on failure.
+ *
+ * Allocate and reserve free pages.
+ */
 unsigned long DRM(alloc_pages)(int order, int area)
 {
 	unsigned long address;
@@ -245,6 +276,15 @@ unsigned long DRM(alloc_pages)(int order, int area)
 	return address;
 }
 
+/**
+ * Free pages.
+ * 
+ * \param address address of the pages to free.
+ * \param order size order.
+ * \param area memory area. (Not used.)
+ *
+ * Unreserve and free pages allocated by alloc_pages().
+ */
 void DRM(free_pages)(unsigned long address, int order, int area)
 {
 	unsigned long bytes = PAGE_SIZE << order;
@@ -264,37 +304,44 @@ void DRM(free_pages)(unsigned long address, int order, int area)
 	free_pages(address, order);
 }
 
+/** Wrapper around drm_ioremap() */
 void *DRM(ioremap)(unsigned long offset, unsigned long size, drm_device_t *dev)
 {
 	return drm_ioremap(offset, size, dev);
 }
 
+/** Wrapper around drm_ioremap_nocache() */
 void *DRM(ioremap_nocache)(unsigned long offset, unsigned long size, drm_device_t *dev)
 {
 	return drm_ioremap_nocache(offset, size, dev);
 }
 
+/** Wrapper around drm_iounmap() */
 void DRM(ioremapfree)(void *pt, unsigned long size, drm_device_t *dev)
 {
 	drm_ioremapfree(pt, size, dev);
 }
 
 #if __REALLY_HAVE_AGP
+/** Wrapper around agp_allocate_memory() */
 struct agp_memory *DRM(alloc_agp)(int pages, u32 type)
 {
 	return DRM(agp_allocate_memory)(pages, type);
 }
 
+/** Wrapper around agp_free_memory() */
 int DRM(free_agp)(struct agp_memory *handle, int pages)
 {
 	return DRM(agp_free_memory)(handle) ? 0 : -EINVAL;
 }
 
+/** Wrapper around agp_bind_memory() */
 int DRM(bind_agp)(struct agp_memory *handle, unsigned int start)
 {
 	return DRM(agp_bind_memory)(handle, start);
 }
 
+/** Wrapper around agp_unbind_memory() */
 int DRM(unbind_agp)(struct agp_memory *handle)
 {
 	return DRM(agp_unbind_memory)(handle);

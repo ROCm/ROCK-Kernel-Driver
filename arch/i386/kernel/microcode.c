@@ -380,7 +380,6 @@ static int microcode_ioctl(struct inode *inode, struct file *file,
 			return -ENODATA;
 
 		default:
-			printk(KERN_ERR "microcode: unknown ioctl cmd=%d\n", cmd);
 			return -EINVAL;
 	}
 	return -EINVAL;

@@ -169,23 +169,10 @@ void journal_commit_transaction(journal_t *journal)
 	 * that multiple journal_get_write_access() calls to the same
 	 * buffer are perfectly permissable.
 	 */
-	{
-		int nr = 0;
-		while (commit_transaction->t_reserved_list) {
-			jh = commit_transaction->t_reserved_list;
-			JBUFFER_TRACE(jh, "reserved, unused: refile");
-			journal_refile_buffer(journal, jh);
-			nr++;
-		}
-		if (nr) {
-			static int noisy;
-
-			if (noisy < 10) {
-				noisy++;
-				printk("%s: freed %d reserved buffers\n",
-					__FUNCTION__, nr);
-			}
-		}
+	while (commit_transaction->t_reserved_list) {
+		jh = commit_transaction->t_reserved_list;
+		JBUFFER_TRACE(jh, "reserved, unused: refile");
+		journal_refile_buffer(journal, jh);
 	}
 
 	/*
@@ -413,6 +400,13 @@ sync_datalist_empty:
 			__journal_abort_hard(journal);
 			continue;
 		}
+
+		/*
+		 * start_this_handle() uses t_outstanding_credits to determine
+		 * the free space in the log, but this counter is changed
+		 * by journal_next_log_block() also.
+		 */
+		commit_transaction->t_outstanding_credits--;
 
 		/* Bump b_count to prevent truncate from stumbling over
                    the shadowed buffer!  @@@ This can go if we ever get

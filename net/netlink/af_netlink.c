@@ -430,6 +430,10 @@ retry:
 		goto no_dst;
 	nlk = nlk_sk(sk);
 
+	/* Don't bother queuing skb if kernel socket has no input function */
+        if (nlk->pid == 0 && !nlk->data_ready)
+        	goto no_dst;
+
 #ifdef NL_EMULATE_DEV
 	if (nlk->handler) {
 		skb_orphan(skb);

@@ -262,18 +262,3 @@ io_module_init(void)
     if (nserial == 0)
 	DPRINTF(KERN_WARNING  "io_module_init: No serial number found.\n");
 }
-
-int
-get_kmod_info(cmoduleid_t cmod, module_info_t *mod_info)
-{
-    if (cmod < 0 || cmod >= nummodules)
-	return -EINVAL;
-
-    mod_info->mod_num = modules[cmod]->id;
-
-    ia64_sn_sys_serial_get(mod_info->serial_str);
-    
-    mod_info->serial_num = ia64_sn_partition_serial_get();
-
-    return 0;
-}

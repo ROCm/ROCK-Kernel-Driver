@@ -598,6 +598,13 @@ config SOUND_AD1816
 	  If you compile the driver into the kernel, you have to add
 	  "ad1816=<io>,<irq>,<dma>,<dma2>" to the kernel command line.
 
+config SOUND_AD1889
+	tristate "AD1889 based cards (AD1819 codec) (EXPERIMENTAL)"
+	depends on EXPERIMENTAL && SOUND_OSS
+	help
+	  Say M here if you have a sound card based on the Analog Devices
+	  AD1889 chip.
+
 config SOUND_SGALAXY
 	tristate "Aztech Sound Galaxy (non-PnP) cards"
 	depends on SOUND_OSS

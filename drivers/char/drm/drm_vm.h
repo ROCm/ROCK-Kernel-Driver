@@ -1,4 +1,12 @@
-/* drm_vm.h -- Memory mapping for DRM -*- linux-c -*-
+/**
+ * \file drm_vm.h
+ * Memory mapping for DRM
+ * 
+ * \author Rickard E. (Rik) Faith <faith@valinux.com>
+ * \author Gareth Hughes <gareth@valinux.com>
+ */
+
+/*
  * Created: Mon Jan  4 08:58:31 1999 by faith@valinux.com
  *
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
@@ -23,38 +31,49 @@
  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
- *
- * Authors:
- *    Rickard E. (Rik) Faith <faith@valinux.com>
- *    Gareth Hughes <gareth@valinux.com>
  */
 
 #include "drmP.h"
 
+/** AGP virtual memory operations */
 struct vm_operations_struct   DRM(vm_ops) = {
 	.nopage = DRM(vm_nopage),
 	.open	= DRM(vm_open),
 	.close	= DRM(vm_close),
 };
 
+/** Shared virtual memory operations */
 struct vm_operations_struct   DRM(vm_shm_ops) = {
 	.nopage = DRM(vm_shm_nopage),
 	.open	= DRM(vm_open),
 	.close	= DRM(vm_shm_close),
 };
 
+/** DMA virtual memory operations */
 struct vm_operations_struct   DRM(vm_dma_ops) = {
 	.nopage = DRM(vm_dma_nopage),
 	.open	= DRM(vm_open),
 	.close	= DRM(vm_close),
 };
 
+/** Scatter-gather virtual memory operations */
 struct vm_operations_struct   DRM(vm_sg_ops) = {
 	.nopage = DRM(vm_sg_nopage),
 	.open   = DRM(vm_open),
 	.close  = DRM(vm_close),
 };
 
+/**
+ * \c nopage method for AGP virtual memory.
+ *
+ * \param vma virtual memory area.
+ * \param address access address.
+ * \param write_access sharing.
+ * \return pointer to the page structure.
+ * 
+ * Find the right map and if it's AGP memory find the real physical page to
+ * map, get the page, increment the use count and return it.
+ */
 struct page *DRM(vm_nopage)(struct vm_area_struct *vma,
 			    unsigned long address,
 			    int write_access)
@@ -122,6 +141,17 @@ vm_nopage_error:
 	return NOPAGE_SIGBUS;		/* Disallow mremap */
 }
 
+/**
+ * \c nopage method for shared virtual memory.
+ *
+ * \param vma virtual memory area.
+ * \param address access address.
+ * \param write_access sharing.
+ * \return pointer to the page structure.
+ * 
+ * Get the the mapping, find the real physical page to map, get the page, and
+ * return it.
+ */
 struct page *DRM(vm_shm_nopage)(struct vm_area_struct *vma,
 				unsigned long address,
 				int write_access)
@@ -145,10 +175,15 @@ struct page *DRM(vm_shm_nopage)(struct vm_area_struct *vma,
 	return page;
 }
 
-/* Special close routine which deletes map information if we are the last
+
+/**
+ * \c close method for shared virtual memory.
+ * 
+ * \param vma virtual memory area.
+ * 
+ * Deletes map information if we are the last
  * person to close a mapping and it's not in the global maplist.
  */
-
 void DRM(vm_shm_close)(struct vm_area_struct *vma)
 {
 	drm_file_t	*priv	= vma->vm_file->private_data;
@@ -221,6 +256,16 @@ void DRM(vm_shm_close)(struct vm_area_struct *vma)
 	up(&dev->struct_sem);
 }
 
+/**
+ * \c nopage method for DMA virtual memory.
+ *
+ * \param vma virtual memory area.
+ * \param address access address.
+ * \param write_access sharing.
+ * \return pointer to the page structure.
+ * 
+ * Determine the page number from the page offset and get it from drm_device_dma::pagelist.
+ */
 struct page *DRM(vm_dma_nopage)(struct vm_area_struct *vma,
 				unsigned long address,
 				int write_access)
@@ -247,6 +292,16 @@ struct page *DRM(vm_dma_nopage)(struct vm_area_struct *vma,
 	return page;
 }
 
+/**
+ * \c nopage method for scatter-gather virtual memory.
+ *
+ * \param vma virtual memory area.
+ * \param address access address.
+ * \param write_access sharing.
+ * \return pointer to the page structure.
+ * 
+ * Determine the map offset from the page offset and get it from drm_sg_mem::pagelist.
+ */
 struct page *DRM(vm_sg_nopage)(struct vm_area_struct *vma,
 			       unsigned long address,
 			       int write_access)
@@ -274,6 +329,14 @@ struct page *DRM(vm_sg_nopage)(struct vm_area_struct *vma,
 	return page;
 }
 
+/**
+ * \c open method for shared virtual memory.
+ * 
+ * \param vma virtual memory area.
+ * 
+ * Create a new drm_vma_entry structure as the \p vma private data entry and
+ * add it to drm_device::vmalist.
+ */
 void DRM(vm_open)(struct vm_area_struct *vma)
 {
 	drm_file_t	*priv	= vma->vm_file->private_data;
@@ -295,6 +358,14 @@ void DRM(vm_open)(struct vm_area_struct *vma)
 	}
 }
 
+/**
+ * \c close method for all virtual memory types.
+ * 
+ * \param vma virtual memory area.
+ * 
+ * Search the \p vma private data entry in drm_device::vmalist, unlink it, and
+ * free it.
+ */
 void DRM(vm_close)(struct vm_area_struct *vma)
 {
 	drm_file_t	*priv	= vma->vm_file->private_data;
@@ -320,6 +391,16 @@ void DRM(vm_close)(struct vm_area_struct *vma)
 	up(&dev->struct_sem);
 }
 
+/**
+ * mmap DMA memory.
+ *
+ * \param filp file pointer.
+ * \param vma virtual memory area.
+ * \return zero on success or a negative number on failure.
+ * 
+ * Sets the virtual memory area operations structure to vm_dma_ops, the file
+ * pointer, and calls vm_open().
+ */
 int DRM(mmap_dma)(struct file *filp, struct vm_area_struct *vma)
 {
 	drm_file_t	 *priv	 = filp->private_data;
@@ -366,6 +447,19 @@ int DRM(mmap_dma)(struct file *filp, struct vm_area_struct *vma)
 #endif
 #endif
 
+/**
+ * mmap DMA memory.
+ *
+ * \param filp file pointer.
+ * \param vma virtual memory area.
+ * \return zero on success or a negative number on failure.
+ * 
+ * If the virtual memory area has no offset associated with it then it's a DMA
+ * area, so calls mmap_dma(). Otherwise searches the map in drm_device::maplist,
+ * checks that the restricted flag is not set, sets the virtual memory operations
+ * according to the mapping type and remaps the pages. Finally sets the file
+ * pointer and calls vm_open().
+ */
 int DRM(mmap)(struct file *filp, struct vm_area_struct *vma)
 {
 	drm_file_t	*priv	= filp->private_data;

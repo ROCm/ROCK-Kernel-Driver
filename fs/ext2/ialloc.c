@@ -235,10 +235,7 @@ static void ext2_preread_inode(struct inode *inode)
 				EXT2_INODE_SIZE(inode->i_sb);
 	block = le32_to_cpu(gdp->bg_inode_table) +
 				(offset >> EXT2_BLOCK_SIZE_BITS(inode->i_sb));
-	bh = sb_getblk(inode->i_sb, block);
-	if (!buffer_uptodate(bh) && !buffer_locked(bh))
-		ll_rw_block(READA, 1, &bh);
-	__brelse(bh);
+	sb_breadahead(inode->i_sb, block);
 }
 
 /*

@@ -293,9 +293,9 @@ static void ibmtr_detach(dev_link_t *link)
     dev = info->dev;
     {
 	struct tok_info *ti = (struct tok_info *)dev->priv;
-	del_timer(&(ti->tr_timer));
+	del_timer_sync(&(ti->tr_timer));
     }
-    del_timer(&link->release);
+    del_timer_sync(&link->release);
     if (link->state & DEV_CONFIG) {
         ibmtr_release((u_long)link);
         if (link->state & DEV_STALE_CONFIG) {

@@ -992,7 +992,7 @@ static void lance_set_multicast(struct net_device *dev)
 		return;
 
 	if (lp->tx_old != lp->tx_new) {
-		mod_timer(&lp->multicast_timer, jiffies + 4);
+		mod_timer(&lp->multicast_timer, jiffies + 4 * HZ/100);
 		netif_wake_queue(dev);
 		return;
 	}

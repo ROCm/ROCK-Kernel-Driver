@@ -208,11 +208,12 @@ __do_page_cache_readahead(struct address_space *mapping, struct file *filp,
 	LIST_HEAD(page_pool);
 	int page_idx;
 	int ret = 0;
+	loff_t isize = i_size_read(inode);
 
-	if (inode->i_size == 0)
+	if (isize == 0)
 		goto out;
 
- 	end_index = ((inode->i_size - 1) >> PAGE_CACHE_SHIFT);
+ 	end_index = ((isize - 1) >> PAGE_CACHE_SHIFT);
 
 	/*
 	 * Preallocate as many pages as we will need.

@@ -434,19 +434,17 @@ int follow_up(struct vfsmount **mnt, struct dentry **dentry)
 	return 1;
 }
 
+/* no need for dcache_lock, as serialization is taken care in
+ * namespace.c
+ */
 static int follow_mount(struct vfsmount **mnt, struct dentry **dentry)
 {
 	int res = 0;
 	while (d_mountpoint(*dentry)) {
-		struct vfsmount *mounted;
-		spin_lock(&dcache_lock);
-		mounted = lookup_mnt(*mnt, *dentry);
-		if (!mounted) {
-			spin_unlock(&dcache_lock);
+		struct vfsmount *mounted = lookup_mnt(*mnt, *dentry);
+		if (!mounted)
 			break;
-		}
-		*mnt = mntget(mounted);
-		spin_unlock(&dcache_lock);
+		*mnt = mounted;
 		dput(*dentry);
 		mntput(mounted->mnt_parent);
 		*dentry = dget(mounted->mnt_root);
@@ -455,21 +453,21 @@ static int follow_mount(struct vfsmount **mnt, struct dentry **dentry)
 	return res;
 }
 
+/* no need for dcache_lock, as serialization is taken care in
+ * namespace.c
+ */
 static inline int __follow_down(struct vfsmount **mnt, struct dentry **dentry)
 {
 	struct vfsmount *mounted;
 
-	spin_lock(&dcache_lock);
 	mounted = lookup_mnt(*mnt, *dentry);
 	if (mounted) {
-		*mnt = mntget(mounted);
-		spin_unlock(&dcache_lock);
+		*mnt = mounted;
 		dput(*dentry);
 		mntput(mounted->mnt_parent);
 		*dentry = dget(mounted->mnt_root);
 		return 1;
 	}
-	spin_unlock(&dcache_lock);
 	return 0;
 }
 

@@ -634,7 +634,6 @@ get_dfs_path(int xid, struct cifsSesInfo *pSesInfo,
 int setup_session(unsigned int xid, struct cifsSesInfo *pSesInfo, struct nls_table * nls_info)
 {
 	int rc = 0;
-	char session_key[CIFS_SESSION_KEY_SIZE];
 	char ntlm_session_key[CIFS_SESSION_KEY_SIZE];
 	int ntlmv2_flag = FALSE;
 
@@ -666,35 +665,44 @@ int setup_session(unsigned int xid, struct cifsSesInfo *pSesInfo, struct nls_tab
 						nls_info);
 			if (!rc) {
 				if(ntlmv2_flag) {
-					cFYI(1,("Able to use the more secure NTLM version 2 password hash"));
-			/* SMBNTv2encrypt( ...);  */ /* BB fix this up - 
-			   and note that Samba client equivalent looks wrong */
-				} else
+					char * v2_response;
+					cFYI(1,("Can use more secure NTLM version 2 password hash"));
+					CalcNTLMv2_partial_mac_key(pSesInfo, 
+						nls_info);
+					v2_response = kmalloc(16 + 64 /* blob */, GFP_KERNEL);
+					if(v2_response) {
+						CalcNTLMv2_response(pSesInfo,v2_response);
+/*						cifs_calculate_ntlmv2_mac_key(pSesInfo->mac_signing_key, response, ntlm_session_key, */
+						kfree(v2_response);
+					/* BB Put dummy sig in SessSetup PDU? */
+					} else
+						rc = -ENOMEM;
+
+				} else {
 					SMBNTencrypt(pSesInfo->password_with_pad,
-						pSesInfo->server->cryptKey,ntlm_session_key);
+						pSesInfo->server->cryptKey,
+						ntlm_session_key);
 
-				/* BB add call to save MAC key here BB */
-
-				/* for better security the weaker lanman hash not sent 
-				   in AuthSessSetup so why bother calculating it */
-				/* toUpper(nls_info,
-					password_with_pad);
-				SMBencrypt(password_with_pad,
-					   pSesInfo->server->cryptKey, session_key); */
+					cifs_calculate_mac_key(pSesInfo->mac_signing_key,
+						ntlm_session_key,
+						pSesInfo->password_with_pad);
+				}
+			/* for better security the weaker lanman hash not sent
+			   in AuthSessSetup so we no longer calculate it */
 
 				rc = CIFSNTLMSSPAuthSessSetup(xid,
-						pSesInfo,
-						ntlm_session_key,
-						session_key,
-						ntlmv2_flag,
-						nls_info);
+					pSesInfo,
+					ntlm_session_key,
+					ntlmv2_flag,
+					nls_info);
 			}
 		} else { /* old style NTLM 0.12 session setup */
 			SMBNTencrypt(pSesInfo->password_with_pad,
 				pSesInfo->server->cryptKey,
 				ntlm_session_key);
 
-			cifs_calculate_mac_key(pSesInfo->mac_signing_key, ntlm_session_key, pSesInfo->password_with_pad);
+			cifs_calculate_mac_key(pSesInfo->mac_signing_key, 
+				ntlm_session_key, pSesInfo->password_with_pad);
 			rc = CIFSSessSetup(xid, pSesInfo,
 				ntlm_session_key, nls_info);
 		}
@@ -1297,7 +1305,7 @@ CIFSSpnegoSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 	int bytes_returned = 0;
 	int len;
 
-	cFYI(1, ("In v2 sesssetup "));
+	cFYI(1, ("In spnego sesssetup "));
 
 	smb_buffer = buf_get();
 	if (smb_buffer == 0) {
@@ -1605,7 +1613,9 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 	SecurityBlob->NegotiateFlags =
 	    NTLMSSP_NEGOTIATE_UNICODE | NTLMSSP_NEGOTIATE_OEM |
 	    NTLMSSP_REQUEST_TARGET | NTLMSSP_NEGOTIATE_NTLM | 0x80000000 |
-	    NTLMSSP_NEGOTIATE_ALWAYS_SIGN | NTLMSSP_NEGOTIATE_128;
+	    /* NTLMSSP_NEGOTIATE_ALWAYS_SIGN | */ NTLMSSP_NEGOTIATE_128;
+	if(sign_CIFS_PDUs)
+		SecurityBlob->NegotiateFlags |= NTLMSSP_NEGOTIATE_SIGN;
 	if(ntlmv2_support)
 		SecurityBlob->NegotiateFlags |= NTLMSSP_NEGOTIATE_NTLMV2;
 	/* setup pointers to domain name and workstation name */
@@ -1725,6 +1735,17 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 				       CIFS_CRYPTO_KEY_SIZE);
 				if(SecurityBlob2->NegotiateFlags & NTLMSSP_NEGOTIATE_NTLMV2)
 					*pNTLMv2_flag = TRUE;
+
+				if((SecurityBlob2->NegotiateFlags & 
+					NTLMSSP_NEGOTIATE_ALWAYS_SIGN) 
+					|| (sign_CIFS_PDUs > 1))
+						ses->server->secMode |= 
+							SECMODE_SIGN_REQUIRED;	
+				if ((SecurityBlob2->NegotiateFlags & 
+					NTLMSSP_NEGOTIATE_SIGN) && (sign_CIFS_PDUs))
+						ses->server->secMode |= 
+							SECMODE_SIGN_ENABLED;
+
 				if (smb_buffer->Flags2 &= SMBFLG2_UNICODE) {
 					if ((long) (bcc_ptr) % 2) {
 						remaining_words =
@@ -1868,7 +1889,7 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 
 int
 CIFSNTLMSSPAuthSessSetup(unsigned int xid, struct cifsSesInfo *ses,
-		char *ntlm_session_key, char *lanman_session_key, int ntlmv2_flag,
+		char *ntlm_session_key, int ntlmv2_flag,
 		const struct nls_table *nls_codepage)
 {
 	struct smb_hdr *smb_buffer;
@@ -1934,7 +1955,9 @@ CIFSNTLMSSPAuthSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 	SecurityBlob->NegotiateFlags =
 	    NTLMSSP_NEGOTIATE_UNICODE | NTLMSSP_REQUEST_TARGET |
 	    NTLMSSP_NEGOTIATE_NTLM | NTLMSSP_NEGOTIATE_TARGET_INFO |
-	    0x80000000 | NTLMSSP_NEGOTIATE_ALWAYS_SIGN | NTLMSSP_NEGOTIATE_128;
+	    0x80000000 | NTLMSSP_NEGOTIATE_128;
+	if(sign_CIFS_PDUs)
+		SecurityBlob->NegotiateFlags |= /* NTLMSSP_NEGOTIATE_ALWAYS_SIGN |*/ NTLMSSP_NEGOTIATE_SIGN;
 	if(ntlmv2_flag)
 		SecurityBlob->NegotiateFlags |= NTLMSSP_NEGOTIATE_NTLMV2;
 

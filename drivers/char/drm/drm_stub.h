@@ -1,4 +1,11 @@
-/* drm_stub.h -- -*- linux-c -*-
+/**
+ * \file drm_stub.h
+ * Stub support
+ *
+ * \author Rickard E. (Rik) Faith <faith@valinux.com>
+ */
+
+/*
  * Created: Fri Jan 19 10:48:35 2001 by faith@acm.org
  *
  * Copyright 2001 VA Linux Systems, Inc., Sunnyvale, California.
@@ -22,30 +29,37 @@
  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
- *
- * Authors:
- *    Rickard E. (Rik) Faith <faith@valinux.com>
- *
  */
 
 #include "drmP.h"
 
 #define DRM_STUB_MAXCARDS 16	/* Enough for one machine */
 
+/** Stub list. One for each minor. */
 static struct drm_stub_list {
 	const char             *name;
-	struct file_operations *fops;
-	struct proc_dir_entry  *dev_root;
+	struct file_operations *fops;	/**< file operations */
+	struct proc_dir_entry  *dev_root;	/**< proc directory entry */
 } *DRM(stub_list);
 
 static struct proc_dir_entry *DRM(stub_root);
 
+/** Stub information */
 static struct drm_stub_info {
 	int (*info_register)(const char *name, struct file_operations *fops,
 			     drm_device_t *dev);
 	int (*info_unregister)(int minor);
 } DRM(stub_info);
 
+/**
+ * File \c open operation.
+ *
+ * \param inode device inode.
+ * \param filp file pointer.
+ *
+ * Puts the drm_stub_list::fops corresponding to the device minor number into
+ * \p filp, call the \c open method, and restore the file operations.
+ */
 static int DRM(stub_open)(struct inode *inode, struct file *filp)
 {
 	int                    minor = minor(inode->i_rdev);
@@ -64,11 +78,24 @@ static int DRM(stub_open)(struct inode *inode, struct file *filp)
 	return err;
 }
 
+/** File operations structure */
 static struct file_operations DRM(stub_fops) = {
 	.owner = THIS_MODULE,
 	.open  = DRM(stub_open)
 };
 
+/**
+ * Get a device minor number.
+ *
+ * \param name driver name.
+ * \param fops file operations.
+ * \param dev DRM device.
+ * \return minor number on success, or a negative number on failure.
+ *
+ * Allocate and initialize ::stub_list if one doesn't exist already.  Search an
+ * empty entry and initialize it to the given parameters, and create the proc
+ * init entry via proc_init().
+ */
 static int DRM(stub_getminor)(const char *name, struct file_operations *fops,
 			      drm_device_t *dev)
 {
@@ -96,6 +123,16 @@ static int DRM(stub_getminor)(const char *name, struct file_operations *fops,
 	return -1;
 }
 
+/**
+ * Put a device minor number.
+ *
+ * \param minor minor number.
+ * \return always zero.
+ *
+ * Cleans up the proc resources. If a minor is zero then release the foreign
+ * "drm" data, otherwise unregisters the "drm" data, frees the stub list and
+ * unregisters the character device. 
+ */
 static int DRM(stub_putminor)(int minor)
 {
 	if (minor < 0 || minor >= DRM_STUB_MAXCARDS) return -1;
@@ -115,7 +152,20 @@ static int DRM(stub_putminor)(int minor)
 	return 0;
 }
 
-
+/**
+ * Register.
+ *
+ * \param name driver name.
+ * \param fops file operations
+ * \param dev DRM device.
+ * \return zero on success or a negative number on failure.
+ *
+ * Attempt to register the char device and get the foreign "drm" data. If
+ * successful then another module already registered so gets the stub info,
+ * otherwise use this module stub info and make it available for other modules.
+ *
+ * Finally calls stub_info::info_register.
+ */
 int DRM(stub_register)(const char *name, struct file_operations *fops,
 		       drm_device_t *dev)
 {
@@ -141,6 +191,13 @@ int DRM(stub_register)(const char *name, struct file_operations *fops,
 	return -1;
 }
 
+/**
+ * Unregister.
+ *
+ * \param minor
+ *
+ * Calls drm_stub_info::unregister.
+ */
 int DRM(stub_unregister)(int minor)
 {
 	DRM_DEBUG("%d\n", minor);

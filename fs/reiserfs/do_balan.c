@@ -1250,12 +1250,12 @@ static void store_thrown (struct tree_balance * tb, struct buffer_head * bh)
 
 static void free_thrown(struct tree_balance *tb) {
     int i ;
-    unsigned long blocknr ;
+    b_blocknr_t blocknr ;
     for (i = 0; i < sizeof (tb->thrown)/sizeof (tb->thrown[0]); i++) {
 	if (tb->thrown[i]) {
 	    blocknr = tb->thrown[i]->b_blocknr ;
 	    if (buffer_dirty (tb->thrown[i]))
-	      printk ("free_thrown deals with dirty buffer %ld\n", blocknr);
+	      printk ("free_thrown deals with dirty buffer %d\n", blocknr);
 	    brelse(tb->thrown[i]) ; /* incremented in store_thrown */
 	    reiserfs_free_block (tb->transaction_handle, blocknr);
 	}
@@ -1339,7 +1339,7 @@ int get_right_neighbor_position (struct tree_balance * tb, int h)
 
 #ifdef CONFIG_REISERFS_CHECK
 
-int is_reusable (struct super_block * s, unsigned long block, int bit_value);
+int is_reusable (struct super_block * s, b_blocknr_t block, int bit_value);
 static void check_internal_node (struct super_block * s, struct buffer_head * bh, char * mes)
 {
   struct disk_child * dc;

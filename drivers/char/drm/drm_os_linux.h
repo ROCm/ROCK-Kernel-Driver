@@ -1,35 +1,55 @@
+/**
+ * \file drm_os_linux.h
+ * OS abstraction macros.
+ */
+
 
 #include <linux/interrupt.h>	/* For task queue support */
 #include <linux/delay.h>
 
+/** File pointer type */
 #define DRMFILE                         struct file *
+/** Ioctl arguments */
 #define DRM_IOCTL_ARGS			struct inode *inode, struct file *filp, unsigned int cmd, unsigned long data
 #define DRM_ERR(d)			-(d)
+/** Current process ID */
 #define DRM_CURRENTPID			current->pid
 #define DRM_UDELAY(d)			udelay(d)
+/** Read a byte from a MMIO region */
 #define DRM_READ8(map, offset)		readb(((unsigned long)(map)->handle) + (offset))
+/** Read a dword from a MMIO region */
 #define DRM_READ32(map, offset)		readl(((unsigned long)(map)->handle) + (offset))
+/** Write a byte into a MMIO region */
 #define DRM_WRITE8(map, offset, val)	writeb(val, ((unsigned long)(map)->handle) + (offset))
+/** Write a dword into a MMIO region */
 #define DRM_WRITE32(map, offset, val)	writel(val, ((unsigned long)(map)->handle) + (offset))
+/** Read memory barrier */
 #define DRM_READMEMORYBARRIER()		rmb()
+/** Write memory barrier */
 #define DRM_WRITEMEMORYBARRIER()	wmb()
+/** Read/write memory barrier */
 #define DRM_MEMORYBARRIER()		mb()
+/** DRM device local declaration */
 #define DRM_DEVICE	drm_file_t	*priv	= filp->private_data; \
 			drm_device_t	*dev	= priv->dev
-
+			
+/** IRQ handler arguments */
 #define DRM_IRQ_ARGS	        int irq, void *arg, struct pt_regs *regs
+/** Task queue handler arguments */
 #define DRM_TASKQUEUE_ARGS	void *arg
 
-/* For data going from/to the kernel through the ioctl argument */
+/** For data going into the kernel through the ioctl argument */
 #define DRM_COPY_FROM_USER_IOCTL(arg1, arg2, arg3)	\
 	if ( copy_from_user(&arg1, arg2, arg3) )	\
 		return -EFAULT
+/** For data going from the kernel through the ioctl argument */
 #define DRM_COPY_TO_USER_IOCTL(arg1, arg2, arg3)	\
 	if ( copy_to_user(arg1, &arg2, arg3) )		\
 		return -EFAULT
-/* Other copying of data from/to kernel space */
+/** Other copying of data to kernel space */
 #define DRM_COPY_FROM_USER(arg1, arg2, arg3)		\
 	copy_from_user(arg1, arg2, arg3)
+/** Other copying of data from kernel space */
 #define DRM_COPY_TO_USER(arg1, arg2, arg3)		\
 	copy_to_user(arg1, arg2, arg3)
 /* Macros for copyfrom user, but checking readability only once */
@@ -41,10 +61,16 @@
 	__get_user(val, uaddr)
 
 
-/* malloc/free without the overhead of DRM(alloc) */
+/** 'malloc' without the overhead of DRM(alloc)() */
 #define DRM_MALLOC(x) kmalloc(x, GFP_KERNEL)
+/** 'free' without the overhead of DRM(free)() */
 #define DRM_FREE(x,size) kfree(x)
 
+/** 
+ * Get the pointer to the SAREA.
+ *
+ * Searches the SAREA on the mapping lists and points drm_device::sarea to it.
+ */
 #define DRM_GETSAREA()							 \
 do { 									 \
 	drm_map_list_t *entry;						 \

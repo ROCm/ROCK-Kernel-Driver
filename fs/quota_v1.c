@@ -132,12 +132,14 @@ static int v1_check_quota_file(struct super_block *sb, int type)
 	mm_segment_t fs;
 	ssize_t size;
 	loff_t offset = 0;
+	loff_t isize;
 	static const uint quota_magics[] = V2_INITQMAGICS;
 
-	if (!inode->i_size)
+	isize = i_size_read(inode);
+	if (!isize)
 		return 0;
-	blocks = inode->i_size >> BLOCK_SIZE_BITS;
-	off = inode->i_size & (BLOCK_SIZE - 1);
+	blocks = isize >> BLOCK_SIZE_BITS;
+	off = isize & (BLOCK_SIZE - 1);
 	if ((blocks % sizeof(struct v1_disk_dqblk) * BLOCK_SIZE + off) % sizeof(struct v1_disk_dqblk))
 		return 0;
 	/* Doublecheck whether we didn't get file with new format - with old quotactl() this could happen */

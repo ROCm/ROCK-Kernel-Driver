@@ -24,6 +24,9 @@
 extern void dump_thread(struct pt_regs *, struct user *);
 extern unsigned long get_cmos_time(void);
 extern void __Udiv(void);
+extern void __Umod(void);
+extern void __Div(void);
+extern void __Mod(void);
 extern void __ashrdi3(void);
 extern void iounmap(void *addr);
 
@@ -44,11 +47,16 @@ EXPORT_SYMBOL(strcpy);
 EXPORT_SYMBOL(strchr);
 EXPORT_SYMBOL(strcmp);
 EXPORT_SYMBOL(strlen);
+EXPORT_SYMBOL(strcat);
 EXPORT_SYMBOL(strncat);
 EXPORT_SYMBOL(strncmp);
+EXPORT_SYMBOL(strncpy);
 
 /* Math functions */
 EXPORT_SYMBOL(__Udiv);
+EXPORT_SYMBOL(__Umod);
+EXPORT_SYMBOL(__Div);
+EXPORT_SYMBOL(__Mod);
 EXPORT_SYMBOL(__ashrdi3);
 
 /* Memory functions */
@@ -58,6 +66,8 @@ EXPORT_SYMBOL(iounmap);
 /* Semaphore functions */
 EXPORT_SYMBOL(__up);
 EXPORT_SYMBOL(__down);
+EXPORT_SYMBOL(__down_interruptible);
+EXPORT_SYMBOL(__down_trylock);
 
 /* Export shadow registers for the CPU I/O pins */
 EXPORT_SYMBOL(genconfig_shadow);
@@ -69,13 +79,12 @@ EXPORT_SYMBOL(port_pb_config_shadow);
 EXPORT_SYMBOL(port_g_data_shadow);
 
 /* Userspace access functions */
-EXPORT_SYMBOL(strncpy_from_user);
-EXPORT_SYMBOL(__strncpy_from_user);
-EXPORT_SYMBOL(__generic_copy_from_user);
-EXPORT_SYMBOL(__generic_copy_to_user);
-EXPORT_SYMBOL(strnlen_user);
 EXPORT_SYMBOL(__copy_user_zeroing);
 EXPORT_SYMBOL(__copy_user);
+
+/* Cache flush functions */
+EXPORT_SYMBOL(flush_etrax_cache);
+EXPORT_SYMBOL(prepare_rx_descriptor);
 
 #undef memcpy
 #undef memset

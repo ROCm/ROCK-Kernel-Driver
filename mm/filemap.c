@@ -555,14 +555,15 @@ void do_generic_mapping_read(struct address_space *mapping,
 	for (;;) {
 		struct page *page;
 		unsigned long end_index, nr, ret;
+		loff_t isize = i_size_read(inode);
 
-		end_index = inode->i_size >> PAGE_CACHE_SHIFT;
+		end_index = isize >> PAGE_CACHE_SHIFT;
 			
 		if (index > end_index)
 			break;
 		nr = PAGE_CACHE_SIZE;
 		if (index == end_index) {
-			nr = inode->i_size & ~PAGE_CACHE_MASK;
+			nr = isize & ~PAGE_CACHE_MASK;
 			if (nr <= offset)
 				break;
 		}
@@ -763,7 +764,7 @@ __generic_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
 		retval = 0;
 		if (!count)
 			goto out; /* skip atime */
-		size = inode->i_size;
+		size = i_size_read(inode);
 		if (pos < size) {
 			retval = generic_file_direct_IO(READ, iocb,
 						iov, pos, nr_segs);
@@ -951,7 +952,7 @@ struct page * filemap_nopage(struct vm_area_struct * area, unsigned long address
 	endoff = ((area->vm_end - area->vm_start) >> PAGE_CACHE_SHIFT) + area->vm_pgoff;
 
 retry_all:
-	size = (inode->i_size + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
+	size = (i_size_read(inode) + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
 	if (pgoff >= size)
 		goto outside_data_content;
 
@@ -1233,7 +1234,7 @@ static int filemap_populate(struct vm_area_struct *vma,
 					pgoff, len >> PAGE_CACHE_SHIFT);
 
 repeat:
-	size = (inode->i_size + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
+	size = (i_size_read(inode) + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
 	if (pgoff + (len >> PAGE_CACHE_SHIFT) > size)
 		return -EINVAL;
 
@@ -1544,7 +1545,7 @@ inline int generic_write_checks(struct inode *inode,
 	if (!isblk) {
 		/* FIXME: this is for backwards compatibility with 2.4 */
 		if (file->f_flags & O_APPEND)
-                        *pos = inode->i_size;
+                        *pos = i_size_read(inode);
 
 		if (limit != RLIM_INFINITY) {
 			if (*pos >= limit) {
@@ -1590,15 +1591,17 @@ inline int generic_write_checks(struct inode *inode,
 		if (unlikely(*pos + *count > inode->i_sb->s_maxbytes))
 			*count = inode->i_sb->s_maxbytes - *pos;
 	} else {
+		loff_t isize;
 		if (bdev_read_only(inode->i_bdev))
 			return -EPERM;
-		if (*pos >= inode->i_size) {
-			if (*count || *pos > inode->i_size)
+		isize = i_size_read(inode);
+		if (*pos >= isize) {
+			if (*count || *pos > isize)
 				return -ENOSPC;
 		}
 
-		if (*pos + *count > inode->i_size)
-			*count = inode->i_size - *pos;
+		if (*pos + *count > isize)
+			*count = isize - *pos;
 	}
 	return 0;
 }
@@ -1685,8 +1688,8 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 					iov, pos, nr_segs);
 		if (written > 0) {
 			loff_t end = pos + written;
-			if (end > inode->i_size && !isblk) {
-				inode->i_size = end;
+			if (end > i_size_read(inode) && !isblk) {
+				i_size_write(inode,  end);
 				mark_inode_dirty(inode);
 			}
 			*ppos = end;
@@ -1730,14 +1733,15 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 
 		status = a_ops->prepare_write(file, page, offset, offset+bytes);
 		if (unlikely(status)) {
+			loff_t isize = i_size_read(inode);
 			/*
 			 * prepare_write() may have instantiated a few blocks
 			 * outside i_size.  Trim these off again.
 			 */
 			unlock_page(page);
 			page_cache_release(page);
-			if (pos + bytes > inode->i_size)
-				vmtruncate(inode, inode->i_size);
+			if (pos + bytes > isize)
+				vmtruncate(inode, isize);
 			break;
 		}
 		if (likely(nr_segs == 1))

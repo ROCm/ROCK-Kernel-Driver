@@ -26,6 +26,8 @@
 extern int __init init_rootfs(void);
 extern int __init sysfs_init(void);
 
+/* spinlock for vfsmount related operations, inplace of dcache_lock */
+spinlock_t vfsmount_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 static struct list_head *mount_hashtable;
 static int hash_mask, hash_bits;
 static kmem_cache_t *mnt_cache; 
@@ -66,30 +68,38 @@ void free_vfsmnt(struct vfsmount *mnt)
 	kmem_cache_free(mnt_cache, mnt);
 }
 
+/*
+ * Now, lookup_mnt increments the ref count before returning
+ * the vfsmount struct.
+ */
 struct vfsmount *lookup_mnt(struct vfsmount *mnt, struct dentry *dentry)
 {
 	struct list_head * head = mount_hashtable + hash(mnt, dentry);
 	struct list_head * tmp = head;
-	struct vfsmount *p;
+	struct vfsmount *p, *found = NULL;
 
+	spin_lock(&vfsmount_lock);
 	for (;;) {
 		tmp = tmp->next;
 		p = NULL;
 		if (tmp == head)
 			break;
 		p = list_entry(tmp, struct vfsmount, mnt_hash);
-		if (p->mnt_parent == mnt && p->mnt_mountpoint == dentry)
+		if (p->mnt_parent == mnt && p->mnt_mountpoint == dentry) {
+			found = mntget(p);
 			break;
+		}
 	}
-	return p;
+	spin_unlock(&vfsmount_lock);
+	return found;
 }
 
 static int check_mnt(struct vfsmount *mnt)
 {
-	spin_lock(&dcache_lock);
+	spin_lock(&vfsmount_lock);
 	while (mnt->mnt_parent != mnt)
 		mnt = mnt->mnt_parent;
-	spin_unlock(&dcache_lock);
+	spin_unlock(&vfsmount_lock);
 	return mnt == current->namespace->root;
 }
 
@@ -263,15 +273,15 @@ void umount_tree(struct vfsmount *mnt)
 		mnt = list_entry(kill.next, struct vfsmount, mnt_list);
 		list_del_init(&mnt->mnt_list);
 		if (mnt->mnt_parent == mnt) {
-			spin_unlock(&dcache_lock);
+			spin_unlock(&vfsmount_lock);
 		} else {
 			struct nameidata old_nd;
 			detach_mnt(mnt, &old_nd);
-			spin_unlock(&dcache_lock);
+			spin_unlock(&vfsmount_lock);
 			path_release(&old_nd);
 		}
 		mntput(mnt);
-		spin_lock(&dcache_lock);
+		spin_lock(&vfsmount_lock);
 	}
 }
 
@@ -324,17 +334,17 @@ static int do_umount(struct vfsmount *mnt, int flags)
 	}
 
 	down_write(&current->namespace->sem);
-	spin_lock(&dcache_lock);
+	spin_lock(&vfsmount_lock);
 
 	if (atomic_read(&sb->s_active) == 1) {
 		/* last instance - try to be smart */
-		spin_unlock(&dcache_lock);
+		spin_unlock(&vfsmount_lock);
 		lock_kernel();
 		DQUOT_OFF(sb);
 		acct_auto_close(sb);
 		unlock_kernel();
 		security_sb_umount_close(mnt);
-		spin_lock(&dcache_lock);
+		spin_lock(&vfsmount_lock);
 	}
 	retval = -EBUSY;
 	if (atomic_read(&mnt->mnt_count) == 2 || flags & MNT_DETACH) {
@@ -342,7 +352,7 @@ static int do_umount(struct vfsmount *mnt, int flags)
 			umount_tree(mnt);
 		retval = 0;
 	}
-	spin_unlock(&dcache_lock);
+	spin_unlock(&vfsmount_lock);
 	if (retval)
 		security_sb_umount_busy(mnt);
 	up_write(&current->namespace->sem);
@@ -449,18 +459,18 @@ static struct vfsmount *copy_tree(struct vfsmount *mnt, struct dentry *dentry)
 			q = clone_mnt(p, p->mnt_root);
 			if (!q)
 				goto Enomem;
-			spin_lock(&dcache_lock);
+			spin_lock(&vfsmount_lock);
 			list_add_tail(&q->mnt_list, &res->mnt_list);
 			attach_mnt(q, &nd);
-			spin_unlock(&dcache_lock);
+			spin_unlock(&vfsmount_lock);
 		}
 	}
 	return res;
  Enomem:
 	if (res) {
-		spin_lock(&dcache_lock);
+		spin_lock(&vfsmount_lock);
 		umount_tree(res);
-		spin_unlock(&dcache_lock);
+		spin_unlock(&vfsmount_lock);
 	}
 	return NULL;
 }
@@ -485,7 +495,7 @@ static int graft_tree(struct vfsmount *mnt, struct nameidata *nd)
 		goto out_unlock;
 
 	err = -ENOENT;
-	spin_lock(&dcache_lock);
+	spin_lock(&vfsmount_lock);
 	if (IS_ROOT(nd->dentry) || !d_unhashed(nd->dentry)) {
 		struct list_head head;
 
@@ -495,7 +505,7 @@ static int graft_tree(struct vfsmount *mnt, struct nameidata *nd)
 		mntget(mnt);
 		err = 0;
 	}
-	spin_unlock(&dcache_lock);
+	spin_unlock(&vfsmount_lock);
 out_unlock:
 	up(&nd->dentry->d_inode->i_sem);
 	if (!err)
@@ -532,9 +542,9 @@ static int do_loopback(struct nameidata *nd, char *old_name, int recurse)
 	if (mnt) {
 		err = graft_tree(mnt, nd);
 		if (err) {
-			spin_lock(&dcache_lock);
+			spin_lock(&vfsmount_lock);
 			umount_tree(mnt);
-			spin_unlock(&dcache_lock);
+			spin_unlock(&vfsmount_lock);
 		} else
 			mntput(mnt);
 	}
@@ -599,7 +609,7 @@ static int do_move_mount(struct nameidata *nd, char *old_name)
 	if (IS_DEADDIR(nd->dentry->d_inode))
 		goto out1;
 
-	spin_lock(&dcache_lock);
+	spin_lock(&vfsmount_lock);
 	if (!IS_ROOT(nd->dentry) && d_unhashed(nd->dentry))
 		goto out2;
 
@@ -623,7 +633,7 @@ static int do_move_mount(struct nameidata *nd, char *old_name)
 	detach_mnt(old_nd.mnt, &parent_nd);
 	attach_mnt(old_nd.mnt, nd);
 out2:
-	spin_unlock(&dcache_lock);
+	spin_unlock(&vfsmount_lock);
 out1:
 	up(&nd->dentry->d_inode->i_sem);
 out:
@@ -804,9 +814,9 @@ int copy_namespace(int flags, struct task_struct *tsk)
 	down_write(&tsk->namespace->sem);
 	/* First pass: copy the tree topology */
 	new_ns->root = copy_tree(namespace->root, namespace->root->mnt_root);
-	spin_lock(&dcache_lock);
+	spin_lock(&vfsmount_lock);
 	list_add_tail(&new_ns->list, &new_ns->root->mnt_list);
-	spin_unlock(&dcache_lock);
+	spin_unlock(&vfsmount_lock);
 
 	/* Second pass: switch the tsk->fs->* elements */
 	if (fs) {
@@ -1027,7 +1037,7 @@ asmlinkage long sys_pivot_root(const char __user *new_root, const char __user *p
 	if (new_nd.mnt->mnt_root != new_nd.dentry)
 		goto out2; /* not a mountpoint */
 	tmp = old_nd.mnt; /* make sure we can reach put_old from new_root */
-	spin_lock(&dcache_lock);
+	spin_lock(&vfsmount_lock);
 	if (tmp != new_nd.mnt) {
 		for (;;) {
 			if (tmp->mnt_parent == tmp)
@@ -1044,7 +1054,7 @@ asmlinkage long sys_pivot_root(const char __user *new_root, const char __user *p
 	detach_mnt(user_nd.mnt, &root_parent);
 	attach_mnt(user_nd.mnt, &old_nd);
 	attach_mnt(new_nd.mnt, &root_parent);
-	spin_unlock(&dcache_lock);
+	spin_unlock(&vfsmount_lock);
 	chroot_fs_refs(&user_nd, &new_nd);
 	security_sb_post_pivotroot(&user_nd, &new_nd);
 	error = 0;
@@ -1061,7 +1071,7 @@ out0:
 	unlock_kernel();
 	return error;
 out3:
-	spin_unlock(&dcache_lock);
+	spin_unlock(&vfsmount_lock);
 	goto out2;
 }
 

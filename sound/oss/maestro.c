@@ -726,6 +726,12 @@ static void ac97_write_mixer(struct ess_card *card,int mixer, unsigned int left,
 			left = (left * mh->scale) / 100;
 			if ((left == 0) && (right == 0))
 				val |= 0x8000;
+		} else if (mixer == SOUND_MIXER_PCM || mixer == SOUND_MIXER_CD) {
+			/* log conversion seems bad for them */
+			if ((left == 0) && (right == 0))
+				val = 0x8000;
+			right = ((100 - right) * mh->scale) / 100;
+			left = ((100 - left) * mh->scale) / 100;
 		} else {
 			/* log conversion for the stereo controls */
 			if((left == 0) && (right == 0))
@@ -1937,12 +1943,12 @@ ess_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		   manner by adjusting the master mixer volume. */
 		volume = c->mix.mixer_state[0] & 0xff;
 		if (vol_evt == UP_EVT) {
-			volume += 10;
+			volume += 5;
 			if (volume > 100)
 				volume = 100;
 		}
 		else if (vol_evt == DOWN_EVT) {
-			volume -= 10;
+			volume -= 5;
 			if (volume < 0)
 				volume = 0;
 		} else {
@@ -2024,8 +2030,8 @@ static int mixer_ioctl(struct ess_card *card, unsigned int cmd, unsigned long ar
 	VALIDATE_CARD(card);
         if (cmd == SOUND_MIXER_INFO) {
 		mixer_info info;
-		strlcpy(info.id, card_names[card->card_type], sizeof(info.id));
-		strlcpy(info.name, card_names[card->card_type], sizeof(info.name));
+		strncpy(info.id, card_names[card->card_type], sizeof(info.id));
+		strncpy(info.name, card_names[card->card_type], sizeof(info.name));
 		info.modify_counter = card->mix.modcnt;
 		if (copy_to_user((void *)arg, &info, sizeof(info)))
 			return -EFAULT;
@@ -2033,8 +2039,8 @@ static int mixer_ioctl(struct ess_card *card, unsigned int cmd, unsigned long ar
 	}
 	if (cmd == SOUND_OLD_MIXER_INFO) {
 		_old_mixer_info info;
-		strlcpy(info.id, card_names[card->card_type], sizeof(info.id));
-		strlcpy(info.name, card_names[card->card_type], sizeof(info.name));
+		strncpy(info.id, card_names[card->card_type], sizeof(info.id));
+		strncpy(info.name, card_names[card->card_type], sizeof(info.name));
 		if (copy_to_user((void *)arg, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;

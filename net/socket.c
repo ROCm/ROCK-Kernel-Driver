@@ -1614,7 +1614,7 @@ asmlinkage long sys_sendmsg(int fd, struct msghdr __user *msg, unsigned flags)
 		goto out;
 
 	/* do not move before msg_sys is valid */
-	err = -EINVAL;
+	err = -EMSGSIZE;
 	if (msg_sys.msg_iovlen > UIO_MAXIOV)
 		goto out_put;
 
@@ -1713,7 +1713,7 @@ asmlinkage long sys_recvmsg(int fd, struct msghdr __user *msg, unsigned int flag
 	if (!sock)
 		goto out;
 
-	err = -EINVAL;
+	err = -EMSGSIZE;
 	if (msg_sys.msg_iovlen > UIO_MAXIOV)
 		goto out_put;
 	

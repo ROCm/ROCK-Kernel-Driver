@@ -36,7 +36,8 @@ struct loop_device {
 	int		(*transfer)(struct loop_device *, int cmd,
 				    char *raw_buf, char *loop_buf, int size,
 				    sector_t real_block);
-	char		lo_name[LO_NAME_SIZE];
+	char		lo_file_name[LO_NAME_SIZE];
+	char		lo_crypt_name[LO_NAME_SIZE];
 	char		lo_encrypt_key[LO_KEY_SIZE];
 	int		lo_encrypt_key_size;
 	struct loop_func_table *lo_encryption;
@@ -49,7 +50,6 @@ struct loop_device {
 	struct block_device *lo_device;
 	unsigned	lo_blocksize;
 	void		*key_data; 
-	char		key_reserved[48]; /* for use by the filter modules */
 
 	int		old_gfp_mask;
 
@@ -102,7 +102,8 @@ struct loop_info64 {
 	__u32		   lo_encrypt_type;
 	__u32		   lo_encrypt_key_size;		/* ioctl w/o */
 	__u32		   lo_flags;			/* ioctl r/o */
-	__u8		   lo_name[LO_NAME_SIZE];
+	__u8		   lo_file_name[LO_NAME_SIZE];
+	__u8		   lo_crypt_name[LO_NAME_SIZE];
 	__u8		   lo_encrypt_key[LO_KEY_SIZE]; /* ioctl w/o */
 	__u64		   lo_init[2];
 };

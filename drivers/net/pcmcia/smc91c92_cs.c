@@ -433,7 +433,7 @@ static void smc91c92_detach(dev_link_t *link)
     if (*linkp == NULL)
 	return;
 
-    del_timer(&link->release);
+    del_timer_sync(&link->release);
     if (link->state & DEV_CONFIG) {
 	smc91c92_release((u_long)link);
 	if (link->state & DEV_STALE_CONFIG) {
@@ -1330,7 +1330,7 @@ static int smc_close(struct net_device *dev)
     outw(CTL_POWERDOWN, ioaddr + CONTROL );
 
     link->open--;
-    del_timer(&smc->media);
+    del_timer_sync(&smc->media);
     if (link->state & DEV_STALE_CONFIG)
 	mod_timer(&link->release, jiffies + HZ/20);
 
@@ -1996,7 +1996,7 @@ static void media_check(u_long arg)
     }
     if (smc->fast_poll) {
 	smc->fast_poll--;
-	smc->media.expires = jiffies + 1;
+	smc->media.expires = jiffies + HZ/100;
 	add_timer(&smc->media);
 	SMC_SELECT_BANK(saved_bank);
 	return;

@@ -51,7 +51,7 @@ static inline void do_profile (unsigned long pc)
  * timer_interrupt() needs to keep up the real-time clock,
  * as well as call the "do_timer()" routine every clocktick
  */
-static void timer_interrupt (int irq, void *dummy, struct pt_regs *regs)
+static irqreturn_t timer_interrupt (int irq, void *dummy, struct pt_regs *regs)
 {
 #if 0
 	/* last time the cmos clock got updated */
@@ -106,6 +106,8 @@ static void timer_interrupt (int irq, void *dummy, struct pt_regs *regs)
 	}
 #endif /* CONFIG_HEARTBEAT */
 #endif /* 0 */
+
+	return IRQ_HANDLED;
 }
 
 /*

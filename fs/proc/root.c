@@ -153,7 +153,6 @@ struct proc_dir_entry proc_root = {
 EXPORT_SYMBOL(proc_sys_root);
 #endif
 EXPORT_SYMBOL(proc_symlink);
-EXPORT_SYMBOL(proc_mknod);
 EXPORT_SYMBOL(proc_mkdir);
 EXPORT_SYMBOL(create_proc_entry);
 EXPORT_SYMBOL(remove_proc_entry);

@@ -391,7 +391,7 @@ static void atmel_config(dev_link_t *link)
 	local_info_t *dev;
 	int last_fn, last_ret;
 	u_char buf[64];
-	int card_index = -1;
+	int card_index = -1, done = 0;
 	
 	handle = link->handle;
 	dev = link->priv;
@@ -415,13 +415,13 @@ static void atmel_config(dev_link_t *link)
 			    manfid->manf == card_table[i].manf &&
 			    manfid->card == card_table[i].card) {
 				card_index = i;
-				goto done;
+				done = 1;
 			}
 		}
 	}
 
 	tuple.DesiredTuple = CISTPL_VERS_1;
-	if (CardServices(GetFirstTuple, handle, &tuple) == 0) {
+	if (!done && (CardServices(GetFirstTuple, handle, &tuple) == 0)) {
 		int i, j, k;
 		cistpl_vers_1_t *ver1;
 		CS_CHECK(GetTupleData, handle, &tuple);
@@ -446,12 +446,11 @@ static void atmel_config(dev_link_t *link)
 					goto mismatch;
 			}
 			card_index = i;
-			goto done;
+			break;	/* done */
 			
 		mismatch:
-			
+			j = 0; /* dummy stmt to shut up compiler */
 		}
-	done:
 	}		
 
 	/*

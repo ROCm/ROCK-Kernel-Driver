@@ -83,8 +83,8 @@ extern int jfs_commit_inode(struct inode *, int);
  *
  * RETURN VALUES:
  *      0       - success
- *      EIO	- i/o error.
- *      ENOSPC	- insufficient disk resources.
+ *      -EIO	- i/o error.
+ *      -ENOSPC	- insufficient disk resources.
  */
 int
 extAlloc(struct inode *ip, s64 xlen, s64 pno, xad_t * xp, boolean_t abnr)
@@ -207,8 +207,8 @@ extAlloc(struct inode *ip, s64 xlen, s64 pno, xad_t * xp, boolean_t abnr)
  *
  * RETURN VALUES:
  *      0       - success
- *      EIO	- i/o error.
- *      ENOSPC	- insufficient disk resources.
+ *      -EIO	- i/o error.
+ *      -ENOSPC	- insufficient disk resources.
  */
 int extRealloc(struct inode *ip, s64 nxlen, xad_t * xp, boolean_t abnr)
 {
@@ -350,7 +350,7 @@ exit:
  *
  * RETURN VALUES:
  *      0       - success
- *      EIO	- i/o error.
+ *      -EIO	- i/o error.
  */
 int extHint(struct inode *ip, s64 offset, xad_t * xp)
 {
@@ -421,8 +421,8 @@ int extHint(struct inode *ip, s64 offset, xad_t * xp)
  *
  * RETURN VALUES:
  *      0       - success
- *      EIO	- i/o error.
- *      ENOSPC	- insufficient disk resources.
+ *      -EIO	- i/o error.
+ *      -ENOSPC	- insufficient disk resources.
  */
 int extRecord(struct inode *ip, xad_t * xp)
 {
@@ -436,7 +436,7 @@ int extRecord(struct inode *ip, xad_t * xp)
 	rc = xtUpdate(0, ip, xp);
 
 	up(&JFS_IP(ip)->commit_sem);
-	return (rc);
+	return rc;
 }
 
 
@@ -453,8 +453,8 @@ int extRecord(struct inode *ip, xad_t * xp)
  *
  * RETURN VALUES:
  *      0       - success
- *      EIO	- i/o error.
- *      ENOSPC	- insufficient disk resources.
+ *      -EIO	- i/o error.
+ *      -ENOSPC	- insufficient disk resources.
  */
 int extFill(struct inode *ip, xad_t * xp)
 {
@@ -505,8 +505,8 @@ int extFill(struct inode *ip, xad_t * xp)
  *
  * RETURN VALUES:
  *      0       - success
- *      EIO	- i/o error.
- *      ENOSPC	- insufficient disk resources.
+ *      -EIO	- i/o error.
+ *      -ENOSPC	- insufficient disk resources.
  */
 static int
 extBalloc(struct inode *ip, s64 hint, s64 * nblocks, s64 * blkno)
@@ -535,7 +535,7 @@ extBalloc(struct inode *ip, s64 hint, s64 * nblocks, s64 * blkno)
 		/* if something other than an out of space error,
 		 * stop and return this error.
 		 */
-		if (rc != ENOSPC)
+		if (rc != -ENOSPC)
 			return (rc);
 
 		/* decrease the allocation request size */
@@ -596,8 +596,8 @@ extBalloc(struct inode *ip, s64 hint, s64 * nblocks, s64 * blkno)
  *
  * RETURN VALUES:
  *      0       - success
- *      EIO	- i/o error.
- *      ENOSPC	- insufficient disk resources.
+ *      -EIO	- i/o error.
+ *      -ENOSPC	- insufficient disk resources.
  */
 static int
 extBrealloc(struct inode *ip,
@@ -610,7 +610,7 @@ extBrealloc(struct inode *ip,
 		*newblkno = blkno;
 		return (0);
 	} else {
-		if (rc != ENOSPC)
+		if (rc != -ENOSPC)
 			return (rc);
 	}
 

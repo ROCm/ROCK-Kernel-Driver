@@ -2,7 +2,7 @@
 #define _CRIS_PAGE_H
 
 #include <linux/config.h>
-#include <asm/mmu.h>
+#include <asm/arch/page.h>
 
 /* PAGE_SHIFT determines the page size */
 #define PAGE_SHIFT	13
@@ -14,12 +14,9 @@
 #define clear_page(page)        memset((void *)(page), 0, PAGE_SIZE)
 #define copy_page(to,from)      memcpy((void *)(to), (void *)(from), PAGE_SIZE)
 
-#define clear_user_page(page, vaddr)    clear_page(page)
-#define copy_user_page(to, from, vaddr) copy_page(to, from)
+#define clear_user_page(page, vaddr, pg)    clear_page(page)
+#define copy_user_page(to, from, vaddr, pg) copy_page(to, from)
 
-#define STRICT_MM_TYPECHECKS
-
-#ifdef STRICT_MM_TYPECHECKS
 /*
  * These are used to make use of C type-checking..
  */
@@ -38,52 +35,11 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 #define __pgd(x)	((pgd_t) { (x) } )
 #define __pgprot(x)	((pgprot_t) { (x) } )
 
-#else
-/*
- * .. while these make it easier on the compiler
- */
-typedef unsigned long pte_t;
-typedef unsigned long pmd_t;
-typedef unsigned long pgd_t;
-typedef unsigned long pgprot_t;
-
-#define pte_val(x)	(x)
-#define pmd_val(x)	(x)
-#define pgd_val(x)	(x)
-#define pgprot_val(x)	(x)
-
-#define __pte(x)	(x)
-#define __pmd(x)	(x)
-#define __pgd(x)	(x)
-#define __pgprot(x)	(x)
-
-#endif
-
-/* to align the pointer to the (next) page boundary */
-#define PAGE_ALIGN(addr)	(((addr)+PAGE_SIZE-1)&PAGE_MASK)
-
-/* This handles the memory map.. */
-
-#ifdef CONFIG_CRIS_LOW_MAP
-#define PAGE_OFFSET		KSEG_6   /* kseg_6 is mapped to physical ram */
-#else
-#define PAGE_OFFSET		KSEG_C   /* kseg_c is mapped to physical ram */
-#endif
-
-/* macros to convert between really physical and virtual addresses
- * by stripping a selected bit, we can convert between KSEG_x and 0x40000000 where
- * the DRAM really resides
- */
-
-#ifdef CONFIG_CRIS_LOW_MAP
-/* we have DRAM virtually at 0x6 */
-#define __pa(x)                 ((unsigned long)(x) & 0xdfffffff)
-#define __va(x)                 ((void *)((unsigned long)(x) | 0x20000000))
-#else
-/* we have DRAM virtually at 0xc */
-#define __pa(x)                 ((unsigned long)(x) & 0x7fffffff)
-#define __va(x)                 ((void *)((unsigned long)(x) | 0x80000000))
-#endif
+/* On CRIS the PFN numbers doesn't start at 0 so we have to compensate */
+/* for that before indexing into the page table starting at mem_map    */
+#define pfn_to_page(pfn)	(mem_map + ((pfn) - (PAGE_OFFSET >> PAGE_SHIFT)))
+#define page_to_pfn(page)	((unsigned long)((page) - mem_map) + (PAGE_OFFSET >> PAGE_SHIFT))
+#define pfn_valid(pfn)		(((pfn) - (PAGE_OFFSET >> PAGE_SHIFT)) < max_mapnr)
 
 /* to index into the page map. our pages all start at physical addr PAGE_OFFSET so
  * we can let the map start there. notice that we subtract PAGE_OFFSET because
@@ -95,6 +51,7 @@ typedef unsigned long pgprot_t;
 
 #define virt_to_page(kaddr)    (mem_map + (((unsigned long)(kaddr) - PAGE_OFFSET) >> PAGE_SHIFT))
 #define VALID_PAGE(page)       (((page) - mem_map) < max_mapnr)
+#define virt_addr_valid(kaddr)	pfn_valid((kaddr) >> PAGE_SHIFT)
 
 /* convert a page (based on mem_map and forward) to a physical address
  * do this by figuring out the virtual address and then use __pa
@@ -102,9 +59,34 @@ typedef unsigned long pgprot_t;
 
 #define page_to_phys(page)     __pa((((page) - mem_map) << PAGE_SHIFT) + PAGE_OFFSET)
 
-/* from linker script */
+/* to align the pointer to the (next) page boundary */
+#define PAGE_ALIGN(addr)	(((addr)+PAGE_SIZE-1)&PAGE_MASK)
 
-extern unsigned long dram_start, dram_end;
+#ifndef __ASSEMBLY__
+
+#define BUG() do { \
+  printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); \
+} while (0)
+
+#define PAGE_BUG(page) do { \
+         BUG(); \
+} while (0)
+
+#endif /* __ASSEMBLY__ */
+
+/* Pure 2^n version of get_order */
+static inline int get_order(unsigned long size)
+{
+	int order;
+
+	size = (size-1) >> (PAGE_SHIFT-1);
+	order = -1;
+	do {
+		size >>= 1;
+		order++;
+	} while (size);
+	return order;
+}
 
 #define VM_DATA_DEFAULT_FLAGS	(VM_READ | VM_WRITE | VM_EXEC | \
 				 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)

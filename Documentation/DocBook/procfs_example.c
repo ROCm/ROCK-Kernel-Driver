@@ -63,7 +63,7 @@ struct fb_data_t {
 
 
 static struct proc_dir_entry *example_dir, *foo_file,
-	*bar_file, *jiffies_file, *tty_device, *symlink;
+	*bar_file, *jiffies_file, *symlink;
 
 
 struct fb_data_t foo_data, bar_data;
@@ -173,16 +173,6 @@ static int __init init_procfs_example(void)
 	bar_file->write_proc = proc_write_foobar;
 	bar_file->owner = THIS_MODULE;
 		
-	/* create tty device */
-	tty_device = proc_mknod("tty", S_IFCHR | 0666,
-				example_dir, MKDEV(5, 0));
-	if(tty_device == NULL) {
-		rv = -ENOMEM;
-		goto no_tty;
-	}
-	
-	tty_device->owner = THIS_MODULE;
-
 	/* create symlink */
 	symlink = proc_symlink("jiffies_too", example_dir, 
 			       "jiffies");

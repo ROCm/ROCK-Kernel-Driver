@@ -802,6 +802,8 @@ static int r128_cce_dispatch_blit( DRMFILE filp,
 	case R128_DATATYPE_ARGB1555:
 	case R128_DATATYPE_RGB565:
 	case R128_DATATYPE_ARGB4444:
+	case R128_DATATYPE_YVYU422:
+	case R128_DATATYPE_VYUY422:
 		dword_shift = 1;
 		break;
 	case R128_DATATYPE_CI8:

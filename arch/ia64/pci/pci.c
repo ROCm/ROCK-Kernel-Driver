@@ -138,37 +138,6 @@ alloc_pci_controller (int seg)
 	return controller;
 }
 
-static struct pci_bus *
-scan_root_bus (int bus, struct pci_ops *ops, void *sysdata)
-{
-	struct pci_bus *b;
-
-	/*
-	 * We know this is a new root bus we haven't seen before, so
-	 * scan it, even if we've seen the same bus number in a different
-	 * segment.
-	 */
-	b = kmalloc(sizeof(*b), GFP_KERNEL);
-	if (!b)
-		return NULL;
-
-	memset(b, 0, sizeof(*b));
-	INIT_LIST_HEAD(&b->children);
-	INIT_LIST_HEAD(&b->devices);
-
-	list_add_tail(&b->node, &pci_root_buses);
-
-	b->number = b->secondary = bus;
-	b->resource[0] = &ioport_resource;
-	b->resource[1] = &iomem_resource;
-
-	b->sysdata = sysdata;
-	b->ops = ops;
-	b->subordinate = pci_do_scan_bus(b);
-
-	return b;
-}
-
 static int
 alloc_resource (char *name, struct resource *root, unsigned long start, unsigned long end, unsigned long flags)
 {
@@ -312,7 +281,7 @@ pci_acpi_scan_root (struct acpi_device *device, int domain, int bus)
 	info.name = name;
 	acpi_walk_resources(device->handle, METHOD_NAME__CRS, add_window, &info);
 
-	return scan_root_bus(bus, &pci_root_ops, controller);
+	return pci_scan_bus(bus, &pci_root_ops, controller);
 
 out3:
 	kfree(controller->window);

@@ -355,8 +355,6 @@ static int gen_rtc_open(struct inode *inode, struct file *file)
 	if (gen_rtc_status & RTC_IS_OPEN)
 		return -EBUSY;
 
-	MOD_INC_USE_COUNT;
-
 	gen_rtc_status |= RTC_IS_OPEN;
 	gen_rtc_irq_data = 0;
 	irq_active = 0;
@@ -374,8 +372,6 @@ static int gen_rtc_release(struct inode *inode, struct file *file)
 	gen_clear_rtc_irq_bit(RTC_PIE|RTC_AIE|RTC_UIE);
 
 	gen_rtc_status &= ~RTC_IS_OPEN;
-	MOD_DEC_USE_COUNT;
-
 	return 0;
 }
 

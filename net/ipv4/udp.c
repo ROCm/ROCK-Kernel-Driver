@@ -540,7 +540,7 @@ int udp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 			return -EINVAL;
 	} else {
 		if (sk->sk_state != TCP_ESTABLISHED)
-			return -ENOTCONN;
+			return -EDESTADDRREQ;
 		daddr = inet->daddr;
 		dport = inet->dport;
 		/* Open fast path for connected socket.

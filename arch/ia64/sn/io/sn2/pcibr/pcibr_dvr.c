@@ -12,6 +12,7 @@
 #include <linux/module.h>
 #include <linux/string.h>
 #include <linux/interrupt.h>
+#include <linux/ioport.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/sn_sal.h>
 #include <asm/sn/sn_cpuid.h>
@@ -33,13 +34,6 @@
 #include <asm/sn/ioc3.h>
 #include <asm/sn/io.h>
 #include <asm/sn/sn_private.h>
-
-#ifdef __ia64
-#define rmallocmap atemapalloc
-#define rmfreemap atemapfree
-#define rmfree atefree
-#define rmalloc atealloc
-#endif
 
 /*
  * global variables to toggle the different levels of pcibr debugging.  
@@ -933,7 +927,7 @@ pcibr_bus_cnvlink(vertex_hdl_t f_c)
 	xp = strstr(dst, "/"EDGE_LBL_XTALK"/");
 	if (xp == NULL)
 		return 0;
-	widgetnum = atoi(xp+7);
+	widgetnum = simple_strtoul(xp+7, NULL, 0);
 	if (widgetnum < XBOW_PORT_8 || widgetnum > XBOW_PORT_F)
 		return 0;
 
@@ -1494,18 +1488,21 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
 	/* we always have 128 ATEs (512 for Xbridge) inside the chip
 	 * even if disabled for debugging.
 	 */
-	pcibr_soft->bs_int_ate_map = rmallocmap(pcibr_soft->bs_int_ate_size);
-	pcibr_ate_free(pcibr_soft, 0, pcibr_soft->bs_int_ate_size);
+	pcibr_soft->bs_int_ate_resource.start = 0;
+	pcibr_soft->bs_int_ate_resource.end = pcibr_soft->bs_int_ate_size - 1;
 
 	if (num_entries > pcibr_soft->bs_int_ate_size) {
 #if PCIBR_ATE_NOTBOTH			/* for debug -- forces us to use external ates */
 	    printk("pcibr_attach: disabling internal ATEs.\n");
 	    pcibr_ate_alloc(pcibr_soft, pcibr_soft->bs_int_ate_size);
 #endif
-	    pcibr_soft->bs_ext_ate_map = rmallocmap(num_entries);
-	    pcibr_ate_free(pcibr_soft, pcibr_soft->bs_int_ate_size,
-			   num_entries - pcibr_soft->bs_int_ate_size);
+	   pcibr_soft->bs_ext_ate_resource.start = pcibr_soft->bs_int_ate_size;
+	   pcibr_soft->bs_ext_ate_resource.end = num_entries;
 	}
+
+        pcibr_soft->bs_allocated_ate_res = (void *) kmalloc(pcibr_soft->bs_int_ate_size * sizeof(unsigned long), GFP_KERNEL);
+	memset(pcibr_soft->bs_allocated_ate_res, 0x0, pcibr_soft->bs_int_ate_size * sizeof(unsigned long));
+
 	PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_ATE, pcibr_vhdl,
 		    "pcibr_attach2: %d ATEs, %d internal & %d external\n",
 		    num_entries ? num_entries : pcibr_soft->bs_int_ate_size,
@@ -1716,10 +1713,10 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
 
     {
 
-    pciio_win_map_t         win_map_p;
     iopaddr_t               prom_base_addr = pcibr_soft->bs_xid << 24;
     int                     prom_base_size = 0x1000000;
-    iopaddr_t               prom_base_limit = prom_base_addr + prom_base_size; 
+    int			    status;
+    struct resource	    *res;
 
     /* Allocate resource maps based on bus page size; for I/O and memory
      * space, free all pages except those in the base area and in the
@@ -1729,35 +1726,38 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
      * the widget number and s is the device register offset for the slot.
      */
 
-    win_map_p = &pcibr_soft->bs_io_win_map;
-    pciio_device_win_map_new(win_map_p,
-			     PCIBR_BUS_IO_MAX + 1,
-			     PCIBR_BUS_IO_PAGE);
-    pciio_device_win_populate(win_map_p,
-			      PCIBR_BUS_IO_BASE,
-			      prom_base_addr - PCIBR_BUS_IO_BASE);
-    pciio_device_win_populate(win_map_p,
-			      prom_base_limit,
-			      (PCIBR_BUS_IO_MAX + 1) - prom_base_limit);
+    /* Setup the Bus's PCI IO Root Resource. */
+    pcibr_soft->bs_io_win_root_resource.start = PCIBR_BUS_IO_BASE;
+    pcibr_soft->bs_io_win_root_resource.end = 0xffffffff;
+    res = (struct resource *) kmalloc( sizeof(struct resource), KM_NOSLEEP);
+    if (!res)
+	panic("PCIBR:Unable to allocate resource structure\n");
 
-    win_map_p = &pcibr_soft->bs_swin_map;
-    pciio_device_win_map_new(win_map_p,
-			     PCIBR_BUS_SWIN_MAX + 1,
-			     PCIBR_BUS_SWIN_PAGE);
-    pciio_device_win_populate(win_map_p,
-			      PCIBR_BUS_SWIN_BASE,
-			      (PCIBR_BUS_SWIN_MAX + 1) - PCIBR_BUS_SWIN_PAGE);
+    /* Block off the range used by PROM. */
+    res->start = prom_base_addr;
+    res->end = prom_base_addr + (prom_base_size - 1);
+    status = request_resource(&pcibr_soft->bs_io_win_root_resource, res);
+    if (status)
+	panic("PCIBR:Unable to request_resource()\n");
 
-    win_map_p = &pcibr_soft->bs_mem_win_map;
-    pciio_device_win_map_new(win_map_p,
-			     PCIBR_BUS_MEM_MAX + 1,
-			     PCIBR_BUS_MEM_PAGE);
-    pciio_device_win_populate(win_map_p,
-			      PCIBR_BUS_MEM_BASE,
-			      prom_base_addr - PCIBR_BUS_MEM_BASE);
-    pciio_device_win_populate(win_map_p,
-			      prom_base_limit,
-			      (PCIBR_BUS_MEM_MAX + 1) - prom_base_limit);
+    /* Setup the Small Window Root Resource */
+    pcibr_soft->bs_swin_root_resource.start = _PAGESZ;
+    pcibr_soft->bs_swin_root_resource.end = 0x000FFFFF;
+
+    /* Setup the Bus's PCI Memory Root Resource */
+    pcibr_soft->bs_mem_win_root_resource.start = 0x200000;
+    pcibr_soft->bs_mem_win_root_resource.end = 0xffffffff;
+    res = (struct resource *) kmalloc( sizeof(struct resource), KM_NOSLEEP);
+    if (!res)
+        panic("PCIBR:Unable to allocate resource structure\n");
+
+    /* Block off the range used by PROM. */
+    res->start = prom_base_addr;
+    res->end = prom_base_addr + (prom_base_size - 1);;
+    status = request_resource(&pcibr_soft->bs_mem_win_root_resource, res);
+    if (status)
+        panic("PCIBR:Unable to request_resource()\n");
+
     }
 
     /* build "no-slot" connection point
@@ -1940,15 +1940,6 @@ pcibr_detach(vertex_hdl_t xconn)
     spin_lock_destroy(&pcibr_soft->bs_lock);
     kfree(pcibr_soft->bs_name);
     
-    /* Error handler gets unregistered when the widget info is 
-     * cleaned 
-     */
-    /* Free the soft ATE maps */
-    if (pcibr_soft->bs_int_ate_map)
-	rmfreemap(pcibr_soft->bs_int_ate_map);
-    if (pcibr_soft->bs_ext_ate_map)
-	rmfreemap(pcibr_soft->bs_ext_ate_map);
-
     /* Disconnect the error interrupt and free the xtalk resources 
      * associated with it.
      */
@@ -4188,14 +4179,14 @@ pcibr_debug(uint32_t type, vertex_hdl_t vhdl, char *format, ...)
                     cp = strstr(hwpath, "/xtalk/");
                     if (cp) {
                         cp += strlen("/xtalk/");
-                        widget = atoi(cp);
+                        widget = simple_strtoul(cp, NULL, 0);
                     }
                 }
                 if (pcibr_debug_slot != -1) {
                     cp = strstr(hwpath, "/pci/");
                     if (cp) {
                         cp += strlen("/pci/");
-                        slot = atoi(cp);
+                        slot = simple_strtoul(cp, NULL, 0);
                     }
                 }
             }
@@ -4214,9 +4205,15 @@ pcibr_debug(uint32_t type, vertex_hdl_t vhdl, char *format, ...)
 	     * Since we have a variable length argument list, we
 	     * need to call printk this way rather than directly
 	     */
-	    va_start(ap, format);
-	    printk(format, ap);
-	    va_end(ap);
+	    {
+		char buffer[500];
+
+		va_start(ap, format);
+		vsnprintf(buffer, 500, format, ap);
+		va_end(ap);
+		buffer[499] = (char)0;	/* just to be safe */
+		printk("%s", buffer);
+	    }
         }
     }
 }

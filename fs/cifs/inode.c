@@ -397,6 +397,7 @@ cifs_mkdir(struct inode *inode, struct dentry *direntry, int mode)
 			CIFSSMBUnixSetPerms(xid, pTcon, full_path, mode,
 				(__u64)-1,  
 				(__u64)-1,
+				0 /* dev_t */,
 				cifs_sb->local_nls);
 		else { /* BB to be implemented via Windows secrty descriptors*/
 		/* eg CIFSSMBWinSetPerms(xid,pTcon,full_path,mode,-1,-1,local_nls);*/
@@ -702,7 +703,7 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 	if ((cifs_sb->tcon->ses->capabilities & CAP_UNIX)
 	    && (attrs->ia_valid & (ATTR_MODE | ATTR_GID | ATTR_UID)))
 		rc = CIFSSMBUnixSetPerms(xid, pTcon, full_path, mode, uid, gid,
-				    cifs_sb->local_nls);
+				0 /* dev_t */, cifs_sb->local_nls);
 	else if (attrs->ia_valid & ATTR_MODE) {
 		if((mode & S_IWUGO) == 0) /* not writeable */ {
 			if((cifsInode->cifsAttrs & ATTR_READONLY) == 0)

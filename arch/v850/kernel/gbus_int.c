@@ -1,8 +1,8 @@
 /*
  * arch/v850/kernel/gbus_int.c -- Midas labs GBUS interrupt support
  *
- *  Copyright (C) 2001,02  NEC Corporation
- *  Copyright (C) 2001,02  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03  NEC Electronics Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -99,9 +99,11 @@ int gbus_int_irq_pending (unsigned irq)
 
 /* Handle a shared GINT interrupt by passing to the appropriate GBUS
    interrupt handler.  */
-static void gbus_int_handle_irq (int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t gbus_int_handle_irq (int irq, void *dev_id,
+					struct pt_regs *regs)
 {
 	unsigned w;
+	irqreturn_t rval = IRQ_NONE;
 	unsigned gint = irq - IRQ_GINT (0);
 
 	for (w = 0; w < GBUS_INT_NUM_WORDS; w++) {
@@ -127,6 +129,7 @@ static void gbus_int_handle_irq (int irq, void *dev_id, struct pt_regs *regs)
 
 				/* Recursively call handle_irq to handle it. */
 				handle_irq (irq, regs);
+				rval = IRQ_HANDLED;
 			} while (status);
 		}
 	}
@@ -136,6 +139,8 @@ static void gbus_int_handle_irq (int irq, void *dev_id, struct pt_regs *regs)
 	   still pending, and so result in another CPU interrupt.  */
 	GBUS_INT_ENABLE (0, gint) &= ~0x1;
 	GBUS_INT_ENABLE (0, gint) |=  0x1;
+
+	return rval;
 }
 
 

@@ -484,6 +484,13 @@ int journal_start_commit(journal_t *journal, tid_t *ptid)
 		ret = __log_start_commit(journal, tid);
 		if (ret && ptid)
 			*ptid = tid;
+	} else if (journal->j_committing_transaction && ptid) {
+		/*
+		 * If ext3_write_super() recently started a commit, then we
+		 * have to wait for completion of that transaction
+		 */
+		*ptid = journal->j_committing_transaction->t_tid;
+		ret = 1;
 	}
 	spin_unlock(&journal->j_state_lock);
 	return ret;
@@ -1076,7 +1083,7 @@ void journal_destroy(journal_t *journal)
 	spin_lock(&journal->j_list_lock);
 	while (journal->j_checkpoint_transactions != NULL) {
 		spin_unlock(&journal->j_list_lock);
-		log_do_checkpoint(journal, 1);
+		log_do_checkpoint(journal);
 		spin_lock(&journal->j_list_lock);
 	}
 
@@ -1284,7 +1291,7 @@ int journal_flush(journal_t *journal)
 	spin_lock(&journal->j_list_lock);
 	while (!err && journal->j_checkpoint_transactions != NULL) {
 		spin_unlock(&journal->j_list_lock);
-		err = log_do_checkpoint(journal, journal->j_maxlen);
+		err = log_do_checkpoint(journal);
 		spin_lock(&journal->j_list_lock);
 	}
 	spin_unlock(&journal->j_list_lock);

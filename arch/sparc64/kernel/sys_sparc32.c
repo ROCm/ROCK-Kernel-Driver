@@ -480,7 +480,7 @@ out:
 
 static int do_sys32_msgsnd (int first, int second, int third, void *uptr)
 {
-	struct msgbuf *p = kmalloc (second + sizeof (struct msgbuf) + 4, GFP_USER);
+	struct msgbuf *p = kmalloc (second + sizeof (struct msgbuf), GFP_USER);
 	struct msgbuf32 *up = (struct msgbuf32 *)uptr;
 	mm_segment_t old_fs;
 	int err;
@@ -522,12 +522,12 @@ static int do_sys32_msgrcv (int first, int second, int msgtyp, int third,
 		msgtyp = ipck.msgtyp;
 	}
 	err = -ENOMEM;
-	p = kmalloc (second + sizeof (struct msgbuf) + 4, GFP_USER);
+	p = kmalloc (second + sizeof (struct msgbuf), GFP_USER);
 	if (!p)
 		goto out;
 	old_fs = get_fs ();
 	set_fs (KERNEL_DS);
-	err = sys_msgrcv (first, p, second + 4, msgtyp, third);
+	err = sys_msgrcv (first, p, second, msgtyp, third);
 	set_fs (old_fs);
 	if (err < 0)
 		goto free_then_out;
@@ -736,6 +736,22 @@ out:
 	return err;
 }
 
+static int sys32_semtimedop(int semid, struct sembuf *tsems, int nsems,
+			    const struct compat_timespec *timeout32)
+{
+	struct compat_timespec t32;
+	struct timespec *t64 = compat_alloc_user_space(sizeof(*t64));
+
+	if (copy_from_user(&t32, timeout32, sizeof(t32)))
+		return -EFAULT;
+
+	if (put_user(t32.tv_sec, &t64->tv_sec) ||
+	    put_user(t32.tv_nsec, &t64->tv_nsec))
+		return -EFAULT;
+
+	return sys_semtimedop(semid, tsems, nsems, t64);
+}
+
 asmlinkage int sys32_ipc (u32 call, int first, int second, int third, u32 ptr, u32 fifth)
 {
 	int version, err;
@@ -747,8 +763,10 @@ asmlinkage int sys32_ipc (u32 call, int first, int second, int third, u32 ptr, u
 		switch (call) {
 		case SEMOP:
 			/* struct sembuf is the same on 32 and 64bit :)) */
-			err = sys_semop (first, (struct sembuf *)AA(ptr), second);
+			err = sys_semtimedop (first, (struct sembuf *)AA(ptr), second, NULL);
 			goto out;
+		case SEMTIMEDOP:
+			err = sys32_semtimedop (first, (struct sembuf *)AA(ptr), second, (const struct compat_timespec *) AA(fifth));
 		case SEMGET:
 			err = sys_semget (first, second, third);
 			goto out;

@@ -628,13 +628,6 @@ static inline void tcp_openreq_free(struct open_request *req)
 /*
  *	Pointers to address related TCP functions
  *	(i.e. things that depend on the address family)
- *
- * 	BUGGG_FUTURE: all the idea behind this struct is wrong.
- *	It mixes socket frontend with transport function.
- *	With port sharing between IPv6/v4 it gives the only advantage,
- *	only poor IPv6 needs to permanently recheck, that it
- *	is still IPv6 8)8) It must be cleaned up as soon as possible.
- *						--ANK (980802)
  */
 
 struct tcp_func {

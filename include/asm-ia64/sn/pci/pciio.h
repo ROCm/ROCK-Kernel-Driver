@@ -14,6 +14,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/ioport.h>
 #include <asm/sn/ioerror.h>
 #include <asm/sn/driver.h>
 #include <asm/sn/hcl.h>
@@ -632,7 +633,7 @@ pciio_device_win_populate(pciio_win_map_t win_map,	/* win map */
 
 /* allocate window from mapping resource */
 extern iopaddr_t
-pciio_device_win_alloc(pciio_win_map_t win_map,		/* win map */
+pciio_device_win_alloc(struct resource * res,
 		       pciio_win_alloc_t win_alloc,	/* opaque allocation cookie */
 		       size_t start,			/* start unit, or 0 */
 		       size_t size,			/* size of allocation */

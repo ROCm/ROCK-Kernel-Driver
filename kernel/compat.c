@@ -425,11 +425,9 @@ asmlinkage int compat_sys_sched_getaffinity(compat_pid_t pid, unsigned int len,
 				    &kernel_mask);
 	set_fs(old_fs);
 
-	if (ret > 0) {
+	if (ret > 0)
 		if (put_user(kernel_mask, user_mask_ptr))
-			ret = -EFAULT;
-		ret = sizeof(compat_ulong_t);
-	}
+			return -EFAULT;
 
 	return ret;
 }

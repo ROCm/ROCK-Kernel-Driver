@@ -13,6 +13,9 @@
 #include <asm/thread_info.h>	/* TI_UWINMASK for WINDOW_FLUSH */
 #endif
 
+/* Number of contexts is implementation-dependent; 64k is the most we support */
+#define SRMMU_MAX_CONTEXTS	65536
+
 /* PMD_SHIFT determines the size of the area a second-level page table entry can map */
 #define SRMMU_PMD_SHIFT         18
 #define SRMMU_PMD_SIZE          (1UL << SRMMU_PMD_SHIFT)

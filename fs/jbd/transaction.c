@@ -206,15 +206,10 @@ repeat_locked:
 	 * Also, this test is inconsitent with the matching one in
 	 * journal_extend().
 	 */
-	needed = journal->j_max_transaction_buffers;
-	if (journal->j_committing_transaction) 
-		needed += journal->j_committing_transaction->
-					t_outstanding_credits;
-
-	if (__log_space_left(journal) < needed) {
+	if (__log_space_left(journal) < jbd_space_needed(journal)) {
 		jbd_debug(2, "Handle %p waiting for checkpoint...\n", handle);
 		spin_unlock(&transaction->t_handle_lock);
-		__log_wait_for_space(journal, needed);
+		__log_wait_for_space(journal);
 		goto repeat_locked;
 	}
 

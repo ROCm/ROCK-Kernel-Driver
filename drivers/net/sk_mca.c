@@ -537,7 +537,7 @@ static int __init ProbeIRQ(struct SKMCA_NETDEV *dev)
 	ResetBoard(dev);
 	InitBoard(dev);
 
-	njiffies = jiffies + 100;
+	njiffies = jiffies + HZ;
 	do {
 		csr0val = GetLANCE(dev, LANCE_CSR0);
 	}

@@ -15,6 +15,7 @@
 #include <asm/smp.h>
 #include <asm/irq.h>
 #include <asm/hw_irq.h>
+#include <asm/system.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/iograph.h>
 #include <asm/sn/invent.h>
@@ -485,10 +486,13 @@ sn_linkstats_get(char *page)
 static int __init
 linkstatd_init(void)
 {
+	if (!ia64_platform_is("sn2"))
+		return -ENODEV;
+
 	spin_lock_init(&sn_linkstats_lock);
 	sn_linkstats = kmalloc(numnodes * sizeof(struct s_linkstats), GFP_KERNEL);
 	sn_linkstats_reset(60000UL); /* default 60 second update interval */
-	kernel_thread(linkstatd_thread, NULL, CLONE_FS | CLONE_FILES);
+	kernel_thread(linkstatd_thread, NULL, CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
 
 	return 0;                                                                       
 }

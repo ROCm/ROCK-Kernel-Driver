@@ -17,8 +17,12 @@
 int version_string(LINUX_VERSION_CODE);
 
 struct new_utsname system_utsname = {
-	UTS_SYSNAME, UTS_NODENAME, UTS_RELEASE, UTS_VERSION,
-	UTS_MACHINE, UTS_DOMAINNAME
+	.sysname	= UTS_SYSNAME,
+	.nodename	= UTS_NODENAME,
+	.release	= UTS_RELEASE,
+	.version	= UTS_VERSION,
+	.machine	= UTS_MACHINE,
+	.domainname	= UTS_DOMAINNAME,
 };
 
 const char *linux_banner = 

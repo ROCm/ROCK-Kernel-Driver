@@ -992,9 +992,9 @@ int log_start_commit(journal_t *journal, tid_t tid);
 int __log_start_commit(journal_t *journal, tid_t tid);
 int journal_start_commit(journal_t *journal, tid_t *tid);
 int log_wait_commit(journal_t *journal, tid_t tid);
-int log_do_checkpoint(journal_t *journal, int nblocks);
+int log_do_checkpoint(journal_t *journal);
 
-void __log_wait_for_space(journal_t *journal, int nblocks);
+void __log_wait_for_space(journal_t *journal);
 extern void	__journal_drop_transaction(journal_t *, transaction_t *);
 extern int	cleanup_journal_tail(journal_t *);
 
@@ -1052,6 +1052,19 @@ static inline int tid_geq(tid_t x, tid_t y)
 }
 
 extern int journal_blocks_per_page(struct inode *inode);
+
+/*
+ * Return the minimum number of blocks which must be free in the journal
+ * before a new transaction may be started.  Must be called under j_state_lock.
+ */
+static inline int jbd_space_needed(journal_t *journal)
+{
+	int nblocks = journal->j_max_transaction_buffers;
+	if (journal->j_committing_transaction)
+		nblocks += journal->j_committing_transaction->
+					t_outstanding_credits;
+	return nblocks;
+}
 
 /*
  * Definitions which augment the buffer_head layer

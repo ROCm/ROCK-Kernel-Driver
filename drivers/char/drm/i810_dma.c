@@ -282,10 +282,12 @@ static int i810_wait_ring(drm_device_t *dev, int n)
 	   	ring->head = I810_READ(LP_RING + RING_HEAD) & HEAD_ADDR;
 	   	ring->space = ring->head - (ring->tail+8);
 		if (ring->space < 0) ring->space += ring->Size;
-
-		if (ring->head != last_head)
-		   end = jiffies + (HZ*3);
-
+	   
+		if (ring->head != last_head) {
+			end = jiffies + (HZ*3);
+			last_head = ring->head;
+		}
+	  
 	   	iters++;
 		if(time_before(end, jiffies)) {
 		   	DRM_ERROR("space: %d wanted %d\n", ring->space, n);
@@ -403,6 +405,7 @@ static int i810_dma_initialize(drm_device_t *dev,
 	dev_priv->pitch = init->pitch;
 	dev_priv->back_offset = init->back_offset;
 	dev_priv->depth_offset = init->depth_offset;
+	dev_priv->front_offset = init->front_offset;
 
 	dev_priv->overlay_offset = init->overlay_offset;
 	dev_priv->overlay_physical = init->overlay_physical;
@@ -582,6 +585,8 @@ static void i810EmitState( drm_device_t *dev )
    	drm_i810_private_t *dev_priv = dev->dev_private;
       	drm_i810_sarea_t *sarea_priv = dev_priv->sarea_priv;
 	unsigned int dirty = sarea_priv->dirty;
+	
+	DRM_DEBUG("%s %x\n", __FUNCTION__, dirty);
 
 	if (dirty & I810_UPLOAD_BUFFERS) {
 		i810EmitDestVerified( dev, sarea_priv->BufferState );
@@ -620,6 +625,14 @@ static void i810_dma_dispatch_clear( drm_device_t *dev, int flags,
 	int cpp = 2;
 	int i;
 	RING_LOCALS;
+	
+	if ( dev_priv->current_page == 1 ) {
+	        unsigned int tmp = flags;
+	       
+		flags &= ~(I810_FRONT | I810_BACK);
+		if (tmp & I810_FRONT) flags |= I810_BACK;
+		if (tmp & I810_BACK) flags |= I810_FRONT;
+	}
 
   	i810_kernel_lost_context(dev);
 
@@ -685,9 +698,10 @@ static void i810_dma_dispatch_swap( drm_device_t *dev )
 	drm_clip_rect_t *pbox = sarea_priv->boxes;
 	int pitch = dev_priv->pitch;
 	int cpp = 2;
-	int ofs = dev_priv->back_offset;
 	int i;
 	RING_LOCALS;
+
+	DRM_DEBUG("swapbuffers\n");
 
   	i810_kernel_lost_context(dev);
 
@@ -699,7 +713,7 @@ static void i810_dma_dispatch_swap( drm_device_t *dev )
 		unsigned int w = pbox->x2 - pbox->x1;
 		unsigned int h = pbox->y2 - pbox->y1;
 		unsigned int dst = pbox->x1*cpp + pbox->y1*pitch;
-		unsigned int start = ofs + dst;
+		unsigned int start = dst;
 
 		if (pbox->x1 > pbox->x2 ||
 		    pbox->y1 > pbox->y2 ||
@@ -711,9 +725,15 @@ static void i810_dma_dispatch_swap( drm_device_t *dev )
 		OUT_RING( BR00_BITBLT_CLIENT | BR00_OP_SRC_COPY_BLT | 0x4 );
 		OUT_RING( pitch | (0xCC << 16));
 		OUT_RING( (h << 16) | (w * cpp));
-		OUT_RING( dst );
+		if (dev_priv->current_page == 0)
+		  OUT_RING(dev_priv->front_offset + start);
+		else
+		  OUT_RING(dev_priv->back_offset + start);
 		OUT_RING( pitch );
-		OUT_RING( start );
+		if (dev_priv->current_page == 0)
+		  OUT_RING(dev_priv->back_offset + start);
+		else
+		  OUT_RING(dev_priv->front_offset + start);
 		ADVANCE_LP_RING();
 	}
 }
@@ -800,6 +820,52 @@ static void i810_dma_dispatch_vertex(drm_device_t *dev,
 	}
 }
 
+static void i810_dma_dispatch_flip( drm_device_t *dev )
+{
+        drm_i810_private_t *dev_priv = dev->dev_private;
+	int pitch = dev_priv->pitch;
+	RING_LOCALS;
+
+	DRM_DEBUG( "%s: page=%d pfCurrentPage=%d\n", 
+		__FUNCTION__, 
+		dev_priv->current_page,
+		dev_priv->sarea_priv->pf_current_page);
+	
+        i810_kernel_lost_context(dev);
+
+	BEGIN_LP_RING( 2 );
+   	OUT_RING( INST_PARSER_CLIENT | INST_OP_FLUSH | INST_FLUSH_MAP_CACHE ); 
+	OUT_RING( 0 );
+	ADVANCE_LP_RING();
+
+	BEGIN_LP_RING( I810_DEST_SETUP_SIZE + 2 );
+	/* On i815 at least ASYNC is buggy */
+	/* pitch<<5 is from 11.2.8 p158,
+	   its the pitch / 8 then left shifted 8,
+	   so (pitch >> 3) << 8 */
+	OUT_RING( CMD_OP_FRONTBUFFER_INFO | (pitch<<5) /*| ASYNC_FLIP */ );
+	if ( dev_priv->current_page == 0 ) {
+		OUT_RING( dev_priv->back_offset );
+		dev_priv->current_page = 1;
+	} else {
+		OUT_RING( dev_priv->front_offset );
+		dev_priv->current_page = 0;
+	}
+	OUT_RING(0);
+	ADVANCE_LP_RING();
+
+	BEGIN_LP_RING(2);
+	OUT_RING( CMD_OP_WAIT_FOR_EVENT | WAIT_FOR_PLANE_A_FLIP );
+	OUT_RING( 0 );
+	ADVANCE_LP_RING();
+
+	/* Increment the frame counter.  The client-side 3D driver must
+	 * throttle the framerate by waiting for this value before
+	 * performing the swapbuffer ioctl.
+	 */
+	dev_priv->sarea_priv->pf_current_page = dev_priv->current_page;
+
+}
 
 void i810_dma_quiescent(drm_device_t *dev)
 {
@@ -1191,3 +1257,47 @@ int i810_ov0_flip(struct inode *inode, struct file *filp,
 }
 
 
+/* Not sure why this isn't set all the time:
+ */ 
+static void i810_do_init_pageflip( drm_device_t *dev )
+{
+	drm_i810_private_t *dev_priv = dev->dev_private;
+	
+	DRM_DEBUG("%s\n", __FUNCTION__);
+	dev_priv->page_flipping = 1;
+	dev_priv->current_page = 0;
+	dev_priv->sarea_priv->pf_current_page = dev_priv->current_page;
+}
+
+int i810_do_cleanup_pageflip( drm_device_t *dev )
+{
+	drm_i810_private_t *dev_priv = dev->dev_private;
+
+	DRM_DEBUG("%s\n", __FUNCTION__);
+	if (dev_priv->current_page != 0)
+		i810_dma_dispatch_flip( dev );
+
+	dev_priv->page_flipping = 0;
+	return 0;
+}
+
+int i810_flip_bufs(struct inode *inode, struct file *filp,
+		   unsigned int cmd, unsigned long arg)
+{
+	drm_file_t *priv = filp->private_data;
+	drm_device_t *dev = priv->dev;
+	drm_i810_private_t *dev_priv = dev->dev_private;
+
+	DRM_DEBUG("%s\n", __FUNCTION__);
+
+   	if(!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
+		DRM_ERROR("i810_flip_buf called without lock held\n");
+		return -EINVAL;
+	}
+
+	if (!dev_priv->page_flipping) 
+		i810_do_init_pageflip( dev );
+
+	i810_dma_dispatch_flip( dev );
+   	return 0;
+}

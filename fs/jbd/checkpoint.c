@@ -75,11 +75,12 @@ static int __try_to_free_cp_buf(struct journal_head *jh)
  * Called under j-state_lock *only*.  It will be unlocked if we have to wait
  * for a checkpoint to free up some space in the log.
  */
-
-void __log_wait_for_space(journal_t *journal, int nblocks)
+void __log_wait_for_space(journal_t *journal)
 {
+	int nblocks;
 	assert_spin_locked(&journal->j_state_lock);
 
+	nblocks = jbd_space_needed(journal);
 	while (__log_space_left(journal) < nblocks) {
 		if (journal->j_flags & JFS_ABORT)
 			return;
@@ -91,9 +92,10 @@ void __log_wait_for_space(journal_t *journal, int nblocks)
 		 * were waiting for the checkpoint lock
 		 */
 		spin_lock(&journal->j_state_lock);
+		nblocks = jbd_space_needed(journal);
 		if (__log_space_left(journal) < nblocks) {
 			spin_unlock(&journal->j_state_lock);
-			log_do_checkpoint(journal, nblocks);
+			log_do_checkpoint(journal);
 			spin_lock(&journal->j_state_lock);
 		}
 		up(&journal->j_checkpoint_sem);
@@ -279,9 +281,7 @@ static int __flush_buffer(journal_t *journal, struct journal_head *jh,
  *
  * The journal should be locked before calling this function.
  */
-
-/* @@@ `nblocks' is unused.  Should it be used? */
-int log_do_checkpoint(journal_t *journal, int nblocks)
+int log_do_checkpoint(journal_t *journal)
 {
 	int result;
 	int batch_count = 0;
@@ -315,7 +315,7 @@ int log_do_checkpoint(journal_t *journal, int nblocks)
 		int cleanup_ret, retry = 0;
 		tid_t this_tid;
 
-		transaction = journal->j_checkpoint_transactions->t_cpnext;
+		transaction = journal->j_checkpoint_transactions;
 		this_tid = transaction->t_tid;
 		jh = transaction->t_checkpoint_list;
 		last_jh = jh->b_cpprev;
@@ -332,27 +332,19 @@ int log_do_checkpoint(journal_t *journal, int nblocks)
 				retry = 1;
 				break;
 			}
-			retry = __flush_buffer(journal, jh, bhs, &batch_count,
-						&drop_count);
+			retry = __flush_buffer(journal, jh, bhs, &batch_count, &drop_count);
 		} while (jh != last_jh && !retry);
-		if (batch_count) {
-			__flush_batch(journal, bhs, &batch_count);
-			continue;
-		}
-		if (retry)
-			continue;
 
-		/*
-		 * If someone emptied the checkpoint list while we slept, we're
-		 * done.
-		 */
-		if (!journal->j_checkpoint_transactions)
-			break;
+		if (batch_count)
+			__flush_batch(journal, bhs, &batch_count);
+
 		/*
 		 * If someone cleaned up this transaction while we slept, we're
 		 * done
 		 */
-		if (journal->j_checkpoint_transactions->t_cpnext != transaction)
+		if (journal->j_checkpoint_transactions != transaction)
+			break;
+		if (retry)
 			continue;
 		/*
 		 * Maybe it's a new transaction, but it fell at the same
@@ -367,6 +359,8 @@ int log_do_checkpoint(journal_t *journal, int nblocks)
 		 */
 		cleanup_ret = __cleanup_transaction(journal, transaction);
 		J_ASSERT(drop_count != 0 || cleanup_ret != 0);
+		if (journal->j_checkpoint_transactions != transaction)
+			break;
 	}
 	spin_unlock(&journal->j_list_lock);
 	result = cleanup_journal_tail(journal);

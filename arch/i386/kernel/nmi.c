@@ -189,7 +189,6 @@ void disable_timer_nmi_watchdog(void)
 	if ((nmi_watchdog != NMI_IO_APIC) || (nmi_active <= 0))
 		return;
 
-	disable_irq(0);
 	unset_nmi_callback();
 	nmi_active = -1;
 	nmi_watchdog = NMI_NONE;
@@ -201,7 +200,6 @@ void enable_timer_nmi_watchdog(void)
 		nmi_watchdog = NMI_IO_APIC;
 		touch_nmi_watchdog();
 		nmi_active = 1;
-		enable_irq(0);
 	}
 }
 

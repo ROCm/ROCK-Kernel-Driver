@@ -2493,7 +2493,7 @@ static int sbmac_open(struct net_device *dev)
 	
 	/* Set the timer to check for link beat. */
 	init_timer(&sc->sbm_timer);
-	sc->sbm_timer.expires = jiffies + 2;
+	sc->sbm_timer.expires = jiffies + 2 * HZ/100;
 	sc->sbm_timer.data = (unsigned long)dev;
 	sc->sbm_timer.function = &sbmac_timer;
 	add_timer(&sc->sbm_timer);

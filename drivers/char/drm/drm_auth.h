@@ -1,4 +1,12 @@
-/* drm_auth.h -- IOCTLs for authentication -*- linux-c -*-
+/**
+ * \file drm_auth.h 
+ * IOCTLs for authentication
+ *
+ * \author Rickard E. (Rik) Faith <faith@valinux.com>
+ * \author Gareth Hughes <gareth@valinux.com>
+ */
+
+/*
  * Created: Tue Feb  2 08:37:54 1999 by faith@valinux.com
  *
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
@@ -23,19 +31,34 @@
  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
- *
- * Authors:
- *    Rickard E. (Rik) Faith <faith@valinux.com>
- *    Gareth Hughes <gareth@valinux.com>
  */
 
 #include "drmP.h"
 
+/**
+ * Generate a hash key from a magic.
+ *
+ * \param magic magic.
+ * \return hash key.
+ *
+ * The key is the modulus of the hash table size, #DRM_HASH_SIZE, which must be
+ * a power of 2.
+ */
 static int DRM(hash_magic)(drm_magic_t magic)
 {
 	return magic & (DRM_HASH_SIZE-1);
 }
 
+/**
+ * Find the file with the given magic number.
+ *
+ * \param dev DRM device.
+ * \param magic magic number.
+ *
+ * Searches in drm_device::magiclist within all files with the same hash key
+ * the one with matching magic number, while holding the drm_device::struct_sem
+ * lock.
+ */
 static drm_file_t *DRM(find_file)(drm_device_t *dev, drm_magic_t magic)
 {
 	drm_file_t	  *retval = NULL;
@@ -53,6 +76,17 @@ static drm_file_t *DRM(find_file)(drm_device_t *dev, drm_magic_t magic)
 	return retval;
 }
 
+/**
+ * Adds a magic number.
+ * 
+ * \param dev DRM device.
+ * \param priv file private data.
+ * \param magic magic number.
+ *
+ * Creates a drm_magic_entry structure and appends to the linked list
+ * associated the magic number hash key in drm_device::magiclist, while holding
+ * the drm_device::struct_sem lock.
+ */
 int DRM(add_magic)(drm_device_t *dev, drm_file_t *priv, drm_magic_t magic)
 {
 	int		  hash;
@@ -81,11 +115,21 @@ int DRM(add_magic)(drm_device_t *dev, drm_file_t *priv, drm_magic_t magic)
 	return 0;
 }
 
+/**
+ * Remove a magic number.
+ * 
+ * \param dev DRM device.
+ * \param magic magic number.
+ *
+ * Searches and unlinks the entry in drm_device::magiclist with the magic
+ * number hash key, while holding the drm_device::struct_sem lock.
+ */
 int DRM(remove_magic)(drm_device_t *dev, drm_magic_t magic)
 {
 	drm_magic_entry_t *prev = NULL;
 	drm_magic_entry_t *pt;
 	int		  hash;
+
 
 	DRM_DEBUG("%d\n", magic);
 	hash = DRM(hash_magic)(magic);
@@ -113,6 +157,19 @@ int DRM(remove_magic)(drm_device_t *dev, drm_magic_t magic)
 	return -EINVAL;
 }
 
+/**
+ * Get a unique magic number (ioctl).
+ *
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param arg pointer to a resulting drm_auth structure.
+ * \return zero on success, or a negative number on failure.
+ *
+ * If there is a magic number in drm_file::magic then use it, otherwise
+ * searches an unique non-zero magic number and add it associating it with \p
+ * filp.
+ */
 int DRM(getmagic)(struct inode *inode, struct file *filp,
 		  unsigned int cmd, unsigned long arg)
 {
@@ -142,6 +199,17 @@ int DRM(getmagic)(struct inode *inode, struct file *filp,
 	return 0;
 }
 
+/**
+ * Authenticate with a magic.
+ *
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param arg pointer to a drm_auth structure.
+ * \return zero if authentication successed, or a negative number otherwise.
+ *
+ * Checks if \p filp is associated with the magic number passed in \arg.
+ */
 int DRM(authmagic)(struct inode *inode, struct file *filp,
 		   unsigned int cmd, unsigned long arg)
 {

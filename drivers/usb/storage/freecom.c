@@ -44,11 +44,6 @@ static void pdump (void *, int);
 #define ERR_STAT		0x01
 #define DRQ_STAT		0x08
 
-struct freecom_udata {
-	u8    buffer[64];	/* Common command block. */
-};
-typedef struct freecom_udata *freecom_udata_t;
-
 /* All of the outgoing packets are 64 bytes long. */
 struct freecom_cb_wrap {
 	u8    Type;		/* Command type. */
@@ -112,9 +107,8 @@ static int
 freecom_readdata (Scsi_Cmnd *srb, struct us_data *us,
 		unsigned int ipipe, unsigned int opipe, int count)
 {
-	freecom_udata_t extra = (freecom_udata_t) us->extra;
 	struct freecom_xfer_wrap *fxfr =
-		(struct freecom_xfer_wrap *) extra->buffer;
+		(struct freecom_xfer_wrap *) us->iobuf;
 	int result;
 
 	fxfr->Type = FCM_PACKET_INPUT | 0x00;
@@ -147,9 +141,8 @@ static int
 freecom_writedata (Scsi_Cmnd *srb, struct us_data *us,
 		int unsigned ipipe, unsigned int opipe, int count)
 {
-	freecom_udata_t extra = (freecom_udata_t) us->extra;
 	struct freecom_xfer_wrap *fxfr =
-		(struct freecom_xfer_wrap *) extra->buffer;
+		(struct freecom_xfer_wrap *) us->iobuf;
 	int result;
 
 	fxfr->Type = FCM_PACKET_OUTPUT | 0x00;
@@ -190,12 +183,9 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
 	int result;
 	unsigned int partial;
 	int length;
-	freecom_udata_t extra;
 
-	extra = (freecom_udata_t) us->extra;
-
-	fcb = (struct freecom_cb_wrap *) extra->buffer;
-	fst = (struct freecom_status *) extra->buffer;
+	fcb = (struct freecom_cb_wrap *) us->iobuf;
+	fst = (struct freecom_status *) us->iobuf;
 
 	US_DEBUGP("Freecom TRANSPORT STARTED\n");
 
@@ -386,18 +376,11 @@ int
 freecom_init (struct us_data *us)
 {
 	int result;
-	char buffer[33];
+	char *buffer = us->iobuf;
 
-	/* Allocate a buffer for us.  The upper usb transport code will
-	 * free this for us when cleaning up. */
-	if (us->extra == NULL) {
-		us->extra = kmalloc (sizeof (struct freecom_udata),
-				GFP_KERNEL);
-		if (us->extra == NULL) {
-			US_DEBUGP("Out of memory\n");
-			return USB_STOR_TRANSPORT_ERROR;
-		}
-	}
+	/* The DMA-mapped I/O buffer is 64 bytes long, just right for
+	 * all our packets.  No need to allocate any extra buffer space.
+	 */
 
 	result = usb_stor_control_msg(us, us->recv_ctrl_pipe,
 			0x4c, 0xc0, 0x4346, 0x0, buffer, 0x20, 3*HZ);

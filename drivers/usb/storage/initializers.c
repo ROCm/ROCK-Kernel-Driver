@@ -47,37 +47,26 @@
  * mode */
 int usb_stor_euscsi_init(struct us_data *us)
 {
-	unsigned char data = 0x1;
 	int result;
 
 	US_DEBUGP("Attempting to init eUSCSI bridge...\n");
+	us->iobuf[0] = 0x1;
 	result = usb_stor_control_msg(us, us->send_ctrl_pipe,
 			0x0C, USB_RECIP_INTERFACE | USB_TYPE_VENDOR,
-			0x01, 0x0, &data, 0x1, 5*HZ);
+			0x01, 0x0, us->iobuf, 0x1, 5*HZ);
 	US_DEBUGP("-- result is %d\n", result);
-	US_DEBUGP("-- data afterwards is %d\n", data);
+	US_DEBUGP("-- data afterwards is %d\n", us->iobuf[0]);
 
 	return 0;
 }
 
 /* This function is required to activate all four slots on the UCR-61S2B
  * flash reader */
-
 int usb_stor_ucr61s2b_init(struct us_data *us)
 {
-	struct bulk_cb_wrap *bcb;
-	struct bulk_cs_wrap *bcs;
+	struct bulk_cb_wrap *bcb = (struct bulk_cb_wrap*) us->iobuf;
+	struct bulk_cs_wrap *bcs = (struct bulk_cs_wrap*) us->iobuf;
 	int res, partial;
-
-	bcb = kmalloc(sizeof *bcb, in_interrupt() ? GFP_ATOMIC : GFP_NOIO);
-	if (!bcb) {
-		return(-1);
-	}
-	bcs = kmalloc(sizeof *bcs, in_interrupt() ? GFP_ATOMIC : GFP_NOIO);
-	if (!bcs) {
-		kfree(bcb);
-		return(-1);
-	}
 
 	US_DEBUGP("Sending UCR-61S2B initialization packet...\n");
 
@@ -91,19 +80,12 @@ int usb_stor_ucr61s2b_init(struct us_data *us)
 
 	res = usb_stor_bulk_transfer_buf(us, us->send_bulk_pipe, bcb,
 			US_BULK_CB_WRAP_LEN, &partial);
-	US_DEBUGP("-- result is %d\n", res);
-	kfree(bcb);
+	if(res)
+		return res;
 
-	if(res) {
-		kfree(bcs);
-		return(res);
-	}
-
+	US_DEBUGP("Getting status packet...\n");
 	res = usb_stor_bulk_transfer_buf(us, us->recv_bulk_pipe, bcs,
 			US_BULK_CS_WRAP_LEN, &partial);
-	US_DEBUGP("-- result of status read is %d\n", res);
 
-	kfree(bcs);
-
-	return(res ? -1 : 0);
+	return (res ? -1 : 0);
 }

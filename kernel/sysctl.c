@@ -87,6 +87,11 @@ extern char reboot_command [];
 extern int stop_a_enabled;
 #endif
 
+#ifdef __hppa__
+extern int pwrsw_enabled;
+extern int unaligned_enabled;
+#endif
+
 #ifdef CONFIG_ARCH_S390
 #ifdef CONFIG_MATHEMU
 extern int sysctl_ieee_emulation_warnings;
@@ -312,6 +317,30 @@ static ctl_table kern_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
+#endif
+#ifdef __hppa__
+	{
+		.ctl_name	= KERN_HPPA_PWRSW,
+		.procname	= "soft-power",
+		.data		= &pwrsw_enabled,
+		.maxlen		= sizeof (int),
+	 	.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= KERN_HPPA_UNALIGNED,
+		.procname	= "unaligned-trap",
+		.data		= &unaligned_enabled,
+		.maxlen		= sizeof (int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+#endif
+#ifdef __hppa__
+	{KERN_HPPA_PWRSW, "soft-power", &pwrsw_enabled, sizeof (int),
+	 0644, NULL, &proc_dointvec},
+	{KERN_HPPA_UNALIGNED, "unaligned-trap", &unaligned_enabled, sizeof (int),
+	 0644, NULL, &proc_dointvec},
 #endif
 #if defined(CONFIG_PPC32) && defined(CONFIG_6xx)
 	{
@@ -819,11 +848,28 @@ int do_sysctl(int __user *name, int nlen, void __user *oldval, size_t __user *ol
 asmlinkage long sys_sysctl(struct __sysctl_args __user *args)
 {
 	struct __sysctl_args tmp;
+	int name[2];
 	int error;
 
 	if (copy_from_user(&tmp, args, sizeof(tmp)))
 		return -EFAULT;
-		
+	
+	if (tmp.nlen != 2 || copy_from_user(name, tmp.name, sizeof(name)) ||
+	    name[0] != CTL_KERN || name[1] != KERN_VERSION) { 
+		int i;
+		printk(KERN_INFO "%s: numerical sysctl ", current->comm); 
+		for (i = 0; i < tmp.nlen; i++) {
+			int n;
+			
+			if (get_user(n, tmp.name+i)) {
+				printk("? ");
+			} else {
+				printk("%d ", n);
+			}
+		}
+		printk("is obsolete.\n");
+	} 
+
 	lock_kernel();
 	error = do_sysctl(tmp.name, tmp.nlen, tmp.oldval, tmp.oldlenp,
 			  tmp.newval, tmp.newlen);

@@ -679,12 +679,11 @@ int aio_complete(struct kiocb *iocb, long res, long res2)
 	/* after flagging the request as done, we
 	 * must never even look at it again
 	 */
-	barrier();
+	smp_wmb();	/* make event visible before updating tail */
 
 	info->tail = tail;
 	ring->tail = tail;
 
-	wmb();
 	put_aio_ring_event(event, KM_IRQ0);
 	kunmap_atomic(ring, KM_IRQ1);
 
@@ -721,7 +720,7 @@ static int aio_read_evt(struct kioctx *ioctx, struct io_event *ent)
 	dprintk("in aio_read_evt h%lu t%lu m%lu\n",
 		 (unsigned long)ring->head, (unsigned long)ring->tail,
 		 (unsigned long)ring->nr);
-	barrier();
+
 	if (ring->head == ring->tail)
 		goto out;
 
@@ -732,7 +731,7 @@ static int aio_read_evt(struct kioctx *ioctx, struct io_event *ent)
 		struct io_event *evp = aio_ring_event(info, head, KM_USER1);
 		*ent = *evp;
 		head = (head + 1) % info->nr;
-		barrier();
+		smp_mb(); /* finish reading the event before updatng the head */
 		ring->head = head;
 		ret = 1;
 		put_aio_ring_event(evp, KM_USER1);

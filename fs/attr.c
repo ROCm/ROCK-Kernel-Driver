@@ -65,7 +65,7 @@ int inode_setattr(struct inode * inode, struct iattr * attr)
 	int error = 0;
 
 	if (ia_valid & ATTR_SIZE) {
-		if (attr->ia_size != inode->i_size) {
+		if (attr->ia_size != i_size_read(inode)) {
 			error = vmtruncate(inode, attr->ia_size);
 			if (error || (ia_valid == ATTR_SIZE))
 				goto out;

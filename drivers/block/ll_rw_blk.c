@@ -1546,7 +1546,7 @@ void drive_stat_acct(struct request *rq, int nr_sectors, int new_io)
 {
 	int rw = rq_data_dir(rq);
 
-	if (!rq->rq_disk)
+	if (!blk_fs_request(rq) || !rq->rq_disk)
 		return;
 
 	if (rw == READ) {
@@ -2354,7 +2354,7 @@ void end_that_request_last(struct request *req)
 	struct gendisk *disk = req->rq_disk;
 	struct completion *waiting = req->waiting;
 
-	if (disk) {
+	if (disk && blk_fs_request(req)) {
 		unsigned long duration = jiffies - req->start_time;
 		switch (rq_data_dir(req)) {
 		    case WRITE:

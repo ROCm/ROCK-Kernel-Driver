@@ -1,4 +1,12 @@
-/* drm_ioctl.h -- IOCTL processing for DRM -*- linux-c -*-
+/**
+ * \file drm_ioctl.h 
+ * IOCTL processing for DRM
+ *
+ * \author Rickard E. (Rik) Faith <faith@valinux.com>
+ * \author Gareth Hughes <gareth@valinux.com>
+ */
+
+/*
  * Created: Fri Jan  8 09:01:26 1999 by faith@valinux.com
  *
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
@@ -23,15 +31,22 @@
  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
- *
- * Authors:
- *    Rickard E. (Rik) Faith <faith@valinux.com>
- *    Gareth Hughes <gareth@valinux.com>
  */
 
 #include "drmP.h"
 
 
+/**
+ * Get interrupt from bus id.
+ * 
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param arg user argument, pointing to a drm_irq_busid structure.
+ * \return zero on success or a negative number on failure.
+ * 
+ * Finds the PCI device with the specified bus id and gets its IRQ number.
+ */
 int DRM(irq_busid)(struct inode *inode, struct file *filp,
 		   unsigned int cmd, unsigned long arg)
 {
@@ -84,6 +99,17 @@ int DRM(irq_busid)(struct inode *inode, struct file *filp,
 	return 0;
 }
 
+/**
+ * Get the bus id.
+ * 
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param arg user argument, pointing to a drm_unique structure.
+ * \return zero on success or a negative number on failure.
+ *
+ * Copies the bus id from drm_device::unique into user space.
+ */
 int DRM(getunique)(struct inode *inode, struct file *filp,
 		   unsigned int cmd, unsigned long arg)
 {
@@ -103,6 +129,18 @@ int DRM(getunique)(struct inode *inode, struct file *filp,
 	return 0;
 }
 
+/**
+ * Set the bus id.
+ * 
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param arg user argument, pointing to a drm_unique structure.
+ * \return zero on success or a negative number on failure.
+ *
+ * Copies the bus id from userspace into drm_device::unique, and searches for
+ * the respective PCI device, updating drm_device::pdev.
+ */
 int DRM(setunique)(struct inode *inode, struct file *filp,
 		   unsigned int cmd, unsigned long arg)
 {
@@ -180,6 +218,19 @@ int DRM(setunique)(struct inode *inode, struct file *filp,
 }
 
 
+/**
+ * Get a mapping information.
+ *
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param arg user argument, pointing to a drm_map structure.
+ * 
+ * \return zero on success or a negative number on failure.
+ *
+ * Searches for the mapping with the specified offset and copies its information
+ * into userspace
+ */
 int DRM(getmap)( struct inode *inode, struct file *filp,
 		 unsigned int cmd, unsigned long arg )
 {
@@ -226,6 +277,19 @@ int DRM(getmap)( struct inode *inode, struct file *filp,
 	return 0;
 }
 
+/**
+ * Get client information.
+ *
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param arg user argument, pointing to a drm_client structure.
+ * 
+ * \return zero on success or a negative number on failure.
+ *
+ * Searches for the client with the specified index and copies its information
+ * into userspace
+ */
 int DRM(getclient)( struct inode *inode, struct file *filp,
 		    unsigned int cmd, unsigned long arg )
 {
@@ -259,6 +323,16 @@ int DRM(getclient)( struct inode *inode, struct file *filp,
 	return 0;
 }
 
+/** 
+ * Get statistics information. 
+ * 
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param arg user argument, pointing to a drm_stats structure.
+ * 
+ * \return zero on success or a negative number on failure.
+ */
 int DRM(getstats)( struct inode *inode, struct file *filp,
 		   unsigned int cmd, unsigned long arg )
 {

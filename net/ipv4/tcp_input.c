@@ -3693,7 +3693,24 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 
 		tcp_sync_mss(sk, tp->pmtu_cookie);
 		tcp_initialize_rcv_mss(sk);
+
+		/* Remember, tcp_poll() does not lock socket!
+		 * Change state from SYN-SENT only after copied_seq
+		 * is initialized. */
+		tp->copied_seq = tp->rcv_nxt;
+		mb();
+		tcp_set_state(sk, TCP_ESTABLISHED);
+
+		/* Make sure socket is routed, for correct metrics.  */
+		tp->af_specific->rebuild_header(sk);
+
 		tcp_init_metrics(sk);
+
+		/* Prevent spurious tcp_cwnd_restart() on first data
+		 * packet.
+		 */
+		tp->lsndtime = tcp_time_stamp;
+
 		tcp_init_buffer_space(sk);
 
 		if (sock_flag(sk, SOCK_KEEPOPEN))
@@ -3703,13 +3720,6 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 			__tcp_fast_path_on(tp, tp->snd_wnd);
 		else
 			tp->pred_flags = 0;
-
-		/* Remember, tcp_poll() does not lock socket!
-		 * Change state from SYN-SENT only after copied_seq
-		 * is initialized. */
-		tp->copied_seq = tp->rcv_nxt;
-		mb();
-		tcp_set_state(sk, TCP_ESTABLISHED);
 
 		if (!sock_flag(sk, SOCK_DEAD)) {
 			sk->sk_state_change(sk);
@@ -3959,7 +3969,18 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb,
 				if (tp->tstamp_ok)
 					tp->advmss -= TCPOLEN_TSTAMP_ALIGNED;
 
+				/* Make sure socket is routed, for
+				 * correct metrics.
+				 */
+				tp->af_specific->rebuild_header(sk);
+
 				tcp_init_metrics(sk);
+
+				/* Prevent spurious tcp_cwnd_restart() on
+				 * first data packet.
+				 */
+				tp->lsndtime = tcp_time_stamp;
+
 				tcp_initialize_rcv_mss(sk);
 				tcp_init_buffer_space(sk);
 				tcp_fast_path_on(tp);

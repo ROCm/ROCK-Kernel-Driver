@@ -127,7 +127,7 @@ static int skip_atoi(const char **s)
 #define SPECIAL	32		/* 0x */
 #define LARGE	64		/* use 'ABCDEF' instead of 'abcdef' */
 
-static char * number(char * buf, char * end, long long num, int base, int size, int precision, int type)
+static char * number(char * buf, char * end, unsigned long long num, int base, int size, int precision, int type)
 {
 	char c,sign,tmp[66];
 	const char *digits;
@@ -143,9 +143,9 @@ static char * number(char * buf, char * end, long long num, int base, int size, 
 	c = (type & ZEROPAD) ? '0' : ' ';
 	sign = 0;
 	if (type & SIGN) {
-		if (num < 0) {
+		if ((signed long long) num < 0) {
 			sign = '-';
-			num = -num;
+			num = - (signed long long) num;
 			size--;
 		} else if (type & PLUS) {
 			sign = '+';

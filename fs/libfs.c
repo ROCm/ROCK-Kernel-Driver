@@ -328,8 +328,12 @@ int simple_commit_write(struct file *file, struct page *page,
 	struct inode *inode = page->mapping->host;
 	loff_t pos = ((loff_t)page->index << PAGE_CACHE_SHIFT) + to;
 
+	/*
+	 * No need to use i_size_read() here, the i_size
+	 * cannot change under us because we hold the i_sem.
+	 */
 	if (pos > inode->i_size)
-		inode->i_size = pos;
+		i_size_write(inode, pos);
 	set_page_dirty(page);
 	return 0;
 }

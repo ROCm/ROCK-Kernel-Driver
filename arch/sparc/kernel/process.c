@@ -287,12 +287,21 @@ void show_regs(struct pt_regs *r)
 	       rw->ins[4], rw->ins[5], rw->ins[6], rw->ins[7]);
 }
 
+/*
+ * The show_stack is an external API which we do not use ourselves.
+ * The oops is printed in die_if_kernel.
+ */
 void show_stack(struct task_struct *tsk, unsigned long *_ksp)
 {
 	unsigned long pc, fp;
-	unsigned long task_base = (unsigned long) tsk;
+	unsigned long task_base;
 	struct reg_window *rw;
 	int count = 0;
+
+	if (tsk != NULL)
+		task_base = (unsigned long) tsk->thread_info;
+	else
+		task_base = (unsigned long) current_thread_info();
 
 	fp = (unsigned long) _ksp;
 	do {
@@ -306,13 +315,6 @@ void show_stack(struct task_struct *tsk, unsigned long *_ksp)
 		fp = rw->ins[6];
 	} while (++count < 16);
 	printk("\n");
-}
-
-void show_trace_task(struct task_struct *tsk)
-{
-	if (tsk)
-		show_stack(tsk,
-			   (unsigned long *) tsk->thread_info->ksp);
 }
 
 /*

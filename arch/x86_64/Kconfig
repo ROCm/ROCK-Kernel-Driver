@@ -540,13 +540,6 @@ config INIT_DEBUG
 	  Fill __init and __initdata at the end of boot. This helps debugging
 	  illegal uses of __init and __initdata after initialization.	  
 
-config KALLSYMS
-	bool "Load all symbols for debugging/kksymoops"
-	help
-	  Say Y here to let the kernel print out symbolic crash information and
-	  symbolic stack backtraces. This increases the size of the kernel
-	  somewhat, as all symbols have to be loaded into the kernel image.
-
 config FRAME_POINTER
        bool "Compile the kernel with frame pointers"
        help

@@ -258,7 +258,7 @@ static int mtd_modify_window(window_handle_t win, mtd_mod_win_t *req)
 	win->ctl.flags |= MAP_ATTRIB;
     win->ctl.speed = req->AccessSpeed;
     win->ctl.card_start = req->CardOffset;
-    win->sock->ss_entry->set_mem_map(win->sock, &win->ctl);
+    win->sock->ops->set_mem_map(win->sock, &win->ctl);
     return CS_SUCCESS;
 }
 
@@ -271,7 +271,7 @@ static int mtd_set_vpp(client_handle_t handle, mtd_vpp_req_t *req)
 	return CS_BAD_VPP;
     s = SOCKET(handle);
     s->socket.Vpp = req->Vpp1;
-    if (s->ss_entry->set_socket(s, &s->socket))
+    if (s->ops->set_socket(s, &s->socket))
 	return CS_BAD_VPP;
     return CS_SUCCESS;
 }
@@ -286,7 +286,7 @@ static int mtd_rdy_mask(client_handle_t handle, mtd_rdy_req_t *req)
 	s->socket.csc_mask |= SS_READY;
     else
 	s->socket.csc_mask &= ~SS_READY;
-    if (s->ss_entry->set_socket(s, &s->socket))
+    if (s->ops->set_socket(s, &s->socket))
 	return CS_GENERAL_FAILURE;
     return CS_SUCCESS;
 }

@@ -118,6 +118,14 @@ menuconfig EMBEDDED
 	  a "non-standard" kernel.  Only use this if you really know what you
 	  are doing.
 
+config KALLSYMS
+	 bool "Load all symbols for debugging/kksymoops" if EMBEDDED
+	 default y
+	 help
+	   Say Y here to let the kernel print out symbolic crash information and
+	   symbolic stack backtraces. This increases the size of the kernel
+	   somewhat, as all symbols have to be loaded into the kernel image.
+
 config FUTEX
 	bool "Enable futex support" if EMBEDDED
 	default y

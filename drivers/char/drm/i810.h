@@ -45,7 +45,7 @@
 
 #define DRIVER_NAME		"i810"
 #define DRIVER_DESC		"Intel i810"
-#define DRIVER_DATE		"20020211"
+#define DRIVER_DATE		"20030605"
 
 /* Interface history
  *
@@ -54,10 +54,11 @@
  *       - XFree86 4.2
  * 1.2.1 - Disable copying code (leave stub ioctls for backwards compatibility)
  *       - Remove requirement for interrupt (leave stubs again)
+ * 1.3   - Add page flipping.
  */
 #define DRIVER_MAJOR		1
-#define DRIVER_MINOR		2
-#define DRIVER_PATCHLEVEL	1
+#define DRIVER_MINOR		3
+#define DRIVER_PATCHLEVEL	0
 
 #define DRIVER_IOCTLS							    \
 	[DRM_IOCTL_NR(DRM_IOCTL_I810_INIT)]   = { i810_dma_init,    1, 1 }, \
@@ -73,8 +74,9 @@
 	[DRM_IOCTL_NR(DRM_IOCTL_I810_FSTATUS)] = { i810_fstatus,    1, 0 }, \
 	[DRM_IOCTL_NR(DRM_IOCTL_I810_OV0FLIP)] = { i810_ov0_flip,   1, 0 }, \
 	[DRM_IOCTL_NR(DRM_IOCTL_I810_MC)]      = { i810_dma_mc,     1, 1 }, \
-	[DRM_IOCTL_NR(DRM_IOCTL_I810_RSTATUS)] = { i810_rstatus,    1, 0 }
-
+	[DRM_IOCTL_NR(DRM_IOCTL_I810_RSTATUS)] = { i810_rstatus,    1, 0 }, \
+	[DRM_IOCTL_NR(DRM_IOCTL_I810_FLIP)] =    { i810_flip_bufs,  1, 0 }
+ 
 
 #define __HAVE_COUNTERS         4
 #define __HAVE_COUNTER6         _DRM_STAT_IRQ

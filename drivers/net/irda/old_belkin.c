@@ -32,8 +32,6 @@
 #include <linux/delay.h>
 #include <linux/tty.h>
 #include <linux/init.h>
-#include <linux/net.h>
-#include <linux/irda.h>
 
 #include <net/irda/irda.h>
 #include <net/irda/irda_device.h>

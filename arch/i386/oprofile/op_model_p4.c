@@ -278,7 +278,7 @@ static struct p4_event_binding p4_events[NUM_EVENTS] = {
 	},
 
 	{ /* GLOBAL_POWER_EVENTS */
-		0x06, 0x13 /* manual says 0x05 */, 
+		0x06, 0x13 /* older manual says 0x05, newer 0x13 */,
 		{ { CTR_BPU_0, MSR_P4_FSB_ESCR0},
 		  { CTR_BPU_2, MSR_P4_FSB_ESCR1} }
 	},

@@ -191,7 +191,7 @@ unmap_buffers(struct page *page, loff_t pos) {
 	bh = next ;
       } while (bh != head) ;
       if ( PAGE_SIZE == bh->b_size ) {
-	ClearPageDirty(page);
+	clear_page_dirty(page);
       }
     }
   } 

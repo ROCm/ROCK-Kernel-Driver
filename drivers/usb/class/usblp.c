@@ -146,6 +146,7 @@ struct usblp {
 	int			rcomplete;		/* reading is completed */
 	unsigned int		quirks;			/* quirks flags */
 	unsigned char		used;			/* True if open */
+	unsigned char		present;		/* True if not disconnected */
 	unsigned char		bidir;			/* interface is bidirectional */
 	unsigned char		*device_id_string;	/* IEEE 1284 DEVICE ID string (ptr) */
 							/* first 2 bytes are (big-endian) length */
@@ -157,6 +158,7 @@ static void usblp_dump(struct usblp *usblp) {
 
 	dbg("usblp=0x%p", usblp);
 	dbg("dev=0x%p", usblp->dev);
+	dbg("present=%d", usblp->present);
 	dbg("buf=0x%p", usblp->buf);
 	dbg("readcount=%d", usblp->readcount);
 	dbg("ifnum=%d", usblp->ifnum);
@@ -253,7 +255,7 @@ static void usblp_bulk_read(struct urb *urb, struct pt_regs *regs)
 {
 	struct usblp *usblp = urb->context;
 
-	if (!usblp || !usblp->dev || !usblp->used)
+	if (!usblp || !usblp->dev || !usblp->used || !usblp->present)
 		return;
 
 	if (unlikely(urb->status))
@@ -267,7 +269,7 @@ static void usblp_bulk_write(struct urb *urb, struct pt_regs *regs)
 {
 	struct usblp *usblp = urb->context;
 
-	if (!usblp || !usblp->dev || !usblp->used)
+	if (!usblp || !usblp->dev || !usblp->used || !usblp->present)
 		return;
 
 	if (unlikely(urb->status))
@@ -332,7 +334,7 @@ static int usblp_open(struct inode *inode, struct file *file)
 		goto out;
 	}
 	usblp = usb_get_intfdata (intf);
-	if (!usblp || !usblp->dev)
+	if (!usblp || !usblp->dev || !usblp->present)
 		goto out;
 
 	retval = -EBUSY;
@@ -404,7 +406,7 @@ static int usblp_release(struct inode *inode, struct file *file)
 	down (&usblp->sem);
 	lock_kernel();
 	usblp->used = 0;
-	if (usblp->dev) {
+	if (usblp->present) {
 		usblp_unlink_urbs(usblp);
 		up(&usblp->sem);
 	} else 		/* finish cleanup from disconnect */
@@ -432,7 +434,7 @@ static int usblp_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	int retval = 0;
 
 	down (&usblp->sem);
-	if (!usblp->dev) {
+	if (!usblp->present) {
 		retval = -ENODEV;
 		goto done;
 	}
@@ -630,7 +632,7 @@ static ssize_t usblp_write(struct file *file, const char __user *buffer, size_t 
 		}
 
 		down (&usblp->sem);
-		if (!usblp->dev) {
+		if (!usblp->present) {
 			up (&usblp->sem);
 			return -ENODEV;
 		}
@@ -691,7 +693,7 @@ static ssize_t usblp_read(struct file *file, char __user *buffer, size_t count, 
 		return -EINVAL;
 
 	down (&usblp->sem);
-	if (!usblp->dev) {
+	if (!usblp->present) {
 		count = -ENODEV;
 		goto done;
 	}
@@ -726,7 +728,7 @@ static ssize_t usblp_read(struct file *file, char __user *buffer, size_t count, 
 		remove_wait_queue(&usblp->wait, &wait);
 	}
 
-	if (!usblp->dev) {
+	if (!usblp->present) {
 		count = -ENODEV;
 		goto done;
 	}
@@ -915,6 +917,8 @@ static int usblp_probe(struct usb_interface *intf,
 		usblp->dev->descriptor.idProduct);
 
 	usb_set_intfdata (intf, usblp);
+
+	usblp->present = 1;
 
 	return 0;
 
@@ -1115,14 +1119,14 @@ static void usblp_disconnect(struct usb_interface *intf)
 
 	down (&usblp->sem);
 	lock_kernel();
-	usblp->dev = NULL;
+	usblp->present = 0;
 	usb_set_intfdata (intf, NULL);
 
 	usblp_unlink_urbs(usblp);
 
 	if (!usblp->used)
 		usblp_cleanup (usblp);
-	else 	/* cleanup later, on close */
+	else 	/* cleanup later, on release */
 		up (&usblp->sem);
 	unlock_kernel();
 }

@@ -161,7 +161,7 @@ static int ricoh_override(struct yenta_socket *socket)
 		rl_config(socket) |= RL5C4XX_CONFIG_PREFETCH;
 	}
 
-	socket->socket.ss_entry->init = ricoh_init;
+	socket->socket.ops->init = ricoh_init;
 
 	return 0;
 }

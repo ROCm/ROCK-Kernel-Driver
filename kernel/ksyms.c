@@ -41,6 +41,7 @@
 #include <linux/capability.h>
 #include <linux/highuid.h>
 #include <linux/fs.h>
+#include <linux/fs_struct.h>
 #include <linux/uio.h>
 #include <linux/tty.h>
 #include <linux/in6.h>
@@ -76,6 +77,8 @@ EXPORT_SYMBOL(do_mmap_pgoff);
 EXPORT_SYMBOL(do_munmap);
 EXPORT_SYMBOL(do_brk);
 EXPORT_SYMBOL(exit_mm);
+EXPORT_SYMBOL_GPL(exit_fs);
+EXPORT_SYMBOL_GPL(copy_fs_struct);
 
 /* internal kernel memory management */
 EXPORT_SYMBOL(__alloc_pages);

@@ -646,9 +646,6 @@ static void skel_disconnect(struct usb_interface *interface)
 	dev = usb_get_intfdata (interface);
 	usb_set_intfdata (interface, NULL);
 
-	if (!dev)
-		return;
-
 	down (&dev->sem);
 
 	/* disable open() */

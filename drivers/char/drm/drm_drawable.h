@@ -1,4 +1,12 @@
-/* drm_drawable.h -- IOCTLs for drawables -*- linux-c -*-
+/**
+ * \file drm_drawable.h 
+ * IOCTLs for drawables
+ *
+ * \author Rickard E. (Rik) Faith <faith@valinux.com>
+ * \author Gareth Hughes <gareth@valinux.com>
+ */
+
+/*
  * Created: Tue Feb  2 08:37:54 1999 by faith@valinux.com
  *
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
@@ -23,14 +31,11 @@
  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
- *
- * Authors:
- *    Rickard E. (Rik) Faith <faith@valinux.com>
- *    Gareth Hughes <gareth@valinux.com>
  */
 
 #include "drmP.h"
 
+/** No-op. */
 int DRM(adddraw)(struct inode *inode, struct file *filp,
 		 unsigned int cmd, unsigned long arg)
 {
@@ -43,6 +48,7 @@ int DRM(adddraw)(struct inode *inode, struct file *filp,
 	return 0;
 }
 
+/** No-op. */
 int DRM(rmdraw)(struct inode *inode, struct file *filp,
 		unsigned int cmd, unsigned long arg)
 {

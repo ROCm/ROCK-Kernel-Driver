@@ -214,6 +214,9 @@
                                     (CODEC)->supported_mixers & (1<<FOO) )
 
 struct ac97_codec {
+	/* Linked list of codecs */
+	struct list_head list;
+
 	/* AC97 controller connected with */
 	void *private_data;
 
@@ -221,21 +224,36 @@ struct ac97_codec {
 	int id;
 	int dev_mixer; 
 	int type;
+	u32 model;
+
+	int modem:1;
 
 	struct ac97_ops *codec_ops;
 
-	/* controller specific lower leverl ac97 accessing routines */
+	/* controller specific lower leverl ac97 accessing routines.
+	   must be re-entrant safe */
 	u16  (*codec_read)  (struct ac97_codec *codec, u8 reg);
 	void (*codec_write) (struct ac97_codec *codec, u8 reg, u16 val);
 
 	/* Wait for codec-ready.  Ok to sleep here.  */
 	void  (*codec_wait)  (struct ac97_codec *codec);
 
+	/* callback used by helper drivers for interesting ac97 setups */
+	void  (*codec_unregister) (struct ac97_codec *codec);
+	
+	struct ac97_driver *driver;
+	void *driver_private;	/* Private data for the driver */
+	
+	spinlock_t lock;
+	
 	/* OSS mixer masks */
 	int modcnt;
 	int supported_mixers;
 	int stereo_mixers;
 	int record_sources;
+
+	/* Property flags */
+	int flags;
 
 	int bit_resolution;
 
@@ -264,7 +282,14 @@ struct ac97_ops
 	/* Amplifier control */
 	int (*amplifier)(struct ac97_codec *codec, int on);
 	/* Digital mode control */
-	int (*digital)(struct ac97_codec *codec, int format);
+	int (*digital)(struct ac97_codec *codec, int slots, int rate, int mode);
+#define AUDIO_DIGITAL		0x8000
+#define AUDIO_PRO		0x4000
+#define AUDIO_DRS		0x2000
+#define AUDIO_CCMASK		0x003F
+	
+#define AC97_DELUDED_MODEM	1	/* Audio codec reports its a modem */
+#define AC97_NO_PCM_VOLUME	2	/* Volume control is missing 	   */
 };
 
 extern int ac97_read_proc (char *page_out, char **start, off_t off,
@@ -274,5 +299,20 @@ extern unsigned int ac97_set_adc_rate(struct ac97_codec *codec, unsigned int rat
 extern unsigned int ac97_set_dac_rate(struct ac97_codec *codec, unsigned int rate);
 extern int ac97_save_state(struct ac97_codec *codec);
 extern int ac97_restore_state(struct ac97_codec *codec);
+
+extern struct ac97_codec *ac97_alloc_codec(void);
+extern void ac97_release_codec(struct ac97_codec *codec);
+
+struct ac97_driver {
+	struct list_head list;
+	char *name;
+	u32 codec_id;
+	u32 codec_mask;
+	int (*probe) (struct ac97_codec *codec, struct ac97_driver *driver);
+	void (*remove) (struct ac97_codec *codec, struct ac97_driver *driver);
+};
+
+extern int ac97_register_driver(struct ac97_driver *driver);
+extern void ac97_unregister_driver(struct ac97_driver *driver);
 
 #endif /* _AC97_CODEC_H_ */

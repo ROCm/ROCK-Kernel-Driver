@@ -360,7 +360,7 @@ static int checksum(struct pcmcia_socket *s, struct resource *res)
 		map.sys_start = res->start;
 		map.sys_stop = res->end;
 		map.card_start = 0;
-		s->ss_entry->set_mem_map(s, &map);
+		s->ops->set_mem_map(s, &map);
 
 		/* Don't bother checking every word... */
 		for (i = 0; i < s->map_size; i += 44) {
@@ -370,7 +370,7 @@ static int checksum(struct pcmcia_socket *s, struct resource *res)
 		}
 
 		map.flags = 0;
-		s->ss_entry->set_mem_map(s, &map);
+		s->ops->set_mem_map(s, &map);
 
 		iounmap(virt);
 	}

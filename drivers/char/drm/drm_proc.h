@@ -1,4 +1,16 @@
-/* drm_proc.h -- /proc support for DRM -*- linux-c -*-
+/**
+ * \file drm_proc.h 
+ * /proc support for DRM
+ *
+ * \author Rickard E. (Rik) Faith <faith@valinux.com>
+ * \author Gareth Hughes <gareth@valinux.com>
+ *
+ * \par Acknowledgements:
+ *    Matthew J Sottek <matthew.j.sottek@intel.com> sent in a patch to fix
+ *    the problem with the proc files not outputting all their information.
+ */
+
+/*
  * Created: Mon Jan 11 09:48:47 1999 by faith@valinux.com
  *
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
@@ -23,14 +35,6 @@
  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
- *
- * Authors:
- *    Rickard E. (Rik) Faith <faith@valinux.com>
- *    Gareth Hughes <gareth@valinux.com>
- *
- * Acknowledgements:
- *    Matthew J Sottek <matthew.j.sottek@intel.com> sent in a patch to fix
- *    the problem with the proc files not outputting all their information.
  */
 
 #include "drmP.h"
@@ -50,9 +54,12 @@ static int	   DRM(vma_info)(char *buf, char **start, off_t offset,
 				 int request, int *eof, void *data);
 #endif
 
+/**
+ * Proc file list.
+ */
 struct drm_proc_list {
-	const char *name;
-	int	   (*f)(char *, char **, off_t, int, int *, void *);
+	const char *name;	/**< file name */
+	int	   (*f)(char *, char **, off_t, int, int *, void *);	/**< proc callback*/
 } DRM(proc_list)[] = {
 	{ "name",    DRM(name_info)    },
 	{ "mem",     DRM(mem_info)     },
@@ -66,6 +73,19 @@ struct drm_proc_list {
 };
 #define DRM_PROC_ENTRIES (sizeof(DRM(proc_list))/sizeof(DRM(proc_list)[0]))
 
+/**
+ * Initialize the DRI proc filesystem for a device.
+ *
+ * \param dev DRM device.
+ * \param minor device minor number.
+ * \param root DRI proc dir entry.
+ * \param dev_root resulting DRI device proc dir entry.
+ * \return root entry pointer on success, or NULL on failure.
+ * 
+ * Create the DRI proc root entry "/proc/dri", the device proc root entry
+ * "/proc/dri/%minor%/", and each entry in proc_list as
+ * "/proc/dri/%minor%/%name%".
+ */
 struct proc_dir_entry *DRM(proc_init)(drm_device_t *dev, int minor,
 				      struct proc_dir_entry *root,
 				      struct proc_dir_entry **dev_root)
@@ -83,7 +103,7 @@ struct proc_dir_entry *DRM(proc_init)(drm_device_t *dev, int minor,
 	sprintf(name, "%d", minor);
 	*dev_root = create_proc_entry(name, S_IFDIR, root);
 	if (!*dev_root) {
-		DRM_ERROR("Cannot create /proc/%s\n", name);
+		DRM_ERROR("Cannot create /proc/dri/%s\n", name);
 		return NULL;
 	}
 
@@ -108,6 +128,16 @@ struct proc_dir_entry *DRM(proc_init)(drm_device_t *dev, int minor,
 }
 
 
+/**
+ * Cleanup the proc filesystem resources.
+ *
+ * \param minor device minor number.
+ * \param root DRI proc dir entry.
+ * \param dev_root DRI device proc dir entry.
+ * \return always zero.
+ *
+ * Remove all proc entries created by proc_init().
+ */
 int DRM(proc_cleanup)(int minor, struct proc_dir_entry *root,
 		      struct proc_dir_entry *dev_root)
 {
@@ -125,6 +155,19 @@ int DRM(proc_cleanup)(int minor, struct proc_dir_entry *root,
 	return 0;
 }
 
+/**
+ * Called when "/proc/dri/.../name" is read.
+ * 
+ * \param buf output buffer.
+ * \param start start of output data.
+ * \param offset requested start offset.
+ * \param request requested number of bytes.
+ * \param eof whether there is no more data to return.
+ * \param data private data.
+ * \return number of written bytes.
+ * 
+ * Prints the device name together with the bus id if available.
+ */
 static int DRM(name_info)(char *buf, char **start, off_t offset, int request,
 			  int *eof, void *data)
 {
@@ -151,6 +194,19 @@ static int DRM(name_info)(char *buf, char **start, off_t offset, int request,
 	return len - offset;
 }
 
+/**
+ * Called when "/proc/dri/.../vm" is read.
+ * 
+ * \param buf output buffer.
+ * \param start start of output data.
+ * \param offset requested start offset.
+ * \param request requested number of bytes.
+ * \param eof whether there is no more data to return.
+ * \param data private data.
+ * \return number of written bytes.
+ * 
+ * Prints information about all mappings in drm_device::maplist.
+ */
 static int DRM(_vm_info)(char *buf, char **start, off_t offset, int request,
 			 int *eof, void *data)
 {
@@ -204,6 +260,9 @@ static int DRM(_vm_info)(char *buf, char **start, off_t offset, int request,
 	return len - offset;
 }
 
+/**
+ * Simply calls _vm_info() while holding the drm_device::struct_sem lock.
+ */
 static int DRM(vm_info)(char *buf, char **start, off_t offset, int request,
 			int *eof, void *data)
 {
@@ -216,7 +275,17 @@ static int DRM(vm_info)(char *buf, char **start, off_t offset, int request,
 	return ret;
 }
 
-
+/**
+ * Called when "/proc/dri/.../queues" is read.
+ * 
+ * \param buf output buffer.
+ * \param start start of output data.
+ * \param offset requested start offset.
+ * \param request requested number of bytes.
+ * \param eof whether there is no more data to return.
+ * \param data private data.
+ * \return number of written bytes.
+ */
 static int DRM(_queues_info)(char *buf, char **start, off_t offset,
 			     int request, int *eof, void *data)
 {
@@ -261,6 +330,9 @@ static int DRM(_queues_info)(char *buf, char **start, off_t offset,
 	return len - offset;
 }
 
+/**
+ * Simply calls _queues_info() while holding the drm_device::struct_sem lock.
+ */
 static int DRM(queues_info)(char *buf, char **start, off_t offset, int request,
 			    int *eof, void *data)
 {
@@ -273,9 +345,17 @@ static int DRM(queues_info)(char *buf, char **start, off_t offset, int request,
 	return ret;
 }
 
-/* drm_bufs_info is called whenever a process reads
-   /dev/dri/<dev>/bufs. */
-
+/**
+ * Called when "/proc/dri/.../bufs" is read.
+ * 
+ * \param buf output buffer.
+ * \param start start of output data.
+ * \param offset requested start offset.
+ * \param request requested number of bytes.
+ * \param eof whether there is no more data to return.
+ * \param data private data.
+ * \return number of written bytes.
+ */
 static int DRM(_bufs_info)(char *buf, char **start, off_t offset, int request,
 			   int *eof, void *data)
 {
@@ -320,6 +400,9 @@ static int DRM(_bufs_info)(char *buf, char **start, off_t offset, int request,
 	return len - offset;
 }
 
+/**
+ * Simply calls _bufs_info() while holding the drm_device::struct_sem lock.
+ */
 static int DRM(bufs_info)(char *buf, char **start, off_t offset, int request,
 			  int *eof, void *data)
 {
@@ -332,7 +415,17 @@ static int DRM(bufs_info)(char *buf, char **start, off_t offset, int request,
 	return ret;
 }
 
-
+/**
+ * Called when "/proc/dri/.../clients" is read.
+ * 
+ * \param buf output buffer.
+ * \param start start of output data.
+ * \param offset requested start offset.
+ * \param request requested number of bytes.
+ * \param eof whether there is no more data to return.
+ * \param data private data.
+ * \return number of written bytes.
+ */
 static int DRM(_clients_info)(char *buf, char **start, off_t offset,
 			      int request, int *eof, void *data)
 {
@@ -364,6 +457,9 @@ static int DRM(_clients_info)(char *buf, char **start, off_t offset,
 	return len - offset;
 }
 
+/**
+ * Simply calls _clients_info() while holding the drm_device::struct_sem lock.
+ */
 static int DRM(clients_info)(char *buf, char **start, off_t offset,
 			     int request, int *eof, void *data)
 {

@@ -45,6 +45,9 @@ xfs_db -V 2>&1 | grep version | awk \
 cardmgr -V 2>&1| grep version | awk \
 'NR==1{print "pcmcia-cs             ", $3}'
 
+quota -V 2>&1 | grep version | awk \
+'NR==1{print "quota-tools           ", $NF}'
+
 pppd --version 2>&1| grep version | awk \
 'NR==1{print "PPP                   ", $3}'
 

@@ -2799,8 +2799,8 @@ static int __init happy_meal_sbus_init(struct sbus_dev *sdev, int is_qfe)
 	dev->watchdog_timeo = 5*HZ;
 	dev->do_ioctl = &happy_meal_ioctl;
 
-	/* Happy Meal can do it all... */
-	dev->features |= NETIF_F_SG | NETIF_F_HW_CSUM;
+	/* Happy Meal can do it all... except VLAN. */
+	dev->features |= NETIF_F_SG | NETIF_F_HW_CSUM | NETIF_F_VLAN_CHALLENGED;
 
 	dev->irq = sdev->irqs[0];
 

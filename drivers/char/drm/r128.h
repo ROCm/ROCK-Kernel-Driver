@@ -47,13 +47,17 @@
 
 #define DRIVER_NAME		"r128"
 #define DRIVER_DESC		"ATI Rage 128"
-#define DRIVER_DATE		"20021029"
+#define DRIVER_DATE		"20030526"
 
 #define DRIVER_MAJOR		2
-#define DRIVER_MINOR		3
+#define DRIVER_MINOR		4
 #define DRIVER_PATCHLEVEL	0
 
-
+/* Interface history:
+ *
+ * ??  - ??
+ * 2.4 - Add support for ycbcr textures (no new ioctls)
+ */
 #define DRIVER_IOCTLS							    \
    [DRM_IOCTL_NR(DRM_IOCTL_DMA)]             = { r128_cce_buffers,  1, 0 }, \
    [DRM_IOCTL_NR(DRM_IOCTL_R128_INIT)]       = { r128_cce_init,     1, 1 }, \

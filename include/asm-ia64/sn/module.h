@@ -14,7 +14,6 @@ extern "C" {
 
 
 #include <linux/config.h>
-#include <asm/sn/systeminfo.h>
 #include <asm/sn/klconfig.h>
 #include <asm/sn/ksys/elsc.h>
 
@@ -193,8 +192,6 @@ extern int		nummodules;
 
 extern module_t	       *module_lookup(moduleid_t id);
 
-extern int		get_kmod_info(cmoduleid_t cmod,
-				      module_info_t *mod_info);
 extern int		get_kmod_sys_snum(cmoduleid_t cmod,
 					  char *snum);
 

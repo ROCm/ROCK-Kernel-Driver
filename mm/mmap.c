@@ -476,10 +476,10 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 	if (!len)
 		return addr;
 
-	if (len > TASK_SIZE)
-		return -EINVAL;
-
+	/* Careful about overflows.. */
 	len = PAGE_ALIGN(len);
+	if (!len || len > TASK_SIZE)
+		return -EINVAL;
 
 	/* offset overflow? */
 	if ((pgoff + (len >> PAGE_SHIFT)) < pgoff)

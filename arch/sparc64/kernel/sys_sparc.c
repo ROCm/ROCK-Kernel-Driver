@@ -46,8 +46,10 @@ asmlinkage unsigned long sys_getpagesize(void)
 
 unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr, unsigned long len, unsigned long pgoff, unsigned long flags)
 {
-	struct vm_area_struct * vmm;
+	struct mm_struct *mm = current->mm;
+	struct vm_area_struct * vma;
 	unsigned long task_size = TASK_SIZE;
+	unsigned long start_addr;
 	int do_color_align;
 
 	if (flags & MAP_FIXED) {
@@ -63,30 +65,54 @@ unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr, unsi
 		task_size = 0xf0000000UL;
 	if (len > task_size || len > -PAGE_OFFSET)
 		return -ENOMEM;
-	if (!addr)
-		addr = TASK_UNMAPPED_BASE;
 
 	do_color_align = 0;
 	if (filp || (flags & MAP_SHARED))
 		do_color_align = 1;
 
+	if (addr) {
+		if (do_color_align)
+			addr = COLOUR_ALIGN(addr, pgoff);
+		else
+			addr = PAGE_ALIGN(addr);
+
+		vma = find_vma(mm, addr);
+		if (task_size - len >= addr &&
+		    (!vma || addr + len <= vma->vm_start))
+			return addr;
+	}
+
+	start_addr = addr = mm->free_area_cache;
+
+	task_size -= len;
+
+full_search:
 	if (do_color_align)
 		addr = COLOUR_ALIGN(addr, pgoff);
 	else
 		addr = PAGE_ALIGN(addr);
-	task_size -= len;
 
-	for (vmm = find_vma(current->mm, addr); ; vmm = vmm->vm_next) {
-		/* At this point:  (!vmm || addr < vmm->vm_end). */
+	for (vma = find_vma(mm, addr); ; vma = vma->vm_next) {
+		/* At this point:  (!vma || addr < vma->vm_end). */
 		if (addr < PAGE_OFFSET && -PAGE_OFFSET - len < addr) {
 			addr = PAGE_OFFSET;
-			vmm = find_vma(current->mm, PAGE_OFFSET);
+			vma = find_vma(mm, PAGE_OFFSET);
 		}
-		if (task_size < addr)
+		if (task_size < addr) {
+			if (start_addr != TASK_UNMAPPED_BASE) {
+				start_addr = addr = TASK_UNMAPPED_BASE;
+				goto full_search;
+			}
 			return -ENOMEM;
-		if (!vmm || addr + len <= vmm->vm_start)
+		}
+		if (!vma || addr + len <= vma->vm_start) {
+			/*
+			 * Remember the place where we stopped the search:
+			 */
+			mm->free_area_cache = addr + len;
 			return addr;
-		addr = vmm->vm_end;
+		}
+		addr = vma->vm_end;
 		if (do_color_align)
 			addr = COLOUR_ALIGN(addr, pgoff);
 	}
@@ -182,7 +208,10 @@ asmlinkage int sys_ipc (unsigned call, int first, int second, unsigned long thir
 	if (call <= SEMCTL)
 		switch (call) {
 		case SEMOP:
-			err = sys_semop (first, (struct sembuf *)ptr, second);
+			err = sys_semtimedop (first, (struct sembuf *)ptr, second, NULL);
+			goto out;
+		case SEMTIMEDOP:
+			err = sys_semtimedop (first, (struct sembuf *)ptr, second, (const struct timespec *) fifth);
 			goto out;
 		case SEMGET:
 			err = sys_semget (first, second, (int)third);

@@ -126,7 +126,7 @@ void show_regs(struct pt_regs *regs)
 void dump_stack(void)
 {
 	unsigned long stack;
-	show_trace(&stack);
+	show_trace(current, &stack);
 }
 
 
@@ -136,7 +136,7 @@ static int kstack_depth_to_print = 64 * 4;
 static int kstack_depth_to_print = 128 * 4;
 #endif
 
-void show_stack(unsigned long *sp)
+void show_stack(struct task_struct *task, unsigned long *sp)
 {
 	unsigned long *stack;
 	int i;
@@ -145,8 +145,10 @@ void show_stack(unsigned long *sp)
 	 * debugging aid: "show_stack(NULL);" prints the
 	 * back trace for this cpu.
 	 */
-	if (sp==NULL)
+	if (task==NULL)
 		sp = (unsigned long*)&sp;
+	else if(sp == NULL)
+		sp = (unsigned long*)task->thread.regs.ksp;
 
 	stack = sp;
 	printk("\n" KERN_CRIT "Stack Dump:\n");
@@ -160,11 +162,11 @@ void show_stack(unsigned long *sp)
 		printk(RFMT " ", *stack--);
 	}
 	printk("\n" KERN_CRIT "\n");
-	show_trace(sp);
+	show_trace(task, sp);
 }
 
 
-void show_trace(unsigned long *stack)
+void show_trace(struct task_struct *task, unsigned long *stack)
 {
 	unsigned long *startstack;
 	unsigned long addr;
@@ -201,7 +203,7 @@ void show_trace(unsigned long *stack)
 
 void show_trace_task(struct task_struct *tsk)
 {
-	show_trace((unsigned long *)tsk->thread.regs.ksp);
+	show_trace(tsk, (unsigned long *)tsk->thread.regs.ksp);
 }
 
 void die_if_kernel(char *str, struct pt_regs *regs, long err)
@@ -426,7 +428,7 @@ void parisc_terminate(char *msg, struct pt_regs *regs, int code, unsigned long o
 	if (code == 1)
 	    transfer_pim_to_trap_frame(regs);
 
-	show_stack((unsigned long *)regs->gr[30]);
+	show_stack(NULL, (unsigned long *)regs->gr[30]);
 
 	printk("\n");
 	printk(KERN_CRIT "%s: Code=%d regs=%p (Addr=" RFMT ")\n",

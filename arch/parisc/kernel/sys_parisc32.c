@@ -418,11 +418,11 @@ sys32_gettimeofday(struct compat_timeval *tv, struct timezone *tz)
 }
 
 asmlinkage int
-sys32_settimeofday(struct compat_timeval *tv, struct timezone *tz)
+sys32_settimeofday(struct compat_timespec *tv, struct timezone *tz)
 {
     struct timeval ktv;
     struct timezone ktz;
-    extern int do_sys_settimeofday(struct timeval *tv, struct timezone *tz);
+    extern int do_sys_settimeofday(struct timespec *tv, struct timezone *tz);
 
     if (tv) {
 	    if (get_compat_timeval(tv, &ktv))

@@ -217,6 +217,21 @@ extern void clock_was_set(void); // call when ever the clock is set
 extern int do_posix_clock_monotonic_gettime(struct timespec *tp);
 extern long do_nanosleep(struct timespec *t);
 extern long do_utimes(char __user * filename, struct timeval * times);
+
+static inline void
+set_normalized_timespec (struct timespec *ts, time_t sec, long nsec)
+{
+	while (nsec > NSEC_PER_SEC) {
+		nsec -= NSEC_PER_SEC;
+		++sec;
+	}
+	while (nsec < 0) {
+		nsec += NSEC_PER_SEC;
+		--sec;
+	}
+	ts->tv_sec = sec;
+	ts->tv_nsec = nsec;
+}
 #endif
 
 #define FD_SETSIZE		__FD_SETSIZE
