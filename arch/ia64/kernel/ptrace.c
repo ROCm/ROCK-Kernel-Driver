@@ -31,9 +31,6 @@
 
 #include "entry.h"
 
-#define p4	(1UL << 4)	/* for pSys (see entry.h) */
-#define p5	(1UL << 5)	/* for pNonSys (see entry.h) */
-
 /*
  * Bits in the PSR that we allow ptrace() to change:
  *	be, up, ac, mfl, mfh (the user mask; five bits total)
@@ -669,8 +666,8 @@ convert_to_non_syscall (struct task_struct *child, struct pt_regs  *pt, unsigned
 	}
 
 	unw_get_pr(&prev_info, &pr);
-	pr &= ~pSys;
-	pr |= pNonSys;
+	pr &= ~(1UL << PRED_SYSCALL);
+	pr |=  (1UL << PRED_NON_SYSCALL);
 	unw_set_pr(&prev_info, pr);
 
 	pt->cr_ifs = (1UL << 63) | cfm;

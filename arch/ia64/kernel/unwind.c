@@ -47,8 +47,6 @@
 #include "entry.h"
 #include "unwind_i.h"
 
-#define p5		5
-
 #define UNW_LOG_CACHE_SIZE	7	/* each unw_script is ~256 bytes in size */
 #define UNW_CACHE_SIZE		(1 << UNW_LOG_CACHE_SIZE)
 
@@ -1899,7 +1897,7 @@ unw_unwind (struct unw_frame_info *info)
 	num_regs = 0;
 	if ((info->flags & UNW_FLAG_INTERRUPT_FRAME)) {
 		info->pt = info->sp + 16;
-		if ((pr & (1UL << pNonSys)) != 0)
+		if ((pr & (1UL << PRED_NON_SYSCALL)) != 0)
 			num_regs = *info->cfm_loc & 0x7f;		/* size of frame */
 		info->pfs_loc =
 			(unsigned long *) (info->pt + offsetof(struct pt_regs, ar_pfs));
