@@ -789,7 +789,7 @@ dc390_MsgIn_complete (UCHAR *msgbuf, UINT len)
 
 
 /* read and eval received messages */
-void
+static void
 dc390_MsgIn_0( PACB pACB, PSRB pSRB, PUCHAR psstatus)
 {
     PDCB   pDCB = pACB->pActiveDCB;
@@ -948,7 +948,7 @@ dc390_DataInPhase( PACB pACB, PSRB pSRB, PUCHAR psstatus)
     dc390_DataIO_Comm (pACB, pSRB, READ_DIRECTION);
 }
 
-void
+static void
 dc390_CommandPhase( PACB pACB, PSRB pSRB, PUCHAR psstatus)
 {
     PDCB   pDCB;
@@ -989,7 +989,7 @@ dc390_StatusPhase( PACB pACB, PSRB pSRB, PUCHAR psstatus)
     //DC390_write8 (DMA_Cmd, DMA_IDLE_CMD);
 }
 
-void
+static void
 dc390_MsgOutPhase( PACB pACB, PSRB pSRB, PUCHAR psstatus)
 {
     UCHAR   bval, i, cnt;
@@ -1097,7 +1097,7 @@ dc390_SetXferRate( PACB pACB, PDCB pDCB )
 }
 
 
-void
+static void
 dc390_Disconnect( PACB pACB )
 {
     PDCB   pDCB;
@@ -1179,7 +1179,7 @@ disc1:
 }
 
 
-void
+static void
 dc390_Reselect( PACB pACB )
 {
     PDCB   pDCB;
@@ -1349,10 +1349,10 @@ dc390_add_dev (PACB pACB, PDCB pDCB, PSCSI_INQDATA ptr)
 };
 
 
-void
+static void
 dc390_SRBdone( PACB pACB, PDCB pDCB, PSRB pSRB )
 {
-    UCHAR  bval, status, i, DCB_removed;
+    UCHAR  bval, status, i;
     PSCSICMD pcmd;
     PSCSI_INQDATA  ptr;
     PSGL   ptr2;
@@ -1362,7 +1362,6 @@ dc390_SRBdone( PACB pACB, PDCB pDCB, PSRB pSRB )
     /* KG: Moved pci_unmap here */
     dc390_pci_unmap(pSRB);
 
-    DCB_removed = 0;
     status = pSRB->TargetStatus;
     ptr = (PSCSI_INQDATA) (pcmd->request_buffer);
     if( pcmd->use_sg )
@@ -1569,8 +1568,6 @@ ckc_e:
 		(pcmd->sense_buffer[2] & 0xf) == ILLEGAL_REQUEST) || host_byte(pcmd->result) & DID_ERROR )
 	    {
 	       /* device not present: remove */ 
-	       //dc390_Going_remove (pDCB, pSRB);
-	       dc390_remove_dev (pACB, pDCB); DCB_removed = 1;
 	       
 	       if( (pcmd->device->id == pACB->pScsiHost->max_id - 1) &&
 		  ((pcmd->device->lun == 0) || (pcmd->device->lun == pACB->pScsiHost->max_lun - 1)) )
@@ -1582,24 +1579,14 @@ ckc_e:
 		if( (pcmd->device->id == pACB->pScsiHost->max_id - 1) && 
 		    (pcmd->device->lun == pACB->pScsiHost->max_lun - 1) )
 		    pACB->scan_devices = END_SCAN ;
-	        /* pACB->DeviceCnt++; */ /* Dev is added on INQUIRY */
 	    }
 	}
     }
-   
-    //if( pSRB->pcmd->cmnd[0] == INQUIRY && 
-    //  (host_byte(pcmd->result) == DID_OK || status_byte(pcmd->result) & CHECK_CONDITION) )
+
     if( pcmd->cmnd[0] == INQUIRY && 
 	(pcmd->result == (DID_OK << 16) || status_byte(pcmd->result) & CHECK_CONDITION) )
      {
-	if ((ptr->DevType & SCSI_DEVTYPE) == TYPE_NODEV && !DCB_removed)
-	  {
-	     //printk ("DC390: Type = nodev! (%02i-%i)\n", pcmd->target, pcmd->lun);
-	     /* device not present: remove */
-	     //dc390_Going_remove (pDCB, pSRB);
-	     dc390_remove_dev (pACB, pDCB); DCB_removed = 1;
-	  }
-	else
+	if ((ptr->DevType & SCSI_DEVTYPE) != TYPE_NODEV)
 	  {
 	     /* device found: add */ 
 	     dc390_add_dev (pACB, pDCB, ptr);
@@ -1608,11 +1595,11 @@ ckc_e:
 	if( (pcmd->device->id == pACB->pScsiHost->max_id - 1) &&
 	    (pcmd->device->lun == pACB->pScsiHost->max_lun - 1) )
 	  pACB->scan_devices = 0;
-     };
+     }
 
     pcmd->resid = pcmd->request_bufflen - pSRB->TotalXferredLen;
 
-    if (!DCB_removed) dc390_Going_remove (pDCB, pSRB);
+    dc390_Going_remove (pDCB, pSRB);
     /* Add to free list */
     dc390_Free_insert (pACB, pSRB);
 
@@ -1625,7 +1612,7 @@ ckc_e:
 
 
 /* Remove all SRBs from Going list and inform midlevel */
-void
+static void
 dc390_DoingSRB_Done( PACB pACB, PSCSICMD cmd )
 {
     PDCB   pDCB, pdcb;
@@ -1760,4 +1747,3 @@ dc390_InvalidCmd( PACB pACB )
     if( pACB->pActiveDCB->pActiveSRB->SRBState & (SRB_START_+SRB_MSGOUT) )
 	DC390_write8 (ScsiCmd, CLEAR_FIFO_CMD);
 }
-

@@ -33,7 +33,6 @@
 # define USE_NEW_EH
 #endif
 
-static int DC390_detect(Scsi_Host_Template *psht);
 static int DC390_queue_command(Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *));
 static int DC390_abort(Scsi_Cmnd *cmd);
 static int DC390_reset(Scsi_Cmnd *cmd);
