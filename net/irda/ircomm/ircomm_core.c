@@ -119,8 +119,10 @@ struct ircomm_cb *ircomm_open(notify_t *notify, __u8 service_type, int line)
 	} else
 		ret = ircomm_open_tsap(self);
 
-	if (ret < 0)
+	if (ret < 0) {
+		kfree(self);
 		return NULL;
+	}
 
 	self->service_type = service_type;
 	self->line = line;
