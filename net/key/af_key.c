@@ -2029,6 +2029,7 @@ static int pfkey_send_acquire(struct xfrm_state *x, struct xfrm_tmpl *t, struct 
 	struct sadb_msg *hdr;
 	struct sadb_address *addr;
 	struct sadb_x_policy *pol;
+	struct sockaddr_in *sin;
 	int size;
 	
 	size = sizeof(struct sadb_msg) +
