@@ -39,9 +39,6 @@
 #include <linux/netlink.h>
 #include <linux/divert.h>
 
-#define	NEXT_DEV	NULL
-
-
 /* A unified ethernet device probe.  This is the easiest way to have every
    ethernet adaptor have the name "eth[0123...]".
    */
@@ -438,11 +435,23 @@ static __init int trif_probe(void)
 }
 #endif
 
+	
+/*
+ *	The loopback device is global so it can be directly referenced
+ *	by the network code. Also, it must be first on device list.
+ */
+extern int loopback_init(void);
+
 /*  Statically configured drivers -- order matters here. */
 void __init probe_old_netdevs(void)
 {
 	int num;
 
+	if (loopback_init()) {
+		printk(KERN_ERR "Network loopback device setup failed\n");
+	}
+
+	
 #ifdef CONFIG_SBNI
 	for (num = 0; num < 8; ++num)
 		if (sbni_probe())
@@ -477,18 +486,6 @@ static struct net_device dev_ltpc = {
 #undef NEXT_DEV
 #define NEXT_DEV	(&dev_ltpc)
 #endif  /* LTPC */
-	
-/*
- *	The loopback device is global so it can be directly referenced
- *	by the network code. Also, it must be first on device list.
- */
-
-extern int loopback_init(struct net_device *dev);
-struct net_device loopback_dev = {
-	.name		= "lo",
-	.next		= NEXT_DEV,
-	.init		= loopback_init
-};
 
 /*
  * The @dev_base list is protected by @dev_base_lock and the rtln
@@ -509,6 +506,6 @@ struct net_device loopback_dev = {
  * unregister_netdevice(), which must be called with the rtnl
  * semaphore held.
  */
-struct net_device *dev_base = &loopback_dev;
+struct net_device *dev_base;
 rwlock_t dev_base_lock = RW_LOCK_UNLOCKED;
 

@@ -55,6 +55,7 @@
 #include <linux/ip.h>
 #include <linux/tcp.h>
 
+
 #define LOOPBACK_OVERHEAD (128 + MAX_HEADER + 16 + 16)
 
 /* KISS: just allocate small chunks and copy bits.
@@ -152,10 +153,12 @@ static int loopback_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	dev->last_rx = jiffies;
-	stats->rx_bytes+=skb->len;
-	stats->tx_bytes+=skb->len;
-	stats->rx_packets++;
-	stats->tx_packets++;
+	if (likely(stats)) {
+		stats->rx_bytes+=skb->len;
+		stats->tx_bytes+=skb->len;
+		stats->rx_packets++;
+		stats->tx_packets++;
+	}
 
 	netif_rx(skb);
 
@@ -167,36 +170,35 @@ static struct net_device_stats *get_stats(struct net_device *dev)
 	return (struct net_device_stats *)dev->priv;
 }
 
-/* Initialize the rest of the LOOPBACK device. */
-int __init loopback_init(struct net_device *dev)
+struct net_device loopback_dev = {
+	.name	 		= "lo",
+	.mtu			= (16 * 1024) + 20 + 20 + 12,
+	.hard_start_xmit	= loopback_xmit,
+	.hard_header		= eth_header,
+	.hard_header_cache	= eth_header_cache,
+	.header_cache_update	= eth_header_cache_update,
+	.hard_header_len	= ETH_HLEN,	/* 14	*/
+	.addr_len		= ETH_ALEN,	/* 6	*/
+	.tx_queue_len		= 0,
+	.type			= ARPHRD_LOOPBACK,	/* 0x0001*/
+	.rebuild_header		= eth_rebuild_header,
+	.flags			= IFF_LOOPBACK,
+	.features 		= NETIF_F_SG|NETIF_F_FRAGLIST
+				  |NETIF_F_NO_CSUM|NETIF_F_HIGHDMA|NETIF_F_TSO,
+};
+
+/* Setup and register the of the LOOPBACK device. */
+int __init loopback_init(void)
 {
-	dev->mtu		= (16 * 1024) + 20 + 20 + 12;
-	dev->hard_start_xmit	= loopback_xmit;
-	dev->hard_header	= eth_header;
-	dev->hard_header_cache	= eth_header_cache;
-	dev->header_cache_update= eth_header_cache_update;
-	dev->hard_header_len	= ETH_HLEN;		/* 14			*/
-	dev->addr_len		= ETH_ALEN;		/* 6			*/
-	dev->tx_queue_len	= 0;
-	dev->type		= ARPHRD_LOOPBACK;	/* 0x0001		*/
-	dev->rebuild_header	= eth_rebuild_header;
-	dev->flags		= IFF_LOOPBACK;
-	dev->features		= NETIF_F_SG|NETIF_F_FRAGLIST|NETIF_F_NO_CSUM|NETIF_F_HIGHDMA;
+	struct net_device_stats *stats;
 
-	/* Current netfilter will die with oom linearizing large skbs,
-	 * however this will be cured before 2.5.x is done.
-	 */
-	dev->features	       |= NETIF_F_TSO;
-
-	dev->priv = kmalloc(sizeof(struct net_device_stats), GFP_KERNEL);
-	if (dev->priv == NULL)
-			return -ENOMEM;
-	memset(dev->priv, 0, sizeof(struct net_device_stats));
-	dev->get_stats = get_stats;
-
-	/*
-	 *	Fill in the generic fields of the device structure. 
-	 */
-   
-	return(0);
+	/* Can survive without statistics */
+	stats = kmalloc(sizeof(struct net_device_stats), GFP_KERNEL);
+	if (stats) {
+		memset(stats, 0, sizeof(struct net_device_stats));
+		loopback_dev.priv = stats;
+		loopback_dev.get_stats = &get_stats;
+	}
+	
+	return register_netdev(&loopback_dev);
 };
