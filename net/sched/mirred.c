@@ -257,9 +257,9 @@ tcf_mirred_dump(struct sk_buff *skb, struct tc_action *a,int bind, int ref)
 	opt.ifindex = p->ifindex;
 	DPRINTK(" tcf_mirred_dump index %d action %d eaction %d ifndex %d\n",p->index,p->action,p->eaction,p->ifindex);
 	RTA_PUT(skb, TCA_MIRRED_PARMS, sizeof (opt), &opt);
-	t.install = jiffies - p->tm.install;
-	t.lastuse = jiffies - p->tm.lastuse;
-	t.expires = p->tm.expires;
+	t.install = jiffies_to_clock_t(jiffies - p->tm.install);
+	t.lastuse = jiffies_to_clock_t(jiffies - p->tm.lastuse);
+	t.expires = jiffies_to_clock_t(p->tm.expires);
 	RTA_PUT(skb, TCA_MIRRED_TM, sizeof (t), &t);
 	return skb->len;
 
