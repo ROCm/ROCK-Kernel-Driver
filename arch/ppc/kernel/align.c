@@ -28,7 +28,7 @@ struct aligninfo {
 #define	OPCD(inst)	(((inst) & 0xFC000000) >> 26)
 #define	RS(inst)	(((inst) & 0x03E00000) >> 21)
 #define	RA(inst)	(((inst) & 0x001F0000) >> 16)
-#define	IS_DFORM(code)	((code) >= 32 && (code) <= 47)
+#define	IS_DFORM(code)	((code) >= 32 && (code) <= 55)
 #endif
 
 #define INVALID	{ 0, 0 }
