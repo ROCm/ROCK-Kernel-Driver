@@ -280,7 +280,7 @@ sn_pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents, int dire
 	 */
 	for (i = 0; i < nents; i++, sg++) {
 		phys_addr = __pa(sg->dma_address ? sg->dma_address :
-			page_address(sg->page) + sg->offset);
+			(unsigned long)page_address(sg->page) + sg->offset);
 
 		/*
 		 * Handle the most common case: 64 bit cards.  This
@@ -578,7 +578,7 @@ sn_dma_supported(struct device *dev, u64 mask)
 {
 	BUG_ON(dev->bus != &pci_bus_type);
 
-	return pci_dma_supported(to_pci_dev(dev), mask);
+	return sn_pci_dma_supported(to_pci_dev(dev), mask);
 }
 EXPORT_SYMBOL(sn_dma_supported);
 
@@ -587,7 +587,11 @@ sn_dma_set_mask(struct device *dev, u64 dma_mask)
 {
 	BUG_ON(dev->bus != &pci_bus_type);
 
-	return pci_set_dma_mask(to_pci_dev(dev), dma_mask);
+	if (!sn_dma_supported(to_pci_dev(dev), dma_mask))
+		return 0;
+
+	dev->dma_mask = dma_mask;
+	return 1;
 }
 EXPORT_SYMBOL(sn_dma_set_mask);
 
@@ -597,7 +601,7 @@ sn_dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *dma_handle,
 {
 	BUG_ON(dev->bus != &pci_bus_type);
 
-	return pci_alloc_consistent(to_pci_dev(dev), size, dma_handle);
+	return sn_pci_alloc_consistent(to_pci_dev(dev), size, dma_handle);
 }
 EXPORT_SYMBOL(sn_dma_alloc_coherent);
 
@@ -607,7 +611,7 @@ sn_dma_free_coherent(struct device *dev, size_t size, void *cpu_addr,
 {
 	BUG_ON(dev->bus != &pci_bus_type);
 
-	pci_free_consistent(to_pci_dev(dev), size, cpu_addr, dma_handle);
+	sn_pci_free_consistent(to_pci_dev(dev), size, cpu_addr, dma_handle);
 }
 EXPORT_SYMBOL(sn_dma_free_coherent);
 
@@ -617,7 +621,7 @@ sn_dma_map_single(struct device *dev, void *cpu_addr, size_t size,
 {
 	BUG_ON(dev->bus != &pci_bus_type);
 
-	return pci_map_single(to_pci_dev(dev), cpu_addr, size, (int)direction);
+	return sn_pci_map_single(to_pci_dev(dev), cpu_addr, size, (int)direction);
 }
 EXPORT_SYMBOL(sn_dma_map_single);
 
@@ -627,7 +631,7 @@ sn_dma_unmap_single(struct device *dev, dma_addr_t dma_addr, size_t size,
 {
 	BUG_ON(dev->bus != &pci_bus_type);
 
-	pci_unmap_single(to_pci_dev(dev), dma_addr, size, (int)direction);
+	sn_pci_unmap_single(to_pci_dev(dev), dma_addr, size, (int)direction);
 }
 EXPORT_SYMBOL(sn_dma_unmap_single);
 
@@ -658,7 +662,7 @@ sn_dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
 {
 	BUG_ON(dev->bus != &pci_bus_type);
 
-	return pci_map_sg(to_pci_dev(dev), sg, nents, (int)direction);
+	return sn_pci_map_sg(to_pci_dev(dev), sg, nents, (int)direction);
 }
 EXPORT_SYMBOL(sn_dma_map_sg);
 
@@ -668,7 +672,7 @@ sn_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nhwentries,
 {
 	BUG_ON(dev->bus != &pci_bus_type);
 
-	pci_unmap_sg(to_pci_dev(dev), sg, nhwentries, (int)direction);
+	sn_pci_unmap_sg(to_pci_dev(dev), sg, nhwentries, (int)direction);
 }
 EXPORT_SYMBOL(sn_dma_unmap_sg);
 
@@ -678,7 +682,7 @@ sn_dma_sync_single(struct device *dev, dma_addr_t dma_handle, size_t size,
 {
 	BUG_ON(dev->bus != &pci_bus_type);
 
-	pci_dma_sync_single(to_pci_dev(dev), dma_handle, size, (int)direction);
+	sn_pci_dma_sync_single(to_pci_dev(dev), dma_handle, size, (int)direction);
 }
 EXPORT_SYMBOL(sn_dma_sync_single);
 
@@ -688,7 +692,7 @@ sn_dma_sync_sg(struct device *dev, struct scatterlist *sg, int nelems,
 {
 	BUG_ON(dev->bus != &pci_bus_type);
 
-	pci_dma_sync_sg(to_pci_dev(dev), sg, nelems, (int)direction);
+	sn_pci_dma_sync_sg(to_pci_dev(dev), sg, nelems, (int)direction);
 }
 EXPORT_SYMBOL(sn_dma_sync_sg);
 
