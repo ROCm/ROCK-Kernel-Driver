@@ -452,8 +452,7 @@ map_unwritten(
 			if (page) {
 				nblocks += bs;
 				atomic_add(bs, &pb->pb_io_remaining);
-				convert_page(inode, page,
-							mp, pb, 1, all_bh);
+				convert_page(inode, page, mp, pb, 1, all_bh);
 			}
 		}
 	}
@@ -627,11 +626,11 @@ cluster_write(
 
 STATIC int
 page_state_convert(
+	struct inode	*inode,
 	struct page	*page,
 	int		startio,
 	int		unmapped) /* also implies page uptodate */
 {
-	struct inode		*inode = page->mapping->host;
 	struct buffer_head	*bh_arr[MAX_BUF_PER_PAGE], *bh, *head;
 	page_buf_bmap_t		*mp, map;
 	unsigned long		p_offset = 0, end_index;
@@ -1080,7 +1079,7 @@ linvfs_writepage(
 	 * Convert delayed allocate, unwritten or unmapped space
 	 * to real space and flush out to disk.
 	 */
-	error = page_state_convert(page, 1, unmapped);
+	error = page_state_convert(inode, page, 1, unmapped);
 	if (error == -EAGAIN)
 		goto out_fail;
 	if (unlikely(error < 0))
@@ -1121,6 +1120,7 @@ linvfs_release_page(
 	struct page		*page,
 	int			gfp_mask)
 {
+	struct inode		*inode = page->mapping->host;
 	int			delalloc, unmapped, unwritten;
 
 	count_page_state(page, &delalloc, &unmapped, &unwritten);
@@ -1136,7 +1136,7 @@ linvfs_release_page(
 	 * Never need to allocate space here - we will always
 	 * come back to writepage in that case.
 	 */
-	if (page_state_convert(page, 0, 0) == 0)
+	if (page_state_convert(inode, page, 0, 0) == 0)
 		goto free_buffers;
 	return 0;
 
