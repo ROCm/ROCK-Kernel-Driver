@@ -1,11 +1,9 @@
 # Rules for making the NTFS driver.
 
-O_TARGET := ntfs.o
+obj-$(CONFIG_NTFS_FS) += ntfs.o
 
-obj-y   := aops.o attrib.o compress.o debug.o dir.o file.o inode.o mft.o \
-		mst.o namei.o super.o sysctl.o time.o unistr.o upcase.o
-
-obj-m   := $(O_TARGET)
+ntfs-objs := aops.o attrib.o compress.o debug.o dir.o file.o inode.o mft.o \
+	     mst.o namei.o super.o sysctl.o time.o unistr.o upcase.o
 
 EXTRA_CFLAGS = -DNTFS_VERSION=\"2.0.7\"
 

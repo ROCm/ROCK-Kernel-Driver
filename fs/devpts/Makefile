@@ -2,10 +2,8 @@
 # Makefile for the Linux /dev/pts virtual filesystem.
 #
 
-O_TARGET := devpts.o
+obj-$(CONFIG_DEVPTS_FS) += devpts.o
 
-obj-y    := root.o inode.o
-
-obj-m    := $(O_TARGET)
+devpts-objs := root.o inode.o
 
 include $(TOPDIR)/Rules.make

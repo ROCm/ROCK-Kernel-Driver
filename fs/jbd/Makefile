@@ -1,15 +1,12 @@
 #
-# fs/jbd/Makefile
-# 
 # Makefile for the linux journaling routines.
 #
 
 export-objs := journal.o
-O_TARGET := jbd.o
 
-obj-y   := transaction.o commit.o recovery.o checkpoint.o revoke.o journal.o
+obj-$(CONFIG_JBD) += jbd.o
 
-obj-m   := $(O_TARGET)
+jbd-objs := transaction.o commit.o recovery.o checkpoint.o revoke.o journal.o
 
 include $(TOPDIR)/Rules.make
 

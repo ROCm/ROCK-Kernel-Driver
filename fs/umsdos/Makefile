@@ -1,16 +1,10 @@
 #
 # Makefile for the umsdos Unix-like filesystem routines.
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (not a .c file).
-#
-# Note 2:  the CFLAGS definitions are now in the main makefile.
-O_TARGET := umsdos.o
 
-obj-y   := dir.o  inode.o ioctl.o mangle.o namei.o rdir.o emd.o
+obj-$(CONFIG_UMSDOS) += umsdos.o
 
-obj-m   := $(O_TARGET)
+umsdos-objs := dir.o  inode.o ioctl.o mangle.o namei.o rdir.o emd.o
 
 include $(TOPDIR)/Rules.make
 
