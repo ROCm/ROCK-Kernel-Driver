@@ -6,8 +6,6 @@
 #include <linux/spinlock.h>
 #include <asm/scatterlist.h>
 #include <asm/machvec.h>
-#include <asm/io.h>
-
 
 /*
  * The following structure is used to manage multiple PCI busses.
