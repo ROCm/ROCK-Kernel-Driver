@@ -13,10 +13,9 @@
 extern int um_execve(const char *file, char *const argv[], char *const env[]);
 
 #ifdef __KERNEL__
+/* We get __ARCH_WANT_OLD_STAT and __ARCH_WANT_STAT64 from the base arch */
 #define __ARCH_WANT_IPC_PARSE_VERSION
 #define __ARCH_WANT_OLD_READDIR
-#define __ARCH_WANT_OLD_STAT
-#define __ARCH_WANT_STAT64
 #define __ARCH_WANT_SYS_ALARM
 #define __ARCH_WANT_SYS_GETHOSTNAME
 #define __ARCH_WANT_SYS_PAUSE
