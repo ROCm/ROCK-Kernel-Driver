@@ -53,7 +53,7 @@
 #include "stv0299.h"
 #include "mt352.h"
 #include "mt312.h"
-
+#include "nxt2002.h"
 
 static int debug;
 static int enable_hw_filters = 2;
@@ -1379,10 +1379,7 @@ static int dma_init_dma(struct adapter *adapter, u32 dma_channel)
 		write_reg_dw(adapter, 0x008, adapter->dmaq1.bus_addr & 0xfffffffc);
 		udelay(1000);
 
-		if (subbuffers == 0)
-			dma_enable_disable_irq(adapter, 0, 1, 0);
-		else
-			dma_enable_disable_irq(adapter, 0, 1, 1);
+		dma_enable_disable_irq(adapter, 0, 1, subbuffers ? 1 : 0);
 
 		irq_dma_enable_disable_irq(adapter, 1);
 
@@ -1681,84 +1678,80 @@ static irqreturn_t isr(int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 
-static void init_dma_queue(struct adapter *adapter)
+static int init_dma_queue_one(struct adapter *adapter, struct dmaq *dmaq,
+			      int size, int dmaq_offset)
 {
+	struct pci_dev *pdev = adapter->pdev;
 	dma_addr_t dma_addr;
 
-	if (adapter->dmaq1.buffer != 0)
-		return;
+	dmaq->head = 0;
+	dmaq->tail = 0;
 
-	adapter->dmaq1.head = 0;
-	adapter->dmaq1.tail = 0;
-	adapter->dmaq1.buffer = NULL;
+	dmaq->buffer = pci_alloc_consistent(pdev, size + 0x80, &dma_addr);
+	if (!dmaq->buffer)
+		return -ENOMEM;
 
-	adapter->dmaq1.buffer = pci_alloc_consistent(adapter->pdev, SIZE_OF_BUF_DMA1 + 0x80, &dma_addr);
+	dmaq->bus_addr = dma_addr;
+	dmaq->buffer_size = size;
 
-	if (adapter->dmaq1.buffer != 0) {
-		memset(adapter->dmaq1.buffer, 0, SIZE_OF_BUF_DMA1);
+	dma_init_dma(adapter, dmaq_offset);
 
-		adapter->dmaq1.bus_addr = dma_addr;
-		adapter->dmaq1.buffer_size = SIZE_OF_BUF_DMA1;
+	ddprintk("%s: allocated dma buffer at 0x%p, length=%d\n",
+		 __FUNCTION__, dmaq->buffer, size);
 
-		dma_init_dma(adapter, 0);
-
-		adapter->dma_status = adapter->dma_status | 0x10000000;
-
-		ddprintk("%s: allocated dma buffer at 0x%p, length=%d\n", __FUNCTION__, adapter->dmaq1.buffer, SIZE_OF_BUF_DMA1);
-
-	} else {
-
-		adapter->dma_status = adapter->dma_status & ~0x10000000;
+	return 0;
 	}
 
-	if (adapter->dmaq2.buffer != 0)
-		return;
+static int init_dma_queue(struct adapter *adapter)
+{
+	struct {
+		struct dmaq *dmaq;
+		u32 dma_status;
+		int size;
+	} dmaq_desc[] = {
+		{ &adapter->dmaq1, 0x10000000, SIZE_OF_BUF_DMA1 },
+		{ &adapter->dmaq2, 0x20000000, SIZE_OF_BUF_DMA2 }
+	}, *p = dmaq_desc;
+	int i;
 
-	adapter->dmaq2.head = 0;
-	adapter->dmaq2.tail = 0;
-	adapter->dmaq2.buffer = NULL;
+	for (i = 0; i < 2; i++, p++) {
+		if (init_dma_queue_one(adapter, p->dmaq, p->size, i) < 0)
+			adapter->dma_status &= ~p->dma_status;
+		else
+			adapter->dma_status |= p->dma_status;
+	}
+	return (adapter->dma_status & 0x30000000) ? 0 : -ENOMEM;
+}
 
-	adapter->dmaq2.buffer = pci_alloc_consistent(adapter->pdev, SIZE_OF_BUF_DMA2 + 0x80, &dma_addr);
-
-	if (adapter->dmaq2.buffer != 0) {
-		memset(adapter->dmaq2.buffer, 0, SIZE_OF_BUF_DMA2);
-
-		adapter->dmaq2.bus_addr = dma_addr;
-		adapter->dmaq2.buffer_size = SIZE_OF_BUF_DMA2;
-
-		dma_init_dma(adapter, 1);
-
-		adapter->dma_status = adapter->dma_status | 0x20000000;
-
-		ddprintk("%s: allocated dma buffer at 0x%p, length=%d\n", __FUNCTION__, adapter->dmaq2.buffer, (int) SIZE_OF_BUF_DMA2);
-
-	} else {
-
-		adapter->dma_status = adapter->dma_status & ~0x20000000;
+static void free_dma_queue_one(struct adapter *adapter, struct dmaq *dmaq)
+{
+	if (dmaq->buffer) {
+		pci_free_consistent(adapter->pdev, dmaq->buffer_size + 0x80,
+				    dmaq->buffer, dmaq->bus_addr);
+		memset(dmaq, 0, sizeof(*dmaq));
 	}
 }
 
 static void free_dma_queue(struct adapter *adapter)
 {
-	if (adapter->dmaq1.buffer != 0) {
-		pci_free_consistent(adapter->pdev, SIZE_OF_BUF_DMA1 + 0x80, adapter->dmaq1.buffer, adapter->dmaq1.bus_addr);
+	struct dmaq *dmaq[] = {
+		&adapter->dmaq1,
+		&adapter->dmaq2,
+		NULL
+	}, **p;
 
-		adapter->dmaq1.bus_addr = 0;
-		adapter->dmaq1.head = 0;
-		adapter->dmaq1.tail = 0;
-		adapter->dmaq1.buffer_size = 0;
-		adapter->dmaq1.buffer = NULL;
+	for (p = dmaq; *p; p++)
+		free_dma_queue_one(adapter, *p);
 	}
 
-	if (adapter->dmaq2.buffer != 0) {
-		pci_free_consistent(adapter->pdev, SIZE_OF_BUF_DMA2 + 0x80, adapter->dmaq2.buffer, adapter->dmaq2.bus_addr);
+static void release_adapter(struct adapter *adapter)
+{
+	struct pci_dev *pdev = adapter->pdev;
 
-		adapter->dmaq2.bus_addr = 0;
-		adapter->dmaq2.head = 0;
-		adapter->dmaq2.tail = 0;
-		adapter->dmaq2.buffer_size = 0;
-		adapter->dmaq2.buffer = NULL;
-	}
+	iounmap(adapter->io_mem);
+	pci_disable_device(pdev);
+	pci_release_region(pdev, 0);
+	pci_release_region(pdev, 1);
 }
 
 static void free_adapter_object(struct adapter *adapter)
@@ -1766,16 +1759,9 @@ static void free_adapter_object(struct adapter *adapter)
 	dprintk("%s:\n", __FUNCTION__);
 
 	close_stream(adapter, 0);
-
-	if (adapter->irq != 0)
 		free_irq(adapter->irq, adapter);
-
 	free_dma_queue(adapter);
-
-	if (adapter->io_mem)
-		iounmap(adapter->io_mem);
-
-	if (adapter != 0)
+	release_adapter(adapter);
 	kfree(adapter);
 }
 
@@ -1784,21 +1770,24 @@ static struct pci_driver skystar2_pci_driver;
 static int claim_adapter(struct adapter *adapter)
 {
 	struct pci_dev *pdev = adapter->pdev;
-
 	u16 var;
+	int ret;
 
-	if (!request_region(pci_resource_start(pdev, 1), pci_resource_len(pdev, 1), skystar2_pci_driver.name))
-		return -EBUSY;
+	ret = pci_request_region(pdev, 1, skystar2_pci_driver.name);
+	if (ret < 0)
+		goto out;
 
-	if (!request_mem_region(pci_resource_start(pdev, 0), pci_resource_len(pdev, 0), skystar2_pci_driver.name))
-		return -EBUSY;
+	ret = pci_request_region(pdev, 0, skystar2_pci_driver.name);
+	if (ret < 0)
+		goto err_pci_release_1;
 
 	pci_read_config_byte(pdev, PCI_CLASS_REVISION, &adapter->card_revision);
 
 	dprintk("%s: card revision %x \n", __FUNCTION__, adapter->card_revision);
 
-	if (pci_enable_device(pdev))
-		return -EIO;
+	ret = pci_enable_device(pdev);
+	if (ret < 0)
+		goto err_pci_release_0;
 
 	pci_read_config_word(pdev, 4, &var);
 
@@ -1811,13 +1800,23 @@ static int claim_adapter(struct adapter *adapter)
 
 	if (!adapter->io_mem) {
 		dprintk("%s: can not map io memory\n", __FUNCTION__);
-
-		return 2;
+		ret = -EIO;
+		goto err_pci_disable;
 	}
 
 	dprintk("%s: io memory maped at %p\n", __FUNCTION__, adapter->io_mem);
 
-	return 1;
+	ret = 1;
+out:
+	return ret;
+
+err_pci_disable:
+	pci_disable_device(pdev);
+err_pci_release_0:
+	pci_release_region(pdev, 0);
+err_pci_release_1:
+	pci_release_region(pdev, 1);
+	goto out;
 }
 
 /*
@@ -1873,11 +1872,12 @@ static int driver_initialize(struct pci_dev *pdev)
 {
 	struct adapter *adapter;
 	u32 tmp;
+	int ret = -ENOMEM;
 
-	if (!(adapter = kmalloc(sizeof(struct adapter), GFP_KERNEL))) {
+	adapter = kmalloc(sizeof(struct adapter), GFP_KERNEL);
+	if (!adapter) {
 		dprintk("%s: out of memory!\n", __FUNCTION__);
-
-		return -ENOMEM;
+		goto out;
 	}
 
 	memset(adapter, 0, sizeof(struct adapter));
@@ -1887,20 +1887,16 @@ static int driver_initialize(struct pci_dev *pdev)
 	adapter->pdev = pdev;
 	adapter->irq = pdev->irq;
 
-	if ((claim_adapter(adapter)) != 1) {
-		free_adapter_object(adapter);
-
-		return -ENODEV;
-	}
+	ret = claim_adapter(adapter);
+	if (ret < 0)
+		goto err_kfree;
 
 	irq_dma_enable_disable_irq(adapter, 0);
 
-	if (request_irq(pdev->irq, isr, 0x4000000, "Skystar2", adapter) != 0) {
+	ret = request_irq(pdev->irq, isr, 0x4000000, "Skystar2", adapter);
+	if (ret < 0) {
 		dprintk("%s: unable to allocate irq=%d !\n", __FUNCTION__, pdev->irq);
-
-		free_adapter_object(adapter);
-
-		return -ENODEV;
+		goto err_release_adapter;
 	}
 
 	read_reg_dw(adapter, 0x208);
@@ -1908,13 +1904,9 @@ static int driver_initialize(struct pci_dev *pdev)
 	write_reg_dw(adapter, 0x210, 0xb2ff);
 	write_reg_dw(adapter, 0x208, 0x40);
 
-	init_dma_queue(adapter);
-
-	if ((adapter->dma_status & 0x30000000) == 0) {
-		free_adapter_object(adapter);
-
-		return -ENODEV;
-	}
+	ret = init_dma_queue(adapter);
+	if (ret < 0)
+		goto err_free_irq;
 
 	adapter->b2c2_revision = (read_reg_dw(adapter, 0x204) >> 0x18);
 
@@ -1931,11 +1923,8 @@ static int driver_initialize(struct pci_dev *pdev)
 	default:
 		printk("%s: The revision of the FlexCop chip on your card is %d\n", __FILE__, adapter->b2c2_revision);
 		printk("%s: This driver works only with FlexCopII(rev.130), FlexCopIIB(rev.195) and FlexCopIII(rev.192).\n", __FILE__);
-		free_adapter_object(adapter);
-		pci_set_drvdata(pdev, NULL);
-		release_region(pci_resource_start(pdev, 1), pci_resource_len(pdev, 1));
-		release_mem_region(pci_resource_start(pdev, 0), pci_resource_len(pdev, 0));
-			return -ENODEV;
+		ret = -ENODEV;
+		goto err_free_dma_queue;
 		}
 
 	decide_how_many_hw_filters(adapter);
@@ -1979,16 +1968,26 @@ static int driver_initialize(struct pci_dev *pdev)
 		ctrl_enable_mac(adapter, 1);
 	}
 
-	spin_lock_init(&adapter->lock);
+	adapter->lock = SPIN_LOCK_UNLOCKED;
 
-	return 0;
+out:
+	return ret;
+
+err_free_dma_queue:
+	free_dma_queue(adapter);
+err_free_irq:
+	free_irq(pdev->irq, adapter);
+err_release_adapter:
+	release_adapter(adapter);
+err_kfree:
+	pci_set_drvdata(pdev, NULL);
+	kfree(adapter);
+	goto out;
 }
 
 static void driver_halt(struct pci_dev *pdev)
 {
-	struct adapter *adapter;
-
-	adapter = pci_get_drvdata(pdev);
+	struct adapter *adapter = pci_get_drvdata(pdev);
 
 	irq_dma_enable_disable_irq(adapter, 0);
 
@@ -1998,9 +1997,9 @@ static void driver_halt(struct pci_dev *pdev)
 
 	pci_set_drvdata(pdev, NULL);
 
-	release_region(pci_resource_start(pdev, 1), pci_resource_len(pdev, 1));
-
-	release_mem_region(pci_resource_start(pdev, 0), pci_resource_len(pdev, 0));
+	pci_disable_device(pdev);
+	pci_release_region(pdev, 1);
+	pci_release_region(pdev, 0);
 }
 
 static int dvb_start_feed(struct dvb_demux_feed *dvbdmxfeed)
@@ -2325,11 +2324,22 @@ static struct stv0299_config samsung_tbmu24112_config = {
 
 
 
+static int nxt2002_request_firmware(struct dvb_frontend* fe, const struct firmware **fw, char* name)
+{
+	struct adapter* adapter = (struct adapter*) fe->dvb->priv;
 
+	return request_firmware(fw, name, &adapter->pdev->dev);
+}
+
+
+static struct nxt2002_config samsung_tbmv_config = {
+	.demod_address = 0x0A,
+	.request_firmware = nxt2002_request_firmware,
+};
 
 static int samsung_tdtc9251dh0_demod_init(struct dvb_frontend* fe)
 {
-	static u8 mt352_clock_config [] = { 0x89, 0x10, 0x2d };
+	static u8 mt352_clock_config [] = { 0x89, 0x18, 0x2d };
 	static u8 mt352_reset [] = { 0x50, 0x80 };
 	static u8 mt352_adc_ctl_1_cfg [] = { 0x8E, 0x40 };
 	static u8 mt352_agc_cfg [] = { 0x67, 0x28, 0xa1 };
@@ -2407,7 +2417,15 @@ static struct mt312_config skystar23_samsung_tbdu18132_config = {
 static void frontend_init(struct adapter *skystar2)
 {
 	switch(skystar2->pdev->device) {
-	case 0x2103: // Technisat Skystar2 OR Technisat Airstar2
+	case 0x2103: // Technisat Skystar2 OR Technisat Airstar2 (DVB-T or ATSC)
+
+		// Attempt to load the Nextwave nxt2002 for ATSC support 
+		skystar2->fe = nxt2002_attach(&samsung_tbmv_config, &skystar2->i2c_adap);
+		if (skystar2->fe != NULL) {
+			skystar2->fe_sleep = skystar2->fe->ops->sleep;
+			skystar2->fe->ops->sleep = flexcop_sleep;
+			break;
+		}
 
 		// try the skystar2 v2.6 first (stv0299/Samsung tbmu24112(sl1935))
 		skystar2->fe = stv0299_attach(&samsung_tbmu24112_config, &skystar2->i2c_adap);
@@ -2462,26 +2480,24 @@ static int skystar2_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	struct adapter *adapter;
 	struct dvb_adapter *dvb_adapter;
 	struct dvb_demux *dvbdemux;
+	struct dmx_demux *dmx;
+	int ret = -ENODEV;
 
-	int ret;
+	if (!pdev)
+		goto out;
 
-	if (pdev == NULL)
-		return -ENODEV;
+	ret = driver_initialize(pdev);
+	if (ret < 0)
+		goto out;
 
-	if (driver_initialize(pdev) != 0)
-		return -ENODEV;
-
-	dvb_register_adapter(&dvb_adapter, skystar2_pci_driver.name, THIS_MODULE);
-
-	if (dvb_adapter == NULL) {
+	ret = dvb_register_adapter(&dvb_adapter, skystar2_pci_driver.name,
+				   THIS_MODULE);
+	if (ret < 0) {
 		printk("%s: Error registering DVB adapter\n", __FUNCTION__);
-
-		driver_halt(pdev);
-
-		return -ENODEV;
+		goto err_halt;
 	}
 
-	adapter = (struct adapter *) pci_get_drvdata(pdev);
+	adapter = pci_get_drvdata(pdev);
 
 	dvb_adapter->priv = adapter;
 	adapter->dvb_adapter = dvb_adapter;
@@ -2504,14 +2520,13 @@ static int skystar2_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	adapter->i2c_adap.algo_data         = NULL;
 	adapter->i2c_adap.id                = I2C_ALGO_BIT;
 
-	if (i2c_add_adapter(&adapter->i2c_adap) < 0) {
-		dvb_unregister_adapter (adapter->dvb_adapter);
-		return -ENOMEM;
-	}
+	ret = i2c_add_adapter(&adapter->i2c_adap);
+	if (ret < 0)
+		goto err_dvb_unregister;
 
 	dvbdemux = &adapter->demux;
 
-	dvbdemux->priv = (void *) adapter;
+	dvbdemux->priv = adapter;
 	dvbdemux->filternum = N_PID_SLOTS;
 	dvbdemux->feednum = N_PID_SLOTS;
 	dvbdemux->start_feed = dvb_start_feed;
@@ -2519,68 +2534,87 @@ static int skystar2_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	dvbdemux->write_to_decoder = NULL;
 	dvbdemux->dmx.capabilities = (DMX_TS_FILTERING | DMX_SECTION_FILTERING | DMX_MEMORY_BASED_FILTERING);
 
-	dvb_dmx_init(&adapter->demux);
+	ret = dvb_dmx_init(&adapter->demux);
+	if (ret < 0)
+		goto err_i2c_del;
+
+	dmx = &dvbdemux->dmx;
 
 	adapter->hw_frontend.source = DMX_FRONTEND_0;
-
 	adapter->dmxdev.filternum = N_PID_SLOTS;
-	adapter->dmxdev.demux = &dvbdemux->dmx;
+	adapter->dmxdev.demux = dmx;
 	adapter->dmxdev.capabilities = 0;
 
-	dvb_dmxdev_init(&adapter->dmxdev, adapter->dvb_adapter);
-
-	ret = dvbdemux->dmx.add_frontend(&dvbdemux->dmx, &adapter->hw_frontend);
+	ret = dvb_dmxdev_init(&adapter->dmxdev, adapter->dvb_adapter);
 	if (ret < 0)
-		return ret;
+		goto err_dmx_release;
+
+	ret = dmx->add_frontend(dmx, &adapter->hw_frontend);
+	if (ret < 0)
+		goto err_dmxdev_release;
 
 	adapter->mem_frontend.source = DMX_MEMORY_FE;
 
-	ret = dvbdemux->dmx.add_frontend(&dvbdemux->dmx, &adapter->mem_frontend);
+	ret = dmx->add_frontend(dmx, &adapter->mem_frontend);
 	if (ret < 0)
-		return ret;
+		goto err_remove_hw_frontend;
 
-	ret = dvbdemux->dmx.connect_frontend(&dvbdemux->dmx, &adapter->hw_frontend);
+	ret = dmx->connect_frontend(dmx, &adapter->hw_frontend);
 	if (ret < 0)
-		return ret;
+		goto err_remove_mem_frontend;
 
 	dvb_net_init(adapter->dvb_adapter, &adapter->dvbnet, &dvbdemux->dmx);
 
 	frontend_init(adapter);
+out:
+	return ret;
 
-	return 0;
+err_remove_mem_frontend:
+	dvbdemux->dmx.remove_frontend(&dvbdemux->dmx, &adapter->mem_frontend);
+err_remove_hw_frontend:
+	dvbdemux->dmx.remove_frontend(&dvbdemux->dmx, &adapter->hw_frontend);
+err_dmxdev_release:
+	dvb_dmxdev_release(&adapter->dmxdev);
+err_dmx_release:
+	dvb_dmx_release(&adapter->demux);
+err_i2c_del:
+	i2c_del_adapter(&adapter->i2c_adap);
+err_dvb_unregister:
+	dvb_unregister_adapter(adapter->dvb_adapter);
+err_halt:
+	driver_halt(pdev);
+	goto out;
 }
 
 static void skystar2_remove(struct pci_dev *pdev)
 {
-	struct adapter *adapter;
+	struct adapter *adapter = pci_get_drvdata(pdev);
 	struct dvb_demux *dvbdemux;
+	struct dmx_demux *dmx;
 
-	if (pdev == NULL)
+	if (!adapter)
 		return;
 
-	adapter = pci_get_drvdata(pdev);
-
-	if (adapter != NULL) {
 		dvb_net_release(&adapter->dvbnet);
 		dvbdemux = &adapter->demux;
+	dmx = &dvbdemux->dmx;
 
-		dvbdemux->dmx.close(&dvbdemux->dmx);
-		dvbdemux->dmx.remove_frontend(&dvbdemux->dmx, &adapter->hw_frontend);
-		dvbdemux->dmx.remove_frontend(&dvbdemux->dmx, &adapter->mem_frontend);
+	dmx->close(dmx);
+	dmx->remove_frontend(dmx, &adapter->hw_frontend);
+	dmx->remove_frontend(dmx, &adapter->mem_frontend);
 
 		dvb_dmxdev_release(&adapter->dmxdev);
-		dvb_dmx_release(&adapter->demux);
+	dvb_dmx_release(dvbdemux);
 
-		if (adapter->fe != NULL) dvb_unregister_frontend(adapter->fe);
+	if (adapter->fe != NULL)
+		dvb_unregister_frontend(adapter->fe);
 
-		if (adapter->dvb_adapter != NULL) {
+	dvb_unregister_adapter(adapter->dvb_adapter);
+
 			i2c_del_adapter(&adapter->i2c_adap);
 
-			dvb_unregister_adapter(adapter->dvb_adapter);
-		}
 		driver_halt(pdev);
 	}
-}
 
 static struct pci_device_id skystar2_pci_tbl[] = {
 	{0x000013d0, 0x00002103, 0xffffffff, 0xffffffff, 0x00000000, 0x00000000, 0x00000000},

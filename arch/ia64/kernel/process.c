@@ -40,6 +40,8 @@
 #include <asm/unwind.h>
 #include <asm/user.h>
 
+#include "entry.h"
+
 #ifdef CONFIG_PERFMON
 # include <asm/perfmon.h>
 #endif
@@ -630,7 +632,7 @@ dump_fpu (struct pt_regs *pt, elf_fpregset_t dst)
 	return 1;	/* f0-f31 are always valid so we always return 1 */
 }
 
-asmlinkage long
+long
 sys_execve (char __user *filename, char __user * __user *argv, char __user * __user *envp,
 	    struct pt_regs *regs)
 {
@@ -667,7 +669,7 @@ kernel_thread (int (*fn)(void *), void *arg, unsigned long flags)
 	regs.pt.cr_ifs = 1UL << 63;		/* mark as valid, empty frame */
 	regs.sw.ar_fpsr = regs.pt.ar_fpsr = ia64_getreg(_IA64_REG_AR_FPSR);
 	regs.sw.ar_bspstore = (unsigned long) current + IA64_RBS_OFFSET;
-
+	regs.sw.pr = (1 << PRED_KERNEL_STACK);
 	return do_fork(flags | CLONE_VM | CLONE_UNTRACED, 0, &regs.pt, 0, NULL, NULL);
 }
 EXPORT_SYMBOL(kernel_thread);

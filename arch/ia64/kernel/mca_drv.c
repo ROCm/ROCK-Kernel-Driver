@@ -52,7 +52,7 @@ typedef enum {
 	MCA_IS_GLOBAL = 1
 } mca_type_t;
 
-#define MAX_PAGE_ISOLATE 32
+#define MAX_PAGE_ISOLATE 1024
 
 static struct page *page_isolate[MAX_PAGE_ISOLATE];
 static int num_page_isolate = 0;

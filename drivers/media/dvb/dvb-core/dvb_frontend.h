@@ -115,28 +115,7 @@ struct dvb_frontend {
 	struct dvb_frontend_ops* ops;
 	struct dvb_adapter *dvb;
 	void* demodulator_priv;
-
-	struct dvb_device *dvbdev;
-	struct dvb_frontend_parameters parameters;
-	struct dvb_fe_events events;
-	struct semaphore sem;
-	struct list_head list_head;
-	wait_queue_head_t wait_queue;
-	pid_t thread_pid;
-	unsigned long release_jiffies;
-	int state;
-	int bending;
-	int lnb_drift;
-	int inversion;
-	int auto_step;
-	int auto_sub_step;
-	int started_auto_step;
-	int min_delay;
-	int max_drift;
-	int step_size;
-	int exit;
-	int wakeup;
-	fe_status_t status;
+	void* frontend_priv;
 };
 
 extern int dvb_register_frontend(struct dvb_adapter* dvb,

@@ -2,7 +2,7 @@
 
 #ifdef CONFIG_DVB_DIBCOM_DEBUG
 static int debug;
-module_param(debug, int, 0x644);
+module_param(debug, int, 0644);
 MODULE_PARM_DESC(debug, "set debugging level (1=info,2=i2c,4=srch (|-able)).");
 #endif
 #define deb_info(args...) dprintk(0x01,args)
@@ -40,65 +40,6 @@ int dib3000_write_reg(struct dib3000_state *state, u16 reg, u16 val)
 	deb_i2c("writing i2c bus (reg: %5d 0x%04x, val: %5d 0x%04x)\n",reg,reg,val,val);
 
 	return i2c_transfer(state->i2c,msg, 1) != 1 ? -EREMOTEIO : 0;
-}
-
-int dib3000_init_pid_list(struct dib3000_state *state, int num)
-{
-	int i;
-	if (state != NULL) {
-		state->pid_list = kmalloc(sizeof(struct dib3000_pid) * num,GFP_KERNEL);
-		if (state->pid_list == NULL)
-			return -ENOMEM;
-
-		deb_info("initializing %d pids for the pid_list.\n",num);
-		spin_lock_init(&state->pid_list_lock);
-		memset(state->pid_list,0,num*(sizeof(struct dib3000_pid)));
-		for (i=0; i < num; i++) {
-			state->pid_list[i].pid = 0;
-			state->pid_list[i].active = 0;
-		}
-		state->feedcount = 0;
-	} else
-		return -EINVAL;
-
-	return 0;
-}
-
-void dib3000_dealloc_pid_list(struct dib3000_state *state)
-{
-	if (state != NULL && state->pid_list != NULL)
-		kfree(state->pid_list);
-}
-
-/* fetch a pid from pid_list */
-int dib3000_get_pid_index(struct dib3000_pid pid_list[], int num_pids, int pid,
-		spinlock_t *pid_list_lock,int onoff)
-{
-	int i,ret = -1;
-	unsigned long flags;
-
-	spin_lock_irqsave(pid_list_lock,flags);
-	for (i=0; i < num_pids; i++)
-		if (onoff) {
-			if (!pid_list[i].active) {
-				pid_list[i].pid = pid;
-				pid_list[i].active = 1;
-				ret = i;
-				break;
-			}
-		} else {
-			if (pid_list[i].active && pid_list[i].pid == pid) {
-				pid_list[i].pid = 0;
-				pid_list[i].active = 0;
-				ret = i;
-				break;
-			}
-		}
-
-	deb_info("setting pid: %5d %04x at index %d '%s'\n",pid,pid,ret,onoff ? "on" : "off");
-
-	spin_unlock_irqrestore(pid_list_lock,flags);
-	return ret;
 }
 
 int dib3000_search_status(u16 irq,u16 lock)
@@ -139,7 +80,4 @@ EXPORT_SYMBOL(dib3000_seq);
 
 EXPORT_SYMBOL(dib3000_read_reg);
 EXPORT_SYMBOL(dib3000_write_reg);
-EXPORT_SYMBOL(dib3000_init_pid_list);
-EXPORT_SYMBOL(dib3000_dealloc_pid_list);
-EXPORT_SYMBOL(dib3000_get_pid_index);
 EXPORT_SYMBOL(dib3000_search_status);

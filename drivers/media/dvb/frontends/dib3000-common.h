@@ -4,7 +4,7 @@
  *
  * DiBcom (http://www.dibcom.fr/)
  *
- * Copyright (C) 2004 Patrick Boettcher (patrick.boettcher@desy.de)
+ * Copyright (C) 2004-5 Patrick Boettcher (patrick.boettcher@desy.de)
  *
  * based on GPL code from DibCom, which has
  *
@@ -29,19 +29,10 @@
 #include "dvb_frontend.h"
 #include "dib3000.h"
 
-/* info and err, taken from usb.h, if there is anything available like by default,
- * please change !
- */
-#define err(format, arg...) printk(KERN_ERR "%s: " format "\n" , __FILE__ , ## arg)
-#define info(format, arg...) printk(KERN_INFO "%s: " format "\n" , __FILE__ , ## arg)
-#define warn(format, arg...) printk(KERN_WARNING "%s: " format "\n" , __FILE__ , ## arg)
-
-/* a PID for the pid_filter list, when in use */
-struct dib3000_pid
-{
-	u16 pid;
-	int active;
-};
+/* info and err, taken from usb.h, if there is anything available like by default. */
+#define err(format, arg...) printk(KERN_ERR "dib3000mX: " format "\n" , ## arg)
+#define info(format, arg...) printk(KERN_INFO "dib3000mX: " format "\n" , ## arg)
+#define warn(format, arg...) printk(KERN_WARNING "dib3000mX: " format "\n" , ## arg)
 
 /* frontend state */
 struct dib3000_state {
@@ -52,24 +43,17 @@ struct dib3000_state {
 /* configuration settings */
 	struct dib3000_config config;
 
-	spinlock_t pid_list_lock;
-	struct dib3000_pid *pid_list;
-
-	int feedcount;
-
 	struct dvb_frontend frontend;
 	int timing_offset;
 	int timing_offset_comp_done;
+
+	fe_bandwidth_t last_tuned_bw;
+	u32 last_tuned_freq;
 };
 
 /* commonly used methods by the dib3000mb/mc/p frontend */
 extern int dib3000_read_reg(struct dib3000_state *state, u16 reg);
 extern int dib3000_write_reg(struct dib3000_state *state, u16 reg, u16 val);
-
-extern int dib3000_init_pid_list(struct dib3000_state *state, int num);
-extern void dib3000_dealloc_pid_list(struct dib3000_state *state);
-extern int dib3000_get_pid_index(struct dib3000_pid pid_list[], int num_pids,
-	int pid, spinlock_t *pid_list_lock,int onoff);
 
 extern int dib3000_search_status(u16 irq,u16 lock);
 
@@ -81,7 +65,7 @@ extern int dib3000_search_status(u16 irq,u16 lock);
 
 #define wr_foreach(a,v) { int i; \
 	if (sizeof(a) != sizeof(v)) \
-		err("sizeof: %zd %zd is different",sizeof(a),sizeof(v));\
+		err("sizeof: %d %d is different",sizeof(a),sizeof(v));\
 	for (i=0; i < sizeof(a)/sizeof(u16); i++) \
 		wr(a[i],v[i]); \
 	}
@@ -136,8 +120,8 @@ extern int dib3000_search_status(u16 irq,u16 lock);
 #define DIB3000_DDS_INVERSION_OFF		(     0)
 #define DIB3000_DDS_INVERSION_ON		(     1)
 
-#define DIB3000_TUNER_WRITE_ENABLE(a)	(0xffff & (a << 7))
-#define DIB3000_TUNER_WRITE_DISABLE(a)	(0xffff & ((a << 7) | (1 << 7)))
+#define DIB3000_TUNER_WRITE_ENABLE(a)	(0xffff & (a << 8))
+#define DIB3000_TUNER_WRITE_DISABLE(a)	(0xffff & ((a << 8) | (1 << 7)))
 
 /* for auto search */
 extern u16 dib3000_seq[2][2][2];

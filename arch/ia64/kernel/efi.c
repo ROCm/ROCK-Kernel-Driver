@@ -778,6 +778,7 @@ efi_mem_attributes (unsigned long phys_addr)
 	}
 	return 0;
 }
+EXPORT_SYMBOL(efi_mem_attributes);
 
 int
 valid_phys_addr_range (unsigned long phys_addr, unsigned long *size)

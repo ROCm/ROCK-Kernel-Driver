@@ -198,9 +198,6 @@ int __init setup_early_printk(char *opt)
 		early_console = &early_serial_console;		
 	} else if (!strncmp(buf, "vga", 3)) {
 		early_console = &early_vga_console; 
-	} else {
-		early_console = NULL; 		
-		return -1; 
 	}
 	early_console_initialized = 1;
 	register_console(early_console);       

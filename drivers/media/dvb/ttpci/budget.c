@@ -414,7 +414,7 @@ static void frontend_init(struct budget *budget)
 {
 	switch(budget->dev->pci->subsystem_device) {
 	case 0x1003: // Hauppauge/TT Nova budget (stv0299/ALPS BSRU6(tsa5059) OR ves1893/ALPS BSRV2(sp5659))
-
+	case 0x1013:
 		// try the ALPS BSRV2 first of all
 		budget->dvb_frontend = ves1x93_attach(&alps_bsrv2_config, &budget->i2c_adap);
 		if (budget->dvb_frontend) {
@@ -522,14 +522,14 @@ static struct saa7146_extension budget_extension;
 MAKE_BUDGET_INFO(ttbs,	"TT-Budget/WinTV-NOVA-S  PCI",	BUDGET_TT);
 MAKE_BUDGET_INFO(ttbc,	"TT-Budget/WinTV-NOVA-C  PCI",	BUDGET_TT);
 MAKE_BUDGET_INFO(ttbt,	"TT-Budget/WinTV-NOVA-T  PCI",	BUDGET_TT);
-/* MAKE_BUDGET_INFO(satel,	"SATELCO Multimedia PCI",	BUDGET_TT_HW_DISEQC); UNDEFINED HARDWARE - mail linuxtv.org list */
+MAKE_BUDGET_INFO(satel,	"SATELCO Multimedia PCI",	BUDGET_TT_HW_DISEQC);
 MAKE_BUDGET_INFO(fsacs, "Fujitsu Siemens Activy Budget-S PCI", BUDGET_FS_ACTIVY);
 
 static struct pci_device_id pci_tbl[] = {
 	MAKE_EXTENSION_PCI(ttbs,  0x13c2, 0x1003),
 	MAKE_EXTENSION_PCI(ttbc,  0x13c2, 0x1004),
 	MAKE_EXTENSION_PCI(ttbt,  0x13c2, 0x1005),
-/*	MAKE_EXTENSION_PCI(satel, 0x13c2, 0x1013), UNDEFINED HARDWARE */
+	MAKE_EXTENSION_PCI(satel, 0x13c2, 0x1013),
 	MAKE_EXTENSION_PCI(fsacs, 0x1131, 0x4f61),
 	{
 		.vendor    = 0,

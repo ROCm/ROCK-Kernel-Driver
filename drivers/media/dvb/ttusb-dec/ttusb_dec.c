@@ -756,7 +756,7 @@ static void ttusb_dec_stop_iso_xfer(struct ttusb_dec *dec)
 
 	if (!dec->iso_stream_count) {
 		for (i = 0; i < ISO_BUF_COUNT; i++)
-			usb_unlink_urb(dec->iso_urb[i]);
+			usb_kill_urb(dec->iso_urb[i]);
 	}
 
 	up(&dec->iso_sem);
@@ -821,7 +821,7 @@ static int ttusb_dec_start_iso_xfer(struct ttusb_dec *dec)
 				       "error %d\n", __FUNCTION__, i, result);
 
 				while (i) {
-					usb_unlink_urb(dec->iso_urb[i - 1]);
+					usb_kill_urb(dec->iso_urb[i - 1]);
 					i--;
 				}
 
@@ -1379,7 +1379,7 @@ static void ttusb_dec_exit_usb(struct ttusb_dec *dec)
 	dec->iso_stream_count = 0;
 
 	for (i = 0; i < ISO_BUF_COUNT; i++)
-		usb_unlink_urb(dec->iso_urb[i]);
+		usb_kill_urb(dec->iso_urb[i]);
 
 	ttusb_dec_free_iso_urbs(dec);
 }

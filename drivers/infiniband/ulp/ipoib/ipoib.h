@@ -104,10 +104,10 @@ struct ipoib_buf {
 };
 
 /*
- * Device private locking: netdev->xmit_lock protects members used
- * in TX fast path.
- * lock protects everything else.  lock nests inside of xmit_lock (ie
- * xmit_lock must be acquired first if needed).
+ * Device private locking: tx_lock protects members used in TX fast
+ * path (and we use LLTX so upper layers don't do extra locking).
+ * lock protects everything else.  lock nests inside of tx_lock (ie
+ * tx_lock must be acquired first if needed).
  */
 struct ipoib_dev_priv {
 	spinlock_t lock;
@@ -150,6 +150,7 @@ struct ipoib_dev_priv {
 
 	struct ipoib_buf *rx_ring;
 
+	spinlock_t        tx_lock;
 	struct ipoib_buf *tx_ring;
 	unsigned          tx_head;
 	unsigned          tx_tail;

@@ -1,14 +1,25 @@
 #include <linux/config.h>
 
 /*
- * Preserved registers that are shared between code in ivt.S and entry.S.  Be
- * careful not to step on these!
+ * Preserved registers that are shared between code in ivt.S and
+ * entry.S.  Be careful not to step on these!
  */
-#define pLvSys		p1	/* set 1 if leave from syscall; otherwise, set 0 */
-#define pKStk		p2	/* will leave_{kernel,syscall} return to kernel-stacks? */
-#define pUStk		p3	/* will leave_{kernel,syscall} return to user-stacks? */
-#define pSys		p4	/* are we processing a (synchronous) system call? */
-#define pNonSys		p5	/* complement of pSys */
+#define PRED_LEAVE_SYSCALL	1 /* TRUE iff leave from syscall */
+#define PRED_KERNEL_STACK	2 /* returning to kernel-stacks? */
+#define PRED_USER_STACK		3 /* returning to user-stacks? */
+#define PRED_SYSCALL		4 /* inside a system call? */
+#define PRED_NON_SYSCALL	5 /* complement of PRED_SYSCALL */
+
+#ifdef __ASSEMBLY__
+# define PASTE2(x,y)	x##y
+# define PASTE(x,y)	PASTE2(x,y)
+
+# define pLvSys		PASTE(p,PRED_LEAVE_SYSCALL)
+# define pKStk		PASTE(p,PRED_KERNEL_STACK)
+# define pUStk		PASTE(p,PRED_USER_STACK)
+# define pSys		PASTE(p,PRED_SYSCALL)
+# define pNonSys	PASTE(p,PRED_NON_SYSCALL)
+#endif
 
 #define PT(f)		(IA64_PT_REGS_##f##_OFFSET)
 #define SW(f)		(IA64_SWITCH_STACK_##f##_OFFSET)

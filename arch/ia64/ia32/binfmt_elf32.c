@@ -103,7 +103,7 @@ ia64_elf32_init (struct pt_regs *regs)
 			if (insert_vm_struct(current->mm, vma)) {
 				kmem_cache_free(vm_area_cachep, vma);
 				up_write(&current->mm->mmap_sem);
-				return;
+				BUG();
 			}
 		}
 		up_write(&current->mm->mmap_sem);
@@ -130,7 +130,7 @@ ia64_elf32_init (struct pt_regs *regs)
 			if (insert_vm_struct(current->mm, vma)) {
 				kmem_cache_free(vm_area_cachep, vma);
 				up_write(&current->mm->mmap_sem);
-				return;
+				BUG();
 			}
 		}
 		up_write(&current->mm->mmap_sem);
@@ -153,7 +153,7 @@ ia64_elf32_init (struct pt_regs *regs)
 			if (insert_vm_struct(current->mm, vma)) {
 				kmem_cache_free(vm_area_cachep, vma);
 				up_write(&current->mm->mmap_sem);
-				return;
+				BUG();
 			}
 		}
 		up_write(&current->mm->mmap_sem);

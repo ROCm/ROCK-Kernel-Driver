@@ -539,7 +539,8 @@ pci_mmap_page_range (struct pci_dev *dev, struct vm_area_struct *vma,
 	 */
 	vma->vm_flags |= (VM_SHM | VM_RESERVED | VM_IO);
 
-	if (write_combine)
+	if (write_combine && efi_range_is_wc(vma->vm_start,
+					     vma->vm_end - vma->vm_start))
 		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
 	else
 		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
