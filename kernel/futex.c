@@ -468,6 +468,7 @@ futexfs_get_sb(struct file_system_type *fs_type,
 static struct file_system_type futex_fs_type = {
 	.name		= "futexfs",
 	.get_sb		= futexfs_get_sb,
+	.kill_sb	= kill_anon_super,
 };
 
 static int __init init(void)
