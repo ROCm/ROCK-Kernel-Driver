@@ -2561,6 +2561,13 @@ config NET_FC
 	  adaptor below. You also should have said Y to "SCSI support" and
 	  "SCSI generic support".
 
+config NET_LPFC
+        tristate "Emulex LightPulse IP over FC Support"
+        depends on MODULES && NET_FC && SCSI_LPFC && m && (PPC_PSERIES || PPC_ISERIES || IA64 || X86)
+	help
+          The lpfndd driver provides IP over FC Support for the Emulex
+          LightPulse Family of Fibre Channel PCI host adapters.
+
 config IPHASE5526
 	tristate "Interphase 5526 Tachyon chipset based adapter support"
 	depends on NET_FC && SCSI && PCI && BROKEN

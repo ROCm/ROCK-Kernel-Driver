@@ -34,12 +34,14 @@
 #include <linux/interrupt.h>
 #include <linux/kmod.h>
 #include <linux/delay.h>
+#include <linux/init.h>
 #include <linux/workqueue.h>
 #include <linux/nmi.h>
 #include <acpi/acpi.h>
 #include <asm/io.h>
 #include <acpi/acpi_bus.h>
 #include <asm/uaccess.h>
+#include <linux/vmalloc.h>
 
 #include <linux/efi.h>
 
@@ -232,11 +234,33 @@ acpi_status
 acpi_os_table_override (struct acpi_table_header *existing_table,
 			struct acpi_table_header **new_table)
 {
-	if (!existing_table || !new_table)
-		return AE_BAD_PARAMETER;
-
-	*new_table = NULL;
-	return AE_OK;
+ #ifdef CONFIG_ACPI_INITRD
+	extern char* dsdt_start;
+ #endif
+         if (!existing_table || !new_table)
+                 return AE_BAD_PARAMETER;
+  
+  #ifdef CONFIG_ACPI_INITRD
+	if(memcmp(existing_table, "DSDT", 4)){
+		*new_table = NULL;
+		return AE_OK;
+	}
+	// dsdt_start has been kmalloced in /init/initram.c
+	// where should it be freed ?!? 
+	if (dsdt_start != NULL){
+	 	printk(KERN_INFO "new dsdt found and will be loaded!\n");
+		*new_table = (struct acpi_table_header*)dsdt_start;
+		return AE_OK;
+	 }
+	 else{
+		printk(KERN_INFO "No customized DSDT found!\n");
+                *new_table = NULL;
+		return AE_OK;
+	 }
+ #else
+         *new_table = NULL;
+ #endif
+         return AE_OK;
 }
 
 static irqreturn_t

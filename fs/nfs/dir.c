@@ -1549,6 +1549,13 @@ nfs_permission(struct inode *inode, int mask, struct nameidata *nd)
 			/* Is the mask a subset of an accepted mask? */
 			if ((cache->mask & mask) == mask)
 				goto out;
+			/* Try with expanded credentials. */
+			res = NFS_PROTO(inode)->access(inode, cred,
+					mask | cache->mask);
+			if (!res || !cache->mask) {
+				mask |= cache->mask;
+				goto rpc_done;
+			}
 		} else {
 			/* ...or is it a superset of a rejected mask? */
 			if ((cache->mask & mask) == cache->mask)
@@ -1557,6 +1564,7 @@ nfs_permission(struct inode *inode, int mask, struct nameidata *nd)
 	}
 
 	res = NFS_PROTO(inode)->access(inode, cred, mask);
+rpc_done:
 	if (!res || res == -EACCES)
 		goto add_cache;
 out:

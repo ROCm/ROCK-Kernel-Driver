@@ -6,8 +6,14 @@
 #include <linux/delay.h>
 #include <linux/string.h>
 #include <linux/syscalls.h>
+#include <linux/vmalloc.h>
+
+#ifdef CONFIG_ACPI_INITRD
+		unsigned char *dsdt_start;
+#endif
 
 static __initdata char *message;
+
 static void __init error(char *x)
 {
 	if (!message)
@@ -474,17 +480,68 @@ void __init populate_rootfs(void)
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (initrd_start) {
 		int fd;
+		
+		
 		printk(KERN_INFO "checking if image is initramfs...");
 		err = unpack_to_rootfs((char *)initrd_start,
-			initrd_end - initrd_start, 1);
+			       initrd_end - initrd_start, 1);
 		if (!err) {
 			printk(" it is\n");
 			unpack_to_rootfs((char *)initrd_start,
-				initrd_end - initrd_start, 0);
+				 initrd_end - initrd_start, 0);
 			free_initrd_mem(initrd_start, initrd_end);
 			return;
 		}
 		printk("it isn't (%s); looks like an initrd\n", err);
+		
+#ifdef CONFIG_ACPI_INITRD
+		unsigned char start_signature[] = "INITRDDSDT123DSDT123";
+		unsigned char end_signature[] =   "INITRDDSDT321DSDT321";
+		unsigned char *data;
+		unsigned char *dsdt_start_tmp = NULL;
+		unsigned char *initrd_end_tmp = NULL;
+		dsdt_start = NULL;
+		
+		printk(KERN_INFO "Looking for DSDT in initrd ...");
+		 //* don't scan above end, do not modify initrd borders *//
+		initrd_end_tmp=(unsigned char*)initrd_end-sizeof(end_signature);
+
+		// searching for start signature in initrd
+		for (data=(unsigned char*)initrd_start; 
+			data < (unsigned char*)initrd_end_tmp ; ++data) {
+			
+			if (!memcmp(data, start_signature, 
+				sizeof(start_signature)-1)) {
+				printk(" found (at offset %u in initrd)!\n", 
+					data+sizeof(start_signature)-
+					(unsigned char*)initrd_start);
+				dsdt_start_tmp = data+sizeof(start_signature);
+				break;
+			}
+		}
+		// check if head of dsdt is valid
+		if (dsdt_start_tmp != NULL && !memcmp(dsdt_start_tmp, "DSDT", 4)) {
+			// searching for end signature in initrd
+			for (data += sizeof(end_signature); 
+				data <= (unsigned char*)initrd_end; data++){  
+				if (!memcmp(data, end_signature, 
+					sizeof(end_signature)-1)){
+					break;
+				}
+			}
+			printk (KERN_INFO "size of dsdt: %u!\n", data-dsdt_start_tmp);
+			// DSDT could be about 10-200kb, maybe more? 
+			// could kmalloc be used ?
+			// am I allowed to use vmalloc ?
+			dsdt_start = vmalloc(data-dsdt_start_tmp+1);
+			memcpy(dsdt_start, dsdt_start_tmp, data-dsdt_start_tmp);
+			printk(KERN_INFO "%d bytes allocated and copied for DSDT", data-dsdt_start_tmp);
+		}
+		else{
+			printk("No customized DSDT found in initrd!\n");
+		}
+#endif 
+		
 		fd = sys_open("/initrd.image", O_WRONLY|O_CREAT, 700);
 		if (fd >= 0) {
 			sys_write(fd, (char *)initrd_start,

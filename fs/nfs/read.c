@@ -453,6 +453,8 @@ static void nfs_readpage_result_full(struct nfs_read_data *data, int status)
 					memclear_highpage_flush(page,
 							req->wb_pgbase + count,
 							req->wb_bytes - count);
+				if (!data->res.eof)
+					SetPageError(page);
 				count = 0;
 			} else
 				count -= PAGE_CACHE_SIZE;

@@ -161,7 +161,6 @@ void nlmclnt_mark_reclaim(struct nlm_host *host)
 static inline
 void nlmclnt_prepare_reclaim(struct nlm_host *host, u32 newstate)
 {
-	host->h_monitored = 0;
 	host->h_nsmstate = newstate;
 	host->h_state++;
 	host->h_nextrebind = 0;

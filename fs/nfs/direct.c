@@ -423,6 +423,8 @@ nfs_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 	if (!is_sync_kiocb(iocb))
 		return result;
 
+	up(&inode->i_sem);
+
 	switch (rw) {
 	case READ:
 		dprintk("NFS: direct_IO(read) (%s) off/no(%Lu/%lu)\n",
@@ -441,6 +443,8 @@ nfs_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 	default:
 		break;
 	}
+
+	down(&inode->i_sem);
 	return result;
 }
 

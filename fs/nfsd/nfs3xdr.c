@@ -571,6 +571,8 @@ nfs3svc_decode_readdirplusargs(struct svc_rqst *rqstp, u32 *p,
 
 	len = (args->count > NFSSVC_MAXBLKSIZE) ? NFSSVC_MAXBLKSIZE :
 						  args->count;
+	if (len > 8192)
+		len = 8192;
 	args->count = len;
 
 	while (len > 0) {

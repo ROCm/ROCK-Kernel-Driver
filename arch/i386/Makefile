@@ -25,6 +25,8 @@ CFLAGS += -pipe -msoft-float
 # prevent gcc from keeping the stack 16 byte aligned
 CFLAGS += $(call check_gcc,-mpreferred-stack-boundary=2,)
 
+CFLAGS += $(call check_gcc,-funit-at-a-time,)
+
 align := $(subst -functions=0,,$(call check_gcc,-falign-functions=0,-malign-functions=0))
 
 cflags-$(CONFIG_M386)		+= -march=i386
@@ -60,6 +62,12 @@ cflags-$(CONFIG_REGPARM) 	+= $(shell if [ $(GCC_VERSION) -ge 0300 ] ; then echo 
 # Disable unit-at-a-time mode, it makes gcc use a lot more stack
 # due to the lack of sharing of stacklots.
 CFLAGS += $(call check_gcc,-fno-unit-at-a-time,)
+
+# m586 and genericarch is likely a distribution kernel. optimize for the
+# most common CPU (686)
+ifeq ($(CONFIG_X86_GENERICARCH),y)
+cflags-$(CONFIG_M586) += -mcpu=i686
+endif
 
 CFLAGS += $(cflags-y)
 

@@ -45,6 +45,9 @@
 #include <acpi/acpi.h>
 #include <acpi/actables.h>
 
+#ifdef CONFIG_ACPI_INITRD
+extern unsigned char *dsdt_start;
+#endif
 
 #define _COMPONENT          ACPI_TABLES
 	 ACPI_MODULE_NAME    ("tbget")
@@ -284,8 +287,13 @@ acpi_tb_table_override (
 			acpi_format_exception (status)));
 		return_ACPI_STATUS (status);
 	}
-
 	/* Copy the table info */
+#ifdef CONFIG_ACPI_INITRD
+	if (dsdt_start) {
+		vfree(dsdt_start);
+		dsdt_start = NULL;
+	}
+#endif
 
 	ACPI_REPORT_INFO (("Table [%4.4s] replaced by host OS\n",
 		table_info->pointer->signature));

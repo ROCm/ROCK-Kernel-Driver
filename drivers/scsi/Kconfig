@@ -999,6 +999,13 @@ config SCSI_SYM53C8XX_IOMAPPED
 	  the card.  This is significantly slower then using memory
 	  mapped IO.  Most people should answer N.
 
+config SCSI_LPFC
+	tristate "Emulex LightPulse Fibre Channel Support"
+	depends on PCI && SCSI && (PPC_PSERIES || PPC_ISERIES || IA64 || X86)
+	help
+          This lpfcdd driver supports the Emulex LightPulse
+          Family of Fibre Channel PCI host adapters.
+
 config SCSI_IPR
 	tristate "IBM Power Linux RAID adapter support"
 	depends on PCI && SCSI

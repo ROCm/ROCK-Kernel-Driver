@@ -270,5 +270,19 @@ config X86_PM_TIMER
 	  kernel logs, and/or you are using this on a notebook which
 	  does not yet have an HPET, you should say "Y" here.
 
+config ACPI_INITRD
+	bool "Read DSDT from initrd"
+	depends on ACPI && BLK_DEV_INITRD
+	default y
+	help
+	  The DSDT (Differentiated System Description Table) often needs to be
+	  overridden because of broken BIOS implementations. If you want to use
+	  a customized DSDT, please use the mkinitrd tool (mkinitrd package) to 
+	  attach the  DSDT to the initrd) or see http://gaugusch.at/kernel.shtml 
+	  for instructions on using an existing initrd with ACPI. If there is no 
+	  one found in the initrd, the DSDT from the BIOS is used. Even you do not 
+	  need a new one at the moment, you may want to use a better implemented 
+	  DSDT later. It is save to say yes here
+
 endmenu
 

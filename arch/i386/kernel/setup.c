@@ -762,7 +762,7 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 		}
 
 		/* Limit ACPI just to boot-time to enable HT */
-		else if (!memcmp(from, "acpi=ht", 7)) {
+		else if (!memcmp(from, "acpi=ht", 7) || !memcmp(from,"acpi=oldboot",12)) {
 			if (!acpi_force)
 				disable_acpi();
 			acpi_ht = 1;

@@ -177,6 +177,14 @@ int ip_call_ra_chain(struct sk_buff *skb)
 					read_unlock(&ip_ra_lock);
 					return 1;
 				}
+				if (skb->dst == NULL) {
+					/* IP conntrack zaps skb->dst before queueing fragments,
+					 * and fixes up the skb before reinjecting it.
+					 * Too bad if the module is unloaded inbetween.
+					 */
+					 kfree_skb(skb);
+					 return 1;
+				 }
 			}
 			if (last) {
 				struct sk_buff *skb2 = skb_clone(skb, GFP_ATOMIC);
@@ -277,6 +285,14 @@ int ip_local_deliver(struct sk_buff *skb)
 		skb = ip_defrag(skb);
 		if (!skb)
 			return 0;
+		if (skb->dst == NULL) {
+			/* IP conntrack zaps skb->dst before queueing fragments,
+			 * and fixes up the skb before reinjecting it.
+			 * Too bad if the module is unloaded inbetween.
+			 */
+			 kfree_skb(skb);
+			 return 0;
+		 }
 	}
 
 	return NF_HOOK(PF_INET, NF_IP_LOCAL_IN, skb, skb->dev, NULL,

@@ -293,14 +293,6 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 		server->rsize = nfs_block_size(fsinfo.rtpref, NULL);
 	if (server->wsize == 0)
 		server->wsize = nfs_block_size(fsinfo.wtpref, NULL);
-	if (sb->s_blocksize == 0) {
-		if (fsinfo.wtmult == 0) {
-			sb->s_blocksize = 512;
-			sb->s_blocksize_bits = 9;
-		} else
-			sb->s_blocksize = nfs_block_bits(fsinfo.wtmult,
-							 &sb->s_blocksize_bits);
-	}
 
 	if (fsinfo.rtmax >= 512 && server->rsize > fsinfo.rtmax)
 		server->rsize = nfs_block_size(fsinfo.rtmax, NULL);
@@ -318,6 +310,10 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 		server->wpages = NFS_WRITE_MAXIOV;
                 server->wsize = server->wpages << PAGE_CACHE_SHIFT;
 	}
+
+	if (sb->s_blocksize == 0)
+		sb->s_blocksize = nfs_block_bits(server->wsize,
+							 &sb->s_blocksize_bits);
 
 	server->dtsize = nfs_block_size(fsinfo.dtpref, NULL);
 	if (server->dtsize > PAGE_CACHE_SIZE)
@@ -1335,8 +1331,9 @@ static struct super_block *nfs_get_sb(struct file_system_type *fs_type,
 		memset(root->data+root->size, 0, sizeof(root->data)-root->size);
 
 	if (data->version != NFS_MOUNT_VERSION) {
-		printk("nfs warning: mount version %s than kernel\n",
-			data->version < NFS_MOUNT_VERSION ? "older" : "newer");
+		if (data->version < 3)
+			printk("nfs warning: mount version %d is older "
+			       "than 3\n", data->version);
 		if (data->version < 2)
 			data->namlen = 0;
 		if (data->version < 3)

@@ -1077,12 +1077,16 @@ rpc_killall_tasks(struct rpc_clnt *clnt)
 	/*
 	 * Spin lock all_tasks to prevent changes...
 	 */
+again:
 	spin_lock(&rpc_sched_lock);
 	alltask_for_each(rovr, le, &all_tasks)
-		if (!clnt || rovr->tk_client == clnt) {
+		if (!(rovr->tk_flags & RPC_TASK_KILLED) && 
+		    (!clnt || rovr->tk_client == clnt)) {
 			rovr->tk_flags |= RPC_TASK_KILLED;
 			rpc_exit(rovr, -EIO);
+			spin_unlock(&rpc_sched_lock);
 			rpc_wake_up_task(rovr);
+			goto again;
 		}
 	spin_unlock(&rpc_sched_lock);
 }

@@ -81,6 +81,7 @@ obj-$(CONFIG_AGP) += agp/
 obj-$(CONFIG_DRM) += drm/
 obj-$(CONFIG_PCMCIA) += pcmcia/
 obj-$(CONFIG_IPMI_HANDLER) += ipmi/
+obj-$(CONFIG_VTUNE) += vtune/
 
 obj-$(CONFIG_HANGCHECK_TIMER) += hangcheck-timer.o
 
