@@ -260,40 +260,44 @@ static void get_prompt_str(struct gstr *r, struct property *prop)
 	}
 }
 
+static void get_symbol_str(struct gstr *r, struct symbol *sym)
+{
+	bool hit;
+	struct property *prop;
+
+	str_printf(r, "Symbol: %s [=%s]\n", sym->name,
+	                               sym_get_string_value(sym));
+	for_all_prompts(sym, prop)
+		get_prompt_str(r, prop);
+	hit = false;
+	for_all_properties(sym, prop, P_SELECT) {
+		if (!hit) {
+			str_append(r, "  Selects: ");
+			hit = true;
+		} else
+			str_printf(r, " && ");
+		expr_gstr_print(prop->expr, r);
+	}
+	if (hit)
+		str_append(r, "\n");
+	if (sym->rev_dep.expr) {
+		str_append(r, "  Selected by: ");
+		expr_gstr_print(sym->rev_dep.expr, r);
+		str_append(r, "\n");
+	}
+	str_append(r, "\n\n");
+}
+
 static struct gstr get_relations_str(struct symbol **sym_arr)
 {
 	struct symbol *sym;
-	struct property *prop;
 	struct gstr res = str_new();
-	struct gstr *r = &res;
-	bool hit;
 	int i;
 
-	for (i = 0; sym_arr && (sym = sym_arr[i]); i++) {
-		str_printf(&res, "Symbol: %s [=%s]\n", sym->name,
-		                               sym_get_string_value(sym));
-		for_all_prompts(sym, prop)
-			get_prompt_str(r, prop);
-		hit = false;
-		for_all_properties(sym, prop, P_SELECT) {
-			if (!hit) {
-				str_append(r, "  Selects: ");
-				hit = true;
-			} else
-				str_printf(r, " && ");
-			expr_gstr_print(prop->expr, r);
-		}
-		if (hit)
-			str_append(r, "\n");
-		if (sym->rev_dep.expr) {
-			str_append(r, "  Selected by: ");
-			expr_gstr_print(sym->rev_dep.expr, r);
-			str_append(r, "\n");
-		}
-		str_append(r, "\n\n");
-	}
+	for (i = 0; sym_arr && (sym = sym_arr[i]); i++)
+		get_symbol_str(&res, sym);
 	if (!i)
-		str_append(r, "No matches found.\n");
+		str_append(&res, "No matches found.\n");
 	return res;
 }
 
@@ -705,20 +709,22 @@ static void show_helptext(const char *title, const char *text)
 
 static void show_help(struct menu *menu)
 {
-	const char *help;
-	char *helptext;
+	struct gstr help = str_new();
 	struct symbol *sym = menu->sym;
 
-	help = sym->help;
-	if (!help)
-		help = nohelp_text;
-	if (sym->name) {
-		helptext = malloc(strlen(sym->name) + strlen(help) + 16);
-		sprintf(helptext, "CONFIG_%s:\n\n%s", sym->name, help);
-		show_helptext(menu_get_prompt(menu), helptext);
-		free(helptext);
-	} else
-		show_helptext(menu_get_prompt(menu), help);
+	if (sym->help)
+	{
+		if (sym->name) {
+			str_printf(&help, "CONFIG_%s:\n\n", sym->name);
+			str_append(&help, sym->help);
+			str_append(&help, "\n");
+		}
+	} else {
+		str_append(&help, nohelp_text);
+	}
+	get_symbol_str(&help, sym);
+	show_helptext(menu_get_prompt(menu), str_get(&help));
+	str_free(&help);
 }
 
 static void show_readme(void)
