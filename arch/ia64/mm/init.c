@@ -27,6 +27,7 @@
 #include <asm/sal.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
+#include <asm/unistd.h>
 #include <asm/tlb.h>
 
 DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
@@ -569,6 +570,29 @@ count_reserved_pages (u64 start, u64 end, void *arg)
 	return 0;
 }
 
+#ifdef CONFIG_FSYS
+
+/*
+ * Boot command-line option "nolwsys" can be used to disable the use of any light-weight
+ * system call handler.  When this option is in effect, all fsyscalls will end up bubbling
+ * down into the kernel and calling the normal (heavy-weight) syscall handler.  This is
+ * useful for performance testing, but conceivably could also come in handy for debugging
+ * purposes.
+ */
+
+static int nolwsys;
+
+static int __init
+nolwsys_setup (char *s)
+{
+	nolwsys = 1;
+	return 1;
+}
+
+__setup("nolwsys", nolwsys_setup);
+
+#endif /* CONFIG_FSYS */
+
 void
 mem_init (void)
 {
@@ -621,6 +645,25 @@ mem_init (void)
 		num_pgt_pages = nr_free_pages() / 10;
 	if (num_pgt_pages > (u64) pgt_cache_water[1])
 		pgt_cache_water[1] = num_pgt_pages;
+
+#ifdef CONFIG_FSYS
+	{
+		int i;
+
+		/*
+		 * For fsyscall entrpoints with no light-weight handler, use the ordinary
+		 * (heavy-weight) handler, but mark it by setting bit 0, so the fsyscall entry
+		 * code can tell them apart.
+		 */
+		for (i = 0; i < NR_syscalls; ++i) {
+			extern unsigned long fsyscall_table[NR_syscalls];
+			extern unsigned long sys_call_table[NR_syscalls];
+
+			if (!fsyscall_table[i] || nolwsys)
+				fsyscall_table[i] = sys_call_table[i] | 1;
+		}
+	}
+#endif
 
 	/* install the gate page in the global page table: */
 	put_gate_page(virt_to_page(ia64_imva(__start_gate_section)), GATE_ADDR);

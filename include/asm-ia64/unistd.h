@@ -247,6 +247,8 @@
 #define __NR_sys_clock_getres		1255
 #define __NR_sys_clock_nanosleep	1256
 
+#define NR_syscalls			256 /* length of syscall table */
+
 #if !defined(__ASSEMBLY__) && !defined(ASSEMBLER)
 
 extern long __ia64_syscall (long a0, long a1, long a2, long a3, long a4, long nr);

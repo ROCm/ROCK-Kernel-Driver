@@ -11,11 +11,9 @@
 #include <asm/sigcontext.h>
 #include <asm/system.h>
 #include <asm/unistd.h>
-#include <asm/page.h>
 
 	.section .text.gate, "ax"
 .start_gate:
-
 
 #if CONFIG_FSYS
 
@@ -49,6 +47,7 @@ END(syscall_via_break)
  *	all other "scratch" registers:	undefined
  *	all "preserved" registers:	same as on entry
  */
+
 GLOBAL_ENTRY(syscall_via_epc)
 	.prologue
 	.altrp b6
@@ -65,43 +64,44 @@ GLOBAL_ENTRY(syscall_via_epc)
 }
 	;;
 	rsm psr.be
-	movl r18=fsyscall_table
+	movl r14=fsyscall_table
 
-	mov r16=IA64_KR(CURRENT)
-	mov r19=255
+	mov r16=IA64_KR(CURRENT)		// 12 cycle read latency
+	mov r19=NR_syscalls-1
 	;;
-	shladd r18=r17,3,r18
-	cmp.geu p6,p0=r19,r17			// (syscall > 0 && syscall <= 1024+255)?
-	;;
+	shladd r18=r17,3,r14
+
 	srlz.d					// ensure little-endian byteorder is in effect
+	cmp.ne p8,p0=r0,r0			// p8 <- FALSE
+	/* Note: if r17 is a NaT, p6 will be set to zero.  */
+	cmp.geu p6,p7=r19,r17			// (syscall > 0 && syscall < 1024+NR_syscalls)?
+	;;
 (p6)	ld8 r18=[r18]
+	mov r29=psr				// read psr (12 cyc load latency)
+	add r14=-8,r14				// r14 <- addr of fsys_bubble_down entry
 	;;
 (p6)	mov b7=r18
+(p6)	tbit.z p8,p0=r18,0
+(p8)	br.dptk.many b7
+
+	mov r27=ar.rsc
+	mov r21=ar.fpsr
+	mov r26=ar.pfs
+#if 1/*def CONFIG_ITANIUM*/
+(p6)	ld8 r14=[r14]				// r14 <- fsys_bubble_down
+	;;
+(p6)	mov b7=r14
 (p6)	br.sptk.many b7
+#else
+	/* We can't do this until gate is a proper ELF DSO.  */
+(p6)	brl.cond.sptk fsys_bubble_down
+#endif
 
 	mov r10=-1
 	mov r8=ENOSYS
 	MCKINLEY_E9_WORKAROUND
 	br.ret.sptk.many b6
 END(syscall_via_epc)
-
-#if 0
-GLOBAL_ENTRY(fsys_fallback_syscall)
-	/*
-	 * It would be better/fsyser to do the SAVE_MIN magic directly here, but for now
-	 * we simply fall back on doing a system-call via break.  Good enough
-	 * to get started.  (Note: we have to do this through the gate page again, since
-	 * the br.ret will switch us back to user-level privilege.)
-	 *
-	 * XXX Move this back to fsys.S after changing it over to avoid break 0x100000.
-	 */
-	movl r2=(syscall_via_break - .start_gate) + GATE_ADDR
-	;;
-	MCKINLEY_E9_WORKAROUND
-	mov b7=r2
-	br.ret.sptk.many b7
-END(fsys_fallback_syscall)
-#endif
 
 #endif /* CONFIG_FSYS */
 

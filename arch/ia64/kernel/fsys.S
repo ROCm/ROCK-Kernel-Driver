@@ -16,6 +16,7 @@
 #include <asm/thread_info.h>
 #include <asm/sal.h>
 #include <asm/system.h>
+#include <asm/unistd.h>
 
 #include "entry.h"
 
@@ -41,59 +42,10 @@
  *   ar.pfs	= previous frame-state (as passed into the fsyscall handler)
  */
 
-#if 1
-ENTRY(fsys_fallback_syscall)
-	/*
-	 * This is called for system calls which are entered via epc, but don't
-	 * have a light-weight handler.  We need to bubble down into the kernel,
-	 * and that requires setting up a minimal pt_regs structure, and initializing
-	 * the CPU state more or less as if an interruption had occurred.  To make
-	 * syscall-restarts work, we setup pt_regs such that cr_iip points to the
-	 * second instruction in syscall_via_break.  Decrementing the IP hence will
-	 * restart the syscall via break and not decrementing IP will return us
-	 * to the caller, as usual.
-	 */
-#	define PSR_PRESERVED_BITS	(IA64_PSR_UP | IA64_PSR_MFL | IA64_PSR_MFH | IA64_PSR_PK \
-					 | IA64_PSR_DT | IA64_PSR_RT)
-	/*
-	 * Reading psr.l gives us only bits 0-31, psr.it, and psr.mc.  The rest we have
-	 * to synthesize.
-	 */
-#	define PSR_ONE_BITS		((3 << IA64_PSR_CPL0_BIT) | (0x1 << IA64_PSR_RI_BIT) \
-					 | IA64_PSR_BN)
-	mov r29=psr
-	movl r9=PSR_PRESERVED_BITS
-
-	mov r20=r1
-	movl r8=PSR_ONE_BITS
-	;;
-	mov r1=IA64_KR(CURRENT)		// r16 = current (physical); 12 cycle read lat.
-	and r9=r9,r29
-	or r29=r8,r29
-	;;
-	mov psr.l=r9			// slam the door
-	mov r21=ar.fpsr
-	mov r26=ar.pfs
-
-	mov r25=ar.unat
-	mov r27=ar.rsc
-	mov r19=b6
-	;;
-
-	srlz.i				// ensure new psr.l has been established
-	movl r28=GATE_ADDR	// cr.iip XXX fix me!! Should be: GATE_ADDR(syscall_via_break)
-
-	invala
-	mov r31=pr
-	adds r16=IA64_TASK_THREAD_ON_USTACK_OFFSET,r1
-	;;
-	st1 [r16]=r0				// clear current->thread.on_ustack flag
-	cmp.ne pKStk,pUStk=r0,r0		// set pKStk <- 0, pUStk <- 1
-	br.cond.sptk.many ia64_enter_syscall
-END(fsys_fallback_syscall)
-#endif
-
 ENTRY(fsys_ni_syscall)
+	.prologue
+	.altrp b6
+	.body
 	mov r8=ENOSYS
 	mov r10=-1
 	MCKINLEY_E9_WORKAROUND
@@ -101,6 +53,9 @@ ENTRY(fsys_ni_syscall)
 END(fsys_ni_syscall)
 
 ENTRY(fsys_getpid)
+	.prologue
+	.altrp b6
+	.body
 	add r9=TI_FLAGS+IA64_TASK_SIZE,r16
 	;;
 	ld4 r9=[r9]
@@ -116,6 +71,9 @@ ENTRY(fsys_getpid)
 END(fsys_getpid)
 
 ENTRY(fsys_getppid)
+	.prologue
+	.altrp b6
+	.body
 	add r17=IA64_TASK_GROUP_LEADER_OFFSET,r16
 	;;
 	ld8 r17=[r17]				// r17 = current->group_leader
@@ -161,6 +119,9 @@ ENTRY(fsys_getppid)
 END(fsys_getppid)
 
 ENTRY(fsys_set_tid_address)
+	.prologue
+	.altrp b6
+	.body
 	add r9=TI_FLAGS+IA64_TASK_SIZE,r16
 	;;
 	ld4 r9=[r9]
@@ -200,6 +161,9 @@ END(fsys_set_tid_address)
  */
 
 ENTRY(fsys_gettimeofday)
+	.prologue
+	.altrp b6
+	.body
 	add r9=TI_FLAGS+IA64_TASK_SIZE,r16
 	movl r3=THIS_CPU(cpu_info)
 
@@ -213,7 +177,7 @@ ENTRY(fsys_gettimeofday)
 	movl r19=xtime			// xtime is a timespec struct
 
 	ld8 r10=[r10]			// r10 <- __per_cpu_offset[0]
-	movl r21=cpu_info__per_cpu
+	movl r21=THIS_CPU(cpu_info)
 	;;
 	add r10=r21, r10		// r10 <- &cpu_data(time_keeper_id)
 	tbit.nz p8,p0 = r2, IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT_BIT
@@ -368,262 +332,373 @@ EX(.fail, st8 [r9]=r3)			// store them in the timeval struct
 	br.ret.spnt.many b6		// return with r8 set to EINVAL
 END(fsys_gettimeofday)
 
+ENTRY(fsys_fallback_syscall)
+	.prologue
+	.altrp b6
+	.body
+	/*
+	 * We only get here from light-weight syscall handlers.  Thus, we already
+	 * know that r15 contains a valid syscall number.  No need to re-check.
+	 */
+	adds r17=-1024,r15
+	movl r14=sys_call_table
+	;;
+	shladd r18=r17,3,r14
+	;;
+	ld8 r18=[r18]				// load normal (heavy-weight) syscall entry-point
+	mov r29=psr				// read psr (12 cyc load latency)
+	mov r27=ar.rsc
+	mov r21=ar.fpsr
+	mov r26=ar.pfs
+END(fsys_fallback_syscall)
+	/* FALL THROUGH */
+GLOBAL_ENTRY(fsys_bubble_down)
+	.prologue
+	.altrp b6
+	.body
+	/*
+	 * We get here for syscalls that don't have a lightweight handler.  For those, we
+	 * need to bubble down into the kernel and that requires setting up a minimal
+	 * pt_regs structure, and initializing the CPU state more or less as if an
+	 * interruption had occurred.  To make syscall-restarts work, we setup pt_regs
+	 * such that cr_iip points to the second instruction in syscall_via_break.
+	 * Decrementing the IP hence will restart the syscall via break and not
+	 * decrementing IP will return us to the caller, as usual.  Note that we preserve
+	 * the value of psr.pp rather than initializing it from dcr.pp.  This makes it
+	 * possible to distinguish fsyscall execution from other privileged execution.
+	 *
+	 * On entry:
+	 *	- normal fsyscall handler register usage, except that we also have:
+	 *	- r18: address of syscall entry point
+	 *	- r21: ar.fpsr
+	 *	- r26: ar.pfs
+	 *	- r27: ar.rsc
+	 *	- r29: psr
+	 */
+#	define PSR_PRESERVED_BITS	(IA64_PSR_UP | IA64_PSR_MFL | IA64_PSR_MFH | IA64_PSR_PK \
+					 | IA64_PSR_DT | IA64_PSR_PP | IA64_PSR_RT | IA64_PSR_IC)
+	/*
+	 * Reading psr.l gives us only bits 0-31, psr.it, and psr.mc.  The rest we have
+	 * to synthesize.
+	 */
+#	define PSR_ONE_BITS		((3 << IA64_PSR_CPL0_BIT) | (0x1 << IA64_PSR_RI_BIT) \
+					 | IA64_PSR_BN)
+
+	invala
+	movl r8=PSR_ONE_BITS
+
+	mov r25=ar.unat			// save ar.unat (5 cyc)
+	movl r9=PSR_PRESERVED_BITS
+
+	mov ar.rsc=0			// set enforced lazy mode, pl 0, little-endian, loadrs=0
+	movl r28=GATE_ADDR	// cr.iip XXX fix me!! Should be: GATE_ADDR(syscall_via_break)
+	;;
+	mov r23=ar.bspstore		// save ar.bspstore (12 cyc)
+	mov r31=pr			// save pr (2 cyc)
+	mov r20=r1			// save caller's gp in r20
+	;;
+	mov r2=r16			// copy current task addr to addl-addressable register
+	and r9=r9,r29
+	mov r19=b6			// save b6 (2 cyc)
+	;;
+	mov psr.l=r9			// slam the door (17 cyc to srlz.i)
+	or r29=r8,r29			// construct cr.ipsr value to save
+	addl r22=IA64_RBS_OFFSET,r2	// compute base of RBS
+	;;
+	mov.m r24=ar.rnat		// read ar.rnat (5 cyc lat)
+	lfetch.fault.excl.nt1 [r22]
+	adds r16=IA64_TASK_THREAD_ON_USTACK_OFFSET,r2
+
+	// ensure previous insn group is issued before we stall for srlz.i:
+	;;
+	srlz.i				// ensure new psr.l has been established
+	/////////////////////////////////////////////////////////////////////////////
+	////////// from this point on, execution is not interruptible anymore
+	/////////////////////////////////////////////////////////////////////////////
+	addl r1=IA64_STK_OFFSET-IA64_PT_REGS_SIZE,r2	// compute base of memory stack
+	cmp.ne pKStk,pUStk=r0,r0	// set pKStk <- 0, pUStk <- 1
+	;;
+	st1 [r16]=r0			// clear current->thread.on_ustack flag
+	mov ar.bspstore=r22		// switch to kernel RBS
+	mov b6=r18			// copy syscall entry-point to b6 (7 cyc)
+	add r3=TI_FLAGS+IA64_TASK_SIZE,r2
+	;;
+	ld4 r3=[r3]				// r2 = current_thread_info()->flags
+	mov r18=ar.bsp			// save (kernel) ar.bsp (12 cyc)
+	mov ar.rsc=0x3			// set eager mode, pl 0, little-endian, loadrs=0
+	br.call.sptk.many b7=ia64_syscall_setup
+	;;
+	ssm psr.i
+	movl r2=ia64_ret_from_syscall
+	;;
+	mov rp=r2				// set the real return addr
+	tbit.z p8,p0=r3,TIF_SYSCALL_TRACE
+
+(p8)	br.call.sptk.many b6=b6			// ignore this return addr
+	br.cond.sptk ia64_trace_syscall
+END(fsys_bubble_down)
+
 	.rodata
 	.align 8
 	.globl fsyscall_table
+
+	data8 fsys_bubble_down
 fsyscall_table:
 	data8 fsys_ni_syscall
-	data8 fsys_fallback_syscall	// exit			// 1025
-	data8 fsys_fallback_syscall	// read
-	data8 fsys_fallback_syscall	// write
-	data8 fsys_fallback_syscall	// open
-	data8 fsys_fallback_syscall	// close
-	data8 fsys_fallback_syscall	// creat		// 1030
-	data8 fsys_fallback_syscall	// link
-	data8 fsys_fallback_syscall	// unlink
-	data8 fsys_fallback_syscall	// execve
-	data8 fsys_fallback_syscall	// chdir
-	data8 fsys_fallback_syscall	// fchdir		// 1035
-	data8 fsys_fallback_syscall	// utimes
-	data8 fsys_fallback_syscall	// mknod
-	data8 fsys_fallback_syscall	// chmod
-	data8 fsys_fallback_syscall	// chown
-	data8 fsys_fallback_syscall	// lseek		// 1040
+	data8 0				// exit			// 1025
+	data8 0				// read
+	data8 0				// write
+	data8 0				// open
+	data8 0				// close
+	data8 0				// creat		// 1030
+	data8 0				// link
+	data8 0				// unlink
+	data8 0				// execve
+	data8 0				// chdir
+	data8 0				// fchdir		// 1035
+	data8 0				// utimes
+	data8 0				// mknod
+	data8 0				// chmod
+	data8 0				// chown
+	data8 0				// lseek		// 1040
 	data8 fsys_getpid		// getpid
 	data8 fsys_getppid		// getppid
-	data8 fsys_fallback_syscall	// mount
-	data8 fsys_fallback_syscall	// umount
-	data8 fsys_fallback_syscall	// setuid		// 1045
-	data8 fsys_fallback_syscall	// getuid
-	data8 fsys_fallback_syscall	// geteuid
-	data8 fsys_fallback_syscall	// ptrace
-	data8 fsys_fallback_syscall	// access
-	data8 fsys_fallback_syscall	// sync			// 1050
-	data8 fsys_fallback_syscall	// fsync
-	data8 fsys_fallback_syscall	// fdatasync
-	data8 fsys_fallback_syscall	// kill
-	data8 fsys_fallback_syscall	// rename
-	data8 fsys_fallback_syscall	// mkdir		// 1055
-	data8 fsys_fallback_syscall	// rmdir
-	data8 fsys_fallback_syscall	// dup
-	data8 fsys_fallback_syscall	// pipe
-	data8 fsys_fallback_syscall	// times
-	data8 fsys_fallback_syscall	// brk			// 1060
-	data8 fsys_fallback_syscall	// setgid
-	data8 fsys_fallback_syscall	// getgid
-	data8 fsys_fallback_syscall	// getegid
-	data8 fsys_fallback_syscall	// acct
-	data8 fsys_fallback_syscall	// ioctl		// 1065
-	data8 fsys_fallback_syscall	// fcntl
-	data8 fsys_fallback_syscall	// umask
-	data8 fsys_fallback_syscall	// chroot
-	data8 fsys_fallback_syscall	// ustat
-	data8 fsys_fallback_syscall	// dup2			// 1070
-	data8 fsys_fallback_syscall	// setreuid
-	data8 fsys_fallback_syscall	// setregid
-	data8 fsys_fallback_syscall	// getresuid
-	data8 fsys_fallback_syscall	// setresuid
-	data8 fsys_fallback_syscall	// getresgid		// 1075
-	data8 fsys_fallback_syscall	// setresgid
-	data8 fsys_fallback_syscall	// getgroups
-	data8 fsys_fallback_syscall	// setgroups
-	data8 fsys_fallback_syscall	// getpgid
-	data8 fsys_fallback_syscall	// setpgid		// 1080
-	data8 fsys_fallback_syscall	// setsid
-	data8 fsys_fallback_syscall	// getsid
-	data8 fsys_fallback_syscall	// sethostname
-	data8 fsys_fallback_syscall	// setrlimit
-	data8 fsys_fallback_syscall	// getrlimit		// 1085
-	data8 fsys_fallback_syscall	// getrusage
+	data8 0				// mount
+	data8 0				// umount
+	data8 0				// setuid		// 1045
+	data8 0				// getuid
+	data8 0				// geteuid
+	data8 0				// ptrace
+	data8 0				// access
+	data8 0				// sync			// 1050
+	data8 0				// fsync
+	data8 0				// fdatasync
+	data8 0				// kill
+	data8 0				// rename
+	data8 0				// mkdir		// 1055
+	data8 0				// rmdir
+	data8 0				// dup
+	data8 0				// pipe
+	data8 0				// times
+	data8 0				// brk			// 1060
+	data8 0				// setgid
+	data8 0				// getgid
+	data8 0				// getegid
+	data8 0				// acct
+	data8 0				// ioctl		// 1065
+	data8 0				// fcntl
+	data8 0				// umask
+	data8 0				// chroot
+	data8 0				// ustat
+	data8 0				// dup2			// 1070
+	data8 0				// setreuid
+	data8 0				// setregid
+	data8 0				// getresuid
+	data8 0				// setresuid
+	data8 0				// getresgid		// 1075
+	data8 0				// setresgid
+	data8 0				// getgroups
+	data8 0				// setgroups
+	data8 0				// getpgid
+	data8 0				// setpgid		// 1080
+	data8 0				// setsid
+	data8 0				// getsid
+	data8 0				// sethostname
+	data8 0				// setrlimit
+	data8 0				// getrlimit		// 1085
+	data8 0				// getrusage
 	data8 fsys_gettimeofday		// gettimeofday
-	data8 fsys_fallback_syscall	// settimeofday
-	data8 fsys_fallback_syscall	// select
-	data8 fsys_fallback_syscall	// poll			// 1090
-	data8 fsys_fallback_syscall	// symlink
-	data8 fsys_fallback_syscall	// readlink
-	data8 fsys_fallback_syscall	// uselib
-	data8 fsys_fallback_syscall	// swapon
-	data8 fsys_fallback_syscall	// swapoff		// 1095
-	data8 fsys_fallback_syscall	// reboot
-	data8 fsys_fallback_syscall	// truncate
-	data8 fsys_fallback_syscall	// ftruncate
-	data8 fsys_fallback_syscall	// fchmod
-	data8 fsys_fallback_syscall	// fchown		// 1100
-	data8 fsys_fallback_syscall	// getpriority
-	data8 fsys_fallback_syscall	// setpriority
-	data8 fsys_fallback_syscall	// statfs
-	data8 fsys_fallback_syscall	// fstatfs
-	data8 fsys_fallback_syscall	// gettid		// 1105
-	data8 fsys_fallback_syscall	// semget
-	data8 fsys_fallback_syscall	// semop
-	data8 fsys_fallback_syscall	// semctl
-	data8 fsys_fallback_syscall	// msgget
-	data8 fsys_fallback_syscall	// msgsnd		// 1110
-	data8 fsys_fallback_syscall	// msgrcv
-	data8 fsys_fallback_syscall	// msgctl
-	data8 fsys_fallback_syscall	// shmget
-	data8 fsys_fallback_syscall	// shmat
-	data8 fsys_fallback_syscall	// shmdt		// 1115
-	data8 fsys_fallback_syscall	// shmctl
-	data8 fsys_fallback_syscall	// syslog
-	data8 fsys_fallback_syscall	// setitimer
-	data8 fsys_fallback_syscall	// getitimer
-	data8 fsys_fallback_syscall		 		// 1120
-	data8 fsys_fallback_syscall
-	data8 fsys_fallback_syscall
-	data8 fsys_fallback_syscall	// vhangup
-	data8 fsys_fallback_syscall	// lchown
-	data8 fsys_fallback_syscall	// remap_file_pages	// 1125
-	data8 fsys_fallback_syscall	// wait4
-	data8 fsys_fallback_syscall	// sysinfo
-	data8 fsys_fallback_syscall	// clone
-	data8 fsys_fallback_syscall	// setdomainname
-	data8 fsys_fallback_syscall	// newuname		// 1130
-	data8 fsys_fallback_syscall	// adjtimex
-	data8 fsys_fallback_syscall
-	data8 fsys_fallback_syscall	// init_module
-	data8 fsys_fallback_syscall	// delete_module
-	data8 fsys_fallback_syscall				// 1135
-	data8 fsys_fallback_syscall
-	data8 fsys_fallback_syscall	// quotactl
-	data8 fsys_fallback_syscall	// bdflush
-	data8 fsys_fallback_syscall	// sysfs
-	data8 fsys_fallback_syscall	// personality		// 1140
-	data8 fsys_fallback_syscall	// afs_syscall
-	data8 fsys_fallback_syscall	// setfsuid
-	data8 fsys_fallback_syscall	// setfsgid
-	data8 fsys_fallback_syscall	// getdents
-	data8 fsys_fallback_syscall	// flock		// 1145
-	data8 fsys_fallback_syscall	// readv
-	data8 fsys_fallback_syscall	// writev
-	data8 fsys_fallback_syscall	// pread64
-	data8 fsys_fallback_syscall	// pwrite64
-	data8 fsys_fallback_syscall	// sysctl		// 1150
-	data8 fsys_fallback_syscall	// mmap
-	data8 fsys_fallback_syscall	// munmap
-	data8 fsys_fallback_syscall	// mlock
-	data8 fsys_fallback_syscall	// mlockall
-	data8 fsys_fallback_syscall	// mprotect		// 1155
-	data8 fsys_fallback_syscall	// mremap
-	data8 fsys_fallback_syscall	// msync
-	data8 fsys_fallback_syscall	// munlock
-	data8 fsys_fallback_syscall	// munlockall
-	data8 fsys_fallback_syscall	// sched_getparam	// 1160
-	data8 fsys_fallback_syscall	// sched_setparam
-	data8 fsys_fallback_syscall	// sched_getscheduler
-	data8 fsys_fallback_syscall	// sched_setscheduler
-	data8 fsys_fallback_syscall	// sched_yield
-	data8 fsys_fallback_syscall	// sched_get_priority_max	// 1165
-	data8 fsys_fallback_syscall	// sched_get_priority_min
-	data8 fsys_fallback_syscall	// sched_rr_get_interval
-	data8 fsys_fallback_syscall	// nanosleep
-	data8 fsys_fallback_syscall	// nfsservctl
-	data8 fsys_fallback_syscall	// prctl		// 1170
-	data8 fsys_fallback_syscall	// getpagesize
-	data8 fsys_fallback_syscall	// mmap2
-	data8 fsys_fallback_syscall	// pciconfig_read
-	data8 fsys_fallback_syscall	// pciconfig_write
-	data8 fsys_fallback_syscall	// perfmonctl		// 1175
-	data8 fsys_fallback_syscall	// sigaltstack
-	data8 fsys_fallback_syscall	// rt_sigaction
-	data8 fsys_fallback_syscall	// rt_sigpending
-	data8 fsys_fallback_syscall	// rt_sigprocmask
-	data8 fsys_fallback_syscall	// rt_sigqueueinfo	// 1180
-	data8 fsys_fallback_syscall	// rt_sigreturn
-	data8 fsys_fallback_syscall	// rt_sigsuspend
-	data8 fsys_fallback_syscall	// rt_sigtimedwait
-	data8 fsys_fallback_syscall	// getcwd
-	data8 fsys_fallback_syscall	// capget		// 1185
-	data8 fsys_fallback_syscall	// capset
-	data8 fsys_fallback_syscall	// sendfile
-	data8 fsys_fallback_syscall
-	data8 fsys_fallback_syscall
-	data8 fsys_fallback_syscall	// socket		// 1190
-	data8 fsys_fallback_syscall	// bind
-	data8 fsys_fallback_syscall	// connect
-	data8 fsys_fallback_syscall	// listen
-	data8 fsys_fallback_syscall	// accept
-	data8 fsys_fallback_syscall	// getsockname		// 1195
-	data8 fsys_fallback_syscall	// getpeername
-	data8 fsys_fallback_syscall	// socketpair
-	data8 fsys_fallback_syscall	// send
-	data8 fsys_fallback_syscall	// sendto
-	data8 fsys_fallback_syscall	// recv			// 1200
-	data8 fsys_fallback_syscall	// recvfrom
-	data8 fsys_fallback_syscall	// shutdown
-	data8 fsys_fallback_syscall	// setsockopt
-	data8 fsys_fallback_syscall	// getsockopt
-	data8 fsys_fallback_syscall	// sendmsg		// 1205
-	data8 fsys_fallback_syscall	// recvmsg
-	data8 fsys_fallback_syscall	// pivot_root
-	data8 fsys_fallback_syscall	// mincore
-	data8 fsys_fallback_syscall	// madvise
-	data8 fsys_fallback_syscall	// newstat		// 1210
-	data8 fsys_fallback_syscall	// newlstat
-	data8 fsys_fallback_syscall	// newfstat
-	data8 fsys_fallback_syscall	// clone2
-	data8 fsys_fallback_syscall	// getdents64
-	data8 fsys_fallback_syscall	// getunwind		// 1215
-	data8 fsys_fallback_syscall	// readahead
-	data8 fsys_fallback_syscall	// setxattr
-	data8 fsys_fallback_syscall	// lsetxattr
-	data8 fsys_fallback_syscall	// fsetxattr
-	data8 fsys_fallback_syscall	// getxattr		// 1220
-	data8 fsys_fallback_syscall	// lgetxattr
-	data8 fsys_fallback_syscall	// fgetxattr
-	data8 fsys_fallback_syscall	// listxattr
-	data8 fsys_fallback_syscall	// llistxattr
-	data8 fsys_fallback_syscall	// flistxattr		// 1225
-	data8 fsys_fallback_syscall	// removexattr
-	data8 fsys_fallback_syscall	// lremovexattr
-	data8 fsys_fallback_syscall	// fremovexattr
-	data8 fsys_fallback_syscall	// tkill
-	data8 fsys_fallback_syscall	// futex		// 1230
-	data8 fsys_fallback_syscall	// sched_setaffinity
-	data8 fsys_fallback_syscall	// sched_getaffinity
+	data8 0				// settimeofday
+	data8 0				// select
+	data8 0				// poll			// 1090
+	data8 0				// symlink
+	data8 0				// readlink
+	data8 0				// uselib
+	data8 0				// swapon
+	data8 0				// swapoff		// 1095
+	data8 0				// reboot
+	data8 0				// truncate
+	data8 0				// ftruncate
+	data8 0				// fchmod
+	data8 0				// fchown		// 1100
+	data8 0				// getpriority
+	data8 0				// setpriority
+	data8 0				// statfs
+	data8 0				// fstatfs
+	data8 0				// gettid		// 1105
+	data8 0				// semget
+	data8 0				// semop
+	data8 0				// semctl
+	data8 0				// msgget
+	data8 0				// msgsnd		// 1110
+	data8 0				// msgrcv
+	data8 0				// msgctl
+	data8 0				// shmget
+	data8 0				// shmat
+	data8 0				// shmdt		// 1115
+	data8 0				// shmctl
+	data8 0				// syslog
+	data8 0				// setitimer
+	data8 0				// getitimer
+	data8 0					 		// 1120
+	data8 0
+	data8 0
+	data8 0				// vhangup
+	data8 0				// lchown
+	data8 0				// remap_file_pages	// 1125
+	data8 0				// wait4
+	data8 0				// sysinfo
+	data8 0				// clone
+	data8 0				// setdomainname
+	data8 0				// newuname		// 1130
+	data8 0				// adjtimex
+	data8 0
+	data8 0				// init_module
+	data8 0				// delete_module
+	data8 0							// 1135
+	data8 0
+	data8 0				// quotactl
+	data8 0				// bdflush
+	data8 0				// sysfs
+	data8 0				// personality		// 1140
+	data8 0				// afs_syscall
+	data8 0				// setfsuid
+	data8 0				// setfsgid
+	data8 0				// getdents
+	data8 0				// flock		// 1145
+	data8 0				// readv
+	data8 0				// writev
+	data8 0				// pread64
+	data8 0				// pwrite64
+	data8 0				// sysctl		// 1150
+	data8 0				// mmap
+	data8 0				// munmap
+	data8 0				// mlock
+	data8 0				// mlockall
+	data8 0				// mprotect		// 1155
+	data8 0				// mremap
+	data8 0				// msync
+	data8 0				// munlock
+	data8 0				// munlockall
+	data8 0				// sched_getparam	// 1160
+	data8 0				// sched_setparam
+	data8 0				// sched_getscheduler
+	data8 0				// sched_setscheduler
+	data8 0				// sched_yield
+	data8 0				// sched_get_priority_max	// 1165
+	data8 0				// sched_get_priority_min
+	data8 0				// sched_rr_get_interval
+	data8 0				// nanosleep
+	data8 0				// nfsservctl
+	data8 0				// prctl		// 1170
+	data8 0				// getpagesize
+	data8 0				// mmap2
+	data8 0				// pciconfig_read
+	data8 0				// pciconfig_write
+	data8 0				// perfmonctl		// 1175
+	data8 0				// sigaltstack
+	data8 0				// rt_sigaction
+	data8 0				// rt_sigpending
+	data8 0				// rt_sigprocmask
+	data8 0				// rt_sigqueueinfo	// 1180
+	data8 0				// rt_sigreturn
+	data8 0				// rt_sigsuspend
+	data8 0				// rt_sigtimedwait
+	data8 0				// getcwd
+	data8 0				// capget		// 1185
+	data8 0				// capset
+	data8 0				// sendfile
+	data8 0
+	data8 0
+	data8 0				// socket		// 1190
+	data8 0				// bind
+	data8 0				// connect
+	data8 0				// listen
+	data8 0				// accept
+	data8 0				// getsockname		// 1195
+	data8 0				// getpeername
+	data8 0				// socketpair
+	data8 0				// send
+	data8 0				// sendto
+	data8 0				// recv			// 1200
+	data8 0				// recvfrom
+	data8 0				// shutdown
+	data8 0				// setsockopt
+	data8 0				// getsockopt
+	data8 0				// sendmsg		// 1205
+	data8 0				// recvmsg
+	data8 0				// pivot_root
+	data8 0				// mincore
+	data8 0				// madvise
+	data8 0				// newstat		// 1210
+	data8 0				// newlstat
+	data8 0				// newfstat
+	data8 0				// clone2
+	data8 0				// getdents64
+	data8 0				// getunwind		// 1215
+	data8 0				// readahead
+	data8 0				// setxattr
+	data8 0				// lsetxattr
+	data8 0				// fsetxattr
+	data8 0				// getxattr		// 1220
+	data8 0				// lgetxattr
+	data8 0				// fgetxattr
+	data8 0				// listxattr
+	data8 0				// llistxattr
+	data8 0				// flistxattr		// 1225
+	data8 0				// removexattr
+	data8 0				// lremovexattr
+	data8 0				// fremovexattr
+	data8 0				// tkill
+	data8 0				// futex		// 1230
+	data8 0				// sched_setaffinity
+	data8 0				// sched_getaffinity
 	data8 fsys_set_tid_address	// set_tid_address
-	data8 fsys_fallback_syscall	// unused
-	data8 fsys_fallback_syscall	// unused		// 1235
-	data8 fsys_fallback_syscall	// exit_group
-	data8 fsys_fallback_syscall	// lookup_dcookie
-	data8 fsys_fallback_syscall	// io_setup
-	data8 fsys_fallback_syscall	// io_destroy
-	data8 fsys_fallback_syscall	// io_getevents		// 1240
-	data8 fsys_fallback_syscall	// io_submit
-	data8 fsys_fallback_syscall	// io_cancel
-	data8 fsys_fallback_syscall	// epoll_create
-	data8 fsys_fallback_syscall	// epoll_ctl
-	data8 fsys_fallback_syscall	// epoll_wait		// 1245
-	data8 fsys_fallback_syscall	// restart_syscall
-	data8 fsys_fallback_syscall	// semtimedop
-	data8 fsys_fallback_syscall	// timer_create
-	data8 fsys_fallback_syscall	// timer_settime
-	data8 fsys_fallback_syscall	// timer_gettime 	// 1250
-	data8 fsys_fallback_syscall	// timer_getoverrun
-	data8 fsys_fallback_syscall	// timer_delete
-	data8 fsys_fallback_syscall	// clock_settime
-	data8 fsys_fallback_syscall	// clock_gettime
-	data8 fsys_fallback_syscall	// clock_getres		// 1255
-	data8 fsys_fallback_syscall	// clock_nanosleep
-	data8 fsys_fallback_syscall
-	data8 fsys_fallback_syscall
-	data8 fsys_fallback_syscall
-	data8 fsys_fallback_syscall				// 1260
-	data8 fsys_fallback_syscall
-	data8 fsys_fallback_syscall
-	data8 fsys_fallback_syscall
-	data8 fsys_fallback_syscall
-	data8 fsys_fallback_syscall				// 1265
-	data8 fsys_fallback_syscall
-	data8 fsys_fallback_syscall
-	data8 fsys_fallback_syscall
-	data8 fsys_fallback_syscall
-	data8 fsys_fallback_syscall				// 1270
-	data8 fsys_fallback_syscall
-	data8 fsys_fallback_syscall
-	data8 fsys_fallback_syscall
-	data8 fsys_fallback_syscall
-	data8 fsys_fallback_syscall				// 1275
-	data8 fsys_fallback_syscall
-	data8 fsys_fallback_syscall
-	data8 fsys_fallback_syscall
+	data8 0				// unused
+	data8 0				// unused		// 1235
+	data8 0				// exit_group
+	data8 0				// lookup_dcookie
+	data8 0				// io_setup
+	data8 0				// io_destroy
+	data8 0				// io_getevents		// 1240
+	data8 0				// io_submit
+	data8 0				// io_cancel
+	data8 0				// epoll_create
+	data8 0				// epoll_ctl
+	data8 0				// epoll_wait		// 1245
+	data8 0				// restart_syscall
+	data8 0				// semtimedop
+	data8 0				// timer_create
+	data8 0				// timer_settime
+	data8 0				// timer_gettime 	// 1250
+	data8 0				// timer_getoverrun
+	data8 0				// timer_delete
+	data8 0				// clock_settime
+	data8 0				// clock_gettime
+	data8 0				// clock_getres		// 1255
+	data8 0				// clock_nanosleep
+	data8 0
+	data8 0
+	data8 0
+	data8 0							// 1260
+	data8 0
+	data8 0
+	data8 0
+	data8 0
+	data8 0							// 1265
+	data8 0
+	data8 0
+	data8 0
+	data8 0
+	data8 0							// 1270
+	data8 0
+	data8 0
+	data8 0
+	data8 0
+	data8 0							// 1275
+	data8 0
+	data8 0
+	data8 0
+	data8 0
+
+	.org fsyscall_table + 8*NR_syscalls	// guard against failures to increase NR_syscalls

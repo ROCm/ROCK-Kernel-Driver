@@ -637,7 +637,6 @@ END(daccess_bit)
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x2c00 Entry 11 (size 64 bundles) Break instruction (33)
 ENTRY(break_fault)
-	.global ia64_enter_syscall
 	/*
 	 * The streamlined system call entry/exit paths only save/restore the initial part
 	 * of pt_regs.  This implies that the callers of system-calls must adhere to the
@@ -654,7 +653,7 @@ ENTRY(break_fault)
 	 * to prevent leaking bits from kernel to user level.
 	 */
 	DBG_FAULT(11)
-	mov r16=IA64_KR(CURRENT)		// r16 = current (physical); 12 cycle read lat.
+	mov r16=IA64_KR(CURRENT)		// r16 = current task; 12 cycle read lat.
 	mov r17=cr.iim
 	mov r18=__IA64_BREAK_SYSCALL
 	mov r21=ar.fpsr
@@ -673,7 +672,7 @@ ENTRY(break_fault)
 	;;
 	ld1 r17=[r16]				// load current->thread.on_ustack flag
 	st1 [r16]=r0				// clear current->thread.on_ustack flag
-	adds r1=-IA64_TASK_THREAD_ON_USTACK_OFFSET,r16	// set r1 for MINSTATE_START_SAVE_MIN_VIRT
+	add r1=-IA64_TASK_THREAD_ON_USTACK_OFFSET,r16	// set r1 for MINSTATE_START_SAVE_MIN_VIRT
 	;;
 	invala
 
@@ -682,6 +681,7 @@ ENTRY(break_fault)
 	extr.u r8=r29,41,2			// extract ei field from cr.ipsr
 	;;
 	cmp.eq p6,p7=2,r8			// isr.ei==2?
+	mov r2=r1				// setup r2 for ia64_syscall_setup
 	;;
 (p6)	mov r8=0				// clear ei to 0
 (p6)	adds r28=16,r28				// switch cr.iip to next bundle cr.ipsr.ei wrapped
@@ -691,19 +691,25 @@ ENTRY(break_fault)
 	dep r29=r8,r29,41,2			// insert new ei into cr.ipsr
 	;;
 
-ia64_enter_syscall:
 	// switch from user to kernel RBS:
 	MINSTATE_START_SAVE_MIN_VIRT
-	br.call.sptk.many b7=setup_syscall_via_break
+	br.call.sptk.many b7=ia64_syscall_setup
 	;;
-	mov r3=255
+	MINSTATE_END_SAVE_MIN_VIRT		// switch to bank 1
+	ssm psr.ic | PSR_DEFAULT_BITS
+	;;
+	srlz.i					// guarantee that interruption collection is on
+	;;
+(p15)	ssm psr.i				// restore psr.i
+	;;
+	mov r3=NR_syscalls - 1
 	movl r16=sys_call_table
 
 	adds r15=-1024,r15			// r15 contains the syscall number---subtract 1024
 	movl r2=ia64_ret_from_syscall
 	;;
 	shladd r20=r15,3,r16			// r20 = sys_call_table + 8*(syscall-1024)
-	cmp.geu p0,p7=r3,r15			// (syscall > 0 && syscall <= 1024+255) ?
+	cmp.geu p0,p7=r3,r15			// (syscall > 0 && syscall < 1024 + NR_syscalls) ?
 	mov rp=r2				// set the real return addr
 	;;
 (p7)	add r20=(__NR_ni_syscall-1024)*8,r16	// force __NR_ni_syscall
@@ -764,11 +770,44 @@ END(interrupt)
 	 * fault ever gets "unreserved", simply moved the following code to a more
 	 * suitable spot...
 	 *
-	 * setup_syscall_via_break() is a separate subroutine so that it can
+	 * ia64_syscall_setup() is a separate subroutine so that it can
 	 *	allocate stacked registers so it can safely demine any
 	 *	potential NaT values from the input registers.
+	 *
+	 * On entry:
+	 *	- executing on bank 0 or bank 1 register set (doesn't matter)
+	 *	-  r1: stack pointer
+	 *	-  r2: current task pointer
+	 *	-  r3: preserved
+	 *	- r11: original contents (saved ar.pfs to be saved)
+	 *	- r12: original contents (sp to be saved)
+	 *	- r13: original contents (tp to be saved)
+	 *	- r15: original contents (syscall # to be saved)
+	 *	- r18: saved bsp (after switching to kernel stack)
+	 *	- r19: saved b6
+	 *	- r20: saved r1 (gp)
+	 *	- r21: saved ar.fpsr
+	 *	- r22: kernel's register backing store base (krbs_base)
+	 *	- r23: saved ar.bspstore
+	 *	- r24: saved ar.rnat
+	 *	- r25: saved ar.unat
+	 *	- r26: saved ar.pfs
+	 *	- r27: saved ar.rsc
+	 *	- r28: saved cr.iip
+	 *	- r29: saved cr.ipsr
+	 *	- r31: saved pr
+	 *	-  b0: original contents (to be saved)
+	 * On exit:
+	 *	- executing on bank 1 registers
+	 *	- psr.ic enabled, interrupts restored
+	 *	-  r1: kernel's gp
+	 *	-  r3: preserved (same as on entry)
+	 *	- r12: points to kernel stack
+	 *	- r13: points to current task
+	 *	- p15: TRUE if interrupts need to be re-enabled
+	 *	- ar.fpsr: set to kernel settings
 	 */
-ENTRY(setup_syscall_via_break)
+GLOBAL_ENTRY(ia64_syscall_setup)
 #if PT(B6) != 0
 # error This code assumes that b6 is the first field in pt_regs.
 #endif
@@ -786,7 +825,7 @@ ENTRY(setup_syscall_via_break)
 	;;
 
 	st8 [r17]=r28,PT(AR_UNAT)-PT(CR_IIP)	// save cr.iip
-	mov r28=b0
+	mov r28=b0				// save b0 (2 cyc)
 (p8)	mov in0=-1
 	;;
 
@@ -824,8 +863,8 @@ ENTRY(setup_syscall_via_break)
 (p13)	mov in5=-1
 	;;
 
-.mem.offset 0,0; st8.spill [r16]=r12,PT(AR_FPSR)-PT(R12) // save r12
-.mem.offset 8,0; st8.spill [r17]=r13,PT(R15)-PT(R13) // save r13
+.mem.offset 0,0; st8.spill [r16]=r12,PT(AR_FPSR)-PT(R12)	// save r12
+.mem.offset 8,0; st8.spill [r17]=r13,PT(R15)-PT(R13)		// save r13
 	tnat.nz p14,p0=in6
 	;;
 	st8 [r16]=r21,PT(R8)-PT(AR_FPSR)	// save ar.fpsr
@@ -836,23 +875,19 @@ ENTRY(setup_syscall_via_break)
 	adds r12=-16,r1		// switch to kernel memory stack (with 16 bytes of scratch)
 (p14)	mov in6=-1
 
-	mov r13=IA64_KR(CURRENT)		// establish `current'
+	mov r13=r2				// establish `current'
 	movl r1=__gp				// establish kernel global pointer
 	;;
 (p8)	mov in7=-1
 	tnat.nz p9,p0=r15
-	MINSTATE_END_SAVE_MIN_VIRT		// switch to bank 1
 
-	ssm psr.ic | PSR_DEFAULT_BITS
+	cmp.eq pSys,pNonSys=r0,r0		// set pSys=1, pNonSys=0
 	movl r17=FPSR_DEFAULT
 	;;
-	srlz.i					// guarantee that interruption collection is on
-	cmp.eq pSys,pNonSys=r0,r0		// set pSys=1, pNonSys=0
-(p9)	mov r15=-1
-(p15)	ssm psr.i				// restore psr.i
 	mov.m ar.fpsr=r17			// set ar.fpsr to kernel default value
+(p9)	mov r15=-1
 	br.ret.sptk.many b7
-END(setup_syscall_via_break)
+END(ia64_syscall_setup)
 
 	.org ia64_ivt+0x3c00
 /////////////////////////////////////////////////////////////////////////////////////////

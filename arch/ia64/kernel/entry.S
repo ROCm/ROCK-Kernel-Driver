@@ -1464,3 +1464,6 @@ sys_call_table:
 	data8 ia64_ni_syscall
 	data8 ia64_ni_syscall
 	data8 ia64_ni_syscall
+	data8 ia64_ni_syscall
+
+	.org sys_call_table + 8*NR_syscalls	// guard against failures to increase NR_syscalls
