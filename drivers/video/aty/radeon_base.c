@@ -1337,18 +1337,17 @@ static void radeon_calc_pll_regs(struct radeonfb_info *rinfo, struct radeon_regs
 		if (rinfo->family == CHIP_FAMILY_R200 ||
 		    rinfo->family == CHIP_FAMILY_R300 ||
 		    rinfo->family == CHIP_FAMILY_R350 ||
-		    rinfo->family == CHIP_FAMILY_RV350)
+		    rinfo->family == CHIP_FAMILY_RV350) {
 			source = (fp2_gen_cntl >> 10) & 0x3;
-		else {
 			/* sourced from transform unit, check for transform unit
 			 * own source
 			 */
-			source = (fp2_gen_cntl >> 13) & 0x3;
 			if (source == 3) {
 				disp_output_cntl = INREG(DISP_OUTPUT_CNTL);
 				source = (disp_output_cntl >> 12) & 0x3;
 			}
-		}
+		} else
+			source = (fp2_gen_cntl >> 13) & 0x1;
 		/* sourced from CRTC2 -> exit */
 		if (source == 1)
 			break;

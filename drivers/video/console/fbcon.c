@@ -2384,15 +2384,23 @@ static void fbcon_suspended(void *data, struct fb_info *info)
 
 static void fbcon_resumed(void *data, struct fb_info *info)
 {
-	struct vc_data *vc = vc_cons[info->currcon].d;
+	struct vc_data *vc;
+
+	if (info->currcon < 0)
+		return;
+	vc = vc_cons[info->currcon].d;
 
 	update_screen(vc->vc_num);
 }
 
 static void fbcon_mode_changed(void *data, struct fb_info *info)
 {
-	struct vc_data *vc = vc_cons[info->currcon].d;
+	struct vc_data *vc;
 	int rows, cols;
+
+	if (info->currcon < 0)
+		return;
+	vc = vc_cons[info->currcon].d;
 
 	/* This isn't perfect yet. If we change one console, we
 	 * don't change them all and we switch back to the wrong
