@@ -23,12 +23,12 @@
  */
 
 
-#include "acpi.h"
-#include "amlcode.h"
-#include "acdispat.h"
-#include "acinterp.h"
-#include "acnamesp.h"
-#include "acparser.h"
+#include <acpi/acpi.h>
+#include <acpi/amlcode.h>
+#include <acpi/acdispat.h>
+#include <acpi/acinterp.h>
+#include <acpi/acnamesp.h>
+#include <acpi/acparser.h>
 
 
 #define _COMPONENT          ACPI_DISPATCHER

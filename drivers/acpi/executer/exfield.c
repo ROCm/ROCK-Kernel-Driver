@@ -23,9 +23,9 @@
  */
 
 
-#include "acpi.h"
-#include "acdispat.h"
-#include "acinterp.h"
+#include <acpi/acpi.h>
+#include <acpi/acdispat.h>
+#include <acpi/acinterp.h>
 
 
 #define _COMPONENT          ACPI_EXECUTER
