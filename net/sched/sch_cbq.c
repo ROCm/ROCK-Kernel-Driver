@@ -485,6 +485,7 @@ cbq_requeue(struct sk_buff *skb, struct Qdisc *sch)
 #endif
 	if ((ret = cl->q->ops->requeue(skb, cl->q)) == 0) {
 		sch->q.qlen++;
+		sch->qstats.requeues++;
 		if (!cl->next_alive)
 			cbq_activate_class(cl);
 		return 0;

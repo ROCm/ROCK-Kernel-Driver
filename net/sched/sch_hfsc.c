@@ -1779,6 +1779,7 @@ hfsc_requeue(struct sk_buff *skb, struct Qdisc *sch)
 
 	__skb_queue_head(&q->requeue, skb);
 	sch->q.qlen++;
+	sch->qstats.requeues++;
 	return NET_XMIT_SUCCESS;
 }
 

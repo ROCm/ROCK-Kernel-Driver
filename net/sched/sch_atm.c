@@ -545,8 +545,10 @@ static int atm_tc_requeue(struct sk_buff *skb,struct Qdisc *sch)
 
 	D2PRINTK("atm_tc_requeue(skb %p,sch %p,[qdisc %p])\n",skb,sch,p);
 	ret = p->link.q->ops->requeue(skb,p->link.q);
-	if (!ret) sch->q.qlen++;
-	else {
+	if (!ret) {
+        sch->q.qlen++;
+        sch->qstats.requeues++;
+    } else {
 		sch->qstats.drops++;
 		p->link.stats.drops++;
 	}

@@ -215,8 +215,10 @@ static int netem_requeue(struct sk_buff *skb, struct Qdisc *sch)
 	struct netem_sched_data *q = qdisc_priv(sch);
 	int ret;
 
-	if ((ret = q->qdisc->ops->requeue(skb, q->qdisc)) == 0)
+	if ((ret = q->qdisc->ops->requeue(skb, q->qdisc)) == 0) {
 		sch->q.qlen++;
+		sch->qstats.requeues++;
+	}
 
 	return ret;
 }

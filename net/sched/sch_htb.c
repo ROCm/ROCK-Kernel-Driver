@@ -794,6 +794,7 @@ static int htb_requeue(struct sk_buff *skb, struct Qdisc *sch)
 	    htb_activate (q,cl);
 
     sch->q.qlen++;
+    sch->qstats.requeues++;
     HTB_DBG(1,1,"htb_req_ok cl=%X skb=%p\n",(cl && cl != HTB_DIRECT)?cl->classid:0,skb);
     return NET_XMIT_SUCCESS;
 }
