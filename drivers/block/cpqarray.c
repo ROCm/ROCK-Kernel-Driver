@@ -437,7 +437,6 @@ Enomem2:
 	}
 	return 0;
 }
-}
 
 /*
  * Find the controller and initialize it
