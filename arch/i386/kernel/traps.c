@@ -93,7 +93,7 @@ asmlinkage void machine_check(void);
 
 static int kstack_depth_to_print = 24;
 struct notifier_block *i386die_chain;
-static spinlock_t die_notifier_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(die_notifier_lock);
 
 int register_die_notifier(struct notifier_block *nb)
 {
@@ -551,7 +551,7 @@ static void unknown_nmi_error(unsigned char reason, struct pt_regs * regs)
 	printk("Do you have a strange power saving mode enabled?\n");
 }
 
-static spinlock_t nmi_print_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(nmi_print_lock);
 
 void die_nmi (struct pt_regs *regs, const char *msg)
 {

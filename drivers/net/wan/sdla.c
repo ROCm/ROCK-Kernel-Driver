@@ -69,7 +69,7 @@ static unsigned int valid_mem[]  __initdata = {
                                     0xD0000, 0xD2000, 0xD4000, 0xD6000, 0xD8000, 0xDA000, 0xDC000, 0xDE000,
                                     0xE0000, 0xE2000, 0xE4000, 0xE6000, 0xE8000, 0xEA000, 0xEC000, 0xEE000}; 
 
-static spinlock_t sdla_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(sdla_lock);
 
 /*********************************************************
  *

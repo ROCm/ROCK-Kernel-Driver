@@ -429,9 +429,6 @@ ENTRY(do_suspend_lowlevel_s4bios)
 do_suspend_lowlevel:
 .LFB5:
 	subq	$8, %rsp
-.LCFI2:
-	testl	%edi, %edi
-	jne	.L99
 	xorl	%eax, %eax
 	call	save_processor_state
 

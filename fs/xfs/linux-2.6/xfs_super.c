@@ -947,10 +947,6 @@ init_xfs_fs( void )
 		goto undo_shaker;
 	}
 
-	error = xfs_ioctl32_init();
-	if (error)
-		goto undo_ioctl32;
-
 	error = register_filesystem(&xfs_fs_type);
 	if (error)
 		goto undo_register;
@@ -958,9 +954,6 @@ init_xfs_fs( void )
 	return 0;
 
 undo_register:
-	xfs_ioctl32_exit();
-
-undo_ioctl32:
 	kmem_shake_deregister(xfs_inode_shaker);
 
 undo_shaker:
@@ -979,7 +972,6 @@ exit_xfs_fs( void )
 	vfs_exitquota();
 	XFS_DM_EXIT(&xfs_fs_type);
 	unregister_filesystem(&xfs_fs_type);
-	xfs_ioctl32_exit();
 	kmem_shake_deregister(xfs_inode_shaker);
 	xfs_cleanup();
 	pagebuf_terminate();

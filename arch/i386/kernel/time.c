@@ -81,9 +81,9 @@ unsigned long cpu_khz;	/* Detected as we calibrate the TSC */
 
 extern unsigned long wall_jiffies;
 
-spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(rtc_lock);
 
-spinlock_t i8253_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(i8253_lock);
 EXPORT_SYMBOL(i8253_lock);
 
 struct timer_opts *cur_timer = &timer_none;

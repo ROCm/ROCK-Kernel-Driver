@@ -27,7 +27,7 @@ DECLARE_RWSEM(afs_proc_cells_sem);
 LIST_HEAD(afs_proc_cells);
 
 static struct list_head afs_cells = LIST_HEAD_INIT(afs_cells);
-static rwlock_t afs_cells_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(afs_cells_lock);
 static DECLARE_RWSEM(afs_cells_sem); /* add/remove serialisation */
 static struct afs_cell *afs_cell_root;
 

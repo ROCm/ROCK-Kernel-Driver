@@ -147,7 +147,7 @@ static int AudioEnd_m;
 static int AudioEnd_f;
 
 static struct timer_list gscd_timer = TIMER_INITIALIZER(NULL, 0, 0);
-static spinlock_t gscd_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(gscd_lock);
 static struct request_queue *gscd_queue;
 
 static struct block_device_operations gscd_fops = {

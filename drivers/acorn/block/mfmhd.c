@@ -124,7 +124,7 @@
 
 static void (*do_mfm)(void) = NULL;
 static struct request_queue *mfm_queue;
-static spinlock_t mfm_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(mfm_lock);
 
 #define MAJOR_NR	MFM_ACORN_MAJOR
 #define QUEUE (mfm_queue)

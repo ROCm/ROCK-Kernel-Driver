@@ -432,7 +432,7 @@ static int terminate(unsigned minor)
       return 0;
 }
 
-static spinlock_t bpp_open_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(bpp_open_lock);
 
 /*
  * Allow only one process to open the device at a time.

@@ -4,9 +4,11 @@
 
 #include <linux/proc_fs.h>
 #include <linux/init.h>
+#include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <asm/uaccess.h>
 #include <acpi/acpi_drivers.h>
+#include <acpi/acglobal.h>
 
 #define _COMPONENT		ACPI_SYSTEM_COMPONENT
 ACPI_MODULE_NAME		("debug")

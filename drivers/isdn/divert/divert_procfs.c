@@ -29,7 +29,7 @@
 ulong if_used = 0;		/* number of interface users */
 static struct divert_info *divert_info_head = NULL;	/* head of queue */
 static struct divert_info *divert_info_tail = NULL;	/* pointer to last entry */
-static spinlock_t divert_info_lock = SPIN_LOCK_UNLOCKED;/* lock for queue */
+static DEFINE_SPINLOCK(divert_info_lock);/* lock for queue */
 static wait_queue_head_t rd_queue;
 
 /*********************************/

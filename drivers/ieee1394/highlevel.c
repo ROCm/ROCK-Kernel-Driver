@@ -43,9 +43,9 @@ static LIST_HEAD(hl_drivers);
 static DECLARE_RWSEM(hl_drivers_sem);
 
 static LIST_HEAD(hl_irqs);
-static rwlock_t hl_irqs_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(hl_irqs_lock);
 
-static rwlock_t addr_space_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(addr_space_lock);
 
 /* addr_space list will have zero and max already included as bounds */
 static struct hpsb_address_ops dummy_ops = { NULL, NULL, NULL, NULL };

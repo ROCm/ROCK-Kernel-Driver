@@ -236,7 +236,7 @@ static volatile unsigned short sony_cd_read_reg;
 static volatile unsigned short sony_cd_fifost_reg;
 
 static struct request_queue *cdu31a_queue;
-static spinlock_t cdu31a_lock = SPIN_LOCK_UNLOCKED; /* queue lock */
+static DEFINE_SPINLOCK(cdu31a_lock); /* queue lock */
 
 static int sony_spun_up = 0;	/* Has the drive been spun up? */
 

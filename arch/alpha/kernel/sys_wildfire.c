@@ -32,7 +32,7 @@
 
 static unsigned long cached_irq_mask[WILDFIRE_NR_IRQS/(sizeof(long)*8)];
 
-spinlock_t wildfire_irq_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(wildfire_irq_lock);
 
 static int doing_init_irq_hw = 0;
 

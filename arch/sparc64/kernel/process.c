@@ -282,7 +282,7 @@ void show_stackframe32(struct sparc_stackf32 *sf)
 }
 
 #ifdef CONFIG_SMP
-static spinlock_t regdump_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(regdump_lock);
 #endif
 
 void __show_regs(struct pt_regs * regs)

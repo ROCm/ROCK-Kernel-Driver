@@ -314,7 +314,7 @@ module_param(radio_nr, int, 0);
 
 #ifdef MODULE
 static unsigned long mutefreq = 0;
-module_param(mutefreq, int, 0);
+module_param(mutefreq, ulong, 0);
 MODULE_PARM_DESC(mutefreq, "Frequency used when muting the card (in kHz)");
 #endif
 

@@ -66,7 +66,7 @@ struct smp_call_struct {
 };
 
 static struct smp_call_struct * volatile smp_call_function_data;
-static spinlock_t smp_call_function_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(smp_call_function_lock);
 
 int __init __cpu_up(unsigned int cpu)
 {
@@ -284,7 +284,7 @@ static void ipi_call_function(unsigned int cpu)
 		cpu_clear(cpu, data->unfinished);
 }
 
-static spinlock_t stop_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(stop_lock);
 
 /*
  * ipi_cpu_stop - handle IPI from smp_send_stop()

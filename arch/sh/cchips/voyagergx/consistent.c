@@ -23,7 +23,7 @@ struct voya_alloc_entry {
 	unsigned long len;
 };
 
-static spinlock_t voya_list_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(voya_list_lock);
 static LIST_HEAD(voya_alloc_list);
 
 #define OHCI_SRAM_START	0xb0000000

@@ -21,7 +21,7 @@
 #include "kafstimod.h"
 #include "internal.h"
 
-spinlock_t afs_server_peer_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(afs_server_peer_lock);
 
 #define FS_SERVICE_ID		1	/* AFS Volume Location Service ID */
 #define VL_SERVICE_ID		52	/* AFS Volume Location Service ID */

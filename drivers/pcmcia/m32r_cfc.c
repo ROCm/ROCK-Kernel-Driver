@@ -86,7 +86,7 @@ static pcc_socket_t socket[M32R_MAX_PCC] = {
 static unsigned int pcc_get(u_short, unsigned int);
 static void pcc_set(u_short, unsigned int , unsigned int );
 
-static spinlock_t pcc_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(pcc_lock);
 
 #if !defined(CONFIG_PLAT_USRV)
 static inline u_long pcc_port2addr(unsigned long port, int size) {

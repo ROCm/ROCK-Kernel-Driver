@@ -75,7 +75,7 @@ struct core99_header {
 static volatile unsigned char *nvram_data;
 static int core99_bank = 0;
 // XXX Turn that into a sem
-static spinlock_t nv_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(nv_lock);
 
 extern int system_running;
 

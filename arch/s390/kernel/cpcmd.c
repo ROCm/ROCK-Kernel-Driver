@@ -14,7 +14,7 @@
 #include <asm/cpcmd.h>
 #include <asm/system.h>
 
-static spinlock_t cpcmd_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(cpcmd_lock);
 static char cpcmd_buf[240];
 
 void cpcmd(char *cmd, char *response, int rlen)

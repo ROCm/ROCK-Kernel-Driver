@@ -65,7 +65,7 @@ EXPORT_SYMBOL(MCA_bus);
  *
  * Yes - Alan
  */
-static spinlock_t mca_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(mca_lock);
 
 /* Build the status info for the adapter */
 

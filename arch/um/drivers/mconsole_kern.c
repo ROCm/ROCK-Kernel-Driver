@@ -538,7 +538,7 @@ static int create_proc_mconsole(void)
 	return(0);
 }
 
-static spinlock_t notify_spinlock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(notify_spinlock);
 
 void lock_notify(void)
 {

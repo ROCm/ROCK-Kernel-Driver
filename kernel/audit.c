@@ -300,21 +300,55 @@ nlmsg_failure:			/* Used by NLMSG_PUT */
 		kfree_skb(skb);
 }
 
+/*
+ * Check for appropriate CAP_AUDIT_ capabilities on incoming audit
+ * control messages.
+ */
+static int audit_netlink_ok(kernel_cap_t eff_cap, u16 msg_type)
+{
+	int err = 0;
+
+	switch (msg_type) {
+	case AUDIT_GET:
+	case AUDIT_LIST:
+	case AUDIT_SET:
+	case AUDIT_LOGIN:
+	case AUDIT_ADD:
+	case AUDIT_DEL:
+		if (!cap_raised(eff_cap, CAP_AUDIT_CONTROL))
+			err = -EPERM;
+		break;
+	case AUDIT_USER:
+		if (!cap_raised(eff_cap, CAP_AUDIT_WRITE))
+			err = -EPERM;
+		break;
+	default:  /* bad msg */
+		err = -EINVAL;
+	}
+
+	return err;
+}
+
 static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 {
 	u32			uid, pid, seq;
 	void			*data;
 	struct audit_status	*status_get, status_set;
 	struct audit_login	*login;
-	int			err = 0;
+	int			err;
 	struct audit_buffer	*ab;
+	u16			msg_type = nlh->nlmsg_type;
+
+	err = audit_netlink_ok(NETLINK_CB(skb).eff_cap, msg_type);
+	if (err)
+		return err;
 
 	pid  = NETLINK_CREDS(skb)->pid;
 	uid  = NETLINK_CREDS(skb)->uid;
 	seq  = nlh->nlmsg_seq;
 	data = NLMSG_DATA(nlh);
 
-	switch (nlh->nlmsg_type) {
+	switch (msg_type) {
 	case AUDIT_GET:
 		status_set.enabled	 = audit_enabled;
 		status_set.failure	 = audit_failure;
@@ -327,8 +361,8 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 				 &status_set, sizeof(status_set));
 		break;
 	case AUDIT_SET:
-		if (!capable(CAP_SYS_ADMIN))
-			return -EPERM;
+		if (nlh->nlmsg_len < sizeof(struct audit_status))
+			return -EINVAL;
 		status_get   = (struct audit_status *)data;
 		if (status_get->mask & AUDIT_STATUS_ENABLED) {
 			err = audit_set_enabled(status_get->enabled);
@@ -364,8 +398,8 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 		audit_log_end(ab);
 		break;
 	case AUDIT_LOGIN:
-		if (!capable(CAP_SYS_ADMIN))
-			return -EPERM;
+		if (nlh->nlmsg_len < sizeof(struct audit_login))
+			return -EINVAL;
 		login = (struct audit_login *)data;
 		ab = audit_log_start(NULL);
 		if (ab) {
@@ -384,9 +418,12 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 					 login->loginuid);
 #endif
 		break;
-	case AUDIT_LIST:
 	case AUDIT_ADD:
 	case AUDIT_DEL:
+		if (nlh->nlmsg_len < sizeof(struct audit_rule))
+			return -EINVAL;
+		/* fallthrough */
+	case AUDIT_LIST:
 #ifdef CONFIG_AUDITSYSCALL
 		err = audit_receive_filter(nlh->nlmsg_type, pid, uid, seq,
 					   data);

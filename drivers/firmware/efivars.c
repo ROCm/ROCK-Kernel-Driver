@@ -97,7 +97,7 @@ MODULE_VERSION(EFIVARS_VERSION);
  * efi.get_next_variable() is only called from efivars_init(),
  * which is protected by the BKL, so that path is safe.
  */
-static spinlock_t efivars_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(efivars_lock);
 static LIST_HEAD(efivar_list);
 
 /*

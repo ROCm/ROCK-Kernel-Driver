@@ -54,7 +54,7 @@ struct memelfnote
 };
 
 static struct kcore_list *kclist;
-static rwlock_t kclist_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(kclist_lock);
 
 void
 kclist_add(struct kcore_list *new, void *addr, size_t size)

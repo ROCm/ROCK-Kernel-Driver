@@ -377,7 +377,7 @@ enum schizo_error_type {
 	UE_ERR, CE_ERR, PCI_ERR, SAFARI_ERR
 };
 
-static spinlock_t stc_buf_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(stc_buf_lock);
 static unsigned long stc_error_buf[128];
 static unsigned long stc_tag_buf[16];
 static unsigned long stc_line_buf[16];

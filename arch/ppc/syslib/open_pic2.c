@@ -386,7 +386,7 @@ static void openpic2_set_spurious(u_int vec)
 			   vec);
 }
 
-static spinlock_t openpic2_setup_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(openpic2_setup_lock);
 
 /*
  *  Initialize a timer interrupt (and disable it)

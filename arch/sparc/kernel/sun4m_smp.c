@@ -321,7 +321,7 @@ static struct smp_funcall {
 	unsigned long processors_out[NR_CPUS]; /* Set when ipi exited. */
 } ccall_info;
 
-static spinlock_t cross_call_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(cross_call_lock);
 
 /* Cross calls must be serialized, at least currently. */
 void smp4m_cross_call(smpfunc_t func, unsigned long arg1, unsigned long arg2,

@@ -206,7 +206,7 @@ struct floppy_state {
 
 static struct floppy_state floppy_states[MAX_FLOPPIES];
 static int floppy_count = 0;
-static spinlock_t swim3_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(swim3_lock);
 
 static unsigned short write_preamble[] = {
 	0x4e4e, 0x4e4e, 0x4e4e, 0x4e4e, 0x4e4e,	/* gap field */

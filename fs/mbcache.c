@@ -99,7 +99,7 @@ struct mb_cache {
 
 static LIST_HEAD(mb_cache_list);
 static LIST_HEAD(mb_cache_lru_list);
-static spinlock_t mb_cache_spinlock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(mb_cache_spinlock);
 static struct shrinker *mb_shrinker;
 
 static inline int

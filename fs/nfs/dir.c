@@ -1498,29 +1498,11 @@ out:
 int nfs_permission(struct inode *inode, int mask, struct nameidata *nd)
 {
 	struct rpc_cred *cred;
-	int mode = inode->i_mode;
 	int res;
 
 	if (mask == 0)
 		return 0;
-	if (mask & MAY_WRITE) {
-		/*
-		 *
-		 * Nobody gets write access to a read-only fs.
-		 *
-		 */
-		if (IS_RDONLY(inode) &&
-		    (S_ISREG(mode) || S_ISDIR(mode) || S_ISLNK(mode)))
-			return -EROFS;
 
-		/*
-		 *
-		 * Nobody gets write access to an immutable file.
-		 *
-		 */
-		if (IS_IMMUTABLE(inode))
-			return -EACCES;
-	}
 	/* Are we checking permissions on anything other than lookup/execute? */
 	if ((mask & MAY_EXEC) == 0) {
 		/* We only need to check permissions on file open() and access() */

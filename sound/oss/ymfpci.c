@@ -99,7 +99,7 @@ static void ymfpci_disable_dsp(ymfpci_t *unit);
 static void ymfpci_download_image(ymfpci_t *codec);
 static void ymf_memload(ymfpci_t *unit);
 
-static spinlock_t ymf_devs_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ymf_devs_lock);
 static LIST_HEAD(ymf_devs);
 
 /*

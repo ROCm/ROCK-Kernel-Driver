@@ -159,7 +159,7 @@ long execute_syscall(void *r)
 	return(CHOOSE_MODE_PROC(execute_syscall_tt, execute_syscall_skas, r));
 }
 
-spinlock_t syscall_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(syscall_lock);
 
 static int syscall_index = 0;
 

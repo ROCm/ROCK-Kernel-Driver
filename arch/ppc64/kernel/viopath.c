@@ -64,7 +64,7 @@ static struct viopathStatus {
 	int numberAllocated;
 } viopathStatus[HVMAXARCHITECTEDLPS];
 
-static spinlock_t statuslock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(statuslock);
 
 /*
  * For each kind of event we allocate a buffer that is

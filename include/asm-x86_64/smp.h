@@ -59,6 +59,7 @@ extern u8 phys_proc_id[NR_CPUS];
  */
 
 extern cpumask_t cpu_callout_map;
+extern cpumask_t cpu_callin_map;
 #define cpu_possible_map cpu_callout_map
 
 static inline int num_booting_cpus(void)

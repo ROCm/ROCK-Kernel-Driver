@@ -62,7 +62,7 @@ extern void * boot_ioremap(unsigned long, unsigned long);
  */
 
 static unsigned long efi_rt_eflags;
-static spinlock_t efi_rt_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(efi_rt_lock);
 static pgd_t efi_bak_pg_dir_pointer[2];
 
 static void efi_call_phys_prelog(void)

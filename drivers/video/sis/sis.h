@@ -527,10 +527,6 @@ struct sis_video_info {
 	int  		newrom;
 	int  		registered;
 	int		warncount;
-#ifdef SIS_CONFIG_COMPAT
-	int		ioctl32registered;
-	int		ioctl32vblankregistered;
-#endif
 
 	int 		sisvga_engine;
 	int 		hwcursor_size;

@@ -273,7 +273,7 @@ char *task_show_regs(struct task_struct *task, char *buffer)
 	return buffer;
 }
 
-spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(die_lock);
 
 void die(const char * str, struct pt_regs * regs, long err)
 {

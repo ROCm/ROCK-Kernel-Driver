@@ -80,7 +80,7 @@ static volatile unsigned char *nvram_data;
 static int nvram_mult, is_core_99;
 static int core99_bank = 0;
 static int nvram_partitions[3];
-static spinlock_t nv_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(nv_lock);
 
 extern int pmac_newworld;
 extern int system_running;

@@ -54,7 +54,7 @@
 
 #define kDEBUG 0
 
-spinlock_t smp_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(smp_lock);
 
 volatile struct task_struct *smp_init_current_idle_task;
 
@@ -332,7 +332,7 @@ smp_call_function (void (*func) (void *info), void *info, int retry, int wait)
 {
 	struct smp_call_struct data;
 	unsigned long timeout;
-	static spinlock_t lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(lock);
 	int retries = 0;
 
 	if (num_online_cpus() < 2)

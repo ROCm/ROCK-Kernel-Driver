@@ -53,6 +53,7 @@ extern u8 x86_cpu_to_apicid[];
 #define __smp_processor_id() (current_thread_info()->cpu)
 
 extern cpumask_t cpu_callout_map;
+extern cpumask_t cpu_callin_map;
 #define cpu_possible_map cpu_callout_map
 
 /* We don't mark CPUs online until __cpu_up(), so we need another measure */

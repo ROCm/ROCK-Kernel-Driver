@@ -893,26 +893,18 @@ int swsusp_resume(void)
 	return error;
 }
 
-
-
 /* More restore stuff */
-
-#define does_collide(addr) does_collide_order(pagedir_nosave, addr, 0)
 
 /*
  * Returns true if given address/order collides with any orig_address 
  */
-static int __init does_collide_order(suspend_pagedir_t *pagedir, unsigned long addr,
-		int order)
+static int __init does_collide_order(unsigned long addr, int order)
 {
 	int i;
-	unsigned long addre = addr + (PAGE_SIZE<<order);
 	
-	for (i=0; i < nr_copy_pages; i++)
-		if ((pagedir+i)->orig_address >= addr &&
-			(pagedir+i)->orig_address < addre)
+	for (i=0; i < (1<<order); i++)
+		if (!PageNosaveFree(virt_to_page(addr + i * PAGE_SIZE)))
 			return 1;
-
 	return 0;
 }
 
@@ -931,7 +923,7 @@ static int __init check_pagedir(void)
 			addr = get_zeroed_page(GFP_ATOMIC);
 			if(!addr)
 				return -ENOMEM;
-		} while (does_collide(addr));
+		} while (does_collide_order(addr, 0));
 
 		(pagedir_nosave+i)->address = addr;
 	}
@@ -948,16 +940,34 @@ static int __init swsusp_pagedir_relocate(void)
 	void **eaten_memory = NULL;
 	void **c = eaten_memory, *m, *f;
 	int ret = 0;
+	struct zone *zone;
+	int i;
+	struct pbe *p;
+	unsigned long zone_pfn;
 
 	printk("Relocating pagedir ");
 
-	if (!does_collide_order(old_pagedir, (unsigned long)old_pagedir, pagedir_order)) {
+	/* Set page flags */
+
+	for_each_zone(zone) {
+        	for (zone_pfn = 0; zone_pfn < zone->spanned_pages; ++zone_pfn)
+                	SetPageNosaveFree(pfn_to_page(zone_pfn +
+					zone->zone_start_pfn));
+	}
+
+	/* Clear orig address */
+
+	for(i = 0, p = pagedir_nosave; i < nr_copy_pages; i++, p++) {
+		ClearPageNosaveFree(virt_to_page(p->orig_address));
+	}
+
+	if (!does_collide_order((unsigned long)old_pagedir, pagedir_order)) {
 		printk("not necessary\n");
 		return check_pagedir();
 	}
 
 	while ((m = (void *) __get_free_pages(GFP_ATOMIC, pagedir_order)) != NULL) {
-		if (!does_collide_order(old_pagedir, (unsigned long)m, pagedir_order))
+		if (!does_collide_order((unsigned long)m, pagedir_order))
 			break;
 		eaten_memory = m;
 		printk( "." ); 

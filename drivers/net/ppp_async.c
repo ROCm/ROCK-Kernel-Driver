@@ -126,7 +126,7 @@ static struct ppp_channel_ops async_ops = {
  * FIXME: this is no longer true. The _close path for the ldisc is 
  * now guaranteed to be sane. 
  */
-static rwlock_t disc_data_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(disc_data_lock);
 
 static struct asyncppp *ap_get(struct tty_struct *tty)
 {

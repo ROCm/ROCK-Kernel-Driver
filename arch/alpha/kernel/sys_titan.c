@@ -56,7 +56,7 @@ static unsigned long titan_cached_irq_mask;
 /*
  * Need SMP-safe access to interrupt CSRs
  */
-spinlock_t titan_irq_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(titan_irq_lock);
 
 static void
 titan_update_irq_hw(unsigned long mask)

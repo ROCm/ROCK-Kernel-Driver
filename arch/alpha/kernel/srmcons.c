@@ -22,7 +22,7 @@
 #include <asm/uaccess.h>
 
 
-static spinlock_t srmcons_callback_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(srmcons_callback_lock);
 static int srm_is_registered_console = 0;
 
 /* 
@@ -160,7 +160,7 @@ static int
 srmcons_get_private_struct(struct srmcons_private **ps)
 {
 	static struct srmcons_private *srmconsp = NULL;
-	static spinlock_t srmconsp_lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(srmconsp_lock);
 	unsigned long flags;
 	int retval = 0;
 

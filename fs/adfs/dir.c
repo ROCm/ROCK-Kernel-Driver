@@ -24,7 +24,7 @@
 /*
  * For future.  This should probably be per-directory.
  */
-static rwlock_t adfs_dir_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(adfs_dir_lock);
 
 static int
 adfs_readdir(struct file *filp, void *dirent, filldir_t filldir)

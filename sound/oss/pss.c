@@ -143,7 +143,7 @@ typedef struct pss_confdata {
   
 static pss_confdata pss_data;
 static pss_confdata *devc = &pss_data;
-static spinlock_t lock=SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(lock);
 
 static int      pss_initialized;
 static int      nonstandard_microcode;

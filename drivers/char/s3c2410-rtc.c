@@ -48,7 +48,7 @@ static int s3c2410_rtc_alarmno = NO_IRQ;
 static int s3c2410_rtc_tickno  = NO_IRQ;
 static int s3c2410_rtc_freq    = 1;
 
-static spinlock_t s3c2410_rtc_pie_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(s3c2410_rtc_pie_lock);
 
 /* IRQ Handlers */
 

@@ -36,7 +36,7 @@ static void __tape_remove_request(struct tape_device *, struct tape_request *);
  * The list is protected by the rwlock
  */
 static struct list_head tape_device_list = LIST_HEAD_INIT(tape_device_list);
-static rwlock_t tape_device_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(tape_device_lock);
 
 /*
  * Pointer to debug area.

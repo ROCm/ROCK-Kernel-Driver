@@ -569,7 +569,7 @@ static int leds_req_pending;
 static int pending_devs[16];
 static int pending_led_start=0;
 static int pending_led_end=0;
-static spinlock_t leds_lock  = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(leds_lock);
 
 static void leds_done(struct adb_request *req)
 {

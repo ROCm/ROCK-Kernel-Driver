@@ -27,7 +27,7 @@ static char pcspkr_name[] = "PC Speaker";
 static char pcspkr_phys[] = "isa0061/input0";
 static struct input_dev pcspkr_dev;
 
-spinlock_t i8253_beep_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(i8253_beep_lock);
 
 static int pcspkr_event(struct input_dev *dev, unsigned int type, unsigned int code, int value)
 {

@@ -47,7 +47,7 @@
 #include <asm/io.h>
 #include <asm/vga.h>
 
-static spinlock_t mda_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(mda_lock);
 
 /* description of the hardware layout */
 

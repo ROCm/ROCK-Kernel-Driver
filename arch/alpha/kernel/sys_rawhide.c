@@ -42,7 +42,7 @@ static unsigned int hose_irq_masks[4] = {
 	0xff0000, 0xfe0000, 0xff0000, 0xff0000
 };
 static unsigned int cached_irq_masks[4];
-spinlock_t rawhide_irq_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(rawhide_irq_lock);
 
 static inline void
 rawhide_update_irq_hw(int hose, int mask)

@@ -3,6 +3,7 @@
 #include <linux/blkpg.h>
 #include <linux/backing-dev.h>
 #include <linux/buffer_head.h>
+#include <linux/smp_lock.h>
 #include <asm/uaccess.h>
 
 static int blkpg_ioctl(struct block_device *bdev, struct blkpg_ioctl_arg __user *arg)
@@ -219,4 +220,20 @@ int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
 			return disk->fops->ioctl(inode, file, cmd, arg);
 	}
 	return -ENOTTY;
+}
+
+/* Most of the generic ioctls are handled in the normal fallback path.
+   This assumes the blkdev's low level compat_ioctl always returns
+   ENOIOCTLCMD for unknown ioctls. */
+long compat_blkdev_ioctl(struct file *file, unsigned cmd, unsigned long arg)
+{
+	struct block_device *bdev = file->f_dentry->d_inode->i_bdev;
+	struct gendisk *disk = bdev->bd_disk;
+	int ret = -ENOIOCTLCMD;
+	if (disk->fops->compat_ioctl) {
+		lock_kernel();
+		ret = disk->fops->compat_ioctl(file, cmd, arg);
+		unlock_kernel();
+	}
+	return ret;
 }

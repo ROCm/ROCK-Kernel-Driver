@@ -18,7 +18,7 @@
  * in entry.S::floppy_tdone
  */
 void __iomem *auxio_register = NULL;
-static spinlock_t auxio_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(auxio_lock);
 
 void __init auxio_probe(void)
 {

@@ -272,7 +272,7 @@ static struct notifier_block velocity_inetaddr_notifier = {
       .notifier_call	= velocity_netdev_event,
 };
 
-static spinlock_t velocity_dev_list_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(velocity_dev_list_lock);
 static LIST_HEAD(velocity_dev_list);
 
 static void velocity_register_notifier(void)

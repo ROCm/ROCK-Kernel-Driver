@@ -67,7 +67,7 @@ void *smw_free;
 
 static int jazz16_base;			/* Not detected */
 static unsigned char jazz16_bits;	/* I/O relocation bits */
-static spinlock_t jazz16_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(jazz16_lock);
 
 /*
  * Logitech Soundman Wave specific initialization code

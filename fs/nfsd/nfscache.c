@@ -48,7 +48,7 @@ static int	nfsd_cache_append(struct svc_rqst *rqstp, struct kvec *vec);
  * A cache entry is "single use" if c_state == RC_INPROG
  * Otherwise, it when accessing _prev or _next, the lock must be held.
  */
-static spinlock_t cache_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(cache_lock);
 
 void
 nfsd_cache_init(void)

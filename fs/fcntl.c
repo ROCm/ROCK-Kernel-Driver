@@ -41,38 +41,6 @@ static inline int get_close_on_exec(unsigned int fd)
 	return res;
 }
 
-
-/* Expand files.  Return <0 on error; 0 nothing done; 1 files expanded,
- * we may have blocked. 
- *
- * Should be called with the files->file_lock spinlock held for write.
- */
-static int expand_files(struct files_struct *files, int nr)
-{
-	int err, expand = 0;
-#ifdef FDSET_DEBUG	
-	printk (KERN_ERR "%s %d: nr = %d\n", __FUNCTION__, current->pid, nr);
-#endif
-	
-	if (nr >= files->max_fdset) {
-		expand = 1;
-		if ((err = expand_fdset(files, nr)))
-			goto out;
-	}
-	if (nr >= files->max_fds) {
-		expand = 1;
-		if ((err = expand_fd_array(files, nr)))
-			goto out;
-	}
-	err = expand;
- out:
-#ifdef FDSET_DEBUG	
-	if (err)
-		printk (KERN_ERR "%s %d: return %d\n", __FUNCTION__, current->pid, err);
-#endif
-	return err;
-}
-
 /*
  * locate_fd finds a free file descriptor in the open_fds fdset,
  * expanding the fd arrays if necessary.  Must be called with the
@@ -539,7 +507,7 @@ int send_sigurg(struct fown_struct *fown)
 	return ret;
 }
 
-static rwlock_t fasync_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(fasync_lock);
 static kmem_cache_t *fasync_cache;
 
 /*

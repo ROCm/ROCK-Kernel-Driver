@@ -533,6 +533,9 @@ include $(srctree)/arch/$(ARCH)/Makefile
 # warn about C99 declaration after statement
 CFLAGS += $(call cc-option,-Wdeclaration-after-statement,)
 
+# disable pointer signedness warnings in gcc 4.0
+CFLAGS += $(call cc-option,-Wno-pointer-sign,)
+
 # Default kernel image to build when no specific target is given.
 # KBUILD_IMAGE may be overruled on the commandline or
 # set in the environment

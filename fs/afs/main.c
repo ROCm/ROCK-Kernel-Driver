@@ -58,7 +58,7 @@ static struct rxrpc_peer_ops afs_peer_ops = {
 };
 
 struct list_head afs_cb_hash_tbl[AFS_CB_HASH_COUNT];
-spinlock_t afs_cb_hash_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(afs_cb_hash_lock);
 
 #ifdef AFS_CACHING_SUPPORT
 static struct cachefs_netfs_operations afs_cache_ops = {

@@ -18,7 +18,7 @@
 #define __MACH_MPC8555CDS_H__
 
 #include <linux/config.h>
-#include <linux/serial.h>
+#include <syslib/ppc85xx_setup.h>
 #include <platforms/85xx/mpc85xx_cds_common.h>
 
 #define CPM_MAP_ADDR	(CCSRBAR + MPC85xx_CPM_OFFSET)

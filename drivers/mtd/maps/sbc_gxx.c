@@ -85,7 +85,7 @@ separate MTD devices.
 
 static volatile int page_in_window = -1; // Current page in window.
 static void __iomem *iomapadr;
-static spinlock_t sbc_gxx_spin = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(sbc_gxx_spin);
 
 /* partition_info gives details on the logical partitions that the split the 
  * single flash device into. If the size if zero we use up to the end of the

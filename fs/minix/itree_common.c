@@ -6,7 +6,7 @@ typedef struct {
 	struct buffer_head *bh;
 } Indirect;
 
-static rwlock_t pointers_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(pointers_lock);
 
 static inline void add_chain(Indirect *p, struct buffer_head *bh, block_t *v)
 {

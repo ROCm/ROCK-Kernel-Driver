@@ -53,7 +53,7 @@
  * We use a single global lock to protect accesses. Each driver has
  * to take care of its own locking
  */
-static spinlock_t feature_lock  __pmacdata = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(feature_lock  __pmacdata);
 
 #define LOCK(flags)	spin_lock_irqsave(&feature_lock, flags);
 #define UNLOCK(flags)	spin_unlock_irqrestore(&feature_lock, flags);
@@ -111,7 +111,7 @@ static u32* uninorth_base __pmacdata;
 static u32 uninorth_rev __pmacdata;
 static void *u3_ht;
 
-extern struct pci_dev *k2_skiplist[2];
+extern struct device_node *k2_skiplist[2];
 
 /*
  * For each motherboard family, we have a table of functions pointers
@@ -160,22 +160,9 @@ static long __pmac g5_gmac_enable(struct device_node* node, long param, long val
 {
 	struct macio_chip* macio = &macio_chips[0];
 	unsigned long flags;
-	struct pci_dev *pdev = NULL;
 
 	if (node == NULL)
 		return -ENODEV;
-
-	/* XXX FIXME: We should fix pci_device_from_OF_node here, and
-	 * get to a real pci_dev or we'll get into trouble with PCI
-	 * domains the day we get overlapping numbers (like if we ever
-	 * decide to show the HT root.
-	 * Note that we only get the slot when value is 0. This is called
-	 * early during boot with value 1 to enable all devices, at which
-	 * point, we don't yet have probed pci_find_slot, so it would fail
-	 * to look for the slot at this point.
-	 */
-	if (!value)
-		pdev = pci_find_slot(node->busno, node->devfn);
 
 	LOCK(flags);
 	if (value) {
@@ -183,7 +170,7 @@ static long __pmac g5_gmac_enable(struct device_node* node, long param, long val
 		mb();
 		k2_skiplist[0] = NULL;
 	} else {
-		k2_skiplist[0] = pdev;
+		k2_skiplist[0] = node;
 		mb();
 		MACIO_BIC(KEYLARGO_FCR1, K2_FCR1_GMAC_CLK_ENABLE);
 	}
@@ -198,22 +185,9 @@ static long __pmac g5_fw_enable(struct device_node* node, long param, long value
 {
 	struct macio_chip* macio = &macio_chips[0];
 	unsigned long flags;
-	struct pci_dev *pdev = NULL;
 
-	/* XXX FIXME: We should fix pci_device_from_OF_node here, and
-	 * get to a real pci_dev or we'll get into trouble with PCI
-	 * domains the day we get overlapping numbers (like if we ever
-	 * decide to show the HT root
-	 * Note that we only get the slot when value is 0. This is called
-	 * early during boot with value 1 to enable all devices, at which
-	 * point, we don't yet have probed pci_find_slot, so it would fail
-	 * to look for the slot at this point.
-	 */
 	if (node == NULL)
 		return -ENODEV;
-
-	if (!value)
-		pdev = pci_find_slot(node->busno, node->devfn);
 
 	LOCK(flags);
 	if (value) {
@@ -221,7 +195,7 @@ static long __pmac g5_fw_enable(struct device_node* node, long param, long value
 		mb();
 		k2_skiplist[1] = NULL;
 	} else {
-		k2_skiplist[1] = pdev;
+		k2_skiplist[1] = node;
 		mb();
 		MACIO_BIC(KEYLARGO_FCR1, K2_FCR1_FW_CLK_ENABLE);
 	}

@@ -300,7 +300,7 @@ static struct smp_funcall {
 	unsigned char processors_out[NR_CPUS]; /* Set when ipi exited. */
 } ccall_info __attribute__((aligned(8)));
 
-static spinlock_t cross_call_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(cross_call_lock);
 
 /* Cross calls must be serialized, at least currently. */
 void smp4d_cross_call(smpfunc_t func, unsigned long arg1, unsigned long arg2,
@@ -397,7 +397,7 @@ void smp4d_message_pass(int target, int msg, unsigned long data, int wait)
 	SMP_PRINTK(("smp4d_message_pass %d %d %08lx %d\n", target, msg, data, wait));
 	if (msg == MSG_STOP_CPU && target == MSG_ALL_BUT_SELF) {
 		unsigned long flags;
-		static spinlock_t stop_cpu_lock = SPIN_LOCK_UNLOCKED;
+		static DEFINE_SPINLOCK(stop_cpu_lock);
 		spin_lock_irqsave(&stop_cpu_lock, flags);
 		smp4d_stop_cpu_sender = me;
 		smp4d_cross_call((smpfunc_t)smp4d_stop_cpu, 0, 0, 0, 0, 0);

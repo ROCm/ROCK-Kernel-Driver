@@ -158,11 +158,6 @@ asmlinkage void do_IRQ(int irq, struct pt_regs * regs)
 		local_irq_disable();
         }
         irq_exit();
-
-	if (softirq_pending(cpu))
-                do_softirq();
-
-        /* unmasking and bottom half handling is done magically for us. */
 }
 
 /* this function links in a handler into the chain of handlers for the

@@ -179,7 +179,7 @@ static u32 tx_max_out_p = 127 - 16;
 
 #ifdef QLOGIC_NAA_WORKAROUND
 static struct NAA_Hosed *mpt_bad_naa = NULL;
-rwlock_t bad_naa_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(bad_naa_lock);
 #endif
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/

@@ -251,7 +251,7 @@ void prom_cif_callback(void)
  * This provides SMP safety on the p1275buf. prom_callback() drops this lock
  * to allow recursuve acquisition.
  */
-spinlock_t prom_entry_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(prom_entry_lock);
 
 long p1275_cmd (char *service, long fmt, ...)
 {

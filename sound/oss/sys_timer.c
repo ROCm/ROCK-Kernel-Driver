@@ -27,7 +27,7 @@ static volatile unsigned long next_event_time;
 static unsigned long prev_event_time;
 
 static void     poll_def_tmr(unsigned long dummy);
-static spinlock_t lock=SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(lock);
 
 static struct timer_list def_tmr = TIMER_INITIALIZER(poll_def_tmr, 0, 0);
 

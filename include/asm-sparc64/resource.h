@@ -26,30 +26,8 @@
 #define RLIMIT_MSGQUEUE 12		/* maximum bytes in POSIX mqueues */
 
 #define RLIM_NLIMITS	13
+#define __ARCH_RLIMIT_ORDER
 
-/*
- * SuS says limits have to be unsigned.
- * Which makes a ton more sense anyway.
- */
-#define RLIM_INFINITY	(~0UL)
-
-#ifdef __KERNEL__
-#define INIT_RLIMITS			\
-{					\
-    {RLIM_INFINITY, RLIM_INFINITY},	\
-    {RLIM_INFINITY, RLIM_INFINITY},	\
-    {RLIM_INFINITY, RLIM_INFINITY},	\
-    {_STK_LIM, RLIM_INFINITY},		\
-    {       0, RLIM_INFINITY},		\
-    {RLIM_INFINITY, RLIM_INFINITY},	\
-    {INR_OPEN, INR_OPEN}, {0, 0},	\
-    {  MLOCK_LIMIT,   MLOCK_LIMIT},	\
-    {RLIM_INFINITY, RLIM_INFINITY},	\
-    {RLIM_INFINITY, RLIM_INFINITY},	\
-    {MAX_SIGPENDING, MAX_SIGPENDING},	\
-    {MQ_BYTES_MAX, MQ_BYTES_MAX},	\
-}
-
-#endif /* __KERNEL__ */
+#include <asm-generic/resource.h>
 
 #endif /* !(_SPARC64_RESOURCE_H) */

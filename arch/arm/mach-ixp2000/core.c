@@ -40,7 +40,7 @@
 #include <asm/mach/time.h>
 #include <asm/mach/irq.h>
 
-static spinlock_t ixp2000_slowport_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ixp2000_slowport_lock);
 static unsigned long ixp2000_slowport_irq_flags;
 
 /*************************************************************************

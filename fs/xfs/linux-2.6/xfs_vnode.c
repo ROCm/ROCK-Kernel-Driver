@@ -34,7 +34,7 @@
 
 
 uint64_t vn_generation;		/* vnode generation number */
-spinlock_t vnumber_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(vnumber_lock);
 
 /*
  * Dedicated vnode inactive/reclaim sync semaphores.

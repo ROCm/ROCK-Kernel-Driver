@@ -185,7 +185,7 @@ enum {
 
 /* The master ring of all esp hosts we are managing in this driver. */
 static struct esp *espchain;
-static spinlock_t espchain_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(espchain_lock);
 static int esps_running = 0;
 
 /* Forward declarations. */

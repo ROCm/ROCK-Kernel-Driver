@@ -27,7 +27,7 @@ static char *sparcspkr_ebus_name = "Sparc EBUS Speaker";
 static char *sparcspkr_phys = "sparc/input0";
 static struct input_dev sparcspkr_dev;
 
-spinlock_t beep_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(beep_lock);
 
 static void __init init_sparcspkr_struct(void)
 {

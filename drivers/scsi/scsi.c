@@ -925,7 +925,7 @@ EXPORT_SYMBOL(scsi_finish_command);
  */
 void scsi_adjust_queue_depth(struct scsi_device *sdev, int tagged, int tags)
 {
-	static spinlock_t device_request_lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(device_request_lock);
 	unsigned long flags;
 
 	/*

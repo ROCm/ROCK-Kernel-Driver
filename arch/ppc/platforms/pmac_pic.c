@@ -68,7 +68,7 @@ static int max_irqs __pmacdata;
 static int max_real_irqs __pmacdata;
 static u32 level_mask[4] __pmacdata;
 
-static spinlock_t pmac_pic_lock __pmacdata = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(pmac_pic_lock __pmacdata);
 
 
 #define GATWICK_IRQ_POOL_SIZE        10

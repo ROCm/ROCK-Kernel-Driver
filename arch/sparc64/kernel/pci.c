@@ -56,7 +56,7 @@ volatile int pci_poke_in_progress;
 volatile int pci_poke_cpu = -1;
 volatile int pci_poke_faulted;
 
-static spinlock_t pci_poke_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(pci_poke_lock);
 
 void pci_config_read8(u8 *addr, u8 *ret)
 {

@@ -178,7 +178,7 @@ struct vfc_dev *vfc_get_dev_ptr(int instance)
 	return vfc_dev_lst[instance];
 }
 
-static spinlock_t vfc_dev_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(vfc_dev_lock);
 
 static int vfc_open(struct inode *inode, struct file *file) 
 {

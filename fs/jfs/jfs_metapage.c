@@ -28,7 +28,7 @@
 #include "jfs_txnmgr.h"
 #include "jfs_debug.h"
 
-static spinlock_t meta_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(meta_lock);
 
 #ifdef CONFIG_JFS_STATISTICS
 static struct {

@@ -45,11 +45,17 @@ static struct pt_regs jprobe_saved_regs;
 
 int arch_prepare_kprobe(struct kprobe *p)
 {
-	memcpy(p->ainsn.insn, p->addr, MAX_INSN_SIZE * sizeof(kprobe_opcode_t));
-	if (IS_MTMSRD(p->ainsn.insn[0]) || IS_RFID(p->ainsn.insn[0]))
+	kprobe_opcode_t insn = *p->addr;
+
+	if (IS_MTMSRD(insn) || IS_RFID(insn))
 		/* cannot put bp on RFID/MTMSRD */
 		return 1;
 	return 0;
+}
+
+void arch_copy_kprobe(struct kprobe *p)
+{
+	memcpy(p->ainsn.insn, p->addr, MAX_INSN_SIZE * sizeof(kprobe_opcode_t));
 }
 
 void arch_remove_kprobe(struct kprobe *p)

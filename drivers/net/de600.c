@@ -99,7 +99,7 @@ static volatile int		tx_fifo_in;
 static volatile int		tx_fifo_out;
 static volatile int		free_tx_pages = TX_PAGES;
 static int			was_down;
-static spinlock_t		de600_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(de600_lock);
 
 static inline u8 de600_read_status(struct net_device *dev)
 {

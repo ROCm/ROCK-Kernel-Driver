@@ -984,8 +984,7 @@ static void show_node(struct zone *zone)
  * The result is unavoidably approximate - it can change
  * during and after execution of this function.
  */
-DEFINE_PER_CPU(struct page_state, page_states) = {0};
-EXPORT_PER_CPU_SYMBOL(page_states);
+static DEFINE_PER_CPU(struct page_state, page_states) = {0};
 
 atomic_t nr_pagecache = ATOMIC_INIT(0);
 EXPORT_SYMBOL(nr_pagecache);
@@ -1044,6 +1043,19 @@ unsigned long __read_page_state(unsigned offset)
 	}
 	return ret;
 }
+
+void __mod_page_state(unsigned offset, unsigned long delta)
+{
+	unsigned long flags;
+	void* ptr;
+
+	local_irq_save(flags);
+	ptr = &__get_cpu_var(page_states);
+	*(unsigned long*)(ptr + offset) += delta;
+	local_irq_restore(flags);
+}
+
+EXPORT_SYMBOL(__mod_page_state);
 
 void __get_zone_counts(unsigned long *active, unsigned long *inactive,
 			unsigned long *free, struct pglist_data *pgdat)

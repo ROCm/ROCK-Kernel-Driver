@@ -351,7 +351,7 @@ struct net_device *alloc_arcdev(char *name)
 			   name && *name ? name : "arc%d", arcdev_setup);
 	if(dev) {
 		struct arcnet_local *lp = (struct arcnet_local *) dev->priv;
-		lp->lock = SPIN_LOCK_UNLOCKED;
+		spin_lock_init(&lp->lock);
 	}
 
 	return dev;

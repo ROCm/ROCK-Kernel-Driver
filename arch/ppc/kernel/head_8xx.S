@@ -343,7 +343,7 @@ InstructionTLBMiss:
 	 * set.  All other Linux PTE bits control the behavior
 	 * of the MMU.
 	 */
-	li	r11, 0x00f0
+2:	li	r11, 0x00f0
 	rlwimi	r10, r11, 0, 24, 28	/* Set 24-27, clear 28 */
 	DO_8xx_CPU6(0x2d80, r3)
 	mtspr	MI_RPN, r10	/* Update TLB entry */
@@ -356,15 +356,6 @@ InstructionTLBMiss:
 	lwz	r3, 8(r0)
 #endif
 	rfi
-
-2:	mfspr	r10, M_TW	/* Restore registers */
-	lwz	r11, 0(r0)
-	mtcr	r11
-	lwz	r11, 4(r0)
-#ifdef CONFIG_8xx_CPU6
-	lwz	r3, 8(r0)
-#endif
-	b	InstructionAccess
 
 	. = 0x1200
 DataStoreTLBMiss:
@@ -419,7 +410,7 @@ DataStoreTLBMiss:
 	 * set.  All other Linux PTE bits control the behavior
 	 * of the MMU.
 	 */
-	li	r11, 0x00f0
+2:	li	r11, 0x00f0
 	rlwimi	r10, r11, 0, 24, 28	/* Set 24-27, clear 28 */
 	DO_8xx_CPU6(0x3d80, r3)
 	mtspr	MD_RPN, r10	/* Update TLB entry */
@@ -432,15 +423,6 @@ DataStoreTLBMiss:
 	lwz	r3, 8(r0)
 #endif
 	rfi
-
-2:	mfspr	r10, M_TW	/* Restore registers */
-	lwz	r11, 0(r0)
-	mtcr	r11
-	lwz	r11, 4(r0)
-#ifdef CONFIG_8xx_CPU6
-	lwz	r3, 8(r0)
-#endif
-	b	DataAccess
 
 /* This is an instruction TLB error on the MPC8xx.  This could be due
  * to many reasons, such as executing guarded memory or illegal instruction

@@ -103,7 +103,7 @@ static iucv_GeneralInterrupt *iucv_external_int_buffer = NULL;
 
 /* Spin Lock declaration */
 
-static spinlock_t iucv_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(iucv_lock);
 
 static int messagesDisabled = 0;
 
@@ -115,7 +115,7 @@ typedef struct {
 } iucv_irqdata;
 
 static struct list_head  iucv_irq_queue;
-static spinlock_t iucv_irq_queue_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(iucv_irq_queue_lock);
 
 /*
  *Internal function prototypes

@@ -1563,7 +1563,7 @@ lba_common_init(struct lba_device *lba_dev)
 {
 	pci_bios = &lba_bios_ops;
 	pcibios_register_hba(HBA_DATA(lba_dev));
-	lba_dev->lba_lock = SPIN_LOCK_UNLOCKED;	
+	spin_lock_init(&lba_dev->lba_lock);
 
 	/*
 	** Set flags which depend on hw_rev

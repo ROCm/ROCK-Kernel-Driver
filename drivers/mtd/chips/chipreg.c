@@ -15,7 +15,7 @@
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/compatmac.h>
 
-static spinlock_t chip_drvs_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(chip_drvs_lock);
 static LIST_HEAD(chip_drvs_list);
 
 void register_mtd_chip_driver(struct mtd_chip_driver *drv)

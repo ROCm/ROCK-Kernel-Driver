@@ -50,7 +50,7 @@ extern void show_registers(struct pt_regs *regs);
  * This is maintained separately from nmi_active because the NMI
  * watchdog may also be driven from the I/O APIC timer.
  */
-static spinlock_t lapic_nmi_owner_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(lapic_nmi_owner_lock);
 static unsigned int lapic_nmi_owner;
 #define LAPIC_NMI_WATCHDOG	(1<<0)
 #define LAPIC_NMI_RESERVED	(1<<1)
@@ -117,8 +117,12 @@ int __init check_nmi_watchdog (void)
 	/* FIXME: Only boot CPU is online at this stage.  Check CPUs
            as they come up. */
 	for (cpu = 0; cpu < NR_CPUS; cpu++) {
-		if (!cpu_online(cpu))
+#ifdef CONFIG_SMP
+		/* Check cpu_callin_map here because that is set
+		   after the timer is started. */
+		if (!cpu_isset(cpu, cpu_callin_map))
 			continue;
+#endif
 		if (nmi_count(cpu) - prev_nmi_count[cpu] <= 5) {
 			printk("CPU#%d: NMI appears to be stuck!\n", cpu);
 			nmi_active = 0;

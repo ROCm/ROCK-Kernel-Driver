@@ -312,7 +312,7 @@ static unsigned char aztIndatum;
 static unsigned long aztTimeOutCount;
 static int aztCmd = 0;
 
-static spinlock_t aztSpin = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(aztSpin);
 
 /*###########################################################################
    Function Prototypes

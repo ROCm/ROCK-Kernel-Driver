@@ -250,8 +250,6 @@ int audit_receive_filter(int type, int pid, int uid, int seq, void *data)
 		audit_send_reply(pid, seq, AUDIT_LIST, 1, 1, NULL, 0);
 		break;
 	case AUDIT_ADD:
-		if (!capable(CAP_SYS_ADMIN))
-			return -EPERM;
 		if (!(entry = kmalloc(sizeof(*entry), GFP_KERNEL)))
 			return -ENOMEM;
 		if (audit_copy_rule(&entry->rule, data)) {

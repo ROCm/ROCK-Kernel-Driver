@@ -250,7 +250,7 @@ static int				CurrentNReq;
 static int				CurrentNSect;
 static char				*CurrentBuffer;
 
-static spinlock_t			acsi_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(acsi_lock);
 
 
 #define SET_TIMER()	mod_timer(&acsi_timer, jiffies + ACSI_TIMEOUT)

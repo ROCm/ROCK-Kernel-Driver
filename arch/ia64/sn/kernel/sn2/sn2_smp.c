@@ -42,7 +42,7 @@
 void sn2_ptc_deadlock_recovery(volatile unsigned long *, unsigned long data0, 
 	volatile unsigned long *, unsigned long data1);
 
-static spinlock_t sn2_global_ptc_lock __cacheline_aligned = SPIN_LOCK_UNLOCKED;
+static  __cacheline_aligned DEFINE_SPINLOCK(sn2_global_ptc_lock);
 
 static unsigned long sn2_ptc_deadlock_count;
 

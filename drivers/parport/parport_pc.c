@@ -2130,7 +2130,7 @@ static int __devinit parport_dma_probe (struct parport *p)
 /* --- Initialisation code -------------------------------- */
 
 static LIST_HEAD(ports_list);
-static spinlock_t ports_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ports_lock);
 
 struct parport *parport_pc_probe_port (unsigned long int base,
 				       unsigned long int base_hi,

@@ -154,7 +154,7 @@ static unsigned long current_tick_offset;
 #define NUM_ROUNDS	64	/* magic value */
 #define NUM_ITERS	5	/* likewise */
 
-static spinlock_t itc_sync_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(itc_sync_lock);
 static unsigned long go[SLAVE + 1];
 
 #define DEBUG_TICK_SYNC	0
@@ -546,7 +546,7 @@ struct call_data_struct {
 	int wait;
 };
 
-static spinlock_t call_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(call_lock);
 static struct call_data_struct *call_data;
 
 extern unsigned long xcall_call_function;
@@ -1146,7 +1146,7 @@ report:
 }
 
 /* /proc/profile writes can call this, don't __init it please. */
-static spinlock_t prof_setup_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(prof_setup_lock);
 
 int setup_profiling_timer(unsigned int multiplier)
 {

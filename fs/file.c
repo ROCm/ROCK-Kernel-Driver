@@ -53,7 +53,7 @@ void free_fd_array(struct file **array, int num)
  * spinlock held for write.
  */
 
-int expand_fd_array(struct files_struct *files, int nr)
+static int expand_fd_array(struct files_struct *files, int nr)
 	__releases(files->file_lock)
 	__acquires(files->file_lock)
 {
@@ -158,7 +158,7 @@ void free_fdset(fd_set *array, int num)
  * Expand the fdset in the files_struct.  Called with the files spinlock
  * held for write.
  */
-int expand_fdset(struct files_struct *files, int nr)
+static int expand_fdset(struct files_struct *files, int nr)
 	__releases(file->file_lock)
 	__acquires(file->file_lock)
 {
@@ -229,3 +229,26 @@ out:
 	return error;
 }
 
+/*
+ * Expand files.
+ * Return <0 on error; 0 nothing done; 1 files expanded, we may have blocked.
+ * Should be called with the files->file_lock spinlock held for write.
+ */
+int expand_files(struct files_struct *files, int nr)
+{
+	int err, expand = 0;
+
+	if (nr >= files->max_fdset) {
+		expand = 1;
+		if ((err = expand_fdset(files, nr)))
+			goto out;
+	}
+	if (nr >= files->max_fds) {
+		expand = 1;
+		if ((err = expand_fd_array(files, nr)))
+			goto out;
+	}
+	err = expand;
+out:
+	return err;
+}

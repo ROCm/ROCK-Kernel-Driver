@@ -62,6 +62,7 @@ extern void iSeries_smp_message_recv( struct pt_regs * );
 
 extern irq_desc_t irq_desc[NR_IRQS];
 
+int distribute_irqs = 1;
 int __irq_offset_value;
 int ppc_spurious_interrupts;
 unsigned long lpevent_count;
@@ -479,3 +480,10 @@ EXPORT_SYMBOL(do_softirq);
 
 #endif /* CONFIG_IRQSTACKS */
 
+static int __init setup_noirqdistrib(char *str)
+{
+	distribute_irqs = 0;
+	return 1;
+}
+
+__setup("noirqdistrib", setup_noirqdistrib);
