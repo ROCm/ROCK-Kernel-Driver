@@ -4,7 +4,7 @@
 #
 
 obj-y = exec_kern.o exec_user.o gdb.o gdb_kern.o mem.o process_kern.o \
-	syscall_user.o tracer.o
+	syscall_user.o tracer.o uaccess_user.o
 
 obj-$(CONFIG_PT_PROXY) += ptproxy/
 
