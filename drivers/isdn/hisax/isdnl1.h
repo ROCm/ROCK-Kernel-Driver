@@ -28,7 +28,7 @@
 #define B_LL_CONNECT	9
 #define B_LL_OK		10
 
-extern void debugl1(struct IsdnCardState *cs, char *fmt, ...);
+extern void debugl1(struct IsdnCardState *cs, const char *fmt, ...);
 extern void DChannel_proc_xmt(struct IsdnCardState *cs);
 extern void DChannel_proc_rcv(struct IsdnCardState *cs);
 extern void l1_msg(struct IsdnCardState *cs, int pr, void *arg);
