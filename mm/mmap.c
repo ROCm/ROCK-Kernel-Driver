@@ -1359,7 +1359,7 @@ static int acct_stack_growth(struct vm_area_struct * vma, unsigned long size, un
 		unsigned long limit;
 		locked = mm->locked_vm + grow;
 		limit = rlim[RLIMIT_MEMLOCK].rlim_cur >> PAGE_SHIFT;
-		if (locked > limit)
+		if (locked > limit && !capable(CAP_IPC_LOCK))
 			return -ENOMEM;
 	}
 
