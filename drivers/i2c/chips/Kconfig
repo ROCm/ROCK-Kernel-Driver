@@ -66,7 +66,8 @@ config SENSORS_W83781D
 
 config I2C_SENSOR
 	tristate
-	depends on SENSORS_ADM1021 || SENSORS_LM75 || SENSORS_VIA686A || SENSORS_W83781D
-	default m
+	default y if SENSORS_ADM1021=y || SENSORS_LM75=y || SENSORS_VIA686A=y || SENSORS_W83781D=y
+	default m if SENSORS_ADM1021=m || SENSORS_LM75=m || SENSORS_VIA686A=m || SENSORS_W83781D=m
+	default n
 
 endmenu
