@@ -105,7 +105,8 @@ static void sctp_cmd_new_state(sctp_cmd_seq_t *, sctp_association_t *,
 #define DEBUG_POST_SFX \
 	SCTP_DEBUG_PRINTK("sctp_do_sm post sfx: error %d, asoc %p[%s]\n", \
 			  error, asoc, \
-			  sctp_state_tbl[asoc?asoc->state:SCTP_STATE_CLOSED])
+			  sctp_state_tbl[(asoc && sctp_id2assoc(ep->base.sk, \
+			  sctp_assoc2id(asoc)))?asoc->state:SCTP_STATE_CLOSED])
 
 /*
  * This is the master state machine processing function.
