@@ -65,7 +65,7 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 
-struct icmpv6_mib icmpv6_statistics[NR_CPUS*2];
+DEFINE_SNMP_STAT(struct icmpv6_mib, icmpv6_statistics);
 
 /*
  *	ICMP socket for flow control.
@@ -377,7 +377,7 @@ void icmpv6_send(struct sk_buff *skb, int type, int code, __u32 info,
 	ip6_build_xmit(sk, icmpv6_getfrag, &msg, &fl, len, NULL, -1,
 		       MSG_DONTWAIT);
 	if (type >= ICMPV6_DEST_UNREACH && type <= ICMPV6_PARAMPROB)
-		(&(icmpv6_statistics[smp_processor_id()*2].Icmp6OutDestUnreachs))[type-1]++;
+		ICMP6_STATS_PTR_BH(Icmp6OutDestUnreachs) [type-1]++;
 	ICMP6_INC_STATS_BH(Icmp6OutMsgs);
 out:
 	icmpv6_xmit_unlock();
@@ -539,9 +539,9 @@ static int icmpv6_rcv(struct sk_buff *skb)
 	type = hdr->icmp6_type;
 
 	if (type >= ICMPV6_DEST_UNREACH && type <= ICMPV6_PARAMPROB)
-		(&icmpv6_statistics[smp_processor_id()*2].Icmp6InDestUnreachs)[type-ICMPV6_DEST_UNREACH]++;
+		ICMP6_STATS_PTR_BH(Icmp6InDestUnreachs)[type-ICMPV6_DEST_UNREACH]++;
 	else if (type >= ICMPV6_ECHO_REQUEST && type <= NDISC_REDIRECT)
-		(&icmpv6_statistics[smp_processor_id()*2].Icmp6InEchos)[type-ICMPV6_ECHO_REQUEST]++;
+		ICMP6_STATS_PTR_BH(Icmp6InEchos)[type-ICMPV6_ECHO_REQUEST]++;
 
 	switch (type) {
 	case ICMPV6_ECHO_REQUEST:

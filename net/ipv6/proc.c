@@ -59,11 +59,11 @@ int afinet6_get_info(char *buffer, char **start, off_t offset, int length)
 static struct snmp6_item
 {
 	char *name;
-	unsigned long *ptr;
-	int   mibsize;
+	void **mib;
+	int   offset;
 } snmp6_list[] = {
 /* ipv6 mib according to draft-ietf-ipngwg-ipv6-mib-04 */
-#define SNMP6_GEN(x) { #x , &ipv6_statistics[0].x, sizeof(struct ipv6_mib)/sizeof(unsigned long) }
+#define SNMP6_GEN(x) { #x , (void **)ipv6_statistics, offsetof(struct ipv6_mib, x) }
 	SNMP6_GEN(Ip6InReceives),
 	SNMP6_GEN(Ip6InHdrErrors),
 	SNMP6_GEN(Ip6InTooBigErrors),
@@ -97,7 +97,7 @@ static struct snmp6_item
 		OutRouterAdvertisements too.
 		OutGroupMembQueries too.
  */
-#define SNMP6_GEN(x) { #x , &icmpv6_statistics[0].x, sizeof(struct icmpv6_mib)/sizeof(unsigned long) }
+#define SNMP6_GEN(x) { #x , (void **)icmpv6_statistics, offsetof(struct icmpv6_mib, x) }
 	SNMP6_GEN(Icmp6InMsgs),
 	SNMP6_GEN(Icmp6InErrors),
 	SNMP6_GEN(Icmp6InDestUnreachs),
@@ -127,7 +127,7 @@ static struct snmp6_item
 	SNMP6_GEN(Icmp6OutGroupMembResponses),
 	SNMP6_GEN(Icmp6OutGroupMembReductions),
 #undef SNMP6_GEN
-#define SNMP6_GEN(x) { "Udp6" #x , &udp_stats_in6[0].Udp##x, sizeof(struct udp_mib)/sizeof(unsigned long) }
+#define SNMP6_GEN(x) { "Udp6" #x , (void **)udp_stats_in6, offsetof(struct udp_mib, Udp##x) }
 	SNMP6_GEN(InDatagrams),
 	SNMP6_GEN(NoPorts),
 	SNMP6_GEN(InErrors),
@@ -135,17 +135,23 @@ static struct snmp6_item
 #undef SNMP6_GEN
 };
 
-static unsigned long fold_field(unsigned long *ptr, int size)
+static unsigned long
+fold_field(void *mib[], int offt)
 {
-	unsigned long res = 0;
-	int i;
-
-	for (i=0; i<NR_CPUS; i++) {
-		res += ptr[2*i*size];
-		res += ptr[(2*i+1)*size];
-	}
-
-	return res;
+        unsigned long res = 0;
+        int i;
+ 
+        for (i = 0; i < NR_CPUS; i++) {
+                if (!cpu_possible(i))
+                        continue;
+                res +=
+                    *((unsigned long *) (((void *)per_cpu_ptr(mib[0], i)) +
+                                         offt));
+                res +=
+                    *((unsigned long *) (((void *)per_cpu_ptr(mib[1], i)) +
+                                         offt));
+        }
+        return res;
 }
 
 int afinet6_get_snmp(char *buffer, char **start, off_t offset, int length)
@@ -155,7 +161,7 @@ int afinet6_get_snmp(char *buffer, char **start, off_t offset, int length)
 
 	for (i=0; i<sizeof(snmp6_list)/sizeof(snmp6_list[0]); i++)
 		len += sprintf(buffer+len, "%-32s\t%ld\n", snmp6_list[i].name,
-			       fold_field(snmp6_list[i].ptr, snmp6_list[i].mibsize));
+			       fold_field(snmp6_list[i].mib, snmp6_list[i].offset));
 
 	len -= offset;
 

@@ -113,7 +113,7 @@ struct icmp_bxm {
 /*
  *	Statistics
  */
-struct icmp_mib icmp_statistics[NR_CPUS * 2];
+DEFINE_SNMP_STAT(struct icmp_mib, icmp_statistics);
 
 /* An array of errno for error messages from dest unreach. */
 /* RFC 1122: 3.2.2.1 States that NET_UNREACH, HOS_UNREACH and SR_FAIELD MUST be considered 'transient errs'. */
@@ -213,12 +213,11 @@ int sysctl_icmp_ratemask = 0x1818;
  *	ICMP control array. This specifies what to do with each ICMP.
  */
 
-struct icmp_control
-{
-	unsigned long *output;		/* Address to increment on output */
-	unsigned long *input;		/* Address to increment on input */
+struct icmp_control {
+	int output_off;		/* Field offset for increment on output */
+	int input_off;		/* Field offset for increment on input */
 	void (*handler)(struct sk_buff *skb);
-	short	error;		/* This ICMP is classed as an error message */
+	short   error;		/* This ICMP is classed as an error message */
 };
 
 static struct icmp_control icmp_pointers[NR_ICMP_TYPES+1];
@@ -343,10 +342,7 @@ out:
 static void icmp_out_count(int type)
 {
 	if (type <= NR_ICMP_TYPES) {
-		(icmp_pointers[type].output)[(smp_processor_id() * 2 +
-					      !in_softirq()) *
-					     sizeof(struct icmp_mib) /
-					     sizeof(unsigned long)]++;
+		ICMP_INC_STATS_FIELD(icmp_pointers[type].output_off);
 		ICMP_INC_STATS(IcmpOutMsgs);
 	}
 }
@@ -1005,9 +1001,7 @@ int icmp_rcv(struct sk_buff *skb)
   		}
 	}
 
-	icmp_pointers[icmph->type].input[smp_processor_id() * 2 *
-					 sizeof(struct icmp_mib) /
-					 sizeof(unsigned long)]++;
+	ICMP_INC_STATS_BH_FIELD(icmp_pointers[icmph->type].input_off);
 	(icmp_pointers[icmph->type].handler)(skb);
 
 drop:
@@ -1024,122 +1018,122 @@ error:
 static struct icmp_control icmp_pointers[NR_ICMP_TYPES + 1] = {
 	/* ECHO REPLY (0) */
 	[0] = {
-		.output =	 &icmp_statistics[0].IcmpOutEchoReps,
-		.input = &icmp_statistics[0].IcmpInEchoReps,
+		.output_off = offsetof(struct icmp_mib, IcmpOutEchoReps),
+		.input_off = offsetof(struct icmp_mib, IcmpInEchoReps),
 		.handler = icmp_discard,
 	},
 	[1] = {
-		.output =	 &icmp_statistics[0].dummy,
-		.input = &icmp_statistics[0].IcmpInErrors,
+		.output_off = offsetof(struct icmp_mib, dummy),
+		.input_off = offsetof(struct icmp_mib,IcmpInErrors),
 		.handler = icmp_discard,
 		.error = 1,
 	},
 	[2] = {
-		.output =	 &icmp_statistics[0].dummy,
-		.input = &icmp_statistics[0].IcmpInErrors,
+		.output_off = offsetof(struct icmp_mib, dummy),
+		.input_off = offsetof(struct icmp_mib,IcmpInErrors),
 		.handler = icmp_discard,
 		.error = 1,
 	},
 	/* DEST UNREACH (3) */
 	[3] = {
-		.output =	 &icmp_statistics[0].IcmpOutDestUnreachs,
-		.input = &icmp_statistics[0].IcmpInDestUnreachs,
+		.output_off = offsetof(struct icmp_mib, IcmpOutDestUnreachs),
+		.input_off = offsetof(struct icmp_mib, IcmpInDestUnreachs),
 		.handler = icmp_unreach,
 		.error = 1,
 	},
 	/* SOURCE QUENCH (4) */
 	[4] = {
-		.output =	 &icmp_statistics[0].IcmpOutSrcQuenchs,
-		.input = &icmp_statistics[0].IcmpInSrcQuenchs,
+		.output_off = offsetof(struct icmp_mib, IcmpOutSrcQuenchs),
+		.input_off = offsetof(struct icmp_mib, IcmpInSrcQuenchs),
 		icmp_unreach,
 		.error = 1,
 	},
 	/* REDIRECT (5) */
 	[5] = {
-		.output =	 &icmp_statistics[0].IcmpOutRedirects,
-		.input = &icmp_statistics[0].IcmpInRedirects,
+		.output_off = offsetof(struct icmp_mib, IcmpOutRedirects),
+		.input_off = offsetof(struct icmp_mib, IcmpInRedirects),
 		.handler = icmp_redirect,
 		.error = 1,
 	},
 	[6] = {
-		.output =	 &icmp_statistics[0].dummy,
-		.input = &icmp_statistics[0].IcmpInErrors,
+		.output_off = offsetof(struct icmp_mib, dummy),
+		.input_off = offsetof(struct icmp_mib, IcmpInErrors),
 		.handler = icmp_discard,
 		.error = 1,
 	},
 	[7] = {
-		.output =	 &icmp_statistics[0].dummy,
-		.input = &icmp_statistics[0].IcmpInErrors,
+		.output_off = offsetof(struct icmp_mib, dummy),
+		.input_off = offsetof(struct icmp_mib, IcmpInErrors),
 		.handler = icmp_discard,
 		.error = 1,
 	},
 	/* ECHO (8) */
 	[8] = {
-		.output =	 &icmp_statistics[0].IcmpOutEchos,
-		.input = &icmp_statistics[0].IcmpInEchos,
+		.output_off = offsetof(struct icmp_mib, IcmpOutEchos),
+		.input_off = offsetof(struct icmp_mib, IcmpInEchos),
 		.handler = icmp_echo,
 		.error = 0,
 	},
 	[9] = {
-		.output =	 &icmp_statistics[0].dummy,
-		.input = &icmp_statistics[0].IcmpInErrors,
+		.output_off = offsetof(struct icmp_mib, dummy),
+		.input_off = offsetof(struct icmp_mib, IcmpInErrors),
 		.handler = icmp_discard,
 		.error = 1,
 	},
 	[10] = {
-		.output =	 &icmp_statistics[0].dummy,
-		.input = &icmp_statistics[0].IcmpInErrors,
+		.output_off = offsetof(struct icmp_mib, dummy),
+		.input_off = offsetof(struct icmp_mib, IcmpInErrors),
 		.handler = icmp_discard,
 		.error = 1,
 	},
 	/* TIME EXCEEDED (11) */
 	[11] = {
-		.output =	 &icmp_statistics[0].IcmpOutTimeExcds,
-		.input = &icmp_statistics[0].IcmpInTimeExcds,
+		.output_off = offsetof(struct icmp_mib, IcmpOutTimeExcds),
+		.input_off = offsetof(struct icmp_mib,IcmpInTimeExcds),
 		.handler = icmp_unreach,
 		.error = 1,
 	},
 	/* PARAMETER PROBLEM (12) */
 	[12] = {
-		.output =	 &icmp_statistics[0].IcmpOutParmProbs,
-		.input = &icmp_statistics[0].IcmpInParmProbs,
+		.output_off = offsetof(struct icmp_mib, IcmpOutParmProbs),
+		.input_off = offsetof(struct icmp_mib, IcmpInParmProbs),
 		.handler = icmp_unreach,
 		.error = 1,
 	},
 	/* TIMESTAMP (13) */
 	[13] = {
-		.output =	 &icmp_statistics[0].IcmpOutTimestamps,
-		.input = &icmp_statistics[0].IcmpInTimestamps,
+		.output_off = offsetof(struct icmp_mib, IcmpOutTimestamps),
+		.input_off = offsetof(struct icmp_mib, IcmpInTimestamps),
 		.handler = icmp_timestamp,
 	},
 	/* TIMESTAMP REPLY (14) */
 	[14] = {
-		.output =	 &icmp_statistics[0].IcmpOutTimestampReps,
-		.input = &icmp_statistics[0].IcmpInTimestampReps,
+		.output_off = offsetof(struct icmp_mib, IcmpOutTimestampReps),
+		.input_off = offsetof(struct icmp_mib, IcmpInTimestampReps),
 		.handler = icmp_discard,
 	},
 	/* INFO (15) */
 	[15] = {
-		.output =	 &icmp_statistics[0].dummy,
-		.input = &icmp_statistics[0].dummy,
+		.output_off = offsetof(struct icmp_mib, dummy),
+		.input_off = offsetof(struct icmp_mib, dummy),
 		.handler = icmp_discard,
 	},
 	/* INFO REPLY (16) */
  	[16] = {
-		.output =	 &icmp_statistics[0].dummy,
-		.input = &icmp_statistics[0].dummy,
+		.output_off = offsetof(struct icmp_mib, dummy),
+		.input_off = offsetof(struct icmp_mib, dummy),
 		.handler = icmp_discard,
 	},
 	/* ADDR MASK (17) */
 	[17] = {
-		.output =	 &icmp_statistics[0].IcmpOutAddrMasks,
-		.input = &icmp_statistics[0].IcmpInAddrMasks,
+		.output_off = offsetof(struct icmp_mib, IcmpOutAddrMasks),
+		.input_off = offsetof(struct icmp_mib, IcmpInAddrMasks),
 		.handler = icmp_address,
 	},
 	/* ADDR MASK REPLY (18) */
 	[18] = {
-		.output =	 &icmp_statistics[0].IcmpOutAddrMaskReps,
-		.input = &icmp_statistics[0].IcmpInAddrMaskReps,
+		.output_off = offsetof(struct icmp_mib, IcmpOutAddrMaskReps),
+		.input_off = offsetof(struct icmp_mib, IcmpInAddrMaskReps),
 		.handler = icmp_address_reply,
 	}
 };
