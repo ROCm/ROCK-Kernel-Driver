@@ -155,9 +155,20 @@ int is_aligned_hugepage_range(unsigned long addr, unsigned long len)
 	return 0;
 }
 
-static void do_slbia(void *unused)
+static void flush_segments(void *parm)
 {
-	asm volatile ("isync; slbia; isync":::"memory");
+	u16 segs = (unsigned long) parm;
+	unsigned long i;
+
+	asm volatile("isync" : : : "memory");
+
+	for (i = 0; i < 16; i++) {
+		if (! (segs & (1U << i)))
+			continue;
+		asm volatile("slbie %0" : : "r" (i << SID_SHIFT));
+	}
+
+	asm volatile("isync" : : : "memory");
 }
 
 static int prepare_low_seg_for_htlb(struct mm_struct *mm, unsigned long seg)
@@ -226,10 +237,10 @@ static int open_low_hpage_segs(struct mm_struct *mm, u16 newsegs)
 				return -EBUSY;
 
 	mm->context.htlb_segs |= newsegs;
-	/* the context change must make it to memory before the slbia,
+	/* the context change must make it to memory before the flush,
 	 * so that further SLB misses do the right thing. */
 	mb();
-	on_each_cpu(do_slbia, NULL, 0, 1);
+	on_each_cpu(flush_segments, (void *)(unsigned long)newsegs, 0, 1);
 
 	return 0;
 }
