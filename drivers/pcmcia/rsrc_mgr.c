@@ -337,15 +337,69 @@ static void do_io_probe(ioaddr_t base, ioaddr_t num)
 
 /*======================================================================
 
+    This is tricky... when we set up CIS memory, we try to validate
+    the memory window space allocations.
+    
+======================================================================*/
+
+/* Validation function for cards with a valid CIS */
+static int cis_readable(socket_info_t *s, u_long base)
+{
+    cisinfo_t info1, info2;
+    int ret;
+    s->cis_mem.sys_start = base;
+    s->cis_mem.sys_stop = base+s->cap.map_size-1;
+    s->cis_virt = ioremap(base, s->cap.map_size);
+    ret = pcmcia_validate_cis(s->clients, &info1);
+    /* invalidate mapping and CIS cache */
+    iounmap(s->cis_virt);
+    s->cis_used = 0;
+    if ((ret != 0) || (info1.Chains == 0))
+	return 0;
+    s->cis_mem.sys_start = base+s->cap.map_size;
+    s->cis_mem.sys_stop = base+2*s->cap.map_size-1;
+    s->cis_virt = ioremap(base+s->cap.map_size, s->cap.map_size);
+    ret = pcmcia_validate_cis(s->clients, &info2);
+    iounmap(s->cis_virt);
+    s->cis_used = 0;
+    return ((ret == 0) && (info1.Chains == info2.Chains));
+}
+
+/* Validation function for simple memory cards */
+static int checksum(socket_info_t *s, u_long base)
+{
+    int i, a, b, d;
+    s->cis_mem.sys_start = base;
+    s->cis_mem.sys_stop = base+s->cap.map_size-1;
+    s->cis_virt = ioremap(base, s->cap.map_size);
+    s->cis_mem.card_start = 0;
+    s->cis_mem.flags = MAP_ACTIVE;
+    s->ss_entry->set_mem_map(s->sock, &s->cis_mem);
+    /* Don't bother checking every word... */
+    a = 0; b = -1;
+    for (i = 0; i < s->cap.map_size; i += 44) {
+	d = readl(s->cis_virt+i);
+	a += d; b &= d;
+    }
+    iounmap(s->cis_virt);
+    return (b == -1) ? -1 : (a>>1);
+}
+
+static int checksum_match(socket_info_t *s, u_long base)
+{
+    int a = checksum(s, base), b = checksum(s, base+s->cap.map_size);
+    return ((a == b) && (a >= 0));
+}
+
+/*======================================================================
+
     The memory probe.  If the memory list includes a 64K-aligned block
     below 1MB, we probe in 64K chunks, and as soon as we accumulate at
     least mem_limit free space, we quit.
     
 ======================================================================*/
 
-static int do_mem_probe(u_long base, u_long num,
-			int (*is_valid)(u_long), int (*do_cksum)(u_long),
-			socket_info_t *s)
+static int do_mem_probe(u_long base, u_long num, socket_info_t *s)
 {
     u_long i, j, bad, fail, step;
 
@@ -353,18 +407,21 @@ static int do_mem_probe(u_long base, u_long num,
 	   base, base+num-1);
     bad = fail = 0;
     step = (num < 0x20000) ? 0x2000 : ((num>>4) & ~0x1fff);
+    /* cis_readable wants to map 2x map_size */
+    if (step < 2 * s->cap.map_size)
+	step = 2 * s->cap.map_size;
     for (i = j = base; i < base+num; i = j + step) {
 	if (!fail) {	
 	    for (j = i; j < base+num; j += step)
 		if ((check_mem_resource(j, step, s->cap.cb_dev) == 0) &&
-		    is_valid(j))
+		    cis_readable(s, j))
 		    break;
 	    fail = ((i == base) && (j == base+num));
 	}
 	if (fail) {
 	    for (j = i; j < base+num; j += 2*step)
 		if ((check_mem_resource(j, 2*step, s->cap.cb_dev) == 0) &&
-		    do_cksum(j) && do_cksum(j+step))
+		    checksum_match(s, j) && checksum_match(s, j + step))
 		    break;
 	}
 	if (i != j) {
@@ -380,14 +437,12 @@ static int do_mem_probe(u_long base, u_long num,
 
 #ifdef CONFIG_PCMCIA_PROBE
 
-static u_long inv_probe(int (*is_valid)(u_long),
-			int (*do_cksum)(u_long),
-			resource_map_t *m, socket_info_t *s)
+static u_long inv_probe(resource_map_t *m, socket_info_t *s)
 {
     u_long ok;
     if (m == &mem_db)
 	return 0;
-    ok = inv_probe(is_valid, do_cksum, m->next, s);
+    ok = inv_probe(m->next, s);
     if (ok) {
 	if (m->base >= 0x100000)
 	    sub_interval(&mem_db, m->base, m->num);
@@ -395,16 +450,16 @@ static u_long inv_probe(int (*is_valid)(u_long),
     }
     if (m->base < 0x100000)
 	return 0;
-    return do_mem_probe(m->base, m->num, is_valid, do_cksum, s);
+    return do_mem_probe(m->base, m->num, s);
 }
 
-void validate_mem(int (*is_valid)(u_long), int (*do_cksum)(u_long),
-		  int force_low, socket_info_t *s)
+void validate_mem(socket_info_t *s)
 {
     resource_map_t *m, *n;
     static u_char order[] = { 0xd0, 0xe0, 0xc0, 0xf0 };
     static int hi = 0, lo = 0;
     u_long b, i, ok = 0;
+    int force_low = !(s->cap.features & SS_CAP_PAGE_REGS);
 
     if (!probe_mem)
 	return;
@@ -412,7 +467,7 @@ void validate_mem(int (*is_valid)(u_long), int (*do_cksum)(u_long),
     down(&rsrc_sem);
     /* We do up to four passes through the list */
     if (!force_low) {
-	if (hi++ || (inv_probe(is_valid, do_cksum, mem_db.next, s) > 0))
+	if (hi++ || (inv_probe(mem_db.next, s) > 0))
 	    goto out;
 	printk(KERN_NOTICE "cs: warning: no high memory space "
 	       "available!\n");
@@ -424,7 +479,7 @@ void validate_mem(int (*is_valid)(u_long), int (*do_cksum)(u_long),
 	/* Only probe < 1 MB */
 	if (m->base >= 0x100000) continue;
 	if ((m->base | m->num) & 0xffff) {
-	    ok += do_mem_probe(m->base, m->num, is_valid, do_cksum, s);
+	    ok += do_mem_probe(m->base, m->num, s);
 	    continue;
 	}
 	/* Special probe for 64K-aligned block */
@@ -434,7 +489,7 @@ void validate_mem(int (*is_valid)(u_long), int (*do_cksum)(u_long),
 		if (ok >= mem_limit)
 		    sub_interval(&mem_db, b, 0x10000);
 		else
-		    ok += do_mem_probe(b, 0x10000, is_valid, do_cksum, s);
+		    ok += do_mem_probe(b, 0x10000, s);
 	    }
 	}
     }
@@ -444,8 +499,7 @@ void validate_mem(int (*is_valid)(u_long), int (*do_cksum)(u_long),
 
 #else /* CONFIG_PCMCIA_PROBE */
 
-void validate_mem(int (*is_valid)(u_long), int (*do_cksum)(u_long),
-		  int force_low, socket_info_t *s)
+void validate_mem(socket_info_t *s)
 {
     resource_map_t *m;
     static int done = 0;
@@ -453,7 +507,7 @@ void validate_mem(int (*is_valid)(u_long), int (*do_cksum)(u_long),
     if (probe_mem && done++ == 0) {
 	down(&rsrc_sem);
 	for (m = mem_db.next; m != &mem_db; m = m->next)
-	    if (do_mem_probe(m->base, m->num, is_valid, do_cksum, s))
+	    if (do_mem_probe(m->base, m->num, s))
 		break;
 	up(&rsrc_sem);
     }
