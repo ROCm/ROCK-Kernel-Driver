@@ -98,7 +98,7 @@ struct snd_card_als100 {
 	struct pnp_dev *devopl;
 };
 
-static struct pnp_card_id snd_als100_pnpids[] __devinitdata = {
+static struct pnp_card_device_id snd_als100_pnpids[] __devinitdata = {
 	/* ALS100 - PRO16PNP */
 	{ .id = "ALS0001", .devs = { { "@@@0001" }, { "@X@0001" }, { "@H@0001" }, } },
 	/* ALS110 - MF1000 - Digimate 3D Sound */
@@ -118,10 +118,10 @@ MODULE_DEVICE_TABLE(pnp_card, snd_als100_pnpids);
 
 static int __devinit snd_card_als100_isapnp(int dev, struct snd_card_als100 *acard,
 					    struct pnp_card_link *card,
-					    const struct pnp_card_id *id)
+					    const struct pnp_card_device_id *id)
 {
 	struct pnp_dev *pdev;
-	struct pnp_resource_table * cfg = kmalloc(GFP_ATOMIC, sizeof(struct pnp_resource_table));
+	struct pnp_resource_table *cfg = kmalloc(sizeof(*cfg), GFP_KERNEL);
 	int err;
 	if (!cfg)
 		return -ENOMEM;
@@ -151,6 +151,7 @@ static int __devinit snd_card_als100_isapnp(int dev, struct snd_card_als100 *aca
 	err = pnp_activate_dev(pdev);
 	if (err < 0) {
 		printk(KERN_ERR PFX "AUDIO pnp configure failure\n");
+		kfree(cfg);
 		return err;
 	}
 	port[dev] = pnp_port_start(pdev, 0);
@@ -209,7 +210,7 @@ static int __devinit snd_card_als100_isapnp(int dev, struct snd_card_als100 *aca
 
 static int __init snd_card_als100_probe(int dev,
 					struct pnp_card_link *pcard,
-					const struct pnp_card_id *pid)
+					const struct pnp_card_device_id *pid)
 {
 	int error;
 	sb_t *chip;
@@ -287,7 +288,7 @@ static int __init snd_card_als100_probe(int dev,
 }
 
 static int __devinit snd_als100_pnp_detect(struct pnp_card_link *card,
-					   const struct pnp_card_id *id)
+					   const struct pnp_card_device_id *id)
 {
 	static int dev;
 	int res;

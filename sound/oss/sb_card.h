@@ -23,7 +23,7 @@ struct sb_card_config {
  */
 
 /* Card PnP ID Table */
-static struct pnp_card_id sb_pnp_card_table[] = {
+static struct pnp_card_device_id sb_pnp_card_table[] = {
 	/* Sound Blaster 16 */
 	{.id = "CTL0024", .driver_data = 0, devs : { {.id="CTL0031"}, } },
 	/* Sound Blaster 16 */

@@ -506,8 +506,8 @@ void do_tty_hangup(void *data)
 				p->tty = NULL;
 			if (!p->leader)
 				continue;
-			send_sig(SIGHUP, p, 1);
-			send_sig(SIGCONT, p, 1);
+			send_group_sig_info(SIGHUP, SEND_SIG_PRIV, p);
+			send_group_sig_info(SIGCONT, SEND_SIG_PRIV, p);
 			if (tty->pgrp > 0)
 				p->tty_old_pgrp = tty->pgrp;
 		}

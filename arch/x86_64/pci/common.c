@@ -17,6 +17,7 @@
 #include <asm/segment.h>
 #include <asm/io.h>
 #include <asm/smp.h>
+#include <asm/cache.h>
 
 #include "pci.h"
 
@@ -94,6 +95,8 @@ static void __devinit pcibios_fixup_ghosts(struct pci_bus *b)
 	}
 }
 
+struct pbus_set_ranges_data;
+
 void __devinit
 pcibios_fixup_pbus_ranges (struct pci_bus *bus, struct pbus_set_ranges_data *ranges)
 {
@@ -129,6 +132,8 @@ struct pci_bus * __devinit pcibios_scan_root(int busnum)
 	return pci_scan_bus(busnum, pci_root_ops, NULL);
 }
 
+extern u8 pci_cache_line_size;
+
 static int __init pcibios_init(void)
 {
 	if (!pci_root_ops) {
@@ -136,6 +141,8 @@ static int __init pcibios_init(void)
 		return 0;
 	}
 
+	pci_cache_line_size = boot_cpu_data.x86_clflush_size >> 2;
+	
 	pcibios_resource_survey();
 
 #ifdef CONFIG_GART_IOMMU

@@ -44,9 +44,7 @@
 #include <asm/pgalloc.h>
 #include <asm/io_apic.h>
 #include <asm/proto.h>
-#include <asm/desc.h>
-#include <asm/system.h>
-#include <asm/segment.h>
+#include <asm/tlbflush.h>
 
 extern int acpi_disabled;
 
@@ -300,7 +298,7 @@ acpi_boot_init (void)
 
 	/*
 	 * The default interrupt routing model is PIC (8259).  This gets
-	 * overridden if IOAPICs are enumerated (below).
+	 * overriden if IOAPICs are enumerated (below).
 	 */
 	acpi_irq_model = ACPI_IRQ_MODEL_PIC;
 
@@ -317,6 +315,7 @@ acpi_boot_init (void)
 		return result;
 	} else
                printk(KERN_NOTICE PREFIX "BIOS passes blacklist\n");
+
 
 	extern int disable_apic;
 	if (disable_apic)
@@ -348,7 +347,7 @@ acpi_boot_init (void)
 	 * Local APIC
 	 * ----------
 	 * Note that the LAPIC address is obtained from the MADT (32-bit value)
-	 * and (optionally) overridden by a LAPIC_ADDR_OVR entry (64-bit value).
+	 * and (optionally) overriden by a LAPIC_ADDR_OVR entry (64-bit value).
 	 */
 
 	result = acpi_table_parse_madt(ACPI_MADT_LAPIC_ADDR_OVR, acpi_parse_lapic_addr_ovr);
@@ -438,75 +437,3 @@ acpi_boot_init (void)
 
 #endif /*CONFIG_ACPI_BOOT*/
 
-
-/* --------------------------------------------------------------------------
-                              Low-Level Sleep Support
-   -------------------------------------------------------------------------- */
-
-#ifdef CONFIG_ACPI_SLEEP
-
-extern void acpi_prepare_wakeup(void);
-extern unsigned char acpi_wakeup[], acpi_wakeup_end[], s3_prot16[];
-
-/* address in low memory of the wakeup routine. */
-unsigned long acpi_wakeup_address;
-
-/**
- * acpi_save_state_mem - save kernel state
- */
-int acpi_save_state_mem (void)
-{
-	if (!acpi_wakeup_address)
-		return -1;
-
-	memcpy((void*)acpi_wakeup_address, acpi_wakeup, acpi_wakeup_end - acpi_wakeup); 
-	return 0;
-}
-
-/**
- * acpi_save_state_disk - save kernel state to disk
- *
- * Assume preemption/interrupts are already turned off and that we're running
- * on the BP (note this doesn't imply SMP is handled correctly)
- */
-int acpi_save_state_disk (void)
-{
-	unsigned long pbase = read_cr3() & PAGE_MASK; 
-	if (pbase >= 0xffffffffUL) {
-		printk(KERN_ERR "ACPI: High page table. Suspend disabled.\n");
-	return 1;
-	} 
-	set_seg_base(smp_processor_id(), GDT_ENTRY_KERNELCS16, s3_prot16); 
-	swap_low_mappings();
-	acpi_prepare_wakeup();
-	return 0;
-}
-
-/*
- * acpi_restore_state
- */
-void acpi_restore_state_mem (void)
-{
-	swap_low_mappings();
-}
-
-/**
- * acpi_reserve_bootmem - do _very_ early ACPI initialisation
- *
- * We allocate a page in 1MB low memory for the real-mode wakeup
- * routine for when we come back from a sleep state. The
- * runtime allocator allows specification of <16M pages, but not
- * <1M pages.
- */
-void __init acpi_reserve_bootmem(void)
-{
-	acpi_wakeup_address = (unsigned long)alloc_bootmem_low(PAGE_SIZE);
-	if (!acpi_wakeup_address) { 
-		printk(KERN_ERR "ACPI: Cannot allocate lowmem. S3 disabled.\n");
-		return;
-	} 
-}
-
-#endif /*CONFIG_ACPI_SLEEP*/
-
-void acpi_pci_link_exit(void) {}

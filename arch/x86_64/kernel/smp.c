@@ -160,7 +160,7 @@ static inline void leave_mm (unsigned long cpu)
  * 1a1) clear_bit(cpu, &old_mm->cpu_vm_mask);
  * 	Stop ipi delivery for the old mm. This is not synchronized with
  * 	the other cpus, but smp_invalidate_interrupt ignore flush ipis
- * 	for the wrong mm, and in the worst case we perform a superflous
+ * 	for the wrong mm, and in the worst case we perform a superfluous
  * 	tlb flush.
  * 1a2) set cpu mmu_state to TLBSTATE_OK
  * 	Now the smp_invalidate_interrupt won't call leave_mm if cpu0
@@ -250,7 +250,7 @@ static void flush_tlb_others (unsigned long cpumask, struct mm_struct *mm,
 		BUG();
 
 	/*
-	 * i'm not happy about this global shared spinlock in the
+	 * I'm not happy about this global shared spinlock in the
 	 * MM hot path, but we'll see how contended it is.
 	 * Temporarily this turns IRQs off, so that lockups are
 	 * detected by the NMI watchdog.

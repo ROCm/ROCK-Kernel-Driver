@@ -4,8 +4,6 @@
 #include <linux/smp.h>
 
 #include <asm/smp.h>
-#include <asm/apic.h>
-#include <asm/mpspec.h>
 #include <asm/io.h>
 
 #include "cobalt.h"
@@ -19,21 +17,6 @@ int smp_found_config;
  * MP-table.
  */
 int apic_version [MAX_APICS];
-int mp_bus_id_to_type [MAX_MP_BUSSES];
-int mp_bus_id_to_node [MAX_MP_BUSSES];
-int mp_bus_id_to_pci_bus [MAX_MP_BUSSES] = { [0 ... MAX_MP_BUSSES-1] = -1 };
-int mp_current_pci_id;
-
-/* I/O APIC entries */
-struct mpc_config_ioapic mp_ioapics[MAX_IO_APICS];
-
-/* # of MP IRQ source entries */
-struct mpc_config_intsrc mp_irqs[MAX_IRQ_SOURCES];
-
-/* MP IRQ source entries */
-int mp_irq_entries;
-
-int nr_ioapics;
 
 int pic_mode;
 unsigned long mp_lapic_addr;
@@ -42,13 +25,9 @@ unsigned long mp_lapic_addr;
 unsigned int boot_cpu_physical_apicid = -1U;
 unsigned int boot_cpu_logical_apicid = -1U;
 
-/* Internal processor count */
-static unsigned int num_processors;
-
 /* Bitmask of physically existing CPUs */
 unsigned long phys_cpu_present_map;
 
-u8 raw_phys_apicid[NR_CPUS] = { [0 ... NR_CPUS - 1] = BAD_APICID };
 
 /*
  * The Visual Workstation is Intel MP compliant in the hardware
@@ -76,12 +55,9 @@ void __init MP_processor_info (struct mpc_config_processor *m)
 		boot_cpu_logical_apicid = logical_apicid;
 	}
 
-	num_processors++;
-
 	if (m->mpc_apicid > MAX_APICS) {
 		printk(KERN_ERR "Processor #%d INVALID. (Max ID: %d).\n",
 			m->mpc_apicid, MAX_APICS);
-		--num_processors;
 		return;
 	}
 	ver = m->mpc_apicver;
@@ -97,7 +73,6 @@ void __init MP_processor_info (struct mpc_config_processor *m)
 		ver = 0x10;
 	}
 	apic_version[m->mpc_apicid] = ver;
-	raw_phys_apicid[num_processors - 1] = m->mpc_apicid;
 }
 
 void __init find_smp_config(void)

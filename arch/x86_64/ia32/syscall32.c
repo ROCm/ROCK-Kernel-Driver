@@ -27,13 +27,13 @@ asm("	.code32\n"
 
     "sig32_rt_tramp:\n"
     "	movl $"  __stringify(__NR_ia32_rt_sigreturn) ",%eax\n"
-    "   int $0x80\n"
+    "   syscall\n"
     "sig32_rt_tramp_end:\n"
 
     "sig32_tramp:\n"
     "	popl %eax\n"
     "	movl $"  __stringify(__NR_ia32_sigreturn) ",%eax\n"
-    "	int $0x80\n"
+    "	syscall\n"
     "sig32_tramp_end:\n"
     "	.code64\n"); 
 
@@ -44,7 +44,7 @@ extern unsigned char sig32_tramp[], sig32_tramp_end[];
 char *syscall32_page; 
 
 /* RED-PEN: This knows too much about high level VM */ 
-/* Alternative would be to generate a vma with appropiate backing options
+/* Alternative would be to generate a vma with appropriate backing options
    and let it be handled by generic VM */ 
 int map_syscall32(struct mm_struct *mm, unsigned long address) 
 { 

@@ -620,7 +620,7 @@ config NET_SCHED
 	  Differentiated Services (diffserv) and Resource Reservation Protocol
 	  (RSVP) on your Linux router if you also say Y to "QoS support",
 	  "Packet classifier API" and to some classifiers below. Documentation
-	  and software is at <http://icawww1.epfl.ch/linux-diffserv/>.
+	  and software is at <http://diffserv.sourceforge.net/>.
 
 	  If you say Y here and to "/proc file system" below, you will be able
 	  to read status information about packet schedulers from the file
