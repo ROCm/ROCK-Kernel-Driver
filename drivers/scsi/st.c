@@ -33,7 +33,7 @@ static char *verstr = "20021015";
 #include <linux/ioctl.h>
 #include <linux/fcntl.h>
 #include <linux/spinlock.h>
-#include <linux/smp_lock.h>
+#include <linux/blk.h>
 #include <asm/uaccess.h>
 #include <asm/dma.h>
 #include <asm/system.h>
@@ -54,9 +54,6 @@ static char *verstr = "20021015";
 #define DEBC(a)
 #endif
 
-#define MAJOR_NR SCSI_TAPE_MAJOR
-#define DEVICE_NR(device) (minor(device) & 0x7f)
-#include <linux/blk.h>
 
 #include "scsi.h"
 #include "hosts.h"
