@@ -933,8 +933,8 @@ static inline const struct pci_device_id *pci_match_device(const struct pci_devi
 /* Power management related routines */
 static inline int pci_save_state(struct pci_dev *dev) { return 0; }
 static inline int pci_restore_state(struct pci_dev *dev) { return 0; }
-static inline int pci_set_power_state(struct pci_dev *dev, int state) { return 0; }
-static inline int pci_enable_wake(struct pci_dev *dev, u32 state, int enable) { return 0; }
+static inline int pci_set_power_state(struct pci_dev *dev, pci_power_t state) { return 0; }
+static inline int pci_enable_wake(struct pci_dev *dev, pci_power_t state, int enable) { return 0; }
 
 #define	isa_bridge	((struct pci_dev *)NULL)
 
