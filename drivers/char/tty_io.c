@@ -2336,9 +2336,6 @@ void __init tty_init(void)
 	rs_8xx_init();
 #endif /* CONFIG_8xx */
 	pty_init();
-#ifdef CONFIG_MOXA_SMARTIO
-	mxser_init();
-#endif	
 #ifdef CONFIG_MOXA_INTELLIO
 	moxa_init();
 #endif	
