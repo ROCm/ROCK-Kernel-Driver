@@ -54,8 +54,6 @@ cycles_t         cacheflush_time=0;
 int              smp_threads_ready=0;      /* Set when the idlers are all forked. */
 static atomic_t  smp_commenced = ATOMIC_INIT(0);
 
-spinlock_t       kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
-
 volatile unsigned long phys_cpu_present_map;
 volatile unsigned long cpu_online_map;
 unsigned long    cache_decay_ticks = 0;
@@ -634,7 +632,6 @@ int setup_profiling_timer(unsigned int multiplier)
 }
 
 EXPORT_SYMBOL(lowcore_ptr);
-EXPORT_SYMBOL(kernel_flag);
 EXPORT_SYMBOL(smp_ctl_set_bit);
 EXPORT_SYMBOL(smp_ctl_clear_bit);
 EXPORT_SYMBOL(smp_num_cpus);

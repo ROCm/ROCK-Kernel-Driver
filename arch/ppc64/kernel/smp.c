@@ -51,7 +51,6 @@
 #include <asm/machdep.h>
 
 int smp_threads_ready = 0;
-spinlock_t kernel_flag __cacheline_aligned = SPIN_LOCK_UNLOCKED;
 unsigned long cache_decay_ticks;
 
 /* initialised so it doesnt end up in bss */

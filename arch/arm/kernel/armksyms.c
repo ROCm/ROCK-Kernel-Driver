@@ -273,7 +273,3 @@ EXPORT_SYMBOL_NOVERS(__down_trylock_failed);
 EXPORT_SYMBOL_NOVERS(__up_wakeup);
 
 EXPORT_SYMBOL(get_wchan);
-
-#ifdef CONFIG_PREEMPT
-EXPORT_SYMBOL(kernel_flag);
-#endif

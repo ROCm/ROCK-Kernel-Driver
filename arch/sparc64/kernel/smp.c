@@ -46,9 +46,6 @@ cpuinfo_sparc cpu_data[NR_CPUS];
 /* Please don't make this stuff initdata!!!  --DaveM */
 static unsigned char boot_cpu_id;
 
-/* Kernel spinlock */
-spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
-
 atomic_t sparc64_num_cpus_online = ATOMIC_INIT(0);
 unsigned long cpu_online_map = 0;
 atomic_t sparc64_num_cpus_possible = ATOMIC_INIT(0);
