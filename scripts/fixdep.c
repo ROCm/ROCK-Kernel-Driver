@@ -238,7 +238,7 @@ void parse_config_file(char *map, size_t len)
 		if (memcmp(p, "CONFIG_", 7))
 			continue;
 		for (q = p + 7; q < map + len; q++) {
-			if (!(isalnum(*q)))
+			if (!(isalnum(*q) || *q == '_'))
 				goto found;
 		}
 		continue;
