@@ -94,7 +94,6 @@ int main(void)
 	DEFINE(PACASLBCACHE, offsetof(struct paca_struct, slb_cache));
 	DEFINE(PACASLBCACHEPTR, offsetof(struct paca_struct, slb_cache_ptr));
 	DEFINE(PACACONTEXTID, offsetof(struct paca_struct, context.id));
-	DEFINE(PACASLBR3, offsetof(struct paca_struct, slb_r3));
 #ifdef CONFIG_HUGETLB_PAGE
 	DEFINE(PACAHTLBSEGS, offsetof(struct paca_struct, context.htlb_segs));
 #endif /* CONFIG_HUGETLB_PAGE */
