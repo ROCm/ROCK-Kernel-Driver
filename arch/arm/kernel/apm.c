@@ -63,11 +63,14 @@ struct apm_user {
 	unsigned int		suser: 1;
 	unsigned int		writer: 1;
 	unsigned int		reader: 1;
-	unsigned int		suspend_wait: 1;
-	int			suspend_result;
 
-	int			suspends_pending;
-	unsigned int		suspends_read;
+	int			suspend_result;
+	unsigned int		suspend_state;
+#define SUSPEND_NONE	0		/* no suspend pending */
+#define SUSPEND_PENDING	1		/* suspend pending read */
+#define SUSPEND_READ	2		/* suspend read, pending ack */
+#define SUSPEND_ACKED	3		/* suspend acked */
+#define SUSPEND_DONE	4		/* suspend completed */
 
 	struct apm_queue	queue;
 };
@@ -141,18 +144,23 @@ static void queue_add_event(struct apm_queue *q, apm_event_t event)
 
 static void queue_event_one_user(struct apm_user *as, apm_event_t event)
 {
-	queue_add_event(&as->queue, event);
+	if (as->suser && as->writer) {
+		switch (event) {
+		case APM_SYS_SUSPEND:
+		case APM_USER_SUSPEND:
+			/*
+			 * If this user already has a suspend pending,
+			 * don't queue another one.
+			 */
+			if (as->suspend_state != SUSPEND_NONE)
+				return;
 
-	if (!as->suser || !as->writer)
-		return;
-
-	switch (event) {
-	case APM_SYS_SUSPEND:
-	case APM_USER_SUSPEND:
-		as->suspends_pending++;
-		suspends_pending++;
-		break;
+			as->suspend_state = SUSPEND_PENDING;
+			suspends_pending++;
+			break;
+		}
 	}
+	queue_add_event(&as->queue, event);
 }
 
 static void queue_event(apm_event_t event, struct apm_user *sender)
@@ -185,7 +193,7 @@ static int apm_suspend(void)
 	down_read(&user_list_lock);
 	list_for_each_entry(as, &apm_user_list, list) {
 		as->suspend_result = err;
-		as->suspend_wait = 0;
+		as->suspend_state = SUSPEND_DONE;
 	}
 	up_read(&user_list_lock);
 
@@ -215,7 +223,7 @@ static ssize_t apm_read(struct file *fp, char __user *buf, size_t count, loff_t 
 			break;
 
 		if (event == APM_SYS_SUSPEND || event == APM_USER_SUSPEND)
-			as->suspends_read++;
+			as->suspend_state = SUSPEND_READ;
 
 		buf += sizeof(event);
 		i -= sizeof(event);
@@ -256,16 +264,23 @@ apm_ioctl(struct inode * inode, struct file *filp, u_int cmd, u_long arg)
 
 	switch (cmd) {
 	case APM_IOC_SUSPEND:
-		/*
-		 * If we read a suspend command from /dev/apm_bios,
-		 * then the corresponding APM_IOC_SUSPEND ioctl is
-		 * interpreted as an acknowledge.
-		 */
-		if (as->suspends_read > 0) {
-			as->suspends_read--;
-			as->suspends_pending--;
+		as->suspend_result = -EINTR;
+
+		if (as->suspend_state == SUSPEND_READ) {
+			/*
+			 * If we read a suspend command from /dev/apm_bios,
+			 * then the corresponding APM_IOC_SUSPEND ioctl is
+			 * interpreted as an acknowledge.
+			 */
+			as->suspend_state = SUSPEND_ACKED;
 			suspends_pending--;
 		} else {
+			/*
+			 * Otherwise it is a request to suspend the system.
+			 * Queue an event for all readers, and expect an
+			 * acknowledge from all writers who haven't already
+			 * acknowledged.
+			 */
 			queue_event(APM_USER_SUSPEND, as);
 		}
 
@@ -275,14 +290,14 @@ apm_ioctl(struct inode * inode, struct file *filp, u_int cmd, u_long arg)
 		 * Last one to bed turns the lights out.
 		 */
 		if (suspends_pending > 0) {
-			as->suspend_wait = 1;
 			err = wait_event_interruptible(apm_suspend_waitqueue,
-						 as->suspend_wait == 0);
+						 as->suspend_state == SUSPEND_DONE);
 			if (err == 0)
 				err = as->suspend_result;
 		} else {			
 			err = apm_suspend();
 		}
+		as->suspend_state = SUSPEND_NONE;
 		break;
 	}
 
@@ -304,9 +319,9 @@ static int apm_release(struct inode * inode, struct file * filp)
 	 * need to balance suspends_pending, which means the
 	 * possibility of sleeping.
 	 */
-	if (as->suspends_pending > 0) {
-		suspends_pending -= as->suspends_pending;
-		if (suspends_pending <= 0)
+	if (as->suspend_state != SUSPEND_NONE) {
+		suspends_pending -= 1;
+		if (suspends_pending == 0)
 			apm_suspend();
 	}
 
