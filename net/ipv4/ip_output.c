@@ -46,6 +46,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -1317,3 +1318,13 @@ void __init ip_init(void)
 	igmp_mc_proc_init();
 #endif
 }
+
+EXPORT_SYMBOL(ip_finish_output);
+EXPORT_SYMBOL(ip_fragment);
+EXPORT_SYMBOL(ip_generic_getfrag);
+EXPORT_SYMBOL(ip_queue_xmit);
+EXPORT_SYMBOL(ip_send_check);
+
+#ifdef CONFIG_SYSCTL
+EXPORT_SYMBOL(sysctl_ip_default_ttl);
+#endif

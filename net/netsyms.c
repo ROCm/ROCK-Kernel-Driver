@@ -36,13 +36,11 @@
 #endif /* CONFIG_NET_DIVERT */
 
 #ifdef CONFIG_INET
-#include <linux/ip.h>
 #include <net/protocol.h>
 #include <net/arp.h>
 #if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
 #include <net/atmclip.h>
 #endif
-#include <net/ip.h>
 #include <net/icmp.h>
 #include <net/inet_common.h>
 #include <linux/inet.h>
@@ -65,10 +63,6 @@ extern void destroy_8023_client(struct datalink_proto *);
 
 #ifdef CONFIG_ATALK_MODULE
 #include <net/sock.h>
-#endif
-
-#ifdef CONFIG_SYSCTL
-extern int sysctl_max_syn_backlog;
 #endif
 
 /* Socket layer support routines */
@@ -132,13 +126,10 @@ EXPORT_SYMBOL(ip_options_undo);
 EXPORT_SYMBOL(arp_send);
 EXPORT_SYMBOL(arp_broken_ops);
 EXPORT_SYMBOL(__ip_select_ident);
-EXPORT_SYMBOL(ip_send_check);
-EXPORT_SYMBOL(ip_fragment);
 EXPORT_SYMBOL(in_aton);
 EXPORT_SYMBOL(ip_mc_inc_group);
 EXPORT_SYMBOL(ip_mc_dec_group);
 EXPORT_SYMBOL(ip_mc_join_group);
-EXPORT_SYMBOL(ip_finish_output);
 EXPORT_SYMBOL(inet_addr_type); 
 EXPORT_SYMBOL(ip_dev_find);
 EXPORT_SYMBOL(ip_defrag);
@@ -163,13 +154,11 @@ EXPORT_SYMBOL(flow_cache_genid);
 
 /* Socket demultiplexing. */
 
-EXPORT_SYMBOL(ip_queue_xmit);
 EXPORT_SYMBOL(memcpy_fromiovecend);
 EXPORT_SYMBOL(csum_partial_copy_fromiovecend);
 /* UDP/TCP exported functions for TCPv6 */
 EXPORT_SYMBOL(net_statistics); 
 
-EXPORT_SYMBOL(ip_generic_getfrag);
 #endif
 
 /* Used by at least ipip.c.  */
@@ -215,12 +204,6 @@ EXPORT_SYMBOL(__kill_fasync);
 
 #ifdef CONFIG_HIPPI
 EXPORT_SYMBOL(hippi_type_trans);
-#endif
-
-#ifdef CONFIG_SYSCTL
-#ifdef CONFIG_INET
-EXPORT_SYMBOL(sysctl_ip_default_ttl);
-#endif
 #endif
 
 #ifdef CONFIG_NET_SCHED
