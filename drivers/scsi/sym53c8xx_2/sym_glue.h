@@ -137,8 +137,8 @@ typedef	u_long	vm_offset_t;
 /*
  *  Insert a delay in micro-seconds and milli-seconds.
  */
-void sym_udelay(int us);
-void sym_mdelay(int ms);
+#define sym_udelay(us)	udelay(us)
+#define sym_mdelay(ms)	mdelay(ms)
 
 /*
  *  Let the compiler know about driver data structure names.
@@ -421,9 +421,6 @@ struct sym_shcb {
 
 	struct Scsi_Host *host;
 
-	u_char		bus;		/* PCI BUS number		*/
-	u_char		device_fn;	/* PCI BUS device and function	*/
-
 	vm_offset_t	mmio_va;	/* MMIO kernel virtual address	*/
 	vm_offset_t	ram_va;		/* RAM  kernel virtual address	*/
 	u_long		io_port;	/* IO port address cookie	*/
@@ -450,8 +447,6 @@ struct sym_shcb {
  *  used as sub-field 's' of another structure.
  */
 typedef struct {
-	int	bus;
-	u_char	device_fn;
 	u_long	base;
 	u_long	base_2;
 	u_long	base_c;
@@ -464,12 +459,11 @@ typedef struct {
 } sym_slot;
 
 typedef struct sym_nvram sym_nvram;
-typedef struct sym_pci_chip sym_chip;
 
 typedef struct {
 	struct pci_dev *pdev;
 	sym_slot  s;
-	sym_chip  chip;
+	struct sym_pci_chip chip;
 	sym_nvram *nvram;
 	u_short device_id;
 	u_char host_id;
