@@ -134,8 +134,9 @@ $(MODVERDIR)/%.ver: %.c FORCE
 	  mv -f $@.tmp $@; \
 	fi
 
-# updates .ver files but not modversions.h
-fastdep: $(addprefix $(MODVERDIR)/,$(export-objs:.o=.ver))
+targets := $(addprefix $(MODVERDIR)/,$(export-objs:.o=.ver))
+
+fastdep: $(targets)
 ifneq ($(export-objs),)
 	@mkdir -p $(TOPDIR)/.tmp_export-objs/modules/$(RELDIR)
 	@touch $(addprefix $(TOPDIR)/.tmp_export-objs/modules/$(RELDIR)/,$(export-objs:.o=.ver))
@@ -270,6 +271,8 @@ cmd_as_o_S       = $(CC) $(a_flags) -c -o $@ $<
 %.o: %.S FORCE
 	$(call if_changed_dep,as_o_S)
 
+targets += $(real-objs-y) $(real-objs-m) $(EXTRA_TARGETS) $(MAKECMDGOALS)
+
 # Build the compiled-in targets
 # ---------------------------------------------------------------------------
 
@@ -288,6 +291,8 @@ cmd_link_o_target = $(if $(strip $(obj-y)),\
 
 $(O_TARGET): $(obj-y) FORCE
 	$(call if_changed,link_o_target)
+
+targets += $(O_TARGET)
 endif # O_TARGET
 
 #
@@ -299,6 +304,8 @@ cmd_link_l_target = rm -f $@; $(AR) $(EXTRA_ARFLAGS) rcs $@ $(obj-y)
 
 $(L_TARGET): $(obj-y) FORCE
 	$(call if_changed,link_l_target)
+
+targets += $(L_TARGET)
 endif
 
 #
@@ -317,6 +324,8 @@ $(multi-used-y) : %.o: $(multi-objs-y) FORCE
 
 $(multi-used-m) : %.o: $(multi-objs-m) FORCE
 	$(call if_changed,link_multi)
+
+targets += $(multi-used-y) $(multi-used-m)
 
 # Compile programs on the host
 # ===========================================================================
@@ -346,6 +355,7 @@ cmd_host_cc__o        = $(HOSTCC) $(HOSTLDFLAGS) -o $@ $($@-objs) \
 $(host-progs-multi): %: $(host-progs-multi-objs) FORCE
 	$(call if_changed,host_cc__o)
 
+targets += $(host-progs-single) $(host-progs-multi-objs) $(host-progs-multi) 
 
 # Descending when building
 # ---------------------------------------------------------------------------
@@ -410,9 +420,14 @@ FORCE:
 #   which is saved in .<target>.o, to the current command line using
 #   the two filter-out commands)
 
-# read all saved command lines and dependencies
+# Read all saved command lines and dependencies for the $(targets) we
+# may be building above, using $(if_changed{,_dep}). As an
+# optimization, we don't need to read them if the target does not
+# exist, we will rebuild anyway in that case.
 
-cmd_files := $(wildcard .*.cmd)
+targets := $(wildcard $(sort $(targets)))
+cmd_files := $(wildcard $(foreach f,$(targets),$(dir $(f)).$(notdir $(f)).cmd))
+
 ifneq ($(cmd_files),)
   include $(cmd_files)
 endif
