@@ -63,6 +63,7 @@ void mark_open_files_invalid(struct cifsTconInfo * pTcon)
 		}
 	}
 	write_unlock(&GlobalSMBSeslock);
+	/* BB Add call to invalidate_inodes(sb) for all superblocks mounted to this tcon */
 }
 
 int
@@ -746,7 +747,7 @@ CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 	int timeout = 0;
 	__u64 temp;
 
-	cFYI(1, ("In CIFSSMBLock"));
+	cFYI(1, ("In CIFSSMBLock - timeout %d numLock %d",waitFlag,numLock));
 	rc = smb_init(SMB_COM_LOCKING_ANDX, 8, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -758,6 +759,10 @@ CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 
 	pSMB->NumberOfLocks = cpu_to_le32(numLock);
 	pSMB->NumberOfUnlocks = cpu_to_le32(numUnlock);
+	if(waitFlag)
+		pSMB->Timeout = 3;  /* blocking - do time out */
+	else
+		pSMB->Timeout = 0;
 	pSMB->LockType = lockType;
 	pSMB->AndXCommand = 0xFF;	/* none */
 	pSMB->Fid = smb_file_id; /* netfid stays le */

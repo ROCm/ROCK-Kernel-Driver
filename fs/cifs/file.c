@@ -47,7 +47,7 @@ cifs_open(struct inode *inode, struct file *file)
 	struct list_head * tmp;
 	char *full_path = NULL;
 	int desiredAccess = 0x20197;
-	int disposition = FILE_OPEN;
+	int disposition;
 	__u16 netfid;
 	FILE_ALL_INFO * buf = NULL;
 
@@ -57,27 +57,27 @@ cifs_open(struct inode *inode, struct file *file)
 	pTcon = cifs_sb->tcon;
 
 	if (file->f_flags & O_CREAT) {
-	    /* search inode for this file and fill in file->private_data = */
-	    pCifsInode = CIFS_I(file->f_dentry->d_inode);
-	    read_lock(&GlobalSMBSeslock);
-	    list_for_each(tmp, &pCifsInode->openFileList) {            
-		pCifsFile = list_entry(tmp,struct cifsFileInfo, flist);           
-		if((pCifsFile->pfile == NULL)&& (pCifsFile->pid = current->pid)){		
-		    /* set mode ?? */
-		    pCifsFile->pfile = file; /* needed for writepage */
-		    file->private_data = pCifsFile;
-		    break;
+		/* search inode for this file and fill in file->private_data = */
+		pCifsInode = CIFS_I(file->f_dentry->d_inode);
+		read_lock(&GlobalSMBSeslock);
+		list_for_each(tmp, &pCifsInode->openFileList) {            
+			pCifsFile = list_entry(tmp,struct cifsFileInfo, flist);           
+			if((pCifsFile->pfile == NULL)&& (pCifsFile->pid = current->pid)){		
+			/* set mode ?? */
+				pCifsFile->pfile = file; /* needed for writepage */
+				file->private_data = pCifsFile;
+				break;
+			}
 		}
-	    }
-	    read_unlock(&GlobalSMBSeslock);
-	    if(file->private_data != NULL) {
-		rc = 0;
-	    	FreeXid(xid);
-		return rc;
-	    } else {
-		if(file->f_flags & O_EXCL)
-			cERROR(1,("could not find file instance for new file %p ",file));
-	    }
+		read_unlock(&GlobalSMBSeslock);
+		if(file->private_data != NULL) {
+			rc = 0;
+			FreeXid(xid);
+			return rc;
+		} else {
+			if(file->f_flags & O_EXCL)
+				cERROR(1,("could not find file instance for new file %p ",file));
+		}
 	}
 
 	full_path = build_path_from_dentry(file->f_dentry);
@@ -90,26 +90,38 @@ cifs_open(struct inode *inode, struct file *file)
 	else if ((file->f_flags & O_ACCMODE) == O_RDWR)
 		desiredAccess = GENERIC_ALL;
 
-/* BB check other flags carefully to find equivalent NTCreateX flags */
+/*********************************************************************
+ *  open flag mapping table:
+ *  
+ *	POSIX Flag            CIFS Disposition
+ *	----------            ---------------- 
+ *	O_CREAT               FILE_OPEN_IF
+ *	O_CREAT | O_EXCL      FILE_CREATE
+ *	O_CREAT | O_TRUNC     FILE_OVERWRITE_IF
+ *	O_TRUNC               FILE_OVERWRITE
+ *	none of the above     FILE_OPEN
+ *
+ *	Note that there is not a direct match between disposition
+ *	FILE_SUPERSEDE (ie create whether or not file exists although 
+ *	O_CREAT | O_TRUNC is similar but truncates the existing
+ *	file rather than creating a new file as FILE_SUPERSEDE does
+ *	(which uses the attributes / metadata passed in on open call)
+ *?
+ *?  O_SYNC is a reasonable match to CIFS writethrough flag  
+ *?  and the read write flags match reasonably.  O_LARGEFILE
+ *?  is irrelevant because largefile support is always used
+ *?  by this client. Flags O_APPEND, O_DIRECT, O_DIRECTORY,
+ *	 O_FASYNC, O_NOFOLLOW, O_NONBLOCK need further investigation
+ *********************************************************************/
 
-/*
-#define O_CREAT		   0100	
-#define O_EXCL		   0200	
-#define O_NOCTTY	   0400	
-#define O_TRUNC		  01000	
-#define O_APPEND	  02000
-#define O_NONBLOCK	  04000
-#define O_NDELAY	O_NONBLOCK
-#define O_SYNC		 010000
-#define FASYNC		 020000	
-#define O_DIRECT	 040000	
-#define O_LARGEFILE	0100000
-#define O_DIRECTORY	0200000	
-#define O_NOFOLLOW	0400000
-#define O_ATOMICLOOKUP	01000000 */
-
-	if (file->f_flags & O_CREAT)
-		disposition = FILE_OVERWRITE;
+	if((file->f_flags & (O_CREAT | O_EXCL)) == (O_CREAT | O_EXCL))
+		disposition = FILE_CREATE;
+	else if((file->f_flags & (O_CREAT | O_TRUNC)) == (O_CREAT | O_TRUNC))
+		disposition = FILE_OVERWRITE_IF;
+	else if((file->f_flags & O_CREAT) == O_CREAT)
+		disposition = FILE_OPEN_IF;
+	else
+		disposition = FILE_OPEN;
 
 	if (oplockEnabled)
 		oplock = REQ_OPLOCK;
@@ -121,7 +133,7 @@ cifs_open(struct inode *inode, struct file *file)
 	/* Also refresh inode by passing in file_info buf returned by SMBOpen 
 	   and calling get_inode_info with returned buf (at least 
 	   helps non-Unix server case */
-        buf = kmalloc(sizeof(FILE_ALL_INFO),GFP_KERNEL);
+	buf = kmalloc(sizeof(FILE_ALL_INFO),GFP_KERNEL);
 	if(buf==0) {
 		if (full_path)
 			kfree(full_path);
@@ -390,6 +402,7 @@ cifs_lock(struct file *file, int cmd, struct file_lock *pfLock)
 	__u32 numLock = 0;
 	__u32 numUnlock = 0;
 	__u64 length;
+	int wait_flag = FALSE;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
 	length = 1 + pfLock->fl_end - pfLock->fl_start;
@@ -407,14 +420,16 @@ cifs_lock(struct file *file, int cmd, struct file_lock *pfLock)
 		cFYI(1, ("Posix "));
 	if (pfLock->fl_flags & FL_FLOCK)
 		cFYI(1, ("Flock "));
-	if (pfLock->fl_flags & FL_SLEEP)
+	if (pfLock->fl_flags & FL_SLEEP) {
 		cFYI(1, ("Blocking lock "));
+		wait_flag = TRUE;
+	}
 	if (pfLock->fl_flags & FL_ACCESS)
-		cFYI(1, ("Process suspended by mandatory locking "));
+		cFYI(1, ("Process suspended by mandatory locking - not implemented yet "));
 	if (pfLock->fl_flags & FL_LEASE)
-		cFYI(1, ("Lease on file "));
-	if (pfLock->fl_flags & 0xFFD0)
-		cFYI(1, ("Unknown lock flags "));
+		cFYI(1, ("Lease on file - not implemented yet"));
+	if (pfLock->fl_flags & (~(FL_POSIX | FL_FLOCK | FL_SLEEP | FL_ACCESS | FL_LEASE)))
+		cFYI(1, ("Unknown lock flags 0x%x",pfLock->fl_flags));
 
 	if (pfLock->fl_type == F_WRLCK) {
 		cFYI(1, ("F_WRLCK "));
@@ -462,7 +477,7 @@ cifs_lock(struct file *file, int cmd, struct file_lock *pfLock)
 			pfLock->fl_type = F_UNLCK;
 			if (rc != 0)
 				cERROR(1,
-				       ("Error unlocking previously locked range %d during test of lock ",
+					("Error unlocking previously locked range %d during test of lock ",
 					rc));
 			rc = 0;
 
@@ -479,7 +494,7 @@ cifs_lock(struct file *file, int cmd, struct file_lock *pfLock)
 			 ((struct cifsFileInfo *) file->private_data)->
 			 netfid, length,
 			 pfLock->fl_start, numUnlock, numLock, lockType,
-			 0 /* wait flag */ );
+			 wait_flag);
 	FreeXid(xid);
 	return rc;
 }

@@ -147,7 +147,7 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 		cFYI(1,("In create for inode %p dentry->inode %p nd flags = 0x%x for %s",inode, direntry->d_inode, nd->flags,full_path));
 
 		if ((nd->intent.open.flags & O_ACCMODE) == O_RDONLY)
-                	desiredAccess = GENERIC_READ;
+			desiredAccess = GENERIC_READ;
 		else if ((nd->intent.open.flags & O_ACCMODE) == O_WRONLY)
 			desiredAccess = GENERIC_WRITE;
 		else if ((nd->intent.open.flags & O_ACCMODE) == O_RDWR)
@@ -283,19 +283,19 @@ int cifs_mknod(struct inode *inode, struct dentry *direntry, int mode, dev_t dev
 			full_path, mode, current->euid, current->egid,
 			device_number, cifs_sb->local_nls);
 		if(!rc) {
-                        rc = cifs_get_inode_info_unix(&newinode, full_path,
-                                                      inode->i_sb);
+			rc = cifs_get_inode_info_unix(&newinode, full_path,
+						inode->i_sb);
 			direntry->d_op = &cifs_dentry_ops;
 			if(rc == 0)
 				d_instantiate(direntry, newinode);
 		}
 	}
 
-        if (full_path)
-                kfree(full_path);
-        FreeXid(xid);
+	if (full_path)
+		kfree(full_path);
+	FreeXid(xid);
 
-        return rc;
+	return rc;
 }
 
 

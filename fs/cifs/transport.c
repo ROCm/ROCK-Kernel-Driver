@@ -222,12 +222,14 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 	up(&ses->server->tcpSem);
 	if (long_op == -1)
 		goto cifs_no_response_exit;
-	if (long_op > 1) /* writes past end of file can take looooong time */
+	else if (long_op == 2) /* writes past end of file can take looooong time */
 		timeout = 300 * HZ;
 	else if (long_op == 1)
 		timeout = 45 * HZ; /* should be greater than 
 			servers oplock break timeout (about 43 seconds) */
-	else
+	else if (long_op > 2) {
+		timeout = MAX_SCHEDULE_TIMEOUT;
+	} else
 		timeout = 15 * HZ;
 	/* wait for 15 seconds or until woken up due to response arriving or 
 	   due to last connection to this server being unmounted */
