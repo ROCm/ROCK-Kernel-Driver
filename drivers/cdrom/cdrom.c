@@ -1901,6 +1901,7 @@ static int mmc_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 {		
 	struct cdrom_device_ops *cdo = cdi->ops;
 	struct cdrom_generic_command cgc;
+	struct request_sense sense;
 	char buffer[32];
 	int ret = 0;
 
@@ -1935,9 +1936,11 @@ static int mmc_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 		cgc.buffer = (char *) kmalloc(blocksize, GFP_KERNEL);
 		if (cgc.buffer == NULL)
 			return -ENOMEM;
+		memset(&sense, 0, sizeof(sense));
+		cgc.sense = &sense;
 		cgc.data_direction = CGC_DATA_READ;
 		ret = cdrom_read_block(cdi, &cgc, lba, 1, format, blocksize);
-		if (ret) {
+		if (ret && sense.sense_key==0x05 && sense.asc==0x20 && sense.ascq==0x00) {
 			/*
 			 * SCSI-II devices are not required to support
 			 * READ_CD, so let's try switching block size
