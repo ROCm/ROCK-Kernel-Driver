@@ -2011,12 +2011,12 @@ static void __devinit intel8x0_measure_ac97_clock(intel8x0_t *chip)
 		return; /* specified in module option */
 
 	subs = chip->pcm->streams[0].substream;
-	if (! subs || subs->dma_bytes < INTEL8X0_TESTBUF_SIZE) {
+	if (! subs || subs->dma_buffer.bytes < INTEL8X0_TESTBUF_SIZE) {
 		snd_printk("no playback buffer allocated - aborting measure ac97 clock\n");
 		return;
 	}
 	ichdev = &chip->ichd[ICHD_PCMOUT];
-	ichdev->physbuf = subs->dma_addr;
+	ichdev->physbuf = subs->dma_buffer.addr;
 	ichdev->size = chip->ichd[ICHD_PCMOUT].fragsize = INTEL8X0_TESTBUF_SIZE;
 	ichdev->substream = NULL; /* don't process interrupts */
 

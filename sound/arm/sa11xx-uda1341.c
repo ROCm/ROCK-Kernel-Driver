@@ -7,7 +7,7 @@
  * 
  * History:
  *
- * 2002-03-13	Tomas Kasparek	Initial release - based on h3600-uda1341.c from OSS
+ * 2002-03-13   Tomas Kasparek  initial release - based on h3600-uda1341.c from OSS
  * 2002-03-20   Tomas Kasparek  playback over ALSA is working
  * 2002-03-28   Tomas Kasparek  playback over OSS emulation is working
  * 2002-03-29   Tomas Kasparek  basic capture is working (native ALSA)
@@ -15,7 +15,7 @@
  * 2002-04-04   Tomas Kasparek  better rates handling (allow non-standard rates)
  */
 
-/* $Id: sa11xx-uda1341.c,v 1.6 2002/12/04 18:52:05 perex Exp $ */
+/* $Id: sa11xx-uda1341.c,v 1.7 2003/02/13 19:19:18 perex Exp $ */
 
 #include <sound/driver.h>
 #include <linux/module.h>
@@ -444,7 +444,7 @@ static void audio_dma_callback(void *data)
 		DEBUG(KERN_DEBUG "----> period done <----\n");
 #ifdef DEBUG_MODE
 		printk(KERN_DEBUG "  dma_area:");
-		buf = s->stream->runtime->dma_addr +
+		buf = (char *)s->stream->runtime->dma_addr +
 			((s->sent_periods - 1 ) *
 			 (s->stream->runtime->period_size << SHIFT_16_STEREO));
 		for (i=0; i < 32; i++) {

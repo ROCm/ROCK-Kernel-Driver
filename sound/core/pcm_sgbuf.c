@@ -32,60 +32,32 @@
 #define sgbuf_align_table(tbl)	((((tbl) + SGBUF_TBL_ALIGN - 1) / SGBUF_TBL_ALIGN) * SGBUF_TBL_ALIGN)
 
 
-/*
- * snd_pcm_sgbuf_new - constructor of the sgbuf instance
- * @pci: pci device pointer
- *
- * Initializes the SG-buffer instance to be assigned to
- * substream->dma_private.
- * 
- * Returns the pointer of the instance, or NULL at error.
- */
-struct snd_sg_buf *snd_pcm_sgbuf_new(struct pci_dev *pci)
-{
-	struct snd_sg_buf *sgbuf;
-
-	sgbuf = snd_magic_kcalloc(snd_pcm_sgbuf_t, 0, GFP_KERNEL);
-	if (! sgbuf)
-		return NULL;
-	sgbuf->pci = pci;
-	sgbuf->pages = 0;
-	sgbuf->tblsize = 0;
-
-	return sgbuf;
-}
-
-/*
- * snd_pcm_sgbuf_delete - destructor of sgbuf instance
- * @sgbuf: the SG-buffer instance
- *
- * Destructor Releaes all pages and free the sgbuf instance.
- */
-void snd_pcm_sgbuf_delete(struct snd_sg_buf *sgbuf)
-{
-	snd_pcm_sgbuf_free_pages(sgbuf, NULL);
-	snd_magic_kfree(sgbuf);
-}
-
 /**
  * snd_pcm_sgbuf_alloc_pages - allocate the pages for the SG buffer
- * @sgbuf: the sgbuf instance
+ * @pci: the pci device pointer
  * @size: the requested buffer size in bytes
+ * @dmab: the dma-buffer record to store
  *
- * Allocates the buffer pages for the given size and updates the
- * sg buffer table.  The pages are mapped to the virtually continuous
- * memory.
+ * Initializes the SG-buffer table and allocates the buffer pages
+ * for the given size.
+ * The pages are mapped to the virtually continuous memory.
  *
  * This function is usually called from snd_pcm_lib_malloc_pages().
  *
  * Returns the mapped virtual address of the buffer if allocation was
  * successful, or NULL at error.
  */
-void *snd_pcm_sgbuf_alloc_pages(struct snd_sg_buf *sgbuf, size_t size)
+void *snd_pcm_sgbuf_alloc_pages(struct pci_dev *pci, size_t size, struct snd_pcm_dma_buffer *dmab)
 {
+	struct snd_sg_buf *sgbuf;
 	unsigned int i, pages;
-	void *vmaddr;
 
+	dmab->area = NULL;
+	dmab->addr = 0;
+	dmab->private_data = sgbuf = snd_magic_kcalloc(snd_pcm_sgbuf_t, 0, GFP_KERNEL);
+	if (! sgbuf)
+		return NULL;
+	sgbuf->pci = pci;
 	pages = snd_pcm_sgbuf_pages(size);
 	sgbuf->tblsize = sgbuf_align_table(pages);
 	sgbuf->table = snd_kcalloc(sizeof(*sgbuf->table) * sgbuf->tblsize, GFP_KERNEL);
@@ -109,46 +81,43 @@ void *snd_pcm_sgbuf_alloc_pages(struct snd_sg_buf *sgbuf, size_t size)
 	}
 
 	sgbuf->size = size;
-	vmaddr = vmap(sgbuf->page_table, sgbuf->pages);
-	if (! vmaddr)
+	dmab->area = vmap(sgbuf->page_table, sgbuf->pages);
+	if (! dmab->area)
 		goto _failed;
-	return vmaddr;
+	return dmab->area;
 
  _failed:
-	snd_pcm_sgbuf_free_pages(sgbuf, NULL); /* free the table */
+	snd_pcm_sgbuf_free_pages(dmab); /* free the table */
 	return NULL;
 }
 
 /**
  * snd_pcm_sgbuf_free_pages - free the sg buffer
- * @sgbuf: the sgbuf instance
- * @vmaddr: the mapped virtual address
+ * @dmab: dma buffer record
  *
- * Releases the pages and the mapped tables.
+ * Releases the pages and the SG-buffer table.
  *
  * This function is called usually from snd_pcm_lib_free_pages().
  *
  * Returns zero if successful, or a negative error code on failure.
  */
-int snd_pcm_sgbuf_free_pages(struct snd_sg_buf *sgbuf, void *vmaddr)
+int snd_pcm_sgbuf_free_pages(struct snd_pcm_dma_buffer *dmab)
 {
-	if (vmaddr)
-		vunmap(vmaddr);
+	struct snd_sg_buf *sgbuf = snd_magic_cast(snd_pcm_sgbuf_t, dmab->private_data, return -EINVAL);
+	int i;
 
-	while (sgbuf->pages > 0) {
-		sgbuf->pages--;
-		snd_free_pci_page(sgbuf->pci, sgbuf->table[sgbuf->pages].buf,
-				   sgbuf->table[sgbuf->pages].addr);
-	}
+	for (i = 0; i < sgbuf->pages; i++)
+		snd_free_pci_page(sgbuf->pci, sgbuf->table[i].buf, sgbuf->table[i].addr);
+	if (dmab->area)
+		vunmap(dmab->area);
+	dmab->area = NULL;
+
 	if (sgbuf->table)
 		kfree(sgbuf->table);
-	sgbuf->table = NULL;
 	if (sgbuf->page_table)
 		kfree(sgbuf->page_table);
-	sgbuf->page_table = NULL;
-	sgbuf->tblsize = 0;
-	sgbuf->pages = 0;
-	sgbuf->size = 0;
+	snd_magic_kfree(sgbuf);
+	dmab->private_data = NULL;
 	
 	return 0;
 }
@@ -163,62 +132,12 @@ int snd_pcm_sgbuf_free_pages(struct snd_sg_buf *sgbuf, void *vmaddr)
  */
 struct page *snd_pcm_sgbuf_ops_page(snd_pcm_substream_t *substream, unsigned long offset)
 {
-	struct snd_sg_buf *sgbuf = snd_magic_cast(snd_pcm_sgbuf_t, substream->dma_private, return NULL);
+	struct snd_sg_buf *sgbuf = snd_magic_cast(snd_pcm_sgbuf_t, _snd_pcm_substream_sgbuf(substream), return NULL);
 
 	unsigned int idx = offset >> PAGE_SHIFT;
 	if (idx >= (unsigned int)sgbuf->pages)
 		return NULL;
 	return sgbuf->page_table[idx];
-}
-
-
-/**
- * snd_pcm_lib_preallocate_sg_pages - initialize SG-buffer for the PCI bus
- *
- * @pci: pci device
- * @substream: substream to assign the buffer
- *
- * Initializes SG-buffer for the PCI bus.
- *
- * Returns zero if successful, or a negative error code on failure.
- */
-int snd_pcm_lib_preallocate_sg_pages(struct pci_dev *pci,
-				     snd_pcm_substream_t *substream)
-{
-	if ((substream->dma_private = snd_pcm_sgbuf_new(pci)) == NULL)
-		return -ENOMEM;
-	substream->dma_type = SNDRV_PCM_DMA_TYPE_PCI_SG;
-	substream->dma_area = 0;
-	substream->dma_addr = 0;
-	substream->dma_bytes = 0;
-	substream->buffer_bytes_max = UINT_MAX;
-	substream->dma_max = 0;
-	return 0;
-}
-
-/*
- * FIXME: the function name is too long for docbook!
- *
- * snd_pcm_lib_preallocate_sg_pages_for_all - initialize SG-buffer for the PCI bus (all substreams)
- * @pci: pci device
- * @pcm: pcm to assign the buffer
- *
- * Initialize the SG-buffer to all substreams of the given pcm for the
- * PCI bus.
- *
- * Returns zero if successful, or a negative error code on failure.
- */
-int snd_pcm_lib_preallocate_sg_pages_for_all(struct pci_dev *pci,
-					     snd_pcm_t *pcm)
-{
-	snd_pcm_substream_t *substream;
-	int stream, err;
-
-	for (stream = 0; stream < 2; stream++)
-		for (substream = pcm->streams[stream].substream; substream; substream = substream->next)
-			if ((err = snd_pcm_lib_preallocate_sg_pages(pci, substream)) < 0)
-				return err;
-	return 0;
 }
 
 

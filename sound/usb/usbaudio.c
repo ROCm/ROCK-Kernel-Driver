@@ -2236,10 +2236,49 @@ static int create_composite_quirk(snd_usb_audio_t *chip,
 	return 0;
 }
 
+
+/*
+ * boot quirks
+ */
+
+#define EXTIGY_FIRMWARE_SIZE_OLD 794
+#define EXTIGY_FIRMWARE_SIZE_NEW 483
+
+static int snd_usb_boot_quirk(struct usb_device *dev,
+			      struct usb_interface *intf,
+			      const snd_usb_audio_quirk_t *quirk)
+{
+	struct usb_host_config *config = dev->actconfig;
+
+	/* FIXME: we need to handle composite type quirks later.. */
+	switch (quirk->type) {
+	case QUIRK_BOOT_EXTIGY:
+		snd_printdd(KERN_INFO "extigy_boot: boot length = %d\n", get_cfg_desc(config)->wTotalLength);
+		if (get_cfg_desc(config)->wTotalLength == EXTIGY_FIRMWARE_SIZE_OLD ||
+		    get_cfg_desc(config)->wTotalLength == EXTIGY_FIRMWARE_SIZE_NEW) {
+			/* Send message to force it to reconnect with full interface. */
+			usb_control_msg(dev, usb_sndctrlpipe(dev,0),
+					0x10, 0x43, 0x0001, 0x000a, NULL, 0, HZ);
+			usb_get_device_descriptor(dev);
+			usb_set_configuration(dev, get_cfg_desc(config)->bConfigurationValue);
+			return -ENODEV; /* quit this anyway */
+		}
+		return 0;
+	}
+	return 0;
+}
+
+
+/*
+ * audio-interface quirks
+ */
 static int snd_usb_create_quirk(snd_usb_audio_t *chip,
 				struct usb_interface *iface,
 				const snd_usb_audio_quirk_t *quirk)
 {
+	if (quirk->type & QUIRK_BOOT_MASK)
+		return 1; /* continue as the normal device */
+
 	switch (quirk->type) {
 	case QUIRK_MIDI_FIXED_ENDPOINT:
 	case QUIRK_MIDI_YAMAHA:
@@ -2417,7 +2456,7 @@ static void *snd_usb_audio_probe(struct usb_device *dev,
 {
 	struct usb_host_config *config = dev->actconfig;
 	const snd_usb_audio_quirk_t *quirk = (const snd_usb_audio_quirk_t *)usb_id->driver_info;
-	int i;
+	int i, err;
 	snd_card_t *card;
 	snd_usb_audio_t *chip;
 	struct usb_host_interface *alts;
@@ -2432,6 +2471,12 @@ static void *snd_usb_audio_probe(struct usb_device *dev,
 	if (usb_set_configuration(dev, get_cfg_desc(config)->bConfigurationValue) < 0) {
 		snd_printk(KERN_ERR "cannot set configuration (value 0x%x)\n", get_cfg_desc(config)->bConfigurationValue);
 		goto __err_val;
+	}
+
+	if (quirk) {
+		/* try to check the boot quirk */
+		if (snd_usb_boot_quirk(dev, intf, quirk) < 0)
+			goto __err_val;
 	}
 
 	/*
@@ -2478,8 +2523,15 @@ static void *snd_usb_audio_probe(struct usb_device *dev,
 		}
 	}
 
-	if (!quirk) {
-		/* USB audio interface */
+	err = 1; /* continue */
+	if (quirk) {
+		/* need some special handlings */
+		if ((err = snd_usb_create_quirk(chip, intf, quirk)) < 0)
+			goto __error;
+	}
+
+	if (err > 0) {
+		/* create normal USB audio interfaces */
 		unsigned char *buffer;
 		unsigned int index;
 		int buflen;
@@ -2494,10 +2546,6 @@ static void *snd_usb_audio_probe(struct usb_device *dev,
 			goto __error;
 		}
 		kfree(buffer);
-	} else {
-		/* USB midi interface */
-		if (snd_usb_create_quirk(chip, intf, quirk) < 0)
-			goto __error;
 	}
 
 	/* we are allowed to call snd_card_register() many times */
