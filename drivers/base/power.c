@@ -47,7 +47,7 @@ int device_suspend(u32 state, u32 level)
 		prev = dev;
 		dev = g_list_to_dev(prev->g_list.next);
 	}
-	spin_unlock(&device_root);
+	spin_unlock(&device_lock);
 	put_device(prev);
 
 	return error;
@@ -82,7 +82,7 @@ void device_resume(u32 level)
 		prev = dev;
 		dev = g_list_to_dev(prev->g_list.prev);
 	}
-	spin_unlock(&device_root);
+	spin_unlock(&device_lock);
 	put_device(prev);
 
 	printk(KERN_EMERG "Devices Resumed\n");
@@ -119,7 +119,7 @@ void device_shutdown(void)
 		prev = dev;
 		dev = g_list_to_dev(prev->g_list.next);
 	}
-	spin_unlock(&device_root);
+	spin_unlock(&device_lock);
 	put_device(prev);
 }
 
