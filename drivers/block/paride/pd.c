@@ -195,7 +195,6 @@ MODULE_PARM(drive3, "1-8i");
 static void ps_tq_int( void *data);
 
 static void (* ps_continuation)(void);
-static int (* ps_ready)(void);
 static unsigned long ps_timeout;
 
 static DECLARE_WORK(ps_tq, ps_tq_int, NULL);
@@ -210,11 +209,7 @@ static void ps_set_intr(void)
 
 static void ps_tq_int(void *data)
 {
-	if (!ps_ready || ps_ready() || time_after_eq(jiffies, ps_timeout)) {
-		ps_continuation();
-		return;
-	}
-	ps_set_intr();
+	ps_continuation();
 }
 
 #define PD_BITS    4
@@ -821,8 +816,6 @@ static inline void next_request(int success)
 static void do_pd_read(void)
 {
 	ps_continuation = do_pd_read_start;
-	ps_ready = 0;
-	ps_timeout = jiffies;
 	ps_set_intr();
 }
 
@@ -841,13 +834,16 @@ static void do_pd_read_start(void)
 	}
 	pd_ide_command(pd_current, IDE_READ, pd_block, pd_run);
 	ps_continuation = do_pd_read_drq;
-	ps_ready = pd_ready;
 	ps_timeout = jiffies + PD_TMO;
 	ps_set_intr();
 }
 
 static void do_pd_read_drq(void)
 {
+	if (!pd_ready() && !time_after_eq(jiffies, ps_timeout)) {
+		ps_set_intr();
+		return;
+	}
 	while (1) {
 		if (pd_wait_for(pd_current, STAT_DRQ, "do_pd_read_drq") & STAT_ERR) {
 			pi_disconnect(pd_current->pi);
@@ -870,8 +866,6 @@ static void do_pd_read_drq(void)
 static void do_pd_write(void)
 {
 	ps_continuation = do_pd_write_start;
-	ps_ready = 0;
-	ps_timeout = jiffies;
 	ps_set_intr();
 }
 
@@ -905,13 +899,16 @@ static void do_pd_write_start(void)
 			break;
 	}
 	ps_continuation = do_pd_write_done;
-	ps_ready = pd_ready;
 	ps_timeout = jiffies + PD_TMO;
 	ps_set_intr();
 }
 
 static void do_pd_write_done(void)
 {
+	if (!pd_ready() && !time_after_eq(jiffies, ps_timeout)) {
+		ps_set_intr();
+		return;
+	}
 	if (pd_wait_for(pd_current, STAT_READY, "do_pd_write_done") & STAT_ERR) {
 		pi_disconnect(pd_current->pi);
 		if (pd_retries < PD_MAX_RETRIES) {
