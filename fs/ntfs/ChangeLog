@@ -33,6 +33,10 @@ ToDo:
 	  in between. Either need different type of optimization as above or
 	  need to change the read/write spinlock to a read/write semaphore.
 
+tng-0.0.9 - Work in progress
+
+	- Add kill_super, just keeping up with the vfs changes in the kernel.
+
 tng-0.0.8 - 08/03/2002 - BitKeeper ChangeSet 1.386
 
 	- Replace bdevname(sb->s_dev) with sb->s_id.
