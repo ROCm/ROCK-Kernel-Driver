@@ -5,7 +5,6 @@
 mainmenu_name "Linux Kernel Configuration"
 
 define_bool CONFIG_X86 y
-define_bool CONFIG_ISA y
 define_bool CONFIG_SBUS n
 
 define_bool CONFIG_UID16 y
@@ -298,7 +297,8 @@ tristate 'NatSemi SCx200 support' CONFIG_SCx200
 
 source drivers/pci/Config.in
 
-bool 'EISA support' CONFIG_EISA
+bool 'ISA support' CONFIG_ISA
+dep_bool 'EISA support' CONFIG_EISA $CONFIG_ISA
 
 if [ "$CONFIG_VISWS" != "y" ]; then
    bool 'MCA support' CONFIG_MCA
@@ -362,14 +362,16 @@ if [ "$CONFIG_SCSI" != "n" ]; then
 fi
 endmenu
 
-mainmenu_option next_comment
-comment 'Old non-SCSI/ATAPI CD-ROM drives'
+if [ "$CONFIG_ISA" = "y" ]; then
+   mainmenu_option next_comment
+   comment 'Old CD-ROM drivers (not SCSI, not IDE)'
 
-bool 'Support non-SCSI/ATAPI CDROM drives' CONFIG_CD_NO_IDESCSI
-if [ "$CONFIG_CD_NO_IDESCSI" != "n" ]; then
-   source drivers/cdrom/Config.in
+   bool 'Support non-SCSI/IDE/ATAPI CDROM drives' CONFIG_CD_NO_IDESCSI
+   if [ "$CONFIG_CD_NO_IDESCSI" != "n" ]; then
+      source drivers/cdrom/Config.in
+   fi
+   endmenu
 fi
-endmenu
 
 source drivers/md/Config.in
 
