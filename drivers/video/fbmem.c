@@ -223,6 +223,9 @@ static struct {
 #ifdef CONFIG_FB_RADEON
 	{ "radeonfb", radeonfb_init, radeonfb_setup },
 #endif
+#ifdef CONFIG_FB_RADEON_OLD
+	{ "radeonfb_old", radeonfb_init, radeonfb_setup },
+#endif
 #ifdef CONFIG_FB_CONTROL
 	{ "controlfb", control_init, control_setup },
 #endif
