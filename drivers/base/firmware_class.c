@@ -11,6 +11,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/timer.h>
+#include <linux/vmalloc.h>
 #include <asm/hardirq.h>
 
 #include <linux/firmware.h>
@@ -159,7 +160,7 @@ fw_realloc_buffer(struct firmware_priv *fw_priv, int min_size)
 	if (min_size <= fw_priv->alloc_size)
 		return 0;
 
-	new_data = kmalloc(fw_priv->alloc_size + PAGE_SIZE, GFP_KERNEL);
+	new_data = vmalloc(fw_priv->alloc_size + PAGE_SIZE);
 	if (!new_data) {
 		printk(KERN_ERR "%s: unable to alloc buffer\n", __FUNCTION__);
 		/* Make sure that we don't keep incomplete data */
@@ -169,7 +170,7 @@ fw_realloc_buffer(struct firmware_priv *fw_priv, int min_size)
 	fw_priv->alloc_size += PAGE_SIZE;
 	if (fw_priv->fw->data) {
 		memcpy(new_data, fw_priv->fw->data, fw_priv->fw->size);
-		kfree(fw_priv->fw->data);
+		vfree(fw_priv->fw->data);
 	}
 	fw_priv->fw->data = new_data;
 	BUG_ON(min_size > fw_priv->alloc_size);
@@ -367,7 +368,7 @@ request_firmware(const struct firmware **firmware, const char *name,
 		*firmware = fw_priv->fw;
 	} else {
 		retval = -ENOENT;
-		kfree(fw_priv->fw->data);
+		vfree(fw_priv->fw->data);
 		kfree(fw_priv->fw);
 	}
 	kfree(fw_priv);
@@ -382,7 +383,7 @@ void
 release_firmware(const struct firmware *fw)
 {
 	if (fw) {
-		kfree(fw->data);
+		vfree(fw->data);
 		kfree(fw);
 	}
 }
