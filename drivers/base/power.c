@@ -92,13 +92,13 @@ void device_resume(u32 level)
  */
 void device_shutdown(void)
 {
-	struct list_head * node;
+	struct list_head * node, * next;
 	struct device * prev = NULL;
 
 	printk(KERN_EMERG "Shutting down devices\n");
 
 	spin_lock(&device_lock);
-	list_for_each(node,&global_device_list) {
+	list_for_each_safe(node,next,&global_device_list) {
 		struct device * dev = get_device_locked(to_dev(node));
 		if (dev) {
 			spin_unlock(&device_lock);
@@ -111,6 +111,8 @@ void device_shutdown(void)
 		}
 	}
 	spin_unlock(&device_lock);
+	if (prev)
+		put_device(prev);
 }
 
 EXPORT_SYMBOL(device_suspend);
