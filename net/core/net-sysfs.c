@@ -414,7 +414,7 @@ int netdev_register_sysfs(struct net_device *net)
 	if ((ret = class_device_register(class_dev)))
 		goto out;
 
-	for (i = 0; (attr = net_class_attributes[i]); i++) {
+	for (i = 0; (attr = net_class_attributes[i]) != NULL; i++) {
 		if ((ret = class_device_create_file(class_dev, attr)))
 		    goto out_unreg;
 	}
