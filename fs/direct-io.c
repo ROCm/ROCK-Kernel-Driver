@@ -75,7 +75,7 @@ struct dio {
  */
 static inline unsigned dio_pages_present(struct dio *dio)
 {
-	return dio->head - dio->tail;
+	return dio->tail - dio->head;
 }
 
 /*
@@ -265,6 +265,10 @@ static int dio_bio_complete(struct dio *dio, struct bio *bio)
 static int dio_await_completion(struct dio *dio)
 {
 	int ret = 0;
+
+	if (dio->bio)
+		dio_bio_submit(dio);
+
 	while (atomic_read(&dio->bio_count)) {
 		struct bio *bio = dio_await_one(dio);
 		int ret2;
@@ -523,29 +527,16 @@ out:
 	return ret;
 }
 
-/*
- * The main direct-IO function.  This is a library function for use by
- * filesystem drivers.
- */
 int
-generic_direct_IO(int rw, struct inode *inode, char *buf, loff_t offset,
-			size_t count, get_blocks_t get_blocks)
+direct_io_worker(int rw, struct inode *inode, const struct iovec *iov, 
+	loff_t offset, unsigned long nr_segs, get_blocks_t get_blocks)
 {
 	const unsigned blkbits = inode->i_blkbits;
-	const unsigned blocksize_mask = (1 << blkbits) - 1;
-	const unsigned long user_addr = (unsigned long)buf;
-	int ret;
-	int ret2;
+	unsigned long user_addr; 
+	int seg, ret2, ret = 0;
 	struct dio dio;
-	size_t bytes;
+	size_t bytes, tot_bytes = 0;
 
-	/* Check the memory alignment.  Blocks cannot straddle pages */
-	if ((user_addr & blocksize_mask) || (count & blocksize_mask)) {
-		ret = -EINVAL;
-		goto out;
-	}
-
-	/* BIO submission state */
 	dio.bio = NULL;
 	dio.bvec = NULL;
 	dio.inode = inode;
@@ -553,31 +544,13 @@ generic_direct_IO(int rw, struct inode *inode, char *buf, loff_t offset,
 	dio.blkbits = blkbits;
 	dio.block_in_file = offset >> blkbits;
 	dio.blocks_available = 0;
-	dio.final_block_in_request = (offset + count) >> blkbits;
 
-	/* Index into the first page of the first block */
-	dio.first_block_in_page = (user_addr & (PAGE_SIZE - 1)) >> blkbits;
 	dio.boundary = 0;
 	dio.reap_counter = 0;
 	dio.get_blocks = get_blocks;
 	dio.last_block_in_bio = -1;
 	dio.next_block_in_bio = -1;
 
-	/* Page fetching state */
-	dio.curr_page = 0;
-	bytes = count;
-	dio.total_pages = 0;
-	if (user_addr & (PAGE_SIZE - 1)) {
-		dio.total_pages++;
-		bytes -= PAGE_SIZE - (user_addr & (PAGE_SIZE - 1));
-	}
-
-	dio.total_pages += (bytes + PAGE_SIZE - 1) / PAGE_SIZE;
-	dio.curr_user_address = user_addr;
-
-	/* Page queue */
-	dio.head = 0;
-	dio.tail = 0;
 	dio.page_errors = 0;
 
 	/* BIO completion state */
@@ -586,36 +559,73 @@ generic_direct_IO(int rw, struct inode *inode, char *buf, loff_t offset,
 	dio.bio_list = NULL;
 	dio.waiter = NULL;
 
-	ret = do_direct_IO(&dio);
+	for (seg = 0; seg < nr_segs; seg++) {
+		user_addr = (unsigned long)iov[seg].iov_base;
+		bytes = iov[seg].iov_len;
 
-	if (dio.bio)
-		dio_bio_submit(&dio);
-	if (ret)
-		dio_cleanup(&dio);
+		/* Index into the first page of the first block */
+		dio.first_block_in_page = (user_addr & (PAGE_SIZE - 1)) >> blkbits;
+		dio.final_block_in_request = dio.block_in_file + (bytes >> blkbits);
+		/* Page fetching state */
+		dio.head = 0;
+		dio.tail = 0;
+		dio.curr_page = 0;
+
+		dio.total_pages = 0;
+		if (user_addr & (PAGE_SIZE-1)) {
+			dio.total_pages++;
+			bytes -= PAGE_SIZE - (user_addr & (PAGE_SIZE - 1));
+		}
+		dio.total_pages += (bytes + PAGE_SIZE - 1) / PAGE_SIZE;
+		dio.curr_user_address = user_addr;
+	
+		ret = do_direct_IO(&dio);
+
+		if (ret) {
+			dio_cleanup(&dio);
+			break;
+		}
+
+		tot_bytes += iov[seg].iov_len - ((dio.final_block_in_request -
+					dio.block_in_file) << blkbits);
+
+	} /* end iovec loop */
+
 	ret2 = dio_await_completion(&dio);
 	if (ret == 0)
 		ret = ret2;
 	if (ret == 0)
 		ret = dio.page_errors;
 	if (ret == 0)
-		ret = count - ((dio.final_block_in_request -
-				dio.block_in_file) << blkbits);
-out:
+		ret = tot_bytes; 
+
 	return ret;
 }
 
-ssize_t
-generic_file_direct_IO(int rw, struct inode *inode, char *buf,
-			loff_t offset, size_t count)
+/*
+ * This is a library function for use by filesystem drivers.
+ */
+int
+generic_direct_IO(int rw, struct inode *inode, const struct iovec *iov, 
+	loff_t offset, unsigned long nr_segs, get_blocks_t get_blocks)
 {
+	int seg;
+	size_t size;
+	unsigned long addr;
 	struct address_space *mapping = inode->i_mapping;
-	unsigned blocksize_mask;
-	ssize_t retval;
+	unsigned blocksize_mask = (1 << inode->i_blkbits) - 1;
+	ssize_t retval = -EINVAL;
 
-	blocksize_mask = (1 << inode->i_blkbits) - 1;
-	if ((offset & blocksize_mask) || (count & blocksize_mask)) {
-		retval = -EINVAL;
+	if (offset & blocksize_mask) {
 		goto out;
+	}
+
+	/* Check the memory alignment.  Blocks cannot straddle pages */
+	for (seg = 0; seg < nr_segs; seg++) {
+		addr = (unsigned long)iov[seg].iov_base;
+		size = iov[seg].iov_len;
+		if ((addr & blocksize_mask) || (size & blocksize_mask)) 
+			goto out;	
 	}
 
 	if (mapping->nrpages) {
@@ -625,9 +635,21 @@ generic_file_direct_IO(int rw, struct inode *inode, char *buf,
 		if (retval)
 			goto out;
 	}
-	retval = mapping->a_ops->direct_IO(rw, inode, buf, offset, count);
+
+	retval = direct_io_worker(rw, inode, iov, offset, nr_segs, get_blocks);
+out:
+	return retval;
+}
+
+ssize_t
+generic_file_direct_IO(int rw, struct inode *inode, const struct iovec *iov, 
+	loff_t offset, unsigned long nr_segs)
+{
+	struct address_space *mapping = inode->i_mapping;
+	ssize_t retval;
+
+	retval = mapping->a_ops->direct_IO(rw, inode, iov, offset, nr_segs);
 	if (inode->i_mapping->nrpages)
 		invalidate_inode_pages2(inode->i_mapping);
-out:
 	return retval;
 }

@@ -34,4 +34,19 @@ struct iovec
                                 /* Beg pardon: BSD has 1024 --ANK */
 #endif
 
+/*
+ * Total number of bytes covered by an iovec
+ */
+static inline size_t iov_length(const struct iovec *iov, unsigned long nr_segs)
+{
+	unsigned long seg;
+	size_t ret = 0;
+
+	for (seg = 0; seg < nr_segs; seg++)
+		ret += iov[seg].iov_len;
+	return ret;
+}
+
+unsigned long iov_shorten(struct iovec *iov, unsigned long nr_segs, size_t to);
+
 #endif

@@ -309,11 +309,11 @@ static int jfs_bmap(struct address_space *mapping, long block)
 	return generic_block_bmap(mapping, block, jfs_get_block);
 }
 
-static int jfs_direct_IO(int rw, struct inode *inode, char *buf,
-			loff_t offset, size_t count)
+static int jfs_direct_IO(int rw, struct inode *inode, const struct iovec *iov, 
+			loff_t offset, unsigned long nr_segs)
 {
-	return generic_direct_IO(rw, inode, buf,
-				offset, count, jfs_get_blocks);
+	return generic_direct_IO(rw, inode, iov,
+				offset, nr_segs, jfs_get_blocks);
 }
 
 struct address_space_operations jfs_aops = {
