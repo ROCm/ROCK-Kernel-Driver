@@ -1396,11 +1396,8 @@ void __init inode_init(unsigned long mempages)
 
 	/* inode slab cache */
 	inode_cachep = kmem_cache_create("inode_cache", sizeof(struct inode),
-					 0, SLAB_HWCACHE_ALIGN, init_once,
-					 NULL);
-	if (!inode_cachep)
-		panic("cannot create inode slab cache");
-
+				0, SLAB_HWCACHE_ALIGN|SLAB_PANIC, init_once,
+				NULL);
 	set_shrinker(DEFAULT_SEEKS, shrink_icache_memory);
 }
 
@@ -1421,5 +1418,4 @@ void init_special_inode(struct inode *inode, umode_t mode, dev_t rdev)
 		printk(KERN_DEBUG "init_special_inode: bogus i_mode (%o)\n",
 		       mode);
 }
-
 EXPORT_SYMBOL(init_special_inode);

@@ -977,10 +977,7 @@ void __init pte_chain_init(void)
 	pte_chain_cache = kmem_cache_create(	"pte_chain",
 						sizeof(struct pte_chain),
 						sizeof(struct pte_chain),
-						0,
+						SLAB_PANIC,
 						pte_chain_ctor,
 						NULL);
-
-	if (!pte_chain_cache)
-		panic("failed to create pte_chain cache!\n");
 }

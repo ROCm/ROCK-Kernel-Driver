@@ -216,11 +216,8 @@ void __init fork_init(unsigned long mempages)
 #endif
 	/* create a slab on which task_structs can be allocated */
 	task_struct_cachep =
-		kmem_cache_create("task_struct",
-				  sizeof(struct task_struct),ARCH_MIN_TASKALIGN,
-				  0, NULL, NULL);
-	if (!task_struct_cachep)
-		panic("fork_init(): cannot create task_struct SLAB cache");
+		kmem_cache_create("task_struct", sizeof(struct task_struct),
+			ARCH_MIN_TASKALIGN, SLAB_PANIC, NULL, NULL);
 #endif
 
 	/*
@@ -1249,37 +1246,20 @@ void __init proc_caches_init(void)
 {
 	sighand_cachep = kmem_cache_create("sighand_cache",
 			sizeof(struct sighand_struct), 0,
-			SLAB_HWCACHE_ALIGN, NULL, NULL);
-	if (!sighand_cachep)
-		panic("Cannot create sighand SLAB cache");
-
+			SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL, NULL);
 	signal_cachep = kmem_cache_create("signal_cache",
 			sizeof(struct signal_struct), 0,
-			SLAB_HWCACHE_ALIGN, NULL, NULL);
-	if (!signal_cachep)
-		panic("Cannot create signal SLAB cache");
-
+			SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL, NULL);
 	files_cachep = kmem_cache_create("files_cache", 
-			 sizeof(struct files_struct), 0, 
-			 SLAB_HWCACHE_ALIGN, NULL, NULL);
-	if (!files_cachep) 
-		panic("Cannot create files SLAB cache");
-
+			sizeof(struct files_struct), 0,
+			SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL, NULL);
 	fs_cachep = kmem_cache_create("fs_cache", 
-			 sizeof(struct fs_struct), 0, 
-			 SLAB_HWCACHE_ALIGN, NULL, NULL);
-	if (!fs_cachep) 
-		panic("Cannot create fs_struct SLAB cache");
- 
+			sizeof(struct fs_struct), 0,
+			SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL, NULL);
 	vm_area_cachep = kmem_cache_create("vm_area_struct",
 			sizeof(struct vm_area_struct), 0,
-			0, NULL, NULL);
-	if(!vm_area_cachep)
-		panic("vma_init: Cannot alloc vm_area_struct SLAB cache");
-
+			SLAB_PANIC, NULL, NULL);
 	mm_cachep = kmem_cache_create("mm_struct",
 			sizeof(struct mm_struct), 0,
-			SLAB_HWCACHE_ALIGN, NULL, NULL);
-	if(!mm_cachep)
-		panic("vma_init: Cannot alloc mm_struct SLAB cache");
+			SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL, NULL);
 }

@@ -3100,7 +3100,7 @@ void __init buffer_init(void)
 
 	bh_cachep = kmem_cache_create("buffer_head",
 			sizeof(struct buffer_head), 0,
-			0, init_buffer_head, NULL);
+			SLAB_PANIC, init_buffer_head, NULL);
 	for (i = 0; i < ARRAY_SIZE(bh_wait_queue_heads); i++)
 		init_waitqueue_head(&bh_wait_queue_heads[i].wqh);
 

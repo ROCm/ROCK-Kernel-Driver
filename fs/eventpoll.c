@@ -1695,22 +1695,14 @@ static int __init eventpoll_init(void)
 	ep_poll_safewake_init(&psw);
 
 	/* Allocates slab cache used to allocate "struct epitem" items */
-	error = -ENOMEM;
-	epi_cache = kmem_cache_create("eventpoll_epi",
-				      sizeof(struct epitem),
-				      0,
-				      SLAB_HWCACHE_ALIGN | EPI_SLAB_DEBUG, NULL, NULL);
-	if (!epi_cache)
-		goto eexit_1;
+	epi_cache = kmem_cache_create("eventpoll_epi", sizeof(struct epitem),
+			0, SLAB_HWCACHE_ALIGN|EPI_SLAB_DEBUG|SLAB_PANIC,
+			NULL, NULL);
 
 	/* Allocates slab cache used to allocate "struct eppoll_entry" */
-	error = -ENOMEM;
 	pwq_cache = kmem_cache_create("eventpoll_pwq",
-				      sizeof(struct eppoll_entry),
-				      0,
-				      EPI_SLAB_DEBUG, NULL, NULL);
-	if (!pwq_cache)
-		goto eexit_2;
+			sizeof(struct eppoll_entry), 0,
+			EPI_SLAB_DEBUG|SLAB_PANIC, NULL, NULL);
 
 	/*
 	 * Register the virtual file system that will be the source of inodes
@@ -1718,27 +1710,20 @@ static int __init eventpoll_init(void)
 	 */
 	error = register_filesystem(&eventpoll_fs_type);
 	if (error)
-		goto eexit_3;
+		goto epanic;
 
 	/* Mount the above commented virtual file system */
 	eventpoll_mnt = kern_mount(&eventpoll_fs_type);
 	error = PTR_ERR(eventpoll_mnt);
 	if (IS_ERR(eventpoll_mnt))
-		goto eexit_4;
+		goto epanic;
 
-	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: successfully initialized.\n", current));
-
+	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: successfully initialized.\n",
+			current));
 	return 0;
 
-eexit_4:
-	unregister_filesystem(&eventpoll_fs_type);
-eexit_3:
-	kmem_cache_destroy(pwq_cache);
-eexit_2:
-	kmem_cache_destroy(epi_cache);
-eexit_1:
-
-	return error;
+epanic:
+	panic("eventpoll_init() failed\n");
 }
 
 
@@ -1755,4 +1740,3 @@ module_init(eventpoll_init);
 module_exit(eventpoll_exit);
 
 MODULE_LICENSE("GPL");
-
