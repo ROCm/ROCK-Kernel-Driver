@@ -1433,11 +1433,11 @@ static int cp_new_stat32(struct kstat *stat, struct stat32 *statbuf)
 	if (stat->size > MAX_NON_LFS)
 		return -EOVERFLOW;
 	err |= put_user(stat->size, &statbuf->st_size);
-	err |= put_user(stat->atime, &statbuf->st_atime);
+	err |= put_user(stat->atime.tv_sec, &statbuf->st_atime);
 	err |= put_user(0, &statbuf->__unused1);
-	err |= put_user(stat->mtime, &statbuf->st_mtime);
+	err |= put_user(stat->mtime.tv_sec, &statbuf->st_mtime);
 	err |= put_user(0, &statbuf->__unused2);
-	err |= put_user(stat->ctime, &statbuf->st_ctime);
+	err |= put_user(stat->ctime.tv_sec, &statbuf->st_ctime);
 	err |= put_user(0, &statbuf->__unused3);
 	err |= put_user(stat->blksize, &statbuf->st_blksize);
 	err |= put_user(stat->blocks, &statbuf->st_blocks);
