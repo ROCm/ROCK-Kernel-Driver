@@ -1,6 +1,12 @@
-/* drmP.h -- Private header for Direct Rendering Manager -*- linux-c -*-
- * Created: Mon Jan  4 10:05:05 1999 by faith@precisioninsight.com
- *
+/**
+ * \file drmP.h 
+ * Private header for Direct Rendering Manager
+ * 
+ * \author Rickard E. (Rik) Faith <faith@valinux.com>
+ * \author Gareth Hughes <gareth@valinux.com>
+ */
+
+/*
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
  * All rights reserved.
@@ -23,14 +29,11 @@
  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
- *
- * Authors:
- *    Rickard E. (Rik) Faith <faith@valinux.com>
- *    Gareth Hughes <gareth@valinux.com>
  */
 
 #ifndef _DRM_P_H_
 #define _DRM_P_H_
+
 
 #ifdef __KERNEL__
 #ifdef __alpha__
@@ -72,8 +75,11 @@
 
 #include "drm_os_linux.h"
 
-/* DRM template customization defaults
- */
+
+/***********************************************************************/
+/** \name DRM template customization defaults */
+/*@{*/
+
 #ifndef __HAVE_AGP
 #define __HAVE_AGP		0
 #endif
@@ -101,19 +107,23 @@
 #define __REALLY_HAVE_MTRR	(__HAVE_MTRR && defined(CONFIG_MTRR))
 #define __REALLY_HAVE_SG	(__HAVE_SG)
 
-/* Begin the DRM...
- */
+/*@}*/
 
-#define DRM_DEBUG_CODE 2	  /* Include debugging code (if > 1, then
+
+/***********************************************************************/
+/** \name Begin the DRM... */
+/*@{*/
+
+#define DRM_DEBUG_CODE 2	  /**< Include debugging code if > 1, then
 				     also include looping detection. */
 
-#define DRM_HASH_SIZE	      16 /* Size of key hash table		  */
-#define DRM_KERNEL_CONTEXT    0	 /* Change drm_resctx if changed	  */
-#define DRM_RESERVED_CONTEXTS 1	 /* Change drm_resctx if changed	  */
+#define DRM_HASH_SIZE	      16 /**< Size of key hash table. Must be power of 2. */
+#define DRM_KERNEL_CONTEXT    0	 /**< Change drm_resctx if changed */
+#define DRM_RESERVED_CONTEXTS 1	 /**< Change drm_resctx if changed */
 #define DRM_LOOPING_LIMIT     5000000
-#define DRM_BSZ		      1024 /* Buffer size for /dev/drm? output	  */
-#define DRM_TIME_SLICE	      (HZ/20)  /* Time slice for GLXContexts	  */
-#define DRM_LOCK_SLICE	      1	/* Time slice for lock, in jiffies	  */
+#define DRM_BSZ		      1024 /**< Buffer size for /dev/drm? output */
+#define DRM_TIME_SLICE	      (HZ/20)  /**< Time slice for GLXContexts */
+#define DRM_LOCK_SLICE	      1	/**< Time slice for lock, in jiffies */
 
 #define DRM_FLAG_DEBUG	  0x01
 
@@ -140,8 +150,14 @@
 #define DRM_MEM_SGLISTS   20
 
 #define DRM_MAX_CTXBITMAP (PAGE_SIZE * 8)
+	
+/*@}*/
 
-				/* Backward compatibility section */
+
+/***********************************************************************/
+/** \name Backward compatibility section */
+/*@{*/
+
 #ifndef minor
 #define minor(x) MINOR((x))
 #endif
@@ -191,17 +207,42 @@ static inline struct page * vmalloc_to_page(void * vmalloc_addr)
 #define DRM_RPR_ARG(vma) vma,
 #endif
 
-
 #define VM_OFFSET(vma) ((vma)->vm_pgoff << PAGE_SHIFT)
 
-				/* Macros to make printk easier */
+/*@}*/
+
+
+/***********************************************************************/
+/** \name Macros to make printk easier */
+/*@{*/
+
+/**
+ * Error output.
+ *
+ * \param fmt printf() like format string.
+ * \param arg arguments
+ */
 #define DRM_ERROR(fmt, arg...) \
 	printk(KERN_ERR "[" DRM_NAME ":%s] *ERROR* " fmt , __FUNCTION__ , ##arg)
+
+/**
+ * Memory error output.
+ *
+ * \param area memory area where the error occurred.
+ * \param fmt printf() like format string.
+ * \param arg arguments
+ */
 #define DRM_MEM_ERROR(area, fmt, arg...) \
 	printk(KERN_ERR "[" DRM_NAME ":%s:%s] *ERROR* " fmt , __FUNCTION__, \
 	       DRM(mem_stats)[area].name , ##arg)
 #define DRM_INFO(fmt, arg...)  printk(KERN_INFO "[" DRM_NAME "] " fmt , ##arg)
 
+/**
+ * Debug output.
+ * 
+ * \param fmt printf() like format string.
+ * \param arg arguments
+ */
 #if DRM_DEBUG_CODE
 #define DRM_DEBUG(fmt, arg...)						\
 	do {								\
@@ -224,7 +265,13 @@ static inline struct page * vmalloc_to_page(void * vmalloc_addr)
    len += sprintf(&buf[len], fmt , ##arg);				\
    if (len > DRM_PROC_LIMIT) { ret; *eof = 1; return len - offset; }
 
-				/* Mapping helper macros */
+/*@}*/
+
+
+/***********************************************************************/
+/** \name Mapping helper macros */
+/*@{*/
+
 #define DRM_IOREMAP(map, dev)							\
 	(map)->handle = DRM(ioremap)( (map)->offset, (map)->size, (dev) )
 
@@ -237,6 +284,15 @@ static inline struct page * vmalloc_to_page(void * vmalloc_addr)
 			DRM(ioremapfree)( (map)->handle, (map)->size, (dev) );	\
 	} while (0)
 
+/**
+ * Find mapping.
+ *
+ * \param _map matching mapping if found, untouched otherwise.
+ * \param _o offset.
+ *
+ * Expects the existence of a local variable named \p dev pointing to the
+ * drm_device structure.
+ */
 #define DRM_FIND_MAP(_map, _o)								\
 do {											\
 	struct list_head *_list;							\
@@ -249,9 +305,21 @@ do {											\
  		}									\
 	}										\
 } while(0)
+
+/**
+ * Drop mapping.
+ *
+ * \sa #DRM_FIND_MAP.
+ */
 #define DRM_DROP_MAP(_map)
 
-				/* Internal types and structures */
+/*@}*/
+
+
+/***********************************************************************/
+/** \name Internal types and structures */
+/*@{*/
+
 #define DRM_ARRAY_SIZE(x) (sizeof(x)/sizeof(x[0]))
 #define DRM_MIN(a,b) ((a)<(b)?(a):(b))
 #define DRM_MAX(a,b) ((a)>(b)?(a):(b))
@@ -260,10 +328,23 @@ do {											\
 #define DRM_BUFCOUNT(x) ((x)->count - DRM_LEFTCOUNT(x))
 #define DRM_WAITCOUNT(dev,idx) DRM_BUFCOUNT(&dev->queuelist[idx]->waitlist)
 
+/**
+ * Get the private SAREA mapping.
+ *
+ * \param _dev DRM device.
+ * \param _ctx context number.
+ * \param _map output mapping.
+ */
 #define DRM_GET_PRIV_SAREA(_dev, _ctx, _map) do {	\
 	(_map) = (_dev)->context_sareas[_ctx];		\
 } while(0)
 
+/**
+ * Test that the hardware lock is held by the caller, returning otherwise.
+ *
+ * \param dev DRM device.
+ * \param filp file pointer of the caller.
+ */
 #define LOCK_TEST_WITH_RETURN( dev, filp )				\
 do {									\
 	if ( !_DRM_LOCK_IS_HELD( dev->lock.hw_lock->lock ) ||		\
@@ -274,7 +355,14 @@ do {									\
 	}								\
 } while (0)
 
-
+/**
+ * Ioctl function type.
+ *
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param arg argument.
+ */
 typedef int drm_ioctl_t( struct inode *inode, struct file *filp,
 			 unsigned int cmd, unsigned long arg );
 
@@ -290,8 +378,7 @@ typedef struct drm_ioctl_desc {
 } drm_ioctl_desc_t;
 
 typedef struct drm_devstate {
-	pid_t		  owner;	/* X server pid holding x_lock */
-
+	pid_t		  owner;	/**< X server pid holding x_lock */
 } drm_devstate_t;
 
 typedef struct drm_magic_entry {
@@ -311,21 +398,24 @@ typedef struct drm_vma_entry {
 	pid_t		      pid;
 } drm_vma_entry_t;
 
+/**
+ * DMA buffer.
+ */
 typedef struct drm_buf {
-	int		  idx;	       /* Index into master buflist	     */
-	int		  total;       /* Buffer size			     */
-	int		  order;       /* log-base-2(total)		     */
-	int		  used;	       /* Amount of buffer in use (for DMA)  */
-	unsigned long	  offset;      /* Byte offset (used internally)	     */
-	void		  *address;    /* Address of buffer		     */
-	unsigned long	  bus_address; /* Bus address of buffer		     */
-	struct drm_buf	  *next;       /* Kernel-only: used for free list    */
-	__volatile__ int  waiting;     /* On kernel DMA queue		     */
-	__volatile__ int  pending;     /* On hardware DMA queue		     */
-	wait_queue_head_t dma_wait;    /* Processes waiting		     */
-	struct file       *filp;       /* Pointer to holding file descr	     */
-	int		  context;     /* Kernel queue for this buffer	     */
-	int		  while_locked;/* Dispatch this buffer while locked  */
+	int		  idx;	       /**< Index into master buflist */
+	int		  total;       /**< Buffer size */
+	int		  order;       /**< log-base-2(total) */
+	int		  used;	       /**< Amount of buffer in use (for DMA) */
+	unsigned long	  offset;      /**< Byte offset (used internally) */
+	void		  *address;    /**< Address of buffer */
+	unsigned long	  bus_address; /**< Bus address of buffer */
+	struct drm_buf	  *next;       /**< Kernel-only: used for free list */
+	__volatile__ int  waiting;     /**< On kernel DMA queue */
+	__volatile__ int  pending;     /**< On hardware DMA queue */
+	wait_queue_head_t dma_wait;    /**< Processes waiting */
+	struct file       *filp;       /**< Pointer to holding file descr */
+	int		  context;     /**< Kernel queue for this buffer */
+	int		  while_locked;/**< Dispatch this buffer while locked */
 	enum {
 		DRM_LIST_NONE	 = 0,
 		DRM_LIST_FREE	 = 1,
@@ -333,41 +423,43 @@ typedef struct drm_buf {
 		DRM_LIST_PEND	 = 3,
 		DRM_LIST_PRIO	 = 4,
 		DRM_LIST_RECLAIM = 5
-	}		  list;	       /* Which list we're on		     */
+	}		  list;	       /**< Which list we're on */
 
-
-	int		  dev_priv_size; /* Size of buffer private stoarge   */
-	void		  *dev_private;  /* Per-buffer private storage       */
+	int		  dev_priv_size; /**< Size of buffer private storage */
+	void		  *dev_private;  /**< Per-buffer private storage */
 } drm_buf_t;
 
 
-				/* bufs is one longer than it has to be */
+/** bufs is one longer than it has to be */
 typedef struct drm_waitlist {
-	int		  count;	/* Number of possible buffers	   */
-	drm_buf_t	  **bufs;	/* List of pointers to buffers	   */
-	drm_buf_t	  **rp;		/* Read pointer			   */
-	drm_buf_t	  **wp;		/* Write pointer		   */
-	drm_buf_t	  **end;	/* End pointer			   */
+	int		  count;	/**< Number of possible buffers */
+	drm_buf_t	  **bufs;	/**< List of pointers to buffers */
+	drm_buf_t	  **rp;		/**< Read pointer */
+	drm_buf_t	  **wp;		/**< Write pointer */
+	drm_buf_t	  **end;	/**< End pointer */
 	spinlock_t	  read_lock;
 	spinlock_t	  write_lock;
 } drm_waitlist_t;
 
 typedef struct drm_freelist {
-	int		  initialized; /* Freelist in use		   */
-	atomic_t	  count;       /* Number of free buffers	   */
-	drm_buf_t	  *next;       /* End pointer			   */
+	int		  initialized; /**< Freelist in use */
+	atomic_t	  count;       /**< Number of free buffers */
+	drm_buf_t	  *next;       /**< End pointer */
 
-	wait_queue_head_t waiting;     /* Processes waiting on free bufs   */
-	int		  low_mark;    /* Low water mark		   */
-	int		  high_mark;   /* High water mark		   */
-	atomic_t	  wfh;	       /* If waiting for high mark	   */
+	wait_queue_head_t waiting;     /**< Processes waiting on free bufs */
+	int		  low_mark;    /**< Low water mark */
+	int		  high_mark;   /**< High water mark */
+	atomic_t	  wfh;	       /**< If waiting for high mark */
 	spinlock_t        lock;
 } drm_freelist_t;
 
+/**
+ * Buffer entry.  There is one of this for each buffer size order.
+ */
 typedef struct drm_buf_entry {
-	int		  buf_size;
-	int		  buf_count;
-	drm_buf_t	  *buflist;
+	int		  buf_size;	/**< size */
+	int		  buf_count;	/**< number of buffers */
+	drm_buf_t	  *buflist;	/**< buffer list */
 	int		  seg_count;
 	int		  page_order;
 	unsigned long	  *seglist;
@@ -375,11 +467,19 @@ typedef struct drm_buf_entry {
 	drm_freelist_t	  freelist;
 } drm_buf_entry_t;
 
+/**
+ * Hardware lock.
+ *
+ * The lock structure is a simple cache-line aligned integer.  To avoid
+ * processor bus contention on a multiprocessor system, there should not be any
+ * other data stored in the same cache line.
+ */
 typedef struct drm_hw_lock {
-	__volatile__ unsigned int lock;
-	char			  padding[60]; /* Pad to cache line */
+	__volatile__ unsigned int lock;		/**< lock variable */
+	char			  padding[60];	/**< Pad to cache line */
 } drm_hw_lock_t;
 
+/** File private data */
 typedef struct drm_file {
 	int		  authenticated;
 	int		  minor;
@@ -394,69 +494,85 @@ typedef struct drm_file {
 	unsigned long     lock_count;
 } drm_file_t;
 
-
+/** Wait queue */
 typedef struct drm_queue {
-	atomic_t	  use_count;	/* Outstanding uses (+1)	    */
-	atomic_t	  finalization;	/* Finalization in progress	    */
-	atomic_t	  block_count;	/* Count of processes waiting	    */
-	atomic_t	  block_read;	/* Queue blocked for reads	    */
-	wait_queue_head_t read_queue;	/* Processes waiting on block_read  */
-	atomic_t	  block_write;	/* Queue blocked for writes	    */
-	wait_queue_head_t write_queue;	/* Processes waiting on block_write */
+	atomic_t	  use_count;	/**< Outstanding uses (+1) */
+	atomic_t	  finalization;	/**< Finalization in progress */
+	atomic_t	  block_count;	/**< Count of processes waiting */
+	atomic_t	  block_read;	/**< Queue blocked for reads */
+	wait_queue_head_t read_queue;	/**< Processes waiting on block_read */
+	atomic_t	  block_write;	/**< Queue blocked for writes */
+	wait_queue_head_t write_queue;	/**< Processes waiting on block_write */
 #if 1
-	atomic_t	  total_queued;	/* Total queued statistic	    */
-	atomic_t	  total_flushed;/* Total flushes statistic	    */
-	atomic_t	  total_locks;	/* Total locks statistics	    */
+	atomic_t	  total_queued;	/**< Total queued statistic */
+	atomic_t	  total_flushed;/**< Total flushes statistic */
+	atomic_t	  total_locks;	/**< Total locks statistics */
 #endif
-	drm_ctx_flags_t	  flags;	/* Context preserving and 2D-only   */
-	drm_waitlist_t	  waitlist;	/* Pending buffers		    */
-	wait_queue_head_t flush_queue;	/* Processes waiting until flush    */
+	drm_ctx_flags_t	  flags;	/**< Context preserving and 2D-only */
+	drm_waitlist_t	  waitlist;	/**< Pending buffers */
+	wait_queue_head_t flush_queue;	/**< Processes waiting until flush */
 } drm_queue_t;
 
+/**
+ * Lock data.
+ */
 typedef struct drm_lock_data {
-	drm_hw_lock_t	  *hw_lock;	/* Hardware lock		   */
-	struct file       *filp;	/* File descr of lock holder (0=kernel)   */
-	wait_queue_head_t lock_queue;	/* Queue of blocked processes	   */
-	unsigned long	  lock_time;	/* Time of last lock in jiffies	   */
+	drm_hw_lock_t	  *hw_lock;	/**< Hardware lock */
+	struct file       *filp;	/**< File descr of lock holder (0=kernel) */
+	wait_queue_head_t lock_queue;	/**< Queue of blocked processes */
+	unsigned long	  lock_time;	/**< Time of last lock in jiffies */
 } drm_lock_data_t;
 
+/**
+ * DMA data.
+ */
 typedef struct drm_device_dma {
 
-	drm_buf_entry_t	  bufs[DRM_MAX_ORDER+1];
-	int		  buf_count;
-	drm_buf_t	  **buflist;	/* Vector of pointers info bufs	   */
+	drm_buf_entry_t	  bufs[DRM_MAX_ORDER+1];	/**< buffers, grouped by their size order */
+	int		  buf_count;	/**< total number of buffers */
+	drm_buf_t	  **buflist;	/**< Vector of pointers into drm_device_dma::bufs */
 	int		  seg_count;
-	int		  page_count;
-	unsigned long	  *pagelist;
+	int		  page_count;	/**< number of pages */
+	unsigned long	  *pagelist;	/**< page list */
 	unsigned long	  byte_count;
 	enum {
 		_DRM_DMA_USE_AGP = 0x01,
 		_DRM_DMA_USE_SG  = 0x02
 	} flags;
 
-				/* DMA support */
-	drm_buf_t	  *this_buffer;	/* Buffer being sent		   */
-	drm_buf_t	  *next_buffer; /* Selected buffer to send	   */
-	drm_queue_t	  *next_queue;	/* Queue from which buffer selected*/
-	wait_queue_head_t waiting;	/* Processes waiting on free bufs  */
+	/** \name DMA support */
+	/*@{*/
+	drm_buf_t	  *this_buffer;	/**< Buffer being sent */
+	drm_buf_t	  *next_buffer; /**< Selected buffer to send */
+	drm_queue_t	  *next_queue;	/**< Queue from which buffer selected*/
+	wait_queue_head_t waiting;	/**< Processes waiting on free bufs */
+	/*@}*/
 } drm_device_dma_t;
 
 #if __REALLY_HAVE_AGP
+/** 
+ * AGP memory entry.  Stored as a doubly linked list.
+ */
 typedef struct drm_agp_mem {
-	unsigned long      handle;
-	struct agp_memory         *memory;
-	unsigned long      bound; /* address */
+	unsigned long      handle;	/**< handle */
+	struct agp_memory *memory;	
+	unsigned long      bound;	/**< address */
 	int                pages;
-	struct drm_agp_mem *prev;
-	struct drm_agp_mem *next;
+	struct drm_agp_mem *prev;	/**< previous entry */
+	struct drm_agp_mem *next;	/**< next entry */
 } drm_agp_mem_t;
 
+/**
+ * AGP data.
+ *
+ * \sa DRM(agp_init)() and drm_device::agp.
+ */
 typedef struct drm_agp_head {
-	struct agp_kern_info      agp_info;
-	drm_agp_mem_t      *memory;
-	unsigned long      mode;
-	int                enabled;
-	int                acquired;
+	struct agp_kern_info      agp_info;	/**< AGP device information */
+	drm_agp_mem_t      *memory;	/**< memory entries */
+	unsigned long      mode;	/**< AGP mode */
+	int                enabled;	/**< whether the AGP bus as been enabled */
+	int                acquired;	/**< whether the AGP device has been acquired */
 	unsigned long      base;
    	int 		   agp_mtrr;
 	int		   cant_use_aperture;
@@ -464,6 +580,9 @@ typedef struct drm_agp_head {
 } drm_agp_head_t;
 #endif
 
+/**
+ * Scatter-gather memory.
+ */
 typedef struct drm_sg_mem {
 	unsigned long   handle;
 	void            *virtual;
@@ -477,9 +596,12 @@ typedef struct drm_sigdata {
 	drm_hw_lock_t *lock;
 } drm_sigdata_t;
 
+/**
+ * Mappings list
+ */
 typedef struct drm_map_list {
-	struct list_head	head;
-	drm_map_t		*map;
+	struct list_head	head;	/**< list head */
+	drm_map_t		*map;	/**< mapping */
 } drm_map_list_t;
 
 typedef drm_map_t drm_local_map_t;
@@ -495,88 +617,108 @@ typedef struct drm_vbl_sig {
 
 #endif
 
+/**
+ * DRM device structure.
+ */
 typedef struct drm_device {
-	const char	  *name;	/* Simple driver name		   */
-	char		  *unique;	/* Unique identifier: e.g., busid  */
-	int		  unique_len;	/* Length of unique field	   */
-	dev_t		  device;	/* Device number for mknod	   */
-	char		  *devname;	/* For /proc/interrupts		   */
+	const char	  *name;	/**< Simple driver name */
+	char		  *unique;	/**< Unique identifier: e.g., busid */
+	int		  unique_len;	/**< Length of unique field */
+	dev_t		  device;	/**< Device number for mknod */
+	char		  *devname;	/**< For /proc/interrupts */
 
-	int		  blocked;	/* Blocked due to VC switch?	   */
-	struct proc_dir_entry *root;	/* Root for this device's entries  */
+	int		  blocked;	/**< Blocked due to VC switch? */
+	struct proc_dir_entry *root;	/**< Root for this device's entries */
 
-				/* Locks */
-	spinlock_t	  count_lock;	/* For inuse, open_count, buf_use  */
-	struct semaphore  struct_sem;	/* For others			   */
+	/** \name Locks */
+	/*@{*/
+	spinlock_t	  count_lock;	/**< For inuse, drm_device::open_count, drm_device::buf_use */
+	struct semaphore  struct_sem;	/**< For others */
+	/*@}*/
 
-				/* Usage Counters */
-	int		  open_count;	/* Outstanding files open	   */
-	atomic_t	  ioctl_count;	/* Outstanding IOCTLs pending	   */
-	atomic_t	  vma_count;	/* Outstanding vma areas open	   */
-	int		  buf_use;	/* Buffers in use -- cannot alloc  */
-	atomic_t	  buf_alloc;	/* Buffer allocation in progress   */
+	/** \name Usage Counters */
+	/*@{*/
+	int		  open_count;	/**< Outstanding files open */
+	atomic_t	  ioctl_count;	/**< Outstanding IOCTLs pending */
+	atomic_t	  vma_count;	/**< Outstanding vma areas open */
+	int		  buf_use;	/**< Buffers in use -- cannot alloc */
+	atomic_t	  buf_alloc;	/**< Buffer allocation in progress */
+	/*@}*/
 
-				/* Performance counters */
+	/** \name Performance counters */
+	/*@{*/
 	unsigned long     counters;
 	drm_stat_type_t   types[15];
 	atomic_t          counts[15];
+	/*@}*/
 
-				/* Authentication */
-	drm_file_t	  *file_first;
-	drm_file_t	  *file_last;
-	drm_magic_head_t  magiclist[DRM_HASH_SIZE];
+	/** \name Authentication */
+	/*@{*/
+	drm_file_t	  *file_first;	/**< file list head */
+	drm_file_t	  *file_last;	/**< file list tail */
+	drm_magic_head_t  magiclist[DRM_HASH_SIZE];	/**< magic hash table */
+	/*@}*/
 
-				/* Memory management */
-	drm_map_list_t	  *maplist;	/* Linked list of regions	   */
+	/** \name Memory management */
+	/*@{*/
+	drm_map_list_t	  *maplist;	/**< Linked list of regions */
+	int		  map_count;	/**< Number of mappable regions */
 
-	drm_map_t	  **context_sareas;
+	drm_map_t	  **context_sareas; /**< per-context SAREA's */
 	int		  max_context;
 
-	drm_vma_entry_t	  *vmalist;	/* List of vmas (for debugging)	   */
-	drm_lock_data_t	  lock;		/* Information on hardware lock	   */
+	drm_vma_entry_t	  *vmalist;	/**< List of vmas (for debugging) */
+	drm_lock_data_t	  lock;		/**< Information on hardware lock */
+	/*@}*/
 
-				/* DMA queues (contexts) */
-	int		  queue_count;	/* Number of active DMA queues	   */
-	int		  queue_reserved; /* Number of reserved DMA queues */
-	int		  queue_slots;	/* Actual length of queuelist	   */
-	drm_queue_t	  **queuelist;	/* Vector of pointers to DMA queues */
-	drm_device_dma_t  *dma;		/* Optional pointer for DMA support */
+	/** \name DMA queues (contexts) */
+	/*@{*/
+	int		  queue_count;	/**< Number of active DMA queues */
+	int		  queue_reserved; /**< Number of reserved DMA queues */
+	int		  queue_slots;	/**< Actual length of queuelist */
+	drm_queue_t	  **queuelist;	/**< Vector of pointers to DMA queues */
+	drm_device_dma_t  *dma;		/**< Optional pointer for DMA support */
+	/*@}*/
 
-				/* Context support */
-	int		  irq;		/* Interrupt used by board	   */
-	__volatile__ long context_flag;	/* Context swapping flag	   */
-	__volatile__ long interrupt_flag; /* Interruption handler flag	   */
-	__volatile__ long dma_flag;	/* DMA dispatch flag		   */
-	struct timer_list timer;	/* Timer for delaying ctx switch   */
-	wait_queue_head_t context_wait; /* Processes waiting on ctx switch */
-	int		  last_checked;	/* Last context checked for DMA	   */
-	int		  last_context;	/* Last current context		   */
-	unsigned long	  last_switch;	/* jiffies at last context switch  */
-	struct work_struct		  work;
+	/** \name Context support */
+	/*@{*/
+	int		  irq;		/**< Interrupt used by board */
+	__volatile__ long context_flag;	/**< Context swapping flag */
+	__volatile__ long interrupt_flag; /**< Interruption handler flag */
+	__volatile__ long dma_flag;	/**< DMA dispatch flag */
+	struct timer_list timer;	/**< Timer for delaying ctx switch */
+	wait_queue_head_t context_wait; /**< Processes waiting on ctx switch */
+	int		  last_checked;	/**< Last context checked for DMA */
+	int		  last_context;	/**< Last current context */
+	unsigned long	  last_switch;	/**< jiffies at last context switch */
+	/*@}*/
+	
+	struct work_struct	work;
+	/** \name VBLANK IRQ support */
+	/*@{*/
 #if __HAVE_VBL_IRQ
-   	wait_queue_head_t vbl_queue;
+   	wait_queue_head_t vbl_queue;	/**< VBLANK wait queue */
    	atomic_t          vbl_received;
 	spinlock_t        vbl_lock;
-	drm_vbl_sig_t     vbl_sigs;
+	drm_vbl_sig_t     vbl_sigs;	/**< signal list to send on VBLANK */
 	unsigned int      vbl_pending;
 #endif
+	/*@}*/
 	cycles_t	  ctx_start;
 	cycles_t	  lck_start;
 
-				/* Callback to X server for context switch
-				   and for heavy-handed reset. */
-	char		  buf[DRM_BSZ]; /* Output buffer		   */
-	char		  *buf_rp;	/* Read pointer			   */
-	char		  *buf_wp;	/* Write pointer		   */
-	char		  *buf_end;	/* End pointer			   */
-	struct fasync_struct *buf_async;/* Processes waiting for SIGIO	   */
-	wait_queue_head_t buf_readers;	/* Processes waiting to read	   */
-	wait_queue_head_t buf_writers;	/* Processes waiting to ctx switch */
+	char		  buf[DRM_BSZ]; /**< Output buffer */
+	char		  *buf_rp;	/**< Read pointer */
+	char		  *buf_wp;	/**< Write pointer */
+	char		  *buf_end;	/**< End pointer */
+	struct fasync_struct *buf_async;/**< Processes waiting for SIGIO */
+	wait_queue_head_t buf_readers;	/**< Processes waiting to read */
+	wait_queue_head_t buf_writers;	/**< Processes waiting to ctx switch */
 
 #if __REALLY_HAVE_AGP
-	drm_agp_head_t    *agp;
+	drm_agp_head_t    *agp;	/**< AGP data */
 #endif
-	struct pci_dev *pdev;
+	struct pci_dev *pdev;		/**< PCI device structure */
 #ifdef __alpha__
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,3)
 	struct pci_controler *hose;
@@ -584,17 +726,17 @@ typedef struct drm_device {
 	struct pci_controller *hose;
 #endif
 #endif
-	drm_sg_mem_t      *sg;  /* Scatter gather memory */
-	unsigned long     *ctx_bitmap;
-	void		  *dev_private;
-	drm_sigdata_t     sigdata; /* For block_all_signals */
+	drm_sg_mem_t      *sg;  /**< Scatter gather memory */
+	unsigned long     *ctx_bitmap;	/**< context bitmap */
+	void		  *dev_private; /**< device private data */
+	drm_sigdata_t     sigdata; /**< For block_all_signals */
 	sigset_t          sigmask;
 } drm_device_t;
 
 
-/* ================================================================
- * Internal function definitions
- */
+/******************************************************************/
+/** \name Internal function definitions */
+/*@{*/
 
 				/* Misc. support (drm_init.h) */
 extern int	     DRM(flags);
@@ -653,7 +795,8 @@ extern unsigned long DRM(alloc_pages)(int order, int area);
 extern void	     DRM(free_pages)(unsigned long address, int order,
 				     int area);
 extern void	     *DRM(ioremap)(unsigned long offset, unsigned long size, drm_device_t *dev);
-extern void	     *DRM(ioremap_nocache)(unsigned long offset, unsigned long size, drm_device_t *dev);
+extern void	     *DRM(ioremap_nocache)(unsigned long offset, unsigned long size,
+					   drm_device_t *dev);
 extern void	     DRM(ioremapfree)(void *pt, unsigned long size, drm_device_t *dev);
 
 #if __REALLY_HAVE_AGP
@@ -841,6 +984,8 @@ extern int            DRM(ati_pcigart_init)(drm_device_t *dev,
 extern int            DRM(ati_pcigart_cleanup)(drm_device_t *dev,
 					       unsigned long addr,
 					       dma_addr_t bus_addr);
+
+/*@}*/
 
 #endif /* __KERNEL__ */
 #endif

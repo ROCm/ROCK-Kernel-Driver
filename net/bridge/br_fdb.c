@@ -251,8 +251,21 @@ void br_fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
 	write_lock_bh(&br->hash_lock);
 	hlist_for_each(h, &br->hash[hash]) {
 		fdb = hlist_entry(h, struct net_bridge_fdb_entry, hlist);
-		if (!fdb->is_local &&
-		    !memcmp(fdb->addr.addr, addr, ETH_ALEN)) {
+		if (!memcmp(fdb->addr.addr, addr, ETH_ALEN)) {
+			/* attempt to update an entry for a local interface */
+			if (unlikely(fdb->is_local)) {
+				if (is_local) 
+					printk(KERN_INFO "%s: attempt to add"
+					       " interface with same source address.\n",
+					       source->dev->name);
+				else if (net_ratelimit()) 
+					printk(KERN_WARNING "%s: received packet with "
+					       " own address as source address\n",
+					       source->dev->name);
+				goto out;
+			}
+
+
 			if (likely(!fdb->is_static || is_local)) {
 				/* move to end of age list */
 				list_del(&fdb->age_list);

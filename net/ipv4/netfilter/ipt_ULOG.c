@@ -325,7 +325,6 @@ static int __init init(void)
 
 	/* initialize ulog_buffers */
 	for (i = 0; i < ULOG_MAXNLGROUPS; i++) {
-		memset(&ulog_buffers[i], 0, sizeof(ulog_buff_t));
 		init_timer(&ulog_buffers[i].timer);
 		ulog_buffers[i].timer.function = ulog_timer;
 		ulog_buffers[i].timer.data = i;

@@ -85,7 +85,6 @@ struct pnp_option * pnp_register_dependent_option(struct pnp_dev *dev, int prior
 
 int pnp_register_irq_resource(struct pnp_option *option, struct pnp_irq *data)
 {
-	int i;
 	struct pnp_irq *ptr;
 	if (!option)
 		return -EINVAL;
@@ -101,9 +100,13 @@ int pnp_register_irq_resource(struct pnp_option *option, struct pnp_irq *data)
 		option->irq = data;
 
 #ifdef CONFIG_PCI
-	for (i=0; i<16; i++)
-		if (data->map & (1<<i))
-			pcibios_penalize_isa_irq(i);
+	{
+		int i;
+
+		for (i=0; i<16; i++)
+			if (data->map & (1<<i))
+				pcibios_penalize_isa_irq(i);
+	}
 #endif
 	return 0;
 }
@@ -283,6 +286,8 @@ int pnp_check_port(struct pnp_dev * dev, int idx)
 			continue;
 		for (tmp = 0; tmp < PNP_MAX_PORT; tmp++) {
 			if (tdev->res.port_resource[tmp].flags & IORESOURCE_IO) {
+				if (pnp_port_flags(dev, tmp) & IORESOURCE_DISABLED)
+					continue;
 				tport = &tdev->res.port_resource[tmp].start;
 				tend = &tdev->res.port_resource[tmp].end;
 				if (ranged_conflict(port,end,tport,tend))
@@ -337,6 +342,8 @@ int pnp_check_mem(struct pnp_dev * dev, int idx)
 			continue;
 		for (tmp = 0; tmp < PNP_MAX_MEM; tmp++) {
 			if (tdev->res.mem_resource[tmp].flags & IORESOURCE_MEM) {
+				if (pnp_mem_flags(dev, tmp) & IORESOURCE_DISABLED)
+					continue;
 				taddr = &tdev->res.mem_resource[tmp].start;
 				tend = &tdev->res.mem_resource[tmp].end;
 				if (ranged_conflict(addr,end,taddr,tend))
@@ -406,6 +413,8 @@ int pnp_check_irq(struct pnp_dev * dev, int idx)
 			continue;
 		for (tmp = 0; tmp < PNP_MAX_IRQ; tmp++) {
 			if (tdev->res.irq_resource[tmp].flags & IORESOURCE_IRQ) {
+				if (pnp_irq_flags(dev, tmp) & IORESOURCE_DISABLED)
+					continue;
 				if ((tdev->res.irq_resource[tmp].start == *irq))
 					return 0;
 			}
@@ -459,6 +468,8 @@ int pnp_check_dma(struct pnp_dev * dev, int idx)
 			continue;
 		for (tmp = 0; tmp < PNP_MAX_DMA; tmp++) {
 			if (tdev->res.dma_resource[tmp].flags & IORESOURCE_DMA) {
+				if (pnp_dma_flags(dev, tmp) & IORESOURCE_DISABLED)
+					continue;
 				if ((tdev->res.dma_resource[tmp].start == *dma))
 					return 0;
 			}

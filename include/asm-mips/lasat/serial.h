@@ -1,0 +1,28 @@
+#include <asm/lasat/lasat.h>
+
+/* Lasat 100 boards serial configuration */
+#define LASAT_BASE_BAUD_100 		( 7372800 / 16 ) 
+#define LASAT_UART_REGS_BASE_100	0x1c8b0000
+#define LASAT_UART_REGS_SHIFT_100	2
+#define LASATINT_UART_100		8
+
+/* * LASAT 200 boards serial configuration */
+#define LASAT_BASE_BAUD_200		(100000000 / 16 / 12) 
+#define LASAT_UART_REGS_BASE_200	(Vrc5074_PHYS_BASE + 0x0300)
+#define LASAT_UART_REGS_SHIFT_200	3
+#define LASATINT_UART_200		13
+
+#if defined(CONFIG_LASAT_100)
+#define LASAT_BASE_BAUD		LASAT_BASE_BAUD_200
+#define LASAT_UART_REGS_BASE	LASAT_UART_REGS_BASE_200
+#define LASAT_UART_REGS_SHIFT	LASAT_UART_REGS_SHIFT_200
+#define LASATINT_UART		LASAT_UART_REGS_SHIFT_200
+#elif defined(CONFIG_LASAT_200)
+#define LASAT_BASE_BAUD		LASAT_BASE_BAUD_200
+#define LASAT_UART_REGS_BASE	LASAT_UART_REGS_BASE_200
+#define LASAT_UART_REGS_SHIFT	LASAT_UART_REGS_SHIFT_200
+#define LASATINT_UART		LASAT_UART_REGS_SHIFT_200
+#else
+#error Select a Lasat board in the configuration menu
+#endif
+

@@ -30,19 +30,6 @@
 #include <asm/sn/io.h>
 #include <asm/sn/sn_private.h>
 
-#ifdef __ia64
-uint64_t atealloc(struct map *mp, size_t size);
-void atefree(struct map *mp, size_t size, uint64_t a);
-void atemapfree(struct map *mp);
-struct map *atemapalloc(uint64_t mapsiz);
-
-#define rmallocmap atemapalloc
-#define rmfreemap atemapfree
-#define rmfree atefree
-#define rmalloc atealloc
-#endif
-
-
 #ifndef LOCAL
 #define LOCAL           static
 #endif
@@ -165,32 +152,55 @@ pcibr_init_ext_ate_ram(bridge_t *bridge)
 int
 pcibr_ate_alloc(pcibr_soft_t pcibr_soft, int count)
 {
-    int                     index = 0;
+    int			    status = 0;
+    struct resource	    *new_res;
+    struct resource         **allocated_res;
 
-    index = (int) rmalloc(pcibr_soft->bs_int_ate_map, (size_t) count);
+    new_res = (struct resource *) kmalloc( sizeof(struct resource), GFP_ATOMIC);
+    memset(new_res, 0, sizeof(*new_res));
+    status = allocate_resource( &pcibr_soft->bs_int_ate_resource, new_res,
+				count, pcibr_soft->bs_int_ate_resource.start, 
+				pcibr_soft->bs_int_ate_resource.end, 1,
+				NULL, NULL);
 
-    if (!index && pcibr_soft->bs_ext_ate_map)
-	index = (int) rmalloc(pcibr_soft->bs_ext_ate_map, (size_t) count);
+    if ( status && (pcibr_soft->bs_ext_ate_resource.end != 0) ) {
+	status = allocate_resource( &pcibr_soft->bs_ext_ate_resource, new_res,
+				count, pcibr_soft->bs_ext_ate_resource.start,
+				pcibr_soft->bs_ext_ate_resource.end, 1,
+				NULL, NULL);
+	if (status) {
+		new_res->start = -1;
+	}
+    }
 
-    /* rmalloc manages resources in the 1..n
-     * range, with 0 being failure.
-     * pcibr_ate_alloc manages resources
-     * in the 0..n-1 range, with -1 being failure.
-     */
-    return index - 1;
+    if (status) {
+	/* Failed to allocate */
+	kfree(new_res);
+	return -1;
+    }
+
+    /* Save the resource for freeing */
+    allocated_res = (struct resource **)(((unsigned long)pcibr_soft->bs_allocated_ate_res) + new_res->start * sizeof( unsigned long));
+    *allocated_res = new_res;
+
+    return new_res->start;
 }
 
 void
 pcibr_ate_free(pcibr_soft_t pcibr_soft, int index, int count)
 /* Who says there's no such thing as a free meal? :-) */
 {
-    /* note the "+1" since rmalloc handles 1..n but
-     * we start counting ATEs at zero.
-     */
-    rmfree((index < pcibr_soft->bs_int_ate_size)
-	   ? pcibr_soft->bs_int_ate_map
-	   : pcibr_soft->bs_ext_ate_map,
-	   count, index + 1);
+
+    struct resource **allocated_res;
+    int status = 0;
+
+    allocated_res = (struct resource **)(((unsigned long)pcibr_soft->bs_allocated_ate_res) + index * sizeof(unsigned long));
+
+    status = release_resource(*allocated_res);
+    if (status)
+	BUG(); /* Ouch .. */
+    kfree(*allocated_res);
+
 }
 
 /*

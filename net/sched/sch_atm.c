@@ -545,15 +545,16 @@ static int atm_tc_requeue(struct sk_buff *skb,struct Qdisc *sch)
 }
 
 
-static int atm_tc_drop(struct Qdisc *sch)
+static unsigned int atm_tc_drop(struct Qdisc *sch)
 {
 	struct atm_qdisc_data *p = PRIV(sch);
 	struct atm_flow_data *flow;
+	unsigned int len;
 
 	DPRINTK("atm_tc_drop(sch %p,[qdisc %p])\n",sch,p);
 	for (flow = p->flows; flow; flow = flow->next)
-		if (flow->q->ops->drop && flow->q->ops->drop(flow->q))
-			return 1;
+		if (flow->q->ops->drop && (len = flow->q->ops->drop(flow->q)))
+			return len;
 	return 0;
 }
 

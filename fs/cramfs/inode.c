@@ -342,7 +342,7 @@ static int cramfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 /*
  * Lookup and fill in the inode data..
  */
-static struct dentry * cramfs_lookup(struct inode *dir, struct dentry *dentry)
+static struct dentry * cramfs_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *nd)
 {
 	unsigned int offset = 0;
 	int sorted;

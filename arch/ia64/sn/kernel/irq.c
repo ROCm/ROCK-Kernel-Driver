@@ -34,6 +34,7 @@
 
 #include <linux/init.h>
 #include <linux/sched.h>
+#include <linux/vmalloc.h>
 #include <asm/current.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>
@@ -218,6 +219,8 @@ register_pcibr_intr(int irq, pcibr_intr_t intr) {
 
 	if (pcibr_intr_list == NULL) {
 		pcibr_intr_list = kmalloc(sizeof(struct pcibr_intr_list_t *) * NR_IRQS, GFP_KERNEL);
+		if (pcibr_intr_list == NULL) 
+			pcibr_intr_list = vmalloc(sizeof(struct pcibr_intr_list_t *) * NR_IRQS);
 		if (pcibr_intr_list == NULL) panic("Could not allocate memory for pcibr_intr_list\n");
 		memset( (void *)pcibr_intr_list, 0, sizeof(struct pcibr_intr_list_t *) * NR_IRQS);
 	}

@@ -368,11 +368,11 @@ extern void update_mmu_cache(struct vm_area_struct *, unsigned long, pte_t);
 /* Encode and de-code a swap entry */
 
 #define __swp_type(x)                     ((x).val & 0x1f)
-#define __swp_offset(x)                   ( (((x).val >> 5) &  0xf) | \
-					  (((x).val >> 7) & ~0xf) )
+#define __swp_offset(x)                   ( (((x).val >> 6) &  0x7) | \
+					  (((x).val >> 8) & ~0x7) )
 #define __swp_entry(type, offset)         ((swp_entry_t) { (type) | \
-					    ((offset &  0xf) << 5) | \
-					    ((offset & ~0xf) << 7) })
+					    ((offset &  0x7) << 6) | \
+					    ((offset & ~0x7) << 8) })
 #define __pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) })
 #define __swp_entry_to_pte(x)		((pte_t) { (x).val })
 

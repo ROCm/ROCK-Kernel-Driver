@@ -36,6 +36,7 @@
 #include <linux/writeback.h>
 #include <linux/vfs.h>
 #include <linux/blkdev.h>
+#include <linux/security.h>
 #include <asm/uaccess.h>
 #include <asm/div64.h>
 
@@ -298,7 +299,7 @@ static swp_entry_t *shmem_swp_alloc(struct shmem_inode_info *info, unsigned long
 	static const swp_entry_t unswapped = {0};
 
 	if (sgp != SGP_WRITE &&
-	    ((loff_t) index << PAGE_CACHE_SHIFT) >= inode->i_size)
+	    ((loff_t) index << PAGE_CACHE_SHIFT) >= i_size_read(inode))
 		return ERR_PTR(-EINVAL);
 
 	while (!(entry = shmem_swp_entry(info, index, &page))) {
@@ -331,7 +332,7 @@ static swp_entry_t *shmem_swp_alloc(struct shmem_inode_info *info, unsigned long
 			return ERR_PTR(-ENOMEM);
 		}
 		if (sgp != SGP_WRITE &&
-		    ((loff_t) index << PAGE_CACHE_SHIFT) >= inode->i_size) {
+		    ((loff_t) index << PAGE_CACHE_SHIFT) >= i_size_read(inode)) {
 			entry = ERR_PTR(-EINVAL);
 			break;
 		}
@@ -507,7 +508,7 @@ static int shmem_notify_change(struct dentry *dentry, struct iattr *attr)
 	 	 */
 		change = VM_ACCT(attr->ia_size) - VM_ACCT(inode->i_size);
 		if (change > 0) {
-			if (!vm_enough_memory(change))
+			if (security_vm_enough_memory(change))
 				return -ENOMEM;
 		} else if (attr->ia_size < inode->i_size) {
 			vm_unacct_memory(-change);
@@ -640,7 +641,7 @@ found:
 
 	/* Racing against delete or truncate? Must leave out of page cache */
 	limit = (inode->i_state & I_FREEING)? 0:
-		(inode->i_size + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
+		(i_size_read(inode) + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
 
 	if (idx >= limit ||
 	    move_from_swap_cache(page, idx, inode->i_mapping) == 0)
@@ -963,7 +964,7 @@ static int shmem_populate(struct vm_area_struct *vma,
 	enum sgp_type sgp = nonblock? SGP_QUICK: SGP_CACHE;
 	unsigned long size;
 
-	size = (inode->i_size + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	size = (i_size_read(inode) + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	if (pgoff >= size || pgoff + (len >> PAGE_SHIFT) > size)
 		return -EINVAL;
 
@@ -1139,7 +1140,7 @@ shmem_file_write(struct file *file, const char __user *buf, size_t count, loff_t
 	maxpos = inode->i_size;
 	if (maxpos < pos + count) {
 		maxpos = pos + count;
-		if (!vm_enough_memory(VM_ACCT(maxpos) - VM_ACCT(inode->i_size))) {
+		if (security_vm_enough_memory(VM_ACCT(maxpos) - VM_ACCT(inode->i_size))) {
 			err = -ENOMEM;
 			goto out;
 		}
@@ -1238,12 +1239,13 @@ static void do_shmem_file_read(struct file *filp, loff_t *ppos, read_descriptor_
 	for (;;) {
 		struct page *page = NULL;
 		unsigned long end_index, nr, ret;
+		loff_t i_size = i_size_read(inode);
 
-		end_index = inode->i_size >> PAGE_CACHE_SHIFT;
+		end_index = i_size >> PAGE_CACHE_SHIFT;
 		if (index > end_index)
 			break;
 		if (index == end_index) {
-			nr = inode->i_size & ~PAGE_CACHE_MASK;
+			nr = i_size & ~PAGE_CACHE_MASK;
 			if (nr <= offset)
 				break;
 		}
@@ -1260,9 +1262,10 @@ static void do_shmem_file_read(struct file *filp, loff_t *ppos, read_descriptor_
 		 * are called without i_sem protection against truncate
 		 */
 		nr = PAGE_CACHE_SIZE;
-		end_index = inode->i_size >> PAGE_CACHE_SHIFT;
+		i_size = i_size_read(inode);
+		end_index = i_size >> PAGE_CACHE_SHIFT;
 		if (index == end_index) {
-			nr = inode->i_size & ~PAGE_CACHE_MASK;
+			nr = i_size & ~PAGE_CACHE_MASK;
 			if (nr <= offset) {
 				page_cache_release(page);
 				break;
@@ -1397,7 +1400,8 @@ static int shmem_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	return 0;
 }
 
-static int shmem_create(struct inode *dir, struct dentry *dentry, int mode)
+static int shmem_create(struct inode *dir, struct dentry *dentry, int mode,
+		struct nameidata *nd)
 {
 	return shmem_mknod(dir, dentry, mode | S_IFREG, 0);
 }
@@ -1493,7 +1497,7 @@ static int shmem_symlink(struct inode *dir, struct dentry *dentry, const char *s
 		memcpy(info, symname, len);
 		inode->i_op = &shmem_symlink_inline_operations;
 	} else {
-		if (!vm_enough_memory(VM_ACCT(1))) {
+		if (security_vm_enough_memory(VM_ACCT(1))) {
 			iput(inode);
 			return -ENOMEM;
 		}
@@ -1887,7 +1891,7 @@ struct file *shmem_file_setup(char *name, loff_t size, unsigned long flags)
 	if (size > SHMEM_MAX_BYTES)
 		return ERR_PTR(-EINVAL);
 
-	if ((flags & VM_ACCOUNT) && !vm_enough_memory(VM_ACCT(size)))
+	if ((flags & VM_ACCOUNT) && security_vm_enough_memory(VM_ACCT(size)))
 		return ERR_PTR(-ENOMEM);
 
 	error = -ENOMEM;

@@ -2,23 +2,22 @@
 #define _DVB_FILTER_H_
 
 #include <linux/slab.h>
-#include <linux/vmalloc.h>
 
 #include "demux.h"
 
 typedef int (dvb_filter_pes2ts_cb_t) (void *, unsigned char *);
 
-typedef struct dvb_filter_pes2ts_s {
+struct dvb_filter_pes2ts {
 	unsigned char buf[188];
         unsigned char cc;
         dvb_filter_pes2ts_cb_t *cb;
 	void *priv;
-} dvb_filter_pes2ts_t;
+};
 
-void dvb_filter_pes2ts_init(dvb_filter_pes2ts_t *p2ts, unsigned short pid, 
+void dvb_filter_pes2ts_init(struct dvb_filter_pes2ts *p2ts, unsigned short pid, 
 		 	    dvb_filter_pes2ts_cb_t *cb, void *priv);
 
-int dvb_filter_pes2ts(dvb_filter_pes2ts_t *p2ts, unsigned char *pes, int len);
+int dvb_filter_pes2ts(struct dvb_filter_pes2ts *p2ts, unsigned char *pes, int len);
 
 
 #define PROG_STREAM_MAP  0xBC
@@ -35,14 +34,14 @@ int dvb_filter_pes2ts(dvb_filter_pes2ts_t *p2ts, unsigned char *pes, int len);
 #define ISO13522_STREAM  0xF3
 #define PROG_STREAM_DIR  0xFF
 
-#define PICTURE_START    0x00
-#define USER_START       0xb2
-#define SEQUENCE_HEADER  0xb3
-#define SEQUENCE_ERROR   0xb4
-#define EXTENSION_START  0xb5
-#define SEQUENCE_END     0xb7
-#define GOP_START        0xb8
-#define EXCEPT_SLICE     0xb0
+#define DVB_PICTURE_START    0x00
+#define DVB_USER_START       0xb2
+#define DVB_SEQUENCE_HEADER  0xb3
+#define DVB_SEQUENCE_ERROR   0xb4
+#define DVB_EXTENSION_START  0xb5
+#define DVB_SEQUENCE_END     0xb7
+#define DVB_GOP_START        0xb8
+#define DVB_EXCEPT_SLICE     0xb0
 
 #define SEQUENCE_EXTENSION           0x01
 #define SEQUENCE_DISPLAY_EXTENSION   0x02
@@ -111,12 +110,12 @@ int dvb_filter_pes2ts(dvb_filter_pes2ts_t *p2ts, unsigned char *pes, int len);
 #define IPACKS 2048
 #endif
 
-typedef struct ipack_s {
+struct ipack {
 	int size;
 	int found;
 	u8 *buf;
 	u8 cid;
-	uint32_t plength;
+	u32 plength;
 	u8 plen[2];
 	u8 flag1;
 	u8 flag2;
@@ -131,34 +130,33 @@ typedef struct ipack_s {
 	void (*func)(u8 *buf,  int size, void *priv);
 	int count;
 	int repack_subids;
-} ipack;
+};
 
-typedef struct video_i{
-	uint32_t horizontal_size;
-	uint32_t vertical_size;
-	uint32_t aspect_ratio;
-	uint32_t framerate;
-	uint32_t video_format;
-	uint32_t bit_rate;
-	uint32_t comp_bit_rate;
-	uint32_t vbv_buffer_size;
-        int16_t  vbv_delay;
-	uint32_t CSPF;
-	uint32_t off;
-} VideoInfo;            
-
+struct dvb_video_info {
+	u32 horizontal_size;
+	u32 vertical_size;
+	u32 aspect_ratio;
+	u32 framerate;
+	u32 video_format;
+	u32 bit_rate;
+	u32 comp_bit_rate;
+	u32 vbv_buffer_size;
+        s16 vbv_delay;
+	u32 CSPF;
+	u32 off;
+};            
 
 #define OFF_SIZE 4
 #define FIRST_FIELD 0
 #define SECOND_FIELD 1
 #define VIDEO_FRAME_PICTURE 0x03
 
-typedef struct mpg_picture_s{
+struct mpg_picture {
         int       channel;
-	VideoInfo vinfo;
-        uint32_t  *sequence_gop_header;
-        uint32_t  *picture_header;
-        int32_t   time_code;
+	struct dvb_video_info vinfo;
+        u32      *sequence_gop_header;
+        u32      *picture_header;
+        s32       time_code;
         int       low_delay;
         int       closed_gop;
         int       broken_link;
@@ -166,12 +164,12 @@ typedef struct mpg_picture_s{
         int       gop_flag;              
         int       sequence_end_flag;
                                                                 
-        uint8_t   profile_and_level;
-        int32_t   picture_coding_parameter;
-        uint32_t  matrix[32];
-        int8_t    matrix_change_flag;
+        u8        profile_and_level;
+        s32       picture_coding_parameter;
+        u32       matrix[32];
+        s8        matrix_change_flag;
 
-        uint8_t   picture_header_parameter;
+        u8        picture_header_parameter;
   /* bit 0 - 2: bwd f code
      bit 3    : fpb vector
      bit 4 - 6: fwd f code
@@ -180,11 +178,11 @@ typedef struct mpg_picture_s{
         int       mpeg1_flag;
         int       progressive_sequence;
         int       sequence_display_extension_flag;
-        uint32_t  sequence_header_data;
-        int16_t   last_frame_centre_horizontal_offset;
-        int16_t   last_frame_centre_vertical_offset;
+        u32       sequence_header_data;
+        s16       last_frame_centre_horizontal_offset;
+        s16       last_frame_centre_vertical_offset;
 
-        uint32_t  pts[2]; /* [0] 1st field, [1] 2nd field */
+        u32       pts[2]; /* [0] 1st field, [1] 2nd field */
         int       top_field_first;
         int       repeat_first_field;
         int       progressive_frame;
@@ -192,39 +190,36 @@ typedef struct mpg_picture_s{
         int       forward_bank;
         int       backward_bank;
         int       compress;
-        int16_t   frame_centre_horizontal_offset[OFF_SIZE];                   
+        s16       frame_centre_horizontal_offset[OFF_SIZE];                   
                   /* [0-2] 1st field, [3] 2nd field */
-        int16_t   frame_centre_vertical_offset[OFF_SIZE];
+        s16       frame_centre_vertical_offset[OFF_SIZE];
                   /* [0-2] 1st field, [3] 2nd field */
-        int16_t   temporal_reference[2];                               
+        s16       temporal_reference[2];                               
                   /* [0] 1st field, [1] 2nd field */
 
-        int8_t    picture_coding_type[2];
+        s8        picture_coding_type[2];
                  /* [0] 1st field, [1] 2nd field */
-        int8_t    picture_structure[2];
+        s8        picture_structure[2];
                  /* [0] 1st field, [1] 2nd field */
-        int8_t    picture_display_extension_flag[2];
+        s8        picture_display_extension_flag[2];
                  /* [0] 1st field, [1] 2nd field */
                  /* picture_display_extenion() 0:no 1:exit*/
-        int8_t    pts_flag[2];
+        s8        pts_flag[2];
                  /* [0] 1st field, [1] 2nd field */
-} mpg_picture;
+};
 
-
-
-
-typedef struct audio_i{
+struct dvb_audio_info {
 	int layer               ;
-	uint32_t bit_rate    ;
-	uint32_t frequency   ;
-	uint32_t mode                ;
-	uint32_t mode_extension ;
-	uint32_t emphasis    ;
-	uint32_t framesize;
-	uint32_t off;
-} AudioInfo;
+	u32 bit_rate;
+	u32 frequency;
+	u32 mode;
+	u32 mode_extension ;
+	u32 emphasis;
+	u32 framesize;
+	u32 off;
+};
 
-int dvb_filter_get_ac3info(uint8_t *mbuf, int count, AudioInfo *ai, int pr);
+int dvb_filter_get_ac3info(u8 *mbuf, int count, struct dvb_audio_info *ai, int pr);
 
 
 #endif

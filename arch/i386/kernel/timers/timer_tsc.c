@@ -9,6 +9,7 @@
 #include <linux/errno.h>
 #include <linux/cpufreq.h>
 #include <linux/string.h>
+#include <linux/jiffies.h>
 
 #include <asm/timer.h>
 #include <asm/io.h>
@@ -21,7 +22,6 @@
 int tsc_disable __initdata = 0;
 
 extern spinlock_t i8253_lock;
-extern unsigned long jiffies;
 
 static int use_tsc;
 /* Number of usecs that the last interrupt was delayed */
@@ -124,6 +124,7 @@ static void mark_offset_tsc(void)
 	int countmp;
 	static int count1 = 0;
 	unsigned long long this_offset, last_offset;
+	static int lost_count = 0;
 	
 	write_lock(&monotonic_lock);
 	last_offset = ((unsigned long long)last_tsc_high<<32)|last_tsc_low;
@@ -178,9 +179,19 @@ static void mark_offset_tsc(void)
 	delta += delay_at_last_interrupt;
 	lost = delta/(1000000/HZ);
 	delay = delta%(1000000/HZ);
-	if (lost >= 2)
+	if (lost >= 2) {
 		jiffies += lost-1;
 
+		/* sanity check to ensure we're not always loosing ticks */
+		if (lost_count++ > 100) {
+			printk(KERN_WARNING "Loosing too many ticks!\n");
+			printk(KERN_WARNING "TSC cannot be used as a timesource."
+					" (Are you running with SpeedStep?)\n");
+			printk(KERN_WARNING "Falling back to a sane timesource.\n");
+			clock_fallback();
+		}
+	} else
+		lost_count = 0;
 	/* update the monotonic base value */
 	this_offset = ((unsigned long long)last_tsc_high<<32)|last_tsc_low;
 	monotonic_base += cycles_2_ns(this_offset - last_offset);
@@ -194,7 +205,7 @@ static void mark_offset_tsc(void)
 	 * between tsc and pit reads (as noted when 
 	 * usec delta is > 90% # of usecs/tick)
 	 */
-	if (abs(delay - delay_at_last_interrupt) > (900000/HZ))
+	if (lost && abs(delay - delay_at_last_interrupt) > (900000/HZ))
 		jiffies++;
 }
 

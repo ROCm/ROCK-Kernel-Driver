@@ -1,7 +1,7 @@
-#ifndef _MIPS64_RMAP_H
-#define _MIPS64_RMAP_H
+#ifndef __ASM_RMAP_H
+#define __ASM_RMAP_H
 
 /* nothing to see, move along */
 #include <asm-generic/rmap.h>
 
-#endif
+#endif /* __ASM_RMAP_H */

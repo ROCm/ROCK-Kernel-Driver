@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 1995-2001 Russell King
  *               2001-2002 Keith Owens
- *               2003-?    Ian Molton
+ *               2003      Ian Molton
  *     
  * Generate definitions needed by assembly language modules.
  * This code generates raw asm output which is post-processed to extract

@@ -93,43 +93,6 @@ static __inline__ int tcp_v6_sk_hashfn(struct sock *sk)
 	return tcp_v6_hashfn(laddr, lport, faddr, fport);
 }
 
-static inline int ipv6_rcv_saddr_equal(struct sock *sk, struct sock *sk2)
-{
-	struct ipv6_pinfo *np = inet6_sk(sk);
-	int addr_type = ipv6_addr_type(&np->rcv_saddr);
-
-	if (!inet_sk(sk2)->rcv_saddr && !ipv6_only_sock(sk))
-		return 1;
-
-	if (sk2->sk_family == AF_INET6 &&
-	    ipv6_addr_any(&inet6_sk(sk2)->rcv_saddr) &&
-	    !(ipv6_only_sock(sk2) && addr_type == IPV6_ADDR_MAPPED))
-		return 1;
-
-	if (addr_type == IPV6_ADDR_ANY &&
-	    (!ipv6_only_sock(sk) ||
-	     !(sk2->sk_family == AF_INET6 ?
-	       (ipv6_addr_type(&inet6_sk(sk2)->rcv_saddr) == IPV6_ADDR_MAPPED) :
-	        1)))
-		return 1;
-
-	if (sk2->sk_family == AF_INET6 &&
-	    !ipv6_addr_cmp(&np->rcv_saddr,
-			   (sk2->sk_state != TCP_TIME_WAIT ?
-			    &inet6_sk(sk2)->rcv_saddr :
-			    &((struct tcp_tw_bucket *)sk)->tw_v6_rcv_saddr)))
-		return 1;
-
-	if (addr_type == IPV6_ADDR_MAPPED &&
-	    !ipv6_only_sock(sk2) &&
-	    (!inet_sk(sk2)->rcv_saddr ||
-	     !inet_sk(sk)->rcv_saddr ||
-	     inet_sk(sk)->rcv_saddr == inet_sk(sk2)->rcv_saddr))
-		return 1;
-
-	return 0;
-}
-
 static inline int tcp_v6_bind_conflict(struct sock *sk,
 				       struct tcp_bind_bucket *tb)
 {
@@ -581,7 +544,6 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct tcp_opt *tp = tcp_sk(sk);
 	struct in6_addr *saddr = NULL;
-	struct in6_addr saddr_buf;
 	struct flowi fl;
 	struct dst_entry *dst;
 	int addr_type;
@@ -708,22 +670,23 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 		goto failure;
 	}
 
-	ip6_dst_store(sk, dst, NULL);
-	sk->sk_route_caps = dst->dev->features &
-			    ~(NETIF_F_IP_CSUM | NETIF_F_TSO);
-
 	if (saddr == NULL) {
-		err = ipv6_get_saddr(dst, &np->daddr, &saddr_buf);
-		if (err)
+		err = ipv6_get_saddr(dst, &np->daddr, &fl.fl6_src);
+		if (err) {
+			dst_release(dst);
 			goto failure;
-
-		saddr = &saddr_buf;
+		}
+		saddr = &fl.fl6_src;
+		ipv6_addr_copy(&np->rcv_saddr, saddr);
 	}
 
 	/* set the source address */
-	ipv6_addr_copy(&np->rcv_saddr, saddr);
 	ipv6_addr_copy(&np->saddr, saddr);
 	inet->rcv_saddr = LOOPBACK4_IPV6;
+
+	ip6_dst_store(sk, dst, NULL);
+	sk->sk_route_caps = dst->dev->features &
+			    ~(NETIF_F_IP_CSUM | NETIF_F_TSO);
 
 	tp->ext_header_len = 0;
 	if (np->opt)
@@ -751,8 +714,8 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 
 late_failure:
 	tcp_set_state(sk, TCP_CLOSE);
-failure:
 	__sk_dst_reset(sk);
+failure:
 	inet->dport = 0;
 	sk->sk_route_caps = 0;
 	return err;

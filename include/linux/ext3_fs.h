@@ -39,12 +39,6 @@ struct statfs;
 #define EXT3_DEFAULT_PREALLOC_BLOCKS	8
 
 /*
- * The second extended file system version
- */
-#define EXT3FS_DATE		"02 Dec 2001"
-#define EXT3FS_VERSION		"2.4-0.9.16"
-
-/*
  * Always enable hashed directories
  */
 #define CONFIG_EXT3_INDEX
@@ -642,10 +636,14 @@ struct dx_hash_info
 struct ext3_iloc
 {
 	struct buffer_head *bh;
-	struct ext3_inode *raw_inode;
+	unsigned long offset;
 	unsigned long block_group;
 };
 
+static inline struct ext3_inode *ext3_raw_inode(struct ext3_iloc *iloc)
+{
+	return (struct ext3_inode *) (iloc->bh->b_data + iloc->offset);
+}
 
 /*
  * This structure is stuffed into the struct file's private_data field

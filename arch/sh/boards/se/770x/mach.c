@@ -72,6 +72,5 @@ struct sh_machine_vector mv_se __initmv = {
 #ifdef CONFIG_HEARTBEAT
 	mv_heartbeat:		heartbeat_se,
 #endif
-	mv_hw_se:		1,
 };
 ALIAS_MV(se)

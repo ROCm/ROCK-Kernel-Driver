@@ -90,11 +90,6 @@ struct vlan_group;
 #define MAX_HEADER (LL_MAX_HEADER + 48)
 #endif
 
-/* Reserve 16byte aligned hard_header_len, but at least 16.
- * Alternative is: dev->hard_header_len ? (dev->hard_header_len + 15)&~15 : 0
- */
-#define LL_RESERVED_SPACE(dev) (((dev)->hard_header_len&~15) + 16)
-
 /*
  *	Network device statistics. Akin to the 2.0 ether stats but
  *	with byte counters.
@@ -204,6 +199,17 @@ struct hh_cache
 	(((__len)+(HH_DATA_MOD-1))&~(HH_DATA_MOD - 1))
 	unsigned long	hh_data[HH_DATA_ALIGN(LL_MAX_HEADER)];
 };
+
+/* Reserve HH_DATA_MOD byte aligned hard_header_len, but at least that much.
+ * Alternative is:
+ *   dev->hard_header_len ? (dev->hard_header_len +
+ *                           (HH_DATA_MOD - 1)) & ~(HH_DATA_MOD - 1) : 0
+ *
+ * We could use other alignment values, but we must maintain the
+ * relationship HH alignment <= LL alignment.
+ */
+#define LL_RESERVED_SPACE(dev) \
+	(((dev)->hard_header_len&~(HH_DATA_MOD - 1)) + HH_DATA_MOD)
 
 /* These flag bits are private to the generic network queueing
  * layer, they may not be explicitly referenced by any other
@@ -555,7 +561,7 @@ static inline void __netif_schedule(struct net_device *dev)
 		cpu = smp_processor_id();
 		dev->next_sched = softnet_data[cpu].output_queue;
 		softnet_data[cpu].output_queue = dev;
-		cpu_raise_softirq(cpu, NET_TX_SOFTIRQ);
+		raise_softirq_irqoff(NET_TX_SOFTIRQ);
 		local_irq_restore(flags);
 	}
 }
@@ -606,7 +612,7 @@ static inline void dev_kfree_skb_irq(struct sk_buff *skb)
 		cpu = smp_processor_id();
 		skb->next = softnet_data[cpu].completion_queue;
 		softnet_data[cpu].completion_queue = skb;
-		cpu_raise_softirq(cpu, NET_TX_SOFTIRQ);
+		raise_softirq_irqoff(NET_TX_SOFTIRQ);
 		local_irq_restore(flags);
 	}
 }
@@ -773,7 +779,7 @@ static inline void __netif_rx_schedule(struct net_device *dev)
 		dev->quota += dev->weight;
 	else
 		dev->quota = dev->weight;
-	__cpu_raise_softirq(cpu, NET_RX_SOFTIRQ);
+	__raise_softirq_irqoff(NET_RX_SOFTIRQ);
 	local_irq_restore(flags);
 }
 
@@ -799,7 +805,7 @@ static inline int netif_rx_reschedule(struct net_device *dev, int undo)
 		local_irq_save(flags);
 		cpu = smp_processor_id();
 		list_add_tail(&dev->poll_list, &softnet_data[cpu].poll_list);
-		__cpu_raise_softirq(cpu, NET_RX_SOFTIRQ);
+		__raise_softirq_irqoff(NET_RX_SOFTIRQ);
 		local_irq_restore(flags);
 		return 1;
 	}

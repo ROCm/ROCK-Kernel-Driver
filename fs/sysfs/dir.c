@@ -121,7 +121,29 @@ void sysfs_remove_dir(struct kobject * kobj)
 	dput(parent);
 }
 
+void sysfs_rename_dir(struct kobject * kobj, char *new_name)
+{
+	struct dentry * new_dentry, * parent;
+
+	if (!strcmp(kobj->name, new_name))
+		return;
+
+	if (!kobj->parent)
+		return;
+
+	parent = kobj->parent->dentry;
+
+	down(&parent->d_inode->i_sem);
+
+	new_dentry = sysfs_get_dentry(parent, new_name);
+	d_move(kobj->dentry, new_dentry);
+
+	strlcpy(kobj->name, new_name, KOBJ_NAME_LEN);
+
+	up(&parent->d_inode->i_sem);	
+}
 
 EXPORT_SYMBOL(sysfs_create_dir);
 EXPORT_SYMBOL(sysfs_remove_dir);
+EXPORT_SYMBOL(sysfs_rename_dir);
 

@@ -1,9 +1,8 @@
-/* $Id: bagetIRQ.S,v 1.1 1999/01/17 03:49:37 ralf Exp $
+/*
  * bagetIRQ.S: Interrupt exception dispatch code for Baget/MIPS
  *
  * Copyright (C) 1998 Gleb Raiko & Vladimir Roganov
  */
-
 #include <asm/asm.h>
 #include <asm/mipsregs.h>
 #include <asm/regdef.h>
@@ -25,28 +24,28 @@ NESTED(bagetIRQ, PT_SIZE, sp)
 	.set	push
 	.set    noreorder
 	jal	a1
-	.set    pop 
-	move	a0, sp                                          
+	.set    pop
+	move	a0, sp
 
 	la      a1, ret_from_irq
 	jr	a1
 END(bagetIRQ)
-	
+
 #define DBE_HANDLER       0x1C
-	
+
 NESTED(try_read, PT_SIZE, sp)
 	mfc0	t3, CP0_STATUS		# save flags and
 	CLI				#  disable interrupts
 
 	li	t0, KSEG2
-	sltu    t1, t0, a0              # Is it KSEG2 address ?               
-	beqz	t1, mapped              # No - already mapped !    
-					 
-	move    t0, a0		        
+	sltu    t1, t0, a0              # Is it KSEG2 address ?
+	beqz	t1, mapped              # No - already mapped !
+
+	move    t0, a0
 	ori	t0, 0xfff
 	xori    t0, 0xfff               # round address to page
 
-	ori     t1, t0, 0xf00           # prepare EntryLo (N,V,D,G) 
+	ori     t1, t0, 0xf00           # prepare EntryLo (N,V,D,G)
 
 	mfc0    t2,   CP0_ENTRYHI       # save ASID value
 	mtc0	zero, CP0_INDEX
@@ -57,15 +56,15 @@ NESTED(try_read, PT_SIZE, sp)
 	tlbwi				# ... and write ones
 	nop
 	nop
-	mtc0    t2,  CP0_ENTRYHI           
-	
-mapped:		
+	mtc0    t2,  CP0_ENTRYHI
+
+mapped:
 	la	t0, exception_handlers
 	lw	t1, DBE_HANDLER(t0)	# save real handler
-	la	t2, dbe_handler			
+	la	t2, dbe_handler
 	sw	t2, DBE_HANDLER(t0)	# set temporary local handler
 	li	v0, -1			# default (failure) value
-	
+
 	li	t2, 1
 	beq	t2, a1, 1f
 	li	t2, 2
@@ -81,13 +80,13 @@ mapped:
 	b	out
 
 4:	lw	v0, (a0)		# word
-	
-out:		
+
+out:
 	sw	t1, DBE_HANDLER(t0)	# restore real handler
 	mtc0	t3, CP0_STATUS		# restore CPU flags
-	jr	ra			
-	
-dbe_handler:	
+	jr	ra
+
+dbe_handler:
 	li	v0, -1			# mark our failure
 	.set	push
 	.set	noreorder

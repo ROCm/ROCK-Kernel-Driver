@@ -139,7 +139,7 @@ struct scsi_request *scsi_allocate_request(struct scsi_device *sdev)
 		sreq->sr_device = sdev;
 		sreq->sr_host = sdev->host;
 		sreq->sr_magic = SCSI_REQ_MAGIC;
-		sreq->sr_data_direction = SCSI_DATA_UNKNOWN;
+		sreq->sr_data_direction = DMA_BIDIRECTIONAL;
 	}
 
 	return sreq;
@@ -582,7 +582,7 @@ void scsi_done(struct scsi_cmnd *cmd)
 	local_irq_save(flags);
 	cpu = smp_processor_id();
 	list_add_tail(&cmd->eh_entry, &done_q[cpu]);
-	cpu_raise_softirq(cpu, SCSI_SOFTIRQ);
+	raise_softirq_irqoff(SCSI_SOFTIRQ);
 	local_irq_restore(flags);
 }
 

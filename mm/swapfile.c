@@ -20,7 +20,9 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/init.h>
+#include <linux/module.h>
 #include <linux/rmap-locking.h>
+#include <linux/security.h>
 
 #include <asm/pgtable.h>
 #include <linux/swapops.h>
@@ -29,6 +31,8 @@ spinlock_t swaplock = SPIN_LOCK_UNLOCKED;
 unsigned int nr_swapfiles;
 int total_swap_pages;
 static int swap_overflow;
+
+EXPORT_SYMBOL(total_swap_pages);
 
 static const char Bad_file[] = "Bad swap file entry ";
 static const char Unused_file[] = "Unused swap file entry ";
@@ -922,7 +926,7 @@ static int setup_swap_extents(struct swap_info_struct *sis)
 	 */
 	probe_block = 0;
 	page_no = 0;
-	last_block = inode->i_size >> blkbits;
+	last_block = i_size_read(inode) >> blkbits;
 	while ((probe_block + blocks_per_page) <= last_block &&
 			page_no < sis->max) {
 		unsigned block_in_page;
@@ -1042,7 +1046,7 @@ asmlinkage long sys_swapoff(const char __user * specialfile)
 		swap_list_unlock();
 		goto out_dput;
 	}
-	if (vm_enough_memory(p->pages))
+	if (!security_vm_enough_memory(p->pages))
 		vm_unacct_memory(p->pages);
 	else {
 		err = -ENOMEM;
@@ -1308,7 +1312,7 @@ asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 		goto bad_swap;
 	}
 
-	swapfilesize = mapping->host->i_size >> PAGE_SHIFT;
+	swapfilesize = i_size_read(mapping->host) >> PAGE_SHIFT;
 
 	/*
 	 * Read the swap header.

@@ -111,7 +111,7 @@ static int ramfs_mkdir(struct inode * dir, struct dentry * dentry, int mode)
 	return retval;
 }
 
-static int ramfs_create(struct inode *dir, struct dentry *dentry, int mode)
+static int ramfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidata *nd)
 {
 	return ramfs_mknod(dir, dentry, mode | S_IFREG, 0);
 }
@@ -146,6 +146,7 @@ static struct file_operations ramfs_file_operations = {
 	.mmap		= generic_file_mmap,
 	.fsync		= simple_sync_file,
 	.sendfile	= generic_file_sendfile,
+	.llseek		= generic_file_llseek,
 };
 
 static struct inode_operations ramfs_file_inode_operations = {

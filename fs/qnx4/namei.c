@@ -107,7 +107,7 @@ static struct buffer_head *qnx4_find_entry(int len, struct inode *dir,
 	return NULL;
 }
 
-struct dentry * qnx4_lookup(struct inode *dir, struct dentry *dentry)
+struct dentry * qnx4_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *nd)
 {
 	int ino;
 	struct qnx4_inode_entry *de;
@@ -142,7 +142,8 @@ out:
 }
 
 #ifdef CONFIG_QNX4FS_RW
-int qnx4_create(struct inode *dir, struct dentry *dentry, int mode)
+int qnx4_create(struct inode *dir, struct dentry *dentry, int mode,
+		struct nameidata *nd)
 {
 	QNX4DEBUG(("qnx4: qnx4_create\n"));
 	if (dir == NULL) {

@@ -26,7 +26,7 @@ struct exec
 
 #ifdef __KERNEL__
 
-#define STACK_TOP (current->thread.mflags & MF_32BIT ? 0x7fff8000 : TASK_SIZE)
+#define STACK_TOP (current->thread.mflags & MF_32BIT_ADDR ? TASK_SIZE32 : TASK_SIZE)
 
 #endif
 

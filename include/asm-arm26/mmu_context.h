@@ -26,7 +26,7 @@
  * tsk->mm will be NULL
  */
 static inline void
-enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
+enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
 {
 }
 
@@ -36,7 +36,7 @@ enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
  */
 static inline void
 switch_mm(struct mm_struct *prev, struct mm_struct *next,
-	  struct task_struct *tsk, unsigned int cpu)
+	  struct task_struct *tsk)
 {
 	cpu_switch_mm(next->pgd, next);
 }

@@ -28,64 +28,76 @@ extern void sn_dma_flush(unsigned long);
 static inline unsigned int
 __sn_inb (unsigned long port)
 {
-	volatile unsigned char *addr = sn_io_addr(port);
-	unsigned char ret;
+	volatile unsigned char *addr;
+	unsigned char ret = -1;
 
-	ret = *addr;
-	__sn_mf_a();
-	sn_dma_flush((unsigned long)addr);
+	if ((addr = sn_io_addr(port))) {
+		ret = *addr;
+		__sn_mf_a();
+		sn_dma_flush((unsigned long)addr);
+	}
 	return ret;
 }
 
 static inline unsigned int
 __sn_inw (unsigned long port)
 {
-	volatile unsigned short *addr = sn_io_addr(port);
-	unsigned short ret;
+	volatile unsigned short *addr;
+	unsigned short ret = -1;
 
-	ret = *addr;
-	__sn_mf_a();
-	sn_dma_flush((unsigned long)addr);
+	if ((addr = sn_io_addr(port))) {
+		ret = *addr;
+		__sn_mf_a();
+		sn_dma_flush((unsigned long)addr);
+	}
 	return ret;
 }
 
 static inline unsigned int
 __sn_inl (unsigned long port)
 {
-	volatile unsigned int *addr = sn_io_addr(port);
-	unsigned int ret;
+	volatile unsigned int *addr;
+	unsigned int ret = -1;
 
-	ret = *addr;
-	__sn_mf_a();
-	sn_dma_flush((unsigned long)addr);
+	if ((addr = sn_io_addr(port))) {
+		ret = *addr;
+		__sn_mf_a();
+		sn_dma_flush((unsigned long)addr);
+	}
 	return ret;
 }
 
 static inline void
 __sn_outb (unsigned char val, unsigned long port)
 {
-	volatile unsigned char *addr = sn_io_addr(port);
+	volatile unsigned char *addr;
 
-	*addr = val;
-	sn_mmiob();
+	if ((addr = sn_io_addr(port))) {
+		*addr = val;
+		sn_mmiob();
+	}
 }
 
 static inline void
 __sn_outw (unsigned short val, unsigned long port)
 {
-	volatile unsigned short *addr = sn_io_addr(port);
+	volatile unsigned short *addr;
 
-	*addr = val;
-	sn_mmiob();
+	if ((addr = sn_io_addr(port))) {
+		*addr = val;
+		sn_mmiob();
+	}
 }
 
 static inline void
 __sn_outl (unsigned int val, unsigned long port)
 {
-	volatile unsigned int *addr = sn_io_addr(port);
+	volatile unsigned int *addr;
 
-	*addr = val;
-	sn_mmiob();
+	if ((addr = sn_io_addr(port))) {
+		*addr = val;
+		sn_mmiob();
+	}
 }
 
 /*

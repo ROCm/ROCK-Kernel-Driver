@@ -234,7 +234,7 @@ extern struct hfs_cat_entry *hfs_cat_get(struct hfs_mdb *,
 					 const struct hfs_cat_key *);
 
 /* dir.c */
-extern int hfs_create(struct inode *, struct dentry *, int);
+extern int hfs_create(struct inode *, struct dentry *, int, struct nameidata *);
 extern int hfs_mkdir(struct inode *, struct dentry *, int);
 extern int hfs_unlink(struct inode *, struct dentry *);
 extern int hfs_rmdir(struct inode *, struct dentry *);

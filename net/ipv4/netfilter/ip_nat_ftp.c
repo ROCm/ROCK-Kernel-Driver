@@ -84,7 +84,7 @@ ftp_nat_expected(struct sk_buff **pskb,
 		mr.range[0].flags |= IP_NAT_RANGE_PROTO_SPECIFIED;
 		mr.range[0].min = mr.range[0].max
 			= ((union ip_conntrack_manip_proto)
-				{ htons(exp_ftp_info->port) });
+				{ .tcp = { htons(exp_ftp_info->port) } });
 	}
 	return ip_nat_setup_info(ct, &mr, hooknum);
 }
@@ -306,9 +306,6 @@ static int __init init(void)
 		ports[0] = FTP_PORT;
 
 	for (i = 0; (i < MAX_PORTS) && ports[i]; i++) {
-
-		memset(&ftp[i], 0, sizeof(struct ip_nat_helper));
-
 		ftp[i].tuple.dst.protonum = IPPROTO_TCP;
 		ftp[i].tuple.src.u.tcp.port = htons(ports[i]);
 		ftp[i].mask.dst.protonum = 0xFFFF;

@@ -166,7 +166,11 @@ static int device_reset( Scsi_Cmnd *srb )
 
 	/* lock the device pointers and do the reset */
 	down(&(us->dev_semaphore));
-	result = us->transport_reset(us);
+	if (test_bit(US_FLIDX_DISCONNECTING, &us->flags)) {
+		result = FAILED;
+		US_DEBUGP("No reset during disconnect\n");
+	} else
+		result = us->transport_reset(us);
 	up(&(us->dev_semaphore));
 
 	/* lock access to the state and clear it */
@@ -202,7 +206,7 @@ static int bus_reset( Scsi_Cmnd *srb )
 	down(&(us->dev_semaphore));
 	if (test_bit(US_FLIDX_DISCONNECTING, &us->flags)) {
 		result = -EIO;
-		US_DEBUGP("Attempt to reset during disconnect\n");
+		US_DEBUGP("No reset during disconnect\n");
 	} else if (us->pusb_dev->actconfig->desc.bNumInterfaces != 1) {
 		result = -EBUSY;
 		US_DEBUGP("Refusing to reset a multi-interface device\n");

@@ -10,6 +10,7 @@
 #include <linux/mm.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
+#include <linux/sockios.h>
 #include <linux/tty.h>
 #include <linux/file.h>
 

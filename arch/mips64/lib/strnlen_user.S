@@ -23,11 +23,11 @@
  * Return 0 for error, len on string but at max a1 otherwise
  */
 LEAF(__strnlen_user_asm)
-	ld	v0, THREAD_CURDS($28)	# pointer ok?
-	and	v0, ta0
-	bltz	v0, fault
+	ld	v0, TI_ADDR_LIMIT($28)	# pointer ok?
+	and	v0, a0
+	bnez	v0, fault
 
-EXPORT(__strnlen_user_nocheck_asm)
+FEXPORT(__strnlen_user_nocheck_asm)
 	move	v0, a0
 	daddu	a1, a0			# stop pointer
 1:	beq	v0, a1, 1f		# limit reached?
@@ -37,10 +37,6 @@ EXPORT(__strnlen_user_nocheck_asm)
 1:	dsubu	v0, a0
 	jr	ra
 	END(__strnlen_user_asm)
-
-	.section	__ex_table,"a"
-	PTR		1b, fault
-	.previous
 
 fault:	move	v0, zero
 	jr	ra

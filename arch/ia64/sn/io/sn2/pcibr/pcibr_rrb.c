@@ -700,10 +700,10 @@ pcibr_slot_initial_rrb_alloc(vertex_hdl_t pcibr_vhdl,
     pcibr_soft = pcibr_soft_get(pcibr_vhdl);
 
     if (!pcibr_soft)
-	return(EINVAL);
+	return(-EINVAL);
 
     if (!PCIBR_VALID_SLOT(pcibr_soft, slot))
-	return(EINVAL);
+	return(-EINVAL);
 
     bridge = pcibr_soft->bs_base;
 
@@ -741,7 +741,13 @@ pcibr_slot_initial_rrb_alloc(vertex_hdl_t pcibr_vhdl,
 
         pcibr_soft->bs_rrb_valid[slot][3] = chan[3];
 
-        return(ENODEV);
+        return(-ENODEV);
+    }
+
+    /* Give back any assigned to empty slots */
+    if ((pcibr_info->f_vendor == PCIIO_VENDOR_ID_NONE) && !pcibr_soft->bs_slot[slot].has_host) {
+	do_pcibr_rrb_free_all(pcibr_soft, bridge, slot);
+	return(-ENODEV);
     }
 
     for (vchan = 0; vchan < vchan_total; vchan++)

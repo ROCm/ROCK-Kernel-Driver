@@ -4163,9 +4163,7 @@ static void trigger_fr_arp(struct net_device *dev)
 {
 	fr_channel_t* chan = dev->priv;
 
-	del_timer(&chan->fr_arp_timer);
-	chan->fr_arp_timer.expires = jiffies + (chan->inarp_interval * HZ);
-	add_timer(&chan->fr_arp_timer);
+	mod_timer(&chan->fr_arp_timer, jiffies + chan->inarp_interval * HZ);
 	return;
 }
 

@@ -226,19 +226,23 @@ xfs_acl_vget(
 	int		kind)
 {
 	int			error;
-	xfs_acl_t		*xfs_acl;
+	xfs_acl_t		*xfs_acl = NULL;
 	posix_acl_xattr_header	*ext_acl = acl;
+	int			flags = 0;
 
 	VN_HOLD(vp);
 	if ((error = _MAC_VACCESS(vp, NULL, VREAD)))
 		goto out;
-	if (!(_ACL_ALLOC(xfs_acl))) {
-		error = ENOMEM;
-		goto out;
-	}
+	if(size) {
+		if (!(_ACL_ALLOC(xfs_acl))) {
+			error = ENOMEM;
+			goto out;
+		}
+		memset(xfs_acl, 0, sizeof(xfs_acl_t));
+	} else
+		flags = ATTR_KERNOVAL;
 
-	memset(xfs_acl, 0, sizeof(xfs_acl_t));
-	xfs_acl_get_attr(vp, xfs_acl, kind, size? 0 : ATTR_KERNOVAL, &error);
+	xfs_acl_get_attr(vp, xfs_acl, kind, flags, &error);
 	if (error)
 		goto out;
 
@@ -262,7 +266,8 @@ xfs_acl_vget(
 	}
 out:
 	VN_RELE(vp);
-	_ACL_FREE(xfs_acl);
+	if(xfs_acl)
+		_ACL_FREE(xfs_acl);
 	return -error;
 }
 
@@ -657,6 +662,7 @@ xfs_acl_get_attr(
 {
 	int		len = sizeof(xfs_acl_t);
 
+	ASSERT((flags & ATTR_KERNOVAL) ? (aclp == NULL) : 1);
 	flags |= ATTR_ROOT;
 	VOP_ATTR_GET(vp,
 		kind == _ACL_TYPE_ACCESS ? SGI_ACL_FILE : SGI_ACL_DEFAULT,

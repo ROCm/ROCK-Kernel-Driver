@@ -3,113 +3,65 @@
 
 #include <asm/page.h>
 #include <linux/threads.h>
+#include <linux/mm.h>
 
-extern struct pgtable_cache_struct {
-        unsigned long *pgd_cache;
-        unsigned long *pte_cache;
-        unsigned long pgtable_cache_sz;
-} quicklists;
-
-#define pgd_quicklist           (quicklists.pgd_cache)
-#define pmd_quicklist           ((unsigned long *)0)
-#define pte_quicklist           (quicklists.pte_cache)
-#define pgtable_cache_size      (quicklists.pgtable_cache_sz)
-
-#define pmd_populate(mm, pmd, pte) pmd_set(pmd, pte)
+#define pmd_populate_kernel(mm, pmd, pte) pmd_set(pmd, pte)
+#define pmd_populate(mm, pmd, pte) pmd_set(pmd, page_address(pte))
 
 /*
  * Allocate and free page tables.
  */
 
-static inline pgd_t *get_pgd_slow(void)
+extern inline pgd_t *pgd_alloc (struct mm_struct *mm)
 {
-        pgd_t *ret = (pgd_t *)__get_free_page(GFP_KERNEL);
-
-        if (ret) {
-                memset(ret, 0, USER_PTRS_PER_PGD * sizeof(pgd_t));
-                memcpy(ret + USER_PTRS_PER_PGD, swapper_pg_dir + USER_PTRS_PER_PGD,
-		       (PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
-        }
-        return ret;
+	return (pgd_t *)get_zeroed_page(GFP_KERNEL);
 }
 
-static inline void free_pgd_slow(pgd_t *pgd)
+extern inline void pgd_free (pgd_t *pgd)
 {
-        free_page((unsigned long)pgd);
+	free_page((unsigned long)pgd);
 }
 
-static inline pgd_t *get_pgd_fast(void)
+extern inline pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 {
-        unsigned long *ret;
-
-        if ((ret = pgd_quicklist) != NULL) {
-                pgd_quicklist = (unsigned long *)(*ret);
-                ret[0] = 0;
-                pgtable_cache_size--;
-        } else
-                ret = (unsigned long *)get_pgd_slow();
-        return (pgd_t *)ret;
+  	pte_t *pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
+	if (pte)
+		clear_page(pte);
+ 	return pte;
 }
 
-static inline void free_pgd_fast(pgd_t *pgd)
+extern inline struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 {
-        *(unsigned long *)pgd = (unsigned long) pgd_quicklist;
-        pgd_quicklist = (unsigned long *) pgd;
-        pgtable_cache_size++;
+	struct page *pte;
+	pte = alloc_pages(GFP_KERNEL|__GFP_REPEAT, 0);
+	if (pte)
+		clear_page(page_address(pte));
+	return pte;
 }
 
-static inline pte_t *pte_alloc_one(struct mm_struct *mm, unsigned long address)
+extern inline void pte_free_kernel(pte_t *pte)
 {
-        pte_t *pte;
-
-        pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
-        if (pte)
-                clear_page(pte);
-        return pte;
+	free_page((unsigned long)pte);
 }
 
-static inline pte_t *pte_alloc_one_fast(struct mm_struct *mm, unsigned long address)
+extern inline void pte_free(struct page *pte)
 {
-        unsigned long *ret;
-
-        if((ret = (unsigned long *)pte_quicklist) != NULL) {
-                pte_quicklist = (unsigned long *)(*ret);
-                ret[0] = ret[1];
-                pgtable_cache_size--;
-        }
-        return (pte_t *)ret;
+	__free_page(pte);
 }
 
-static __inline__ void pte_free_fast(pte_t *pte)
-{
-        *(unsigned long *)pte = (unsigned long) pte_quicklist;
-        pte_quicklist = (unsigned long *) pte;
-        pgtable_cache_size++;
-}
 
-static __inline__ void pte_free_slow(pte_t *pte)
-{
-        free_page((unsigned long)pte);
-}
-
-#define pte_free(pte)      pte_free_slow(pte)
-#define pgd_free(pgd)      free_pgd_slow(pgd)
-#define pgd_alloc(mm)      get_pgd_fast()
+#define __pte_free_tlb(tlb,pte) tlb_remove_page((tlb),(pte))
 
 /*
  * We don't have any real pmd's, and this code never triggers because
  * the pgd will always be present..
  */
 
-#define pmd_alloc_one_fast(mm, addr)    ({ BUG(); ((pmd_t *)1); })
-#define pmd_alloc_one(mm, addr)         ({ BUG(); ((pmd_t *)2); })
-#define pmd_free_slow(x)                do { } while (0)
-#define pmd_free_fast(x)                do { } while (0)
-#define pmd_free(x)                     do { } while (0)
-#define pgd_populate(mm, pmd, pte)      BUG()
+#define pmd_alloc_one(mm, addr)    ({ BUG(); ((pmd_t *)2); })
+#define pmd_free(x)                do { } while (0)
+#define __pmd_free_tlb(tlb,x)      do { } while (0)
+#define pgd_populate(mm, pmd, pte) BUG()
 
-/* other stuff */
-
-extern int do_check_pgt_cache(int, int);
+#define check_pgt_cache()          do { } while (0)
 
 #endif

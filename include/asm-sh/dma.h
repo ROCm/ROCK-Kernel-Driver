@@ -1,7 +1,12 @@
 #ifndef __ASM_SH_DMA_H
 #define __ASM_SH_DMA_H
 
+#ifdef CONFIG_SH_MPC1211
+#include <asm/mpc1211/dma.h>
+#else
+
 #include <linux/config.h>
+#include <asm/cpu/dma.h>
 #include <asm/io.h>		/* need byte IO */
 
 #define MAX_DMA_CHANNELS 8
@@ -13,20 +18,6 @@
 /* But... */
 /* XXX: This is not applicable to SuperH, just needed for alloc_bootmem */
 #define MAX_DMA_ADDRESS      (PAGE_OFFSET+0x10000000)
-
-#if defined(__sh3__)
-#define SAR ((unsigned long[]){0xa4000020,0xa4000030,0xa4000040,0xa4000050})
-#define DAR ((unsigned long[]){0xa4000024,0xa4000034,0xa4000044,0xa4000054})
-#define DMATCR ((unsigned long[]){0xa4000028,0xa4000038,0xa4000048,0xa4000058})
-#define CHCR ((unsigned long[]){0xa400002c,0xa400003c,0xa400004c,0xa400005c})
-#define DMAOR 0xa4000060UL
-#elif defined(__SH4__)
-#define SAR ((unsigned long[]){0xbfa00000,0xbfa00010,0xbfa00020,0xbfa00030})
-#define DAR ((unsigned long[]){0xbfa00004,0xbfa00014,0xbfa00024,0xbfa00034})
-#define DMATCR ((unsigned long[]){0xbfa00008,0xbfa00018,0xbfa00028,0xbfa00038})
-#define CHCR ((unsigned long[]){0xbfa0000c,0xbfa0001c,0xbfa0002c,0xbfa0003c})
-#define DMAOR 0xbfa00040UL
-#endif
 
 #define DMTE_IRQ ((int[]){DMTE0_IRQ,DMTE1_IRQ,DMTE2_IRQ,DMTE3_IRQ})
 
@@ -66,8 +57,6 @@
 
 struct dma_info_t {
 	unsigned int chan;
-	unsigned int mode_read;
-	unsigned int mode_write;
 	unsigned long dev_addr;
 	unsigned int mode;
 	unsigned long mem_addr;
@@ -93,5 +82,6 @@ extern int isa_dma_bridge_buggy;
 #define isa_dma_bridge_buggy 	(0)
 #endif
 
+#endif /* CONFIG_SH_MPC1211 */
 
 #endif /* __ASM_SH_DMA_H */

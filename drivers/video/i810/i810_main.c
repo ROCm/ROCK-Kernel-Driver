@@ -1075,8 +1075,6 @@ static int i810fb_getcolreg(u8 regno, u8 *red, u8 *green, u8 *blue,
 	struct i810fb_par *par = (struct i810fb_par *) info->par;
 	u8 *mmio = par->mmio_start_virtual, temp;
 
-	if (regno > 255) return 1;
-
 	if (info->fix.visual == FB_VISUAL_DIRECTCOLOR) {
 		if ((info->var.green.length == 5 && regno > 31) ||
 		    (info->var.green.length == 6 && regno > 63))

@@ -373,12 +373,45 @@ struct shmid64_ds32 {
 	unsigned int		__unused5;
 };
 
-                                                        
-/*
- * sys32_ipc() is the de-multiplexer for the SysV IPC calls in 32bit emulation..
- *
- * This is really horribly ugly.
- */
+extern int sem_ctls[];
+#define sc_semopm	(sem_ctls[2])
+#define SEMOPM_FAST	64  /* ~ 372 bytes on stack */
+
+static long
+do_sys32_semtimedop (int semid, struct sembuf *tsops, int nsops,
+		     struct compat_timespec *timeout32)
+{
+	struct sembuf *sops, fast_sops[SEMOPM_FAST];
+	struct timespec t;
+	mm_segment_t oldfs;
+	long ret;
+
+	/* parameter checking precedence should mirror sys_semtimedop() */
+	if (nsops < 1 || semid < 0)
+		return -EINVAL;
+	if (nsops > sc_semopm)
+		return -E2BIG;
+	if (nsops <= SEMOPM_FAST)
+		sops = fast_sops;
+	else {
+		sops = kmalloc(nsops * sizeof(*sops), GFP_KERNEL);
+		if (sops == NULL)
+			return -ENOMEM;
+	}
+	if (copy_from_user(sops, tsops, nsops * sizeof(*tsops)) ||
+	    get_compat_timespec(&t, timeout32))
+		ret = -EFAULT;
+	else {
+		oldfs = get_fs();
+		set_fs(KERNEL_DS);
+		ret = sys_semtimedop(semid, sops, nsops, &t);
+		set_fs(oldfs);
+	}
+	if (sops != fast_sops)
+		kfree(sops);
+	return ret;
+}
+
 #define IPCOP_MASK(__x)	(1UL << (__x))
 static int do_sys32_semctl(int first, int second, int third, void *uptr)
 {
@@ -763,7 +796,12 @@ out:
 	return err;
 }
 
-asmlinkage int sys32_ipc (u32 call, int first, int second, int third, u32 ptr, u32 fifth)
+/*
+ * sys32_ipc() is the de-multiplexer for the SysV IPC calls in 32bit emulation.
+ *
+ * This is really horribly ugly.
+ */
+asmlinkage int sys32_ipc (u32 call, int first, int second, int third, u32 ptr)
 {
 	int version, err;
 
@@ -773,11 +811,22 @@ asmlinkage int sys32_ipc (u32 call, int first, int second, int third, u32 ptr, u
 	if(version)
 		return -EINVAL;
 
-	if (call <= SEMCTL)
+	if (call <= SEMTIMEDOP)
 		switch (call) {
+		case SEMTIMEDOP:
+			if (third) {
+				err = do_sys32_semtimedop(first,
+					(struct sembuf *)AA(ptr),
+					second,
+					(struct compat_timespec *)
+						AA((u32)third));
+				goto out;
+			}
+			/* else fall through for normal semop() */
 		case SEMOP:
 			/* struct sembuf is the same on 32 and 64bit :)) */
-			err = sys_semop (first, (struct sembuf *)AA(ptr), second);
+			err = sys_semtimedop (first, (struct sembuf *)AA(ptr),
+					      second, NULL);
 			goto out;
 		case SEMGET:
 			err = sys_semget (first, second, third);
@@ -2193,7 +2242,6 @@ done:
    sorts of things, like timeval and itimerval.  */
 
 extern struct timezone sys_tz;
-extern int do_sys_settimeofday(struct timeval *tv, struct timezone *tz);
 
 asmlinkage int sys32_gettimeofday(struct compat_timeval *tv, struct timezone *tz)
 {
@@ -2210,13 +2258,27 @@ asmlinkage int sys32_gettimeofday(struct compat_timeval *tv, struct timezone *tz
 	return 0;
 }
 
+static inline long get_ts32(struct timespec *o, struct compat_timeval *i)
+{
+	long usec;
+
+	if (!access_ok(VERIFY_READ, i, sizeof(*i)))
+		return -EFAULT;
+	if (__get_user(o->tv_sec, &i->tv_sec))
+		return -EFAULT;
+	if (__get_user(usec, &i->tv_usec))
+		return -EFAULT;
+	o->tv_nsec = usec * 1000;
+	return 0;
+}
+
 asmlinkage int sys32_settimeofday(struct compat_timeval *tv, struct timezone *tz)
 {
-	struct timeval ktv;
+	struct timespec kts;
 	struct timezone ktz;
 
  	if (tv) {
-		if (get_tv32(&ktv, tv))
+		if (get_ts32(&kts, tv))
 			return -EFAULT;
 	}
 	if (tz) {
@@ -2224,7 +2286,7 @@ asmlinkage int sys32_settimeofday(struct compat_timeval *tv, struct timezone *tz
 			return -EFAULT;
 	}
 
-	return do_sys_settimeofday(tv ? &ktv : NULL, tz ? &ktz : NULL);
+	return do_sys_settimeofday(tv ? &kts : NULL, tz ? &ktz : NULL);
 }
 
 asmlinkage int sys_utimes(char *, struct timeval *);

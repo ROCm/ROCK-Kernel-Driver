@@ -29,6 +29,7 @@
  * ntfs_lookup - find the inode represented by a dentry in a directory inode
  * @dir_ino:	directory inode in which to look for the inode
  * @dent:	dentry representing the inode to look for
+ * @nd:		lookup nameidata
  *
  * In short, ntfs_lookup() looks for the inode represented by the dentry @dent
  * in the directory inode @dir_ino and if found attaches the inode to the
@@ -87,7 +88,7 @@
  *    name. We then convert the name to the current NLS code page, and proceed
  *    searching for a dentry with this name, etc, as in case 2), above.
  */
-static struct dentry *ntfs_lookup(struct inode *dir_ino, struct dentry *dent)
+static struct dentry *ntfs_lookup(struct inode *dir_ino, struct dentry *dent, struct nameidata *nd)
 {
 	ntfs_volume *vol = NTFS_SB(dir_ino->i_sb);
 	struct inode *dent_inode;

@@ -29,8 +29,8 @@
 #define ATLASINT_UART      0
 #define ATLASINT_END      32
 
-/* 
- * Atlas registers are memory mapped on 64-bit aligned boundaries and 
+/*
+ * Atlas registers are memory mapped on 64-bit aligned boundaries and
  * only word access are allowed.
  */
 struct atlas_ictrl_regs {

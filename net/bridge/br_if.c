@@ -95,7 +95,7 @@ static struct net_bridge *new_nb(const char *name)
 	br->bridge_id.prio[1] = 0x00;
 	memset(br->bridge_id.addr, 0, ETH_ALEN);
 
-	br->stp_enabled = 1;
+	br->stp_enabled = 0;
 	br->designated_root = br->bridge_id;
 	br->root_path_cost = 0;
 	br->root_port = 0;

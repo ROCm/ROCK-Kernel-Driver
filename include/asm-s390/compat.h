@@ -94,6 +94,7 @@ struct compat_statfs {
 	s32		f_ffree;
 	compat_fsid_t	f_fsid;
 	s32		f_namelen;
+	s32		f_frsize;
 	s32		f_spare[6];
 };
 

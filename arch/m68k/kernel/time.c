@@ -103,6 +103,7 @@ void time_init(void)
 				      time.tm_hour, time.tm_min, time.tm_sec);
 		xtime.tv_nsec = 0;
 	}
+	wall_to_monotonic.tv_sec = -xtime.tv_sec;
 
 	mach_sched_init(timer_interrupt);
 }
@@ -140,6 +141,8 @@ void do_gettimeofday(struct timeval *tv)
 
 int do_settimeofday(struct timespec *tv)
 {
+	time_t wtm_sec, sec = tv->tv_sec;
+	long wtm_nsec, nsec = tv->tv_nsec;
 	extern unsigned long wall_jiffies;
 
 	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
@@ -152,16 +155,15 @@ int do_settimeofday(struct timespec *tv)
 	 * Discover what correction gettimeofday
 	 * would have done, and then undo it!
 	 */
-	tv->tv_nsec -= 1000 * (mach_gettimeoffset() +
+	nsec -= 1000 * (mach_gettimeoffset() +
 			(jiffies - wall_jiffies) * (1000000 / HZ));
 
-	while (tv->tv_nsec < 0) {
-		tv->tv_nsec += NSEC_PER_SEC;
-		tv->tv_sec--;
-	}
+	wtm_sec  = wall_to_monotonic.tv_sec + (xtime.tv_sec - sec);
+	wtm_nsec = wall_to_monotonic.tv_nsec + (xtime.tv_nsec - nsec);
 
-	xtime.tv_sec = tv->tv_sec;
-	xtime.tv_nsec = tv->tv_nsec;
+	set_normalized_timespec(&xtime, sec, nsec);
+	set_normalized_timespec(&wall_to_monotonic, wtm_sec, wtm_nsec);
+
 	time_adjust = 0;		/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;

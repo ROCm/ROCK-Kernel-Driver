@@ -519,6 +519,9 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
 	    SLAB_CTOR_CONSTRUCTOR) {
 		INIT_LIST_HEAD(&ei->i_orphan);
+#ifdef CONFIG_EXT3_FS_XATTR
+		init_rwsem(&ei->xattr_sem);
+#endif
 		init_rwsem(&ei->truncate_sem);
 		inode_init_once(&ei->vfs_inode);
 	}
@@ -864,19 +867,17 @@ static int ext3_setup_super(struct super_block *sb, struct ext3_super_block *es,
 	ext3_update_dynamic_rev(sb);
 	EXT3_SET_INCOMPAT_FEATURE(sb, EXT3_FEATURE_INCOMPAT_RECOVER);
 
-	ext3_commit_super (sb, es, 1);
-	if (test_opt (sb, DEBUG))
-		printk (KERN_INFO
-			"[EXT3 FS %s, %s, bs=%lu, gc=%lu, "
-			"bpg=%lu, ipg=%lu, mo=%04lx]\n",
-			EXT3FS_VERSION, EXT3FS_DATE, sb->s_blocksize,
+	ext3_commit_super(sb, es, 1);
+	if (test_opt(sb, DEBUG))
+		printk(KERN_INFO "[EXT3 FS bs=%lu, gc=%lu, "
+				"bpg=%lu, ipg=%lu, mo=%04lx]\n",
+			sb->s_blocksize,
 			sbi->s_groups_count,
 			EXT3_BLOCKS_PER_GROUP(sb),
 			EXT3_INODES_PER_GROUP(sb),
 			sbi->s_mount_opt);
 
-	printk(KERN_INFO "EXT3 FS " EXT3FS_VERSION ", " EXT3FS_DATE " on %s, ",
-				sb->s_id);
+	printk(KERN_INFO "EXT3 FS on %s, ", sb->s_id);
 	if (EXT3_SB(sb)->s_journal->j_inode == NULL) {
 		char b[BDEVNAME_SIZE];
 

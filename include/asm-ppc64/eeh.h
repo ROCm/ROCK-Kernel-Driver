@@ -25,6 +25,8 @@
 #ifndef _EEH_H
 #define _EEH_H
 
+#include <linux/string.h>
+
 struct pci_dev;
 
 /* I/O addresses are converted to EEH "tokens" such that a driver will cause
@@ -64,9 +66,6 @@ int is_eeh_configured(struct pci_dev *dev);
  * the assumption that it is already a physical addr.
  */
 unsigned long eeh_token_to_phys(unsigned long token);
-
-extern void *memcpy(void *, const void *, unsigned long);
-extern void *memset(void *,int, unsigned long);
 
 /* EEH_POSSIBLE_ERROR() -- test for possible MMIO failure.
  *

@@ -1,4 +1,12 @@
-/* drm_context.h -- IOCTLs for generic contexts -*- linux-c -*-
+/**
+ * \file drm_context.h 
+ * IOCTLs for generic contexts
+ * 
+ * \author Rickard E. (Rik) Faith <faith@valinux.com>
+ * \author Gareth Hughes <gareth@valinux.com>
+ */
+
+/*
  * Created: Fri Nov 24 18:31:37 2000 by gareth@valinux.com
  *
  * Copyright 1999, 2000 Precision Insight, Inc., Cedar Park, Texas.
@@ -23,10 +31,9 @@
  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
- *
- * Authors:
- *    Rickard E. (Rik) Faith <faith@valinux.com>
- *    Gareth Hughes <gareth@valinux.com>
+ */
+
+/*
  * ChangeLog:
  *  2001-11-16	Torsten Duwe <duwe@caldera.de>
  *		added context constructor/destructor hooks,
@@ -40,10 +47,20 @@
 #endif
 
 
-/* ================================================================
- * Context bitmap support
- */
+/******************************************************************/
+/** \name Context bitmap support */
+/*@{*/
 
+/**
+ * Free a handle from the context bitmap.
+ *
+ * \param dev DRM device.
+ * \param ctx_handle context handle.
+ *
+ * Clears the bit specified by \p ctx_handle in drm_device::ctx_bitmap and the entry
+ * in drm_device::context_sareas, while holding the drm_device::struct_sem
+ * lock.
+ */
 void DRM(ctxbitmap_free)( drm_device_t *dev, int ctx_handle )
 {
 	if ( ctx_handle < 0 ) goto failed;
@@ -62,6 +79,16 @@ failed:
        	return;
 }
 
+/** 
+ * Context bitmap allocation.
+ *
+ * \param dev DRM device.
+ * \return (non-negative) context handle on success or a negative number on failure.
+ *
+ * Find the first zero bit in drm_device::ctx_bitmap and (re)allocates
+ * drm_device::context_sareas to accommodate the new entry while holding the
+ * drm_device::struct_sem lock.
+ */
 int DRM(ctxbitmap_next)( drm_device_t *dev )
 {
 	int bit;
@@ -112,6 +139,14 @@ int DRM(ctxbitmap_next)( drm_device_t *dev )
 	return -1;
 }
 
+/**
+ * Context bitmap initialization.
+ *
+ * \param dev DRM device.
+ *
+ * Allocates and initialize drm_device::ctx_bitmap and drm_device::context_sareas, while holding
+ * the drm_device::struct_sem lock.
+ */
 int DRM(ctxbitmap_init)( drm_device_t *dev )
 {
 	int i;
@@ -137,6 +172,14 @@ int DRM(ctxbitmap_init)( drm_device_t *dev )
 	return 0;
 }
 
+/**
+ * Context bitmap cleanup.
+ *
+ * \param dev DRM device.
+ *
+ * Frees drm_device::ctx_bitmap and drm_device::context_sareas, while holding
+ * the drm_device::struct_sem lock.
+ */
 void DRM(ctxbitmap_cleanup)( drm_device_t *dev )
 {
 	down(&dev->struct_sem);
@@ -148,10 +191,24 @@ void DRM(ctxbitmap_cleanup)( drm_device_t *dev )
 	up(&dev->struct_sem);
 }
 
-/* ================================================================
- * Per Context SAREA Support
- */
+/*@}*/
 
+/******************************************************************/
+/** \name Per Context SAREA Support */
+/*@{*/
+
+/**
+ * Get per-context SAREA.
+ * 
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param arg user argument pointing to a drm_ctx_priv_map structure.
+ * \return zero on success or a negative number on failure.
+ *
+ * Gets the map from drm_device::context_sareas with the handle specified and
+ * returns its handle.
+ */
 int DRM(getsareactx)(struct inode *inode, struct file *filp,
 		     unsigned int cmd, unsigned long arg)
 {
@@ -180,6 +237,18 @@ int DRM(getsareactx)(struct inode *inode, struct file *filp,
 	return 0;
 }
 
+/**
+ * Set per-context SAREA.
+ * 
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param arg user argument pointing to a drm_ctx_priv_map structure.
+ * \return zero on success or a negative number on failure.
+ *
+ * Searches the mapping specified in \p arg and update the entry in
+ * drm_device::context_sareas with it.
+ */
 int DRM(setsareactx)(struct inode *inode, struct file *filp,
 		     unsigned int cmd, unsigned long arg)
 {
@@ -218,10 +287,22 @@ found:
 	return 0;
 }
 
-/* ================================================================
- * The actual DRM context handling routines
- */
+/*@}*/
 
+/******************************************************************/
+/** \name The actual DRM context handling routines */
+/*@{*/
+
+/**
+ * Switch context.
+ *
+ * \param dev DRM device.
+ * \param old old context handle.
+ * \param new new context handle.
+ * \return zero on success or a negative number on failure.
+ *
+ * Attempt to set drm_device::context_flag.
+ */
 int DRM(context_switch)( drm_device_t *dev, int old, int new )
 {
         if ( test_and_set_bit( 0, &dev->context_flag ) ) {
@@ -240,6 +321,17 @@ int DRM(context_switch)( drm_device_t *dev, int old, int new )
         return 0;
 }
 
+/**
+ * Complete context switch.
+ *
+ * \param dev DRM device.
+ * \param new new context handle.
+ * \return zero on success or a negative number on failure.
+ *
+ * Updates drm_device::last_context and drm_device::last_switch. Verifies the
+ * hardware lock is held, clears the drm_device::context_flag and wakes up
+ * drm_device::context_wait.
+ */
 int DRM(context_switch_complete)( drm_device_t *dev, int new )
 {
         dev->last_context = new;  /* PRE/POST: This is the _only_ writer. */
@@ -258,6 +350,15 @@ int DRM(context_switch_complete)( drm_device_t *dev, int new )
         return 0;
 }
 
+/**
+ * Reserve contexts.
+ *
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param arg user argument pointing to a drm_ctx_res structure.
+ * \return zero on success or a negative number on failure.
+ */
 int DRM(resctx)( struct inode *inode, struct file *filp,
 		 unsigned int cmd, unsigned long arg )
 {
@@ -284,6 +385,17 @@ int DRM(resctx)( struct inode *inode, struct file *filp,
 	return 0;
 }
 
+/**
+ * Add context.
+ *
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param arg user argument pointing to a drm_ctx structure.
+ * \return zero on success or a negative number on failure.
+ *
+ * Get a new handle for the context and copy to userspace.
+ */
 int DRM(addctx)( struct inode *inode, struct file *filp,
 		 unsigned int cmd, unsigned long arg )
 {
@@ -322,6 +434,15 @@ int DRM(modctx)( struct inode *inode, struct file *filp,
 	return 0;
 }
 
+/**
+ * Get context.
+ *
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param arg user argument pointing to a drm_ctx structure.
+ * \return zero on success or a negative number on failure.
+ */
 int DRM(getctx)( struct inode *inode, struct file *filp,
 		 unsigned int cmd, unsigned long arg )
 {
@@ -338,6 +459,17 @@ int DRM(getctx)( struct inode *inode, struct file *filp,
 	return 0;
 }
 
+/**
+ * Switch context.
+ *
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param arg user argument pointing to a drm_ctx structure.
+ * \return zero on success or a negative number on failure.
+ *
+ * Calls context_switch().
+ */
 int DRM(switchctx)( struct inode *inode, struct file *filp,
 		    unsigned int cmd, unsigned long arg )
 {
@@ -352,6 +484,17 @@ int DRM(switchctx)( struct inode *inode, struct file *filp,
 	return DRM(context_switch)( dev, dev->last_context, ctx.handle );
 }
 
+/**
+ * New context.
+ *
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param arg user argument pointing to a drm_ctx structure.
+ * \return zero on success or a negative number on failure.
+ *
+ * Calls context_switch_complete().
+ */
 int DRM(newctx)( struct inode *inode, struct file *filp,
 		 unsigned int cmd, unsigned long arg )
 {
@@ -368,6 +511,17 @@ int DRM(newctx)( struct inode *inode, struct file *filp,
 	return 0;
 }
 
+/**
+ * Remove context.
+ *
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param arg user argument pointing to a drm_ctx structure.
+ * \return zero on success or a negative number on failure.
+ *
+ * If not the special kernel context, calls ctxbitmap_free() to free the specified context.
+ */
 int DRM(rmctx)( struct inode *inode, struct file *filp,
 		unsigned int cmd, unsigned long arg )
 {
@@ -392,3 +546,4 @@ int DRM(rmctx)( struct inode *inode, struct file *filp,
 	return 0;
 }
 
+/*@}*/

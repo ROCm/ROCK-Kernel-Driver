@@ -85,7 +85,7 @@ static inline struct thread_info *current_thread_info(void)
 //#define INIT_THREAD_SIZE        (65536)
 #define __get_user_regs(x) (((struct pt_regs *)((unsigned long)(x) + THREAD_SIZE - 8)) - 1)
 
-extern struct thread_info *alloc_thread_info(void);
+extern struct thread_info *alloc_thread_info(struct task_struct *task);
 extern void free_thread_info(struct thread_info *);
 
 #define get_thread_info(ti)	get_task_struct((ti)->task)

@@ -1,4 +1,4 @@
-/* $Id: dma.h,v 1.6 1999/12/30 14:22:47 raiko Exp $
+/*
  * linux/include/asm/dma.h: Defines for using and allocating dma channels.
  * Written by Hennus Bergman, 1992.
  * High DMA channel support & info by Hannu Savolainen
@@ -43,7 +43,7 @@
  *  - page registers for 5-7 don't use data bit 0, represent 128K pages
  *  - page registers for 0-3 use bit 0, represent 64K pages
  *
- * DMA transfers are limited to the lower 16MB of _physical_ memory.  
+ * DMA transfers are limited to the lower 16MB of _physical_ memory.
  * Note that addresses loaded into registers must be _physical_ addresses,
  * not logical addresses (which may differ if paging is active).
  *
@@ -53,7 +53,7 @@
  *    |  ...  |   |  ... |   |  ... |
  *    |  ...  |   |  ... |   |  ... |
  *    |  ...  |   |  ... |   |  ... |
- *   P7  ...  P0  A7 ... A0  A7 ... A0   
+ *   P7  ...  P0  A7 ... A0  A7 ... A0
  * |    Page    | Addr MSB | Addr LSB |   (DMA registers)
  *
  *  Address mapping for channels 5-7:
@@ -62,7 +62,7 @@
  *    |  ...  |   \   \   ... \  \  \  ... \  \
  *    |  ...  |    \   \   ... \  \  \  ... \  (not used)
  *    |  ...  |     \   \   ... \  \  \  ... \
- *   P7  ...  P1 (0) A7 A6  ... A0 A7 A6 ... A0   
+ *   P7  ...  P1 (0) A7 A6  ... A0 A7 A6 ... A0
  * |      Page      |  Addr MSB   |  Addr LSB  |   (DMA registers)
  *
  * Again, channels 5-7 transfer _physical_ words (16 bits), so addresses
@@ -71,7 +71,7 @@
  *
  * Transfer count (_not # bytes_) is limited to 64K, represented as actual
  * count - 1 : 64K => 0xFFFF, 1 => 0x0000.  Thus, count is always 1 or more,
- * and up to 128K bytes may be transferred on channels 5-7 in one operation. 
+ * and up to 128K bytes may be transferred on channels 5-7 in one operation.
  *
  */
 
@@ -83,7 +83,13 @@
  * Deskstations or Acer PICA but not the much more versatile DMA logic used
  * for the local devices on Acer PICA or Magnums.
  */
+#ifdef CONFIG_SGI_IP22
+/* Horrible hack to have a correct DMA window on IP22 */
+#include <asm/sgi/mc.h>
+#define MAX_DMA_ADDRESS		(PAGE_OFFSET + SGIMC_SEG0_BADDR + 0x01000000)
+#else
 #define MAX_DMA_ADDRESS		(PAGE_OFFSET + 0x01000000)
+#endif
 
 /* 8237 DMA controllers */
 #define IO_DMA1_BASE	0x00	/* 8 bit slave DMA, channels 0..3 */
@@ -142,6 +148,7 @@
 #define DMA_MODE_WRITE	0x48	/* memory to I/O, no autoinit, increment, single mode */
 #define DMA_MODE_CASCADE 0xC0   /* pass thru DREQ->HRQ, DACK<-HLDA only */
 
+#define DMA_AUTOINIT	0x10
 
 extern spinlock_t  dma_spin_lock;
 
@@ -247,7 +254,7 @@ static __inline__ void set_dma_addr(unsigned int dmanr, unsigned int a)
 }
 
 
-/* Set transfer size (max 64k for DMA1..3, 128k for DMA5..7) for
+/* Set transfer size (max 64k for DMA0..3, 128k for DMA5..7) for
  * a specific DMA channel.
  * You must ensure the parameters are valid.
  * NOTE: from a manual: "the number of transfers is one more
@@ -286,7 +293,7 @@ static __inline__ int get_dma_residue(unsigned int dmanr)
 
 	count = 1 + dma_inb(io_port);
 	count += dma_inb(io_port) << 8;
-	
+
 	return (dmanr<=3)? count : (count<<1);
 }
 

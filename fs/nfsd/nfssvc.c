@@ -20,6 +20,7 @@
 #include <linux/slab.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
+#include <linux/fs_struct.h>
 
 #include <linux/sunrpc/types.h>
 #include <linux/sunrpc/stats.h>
@@ -168,6 +169,7 @@ static void
 nfsd(struct svc_rqst *rqstp)
 {
 	struct svc_serv	*serv = rqstp->rq_server;
+	struct fs_struct *fsp;
 	int		err;
 	struct nfsd_list me;
 	sigset_t shutdown_mask, allowed_mask;
@@ -177,6 +179,18 @@ nfsd(struct svc_rqst *rqstp)
 	lock_kernel();
 	daemonize("nfsd");
 	current->rlim[RLIMIT_FSIZE].rlim_cur = RLIM_INFINITY;
+
+	/* After daemonize() this kernel thread shares current->fs
+	 * with the init process. We need to create files with a
+	 * umask of 0 instead of init's umask. */
+	fsp = copy_fs_struct(current->fs);
+	if (!fsp) {
+		printk("Unable to start nfsd thread: out of memory\n");
+		goto out;
+	}
+	exit_fs(current);
+	current->fs = fsp;
+	current->fs->umask = 0;
 
 	siginitsetinv(&shutdown_mask, SHUTDOWN_SIGS);
 	siginitsetinv(&allowed_mask, ALLOWED_SIGS);
@@ -209,8 +223,8 @@ nfsd(struct svc_rqst *rqstp)
 		 * recvfrom routine.
 		 */
 		while ((err = svc_recv(serv, rqstp,
-				       5*60*HZ)) == -EAGAIN)
-			cache_clean();
+				       60*60*HZ)) == -EAGAIN)
+			;
 		if (err < 0)
 			break;
 		update_thread_usage(atomic_read(&nfsd_busy));
@@ -262,6 +276,7 @@ nfsd(struct svc_rqst *rqstp)
 	list_del(&me.list);
 	nfsdstats.th_cnt --;
 
+out:
 	/* Release the thread */
 	svc_exit_thread(rqstp);
 

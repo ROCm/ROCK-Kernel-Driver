@@ -1,4 +1,12 @@
-/* drm_init.h -- Setup/Cleanup for DRM -*- linux-c -*-
+/**
+ * \file drm_init.h 
+ * Setup/Cleanup for DRM
+ *
+ * \author Rickard E. (Rik) Faith <faith@valinux.com>
+ * \author Gareth Hughes <gareth@valinux.com>
+ */
+
+/*
  * Created: Mon Jan  4 08:58:31 1999 by faith@valinux.com
  *
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
@@ -23,22 +31,23 @@
  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
- *
- * Authors:
- *    Rickard E. (Rik) Faith <faith@valinux.com>
- *    Gareth Hughes <gareth@valinux.com>
  */
 
 #include "drmP.h"
 
+/** Debug flags.  Set by parse_option(). */
 #if 0
 int DRM(flags) = DRM_FLAG_DEBUG;
 #else
 int DRM(flags) = 0;
 #endif
 
-/* drm_parse_option parses a single option.  See description for
- * drm_parse_options for details.
+/**
+ * Parse a single option.
+ *
+ * \param s option string.
+ *
+ * \sa See parse_options() for details.
  */
 static void DRM(parse_option)(char *s)
 {
@@ -58,26 +67,33 @@ static void DRM(parse_option)(char *s)
 	return;
 }
 
-/* drm_parse_options parse the insmod "drm_opts=" options, or the command-line
- * options passed to the kernel via LILO.  The grammar of the format is as
+/**
+ * Parse the insmod "drm_opts=" options, or the command-line
+ * options passed to the kernel via LILO.  
+ *
+ * \param s contains option_list without the 'drm_opts=' part.
+ *
+ * The grammar of the format is as
  * follows:
  *
+ * \code
  * drm		::= 'drm_opts=' option_list
  * option_list	::= option [ ';' option_list ]
  * option	::= 'device:' major
  *		|   'debug'
  *		|   'noctx'
  * major	::= INTEGER
+ * \endcode
  *
- * Note that 's' contains option_list without the 'drm_opts=' part.
+ * - device=major,minor specifies the device number used for /dev/drm
+ *   - if major == 0 then the misc device is used
+ *   - if major == 0 and minor == 0 then dynamic misc allocation is used
+ * - debug=on specifies that debugging messages will be printk'd
+ * - debug=trace specifies that each function call will be logged via printk
+ * - debug=off turns off all debugging options
  *
- * device=major,minor specifies the device number used for /dev/drm
- *	  if major == 0 then the misc device is used
- *	  if major == 0 and minor == 0 then dynamic misc allocation is used
- * debug=on specifies that debugging messages will be printk'd
- * debug=trace specifies that each function call will be logged via printk
- * debug=off turns off all debugging options
- *
+ * \todo Actually only the \e presence of the 'debug' option is currently
+ * checked.
  */
 
 void DRM(parse_options)(char *s)
@@ -95,8 +111,10 @@ void DRM(parse_options)(char *s)
 	}
 }
 
-/* drm_cpu_valid returns non-zero if the DRI will run on this CPU, and 0
- * otherwise.
+/**
+ * Check whether DRI will run on this CPU.
+ *
+ * \return non-zero if the DRI will run on this CPU, or zero otherwise.
  */
 int DRM(cpu_valid)(void)
 {

@@ -416,7 +416,6 @@ asmlinkage unsigned int do_IRQ(struct pt_regs regs)
 	 * handled by some other CPU. (or is disabled)
 	 */
 	int irq = regs.orig_eax & 0xff; /* high bits used in ret_from_ code  */
-	int cpu = smp_processor_id();
 	irq_desc_t *desc = irq_desc + irq;
 	struct irqaction * action;
 	unsigned int status;
@@ -437,7 +436,7 @@ asmlinkage unsigned int do_IRQ(struct pt_regs regs)
 		}
 	}
 #endif
-	kstat_cpu(cpu).irqs[irq]++;
+	kstat_this_cpu.irqs[irq]++;
 	spin_lock(&desc->lock);
 	desc->handler->ack(irq);
 	/*

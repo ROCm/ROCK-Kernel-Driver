@@ -3,7 +3,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1995, 96, 97, 98, 99, 2000 by Ralf Baechle
+ * Copyright (C) 1995, 96, 97, 98, 99, 2000, 2001, 2002 by Ralf Baechle
  */
 
 /*
@@ -20,7 +20,7 @@ SYS(sys_fork, 0)
 SYS(sys_read, 3)
 SYS(sys_write, 3)
 SYS(sys_open, 3)				/* 4005 */
-SYS(sys_close, 3)
+SYS(sys_close, 1)
 SYS(sys_waitpid, 3)
 SYS(sys_creat, 2)
 SYS(sys_link, 2)
@@ -32,7 +32,7 @@ SYS(sys_mknod, 3)
 SYS(sys_chmod, 2)				/* 4015 */
 SYS(sys_lchown, 3)
 SYS(sys_ni_syscall, 0)
-SYS(sys_stat, 2)
+SYS(sys_ni_syscall, 0)				/* was sys_stat */
 SYS(sys_lseek, 3)
 SYS(sys_getpid, 0)				/* 4020 */
 SYS(sys_mount, 5)
@@ -42,7 +42,7 @@ SYS(sys_getuid, 0)
 SYS(sys_stime, 1)				/* 4025 */
 SYS(sys_ptrace, 4)
 SYS(sys_alarm, 1)
-SYS(sys_fstat, 2)
+SYS(sys_ni_syscall, 0)				/* was sys_fstat */
 SYS(sys_pause, 0)
 SYS(sys_utime, 2)				/* 4030 */
 SYS(sys_ni_syscall, 0)
@@ -96,9 +96,9 @@ SYS(sys_gettimeofday, 2)
 SYS(sys_settimeofday, 2)
 SYS(sys_getgroups, 2)				/* 4080 */
 SYS(sys_setgroups, 2)
-SYS(sys_ni_syscall, 0) /* old_select */
+SYS(sys_ni_syscall, 0)				/* old_select */
 SYS(sys_symlink, 2)
-SYS(sys_lstat, 2)
+SYS(sys_ni_syscall, 0)				/* was sys_lstat */
 SYS(sys_readlink, 3)				/* 4085 */
 SYS(sys_uselib, 1)
 SYS(sys_swapon, 2)
@@ -115,7 +115,7 @@ SYS(sys_setpriority, 3)
 SYS(sys_ni_syscall, 0)
 SYS(sys_statfs, 2)
 SYS(sys_fstatfs, 2)				/* 4100 */
-SYS(sys_ioperm, 3)
+SYS(sys_ni_syscall, 0)				/* was ioperm(2) */
 SYS(sys_socketcall, 2)
 SYS(sys_syslog, 3)
 SYS(sys_setitimer, 3)
@@ -124,10 +124,10 @@ SYS(sys_newstat, 2)
 SYS(sys_newlstat, 2)
 SYS(sys_newfstat, 2)
 SYS(sys_uname, 1)
-SYS(sys_iopl, 0)	/* Well, actually 17 args ... */				/* 4110 */
+SYS(sys_ni_syscall, 0)				/* 4110 was iopl(2) */
 SYS(sys_vhangup, 0)
-SYS(sys_ni_syscall, 0)	/* was sys_idle() */
-SYS(sys_vm86, 1)
+SYS(sys_ni_syscall, 0)				/* was sys_idle() */
+SYS(sys_ni_syscall, 0)				/* was sys_vm86 */
 SYS(sys_wait4, 4)
 SYS(sys_swapoff, 1)				/* 4115 */
 SYS(sys_sysinfo, 1)
@@ -141,10 +141,10 @@ SYS(sys_ni_syscall, 0) /* sys_modify_ldt */
 SYS(sys_adjtimex, 1)
 SYS(sys_mprotect, 3)				/* 4125 */
 SYS(sys_sigprocmask, 3)
-SYS(sys_create_module, 2)
+SYS(sys_ni_syscall, 0)				/* was create_module */
 SYS(sys_init_module, 5)
 SYS(sys_delete_module, 1)
-SYS(sys_get_kernel_syms, 1)			/* 4130 */
+SYS(sys_ni_syscall, 0)				/* 4130, was get_kernel_syms */
 SYS(sys_quotactl, 0)
 SYS(sys_getpgid, 1)
 SYS(sys_fchdir, 1)
@@ -201,7 +201,7 @@ SYS(sys_socket, 3)
 SYS(sys_socketpair, 4)
 SYS(sys_setresuid, 3)				/* 4185 */
 SYS(sys_getresuid, 3)
-SYS(sys_query_module, 5)
+SYS(sys_ni_syscall, 0)				/* sys_query_module */
 SYS(sys_poll, 3)
 SYS(sys_nfsservctl, 3)
 SYS(sys_setresgid, 3)				/* 4190 */
@@ -214,19 +214,19 @@ SYS(sys_rt_sigpending, 2)
 SYS(sys_rt_sigtimedwait, 4)
 SYS(sys_rt_sigqueueinfo, 3)
 SYS(sys_rt_sigsuspend, 0)
-SYS(sys_pread, 6)				/* 4200 */
-SYS(sys_pwrite, 6)
+SYS(sys_pread64, 6)				/* 4200 */
+SYS(sys_pwrite64, 6)
 SYS(sys_chown, 3)
 SYS(sys_getcwd, 2)
 SYS(sys_capget, 2)
 SYS(sys_capset, 2)				/* 4205 */
 SYS(sys_sigaltstack, 0)
-SYS(sys_sendfile, 3)
+SYS(sys_sendfile, 4)
 SYS(sys_ni_syscall, 0)
 SYS(sys_ni_syscall, 0)
 SYS(sys_mmap2, 6)				/* 4210 */
-SYS(sys_truncate64, 2)
-SYS(sys_ftruncate64, 2)
+SYS(sys_truncate64, 4)
+SYS(sys_ftruncate64, 4)
 SYS(sys_stat64, 2)
 SYS(sys_lstat64, 2)
 SYS(sys_fstat64, 2)				/* 4215 */
@@ -235,5 +235,39 @@ SYS(sys_mincore, 3)
 SYS(sys_madvise, 3)
 SYS(sys_getdents64, 3)
 SYS(sys_fcntl64, 3)				/* 4220 */
+SYS(sys_ni_syscall, 0)
 SYS(sys_gettid, 0)
+SYS(sys_readahead, 5)
+SYS(sys_setxattr, 5)
+SYS(sys_lsetxattr, 5)				/* 4225 */
+SYS(sys_fsetxattr, 5)
+SYS(sys_getxattr, 4)
+SYS(sys_lgetxattr, 4)
+SYS(sys_fgetxattr, 4)
+SYS(sys_listxattr, 3)				/* 4230 */
+SYS(sys_llistxattr, 3)
+SYS(sys_flistxattr, 3)
+SYS(sys_removexattr, 2)
+SYS(sys_lremovexattr, 2)
+SYS(sys_fremovexattr, 2)			/* 4235 */
 SYS(sys_tkill, 2)
+SYS(sys_sendfile64, 5)
+SYS(sys_futex, 2)
+SYS(sys_sched_setaffinity, 3)
+SYS(sys_sched_getaffinity, 3)			/* 4240 */
+SYS(sys_io_setup, 2)
+SYS(sys_io_destroy, 1)
+SYS(sys_io_getevents, 5)
+SYS(sys_io_submit, 3)
+SYS(sys_io_cancel, 3)				/* 4245 */
+SYS(sys_exit_group, 1)
+SYS(sys_lookup_dcookie, 3)
+SYS(sys_epoll_create, 1)
+SYS(sys_epoll_ctl, 4)
+SYS(sys_epoll_wait, 3)				/* 4250 */
+SYS(sys_remap_file_pages, 5)
+SYS(sys_set_tid_address, 1)
+SYS(sys_restart_syscall, 0)			/* XXX */
+SYS(sys_fadvise64, 6)
+SYS(sys_statfs64, 3)				/* 4255 */
+SYS(sys_fstatfs64, 2)

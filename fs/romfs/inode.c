@@ -329,7 +329,7 @@ out:
 }
 
 static struct dentry *
-romfs_lookup(struct inode *dir, struct dentry *dentry)
+romfs_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *nd)
 {
 	unsigned long offset, maxoff;
 	int fslen, res;

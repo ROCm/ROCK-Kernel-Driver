@@ -106,9 +106,6 @@ CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses)
 	pSMB->hdr.Flags2 |= SMBFLG2_UNICODE;
 	if (extended_security)
 		pSMB->hdr.Flags2 |= SMBFLG2_EXT_SEC;
-	if (sign_CIFS_PDUs) {
-		pSMB->hdr.Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
-	}
 
 	pSMB->ByteCount = strlen(protocols[0].name) + 1;
 	strncpy(pSMB->DialectsArray, protocols[0].name, 30);	
@@ -260,10 +257,13 @@ CIFSSMBLogoff(const int xid, struct cifsSesInfo *ses)
 		up(&ses->sesSem);
 		return -EBUSY;
 	}
-	if(ses->server->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
-		pSMB->hdr.Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
+
 	rc = smb_init(SMB_COM_LOGOFF_ANDX, 2, 0 /* no tcon anymore */,
 		 (void **) &pSMB, (void **) &smb_buffer_response);
+
+        if(ses->server->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
+                pSMB->hdr.Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
+
 	if (rc) {
 		up(&ses->sesSem);
 		return rc;
@@ -618,6 +618,7 @@ CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 	LOCK_REQ *pSMB = NULL;
 	LOCK_RSP *pSMBr = NULL;
 	int bytes_returned;
+	int timeout = 0;
 
 	cFYI(1, ("In CIFSSMBLock"));
 
@@ -625,6 +626,9 @@ CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 		      (void **) &pSMBr);
 	if (rc)
 		return rc;
+
+	if(lockType == LOCKING_ANDX_OPLOCK_RELEASE)
+		timeout = -1; /* no response expected */
 
 	pSMB->NumberOfLocks = cpu_to_le32(numLock);
 	pSMB->NumberOfUnlocks = cpu_to_le32(numUnlock);
@@ -640,7 +644,7 @@ CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
 
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
-			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
+			 (struct smb_hdr *) pSMBr, &bytes_returned, timeout);
 
 	if (rc) {
 		cERROR(1, ("Send error in Lock = %d", rc));
@@ -1657,8 +1661,6 @@ CIFSGetDFSRefer(const int xid, struct cifsSesInfo *ses,
 	if (ses->capabilities & CAP_DFS) {
 		pSMB->hdr.Flags2 |= SMBFLG2_DFS;
 	}
-	if(ses->server->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
-		pSMB->hdr.Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
 
 	if (ses->capabilities & CAP_UNICODE) {
 		pSMB->hdr.Flags2 |= SMBFLG2_UNICODE;
@@ -2301,7 +2303,7 @@ CIFSSMBSetTimes(int xid, struct cifsTconInfo *tcon, char *fileName,
 int
 CIFSSMBUnixSetPerms(const int xid, struct cifsTconInfo *tcon,
 		    char *fileName, __u64 mode, __u64 uid, __u64 gid,
-		    const struct nls_table *nls_codepage)
+		    dev_t device, const struct nls_table *nls_codepage)
 {
 	TRANSACTION2_SPI_REQ *pSMB = NULL;
 	TRANSACTION2_SPI_RSP *pSMBr = NULL;
@@ -2360,6 +2362,9 @@ CIFSSMBUnixSetPerms(const int xid, struct cifsTconInfo *tcon,
 	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
 	data_offset->Uid = cpu_to_le64(uid);
 	data_offset->Gid = cpu_to_le64(gid);
+	/* better to leave device as zero when it is  */
+	data_offset->DevMajor = cpu_to_le64(MAJOR(device));
+	data_offset->DevMinor = cpu_to_le64(MINOR(device));
 	data_offset->Permissions = cpu_to_le64(mode);
 	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,

@@ -72,9 +72,9 @@ struct ccw_device_private {
 	struct {
 		unsigned int fast:1;	/* post with "channel end" */
 		unsigned int repall:1;	/* report every interrupt status */
+		unsigned int pgroup:1;  /* do path grouping */
 	} __attribute__ ((packed)) options;
 	struct {
-		unsigned int pgid_supp:1;   /* "path group ID" supported */
 		unsigned int pgid_single:1; /* use single path for Set PGID */
 		unsigned int esid:1;        /* Ext. SenseID supported by HW */
 		unsigned int dosense:1;	    /* delayed SENSE required */

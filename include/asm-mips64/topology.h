@@ -1,8 +1,13 @@
-#ifndef _ASM_MIPS64_TOPOLOGY_H
-#define _ASM_MIPS64_TOPOLOGY_H
+#ifndef __ASM_TOPOLOGY_H
+#define __ASM_TOPOLOGY_H
+
+#if CONFIG_SGI_IP27
 
 #include <asm/mmzone.h>
 
 #define cpu_to_node(cpu)	(cputocnode(cpu))
+#endif
 
-#endif /* _ASM_MIPS64_TOPOLOGY_H */
+#include <asm-generic/topology.h>
+
+#endif /* __ASM_TOPOLOGY_H */

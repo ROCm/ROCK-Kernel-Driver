@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) International Business Machines Corp., 2000-2002
+ *   Copyright (c) International Business Machines Corp., 2000-2003
  *   Portions Copyright (c) Christoph Hellwig, 2001-2002
  *
  *   This program is free software;  you can redistribute it and/or modify
@@ -130,32 +130,34 @@ enum cflags {
  * JFS-private superblock information.
  */
 struct jfs_sb_info {
-	unsigned long	mntflag;	/* 4: aggregate attributes	*/
-	struct inode	*ipbmap;	/* 4: block map inode		*/
-	struct inode	*ipaimap;	/* 4: aggregate inode map inode	*/
-	struct inode	*ipaimap2;	/* 4: secondary aimap inode	*/
-	struct inode	*ipimap;	/* 4: aggregate inode map inode	*/
-	struct jfs_log	*log;		/* 4: log			*/
-	short		bsize;		/* 2: logical block size	*/
-	short		l2bsize;	/* 2: log2 logical block size	*/
-	short		nbperpage;	/* 2: blocks per page		*/
-	short		l2nbperpage;	/* 2: log2 blocks per page	*/
-	short		l2niperblk;	/* 2: log2 inodes per page	*/
-	u32		logdev;		/* 2: external log device	*/
+	unsigned long	mntflag;	/* aggregate attributes	*/
+	struct inode	*ipbmap;	/* block map inode		*/
+	struct inode	*ipaimap;	/* aggregate inode map inode	*/
+	struct inode	*ipaimap2;	/* secondary aimap inode	*/
+	struct inode	*ipimap;	/* aggregate inode map inode	*/
+	struct jfs_log	*log;		/* log			*/
+	short		bsize;		/* logical block size	*/
+	short		l2bsize;	/* log2 logical block size	*/
+	short		nbperpage;	/* blocks per page		*/
+	short		l2nbperpage;	/* log2 blocks per page	*/
+	short		l2niperblk;	/* log2 inodes per page	*/
+	u32		logdev;		/* external log device	*/
 	uint		aggregate;	/* volume identifier in log record */
-	pxd_t		logpxd;		/* 8: pxd describing log	*/
-	pxd_t		fsckpxd;	/* 8: pxd describing fsck wkspc */
-	pxd_t		ait2;		/* 8: pxd describing AIT copy	*/
-	char		uuid[16];	/* 16: 128-bit uuid for volume	*/
-	char		loguuid[16];	/* 16: 128-bit uuid for log	*/
+	pxd_t		logpxd;		/* pxd describing log	*/
+	pxd_t		fsckpxd;	/* pxd describing fsck wkspc */
+	pxd_t		ait2;		/* pxd describing AIT copy	*/
+	char		uuid[16];	/* 128-bit uuid for volume	*/
+	char		loguuid[16];	/* 128-bit uuid for log	*/
 	/* Formerly in ipimap */
-	uint		gengen;		/* 4: inode generation generator*/
-	uint		inostamp;	/* 4: shows inode belongs to fileset*/
+	uint		gengen;		/* inode generation generator*/
+	uint		inostamp;	/* shows inode belongs to fileset*/
 
         /* Formerly in ipbmap */
-	struct bmap	*bmap;		/* 4: incore bmap descriptor	*/
-	struct nls_table *nls_tab;	/* 4: current codepage		*/
-	uint		state;		/* 4: mount/recovery state	*/
+	struct bmap	*bmap;		/* incore bmap descriptor	*/
+	struct nls_table *nls_tab;	/* current codepage		*/
+	uint		state;		/* mount/recovery state	*/
+	unsigned long	flag;		/* mount time flags */
+	uint		p_state;	/* state prior to going no integrity */
 };
 
 static inline struct jfs_inode_info *JFS_IP(struct inode *inode)

@@ -7,13 +7,26 @@
 #define _ASM_DIV64_H
 
 /*
- * Hey, we're already 64-bit, no
- * need to play games..
+ * Don't use this one in new code
  */
-#define do_div(n,base) ({ \
-	int __res; \
-	__res = ((unsigned long) n) % (unsigned) base; \
-	n = ((unsigned long) n) / (unsigned) base; \
-	__res; })
+#define do_div64_32(res, high, low, base) ({ \
+	unsigned int __quot, __mod; \
+	unsigned long __div; \
+	unsigned int __low, __high, __base; \
+	\
+	__high = (high); \
+	__low = (low); \
+	__div = __high; \
+	__div = __div << 32 | __low; \
+	__base = (base); \
+	\
+	__mod = __div % __base; \
+	__div = __div / __base; \
+	\
+	__quot = __div; \
+	(res) = __quot; \
+	__mod; })
+
+#include <asm-generic.h>
 
 #endif /* _ASM_DIV64_H */

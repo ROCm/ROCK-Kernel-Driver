@@ -350,6 +350,11 @@ long_mode_panic:
 sse_ok:
 	popw	%ds
 	
+# tell BIOS we want to go to long mode
+	movl  $0xec00,%eax	# declare target operating mode
+	movl  $2,%ebx		# long mode
+	int $0x15			
+	
 # Get memory size (extended mem, kB)
 
 	xorl	%eax, %eax

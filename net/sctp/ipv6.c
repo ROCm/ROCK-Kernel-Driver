@@ -248,7 +248,7 @@ void sctp_v6_get_saddr(struct sctp_association *asoc, struct dst_entry *dst,
 {
 	struct sctp_bind_addr *bp;
 	rwlock_t *addr_lock;
-	struct sockaddr_storage_list *laddr;
+	struct sctp_sockaddr_entry *laddr;
 	struct list_head *pos;
 	sctp_scope_t scope;
 	union sctp_addr *baddr = NULL;
@@ -277,7 +277,7 @@ void sctp_v6_get_saddr(struct sctp_association *asoc, struct dst_entry *dst,
 	 */
 	sctp_read_lock(addr_lock);
 	list_for_each(pos, &bp->address_list) {
-		laddr = list_entry(pos, struct sockaddr_storage_list, list);
+		laddr = list_entry(pos, struct sctp_sockaddr_entry, list);
 		if ((laddr->a.sa.sa_family == AF_INET6) &&
 		    (scope <= sctp_scope(&laddr->a))) {
 			bmatchlen = sctp_v6_addr_match_len(daddr, &laddr->a);
@@ -309,7 +309,7 @@ static void sctp_v6_copy_addrlist(struct list_head *addrlist,
 {
 	struct inet6_dev *in6_dev;
 	struct inet6_ifaddr *ifp;
-	struct sockaddr_storage_list *addr;
+	struct sctp_sockaddr_entry *addr;
 
 	read_lock(&addrconf_lock);
 	if ((in6_dev = __in6_dev_get(dev)) == NULL) {
@@ -320,7 +320,7 @@ static void sctp_v6_copy_addrlist(struct list_head *addrlist,
 	read_lock(&in6_dev->lock);
 	for (ifp = in6_dev->addr_list; ifp; ifp = ifp->if_next) {
 		/* Add the address to the local list.  */
-		addr = t_new(struct sockaddr_storage_list, GFP_ATOMIC);
+		addr = t_new(struct sctp_sockaddr_entry, GFP_ATOMIC);
 		if (addr) {
 			addr->a.v6.sin6_family = AF_INET6;
 			addr->a.v6.sin6_port = 0;

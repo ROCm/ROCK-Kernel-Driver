@@ -157,7 +157,7 @@ static void get_ksymbol_core(struct kallsym_iter *iter)
 	unsigned stemlen;
 
 	/* First char of each symbol name indicates prefix length
-	   shared with previous name (stem compresion). */
+	   shared with previous name (stem compression). */
 	stemlen = kallsyms_names[iter->nameoff++];
 
 	strlcpy(iter->name+stemlen, kallsyms_names+iter->nameoff, 128-stemlen);

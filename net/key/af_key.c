@@ -1213,7 +1213,7 @@ static int pfkey_add(struct sock *sk, struct sk_buff *skb, struct sadb_msg *hdr,
 	struct sk_buff *out_skb;
 	struct sadb_msg *out_hdr;
 	struct xfrm_state *x;
-	struct xfrm_state *x1;
+	int err;
 
 	xfrm_probe_algs();
 	
@@ -1221,31 +1221,15 @@ static int pfkey_add(struct sock *sk, struct sk_buff *skb, struct sadb_msg *hdr,
 	if (IS_ERR(x))
 		return PTR_ERR(x);
 
-	/* XXX there is race condition */
-	x1 = pfkey_xfrm_state_lookup(hdr, ext_hdrs);
-	if (!x1) {
-		x1 = xfrm_find_acq(x->props.mode, x->props.reqid, x->id.proto,
-				   &x->id.daddr,
-				   &x->props.saddr, 0, x->props.family);
-		if (x1 && x1->id.spi != x->id.spi && x1->id.spi) {
-			xfrm_state_put(x1);
-			x1 = NULL;
-		}
-	}
+	if (hdr->sadb_msg_type == SADB_ADD)
+		err = xfrm_state_add(x);
+	else
+		err = xfrm_state_update(x);
 
-	if (x1 && ((x1->id.spi && hdr->sadb_msg_type == SADB_ADD) ||
-	     (hdr->sadb_msg_type == SADB_UPDATE && xfrm_state_kern(x1)))) {
+	if (err < 0) {
 		x->km.state = XFRM_STATE_DEAD;
 		xfrm_state_put(x);
-		xfrm_state_put(x1);
-		return -EEXIST;
-	}
-
-	xfrm_state_insert(x);
-
-	if (x1) {
-		xfrm_state_delete(x1);
-		xfrm_state_put(x1);
+		return err;
 	}
 
 	out_skb = pfkey_xfrm_state2msg(x, 0, 3);
@@ -2005,9 +1989,7 @@ static int pfkey_spddelete(struct sock *sk, struct sk_buff *skb, struct sadb_msg
 	err = 0;
 
 out:
-	if (xp) {
-		xfrm_policy_kill(xp);
-	}
+	xfrm_pol_put(xp);
 	return err;
 }
 
@@ -2047,12 +2029,7 @@ static int pfkey_spdget(struct sock *sk, struct sk_buff *skb, struct sadb_msg *h
 	err = 0;
 
 out:
-	if (xp) {
-		if (hdr->sadb_msg_type == SADB_X_SPDDELETE2)
-			xfrm_policy_kill(xp);
-		else
-			xfrm_pol_put(xp);
-	}
+	xfrm_pol_put(xp);
 	return err;
 }
 

@@ -2301,9 +2301,8 @@ static int __init m3_codec_install(struct m3_card *card)
 {
     struct ac97_codec *codec;
 
-    if ((codec = kmalloc(sizeof(struct ac97_codec), GFP_KERNEL)) == NULL)
+    if ((codec = ac97_alloc_codec()) == NULL)
         return -ENOMEM;
-    memset(codec, 0, sizeof(struct ac97_codec));
 
     codec->private_data = card;
     codec->codec_read = m3_ac97_read;
@@ -2313,13 +2312,13 @@ static int __init m3_codec_install(struct m3_card *card)
 
     if (ac97_probe_codec(codec) == 0) {
         printk(KERN_ERR PFX "codec probe failed\n");
-        kfree(codec);
+        ac97_release_codec(codec);
         return -1;
     }
 
     if ((codec->dev_mixer = register_sound_mixer(&m3_mixer_fops, -1)) < 0) {
         printk(KERN_ERR PFX "couldn't register mixer!\n");
-        kfree(codec);
+        ac97_release_codec(codec);
         return -1;
     }
 

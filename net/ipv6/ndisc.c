@@ -144,6 +144,19 @@ struct neigh_table nd_tbl = {
 	.gc_thresh3 =	1024,
 };
 
+/* ND options */
+struct ndisc_options {
+	struct nd_opt_hdr *nd_opt_array[7];
+	struct nd_opt_hdr *nd_opt_piend;
+};
+
+#define nd_opts_src_lladdr	nd_opt_array[ND_OPT_SOURCE_LL_ADDR]
+#define nd_opts_tgt_lladdr	nd_opt_array[ND_OPT_TARGET_LL_ADDR]
+#define nd_opts_pi		nd_opt_array[ND_OPT_PREFIX_INFO]
+#define nd_opts_pi_end		nd_opt_piend
+#define nd_opts_rh		nd_opt_array[ND_OPT_REDIRECT_HDR]
+#define nd_opts_mtu		nd_opt_array[ND_OPT_MTU]
+
 #define NDISC_OPT_SPACE(len) (((len)+2+7)&~7)
 
 static u8 *ndisc_fill_option(u8 *opt, int type, void *data, int data_len)
@@ -160,8 +173,8 @@ static u8 *ndisc_fill_option(u8 *opt, int type, void *data, int data_len)
 	return opt + space;
 }
 
-struct nd_opt_hdr *ndisc_next_option(struct nd_opt_hdr *cur,
-				     struct nd_opt_hdr *end)
+static struct nd_opt_hdr *ndisc_next_option(struct nd_opt_hdr *cur,
+					    struct nd_opt_hdr *end)
 {
 	int type;
 	if (!cur || !end || cur >= end)
@@ -173,8 +186,8 @@ struct nd_opt_hdr *ndisc_next_option(struct nd_opt_hdr *cur,
 	return (cur <= end && cur->nd_opt_type == type ? cur : NULL);
 }
 
-struct ndisc_options *ndisc_parse_options(u8 *opt, int opt_len,
-					  struct ndisc_options *ndopts)
+static struct ndisc_options *ndisc_parse_options(u8 *opt, int opt_len,
+						 struct ndisc_options *ndopts)
 {
 	struct nd_opt_hdr *nd_opt = (struct nd_opt_hdr *)opt;
 
@@ -375,7 +388,7 @@ ndisc_build_ll_hdr(struct sk_buff *skb, struct net_device *dev,
  *	Send a Neighbour Advertisement
  */
 
-int ndisc_output(struct sk_buff *skb)
+static int ndisc_output(struct sk_buff *skb)
 {
 	if (skb) {
 		struct neighbour *neigh = (skb->dst ? skb->dst->neighbour : NULL);
@@ -387,25 +400,6 @@ int ndisc_output(struct sk_buff *skb)
 		return 0;
 	}
 	return -EINVAL;
-}
-
-static inline struct dst_entry *ndisc_dst_alloc(struct net_device *dev, 
-						struct neighbour *neigh)
-{
-	struct rt6_info *rt = ip6_dst_alloc();
-
-	if (unlikely(rt == NULL))
-		goto out;
-
-	rt->rt6i_dev	  = dev;
-	rt->rt6i_nexthop  = neigh;
-	rt->rt6i_expires  = 0;
-	rt->rt6i_flags    = RTF_LOCAL;
-	rt->rt6i_metric   = 0;
-	rt->u.dst.metrics[RTAX_HOPLIMIT-1] = 255;
-	rt->u.dst.output  = ndisc_output;
-out:
-	return (struct dst_entry *)rt;
 }
 
 static inline void ndisc_flow_init(struct flowi *fl, u8 type,
@@ -423,7 +417,7 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 		   struct in6_addr *daddr, struct in6_addr *solicited_addr,
 	 	   int router, int solicited, int override, int inc_opt) 
 {
-	static struct in6_addr tmpaddr;
+	struct in6_addr tmpaddr;
 	struct inet6_ifaddr *ifp;
 	struct inet6_dev *idev;
 	struct flowi fl;
@@ -450,13 +444,13 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 
 	ndisc_flow_init(&fl, NDISC_NEIGHBOUR_ADVERTISEMENT, src_addr, daddr);
 
-	dst = ndisc_dst_alloc(dev, neigh);	
+	dst = ndisc_dst_alloc(dev, neigh, ndisc_output);
 	if (!dst)
 		return;
 
 	err = xfrm_lookup(&dst, &fl, NULL, 0);
 	if (err < 0) {
-		dst_free(dst);
+		dst_release(dst);
 		return;
 	}
 
@@ -472,7 +466,7 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 
 	if (skb == NULL) {
 		ND_PRINTK1("send_na: alloc skb failed\n");
-		dst_free(dst);
+		dst_release(dst);
 		return;
 	}
 
@@ -502,7 +496,6 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 						 csum_partial((__u8 *) msg, 
 							      len, 0));
 
-	dst_clone(dst);
 	skb->dst = dst;
 	idev = in6_dev_get(dst->dev);
 	dst_output(skb);
@@ -537,10 +530,9 @@ void ndisc_send_ns(struct net_device *dev, struct neighbour *neigh,
 
 	ndisc_flow_init(&fl, NDISC_NEIGHBOUR_SOLICITATION, saddr, daddr);
 
-	dst = ndisc_dst_alloc(dev, neigh);
+	dst = ndisc_dst_alloc(dev, neigh, ndisc_output);
 	if (!dst)
 		return;
-	dst_clone(dst);
 
 	err = xfrm_lookup(&dst, &fl, NULL, 0);
 	if (err < 0) {
@@ -557,6 +549,7 @@ void ndisc_send_ns(struct net_device *dev, struct neighbour *neigh,
 				  1, &err);
 	if (skb == NULL) {
 		ND_PRINTK1("send_ns: alloc skb failed\n");
+		dst_release(dst);
 		return;
 	}
 
@@ -582,7 +575,6 @@ void ndisc_send_ns(struct net_device *dev, struct neighbour *neigh,
 						 csum_partial((__u8 *) msg, 
 							      len, 0));
 	/* send it! */
-	dst_clone(dst);
 	skb->dst = dst;
 	idev = in6_dev_get(dst->dev);
 	dst_output(skb);
@@ -609,10 +601,9 @@ void ndisc_send_rs(struct net_device *dev, struct in6_addr *saddr,
 
 	ndisc_flow_init(&fl, NDISC_ROUTER_SOLICITATION, saddr, daddr);
 
-	dst = ndisc_dst_alloc(dev, NULL);
+	dst = ndisc_dst_alloc(dev, NULL, ndisc_output);
 	if (!dst)
 		return;
-	dst_clone(dst);
 
 	err = xfrm_lookup(&dst, &fl, NULL, 0);
 	if (err < 0) {
@@ -651,7 +642,6 @@ void ndisc_send_rs(struct net_device *dev, struct in6_addr *saddr,
 					   csum_partial((__u8 *) hdr, len, 0));
 
 	/* send it! */
-	dst_clone(dst);
 	skb->dst = dst;
 	idev = in6_dev_get(dst->dev);
 	dst_output(skb);
@@ -701,7 +691,7 @@ static void ndisc_solicit(struct neighbour *neigh, struct sk_buff *skb)
 	}
 }
 
-void ndisc_recv_ns(struct sk_buff *skb)
+static void ndisc_recv_ns(struct sk_buff *skb)
 {
 	struct nd_msg *msg = (struct nd_msg *)skb->h.raw;
 	struct in6_addr *saddr = &skb->nh.ipv6h->saddr;
@@ -713,10 +703,25 @@ void ndisc_recv_ns(struct sk_buff *skb)
 	struct net_device *dev = skb->dev;
 	struct inet6_ifaddr *ifp;
 	struct neighbour *neigh;
+	int addr_type = ipv6_addr_type(saddr);
 
 	if (ipv6_addr_type(&msg->target)&IPV6_ADDR_MULTICAST) {
 		if (net_ratelimit())
 			printk(KERN_WARNING "ICMP NS: target address is multicast\n");
+		return;
+	}
+
+	/*
+	 * RFC2461 7.1.1:
+	 * DAD has to be destined for solicited node multicast address.
+	 */
+	if (addr_type == IPV6_ADDR_ANY &&
+	    !(daddr->s6_addr32[0] == htonl(0xff020000) &&
+	      daddr->s6_addr32[1] == htonl(0x00000000) &&
+	      daddr->s6_addr32[2] == htonl(0x00000001) &&
+	      daddr->s6_addr [12] == 0xff )) {
+		if (net_ratelimit())
+			printk(KERN_DEBUG "ICMP6 NS: bad DAD packet (wrong destination)\n");
 		return;
 	}
 
@@ -734,23 +739,20 @@ void ndisc_recv_ns(struct sk_buff *skb)
 				printk(KERN_WARNING "ICMP NS: bad lladdr length.\n");
 			return;
 		}
+
+		/* XXX: RFC2461 7.1.1:
+	 	 *	If the IP source address is the unspecified address, 
+		 *	there MUST NOT be source link-layer address option 
+		 *	in the message.
+		 */
+		if (addr_type == IPV6_ADDR_ANY) {
+			if (net_ratelimit())
+				printk(KERN_WARNING "ICMP6 NS: bad DAD packet (link-layer address option)\n");
+			return;
+		}
 	}
 
-	/* XXX: RFC2461 7.1.1:
-	 * 	If the IP source address is the unspecified address, there
-	 *	MUST NOT be source link-layer address option in the message.
-	 *
-	 *	NOTE! Linux kernel < 2.4.4 broke this rule.
-	 */
-		 	
-	/* XXX: RFC2461 7.1.1:
-	 *	If the IP source address is the unspecified address, the IP
-      	 *	destination address MUST be a solicited-node multicast address.
-	 */
-
 	if ((ifp = ipv6_get_ifaddr(&msg->target, dev)) != NULL) {
-		int addr_type = ipv6_addr_type(saddr);
-
 		if (ifp->flags & IFA_F_TENTATIVE) {
 			/* Address is tentative. If the source
 			   is unspecified address, it is someone
@@ -816,7 +818,6 @@ void ndisc_recv_ns(struct sk_buff *skb)
 		in6_ifa_put(ifp);
 	} else if (ipv6_chk_acast_addr(dev, &msg->target)) {
 		struct inet6_dev *idev = in6_dev_get(dev);
-		int addr_type = ipv6_addr_type(saddr);
 	
 		/* anycast */
 	
@@ -860,7 +861,6 @@ void ndisc_recv_ns(struct sk_buff *skb)
 		in6_dev_put(idev);
 	} else {
 		struct inet6_dev *in6_dev = in6_dev_get(dev);
-		int addr_type = ipv6_addr_type(saddr);
 
 		if (in6_dev && in6_dev->cnf.forwarding &&
 		    (addr_type & IPV6_ADDR_UNICAST) &&
@@ -897,7 +897,7 @@ void ndisc_recv_ns(struct sk_buff *skb)
 	return;
 }
 
-void ndisc_recv_na(struct sk_buff *skb)
+static void ndisc_recv_na(struct sk_buff *skb)
 {
 	struct nd_msg *msg = (struct nd_msg *)skb->h.raw;
 	struct in6_addr *saddr = &skb->nh.ipv6h->saddr;
@@ -1298,7 +1298,6 @@ void ndisc_send_redirect(struct sk_buff *skb, struct neighbour *neigh,
 	if (rt == NULL)
 		return;
 	dst = &rt->u.dst;
-	dst_clone(dst);
 
 	err = xfrm_lookup(&dst, &fl, NULL, 0);
 	if (err) {
@@ -1306,16 +1305,17 @@ void ndisc_send_redirect(struct sk_buff *skb, struct neighbour *neigh,
 		return;
 	}
 
+	rt = (struct rt6_info *) dst;
+
 	if (rt->rt6i_flags & RTF_GATEWAY) {
 		ND_PRINTK1("ndisc_send_redirect: not a neighbour\n");
-		dst_release(&rt->u.dst);
+		dst_release(dst);
 		return;
 	}
-	if (!xrlim_allow(&rt->u.dst, 1*HZ)) {
-		dst_release(&rt->u.dst);
+	if (!xrlim_allow(dst, 1*HZ)) {
+		dst_release(dst);
 		return;
 	}
-	dst_release(&rt->u.dst);
 
 	if (dev->addr_len) {
 		if (neigh->nud_state&NUD_VALID) {
@@ -1325,6 +1325,7 @@ void ndisc_send_redirect(struct sk_buff *skb, struct neighbour *neigh,
 			   We will make it later, when will be sure,
 			   that it is alive.
 			 */
+			dst_release(dst);
 			return;
 		}
 	}
@@ -1343,11 +1344,11 @@ void ndisc_send_redirect(struct sk_buff *skb, struct neighbour *neigh,
 
 	hlen = 0;
 
-	skb_reserve(skb, (dev->hard_header_len + 15) & ~15);
+	skb_reserve(buff, (dev->hard_header_len + 15) & ~15);
 	ip6_nd_hdr(sk, buff, dev, &saddr_buf, &skb->nh.ipv6h->saddr,
 		   IPPROTO_ICMPV6, len);
 
-	skb->h.raw = (unsigned char*) icmph = (struct icmp6hdr *) skb_put(buff, len);
+	buff->h.raw = (unsigned char*) icmph = (struct icmp6hdr *) skb_put(buff, len);
 
 	memset(icmph, 0, sizeof(struct icmp6hdr));
 	icmph->icmp6_type = NDISC_REDIRECT;
@@ -1385,9 +1386,9 @@ void ndisc_send_redirect(struct sk_buff *skb, struct neighbour *neigh,
 					     len, IPPROTO_ICMPV6,
 					     csum_partial((u8 *) icmph, len, 0));
 
-	skb->dst = dst;
+	buff->dst = dst;
 	idev = in6_dev_get(dst->dev);
-	dst_output(skb);
+	dst_output(buff);
 
 	ICMP6_INC_STATS(idev, Icmp6OutRedirects);
 	ICMP6_INC_STATS(idev, Icmp6OutMsgs);

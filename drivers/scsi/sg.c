@@ -64,6 +64,7 @@ static int sg_version_num = 30529;	/* 2 digits for each component */
 #include <linux/blk.h>
 #include "scsi.h"
 #include "hosts.h"
+#include <scsi/scsi_driver.h>
 #include <scsi/scsi_ioctl.h>
 #include <scsi/sg.h>
 

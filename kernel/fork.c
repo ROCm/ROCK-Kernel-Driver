@@ -286,7 +286,7 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 			continue;
 		if (mpnt->vm_flags & VM_ACCOUNT) {
 			unsigned int len = (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT;
-			if (!vm_enough_memory(len))
+			if (security_vm_enough_memory(len))
 				goto fail_nomem;
 			charge += len;
 		}
@@ -375,6 +375,7 @@ static struct mm_struct * mm_init(struct mm_struct * mm)
 	mm->core_waiters = 0;
 	mm->page_table_lock = SPIN_LOCK_UNLOCKED;
 	mm->ioctx_list_lock = RW_LOCK_UNLOCKED;
+	mm->ioctx_list = NULL;
 	mm->default_kioctx = (struct kioctx)INIT_KIOCTX(mm->default_kioctx, *mm);
 	mm->free_area_cache = TASK_UNMAPPED_BASE;
 
@@ -864,6 +865,7 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	p->lock_depth = -1;		/* -1 = no lock */
 	p->start_time = get_jiffies_64();
 	p->security = NULL;
+	p->io_context = NULL;
 
 	retval = -ENOMEM;
 	if ((retval = security_task_alloc(p)))
@@ -1006,7 +1008,7 @@ struct task_struct *copy_process(unsigned long clone_flags,
 		attach_pid(p, PIDTYPE_PGID, p->pgrp);
 		attach_pid(p, PIDTYPE_SID, p->session);
 		if (p->pid)
-			per_cpu(process_counts, smp_processor_id())++;
+			__get_cpu_var(process_counts)++;
 	} else
 		link_pid(p, p->pids + PIDTYPE_TGID, &p->group_leader->pids[PIDTYPE_TGID].pid);
 

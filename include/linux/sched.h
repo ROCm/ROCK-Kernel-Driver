@@ -321,6 +321,8 @@ struct k_itimer {
 };
 
 
+struct io_context;			/* See blkdev.h */
+void exit_io_context(void);
 
 struct task_struct {
 	volatile long state;	/* -1 unrunnable, 0 runnable, >0 stopped */
@@ -450,6 +452,8 @@ struct task_struct {
 	struct dentry *proc_dentry;
 	struct backing_dev_info *backing_dev_info;
 
+	struct io_context *io_context;
+
 	unsigned long ptrace_message;
 	siginfo_t *last_siginfo; /* For ptrace use.  */
 };
@@ -481,6 +485,7 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_KSWAPD	0x00040000	/* I am kswapd */
 #define PF_SWAPOFF	0x00080000	/* I am in swapoff */
 #define PF_LESS_THROTTLE 0x01000000	/* Throttle me less: I clena memory */
+#define PF_SYNCWRITE	0x00200000	/* I am doing a sync write */
 
 #ifdef CONFIG_SMP
 extern int set_cpus_allowed(task_t *p, unsigned long new_mask);
@@ -512,10 +517,9 @@ void yield(void);
  */
 extern struct exec_domain	default_exec_domain;
 
-#ifndef __HAVE_ARCH_TASK_STRUCT_ALLOCATOR
-# ifndef INIT_THREAD_SIZE
-#  define INIT_THREAD_SIZE	2048*sizeof(long)
-# endif
+#ifndef INIT_THREAD_SIZE
+# define INIT_THREAD_SIZE	2048*sizeof(long)
+#endif
 
 union thread_union {
 	struct thread_info thread_info;
@@ -523,9 +527,6 @@ union thread_union {
 };
 
 extern union thread_union init_thread_union;
-
-#endif /* !__HAVE_ARCH_TASK_STRUCT_ALLOCATOR */
-
 extern struct task_struct init_task;
 
 extern struct   mm_struct init_mm;

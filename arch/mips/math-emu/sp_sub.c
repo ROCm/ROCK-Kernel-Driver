@@ -32,32 +32,28 @@ ieee754sp ieee754sp_sub(ieee754sp x, ieee754sp y)
 	COMPXSP;
 	COMPYSP;
 
-	CLEARCX;
-
 	EXPLODEXSP;
 	EXPLODEYSP;
 
-	switch (CLPAIR(xc, yc)) {
-	case CLPAIR(IEEE754_CLASS_SNAN, IEEE754_CLASS_SNAN):
-		return ieee754sp_nanxcpt(ieee754sp_bestnan(x, y), "sub", x,
-					 y);
+	CLEARCX;
 
+	FLUSHXSP;
+	FLUSHYSP;
+
+	switch (CLPAIR(xc, yc)) {
+	case CLPAIR(IEEE754_CLASS_SNAN, IEEE754_CLASS_QNAN):
 	case CLPAIR(IEEE754_CLASS_QNAN, IEEE754_CLASS_SNAN):
+	case CLPAIR(IEEE754_CLASS_SNAN, IEEE754_CLASS_SNAN):
 	case CLPAIR(IEEE754_CLASS_ZERO, IEEE754_CLASS_SNAN):
 	case CLPAIR(IEEE754_CLASS_NORM, IEEE754_CLASS_SNAN):
 	case CLPAIR(IEEE754_CLASS_DNORM, IEEE754_CLASS_SNAN):
 	case CLPAIR(IEEE754_CLASS_INF, IEEE754_CLASS_SNAN):
-		return ieee754sp_nanxcpt(y, "sub", x, y);
-
-	case CLPAIR(IEEE754_CLASS_SNAN, IEEE754_CLASS_QNAN):
 	case CLPAIR(IEEE754_CLASS_SNAN, IEEE754_CLASS_ZERO):
 	case CLPAIR(IEEE754_CLASS_SNAN, IEEE754_CLASS_NORM):
 	case CLPAIR(IEEE754_CLASS_SNAN, IEEE754_CLASS_DNORM):
 	case CLPAIR(IEEE754_CLASS_SNAN, IEEE754_CLASS_INF):
-		return ieee754sp_nanxcpt(x, "sub", x, y);
-
-	case CLPAIR(IEEE754_CLASS_QNAN, IEEE754_CLASS_QNAN):
-		return ieee754sp_bestnan(x, y);
+		SETCX(IEEE754_INVALID_OPERATION);
+		return ieee754sp_nanxcpt(ieee754sp_indef(), "sub", x, y);
 
 	case CLPAIR(IEEE754_CLASS_ZERO, IEEE754_CLASS_QNAN):
 	case CLPAIR(IEEE754_CLASS_NORM, IEEE754_CLASS_QNAN):
@@ -65,6 +61,7 @@ ieee754sp ieee754sp_sub(ieee754sp x, ieee754sp y)
 	case CLPAIR(IEEE754_CLASS_INF, IEEE754_CLASS_QNAN):
 		return y;
 
+	case CLPAIR(IEEE754_CLASS_QNAN, IEEE754_CLASS_QNAN):
 	case CLPAIR(IEEE754_CLASS_QNAN, IEEE754_CLASS_ZERO):
 	case CLPAIR(IEEE754_CLASS_QNAN, IEEE754_CLASS_NORM):
 	case CLPAIR(IEEE754_CLASS_QNAN, IEEE754_CLASS_DNORM):
@@ -72,7 +69,7 @@ ieee754sp ieee754sp_sub(ieee754sp x, ieee754sp y)
 		return x;
 
 
-		/* Inifity handling
+		/* Infinity handling
 		 */
 
 	case CLPAIR(IEEE754_CLASS_INF, IEEE754_CLASS_INF):
@@ -170,13 +167,13 @@ ieee754sp ieee754sp_sub(ieee754sp x, ieee754sp y)
 			xe = xe;
 			xs = ys;
 		}
-		if (xm == 0)
+		if (xm == 0) {
 			if (ieee754_csr.rm == IEEE754_RD)
 				return ieee754sp_zero(1);	/* round negative inf. => sign = -1 */
 			else
 				return ieee754sp_zero(0);	/* other round modes   => sign = 1 */
-
-		/* normalize to rounding precision 
+		}
+		/* normalize to rounding precision
 		 */
 		while ((xm >> (SP_MBITS + 3)) == 0) {
 			xm <<= 1;

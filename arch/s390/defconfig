@@ -41,6 +41,9 @@ CONFIG_KMOD=y
 #
 # CONFIG_ARCH_S390X is not set
 CONFIG_ARCH_S390_31=y
+CONFIG_MARCH_G5=y
+# CONFIG_MARCH_Z900 is not set
+# CONFIG_MARCH_Z990 is not set
 CONFIG_SMP=y
 CONFIG_NR_CPUS=32
 CONFIG_MATHEMU=y
@@ -66,6 +69,11 @@ CONFIG_BINFMT_MISC=m
 CONFIG_PFAULT=y
 # CONFIG_SHARED_KERNEL is not set
 # CONFIG_PCMCIA is not set
+
+#
+# Generic Driver Options
+#
+# CONFIG_FW_LOADER is not set
 
 #
 # SCSI support
@@ -166,6 +174,7 @@ CONFIG_IPV6=m
 # CONFIG_INET6_AH is not set
 # CONFIG_INET6_ESP is not set
 # CONFIG_INET6_IPCOMP is not set
+# CONFIG_IPV6_TUNNEL is not set
 # CONFIG_XFRM_USER is not set
 
 #
@@ -260,7 +269,14 @@ CONFIG_NET_ETHERNET=y
 CONFIG_LCS=m
 CONFIG_CTC=m
 CONFIG_IUCV=m
-CONFIG_CCWGROUP=m
+CONFIG_QETH=y
+
+#
+# Gigabit Ethernet default settings
+#
+# CONFIG_QETH_IPV6 is not set
+# CONFIG_QETH_PERF_STATS is not set
+CONFIG_CCWGROUP=y
 
 #
 # File systems

@@ -1264,7 +1264,7 @@ irqreturn_t ide_intr (int irq, void *dev_id, struct pt_regs *regs)
 #endif /* CONFIG_BLK_DEV_IDEPCI */
 		}
 		spin_unlock_irqrestore(&ide_lock, flags);
-		return IRQ_HANDLED;
+		return IRQ_NONE;
 	}
 	drive = hwgroup->drive;
 	if (!drive) {
@@ -1286,7 +1286,7 @@ irqreturn_t ide_intr (int irq, void *dev_id, struct pt_regs *regs)
 		 * enough advance overhead that the latter isn't a problem.
 		 */
 		spin_unlock_irqrestore(&ide_lock, flags);
-		return IRQ_HANDLED;
+		return IRQ_NONE;
 	}
 	if (!hwgroup->busy) {
 		hwgroup->busy = 1;	/* paranoia */

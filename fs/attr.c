@@ -22,8 +22,6 @@ int inode_change_ok(struct inode *inode, struct iattr *attr)
 	int retval = -EPERM;
 	unsigned int ia_valid = attr->ia_valid;
 
-	lock_kernel();
-
 	/* If force is set do it anyway. */
 	if (ia_valid & ATTR_FORCE)
 		goto fine;
@@ -58,7 +56,6 @@ int inode_change_ok(struct inode *inode, struct iattr *attr)
 fine:
 	retval = 0;
 error:
-	unlock_kernel();
 	return retval;
 }
 
@@ -68,7 +65,7 @@ int inode_setattr(struct inode * inode, struct iattr * attr)
 	int error = 0;
 
 	if (ia_valid & ATTR_SIZE) {
-		if (attr->ia_size != inode->i_size) {
+		if (attr->ia_size != i_size_read(inode)) {
 			error = vmtruncate(inode, attr->ia_size);
 			if (error || (ia_valid == ATTR_SIZE))
 				goto out;

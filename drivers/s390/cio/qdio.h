@@ -1,7 +1,7 @@
 #ifndef _CIO_QDIO_H
 #define _CIO_QDIO_H
 
-#define VERSION_CIO_QDIO_H "$Revision: 1.16 $"
+#define VERSION_CIO_QDIO_H "$Revision: 1.18 $"
 
 //#define QDIO_DBF_LIKE_HELL
 
@@ -21,10 +21,18 @@
 #define QDIO_TIMER_POLL_VALUE 1
 #define IQDIO_TIMER_POLL_VALUE 1
 
-#define IQDIO_FILL_LEVEL_TO_POLL (QDIO_MAX_BUFFERS_PER_Q*4/3)
+/*
+ * unfortunately this can't be (QDIO_MAX_BUFFERS_PER_Q*4/3) or so -- as
+ * we never know, whether we'll get initiative again, e.g. to give the
+ * transmit skb's back to the stack, however the stack may be waiting for
+ * them... therefore we define 4 as threshold to start polling (which
+ * will stop as soon as the asynchronous queue catches up)
+ * btw, this only applies to the asynchronous HiperSockets queue
+ */
+#define IQDIO_FILL_LEVEL_TO_POLL 4
 
-#define IQDIO_THININT_ISC 3
-#define IQDIO_DELAY_TARGET 0
+#define TIQDIO_THININT_ISC 3
+#define TIQDIO_DELAY_TARGET 0
 #define QDIO_BUSY_BIT_PATIENCE 2000 /* in microsecs */
 #define IQDIO_GLOBAL_LAPS 2 /* GLOBAL_LAPS are not used as we */
 #define IQDIO_GLOBAL_LAPS_INT 1 /* don't global summary */
@@ -465,7 +473,13 @@ struct qdio_perf_stats {
 
 #define atomic_swap(a,b) xchg((int*)a.counter,b)
 
-#define SYNC_MEMORY if (q->siga_sync) qdio_siga_sync(q)
+/* unlikely as the later the better */
+#define SYNC_MEMORY if (unlikely(q->siga_sync)) qdio_siga_sync_q(q)
+#define SYNC_MEMORY_ALL if (unlikely(q->siga_sync)) \
+	qdio_siga_sync(q,~0U,~0U)
+#define SYNC_MEMORY_ALL_OUTB if (unlikely(q->siga_sync)) \
+	qdio_siga_sync(q,~0U,0)
+
 #define NOW qdio_get_micros()
 #define SAVE_TIMESTAMP(q) q->timing.last_transfer_time=NOW
 #define GET_SAVED_TIMESTAMP(q) (q->timing.last_transfer_time)
@@ -511,6 +525,7 @@ struct qdio_q {
 	struct ccw_device *cdev;
 
 	unsigned int is_iqdio_q;
+	unsigned int is_thinint_q;
 
 	/* bit 0 means queue 0, bit 1 means queue 1, ... */
 	unsigned int mask;
@@ -532,6 +547,7 @@ struct qdio_q {
 	unsigned int siga_out;
 	unsigned int siga_sync;
 	unsigned int siga_sync_done_on_thinints;
+	unsigned int siga_sync_done_on_outb_tis;
 	unsigned int hydra_gives_outbound_pcis;
 
 	/* used to save beginning position when calling dd_handlers */
@@ -539,6 +555,8 @@ struct qdio_q {
 
 	atomic_t use_count;
 	atomic_t is_in_shutdown;
+
+	void *irq_ptr;
 
 #ifdef QDIO_USE_TIMERS_FOR_POLLING
 	struct timer_list timer;
@@ -596,6 +614,7 @@ struct qdio_irq {
 	int irq;
 
 	unsigned int is_iqdio_irq;
+	unsigned int is_thinint_irq;
 	unsigned int hydra_gives_outbound_pcis;
 	unsigned int sync_done_on_outb_pcis;
 

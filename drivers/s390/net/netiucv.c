@@ -1,5 +1,5 @@
 /*
- * $Id: netiucv.c,v 1.19 2003/04/08 16:00:17 mschwide Exp $
+ * $Id: netiucv.c,v 1.20 2003/05/27 11:34:24 mschwide Exp $
  *
  * IUCV network driver
  *
@@ -30,7 +30,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: IUCV network driver $Revision: 1.19 $
+ * RELEASE-TAG: IUCV network driver $Revision: 1.20 $
  *
  */
 
@@ -1631,7 +1631,7 @@ netiucv_init_netdevice(int ifno, char *username)
 	dev->type                = ARPHRD_SLIP;
 	dev->tx_queue_len        = NETIUCV_QUEUELEN_DEFAULT;
 	dev->flags	         = IFF_POINTOPOINT | IFF_NOARP;
-	SET_MODULE_OWNER(&tun->dev);
+	SET_MODULE_OWNER(dev);
 	return dev;
 }
 
@@ -1717,7 +1717,7 @@ static struct device_driver netiucv_driver = {
 static void
 netiucv_banner(void)
 {
-	char vbuf[] = "$Revision: 1.19 $";
+	char vbuf[] = "$Revision: 1.20 $";
 	char *version = vbuf;
 
 	if ((version = strchr(version, ':'))) {

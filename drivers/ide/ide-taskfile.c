@@ -954,6 +954,9 @@ ide_startstop_t pre_task_out_intr (ide_drive_t *drive, struct request *rq)
 		return startstop;
 	}
 
+	if (!drive->unmask)
+		local_irq_disable();
+
 	return task_out_intr(drive);
 }
 EXPORT_SYMBOL(pre_task_out_intr);
@@ -1029,6 +1032,9 @@ ide_startstop_t pre_task_mulout_intr (ide_drive_t *drive, struct request *rq)
 				drive->name, drive->addressing ? "_EXT" : "");
 		return startstop;
 	}
+
+	if (!drive->unmask)
+		local_irq_disable();
 
 	return task_mulout_intr(drive);
 }
@@ -1361,8 +1367,6 @@ void ide_init_drive_taskfile (struct request *rq)
 
 EXPORT_SYMBOL(ide_init_drive_taskfile);
 
-#if 1
-
 int ide_diag_taskfile (ide_drive_t *drive, ide_task_t *args, unsigned long data_size, u8 *buf)
 {
 	struct request rq;
@@ -1400,69 +1404,6 @@ int ide_diag_taskfile (ide_drive_t *drive, ide_task_t *args, unsigned long data_
 	rq.special = args;
 	return ide_do_drive_cmd(drive, &rq, ide_wait);
 }
-
-#else
-
-int ide_diag_taskfile (ide_drive_t *drive, ide_task_t *args, unsigned long data_size, u8 *buf)
-{
-	struct request *rq;
-	unsigned long flags;
-	ide_hwgroup_t *hwgroup = HWGROUP(drive);
-	struct list_head *queue_head = &drive->queue.queue_head;
-	DECLARE_COMPLETION(wait);
-
-	if (HWIF(drive)->chipset == ide_pdc4030 && buf != NULL)
-		return -ENOSYS; /* special drive cmds not supported */
-
-	memset(rq, 0, sizeof(*rq));
-	rq->flags = REQ_DRIVE_TASKFILE;
-	rq->buffer = buf;
-
-	/*
-	 * (ks) We transfer currently only whole sectors.
-	 * This is suffient for now.  But, it would be great,
-	 * if we would find a solution to transfer any size.
-	 * To support special commands like READ LONG.
-	 */
-	if (args->command_type != IDE_DRIVE_TASK_NO_DATA) {
-		if (data_size == 0) {
-			ata_nsector_t nsector;
-			nsector.b.low = args->hobRegister[IDE_NSECTOR_OFFSET_HOB];
-			nsector.b.high = args->tfRegister[IDE_NSECTOR_OFFSET];
-			rq.nr_sectors = nsector.all;
-		} else {
-			rq.nr_sectors = data_size / SECTOR_SIZE;
-		}
-		rq.current_nr_sectors = rq.nr_sectors;
-	//	rq.hard_cur_sectors = rq.nr_sectors;
-	}
-
-	if (args->tf_out_flags.all == 0) {
-		/*
-		 * clean up kernel settings for driver sanity, regardless.
-		 * except for discrete diag services.
-		 */
-		args->posthandler = ide_post_handler_parser(
-				(struct hd_drive_task_hdr *) args->tfRegister,
-				(struct hd_drive_hob_hdr *) args->hobRegister);
-	}
-	rq->special = args;
-	rq->errors = 0;
-	rq->rq_status = RQ_ACTIVE;
-	rq->rq_disk = drive->disk;
-	rq->waiting = &wait;
-
-	spin_lock_irqsave(&ide_lock, flags);
-	queue_head = queue_head->prev;
-	list_add(&rq->queue, queue_head);
-	ide_do_request(hwgroup, 0);
-	spin_unlock_irqrestore(&ide_lock, flags);
-
-	wait_for_completion(&wait);	/* wait for it to be serviced */
-	return rq->errors ? -EIO : 0;	/* return -EIO if errors */
-}
-
-#endif
 
 EXPORT_SYMBOL(ide_diag_taskfile);
 

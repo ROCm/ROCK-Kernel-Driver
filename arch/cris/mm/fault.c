@@ -6,6 +6,25 @@
  *  Authors:  Bjorn Wesen 
  * 
  *  $Log: fault.c,v $
+ *  Revision 1.8  2003/07/04 13:02:48  tobiasa
+ *  Moved code snippet from arch/cris/mm/fault.c that searches for fixup code
+ *  to seperate function in arch-specific files.
+ *
+ *  Revision 1.7  2003/01/22 06:48:38  starvik
+ *  Fixed warnings issued by GCC 3.2.1
+ *
+ *  Revision 1.6  2003/01/09 14:42:52  starvik
+ *  Merge of Linux 2.5.55
+ *
+ *  Revision 1.5  2002/12/11 14:44:48  starvik
+ *  Extracted v10 (ETRAX 100LX) specific stuff to arch/cris/arch-v10/mm
+ *
+ *  Revision 1.4  2002/11/13 15:10:28  starvik
+ *  pte_offset has been renamed to pte_offset_kernel
+ *
+ *  Revision 1.3  2002/11/05 06:45:13  starvik
+ *  Merge of Linux 2.5.45
+ *
  *  Revision 1.2  2001/12/18 13:35:22  bjornw
  *  Applied the 2.4.13->2.4.16 CRIS patch to 2.5.1 (is a copy of 2.4.15).
  *
@@ -68,24 +87,13 @@
  *
  */
 
-#include <linux/signal.h>
-#include <linux/sched.h>
-#include <linux/kernel.h>
-#include <linux/errno.h>
-#include <linux/string.h>
-#include <linux/types.h>
-#include <linux/ptrace.h>
-#include <linux/mman.h>
 #include <linux/mm.h>
 #include <linux/interrupt.h>
-
-#include <asm/system.h>
-#include <asm/segment.h>
-#include <asm/pgtable.h>
+#include <linux/module.h>
 #include <asm/uaccess.h>
-#include <asm/svinto.h>
 
-extern void die_if_kernel(const char *,struct pt_regs *,long);
+extern int find_fixup_code(struct pt_regs *);
+extern void die_if_kernel(const char *, struct pt_regs *, long);
 
 asmlinkage void do_invalid_op (struct pt_regs *, unsigned long);
 asmlinkage void do_page_fault(unsigned long address, struct pt_regs *regs,
@@ -106,127 +114,6 @@ asmlinkage void do_page_fault(unsigned long address, struct pt_regs *regs,
 /* current active page directory */
 
 volatile pgd_t *current_pgd;
-
-/* fast TLB-fill fault handler
- * this is called from entry.S with interrupts disabled
- */
-
-void
-handle_mmu_bus_fault(struct pt_regs *regs)
-{
-	int cause, select;
-#ifdef DEBUG
-	int index;
-	int page_id;
-	int acc, inv;
-#endif
-	int miss, we, writeac;
-	pmd_t *pmd;
-	pte_t pte;
-	int errcode;
-	unsigned long address;
-
-	cause = *R_MMU_CAUSE;
-	select = *R_TLB_SELECT;
-
-	address = cause & PAGE_MASK; /* get faulting address */
-
-#ifdef DEBUG
-	page_id = IO_EXTRACT(R_MMU_CAUSE,  page_id,   cause);
-	acc     = IO_EXTRACT(R_MMU_CAUSE,  acc_excp,  cause);
-	inv     = IO_EXTRACT(R_MMU_CAUSE,  inv_excp,  cause);  
-	index   = IO_EXTRACT(R_TLB_SELECT, index,     select);
-#endif
-	miss    = IO_EXTRACT(R_MMU_CAUSE,  miss_excp, cause);
-	we      = IO_EXTRACT(R_MMU_CAUSE,  we_excp,   cause);
-	writeac = IO_EXTRACT(R_MMU_CAUSE,  wr_rd,     cause);
-
-	/* ETRAX 100LX TR89 bugfix: if the second half of an unaligned
-	 * write causes a MMU-fault, it will not be restarted correctly.
-	 * This could happen if a write crosses a page-boundary and the
-	 * second page is not yet COW'ed or even loaded. The workaround
-	 * is to clear the unaligned bit in the CPU status record, so 
-	 * that the CPU will rerun both the first and second halves of
-	 * the instruction. This will not have any sideeffects unless
-	 * the first half goes to any device or memory that can't be
-	 * written twice, and which is mapped through the MMU.
-	 *
-	 * We only need to do this for writes.
-	 */
-
-	if(writeac)
-		regs->csrinstr &= ~(1 << 5);
-	
-	/* Set errcode's R/W flag according to the mode which caused the
-	 * fault
-	 */
-
-	errcode = writeac << 1;
-
-	D(printk("bus_fault from IRP 0x%lx: addr 0x%lx, miss %d, inv %d, we %d, acc %d, dx %d pid %d\n",
-		 regs->irp, address, miss, inv, we, acc, index, page_id));
-
-	/* for a miss, we need to reload the TLB entry */
-
-	if (miss) {
-		/* see if the pte exists at all
-		 * refer through current_pgd, don't use mm->pgd
-		 */
-
-		pmd = (pmd_t *)(current_pgd + pgd_index(address));
-		if (pmd_none(*pmd))
-			goto dofault;
-		if (pmd_bad(*pmd)) {
-			printk("bad pgdir entry 0x%lx at 0x%p\n", *(unsigned long*)pmd, pmd);
-			pmd_clear(pmd);
-			return;
-		}
-		pte = *pte_offset(pmd, address);
-		if (!pte_present(pte))
-			goto dofault;
-
-#ifdef DEBUG
-		printk(" found pte %lx pg %p ", pte_val(pte), pte_page(pte));
-		if (pte_val(pte) & _PAGE_SILENT_WRITE)
-			printk("Silent-W ");
-		if (pte_val(pte) & _PAGE_KERNEL)
-			printk("Kernel ");
-		if (pte_val(pte) & _PAGE_SILENT_READ)
-			printk("Silent-R ");
-		if (pte_val(pte) & _PAGE_GLOBAL)
-			printk("Global ");
-		if (pte_val(pte) & _PAGE_PRESENT)
-			printk("Present ");
-		if (pte_val(pte) & _PAGE_ACCESSED)
-			printk("Accessed ");
-		if (pte_val(pte) & _PAGE_MODIFIED)
-			printk("Modified ");
-		if (pte_val(pte) & _PAGE_READ)
-			printk("Readable ");
-		if (pte_val(pte) & _PAGE_WRITE)
-			printk("Writeable ");
-		printk("\n");
-#endif
-
-		/* load up the chosen TLB entry
-		 * this assumes the pte format is the same as the TLB_LO layout.
-		 *
-		 * the write to R_TLB_LO also writes the vpn and page_id fields from
-		 * R_MMU_CAUSE, which we in this case obviously want to keep
-		 */
-
-		*R_TLB_LO = pte_val(pte);
-
-		return;
-	} 
-
-	errcode = 1 | (we << 1);
-
- dofault:
-	/* leave it to the MM system fault handler below */
-	D(printk("do_page_fault %lx errcode %d\n", address, errcode));
-	do_page_fault(address, regs, errcode);
-}
 
 /*
  * This routine handles page faults.  It determines the address,
@@ -253,7 +140,6 @@ do_page_fault(unsigned long address, struct pt_regs *regs,
 	struct mm_struct *mm;
 	struct vm_area_struct * vma;
 	int writeaccess;
-	unsigned long fixup;
 	siginfo_t info;
 
 	tsk = current;
@@ -391,20 +277,8 @@ do_page_fault(unsigned long address, struct pt_regs *regs,
 	 *  code)
 	 */
 
-	if ((fixup = search_exception_table(regs->irp)) != 0) {
-		/* Adjust the instruction pointer in the stackframe */
-
-		regs->irp = fixup;
-
-		/* We do not want to return by restoring the CPU-state
-		 * anymore, so switch frame-types (see ptrace.h)
-		 */
-
-		regs->frametype = CRIS_FRAME_NORMAL;
-
-		D(printk("doing fixup to 0x%lx\n", fixup));
+	if (find_fixup_code(regs))
 		return;
-	}
 
 	/*
 	 * Oops. The kernel tried to access some bad page. We'll have to
@@ -498,7 +372,7 @@ vmalloc_fault:
 		 * silently loop forever.
 		 */
 
-		pte_k = pte_offset(pmd_k, address);
+		pte_k = pte_offset_kernel(pmd_k, address);
 		if (!pte_present(*pte_k))
 			goto no_context;
 

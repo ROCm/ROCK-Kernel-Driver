@@ -25,7 +25,11 @@
 #ifndef KERNEL_IRDA_H
 #define KERNEL_IRDA_H
 
-#include <linux/socket.h> /* only for sa_family_t */
+/* Please do *not* add any #include in this file, this file is
+ * included as-is in user space.
+ * Please fix the calling file to properly included needed files before
+ * this one, or preferably to include <net/irda/irda.h> instead.
+ * Jean II */
 
 /* Hint bit positions for first hint byte */
 #define HINT_PNP         0x01

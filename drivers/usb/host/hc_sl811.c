@@ -1205,7 +1205,7 @@ static void hc_release_hci (hci_t * hci)
 	}
 
 	usb_deregister_bus (hci->bus);
-	usb_free_bus (hci->bus);
+	usb_put_bus (hci->bus);
 
 	list_del_init (&hci->hci_hcd_list);
 

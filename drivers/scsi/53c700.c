@@ -133,7 +133,6 @@
 #include <asm/byteorder.h>
 #include <linux/blk.h>
 #include <linux/module.h>
-#include <linux/pci.h>
 #include <linux/interrupt.h>
 
 #include "scsi.h"
@@ -564,8 +563,7 @@ NCR_700_unmap(struct NCR_700_Host_Parameters *hostdata, Scsi_Cmnd *SCp,
 {
 	if(SCp->sc_data_direction != SCSI_DATA_NONE &&
 	   SCp->sc_data_direction != SCSI_DATA_UNKNOWN) {
-		enum dma_data_direction direction = 
-			(enum dma_data_direction)scsi_to_pci_dma_dir(SCp->sc_data_direction);
+		enum dma_data_direction direction = SCp->sc_data_direction;
 		if(SCp->use_sg) {
 			dma_unmap_sg(hostdata->dev, SCp->buffer,
 				     SCp->use_sg, direction);
@@ -1842,7 +1840,7 @@ NCR_700_queuecommand(Scsi_Cmnd *SCp, void (*done)(Scsi_Cmnd *))
 	}
 
 	/* now build the scatter gather list */
-	direction = (enum dma_data_direction)scsi_to_pci_dma_dir(SCp->sc_data_direction);
+	direction = SCp->sc_data_direction;
 	if(move_ins != 0) {
 		int i;
 		int sg_count;
@@ -2039,8 +2037,15 @@ NCR_700_init(void)
 	return 0;
 }
 
+/* NULL exit routine to keep modutils happy */
+STATIC void __exit
+NCR_700_exit(void)
+{
+}
+
 EXPORT_SYMBOL(NCR_700_detect);
 EXPORT_SYMBOL(NCR_700_release);
 EXPORT_SYMBOL(NCR_700_intr);
 
 module_init(NCR_700_init);
+module_exit(NCR_700_exit);

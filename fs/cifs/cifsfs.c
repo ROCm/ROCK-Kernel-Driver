@@ -165,7 +165,7 @@ cifs_statfs(struct super_block *sb, struct kstatfs *buf)
 					   able to support more than this, but best to be safe
 					   since Win2k and others can not handle very long filenames */
 	buf->f_files = 0;	/* undefined */
-	buf->f_ffree = -1;	/* unlimited */
+	buf->f_ffree = 0;	/* unlimited */
 
 	rc = CIFSSMBQFSInfo(xid, pTcon, buf, cifs_sb->local_nls);
 
@@ -178,7 +178,7 @@ cifs_statfs(struct super_block *sb, struct kstatfs *buf)
 	return 0;		/* always return success? what if volume is no longer available? */
 }
 
-static int cifs_permission(struct inode * inode, int mask)
+static int cifs_permission(struct inode * inode, int mask, struct nameidata *nd)
 {
 	/* the server does permission checks, we do not need to do it here */
 	return 0;
@@ -301,6 +301,7 @@ struct inode_operations cifs_dir_inode_ops = {
 /*	revalidate:cifs_revalidate,   */
 	.setattr = cifs_setattr,
 	.symlink = cifs_symlink,
+	.mknod   = cifs_mknod,
 };
 
 struct inode_operations cifs_file_inode_ops = {
@@ -465,7 +466,14 @@ static int cifs_oplock_thread(void * dummyarg)
 					CIFS_I(pfile->f_dentry->d_inode)->write_behind_rc 
 						= rc;
 				cFYI(1,("Oplock flush file %p rc %d",pfile,rc));
-				/* send oplock break */
+				if(pfile->private_data) {
+					rc = CIFSSMBLock(0, pTcon, 
+						((struct cifsFileInfo *) pfile->private_data)->netfid,
+						0 /* len */ , 0 /* offset */, 0, 
+						0, LOCKING_ANDX_OPLOCK_RELEASE,
+						0 /* wait flag */);
+					cFYI(1,("Oplock release rc = %d ",rc));
+				}
 				write_lock(&GlobalMid_Lock);
 			} else
 				break;

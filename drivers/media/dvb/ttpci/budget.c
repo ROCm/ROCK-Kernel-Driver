@@ -30,21 +30,9 @@
  */
 
 #include "budget.h"
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,51)
-        #define KBUILD_MODNAME budget
-#endif
+#include "dvb_functions.h"
 
-
-
-static inline void ddelay(int i)
-{
-	current->state=TASK_INTERRUPTIBLE;
-	schedule_timeout((HZ*i)/100);
-}
-
-
-static
-void Set22K (struct budget *budget, int state)
+static void Set22K (struct budget *budget, int state)
 {
 	struct saa7146_dev *dev=budget->dev;
 	DEB_EE(("budget: %p\n",budget));
@@ -56,8 +44,7 @@ void Set22K (struct budget *budget, int state)
 /* taken from the Skyvision DVB driver by
    Ralph Metzler <rjkm@metzlerbros.de> */
 
-static
-void DiseqcSendBit (struct budget *budget, int data)
+static void DiseqcSendBit (struct budget *budget, int data)
 {
 	struct saa7146_dev *dev=budget->dev;
 	DEB_EE(("budget: %p\n",budget));
@@ -69,8 +56,7 @@ void DiseqcSendBit (struct budget *budget, int data)
 }
 
 
-static
-void DiseqcSendByte (struct budget *budget, int data)
+static void DiseqcSendByte (struct budget *budget, int data)
 {
 	int i, par=1, d;
 
@@ -86,8 +72,7 @@ void DiseqcSendByte (struct budget *budget, int data)
 }
 
 
-static
-int SendDiSEqCMsg (struct budget *budget, int len, u8 *msg, int burst)
+static int SendDiSEqCMsg (struct budget *budget, int len, u8 *msg, unsigned long burst)
 {
 	struct saa7146_dev *dev=budget->dev;
 	int i;
@@ -110,7 +95,7 @@ int SendDiSEqCMsg (struct budget *budget, int len, u8 *msg, int burst)
 			udelay(12500);
 			saa7146_setgpio(dev, 3, SAA7146_GPIO_OUTLO);
 		}
-		ddelay(2);
+		dvb_delay(20);
 	}
 
 	return 0;
@@ -146,7 +131,7 @@ int budget_diseqc_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
        }
 
        case FE_DISEQC_SEND_BURST:
-               SendDiSEqCMsg (budget, 0, NULL, (int) arg);
+               SendDiSEqCMsg (budget, 0, NULL, (unsigned long)arg);
                break;
 
        default:
@@ -157,18 +142,20 @@ int budget_diseqc_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 }
 
 
-static
-int budget_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_data *info)
+static int budget_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_data *info)
 {
-	struct budget *budget;
+	struct budget *budget = NULL;
 	int err;
 
-	if (!(budget = kmalloc (sizeof(struct budget), GFP_KERNEL)))
+	budget = kmalloc(sizeof(struct budget), GFP_KERNEL);
+	if( NULL == budget ) {
 		return -ENOMEM;
+	}
 
-	DEB_EE(("budget: %p\n",budget));
+	DEB_EE(("dev:%p, info:%p, budget:%p\n",dev,info,budget));
 
 	if ((err = ttpci_budget_init (budget, dev, info))) {
+		printk("==> failed\n");
 		kfree (budget);
 		return err;
 	}
@@ -182,8 +169,7 @@ int budget_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_data *i
 }
 
 
-static
-int budget_detach (struct saa7146_dev* dev)
+static int budget_detach (struct saa7146_dev* dev)
 {
 	struct budget *budget = (struct budget*) dev->ext_priv;
 	int err;
@@ -194,6 +180,7 @@ int budget_detach (struct saa7146_dev* dev)
 	err = ttpci_budget_deinit (budget);
 
 	kfree (budget);
+	dev->ext_priv = NULL;
 
 	return err;
 }
@@ -209,8 +196,7 @@ MAKE_BUDGET_INFO(satel,	"SATELCO Multimedia PCI",	BUDGET_TT_HW_DISEQC);
 /* Uncomment for Budget Patch */
 /*MAKE_BUDGET_INFO(fs_1_3,"Siemens/Technotrend/Hauppauge PCI rev1.3+Budget_Patch", BUDGET_PATCH);*/
 
-static
-struct pci_device_id pci_tbl[] = {
+static struct pci_device_id pci_tbl[] = {
 	/* Uncomment for Budget Patch */
 	/*MAKE_EXTENSION_PCI(fs_1_3,0x13c2, 0x0000),*/
 	MAKE_EXTENSION_PCI(ttbs,  0x13c2, 0x1003),
@@ -222,10 +208,9 @@ struct pci_device_id pci_tbl[] = {
 	}
 };
 
+MODULE_DEVICE_TABLE(pci, pci_tbl);
 
-
-static
-struct saa7146_extension budget_extension = {
+static struct saa7146_extension budget_extension = {
 	.name		= "budget dvb\0",
 	.flags	 	= 0,
 	.ext_vv_data	= NULL,
@@ -240,8 +225,7 @@ struct saa7146_extension budget_extension = {
 };	
 
 
-static
-int __init budget_init(void) 
+static int __init budget_init(void) 
 {
 	if (saa7146_register_extension(&budget_extension))
 		return -ENODEV;
@@ -250,8 +234,7 @@ int __init budget_init(void)
 }
 
 
-static
-void __exit budget_exit(void)
+static void __exit budget_exit(void)
 {
 	DEB_EE((".\n"));
 	saa7146_unregister_extension(&budget_extension); 

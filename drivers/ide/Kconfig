@@ -267,7 +267,7 @@ config BLK_DEV_IDESCSI
 
 config IDE_TASK_IOCTL
 	bool "IDE Taskfile Access"
-	depends on BLK_DEV_IDE && BROKEN
+	depends on BLK_DEV_IDE
 	help
 	  This is a direct raw access to the media.  It is a complex but
 	  elegant solution to test and validate the domain of the hardware and
@@ -277,9 +277,9 @@ config IDE_TASK_IOCTL
 	  If you are unsure, say N here.
 
 config IDE_TASKFILE_IO
-	bool 'IDE Taskfile IO'
-	depends on BLK_DEV_IDE
-	default y
+	bool 'IDE Taskfile IO (EXPERIMENTAL)'
+	depends on BLK_DEV_IDE && EXPERIMENTAL
+	default n
 	---help---
 	  Use new taskfile IO code.
 

@@ -18,13 +18,13 @@
 #include <linux/smp_lock.h>
 #include "autofs_i.h"
 
-static struct dentry *autofs4_dir_lookup(struct inode *,struct dentry *);
+static struct dentry *autofs4_dir_lookup(struct inode *,struct dentry *, struct nameidata *);
 static int autofs4_dir_symlink(struct inode *,struct dentry *,const char *);
 static int autofs4_dir_unlink(struct inode *,struct dentry *);
 static int autofs4_dir_rmdir(struct inode *,struct dentry *);
 static int autofs4_dir_mkdir(struct inode *,struct dentry *,int);
 static int autofs4_root_ioctl(struct inode *, struct file *,unsigned int,unsigned long);
-static struct dentry *autofs4_root_lookup(struct inode *,struct dentry *);
+static struct dentry *autofs4_root_lookup(struct inode *,struct dentry *, struct nameidata *);
 
 struct file_operations autofs4_root_operations = {
 	.open		= dcache_dir_open,
@@ -143,7 +143,7 @@ static int try_to_fill_dentry(struct dentry *dentry,
  * yet completely filled in, and revalidate has to delay such
  * lookups..
  */
-static int autofs4_root_revalidate(struct dentry * dentry, int flags)
+static int autofs4_root_revalidate(struct dentry * dentry, struct nameidata *nd)
 {
 	struct inode * dir = dentry->d_parent->d_inode;
 	struct autofs_sb_info *sbi = autofs4_sbi(dir->i_sb);
@@ -183,7 +183,7 @@ static int autofs4_root_revalidate(struct dentry * dentry, int flags)
 	return 1;
 }
 
-static int autofs4_revalidate(struct dentry *dentry, int flags)
+static int autofs4_revalidate(struct dentry *dentry, struct nameidata *nd)
 {
 	struct autofs_sb_info *sbi = autofs4_sbi(dentry->d_sb);
 
@@ -225,7 +225,7 @@ static struct dentry_operations autofs4_dentry_operations = {
 /* Lookups in non-root dirs never find anything - if it's there, it's
    already in the dcache */
 /* SMP-safe */
-static struct dentry *autofs4_dir_lookup(struct inode *dir, struct dentry *dentry)
+static struct dentry *autofs4_dir_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *nd)
 {
 #if 0
 	DPRINTK(("autofs_dir_lookup: ignoring lookup of %.*s/%.*s\n",
@@ -239,7 +239,7 @@ static struct dentry *autofs4_dir_lookup(struct inode *dir, struct dentry *dentr
 }
 
 /* Lookups in the root directory */
-static struct dentry *autofs4_root_lookup(struct inode *dir, struct dentry *dentry)
+static struct dentry *autofs4_root_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *nd)
 {
 	struct autofs_sb_info *sbi;
 	int oz_mode;
@@ -276,7 +276,7 @@ static struct dentry *autofs4_root_lookup(struct inode *dir, struct dentry *dent
 
 	if (dentry->d_op && dentry->d_op->d_revalidate) {
 		up(&dir->i_sem);
-		(dentry->d_op->d_revalidate)(dentry, 0);
+		(dentry->d_op->d_revalidate)(dentry, nd);
 		down(&dir->i_sem);
 	}
 

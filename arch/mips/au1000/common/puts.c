@@ -29,8 +29,9 @@
  */
 
 #include <linux/types.h>
+#include <asm/au1000.h>
 
-#define SERIAL_BASE   0xB1100000 /* au1000, uart 0 */
+#define SERIAL_BASE   UART_BASE
 #define SER_CMD       0x7
 #define SER_DATA      0x1
 #define TX_BUSY       0x20

@@ -250,14 +250,7 @@ acpi_os_install_interrupt_handler(u32 irq, OSD_HANDLER handler, void *context)
 	irq = acpi_fadt.sci_int;
 
 #ifdef CONFIG_IA64
-	int vector;
-
-	vector = acpi_irq_to_vector(irq);
-	if (vector < 0) {
-		printk(KERN_ERR PREFIX "SCI (IRQ%d) not registerd\n", irq);
-		return AE_OK;
-	}
-	irq = vector;
+	irq = gsi_to_vector(irq);
 #endif
 	acpi_irq_irq = irq;
 	acpi_irq_handler = handler;
@@ -275,7 +268,7 @@ acpi_os_remove_interrupt_handler(u32 irq, OSD_HANDLER handler)
 {
 	if (acpi_irq_handler) {
 #ifdef CONFIG_IA64
-		irq = acpi_irq_to_vector(irq);
+		irq = gsi_to_vector(irq);
 #endif
 		free_irq(irq, acpi_irq);
 		acpi_irq_handler = NULL;
@@ -473,7 +466,8 @@ acpi_os_read_pci_configuration (struct acpi_pci_id *pci_id, u32 reg, void *value
 	}
 
 	result = raw_pci_ops->read(pci_id->segment, pci_id->bus,
-			pci_id->device, pci_id->function, reg, size, value);
+				PCI_DEVFN(pci_id->device, pci_id->function),
+				reg, size, value);
 
 	return (result ? AE_ERROR : AE_OK);
 }
@@ -498,7 +492,8 @@ acpi_os_write_pci_configuration (struct acpi_pci_id *pci_id, u32 reg, acpi_integ
 	}
 
 	result = raw_pci_ops->write(pci_id->segment, pci_id->bus,
-			pci_id->device, pci_id->function, reg, size, value);
+				PCI_DEVFN(pci_id->device, pci_id->function),
+				reg, size, value);
 
 	return (result ? AE_ERROR : AE_OK);
 }
@@ -940,7 +935,7 @@ acpi_os_get_line(char *buffer)
 }
 
 /* Assumes no unreadable holes inbetween */
-BOOLEAN
+u8
 acpi_os_readable(void *ptr, acpi_size len)
 {
 #if defined(__i386__) || defined(__x86_64__) 
@@ -950,7 +945,7 @@ acpi_os_readable(void *ptr, acpi_size len)
 	return 1;
 }
 
-BOOLEAN
+u8
 acpi_os_writable(void *ptr, acpi_size len)
 {
 	/* could do dummy write (racy) or a kernel page table lookup.

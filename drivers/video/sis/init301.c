@@ -5282,7 +5282,7 @@ SiS_DisableBridge(SiS_Private *SiS_Pr, PSIS_HW_DEVICE_INFO HwDeviceExtension,USH
 #ifdef SIS315H	/* 310/325 series */
 
 	if(SiS_Pr->SiS_IF_DEF_CH70xx != 0) {
-		temp =  temp = SiS_GetCH701x(SiS_Pr,0x61);
+		temp = SiS_GetCH701x(SiS_Pr,0x61);
 		if(temp < 1) {
 		   SiS_SetCH701x(SiS_Pr,0xac76);
 		   SiS_SetCH701x(SiS_Pr,0x0066);

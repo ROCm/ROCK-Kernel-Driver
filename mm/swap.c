@@ -20,6 +20,7 @@
 #include <linux/pagemap.h>
 #include <linux/pagevec.h>
 #include <linux/init.h>
+#include <linux/module.h>
 #include <linux/mm_inline.h>
 #include <linux/buffer_head.h>	/* for try_to_release_page() */
 #include <linux/percpu.h>
@@ -112,35 +113,34 @@ static DEFINE_PER_CPU(struct pagevec, lru_add_active_pvecs) = { 0, };
 
 void lru_cache_add(struct page *page)
 {
-	struct pagevec *pvec = &per_cpu(lru_add_pvecs, get_cpu());
+	struct pagevec *pvec = &get_cpu_var(lru_add_pvecs);
 
 	page_cache_get(page);
 	if (!pagevec_add(pvec, page))
 		__pagevec_lru_add(pvec);
-	put_cpu();
+	put_cpu_var(lru_add_pvecs);
 }
 
 void lru_cache_add_active(struct page *page)
 {
-	struct pagevec *pvec = &per_cpu(lru_add_active_pvecs, get_cpu());
+	struct pagevec *pvec = &get_cpu_var(lru_add_active_pvecs);
 
 	page_cache_get(page);
 	if (!pagevec_add(pvec, page))
 		__pagevec_lru_add_active(pvec);
-	put_cpu();
+	put_cpu_var(lru_add_active_pvecs);
 }
 
 void lru_add_drain(void)
 {
-	int cpu = get_cpu();
-	struct pagevec *pvec = &per_cpu(lru_add_pvecs, cpu);
+	struct pagevec *pvec = &get_cpu_var(lru_add_pvecs);
 
 	if (pagevec_count(pvec))
 		__pagevec_lru_add(pvec);
-	pvec = &per_cpu(lru_add_active_pvecs, cpu);
+	pvec = &__get_cpu_var(lru_add_active_pvecs);
 	if (pagevec_count(pvec))
 		__pagevec_lru_add_active(pvec);
-	put_cpu();
+	put_cpu_var(lru_add_pvecs);
 }
 
 /*
@@ -371,6 +371,7 @@ void vm_acct_memory(long pages)
 	}
 	preempt_enable();
 }
+EXPORT_SYMBOL(vm_acct_memory);
 #endif
 
 

@@ -24,9 +24,9 @@
 
 /*================ Forward declarations ================*/
 
-static struct dentry *dbl_lookup(struct inode *, struct dentry *);
+static struct dentry *dbl_lookup(struct inode *, struct dentry *, struct nameidata *);
 static int dbl_readdir(struct file *, void *, filldir_t);
-static int dbl_create(struct inode *, struct dentry *, int);
+static int dbl_create(struct inode *, struct dentry *, int, struct nameidata *);
 static int dbl_mkdir(struct inode *, struct dentry *, int);
 static int dbl_unlink(struct inode *, struct dentry *);
 static int dbl_rmdir(struct inode *, struct dentry *);
@@ -108,7 +108,7 @@ static int is_hdr(struct inode *dir, const char *name, int len)
  * the inode for the directory and the name (and its length) of the
  * entry.
  */
-static struct dentry *dbl_lookup(struct inode * dir, struct dentry *dentry)
+static struct dentry *dbl_lookup(struct inode * dir, struct dentry *dentry, struct nameidata *nd)
 {
 	struct hfs_name cname;
 	struct hfs_cat_entry *entry;
@@ -272,7 +272,7 @@ out:
  * the directory and the name (and its length) of the new file.
  */
 static int dbl_create(struct inode * dir, struct dentry *dentry,
-		      int mode)
+		      int mode, struct nameidata *nd)
 {
 	int error;
 
@@ -280,7 +280,7 @@ static int dbl_create(struct inode * dir, struct dentry *dentry,
 	if (is_hdr(dir, dentry->d_name.name, dentry->d_name.len)) {
 		error = -EEXIST;
 	} else {
-		error = hfs_create(dir, dentry, mode);
+		error = hfs_create(dir, dentry, mode, nd);
 	}
 	unlock_kernel();
 	return error;

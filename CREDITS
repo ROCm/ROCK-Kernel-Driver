@@ -828,8 +828,8 @@ W: http://www.xenotime.net/linux/linux.html
 W: http://www.linux-usb.org
 D: Linux-USB subsystem, USB core/UHCI/printer/storage drivers
 D: x86 SMP, ACPI, bootflag hacking
-S: 15275 SW Koll Parkway, Suite H
-S: Beaverton, Oregon 97006
+S: 12725 SW Millikan Way, Suite 400
+S: Beaverton, Oregon 97005
 S: USA
 
 N: Bob Dunlop
@@ -2228,8 +2228,8 @@ N: Patrick Mochel
 E: mochel@osdl.org
 E: mochelp@infinity.powertie.org
 D: PCI Power Management, ACPI work
-S: 15275 SW Koll Parkway, Suite H
-S: Beaverton, OR 97006 
+S: 12725 SW Millikan Way, Suite 400
+S: Beaverton, Oregon 97005
 S: USA
 
 N: Eberhard Moenkeberg
@@ -3046,12 +3046,10 @@ S: Sevilla 41005
 S: Spain
 
 N: Linus Torvalds
-E: torvalds@transmeta.com
-W: http://www.cs.helsinki.fi/Linus.Torvalds
-P: 1024/A86B35C5 96 54 50 29 EC 11 44 7A  BE 67 3C 24 03 13 62 C8
+E: torvalds@osdl.org
 D: Original kernel hacker
-S: 3990 Freedom Circle
-S: Santa Clara, California 95054
+S: 12725 SW Millikan Way, Suite 400
+S: Beaverton, Oregon 97005
 S: USA
 
 N: Marcelo W. Tosatti

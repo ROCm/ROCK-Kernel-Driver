@@ -86,6 +86,8 @@ static void arcrimi_copy_from_card(struct net_device *dev, int bufnum, int offse
  */
 static int __init arcrimi_probe(struct net_device *dev)
 {
+	int retval;
+
 	BUGLVL(D_NORMAL) printk(VERSION);
 	BUGLVL(D_NORMAL) printk("E-mail me if you actually test the RIM I driver, please!\n");
 
@@ -97,16 +99,27 @@ static int __init arcrimi_probe(struct net_device *dev)
 		       "must specify the shmem and irq!\n");
 		return -ENODEV;
 	}
-	if (check_mem_region(dev->mem_start, BUFFER_SIZE)) {
+	/*
+	 * Grab the memory region at mem_start for BUFFER_SIZE bytes.
+	 * Later in arcrimi_found() the real size will be determined
+	 * and this reserve will be released and the correct size
+	 * will be taken.
+	 */
+	if (!request_mem_region(dev->mem_start, BUFFER_SIZE, "arcnet (90xx)")) {
 		BUGMSG(D_NORMAL, "Card memory already allocated\n");
 		return -ENODEV;
 	}
 	if (dev->dev_addr[0] == 0) {
+		release_mem_region(dev->mem_start, BUFFER_SIZE);
 		BUGMSG(D_NORMAL, "You need to specify your card's station "
 		       "ID!\n");
 		return -ENODEV;
 	}
-	return arcrimi_found(dev);
+	retval = arcrimi_found(dev);
+	if (retval < 0) {
+		release_mem_region(dev->mem_start, BUFFER_SIZE);
+	}
+	return retval;
 }
 
 
@@ -182,8 +195,19 @@ static int __init arcrimi_found(struct net_device *dev)
 	/* get and check the station ID from offset 1 in shmem */
 	dev->dev_addr[0] = readb(lp->mem_start + 1);
 
-	/* reserve the memory region - guaranteed to work by check_region */
-	request_mem_region(dev->mem_start, dev->mem_end - dev->mem_start + 1, "arcnet (90xx)");
+	/*
+	 * re-reserve the memory region - arcrimi_probe() alloced this reqion
+	 * but didn't know the real size.  Free that region and then re-get
+	 * with the correct size.  There is a VERY slim chance this could
+	 * fail.
+	 */
+	release_mem_region(dev->mem_start, BUFFER_SIZE);
+	if (!request_mem_region(dev->mem_start,
+				dev->mem_end - dev->mem_start + 1,
+				"arcnet (90xx)")) {
+		BUGMSG(D_NORMAL, "Card memory already allocated\n");
+		goto err_free_dev_priv;
+	}
 
 	BUGMSG(D_NORMAL, "ARCnet RIM I: station %02Xh found at IRQ %d, "
 	       "ShMem %lXh (%ld*%d bytes).\n",

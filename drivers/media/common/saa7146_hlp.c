@@ -1,16 +1,11 @@
 #include <media/saa7146_vv.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,51)
-	#define KBUILD_MODNAME saa7146
-#endif
-
 #define my_min(type,x,y) \
 	({ type __x = (x), __y = (y); __x < __y ? __x: __y; })
 #define my_max(type,x,y) \
 	({ type __x = (x), __y = (y); __x > __y ? __x: __y; })
 
-static
-void calculate_output_format_register(struct saa7146_dev* saa, u32 palette, u32* clip_format)
+static void calculate_output_format_register(struct saa7146_dev* saa, u32 palette, u32* clip_format)
 {
 	/* clear out the necessary bits */
 	*clip_format &= 0x0000ffff;	
@@ -18,21 +13,18 @@ void calculate_output_format_register(struct saa7146_dev* saa, u32 palette, u32*
 	*clip_format |=  (( ((palette&0xf00)>>8) << 30) | ((palette&0x00f) << 24) | (((palette&0x0f0)>>4) << 16));
 }
 
-static
-void calculate_bcs_ctrl_register(struct saa7146_dev *dev, int brightness, int contrast, int colour, u32 *bcs_ctrl)
+static void calculate_bcs_ctrl_register(struct saa7146_dev *dev, int brightness, int contrast, int colour, u32 *bcs_ctrl)
 {
 	*bcs_ctrl = ((brightness << 24) | (contrast << 16) | (colour <<  0));
 }
 
-static
-void calculate_hps_source_and_sync(struct saa7146_dev *dev, int source, int sync, u32* hps_ctrl)
+static void calculate_hps_source_and_sync(struct saa7146_dev *dev, int source, int sync, u32* hps_ctrl)
 {
 	*hps_ctrl &= ~(MASK_30 | MASK_31 | MASK_28);
 	*hps_ctrl |= (source << 30) | (sync << 28);
 }
 
-static
-void calculate_hxo_and_hyo(struct saa7146_vv *vv, u32* hps_h_scale, u32* hps_ctrl)
+static void calculate_hxo_and_hyo(struct saa7146_vv *vv, u32* hps_h_scale, u32* hps_ctrl)
 {
 	int hyo = 0, hxo = 0;
 
@@ -77,8 +69,7 @@ static struct {
 u8 h_attenuation[] = { 1, 2, 4, 8, 2, 4, 8, 16, 0};
 
 /* calculate horizontal scale registers */
-static
-int calculate_h_scale_registers(struct saa7146_dev *dev,
+static int calculate_h_scale_registers(struct saa7146_dev *dev,
 	int in_x, int out_x, int flip_lr,
 	u32* hps_ctrl, u32* hps_v_gain, u32* hps_h_prescale, u32* hps_h_scale)
 {
@@ -225,8 +216,7 @@ static struct {
 u16 v_attenuation[] = { 2, 4, 8, 16, 32, 64, 128, 256, 0};
 
 /* calculate vertical scale registers */
-static
-int calculate_v_scale_registers(struct saa7146_dev *dev, enum v4l2_field field,
+static int calculate_v_scale_registers(struct saa7146_dev *dev, enum v4l2_field field,
 	int in_y, int out_y, u32* hps_v_scale, u32* hps_v_gain)
 {
 	int lpi = 0;
@@ -322,8 +312,7 @@ int calculate_v_scale_registers(struct saa7146_dev *dev, enum v4l2_field field,
 }
 
 /* simple bubble-sort algorithm with duplicate elimination */
-static
-int sort_and_eliminate(u32* values, int* count)
+static int sort_and_eliminate(u32* values, int* count)
 {
 	int low = 0, high = 0, top = 0, temp = 0;
 	int cur = 0, next = 0;
@@ -355,12 +344,11 @@ int sort_and_eliminate(u32* values, int* count)
 	return 0;
 }
 
-static
-void calculate_clipping_registers_rect(struct saa7146_dev *dev, struct saa7146_fh *fh,
+static void calculate_clipping_registers_rect(struct saa7146_dev *dev, struct saa7146_fh *fh,
 	struct saa7146_video_dma *vdma2, u32* clip_format, u32* arbtr_ctrl, enum v4l2_field field)
 {
 	struct saa7146_vv *vv = dev->vv_data;
-	u32 *clipping = vv->clipping;
+	u32 *clipping = vv->d_clipping.cpu_addr;
 
 	int width = fh->ov.win.w.width;
 	int height =  fh->ov.win.w.height;
@@ -469,9 +457,9 @@ void calculate_clipping_registers_rect(struct saa7146_dev *dev, struct saa7146_f
 	*arbtr_ctrl &= 0xffff00ff;
 	*arbtr_ctrl |= 0x00001c00;	
 	
-	vdma2->base_even	= virt_to_bus(clipping);
-	vdma2->base_odd		= virt_to_bus(clipping);
-	vdma2->prot_addr	= virt_to_bus(clipping)+((sizeof(u32))*(numdwords));
+	vdma2->base_even	= vv->d_clipping.dma_handle;
+	vdma2->base_odd		= vv->d_clipping.dma_handle;
+	vdma2->prot_addr	= vv->d_clipping.dma_handle+((sizeof(u32))*(numdwords));
 	vdma2->base_page	= 0x04;
 	vdma2->pitch		= 0x00;
 	vdma2->num_line_byte	= (0 << 16 | (sizeof(u32))*(numdwords-1) );
@@ -488,8 +476,7 @@ void calculate_clipping_registers_rect(struct saa7146_dev *dev, struct saa7146_f
 }
 
 /* disable clipping */
-static
-void saa7146_disable_clipping(struct saa7146_dev *dev)
+static void saa7146_disable_clipping(struct saa7146_dev *dev)
 {
 	u32 clip_format	= saa7146_read(dev, CLIP_FORMAT_CTRL);
 
@@ -504,8 +491,7 @@ void saa7146_disable_clipping(struct saa7146_dev *dev)
 	saa7146_write(dev, MC1, (MASK_21));
 }
 
-static
-void saa7146_set_clipping_rect(struct saa7146_dev *dev, struct saa7146_fh *fh)
+static void saa7146_set_clipping_rect(struct saa7146_dev *dev, struct saa7146_fh *fh)
 {
 	enum v4l2_field field = fh->ov.win.field;
 	int clipcount = fh->ov.nclips;
@@ -547,8 +533,7 @@ void saa7146_set_clipping_rect(struct saa7146_dev *dev, struct saa7146_fh *fh)
 	saa7146_write(dev, MC1, (MASK_05 | MASK_21));
 }
 
-static
-void saa7146_set_window(struct saa7146_dev *dev, int width, int height, enum v4l2_field field)
+static void saa7146_set_window(struct saa7146_dev *dev, int width, int height, enum v4l2_field field)
 {
 	struct saa7146_vv *vv = dev->vv_data;
 
@@ -584,8 +569,7 @@ void saa7146_set_window(struct saa7146_dev *dev, int width, int height, enum v4l
 }
 
 /* calculate the new memory offsets for a desired position */
-static
-void saa7146_set_position(struct saa7146_dev *dev, int w_x, int w_y, int w_height, enum v4l2_field field)
+static void saa7146_set_position(struct saa7146_dev *dev, int w_x, int w_y, int w_height, enum v4l2_field field)
 {	
 	struct saa7146_vv *vv = dev->vv_data;
 
@@ -628,8 +612,7 @@ void saa7146_set_position(struct saa7146_dev *dev, int w_x, int w_y, int w_heigh
 	saa7146_write_out_dma(dev, 1, &vdma1);
 }
 
-static
-void saa7146_set_output_format(struct saa7146_dev *dev, unsigned long palette)
+static void saa7146_set_output_format(struct saa7146_dev *dev, unsigned long palette)
 {
 	u32 clip_format = saa7146_read(dev, CLIP_FORMAT_CTRL);
 	
@@ -746,8 +729,7 @@ void saa7146_write_out_dma(struct saa7146_dev* dev, int which, struct saa7146_vi
 	printk("vdma%d.num_line_byte: 0x%08x\n", which,vdma->num_line_byte);
 */
 }
-static
-int calculate_video_dma_grab_packed(struct saa7146_dev* dev, struct saa7146_buf *buf)
+static int calculate_video_dma_grab_packed(struct saa7146_dev* dev, struct saa7146_buf *buf)
 {
 	struct saa7146_vv *vv = dev->vv_data;
 	struct saa7146_video_dma vdma1;
@@ -795,8 +777,7 @@ int calculate_video_dma_grab_packed(struct saa7146_dev* dev, struct saa7146_buf 
 	return 0;
 }
 
-static
-int calc_planar_422(struct saa7146_vv *vv, struct saa7146_buf *buf, struct saa7146_video_dma *vdma2, struct saa7146_video_dma *vdma3)
+static int calc_planar_422(struct saa7146_vv *vv, struct saa7146_buf *buf, struct saa7146_video_dma *vdma2, struct saa7146_video_dma *vdma3)
 {
 	int height = buf->fmt->height;
 	int width = buf->fmt->width;
@@ -826,8 +807,7 @@ int calc_planar_422(struct saa7146_vv *vv, struct saa7146_buf *buf, struct saa71
 	return 0;
 }
 
-static
-int calc_planar_420(struct saa7146_vv *vv, struct saa7146_buf *buf, struct saa7146_video_dma *vdma2, struct saa7146_video_dma *vdma3)
+static int calc_planar_420(struct saa7146_vv *vv, struct saa7146_buf *buf, struct saa7146_video_dma *vdma2, struct saa7146_video_dma *vdma3)
 {
 	int height = buf->fmt->height;
 	int width = buf->fmt->width;
@@ -857,8 +837,7 @@ int calc_planar_420(struct saa7146_vv *vv, struct saa7146_buf *buf, struct saa71
 }
 
 
-static
-int calculate_video_dma_grab_planar(struct saa7146_dev* dev, struct saa7146_buf *buf)
+static int calculate_video_dma_grab_planar(struct saa7146_dev* dev, struct saa7146_buf *buf)
 {
 	struct saa7146_vv *vv = dev->vv_data;
 	struct saa7146_video_dma vdma1;
@@ -953,67 +932,68 @@ int calculate_video_dma_grab_planar(struct saa7146_dev* dev, struct saa7146_buf 
 	return 0;
 }
 
-static
-void program_capture_engine(struct saa7146_dev *dev, int planar)
+static void program_capture_engine(struct saa7146_dev *dev, int planar)
 {
 	struct saa7146_vv *vv = dev->vv_data;
-	int count = 0;
 
 	unsigned long e_wait = vv->current_hps_sync == SAA7146_HPS_SYNC_PORT_A ? CMD_E_FID_A : CMD_E_FID_B;
 	unsigned long o_wait = vv->current_hps_sync == SAA7146_HPS_SYNC_PORT_A ? CMD_O_FID_A : CMD_O_FID_B;
 
-	/* write beginning of rps-program */
-	count = 0;
+	if( 0 != (dev->ext->ext_vv_data->flags & SAA7146_EXT_SWAP_ODD_EVEN)) {
+		unsigned long tmp = e_wait;
+		e_wait = o_wait;
+		o_wait = tmp;
+	}
 
 	/* wait for o_fid_a/b / e_fid_a/b toggle only if bit 0 is not set*/
-	dev->rps0[ count++ ] = CMD_PAUSE | CMD_OAN | CMD_SIG0 | e_wait;
-	dev->rps0[ count++ ] = CMD_PAUSE | CMD_OAN | CMD_SIG0 | o_wait;
+	WRITE_RPS0(CMD_PAUSE | CMD_OAN | CMD_SIG0 | e_wait);
+	WRITE_RPS0(CMD_PAUSE | CMD_OAN | CMD_SIG0 | o_wait);
 
 	/* set bit 0 */
-	dev->rps0[ count++ ] = CMD_WR_REG | (1 << 8) | (MC2/4); 	
-	dev->rps0[ count++ ] = MASK_27 | MASK_11;
+	WRITE_RPS0(CMD_WR_REG | (1 << 8) | (MC2/4)); 	
+	WRITE_RPS0(MASK_27 | MASK_11);
 	
 	/* turn on video-dma1 */
-	dev->rps0[ count++ ] = CMD_WR_REG_MASK | (MC1/4);		
-	dev->rps0[ count++ ] = MASK_06 | MASK_22;	    		/* => mask */
-	dev->rps0[ count++ ] = MASK_06 | MASK_22;			/* => values */
+	WRITE_RPS0(CMD_WR_REG_MASK | (MC1/4));		
+	WRITE_RPS0(MASK_06 | MASK_22);	    		/* => mask */
+	WRITE_RPS0(MASK_06 | MASK_22);			/* => values */
 	if( 0 != planar ) {
 		/* turn on video-dma2 */
-		dev->rps0[ count++ ] = CMD_WR_REG_MASK | (MC1/4);		
-		dev->rps0[ count++ ] = MASK_05 | MASK_21;	    		/* => mask */
-		dev->rps0[ count++ ] = MASK_05 | MASK_21;			/* => values */
+		WRITE_RPS0(CMD_WR_REG_MASK | (MC1/4));		
+		WRITE_RPS0(MASK_05 | MASK_21);	    		/* => mask */
+		WRITE_RPS0(MASK_05 | MASK_21);			/* => values */
 
 		/* turn on video-dma3 */
-		dev->rps0[ count++ ] = CMD_WR_REG_MASK | (MC1/4);		
-		dev->rps0[ count++ ] = MASK_04 | MASK_20;	    		/* => mask */
-		dev->rps0[ count++ ] = MASK_04 | MASK_20;			/* => values */
+		WRITE_RPS0(CMD_WR_REG_MASK | (MC1/4));		
+		WRITE_RPS0(MASK_04 | MASK_20);	    		/* => mask */
+		WRITE_RPS0(MASK_04 | MASK_20);			/* => values */
 	}
 	
 	/* wait for o_fid_a/b / e_fid_a/b toggle */
-	dev->rps0[ count++ ] = CMD_PAUSE | e_wait;
-	dev->rps0[ count++ ] = CMD_PAUSE | o_wait;
+	WRITE_RPS0(CMD_PAUSE | e_wait);
+	WRITE_RPS0(CMD_PAUSE | o_wait);
 
 	/* turn off video-dma1 */
-	dev->rps0[ count++ ] = CMD_WR_REG_MASK | (MC1/4);
-	dev->rps0[ count++ ] = MASK_22 | MASK_06;	    		/* => mask */
-	dev->rps0[ count++ ] = MASK_22;					/* => values */
+	WRITE_RPS0(CMD_WR_REG_MASK | (MC1/4));
+	WRITE_RPS0(MASK_22 | MASK_06);	    		/* => mask */
+	WRITE_RPS0(MASK_22);					/* => values */
 	if( 0 != planar ) {
 		/* turn off video-dma2 */
-		dev->rps0[ count++ ] = CMD_WR_REG_MASK | (MC1/4);		
-		dev->rps0[ count++ ] = MASK_05 | MASK_21;	    		/* => mask */
-		dev->rps0[ count++ ] = MASK_21;					/* => values */
+		WRITE_RPS0(CMD_WR_REG_MASK | (MC1/4));		
+		WRITE_RPS0(MASK_05 | MASK_21);	    		/* => mask */
+		WRITE_RPS0(MASK_21);					/* => values */
 
 		/* turn off video-dma3 */
-		dev->rps0[ count++ ] = CMD_WR_REG_MASK | (MC1/4);		
-		dev->rps0[ count++ ] = MASK_04 | MASK_20;	    		/* => mask */
-		dev->rps0[ count++ ] = MASK_20;					/* => values */
+		WRITE_RPS0(CMD_WR_REG_MASK | (MC1/4));		
+		WRITE_RPS0(MASK_04 | MASK_20);	    		/* => mask */
+		WRITE_RPS0(MASK_20);					/* => values */
 	}
 
 	/* generate interrupt */
-	dev->rps0[ count++ ] = CMD_INTERRUPT;					
+	WRITE_RPS0(CMD_INTERRUPT);					
 
 	/* stop */
-	dev->rps0[ count++ ] = CMD_STOP;					
+	WRITE_RPS0(CMD_STOP);					
 }
 
 void saa7146_set_capture(struct saa7146_dev *dev, struct saa7146_buf *buf, struct saa7146_buf *next)
@@ -1035,7 +1015,7 @@ void saa7146_set_capture(struct saa7146_dev *dev, struct saa7146_buf *buf, struc
 	}
 
 	/* write the address of the rps-program */
-	saa7146_write(dev, RPS_ADDR0, virt_to_bus(&dev->rps0[ 0]));
+	saa7146_write(dev, RPS_ADDR0, dev->d_rps0.dma_handle);
 
 	/* turn on rps */
 	saa7146_write(dev, MC1, (MASK_12 | MASK_28));	

@@ -57,7 +57,7 @@ unsigned long cpu_online_map = 0;
 
 static struct smp_ops_t *smp_ops;
 
-volatile unsigned int cpu_callin_map[NR_CPUS];
+static volatile unsigned int cpu_callin_map[NR_CPUS];
 
 extern unsigned char stab_array[];
 

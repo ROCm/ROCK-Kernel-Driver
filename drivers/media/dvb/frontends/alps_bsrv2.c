@@ -20,8 +20,11 @@
 
 */    
 
+#include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/string.h>
+#include <linux/slab.h>
 
 #include "dvb_frontend.h"
 
@@ -29,19 +32,18 @@ static int debug = 0;
 #define dprintk	if (debug) printk
 
 
-static
-struct dvb_frontend_info bsrv2_info = {
-	name: "Alps BSRV2",
-	type: FE_QPSK,
-	frequency_min: 950000,
-	frequency_max: 2150000,
-	frequency_stepsize: 250,           /* kHz for QPSK frontends */
-	frequency_tolerance: 29500,
-	symbol_rate_min: 1000000,
-	symbol_rate_max: 45000000,
-/*      symbol_rate_tolerance: ???,*/
-	notifier_delay: 50,                /* 1/20 s */
-	caps:   FE_CAN_INVERSION_AUTO |
+static struct dvb_frontend_info bsrv2_info = {
+	.name 			= "Alps BSRV2",
+	.type 			= FE_QPSK,
+	.frequency_min 		= 950000,
+	.frequency_max 		= 2150000,
+	.frequency_stepsize 	= 250,           /* kHz for QPSK frontends */
+	.frequency_tolerance 	= 29500,
+	.symbol_rate_min	= 1000000,
+	.symbol_rate_max	= 45000000,
+/*     . symbol_rate_tolerance	= 	???,*/
+	.notifier_delay		= 50,                /* 1/20 s */
+	.caps = FE_CAN_INVERSION_AUTO |
 		FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 |
 		FE_CAN_FEC_5_6 | FE_CAN_FEC_7_8 | FE_CAN_FEC_AUTO |
 		FE_CAN_QPSK
@@ -49,8 +51,7 @@ struct dvb_frontend_info bsrv2_info = {
 
 
 
-static
-u8 init_1893_tab [] = {
+static u8 init_1893_tab [] = {
         0x01, 0xA4, 0x35, 0x81, 0x2A, 0x0d, 0x55, 0xC4,
         0x09, 0x69, 0x00, 0x86, 0x4c, 0x28, 0x7F, 0x00,
         0x00, 0x81, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,	
@@ -61,8 +62,7 @@ u8 init_1893_tab [] = {
 };
 
 
-static
-u8 init_1893_wtab[] =
+static u8 init_1893_wtab[] =
 {
         1,1,1,1,1,1,1,1, 1,1,0,0,1,1,0,0,
         0,1,0,0,0,0,0,0, 1,0,1,1,0,0,0,1,
@@ -71,11 +71,10 @@ u8 init_1893_wtab[] =
 };
 
 
-static
-int ves1893_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
+static int ves1893_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
 {
         u8 buf [] = { 0x00, reg, data };
-	struct i2c_msg msg = { addr: 0x08, flags: 0, buf: buf, len: 3 };
+	struct i2c_msg msg = { .addr = 0x08, .flags = 0, .buf = buf, .len = 3 };
 	int err;
 
         if ((err = i2c->xfer (i2c, &msg, 1)) != 1) {
@@ -87,14 +86,13 @@ int ves1893_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
 }
 
 
-static
-u8 ves1893_readreg (struct dvb_i2c_bus *i2c, u8 reg)
+static u8 ves1893_readreg (struct dvb_i2c_bus *i2c, u8 reg)
 {
 	int ret;
 	u8 b0 [] = { 0x00, reg };
 	u8 b1 [] = { 0 };
-	struct i2c_msg msg [] = { { addr: 0x08, flags: 0, buf: b0, len: 2 },
-			   { addr: 0x08, flags: I2C_M_RD, buf: b1, len: 1 } };
+	struct i2c_msg msg [] = { { .addr = 0x08, .flags = 0, .buf = b0, .len = 2 },
+			   { .addr = 0x08, .flags = I2C_M_RD, .buf = b1, .len = 1 } };
 
 	ret = i2c->xfer (i2c, msg, 2);
 
@@ -105,11 +103,10 @@ u8 ves1893_readreg (struct dvb_i2c_bus *i2c, u8 reg)
 }
 
 
-static
-int sp5659_write (struct dvb_i2c_bus *i2c, u8 data [4])
+static int sp5659_write (struct dvb_i2c_bus *i2c, u8 data [4])
 {
         int ret;
-        struct i2c_msg msg = { addr: 0x61, flags: 0, buf: data, len: 4 };
+        struct i2c_msg msg = { .addr = 0x61, .flags = 0, .buf = data, .len = 4 };
 
         ret = i2c->xfer (i2c, &msg, 1);
 
@@ -125,8 +122,7 @@ int sp5659_write (struct dvb_i2c_bus *i2c, u8 data [4])
  *   set up the downconverter frequency divisor for a
  *   reference clock comparision frequency of 125 kHz.
  */
-static
-int sp5659_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq, u8 pwr)
+static int sp5659_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq, u8 pwr)
 {
         u32 div = (freq + 479500) / 125;
         u8 buf [4] = { (div >> 8) & 0x7f, div & 0xff, 0x95, (pwr << 5) | 0x30 };
@@ -135,8 +131,7 @@ int sp5659_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq, u8 pwr)
 }
 
 
-static
-int ves1893_init (struct dvb_i2c_bus *i2c)
+static int ves1893_init (struct dvb_i2c_bus *i2c)
 {
 	int i;
         
@@ -150,8 +145,7 @@ int ves1893_init (struct dvb_i2c_bus *i2c)
 }
 
 
-static
-int ves1893_clr_bit (struct dvb_i2c_bus *i2c)
+static int ves1893_clr_bit (struct dvb_i2c_bus *i2c)
 {
         ves1893_writereg (i2c, 0, init_1893_tab[0] & 0xfe);
         ves1893_writereg (i2c, 0, init_1893_tab[0]);
@@ -160,8 +154,7 @@ int ves1893_clr_bit (struct dvb_i2c_bus *i2c)
 }
 
 
-static
-int ves1893_set_inversion (struct dvb_i2c_bus *i2c, fe_spectral_inversion_t inversion)
+static int ves1893_set_inversion (struct dvb_i2c_bus *i2c, fe_spectral_inversion_t inversion)
 {
 	u8 val;
 
@@ -183,8 +176,7 @@ int ves1893_set_inversion (struct dvb_i2c_bus *i2c, fe_spectral_inversion_t inve
 }
 
 
-static
-int ves1893_set_fec (struct dvb_i2c_bus *i2c, fe_code_rate_t fec)
+static int ves1893_set_fec (struct dvb_i2c_bus *i2c, fe_code_rate_t fec)
 {
 	if (fec == FEC_AUTO)
 		return ves1893_writereg (i2c, 0x0d, 0x08);
@@ -195,15 +187,13 @@ int ves1893_set_fec (struct dvb_i2c_bus *i2c, fe_code_rate_t fec)
 }
 
 
-static
-fe_code_rate_t ves1893_get_fec (struct dvb_i2c_bus *i2c)
+static fe_code_rate_t ves1893_get_fec (struct dvb_i2c_bus *i2c)
 {
 	return FEC_1_2 + ((ves1893_readreg (i2c, 0x0d) >> 4) & 0x7);
 }
 
 
-static
-int ves1893_set_symbolrate (struct dvb_i2c_bus *i2c, u32 srate)
+static int ves1893_set_symbolrate (struct dvb_i2c_bus *i2c, u32 srate)
 {
 	u32 BDR;
         u32 ratio;
@@ -211,7 +201,7 @@ int ves1893_set_symbolrate (struct dvb_i2c_bus *i2c, u32 srate)
 	u32 BDRI;
 	u32 tmp;
 
-	dprintk("%s: srate == %d\n", __FUNCTION__, srate);
+	dprintk("%s: srate == %ud\n", __FUNCTION__, (unsigned int) srate);
 
 	if (srate > 90100000UL/2)
 		srate = 90100000UL/2;
@@ -257,9 +247,9 @@ int ves1893_set_symbolrate (struct dvb_i2c_bus *i2c, u32 srate)
 	BDRI = ( ((FIN << 8) / ((srate << (FNR >> 1)) >> 2)) + 1) >> 1;
 
         dprintk("FNR= %d\n", FNR);
-        dprintk("ratio= %08x\n", ratio);
-        dprintk("BDR= %08x\n", BDR);
-        dprintk("BDRI= %02x\n", BDRI);
+        dprintk("ratio= %08x\n", (unsigned int) ratio);
+        dprintk("BDR= %08x\n", (unsigned int) BDR);
+        dprintk("BDRI= %02x\n", (unsigned int) BDRI);
 
 	if (BDRI > 0xff)
 		BDRI = 0xff;
@@ -286,22 +276,22 @@ int ves1893_set_symbolrate (struct dvb_i2c_bus *i2c, u32 srate)
 }
 
 
-static
-int ves1893_set_voltage (struct dvb_i2c_bus *i2c, fe_sec_voltage_t voltage)
+static int ves1893_set_voltage (struct dvb_i2c_bus *i2c, fe_sec_voltage_t voltage)
 {
 	switch (voltage) {
 	case SEC_VOLTAGE_13:
 		return ves1893_writereg (i2c, 0x1f, 0x20);
 	case SEC_VOLTAGE_18:
 		return ves1893_writereg (i2c, 0x1f, 0x30);
+	case SEC_VOLTAGE_OFF:
+		return ves1893_writereg (i2c, 0x1f, 0x00);
 	default:
 		return -EINVAL;
 	}
 }
 
 
-static
-int bsrv2_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
+static int bsrv2_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 {
 	struct dvb_i2c_bus *i2c = fe->i2c;
                 
@@ -387,12 +377,12 @@ int bsrv2_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 	case FE_GET_FRONTEND:
 	{
 		struct dvb_frontend_parameters *p = arg;
-		s32 afc;
+		int afc;
 
 		afc = ((int)((char)(ves1893_readreg (i2c, 0x0a) << 1)))/2;
-		afc = (afc * (int)(p->u.qpsk.symbol_rate/8))/16;
+		afc = (afc * (int)(p->u.qpsk.symbol_rate/1000/8))/16;
 
-		p->frequency += afc;
+		p->frequency -= afc;
 		p->inversion = (ves1893_readreg (i2c, 0x0f) & 2) ? 
 					INVERSION_ON : INVERSION_OFF;
 		p->u.qpsk.fec_inner = ves1893_get_fec (i2c);
@@ -425,8 +415,7 @@ int bsrv2_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 } 
 
 
-static
-int bsrv2_attach (struct dvb_i2c_bus *i2c)
+static int bsrv2_attach (struct dvb_i2c_bus *i2c)
 {
 	if ((ves1893_readreg (i2c, 0x1e) & 0xf0) != 0xd0)
 		return -ENODEV;
@@ -437,22 +426,19 @@ int bsrv2_attach (struct dvb_i2c_bus *i2c)
 }
 
 
-static
-void bsrv2_detach (struct dvb_i2c_bus *i2c)
+static void bsrv2_detach (struct dvb_i2c_bus *i2c)
 {
 	dvb_unregister_frontend (bsrv2_ioctl, i2c);
 }
 
 
-static
-int __init init_bsrv2 (void)
+static int __init init_bsrv2 (void)
 {
 	return dvb_register_i2c_device (THIS_MODULE, bsrv2_attach, bsrv2_detach);
 }
 
 
-static 
-void __exit exit_bsrv2 (void)
+static void __exit exit_bsrv2 (void)
 {
 	dvb_unregister_i2c_device (bsrv2_attach);
 }

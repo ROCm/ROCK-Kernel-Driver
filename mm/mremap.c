@@ -16,6 +16,7 @@
 #include <linux/fs.h>
 #include <linux/highmem.h>
 #include <linux/rmap-locking.h>
+#include <linux/security.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
@@ -244,9 +245,7 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 	}
 
 	if (!move_page_tables(vma, new_addr, addr, old_len)) {
-		unsigned long must_fault_in;
-		unsigned long fault_in_start;
-		unsigned long fault_in_end;
+		unsigned long vm_locked = vma->vm_flags & VM_LOCKED;
 
 		if (allocated_vma) {
 			*new_vma = *vma;
@@ -272,13 +271,7 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 		} else
 			vma = NULL;		/* nothing more to do */
 
-		must_fault_in = new_vma->vm_flags & VM_LOCKED;
-		fault_in_start = new_vma->vm_start;
-		fault_in_end = new_vma->vm_end;
-
 		do_munmap(current->mm, addr, old_len);
-
-		/* new_vma could have been invalidated by do_munmap */
 
 		/* Restore VM_ACCOUNT if one or two pieces of vma left */
 		if (vma) {
@@ -288,9 +281,11 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 		}
 
 		current->mm->total_vm += new_len >> PAGE_SHIFT;
-		if (must_fault_in) {
+		if (vm_locked) {
 			current->mm->locked_vm += new_len >> PAGE_SHIFT;
-			make_pages_present(fault_in_start, fault_in_end);
+			if (new_len > old_len)
+				make_pages_present(new_addr + old_len,
+						   new_addr + new_len);
 		}
 		return new_addr;
 	}
@@ -391,7 +386,7 @@ unsigned long do_mremap(unsigned long addr,
 
 	if (vma->vm_flags & VM_ACCOUNT) {
 		charged = (new_len - old_len) >> PAGE_SHIFT;
-		if (!vm_enough_memory(charged))
+		if (security_vm_enough_memory(charged))
 			goto out_nc;
 	}
 

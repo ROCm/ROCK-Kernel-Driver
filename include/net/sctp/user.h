@@ -40,6 +40,7 @@
  *    Karl Knutson             <karl@athena.chicago.il.us>
  *    Jon Grimm                <jgrimm@us.ibm.com>
  *    Daisy Chang              <daisyc@us.ibm.com>
+ *    Ryan Layer               <rmlayer@us.ibm.com>
  * 
  * 
  * Any bugs reported given to us we will try to fix... any fixes shared will
@@ -517,10 +518,13 @@ struct sctp_rtoinfo {
  */
 
 struct sctp_assocparams {
-	__u16		sasoc_asocmaxrxt;
 	sctp_assoc_t	sasoc_assoc_id;
+	__u16		sasoc_asocmaxrxt;
+	__u16		sasoc_number_peer_destinations;
+	__u32		sasoc_peer_rwnd;
+	__u32		sasoc_local_rwnd;
+	__u32		sasoc_cookie_life;
 };
-
 
 /*
  * 7.1.9 Set Primary Address (SCTP_SET_PRIMARY_ADDR)

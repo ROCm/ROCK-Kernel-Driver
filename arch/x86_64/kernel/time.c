@@ -125,33 +125,22 @@ void do_gettimeofday(struct timeval *tv)
 
 int do_settimeofday(struct timespec *tv)
 {
+	time_t wtm_sec, sec = tv->tv_sec;
+	long wtm_nsec, nsec = tv->tv_nsec;
+
 	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
 		return -EINVAL;
 
 	write_seqlock_irq(&xtime_lock);
 
-	tv->tv_nsec -= do_gettimeoffset() * 1000 +
+	nsec -= do_gettimeoffset() * 1000 +
 		(jiffies - wall_jiffies) * (NSEC_PER_SEC/HZ);
 
-	while (tv->tv_nsec < 0) {
-		tv->tv_nsec += NSEC_PER_SEC;
-		tv->tv_sec--;
-	}
+	wtm_sec  = wall_to_monotonic.tv_sec + (xtime.tv_sec - sec);
+	wtm_nsec = wall_to_monotonic.tv_nsec + (xtime.tv_nsec - nsec);
 
-	wall_to_monotonic.tv_sec += xtime.tv_sec - tv->tv_sec;
-	wall_to_monotonic.tv_nsec += xtime.tv_nsec - tv->tv_nsec;
-
-	if (wall_to_monotonic.tv_nsec > NSEC_PER_SEC) {
-		wall_to_monotonic.tv_nsec -= NSEC_PER_SEC;
-		wall_to_monotonic.tv_sec++;
-	}
-	if (wall_to_monotonic.tv_nsec < 0) {
-		wall_to_monotonic.tv_nsec += NSEC_PER_SEC;
-		wall_to_monotonic.tv_sec--;
-	}
-
-	xtime.tv_sec = tv->tv_sec;
-	xtime.tv_nsec = tv->tv_nsec;
+	set_normalized_timespec(&xtime, sec, nsec);
+	set_normalized_timespec(&wall_to_monotonic, wtm_sec, wtm_nsec);
 
 	time_adjust = 0;		/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
@@ -603,8 +592,8 @@ void __init time_init(void)
 	xtime.tv_sec = get_cmos_time();
 	xtime.tv_nsec = 0;
 
-	wall_to_monotonic.tv_sec = -xtime.tv_sec;
-	wall_to_monotonic.tv_nsec = -xtime.tv_nsec;
+	set_normalized_timespec(&wall_to_monotonic,
+	                        -xtime.tv_sec, -xtime.tv_nsec);
 
 	if (!hpet_init()) {
                 vxtime_hz = (1000000000000000L + hpet_period / 2) /

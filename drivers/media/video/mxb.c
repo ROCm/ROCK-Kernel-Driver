@@ -26,10 +26,6 @@
 #include <media/saa7146_vv.h>
 #include <linux/video_decoder.h>	/* for saa7111a */
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,51)
-	#define KBUILD_MODNAME mxb
-#endif
-
 #include "mxb.h"
 #include "tea6415c.h"
 #include "tea6420.h"

@@ -27,43 +27,44 @@
 
 #include "ieee754sp.h"
 
-static const struct ieee754sp_konst knan = {
-	0, SP_EBIAS + SP_EMAX + 1, 0
-};
-
-#define nan	((ieee754sp)knan)
-
 ieee754sp ieee754sp_sqrt(ieee754sp x)
 {
-	int sign = (int) 0x80000000;
 	int ix, s, q, m, t, i;
 	unsigned int r;
-	COMPXDP;
+	COMPXSP;
 
 	/* take care of Inf and NaN */
 
-	EXPLODEXDP;
+	EXPLODEXSP;
+	CLEARCX;
+	FLUSHXSP;
 
 	/* x == INF or NAN? */
 	switch (xc) {
 	case IEEE754_CLASS_QNAN:
-	case IEEE754_CLASS_SNAN:
 		/* sqrt(Nan) = Nan */
 		return ieee754sp_nanxcpt(x, "sqrt");
+	case IEEE754_CLASS_SNAN:
+		SETCX(IEEE754_INVALID_OPERATION);
+		return ieee754sp_nanxcpt(ieee754sp_indef(), "sqrt");
 	case IEEE754_CLASS_ZERO:
 		/* sqrt(0) = 0 */
 		return x;
 	case IEEE754_CLASS_INF:
-		if (xs)
+		if (xs) {
 			/* sqrt(-Inf) = Nan */
-			return ieee754sp_nanxcpt(nan, "sqrt");
+			SETCX(IEEE754_INVALID_OPERATION);
+			return ieee754sp_nanxcpt(ieee754sp_indef(), "sqrt");
+		}
 		/* sqrt(+Inf) = Inf */
 		return x;
 	case IEEE754_CLASS_DNORM:
 	case IEEE754_CLASS_NORM:
-		if (xs)
+		if (xs) {
 			/* sqrt(-x) = Nan */
-			return ieee754sp_nanxcpt(nan, "sqrt");
+			SETCX(IEEE754_INVALID_OPERATION);
+			return ieee754sp_nanxcpt(ieee754sp_indef(), "sqrt");
+		}
 		break;
 	}
 
@@ -99,6 +100,7 @@ ieee754sp ieee754sp_sqrt(ieee754sp x)
 	}
 
 	if (ix != 0) {
+		SETCX(IEEE754_INEXACT);
 		switch (ieee754_csr.rm) {
 		case IEEE754_RP:
 			q += 2;

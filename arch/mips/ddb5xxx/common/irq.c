@@ -13,12 +13,13 @@
  */
 #include <linux/config.h>
 #include <linux/init.h>
+#include <asm/irq.h>
 
 void (*irq_setup)(void);
 
 void __init init_IRQ(void)
 {
-#ifdef CONFIG_REMOTE_DEBUG
+#ifdef CONFIG_KGDB
 	extern void breakpoint(void);
 	extern void set_debug_traps(void);
 
@@ -26,6 +27,8 @@ void __init init_IRQ(void)
 	set_debug_traps();
 	breakpoint();
 #endif
+	/* set up default irq controller */
+	init_generic_irq();
 
 	/* invoke board-specific irq setup */
 	irq_setup();

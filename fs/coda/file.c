@@ -153,19 +153,22 @@ int coda_flush(struct file *coda_file)
 	struct inode *coda_inode;
 	int err = 0, fcnt;
 
+	lock_kernel();
+
 	coda_vfs_stat.flush++;
 
 	/* last close semantics */
 	fcnt = file_count(coda_file);
-	if (fcnt > 1) return 0;
+	if (fcnt > 1)
+		goto out;
 
 	/* No need to make an upcall when we have not made any modifications
 	 * to the file */
 	if ((coda_file->f_flags & O_ACCMODE) == O_RDONLY)
-		return 0;
+		goto out;
 
 	if (use_coda_close)
-		return 0;
+		goto out;
 
 	cfi = CODA_FTOC(coda_file);
 	BUG_ON(!cfi || cfi->cfi_magic != CODA_MAGIC);
@@ -180,6 +183,8 @@ int coda_flush(struct file *coda_file)
 		err = 0;
 	}
 
+out:
+	unlock_kernel();
 	return err;
 }
 

@@ -66,6 +66,7 @@
 #include <net/ndisc.h>
 #include <net/ip6_route.h>
 #include <net/addrconf.h>
+#include <net/tcp.h>
 #include <net/ip.h>
 #include <linux/if_tunnel.h>
 #include <linux/rtnetlink.h>
@@ -701,7 +702,7 @@ retry:
 	ift = ipv6_count_addresses(idev) < IPV6_MAX_ADDRESSES ?
 		ipv6_add_addr(idev, &addr, tmp_plen,
 			      ipv6_addr_type(&addr)&IPV6_ADDR_SCOPE_MASK, IFA_F_TEMPORARY) : 0;
-	if (IS_ERR(ift)) {
+	if (!ift || IS_ERR(ift)) {
 		in6_dev_put(idev);
 		in6_ifa_put(ifp);
 		printk(KERN_INFO
@@ -967,6 +968,43 @@ struct inet6_ifaddr * ipv6_get_ifaddr(struct in6_addr *addr, struct net_device *
 	read_unlock_bh(&addrconf_hash_lock);
 
 	return ifp;
+}
+
+int ipv6_rcv_saddr_equal(const struct sock *sk, const struct sock *sk2)
+{
+	struct ipv6_pinfo *np = inet6_sk(sk);
+	int addr_type = ipv6_addr_type(&np->rcv_saddr);
+
+	if (!inet_sk(sk2)->rcv_saddr && !ipv6_only_sock(sk))
+		return 1;
+
+	if (sk2->sk_family == AF_INET6 &&
+	    ipv6_addr_any(&inet6_sk(sk2)->rcv_saddr) &&
+	    !(ipv6_only_sock(sk2) && addr_type == IPV6_ADDR_MAPPED))
+		return 1;
+
+	if (addr_type == IPV6_ADDR_ANY &&
+	    (!ipv6_only_sock(sk) ||
+	     !(sk2->sk_family == AF_INET6 ?
+	       (ipv6_addr_type(&inet6_sk(sk2)->rcv_saddr) == IPV6_ADDR_MAPPED) :
+	        1)))
+		return 1;
+
+	if (sk2->sk_family == AF_INET6 &&
+	    !ipv6_addr_cmp(&np->rcv_saddr,
+			   (sk2->sk_state != TCP_TIME_WAIT ?
+			    &inet6_sk(sk2)->rcv_saddr :
+			    &tcptw_sk(sk)->tw_v6_rcv_saddr)))
+		return 1;
+
+	if (addr_type == IPV6_ADDR_MAPPED &&
+	    !ipv6_only_sock(sk2) &&
+	    (!inet_sk(sk2)->rcv_saddr ||
+	     !inet_sk(sk)->rcv_saddr ||
+	     inet_sk(sk)->rcv_saddr == inet_sk(sk2)->rcv_saddr))
+		return 1;
+
+	return 0;
 }
 
 /* Gets referenced address, destroys ifaddr */
@@ -1261,7 +1299,6 @@ static struct inet6_dev *addrconf_add_dev(struct net_device *dev)
 void addrconf_prefix_rcv(struct net_device *dev, u8 *opt, int len)
 {
 	struct prefix_info *pinfo;
-	struct rt6_info *rt;
 	__u32 valid_lft;
 	__u32 prefered_lft;
 	int addr_type;
@@ -1317,33 +1354,33 @@ void addrconf_prefix_rcv(struct net_device *dev, u8 *opt, int len)
 	else
 		rt_expires = jiffies + valid_lft * HZ;
 
-	rt = rt6_lookup(&pinfo->prefix, NULL, dev->ifindex, 1);
+	if (pinfo->onlink) {
+		struct rt6_info *rt;
+		rt = rt6_lookup(&pinfo->prefix, NULL, dev->ifindex, 1);
 
-	if (rt && ((rt->rt6i_flags & (RTF_GATEWAY | RTF_DEFAULT)) == 0)) {
-		if (rt->rt6i_flags&RTF_EXPIRES) {
-			if (pinfo->onlink == 0 || valid_lft == 0) {
-				ip6_del_rt(rt, NULL, NULL);
-				rt = NULL;
-			} else {
-				rt->rt6i_expires = rt_expires;
+		if (rt && ((rt->rt6i_flags & (RTF_GATEWAY | RTF_DEFAULT)) == 0)) {
+			if (rt->rt6i_flags&RTF_EXPIRES) {
+				if (valid_lft == 0) {
+					ip6_del_rt(rt, NULL, NULL);
+					rt = NULL;
+				} else {
+					rt->rt6i_expires = rt_expires;
+				}
 			}
+		} else if (valid_lft) {
+			addrconf_prefix_route(&pinfo->prefix, pinfo->prefix_len,
+					      dev, rt_expires, RTF_ADDRCONF|RTF_EXPIRES);
 		}
-	} else if (pinfo->onlink && valid_lft) {
-		addrconf_prefix_route(&pinfo->prefix, pinfo->prefix_len,
-				      dev, rt_expires, RTF_ADDRCONF|RTF_EXPIRES);
+		if (rt)
+			dst_release(&rt->u.dst);
 	}
-	if (rt)
-		dst_release(&rt->u.dst);
 
 	/* Try to figure out our local address for this prefix */
 
 	if (pinfo->autoconf && in6_dev->cnf.autoconf) {
 		struct inet6_ifaddr * ifp;
 		struct in6_addr addr;
-		int plen;
-		int create = 0;
-
-		plen = pinfo->prefix_len >> 3;
+		int create = 0, update_lft = 0;
 
 		if (pinfo->prefix_len == 64) {
 			memcpy(&addr, &pinfo->prefix, 8);
@@ -1372,37 +1409,59 @@ ok:
 				ifp = ipv6_add_addr(in6_dev, &addr, pinfo->prefix_len,
 						    addr_type&IPV6_ADDR_SCOPE_MASK, 0);
 
-			if (IS_ERR(ifp)) {
+			if (!ifp || IS_ERR(ifp)) {
 				in6_dev_put(in6_dev);
 				return;
 			}
 
-			create = 1;
+			update_lft = create = 1;
 			addrconf_dad_start(ifp);
-		}
-
-		if (ifp && valid_lft == 0) {
-			ipv6_del_addr(ifp);
-			ifp = NULL;
 		}
 
 		if (ifp) {
 			int flags;
+			unsigned long now;
 #ifdef CONFIG_IPV6_PRIVACY
 			struct inet6_ifaddr *ift;
 #endif
+			u32 stored_lft;
 
+			/* update lifetime (RFC2462 5.5.3 e) */
 			spin_lock(&ifp->lock);
-			ifp->valid_lft = valid_lft;
-			ifp->prefered_lft = prefered_lft;
-			ifp->tstamp = jiffies;
-			flags = ifp->flags;
-			ifp->flags &= ~IFA_F_DEPRECATED;
-			spin_unlock(&ifp->lock);
+			now = jiffies;
+			if (ifp->valid_lft > (now - ifp->tstamp) / HZ)
+				stored_lft = ifp->valid_lft - (now - ifp->tstamp) / HZ;
+			else
+				stored_lft = 0;
+			if (!update_lft && stored_lft) {
+				if (valid_lft > MIN_VALID_LIFETIME ||
+				    valid_lft > stored_lft)
+					update_lft = 1;
+				else if (stored_lft <= MIN_VALID_LIFETIME) {
+					/* valid_lft <= stored_lft is always true */
+					/* XXX: IPsec */
+					update_lft = 0;
+				} else {
+					valid_lft = MIN_VALID_LIFETIME;
+					if (valid_lft < prefered_lft)
+						prefered_lft = valid_lft;
+					update_lft = 1;
+				}
+			}
 
-			if (!(flags&IFA_F_TENTATIVE))
-				ipv6_ifa_notify((flags&IFA_F_DEPRECATED) ?
-						0 : RTM_NEWADDR, ifp);
+			if (update_lft) {
+				ifp->valid_lft = valid_lft;
+				ifp->prefered_lft = prefered_lft;
+				ifp->tstamp = now;
+				flags = ifp->flags;
+				ifp->flags &= ~IFA_F_DEPRECATED;
+				spin_unlock(&ifp->lock);
+
+				if (!(flags&IFA_F_TENTATIVE))
+					ipv6_ifa_notify((flags&IFA_F_DEPRECATED) ?
+							0 : RTM_NEWADDR, ifp);
+			} else
+				spin_unlock(&ifp->lock);
 
 #ifdef CONFIG_IPV6_PRIVACY
 			read_lock_bh(&in6_dev->lock);

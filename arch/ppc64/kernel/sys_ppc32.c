@@ -1147,7 +1147,7 @@ struct sysinfo32 {
 	u32 totalhigh;
 	u32 freehigh;
 	u32 mem_unit;
-	char _f[20-2*sizeof(long)-sizeof(int)];
+	char _f[20-2*sizeof(int)-sizeof(int)];
 };
 
 extern asmlinkage long sys_sysinfo(struct sysinfo *info);

@@ -59,7 +59,7 @@ ieee754sp ieee754sp_modf(ieee754sp x, ieee754sp * ip)
 		*ip = x;
 		return ieee754sp_zero(xs);
 	}
-	/* generate ipart mantissa by clearing bottom bits 
+	/* generate ipart mantissa by clearing bottom bits
 	 */
 	*ip = buildsp(xs, xe + SP_EBIAS,
 		      ((xm >> (SP_MBITS - xe)) << (SP_MBITS - xe)) &

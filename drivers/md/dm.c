@@ -783,10 +783,9 @@ int dm_suspend(struct mapped_device *md)
 		if (!atomic_read(&md->pending))
 			break;
 
-		yield();
+		io_schedule();
 	}
-
-	current->state = TASK_RUNNING;
+	set_current_state(TASK_RUNNING);
 
 	down_write(&md->lock);
 	remove_wait_queue(&md->wait, &wait);

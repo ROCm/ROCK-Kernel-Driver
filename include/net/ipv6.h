@@ -23,6 +23,8 @@
 
 #define SIN6_LEN_RFC2133	24
 
+#define IPV6_MAXPLEN		65535
+
 /*
  *	NextHeader field of IPv6 header
  */
@@ -98,6 +100,8 @@ struct frag_hdr {
 	unsigned short	frag_off;
 	__u32		identification;
 };
+
+#define	IP6_MF	0x0001
 
 #ifdef __KERNEL__
 
@@ -272,8 +276,10 @@ static inline void ipv6_addr_prefix(struct in6_addr *pfx,
 	    b = plen & 0x7;
 
 	memcpy(pfx->s6_addr, addr, o);
-	if (b != 0)
+	if (b != 0) {
 		pfx->s6_addr[o] = addr->s6_addr[o] & (0xff00 >> b);
+		o++;
+	}
 	if (o < 16)
 		memset(pfx->s6_addr + o, 0, 16 - o);
 }

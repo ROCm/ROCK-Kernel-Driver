@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) International Business Machines Corp., 2000-2002
+ *   Copyright (c) International Business Machines Corp., 2000-2003
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -72,11 +72,11 @@ static int logMOUNT(struct super_block *sb);
  *
  * PARAMETER:	sb	- super block
  *
- * RETURN:	EBUSY	- device already mounted or open for write
- *		EBUSY	- cvrdvp already mounted;
- *		EBUSY	- mount table full
- *		ENOTDIR	- cvrdvp not directory on a device mount
- *		ENXIO	- device open failure
+ * RETURN:	-EBUSY	- device already mounted or open for write
+ *		-EBUSY	- cvrdvp already mounted;
+ *		-EBUSY	- mount table full
+ *		-ENOTDIR- cvrdvp not directory on a device mount
+ *		-ENXIO	- device open failure
  */
 int jfs_mount(struct super_block *sb)
 {
@@ -98,7 +98,7 @@ int jfs_mount(struct super_block *sb)
 	ipaimap = diReadSpecial(sb, AGGREGATE_I, 0);
 	if (ipaimap == NULL) {
 		jfs_err("jfs_mount: Faild to read AGGREGATE_I");
-		rc = EIO;
+		rc = -EIO;
 		goto errout20;
 	}
 	sbi->ipaimap = ipaimap;
@@ -118,7 +118,7 @@ int jfs_mount(struct super_block *sb)
 	 */
 	ipbmap = diReadSpecial(sb, BMAP_I, 0);
 	if (ipbmap == NULL) {
-		rc = EIO;
+		rc = -EIO;
 		goto errout22;
 	}
 
@@ -149,7 +149,7 @@ int jfs_mount(struct super_block *sb)
 		ipaimap2 = diReadSpecial(sb, AGGREGATE_I, 1);
 		if (ipaimap2 == 0) {
 			jfs_err("jfs_mount: Faild to read AGGREGATE_I");
-			rc = EIO;
+			rc = -EIO;
 			goto errout35;
 		}
 		sbi->ipaimap2 = ipaimap2;
@@ -178,7 +178,7 @@ int jfs_mount(struct super_block *sb)
 	if (ipimap == NULL) {
 		jfs_err("jfs_mount: Failed to read FILESYSTEM_I");
 		/* open fileset secondary inode allocation map */
-		rc = EIO;
+		rc = -EIO;
 		goto errout40;
 	}
 	jfs_info("jfs_mount: ipimap:0x%p", ipimap);
@@ -327,8 +327,7 @@ static int chkSuper(struct super_block *sb)
 	/* validate fs signature */
 	if (strncmp(j_sb->s_magic, JFS_MAGIC, 4) ||
 	    j_sb->s_version > cpu_to_le32(JFS_VERSION)) {
-		//rc = EFORMAT;
-		rc = EINVAL;
+		rc = -EINVAL;
 		goto out;
 	}
 
@@ -336,7 +335,7 @@ static int chkSuper(struct super_block *sb)
 #ifdef _JFS_4K
 	if (bsize != PSIZE) {
 		jfs_err("Currently only 4K block size supported!");
-		rc = EINVAL;
+		rc = -EINVAL;
 		goto out;
 	}
 #endif				/* _JFS_4K */
@@ -372,7 +371,7 @@ static int chkSuper(struct super_block *sb)
 	if (j_sb->s_state != cpu_to_le32(FM_CLEAN) &&
 	    !(sb->s_flags & MS_RDONLY)) {
 		jfs_err("jfs_mount: Mount Failure: File System Dirty.");
-		rc = EINVAL;
+		rc = -EINVAL;
 		goto out;
 	}
 
@@ -421,12 +420,20 @@ int updateSuper(struct super_block *sb, uint state)
 	struct buffer_head *bh;
 	int rc;
 
-	/*
-	 * Only fsck can fix dirty state
-	 */
-	if (sbi->state == FM_DIRTY)
+	if (sbi->flag & JFS_NOINTEGRITY) {
+		if (state == FM_DIRTY) {
+			sbi->p_state = state;
+			return 0;
+		} else if (state == FM_MOUNT) {
+			sbi->p_state = sbi->state;
+			state = FM_DIRTY;
+		} else if (state == FM_CLEAN) {
+			state = sbi->p_state;
+		} else
+			jfs_err("updateSuper: bad state");
+	} else if (sbi->state == FM_DIRTY)
 		return 0;
-
+	
 	if ((rc = readSuper(sb, &bh)))
 		return rc;
 

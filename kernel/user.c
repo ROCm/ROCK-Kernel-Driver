@@ -126,7 +126,6 @@ void switch_uid(struct user_struct *new_user)
 	 * we should be checking for it.  -DaveM
 	 */
 	old_user = current->user;
-	atomic_inc(&new_user->__count);
 	atomic_inc(&new_user->processes);
 	atomic_dec(&old_user->processes);
 	current->user = new_user;

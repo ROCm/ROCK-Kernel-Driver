@@ -307,7 +307,7 @@ struct pcibr_intr_wrap_s {
  */
 #define PV854697 (~0)     /* PIC: write 64bit regs as 64bits. permanent */
 #define PV854827 (~0)     /* PIC: fake widget 0xf presence bit. permanent */
-#define PV855271 (~0)     /* PIC: use virt chan iff 64-bit device. permanent */
+#define PV855271 (1 << 1) /* PIC: PIC: use virt chan iff 64-bit device. */
 #define PV855272 (1 << 1) /* PIC: runaway interrupt WAR */
 #define PV856155 (1 << 1) /* PIC: arbitration WAR */
 #define PV856864 (1 << 1) /* PIC: lower timeout to free TNUMs quicker */
@@ -367,8 +367,9 @@ struct pcibr_soft_s {
     iopaddr_t               bs_dir_xbase;	/* xtalk address for 32-bit PCI direct map */
     xwidgetnum_t	    bs_dir_xport;	/* xtalk port for 32-bit PCI direct map */
 
-    struct map             *bs_int_ate_map;	/* rmalloc map for internal ATEs */
-    struct map             *bs_ext_ate_map;	/* rmalloc map for external ATEs */
+    struct resource	    bs_int_ate_resource;/* root resource for internal ATEs */
+    struct resource	    bs_ext_ate_resource;/* root resource for external ATEs */
+    void	 	    *bs_allocated_ate_res;/* resource struct allocated */
     short		    bs_int_ate_size;	/* number of internal ates */
     short		    bs_bridge_type;	/* see defines above */
     short		    bs_bridge_mode;	/* see defines above */
@@ -591,6 +592,10 @@ struct pcibr_soft_s {
     struct pciio_win_map_s	bs_io_win_map;	/* I/O addr space */
     struct pciio_win_map_s	bs_swin_map;	/* Small window addr space */
     struct pciio_win_map_s	bs_mem_win_map;	/* Memory addr space */
+
+    struct resource		bs_io_win_root_resource; /* I/O addr space */
+    struct resource		bs_swin_root_resource; /* Small window addr space */
+    struct resource		bs_mem_win_root_resource; /* Memory addr space */
 
     int                   bs_bus_addr_status;    /* Bus space status */
 

@@ -25,13 +25,11 @@
 
 */    
 
-#include <linux/module.h>
 #include <linux/init.h>
-#include <linux/delay.h>
+#include <linux/kernel.h>
+#include <linux/module.h>
+#include <linux/string.h>
 #include <linux/slab.h>
-#include <linux/poll.h>
-#include <asm/io.h>
-#include <linux/i2c.h>
 
 #include "dvb_frontend.h"
 #include "nxt6000.h"
@@ -90,11 +88,11 @@ static int nxt6000_write(struct dvb_i2c_bus *i2c, u8 addr, u8 reg, u8 data)
 {
 
 	u8 buf[] = {reg, data};
-	struct i2c_msg msg = {addr: addr >> 1, flags: 0, buf: buf, len: 2};
+	struct i2c_msg msg = {.addr = addr >> 1, .flags = 0, .buf = buf, .len = 2};
 	int ret;
 	
 	if ((ret = i2c->xfer(i2c, &msg, 1)) != 1)
-		dprintk("nxt6000: nxt6000_write error (addr: 0x%02X, reg: 0x%02X, data: 0x%02X, ret: %d)\n", addr, reg, data, ret);
+		dprintk("nxt6000: nxt6000_write error (.addr = 0x%02X, reg: 0x%02X, data: 0x%02X, ret: %d)\n", addr, reg, data, ret);
 
 	return (ret != 1) ? -EFAULT : 0;
 	
@@ -115,13 +113,13 @@ static u8 nxt6000_read(struct dvb_i2c_bus *i2c, u8 addr, u8 reg)
 	int ret;
 	u8 b0[] = {reg};
 	u8 b1[] = {0};
-	struct i2c_msg msgs[] = {{addr: addr >> 1, flags: 0, buf: b0, len: 1},
-							{addr: addr >> 1, flags: I2C_M_RD, buf: b1, len: 1}};
+	struct i2c_msg msgs[] = {{.addr = addr >> 1, .flags = 0, .buf = b0, .len = 1},
+							{.addr = addr >> 1, .flags = I2C_M_RD, .buf = b1, .len = 1}};
 
 	ret = i2c->xfer(i2c, msgs, 2);
 	
 	if (ret != 2)
-		dprintk("nxt6000: nxt6000_read error (addr: 0x%02X, reg: 0x%02X, ret: %d)\n", addr, reg, ret);
+		dprintk("nxt6000: nxt6000_read error (.addr = 0x%02X, reg: 0x%02X, ret: %d)\n", addr, reg, ret);
 	
 	return b1[0];
 
@@ -139,7 +137,7 @@ static u8 nxt6000_readreg(struct dvb_frontend *fe, u8 reg)
 static int pll_write(struct dvb_i2c_bus *i2c, u8 demod_addr, u8 tuner_addr, u8 *buf, u8 len)
 {
 
-	struct i2c_msg msg = {addr: tuner_addr >> 1, flags: 0, buf: buf, len: len};
+	struct i2c_msg msg = {.addr = tuner_addr >> 1, .flags = 0, .buf = buf, .len = len};
 	int ret;
 				
 	nxt6000_write(i2c, demod_addr, ENABLE_TUNER_IIC, 0x01);		/* open i2c bus switch */

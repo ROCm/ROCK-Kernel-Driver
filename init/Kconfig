@@ -93,7 +93,8 @@ config SYSCTL
 	  limited in memory.
 
 config LOG_BUF_SHIFT
-	int "Kernel log buffer size" if DEBUG_KERNEL
+	int "Kernel log buffer size (16 => 64KB, 17 => 128KB)" if DEBUG_KERNEL
+	range 12 20
 	default 17 if ARCH_S390
 	default 16 if X86_NUMAQ || IA64
 	default 15 if SMP
@@ -116,6 +117,14 @@ menuconfig EMBEDDED
 	  the build.  This is for specialized environments which can tolerate
 	  a "non-standard" kernel.  Only use this if you really know what you
 	  are doing.
+
+config KALLSYMS
+	 bool "Load all symbols for debugging/kksymoops" if EMBEDDED
+	 default y
+	 help
+	   Say Y here to let the kernel print out symbolic crash information and
+	   symbolic stack backtraces. This increases the size of the kernel
+	   somewhat, as all symbols have to be loaded into the kernel image.
 
 config FUTEX
 	bool "Enable futex support" if EMBEDDED

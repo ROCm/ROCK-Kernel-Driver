@@ -35,27 +35,6 @@
 #include <asm/timer.h>
 #include <asm/uaccess.h>
 
-#ifndef CONFIG_PCI
-
-asmlinkage int sys_pciconfig_read(unsigned long bus,
-				  unsigned long dfn,
-				  unsigned long off,
-				  unsigned long len,
-				  unsigned char *buf)
-{
-	return -EINVAL;
-}
-
-asmlinkage int sys_pciconfig_write(unsigned long bus,
-				   unsigned long dfn,
-				   unsigned long off,
-				   unsigned long len,
-				   unsigned char *buf)
-{
-	return -EINVAL;
-}
-
-#else
 
 struct pci_fixup pcibios_fixups[] = {
 	{ 0 }
@@ -1044,5 +1023,3 @@ void insl(unsigned long addr, void *dst, unsigned long count) {
 }
 
 subsys_initcall(pcic_init);
-
-#endif

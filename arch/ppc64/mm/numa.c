@@ -160,21 +160,21 @@ new_range:
 		 * this simple case and complain if there is a gap in
 		 * memory
 		 */
-		if (node_data[numa_domain].node_size) {
+		if (node_data[numa_domain].node_spanned_pages) {
 			unsigned long shouldstart =
 				node_data[numa_domain].node_start_pfn + 
-				node_data[numa_domain].node_size;
+				node_data[numa_domain].node_spanned_pages;
 			if (shouldstart != (start / PAGE_SIZE)) {
 				printk(KERN_ERR "Hole in node, disabling "
 						"region start %lx length %lx\n",
 						start, size);
 				continue;
 			}
-			node_data[numa_domain].node_size += size / PAGE_SIZE;
+			node_data[numa_domain].node_spanned_pages += size / PAGE_SIZE;
 		} else {
 			node_data[numa_domain].node_start_pfn =
 				start / PAGE_SIZE;
-			node_data[numa_domain].node_size = size / PAGE_SIZE;
+			node_data[numa_domain].node_spanned_pages = size / PAGE_SIZE;
 		}
 
 		for (i = start ; i < (start+size); i += MEMORY_INCREMENT)
@@ -202,7 +202,7 @@ void setup_nonnuma(void)
 		map_cpu_to_node(i, 0);
 
 	node_data[0].node_start_pfn = 0;
-	node_data[0].node_size = lmb_end_of_DRAM() / PAGE_SIZE;
+	node_data[0].node_spanned_pages = lmb_end_of_DRAM() / PAGE_SIZE;
 
 	for (i = 0 ; i < lmb_end_of_DRAM(); i += MEMORY_INCREMENT)
 		numa_memory_lookup_table[i >> MEMORY_INCREMENT_SHIFT] = 0;
@@ -224,12 +224,12 @@ void __init do_init_bootmem(void)
 		unsigned long bootmem_paddr;
 		unsigned long bootmap_pages;
 
-		if (node_data[nid].node_size == 0)
+		if (node_data[nid].node_spanned_pages == 0)
 			continue;
 
 		start_paddr = node_data[nid].node_start_pfn * PAGE_SIZE;
 		end_paddr = start_paddr + 
-				(node_data[nid].node_size * PAGE_SIZE);
+				(node_data[nid].node_spanned_pages * PAGE_SIZE);
 
 		dbg("node %d\n", nid);
 		dbg("start_paddr = %lx\n", start_paddr);
@@ -311,7 +311,7 @@ void __init paging_init(void)
 		unsigned long start_pfn;
 		unsigned long end_pfn;
 
-		if (node_data[nid].node_size == 0)
+		if (node_data[nid].node_spanned_pages == 0)
 			continue;
 
 		start_pfn = plat_node_bdata[nid].node_boot_start >> PAGE_SHIFT;

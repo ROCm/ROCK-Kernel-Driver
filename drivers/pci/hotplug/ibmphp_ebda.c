@@ -3,8 +3,8 @@
  *
  * Written By: Tong Yu, IBM Corporation
  *
- * Copyright (c) 2001 Greg Kroah-Hartman (greg@kroah.com)
- * Copyright (c) 2001,2002 IBM Corp.
+ * Copyright (c) 2001,2003 Greg Kroah-Hartman (greg@kroah.com)
+ * Copyright (c) 2001-2003 IBM Corp.
  *
  * All rights reserved.
  *
@@ -727,6 +727,64 @@ static char *create_file_name (struct slot * slot_cur)
 	return str;
 }
 
+static int fillslotinfo(struct hotplug_slot *hotplug_slot)
+{
+	struct slot *slot;
+	int rc = 0;
+
+	if (!hotplug_slot || !hotplug_slot->private)
+		return -EINVAL;
+
+	slot = hotplug_slot->private;
+	rc = ibmphp_hpc_readslot(slot, READ_ALLSTAT, NULL);
+	if (rc)
+		return rc;
+
+	// power - enabled:1  not:0
+	hotplug_slot->info->power_status = SLOT_POWER(slot->status);
+
+	// attention - off:0, on:1, blinking:2
+	hotplug_slot->info->attention_status = SLOT_ATTN(slot->status, slot->ext_status);
+
+	// latch - open:1 closed:0
+	hotplug_slot->info->latch_status = SLOT_LATCH(slot->status);
+
+	// pci board - present:1 not:0
+	if (SLOT_PRESENT (slot->status))
+		hotplug_slot->info->adapter_status = 1;
+	else
+		hotplug_slot->info->adapter_status = 0;
+/*
+	if (slot->bus_on->supported_bus_mode
+		&& (slot->bus_on->supported_speed == BUS_SPEED_66))
+		hotplug_slot->info->max_bus_speed_status = BUS_SPEED_66PCIX;
+	else
+		hotplug_slot->info->max_bus_speed_status = slot->bus_on->supported_speed;
+*/
+
+	return rc;
+}
+
+static void release_slot(struct hotplug_slot *hotplug_slot)
+{
+	struct slot *slot;
+
+	if (!hotplug_slot || !hotplug_slot->private)
+		return;
+
+	slot = hotplug_slot->private;
+	kfree(slot->hotplug_slot->info);
+	kfree(slot->hotplug_slot->name);
+	kfree(slot->hotplug_slot);
+	slot->ctrl = NULL;
+	slot->bus_on = NULL;
+
+	/* we don't want to actually remove the resources, since free_resources will do just that */
+	ibmphp_unconfigure_card(&slot, -1);
+
+	kfree (slot);
+}
+
 static struct pci_driver ibmphp_driver;
 
 /*
@@ -900,32 +958,32 @@ static int __init ebda_rsrc_controller (void)
 		// register slots with hpc core as well as create linked list of ibm slot
 		for (index = 0; index < hpc_ptr->slot_count; index++) {
 
-			hp_slot_ptr = (struct hotplug_slot *) kmalloc (sizeof (struct hotplug_slot), GFP_KERNEL);
+			hp_slot_ptr = kmalloc(sizeof(*hp_slot_ptr), GFP_KERNEL);
 			if (!hp_slot_ptr) {
 				rc = -ENOMEM;
 				goto error_no_hp_slot;
 			}
-			memset (hp_slot_ptr, 0, sizeof (struct hotplug_slot));
+			memset(hp_slot_ptr, 0, sizeof(*hp_slot_ptr));
 
-			hp_slot_ptr->info = (struct hotplug_slot_info *) kmalloc (sizeof (struct hotplug_slot_info), GFP_KERNEL);
+			hp_slot_ptr->info = kmalloc (sizeof(struct hotplug_slot_info), GFP_KERNEL);
 			if (!hp_slot_ptr->info) {
 				rc = -ENOMEM;
 				goto error_no_hp_info;
 			}
-			memset (hp_slot_ptr->info, 0, sizeof (struct hotplug_slot_info));
+			memset(hp_slot_ptr->info, 0, sizeof(struct hotplug_slot_info));
 
-			hp_slot_ptr->name = (char *) kmalloc (30, GFP_KERNEL);
+			hp_slot_ptr->name = kmalloc(30, GFP_KERNEL);
 			if (!hp_slot_ptr->name) {
 				rc = -ENOMEM;
 				goto error_no_hp_name;
 			}
 
-			tmp_slot = kmalloc (sizeof (struct slot), GFP_KERNEL);
+			tmp_slot = kmalloc(sizeof(*tmp_slot), GFP_KERNEL);
 			if (!tmp_slot) {
 				rc = -ENOMEM;
 				goto error_no_slot;
 			}
-			memset (tmp_slot, 0, sizeof (*tmp_slot));
+			memset(tmp_slot, 0, sizeof(*tmp_slot));
 
 			tmp_slot->flag = TRUE;
 
@@ -959,8 +1017,9 @@ static int __init ebda_rsrc_controller (void)
 			tmp_slot->hotplug_slot = hp_slot_ptr;
 
 			hp_slot_ptr->private = tmp_slot;
+			hp_slot_ptr->release = release_slot;
 
-			rc = ibmphp_hpc_fillhpslotinfo (hp_slot_ptr);
+			rc = fillslotinfo(hp_slot_ptr);
 			if (rc)
 				goto error;
 

@@ -1,4 +1,12 @@
-/* drm_bufs.h -- Generic buffer template -*- linux-c -*-
+/**
+ * \file drm_bufs.h 
+ * Generic buffer template
+ * 
+ * \author Rickard E. (Rik) Faith <faith@valinux.com>
+ * \author Gareth Hughes <gareth@valinux.com>
+ */
+
+/*
  * Created: Thu Nov 23 03:10:50 2000 by gareth@valinux.com
  *
  * Copyright 1999, 2000 Precision Insight, Inc., Cedar Park, Texas.
@@ -23,10 +31,6 @@
  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
- *
- * Authors:
- *    Rickard E. (Rik) Faith <faith@valinux.com>
- *    Gareth Hughes <gareth@valinux.com>
  */
 
 #include <linux/vmalloc.h>
@@ -51,8 +55,15 @@
 #endif
 #endif
 
-/*
- * Compute order.  Can be made faster.
+
+/**
+ * Compute size order.  Returns the exponent of the smaller power of two which
+ * is greater or equal to given number.
+ * 
+ * \param size size.
+ * \return order.
+ *
+ * \todo Can be made faster.
  */
 int DRM(order)( unsigned long size )
 {
@@ -67,6 +78,19 @@ int DRM(order)( unsigned long size )
 	return order;
 }
 
+/**
+ * Ioctl to specify a range of memory that is available for mapping by a non-root process.
+ *
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param arg pointer to a drm_map structure.
+ * \return zero on success or a negative value on error.
+ *
+ * Adjusts the memory offset to its absolute value according to the mapping
+ * type.  Adds the map to the map list drm_device::maplist. Adds MTRR's where
+ * applicable and if supported by the kernel.
+ */
 int DRM(addmap)( struct inode *inode, struct file *filp,
 		 unsigned int cmd, unsigned long arg )
 {
@@ -186,10 +210,22 @@ int DRM(addmap)( struct inode *inode, struct file *filp,
 }
 
 
-/* Remove a map private from list and deallocate resources if the mapping
+/**
+ * Remove a map private from list and deallocate resources if the mapping
  * isn't in use.
+ *
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param arg pointer to a drm_map_t structure.
+ * \return zero on success or a negative value on error.
+ *
+ * Searches the map on drm_device::maplist, removes it from the list, see if
+ * its being used, and free any associate resource (such as MTRR's) if it's not
+ * being on use.
+ *
+ * \sa addmap().
  */
-
 int DRM(rmmap)(struct inode *inode, struct file *filp,
 	       unsigned int cmd, unsigned long arg)
 {
@@ -262,7 +298,13 @@ int DRM(rmmap)(struct inode *inode, struct file *filp,
 
 #if __HAVE_DMA
 
-
+/**
+ * Cleanup after an error on one of the addbufs() functions.
+ *
+ * \param entry buffer entry where the error occurred.
+ *
+ * Frees any pages and buffers associated with the given entry.
+ */
 static void DRM(cleanup_buf_error)(drm_buf_entry_t *entry)
 {
 	int i;
@@ -305,6 +347,19 @@ static void DRM(cleanup_buf_error)(drm_buf_entry_t *entry)
 }
 
 #if __REALLY_HAVE_AGP
+/**
+ * Add AGP buffers for DMA transfers (ioctl).
+ *
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param arg pointer to a drm_buf_desc_t request.
+ * \return zero on success or a negative number on failure.
+ * 
+ * After some sanity checks creates a drm_buf structure for each buffer and
+ * reallocates the buffer list of the same size order to accommodate the new
+ * buffers.
+ */
 int DRM(addbufs_agp)( struct inode *inode, struct file *filp,
 		      unsigned int cmd, unsigned long arg )
 {
@@ -884,6 +939,20 @@ int DRM(addbufs_sg)( struct inode *inode, struct file *filp,
 }
 #endif /* __HAVE_SG */
 
+/**
+ * Add buffers for DMA transfers (ioctl).
+ *
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param arg pointer to a drm_buf_desc_t request.
+ * \return zero on success or a negative number on failure.
+ *
+ * According with the memory type specified in drm_buf_desc::flags and the
+ * build options, it dispatches the call either to addbufs_agp(),
+ * addbufs_sg() or addbufs_pci() for AGP, scatter-gather or consistent
+ * PCI memory respectively.
+ */
 int DRM(addbufs)( struct inode *inode, struct file *filp,
 		  unsigned int cmd, unsigned long arg )
 {
@@ -910,6 +979,24 @@ int DRM(addbufs)( struct inode *inode, struct file *filp,
 #endif
 }
 
+
+/**
+ * Get information about the buffer mappings.
+ *
+ * This was originally mean for debugging purposes, or by a sophisticated
+ * client library to determine how best to use the available buffers (e.g.,
+ * large buffers can be used for image transfer).
+ *
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param arg pointer to a drm_buf_info structure.
+ * \return zero on success or a negative number on failure.
+ *
+ * Increments drm_device::buf_use while holding the drm_device::count_lock
+ * lock, preventing of allocating more buffers after this call. Information
+ * about each requested buffer is then copied into user space.
+ */
 int DRM(infobufs)( struct inode *inode, struct file *filp,
 		   unsigned int cmd, unsigned long arg )
 {
@@ -981,6 +1068,20 @@ int DRM(infobufs)( struct inode *inode, struct file *filp,
 	return 0;
 }
 
+/**
+ * Specifies a low and high water mark for buffer allocation
+ *
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param arg a pointer to a drm_buf_desc structure.
+ * \return zero on success or a negative number on failure.
+ *
+ * Verifies that the size order is bounded between the admissible orders and
+ * updates the respective drm_device_dma::bufs entry low and high water mark.
+ *
+ * \note This ioctl is deprecated and mostly never used.
+ */
 int DRM(markbufs)( struct inode *inode, struct file *filp,
 		   unsigned int cmd, unsigned long arg )
 {
@@ -1015,6 +1116,18 @@ int DRM(markbufs)( struct inode *inode, struct file *filp,
 	return 0;
 }
 
+/**
+ * Unreserve the buffers in list, previously reserved using drmDMA. 
+ *
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param arg pointer to a drm_buf_free structure.
+ * \return zero on success or a negative number on failure.
+ * 
+ * Calls free_buffer() for each used buffer.
+ * This function is primarily used for debugging.
+ */
 int DRM(freebufs)( struct inode *inode, struct file *filp,
 		   unsigned int cmd, unsigned long arg )
 {
@@ -1056,6 +1169,19 @@ int DRM(freebufs)( struct inode *inode, struct file *filp,
 	return 0;
 }
 
+/**
+ * Maps all of the DMA buffers into client-virtual space (ioctl).
+ *
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param arg pointer to a drm_buf_map structure.
+ * \return zero on success or a negative number on failure.
+ *
+ * Maps the AGP or SG buffer region with do_mmap(), and copies information
+ * about each buffer into user space. The PCI buffers are already mapped on the
+ * addbufs_pci() call.
+ */
 int DRM(mapbufs)( struct inode *inode, struct file *filp,
 		  unsigned int cmd, unsigned long arg )
 {

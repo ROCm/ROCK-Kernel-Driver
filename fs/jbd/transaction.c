@@ -206,15 +206,10 @@ repeat_locked:
 	 * Also, this test is inconsitent with the matching one in
 	 * journal_extend().
 	 */
-	needed = journal->j_max_transaction_buffers;
-	if (journal->j_committing_transaction) 
-		needed += journal->j_committing_transaction->
-					t_outstanding_credits;
-
-	if (__log_space_left(journal) < needed) {
+	if (__log_space_left(journal) < jbd_space_needed(journal)) {
 		jbd_debug(2, "Handle %p waiting for checkpoint...\n", handle);
 		spin_unlock(&transaction->t_handle_lock);
-		__log_wait_for_space(journal, needed);
+		__log_wait_for_space(journal);
 		goto repeat_locked;
 	}
 
@@ -1168,37 +1163,24 @@ out:
  * journal_release_buffer: undo a get_write_access without any buffer
  * updates, if the update decided in the end that it didn't need access.
  *
- * journal_get_write_access() can block, so it is quite possible for a
- * journaling component to decide after the write access is returned
- * that global state has changed and the update is no longer required.
- *
  * The caller passes in the number of credits which should be put back for
  * this buffer (zero or one).
+ *
+ * We leave the buffer attached to t_reserved_list because even though this
+ * handle doesn't want it, some other concurrent handle may want to journal
+ * this buffer.  If that handle is curently in between get_write_access() and
+ * journal_dirty_metadata() then it expects the buffer to be reserved.  If
+ * we were to rip it off t_reserved_list here, the other handle will explode
+ * when journal_dirty_metadata is presented with a non-reserved buffer.
+ *
+ * If nobody really wants to journal this buffer then it will be thrown
+ * away at the start of commit.
  */
 void
 journal_release_buffer(handle_t *handle, struct buffer_head *bh, int credits)
 {
-	transaction_t *transaction = handle->h_transaction;
-	journal_t *journal = transaction->t_journal;
-	struct journal_head *jh = bh2jh(bh);
-
-	JBUFFER_TRACE(jh, "entry");
-
-	/* If the buffer is reserved but not modified by this
-	 * transaction, then it is safe to release it.  In all other
-	 * cases, just leave the buffer as it is. */
-
-	jbd_lock_bh_state(bh);
-	spin_lock(&journal->j_list_lock);
-	if (jh->b_jlist == BJ_Reserved && jh->b_transaction == transaction &&
-	    !buffer_jbddirty(jh2bh(jh))) {
-		JBUFFER_TRACE(jh, "unused: refiling it");
-		__journal_refile_buffer(jh);
-	}
-	spin_unlock(&journal->j_list_lock);
-	jbd_unlock_bh_state(bh);
+	BUFFER_TRACE(bh, "entry");
 	handle->h_buffer_credits += credits;
-	JBUFFER_TRACE(jh, "exit");
 }
 
 /** 

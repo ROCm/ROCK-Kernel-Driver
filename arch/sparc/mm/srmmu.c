@@ -148,6 +148,9 @@ extern unsigned long fix_kmap_end;
 /* 1 bit <=> 256 bytes of nocache <=> 64 PTEs */
 #define SRMMU_NOCACHE_BITMAP_SHIFT (PAGE_SHIFT - 4)
 
+/* The context table is a nocache user with the biggest alignment needs. */
+#define SRMMU_NOCACHE_ALIGN_MAX (sizeof(ctxd_t)*SRMMU_MAX_CONTEXTS)
+
 void *srmmu_nocache_pool;
 void *srmmu_nocache_bitmap;
 static struct bit_map srmmu_nocache_map;
@@ -320,6 +323,10 @@ static unsigned long __srmmu_get_nocache(int size, int align)
 		printk("Size 0x%x unaligned int nocache request\n", size);
 		size += SRMMU_NOCACHE_BITMAP_SHIFT-1;
 	}
+	if (align > SRMMU_NOCACHE_ALIGN_MAX) {
+		BUG();
+		return 0;
+	}
 
 	offset = bit_map_string_get(&srmmu_nocache_map,
 		       			size >> SRMMU_NOCACHE_BITMAP_SHIFT,
@@ -425,7 +432,8 @@ void srmmu_nocache_init(void)
 
 	bitmap_bits = srmmu_nocache_size >> SRMMU_NOCACHE_BITMAP_SHIFT;
 
-	srmmu_nocache_pool = __alloc_bootmem(srmmu_nocache_size, PAGE_SIZE, 0UL);
+	srmmu_nocache_pool = __alloc_bootmem(srmmu_nocache_size,
+		SRMMU_NOCACHE_ALIGN_MAX, 0UL);
 	memset(srmmu_nocache_pool, 0, srmmu_nocache_size);
 
 	srmmu_nocache_bitmap = __alloc_bootmem(bitmap_bits >> 3, SMP_CACHE_BYTES, 0UL);

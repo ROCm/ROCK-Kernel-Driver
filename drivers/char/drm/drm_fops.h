@@ -1,4 +1,13 @@
-/* drm_fops.h -- File operations for DRM -*- linux-c -*-
+/**
+ * \file drm_fops.h 
+ * File operations for DRM
+ * 
+ * \author Rickard E. (Rik) Faith <faith@valinux.com>
+ * \author Daryll Strauss <daryll@valinux.com>
+ * \author Gareth Hughes <gareth@valinux.com>
+ */
+
+/*
  * Created: Mon Jan  4 08:58:31 1999 by faith@valinux.com
  *
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
@@ -23,18 +32,23 @@
  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
- *
- * Authors:
- *    Rickard E. (Rik) Faith <faith@valinux.com>
- *    Daryll Strauss <daryll@valinux.com>
- *    Gareth Hughes <gareth@valinux.com>
  */
 
 #include "drmP.h"
 #include <linux/poll.h>
 
-/* drm_open is called whenever a process opens /dev/drm. */
 
+/**
+ * Called whenever a process opens /dev/drm. 
+ *
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param dev device.
+ * \return zero on success or a negative number on failure.
+ * 
+ * Creates and initializes a drm_file structure for the file private data in \p
+ * filp and add it into the double linked list in \p dev.
+ */
 int DRM(open_helper)(struct inode *inode, struct file *filp, drm_device_t *dev)
 {
 	int	     minor = minor(inode->i_rdev);
@@ -90,6 +104,7 @@ int DRM(open_helper)(struct inode *inode, struct file *filp, drm_device_t *dev)
 	return 0;
 }
 
+/** No-op. */
 int DRM(flush)(struct file *filp)
 {
 	drm_file_t    *priv   = filp->private_data;
@@ -100,6 +115,7 @@ int DRM(flush)(struct file *filp)
 	return 0;
 }
 
+/** No-op. */
 int DRM(fasync)(int fd, struct file *filp, int on)
 {
 	drm_file_t    *priv   = filp->private_data;
@@ -113,6 +129,7 @@ int DRM(fasync)(int fd, struct file *filp, int on)
 }
 
 #if !__HAVE_DRIVER_FOPS_POLL
+/** No-op. */
 unsigned int DRM(poll)(struct file *filp, struct poll_table_struct *wait)
 {
 	return 0;
@@ -121,6 +138,7 @@ unsigned int DRM(poll)(struct file *filp, struct poll_table_struct *wait)
 
 
 #if !__HAVE_DRIVER_FOPS_READ
+/** No-op. */
 ssize_t DRM(read)(struct file *filp, char *buf, size_t count, loff_t *off)
 {
 	return 0;

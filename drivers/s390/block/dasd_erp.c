@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999-2001
  *
- * $Revision: 1.9 $
+ * $Revision: 1.10 $
  */
 
 #include <linux/config.h>
@@ -86,48 +86,31 @@ dasd_free_erp_request(struct dasd_ccw_req * cqr, struct dasd_device * device)
 	atomic_dec(&device->ref_count);
 }
 
+
 /*
- * DESCRIPTION
- *   sets up the default-ERP struct dasd_ccw_req, namely one, which performs
- *   a TIC to the original channel program with a retry counter of 16
- *
- * PARAMETER
- *   cqr		failed CQR
- *
- * RETURN VALUES
- *   erp		CQR performing the ERP
+ * dasd_default_erp_action just retries the current cqr
  */
 struct dasd_ccw_req *
 dasd_default_erp_action(struct dasd_ccw_req * cqr)
 {
 	struct dasd_device *device;
-	struct dasd_ccw_req *erp;
 
-	MESSAGE(KERN_DEBUG, "%s", "Default ERP called... ");
 	device = cqr->device;
-	erp = dasd_alloc_erp_request((char *) &cqr->magic, 1, 0, device);
-	if (IS_ERR(erp)) {
-		DEV_MESSAGE(KERN_ERR, device, "%s",
-			    "Unable to allocate request for default ERP");
+
+        /* just retry - there is nothing to save ... I got no sense data.... */
+        if (cqr->retries > 0) {
+                DEV_MESSAGE (KERN_DEBUG, device, 
+                             "default ERP called (%i retries left)",
+                             cqr->retries);
+		cqr->status = DASD_CQR_QUEUED;
+        } else {
+                DEV_MESSAGE (KERN_WARNING, device, "%s",
+			     "default ERP called (NO retry left)");
+		
 		cqr->status = DASD_CQR_FAILED;
-		cqr->stopclk = get_clock();
-		return cqr;
-	}
-
-	erp->cpaddr->cmd_code = CCW_CMD_TIC;
-	erp->cpaddr->cda = (__u32) (addr_t) cqr->cpaddr;
-	erp->function = dasd_default_erp_action;
-	erp->refers = cqr;
-	erp->device = device;
-	erp->magic = cqr->magic;
-	erp->retries = 16;
-	erp->status = DASD_CQR_FILLED;
-
-	list_add(&erp->list, &device->ccw_queue);
-	erp->status = DASD_CQR_QUEUED;
-
-	return erp;
-
+		cqr->stopclk = get_clock ();
+        }
+        return cqr;
 }				/* end dasd_default_erp_action */
 
 /*

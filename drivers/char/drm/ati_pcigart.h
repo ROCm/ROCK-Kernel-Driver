@@ -1,4 +1,11 @@
-/* ati_pcigart.h -- ATI PCI GART support -*- linux-c -*-
+/**
+ * \file ati_pcigart.h 
+ * ATI PCI GART support
+ *
+ * \author Gareth Hughes <gareth@valinux.com>
+ */
+
+/*
  * Created: Wed Dec 13 21:52:19 2000 by gareth@valinux.com
  *
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
@@ -22,9 +29,6 @@
  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
- *
- * Authors:
- *   Gareth Hughes <gareth@valinux.com>
  */
 
 #include "drmP.h"
@@ -45,8 +49,8 @@
 # error - PAGE_SIZE not 64K, 16K, 8K or 4K
 #endif
 
-# define ATI_MAX_PCIGART_PAGES		8192	/* 32 MB aperture, 4K pages */
-# define ATI_PCIGART_PAGE_SIZE		4096	/* PCI GART page size */
+# define ATI_MAX_PCIGART_PAGES		8192	/**< 32 MB aperture, 4K pages */
+# define ATI_PCIGART_PAGE_SIZE		4096	/**< PCI GART page size */
 
 static unsigned long DRM(ati_alloc_pcigart_table)( void )
 {

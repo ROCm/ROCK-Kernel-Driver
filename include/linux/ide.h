@@ -726,7 +726,6 @@ typedef struct ide_drive_s {
 	unsigned ata_flash	: 1;	/* 1=present, 0=default */
 	unsigned blocked        : 1;	/* 1=powermanagment told us not to do anything, so sleep nicely */
 	unsigned vdma		: 1;	/* 1=doing PIO over DMA 0=doing normal DMA */
-	unsigned queue_setup	: 1;
 	unsigned addressing;		/*      : 3;
 					 *  0=28-bit
 					 *  1=48-bit
@@ -1777,7 +1776,8 @@ static inline int __ide_dma_queued_off(ide_drive_t *drive)
 static inline void ide_release_dma(ide_hwif_t *drive) {;}
 #endif
 
-extern void hwif_unregister(ide_hwif_t *);
+extern int ide_hwif_request_regions(ide_hwif_t *hwif);
+extern void ide_hwif_release_regions(ide_hwif_t* hwif);
 extern void ide_unregister (unsigned int index);
 
 extern void export_ide_init_queue(ide_drive_t *);

@@ -232,7 +232,7 @@ show_mem(void)
 		printk("Free swap:       %6dkB\n", nr_swap_pages<<(PAGE_SHIFT-10));
 		for_each_pgdat(pgdat) {
 			printk("Node ID: %d\n", pgdat->node_id);
-			for(i = 0; i < pgdat->node_size; i++) {
+			for(i = 0; i < pgdat->node_spanned_pages; i++) {
 				if (PageReserved(pgdat->node_mem_map+i))
 					reserved++;
 				else if (PageSwapCache(pgdat->node_mem_map+i))
@@ -240,7 +240,7 @@ show_mem(void)
 				else if (page_count(pgdat->node_mem_map + i))
 					shared += page_count(pgdat->node_mem_map + i) - 1;
 			}
-			printk("\t%d pages of RAM\n", pgdat->node_size);
+			printk("\t%d pages of RAM\n", pgdat->node_spanned_pages);
 			printk("\t%d reserved pages\n", reserved);
 			printk("\t%d pages shared\n", shared);
 			printk("\t%d pages swap cached\n", cached);

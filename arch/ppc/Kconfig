@@ -450,9 +450,6 @@ config EV64260
 config SPRUCE
 	bool "IBM-Spruce"
 
-config MENF1
-	bool "MEN-F1"
-
 config LOPEC
 	bool "Motorola-LoPEC"
 
@@ -473,6 +470,10 @@ config PRPMC800
 
 config SANDPOINT
 	bool "Motorola-Sandpoint"
+	help
+	  Select SANDPOINT if configuring for a Motorola Sandpoint X3
+	  or X3(b).
+	  X3 (any flavor).
 
 config ADIR
 	bool "SBS-Adirondack"
@@ -490,14 +491,16 @@ config GEMINI
 	  series Single Board Computer.  More information is available at:
 	  <http://www.synergymicro.com/PressRel/97_10_15.html>.
 
-config ZX4500
-	bool "Zynx-ZX4500"
-
 endchoice
 
 config PPC_CHRP
 	bool
 	depends on PPC_MULTIPLATFORM
+	default y
+
+config PPC_GEN550
+	bool
+	depends on SANDPOINT
 	default y
 
 config PPC_PMAC
@@ -515,10 +518,6 @@ config PPC_OF
 	depends on PPC_PMAC || PPC_CHRP
 	default y
 
-config SANDPOINT_X3
-	bool "Sandpoint X3"
-	depends on SANDPOINT
-
 config FORCE
 	bool
 	depends on 6xx && !8260 && (PCORE || POWERPMC250)
@@ -526,7 +525,7 @@ config FORCE
 
 config EPIC_SERIAL_MODE
 	bool
-	depends on 6xx && !8260 && (LOPEC || SANDPOINT_X3)
+	depends on 6xx && !8260 && (LOPEC || SANDPOINT)
 	default y
 
 config WILLOW
@@ -536,7 +535,7 @@ config WILLOW
 
 config MPC10X_STORE_GATHERING
 	bool "Enable MPC10x store gathering"
-	depends on FORCE || MENF1 || SANDPOINT || ZX4500
+	depends on FORCE || SANDPOINT
 
 config GT64260
 	bool
@@ -1175,32 +1174,7 @@ source "drivers/md/Kconfig"
 
 source "drivers/ide/Kconfig"
 
-
-menu "SCSI support"
-
-config SCSI
-	tristate "SCSI support"
-	---help---
-	  If you want to use a SCSI hard disk, SCSI tape drive, SCSI CD-ROM or
-	  any other SCSI device under Linux, say Y and make sure that you know
-	  the name of your SCSI host adapter (the card inside your computer
-	  that "speaks" the SCSI protocol, also called SCSI controller),
-	  because you will be asked for it.
-
-	  You also need to say Y here if you want support for the parallel
-	  port version of the 100 MB IOMEGA ZIP drive.
-
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called scsi_mod.  If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt> and
-	  <file:Documentation/scsi/scsi.txt>.  However, do not compile this as a
-	  module if your root file system (the one containing the directory /)
-	  is located on a SCSI device.
-
 source "drivers/scsi/Kconfig"
-
-endmenu
 
 source "drivers/message/fusion/Kconfig"
 
@@ -1218,14 +1192,7 @@ source "drivers/isdn/Kconfig"
 
 source "drivers/video/Kconfig"
 
-menu "Old CD-ROM drivers (not SCSI, not IDE)"
-
-config CD_NO_IDESCSI
-	bool "Support non-SCSI/IDE/ATAPI CDROM drives"
-
 source "drivers/cdrom/Kconfig"
-
-endmenu
 
 source "drivers/input/Kconfig"
 
@@ -1482,13 +1449,6 @@ config DEBUG_HIGHMEM
 	  This options enables additional error checking for high memory
 	  systems.  Disable for production systems.
 
-config KALLSYMS
-	bool "Load all symbols for debugging/kksymoops"
-	help
-	  Say Y here to let the kernel print out symbolic crash information and
-	  symbolic stack backtraces. This increases the size of the kernel
-	  somewhat, as all symbols have to be loaded into the kernel image.
-
 config DEBUG_SPINLOCK_SLEEP
 	bool "Sleep-inside-spinlock checking"
 	depends on DEBUG_KERNEL
@@ -1560,7 +1520,7 @@ config BOOTX_TEXT
 
 config SERIAL_TEXT_DEBUG
 	bool "Support for early boot texts over serial port"
-	depends on 4xx || GT64260 || LOPEC || MCPN765 || PPLUS || PRPMC800 || SANDPOINT || ZX4500
+	depends on 4xx || GT64260 || LOPEC || MCPN765 || PPLUS || PRPMC800 || SANDPOINT
 
 config OCP
 	bool

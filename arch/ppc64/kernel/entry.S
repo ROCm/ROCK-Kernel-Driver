@@ -141,9 +141,6 @@ _GLOBAL(ret_from_syscall_1)
 	cmpl	0,r3,r10
 	blt	30f
 	neg	r3,r3
-	cmpi	0,r3,ERESTARTNOHAND
-	bne	22f
-	li	r3,EINTR
 22:	ld	r10,_CCR(r1)	/* Set SO bit in CR */
 	oris	r10,r10,0x1000
 	std	r10,_CCR(r1)
@@ -199,9 +196,6 @@ _GLOBAL(ret_from_syscall_2)
 	cmpl	0,r3,r10
 	blt	60f
 	neg	r3,r3
-	cmpi	0,r3,ERESTARTNOHAND
-	bne	57f
-	li	r3,EINTR
 57:	ld	r10,_CCR(r1)	/* Set SO bit in CR */
 	oris	r10,r10,0x1000
 	std	r10,_CCR(r1)

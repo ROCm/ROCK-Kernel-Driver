@@ -163,6 +163,8 @@ typedef __s64	Elf64_Sxword;
 #define AT_HWCAP  16    /* arch dependent hints at CPU capabilities */
 #define AT_CLKTCK 17	/* frequency at which times() increments */
 
+#define AT_SECURE 23   /* secure mode boolean */
+
 typedef struct dynamic{
   Elf32_Sword d_tag;
   union{

@@ -45,7 +45,7 @@ asmlinkage int sys_ipc (uint call, int first, int second,
 	}
 
 	case MSGSND:
-		return sys_msgsnd (first, (struct msgbuf *) ptr, 
+		return sys_msgsnd (first, (struct msgbuf *) ptr,
 				   second, third);
 	case MSGRCV:
 		switch (version) {
@@ -53,9 +53,9 @@ asmlinkage int sys_ipc (uint call, int first, int second,
 			struct ipc_kludge tmp;
 			if (!ptr)
 				return -EINVAL;
-			
+
 			if (copy_from_user(&tmp,
-					   (struct ipc_kludge *) ptr, 
+					   (struct ipc_kludge *) ptr,
 					   sizeof (tmp)))
 				return -EFAULT;
 			return sys_msgrcv (first, tmp.msgp, second,
@@ -85,7 +85,7 @@ asmlinkage int sys_ipc (uint call, int first, int second,
 				return -EINVAL;
 			return sys_shmat (first, (char *) ptr, second, (ulong *) third);
 		}
-	case SHMDT: 
+	case SHMDT:
 		return sys_shmdt ((char *)ptr);
 	case SHMGET:
 		return sys_shmget (first, second, third);
@@ -93,6 +93,6 @@ asmlinkage int sys_ipc (uint call, int first, int second,
 		return sys_shmctl (first, second,
 				   (struct shmid_ds *) ptr);
 	default:
-		return -EINVAL;
+		return -ENOSYS;
 	}
 }

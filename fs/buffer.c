@@ -319,6 +319,7 @@ asmlinkage long sys_fsync(unsigned int fd)
 
 	/* We need to protect against concurrent writers.. */
 	down(&inode->i_sem);
+	current->flags |= PF_SYNCWRITE;
 	ret = filemap_fdatawrite(inode->i_mapping);
 	err = file->f_op->fsync(file, dentry, 0);
 	if (!ret)
@@ -326,6 +327,7 @@ asmlinkage long sys_fsync(unsigned int fd)
 	err = filemap_fdatawait(inode->i_mapping);
 	if (!ret)
 		ret = err;
+	current->flags &= ~PF_SYNCWRITE;
 	up(&inode->i_sem);
 
 out_putf:
@@ -354,6 +356,7 @@ asmlinkage long sys_fdatasync(unsigned int fd)
 		goto out_putf;
 
 	down(&inode->i_sem);
+	current->flags |= PF_SYNCWRITE;
 	ret = filemap_fdatawrite(inode->i_mapping);
 	err = file->f_op->fsync(file, dentry, 1);
 	if (!ret)
@@ -361,6 +364,7 @@ asmlinkage long sys_fdatasync(unsigned int fd)
 	err = filemap_fdatawait(inode->i_mapping);
 	if (!ret)
 		ret = err;
+	current->flags &= ~PF_SYNCWRITE;
 	up(&inode->i_sem);
 
 out_putf:
@@ -1337,7 +1341,7 @@ static void bh_lru_install(struct buffer_head *bh)
 
 	check_irqs_on();
 	bh_lru_lock();
-	lru = &per_cpu(bh_lrus, smp_processor_id());
+	lru = &__get_cpu_var(bh_lrus);
 	if (lru->bhs[0] != bh) {
 		struct buffer_head *bhs[BH_LRU_SIZE];
 		int in;
@@ -1381,7 +1385,7 @@ lookup_bh_lru(struct block_device *bdev, sector_t block, int size)
 
 	check_irqs_on();
 	bh_lru_lock();
-	lru = &per_cpu(bh_lrus, smp_processor_id());
+	lru = &__get_cpu_var(bh_lrus);
 	for (i = 0; i < BH_LRU_SIZE; i++) {
 		struct buffer_head *bh = lru->bhs[i];
 
@@ -1447,6 +1451,17 @@ __getblk(struct block_device *bdev, sector_t block, int size)
 }
 EXPORT_SYMBOL(__getblk);
 
+/*
+ * Do async read-ahead on a buffer..
+ */
+void __breadahead(struct block_device *bdev, sector_t block, int size)
+{
+	struct buffer_head *bh = __getblk(bdev, block, size);
+	ll_rw_block(READA, 1, &bh);
+	brelse(bh);
+}
+EXPORT_SYMBOL(__breadahead);
+
 /**
  *  __bread() - reads a specified block and returns the bh
  *  @block: number of block
@@ -1474,15 +1489,14 @@ EXPORT_SYMBOL(__bread);
  */
 static void invalidate_bh_lru(void *arg)
 {
-	const int cpu = get_cpu();
-	struct bh_lru *b = &per_cpu(bh_lrus, cpu);
+	struct bh_lru *b = &get_cpu_var(bh_lrus);
 	int i;
 
 	for (i = 0; i < BH_LRU_SIZE; i++) {
 		brelse(b->bhs[i]);
 		b->bhs[i] = NULL;
 	}
-	put_cpu();
+	put_cpu_var(bh_lrus);
 }
 	
 static void invalidate_bh_lrus(void)
@@ -1707,7 +1721,7 @@ static int __block_write_full_page(struct inode *inode, struct page *page,
 
 	BUG_ON(!PageLocked(page));
 
-	last_block = (inode->i_size - 1) >> inode->i_blkbits;
+	last_block = (i_size_read(inode) - 1) >> inode->i_blkbits;
 
 	if (!page_has_buffers(page)) {
 		if (!PageUptodate(page))
@@ -2043,7 +2057,7 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 	head = page_buffers(page);
 
 	iblock = (sector_t)page->index << (PAGE_CACHE_SHIFT - inode->i_blkbits);
-	lblock = (inode->i_size+blocksize-1) >> inode->i_blkbits;
+	lblock = (i_size_read(inode)+blocksize-1) >> inode->i_blkbits;
 	bh = head;
 	nr = 0;
 	i = 0;
@@ -2268,8 +2282,12 @@ int generic_commit_write(struct file *file, struct page *page,
 	struct inode *inode = page->mapping->host;
 	loff_t pos = ((loff_t)page->index << PAGE_CACHE_SHIFT) + to;
 	__block_commit_write(inode,page,from,to);
+	/*
+	 * No need to use i_size_read() here, the i_size
+	 * cannot change under us because we hold i_sem.
+	 */
 	if (pos > inode->i_size) {
-		inode->i_size = pos;
+		i_size_write(inode, pos);
 		mark_inode_dirty(inode);
 	}
 	return 0;
@@ -2421,7 +2439,7 @@ int nobh_commit_write(struct file *file, struct page *page,
 
 	set_page_dirty(page);
 	if (pos > inode->i_size) {
-		inode->i_size = pos;
+		i_size_write(inode, pos);
 		mark_inode_dirty(inode);
 	}
 	return 0;
@@ -2551,7 +2569,8 @@ int block_write_full_page(struct page *page, get_block_t *get_block,
 			struct writeback_control *wbc)
 {
 	struct inode * const inode = page->mapping->host;
-	const unsigned long end_index = inode->i_size >> PAGE_CACHE_SHIFT;
+	loff_t i_size = i_size_read(inode);
+	const unsigned long end_index = i_size >> PAGE_CACHE_SHIFT;
 	unsigned offset;
 	void *kaddr;
 
@@ -2560,7 +2579,7 @@ int block_write_full_page(struct page *page, get_block_t *get_block,
 		return __block_write_full_page(inode, page, get_block, wbc);
 
 	/* Is the page fully outside i_size? (truncate in progress) */
-	offset = inode->i_size & (PAGE_CACHE_SIZE-1);
+	offset = i_size & (PAGE_CACHE_SIZE-1);
 	if (page->index >= end_index+1 || !offset) {
 		/*
 		 * The page may have dirty, unmapped buffers.  For example,

@@ -57,8 +57,11 @@ config EISA
 source "drivers/eisa/Kconfig"
 
 config ISA
-	bool
+	bool "ISA support"
 	depends on EISA
+	help
+	  If you want to plug an ISA card into your EISA bus, say Y here.
+	  Most people should say N.
 
 config PCI
 	bool "PCI support"

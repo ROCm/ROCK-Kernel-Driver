@@ -1,12 +1,19 @@
-/* $Id: sgiarcs.h,v 1.3 1999/02/25 20:55:08 tsbogend Exp $
+/*
+ * This file is subject to the terms and conditions of the GNU General Public
+ * License.  See the file "COPYING" in the main directory of this archive
+ * for more details.
  *
- * SGI ARCS firmware interface defines.
+ * ARC firmware interface defines.
  *
  * Copyright (C) 1996 David S. Miller (dm@engr.sgi.com)
+ * Copyright (C) 1999, 2001 Ralf Baechle (ralf@gnu.org)
+ * Copyright (C) 1999 Silicon Graphics, Inc.
  */
 #ifndef _ASM_SGIARCS_H
 #define _ASM_SGIARCS_H
 
+#include <linux/config.h>
+#include <asm/types.h>
 #include <asm/arc/types.h>
 
 /* Various ARCS error codes. */
@@ -71,16 +78,16 @@ enum linux_identifier {
 
 /* A prom device tree component. */
 struct linux_component {
-	enum linux_devclass     class;   /* node class */
-	enum linux_devtypes     type;    /* node type */
-	enum linux_identifier   iflags;  /* node flags */
-	unsigned short          vers;    /* node version */
-	unsigned short          rev;     /* node revision */
-	unsigned long           key;     /* completely magic */
-	unsigned long           amask;   /* XXX affinity mask??? */
-	unsigned long           cdsize;  /* size of configuration data */
-	unsigned long           ilen;    /* length of string identifier */
-	char                   *iname;   /* string identifier */
+	enum linux_devclass     class;	/* node class */
+	enum linux_devtypes     type;	/* node type */
+	enum linux_identifier   iflags;	/* node flags */
+	USHORT 			vers;	/* node version */
+	USHORT 			rev;	/* node revision */
+	ULONG 			key;	/* completely magic */
+	ULONG 			amask;	/* XXX affinity mask??? */
+	ULONG			cdsize;	/* size of configuration data */
+	ULONG			ilen;	/* length of string identifier */
+	_PULONG			iname;	/* string identifier */
 };
 typedef struct linux_component pcomponent;
 
@@ -109,7 +116,7 @@ enum arc_memtypes {
 	arc_prog,    /* A loaded program resides here */
 	arc_atmp,    /* temporary storage area */
 	arc_aperm,   /* permanent storage */
-	arc_fcontig, /* Contiguous and free */    
+	arc_fcontig, /* Contiguous and free */
 };
 
 union linux_memtypes {
@@ -118,9 +125,9 @@ union linux_memtypes {
 };
 
 struct linux_mdesc {
-        union linux_memtypes type;
-	unsigned long base;
-	unsigned long pages;
+	union linux_memtypes type;
+	ULONG base;
+	ULONG pages;
 };
 
 /* Time of day descriptor. */
@@ -136,7 +143,7 @@ struct linux_tinfo {
 
 /* ARCS virtual dirents. */
 struct linux_vdirent {
-	unsigned long namelen;
+	ULONG namelen;
 	unsigned char attr;
 	char fname[32]; /* XXX imperical, should be a define */
 };
@@ -158,11 +165,11 @@ enum linux_mountops {
 /* This prom has a bolixed design. */
 struct linux_bigint {
 #ifdef __MIPSEL__
-	unsigned long lo;
-	long hi;
+	u32 lo;
+	s32 hi;
 #else /* !(__MIPSEL__) */
-	long hi;
-	unsigned long lo;
+	s32 hi;
+	u32 lo;
 #endif
 };
 
@@ -170,110 +177,97 @@ struct linux_finfo {
 	struct linux_bigint   begin;
 	struct linux_bigint   end;
 	struct linux_bigint   cur;
-	enum linux_devtypes dtype;
+	enum linux_devtypes   dtype;
 	unsigned long         namelen;
 	unsigned char         attr;
 	char                  name[32]; /* XXX imperical, should be define */
 };
 
+/* This describes the vector containing function pointers to the ARC
+   firmware functions.  */
 struct linux_romvec {
-	/* Load an executable image. */
-	long (*load)(char *file, unsigned long end,
-		     unsigned long *start_pc,
-		     unsigned long *end_addr);
-
-	/* Invoke a standalong image. */
-	long (*invoke)(unsigned long startpc, unsigned long sp,
-		       long argc, char **argv, char **envp);
-
-	/* Load and begin execution of a standalong image. */
-	long (*exec)(char *file, long argc, char **argv, char **envp);
-
-	void (*halt)(void) __attribute__((noreturn)); 	/* Halt the machine. */
-	void (*pdown)(void) __attribute__((noreturn));    /* Power down the machine. */
-	void (*restart)(void) __attribute__((noreturn));  /* XXX soft reset??? */
-	void (*reboot)(void) __attribute__((noreturn));   /* Reboot the machine. */
-	void (*imode)(void) __attribute__((noreturn));    /* Enter PROM interactive mode. */
-	int _unused1; /* padding */
+	LONG	load;			/* Load an executable image. */
+	LONG	invoke;			/* Invoke a standalong image. */
+	LONG	exec;			/* Load and begin execution of a
+					   standalone image. */
+	LONG	halt;			/* Halt the machine. */
+	LONG	pdown;			/* Power down the machine. */
+	LONG	restart;		/* XXX soft reset??? */
+	LONG	reboot;			/* Reboot the machine. */
+	LONG	imode;			/* Enter PROM interactive mode. */
+	LONG	_unused1;		/* Was ReturnFromMain(). */
 
 	/* PROM device tree interface. */
-	pcomponent *(*next_component)(pcomponent *this);
-	pcomponent *(*child_component)(pcomponent *this);
-	pcomponent *(*parent_component)(pcomponent *this);
-	long (*component_data)(void *opaque_data, pcomponent *this);
-	pcomponent *(*child_add)(pcomponent *this,
-				 pcomponent *tmp,
-				 void *opaque_data);
-	long (*comp_del)(pcomponent *this);
-	pcomponent *(*component_by_path)(char *file);
+	LONG	next_component;
+	LONG	child_component;
+	LONG	parent_component;
+	LONG	component_data;
+	LONG	child_add;
+	LONG	comp_del;
+	LONG	component_by_path;
 
 	/* Misc. stuff. */
-	long (*cfg_save)(void);
-	struct linux_sysid *(*get_sysid)(void);
+	LONG	cfg_save;
+	LONG	get_sysid;
 
 	/* Probing for memory. */
-	struct linux_mdesc *(*get_mdesc)(struct linux_mdesc *curr);
-	long _unused2; /* padding */
+	LONG	get_mdesc;
+	LONG	_unused2;		/* was Signal() */
 
-	struct linux_tinfo *(*get_tinfo)(void);
-	unsigned long (*get_rtime)(void);
+	LONG	get_tinfo;
+	LONG	get_rtime;
 
 	/* File type operations. */
-	long (*get_vdirent)(unsigned long fd, struct linux_vdirent *entry,
-			    unsigned long num, unsigned long *count);
-	long (*open)(char *file, enum linux_omode mode, unsigned long *fd);
-	long (*close)(unsigned long fd);
-	long (*read)(unsigned long fd, void *buffer, unsigned long num,
-		     unsigned long *count);
-	long (*get_rstatus)(unsigned long fd);
-	long (*write)(unsigned long fd, void *buffer, unsigned long num,
-		      unsigned long *count);
-	long (*seek)(unsigned long fd, struct linux_bigint *offset,
-		     enum linux_seekmode smode);
-	long (*mount)(char *file, enum linux_mountops op);
+	LONG	get_vdirent;
+	LONG	open;
+	LONG	close;
+	LONG	read;
+	LONG	get_rstatus;
+	LONG	write;
+	LONG	seek;
+	LONG	mount;
 
 	/* Dealing with firmware environment variables. */
-	PCHAR (*get_evar)(CHAR *name);
-	LONG (*set_evar)(PCHAR name, PCHAR value);
+	LONG	get_evar;
+	LONG	set_evar;
 
-	long (*get_finfo)(unsigned long fd, struct linux_finfo *buf);
-	long (*set_finfo)(unsigned long fd, unsigned long flags,
-			  unsigned long mask);
+	LONG	get_finfo;
+	LONG	set_finfo;
 
 	/* Miscellaneous. */
-	void (*cache_flush)(void);
+	LONG	cache_flush;
 };
 
 /* The SGI ARCS parameter block is in a fixed location for standalone
  * programs to access PROM facilities easily.
  */
-struct linux_promblock {
-	long                 magic;       /* magic cookie */
+typedef struct _SYSTEM_PARAMETER_BLOCK {
+	ULONG			magic;		/* magic cookie */
 #define PROMBLOCK_MAGIC      0x53435241
 
-	unsigned long        len;          /* length of parm block */
-	unsigned short       ver;          /* ARCS firmware version */
-	unsigned short       rev;          /* ARCS firmware revision */
-	long                *rs_block;     /* Restart block. */
-	long                *dbg_block;    /* Debug block. */
-	long                *gevect;       /* XXX General vector??? */
-	long                *utlbvect;     /* XXX UTLB vector??? */
-	unsigned long        rveclen;      /* Size of romvec struct. */
-	struct linux_romvec *romvec;       /* Function interface. */
-	unsigned long        pveclen;      /* Length of private vector. */
-	long                *pvector;      /* Private vector. */
-	long                 adap_cnt;     /* Adapter count. */
-	long                 adap_typ0;    /* First adapter type. */
-	long                 adap_vcnt0;   /* Adapter 0 vector count. */
-	long                *adap_vector;  /* Adapter 0 vector ptr. */
-	long                 adap_typ1;    /* Second adapter type. */
-	long                 adap_vcnt1;   /* Adapter 1 vector count. */
-	long                *adap_vector1; /* Adapter 1 vector ptr. */
+	ULONG			len;		/* length of parm block */
+	USHORT			ver;		/* ARCS firmware version */
+	USHORT			rev;		/* ARCS firmware revision */
+	_PLONG			rs_block;	/* Restart block. */
+	_PLONG			dbg_block;	/* Debug block. */
+	_PLONG			gevect;		/* XXX General vector??? */
+	_PLONG			utlbvect;	/* XXX UTLB vector??? */
+	ULONG			rveclen;	/* Size of romvec struct. */
+	_PVOID			romvec;		/* Function interface. */
+	ULONG			pveclen;	/* Length of private vector. */
+	_PVOID			pvector;	/* Private vector. */
+	ULONG			adap_cnt;	/* Adapter count. */
+	ULONG			adap_typ0;	/* First adapter type. */
+	ULONG			adap_vcnt0;	/* Adapter 0 vector count. */
+	_PVOID			adap_vector;	/* Adapter 0 vector ptr. */
+	ULONG			adap_typ1;	/* Second adapter type. */
+	ULONG			adap_vcnt1;	/* Adapter 1 vector count. */
+	_PVOID			adap_vector1;	/* Adapter 1 vector ptr. */
 	/* More adapter vectors go here... */
-};
+} SYSTEM_PARAMETER_BLOCK, *PSYSTEM_PARAMETER_BLOCK;
 
-#define PROMBLOCK ((struct linux_promblock *)0xA0001000UL)
-#define ROMVECTOR ((PROMBLOCK)->romvec)
+#define PROMBLOCK ((PSYSTEM_PARAMETER_BLOCK) (int)0xA0001000)
+#define ROMVECTOR ((struct linux_romvec *) (long)(PROMBLOCK)->romvec)
 
 /* Cache layout parameter block. */
 union linux_cache_key {
@@ -366,5 +360,188 @@ struct linux_smonblock {
 	unsigned long   stab;              /* Symbol table. */
 	int             smax;              /* Max # of symbols. */
 };
+
+/*
+ * Macros for calling a 32-bit ARC implementation from 64-bit code
+ */
+
+#if defined(CONFIG_MIPS64) && defined(CONFIG_ARC32)
+
+#define __arc_clobbers							\
+	"$2","$3" /* ... */, "$8","$9","$10","$11",			\
+	"$12","$13","$14","$15","$16","$24","25","$31"
+
+#define ARC_CALL0(dest)							\
+({	long __res;							\
+	long __vec = (long) romvec->dest;				\
+	__asm__ __volatile__(						\
+	"dsubu\t$29, 32\n\t"						\
+	"jalr\t%1\n\t"							\
+	"daddu\t$29, 32\n\t"						\
+	"move\t%0, $2"							\
+	: "=r" (__res), "=r" (__vec)					\
+	: "1" (__vec)							\
+	: __arc_clobbers, "$4","$5","$6","$7");				\
+	(unsigned long) __res;						\
+})
+
+#define ARC_CALL1(dest,a1)						\
+({	long __res;							\
+	register signed int __a1 __asm__("$4") = (int) (long) (a1);	\
+	long __vec = (long) romvec->dest;				\
+	__asm__ __volatile__(						\
+	"dsubu\t$29, 32\n\t"						\
+	"jalr\t%1\n\t"							\
+	"daddu\t$29, 32\n\t"						\
+	"move\t%0, $2"							\
+	: "=r" (__res), "=r" (__vec)					\
+	: "1" (__vec), "r" (__a1)					\
+	: __arc_clobbers, "$5","$6","$7");				\
+	(unsigned long) __res;						\
+})
+
+#define ARC_CALL2(dest,a1,a2)						\
+({	long __res;							\
+	register signed int __a1 __asm__("$4") = (int) (long) (a1);	\
+	register signed int __a2 __asm__("$5") = (int) (long) (a2);	\
+	long __vec = (long) romvec->dest;				\
+	__asm__ __volatile__(						\
+	"dsubu\t$29, 32\n\t"						\
+	"jalr\t%1\n\t"							\
+	"daddu\t$29, 32\n\t"						\
+	"move\t%0, $2"							\
+	: "=r" (__res), "=r" (__vec)					\
+	: "1" (__vec), "r" (__a1), "r" (__a2)				\
+	: __arc_clobbers, "$6","$7");					\
+	__res;								\
+})
+
+#define ARC_CALL3(dest,a1,a2,a3)					\
+({	long __res;							\
+	register signed int __a1 __asm__("$4") = (int) (long) (a1);	\
+	register signed int __a2 __asm__("$5") = (int) (long) (a2);	\
+	register signed int __a3 __asm__("$6") = (int) (long) (a3);	\
+	long __vec = (long) romvec->dest;				\
+	__asm__ __volatile__(						\
+	"dsubu\t$29, 32\n\t"						\
+	"jalr\t%1\n\t"							\
+	"daddu\t$29, 32\n\t"						\
+	"move\t%0, $2"							\
+	: "=r" (__res), "=r" (__vec)					\
+	: "1" (__vec), "r" (__a1), "r" (__a2), "r" (__a3)		\
+	: __arc_clobbers, "$7");					\
+	__res;								\
+})
+
+#define ARC_CALL4(dest,a1,a2,a3,a4)					\
+({	long __res;							\
+	register signed int __a1 __asm__("$4") = (int) (long) (a1);	\
+	register signed int __a2 __asm__("$5") = (int) (long) (a2);	\
+	register signed int __a3 __asm__("$6") = (int) (long) (a3);	\
+	register signed int __a4 __asm__("$7") = (int) (long) (a4);	\
+	long __vec = (long) romvec->dest;				\
+	__asm__ __volatile__(						\
+	"dsubu\t$29, 32\n\t"						\
+	"jalr\t%1\n\t"							\
+	"daddu\t$29, 32\n\t"						\
+	"move\t%0, $2"							\
+	: "=r" (__res), "=r" (__vec)					\
+	: "1" (__vec), "r" (__a1), "r" (__a2), "r" (__a3), 		\
+	  "r" (__a4)							\
+	: __arc_clobbers);						\
+	__res;								\
+})
+
+#define ARC_CALL5(dest,a1,a2,a3,a4,a5)					\
+({	long __res;							\
+	register signed int __a1 __asm__("$4") = (int) (long) (a1);	\
+	register signed int __a2 __asm__("$5") = (int) (long) (a2);	\
+	register signed int __a3 __asm__("$6") = (int) (long) (a3);	\
+	register signed int __a4 __asm__("$7") = (int) (long) (a4);	\
+	register signed int __a5 = (a5);				\
+	long __vec = (long) romvec->dest;				\
+	__asm__ __volatile__(						\
+	"dsubu\t$29, 32\n\t"						\
+	"sw\t%6, 16($29)\n\t"						\
+	"jalr\t%1\n\t"							\
+	"daddu\t$29, 32\n\t"						\
+	"move\t%0, $2"							\
+	: "=r" (__res), "=r" (__vec)					\
+	: "1" (__vec),							\
+	  "r" (__a1), "r" (__a2), "r" (__a3), "r" (__a4),		\
+	  "r" (__a5)							\
+	: __arc_clobbers);						\
+	__res;								\
+})
+
+#endif /* defined(CONFIG_MIPS64) && defined(CONFIG_ARC32) */
+
+#if (defined(CONFIG_MIPS32) && defined(CONFIG_ARC32)) ||		\
+    (defined(CONFIG_MIPS64) && defined(CONFIG_ARC64))
+
+#define ARC_CALL0(dest)							\
+({	long __res;							\
+	long (*__vec)(void) = (void *) romvec->dest;			\
+									\
+	__res = __vec();						\
+	__res;								\
+})
+
+#define ARC_CALL1(dest,a1)						\
+({	long __res;							\
+	long __a1 = (long) (a1);					\
+	long (*__vec)(long) = (void *) romvec->dest;			\
+									\
+	__res = __vec(__a1);						\
+	__res;								\
+})
+
+#define ARC_CALL2(dest,a1,a2)						\
+({	long __res;							\
+	long __a1 = (long) (a1);					\
+	long __a2 = (long) (a2);					\
+	long (*__vec)(long, long) = (void *) romvec->dest;		\
+									\
+	__res = __vec(__a1, __a2);					\
+	__res;								\
+})
+
+#define ARC_CALL3(dest,a1,a2,a3)					\
+({	long __res;							\
+	long __a1 = (long) (a1);					\
+	long __a2 = (long) (a2);					\
+	long __a3 = (long) (a3);					\
+	long (*__vec)(long, long, long)	= (void *) romvec->dest;	\
+									\
+	__res = __vec(__a1, __a2, __a3);				\
+	__res;								\
+})
+
+#define ARC_CALL4(dest,a1,a2,a3,a4)					\
+({	long __res;							\
+	long __a1 = (long) (a1);					\
+	long __a2 = (long) (a2);					\
+	long __a3 = (long) (a3);					\
+	long __a4 = (long) (a4);					\
+	long (*__vec)(long, long, long, long) = (void *) romvec->dest;	\
+									\
+	__res = __vec(__a1, __a2, __a3, __a4);				\
+	__res;								\
+})
+
+#define ARC_CALL5(dest,a1,a2,a3,a4,a5)					\
+({	long __res;							\
+	long __a1 = (long) (a1);					\
+	long __a2 = (long) (a2);					\
+	long __a3 = (long) (a3);					\
+	long __a4 = (long) (a4);					\
+	long __a5 = (long) (a5);					\
+	long (*__vec)(long, long, long, long, long);			\
+	__vec = (void *) romvec->dest;					\
+									\
+	__res = __vec(__a1, __a2, __a3, __a4, __a5);			\
+	__res;								\
+})
+#endif /* both kernel and ARC either 32-bit or 64-bit */
 
 #endif /* _ASM_SGIARCS_H */

@@ -4,7 +4,7 @@
  * This file provides autodetection for ISA PnP IDE interfaces.
  * It was tested with "ESS ES1868 Plug and Play AudioDrive" IDE interface.
  *
- * Copyright (C) 2000 Andrey Panin <pazke@orbita.don.sitek.net>
+ * Copyright (C) 2000 Andrey Panin <pazke@donpac.ru>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

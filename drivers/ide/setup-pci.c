@@ -702,8 +702,9 @@ static ata_index_t do_ide_setup_pci_device (struct pci_dev *dev, ide_pci_device_
 	 * Can we trust the reported IRQ?
 	 */
 	pciirq = dev->irq;
-	
-	if ((dev->class & ~(0xfa)) != ((PCI_CLASS_STORAGE_IDE << 8) | 5)) {
+
+	/* Is it an "IDE storage" device in non-PCI mode? */
+	if ((dev->class >> 8) == PCI_CLASS_STORAGE_IDE && (dev->class & 5) != 5) {
 		if (noisy)
 			printk(KERN_INFO "%s: not 100%% native mode: "
 				"will probe irqs later\n", d->name);

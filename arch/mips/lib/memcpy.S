@@ -4,407 +4,468 @@
  * for more details.
  *
  * Unified implementation of memcpy, memmove and the __copy_user backend.
- * For __rmemcpy and memmove an exception is always a kernel bug, therefore
- * they're not protected.  In order to keep the exception fixup routine
- * simple all memory accesses in __copy_user to src rsp. dst are stricly
- * incremental.  The fixup routine depends on $at not being changed.
+ *
+ * Copyright (C) 1998, 99, 2000, 01, 2002 Ralf Baechle (ralf@gnu.org)
+ * Copyright (C) 1999, 2000, 01, 2002 Silicon Graphics, Inc.
+ * Copyright (C) 2002 Broadcom, Inc.
+ *   memcpy/copy_user author: Mark Vandevoorde
+ *
+ * Mnemonic names for arguments to memcpy/__copy_user
  */
+#include <linux/config.h>
 #include <asm/asm.h>
 #include <asm/offset.h>
 #include <asm/regdef.h>
 
+#define dst a0
+#define src a1
+#define len a2
+
 /*
- * The fixup routine for copy_to_user depends on copying strictly in
- * increasing order.  Gas expands the ulw/usw macros in the wrong order for
- * little endian machines, so we cannot depend on them.
+ * Spec
+ *
+ * memcpy copies len bytes from src to dst and sets v0 to dst.
+ * It assumes that
+ *   - src and dst don't overlap
+ *   - src is readable
+ *   - dst is writable
+ * memcpy uses the standard calling convention
+ *
+ * __copy_user copies up to len bytes from src to dst and sets a2 (len) to
+ * the number of uncopied bytes due to an exception caused by a read or write.
+ * __copy_user assumes that src and dst don't overlap, and that the call is
+ * implementing one of the following:
+ *   copy_to_user
+ *     - src is readable  (no exceptions when reading src)
+ *   copy_from_user
+ *     - dst is writable  (no exceptions when writing dst)
+ * __copy_user uses a non-standard calling convention; see
+ * include/asm-mips/uaccess.h
+ *
+ * When an exception happens on a load, the handler must
+ # ensure that all of the destination buffer is overwritten to prevent
+ * leaking information to user mode programs.
  */
-#ifdef __MIPSEB__
-#define uswL	swl
-#define uswU	swr
-#define ulwL	lwl
-#define ulwU	lwr
-#endif
-#ifdef __MIPSEL__
-#define uswL	swr
-#define uswU	swl
-#define ulwL	lwr
-#define ulwU	lwl
-#endif
 
-#define EX(insn,reg,addr,handler)			\
-9:	insn	reg, addr;				\
-	.section __ex_table,"a"; 			\
-	PTR	9b, handler; 				\
+/*
+ * Implementation
+ */
+
+/*
+ * The exception handler for loads requires that:
+ *  1- AT contain the address of the byte just past the end of the source
+ *     of the copy,
+ *  2- src_entry <= src < AT, and
+ *  3- (dst - src) == (dst_entry - src_entry),
+ * The _entry suffix denotes values when __copy_user was called.
+ *
+ * (1) is set up up by uaccess.h and maintained by not writing AT in copy_user
+ * (2) is met by incrementing src by the number of bytes copied
+ * (3) is met by not doing loads between a pair of increments of dst and src
+ *
+ * The exception handlers for stores adjust len (if necessary) and return.
+ * These handlers do not need to overwrite any data.
+ *
+ * For __rmemcpy and memmove an exception is always a kernel bug, therefore
+ * they're not protected.
+ */
+
+#define EXC(inst_reg,addr,handler)		\
+9:	inst_reg, addr;				\
+	.section __ex_table,"a";		\
+	PTR	9b, handler;			\
 	.previous
 
-#define UEX(insn,reg,addr,handler)			\
-9:	insn ## L reg, addr;				\
-10:	insn ## U reg, 3 + addr;			\
-	.section __ex_table,"a"; 			\
-	PTR	9b, handler; 				\
-	PTR	10b, handler; 				\
-	.previous
+/*
+ * Only on the 64-bit kernel we can made use of 64-bit registers.
+ */
+#ifdef CONFIG_MIPS64
+#define USE_DOUBLE
+#endif
 
-/* ascending order, destination aligned  */
-#define MOVE_BIGCHUNK(src, dst, offset, t0, t1, t2, t3) \
-	EX(lw, t0, (offset + 0x00)(src), l_fixup); \
-	EX(lw, t1, (offset + 0x04)(src), l_fixup); \
-	EX(lw, t2, (offset + 0x08)(src), l_fixup); \
-	EX(lw, t3, (offset + 0x0c)(src), l_fixup); \
-	EX(sw, t0, (offset + 0x00)(dst), s_fixup); \
-	EX(sw, t1, (offset + 0x04)(dst), s_fixup); \
-	EX(sw, t2, (offset + 0x08)(dst), s_fixup); \
-	EX(sw, t3, (offset + 0x0c)(dst), s_fixup); \
-	EX(lw, t0, (offset + 0x10)(src), l_fixup); \
-	EX(lw, t1, (offset + 0x14)(src), l_fixup); \
-	EX(lw, t2, (offset + 0x18)(src), l_fixup); \
-	EX(lw, t3, (offset + 0x1c)(src), l_fixup); \
-	EX(sw, t0, (offset + 0x10)(dst), s_fixup); \
-	EX(sw, t1, (offset + 0x14)(dst), s_fixup); \
-	EX(sw, t2, (offset + 0x18)(dst), s_fixup); \
-	EX(sw, t3, (offset + 0x1c)(dst), s_fixup)
+#ifdef USE_DOUBLE
 
-/* ascending order, destination unaligned  */
-#define UMOVE_BIGCHUNK(src, dst, offset, t0, t1, t2, t3) \
-	EX(lw, t0, (offset + 0x00)(src), l_fixup); \
-	EX(lw, t1, (offset + 0x04)(src), l_fixup); \
-	EX(lw, t2, (offset + 0x08)(src), l_fixup); \
-	EX(lw, t3, (offset + 0x0c)(src), l_fixup); \
-	UEX(usw, t0, (offset + 0x00)(dst), s_fixup); \
-	UEX(usw, t1, (offset + 0x04)(dst), s_fixup); \
-	UEX(usw, t2, (offset + 0x08)(dst), s_fixup); \
-	UEX(usw, t3, (offset + 0x0c)(dst), s_fixup); \
-	EX(lw, t0, (offset + 0x10)(src), l_fixup); \
-	EX(lw, t1, (offset + 0x14)(src), l_fixup); \
-	EX(lw, t2, (offset + 0x18)(src), l_fixup); \
-	EX(lw, t3, (offset + 0x1c)(src), l_fixup); \
-	UEX(usw, t0, (offset + 0x10)(dst), s_fixup); \
-	UEX(usw, t1, (offset + 0x14)(dst), s_fixup); \
-	UEX(usw, t2, (offset + 0x18)(dst), s_fixup); \
-	UEX(usw, t3, (offset + 0x1c)(dst), s_fixup)
+#define LOAD   ld
+#define LOADL  ldl
+#define LOADR  ldr
+#define STOREL sdl
+#define STORER sdr
+#define STORE  sd
+#define ADD    daddu
+#define SUB    dsubu
+#define SRL    dsrl
+#define SRA    dsra
+#define SLL    dsll
+#define SLLV   dsllv
+#define SRLV   dsrlv
+#define NBYTES 8
+#define LOG_NBYTES 3
+
+/* 
+ * As we are sharing code base with the mips32 tree (which use the o32 ABI
+ * register definitions). We need to redefine the register definitions from
+ * the n64 ABI register naming to the o32 ABI register naming.
+ */
+#undef t0
+#undef t1
+#undef t2
+#undef t3
+#define t0	$8
+#define t1	$9
+#define t2	$10
+#define t3	$11
+#define t4	$12
+#define t5	$13
+#define t6	$14
+#define t7	$15
+	
+#else
+
+#define LOAD   lw
+#define LOADL  lwl
+#define LOADR  lwr
+#define STOREL swl
+#define STORER swr
+#define STORE  sw
+#define ADD    addu
+#define SUB    subu
+#define SRL    srl
+#define SLL    sll
+#define SRA    sra
+#define SLLV   sllv
+#define SRLV   srlv
+#define NBYTES 4
+#define LOG_NBYTES 2
+
+#endif /* USE_DOUBLE */
+
+#ifdef CONFIG_CPU_LITTLE_ENDIAN
+#define LDFIRST LOADR
+#define LDREST  LOADL
+#define STFIRST STORER
+#define STREST  STOREL
+#define SHIFT_DISCARD SLLV
+#else
+#define LDFIRST LOADL
+#define LDREST  LOADR
+#define STFIRST STOREL
+#define STREST  STORER
+#define SHIFT_DISCARD SRLV
+#endif
+
+#define FIRST(unit) ((unit)*NBYTES)
+#define REST(unit)  (FIRST(unit)+NBYTES-1)
+#define UNIT(unit)  FIRST(unit)
+
+#define ADDRMASK (NBYTES-1)
 
 	.text
 	.set	noreorder
 	.set	noat
 
+/*
+ * A combined memcpy/__copy_user
+ * __copy_user sets len to 0 for success; else to an upper bound of
+ * the number of uncopied bytes.
+ * memcpy sets v0 to dst.
+ */
 	.align	5
 LEAF(memcpy)					/* a0=dst a1=src a2=len */
-	move	v0, a0				/* return value */
+	move	v0, dst				/* return value */
 __memcpy:
-EXPORT(__copy_user)
-	xor	t0, a0, a1
-	andi	t0, t0, 0x3
-	move	t7, a0
-	beqz	t0, can_align
-	 sltiu	t8, a2, 0x8
+FEXPORT(__copy_user)
+	/*
+	 * Note: dst & src may be unaligned, len may be 0
+	 * Temps
+	 */
+#define rem t8
 
-	b	memcpy_u_src			# bad alignment
-	 move	t2, a2
-
-can_align:
-	bnez	t8, small_memcpy		# < 8 bytes to copy
-	 move	t2, a2
-
-	beqz	a2, out
-	 andi	t8, a1, 0x1
-
-hword_align:
-	beqz	t8, word_align
-	 andi	t8, a1, 0x2
-
-	EX(lb, t0, (a1), l_fixup)
-	subu	a2, a2, 0x1
-	EX(sb, t0, (a0), s_fixup)
-	addu	a1, a1, 0x1
-	addu	a0, a0, 0x1
-	andi	t8, a1, 0x2
-
-word_align:
-	beqz	t8, dword_align
-	 sltiu	t8, a2, 56
-	
-	EX(lh, t0, (a1), l_fixup)
-	subu	a2, a2, 0x2
-	EX(sh, t0, (a0), s_fixup)
-	sltiu	t8, a2, 56
-	addu	a0, a0, 0x2
-	addu	a1, a1, 0x2
-
-dword_align:
-	bnez	t8, do_end_words
-	 move	t8, a2
-
-	andi	t8, a1, 0x4
-	beqz	t8, qword_align
-	 andi	t8, a1, 0x8
-
-	EX(lw, t0, 0x00(a1), l_fixup)
-	subu	a2, a2, 0x4
-	EX(sw, t0, 0x00(a0), s_fixup)
-	addu	a1, a1, 0x4
-	addu	a0, a0, 0x4
-	andi	t8, a1, 0x8
-
-qword_align:
-	beqz	t8, oword_align
-	 andi	t8, a1, 0x10
-
-	EX(lw, t0, 0x00(a1), l_fixup)
-	EX(lw, t1, 0x04(a1), l_fixup)
-	subu	a2, a2, 0x8
-	EX(sw, t0, 0x00(a0), s_fixup)
-	EX(sw, t1, 0x04(a0), s_fixup)
-	addu	a1, a1, 0x8
-	andi	t8, a1, 0x10
-	addu	a0, a0, 0x8
-
-oword_align:
-	beqz	t8, begin_movement
-	 srl	t8, a2, 0x7
-
-	EX(lw, t3, 0x00(a1), l_fixup)
-	EX(lw, t4, 0x04(a1), l_fixup)
-	EX(lw, t0, 0x08(a1), l_fixup)
-	EX(lw, t1, 0x0c(a1), l_fixup)
-	EX(sw, t3, 0x00(a0), s_fixup)
-	EX(sw, t4, 0x04(a0), s_fixup)
-	EX(sw, t0, 0x08(a0), s_fixup)
-	EX(sw, t1, 0x0c(a0), s_fixup)
-	subu	a2, a2, 0x10
-	addu	a1, a1, 0x10
-	srl	t8, a2, 0x7
-	addu	a0, a0, 0x10
-
-begin_movement:
-	beqz	t8, 0f
-	 andi	t2, a2, 0x40
-
-move_128bytes:
-	MOVE_BIGCHUNK(a1, a0, 0x00, t0, t1, t3, t4)
-	MOVE_BIGCHUNK(a1, a0, 0x20, t0, t1, t3, t4)
-	MOVE_BIGCHUNK(a1, a0, 0x40, t0, t1, t3, t4)
-	MOVE_BIGCHUNK(a1, a0, 0x60, t0, t1, t3, t4)
-	subu	t8, t8, 0x01
-	addu	a1, a1, 0x80
-	bnez	t8, move_128bytes
-	 addu	a0, a0, 0x80
-
-0:
-	beqz	t2, 1f
-	 andi	t2, a2, 0x20
-
-move_64bytes:
-	MOVE_BIGCHUNK(a1, a0, 0x00, t0, t1, t3, t4)
-	MOVE_BIGCHUNK(a1, a0, 0x20, t0, t1, t3, t4)
-	addu	a1, a1, 0x40
-	addu	a0, a0, 0x40
-
+	/*
+	 * The "issue break"s below are very approximate.
+	 * Issue delays for dcache fills will perturb the schedule, as will
+	 * load queue full replay traps, etc.
+	 *
+	 * If len < NBYTES use byte operations.
+	 */
+	PREF(	0, 0(src) )
+	PREF(	1, 0(dst) )
+	sltu	t2, len, NBYTES
+	and	t1, dst, ADDRMASK
+	PREF(	0, 1*32(src) )
+	PREF(	1, 1*32(dst) )
+	bnez	t2, copy_bytes_checklen
+	 and	t0, src, ADDRMASK
+	PREF(	0, 2*32(src) )
+	PREF(	1, 2*32(dst) )
+	bnez	t1, dst_unaligned
+	 nop
+	bnez	t0, src_unaligned_dst_aligned
+	/*
+	 * use delay slot for fall-through
+	 * src and dst are aligned; need to compute rem
+	 */
+both_aligned:
+	 SRL	t0, len, LOG_NBYTES+3    # +3 for 8 units/iter
+	beqz	t0, cleanup_both_aligned # len < 8*NBYTES
+	 and	rem, len, (8*NBYTES-1)	 # rem = len % (8*NBYTES)
+	PREF(	0, 3*32(src) )
+	PREF(	1, 3*32(dst) )
+	.align	4
 1:
-	beqz	t2, do_end_words
-	 andi	t8, a2, 0x1c
+EXC(	LOAD	t0, UNIT(0)(src),	l_exc)
+EXC(	LOAD	t1, UNIT(1)(src),	l_exc_copy)
+EXC(	LOAD	t2, UNIT(2)(src),	l_exc_copy)
+EXC(	LOAD	t3, UNIT(3)(src),	l_exc_copy)
+	SUB	len, len, 8*NBYTES
+EXC(	LOAD	t4, UNIT(4)(src),	l_exc_copy)
+EXC(	LOAD	t7, UNIT(5)(src),	l_exc_copy)
+EXC(	STORE	t0, UNIT(0)(dst),	s_exc_p8u)
+EXC(	STORE	t1, UNIT(1)(dst),	s_exc_p7u)
+EXC(	LOAD	t0, UNIT(6)(src),	l_exc_copy)
+EXC(	LOAD	t1, UNIT(7)(src),	l_exc_copy)
+	ADD	src, src, 8*NBYTES
+	ADD	dst, dst, 8*NBYTES
+EXC(	STORE	t2, UNIT(-6)(dst),	s_exc_p6u)
+EXC(	STORE	t3, UNIT(-5)(dst),	s_exc_p5u)
+EXC(	STORE	t4, UNIT(-4)(dst),	s_exc_p4u)
+EXC(	STORE	t7, UNIT(-3)(dst),	s_exc_p3u)
+EXC(	STORE	t0, UNIT(-2)(dst),	s_exc_p2u)
+EXC(	STORE	t1, UNIT(-1)(dst),	s_exc_p1u)
+	PREF(	0, 8*32(src) )
+	PREF(	1, 8*32(dst) )
+	bne	len, rem, 1b
+	 nop
 
-move_32bytes:
-	MOVE_BIGCHUNK(a1, a0, 0x00, t0, t1, t3, t4)
-	andi	t8, a2, 0x1c
-	addu	a1, a1, 0x20
-	addu	a0, a0, 0x20
-
-do_end_words:
-	beqz	t8, maybe_end_cruft
-	 srl	t8, t8, 0x2
-
-end_words:
-	EX(lw, t0, (a1), l_fixup)
-	subu	t8, t8, 0x1
-	EX(sw, t0, (a0), s_fixup)
-	addu	a1, a1, 0x4
-	bnez	t8, end_words
-	 addu	a0, a0, 0x4
-
-maybe_end_cruft:
-	andi	t2, a2, 0x3
-
-small_memcpy:
-	beqz	t2, out
-	 move	a2, t2
-
-end_bytes:
-	EX(lb, t0, (a1), l_fixup)
-	subu	a2, a2, 0x1
-	EX(sb, t0, (a0), s_fixup)
-	addu	a1, a1, 0x1
-	bnez	a2, end_bytes
-	 addu	a0, a0, 0x1
-
-out:	jr	ra
-	 move	a2, zero
-
-/* ------------------------------------------------------------------------- */
-
-/* Bad, bad.  At least try to align the source  */
-
-memcpy_u_src:
-	bnez	t8, small_memcpy		# < 8 bytes?
-	 move	t2, a2
-
-	addiu	t0, a1, 7			# t0: how much to align
-	ori	t0, 7
-	xori	t0, 7
-	subu	t0, a1
-
-	UEX(ulw, t1, 0(a1), l_fixup)		# dword alignment
-	UEX(ulw, t2, 4(a1), l_fixup)
-	UEX(usw, t1, 0(a0), s_fixup)
-	UEX(usw, t2, 4(a0), s_fixup)
-
-	addu	a1, t0				# src
-	addu	a0, t0				# dst
-	subu	a2, t0				# len
-
-	sltiu	t8, a2, 56
-	bnez	t8, u_do_end_words
-	 andi	t8, a2, 0x3c
-
-	andi	t8, a1, 8			# now qword aligned?
-
-u_qword_align:
-	beqz	t8, u_oword_align
-	 andi	t8, a1, 0x10
-
-	EX(lw, t0, 0x00(a1), l_fixup)
-	EX(lw, t1, 0x04(a1), l_fixup)
-	subu	a2, a2, 0x8
-	UEX(usw, t0, 0x00(a0), s_fixup)
-	UEX(usw, t1, 0x04(a0), s_fixup)
-	addu	a1, a1, 0x8
-	andi	t8, a1, 0x10
-	addu	a0, a0, 0x8
-
-u_oword_align:
-	beqz	t8, u_begin_movement
-	 srl	t8, a2, 0x7
-
-	EX(lw, t3, 0x08(a1), l_fixup)
-	EX(lw, t4, 0x0c(a1), l_fixup)
-	EX(lw, t0, 0x00(a1), l_fixup)
-	EX(lw, t1, 0x04(a1), l_fixup)
-	UEX(usw, t3, 0x08(a0), s_fixup)
-	UEX(usw, t4, 0x0c(a0), s_fixup)
-	UEX(usw, t0, 0x00(a0), s_fixup)
-	UEX(usw, t1, 0x04(a0), s_fixup)
-	subu	a2, a2, 0x10
-	addu	a1, a1, 0x10
-	srl	t8, a2, 0x7
-	addu	a0, a0, 0x10
-
-u_begin_movement:
-	beqz	t8, 0f
-	 andi	t2, a2, 0x40
-
-u_move_128bytes:
-	UMOVE_BIGCHUNK(a1, a0, 0x00, t0, t1, t3, t4)
-	UMOVE_BIGCHUNK(a1, a0, 0x20, t0, t1, t3, t4)
-	UMOVE_BIGCHUNK(a1, a0, 0x40, t0, t1, t3, t4)
-	UMOVE_BIGCHUNK(a1, a0, 0x60, t0, t1, t3, t4)
-	subu	t8, t8, 0x01
-	addu	a1, a1, 0x80
-	bnez	t8, u_move_128bytes
-	 addu	a0, a0, 0x80
-
-0:
-	beqz	t2, 1f
-	 andi	t2, a2, 0x20
-
-u_move_64bytes:
-	UMOVE_BIGCHUNK(a1, a0, 0x00, t0, t1, t3, t4)
-	UMOVE_BIGCHUNK(a1, a0, 0x20, t0, t1, t3, t4)
-	addu	a1, a1, 0x40
-	addu	a0, a0, 0x40
-
+	/*
+	 * len == rem == the number of bytes left to copy < 8*NBYTES
+	 */
+cleanup_both_aligned:
+	beqz	len, done
+	 sltu	t0, len, 4*NBYTES
+	bnez	t0, less_than_4units
+	 and	rem, len, (NBYTES-1)	# rem = len % NBYTES
+	/*
+	 * len >= 4*NBYTES
+	 */
+EXC(	LOAD	t0, UNIT(0)(src),	l_exc)
+EXC(	LOAD	t1, UNIT(1)(src),	l_exc_copy)
+EXC(	LOAD	t2, UNIT(2)(src),	l_exc_copy)
+EXC(	LOAD	t3, UNIT(3)(src),	l_exc_copy)
+	SUB	len, len, 4*NBYTES
+	ADD	src, src, 4*NBYTES
+EXC(	STORE	t0, UNIT(0)(dst),	s_exc_p4u)
+EXC(	STORE	t1, UNIT(1)(dst),	s_exc_p3u)
+EXC(	STORE	t2, UNIT(2)(dst),	s_exc_p2u)
+EXC(	STORE	t3, UNIT(3)(dst),	s_exc_p1u)
+	beqz	len, done
+	 ADD	dst, dst, 4*NBYTES
+less_than_4units:
+	/*
+	 * rem = len % NBYTES
+	 */
+	beq	rem, len, copy_bytes
+	 nop
 1:
-	beqz	t2, u_do_end_words
-	 andi	t8, a2, 0x1c
+EXC(	LOAD	 t0, 0(src),		l_exc)
+	ADD	src, src, NBYTES
+	SUB	len, len, NBYTES
+EXC(	STORE	t0, 0(dst),		s_exc_p1u)
+	bne	rem, len, 1b
+	 ADD	dst, dst, NBYTES
 
-u_move_32bytes:
-	UMOVE_BIGCHUNK(a1, a0, 0x00, t0, t1, t3, t4)
-	andi	t8, a2, 0x1c
-	addu	a1, a1, 0x20
-	addu	a0, a0, 0x20
-
-u_do_end_words:
-	beqz	t8, u_maybe_end_cruft
-	 srl	t8, t8, 0x2
-
-u_end_words:
-	EX(lw, t0, 0x00(a1), l_fixup)
-	subu	t8, t8, 0x1
-	UEX(usw, t0, 0x00(a0), s_fixup)
-	addu	a1, a1, 0x4
-	bnez	t8, u_end_words
-	 addu	a0, a0, 0x4
-
-u_maybe_end_cruft:
-	andi	t2, a2, 0x3
-
-u_cannot_optimize:
-	beqz	t2, out
-	 move	a2, t2
-
-u_end_bytes:
-	EX(lb, t0, (a1), l_fixup)
-	subu	a2, a2, 0x1
-	EX(sb, t0, (a0), s_fixup)
-	addu	a1, a1, 0x1
-	bnez	a2, u_end_bytes
-	 addu	a0, a0, 0x1
-
+	/*
+	 * src and dst are aligned, need to copy rem bytes (rem < NBYTES)
+	 * A loop would do only a byte at a time with possible branch
+	 * mispredicts.  Can't do an explicit LOAD dst,mask,or,STORE
+	 * because can't assume read-access to dst.  Instead, use
+	 * STREST dst, which doesn't require read access to dst.
+	 *
+	 * This code should perform better than a simple loop on modern,
+	 * wide-issue mips processors because the code has fewer branches and
+	 * more instruction-level parallelism.
+	 */
+#define bits t2
+	beqz	len, done
+	 ADD	t1, dst, len	# t1 is just past last byte of dst
+	li	bits, 8*NBYTES
+	SLL	rem, len, 3	# rem = number of bits to keep
+EXC(	LOAD	t0, 0(src),		l_exc)
+	SUB	bits, bits, rem	# bits = number of bits to discard
+	SHIFT_DISCARD t0, t0, bits
+EXC(	STREST	t0, -1(t1),		s_exc)
 	jr	ra
-	 move	a2, zero
+	 move	len, zero
+dst_unaligned:
+	/*
+	 * dst is unaligned
+	 * t0 = src & ADDRMASK
+	 * t1 = dst & ADDRMASK; T1 > 0
+	 * len >= NBYTES
+	 *
+	 * Copy enough bytes to align dst
+	 * Set match = (src and dst have same alignment)
+	 */
+#define match rem
+EXC(	LDFIRST	t3, FIRST(0)(src),	l_exc)
+	ADD	t2, zero, NBYTES
+EXC(	LDREST	t3, REST(0)(src),	l_exc_copy)
+	SUB	t2, t2, t1	# t2 = number of bytes copied
+	xor	match, t0, t1
+EXC(	STFIRST t3, FIRST(0)(dst),	s_exc)
+	beq	len, t2, done
+	 SUB	len, len, t2
+	ADD	dst, dst, t2
+	beqz	match, both_aligned
+	 ADD	src, src, t2
+
+src_unaligned_dst_aligned:
+	SRL	t0, len, LOG_NBYTES+2    # +2 for 4 units/iter
+	PREF(	0, 3*32(src) )
+	beqz	t0, cleanup_src_unaligned
+	 and	rem, len, (4*NBYTES-1)   # rem = len % 4*NBYTES
+	PREF(	1, 3*32(dst) )
+1:
+/*
+ * Avoid consecutive LD*'s to the same register since some mips
+ * implementations can't issue them in the same cycle.
+ * It's OK to load FIRST(N+1) before REST(N) because the two addresses
+ * are to the same unit (unless src is aligned, but it's not).
+ */
+EXC(	LDFIRST	t0, FIRST(0)(src),	l_exc)
+EXC(	LDFIRST	t1, FIRST(1)(src),	l_exc_copy)
+	SUB     len, len, 4*NBYTES
+EXC(	LDREST	t0, REST(0)(src),	l_exc_copy)
+EXC(	LDREST	t1, REST(1)(src),	l_exc_copy)
+EXC(	LDFIRST	t2, FIRST(2)(src),	l_exc_copy)
+EXC(	LDFIRST	t3, FIRST(3)(src),	l_exc_copy)
+EXC(	LDREST	t2, REST(2)(src),	l_exc_copy)
+EXC(	LDREST	t3, REST(3)(src),	l_exc_copy)
+	PREF(	0, 9*32(src) )	   	# 0 is PREF_LOAD  (not streamed)
+	ADD	src, src, 4*NBYTES
+#ifdef CONFIG_CPU_SB1
+	nop			   	# improves slotting
+#endif
+EXC(	STORE	t0, UNIT(0)(dst),	s_exc_p4u)
+EXC(	STORE	t1, UNIT(1)(dst),	s_exc_p3u)
+EXC(	STORE	t2, UNIT(2)(dst),	s_exc_p2u)
+EXC(	STORE	t3, UNIT(3)(dst),	s_exc_p1u)
+	PREF(	1, 9*32(dst) )     	# 1 is PREF_STORE (not streamed)
+	bne	len, rem, 1b
+	 ADD	dst, dst, 4*NBYTES
+
+cleanup_src_unaligned:
+	beqz	len, done
+	 and	rem, len, NBYTES-1  # rem = len % NBYTES
+	beq	rem, len, copy_bytes
+	 nop
+1:
+EXC(	LDFIRST t0, FIRST(0)(src),	l_exc)
+EXC(	LDREST	t0, REST(0)(src),	l_exc_copy)
+	ADD	src, src, NBYTES
+	SUB	len, len, NBYTES
+EXC(	STORE	t0, 0(dst),		s_exc_p1u)
+	bne	len, rem, 1b
+	 ADD	dst, dst, NBYTES
+
+copy_bytes_checklen:
+	beqz	len, done
+	 nop
+copy_bytes:
+	/* 0 < len < NBYTES  */
+#define COPY_BYTE(N)			\
+EXC(	lb	t0, N(src), l_exc);	\
+	SUB	len, len, 1;		\
+	beqz	len, done;		\
+EXC(	 sb	t0, N(dst), s_exc_p1)
+
+	COPY_BYTE(0)
+	COPY_BYTE(1)
+#ifdef USE_DOUBLE
+	COPY_BYTE(2)
+	COPY_BYTE(3)
+	COPY_BYTE(4)
+	COPY_BYTE(5)
+#endif
+EXC(	lb	t0, NBYTES-2(src), l_exc)
+	SUB	len, len, 1
+	jr	ra
+EXC(	 sb	t0, NBYTES-2(dst), s_exc_p1)
+done:
+	jr	ra
+	 nop
 	END(memcpy)
 
-/* descending order, destination aligned  */
-#define RMOVE_BIGCHUNK(src, dst, offset, t0, t1, t2, t3) \
-	lw	t0, (offset + 0x10)(src); \
-	lw	t1, (offset + 0x14)(src); \
-	lw	t2, (offset + 0x18)(src); \
-	lw	t3, (offset + 0x1c)(src); \
-	sw	t0, (offset + 0x10)(dst); \
-	sw	t1, (offset + 0x14)(dst); \
-	sw	t2, (offset + 0x18)(dst); \
-	sw	t3, (offset + 0x1c)(dst); \
-	lw	t0, (offset + 0x00)(src); \
-	lw	t1, (offset + 0x04)(src); \
-	lw	t2, (offset + 0x08)(src); \
-	lw	t3, (offset + 0x0c)(src); \
-	sw	t0, (offset + 0x00)(dst); \
-	sw	t1, (offset + 0x04)(dst); \
-	sw	t2, (offset + 0x08)(dst); \
-	sw	t3, (offset + 0x0c)(dst)
+l_exc_copy:
+	/*
+	 * Copy bytes from src until faulting load address (or until a
+	 * lb faults)
+	 *
+	 * When reached by a faulting LDFIRST/LDREST, THREAD_BUADDR($28)
+	 * may be more than a byte beyond the last address.
+	 * Hence, the lb below may get an exception.
+	 *
+	 * Assumes src < THREAD_BUADDR($28)
+	 */
+	LOAD	t0, TI_TASK($28)
+	LOAD	t0, THREAD_BUADDR(t0)
+1:
+EXC(	lb	t1, 0(src),	l_exc)
+	ADD	src, src, 1
+	sb	t1, 0(dst)	# can't fault -- we're copy_from_user
+	bne	src, t0, 1b
+	 ADD	dst, dst, 1
+l_exc:
+	LOAD	t0, THREAD_BUADDR($28)	# t0 is just past last good address
+	LOAD	t0, THREAD_BUADDR(t0)
+	 nop
+	SUB	len, AT, t0		# len number of uncopied bytes
+	/*
+	 * Here's where we rely on src and dst being incremented in tandem,
+	 *   See (3) above.
+	 * dst += (fault addr - src) to put dst at first byte to clear
+	 */
+	ADD	dst, t0			# compute start address in a1
+	SUB	dst, src
+	/*
+	 * Clear len bytes starting at dst.  Can't call __bzero because it
+	 * might modify len.  An inefficient loop for these rare times...
+	 */
+	beqz	len, done
+	 SUB	src, len, 1
+1:	sb	zero, 0(dst)
+	ADD	dst, dst, 1
+	bnez	src, 1b
+	 SUB	src, src, 1
+	jr	ra
+	 nop
 
-/* descending order, destination ununaligned  */
-#define RUMOVE_BIGCHUNK(src, dst, offset, t0, t1, t2, t3) \
-	lw	t0, (offset + 0x10)(src); \
-	lw	t1, (offset + 0x14)(src); \
-	lw	t2, (offset + 0x18)(src); \
-	lw	t3, (offset + 0x1c)(src); \
-	usw	t0, (offset + 0x10)(dst); \
-	usw	t1, (offset + 0x14)(dst); \
-	usw	t2, (offset + 0x18)(dst); \
-	usw	t3, (offset + 0x1c)(dst); \
-	lw	t0, (offset + 0x00)(src); \
-	lw	t1, (offset + 0x04)(src); \
-	lw	t2, (offset + 0x08)(src); \
-	lw	t3, (offset + 0x0c)(src); \
-	usw	t0, (offset + 0x00)(dst); \
-	usw	t1, (offset + 0x04)(dst); \
-	usw	t2, (offset + 0x08)(dst); \
-	usw	t3, (offset + 0x0c)(dst)
+
+#define SEXC(n)				\
+s_exc_p ## n ## u:			\
+	jr	ra;			\
+	 ADD	len, len, n*NBYTES
+
+SEXC(8)
+SEXC(7)
+SEXC(6)
+SEXC(5)
+SEXC(4)
+SEXC(3)
+SEXC(2)
+SEXC(1)
+
+s_exc_p1:
+	jr	ra
+	 ADD	len, len, 1
+s_exc:
+	jr	ra
+	 nop
 
 	.align	5
 LEAF(memmove)
-	addu	t0, a0, a2
+	ADD	t0, a0, a2
+	ADD	t1, a1, a2
 	sltu	t0, a1, t0			# dst + len <= src -> memcpy
-	addu	t1, a1, a2
 	sltu	t1, a0, t1			# dst >= src + len -> memcpy
 	and	t0, t1
 	beqz	t0, __memcpy
@@ -412,159 +473,21 @@ LEAF(memmove)
 	beqz	a2, r_out
 	END(memmove)
 
+	/* fall through to __rmemcpy */
 LEAF(__rmemcpy)					/* a0=dst a1=src a2=len */
-	sltu	t0, a1, a0
+	 sltu	t0, a1, a0
 	beqz	t0, r_end_bytes_up		# src >= dst
 	 nop
-	addu	a0, a2				# dst = dst + len
-	addu	a1, a2				# src = src + len
-
-#if 0 /* Horror fix */
-	xor	t0, a0, a1
-	andi	t0, t0, 0x3
-	move	t7, a0
-	beqz	t0, r_can_align
-	 sltiu	t8, a2, 0x8
-
-	b	r_memcpy_u_src			# bad alignment
-	 move	t2, a2
-
-r_can_align:
-	bnez	t8, r_small_memcpy		# < 8 bytes to copy
-	 move	t2, a2
-
-	beqz	a2, r_out
-	 andi	t8, a1, 0x1
-
-r_hword_align:
-	beqz	t8, r_word_align
-	 andi	t8, a1, 0x2
-
-	lb	t0, -1(a1)
-	subu	a2, a2, 0x1
-	sb	t0, -1(a0)
-	subu	a1, a1, 0x1
-	subu	a0, a0, 0x1
-	andi	t8, a1, 0x2
-
-r_word_align:
-	beqz	t8, r_dword_align
-	 sltiu	t8, a2, 56
-	
-	lh	t0, -2(a1)
-	subu	a2, a2, 0x2
-	sh	t0, -2(a0)
-	sltiu	t8, a2, 56
-	subu	a0, a0, 0x2
-	subu	a1, a1, 0x2
-
-r_dword_align:
-	bnez	t8, r_do_end_words
-	 move	t8, a2
-
-	andi	t8, a1, 0x4
-	beqz	t8, r_qword_align
-	 andi	t8, a1, 0x8
-
-	lw	t0, -4(a1)
-	subu	a2, a2, 0x4
-	sw	t0, -4(a0)
-	subu	a1, a1, 0x4
-	subu	a0, a0, 0x4
-	andi	t8, a1, 0x8
-
-r_qword_align:
-	beqz	t8, r_oword_align
-	 andi	t8, a1, 0x10
-
-	subu	a1, a1, 0x8
-	lw	t0, 0x04(a1)
-	lw	t1, 0x00(a1)
-	subu	a0, a0, 0x8
-	sw	t0, 0x04(a0)
-	sw	t1, 0x00(a0)
-	subu	a2, a2, 0x8
-
-	andi	t8, a1, 0x10
-
-r_oword_align:
-	beqz	t8, r_begin_movement
-	 srl	t8, a2, 0x7
-
-	subu	a1, a1, 0x10
-	lw	t3, 0x08(a1)			# assumes subblock ordering
-	lw	t4, 0x0c(a1)
-	lw	t0, 0x00(a1)
-	lw	t1, 0x04(a1)
-	subu	a0, a0, 0x10
-	sw	t3, 0x08(a0)
-	sw	t4, 0x0c(a0)
-	sw	t0, 0x00(a0)
-	sw	t1, 0x04(a0)
-	subu	a2, a2, 0x10
-	srl	t8, a2, 0x7
-
-r_begin_movement:
-	beqz	t8, 0f
-	 andi	t2, a2, 0x40
-
-r_move_128bytes:
-	RMOVE_BIGCHUNK(a1, a0, -0x80, t0, t1, t3, t4)
-	RMOVE_BIGCHUNK(a1, a0, -0x60, t0, t1, t3, t4)
-	RMOVE_BIGCHUNK(a1, a0, -0x40, t0, t1, t3, t4)
-	RMOVE_BIGCHUNK(a1, a0, -0x20, t0, t1, t3, t4)
-	subu	t8, t8, 0x01
-	subu	a1, a1, 0x80
-	bnez	t8, r_move_128bytes
-	 subu	a0, a0, 0x80
-
-0:
-	beqz	t2, 1f
-	 andi	t2, a2, 0x20
-
-r_move_64bytes:
-	subu	a1, a1, 0x40
-	subu	a0, a0, 0x40
-	RMOVE_BIGCHUNK(a1, a0, 0x20, t0, t1, t3, t4)
-	RMOVE_BIGCHUNK(a1, a0, 0x00, t0, t1, t3, t4)
-
-1:
-	beqz	t2, r_do_end_words
-	 andi	t8, a2, 0x1c
-
-r_move_32bytes:
-	subu	a1, a1, 0x20
-	subu	a0, a0, 0x20
-	RMOVE_BIGCHUNK(a1, a0, 0x00, t0, t1, t3, t4)
-	andi	t8, a2, 0x1c
-
-r_do_end_words:
-	beqz	t8, r_maybe_end_cruft
-	 srl	t8, t8, 0x2
-
-r_end_words:
-	lw	t0, -4(a1)
-	subu	t8, t8, 0x1
-	sw	t0, -4(a0)
-	subu	a1, a1, 0x4
-	bnez	t8, r_end_words
-	 subu	a0, a0, 0x4
-
-r_maybe_end_cruft:
-	andi	t2, a2, 0x3
-
-r_small_memcpy:
-	beqz	t2, r_out
-	 move	a2, t2
-#endif /* Horror fix */
+	ADD	a0, a2				# dst = dst + len
+	ADD	a1, a2				# src = src + len
 
 r_end_bytes:
 	lb	t0, -1(a1)
-	subu	a2, a2, 0x1
+	SUB	a2, a2, 0x1
 	sb	t0, -1(a0)
-	subu	a1, a1, 0x1
+	SUB	a1, a1, 0x1
 	bnez	a2, r_end_bytes
-	 subu	a0, a0, 0x1
+	 SUB	a0, a0, 0x1
 
 r_out:
 	jr	ra
@@ -572,148 +495,12 @@ r_out:
 
 r_end_bytes_up:
 	lb	t0, (a1)
-	subu	a2, a2, 0x1
+	SUB	a2, a2, 0x1
 	sb	t0, (a0)
-	addu	a1, a1, 0x1
+	ADD	a1, a1, 0x1
 	bnez	a2, r_end_bytes_up
-	 addu	a0, a0, 0x1
+	 ADD	a0, a0, 0x1
 
 	jr	ra
 	 move	a2, zero
-
-#if 0 /* Horror fix */
-/* ------------------------------------------------------------------------- */
-
-/* Bad, bad.  At least try to align the source  */
-
-r_memcpy_u_src:
-	bnez	t8, r_small_memcpy		# < 8 bytes?
-	 move	t2, a2
-
-	andi	t0, a1, 7			# t0: how much to align
-
-	ulw	t1, -8(a1)			# dword alignment
-	ulw	t2, -4(a1)
-	usw	t1, -8(a0)
-	usw	t2, -4(a0)
-
-	subu	a1, t0				# src
-	subu	a0, t0				# dst
-	subu	a2, t0				# len
-
-	sltiu	t8, a2, 56
-	bnez	t8, ru_do_end_words
-	 andi	t8, a2, 0x3c
-
-	andi	t8, a1, 8			# now qword aligned?
-
-ru_qword_align:
-	beqz	t8, ru_oword_align
-	 andi	t8, a1, 0x10
-
-	subu	a1, a1, 0x8
-	lw	t0, 0x00(a1)
-	lw	t1, 0x04(a1)
-	subu	a0, a0, 0x8
-	usw	t0, 0x00(a0)
-	usw	t1, 0x04(a0)
-	subu	a2, a2, 0x8
-
-	andi	t8, a1, 0x10
-
-ru_oword_align:
-	beqz	t8, ru_begin_movement
-	 srl	t8, a2, 0x7
-
-	subu	a1, a1, 0x10
-	lw	t3, 0x08(a1)			# assumes subblock ordering
-	lw	t4, 0x0c(a1)
-	lw	t0, 0x00(a1)
-	lw	t1, 0x04(a1)
-	subu	a0, a0, 0x10
-	usw	t3, 0x08(a0)
-	usw	t4, 0x0c(a0)
-	usw	t0, 0x00(a0)
-	usw	t1, 0x04(a0)
-	subu	a2, a2, 0x10
-
-	srl	t8, a2, 0x7
-
-ru_begin_movement:
-	beqz	t8, 0f
-	 andi	t2, a2, 0x40
-
-ru_move_128bytes:
-	RUMOVE_BIGCHUNK(a1, a0, -0x80, t0, t1, t3, t4)
-	RUMOVE_BIGCHUNK(a1, a0, -0x60, t0, t1, t3, t4)
-	RUMOVE_BIGCHUNK(a1, a0, -0x40, t0, t1, t3, t4)
-	RUMOVE_BIGCHUNK(a1, a0, -0x20, t0, t1, t3, t4)
-	subu	t8, t8, 0x01
-	subu	a1, a1, 0x80
-	bnez	t8, ru_move_128bytes
-	 subu	a0, a0, 0x80
-
-0:
-	beqz	t2, 1f
-	 andi	t2, a2, 0x20
-
-ru_move_64bytes:
-	subu	a1, a1, 0x40
-	subu	a0, a0, 0x40
-	RUMOVE_BIGCHUNK(a1, a0, 0x20, t0, t1, t3, t4)
-	RUMOVE_BIGCHUNK(a1, a0, 0x00, t0, t1, t3, t4)
-
-1:
-	beqz	t2, ru_do_end_words
-	 andi	t8, a2, 0x1c
-
-ru_move_32bytes:
-	subu	a1, a1, 0x20
-	subu	a0, a0, 0x20
-	RUMOVE_BIGCHUNK(a1, a0, 0x00, t0, t1, t3, t4)
-	andi	t8, a2, 0x1c
-
-ru_do_end_words:
-	beqz	t8, ru_maybe_end_cruft
-	 srl	t8, t8, 0x2
-
-ru_end_words:
-	lw	t0, -4(a1)
-	usw	t0, -4(a0)
-	subu	t8, t8, 0x1
-	subu	a1, a1, 0x4
-	bnez	t8, ru_end_words
-	 subu	a0, a0, 0x4
-
-ru_maybe_end_cruft:
-	andi	t2, a2, 0x3
-
-ru_cannot_optimize:
-	beqz	t2, r_out
-	 move	a2, t2
-
-ru_end_bytes:
-	lb	t0, -1(a1)
-	subu	a2, a2, 0x1
-	sb	t0, -1(a0)
-	subu	a1, a1, 0x1
-	bnez	a2, ru_end_bytes
-	 subu	a0, a0, 0x1
-
-	jr	ra
-	 move	a2, zero
-#endif /* Horror fix */
 	END(__rmemcpy)
-
-l_fixup:					# clear the rest of the buffer
-	lw	t0, THREAD_BUADDR($28)
-	 nop
-	subu	a2, AT, t0			# a2 bytes to go
-	addu	a0, t0				# compute start address in a1
-	subu	a0, a1
-	j	__bzero
-	 move	a1, zero
-
-s_fixup:
-	jr	ra
-	 nop

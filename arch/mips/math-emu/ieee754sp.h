@@ -1,4 +1,4 @@
-/* 
+/*
  * IEEE754 floating point
  * double precision internal header file
  */
@@ -70,7 +70,7 @@ static __inline ieee754sp buildsp(int s, int bx, unsigned m)
 extern int ieee754sp_isnan(ieee754sp);
 extern int ieee754sp_issnan(ieee754sp);
 extern int ieee754si_xcpt(int, const char *, ...);
-extern long long ieee754di_xcpt(long long, const char *, ...);
+extern s64 ieee754di_xcpt(s64, const char *, ...);
 extern ieee754sp ieee754sp_xcpt(ieee754sp, const char *, ...);
 extern ieee754sp ieee754sp_nanxcpt(ieee754sp, const char *, ...);
 extern ieee754sp ieee754sp_bestnan(ieee754sp, ieee754sp);

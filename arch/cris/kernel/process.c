@@ -1,13 +1,51 @@
-/* $Id: process.c,v 1.3 2002/01/21 15:22:49 bjornw Exp $
+/* $Id: process.c,v 1.14 2003/06/10 10:21:12 johana Exp $
  * 
  *  linux/arch/cris/kernel/process.c
  *
  *  Copyright (C) 1995  Linus Torvalds
- *  Copyright (C) 2000, 2001  Axis Communications AB
+ *  Copyright (C) 2000-2002  Axis Communications AB
  *
  *  Authors:   Bjorn Wesen (bjornw@axis.com)
  *
  *  $Log: process.c,v $
+ *  Revision 1.14  2003/06/10 10:21:12  johana
+ *  Moved thread_saved_pc() from arch/cris/kernel/process.c to
+ *  subarch specific process.c. 
+ *
+ *  Revision 1.13  2003/04/09 05:20:47  starvik
+ *  Merge of Linux 2.5.67
+ *
+ *  Revision 1.12  2002/12/11 15:41:11  starvik
+ *  Extracted v10 (ETRAX 100LX) specific stuff to arch/cris/arch-v10/kernel
+ *
+ *  Revision 1.11  2002/12/10 09:00:10  starvik
+ *  Merge of Linux 2.5.51
+ *
+ *  Revision 1.10  2002/11/27 08:42:34  starvik
+ *  Argument to user_regs() is thread_info*
+ *
+ *  Revision 1.9  2002/11/26 09:44:21  starvik
+ *  New threads exits through ret_from_fork (necessary for preemptive scheduling)
+ *
+ *  Revision 1.8  2002/11/19 14:35:24  starvik
+ *  Changes from linux 2.4
+ *  Changed struct initializer syntax to the currently prefered notation
+ *
+ *  Revision 1.7  2002/11/18 07:39:42  starvik
+ *  thread_saved_pc moved here from processor.h
+ *
+ *  Revision 1.6  2002/11/14 06:51:27  starvik
+ *  Made cpu_idle more similar with other archs
+ *  init_task_union -> init_thread_union
+ *  Updated for new interrupt macros
+ *  sys_clone and do_fork have a new argument, user_tid
+ *
+ *  Revision 1.5  2002/11/05 06:45:11  starvik
+ *  Merge of Linux 2.5.45
+ *
+ *  Revision 1.4  2002/02/05 15:37:44  bjornw
+ *  Need init_task.h
+ *
  *  Revision 1.3  2002/01/21 15:22:49  bjornw
  *  current->counter is gone
  *
@@ -54,29 +92,17 @@
  */
 
 #define __KERNEL_SYSCALLS__
-#include <stdarg.h>
 
-#include <linux/errno.h>
-#include <linux/sched.h>
-#include <linux/kernel.h>
-#include <linux/mm.h>
-#include <linux/stddef.h>
-#include <linux/unistd.h>
-#include <linux/ptrace.h>
-#include <linux/slab.h>
-#include <linux/user.h>
-#include <linux/a.out.h>
-#include <linux/elfcore.h>
-#include <linux/interrupt.h>
-#include <linux/delay.h>
-
-#include <asm/uaccess.h>
+#include <asm/atomic.h>
 #include <asm/pgtable.h>
-#include <asm/system.h>
-#include <asm/io.h>
-#include <asm/processor.h>
-
-#include <linux/smp.h>
+#include <asm/uaccess.h>
+#include <linux/spinlock.h>
+#include <linux/fs_struct.h>
+#include <linux/init_task.h>
+#include <linux/sched.h>
+#include <linux/fs.h>
+#include <linux/user.h>
+#include <linux/elfcore.h>
 
 //#define DEBUG
 
@@ -89,20 +115,29 @@
 
 static struct fs_struct init_fs = INIT_FS;
 static struct files_struct init_files = INIT_FILES;
-static struct signal_struct init_signals = INIT_SIGNALS;
+static struct signal_struct init_signals = INIT_SIGNALS(init_signals);
+static struct sighand_struct init_sighand = INIT_SIGHAND(init_sighand);
 struct mm_struct init_mm = INIT_MM(init_mm);
 
 /*
- * Initial task structure.
+ * Initial thread structure.
  *
  * We need to make sure that this is 8192-byte aligned due to the
  * way process stacks are handled. This is done by having a special
  * "init_task" linker map entry..
  */
+union thread_union init_thread_union 
+	__attribute__((__section__(".data.init_task"))) =
+		{ INIT_THREAD_INFO(init_task) };
 
-union task_union init_task_union 
-      __attribute__((__section__(".data.init_task"))) =
-             { INIT_TASK(init_task_union.task) };
+/*
+ * Initial task structure.
+ *
+ * All other task structs will be allocated on slabs in fork.c
+ */
+struct task_struct init_task = INIT_TASK(init_task);
+
+
 
 /*
  * The hlt_counter, disable_hlt and enable_hlt is just here as a hook if
@@ -125,43 +160,33 @@ void enable_hlt(void)
 	hlt_counter--;
 }
  
-int cpu_idle(void *unused)
+/*
+ * The following aren't currently used.
+ */
+void (*pm_idle)(void);
+
+extern void default_idle(void);
+
+/*
+ * The idle thread. There's no useful work to be
+ * done, so just try to conserve power and have a
+ * low exit latency (ie sit in a loop waiting for
+ * somebody to say that they'd like to reschedule)
+ */
+void cpu_idle (void)
 {
-	while(1) {
+	/* endless idle loop with no priority at all */
+	while (1) {
+		void (*idle)(void) = pm_idle;
+		if (!idle)
+			idle = default_idle;
+		while (!need_resched())
+			idle();
 		schedule();
 	}
 }
 
-/* if the watchdog is enabled, we can simply disable interrupts and go
- * into an eternal loop, and the watchdog will reset the CPU after 0.1s
- * if on the other hand the watchdog wasn't enabled, we just enable it and wait
- */
-
-void hard_reset_now (void)
-{
-	/*
-	 * Don't declare this variable elsewhere.  We don't want any other
-	 * code to know about it than the watchdog handler in entry.S and
-	 * this code, implementing hard reset through the watchdog.
-	 */
-#if defined(CONFIG_ETRAX_WATCHDOG) && !defined(CONFIG_SVINTO_SIM)
-	extern int cause_of_death;
-#endif
-
-	printk("*** HARD RESET ***\n");
-	cli();
-
-#if defined(CONFIG_ETRAX_WATCHDOG) && !defined(CONFIG_SVINTO_SIM)
-	cause_of_death = 0xbedead;
-#else
-	/* Since we don't plan to keep on reseting the watchdog,
-	   the key can be arbitrary hence three */
-	*R_WATCHDOG = IO_FIELD(R_WATCHDOG, key, 3) |
-		IO_STATE(R_WATCHDOG, enable, start);
-#endif
-
-	while(1) /* waiting for RETRIBUTION! */ ;
-}
+void hard_reset_now (void);
 
 void machine_restart(void)
 {
@@ -192,60 +217,6 @@ void machine_power_off(void)
 
 void flush_thread(void)
 {
-}
-
-asmlinkage void ret_from_sys_call(void);
-
-/* setup the child's kernel stack with a pt_regs and switch_stack on it.
- * it will be un-nested during _resume and _ret_from_sys_call when the
- * new thread is scheduled.
- *
- * also setup the thread switching structure which is used to keep
- * thread-specific data during _resumes.
- *
- */
-
-int copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
-		unsigned long unused,
-		struct task_struct *p, struct pt_regs *regs)
-{
-	struct pt_regs * childregs;
-	struct switch_stack *swstack;
-	
-	/* put the pt_regs structure at the end of the new kernel stack page and fix it up
-	 * remember that the task_struct doubles as the kernel stack for the task
-	 */
-
-	childregs = user_regs(p);
-
-	*childregs = *regs;  /* struct copy of pt_regs */
-
-	childregs->r10 = 0;  /* child returns 0 after a fork/clone */
-	
-	/* put the switch stack right below the pt_regs */
-
-	swstack = ((struct switch_stack *)childregs) - 1;
-
-	swstack->r9 = 0; /* parameter to ret_from_sys_call, 0 == don't restart the syscall */
-
-	/* we want to return into ret_from_sys_call after the _resume */
-
-	swstack->return_ip = (unsigned long) ret_from_sys_call;
-	
-	/* fix the user-mode stackpointer */
-
-	p->thread.usp = usp;	
-
-	/* and the kernel-mode one */
-
-	p->thread.ksp = (unsigned long) swstack;
-
-#ifdef DEBUG
-	printk("copy_thread: new regs at 0x%p, as shown below:\n", childregs);
-	show_registers(childregs);
-#endif
-
-	return 0;
 }
 
 /*
@@ -281,110 +252,3 @@ int dump_fpu(struct pt_regs *regs, elf_fpregset_t *fpu)
 {
         return 0;
 }
-
-/* 
- * Be aware of the "magic" 7th argument in the four system-calls below.
- * They need the latest stackframe, which is put as the 7th argument by
- * entry.S. The previous arguments are dummies or actually used, but need
- * to be defined to reach the 7th argument.
- *
- * N.B.: Another method to get the stackframe is to use current_regs(). But
- * it returns the latest stack-frame stacked when going from _user mode_ and
- * some of these (at least sys_clone) are called from kernel-mode sometimes
- * (for example during kernel_thread, above) and thus cannot use it. Thus,
- * to be sure not to get any surprises, we use the method for the other calls
- * as well.
- */
-
-asmlinkage int sys_fork(long r10, long r11, long r12, long r13, long mof, long srp,
-			struct pt_regs *regs)
-{
-	struct task_struct *p;
-	p = do_fork(SIGCHLD, rdusp(), regs, 0);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
-}
-
-/* if newusp is 0, we just grab the old usp */
-
-asmlinkage int sys_clone(unsigned long newusp, unsigned long flags,
-			 long r12, long r13, long mof, long srp,
-			 struct pt_regs *regs)
-{
-	struct task_struct *p;
-	if (!newusp)
-		newusp = rdusp();
-	p = do_fork(flags & ~CLONE_IDLETASK, newusp, regs, 0);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
-}
-
-/* vfork is a system call in i386 because of register-pressure - maybe
- * we can remove it and handle it in libc but we put it here until then.
- */
-
-asmlinkage int sys_vfork(long r10, long r11, long r12, long r13, long mof, long srp,
-			 struct pt_regs *regs)
-{
-	struct task_struct *p;
-        p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, rdusp(), regs, 0);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
-}
-
-/*
- * sys_execve() executes a new program.
- */
-asmlinkage int sys_execve(const char *fname, char **argv, char **envp,
-			  long r13, long mof, long srp, 
-			  struct pt_regs *regs)
-{
-	int error;
-	char *filename;
-
-	filename = getname(fname);
-	error = PTR_ERR(filename);
-
-	if (IS_ERR(filename))
-	        goto out;
-	error = do_execve(filename, argv, envp, regs);
-	putname(filename);
- out:
-	return error;
-}
-
-/*
- * These bracket the sleeping functions..
- */
-
-extern void scheduling_functions_start_here(void);
-extern void scheduling_functions_end_here(void);
-#define first_sched     ((unsigned long) scheduling_functions_start_here)
-#define last_sched      ((unsigned long) scheduling_functions_end_here)
-
-unsigned long get_wchan(struct task_struct *p)
-{
-#if 0
-	/* YURGH. TODO. */
-
-        unsigned long ebp, esp, eip;
-        unsigned long stack_page;
-        int count = 0;
-        if (!p || p == current || p->state == TASK_RUNNING)
-                return 0;
-        stack_page = (unsigned long)p;
-        esp = p->thread.esp;
-        if (!stack_page || esp < stack_page || esp > 8188+stack_page)
-                return 0;
-        /* include/asm-i386/system.h:switch_to() pushes ebp last. */
-        ebp = *(unsigned long *) esp;
-        do {
-                if (ebp < stack_page || ebp > 8184+stack_page)
-                        return 0;
-                eip = *(unsigned long *) (ebp+4);
-                if (eip < first_sched || eip >= last_sched)
-                        return eip;
-                ebp = *(unsigned long *) ebp;
-        } while (count++ < 16);
-#endif
-        return 0;
-}
-#undef last_sched
-#undef first_sched

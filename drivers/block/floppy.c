@@ -3767,7 +3767,7 @@ static int floppy_open(struct inode * inode, struct file * filp)
 	 * Needed so that programs such as fdrawcmd still can work on write
 	 * protected disks */
 	if ((filp->f_mode & 2) || 
-	    (inode->i_sb && (permission(inode,2) == 0)))
+	    (inode->i_sb && (permission(inode,2, NULL) == 0)))
 	    filp->private_data = (void*) 8;
 
 	if (UFDCS->rawcmd == 1)

@@ -1,6 +1,6 @@
 #
 # For a description of the syntax of this configuration file,
-# see the Configure script.
+# see Documentation/kbuild/kconfig-language.txt.
 #
 
 mainmenu "Linux/PA-RISC Kernel Configuration"
@@ -182,33 +182,7 @@ source "drivers/block/Kconfig"
 
 source "drivers/ide/Kconfig"
 
-
-menu "SCSI support"
-
-config SCSI
-	tristate "SCSI support"
-	---help---
-	  If you want to use a SCSI hard disk, SCSI tape drive, SCSI CD-ROM or
-	  any other SCSI device under Linux, say Y and make sure that you know
-	  the name of your SCSI host adapter (the card inside your computer
-	  that "speaks" the SCSI protocol, also called SCSI controller),
-	  because you will be asked for it.
-
-	  You also need to say Y here if you want support for the parallel
-	  port version of the 100 MB IOMEGA ZIP drive.
-
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called scsi_mod.  If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt> and
-	  <file:Documentation/scsi/scsi.txt>.  However, do not compile this as a
-	  module if your root file system (the one containing the directory /)
-	  is located on a SCSI device.
-
-source drivers/scsi/Kconfig
-
-
-endmenu
+source "drivers/scsi/Kconfig"
 
 source "drivers/md/Kconfig"
 
@@ -313,13 +287,13 @@ config MAGIC_SYSRQ
 	  keys are documented in <file:Documentation/sysrq.txt>. Don't say Y
 	  unless you really know what this hack does.
 
-config KALLSYMS
-	bool "Load all symbols for debugging/kksymoops"
-	depends on DEBUG_KERNEL
+config FRAME_POINTER
+	bool "Compile the kernel with frame pointers"
 	help
-	  Say Y here to let the kernel print out symbolic crash information and
-	  symbolic stack backtraces. This increases the size of the kernel
-	  somewhat, as all symbols have to be loaded into the kernel image.
+	  If you say Y here the resulting kernel image will be slightly larger
+	  and slower, but it will give very useful debugging information.
+	  If you don't debug the kernel, you can say N, but we may not be able
+	  to solve problems without frame pointers.
 
 endmenu
 

@@ -95,7 +95,7 @@ static void fill_phy_packet(struct hpsb_packet *packet, quadlet_t data)
         packet->data_size = 0;
         packet->expect_response = 0;
         packet->type = hpsb_raw;             /* No CRC added */
-        packet->speed_code = SPEED_100; /* Force speed to be 100Mbps */
+        packet->speed_code = IEEE1394_SPEED_100; /* Force speed to be 100Mbps */
 }
 
 static void fill_async_stream_packet(struct hpsb_packet *packet, int length,
@@ -147,7 +147,7 @@ int hpsb_get_tlabel(struct hpsb_packet *packet, int wait)
 	spin_lock_irqsave(&tp->lock, flags);
 	
 	packet->tlabel = find_next_zero_bit(tp->pool, 64, tp->next);
-	if(packet->tlabel > 63)
+	if (packet->tlabel > 63)
 		packet->tlabel = find_first_zero_bit(tp->pool, 64);
 	tp->next = (packet->tlabel + 1) % 64;
 	/* Should _never_ happen */

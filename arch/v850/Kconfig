@@ -265,15 +265,6 @@ menu "Disk device support"
 
 source "drivers/ide/Kconfig"
 
-config SCSI
-	tristate "SCSI device support"
-	help
-	  If you want to use a SCSI hard disk, SCSI tape drive, SCSI CD-ROM or
-	  any other SCSI device under Linux, say Y and make sure that you know
-	  the name of your SCSI host adapter (the card inside your computer
-	  that "speaks" the SCSI protocol, also called SCSI controller),
-	  because you will be asked for it.
-
 source "drivers/scsi/Kconfig"
 
 endmenu

@@ -621,7 +621,7 @@ int ip6_build_xmit(struct sock *sk, inet_getfrag_t getfrag, const void *data,
 		if (opt)
 			pktlength += opt->opt_flen + opt->opt_nflen;
 
-		if (pktlength > 0xFFFF + sizeof(struct ipv6hdr)) {
+		if (pktlength > sizeof(struct ipv6hdr) + IPV6_MAXPLEN) {
 			/* Jumbo datagram.
 			   It is assumed, that in the case of hdrincl
 			   jumbo option is supplied by user.
@@ -939,7 +939,7 @@ static int ip6_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 	mtu = dst_pmtu(&rt->u.dst) - hlen - sizeof(struct frag_hdr);
 
 	if (skb_shinfo(skb)->frag_list) {
-		int first_len = 0;
+		int first_len = skb_pagelen(skb);
 
 		if (first_len - hlen > mtu ||
 		    ((first_len - hlen) & 7) ||
@@ -984,7 +984,7 @@ static int ip6_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 		ipv6_select_ident(skb, fh);
 		fh->nexthdr = nexthdr;
 		fh->reserved = 0;
-		fh->frag_off = htons(0x0001);
+		fh->frag_off = htons(IP6_MF);
 		frag_id = fh->identification;
 
 		first_len = skb_pagelen(skb);
@@ -1004,9 +1004,9 @@ static int ip6_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 				offset += skb->len - hlen - sizeof(struct frag_hdr);
 				fh->nexthdr = nexthdr;
 				fh->reserved = 0;
-				if (frag->next != NULL)
-					offset |= 0x0001;
 				fh->frag_off = htons(offset);
+				if (frag->next != NULL)
+					fh->frag_off |= htons(IP6_MF);
 				fh->identification = frag_id;
 				frag->nh.ipv6h->payload_len = htons(frag->len - sizeof(struct ipv6hdr));
 				ip6_copy_metadata(frag, skb);
@@ -1113,7 +1113,9 @@ slow_path:
 			BUG();
 		left -= len;
 
-		fh->frag_off = htons( left > 0 ?  (offset | 0x0001) : offset);
+		fh->frag_off = htons(offset);
+		if (left > 0)
+			fh->frag_off |= htons(IP6_MF);
 		frag->nh.ipv6h->payload_len = htons(frag->len - sizeof(struct ipv6hdr));
 
 		ptr += len;
@@ -1237,7 +1239,6 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 			memcpy(np->cork.opt, opt, opt->tot_len);
 			inet->cork.flags |= IPCORK_OPT;
 			/* need source address above miyazawa*/
-			exthdrlen += opt->opt_flen ? opt->opt_flen : 0;
 		}
 		dst_hold(&rt->u.dst);
 		np->cork.rt = rt;
@@ -1246,10 +1247,9 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 		inet->cork.length = 0;
 		inet->sndmsg_page = NULL;
 		inet->sndmsg_off = 0;
-		if ((exthdrlen = rt->u.dst.header_len) != 0) {
-			length += exthdrlen;
-			transhdrlen += exthdrlen;
-		}
+		exthdrlen = rt->u.dst.header_len + (opt ? opt->opt_flen : 0);
+		length += exthdrlen;
+		transhdrlen += exthdrlen;
 	} else {
 		rt = np->cork.rt;
 		if (inet->cork.flags & IPCORK_OPT)
@@ -1264,8 +1264,8 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 	fragheaderlen = sizeof(struct ipv6hdr) + (opt ? opt->opt_nflen : 0);
 	maxfraglen = ((mtu - fragheaderlen) & ~7) + fragheaderlen - sizeof(struct frag_hdr);
 
-	if (mtu < 65576) {
-		if (inet->cork.length + length > 0xFFFF - fragheaderlen) {
+	if (mtu <= sizeof(struct ipv6hdr) + IPV6_MAXPLEN) {
+		if (inet->cork.length + length > sizeof(struct ipv6hdr) + IPV6_MAXPLEN - fragheaderlen) {
 			ipv6_local_error(sk, EMSGSIZE, fl, mtu-exthdrlen);
 			return -EMSGSIZE;
 		}
@@ -1461,7 +1461,7 @@ int ip6_push_pending_frames(struct sock *sk)
 	
 	*(u32*)hdr = fl->fl6_flowlabel | htonl(0x60000000);
 
-	if (skb->len < 65536)
+	if (skb->len <= sizeof(struct ipv6hdr) + IPV6_MAXPLEN)
 		hdr->payload_len = htons(skb->len - sizeof(struct ipv6hdr));
 	else
 		hdr->payload_len = 0;

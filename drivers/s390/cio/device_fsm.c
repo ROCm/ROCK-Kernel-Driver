@@ -132,11 +132,11 @@ ccw_device_recog_done(struct ccw_device *cdev, int state)
 		CIO_DEBUG(KERN_WARNING, 2,
 			  "SenseID : boxed device %04X on subchannel %04X\n",
 			  sch->schib.pmcw.dev, sch->irq);
-		ccw_device_add_stlck(cdev);
 		break;
 	}
 	io_subchannel_recog_done(cdev);
-	wake_up(&cdev->private->wait_q);
+	if (state != DEV_STATE_NOT_OPER)
+		wake_up(&cdev->private->wait_q);
 }
 
 /*
@@ -159,22 +159,65 @@ ccw_device_sense_id_done(struct ccw_device *cdev, int err)
 }
 
 /*
+ * Finished with online/offline processing.
+ */
+static void
+ccw_device_done(struct ccw_device *cdev, int state)
+{
+	struct subchannel *sch;
+
+	sch = to_subchannel(cdev->dev.parent);
+
+	if (state != DEV_STATE_ONLINE)
+		cio_disable_subchannel(sch);
+
+	/* Reset device status. */
+	memset(&cdev->private->irb, 0, sizeof(struct irb));
+
+	cdev->private->state = state;
+
+
+	if (state == DEV_STATE_BOXED) {
+		CIO_DEBUG(KERN_WARNING, 2,
+			  "Boxed device %04X on subchannel %04X\n",
+			  sch->schib.pmcw.dev, sch->irq);
+		INIT_WORK(&cdev->private->kick_work,
+			  ccw_device_add_stlck, (void *) cdev);
+		queue_work(ccw_device_work, &cdev->private->kick_work);
+	}
+
+	wake_up(&cdev->private->wait_q);
+
+	if (state != DEV_STATE_ONLINE)
+		put_device (&cdev->dev);
+}
+
+/*
  * Function called from device_pgid.c after sense path ground has completed.
  */
 void
 ccw_device_sense_pgid_done(struct ccw_device *cdev, int err)
 {
+	struct subchannel *sch;
+
+	sch = to_subchannel(cdev->dev.parent);
 	switch (err) {
 	case 0:
-		cdev->private->state = DEV_STATE_SENSE_ID;
-		ccw_device_sense_id_start(cdev);
+		/* Start Path Group verification. */
+		sch->vpm = 0;	/* Start with no path groups set. */
+		cdev->private->state = DEV_STATE_VERIFY;
+		ccw_device_verify_start(cdev);
 		break;
 	case -ETIME:		/* Sense path group id stopped by timeout. */
 	case -EUSERS:		/* device is reserved for someone else. */
-		ccw_device_recog_done(cdev, DEV_STATE_BOXED);
+		ccw_device_done(cdev, DEV_STATE_BOXED);
+		break;
+	case -EOPNOTSUPP: /* path grouping not supported, just set online. */
+		cdev->private->options.pgroup = 0;
+		ccw_device_done(cdev, DEV_STATE_ONLINE);
 		break;
 	default:
-		ccw_device_recog_done(cdev, DEV_STATE_NOT_OPER);
+		ccw_device_done(cdev, DEV_STATE_NOT_OPER);
 		break;
 	}
 }
@@ -198,11 +241,15 @@ ccw_device_recognition(struct ccw_device *cdev)
 	ccw_device_set_timeout(cdev, 60*HZ);
 
 	/*
-	 * First thing we should do is a sensePGID in order to find out how
-	 * we can proceed with the recognition process.
+	 * We used to start here with a sense pgid to find out whether a device
+	 * is locked by someone else. Unfortunately, the sense pgid command
+	 * code has other meanings on devices predating the path grouping
+	 * algorithm, so we start with sense id and box the device after an
+	 * timeout (or if sense pgid during path verification detects the device
+	 * is locked, as may happen on newer devices).
 	 */
-	cdev->private->state = DEV_STATE_SENSE_PGID;
-	ccw_device_sense_pgid_start(cdev);
+	cdev->private->state = DEV_STATE_SENSE_ID;
+	ccw_device_sense_id_start(cdev);
 	return 0;
 }
 
@@ -218,29 +265,6 @@ ccw_device_recog_timeout(struct ccw_device *cdev, enum dev_event dev_event)
 		ccw_device_set_timeout(cdev, 3*HZ);
 }
 
-/*
- * Finished with online/offline processing.
- */
-static void
-ccw_device_done(struct ccw_device *cdev, int state)
-{
-	struct subchannel *sch;
-
-	sch = to_subchannel(cdev->dev.parent);
-
-	if (state != DEV_STATE_ONLINE)
-		cio_disable_subchannel(sch);
-
-	/* Reset device status. */
-	memset(&cdev->private->irb, 0, sizeof(struct irb));
-
-	cdev->private->state = state;
-
-	wake_up(&cdev->private->wait_q);
-
-	if (state != DEV_STATE_ONLINE)
-		put_device (&cdev->dev);
-}
 
 void
 ccw_device_verify_done(struct ccw_device *cdev, int err)
@@ -276,16 +300,15 @@ ccw_device_online(struct ccw_device *cdev)
 		dev_fsm_event(cdev, DEV_EVENT_NOTOPER);
 		return -ENODEV;
 	}
-	/* Is Set Path Group supported? */
-	if (!cdev->private->flags.pgid_supp) {
+	/* Do we want to do path grouping? */
+	if (!cdev->private->options.pgroup) {
 		/* No, set state online immediately. */
 		ccw_device_done(cdev, DEV_STATE_ONLINE);
 		return 0;
 	}
-	/* Start Path Group verification. */
-	sch->vpm = 0;	/* Start with no path groups set. */
-	cdev->private->state = DEV_STATE_VERIFY;
-	ccw_device_verify_start(cdev);
+	/* Do a SensePGID first. */
+	cdev->private->state = DEV_STATE_SENSE_PGID;
+	ccw_device_sense_pgid_start(cdev);
 	return 0;
 }
 
@@ -321,8 +344,8 @@ ccw_device_offline(struct ccw_device *cdev)
 	}
 	if (sch->schib.scsw.actl != 0)
 		return -EBUSY;
-	/* Is Set Path Group supported? */
-	if (!cdev->private->flags.pgid_supp) {
+	/* Are we doing path grouping? */
+	if (!cdev->private->options.pgroup) {
 		/* No, set state offline immediately. */
 		ccw_device_done(cdev, DEV_STATE_OFFLINE);
 		return 0;
@@ -643,9 +666,9 @@ fsm_func_t *dev_jumptable[NR_DEV_STATES][NR_DEV_EVENTS] = {
 		[DEV_EVENT_VERIFY]	ccw_device_nop,
 	},
 	[DEV_STATE_SENSE_PGID] {
-		[DEV_EVENT_NOTOPER]	ccw_device_recog_notoper,
+		[DEV_EVENT_NOTOPER]	ccw_device_online_notoper,
 		[DEV_EVENT_INTERRUPT]	ccw_device_sense_pgid_irq,
-		[DEV_EVENT_TIMEOUT]	ccw_device_recog_timeout,
+		[DEV_EVENT_TIMEOUT]	ccw_device_onoff_timeout,
 		[DEV_EVENT_VERIFY]	ccw_device_nop,
 	},
 	[DEV_STATE_SENSE_ID] {

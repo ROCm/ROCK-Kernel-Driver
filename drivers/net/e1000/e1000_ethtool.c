@@ -1112,8 +1112,9 @@ e1000_ethtool_test(struct e1000_adapter *adapter,
 
 		if(if_running)
 			e1000_down(adapter);
-
-		e1000_reset(adapter);
+		else
+			e1000_reset(adapter);
+		
 		if(e1000_reg_test(adapter, &data[0]))
 			eth_test->flags |= ETH_TEST_FL_FAILED;
 
@@ -1289,8 +1290,6 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 	}
 	case ETHTOOL_SSET: {
 		struct ethtool_cmd ecmd;
-		if(!capable(CAP_NET_ADMIN))
-			return -EPERM;
 		if(copy_from_user(&ecmd, addr, sizeof(ecmd)))
 			return -EFAULT;
 		return e1000_ethtool_sset(adapter, &ecmd);
@@ -1363,8 +1362,6 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 		return 0;
 	}
 	case ETHTOOL_NWAY_RST: {
-		if(!capable(CAP_NET_ADMIN))
-			return -EPERM;
 		if(netif_running(netdev)) {
 			e1000_down(adapter);
 			e1000_up(adapter);
@@ -1393,8 +1390,6 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 	}
 	case ETHTOOL_SWOL: {
 		struct ethtool_wolinfo wol;
-		if(!capable(CAP_NET_ADMIN))
-			return -EPERM;
 		if(copy_from_user(&wol, addr, sizeof(wol)) != 0)
 			return -EFAULT;
 		return e1000_ethtool_swol(adapter, &wol);
@@ -1436,9 +1431,6 @@ err_geeprom_ioctl:
 	case ETHTOOL_SEEPROM: {
 		struct ethtool_eeprom eeprom;
 
-		if(!capable(CAP_NET_ADMIN))
-			return -EPERM;
-
 		if(copy_from_user(&eeprom, addr, sizeof(eeprom)))
 			return -EFAULT;
 
@@ -1469,9 +1461,6 @@ err_geeprom_ioctl:
 			uint64_t data[E1000_TEST_LEN];
 		} test = { {ETHTOOL_TEST} };
 		int err;
-
-		if(!capable(CAP_NET_ADMIN))
-			return -EPERM;
 
 		if(copy_from_user(&test.eth_test, addr, sizeof(test.eth_test)))
 			return -EFAULT;

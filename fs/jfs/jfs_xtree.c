@@ -73,7 +73,7 @@
 			BT_PUTPAGE(MP);\
 			updateSuper((IP)->i_sb, FM_DIRTY);\
 			MP = NULL;\
-                        RC = EIO;\
+                        RC = -EIO;\
                 }\
         }\
 }
@@ -814,7 +814,7 @@ int xtInsert(tid_t tid,		/* transaction id */
 	/* This test must follow XT_GETSEARCH since mp must be valid if
 	 * we branch to out: */
 	if (cmp == 0) {
-		rc = EEXIST;
+		rc = -EEXIST;
 		goto out;
 	}
 
@@ -1033,7 +1033,7 @@ xtSplitUp(tid_t tid,
 	    xtSplitRoot(tid, ip, split, &rmp) :
 	    xtSplitPage(tid, ip, split, &rmp, &rbn);
 	if (rc)
-		return EIO;
+		return -EIO;
 
 	XT_PUTPAGE(smp);
 
@@ -1238,7 +1238,7 @@ xtSplitPage(tid_t tid, struct inode *ip,
 	rbn = addressPXD(pxd);
 	rmp = get_metapage(ip, rbn, PSIZE, 1);
 	if (rmp == NULL)
-		return EIO;
+		return -EIO;
 
 	jfs_info("xtSplitPage: ip:0x%p smp:0x%p rmp:0x%p", ip, smp, rmp);
 
@@ -1485,7 +1485,7 @@ xtSplitRoot(tid_t tid,
 	rbn = addressPXD(pxd);
 	rmp = get_metapage(ip, rbn, PSIZE, 1);
 	if (rmp == NULL)
-		return EIO;
+		return -EIO;
 
 	jfs_info("xtSplitRoot: ip:0x%p rmp:0x%p", ip, rmp);
 
@@ -2409,7 +2409,7 @@ int xtAppend(tid_t tid,		/* transaction id */
 	XT_GETSEARCH(ip, btstack.top, bn, mp, p, index);
 
 	if (cmp == 0) {
-		rc = EEXIST;
+		rc = -EEXIST;
 		goto out;
 	}
 //insert:
@@ -2557,7 +2557,7 @@ int xtDelete(tid_t tid, struct inode *ip, s64 xoff, s32 xlen, int flag)
 	if (cmp) {
 		/* unpin the leaf page */
 		XT_PUTPAGE(mp);
-		return ENOENT;
+		return -ENOENT;
 	}
 
 	/*
@@ -2788,7 +2788,7 @@ xtRelocate(tid_t tid, struct inode * ip, xad_t * oxad,	/* old XAD */
 	/* validate extent offset */
 	offset = xoff << JFS_SBI(ip->i_sb)->l2bsize;
 	if (offset >= ip->i_size)
-		return ESTALE;	/* stale extent */
+		return -ESTALE;	/* stale extent */
 
 	jfs_info("xtRelocate: xtype:%d xoff:0x%lx xlen:0x%x xaddr:0x%lx:0x%lx",
 		 xtype, (ulong) xoff, xlen, (ulong) oxaddr, (ulong) nxaddr);
@@ -2804,7 +2804,7 @@ xtRelocate(tid_t tid, struct inode * ip, xad_t * oxad,	/* old XAD */
 			return rc;
 		if (cmp) {
 			XT_PUTPAGE(pmp);
-			return ESTALE;
+			return -ESTALE;
 		}
 
 		/* retrieve search result */
@@ -2814,7 +2814,7 @@ xtRelocate(tid_t tid, struct inode * ip, xad_t * oxad,	/* old XAD */
 		xad = &pp->xad[index];
 		if (addressXAD(xad) != oxaddr || lengthXAD(xad) != xlen) {
 			XT_PUTPAGE(pmp);
-			return ESTALE;
+			return -ESTALE;
 		}
 	} else {		/* (xtype == XTPAGE) */
 
@@ -2824,7 +2824,7 @@ xtRelocate(tid_t tid, struct inode * ip, xad_t * oxad,	/* old XAD */
 			return rc;
 		if (cmp) {
 			XT_PUTPAGE(pmp);
-			return ESTALE;
+			return -ESTALE;
 		}
 
 		/* retrieve search result */
@@ -3127,7 +3127,7 @@ static int xtSearchNode(struct inode *ip, xad_t * xad,	/* required XAD entry */
 		if (rc)
 			return rc;
 		if (p->header.flag & BT_LEAF)
-			return ESTALE;
+			return -ESTALE;
 
 		lim = le16_to_cpu(p->header.nextindex) - XTENTRYSTART;
 
@@ -3439,7 +3439,7 @@ s64 xtTruncate(tid_t tid, struct inode *ip, s64 newsize, int flag)
       getPage:
 	XT_GETPAGE(ip, bn, mp, PSIZE, p, rc);
 	if (rc)
-		return -rc;
+		return rc;
 
 	/* process entries backward from last index */
 	index = le16_to_cpu(p->header.nextindex) - 1;
@@ -3667,7 +3667,7 @@ s64 xtTruncate(tid_t tid, struct inode *ip, s64 newsize, int flag)
 	bn = parent->bn;
 	XT_GETPAGE(ip, bn, mp, PSIZE, p, rc);
 	if (rc)
-		return -rc;
+		return rc;
 
 	index = parent->index;
 
@@ -3924,7 +3924,7 @@ s64 xtTruncate_pmap(tid_t tid, struct inode *ip, s64 committed_size)
 		xoff = (committed_size >> JFS_SBI(ip->i_sb)->l2bsize) - 1;
 		rc = xtSearch(ip, xoff, &cmp, &btstack, 0);
 		if (rc)
-			return -rc;
+			return rc;
 		assert(cmp == 0);
 		XT_GETSEARCH(ip, btstack.top, bn, mp, p, index);
 	} else {
@@ -3941,7 +3941,7 @@ s64 xtTruncate_pmap(tid_t tid, struct inode *ip, s64 committed_size)
       getPage:
 		XT_GETPAGE(ip, bn, mp, PSIZE, p, rc);
 		if (rc)
-			return -rc;
+			return rc;
 
 		/* process entries backward from last index */
 		index = le16_to_cpu(p->header.nextindex) - 1;
@@ -3986,7 +3986,7 @@ s64 xtTruncate_pmap(tid_t tid, struct inode *ip, s64 committed_size)
 	bn = parent->bn;
 	XT_GETPAGE(ip, bn, mp, PSIZE, p, rc);
 	if (rc)
-		return -rc;
+		return rc;
 
 	index = parent->index;
 
@@ -4311,7 +4311,7 @@ int xtGather(btree_t *t)
 			bn = parent->bn;
 			XT_GETPAGE(ip, bn, mp, PSIZE, p, rc);
 			if (rc)
-				return EIO;
+				return -EIO;
 
 			/* first subroot page which
 			 * covers all new allocated blocks

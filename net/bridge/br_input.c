@@ -129,12 +129,15 @@ int br_handle_frame(struct sk_buff *skb)
 	if (p->br->stp_enabled &&
 	    !memcmp(dest, bridge_ula, 5) &&
 	    !(dest[5] & 0xF0)) {
-		if (!dest[5]) 
-			br_stp_handle_bpdu(skb);
-		goto err;
+		if (!dest[5]) {
+			NF_HOOK(PF_BRIDGE, NF_BR_LOCAL_IN, skb, skb->dev, 
+				NULL, br_stp_handle_bpdu);
+			rcu_read_unlock();
+			return 0;
+		}
 	}
 
-	if (p->state == BR_STATE_FORWARDING) {
+	else if (p->state == BR_STATE_FORWARDING) {
 		if (br_should_route_hook && br_should_route_hook(&skb)) {
 			rcu_read_unlock();
 			return -1;

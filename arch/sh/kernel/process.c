@@ -1,4 +1,4 @@
-/* $Id: process.c,v 1.35 2001/10/11 09:18:17 gniibe Exp $
+/* $Id: process.c,v 1.17 2003/05/27 21:37:11 lethal Exp $
  *
  *  linux/arch/sh/kernel/process.c
  *
@@ -13,9 +13,11 @@
 
 #include <linux/unistd.h>
 #include <linux/mm.h>
+#include <linux/elfcore.h>
 #include <linux/slab.h>
 #include <linux/a.out.h>
 #include <linux/ptrace.h>
+#include <linux/platform.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
@@ -36,16 +38,14 @@ void enable_hlt(void)
 	hlt_counter--;
 }
 
-/*
- * The idle loop on a uniprocessor i386..
- */ 
-void cpu_idle(void *unused)
+void default_idle(void)
 {
 	/* endless idle loop with no priority at all */
 	while (1) {
 		if (hlt_counter) {
-			if (need_resched())
-				break;
+			while (1)
+				if (need_resched())
+					break;
 		} else {
 			local_irq_disable();
 			while (!need_resched()) {
@@ -56,8 +56,12 @@ void cpu_idle(void *unused)
 			local_irq_enable();
 		}
 		schedule();
-		check_pgt_cache();
 	}
+}
+
+void cpu_idle(void *unused)
+{
+	default_idle();
 }
 
 void machine_restart(char * __unused)
@@ -96,17 +100,16 @@ void show_regs(struct pt_regs * regs)
 	       regs->regs[14]);
 	printk("MACH: %08lx MACL: %08lx GBR : %08lx PR  : %08lx\n",
 	       regs->mach, regs->macl, regs->gbr, regs->pr);
-}
 
-struct task_struct * alloc_task_struct(void)
-{
-	/* Get two pages */
-	return (struct task_struct *) __get_free_pages(GFP_KERNEL,1);
-}
+	/*
+	 * If we're in kernel mode, dump the stack too..
+	 */
+	if (!user_mode(regs)) {
+		extern void show_task(unsigned long *sp);
+		unsigned long sp = regs->regs[15];
 
-void free_task_struct(struct task_struct *p)
-{
-	free_pages((unsigned long) p, 1);
+		show_task((unsigned long *)sp);
+	}
 }
 
 /*
@@ -117,29 +120,30 @@ void free_task_struct(struct task_struct *p)
  * This is the mechanism for creating a new kernel thread.
  *
  */
+extern void kernel_thread_helper(void);
+__asm__(".align 5\n"
+	"kernel_thread_helper:\n\t"
+	"jsr	@r5\n\t"
+	" nop\n\t"
+	"mov.l	1f, r1\n\t"
+	"jsr	@r1\n\t"
+	" mov	r0, r4\n\t"
+	".align 2\n\t"
+	"1:.long do_exit");
+
 int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 {	/* Don't use this in BL=1(cli).  Or else, CPU resets! */
-	register unsigned long __sc0 __asm__ ("r0");
-	register unsigned long __sc3 __asm__ ("r3") = __NR_clone;
-	register unsigned long __sc4 __asm__ ("r4") = (long) flags | CLONE_VM | CLONE_UNTRACED;
-	register unsigned long __sc5 __asm__ ("r5") = 0;
-	register unsigned long __sc8 __asm__ ("r8") = (long) arg;
-	register unsigned long __sc9 __asm__ ("r9") = (long) fn;
+	struct pt_regs regs;
 
-	__asm__("trapa	#0x12\n\t" 	/* Linux/SH system call */
-		"tst	r0, r0\n\t"	/* child or parent? */
-		"bf	1f\n\t"		/* parent - jump */
-		"jsr	@r9\n\t"	/* call fn */
-		" mov	r8, r4\n\t"	/* push argument */
-		"mov	r0, r4\n\t"	/* return value to arg of exit */
-		"mov	%1, r3\n\t"	/* exit */
-		"trapa	#0x11\n"
-		"1:"
-		: "=z" (__sc0)
-		: "i" (__NR_exit), "r" (__sc3), "r" (__sc4), "r" (__sc5), 
-		  "r" (__sc8), "r" (__sc9)
-		: "memory", "t");
-	return __sc0;
+	memset(&regs, 0, sizeof(regs));
+	regs.regs[4] = (unsigned long) arg;
+	regs.regs[5] = (unsigned long) fn;
+
+	regs.pc = (unsigned long) kernel_thread_helper;
+	regs.sr = (1 << 30);
+
+	/* Ok, create the new process.. */
+	return do_fork(flags | CLONE_VM | CLONE_UNTRACED, 0, &regs, 0, NULL, NULL);
 }
 
 /*
@@ -152,10 +156,7 @@ void exit_thread(void)
 
 void flush_thread(void)
 {
-#if defined(__sh3__)
-	/* do nothing */
-	/* Possibly, set clear debug registers */
-#elif defined(__SH4__)
+#if defined(CONFIG_CPU_SH4)
 	struct task_struct *tsk = current;
 
 	/* Forget lazy FPU state */
@@ -172,24 +173,49 @@ void release_thread(struct task_struct *dead_task)
 /* Fill in the fpu structure for a core dump.. */
 int dump_fpu(struct pt_regs *regs, elf_fpregset_t *fpu)
 {
-#if defined(__SH4__)
-	int fpvalid;
+	int fpvalid = 0;
+
+#if defined(CONFIG_CPU_SH4)
 	struct task_struct *tsk = current;
 
 	fpvalid = tsk->used_math;
 	if (fpvalid) {
-		unsigned long flags;
-
-		save_and_cli(flags);
 		unlazy_fpu(tsk);
-		restore_flags(flags);
 		memcpy(fpu, &tsk->thread.fpu.hard, sizeof(*fpu));
 	}
+#endif
 
 	return fpvalid;
-#else
-	return 0; /* Task didn't use the fpu at all. */
+}
+
+/* 
+ * Capture the user space registers if the task is not running (in user space)
+ */
+int dump_task_regs(struct task_struct *tsk, elf_gregset_t *regs)
+{
+	struct pt_regs ptregs;
+	
+	ptregs = *(struct pt_regs *)
+		((unsigned long)tsk->thread_info+THREAD_SIZE - sizeof(ptregs));
+	elf_core_copy_regs(regs, &ptregs);
+
+	return 1;
+}
+
+int
+dump_task_fpu (struct task_struct *tsk, elf_fpregset_t *fpu)
+{
+	int fpvalid = 0;
+
+#if defined(CONFIG_CPU_SH4)
+	fpvalid = tsk->used_math;
+	if (fpvalid) {
+		unlazy_fpu(tsk);
+		memcpy(fpu, &tsk->thread.fpu.hard, sizeof(*fpu));
+	}
 #endif
+
+	return fpvalid;
 }
 
 asmlinkage void ret_from_fork(void);
@@ -199,33 +225,35 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 		struct task_struct *p, struct pt_regs *regs)
 {
 	struct pt_regs *childregs;
-#if defined(__SH4__)
-	struct task_struct *tsk = current;
 
-	if (tsk != &init_task) {
-		unsigned long flags;
-
-		save_and_cli(flags);
-		unlazy_fpu(tsk);
-		restore_flags(flags);
-		p->thread.fpu = current->thread.fpu;
-		p->used_math = tsk->used_math;
-	}
-#endif
-	childregs = ((struct pt_regs *)(THREAD_SIZE + (unsigned long) p)) - 1;
+	childregs = ((struct pt_regs *)(THREAD_SIZE + (unsigned long) p->thread_info)) - 1;
 	*childregs = *regs;
 
 	if (user_mode(regs)) {
 		childregs->regs[15] = usp;
 	} else {
-		childregs->regs[15] = (unsigned long)p+2*PAGE_SIZE;
+		childregs->regs[15] = (unsigned long)p->thread_info+THREAD_SIZE;
+	}
+        if (clone_flags & CLONE_SETTLS) {
+		childregs->gbr = childregs->regs[0];
 	}
 	childregs->regs[0] = 0; /* Set return value for child */
 	childregs->sr |= SR_FD; /* Invalidate FPU flag */
+	p->set_child_tid = p->clear_child_tid = NULL;
 
 	p->thread.sp = (unsigned long) childregs;
 	p->thread.pc = (unsigned long) ret_from_fork;
 
+#if defined(CONFIG_CPU_SH4)
+	{
+		struct task_struct *tsk = current;
+
+		unlazy_fpu(tsk);
+		p->thread.fpu = tsk->thread.fpu;
+		p->used_math = tsk->used_math;
+		clear_ti_thread_flag(p->thread_info, TIF_USEDFPU);
+	}
+#endif
 	return 0;
 }
 
@@ -253,16 +281,10 @@ void dump_thread(struct pt_regs * regs, struct user * dump)
  *	switch_to(x,y) should switch tasks from x to y.
  *
  */
-void __switch_to(struct task_struct *prev, struct task_struct *next)
+struct task_struct *__switch_to(struct task_struct *prev, struct task_struct *next)
 {
-#if defined(__SH4__)
-	if (prev != &init_task) {
-		unsigned long flags;
-
-		save_and_cli(flags);
-		unlazy_fpu(prev);
-		restore_flags(flags);
-	}
+#if defined(CONFIG_CPU_SH4)
+	unlazy_fpu(prev);
 #endif
 	/*
 	 * Restore the kernel mode register
@@ -270,27 +292,32 @@ void __switch_to(struct task_struct *prev, struct task_struct *next)
 	 */
 	asm volatile("ldc	%0, r7_bank"
 		     : /* no output */
-		     :"r" (next));
+		     : "r" (next->thread_info));
+
+	return prev;
 }
 
 asmlinkage int sys_fork(unsigned long r4, unsigned long r5,
 			unsigned long r6, unsigned long r7,
 			struct pt_regs regs)
 {
-	struct task_struct *p;
-	p = do_fork(SIGCHLD, regs.regs[15], &regs, 0);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
+#ifdef CONFIG_MMU
+	return do_fork(SIGCHLD, regs.regs[15], &regs, 0, NULL, NULL);
+#else
+	/* fork almost works, enough to trick you into looking elsewhere :-( */
+	return -EINVAL;
+#endif
 }
 
 asmlinkage int sys_clone(unsigned long clone_flags, unsigned long newsp,
-			 unsigned long r6, unsigned long r7,
+			 unsigned long parent_tidptr,
+			 unsigned long child_tidptr,
 			 struct pt_regs regs)
 {
-	struct task_struct *p;
 	if (!newsp)
 		newsp = regs.regs[15];
-	p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
+	return do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0,
+			(int *)parent_tidptr, (int *)child_tidptr);
 }
 
 /*
@@ -307,9 +334,8 @@ asmlinkage int sys_vfork(unsigned long r4, unsigned long r5,
 			 unsigned long r6, unsigned long r7,
 			 struct pt_regs regs)
 {
-	struct task_struct *p;
-	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs.regs[15], &regs, 0);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
+	return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs.regs[15], &regs,
+		       0, NULL, NULL);
 }
 
 /*
@@ -354,23 +380,12 @@ unsigned long get_wchan(struct task_struct *p)
 	/*
 	 * The same comment as on the Alpha applies here, too ...
 	 */
-	pc = thread_saved_pc(&p->thread);
+	pc = thread_saved_pc(p);
 	if (pc >= (unsigned long) interruptible_sleep_on && pc < (unsigned long) add_timer) {
 		schedule_frame = ((unsigned long *)(long)p->thread.sp)[1];
 		return (unsigned long)((unsigned long *)schedule_frame)[1];
 	}
 	return pc;
-}
-
-asmlinkage void print_syscall(int x)
-{
-	unsigned long flags, sr;
-	asm("stc	sr, %0": "=r" (sr));
-	save_and_cli(flags);
-	printk("%c: %c %c, %c: SYSCALL\n", (x&63)+32,
-	       (current->flags&PF_USEDFPU)?'C':' ',
-	       (init_task.flags&PF_USEDFPU)?'K':' ', (sr&SR_FD)?' ':'F');
-	restore_flags(flags);
 }
 
 asmlinkage void break_point_trap(unsigned long r4, unsigned long r5,

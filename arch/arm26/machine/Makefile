@@ -4,7 +4,7 @@
 
 # Object file lists.
 
-obj-y			:= arch.o dma.o irq.o oldlatches.o \
+obj-y			:= dma.o irq.o oldlatches.o \
 			   small_page.o
 
 extra-y 		:= head.o

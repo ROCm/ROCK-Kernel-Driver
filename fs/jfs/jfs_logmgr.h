@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) International Business Machines Corp., 2000-2002
+ *   Copyright (c) International Business Machines Corp., 2000-2003
  *   Portions Copyright (c) Christoph Hellwig, 2001-2002
  *
  *   This program is free software;  you can redistribute it and/or modify
@@ -417,6 +417,10 @@ struct jfs_log {
 	struct lbuf *wqueue;	/* 4: log pageout queue */
 	int count;		/* 4: count */
 	char uuid[16];		/* 16: 128-bit uuid of log device */
+
+	int no_integrity;	/* 3: flag to disable journaling to disk */
+	int ni_page;		/* 4: backup of page for nointegrity option */
+	int ni_eor;		/* 4: backup of eor for nointegrity option */
 };
 
 /*

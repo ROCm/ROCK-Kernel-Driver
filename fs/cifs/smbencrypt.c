@@ -5,7 +5,8 @@
    Copyright (C) Andrew Tridgell 1992-2000
    Copyright (C) Luke Kenneth Casson Leighton 1996-2000
    Modified by Jeremy Allison 1995.
-   Modified by Steve French (sfrench@us.ibm.com) 2002
+   Copyright (C) Andrew Bartlett <abartlet@samba.org> 2002-2003
+   Modified by Steve French (sfrench@us.ibm.com) 2002-2003
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -97,13 +98,15 @@ SMBencrypt(unsigned char *passwd, unsigned char *c8, unsigned char *p24)
 	E_P16(p14, p21);
 
 	SMBOWFencrypt(p21, c8, p24);
-
+	
 #ifdef DEBUG_PASSWORD
 	DEBUG(100, ("SMBencrypt: lm#, challenge, response\n"));
 	dump_data(100, (char *) p21, 16);
 	dump_data(100, (char *) c8, 8);
 	dump_data(100, (char *) p24, 24);
 #endif
+	memset(p14,0,15);
+	memset(p21,0,21);
 }
 
 /* Routines for Windows NT MD4 Hash functions. */
@@ -161,6 +164,7 @@ E_md4hash(const unsigned char *passwd, unsigned char *p16)
 	len = _my_wcslen(wpwd) * sizeof (__u16);
 
 	mdfour(p16, (unsigned char *) wpwd, len);
+	memset(wpwd,0,129 * 2);
 }
 
 /* Does both the NT and LM owfs of a user's password */
@@ -222,7 +226,7 @@ ntv2_owf_gen(const unsigned char owf[16], const char *user_n,
 	/* push_ucs2(NULL, user_u, user_n, (user_l+1)*2, STR_UNICODE|STR_NOALIGN|STR_TERMINATE|STR_UPPER);
 	   push_ucs2(NULL, dom_u, domain_n, (domain_l+1)*2, STR_UNICODE|STR_NOALIGN|STR_TERMINATE|STR_UPPER); */
 
-	/* do not think it is supposed to be uppercased */
+	/* BB user and domain may need to be uppercased */
 	user_l = cifs_strtoUCS(user_u, user_n, 511, nls_codepage);
 	domain_l = cifs_strtoUCS(dom_u, domain_n, 511, nls_codepage);
 
@@ -297,8 +301,52 @@ SMBNTencrypt(unsigned char *passwd, unsigned char *c8, unsigned char *p24)
 #endif
 }
 
-int
-make_oem_passwd_hash(char data[516], const char *passwd,
+/* Does the md5 encryption from the NT hash for NTLMv2. */
+void
+SMBOWFencrypt_ntv2(const unsigned char kr[16],
+                   const struct data_blob * srv_chal,
+                   const struct data_blob * cli_chal, unsigned char resp_buf[16])
+{
+        struct HMACMD5Context ctx;
+
+        hmac_md5_init_limK_to_64(kr, 16, &ctx);
+        hmac_md5_update(srv_chal->data, srv_chal->length, &ctx);
+        hmac_md5_update(cli_chal->data, cli_chal->length, &ctx);
+        hmac_md5_final(resp_buf, &ctx);
+
+#ifdef DEBUG_PASSWORD
+        DEBUG(100, ("SMBOWFencrypt_ntv2: srv_chal, cli_chal, resp_buf\n"));
+        dump_data(100, srv_chal->data, srv_chal->length);
+        dump_data(100, cli_chal->data, cli_chal->length);
+        dump_data(100, resp_buf, 16);
+#endif
+}
+
+static struct data_blob LMv2_generate_response(const unsigned char ntlm_v2_hash[16],
+                                        const struct data_blob * server_chal)
+{
+        unsigned char lmv2_response[16];
+	struct data_blob lmv2_client_data/* = data_blob(NULL, 8)*/; /* BB Fix BB */
+        struct data_blob final_response /* = data_blob(NULL, 24)*/; /* BB Fix BB */
+
+        /* LMv2 */
+        /* client-supplied random data */
+        get_random_bytes(lmv2_client_data.data, lmv2_client_data.length);
+        /* Given that data, and the challenge from the server, generate a response */
+        SMBOWFencrypt_ntv2(ntlm_v2_hash, server_chal, &lmv2_client_data, lmv2_response);
+        memcpy(final_response.data, lmv2_response, sizeof(lmv2_response));
+
+        /* after the first 16 bytes is the random data we generated above,
+           so the server can verify us with it */
+        memcpy(final_response.data+sizeof(lmv2_response),
+               lmv2_client_data.data, lmv2_client_data.length);
+
+/*        data_blob_free(&lmv2_client_data); */ /* BB fix BB */
+
+        return final_response;
+}
+
+int make_oem_passwd_hash(char data[516], const char *passwd,
 		     unsigned char old_pw_hash[16], int unicode)
 {
 	int new_pw_len = strlen(passwd) * (unicode ? 2 : 1);
@@ -333,30 +381,9 @@ make_oem_passwd_hash(char data[516], const char *passwd,
 	DEBUG(100, ("make_oem_passwd_hash\n"));
 	dump_data(100, data, 516);
 #endif
-	SamOEMhash((unsigned char *) data, (unsigned char *) old_pw_hash, TRUE);
+	SamOEMhash((unsigned char *) data, (unsigned char *) old_pw_hash, 516);
 
 	return TRUE;
-}
-
-/* Does the md5 encryption from the NT hash for NTLMv2. */
-void
-SMBOWFencrypt_ntv2(const unsigned char kr[16],
-		   const struct data_blob srv_chal,
-		   const struct data_blob cli_chal, unsigned char resp_buf[16])
-{
-	struct HMACMD5Context ctx;
-
-	hmac_md5_init_limK_to_64(kr, 16, &ctx);
-	hmac_md5_update(srv_chal.data, srv_chal.length, &ctx);
-	hmac_md5_update(cli_chal.data, cli_chal.length, &ctx);
-	hmac_md5_final(resp_buf, &ctx);
-
-#ifdef DEBUG_PASSWORD
-	DEBUG(100, ("SMBOWFencrypt_ntv2: srv_chal, cli_chal, resp_buf\n"));
-	dump_data(100, srv_chal.data, srv_chal.length);
-	dump_data(100, cli_chal.data, cli_chal.length);
-	dump_data(100, resp_buf, 16);
-#endif
 }
 
 void
@@ -407,56 +434,39 @@ encode_pw_buffer(char buffer[516], char *new_pw, int new_pw_length)
 	return TRUE;
 }
 
-/***********************************************************
- SMB signing - setup the MAC key.
-************************************************************/
-
-void
-cli_calculate_mac_key(__u8 * mac_key, int *pmac_key_len,
-		      const char *ntpasswd, const unsigned char resp[24])
+int SMBNTLMv2encrypt(const char *user, const char *domain, const char *password,
+                      const struct data_blob *server_chal,
+                      const struct data_blob *names_blob,
+                      struct data_blob *lm_response, struct data_blob *nt_response,
+                      struct data_blob *nt_session_key,struct nls_table * nls_codepage)
 {
-	/* Get first 16 bytes. */
-	E_md4hash(ntpasswd, mac_key);
-	memcpy(mac_key + 16, resp, 24);
-	*pmac_key_len = 40;
+        unsigned char nt_hash[16];
+        unsigned char ntlm_v2_hash[16];
+        E_md4hash(password, nt_hash);
 
-	/* Reset the sequence number in case we had a previous (aborted) attempt */
-/*	cli->sign_info.send_seq_num = 0; */
-}
+        /* We don't use the NT# directly.  Instead we use it mashed up with
+           the username and domain.
+           This prevents username swapping during the auth exchange
+        */
+        ntv2_owf_gen(nt_hash, user, domain, ntlm_v2_hash,nls_codepage);
 
-/***********************************************************
- SMB signing - calculate a MAC to send.
-************************************************************/
+        if (nt_response) {
+/*                *nt_response = NTLMv2_generate_response(ntlm_v2_hash, server_chal,
+                                                        names_blob); */ /* BB fix BB */
+                if (nt_session_key) {
+/*                        *nt_session_key = data_blob(NULL, 16); */ /* BB fix BB */
 
-void
-cli_caclulate_sign_mac(struct smb_hdr *outbuf, __u8 * mac_key,
-		       int mac_key_len, __u32 * send_seq_num,
-		       __u32 * reply_seq_num)
-{
-	unsigned char calc_md5_mac[16];
-	struct MD5Context md5_ctx;
+                        /* The NTLMv2 calculations also provide a session key, for signing etc later */
+                        /* use only the first 16 bytes of nt_response for session key */
+                        SMBsesskeygen_ntv2(ntlm_v2_hash, nt_response->data, nt_session_key->data);
+                }
+        }
 
-/*	if (!cli->sign_info.use_smb_signing) {
-		return;
-	} */
+        /* LMv2 */
 
-	/*
-	 * Firstly put the sequence number into the first 4 bytes.
-	 * and zero out the next 4 bytes.
-	 */
-/*
-	SIVAL(outbuf, smb_ss_field, *send_seq_num);
-	SIVAL(outbuf, smb_ss_field + 4, 0); */
+        if (lm_response) {
+                *lm_response = LMv2_generate_response(ntlm_v2_hash, server_chal);
+        }
 
-	/* Calculate the 16 byte MAC and place first 8 bytes into the field. */
-	MD5Init(&md5_ctx);
-	MD5Update(&md5_ctx, mac_key, mac_key_len);
-	MD5Update(&md5_ctx, outbuf->Protocol,
-		  be32_to_cpu(outbuf->smb_buf_length));
-	MD5Final(calc_md5_mac, &md5_ctx);
-
-	memcpy(outbuf->SecuritySignature, calc_md5_mac, 8);
-	(*send_seq_num)++;
-	*reply_seq_num = *send_seq_num;
-	(*send_seq_num)++;
+        return TRUE;
 }

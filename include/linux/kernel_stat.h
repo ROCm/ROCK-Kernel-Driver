@@ -31,7 +31,8 @@ struct kernel_stat {
 DECLARE_PER_CPU(struct kernel_stat, kstat);
 
 #define kstat_cpu(cpu)	per_cpu(kstat, cpu)
-#define kstat_this_cpu	kstat_cpu(smp_processor_id())
+/* Must have preemption disabled for this to be meaningful. */
+#define kstat_this_cpu	__get_cpu_var(kstat)
 
 extern unsigned long nr_context_switches(void);
 

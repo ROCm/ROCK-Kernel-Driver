@@ -970,7 +970,7 @@ errout:
 }
 #endif
 
-static struct dentry *ext3_lookup(struct inode * dir, struct dentry *dentry)
+static struct dentry *ext3_lookup(struct inode * dir, struct dentry *dentry, struct nameidata *nd)
 {
 	struct inode * inode;
 	struct ext3_dir_entry_2 * de;
@@ -1295,12 +1295,12 @@ static int make_indexed_dir(handle_t *handle, struct dentry *dentry,
 	}
 	root = (struct dx_root *) bh->b_data;
 
-	EXT3_I(dir)->i_flags |= EXT3_INDEX_FL;
 	bh2 = ext3_append (handle, dir, &block, &retval);
 	if (!(bh2)) {
 		brelse(bh);
 		return retval;
 	}
+	EXT3_I(dir)->i_flags |= EXT3_INDEX_FL;
 	data1 = bh2->b_data;
 
 	/* The 0th block becomes the root, move the dirents out */
@@ -1623,7 +1623,8 @@ static int ext3_add_nondir(handle_t *handle,
  * If the create succeeds, we fill in the inode information
  * with d_instantiate(). 
  */
-static int ext3_create (struct inode * dir, struct dentry * dentry, int mode)
+static int ext3_create (struct inode * dir, struct dentry * dentry, int mode,
+		struct nameidata *nd)
 {
 	handle_t *handle; 
 	struct inode * inode;

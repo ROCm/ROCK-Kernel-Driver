@@ -3,6 +3,7 @@
 #
 
 obj-$(CONFIG_HOTPLUG_PCI)		+= pci_hotplug.o
+obj-$(CONFIG_HOTPLUG_PCI_FAKE)		+= fakephp.o 
 obj-$(CONFIG_HOTPLUG_PCI_COMPAQ)	+= cpqphp.o
 obj-$(CONFIG_HOTPLUG_PCI_IBM)		+= ibmphp.o
 obj-$(CONFIG_HOTPLUG_PCI_ACPI)		+= acpiphp.o

@@ -12,6 +12,9 @@
 
 #include <linux/config.h>
 #include <linux/types.h>
+#include <linux/time.h>
+
+#include <asm/machtypes.h>
 
 struct timeval;
 
@@ -63,105 +66,10 @@ struct sh_machine_vector
 
 	void (*mv_heartbeat)(void);
 
-	void (*mv_rtc_gettimeofday)(struct timeval *tv);
-	int (*mv_rtc_settimeofday)(const struct timeval *tv);
-
-	unsigned int mv_hw_se : 1;
-	unsigned int mv_hw_hp600 : 1;
-	unsigned int mv_hw_hp620 : 1;
-	unsigned int mv_hw_hp680 : 1;
-	unsigned int mv_hw_hp690 : 1;
-	unsigned int mv_hw_hd64461 : 1;
-	unsigned int mv_hw_sh2000 : 1;
-	unsigned int mv_hw_hd64465 : 1;
-	unsigned int mv_hw_dreamcast : 1;
-	unsigned int mv_hw_bigsur : 1;
-	unsigned int mv_hw_7751se: 1;
-	unsigned int mv_hw_adx : 1;
+	void (*mv_rtc_gettimeofday)(struct timespec *ts);
+	int (*mv_rtc_settimeofday)(const time_t secs);
 };
 
 extern struct sh_machine_vector sh_mv;
-
-/* Machine check macros */
-#ifdef CONFIG_SH_GENERIC
-#define MACH_SE		(sh_mv.mv_hw_se)
-#define MACH_HP600	(sh_mv.mv_hw_hp600)
-#define MACH_HP620	(sh_mv.mv_hw_hp620)
-#define MACH_HP680	(sh_mv.mv_hw_hp680)
-#define MACH_HP690	(sh_mv.mv_hw_hp690)
-#define MACH_HD64461	(sh_mv.mv_hw_hd64461)
-#define MACH_HD64465	(sh_mv.mv_hw_hd64465)
-#define MACH_SH2000	(sh_mv.mv_hw_sh2000)
-#define MACH_DREAMCAST	(sh_mv.mv_hw_dreamcast)
-#define MACH_BIGSUR	(sh_mv.mv_hw_bigsur)
-#define MACH_7751SE	(sh_mv.mv_hw_7751se)
-#define MACH_ADX	(sh_mv.mv_hw_adx)
-#else
-# ifdef CONFIG_SH_SOLUTION_ENGINE
-#  define MACH_SE		1
-# else
-#  define MACH_SE		0
-# endif
-# ifdef CONFIG_SH_7751_SOLUTION_ENGINE
-#  define MACH_7751SE		1
-# else
-#  define MACH_7751SE		0
-# endif
-# ifdef CONFIG_SH_HP600
-#  define MACH_HP600		1
-# else
-#  define MACH_HP600		0
-# endif
-# ifdef CONFIG_SH_HP620
-#  define MACH_HP620		1
-# else
-#  define MACH_HP620		0
-# endif
-# ifdef CONFIG_SH_HP680
-#  define MACH_HP680		1
-# else
-#  define MACH_HP680		0
-# endif
-# ifdef CONFIG_SH_HP690
-#  define MACH_HP690		1
-# else
-#  define MACH_HP690		0
-# endif
-# ifdef CONFIG_HD64461
-#  define MACH_HD64461		1
-# else
-#  define MACH_HD64461		0
-# endif
-# ifdef CONFIG_HD64465
-#  define MACH_HD64465		1
-# else
-#  define MACH_HD64465		0
-# endif
-# ifdef CONFIG_SH_SH2000
-#  define MACH_SH2000		1
-# else
-#  define MACH_SH2000		0
-# endif
-# ifdef CONFIG_SH_EC3104
-#  define MACH_EC3104		1
-# else
-#  define MACH_EC3104		0
-# endif
-# ifdef CONFIG_SH_DREAMCAST
-#  define MACH_DREAMCAST	1
-# else
-#  define MACH_DREAMCAST	0
-# endif
-# ifdef CONFIG_SH_BIGSUR
-#  define MACH_BIGSUR		1
-# else
-#  define MACH_BIGSUR		0
-# endif
-# ifdef CONFIG_SH_ADX
-#  define MACH_ADX		1
-# else
-#  define MACH_ADX		0
-# endif
-#endif
 
 #endif /* _ASM_SH_MACHVEC_H */

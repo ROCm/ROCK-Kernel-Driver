@@ -408,9 +408,9 @@ void __init sbus_time_init(void)
 	mon = MSTK_REG_MONTH(mregs);
 	year = MSTK_CVT_YEAR( MSTK_REG_YEAR(mregs) );
 	xtime.tv_sec = mktime(year, mon, day, hour, min, sec);
-	wall_to_monotonic.tv_sec = -xtime.tv_sec;
 	xtime.tv_nsec = (INITIAL_JIFFIES % HZ) * (NSEC_PER_SEC / HZ);
-	wall_to_monotonic.tv_nsec = -xtime.tv_nsec;
+        set_normalized_timespec(&wall_to_monotonic,
+                                -xtime.tv_sec, -xtime.tv_nsec);
 	mregs->creg &= ~MSTK_CREG_READ;
 	spin_unlock_irq(&mostek_lock);
 #ifdef CONFIG_SUN4
@@ -441,9 +441,9 @@ void __init sbus_time_init(void)
 		intersil_start(iregs);
 
 		xtime.tv_sec = mktime(year, mon, day, hour, min, sec);
-		wall_to_monotonic.tv_sec = -xtime.tv_sec;
 		xtime.tv_nsec = (INITIAL_JIFFIES % HZ) * (NSEC_PER_SEC / HZ);
-		wall_to_monotonic.tv_nsec = -xtime.tv_nsec;
+	        set_normalized_timespec(&wall_to_monotonic,
+ 	                               -xtime.tv_sec, -xtime.tv_nsec);
 		printk("%u/%u/%u %u:%u:%u\n",day,mon,year,hour,min,sec);
 	}
 #endif
@@ -512,6 +512,9 @@ int do_settimeofday(struct timespec *tv)
 
 static int sbus_do_settimeofday(struct timespec *tv)
 {
+	time_t wtm_sec, sec = tv->tv_sec;
+	long wtm_nsec, nsec = tv->tv_nsec;
+
 	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
 		return -EINVAL;
 
@@ -521,28 +524,15 @@ static int sbus_do_settimeofday(struct timespec *tv)
 	 * wall time.  Discover what correction gettimeofday() would have
 	 * made, and then undo it!
 	 */
-	tv->tv_nsec -= 1000 * (do_gettimeoffset() +
+	nsec -= 1000 * (do_gettimeoffset() +
 			(jiffies - wall_jiffies) * (USEC_PER_SEC / HZ));
 
-	while (tv->tv_nsec < 0) {
-		tv->tv_nsec += NSEC_PER_SEC;
-		tv->tv_sec--;
-	}
+	wtm_sec  = wall_to_monotonic.tv_sec + (xtime.tv_sec - sec);
+	wtm_nsec = wall_to_monotonic.tv_nsec + (xtime.tv_nsec - nsec);
 
-	wall_to_monotonic.tv_sec += xtime.tv_sec - tv->tv_sec;
-	wall_to_monotonic.tv_nsec += xtime.tv_nsec - tv->tv_nsec;
+	set_normalized_timespec(&xtime, sec, nsec);
+	set_normalized_timespec(&wall_to_monotonic, wtm_sec, wtm_nsec);
 
-	if (wall_to_monotonic.tv_nsec > NSEC_PER_SEC) {
-		wall_to_monotonic.tv_nsec -= NSEC_PER_SEC;
-		wall_to_monotonic.tv_sec++;
-	}
-	if (wall_to_monotonic.tv_nsec < 0) {
-		wall_to_monotonic.tv_nsec += NSEC_PER_SEC;
-		wall_to_monotonic.tv_sec--;
-	}
-
-	xtime.tv_sec = tv->tv_sec;
-	xtime.tv_nsec = tv->tv_nsec;
 	time_adjust = 0;		/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;

@@ -21,6 +21,8 @@ Contents:
 1.1 ARM
 1.2 x86
 1.3 sparc64
+1.4 ppc
+1.5 SuperH
 
 2. "Policy" / "Governor"?
 2.1 Policy
@@ -56,19 +58,15 @@ AMD mobile K6-3+
 AMD mobile Duron
 AMD mobile Athlon
 Cyrix Media GXm
-Intel mobile PIII [*] and Intel mobile PIII-M on certain chipsets
+Intel mobile PIII and Intel mobile PIII-M on certain chipsets
 Intel Pentium 4, Intel Xeon
 Intel Pentium M (Centrino)
 National Semiconductors Geode GX
 Transmeta Crusoe
 VIA Cyrix 3 / C3
-various processors on some ACPI 2.0-compatible systems [**]
+various processors on some ACPI 2.0-compatible systems [*]
 
-[*] only certain Intel mobile PIII processors are supported. If you
-know that you own a speedstep-capable processor, pass the option
-"speedstep_coppermine=1" to the module speedstep.o
-
-[**] Only if "ACPI Processor Performance States" are available
+[*] Only if "ACPI Processor Performance States" are available
 to the ACPI<->BIOS interface.
 
 
@@ -80,6 +78,20 @@ cpufreq:
 
 UltraSPARC-III
 
+
+1.4 ppc
+-------
+
+Several "PowerBook" and "iBook2" notebooks are supported.
+
+
+1.5 SuperH
+----------
+
+The following SuperH processors are supported by cpufreq:
+
+SH-3
+SH-4
 
 
 2. "Policy" / "Governor" ?

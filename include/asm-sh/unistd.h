@@ -9,7 +9,7 @@
  * This file contains the system call numbers.
  */
 
-#define __NR_setup		  0	/* used only by init, to get system going */
+#define __NR_restart_syscall	  0
 #define __NR_exit		  1
 #define __NR_fork		  2
 #define __NR_read		  3
@@ -231,14 +231,58 @@
 #define __NR_madvise		219
 #define __NR_getdents64		220
 #define __NR_fcntl64		221
-#define __NR_gettid		222
-#define __NR_tkill		223
+/* 223 is unused */
+#define __NR_gettid		224
+#define __NR_setxattr		226
+#define __NR_lsetxattr		227
+#define __NR_fsetxattr		228
+#define __NR_getxattr		229
+#define __NR_lgetxattr		230
+#define __NR_fgetxattr		231
+#define __NR_listxattr		232
+#define __NR_llistxattr		233
+#define __NR_flistxattr		234
+#define __NR_removexattr	235
+#define __NR_lremovexattr	236
+#define __NR_fremovexattr	237
+#define __NR_tkill		238
+#define __NR_sendfile64		239
+#define __NR_futex		240
+#define __NR_sched_setaffinity	241
+#define __NR_sched_getaffinity	242
+#define __NR_set_thread_area	243
+#define __NR_get_thread_area	244
+#define __NR_io_setup		245
+#define __NR_io_destroy		246
+#define __NR_io_getevents	247
+#define __NR_io_submit		248
+#define __NR_io_cancel		249
+#define __NR_fadvise64		250
 
-/* user-visible error numbers are in the range -1 - -125: see <asm-sh/errno.h> */
+#define __NR_exit_group		252
+#define __NR_lookup_dcookie	253
+#define __NR_epoll_create	254
+#define __NR_epoll_ctl		255
+#define __NR_epoll_wait		256
+#define __NR_remap_file_pages	257
+#define __NR_set_tid_address	258
+#define __NR_timer_create	259
+#define __NR_timer_settime	(__NR_timer_create+1)
+#define __NR_timer_gettime	(__NR_timer_create+2)
+#define __NR_timer_getoverrun	(__NR_timer_create+3)
+#define __NR_timer_delete	(__NR_timer_create+4)
+#define __NR_clock_settime	(__NR_timer_create+5)
+#define __NR_clock_gettime	(__NR_timer_create+6)
+#define __NR_clock_getres	(__NR_timer_create+7)
+#define __NR_clock_nanosleep	(__NR_timer_create+8)
+
+#define NR_syscalls 268
+
+/* user-visible error numbers are in the range -1 - -124: see <asm-sh/errno.h> */
 
 #define __syscall_return(type, res) \
 do { \
-	if ((unsigned long)(res) >= (unsigned long)(-125)) { \
+	if ((unsigned long)(res) >= (unsigned long)(-124)) { \
 	/* Avoid using "res" which is declared to be in register r0; \
 	   errno might expand to a function call and clobber it.  */ \
 		int __err = -(res); \
@@ -332,6 +376,24 @@ __asm__ __volatile__ ("trapa	#0x15" \
 __syscall_return(type,__sc0); \
 }
 
+#define _syscall6(type,name,type1,arg1,type2,arg2,type3,arg3,type4,arg4,type5,arg5,type6,arg6) \
+type name (type1 arg1, type2 arg2, type3 arg3, type4 arg4, type5 arg5, type6 arg6) \
+{ \
+register long __sc3 __asm__ ("r3") = __NR_##name; \
+register long __sc4 __asm__ ("r4") = (long) arg1; \
+register long __sc5 __asm__ ("r5") = (long) arg2; \
+register long __sc6 __asm__ ("r6") = (long) arg3; \
+register long __sc7 __asm__ ("r7") = (long) arg4; \
+register long __sc0 __asm__ ("r0") = (long) arg5; \
+register long __sc1 __asm__ ("r1") = (long) arg6; \
+__asm__ __volatile__ ("trapa	#0x15" \
+	: "=z" (__sc0) \
+	: "0" (__sc0), "r" (__sc4), "r" (__sc5), "r" (__sc6), "r" (__sc7),  \
+	  "r" (__sc3), "r" (__sc1) \
+	: "memory" ); \
+__syscall_return(type,__sc0); \
+}
+
 #ifdef __KERNEL_SYSCALLS__
 
 /*
@@ -347,6 +409,8 @@ __syscall_return(type,__sc0); \
  * some others too.
  */
 #define __NR__exit __NR_exit
+static __inline__ _syscall0(int,pause)
+static __inline__ _syscall0(int,sync)
 static __inline__ _syscall0(pid_t,setsid)
 static __inline__ _syscall3(int,write,int,fd,const char *,buf,off_t,count)
 static __inline__ _syscall3(int,read,int,fd,char *,buf,off_t,count)
@@ -357,7 +421,12 @@ static __inline__ _syscall3(int,open,const char *,file,int,flag,int,mode)
 static __inline__ _syscall1(int,close,int,fd)
 static __inline__ _syscall1(int,_exit,int,exitcode)
 static __inline__ _syscall3(pid_t,waitpid,pid_t,pid,int *,wait_stat,int,options)
+static __inline__ _syscall1(int,delete_module,const char *,name)
 
+static __inline__ pid_t wait(int * wait_stat)
+{
+	return waitpid(-1,wait_stat,0);
+}
 #endif
 
 /*

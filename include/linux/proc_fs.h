@@ -71,7 +71,6 @@ struct proc_dir_entry {
 	write_proc_t *write_proc;
 	atomic_t count;		/* use count */
 	int deleted;		/* delete flag */
-	kdev_t	rdev;
 };
 
 struct kcore_list {
@@ -92,7 +91,7 @@ extern struct proc_dir_entry *proc_root_kcore;
 extern void proc_root_init(void);
 extern void proc_misc_init(void);
 
-struct dentry *proc_pid_lookup(struct inode *dir, struct dentry * dentry);
+struct dentry *proc_pid_lookup(struct inode *dir, struct dentry * dentry, struct nameidata *);
 struct dentry *proc_pid_unhash(struct task_struct *p);
 void proc_pid_flush(struct dentry *proc_dentry);
 int proc_pid_readdir(struct file * filp, void * dirent, filldir_t filldir);
@@ -115,7 +114,7 @@ extern int proc_match(int, const char *,struct proc_dir_entry *);
  * of the /proc/<pid> subdirectories.
  */
 extern int proc_readdir(struct file *, void *, filldir_t);
-extern struct dentry *proc_lookup(struct inode *, struct dentry *);
+extern struct dentry *proc_lookup(struct inode *, struct dentry *, struct nameidata *);
 
 extern struct file_operations proc_kcore_operations;
 extern struct file_operations proc_kmsg_operations;
@@ -141,8 +140,6 @@ extern void proc_rtas_init(void);
 
 extern struct proc_dir_entry *proc_symlink(const char *,
 		struct proc_dir_entry *, const char *);
-extern struct proc_dir_entry *proc_mknod(const char *,mode_t,
-		struct proc_dir_entry *,kdev_t);
 extern struct proc_dir_entry *proc_mkdir(const char *,struct proc_dir_entry *);
 
 static inline struct proc_dir_entry *create_proc_read_entry(const char *name,
@@ -209,8 +206,6 @@ static inline struct proc_dir_entry *create_proc_entry(const char *name,
 
 static inline struct proc_dir_entry *proc_symlink(const char *name,
 		struct proc_dir_entry *parent,char *dest) {return NULL;}
-static inline struct proc_dir_entry *proc_mknod(const char *name,mode_t mode,
-		struct proc_dir_entry *parent,kdev_t rdev) {return NULL;}
 static inline struct proc_dir_entry *proc_mkdir(const char *name,
 	struct proc_dir_entry *parent) {return NULL;}
 

@@ -140,7 +140,7 @@ static void xfrm_timer_handler(unsigned long data)
 	}
 
 	if (warn)
-		km_warn_expired(x);
+		km_state_expired(x, 0);
 resched:
 	if (next != LONG_MAX &&
 	    !mod_timer(&x->timer, jiffies + make_jiffies(next)))
@@ -155,7 +155,7 @@ expired:
 		goto resched;
 	}
 	if (x->id.spi != 0)
-		km_expired(x);
+		km_state_expired(x, 1);
 	__xfrm_state_delete(x);
 
 out:
@@ -370,11 +370,10 @@ xfrm_state_find(xfrm_address_t *daddr, xfrm_address_t *saddr,
 	return x;
 }
 
-void xfrm_state_insert(struct xfrm_state *x)
+static void __xfrm_state_insert(struct xfrm_state *x)
 {
 	unsigned h = xfrm_dst_hash(&x->id.daddr, x->props.family);
 
-	spin_lock_bh(&xfrm_state_lock);
 	list_add(&x->bydst, xfrm_state_bydst+h);
 	xfrm_state_hold(x);
 
@@ -386,8 +385,121 @@ void xfrm_state_insert(struct xfrm_state *x)
 	if (!mod_timer(&x->timer, jiffies + HZ))
 		xfrm_state_hold(x);
 
-	spin_unlock_bh(&xfrm_state_lock);
 	wake_up(&km_waitq);
+}
+
+void xfrm_state_insert(struct xfrm_state *x)
+{
+	spin_lock_bh(&xfrm_state_lock);
+	__xfrm_state_insert(x);
+	spin_unlock_bh(&xfrm_state_lock);
+}
+
+int xfrm_state_add(struct xfrm_state *x)
+{
+	struct xfrm_state_afinfo *afinfo;
+	struct xfrm_state *x1;
+	int err;
+
+	afinfo = xfrm_state_get_afinfo(x->props.family);
+	if (unlikely(afinfo == NULL))
+		return -EAFNOSUPPORT;
+
+	spin_lock_bh(&xfrm_state_lock);
+
+	x1 = afinfo->state_lookup(&x->id.daddr, x->id.spi, x->id.proto);
+	if (!x1) {
+		x1 = afinfo->find_acq(
+			x->props.mode, x->props.reqid, x->id.proto,
+			&x->id.daddr, &x->props.saddr, 0);
+		if (x1 && x1->id.spi != x->id.spi && x1->id.spi) {
+			xfrm_state_put(x1);
+			x1 = NULL;
+		}
+	}
+
+	if (x1 && x1->id.spi) {
+		xfrm_state_put(x1);
+		x1 = NULL;
+		err = -EEXIST;
+		goto out;
+	}
+
+	__xfrm_state_insert(x);
+	err = 0;
+
+out:
+	spin_unlock_bh(&xfrm_state_lock);
+	xfrm_state_put_afinfo(afinfo);
+
+	if (x1) {
+		xfrm_state_delete(x1);
+		xfrm_state_put(x1);
+	}
+
+	return err;
+}
+
+int xfrm_state_update(struct xfrm_state *x)
+{
+	struct xfrm_state_afinfo *afinfo;
+	struct xfrm_state *x1;
+	int err;
+
+	afinfo = xfrm_state_get_afinfo(x->props.family);
+	if (unlikely(afinfo == NULL))
+		return -EAFNOSUPPORT;
+
+	spin_lock_bh(&xfrm_state_lock);
+	x1 = afinfo->state_lookup(&x->id.daddr, x->id.spi, x->id.proto);
+
+	err = -ESRCH;
+	if (!x1)
+		goto out;
+
+	if (xfrm_state_kern(x1)) {
+		xfrm_state_put(x1);
+		err = -EEXIST;
+		goto out;
+	}
+
+	if (x1->km.state == XFRM_STATE_ACQ) {
+		__xfrm_state_insert(x);
+		x = NULL;
+	}
+	err = 0;
+
+out:
+	spin_unlock_bh(&xfrm_state_lock);
+	xfrm_state_put_afinfo(afinfo);
+
+	if (err)
+		return err;
+
+	if (!x) {
+		xfrm_state_delete(x1);
+		xfrm_state_put(x1);
+		return 0;
+	}
+
+	err = -EINVAL;
+	spin_lock_bh(&x1->lock);
+	if (likely(x1->km.state == XFRM_STATE_VALID)) {
+		memcpy(x1->encap, x->encap, sizeof(*x1->encap));
+		memcpy(&x1->lft, &x->lft, sizeof(x1->lft));
+		x1->km.dying = 0;
+		err = 0;
+	}
+	spin_unlock_bh(&x1->lock);
+
+	if (!mod_timer(&x1->timer, jiffies + HZ))
+		xfrm_state_hold(x1);
+	if (x1->curlft.use_time)
+		xfrm_state_check_expire(x1);
+
+	xfrm_state_put(x1);
+
+	return err;
 }
 
 int xfrm_state_check_expire(struct xfrm_state *x)
@@ -400,7 +512,7 @@ int xfrm_state_check_expire(struct xfrm_state *x)
 
 	if (x->curlft.bytes >= x->lft.hard_byte_limit ||
 	    x->curlft.packets >= x->lft.hard_packet_limit) {
-		km_expired(x);
+		km_state_expired(x, 1);
 		if (!mod_timer(&x->timer, jiffies + XFRM_ACQ_EXPIRES*HZ))
 			xfrm_state_hold(x);
 		return -EINVAL;
@@ -409,7 +521,7 @@ int xfrm_state_check_expire(struct xfrm_state *x)
 	if (!x->km.dying &&
 	    (x->curlft.bytes >= x->lft.soft_byte_limit ||
 	     x->curlft.packets >= x->lft.soft_packet_limit))
-		km_warn_expired(x);
+		km_state_expired(x, 0);
 	return 0;
 }
 
@@ -625,28 +737,22 @@ int xfrm_check_selectors(struct xfrm_state **x, int n, struct flowi *fl)
 static struct list_head xfrm_km_list = LIST_HEAD_INIT(xfrm_km_list);
 static rwlock_t		xfrm_km_lock = RW_LOCK_UNLOCKED;
 
-void km_warn_expired(struct xfrm_state *x)
+void km_state_expired(struct xfrm_state *x, int hard)
 {
 	struct xfrm_mgr *km;
 
-	x->km.dying = 1;
-	read_lock(&xfrm_km_lock);
-	list_for_each_entry(km, &xfrm_km_list, list)
-		km->notify(x, 0);
-	read_unlock(&xfrm_km_lock);
-}
-
-void km_expired(struct xfrm_state *x)
-{
-	struct xfrm_mgr *km;
-
-	x->km.state = XFRM_STATE_EXPIRED;
+	if (hard)
+		x->km.state = XFRM_STATE_EXPIRED;
+	else
+		x->km.dying = 1;
 
 	read_lock(&xfrm_km_lock);
 	list_for_each_entry(km, &xfrm_km_list, list)
-		km->notify(x, 1);
+		km->notify(x, hard);
 	read_unlock(&xfrm_km_lock);
-	wake_up(&km_waitq);
+
+	if (hard)
+		wake_up(&km_waitq);
 }
 
 int km_query(struct xfrm_state *x, struct xfrm_tmpl *t, struct xfrm_policy *pol)
@@ -678,6 +784,20 @@ int km_new_mapping(struct xfrm_state *x, xfrm_address_t *ipaddr, u16 sport)
 	}
 	read_unlock(&xfrm_km_lock);
 	return err;
+}
+
+void km_policy_expired(struct xfrm_policy *pol, int dir, int hard)
+{
+	struct xfrm_mgr *km;
+
+	read_lock(&xfrm_km_lock);
+	list_for_each_entry(km, &xfrm_km_list, list)
+		if (km->notify_policy)
+			km->notify_policy(pol, dir, hard);
+	read_unlock(&xfrm_km_lock);
+
+	if (hard)
+		wake_up(&km_waitq);
 }
 
 int xfrm_user_policy(struct sock *sk, int optname, u8 *optval, int optlen)

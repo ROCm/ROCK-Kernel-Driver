@@ -285,7 +285,7 @@ static int flock_to_posix_lock(struct file *filp, struct file_lock *fl,
 		start = filp->f_pos;
 		break;
 	case 2: /*SEEK_END*/
-		start = filp->f_dentry->d_inode->i_size;
+		start = i_size_read(filp->f_dentry->d_inode);
 		break;
 	default:
 		return -EINVAL;
@@ -335,7 +335,7 @@ static int flock64_to_posix_lock(struct file *filp, struct file_lock *fl,
 		start = filp->f_pos;
 		break;
 	case 2: /*SEEK_END*/
-		start = filp->f_dentry->d_inode->i_size;
+		start = i_size_read(filp->f_dentry->d_inode);
 		break;
 	default:
 		return -EINVAL;

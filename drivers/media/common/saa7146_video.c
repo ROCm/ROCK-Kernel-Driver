@@ -1,18 +1,12 @@
 #include <media/saa7146_vv.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,51)
-	#define KBUILD_MODNAME saa7146
-#endif
-
-static
-int memory = 32;
+static int memory = 32;
 
 MODULE_PARM(memory,"i");
 MODULE_PARM_DESC(memory, "maximum memory usage for capture buffers (default: 32Mb)");
 
 /* format descriptions for capture and preview */
-static
-struct saa7146_format formats[] = {
+static struct saa7146_format formats[] = {
 	{
 		.name 		= "RGB-8 (3-3-2)",
 		.pixelformat	= V4L2_PIX_FMT_RGB332,
@@ -67,8 +61,7 @@ struct saa7146_format formats[] = {
    due to this, it's impossible to provide additional *packed* formats, which are simply byte swapped
    (like V4L2_PIX_FMT_YUYV) ... 8-( */
    
-static
-int NUM_FORMATS = sizeof(formats)/sizeof(struct saa7146_format);
+static int NUM_FORMATS = sizeof(formats)/sizeof(struct saa7146_format);
 
 struct saa7146_format* format_by_fourcc(struct saa7146_dev *dev, int fourcc)
 {
@@ -84,8 +77,7 @@ struct saa7146_format* format_by_fourcc(struct saa7146_dev *dev, int fourcc)
 	return NULL;
 }
 
-static
-int g_fmt(struct saa7146_fh *fh, struct v4l2_format *f)
+static int g_fmt(struct saa7146_fh *fh, struct v4l2_format *f)
 {
 	struct saa7146_dev *dev = fh->dev;
 	DEB_EE(("dev:%p, fh:%p\n",dev,fh));
@@ -108,8 +100,7 @@ int g_fmt(struct saa7146_fh *fh, struct v4l2_format *f)
 	}
 }
 
-static
-int try_win(struct saa7146_dev *dev, struct v4l2_window *win)
+static int try_win(struct saa7146_dev *dev, struct v4l2_window *win)
 {
 	struct saa7146_vv *vv = dev->vv_data;
 	enum v4l2_field field;
@@ -165,8 +156,7 @@ int try_win(struct saa7146_dev *dev, struct v4l2_window *win)
 	return 0;
 }
 
-static
-int try_fmt(struct saa7146_fh *fh, struct v4l2_format *f)
+static int try_fmt(struct saa7146_fh *fh, struct v4l2_format *f)
 {
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
@@ -230,8 +220,7 @@ int try_fmt(struct saa7146_fh *fh, struct v4l2_format *f)
 	}
 }
 
-static
-int start_preview(struct saa7146_fh *fh)
+static int start_preview(struct saa7146_fh *fh)
 {
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
@@ -277,8 +266,7 @@ int start_preview(struct saa7146_fh *fh)
 	return 0;
 }
 
-static
-int stop_preview(struct saa7146_fh *fh)
+static int stop_preview(struct saa7146_fh *fh)
 {
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
@@ -302,8 +290,7 @@ int stop_preview(struct saa7146_fh *fh)
 	return 0;
 }
 
-static
-int s_fmt(struct saa7146_fh *fh, struct v4l2_format *f)
+static int s_fmt(struct saa7146_fh *fh, struct v4l2_format *f)
 {
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
@@ -362,8 +349,7 @@ int s_fmt(struct saa7146_fh *fh, struct v4l2_format *f)
 /********************************************************************************/
 /* device controls */
 
-static
-struct v4l2_queryctrl controls[] = {
+static struct v4l2_queryctrl controls[] = {
 	{
 		id:            V4L2_CID_BRIGHTNESS,
 		name:          "Brightness",
@@ -402,13 +388,11 @@ struct v4l2_queryctrl controls[] = {
 		type:          V4L2_CTRL_TYPE_BOOLEAN,
 	},
 };
-static
-int NUM_CONTROLS = sizeof(controls)/sizeof(struct v4l2_queryctrl);
+static int NUM_CONTROLS = sizeof(controls)/sizeof(struct v4l2_queryctrl);
 
 #define V4L2_CID_PRIVATE_LASTP1      (V4L2_CID_PRIVATE_BASE + 0)
 
-static
-struct v4l2_queryctrl* ctrl_by_id(int id)
+static struct v4l2_queryctrl* ctrl_by_id(int id)
 {
 	int i;
 	
@@ -418,8 +402,7 @@ struct v4l2_queryctrl* ctrl_by_id(int id)
 	return NULL;
 }
 
-static
-int get_control(struct saa7146_fh *fh, struct v4l2_control *c)
+static int get_control(struct saa7146_fh *fh, struct v4l2_control *c)
 {
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
@@ -434,20 +417,25 @@ int get_control(struct saa7146_fh *fh, struct v4l2_control *c)
 	case V4L2_CID_BRIGHTNESS:
 		value = saa7146_read(dev, BCS_CTRL);
 		c->value = 0xff & (value >> 24);
+		DEB_D(("V4L2_CID_BRIGHTNESS: %d\n",c->value));
 		break;
 	case V4L2_CID_CONTRAST:
 		value = saa7146_read(dev, BCS_CTRL);
 		c->value = 0x7f & (value >> 16);
+		DEB_D(("V4L2_CID_CONTRAST: %d\n",c->value));
 		break;
 	case V4L2_CID_SATURATION:
 		value = saa7146_read(dev, BCS_CTRL);
 		c->value = 0x7f & (value >> 0);
+		DEB_D(("V4L2_CID_SATURATION: %d\n",c->value));
 		break;
 	case V4L2_CID_VFLIP:
 		c->value = vv->vflip;
+		DEB_D(("V4L2_CID_VFLIP: %d\n",c->value));
 		break;
 	case V4L2_CID_HFLIP:
 		c->value = vv->hflip;
+		DEB_D(("V4L2_CID_HFLIP: %d\n",c->value));
 		break;
 	default:
 		return -EINVAL;
@@ -456,8 +444,7 @@ int get_control(struct saa7146_fh *fh, struct v4l2_control *c)
 	return 0;
 }
 
-static
-int set_control(struct saa7146_fh *fh, struct v4l2_control *c)
+static int set_control(struct saa7146_fh *fh, struct v4l2_control *c)
 {
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
@@ -547,8 +534,7 @@ int set_control(struct saa7146_fh *fh, struct v4l2_control *c)
 /********************************************************************************/
 /* common pagetable functions */
 
-static
-int saa7146_pgtable_build(struct saa7146_dev *dev, struct saa7146_buf *buf)
+static int saa7146_pgtable_build(struct saa7146_dev *dev, struct saa7146_buf *buf)
 {
 	struct pci_dev *pci = dev->pci;
 	struct scatterlist *list = buf->vb.dma.sglist;
@@ -666,8 +652,7 @@ int saa7146_pgtable_build(struct saa7146_dev *dev, struct saa7146_buf *buf)
 /********************************************************************************/
 /* file operations */
 
-static
-int video_begin(struct saa7146_fh *fh)
+static int video_begin(struct saa7146_fh *fh)
 {
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
@@ -700,8 +685,7 @@ int video_begin(struct saa7146_fh *fh)
 	return 0;
 }
 
-static
-int video_end(struct saa7146_fh *fh)
+static int video_end(struct saa7146_fh *fh)
 {
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
@@ -876,7 +860,7 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 			return -EINVAL;	
 		}
 
-		DEB_EE(("VIDIOC_ENUMSTD: type:%d, index:%d\n",f->type,f->index));
+		DEB_EE(("VIDIOC_ENUM_FMT: type:%d, index:%d\n",f->type,f->index));
 		return 0;
 	}
 	case VIDIOC_QUERYCTRL:
@@ -974,6 +958,8 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 		
 		struct saa7146_fh *ov_fh = NULL;
 						
+		DEB_EE(("VIDIOC_S_STD\n"));
+
 		if( 0 != vv->streaming ) {
 			return -EBUSY;
 		}
@@ -1112,8 +1098,7 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 /*********************************************************************************/
 /* buffer handling functions                                                  */
 
-static 
-int buffer_activate (struct saa7146_dev *dev,
+static int buffer_activate (struct saa7146_dev *dev,
 		     struct saa7146_buf *buf,
 		     struct saa7146_buf *next)
 {
@@ -1126,8 +1111,7 @@ int buffer_activate (struct saa7146_dev *dev,
 	return 0;
 }
 
-static
-int buffer_prepare(struct file *file, struct videobuf_buffer *vb, enum v4l2_field field)
+static int buffer_prepare(struct file *file, struct videobuf_buffer *vb, enum v4l2_field field)
 {
 	struct saa7146_fh *fh = file->private_data;
 	struct saa7146_dev *dev = fh->dev;
@@ -1205,8 +1189,7 @@ int buffer_prepare(struct file *file, struct videobuf_buffer *vb, enum v4l2_fiel
 	return err;
 }
 
-static 
-int buffer_setup(struct file *file, unsigned int *count, unsigned int *size)
+static int buffer_setup(struct file *file, unsigned int *count, unsigned int *size)
 {
 	struct saa7146_fh *fh = file->private_data;
 
@@ -1225,8 +1208,7 @@ int buffer_setup(struct file *file, unsigned int *count, unsigned int *size)
 	return 0;
 }
 
-static 
-void buffer_queue(struct file *file, struct videobuf_buffer *vb)
+static void buffer_queue(struct file *file, struct videobuf_buffer *vb)
 {
 	struct saa7146_fh *fh = file->private_data;
 	struct saa7146_dev *dev = fh->dev;
@@ -1238,8 +1220,7 @@ void buffer_queue(struct file *file, struct videobuf_buffer *vb)
 }
 
 
-static 
-void buffer_release(struct file *file, struct videobuf_buffer *vb)
+static void buffer_release(struct file *file, struct videobuf_buffer *vb)
 {
 	struct saa7146_fh *fh = file->private_data;
 	struct saa7146_dev *dev = fh->dev;
@@ -1249,8 +1230,7 @@ void buffer_release(struct file *file, struct videobuf_buffer *vb)
 	saa7146_dma_free(dev,buf);
 }
 
-static
-struct videobuf_queue_ops video_qops = {
+static struct videobuf_queue_ops video_qops = {
 	.buf_setup    = buffer_setup,
 	.buf_prepare  = buffer_prepare,
 	.buf_queue    = buffer_queue,
@@ -1260,8 +1240,7 @@ struct videobuf_queue_ops video_qops = {
 /********************************************************************************/
 /* file operations */
 
-static
-void video_init(struct saa7146_dev *dev, struct saa7146_vv *vv)
+static void video_init(struct saa7146_dev *dev, struct saa7146_vv *vv)
 {
         INIT_LIST_HEAD(&vv->video_q.queue);
 
@@ -1279,8 +1258,7 @@ void video_init(struct saa7146_dev *dev, struct saa7146_vv *vv)
 }
 
 
-static
-void video_open(struct saa7146_dev *dev, struct saa7146_fh *fh)
+static void video_open(struct saa7146_dev *dev, struct saa7146_fh *fh)
 {
 	struct saa7146_format *sfmt;
 
@@ -1301,8 +1279,7 @@ void video_open(struct saa7146_dev *dev, struct saa7146_fh *fh)
 }
 
 
-static
-void video_close(struct saa7146_dev *dev, struct saa7146_fh *fh, struct file *file)
+static void video_close(struct saa7146_dev *dev, struct saa7146_fh *fh, struct file *file)
 {
 	struct saa7146_vv *vv = dev->vv_data;
 	unsigned long flags;
@@ -1323,8 +1300,7 @@ void video_close(struct saa7146_dev *dev, struct saa7146_fh *fh, struct file *fi
 }
 
 
-static
-void video_irq_done(struct saa7146_dev *dev, unsigned long st)
+static void video_irq_done(struct saa7146_dev *dev, unsigned long st)
 {
 	struct saa7146_vv *vv = dev->vv_data;
 	struct saa7146_dmaqueue *q = &vv->video_q;
@@ -1341,8 +1317,7 @@ void video_irq_done(struct saa7146_dev *dev, unsigned long st)
 	spin_unlock(&dev->slock);
 }
 
-static
-ssize_t video_read(struct file *file, char *data, size_t count, loff_t *ppos)
+static ssize_t video_read(struct file *file, char *data, size_t count, loff_t *ppos)
 {
 	struct saa7146_fh *fh = file->private_data;
 	struct saa7146_dev *dev = fh->dev;

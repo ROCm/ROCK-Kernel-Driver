@@ -114,10 +114,8 @@ static inline void free_one_pgd(struct mmu_gather *tlb, pgd_t * dir)
 	}
 	pmd = pmd_offset(dir, 0);
 	pgd_clear(dir);
-	for (j = 0; j < PTRS_PER_PMD ; j++) {
-		prefetchw(pmd + j + PREFETCH_STRIDE/sizeof(*pmd));
+	for (j = 0; j < PTRS_PER_PMD ; j++)
 		free_one_pmd(tlb, pmd+j);
-	}
 	pmd_free_tlb(tlb, pmd);
 }
 
@@ -1111,7 +1109,7 @@ int vmtruncate(struct inode * inode, loff_t offset)
 
 	if (inode->i_size < offset)
 		goto do_expand;
-	inode->i_size = offset;
+	i_size_write(inode, offset);
 	pgoff = (offset + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	down(&mapping->i_shared_sem);
 	if (unlikely(!list_empty(&mapping->i_mmap)))
@@ -1128,7 +1126,7 @@ do_expand:
 		goto out_sig;
 	if (offset > inode->i_sb->s_maxbytes)
 		goto out;
-	inode->i_size = offset;
+	i_size_write(inode, offset);
 
 out_truncate:
 	if (inode->i_op && inode->i_op->truncate)

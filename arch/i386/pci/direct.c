@@ -10,19 +10,19 @@
  * Functions for accessing PCI configuration space with type 1 accesses
  */
 
-#define PCI_CONF1_ADDRESS(bus, dev, fn, reg) \
-	(0x80000000 | (bus << 16) | (dev << 11) | (fn << 8) | (reg & ~3))
+#define PCI_CONF1_ADDRESS(bus, devfn, reg) \
+	(0x80000000 | (bus << 16) | (devfn << 8) | (reg & ~3))
 
-static int pci_conf1_read (int seg, int bus, int dev, int fn, int reg, int len, u32 *value)
+static int pci_conf1_read (int seg, int bus, int devfn, int reg, int len, u32 *value)
 {
 	unsigned long flags;
 
-	if (!value || (bus > 255) || (dev > 31) || (fn > 7) || (reg > 255))
+	if (!value || (bus > 255) || (devfn > 255) || (reg > 255))
 		return -EINVAL;
 
 	spin_lock_irqsave(&pci_config_lock, flags);
 
-	outl(PCI_CONF1_ADDRESS(bus, dev, fn, reg), 0xCF8);
+	outl(PCI_CONF1_ADDRESS(bus, devfn, reg), 0xCF8);
 
 	switch (len) {
 	case 1:
@@ -41,16 +41,16 @@ static int pci_conf1_read (int seg, int bus, int dev, int fn, int reg, int len, 
 	return 0;
 }
 
-static int pci_conf1_write (int seg, int bus, int dev, int fn, int reg, int len, u32 value)
+static int pci_conf1_write (int seg, int bus, int devfn, int reg, int len, u32 value)
 {
 	unsigned long flags;
 
-	if ((bus > 255) || (dev > 31) || (fn > 7) || (reg > 255)) 
+	if ((bus > 255) || (devfn > 255) || (reg > 255)) 
 		return -EINVAL;
 
 	spin_lock_irqsave(&pci_config_lock, flags);
 
-	outl(PCI_CONF1_ADDRESS(bus, dev, fn, reg), 0xCF8);
+	outl(PCI_CONF1_ADDRESS(bus, devfn, reg), 0xCF8);
 
 	switch (len) {
 	case 1:
@@ -83,12 +83,16 @@ struct pci_raw_ops pci_direct_conf1 = {
 
 #define PCI_CONF2_ADDRESS(dev, reg)	(u16)(0xC000 | (dev << 8) | reg)
 
-static int pci_conf2_read (int seg, int bus, int dev, int fn, int reg, int len, u32 *value)
+static int pci_conf2_read(int seg, int bus, int devfn, int reg, int len, u32 *value)
 {
 	unsigned long flags;
+	int dev, fn;
 
-	if (!value || (bus > 255) || (dev > 31) || (fn > 7) || (reg > 255))
+	if (!value || (bus > 255) || (devfn > 255) || (reg > 255))
 		return -EINVAL;
+
+	dev = PCI_SLOT(devfn);
+	fn = PCI_FUNC(devfn);
 
 	if (dev & 0x10) 
 		return PCIBIOS_DEVICE_NOT_FOUND;
@@ -110,19 +114,23 @@ static int pci_conf2_read (int seg, int bus, int dev, int fn, int reg, int len, 
 		break;
 	}
 
-	outb (0, 0xCF8);
+	outb(0, 0xCF8);
 
 	spin_unlock_irqrestore(&pci_config_lock, flags);
 
 	return 0;
 }
 
-static int pci_conf2_write (int seg, int bus, int dev, int fn, int reg, int len, u32 value)
+static int pci_conf2_write (int seg, int bus, int devfn, int reg, int len, u32 value)
 {
 	unsigned long flags;
+	int dev, fn;
 
-	if ((bus > 255) || (dev > 31) || (fn > 7) || (reg > 255)) 
+	if ((bus > 255) || (devfn > 255) || (reg > 255)) 
 		return -EINVAL;
+
+	dev = PCI_SLOT(devfn);
+	fn = PCI_FUNC(devfn);
 
 	if (dev & 0x10) 
 		return PCIBIOS_DEVICE_NOT_FOUND;
@@ -134,17 +142,17 @@ static int pci_conf2_write (int seg, int bus, int dev, int fn, int reg, int len,
 
 	switch (len) {
 	case 1:
-		outb ((u8)value, PCI_CONF2_ADDRESS(dev, reg));
+		outb((u8)value, PCI_CONF2_ADDRESS(dev, reg));
 		break;
 	case 2:
-		outw ((u16)value, PCI_CONF2_ADDRESS(dev, reg));
+		outw((u16)value, PCI_CONF2_ADDRESS(dev, reg));
 		break;
 	case 4:
-		outl ((u32)value, PCI_CONF2_ADDRESS(dev, reg));
+		outl((u32)value, PCI_CONF2_ADDRESS(dev, reg));
 		break;
 	}
 
-	outb (0, 0xCF8);    
+	outb(0, 0xCF8);    
 
 	spin_unlock_irqrestore(&pci_config_lock, flags);
 
@@ -169,7 +177,7 @@ static struct pci_raw_ops pci_direct_conf2 = {
  * This should be close to trivial, but it isn't, because there are buggy
  * chipsets (yes, you guessed it, by Intel and Compaq) that have no class ID.
  */
-static int __devinit pci_sanity_check(struct pci_raw_ops *o)
+static int __init pci_sanity_check(struct pci_raw_ops *o)
 {
 	u32 x = 0;
 	int devfn;
@@ -178,14 +186,12 @@ static int __devinit pci_sanity_check(struct pci_raw_ops *o)
 		return 1;
 
 	for (devfn = 0; devfn < 0x100; devfn++) {
-		if (o->read(0, 0, PCI_SLOT(devfn), PCI_FUNC(devfn),
-						PCI_CLASS_DEVICE, 2, &x))
+		if (o->read(0, 0, devfn, PCI_CLASS_DEVICE, 2, &x))
 			continue;
 		if (x == PCI_CLASS_BRIDGE_HOST || x == PCI_CLASS_DISPLAY_VGA)
 			return 1;
 
-		if (o->read(0, 0, PCI_SLOT(devfn), PCI_FUNC(devfn),
-						PCI_VENDOR_ID, 2, &x))
+		if (o->read(0, 0, devfn, PCI_VENDOR_ID, 2, &x))
 			continue;
 		if (x == PCI_VENDOR_ID_INTEL || x == PCI_VENDOR_ID_COMPAQ)
 			return 1;
@@ -195,54 +201,84 @@ static int __devinit pci_sanity_check(struct pci_raw_ops *o)
 	return 0;
 }
 
-static int __init pci_direct_init(void)
+static int __init pci_check_type1(void)
 {
-	unsigned int tmp;
 	unsigned long flags;
+	unsigned int tmp;
+	int works = 0;
 
 	local_irq_save(flags);
 
-	/*
-	 * Check if configuration type 1 works.
-	 */
-	if (pci_probe & PCI_PROBE_CONF1) {
-		outb (0x01, 0xCFB);
-		tmp = inl (0xCF8);
-		outl (0x80000000, 0xCF8);
-		if (inl (0xCF8) == 0x80000000 &&
-		    pci_sanity_check(&pci_direct_conf1)) {
-			outl (tmp, 0xCF8);
-			local_irq_restore(flags);
-			printk(KERN_INFO "PCI: Using configuration type 1\n");
-			if (!request_region(0xCF8, 8, "PCI conf1"))
-				raw_pci_ops = NULL;
-			else
-				raw_pci_ops = &pci_direct_conf1;
-			return 0;
-		}
-		outl (tmp, 0xCF8);
+	outb(0x01, 0xCFB);
+	tmp = inl(0xCF8);
+	outl(0x80000000, 0xCF8);
+	if (inl(0xCF8) == 0x80000000 && pci_sanity_check(&pci_direct_conf1)) {
+		works = 1;
 	}
+	outl(tmp, 0xCF8);
+	local_irq_restore(flags);
 
-	/*
-	 * Check if configuration type 2 works.
-	 */
-	if (pci_probe & PCI_PROBE_CONF2) {
-		outb (0x00, 0xCFB);
-		outb (0x00, 0xCF8);
-		outb (0x00, 0xCFA);
-		if (inb (0xCF8) == 0x00 && inb (0xCFA) == 0x00 &&
-		    pci_sanity_check(&pci_direct_conf2)) {
-			local_irq_restore(flags);
-			printk(KERN_INFO "PCI: Using configuration type 2\n");
-			if (!request_region(0xCF8, 4, "PCI conf2"))
-				raw_pci_ops = NULL;
-			else
-				raw_pci_ops = &pci_direct_conf2;
-			return 0;
-		}
+	return works;
+}
+
+static int __init pci_check_type2(void)
+{
+	unsigned long flags;
+	int works = 0;
+
+	local_irq_save(flags);
+
+	outb(0x00, 0xCFB);
+	outb(0x00, 0xCF8);
+	outb(0x00, 0xCFA);
+	if (inb(0xCF8) == 0x00 && inb(0xCFA) == 0x00 &&
+	    pci_sanity_check(&pci_direct_conf2)) {
+		works = 1;
 	}
 
 	local_irq_restore(flags);
+
+	return works;
+}
+
+static int __init pci_direct_init(void)
+{
+	struct resource *region, *region2;
+
+	if ((pci_probe & PCI_PROBE_CONF1) == 0)
+		goto type2;
+	region = request_region(0xCF8, 8, "PCI conf1");
+	if (!region)
+		goto type2;
+
+	if (pci_check_type1()) {
+		printk(KERN_INFO "PCI: Using configuration type 1\n");
+		raw_pci_ops = &pci_direct_conf1;
+		return 0;
+	}
+	release_resource(region);
+
+ type2:
+	if ((!pci_probe & PCI_PROBE_CONF2) == 0)
+		goto out;
+	region = request_region(0xCF8, 4, "PCI conf2");
+	if (!region)
+		goto out;
+	region2 = request_region(0xC000, 0x1000, "PCI conf2");
+	if (!region2)
+		goto fail2;
+
+	if (pci_check_type2()) {
+		printk(KERN_INFO "PCI: Using configuration type 2\n");
+		raw_pci_ops = &pci_direct_conf2;
+		return 0;
+	}
+
+	release_resource(region2);
+ fail2:
+	release_resource(region);
+
+ out:
 	return 0;
 }
 

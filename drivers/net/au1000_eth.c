@@ -1,12 +1,9 @@
 /*
- *
  * Alchemy Semi Au1000 ethernet driver
  *
  * Copyright 2001 MontaVista Software Inc.
  * Author: MontaVista Software, Inc.
  *         	ppopov@mvista.com or source@mvista.com
- *
- * ########################################################################
  *
  *  This program is free software; you can distribute it and/or modify it
  *  under the terms of the GNU General Public License (Version 2) as
@@ -20,16 +17,8 @@
  *  You should have received a copy of the GNU General Public License along
  *  with this program; if not, write to the Free Software Foundation, Inc.,
  *  59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
- *
- * ########################################################################
- *
- * 
  */
-
-#ifndef __mips__
-#error This driver only works with MIPS architectures!
-#endif
-
+#include <linux/config.h>
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -125,7 +114,7 @@ static struct {
 	},
   au1100_iflist[NUM_INTERFACES] = {
 		{AU1000_ETH0_BASE, AU1000_ETH0_IRQ}, 
-		{NULL, NULL}
+		{0, 0}
 	};
 
 static char version[] __devinitdata =
@@ -152,13 +141,6 @@ static unsigned char au1000_mac_addr[6] __devinitdata = {
  * code.
  */
 
-static char *phy_link[] = 
-	{"unknown", 
-	"10Base2", "10BaseT", 
-	"AUI",
-	"100BaseT", "100BaseTX", "100BaseFX"
-	};
-
 int bcm_5201_init(struct net_device *dev, int phy_addr)
 {
 	s16 data;
@@ -178,6 +160,11 @@ int bcm_5201_init(struct net_device *dev, int phy_addr)
 	data = mdio_read(dev, phy_addr, MII_CONTROL);
 	data |= MII_CNTL_RST_AUTO | MII_CNTL_AUTO;
 	mdio_write(dev, phy_addr, MII_CONTROL, data);
+
+	/* Enable TX LED instead of FDX */
+	data = mdio_read(dev, phy_addr, MII_INT);
+	data &= ~MII_FDX_LED;
+	mdio_write(dev, phy_addr, MII_INT, data);
 
 	/* Enable TX LED instead of FDX */
 	data = mdio_read(dev, phy_addr, MII_INT);
@@ -640,7 +627,7 @@ static int __init au1000_init_module(void)
 	int prid;
 	int base_addr, irq;
 
-	prid = read_32bit_cp0_register(CP0_PRID);
+	prid = read_c0_prid();
 	for (i=0; i<NUM_INTERFACES; i++) {
 		if ( (prid & 0xffff0000) == 0x00030000 ) {
 			base_addr = au1000_iflist[i].port;
@@ -657,10 +644,10 @@ static int __init au1000_init_module(void)
 		}
 		// check for valid entries, au1100 only has one entry
 		if (base_addr && irq) {
-		if (au1000_probe1(NULL, base_addr, irq, i) != 0) {
-			return -ENODEV;
+			if (au1000_probe1(NULL, base_addr, irq, i) != 0) {
+				return -ENODEV;
+			}
 		}
-	}
 	}
 	return 0;
 }
@@ -675,10 +662,11 @@ au1000_probe1(struct net_device *dev, long ioaddr, int irq, int port_num)
 	char *pmac, *argptr;
 	char ethaddr[6];
 
-	if (!request_region(ioaddr, MAC_IOSIZE, "Au1000 ENET"))
+	if (!request_region(PHYSADDR(ioaddr), MAC_IOSIZE, "Au1000 ENET"))
 		 return -ENODEV;
 
-	if (version_printed++ == 0) printk(version);
+	if (version_printed++ == 0)
+		printk(version);
 
 	if (!dev)
 		dev = init_etherdev(NULL, sizeof(struct au1000_private));
@@ -690,7 +678,7 @@ au1000_probe1(struct net_device *dev, long ioaddr, int irq, int port_num)
 	}
 
 	printk("%s: Au1xxx ethernet found at 0x%lx, irq %d\n", 
-			dev->name, ioaddr, irq);
+	       dev->name, ioaddr, irq);
 
 	aup = dev->priv;
 
@@ -816,7 +804,7 @@ au1000_probe1(struct net_device *dev, long ioaddr, int irq, int port_num)
 	return 0;
 
 free_region:
-	release_region(ioaddr, MAC_IOSIZE);
+	release_region(PHYSADDR(ioaddr), MAC_IOSIZE);
 	unregister_netdev(dev);
 	if (aup->vaddr) 
 		dma_free((void *)aup->vaddr, 
@@ -1047,8 +1035,9 @@ static void au1000_tx_ack(struct net_device *dev)
 	ptxd = aup->tx_dma_ring[aup->tx_tail];
 
 	while (ptxd->buff_stat & TX_T_DONE) {
-		update_tx_stats(dev, ptxd->status, ptxd->len & 0x3ff);
+ 		update_tx_stats(dev, ptxd->status, aup->tx_len[aup->tx_tail]  & 0x3ff);
 		ptxd->buff_stat &= ~TX_T_DONE;
+ 		aup->tx_len[aup->tx_tail] = 0;
 		ptxd->len = 0;
 		au_sync();
 
@@ -1088,7 +1077,8 @@ static int au1000_tx(struct sk_buff *skb, struct net_device *dev)
 		return 1;
 	}
 	else if (buff_stat & TX_T_DONE) {
-		update_tx_stats(dev, ptxd->status, ptxd->len & 0x3ff);
+ 		update_tx_stats(dev, ptxd->status, aup->tx_len[aup->tx_head] & 0x3ff);
+ 		aup->tx_len[aup->tx_head] = 0;
 		ptxd->len = 0;
 	}
 
@@ -1103,11 +1093,13 @@ static int au1000_tx(struct sk_buff *skb, struct net_device *dev)
 		for (i=skb->len; i<MAC_MIN_PKT_SIZE; i++) { 
 			((char *)pDB->vaddr)[i] = 0;
 		}
+ 		aup->tx_len[aup->tx_head] = MAC_MIN_PKT_SIZE;
 		ptxd->len = MAC_MIN_PKT_SIZE;
 	}
-	else
+	else {
+ 		aup->tx_len[aup->tx_head] = skb->len;
 		ptxd->len = skb->len;
-
+	}
 	ptxd->buff_stat = pDB->dma_addr | TX_DMA_ENABLE;
 	au_sync();
 	dev_kfree_skb(skb);
@@ -1244,6 +1236,8 @@ static void au1000_tx_timeout(struct net_device *dev)
 	printk(KERN_ERR "%s: au1000_tx_timeout: dev=%p\n", dev->name, dev);
 	reset_mac(dev);
 	au1000_init(dev);
+	dev->trans_start = jiffies;
+	netif_wake_queue(dev);
 }
 
 static void set_rx_mode(struct net_device *dev)
@@ -1269,7 +1263,8 @@ static void set_rx_mode(struct net_device *dev)
 		mc_filter[1] = mc_filter[0] = 0;
 		for (i = 0, mclist = dev->mc_list; mclist && i < dev->mc_count;
 			 i++, mclist = mclist->next) {
-			set_bit(ether_crc(ETH_ALEN, mclist->dmi_addr)>>26, mc_filter);
+			set_bit(ether_crc_le(ETH_ALEN, mclist->dmi_addr)>>26, 
+					mc_filter);
 		}
 		aup->mac->multi_hash_high = mc_filter[1];
 		aup->mac->multi_hash_low = mc_filter[0];
@@ -1285,18 +1280,21 @@ static int au1000_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 	/* fixme */
 	switch(cmd) { 
-	case SIOCGMIIPHY:		/* Get the address of the PHY in use. */
+	case SIOCGMIIPHY:	/* Get the address of the PHY in use. */
 		data[0] = PHY_ADDRESS;
+		return 0;
 
-	case SIOCGMIIREG:		/* Read the specified MII register. */
+	case SIOCGMIIREG:	/* Read the specified MII register. */
 		//data[3] = mdio_read(ioaddr, data[0], data[1]); 
 		return 0;
 
-	case SIOCSMIIREG:		/* Write the specified MII register */
+	case SIOCSMIIREG:	/* Write the specified MII register */
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
+
 		//mdio_write(ioaddr, data[0], data[1], data[2]);
 		return 0;
+
 	default:
 		return -EOPNOTSUPP;
 	}

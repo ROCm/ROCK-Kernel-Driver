@@ -758,7 +758,7 @@ static int  get_empty_nodes(
             ) {
   struct buffer_head  * p_s_new_bh,
     		      *	p_s_Sh = PATH_H_PBUFFER (p_s_tb->tb_path, n_h);
-  unsigned long	      *	p_n_blocknr,
+  b_blocknr_t	      *	p_n_blocknr,
     			a_n_blocknrs[MAX_AMOUNT_NEEDED] = {0, };
   int       		n_counter,
    			n_number_of_freeblk,
@@ -879,7 +879,7 @@ static int  is_left_neighbor_in_cache(
             ) {
   struct buffer_head  * p_s_father, * left;
   struct super_block  * p_s_sb = p_s_tb->tb_sb;
-  unsigned long         n_left_neighbor_blocknr;
+  b_blocknr_t		n_left_neighbor_blocknr;
   int                   n_left_neighbor_position;
 
   if ( ! p_s_tb->FL[n_h] ) /* Father of the left neighbor does not exist. */
@@ -2501,7 +2501,7 @@ void unfix_nodes (struct tree_balance * tb)
     /* deal with list of allocated (used and unused) nodes */
     for ( i = 0; i < MAX_FEB_SIZE; i++ ) {
 	if ( tb->FEB[i] ) {
-	    unsigned long blocknr  = tb->FEB[i]->b_blocknr ;
+	    b_blocknr_t blocknr  = tb->FEB[i]->b_blocknr ;
 	    /* de-allocated block which was not used by balancing and
                bforget about buffer for it */
 	    brelse (tb->FEB[i]);

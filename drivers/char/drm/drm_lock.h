@@ -1,4 +1,12 @@
-/* lock.c -- IOCTLs for locking -*- linux-c -*-
+/**
+ * \file drm_lock.h 
+ * IOCTLs for locking
+ * 
+ * \author Rickard E. (Rik) Faith <faith@valinux.com>
+ * \author Gareth Hughes <gareth@valinux.com>
+ */
+
+/*
  * Created: Tue Feb  2 08:37:54 1999 by faith@valinux.com
  *
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
@@ -23,14 +31,11 @@
  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
- *
- * Authors:
- *    Rickard E. (Rik) Faith <faith@valinux.com>
- *    Gareth Hughes <gareth@valinux.com>
  */
 
 #include "drmP.h"
 
+/** No-op ioctl. */
 int DRM(noop)(struct inode *inode, struct file *filp, unsigned int cmd,
 	       unsigned long arg)
 {
@@ -38,7 +43,15 @@ int DRM(noop)(struct inode *inode, struct file *filp, unsigned int cmd,
 	return 0;
 }
 
-
+/**
+ * Take the heavyweight lock.
+ *
+ * \param lock lock pointer.
+ * \param context locking context.
+ * \return one if the lock is held, or zero otherwise.
+ *
+ * Attempt to mark the lock as held by the given context, via the \p cmpxchg instruction.
+ */
 int DRM(lock_take)(__volatile__ unsigned int *lock, unsigned int context)
 {
 	unsigned int old, new, prev;
@@ -65,8 +78,18 @@ int DRM(lock_take)(__volatile__ unsigned int *lock, unsigned int context)
 	return 0;
 }
 
-/* This takes a lock forcibly and hands it to context.	Should ONLY be used
-   inside *_unlock to give lock to kernel before calling *_dma_schedule. */
+/**
+ * This takes a lock forcibly and hands it to context.	Should ONLY be used
+ * inside *_unlock to give lock to kernel before calling *_dma_schedule. 
+ * 
+ * \param dev DRM device.
+ * \param lock lock pointer.
+ * \param context locking context.
+ * \return always one.
+ *
+ * Resets the lock file pointer.
+ * Marks the lock as held by the given context, via the \p cmpxchg instruction.
+ */
 int DRM(lock_transfer)(drm_device_t *dev,
 		       __volatile__ unsigned int *lock, unsigned int context)
 {
@@ -81,6 +104,17 @@ int DRM(lock_transfer)(drm_device_t *dev,
 	return 1;
 }
 
+/**
+ * Free lock.
+ * 
+ * \param dev DRM device.
+ * \param lock lock.
+ * \param context context.
+ * 
+ * Resets the lock file pointer.
+ * Marks the lock as not held, via the \p cmpxchg instruction. Wakes any task
+ * waiting on the lock queue.
+ */
 int DRM(lock_free)(drm_device_t *dev,
 		   __volatile__ unsigned int *lock, unsigned int context)
 {
@@ -102,18 +136,17 @@ int DRM(lock_free)(drm_device_t *dev,
 	return 0;
 }
 
-/* If we get here, it means that the process has called DRM_IOCTL_LOCK
-   without calling DRM_IOCTL_UNLOCK.
-
-   If the lock is not held, then let the signal proceed as usual.
-
-   If the lock is held, then set the contended flag and keep the signal
-   blocked.
-
-
-   Return 1 if the signal should be delivered normally.
-   Return 0 if the signal should be blocked.  */
-
+/**
+ * If we get here, it means that the process has called DRM_IOCTL_LOCK
+ * without calling DRM_IOCTL_UNLOCK.
+ *
+ * If the lock is not held, then let the signal proceed as usual.  If the lock
+ * is held, then set the contended flag and keep the signal blocked.
+ *
+ * \param priv pointer to a drm_sigdata structure.
+ * \return one if the signal should be delivered normally, or zero if the
+ * signal should be blocked.
+ */
 int DRM(notifier)(void *priv)
 {
 	drm_sigdata_t *s = (drm_sigdata_t *)priv;

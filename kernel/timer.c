@@ -126,13 +126,17 @@ static void internal_add_timer(tvec_base_t *base, struct timer_list *timer)
 		 * or you set a timer to go off in the past
 		 */
 		vec = base->tv1.vec + (base->timer_jiffies & TVR_MASK);
-	} else if (idx <= 0xffffffffUL) {
-		int i = (expires >> (TVR_BITS + 3 * TVN_BITS)) & TVN_MASK;
-		vec = base->tv5.vec + i;
 	} else {
-		/* Can only get here on architectures with 64-bit jiffies */
-		INIT_LIST_HEAD(&timer->entry);
-		return;
+		int i;
+		/* If the timeout is larger than 0xffffffff on 64-bit
+		 * architectures then we use the maximum timeout:
+		 */
+		if (idx > 0xffffffffUL) {
+			idx = 0xffffffffUL;
+			expires = idx + base->timer_jiffies;
+		}
+		i = (expires >> (TVR_BITS + 3 * TVN_BITS)) & TVN_MASK;
+		vec = base->tv5.vec + i;
 	}
 	/*
 	 * Timers are FIFO:
@@ -156,8 +160,7 @@ static void internal_add_timer(tvec_base_t *base, struct timer_list *timer)
  */
 void add_timer(struct timer_list *timer)
 {
-	int cpu = get_cpu();
-	tvec_base_t *base = &per_cpu(tvec_bases, cpu);
+	tvec_base_t *base = &get_cpu_var(tvec_bases);
   	unsigned long flags;
   
   	BUG_ON(timer_pending(timer) || !timer->function);
@@ -168,7 +171,7 @@ void add_timer(struct timer_list *timer)
 	internal_add_timer(base, timer);
 	timer->base = base;
 	spin_unlock_irqrestore(&base->lock, flags);
-	put_cpu();
+	put_cpu_var(tvec_bases);
 }
 
 /***
@@ -231,7 +234,7 @@ int mod_timer(struct timer_list *timer, unsigned long expires)
 		return 1;
 
 	spin_lock_irqsave(&timer->lock, flags);
-	new_base = &per_cpu(tvec_bases, smp_processor_id());
+	new_base = &__get_cpu_var(tvec_bases);
 repeat:
 	old_base = timer->base;
 
@@ -789,7 +792,7 @@ seqlock_t xtime_lock __cacheline_aligned_in_smp = SEQLOCK_UNLOCKED;
  */
 static void run_timer_softirq(struct softirq_action *h)
 {
-	tvec_base_t *base = &per_cpu(tvec_bases, smp_processor_id());
+	tvec_base_t *base = &__get_cpu_var(tvec_bases);
 
 	if (time_after_eq(jiffies, base->timer_jiffies))
 		__run_timers(base);

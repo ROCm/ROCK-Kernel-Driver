@@ -321,7 +321,6 @@ struct site_survey {
    
 typedef struct netwave_private {
     dev_link_t link;
-    struct net_device      dev;
     spinlock_t	spinlock;	/* Serialize access to the hardware (SMP) */
     dev_node_t node;
     u_char     *ramBase;
@@ -449,11 +448,13 @@ static dev_link_t *netwave_attach(void)
     netwave_flush_stale_links();
 
     /* Initialize the dev_link_t structure */
-    priv = kmalloc(sizeof(*priv), GFP_KERNEL);
-    if (!priv) return NULL;
-    memset(priv, 0, sizeof(*priv));
-    link = &priv->link; dev = &priv->dev;
-    link->priv = dev->priv = priv;
+    dev = alloc_etherdev(sizeof(netwave_private));
+    if (!dev)
+	return NULL;
+    priv = dev->priv;
+    link = &priv->link;
+    link->priv = dev;
+
     init_timer(&link->release);
     link->release.function = &netwave_release;
     link->release.data = (u_long)link;
@@ -504,7 +505,6 @@ static dev_link_t *netwave_attach(void)
     dev->tx_timeout = &netwave_watchdog;
     dev->watchdog_timeo = TX_TIMEOUT;
 
-    ether_setup(dev);
     dev->open = &netwave_open;
     dev->stop = &netwave_close;
     link->irq.Instance = dev;
@@ -541,7 +541,7 @@ static dev_link_t *netwave_attach(void)
  */
 static void netwave_detach(dev_link_t *link)
 {
-    netwave_private *priv = link->priv;
+    struct net_device *dev = link->priv;
     dev_link_t **linkp;
 
     DEBUG(0, "netwave_detach(0x%p)\n", link);
@@ -580,8 +580,8 @@ static void netwave_detach(dev_link_t *link)
     /* Unlink device structure, free pieces */
     *linkp = link->next;
     if (link->dev)
-	unregister_netdev(&priv->dev);
-    kfree(priv);
+	unregister_netdev(dev);
+    kfree(dev);
     
 } /* netwave_detach */
 
@@ -1038,8 +1038,8 @@ while ((last_ret=CardServices(last_fn=(fn), args))!=0) goto cs_failed
 
 static void netwave_pcmcia_config(dev_link_t *link) {
     client_handle_t handle = link->handle;
-    netwave_private *priv = link->priv;
-    struct net_device *dev = &priv->dev;
+    struct net_device *dev = link->priv;
+    netwave_private *priv = dev->priv;
     tuple_t tuple;
     cisparse_t parse;
     int i, j, last_ret, last_fn;
@@ -1099,7 +1099,7 @@ static void netwave_pcmcia_config(dev_link_t *link) {
      *  Allocate a 32K memory window.  Note that the dev_link_t
      *  structure provides space for one window handle -- if your
      *  device needs several windows, you'll need to keep track of
-     *  the handles in your private data structure, link->priv.
+     *  the handles in your private data structure, dev->priv.
      */
     DEBUG(1, "Setting mem speed of %d\n", mem_speed);
 
@@ -1161,7 +1161,8 @@ failed:
  */
 static void netwave_release(u_long arg) {
     dev_link_t *link = (dev_link_t *)arg;
-    netwave_private *priv = link->priv;
+    struct net_device *dev = link->priv;
+    netwave_private *priv = dev->priv;
 
     DEBUG(0, "netwave_release(0x%p)\n", link);
 
@@ -1206,8 +1207,7 @@ static void netwave_release(u_long arg) {
 static int netwave_event(event_t event, int priority,
 			 event_callback_args_t *args) {
     dev_link_t *link = args->client_data;
-    netwave_private *priv = link->priv;
-    struct net_device *dev = &priv->dev;
+    struct net_device *dev = link->priv;
 	
     DEBUG(1, "netwave_event(0x%06x)\n", event);
   

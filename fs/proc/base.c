@@ -307,20 +307,22 @@ static int proc_check_root(struct inode *inode)
 	base = dget(current->fs->root);
 	read_unlock(&current->fs->lock);
 
-	spin_lock(&dcache_lock);
+	spin_lock(&vfsmount_lock);
 	de = root;
 	mnt = vfsmnt;
 
 	while (vfsmnt != our_vfsmnt) {
-		if (vfsmnt == vfsmnt->mnt_parent)
+		if (vfsmnt == vfsmnt->mnt_parent) {
+			spin_unlock(&vfsmount_lock);
 			goto out;
+		}
 		de = vfsmnt->mnt_mountpoint;
 		vfsmnt = vfsmnt->mnt_parent;
 	}
+	spin_unlock(&vfsmount_lock);
 
 	if (!is_subdir(de, base))
 		goto out;
-	spin_unlock(&dcache_lock);
 
 exit:
 	dput(base);
@@ -329,12 +331,11 @@ exit:
 	mntput(mnt);
 	return res;
 out:
-	spin_unlock(&dcache_lock);
 	res = -EACCES;
 	goto exit;
 }
 
-static int proc_permission(struct inode *inode, int mask)
+static int proc_permission(struct inode *inode, int mask, struct nameidata *nd)
 {
 	if (vfs_permission(inode, mask) != 0)
 		return -EACCES;
@@ -864,7 +865,7 @@ out_unlock:
  * directory. In this case, however, we can do it - no aliasing problems
  * due to the way we treat inodes.
  */
-static int pid_revalidate(struct dentry * dentry, int flags)
+static int pid_revalidate(struct dentry * dentry, struct nameidata *nd)
 {
 	if (pid_alive(proc_task(dentry->d_inode)))
 		return 1;
@@ -872,7 +873,7 @@ static int pid_revalidate(struct dentry * dentry, int flags)
 	return 0;
 }
 
-static int pid_fd_revalidate(struct dentry * dentry, int flags)
+static int pid_fd_revalidate(struct dentry * dentry, struct nameidata *nd)
 {
 	struct task_struct *task = proc_task(dentry->d_inode);
 	int fd = proc_type(dentry->d_inode) - PROC_PID_FD_DIR;
@@ -961,7 +962,7 @@ out:
 }
 
 /* SMP-safe */
-static struct dentry *proc_lookupfd(struct inode * dir, struct dentry * dentry)
+static struct dentry *proc_lookupfd(struct inode * dir, struct dentry * dentry, struct nameidata *nd)
 {
 	struct task_struct *task = proc_task(dir);
 	unsigned fd = name_to_int(dentry);
@@ -1219,7 +1220,7 @@ out:
 	return ERR_PTR(error);
 }
 
-static struct dentry *proc_base_lookup(struct inode *dir, struct dentry *dentry){
+static struct dentry *proc_base_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *nd){
 	return proc_pident_lookup(dir, dentry, base_stuff);
 }
 
@@ -1245,7 +1246,9 @@ static struct file_operations proc_attr_operations = {
 	.readdir	= proc_attr_readdir,
 };
 
-static struct dentry *proc_attr_lookup(struct inode *dir, struct dentry *dentry){
+static struct dentry *proc_attr_lookup(struct inode *dir,
+				struct dentry *dentry, struct nameidata *nd)
+{
 	return proc_pident_lookup(dir, dentry, attr_stuff);
 }
 
@@ -1326,7 +1329,7 @@ void proc_pid_flush(struct dentry *proc_dentry)
 }
 
 /* SMP-safe */
-struct dentry *proc_pid_lookup(struct inode *dir, struct dentry * dentry)
+struct dentry *proc_pid_lookup(struct inode *dir, struct dentry * dentry, struct nameidata *nd)
 {
 	struct task_struct *task;
 	struct inode *inode;

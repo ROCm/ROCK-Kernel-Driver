@@ -53,8 +53,6 @@ struct sh_machine_vector mv_saturn __initmv = {
 
         mv_ioremap:             saturn_ioremap,
         mv_iounmap:             saturn_iounmap,
-
-        mv_hw_saturn:           1,
 };
 
 ALIAS_MV(saturn)

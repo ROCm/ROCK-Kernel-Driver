@@ -27,99 +27,85 @@
 
 #include "ieee754dp.h"
 
-long long ieee754dp_tlong(ieee754dp x)
+s64 ieee754dp_tlong(ieee754dp x)
 {
 	COMPXDP;
 
 	CLEARCX;
 
 	EXPLODEXDP;
+	FLUSHXDP;
 
 	switch (xc) {
 	case IEEE754_CLASS_SNAN:
 	case IEEE754_CLASS_QNAN:
-		SETCX(IEEE754_INVALID_OPERATION);
-		return ieee754di_xcpt(ieee754di_indef(), "dp_tlong", x);
 	case IEEE754_CLASS_INF:
-		SETCX(IEEE754_OVERFLOW);
+		SETCX(IEEE754_INVALID_OPERATION);
 		return ieee754di_xcpt(ieee754di_indef(), "dp_tlong", x);
 	case IEEE754_CLASS_ZERO:
 		return 0;
-	case IEEE754_CLASS_DNORM:	/* much too small */
-		SETCX(IEEE754_UNDERFLOW);
-		return ieee754di_xcpt(0, "dp_tlong", x);
+	case IEEE754_CLASS_DNORM:
 	case IEEE754_CLASS_NORM:
 		break;
 	}
 	if (xe >= 63) {
-		SETCX(IEEE754_OVERFLOW);
+		/* look for valid corner case */
+		if (xe == 63 && xs && xm == DP_HIDDEN_BIT)
+			return -0x8000000000000000LL;
+		/* Set invalid. We will only use overflow for floating
+		   point overflow */
+		SETCX(IEEE754_INVALID_OPERATION);
 		return ieee754di_xcpt(ieee754di_indef(), "dp_tlong", x);
-	}
-	if (xe < 0) {
-		if (ieee754_csr.rm == IEEE754_RU) {
-			if (xs) {	/* Negative  */
-				return 0x0000000000000000LL;
-			} else {	/* Positive */
-				return 0x0000000000000001LL;
-			}
-		} else if (ieee754_csr.rm == IEEE754_RD) {
-			if (xs) {	/* Negative , return -1 */
-				return 0xffffffffffffffffLL;
-			} else {	/* Positive */
-				return 0x0000000000000000LL;
-			}
-		} else {
-			SETCX(IEEE754_UNDERFLOW);
-			return ieee754di_xcpt(0, "dp_tlong", x);
-		}
 	}
 	/* oh gawd */
 	if (xe > DP_MBITS) {
 		xm <<= xe - DP_MBITS;
 	} else if (xe < DP_MBITS) {
-		unsigned long long residue;
-		unsigned long long mask = 0;
-		int i;
+		u64 residue;
 		int round;
 		int sticky;
 		int odd;
 
-		/* compute mask */
-		for (i = 0; i < DP_MBITS - xe; i++) {
-			mask = mask << 1;
-			mask = mask | 0x1;
+		if (xe < -1) {
+			residue = xm;
+			round = 0;
+			sticky = residue != 0;
+			xm = 0;
 		}
-		residue = (xm & mask) << (64 - (DP_MBITS - xe));
-		round =
-		    ((0x8000000000000000LL & residue) !=
-		     0x0000000000000000LL);
-		sticky =
-		    ((0x7fffffffffffffffLL & residue) !=
-		     0x0000000000000000LL);
-
-		xm >>= DP_MBITS - xe;
-
-		odd = ((xm & 0x1) != 0x0000000000000000LL);
-
-		/* Do the rounding */
-		if (!round && sticky) {
-			if ((ieee754_csr.rm == IEEE754_RU && !xs)
-			    || (ieee754_csr.rm == IEEE754_RD && xs)) {
-				xm++;
-			}
-		} else if (round && !sticky) {
-			if ((ieee754_csr.rm == IEEE754_RU && !xs)
-			    || (ieee754_csr.rm == IEEE754_RD && xs)
-			    || (ieee754_csr.rm == IEEE754_RN && odd)) {
-				xm++;
-			}
-		} else if (round && sticky) {
-			if ((ieee754_csr.rm == IEEE754_RU && !xs)
-			    || (ieee754_csr.rm == IEEE754_RD && xs)
-			    || (ieee754_csr.rm == IEEE754_RN)) {
-				xm++;
-			}
+		else {
+			/* Shifting a u64 64 times does not work,
+			* so we do it in two steps. Be aware that xe
+			* may be -1 */
+			residue = xm << (xe + 1);
+			residue <<= 63 - DP_MBITS;
+			round = (residue >> 63) != 0;
+			sticky = (residue << 1) != 0;
+			xm >>= DP_MBITS - xe;
 		}
+		odd = (xm & 0x1) != 0x0;
+		switch (ieee754_csr.rm) {
+		case IEEE754_RN:
+			if (round && (sticky || odd))
+				xm++;
+			break;
+		case IEEE754_RZ:
+			break;
+		case IEEE754_RU:	/* toward +Infinity */
+			if ((round || sticky) && !xs)
+				xm++;
+			break;
+		case IEEE754_RD:	/* toward -Infinity */
+			if ((round || sticky) && xs)
+				xm++;
+			break;
+		}
+		if ((xm >> 63) != 0) {
+			/* This can happen after rounding */
+			SETCX(IEEE754_INVALID_OPERATION);
+			return ieee754di_xcpt(ieee754di_indef(), "dp_tlong", x);
+		}
+		if (round || sticky)
+			SETCX(IEEE754_INEXACT);
 	}
 	if (xs)
 		return -xm;
@@ -128,14 +114,14 @@ long long ieee754dp_tlong(ieee754dp x)
 }
 
 
-unsigned long long ieee754dp_tulong(ieee754dp x)
+u64 ieee754dp_tulong(ieee754dp x)
 {
 	ieee754dp hb = ieee754dp_1e63();
 
 	/* what if x < 0 ?? */
 	if (ieee754dp_lt(x, hb))
-		return (unsigned long long) ieee754dp_tlong(x);
+		return (u64) ieee754dp_tlong(x);
 
-	return (unsigned long long) ieee754dp_tlong(ieee754dp_sub(x, hb)) |
+	return (u64) ieee754dp_tlong(ieee754dp_sub(x, hb)) |
 	    (1ULL << 63);
 }

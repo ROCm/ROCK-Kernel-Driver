@@ -241,6 +241,8 @@ void do_gettimeofday(struct timeval *tv)
 
 int do_settimeofday(struct timespec *tv)
 {
+	time_t wtm_sec, new_sec = tv->tv_sec;
+	long wtm_nsec, new_nsec = tv->tv_nsec;
 	unsigned long flags;
 	int tb_delta, new_nsec, new_sec;
 
@@ -268,14 +270,14 @@ int do_settimeofday(struct timespec *tv)
 	 */
 	tb_delta = tb_ticks_since(last_jiffy_stamp(smp_processor_id()));
 	tb_delta += (jiffies - wall_jiffies) * tb_ticks_per_jiffy;
-	new_sec = tv->tv_sec;
-	new_nsec = tv->tv_nsec - 1000 * mulhwu(tb_to_us, tb_delta);
-	while (new_nsec < 0) {
-		new_sec--; 
-		new_nsec += NSEC_PER_SEC;
-	}
-	xtime.tv_nsec = new_nsec;
-	xtime.tv_sec = new_sec;
+
+	new_nsec -= 1000 * mulhwu(tb_to_us, tb_delta);
+
+	wtm_sec  = wall_to_monotonic.tv_sec + (xtime.tv_sec - new_sec);
+	wtm_nsec = wall_to_monotonic.tv_nsec + (xtime.tv_nsec - new_nsec);
+
+	set_normalized_timespec(&xtime, new_sec, new_nsec);
+	set_normalized_timespec(&wall_to_monotonic, wtm_sec, wtm_nsec);
 
 	/* In case of a large backwards jump in time with NTP, we want the 
 	 * clock to be updated as soon as the PLL is again in lock.
@@ -347,6 +349,8 @@ void __init time_init(void)
 		sys_tz.tz_dsttime = 0;
 		xtime.tv_sec -= time_offset;
         }
+        set_normalized_timespec(&wall_to_monotonic,
+                                -xtime.tv_sec, -xtime.tv_nsec);
 }
 
 #define FEBRUARY		2

@@ -926,8 +926,9 @@ static void ltpc_poll(unsigned long l)
 	if (!dev)
 		return;  /* we've been downed */
 
+	/* poll 20 times per second */
 	idle(dev);
-	ltpc_timer.expires = jiffies+5;
+	ltpc_timer.expires = jiffies + HZ/20;
 	
 	add_timer(&ltpc_timer);
 }
@@ -1217,7 +1218,7 @@ int __init ltpc_probe(struct net_device *dev)
 		ltpc_timer.function=ltpc_poll;
 		ltpc_timer.data = (unsigned long) dev;
 
-		ltpc_timer.expires = jiffies + 5;
+		ltpc_timer.expires = jiffies + HZ/20;
 		add_timer(&ltpc_timer);
 	}
 

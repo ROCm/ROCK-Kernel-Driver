@@ -63,6 +63,7 @@ const char * osst_version = "0.99.0";
 
 #include "scsi.h"
 #include "hosts.h"
+#include <scsi/scsi_driver.h>
 #include <scsi/scsi_ioctl.h>
 
 #define ST_KILOBYTE 1024

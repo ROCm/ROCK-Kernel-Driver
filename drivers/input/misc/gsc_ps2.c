@@ -56,12 +56,13 @@
 #include <linux/sched.h>        /* for request_irq/free_irq */        
 #include <linux/spinlock.h>
 #include <linux/delay.h>
-#include <linux/pc_keyb.h>
 #include <linux/ioport.h>
 #include <linux/kd.h>
+#include <linux/pci_ids.h>
 
 #include <asm/irq.h>
 #include <asm/io.h>
+#include <asm/parisc-device.h>
 
 /* Debugging stuff */
 #undef KBD_DEBUG
@@ -79,6 +80,7 @@
 /* PS/2 keyboard and mouse constants */
 #define AUX_RECONNECT		0xAA	/* PS/2 Mouse end of test successful */
 #define AUX_REPLY_ACK		0xFA
+#define AUX_ENABLE_DEV		0xF4	/* Enables aux device */
 
 /* Order of the mouse bytes coming to the host */
 #define PACKET_X		1
@@ -131,6 +133,12 @@
 #define MOUSE_XOVFLOW		0x40
 #define MOUSE_YOVFLOW		0x80
 
+/* Remnant of pc_keyb.h */
+#define KBD_CMD_SET_LEDS	0xED	/* Sets keyboard leds */
+#define KBD_CMD_SET_RATE	0xF3	/* Sets typematic rate */
+#define KBD_CMD_ENABLE		0xF4	/* Enables scanning */
+#define KBD_CMD_DISABLE		0xF5
+#define KBD_CMD_RESET		0xFF
 
 static unsigned char hpkeyb_keycode[KBD_TBLSIZE] =
 {
@@ -341,7 +349,7 @@ static void gscps2_kbd_docode(struct pt_regs *regs)
 		default:
 			hpkeyb.scancode = scancode;
 			DPRINTK("sent=%d, rel=%d\n",hpkeyb.scancode, hpkeyb.released);
-			input_regs(regs);
+			/*input_regs(regs);*/
 			input_report_key(&hpkeyb.dev, hpkeyb_keycode[hpkeyb.scancode], !hpkeyb.released);
 			input_sync(&hpkeyb.dev);
 			if (hpkeyb.escaped)
@@ -388,7 +396,7 @@ static void gscps2_mouse_docode(struct pt_regs *regs)
 		if ((hpmouse.bytes[PACKET_CTRL] & (MOUSE_XOVFLOW | MOUSE_YOVFLOW)))
 			DPRINTK("Mouse: position overflow\n");
 		
-		input_regs(regs);
+		/*input_regs(regs);*/
 
 		input_report_key(&hpmouse.dev, BTN_LEFT, hpmouse.bytes[PACKET_CTRL] & MOUSE_LEFTBTN);
 		input_report_key(&hpmouse.dev, BTN_MIDDLE, hpmouse.bytes[PACKET_CTRL] & MOUSE_MIDBTN);
@@ -420,7 +428,7 @@ static void gscps2_mouse_docode(struct pt_regs *regs)
  * key value to the system.
  */
 
-static void gscps2_interrupt(int irq, void *dev, struct pt_regs *reg)
+static irqreturn_t gscps2_interrupt(int irq, void *dev, struct pt_regs *reg)
 {
 	/* process mouse actions */
 	while (gscps2_readb_status(hpmouse.addr) & GSC_STAT_RBNE)
@@ -429,6 +437,8 @@ static void gscps2_interrupt(int irq, void *dev, struct pt_regs *reg)
 	/* process keyboard scancode */
 	while (gscps2_readb_status(hpkeyb.addr) & GSC_STAT_RBNE)
 		gscps2_kbd_docode(reg);
+
+	return IRQ_HANDLED;
 }
 
 
@@ -525,7 +535,7 @@ static int __init gscps2_kbd_probe(void)
 	
 	/* TODO These need some adjustement, are they really useful ? */
 	hpkeyb.dev.id.bustype	= BUS_GSC;
-	hpkeyb.dev.id.vendor	= 0x0001;
+	hpkeyb.dev.id.vendor	= PCI_VENDOR_ID_HP;
 	hpkeyb.dev.id.product	= 0x0001;
 	hpkeyb.dev.id.version	= 0x0010;
 	hpkeyb.initialized	= 1;
@@ -580,7 +590,7 @@ static int __init gscps2_probe(struct parisc_device *dev)
 {
 	u8 id;
 	char *addr, *name;
-	int ret, device_found = 0;
+	int ret = 0, device_found = 0;
 	unsigned long hpa = dev->hpa;
 
 	if (!dev->irq)

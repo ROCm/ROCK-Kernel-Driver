@@ -3,13 +3,13 @@
 #include <asm/io.h>
 #include <asm/au1000.h>
 
-#ifdef CONFIG_REMOTE_DEBUG
+#ifdef CONFIG_KGDB
 
 /*
  * FIXME the user should be able to select the
  * uart to be used for debugging.
  */
-#define	DEBUG_BASE  UART2_ADDR
+#define DEBUG_BASE  UART_DEBUG_BASE
 /**/
 
 /* we need uint32 uint8 */
@@ -53,8 +53,11 @@ typedef         unsigned int  uint32;
 #define UART_MOD_CNTRL	0x100	/* Module Control */
 
 /* memory-mapped read/write of the port */
-#define UART16550_READ(y)    (inl(DEBUG_BASE + y) & 0xff)
-#define UART16550_WRITE(y,z) (outl(z&0xff, DEBUG_BASE + y))
+#define UART16550_READ(y)    (au_readl(DEBUG_BASE + y) & 0xff)
+#define UART16550_WRITE(y,z) (au_writel(z&0xff, DEBUG_BASE + y))
+
+extern unsigned long get_au1x00_uart_baud_base(void);
+extern unsigned long cal_r4koff(void);
 
 void debugInit(uint32 baud, uint8 data, uint8 parity, uint8 stop)
 {
@@ -68,16 +71,16 @@ void debugInit(uint32 baud, uint8 data, uint8 parity, uint8 stop)
 	UART16550_WRITE(UART_IER, 0);
 
 	/* set up baud rate */
-	{ 
+	{
 		uint32 divisor;
 
 		/* set divisor */
-		divisor = get_au1000_uart_baud() / baud;
+		divisor = get_au1x00_uart_baud_base() / baud;
 		UART16550_WRITE(UART_CLK, divisor & 0xffff);
 	}
 
 	/* set data format */
-	UART16550_WRITE(UART_LCR, data | parity | stop);
+	UART16550_WRITE(UART_LCR, (data | parity | stop));
 }
 
 static int remoteDebugInitialized = 0;
@@ -99,7 +102,8 @@ uint8 getDebugChar(void)
 
 int putDebugChar(uint8 byte)
 {
-	int i;
+//	int i;
+
 	if (!remoteDebugInitialized) {
 		remoteDebugInitialized = 1;
 		debugInit(UART16550_BAUD_115200,

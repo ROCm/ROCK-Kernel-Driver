@@ -5,7 +5,7 @@
 
 lib-y := errno.o ctype.o string.o vsprintf.o cmdline.o \
 	 bust_spinlocks.o rbtree.o radix-tree.o dump_stack.o \
-	 kobject.o idr.o
+	 kobject.o idr.o div64.o
 
 lib-$(CONFIG_RWSEM_GENERIC_SPINLOCK) += rwsem-spinlock.o
 lib-$(CONFIG_RWSEM_XCHGADD_ALGORITHM) += rwsem.o
@@ -24,6 +24,7 @@ include drivers/net/Makefile.lib
 include drivers/usb/Makefile.lib
 include fs/Makefile.lib
 include net/bluetooth/bnep/Makefile.lib
+include drivers/media/dvb/dvb-core/Makefile.lib
 
 host-progs	:= gen_crc32table
 clean-files	:= crc32table.h

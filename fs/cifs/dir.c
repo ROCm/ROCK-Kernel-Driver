@@ -23,6 +23,7 @@
 #include <linux/fs.h>
 #include <linux/stat.h>
 #include <linux/slab.h>
+#include <linux/namei.h>
 #include "cifsfs.h"
 #include "cifspdu.h"
 #include "cifsglob.h"
@@ -119,11 +120,13 @@ build_wildcard_path_from_dentry(struct dentry *direntry)
 /* Inode operations in similar order to how they appear in the Linux file fs.h */
 
 int
-cifs_create(struct inode *inode, struct dentry *direntry, int mode)
+cifs_create(struct inode *inode, struct dentry *direntry, int mode,
+		struct nameidata *nd)
 {
 	int rc = -ENOENT;
 	int xid;
 	int oplock = REQ_OPLOCK;
+	int desiredAccess = GENERIC_ALL;
 	__u16 fileHandle;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
@@ -137,10 +140,23 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode)
 
 	full_path = build_path_from_dentry(direntry);
 
+
+	if(nd) { 
+		cFYI(1,("In create nd flags = 0x%x for %s",nd->flags,full_path));
+                cFYI(1,("Intent flags: 0x%x", nd->intent.open.flags));
+		if ((nd->intent.open.flags & O_ACCMODE) == O_RDONLY)
+                	desiredAccess = GENERIC_READ;
+		else if ((nd->intent.open.flags & O_ACCMODE) == O_WRONLY)
+			desiredAccess = GENERIC_WRITE;
+		else if ((nd->intent.open.flags & O_ACCMODE) == O_RDWR)
+			desiredAccess = GENERIC_ALL;
+	}
+
+
 	/* BB add processing for setting the equivalent of mode - e.g. via CreateX with ACLs */
 
-	rc = CIFSSMBOpen(xid, pTcon, full_path, FILE_OVERWRITE_IF, GENERIC_ALL
-			 /* 0x20197 was used previously */ , CREATE_NOT_DIR,
+	rc = CIFSSMBOpen(xid, pTcon, full_path, FILE_OVERWRITE_IF,
+			 desiredAccess, CREATE_NOT_DIR,
 			 &fileHandle, &oplock, cifs_sb->local_nls);
 	if (rc) {
 		cFYI(1, ("cifs_create returned 0x%x ", rc));
@@ -177,8 +193,45 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode)
 	return rc;
 }
 
+int cifs_mknod(struct inode *inode, struct dentry *direntry, int mode, dev_t device_number) 
+{
+	int rc = -EPERM;
+	int xid;
+	struct cifs_sb_info *cifs_sb;
+	struct cifsTconInfo *pTcon;
+	char *full_path = NULL;
+	struct inode * newinode = NULL;
+
+	xid = GetXid();
+
+	cifs_sb = CIFS_SB(inode->i_sb);
+	pTcon = cifs_sb->tcon;
+
+	full_path = build_path_from_dentry(direntry);
+
+	if (pTcon->ses->capabilities & CAP_UNIX) {
+		rc = CIFSSMBUnixSetPerms(xid, pTcon,
+			full_path, mode, current->euid, current->egid,
+			device_number, cifs_sb->local_nls);
+		if(!rc) {
+                        rc = cifs_get_inode_info_unix(&newinode, full_path,
+                                                      inode->i_sb);
+			direntry->d_op = &cifs_dentry_ops;
+			if(rc == 0)
+				d_instantiate(direntry, newinode);
+		}
+	}
+
+        if (full_path)
+                kfree(full_path);
+        FreeXid(xid);
+
+        return rc;
+}
+
+
 struct dentry *
-cifs_lookup(struct inode *parent_dir_inode, struct dentry *direntry)
+cifs_lookup(struct inode *parent_dir_inode, struct dentry *direntry, struct nameidata *nd)
 {
 	int rc, xid;
 	struct cifs_sb_info *cifs_sb;
@@ -207,6 +260,13 @@ cifs_lookup(struct inode *parent_dir_inode, struct dentry *direntry)
 	}
 	cFYI(1,
 	     (" Full path: %s inode = 0x%p", full_path, direntry->d_inode));
+
+        if(nd) { /* BB remove begin */
+                cFYI(1,("In lookup nd flags = 0x%x",nd->flags));
+                cFYI(1,("Intent flags: 0x%x", nd->intent.open.flags));
+	}
+/* BB remove end BB */
+
 	if (pTcon->ses->capabilities & CAP_UNIX)
 		rc = cifs_get_inode_info_unix(&newInode, full_path,
 					      parent_dir_inode->i_sb);
@@ -262,11 +322,17 @@ cifs_dir_open(struct inode *inode, struct file *file)
 }
 
 static int
-cifs_d_revalidate(struct dentry *direntry, int flags)
+cifs_d_revalidate(struct dentry *direntry, struct nameidata *nd)
 {
 	int isValid = 1;
 
 /*	lock_kernel(); *//* surely we do not want to lock the kernel for a whole network round trip which could take seconds */
+
+        if(nd) {  /* BB remove begin */
+                cFYI(1,("In d_revalidate nd flags = 0x%x",nd->flags));
+		cFYI(1,("Intent flags: 0x%x", nd->intent.open.flags));
+	}
+/* BB remove end BB */
 
 	if (direntry->d_inode) {
 		if (cifs_revalidate(direntry)) {

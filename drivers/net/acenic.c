@@ -3026,9 +3026,6 @@ static int ace_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		return 0;
 
 	case ETHTOOL_SSET:
-		if(!capable(CAP_NET_ADMIN))
-			return -EPERM;
-
 		link = readl(&regs->GigLnkState);
 		if (link & LNK_1000MB)
 			speed = SPEED_1000;

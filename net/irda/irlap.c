@@ -79,6 +79,13 @@ int irlap_proc_read(char *, char **, off_t, int);
 
 int __init irlap_init(void)
 {
+	/* Check if the compiler did its job properly.
+	 * May happen on some ARM configuration, check with Russell King. */
+	ASSERT(sizeof(struct xid_frame) == 14, ;);
+	ASSERT(sizeof(struct test_frame) == 10, ;);
+	ASSERT(sizeof(struct ua_frame) == 10, ;);
+	ASSERT(sizeof(struct snrm_frame) == 11, ;);
+
 	/* Allocate master array */
 	irlap = hashbin_new(HB_LOCK);
 	if (irlap == NULL) {

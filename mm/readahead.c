@@ -208,11 +208,12 @@ __do_page_cache_readahead(struct address_space *mapping, struct file *filp,
 	LIST_HEAD(page_pool);
 	int page_idx;
 	int ret = 0;
+	loff_t isize = i_size_read(inode);
 
-	if (inode->i_size == 0)
+	if (isize == 0)
 		goto out;
 
- 	end_index = ((inode->i_size - 1) >> PAGE_CACHE_SHIFT);
+ 	end_index = ((isize - 1) >> PAGE_CACHE_SHIFT);
 
 	/*
 	 * Preallocate as many pages as we will need.
@@ -259,6 +260,9 @@ int do_page_cache_readahead(struct address_space *mapping, struct file *filp,
 			unsigned long offset, unsigned long nr_to_read)
 {
 	int ret = 0;
+
+	if (unlikely(!mapping->a_ops->readpage && !mapping->a_ops->readpages))
+		return -EINVAL;
 
 	while (nr_to_read) {
 		int err;
@@ -360,9 +364,9 @@ page_cache_readahead(struct address_space *mapping, struct file_ra_state *ra,
 	} else {
 		/*
 		 * A miss - lseek, pagefault, pread, etc.  Shrink the readahead
-		 * window by 25%.
+		 * window.
 		 */
-		ra->next_size -= ra->next_size / 4 + 2;
+		ra->next_size -= 2;
 	}
 
 	if ((long)ra->next_size > (long)max)
@@ -434,37 +438,6 @@ out:
 	return;
 }
 
-/*
- * For mmap reads (typically executables) the access pattern is fairly random,
- * but somewhat ascending.  So readaround favours pages beyond the target one.
- * We also boost the window size, as it can easily shrink due to misses.
- */
-void
-page_cache_readaround(struct address_space *mapping, struct file_ra_state *ra,
-			struct file *filp, unsigned long offset)
-{
-	if (ra->next_size != -1UL) {
-		const unsigned long min = get_min_readahead(ra) * 2;
-		unsigned long target;
-		unsigned long backward;
-
-		/*
-		 * If next_size is zero then leave it alone, because that's a
-		 * readahead startup state.
-		 */
-		if (ra->next_size && ra->next_size < min)
-			ra->next_size = min;
-
-		target = offset;
-		backward = ra->next_size / 4;
-
-		if (backward > target)
-			target = 0;
-		else
-			target -= backward;
-		page_cache_readahead(mapping, ra, filp, target);
-	}
-}
 
 /*
  * handle_ra_miss() is called when it is known that a page which should have

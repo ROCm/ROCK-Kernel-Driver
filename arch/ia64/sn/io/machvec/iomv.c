@@ -26,8 +26,12 @@ void *
 sn_io_addr(unsigned long port)
 {
 	if (!IS_RUNNING_ON_SIMULATOR()) {
+		/* On sn2, legacy I/O ports don't point at anything */
+		if (port < 64*1024)
+			return 0;
 		return( (void *)  (port | __IA64_UNCACHED_OFFSET));
 	} else {
+		/* but the simulator uses them... */
 		unsigned long io_base;
 		unsigned long addr;
  

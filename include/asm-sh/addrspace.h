@@ -10,28 +10,14 @@
 #ifndef __ASM_SH_ADDRSPACE_H
 #define __ASM_SH_ADDRSPACE_H
 
+#include <asm/cpu/addrspace.h>
+
 /* Memory segments (32bit Priviledged mode addresses)  */
 #define P0SEG		0x00000000
 #define P1SEG		0x80000000
 #define P2SEG		0xa0000000
 #define P3SEG		0xc0000000
 #define P4SEG		0xe0000000
-
-#if defined(__sh3__)
-/* Should fill here */
-#elif defined(__SH4__)
-/* Detailed P4SEG  */
-#define P4SEG_STORE_QUE	(P4SEG)
-#define P4SEG_IC_ADDR	0xf0000000
-#define P4SEG_IC_DATA	0xf1000000
-#define P4SEG_ITLB_ADDR	0xf2000000
-#define P4SEG_ITLB_DATA	0xf3000000
-#define P4SEG_OC_ADDR	0xf4000000
-#define P4SEG_OC_DATA	0xf5000000
-#define P4SEG_TLB_ADDR	0xf6000000
-#define P4SEG_TLB_DATA	0xf7000000
-#define P4SEG_REG_BASE	0xff000000
-#endif
 
 /* Returns the privileged segment base of a given address  */
 #define PXSEG(a)	(((unsigned long)(a)) & 0xe0000000)

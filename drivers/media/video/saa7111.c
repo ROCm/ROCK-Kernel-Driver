@@ -57,7 +57,7 @@ struct saa7111 {
 	int sat;
 };
 
-static unsigned short normal_i2c[] = { 34>>1, I2C_CLIENT_END };	
+static unsigned short normal_i2c[] = { 0x24, 0x25, I2C_CLIENT_END };	
 static unsigned short normal_i2c_range[] = { I2C_CLIENT_END };	
 
 I2C_CLIENT_INSMOD;

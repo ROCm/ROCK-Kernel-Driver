@@ -986,7 +986,7 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
 		if (err < 0) {
 			err("error getting string descriptor 0 (error=%d)", err);
 			goto errout;
-		} else if (tbuf[0] < 4) {
+		} else if (err < 4 || tbuf[0] < 4) {
 			err("string descriptor 0 too short");
 			err = -EINVAL;
 			goto errout;

@@ -740,19 +740,19 @@ err_out:
 }
 
 
-static ssize_t agp_read(struct file *file, char *buf,
+static ssize_t agp_read(struct file *file, char __user *buf,
 			size_t count, loff_t * ppos)
 {
 	return -EINVAL;
 }
 
-static ssize_t agp_write(struct file *file, const char *buf,
+static ssize_t agp_write(struct file *file, const char __user *buf,
 			 size_t count, loff_t * ppos)
 {
 	return -EINVAL;
 }
 
-static int agpioc_info_wrap(struct agp_file_private *priv, unsigned long arg)
+static int agpioc_info_wrap(struct agp_file_private *priv, void __user *arg)
 {
 	struct agp_info userinfo;
 	struct agp_kern_info kerninfo;
@@ -769,13 +769,13 @@ static int agpioc_info_wrap(struct agp_file_private *priv, unsigned long arg)
 	userinfo.pg_total = userinfo.pg_system = kerninfo.max_memory;
 	userinfo.pg_used = kerninfo.current_memory;
 
-	if (copy_to_user((void *) arg, &userinfo, sizeof(struct agp_info)))
+	if (copy_to_user(arg, &userinfo, sizeof(struct agp_info)))
 		return -EFAULT;
 
 	return 0;
 }
 
-static int agpioc_acquire_wrap(struct agp_file_private *priv, unsigned long arg)
+static int agpioc_acquire_wrap(struct agp_file_private *priv)
 {
 	int ret;
 	struct agp_controller *controller;
@@ -815,33 +815,33 @@ static int agpioc_acquire_wrap(struct agp_file_private *priv, unsigned long arg)
 	return 0;
 }
 
-static int agpioc_release_wrap(struct agp_file_private *priv, unsigned long arg)
+static int agpioc_release_wrap(struct agp_file_private *priv)
 {
 	DBG("");
 	agp_controller_release_current(agp_fe.current_controller, priv);
 	return 0;
 }
 
-static int agpioc_setup_wrap(struct agp_file_private *priv, unsigned long arg)
+static int agpioc_setup_wrap(struct agp_file_private *priv, void __user *arg)
 {
 	struct agp_setup mode;
 
 	DBG("");
-	if (copy_from_user(&mode, (void *) arg, sizeof(struct agp_setup)))
+	if (copy_from_user(&mode, arg, sizeof(struct agp_setup)))
 		return -EFAULT;
 
 	agp_enable(mode.agp_mode);
 	return 0;
 }
 
-static int agpioc_reserve_wrap(struct agp_file_private *priv, unsigned long arg)
+static int agpioc_reserve_wrap(struct agp_file_private *priv, void __user *arg)
 {
 	struct agp_region reserve;
 	struct agp_client *client;
 	struct agp_file_private *client_priv;
 
 	DBG("");
-	if (copy_from_user(&reserve, (void *) arg, sizeof(struct agp_region)))
+	if (copy_from_user(&reserve, arg, sizeof(struct agp_region)))
 		return -EFAULT;
 
 	if ((unsigned) reserve.seg_count >= ~0U/sizeof(struct agp_segment))
@@ -874,7 +874,7 @@ static int agpioc_reserve_wrap(struct agp_file_private *priv, unsigned long arg)
 		if (segment == NULL)
 			return -ENOMEM;
 
-		if (copy_from_user(segment, (void *) reserve.seg_list,
+		if (copy_from_user(segment, (void __user *) reserve.seg_list,
 				   sizeof(struct agp_segment) * reserve.seg_count)) {
 			kfree(segment);
 			return -EFAULT;
@@ -902,20 +902,20 @@ static int agpioc_reserve_wrap(struct agp_file_private *priv, unsigned long arg)
 	return -EINVAL;
 }
 
-static int agpioc_protect_wrap(struct agp_file_private *priv, unsigned long arg)
+static int agpioc_protect_wrap(struct agp_file_private *priv)
 {
 	DBG("");
 	/* This function is not currently implemented */
 	return -EINVAL;
 }
 
-static int agpioc_allocate_wrap(struct agp_file_private *priv, unsigned long arg)
+static int agpioc_allocate_wrap(struct agp_file_private *priv, void __user *arg)
 {
 	struct agp_memory *memory;
 	struct agp_allocate alloc;
 
 	DBG("");
-	if (copy_from_user(&alloc, (void *) arg, sizeof(struct agp_allocate)))
+	if (copy_from_user(&alloc, arg, sizeof(struct agp_allocate)))
 		return -EFAULT;
 
 	memory = agp_allocate_memory_wrap(alloc.pg_count, alloc.type);
@@ -926,19 +926,19 @@ static int agpioc_allocate_wrap(struct agp_file_private *priv, unsigned long arg
 	alloc.key = memory->key;
 	alloc.physical = memory->physical;
 
-	if (copy_to_user((void *) arg, &alloc, sizeof(struct agp_allocate))) {
+	if (copy_to_user(arg, &alloc, sizeof(struct agp_allocate))) {
 		agp_free_memory_wrap(memory);
 		return -EFAULT;
 	}
 	return 0;
 }
 
-static int agpioc_deallocate_wrap(struct agp_file_private *priv, unsigned long arg)
+static int agpioc_deallocate_wrap(struct agp_file_private *priv, int arg)
 {
 	struct agp_memory *memory;
 
 	DBG("");
-	memory = agp_find_mem_by_key((int) arg);
+	memory = agp_find_mem_by_key(arg);
 
 	if (memory == NULL)
 		return -EINVAL;
@@ -947,13 +947,13 @@ static int agpioc_deallocate_wrap(struct agp_file_private *priv, unsigned long a
 	return 0;
 }
 
-static int agpioc_bind_wrap(struct agp_file_private *priv, unsigned long arg)
+static int agpioc_bind_wrap(struct agp_file_private *priv, void __user *arg)
 {
 	struct agp_bind bind_info;
 	struct agp_memory *memory;
 
 	DBG("");
-	if (copy_from_user(&bind_info, (void *) arg, sizeof(struct agp_bind)))
+	if (copy_from_user(&bind_info, arg, sizeof(struct agp_bind)))
 		return -EFAULT;
 
 	memory = agp_find_mem_by_key(bind_info.key);
@@ -964,13 +964,13 @@ static int agpioc_bind_wrap(struct agp_file_private *priv, unsigned long arg)
 	return agp_bind_memory(memory, bind_info.pg_start);
 }
 
-static int agpioc_unbind_wrap(struct agp_file_private *priv, unsigned long arg)
+static int agpioc_unbind_wrap(struct agp_file_private *priv, void __user *arg)
 {
 	struct agp_memory *memory;
 	struct agp_unbind unbind;
 
 	DBG("");
-	if (copy_from_user(&unbind, (void *) arg, sizeof(struct agp_unbind)))
+	if (copy_from_user(&unbind, arg, sizeof(struct agp_unbind)))
 		return -EFAULT;
 
 	memory = agp_find_mem_by_key(unbind.key);
@@ -1016,43 +1016,43 @@ static int agp_ioctl(struct inode *inode, struct file *file,
 
 	switch (cmd) {
 	case AGPIOC_INFO:
-		ret_val = agpioc_info_wrap(curr_priv, arg);
+		ret_val = agpioc_info_wrap(curr_priv, (void __user *) arg);
 		break;
 
 	case AGPIOC_ACQUIRE:
-		ret_val = agpioc_acquire_wrap(curr_priv, arg);
+		ret_val = agpioc_acquire_wrap(curr_priv);
 		break;
 	   	
 	case AGPIOC_RELEASE:
-		ret_val = agpioc_release_wrap(curr_priv, arg);
+		ret_val = agpioc_release_wrap(curr_priv);
 		break;
 	   	
 	case AGPIOC_SETUP:
-		ret_val = agpioc_setup_wrap(curr_priv, arg);
+		ret_val = agpioc_setup_wrap(curr_priv, (void __user *) arg);
 		break;
 	   	
 	case AGPIOC_RESERVE:
-		ret_val = agpioc_reserve_wrap(curr_priv, arg);
+		ret_val = agpioc_reserve_wrap(curr_priv, (void __user *) arg);
 		break;
 	   	
 	case AGPIOC_PROTECT:
-		ret_val = agpioc_protect_wrap(curr_priv, arg);
+		ret_val = agpioc_protect_wrap(curr_priv);
 		break;
 	  	
 	case AGPIOC_ALLOCATE:
-		ret_val = agpioc_allocate_wrap(curr_priv, arg);
+		ret_val = agpioc_allocate_wrap(curr_priv, (void __user *) arg);
 		break;
 	   	
 	case AGPIOC_DEALLOCATE:
-		ret_val = agpioc_deallocate_wrap(curr_priv, arg);
+		ret_val = agpioc_deallocate_wrap(curr_priv, (int) arg);
 		break;
 	   	
 	case AGPIOC_BIND:
-		ret_val = agpioc_bind_wrap(curr_priv, arg);
+		ret_val = agpioc_bind_wrap(curr_priv, (void __user *) arg);
 		break;
 	   	
 	case AGPIOC_UNBIND:
-		ret_val = agpioc_unbind_wrap(curr_priv, arg);
+		ret_val = agpioc_unbind_wrap(curr_priv, (void __user *) arg);
 		break;
 	}
 

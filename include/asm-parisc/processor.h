@@ -142,6 +142,7 @@ struct thread_struct {
  */
 
 unsigned long thread_saved_pc(struct task_struct *t);
+void show_trace(struct task_struct *task, unsigned long *stack);
 
 /*
  * Start user thread in another space.

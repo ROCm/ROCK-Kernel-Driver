@@ -780,7 +780,7 @@ encode_entry(struct readdir_cd *ccd, const char *name,
 {
 	struct nfsd3_readdirres *cd = container_of(ccd, struct nfsd3_readdirres, common);
 	u32		*p = cd->buffer;
-	int		buflen, slen, elen;
+	int		slen, elen;
 
 	if (cd->offset)
 		xdr_encode_hyper(cd->offset, (u64) offset);
@@ -797,7 +797,7 @@ encode_entry(struct readdir_cd *ccd, const char *name,
 	slen = XDR_QUADLEN(namlen);
 	elen = slen + NFS3_ENTRY_BAGGAGE
 		+ (plus? NFS3_ENTRYPLUS_BAGGAGE : 0);
-	if ((buflen = cd->buflen - elen) < 0) {
+	if (cd->buflen < elen) {
 		cd->common.err = nfserr_readdir_nospc;
 		return -EINVAL;
 	}
@@ -836,7 +836,7 @@ encode_entry(struct readdir_cd *ccd, const char *name,
 	}
 
 out:
-	cd->buflen = buflen;
+	cd->buflen -= p - cd->buffer;
 	cd->buffer = p;
 	cd->common.err = nfs_ok;
 	return 0;

@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) International Business Machines Corp., 2000-2002
+ *   Copyright (c) International Business Machines Corp., 2000-2003
  *   Portions Copyright (c) Christoph Hellwig, 2001-2002
  *
  *   This program is free software;  you can redistribute it and/or modify
@@ -667,7 +667,7 @@ int lmGroupCommit(struct jfs_log * log, struct tblock * tblk)
 	/* group committed already ? */
 	if (tblk->flag & tblkGC_COMMITTED) {
 		if (tblk->flag & tblkGC_ERROR)
-			rc = EIO;
+			rc = -EIO;
 
 		LOGGC_UNLOCK(log);
 		return rc;
@@ -701,7 +701,7 @@ int lmGroupCommit(struct jfs_log * log, struct tblock * tblk)
 
 	if (tblk->flag & tblkGC_COMMITTED) {
 		if (tblk->flag & tblkGC_ERROR)
-			rc = EIO;
+			rc = -EIO;
 
 		LOGGC_UNLOCK(log);
 		return rc;
@@ -717,7 +717,7 @@ int lmGroupCommit(struct jfs_log * log, struct tblock * tblk)
 
 	/* removed from commit queue */
 	if (tblk->flag & tblkGC_ERROR)
-		rc = EIO;
+		rc = -EIO;
 
 	LOGGC_UNLOCK(log);
 	return rc;
@@ -1068,7 +1068,7 @@ int lmLogOpen(struct super_block *sb, struct jfs_log ** logptr)
 	struct jfs_log *log;
 
 	if (!(log = kmalloc(sizeof(struct jfs_log), GFP_KERNEL)))
-		return ENOMEM;
+		return -ENOMEM;
 	memset(log, 0, sizeof(struct jfs_log));
 	init_waitqueue_head(&log->syncwait);
 
@@ -1113,7 +1113,6 @@ int lmLogOpen(struct super_block *sb, struct jfs_log ** logptr)
 	}
 
 	if ((rc = bd_claim(bdev, log))) {
-		rc = -rc;
 		goto close;
 	}
 
@@ -1169,7 +1168,7 @@ int lmLogOpen(struct super_block *sb, struct jfs_log ** logptr)
  * PARAMETER:	log	- log structure
  *
  * RETURN:	0	- if ok
- *		EINVAL	- bad log magic number or superblock dirty
+ *		-EINVAL	- bad log magic number or superblock dirty
  *		error returned from logwait()
  *			
  * serialization: single first open thread
@@ -1209,21 +1208,21 @@ int lmLogInit(struct jfs_log * log)
 
 	if (logsuper->magic != cpu_to_le32(LOGMAGIC)) {
 		jfs_warn("*** Log Format Error ! ***");
-		rc = EINVAL;
+		rc = -EINVAL;
 		goto errout20;
 	}
 
 	/* logredo() should have been run successfully. */
 	if (logsuper->state != cpu_to_le32(LOGREDONE)) {
 		jfs_warn("*** Log Is Dirty ! ***");
-		rc = EINVAL;
+		rc = -EINVAL;
 		goto errout20;
 	}
 
 	/* initialize log inode from log superblock */
 	if (test_bit(log_INLINELOG,&log->flag)) {
 		if (log->size != le32_to_cpu(logsuper->size)) {
-			rc = EINVAL;
+			rc = -EINVAL;
 			goto errout20;
 		}
 		jfs_info("lmLogInit: inline log:0x%p base:0x%Lx size:0x%x",
@@ -1241,6 +1240,15 @@ int lmLogInit(struct jfs_log * log)
 
 	log->page = le32_to_cpu(logsuper->end) / LOGPSIZE;
 	log->eor = le32_to_cpu(logsuper->end) - (LOGPSIZE * log->page);
+
+	/* check for disabled journaling to disk */
+	if (JFS_SBI(log->sb)->flag & JFS_NOINTEGRITY) {
+		log->no_integrity = 1;
+		log->ni_page = log->page;
+		log->ni_eor = log->eor;
+	}
+	else
+		log->no_integrity = 0;
 
 	/*
 	 * initialize for log append write mode
@@ -1525,6 +1533,14 @@ int lmLogShutdown(struct jfs_log * log)
 	lrd.type = cpu_to_le16(LOG_SYNCPT);
 	lrd.length = 0;
 	lrd.log.syncpt.sync = 0;
+	
+	/* check for disabled journaling to disk */
+	if (JFS_SBI(log->sb)->flag & JFS_NOINTEGRITY) {
+		log->no_integrity = 0;
+		log->page = log->ni_page;
+		log->eor = log->ni_eor;
+	}
+
 	lsn = lmWriteRecord(log, NULL, &lrd, NULL);
 	bp = log->bp;
 	lp = (struct logpage *) bp->l_ldata;
@@ -1610,7 +1626,7 @@ static int lmLogFileSystem(struct jfs_log * log, char *uuid, int activate)
 		if (i == MAX_ACTIVE) {
 			jfs_warn("Somebody stomped on the journal!");
 			lbmFree(bpsuper);
-			return EIO;
+			return -EIO;
 		}
 		
 	}
@@ -1698,7 +1714,7 @@ static int lbmLogInit(struct jfs_log * log)
 
       error:
 	lbmLogShutdown(log);
-	return (ENOMEM);
+	return -ENOMEM;
 }
 
 
@@ -1986,10 +2002,18 @@ static void lbmStartIO(struct lbuf * bp)
 	bio->bi_end_io = lbmIODone;
 	bio->bi_private = bp;
 
-	submit_bio(WRITE, bio);
-
-	INCREMENT(lmStat.submitted);
-	blk_run_queues();
+	/* check if journaling to disk has been disabled */
+	if (!log->no_integrity) {
+		submit_bio(WRITE, bio);
+		INCREMENT(lmStat.submitted);
+		blk_run_queues();
+	}
+	else {
+		bio->bi_size = 0;
+		lbmIODone(bio, 0, 0); /* 2nd argument appears to not be used => 0
+				       *  3rd argument appears to not be used => 0
+				       */
+	}
 }
 
 
@@ -2007,7 +2031,7 @@ static int lbmIOWait(struct lbuf * bp, int flag)
 
 	LCACHE_SLEEP_COND(bp->l_ioevent, (bp->l_flag & lbmDONE), flags);
 
-	rc = (bp->l_flag & lbmERROR) ? EIO : 0;
+	rc = (bp->l_flag & lbmERROR) ? -EIO : 0;
 
 	if (flag & lbmFREE)
 		lbmfree(bp);

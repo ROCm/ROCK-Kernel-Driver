@@ -237,7 +237,7 @@ setup_isurf(struct IsdnCard *card)
 		struct pnp_card *pb;
 		struct pnp_dev *pd;
 	
-		cs->subtyp = 0;
+		card->cs->subtyp = 0;
 		if ((pb = pnp_find_card(
 			     ISAPNP_VENDOR('S', 'I', 'E'),
 			     ISAPNP_FUNCTION(0x0010), pnp_surf))) {

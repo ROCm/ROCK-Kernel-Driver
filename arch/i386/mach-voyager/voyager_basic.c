@@ -284,7 +284,6 @@ mca_nmi_hook(void)
 {
 	__u8 dumpval __attribute__((unused)) = inb(0xf823);
 	__u8 swnmi __attribute__((unused)) = inb(0xf813);
-	extern void show_stack(unsigned long *);
 
 	/* FIXME: assume dump switch pressed */
 	/* check to see if the dump switch was pressed */
@@ -302,7 +301,7 @@ mca_nmi_hook(void)
 		}
 	}
 	printk(KERN_ERR "VOYAGER: Dump switch pressed, printing CPU%d tracebacks\n", smp_processor_id());
-	show_stack(NULL);
+	show_stack(NULL, NULL);
 	show_state();
 }
 

@@ -602,7 +602,7 @@ static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 			fl.oif = sin6->sin6_scope_id;
 	} else {
 		if (sk->sk_state != TCP_ESTABLISHED) 
-			return(-EINVAL);
+			return -EDESTADDRREQ;
 		
 		proto = inet->num;
 		daddr = &np->daddr;
@@ -624,6 +624,7 @@ static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 	if (msg->msg_controllen) {
 		opt = &opt_space;
 		memset(opt, 0, sizeof(struct ipv6_txoptions));
+		opt->tot_len = sizeof(struct ipv6_txoptions);
 
 		err = datagram_send_ctl(msg, &fl, opt, &hlimit);
 		if (err < 0) {
@@ -913,7 +914,7 @@ struct raw6_iter_state {
 	int bucket;
 };
 
-#define raw6_seq_private(seq) ((struct raw6_iter_state *)&seq->private)
+#define raw6_seq_private(seq) ((struct raw6_iter_state *)(seq)->private)
 
 static struct sock *raw6_get_first(struct seq_file *seq)
 {
@@ -1029,7 +1030,22 @@ static struct seq_operations raw6_seq_ops = {
 
 static int raw6_seq_open(struct inode *inode, struct file *file)
 {
-	return seq_open(file, &raw6_seq_ops);
+	struct seq_file *seq;
+	int rc = -ENOMEM;
+	struct raw6_iter_state *s = kmalloc(sizeof(*s), GFP_KERNEL);
+	if (!s)
+		goto out;
+	rc = seq_open(file, &raw6_seq_ops);
+	if (rc)
+		goto out_kfree;
+	seq = file->private_data;
+	seq->private = s;
+	memset(s, 0, sizeof(*s));
+out:
+	return rc;
+out_kfree:
+	kfree(s);
+	goto out;
 }
 
 static struct file_operations raw6_seq_fops = {
@@ -1037,7 +1053,7 @@ static struct file_operations raw6_seq_fops = {
 	.open =		raw6_seq_open,
 	.read =		seq_read,
 	.llseek =	seq_lseek,
-	.release =	seq_release,
+	.release =	seq_release_private,
 };
 
 int __init raw6_proc_init(void)

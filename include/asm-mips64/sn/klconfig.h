@@ -19,9 +19,9 @@
 
 /*
  * WARNING:
- *	Certain assembly language routines (notably xxxxx.s) in the IP27PROM 
- *	will depend on the format of the data structures in this file.  In 
- *      most cases, rearranging the fields can seriously break things.   
+ *	Certain assembly language routines (notably xxxxx.s) in the IP27PROM
+ *	will depend on the format of the data structures in this file.  In
+ *      most cases, rearranging the fields can seriously break things.
  *      Adding fields in the beginning or middle can also break things.
  *      Add fields if necessary, to the end of a struct in such a way
  *      that offsets of existing fields do not change.
@@ -76,11 +76,11 @@ typedef s32 klconf_off_t;
 
 #define	MAX_MODULE_ID		255
 #define SIZE_PAD		4096 /* 4k padding for structures */
-/* 
- * 1 NODE brd, 2 Router brd (1 8p, 1 meta), 6 Widgets, 
- * 2 Midplanes assuming no pci card cages 
+/*
+ * 1 NODE brd, 2 Router brd (1 8p, 1 meta), 6 Widgets,
+ * 2 Midplanes assuming no pci card cages
  */
-#define MAX_SLOTS_PER_NODE	(1 + 2 + 6 + 2) 
+#define MAX_SLOTS_PER_NODE	(1 + 2 + 6 + 2)
 
 /* XXX if each node is guranteed to have some memory */
 
@@ -117,7 +117,7 @@ typedef s32 klconf_off_t;
 
 /* Structures to manage various data storage areas */
 /* The numbers must be contiguous since the array index i
-   is used in the code to allocate various areas. 
+   is used in the code to allocate various areas.
 */
 
 #define BOARD_STRUCT 		0
@@ -240,7 +240,7 @@ typedef struct kl_config_hdr {
 
 /*
  * The KLCONFIG area is organized as a LINKED LIST of BOARDs. A BOARD
- * can be either 'LOCAL' or 'REMOTE'. LOCAL means it is attached to 
+ * can be either 'LOCAL' or 'REMOTE'. LOCAL means it is attached to
  * the LOCAL/current NODE. REMOTE means it is attached to a different
  * node.(TBD - Need a way to treat ROUTER boards.)
  *
@@ -250,20 +250,20 @@ typedef struct kl_config_hdr {
  * Figure below). The first byte of the rboard or lboard structure
  * is used to find out its type - no unions are used.
  * If it is a lboard, then the config info of this board will be found
- * on the local node. (LOCAL NODE BASE + offset value gives pointer to 
+ * on the local node. (LOCAL NODE BASE + offset value gives pointer to
  * the structure.
  * If it is a rboard, the local structure contains the node number
  * and the offset of the beginning of the LINKED LIST on the remote node.
  * The details of the hardware on a remote node can be built locally,
- * if required, by reading the LINKED LIST on the remote node and 
+ * if required, by reading the LINKED LIST on the remote node and
  * ignoring all the rboards on that node.
  *
- * The local node uses the REMOTE NODE NUMBER + OFFSET to point to the 
- * First board info on the remote node. The remote node list is 
+ * The local node uses the REMOTE NODE NUMBER + OFFSET to point to the
+ * First board info on the remote node. The remote node list is
  * traversed as the local list, using the REMOTE BASE ADDRESS and not
  * the local base address and ignoring all rboard values.
  *
- * 
+ *
  KLCONFIG
 
  +------------+      +------------+      +------------+      +------------+
@@ -290,7 +290,7 @@ typedef struct kl_config_hdr {
                       +--------------------------------+
 
  *
- * Each BOARD consists of COMPONENTs and the BOARD structure has 
+ * Each BOARD consists of COMPONENTs and the BOARD structure has
  * pointers (offsets) to its COMPONENT structure.
  * The COMPONENT structure has version info, size and speed info, revision,
  * error info and the NIC info. This structure can accommodate any
@@ -298,19 +298,19 @@ typedef struct kl_config_hdr {
  *
  * The ERRORINFO part of each BOARD has error information
  * that describes errors about the BOARD itself. It also has flags to
- * indicate the COMPONENT(s) on the board that have errors. The error 
- * information specific to the COMPONENT is present in the respective 
+ * indicate the COMPONENT(s) on the board that have errors. The error
+ * information specific to the COMPONENT is present in the respective
  * COMPONENT structure.
  *
- * The ERRORINFO structure is also treated like a COMPONENT, ie. the 
+ * The ERRORINFO structure is also treated like a COMPONENT, ie. the
  * BOARD has pointers(offset) to the ERRORINFO structure. The rboard
- * structure also has a pointer to the ERRORINFO structure. This is 
+ * structure also has a pointer to the ERRORINFO structure. This is
  * the place to store ERRORINFO about a REMOTE NODE, if the HUB on
- * that NODE is not working or if the REMOTE MEMORY is BAD. In cases where 
+ * that NODE is not working or if the REMOTE MEMORY is BAD. In cases where
  * only the CPU of the REMOTE NODE is disabled, the ERRORINFO pointer can
- * be a NODE NUMBER, REMOTE OFFSET combination, pointing to error info 
+ * be a NODE NUMBER, REMOTE OFFSET combination, pointing to error info
  * which is present on the REMOTE NODE.(TBD)
- * REMOTE ERRINFO can be stored on any of the nearest nodes 
+ * REMOTE ERRINFO can be stored on any of the nearest nodes
  * or on all the nearest nodes.(TBD)
  * Like BOARD structures, REMOTE ERRINFO structures can be built locally
  * using the rboard errinfo pointer.
@@ -319,9 +319,9 @@ typedef struct kl_config_hdr {
  * interface routines are provided (TBD). The important thing to remember while
  * manipulating the structures, is that, the NODE number information should
  * be used. If the NODE is non-zero (remote) then each offset should
- * be added to the REMOTE BASE ADDR else it should be added to the LOCAL BASE ADDR. 
+ * be added to the REMOTE BASE ADDR else it should be added to the LOCAL BASE ADDR.
  * This includes offsets for BOARDS, COMPONENTS and ERRORINFO.
- * 
+ *
  * Note that these structures do not provide much info about connectivity.
  * That info will be part of HWGRAPH, which is an extension of the cfg_t
  * data structure. (ref IP27prom/cfg.h) It has to be extended to include
@@ -342,11 +342,11 @@ typedef struct kl_config_hdr {
  * IP27 BOARD classes
  */
 
-#define KLCLASS_MASK	0xf0   
+#define KLCLASS_MASK	0xf0
 #define KLCLASS_NONE	0x00
 #define KLCLASS_NODE	0x10             /* CPU, Memory and HUB board */
-#define KLCLASS_CPU	KLCLASS_NODE	
-#define KLCLASS_IO	0x20             /* BaseIO, 4 ch SCSI, ethernet, FDDI 
+#define KLCLASS_CPU	KLCLASS_NODE
+#define KLCLASS_IO	0x20             /* BaseIO, 4 ch SCSI, ethernet, FDDI
 					    and the non-graphics widget boards */
 #define KLCLASS_ROUTER	0x30             /* Router board */
 #define KLCLASS_MIDPLANE 0x40            /* We need to treat this as a board
@@ -420,7 +420,7 @@ typedef struct kl_config_hdr {
  * out the board name from the NIC string. For values less than
  * 8 the name of the board needs to be hard coded in a few places.
  * When bringup started nic names had not standardized and so we
- * had to hard code. (For people interested in history.) 
+ * had to hard code. (For people interested in history.)
  */
 #define KLTYPE_XTHD   	(KLCLASS_PSEUDO_GFX | 0x9)
 
@@ -431,7 +431,7 @@ typedef struct kl_config_hdr {
 				 (l->brd_flags & SECOND_NIC_PRESENT))
 #define IS_MIO_IOC3(l,n)	(IS_MIO_PRESENT(l) && (n > 2))
 
-/* 
+/*
  * board structures
  */
 
@@ -511,10 +511,10 @@ typedef struct lboard_s {
 
 
 /*
- * Generic info structure. This stores common info about a 
+ * Generic info structure. This stores common info about a
  * component.
  */
- 
+
 typedef struct klinfo_s {                  /* Generic info */
         unsigned char   struct_type;       /* type of this structure */
         unsigned char   struct_version;    /* version of this structure */
@@ -540,9 +540,9 @@ typedef struct klinfo_s {                  /* Generic info */
 /*
  * Component structures.
  * Following are the currently identified components:
- * 	CPU, HUB, MEM_BANK, 
+ * 	CPU, HUB, MEM_BANK,
  * 	XBOW(consists of 16 WIDGETs, each of which can be HUB or GRAPHICS or BRIDGE)
- * 	BRIDGE, IOC3, SuperIO, SCSI, FDDI 
+ * 	BRIDGE, IOC3, SuperIO, SCSI, FDDI
  * 	ROUTER
  * 	GRAPHICS
  */
@@ -614,9 +614,9 @@ typedef u64 *graphics_t;
 typedef u64 *router_t;
 
 /*
- * The port info in ip27_cfg area translates to a lboart_t in the 
+ * The port info in ip27_cfg area translates to a lboart_t in the
  * KLCONFIG area. But since KLCONFIG does not use pointers, lboart_t
- * is stored in terms of a nasid and a offset from start of KLCONFIG 
+ * is stored in terms of a nasid and a offset from start of KLCONFIG
  * area  on that nasid.
  */
 typedef struct klport_s {
@@ -692,7 +692,7 @@ typedef struct klmod_serial_num_s {
 } klmod_serial_num_t;
 
 /* Macros needed to access serial number structure in lboard_t.
-   Hard coded values are necessary since we cannot treat 
+   Hard coded values are necessary since we cannot treat
    serial number struct as a component without losing compatibility
    between prom versions. */
 
@@ -789,7 +789,7 @@ typedef struct klgfx_s {		/* GRAPHICS Device */
 	klconf_off_t    gfx_mfg_nic;
 } klgfx_t;
 
-typedef struct klxthd_s {   
+typedef struct klxthd_s {
 	klinfo_t 	xthd_info ;
 	klconf_off_t	xthd_mfg_nic ;        /* MFG NIC string */
 } klxthd_t ;
@@ -815,9 +815,9 @@ typedef struct klgsn_s {                     /* GSN board */
 
 typedef struct klscsi_s {                          /* SCSI Controller */
 	klinfo_t 	scsi_info ;
-    	scsi_t       	scsi_specific   ; 
+    	scsi_t       	scsi_specific   ;
 	unsigned char 	scsi_numdevs ;
-	klconf_off_t	scsi_devinfo[MAX_SCSI_DEVS] ; 
+	klconf_off_t	scsi_devinfo[MAX_SCSI_DEVS] ;
 } klscsi_t ;
 
 typedef struct klscdev_s {                          /* SCSI device */
@@ -842,20 +842,20 @@ typedef struct klkbddev_s {                          /* KBD device */
 
 typedef struct klmsdev_s {                          /* mouse device */
         klinfo_t        msdev_info ;
-        void 		*msdev_cfg ; 
+        void 		*msdev_cfg ;
 } klmsdev_t ;
 
 #define MAX_FDDI_DEVS 10 /* XXX Is this true */
 
 typedef struct klfddi_s {                          /* FDDI */
 	klinfo_t 	fddi_info ;
-    	fddi_t        	fddi_specific ;       
+    	fddi_t        	fddi_specific ;
 	klconf_off_t	fddi_devinfo[MAX_FDDI_DEVS] ;
 } klfddi_t ;
 
 typedef struct klmio_s {                          /* MIO */
 	klinfo_t 	mio_info ;
-    	mio_t       	mio_specific   ; 
+    	mio_t       	mio_specific   ;
 } klmio_t ;
 
 
@@ -890,17 +890,17 @@ typedef union kldev_s {      /* for device structure allocation */
 
 /*
  * TBD - Can the ARCS and device driver related info also be included in the
- * KLCONFIG area. On the IO4PROM, prom device driver info is part of cfgnode_t 
+ * KLCONFIG area. On the IO4PROM, prom device driver info is part of cfgnode_t
  * structure, viz private to the IO4prom.
  */
 
-/* 
- * TBD - Allocation issues. 
+/*
+ * TBD - Allocation issues.
  *
- * Do we need to Mark off sepatate heaps for lboard_t, rboard_t, component, 
- * errinfo and allocate from them, or have a single heap and allocate all 
+ * Do we need to Mark off sepatate heaps for lboard_t, rboard_t, component,
+ * errinfo and allocate from them, or have a single heap and allocate all
  * structures from it. Debug is easier in the former method since we can
- * dump all similar structs in one command, but there will be lots of holes, 
+ * dump all similar structs in one command, but there will be lots of holes,
  * in memory and max limits are needed for number of structures.
  * Another way to make it organized, is to have a union of all components
  * and allocate a aligned chunk of memory greater than the biggest

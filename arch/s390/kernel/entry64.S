@@ -254,7 +254,7 @@ sysc_tracesys:
         brasl   %r14,syscall_trace
 	larl	%r1,.Lnr_syscalls
 	clc	SP_R2(8,%r15),0(%r1)
-	jl	sysc_tracego
+	jnl	sysc_tracenogo
 	lg	%r7,SP_R2(%r15)   # strace might have changed the
 	sll     %r7,2             #  system call
 	lgf	%r8,0(%r7,%r10)
@@ -263,6 +263,7 @@ sysc_tracego:
 	lg      %r2,SP_ORIG_R2(%r15)
         basr    %r14,%r8            # call sys_xxx
         stg     %r2,SP_R2(%r15)     # store return value
+sysc_tracenogo:
 	tm	__TI_flags+7(%r9),_TIF_SYSCALL_TRACE
         jno     sysc_return
 	larl	%r14,sysc_return    # return point is sysc_return
@@ -481,7 +482,7 @@ pgm_per_only:
 #
 pgm_svcper:
 	SAVE_ALL __LC_SVC_OLD_PSW,1
-	llgh    %r8,__LC_SVC_INT_CODE # get svc number from lowcore
+	llgh    %r7,__LC_SVC_INT_CODE # get svc number from lowcore
 	stosm   48(%r15),0x03     # reenable interrupts
         GET_THREAD_INFO           # load pointer to task_struct to R9
 	slag	%r7,%r7,2         # *4 and test for svc 0
@@ -490,15 +491,15 @@ pgm_svcper:
 	clg	%r1,.Lnr_syscalls-.Lconst(%r14)
 	slag	%r7,%r1,2
 pgm_svcstd:
-	larl    %r7,sys_call_table
+	larl    %r10,sys_call_table
 #ifdef CONFIG_S390_SUPPORT
         tm      SP_PSW+3(%r15),0x01  # are we running in 31 bit mode ?
         jo      pgm_svcper_noemu
-	larl    %r7,sys_call_table_emu # use 31 bit emulation system calls
+	larl    %r10,sys_call_table_emu # use 31 bit emulation system calls
 pgm_svcper_noemu:
 #endif
 	tm	__TI_flags+3(%r9),_TIF_SYSCALL_TRACE
-        lgf     %r8,0(%r8,%r7)    # load address of system call routine
+        lgf     %r8,0(%r7,%r10)   # load address of system call routine
         jo      pgm_tracesys
         basr    %r14,%r8          # call sys_xxxx
         stg     %r2,SP_R2(%r15)   # store return value (change R2 on stack)
@@ -522,19 +523,20 @@ pgm_svcper_nosig:
 # call trace before and after sys_call
 #
 pgm_tracesys:
-	lgfr	%r7,%r7
+	srlg	%r7,%r7,2
 	stg	%r7,SP_R2(%r15)
         brasl   %r14,syscall_trace
 	clc	SP_R2(8,%r15),.Lnr_syscalls
-	jnl     pgm_svc_go
-	lg      %r2,SP_R2(%r15)
-	sllg    %r2,%r2,3           # strace wants to change the syscall
-	lgf	%r8,0(%r2,%r7)
+	jnl     pgm_svc_nogo
+	lg      %r7,SP_R2(%r15)
+	sllg    %r7,%r7,2           # strace wants to change the syscall
+	lgf	%r8,0(%r7,%r10)
 pgm_svc_go:
 	lmg     %r3,%r6,SP_R3(%r15)
 	lg      %r2,SP_ORIG_R2(%r15)
         basr    %r14,%r8            # call sys_xxx
         stg     %r2,SP_R2(%r15)     # store return value
+pgm_svc_nogo:
 	tm	__TI_flags+7(%r9),_TIF_SYSCALL_TRACE
         jno     pgm_svcret
 	larl	%r14,pgm_svcret     # return point is sysc_return

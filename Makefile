@@ -1,7 +1,7 @@
 VERSION = 2
-PATCHLEVEL = 5
-SUBLEVEL = 73
-EXTRAVERSION = -$(CONFIG_RELEASE)-$(CONFIG_CFGNAME)
+PATCHLEVEL = 6
+SUBLEVEL = 0
+EXTRAVERSION = -test1-$(CONFIG_RELEASE)-$(CONFIG_CFGNAME)
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
@@ -35,7 +35,7 @@ KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
 
 SUBARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ \
 				  -e s/arm.*/arm/ -e s/sa110/arm/ \
-				  -e s/s390x/s390/ )
+				  -e s/s390x/s390/ -e s/parisc64/parisc/ )
 
 # Remove hyphens since they have special meaning in RPM filenames
 KERNELPATH=kernel-$(subst -,,$(KERNELRELEASE))
@@ -213,7 +213,7 @@ AFLAGS_KERNEL	=
 NOSTDINC_FLAGS  = -nostdinc -iwithprefix include
 
 CPPFLAGS	:= -D__KERNEL__ -Iinclude
-CFLAGS 		:= $(CPPFLAGS) -Wall -Wstrict-prototypes -Wno-trigraphs -g -O2 \
+CFLAGS 		:= $(CPPFLAGS) -Wall -Wstrict-prototypes -Wno-trigraphs -O2 \
 	  	   -fno-strict-aliasing -fno-common
 AFLAGS		:= -D__ASSEMBLY__ $(CPPFLAGS)
 
@@ -388,7 +388,7 @@ ifdef CONFIG_KALLSYMS
 kallsyms.o := .tmp_kallsyms2.o
 
 quiet_cmd_kallsyms = KSYM    $@
-cmd_kallsyms = $(NM) -n $< | scripts/kallsyms > $@
+cmd_kallsyms = $(NM) -n $< | $(KALLSYMS) > $@
 
 .tmp_kallsyms1.o .tmp_kallsyms2.o: %.o: %.S scripts FORCE
 	$(call if_changed_dep,as_o_S)

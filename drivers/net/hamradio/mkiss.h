@@ -19,7 +19,6 @@ struct ax_disp {
 	/* Various fields. */
 	struct tty_struct  *tty;		/* ptr to TTY structure		*/
 	struct net_device      *dev;		/* easy for intr handling	*/
-	struct ax_disp     *mkiss;		/* mkiss txport if mkiss channel*/
 
 	/* These are pointers to the malloc()ed frame buffers. */
 	unsigned char      *rbuff;		/* receiver buffer		*/
@@ -60,4 +59,3 @@ struct ax_disp {
 };
 
 #define AX25_MAGIC		0x5316
-#define MKISS_DRIVER_MAGIC	1215

@@ -48,6 +48,8 @@
 
 #include "scsi.h"
 #include "hosts.h"
+
+#include <scsi/scsi_driver.h>
 #include <scsi/scsi_ioctl.h>	/* For the door lock/unlock commands */
 
 #include "scsi_logging.h"
@@ -65,7 +67,7 @@ MODULE_PARM(xa_test, "i");	/* see sr_ioctl.c */
 	(CDC_CLOSE_TRAY|CDC_OPEN_TRAY|CDC_LOCK|CDC_SELECT_SPEED| \
 	 CDC_SELECT_DISC|CDC_MULTI_SESSION|CDC_MCN|CDC_MEDIA_CHANGED| \
 	 CDC_PLAY_AUDIO|CDC_RESET|CDC_IOCTLS|CDC_DRIVE_STATUS| \
-	 CDC_CD_R|CDC_CD_RW|CDC_DVD|CDC_DVD_R|CDC_GENERIC_PACKET)
+	 CDC_CD_R|CDC_CD_RW|CDC_DVD|CDC_DVD_R|CDC_DVD_RAM|CDC_GENERIC_PACKET)
 
 static int sr_probe(struct device *);
 static int sr_remove(struct device *);
@@ -660,9 +662,9 @@ Enomem:
 
 static void get_capabilities(struct scsi_cd *cd)
 {
-	struct cdrom_generic_command cgc;
 	unsigned char *buffer;
 	int rc, n;
+	struct scsi_mode_data data;
 
 	static char *loadmech[] =
 	{
@@ -681,18 +683,10 @@ static void get_capabilities(struct scsi_cd *cd)
 		printk(KERN_ERR "sr: out of memory.\n");
 		return;
 	}
-	memset(&cgc, 0, sizeof(struct cdrom_generic_command));
-	cgc.cmd[0] = MODE_SENSE;
-	cgc.cmd[2] = 0x2a;
-	cgc.cmd[4] = 128;
-	cgc.buffer = buffer;
-	cgc.buflen = 128;
-	cgc.quiet = 1;
-	cgc.data_direction = SCSI_DATA_READ;
-	cgc.timeout = SR_TIMEOUT;
-	rc = sr_do_ioctl(cd, &cgc);
+	rc = scsi_mode_sense(cd->device, 0, 0x2a, buffer, 128,
+			     SR_TIMEOUT, 3, &data);
 
-	if (rc) {
+	if (!scsi_status_is_good(rc)) {
 		/* failed, drive doesn't have capabilities mode page */
 		cd->cdi.speed = 1;
 		cd->cdi.mask |= (CDC_CD_R | CDC_CD_RW | CDC_DVD_R |
@@ -702,7 +696,7 @@ static void get_capabilities(struct scsi_cd *cd)
 		printk("%s: scsi-1 drive\n", cd->cdi.name);
 		return;
 	}
-	n = buffer[3] + 4;
+	n = data.header_length + data.block_descriptor_length;
 	cd->cdi.speed = ((buffer[n + 8] << 8) + buffer[n + 9]) / 176;
 	cd->readcd_known = 1;
 	cd->readcd_cdda = buffer[n + 5] & 0x01;

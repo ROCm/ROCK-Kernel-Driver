@@ -336,7 +336,7 @@ static struct dentry_operations proc_dentry_operations =
  * Don't create negative dentries here, return -ENOENT by hand
  * instead.
  */
-struct dentry *proc_lookup(struct inode * dir, struct dentry *dentry)
+struct dentry *proc_lookup(struct inode * dir, struct dentry *dentry, struct nameidata *nd)
 {
 	struct inode *inode = NULL;
 	struct proc_dir_entry * de;
@@ -559,22 +559,6 @@ struct proc_dir_entry *proc_symlink(const char *name,
 				ent = NULL;
 			}
 		} else {
-			kfree(ent);
-			ent = NULL;
-		}
-	}
-	return ent;
-}
-
-struct proc_dir_entry *proc_mknod(const char *name, mode_t mode,
-		struct proc_dir_entry *parent, kdev_t rdev)
-{
-	struct proc_dir_entry *ent;
-
-	ent = proc_create(&parent,name,mode,1);
-	if (ent) {
-		ent->rdev = rdev;
-		if (proc_register(parent, ent) < 0) {
 			kfree(ent);
 			ent = NULL;
 		}

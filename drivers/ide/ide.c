@@ -216,7 +216,7 @@ EXPORT_SYMBOL(idetape);
 EXPORT_SYMBOL(idescsi);
 
 extern ide_driver_t idedefault_driver;
-static void setup_driver_defaults (ide_drive_t *drive);
+static void setup_driver_defaults(ide_driver_t *driver);
 
 /*
  * Do not even *think* about calling this!
@@ -275,7 +275,6 @@ static void init_hwif_data (unsigned int index)
 		drive->using_dma		= 0;
 		drive->is_flash			= 0;
 		drive->driver			= &idedefault_driver;
-		setup_driver_defaults(drive);
 		drive->vdma			= 0;
 		INIT_LIST_HEAD(&drive->list);
 	}
@@ -307,6 +306,8 @@ static void __init init_ide_data (void)
 	if (magic_cookie != MAGIC_COOKIE)
 		return;		/* already initialized */
 	magic_cookie = 0;
+
+	setup_driver_defaults(&idedefault_driver);
 
 	/* Initialise all interface structures */
 	for (index = 0; index < MAX_HWIFS; ++index)
@@ -507,12 +508,87 @@ ide_proc_entry_t generic_subdriver_entries[] = {
 };
 #endif
 
+static struct resource* hwif_request_region(ide_hwif_t *hwif,
+					    unsigned long addr, int num)
+{
+	struct resource *res;
+
+	if (hwif->mmio)
+		res = request_mem_region(addr, num, hwif->name);
+	else
+		res = request_region(addr, num, hwif->name);
+
+	if (!res)
+		printk(KERN_ERR "%s: %s resource 0x%lX-0x%lX not free.\n",
+				hwif->name, hwif->mmio ? "MMIO" : "I/O",
+				addr, addr+num-1);
+	return res;
+}
 
 #define hwif_release_region(addr, num) \
 	((hwif->mmio) ? release_mem_region((addr),(num)) : release_region((addr),(num)))
 
 /**
- *	hwif_unregister		-	free IDE resources
+ *	ide_hwif_request_regions - request resources for IDE
+ *	@hwif: interface to use
+ *
+ *	Requests all the needed resources for an interface.
+ *	Right now core IDE code does this work which is deeply wrong.
+ *	MMIO leaves it to the controller driver,
+ *	PIO will migrate this way over time.
+ */
+int ide_hwif_request_regions(ide_hwif_t *hwif)
+{
+	unsigned long addr;
+	unsigned int i;
+
+	if (hwif->mmio == 2)
+		return 0;
+	addr = hwif->io_ports[IDE_CONTROL_OFFSET];
+	if (addr && !hwif_request_region(hwif, addr, 1))
+		goto control_region_busy;
+#if defined(CONFIG_AMIGA) || defined(CONFIG_MAC)
+	addr = hwif->io_ports[IDE_IRQ_OFFSET];
+	if (addr && !hwif_request_region(hwif, addr, 1))
+		goto irq_region_busy;
+#endif /* (CONFIG_AMIGA) || (CONFIG_MAC) */
+	hwif->straight8 = 0;
+	addr = hwif->io_ports[IDE_DATA_OFFSET];
+	if ((addr | 7) == hwif->io_ports[IDE_STATUS_OFFSET]) {
+		if (!hwif_request_region(hwif, addr, 8))
+			goto data_region_busy;
+		hwif->straight8 = 1;
+		return 0;
+	}
+	for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; i++) {
+		addr = hwif->io_ports[i];
+		if (!hwif_request_region(hwif, addr, 1)) {
+			while (--i)
+				hwif_release_region(addr, 1);
+			goto data_region_busy;
+		}
+	}
+	return 0;
+
+data_region_busy:
+#if defined(CONFIG_AMIGA) || defined(CONFIG_MAC)
+	addr = hwif->io_ports[IDE_IRQ_OFFSET];
+	if (addr)
+		hwif_release_region(addr, 1);
+irq_region_busy:
+#endif /* (CONFIG_AMIGA) || (CONFIG_MAC) */
+	addr = hwif->io_ports[IDE_CONTROL_OFFSET];
+	if (addr)
+		hwif_release_region(addr, 1);
+control_region_busy:
+	/* If any errors are return, we drop the hwif interface. */
+	return -EBUSY;
+}
+
+EXPORT_SYMBOL(ide_hwif_request_regions);
+
+/**
+ *	ide_hwif_release_regions - free IDE resources
  *
  *	Note that we only release the standard ports,
  *	and do not even try to handle any extra ports
@@ -522,8 +598,7 @@ ide_proc_entry_t generic_subdriver_entries[] = {
  *	importantly our caller should be doing this so we need to 
  *	restructure this as a helper function for drivers.
  */
- 
-void hwif_unregister (ide_hwif_t *hwif)
+void ide_hwif_release_regions(ide_hwif_t *hwif)
 {
 	u32 i = 0;
 
@@ -547,7 +622,7 @@ void hwif_unregister (ide_hwif_t *hwif)
 	}
 }
 
-EXPORT_SYMBOL(hwif_unregister);
+EXPORT_SYMBOL(ide_hwif_release_regions);
 
 extern void init_hwif_data(unsigned int index);
 
@@ -634,7 +709,7 @@ void ide_unregister (unsigned int index)
 	 * and do not even try to handle any extra ports
 	 * allocated for weird IDE interface chipsets.
 	 */
-	hwif_unregister(hwif);
+	ide_hwif_release_regions(hwif);
 
 	/*
 	 * Remove us from the hwgroup, and free
@@ -673,8 +748,8 @@ void ide_unregister (unsigned int index)
 		blk_cleanup_queue(&drive->queue);
 	}
 	if (hwif->next == hwif) {
-		kfree(hwgroup);
 		BUG_ON(hwgroup->hwif != hwif);
+		kfree(hwgroup);
 	} else {
 		/* There is another interface in hwgroup.
 		 * Unlink us, and set hwgroup->drive and ->hwif to
@@ -1134,13 +1209,12 @@ ide_settings_t *ide_find_setting_by_name (ide_drive_t *drive, char *name)
  *
  *	Automatically remove all the driver specific settings for this
  *	drive. This function may sleep and must not be called from IRQ
- *	context. Takes the settings_lock
+ *	context. The caller must hold ide_setting_sem.
  */
  
 static void auto_remove_settings (ide_drive_t *drive)
 {
 	ide_settings_t *setting;
-	down(&ide_setting_sem);
 repeat:
 	setting = drive->settings;
 	while (setting) {
@@ -1150,7 +1224,6 @@ repeat:
 		}
 		setting = setting->next;
 	}
-	up(&ide_setting_sem);
 }
 
 /**
@@ -2099,10 +2172,9 @@ int __init ide_setup (char *s)
 #ifdef CONFIG_BLK_DEV_IDEPCI
 				hwif->udma_four = 1;
 				goto done;
-#else /* !CONFIG_BLK_DEV_IDEPCI */
-				hwif->udma_four = 0;
+#else
 				goto bad_hwif;
-#endif /* CONFIG_BLK_DEV_IDEPCI */
+#endif
 			case -6: /* dma */
 				hwif->autodma = 1;
 				goto done;
@@ -2346,10 +2418,8 @@ static ide_startstop_t default_abort (ide_drive_t *drive, const char *msg)
 	return ide_abort(drive, msg);
 }
 
-static void setup_driver_defaults (ide_drive_t *drive)
+static void setup_driver_defaults (ide_driver_t *d)
 {
-	ide_driver_t *d = drive->driver;
-
 	if (d->cleanup == NULL)		d->cleanup = default_cleanup;
 	if (d->shutdown == NULL)	d->shutdown = default_shutdown;
 	if (d->flushcache == NULL)	d->flushcache = default_flushcache;
@@ -2377,7 +2447,6 @@ int ide_register_subdriver (ide_drive_t *drive, ide_driver_t *driver, int versio
 		return 1;
 	}
 	drive->driver = driver;
-	setup_driver_defaults(drive);
 	spin_unlock_irqrestore(&ide_lock, flags);
 	spin_lock(&drives_lock);
 	list_add_tail(&drive->list, &driver->drives);
@@ -2408,9 +2477,11 @@ int ide_unregister_subdriver (ide_drive_t *drive)
 {
 	unsigned long flags;
 	
+	down(&ide_setting_sem);
 	spin_lock_irqsave(&ide_lock, flags);
 	if (drive->usage || drive->driver == &idedefault_driver || DRIVER(drive)->busy) {
 		spin_unlock_irqrestore(&ide_lock, flags);
+		up(&ide_setting_sem);
 		return 1;
 	}
 #if defined(CONFIG_BLK_DEV_IDEPNP) && defined(CONFIG_PNP) && defined(MODULE)
@@ -2422,8 +2493,8 @@ int ide_unregister_subdriver (ide_drive_t *drive)
 #endif
 	auto_remove_settings(drive);
 	drive->driver = &idedefault_driver;
-	setup_driver_defaults(drive);
 	spin_unlock_irqrestore(&ide_lock, flags);
+	up(&ide_setting_sem);
 	spin_lock(&drives_lock);
 	list_del_init(&drive->list);
 	spin_unlock(&drives_lock);
@@ -2445,6 +2516,8 @@ int ide_register_driver(ide_driver_t *driver)
 	struct list_head list;
 	struct list_head *list_loop;
 	struct list_head *tmp_storage;
+
+	setup_driver_defaults(driver);
 
 	spin_lock(&drivers_lock);
 	list_add(&driver->drivers, &drivers);
@@ -2520,13 +2593,9 @@ struct bus_type ide_bus_type = {
  */
 int __init ide_init (void)
 {
-	static char banner_printed;
-	if (!banner_printed) {
-		printk(KERN_INFO "Uniform Multi-Platform E-IDE driver " REVISION "\n");
-		devfs_mk_dir("ide");
-		system_bus_speed = ide_system_bus_speed();
-		banner_printed = 1;
-	}
+	printk(KERN_INFO "Uniform Multi-Platform E-IDE driver " REVISION "\n");
+	devfs_mk_dir("ide");
+	system_bus_speed = ide_system_bus_speed();
 
 	bus_register(&ide_bus_type);
 

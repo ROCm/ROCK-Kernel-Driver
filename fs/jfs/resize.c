@@ -182,7 +182,7 @@ int jfs_extendfs(struct super_block *sb, s64 newLVSize, int newLogSize)
 
 	/* file system cannot be shrinked */
 	if (newFSSize < bmp->db_mapsize) {
-		rc = EINVAL;
+		rc = -EINVAL;
 		goto out;
 	}
 
@@ -315,7 +315,7 @@ int jfs_extendfs(struct super_block *sb, s64 newLVSize, int newLogSize)
 	if (mapSize > t64) {
 		printk(KERN_ERR "jfs_extendfs: mapSize (0x%Lx) > t64 (0x%Lx)\n",
 		       (long long) mapSize, (long long) t64);
-		rc = EIO;
+		rc = -EIO;
 		goto error_out;
 	}
 	nblocks = min(t64 - mapSize, XSize);

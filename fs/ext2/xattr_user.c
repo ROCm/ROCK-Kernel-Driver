@@ -11,10 +11,6 @@
 #include "ext2.h"
 #include "xattr.h"
 
-#ifdef CONFIG_EXT2_FS_POSIX_ACL
-# include "acl.h"
-#endif
-
 #define XATTR_USER_PREFIX "user."
 
 static size_t
@@ -44,11 +40,7 @@ ext2_xattr_user_get(struct inode *inode, const char *name,
 		return -EINVAL;
 	if (!test_opt(inode->i_sb, XATTR_USER))
 		return -EOPNOTSUPP;
-#ifdef CONFIG_EXT2_FS_POSIX_ACL
-	error = ext2_permission_locked(inode, MAY_READ);
-#else
-	error = permission(inode, MAY_READ);
-#endif
+	error = permission(inode, MAY_READ, NULL);
 	if (error)
 		return error;
 
@@ -68,11 +60,7 @@ ext2_xattr_user_set(struct inode *inode, const char *name,
 	if ( !S_ISREG(inode->i_mode) &&
 	    (!S_ISDIR(inode->i_mode) || inode->i_mode & S_ISVTX))
 		return -EPERM;
-#ifdef CONFIG_EXT2_FS_POSIX_ACL
-	error = ext2_permission_locked(inode, MAY_WRITE);
-#else
-	error = permission(inode, MAY_WRITE);
-#endif
+	error = permission(inode, MAY_WRITE, NULL);
 	if (error)
 		return error;
 

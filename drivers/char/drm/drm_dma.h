@@ -1,4 +1,12 @@
-/* drm_dma.c -- DMA IOCTL and function support -*- linux-c -*-
+/**
+ * \file drm_dma.h 
+ * DMA IOCTL and function support
+ *
+ * \author Rickard E. (Rik) Faith <faith@valinux.com>
+ * \author Gareth Hughes <gareth@valinux.com>
+ */
+
+/*
  * Created: Fri Mar 19 14:30:16 1999 by faith@valinux.com
  *
  * Copyright 1999, 2000 Precision Insight, Inc., Cedar Park, Texas.
@@ -23,10 +31,6 @@
  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
- *
- * Authors:
- *    Rickard E. (Rik) Faith <faith@valinux.com>
- *    Gareth Hughes <gareth@valinux.com>
  */
 
 #include "drmP.h"
@@ -51,6 +55,14 @@
 
 #if __HAVE_DMA
 
+/**
+ * Initialize the DMA data.
+ * 
+ * \param dev DRM device.
+ * \return zero on success or a negative value on failure.
+ *
+ * Allocate and initialize a drm_device_dma structure.
+ */
 int DRM(dma_setup)( drm_device_t *dev )
 {
 	int i;
@@ -67,6 +79,14 @@ int DRM(dma_setup)( drm_device_t *dev )
 	return 0;
 }
 
+/**
+ * Cleanup the DMA resources.
+ *
+ * \param dev DRM device.
+ *
+ * Free all pages associated with DMA buffers, the buffers and pages lists, and
+ * finally the the drm_device::dma structure itself.
+ */
 void DRM(dma_takedown)(drm_device_t *dev)
 {
 	drm_device_dma_t  *dma = dev->dma;
@@ -128,7 +148,14 @@ void DRM(dma_takedown)(drm_device_t *dev)
 }
 
 
-
+/**
+ * Free a buffer.
+ *
+ * \param dev DRM device.
+ * \param buf buffer to free.
+ * 
+ * Resets the fields of \p buf.
+ */
 void DRM(free_buffer)(drm_device_t *dev, drm_buf_t *buf)
 {
 	if (!buf) return;
@@ -154,6 +181,13 @@ void DRM(free_buffer)(drm_device_t *dev, drm_buf_t *buf)
 }
 
 #if !__HAVE_DMA_RECLAIM
+/**
+ * Reclaim the buffers.
+ *
+ * \param filp file pointer.
+ *
+ * Frees each buffer associated with \p filp not already on the hardware.
+ */
 void DRM(reclaim_buffers)( struct file *filp )
 {
 	drm_file_t    *priv   = filp->private_data;
@@ -185,6 +219,16 @@ void DRM(reclaim_buffers)( struct file *filp )
 
 #if __HAVE_DMA_IRQ
 
+/**
+ * Install IRQ handler.
+ *
+ * \param dev DRM device.
+ * \param irq IRQ number.
+ *
+ * Initializes the IRQ related data, and setups drm_device::vbl_queue. Installs the handler, calling the driver
+ * \c DRM(driver_irq_preinstall)() and \c DRM(driver_irq_postinstall)() functions
+ * before and after the installation.
+ */
 int DRM(irq_install)( drm_device_t *dev, int irq )
 {
 	int ret;
@@ -250,6 +294,13 @@ int DRM(irq_install)( drm_device_t *dev, int irq )
 	return 0;
 }
 
+/**
+ * Uninstall the IRQ handler.
+ *
+ * \param dev DRM device.
+ *
+ * Calls the driver's \c DRM(driver_irq_uninstall)() function, and stops the irq.
+ */
 int DRM(irq_uninstall)( drm_device_t *dev )
 {
 	int irq;
@@ -271,6 +322,17 @@ int DRM(irq_uninstall)( drm_device_t *dev )
 	return 0;
 }
 
+/**
+ * IRQ control ioctl.
+ *
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param arg user argument, pointing to a drm_control structure.
+ * \return zero on success or a negative number on failure.
+ *
+ * Calls irq_install() or irq_uninstall() according to \p arg.
+ */
 int DRM(control)( struct inode *inode, struct file *filp,
 		  unsigned int cmd, unsigned long arg )
 {
@@ -293,6 +355,25 @@ int DRM(control)( struct inode *inode, struct file *filp,
 
 #if __HAVE_VBL_IRQ
 
+/**
+ * Wait for VBLANK.
+ *
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param data user argument, pointing to a drm_wait_vblank structure.
+ * \return zero on success or a negative number on failure.
+ *
+ * Verifies the IRQ is installed. 
+ *
+ * If a signal is requested checks if this task has already scheduled the same signal
+ * for the same vblank sequence number - nothing to be done in
+ * that case. If the number of tasks waiting for the interrupt exceeds 100 the
+ * function fails. Otherwise adds a new entry to drm_device::vbl_sigs for this
+ * task.
+ *
+ * If a signal is not requested, then calls vblank_wait().
+ */
 int DRM(wait_vblank)( DRM_IOCTL_ARGS )
 {
 	drm_file_t *priv = filp->private_data;
@@ -381,6 +462,15 @@ done:
 	return ret;
 }
 
+/**
+ * Send the VBLANK signals.
+ *
+ * \param dev DRM device.
+ *
+ * Sends a signal for each task in drm_device::vbl_sigs and empties the list.
+ *
+ * If a signal is not requested, then calls vblank_wait().
+ */
 void DRM(vbl_send_signals)( drm_device_t *dev )
 {
 	struct list_head *list, *tmp;

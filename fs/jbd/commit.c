@@ -401,6 +401,13 @@ sync_datalist_empty:
 			continue;
 		}
 
+		/*
+		 * start_this_handle() uses t_outstanding_credits to determine
+		 * the free space in the log, but this counter is changed
+		 * by journal_next_log_block() also.
+		 */
+		commit_transaction->t_outstanding_credits--;
+
 		/* Bump b_count to prevent truncate from stumbling over
                    the shadowed buffer!  @@@ This can go if we ever get
                    rid of the BJ_IO/BJ_Shadow pairing of buffers. */
@@ -727,9 +734,8 @@ skip_commit: /* The journal should be unlocked by now. */
 			__journal_unfile_buffer(jh);
 			jh->b_transaction = 0;
 			jbd_unlock_bh_state(bh);
-			journal_remove_journal_head(bh);
-			if (buffer_freed(bh))
-				release_buffer_page(bh);
+			journal_remove_journal_head(bh);  /* needs a brelse */
+			release_buffer_page(bh);
 		}
 		spin_unlock(&journal->j_list_lock);
 	}

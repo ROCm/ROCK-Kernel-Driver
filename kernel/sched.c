@@ -33,6 +33,7 @@
 #include <linux/timer.h>
 #include <linux/rcupdate.h>
 #include <linux/cpu.h>
+#include <linux/percpu.h>
 
 #ifdef CONFIG_NUMA
 #define cpu_to_node_mask(cpu) node_to_cpumask(cpu_to_node(cpu))
@@ -170,12 +171,12 @@ struct runqueue {
 	struct list_head migration_queue;
 
 	atomic_t nr_iowait;
-} ____cacheline_aligned;
+};
 
-static struct runqueue runqueues[NR_CPUS] __cacheline_aligned;
+static DEFINE_PER_CPU(struct runqueue, runqueues);
 
-#define cpu_rq(cpu)		(runqueues + (cpu))
-#define this_rq()		cpu_rq(smp_processor_id())
+#define cpu_rq(cpu)		(&per_cpu(runqueues, (cpu)))
+#define this_rq()		(&__get_cpu_var(runqueues))
 #define task_rq(p)		cpu_rq(task_cpu(p))
 #define cpu_curr(cpu)		(cpu_rq(cpu)->curr)
 #define rt_task(p)		((p)->prio < MAX_RT_PRIO)
@@ -507,8 +508,8 @@ repeat_lock_task:
 		}
 #ifdef CONFIG_SMP
 	       	else
-			if (unlikely(kick) && task_running(rq, p) && (p->thread_info->cpu != smp_processor_id()))
-				smp_send_reschedule(p->thread_info->cpu);
+			if (unlikely(kick) && task_running(rq, p) && (task_cpu(p) != smp_processor_id()))
+				smp_send_reschedule(task_cpu(p));
 #endif
 		p->state = TASK_RUNNING;
 	}
@@ -645,9 +646,9 @@ static inline task_t * context_switch(runqueue_t *rq, task_t *prev, task_t *next
 	if (unlikely(!mm)) {
 		next->active_mm = oldmm;
 		atomic_inc(&oldmm->mm_count);
-		enter_lazy_tlb(oldmm, next, smp_processor_id());
+		enter_lazy_tlb(oldmm, next);
 	} else
-		switch_mm(oldmm, mm, next, smp_processor_id());
+		switch_mm(oldmm, mm, next);
 
 	if (unlikely(!prev->mm)) {
 		prev->active_mm = NULL;
@@ -784,7 +785,13 @@ static int sched_best_cpu(struct task_struct *p)
 
 	minload = 10000000;
 	for_each_node_with_cpus(i) {
-		load = atomic_read(&node_nr_running[i]);
+		/*
+		 * Node load is always divided by nr_cpus_node to normalise 
+		 * load values in case cpu count differs from node to node.
+		 * We first multiply node_nr_running by 10 to get a little
+		 * better resolution.   
+		 */
+		load = 10 * atomic_read(&node_nr_running[i]) / nr_cpus_node(i);
 		if (load < minload) {
 			minload = load;
 			node = i;
@@ -820,19 +827,26 @@ void sched_balance_exec(void)
  * geometrically deccaying weight to the load measure:
  *      load_{t} = load_{t-1}/2 + nr_node_running_{t}
  * This way sudden load peaks are flattened out a bit.
+ * Node load is divided by nr_cpus_node() in order to compare nodes
+ * of different cpu count but also [first] multiplied by 10 to 
+ * provide better resolution.
  */
 static int find_busiest_node(int this_node)
 {
 	int i, node = -1, load, this_load, maxload;
 
+	if (!nr_cpus_node(this_node))
+		return node;
 	this_load = maxload = (this_rq()->prev_node_load[this_node] >> 1)
-		+ atomic_read(&node_nr_running[this_node]);
+		+ (10 * atomic_read(&node_nr_running[this_node])
+		/ nr_cpus_node(this_node));
 	this_rq()->prev_node_load[this_node] = this_load;
-	for (i = 0; i < numnodes; i++) {
+	for_each_node_with_cpus(i) {
 		if (i == this_node)
 			continue;
 		load = (this_rq()->prev_node_load[i] >> 1)
-			+ atomic_read(&node_nr_running[i]);
+			+ (10 * atomic_read(&node_nr_running[i])
+			/ nr_cpus_node(i));
 		this_rq()->prev_node_load[i] = load;
 		if (load > maxload && (100*load > NODE_THRESHOLD*this_load)) {
 			maxload = load;
@@ -1033,7 +1047,7 @@ skip_queue:
 	 */
 
 #define CAN_MIGRATE_TASK(p,rq,this_cpu)					\
-	((jiffies - (p)->last_run > cache_decay_ticks) &&	\
+	((!idle || (jiffies - (p)->last_run > cache_decay_ticks)) &&	\
 		!task_running(rq, p) &&					\
 			((p)->cpus_allowed & (1UL << (this_cpu))))
 
@@ -1161,6 +1175,7 @@ DEFINE_PER_CPU(struct kernel_stat, kstat) = { { 0 } };
 void scheduler_tick(int user_ticks, int sys_ticks)
 {
 	int cpu = smp_processor_id();
+	struct cpu_usage_stat *cpustat = &kstat_this_cpu.cpustat;
 	runqueue_t *rq = this_rq();
 	task_t *p = current;
 
@@ -1170,19 +1185,19 @@ void scheduler_tick(int user_ticks, int sys_ticks)
 	if (p == rq->idle) {
 		/* note: this timer irq context must be accounted for as well */
 		if (irq_count() - HARDIRQ_OFFSET >= SOFTIRQ_OFFSET)
-			kstat_cpu(cpu).cpustat.system += sys_ticks;
+			cpustat->system += sys_ticks;
 		else if (atomic_read(&rq->nr_iowait) > 0)
-			kstat_cpu(cpu).cpustat.iowait += sys_ticks;
+			cpustat->iowait += sys_ticks;
 		else
-			kstat_cpu(cpu).cpustat.idle += sys_ticks;
+			cpustat->idle += sys_ticks;
 		rebalance_tick(rq, 1);
 		return;
 	}
 	if (TASK_NICE(p) > 0)
-		kstat_cpu(cpu).cpustat.nice += user_ticks;
+		cpustat->nice += user_ticks;
 	else
-		kstat_cpu(cpu).cpustat.user += user_ticks;
-	kstat_cpu(cpu).cpustat.system += sys_ticks;
+		cpustat->user += user_ticks;
+	cpustat->system += sys_ticks;
 
 	/* Task might have expired already, but not scheduled off yet */
 	if (p->array != rq->active) {
@@ -1318,7 +1333,7 @@ pick_next_task:
 switch_tasks:
 	prefetch(next);
 	clear_tsk_need_resched(prev);
-	RCU_qsctr(prev->thread_info->cpu)++;
+	RCU_qsctr(task_cpu(prev))++;
 
 	if (likely(prev != next)) {
 		rq->nr_switches++;
@@ -1691,6 +1706,7 @@ static int setscheduler(pid_t pid, int policy, struct sched_param __user *param)
 {
 	struct sched_param lp;
 	int retval = -EINVAL;
+	int oldprio;
 	prio_array_t *array;
 	unsigned long flags;
 	runqueue_t *rq;
@@ -1757,12 +1773,24 @@ static int setscheduler(pid_t pid, int policy, struct sched_param __user *param)
 	retval = 0;
 	p->policy = policy;
 	p->rt_priority = lp.sched_priority;
+	oldprio = p->prio;
 	if (policy != SCHED_NORMAL)
 		p->prio = MAX_USER_RT_PRIO-1 - p->rt_priority;
 	else
 		p->prio = p->static_prio;
-	if (array)
+	if (array) {
 		__activate_task(p, task_rq(p));
+		/*
+		 * Reschedule if we are currently running on this runqueue and
+		 * our priority decreased, or if we are not currently running on
+		 * this runqueue and our priority is higher than the current's
+		 */
+		if (rq->curr == p) {
+			if (p->prio > oldprio)
+				resched_task(rq->curr);
+		} else if (p->prio < rq->curr->prio)
+			resched_task(rq->curr);
+	}
 
 out_unlock:
 	task_rq_unlock(rq, &flags);
@@ -2500,7 +2528,7 @@ void __init sched_init(void)
 	 * The boot idle thread does lazy MMU switching as well:
 	 */
 	atomic_inc(&init_mm.mm_count);
-	enter_lazy_tlb(&init_mm, current, smp_processor_id());
+	enter_lazy_tlb(&init_mm, current);
 }
 
 #ifdef CONFIG_DEBUG_SPINLOCK_SLEEP

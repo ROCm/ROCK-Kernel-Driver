@@ -288,7 +288,7 @@ void __init cpu_init (void)
 	me->active_mm = &init_mm;
 	if (me->mm)
 		BUG();
-	enter_lazy_tlb(&init_mm, me, cpu);
+	enter_lazy_tlb(&init_mm, me);
 
 	set_tss_desc(cpu, t);
 	load_TR_desc();

@@ -41,7 +41,7 @@
  * not be set too low to prevent false triggering.  Conversely, if it
  * is set too high, then you could miss a stuck IRQ.
  *
- * Maybe we ought to set a timer and re-enable the IRQ at a later time?
+ * FIXME Maybe we ought to set a timer and re-enable the IRQ at a later time?
  */
 #define MAX_IRQ_CNT	100000
 
@@ -49,7 +49,6 @@ static volatile unsigned long irq_err_count;
 static spinlock_t irq_controller_lock = SPIN_LOCK_UNLOCKED;
 
 struct irqdesc irq_desc[NR_IRQS];
-void (*init_arch_irq)(void) __initdata = NULL;
 
 /*
  * Dummy mask/unmask handler
@@ -88,7 +87,6 @@ void disable_irq(unsigned int irq)
 {
 	struct irqdesc *desc = irq_desc + irq;
 	unsigned long flags;
-
 	spin_lock_irqsave(&irq_controller_lock, flags);
 	if (!desc->depth++)
 		desc->enabled = 0;
@@ -114,7 +112,7 @@ void enable_irq(unsigned int irq)
 	spin_lock_irqsave(&irq_controller_lock, flags);
 	if (unlikely(!desc->depth)) {
 		printk("enable_irq(%u) unbalanced from %p\n", irq,
-			__builtin_return_address(0));
+			__builtin_return_address(0)); //FIXME bum addresses reported - why?
 	} else if (!--desc->depth) {
 		desc->probing = 0;
 		desc->enabled = 1;
@@ -187,7 +185,6 @@ __do_irq(unsigned int irq, struct irqaction *action, struct pt_regs *regs)
 	unsigned int status;
 
 	spin_unlock(&irq_controller_lock);
-
 	if (!(action->flags & SA_INTERRUPT))
 		local_irq_enable();
 
@@ -700,6 +697,6 @@ void __init init_IRQ(void)
 	for (irq = 0, desc = irq_desc; irq < NR_IRQS; irq++, desc++)
 		*desc = bad_irq_desc;
 
-	init_arch_irq();
+	arc_init_irq();
 	init_dma();
 }

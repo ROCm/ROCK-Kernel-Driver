@@ -184,8 +184,7 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
  * This is really horribly ugly.
  */
 asmlinkage __SYS_RETTYPE sys_ipc (uint call, int first, int second, 
-				  unsigned long third, void *ptr,
-				  unsigned long fifth)
+				  unsigned long third, void *ptr)
 {
         struct ipc_kludge tmp;
 	int ret;
@@ -195,8 +194,8 @@ asmlinkage __SYS_RETTYPE sys_ipc (uint call, int first, int second,
 		return sys_semtimedop (first, (struct sembuf *) ptr, second,
 				       NULL);
 	case SEMTIMEDOP:
-		return sys_semtimedop(first, (struct sembuf *) ptr, second,
-				      (const struct timespec *) fifth);
+		return sys_semtimedop (first, (struct sembuf *) ptr, second,
+				       (const struct timespec *) third);
         case SEMGET:
                 return sys_semget (first, second, third);
         case SEMCTL: {

@@ -200,7 +200,7 @@ static void copy_from_user_state(struct xfrm_state *x, struct xfrm_usersa_info *
 	x->props.replay_window = p->replay_window;
 	x->props.reqid = p->reqid;
 	x->props.family = p->family;
-	x->props.saddr = x->sel.saddr;
+	x->props.saddr = p->saddr;
 }
 
 static struct xfrm_state *xfrm_state_construct(struct xfrm_usersa_info *p,
@@ -249,7 +249,7 @@ error_no_put:
 static int xfrm_add_sa(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
 {
 	struct xfrm_usersa_info *p = NLMSG_DATA(nlh);
-	struct xfrm_state *x, *x1;
+	struct xfrm_state *x;
 	int err;
 
 	err = verify_newsa_info(p, (struct rtattr **) xfrma);
@@ -260,16 +260,17 @@ static int xfrm_add_sa(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
 	if (!x)
 		return err;
 
-	x1 = xfrm_state_lookup(&x->id.daddr, x->id.spi, x->id.proto, x->props.family);
-	if (x1) {
+	if (nlh->nlmsg_type == XFRM_MSG_NEWSA)
+		err = xfrm_state_add(x);
+	else
+		err = xfrm_state_update(x);
+
+	if (err < 0) {
+		x->km.state = XFRM_STATE_DEAD;
 		xfrm_state_put(x);
-		xfrm_state_put(x1);
-		return -EEXIST;
 	}
 
-	xfrm_state_insert(x);
-
-	return 0;
+	return err;
 }
 
 static int xfrm_del_sa(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
@@ -299,6 +300,7 @@ static void copy_to_user_state(struct xfrm_state *x, struct xfrm_usersa_info *p)
 	memcpy(&p->lft, &x->lft, sizeof(p->lft));
 	memcpy(&p->curlft, &x->curlft, sizeof(p->curlft));
 	memcpy(&p->stats, &x->stats, sizeof(p->stats));
+	p->saddr = x->props.saddr;
 	p->mode = x->props.mode;
 	p->replay_window = x->props.replay_window;
 	p->reqid = x->props.reqid;
@@ -563,7 +565,7 @@ static void copy_templates(struct xfrm_policy *xp, struct xfrm_user_tmpl *ut,
 	}
 }
 
-static int copy_user_tmpl(struct xfrm_policy *pol, struct rtattr **xfrma)
+static int copy_from_user_tmpl(struct xfrm_policy *pol, struct rtattr **xfrma)
 {
 	struct rtattr *rt = xfrma[XFRMA_TMPL-1];
 	struct xfrm_user_tmpl *utmpl;
@@ -619,7 +621,7 @@ static struct xfrm_policy *xfrm_policy_construct(struct xfrm_userpolicy_info *p,
 	}
 
 	copy_from_user_policy(xp, p);
-	err = copy_user_tmpl(xp, xfrma);
+	err = copy_from_user_tmpl(xp, xfrma);
 	if (err) {
 		*errp = err;
 		kfree(xp);
@@ -656,6 +658,38 @@ static int xfrm_add_policy(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfr
 	return 0;
 }
 
+static int copy_to_user_tmpl(struct xfrm_policy *xp, struct sk_buff *skb)
+{
+	struct xfrm_user_tmpl vec[XFRM_MAX_DEPTH];
+	int i;
+
+	if (xp->xfrm_nr == 0)
+		return 0;
+
+	for (i = 0; i < xp->xfrm_nr; i++) {
+		struct xfrm_user_tmpl *up = &vec[i];
+		struct xfrm_tmpl *kp = &xp->xfrm_vec[i];
+
+		memcpy(&up->id, &kp->id, sizeof(up->id));
+		memcpy(&up->saddr, &kp->saddr, sizeof(up->saddr));
+		up->reqid = kp->reqid;
+		up->mode = kp->mode;
+		up->share = kp->share;
+		up->optional = kp->optional;
+		up->aalgos = kp->aalgos;
+		up->ealgos = kp->ealgos;
+		up->calgos = kp->calgos;
+	}
+	RTA_PUT(skb, XFRMA_TMPL,
+		(sizeof(struct xfrm_user_tmpl) * xp->xfrm_nr),
+		vec);
+
+	return 0;
+
+rtattr_failure:
+	return -1;
+}
+
 static int dump_one_policy(struct xfrm_policy *xp, int dir, int count, void *ptr)
 {
 	struct xfrm_dump_info *sp = ptr;
@@ -675,29 +709,8 @@ static int dump_one_policy(struct xfrm_policy *xp, int dir, int count, void *ptr
 	nlh->nlmsg_flags = 0;
 
 	copy_to_user_policy(xp, p, dir);
-
-	if (xp->xfrm_nr) {
-		struct xfrm_user_tmpl vec[XFRM_MAX_DEPTH];
-		int i;
-
-		for (i = 0; i < xp->xfrm_nr; i++) {
-			struct xfrm_user_tmpl *up = &vec[i];
-			struct xfrm_tmpl *kp = &xp->xfrm_vec[i];
-
-			memcpy(&up->id, &kp->id, sizeof(up->id));
-			memcpy(&up->saddr, &kp->saddr, sizeof(up->saddr));
-			up->reqid = kp->reqid;
-			up->mode = kp->mode;
-			up->share = kp->share;
-			up->optional = kp->optional;
-			up->aalgos = kp->aalgos;
-			up->ealgos = kp->ealgos;
-			up->calgos = kp->calgos;
-		}
-		RTA_PUT(skb, XFRMA_TMPL,
-			(sizeof(struct xfrm_user_tmpl) * xp->xfrm_nr),
-			vec);
-	}
+	if (copy_to_user_tmpl(xp, skb) < 0)
+		goto nlmsg_failure;
 
 	nlh->nlmsg_len = skb->tail - b;
 out:
@@ -705,7 +718,6 @@ out:
 	return 0;
 
 nlmsg_failure:
-rtattr_failure:
 	skb_trim(skb, b - skb->data);
 	return -1;
 }
@@ -771,9 +783,7 @@ static int xfrm_get_policy(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfr
 	if (xp == NULL)
 		return -ENOENT;
 
-	if (delete)
-		xfrm_policy_kill(xp);
-	else {
+	if (!delete) {
 		struct sk_buff *resp_skb;
 
 		resp_skb = xfrm_policy_netlink(skb, xp, p->dir, nlh->nlmsg_seq);
@@ -784,8 +794,9 @@ static int xfrm_get_policy(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfr
 					      NETLINK_CB(skb).pid,
 					      MSG_DONTWAIT);
 		}
-		xfrm_pol_put(xp);
 	}
+
+	xfrm_pol_put(xp);
 
 	return err;
 }
@@ -801,6 +812,7 @@ static const int xfrm_msg_min[(XFRM_MSG_MAX + 1 - XFRM_MSG_BASE)] = {
 	NLMSG_LENGTH(sizeof(struct xfrm_user_acquire)),	/* ACQUIRE */
 	NLMSG_LENGTH(sizeof(struct xfrm_user_expire)),	/* EXPIRE */
 	NLMSG_LENGTH(sizeof(struct xfrm_userpolicy_info)),/* UPD POLICY */
+	NLMSG_LENGTH(sizeof(struct xfrm_usersa_info)),	/* UPD SA */
 };
 
 static struct xfrm_link {
@@ -823,6 +835,7 @@ static struct xfrm_link {
 	{},
 	{},
 	{	.doit	=	xfrm_add_policy 	},
+	{	.doit	=	xfrm_add_sa, 		},
 };
 
 static int xfrm_done(struct netlink_callback *cb)
@@ -980,7 +993,7 @@ nlmsg_failure:
 	return -1;
 }
 
-static int xfrm_send_notify(struct xfrm_state *x, int hard)
+static int xfrm_send_state_notify(struct xfrm_state *x, int hard)
 {
 	struct sk_buff *skb;
 
@@ -1012,11 +1025,15 @@ static int build_acquire(struct sk_buff *skb, struct xfrm_state *x,
 
 	memcpy(&ua->id, &x->id, sizeof(ua->id));
 	memcpy(&ua->saddr, &x->props.saddr, sizeof(ua->saddr));
+	memcpy(&ua->sel, &x->sel, sizeof(ua->sel));
 	copy_to_user_policy(xp, &ua->policy, dir);
 	ua->aalgos = xt->aalgos;
 	ua->ealgos = xt->ealgos;
 	ua->calgos = xt->calgos;
 	ua->seq = x->km.seq = seq;
+
+	if (copy_to_user_tmpl(xp, skb) < 0)
+		goto nlmsg_failure;
 
 	nlh->nlmsg_len = skb->tail - b;
 	return skb->len;
@@ -1030,8 +1047,12 @@ static int xfrm_send_acquire(struct xfrm_state *x, struct xfrm_tmpl *xt,
 			     struct xfrm_policy *xp, int dir)
 {
 	struct sk_buff *skb;
+	size_t len;
 
-	skb = alloc_skb(sizeof(struct xfrm_user_acquire) + 16, GFP_ATOMIC);
+	len = RTA_LENGTH(sizeof(struct xfrm_user_tmpl) * xp->xfrm_nr);
+	len = RTA_ALIGN(len);
+	len += NLMSG_ALIGN(NLMSG_LENGTH(sizeof(struct xfrm_user_acquire)));
+	skb = alloc_skb(len, GFP_ATOMIC);
 	if (skb == NULL)
 		return -ENOMEM;
 
@@ -1098,11 +1119,56 @@ struct xfrm_policy *xfrm_compile_policy(u16 family, int opt,
 	return xp;
 }
 
+static int build_polexpire(struct sk_buff *skb, struct xfrm_policy *xp,
+			   int dir, int hard)
+{
+	struct xfrm_user_polexpire *upe;
+	struct nlmsghdr *nlh;
+	unsigned char *b = skb->tail;
+
+	nlh = NLMSG_PUT(skb, 0, 0, XFRM_MSG_POLEXPIRE, sizeof(*upe));
+	upe = NLMSG_DATA(nlh);
+	nlh->nlmsg_flags = 0;
+
+	copy_to_user_policy(xp, &upe->pol, dir);
+	if (copy_to_user_tmpl(xp, skb) < 0)
+		goto nlmsg_failure;
+	upe->hard = !!hard;
+
+	nlh->nlmsg_len = skb->tail - b;
+	return skb->len;
+
+nlmsg_failure:
+	skb_trim(skb, b - skb->data);
+	return -1;
+}
+
+static int xfrm_send_policy_notify(struct xfrm_policy *xp, int dir, int hard)
+{
+	struct sk_buff *skb;
+	size_t len;
+
+	len = sizeof(struct xfrm_user_tmpl) * xp->xfrm_nr;
+	len = RTA_ALIGN(RTA_LENGTH(len));
+	len += NLMSG_ALIGN(NLMSG_LENGTH(sizeof(struct xfrm_userpolicy_info)));
+	skb = alloc_skb(len, GFP_ATOMIC);
+	if (skb == NULL)
+		return -ENOMEM;
+
+	if (build_polexpire(skb, xp, dir, hard) < 0)
+		BUG();
+
+	NETLINK_CB(skb).dst_groups = XFRMGRP_EXPIRE;
+
+	return netlink_broadcast(xfrm_nl, skb, 0, XFRMGRP_EXPIRE, GFP_ATOMIC);
+}
+
 static struct xfrm_mgr netlink_mgr = {
 	.id		= "netlink",
-	.notify		= xfrm_send_notify,
+	.notify		= xfrm_send_state_notify,
 	.acquire	= xfrm_send_acquire,
 	.compile_policy	= xfrm_compile_policy,
+	.notify_policy	= xfrm_send_policy_notify,
 };
 
 static int __init xfrm_user_init(void)

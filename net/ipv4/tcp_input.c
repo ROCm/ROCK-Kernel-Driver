@@ -598,25 +598,17 @@ void tcp_update_metrics(struct sock *sk)
 	}
 }
 
-/* Increase initial CWND conservatively: if estimated
- * RTT is low enough (<20msec) or if we have some preset ssthresh.
- *
- * Numbers are taken from RFC2414.
- */
-__u32 tcp_init_cwnd(struct tcp_opt *tp)
+/* Numbers are taken from RFC2414.  */
+__u32 tcp_init_cwnd(struct tcp_opt *tp, struct dst_entry *dst)
 {
-	__u32 cwnd;
+	__u32 cwnd = (dst ? dst_metric(dst, RTAX_INITCWND) : 0);
 
-	if (tp->mss_cache > 1460)
-		return 2;
-
-	cwnd = (tp->mss_cache > 1095) ? 3 : 4;
-
-	if (!tp->srtt || (tp->snd_ssthresh >= 0xFFFF && tp->srtt > ((HZ/50)<<3)))
-		cwnd = 2;
-	else if (cwnd > tp->snd_ssthresh)
-		cwnd = tp->snd_ssthresh;
-
+	if (!cwnd) {
+		if (tp->mss_cache > 1460)
+			cwnd = 2;
+		else
+			cwnd = (tp->mss_cache > 1095) ? 3 : 4;
+	}
 	return min_t(__u32, cwnd, tp->snd_cwnd_clamp);
 }
 
@@ -675,7 +667,7 @@ static void tcp_init_metrics(struct sock *sk)
 	tcp_bound_rto(tp);
 	if (tp->rto < TCP_TIMEOUT_INIT && !tp->saw_tstamp)
 		goto reset;
-	tp->snd_cwnd = tcp_init_cwnd(tp);
+	tp->snd_cwnd = tcp_init_cwnd(tp, dst);
 	tp->snd_cwnd_stamp = tcp_time_stamp;
 	return;
 
@@ -3701,7 +3693,24 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 
 		tcp_sync_mss(sk, tp->pmtu_cookie);
 		tcp_initialize_rcv_mss(sk);
+
+		/* Remember, tcp_poll() does not lock socket!
+		 * Change state from SYN-SENT only after copied_seq
+		 * is initialized. */
+		tp->copied_seq = tp->rcv_nxt;
+		mb();
+		tcp_set_state(sk, TCP_ESTABLISHED);
+
+		/* Make sure socket is routed, for correct metrics.  */
+		tp->af_specific->rebuild_header(sk);
+
 		tcp_init_metrics(sk);
+
+		/* Prevent spurious tcp_cwnd_restart() on first data
+		 * packet.
+		 */
+		tp->lsndtime = tcp_time_stamp;
+
 		tcp_init_buffer_space(sk);
 
 		if (sock_flag(sk, SOCK_KEEPOPEN))
@@ -3711,13 +3720,6 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 			__tcp_fast_path_on(tp, tp->snd_wnd);
 		else
 			tp->pred_flags = 0;
-
-		/* Remember, tcp_poll() does not lock socket!
-		 * Change state from SYN-SENT only after copied_seq
-		 * is initialized. */
-		tp->copied_seq = tp->rcv_nxt;
-		mb();
-		tcp_set_state(sk, TCP_ESTABLISHED);
 
 		if (!sock_flag(sk, SOCK_DEAD)) {
 			sk->sk_state_change(sk);
@@ -3967,7 +3969,18 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb,
 				if (tp->tstamp_ok)
 					tp->advmss -= TCPOLEN_TSTAMP_ALIGNED;
 
+				/* Make sure socket is routed, for
+				 * correct metrics.
+				 */
+				tp->af_specific->rebuild_header(sk);
+
 				tcp_init_metrics(sk);
+
+				/* Prevent spurious tcp_cwnd_restart() on
+				 * first data packet.
+				 */
+				tp->lsndtime = tcp_time_stamp;
+
 				tcp_initialize_rcv_mss(sk);
 				tcp_init_buffer_space(sk);
 				tcp_fast_path_on(tp);

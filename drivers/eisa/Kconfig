@@ -14,7 +14,7 @@ config EISA_VLB_PRIMING
 
 config EISA_PCI_EISA
 	bool "Generic PCI/EISA bridge"
-	depends on PCI && EISA
+	depends on !PARISC && PCI && EISA
 	default y
 	---help---
 	  Activate this option if your system contains a PCI to EISA

@@ -55,7 +55,7 @@ loff_t remote_llseek(struct file *file, loff_t offset, int origin)
 	lock_kernel();
 	switch (origin) {
 		case 2:
-			offset += file->f_dentry->d_inode->i_size;
+			offset += i_size_read(file->f_dentry->d_inode);
 			break;
 		case 1:
 			offset += file->f_pos;
@@ -84,7 +84,7 @@ loff_t default_llseek(struct file *file, loff_t offset, int origin)
 	lock_kernel();
 	switch (origin) {
 		case 2:
-			offset += file->f_dentry->d_inode->i_size;
+			offset += i_size_read(file->f_dentry->d_inode);
 			break;
 		case 1:
 			offset += file->f_pos;

@@ -13,6 +13,10 @@
 #include <asm/processor.h>
 #include <asm/tlbflush.h>
 
+static spinlock_t cpa_lock = SPIN_LOCK_UNLOCKED;
+static struct list_head df_list = LIST_HEAD_INIT(df_list);
+
+
 static inline pte_t *lookup_address(unsigned long address) 
 { 
 	pgd_t *pgd = pgd_offset_k(address); 
@@ -31,10 +35,15 @@ static struct page *split_large_page(unsigned long address, pgprot_t prot)
 { 
 	int i; 
 	unsigned long addr;
-	struct page *base = alloc_pages(GFP_KERNEL, 0);
+	struct page *base;
 	pte_t *pbase;
+
+	spin_unlock_irq(&cpa_lock);
+	base = alloc_pages(GFP_KERNEL, 0);
+	spin_lock_irq(&cpa_lock);
 	if (!base) 
 		return NULL;
+
 	address = __pa(address);
 	addr = address & LARGE_PAGE_MASK; 
 	pbase = (pte_t *)page_address(base);
@@ -87,7 +96,7 @@ static inline void revert_page(struct page *kpte_page, unsigned long address)
 }
 
 static int
-__change_page_attr(struct page *page, pgprot_t prot, struct page **oldpage) 
+__change_page_attr(struct page *page, pgprot_t prot)
 { 
 	pte_t *kpte; 
 	unsigned long address;
@@ -123,7 +132,7 @@ __change_page_attr(struct page *page, pgprot_t prot, struct page **oldpage)
 	}
 
 	if (cpu_has_pse && (atomic_read(&kpte_page->count) == 1)) { 
-		*oldpage = kpte_page;
+		list_add(&kpte_page->list, &df_list);
 		revert_page(kpte_page, address);
 	} 
 	return 0;
@@ -133,12 +142,6 @@ static inline void flush_map(void)
 {
 	on_each_cpu(flush_kernel_map, NULL, 1, 1);
 }
-
-struct deferred_page { 
-	struct deferred_page *next; 
-	struct page *fpage;
-}; 
-static struct deferred_page *df_list; /* protected by init_mm.mmap_sem */
 
 /*
  * Change the page attributes of an page in the linear mapping.
@@ -156,47 +159,54 @@ static struct deferred_page *df_list; /* protected by init_mm.mmap_sem */
 int change_page_attr(struct page *page, int numpages, pgprot_t prot)
 {
 	int err = 0; 
-	struct page *fpage; 
 	int i; 
+	unsigned long flags;
 
-	down_write(&init_mm.mmap_sem);
+	spin_lock_irqsave(&cpa_lock, flags);
 	for (i = 0; i < numpages; i++, page++) { 
-		fpage = NULL;
-		err = __change_page_attr(page, prot, &fpage); 
+		err = __change_page_attr(page, prot);
 		if (err) 
 			break; 
-		if (fpage) { 
-			struct deferred_page *df;
-			df = kmalloc(sizeof(struct deferred_page), GFP_KERNEL); 
-			if (!df) {
-				flush_map();
-				__free_page(fpage);
-			} else { 
-				df->next = df_list;
-				df->fpage = fpage;				
-				df_list = df;
-			} 			
-		} 
 	} 	
-	up_write(&init_mm.mmap_sem); 
+	spin_unlock_irqrestore(&cpa_lock, flags);
 	return err;
 }
 
 void global_flush_tlb(void)
 { 
-	struct deferred_page *df, *next_df;
+	LIST_HEAD(l);
+	struct list_head* n;
 
-	down_read(&init_mm.mmap_sem);
-	df = xchg(&df_list, NULL);
-	up_read(&init_mm.mmap_sem);
+	BUG_ON(irqs_disabled());
+
+	spin_lock_irq(&cpa_lock);
+	list_splice_init(&df_list, &l);
+	spin_unlock_irq(&cpa_lock);
 	flush_map();
-	for (; df; df = next_df) { 
-		next_df = df->next;
-		if (df->fpage) 
-			__free_page(df->fpage);
-		kfree(df);
-	} 
+	n = l.next;
+	while (n != &l) {
+		struct page *pg = list_entry(n, struct page, list);
+		n = n->next;
+		__free_page(pg);
+	}
 } 
+
+#ifdef CONFIG_DEBUG_PAGEALLOC
+void kernel_map_pages(struct page *page, int numpages, int enable)
+{
+	if (PageHighMem(page))
+		return;
+	/* the return value is ignored - the calls cannot fail,
+	 * large pages are disabled at boot time.
+	 */
+	change_page_attr(page, numpages, enable ? PAGE_KERNEL : __pgprot(0));
+	/* we should perform an IPI and flush all tlbs,
+	 * but that can deadlock->flush only current cpu.
+	 */
+	__flush_tlb_all();
+}
+EXPORT_SYMBOL(kernel_map_pages);
+#endif
 
 EXPORT_SYMBOL(change_page_attr);
 EXPORT_SYMBOL(global_flush_tlb);

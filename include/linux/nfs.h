@@ -100,7 +100,18 @@
 	NFSERR_RECLAIM_CONFLICT = 10035,/*       v4 */
 	NFSERR_BAD_XDR = 10036,		/*       v4 */
 	NFSERR_LOCKS_HELD = 10037,	/*       v4 */
-	NFSERR_REPLAY_ME = 10038	/*       v4 */
+	NFSERR_OPENMODE = 10038,       /*       v4 */
+	NFSERR_BADOWNER = 10039,       /*       v4 */
+	NFSERR_BADCHAR = 10040,        /*       v4 */
+	NFSERR_BADNAME = 10041,        /*       v4 */
+	NFSERR_BAD_RANGE = 10042,      /*       v4 */
+	NFSERR_LOCK_NOTSUPP = 10043,   /*       v4 */
+	NFSERR_OP_ILLEGAL = 10044,     /*       v4 */
+	NFSERR_DEADLOCK = 10045,       /*       v4 */
+	NFSERR_FILE_OPEN = 10046,      /*       v4 */
+	NFSERR_ADMIN_REVOKED = 10047,  /*       v4 */
+	NFSERR_CB_PATH_DOWN = 10048,   /*       v4 */
+	NFSERR_REPLAY_ME = 10049	/*       v4 */
 };
 
 /* NFSv2 file types - beware, these are not the same in NFSv3 */

@@ -107,7 +107,7 @@ void __devinit cpu_init (void)
         current->active_mm = &init_mm;
         if (current->mm)
                 BUG();
-        enter_lazy_tlb(&init_mm, current, nr);
+        enter_lazy_tlb(&init_mm, current);
 }
 
 /*

@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/chsc.c
  *   S/390 common I/O routines -- channel subsystem call
- *   $Revision: 1.69 $
+ *   $Revision: 1.73 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -322,10 +322,6 @@ s390_set_chpid_offline( __u8 chpid)
 	sprintf(dbf_txt, "chpr%x", chpid);
 	CIO_TRACE_EVENT(2, dbf_txt);
 
-	/*
-	 * TODO: the chpid may be not the chpid with the link incident,
-	 * but the chpid the report came in through. How to handle???
-	 */
 	clear_bit(chpid, chpids);
 	if (!test_and_clear_bit(chpid, chpids_known))
 		return;	 /* we didn't know the chpid anyway */
@@ -469,9 +465,40 @@ s390_process_res_acc (u8 chpid, __u16 fla, u32 fla_mask)
 	free_page((unsigned long)page);
 }
 
+static int
+__get_chpid_from_lir(void *data)
+{
+	struct lir {
+		u8  iq;
+		u8  ic;
+		u16 sci;
+		/* incident-node descriptor */
+		u32 indesc[28];
+		/* attached-node descriptor */
+		u32 andesc[28];
+		/* incident-specific information */
+		u32 isinfo[28];
+	} *lir;
+
+	lir = (struct lir*) data;
+	if (!(lir->iq&0x80))
+		/* NULL link incident record */
+		return -EINVAL;
+	if (!(lir->indesc[0]&0xc0000000))
+		/* node descriptor not valid */
+		return -EINVAL;
+	if (!(lir->indesc[0]&0x10000000))
+		/* don't handle device-type nodes - FIXME */
+		return -EINVAL;
+	/* Byte 3 contains the chpid. Could also be CTCA, but we don't care */
+
+	return (u16) (lir->indesc[0]&0x000000ff);
+}
+
 static void
 do_process_crw(void *ignore)
 {
+	int chpid;
 	struct {
 		struct chsc_header request;
 		u32 reserved1;
@@ -487,10 +514,8 @@ do_process_crw(void *ignore)
 		u16 rsid;	/* reporting source id */
 		u32 reserved5;
 		u32 reserved6;
-		u32 ccdf;	/* content-code dependent field */
-		u32 reserved7;
-		u32 reserved8;
-		u32 reserved9;
+		u32 ccdf[96];	/* content-code dependent field */
+		/* ccdf has to be big enough for a link-incident record */
 	} *sei_area;
 
 	/*
@@ -560,9 +585,14 @@ do_process_crw(void *ignore)
 		case 1: /* link incident*/
 			CIO_CRW_EVENT(4, "chsc_process_crw: "
 				      "channel subsystem reports link incident,"
-				      " source is chpid %x\n", sei_area->rsid);
-			
-			s390_set_chpid_offline(sei_area->rsid);
+				      " reporting source is chpid %x\n",
+				      sei_area->rsid);
+			chpid = __get_chpid_from_lir(sei_area->ccdf);
+			if (chpid < 0)
+				CIO_CRW_EVENT(4, "%s: Invalid LIR, skipping\n",
+					      __FUNCTION__);
+			else
+				s390_set_chpid_offline(chpid);
 			break;
 			
 		case 2: /* i/o resource accessibiliy */

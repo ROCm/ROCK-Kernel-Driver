@@ -19,9 +19,10 @@
 #define NF_REPEAT 4
 #define NF_MAX_VERDICT NF_REPEAT
 
-/* Generic cache responses from hook functions. */
-#define NFC_ALTERED 0x8000
+/* Generic cache responses from hook functions.
+   <= 0x2000 is used for protocol-flags. */
 #define NFC_UNKNOWN 0x4000
+#define NFC_ALTERED 0x8000
 
 #ifdef __KERNEL__
 #include <linux/config.h>

@@ -1,5 +1,4 @@
-/* $Id: stackframe.h,v 1.3 1999/12/04 03:59:12 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -8,17 +7,18 @@
  * Copyright (C) 1994, 1995, 1996 Paul M. Antoine.
  * Copyright (C) 1999 Silicon Graphics, Inc.
  */
-#ifndef _ASM_STACKFRAME_H
-#define _ASM_STACKFRAME_H
+#ifndef __ASM_STACKFRAME_H
+#define __ASM_STACKFRAME_H
 
 #include <linux/config.h>
+#include <linux/threads.h>
 
 #include <asm/asm.h>
 #include <asm/offset.h>
 #include <asm/processor.h>
 #include <asm/addrspace.h>
 
-#ifdef _LANGUAGE_C
+#ifndef __ASSEMBLY__
 
 #define __str2(x) #x
 #define __str(x) __str2(x)
@@ -37,9 +37,9 @@
 		: /* No outputs */                       \
 		: "r" (frame))
 
-#endif /* _LANGUAGE_C */
+#endif /* !__ASSEMBLY__ */
 
-#ifdef _LANGUAGE_ASSEMBLY
+#ifdef __ASSEMBLY__
 
 		.macro	SAVE_AT
 		.set	push
@@ -76,6 +76,39 @@
 		sd	$30, PT_R30(sp)
 		.endm
 
+#ifdef CONFIG_SMP
+		.macro	get_saved_sp	/* SMP variation */
+		dmfc0	k1, CP0_CONTEXT
+		dsra	k1, 23
+		lui	k0, %hi(pgd_current)
+		daddiu	k0, %lo(pgd_current)
+		dsubu	k1, k0
+		lui	k0, %hi(kernelsp)
+		daddu	k1, k0
+		ld	k1, %lo(kernelsp)(k1)
+		.endm
+
+		.macro	set_saved_sp	stackp temp temp2
+		lw	\temp, TI_CPU(gp)
+		dsll	\temp, 3
+		lui	\temp2, %hi(kernelsp)
+		daddu	\temp, \temp2
+		sd	\stackp, %lo(kernelsp)(\temp)
+		.endm
+#else
+		.macro	get_saved_sp	/* Uniprocessor variation */
+		lui	k1, %hi(kernelsp)
+		ld	k1, %lo(kernelsp)(k1)
+		.endm
+
+		.macro	set_saved_sp	stackp temp temp2
+		sd	\stackp, kernelsp
+		.endm
+#endif
+		.macro	declare_saved_sp
+		.comm	kernelsp, NR_CPUS * 8, 8
+		.endm
+
 		.macro	SAVE_SOME
 		.set	push
 		.set	reorder
@@ -86,30 +119,17 @@
 		 move	k1, sp
 		.set	reorder
 		/* Called from user mode, new stack. */
-#ifndef CONFIG_SMP
-		lui	k1, %hi(kernelsp)
-		ld	k1, %lo(kernelsp)(k1)
-#else
-		mfc0	k0, CP0_WATCHLO
-		mfc0	k1, CP0_WATCHHI
-		dsll32	k0, k0, 0	/* Get rid of sign extension */
-		dsrl32	k0, k0, 0	/* Get rid of sign extension */
-		dsll32	k1, k1, 0
-		or	k1, k1, k0
-		li	k0, K0BASE
-		or	k1, k1, k0
-		daddiu	k1, k1, KERNEL_STACK_SIZE-32
-#endif
+		get_saved_sp
 8:		move	k0, sp
 		dsubu	sp, k1, PT_SIZE
 		sd	k0, PT_R29(sp)
 		sd	$3, PT_R3(sp)
 		sd	$0, PT_R0(sp)
-		dmfc0	v1, CP0_STATUS
+		mfc0	v1, CP0_STATUS
 		sd	$2, PT_R2(sp)
 		sd	v1, PT_STATUS(sp)
 		sd	$4, PT_R4(sp)
-		dmfc0	v1, CP0_CAUSE
+		mfc0	v1, CP0_CAUSE
 		sd	$5, PT_R5(sp)
 		sd	v1, PT_CAUSE(sp)
 		sd	$6, PT_R6(sp)
@@ -184,7 +204,7 @@
 		nor	v1, $0, v1
 		and	v0, v1
 		or	v0, t0
-		dmtc0	v0, CP0_STATUS
+		mtc0	v0, CP0_STATUS
 		ld	v1, PT_EPC(sp)
 		dmtc0	v1, CP0_EPC
 		ld	$31, PT_R31(sp)
@@ -242,6 +262,6 @@
 		mtc0	t0, CP0_STATUS
 		.endm
 
-#endif /* _LANGUAGE_ASSEMBLY */
+#endif /* __ASSEMBLY__ */
 
-#endif /* _ASM_STACKFRAME_H */
+#endif /* __ASM_STACKFRAME_H */

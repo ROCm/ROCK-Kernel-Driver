@@ -1,4 +1,4 @@
-/* $Id: traps.c,v 1.2 2001/12/18 13:35:20 bjornw Exp $
+/* $Id: traps.c,v 1.7 2003/07/04 08:27:52 starvik Exp $
  *
  *  linux/arch/cris/traps.c
  *
@@ -6,7 +6,7 @@
  *  mechanism, as well as some general stack/register dumping 
  *  things.
  * 
- *  Copyright (C) 2000,2001 Axis Communications AB
+ *  Copyright (C) 2000-2002 Axis Communications AB
  *
  *  Authors:   Bjorn Wesen
  *  	       Hans-Peter Nilsson
@@ -14,19 +14,8 @@
  */
 
 #include <linux/init.h>
-#include <linux/sched.h>
-#include <linux/kernel.h>
-#include <linux/string.h>
-#include <linux/errno.h>
-#include <linux/ptrace.h>
-#include <linux/timer.h>
-#include <linux/mm.h>
-#include <asm/uaccess.h>
-
-#include <asm/system.h>
-#include <asm/segment.h>
-#include <asm/io.h>
 #include <asm/pgtable.h>
+#include <asm/uaccess.h>
 
 static int kstack_depth_to_print = 24;
 
@@ -95,7 +84,7 @@ void show_trace_task(struct task_struct *tsk)
  */
 
 void 
-show_stack(unsigned long *sp)
+show_stack(struct task_struct *task, unsigned long *sp)
 {
         unsigned long *stack, addr;
         int i;
@@ -105,8 +94,12 @@ show_stack(unsigned long *sp)
 	 * back trace.
 	 */
 
-        if(sp == NULL)
-                sp = (unsigned long*)rdsp();
+        if(sp == NULL) {
+		if (task)
+			sp = (unsigned long*)task->thread.ksp;
+		else
+			sp = (unsigned long*)rdsp();
+	}
 
         stack = sp;
 
@@ -144,123 +137,9 @@ show_stack()
 }
 #endif
 
-void 
-show_registers(struct pt_regs * regs)
-{
-	/* We either use rdusp() - the USP register, which might not
-	   correspond to the current process for all cases we're called,
-	   or we use the current->thread.usp, which is not up to date for
-	   the current process.  Experience shows we want the USP
-	   register.  */
-	unsigned long usp = rdusp();
-
-	printk("IRP: %08lx SRP: %08lx DCCR: %08lx USP: %08lx MOF: %08lx\n",
-	       regs->irp, regs->srp, regs->dccr, usp, regs->mof );
-	printk(" r0: %08lx  r1: %08lx   r2: %08lx  r3: %08lx\n",
-	       regs->r0, regs->r1, regs->r2, regs->r3);
-	printk(" r4: %08lx  r5: %08lx   r6: %08lx  r7: %08lx\n",
-	       regs->r4, regs->r5, regs->r6, regs->r7);
-	printk(" r8: %08lx  r9: %08lx  r10: %08lx r11: %08lx\n",
-	       regs->r8, regs->r9, regs->r10, regs->r11);
-	printk("r12: %08lx r13: %08lx oR10: %08lx\n",
-	       regs->r12, regs->r13, regs->orig_r10);
-	printk("R_MMU_CAUSE: %08lx\n", (unsigned long)*R_MMU_CAUSE);
-	printk("Process %s (pid: %d, stackpage=%08lx)\n",
-	       current->comm, current->pid, (unsigned long)current);
-
-	/*
-         * When in-kernel, we also print out the stack and code at the
-         * time of the fault..
-         */
-        if (! user_mode(regs)) {
-	  	int i;
-
-                show_stack((unsigned long*)usp);
-
-		/* Dump kernel stack if the previous dump wasn't one.  */
-		if (usp != 0)
-			show_stack (NULL);
-
-                printk("\nCode: ");
-                if(regs->irp < PAGE_OFFSET)
-                        goto bad;
-
-		/* Often enough the value at regs->irp does not point to
-		   the interesting instruction, which is most often the
-		   _previous_ instruction.  So we dump at an offset large
-		   enough that instruction decoding should be in sync at
-		   the interesting point, but small enough to fit on a row
-		   (sort of).  We point out the regs->irp location in a
-		   ksymoops-friendly way by wrapping the byte for that
-		   address in parentheses.  */
-                for(i = -12; i < 12; i++)
-                {
-                        unsigned char c;
-                        if(__get_user(c, &((unsigned char*)regs->irp)[i])) {
-bad:
-                                printk(" Bad IP value.");
-                                break;
-                        }
-
-			if (i == 0)
-			  printk("(%02x) ", c);
-			else
-			  printk("%02x ", c);
-                }
-		printk("\n");
-        }
-}
-
-/* Called from entry.S when the watchdog has bitten
- * We print out something resembling an oops dump, and if
- * we have the nice doggy development flag set, we halt here
- * instead of rebooting.
- */
-
-void
-watchdog_bite_hook(struct pt_regs *regs)
-{
-#ifdef CONFIG_ETRAX_WATCHDOG_NICE_DOGGY
-	cli();
-	stop_watchdog();
-	show_registers(regs);
-	while(1) /* nothing */;
-#else
-	show_registers(regs);
-#endif	
-}
-
 void dump_stack(void)
 {
-	show_stack(NULL);
-}
-
-/* This is normally the 'Oops' routine */
-void 
-die_if_kernel(const char * str, struct pt_regs * regs, long err)
-{
-	extern void reset_watchdog(void);
-	extern void stop_watchdog(void);
-
-	if(user_mode(regs))
-		return;
-
-#ifdef CONFIG_ETRAX_WATCHDOG_NICE_DOGGY
-	/* This printout might take too long and trigger the 
-	 * watchdog normally. If we're in the nice doggy
-	 * development mode, stop the watchdog during printout.
-	 */
-	stop_watchdog();
-#endif
-
-	printk("%s: %04lx\n", str, err & 0xffff);
-
-	show_registers(regs);
-
-#ifdef CONFIG_ETRAX_WATCHDOG_NICE_DOGGY
-	reset_watchdog();
-#endif
-	do_exit(SIGSEGV);
+	show_stack(NULL, NULL);
 }
 
 void __init 

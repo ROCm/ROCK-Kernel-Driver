@@ -1167,7 +1167,7 @@ do {								\
 		return -ENOMEM;					\
 	++length;						\
 	scratch = buffer + length;				\
-} while(0)
+} while (0)
 
 	PUT_ENVP("VENDOR_ID=%06x", ud->vendor_id);
 	PUT_ENVP("MODEL_ID=%06x", ud->model_id);
@@ -1303,8 +1303,9 @@ static void nodemgr_update_node(struct node_entry *ne, quadlet_t busoptions,
 		snprintf(ne->device.name, DEVICE_NAME_SIZE,
 			 "IEEE-1394 device %d-" NODE_BUS_FMT,
 			 hi->host->id, NODE_BUS_ARGS(ne->nodeid));
-		HPSB_DEBUG("Node " NODE_BUS_FMT " changed to " NODE_BUS_FMT,
-			   NODE_BUS_ARGS(ne->nodeid), NODE_BUS_ARGS(nodeid));
+		HPSB_DEBUG("Node changed: %d-" NODE_BUS_FMT " -> %d-" NODE_BUS_FMT,
+			   ne->host->id, NODE_BUS_ARGS(ne->nodeid),
+			   ne->host->id, NODE_BUS_ARGS(nodeid));
 		ne->nodeid = nodeid;
 
 		update_ud_names++;
@@ -1507,8 +1508,8 @@ static void nodemgr_node_probe(struct host_info *hi, int generation)
 					nodemgr_remove_node)) {
 			struct node_entry *ne = cleanup.ne;
 
-			HPSB_DEBUG("Device removed: ID:BUS[" NODE_BUS_FMT "]  GUID[%016Lx]",
-				   NODE_BUS_ARGS(ne->nodeid), (unsigned long long)ne->guid);
+			HPSB_DEBUG("Node removed: ID:BUS[%d-" NODE_BUS_FMT "]  GUID[%016Lx]",
+				   host->id, NODE_BUS_ARGS(ne->nodeid), (unsigned long long)ne->guid);
 
 			nodemgr_remove_ne(ne);
 		}
@@ -1547,12 +1548,12 @@ static void nodemgr_do_irm_duties(struct hpsb_host *host)
 	/* If there is no bus manager then we should set the root node's
 	 * force_root bit to promote bus stability per the 1394
 	 * spec. (8.4.2.6) */
-	if (host->busmgr_id == 0x3f && host->node_count > 1)
+	if (host->busmgr_id == 0xffff && host->node_count > 1)
 	{
 		u16 root_node = host->node_count - 1;
-		struct node_entry *ne = hpsb_nodeid_get_entry(host, root_node);
+		struct node_entry *ne = find_entry_by_nodeid(host, root_node | LOCAL_BUS);
 
-		if (ne->busopt.cmc)
+		if (ne && ne->busopt.cmc)
 			hpsb_send_phy_config(host, root_node, -1);
 		else {
 			HPSB_DEBUG("The root node is not cycle master capable; "
@@ -1782,7 +1783,7 @@ static void nodemgr_host_reset(struct hpsb_host *host)
 
 	if (hi != NULL) {
 #ifdef CONFIG_IEEE1394_VERBOSEDEBUG
-		HPSB_DEBUG ("NodeMgr: Processing host reset for %s", host->driver->name);
+		HPSB_DEBUG ("NodeMgr: Processing host reset for %s", hi->daemon_name);
 #endif
 		up(&hi->reset_sem);
 	} else

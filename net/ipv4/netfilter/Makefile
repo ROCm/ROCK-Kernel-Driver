@@ -49,6 +49,9 @@ obj-$(CONFIG_IP_NF_MATCH_PKTTYPE) += ipt_pkttype.o
 obj-$(CONFIG_IP_NF_MATCH_MULTIPORT) += ipt_multiport.o
 obj-$(CONFIG_IP_NF_MATCH_OWNER) += ipt_owner.o
 obj-$(CONFIG_IP_NF_MATCH_TOS) += ipt_tos.o
+
+obj-$(CONFIG_IP_NF_MATCH_RECENT) += ipt_recent.o
+
 obj-$(CONFIG_IP_NF_MATCH_ECN) += ipt_ecn.o
 obj-$(CONFIG_IP_NF_MATCH_DSCP) += ipt_dscp.o
 obj-$(CONFIG_IP_NF_MATCH_AH_ESP) += ipt_ah.o ipt_esp.o
@@ -79,6 +82,7 @@ obj-$(CONFIG_IP_NF_TARGET_TCPMSS) += ipt_TCPMSS.o
 
 # generic ARP tables
 obj-$(CONFIG_IP_NF_ARPTABLES) += arp_tables.o
+obj-$(CONFIG_IP_NF_ARP_MANGLE) += arpt_mangle.o
 
 # just filtering instance of ARP tables for now
 obj-$(CONFIG_IP_NF_ARPFILTER) += arptable_filter.o

@@ -140,7 +140,7 @@ understand what the function is all about, you should adhere to the
 maximum limits all the more closely.  Use helper functions with
 descriptive names (you can ask the compiler to in-line them if you think
 it's performance-critical, and it will probably do a better job of it
-that you would have done). 
+than you would have done). 
 
 Another measure of the function is the number of local variables.  They
 shouldn't exceed 5-10, or you're doing something wrong.  Re-think the
@@ -200,7 +200,7 @@ automagically when you edit source files under /usr/src/linux.
 But even if you fail in getting emacs to do sane formatting, not
 everything is lost: use "indent".
 
-Now, again, GNU indent has the same brain dead settings that GNU emacs
+Now, again, GNU indent has the same brain-dead settings that GNU emacs
 has, which is why you need to give it a few command line options. 
 However, that's not too bad, because even the makers of GNU indent
 recognize the authority of K&R (the GNU people aren't evil, they are
@@ -232,7 +232,7 @@ fi
 Generally, CONFIG_EXPERIMENTAL should surround all options not considered
 stable. All options that are known to trash data (experimental write-
 support for file-systems, for instance) should be denoted (DANGEROUS), other
-Experimental options should be denoted (EXPERIMENTAL).
+experimental options should be denoted (EXPERIMENTAL).
 
 
 		Chapter 8: Data structures
@@ -258,7 +258,7 @@ when there are users of different "classes".  The subclass count counts
 the number of subclass users, and decrements the global count just once
 when the subclass count goes to zero.
 
-Examples of this kind of "multi-reference-counting" can be found in
+Examples of this kind of "multi-level-reference-counting" can be found in
 memory management ("struct mm_struct": mm_users and mm_count), and in
 filesystem code ("struct super_block": s_count and s_active).
 

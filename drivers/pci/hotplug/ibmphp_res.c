@@ -42,7 +42,7 @@ static int remove_ranges (struct bus_node *, struct bus_node *);
 static int update_bridge_ranges (struct bus_node **);
 static int add_range (int type, struct range_node *, struct bus_node *);
 static void fix_resources (struct bus_node *);
-static inline struct bus_node *find_bus_wprev (u8, struct bus_node **, u8);
+static struct bus_node *find_bus_wprev (u8, struct bus_node **, u8);
 
 static LIST_HEAD(gbuses);
 LIST_HEAD(ibmphp_res_head);
@@ -1757,7 +1757,7 @@ struct bus_node *ibmphp_find_res_bus (u8 bus_number)
 	return find_bus_wprev (bus_number, NULL, 0);
 }
 
-static inline struct bus_node *find_bus_wprev (u8 bus_number, struct bus_node **prev, u8 flag)
+static struct bus_node *find_bus_wprev (u8 bus_number, struct bus_node **prev, u8 flag)
 {
 	struct bus_node *bus_cur;
 	struct list_head *tmp;

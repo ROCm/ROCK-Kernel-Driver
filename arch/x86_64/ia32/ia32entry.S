@@ -47,7 +47,6 @@
 ENTRY(ia32_cstar_target)
 	swapgs
 	movl	%esp,%r8d
-	movq	%r8,%gs:pda_oldrsp
 	movq	%gs:pda_kernelstack,%rsp
 	sti
 	SAVE_ARGS 8,1
@@ -67,7 +66,6 @@ ENTRY(ia32_cstar_target)
 	.section __ex_table,"a"
 	.quad 1b,cstar_badarg
 	.previous	
-	movq	%r9,R9-ARGOFFSET(%rsp)		
 	GET_THREAD_INFO(%r10)
 	bt  $TIF_SYSCALL_TRACE,threadinfo_flags(%r10)
 	jc  ia32_tracesys

@@ -392,9 +392,10 @@ done:
 }
 
 static ssize_t
-show_async (struct device *dev, char *buf)
+show_async (struct class_device *class_dev, char *buf)
 {
-	struct pci_dev		*pdev;
+	struct usb_bus		*bus;
+	struct usb_hcd		*hcd;
 	struct ehci_hcd		*ehci;
 	unsigned long		flags;
 	unsigned		temp, size;
@@ -403,8 +404,9 @@ show_async (struct device *dev, char *buf)
 
 	*buf = 0;
 
-	pdev = container_of (dev, struct pci_dev, dev);
-	ehci = container_of (pci_get_drvdata (pdev), struct ehci_hcd, hcd);
+	bus = to_usb_bus(class_dev);
+	hcd = bus->hcpriv;
+	ehci = hcd_to_ehci (hcd);
 	next = buf;
 	size = PAGE_SIZE;
 
@@ -427,14 +429,15 @@ show_async (struct device *dev, char *buf)
 
 	return strlen (buf);
 }
-static DEVICE_ATTR (async, S_IRUGO, show_async, NULL);
+static CLASS_DEVICE_ATTR (async, S_IRUGO, show_async, NULL);
 
 #define DBG_SCHED_LIMIT 64
 
 static ssize_t
-show_periodic (struct device *dev, char *buf)
+show_periodic (struct class_device *class_dev, char *buf)
 {
-	struct pci_dev		*pdev;
+	struct usb_bus		*bus;
+	struct usb_hcd		*hcd;
 	struct ehci_hcd		*ehci;
 	unsigned long		flags;
 	union ehci_shadow	p, *seen;
@@ -446,8 +449,9 @@ show_periodic (struct device *dev, char *buf)
 		return 0;
 	seen_count = 0;
 
-	pdev = container_of (dev, struct pci_dev, dev);
-	ehci = container_of (pci_get_drvdata (pdev), struct ehci_hcd, hcd);
+	bus = to_usb_bus(class_dev);
+	hcd = bus->hcpriv;
+	ehci = hcd_to_ehci (hcd);
 	next = buf;
 	size = PAGE_SIZE;
 
@@ -535,14 +539,15 @@ show_periodic (struct device *dev, char *buf)
 
 	return PAGE_SIZE - size;
 }
-static DEVICE_ATTR (periodic, S_IRUGO, show_periodic, NULL);
+static CLASS_DEVICE_ATTR (periodic, S_IRUGO, show_periodic, NULL);
 
 #undef DBG_SCHED_LIMIT
 
 static ssize_t
-show_registers (struct device *dev, char *buf)
+show_registers (struct class_device *class_dev, char *buf)
 {
-	struct pci_dev		*pdev;
+	struct usb_bus		*bus;
+	struct usb_hcd		*hcd;
 	struct ehci_hcd		*ehci;
 	unsigned long		flags;
 	unsigned		temp, size, i;
@@ -550,9 +555,9 @@ show_registers (struct device *dev, char *buf)
 	static char		fmt [] = "%*s\n";
 	static char		label [] = "";
 
-	pdev = container_of (dev, struct pci_dev, dev);
-	ehci = container_of (pci_get_drvdata (pdev), struct ehci_hcd, hcd);
-
+	bus = to_usb_bus(class_dev);
+	hcd = bus->hcpriv;
+	ehci = hcd_to_ehci (hcd);
 	next = buf;
 	size = PAGE_SIZE;
 
@@ -562,7 +567,7 @@ show_registers (struct device *dev, char *buf)
 	i = readw (&ehci->caps->hci_version);
 	temp = snprintf (next, size,
 		"%s\nEHCI %x.%02x, hcd state %d (driver " DRIVER_VERSION ")\n",
-		pdev->dev.name,
+		hcd->pdev->dev.name,
 		i >> 8, i & 0x0ff, ehci->hcd.state);
 	size -= temp;
 	next += temp;
@@ -636,20 +641,20 @@ show_registers (struct device *dev, char *buf)
 
 	return PAGE_SIZE - size;
 }
-static DEVICE_ATTR (registers, S_IRUGO, show_registers, NULL);
+static CLASS_DEVICE_ATTR (registers, S_IRUGO, show_registers, NULL);
 
 static inline void create_debug_files (struct ehci_hcd *bus)
 {
-	device_create_file (&bus->hcd.pdev->dev, &dev_attr_async);
-	device_create_file (&bus->hcd.pdev->dev, &dev_attr_periodic);
-	device_create_file (&bus->hcd.pdev->dev, &dev_attr_registers);
+	class_device_create_file(&bus->hcd.self.class_dev, &class_device_attr_async);
+	class_device_create_file(&bus->hcd.self.class_dev, &class_device_attr_periodic);
+	class_device_create_file(&bus->hcd.self.class_dev, &class_device_attr_registers);
 }
 
 static inline void remove_debug_files (struct ehci_hcd *bus)
 {
-	device_remove_file (&bus->hcd.pdev->dev, &dev_attr_async);
-	device_remove_file (&bus->hcd.pdev->dev, &dev_attr_periodic);
-	device_remove_file (&bus->hcd.pdev->dev, &dev_attr_registers);
+	class_device_remove_file(&bus->hcd.self.class_dev, &class_device_attr_async);
+	class_device_remove_file(&bus->hcd.self.class_dev, &class_device_attr_periodic);
+	class_device_remove_file(&bus->hcd.self.class_dev, &class_device_attr_registers);
 }
 
 #endif /* STUB_DEBUG_FILES */

@@ -213,21 +213,19 @@ void balance_dirty_pages(struct address_space *mapping)
 void balance_dirty_pages_ratelimited(struct address_space *mapping)
 {
 	static DEFINE_PER_CPU(int, ratelimits) = 0;
-	int cpu;
 	long ratelimit;
 
 	ratelimit = ratelimit_pages;
 	if (dirty_exceeded)
 		ratelimit = 8;
 
-	cpu = get_cpu();
-	if (per_cpu(ratelimits, cpu)++ >= ratelimit) {
-		per_cpu(ratelimits, cpu) = 0;
-		put_cpu();
+	if (get_cpu_var(ratelimits)++ >= ratelimit) {
+		__get_cpu_var(ratelimits) = 0;
+		put_cpu_var(ratelimits);
 		balance_dirty_pages(mapping);
 		return;
 	}
-	put_cpu();
+	put_cpu_var(ratelimits);
 }
 
 /*

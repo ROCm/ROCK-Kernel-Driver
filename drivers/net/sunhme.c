@@ -2481,9 +2481,6 @@ static int happy_meal_ioctl(struct net_device *dev,
 			return -EFAULT;
 		return 0;
 	} else if (ecmd.cmd == ETHTOOL_SSET) {
-		if (!capable(CAP_NET_ADMIN))
-			return -EPERM;
-
 		/* Verify the settings we care about. */
 		if (ecmd.autoneg != AUTONEG_ENABLE &&
 		    ecmd.autoneg != AUTONEG_DISABLE)
@@ -2802,8 +2799,8 @@ static int __init happy_meal_sbus_init(struct sbus_dev *sdev, int is_qfe)
 	dev->watchdog_timeo = 5*HZ;
 	dev->do_ioctl = &happy_meal_ioctl;
 
-	/* Happy Meal can do it all... */
-	dev->features |= NETIF_F_SG | NETIF_F_HW_CSUM;
+	/* Happy Meal can do it all... except VLAN. */
+	dev->features |= NETIF_F_SG | NETIF_F_HW_CSUM | NETIF_F_VLAN_CHALLENGED;
 
 	dev->irq = sdev->irqs[0];
 

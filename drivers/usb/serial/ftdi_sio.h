@@ -14,11 +14,12 @@
  * of the protocol required to talk to the device and ongoing assistence
  * during development.
  *
- * Bill Ryder - bryder@sgi.com of Silicon Graphics, Inc.- wrote the 
+ * Bill Ryder - bryder@sgi.com formerly of Silicon Graphics, Inc.- wrote the 
  * FTDI_SIO implementation.
  *
  * Philipp Gühring - pg@futureware.at - added the Device ID of the USB relais
  * from Rudolf Gugler
+ *
  */
 
 #define FTDI_VID	0x0403	/* Vendor Id */
@@ -28,6 +29,93 @@
 #define FTDI_NF_RIC_VID	0x0DCD	/* Vendor Id */
 #define FTDI_NF_RIC_PID	0x0001	/* Product Id */
 
+
+/* www.crystalfontz.com devices - thanx for providing free devices for evaluation ! */
+/* they use the ftdi chipset for the USB interface and the vendor id is the same */
+#define FTDI_XF_634_PID  0xFC09	/* Four line device */
+#define FTDI_XF_632_PID  0xFC08	/* Two line device */
+
+/* Video Networks Limited / Homechoice in the UK use an ftdi-based device for their 1Mb */
+/* broadband internet service.  The following PID is exhibited by the usb device supplied */
+/* (the VID is the standard ftdi vid (FTDI_VID) */
+#define FTDI_VNHCPCUSB_D_PID 0xfe38 /* Product Id */
+
+/*
+ * The following are the values for the Matrix Orbital LCD displays,
+ * which are the FT232BM ( similar to the 8U232AM )
+ */
+#define FTDI_MTXORB_VID                FTDI_VID        /* Matrix Orbital Product Id */
+#define FTDI_MTXORB_0_PID      0xFA00  /* Matrix Orbital Product Id */
+#define FTDI_MTXORB_1_PID      0xFA01  /* Matrix Orbital Product Id */
+#define FTDI_MTXORB_2_PID      0xFA02  /* Matrix Orbital Product Id */
+#define FTDI_MTXORB_3_PID      0xFA03  /* Matrix Orbital Product Id */
+#define FTDI_MTXORB_4_PID      0xFA04  /* Matrix Orbital Product Id */
+#define FTDI_MTXORB_5_PID      0xFA05  /* Matrix Orbital Product Id */
+#define FTDI_MTXORB_6_PID      0xFA06  /* Matrix Orbital Product Id */
+
+/*
+ * The following are the values for the Sealevel SeaLINK+ adapters.
+ * (Original list sent by Tuan Hoang.  Ian Abbott renamed the macros and
+ * removed some PIDs that don't seem to match any existing products.)
+ */
+#define SEALEVEL_VID		0x0c52	/* Sealevel Vendor ID */
+#define SEALEVEL_2101_PID	0x2101	/* SeaLINK+232 (2101/2105) */
+#define SEALEVEL_2102_PID	0x2102	/* SeaLINK+485 (2102) */
+#define SEALEVEL_2103_PID	0x2103	/* SeaLINK+232I (2103) */
+#define SEALEVEL_2104_PID	0x2104	/* SeaLINK+485I (2104) */
+#define SEALEVEL_2201_1_PID	0x2211	/* SeaPORT+2/232 (2201) Port 1 */
+#define SEALEVEL_2201_2_PID	0x2221	/* SeaPORT+2/232 (2201) Port 2 */
+#define SEALEVEL_2202_1_PID	0x2212	/* SeaPORT+2/485 (2202) Port 1 */
+#define SEALEVEL_2202_2_PID	0x2222	/* SeaPORT+2/485 (2202) Port 2 */
+#define SEALEVEL_2203_1_PID	0x2213	/* SeaPORT+2 (2203) Port 1 */
+#define SEALEVEL_2203_2_PID	0x2223	/* SeaPORT+2 (2203) Port 2 */
+#define SEALEVEL_2401_1_PID	0x2411	/* SeaPORT+4/232 (2401) Port 1 */
+#define SEALEVEL_2401_2_PID	0x2421	/* SeaPORT+4/232 (2401) Port 2 */
+#define SEALEVEL_2401_3_PID	0x2431	/* SeaPORT+4/232 (2401) Port 3 */
+#define SEALEVEL_2401_4_PID	0x2441	/* SeaPORT+4/232 (2401) Port 4 */
+#define SEALEVEL_2402_1_PID	0x2412	/* SeaPORT+4/485 (2402) Port 1 */
+#define SEALEVEL_2402_2_PID	0x2422	/* SeaPORT+4/485 (2402) Port 2 */
+#define SEALEVEL_2402_3_PID	0x2432	/* SeaPORT+4/485 (2402) Port 3 */
+#define SEALEVEL_2402_4_PID	0x2442	/* SeaPORT+4/485 (2402) Port 4 */
+#define SEALEVEL_2403_1_PID	0x2413	/* SeaPORT+4 (2403) Port 1 */
+#define SEALEVEL_2403_2_PID	0x2423	/* SeaPORT+4 (2403) Port 2 */
+#define SEALEVEL_2403_3_PID	0x2433	/* SeaPORT+4 (2403) Port 3 */
+#define SEALEVEL_2403_4_PID	0x2443	/* SeaPORT+4 (2403) Port 4 */
+#define SEALEVEL_2801_1_PID	0X2811	/* SeaLINK+8/232 (2801) Port 1 */
+#define SEALEVEL_2801_2_PID	0X2821	/* SeaLINK+8/232 (2801) Port 2 */
+#define SEALEVEL_2801_3_PID	0X2831	/* SeaLINK+8/232 (2801) Port 3 */
+#define SEALEVEL_2801_4_PID	0X2841	/* SeaLINK+8/232 (2801) Port 4 */
+#define SEALEVEL_2801_5_PID	0X2851	/* SeaLINK+8/232 (2801) Port 5 */
+#define SEALEVEL_2801_6_PID	0X2861	/* SeaLINK+8/232 (2801) Port 6 */
+#define SEALEVEL_2801_7_PID	0X2871	/* SeaLINK+8/232 (2801) Port 7 */
+#define SEALEVEL_2801_8_PID	0X2881	/* SeaLINK+8/232 (2801) Port 8 */
+#define SEALEVEL_2802_1_PID	0X2812	/* SeaLINK+8/485 (2802) Port 1 */
+#define SEALEVEL_2802_2_PID	0X2822	/* SeaLINK+8/485 (2802) Port 2 */
+#define SEALEVEL_2802_3_PID	0X2832	/* SeaLINK+8/485 (2802) Port 3 */
+#define SEALEVEL_2802_4_PID	0X2842	/* SeaLINK+8/485 (2802) Port 4 */
+#define SEALEVEL_2802_5_PID	0X2852	/* SeaLINK+8/485 (2802) Port 5 */
+#define SEALEVEL_2802_6_PID	0X2862	/* SeaLINK+8/485 (2802) Port 6 */
+#define SEALEVEL_2802_7_PID	0X2872	/* SeaLINK+8/485 (2802) Port 7 */
+#define SEALEVEL_2802_8_PID	0X2882	/* SeaLINK+8/485 (2802) Port 8 */
+#define SEALEVEL_2803_1_PID	0X2813	/* SeaLINK+8 (2803) Port 1 */
+#define SEALEVEL_2803_2_PID	0X2823 	/* SeaLINK+8 (2803) Port 2 */
+#define SEALEVEL_2803_3_PID	0X2833 	/* SeaLINK+8 (2803) Port 3 */
+#define SEALEVEL_2803_4_PID	0X2843 	/* SeaLINK+8 (2803) Port 4 */
+#define SEALEVEL_2803_5_PID	0X2853 	/* SeaLINK+8 (2803) Port 5 */
+#define SEALEVEL_2803_6_PID	0X2863 	/* SeaLINK+8 (2803) Port 6 */
+#define SEALEVEL_2803_7_PID	0X2873 	/* SeaLINK+8 (2803) Port 7 */
+#define SEALEVEL_2803_8_PID	0X2883 	/* SeaLINK+8 (2803) Port 8 */
+ 
+/*
+ * Home Electronics (www.home-electro.com) USB gadgets
+ */
+#define FTDI_HE_TIRA1_PID	0xFA78	/* Tira-1 IR tranceiver */
+
+/* USB-UIRT - An infrared receiver and transmitter using the 8U232AM chip */
+/* http://home.earthlink.net/~jrhees/USBUIRT/index.htm */
+#define FTDI_USB_UIRT_PID	0xF850	/* Product Id */
+
+/* Commands */
 #define FTDI_SIO_RESET 		0 /* Reset the port */
 #define FTDI_SIO_MODEM_CTRL 	1 /* Set the modem control register */
 #define FTDI_SIO_SET_FLOW_CTRL	2 /* Set flow control register */
@@ -84,19 +172,61 @@
 /*
  * BmRequestType:  0100 0000B
  * bRequest:       FTDI_SIO_SET_BAUDRATE
- * wValue:         BaudRate value - see below
+ * wValue:         BaudDivisor value - see below
  * wIndex:         Port
  * wLength:        0
  * Data:           None
+ * The BaudDivisor values are calculated as follows:
+ * - BaseClock is either 12000000 or 48000000 depending on the device. FIXME: I wish
+ *   I knew how to detect old chips to select proper base clock!
+ * - BaudDivisor is a fixed point number encoded in a funny way.
+ *   (--WRONG WAY OF THINKING--)
+ *   BaudDivisor is a fixed point number encoded with following bit weighs:
+ *   (-2)(-1)(13..0). It is a radical with a denominator of 4, so values
+ *   end with 0.0 (00...), 0.25 (10...), 0.5 (01...), and 0.75 (11...).
+ *   (--THE REALITY--)
+ *   The both-bits-set has quite different meaning from 0.75 - the chip designers
+ *   have decided it to mean 0.125 instead of 0.75.
+ *   This info looked up in FTDI application note "FT8U232 DEVICES \ Data Rates
+ *   and Flow Control Consideration for USB to RS232".
+ * - BaudDivisor = (BaseClock / 16) / BaudRate, where the (=) operation should
+ *   automagically re-encode the resulting value to take fractions into consideration.
+ * As all values are integers, some bit twiddling is in order:
+ *   BaudDivisor = (BaseClock / 16 / BaudRate) |
+ *   (((BaseClock / 2 / BaudRate) & 4) ? 0x4000    // 0.5
+ *    : ((BaseClock / 2 / BaudRate) & 2) ? 0x8000  // 0.25
+ *    : ((BaseClock / 2 / BaudRate) & 1) ? 0xc000  // 0.125
+ *    : 0)
+ *
+ * For the FT232BM, a 17th divisor bit was introduced to encode the multiples
+ * of 0.125 missing from the FT8U232AM.  Bits 16 to 14 are coded as follows
+ * (the first four codes are the same as for the FT8U232AM, where bit 16 is
+ * always 0):
+ *   000 - add .000 to divisor
+ *   001 - add .500 to divisor
+ *   010 - add .250 to divisor
+ *   011 - add .125 to divisor
+ *   100 - add .375 to divisor
+ *   101 - add .625 to divisor
+ *   110 - add .750 to divisor
+ *   111 - add .875 to divisor
+ * Bits 15 to 0 of the 17-bit divisor are placed in the urb value.  Bit 16 is 
+ * placed in bit 0 of the urb index.
+ *
+ * Note that there are a couple of special cases to support the highest baud
+ * rates.  If the calculated divisor value is 1, this needs to be replaced with
+ * 0.  Additionally for the FT232BM, if the calculated divisor value is 0x4001
+ * (1.5), this needs to be replaced with 0x0001 (1) (but this divisor value is
+ * not supported by the FT8U232AM).
  */
 
-enum ftdi_type {
-	sio = 1,
-	F8U232AM = 2,
-};
+typedef enum {
+	SIO = 1,
+	FT8U232AM = 2,
+	FT232BM = 3,
+} ftdi_chip_type_t;
 
-
-enum {
+typedef enum {
  ftdi_sio_b300 = 0, 
  ftdi_sio_b600 = 1, 
  ftdi_sio_b1200 = 2,
@@ -107,39 +237,12 @@ enum {
  ftdi_sio_b38400 = 7,
  ftdi_sio_b57600 = 8,
  ftdi_sio_b115200 = 9
-};
+} FTDI_SIO_baudrate_t ;
 
-
-enum {
-  ftdi_8U232AM_12MHz_b300 = 0x09c4,
-  ftdi_8U232AM_12MHz_b600 = 0x04E2,
-  ftdi_8U232AM_12MHz_b1200 = 0x0271,
-  ftdi_8U232AM_12MHz_b2400 = 0x4138,
-  ftdi_8U232AM_12MHz_b4800 = 0x809c,
-  ftdi_8U232AM_12MHz_b9600 = 0xc04e,
-  ftdi_8U232AM_12MHz_b19200 = 0x0027,
-  ftdi_8U232AM_12MHz_b38400 = 0x4013,
-  ftdi_8U232AM_12MHz_b57600 = 0x000d,
-  ftdi_8U232AM_12MHz_b115200 = 0x4006,
-  ftdi_8U232AM_12MHz_b230400 = 0x8003,
-};
-/* Apparently all devices are 48MHz */
-enum {
-  ftdi_8U232AM_48MHz_b300 = 0x2710,
-  ftdi_8U232AM_48MHz_b600 = 0x1388,
-  ftdi_8U232AM_48MHz_b1200 = 0x09c4,
-  ftdi_8U232AM_48MHz_b2400 = 0x04e2,
-  ftdi_8U232AM_48MHz_b4800 = 0x0271,
-  ftdi_8U232AM_48MHz_b9600 = 0x4138,
-  ftdi_8U232AM_48MHz_b19200 = 0x809c,
-  ftdi_8U232AM_48MHz_b38400 = 0xc04e,
-  ftdi_8U232AM_48MHz_b57600 = 0x0034,
-  ftdi_8U232AM_48MHz_b115200 = 0x001a,
-  ftdi_8U232AM_48MHz_b230400 = 0x000d,
-  ftdi_8U232AM_48MHz_b460800 = 0x4006,
-  ftdi_8U232AM_48MHz_b921600 = 0x8003,
-
-};
+/*
+ * The ftdi_8U232AM_xxMHz_byyy constants have been removed. The encoded divisor values
+ * are calculated internally.
+ */
 
 #define FTDI_SIO_SET_DATA_REQUEST FTDI_SIO_SET_DATA
 #define FTDI_SIO_SET_DATA_REQUEST_TYPE 0x40
@@ -443,6 +546,11 @@ enum {
  * B7	Error in RCVR FIFO
  * 
  */
+#define FTDI_RS0_CTS	(1 << 4)
+#define FTDI_RS0_DSR	(1 << 5)
+#define FTDI_RS0_RI	(1 << 6)
+#define FTDI_RS0_RLSD	(1 << 7)
+
 #define FTDI_RS_DR  1
 #define FTDI_RS_OE (1<<1)
 #define FTDI_RS_PE (1<<2)

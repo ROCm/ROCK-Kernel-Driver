@@ -259,7 +259,10 @@ static ssize_t pnp_show_current_resources(struct device *dmdev, char *buf)
 	for (i = 0; i < PNP_MAX_PORT; i++) {
 		if (pnp_port_valid(dev, i)) {
 			pnp_printf(buffer,"io");
-			pnp_printf(buffer," 0x%lx-0x%lx \n",
+			if (pnp_port_flags(dev, i) & IORESOURCE_DISABLED)
+				pnp_printf(buffer," disabled\n");
+			else
+				pnp_printf(buffer," 0x%lx-0x%lx\n",
 						pnp_port_start(dev, i),
 						pnp_port_end(dev, i));
 		}
@@ -267,7 +270,10 @@ static ssize_t pnp_show_current_resources(struct device *dmdev, char *buf)
 	for (i = 0; i < PNP_MAX_MEM; i++) {
 		if (pnp_mem_valid(dev, i)) {
 			pnp_printf(buffer,"mem");
-			pnp_printf(buffer," 0x%lx-0x%lx \n",
+			if (pnp_mem_flags(dev, i) & IORESOURCE_DISABLED)
+				pnp_printf(buffer," disabled\n");
+			else
+				pnp_printf(buffer," 0x%lx-0x%lx\n",
 						pnp_mem_start(dev, i),
 						pnp_mem_end(dev, i));
 		}
@@ -275,13 +281,21 @@ static ssize_t pnp_show_current_resources(struct device *dmdev, char *buf)
 	for (i = 0; i < PNP_MAX_IRQ; i++) {
 		if (pnp_irq_valid(dev, i)) {
 			pnp_printf(buffer,"irq");
-			pnp_printf(buffer," %ld \n", pnp_irq(dev, i));
+			if (pnp_irq_flags(dev, i) & IORESOURCE_DISABLED)
+				pnp_printf(buffer," disabled\n");
+			else
+				pnp_printf(buffer," %ld\n",
+						pnp_irq(dev, i));
 		}
 	}
 	for (i = 0; i < PNP_MAX_DMA; i++) {
 		if (pnp_dma_valid(dev, i)) {
 			pnp_printf(buffer,"dma");
-			pnp_printf(buffer," %ld \n", pnp_dma(dev, i));
+			if (pnp_dma_flags(dev, i) & IORESOURCE_DISABLED)
+				pnp_printf(buffer," disabled\n");
+			else
+				pnp_printf(buffer," %ld\n",
+						pnp_dma(dev, i));
 		}
 	}
 	ret = (buffer->curr - buf);
@@ -323,14 +337,14 @@ pnp_set_current_resources(struct device * dmdev, const char * ubuf, size_t count
 	if (!strnicmp(buf,"auto",4)) {
 		if (dev->active)
 			goto done;
-		pnp_init_resources(&dev->res);
+		pnp_init_resource_table(&dev->res);
 		retval = pnp_auto_config_dev(dev);
 		goto done;
 	}
 	if (!strnicmp(buf,"clear",5)) {
 		if (dev->active)
 			goto done;
-		pnp_init_resources(&dev->res);
+		pnp_init_resource_table(&dev->res);
 		goto done;
 	}
 	if (!strnicmp(buf,"get",3)) {
@@ -345,7 +359,7 @@ pnp_set_current_resources(struct device * dmdev, const char * ubuf, size_t count
 		if (dev->active)
 			goto done;
 		buf += 3;
-		pnp_init_resources(&dev->res);
+		pnp_init_resource_table(&dev->res);
 		down(&pnp_res_mutex);
 		while (1) {
 			while (isspace(*buf))

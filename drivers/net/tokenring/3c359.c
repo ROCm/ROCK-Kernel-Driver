@@ -464,7 +464,7 @@ static int xl_hw_reset(struct net_device *dev)
 		
 		printk(KERN_INFO "3C359: Uploading Microcode: "); 
 		
-		for (i = start,j=0; (j < mc_size && i <= 0xffff) ; i++,j++) { 
+		for (i = start, j = 0; j < mc_size; i++, j++) { 
 			writel(MEM_BYTE_WRITE | 0XD0000 | i, xl_mmio + MMIO_MAC_ACCESS_CMD) ; 
 			writeb(microcode[j],xl_mmio + MMIO_MACDATA) ; 
 			if (j % 1024 == 0)

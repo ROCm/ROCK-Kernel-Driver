@@ -277,27 +277,10 @@ inline static unsigned char read_status (struct net_device *dev)
    then calls us here.
 
    */
-int __init
-plip_init_dev(struct net_device *dev, struct parport *pb)
+static int
+plip_init_netdev(struct net_device *dev)
 {
-	struct net_local *nl;
-	struct pardevice *pardev;
-
-	SET_MODULE_OWNER(dev);
-	dev->irq = pb->irq;
-	dev->base_addr = pb->base;
-
-	if (pb->irq == -1) {
-		printk(KERN_INFO "plip: %s has no IRQ. Using IRQ-less mode,"
-		                 "which is fairly inefficient!\n", pb->name);
-	}
-
-	pardev = parport_register_device(pb, dev->name, plip_preempt,
-					 plip_wakeup, plip_interrupt, 
-					 0, dev);
-
-	if (!pardev)
-		return -ENODEV;
+	struct net_local *nl = dev->priv;
 
 	printk(KERN_INFO "%s", version);
 	if (dev->irq != -1)
@@ -306,9 +289,6 @@ plip_init_dev(struct net_device *dev, struct parport *pb)
 	else
 		printk(KERN_INFO "%s: Parallel port at %#3lx, not using IRQ.\n",
 		       dev->name, dev->base_addr);
-
-	/* Fill in the generic fields of the device structure. */
-	ether_setup(dev);
 
 	/* Then, override parts of it */
 	dev->hard_start_xmit	 = plip_tx_packet;
@@ -322,22 +302,12 @@ plip_init_dev(struct net_device *dev, struct parport *pb)
 	memset(dev->dev_addr, 0xfc, ETH_ALEN);
 
 	/* Set the private structure */
-	dev->priv = kmalloc(sizeof (struct net_local), GFP_KERNEL);
-	if (dev->priv == NULL) {
-		printk(KERN_ERR "%s: out of memory\n", dev->name);
-		parport_unregister_device(pardev);
-		return -ENOMEM;
-	}
-	memset(dev->priv, 0, sizeof(struct net_local));
-	nl = (struct net_local *) dev->priv;
-
 	nl->orig_hard_header    = dev->hard_header;
 	dev->hard_header        = plip_hard_header;
 
 	nl->orig_hard_header_cache = dev->hard_header_cache;
 	dev->hard_header_cache     = plip_hard_header_cache;
 
-	nl->pardev = pardev; 
 
 	nl->port_owner = 0;
 
@@ -1299,29 +1269,52 @@ plip_searchfor(int list[], int a)
  * available to use. */
 static void plip_attach (struct parport *port)
 {
-	static int i;
+	static int unit;
+	struct net_device *dev;
+	struct net_local *nl;
+	char name[IFNAMSIZ];
 
 	if ((parport[0] == -1 && (!timid || !port->devices)) || 
 	    plip_searchfor(parport, port->number)) {
-		if (i == PLIP_MAX) {
+		if (unit == PLIP_MAX) {
 			printk(KERN_ERR "plip: too many devices\n");
 			return;
 		}
-		dev_plip[i] = kmalloc(sizeof(struct net_device),
-				      GFP_KERNEL);
-		if (!dev_plip[i]) {
+
+		sprintf(name, "plip%d", unit);
+		dev = alloc_netdev(sizeof(struct net_local), name, 
+				   ether_setup);
+		if (!dev) {
 			printk(KERN_ERR "plip: memory squeeze\n");
 			return;
 		}
-		memset(dev_plip[i], 0, sizeof(struct net_device));
-		sprintf(dev_plip[i]->name, "plip%d", i);
-		dev_plip[i]->priv = port;
-		if (plip_init_dev(dev_plip[i],port) ||
-		    register_netdev(dev_plip[i])) {
-			kfree(dev_plip[i]);
-			dev_plip[i] = NULL;
+		
+		dev->init = plip_init_netdev;
+
+		SET_MODULE_OWNER(dev);
+		dev->irq = port->irq;
+		dev->base_addr = port->base;
+		if (port->irq == -1) {
+			printk(KERN_INFO "plip: %s has no IRQ. Using IRQ-less mode,"
+		                 "which is fairly inefficient!\n", port->name);
+		}
+
+		nl = dev->priv;
+		nl->pardev = parport_register_device(port, name, plip_preempt,
+						 plip_wakeup, plip_interrupt, 
+						 0, dev);
+
+		if (!nl->pardev) {
+			printk(KERN_ERR "%s: parport_register failed\n", name);
+			kfree(dev);
+			return;
+		}
+
+		if (register_netdev(dev)) {
+			printk(KERN_ERR "%s: network register failed\n", name);
+			kfree(dev);
 		} else {
-			i++;
+			dev_plip[unit++] = dev;
 		}
 	}
 }
@@ -1341,20 +1334,19 @@ static struct parport_driver plip_driver = {
 
 static void __exit plip_cleanup_module (void)
 {
+	struct net_device *dev;
 	int i;
 
 	parport_unregister_driver (&plip_driver);
 
 	for (i=0; i < PLIP_MAX; i++) {
-		if (dev_plip[i]) {
-			struct net_local *nl =
-				(struct net_local *)dev_plip[i]->priv;
-			unregister_netdev(dev_plip[i]);
+		if ((dev = dev_plip[i])) {
+			struct net_local *nl = dev->priv;
+			unregister_netdev(dev);
 			if (nl->port_owner)
 				parport_release(nl->pardev);
 			parport_unregister_device(nl->pardev);
-			kfree(dev_plip[i]->priv);
-			kfree(dev_plip[i]);
+			kfree(dev);
 			dev_plip[i] = NULL;
 		}
 	}

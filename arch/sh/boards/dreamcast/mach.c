@@ -1,5 +1,5 @@
 /*
- *	$Id: mach.c,v 1.1.2.5 2002/03/01 11:22:17 lethal Exp $
+ *	$Id: mach.c,v 1.4 2003/05/20 03:04:36 lethal Exp $
  *	SEGA Dreamcast machine vector
  */
 
@@ -56,7 +56,5 @@ struct sh_machine_vector mv_dreamcast __initmv = {
 
 	mv_isa_port2addr:	dreamcast_isa_port2addr,
 	mv_irq_demux:		systemasic_irq_demux,
-
-	mv_hw_dreamcast:	1,
 };
 ALIAS_MV(dreamcast)

@@ -21,8 +21,10 @@ static inline void activate_mm(struct mm_struct *old, struct mm_struct *new)
 extern void switch_mm_skas(int mm_fd);
 
 static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, 
-			     struct task_struct *tsk, unsigned cpu)
+			     struct task_struct *tsk)
 {
+	unsigned cpu = smp_processor_id();
+
 	if(prev != next){
 		clear_bit(cpu, &prev->cpu_vm_mask);
 		set_bit(cpu, &next->cpu_vm_mask);
@@ -33,7 +35,7 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 }
 
 static inline void enter_lazy_tlb(struct mm_struct *mm, 
-				  struct task_struct *tsk, unsigned cpu)
+				  struct task_struct *tsk)
 {
 }
 

@@ -245,6 +245,9 @@ struct epitem {
 	/* The "container" of this item */
 	struct eventpoll *ep;
 
+	/* The file descriptor this item refers to */
+	int fd;
+
 	/* The file this item refers to */
 	struct file *file;
 
@@ -285,15 +288,17 @@ static int ep_getfd(int *efd, struct inode **einode, struct file **efile);
 static int ep_alloc_pages(char **pages, int numpages);
 static int ep_free_pages(char **pages, int numpages);
 static int ep_file_init(struct file *file, unsigned int hashbits);
-static unsigned int ep_hash_index(struct eventpoll *ep, struct file *file);
+static unsigned int ep_hash_index(struct eventpoll *ep, struct file *file, int fd);
 static struct list_head *ep_hash_entry(struct eventpoll *ep, unsigned int index);
 static int ep_init(struct eventpoll *ep, unsigned int hashbits);
 static void ep_free(struct eventpoll *ep);
-static struct epitem *ep_find(struct eventpoll *ep, struct file *file);
+static struct epitem *ep_find(struct eventpoll *ep, struct file *file, int fd);
 static void ep_use_epitem(struct epitem *epi);
 static void ep_release_epitem(struct epitem *epi);
-static void ep_ptable_queue_proc(struct file *file, wait_queue_head_t *whead, poll_table *pt);
-static int ep_insert(struct eventpoll *ep, struct epoll_event *event, struct file *tfile);
+static void ep_ptable_queue_proc(struct file *file, wait_queue_head_t *whead,
+				 poll_table *pt);
+static int ep_insert(struct eventpoll *ep, struct epoll_event *event,
+		     struct file *tfile, int fd);
 static int ep_modify(struct eventpoll *ep, struct epitem *epi, struct epoll_event *event);
 static void ep_unregister_pollwait(struct eventpoll *ep, struct epitem *epi);
 static int ep_unlink(struct eventpoll *ep, struct epitem *epi);
@@ -443,27 +448,15 @@ void eventpoll_init_file(struct file *file)
 
 
 /*
- * This is called from inside fs/file_table.c:__fput() to unlink files
- * from the eventpoll interface. We need to have this facility to cleanup
- * correctly files that are closed without being removed from the eventpoll
- * interface.
+ * This is called from eventpoll_release() to unlink files from the eventpoll
+ * interface. We need to have this facility to cleanup correctly files that are
+ * closed without being removed from the eventpoll interface.
  */
-void eventpoll_release(struct file *file)
+void eventpoll_release_file(struct file *file)
 {
 	struct list_head *lsthead = &file->f_ep_links;
 	struct eventpoll *ep;
 	struct epitem *epi;
-
-	/*
-	 * Fast check to avoid the get/release of the semaphore. Since
-	 * we're doing this outside the semaphore lock, it might return
-	 * false negatives, but we don't care. It'll help in 99.99% of cases
-	 * to avoid the semaphore lock. False positives simply cannot happen
-	 * because the file in on the way to be removed and nobody ( but
-	 * eventpoll ) has still a reference to this file.
-	 */
-	if (list_empty(lsthead))
-		return;
 
 	/*
 	 * We don't want to get "file->f_ep_lock" because it is not
@@ -541,7 +534,7 @@ eexit_1:
 /*
  * The following function implement the controller interface for the eventpoll
  * file that enable the insertion/removal/change of file descriptors inside
- * the interest set. It rapresents the kernel part of the user spcae epoll_ctl(2).
+ * the interest set. It rapresents the kernel part of the user space epoll_ctl(2).
  */
 asmlinkage long sys_epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
 {
@@ -551,8 +544,8 @@ asmlinkage long sys_epoll_ctl(int epfd, int op, int fd, struct epoll_event *even
 	struct epitem *epi;
 	struct epoll_event epds;
 
-	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: sys_epoll_ctl(%d, %d, %d, %u)\n",
-		     current, epfd, op, fd, event->events));
+	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: sys_epoll_ctl(%d, %d, %d, %p)\n",
+		     current, epfd, op, fd, event));
 
 	error = -EFAULT;
 	if (copy_from_user(&epds, event, sizeof(struct epoll_event)))
@@ -592,7 +585,7 @@ asmlinkage long sys_epoll_ctl(int epfd, int op, int fd, struct epoll_event *even
 	down_write(&ep->sem);
 
 	/* Try to lookup the file inside our hash table */
-	epi = ep_find(ep, tfile);
+	epi = ep_find(ep, tfile, fd);
 
 	error = -EINVAL;
 	switch (op) {
@@ -600,7 +593,7 @@ asmlinkage long sys_epoll_ctl(int epfd, int op, int fd, struct epoll_event *even
 		if (!epi) {
 			epds.events |= POLLERR | POLLHUP;
 
-			error = ep_insert(ep, &epds, tfile);
+			error = ep_insert(ep, &epds, tfile, fd);
 		} else
 			error = -EEXIST;
 		break;
@@ -633,8 +626,8 @@ eexit_3:
 eexit_2:
 	fput(file);
 eexit_1:
-	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: sys_epoll_ctl(%d, %d, %d, %u) = %d\n",
-		     current, epfd, op, fd, event->events, error));
+	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: sys_epoll_ctl(%d, %d, %d, %p) = %d\n",
+		     current, epfd, op, fd, event, error));
 
 	return error;
 }
@@ -826,10 +819,11 @@ static int ep_file_init(struct file *file, unsigned int hashbits)
 /*
  * Calculate the index of the hash relative to "file".
  */
-static unsigned int ep_hash_index(struct eventpoll *ep, struct file *file)
+static unsigned int ep_hash_index(struct eventpoll *ep, struct file *file, int fd)
 {
+	unsigned long ptr = (unsigned long) file ^ (fd << ep->hashbits);
 
-	return (unsigned int) hash_ptr(file, ep->hashbits);
+	return (unsigned int) hash_ptr((void *) ptr, ep->hashbits);
 }
 
 
@@ -932,7 +926,7 @@ static void ep_free(struct eventpoll *ep)
  * the returned item, so the caller must call ep_release_epitem()
  * after finished using the "struct epitem".
  */
-static struct epitem *ep_find(struct eventpoll *ep, struct file *file)
+static struct epitem *ep_find(struct eventpoll *ep, struct file *file, int fd)
 {
 	unsigned long flags;
 	struct list_head *lsthead, *lnk;
@@ -940,11 +934,11 @@ static struct epitem *ep_find(struct eventpoll *ep, struct file *file)
 
 	read_lock_irqsave(&ep->lock, flags);
 
-	lsthead = ep_hash_entry(ep, ep_hash_index(ep, file));
+	lsthead = ep_hash_entry(ep, ep_hash_index(ep, file, fd));
 	list_for_each(lnk, lsthead) {
 		epi = list_entry(lnk, struct epitem, llink);
 
-		if (epi->file == file) {
+		if (epi->file == file && epi->fd == fd) {
 			ep_use_epitem(epi);
 			break;
 		}
@@ -988,7 +982,8 @@ static void ep_release_epitem(struct epitem *epi)
  * This is the callback that is used to add our wait queue to the
  * target file wakeup lists.
  */
-static void ep_ptable_queue_proc(struct file *file, wait_queue_head_t *whead, poll_table *pt)
+static void ep_ptable_queue_proc(struct file *file, wait_queue_head_t *whead,
+				 poll_table *pt)
 {
 	struct epitem *epi = EP_ITEM_FROM_EPQUEUE(pt);
 	struct eppoll_entry *pwq;
@@ -1007,7 +1002,8 @@ static void ep_ptable_queue_proc(struct file *file, wait_queue_head_t *whead, po
 }
 
 
-static int ep_insert(struct eventpoll *ep, struct epoll_event *event, struct file *tfile)
+static int ep_insert(struct eventpoll *ep, struct epoll_event *event,
+		     struct file *tfile, int fd)
 {
 	int error, revents, pwake = 0;
 	unsigned long flags;
@@ -1026,6 +1022,7 @@ static int ep_insert(struct eventpoll *ep, struct epoll_event *event, struct fil
 	INIT_LIST_HEAD(&epi->pwqlist);
 	epi->ep = ep;
 	epi->file = tfile;
+	epi->fd = fd;
 	epi->event = *event;
 	atomic_set(&epi->usecnt, 1);
 	epi->nwait = 0;
@@ -1058,7 +1055,7 @@ static int ep_insert(struct eventpoll *ep, struct epoll_event *event, struct fil
 	write_lock_irqsave(&ep->lock, flags);
 
 	/* Add the current item to the hash table */
-	list_add(&epi->llink, ep_hash_entry(ep, ep_hash_index(ep, tfile)));
+	list_add(&epi->llink, ep_hash_entry(ep, ep_hash_index(ep, tfile, fd)));
 
 	/* If the file is already "ready" we drop it inside the ready list */
 	if ((revents & event->events) && !EP_IS_LINKED(&epi->rdllink)) {
@@ -1077,8 +1074,8 @@ static int ep_insert(struct eventpoll *ep, struct epoll_event *event, struct fil
 	if (pwake)
 		ep_poll_safewake(&psw, &ep->poll_wait);
 
-	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: ep_insert(%p, %p)\n",
-		     current, ep, tfile));
+	DNPRINTK(3, (KERN_INFO "[%p] eventpoll: ep_insert(%p, %p, %d)\n",
+		     current, ep, tfile, fd));
 
 	return 0;
 

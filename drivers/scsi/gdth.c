@@ -3662,7 +3662,7 @@ static int gdth_sync_event(int hanum,int service,unchar index,Scsi_Cmnd *scp)
             pci_unmap_single(ha->pdev,scp->SCp.dma_handle,
                          scp->request_bufflen,scp->SCp.Message);
         if (scp->SCp.buffer) 
-            pci_unmap_single(ha->pdev,(dma_addr_t)(u32)scp->SCp.buffer,
+            pci_unmap_single(ha->pdev,(dma_addr_t)scp->SCp.buffer,
 						16,PCI_DMA_FROMDEVICE);
 #endif
         if (ha->status == S_OK) {

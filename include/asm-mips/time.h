@@ -10,20 +10,17 @@
  * Free Software Foundation;  either version 2 of the  License, or (at your
  * option) any later version.
  *
+ * Please refer to Documentation/mips/time.README.
  */
-
-/*
- * Please refer to Documentation/MIPS/time.README.
- */
-
 #ifndef _ASM_TIME_H
 #define _ASM_TIME_H
 
-#include <linux/ptrace.h>               /* for struct pt_regs */
-#include <linux/linkage.h>              /* for asmlinkage */
-#include <linux/rtc.h>                  /* for struct rtc_time */
+#include <linux/interrupt.h>
+#include <linux/linkage.h>
+#include <linux/ptrace.h>
+#include <linux/rtc.h>
 
-/* 
+/*
  * RTC ops.  By default, they point a no-RTC functions.
  *	rtc_get_time - mktime(year, mon, day, hour, min, sec) in seconds.
  *	rtc_set_time - reverse the above translation and set time to RTC.
@@ -39,7 +36,7 @@ extern int (*rtc_set_time)(unsigned long);
 extern void to_tm(unsigned long tim, struct rtc_time * tm);
 
 /*
- * do_gettimeoffset(). By default, this func pointer points to 
+ * do_gettimeoffset(). By default, this func pointer points to
  * do_null_gettimeoffset(), which leads to the same resolution as HZ.
  * Higher resolution versions are vailable, which gives ~1us resolution.
  */
@@ -53,7 +50,7 @@ extern unsigned long calibrate_div64_gettimeoffset(void);
 /*
  * high-level timer interrupt routines.
  */
-extern void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+extern irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
 /*
  * the corresponding low-level timer interrupt routine.

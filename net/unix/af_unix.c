@@ -594,7 +594,7 @@ static struct sock *unix_find_other(struct sockaddr_un *sunname, int len,
 		err = path_lookup(sunname->sun_path, LOOKUP_FOLLOW, &nd);
 		if (err)
 			goto fail;
-		err = permission(nd.dentry->d_inode,MAY_WRITE);
+		err = permission(nd.dentry->d_inode,MAY_WRITE, &nd);
 		if (err)
 			goto put_fail;
 

@@ -14,7 +14,8 @@ obj-$(CONFIG_SMP)		+= smp.o
 obj-$(CONFIG_CF_ENABLER)	+= cf-enabler.o
 obj-$(CONFIG_SH_STANDARD_BIOS)	+= sh_bios.o
 obj-$(CONFIG_SH_KGDB)		+= kgdb_stub.o kgdb_jmp.o
-obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
+obj-$(CONFIG_SH_CPU_FREQ)	+= cpufreq.o
+obj-$(CONFIG_MODULES)		+= module.o
 
 ifneq ($(CONFIG_SH_DREAMCAST),y)
 obj-$(CONFIG_PCI)		+= pci-dma.o

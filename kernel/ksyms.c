@@ -41,6 +41,7 @@
 #include <linux/capability.h>
 #include <linux/highuid.h>
 #include <linux/fs.h>
+#include <linux/fs_struct.h>
 #include <linux/uio.h>
 #include <linux/tty.h>
 #include <linux/in6.h>
@@ -76,6 +77,8 @@ EXPORT_SYMBOL(do_mmap_pgoff);
 EXPORT_SYMBOL(do_munmap);
 EXPORT_SYMBOL(do_brk);
 EXPORT_SYMBOL(exit_mm);
+EXPORT_SYMBOL_GPL(exit_fs);
+EXPORT_SYMBOL_GPL(copy_fs_struct);
 
 /* internal kernel memory management */
 EXPORT_SYMBOL(__alloc_pages);
@@ -462,6 +465,7 @@ EXPORT_SYMBOL(preempt_schedule);
 #endif
 EXPORT_SYMBOL(schedule_timeout);
 EXPORT_SYMBOL(yield);
+EXPORT_SYMBOL(io_schedule);
 EXPORT_SYMBOL(__cond_resched);
 EXPORT_SYMBOL(set_user_nice);
 EXPORT_SYMBOL(task_nice);
@@ -523,6 +527,7 @@ EXPORT_SYMBOL(daemonize);
 EXPORT_SYMBOL(csum_partial); /* for networking and md */
 EXPORT_SYMBOL(seq_escape);
 EXPORT_SYMBOL(seq_printf);
+EXPORT_SYMBOL(seq_path);
 EXPORT_SYMBOL(seq_open);
 EXPORT_SYMBOL(seq_release);
 EXPORT_SYMBOL(seq_read);
@@ -585,7 +590,7 @@ EXPORT_SYMBOL(tasklet_kill);
 EXPORT_SYMBOL(do_softirq);
 EXPORT_SYMBOL(raise_softirq);
 EXPORT_SYMBOL(open_softirq);
-EXPORT_SYMBOL(cpu_raise_softirq);
+EXPORT_SYMBOL(raise_softirq_irqoff);
 EXPORT_SYMBOL(__tasklet_schedule);
 EXPORT_SYMBOL(__tasklet_hi_schedule);
 

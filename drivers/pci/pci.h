@@ -29,7 +29,6 @@ extern int pci_remove_device_safe(struct pci_dev *dev);
 extern unsigned char pci_max_busnr(void);
 extern unsigned char pci_bus_max_busnr(struct pci_bus *bus);
 extern int pci_bus_find_capability (struct pci_bus *bus, unsigned int devfn, int cap);
-extern struct pci_bus *pci_find_bus(unsigned char busnr);
 
 struct pci_dev_wrapped {
 	struct pci_dev	*dev;

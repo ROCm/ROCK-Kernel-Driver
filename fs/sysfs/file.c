@@ -247,6 +247,12 @@ static int check_perm(struct inode * inode, struct file * file)
 	if (!kobj || !attr)
 		goto Einval;
 
+	/* Grab the module reference for this attribute if we have one */
+	if (!try_module_get(attr->owner)) {
+		error = -ENODEV;
+		goto Done;
+	}
+
 	/* if the kobject has no ktype, then we assume that it is a subsystem
 	 * itself, and use ops for it.
 	 */
@@ -300,6 +306,7 @@ static int check_perm(struct inode * inode, struct file * file)
 	goto Done;
  Eaccess:
 	error = -EACCES;
+	module_put(attr->owner);
  Done:
 	if (error && kobj)
 		kobject_put(kobj);
@@ -314,10 +321,12 @@ static int sysfs_open_file(struct inode * inode, struct file * filp)
 static int sysfs_release(struct inode * inode, struct file * filp)
 {
 	struct kobject * kobj = filp->f_dentry->d_parent->d_fsdata;
+	struct attribute * attr = filp->f_dentry->d_fsdata;
 	struct sysfs_buffer * buffer = filp->private_data;
 
 	if (kobj) 
 		kobject_put(kobj);
+	module_put(attr->owner);
 
 	if (buffer) {
 		if (buffer->page)

@@ -209,7 +209,7 @@ wakeup_long64:
 
 	movw	$0x0e00 + '!', %ds:(0xb801a)
 	movq	saved_eip, %rax
-	jmp	%rax
+	jmp	*%rax
 
 .code32
 

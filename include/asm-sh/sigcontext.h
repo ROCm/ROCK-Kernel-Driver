@@ -13,7 +13,7 @@ struct sigcontext {
 	unsigned long sc_mach;
 	unsigned long sc_macl;
 
-#if defined(__SH4__)
+#if defined(CONFIG_CPU_SH4)
 	/* FPU registers */
 	unsigned long sc_fpregs[16];
 	unsigned long sc_xfpregs[16];

@@ -151,7 +151,6 @@ xfs_ialloc_ag_alloc(
 	int		ninodes;	/* num inodes per buf */
 	xfs_agino_t	thisino;	/* current inode number, for loop */
 	int		version;	/* inode version number to use */
-	static xfs_timestamp_t ztime;	/* zero xfs timestamp */
 	int		isaligned;	/* inode allocation at stripe unit */
 					/* boundary */
 	xfs_dinode_core_t dic;          /* a dinode_core to copy to new */
@@ -265,6 +264,11 @@ xfs_ialloc_ag_alloc(
 		version = XFS_DINODE_VERSION_2;
 	else
 		version = XFS_DINODE_VERSION_1;
+
+	memset(&dic, 0, sizeof(xfs_dinode_core_t));
+	INT_SET(dic.di_magic, ARCH_CONVERT, XFS_DINODE_MAGIC);
+	INT_SET(dic.di_version, ARCH_CONVERT, version);
+
 	for (j = 0; j < nbufs; j++) {
 		/*
 		 * Get the block.
@@ -279,36 +283,6 @@ xfs_ialloc_ag_alloc(
 		/*
 		 * Loop over the inodes in this buffer.
 		 */
-		INT_SET(dic.di_magic, ARCH_CONVERT, XFS_DINODE_MAGIC);
-		INT_ZERO(dic.di_mode, ARCH_CONVERT);
-		INT_SET(dic.di_version, ARCH_CONVERT, version);
-		INT_ZERO(dic.di_format, ARCH_CONVERT);
-		INT_ZERO(dic.di_onlink, ARCH_CONVERT);
-		INT_ZERO(dic.di_uid, ARCH_CONVERT);
-		INT_ZERO(dic.di_gid, ARCH_CONVERT);
-		INT_ZERO(dic.di_nlink, ARCH_CONVERT);
-		INT_ZERO(dic.di_projid, ARCH_CONVERT);
-		memset(&(dic.di_pad[0]), 0, sizeof(dic.di_pad));
-		INT_SET(dic.di_atime.t_sec, ARCH_CONVERT, ztime.t_sec);
-		INT_SET(dic.di_atime.t_nsec, ARCH_CONVERT, ztime.t_nsec);
-
-		INT_SET(dic.di_mtime.t_sec, ARCH_CONVERT, ztime.t_sec);
-		INT_SET(dic.di_mtime.t_nsec, ARCH_CONVERT, ztime.t_nsec);
-
-		INT_SET(dic.di_ctime.t_sec, ARCH_CONVERT, ztime.t_sec);
-		INT_SET(dic.di_ctime.t_nsec, ARCH_CONVERT, ztime.t_nsec);
-
-		INT_ZERO(dic.di_size, ARCH_CONVERT);
-		INT_ZERO(dic.di_nblocks, ARCH_CONVERT);
-		INT_ZERO(dic.di_extsize, ARCH_CONVERT);
-		INT_ZERO(dic.di_nextents, ARCH_CONVERT);
-		INT_ZERO(dic.di_anextents, ARCH_CONVERT);
-		INT_ZERO(dic.di_forkoff, ARCH_CONVERT);
-		INT_ZERO(dic.di_aformat, ARCH_CONVERT);
-		INT_ZERO(dic.di_dmevmask, ARCH_CONVERT);
-		INT_ZERO(dic.di_dmstate, ARCH_CONVERT);
-		INT_ZERO(dic.di_flags, ARCH_CONVERT);
-		INT_ZERO(dic.di_gen, ARCH_CONVERT);
 
 		for (i = 0; i < ninodes; i++) {
 			free = XFS_MAKE_IPTR(args.mp, fbuf, i);

@@ -11,6 +11,7 @@
 #include <linux/timex.h>
 #include <linux/errno.h>
 #include <linux/string.h>
+#include <linux/jiffies.h>
 
 #include <asm/timer.h>
 #include <asm/io.h>
@@ -18,7 +19,6 @@
 #include <asm/fixmap.h>
 
 extern spinlock_t i8253_lock;
-extern unsigned long jiffies;
 extern unsigned long calibrate_tsc(void);
 
 /* Number of usecs that the last interrupt was delayed */
@@ -88,7 +88,7 @@ static void mark_offset_cyclone(void)
 	 * between cyclone and pit reads (as noted when 
 	 * usec delta is > 90% # of usecs/tick)
 	 */
-	if (abs(delay - delay_at_last_interrupt) > (900000/HZ)) 
+	if (lost && abs(delay - delay_at_last_interrupt) > (900000/HZ))
 		jiffies++;
 }
 

@@ -51,7 +51,7 @@
 #define DRIVER_DATE		"20020828"
 
 #define DRIVER_MAJOR		1
-#define DRIVER_MINOR		8
+#define DRIVER_MINOR		9
 #define DRIVER_PATCHLEVEL	0
 
 /* Interface history:

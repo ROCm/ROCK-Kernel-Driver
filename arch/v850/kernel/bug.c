@@ -17,6 +17,7 @@
 
 #include <asm/errno.h>
 #include <asm/ptrace.h>
+#include <asm/processor.h>
 #include <asm/current.h>
 
 /* We should use __builtin_return_address, but it doesn't work in gcc-2.90
@@ -100,12 +101,21 @@ void show_regs (struct pt_regs *regs)
 	}
 }
 
-void show_stack (unsigned long *sp)
+/*
+ * TASK is a pointer to the task whose backtrace we want to see (or NULL
+ * for current task), SP is the stack pointer of the first frame that
+ * should be shown in the back trace (or NULL if the entire call-chain of
+ * the task should be shown).
+ */
+void show_stack (struct task_struct *task, unsigned long *sp)
 {
-	unsigned long end;
-	unsigned long addr = (unsigned long)sp;
+	unsigned long addr, end;
 
-	if (! addr)
+	if (sp)
+		addr = (unsigned long)sp;
+	else if (task)
+		addr = task_sp (task);
+	else
 		addr = stack_addr ();
 
 	addr = addr & ~3;
@@ -125,5 +135,5 @@ void show_stack (unsigned long *sp)
 
 void dump_stack ()
 {
-	show_stack (0);
+	show_stack (0, 0);
 }

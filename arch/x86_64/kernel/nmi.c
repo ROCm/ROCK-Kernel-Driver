@@ -23,6 +23,7 @@
 #include <linux/kernel_stat.h>
 #include <linux/module.h>
 #include <linux/sysdev.h>
+#include <linux/nmi.h>
 
 #include <asm/smp.h>
 #include <asm/mtrr.h>
@@ -32,7 +33,13 @@
 #include <asm/proto.h>
 #include <asm/kdebug.h>
 
-extern void default_do_nmi(struct pt_regs *);
+/* nmi_active:
+ * +1: the lapic NMI watchdog is active, but can be disabled
+ *  0: the lapic NMI watchdog has not been set up, and cannot
+ *     be enabled
+ * -1: the lapic NMI watchdog is disabled, but can be enabled
+ */
+static int nmi_active;
 
 unsigned int nmi_watchdog = NMI_IO_APIC;
 static unsigned int nmi_hz = HZ;
@@ -90,6 +97,7 @@ int __init check_nmi_watchdog (void)
 			printk("CPU#%d: NMI appears to be stuck (%d)!\n", 
 			       cpu,
 			       cpu_pda[cpu].__nmi_count);
+			nmi_active = 0;
 			return -1;
 		}
 	}
@@ -117,14 +125,6 @@ static int __init setup_nmi_watchdog(char *str)
 
 __setup("nmi_watchdog=", setup_nmi_watchdog);
 
-/* nmi_active:
- * +1: the lapic NMI watchdog is active, but can be disabled
- *  0: the lapic NMI watchdog has not been set up, and cannot
- *     be enabled
- * -1: the lapic NMI watchdog is disabled, but can be enabled
- */
-static int nmi_active;
-
 void disable_lapic_nmi_watchdog(void)
 {
 	if (nmi_active <= 0)
@@ -148,6 +148,28 @@ void enable_lapic_nmi_watchdog(void)
 		setup_apic_nmi_watchdog();
 	}
   }
+
+
+void disable_timer_nmi_watchdog(void)
+{
+	if ((nmi_watchdog != NMI_IO_APIC) || (nmi_active <= 0))
+		return;
+
+	disable_irq(0);
+	unset_nmi_callback();
+	nmi_active = -1;
+	nmi_watchdog = NMI_NONE;
+}
+
+void enable_timer_nmi_watchdog(void)
+{
+	if (nmi_active < 0) {
+		nmi_watchdog = NMI_IO_APIC;
+		touch_nmi_watchdog();
+		nmi_active = 1;
+		enable_irq(0);
+	}
+}
 
 #ifdef CONFIG_PM
 
@@ -352,3 +374,5 @@ void unset_nmi_callback(void)
 EXPORT_SYMBOL(nmi_watchdog);
 EXPORT_SYMBOL(disable_lapic_nmi_watchdog);
 EXPORT_SYMBOL(enable_lapic_nmi_watchdog);
+EXPORT_SYMBOL(disable_timer_nmi_watchdog);
+EXPORT_SYMBOL(enable_timer_nmi_watchdog);

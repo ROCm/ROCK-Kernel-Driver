@@ -6,6 +6,8 @@
 #define MAX_RTR_SOLICITATIONS		3
 #define RTR_SOLICITATION_INTERVAL	(4*HZ)
 
+#define MIN_VALID_LIFETIME		(2*3600)	/* 2 hours */
+
 #define TEMP_VALID_LIFETIME		(7*86400)
 #define TEMP_PREFERRED_LIFETIME		(86400)
 #define REGEN_MAX_RETRY			(5)
@@ -68,6 +70,8 @@ extern int			ipv6_dev_get_saddr(struct net_device *dev,
 					       struct in6_addr *saddr,
 					       int onlink);
 extern int			ipv6_get_lladdr(struct net_device *dev, struct in6_addr *);
+extern int			ipv6_rcv_saddr_equal(const struct sock *sk, 
+						      const struct sock *sk2);
 extern void			addrconf_join_solict(struct net_device *dev,
 					struct in6_addr *addr);
 extern void			addrconf_leave_solict(struct net_device *dev,

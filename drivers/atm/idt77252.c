@@ -2403,37 +2403,43 @@ idt77252_init_rx(struct idt77252_dev *card, struct vc_map *vc,
 static int
 idt77252_find_vcc(struct atm_vcc *vcc, short *vpi, int *vci)
 {
-	unsigned long flags;
+	struct sock *s;
 	struct atm_vcc *walk;
 
-	spin_lock_irqsave(&vcc->dev->lock, flags);
+	read_lock(&vcc_sklist_lock);
 	if (*vpi == ATM_VPI_ANY) {
 		*vpi = 0;
-		walk = vcc->dev->vccs;
-		while (walk) {
+		s = sk_head(&vcc_sklist);
+		while (s) {
+			walk = atm_sk(s);
+			if (walk->dev != vcc->dev)
+				continue;
 			if ((walk->vci == *vci) && (walk->vpi == *vpi)) {
 				(*vpi)++;
-				walk = vcc->dev->vccs;
+				s = sk_head(&vcc_sklist);
 				continue;
 			}
-			walk = walk->next;
+			s = sk_next(s);
 		}
 	}
 
 	if (*vci == ATM_VCI_ANY) {
 		*vci = ATM_NOT_RSV_VCI;
-		walk = vcc->dev->vccs;
-		while (walk) {
+		s = sk_head(&vcc_sklist);
+		while (s) {
+			walk = atm_sk(s);
+			if (walk->dev != vcc->dev)
+				continue;
 			if ((walk->vci == *vci) && (walk->vpi == *vpi)) {
 				(*vci)++;
-				walk = vcc->dev->vccs;
+				s = sk_head(&vcc_sklist);
 				continue;
 			}
-			walk = walk->next;
+			s = sk_next(s);
 		}
 	}
 
-	spin_unlock_irqrestore(&vcc->dev->lock, flags);
+	read_unlock(&vcc_sklist_lock);
 	return 0;
 }
 

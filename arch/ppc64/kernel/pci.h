@@ -42,14 +42,6 @@ void pci_devs_phb_init(void);
 void pci_fix_bus_sysdata(void);
 struct device_node *fetch_dev_dn(struct pci_dev *dev);
 
-/*******************************************************************
- * Helper macros for extracting data from pci structures.  
- *   PCI_GET_PHB_PTR(struct pci_dev*)    returns the Phb pointer.
- *   PCI_GET_PHB_NUMBER(struct pci_dev*) returns the Phb number.
- *   PCI_GET_BUS_NUMBER(struct pci_dev*) returns the bus number.
- *******************************************************************/
 #define PCI_GET_PHB_PTR(dev)    (((struct device_node *)(dev)->sysdata)->phb)
-#define PCI_GET_PHB_NUMBER(dev) (((dev)->bus->number&0x00FFFF00)>>8)
-#define PCI_GET_BUS_NUMBER(dev) ((dev)->bus->number&0x0000FF)
 
 #endif /* __PPC_KERNEL_PCI_H__ */

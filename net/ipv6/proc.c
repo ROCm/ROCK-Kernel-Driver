@@ -229,7 +229,7 @@ int snmp6_register_dev(struct inet6_dev *idev)
 		return -EINVAL;
 
 	if (snmp6_mib_init((void **)idev->stats.icmpv6, sizeof(struct icmpv6_mib),
-			   __alignof__(struct ipv6_mib)) < 0)
+			   __alignof__(struct icmpv6_mib)) < 0)
 		goto err_icmp;
 
 #ifdef CONFIG_PROC_FS

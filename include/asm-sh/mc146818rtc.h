@@ -4,6 +4,12 @@
 #ifndef _ASM_MC146818RTC_H
 #define _ASM_MC146818RTC_H
 
+#ifdef CONFIG_SH_MPC1211
+#undef  _ASM_MC146818RTC_H
+#undef  RTC_IRQ
+#include <asm/mpc1211/mc146818rtc.h>
+#else
+
 #include <asm/rtc.h>
 
 #define RTC_ALWAYS_BCD	1
@@ -12,12 +18,12 @@
 #undef  RTC_IRQ
 #define RTC_IRQ		0
 
-#if defined(__sh3__)
+#if defined(CONFIG_CPU_SH3)
 #define RTC_PORT(n)		(R64CNT+(n)*2)
 #define CMOS_READ(addr)		__CMOS_READ(addr,b)
 #define CMOS_WRITE(val,addr)	__CMOS_WRITE(val,addr,b)
 
-#elif defined(__SH4__)
+#elif defined(CONFIG_CPU_SH4)
 #define RTC_PORT(n)		(R64CNT+(n)*4)
 #define CMOS_READ(addr)		__CMOS_READ(addr,w)
 #define CMOS_WRITE(val,addr)	__CMOS_WRITE(val,addr,w)
@@ -156,4 +162,6 @@
 			break;						\
 	}								\
 })
+
+#endif /* CONFIG_SH_MPC1211 */
 #endif /* _ASM_MC146818RTC_H */

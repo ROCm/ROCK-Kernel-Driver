@@ -14,8 +14,8 @@ for further details.  This implementation is on-disk compatible
 with the IRIX version of XFS.
 
 
-Options
-=======
+Mount Options
+=============
 
 When mounting an XFS filesystem, the following options are accepted.
 
@@ -107,3 +107,66 @@ When mounting an XFS filesystem, the following options are accepted.
         Don't check for double mounted file systems using the file system uuid.
         This is useful to mount LVM snapshot volumes.
 
+sysctls
+=======
+
+The following sysctls are available for the XFS filesystem:
+
+  fs.xfs.stats_clear		(Min: 0  Default: 0  Max: 1)
+	Setting this to "1" clears accumulated XFS statistics 
+	in /proc/fs/xfs/stat.  It then immediately reset to "0".
+  	
+  fs.xfs.sync_interval		(Min: HZ  Default: 30*HZ  Max: 60*HZ)
+	The interval at which the xfssyncd thread for xfs filesystems
+	flushes metadata out to disk. This thread will flush log
+	activity out, and do some processing on unlinked inodes
+
+  fs.xfs.error_level		(Min: 0  Default: 3  Max: 11)
+	A volume knob for error reporting when internal errors occur.
+	This will generate detailed messages & backtraces for filesystem
+	shutdowns, for example.  Current threshold values are:
+
+		XFS_ERRLEVEL_OFF:       0
+		XFS_ERRLEVEL_LOW:       1
+		XFS_ERRLEVEL_HIGH:      5
+
+  fs.xfs.panic_mask		(Min: 0  Default: 0  Max: 127)
+	Causes certain error conditions to call BUG(). Value is a bitmask; 
+	AND together the tags which represent errors which should cause panics:
+	
+		XFS_NO_PTAG                     0LL
+		XFS_PTAG_IFLUSH                 0x0000000000000001LL
+		XFS_PTAG_LOGRES                 0x0000000000000002LL
+		XFS_PTAG_AILDELETE              0x0000000000000004LL
+		XFS_PTAG_ERROR_REPORT           0x0000000000000008LL
+		XFS_PTAG_SHUTDOWN_CORRUPT       0x0000000000000010LL
+		XFS_PTAG_SHUTDOWN_IOERROR       0x0000000000000020LL
+		XFS_PTAG_SHUTDOWN_LOGERROR      0x0000000000000040LL
+
+	This option is intended for debugging only.		
+
+  fs.xfs.irix_symlink_mode	(Min: 0  Default: 0  Max: 1)
+	Controls whether symlinks are created with mode 0777 (default)
+	or whether their mode is affected by the umask (irix mode).
+
+  fs.xfs.irix_sgid_inherit	(Min: 0  Default: 0  Max: 1)
+	Controls files created in SGID directories.
+	If the group ID of the new file does not match the effective group
+	ID or one of the supplementary group IDs of the parent dir, the 
+	ISGID bit is cleared if the irix_sgid_inherit compatibility sysctl 
+	is set.
+
+  fs.xfs.restrict_chown		(Min: 0  Default: 1  Max: 1)
+  	Controls whether unprivileged users can use chown to "give away"
+	a file to another user.
+
+  vm.pagebuf.stats_clear	(Min: 0  Default: 0  Max: 1)
+	Setting this to "1" clears accumulated pagebuf statistics 
+	in /proc/fs/pagebuf/stat.  It then immediately reset to "0".
+  	
+  vm.pagebuf.flush_age		(Min: 1*HZ  Default: 15*HZ  Max: 300*HZ)
+	The age at which dirty metadata buffers are flushed to disk
+
+  vm.pagebuf.flush_int		(Min: HZ/2  Default: HZ  Max: 30*HZ)
+	The interval at which the list of dirty metadata buffers is
+	scanned.

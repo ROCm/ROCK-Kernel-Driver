@@ -794,8 +794,9 @@ xfs_log_move_tail(xfs_mount_t	*mp,
 		do {
 			ASSERT(tic->t_flags & XLOG_TIC_PERM_RESERV);
 
-			if (free_bytes < tic->t_unit_res)
+			if (free_bytes < tic->t_unit_res && tail_lsn != 1)
 				break;
+			tail_lsn = 0;
 			free_bytes -= tic->t_unit_res;
 			sv_signal(&tic->t_sema);
 			tic = tic->t_next;
@@ -814,8 +815,9 @@ xfs_log_move_tail(xfs_mount_t	*mp,
 				need_bytes = tic->t_unit_res*tic->t_cnt;
 			else
 				need_bytes = tic->t_unit_res;
-			if (free_bytes < need_bytes)
+			if (free_bytes < need_bytes && tail_lsn != 1)
 				break;
+			tail_lsn = 0;
 			free_bytes -= need_bytes;
 			sv_signal(&tic->t_sema);
 			tic = tic->t_next;
@@ -836,8 +838,10 @@ xfs_log_need_covered(xfs_mount_t *mp)
 	SPLDECL(s);
 	int		needed = 0, gen;
 	xlog_t		*log = mp->m_log;
+	vfs_t		*vfsp = XFS_MTOVFS(mp);
 
-	if (mp->m_frozen || XFS_FORCED_SHUTDOWN(mp))
+	if (mp->m_frozen || XFS_FORCED_SHUTDOWN(mp) ||
+	    (vfsp->vfs_flag & VFS_RDONLY))
 		return 0;
 
 	s = LOG_LOCK(log);
@@ -1205,7 +1209,10 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	if (XFS_SB_VERSION_HASSECTOR(&mp->m_sb)) {
 		log->l_sectbb_log = mp->m_sb.sb_logsectlog - BBSHIFT;
 		ASSERT(log->l_sectbb_log <= mp->m_sectbb_log);
-		ASSERT(XFS_SB_VERSION_HASLOGV2(&mp->m_sb));
+		/* for larger sector sizes, must have v2 or external log */
+		ASSERT(log->l_sectbb_log == 0 ||
+			log->l_logBBstart == 0 ||
+			XFS_SB_VERSION_HASLOGV2(&mp->m_sb));
 		ASSERT(mp->m_sb.sb_logsectlog >= BBSHIFT);
 	}
 	log->l_sectbb_mask = (1 << log->l_sectbb_log) - 1;

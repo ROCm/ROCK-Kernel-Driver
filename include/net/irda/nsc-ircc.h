@@ -39,17 +39,28 @@
 #define DMA_RX_MODE     0x04    /* I/O to mem, ++, demand. */
 
 /* Config registers for the '108 */
-#define CFG_BAIC 0x00
-#define CFG_CSRT 0x01
-#define CFG_MCTL 0x02
+#define CFG_108_BAIC 0x00
+#define CFG_108_CSRT 0x01
+#define CFG_108_MCTL 0x02
 
 /* Config registers for the '338 */
-#define CFG_FER  0x00
-#define CFG_FAR  0x01
-#define CFG_PTR  0x02
-#define CFG_PNP0 0x1b
-#define CFG_PNP1 0x1c
-#define CFG_PNP3 0x4f
+#define CFG_338_FER  0x00
+#define CFG_338_FAR  0x01
+#define CFG_338_PTR  0x02
+#define CFG_338_PNP0 0x1b
+#define CFG_338_PNP1 0x1c
+#define CFG_338_PNP3 0x4f
+
+/* Config registers for the '39x (in the logical device bank) */
+#define CFG_39X_LDN	0x07	/* Logical device number (Super I/O bank) */
+#define CFG_39X_ACT	0x30	/* Device activation */
+#define CFG_39X_BASEH	0x60	/* Device base address (high bits) */
+#define CFG_39X_BASEL	0x61	/* Device base address (low bits) */
+#define CFG_39X_IRQNUM	0x70	/* Interrupt number & wake up enable */
+#define CFG_39X_IRQSEL	0x71	/* Interrupt select (edge/level + polarity) */
+#define CFG_39X_DMA0	0x74	/* DMA 0 configuration */
+#define CFG_39X_DMA1	0x75	/* DMA 1 configuration */
+#define CFG_39X_SPC	0xF0	/* Serial port configuration register */
 
 /* Flags for configuration register CRF0 */
 #define APEDCRC		0x02

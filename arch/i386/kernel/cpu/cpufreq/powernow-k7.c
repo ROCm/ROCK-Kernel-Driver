@@ -268,8 +268,8 @@ static void change_speed (unsigned int index)
 		change_VID(vid);
 	} else {
 		/* Going up, so change VID first */
-		change_VID(fid);
-		change_FID(vid);
+		change_VID(vid);
+		change_FID(fid);
 	}
 	
 

@@ -275,6 +275,7 @@ struct ymf_unit {
 
 	spinlock_t reg_lock;
 	spinlock_t voice_lock;
+	spinlock_t ac97_lock;
 
 	/* soundcore stuff */
 	int dev_audio;

@@ -51,6 +51,8 @@ struct hotplug_slot_attribute {
 	ssize_t (*show)(struct hotplug_slot *, char *);
 	ssize_t (*store)(struct hotplug_slot *, const char *, size_t);
 };
+#define to_hotplug_attr(n) container_of(n, struct hotplug_slot_attribute, attr);
+
 /**
  * struct hotplug_slot_ops -the callbacks that the hotplug pci core can use
  * @owner: The module owner of this structure
@@ -130,12 +132,14 @@ struct hotplug_slot {
 	char				*name;
 	struct hotplug_slot_ops		*ops;
 	struct hotplug_slot_info	*info;
+	void (*release) (struct hotplug_slot *slot);
 	void				*private;
 
 	/* Variables below this are for use only by the hotplug pci core. */
 	struct list_head		slot_list;
 	struct kobject			kobj;
 };
+#define to_hotplug_slot(n) container_of(n, struct hotplug_slot, kobj)
 
 extern int pci_hp_register		(struct hotplug_slot *slot);
 extern int pci_hp_deregister		(struct hotplug_slot *slot);

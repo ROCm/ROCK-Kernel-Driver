@@ -2,6 +2,10 @@
 #ifndef _IEEE1394_CSR_H
 #define _IEEE1394_CSR_H
 
+#ifdef CONFIG_PREEMPT
+#include <linux/sched.h>
+#endif
+
 #define CSR_REGISTER_BASE  0xfffff0000000ULL
 
 /* register offsets relative to CSR_REGISTER_BASE */

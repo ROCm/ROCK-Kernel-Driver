@@ -6,7 +6,7 @@
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
 
-static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
+static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
 {
 }
 
@@ -43,7 +43,7 @@ static inline void load_context(mm_context_t context)
 #endif
 }
 
-static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, struct task_struct *tsk, unsigned cpu)
+static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, struct task_struct *tsk)
 {
 
 	if (prev != next) {
@@ -69,6 +69,6 @@ static inline void activate_mm(struct mm_struct *prev, struct mm_struct *next)
 	if (next->context == 0)
 	    next->context = alloc_sid();
 
-	switch_mm(prev,next,current,0);
+	switch_mm(prev,next,current);
 }
 #endif

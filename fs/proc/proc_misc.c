@@ -412,7 +412,7 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 	}
 	len += sprintf(page + len, "intr %u", sum);
 
-#if !defined(CONFIG_ARCH_S390) && !defined(CONFIG_PPC64)
+#if !defined(CONFIG_ARCH_S390) && !defined(CONFIG_PPC64) && !defined(CONFIG_ALPHA)
 	for (i = 0 ; i < NR_IRQS ; i++)
 		len += sprintf(page + len, " %u", kstat_irqs(i));
 #endif
@@ -497,11 +497,10 @@ static int ds1286_read_proc(char *page, char **start, off_t off,
 static int locks_read_proc(char *page, char **start, off_t off,
 				 int count, int *eof, void *data)
 {
-	int len;
-	lock_kernel();
-	len = get_locks_status(page, start, off, count);
-	unlock_kernel();
-	if (len < count) *eof = 1;
+	int len = get_locks_status(page, start, off, count);
+
+	if (len < count)
+		*eof = 1;
 	return len;
 }
 

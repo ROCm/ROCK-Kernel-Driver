@@ -71,6 +71,7 @@
 #include <linux/namei.h>
 #include <linux/init.h>
 #include <linux/mount.h>
+#include <linux/suspend.h>
 
 STATIC struct quotactl_ops linvfs_qops;
 STATIC struct super_operations linvfs_sops;
@@ -265,8 +266,8 @@ xfs_setsize_buftarg(
 
 	if (set_blocksize(btp->pbr_bdev, sectorsize)) {
 		printk(KERN_WARNING
-			"XFS: Cannot set_blocksize to %u on device 0x%x\n",
-			sectorsize, btp->pbr_dev);
+			"XFS: Cannot set_blocksize to %u on device 0x%lx\n",
+			sectorsize, (unsigned long)btp->pbr_dev);
 	}
 }
 
@@ -400,7 +401,10 @@ syncd(void *arg)
 
 	for (;;) {
 		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(xfs_params.sync_interval);
+		schedule_timeout(xfs_syncd_interval);
+		/* swsusp */
+		if (current->flags & PF_FREEZE)
+			refrigerator(PF_IOTHREAD);
 		if (vfsp->vfs_flag & VFS_UMOUNT)
 			break;
 		if (vfsp->vfs_flag & VFS_RDONLY)
@@ -483,7 +487,7 @@ linvfs_statfs(
 	int			error;
 
 	VFS_STATVFS(vfsp, statp, NULL, error);
-	return error;
+	return -error;
 }
 
 STATIC int
@@ -500,7 +504,7 @@ linvfs_remount(
 	if (!error)
 		VFS_MNTUPDATE(vfsp, flags, args, error);
 	kmem_free(args, sizeof(*args));
-	return error;
+	return -error;
 }
 
 STATIC void

@@ -383,7 +383,7 @@ static int raw_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		 * IP_HDRINCL is much more convenient.
 		 */
 	} else {
-		err = -EINVAL;
+		err = -EDESTADDRREQ;
 		if (sk->sk_state != TCP_ESTABLISHED) 
 			goto out;
 		daddr = inet->daddr;
@@ -687,7 +687,7 @@ struct raw_iter_state {
 	int bucket;
 };
 
-#define raw_seq_private(seq) ((struct raw_iter_state *)&seq->private)
+#define raw_seq_private(seq) ((struct raw_iter_state *)(seq)->private)
 
 static struct sock *raw_get_first(struct seq_file *seq)
 {
@@ -801,7 +801,24 @@ static struct seq_operations raw_seq_ops = {
 
 static int raw_seq_open(struct inode *inode, struct file *file)
 {
-	return seq_open(file, &raw_seq_ops);
+	struct seq_file *seq;
+	int rc = -ENOMEM;
+	struct raw_iter_state *s = kmalloc(sizeof(*s), GFP_KERNEL);
+
+	if (!s)
+		goto out;
+	rc = seq_open(file, &raw_seq_ops);
+	if (rc)
+		goto out_kfree;
+
+	seq = file->private_data;
+	seq->private = s;
+	memset(s, 0, sizeof(*s));
+out:
+	return rc;
+out_kfree:
+	kfree(s);
+	goto out;
 }
 
 static struct file_operations raw_seq_fops = {
@@ -809,7 +826,7 @@ static struct file_operations raw_seq_fops = {
 	.open	 = raw_seq_open,
 	.read	 = seq_read,
 	.llseek	 = seq_lseek,
-	.release = seq_release,
+	.release = seq_release_private,
 };
 
 int __init raw_proc_init(void)

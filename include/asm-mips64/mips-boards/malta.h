@@ -28,12 +28,29 @@
 #include <asm/addrspace.h>
 #include <asm/io.h>
 
-/* 
- * Malta I/O ports base address. 
-*/
-#define MALTA_PORT_BASE      (KSEG1ADDR(0x18000000))
+/*
+ * Malta I/O ports base address for the Galileo GT64120 and Algorithmics
+ * Bonito system controllers.
+ */
+#define MALTA_GT_PORT_BASE      get_gt_port_base(GT_PCI0IOLD_OFS)
+#define MALTA_BONITO_PORT_BASE  (KSEG1ADDR(0x1fd00000))
+#define MALTA_MSC_PORT_BASE     get_msc_port_base(MSC01_PCI_SC2PIOBASL)
 
-/* 
+static inline unsigned long get_gt_port_base(unsigned long reg)
+{
+	unsigned long addr;
+	GT_READ(reg, addr);
+	return KSEG1ADDR((addr & 0xffff) << 21);
+}
+
+static inline unsigned long get_msc_port_base(unsigned long reg)
+{
+	unsigned long addr;
+	MSC_READ(reg, addr);
+	return KSEG1ADDR(addr);
+}
+
+/*
  * Malta RTC-device indirect register access.
  */
 #define MALTA_RTC_ADR_REG       0x70
@@ -55,5 +72,7 @@
 #define SMSC_CONFIG_ACTIVATE_ENABLE   1
 
 #define SMSC_WRITE(x,a)     outb(x,a)
+
+#define MALTA_JMPRS_REG		(KSEG1ADDR(0x1f000210))
 
 #endif /* !(_MIPS_MALTA_H) */

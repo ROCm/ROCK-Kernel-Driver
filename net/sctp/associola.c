@@ -41,6 +41,7 @@
  *    Hui Huang             <hui.huang@nokia.com>
  *    Sridhar Samudrala	    <sri@us.ibm.com>
  *    Daisy Chang	    <daisyc@us.ibm.com>
+ *    Ryan Layer	    <rmlayer@us.ibm.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -125,23 +126,24 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 	asoc->base.addr_lock = RW_LOCK_UNLOCKED;
 
 	asoc->state = SCTP_STATE_CLOSED;
-	asoc->state_timestamp = jiffies;
 
-	/* Set things that have constant value.  */
-	asoc->cookie_life.tv_sec = sctp_valid_cookie_life / HZ;
-	asoc->cookie_life.tv_usec = (sctp_valid_cookie_life % HZ) *
-					1000000L / HZ;
-
+	/* Set these values from the socket values, a conversion between
+	 * millsecons to seconds/microseconds must also be done.
+	 */
+	asoc->cookie_life.tv_sec = sp->assocparams.sasoc_cookie_life / 1000;
+	asoc->cookie_life.tv_usec = (sp->assocparams.sasoc_cookie_life % 1000)
+					* 1000;
 	asoc->pmtu = 0;
 	asoc->frag_point = 0;
 
-	/* Initialize the default association max_retrans and RTO values.  */
-	asoc->max_retrans = sctp_max_retrans_association;
-	asoc->rto_initial = sctp_rto_initial;
-	asoc->rto_max = sctp_rto_max;
-	asoc->rto_min = sctp_rto_min;
+	/* Set the association max_retrans and RTO values from the
+	 * socket values.
+	 */
+	asoc->max_retrans = sp->assocparams.sasoc_asocmaxrxt;
+	asoc->rto_initial = sp->rtoinfo.srto_initial * HZ / 1000;
+	asoc->rto_max = sp->rtoinfo.srto_max * HZ / 1000;
+	asoc->rto_min = sp->rtoinfo.srto_min * HZ / 1000;
 
-	asoc->overall_error_threshold = asoc->max_retrans;
 	asoc->overall_error_count = 0;
 
 	/* Initialize the maximum mumber of new data packets that can be sent
@@ -164,7 +166,8 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 	asoc->c.sinit_max_instreams = sp->initmsg.sinit_max_instreams;
 	asoc->c.sinit_num_ostreams  = sp->initmsg.sinit_num_ostreams;
 	asoc->max_init_attempts	= sp->initmsg.sinit_max_attempts;
-	asoc->max_init_timeo    = sp->initmsg.sinit_max_init_timeo * HZ;
+
+	asoc->max_init_timeo    = sp->initmsg.sinit_max_init_timeo * HZ / 1000;
 
 	/* Allocate storage for the ssnmap after the inbound and outbound
 	 * streams have been negotiated during Init.
@@ -281,7 +284,7 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 	asoc->default_flags = sp->default_flags;
 	asoc->default_context = sp->default_context;
 	asoc->default_timetolive = sp->default_timetolive;
-	
+
 	return asoc;
 
 fail_init:
@@ -384,7 +387,7 @@ void sctp_assoc_set_primary(struct sctp_association *asoc,
 	if (transport->active)
 		asoc->peer.active_path = transport;
 
-	/* 
+	/*
 	 * SFR-CACC algorithm:
 	 * Upon the receipt of a request to change the primary
 	 * destination address, on the data structure for the new
@@ -491,8 +494,13 @@ struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *asoc,
 	/* Initialize the peer's heartbeat interval based on the
 	 * sock configured value.
 	 */
-
 	peer->hb_interval = sp->paddrparam.spp_hbinterval * HZ;
+
+	/* Set the path max_retrans.  */
+	peer->max_retrans = asoc->max_retrans;
+
+	/* Set the transport's RTO.initial value */
+	peer->rto = asoc->rto_initial;
 
 	/* Attach the remote transport to our asoc.  */
 	list_add_tail(&peer->transports, &asoc->peer.transport_addr_list);
@@ -793,6 +801,26 @@ out:
 	return transport;
 }
 
+/*  Is this a live association structure. */
+int sctp_assoc_valid(struct sock *sk, struct sctp_association *asoc)
+{
+
+	/* First, verify that this is a kernel address. */
+	if (!sctp_is_valid_kaddr((unsigned long) asoc))
+		return 0;
+
+	/* Verify that this _is_ an sctp_association
+	 * data structure and if so, that the socket matches.
+	 */
+	if (SCTP_ASSOC_EYECATCHER != asoc->eyecatcher)
+		return 0;
+	if (asoc->base.sk != sk)
+		return 0;
+
+	/* The association is valid. */
+	return 1;
+}
+
 /* Do delayed input processing.  This is scheduled by sctp_rcv(). */
 static void sctp_assoc_bh_rcv(struct sctp_association *asoc)
 {
@@ -801,7 +829,6 @@ static void sctp_assoc_bh_rcv(struct sctp_association *asoc)
 	struct sock *sk;
 	struct sctp_inq *inqueue;
 	int state, subtype;
-	sctp_assoc_t associd = sctp_assoc2id(asoc);
 	int error = 0;
 
 	/* The association should be held so we should be safe. */
@@ -831,7 +858,7 @@ static void sctp_assoc_bh_rcv(struct sctp_association *asoc)
 		/* Check to see if the association is freed in response to
 		 * the incoming chunk.  If so, get out of the while loop.
 		 */
-		if (!sctp_id2assoc(sk, associd))
+		if (!sctp_assoc_valid(sk, asoc))
 			break;
 
 		/* If there is an error on chunk, discard this packet. */
@@ -1033,7 +1060,7 @@ static inline int sctp_peer_needs_update(struct sctp_association *asoc)
 }
 
 /* Increase asoc's rwnd by len and send any window update SACK if needed. */
-void sctp_assoc_rwnd_increase(struct sctp_association *asoc, int len)
+void sctp_assoc_rwnd_increase(struct sctp_association *asoc, unsigned len)
 {
 	struct sctp_chunk *sack;
 	struct timer_list *timer;
@@ -1079,7 +1106,7 @@ void sctp_assoc_rwnd_increase(struct sctp_association *asoc, int len)
 }
 
 /* Decrease asoc's rwnd by len. */
-void sctp_assoc_rwnd_decrease(struct sctp_association *asoc, int len)
+void sctp_assoc_rwnd_decrease(struct sctp_association *asoc, unsigned len)
 {
 	SCTP_ASSERT(asoc->rwnd, "rwnd zero", return);
 	SCTP_ASSERT(!asoc->rwnd_over, "rwnd_over not zero", return);
@@ -1119,11 +1146,11 @@ int sctp_assoc_set_bind_addr_from_ep(struct sctp_association *asoc, int gfp)
 
 /* Build the association's bind address list from the cookie.  */
 int sctp_assoc_set_bind_addr_from_cookie(struct sctp_association *asoc,
-					 sctp_cookie_t *cookie, int gfp)
+					 struct sctp_cookie *cookie, int gfp)
 {
 	int var_size2 = ntohs(cookie->peer_init->chunk_hdr.length);
 	int var_size3 = cookie->raw_addr_list_len;
-	__u8 *raw = (__u8 *)cookie + sizeof(sctp_cookie_t) + var_size2;
+	__u8 *raw = (__u8 *)cookie + sizeof(struct sctp_cookie) + var_size2;
 
 	return sctp_raw_to_bind_addrs(&asoc->base.bind_addr, raw, var_size3,
 				      asoc->ep->base.bind_addr.port, gfp);

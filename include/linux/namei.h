@@ -5,12 +5,22 @@
 
 struct vfsmount;
 
+struct open_intent {
+	int	flags;
+	int	create_mode;
+};
+
 struct nameidata {
 	struct dentry	*dentry;
 	struct vfsmount *mnt;
 	struct qstr	last;
 	unsigned int	flags;
 	int		last_type;
+
+	/* Intent data */
+	union {
+		struct open_intent open;
+	} intent;
 };
 
 /*
@@ -31,7 +41,12 @@ enum {LAST_NORM, LAST_ROOT, LAST_DOT, LAST_DOTDOT, LAST_BIND};
 #define LOOKUP_CONTINUE		 4
 #define LOOKUP_PARENT		16
 #define LOOKUP_NOALT		32
-
+/*
+ * Intent data
+ */
+#define LOOKUP_OPEN		(0x0100)
+#define LOOKUP_CREATE		(0x0200)
+#define LOOKUP_ACCESS		(0x0400)
 
 extern int FASTCALL(__user_walk(const char __user *, unsigned, struct nameidata *));
 #define user_path_walk(name,nd) \

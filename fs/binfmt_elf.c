@@ -35,6 +35,7 @@
 #include <linux/compiler.h>
 #include <linux/highmem.h>
 #include <linux/pagemap.h>
+#include <linux/security.h>
 
 #include <asm/uaccess.h>
 #include <asm/param.h>
@@ -113,7 +114,7 @@ static void padzero(unsigned long elf_bss)
 #define STACK_ADD(sp, items) ((elf_addr_t *)(sp) + (items))
 #define STACK_ROUND(sp, items) \
 	((15 + (unsigned long) ((sp) + (items))) &~ 15UL)
-#define STACK_ALLOC(sp, len) ({ elf_addr_t *old_sp = sp; sp += len; old_sp; })
+#define STACK_ALLOC(sp, len) ({ elf_addr_t *old_sp = (elf_addr_t *)sp; sp += len; old_sp; })
 #else
 #define STACK_ADD(sp, items) ((elf_addr_t *)(sp) - (items))
 #define STACK_ROUND(sp, items) \
@@ -191,6 +192,7 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 	NEW_AUX_ENT(AT_EUID, (elf_addr_t) tsk->euid);
 	NEW_AUX_ENT(AT_GID, (elf_addr_t) tsk->gid);
 	NEW_AUX_ENT(AT_EGID, (elf_addr_t) tsk->egid);
+ 	NEW_AUX_ENT(AT_SECURE, (elf_addr_t) security_bprm_secureexec(bprm));
 	if (k_platform) {
 		NEW_AUX_ENT(AT_PLATFORM, (elf_addr_t)(long)u_platform);
 	}

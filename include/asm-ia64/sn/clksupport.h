@@ -29,12 +29,18 @@
 #include <asm/sn/addrs.h>
 
 typedef long clkreg_t;
+
 extern unsigned long sn_rtc_cycles_per_second;
+extern unsigned long sn_rtc_usec_per_cyc;
+extern unsigned long sn_rtc_per_itc;
+extern unsigned long sn_rtc_delta;
+
 
 #include <asm/sn/addrs.h>
 #include <asm/sn/sn2/addrs.h>
 #include <asm/sn/sn2/shubio.h>
 #include <asm/sn/sn2/shub_mmr.h>
+#define RTC_MASK		SH_RTC_MASK
 #define RTC_COUNTER_ADDR	((clkreg_t*)LOCAL_MMR_ADDR(SH_RTC))
 #define RTC_COMPARE_A_ADDR      ((clkreg_t*)LOCAL_MMR_ADDR(SH_RTC))
 #define RTC_COMPARE_B_ADDR      ((clkreg_t*)LOCAL_MMR_ADDR(SH_RTC))
@@ -43,6 +49,7 @@ extern unsigned long sn_rtc_cycles_per_second;
 #define RTC_INT_ENABLED_A_ADDR  ((clkreg_t*)LOCAL_MMR_ADDR(SH_RTC))
 #define RTC_INT_ENABLED_B_ADDR  ((clkreg_t*)LOCAL_MMR_ADDR(SH_RTC))
 
+#define SN_RTC_PER_ITC_SHIFT	34
 #define GET_RTC_COUNTER()	(*RTC_COUNTER_ADDR)
 #define rtc_time()		GET_RTC_COUNTER()
 

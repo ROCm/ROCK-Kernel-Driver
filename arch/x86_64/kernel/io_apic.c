@@ -712,9 +712,9 @@ void __init UNEXPECTED_IO_APIC(void)
 void __init print_IO_APIC(void)
 {
 	int apic, i;
-	struct IO_APIC_reg_00 reg_00;
-	struct IO_APIC_reg_01 reg_01;
-	struct IO_APIC_reg_02 reg_02;
+	union IO_APIC_reg_00 reg_00;
+	union IO_APIC_reg_01 reg_01;
+	union IO_APIC_reg_02 reg_02;
 	unsigned long flags;
 
  	printk(KERN_DEBUG "number of MP IRQ sources: %d.\n", mp_irq_entries);
@@ -731,49 +731,49 @@ void __init print_IO_APIC(void)
 	for (apic = 0; apic < nr_ioapics; apic++) {
 
 	spin_lock_irqsave(&ioapic_lock, flags);
-	*(int *)&reg_00 = io_apic_read(apic, 0);
-	*(int *)&reg_01 = io_apic_read(apic, 1);
-	if (reg_01.version >= 0x10)
-		*(int *)&reg_02 = io_apic_read(apic, 2);
+	reg_00.raw = io_apic_read(apic, 0);
+	reg_01.raw = io_apic_read(apic, 1);
+	if (reg_01.bits.version >= 0x10)
+		reg_02.raw = io_apic_read(apic, 2);
 	spin_unlock_irqrestore(&ioapic_lock, flags);
 
 	printk("\n");
 	printk(KERN_DEBUG "IO APIC #%d......\n", mp_ioapics[apic].mpc_apicid);
-	printk(KERN_DEBUG ".... register #00: %08X\n", *(int *)&reg_00);
-	printk(KERN_DEBUG ".......    : physical APIC id: %02X\n", reg_00.ID);
-	if (reg_00.__reserved_1 || reg_00.__reserved_2)
+	printk(KERN_DEBUG ".... register #00: %08X\n", reg_00.raw);
+	printk(KERN_DEBUG ".......    : physical APIC id: %02X\n", reg_00.bits.ID);
+	if (reg_00.bits.__reserved_1 || reg_00.bits.__reserved_2)
 		UNEXPECTED_IO_APIC();
 
 	printk(KERN_DEBUG ".... register #01: %08X\n", *(int *)&reg_01);
-	printk(KERN_DEBUG ".......     : max redirection entries: %04X\n", reg_01.entries);
-	if (	(reg_01.entries != 0x0f) && /* older (Neptune) boards */
-		(reg_01.entries != 0x17) && /* typical ISA+PCI boards */
-		(reg_01.entries != 0x1b) && /* Compaq Proliant boards */
-		(reg_01.entries != 0x1f) && /* dual Xeon boards */
-		(reg_01.entries != 0x22) && /* bigger Xeon boards */
-		(reg_01.entries != 0x2E) &&
-		(reg_01.entries != 0x3F) &&
-		(reg_01.entries != 0x03) 
+	printk(KERN_DEBUG ".......     : max redirection entries: %04X\n", reg_01.bits.entries);
+	if (	(reg_01.bits.entries != 0x0f) && /* older (Neptune) boards */
+		(reg_01.bits.entries != 0x17) && /* typical ISA+PCI boards */
+		(reg_01.bits.entries != 0x1b) && /* Compaq Proliant boards */
+		(reg_01.bits.entries != 0x1f) && /* dual Xeon boards */
+		(reg_01.bits.entries != 0x22) && /* bigger Xeon boards */
+		(reg_01.bits.entries != 0x2E) &&
+		(reg_01.bits.entries != 0x3F) &&
+		(reg_01.bits.entries != 0x03) 
 	)
 		UNEXPECTED_IO_APIC();
 
-	printk(KERN_DEBUG ".......     : PRQ implemented: %X\n", reg_01.PRQ);
-	printk(KERN_DEBUG ".......     : IO APIC version: %04X\n", reg_01.version);
-	if (	(reg_01.version != 0x01) && /* 82489DX IO-APICs */
-		(reg_01.version != 0x02) && /* 82801BA IO-APICs (ICH2) */
-		(reg_01.version != 0x10) && /* oldest IO-APICs */
-		(reg_01.version != 0x11) && /* Pentium/Pro IO-APICs */
-		(reg_01.version != 0x13) && /* Xeon IO-APICs */
-		(reg_01.version != 0x20)    /* Intel P64H (82806 AA) */
+	printk(KERN_DEBUG ".......     : PRQ implemented: %X\n", reg_01.bits.PRQ);
+	printk(KERN_DEBUG ".......     : IO APIC version: %04X\n", reg_01.bits.version);
+	if (	(reg_01.bits.version != 0x01) && /* 82489DX IO-APICs */
+		(reg_01.bits.version != 0x02) && /* 82801BA IO-APICs (ICH2) */
+		(reg_01.bits.version != 0x10) && /* oldest IO-APICs */
+		(reg_01.bits.version != 0x11) && /* Pentium/Pro IO-APICs */
+		(reg_01.bits.version != 0x13) && /* Xeon IO-APICs */
+		(reg_01.bits.version != 0x20)    /* Intel P64H (82806 AA) */
 	)
 		UNEXPECTED_IO_APIC();
-	if (reg_01.__reserved_1 || reg_01.__reserved_2)
+	if (reg_01.bits.__reserved_1 || reg_01.bits.__reserved_2)
 		UNEXPECTED_IO_APIC();
 
-	if (reg_01.version >= 0x10) {
-		printk(KERN_DEBUG ".... register #02: %08X\n", *(int *)&reg_02);
-		printk(KERN_DEBUG ".......     : arbitration: %02X\n", reg_02.arbitration);
-		if (reg_02.__reserved_1 || reg_02.__reserved_2)
+	if (reg_01.bits.version >= 0x10) {
+		printk(KERN_DEBUG ".... register #02: %08X\n", reg_02.raw);
+		printk(KERN_DEBUG ".......     : arbitration: %02X\n", reg_02.bits.arbitration);
+		if (reg_02.bits.__reserved_1 || reg_02.bits.__reserved_2)
 			UNEXPECTED_IO_APIC();
 	}
 
@@ -782,7 +782,7 @@ void __init print_IO_APIC(void)
 	printk(KERN_DEBUG " NR Log Phy Mask Trig IRR Pol"
 			  " Stat Dest Deli Vect:   \n");
 
-	for (i = 0; i <= reg_01.entries; i++) {
+	for (i = 0; i <= reg_01.bits.entries; i++) {
 		struct IO_APIC_route_entry entry;
 
 		spin_lock_irqsave(&ioapic_lock, flags);
@@ -963,7 +963,7 @@ void /*__init*/ print_PIC(void)
 
 static void __init enable_IO_APIC(void)
 {
-	struct IO_APIC_reg_01 reg_01;
+	union IO_APIC_reg_01 reg_01;
 	int i;
 	unsigned long flags;
 
@@ -980,9 +980,9 @@ static void __init enable_IO_APIC(void)
 	 */
 	for (i = 0; i < nr_ioapics; i++) {
 		spin_lock_irqsave(&ioapic_lock, flags);
-		*(int *)&reg_01 = io_apic_read(i, 1);
+		reg_01.raw = io_apic_read(i, 1);
 		spin_unlock_irqrestore(&ioapic_lock, flags);
-		nr_ioapic_registers[i] = reg_01.entries+1;
+		nr_ioapic_registers[i] = reg_01.bits.entries+1;
 	}
 
 	/*
@@ -1013,7 +1013,7 @@ void disable_IO_APIC(void)
 
 static void __init setup_ioapic_ids_from_mpc (void)
 {
-	struct IO_APIC_reg_00 reg_00;
+	union IO_APIC_reg_00 reg_00;
 	unsigned long phys_id_present_map = phys_cpu_present_map;
 	int apic;
 	int i;
@@ -1029,7 +1029,7 @@ static void __init setup_ioapic_ids_from_mpc (void)
 
 		/* Read the register 0 value */
 		spin_lock_irqsave(&ioapic_lock, flags);
-		*(int *)&reg_00 = io_apic_read(apic, 0);
+		reg_00.raw = io_apic_read(apic, 0);
 		spin_unlock_irqrestore(&ioapic_lock, flags);
 		
 		old_id = mp_ioapics[apic].mpc_apicid;
@@ -1038,8 +1038,8 @@ static void __init setup_ioapic_ids_from_mpc (void)
 			printk(KERN_ERR "BIOS bug, IO-APIC#%d ID is %d in the MPC table!...\n",
 				apic, mp_ioapics[apic].mpc_apicid);
 			printk(KERN_ERR "... fixing up to %d. (tell your hw vendor)\n",
-				reg_00.ID);
-			mp_ioapics[apic].mpc_apicid = reg_00.ID;
+				reg_00.bits.ID);
+			mp_ioapics[apic].mpc_apicid = reg_00.bits.ID;
 		}
 
 		/*
@@ -1083,18 +1083,18 @@ static void __init setup_ioapic_ids_from_mpc (void)
 		printk(KERN_INFO "...changing IO-APIC physical APIC ID to %d ...",
 				mp_ioapics[apic].mpc_apicid);
 
-		reg_00.ID = mp_ioapics[apic].mpc_apicid;
+		reg_00.bits.ID = mp_ioapics[apic].mpc_apicid;
 		spin_lock_irqsave(&ioapic_lock, flags);
-		io_apic_write(apic, 0, *(int *)&reg_00);
+		io_apic_write(apic, 0, reg_00.raw);
 		spin_unlock_irqrestore(&ioapic_lock, flags);
 
 		/*
 		 * Sanity check
 		 */
 		spin_lock_irqsave(&ioapic_lock, flags);
-		*(int *)&reg_00 = io_apic_read(apic, 0);
+		reg_00.raw = io_apic_read(apic, 0);
 		spin_unlock_irqrestore(&ioapic_lock, flags);
-		if (reg_00.ID != mp_ioapics[apic].mpc_apicid)
+		if (reg_00.bits.ID != mp_ioapics[apic].mpc_apicid)
 			panic("could not set ID!\n");
 		else
 			printk(" ok.\n");
@@ -1637,7 +1637,7 @@ void __init mp_config_ioapic_for_sci(int irq)
 
 int __init io_apic_get_unique_id (int ioapic, int apic_id)
 {
-	struct IO_APIC_reg_00 reg_00;
+	union IO_APIC_reg_00 reg_00;
 	static unsigned long apic_id_map = 0;
 	unsigned long flags;
 	int i = 0;
@@ -1655,13 +1655,13 @@ int __init io_apic_get_unique_id (int ioapic, int apic_id)
 		apic_id_map = phys_cpu_present_map;
 
 	spin_lock_irqsave(&ioapic_lock, flags);
-	*(int *)&reg_00 = io_apic_read(ioapic, 0);
+	reg_00.raw = io_apic_read(ioapic, 0);
 	spin_unlock_irqrestore(&ioapic_lock, flags);
 
 	if (apic_id >= IO_APIC_MAX_ID) {
 		printk(KERN_WARNING "IOAPIC[%d]: Invalid apic_id %d, trying "
-			"%d\n", ioapic, apic_id, reg_00.ID);
-		apic_id = reg_00.ID;
+			"%d\n", ioapic, apic_id, reg_00.bits.ID);
+		apic_id = reg_00.bits.ID;
 	}
 
 	/*
@@ -1686,16 +1686,16 @@ int __init io_apic_get_unique_id (int ioapic, int apic_id)
 
 	apic_id_map |= (1 << apic_id);
 
-	if (reg_00.ID != apic_id) {
-		reg_00.ID = apic_id;
+	if (reg_00.bits.ID != apic_id) {
+		reg_00.bits.ID = apic_id;
 
 		spin_lock_irqsave(&ioapic_lock, flags);
-		io_apic_write(ioapic, 0, *(int *)&reg_00);
-		*(int *)&reg_00 = io_apic_read(ioapic, 0);
+		io_apic_write(ioapic, 0, reg_00.raw);
+		reg_00.raw = io_apic_read(ioapic, 0);
 		spin_unlock_irqrestore(&ioapic_lock, flags);
 
 		/* Sanity check */
-		if (reg_00.ID != apic_id)
+		if (reg_00.bits.ID != apic_id)
 			panic("IOAPIC[%d]: Unable change apic_id!\n", ioapic);
 	}
 
@@ -1707,27 +1707,27 @@ int __init io_apic_get_unique_id (int ioapic, int apic_id)
 
 int __init io_apic_get_version (int ioapic)
 {
-	struct IO_APIC_reg_01	reg_01;
+	union IO_APIC_reg_01	reg_01;
 	unsigned long flags;
 
 	spin_lock_irqsave(&ioapic_lock, flags);
-	*(int *)&reg_01 = io_apic_read(ioapic, 1);
+	reg_01.raw = io_apic_read(ioapic, 1);
 	spin_unlock_irqrestore(&ioapic_lock, flags);
 
-	return reg_01.version;
+	return reg_01.bits.version;
 }
 
 
 int __init io_apic_get_redir_entries (int ioapic)
 {
-	struct IO_APIC_reg_01	reg_01;
+	union IO_APIC_reg_01	reg_01;
 	unsigned long flags;
 
 	spin_lock_irqsave(&ioapic_lock, flags);
-	*(int *)&reg_01 = io_apic_read(ioapic, 1);
+	reg_01.raw = io_apic_read(ioapic, 1);
 	spin_unlock_irqrestore(&ioapic_lock, flags);
 
-	return reg_01.entries;
+	return reg_01.bits.entries;
 }
 
 

@@ -844,7 +844,7 @@ ppp_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		if (ns == 0)
 			goto outf;
 		skb_reserve(ns, dev->hard_header_len);
-		memcpy(skb_put(ns, skb->len), skb->data, skb->len);
+		skb_copy_bits(skb, 0, skb_put(ns, skb->len), skb->len);
 		kfree_skb(skb);
 		skb = ns;
 	}
@@ -1352,7 +1352,7 @@ ppp_input(struct ppp_channel *chan, struct sk_buff *skb)
 		kfree_skb(skb);
 		return;
 	}
-
+	
 	proto = PPP_PROTO(skb);
 	read_lock_bh(&pch->upl);
 	if (pch->ppp == 0 || proto >= 0xc000 || proto == PPP_CCPFRAG) {
@@ -1446,6 +1446,7 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 		/* decompress VJ compressed packets */
 		if (ppp->vj == 0 || (ppp->flags & SC_REJ_COMP_TCP))
 			goto err;
+
 		if (skb_tailroom(skb) < 124) {
 			/* copy to a new sk_buff with more tailroom */
 			ns = dev_alloc_skb(skb->len + 128);
@@ -1454,10 +1455,13 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 				goto err;
 			}
 			skb_reserve(ns, 2);
-			memcpy(skb_put(ns, skb->len), skb->data, skb->len);
+			skb_copy_bits(skb, 0, skb_put(ns, skb->len), skb->len);
 			kfree_skb(skb);
 			skb = ns;
 		}
+		else if (!pskb_may_pull(skb, skb->len))
+			goto err;
+
 		len = slhc_uncompress(ppp->vj, skb->data + 2, skb->len - 2);
 		if (len <= 0) {
 			printk(KERN_DEBUG "PPP: VJ decompression error\n");
@@ -1474,6 +1478,13 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 	case PPP_VJC_UNCOMP:
 		if (ppp->vj == 0 || (ppp->flags & SC_REJ_COMP_TCP))
 			goto err;
+		
+		/* Until we fix the decompressor need to make sure
+		 * data portion is linear.
+		 */
+		if (!pskb_may_pull(skb, skb->len)) 
+			goto err;
+
 		if (slhc_remember(ppp->vj, skb->data + 2, skb->len - 2) <= 0) {
 			printk(KERN_ERR "PPP: VJ uncompressed error\n");
 			goto err;
@@ -1551,6 +1562,12 @@ ppp_decompress_frame(struct ppp *ppp, struct sk_buff *skb)
 	struct sk_buff *ns;
 	int len;
 
+	/* Until we fix all the decompressor's need to make sure
+	 * data portion is linear.
+	 */
+	if (!pskb_may_pull(skb, skb->len))
+		goto err;
+
 	if (proto == PPP_COMP) {
 		ns = dev_alloc_skb(ppp->mru + PPP_HDRLEN);
 		if (ns == 0) {
@@ -1603,7 +1620,7 @@ ppp_receive_mp_frame(struct ppp *ppp, struct sk_buff *skb, struct channel *pch)
 	struct list_head *l;
 	int mphdrlen = (ppp->flags & SC_MP_SHORTSEQ)? MPHDRLEN_SSN: MPHDRLEN;
 
-	if (skb->len < mphdrlen + 1 || ppp->mrru == 0)
+	if (!pskb_may_pull(skb, mphdrlen + 1) || ppp->mrru == 0)
 		goto err;		/* no good, throw it away */
 
 	/* Decode sequence number and begin/end bits */
@@ -1809,7 +1826,7 @@ ppp_mp_reconstruct(struct ppp *ppp)
 		if (head != tail)
 			/* copy to a single skb */
 			for (p = head; p != tail->next; p = p->next)
-				memcpy(skb_put(skb, p->len), p->data, p->len);
+				skb_copy_bits(p, 0, skb_put(skb, p->len), p->len);
 		ppp->nextseq = tail->sequence + 1;
 		head = tail->next;
 	}
@@ -2018,12 +2035,12 @@ ppp_set_compress(struct ppp *ppp, unsigned long arg)
 static void
 ppp_ccp_peek(struct ppp *ppp, struct sk_buff *skb, int inbound)
 {
-	unsigned char *dp = skb->data + 2;
+	unsigned char *dp;
 	int len;
 
-	if (skb->len < CCP_HDRLEN + 2
-	    || skb->len < (len = CCP_LENGTH(dp)) + 2)
-		return;		/* too short */
+	if (!pskb_may_pull(skb, CCP_HDRLEN + 2))
+		return;	/* no header */
+	dp = skb->data + 2;
 
 	switch (CCP_CODE(dp)) {
 	case CCP_CONFREQ:
@@ -2056,6 +2073,8 @@ ppp_ccp_peek(struct ppp *ppp, struct sk_buff *skb, int inbound)
 	case CCP_CONFACK:
 		if ((ppp->flags & (SC_CCP_OPEN | SC_CCP_UP)) != SC_CCP_OPEN)
 			break;
+		if (!pskb_may_pull(skb, len = CCP_LENGTH(dp)) + 2)
+			return;		/* too short */
 		dp += CCP_HDRLEN;
 		len -= CCP_HDRLEN;
 		if (len < CCP_OPT_MINLEN || len < CCP_OPT_LENGTH(dp))

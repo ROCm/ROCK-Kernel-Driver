@@ -69,8 +69,6 @@ struct task_struct init_task = INIT_TASK(init_task);
 /* only used to get secondary processor up */
 struct task_struct *current_set[NR_CPUS] = {&init_task, };
 
-static void show_tsk_stack(struct task_struct *tsk, unsigned long sp);
-
 #undef SHOW_TASK_SWITCHES
 #undef CHECK_STACK
 
@@ -296,7 +294,7 @@ void show_regs(struct pt_regs * regs)
 			break;
 	}
 	printk("\n");
-	show_tsk_stack(current, regs->gpr[1]);
+	show_stack(current, (unsigned long *) regs->gpr[1]);
 }
 
 void exit_thread(void)
@@ -494,26 +492,29 @@ out:
 	return error;
 }
 
-void show_trace_task(struct task_struct *tsk)
-{
-	show_tsk_stack(tsk, tsk->thread.ksp);
-}
-
 void dump_stack(void)
 {
-	show_tsk_stack(current, _get_SP());
+	show_stack(current, NULL);
 }
 
-static void show_tsk_stack(struct task_struct *tsk, unsigned long sp)
+void show_stack(struct task_struct *tsk, unsigned long *stack)
 {
-	unsigned long stack_top, prev_sp, ret;
+	unsigned long sp, stack_top, prev_sp, ret;
 	int count = 0;
 	unsigned long next_exc = 0;
 	struct pt_regs *regs;
 	extern char ret_from_except, ret_from_except_full, ret_from_syscall;
 
+	sp = (unsigned long) stack;
 	if (tsk == NULL)
-		return;
+		tsk = current;
+	if (sp == 0) {
+		if (tsk == current)
+			asm("mr %0,1" : "=r" (sp));
+		else
+			sp = tsk->thread.ksp;
+	}
+
 	prev_sp = (unsigned long) (tsk->thread_info + 1);
 	stack_top = (unsigned long) tsk->thread_info + THREAD_SIZE;
 	while (count < 16 && sp > prev_sp && sp < stack_top && (sp & 3) == 0) {

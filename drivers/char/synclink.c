@@ -1,7 +1,7 @@
 /*
  * linux/drivers/char/synclink.c
  *
- * $Id: synclink.c,v 4.9 2003/05/06 21:18:51 paulkf Exp $
+ * $Id: synclink.c,v 4.12 2003/06/18 15:29:32 paulkf Exp $
  *
  * Device driver for Microgate SyncLink ISA and PCI
  * high speed multiprotocol serial adapters.
@@ -910,7 +910,7 @@ MODULE_PARM(txdmabufs,"1-" __MODULE_STRING(MAX_TOTAL_DEVICES) "i");
 MODULE_PARM(txholdbufs,"1-" __MODULE_STRING(MAX_TOTAL_DEVICES) "i");
 
 static char *driver_name = "SyncLink serial driver";
-static char *driver_version = "$Revision: 4.9 $";
+static char *driver_version = "$Revision: 4.12 $";
 
 static int synclink_init_one (struct pci_dev *dev,
 				     const struct pci_device_id *ent);
@@ -3170,14 +3170,17 @@ static void mgsl_close(struct tty_struct *tty, struct file * filp)
 {
 	struct mgsl_struct * info = (struct mgsl_struct *)tty->driver_data;
 
-	if (!info || mgsl_paranoia_check(info, tty->name, "mgsl_close"))
+	if (mgsl_paranoia_check(info, tty->name, "mgsl_close"))
 		return;
 	
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("%s(%d):mgsl_close(%s) entry, count=%d\n",
 			 __FILE__,__LINE__, info->device_name, info->count);
 			 
-	if (!info->count || tty_hung_up_p(filp))
+	if (!info->count)
+		return;
+
+	if (tty_hung_up_p(filp))
 		goto cleanup;
 			
 	if ((tty->count == 1) && (info->count != 1)) {
@@ -3493,16 +3496,11 @@ static int mgsl_open(struct tty_struct *tty, struct file * filp)
 	info = mgsl_device_list;
 	while(info && info->line != line)
 		info = info->next_device;
-	if ( !info ){
-		printk("%s(%d):Can't find specified device on open (line=%d)\n",
-			__FILE__,__LINE__,line);
+	if (mgsl_paranoia_check(info, tty->name, "mgsl_open"))
 		return -ENODEV;
-	}
 	
 	tty->driver_data = info;
 	info->tty = tty;
-	if (mgsl_paranoia_check(info, tty->name, "mgsl_open"))
-		return -ENODEV;
 		
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("%s(%d):mgsl_open(%s), old ref count = %d\n",
@@ -3562,6 +3560,8 @@ static int mgsl_open(struct tty_struct *tty, struct file * filp)
 	
 cleanup:			
 	if (retval) {
+		if (tty->count == 1)
+			info->tty = 0; /* tty layer will release tty struct */
 		if(info->count)
 			info->count--;
 	}
@@ -4461,7 +4461,6 @@ static struct tty_operations mgsl_ops = {
 int mgsl_init_tty(void);
 int mgsl_init_tty()
 {
-	struct mgsl_struct *info;
 	serial_driver = alloc_tty_driver(mgsl_device_count);
 	if (!serial_driver)
 		return -ENOMEM;

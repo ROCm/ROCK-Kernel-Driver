@@ -749,12 +749,17 @@ static int cdrom_decode_status(ide_drive_t *drive, int good_stat, int *stat_ret)
 		   by transferring the semaphore from the packet
 		   command request to the request sense request. */
 
+		rq->flags |= REQ_FAILED;
 		if ((stat & ERR_STAT) != 0) {
 			wait = rq->waiting;
 			rq->waiting = NULL;
+			if ((rq->flags & REQ_BLOCK_PC) != 0) {
+				cdrom_queue_request_sense(drive, wait,
+							  rq->sense, rq);
+				return 1; /* REQ_BLOCK_PC self-cares */
+			}
 		}
 
-		rq->flags |= REQ_FAILED;
 		cdrom_end_request(drive, 0);
 
 		if ((stat & ERR_STAT) != 0)
@@ -1657,13 +1662,14 @@ static ide_startstop_t cdrom_newpc_intr(ide_drive_t *drive)
 	dma = info->dma;
 	if (dma) {
 		info->dma = 0;
-		if ((dma_error = HWIF(drive)->ide_dma_end(drive))) {
-			printk("ide-cd: dma error\n");
-			HWIF(drive)->ide_dma_off(drive);
-		}
+		dma_error = HWIF(drive)->ide_dma_end(drive);
 	}
 
 	if (cdrom_decode_status(drive, 0, &stat)) {
+		if ((stat & ERR_STAT) != 0) {
+			end_that_request_chunk(rq, 0, rq->data_len);
+			goto end_request; /* purge the whole thing... */
+		}
 		end_that_request_chunk(rq, 1, rq->data_len);
 		return ide_stopped;
 	}
@@ -1672,8 +1678,11 @@ static ide_startstop_t cdrom_newpc_intr(ide_drive_t *drive)
 	 * using dma, transfer is complete now
 	 */
 	if (dma) {
-		if (dma_error)
+		if (dma_error) {
+			printk("ide-cd: dma error\n");
+			HWIF(drive)->ide_dma_off(drive);
 			return DRIVER(drive)->error(drive, "dma error", stat);
+		}
 
 		end_that_request_chunk(rq, 1, rq->data_len);
 		rq->data_len = 0;
@@ -2805,7 +2814,7 @@ static struct cdrom_device_ops ide_cdrom_dops = {
 				CDC_MEDIA_CHANGED | CDC_PLAY_AUDIO | CDC_RESET |
 				CDC_IOCTLS | CDC_DRIVE_STATUS | CDC_CD_R |
 				CDC_CD_RW | CDC_DVD | CDC_DVD_R| CDC_DVD_RAM |
-				CDC_GENERIC_PACKET,
+				CDC_GENERIC_PACKET | CDC_MO_DRIVE,
 	.generic_packet		= ide_cdrom_packet,
 };
 
@@ -2838,6 +2847,8 @@ static int ide_cdrom_register (ide_drive_t *drive, int nslots)
 		devinfo->mask |= CDC_PLAY_AUDIO;
 	if (!CDROM_CONFIG_FLAGS(drive)->close_tray)
 		devinfo->mask |= CDC_CLOSE_TRAY;
+	if (!CDROM_CONFIG_FLAGS(drive)->mo_drive)
+		devinfo->mask |= CDC_MO_DRIVE;
 
 	return register_cdrom(devinfo);
 }
@@ -2884,6 +2895,7 @@ int ide_cdrom_probe_capabilities (ide_drive_t *drive)
 	int nslots = 1;
 
 	if (drive->media == ide_optical) {
+		CDROM_CONFIG_FLAGS(drive)->mo_drive = 1;
 		printk("%s: ATAPI magneto-optical drive\n", drive->name);
 		return nslots;
 	}

@@ -175,7 +175,37 @@ static int ti_override(struct yenta_socket *socket)
 	new = reg & ~I365_INTR_ENA;
 	if (new != reg)
 		exca_writeb(socket, I365_INTCTL, new);
-	socket->socket.ss_entry->init = ti_init;
+
+#if 0
+	/* THIS CAUSES HANGS! Disabled for now, do not know why */
+
+	/*
+	 * If ISA interrupts don't work, then fall back to routing card
+	 * interrupts to the PCI interrupt of the socket.
+	 *
+	 * Tweaking this when we are using serial PCI IRQs causes hangs
+	 *   --rmk
+	 */
+	if (!socket->socket.irq_mask) {
+		u8 irqmux, devctl;
+
+		devctl = config_readb(socket, TI113X_DEVICE_CONTROL);
+		if (devctl & TI113X_DCR_IMODE_MASK != TI12XX_DCR_IMODE_ALL_SERIAL) {
+			printk (KERN_INFO "ti113x: Routing card interrupts to PCI\n");
+
+			devctl &= ~TI113X_DCR_IMODE_MASK;
+
+			irqmux = config_readl(socket, TI122X_IRQMUX);
+			irqmux = (irqmux & ~0x0f) | 0x02; /* route INTA */
+			irqmux = (irqmux & ~0xf0) | 0x20; /* route INTB */
+
+			config_writel(socket, TI122X_IRQMUX, irqmux);
+			config_writeb(socket, TI113X_DEVICE_CONTROL, devctl);
+		}
+	}
+#endif
+
+	socket->socket.ops->init = ti_init;
 	return 0;
 }
 
@@ -208,7 +238,7 @@ static int ti113x_override(struct yenta_socket *socket)
 	if (socket->cb_irq)
 		ti_cardctl(socket) |= TI113X_CCR_PCI_IRQ_ENA | TI113X_CCR_PCI_CSC | TI113X_CCR_PCI_IREQ;
 	ti_override(socket);
-	socket->socket.ss_entry->init = ti113x_init;
+	socket->socket.ops->init = ti113x_init;
 	return 0;
 }
 
@@ -237,8 +267,19 @@ static int ti1250_override(struct yenta_socket *socket)
 	if (socket->cb_irq)
 		ti_diag(socket) |= TI1250_DIAG_PCI_CSC | TI1250_DIAG_PCI_IREQ;
 	ti113x_override(socket);
-	socket->socket.ss_entry->init = ti1250_init;
+	socket->socket.ops->init = ti1250_init;
 	return 0;
+}
+
+
+static int ti12xx_override(struct yenta_socket *socket)
+{
+	/* make sure that memory burst is active */
+	ti_sysctl(socket) = config_readl(socket, TI113X_SYSTEM_CONTROL);
+	ti_sysctl(socket) |= TI122X_SCR_MRBURSTUP;
+	config_writel(socket, TI113X_SYSTEM_CONTROL, ti_sysctl(socket));
+
+	return ti113x_override(socket);
 }
 
 #endif /* CONFIG_CARDBUS */

@@ -72,7 +72,7 @@
 
 
 static int ip6_rt_max_size = 4096;
-static int ip6_rt_gc_min_interval = 5*HZ;
+static int ip6_rt_gc_min_interval = HZ / 2;
 static int ip6_rt_gc_timeout = 60*HZ;
 int ip6_rt_gc_interval = 30*HZ;
 static int ip6_rt_gc_elasticity = 9;
@@ -131,14 +131,9 @@ rwlock_t rt6_lock = RW_LOCK_UNLOCKED;
 
 
 /* allocate dst with ip6_dst_ops */
-static __inline__ struct rt6_info *__ip6_dst_alloc(void)
+static __inline__ struct rt6_info *ip6_dst_alloc(void)
 {
 	return dst_alloc(&ip6_dst_ops);
-}
-
-struct rt6_info *ip6_dst_alloc(void)
-{
-	return __ip6_dst_alloc();
 }
 
 /*
@@ -560,6 +555,60 @@ static void ip6_rt_update_pmtu(struct dst_entry *dst, u32 mtu)
 	}
 }
 
+/* Protected by rt6_lock.  */
+static struct dst_entry *ndisc_dst_gc_list;
+
+struct dst_entry *ndisc_dst_alloc(struct net_device *dev, 
+				  struct neighbour *neigh,
+				  int (*output)(struct sk_buff *))
+{
+	struct rt6_info *rt = ip6_dst_alloc();
+
+	if (unlikely(rt == NULL))
+		goto out;
+
+	rt->rt6i_dev	  = dev;
+	rt->rt6i_nexthop  = neigh;
+	rt->rt6i_expires  = 0;
+	rt->rt6i_flags    = RTF_LOCAL;
+	rt->rt6i_metric   = 0;
+	atomic_set(&rt->u.dst.__refcnt, 1);
+	rt->u.dst.metrics[RTAX_HOPLIMIT-1] = 255;
+	rt->u.dst.output  = output;
+
+	write_lock_bh(&rt6_lock);
+	rt->u.dst.next = ndisc_dst_gc_list;
+	ndisc_dst_gc_list = &rt->u.dst;
+	write_unlock_bh(&rt6_lock);
+
+	fib6_force_start_gc();
+
+out:
+	return (struct dst_entry *)rt;
+}
+
+int ndisc_dst_gc(int *more)
+{
+	struct dst_entry *dst, *next, **pprev;
+	int freed;
+
+	next = NULL;
+	pprev = &ndisc_dst_gc_list;
+	freed = 0;
+	while ((dst = *pprev) != NULL) {
+		if (!atomic_read(&dst->__refcnt)) {
+			*pprev = dst->next;
+			dst_free(dst);
+			freed++;
+		} else {
+			pprev = &dst->next;
+			(*more)++;
+		}
+	}
+
+	return freed;
+}
+
 static int ip6_dst_gc(void)
 {
 	static unsigned expire = 30*HZ;
@@ -600,6 +649,24 @@ static int ipv6_get_mtu(struct net_device *dev)
 	return mtu;
 }
 
+static inline unsigned int ipv6_advmss(unsigned int mtu)
+{
+	mtu -= sizeof(struct ipv6hdr) + sizeof(struct tcphdr);
+
+	if (mtu < ip6_rt_min_advmss)
+		mtu = ip6_rt_min_advmss;
+
+	/*
+	 * Maximal non-jumbo IPv6 payload is IPV6_MAXPLEN and 
+	 * corresponding MSS is IPV6_MAXPLEN - tcp_header_size. 
+	 * IPV6_MAXPLEN is also valid and means: "any MSS, 
+	 * rely only on pmtu discovery"
+	 */
+	if (mtu > IPV6_MAXPLEN - sizeof(struct tcphdr))
+		mtu = IPV6_MAXPLEN;
+	return mtu;
+}
+
 static int ipv6_get_hoplimit(struct net_device *dev)
 {
 	int hoplimit = ipv6_devconf.hop_limit;
@@ -637,7 +704,7 @@ int ip6_route_add(struct in6_rtmsg *rtmsg, struct nlmsghdr *nlh, void *_rtattr)
 	if (rtmsg->rtmsg_metric == 0)
 		rtmsg->rtmsg_metric = IP6_RT_PRIO_USER;
 
-	rt = __ip6_dst_alloc();
+	rt = ip6_dst_alloc();
 
 	if (rt == NULL)
 		return -ENOMEM;
@@ -790,16 +857,7 @@ install_route:
 	if (!rt->u.dst.metrics[RTAX_MTU-1])
 		rt->u.dst.metrics[RTAX_MTU-1] = ipv6_get_mtu(dev);
 	if (!rt->u.dst.metrics[RTAX_ADVMSS-1])
-		rt->u.dst.metrics[RTAX_ADVMSS-1] =
-			max_t(unsigned int, dst_pmtu(&rt->u.dst) - 60,
-			      ip6_rt_min_advmss);
-
-	/* Maximal non-jumbo IPv6 payload is 65535 and corresponding
-	   MSS is 65535 - tcp_header_size. 65535 is also valid and
-	   means: "any MSS, rely only on pmtu discovery"
-	 */
-	if (dst_metric(&rt->u.dst, RTAX_ADVMSS) > 65535-20)
-		rt->u.dst.metrics[RTAX_ADVMSS-1] = 65535;
+		rt->u.dst.metrics[RTAX_ADVMSS-1] = ipv6_advmss(dst_pmtu(&rt->u.dst));
 	rt->u.dst.dev = dev;
 	return rt6_ins(rt, nlh, _rtattr);
 
@@ -952,9 +1010,7 @@ source_ok:
 	nrt->rt6i_nexthop = neigh_clone(neigh);
 	/* Reset pmtu, it may be better */
 	nrt->u.dst.metrics[RTAX_MTU-1] = ipv6_get_mtu(neigh->dev);
-	nrt->u.dst.metrics[RTAX_ADVMSS-1] = max_t(unsigned int, dst_pmtu(&nrt->u.dst) - 60, ip6_rt_min_advmss);
-	if (nrt->u.dst.metrics[RTAX_ADVMSS-1] > 65535-20)
-		nrt->u.dst.metrics[RTAX_ADVMSS-1] = 65535;
+	nrt->u.dst.metrics[RTAX_ADVMSS-1] = ipv6_advmss(dst_pmtu(&nrt->u.dst));
 
 	if (rt6_ins(nrt, NULL, NULL))
 		goto out;
@@ -1059,7 +1115,7 @@ out:
 
 static struct rt6_info * ip6_rt_copy(struct rt6_info *ort)
 {
-	struct rt6_info *rt = __ip6_dst_alloc();
+	struct rt6_info *rt = ip6_dst_alloc();
 
 	if (rt) {
 		rt->u.dst.input = ort->u.dst.input;
@@ -1202,7 +1258,7 @@ int ip6_pkt_discard(struct sk_buff *skb)
 
 int ip6_rt_addr_add(struct in6_addr *addr, struct net_device *dev)
 {
-	struct rt6_info *rt = __ip6_dst_alloc();
+	struct rt6_info *rt = ip6_dst_alloc();
 
 	if (rt == NULL)
 		return -ENOMEM;
@@ -1214,9 +1270,7 @@ int ip6_rt_addr_add(struct in6_addr *addr, struct net_device *dev)
 	rt->u.dst.output = ip6_output;
 	rt->rt6i_dev = &loopback_dev;
 	rt->u.dst.metrics[RTAX_MTU-1] = ipv6_get_mtu(rt->rt6i_dev);
-	rt->u.dst.metrics[RTAX_ADVMSS-1] = max_t(unsigned int, dst_pmtu(&rt->u.dst) - 60, ip6_rt_min_advmss);
-	if (rt->u.dst.metrics[RTAX_ADVMSS-1] > 65535-20)
-		rt->u.dst.metrics[RTAX_ADVMSS-1] = 65535;
+	rt->u.dst.metrics[RTAX_ADVMSS-1] = ipv6_advmss(dst_pmtu(&rt->u.dst));
 	rt->u.dst.metrics[RTAX_HOPLIMIT-1] = ipv6_get_hoplimit(rt->rt6i_dev);
 	rt->u.dst.obsolete = -1;
 
@@ -1312,9 +1366,7 @@ static int rt6_mtu_change_route(struct rt6_info *rt, void *p_arg)
              (dst_pmtu(&rt->u.dst) < arg->mtu &&
 	      dst_pmtu(&rt->u.dst) == idev->cnf.mtu6)))
 		rt->u.dst.metrics[RTAX_MTU-1] = arg->mtu;
-	rt->u.dst.metrics[RTAX_ADVMSS-1] = max_t(unsigned int, arg->mtu - 60, ip6_rt_min_advmss);
-	if (rt->u.dst.metrics[RTAX_ADVMSS-1] > 65535-20)
-		rt->u.dst.metrics[RTAX_ADVMSS-1] = 65535;
+	rt->u.dst.metrics[RTAX_ADVMSS-1] = ipv6_advmss(arg->mtu);
 	return 0;
 }
 

@@ -18,6 +18,7 @@
 
 #include "scsi.h"
 #include "hosts.h"
+#include <scsi/scsi_driver.h>
 
 #include "scsi_priv.h"
 #include "scsi_logging.h"
@@ -1094,13 +1095,16 @@ static inline int scsi_host_queue_ready(struct request_queue *q,
 			return 0;
 		}
 	}
-	if (!list_empty(&sdev->starved_entry))
-		return 0;
 	if ((shost->can_queue > 0 && shost->host_busy >= shost->can_queue) ||
 	    shost->host_blocked || shost->host_self_blocked) {
-		list_add_tail(&sdev->starved_entry, &shost->starved_list);
+		if (list_empty(&sdev->starved_entry))
+			list_add_tail(&sdev->starved_entry, &shost->starved_list);
 		return 0;
 	}
+
+	/* We're OK to process the command, so we can't be starved */
+	if (!list_empty(&sdev->starved_entry))
+		list_del_init(&sdev->starved_entry);
 
 	return 1;
 }
@@ -1128,6 +1132,7 @@ static void scsi_request_fn(struct request_queue *q)
 	 * the host is no longer able to accept any more requests.
 	 */
 	while (!blk_queue_plugged(q)) {
+		int rtn;
 		/*
 		 * get next queueable request.  We do this early to make sure
 		 * that the request is fully prepared even if we cannot 
@@ -1181,8 +1186,17 @@ static void scsi_request_fn(struct request_queue *q)
 		/*
 		 * Dispatch the command to the low-level driver.
 		 */
-		scsi_dispatch_cmd(cmd);
+		rtn = scsi_dispatch_cmd(cmd);
 		spin_lock_irq(q->queue_lock);
+		if(rtn) {
+			/* we're refusing the command; because of
+			 * the way locks get dropped, we need to 
+			 * check here if plugging is required */
+			if(sdev->device_busy == 0)
+				blk_plug_device(q);
+
+			break;
+		}
 	}
 
 	return;
@@ -1203,6 +1217,8 @@ static void scsi_request_fn(struct request_queue *q)
 		blk_queue_end_tag(q, req);
 	__elv_add_request(q, req, 0, 0);
 	sdev->device_busy--;
+	if(sdev->device_busy == 0)
+		blk_plug_device(q);
 }
 
 u64 scsi_calculate_bounce_limit(struct Scsi_Host *shost)
@@ -1335,4 +1351,128 @@ void scsi_exit_queue(void)
 		mempool_destroy(sgp->pool);
 		kmem_cache_destroy(sgp->slab);
 	}
+}
+/**
+ *	__scsi_mode_sense - issue a mode sense, falling back from 10 to 
+ *		six bytes if necessary.
+ *	@sreq:	SCSI request to fill in with the MODE_SENSE
+ *	@dbd:	set if mode sense will allow block descriptors to be returned
+ *	@modepage: mode page being requested
+ *	@buffer: request buffer (may not be smaller than eight bytes)
+ *	@len:	length of request buffer.
+ *	@timeout: command timeout
+ *	@retries: number of retries before failing
+ *	@data: returns a structure abstracting the mode header data
+ *
+ *	Returns zero if unsuccessful, or the header offset (either 4
+ *	or 8 depending on whether a six or ten byte command was
+ *	issued) if successful.
+ **/
+int
+__scsi_mode_sense(struct scsi_request *sreq, int dbd, int modepage,
+		  unsigned char *buffer, int len, int timeout, int retries,
+		  struct scsi_mode_data *data) {
+	unsigned char cmd[12];
+	int use_10_for_ms;
+	int header_length;
+
+	memset(data, 0, sizeof(*data));
+	memset(&cmd[0], 0, 12);
+	cmd[1] = dbd & 0x18;	/* allows DBD and LLBA bits */
+	cmd[2] = modepage;
+
+ retry:
+	use_10_for_ms = sreq->sr_device->use_10_for_ms;
+
+	if (use_10_for_ms) {
+		if (len < 8)
+			len = 8;
+
+		cmd[0] = MODE_SENSE_10;
+		cmd[8] = len;
+		header_length = 8;
+	} else {
+		if (len < 4)
+			len = 4;
+
+		cmd[0] = MODE_SENSE;
+		cmd[4] = len;
+		header_length = 4;
+	}
+
+	sreq->sr_cmd_len = 0;
+	sreq->sr_sense_buffer[0] = 0;
+	sreq->sr_sense_buffer[2] = 0;
+	sreq->sr_data_direction = DMA_FROM_DEVICE;
+
+	memset(buffer, 0, len);
+
+	scsi_wait_req(sreq, cmd, buffer, len, timeout, retries);
+
+	/* This code looks awful: what it's doing is making sure an
+	 * ILLEGAL REQUEST sense return identifies the actual command
+	 * byte as the problem.  MODE_SENSE commands can return
+	 * ILLEGAL REQUEST if the code page isn't supported */
+	if (use_10_for_ms && ! scsi_status_is_good(sreq->sr_result) &&
+	    (driver_byte(sreq->sr_result) & DRIVER_SENSE) &&
+	    sreq->sr_sense_buffer[2] == ILLEGAL_REQUEST &&
+	    (sreq->sr_sense_buffer[4] & 0x40) == 0x40 &&
+	    sreq->sr_sense_buffer[5] == 0 &&
+	    sreq->sr_sense_buffer[6] == 0 ) {
+		sreq->sr_device->use_10_for_ms = 0;
+		goto retry;
+	}
+
+	if(scsi_status_is_good(sreq->sr_result)) {
+		data->header_length = header_length;
+		if(use_10_for_ms) {
+			data->length = buffer[0]*256 + buffer[1];
+			data->medium_type = buffer[2];
+			data->device_specific = buffer[3];
+			data->longlba = buffer[4] & 0x01;
+			data->block_descriptor_length = buffer[6]*256
+				+ buffer[7];
+		} else {
+			data->length = buffer[0];
+			data->medium_type = buffer[1];
+			data->device_specific = buffer[3];
+			data->block_descriptor_length = buffer[4];
+		}
+	}
+
+	return sreq->sr_result;
+}
+
+/**
+ *	scsi_mode_sense - issue a mode sense, falling back from 10 to 
+ *		six bytes if necessary.
+ *	@sdev:	scsi device to send command to.
+ *	@dbd:	set if mode sense will disable block descriptors in the return
+ *	@modepage: mode page being requested
+ *	@buffer: request buffer (may not be smaller than eight bytes)
+ *	@len:	length of request buffer.
+ *	@timeout: command timeout
+ *	@retries: number of retries before failing
+ *
+ *	Returns zero if unsuccessful, or the header offset (either 4
+ *	or 8 depending on whether a six or ten byte command was
+ *	issued) if successful.
+ **/
+int
+scsi_mode_sense(struct scsi_device *sdev, int dbd, int modepage,
+		unsigned char *buffer, int len, int timeout, int retries,
+		struct scsi_mode_data *data)
+{
+	struct scsi_request *sreq = scsi_allocate_request(sdev);
+	int ret;
+
+	if (!sreq)
+		return -1;
+
+	ret = __scsi_mode_sense(sreq, dbd, modepage, buffer, len,
+				timeout, retries, data);
+
+	scsi_release_request(sreq);
+
+	return ret;
 }
