@@ -57,7 +57,7 @@ static void vortex_EqHw_SetTimeConsts(vortex_t * vortex, u16 gain, u16 level)
 static inline u16 sign_invert(u16 a)
 {
 	/* -(-32768) -> -32768 so we do -(-32768) -> 32767 to make the result positive */
-	if (a == -32768)
+	if (a == (u16)-32768)
 		return 32767;
 	else
 		return -a;
