@@ -80,17 +80,10 @@ static int fmv18x_probe_list[] __initdata = {
  *	ISA
  */
 
-#ifndef CONFIG_X86_PC9800
 static unsigned at1700_probe_list[] __initdata = {
 	0x260, 0x280, 0x2a0, 0x240, 0x340, 0x320, 0x380, 0x300, 0
 };
 
-#else /* CONFIG_X86_PC9800 */
-static unsigned at1700_probe_list[] __initdata = {
-	0x1d6, 0x1d8, 0x1da, 0x1d4, 0xd4, 0xd2, 0xd8, 0xd0, 0
-};
-
-#endif /* CONFIG_X86_PC9800 */
 /*
  *	MCA
  */
@@ -133,7 +126,6 @@ struct net_local {
 
 
 /* Offsets from the base address. */
-#ifndef CONFIG_X86_PC9800
 #define STATUS			0
 #define TX_STATUS		0
 #define RX_STATUS		1
@@ -161,34 +153,6 @@ struct net_local {
 #define RESET			31		/* Write to reset some parts of the chip. */
 #define AT1700_IO_EXTENT	32
 #define PORT_OFFSET(o) (o)
-#else /* CONFIG_X86_PC9800 */
-#define STATUS			(0x0000)
-#define TX_STATUS		(0x0000)
-#define RX_STATUS		(0x0001)
-#define TX_INTR			(0x0200)/* Bit-mapped interrupt enable registers. */
-#define RX_INTR			(0x0201)
-#define TX_MODE			(0x0400)
-#define RX_MODE			(0x0401)
-#define CONFIG_0		(0x0600)/* Misc. configuration settings. */
-#define CONFIG_1		(0x0601)
-/* Run-time register bank 2 definitions. */
-#define DATAPORT		(0x0800)/* Word-wide DMA or programmed-I/O dataport. */
-#define TX_START		(0x0a00)
-#define COL16CNTL		(0x0a01)/* Controll Reg for 16 collisions */
-#define MODE13			(0x0c01)
-#define RX_CTRL			(0x0e00)
-/* Configuration registers only on the '865A/B chips. */
-#define EEPROM_Ctrl 	(0x1000)
-#define EEPROM_Data 	(0x1200)
-#define CARDSTATUS	16			/* FMV-18x Card Status */
-#define CARDSTATUS1	17			/* FMV-18x Card Status */
-#define IOCONFIG		(0x1400)/* Either read the jumper, or move the I/O. */
-#define IOCONFIG1		(0x1600)
-#define	SAPROM			20		/* The station address PROM, if no EEPROM. */
-#define	MODE24			(0x1800)/* The station address PROM, if no EEPROM. */
-#define RESET			(0x1e01)/* Write to reset some parts of the chip. */
-#define PORT_OFFSET(o) ({ int _o_ = (o); (_o_ & ~1) * 0x100 + (_o_ & 1); })
-#endif /* CONFIG_X86_PC9800 */
 
 
 #define TX_TIMEOUT		10
@@ -230,11 +194,7 @@ static struct at1720_mca_adapters_struct at1720_mca_adapters[] __initdata = {
    (detachable devices only).
    */
 
-#ifndef CONFIG_X86_PC9800
 static int io = 0x260;
-#else
-static int io = 0xd0;
-#endif
 
 static int irq;
 
@@ -246,15 +206,7 @@ static void cleanup_card(struct net_device *dev)
 		mca_mark_as_unused(lp->mca_slot);
 #endif	
 	free_irq(dev->irq, NULL);
-#ifndef CONFIG_X86_PC9800
 	release_region(dev->base_addr, AT1700_IO_EXTENT);
-#else
-	{
-		int i;
-		for (i = 0; i < 0x2000; i += 0x200)
-			release_region(dev->base_addr + i, 2);
-	}
-#endif
 }
 
 struct net_device * __init at1700_probe(int unit)
@@ -321,20 +273,8 @@ static int __init at1700_probe1(struct net_device *dev, int ioaddr)
 	int slot, ret = -ENODEV;
 	struct net_local *lp = netdev_priv(dev);
 
-#ifndef CONFIG_X86_PC9800
 	if (!request_region(ioaddr, AT1700_IO_EXTENT, dev->name))
 		return -EBUSY;
-#else
-	for (i = 0; i < 0x2000; i += 0x0200) {
-		if (!request_region(ioaddr + i, 2, dev->name)) {
-			while (i > 0) {
-				i -= 0x0200;
-				release_region(ioaddr + i, 2);
-			}
-			return -EBUSY;
-		}
-	}
-#endif
 
 	/* Resetting the chip doesn't reset the ISA interface, so don't bother.
 	   That means we have to be careful with the register values we probe
@@ -425,15 +365,8 @@ found:
 	outb(0, ioaddr + RESET);
 
 	if (is_at1700) {
-#ifndef CONFIG_X86_PC9800
 		irq = at1700_irqmap[(read_eeprom(ioaddr, 12)&0x04)
 						   | (read_eeprom(ioaddr, 0)>>14)];
-#else
-		{
-			char re1000plus_irqmap[4] = {3, 5, 6, 12};
-			irq = re1000plus_irqmap[inb(ioaddr + IOCONFIG1) >> 6];
-		}
-#endif
 	} else {
 		/* Check PnP mode for FMV-183/184/183A/184A. */
 		/* This PnP routine is very poor. IO and IRQ should be known. */
@@ -517,11 +450,7 @@ found:
 	/* Switch to bank 2 */
 	/* Lock our I/O address, and set manual processing mode for 16 collisions. */
 	outb(0x08, ioaddr + CONFIG_1);
-#ifndef CONFIG_X86_PC9800
 	outb(dev->if_port, ioaddr + MODE13);
-#else
-	outb(0, ioaddr + MODE13);
-#endif
 	outb(0x00, ioaddr + COL16CNTL);
 
 	if (net_debug)
@@ -557,12 +486,7 @@ err_mca:
 		mca_mark_as_unused(slot);
 #endif
 err_out:
-#ifndef CONFIG_X86_PC9800
 	release_region(ioaddr, AT1700_IO_EXTENT);
-#else
-	for (i = 0; i < 0x2000; i += 0x0200)
-		release_region(ioaddr + i, 2);
-#endif
 	return ret;
 }
 
@@ -572,13 +496,6 @@ err_out:
 #define EE_CS			0x20	/* EEPROM chip select, in reg. 16. */
 #define EE_DATA_WRITE	0x80	/* EEPROM chip data in, in reg. 17. */
 #define EE_DATA_READ	0x80	/* EEPROM chip data out, in reg. 17. */
-
-/* Delay between EEPROM clock transitions. */
-#ifndef CONFIG_X86_PC9800
-#define eeprom_delay()	do { } while (0)
-#else
-#define eeprom_delay()	__asm__ ("out%B0 %%al,%0" :: "N"(0x5f))
-#endif
 
 /* The EEPROM commands include the alway-set leading bit. */
 #define EE_WRITE_CMD	(5 << 6)
@@ -598,22 +515,17 @@ static int __init read_eeprom(long ioaddr, int location)
 		short dataval = (read_cmd & (1 << i)) ? EE_DATA_WRITE : 0;
 		outb(EE_CS, ee_addr);
 		outb(dataval, ee_daddr);
-		eeprom_delay();
 		outb(EE_CS | EE_SHIFT_CLK, ee_addr);	/* EEPROM clock tick. */
-		eeprom_delay();
 	}
 	outb(EE_DATA_WRITE, ee_daddr);
 	for (i = 16; i > 0; i--) {
 		outb(EE_CS, ee_addr);
-		eeprom_delay();
 		outb(EE_CS | EE_SHIFT_CLK, ee_addr);
-		eeprom_delay();
 		retval = (retval << 1) | ((inb(ee_daddr) & EE_DATA_READ) ? 1 : 0);
 	}
 
 	/* Terminate the EEPROM access. */
 	outb(EE_CS, ee_addr);
-	eeprom_delay();
 	outb(EE_SHIFT_CLK, ee_addr);
 	outb(0, ee_addr);
 	return retval;

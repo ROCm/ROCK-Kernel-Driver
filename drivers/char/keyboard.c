@@ -52,13 +52,12 @@ extern void ctrl_alt_del(void);
 
 /*
  * Some laptops take the 789uiojklm,. keys as number pad when NumLock is on.
- * This seems a good reason to start with NumLock off. On PC9800 and HIL keyboards 
+ * This seems a good reason to start with NumLock off. On HIL keyboards
  * of PARISC machines however there is no NumLock key and everyone expects the keypad 
  * to be used for numbers.
  */
 
-#if defined(CONFIG_X86_PC9800) || \
-    defined(CONFIG_PARISC) && (defined(CONFIG_KEYBOARD_HIL) || defined(CONFIG_KEYBOARD_HIL_OLD))
+#if defined(CONFIG_PARISC) && (defined(CONFIG_KEYBOARD_HIL) || defined(CONFIG_KEYBOARD_HIL_OLD))
 #define KBD_DEFLEDS (1 << VC_NUMLOCK)
 #else
 #define KBD_DEFLEDS 0

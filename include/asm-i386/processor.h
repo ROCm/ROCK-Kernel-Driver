@@ -259,14 +259,8 @@ static inline void clear_in_cr4 (unsigned long mask)
 
 /*
  * Bus types (default is ISA, but people can check others with these..)
- * pc98 indicates PC98 systems (CBUS)
  */
 extern int MCA_bus;
-#ifdef CONFIG_X86_PC9800
-#define pc98 1
-#else
-#define pc98 0
-#endif
 
 static inline void __monitor(const void *eax, unsigned long ecx,
 		unsigned long edx)

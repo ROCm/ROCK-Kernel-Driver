@@ -361,9 +361,6 @@ static int __devinit check_resources(struct pnp_option *option)
 			    ((port->min == 0x2f8) ||
 			     (port->min == 0x3f8) ||
 			     (port->min == 0x2e8) ||
-#ifdef CONFIG_X86_PC9800
-			     (port->min == 0x8b0) ||
-#endif
 			     (port->min == 0x3e8)))
 				return 1;
 	}
