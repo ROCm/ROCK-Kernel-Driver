@@ -49,12 +49,10 @@
 # define CHECK_DEVLOCK()
 #endif
 
+#define PRINTK(x...) ((void)(RAID5_DEBUG && printk(x)))
 #if RAID5_DEBUG
-#define PRINTK(x...) printk(x)
 #define inline
 #define __inline__
-#else
-#define PRINTK(x...) do { } while (0)
 #endif
 
 static void print_raid5_conf (raid5_conf_t *conf);
@@ -933,13 +931,16 @@ static void handle_stripe(struct stripe_head *sh)
 		test_bit(R5_UPTODATE, &dev->flags))
 	       || (failed == 1 && failed_num == sh->pd_idx))
 	    ) {
-	    /* any written block on an uptodate or failed drive can be returned */
+	    /* any written block on an uptodate or failed drive can be returned.
+	     * Note that if we 'wrote' to a failed drive, it will be UPTODATE, but 
+	     * never LOCKED, so we don't need to test 'failed' directly.
+	     */
 	    for (i=disks; i--; )
 		if (sh->dev[i].written) {
 		    dev = &sh->dev[i];
-		    if (!test_bit(R5_Insync, &sh->dev[sh->pd_idx].flags) &&
-			(!test_bit(R5_LOCKED, &dev->flags) && test_bit(R5_UPTODATE, &dev->flags)) ) {
-			/* maybe we can return some write requests */
+		    if (!test_bit(R5_LOCKED, &dev->flags) &&
+			 test_bit(R5_UPTODATE, &dev->flags) ) {
+			/* We can return any write requests */
 			    struct bio *wbi, *wbi2;
 			    PRINTK("Return write for disc %d\n", i);
 			    wbi = dev->written;
@@ -1164,7 +1165,7 @@ static void handle_stripe(struct stripe_head *sh)
 					md_sync_acct(rdev, STRIPE_SECTORS);
 
 				bi->bi_bdev = rdev->bdev;
-				PRINTK("for %ld schedule op %d on disc %d\n", sh->sector, bi->bi_rw, i);
+				PRINTK("for %ld schedule op %ld on disc %d\n", sh->sector, bi->bi_rw, i);
 				atomic_inc(&sh->count);
 				bi->bi_sector = sh->sector;
 				bi->bi_flags = 0;
@@ -1175,7 +1176,7 @@ static void handle_stripe(struct stripe_head *sh)
 				bi->bi_next = NULL;
 				generic_make_request(bi);
 			} else {
-				PRINTK("skip op %d on disc %d for sector %ld\n", bi->bi_rw, i, sh->sector);
+				PRINTK("skip op %ld on disc %d for sector %ld\n", bi->bi_rw, i, sh->sector);
 				clear_bit(R5_LOCKED, &dev->flags);
 				set_bit(STRIPE_HANDLE, &sh->state);
 			}
@@ -1242,8 +1243,8 @@ static int make_request (request_queue_t *q, struct bio * bi)
 		new_sector = raid5_compute_sector(logical_sector,
 						  raid_disks, data_disks, &dd_idx, &pd_idx, conf);
 
-		PRINTK("raid5: make_request, sector %ul logical %ul\n", 
-		       new_sector, logical_sector);
+		PRINTK("raid5: make_request, sector %Lu logical %Lu\n", 
+		       (unsigned long long)new_sector, (unsigned long long)logical_sector);
 
 		sh = get_active_stripe(conf, new_sector, pd_idx, (bi->bi_rw&RWA_MASK));
 		if (sh) {

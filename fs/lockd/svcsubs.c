@@ -294,15 +294,13 @@ nlmsvc_free_host_resources(struct nlm_host *host)
 }
 
 /*
- * Delete a client when the nfsd entry is removed.
+ * delete all hosts structs for clients
  */
 void
-nlmsvc_invalidate_client(struct svc_client *clnt)
+nlmsvc_invalidate_all(void)
 {
-	struct nlm_host	*host;
-
-	if ((host = nlm_lookup_host(clnt, NULL, 0, 0)) != NULL) {
-		dprintk("lockd: invalidating client for %s\n", host->h_name);
+	struct nlm_host *host;
+	while ((host = nlm_find_client()) != NULL) {
 		nlmsvc_free_host_resources(host);
 		host->h_expires = 0;
 		host->h_killed = 1;

@@ -76,6 +76,8 @@ struct nlm_reboot {
 	int		len;
 	u32		state;
 	u32		addr;
+	u32		vers;
+	u32		proto;
 };
 
 /*

@@ -199,6 +199,19 @@ typedef struct svc_fh {
 
 } svc_fh;
 
+static inline void mk_fsid_v0(u32 *fsidv, dev_t dev, ino_t ino)
+{
+	fsidv[0] = htonl((MAJOR(dev)<<16) |
+			MINOR(dev));
+	fsidv[1] = ino_t_to_u32(ino);
+}
+
+static inline void mk_fsid_v1(u32 *fsidv, u32 fsid)
+{
+	fsidv[0] = fsid;
+}
+
+
 /*
  * Shorthand for dprintk()'s
  */

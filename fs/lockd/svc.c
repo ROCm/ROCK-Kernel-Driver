@@ -130,7 +130,7 @@ lockd(struct svc_rqst *rqstp)
 			flush_signals(current);
 			spin_unlock_irq(&current->sigmask_lock);
 			if (nlmsvc_ops) {
-				nlmsvc_ops->detach();
+				nlmsvc_invalidate_all();
 				grace_period_expire = set_grace_period();
 			}
 		}
@@ -163,22 +163,8 @@ lockd(struct svc_rqst *rqstp)
 		dprintk("lockd: request from %08x\n",
 			(unsigned)ntohl(rqstp->rq_addr.sin_addr.s_addr));
 
-		/*
-		 * Look up the NFS client handle. The handle is needed for
-		 * all but the GRANTED callback RPCs.
-		 */
-		rqstp->rq_client = NULL;
-		if (nlmsvc_ops) {
-			nlmsvc_ops->exp_readlock();
-			rqstp->rq_client =
-				nlmsvc_ops->exp_getclient(&rqstp->rq_addr);
-		}
-
 		svc_process(serv, rqstp);
 
-		/* Unlock export hash tables */
-		if (nlmsvc_ops)
-			nlmsvc_ops->exp_unlock();
 	}
 
 	/*
@@ -187,7 +173,7 @@ lockd(struct svc_rqst *rqstp)
 	 */
 	if (!nlmsvc_pid || current->pid == nlmsvc_pid) {
 		if (nlmsvc_ops)
-			nlmsvc_ops->detach();
+			nlmsvc_invalidate_all();
 		nlm_shutdown_hosts();
 		nlmsvc_pid = 0;
 	} else
@@ -369,29 +355,27 @@ __setup("lockd.tcpport=", tcpport_set);
  * Define NLM program and procedures
  */
 static struct svc_version	nlmsvc_version1 = {
-		vs_vers:	1,
-		vs_nproc:	17,
-		vs_proc:	nlmsvc_procedures,
+		.vs_vers	= 1,
+		.vs_nproc	= 17,
+		.vs_proc	= nlmsvc_procedures,
 };
 static struct svc_version	nlmsvc_version3 = {
-		vs_vers:	3,
-		vs_nproc:	24,
-		vs_proc:	nlmsvc_procedures,
+		.vs_vers	= 3,
+		.vs_nproc	= 24,
+		.vs_proc	= nlmsvc_procedures,
 };
 #ifdef CONFIG_LOCKD_V4
 static struct svc_version	nlmsvc_version4 = {
-		vs_vers:	4,
-		vs_nproc:	24,
-		vs_proc:	nlmsvc_procedures4,
+		.vs_vers	= 4,
+		.vs_nproc	= 24,
+		.vs_proc	= nlmsvc_procedures4,
 };
 #endif
 static struct svc_version *	nlmsvc_version[] = {
-	NULL,
-	&nlmsvc_version1,
-	NULL,
-	&nlmsvc_version3,
+	[1] = &nlmsvc_version1,
+	[3] = &nlmsvc_version3,
 #ifdef CONFIG_LOCKD_V4
-	&nlmsvc_version4,
+	[4] = &nlmsvc_version4,
 #endif
 };
 
@@ -399,11 +383,11 @@ static struct svc_stat		nlmsvc_stats;
 
 #define NLM_NRVERS	(sizeof(nlmsvc_version)/sizeof(nlmsvc_version[0]))
 struct svc_program	nlmsvc_program = {
-	pg_prog:	NLM_PROGRAM,		/* program number */
-	pg_lovers:	1,			// version
-	pg_hivers:	NLM_NRVERS-1,		// range
-	pg_nvers:	NLM_NRVERS,		/* number of entries in nlmsvc_version */
-	pg_vers:	nlmsvc_version,		/* version table */
-	pg_name:	"lockd",		/* service name */
-	pg_stats:	&nlmsvc_stats,		/* stats table */
+	.pg_prog	= NLM_PROGRAM,		/* program number */
+	.pg_lovers	= 1,			/* version */
+	.pg_hivers	= NLM_NRVERS-1,		/* range */
+	.pg_nvers	= NLM_NRVERS,		/* number of entries in nlmsvc_version */
+	.pg_vers	= nlmsvc_version,	/* version table */
+	.pg_name	= "lockd",		/* service name */
+	.pg_stats	= &nlmsvc_stats,	/* stats table */
 };

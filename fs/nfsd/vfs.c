@@ -119,24 +119,24 @@ nfsd_lookup(struct svc_rqst *rqstp, struct svc_fh *fhp, const char *name,
 		else {
 			/* checking mountpoint crossing is very different when stepping up */
 			struct svc_export *exp2 = NULL;
-			struct dentry *dp, *old;
+			struct dentry *dp;
 			struct vfsmount *mnt = mntget(exp->ex_mnt);
 			dentry = dget(dparent);
 			while(follow_up(&mnt, &dentry))
 				;
-			old = dentry;
 			read_lock(&dparent_lock);
-			dp = dentry->d_parent;
-			for ( ; !exp2 && dp->d_parent != dp; dp=dp->d_parent)
-				exp2 = exp_get_by_name(exp->ex_client, mnt, dp);
+			dp = dget(dentry->d_parent);
+			read_unlock(&dparent_lock);
+			dput(dentry);
+			dentry = dp;
+
+			exp2 = exp_parent(exp->ex_client, mnt, dentry);
 			if (!exp2) {
+				dput(dentry);
 				dentry = dget(dparent);
 			} else {
-				dget(dentry->d_parent);
 				exp = exp2;
 			}
-			read_unlock(&dparent_lock);
-			dput(old);
 			mntput(mnt);
 		}
 	} else {

@@ -45,36 +45,34 @@
 
 #ifdef __KERNEL__
 
-/* The following are hashtable sizes and must be powers of 2 */
-#define NFSCLNT_EXPMAX		16
-
 struct svc_client {
 	struct svc_client *	cl_next;
 	char			cl_ident[NFSCLNT_IDMAX];
-	int			cl_idlen;
-	int			cl_naddr;
-	struct in_addr		cl_addr[NFSCLNT_ADDRMAX];
-	struct svc_uidmap *	cl_umap;
-	struct list_head	cl_export[NFSCLNT_EXPMAX];
-	struct list_head	cl_expfsid[NFSCLNT_EXPMAX];
-	struct list_head	cl_list;
 };
 
 struct svc_export {
 	struct list_head	ex_hash;
-	struct list_head	ex_fsid_hash;
-	struct list_head	ex_list;
-	char			ex_path[NFS_MAXPATHLEN+1];
-	struct svc_export *	ex_parent;
 	struct svc_client *	ex_client;
 	int			ex_flags;
 	struct vfsmount *	ex_mnt;
 	struct dentry *		ex_dentry;
-	dev_t			ex_dev;
-	ino_t			ex_ino;
 	uid_t			ex_anon_uid;
 	gid_t			ex_anon_gid;
 	int			ex_fsid;
+};
+
+/* an "export key" (expkey) maps a filehandlefragement to an
+ * svc_export for a given client.  There can be two per export, one
+ * for type 0 (dev/ino), one for type 1 (fsid)
+ */
+struct svc_expkey {
+	struct list_head	ek_hash;
+
+	struct svc_client	*ek_client;
+	int			ek_fsidtype;
+	u32			ek_fsid[2];
+
+	struct svc_export	*ek_export;
 };
 
 #define EX_SECURE(exp)		(!((exp)->ex_flags & NFSEXP_INSECURE_PORT))
@@ -94,16 +92,25 @@ void			exp_readlock(void);
 void			exp_readunlock(void);
 struct svc_client *	exp_getclient(struct sockaddr_in *sin);
 void			exp_putclient(struct svc_client *clp);
-struct svc_export *	exp_get(struct svc_client *clp, dev_t dev, ino_t ino);
-struct svc_export *	exp_get_fsid(struct svc_client *clp, int fsid);
+struct svc_expkey *	exp_find_key(struct svc_client *clp, int fsid_type, u32 *fsidv);
 struct svc_export *	exp_get_by_name(struct svc_client *clp,
 					struct vfsmount *mnt,
 					struct dentry *dentry);
+struct svc_export *	exp_parent(struct svc_client *clp, struct vfsmount *mnt,
+				   struct dentry *dentry);
 int			exp_rootfh(struct svc_client *, 
 					char *path, struct knfsd_fh *, int maxsize);
 int			nfserrno(int errno);
-void			exp_nlmdetach(void);
 
+static inline struct svc_export *
+exp_find(struct svc_client *clp, int fsid_type, u32 *fsidv)
+{
+	struct svc_expkey *ek = exp_find_key(clp, fsid_type, fsidv);
+	if (ek)
+		return ek->ek_export;
+	else
+		return NULL;
+}
 
 #endif /* __KERNEL__ */
 

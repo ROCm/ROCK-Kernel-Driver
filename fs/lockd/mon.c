@@ -42,6 +42,7 @@ nsm_mon_unmon(struct nlm_host *host, u32 proc, struct nsm_res *res)
 		goto out;
 
 	args.addr = host->h_addr.sin_addr.s_addr;
+	args.proto= (host->h_proto<<1) | host->h_server;
 	args.prog = NLM_PROGRAM;
 	args.vers = host->h_version;
 	args.proc = NLMPROC_NSM_NOTIFY;
@@ -167,8 +168,8 @@ xdr_encode_mon(struct rpc_rqst *rqstp, u32 *p, struct nsm_args *argp)
 	/* This is the private part. Needed only for SM_MON call */
 	if (rqstp->rq_task->tk_msg.rpc_proc == SM_MON) {
 		*p++ = argp->addr;
-		*p++ = 0;
-		*p++ = 0;
+		*p++ = argp->vers;
+		*p++ = argp->proto;
 		*p++ = 0;
 	}
 
@@ -206,61 +207,60 @@ xdr_decode_stat(struct rpc_rqst *rqstp, u32 *p, struct nsm_res *resp)
 
 static struct rpc_procinfo	nsm_procedures[] = {
         {
-		p_procname:	"sm_null",
-		p_encode:	(kxdrproc_t) xdr_error,
-		p_decode:	(kxdrproc_t) xdr_error,
+		.p_procname	= "sm_null",
+		.p_encode	= (kxdrproc_t) xdr_error,
+		.p_decode	= (kxdrproc_t) xdr_error,
 	},
         {
-		p_procname:	"sm_stat",
-		p_encode:	(kxdrproc_t) xdr_error,
-		p_decode:	(kxdrproc_t) xdr_error,
+		.p_procname	= "sm_stat",
+		.p_encode	= (kxdrproc_t) xdr_error,
+		.p_decode	= (kxdrproc_t) xdr_error,
 	},
         {
-		p_procname:	"sm_mon",
-		p_encode:	(kxdrproc_t) xdr_encode_mon,
-		p_decode:	(kxdrproc_t) xdr_decode_stat_res,
-		p_bufsiz:	MAX(SM_mon_sz, SM_monres_sz) << 2,
+		.p_procname	= "sm_mon",
+		.p_encode	= (kxdrproc_t) xdr_encode_mon,
+		.p_decode	= (kxdrproc_t) xdr_decode_stat_res,
+		.p_bufsiz	= MAX(SM_mon_sz, SM_monres_sz) << 2,
 	},
         {
-		p_procname:	"sm_unmon",
-		p_encode:	(kxdrproc_t) xdr_encode_mon,
-		p_decode:	(kxdrproc_t) xdr_decode_stat,
-		p_bufsiz:	MAX(SM_mon_id_sz, SM_unmonres_sz) << 2,
+		.p_procname	= "sm_unmon",
+		.p_encode	= (kxdrproc_t) xdr_encode_mon,
+		.p_decode	= (kxdrproc_t) xdr_decode_stat,
+		.p_bufsiz	= MAX(SM_mon_id_sz, SM_unmonres_sz) << 2,
 	},
         {
-		p_procname:	"sm_unmon_all",
-		p_encode:	(kxdrproc_t) xdr_error,
-		p_decode:	(kxdrproc_t) xdr_error,
+		.p_procname	= "sm_unmon_all",
+		.p_encode	= (kxdrproc_t) xdr_error,
+		.p_decode	= (kxdrproc_t) xdr_error,
 	},
         {
-		p_procname:	"sm_simu_crash",
-		p_encode:	(kxdrproc_t) xdr_error,
-		p_decode:	(kxdrproc_t) xdr_error, 0, 0
+		.p_procname	= "sm_simu_crash",
+		.p_encode	= (kxdrproc_t) xdr_error,
+		.p_decode	= (kxdrproc_t) xdr_error,
 	},
         {
-		p_procname:	"sm_notify",
-		p_encode:	(kxdrproc_t) xdr_error,
-		p_decode:	(kxdrproc_t) xdr_error,
+		.p_procname	= "sm_notify",
+		.p_encode	= (kxdrproc_t) xdr_error,
+		.p_decode	= (kxdrproc_t) xdr_error,
 	},
 };
 
 static struct rpc_version	nsm_version1 = {
-		number:		1, 
-		nrprocs:	sizeof(nsm_procedures)/sizeof(nsm_procedures[0]),
-		procs:		nsm_procedures
+		.number		= 1, 
+		.nrprocs	= sizeof(nsm_procedures)/sizeof(nsm_procedures[0]),
+		.procs		= nsm_procedures
 };
 
 static struct rpc_version *	nsm_version[] = {
-	NULL,
-	&nsm_version1,
+	[1] = &nsm_version1,
 };
 
 static struct rpc_stat		nsm_stats;
 
 struct rpc_program		nsm_program = {
-		name:		"statd",
-		number:		SM_PROGRAM,
-		nrvers:		sizeof(nsm_version)/sizeof(nsm_version[0]),
-		version:	nsm_version,
-		stats:		&nsm_stats
+		.name		= "statd",
+		.number		= SM_PROGRAM,
+		.nrvers		= sizeof(nsm_version)/sizeof(nsm_version[0]),
+		.version	= nsm_version,
+		.stats		= &nsm_stats
 };
