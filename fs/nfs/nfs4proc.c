@@ -1107,6 +1107,41 @@ nfs4_proc_write(struct nfs_write_data *wdata, struct file *filp)
 	return status;
 }
 
+static int
+nfs4_proc_commit(struct nfs_write_data *cdata, struct file *filp)
+{
+	struct inode *inode = cdata->inode;
+	struct nfs_fattr *fattr = cdata->res.fattr;
+	struct nfs_server *server = NFS_SERVER(inode);
+	struct rpc_message msg = {
+		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_COMMIT],
+		.rpc_argp	= &cdata->args,
+		.rpc_resp	= &cdata->res,
+	};
+	int status;
+
+	dprintk("NFS call  commit %d @ %Ld\n", cdata->args.count,
+			(long long) cdata->args.offset);
+
+	/*
+	 * Try first to use O_WRONLY, then O_RDWR stateid.
+	 */
+	if (filp) {
+		struct nfs4_state *state;
+		state = (struct nfs4_state *)filp->private_data;
+		memcpy(&cdata->args.stateid, &state->stateid, sizeof(cdata->args.stateid));
+		msg.rpc_cred = state->owner->so_cred;
+	} else {
+		memcpy(&cdata->args.stateid, &zero_stateid, sizeof(cdata->args.stateid));
+		msg.rpc_cred = NFS_I(inode)->mm_cred;
+	}
+
+	fattr->valid = 0;
+	status = rpc_call_sync(server->client, &msg, 0);
+	dprintk("NFS reply commit: %d\n", status);
+	return status;
+}
+
 /*
  * Got race?
  * We will need to arrange for the VFS layer to provide an atomic open.
@@ -1777,7 +1812,7 @@ struct nfs_rpc_ops	nfs_v4_clientops = {
 	.readlink	= nfs4_proc_readlink,
 	.read		= nfs4_proc_read,
 	.write		= nfs4_proc_write,
-	.commit		= NULL,
+	.commit		= nfs4_proc_commit,
 	.create		= nfs4_proc_create,
 	.remove		= nfs4_proc_remove,
 	.unlink_setup	= nfs4_proc_unlink_setup,

@@ -284,6 +284,29 @@ nfs3_proc_write(struct nfs_write_data *wdata, struct file *filp)
 	return status < 0? status : wdata->res.count;
 }
 
+static int
+nfs3_proc_commit(struct nfs_write_data *cdata, struct file *filp)
+{
+	struct inode *		inode = cdata->inode;
+	struct nfs_fattr *	fattr = cdata->res.fattr;
+	struct rpc_message	msg = {
+		.rpc_proc	= &nfs3_procedures[NFS3PROC_COMMIT],
+		.rpc_argp	= &cdata->args,
+		.rpc_resp	= &cdata->res,
+	};
+	int			status;
+
+	dprintk("NFS call  commit %d @ %Ld\n", cdata->args.count,
+			(long long) cdata->args.offset);
+	fattr->valid = 0;
+	msg.rpc_cred = nfs_cred(inode, filp);
+	status = rpc_call_sync(NFS_CLIENT(inode), &msg, 0);
+	if (status >= 0)
+		nfs3_write_refresh_inode(inode, fattr);
+	dprintk("NFS reply commit: %d\n", status);
+	return status;
+}
+
 /*
  * Create a regular file.
  * For now, we don't implement O_EXCL.
@@ -883,6 +906,7 @@ struct nfs_rpc_ops	nfs_v3_clientops = {
 	.readlink	= nfs3_proc_readlink,
 	.read		= nfs3_proc_read,
 	.write		= nfs3_proc_write,
+	.commit		= nfs3_proc_commit,
 	.create		= nfs3_proc_create,
 	.remove		= nfs3_proc_remove,
 	.unlink_setup	= nfs3_proc_unlink_setup,
