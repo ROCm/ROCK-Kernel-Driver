@@ -188,8 +188,8 @@ static int parse_options(char *options,uid_t *uid,gid_t *gid)
 	return 1;
 }
 
-struct inode * proc_get_inode(struct super_block * sb, int ino,
-				struct proc_dir_entry * de)
+struct inode *proc_get_inode(struct super_block *sb, unsigned int ino,
+				struct proc_dir_entry *de)
 {
 	struct inode * inode;
 
@@ -197,11 +197,8 @@ struct inode * proc_get_inode(struct super_block * sb, int ino,
 	 * Increment the use count so the dir entry can't disappear.
 	 */
 	de_get(de);
-#if 1
-/* shouldn't ever happen */
-if (de && de->deleted)
-printk("proc_iget: using deleted entry %s, count=%d\n", de->name, atomic_read(&de->count));
-#endif
+
+	WARN_ON(de && de->deleted);
 
 	inode = iget(sb, ino);
 	if (!inode)
