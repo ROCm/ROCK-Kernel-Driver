@@ -234,7 +234,9 @@ static void tg3_enable_ints(struct tg3 *tp)
 		tw32(GRC_LOCAL_CTRL,
 		     tp->grc_local_ctrl | GRC_LCLCTRL_SETINT);
 	}
+#if 0
 	tr32(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW);
+#endif
 }
 
 static void tg3_switch_clocks(struct tg3 *tp)
