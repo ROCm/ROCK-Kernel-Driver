@@ -1635,8 +1635,8 @@ static void ata_sg_clean(struct ata_queued_cmd *qc)
 	if (cmd->use_sg)
 		pci_unmap_sg(ap->host_set->pdev, sg, qc->n_elem, dir);
 	else
-		pci_unmap_single(ap->host_set->pdev, sg[0].dma_address,
-				 sg[0].length, dir);
+		pci_unmap_single(ap->host_set->pdev, sg_dma_address(&sg[0]),
+				 sg_dma_len(&sg[0]), dir);
 
 	qc->flags &= ~ATA_QCFLAG_SG;
 	qc->sg = NULL;
@@ -1659,8 +1659,8 @@ void ata_fill_sg(struct ata_queued_cmd *qc)
 	assert(qc->n_elem > 0);
 
 	for (i = 0; i < qc->n_elem; i++) {
-		ap->prd[i].addr = cpu_to_le32(sg[i].dma_address);
-		ap->prd[i].flags_len = cpu_to_le32(sg[i].length);
+		ap->prd[i].addr = cpu_to_le32(sg_dma_address(&sg[i]));
+		ap->prd[i].flags_len = cpu_to_le32(sg_dma_len(&sg[i]));
 		VPRINTK("PRD[%u] = (0x%X, 0x%X)\n",
 			i, le32_to_cpu(ap->prd[i].addr), le32_to_cpu(ap->prd[i].flags_len));
 	}
@@ -1691,12 +1691,12 @@ static int ata_sg_setup_one(struct ata_queued_cmd *qc)
 
 	sg->page = virt_to_page(cmd->request_buffer);
 	sg->offset = (unsigned long) cmd->request_buffer & ~PAGE_MASK;
-	sg->length = cmd->request_bufflen;
+	sg_dma_len(sg) = cmd->request_bufflen;
 
 	if (!have_sg)
 		return 0;
 
-	sg->dma_address = pci_map_single(ap->host_set->pdev,
+	sg_dma_address(sg) = pci_map_single(ap->host_set->pdev,
 					 cmd->request_buffer,
 					 cmd->request_bufflen, dir);
 
@@ -1917,7 +1917,7 @@ static void ata_pio_sector(struct ata_port *ap)
 	qc->cursg_ofs++;
 
 	if (cmd->use_sg)
-		if ((qc->cursg_ofs * ATA_SECT_SIZE) == sg[qc->cursg].length) {
+		if ((qc->cursg_ofs * ATA_SECT_SIZE) == sg_dma_len(&sg[qc->cursg])) {
 			qc->cursg++;
 			qc->cursg_ofs = 0;
 		}

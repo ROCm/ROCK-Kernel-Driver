@@ -616,8 +616,8 @@ static void pdc20621_fill_sg(struct ata_queued_cmd *qc)
 	last = qc->n_elem;
 	idx = 0;
 	for (i = 0; i < last; i++) {
-		buf[idx++] = cpu_to_le32(sg[i].dma_address);
-		buf[idx++] = cpu_to_le32(sg[i].length);
+		buf[idx++] = cpu_to_le32(sg_dma_address(&sg[i]));
+		buf[idx++] = cpu_to_le32(sg_dma_len(&sg[i]));
 		total_len += sg[i].length;
 	}
 	buf[idx - 1] |= cpu_to_le32(ATA_PRD_EOT);
