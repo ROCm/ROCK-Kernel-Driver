@@ -369,4 +369,5 @@ if [ "$CONFIG_SH_STANDARD_BIOS" = "y" ]; then
 fi
 endmenu
 
+source security/Config.in
 source lib/Config.in

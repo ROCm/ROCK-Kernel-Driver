@@ -72,6 +72,7 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define MAY_EXEC 1
 #define MAY_WRITE 2
 #define MAY_READ 4
+#define MAY_APPEND 8
 
 #define FMODE_READ 1
 #define FMODE_WRITE 2
@@ -399,6 +400,7 @@ struct inode {
 	unsigned char		i_sock;
 
 	atomic_t		i_writecount;
+	void			*i_security;
 	__u32			i_generation;
 	union {
 		void				*generic_ip;
@@ -429,6 +431,7 @@ struct fown_struct {
 	int pid;		/* pid or -pgrp where SIGIO should be sent */
 	uid_t uid, euid;	/* uid/euid of process setting the owner */
 	int signum;		/* posix.1b rt signal to be delivered on IO */
+	void *security;
 };
 
 static inline void inode_add_bytes(struct inode *inode, loff_t bytes)
@@ -492,6 +495,7 @@ struct file {
 	struct file_ra_state	f_ra;
 
 	unsigned long		f_version;
+	void			*f_security;
 
 	/* needed for tty driver, and maybe others */
 	void			*private_data;
@@ -645,6 +649,7 @@ struct super_block {
 	int			s_count;
 	int			s_syncing;
 	atomic_t		s_active;
+	void                    *s_security;
 
 	struct list_head	s_dirty;	/* dirty inodes */
 	struct list_head	s_io;		/* parked for writeback */

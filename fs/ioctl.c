@@ -8,6 +8,7 @@
 #include <linux/smp_lock.h>
 #include <linux/file.h>
 #include <linux/fs.h>
+#include <linux/security.h>
 
 #include <asm/uaccess.h>
 #include <asm/ioctls.h>
@@ -57,6 +58,13 @@ asmlinkage long sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 	if (!filp)
 		goto out;
 	error = 0;
+
+	error = security_ops->file_ioctl(filp, cmd, arg);
+        if (error) {
+                fput(filp);
+                goto out;
+        }
+
 	lock_kernel();
 	switch (cmd) {
 		case FIOCLEX:
