@@ -480,10 +480,8 @@ static struct vortex_chip_info {
 } vortex_info_tbl[] __devinitdata = {
 	{"3c590 Vortex 10Mbps",
 	 PCI_USES_IO|PCI_USES_MASTER, IS_VORTEX, 32, },
-#define EISA_3C592_OFFSET 1		/* Offset of this entry for vortex_eisa_init */
 	{"3c592 EISA 10Mbps Demon/Vortex",					/* AKPM: from Don's 3c59x_cb.c 0.49H */
 	 PCI_USES_IO|PCI_USES_MASTER, IS_VORTEX, 32, },
-#define EISA_3C597_OFFSET 2		/* Offset of this entry for vortex_eisa_init */
 	{"3c597 EISA Fast Demon/Vortex",					/* AKPM: from Don's 3c59x_cb.c 0.49H */
 	 PCI_USES_IO|PCI_USES_MASTER, IS_VORTEX, 32, },
 	{"3c595 Vortex 100baseTx",
@@ -953,8 +951,8 @@ static int vortex_resume (struct pci_dev *pdev)
 
 #ifdef CONFIG_EISA
 static struct eisa_device_id vortex_eisa_ids[] = {
-	{ "TCM5920", EISA_3C592_OFFSET },
-	{ "TCM5970", EISA_3C597_OFFSET },
+	{ "TCM5920", CH_3C592 },
+	{ "TCM5970", CH_3C597 },
 	{ "" }
 };
 
@@ -1366,7 +1364,7 @@ static int __devinit vortex_probe1(struct device *gendev,
 	} else
 		dev->if_port = vp->default_media;
 
-	if ((vp->available_media & 0x4b) || (vci->drv_flags & HAS_NWAY) ||
+	if ((vp->available_media & 0x40) || (vci->drv_flags & HAS_NWAY) ||
 		dev->if_port == XCVR_MII || dev->if_port == XCVR_NWAY) {
 		int phy, phy_idx = 0;
 		EL3WINDOW(4);
