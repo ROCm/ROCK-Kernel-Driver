@@ -485,7 +485,6 @@ run_list_element *merge_run_lists(run_list_element *drl, run_list_element *srl)
 	finish = ((drl[dins].lcn >= LCN_RL_NOT_MAPPED) &&    /* End of file   */
 		 ((drl[dins].vcn + drl[dins].length) <=      /* End of hole   */
 		  (srl[send-1].vcn + srl[send-1].length)));
-		  //srl[send-1].vcn));
 
 	/* Or we'll lose an end marker */
 	if (start && finish && (drl[dins].length == 0))
@@ -510,9 +509,10 @@ run_list_element *merge_run_lists(run_list_element *drl, run_list_element *srl)
 		else
 			nrl = ntfs_rl_split   (drl, ds, srl + sstart, ss, dins);
 
-	if (marker) {
-		for (ds = 0; nrl[ds].lcn; ds++) ;
-		nrl = ntfs_rl_insert (nrl, ds+1, srl + marker, 1, ds-1);
+	if (marker && !IS_ERR(nrl)) {
+		for (ds = 0; nrl[ds].length; ds++)
+			;
+		nrl = ntfs_rl_insert(nrl, ds + 1, srl + marker, 1, ds);
 	}
 	}
 
@@ -1576,7 +1576,7 @@ attr_search_context *get_attr_search_ctx(ntfs_inode *ni, MFT_RECORD *mrec)
 	ctx = kmem_cache_alloc(ntfs_attr_ctx_cache, SLAB_NOFS);
 	if (ctx)
 		init_attr_search_ctx(ctx, ni, mrec);
-	return NULL;
+	return ctx;
 }
 
 /**

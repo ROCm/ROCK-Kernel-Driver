@@ -31,6 +31,10 @@
 
 #define MAX_BUF_PER_PAGE (PAGE_CACHE_SIZE / 512)
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,8)
+#define page_buffers(page)	(page)->buffers
+#endif
+
 /*
  * Async io completion handler for accessing files. Adapted from
  * end_buffer_read_mst_async().
@@ -110,7 +114,7 @@ static int ntfs_file_read_block(struct page *page)
 	blocksize = 1 << blocksize_bits;
 
 	create_empty_buffers(page, blocksize);
-	bh = head = page->buffers;
+	bh = head = page_buffers(page);
 	if (!bh)
 		return -ENOMEM;
 
@@ -387,7 +391,7 @@ static int ntfs_mftbmp_readpage(ntfs_volume *vol, struct page *page)
 	blocksize_bits = vol->sb->s_blocksize_bits;
 	
 	create_empty_buffers(page, blocksize);
-	bh = head = page->buffers;
+	bh = head = page_buffers(page);
 	if (!bh)
 		return -ENOMEM;
 	
@@ -621,7 +625,7 @@ int ntfs_mst_readpage(struct file *dir, struct page *page)
 	blocksize = 1 << blocksize_bits;
 
 	create_empty_buffers(page, blocksize);
-	bh = head = page->buffers;
+	bh = head = page_buffers(page);
 	if (!bh)
 		return -ENOMEM;
 

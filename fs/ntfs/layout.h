@@ -81,8 +81,15 @@ typedef struct {
 	u8  jump[3];			/* Irrelevant (jump to boot up code).*/
 	u64 oem_id;			/* Magic "NTFS    ". */
 	BIOS_PARAMETER_BLOCK bpb;	/* See BIOS_PARAMETER_BLOCK. */
-	u8  unused[4];			/* zero */
-	s64 number_of_sectors;		/* Number of sectors in volume. Gives
+	u8  unused[4];			/* zero, NTFS diskedit.exe states that
+					   this is actually:
+						__u8 physical_drive;	// 0x80
+						__u8 current_head;	// zero
+						__u8 extended_boot_signature;
+									// 0x80
+						__u8 unused;		// zero
+					 */
+/*0x28*/s64 number_of_sectors;		/* Number of sectors in volume. Gives
 					   maximum volume size of 2^63 sectors.
 					   Assuming standard sector size of 512
 					   bytes, the maximum byte size is
@@ -95,9 +102,10 @@ typedef struct {
 	u8  reserved1[3];		/* zero */
 	u64 volume_serial_number;	/* Irrelevant (serial number). */
 	u32 checksum;			/* Boot sector checksum. */
-	u8  bootstrap[426];		/* Irrelevant (boot up code). */
+/*0x54*/u8  bootstrap[426];		/* Irrelevant (boot up code). */
 	u16 end_of_sector_marker;	/* End of bootsector magic. Always is
 					   0xaa55 in little endian. */
+/* sizeof() = 512 (0x200) bytes */
 } __attribute__ ((__packed__)) NTFS_BOOT_SECTOR;
 
 /*
@@ -174,8 +182,10 @@ typedef enum {
 	FILE_MFT       = 0,	/* Master file table (mft). Data attribute
 				   contains the entries and bitmap attribute
 				   records which ones are in use (bit==1). */
-	FILE_MFTMirr   = 1,	/* Mft mirror (copy of first four mft records)
-				   in data attribute. */
+	FILE_MFTMirr   = 1,	/* Mft mirror: copy of first four mft records
+				   in data attribute. If cluster size > 4kiB,
+				   copy of first N mft records, with
+					N = cluster_size / mft_record_size. */
 	FILE_LogFile   = 2,	/* Journalling log in data attribute. */
 	FILE_Volume    = 3,	/* Volume name attribute and volume information
 				   attribute (flags and ntfs version). Windows

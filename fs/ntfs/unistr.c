@@ -327,12 +327,12 @@ int ntfs_ucstonls(const ntfs_volume *vol, const uchar_t *ins,
 	if (ins) {
 		ns = *outs;
 		ns_len = outs_len;
-		if (!ns_len) {
+		if (ns && !ns_len) {
 			wc = -ENAMETOOLONG;
 			goto conversion_err;
 		}
 		if (!ns) {
-			ns_len = ins_len * 3;
+			ns_len = ins_len * NLS_MAX_CHARSET_SIZE;
 			ns = (unsigned char*)kmalloc(ns_len, GFP_NOFS);
 			if (!ns)
 				goto mem_err_out;
@@ -347,12 +347,12 @@ retry:			wc = nls->uni2char(le16_to_cpu(ins[i]), ns + o,
 				break;
 			else if (wc == -ENAMETOOLONG && ns != *outs) {
 				unsigned char *tc;
-				/* Grow by 64 bytes. (Chosen at random.) */
-				tc = (unsigned char*)kmalloc(ns_len + 64,
-						GFP_NOFS);
+				/* Grow in multiples of 64 bytes. */
+				tc = (unsigned char*)kmalloc((ns_len + 64) &
+						~63, GFP_NOFS);
 				if (tc) {
 					memcpy(tc, ns, ns_len);
-					ns_len += 64;
+					ns_len = (ns_len + 64) & ~63;
 					kfree(ns);
 					ns = tc;
 					goto retry;
@@ -364,7 +364,7 @@ retry:			wc = nls->uni2char(le16_to_cpu(ins[i]), ns + o,
 		*outs = ns;
 		return o;
 	} /* else (!ins) */
-	ntfs_error(NULL, "Received NULL pointer.");
+	ntfs_error(vol->sb, "Received NULL pointer.");
 	return -EINVAL;
 conversion_err:
 	ntfs_error(vol->sb, "Unicode name contains characters that cannot be "
