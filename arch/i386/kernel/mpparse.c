@@ -1102,11 +1102,12 @@ void __init mp_parse_prt (void)
 		if (!io_apic_set_pci_routing(ioapic, ioapic_pin, gsi, edge_level, active_high_low)) {
 			acpi_gsi_to_irq(gsi, &entry->irq);
 		}
-		printk(KERN_DEBUG "%02x:%02x:%02x[%c] -> %d-%d -> IRQ %d\n",
+		printk(KERN_DEBUG "%02x:%02x:%02x[%c] -> %d-%d -> IRQ %d %s %s\n",
 			entry->id.segment, entry->id.bus,
 			entry->id.device, ('A' + entry->pin),
 			mp_ioapic_routing[ioapic].apic_id, ioapic_pin,
-			entry->irq);
+			entry->irq, edge_level ? "level" : "edge",
+			active_high_low ? "low" : "high");
 	}
 
 	print_IO_APIC();
