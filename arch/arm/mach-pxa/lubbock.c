@@ -146,7 +146,7 @@ static void __init lubbock_map_io(void)
 
 MACHINE_START(LUBBOCK, "Intel DBPXA250 Development Platform")
 	MAINTAINER("MontaVista Software Inc.")
-	BOOT_MEM(0xa0000000, 0x40000000, 0xfc000000)
+	BOOT_MEM(0xa0000000, 0x40000000, io_p2v(0x40000000))
 	MAPIO(lubbock_map_io)
 	INITIRQ(lubbock_init_irq)
 MACHINE_END

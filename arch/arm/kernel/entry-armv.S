@@ -590,7 +590,7 @@ ENTRY(anakin_active_irqs)
 		.endm
 
 		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
-		mov	\base, #0xfc000000		@ IIR Ctl = 0xfcd00000
+		mov	\base, #io_p2v(0x40000000)	@ IIR Ctl = 0x40d00000
 		add	\base, \base, #0x00d00000
 		ldr	\irqstat, [\base, #0]		@ ICIP
 		ldr	\irqnr, [\base, #4]		@ ICMR

@@ -27,17 +27,27 @@
 
 
 /*
- * Intel PXA internal I/O mappings
+ * We requires absolute addresses.
+ */
+#define PCIO_BASE		0
+
+/*
+ * Workarounds for at least 2 errata so far require this.
+ * The mapping is set in mach-pxa/generic.c.
+ */
+#define UNCACHED_PHYS_0		0xff000000
+#define UNCACHED_ADDR		UNCACHED_PHYS_0
+
+/*
+ * Intel PXA internal I/O mappings:
+ *
+ * 0x40000000 - 0x41ffffff <--> 0xf8000000 - 0xf9ffffff
+ * 0x44000000 - 0x45ffffff <--> 0xfa000000 - 0xfbffffff
+ * 0x48000000 - 0x49ffffff <--> 0xfc000000 - 0xfdffffff
  */
 
-#define io_p2v(x)	\
-	(((x) < 0x44000000) ? ((x) - 0x40000000 + 0xfc000000) :	\
-	 ((x) < 0x48000000) ? ((x) - 0x44000000 + 0xfe000000) :	\
-	 		      ((x) - 0x48000000 + 0xff000000))
-#define io_v2p( x )	\
-	(((x) < 0xfe000000) ? ((x) - 0xfc000000 + 0x40000000) :	\
-	 ((x) < 0xff000000) ? ((x) - 0xfe000000 + 0x44000000) :	\
-	 		      ((x) - 0xff000000 + 0x48000000))
+#define io_p2v(x)	( ((x) | 0xbe000000) ^ (~((x) >> 1) & 0x06000000) )
+#define io_v2p( x )	( ((x) & 0x41ffffff) ^ ( ((x) & 0x06000000) << 1) )
 
 #ifndef __ASSEMBLY__
 
@@ -51,7 +61,7 @@
  * doesn't guess this by itself.
  */
 #include <asm/types.h>
-typedef struct { volatile u32 offset[1024]; } __regbase;
+typedef struct { volatile u32 offset[4096]; } __regbase;
 # define __REGP(x)	((__regbase *)((x)&~4095))->offset[((x)&4095)>>2]
 # define __REG(x)	__REGP(io_p2v(x))
 #endif
@@ -93,5 +103,6 @@ extern unsigned int get_lclk_frequency_10khz(void);
 
 #include "lubbock.h"
 #include "idp.h"
+#include "cerf.h"
 
 #endif  /* _ASM_ARCH_HARDWARE_H */
