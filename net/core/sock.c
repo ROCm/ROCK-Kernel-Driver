@@ -806,6 +806,7 @@ struct sk_buff *sock_alloc_send_pskb(struct sock *sk, unsigned long header_len,
 					page = alloc_pages(sk->allocation, 0);
 					if (!page) {
 						err = -ENOBUFS;
+						skb_shinfo(skb)->nr_frags = i;
 						kfree_skb(skb);
 						goto failure;
 					}
