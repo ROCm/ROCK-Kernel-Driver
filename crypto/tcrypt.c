@@ -982,6 +982,14 @@ test_des(void)
 	memcpy(tvmem, des_cbc_enc_tv_template, tsize);
 	des_tv = (void *) tvmem;
 
+	crypto_cipher_set_iv(tfm, des_tv[i].iv, crypto_tfm_alg_ivsize(tfm));
+	crypto_cipher_get_iv(tfm, res, crypto_tfm_alg_ivsize(tfm));
+	
+	if (memcmp(res, des_tv[i].iv, sizeof(res))) {
+		printk("crypto_cipher_[set|get]_iv() failed\n");
+		goto out;
+	}
+	
 	for (i = 0; i < DES_CBC_ENC_TEST_VECTORS; i++) {
 		printk("test %d:\n", i + 1);
 
@@ -1000,8 +1008,8 @@ test_des(void)
 		sg[0].offset = ((long) p & ~PAGE_MASK);
 		sg[0].length = len;
 
-		crypto_cipher_copy_iv(tfm, des_tv[i].iv,
-				      crypto_tfm_alg_ivsize(tfm));
+		crypto_cipher_set_iv(tfm, des_tv[i].iv,
+				     crypto_tfm_alg_ivsize(tfm));
 
 		ret = crypto_cipher_encrypt(tfm, sg, 1);
 		if (ret) {
@@ -1060,7 +1068,7 @@ test_des(void)
 	sg[1].offset = ((long) p & ~PAGE_MASK);
 	sg[1].length = 11;
 
-	crypto_cipher_copy_iv(tfm, des_tv[i].iv, crypto_tfm_alg_ivsize(tfm));
+	crypto_cipher_set_iv(tfm, des_tv[i].iv, crypto_tfm_alg_ivsize(tfm));
 
 	ret = crypto_cipher_encrypt(tfm, sg, 2);
 	if (ret) {
@@ -1108,7 +1116,7 @@ test_des(void)
 		sg[0].offset = ((long) p & ~PAGE_MASK);
 		sg[0].length = len;
 
-		crypto_cipher_copy_iv(tfm, des_tv[i].iv,
+		crypto_cipher_set_iv(tfm, des_tv[i].iv,
 				      crypto_tfm_alg_blocksize(tfm));
 
 		ret = crypto_cipher_decrypt(tfm, sg, 1);
@@ -1161,7 +1169,7 @@ test_des(void)
 	sg[1].offset = ((long) p & ~PAGE_MASK);
 	sg[1].length = 4;
 
-	crypto_cipher_copy_iv(tfm, des_tv[i].iv, crypto_tfm_alg_ivsize(tfm));
+	crypto_cipher_set_iv(tfm, des_tv[i].iv, crypto_tfm_alg_ivsize(tfm));
 
 	ret = crypto_cipher_decrypt(tfm, sg, 2);
 	if (ret) {

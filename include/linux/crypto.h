@@ -275,11 +275,18 @@ static inline int crypto_cipher_decrypt(struct crypto_tfm *tfm,
 	return tfm->crt_cipher.cit_decrypt(tfm, sg, nsg);
 }
 
-static inline void crypto_cipher_copy_iv(struct crypto_tfm *tfm,
-                                         u8 *src, size_t len)
+static inline void crypto_cipher_set_iv(struct crypto_tfm *tfm,
+                                        u8 *src, size_t len)
 {
 	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_CIPHER);
 	memcpy(tfm->crt_cipher.cit_iv, src, len);
+}
+
+static inline void crypto_cipher_get_iv(struct crypto_tfm *tfm,
+                                        u8 *dst, size_t len)
+{
+	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_CIPHER);
+	memcpy(dst, tfm->crt_cipher.cit_iv, len);
 }
 
 static inline void crypto_comp_compress(struct crypto_tfm *tfm)
