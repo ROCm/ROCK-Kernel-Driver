@@ -141,19 +141,8 @@ _unlock_tx_hashtbl(struct bonding *bond)
 
 /* Caller must hold tx_hashtbl lock */
 static inline void
-tlb_init_table_entry(struct bonding *bond, u8 index, u8 save_load)
+tlb_init_table_entry(struct tlb_client_info *entry, u8 save_load)
 {
-	struct tlb_client_info *entry;
-
-	if (BOND_ALB_INFO(bond).tx_hashtbl == NULL) {
-		return;
-	}
-
-	entry = &(BOND_ALB_INFO(bond).tx_hashtbl[index]);
-	/* at end of cycle, save the load that was transmitted to the client
-	 * during the cycle, and set the tx_bytes counter to 0 for counting
-	 * the load during the next cycle
-	 */
 	if (save_load) {
 		entry->load_history = 1 + entry->tx_bytes /
 			BOND_TLB_REBALANCE_INTERVAL;
@@ -167,10 +156,8 @@ tlb_init_table_entry(struct bonding *bond, u8 index, u8 save_load)
 static inline void
 tlb_init_slave(struct slave *slave)
 {
-	struct tlb_slave_info *slave_info = &(SLAVE_TLB_INFO(slave));
-
-	slave_info->load = 0;
-	slave_info->head = TLB_NULL_INDEX;
+	SLAVE_TLB_INFO(slave).load = 0;
+	SLAVE_TLB_INFO(slave).head = TLB_NULL_INDEX;
 }
 
 /* Caller must hold bond lock for read */
@@ -178,19 +165,17 @@ static inline void
 tlb_clear_slave(struct bonding *bond, struct slave *slave, u8 save_load)
 {
 	struct tlb_client_info *tx_hash_table = NULL;
-	u32 index, next_index;
+	u32 index;
 
-	/* clear slave from tx_hashtbl */
 	_lock_tx_hashtbl(bond);
+	/* clear slave from tx_hashtbl */
 	tx_hash_table = BOND_ALB_INFO(bond).tx_hashtbl;
 
-	if (tx_hash_table) {
-		index = SLAVE_TLB_INFO(slave).head;
-		while (index != TLB_NULL_INDEX) {
-			next_index = tx_hash_table[index].next;
-			tlb_init_table_entry(bond, index, save_load);
-			index = next_index;
-		}
+	index = SLAVE_TLB_INFO(slave).head;
+	while (index != TLB_NULL_INDEX) {
+		u32 next_index = tx_hash_table[index].next;
+		tlb_init_table_entry(&tx_hash_table[index], save_load);
+		index = next_index;
 	}
 	_unlock_tx_hashtbl(bond);
 
@@ -205,21 +190,9 @@ tlb_initialize(struct bonding *bond)
 	int i;
 	size_t size;
 
-#if(TLB_HASH_TABLE_SIZE != 256)
-	/* Key to the hash table is byte wide. Check the size! */
-	#error Hash Table size is wrong.
-#endif
-
 	spin_lock_init(&(bond_info->tx_hashtbl_lock));
 
 	_lock_tx_hashtbl(bond);
-	if (bond_info->tx_hashtbl != NULL) {
-		printk(KERN_ERR DRV_NAME
-		       ": Error: %s: TLB hash table is not NULL\n",
-		       bond->device->name);
-		_unlock_tx_hashtbl(bond);
-		return -1;
-	}
 
 	size = TLB_HASH_TABLE_SIZE * sizeof(struct tlb_client_info);
 	bond_info->tx_hashtbl = kmalloc(size, GFP_KERNEL);
@@ -233,7 +206,7 @@ tlb_initialize(struct bonding *bond)
 
 	memset(bond_info->tx_hashtbl, 0, size);
 	for (i=0; i<TLB_HASH_TABLE_SIZE; i++) {
-		tlb_init_table_entry(bond, i, 1);
+		tlb_init_table_entry(&bond_info->tx_hashtbl[i], 1);
 	}
 	_unlock_tx_hashtbl(bond);
 
@@ -247,10 +220,6 @@ tlb_deinitialize(struct bonding *bond)
 	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
 
 	_lock_tx_hashtbl(bond);
-	if (bond_info->tx_hashtbl == NULL) {
-		_unlock_tx_hashtbl(bond);
-		return;
-	}
 	kfree(bond_info->tx_hashtbl);
 	bond_info->tx_hashtbl = NULL;
 	_unlock_tx_hashtbl(bond);
@@ -309,14 +278,6 @@ tlb_choose_channel(struct bonding *bond, u32 hash_index, u32 skb_len)
 	_lock_tx_hashtbl(bond);
 
 	hash_table = bond_info->tx_hashtbl;
-	if (hash_table == NULL) {
-		printk(KERN_ERR DRV_NAME
-		       ": Error: %s: TLB hash table is NULL\n",
-		       bond->device->name);
-		_unlock_tx_hashtbl(bond);
-		return NULL;
-	}
-
 	assigned_slave = hash_table[hash_index].tx_slave;
 	if (!assigned_slave) {
 		assigned_slave = tlb_get_least_loaded_slave(bond);
@@ -374,10 +335,6 @@ rlb_update_entry_from_arp(struct bonding *bond, struct arp_pkt *arp)
 
 	_lock_rx_hashtbl(bond);
 
-	if (bond_info->rx_hashtbl == NULL) {
-		_unlock_rx_hashtbl(bond);
-		return;
-	}
 	hash_index = _simple_hash((u8*)&(arp->ip_src), 4);
 	client_info = &(bond_info->rx_hashtbl[hash_index]);
 
@@ -500,13 +457,8 @@ rlb_clear_slave(struct bonding *bond, struct slave *slave)
 
 	/* clear slave from rx_hashtbl */
 	_lock_rx_hashtbl(bond);
+
 	rx_hash_table = bond_info->rx_hashtbl;
-
-	if (rx_hash_table == NULL) {
-		_unlock_rx_hashtbl(bond);
-		return;
-	}
-
 	index = bond_info->rx_hashtbl_head;
 	for (; index != RLB_NULL_INDEX; index = next_index) {
 		next_index = rx_hash_table[index].next;
@@ -575,11 +527,6 @@ rlb_update_rx_clients(struct bonding *bond)
 
 	_lock_rx_hashtbl(bond);
 
-	if (bond_info->rx_hashtbl == NULL) {
-		_unlock_rx_hashtbl(bond);
-		return;
-	}
-
 	hash_index = bond_info->rx_hashtbl_head;
 	for (; hash_index != RLB_NULL_INDEX; hash_index = client_info->next) {
 		client_info = &(bond_info->rx_hashtbl[hash_index]);
@@ -610,11 +557,6 @@ rlb_req_update_slave_clients(struct bonding *bond, struct slave *slave)
 	struct rlb_client_info *client_info = NULL;
 
 	_lock_rx_hashtbl(bond);
-
-	if (bond_info->rx_hashtbl == NULL) {
-		_unlock_rx_hashtbl(bond);
-		return;
-	}
 
 	hash_index = bond_info->rx_hashtbl_head;
 	for (; hash_index != RLB_NULL_INDEX; hash_index = client_info->next) {
@@ -647,11 +589,6 @@ rlb_req_update_subnet_clients(struct bonding *bond, u32 src_ip)
 	struct rlb_client_info *client_info = NULL;
 
 	_lock_rx_hashtbl(bond);
-
-	if (bond_info->rx_hashtbl == NULL) {
-		_unlock_rx_hashtbl(bond);
-		return;
-	}
 
 	hash_index = bond_info->rx_hashtbl_head;
 	for (; hash_index != RLB_NULL_INDEX; hash_index = client_info->next) {
@@ -690,11 +627,6 @@ rlb_choose_channel(struct bonding *bond, struct arp_pkt *arp)
 	u8 mac_bcast[ETH_ALEN] = {0xff,0xff,0xff,0xff,0xff,0xff};
 
 	_lock_rx_hashtbl(bond);
-
-	if (bond_info->rx_hashtbl == NULL) {
-		_unlock_rx_hashtbl(bond);
-		return NULL;
-	}
 
 	hash_index = _simple_hash((u8 *)&arp->ip_dst, 4);
 	client_info = &(bond_info->rx_hashtbl[hash_index]);
@@ -821,11 +753,6 @@ rlb_rebalance(struct bonding *bond)
 
 	_lock_rx_hashtbl(bond);
 
-	if (bond_info->rx_hashtbl == NULL) {
-		_unlock_rx_hashtbl(bond);
-		return;
-	}
-
 	hash_index = bond_info->rx_hashtbl_head;
 	for (; hash_index != RLB_NULL_INDEX; hash_index = client_info->next) {
 		client_info = &(bond_info->rx_hashtbl[hash_index]);
@@ -848,10 +775,9 @@ rlb_rebalance(struct bonding *bond)
 static inline void
 rlb_init_table_entry(struct rlb_client_info *entry)
 {
+	memset(entry, 0, sizeof(struct rlb_client_info));
 	entry->next = RLB_NULL_INDEX;
 	entry->prev = RLB_NULL_INDEX;
-	entry->assigned = 0;
-	entry->ntt = 0;
 }
 
 static int
@@ -865,13 +791,6 @@ rlb_initialize(struct bonding *bond)
 	spin_lock_init(&(bond_info->rx_hashtbl_lock));
 
 	_lock_rx_hashtbl(bond);
-	if (bond_info->rx_hashtbl != NULL) {
-		printk(KERN_ERR DRV_NAME
-		       ": Error: %s: RLB hash table is not NULL\n",
-		       bond->device->name);
-		_unlock_rx_hashtbl(bond);
-		return -1;
-	}
 
 	size = RLB_HASH_TABLE_SIZE * sizeof(struct rlb_client_info);
 	bond_info->rx_hashtbl = kmalloc(size, GFP_KERNEL);
@@ -890,13 +809,12 @@ rlb_initialize(struct bonding *bond)
 	}
 	_unlock_rx_hashtbl(bond);
 
-	/* register to receive ARPs */
-
 	/*initialize packet type*/
 	pk_type->type = __constant_htons(ETH_P_ARP);
 	pk_type->dev = bond->device;
 	pk_type->func = rlb_arp_recv;
 
+	/* register to receive ARPs */
 	dev_add_pack(pk_type);
 
 	return 0;
@@ -910,10 +828,6 @@ rlb_deinitialize(struct bonding *bond)
 	dev_remove_pack(&(bond_info->rlb_pkt_type));
 
 	_lock_rx_hashtbl(bond);
-	if (bond_info->rx_hashtbl == NULL) {
-		_unlock_rx_hashtbl(bond);
-		return;
-	}
 	kfree(bond_info->rx_hashtbl);
 	bond_info->rx_hashtbl = NULL;
 	_unlock_rx_hashtbl(bond);
