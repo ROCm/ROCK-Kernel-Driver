@@ -378,6 +378,25 @@ acpi_scan_rsdp (
 	return 0;
 }
 
+static int __init acpi_parse_sbf(unsigned long phys_addr, unsigned long size)
+{
+	struct acpi_table_sbf *sb;
+
+	if (!phys_addr || !size)
+	return -EINVAL;
+
+	sb = (struct acpi_table_sbf *) __acpi_map_table(phys_addr, size);
+	if (!sb) {
+		printk(KERN_WARNING PREFIX "Unable to map SBF\n");
+		return -ENODEV;
+	}
+
+	sbf_port = sb->sbf_cmos; /* Save CMOS port */
+
+	return 0;
+}
+
+
 #ifdef CONFIG_HPET_TIMER
 extern unsigned long hpet_address;
 
@@ -646,6 +665,8 @@ acpi_boot_init (void)
 		acpi_disabled = 1;
 		return error;
 	}
+
+	(void) acpi_table_parse(ACPI_BOOT, acpi_parse_sbf);
 
 	/*
 	 * blacklist may disable ACPI entirely

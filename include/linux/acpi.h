@@ -233,8 +233,27 @@ struct acpi_table_hpet {
 } __attribute__ ((packed));
 
 /*
+ * Simple Boot Flags
+ * http://www.microsoft.com/whdc/hwdev/resources/specs/simp_bios.mspx
+ */
+struct acpi_table_sbf
+{
+	u8 sbf_signature[4];
+	u32 sbf_len;
+	u8 sbf_revision;
+	u8 sbf_csum;
+	u8 sbf_oemid[6];
+	u8 sbf_oemtable[8];
+	u8 sbf_revdata[4];
+	u8 sbf_creator[4];
+	u8 sbf_crearev[4];
+	u8 sbf_cmos;
+	u8 sbf_spare[3];
+} __attribute__ ((packed));
+
+/*
  * System Resource Affinity Table (SRAT)
- *   see http://www.microsoft.com/hwdev/design/srat.htm
+ * http://www.microsoft.com/whdc/hwdev/platform/proc/SRAT.mspx
  */
 
 struct acpi_table_srat {
@@ -380,6 +399,8 @@ void acpi_numa_arch_fixup(void);
 extern int acpi_mp_config;
 
 extern u32 pci_mmcfg_base_addr;
+
+extern int sbf_port ;
 
 #else	/*!CONFIG_ACPI_BOOT*/
 
