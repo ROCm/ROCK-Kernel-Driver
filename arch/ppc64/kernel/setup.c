@@ -153,14 +153,18 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 	debugger_dabr_match = xmon_dabr_match;
 #endif
 
+#ifdef CONFIG_PPC_ISERIES
 	/* pSeries systems are identified in prom.c via OF. */
 	if ( itLpNaca.xLparInstalled == 1 )
 		naca->platform = PLATFORM_ISERIES_LPAR;
+#endif
 	
 	switch (naca->platform) {
+#ifdef CONFIG_PPC_ISERIES
 	case PLATFORM_ISERIES_LPAR:
 		iSeries_init_early();
 		break;
+#endif
 
 #ifdef CONFIG_PPC_PSERIES
 	case PLATFORM_PSERIES:
@@ -215,9 +219,11 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 	mm_init_ppc64();
 
 	switch (naca->platform) {
+#ifdef CONFIG_PPC_ISERIES
 	case PLATFORM_ISERIES_LPAR:
 		iSeries_init();
 		break;
+#endif
 	default:
 		/* The following relies on the device tree being */
 		/* fully configured.                             */
