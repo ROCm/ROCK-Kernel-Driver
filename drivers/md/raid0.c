@@ -366,11 +366,11 @@ static int raid0_status (char *page, mddev_t *mddev)
 
 static mdk_personality_t raid0_personality=
 {
-	name:		"raid0",
-	make_request:	raid0_make_request,
-	run:		raid0_run,
-	stop:		raid0_stop,
-	status:		raid0_status,
+	.name		= "raid0",
+	.make_request	= raid0_make_request,
+	.run		= raid0_run,
+	.stop		= raid0_stop,
+	.status		= raid0_status,
 };
 
 static int __init raid0_init (void)

@@ -118,14 +118,14 @@ static devfs_handle_t devfs_handle;
 
 static struct gendisk md_gendisk=
 {
-	major: MD_MAJOR,
-	major_name: "md",
-	minor_shift: 0,
-	part: md_hd_struct,
-	sizes: md_size,
-	nr_real: MAX_MD_DEVS,
-	next: NULL,
-	fops: &md_fops,
+	.major		= MD_MAJOR,
+	.major_name	= "md",
+	.minor_shift	= 0,
+	.part		= md_hd_struct,
+	.sizes		= md_size,
+	.nr_real	= MAX_MD_DEVS,
+	.next		= NULL,
+	.fops		= &md_fops,
 };
 
 /*
@@ -2474,10 +2474,10 @@ static int md_release(struct inode *inode, struct file * file)
 
 static struct block_device_operations md_fops =
 {
-	owner:		THIS_MODULE,
-	open:		md_open,
-	release:	md_release,
-	ioctl:		md_ioctl,
+	.owner		= THIS_MODULE,
+	.open		= md_open,
+	.release	= md_release,
+	.ioctl		= md_ioctl,
 };
 
 
@@ -3165,9 +3165,9 @@ int md_notify_reboot(struct notifier_block *this,
 }
 
 struct notifier_block md_notifier = {
-	notifier_call:	md_notify_reboot,
-	next:		NULL,
-	priority:	INT_MAX, /* before any real devices */
+	.notifier_call	= md_notify_reboot,
+	.next		= NULL,
+	.priority	= INT_MAX, /* before any real devices */
 };
 
 static void md_geninit(void)

@@ -562,14 +562,14 @@ static int multipath_stop (mddev_t *mddev)
 
 static mdk_personality_t multipath_personality=
 {
-	name:		"multipath",
-	make_request:	multipath_make_request,
-	run:		multipath_run,
-	stop:		multipath_stop,
-	status:		multipath_status,
-	error_handler:	multipath_error,
-	hot_add_disk:	multipath_add_disk,
-	hot_remove_disk:multipath_remove_disk,
+	.name		= "multipath",
+	.make_request	= multipath_make_request,
+	.run		= multipath_run,
+	.stop		= multipath_stop,
+	.status		= multipath_status,
+	.error_handler	= multipath_error,
+	.hot_add_disk	= multipath_add_disk,
+	.hot_remove_disk= multipath_remove_disk,
 };
 
 static int __init multipath_init (void)
