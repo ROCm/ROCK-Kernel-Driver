@@ -45,7 +45,6 @@ const char * osst_version = "0.99.0";
 #include <linux/fcntl.h>
 #include <linux/spinlock.h>
 #include <linux/vmalloc.h>
-#include <linux/version.h>
 #include <linux/blkdev.h>
 #include <linux/devfs_fs_kernel.h>
 #include <asm/uaccess.h>

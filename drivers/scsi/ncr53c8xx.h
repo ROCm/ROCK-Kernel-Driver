@@ -42,12 +42,6 @@
 #ifndef NCR53C8XX_H
 #define NCR53C8XX_H
 
-/*
-**	Define the BSD style u_int32 and u_int64 type.
-**	Are in fact u_int32_t and u_int64_t :-)
-*/
-typedef u32 u_int32;
-typedef u64 u_int64;
 typedef	u_long		vm_offset_t;
 
 #include "sym53c8xx_defs.h"
@@ -100,7 +94,7 @@ typedef struct {
 **
 **==========================================================
 */
-typedef struct {
+struct ncr_device {
 	struct device  *dev;
 	ncr_slot  slot;
 	ncr_chip  chip;
@@ -111,9 +105,9 @@ typedef struct {
 #endif
 	__u8 differential;
 	int attach_done;
-} ncr_device;
+};
 
-extern struct Scsi_Host *ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device);
+extern struct Scsi_Host *ncr_attach (Scsi_Host_Template *tpnt, int unit, struct ncr_device *device);
 extern int ncr53c8xx_release(struct Scsi_Host *host);
 irqreturn_t ncr53c8xx_intr(int irq, void *dev_id, struct pt_regs * regs);
 

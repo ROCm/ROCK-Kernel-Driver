@@ -85,12 +85,11 @@ void scsi_proc_hostdir_add(struct scsi_host_template *sht)
 	down(&global_host_template_sem);
 	if (!sht->present++) {
 		sht->proc_dir = proc_mkdir(sht->proc_name, proc_scsi);
-        	if (!sht->proc_dir) {
+        	if (!sht->proc_dir)
 			printk(KERN_ERR "%s: proc_mkdir failed for %s\n",
 			       __FUNCTION__, sht->proc_name);
-			return;
-		}
-		sht->proc_dir->owner = sht->module;
+		else
+			sht->proc_dir->owner = sht->module;
 	}
 	up(&global_host_template_sem);
 }
@@ -216,7 +215,7 @@ static int scsi_remove_single_device(uint host, uint channel, uint id, uint lun)
 	sdev = scsi_find_device(shost, channel, id, lun);
 	if (!sdev)
 		goto out;
-	if (sdev->access_count)
+	if (atomic_read(&sdev->access_count))
 		goto out;
 
 	scsi_remove_device(sdev);

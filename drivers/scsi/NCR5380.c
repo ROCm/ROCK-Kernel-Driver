@@ -390,6 +390,7 @@ static int NCR5380_poll_politely(struct Scsi_Host *instance, int reg, int bit, i
 	return -ETIMEDOUT;
 }
 
+#ifdef NDEBUG
 static struct {
 	unsigned char value;
 	const char *name;
@@ -403,7 +404,6 @@ static struct {
 	{PHASE_UNKNOWN, "UNKNOWN"}
 };
 
-#ifdef NDEBUG
 static struct {
 	unsigned char mask;
 	const char *name;
