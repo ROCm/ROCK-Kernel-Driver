@@ -240,15 +240,18 @@ static unsigned long get_offset_pmtmr(void)
 
 
 /* acpi timer_opts struct */
-struct timer_opts timer_pmtmr = {
+static struct timer_opts timer_pmtmr = {
 	.name			= "pmtmr",
-	.init 			= init_pmtmr,
 	.mark_offset		= mark_offset_pmtmr,
 	.get_offset		= get_offset_pmtmr,
 	.monotonic_clock 	= monotonic_clock_pmtmr,
 	.delay 			= delay_pmtmr,
 };
 
+struct init_timer_opts __initdata timer_pmtmr_init = {
+	.init = init_pmtmr,
+	.opts = &timer_pmtmr,
+};
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Dominik Brodowski <linux@brodo.de>");
