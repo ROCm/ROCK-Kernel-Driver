@@ -52,6 +52,8 @@ static wait_queue_head_t congestion_wqh[2] = {
  */
 static struct workqueue_struct *kblockd_workqueue; 
 
+int dev_check_rdonly(dev_t dev);
+
 unsigned long blk_max_low_pfn, blk_max_pfn;
 
 EXPORT_SYMBOL(blk_max_low_pfn);

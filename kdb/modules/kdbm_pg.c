@@ -167,11 +167,11 @@ kdbm_page(int argc, const char **argv, const char **envp,
 		return(diag);
 
 	kdb_printf("struct page at 0x%lx\n", addr);
-	kdb_printf("  next 0x%p prev 0x%p addr space 0x%p index %lu (offset 0x%llx)\n",
-		   page.list.next, page.list.prev, page.mapping, page.index,
+	kdb_printf("  lrunext 0x%p lruprev 0x%p addr space 0x%p index %lu (offset 0x%llx)\n",
+		   page.lru.next, page.lru.prev, page.mapping, page.index,
 		   (unsigned long long)page.index << PAGE_CACHE_SHIFT);
 	kdb_printf("  count %d flags %s\n",
-		   page.count.counter, page_flags(page.flags));
+		   page_count(&page), page_flags(page.flags));
 	kdb_printf("  virtual 0x%p\n", page_address((struct page *)addr));
 	if (page_has_buffers(&page))
 		kdb_printf("  buffers 0x%p\n", page_buffers(&page));
@@ -487,7 +487,7 @@ kdbm_memmap(int argc, const char **argv, const char **envp,
         struct pt_regs *regs)
 {
 	struct page	page;
-	int		i, page_count;
+	int		i, my_page_count;
 	int		slab_count = 0;
 	int		dirty_count = 0;
 	int		locked_count = 0;
@@ -500,10 +500,10 @@ kdbm_memmap(int argc, const char **argv, const char **envp,
 	unsigned long addr;
 
 	addr = (unsigned long)mem_map;
-	page_count = max_mapnr;
+	my_page_count = max_mapnr;
 	memset(page_counts, 0, sizeof(page_counts));
 
-	for (i = 0; i < page_count; i++) {
+	for (i = 0; i < my_page_count; i++) {
 		if ((diag = kdb_getarea(page, addr)))
 			return(diag);
 		addr += sizeof(page);
@@ -514,8 +514,8 @@ kdbm_memmap(int argc, const char **argv, const char **envp,
 			dirty_count++;
 		if (PageLocked(&page))
 			locked_count++;
-		if (page.count.counter < 8)
-			page_counts[page.count.counter]++;
+		if (page_count(&page) < 8)
+			page_counts[page_count(&page)]++;
 		else
 			page_counts[8]++;
 		if (page_has_buffers(&page)) {
@@ -528,7 +528,7 @@ kdbm_memmap(int argc, const char **argv, const char **envp,
 
 	}
 
-	kdb_printf("  Total pages:      %6d\n", page_count);
+	kdb_printf("  Total pages:      %6d\n", my_page_count);
 	kdb_printf("  Slab pages:       %6d\n", slab_count);
 	kdb_printf("  Dirty pages:      %6d\n", dirty_count);
 	kdb_printf("  Locked pages:     %6d\n", locked_count);

@@ -35,6 +35,8 @@
  * http://oss.sgi.com/projects/GenInfo/NoticeExplan
  */
 
+#include <asm/debugreg.h>
+
 typedef unsigned char kdb_machinst_t;
 
 	/*
@@ -87,6 +89,8 @@ extern kdbhard_bp_t	kdb_hardbreaks[/* KDB_MAXHARDBPT */];
 #define DR6_B0  0x00000001
 #define DR6_DR_MASK  0x0000000F
 
+#if 0
+
 #define DR7_RW_VAL(dr, drnum) \
        (((dr) >> (16 + (4 * (drnum)))) & 0x3)
 
@@ -95,6 +99,8 @@ extern kdbhard_bp_t	kdb_hardbreaks[/* KDB_MAXHARDBPT */];
                (dr) &= ~(0x3 << (16 + (4 * (drnum))));         \
                (dr) |= (((rw) & 0x3) << (16 + (4 * (drnum)))); \
        } while (0)
+
+#endif
 
 #define DR7_RW0(dr)       DR7_RW_VAL(dr, 0)
 #define DR7_RW0SET(dr,rw)  DR7_RW_SET(dr, 0, rw)
@@ -105,6 +111,7 @@ extern kdbhard_bp_t	kdb_hardbreaks[/* KDB_MAXHARDBPT */];
 #define DR7_RW3(dr)       DR7_RW_VAL(dr, 3)
 #define DR7_RW3SET(dr,rw)  DR7_RW_SET(dr, 3, rw)
 
+#if 0
 
 #define DR7_LEN_VAL(dr, drnum) \
        (((dr) >> (18 + (4 * (drnum)))) & 0x3)
@@ -114,6 +121,9 @@ extern kdbhard_bp_t	kdb_hardbreaks[/* KDB_MAXHARDBPT */];
                (dr) &= ~(0x3 << (18 + (4 * (drnum))));         \
                (dr) |= (((rw) & 0x3) << (18 + (4 * (drnum)))); \
        } while (0)
+
+#endif
+
 #define DR7_LEN0(dr)        DR7_LEN_VAL(dr, 0)
 #define DR7_LEN0SET(dr,len)  DR7_LEN_SET(dr, 0, len)
 #define DR7_LEN1(dr)        DR7_LEN_VAL(dr, 1)
