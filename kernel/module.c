@@ -1195,6 +1195,7 @@ static int __init init(void)
 
 /* Obsolete lvalue for broken code which asks about usage */
 int module_dummy_usage = 1;
+EXPORT_SYMBOL(module_dummy_usage);
 
 /* Call this at boot */
 __initcall(init);
