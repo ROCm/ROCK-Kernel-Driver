@@ -72,9 +72,6 @@ choice
 	prompt "ARM system type"
 	default ARCH_RPC
 
-config ARCH_ADIFCC
-	bool "ADIFCC-based"
-
 config ARCH_CLPS7500
 	bool "Cirrus-CL-PS7500FE"
 

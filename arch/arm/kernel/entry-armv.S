@@ -561,7 +561,7 @@ ENTRY(soft_irq_mask)
 		.macro	irq_prio_table
 		.endm
 
-#elif defined(CONFIG_ARCH_IOP310) || defined(CONFIG_ARCH_ADIFCC)
+#elif defined(CONFIG_ARCH_IOP310)
 
 		.macro	disable_fiq
 		.endm

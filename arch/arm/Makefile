@@ -91,7 +91,6 @@ textaddr-$(CONFIG_ARCH_CLPS711X)   := 0xc0028000
  machine-$(CONFIG_ARCH_CLPS711X)   := clps711x
 textaddr-$(CONFIG_ARCH_FORTUNET)   := 0xc0008000
  machine-$(CONFIG_ARCH_IOP3XX)	   := iop3xx
- machine-$(CONFIG_ARCH_ADIFCC)	   := adifcc
  machine-$(CONFIG_ARCH_IXP4XX)	   := ixp4xx
  machine-$(CONFIG_ARCH_OMAP)	   := omap
  machine-$(CONFIG_ARCH_S3C2410)	   := s3c2410

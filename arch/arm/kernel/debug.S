@@ -439,32 +439,6 @@
 #endif
 		.endm
 
-#elif defined(CONFIG_ARCH_ADI_EVB)
-
-		.macro	addruart,rx
-		mrc	p15, 0, \rx, c1, c0
-		tst	\rx, #1			@ MMU enabled?
-		mov	\rx, #0x00400000	@ physical base address
-		orrne	\rx, \rx, #0xff000000	@ virtual base
-		.endm
-
-		.macro	senduart,rd,rx
-		strb	\rd, [\rx]
-		.endm
-
-		.macro	busyuart,rd,rx
-1002:		ldrb	\rd, [\rx, #0x5]
-		and	\rd, \rd, #0x60
-		teq	\rd, #0x60
-		bne	1002b
-		.endm
-
-		.macro	waituart,rd,rx
-1001:		ldrb	\rd, [\rx, #0x6]
-		tst	\rd, #0x10
-		beq	1001b
-		.endm
-
 #elif defined(CONFIG_ARCH_IXP4XX)
 
                 .macro  addruart,rx
