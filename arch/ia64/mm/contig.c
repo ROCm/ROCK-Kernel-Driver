@@ -169,7 +169,6 @@ find_memory (void)
 	find_initrd();
 }
 
-#ifdef CONFIG_SMP
 /**
  * per_cpu_init - setup per-cpu variables
  *
@@ -178,30 +177,41 @@ find_memory (void)
 void *
 per_cpu_init (void)
 {
-	void *cpu_data, *mca_data;
+	void *mca_data, *my_data;
 	int cpu;
 
+#ifdef CONFIG_SMP
 	/*
 	 * get_free_pages() cannot be used before cpu_init() done.  BSP
 	 * allocates "NR_CPUS" pages for all CPUs to avoid that AP calls
 	 * get_zeroed_page().
 	 */
 	if (smp_processor_id() == 0) {
+		void *cpu_data;
+
 		cpu_data = __alloc_bootmem(PERCPU_PAGE_SIZE * NR_CPUS,
 					   PERCPU_PAGE_SIZE, __pa(MAX_DMA_ADDRESS));
-		mca_data = alloc_bootmem(PERCPU_MCA_SIZE * NR_CPUS);
 		for (cpu = 0; cpu < NR_CPUS; cpu++) {
 			memcpy(cpu_data, __phys_per_cpu_start, __per_cpu_end - __per_cpu_start);
 			__per_cpu_offset[cpu] = (char *) cpu_data - __per_cpu_start;
 			cpu_data += PERCPU_PAGE_SIZE;
 			per_cpu(local_per_cpu_offset, cpu) = __per_cpu_offset[cpu];
-			__per_cpu_mca[cpu] = (unsigned long)__pa(mca_data);
-			mca_data += PERCPU_MCA_SIZE;
 		}
 	}
-	return __per_cpu_start + __per_cpu_offset[smp_processor_id()];
+	my_data = __per_cpu_start + __per_cpu_offset[smp_processor_id()];
+#else
+	my_data = (void *) __phys_per_cpu_start;
+#endif
+
+	if (smp_processor_id() == 0) {
+		mca_data = alloc_bootmem(sizeof (struct ia64_mca_cpu) * NR_CPUS);
+		for (cpu = 0; cpu < NR_CPUS; cpu++) {
+			__per_cpu_mca[cpu] = __pa(mca_data);
+			mca_data += sizeof (struct ia64_mca_cpu);
+		}
+	}
+	return my_data;
 }
-#endif /* CONFIG_SMP */
 
 static int
 count_pages (u64 start, u64 end, void *arg)

@@ -46,17 +46,13 @@ DECLARE_PER_CPU(unsigned long, local_per_cpu_offset);
 
 extern void percpu_modcopy(void *pcpudst, const void *src, unsigned long size);
 extern void setup_per_cpu_areas (void);
-extern void *per_cpu_init(void);
 
 #else /* ! SMP */
 
 #define per_cpu(var, cpu)			(*((void)cpu, &per_cpu__##var))
 #define __get_cpu_var(var)			per_cpu__##var
-#define per_cpu_init()				(__phys_per_cpu_start)
 
 #endif	/* SMP */
-
-extern unsigned long __per_cpu_mca[NR_CPUS];
 
 #define EXPORT_PER_CPU_SYMBOL(var)		EXPORT_SYMBOL(per_cpu__##var)
 #define EXPORT_PER_CPU_SYMBOL_GPL(var)		EXPORT_SYMBOL_GPL(per_cpu__##var)
@@ -68,6 +64,8 @@ extern unsigned long __per_cpu_mca[NR_CPUS];
  * more efficient.
  */
 #define __ia64_per_cpu_var(var)	(per_cpu__##var)
+
+extern void *per_cpu_init(void);
 
 #endif /* !__ASSEMBLY__ */
 
