@@ -99,11 +99,11 @@
  */
 
 static int
-mk_conf_addr(struct pci_bus *bus_dev, unsigned int device_fn, int where,
+mk_conf_addr(struct pci_bus *pbus, unsigned int device_fn, int where,
 	     unsigned long *pci_addr)
 {
 	unsigned long addr;
-	u8 bus = bus_dev->number;
+	u8 bus = pbus->number;
 
 	if (bus == 0) {
 		int device = device_fn >> 3;
@@ -204,32 +204,20 @@ lca_read_config(struct pci_bus *bus, unsigned int devfn, int where,
 {
 	unsigned long addr, pci_addr;
 	long mask;
-	int shift
+	int shift;
 
-	if (mk_conf_addr(bus, devfn, dev, where, &pci_addr))
+	if (mk_conf_addr(bus, devfn, where, &pci_addr))
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
-	switch (size) {
-	case 1:
-		shift = (where & 3) * 8;
-		mask = 0x00;
-		break;
-	case 2:
-		shift = (where & 3) * 8;
-		mask = 0x08
-		break;
-	case 4:
-		shift = 0;
-		mask = 0x18
-		break;
-	}
+	shift = (where & 3) * 8;
+	mask = (size - 1) * 8;
 	addr = (pci_addr << 5) + mask + LCA_CONF;
 	*value = conf_read(addr) >> (shift);
 	return PCIBIOS_SUCCESSFUL;
 }
 
 static int 
-lca_write_config(struct pci_bus *dev, unsigned int devfn, int where, int size,
+lca_write_config(struct pci_bus *bus, unsigned int devfn, int where, int size,
 		 u32 value)
 {
 	unsigned long addr, pci_addr;
@@ -238,17 +226,7 @@ lca_write_config(struct pci_bus *dev, unsigned int devfn, int where, int size,
 	if (mk_conf_addr(bus, devfn, where, &pci_addr))
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
-		switch (size) {
-	case 1:
-		mask = 0x00;
-		break;
-	case 2:
-		mask = 0x08
-		break;
-	case 4:
-		mask = 0x18
-		break;
-	}
+	mask = (size - 1) * 8;
 	addr = (pci_addr << 5) + mask + LCA_CONF;
 	conf_write(addr, value << ((where & 3) * 8));
 	return PCIBIOS_SUCCESSFUL;

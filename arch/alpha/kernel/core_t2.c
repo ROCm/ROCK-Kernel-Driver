@@ -89,11 +89,11 @@
  */
 
 static int
-mk_conf_addr(struct pci_bus *bus_dev, unsigned int device_fn, int where,
+mk_conf_addr(struct pci_bus *pbus, unsigned int device_fn, int where,
 	     unsigned long *pci_addr, unsigned char *type1)
 {
 	unsigned long addr;
-	u8 bus = bus_dev->number;
+	u8 bus = pbus->number;
 
 	DBG(("mk_conf_addr(bus=%d, dfn=0x%x, where=0x%x,"
 	     " addr=0x%lx, type1=0x%x)\n",
@@ -248,20 +248,8 @@ t2_read_config(struct pci_bus *bus, unsigned int devfn, int where,
 	if (mk_conf_addr(bus, devfn, where, &pci_addr, &type1))
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
-	switch (size) {
-	case 1:
-		mask = 0x00;
-		shift = (where & 3) * 8;
-		break;
-	case 2:
-		mask = 0x08;
-		shift = (where & 3) * 8;
-		break;
-	case 4:
-		mask = 0x18;
-		shift = 0;
-		break;
-	}
+	mask = (size - 1) * 8;
+	shift = (where & 3) * 8;
 	addr = (pci_addr << 5) + mask + T2_CONF;
 	*value = conf_read(addr, type1) >> (shift);
 	return PCIBIOS_SUCCESSFUL;
@@ -275,20 +263,10 @@ t2_write_config(struct pci_bus *bus, unsigned int devfn, int where, int size,
 	unsigned char type1;
 	long mask;
 
-	if (mk_conf_addr(dev, where, &pci_addr, &type1))
+	if (mk_conf_addr(bus, devfn, where, &pci_addr, &type1))
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
-	switch (size) {
-	case 1:
-		mask = 0x00;
-		break;
-	case 2:
-		mask = 0x08;
-		break;
-	case 4:
-		mask = 0x18;
-		break;
-	}
+	mask = (size - 1) * 8;
 	addr = (pci_addr << 5) + mask + T2_CONF;
 	conf_write(addr, value << ((where & 3) * 8), type1);
 	return PCIBIOS_SUCCESSFUL;
