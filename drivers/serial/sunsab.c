@@ -86,10 +86,6 @@ static struct tty_struct *sab82532_table[NR_PORTS];
 static struct termios *sab82532_termios[NR_PORTS];
 static struct termios *sab82532_termios_locked[NR_PORTS];
 
-#ifdef MODULE
-#undef CONFIG_SERIAL_CONSOLE
-#endif
-
 #ifdef CONFIG_SERIAL_CONSOLE
 extern int serial_console;
 static struct console sab82532_console;
@@ -465,7 +461,7 @@ static void check_status(struct sab82532 *info,
 	if (stat->sreg.isr1 & SAB82532_ISR1_BRK) {
 #ifdef CONFIG_SERIAL_CONSOLE
 		if (info->is_console) {
-			batten_down_hatches(info);
+			sun_do_break(info);
 			return;
 		}
 #endif
@@ -874,7 +870,6 @@ static void shutdown(struct sab82532 *info)
 		info->xmit.buf = 0;
 	}
 
-#ifdef CONFIG_SERIAL_CONSOLE
 	if (info->is_console) {
 		info->interrupt_mask0 = SAB82532_IMR0_PERR | SAB82532_IMR0_FERR |
 					SAB82532_IMR0_PLLA | SAB82532_IMR0_CDSC;
@@ -890,7 +885,6 @@ static void shutdown(struct sab82532 *info)
 		restore_flags(flags);
 		return;
 	}
-#endif
 
 	/* Disable Interrupts */
 	info->interrupt_mask0 = 0xff;
@@ -2460,48 +2454,6 @@ void cleanup_module(void)
 #endif /* MODULE */
 
 #ifdef CONFIG_SERIAL_CONSOLE
-static void
-batten_down_hatches(struct sab82532 *info)
-{
-	unsigned char saved_rfc, tmp;
-
-	if (!stop_a_enabled)
-		return;
-
-	/* If we are doing kadb, we call the debugger
-	 * else we just drop into the boot monitor.
-	 * Note that we must flush the user windows
-	 * first before giving up control.
-	 */
-	printk("\n");
-	flush_user_windows();
-
-	/*
-	 * Set FIFO to single character mode.
-	 */
-	saved_rfc = readb(&info->regs->r.rfc);
-	tmp = readb(&info->regs->rw.rfc);
-	tmp &= ~(SAB82532_RFC_RFDF);
-	writeb(tmp, &info->regs->rw.rfc);
-	sab82532_cec_wait(info);
-	writeb(SAB82532_CMDR_RRES, &info->regs->w.cmdr);
-
-#ifndef __sparc_v9__
-	if ((((unsigned long)linux_dbvec) >= DEBUG_FIRSTVADDR) &&
-	    (((unsigned long)linux_dbvec) <= DEBUG_LASTVADDR))
-		sp_enter_debugger();
-	else
-#endif
-		prom_cmdline();
-
-	/*
-	 * Reset FIFO to character + status mode.
-	 */
-	writeb(saved_rfc, &info->regs->w.rfc);
-	sab82532_cec_wait(info);
-	writeb(SAB82532_CMDR_RRES, &info->regs->w.cmdr);
-}
-
 static __inline__ void
 sab82532_console_putchar(struct sab82532 *info, char c)
 {

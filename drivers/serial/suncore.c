@@ -23,12 +23,8 @@
 
 #include "suncore.h"
 
-int serial_console;
-int stop_a_enabled = 1;
 int sunserial_current_minor = 64;
 
-EXPORT_SYMBOL(serial_console);
-EXPORT_SYMBOL(stop_a_enabled);
 EXPORT_SYMBOL(sunserial_current_minor);
 
 void

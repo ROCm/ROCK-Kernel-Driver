@@ -740,10 +740,8 @@ void handler_irq(int irq, struct pt_regs *regs)
 	irq_enter();
 	kstat.irqs[cpu][irq]++;
 
-#ifdef CONFIG_PCI
 	if (irq == 9)
 		kbd_pt_regs = regs;
-#endif
 
 	/* Sliiiick... */
 #ifndef CONFIG_SMP

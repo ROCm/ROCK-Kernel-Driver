@@ -22,16 +22,7 @@
 extern unsigned int suncore_mouse_baud_cflag_next(unsigned int, int *);
 extern int suncore_mouse_baud_detection(unsigned char, int);
 
-extern struct pt_regs *kbd_pt_regs;
-
-extern int serial_console;
-extern int stop_a_enabled;
 extern int sunserial_current_minor;
-
-static __inline__ int con_is_present(void)
-{
-	return serial_console ? 0 : 1;
-}
 
 extern void sunserial_console_termios(struct console *);
 

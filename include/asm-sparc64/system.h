@@ -121,6 +121,15 @@ enum sparc_cpu {
 #ifndef __ASSEMBLY__
 
 extern void sun_do_break(void);
+extern int serial_console;
+extern int stop_a_enabled;
+
+static __inline__ int con_is_present(void)
+{
+	return serial_console ? 0 : 1;
+}
+
+extern struct pt_regs *kbd_pt_regs;
 
 extern void synchronize_user_stack(void);
 
