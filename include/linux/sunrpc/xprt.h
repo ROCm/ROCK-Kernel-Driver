@@ -120,8 +120,6 @@ struct rpc_rqst {
 };
 #define rq_svec			rq_snd_buf.head
 #define rq_slen			rq_snd_buf.len
-#define rq_rvec			rq_rcv_buf.head
-#define rq_rlen			rq_rcv_buf.len
 
 #define XPRT_LAST_FRAG		(1 << 0)
 #define XPRT_COPY_RECM		(1 << 1)

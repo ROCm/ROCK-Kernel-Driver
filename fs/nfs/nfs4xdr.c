@@ -2671,7 +2671,7 @@ static int decode_putrootfh(struct xdr_stream *xdr)
 
 static int decode_read(struct xdr_stream *xdr, struct rpc_rqst *req, struct nfs_readres *res)
 {
-	struct iovec *iov = req->rq_rvec;
+	struct iovec *iov = req->rq_rcv_buf.head;
 	uint32_t *p;
 	uint32_t count, eof, recvd, hdrlen;
 	int status;
@@ -2683,7 +2683,7 @@ static int decode_read(struct xdr_stream *xdr, struct rpc_rqst *req, struct nfs_
 	READ32(eof);
 	READ32(count);
 	hdrlen = (u8 *) p - (u8 *) iov->iov_base;
-	recvd = req->rq_received - hdrlen;
+	recvd = req->rq_rcv_buf.len - hdrlen;
 	if (count > recvd) {
 		printk(KERN_WARNING "NFS: server cheating in read reply: "
 				"count %u > recvd %u\n", count, recvd);
@@ -2713,7 +2713,7 @@ static int decode_readdir(struct xdr_stream *xdr, struct rpc_rqst *req, struct n
 	COPYMEM(readdir->verifier.data, 8);
 
 	hdrlen = (char *) p - (char *) iov->iov_base;
-	recvd = req->rq_received - hdrlen;
+	recvd = rcvbuf->len - hdrlen;
 	if (pglen > recvd)
 		pglen = recvd;
 	xdr_read_pages(xdr, pglen);

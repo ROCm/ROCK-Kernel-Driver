@@ -605,11 +605,13 @@ call_encode(struct rpc_task *task)
 	sndbuf->tail[0].iov_len  = 0;
 	sndbuf->page_len	 = 0;
 	sndbuf->len		 = 0;
+	sndbuf->buflen		 = bufsiz;
 	rcvbuf->head[0].iov_base = (void *)((char *)task->tk_buffer + bufsiz);
 	rcvbuf->head[0].iov_len  = bufsiz;
 	rcvbuf->tail[0].iov_len  = 0;
 	rcvbuf->page_len	 = 0;
-	rcvbuf->len		 = bufsiz;
+	rcvbuf->len		 = 0;
+	rcvbuf->buflen		 = bufsiz;
 
 	/* Encode header and provided arguments */
 	encode = task->tk_msg.rpc_proc->p_encode;
@@ -849,6 +851,8 @@ call_decode(struct rpc_task *task)
 		return;
 	}
 
+	req->rq_rcv_buf.len = req->rq_private_buf.len;
+
 	/* Check that the softirq receive buffer is valid */
 	WARN_ON(memcmp(&req->rq_rcv_buf, &req->rq_private_buf,
 				sizeof(req->rq_rcv_buf)) != 0);
@@ -884,7 +888,7 @@ call_decode(struct rpc_task *task)
 					task->tk_status);
 	return;
 out_retry:
-	req->rq_received = 0;
+	req->rq_received = req->rq_private_buf.len = 0;
 	task->tk_status = 0;
 }
 
@@ -956,7 +960,7 @@ call_header(struct rpc_task *task)
 static u32 *
 call_verify(struct rpc_task *task)
 {
-	u32	*p = task->tk_rqstp->rq_rvec[0].iov_base, n;
+	u32	*p = task->tk_rqstp->rq_rcv_buf.head[0].iov_base, n;
 
 	p += 1;	/* skip XID */
 

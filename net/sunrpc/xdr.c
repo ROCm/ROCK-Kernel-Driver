@@ -160,6 +160,7 @@ xdr_encode_pages(struct xdr_buf *xdr, struct page **pages, unsigned int base,
 		tail->iov_len  = pad;
 		len += pad;
 	}
+	xdr->buflen += len;
 	xdr->len += len;
 }
 
@@ -181,7 +182,7 @@ xdr_inline_pages(struct xdr_buf *xdr, unsigned int offset,
 	tail->iov_base = buf + offset;
 	tail->iov_len = buflen - offset;
 
-	xdr->len += len;
+	xdr->buflen += len;
 }
 
 /*
@@ -675,7 +676,10 @@ xdr_shrink_bufhead(struct xdr_buf *buf, size_t len)
 				copy);
 	}
 	head->iov_len -= len;
-	buf->len -= len;
+	buf->buflen -= len;
+	/* Have we truncated the message? */
+	if (buf->len > buf->buflen)
+		buf->len = buf->buflen;
 }
 
 /*
@@ -705,7 +709,7 @@ xdr_shrink_pagelen(struct xdr_buf *buf, size_t len)
 			copy = tail->iov_len - len;
 			memmove(p, tail->iov_base, copy);
 		} else
-			buf->len -= len;
+			buf->buflen -= len;
 		/* Copy from the inlined pages into the tail */
 		copy = len;
 		if (copy > tail->iov_len)
@@ -715,7 +719,10 @@ xdr_shrink_pagelen(struct xdr_buf *buf, size_t len)
 				copy);
 	}
 	buf->page_len -= len;
-	buf->len -= len;
+	buf->buflen -= len;
+	/* Have we truncated the message? */
+	if (buf->len > buf->buflen)
+		buf->len = buf->buflen;
 }
 
 void
@@ -724,8 +731,67 @@ xdr_shift_buf(struct xdr_buf *buf, size_t len)
 	xdr_shrink_bufhead(buf, len);
 }
 
-void
-xdr_write_pages(struct xdr_stream *xdr, struct page **pages, unsigned int base,
+/**
+ * xdr_init_encode - Initialize a struct xdr_stream for sending data.
+ * @xdr: pointer to xdr_stream struct
+ * @buf: pointer to XDR buffer in which to encode data
+ * @p: current pointer inside XDR buffer
+ *
+ * Note: at the moment the RPC client only passes the length of our
+ *	 scratch buffer in the xdr_buf's header iovec. Previously this
+ *	 meant we needed to call xdr_adjust_iovec() after encoding the
+ *	 data. With the new scheme, the xdr_stream manages the details
+ *	 of the buffer length, and takes care of adjusting the iovec
+ *	 length for us.
+ */
+void xdr_init_encode(struct xdr_stream *xdr, struct xdr_buf *buf, uint32_t *p)
+{
+	struct iovec *iov = buf->head;
+
+	xdr->buf = buf;
+	xdr->iov = iov;
+	xdr->end = (uint32_t *)((char *)iov->iov_base + iov->iov_len);
+	buf->len = iov->iov_len = (char *)p - (char *)iov->iov_base;
+	xdr->p = p;
+}
+EXPORT_SYMBOL(xdr_init_encode);
+
+/**
+ * xdr_reserve_space - Reserve buffer space for sending
+ * @xdr: pointer to xdr_stream
+ * @nbytes: number of bytes to reserve
+ *
+ * Checks that we have enough buffer space to encode 'nbytes' more
+ * bytes of data. If so, update the total xdr_buf length, and
+ * adjust the length of the current iovec.
+ */
+uint32_t * xdr_reserve_space(struct xdr_stream *xdr, size_t nbytes)
+{
+	uint32_t *p = xdr->p;
+	uint32_t *q;
+
+	/* align nbytes on the next 32-bit boundary */
+	nbytes += 3;
+	nbytes &= ~3;
+	q = p + (nbytes >> 2);
+	if (unlikely(q > xdr->end || q < p))
+		return NULL;
+	xdr->p = q;
+	xdr->iov->iov_len += nbytes;
+	xdr->buf->len += nbytes;
+	return p;
+}
+EXPORT_SYMBOL(xdr_reserve_space);
+
+/**
+ * xdr_write_pages - Insert a list of pages into an XDR buffer for sending
+ * @xdr: pointer to xdr_stream
+ * @pages: list of pages
+ * @base: offset of first byte
+ * @len: length of data in bytes
+ *
+ */
+void xdr_write_pages(struct xdr_stream *xdr, struct page **pages, unsigned int base,
 		 unsigned int len)
 {
 	struct xdr_buf *buf = xdr->buf;
@@ -747,15 +813,69 @@ xdr_write_pages(struct xdr_stream *xdr, struct page **pages, unsigned int base,
 		len += pad;
 		*xdr->p++ = 0;
 	}
+	buf->buflen += len;
 	buf->len += len;
 }
+EXPORT_SYMBOL(xdr_write_pages);
 
-void
-xdr_read_pages(struct xdr_stream *xdr, unsigned int len)
+/**
+ * xdr_init_decode - Initialize an xdr_stream for decoding data.
+ * @xdr: pointer to xdr_stream struct
+ * @buf: pointer to XDR buffer from which to decode data
+ * @p: current pointer inside XDR buffer
+ */
+void xdr_init_decode(struct xdr_stream *xdr, struct xdr_buf *buf, uint32_t *p)
+{
+	struct iovec *iov = buf->head;
+	unsigned int len = iov->iov_len;
+
+	if (len > buf->len)
+		len = buf->len;
+	xdr->buf = buf;
+	xdr->iov = iov;
+	xdr->p = p;
+	xdr->end = (uint32_t *)((char *)iov->iov_base + len);
+}
+EXPORT_SYMBOL(xdr_init_decode);
+
+/**
+ * xdr_inline_decode - Retrieve non-page XDR data to decode
+ * @xdr: pointer to xdr_stream struct
+ * @nbytes: number of bytes of data to decode
+ *
+ * Check if the input buffer is long enough to enable us to decode
+ * 'nbytes' more bytes of data starting at the current position.
+ * If so return the current pointer, then update the current
+ * pointer position.
+ */
+uint32_t * xdr_inline_decode(struct xdr_stream *xdr, size_t nbytes)
+{
+	uint32_t *p = xdr->p;
+	uint32_t *q = p + XDR_QUADLEN(nbytes);
+
+	if (unlikely(q > xdr->end || q < p))
+		return NULL;
+	xdr->p = q;
+	return p;
+}
+EXPORT_SYMBOL(xdr_inline_decode);
+
+/**
+ * xdr_read_pages - Ensure page-based XDR data to decode is aligned at current pointer position
+ * @xdr: pointer to xdr_stream struct
+ * @len: number of bytes of page data
+ *
+ * Moves data beyond the current pointer position from the XDR head[] buffer
+ * into the page list. Any data that lies beyond current position + "len"
+ * bytes is moved into the XDR tail[]. The current pointer is then
+ * repositioned at the beginning of the XDR tail.
+ */
+void xdr_read_pages(struct xdr_stream *xdr, unsigned int len)
 {
 	struct xdr_buf *buf = xdr->buf;
 	struct iovec *iov;
 	ssize_t shift;
+	unsigned int end;
 	int padding;
 
 	/* Realign pages to current pointer position */
@@ -769,9 +889,21 @@ xdr_read_pages(struct xdr_stream *xdr, unsigned int len)
 		xdr_shrink_pagelen(buf, buf->page_len - len);
 	padding = (XDR_QUADLEN(len) << 2) - len;
 	xdr->iov = iov = buf->tail;
+	/* Compute remaining message length.  */
+	end = iov->iov_len;
+	shift = buf->buflen - buf->len;
+	if (shift < end)
+		end -= shift;
+	else if (shift > 0)
+		end = 0;
+	/*
+	 * Position current pointer at beginning of tail, and
+	 * set remaining message length.
+	 */
 	xdr->p = (uint32_t *)((char *)iov->iov_base + padding);
-	xdr->end = (uint32_t *)((char *)iov->iov_base + iov->iov_len);
+	xdr->end = (uint32_t *)((char *)iov->iov_base + end);
 }
+EXPORT_SYMBOL(xdr_read_pages);
 
 static struct iovec empty_iov = {.iov_base = NULL, .iov_len = 0};
 
@@ -781,7 +913,7 @@ xdr_buf_from_iov(struct iovec *iov, struct xdr_buf *buf)
 	buf->head[0] = *iov;
 	buf->tail[0] = empty_iov;
 	buf->page_len = 0;
-	buf->len = iov->iov_len;
+	buf->buflen = buf->len = iov->iov_len;
 }
 
 /* Sets subiov to the intersection of iov with the buffer of length len
@@ -811,7 +943,7 @@ xdr_buf_subsegment(struct xdr_buf *buf, struct xdr_buf *subbuf,
 {
 	int i;
 
-	subbuf->len = len;
+	subbuf->buflen = subbuf->len = len;
 	iov_subsegment(buf->head, subbuf->head, &base, &len);
 
 	if (base < buf->page_len) {

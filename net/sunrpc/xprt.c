@@ -647,8 +647,8 @@ xprt_complete_rqst(struct rpc_xprt *xprt, struct rpc_rqst *req, int copied)
 #endif
 
 	dprintk("RPC: %4d has input (%d bytes)\n", task->tk_pid, copied);
-	req->rq_received = copied;
 	list_del_init(&req->rq_list);
+	req->rq_received = req->rq_private_buf.len = copied;
 
 	/* ... and wake up the process. */
 	rpc_wake_up_task(task);
@@ -765,7 +765,7 @@ udp_data_ready(struct sock *sk, int len)
 
 	dprintk("RPC: %4d received reply\n", task->tk_pid);
 
-	if ((copied = rovr->rq_private_buf.len) > repsize)
+	if ((copied = rovr->rq_private_buf.buflen) > repsize)
 		copied = repsize;
 
 	/* Suck it into the iovec, verify checksum if not done by hw. */
@@ -908,7 +908,7 @@ tcp_read_request(struct rpc_xprt *xprt, skb_reader_t *desc)
 	xprt->tcp_copied += len;
 	xprt->tcp_offset += len;
 
-	if (xprt->tcp_copied == req->rq_private_buf.len)
+	if (xprt->tcp_copied == req->rq_private_buf.buflen)
 		xprt->tcp_flags &= ~XPRT_COPY_DATA;
 	else if (xprt->tcp_offset == xprt->tcp_reclen) {
 		if (xprt->tcp_flags & XPRT_LAST_FRAG)
