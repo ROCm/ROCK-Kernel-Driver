@@ -2077,7 +2077,7 @@ static int snd_pcm_oss_ioctl(struct inode *inode, struct file *file,
 {
 	int err;
 	unlock_kernel();
-	err = snd_pcm_oss_ioctl(inode, file, cmd, arg);
+	err = _snd_pcm_oss_ioctl(inode, file, cmd, arg);
 	lock_kernel();
 	return err;
 }
