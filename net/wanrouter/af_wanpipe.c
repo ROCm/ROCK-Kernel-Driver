@@ -113,7 +113,7 @@
  *      function, wanpipe_rcv() to queue the incoming packets
  *      into an AF_WANPIPE socket queue.  Based on wanpipe_rcv()
  *      return code, the driver knows whether the packet was
- *      sucessfully queued.  If the socket queue is full, 
+ *      successfully queued.  If the socket queue is full, 
  *      protocol flow control is used by the driver, if any, 
  *      to slow down the traffic until the sock queue is free.
  *
@@ -217,7 +217,7 @@ static int check_driver_busy (struct sock *);
  *
  *	Wanpipe socket bottom half handler.  This function
  *      is called by the WANPIPE device drivers to queue a
- *      incomming packet into the socket receive queue. 
+ *      incoming packet into the socket receive queue. 
  *      Once the packet is queued, all processes waiting to 
  *      read are woken up.
  *
@@ -298,7 +298,7 @@ static int wanpipe_rcv(struct sk_buff *skb, netdevice_t *dev,  struct sock *sk)
  *
  *	Wanpipe LISTEN socket bottom half handler.  This function
  *      is called by the WANPIPE device drivers to queue an
- *      incomming call into the socket listening queue. 
+ *      incoming call into the socket listening queue. 
  *      Once the packet is queued, the waiting accept() process 
  *      is woken up.
  *
@@ -737,7 +737,7 @@ static void wanpipe_delayed_transmit (unsigned long data)
  *
  *	Execute x25api commands.  The atomic variable
  *      chan->command is used to indicate to the driver that
- *      command is pending for exection.  The acutal command
+ *      command is pending for execution.  The acutal command
  *      structure is placed into a sock mbox structure 
  *      (wp_sk(sk)->mbox).
  *
@@ -1131,7 +1131,7 @@ static void wanpipe_kill_sock_timer (unsigned long data)
 	if (!sk)
 		return;
 
-	/* This functin can be called from interrupt. We must use
+	/* This function can be called from interrupt. We must use
 	 * appropriate locks */
 	
 	if (test_bit(1,&wanpipe_tx_critical)){
@@ -1204,7 +1204,7 @@ static void wanpipe_kill_sock_accept (struct sock *sk)
 	if (!sk)
 		return;
 
-	/* This functin can be called from interrupt. We must use
+	/* This function can be called from interrupt. We must use
 	 * appropriate locks */
 	
 	write_lock(&wanpipe_sklist_lock);

@@ -744,7 +744,7 @@ static struct atm_dev mpc_dev = {
 	.ops	= &mpc_ops,
 	.type	= "mpc",
 	.number	= 42,
-	/* members not explicitely initialised will be 0 */
+	/* members not explicitly initialised will be 0 */
 };
 
 int atm_mpoa_mpoad_attach (struct atm_vcc *vcc, int arg)

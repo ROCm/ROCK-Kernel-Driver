@@ -1,4 +1,4 @@
-/* net/atm/resources.c - Staticly allocated resources */
+/* net/atm/resources.c - Statically allocated resources */
 
 /* Written 1995-2000 by Werner Almesberger, EPFL LRC/ICA */
 

@@ -223,9 +223,9 @@ int netdev_nit;
  *
  *	BEWARE!!! Protocol handlers, mangling input packets,
  *	MUST BE last in hash buckets and checking protocol handlers
- *	MUST start from promiscous ptype_all chain in net_bh.
+ *	MUST start from promiscuous ptype_all chain in net_bh.
  *	It is true now, do not change it.
- *	Explantion follows: if protocol handler, mangling packet, will
+ *	Explanation follows: if protocol handler, mangling packet, will
  *	be the first on list, it is not able to sense, that packet
  *	is cloned and should be copied-on-write, so that it will
  *	change it and subsequent readers will get broken packet.

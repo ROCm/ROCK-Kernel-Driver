@@ -79,7 +79,7 @@ static __inline__ __u32 tcp_acceptable_seq(struct sock *sk, struct tcp_opt *tp)
  *    large MSS.
  * 4. We do not make 3, we advertise MSS, calculated from first
  *    hop device mtu, but allow to raise it to ip_rt_min_advmss.
- *    This may be overriden via information stored in routing table.
+ *    This may be overridden via information stored in routing table.
  * 5. Value 65535 for MSS is valid in IPv6 and means "as large as possible,
  *    probably even Jumbo".
  */

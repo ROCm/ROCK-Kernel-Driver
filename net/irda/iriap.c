@@ -273,7 +273,7 @@ static int iriap_register_lsap(struct iriap_cb *self, __u8 slsap_sel, int mode)
 /*
  * Function iriap_disconnect_indication (handle, reason)
  *
- *    Got disconnect, so clean up everything assosiated with this connection
+ *    Got disconnect, so clean up everything associated with this connection
  *
  */
 static void iriap_disconnect_indication(void *instance, void *sap,

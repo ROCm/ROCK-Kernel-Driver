@@ -635,7 +635,7 @@ static void sctp_cmd_new_state(sctp_cmd_seq_t *cmds, sctp_association_t *asoc,
 			sk->state_change(sk);
 	}
 
-	/* Change the sk->state of a TCP-style socket that has sucessfully
+	/* Change the sk->state of a TCP-style socket that has successfully
 	 * completed a connect() call.
 	 */
 	if ((SCTP_STATE_ESTABLISHED == asoc->state) &&

@@ -858,7 +858,7 @@ static int irda_accept(struct socket *sock, struct socket *newsock, int flags)
 	 */
 
 	/*
-	 * We can perform the accept only if there is incomming data
+	 * We can perform the accept only if there is incoming data
 	 * on the listening socket.
 	 * So, we will block the caller until we receive any data.
 	 * If the caller was waiting on select() or poll() before
@@ -1210,7 +1210,7 @@ static int irda_release(struct socket *sock)
 	/* Notes on socket locking and deallocation... - Jean II
 	 * In theory we should put pairs of sock_hold() / sock_put() to
 	 * prevent the socket to be destroyed whenever there is an
-	 * outstanding request or outstanding incomming packet or event.
+	 * outstanding request or outstanding incoming packet or event.
 	 *
 	 * 1) This may include IAS request, both in connect and getsockopt.
 	 * Unfortunately, the situation is a bit more messy than it looks,

@@ -61,7 +61,7 @@ Short description.
 
 	avg = (1-W)*avg + W*current_queue_len,
 
-	W is the filter time constant (choosen as 2^(-Wlog)), it controls
+	W is the filter time constant (chosen as 2^(-Wlog)), it controls
 	the inertia of the algorithm. To allow larger bursts, W should be
 	decreased.
 

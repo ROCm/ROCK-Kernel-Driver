@@ -356,7 +356,7 @@ int fib_nh_match(struct rtmsg *r, struct nlmsghdr *nlh, struct kern_rta *rta,
    Attempt to reconcile all of these (alas, self-contradictory) conditions
    results in pretty ugly and hairy code with obscure logic.
 
-   I choosed to generalized it instead, so that the size
+   I chose to generalized it instead, so that the size
    of code does not increase practically, but it becomes
    much more general.
    Every prefix is assigned a "scope" value: "host" is local address,

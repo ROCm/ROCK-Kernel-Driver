@@ -745,9 +745,9 @@ out:
 #endif
 
 /*
- *	Choose an apropriate source address
+ *	Choose an appropriate source address
  *	should do:
- *	i)	get an address with an apropriate scope
+ *	i)	get an address with an appropriate scope
  *	ii)	see if there is a specific route for the destination and use
  *		an address of the attached interface 
  *	iii)	don't use deprecated addresses

@@ -344,7 +344,7 @@ out:
  *	llc_conn_send_pdus - Sends queued PDUs
  *	@sk: active connection
  *
- *	Sends queued pdus to MAC layer for transmition.
+ *	Sends queued pdus to MAC layer for transmission.
  */
 static void llc_conn_send_pdus(struct sock *sk)
 {

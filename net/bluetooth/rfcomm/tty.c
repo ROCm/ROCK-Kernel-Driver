@@ -890,7 +890,7 @@ int rfcomm_init_ttys(void)
 {
 	int i;
 
-	/* Initalize our global data */
+	/* Initialize our global data */
 	for (i = 0; i < RFCOMM_TTY_PORTS; i++)
 		rfcomm_tty_table[i] = NULL;
 

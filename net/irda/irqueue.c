@@ -50,13 +50,13 @@
  */
 
 /*
- * Notes on the concurent access to hashbin and other SMP issues
+ * Notes on the concurrent access to hashbin and other SMP issues
  * -------------------------------------------------------------
  *	Hashbins are very often in the IrDA stack a global repository of
  * information, and therefore used in a very asynchronous manner following
  * various events (driver calls, timers, user calls...).
  *	Therefore, very often it is highly important to consider the
- * management of concurent access to the hashbin and how to guarantee the
+ * management of concurrent access to the hashbin and how to guarantee the
  * consistency of the operations on it.
  *
  *	First, we need to define the objective of locking :
@@ -158,12 +158,12 @@
  * Locking Policy :
  * --------------
  *	If the hashbin is used only in a single thread of execution
- * (explicitely or implicitely), you can use HB_NOLOCK
- *	If the calling module already provide concurent access protection,
+ * (explicitly or implicitely), you can use HB_NOLOCK
+ *	If the calling module already provide concurrent access protection,
  * you may use HB_NOLOCK.
  *
  *	In all other cases, you need to use HB_LOCK and lock the hashbin
- * everytime before calling one of the unprotected calls. You also must
+ * every time before calling one of the unprotected calls. You also must
  * use the pointer returned by the unprotected call within the locked
  * region.
  *
@@ -912,7 +912,7 @@ void* hashbin_lock_find( hashbin_t* hashbin, long hashv, char* name )
  *
  *    Find an item with the given hashv or name, and its successor
  *
- * This function allow to do concurent enumerations without the
+ * This function allow to do concurrent enumerations without the
  * need to lock over the whole session, because the caller keep the
  * context of the search. On the other hand, it might fail and return
  * NULL if the entry is removed. - Jean II
@@ -987,7 +987,7 @@ irda_queue_t *hashbin_get_first( hashbin_t* hashbin)
  *    NULL when all items have been traversed
  * 
  * The context of the search is stored within the hashbin, so you must
- * protect yourself from concurent enumerations. - Jean II
+ * protect yourself from concurrent enumerations. - Jean II
  */
 irda_queue_t *hashbin_get_next( hashbin_t *hashbin)
 {
