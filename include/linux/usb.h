@@ -495,8 +495,8 @@ extern struct bus_type usb_bus_type;
  * @minor_base: the start of the minor range for this driver.
  *
  * This structure is used for the usb_register_dev() and
- * usb_unregister_dev() functions, to consolodate a number of the
- * paramaters used for them.
+ * usb_unregister_dev() functions, to consolidate a number of the
+ * parameters used for them.
  */
 struct usb_class_driver {
 	char *name;
@@ -554,7 +554,7 @@ typedef void (*usb_complete_t)(struct urb *, struct pt_regs *);
  * @urb_list: For use by current owner of the URB.
  * @pipe: Holds endpoint number, direction, type, and more.
  *	Create these values with the eight macros available;
- *	usb_{snd,rcv}TYPEpipe(dev,endpoint), where the type is "ctrl"
+ *	usb_{snd,rcv}TYPEpipe(dev,endpoint), where the TYPE is "ctrl"
  *	(control), "bulk", "int" (interrupt), or "iso" (isochronous).
  *	For example usb_sndbulkpipe() or usb_rcvintpipe().  Endpoint
  *	numbers range from zero to fifteen.  Note that "in" endpoint two
@@ -573,8 +573,8 @@ typedef void (*usb_complete_t)(struct urb *, struct pt_regs *);
  * 	the I/O request will be performed (unless URB_NO_TRANSFER_DMA_MAP
  *	is set).  This buffer must be suitable for DMA; allocate it with
  *	kmalloc() or equivalent.  For transfers to "in" endpoints, contents
- *	of this buffer will be modified.  This buffer is used for data
- *	phases of control transfers.
+ *	of this buffer will be modified.  This buffer is used for the data
+ *	stage of control transfers.
  * @transfer_dma: When transfer_flags includes URB_NO_TRANSFER_DMA_MAP,
  *	the device driver is saying that it provided this DMA address,
  *	which the host controller driver should use in preference to the
@@ -597,8 +597,7 @@ typedef void (*usb_complete_t)(struct urb *, struct pt_regs *);
  *	device driver has provided this DMA address for the setup packet.
  *	The host controller driver should use this in preference to
  *	setup_packet.
- * @start_frame: Returns the initial frame for interrupt or isochronous
- *	transfers.
+ * @start_frame: Returns the initial frame for isochronous transfers.
  * @number_of_packets: Lists the number of ISO transfer buffers.
  * @interval: Specifies the polling interval for interrupt or isochronous
  *	transfers.  The units are frames (milliseconds) for for full and low
@@ -666,13 +665,14 @@ typedef void (*usb_complete_t)(struct urb *, struct pt_regs *);
  * Interrupt UBS must provide an interval, saying how often (in milliseconds
  * or, for highspeed devices, 125 microsecond units)
  * to poll for transfers.  After the URB has been submitted, the interval
- * and start_frame fields reflect how the transfer was actually scheduled.
+ * field reflects how the transfer was actually scheduled.
  * The polling interval may be more frequent than requested.
  * For example, some controllers have a maximum interval of 32 microseconds,
  * while others support intervals of up to 1024 microseconds.
  * Isochronous URBs also have transfer intervals.  (Note that for isochronous
  * endpoints, as well as high speed interrupt endpoints, the encoding of
- * the transfer interval in the endpoint descriptor is logarithmic.)
+ * the transfer interval in the endpoint descriptor is logarithmic.
+ * Device drivers must convert that value to linear units themselves.)
  *
  * Isochronous URBs normally use the URB_ISO_ASAP transfer flag, telling
  * the host controller to schedule the transfer as soon as bandwidth
@@ -705,8 +705,9 @@ typedef void (*usb_complete_t)(struct urb *, struct pt_regs *);
  * The context field is normally used to link URBs back to the relevant
  * driver or request state.
  *
- * When completion callback is invoked for non-isochronous URBs, the
- * actual_length field tells how many bytes were transferred.
+ * When the completion callback is invoked for non-isochronous URBs, the
+ * actual_length field tells how many bytes were transferred.  This field
+ * is updated even when the URB terminated with an error or was unlinked.
  *
  * ISO transfer status is reported in the status and actual_length fields
  * of the iso_frame_desc array, and the number of errors is reported in
@@ -733,9 +734,9 @@ struct urb
 	int actual_length;		/* (return) actual transfer length */
 	unsigned char *setup_packet;	/* (in) setup packet (control only) */
 	dma_addr_t setup_dma;		/* (in) dma addr for setup_packet */
-	int start_frame;		/* (modify) start frame (INT/ISO) */
+	int start_frame;		/* (modify) start frame (ISO) */
 	int number_of_packets;		/* (in) number of ISO packets */
-	int interval;			/* (in) transfer interval (INT/ISO) */
+	int interval;			/* (modify) transfer interval (INT/ISO) */
 	int error_count;		/* (return) number of ISO errors */
 	int timeout;			/* (in) timeout, in jiffies */
 	void *context;			/* (in) context for completion */
