@@ -596,7 +596,7 @@ static int ip6_frag_reasm(struct frag_queue *fq, struct sk_buff **skb_in,
 	BUG_TRAP(FRAG6_CB(head)->offset == 0);
 
 	/* Unfragmented part is taken from the first segment. */
-	payload_len = (head->data - head->nh.raw) - sizeof(struct ipv6hdr) + fq->len - 8;
+	payload_len = (head->data - head->nh.raw) - sizeof(struct ipv6hdr) + fq->len - sizeof(struct frag_hdr);
 	if (payload_len > 65535)
 		goto out_oversize;
 
@@ -631,9 +631,10 @@ static int ip6_frag_reasm(struct frag_queue *fq, struct sk_buff **skb_in,
 	 * header in order to calculate ICV correctly. */
 	nhoff = fq->nhoffset;
 	head->nh.raw[nhoff] = head->h.raw[0];
-	memmove(head->head+8, head->head, (head->data-head->head)-8);
-	head->mac.raw += 8;
-	head->nh.raw += 8;
+	memmove(head->head + sizeof(struct frag_hdr), head->head, 
+		(head->data - head->head) - sizeof(struct frag_hdr));
+	head->mac.raw += sizeof(struct frag_hdr);
+	head->nh.raw += sizeof(struct frag_hdr);
 
 	skb_shinfo(head)->frag_list = head->next;
 	head->h.raw = head->data;
