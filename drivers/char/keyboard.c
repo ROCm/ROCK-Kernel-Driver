@@ -264,23 +264,34 @@ void kd_mksound(unsigned int hz, unsigned int ticks)
 /*
  * Setting the keyboard rate.
  */
+static inline unsigned int ms_to_jiffies(unsigned int ms) {
+	unsigned int j;
+
+	j = (ms * HZ + 500) / 1000;
+	return (j > 0) ? j : 1;
+}
+
 int kbd_rate(struct kbd_repeat *rep)
 {
-	struct list_head * node;
-
-	if (rep->rate < 0 || rep->delay < 0)
-		return -EINVAL;
+	struct list_head *node;
+	unsigned int d = 0;
+	unsigned int p = 0;
 
 	list_for_each(node,&kbd_handler.h_list) {
 		struct input_handle *handle = to_handle_h(node);
-		if (test_bit(EV_REP, handle->dev->evbit)) {
-			if (rep->rate > HZ) rep->rate = HZ;
-			handle->dev->rep[REP_PERIOD] = rep->rate ? (HZ / rep->rate) : 0;
-			handle->dev->rep[REP_DELAY] = rep->delay * HZ / 1000;
-			if (handle->dev->rep[REP_DELAY] < handle->dev->rep[REP_PERIOD])
-				handle->dev->rep[REP_DELAY] = handle->dev->rep[REP_PERIOD];
+		struct input_dev *dev = handle->dev;
+
+		if (test_bit(EV_REP, dev->evbit)) {
+			if (rep->delay > 0)
+				dev->rep[REP_DELAY] = ms_to_jiffies(rep->delay);
+			if (rep->period > 0)
+				dev->rep[REP_PERIOD] = ms_to_jiffies(rep->period);
+			d = dev->rep[REP_DELAY]  * 1000 / HZ;
+			p = dev->rep[REP_PERIOD] * 1000 / HZ;
 		}
 	}
+	rep->delay  = d;
+	rep->period = p;
 	return 0;
 }
 

@@ -24,6 +24,7 @@ sequences). To utilise this ability, you have to do 8 things:
     kernel with the ewrk3 configuration turned off and reboot.
     5) insmod ewrk3.o
           [Alan Cox: Changed this so you can insmod ewrk3.o irq=x io=y]
+          [Adam Kropelin: Multiple cards now supported by irq=x1,x2 io=y1,y2]
     6) run the net startup bits for your new eth?? interface manually 
     (usually /etc/rc.inet[12] at boot time). 
     7) enjoy!

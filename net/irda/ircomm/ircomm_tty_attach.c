@@ -517,6 +517,23 @@ void ircomm_tty_link_established(struct ircomm_tty_cb *self)
 	
 	del_timer(&self->watchdog_timer);
 
+	/* Remove LM-IAS object now so it is not reused.
+	 * IrCOMM deals very poorly with multiple incomming connections.
+	 * It should looks a lot more like IrNET, and "dup" a server TSAP
+	 * to the application TSAP (based on various rules).
+	 * This is a cheap workaround allowing multiple clients to
+	 * connect to us. It will not always work.
+	 * Each IrCOMM socket has an IAS entry. Incomming connection will
+	 * pick the first one found. So, when we are fully connected,
+	 * we remove our IAS entries so that the next IAS entry is used.
+	 * We do that for *both* client and server, because a server
+	 * can also create client instances.
+	 * Jean II */
+	if (self->obj) {
+		irias_delete_object(self->obj);
+		self->obj = NULL;
+	}
+
 	/* 
 	 * IrCOMM link is now up, and if we are not using hardware
 	 * flow-control, then declare the hardware as running. Otherwise we
@@ -527,7 +544,7 @@ void ircomm_tty_link_established(struct ircomm_tty_cb *self)
 		IRDA_DEBUG(0, "%s(), waiting for CTS ...\n", __FUNCTION__ );
 		return;
 	} else {
-		IRDA_DEBUG(2, "%s(), starting hardware!\n", __FUNCTION__ );
+		IRDA_DEBUG(1, "%s(), starting hardware!\n", __FUNCTION__ );
 
 		self->tty->hw_stopped = 0;
 	

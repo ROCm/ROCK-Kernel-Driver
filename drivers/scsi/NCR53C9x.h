@@ -283,6 +283,17 @@ enum esp_rev {
   espunknown = 0x09
 };
 
+/* We allocate one of these for each scsi device and attach it to
+ * SDptr->hostdata for use in the driver
+ */
+struct esp_device {
+  unsigned char sync_min_period;
+  unsigned char sync_max_offset;
+  unsigned sync:1;
+  unsigned wide:1;
+  unsigned disconnect:1;
+};
+
 /* We get one of these for each ESP probed. */
 struct NCR_ESP {
   struct NCR_ESP *next;                   /* Next ESP on probed or NULL */

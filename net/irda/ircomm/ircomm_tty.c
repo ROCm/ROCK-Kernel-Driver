@@ -421,8 +421,8 @@ static int ircomm_tty_open(struct tty_struct *tty, struct file *filp)
 
 		self->line = line;
 		INIT_WORK(&self->tqueue, ircomm_tty_do_softint, self);
-		self->max_header_size = IRCOMM_TTY_HDR_UNITIALISED;
-		self->max_data_size = 64-self->max_header_size;
+		self->max_header_size = IRCOMM_TTY_HDR_UNINITIALISED;
+		self->max_data_size = IRCOMM_TTY_DATA_UNINITIALISED;
 		self->close_delay = 5*HZ/10;
 		self->closing_wait = 30*HZ;
 
@@ -719,16 +719,26 @@ static int ircomm_tty_write(struct tty_struct *tty, int from_user,
 
 	/* We may receive packets from the TTY even before we have finished
 	 * our setup. Not cool.
-	 * The problem is that we would allocate a skb with bogus header and
-	 * data size, and when adding data to it later we would get
-	 * confused.
-	 * Better to not accept data until we are properly setup. Use bogus
-	 * header size to check that (safest way to detect it).
+	 * The problem is that we don't know the final header and data size
+	 * to create the proper skb, so any skb we would create would have
+	 * bogus header and data size, so need care.
+	 * We use a bogus header size to safely detect this condition.
+	 * Another problem is that hw_stopped was set to 0 way before it
+	 * should be, so we would drop this skb. It should now be fixed.
+	 * One option is to not accept data until we are properly setup.
+	 * But, I suspect that when it happens, the ppp line discipline
+	 * just "drops" the data, which might screw up connect scripts.
+	 * The second option is to create a "safe skb", with large header
+	 * and small size (see ircomm_tty_open() for values).
+	 * We just need to make sure that when the real values get filled,
+	 * we don't mess up the original "safe skb" (see tx_data_size).
 	 * Jean II */
-	if (self->max_header_size == IRCOMM_TTY_HDR_UNITIALISED) {
-		/* TTY will retry */
-		IRDA_DEBUG(2, "%s() : not initialised\n", __FUNCTION__ );
-		return len;
+	if (self->max_header_size == IRCOMM_TTY_HDR_UNINITIALISED) {
+		IRDA_DEBUG(1, "%s() : not initialised\n", __FUNCTION__);
+#ifdef IRCOMM_NO_TX_BEFORE_INIT
+		/* We didn't consume anything, TTY will retry */
+		return 0;
+#endif
 	}
 
 	spin_lock_irqsave(&self->spinlock, flags);
@@ -761,8 +771,11 @@ static int ircomm_tty_write(struct tty_struct *tty, int from_user,
 			 * transmit buffer? Cannot use skb_tailroom, since
 			 * dev_alloc_skb gives us a larger skb than we 
 			 * requested
+			 * Note : use tx_data_size, because max_data_size
+			 * may have changed and we don't want to overwrite
+			 * the skb. - Jean II
 			 */
-			if ((tailroom = (self->max_data_size-skb->len)) > 0) {
+			if ((tailroom = (self->tx_data_size - skb->len)) > 0) {
 				/* Adjust data to tailroom */
 				if (size > tailroom)
 					size = tailroom;
@@ -783,6 +796,9 @@ static int ircomm_tty_write(struct tty_struct *tty, int from_user,
 			}
 			skb_reserve(skb, self->max_header_size);
 			self->tx_skb = skb;
+			/* Remember skb size because max_data_size may
+			 * change later on - Jean II */
+			self->tx_data_size = self->max_data_size;
 		}
 		
 		/* Copy data */
@@ -825,17 +841,22 @@ static int ircomm_tty_write_room(struct tty_struct *tty)
 	ASSERT(self != NULL, return -1;);
 	ASSERT(self->magic == IRCOMM_TTY_MAGIC, return -1;);
 
+#ifdef IRCOMM_NO_TX_BEFORE_INIT
+	/* max_header_size tells us if the channel is initialised or not. */
+	if (self->max_header_size == IRCOMM_TTY_HDR_UNINITIALISED)
+		/* Don't bother us yet */
+		return 0;
+#endif
+
 	/* Check if we are allowed to transmit any data.
 	 * hw_stopped is the regular flow control.
-	 * max_header_size tells us if the channel is initialised or not.
 	 * Jean II */
-	if ((tty->hw_stopped) ||
-	    (self->max_header_size == IRCOMM_TTY_HDR_UNITIALISED))
+	if (tty->hw_stopped)
 		ret = 0;
 	else {
 		spin_lock_irqsave(&self->spinlock, flags);
 		if (self->tx_skb)
-			ret = self->max_data_size - self->tx_skb->len;
+			ret = self->tx_data_size - self->tx_skb->len;
 		else
 			ret = self->max_data_size;
 		spin_unlock_irqrestore(&self->spinlock, flags);

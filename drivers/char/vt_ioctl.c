@@ -430,6 +430,7 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 	case KDKBDREP:
 	{
 		struct kbd_repeat kbrep;
+		int err;
 		
 		if (!capable(CAP_SYS_TTY_CONFIG))
 			return -EPERM;
@@ -437,8 +438,9 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 		if (copy_from_user(&kbrep, (void *)arg,
 				   sizeof(struct kbd_repeat)))
 			return -EFAULT;
-		if ((i = kbd_rate( &kbrep )))
-			return i;
+		err = kbd_rate(&kbrep);
+		if (err)
+			return err;
 		if (copy_to_user((void *)arg, &kbrep,
 				 sizeof(struct kbd_repeat)))
 			return -EFAULT;

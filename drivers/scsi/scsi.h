@@ -587,8 +587,8 @@ struct scsi_device {
 	char * model;		/* ... after scan; point to static string */
 	char * rev;		/* ... "nullnullnullnull" before scan */
 	unsigned char current_tag;	/* current tag */
-	unsigned char sync_min_period;	/* Not less than this period */
-	unsigned char sync_max_offset;	/* Not greater than this offset */
+//	unsigned char sync_min_period;	/* Not less than this period */
+//	unsigned char sync_max_offset;	/* Not greater than this offset */
 
 	unsigned online:1;
 	unsigned writeable:1;
@@ -599,15 +599,16 @@ struct scsi_device {
 	unsigned lockable:1;	/* Able to prevent media removal */
 	unsigned borken:1;	/* Tell the Seagate driver to be 
 				 * painfully slow on this device */
-	unsigned disconnect:1;	/* can disconnect */
+//	unsigned disconnect:1;	/* can disconnect */
 	unsigned soft_reset:1;	/* Uses soft reset option */
 	unsigned sdtr:1;	/* Device supports SDTR messages */
 	unsigned wdtr:1;	/* Device supports WDTR messages */
 	unsigned ppr:1;		/* Device supports PPR messages */
 	unsigned tagged_supported:1;	/* Supports SCSI-II tagged queuing */
-	unsigned tagged_queue:1;	/* SCSI-II tagged queuing enabled */
-	unsigned simple_tags:1;	/* Device supports simple queue tag messages */
-	unsigned ordered_tags:1;/* Device supports ordered queue tag messages */
+	unsigned tagged_queue:1;/* This is going away!!!!  Look at simple_tags
+				   instead!!!  Please fix your driver now!! */
+	unsigned simple_tags:1;	/* simple queue tag messages are enabled */
+	unsigned ordered_tags:1;/* ordered queue tag messages are enabled */
 	unsigned single_lun:1;	/* Indicates we should only allow I/O to
 				 * one of the luns for the device at a 
 				 * time. */
@@ -619,8 +620,8 @@ struct scsi_device {
 	unsigned remap:1;	/* support remapping  */
 	unsigned starved:1;	/* unable to process commands because
 				   host busy */
-	unsigned sync:1;	/* Sync transfer state, managed by host */
-	unsigned wide:1;	/* WIDE transfer state, managed by host */
+//	unsigned sync:1;	/* Sync transfer state, managed by host */
+//	unsigned wide:1;	/* WIDE transfer state, managed by host */
 
 	unsigned int device_blocked;	/* Device returned QUEUE_FULL. */
 

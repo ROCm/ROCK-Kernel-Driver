@@ -57,7 +57,7 @@ __u16 const irda_crc16_table[256] =
 	0x7bc7, 0x6a4e, 0x58d5, 0x495c, 0x3de3, 0x2c6a, 0x1ef1, 0x0f78
 };
 
-unsigned short crc_calc( __u16 fcs, __u8 const *buf, size_t len) 
+unsigned short irda_calc_crc16( __u16 fcs, __u8 const *buf, size_t len) 
 {
 	while (len--)
                 fcs = irda_fcs(fcs, *buf++);

@@ -48,7 +48,9 @@
 /* This is used as an initial value to max_header_size before the proper
  * value is filled in (5 for ttp, 4 for lmp). This allow us to detect
  * the state of the underlying connection. - Jean II */
-#define IRCOMM_TTY_HDR_UNITIALISED	32
+#define IRCOMM_TTY_HDR_UNINITIALISED	16
+/* Same for payload size. See qos.c for the smallest max data size */
+#define IRCOMM_TTY_DATA_UNINITIALISED	(64 - IRCOMM_TTY_HDR_UNINITIALISED)
 
 /*
  * IrCOMM TTY driver state
@@ -83,6 +85,7 @@ struct ircomm_tty_cb {
 
 	__u32 max_data_size;   /* Max data we can transmit in one packet */
 	__u32 max_header_size; /* The amount of header space we must reserve */
+	__u32 tx_data_size;	/* Max data size of current tx_skb */
 
 	struct iriap_cb *iriap; /* Instance used for querying remote IAS */
 	struct ias_object* obj;

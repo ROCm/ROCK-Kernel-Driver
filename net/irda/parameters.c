@@ -200,11 +200,13 @@ static int irda_extract_integer(void *self, __u8 *buf, int len, __u8 pi,
 {
 	irda_param_t p;
 	int n = 0;
+	int extract_len;	/* Real lenght we extract */
 	int err;
 
 	p.pi = pi;     /* In case handler needs to know */
 	p.pl = buf[1]; /* Extract lenght of value */
 	p.pv.i = 0;    /* Clear value */
+	extract_len = p.pl;	/* Default : extract all */
 
 	/* Check if buffer is long enough for parsing */
 	if (len < (2+p.pl)) {
@@ -217,18 +219,30 @@ static int irda_extract_integer(void *self, __u8 *buf, int len, __u8 pi,
 	/*
 	 * Check that the integer length is what we expect it to be. If the
 	 * handler want a 16 bits integer then a 32 bits is not good enough
+	 * PV_INTEGER means that the handler is flexible.
 	 */
 	if (((type & PV_MASK) != PV_INTEGER) && ((type & PV_MASK) != p.pl)) {
 		ERROR("%s: invalid parameter length! "
 		      "Expected %d bytes, but value had %d bytes!\n",
 		      __FUNCTION__, type & PV_MASK, p.pl);
 
-		/* Skip parameter */
-		return p.pl+2;
+		/* Most parameters are bit/byte fields or little endian,
+		 * so it's ok to only extract a subset of it (the subset
+		 * that the handler expect). This is necessary, as some
+		 * broken implementations seems to add extra undefined bits.
+		 * If the parameter is shorter than we expect or is big
+		 * endian, we can't play those tricks. Jean II */
+		if((p.pl < (type & PV_MASK)) || (type & PV_BIG_ENDIAN)) {
+			/* Skip parameter */
+			return p.pl+2;
+		} else {
+			/* Extract subset of it, fallthrough */
+			extract_len = type & PV_MASK;
+		}
 	}
 
 
-	switch (p.pl) {
+	switch (extract_len) {
 	case 1:
 		n += irda_param_unpack(buf+2, "b", &p.pv.i);
 		break;

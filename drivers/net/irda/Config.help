@@ -55,12 +55,22 @@ CONFIG_NSC_FIR
   <file:Documentation/modules.txt>.  The module will be called
   nsc-ircc.o.
 
-CONFIG_TOSHIBA_FIR
+CONFIG_TOSHIBA_OLD
   Say Y here if you want to build support for the Toshiba Type-O IR
   chipset.  This chipset is used by the Toshiba Libretto 100CT, and
-  many more laptops.  If you want to compile it as a module, say M
-  here and read <file:Documentation/modules.txt>.  The module will be
-  called toshoboe.o.
+  many more laptops. This driver is obsolete, will no more be
+  maintained and will be removed in favor of the new driver.
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.
+  The module will be called toshoboe.o.
+
+CONFIG_TOSHIBA_FIR
+  Say Y here if you want to build support for the Toshiba Type-O IR
+  and Donau oboe chipsets. These chipsets are used by the Toshiba
+  Libretto 100/110CT, Tecra 8100, Portege 7020 and many more laptops.
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.
+  The module will be called donauboe.o.
 
 CONFIG_SMC_IRCC_FIR
   Say Y here if you want to build support for the SMC Infrared
@@ -165,3 +175,18 @@ CONFIG_ACT200L_DONGLE
   the normal 9-pin serial port connector, and can currently only be
   used by IrTTY. To activate support for ACTiSYS IR-200L dongles
   you will have to start irattach like this: "irattach -d act200l".
+
+Mobile Action MA600 dongle (Experimental)
+CONFIG_MA600_DONGLE
+  Say Y here if you want to build support for the Mobile Action MA600
+  dongle.  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  The MA600 dongle attaches to
+  the normal 9-pin serial port connector, and can currently only be
+  tested on IrCOMM.  To activate support for MA600 dongles you will
+  have to insert "irattach -d ma600" in the /etc/irda/drivers script.
+  Note: irutils 0.9.15 requires no modification. irutils 0.9.9 needs
+  modification. For more information, download the following tar gzip
+  file.
+
+  There is a pre-compiled module on
+  <http://engsvr.ust.hk/~eetwl95/download/ma600-2.4.x.tar.gz>

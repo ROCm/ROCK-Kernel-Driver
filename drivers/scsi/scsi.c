@@ -1624,11 +1624,40 @@ void scsi_adjust_queue_depth(Scsi_Device *SDpnt, int tagged, int tags)
 	/*
 	 * refuse to set tagged depth to an unworkable size
 	 */
-	if(tags == 0)
+	if(tags <= 0)
 		return;
+	/*
+	 * Limit max queue depth on a single lun to 256 for now.  Remember,
+	 * we allocate a struct scsi_command for each of these and keep it
+	 * around forever.  Too deep of a depth just wastes memory.
+	 */
+	if(tags > 256)
+		return;
+
 	spin_lock_irqsave(&device_request_lock, flags);
 	SDpnt->new_queue_depth = tags;
-	SDpnt->tagged_queue = tagged;
+	switch(tagged) {
+		case MSG_ORDERED_TAG:
+			SDpnt->ordered_tags = 1;
+			SDpnt->simple_tags = 1;
+			break;
+		case MSG_SIMPLE_TAG:
+			SDpnt->ordered_tags = 0;
+			SDpnt->simple_tags = 1;
+			break;
+		default:
+			printk(KERN_WARNING "(scsi%d:%d:%d:%d) "
+				"scsi_adjust_queue_depth, bad queue type, "
+				"disabled\n", SDpnt->host->host_no,
+				SDpnt->channel, SDpnt->id, SDpnt->lun); 
+		case 0:
+			SDpnt->ordered_tags = SDpnt->simple_tags = 0;
+			if(SDpnt->host->cmd_per_lun)
+				SDpnt->new_queue_depth = SDpnt->host->cmd_per_lun;
+			else
+				SDpnt->new_queue_depth = 1;
+			break;
+	}
 	spin_unlock_irqrestore(&device_request_lock, flags);
 	if(SDpnt->queue_depth == 0)
 	{
