@@ -117,6 +117,7 @@ struct sctp_transport *sctp_transport_init(struct sctp_transport *peer,
 	INIT_LIST_HEAD(&peer->transmitted);
 	INIT_LIST_HEAD(&peer->send_ready);
 	INIT_LIST_HEAD(&peer->transports);
+	sctp_packet_init(&peer->packet, peer, 0, 0);
 
 	/* Set up the retransmission timer.  */
 	init_timer(&peer->T3_rtx_timer);
