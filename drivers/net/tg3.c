@@ -5051,16 +5051,20 @@ static void tg3_set_rx_mode(struct net_device *dev)
 
 #define TG3_REGDUMP_LEN		(32 * 1024)
 
-static u8 *tg3_get_regs(struct tg3 *tp)
+static int tg3_get_regs_len(struct net_device *dev)
 {
-	u8 *orig_p = kmalloc(TG3_REGDUMP_LEN, GFP_KERNEL);
-	u8 *p;
+	return TG3_REGDUMP_LEN;
+}
+
+static void tg3_get_regs(struct net_device *dev, struct ethtool_regs *regs, void *p)
+{
+	struct tg3 *tp = dev->priv;
+	u8 *orig_p = p;
 	int i;
 
-	if (orig_p == NULL)
-		return NULL;
+	regs->version = 0;
 
-	memset(orig_p, 0, TG3_REGDUMP_LEN);
+	memset(p, 0, TG3_REGDUMP_LEN);
 
 	spin_lock_irq(&tp->lock);
 	spin_lock(&tp->tx_lock);
@@ -5114,388 +5118,263 @@ do {	p = orig_p + (reg);	\
 
 	spin_unlock(&tp->tx_lock);
 	spin_unlock_irq(&tp->lock);
-
-	return orig_p;
 }
 
-static int tg3_ethtool_ioctl (struct net_device *dev, void *useraddr)
+static int tg3_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+{
+  	struct tg3 *tp = dev->priv;
+  
+	if (!(tp->tg3_flags & TG3_FLAG_INIT_COMPLETE) ||
+					tp->link_config.phy_is_low_power)
+		return -EAGAIN;
+
+	cmd->supported = (SUPPORTED_Autoneg);
+
+	if (!(tp->tg3_flags & TG3_FLAG_10_100_ONLY))
+		cmd->supported |= (SUPPORTED_1000baseT_Half |
+				   SUPPORTED_1000baseT_Full);
+
+	if (tp->phy_id != PHY_ID_SERDES)
+		cmd->supported |= (SUPPORTED_100baseT_Half |
+				  SUPPORTED_100baseT_Full |
+				  SUPPORTED_10baseT_Half |
+				  SUPPORTED_10baseT_Full |
+				  SUPPORTED_MII);
+	else
+		cmd->supported |= SUPPORTED_FIBRE;
+  
+	cmd->advertising = tp->link_config.advertising;
+	cmd->speed = tp->link_config.active_speed;
+	cmd->duplex = tp->link_config.active_duplex;
+	cmd->port = 0;
+	cmd->phy_address = PHY_ADDR;
+	cmd->transceiver = 0;
+	cmd->autoneg = tp->link_config.autoneg;
+	cmd->maxtxpkt = 0;
+	cmd->maxrxpkt = 0;
+	return 0;
+}
+  
+static int tg3_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 {
 	struct tg3 *tp = dev->priv;
-	struct pci_dev *pci_dev = tp->pdev;
-	u32 ethcmd;
+  
+	if (!(tp->tg3_flags & TG3_FLAG_INIT_COMPLETE) ||
+					tp->link_config.phy_is_low_power)
+		return -EAGAIN;
 
-	if (copy_from_user (&ethcmd, useraddr, sizeof (ethcmd)))
-		return -EFAULT;
-
-	switch (ethcmd) {
-	case ETHTOOL_GDRVINFO:{
-		struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
-		strcpy (info.driver, DRV_MODULE_NAME);
-		strcpy (info.version, DRV_MODULE_VERSION);
-		memset(&info.fw_version, 0, sizeof(info.fw_version));
-		strcpy (info.bus_info, pci_name(pci_dev));
-		info.eedump_len = 0;
-		info.regdump_len = TG3_REGDUMP_LEN;
-		if (copy_to_user (useraddr, &info, sizeof (info)))
-			return -EFAULT;
-		return 0;
-	}
-
-	case ETHTOOL_GSET: {
-		struct ethtool_cmd cmd = { ETHTOOL_GSET };
-
-		if (!(tp->tg3_flags & TG3_FLAG_INIT_COMPLETE) ||
-		    tp->link_config.phy_is_low_power)
-			return -EAGAIN;
-		cmd.supported = (SUPPORTED_Autoneg);
-
-		if (!(tp->tg3_flags & TG3_FLAG_10_100_ONLY))
-			cmd.supported |= (SUPPORTED_1000baseT_Half |
-					  SUPPORTED_1000baseT_Full);
-
-		if (tp->phy_id != PHY_ID_SERDES)
-			cmd.supported |= (SUPPORTED_100baseT_Half |
-					  SUPPORTED_100baseT_Full |
-					  SUPPORTED_10baseT_Half |
-					  SUPPORTED_10baseT_Full |
-					  SUPPORTED_MII);
-		else
-			cmd.supported |= SUPPORTED_FIBRE;
-
-		cmd.advertising = tp->link_config.advertising;
-		cmd.speed = tp->link_config.active_speed;
-		cmd.duplex = tp->link_config.active_duplex;
-		cmd.port = 0;
-		cmd.phy_address = PHY_ADDR;
-		cmd.transceiver = 0;
-		cmd.autoneg = tp->link_config.autoneg;
-		cmd.maxtxpkt = 0;
-		cmd.maxrxpkt = 0;
-		if (copy_to_user(useraddr, &cmd, sizeof(cmd)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_SSET: {
-		struct ethtool_cmd cmd;
-
-		if (!(tp->tg3_flags & TG3_FLAG_INIT_COMPLETE) ||
-		    tp->link_config.phy_is_low_power)
-			return -EAGAIN;
-
-		if (copy_from_user(&cmd, useraddr, sizeof(cmd)))
-			return -EFAULT;
-
-		/* Fiber PHY only supports 1000 full/half */
-		if (cmd.autoneg == AUTONEG_ENABLE) {
-			if (tp->phy_id == PHY_ID_SERDES &&
-			    (cmd.advertising &
-			     (ADVERTISED_10baseT_Half |
-			      ADVERTISED_10baseT_Full |
-			      ADVERTISED_100baseT_Half |
-			      ADVERTISED_100baseT_Full)))
-				return -EINVAL;
-			if ((tp->tg3_flags & TG3_FLAG_10_100_ONLY) &&
-			    (cmd.advertising &
-			     (ADVERTISED_1000baseT_Half |
-			      ADVERTISED_1000baseT_Full)))
-				return -EINVAL;
-		} else {
-			if (tp->phy_id == PHY_ID_SERDES &&
-			    (cmd.speed == SPEED_10 ||
-			     cmd.speed == SPEED_100))
-				return -EINVAL;
-			if ((tp->tg3_flags & TG3_FLAG_10_100_ONLY) &&
-			    (cmd.speed == SPEED_10 ||
-			     cmd.speed == SPEED_100))
-				return -EINVAL;
-		}
-
-		spin_lock_irq(&tp->lock);
-		spin_lock(&tp->tx_lock);
-
-		tp->link_config.autoneg = cmd.autoneg;
-		if (cmd.autoneg == AUTONEG_ENABLE) {
-			tp->link_config.advertising = cmd.advertising;
-			tp->link_config.speed = SPEED_INVALID;
-			tp->link_config.duplex = DUPLEX_INVALID;
-		} else {
-			tp->link_config.speed = cmd.speed;
-			tp->link_config.duplex = cmd.duplex;
-		}
-
-		tg3_setup_phy(tp);
-		spin_unlock(&tp->tx_lock);
-		spin_unlock_irq(&tp->lock);
-
-		return 0;
-	}
-
-	case ETHTOOL_GREGS: {
-		struct ethtool_regs regs;
-		u8 *regbuf;
-		int ret;
-
-		if (copy_from_user(&regs, useraddr, sizeof(regs)))
-			return -EFAULT;
-		if (regs.len > TG3_REGDUMP_LEN)
-			regs.len = TG3_REGDUMP_LEN;
-		regs.version = 0;
-		if (copy_to_user(useraddr, &regs, sizeof(regs)))
-			return -EFAULT;
-
-		regbuf = tg3_get_regs(tp);
-		if (!regbuf)
-			return -ENOMEM;
-
-		useraddr += offsetof(struct ethtool_regs, data);
-		ret = 0;
-		if (copy_to_user(useraddr, regbuf, regs.len))
-			ret = -EFAULT;
-		kfree(regbuf);
-		return ret;
-	}
-	case ETHTOOL_GWOL: {
-		struct ethtool_wolinfo wol = { ETHTOOL_GWOL };
-
-		wol.supported = WAKE_MAGIC;
-		wol.wolopts = 0;
-		if (tp->tg3_flags & TG3_FLAG_WOL_ENABLE)
-			wol.wolopts = WAKE_MAGIC;
-		memset(&wol.sopass, 0, sizeof(wol.sopass));
-		if (copy_to_user(useraddr, &wol, sizeof(wol)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_SWOL: {
-		struct ethtool_wolinfo wol;
-
-		if (copy_from_user(&wol, useraddr, sizeof(wol)))
-			return -EFAULT;
-		if (wol.wolopts & ~WAKE_MAGIC)
-			return -EINVAL;
-		if ((wol.wolopts & WAKE_MAGIC) &&
-		    tp->phy_id == PHY_ID_SERDES &&
-		    !(tp->tg3_flags & TG3_FLAG_SERDES_WOL_CAP))
-			return -EINVAL;
-
-		spin_lock_irq(&tp->lock);
-		if (wol.wolopts & WAKE_MAGIC)
-			tp->tg3_flags |= TG3_FLAG_WOL_ENABLE;
-		else
-			tp->tg3_flags &= ~TG3_FLAG_WOL_ENABLE;
-		spin_unlock_irq(&tp->lock);
-
-		return 0;
-	}
-	case ETHTOOL_GMSGLVL: {
-		struct ethtool_value edata = { ETHTOOL_GMSGLVL };
-		edata.data = tp->msg_enable;
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_SMSGLVL: {
-		struct ethtool_value edata;
-		if (copy_from_user(&edata, useraddr, sizeof(edata)))
-			return -EFAULT;
-		tp->msg_enable = edata.data;
-		return 0;
-	}
-	case ETHTOOL_NWAY_RST: {
-		u32 bmcr;
-		int r;
-
-		spin_lock_irq(&tp->lock);
-		tg3_readphy(tp, MII_BMCR, &bmcr);
-		tg3_readphy(tp, MII_BMCR, &bmcr);
-		r = -EINVAL;
-		if (bmcr & BMCR_ANENABLE) {
-			tg3_writephy(tp, MII_BMCR,
-				     bmcr | BMCR_ANRESTART);
-			r = 0;
-		}
-		spin_unlock_irq(&tp->lock);
-
-		return r;
-	}
-	case ETHTOOL_GLINK: {
-		struct ethtool_value edata = { ETHTOOL_GLINK };
-		edata.data = netif_carrier_ok(tp->dev) ? 1 : 0;
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_GRINGPARAM: {
-		struct ethtool_ringparam ering = { ETHTOOL_GRINGPARAM };
-
-		ering.rx_max_pending = TG3_RX_RING_SIZE - 1;
-		ering.rx_mini_max_pending = 0;
-		ering.rx_jumbo_max_pending = TG3_RX_JUMBO_RING_SIZE - 1;
-
-		ering.rx_pending = tp->rx_pending;
-		ering.rx_mini_pending = 0;
-		ering.rx_jumbo_pending = tp->rx_jumbo_pending;
-		ering.tx_pending = tp->tx_pending;
-
-		if (copy_to_user(useraddr, &ering, sizeof(ering)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_SRINGPARAM: {
-		struct ethtool_ringparam ering;
-
-		if (copy_from_user(&ering, useraddr, sizeof(ering)))
-			return -EFAULT;
-
-		if ((ering.rx_pending > TG3_RX_RING_SIZE - 1) ||
-		    (ering.rx_jumbo_pending > TG3_RX_JUMBO_RING_SIZE - 1) ||
-		    (ering.tx_pending > TG3_TX_RING_SIZE - 1))
-			return -EINVAL;
-
-		tg3_netif_stop(tp);
-		spin_lock_irq(&tp->lock);
-		spin_lock(&tp->tx_lock);
-
-		tp->rx_pending = ering.rx_pending;
-		tp->rx_jumbo_pending = ering.rx_jumbo_pending;
-		tp->tx_pending = ering.tx_pending;
-
-		tg3_halt(tp);
-		tg3_init_hw(tp);
-		netif_wake_queue(tp->dev);
-		spin_unlock(&tp->tx_lock);
-		spin_unlock_irq(&tp->lock);
-		tg3_netif_start(tp);
-
-		return 0;
-	}
-	case ETHTOOL_GPAUSEPARAM: {
-		struct ethtool_pauseparam epause = { ETHTOOL_GPAUSEPARAM };
-
-		epause.autoneg =
-			(tp->tg3_flags & TG3_FLAG_PAUSE_AUTONEG) != 0;
-		epause.rx_pause =
-			(tp->tg3_flags & TG3_FLAG_PAUSE_RX) != 0;
-		epause.tx_pause =
-			(tp->tg3_flags & TG3_FLAG_PAUSE_TX) != 0;
-		if (copy_to_user(useraddr, &epause, sizeof(epause)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_SPAUSEPARAM: {
-		struct ethtool_pauseparam epause;
-
-		if (copy_from_user(&epause, useraddr, sizeof(epause)))
-			return -EFAULT;
-
-		tg3_netif_stop(tp);
-		spin_lock_irq(&tp->lock);
-		spin_lock(&tp->tx_lock);
-		if (epause.autoneg)
-			tp->tg3_flags |= TG3_FLAG_PAUSE_AUTONEG;
-		else
-			tp->tg3_flags &= ~TG3_FLAG_PAUSE_AUTONEG;
-		if (epause.rx_pause)
-			tp->tg3_flags |= TG3_FLAG_PAUSE_RX;
-		else
-			tp->tg3_flags &= ~TG3_FLAG_PAUSE_RX;
-		if (epause.tx_pause)
-			tp->tg3_flags |= TG3_FLAG_PAUSE_TX;
-		else
-			tp->tg3_flags &= ~TG3_FLAG_PAUSE_TX;
-		tg3_halt(tp);
-		tg3_init_hw(tp);
-		spin_unlock(&tp->tx_lock);
-		spin_unlock_irq(&tp->lock);
-		tg3_netif_start(tp);
-
-		return 0;
-	}
-	case ETHTOOL_GRXCSUM: {
-		struct ethtool_value edata = { ETHTOOL_GRXCSUM };
-
-		edata.data =
-			(tp->tg3_flags & TG3_FLAG_RX_CHECKSUMS) != 0;
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_SRXCSUM: {
-		struct ethtool_value edata;
-
-		if (copy_from_user(&edata, useraddr, sizeof(edata)))
-			return -EFAULT;
-
-		if (tp->tg3_flags & TG3_FLAG_BROKEN_CHECKSUMS) {
-			if (edata.data != 0)
-				return -EINVAL;
-			return 0;
-		}
-
-		spin_lock_irq(&tp->lock);
-		if (edata.data)
-			tp->tg3_flags |= TG3_FLAG_RX_CHECKSUMS;
-		else
-			tp->tg3_flags &= ~TG3_FLAG_RX_CHECKSUMS;
-		spin_unlock_irq(&tp->lock);
-
-		return 0;
-	}
-	case ETHTOOL_GTXCSUM: {
-		struct ethtool_value edata = { ETHTOOL_GTXCSUM };
-
-		edata.data =
-			(tp->dev->features & NETIF_F_IP_CSUM) != 0;
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_STXCSUM: {
-		struct ethtool_value edata;
-
-		if (copy_from_user(&edata, useraddr, sizeof(edata)))
-			return -EFAULT;
-
-		if (tp->tg3_flags & TG3_FLAG_BROKEN_CHECKSUMS) {
-			if (edata.data != 0)
-				return -EINVAL;
-			return 0;
-		}
-
-		if (edata.data)
-			tp->dev->features |= NETIF_F_IP_CSUM;
-		else
-			tp->dev->features &= ~NETIF_F_IP_CSUM;
-
-		return 0;
-	}
-	case ETHTOOL_GSG: {
-		struct ethtool_value edata = { ETHTOOL_GSG };
-
-		edata.data =
-			(tp->dev->features & NETIF_F_SG) != 0;
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_SSG: {
-		struct ethtool_value edata;
-
-		if (copy_from_user(&edata, useraddr, sizeof(edata)))
-			return -EFAULT;
-
-		if (edata.data)
-			tp->dev->features |= NETIF_F_SG;
-		else
-			tp->dev->features &= ~NETIF_F_SG;
-
-		return 0;
-	}
-	};
-
-	return -EOPNOTSUPP;
+	if (cmd->autoneg == AUTONEG_ENABLE) {
+		tp->link_config.advertising = cmd->advertising;
+		tp->link_config.speed = SPEED_INVALID;
+		tp->link_config.duplex = DUPLEX_INVALID;
+	} else {
+		tp->link_config.speed = cmd->speed;
+		tp->link_config.duplex = cmd->duplex;
+  	}
+  
+	tg3_setup_phy(tp);
+	spin_unlock(&tp->tx_lock);
+	spin_unlock_irq(&tp->lock);
+  
+	return 0;
 }
+  
+static void tg3_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
+{
+	struct tg3 *tp = dev->priv;
+  
+	strcpy(info->driver, DRV_MODULE_NAME);
+	strcpy(info->version, DRV_MODULE_VERSION);
+	strcpy(info->bus_info, pci_name(tp->pdev));
+}
+  
+static void tg3_get_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
+{
+	struct tg3 *tp = dev->priv;
+  
+	wol->supported = WAKE_MAGIC;
+	wol->wolopts = 0;
+	if (tp->tg3_flags & TG3_FLAG_WOL_ENABLE)
+		wol->wolopts = WAKE_MAGIC;
+	memset(&wol->sopass, 0, sizeof(wol->sopass));
+}
+  
+static int tg3_set_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
+{
+	struct tg3 *tp = dev->priv;
+  
+	if (wol->wolopts & ~WAKE_MAGIC)
+		return -EINVAL;
+	if ((wol->wolopts & WAKE_MAGIC) &&
+	    tp->phy_id == PHY_ID_SERDES &&
+	    !(tp->tg3_flags & TG3_FLAG_SERDES_WOL_CAP))
+		return -EINVAL;
+  
+	spin_lock_irq(&tp->lock);
+	if (wol->wolopts & WAKE_MAGIC)
+		tp->tg3_flags |= TG3_FLAG_WOL_ENABLE;
+	else
+		tp->tg3_flags &= ~TG3_FLAG_WOL_ENABLE;
+	spin_unlock_irq(&tp->lock);
+  
+	return 0;
+}
+  
+static u32 tg3_get_msglevel(struct net_device *dev)
+{
+	struct tg3 *tp = dev->priv;
+	return tp->msg_enable;
+}
+  
+static void tg3_set_msglevel(struct net_device *dev, u32 value)
+{
+	struct tg3 *tp = dev->priv;
+	tp->msg_enable = value;
+}
+  
+static int tg3_nway_reset(struct net_device *dev)
+{
+	struct tg3 *tp = dev->priv;
+	u32 bmcr;
+	int r;
+  
+	spin_lock_irq(&tp->lock);
+	tg3_readphy(tp, MII_BMCR, &bmcr);
+	tg3_readphy(tp, MII_BMCR, &bmcr);
+	r = -EINVAL;
+	if (bmcr & BMCR_ANENABLE) {
+		tg3_writephy(tp, MII_BMCR, bmcr | BMCR_ANRESTART);
+		r = 0;
+	}
+	spin_unlock_irq(&tp->lock);
+  
+	return r;
+}
+  
+static void tg3_get_ringparam(struct net_device *dev, struct ethtool_ringparam *ering)
+{
+	struct tg3 *tp = dev->priv;
+  
+	ering->rx_max_pending = TG3_RX_RING_SIZE - 1;
+	ering->rx_mini_max_pending = 0;
+	ering->rx_jumbo_max_pending = TG3_RX_JUMBO_RING_SIZE - 1;
 
+	ering->rx_pending = tp->rx_pending;
+	ering->rx_mini_pending = 0;
+	ering->rx_jumbo_pending = tp->rx_jumbo_pending;
+	ering->tx_pending = tp->tx_pending;
+}
+  
+static int tg3_set_ringparam(struct net_device *dev, struct ethtool_ringparam *ering)
+{
+	struct tg3 *tp = dev->priv;
+  
+	if ((ering->rx_pending > TG3_RX_RING_SIZE - 1) ||
+	    (ering->rx_jumbo_pending > TG3_RX_JUMBO_RING_SIZE - 1) ||
+	    (ering->tx_pending > TG3_TX_RING_SIZE - 1))
+		return -EINVAL;
+  
+	tg3_netif_stop(tp);
+	spin_lock_irq(&tp->lock);
+	spin_lock(&tp->tx_lock);
+  
+	tp->rx_pending = ering->rx_pending;
+	tp->rx_jumbo_pending = ering->rx_jumbo_pending;
+	tp->tx_pending = ering->tx_pending;
+
+	tg3_halt(tp);
+	tg3_init_rings(tp);
+	tg3_init_hw(tp);
+	netif_wake_queue(tp->dev);
+	spin_unlock(&tp->tx_lock);
+	spin_unlock_irq(&tp->lock);
+	tg3_netif_start(tp);
+  
+	return 0;
+}
+  
+static void tg3_get_pauseparam(struct net_device *dev, struct ethtool_pauseparam *epause)
+{
+	struct tg3 *tp = dev->priv;
+  
+	epause->autoneg = (tp->tg3_flags & TG3_FLAG_PAUSE_AUTONEG) != 0;
+	epause->rx_pause = (tp->tg3_flags & TG3_FLAG_PAUSE_RX) != 0;
+	epause->tx_pause = (tp->tg3_flags & TG3_FLAG_PAUSE_TX) != 0;
+}
+  
+static int tg3_set_pauseparam(struct net_device *dev, struct ethtool_pauseparam *epause)
+{
+	struct tg3 *tp = dev->priv;
+  
+	tg3_netif_stop(tp);
+	spin_lock_irq(&tp->lock);
+	spin_lock(&tp->tx_lock);
+	if (epause->autoneg)
+		tp->tg3_flags |= TG3_FLAG_PAUSE_AUTONEG;
+	else
+		tp->tg3_flags &= ~TG3_FLAG_PAUSE_AUTONEG;
+	if (epause->rx_pause)
+		tp->tg3_flags |= TG3_FLAG_PAUSE_RX;
+	else
+		tp->tg3_flags &= ~TG3_FLAG_PAUSE_RX;
+	if (epause->tx_pause)
+		tp->tg3_flags |= TG3_FLAG_PAUSE_TX;
+	else
+		tp->tg3_flags &= ~TG3_FLAG_PAUSE_TX;
+	tg3_halt(tp);
+	tg3_init_rings(tp);
+	tg3_init_hw(tp);
+	spin_unlock(&tp->tx_lock);
+	spin_unlock_irq(&tp->lock);
+	tg3_netif_start(tp);
+  
+	return 0;
+}
+  
+static u32 tg3_get_rx_csum(struct net_device *dev)
+{
+	struct tg3 *tp = dev->priv;
+	return (tp->tg3_flags & TG3_FLAG_RX_CHECKSUMS) != 0;
+}
+  
+static int tg3_set_rx_csum(struct net_device *dev, u32 data)
+{
+	struct tg3 *tp = dev->priv;
+  
+	if (tp->tg3_flags & TG3_FLAG_BROKEN_CHECKSUMS) {
+		if (data != 0)
+			return -EINVAL;
+  		return 0;
+  	}
+  
+	spin_lock_irq(&tp->lock);
+	if (data)
+		tp->tg3_flags |= TG3_FLAG_RX_CHECKSUMS;
+	else
+		tp->tg3_flags &= ~TG3_FLAG_RX_CHECKSUMS;
+	spin_unlock_irq(&tp->lock);
+  
+	return 0;
+}
+  
+static int tg3_set_tx_csum(struct net_device *dev, u32 data)
+{
+	struct tg3 *tp = dev->priv;
+  
+	if (tp->tg3_flags & TG3_FLAG_BROKEN_CHECKSUMS) {
+		if (data != 0)
+			return -EINVAL;
+  		return 0;
+  	}
+  
+	if (data)
+		dev->features |= NETIF_F_IP_CSUM;
+	else
+		dev->features &= ~NETIF_F_IP_CSUM;
+
+	return 0;
+}
+  
 static int tg3_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&ifr->ifr_data;
@@ -5503,8 +5382,6 @@ static int tg3_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	int err;
 
 	switch(cmd) {
-	case SIOCETHTOOL:
-		return tg3_ethtool_ioctl(dev, (void *) ifr->ifr_data);
 	case SIOCGMIIPHY:
 		data->phy_id = PHY_ADDR;
 
@@ -5567,6 +5444,30 @@ static void tg3_vlan_rx_kill_vid(struct net_device *dev, unsigned short vid)
 	spin_unlock_irq(&tp->lock);
 }
 #endif
+
+static struct ethtool_ops tg3_ethtool_ops = {
+	.get_settings		= tg3_get_settings,
+	.set_settings		= tg3_set_settings,
+	.get_drvinfo		= tg3_get_drvinfo,
+	.get_regs_len		= tg3_get_regs_len,
+	.get_regs		= tg3_get_regs,
+	.get_wol		= tg3_get_wol,
+	.set_wol		= tg3_set_wol,
+	.get_msglevel		= tg3_get_msglevel,
+	.set_msglevel		= tg3_set_msglevel,
+	.nway_reset		= tg3_nway_reset,
+	.get_link		= ethtool_op_get_link,
+	.get_ringparam		= tg3_get_ringparam,
+	.set_ringparam		= tg3_set_ringparam,
+	.get_pauseparam		= tg3_get_pauseparam,
+	.set_pauseparam		= tg3_set_pauseparam,
+	.get_rx_csum		= tg3_get_rx_csum,
+	.set_rx_csum		= tg3_set_rx_csum,
+	.get_tx_csum		= ethtool_op_get_tx_csum,
+	.set_tx_csum		= tg3_set_tx_csum,
+	.get_sg			= ethtool_op_get_sg,
+	.set_sg			= ethtool_op_set_sg,
+};
 
 /* Chips other than 5700/5701 use the NVRAM for fetching info. */
 static void __devinit tg3_nvram_init(struct tg3 *tp)
@@ -6880,6 +6781,7 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	dev->do_ioctl = tg3_ioctl;
 	dev->tx_timeout = tg3_tx_timeout;
 	dev->poll = tg3_poll;
+	dev->ethtool_ops = &tg3_ethtool_ops;
 	dev->weight = 64;
 	dev->watchdog_timeo = TG3_TX_TIMEOUT;
 	dev->change_mtu = tg3_change_mtu;
