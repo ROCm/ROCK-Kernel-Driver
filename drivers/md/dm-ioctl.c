@@ -174,7 +174,7 @@ static void free_cell(struct hash_cell *hc)
 static int register_with_devfs(struct hash_cell *hc)
 {
 	struct gendisk *disk = dm_disk(hc->md);
-	char *name = kmalloc(DM_NAME_LEN + strlen(DM_DIR) + 1);
+	char *name = kmalloc(DM_NAME_LEN + strlen(DM_DIR) + 1, GFP_KERNEL);
 	if (!name) {
 		return -ENOMEM;
 	}
