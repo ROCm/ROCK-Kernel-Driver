@@ -1100,11 +1100,9 @@ hfsc_change_class(struct Qdisc *sch, u32 classid, u32 parentid,
 		sch_tree_unlock(sch);
 
 #ifdef CONFIG_NET_ESTIMATOR
-		if (tca[TCA_RATE-1]) {
-			qdisc_kill_estimator(&cl->stats);
-			qdisc_new_estimator(&cl->stats, cl->stats_lock,
-					    tca[TCA_RATE-1]);
-		}
+		if (tca[TCA_RATE-1])
+			gen_replace_estimator(&cl->bstats, &cl->rate_est,
+				cl->stats_lock, tca[TCA_RATE-1]);
 #endif
 		return 0;
 	}
@@ -1162,8 +1160,8 @@ hfsc_change_class(struct Qdisc *sch, u32 classid, u32 parentid,
 
 #ifdef CONFIG_NET_ESTIMATOR
 	if (tca[TCA_RATE-1])
-		qdisc_new_estimator(&cl->stats, cl->stats_lock,
-				    tca[TCA_RATE-1]);
+		gen_new_estimator(&cl->bstats, &cl->rate_est,
+			cl->stats_lock, tca[TCA_RATE-1]);
 #endif
 	*arg = (unsigned long)cl;
 	return 0;
@@ -1188,7 +1186,7 @@ hfsc_destroy_class(struct Qdisc *sch, struct hfsc_class *cl)
 	hfsc_destroy_filters(&cl->filter_list);
 	qdisc_destroy(cl->qdisc);
 #ifdef CONFIG_NET_ESTIMATOR
-	qdisc_kill_estimator(&cl->stats);
+	gen_kill_estimator(&cl->bstats, &cl->rate_est);
 #endif
 	if (cl != &q->root)
 		kfree(cl);
