@@ -294,25 +294,6 @@ void zap_hugepage_range(struct vm_area_struct *vma, unsigned long start, unsigne
 	spin_unlock(&mm->page_table_lock);
 }
 
-static void unlink_vma(struct vm_area_struct *mpnt)
-{
-	struct mm_struct *mm = current->mm;
-	struct vm_area_struct *vma;
-
-	vma = mm->mmap;
-	if (vma == mpnt) {
-		mm->mmap = vma->vm_next;
-	} else {
-		while (vma->vm_next != mpnt) {
-			vma = vma->vm_next;
-		}
-		vma->vm_next = mpnt->vm_next;
-	}
-	rb_erase(&mpnt->vm_rb, &mm->mm_rb);
-	mm->mmap_cache = NULL;
-	mm->map_count--;
-}
-
 static struct inode *set_new_inode(unsigned long len, int prot, int flag, int key)
 {
 	struct inode *inode;
