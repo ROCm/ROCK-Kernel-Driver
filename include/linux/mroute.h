@@ -217,7 +217,6 @@ struct pimreghdr
 	__u32	flags;
 };
 
-extern int pim_rcv(struct sk_buff *);
 extern int pim_rcv_v1(struct sk_buff *);
 
 struct rtmsg;
