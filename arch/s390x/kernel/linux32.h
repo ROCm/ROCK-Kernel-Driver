@@ -25,15 +25,6 @@ struct ipc_kludge_32 {
 #define F_SETLK64       13
 #define F_SETLKW64      14    
 
-struct flock32 {
-        short l_type;
-        short l_whence;
-        compat_off_t l_start;
-        compat_off_t l_len;
-        compat_pid_t l_pid;
-        short __unused;
-}; 
-
 struct statfs32 {
 	__s32			f_type;
 	__s32			f_bsize;
