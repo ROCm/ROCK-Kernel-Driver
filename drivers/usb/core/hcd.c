@@ -1150,9 +1150,9 @@ static int hcd_unlink_urb (struct urb *urb)
 	 * lower level hcd code is always async, locking on urb->status
 	 * updates; an intercepted completion unblocks us.
 	 */
-	if ((urb->transfer_flags & USB_TIMEOUT_KILLED))
+	if ((urb->transfer_flags & URB_TIMEOUT_KILLED))
 		urb->status = -ETIMEDOUT;
-	else if (!(urb->transfer_flags & USB_ASYNC_UNLINK)) {
+	else if (!(urb->transfer_flags & URB_ASYNC_UNLINK)) {
 		if (in_interrupt ()) {
 			dbg ("non-async unlink in_interrupt");
 			retval = -EWOULDBLOCK;

@@ -1957,7 +1957,7 @@ static int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 	usb_fill_bulk_urb (urb, dev->udev,
 			usb_sndbulkpipe (dev->udev, info->out),
 			skb->data, skb->len, tx_complete, skb);
-	urb->transfer_flags |= USB_ASYNC_UNLINK;
+	urb->transfer_flags |= URB_ASYNC_UNLINK;
 	// FIXME urb->timeout = ... jiffies ... ;
 
 	spin_lock_irqsave (&dev->txq.lock, flags);
