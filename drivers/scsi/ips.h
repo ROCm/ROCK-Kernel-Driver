@@ -959,6 +959,20 @@ typedef struct {
 } IPS_SCSI_MODE_PAGE4;
 
 /*
+ * Sense Data Format - Page 8
+ */
+typedef struct {
+   uint8_t  PageCode;
+   uint8_t  PageLength;
+   uint8_t  flags;
+   uint8_t  RetentPrio;
+   uint16_t DisPrefetchLen;
+   uint16_t MinPrefetchLen;
+   uint16_t MaxPrefetchLen;
+   uint16_t MaxPrefetchCeiling;
+} IPS_SCSI_MODE_PAGE8;
+
+/*
  * Sense Data Format - Block Descriptor (DASD)
  */
 typedef struct {
@@ -985,6 +999,7 @@ typedef struct {
    union {
       IPS_SCSI_MODE_PAGE3 pg3;
       IPS_SCSI_MODE_PAGE4 pg4;
+      IPS_SCSI_MODE_PAGE8 pg8;
    } pdata;
 } IPS_SCSI_MODE_PAGE_DATA;
 

@@ -3375,8 +3375,8 @@ ips_map_status(ips_ha_t *ha, ips_scb_t *scb, ips_stat_t *sp) {
                 ips_name,
                 ha->host_num,
                 scb->scsi_cmd->device->channel,
-                scb->scsi_cmd->channel->id,
-                scb->scsi_cmd->channel->lun,
+                scb->scsi_cmd->device->id,
+                scb->scsi_cmd->device->lun,
                 scb->basic_status,
                 scb->extended_status,
                 scb->extended_status == IPS_ERR_CKCOND ? scb->dcdb.sense_info[2] & 0xf : 0,
@@ -4222,6 +4222,12 @@ ips_msense(ips_ha_t *ha, ips_scb_t *scb) {
       mdata.pdata.pg4.flags = 0;
       mdata.pdata.pg4.RotationalOffset = 0;
       mdata.pdata.pg4.MediumRotationRate = 0;
+      break;
+   case 0x8:
+      mdata.pdata.pg8.PageCode = 8;
+      mdata.pdata.pg8.PageLength = sizeof(IPS_SCSI_MODE_PAGE8);
+      mdata.hdr.DataLength = 3 + mdata.hdr.BlockDescLength + mdata.pdata.pg8.PageLength;
+      /* everything else is left set to 0 */
       break;
 
    default:
@@ -6797,7 +6803,7 @@ ips_module_init(void){
 		pci_unregister_driver(&ips_pci_driver);
 		return -ENODEV;
 	}
-
+	register_reboot_notifier(&ips_notifier);
 	return 0;
 }
 
