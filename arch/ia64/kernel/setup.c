@@ -67,7 +67,6 @@ unsigned int num_io_spaces;
 
 unsigned char aux_device_present = 0xaa;        /* XXX remove this when legacy I/O is gone */
 
-#ifdef CONFIG_PCI
 /*
  * The merge_mask variable needs to be set to (max(iommu_page_size(iommu)) - 1).  This
  * mask specifies a mask of address bits that must be 0 in order for two buffers to be
@@ -78,7 +77,6 @@ unsigned char aux_device_present = 0xaa;        /* XXX remove this when legacy I
  * page-size of 2^64.
  */
 unsigned long ia64_max_iommu_merge_mask = ~0UL;
-#endif
 
 #define COMMAND_LINE_SIZE	512
 
