@@ -6765,13 +6765,13 @@ static int ixj_fasync(int fd, struct file *file_p, int mode)
 
 struct file_operations ixj_fops =
 {
-        owner:          THIS_MODULE,
-        read:           ixj_enhanced_read,
-        write:          ixj_enhanced_write,
-        poll:           ixj_poll,
-        ioctl:          ixj_ioctl,
-        release:        ixj_release,
-        fasync:         ixj_fasync
+        .owner          = THIS_MODULE,
+        .read           = ixj_enhanced_read,
+        .write          = ixj_enhanced_write,
+        .poll           = ixj_poll,
+        .ioctl          = ixj_ioctl,
+        .release        = ixj_release,
+        .fasync         = ixj_fasync
 };
 
 static int ixj_linetest(IXJ *j)
