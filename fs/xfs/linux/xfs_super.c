@@ -453,7 +453,7 @@ syncd(void *arg)
 	vfs_t			*vfsp = (vfs_t *) arg;
 	int			error;
 
-	daemonize("xfs_syncd");
+	daemonize("xfssyncd");
 
 	vfsp->vfs_sync_task = current;
 	wmb();

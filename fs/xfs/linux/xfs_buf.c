@@ -1641,7 +1641,7 @@ pagebuf_daemon(
 	struct list_head	*curr, *next, tmp;
 
 	/*  Set up the thread  */
-	daemonize("pagebufd");
+	daemonize("xfsbufd");
 	current->flags |= PF_MEMALLOC;
 
 	pagebuf_daemon_task = current;
