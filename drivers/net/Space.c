@@ -54,7 +54,7 @@ extern struct net_device *eepro_probe(int unit);
 extern int at1500_probe(struct net_device *);
 extern int at1700_probe(struct net_device *);
 extern int fmv18x_probe(struct net_device *);
-extern int eth16i_probe(struct net_device *);
+extern struct net_device *eth16i_probe(int unit);
 extern struct net_device *i82596_probe(int unit);
 extern struct net_device *ewrk3_probe(int unit);
 extern struct net_device *el1_probe(int unit);
@@ -247,13 +247,13 @@ static struct devprobe isa_probes[] __initdata = {
 #ifdef CONFIG_FMV18X		/* Fujitsu FMV-181/182 */
 	{fmv18x_probe, 0},
 #endif
-#ifdef CONFIG_ETH16I
-	{eth16i_probe, 0},	/* ICL EtherTeam 16i/32 */
-#endif
 	{NULL, 0},
 };
 
 static struct devprobe2 isa_probes2[] __initdata = {
+#ifdef CONFIG_ETH16I
+	{eth16i_probe, 0},	/* ICL EtherTeam 16i/32 */
+#endif
 #ifdef CONFIG_EEXPRESS		/* Intel EtherExpress */
 	{express_probe, 0},
 #endif
