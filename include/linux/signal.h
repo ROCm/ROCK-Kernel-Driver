@@ -3,6 +3,7 @@
 
 #include <asm/signal.h>
 #include <asm/siginfo.h>
+#include <linux/list.h>
 
 #ifdef __KERNEL__
 /*
@@ -10,12 +11,17 @@
  */
 
 struct sigqueue {
-	struct sigqueue *next;
+	struct list_head list;
+	spinlock_t *lock;
+	int flags;
 	siginfo_t info;
 };
 
+/* flags values. */
+#define SIGQUEUE_PREALLOC	1
+
 struct sigpending {
-	struct sigqueue *head, **tail;
+	struct list_head list;
 	sigset_t signal;
 };
 
@@ -197,8 +203,7 @@ static inline void siginitsetinv(sigset_t *set, unsigned long mask)
 static inline void init_sigpending(struct sigpending *sig)
 {
 	sigemptyset(&sig->signal);
-	sig->head = NULL;
-	sig->tail = &sig->head;
+	INIT_LIST_HEAD(&sig->list);
 }
 
 extern long do_sigpending(void __user *, unsigned long);

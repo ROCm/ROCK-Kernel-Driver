@@ -538,8 +538,6 @@ struct gendisk *alloc_disk(int minors)
 			memset(disk->part, 0, size);
 		}
 		disk->minors = minors;
-		while (minors >>= 1)
-			disk->minor_shift++;
 		kobj_set_kset_s(disk,block_subsys);
 		kobject_init(&disk->kobj);
 		rand_initialize_disk(disk);

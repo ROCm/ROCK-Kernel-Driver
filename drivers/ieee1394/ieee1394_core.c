@@ -61,7 +61,6 @@ static kmem_cache_t *hpsb_packet_cache;
 
 /* Some globals used */
 const char *hpsb_speedto_str[] = { "S100", "S200", "S400", "S800", "S1600", "S3200" };
-const u8 hpsb_speedto_maxrec[] = {   0x7,    0x8,    0x9,   0x10,    0x11,    0x12 };
 
 static void dump_packet(const char *text, quadlet_t *data, int size)
 {
@@ -1246,7 +1245,6 @@ EXPORT_SYMBOL(hpsb_unref_host);
 
 /** ieee1394_core.c **/
 EXPORT_SYMBOL(hpsb_speedto_str);
-EXPORT_SYMBOL(hpsb_speedto_maxrec);
 EXPORT_SYMBOL(hpsb_set_packet_complete_task);
 EXPORT_SYMBOL(alloc_hpsb_packet);
 EXPORT_SYMBOL(free_hpsb_packet);

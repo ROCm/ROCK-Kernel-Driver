@@ -384,7 +384,10 @@ static void build_conf(struct menu *menu)
 			switch (type) {
 			case S_BOOLEAN:
 				cprint("t%p", menu);
-				cprint1("[%c]", val == no ? ' ' : '*');
+				if (sym_is_changable(sym))
+					cprint1("[%c]", val == no ? ' ' : '*');
+				else
+					cprint1("---");
 				break;
 			case S_TRISTATE:
 				cprint("t%p", menu);
@@ -393,7 +396,10 @@ static void build_conf(struct menu *menu)
 				case mod: ch = 'M'; break;
 				default:  ch = ' '; break;
 				}
-				cprint1("<%c>", ch);
+				if (sym_is_changable(sym))
+					cprint1("<%c>", ch);
+				else
+					cprint1("---");
 				break;
 			default:
 				cprint("s%p", menu);
@@ -402,13 +408,15 @@ static void build_conf(struct menu *menu)
 				if (tmp < 0)
 					tmp = 0;
 				cprint1("%*c%s%s", tmp, ' ', menu_get_prompt(menu),
-					sym_has_value(sym) ? "" : " (NEW)");
+					(sym_has_value(sym) || !sym_is_changable(sym)) ?
+					"" : " (NEW)");
 				cprint_done();
 				goto conf_childs;
 			}
 		}
 		cprint1("%*c%s%s", indent + 1, ' ', menu_get_prompt(menu),
-			sym_has_value(sym) ? "" : " (NEW)");
+			(sym_has_value(sym) || !sym_is_changable(sym)) ?
+			"" : " (NEW)");
 		if (menu->prompt->type == P_MENU) {
 			cprint1("  --->");
 			cprint_done();
@@ -780,10 +788,12 @@ int main(int ac, char **av)
 		conf_write(NULL);
 		printf("\n\n"
 			"*** End of Linux kernel configuration.\n"
-			"*** Check the top-level Makefile for additional configuration.\n"
-			"*** Next, you may run 'make bzImage', 'make bzdisk', or 'make install'.\n\n");
+			"*** Execute 'make' to build the kernel or try 'make help'."
+			"\n\n");
 	} else
-		printf("\n\nYour kernel configuration changes were NOT saved.\n\n");
+		printf("\n\n"
+			"Your kernel configuration changes were NOT saved."
+			"\n\n");
 
 	return 0;
 }

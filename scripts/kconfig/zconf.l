@@ -106,11 +106,17 @@ n	[A-Za-z0-9_]
 	"default"		BEGIN(PARAM); return T_DEFAULT;
 	"prompt"		BEGIN(PARAM); return T_PROMPT;
 	"tristate"		BEGIN(PARAM); return T_TRISTATE;
+	"def_tristate"		BEGIN(PARAM); return T_DEF_TRISTATE;
 	"bool"			BEGIN(PARAM); return T_BOOLEAN;
 	"boolean"		BEGIN(PARAM); return T_BOOLEAN;
+	"def_bool"		BEGIN(PARAM); return T_DEF_BOOLEAN;
+	"def_boolean"		BEGIN(PARAM); return T_DEF_BOOLEAN;
 	"int"			BEGIN(PARAM); return T_INT;
 	"hex"			BEGIN(PARAM); return T_HEX;
 	"string"		BEGIN(PARAM); return T_STRING;
+	"select"		BEGIN(PARAM); return T_SELECT;
+	"enable"		BEGIN(PARAM); return T_SELECT;
+	"range"			BEGIN(PARAM); return T_RANGE;
 	{n}+	{
 		alloc_string(yytext, yyleng);
 		zconflval.string = text;
@@ -208,7 +214,6 @@ n	[A-Za-z0-9_]
 			}
 			append_string("        ", ts);
 		}
-		
 	}
 	[ \t]*\n/[^ \t\n] {
 		current_file->lineno++;
@@ -250,11 +255,11 @@ void zconf_starthelp(void)
 static void zconf_endhelp(void)
 {
 	zconflval.string = text;
-	BEGIN(INITIAL); 
+	BEGIN(INITIAL);
 }
 
 
-/* 
+/*
  * Try to open specified file with following names:
  * ./name
  * $(srctree)/name
@@ -347,7 +352,7 @@ static struct buffer *zconf_endfile(void)
 int zconf_lineno(void)
 {
 	if (current_buf)
-		return current_file->lineno;
+		return current_file->lineno - 1;
 	else
 		return 0;
 }
