@@ -53,7 +53,9 @@ struct ipt_entry_match
 			u_int16_t match_size;
 
 			/* Used by userspace */
-			char name[IPT_FUNCTION_MAXNAMELEN];
+			char name[IPT_FUNCTION_MAXNAMELEN-1];
+
+			u_int8_t revision;
 		} user;
 		struct {
 			u_int16_t match_size;
@@ -76,7 +78,9 @@ struct ipt_entry_target
 			u_int16_t target_size;
 
 			/* Used by userspace */
-			char name[IPT_FUNCTION_MAXNAMELEN];
+			char name[IPT_FUNCTION_MAXNAMELEN-1];
+
+			u_int8_t revision;
 		} user;
 		struct {
 			u_int16_t target_size;
@@ -344,7 +348,9 @@ struct ipt_match
 {
 	struct list_head list;
 
-	const char name[IPT_FUNCTION_MAXNAMELEN];
+	const char name[IPT_FUNCTION_MAXNAMELEN-1];
+
+	u_int8_t revision;
 
 	/* Return true or false: return FALSE and set *hotdrop = 1 to
            force immediate packet drop. */
@@ -378,7 +384,9 @@ struct ipt_target
 {
 	struct list_head list;
 
-	const char name[IPT_FUNCTION_MAXNAMELEN];
+	const char name[IPT_FUNCTION_MAXNAMELEN-1];
+
+	u_int8_t revision;
 
 	/* Called when user tries to insert an entry of this type:
            hook_mask is a bitmask of hooks from which it can be
