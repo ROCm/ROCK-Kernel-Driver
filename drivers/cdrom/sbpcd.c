@@ -570,7 +570,7 @@ static const char *major_name="sbpcd";
 
 /*==========================================================================*/
 
-#if FUTURE
+#ifdef FUTURE
 static DECLARE_WAIT_QUEUE_HEAD(sbp_waitq);
 #endif /* FUTURE */
 
@@ -703,7 +703,7 @@ static struct sbpcd_drive {
 	u_char TocEnt_number;
 	u_char TocEnt_format; /* em */
 	u_int TocEnt_address;
-#if SAFE_MIXED
+#ifdef SAFE_MIXED
 	char has_data;
 #endif /* SAFE_MIXED */ 
 	u_char ored_ctl_adr; /* to detect if CDROM contains data tracks */
@@ -3176,7 +3176,7 @@ static int cc_CheckMultiSession(void)
 	return (0);
 }
 /*==========================================================================*/
-#if FUTURE
+#ifdef FUTURE
 static int cc_SubChanInfo(int frame, int count, u_char *buffer)
 	/* "frame" is a RED BOOK (msf-bin) address */
 {
@@ -3733,7 +3733,7 @@ static int __init check_drives(void)
 	return (0);
 }
 /*==========================================================================*/
-#if FUTURE
+#ifdef FUTURE
 /*
  *  obtain if requested service disturbs current audio state
  */            
@@ -4027,7 +4027,7 @@ static int sbpcd_drive_status(struct cdrom_device_info *cdi, int slot_nr)
 
 
 /*==========================================================================*/
-#if FUTURE
+#ifdef FUTURE
 /*
  *  called always if driver gets entered
  *  returns 0 or ERROR2 or ERROR15
@@ -4198,7 +4198,7 @@ static int sbpcd_dev_ioctl(struct cdrom_device_info *cdi, u_int cmd,
 		
 	case CDROMREADMODE1:
 		msg(DBG_IOC,"ioctl: CDROMREADMODE1 requested.\n");
-#if SAFE_MIXED
+#ifdef SAFE_MIXED
 		if (current_drive->has_data>1) RETURN_UP(-EBUSY);
 #endif /* SAFE_MIXED */
 		cc_ModeSelect(CD_FRAMESIZE);
@@ -4208,7 +4208,7 @@ static int sbpcd_dev_ioctl(struct cdrom_device_info *cdi, u_int cmd,
 		
 	case CDROMREADMODE2: /* not usable at the moment */
 		msg(DBG_IOC,"ioctl: CDROMREADMODE2 requested.\n");
-#if SAFE_MIXED
+#ifdef SAFE_MIXED
 		if (current_drive->has_data>1) RETURN_UP(-EBUSY);
 #endif /* SAFE_MIXED */
 		cc_ModeSelect(CD_FRAMESIZE_RAW1);
@@ -4257,11 +4257,11 @@ static int sbpcd_dev_ioctl(struct cdrom_device_info *cdi, u_int cmd,
 		if (famL_drive) RETURN_UP(-EINVAL);
 		if (famV_drive) RETURN_UP(-EINVAL);
 		if (famT_drive) RETURN_UP(-EINVAL);
-#if SAFE_MIXED
+#ifdef SAFE_MIXED
 		if (current_drive->has_data>1) RETURN_UP(-EBUSY);
 #endif /* SAFE_MIXED */ 
 		if (current_drive->aud_buf==NULL) RETURN_UP(-EINVAL);
-		if (copy_from_user(&read_audio, (void *)arg,
+		if (copy_from_user(&read_audio, (void __user *)arg,
 				   sizeof(struct cdrom_read_audio)))
 			RETURN_UP(-EFAULT);
 		if (read_audio.nframes < 0 || read_audio.nframes>current_drive->sbp_audsiz) RETURN_UP(-EINVAL);
@@ -4460,8 +4460,8 @@ static int sbpcd_dev_ioctl(struct cdrom_device_info *cdi, u_int cmd,
 				msg(DBG_AUD,"read_audio: cc_ReadError was necessary after read: %02X\n",i);
 				continue;
 			}
-			if (copy_to_user((u_char *)read_audio.buf,
-					 (u_char *) current_drive->aud_buf,
+			if (copy_to_user(read_audio.buf,
+					 current_drive->aud_buf,
 					 read_audio.nframes * CD_FRAMESIZE_RAW))
 				RETURN_UP(-EFAULT);
 			msg(DBG_AUD,"read_audio: copy_to_user done.\n");
@@ -4549,7 +4549,7 @@ static int sbpcd_audio_ioctl(struct cdrom_device_info *cdi, u_int cmd,
 		
 	case CDROMPLAYMSF:
 		msg(DBG_IOC,"ioctl: CDROMPLAYMSF entered.\n");
-#if SAFE_MIXED
+#ifdef SAFE_MIXED
 		if (current_drive->has_data>1) RETURN_UP(-EBUSY);
 #endif /* SAFE_MIXED */ 
 		if (current_drive->audio_state==audio_playing)
@@ -4584,7 +4584,7 @@ static int sbpcd_audio_ioctl(struct cdrom_device_info *cdi, u_int cmd,
 		
 	case CDROMPLAYTRKIND: /* Play a track.  This currently ignores index. */
 		msg(DBG_IOC,"ioctl: CDROMPLAYTRKIND entered.\n");
-#if SAFE_MIXED
+#ifdef SAFE_MIXED
 		if (current_drive->has_data>1) RETURN_UP(-EBUSY);
 #endif /* SAFE_MIXED */ 
 		if (current_drive->audio_state==audio_playing)
@@ -4647,7 +4647,7 @@ static int sbpcd_audio_ioctl(struct cdrom_device_info *cdi, u_int cmd,
 		
 	case CDROMSTOP:      /* Spin down the drive */
 		msg(DBG_IOC,"ioctl: CDROMSTOP entered.\n");
-#if SAFE_MIXED
+#ifdef SAFE_MIXED
 		if (current_drive->has_data>1) RETURN_UP(-EBUSY);
 #endif /* SAFE_MIXED */ 
 		i=cc_Pause_Resume(1);
@@ -4912,7 +4912,7 @@ static void do_sbpcd_request(request_queue_t * q)
 		goto request_loop;
 	}
 
-#if FUTURE
+#ifdef FUTURE
 	i=prepare(0,0); /* at moment not really a hassle check, but ... */
 	if (i!=0)
 		msg(DBG_INF,"\"prepare\" tells error %d -- ignored\n", i);
@@ -4940,7 +4940,7 @@ static void do_sbpcd_request(request_queue_t * q)
 		sbp_sleep(0);
 		if (sbp_data(req) != 0)
 		{
-#if SAFE_MIXED
+#ifdef SAFE_MIXED
 			current_drive->has_data=2; /* is really a data disk */
 #endif /* SAFE_MIXED */ 
 #ifdef DEBUG_GTL
@@ -5416,11 +5416,11 @@ static int sbpcd_open(struct cdrom_device_info *cdi, int purpose)
 		if ((current_drive->ored_ctl_adr&0x40)==0)
 		{		
 			msg(DBG_INF,"CD contains no data tracks.\n");
-#if SAFE_MIXED
+#ifdef SAFE_MIXED
 			current_drive->has_data=0;
 #endif /* SAFE_MIXED */
 		}
-#if SAFE_MIXED
+#ifdef SAFE_MIXED
 		else if (current_drive->has_data<1) current_drive->has_data=1;
 #endif /* SAFE_MIXED */ 
 	}
@@ -5455,7 +5455,7 @@ static void sbpcd_release(struct cdrom_device_info * cdi)
 				if (p->f_eject) cc_SpinDown();
 			p->diskstate_flags &= ~cd_size_bit;
 			p->open_count=0; 
-#if SAFE_MIXED
+#ifdef SAFE_MIXED
 			p->has_data=0;
 #endif /* SAFE_MIXED */ 
 		}
@@ -5822,7 +5822,7 @@ int __init sbpcd_init(void)
 
 		if (p->drv_id==-1) continue;
 		switch_drive(p);
-#if SAFE_MIXED
+#ifdef SAFE_MIXED
 		p->has_data=0;
 #endif /* SAFE_MIXED */ 
 		/*
@@ -5942,7 +5942,7 @@ static int sbpcd_media_changed(struct cdrom_device_info *cdi, int disc_nr)
 		current_drive->diskstate_flags &= ~toc_bit;
 		/* we *don't* need invalidate here, it's done by caller */
 		current_drive->diskstate_flags &= ~cd_size_bit;
-#if SAFE_MIXED
+#ifdef SAFE_MIXED
 		current_drive->has_data=0;
 #endif /* SAFE_MIXED */ 
 
