@@ -1991,6 +1991,9 @@ int ip_mc_sf_allow(struct sock *sk, u32 loc_addr, u32 rmt_addr, int dif)
 	struct ip_sf_socklist *psl;
 	int i;
 
+	if (!MULTICAST(loc_addr))
+		return 1;
+
 	for (pmc=inet->mc_list; pmc; pmc=pmc->next) {
 		if (pmc->multi.imr_multiaddr.s_addr == loc_addr &&
 		    pmc->multi.imr_ifindex == dif)
