@@ -605,6 +605,7 @@ static int __init bpq_init_driver(void)
 
 	printk(banner);
 
+#ifdef CONFIG_PROC_FS
 	if (!proc_net_fops_create("bpqether", S_IRUGO, &bpq_info_fops)) {
 		printk(KERN_ERR
 			"bpq: cannot create /proc/net/bpqether entry.\n");
@@ -612,6 +613,7 @@ static int __init bpq_init_driver(void)
 		dev_remove_pack(&bpq_packet_type);
 		return -ENOENT;
 	}
+#endif  /* CONFIG_PROC_FS */
 
 	rtnl_lock();
 	for (dev = dev_base; dev != NULL; dev = dev->next) {
