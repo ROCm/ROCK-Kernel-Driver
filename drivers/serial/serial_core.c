@@ -584,8 +584,10 @@ static int uart_get_info(struct uart_state *state,
 	tmp.flags	    = port->flags;
 	tmp.xmit_fifo_size  = port->fifosize;
 	tmp.baud_base	    = port->uartclk / 16;
-	tmp.close_delay	    = state->close_delay;
-	tmp.closing_wait    = state->closing_wait;
+	tmp.close_delay	    = state->close_delay / 10;
+	tmp.closing_wait    = state->closing_wait == USF_CLOSING_WAIT_NONE ?
+				ASYNC_CLOSING_WAIT_NONE :
+			        state->closing_wait / 10;
 	tmp.custom_divisor  = port->custom_divisor;
 	tmp.hub6	    = port->hub6;
 	tmp.io_type         = port->iotype;
@@ -603,8 +605,8 @@ static int uart_set_info(struct uart_state *state,
 	struct serial_struct new_serial;
 	struct uart_port *port = state->port;
 	unsigned long new_port;
-	unsigned int change_irq, change_port, old_flags;
-	unsigned int old_custom_divisor;
+	unsigned int change_irq, change_port, old_flags, closing_wait;
+	unsigned int old_custom_divisor, close_delay;
 	int retval = 0;
 
 	if (copy_from_user(&new_serial, newinfo, sizeof(new_serial)))
@@ -615,6 +617,9 @@ static int uart_set_info(struct uart_state *state,
 		new_port += (unsigned long) new_serial.port_high << HIGH_BITS_OFFSET;
 
 	new_serial.irq = irq_canonicalize(new_serial.irq);
+	close_delay = new_serial.close_delay * 10;
+	closing_wait = new_serial.closing_wait == ASYNC_CLOSING_WAIT_NONE ?
+			USF_CLOSING_WAIT_NONE : new_serial.closing_wait * 10;
 
 	/*
 	 * This semaphore protects state->count.  It is also
@@ -646,8 +651,8 @@ static int uart_set_info(struct uart_state *state,
 		retval = -EPERM;
 		if (change_irq || change_port ||
 		    (new_serial.baud_base != port->uartclk / 16) ||
-		    (new_serial.close_delay != state->close_delay) ||
-		    (new_serial.closing_wait != state->closing_wait) ||
+		    (close_delay != state->close_delay) ||
+		    (closing_wait != state->closing_wait) ||
 		    (new_serial.xmit_fifo_size != port->fifosize) ||
 		    (((new_serial.flags ^ old_flags) & ~UPF_USR_MASK) != 0))
 			goto exit;
@@ -751,8 +756,8 @@ static int uart_set_info(struct uart_state *state,
 	port->flags            = (port->flags & ~UPF_CHANGE_MASK) |
 				 (new_serial.flags & UPF_CHANGE_MASK);
 	port->custom_divisor   = new_serial.custom_divisor;
-	state->close_delay     = new_serial.close_delay * HZ / 100;
-	state->closing_wait    = new_serial.closing_wait * HZ / 100;
+	state->close_delay     = close_delay;
+	state->closing_wait    = closing_wait;
 	port->fifosize         = new_serial.xmit_fifo_size;
 	if (state->info->tty)
 		state->info->tty->low_latency =
@@ -1191,7 +1196,7 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 	tty->closing = 1;
 
 	if (state->closing_wait != USF_CLOSING_WAIT_NONE)
-		tty_wait_until_sent(tty, state->closing_wait);
+		tty_wait_until_sent(tty, msecs_to_jiffies(state->closing_wait));
 
 	/*
 	 * At this point, we stop accepting input.  To do this, we
@@ -1219,9 +1224,8 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 	state->info->tty = NULL;
 
 	if (state->info->blocked_open) {
-		if (state->close_delay) {
-			msleep_interruptible(jiffies_to_msecs(state->close_delay));
-		}
+		if (state->close_delay)
+			msleep_interruptible(state->close_delay);
 	} else if (!uart_console(port)) {
 		uart_change_pm(state, 3);
 	}
@@ -2082,8 +2086,8 @@ int uart_register_driver(struct uart_driver *drv)
 	for (i = 0; i < drv->nr; i++) {
 		struct uart_state *state = drv->state + i;
 
-		state->close_delay     = 5 * HZ / 10;
-		state->closing_wait    = 30 * HZ;
+		state->close_delay     = 500;	/* .5 seconds */
+		state->closing_wait    = 30000;	/* 30 seconds */
 
 		init_MUTEX(&state->sem);
 	}

@@ -244,11 +244,11 @@ struct uart_port {
  * within.
  */
 struct uart_state {
-	unsigned int		close_delay;
-	unsigned int		closing_wait;
+	unsigned int		close_delay;		/* msec */
+	unsigned int		closing_wait;		/* msec */
 
 #define USF_CLOSING_WAIT_INF	(0)
-#define USF_CLOSING_WAIT_NONE	(65535)
+#define USF_CLOSING_WAIT_NONE	(~0U)
 
 	int			count;
 	int			pm_state;
