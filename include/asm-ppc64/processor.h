@@ -579,7 +579,9 @@ GLUE(GLUE(.LT,NAME),_procname_end):
 #define mfmsr()		({unsigned long rval; \
 			asm volatile("mfmsr %0" : "=r" (rval)); rval;})
 
-#define mtmsrd(v)	asm volatile("mtmsrd %0" : : "r" (v))
+#define __mtmsrd(v, l)	asm volatile("mtmsrd %0," __stringify(l) \
+				     : : "r" (v))
+#define mtmsrd(v)	__mtmsrd((v), 0)
 
 #define mfspr(rn)	({unsigned long rval; \
 			asm volatile("mfspr %0," __stringify(rn) \

@@ -35,13 +35,13 @@ extern void __no_lpq_restore_flags(unsigned long);
 #else
 
 #define __save_flags(flags)	((flags) = mfmsr())
-#define __restore_flags(flags)	mtmsrd(flags)
+#define __restore_flags(flags)	__mtmsrd((flags), 1)
 
 static inline void __cli(void)
 {
 	unsigned long msr;
 	msr = mfmsr();
-	mtmsrd(msr & ~MSR_EE);
+	__mtmsrd(msr & ~MSR_EE, 1);
 	__asm__ __volatile__("": : :"memory");
 }
 
@@ -50,7 +50,7 @@ static inline void __sti(void)
 	unsigned long msr;
 	__asm__ __volatile__("": : :"memory");
 	msr = mfmsr();
-	mtmsrd(msr | MSR_EE);
+	__mtmsrd(msr | MSR_EE, 1);
 }
 
 static inline void __do_save_and_cli(unsigned long *flags)
@@ -58,7 +58,7 @@ static inline void __do_save_and_cli(unsigned long *flags)
 	unsigned long msr;
 	msr = mfmsr();
 	*flags = msr;
-	mtmsrd(msr & ~MSR_EE);
+	__mtmsrd(msr & ~MSR_EE, 1);
 	__asm__ __volatile__("": : :"memory");
 }
 
