@@ -245,5 +245,6 @@ struct e1000_adapter {
 
 
 	uint32_t pci_state[16];
+	int msg_enable;
 };
 #endif /* _E1000_H_ */

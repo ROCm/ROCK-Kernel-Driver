@@ -170,6 +170,7 @@ static void e1000_alloc_rx_buffers(struct e1000_adapter *adapter);
 static int e1000_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd);
 static int e1000_mii_ioctl(struct net_device *netdev, struct ifreq *ifr,
 			   int cmd);
+void set_ethtool_ops(struct net_device *netdev);
 static void e1000_enter_82542_rst(struct e1000_adapter *adapter);
 static void e1000_leave_82542_rst(struct e1000_adapter *adapter);
 static inline void e1000_rx_checksum(struct e1000_adapter *adapter,
@@ -206,7 +207,7 @@ struct notifier_block e1000_notifier_reboot = {
 /* Exported from other modules */
 
 extern void e1000_check_options(struct e1000_adapter *adapter);
-extern int e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr);
+
 
 static struct pci_driver e1000_driver = {
 	.name     = e1000_driver_name,
@@ -446,6 +447,7 @@ e1000_probe(struct pci_dev *pdev,
 	netdev->set_mac_address = &e1000_set_mac;
 	netdev->change_mtu = &e1000_change_mtu;
 	netdev->do_ioctl = &e1000_ioctl;
+	set_ethtool_ops(netdev);
 	netdev->tx_timeout = &e1000_tx_timeout;
 	netdev->watchdog_timeo = 5 * HZ;
 #ifdef CONFIG_E1000_NAPI
@@ -2497,8 +2499,6 @@ e1000_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
 	case SIOCGMIIREG:
 	case SIOCSMIIREG:
 		return e1000_mii_ioctl(netdev, ifr, cmd);
-	case SIOCETHTOOL:
-		return e1000_ethtool_ioctl(netdev, ifr);
 	default:
 		return -EOPNOTSUPP;
 	}
