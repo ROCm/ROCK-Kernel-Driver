@@ -2,8 +2,6 @@
 # Makefile for the DECstation family specific parts of the kernel
 #
 
-O_TARGET := dec.o
-
 export-objs := wbflush.o
 
 obj-y	 := int-handler.o setup.o irq.o time.o reset.o rtc-dec.o wbflush.o

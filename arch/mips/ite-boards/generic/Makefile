@@ -6,8 +6,6 @@
 # Makefile for the ITE 8172 (qed-4n-s01b) board, generic files.
 #
 
-O_TARGET := it8172.o
-
 obj-y := it8172_rtc.o it8172_setup.o irq.o int-handler.o pmon_prom.o time.o lpc.o puts.o reset.o
 
 ifdef CONFIG_PCI

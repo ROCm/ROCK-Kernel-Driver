@@ -2,8 +2,6 @@
 # Makefile for the Philips Nino specific parts of the kernel
 #
 
-O_TARGET := nino.o
-
 obj-y	 := int-handler.o setup.o irq.o time.o reset.o rtc.o prom.o power.o
 
 obj-$(CONFIG_REMOTE_DEBUG)	+= kgdb.o

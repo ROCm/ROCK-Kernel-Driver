@@ -4,9 +4,7 @@
 
 netboot: all
 	mipsel-linux-ld -N -G 0 -T ld.ecoff ../../boot/zImage \
-		dec_boot.o ramdisk.img -o nbImage
-
-O_TARGET := dec_boot.o
+		built-in.o ramdisk.img -o nbImage
 
 obj-y	 := decstation.o
 

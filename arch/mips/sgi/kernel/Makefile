@@ -3,8 +3,6 @@
 # under Linux.
 #
 
-O_TARGET := ip22-kern.o
-
 obj-y	+= indy_mc.o indy_sc.o indy_hpc.o indy_int.o indy_rtc.o system.o \
 	   indyIRQ.o reset.o setup.o time.o
 
