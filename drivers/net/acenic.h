@@ -790,7 +790,6 @@ static void ace_tasklet(unsigned long dev);
 static void ace_dump_trace(struct ace_private *ap);
 static void ace_set_multicast_list(struct net_device *dev);
 static int ace_change_mtu(struct net_device *dev, int new_mtu);
-static int ace_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd);
 static int ace_set_mac_addr(struct net_device *dev, void *p);
 static void ace_set_rxtx_parms(struct net_device *dev, int jumbo);
 static int ace_allocate_descriptors(struct net_device *dev);
