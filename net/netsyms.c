@@ -37,11 +37,6 @@
 #include <linux/divert.h>
 #endif /* CONFIG_NET_DIVERT */
 
-#ifdef CONFIG_NET
-extern __u32 sysctl_wmem_max;
-extern __u32 sysctl_rmem_max;
-#endif
-
 #ifdef CONFIG_INET
 #include <linux/ip.h>
 #include <net/protocol.h>
@@ -108,8 +103,6 @@ EXPORT_SYMBOL(sock_register);
 EXPORT_SYMBOL(sock_unregister);
 
 /* Socket locking */
-EXPORT_SYMBOL(__lock_sock);
-EXPORT_SYMBOL(__release_sock);
 
 /* Socket layer support routines */
 EXPORT_SYMBOL(memcpy_fromiovec);
@@ -117,37 +110,9 @@ EXPORT_SYMBOL(memcpy_tokerneliovec);
 EXPORT_SYMBOL(sock_create);
 EXPORT_SYMBOL(sock_alloc);
 EXPORT_SYMBOL(sock_release);
-EXPORT_SYMBOL(sock_setsockopt);
-EXPORT_SYMBOL(sock_getsockopt);
 EXPORT_SYMBOL(sock_sendmsg);
 EXPORT_SYMBOL(sock_recvmsg);
-EXPORT_SYMBOL(sk_alloc);
-EXPORT_SYMBOL(sk_free);
-EXPORT_SYMBOL(sk_send_sigurg);
 EXPORT_SYMBOL(sock_wake_async);
-EXPORT_SYMBOL(sock_alloc_send_skb);
-EXPORT_SYMBOL(sock_alloc_send_pskb);
-EXPORT_SYMBOL(sock_init_data);
-EXPORT_SYMBOL(sock_no_release);
-EXPORT_SYMBOL(sock_no_bind);
-EXPORT_SYMBOL(sock_no_connect);
-EXPORT_SYMBOL(sock_no_socketpair);
-EXPORT_SYMBOL(sock_no_accept);
-EXPORT_SYMBOL(sock_no_getname);
-EXPORT_SYMBOL(sock_no_poll);
-EXPORT_SYMBOL(sock_no_ioctl);
-EXPORT_SYMBOL(sock_no_listen);
-EXPORT_SYMBOL(sock_no_shutdown);
-EXPORT_SYMBOL(sock_no_getsockopt);
-EXPORT_SYMBOL(sock_no_setsockopt);
-EXPORT_SYMBOL(sock_no_sendmsg);
-EXPORT_SYMBOL(sock_no_recvmsg);
-EXPORT_SYMBOL(sock_no_mmap);
-EXPORT_SYMBOL(sock_no_sendpage);
-EXPORT_SYMBOL(sock_rfree);
-EXPORT_SYMBOL(sock_wfree);
-EXPORT_SYMBOL(sock_wmalloc);
-EXPORT_SYMBOL(sock_rmalloc);
 EXPORT_SYMBOL(skb_checksum);
 EXPORT_SYMBOL(skb_recv_datagram);
 EXPORT_SYMBOL(skb_free_datagram);
@@ -165,8 +130,6 @@ EXPORT_SYMBOL(pskb_copy);
 EXPORT_SYMBOL(skb_realloc_headroom);
 EXPORT_SYMBOL(datagram_poll);
 EXPORT_SYMBOL(put_cmsg);
-EXPORT_SYMBOL(sock_kmalloc);
-EXPORT_SYMBOL(sock_kfree_s);
 EXPORT_SYMBOL(sock_map_fd);
 EXPORT_SYMBOL(sockfd_lookup);
 
@@ -498,8 +461,6 @@ EXPORT_SYMBOL(hippi_type_trans);
 #endif
 
 #ifdef CONFIG_SYSCTL
-EXPORT_SYMBOL(sysctl_wmem_max);
-EXPORT_SYMBOL(sysctl_rmem_max);
 #ifdef CONFIG_INET
 EXPORT_SYMBOL(sysctl_ip_default_ttl);
 #endif
