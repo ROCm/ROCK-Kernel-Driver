@@ -1217,8 +1217,8 @@ void ip_mc_down(struct in_device *in_dev)
 
 	ASSERT_RTNL();
 
-	if (!in_dev->mc_initted)
-		return;
+	for (i=in_dev->mc_list; i; i=i->next)
+		igmp_group_dropped(i);
 
 #ifdef CONFIG_IP_MULTICAST
 	in_dev->mr_ifc_count = 0;
@@ -1227,24 +1227,14 @@ void ip_mc_down(struct in_device *in_dev)
 	in_dev->mr_gq_running = 0;
 	if (del_timer(&in_dev->mr_gq_timer))
 		__in_dev_put(in_dev);
-#endif
-
-	for (i=in_dev->mc_list; i; i=i->next)
-		igmp_group_dropped(i);
-
-#ifdef CONFIG_IP_MULTICAST
 	igmpv3_clear_delrec(in_dev);
 #endif
 
 	ip_mc_dec_group(in_dev, IGMP_ALL_HOSTS);
 }
 
-/* Device going up */
-
-void ip_mc_up(struct in_device *in_dev)
+void ip_mc_init_dev(struct in_device *in_dev)
 {
-	struct ip_mc_list *i;
-
 	ASSERT_RTNL();
 
 	in_dev->mc_tomb = 0;
@@ -1261,12 +1251,20 @@ void ip_mc_up(struct in_device *in_dev)
 #endif
 
 	in_dev->mc_lock = RW_LOCK_UNLOCKED;
+}
+
+/* Device going up */
+
+void ip_mc_up(struct in_device *in_dev)
+{
+	struct ip_mc_list *i;
+
+	ASSERT_RTNL();
+
 	ip_mc_inc_group(in_dev, IGMP_ALL_HOSTS);
 
 	for (i=in_dev->mc_list; i; i=i->next)
 		igmp_group_added(i);
-
-	in_dev->mc_initted = 1;
 }
 
 /*
