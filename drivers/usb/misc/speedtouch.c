@@ -709,7 +709,7 @@ static void udsl_atm_dev_close (struct atm_dev *dev)
 	PDEBUG ("udsl_atm_dev_close: queue has %u elements\n", instance->sndqueue.qlen);
 
 	PDEBUG ("udsl_atm_dev_close: killing tasklet\n");
-	tasklet_kill (&instance->receive_tasklet);
+	tasklet_kill (&instance->send_tasklet);
 	PDEBUG ("udsl_atm_dev_close: freeing instance\n");
 	kfree (instance);
 }
@@ -1121,7 +1121,7 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 	INIT_LIST_HEAD (&instance->spare_buffers);
 	instance->current_buffer = NULL;
 
-	tasklet_enable (&instance->receive_tasklet);
+	tasklet_enable (&instance->send_tasklet);
 
 	PDEBUG ("udsl_usb_disconnect: freeing senders\n");
 	for (i = 0; i < UDSL_NUMBER_SND_URBS; i++)
