@@ -670,7 +670,7 @@ err_out_uninit:
 	pci_free_consistent(priv->pciDev, priv->dmaSize, priv->dmaStorage,
 			    priv->dmaStorageDMA );
 err_out_free_dev:
-	kfree(dev);
+	free_netdev(dev);
 err_out_regions:
 	if (pdev)
 		pci_release_regions(pdev);
@@ -695,7 +695,7 @@ static void TLan_Eisa_Cleanup(void)
 		release_region( dev->base_addr, 0x10);
 		unregister_netdev( dev );
 		TLan_Eisa_Devices = priv->nextDevice;
-		kfree( dev );
+		free_netdev( dev );
 		tlan_have_eisa--;
 	}
 }

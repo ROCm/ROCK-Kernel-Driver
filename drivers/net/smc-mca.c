@@ -132,7 +132,7 @@ int __init ultramca_probe(struct device *gen_dev)
 	struct mca_device *mca_dev = to_mca_device(gen_dev);
 	char slot = mca_dev->slot;
 	unsigned char pos2 = 0xff, pos3 = 0xff, pos4 = 0xff, pos5 = 0xff;
-	int i;
+	int i, rc;
 	int adapter = mca_dev->index;
 	int tbase = 0;
 	int tirq = 0;
@@ -209,8 +209,9 @@ int __init ultramca_probe(struct device *gen_dev)
 	SET_MODULE_OWNER(dev);
 	SET_NETDEV_DEV(dev, gen_dev);
 
-	if((i = register_netdev(dev)) != 0)
-		return i;
+	rc = register_netdev(dev);
+	if (rc)
+		goto err_free_netdev;
 
 	printk(KERN_INFO "%s: %s found in slot %d\n",
 	       dev->name, smc_mca_adapter_names[adapter], slot + 1);
@@ -262,11 +263,15 @@ int __init ultramca_probe(struct device *gen_dev)
 		}
 	}
 
-	if (dev->mem_start == 0) /* sanity check, shouldn't happen */
-		return -ENODEV;
+	/* sanity check, shouldn't happen */
+	if (dev->mem_start == 0) {
+		rc = -ENODEV;
+		goto err_unregister_netdev;
+	}
 
-	if (!request_region(ioaddr, ULTRA_IO_EXTENT, dev->name))
-		return -EBUSY;
+	rc = request_region(ioaddr, ULTRA_IO_EXTENT, dev->name);
+	if (rc)
+		goto err_unregister_netdev;
 
 	reg4 = inb(ioaddr + 4) & 0x7f;
 	outb(reg4, ioaddr + 4);
@@ -296,10 +301,10 @@ int __init ultramca_probe(struct device *gen_dev)
 	/* Allocate dev->priv and fill in 8390 specific dev fields.
 	 */
 
-	if (ethdev_init(dev)) {
+	rc = ethdev_init(dev);
+	if (rc) {
 		printk (", no memory for dev->priv.\n");
-		release_region(ioaddr, ULTRA_IO_EXTENT);
-		return -ENOMEM;
+		goto err_release_region;
 	}
 	gen_dev->driver_data = dev;
 
@@ -334,6 +339,14 @@ int __init ultramca_probe(struct device *gen_dev)
 	NS8390_init(dev, 0);
 
 	return 0;
+
+err_release_region:
+	release_region(ioaddr, ULTRA_IO_EXTENT);
+err_unregister_netdev:
+	unregister_netdev(dev);
+err_free_netdev:
+	free_netdev(dev);
+	return rc;
 }
 
 static int ultramca_open(struct net_device *dev)

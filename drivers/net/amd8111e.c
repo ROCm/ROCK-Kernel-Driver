@@ -1927,7 +1927,7 @@ err_iounmap:
 	iounmap((void *) lp->mmio);
 
 err_free_dev:
-	kfree(dev);
+	free_netdev(dev);
 
 err_free_reg:
 	pci_release_regions(pdev);

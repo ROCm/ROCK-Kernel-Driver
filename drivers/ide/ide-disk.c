@@ -1716,7 +1716,6 @@ static ide_driver_t idedisk_driver = {
 	.version		= IDEDISK_VERSION,
 	.media			= ide_disk,
 	.busy			= 0,
-	.supports_dma		= 1,
 	.supports_dsc_overlap	= 0,
 	.cleanup		= idedisk_cleanup,
 	.flushcache		= do_idedisk_flushcache,

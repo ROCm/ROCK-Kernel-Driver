@@ -370,25 +370,24 @@ static int sd_open(struct inode *inode, struct file *filp)
 	if (!scsi_block_when_processing_errors(sdev))
 		goto error_out;
 
-	if (sdev->removable) {
+	if (sdev->removable || sdkp->write_prot)
 		check_disk_change(inode->i_bdev);
 
-		/*
-		 * If the drive is empty, just let the open fail.
-		 */
-		retval = -ENOMEDIUM;
-		if ((!sdkp->media_present) && !(filp->f_flags & O_NDELAY))
-			goto error_out;
+	/*
+	 * If the drive is empty, just let the open fail.
+	 */
+	retval = -ENOMEDIUM;
+	if (sdev->removable && !sdkp->media_present &&
+	    !(filp->f_flags & O_NDELAY))
+		goto error_out;
 
-		/*
-		 * Similarly, if the device has the write protect tab set,
-		 * have the open fail if the user expects to be able to write
-		 * to the thing.
-		 */
-		retval = -EROFS;
-		if ((sdkp->write_prot) && (filp->f_mode & FMODE_WRITE))
-			goto error_out;
-	}
+	/*
+	 * If the device has the write protect tab set, have the open fail
+	 * if the user expects to be able to write to the thing.
+	 */
+	retval = -EROFS;
+	if (sdkp->write_prot && (filp->f_mode & FMODE_WRITE))
+		goto error_out;
 
 	/*
 	 * It is possible that the disk changing stuff resulted in
@@ -1174,7 +1173,7 @@ static int sd_revalidate_disk(struct gendisk *disk)
 	if (!sdp->online)
 		goto out;
 
-	sreq = scsi_allocate_request(sdp);
+	sreq = scsi_allocate_request(sdp, GFP_KERNEL);
 	if (!sreq) {
 		printk(KERN_WARNING "(sd_revalidate_disk:) Request allocation "
 		       "failure.\n");
@@ -1355,12 +1354,12 @@ static int sd_remove(struct device *dev)
 static void sd_shutdown(struct device *dev)
 {
 	struct scsi_device *sdp = to_scsi_device(dev);
-       struct scsi_disk *sdkp;
+	struct scsi_disk *sdkp;
 	struct scsi_request *sreq;
 	int retries, res;
 
-       sdkp = dev_get_drvdata(dev);
-       if (!sdkp)
+	sdkp = dev_get_drvdata(dev);
+	if (!sdkp)
                return;         /* this can happen */
 
 	if (!sdp->online || !sdkp->WCE)
@@ -1369,7 +1368,7 @@ static void sd_shutdown(struct device *dev)
 	printk(KERN_NOTICE "Synchronizing SCSI cache for disk %s: ",
 			sdkp->disk->disk_name);
 
-	sreq = scsi_allocate_request(sdp);
+	sreq = scsi_allocate_request(sdp, GFP_KERNEL);
 	if (!sreq) {
 		printk("FAILED\n  No memory for request\n");
 		return;

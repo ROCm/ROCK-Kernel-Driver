@@ -155,9 +155,11 @@ struct frhdr
 struct dlci_local
 {
    struct net_device_stats stats;
-   struct net_device          *slave;
+   struct net_device      *master;
+   struct net_device      *slave;
    struct dlci_conf       config;
    int                    configured;
+   struct list_head	  list;
 
    /* callback function */
    void              (*receive)(struct sk_buff *skb, struct net_device *);

@@ -319,7 +319,7 @@ rio_probe1 (struct pci_dev *pdev, const struct pci_device_id *ent)
 
       err_out_dev:
 #endif
-	kfree (dev);
+	free_netdev (dev);
 
       err_out_res:
 	pci_release_regions (pdev);

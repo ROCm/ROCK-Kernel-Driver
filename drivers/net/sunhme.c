@@ -2895,7 +2895,7 @@ err_out_iounmap:
 		sbus_iounmap(hp->tcvregs, TCVR_REG_SIZE);
 
 err_out_free_netdev:
-	kfree(dev);
+	free_netdev(dev);
 
 err_out:
 	return err;
@@ -3247,7 +3247,7 @@ err_out_clear_quattro:
 	if (qp != NULL)
 		qp->happy_meals[qfe_slot] = NULL;
 
-	kfree(dev);
+	free_netdev(dev);
 
 err_out:
 	return err;

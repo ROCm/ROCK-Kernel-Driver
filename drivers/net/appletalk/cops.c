@@ -92,12 +92,8 @@ static int board_type = DAYNA;	/* Module exported */
 static int board_type = TANGENT;
 #endif
 
-#ifdef MODULE
 static int io = 0x240;		/* Default IO for Dayna */
 static int irq = 5;		/* Default IRQ */
-#else
-static int io;			/* Default IO for Dayna */
-#endif
 
 /*
  *	COPS Autoprobe information.
@@ -146,7 +142,7 @@ static int io;			/* Default IO for Dayna */
  * Zero terminated list of IO ports to probe.
  */
 
-static unsigned int cops_portlist[] = { 
+static unsigned int ports[] = { 
 	0x240, 0x340, 0x200, 0x210, 0x220, 0x230, 0x260, 
 	0x2A0, 0x300, 0x310, 0x320, 0x330, 0x350, 0x360,
 	0
@@ -184,7 +180,6 @@ struct cops_local
 };
 
 /* Index to functions, as function prototypes. */
-extern int  cops_probe (struct net_device *dev);
 static int  cops_probe1 (struct net_device *dev, int ioaddr);
 static int  cops_irq (int ioaddr, int board);
 
@@ -208,6 +203,12 @@ static int  cops_ioctl (struct net_device *dev, struct ifreq *rq, int cmd);
 static int  cops_close (struct net_device *dev);
 static struct net_device_stats *cops_get_stats (struct net_device *dev);
 
+static void cleanup_card(struct net_device *dev)
+{
+	if (dev->irq)
+		free_irq(dev->irq, dev);
+	release_region(dev->base_addr, COPS_IO_EXTENT);
+}
 
 /*
  *      Check for a network adaptor of this type, and return '0' iff one exists.
@@ -215,31 +216,54 @@ static struct net_device_stats *cops_get_stats (struct net_device *dev);
  *      If dev->base_addr in [1..0x1ff], always return failure.
  *        otherwise go with what we pass in.
  */
-int __init cops_probe(struct net_device *dev)
+struct net_device * __init cops_probe(int unit)
 {
-	int i;
-        int base_addr = dev->base_addr;
+	struct net_device *dev;
+	unsigned *port;
+	int base_addr;
+	int err = 0;
+
+	dev = alloc_netdev(sizeof(struct cops_local), "lt%d", ltalk_setup);
+	if (!dev)
+		return ERR_PTR(-ENOMEM);
+
+	if (unit >= 0) {
+		sprintf(dev->name, "lt%d", unit);
+		netdev_boot_setup_check(dev);
+		irq = dev->irq;
+		base_addr = dev->base_addr;
+	} else {
+		base_addr = dev->base_addr = io;
+	}
 
 	SET_MODULE_OWNER(dev);
 
-        if(base_addr == 0 && io)
-        	base_addr=io;
-
-        if(base_addr > 0x1ff)    /* Check a single specified location. */
-                return cops_probe1(dev, base_addr);
-	else if(base_addr != 0)  /* Don't probe at all. */
-               	return -ENXIO;
-	
-	/* FIXME  Does this really work for cards which generate irq?
-	 * It's definitely N.G. for polled Tangent. sh
-	 * Dayna cards don't autoprobe well at all, but if your card is
-	 * at IRQ 5 & IO 0x240 we find it every time. ;) JS
-	 */
-        for(i=0; cops_portlist[i]; i++)
-                if(cops_probe1(dev, cops_portlist[i]) == 0)
-                        return 0;
-	
-        return -ENODEV;
+	if (base_addr > 0x1ff) {    /* Check a single specified location. */
+		err = cops_probe1(dev, base_addr);
+	} else if (base_addr != 0) { /* Don't probe at all. */
+		err = -ENXIO;
+	} else {
+		/* FIXME  Does this really work for cards which generate irq?
+		 * It's definitely N.G. for polled Tangent. sh
+		 * Dayna cards don't autoprobe well at all, but if your card is
+		 * at IRQ 5 & IO 0x240 we find it every time. ;) JS
+		 */
+		for (port = ports; *port && cops_probe1(dev, *port) < 0; port++)
+			;
+		if (!*port)
+			err = -ENODEV;
+	}
+	if (err)
+		goto out;
+	err = register_netdev(dev);
+	if (err)
+		goto out1;
+	return dev;
+out1:
+	cleanup_card(dev);
+out:
+	kfree(dev);
+	return ERR_PTR(err);
 }
 
 /*
@@ -268,16 +292,15 @@ static int __init cops_probe1(struct net_device *dev, int ioaddr)
          * interrupts are typically not reported by the boards, and we must
          * used AutoIRQ to find them.
 	 */
+	dev->irq = irq;
 	switch (dev->irq)
 	{
 		case 0:
 			/* COPS AutoIRQ routine */
 			dev->irq = cops_irq(ioaddr, board);
-			if(!dev->irq) {
-				retval = -EINVAL;	/* No IRQ found on this port */
-				goto err_out;
-			}
-
+			if (dev->irq)
+				break;
+			/* No IRQ found on this port, fallthrough */
 		case 1:
 			retval = -EINVAL;
 			goto err_out;
@@ -302,22 +325,13 @@ static int __init cops_probe1(struct net_device *dev, int ioaddr)
 	}
 
 	/* Reserve any actual interrupt. */
-	if(dev->irq) {
+	if (dev->irq) {
 		retval = request_irq(dev->irq, &cops_interrupt, 0, dev->name, dev);
 		if (retval)
 			goto err_out;
 	}
 
-	dev->base_addr		= ioaddr;
-
-	/* Initialize the private device structure. */
-        dev->priv = kmalloc(sizeof(struct cops_local), GFP_KERNEL);
-        if(dev->priv == NULL) {
-		if (dev->irq)
-			free_irq(dev->irq, dev);
-        	retval = -ENOMEM;
-		goto err_out;
-	}
+	dev->base_addr = ioaddr;
 
         lp = (struct cops_local *)dev->priv;
         memset(lp, 0, sizeof(struct cops_local));
@@ -325,9 +339,6 @@ static int __init cops_probe1(struct net_device *dev, int ioaddr)
 
 	/* Copy local board variable to lp struct. */
 	lp->board               = board;
-
-	/* Fill in the fields of the device structure with LocalTalk values. */
-	ltalk_setup(dev);
 
 	dev->hard_start_xmit    = cops_send_packet;
 	dev->tx_timeout		= cops_timeout;
@@ -1013,7 +1024,7 @@ static struct net_device_stats *cops_get_stats(struct net_device *dev)
 }
 
 #ifdef MODULE
-static struct net_device cops0_dev = { .init = cops_probe };
+static struct net_device *cops_dev;
 
 MODULE_LICENSE("GPL");
 MODULE_PARM(io, "i");
@@ -1022,33 +1033,20 @@ MODULE_PARM(board_type, "i");
 
 int init_module(void)
 {
-        int result, err;
-
-        if(io == 0)
+	if (io == 0)
 		printk(KERN_WARNING "%s: You shouldn't autoprobe with insmod\n",
 			cardname);
-
-        /* Copy the parameters from insmod into the device structure. */
-        cops0_dev.base_addr = io;
-        cops0_dev.irq       = irq;
-
-	err=dev_alloc_name(&cops0_dev, "lt%d");
-        if(err < 0)
-                return err;
-
-        if((result = register_netdev(&cops0_dev)) != 0)
-                return result;
-
+	cops_dev = cops_probe(-1);
+	if (IS_ERR(cops_dev))
+		return PTR_ERR(cops_dev);
         return 0;
 }
 
 void cleanup_module(void)
 {
-	unregister_netdev(&cops0_dev);
-	kfree(cops0_dev.priv);
-	if(cops0_dev.irq)
-		free_irq(cops0_dev.irq, &cops0_dev);
-        release_region(cops0_dev.base_addr, COPS_IO_EXTENT);
+	unregister_netdev(cops_dev);
+	cleanup_card(cops_dev);
+	free_netdev(cops_dev);
 }
 #endif /* MODULE */
 

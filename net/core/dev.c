@@ -99,7 +99,6 @@
 #include <linux/divert.h>
 #include <net/dst.h>
 #include <net/pkt_sched.h>
-#include <net/profile.h>
 #include <net/checksum.h>
 #include <linux/highmem.h>
 #include <linux/init.h>
@@ -127,9 +126,6 @@ extern int plip_init(void);
  * via a timer instead of as each packet is received.
  */
 #undef OFFLINE_SAMPLE
-
-NET_PROFILE_DEFINE(dev_queue_xmit)
-NET_PROFILE_DEFINE(softnet_process)
 
 /*
  *	The list of packet types we will receive (as opposed to discard)
@@ -2981,7 +2977,6 @@ int unregister_netdevice(struct net_device *dev)
  */
 static int __init net_dev_init(void)
 {
-	struct net_device *dev, **dp;
 	int i, rc = -ENOMEM;
 
 	BUG_ON(!dev_boot_phase);
@@ -3016,87 +3011,14 @@ static int __init net_dev_init(void)
 		atomic_set(&queue->backlog_dev.refcnt, 1);
 	}
 
-#ifdef CONFIG_NET_PROFILE
-	net_profile_init();
-	NET_PROFILE_REGISTER(dev_queue_xmit);
-	NET_PROFILE_REGISTER(softnet_process);
-#endif
-
 #ifdef OFFLINE_SAMPLE
 	samp_timer.expires = jiffies + (10 * HZ);
 	add_timer(&samp_timer);
 #endif
 
-	/*
-	 *	Add the devices.
-	 *	If the call to dev->init fails, the dev is removed
-	 *	from the chain disconnecting the device until the
-	 *	next reboot.
-	 *
-	 *	NB At boot phase networking is dead. No locking is required.
-	 *	But we still preserve dev_base_lock for sanity.
-	 */
-
-	dp = &dev_base;
-	while ((dev = *dp) != NULL) {
-		spin_lock_init(&dev->queue_lock);
-		spin_lock_init(&dev->xmit_lock);
-#ifdef CONFIG_NET_FASTROUTE
-		dev->fastpath_lock = RW_LOCK_UNLOCKED;
-#endif
-		dev->xmit_lock_owner = -1;
-		dev->iflink = -1;
-		dev_hold(dev);
-
-		/*
-		 * Allocate name. If the init() fails
-		 * the name will be reissued correctly.
-		 */
-		if (strchr(dev->name, '%'))
-			dev_alloc_name(dev, dev->name);
-
-		/*
-		 * Check boot time settings for the device.
-		 */
-		netdev_boot_setup_check(dev);
-
-		if ( (dev->init && dev->init(dev)) ||
-		     netdev_register_sysfs(dev) ) {
-			/*
-			 * It failed to come up. It will be unhooked later.
-			 * dev_alloc_name can now advance to next suitable
-			 * name that is checked next.
-			 */
-			dp = &dev->next;
-		} else {
-			dp = &dev->next;
-			dev->ifindex = dev_new_index();
-			dev->reg_state = NETREG_REGISTERED;
-			if (dev->iflink == -1)
-				dev->iflink = dev->ifindex;
-			if (!dev->rebuild_header)
-				dev->rebuild_header = default_rebuild_header;
-			dev_init_scheduler(dev);
-			set_bit(__LINK_STATE_PRESENT, &dev->state);
-		}
-	}
-
-	/*
-	 * Unhook devices that failed to come up
-	 */
-	dp = &dev_base;
-	while ((dev = *dp) != NULL) {
-		if (dev->reg_state != NETREG_REGISTERED) {
-			write_lock_bh(&dev_base_lock);
-			*dp = dev->next;
-			write_unlock_bh(&dev_base_lock);
-			dev_put(dev);
-		} else {
-			dp = &dev->next;
-		}
-	}
-
 	dev_boot_phase = 0;
+
+	probe_old_netdevs();
 
 	open_softirq(NET_TX_SOFTIRQ, net_tx_action, NULL);
 	open_softirq(NET_RX_SOFTIRQ, net_rx_action, NULL);

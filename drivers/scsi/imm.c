@@ -86,6 +86,7 @@ int imm_release(struct Scsi_Host *host)
     int host_no = host->unique_id;
 
     printk("Releasing imm%i\n", host_no);
+    scsi_unregister(host);
     parport_unregister_device(imm_hosts[host_no].dev);
     return 0;
 }
