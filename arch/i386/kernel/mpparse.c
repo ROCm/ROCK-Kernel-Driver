@@ -755,8 +755,6 @@ void __init find_smp_config (void)
 	address = *(unsigned short *)phys_to_virt(0x40E);
 	address <<= 4;
 	smp_scan_config(address, 0x400);
-	if (smp_found_config)
-		printk(KERN_WARNING "WARNING: MP table in the EBDA can be UNSAFE, contact linux-smp@vger.kernel.org if you experience SMP problems!\n");
 }
 
 
