@@ -531,7 +531,7 @@ fork_by_hand(void)
 	struct pt_regs regs;
 	/* don't care about the eip and regs settings since we'll
 	 * never reschedule the forked task. */
-	return do_fork(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
+	return copy_process(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
 }
 
 
