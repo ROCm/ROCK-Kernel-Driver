@@ -2470,6 +2470,9 @@ static struct dmi_system_id __initdata processor_dmi_table[] = {
 	{ no_c2c3, "IBM ThinkPad R40e", {
 	  DMI_MATCH(DMI_BIOS_VENDOR,"IBM"),
 	  DMI_MATCH(DMI_BIOS_VERSION,"1SET60WW") }},
+	{ no_c2c3, "Medion 41700", {
+	  DMI_MATCH(DMI_BIOS_VENDOR,"Phoenix Technologies LTD"),
+	  DMI_MATCH(DMI_BIOS_VERSION,"R01-A1J") }},
 	{},
 };
 
