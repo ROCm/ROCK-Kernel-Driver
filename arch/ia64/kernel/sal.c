@@ -13,12 +13,15 @@
 #include <linux/smp.h>
 #include <linux/spinlock.h>
 #include <linux/string.h>
+#include <linux/module.h>
 
 #include <asm/page.h>
 #include <asm/sal.h>
 #include <asm/pal.h>
 
 spinlock_t sal_lock __cacheline_aligned = SPIN_LOCK_UNLOCKED;
+EXPORT_SYMBOL(sal_lock);
+
 unsigned long sal_platform_features;
 
 static struct {
@@ -33,6 +36,8 @@ default_handler (void)
 }
 
 ia64_sal_handler ia64_sal = (ia64_sal_handler) default_handler;
+EXPORT_SYMBOL(ia64_sal);
+
 ia64_sal_desc_ptc_t *ia64_ptc_domain_info;
 
 const char *

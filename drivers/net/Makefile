@@ -190,4 +190,5 @@ obj-$(CONFIG_NET_TULIP) += tulip/
 obj-$(CONFIG_HAMRADIO) += hamradio/
 obj-$(CONFIG_IRDA) += irda/
 
+obj-$(CONFIG_XPNET) += xpnet.o
 obj-$(CONFIG_NETCONSOLE) += netconsole.o

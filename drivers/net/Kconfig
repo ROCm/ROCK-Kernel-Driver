@@ -2528,3 +2528,17 @@ source "drivers/net/pcmcia/Kconfig"
 source "drivers/atm/Kconfig"
 
 source "drivers/s390/net/Kconfig"
+
+
+config XPNET
+	tristate "SGI DMA network driver"
+	depends on NETDEVICES && IA64_SGI_SN_XPC
+	default m if NETDEVICES && IA64_SGI_SN_XPC
+	help
+	  An SGI machine can be divided into multiple Single System
+	  Images which act independently of each other and have
+	  hardware based memory protection from the others.  Enabling
+	  this feature will produce a network adapter that can be
+	  used to communicate directly between SSIs.
+
+

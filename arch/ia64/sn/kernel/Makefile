@@ -9,3 +9,7 @@
 
 obj-y				+= probe.o setup.o bte.o irq.o mca.o idle.o sn2/
 obj-$(CONFIG_IA64_GENERIC)      += machvec.o
+obj-$(CONFIG_IA64_SGI_SN_XPC)	+= xp.o
+xp-y				:= xp_main.o xp_nofault.o
+obj-$(CONFIG_IA64_SGI_SN_XPC)	+= xpc.o
+xpc-y				:= xpc_main.o xpc_kdb.o xpc_channel.o xpc_partition.o

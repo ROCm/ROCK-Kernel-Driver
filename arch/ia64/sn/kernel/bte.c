@@ -7,6 +7,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/nodepda.h>
 #include <asm/sn/addrs.h>
@@ -169,6 +170,7 @@ bte_copy(u64 src, u64 dest, u64 len, u64 mode, void *notification)
 
 	return bte_status;
 }
+EXPORT_SYMBOL(bte_copy);
 
 
 /*
@@ -405,7 +407,7 @@ void
 bte_init_cpu(void)
 {
 	/* Called by setup.c as each cpu is being added to the nodepda */
-	if (local_node_data->active_cpu_count & 0x1) {
+	if (get_slice() == 0) {
 		pda->cpu_bte_if[0] = &(nodepda->bte_if[0]);
 		pda->cpu_bte_if[1] = &(nodepda->bte_if[1]);
 	} else {

@@ -14,6 +14,7 @@
 #include <asm/types.h>
 #include <asm/sn/types.h>
 #include <asm/sn/sn_cpuid.h>
+#include <asm/sn/sn2/arch.h>
 
 typedef u64	shubreg_t;
 typedef u64	hubreg_t;
