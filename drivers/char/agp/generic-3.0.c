@@ -118,7 +118,7 @@ static int agp_3_0_isochronous_node_enable(struct agp_3_0_dev *dev_list, unsigne
 		goto free_and_exit;
 
 	pci_read_config_dword(td, agp_bridge->capndx + 0x0c, &tnistat);
-	pci_read_config_dword(td, agp_bridge->capndx + 0x04, &tstatus);
+	pci_read_config_dword(td, agp_bridge->capndx+AGPSTAT, &tstatus);
 
 	/* Extract power-on defaults from the target */
 	target.maxbw = (tnistat >> 16) & 0xff;
@@ -260,7 +260,7 @@ static int agp_3_0_isochronous_node_enable(struct agp_3_0_dev *dev_list, unsigne
 		              ? (rem_async + rem_isoch) : step;
 
 		pci_read_config_word(dev, cur->capndx + 0x20, &mnicmd);
-		pci_read_config_dword(dev, cur->capndx + 0x08, &mcmd);
+		pci_read_config_dword(dev, cur->capndx+AGPCMD, &mcmd);
 
 		mnicmd &= ~(0xff << 8);
 		mnicmd &= ~(0x3  << 6);
@@ -270,7 +270,7 @@ static int agp_3_0_isochronous_node_enable(struct agp_3_0_dev *dev_list, unsigne
 		mnicmd |= master[cdev].y  << 6;
 		mcmd   |= master[cdev].rq << 24;
 
-		pci_write_config_dword(dev, cur->capndx + 0x08, mcmd);
+		pci_write_config_dword(dev, cur->capndx+AGPCMD, mcmd);
 		pci_write_config_word(dev, cur->capndx + 0x20, mnicmd);
 	}
 
@@ -306,10 +306,10 @@ static int agp_3_0_nonisochronous_node_enable(struct agp_3_0_dev *dev_list, unsi
 	for(pos = head->next; cdev < ndevs; cdev++, pos = pos->next) {
 		cur = list_entry(pos, struct agp_3_0_dev, list);
 
-		pci_read_config_dword(cur->dev, cur->capndx + 0x08, &mcmd);
+		pci_read_config_dword(cur->dev, cur->capndx+AGPCMD, &mcmd);
 		mcmd &= ~(0xff << 24);
 		mcmd |= ((cdev == ndevs - 1) ? rem : mrq) << 24;
-		pci_write_config_dword(cur->dev, cur->capndx + 0x08, mcmd);
+		pci_write_config_dword(cur->dev, cur->capndx+AGPCMD, mcmd);
 	}
 
 	return 0;
@@ -419,8 +419,8 @@ int agp_3_0_node_enable(u32 mode, u32 minor)
 			goto free_and_exit;
 		}
 
-		mmajor = (ncapid >> 20) & 0xf;
-		mminor = (ncapid >> 16) & 0xf;
+		mmajor = (ncapid >> AGP_MAJOR_VERSION_SHIFT) & 0xf;
+		mminor = (ncapid >> AGP_MINOR_VERSION_SHIFT) & 0xf;
 
 		if(mmajor < 3) {
 			printk(KERN_ERR PFX "woah!  AGP 2.0 device "
@@ -487,7 +487,7 @@ int agp_3_0_node_enable(u32 mode, u32 minor)
 	 * Also set the AGP_ENABLE bit, effectively 'turning on' the
 	 * target (this has to be done _before_ turning on the masters).
 	 */
-	pci_read_config_dword(td, agp_bridge->capndx + 0x08, &tcmd);
+	pci_read_config_dword(td, agp_bridge->capndx+AGPCMD, &tcmd);
 
 	tcmd &= ~(0x7 << 10);
 	tcmd &= ~0x7;
@@ -496,7 +496,7 @@ int agp_3_0_node_enable(u32 mode, u32 minor)
 	tcmd |= 0x1 << 8;
 	tcmd |= rate;
 
-	pci_write_config_dword(td, agp_bridge->capndx + 0x08, tcmd);
+	pci_write_config_dword(td, agp_bridge->capndx+AGPCMD, tcmd);
 
 	/*
 	 * Set the target's advertised arqsz value, the minimum supported
@@ -509,16 +509,16 @@ int agp_3_0_node_enable(u32 mode, u32 minor)
 
 		mcapndx = cur->capndx;
 
-		pci_read_config_dword(dev, cur->capndx + 0x08, &mcmd);
+		pci_read_config_dword(dev, cur->capndx+AGPCMD, &mcmd);
 
-		mcmd &= ~(0x7 << 13);
+		mcmd &= ~(0x7 << AGPSTAT_ARQSZ_SHIFT);
 		mcmd &= ~0x7;
 
 		mcmd |= arqsz << 13;
-		mcmd |= 0x1 << 8;
+		mcmd |= AGPSTAT_AGP_ENABLE;
 		mcmd |= rate;
 
-		pci_write_config_dword(dev, cur->capndx + 0x08, mcmd);
+		pci_write_config_dword(dev, cur->capndx+AGPCMD, mcmd);
 	}
 
 free_and_exit:

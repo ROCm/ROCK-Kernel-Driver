@@ -412,7 +412,17 @@ u32 agp_collect_device_status(u32 mode, u32 command);
 void agp_device_command(u32 command, int agp_v3);
 int agp_3_0_node_enable(u32 mode, u32 minor);
 
+/* Standard agp registers */
+#define AGPSTAT			0x4
+#define AGPCMD			0x8
+#define AGPNEPG			0x16
+
+#define AGP_MAJOR_VERSION_SHIFT	(20)
+#define AGP_MINOR_VERSION_SHIFT	(16)
+
 #define AGPSTAT_RQ_DEPTH	(0xff000000)
+
+#define AGPSTAT_ARQSZ_SHIFT	13
 
 #define AGPSTAT_AGP_ENABLE	(1<<8)
 #define AGPSTAT_SBA		(1<<9)
