@@ -221,7 +221,7 @@ static struct {
 #define PCI_NUM_CONTROLLER_TYPES (sizeof(pci_controller_table) / \
 				  sizeof(pci_controller_table[0]))
 
-static void pci_controller_init(char *model_name, int namelen, int node)
+static int pci_controller_init(char *model_name, int namelen, int node)
 {
 	int i;
 
@@ -230,12 +230,14 @@ static void pci_controller_init(char *model_name, int namelen, int node)
 			     pci_controller_table[i].model_name,
 			     namelen)) {
 			pci_controller_table[i].init(node, model_name);
-			return;
+			return 1;
 		}
 	}
 	printk("PCI: Warning unknown controller, model name [%s]\n",
 	       model_name);
 	printk("PCI: Ignoring controller...\n");
+
+	return 0;
 }
 
 static int pci_is_controller(char *model_name, int namelen, int node)
@@ -252,37 +254,49 @@ static int pci_is_controller(char *model_name, int namelen, int node)
 	return 0;
 }
 
-/* Is there some PCI controller in the system?  */
-int pcic_present(void)
+
+static int pci_controller_scan(int (*handler)(char *, int, int))
 {
-	char namebuf[16];
+	char namebuf[64];
 	int node;
+	int count = 0;
 
 	node = prom_getchild(prom_root_node);
 	while ((node = prom_searchsiblings(node, "pci")) != 0) {
-		int len, ret;
+		int len;
 
-		len = prom_getproperty(node, "model",
-				       namebuf, sizeof(namebuf));
+		if ((len = prom_getproperty(node, "model", namebuf, sizeof(namebuf))) > 0 ||
+		    (len = prom_getproperty(node, "compatible", namebuf, sizeof(namebuf))) > 0) {
+			int item_len = 0;
 
-		ret = 0;
-		if (len > 0) {
-			ret = pci_is_controller(namebuf, len, node);
-		} else {
-			len = prom_getproperty(node, "compatible",
-					       namebuf, sizeof(namebuf));
-			if (len > 0)
-				ret = pci_is_controller(namebuf, len, node);
+			/* Our value may be a multi-valued string in the
+			 * case of some compatible properties. For sanity,
+			 * only try the first one. */
+
+			while (namebuf[item_len] && len) {
+				len--;
+				item_len++;
+			}
+
+			if (handler(namebuf, item_len, node)) {
+				count++;
+				break;
+			}
 		}
-		if (ret)
-			return ret;
 
 		node = prom_getsibling(node);
 		if (!node)
 			break;
 	}
 
-	return 0;
+	return count;
+}
+
+
+/* Is there some PCI controller in the system?  */
+int pcic_present(void)
+{
+	return pci_controller_scan(pci_is_controller);
 }
 
 /* Find each controller in the system, attach and initialize
@@ -292,28 +306,9 @@ int pcic_present(void)
  */
 static void pci_controller_probe(void)
 {
-	char namebuf[16];
-	int node;
-
 	printk("PCI: Probing for controllers.\n");
-	node = prom_getchild(prom_root_node);
-	while ((node = prom_searchsiblings(node, "pci")) != 0) {
-		int len;
 
-		len = prom_getproperty(node, "model",
-				       namebuf, sizeof(namebuf));
-		if (len > 0)
-			pci_controller_init(namebuf, len, node);
-		else {
-			len = prom_getproperty(node, "compatible",
-					       namebuf, sizeof(namebuf));
-			if (len > 0)
-				pci_controller_init(namebuf, len, node);
-		}
-		node = prom_getsibling(node);
-		if (!node)
-			break;
-	}
+	pci_controller_scan(pci_controller_init);
 }
 
 static void pci_scan_each_controller_bus(void)
