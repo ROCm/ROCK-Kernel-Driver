@@ -68,6 +68,12 @@
 #define	gadget_is_n9604(g)	0
 #endif
 
+#ifdef CONFIG_USB_GADGET_PXA27X
+#define	gadget_is_pxa27x(g)	!strcmp("pxa27x_udc", (g)->name)
+#else
+#define	gadget_is_pxa27x(g)	0
+#endif
+
 // CONFIG_USB_GADGET_AT91RM9200
 // CONFIG_USB_GADGET_SX2
 // CONFIG_USB_GADGET_AU1X00

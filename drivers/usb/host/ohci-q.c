@@ -35,6 +35,8 @@ static void urb_free_priv (struct ohci_hcd *hc, urb_priv_t *urb_priv)
  */
 static void
 finish_urb (struct ohci_hcd *ohci, struct urb *urb, struct pt_regs *regs)
+__releases(ohci->lock)
+__acquires(ohci->lock)
 {
 	// ASSERT (urb->hcpriv != 0);
 
