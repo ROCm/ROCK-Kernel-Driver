@@ -3316,6 +3316,7 @@ int __init cdu31a_init(void)
 	char msg[255];
 	char buf[40];
 	int i;
+	int tmp_irq;
 
 	/*
 	 * According to Alex Freed (freed@europa.orion.adobe.com), this is
@@ -3335,7 +3336,7 @@ int __init cdu31a_init(void)
 
 	if (cdu31a_port != 0) {
 		/* Need IRQ 0 because we can't sleep here. */
-		int tmp_irq = cdu31a_irq;
+		tmp_irq = cdu31a_irq;
 		cdu31a_irq = 0;
 		if (!get_drive_configuration(cdu31a_port,
 					    drive_config.exec_status,
