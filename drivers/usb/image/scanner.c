@@ -840,7 +840,7 @@ probe_scanner(struct usb_interface *intf,
 	struct usb_device *dev = interface_to_usbdev (intf);
 	struct scn_usb_data *scn;
 	struct usb_host_interface *interface;
-	struct usb_host_endpoint *endpoint;
+	struct usb_endpoint_descriptor *endpoint;
 
 	int ep_cnt;
 	int ix;
@@ -911,7 +911,6 @@ probe_scanner(struct usb_interface *intf,
 	}
 
 	interface = intf->altsetting;
-	endpoint = &interface->endpoint[0];
 
 /*
  * Start checking for two bulk endpoints OR two bulk endpoints *and* one
@@ -929,22 +928,23 @@ probe_scanner(struct usb_interface *intf,
 	ep_cnt = have_bulk_in = have_bulk_out = have_intr = 0;
 
 	while (ep_cnt < interface->desc.bNumEndpoints) {
+		endpoint = &interface->endpoint[ep_cnt].desc;
 
-		if (!have_bulk_in && IS_EP_BULK_IN(endpoint[ep_cnt])) {
+		if (!have_bulk_in && IS_EP_BULK_IN(endpoint)) {
 			ep_cnt++;
 			have_bulk_in = ep_cnt;
 			dbg("probe_scanner: bulk_in_ep:%d", have_bulk_in);
 			continue;
 		}
 
-		if (!have_bulk_out && IS_EP_BULK_OUT(endpoint[ep_cnt])) {
+		if (!have_bulk_out && IS_EP_BULK_OUT(endpoint)) {
 			ep_cnt++;
 			have_bulk_out = ep_cnt;
 			dbg("probe_scanner: bulk_out_ep:%d", have_bulk_out);
 			continue;
 		}
 
-		if (!have_intr && IS_EP_INTR(endpoint[ep_cnt])) {
+		if (!have_intr && IS_EP_INTR(endpoint)) {
 			ep_cnt++;
 			have_intr = ep_cnt;
 			dbg("probe_scanner: intr_ep:%d", have_intr);
