@@ -231,6 +231,24 @@ vma_address(struct page *page, struct vm_area_struct *vma)
 }
 
 /*
+ * At what user virtual address is page expected in vma? checking that the
+ * page matches the vma: currently only used by unuse_process, on anon pages.
+ */
+unsigned long page_address_in_vma(struct page *page, struct vm_area_struct *vma)
+{
+	if (PageAnon(page)) {
+		if ((void *)vma->anon_vma !=
+		    (void *)page->mapping - PAGE_MAPPING_ANON)
+			return -EFAULT;
+	} else if (page->mapping && !(vma->vm_flags & VM_NONLINEAR)) {
+		if (vma->vm_file->f_mapping != page->mapping)
+			return -EFAULT;
+	} else
+		return -EFAULT;
+	return vma_address(page, vma);
+}
+
+/*
  * Subfunctions of page_referenced: page_referenced_one called
  * repeatedly from either page_referenced_anon or page_referenced_file.
  */
@@ -459,6 +477,8 @@ void page_remove_rmap(struct page *page)
 		 * which increments mapcount after us but sets mapping
 		 * before us: so leave the reset to free_hot_cold_page,
 		 * and remember that it's only reliable while mapped.
+		 * Leaving it set also helps swapoff to reinstate ptes
+		 * faster for those pages still in swapcache.
 		 */
 		if (page_test_and_clear_dirty(page))
 			set_page_dirty(page);

@@ -91,6 +91,11 @@ static inline void page_dup_rmap(struct page *page)
 int page_referenced(struct page *, int is_locked);
 int try_to_unmap(struct page *);
 
+/*
+ * Used by swapoff to help locate where page is expected in vma.
+ */
+unsigned long page_address_in_vma(struct page *, struct vm_area_struct *);
+
 #else	/* !CONFIG_MMU */
 
 #define anon_vma_init()		do {} while (0)
