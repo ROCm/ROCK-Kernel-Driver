@@ -609,4 +609,7 @@ int pcmcia_parse_tuple(client_handle_t handle, tuple_t *tuple, cisparse_t *parse
 int pcmcia_validate_cis(client_handle_t handle, cisinfo_t *info);
 int pcmcia_replace_cis(struct pcmcia_socket *s, cisdump_t *cis);
 
+int pccard_get_next_tuple(struct pcmcia_socket *s, unsigned int func, tuple_t *tuple);
+int pccard_get_first_tuple(struct pcmcia_socket *s, unsigned int function, tuple_t *tuple);
+
 #endif /* LINUX_CISTPL_H */

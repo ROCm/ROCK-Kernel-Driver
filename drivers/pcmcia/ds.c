@@ -944,10 +944,10 @@ static int ds_ioctl(struct inode * inode, struct file * file,
 	break;
     case DS_GET_FIRST_TUPLE:
 	pcmcia_validate_mem(s->parent);
-	ret = pcmcia_get_first_tuple(s->handle, &buf.tuple);
+	ret = pccard_get_first_tuple(s->parent, BIND_FN_ALL, &buf.tuple);
 	break;
     case DS_GET_NEXT_TUPLE:
-	ret = pcmcia_get_next_tuple(s->handle, &buf.tuple);
+	ret = pccard_get_next_tuple(s->parent, BIND_FN_ALL, &buf.tuple);
 	break;
     case DS_GET_TUPLE_DATA:
 	buf.tuple.TupleData = buf.tuple_parse.data;

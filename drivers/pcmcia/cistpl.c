@@ -410,14 +410,12 @@ typedef struct tuple_flags {
 #define MFC_FN(f)	(((tuple_flags *)(&(f)))->mfc_fn)
 #define SPACE(f)	(((tuple_flags *)(&(f)))->space)
 
-int pcmcia_get_next_tuple(client_handle_t handle, tuple_t *tuple);
+int pccard_get_next_tuple(struct pcmcia_socket *s, unsigned int func, tuple_t *tuple);
 
-int pcmcia_get_first_tuple(client_handle_t handle, tuple_t *tuple)
+int pccard_get_first_tuple(struct pcmcia_socket *s, unsigned int function, tuple_t *tuple)
 {
-    struct pcmcia_socket *s;
-    if (CHECK_HANDLE(handle))
+    if (!s)
 	return CS_BAD_HANDLE;
-    s = SOCKET(handle);
     if (!(s->state & SOCKET_PRESENT))
 	return CS_NO_CARD;
     tuple->TupleLink = tuple->Flags = 0;
@@ -439,16 +437,17 @@ int pcmcia_get_first_tuple(client_handle_t handle, tuple_t *tuple)
 	!(tuple->Attributes & TUPLE_RETURN_COMMON)) {
 	cisdata_t req = tuple->DesiredTuple;
 	tuple->DesiredTuple = CISTPL_LONGLINK_MFC;
-	if (pcmcia_get_next_tuple(handle, tuple) == CS_SUCCESS) {
+	if (pccard_get_next_tuple(s, function, tuple) == CS_SUCCESS) {
 	    tuple->DesiredTuple = CISTPL_LINKTARGET;
-	    if (pcmcia_get_next_tuple(handle, tuple) != CS_SUCCESS)
+	    if (pccard_get_next_tuple(s, function, tuple) != CS_SUCCESS)
 		return CS_NO_MORE_ITEMS;
 	} else
 	    tuple->CISOffset = tuple->TupleLink = 0;
 	tuple->DesiredTuple = req;
     }
-    return pcmcia_get_next_tuple(handle, tuple);
+    return pccard_get_next_tuple(s, function, tuple);
 }
+EXPORT_SYMBOL(pccard_get_first_tuple);
 
 static int follow_link(struct pcmcia_socket *s, tuple_t *tuple)
 {
@@ -490,15 +489,13 @@ static int follow_link(struct pcmcia_socket *s, tuple_t *tuple)
     return -1;
 }
 
-int pcmcia_get_next_tuple(client_handle_t handle, tuple_t *tuple)
+int pccard_get_next_tuple(struct pcmcia_socket *s, unsigned int function, tuple_t *tuple)
 {
-    struct pcmcia_socket *s;
     u_char link[2], tmp;
     int ofs, i, attr;
-    
-    if (CHECK_HANDLE(handle))
+
+    if (!s)
 	return CS_BAD_HANDLE;
-    s = SOCKET(handle);
     if (!(s->state & SOCKET_PRESENT))
 	return CS_NO_CARD;
 
@@ -550,14 +547,14 @@ int pcmcia_get_next_tuple(client_handle_t handle, tuple_t *tuple)
 	    case CISTPL_LONGLINK_MFC:
 		tuple->LinkOffset = ofs + 3;
 		LINK_SPACE(tuple->Flags) = attr;
-		if (handle->Function == BIND_FN_ALL) {
+		if (function == BIND_FN_ALL) {
 		    /* Follow all the MFC links */
 		    read_cis_cache(s, attr, ofs+2, 1, &tmp);
 		    MFC_FN(tuple->Flags) = tmp;
 		} else {
 		    /* Follow exactly one of the links */
 		    MFC_FN(tuple->Flags) = 1;
-		    tuple->LinkOffset += handle->Function * 5;
+		    tuple->LinkOffset += function * 5;
 		}
 		break;
 	    case CISTPL_NO_LINK:
@@ -585,6 +582,7 @@ int pcmcia_get_next_tuple(client_handle_t handle, tuple_t *tuple)
     tuple->CISOffset = ofs + 2;
     return CS_SUCCESS;
 }
+EXPORT_SYMBOL(pccard_get_next_tuple);
 
 /*====================================================================*/
 
@@ -1415,7 +1413,7 @@ int read_tuple(client_handle_t handle, cisdata_t code, void *parse)
 	return CS_OUT_OF_RESOURCE;
     tuple.DesiredTuple = code;
     tuple.Attributes = TUPLE_RETURN_COMMON;
-    ret = pcmcia_get_first_tuple(handle, &tuple);
+    ret = pccard_get_first_tuple(handle->Socket, handle->Function, &tuple);
     if (ret != CS_SUCCESS) goto done;
     tuple.TupleData = buf;
     tuple.TupleOffset = 0;
@@ -1459,7 +1457,7 @@ int pcmcia_validate_cis(client_handle_t handle, cisinfo_t *info)
     info->Chains = reserved = 0;
     tuple->DesiredTuple = RETURN_FIRST_TUPLE;
     tuple->Attributes = TUPLE_RETURN_COMMON;
-    ret = pcmcia_get_first_tuple(handle, tuple);
+    ret = pccard_get_first_tuple(handle->Socket, handle->Function, tuple);
     if (ret != CS_SUCCESS)
 	goto done;
 
@@ -1482,7 +1480,7 @@ int pcmcia_validate_cis(client_handle_t handle, cisinfo_t *info)
 	goto done;
 
     for (info->Chains = 1; info->Chains < MAX_TUPLES; info->Chains++) {
-	ret = pcmcia_get_next_tuple(handle, tuple);
+	ret = pccard_get_next_tuple(handle->Socket, handle->Function, tuple);
 	if (ret != CS_SUCCESS) break;
 	if (((tuple->TupleCode > 0x23) && (tuple->TupleCode < 0x40)) ||
 	    ((tuple->TupleCode > 0x47) && (tuple->TupleCode < 0x80)) ||
@@ -1499,3 +1497,26 @@ done:
     return CS_SUCCESS;
 }
 
+/*
+ * Compatibility layer.
+ */
+
+int pcmcia_get_first_tuple(client_handle_t handle, tuple_t *tuple)
+{
+	struct pcmcia_socket *s;
+	if (CHECK_HANDLE(handle))
+		return CS_BAD_HANDLE;
+	s = SOCKET(handle);
+	return pccard_get_first_tuple(s, handle->Function, tuple);
+}
+EXPORT_SYMBOL(pcmcia_get_first_tuple);
+
+int pcmcia_get_next_tuple(client_handle_t handle, tuple_t *tuple)
+{
+	struct pcmcia_socket *s;
+	if (CHECK_HANDLE(handle))
+		return CS_BAD_HANDLE;
+	s = SOCKET(handle);
+	return pccard_get_next_tuple(s, handle->Function, tuple);
+}
+EXPORT_SYMBOL(pcmcia_get_next_tuple);
