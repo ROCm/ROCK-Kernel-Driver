@@ -30,7 +30,7 @@ unsigned int EmulateCPDO(const unsigned int opcode)
 {
    FPA11 *fpa11 = GET_FPA11();
    FPREG *rFd;
-   unsigned int Fd, nType, nDest, nRc = 1;
+   unsigned int nType, nDest, nRc;
    
    //printk("EmulateCPDO(0x%08x)\n",opcode);
 
@@ -60,8 +60,7 @@ unsigned int EmulateCPDO(const unsigned int opcode)
      }
    }
 
-   Fd = getFd(opcode);
-   rFd = &fpa11->fpreg[Fd];
+   rFd = &fpa11->fpreg[getFd(opcode)];
 
    switch (nType)
    {
@@ -74,47 +73,47 @@ unsigned int EmulateCPDO(const unsigned int opcode)
    /* The CPDO functions used to always set the destination type
       to be the same as their working size. */
 
-   if ((0 != nRc) && (nDest != nType))
-   {
-     /* If the operation succeeded, check to see if the result in the
-        destination register is the correct size.  If not force it
-        to be. */
-
-     switch (nDest)
-     {
-       case typeSingle:
-       {
-         if (typeDouble == nType)
-           rFd->fSingle = float64_to_float32(rFd->fDouble);
-         else
-           rFd->fSingle = floatx80_to_float32(rFd->fExtended);
-       }
-       break;
-          
-       case typeDouble:
-       {
-         if (typeSingle == nType)
-           rFd->fDouble = float32_to_float64(rFd->fSingle);
-         else
-           rFd->fDouble = floatx80_to_float64(rFd->fExtended);
-       }
-       break;
-          
-       case typeExtended:
-       {
-         if (typeSingle == nType)
-           rFd->fExtended = float32_to_floatx80(rFd->fSingle);
-         else
-           rFd->fExtended = float64_to_floatx80(rFd->fDouble);
-       }
-       break;
-     }
-   }
-
    if (nRc != 0)
    {
-     fpa11->fType[Fd] = nDest;
+      /* If the operation succeeded, check to see if the result in the
+         destination register is the correct size.  If not force it
+         to be. */
+
+      fpa11->fType[getFd(opcode)] = nDest;
+
+      if (nDest != nType)
+      {
+         switch (nDest)
+         {
+           case typeSingle:
+           {
+             if (typeDouble == nType)
+               rFd->fSingle = float64_to_float32(rFd->fDouble);
+             else
+               rFd->fSingle = floatx80_to_float32(rFd->fExtended);
+           }
+           break;
+
+           case typeDouble:
+           {
+             if (typeSingle == nType)
+               rFd->fDouble = float32_to_float64(rFd->fSingle);
+             else
+               rFd->fDouble = floatx80_to_float64(rFd->fExtended);
+           }
+           break;
+
+           case typeExtended:
+           {
+             if (typeSingle == nType)
+               rFd->fExtended = float32_to_floatx80(rFd->fSingle);
+             else
+               rFd->fExtended = float64_to_floatx80(rFd->fDouble);
+           }
+           break;
+         }
+      }
    }
-   
+
    return nRc;
 }
