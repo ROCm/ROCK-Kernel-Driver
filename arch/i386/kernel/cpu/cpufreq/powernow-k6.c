@@ -185,6 +185,11 @@ static int powernow_k6_cpu_exit(struct cpufreq_policy *policy)
  	return 0;
 }
 
+static unsigned int powernow_k6_get(unsigned int cpu)
+{
+	return busfreq * powernow_k6_get_cpu_multiplier();
+}
+
 static struct freq_attr* powernow_k6_attr[] = {
 	&cpufreq_freq_attr_scaling_available_freqs,
 	NULL,
@@ -195,6 +200,7 @@ static struct cpufreq_driver powernow_k6_driver = {
 	.target 	= powernow_k6_target,
 	.init		= powernow_k6_cpu_init,
 	.exit		= powernow_k6_cpu_exit,
+	.get		= powernow_k6_get,
 	.name		= "powernow-k6",
 	.owner		= THIS_MODULE,
 	.attr		= powernow_k6_attr,
