@@ -167,10 +167,6 @@ struct usb_device;
 #define USB_DT_OTHER_SPEED_CONFIG	0x07
 #define USB_DT_INTERFACE_POWER		0x08
 
-// FIXME should be internal to hub driver
-#define USB_DT_HUB			(USB_TYPE_CLASS | 0x09)
-#define USB_DT_HUB_NONVAR_SIZE		7
-
 /*
  * Descriptor sizes per descriptor type
  */
@@ -258,6 +254,8 @@ struct usb_interface {
 	void *private_data;
 };
 #define	to_usb_interface(d) container_of(d, struct usb_interface, dev)
+#define	interface_to_usbdev(intf) \
+	container_of(intf->dev.parent, struct usb_device, dev)
 
 /* USB_DT_CONFIG: Configuration descriptor information.
  *
@@ -303,10 +301,8 @@ struct usb_qualifier_descriptor {
 	__u8  bRESERVED;
 } __attribute__ ((packed));
 
-/* helpers for driver access to descriptors */
-extern int usb_ifnum_to_ifpos(struct usb_device *dev, unsigned ifnum);
-extern struct usb_interface *
-	usb_ifnum_to_if(struct usb_device *dev, unsigned ifnum);
+// FIXME remove; exported only for drivers/usb/misc/auserwald.c
+// prefer usb_device->epnum[0..31]
 extern struct usb_endpoint_descriptor *
 	usb_epnum_to_ep_desc(struct usb_device *dev, unsigned epnum);
 
@@ -435,10 +431,6 @@ extern void usb_free_dev(struct usb_device *);
 /* for when layers above USB add new non-USB drivers */
 extern void usb_scan_devices(void);
 
-/* for probe/disconnect with correct module usage counting */
-void *usb_bind_driver(struct usb_driver *driver, struct usb_device *dev, unsigned int ifnum);
-void usb_unbind_driver(struct usb_device *device, struct usb_interface *intf);
-
 /* mostly for devices emulating SCSI over USB */
 extern int usb_reset_device(struct usb_device *dev);
 
@@ -446,7 +438,6 @@ extern int usb_reset_device(struct usb_device *dev);
 extern int usb_get_current_frame_number (struct usb_device *usb_dev);
 
 /* used these for multi-interface device registration */
-extern int usb_find_interface_driver_for_ifnum(struct usb_device *dev, unsigned int ifnum);
 extern void usb_driver_claim_interface(struct usb_driver *driver,
 			struct usb_interface *iface, void* priv);
 extern int usb_interface_claimed(struct usb_interface *iface);
