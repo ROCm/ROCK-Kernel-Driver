@@ -1597,6 +1597,10 @@ extern void ide_setup_pci_devices(struct pci_dev *, struct pci_dev *, ide_pci_de
 #define BAD_DMA_DRIVE		0
 #define GOOD_DMA_DRIVE		1
 
+#ifdef CONFIG_BLK_DEV_IDEDMA
+int __ide_dma_bad_drive(ide_drive_t *);
+int __ide_dma_good_drive(ide_drive_t *);
+
 #ifdef CONFIG_BLK_DEV_IDEDMA_PCI
 extern int ide_build_sglist(ide_drive_t *, struct request *);
 extern int ide_raw_build_sglist(ide_drive_t *, struct request *);
@@ -1618,8 +1622,6 @@ extern int __ide_dma_write(ide_drive_t *);
 extern int __ide_dma_begin(ide_drive_t *);
 extern int __ide_dma_end(ide_drive_t *);
 extern int __ide_dma_test_irq(ide_drive_t *);
-extern int __ide_dma_bad_drive(ide_drive_t *);
-extern int __ide_dma_good_drive(ide_drive_t *);
 extern int __ide_dma_count(ide_drive_t *);
 extern int __ide_dma_verbose(ide_drive_t *);
 extern int __ide_dma_lostirq(ide_drive_t *);
@@ -1636,6 +1638,8 @@ extern ide_startstop_t __ide_dma_queued_start(ide_drive_t *drive);
 #else
 static inline void ide_release_dma(ide_hwif_t *drive) {;}
 #endif
+
+#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 extern int ide_hwif_request_regions(ide_hwif_t *hwif);
 extern void ide_hwif_release_regions(ide_hwif_t* hwif);
