@@ -434,7 +434,6 @@ struct wl3501_card {
 	u16				bss_cnt;
 	u16				join_sta_bss;
 	unsigned char			rssi;
-	int				card_start;
 	u8				adhoc_times;
 	u8				driver_state;
 	u8				freq_domain;

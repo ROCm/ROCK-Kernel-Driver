@@ -20,8 +20,11 @@
  *      (Specification 2M bits/sec. is about 250 Kbytes/sec., but we must deduct
  *       ETHER/IP/UDP/TCP header, and acknowledgement overhead)
  *
- * Tested with Planet AP in 2.4.17, 184 KiB/s in UDP in Infrastructure mode,
- * 173 KiB/s in TCP.
+ * Tested with Planet AP in 2.4.17, 184 Kbytes/s in UDP in Infrastructure mode,
+ * 173 Kbytes/s in TCP.
+ *
+ * Tested with Planet AP in 2.5.73-bk, 216 Kbytes/s in Infrastructure mode
+ * with a SMP machine (dual pentium 100), using pktgen, 432 pps (pkt_size = 60)
  */
 #include <linux/config.h>
 #include <linux/delay.h>
@@ -989,13 +992,15 @@ static int wl3501_esbq_confirm(struct wl3501_card *this)
 	return tmp & 0x80;
 }
 
-static void wl3501_online(struct wl3501_card *this)
+static void wl3501_online(struct net_device *dev)
 {
-	this->card_start = 1;
+	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+
 	printk(KERN_INFO "Wireless LAN online. BSSID: "
 	       "%02X %02X %02X %02X %02X %02X\n",
 	       this->bssid.b0, this->bssid.b1, this->bssid.b2,
 	       this->bssid.b3, this->bssid.b4, this->bssid.b5);
+	netif_wake_queue(dev);
 }
 
 static void wl3501_esbq_confirm_done(struct wl3501_card *this)
@@ -1051,10 +1056,10 @@ static int wl3501_mgmt_association(struct wl3501_card *this)
 	return 1;
 }
 
-static void wl3501_mgmt_join_confirm(struct net_device *dev,
-				     struct wl3501_card *this, u16 addr)
+static void wl3501_mgmt_join_confirm(struct net_device *dev, u16 addr)
 {
 	u16 i, j;
+	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
 	struct wl3501_join_confirm sig;
 
 	wl3501_get_from_wla(this, addr, &sig, sizeof(sig));
@@ -1077,7 +1082,7 @@ static void wl3501_mgmt_join_confirm(struct net_device *dev,
 			this->chan = this->bss_set[i].phy_pset[2];
 			memcpy((char *)this->keep_essid,
 			       (char *)this->bss_set[i].ssid, 34);
-			wl3501_online(this);
+			wl3501_online(dev);
 		}
 	} else {
 		this->join_sta_bss++;
@@ -1097,11 +1102,6 @@ static void wl3501_mgmt_join_confirm(struct net_device *dev,
 			}
 		}
 	}
-
-	if (this->card_start)
-		netif_wake_queue(dev);
-	else
-		netif_stop_queue(dev);
 }
 
 static inline void wl3501_alarm_interrupt(struct net_device *dev,
@@ -1200,30 +1200,20 @@ static inline void wl3501_start_confirm_interrupt(struct net_device *dev,
 	struct wl3501_start_confirm sig;
 
 	wl3501_get_from_wla(this, addr, &sig, sizeof(sig));
-	this->card_start = sig.status == WL3501_STATUS_SUCCESS;
-	if (this->card_start)
+	if (sig.status == WL3501_STATUS_SUCCESS)
 		netif_wake_queue(dev);
-	else
-		netif_stop_queue(dev);
 }
 
 static inline void wl3501_assoc_confirm_interrupt(struct net_device *dev,
-						  struct wl3501_card *this,
 						  u16 addr)
 {
+	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
 	struct wl3501_assoc_confirm sig;
 
 	wl3501_get_from_wla(this, addr, &sig, sizeof(sig));
 
 	if (sig.status == WL3501_STATUS_SUCCESS)
-		wl3501_online(this);
-	else
-		this->card_start = 0;
-
-	if (this->card_start)
-		netif_wake_queue(dev);
-	else
-		netif_stop_queue(dev);
+		wl3501_online(dev);
 }
 
 static inline void wl3501_auth_confirm_interrupt(struct wl3501_card *this,
@@ -1274,10 +1264,10 @@ loop:
 		wl3501_mgmt_scan_confirm(this, addr);
 		break;
 	case WL3501_SIG_JOIN_CONFIRM:
-		wl3501_mgmt_join_confirm(dev, this, addr);
+		wl3501_mgmt_join_confirm(dev, addr);
 		break;
 	case WL3501_SIG_ASSOC_CONFIRM:
-		wl3501_assoc_confirm_interrupt(dev, this, addr);
+		wl3501_assoc_confirm_interrupt(dev, addr);
 		break;
 	case WL3501_SIG_AUTH_CONFIRM:
 		wl3501_auth_confirm_interrupt(this, addr);
@@ -1433,7 +1423,6 @@ static int wl3501_close(struct net_device *dev)
 
 	/* Stop wl3501_hard_start_xmit() from now on */
 	netif_stop_queue(dev);
-	this->card_start = 0;
 	wl3501_ack_interrupt(this);
 
 	/* Mask interrupts from the SUTRO */
@@ -1478,8 +1467,6 @@ static int wl3501_reset(struct net_device *dev)
 		goto out;
 	}
 
-	/* Initial device variables */
-	this->card_start = 0;
 	/* queue has to be started only when the Card is Started */
 	netif_stop_queue(dev);
 	this->adhoc_times = 0;
@@ -1498,10 +1485,13 @@ static void wl3501_tx_timeout(struct net_device *dev)
 {
 	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
 	struct net_device_stats *stats = &this->stats;
+	unsigned long flags;
 	int rc;
 
 	stats->tx_errors++;
+	spin_lock_irqsave(&this->lock, flags);
 	rc = wl3501_reset(dev);
+	spin_unlock_irqrestore(&this->lock, flags);
 	if (rc)
 		printk(KERN_ERR "%s: Error %d resetting card on Tx timeout!\n",
 		       dev->name, rc);
@@ -1518,54 +1508,22 @@ static void wl3501_tx_timeout(struct net_device *dev)
  */
 static int wl3501_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	int enabled, fail_send;
+	int enabled, rc;
 	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	unsigned long flags;
 
-	if (!netif_running(dev) || !this->card_start) {
-		//printk(KERN_ERR "%s: Tx on stopped device!\n", dev->name);
-		return 1;
-	}
-	if (netif_queue_stopped(dev)) {
-		printk(KERN_ERR "%s: Tx while transmitter busy!\n", dev->name);
-		return 1;
-	}
-	/* Avoid re-entry. Block a timer-based transmit from overlapping. */
-	netif_stop_queue(dev);
-
-	/*
-	 * Good! This packet owns the transmitter, block interrupt immediately.
-	 * wl3501_interrupt() has no chance to start the queue if it gets
-	 * ISR_Tx.
-	 */
-
-	/*
-	 * Mask interrupts from the SUTRO!
-	 * We must mask interrupt from the same card, to prevent interrupt
-	 * routine from accessing data structure and I/O port while
-	 * wl3501_send_pkt is running. It's very important!
-	 */
-
+	spin_lock_irqsave(&this->lock, flags);
 	enabled = wl3501_block_interrupt(this);
-
-	/* Record transmitt start time */
 	dev->trans_start = jiffies;
-
-	/* Send the packet with default speed */
-	fail_send = wl3501_send_pkt(this, skb->data, skb->len);
-
-	/* Turn SUTRO interrupt back on only if it is originally enabled */
+	rc = wl3501_send_pkt(this, skb->data, skb->len);
 	if (enabled)
 		wl3501_unblock_interrupt(this);
-
-	/* If sent successfully, start queue. Otherwise, buffer is enqueued
-	 * and will be restarted again when the SUTRO interrupts us and
-	 * returns ISR_Tx */
-	if (!fail_send) {
-		dev_kfree_skb(skb);
-		netif_start_queue(dev);	/* Let others own the transmitter */
-		return 0;
-	}
-	return 1;		/* Try next time */
+	if (rc)
+		netif_stop_queue(dev);
+	else
+		kfree_skb(skb);
+	spin_unlock_irqrestore(&this->lock, flags);
+	return rc;
 }
 
 static int wl3501_open(struct net_device *dev)
@@ -1590,8 +1548,6 @@ static int wl3501_open(struct net_device *dev)
 	if (wl3501_init_firmware(this))
 		goto fail;
 	/* Initial device variables */
-	netif_start_queue(dev);
-	this->card_start = 0;
 	this->adhoc_times = 0;
 	/* Acknowledge Interrupt, for cleaning last state */
 	wl3501_ack_interrupt(this);
@@ -1633,7 +1589,7 @@ struct iw_statistics *wl3501_get_wireless_stats(struct net_device *dev)
 	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
 	struct iw_statistics *wstats = &this->wstats;
 
-	wstats->status = this->card_start;
+	wstats->status = netif_running(dev);
 	wstats->qual.qual    = 0;
 	wstats->qual.level   = 0;
 	wstats->qual.noise   = 0;
@@ -2071,7 +2027,7 @@ static dev_link_t *wl3501_attach(void)
 	dev->stop		= wl3501_close;
 	dev->hard_start_xmit	= wl3501_hard_start_xmit;
 	dev->tx_timeout		= wl3501_tx_timeout;
-	dev->watchdog_timeo	= 10 * HZ;
+	dev->watchdog_timeo	= 5 * HZ;
 	dev->get_stats		= wl3501_get_stats;
 	dev->get_wireless_stats = wl3501_get_wireless_stats;
 	dev->set_multicast_list = wl3501_set_multicast_list;
@@ -2172,7 +2128,6 @@ static void wl3501_config(dev_link_t *link)
 
 	dev->irq = link->irq.AssignedIRQ;
 	dev->base_addr = link->io.BasePort1;
-	netif_start_queue(dev);
 	if (register_netdev(dev)) {
 		printk(KERN_NOTICE "wl3501_cs: register_netdev() failed\n");
 		goto failed;
@@ -2212,7 +2167,6 @@ static void wl3501_config(dev_link_t *link)
 	this->join_sta_bss	= 0;
 	this->adhoc_times	= 0;
 	this->driver_state	= 0;
-	this->card_start	= 0;
 	this->essid[0]		= 0;
 	this->essid[1]		= 3;
 	this->essid[2]		= 'A';
@@ -2235,6 +2189,7 @@ static void wl3501_config(dev_link_t *link)
 		this->def_chan = 1;
 		break;
 	}
+	netif_start_queue(dev);
 	goto out;
 cs_failed:
 	cs_error(link->handle, last_fn, last_ret);
