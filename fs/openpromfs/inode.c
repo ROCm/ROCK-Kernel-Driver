@@ -633,6 +633,7 @@ static struct dentry *openpromfs_lookup(struct inode * dir, struct dentry *dentr
 	inode = NULL;
 	name = dentry->d_name.name;
 	len = dentry->d_name.len;
+	lock_kernel();
 	if (name [0] == '.' && len == 5 && !strncmp (name + 1, "node", 4)) {
 		ino = NODEP2INO(NODE(dir->i_ino).first_prop);
 		type = OPFSL_NODENUM;
@@ -692,10 +693,13 @@ static struct dentry *openpromfs_lookup(struct inode * dir, struct dentry *dentr
 		ino = lookup_children (NODE(dir->i_ino).child, name, len);
 		if (ino)
 			type = OPFSL_DIR;
-		else
+		else {
+			unlock_kernel();
 			return ERR_PTR(-ENOENT);
+		}
 	}
 	inode = iget (dir->i_sb, ino);
+	unlock_kernel();
 	if (!inode)
 		return ERR_PTR(-EINVAL);
 	switch (type) {

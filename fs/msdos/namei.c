@@ -12,6 +12,7 @@
 
 #include <linux/time.h>
 #include <linux/msdos_fs.h>
+#include <linux/smp_lock.h>
 
 #define MSDOS_DEBUG 0
 #define PRINTK(x)
@@ -215,6 +216,7 @@ struct dentry *msdos_lookup(struct inode *dir,struct dentry *dentry)
 
 	dentry->d_op = &msdos_dentry_operations;
 
+	lock_kernel();
 	res = msdos_find(dir, dentry->d_name.name, dentry->d_name.len, &bh,
 			&de, &ino);
 
@@ -231,6 +233,7 @@ add:
 out:
 	if (bh)
 		fat_brelse(sb, bh);
+	unlock_kernel();
 	return ERR_PTR(res);
 }
 

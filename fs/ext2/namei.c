@@ -31,6 +31,7 @@
 
 #include "ext2.h"
 #include <linux/pagemap.h>
+#include <linux/smp_lock.h>
 
 /*
  * Couple of helper functions - make the code slightly cleaner.
@@ -72,13 +73,17 @@ static struct dentry *ext2_lookup(struct inode * dir, struct dentry *dentry)
 	if (dentry->d_name.len > EXT2_NAME_LEN)
 		return ERR_PTR(-ENAMETOOLONG);
 
+	lock_kernel();
 	ino = ext2_inode_by_name(dir, dentry);
 	inode = NULL;
 	if (ino) {
 		inode = iget(dir->i_sb, ino);
-		if (!inode) 
+		if (!inode)  {
+			unlock_kernel();
 			return ERR_PTR(-EACCES);
+		}
 	}
+	unlock_kernel();
 	d_add(dentry, inode);
 	return NULL;
 }

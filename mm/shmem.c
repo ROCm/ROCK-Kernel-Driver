@@ -973,6 +973,7 @@ static int shmem_statfs(struct super_block *sb, struct statfs *buf)
  * Lookup the data. This is trivial - if the dentry didn't already
  * exist, we know it is negative.
  */
+/* SMP-safe */
 static struct dentry * shmem_lookup(struct inode *dir, struct dentry *dentry)
 {
 	d_add(dentry, NULL);

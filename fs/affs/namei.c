@@ -16,6 +16,7 @@
 #include <linux/fcntl.h>
 #include <linux/locks.h>
 #include <linux/amigaffs.h>
+#include <linux/smp_lock.h>
 #include <asm/uaccess.h>
 
 #include <linux/errno.h>
@@ -217,11 +218,14 @@ affs_lookup(struct inode *dir, struct dentry *dentry)
 
 	pr_debug("AFFS: lookup(\"%.*s\")\n",(int)dentry->d_name.len,dentry->d_name.name);
 
+	lock_kernel();
 	affs_lock_dir(dir);
 	bh = affs_find_entry(dir, dentry);
 	affs_unlock_dir(dir);
-	if (IS_ERR(bh))
+	if (IS_ERR(bh)) {
+		unlock_kernel();
 		return ERR_PTR(PTR_ERR(bh));
+	}
 	if (bh) {
 		u32 ino = bh->b_blocknr;
 
@@ -235,10 +239,13 @@ affs_lookup(struct inode *dir, struct dentry *dentry)
 		}
 		affs_brelse(bh);
 		inode = iget(sb, ino);
-		if (!inode)
+		if (!inode) {
+			unlock_kernel();
 			return ERR_PTR(-EACCES);
+		}
 	}
 	dentry->d_op = AFFS_SB->s_flags & SF_INTL ? &affs_intl_dentry_operations : &affs_dentry_operations;
+	unlock_kernel();
 	d_add(dentry, inode);
 	return NULL;
 }

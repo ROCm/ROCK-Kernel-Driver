@@ -399,6 +399,7 @@ smb_lookup(struct inode *dir, struct dentry *dentry)
 	if (dentry->d_name.len > SMB_MAXNAMELEN)
 		goto out;
 
+	lock_kernel();
 	error = smb_proc_getattr(dentry, &finfo);
 #ifdef SMBFS_PARANOIA
 	if (error && error != -ENOENT)
@@ -426,6 +427,7 @@ smb_lookup(struct inode *dir, struct dentry *dentry)
 			error = 0;
 		}
 	}
+	unlock_kernel();
 out:
 	return ERR_PTR(error);
 }

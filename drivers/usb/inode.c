@@ -142,6 +142,7 @@ static int parse_options(struct super_block *s, char *data)
 
 /* --------------------------------------------------------------------- */
 
+/* SMP-safe */
 static struct dentry *usbfs_lookup (struct inode *dir, struct dentry *dentry)
 {
 	d_add(dentry, NULL);

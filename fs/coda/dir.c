@@ -112,6 +112,7 @@ static struct dentry *coda_lookup(struct inode *dir, struct dentry *entry)
         CDEBUG(D_INODE, "name %s, len %ld in ino %ld, fid %s\n", 
 	       name, (long)length, dir->i_ino, coda_i2s(dir));
 
+	lock_kernel();
         /* control object, create inode on the fly */
         if (coda_isroot(dir) && coda_iscontrol(name, length)) {
 	        error = coda_cnode_makectl(&res_inode, dir->i_sb);
@@ -135,10 +136,14 @@ static struct dentry *coda_lookup(struct inode *dir, struct dentry *entry)
 		}
 
 	    	error = coda_cnode_make(&res_inode, &resfid, dir->i_sb);
-		if (error) return ERR_PTR(error);
+		if (error) {
+			unlock_kernel();
+			return ERR_PTR(error);
+		}
 	} else if (error != -ENOENT) {
 	        CDEBUG(D_INODE, "error for %s(%*s)%d\n",
 		       coda_i2s(dir), (int)length, name, error);
+		unlock_kernel();
 		return ERR_PTR(error);
 	}
 	CDEBUG(D_INODE, "lookup: %s is (%s), type %d result %d, dropme %d\n",
@@ -152,6 +157,7 @@ exit:
 		d_drop(entry);
 		coda_flag_inode(res_inode, C_VATTR);
 	}
+	unlock_kernel();
         return NULL;
 }
 

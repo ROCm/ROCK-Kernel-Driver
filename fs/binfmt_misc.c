@@ -618,6 +618,7 @@ static struct file_operations bm_status_operations = {
 
 /* / */
 
+/* SMP-safe */
 static struct dentry * bm_lookup(struct inode *dir, struct dentry *dentry)
 {
 	d_add(dentry, NULL);

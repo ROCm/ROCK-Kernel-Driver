@@ -17,6 +17,7 @@
 #include <linux/time.h>
 #include <linux/stat.h>
 #include <linux/spinlock.h>
+#include <linux/smp_lock.h>
 
 #include "adfs.h"
 
@@ -271,6 +272,7 @@ struct dentry *adfs_lookup(struct inode *dir, struct dentry *dentry)
 	int error;
 
 	dentry->d_op = &adfs_dentry_operations;	
+	lock_kernel();
 	error = adfs_dir_lookup_byname(dir, &dentry->d_name, &obj);
 	if (error == 0) {
 		error = -EACCES;
@@ -282,6 +284,7 @@ struct dentry *adfs_lookup(struct inode *dir, struct dentry *dentry)
 		if (inode)
 			error = 0;
 	}
+	unlock_kernel();
 	d_add(dentry, inode);
 	return ERR_PTR(error);
 }

@@ -19,6 +19,7 @@
 #include <linux/locks.h>
 #include <linux/blkdev.h>
 #include <linux/cramfs_fs.h>
+#include <linux/smp_lock.h>
 #include <asm/semaphore.h>
 
 #include <asm/uaccess.h>
@@ -330,8 +331,10 @@ static int cramfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 static struct dentry * cramfs_lookup(struct inode *dir, struct dentry *dentry)
 {
 	unsigned int offset = 0;
-	int sorted = dir->i_sb->CRAMFS_SB_FLAGS & CRAMFS_FLAG_SORTED_DIRS;
+	int sorted;
 
+	lock_kernel();
+	sorted = dir->i_sb->CRAMFS_SB_FLAGS & CRAMFS_FLAG_SORTED_DIRS;
 	while (offset < dir->i_size) {
 		struct cramfs_inode *de;
 		char *name;
@@ -354,8 +357,10 @@ static struct dentry * cramfs_lookup(struct inode *dir, struct dentry *dentry)
 			continue;
 
 		for (;;) {
-			if (!namelen)
+			if (!namelen) {
+				unlock_kernel();
 				return ERR_PTR(-EIO);
+			}
 			if (name[namelen-1])
 				break;
 			namelen--;
@@ -367,12 +372,14 @@ static struct dentry * cramfs_lookup(struct inode *dir, struct dentry *dentry)
 			continue;
 		if (!retval) {
 			d_add(dentry, get_cramfs_inode(dir->i_sb, de));
+			unlock_kernel();
 			return NULL;
 		}
 		/* else (retval < 0) */
 		if (sorted)
 			break;
 	}
+	unlock_kernel();
 	d_add(dentry, NULL);
 	return NULL;
 }

@@ -304,9 +304,7 @@ static struct dentry * real_lookup(struct dentry * parent, struct qstr * name, i
 		struct dentry * dentry = d_alloc(parent, name);
 		result = ERR_PTR(-ENOMEM);
 		if (dentry) {
-			lock_kernel();
 			result = dir->i_op->lookup(dir, dentry);
-			unlock_kernel();
 			if (result)
 				dput(dentry);
 			else
@@ -778,9 +776,7 @@ struct dentry * lookup_hash(struct qstr *name, struct dentry * base)
 		dentry = ERR_PTR(-ENOMEM);
 		if (!new)
 			goto out;
-		lock_kernel();
 		dentry = inode->i_op->lookup(inode, new);
-		unlock_kernel();
 		if (!dentry)
 			dentry = new;
 		else

@@ -631,6 +631,8 @@ jffs_lookup(struct inode *dir, struct dentry *dentry)
 	len = dentry->d_name.len;
 	name = dentry->d_name.name;
 
+	lock_kernel();
+
 	D3({
 		char *s = (char *)kmalloc(len + 1, GFP_KERNEL);
 		memcpy(s, name, len);
@@ -698,6 +700,7 @@ jffs_lookup(struct inode *dir, struct dentry *dentry)
 	d_add(dentry, inode);
 	D3(printk (KERN_NOTICE "lookup(): up biglock\n"));
 	up(&c->fmc->biglock);
+	unlock_kernel();
 	return NULL;
 
 jffs_lookup_end:
@@ -705,6 +708,7 @@ jffs_lookup_end:
 	up(&c->fmc->biglock);
 
 jffs_lookup_end_no_biglock:
+	unlock_kernel();
 	return ERR_PTR(r);
 } /* jffs_lookup()  */
 

@@ -741,6 +741,7 @@ static struct dentry *ncp_lookup(struct inode *dir, struct dentry *dentry)
 	int error, res, len = dentry->d_name.len + 1;
 	__u8 __name[len];
 
+	lock_kernel();
 	error = -EIO;
 	if (!ncp_conn_valid(server))
 		goto finished;
@@ -785,6 +786,7 @@ add_entry:
 
 finished:
 	PPRINTK("ncp_lookup: result=%d\n", error);
+	unlock_kernel();
 	return ERR_PTR(error);
 }
 

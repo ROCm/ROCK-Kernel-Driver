@@ -579,6 +579,7 @@ static struct dentry *nfs_lookup(struct inode *dir, struct dentry * dentry)
 	error = -ENOMEM;
 	dentry->d_op = &nfs_dentry_operations;
 
+	lock_kernel();
 	error = NFS_PROTO(dir)->lookup(dir, &dentry->d_name, &fhandle, &fattr);
 	inode = NULL;
 	if (error == -ENOENT)
@@ -593,6 +594,7 @@ static struct dentry *nfs_lookup(struct inode *dir, struct dentry * dentry)
 		}
 		nfs_renew_times(dentry);
 	}
+	unlock_kernel();
 out:
 	return ERR_PTR(error);
 }

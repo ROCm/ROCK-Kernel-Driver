@@ -27,6 +27,7 @@
 #include <linux/time.h>
 #include <linux/fs.h>
 #include <linux/ufs_fs.h>
+#include <linux/smp_lock.h>
 
 #undef UFS_NAMEI_DEBUG
 
@@ -68,12 +69,16 @@ static struct dentry *ufs_lookup(struct inode * dir, struct dentry *dentry)
 	if (dentry->d_name.len > UFS_MAXNAMLEN)
 		return ERR_PTR(-ENAMETOOLONG);
 
+	lock_kernel();
 	ino = ufs_inode_by_name(dir, dentry);
 	if (ino) {
 		inode = iget(dir->i_sb, ino);
-		if (!inode) 
+		if (!inode) {
+			unlock_kernel();
 			return ERR_PTR(-EACCES);
+		}
 	}
+	unlock_kernel();
 	d_add(dentry, inode);
 	return NULL;
 }

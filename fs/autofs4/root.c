@@ -229,6 +229,7 @@ static struct dentry_operations autofs4_dentry_operations = {
 
 /* Lookups in non-root dirs never find anything - if it's there, it's
    already in the dcache */
+/* SMP-safe */
 static struct dentry *autofs4_dir_lookup(struct inode *dir, struct dentry *dentry)
 {
 #if 0
@@ -256,6 +257,7 @@ static struct dentry *autofs4_root_lookup(struct inode *dir, struct dentry *dent
 
 	sbi = autofs4_sbi(dir->i_sb);
 
+	lock_kernel();
 	oz_mode = autofs4_oz_mode(sbi);
 	DPRINTK(("autofs_lookup: pid = %u, pgrp = %u, catatonic = %d, oz_mode = %d\n",
 		 current->pid, current->pgrp, sbi->catatonic, oz_mode));
@@ -288,9 +290,12 @@ static struct dentry *autofs4_root_lookup(struct inode *dir, struct dentry *dent
 	 * a signal. If so we can force a restart..
 	 */
 	if (dentry->d_flags & DCACHE_AUTOFS_PENDING) {
-		if (signal_pending(current))
+		if (signal_pending(current)) {
+			unlock_kernel();
 			return ERR_PTR(-ERESTARTNOINTR);
+		}
 	}
+	unlock_kernel();
 
 	/*
 	 * If this dentry is unhashed, then we shouldn't honour this

@@ -16,6 +16,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <asm/bitops.h>
+#include <linux/smp_lock.h>
 
 struct proc_dir_entry *proc_net, *proc_bus, *proc_root_fs, *proc_root_driver;
 
@@ -80,15 +81,14 @@ void __init proc_root_init(void)
 static struct dentry *proc_root_lookup(struct inode * dir, struct dentry * dentry)
 {
 	if (dir->i_ino == PROC_ROOT_INO) { /* check for safety... */
-		int nlink = proc_root.nlink;
-
-		nlink += nr_threads;
-
-		dir->i_nlink = nlink;
+		lock_kernel();
+		dir->i_nlink = proc_root.nlink + nr_threads;
+		unlock_kernel();
 	}
 
-	if (!proc_lookup(dir, dentry))
+	if (!proc_lookup(dir, dentry)) {
 		return NULL;
+	}
 	
 	return proc_pid_lookup(dir, dentry);
 }

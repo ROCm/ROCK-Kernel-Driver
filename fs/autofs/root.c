@@ -197,10 +197,13 @@ static struct dentry *autofs_root_lookup(struct inode *dir, struct dentry *dentr
 	int oz_mode;
 
 	DPRINTK(("autofs_root_lookup: name = "));
+	lock_kernel();
 	autofs_say(dentry->d_name.name,dentry->d_name.len);
 
-	if (dentry->d_name.len > NAME_MAX)
+	if (dentry->d_name.len > NAME_MAX) {
+		unlock_kernel();
 		return ERR_PTR(-ENAMETOOLONG);/* File name too long to exist */
+	}
 
 	sbi = autofs_sbi(dir->i_sb);
 
@@ -231,9 +234,12 @@ static struct dentry *autofs_root_lookup(struct inode *dir, struct dentry *dentr
 	 * a signal. If so we can force a restart..
 	 */
 	if (dentry->d_flags & DCACHE_AUTOFS_PENDING) {
-		if (signal_pending(current))
+		if (signal_pending(current)) {
+			unlock_kernel();
 			return ERR_PTR(-ERESTARTNOINTR);
+		}
 	}
+	unlock_kernel();
 
 	/*
 	 * If this dentry is unhashed, then we shouldn't honour this

@@ -2944,10 +2944,14 @@ static struct dentry *devfs_lookup (struct inode *dir, struct dentry *dentry)
 	up on any error  */
     dentry->d_op = &devfs_dops;
     /*  First try to get the devfs entry for this directory  */
+    lock_kernel();
     parent = get_devfs_entry_from_vfs_inode (dir);
     DPRINTK (DEBUG_I_LOOKUP, "(%s): dentry: %p parent: %p by: \"%s\"\n",
 	     dentry->d_name.name, dentry, parent, current->comm);
-    if (parent == NULL) return ERR_PTR (-ENOENT);
+    if (parent == NULL) {
+	unlock_kernel();
+	return ERR_PTR (-ENOENT);
+    }
     read_lock (&parent->u.dir.lock);
     de = _devfs_search_dir (parent, dentry->d_name.name, dentry->d_name.len);
     read_unlock (&parent->u.dir.lock);
@@ -2972,6 +2976,7 @@ static struct dentry *devfs_lookup (struct inode *dir, struct dentry *dentry)
 	if (try_modload (parent, fs_info,
 			 dentry->d_name.name, dentry->d_name.len, &tmp) < 0)
 	{   /*  Lookup event was not queued to devfsd  */
+	    unlock_kernel();
 	    d_add (dentry, NULL);
 	    return NULL;
 	}
@@ -3014,6 +3019,7 @@ out:
     wake_up (&lookup_info.wait_queue);
     write_unlock (&parent->u.dir.lock);
     devfs_put (de);
+    unlock_kernel();
     return retval;
 }   /*  End Function devfs_lookup  */
 

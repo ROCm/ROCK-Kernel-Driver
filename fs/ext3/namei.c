@@ -28,6 +28,7 @@
 #include <linux/string.h>
 #include <linux/locks.h>
 #include <linux/quotaops.h>
+#include <linux/smp_lock.h>
 
 
 /*
@@ -205,6 +206,7 @@ static struct dentry *ext3_lookup(struct inode * dir, struct dentry *dentry)
 	if (dentry->d_name.len > EXT3_NAME_LEN)
 		return ERR_PTR(-ENAMETOOLONG);
 
+	lock_kernel();
 	bh = ext3_find_entry(dentry, &de);
 	inode = NULL;
 	if (bh) {
@@ -212,9 +214,12 @@ static struct dentry *ext3_lookup(struct inode * dir, struct dentry *dentry)
 		brelse (bh);
 		inode = iget(dir->i_sb, ino);
 
-		if (!inode)
+		if (!inode) {
+			unlock_kernel();
 			return ERR_PTR(-EACCES);
+		}
 	}
+	unlock_kernel();
 	d_add(dentry, inode);
 	return NULL;
 }

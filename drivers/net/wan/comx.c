@@ -64,6 +64,7 @@
 #include <asm/uaccess.h>
 #include <linux/ctype.h>
 #include <linux/init.h>
+#include <linux/smp_lock.h>
 
 #ifdef CONFIG_KMOD
 #include <linux/kmod.h>
@@ -928,6 +929,7 @@ static struct dentry *comx_lookup(struct inode *dir, struct dentry *dentry)
 	struct proc_dir_entry *de;
 	struct inode *inode = NULL;
 
+	lock_kernel();
 	if ((de = PDE(dir)) != NULL) {
 		for (de = de->subdir ; de ; de = de->next) {
 			if ((de && de->low_ino) && 
@@ -937,12 +939,14 @@ static struct dentry *comx_lookup(struct inode *dir, struct dentry *dentry)
 			 	if ((inode = proc_get_inode(dir->i_sb, 
 			 	    de->low_ino, de)) == NULL) { 
 			 		printk(KERN_ERR "COMX: lookup error\n"); 
+					unlock_kernel();
 			 		return ERR_PTR(-EINVAL); 
 			 	}
 				break;
 			}
 		}
 	}
+	unlock_kernel();
 	dentry->d_op = &comx_dentry_operations;
 	d_add(dentry, inode);
 	return NULL;
