@@ -1097,7 +1097,7 @@ out:
  * If there are applications that are active memory-allocators
  * (most normal use), this basically shouldn't matter.
  */
-int kswapd(void *p)
+static int kswapd(void *p)
 {
 	pg_data_t *pgdat = (pg_data_t*)p;
 	struct task_struct *tsk = current;
@@ -1136,6 +1136,7 @@ int kswapd(void *p)
 
 		balance_pgdat(pgdat, 0);
 	}
+	return 0;
 }
 
 /*
