@@ -42,7 +42,7 @@ static long no_blink(long time)
 }
 
 /* Returns how long it waited in ms */
-long (*panic_blink)(long time) = no_blink;
+long (*panic_blink)(long time);
 EXPORT_SYMBOL(panic_blink);
 
 /**
@@ -75,7 +75,10 @@ NORET_TYPE void panic(const char * fmt, ...)
 	smp_send_stop();
 #endif
 
-       notifier_call_chain(&panic_notifier_list, 0, buf);
+	notifier_call_chain(&panic_notifier_list, 0, buf);
+
+	if (!panic_blink)
+		panic_blink = no_blink;
 
 	if (panic_timeout > 0)
 	{
