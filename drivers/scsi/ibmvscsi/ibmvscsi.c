@@ -87,7 +87,7 @@ static int max_channel = 3;
 static int init_timeout = 5;
 static int max_requests = 50;
 
-#define IBMVSCSI_VERSION "1.5.4"
+#define IBMVSCSI_VERSION "1.5.5"
 
 MODULE_DESCRIPTION("IBM Virtual SCSI");
 MODULE_AUTHOR("Dave Boutcher");
@@ -256,6 +256,7 @@ static void init_event_struct(struct srp_event_struct *evt_struct,
 {
 	evt_struct->cmnd = NULL;
 	evt_struct->cmnd_done = NULL;
+	evt_struct->sync_srp = NULL;
 	evt_struct->crq.format = format;
 	evt_struct->crq.timeout = timeout;
 	evt_struct->done = done;
@@ -536,6 +537,13 @@ static void handle_cmd_rsp(struct srp_event_struct *evt_struct)
 	struct srp_rsp *rsp = &evt_struct->xfer_iu->srp.rsp;
 	struct scsi_cmnd *cmnd = evt_struct->cmnd;
 
+	if (unlikely(rsp->type != SRP_RSP_TYPE)) {
+		if (printk_ratelimit())
+			printk(KERN_WARNING 
+			       "ibmvscsi: bad SRP RSP type %d\n",
+			       rsp->type);
+	}
+	
 	if (cmnd) {
 		cmnd->result = rsp->status;
 		if (((cmnd->result >> 1) & 0x1f) == CHECK_CONDITION)
@@ -800,6 +808,10 @@ static int send_srp_login(struct ibmvscsi_host_data *hostdata)
  */
 static void sync_completion(struct srp_event_struct *evt_struct)
 {
+	/* copy the response back */
+	if (evt_struct->sync_srp)
+		*evt_struct->sync_srp = *evt_struct->xfer_iu;
+	
 	complete(&evt_struct->comp);
 }
 
@@ -814,6 +826,8 @@ static int ibmvscsi_eh_abort_handler(struct scsi_cmnd *cmd)
 	struct srp_tsk_mgmt *tsk_mgmt;
 	struct srp_event_struct *evt;
 	struct srp_event_struct *tmp_evt, *found_evt;
+	union viosrp_iu srp_rsp;
+	int rsp_rc;
 	u16 lun = lun_from_dev(cmd->device);
 
 	/* First, find this command in our sent list so we can figure
@@ -853,6 +867,7 @@ static int ibmvscsi_eh_abort_handler(struct scsi_cmnd *cmd)
 	printk(KERN_INFO "ibmvscsi: aborting command. lun 0x%lx, tag 0x%lx\n",
 	       tsk_mgmt->lun, tsk_mgmt->managed_task_tag);
 
+	evt->sync_srp = &srp_rsp;
 	init_completion(&evt->comp);
 	if (ibmvscsi_send_srp_event(evt, hostdata) != 0) {
 		printk(KERN_ERR "ibmvscsi: failed to send abort() event\n");
@@ -862,6 +877,29 @@ static int ibmvscsi_eh_abort_handler(struct scsi_cmnd *cmd)
 	spin_unlock_irq(hostdata->host->host_lock);
 	wait_for_completion(&evt->comp);
 	spin_lock_irq(hostdata->host->host_lock);
+
+	/* make sure we got a good response */
+	if (unlikely(srp_rsp.srp.generic.type != SRP_RSP_TYPE)) {
+		if (printk_ratelimit())
+			printk(KERN_WARNING 
+			       "ibmvscsi: abort bad SRP RSP type %d\n",
+			       srp_rsp.srp.generic.type);
+		return FAILED;
+	}
+
+	if (srp_rsp.srp.rsp.rspvalid)
+		rsp_rc = *((int *)srp_rsp.srp.rsp.sense_and_response_data);
+	else
+		rsp_rc = srp_rsp.srp.rsp.status;
+
+	if (rsp_rc) {
+		if (printk_ratelimit())
+			printk(KERN_WARNING 
+		       "ibmvscsi: abort code %d for task tag 0x%lx\n",
+			       rsp_rc,
+			       tsk_mgmt->managed_task_tag);
+		return FAILED;
+	}
 
 	/* Because we dropped the spinlock above, it's possible
 	 * The event is no longer in our list.  Make sure it didn't
@@ -875,12 +913,16 @@ static int ibmvscsi_eh_abort_handler(struct scsi_cmnd *cmd)
 		}
 	}
 
+	if (found_evt == NULL) {
+		printk(KERN_INFO
+		       "ibmvscsi: aborted task tag 0x%lx completed\n",
+		       tsk_mgmt->managed_task_tag);
+		return SUCCESS;
+	}
+
 	printk(KERN_INFO
 	       "ibmvscsi: successfully aborted task tag 0x%lx\n",
 	       tsk_mgmt->managed_task_tag);
-
-	if (found_evt == NULL)
-		return SUCCESS;
 
 	cmd->result = (DID_ABORT << 16);
 	list_del(&found_evt->list);
@@ -903,6 +945,8 @@ static int ibmvscsi_eh_device_reset_handler(struct scsi_cmnd *cmd)
 	struct srp_tsk_mgmt *tsk_mgmt;
 	struct srp_event_struct *evt;
 	struct srp_event_struct *tmp_evt, *pos;
+	union viosrp_iu srp_rsp;
+	int rsp_rc;
 	u16 lun = lun_from_dev(cmd->device);
 
 	evt = get_event_struct(&hostdata->pool);
@@ -927,6 +971,7 @@ static int ibmvscsi_eh_device_reset_handler(struct scsi_cmnd *cmd)
 	printk(KERN_INFO "ibmvscsi: resetting device. lun 0x%lx\n",
 	       tsk_mgmt->lun);
 
+	evt->sync_srp = &srp_rsp;
 	init_completion(&evt->comp);
 	if (ibmvscsi_send_srp_event(evt, hostdata) != 0) {
 		printk(KERN_ERR "ibmvscsi: failed to send reset event\n");
@@ -936,6 +981,29 @@ static int ibmvscsi_eh_device_reset_handler(struct scsi_cmnd *cmd)
 	spin_unlock_irq(hostdata->host->host_lock);
 	wait_for_completion(&evt->comp);
 	spin_lock_irq(hostdata->host->host_lock);
+
+	/* make sure we got a good response */
+	if (unlikely(srp_rsp.srp.generic.type != SRP_RSP_TYPE)) {
+		if (printk_ratelimit())
+			printk(KERN_WARNING 
+			       "ibmvscsi: reset bad SRP RSP type %d\n",
+			       srp_rsp.srp.generic.type);
+		return FAILED;
+	}
+
+	if (srp_rsp.srp.rsp.rspvalid)
+		rsp_rc = *((int *)srp_rsp.srp.rsp.sense_and_response_data);
+	else
+		rsp_rc = srp_rsp.srp.rsp.status;
+
+	if (rsp_rc) {
+		if (printk_ratelimit())
+			printk(KERN_WARNING 
+			       "ibmvscsi: reset code %d for task tag 0x%lx\n",
+		       rsp_rc,
+			       tsk_mgmt->managed_task_tag);
+		return FAILED;
+	}
 
 	/* We need to find all commands for this LUN that have not yet been
 	 * responded to, and fail them with DID_RESET
@@ -1048,6 +1116,13 @@ void ibmvscsi_handle_crq(struct viosrp_crq *crq,
 	if (!valid_event_struct(&hostdata->pool, evt_struct)) {
 		printk(KERN_ERR
 		       "ibmvscsi: returned correlation_token 0x%p is invalid!\n",
+		       (void *)crq->IU_data_ptr);
+		return;
+	}
+
+	if (atomic_read(&evt_struct->free)) {
+		printk(KERN_ERR
+		       "ibmvscsi: received duplicate  correlation_token 0x%p!\n",
 		       (void *)crq->IU_data_ptr);
 		return;
 	}
