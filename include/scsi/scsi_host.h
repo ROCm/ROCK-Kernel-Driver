@@ -312,12 +312,6 @@ struct scsi_host_template {
 	 */
 	unsigned emulated:1;
 
-	/* 
-	 * True if the driver wishes to use the generic block layer
-	 * tag queueing functions
-	 */
-	unsigned use_blk_tcq:1;
-
 	/*
 	 * Countdown for host blocking with no commands outstanding
 	 */

@@ -280,7 +280,6 @@ NCR_700_detect(Scsi_Host_Template *tpnt,
 	tpnt->use_clustering = DISABLE_CLUSTERING;
 	tpnt->slave_configure = NCR_700_slave_configure;
 	tpnt->slave_destroy = NCR_700_slave_destroy;
-	tpnt->use_blk_tcq = 1;
 	
 	if(tpnt->name == NULL)
 		tpnt->name = "53c700";
