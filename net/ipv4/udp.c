@@ -520,9 +520,6 @@ int udp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		if (likely(up->pending))
  			goto do_append_data;
 		release_sock(sk);
-
-		NETDEBUG(if (net_ratelimit()) printk(KERN_DEBUG "udp cork app bug 1\n"));
-		return -EINVAL;
 	}
 	ulen += sizeof(struct udphdr);
 
