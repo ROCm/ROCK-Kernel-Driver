@@ -1166,8 +1166,6 @@ rtl8169_init_board(struct pci_dev *pdev, struct net_device **dev_out,
 
 	tp->cp_cmd = PCIMulRW | RxChkSum;
 
-	dev->features |= NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX;
-
 	if ((sizeof(dma_addr_t) > 4) &&
 	    !pci_set_dma_mask(pdev, DMA_64BIT_MASK) && use_dac) {
 		tp->cp_cmd |= PCIDAC;
