@@ -90,6 +90,7 @@ static int detect(struct SHT *sht)
 	if (us->host) {
 		us->host->hostdata[0] = (unsigned long)us;
 		us->host_no = us->host->host_no;
+		scsi_set_device(us->host, &us->pusb_dev->dev);
 		return 1;
 	}
 
