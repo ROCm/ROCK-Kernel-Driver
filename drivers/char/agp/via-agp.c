@@ -438,6 +438,33 @@ static void __devexit agp_via_remove(struct pci_dev *pdev)
 	agp_put_bridge(bridge);
 }
 
+#ifdef CONFIG_PM
+
+static int agp_via_suspend(struct pci_dev *pdev, u32 state)
+{
+	pci_save_state (pdev, pdev->saved_config_space);
+	pci_set_power_state (pdev, 3);
+
+	return 0;
+}
+
+static int agp_via_resume(struct pci_dev *pdev)
+{
+	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
+
+	pci_set_power_state (pdev, 0);
+	pci_restore_state(pdev, pdev->saved_config_space);
+
+	if (bridge->driver == &via_agp3_driver)
+		return via_configure_agp3();
+	else if (bridge->driver == &via_driver)
+		return via_configure();
+
+	return 0;
+}
+
+#endif /* CONFIG_PM */
+
 /* must be the same order as name table above */
 static struct pci_device_id agp_via_pci_table[] = {
 #define ID(x) \
@@ -487,6 +514,10 @@ static struct pci_driver agp_via_pci_driver = {
 	.id_table	= agp_via_pci_table,
 	.probe		= agp_via_probe,
 	.remove		= agp_via_remove,
+#ifdef CONFIG_PM
+	.suspend	= agp_via_suspend,
+	.resume		= agp_via_resume,
+#endif
 };
 
 
