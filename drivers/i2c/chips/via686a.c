@@ -786,14 +786,11 @@ static struct via686a_data *via686a_update_device(struct device *dev)
 }
 
 static struct pci_device_id via686a_pci_ids[] = {
-       {
-	       .vendor 		= PCI_VENDOR_ID_VIA, 
-	       .device 		= PCI_DEVICE_ID_VIA_82C686_4, 
-	       .subvendor	= PCI_ANY_ID, 
-	       .subdevice	= PCI_ANY_ID, 
-       },
+       { PCI_DEVICE(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C686_4) },
        { 0, }
 };
+
+MODULE_DEVICE_TABLE(pci, via686a_pci_ids);
 
 static int __devinit via686a_pci_probe(struct pci_dev *dev,
                                       const struct pci_device_id *id)
