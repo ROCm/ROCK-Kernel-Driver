@@ -30,6 +30,7 @@
 #include <asm/paca.h>
 #include <asm/ppcdebug.h>
 #include <asm/cputable.h>
+#include <asm/rtas.h>
 
 #include "nonstdio.h"
 #include "privinst.h"

@@ -31,6 +31,7 @@
 #include <asm/io.h>
 #include <asm/machdep.h>
 #include <asm/pgtable.h>
+#include <asm/rtas.h>
 #include "pci.h"
 
 #undef DEBUG

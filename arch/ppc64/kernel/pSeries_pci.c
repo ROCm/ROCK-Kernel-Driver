@@ -40,6 +40,7 @@
 #include <asm/ppcdebug.h>
 #include <asm/naca.h>
 #include <asm/iommu.h>
+#include <asm/rtas.h>
 
 #include "open_pic.h"
 #include "pci.h"

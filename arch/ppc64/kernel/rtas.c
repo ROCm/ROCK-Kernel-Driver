@@ -45,11 +45,10 @@ char rtas_data_buf[RTAS_DATA_BUF_SIZE]__page_aligned;
 void
 call_rtas_display_status(char c)
 {
-	struct rtas_args *args;
+	struct rtas_args *args = &rtas.args;
 	unsigned long s;
 
 	spin_lock_irqsave(&rtas.lock, s);
-	args = &(get_paca()->xRtas);
 
 	args->token = 10;
 	args->nargs = 1;
@@ -90,15 +89,15 @@ __log_rtas_error(struct rtas_args *rtas_args)
 	err_args.args[2] = 0;
 
 	temp_args = *rtas_args;
-	get_paca()->xRtas = err_args;
+	rtas.args = err_args;
 
 	PPCDBG(PPCDBG_RTAS, "\tentering rtas with 0x%lx\n",
 	       __pa(&err_args));
-	enter_rtas(__pa(&get_paca()->xRtas));
+	enter_rtas(__pa(&rtas.args));
 	PPCDBG(PPCDBG_RTAS, "\treturned from rtas ...\n");
 
-	err_args = get_paca()->xRtas;
-	get_paca()->xRtas = temp_args;
+	err_args = rtas.args;
+	rtas.args = temp_args;
 
 	return err_args.rets[0];
 }
@@ -134,7 +133,7 @@ int rtas_call(int token, int nargs, int nret, int *outputs, ...)
 
 	/* Gotta do something different here, use global lock for now... */
 	spin_lock_irqsave(&rtas.lock, s);
-	rtas_args = &(get_paca()->xRtas);
+	rtas_args = &rtas.args;
 
 	rtas_args->token = token;
 	rtas_args->nargs = nargs;
@@ -440,9 +439,9 @@ asmlinkage int ppc_rtas(struct rtas_args __user *uargs)
 
 	spin_lock_irqsave(&rtas.lock, flags);
 
-	get_paca()->xRtas = args;
-	enter_rtas(__pa(&get_paca()->xRtas));
-	args = get_paca()->xRtas;
+	rtas.args = args;
+	enter_rtas(__pa(&rtas.args));
+	args = rtas.args;
 
 	spin_unlock_irqrestore(&rtas.lock, flags);
 
@@ -460,19 +459,23 @@ asmlinkage int ppc_rtas(struct rtas_args __user *uargs)
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
-/* This version can't take the spinlock. */
+/* This version can't take the spinlock, because it never returns */
+
+struct rtas_args rtas_stop_self_args = {
+	/* The token is initialized for real in setup_system() */
+	.token = RTAS_UNKNOWN_SERVICE,
+	.nargs = 0,
+	.nret = 1,
+	.rets = &rtas_stop_self_args.args[0],
+};
 
 void rtas_stop_self(void)
 {
-	struct rtas_args *rtas_args = &(get_paca()->xRtas);
+	struct rtas_args *rtas_args = &rtas_stop_self_args;
 
 	local_irq_disable();
 
-	rtas_args->token = rtas_token("stop-self");
 	BUG_ON(rtas_args->token == RTAS_UNKNOWN_SERVICE);
-	rtas_args->nargs = 0;
-	rtas_args->nret  = 1;
-	rtas_args->rets  = &(rtas_args->args[0]);
 
 	printk("%u %u Ready to die...\n",
 	       smp_processor_id(), hard_smp_processor_id());

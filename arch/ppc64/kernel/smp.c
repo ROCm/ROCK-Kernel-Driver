@@ -52,6 +52,7 @@
 #include <asm/xics.h>
 #include <asm/cputable.h>
 #include <asm/system.h>
+#include <asm/rtas.h>
 
 int smp_threads_ready;
 unsigned long cache_decay_ticks;

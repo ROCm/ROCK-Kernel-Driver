@@ -28,6 +28,7 @@
 #include <asm/iSeries/ItLpPaca.h>
 #include <asm/hvcall.h>
 #include <asm/cputable.h>
+#include <asm/rtas.h>
 
 #define MODULE_VERS "1.0"
 #define MODULE_NAME "lparcfg"
