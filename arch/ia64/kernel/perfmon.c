@@ -3060,7 +3060,7 @@ pfm_write_pmcs(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 
 			/* verify validity of reset_pmds */
 			if ((reset_pmds & pmu_conf.impl_pmds[0]) != reset_pmds) {
-				DPRINT(("invalid reset_pmds 0x%lx for pmc%u\n", smpl_pmds, cnum));
+				DPRINT(("invalid reset_pmds 0x%lx for pmc%u\n", reset_pmds, cnum));
 				goto error;
 			}
 		} else {
@@ -3075,7 +3075,7 @@ pfm_write_pmcs(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 		 * execute write checker, if any
 		 */
 		if (PMC_WR_FUNC(cnum)) {
-			ret = PMC_WR_FUNC(cnum)(ctx->ctx_task, NULL, cnum, &value, regs);
+			ret = PMC_WR_FUNC(cnum)(ctx->ctx_task, ctx, cnum, &value, regs);
 			if (ret) goto error;
 			ret = -EINVAL;
 		}
@@ -3254,7 +3254,7 @@ pfm_write_pmds(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 		if (PMD_WR_FUNC(cnum)) {
 			unsigned long v = value;
 
-			ret = PMD_WR_FUNC(cnum)(ctx->ctx_task, NULL, cnum, &v, regs);
+			ret = PMD_WR_FUNC(cnum)(ctx->ctx_task, ctx, cnum, &v, regs);
 			if (ret) goto abort_mission;
 
 			value = v;
@@ -3496,7 +3496,7 @@ pfm_read_pmds(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 		 */
 		if (PMD_RD_FUNC(cnum)) {
 			unsigned long v = val;
-			ret = PMD_RD_FUNC(cnum)(ctx->ctx_task, NULL, cnum, &v, regs);
+			ret = PMD_RD_FUNC(cnum)(ctx->ctx_task, ctx, cnum, &v, regs);
 			if (ret) goto error;
 			val = v;
 			ret = -EINVAL;

@@ -93,15 +93,20 @@ pfm_mck_reserved(unsigned int cnum, unsigned long *val, struct pt_regs *regs)
 	return 0;
 }
 
+/*
+ * task can be NULL if the context is unloaded
+ */
 static int
 pfm_mck_pmc_check(struct task_struct *task, pfm_context_t *ctx, unsigned int cnum, unsigned long *val, struct pt_regs *regs)
 {
 	int ret = 0, check_case1 = 0;
-	struct thread_struct *th = &task->thread;
 	unsigned long val8 = 0, val14 = 0, val13 = 0;
 
 	/* first preserve the reserved fields */
 	pfm_mck_reserved(cnum, val, regs);
+
+	/* sanitfy check */
+	if (ctx == NULL) return -EINVAL;
 
 	/*
 	 * we must clear the debug registers if any pmc13.ena_dbrpX bit is enabled
@@ -141,17 +146,17 @@ pfm_mck_pmc_check(struct task_struct *task, pfm_context_t *ctx, unsigned int cnu
 		case  4: *val |= 1UL << 23; /* force power enable bit */
 			 break;
 		case  8: val8 = *val;
-			 val13 = th->pmcs[13];
-			 val14 = th->pmcs[14];
+			 val13 = ctx->ctx_pmcs[13];
+			 val14 = ctx->ctx_pmcs[14];
 			 check_case1 = 1;
 			 break;
-		case 13: val8  = th->pmcs[8];
+		case 13: val8  = ctx->ctx_pmcs[8];
 			 val13 = *val;
-			 val14 = th->pmcs[14];
+			 val14 = ctx->ctx_pmcs[14];
 			 check_case1 = 1;
 			 break;
-		case 14: val8  = th->pmcs[13];
-			 val13 = th->pmcs[13];
+		case 14: val8  = ctx->ctx_pmcs[13];
+			 val13 = ctx->ctx_pmcs[13];
 			 val14 = *val;
 			 check_case1 = 1;
 			 break;
