@@ -862,7 +862,7 @@ static int proc_submiturb(struct dev_state *ps, void __user *arg)
 		uurb.number_of_packets = 0;
 		if (!(ep_desc = usb_epnum_to_ep_desc(ps->dev, uurb.endpoint)))
 			return -ENOENT;
-		interval = ep_desc->bInterval;
+		interval = (1 << (ep_desc->bInterval - 1));
 		if (uurb.buffer_length > 16384)
 			return -EINVAL;
 		if (!access_ok((uurb.endpoint & USB_DIR_IN) ? VERIFY_WRITE : VERIFY_READ, uurb.buffer, uurb.buffer_length))
