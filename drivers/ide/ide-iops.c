@@ -1,13 +1,12 @@
 /*
- * linux/drivers/ide/ide-iops.c	Version 0.33	April 11, 2002
+ * linux/drivers/ide/ide-iops.c	Version 0.37	Mar 05, 2003
  *
  *  Copyright (C) 2000-2002	Andre Hedrick <andre@linux-ide.org>
- *
+ *  Copyright (C) 2003		Red Hat <alan@redhat.com>
  *
  */
 
 #include <linux/config.h>
-#define __NO_VERSION__
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/string.h>
@@ -63,6 +62,10 @@ static void ide_unplugged_outb (u8 val, unsigned long port)
 {
 }
 
+static void ide_unplugged_outbsync (ide_drive_t *drive, u8 addr, unsigned long port)
+{
+}
+
 static void ide_unplugged_outw (u16 val, unsigned long port)
 {
 }
@@ -82,7 +85,7 @@ static void ide_unplugged_outsl (unsigned long port, void *addr, u32 count)
 void unplugged_hwif_iops (ide_hwif_t *hwif)
 {
 	hwif->OUTB	= ide_unplugged_outb;
-	hwif->OUTBSYNC	= ide_unplugged_outb;
+	hwif->OUTBSYNC	= ide_unplugged_outbsync;
 	hwif->OUTW	= ide_unplugged_outw;
 	hwif->OUTL	= ide_unplugged_outl;
 	hwif->OUTSW	= ide_unplugged_outsw;
@@ -130,6 +133,11 @@ static void ide_outb (u8 val, unsigned long port)
 	outb(val, port);
 }
 
+static void ide_outbsync (ide_drive_t *drive, u8 addr, unsigned long port)
+{
+	outb(addr, port);
+}
+
 static void ide_outw (u16 val, unsigned long port)
 {
 	outw(val, port);
@@ -153,7 +161,7 @@ static void ide_outsl (unsigned long port, void *addr, u32 count)
 void default_hwif_iops (ide_hwif_t *hwif)
 {
 	hwif->OUTB	= ide_outb;
-	hwif->OUTBSYNC	= ide_outb;
+	hwif->OUTBSYNC	= ide_outbsync;
 	hwif->OUTW	= ide_outw;
 	hwif->OUTL	= ide_outl;
 	hwif->OUTSW	= ide_outsw;
@@ -201,6 +209,11 @@ static void ide_mm_outb (u8 value, unsigned long port)
 	writeb(value, port);
 }
 
+static void ide_mm_outbsync (ide_drive_t *drive, u8 value, unsigned long port)
+{
+	writeb(value, port);	
+}
+
 static void ide_mm_outw (u16 value, unsigned long port)
 {
 	writew(value, port);
@@ -226,7 +239,7 @@ void default_hwif_mmiops (ide_hwif_t *hwif)
 	hwif->OUTB	= ide_mm_outb;
 	/* Most systems will need to override OUTBSYNC, alas however
 	   this one is controller specific! */
-	hwif->OUTBSYNC	= ide_mm_outb;
+	hwif->OUTBSYNC	= ide_mm_outbsync;
 	hwif->OUTW	= ide_mm_outw;
 	hwif->OUTL	= ide_mm_outl;
 	hwif->OUTSW	= ide_mm_outsw;
