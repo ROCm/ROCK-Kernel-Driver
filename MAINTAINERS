@@ -364,6 +364,11 @@ M:	kas@fi.muni.cz
 W:	http://www.fi.muni.cz/~kas/cosa/
 S:	Maintained
 
+CPU FREQUENCY DRIVERS
+L:      cpufreq@www.linux.org.uk
+W:      http://www.brodo.de/cpufreq/
+S:      Maintained
+
 CPUID/MSR DRIVER
 P:	H. Peter Anvin
 M:	hpa@zytor.com

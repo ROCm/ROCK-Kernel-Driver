@@ -839,7 +839,71 @@ CONFIG_X86_MCE_NONFATAL
 CONFIG_X86_MCE_P4THERMAL
   Enabling this feature will cause a message to be printed when the P4
   enters thermal throttling.
-				 
+
+CONFIG_CPU_FREQ
+  Clock scaling allows you to change the clock speed of CPUs on the
+  fly. This is a nice method to save battery power on notebooks,
+  because the lower the clock speed, the less power the CPU consumes.
+
+  For more information, take a look at linux/Documentation/cpufreq or
+  at <http://www.brodo.de/cpufreq/>
+
+  If in doubt, say N.
+
+CONFIG_X86_POWERNOW_K6
+  This adds the CPUFreq driver for mobile AMD K6-2+ and mobile
+  AMD K6-3+ processors.
+
+  For details, take a look at linux/Documentation/cpufreq. 
+
+  If in doubt, say N.
+
+CONFIG_X86_P4_CLOCKMOD
+  This adds the CPUFreq driver for Intel Pentium 4 / XEON
+  processors.
+
+  For details, take a look at linux/Documentation/cpufreq. 
+
+  If in doubt, say N.
+
+CONFIG_ELAN_CPUFREQ
+  This adds the CPUFreq driver for AMD Elan SC400 and SC410
+  processors.
+
+  You need to specify the processor maximum speed as boot
+  parameter: elanfreq=maxspeed (in kHz) or as module
+  parameter "max_freq".
+
+  For details, take a look at linux/Documentation/cpufreq. 
+
+  If in doubt, say N.
+
+CONFIG_X86_LONGHAUL
+  This adds the CPUFreq driver for VIA Samuel/CyrixIII, 
+  VIA Cyrix Samuel/C3, VIA Cyrix Ezra and VIA Cyrix Ezra-T 
+  processors.
+
+  For details, take a look at linux/Documentation/cpufreq. 
+
+  If in doubt, say N.
+
+CONFIG_X86_SPEEDSTEP
+  This adds the CPUFreq driver for certain mobile Intel Pentium III
+  (Coppermine), all mobile Intel Pentium III-M (Tulatin) and all
+  mobile Intel Pentium 4 P4-Ms.
+
+  For details, take a look at linux/Documentation/cpufreq. 
+
+  If in doubt, say N.
+
+CONFIG_X86_LONGRUN
+  This adds the CPUFreq driver for Transmeta Crusoe processors which
+  support LongRun.
+
+  For details, take a look at linux/Documentation/cpufreq. 
+
+  If in doubt, say N.
+
 CONFIG_TOSHIBA
   This adds a driver to safely access the System Management Mode of
   the CPU on Toshiba portables with a genuine Toshiba BIOS. It does
