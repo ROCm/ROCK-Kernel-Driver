@@ -32,6 +32,7 @@
 #include <linux/init.h>
 #include <linux/proc_fs.h>
 #include <linux/smp_lock.h>
+#include <linux/vmalloc.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
@@ -40,7 +41,7 @@
 #include "scsi.h"
 #include "hosts.h"
 
-#include<linux/stat.h>
+#include <linux/stat.h>
 
 #ifndef LINUX_VERSION_CODE
 #include <linux/version.h>
