@@ -91,11 +91,11 @@ static int _snd_ioctl32_##type(unsigned int fd, unsigned int cmd, unsigned long 
 	if (data32 == NULL || data == NULL) { \
 		err = -ENOMEM; \
 		goto __end; \
-	}
+	}\
 	if (copy_from_user(data32, (void*)arg, sizeof(*data32))) { \
 		err = -EFAULT; \
 		goto __end; \
-	}
+	}\
 	memset(data, 0, sizeof(*data));\
 	convert_from_32(type, data, data32);\
 	oldseg = get_fs();\
