@@ -18,10 +18,14 @@ define_bool CONFIG_PPC y
 define_bool CONFIG_PPC32 y
 choice 'Processor Type'	\
 	"6xx/7xx/74xx/8260	CONFIG_6xx	\
-	 4xx			CONFIG_4xx	\
+	 40x			CONFIG_40x	\
 	 POWER3               	CONFIG_POWER3	\
 	 8xx			CONFIG_8xx	\
 	 iSeries		CONFIG_PPC_ISERIES"	6xx
+
+if [ "$CONFIG_40x" = "y" ]; then
+  define_bool CONFIG_4xx y
+fi
 
 if [ "$CONFIG_6xx" = "y" ]; then
    bool 'MPC8260 CPM Support' CONFIG_8260
@@ -52,17 +56,21 @@ if [ "$CONFIG_8260" = "y" ]; then
 	 Willow		CONFIG_WILLOW"	Willow
 fi
 
-if [ "$CONFIG_4xx" = "y" ]; then
+if [ "$CONFIG_40x" = "y" ]; then
     choice 'Machine Type'			\
 	"Ash		CONFIG_ASH		\
 	 Ceder		CONFIG_CEDER		\
 	 CPCI405	CONFIG_CPCI405 		\
-	 EP405		CONFIG_EP405 		\
+	 EP405/EP405PC	CONFIG_EP405 		\
 	 Oak		CONFIG_OAK 		\
 	 Redwood-4	CONFIG_REDWOOD_4 	\
 	 Redwood-5	CONFIG_REDWOOD_5 	\
 	 Tivo		CONFIG_TIVO 		\
 	 Walnut		CONFIG_WALNUT"	Walnut
+
+   if [ "$CONFIG_EP405" = "y" ]; then
+      bool 'EP405PC Support' CONFIG_EP405PC
+   fi  
 fi
 
 if [ "$CONFIG_8xx" = "y" ]; then
@@ -182,7 +190,7 @@ if [ "$CONFIG_4xx" = "y" -o "$CONFIG_8xx" = "y" ]; then
    bool 'Math emulation' CONFIG_MATH_EMULATION
 fi
 
-if [ "$CONFIG_4xx" = "y" ]; then
+if [ "$CONFIG_40x" = "y" ]; then
 # It's often necessary to know the specific 4xx processor type.
 # Fortunately, it is impled (so far) from the board type, so we
 # don't need to ask more redundant questions.
@@ -238,11 +246,9 @@ if [ "$CONFIG_4xx" = "y" ]; then
    bool 'Blue Logic DMA' CONFIG_405_DMA
    dep_bool 'Power Management support (experimental)' CONFIG_PM $CONFIG_EXPERIMENTAL
 
-   if [ "$CONFIG_4xx" = "y" ]; then
-      choice 'TTYS0 device and default console'	\
+   choice 'TTYS0 device and default console'	\
 	"UART0  CONFIG_UART0_TTYS0		\
 	 UART1	CONFIG_UART0_TTYS1"		UART0
-   fi
 
    define_bool CONFIG_IBM405_ERR51 y
    define_bool CONFIG_NOT_COHERENT_CACHE y
@@ -282,7 +288,7 @@ if [ "$CONFIG_ADVANCED_OPTIONS" = "y" ]; then
    if [ "$CONFIG_8xx" = "y" ]; then
       bool "Pinned Kernel TLBs (860 ONLY)" CONFIG_PIN_TLB
    fi
-   if [ "$CONFIG_4xx" = "y" ]; then
+   if [ "$CONFIG_40x" = "y" ]; then
       bool "Pinned Kernel TLBs" CONFIG_PIN_TLB
    fi
    if [ "$CONFIG_ALL_PPC" != "y" ]; then
@@ -575,9 +581,9 @@ if [ "$CONFIG_8260" = "y" ]; then
    source arch/ppc/8260_io/Config.in
 fi
 
-if [ "$CONFIG_4xx" = "y" ]; then
+if [ "$CONFIG_40x" = "y" ]; then
    mainmenu_option next_comment
-   comment 'IBM 4xx options'
+   comment 'IBM 40x options'
    if [ "$CONFIG_STB03xxx" = "y" ]; then
       bool 'STB IR Keyboard' CONFIG_STB_KB
       bool 'SICC Serial port' CONFIG_SERIAL_SICC

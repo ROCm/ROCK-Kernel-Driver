@@ -32,6 +32,9 @@
  *
  *	Version 1.0 (02/01/17) - A. Kuster
  *	Initial version	 - moved 405  specific out of the other core.h's
+ *
+ *	Version 1.0 (02/08/02) - A. Kuster
+ *	removed DCRN_UIC1_BASE to NP405L & H
  */
 
 #ifdef __KERNEL__
@@ -57,7 +60,6 @@
 #define DCRN_CHCR0	(DCRN_CHCR_BASE + 0x0)	/* Chip Control Register 1 */
 #define DCRN_CHCR1	(DCRN_CHCR_BASE + 0x1)	/* Chip Control Register 2 */
 #endif
-#define CHR1_CETE	0x00800000	/* CPU external timer enable */
 #define CHR1_PCIPW	0x00008000	/* PCI Int enable/Peripheral Write enable */
 
 #ifdef DCRN_CHPSR_BASE
@@ -211,25 +213,38 @@
 #define IOCR_SCS	0x00000002
 #define IOCR_SPC	0x00000001
 
-#ifdef DCRN_MAL_BASE
-#define DCRN_MALCR		(DCRN_MAL_BASE + 0x0)	/* MAL Configuration */
-#define DCRN_MALDBR		(DCRN_MAL_BASE + 0x3)	/* Debug Register */
-#define DCRN_MALESR		(DCRN_MAL_BASE + 0x1)	/* Error Status */
-#define DCRN_MALIER		(DCRN_MAL_BASE + 0x2)	/* Interrupt Enable */
-#define DCRN_MALTXCARR		(DCRN_MAL_BASE + 0x5)	/* TX Channed Active Reset Register */
-#define DCRN_MALTXCASR		(DCRN_MAL_BASE + 0x4)	/* TX Channel Active Set Register */
-#define DCRN_MALTXDEIR		(DCRN_MAL_BASE + 0x7)	/* Tx Descriptor Error Interrupt */
-#define DCRN_MALTXEOBISR	(DCRN_MAL_BASE + 0x6)	/* Tx End of Buffer Interrupt Status */
-#define DCRN_MALRXCARR		(DCRN_MAL_BASE + 0x11)	/* RX Channed Active Reset Register */
-#define DCRN_MALRXCASR		(DCRN_MAL_BASE + 0x10)	/* RX Channel Active Set Register */
-#define DCRN_MALRXDEIR		(DCRN_MAL_BASE + 0x13)	/* Rx Descriptor Error Interrupt */
-#define DCRN_MALRXEOBISR	(DCRN_MAL_BASE + 0x12)	/* Rx End of Buffer Interrupt Status */
-#define DCRN_MALRXCTP0R		(DCRN_MAL_BASE + 0x40)	/* Channel Rx 0 Channel Table Pointer */
-#define DCRN_MALTXCTP0R		(DCRN_MAL_BASE + 0x20)	/* Channel Tx 0 Channel Table Pointer */
-#define DCRN_MALTXCTP1R		(DCRN_MAL_BASE + 0x21)	/* Channel Tx 1 Channel Table Pointer */
-#define DCRN_MALRCBS0		(DCRN_MAL_BASE + 0x60)	/* Channel Rx 0 Channel Buffer Size */
-#endif
-	/* DCRN_MALCR */
+#define DCRN_MALCR(base)	(base + 0x0)	/* MAL Configuration */
+#define DCRN_MALDBR(base)	((base) + 0x3)	/* Debug Register */
+#define DCRN_MALESR(base)	((base) + 0x1)	/* Error Status */
+#define DCRN_MALIER(base)	((base) + 0x2)	/* Interrupt Enable */
+#define DCRN_MALTXCARR(base)	((base) + 0x5)	/* TX Channed Active Reset Register */
+#define DCRN_MALTXCASR(base)	((base) + 0x4)	/* TX Channel Active Set Register */
+#define DCRN_MALTXDEIR(base)	((base) + 0x7)	/* Tx Descriptor Error Interrupt */
+#define DCRN_MALTXEOBISR(base)	((base) + 0x6)	/* Tx End of Buffer Interrupt Status */
+#define DCRN_MALRXCARR(base)	((base) + 0x11)	/* RX Channed Active Reset Register */
+#define DCRN_MALRXCASR(base)	((base) + 0x10)	/* RX Channel Active Set Register */
+#define DCRN_MALRXDEIR(base)	((base) + 0x13)	/* Rx Descriptor Error Interrupt */
+#define DCRN_MALRXEOBISR(base)	((base) + 0x12)	/* Rx End of Buffer Interrupt Status */
+#define DCRN_MALRXCTP0R(base)	((base) + 0x40)	/* Channel Rx 0 Channel Table Pointer */
+#define DCRN_MALRXCTP1R(base)	((base) + 0x41)	/* Channel Rx 1 Channel Table Pointer */
+#define DCRN_MALTXCTP0R(base)	((base) + 0x20)	/* Channel Tx 0 Channel Table Pointer */
+#define DCRN_MALTXCTP1R(base)	((base) + 0x21)	/* Channel Tx 1 Channel Table Pointer */
+#define DCRN_MALTXCTP2R(base)	((base) + 0x22)	/* Channel Tx 2 Channel Table Pointer */
+#define DCRN_MALTXCTP3R(base)	((base) + 0x23)	/* Channel Tx 3 Channel Table Pointer */
+#define DCRN_MALRCBS0(base)	((base) + 0x60)	/* Channel Rx 0 Channel Buffer Size */
+#define DCRN_MALRCBS1(base)	((base) + 0x61)	/* Channel Rx 1 Channel Buffer Size */
+
+/* EMAC DCRN's */
+#define DCRN_MALRXCTP2R(base)	((base) + 0x42)	/* Channel Rx 2 Channel Table Pointer */
+#define DCRN_MALRXCTP3R(base)	((base) + 0x43)	/* Channel Rx 3 Channel Table Pointer */
+#define DCRN_MALTXCTP4R(base)	((base) + 0x24)	/* Channel Tx 4 Channel Table Pointer */
+#define DCRN_MALTXCTP5R(base)	((base) + 0x25)	/* Channel Tx 5 Channel Table Pointer */
+#define DCRN_MALTXCTP6R(base)	((base) + 0x26)	/* Channel Tx 6 Channel Table Pointer */
+#define DCRN_MALTXCTP7R(base)	((base) + 0x27)	/* Channel Tx 7 Channel Table Pointer */
+#define DCRN_MALRCBS2(base)	((base) + 0x62)	/* Channel Rx 2 Channel Buffer Size */
+#define DCRN_MALRCBS3(base)	((base) + 0x63)	/* Channel Rx 3 Channel Buffer Size */
+
+ /* DCRN_MALCR */
 #define MALCR_MMSR		0x80000000	/* MAL Software reset */
 #define MALCR_PLBP_1		0x00400000	/* MAL reqest priority: */
 #define MALCR_PLBP_2		0x00800000	/* lowsest is 00 */
@@ -294,28 +309,14 @@
 #define DCRN_POB0_BESR1	(DCRN_POB0_BASE + 0x4)
 #endif
 
-#ifdef DCRN_UIC0_BASE
-#define DCRN_UIC0_SR	(DCRN_UIC0_BASE + 0x0)
-#define DCRN_UIC0_ER	(DCRN_UIC0_BASE + 0x2)
-#define DCRN_UIC0_CR	(DCRN_UIC0_BASE + 0x3)
-#define DCRN_UIC0_PR	(DCRN_UIC0_BASE + 0x4)
-#define DCRN_UIC0_TR	(DCRN_UIC0_BASE + 0x5)
-#define DCRN_UIC0_MSR	(DCRN_UIC0_BASE + 0x6)
-#define DCRN_UIC0_VR	(DCRN_UIC0_BASE + 0x7)
-#define DCRN_UIC0_VCR	(DCRN_UIC0_BASE + 0x8)
-#endif
-
-#ifdef DCRN_UIC1_BASE
-#define DCRN_UIC1_SR	(DCRN_UIC1_BASE + 0x0)
-#define DCRN_UIC1_SRS	(DCRN_UIC1_BASE + 0x1)
-#define DCRN_UIC1_ER	(DCRN_UIC1_BASE + 0x2)
-#define DCRN_UIC1_CR	(DCRN_UIC1_BASE + 0x3)
-#define DCRN_UIC1_PR	(DCRN_UIC1_BASE + 0x4)
-#define DCRN_UIC1_TR	(DCRN_UIC1_BASE + 0x5)
-#define DCRN_UIC1_MSR	(DCRN_UIC1_BASE + 0x6)
-#define DCRN_UIC1_VR	(DCRN_UIC1_BASE + 0x7)
-#define DCRN_UIC1_VCR	(DCRN_UIC1_BASE + 0x8)
-#endif
+#define DCRN_UIC_SR(base)	(base + 0x0)
+#define DCRN_UIC_ER(base)	(base + 0x2)
+#define DCRN_UIC_CR(base)	(base + 0x3)
+#define DCRN_UIC_PR(base)	(base + 0x4)
+#define DCRN_UIC_TR(base)	(base + 0x5)
+#define DCRN_UIC_MSR(base)	(base + 0x6)
+#define DCRN_UIC_VR(base)	(base + 0x7)
+#define DCRN_UIC_VCR(base)	(base + 0x8)
 
 #ifdef DCRN_SDRAM0_BASE
 #define DCRN_SDRAM0_CFGADDR	(DCRN_SDRAM0_BASE + 0x0)	/* Memory Controller Address */

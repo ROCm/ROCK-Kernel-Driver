@@ -12,7 +12,7 @@
 ifdef CONFIG_PPC64BRIDGE
 EXTRA_AFLAGS		:= -Wa,-mppc64bridge
 endif
-ifdef CONFIG_4xx
+ifdef CONFIG_40x
 EXTRA_AFLAGS		:= -Wa,-m405
 endif
 

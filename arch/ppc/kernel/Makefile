@@ -21,7 +21,7 @@ CFLAGS_btext.o		+= -mrelocatable-lib
 
 # Start off with 'head.o', change as needed.
 HEAD-y				:= head.o
-HEAD-$(CONFIG_4xx)		:= head_4xx.o
+HEAD-$(CONFIG_40x)		:= head_4xx.o
 HEAD-$(CONFIG_8xx)		:= head_8xx.o
 HEAD-$(CONFIG_PPC_ISERIES)	:= iSeries_head.o
 

@@ -4,21 +4,23 @@
 
 /* Board specific functions for those embedded 8xx boards that do
  * not have boot monitor support for board information.
+ *
+ * This program is free software; you can redistribute  it and/or modify it
+ * under  the terms of  the GNU General  Public License as published by the
+ * Free Software Foundation;  either version 2 of the  License, or (at your
+ * option) any later version.
  */
+
 #include <linux/types.h>
 #include <linux/config.h>
+#include <linux/string.h>
+#include <asm/io.h>
 #ifdef CONFIG_8xx
 #include <asm/mpc8xx.h>
 #endif
 #ifdef CONFIG_8260
 #include <asm/mpc8260.h>
 #include <asm/immap_8260.h>
-#endif
-#ifdef CONFIG_4xx
-#include <asm/io.h>
-#endif
-#if defined(CONFIG_405GP) || defined(CONFIG_NP405H) || defined(CONFIG_NP405L)
-#include <linux/netdevice.h>
 #endif
 
 /* For those boards that don't provide one.
@@ -222,6 +224,23 @@ rpx_memsize(bd_t *bd, u_char *cp)
 	bd->bi_memsize = size * 1024 * 1024;
 }
 #endif /* LITE || CLASSIC || EP405 */
+#if defined(CONFIG_EP405)
+static void
+rpx_nvramsize(bd_t *bd, u_char *cp)
+{
+	uint	size;
+
+	size = 0;
+
+	while (*cp != '\n') {
+		size *= 10;
+		size += (*cp) - '0';
+		cp++;
+	}
+
+	bd->bi_nvramsize = size * 1024;
+}
+#endif /* CONFIG_EP405 */
 
 #endif	/* Embedded Planet boards */
 
@@ -641,7 +660,11 @@ embed_config(bd_t **bdp)
 #ifdef CONFIG_TREEBOOT
 /* This could possibly work for all treeboot roms.
 */
+#if defined(CONFIG_ASH)
+#define BOARD_INFO_VECTOR       0xFFF80B50 /* openbios 1.19 moved this vector down  - armin */
+#else
 #define	BOARD_INFO_VECTOR	0xFFFE0B50
+#endif
 
 void
 embed_config(bd_t **bdp)
@@ -658,8 +681,8 @@ embed_config(bd_t **bdp)
 	/* shut down the Ethernet controller that the boot rom
 	 * sometimes leaves running.
 	 */
-	mtdcr(DCRN_MALCR, MALCR_MMSR);                /* 1st reset MAL */
-	while (mfdcr(DCRN_MALCR) & MALCR_MMSR) {};    /* wait for the reset */
+	mtdcr(DCRN_MALCR(DCRN_MAL_BASE), MALCR_MMSR);     /* 1st reset MAL */
+	while (mfdcr(DCRN_MALCR(DCRN_MAL_BASE)) & MALCR_MMSR) {}; /* wait for the reset */	
 	emacp->em0mr0 = 0x20000000;        /* then reset EMAC */
 	eieio();
 #endif
@@ -684,24 +707,20 @@ embed_config(bd_t **bdp)
 			bd->bi_pci_enetaddr[i] = *cp++;
 #endif
 		}
+		bd->bi_tbfreq = 200 * 1000 * 1000;
 		bd->bi_intfreq = 200000000;
 		bd->bi_busfreq = 100000000;
 #ifdef CONFIG_PCI
 		bd->bi_pci_busfreq = 66666666;
 #endif
-		/* Yeah, this look weird, but on Redwood 4 they are
-		 * different object in the structure.  When RW5 uses
-		 * OpenBIOS, it requires a special value.
-		 */
-#ifdef CONFIG_REDWOOD_5
-	bd->bi_intfreq = 200 * 1000 * 1000;
-	bd->bi_busfreq = 0;
-
-		bd->bi_tbfreq = 27 * 1000 * 1000;
-#elif CONFIG_REDWOOD_4
-		bd->bi_tbfreq = bd->bi_intfreq;
-#endif
 	}
+	/* Yeah, this look weird, but on Redwood 4 they are
+	 * different object in the structure.  When RW5 uses
+	 * OpenBIOS, it requires a special value.
+	 */
+#ifdef CONFIG_REDWOOD_5
+	bd->bi_tbfreq = 27 * 1000 * 1000;
+#endif
 }
 #endif
 
@@ -751,6 +770,13 @@ embed_config(bd_t **bdp)
 	        	                }
                 	}
 
+			if (*cp == 'N') {
+				cp++;
+				if (*cp == 'V') {
+					cp += 2;
+					rpx_nvramsize(bd, cp);
+				}
+			}
 			while ((*cp != '\n') && (*cp != 0xff))
 			      cp++;
 
@@ -768,6 +794,31 @@ embed_config(bd_t **bdp)
 	bd->bi_busfreq   = 100000000;
 	bd->bi_pci_busfreq= 33000000 ;
 #endif
+}
+#endif
+
+#ifdef CONFIG_RAINIER
+/* Rainier uses vxworks bootrom */
+void
+embed_config(bd_t **bdp)
+{
+	u_char	*cp;
+	int	i;
+	bd_t	*bd;
+	
+	bd = &bdinfo;
+	*bdp = bd;
+
+	bd->bi_memsize   = (32 * 1024 * 1024) ;
+	bd->bi_intfreq = 133000000; //the internal clock is 133 MHz
+	bd->bi_busfreq   = 100000000;
+	bd->bi_pci_busfreq= 33000000;
+
+	cp = (u_char *)def_enet_addr;
+	for (i=0; i<6; i++) {
+		bd->bi_enetaddr[i] = *cp++;
+	}
+
 }
 #endif
 

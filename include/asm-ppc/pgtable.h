@@ -125,9 +125,9 @@ extern unsigned long ioremap_bot, ioremap_base;
  * (hardware-defined) PowerPC PTE as closely as possible.
  */
 
-#if defined(CONFIG_4xx)
+#if defined(CONFIG_40x)
 
-/* There are several potential gotchas here.  The 4xx hardware TLBLO
+/* There are several potential gotchas here.  The 40x hardware TLBLO
    field looks like this:
 
    0  1  2  3  4  ... 18 19 20 21 22 23 24 25 26 27 28 29 30 31
@@ -135,7 +135,7 @@ extern unsigned long ioremap_bot, ioremap_base;
 
    Where possible we make the Linux PTE bits match up with this
 
-   - bits 20 and 21 must be cleared, because we use 4k pages (4xx can
+   - bits 20 and 21 must be cleared, because we use 4k pages (40x can
      support down to 1k pages), this is done in the TLBMiss exception
      handler.
    - We use only zones 0 (for kernel pages) and 1 (for user pages)
@@ -143,7 +143,7 @@ extern unsigned long ioremap_bot, ioremap_base;
      miss handler.  Bit 27 is PAGE_USER, thus selecting the correct
      zone.
    - PRESENT *must* be in the bottom two bits because swap cache
-     entries use the top 30 bits.  Because 4xx doesn't support SMP
+     entries use the top 30 bits.  Because 40x doesn't support SMP
      anyway, M is irrelevant so we borrow it for PAGE_PRESENT.  Bit 30
      is cleared in the TLB miss handler before the TLB entry is loaded.
    - All other bits of the PTE are loaded into TLBLO without
@@ -153,7 +153,7 @@ extern unsigned long ioremap_bot, ioremap_base;
      PRESENT.
 */
 
-/* Definitions for 4xx embedded chips. */
+/* Definitions for 40x embedded chips. */
 #define	_PAGE_GUARDED	0x001	/* G: page is guarded from prefetch */
 #define _PAGE_PRESENT	0x002	/* software: PTE contains a translation */
 #define	_PAGE_NO_CACHE	0x004	/* I: caching is inhibited */
@@ -451,7 +451,7 @@ static inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)
 
 /* Find an entry in the third-level page table.. */
 #define __pte_offset(address)		\
-	((address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
+	(((address) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
 #define pte_offset_kernel(dir, addr)	\
 	((pte_t *) pmd_page_kernel(*(dir)) + __pte_offset(addr))
 #define pte_offset_map(dir, addr)		\
