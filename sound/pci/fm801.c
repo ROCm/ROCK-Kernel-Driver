@@ -32,8 +32,6 @@
 #include <sound/opl3.h>
 #define SNDRV_GET_ID
 #include <sound/initval.h>
-#ifdef CONFIG_SND_FM801_TEA575X
-#endif
 
 #include <asm/io.h>
 
@@ -1241,7 +1239,7 @@ static int snd_fm801_free(fm801_t *chip)
 	outw(cmdw, FM801_REG(chip, IRQ_MASK));
 
       __end_hw:
-#ifdef CONFIG_SND_FM801_TEA575X
+#ifdef TEA575X_RADIO
 	snd_tea575x_exit(&chip->tea);
 #endif
 	if (chip->res_port) {
