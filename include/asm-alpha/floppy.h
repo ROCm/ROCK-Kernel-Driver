@@ -51,12 +51,12 @@ alpha_fd_dma_setup(char *addr, unsigned long size, int mode, int io)
 	if (bus_addr 
 	    && (addr != prev_addr || size != prev_size || dir != prev_dir)) {
 		/* different from last time -- unmap prev */
-		pci_unmap_single(NULL, bus_addr, prev_size, prev_dir);
+		pci_unmap_single(isa_bridge, bus_addr, prev_size, prev_dir);
 		bus_addr = 0;
 	}
 
 	if (!bus_addr)	/* need to map it */
-		bus_addr = pci_map_single(NULL, addr, size, dir);
+		bus_addr = pci_map_single(isa_bridge, addr, size, dir);
 
 	/* remember this one as prev */
 	prev_addr = addr;

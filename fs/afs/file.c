@@ -21,52 +21,33 @@
 #include <rxrpc/call.h>
 #include "internal.h"
 
-//static int afs_file_open(struct inode *inode, struct file *file);
-//static int afs_file_release(struct inode *inode, struct file *file);
+#if 0
+static int afs_file_open(struct inode *inode, struct file *file);
+static int afs_file_release(struct inode *inode, struct file *file);
+#endif
 
 static int afs_file_readpage(struct file *file, struct page *page);
-
-//static ssize_t afs_file_read(struct file *file, char *buf, size_t size, loff_t *off);
 
 static ssize_t afs_file_write(struct file *file, const char *buf, size_t size, loff_t *off);
 
 struct inode_operations afs_file_inode_operations = {
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
 	.getattr	= afs_inode_getattr,
-#else
-	.revalidate	= afs_inode_revalidate,
-#endif
 };
 
 struct file_operations afs_file_file_operations = {
-//	.open		= afs_file_open,
-//	.release	= afs_file_release,
-	.read		= generic_file_read, //afs_file_read,
+	.read		= generic_file_read,
 	.write		= afs_file_write,
 	.mmap		= generic_file_mmap,
-//	.fsync		= afs_file_fsync,
+#if 0
+	.open		= afs_file_open,
+	.release	= afs_file_release,
+	.fsync		= afs_file_fsync,
+#endif
 };
 
 struct address_space_operations afs_fs_aops = {
 	.readpage	= afs_file_readpage,
 };
-
-/*****************************************************************************/
-/*
- * AFS file read
- */
-#if 0
-static ssize_t afs_file_read(struct file *file, char *buf, size_t size, loff_t *off)
-{
-	struct afs_inode_info *ai;
-
-	ai = AFS_FS_I(file->f_dentry->d_inode);
-	if (ai->flags & AFS_INODE_DELETED)
-		return -ESTALE;
-
-	return -EIO;
-} /* end afs_file_read() */
-#endif
 
 /*****************************************************************************/
 /*

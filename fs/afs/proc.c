@@ -412,6 +412,7 @@ static int afs_proc_cell_volumes_release(struct inode *inode, struct file *file)
 
 	afs_put_cell(cell);
 
+	return ret;
 } /* end afs_proc_cell_volumes_release() */
 
 /*****************************************************************************/
@@ -536,6 +537,7 @@ static int afs_proc_cell_vlservers_release(struct inode *inode, struct file *fil
 
 	afs_put_cell(cell);
 
+	return ret;
 } /* end afs_proc_cell_vlservers_release() */
 
 /*****************************************************************************/
@@ -651,6 +653,7 @@ static int afs_proc_cell_servers_release(struct inode *inode, struct file *file)
 
 	afs_put_cell(cell);
 
+	return ret;
 } /* end afs_proc_cell_servers_release() */
 
 /*****************************************************************************/

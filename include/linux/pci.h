@@ -643,6 +643,10 @@ void pci_pool_destroy (struct pci_pool *pool);
 void *pci_pool_alloc (struct pci_pool *pool, int flags, dma_addr_t *handle);
 void pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t addr);
 
+#if defined(CONFIG_ISA) || defined(CONFIG_EISA)
+extern struct pci_dev *isa_bridge;
+#endif
+
 #endif /* CONFIG_PCI */
 
 /* Include architecture-dependent settings and functions */
@@ -702,6 +706,8 @@ static inline int pci_enable_wake(struct pci_dev *dev, u32 state, int enable) { 
 
 #define pci_for_each_dev(dev) \
 	for(dev = NULL; 0; )
+
+#define	isa_bridge	((struct pci_dev *)NULL)
 
 #else
 

@@ -15,19 +15,13 @@ rxrpc-objs := \
 	rxrpc_syms.o \
 	transport.o
 
-#ifeq ($(CONFIG_PROC_FS),y)
-rxrpc-objs	+= proc.o
-#endif
-#ifeq ($(CONFIG_SYSCTL),y)
-rxrpc-objs += sysctl.o
-#endif
-
-obj-m  := rxrpc.o
-
-# superfluous for 2.5, but needed for 2.4..
-ifeq "$(VERSION).$(PATCHLEVEL)" "2.4"
-rxrpc.o: $(rxrpc-objs)
-	$(LD) -r -o $@ $(rxrpc-objs)
+ifeq ($(CONFIG_PROC_FS),y)
+rxrpc-objs += proc.o
 endif
+ifeq ($(CONFIG_SYSCTL),y)
+rxrpc-objs += sysctl.o
+endif
+
+obj-$(CONFIG_RXRPC) := rxrpc.o
 
 include $(TOPDIR)/Rules.make
