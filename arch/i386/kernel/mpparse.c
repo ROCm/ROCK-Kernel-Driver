@@ -1129,8 +1129,11 @@ void __init mp_parse_prt (void)
 			continue;
 		ioapic_pin = irq - mp_ioapic_routing[ioapic].irq_start;
 
-		if (!ioapic && (irq < 16))
-			irq += 16;
+		if (es7000_plat) {
+			if (!ioapic && (irq < 16))
+				irq += 16;
+		}
+
 		/* 
 		 * Avoid pin reprogramming.  PRTs typically include entries  
 		 * with redundant pin->irq mappings (but unique PCI devices);

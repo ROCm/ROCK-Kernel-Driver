@@ -16,6 +16,7 @@ EXPORT_SYMBOL(dmi_broken);
 
 int is_sony_vaio_laptop;
 int is_unsafe_smbus;
+int es7000_plat = 0;
 
 struct dmi_header
 {
