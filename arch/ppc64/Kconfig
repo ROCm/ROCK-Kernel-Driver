@@ -301,7 +301,8 @@ source "drivers/pci/Kconfig"
 
 config HOTPLUG_CPU
 	bool "Support for hot-pluggable CPUs"
-	depends on SMP && HOTPLUG && EXPERIMENTAL && PPC_PSERIES
+	depends on SMP && EXPERIMENTAL && PPC_PSERIES
+	select HOTPLUG
 	---help---
 	  Say Y here to be able to turn CPUs off and on.
 
