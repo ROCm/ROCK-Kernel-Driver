@@ -1,7 +1,7 @@
 /*
  * linux/fs/ext2/xattr.c
  *
- * Copyright (C) 2001 by Andreas Gruenbacher, <a.gruenbacher@computer.org>
+ * Copyright (C) 2001-2003 Andreas Gruenbacher <agruen@suse.de>
  *
  * Fix by Harrison Xing <harrison@mountainviewdata.com>.
  * Extended attributes for symlinks and special files added per
@@ -83,8 +83,9 @@ EXPORT_SYMBOL(ext2_xattr_set);
 	} while (0)
 # define ea_bdebug(bh, f...) do { \
 		char b[BDEVNAME_SIZE]; \
-		printk(KERN_DEBUG "block %s:%ld: ", \
-			bdevname(bh->b_bdev, b), bh->b_blocknr); \
+		printk(KERN_DEBUG "block %s:%lu: ", \
+			bdevname(bh->b_bdev, b), \
+			(unsigned long) bh->b_blocknr); \
 		printk(f); \
 		printk("\n"); \
 	} while (0)
@@ -196,7 +197,6 @@ ext2_xattr_handler(int name_index)
  * Inode operation getxattr()
  *
  * dentry->d_inode->i_sem down
- * BKL held [before 2.5.x]
  */
 ssize_t
 ext2_getxattr(struct dentry *dentry, const char *name,
@@ -215,7 +215,6 @@ ext2_getxattr(struct dentry *dentry, const char *name,
  * Inode operation listxattr()
  *
  * dentry->d_inode->i_sem down
- * BKL held [before 2.5.x]
  */
 ssize_t
 ext2_listxattr(struct dentry *dentry, char *buffer, size_t size)
@@ -227,7 +226,6 @@ ext2_listxattr(struct dentry *dentry, char *buffer, size_t size)
  * Inode operation setxattr()
  *
  * dentry->d_inode->i_sem down
- * BKL held [before 2.5.x]
  */
 int
 ext2_setxattr(struct dentry *dentry, const char *name,
@@ -248,7 +246,6 @@ ext2_setxattr(struct dentry *dentry, const char *name,
  * Inode operation removexattr()
  *
  * dentry->d_inode->i_sem down
- * BKL held [before 2.5.x]
  */
 int
 ext2_removexattr(struct dentry *dentry, const char *name)
@@ -278,9 +275,9 @@ ext2_xattr_get(struct inode *inode, int name_index, const char *name,
 {
 	struct buffer_head *bh = NULL;
 	struct ext2_xattr_entry *entry;
-	unsigned int size;
+	size_t name_len, size;
 	char *end;
-	int name_len, error;
+	int error;
 
 	ea_idebug(inode, "name=%d.%s, buffer=%p, buffer_size=%ld",
 		  name_index, name, buffer, (long)buffer_size);
@@ -376,7 +373,7 @@ ext2_xattr_list(struct inode *inode, char *buffer, size_t buffer_size)
 {
 	struct buffer_head *bh = NULL;
 	struct ext2_xattr_entry *entry;
-	unsigned int size = 0;
+	size_t size = 0;
 	char *buf, *end;
 	int error;
 
@@ -482,8 +479,8 @@ ext2_xattr_set(struct inode *inode, int name_index, const char *name,
 	struct buffer_head *bh = NULL;
 	struct ext2_xattr_header *header = NULL;
 	struct ext2_xattr_entry *here, *last;
-	unsigned int name_len;
-	int min_offs = sb->s_blocksize, not_found = 1, free, error;
+	size_t name_len, free, min_offs = sb->s_blocksize;
+	int not_found = 1, error;
 	char *end;
 	
 	/*
@@ -540,7 +537,7 @@ bad_block:		ext2_error(sb, "ext2_xattr_set",
 			if ((char *)next >= end)
 				goto bad_block;
 			if (!here->e_value_block && here->e_value_size) {
-				int offs = le16_to_cpu(here->e_value_offs);
+				size_t offs = le16_to_cpu(here->e_value_offs);
 				if (offs < min_offs)
 					min_offs = offs;
 			}
@@ -560,7 +557,7 @@ bad_block:		ext2_error(sb, "ext2_xattr_set",
 			if ((char *)next >= end)
 				goto bad_block;
 			if (!last->e_value_block && last->e_value_size) {
-				int offs = le16_to_cpu(last->e_value_offs);
+				size_t offs = le16_to_cpu(last->e_value_offs);
 				if (offs < min_offs)
 					min_offs = offs;
 			}
@@ -584,25 +581,23 @@ bad_block:		ext2_error(sb, "ext2_xattr_set",
 		error = 0;
 		if (value == NULL)
 			goto cleanup;
-		else
-			free -= EXT2_XATTR_LEN(name_len);
 	} else {
 		/* Request to create an existing attribute? */
 		error = -EEXIST;
 		if (flags & XATTR_CREATE)
 			goto cleanup;
 		if (!here->e_value_block && here->e_value_size) {
-			unsigned int size = le32_to_cpu(here->e_value_size);
+			size_t size = le32_to_cpu(here->e_value_size);
 
 			if (le16_to_cpu(here->e_value_offs) + size > 
 			    sb->s_blocksize || size > sb->s_blocksize)
 				goto bad_block;
 			free += EXT2_XATTR_SIZE(size);
 		}
+		free += EXT2_XATTR_LEN(name_len);
 	}
-	free -= EXT2_XATTR_SIZE(value_len);
 	error = -ENOSPC;
-	if (free < 0)
+	if (free < EXT2_XATTR_LEN(name_len) + EXT2_XATTR_SIZE(value_len))
 		goto cleanup;
 
 	/* Here we know that we can set the new attribute. */
@@ -640,8 +635,8 @@ bad_block:		ext2_error(sb, "ext2_xattr_set",
 
 	if (not_found) {
 		/* Insert the new name. */
-		int size = EXT2_XATTR_LEN(name_len);
-		int rest = (char *)last - (char *)here;
+		size_t size = EXT2_XATTR_LEN(name_len);
+		size_t rest = (char *)last - (char *)here;
 		memmove((char *)here + size, here, rest);
 		memset(here, 0, size);
 		here->e_name_index = name_index;
@@ -651,7 +646,7 @@ bad_block:		ext2_error(sb, "ext2_xattr_set",
 		/* Remove the old value. */
 		if (!here->e_value_block && here->e_value_size) {
 			char *first_val = (char *)header + min_offs;
-			int offs = le16_to_cpu(here->e_value_offs);
+			size_t offs = le16_to_cpu(here->e_value_offs);
 			char *val = (char *)header + offs;
 			size_t size = EXT2_XATTR_SIZE(
 				le32_to_cpu(here->e_value_size));
@@ -663,7 +658,7 @@ bad_block:		ext2_error(sb, "ext2_xattr_set",
 			/* Adjust all value offsets. */
 			last = ENTRY(header+1);
 			while (!IS_LAST_ENTRY(last)) {
-				int o = le16_to_cpu(last->e_value_offs);
+				size_t o = le16_to_cpu(last->e_value_offs);
 				if (!last->e_value_block && o < offs)
 					last->e_value_offs =
 						cpu_to_le16(o + size);
@@ -678,7 +673,7 @@ bad_block:		ext2_error(sb, "ext2_xattr_set",
 				goto cleanup;
 			} else {
 				/* Remove the old name. */
-				int size = EXT2_XATTR_LEN(name_len);
+				size_t size = EXT2_XATTR_LEN(name_len);
 				last = ENTRY((char *)last - size);
 				memmove(here, (char*)here + size,
 					(char*)last - (char*)here);
@@ -732,9 +727,9 @@ ext2_xattr_set2(struct inode *inode, struct buffer_head *old_bh,
 			 * The old block will be released after updating
 			 * the inode.
 			 */
-			ea_bdebug(new_bh, "%s block %ld",
+			ea_bdebug(new_bh, "%s block %lu",
 				(old_bh == new_bh) ? "keeping" : "reusing",
-				new_bh->b_blocknr);
+				(unsigned long) new_bh->b_blocknr);
 			
 			error = -EDQUOT;
 			if (DQUOT_ALLOC_BLOCK(inode, 1))
@@ -751,8 +746,10 @@ ext2_xattr_set2(struct inode *inode, struct buffer_head *old_bh,
 			ext2_xattr_cache_insert(new_bh);
 		} else {
 			/* We need to allocate a new block */
-			int goal = le32_to_cpu(EXT2_SB(sb)->s_es->s_first_data_block) +
-				EXT2_I(inode)->i_block_group * EXT2_BLOCKS_PER_GROUP(sb);
+			int goal = le32_to_cpu(EXT2_SB(sb)->s_es->
+						           s_first_data_block) +
+				   EXT2_I(inode)->i_block_group *
+				   EXT2_BLOCKS_PER_GROUP(sb);
 			int block = ext2_new_block(inode, goal, 0, 0, &error);
 			if (error)
 				goto cleanup;
@@ -857,8 +854,8 @@ ext2_xattr_delete_inode(struct inode *inode)
 	if (HDR(bh)->h_refcount == cpu_to_le32(1)) {
 		ext2_xattr_cache_remove(bh);
 		ext2_free_blocks(inode, EXT2_I(inode)->i_file_acl, 1);
+		get_bh(bh);
 		bforget(bh);
-		bh = NULL;
 	} else {
 		HDR(bh)->h_refcount = cpu_to_le32(
 			le32_to_cpu(HDR(bh)->h_refcount) - 1);
