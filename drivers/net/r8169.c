@@ -868,6 +868,17 @@ err_out:
 	return -ENOMEM;
 }
 
+static void rtl8169_unmap_tx_skb(struct pci_dev *pdev, struct sk_buff **sk_buff,
+				 struct TxDesc *desc)
+{
+	u32 len = sk_buff[0]->len;
+
+	pci_unmap_single(pdev, desc->buf_addr, len < ETH_ZLEN ? ETH_ZLEN : len,
+			 PCI_DMA_TODEVICE);
+	desc->buf_addr = 0x00;
+	*sk_buff = NULL;
+}
+
 static void
 rtl8169_tx_clear(struct rtl8169_private *tp)
 {
@@ -875,9 +886,12 @@ rtl8169_tx_clear(struct rtl8169_private *tp)
 
 	tp->cur_tx = 0;
 	for (i = 0; i < NUM_TX_DESC; i++) {
-		if (tp->Tx_skbuff[i] != NULL) {
-			dev_kfree_skb(tp->Tx_skbuff[i]);
-			tp->Tx_skbuff[i] = NULL;
+		struct sk_buff *skb = tp->Tx_skbuff[i];
+
+		if (skb) {
+			rtl8169_unmap_tx_skb(tp->pci_dev, tp->Tx_skbuff + i,
+					     tp->TxDescArray + i);
+			dev_kfree_skb(skb);
 			tp->stats.tx_dropped++;
 		}
 	}
@@ -927,8 +941,13 @@ rtl8169_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	spin_lock_irq(&tp->lock);
 
 	if ((tp->TxDescArray[entry].status & OWNbit) == 0) {
+		dma_addr_t mapping;
+
+		mapping = pci_map_single(tp->pci_dev, skb->data, len,
+					 PCI_DMA_TODEVICE);
+
 		tp->Tx_skbuff[entry] = skb;
-		tp->TxDescArray[entry].buf_addr = virt_to_bus(skb->data);
+		tp->TxDescArray[entry].buf_addr = mapping;
 
 		tp->TxDescArray[entry].status = OWNbit | FSbit | LSbit | len |
 				(EORbit * !((entry + 1) % NUM_TX_DESC));
@@ -973,9 +992,12 @@ rtl8169_tx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 
 	while (tx_left > 0) {
 		if ((tp->TxDescArray[entry].status & OWNbit) == 0) {
-			dev_kfree_skb_irq(tp->
-					  Tx_skbuff[dirty_tx % NUM_TX_DESC]);
-			tp->Tx_skbuff[dirty_tx % NUM_TX_DESC] = NULL;
+			int cur = dirty_tx % NUM_TX_DESC;
+			struct sk_buff *skb = tp->Tx_skbuff[cur];
+
+			rtl8169_unmap_tx_skb(tp->pci_dev, tp->Tx_skbuff + cur,
+					     tp->TxDescArray + cur);
+			dev_kfree_skb_irq(skb);
 			tp->stats.tx_packets++;
 			dirty_tx++;
 			tx_left--;
