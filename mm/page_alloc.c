@@ -552,6 +552,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	struct task_struct *p = current;
 	int i;
 	int cold;
+	int alloc_type;
 	int do_retry;
 
 	might_sleep_if(wait);
@@ -564,28 +565,27 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	if (zones[0] == NULL)     /* no zones in the zonelist */
 		return NULL;
 
+	alloc_type = zone_idx(zones[0]);
+
 	/* Go through the zonelist once, looking for a zone with enough free */
-	min = 1UL << order;
 	for (i = 0; zones[i] != NULL; i++) {
 		struct zone *z = zones[i];
-		unsigned long local_low;
+
+		min = (1<<order) + z->protection[alloc_type];
 
 		/*
-		 * This is the fabled 'incremental min'. We let real-time tasks
-		 * dip their real-time paws a little deeper into reserves.
+		 * We let real-time tasks dip their real-time paws a little
+		 * deeper into reserves.
 		 */
-		local_low = z->pages_low;
 		if (rt_task(p))
-			local_low >>= 1;
-		min += local_low;
+			min -= z->pages_low >> 1;
 
 		if (z->free_pages >= min ||
 				(!wait && z->free_pages >= z->pages_high)) {
 			page = buffered_rmqueue(z, order, cold);
 			if (page)
-		       		goto got_pg;
+				goto got_pg;
 		}
-		min += z->pages_low * sysctl_lower_zone_protection;
 	}
 
 	/* we're somewhat low on memory, failed to find what we needed */
@@ -593,24 +593,22 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 		wakeup_kswapd(zones[i]);
 
 	/* Go through the zonelist again, taking __GFP_HIGH into account */
-	min = 1UL << order;
 	for (i = 0; zones[i] != NULL; i++) {
-		unsigned long local_min;
 		struct zone *z = zones[i];
 
-		local_min = z->pages_min;
+		min = (1<<order) + z->protection[alloc_type];
+
 		if (gfp_mask & __GFP_HIGH)
-			local_min >>= 2;
+			min -= z->pages_low >> 2;
 		if (rt_task(p))
-			local_min >>= 1;
-		min += local_min;
+			min -= z->pages_low >> 1;
+
 		if (z->free_pages >= min ||
 				(!wait && z->free_pages >= z->pages_high)) {
 			page = buffered_rmqueue(z, order, cold);
 			if (page)
 				goto got_pg;
 		}
-		min += local_min * sysctl_lower_zone_protection;
 	}
 
 	/* here we're in the low on memory slow path */
@@ -642,18 +640,17 @@ rebalance:
 	p->flags &= ~PF_MEMALLOC;
 
 	/* go through the zonelist yet one more time */
-	min = 1UL << order;
 	for (i = 0; zones[i] != NULL; i++) {
 		struct zone *z = zones[i];
 
-		min += z->pages_min;
+		min = (1UL << order) + z->protection[alloc_type];
+
 		if (z->free_pages >= min ||
 				(!wait && z->free_pages >= z->pages_high)) {
 			page = buffered_rmqueue(z, order, cold);
 			if (page)
 				goto got_pg;
 		}
-		min += z->pages_low * sysctl_lower_zone_protection;
 	}
 
 	/*
@@ -1056,6 +1053,8 @@ void show_free_areas(void)
 		ps.nr_page_table_pages);
 
 	for_each_zone(zone) {
+		int i;
+
 		show_node(zone);
 		printk("%s"
 			" free:%lukB"
@@ -1075,6 +1074,10 @@ void show_free_areas(void)
 			K(zone->nr_inactive),
 			K(zone->present_pages)
 			);
+		printk("protections[]:");
+		for (i = 0; i < MAX_NR_ZONES; i++)
+			printk(" %lu", zone->protection[i]);
+		printk("\n");
 	}
 
 	for_each_zone(zone) {
@@ -1272,7 +1275,7 @@ static void __init build_zonelists(pg_data_t *pgdat)
  			j = build_zonelists_node(NODE_DATA(node), zonelist, j, k);
  
 		zonelist->zones[j++] = NULL;
-	} 
+	}
 }
 
 #endif	/* CONFIG_NUMA */
@@ -1744,6 +1747,93 @@ void __init page_alloc_init(void)
 	hotcpu_notifier(page_alloc_cpu_notify, 0);
 }
 
+static unsigned long higherzone_val(struct zone *z, int max_zone,
+					int alloc_type)
+{
+	int z_idx = zone_idx(z);
+	struct zone *higherzone;
+	unsigned long pages;
+
+	/* there is no higher zone to get a contribution from */
+	if (z_idx == MAX_NR_ZONES-1)
+		return 0;
+
+	higherzone = &z->zone_pgdat->node_zones[z_idx+1];
+
+	/* We always start with the higher zone's protection value */
+	pages = higherzone->protection[alloc_type];
+
+	/*
+	 * We get a lower-zone-protection contribution only if there are
+	 * pages in the higher zone and if we're not the highest zone
+	 * in the current zonelist.  e.g., never happens for GFP_DMA. Happens
+	 * only for ZONE_DMA in a GFP_KERNEL allocation and happens for ZONE_DMA
+	 * and ZONE_NORMAL for a GFP_HIGHMEM allocation.
+	 */
+	if (higherzone->present_pages && z_idx < alloc_type)
+		pages += higherzone->pages_low * sysctl_lower_zone_protection;
+
+	return pages;
+}
+
+/*
+ * setup_per_zone_protection - called whenver min_free_kbytes or
+ *	sysctl_lower_zone_protection changes.  Ensures that each zone
+ *	has a correct pages_protected value, so an adequate number of
+ *	pages are left in the zone after a successful __alloc_pages().
+ *
+ *	This algorithm is way confusing.  I tries to keep the same behavior
+ *	as we had with the incremental min iterative algorithm.
+ */
+static void setup_per_zone_protection(void)
+{
+	struct pglist_data *pgdat;
+	struct zone *zones, *zone;
+	int max_zone;
+	int i, j;
+
+	for_each_pgdat(pgdat) {
+		zones = pgdat->node_zones;
+
+		for (i = 0, max_zone = 0; i < MAX_NR_ZONES; i++)
+			if (zones[i].present_pages)
+				max_zone = i;
+
+		/*
+		 * For each of the different allocation types:
+		 * GFP_DMA -> GFP_KERNEL -> GFP_HIGHMEM
+		 */
+		for (i = 0; i < MAX_NR_ZONES; i++) {
+			/*
+			 * For each of the zones:
+			 * ZONE_HIGHMEM -> ZONE_NORMAL -> ZONE_DMA
+			 */
+			for (j = MAX_NR_ZONES-1; j >= 0; j--) {
+				zone = &zones[j];
+
+				/*
+				 * We never protect zones that don't have memory
+				 * in them (j>max_zone) or zones that aren't in
+				 * the zonelists for a certain type of
+				 * allocation (j>i).  We have to assign these to
+				 * zero because the lower zones take
+				 * contributions from the higher zones.
+				 */
+				if (j > max_zone || j > i) {
+					zone->protection[i] = 0;
+					continue;
+				}
+				/*
+				 * The contribution of the next higher zone
+				 */
+				zone->protection[i] = higherzone_val(zone,
+								max_zone, i);
+				zone->protection[i] += zone->pages_low;
+			}
+		}
+	}
+}
+
 /*
  * setup_per_zone_pages_min - called when min_free_kbytes changes.  Ensures 
  *	that the pages_{min,low,high} values for each zone are set correctly 
@@ -1757,9 +1847,10 @@ static void setup_per_zone_pages_min(void)
 	unsigned long flags;
 
 	/* Calculate total number of !ZONE_HIGHMEM pages */
-	for_each_zone(zone)
+	for_each_zone(zone) {
 		if (!is_highmem(zone))
 			lowmem_pages += zone->present_pages;
+	}
 
 	for_each_zone(zone) {
 		spin_lock_irqsave(&zone->lru_lock, flags);
@@ -1827,13 +1918,14 @@ static int __init init_per_zone_pages_min(void)
 	if (min_free_kbytes > 16384)
 		min_free_kbytes = 16384;
 	setup_per_zone_pages_min();
+	setup_per_zone_protection();
 	return 0;
 }
 module_init(init_per_zone_pages_min)
 
 /*
  * min_free_kbytes_sysctl_handler - just a wrapper around proc_dointvec() so 
- *	that we can call setup_per_zone_pages_min() whenever min_free_kbytes 
+ *	that we can call two helper functions whenever min_free_kbytes
  *	changes.
  */
 int min_free_kbytes_sysctl_handler(ctl_table *table, int write, 
@@ -1841,5 +1933,19 @@ int min_free_kbytes_sysctl_handler(ctl_table *table, int write,
 {
 	proc_dointvec(table, write, file, buffer, length);
 	setup_per_zone_pages_min();
+	setup_per_zone_protection();
+	return 0;
+}
+
+/*
+ * lower_zone_protection_sysctl_handler - just a wrapper around
+ *	proc_dointvec() so that we can call setup_per_zone_protection()
+ *	whenever sysctl_lower_zone_protection changes.
+ */
+int lower_zone_protection_sysctl_handler(ctl_table *table, int write,
+		 struct file *file, void __user *buffer, size_t *length)
+{
+	proc_dointvec_minmax(table, write, file, buffer, length);
+	setup_per_zone_protection();
 	return 0;
 }
