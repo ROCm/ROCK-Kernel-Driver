@@ -3636,6 +3636,7 @@ setPermsRetry:
 	data_offset =
 	    (FILE_UNIX_BASIC_INFO *) ((char *) &pSMB->hdr.Protocol +
 				      offset);
+	memset(data_offset, 0, count);
 	pSMB->DataOffset = cpu_to_le16(offset);
 	pSMB->ParameterOffset = cpu_to_le16(param_offset);
 	pSMB->SetupCount = 1;

@@ -151,7 +151,7 @@ static char * nxt_dir_entry(char * old_entry, char * end_of_smb)
 	char * new_entry;
 	FILE_DIRECTORY_INFO * pDirInfo = (FILE_DIRECTORY_INFO *)old_entry;
 
-	new_entry = old_entry + pDirInfo->NextEntryOffset;
+	new_entry = old_entry + le32_to_cpu(pDirInfo->NextEntryOffset);
 	cFYI(1,("new entry %p old entry %p",new_entry,old_entry));
 	/* validate that new_entry is not past end of SMB */
 	if(new_entry >= end_of_smb) {
@@ -184,22 +184,22 @@ static int cifs_entry_is_dot(char * current_entry, struct cifsFileInfo * cfile)
 		FILE_DIRECTORY_INFO * pFindData = 
 			(FILE_DIRECTORY_INFO *)current_entry;
 		filename = &pFindData->FileName[0];
-		len = pFindData->FileNameLength;
+		len = le32_to_cpu(pFindData->FileNameLength);
 	} else if(cfile->srch_inf.info_level == 0x102) {
 		FILE_FULL_DIRECTORY_INFO * pFindData = 
 			(FILE_FULL_DIRECTORY_INFO *)current_entry;
 		filename = &pFindData->FileName[0];
-		len = pFindData->FileNameLength;
+		len = le32_to_cpu(pFindData->FileNameLength);
 	} else if(cfile->srch_inf.info_level == 0x105) {
 		SEARCH_ID_FULL_DIR_INFO * pFindData = 
 			(SEARCH_ID_FULL_DIR_INFO *)current_entry;
 		filename = &pFindData->FileName[0];
-		len = pFindData->FileNameLength;
+		len = le32_to_cpu(pFindData->FileNameLength);
 	} else if(cfile->srch_inf.info_level == 0x104) {
 		FILE_BOTH_DIRECTORY_INFO * pFindData = 
 			(FILE_BOTH_DIRECTORY_INFO *)current_entry;
 		filename = &pFindData->FileName[0];
-		len = pFindData->FileNameLength;
+		len = le32_to_cpu(pFindData->FileNameLength);
 	} else {
 		cFYI(1,("Unknown findfirst level %d",cfile->srch_inf.info_level));
 	}
@@ -360,23 +360,23 @@ static int cifs_get_name_from_search_buf(struct qstr * pqst,char * current_entry
 		FILE_DIRECTORY_INFO * pFindData = 
 			(FILE_DIRECTORY_INFO *)current_entry;
 		filename = &pFindData->FileName[0];
-		len = pFindData->FileNameLength;
+		len = le32_to_cpu(pFindData->FileNameLength);
 	} else if(level == SMB_FIND_FILE_FULL_DIRECTORY_INFO) {
 		FILE_FULL_DIRECTORY_INFO * pFindData = 
 			(FILE_FULL_DIRECTORY_INFO *)current_entry;
 		filename = &pFindData->FileName[0];
-		len = pFindData->FileNameLength;
+		len = le32_to_cpu(pFindData->FileNameLength);
 	} else if(level == SMB_FIND_FILE_ID_FULL_DIR_INFO) {
 		SEARCH_ID_FULL_DIR_INFO * pFindData = 
 			(SEARCH_ID_FULL_DIR_INFO *)current_entry;
 		filename = &pFindData->FileName[0];
-		len = pFindData->FileNameLength;
+		len = le32_to_cpu(pFindData->FileNameLength);
 		*pinum = pFindData->UniqueId;
 	} else if(level == SMB_FIND_FILE_BOTH_DIRECTORY_INFO) {
 		FILE_BOTH_DIRECTORY_INFO * pFindData = 
 			(FILE_BOTH_DIRECTORY_INFO *)current_entry;
 		filename = &pFindData->FileName[0];
-		len = pFindData->FileNameLength;
+		len = le32_to_cpu(pFindData->FileNameLength);
 	} else {
 		cFYI(1,("Unknown findfirst level %d",level));
 		return -EINVAL;
@@ -488,25 +488,25 @@ int cifs_save_resume_key(const char * current_entry,struct cifsFileInfo * cifsFi
 		FILE_DIRECTORY_INFO * pFindData = 
 			(FILE_DIRECTORY_INFO *)current_entry;
 		filename = &pFindData->FileName[0];
-		len = pFindData->FileNameLength;
+		len = le32_to_cpu(pFindData->FileNameLength);
 		cifsFile->srch_inf.resume_key = pFindData->FileIndex;
 	} else if(level == SMB_FIND_FILE_FULL_DIRECTORY_INFO) {
 		FILE_FULL_DIRECTORY_INFO * pFindData = 
 			(FILE_FULL_DIRECTORY_INFO *)current_entry;
 		filename = &pFindData->FileName[0];
-		len = pFindData->FileNameLength;
+		len = le32_to_cpu(pFindData->FileNameLength);
 		cifsFile->srch_inf.resume_key = pFindData->FileIndex;
 	} else if(level == SMB_FIND_FILE_ID_FULL_DIR_INFO) {
 		SEARCH_ID_FULL_DIR_INFO * pFindData = 
 			(SEARCH_ID_FULL_DIR_INFO *)current_entry;
 		filename = &pFindData->FileName[0];
-		len = pFindData->FileNameLength;
+		len = le32_to_cpu(pFindData->FileNameLength);
 		cifsFile->srch_inf.resume_key = pFindData->FileIndex;
 	} else if(level == SMB_FIND_FILE_BOTH_DIRECTORY_INFO) {
 		FILE_BOTH_DIRECTORY_INFO * pFindData = 
 			(FILE_BOTH_DIRECTORY_INFO *)current_entry;
 		filename = &pFindData->FileName[0];
-		len = pFindData->FileNameLength;
+		len = le32_to_cpu(pFindData->FileNameLength);
 		cifsFile->srch_inf.resume_key = pFindData->FileIndex;
 	} else {
 		cFYI(1,("Unknown findfirst level %d",level));

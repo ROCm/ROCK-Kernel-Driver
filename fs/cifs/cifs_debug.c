@@ -403,7 +403,7 @@ cifs_proc_clean(void)
 	remove_proc_entry("ExtendedSecurity",proc_fs_cifs);
 	remove_proc_entry("PacketSigningEnabled",proc_fs_cifs);
 	remove_proc_entry("LinuxExtensionsEnabled",proc_fs_cifs);
-	remove_proc_entry("NewReaddirEnabled",proc_fs_cifs);
+	remove_proc_entry("ReenableOldCifsReaddirCode",proc_fs_cifs);
 	remove_proc_entry("LookupCacheEnabled",proc_fs_cifs);
 	remove_proc_entry("cifs", proc_root_fs);
 }

@@ -2,7 +2,8 @@ Version 1.26
 ------------
 Add setfacl support to allow setting of ACLs remotely to Samba 3.10 and later
 and other POSIX CIFS compliant servers.  Fix error mapping for getfacl 
-to EOPNOTSUPP when server does not support posix acls on the wire.
+to EOPNOTSUPP when server does not support posix acls on the wire. Fix 
+improperly zeroed buffer in CIFS Unix extensions set times call. 
 
 Version 1.25
 ------------
