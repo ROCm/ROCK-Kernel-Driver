@@ -23,6 +23,7 @@
  */
 
 #include <linux/raid/raid1.h>
+#include <linux/bio.h>
 
 #define MAJOR_NR MD_MAJOR
 #define MD_DRIVER

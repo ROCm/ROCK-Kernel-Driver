@@ -22,6 +22,8 @@ struct x8664_pda {
 	unsigned int __local_bh_count;
 	unsigned int __nmi_count;	/* arch dependent */
 	struct task_struct * __ksoftirqd_task; /* waitqueue is too large */
+	struct mm_struct *active_mm;
+	int mmu_state;     
 } ____cacheline_aligned;
 
 #define PDA_STACKOFFSET (5*8)

@@ -70,6 +70,9 @@
 
 #include <asm/time.h>
 
+/* XXX false sharing with below? */
+u64 jiffies_64;
+
 unsigned long disarm_decr[NR_CPUS];
 
 extern int do_sys_settimeofday(struct timeval *tv, struct timezone *tz);

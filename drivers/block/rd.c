@@ -45,6 +45,8 @@
 #include <linux/config.h>
 #include <linux/string.h>
 #include <linux/slab.h>
+#include <asm/atomic.h>
+#include <linux/bio.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/devfs_fs_kernel.h>

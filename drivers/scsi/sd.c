@@ -36,6 +36,7 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
+#include <linux/bio.h>
 #include <linux/string.h>
 #include <linux/hdreg.h>
 #include <linux/errno.h>

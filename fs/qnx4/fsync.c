@@ -37,7 +37,7 @@ static int sync_block(struct inode *inode, unsigned short *block, int wait)
 	if (!*block)
 		return 0;
 	tmp = *block;
-	bh = sb_get_hash_table(inode->i_sb, *block);
+	bh = sb_find_get_block(inode->i_sb, *block);
 	if (!bh)
 		return 0;
 	if (*block != tmp) {

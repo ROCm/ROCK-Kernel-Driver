@@ -20,6 +20,7 @@
 #include <linux/unistd.h>
 #include <linux/signal.h>
 #include <linux/completion.h>
+#include <linux/tqueue.h>
 
 static DECLARE_TASK_QUEUE(tq_context);
 static DECLARE_WAIT_QUEUE_HEAD(context_task_wq);

@@ -21,10 +21,6 @@ ROOT_DEV := CURRENT
 
 SVGA_MODE := -DSVGA_MODE=NORMAL_VGA
 
-# If you want the RAM disk device, define this to be the size in blocks.
-
-RAMDISK := -DRAMDISK=512
-
 # ---------------------------------------------------------------------------
 
 BOOT_INCL =	$(TOPDIR)/include/linux/config.h \

@@ -32,6 +32,8 @@
 #include <asm/irq.h>
 #include <asm/leds.h>
 
+u64 jiffies_64;
+
 extern rwlock_t xtime_lock;
 extern unsigned long wall_jiffies;
 

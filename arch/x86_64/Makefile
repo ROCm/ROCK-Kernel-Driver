@@ -43,14 +43,8 @@ CFLAGS += -mcmodel=kernel
 CFLAGS += -pipe
 # this makes reading assembly source easier
 CFLAGS += -fno-reorder-blocks	
-# needed for later gcc 3.1
 CFLAGS += -finline-limit=2000
-# needed for earlier gcc 3.1
-#CFLAGS += -fno-strength-reduce
 #CFLAGS += -g
-
-# prevent gcc from keeping the stack 16 byte aligned (FIXME)
-#CFLAGS += -mpreferred-stack-boundary=2
 
 HEAD := arch/x86_64/kernel/head.o arch/x86_64/kernel/head64.o arch/x86_64/kernel/init_task.o
 

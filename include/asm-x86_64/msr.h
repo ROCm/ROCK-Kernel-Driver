@@ -95,6 +95,7 @@
 #define MSR_IA32_PERFCTR0      0xc1
 #define MSR_IA32_PERFCTR1      0xc2
 
+#define MSR_MTRRcap		0x0fe
 #define MSR_IA32_BBL_CR_CTL        0x119
 
 #define MSR_IA32_MCG_CAP       0x179
@@ -109,6 +110,19 @@
 #define MSR_IA32_LASTBRANCHTOIP        0x1dc
 #define MSR_IA32_LASTINTFROMIP     0x1dd
 #define MSR_IA32_LASTINTTOIP       0x1de
+
+#define MSR_MTRRfix64K_00000	0x250
+#define MSR_MTRRfix16K_80000	0x258
+#define MSR_MTRRfix16K_A0000	0x259
+#define MSR_MTRRfix4K_C0000	0x268
+#define MSR_MTRRfix4K_C8000	0x269
+#define MSR_MTRRfix4K_D0000	0x26a
+#define MSR_MTRRfix4K_D8000	0x26b
+#define MSR_MTRRfix4K_E0000	0x26c
+#define MSR_MTRRfix4K_E8000	0x26d
+#define MSR_MTRRfix4K_F0000	0x26e
+#define MSR_MTRRfix4K_F8000	0x26f
+#define MSR_MTRRdefType		0x2ff
 
 #define MSR_IA32_MC0_CTL       0x400
 #define MSR_IA32_MC0_STATUS        0x401
@@ -170,12 +184,5 @@
 #define MSR_IA32_APICBASE_BSP           (1<<8)
 #define MSR_IA32_APICBASE_ENABLE        (1<<11)
 #define MSR_IA32_APICBASE_BASE          (0xfffff<<12)
-
-
-#define MSR_IA32_THERM_CONTROL		0x19a
-#define MSR_IA32_THERM_INTERRUPT	0x19b
-#define MSR_IA32_THERM_STATUS		0x19c
-#define MSR_IA32_MISC_ENABLE		0x1a0
-
 
 #endif

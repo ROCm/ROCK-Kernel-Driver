@@ -84,7 +84,6 @@ struct rt_sigframe
 	char *pretcode;
 	struct ucontext uc;
 	struct siginfo info;
-	struct _fpstate fpstate;
 };
 
 static int
@@ -186,8 +185,7 @@ badframe:
  */
 
 static int
-setup_sigcontext(struct sigcontext *sc, struct _fpstate *fpstate,
-		 struct pt_regs *regs, unsigned long mask)
+setup_sigcontext(struct sigcontext *sc, struct pt_regs *regs, unsigned long mask)
 {
 	int tmp, err = 0;
 	struct task_struct *me = current;
@@ -221,20 +219,17 @@ setup_sigcontext(struct sigcontext *sc, struct _fpstate *fpstate,
 	err |= __put_user(mask, &sc->oldmask);
 	err |= __put_user(me->thread.cr2, &sc->cr2);
 
-	tmp = save_i387(fpstate);
-	if (tmp < 0)
-	  err = 1;
-	else
-	  err |= __put_user(tmp ? fpstate : NULL, &sc->fpstate);
-
 	return err;
 }
 
 /*
  * Determine which stack to use..
  */
-static inline struct rt_sigframe *
-get_sigframe(struct k_sigaction *ka, struct pt_regs * regs)
+
+#define round_down(p, r) ((void *)  ((unsigned long)((p) - (r) + 1) & ~((r)-1)))
+
+static void *
+get_stack(struct k_sigaction *ka, struct pt_regs *regs, unsigned long size)
 {
 	unsigned long rsp;
 
@@ -247,22 +242,34 @@ get_sigframe(struct k_sigaction *ka, struct pt_regs * regs)
 			rsp = current->sas_ss_sp + current->sas_ss_size;
 	}
 
-	rsp = (rsp - sizeof(struct _fpstate)) & ~(15UL); 
-	rsp -= offsetof(struct rt_sigframe, fpstate);
-
-	return (struct rt_sigframe *) rsp; 
+	return round_down(rsp - size, 16); 
 }
 
 static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 			   sigset_t *set, struct pt_regs * regs)
 {
-	struct rt_sigframe *frame;
+	struct rt_sigframe *frame = NULL;
+	struct _fpstate *fp = NULL; 
 	int err = 0;
 
-	frame = get_sigframe(ka, regs);
+	if (current->used_math) {
+		fp = get_stack(ka, regs, sizeof(struct _fpstate)); 
+		frame = round_down((char *)fp - sizeof(struct rt_sigframe), 16) - 8;
 
-	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
+		if (!access_ok(VERIFY_WRITE, fp, sizeof(struct _fpstate))) { 
 		goto give_sigsegv;
+		}
+
+		if (save_i387(fp) < 0) 
+			err |= -1; 
+	}
+
+	if (!frame)
+		frame = get_stack(ka, regs, sizeof(struct rt_sigframe)) - 8;
+
+	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame))) {
+		goto give_sigsegv;
+	}
 
 	if (ka->sa.sa_flags & SA_SIGINFO) { 
 		err |= copy_siginfo_to_user(&frame->info, info);
@@ -278,13 +285,9 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	err |= __put_user(sas_ss_flags(regs->rsp),
 			  &frame->uc.uc_stack.ss_flags);
 	err |= __put_user(current->sas_ss_size, &frame->uc.uc_stack.ss_size);
-	err |= setup_sigcontext(&frame->uc.uc_mcontext, &frame->fpstate,
-			        regs, set->sig[0]);
+	err |= setup_sigcontext(&frame->uc.uc_mcontext, regs, set->sig[0]);
+	err |= __put_user(fp, &frame->uc.uc_mcontext.fpstate);
 	err |= __copy_to_user(&frame->uc.uc_sigmask, set, sizeof(*set));
-
-	if (err) { 
-		goto give_sigsegv;
-	} 
 
 	/* Set up to return from userspace.  If provided, use a stub
 	   already in userspace.  */
@@ -297,14 +300,12 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	}
 
 	if (err) { 
-		printk("fault 3\n"); 
 		goto give_sigsegv;
 	} 
 
 #if DEBUG_SIG
 	printk("%d old rip %lx old rsp %lx old rax %lx\n", current->pid,regs->rip,regs->rsp,regs->rax);
 #endif
-
 
 	/* Set up registers for signal handler */
 	{ 
@@ -320,8 +321,9 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	   next argument after the signal number on the stack. */
 	regs->rsi = (unsigned long)&frame->info; 
 	regs->rdx = (unsigned long)&frame->uc; 
-	regs->rsp = (unsigned long) frame;
 	regs->rip = (unsigned long) ka->sa.sa_handler;
+
+	regs->rsp = (unsigned long)frame;
 
 	set_fs(USER_DS);
 	regs->eflags &= ~TF_MASK;
