@@ -428,52 +428,53 @@ static int core_voltage_post_transition(struct powernow_k8_data *data, u32 reqvi
 
 static int check_supported_cpu(unsigned int cpu)
 {
-	struct cpuinfo_x86 *c = cpu_data;
+	cpumask_t oldmask = CPU_MASK_ALL;
 	u32 eax, ebx, ecx, edx;
+	unsigned int rc = 0;
 
-	if (num_online_cpus() != 1) {
-		printk(KERN_INFO PFX "multiprocessor systems not supported\n");
-		return 0;
+	oldmask = current->cpus_allowed;
+	set_cpus_allowed(current, cpumask_of_cpu(cpu));
+	schedule();
+
+	if (smp_processor_id() != cpu) {
+		printk(KERN_ERR "limiting to cpu %u failed\n", cpu);
+		goto out;
 	}
 
-	if (c->x86_vendor != X86_VENDOR_AMD) {
-#ifdef MODULE
-		printk(KERN_INFO PFX "Not an AMD processor\n");
-#endif
-		return 0;
-	}
+	if (current_cpu_data.x86_vendor != X86_VENDOR_AMD)
+		goto out;
 
 	eax = cpuid_eax(CPUID_PROCESSOR_SIGNATURE);
 	if ((eax & CPUID_XFAM_MOD) == ATHLON64_XFAM_MOD) {
 		dprintk(KERN_DEBUG PFX "AMD Althon 64 Processor found\n");
-		if ((eax & CPUID_F1_STEP) < ATHLON64_REV_C0) {
-			printk(KERN_INFO PFX "Revision C0 or better "
-			       "AMD Athlon 64 processor required\n");
-			return 0;
-		}
 	} else if ((eax & CPUID_XFAM_MOD) == OPTERON_XFAM_MOD) {
 		dprintk(KERN_DEBUG PFX "AMD Opteron Processor found\n");
 	} else {
 		printk(KERN_INFO PFX
 		       "AMD Athlon 64 or AMD Opteron processor required\n");
-		return 0;
+		goto out;
 	}
 
 	eax = cpuid_eax(CPUID_GET_MAX_CAPABILITIES);
 	if (eax < CPUID_FREQ_VOLT_CAPABILITIES) {
 		printk(KERN_INFO PFX
 		       "No frequency change capabilities detected\n");
-		return 0;
+		goto out;
 	}
 
 	cpuid(CPUID_FREQ_VOLT_CAPABILITIES, &eax, &ebx, &ecx, &edx);
 	if ((edx & P_STATE_TRANSITION_CAPABLE) != P_STATE_TRANSITION_CAPABLE) {
 		printk(KERN_INFO PFX "Power state transitions not supported\n");
-		return 0;
+		goto out;
 	}
 
-	printk(KERN_INFO PFX "Found AMD64 processor supporting PowerNow (" VERSION ")\n");
-	return 1;
+	rc = 1;
+
+out:
+	set_cpus_allowed(current, oldmask);
+	schedule();
+	return rc;
+
 }
 
 static int check_pst_table(struct powernow_k8_data *data, struct pst_s *pst, u8 maxvid)
