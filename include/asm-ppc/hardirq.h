@@ -14,8 +14,6 @@
  */
 typedef struct {
 	unsigned long __softirq_pending;	/* set_bit is used on this */
-	unsigned int __syscall_count;
-	struct task_struct * __ksoftirqd_task;
 	unsigned int __last_jiffy_stamp;
 } ____cacheline_aligned irq_cpustat_t;
 
