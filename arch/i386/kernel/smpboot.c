@@ -191,34 +191,6 @@ static unsigned long long tsc_values[NR_CPUS];
 
 #define NR_LOOPS 5
 
-/*
- * accurate 64-bit/32-bit division, expanded to 32-bit divisions and 64-bit
- * multiplication. Not terribly optimized but we need it at boot time only
- * anyway.
- *
- * result == a / b
- *	== (a1 + a2*(2^32)) / b
- *	== a1/b + a2*(2^32/b)
- *	== a1/b + a2*((2^32-1)/b) + a2/b + (a2*((2^32-1) % b))/b
- *		    ^---- (this multiplication can overflow)
- */
-
-static unsigned long long __init div64 (unsigned long long a, unsigned long b0)
-{
-	unsigned int a1, a2;
-	unsigned long long res;
-
-	a1 = ((unsigned int*)&a)[0];
-	a2 = ((unsigned int*)&a)[1];
-
-	res = a1/b0 +
-		(unsigned long long)a2 * (unsigned long long)(0xffffffff/b0) +
-		a2 / b0 +
-		(a2 * (0xffffffff % b0)) / b0;
-
-	return res;
-}
-
 static void __init synchronize_tsc_bp (void)
 {
 	int i;
@@ -228,7 +200,7 @@ static void __init synchronize_tsc_bp (void)
 	unsigned long one_usec;
 	int buggy = 0;
 
-	printk("checking TSC synchronization across %u CPUs: ", num_booting_cpus());
+	printk(KERN_INFO "checking TSC synchronization across %u CPUs: ", num_booting_cpus());
 
 	/* convert from kcyc/sec to cyc/usec */
 	one_usec = cpu_khz / 1000;
@@ -283,7 +255,8 @@ static void __init synchronize_tsc_bp (void)
 			sum += t0;
 		}
 	}
-	avg = div64(sum, num_booting_cpus());
+	avg = sum;
+	do_div(avg, num_booting_cpus());
 
 	sum = 0;
 	for (i = 0; i < NR_CPUS; i++) {
@@ -301,18 +274,18 @@ static void __init synchronize_tsc_bp (void)
 				buggy = 1;
 				printk("\n");
 			}
-			realdelta = div64(delta, one_usec);
+			realdelta = delta;
+			do_div(realdelta, one_usec);
 			if (tsc_values[i] < avg)
 				realdelta = -realdelta;
 
-			printk("BIOS BUG: CPU#%d improperly initialized, has %ld usecs TSC skew! FIXED.\n", i, realdelta);
+			printk(KERN_INFO "CPU#%d had %ld usecs TSC skew, fixed it up.\n", i, realdelta);
 		}
 
 		sum += delta;
 	}
 	if (!buggy)
 		printk("passed.\n");
-		;
 }
 
 static void __init synchronize_tsc_ap (void)
