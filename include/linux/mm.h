@@ -585,7 +585,7 @@ static inline struct vm_area_struct * find_vma_intersection(struct mm_struct * m
 
 extern struct vm_area_struct *find_extend_vma(struct mm_struct *mm, unsigned long addr);
 
-extern struct page * vmalloc_to_page(unsigned long adr);
+extern struct page * vmalloc_to_page(void *addr);
 
 #endif /* __KERNEL__ */
 

@@ -173,22 +173,11 @@ static struct hpsb_highlevel *hl_handle = NULL;
  * defined way to get at the kernel page tables.
  */
 
-static inline unsigned long uvirt_to_bus(unsigned long adr) 
+static inline unsigned long kvirt_to_bus(unsigned long adr) 
 {
         unsigned long kva, ret;
 
-        kva = page_address(vmalloc_to_page(adr));
-	ret = virt_to_bus((void *)kva);
-        MDEBUG(printk("uv2b(%lx-->%lx)", adr, ret));
-        return ret;
-}
-
-static inline unsigned long kvirt_to_bus(unsigned long adr) 
-{
-        unsigned long va, kva, ret;
-
-        va = VMALLOC_VMADDR(adr);
-	kva = page_address(vmalloc_to_page(va));
+	kva = page_address(vmalloc_to_page((void *)adr));
 	ret = virt_to_bus((void *)kva);
         MDEBUG(printk("kv2b(%lx-->%lx)", adr, ret));
         return ret;
@@ -200,10 +189,9 @@ static inline unsigned long kvirt_to_bus(unsigned long adr)
  */
 static inline unsigned long kvirt_to_pa(unsigned long adr) 
 {
-        unsigned long va, kva, ret;
+        unsigned long kva, ret;
 
-        va = VMALLOC_VMADDR(adr);
-	kva = page_address(vmalloc_to_page(va));
+	kva = page_address(vmalloc_to_page((void *)adr));
 	ret = __pa(kva);
         MDEBUG(printk("kv2pa(%lx-->%lx)", adr, ret));
         return ret;

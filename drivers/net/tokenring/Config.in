@@ -18,6 +18,7 @@ if [ "$CONFIG_TR" != "n" ]; then
    fi
    dep_tristate '  IBM Olympic chipset PCI adapter support' CONFIG_IBMOL $CONFIG_TR $CONFIG_PCI
    dep_tristate '  IBM Lanstreamer chipset PCI adapter support' CONFIG_IBMLS $CONFIG_TR $CONFIG_PCI
+   dep_tristate '  3Com 3C359 Token Link Velocity XL adapter support' CONFIG_3C359 $CONFIG_TR $CONFIG_PCI
    tristate '  Generic TMS380 Token Ring ISA/PCI adapter support' CONFIG_TMS380TR
    if [ "$CONFIG_TMS380TR" != "n" ]; then
       dep_tristate '    Generic TMS380 PCI support' CONFIG_TMSPCI $CONFIG_PCI
