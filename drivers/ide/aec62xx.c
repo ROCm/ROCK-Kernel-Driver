@@ -150,7 +150,7 @@ static void aec62xx_tune_drive(struct ata_device *drive, unsigned char pio)
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-static int aec62xx_dmaproc(struct ata_device *drive)
+static int aec62xx_udma_setup(struct ata_device *drive)
 {
 	u32 bmide = pci_resource_start(drive->channel->pci_dev, 4);
 	short speed;
@@ -244,8 +244,8 @@ static void __init aec62xx_init_channel(struct ata_channel *ch)
 {
 	int i;
 
-	ch->tuneproc = &aec62xx_tune_drive;
-	ch->speedproc = &aec_set_drive;
+	ch->tuneproc = aec62xx_tune_drive;
+	ch->speedproc = aec_set_drive;
 	ch->autodma = 0;
 
 	ch->io_32bit = 1;
@@ -259,7 +259,7 @@ static void __init aec62xx_init_channel(struct ata_channel *ch)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (ch->dma_base) {
 		ch->highmem = 1;
-		ch->XXX_udma = aec62xx_dmaproc;
+		ch->udma_setup = aec62xx_udma_setup;
 #ifdef CONFIG_IDEDMA_AUTO
 		if (!noautodma)
 			ch->autodma = 1;

@@ -425,7 +425,7 @@ struct ata_channel {
 	 * mode itself.
 	 */
 
-	/* setup disk on a channel for a particular transfer mode */
+	/* setup disk on a channel for a particular PIO transfer mode */
 	void (*tuneproc) (struct ata_device *, byte pio);
 
 	/* setup the chipset timing for a particular transfer mode */
@@ -455,18 +455,13 @@ struct ata_channel {
 	void (*atapi_read)(struct ata_device *, void *, unsigned int);
 	void (*atapi_write)(struct ata_device *, void *, unsigned int);
 
-	int (*XXX_udma)(struct ata_device *);
+	int (*udma_setup)(struct ata_device *);
 
 	void (*udma_enable)(struct ata_device *, int, int);
-
 	int (*udma_start) (struct ata_device *, struct request *rq);
 	int (*udma_stop) (struct ata_device *);
-
-	int (*udma_read) (struct ata_device *, struct request *rq);
-	int (*udma_write) (struct ata_device *, struct request *rq);
-
+	int (*udma_init) (struct ata_device *, struct request *rq);
 	int (*udma_irq_status) (struct ata_device *);
-
 	void (*udma_timeout) (struct ata_device *);
 	void (*udma_irq_lost) (struct ata_device *);
 
@@ -770,14 +765,12 @@ static inline int udma_stop(struct ata_device *drive)
 	return drive->channel->udma_stop(drive);
 }
 
-static inline int udma_read(struct ata_device *drive, struct request *rq)
+/*
+ * Initiate actual DMA data transfer. The direction is encoded in the request.
+ */
+static inline int udma_init(struct ata_device *drive, struct request *rq)
 {
-	return drive->channel->udma_read(drive, rq);
-}
-
-static inline int udma_write(struct ata_device *drive, struct request *rq)
-{
-	return drive->channel->udma_write(drive, rq);
+	return drive->channel->udma_init(drive, rq);
 }
 
 static inline int udma_irq_status(struct ata_device *drive)
@@ -797,14 +790,14 @@ static inline void udma_irq_lost(struct ata_device *drive)
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 
-void udma_pci_enable(struct ata_device *drive, int on, int verbose);
-int udma_pci_start(struct ata_device *drive, struct request *rq);
-int udma_pci_stop(struct ata_device *drive);
-int udma_pci_read(struct ata_device *drive, struct request *rq);
-int udma_pci_write(struct ata_device *drive, struct request *rq);
-int udma_pci_irq_status(struct ata_device *drive);
-void udma_pci_timeout(struct ata_device *drive);
-void udma_pci_irq_lost(struct ata_device *);
+extern void udma_pci_enable(struct ata_device *drive, int on, int verbose);
+extern int udma_pci_start(struct ata_device *drive, struct request *rq);
+extern int udma_pci_stop(struct ata_device *drive);
+extern int udma_pci_init(struct ata_device *drive, struct request *rq);
+extern int udma_pci_irq_status(struct ata_device *drive);
+extern void udma_pci_timeout(struct ata_device *drive);
+extern void udma_pci_irq_lost(struct ata_device *);
+extern int udma_pci_setup(struct ata_device *);
 
 extern int udma_new_table(struct ata_channel *, struct request *);
 extern void udma_destroy_table(struct ata_channel *);
@@ -813,14 +806,11 @@ extern void udma_print(struct ata_device *);
 extern int udma_black_list(struct ata_device *);
 extern int udma_white_list(struct ata_device *);
 
-extern int ata_do_udma(unsigned int reading, struct ata_device *drive, struct request *rq);
-
 extern ide_startstop_t udma_tcq_taskfile(struct ata_device *, struct request *);
 extern int udma_tcq_enable(struct ata_device *, int);
 
 extern ide_startstop_t ide_dma_intr(struct ata_device *, struct request *);
 extern int check_drive_lists(struct ata_device *, int good_bad);
-extern int XXX_ide_dmaproc(struct ata_device *);
 extern void ide_release_dma(struct ata_channel *);
 extern int ata_start_dma(struct ata_device *, struct request *rq);
 

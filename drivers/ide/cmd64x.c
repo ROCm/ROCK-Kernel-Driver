@@ -627,7 +627,7 @@ no_dma_set:
 	return 0;
 }
 
-static int cmd680_dmaproc(struct ata_device *drive)
+static int cmd680_udma_setup(struct ata_device *drive)
 {
 	return cmd64x_config_drive_for_dma(drive);
 }
@@ -680,7 +680,7 @@ static int cmd64x_udma_irq_status(struct ata_device *drive)
 	return (dma_stat & 4) == 4;	/* return 1 if INTR asserted */
 }
 
-static int cmd64x_dmaproc(struct ata_device *drive)
+static int cmd64x_udma_setup(struct ata_device *drive)
 {
 	return cmd64x_config_drive_for_dma(drive);
 }
@@ -703,7 +703,7 @@ static int cmd646_1_udma_stop(struct ata_device *drive)
  * ASUS P55T2P4D with CMD646 chipset revision 0x01 requires the old
  * event order for DMA transfers.
  */
-static int cmd646_1_dmaproc(struct ata_device *drive)
+static int cmd646_1_udma_setup(struct ata_device *drive)
 {
 	return cmd64x_config_drive_for_dma(drive);
 }
@@ -903,7 +903,7 @@ static void __init cmd64x_init_channel(struct ata_channel *hwif)
 			hwif->busproc	= cmd680_busproc;
 #ifdef CONFIG_BLK_DEV_IDEDMA
 			if (hwif->dma_base)
-				hwif->XXX_udma	= cmd680_dmaproc;
+				hwif->udma_setup = cmd680_udma_setup;
 #endif
 			hwif->resetproc = cmd680_reset;
 			hwif->speedproc	= cmd680_tune_chipset;
@@ -914,7 +914,7 @@ static void __init cmd64x_init_channel(struct ata_channel *hwif)
 		case PCI_DEVICE_ID_CMD_643:
 #ifdef CONFIG_BLK_DEV_IDEDMA
 			if (hwif->dma_base) {
-				hwif->XXX_udma	= cmd64x_dmaproc;
+				hwif->udma_setup = cmd64x_udma_setup;
 				hwif->udma_stop	= cmd64x_udma_stop;
 				hwif->udma_irq_status = cmd64x_udma_irq_status;
 			}
@@ -927,10 +927,10 @@ static void __init cmd64x_init_channel(struct ata_channel *hwif)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 			if (hwif->dma_base) {
 				if (class_rev == 0x01) {
-					hwif->XXX_udma = cmd646_1_dmaproc;
+					hwif->udma_setup = cmd646_1_udma_setup;
 					hwif->udma_stop = cmd646_1_udma_stop;
 				} else {
-					hwif->XXX_udma = cmd64x_dmaproc;
+					hwif->udma_setup = cmd64x_udma_setup;
 					hwif->udma_stop = cmd64x_udma_stop;
 					hwif->udma_irq_status = cmd64x_udma_irq_status;
 				}

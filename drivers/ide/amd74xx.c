@@ -177,7 +177,7 @@ static void amd74xx_tune_drive(struct ata_device *drive, u8 pio)
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-int amd74xx_dmaproc(struct ata_device *drive)
+static int amd74xx_udma_setup(struct ata_device *drive)
 {
 	short w80 = drive->channel->udma_four;
 
@@ -291,7 +291,7 @@ static void __init amd74xx_init_channel(struct ata_channel *hwif)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (hwif->dma_base) {
 		hwif->highmem = 1;
-		hwif->XXX_udma = amd74xx_dmaproc;
+		hwif->udma_setup = amd74xx_udma_setup;
 # ifdef CONFIG_IDEDMA_AUTO
 		if (!noautodma)
 			hwif->autodma = 1;

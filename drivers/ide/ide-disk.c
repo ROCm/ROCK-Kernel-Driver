@@ -517,7 +517,7 @@ static int set_using_tcq(struct ata_device *drive, int arg)
 	if (!drive->driver)
 		return -EPERM;
 
-	if (!drive->channel->XXX_udma)
+	if (!drive->channel->udma_setup)
 		return -EPERM;
 
 	if (arg == drive->queue_depth && drive->using_tcq)
@@ -629,7 +629,7 @@ static unsigned long native_max_address(struct ata_device *drive)
 	ide_raw_taskfile(drive, &args);
 
 	/* if OK, compute maximum address value */
-	if ((args.cmd & 0x01) == 0) {
+	if (!(drive->status & ERR_STAT)) {
 		addr = ((args.taskfile.device_head & 0x0f) << 24)
 		     | (args.taskfile.high_cylinder << 16)
 		     | (args.taskfile.low_cylinder <<  8)
@@ -657,7 +657,7 @@ static u64 native_max_address_ext(struct ata_device *drive)
         ide_raw_taskfile(drive, &args);
 
 	/* if OK, compute maximum address value */
-	if ((args.cmd & 0x01) == 0) {
+	if (!(drive->status & ERR_STAT)) {
 		u32 high = (args.hobfile.high_cylinder << 16) |
 			   (args.hobfile.low_cylinder << 8) |
 			    args.hobfile.sector_number;
@@ -696,7 +696,7 @@ static sector_t set_max_address(struct ata_device *drive, sector_t addr_req)
 	/* submit command request */
 	ide_raw_taskfile(drive, &args);
 	/* if OK, read new maximum address value */
-	if ((args.cmd & 0x01) == 0) {
+	if (!(drive->status & ERR_STAT)) {
 		addr_set = ((args.taskfile.device_head & 0x0f) << 24)
 			 | (args.taskfile.high_cylinder << 16)
 			 | (args.taskfile.low_cylinder <<  8)
@@ -731,7 +731,7 @@ static u64 set_max_address_ext(struct ata_device *drive, u64 addr_req)
 	/* submit command request */
 	ide_raw_taskfile(drive, &args);
 	/* if OK, compute maximum address value */
-	if ((args.cmd & 0x01) == 0) {
+	if (!(drive->status & ERR_STAT)) {
 		u32 high = (args.hobfile.high_cylinder << 16) |
 			   (args.hobfile.low_cylinder << 8) |
 			    args.hobfile.sector_number;

@@ -184,31 +184,6 @@ void ide_set_handler(struct ata_device *drive, ata_handler_t handler,
 	spin_unlock_irqrestore(ch->lock, flags);
 }
 
-static u8 auto_reduce_xfer(struct ata_device *drive)
-{
-	if (!drive->crc_count)
-		return drive->current_speed;
-	drive->crc_count = 0;
-
-	switch(drive->current_speed) {
-		case XFER_UDMA_7:	return XFER_UDMA_6;
-		case XFER_UDMA_6:	return XFER_UDMA_5;
-		case XFER_UDMA_5:	return XFER_UDMA_4;
-		case XFER_UDMA_4:	return XFER_UDMA_3;
-		case XFER_UDMA_3:	return XFER_UDMA_2;
-		case XFER_UDMA_2:	return XFER_UDMA_1;
-		case XFER_UDMA_1:	return XFER_UDMA_0;
-			/*
-			 * OOPS we do not goto non Ultra DMA modes
-			 * without iCRC's available we force
-			 * the system to PIO and make the user
-			 * invoke the ATA-1 ATA-2 DMA modes.
-			 */
-		case XFER_UDMA_0:
-		default:		return XFER_PIO_4;
-	}
-}
-
 static void check_crc_errors(struct ata_device *drive)
 {
 	if (!drive->using_dma)
@@ -218,7 +193,34 @@ static void check_crc_errors(struct ata_device *drive)
 	if (drive->crc_count) {
 		udma_enable(drive, 0, 0);
 		if (drive->channel->speedproc) {
-			u8 pio = auto_reduce_xfer(drive);
+			u8 pio = XFER_PIO_4;
+			drive->crc_count = 0;
+
+			switch (drive->current_speed) {
+			case XFER_UDMA_7: pio = XFER_UDMA_6;
+				break;
+			case XFER_UDMA_6: pio = XFER_UDMA_5;
+				break;
+			case XFER_UDMA_5: pio = XFER_UDMA_4;
+				break;
+			case XFER_UDMA_4: pio = XFER_UDMA_3;
+				break;
+			case XFER_UDMA_3: pio = XFER_UDMA_2;
+				break;
+			case XFER_UDMA_2: pio = XFER_UDMA_1;
+				break;
+			case XFER_UDMA_1: pio = XFER_UDMA_0;
+				break;
+			/*
+			 * OOPS we do not goto non Ultra DMA modes
+			 * without iCRC's available we force
+			 * the system to PIO and make the user
+			 * invoke the ATA-1 ATA-2 DMA modes.
+			 */
+			case XFER_UDMA_0:
+			default:
+				pio = XFER_PIO_4;
+			}
 		        drive->channel->speedproc(drive, pio);
 		}
 		if (drive->current_speed >= XFER_SW_DMA_0)
@@ -408,7 +410,6 @@ void ide_end_drive_cmd(struct ata_device *drive, struct request *rq)
 			ar->taskfile.low_cylinder = IN_BYTE(IDE_LCYL_REG);
 			ar->taskfile.high_cylinder = IN_BYTE(IDE_HCYL_REG);
 			ar->taskfile.device_head = IN_BYTE(IDE_SELECT_REG);
-			ar->cmd = drive->status;
 			if ((drive->id->command_set_2 & 0x0400) &&
 			    (drive->id->cfs_enable_2 & 0x0400) &&
 			    (drive->addressing == 1)) {

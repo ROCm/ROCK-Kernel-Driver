@@ -544,7 +544,7 @@ static int icside_dma_read(struct ata_device *drive, struct request *rq)
 	return 0;
 }
 
-static int icside_dma_write(struct ata_device *drive, struct request *rq)
+static int icside_dma_init(struct ata_device *drive, struct request *rq)
 {
 	struct ata_channel *ch = drive->channel;
 	unsigned int cmd;
@@ -612,12 +612,11 @@ static int icside_setup_dma(struct ata_channel *ch)
 	ch->dmatable_cpu    = NULL;
 	ch->dmatable_dma    = 0;
 	ch->speedproc       = icside_set_speed;
-	ch->XXX_udma        = icside_dma_check;
+	ch->udma_setup	    = icside_dma_check;
 	ch->udma_enable     = icside_dma_enable;
 	ch->udma_start      = icside_dma_start;
 	ch->udma_stop       = icside_dma_stop;
-	ch->udma_read       = icside_dma_read;
-	ch->udma_write      = icside_dma_write;
+	ch->udma_init	    = icside_dma_init;
 	ch->udma_irq_status = icside_irq_status;
 	ch->udma_timeout    = icside_dma_timeout;
 	ch->udma_irq_lost   = icside_irq_lost;

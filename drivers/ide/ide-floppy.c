@@ -1060,12 +1060,8 @@ static ide_startstop_t idefloppy_issue_pc(struct ata_device *drive, struct reque
 	if (test_and_clear_bit (PC_DMA_ERROR, &pc->flags))
 		udma_enable(drive, 0, 1);
 
-	if (test_bit (PC_DMA_RECOMMENDED, &pc->flags) && drive->using_dma) {
-		if (test_bit (PC_WRITING, &pc->flags))
-			dma_ok = !udma_write(drive, rq);
-		else
-			dma_ok = !udma_read(drive, rq);
-	}
+	if (test_bit (PC_DMA_RECOMMENDED, &pc->flags) && drive->using_dma)
+		dma_ok = !udma_init(drive, rq);
 #endif
 
 	ata_irq_enable(drive, 1);

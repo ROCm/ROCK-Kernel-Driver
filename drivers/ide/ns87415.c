@@ -101,11 +101,11 @@ static int ns87415_udma_stop(struct ata_device *drive)
 
 }
 
-static int ns87415_udma_read(struct ata_device *drive, struct request *rq)
+static int ns87415_udma_init(struct ata_device *drive, struct request *rq)
 {
 	ns87415_prepare_drive(drive, 1);	/* select DMA xfer */
 
-	if (!ata_do_udma(1, drive, rq))		/* use standard DMA stuff */
+	if (!udma_pci_init(drive, rq))		/* use standard DMA stuff */
 		return 0;
 
 	ns87415_prepare_drive(drive, 0);	/* DMA failed: select PIO xfer */
@@ -113,26 +113,14 @@ static int ns87415_udma_read(struct ata_device *drive, struct request *rq)
 	return 1;
 }
 
-static int ns87415_udma_write(struct ata_device *drive, struct request *rq)
-{
-	ns87415_prepare_drive(drive, 1);	/* select DMA xfer */
-
-	if (!ata_do_udma(0, drive, rq))		/* use standard DMA stuff */
-		return 0;
-
-	ns87415_prepare_drive(drive, 0);	/* DMA failed: select PIO xfer */
-
-	return 1;
-}
-
-static int ns87415_dmaproc(struct ata_device *drive)
+static int ns87415_udma_setup(struct ata_device *drive)
 {
 	if (drive->type != ATA_DISK) {
 		udma_enable(drive, 0, 0);
 
 		return 0;
 	}
-	return XXX_ide_dmaproc(drive);
+	return udma_pci_setup(drive);
 }
 #endif
 
@@ -218,9 +206,8 @@ static void __init ide_init_ns87415(struct ata_channel *hwif)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (hwif->dma_base) {
 		hwif->udma_stop = ns87415_udma_stop;
-		hwif->udma_read = ns87415_udma_read;
-		hwif->udma_write = ns87415_udma_write;
-		hwif->XXX_udma = ns87415_dmaproc;
+		hwif->udma_init = ns87415_udma_init;
+		hwif->udma_setup = ns87415_udma_setup;
 	}
 #endif
 

@@ -736,10 +736,8 @@ static ide_startstop_t cdrom_start_packet_command(struct ata_device *drive,
 		return startstop;
 
 	if (info->dma) {
-		if (info->cmd == READ)
-			info->dma = !udma_read(drive, rq);
-		else if (info->cmd == WRITE)
-			info->dma = !udma_write(drive, rq);
+		if (info->cmd == READ || info->cmd == WRITE)
+			info->dma = !udma_init(drive, rq);
 		else
 			printk("ide-cd: DMA set, but not allowed\n");
 	}

@@ -191,7 +191,7 @@ static int cs5530_config_dma(struct ata_device *drive)
 	return 0;
 }
 
-int cs5530_dmaproc(struct ata_device *drive)
+static int cs5530_udma_setup(struct ata_device *drive)
 {
 	return cs5530_config_dma(drive);
 }
@@ -292,7 +292,7 @@ static void __init ide_init_cs5530(struct ata_channel *hwif)
 		unsigned int basereg, d0_timings;
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-	hwif->XXX_udma = cs5530_dmaproc;
+	hwif->udma_setup = cs5530_udma_setup;
 	hwif->highmem = 1;
 #else
 	hwif->autodma = 0;

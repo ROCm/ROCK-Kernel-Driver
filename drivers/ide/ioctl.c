@@ -235,7 +235,7 @@ int ata_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
 			if (!drive->driver)
 				return -EPERM;
 
-			if (!drive->id || !(drive->id->capability & 1) || !drive->channel->XXX_udma)
+			if (!drive->id || !(drive->id->capability & 1) || !drive->channel->udma_setup)
 				return -EPERM;
 
 			if (ide_spin_wait_hwgroup(drive))

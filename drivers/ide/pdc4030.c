@@ -619,16 +619,11 @@ ide_startstop_t do_pdc4030_io(struct ata_device *drive, struct ata_taskfile *arg
 		return ide_stopped;
 	}
 
-	ata_irq_enable(drive, 1);  /* clear nIEN */
+	ata_irq_enable(drive, 1);
 	ata_mask(drive);
 
-	outb(taskfile->feature, IDE_FEATURE_REG);
-	outb(taskfile->sector_count, IDE_NSECTOR_REG);
-	/* refers to number of sectors to transfer */
-	outb(taskfile->sector_number, IDE_SECTOR_REG);
-	/* refers to sector offset or start sector */
-	outb(taskfile->low_cylinder, IDE_LCYL_REG);
-	outb(taskfile->high_cylinder, IDE_HCYL_REG);
+	ata_out_regfile(drive, taskfile);
+
 	outb(taskfile->device_head, IDE_SELECT_REG);
 	outb(args->cmd, IDE_COMMAND_REG);
 
@@ -708,14 +703,9 @@ ide_startstop_t promise_do_request(struct ata_device *drive, struct request *rq,
 	args.taskfile.low_cylinder	= (block>>=8);
 	args.taskfile.high_cylinder	= (block>>=8);
 	args.taskfile.device_head	= ((block>>8)&0x0f)|drive->select.all;
-	args.cmd			= (rq_data_dir(rq)==READ)?PROMISE_READ:PROMISE_WRITE;
-
-	/* We can't call ide_cmd_type_parser here, since it won't understand
-	   our command, but that doesn't matter, since we don't use the
-	   generic interrupt handlers either. Setup the bits of args that we
-	   will need. */
-	args.handler		= NULL;
-	rq->special		= &args;
+	args.cmd = (rq_data_dir(rq) == READ) ? PROMISE_READ : PROMISE_WRITE;
+	args.handler	= NULL;
+	rq->special	= &args;
 
 	return do_pdc4030_io(drive, &args, rq);
 }

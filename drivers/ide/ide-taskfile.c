@@ -350,19 +350,19 @@ ide_startstop_t ata_taskfile(struct ata_device *drive,
 			return ar->prehandler(drive, rq);
 	} else {
 		/*
-		 * FIXME: this is a gross hack, need to unify tcq dma proc and
-		 * regular dma proc.
+		 * FIXME: This is a gross hack, need to unify tcq dma proc and
+		 * regular dma proc. It should now be easier.
 		 */
 
 		if (!drive->using_dma)
 			return ide_started;
 
 		/* for dma commands we don't set the handler */
-		if (ar->cmd == WIN_WRITEDMA  || ar->cmd == WIN_WRITEDMA_EXT)
-			return !udma_write(drive, rq);
-		else if (ar->cmd == WIN_READDMA
+		if (ar->cmd == WIN_WRITEDMA
+		      || ar->cmd == WIN_WRITEDMA_EXT
+		      || ar->cmd == WIN_READDMA
 		      || ar->cmd == WIN_READDMA_EXT)
-			return !udma_read(drive, rq);
+			return !udma_init(drive, rq);
 #ifdef CONFIG_BLK_DEV_IDE_TCQ
 		else if (ar->cmd == WIN_WRITEDMA_QUEUED
 		      || ar->cmd == WIN_WRITEDMA_QUEUED_EXT
@@ -371,7 +371,7 @@ ide_startstop_t ata_taskfile(struct ata_device *drive,
 			return udma_tcq_taskfile(drive, rq);
 #endif
 		else {
-			printk("ata_taskfile: unknown command %x\n", ar->cmd);
+			printk(KERN_ERR "%s: unknown command %x\n", __FUNCTION__, ar->cmd);
 			return ide_stopped;
 		}
 	}
@@ -556,31 +556,28 @@ static ide_startstop_t task_mulin_intr(struct ata_device *drive, struct request 
 	 * more data left
 	 */
 	ide_set_handler(drive, task_mulin_intr, WAIT_CMD, NULL);
+
 	return ide_started;
 }
 
 /* Called to figure out the type of command being called.
  */
-void ide_cmd_type_parser(struct ata_taskfile *args)
+void ide_cmd_type_parser(struct ata_taskfile *ar)
 {
-	struct hd_drive_task_hdr *taskfile = &args->taskfile;
+	struct hd_drive_task_hdr *taskfile = &ar->taskfile;
 
-	args->prehandler = NULL;
-	args->handler = NULL;
+	ar->prehandler = NULL;
+	ar->handler = NULL;
 
-	switch (args->cmd) {
+	switch (ar->cmd) {
 		case WIN_IDENTIFY:
 		case WIN_PIDENTIFY:
-			args->handler = task_in_intr;
-			args->command_type = IDE_DRIVE_TASK_IN;
-			return;
-
 		case CFA_TRANSLATE_SECTOR:
 		case WIN_READ:
 		case WIN_READ_EXT:
 		case WIN_READ_BUFFER:
-			args->handler = task_in_intr;
-			args->command_type = IDE_DRIVE_TASK_IN;
+			ar->handler = task_in_intr;
+			ar->command_type = IDE_DRIVE_TASK_IN;
 			return;
 
 		case CFA_WRITE_SECT_WO_ERASE:
@@ -589,56 +586,56 @@ void ide_cmd_type_parser(struct ata_taskfile *args)
 		case WIN_WRITE_VERIFY:
 		case WIN_WRITE_BUFFER:
 		case WIN_DOWNLOAD_MICROCODE:
-			args->prehandler = pre_task_out_intr;
-			args->handler = task_out_intr;
-			args->command_type = IDE_DRIVE_TASK_RAW_WRITE;
+			ar->prehandler = pre_task_out_intr;
+			ar->handler = task_out_intr;
+			ar->command_type = IDE_DRIVE_TASK_RAW_WRITE;
 			return;
 
 		case WIN_MULTREAD:
 		case WIN_MULTREAD_EXT:
-			args->handler = task_mulin_intr;
-			args->command_type = IDE_DRIVE_TASK_IN;
+			ar->handler = task_mulin_intr;
+			ar->command_type = IDE_DRIVE_TASK_IN;
 			return;
 
 		case CFA_WRITE_MULTI_WO_ERASE:
 		case WIN_MULTWRITE:
 		case WIN_MULTWRITE_EXT:
-			args->prehandler = pre_task_mulout_intr;
-			args->handler = task_mulout_intr;
-			args->command_type = IDE_DRIVE_TASK_RAW_WRITE;
+			ar->prehandler = pre_task_mulout_intr;
+			ar->handler = task_mulout_intr;
+			ar->command_type = IDE_DRIVE_TASK_RAW_WRITE;
 			return;
 
 		case WIN_SECURITY_DISABLE:
 		case WIN_SECURITY_ERASE_UNIT:
 		case WIN_SECURITY_SET_PASS:
 		case WIN_SECURITY_UNLOCK:
-			args->handler = task_out_intr;
-			args->command_type = IDE_DRIVE_TASK_OUT;
+			ar->handler = task_out_intr;
+			ar->command_type = IDE_DRIVE_TASK_OUT;
 			return;
 
 		case WIN_SMART:
 			if (taskfile->feature == SMART_WRITE_LOG_SECTOR)
-				args->prehandler = pre_task_out_intr;
+				ar->prehandler = pre_task_out_intr;
 
-			args->taskfile.low_cylinder = SMART_LCYL_PASS;
-			args->taskfile.high_cylinder = SMART_HCYL_PASS;
+			ar->taskfile.low_cylinder = SMART_LCYL_PASS;
+			ar->taskfile.high_cylinder = SMART_HCYL_PASS;
 
-			switch(args->taskfile.feature) {
+			switch(ar->taskfile.feature) {
 				case SMART_READ_VALUES:
 				case SMART_READ_THRESHOLDS:
 				case SMART_READ_LOG_SECTOR:
-					args->handler = task_in_intr;
-					args->command_type = IDE_DRIVE_TASK_IN;
+					ar->handler = task_in_intr;
+					ar->command_type = IDE_DRIVE_TASK_IN;
 					return;
 
 				case SMART_WRITE_LOG_SECTOR:
-					args->handler = task_out_intr;
-					args->command_type = IDE_DRIVE_TASK_OUT;
+					ar->handler = task_out_intr;
+					ar->command_type = IDE_DRIVE_TASK_OUT;
 					return;
 
 				default:
-					args->handler = task_no_data_intr;
-					args->command_type = IDE_DRIVE_TASK_NO_DATA;
+					ar->handler = task_no_data_intr;
+					ar->command_type = IDE_DRIVE_TASK_NO_DATA;
 					return;
 
 			}
@@ -648,22 +645,22 @@ void ide_cmd_type_parser(struct ata_taskfile *args)
 		case WIN_READDMA_QUEUED:
 		case WIN_READDMA_EXT:
 		case WIN_READDMA_QUEUED_EXT:
-			args->command_type = IDE_DRIVE_TASK_IN;
+			ar->command_type = IDE_DRIVE_TASK_IN;
 			return;
 
 		case WIN_WRITEDMA:
 		case WIN_WRITEDMA_QUEUED:
 		case WIN_WRITEDMA_EXT:
 		case WIN_WRITEDMA_QUEUED_EXT:
-			args->command_type = IDE_DRIVE_TASK_RAW_WRITE;
+			ar->command_type = IDE_DRIVE_TASK_RAW_WRITE;
 			return;
 
 #endif
 		case WIN_SETFEATURES:
-			args->handler = task_no_data_intr;
-			switch(args->taskfile.feature) {
+			ar->handler = task_no_data_intr;
+			switch (ar->taskfile.feature) {
 				case SETFEATURES_XFER:
-					args->command_type = IDE_DRIVE_TASK_SET_XFER;
+					ar->command_type = IDE_DRIVE_TASK_SET_XFER;
 					return;
 				case SETFEATURES_DIS_DEFECT:
 				case SETFEATURES_EN_APM:
@@ -681,18 +678,18 @@ void ide_cmd_type_parser(struct ata_taskfile *args)
 				case SETFEATURES_DIS_RI:
 				case SETFEATURES_DIS_SI:
 				default:
-					args->command_type = IDE_DRIVE_TASK_NO_DATA;
+					ar->command_type = IDE_DRIVE_TASK_NO_DATA;
 					return;
 			}
 
 		case WIN_SPECIFY:
-			args->handler = task_no_data_intr;
-			args->command_type = IDE_DRIVE_TASK_NO_DATA;
+			ar->handler = task_no_data_intr;
+			ar->command_type = IDE_DRIVE_TASK_NO_DATA;
 			return;
 
 		case WIN_RESTORE:
-			args->handler = recal_intr;
-			args->command_type = IDE_DRIVE_TASK_NO_DATA;
+			ar->handler = recal_intr;
+			ar->command_type = IDE_DRIVE_TASK_NO_DATA;
 			return;
 
 		case WIN_DIAGNOSE:
@@ -722,19 +719,10 @@ void ide_cmd_type_parser(struct ata_taskfile *args)
 		case WIN_DOORUNLOCK:
 		case DISABLE_SEAGATE:
 		case EXABYTE_ENABLE_NEST:
-
-			args->handler = task_no_data_intr;
-			args->command_type = IDE_DRIVE_TASK_NO_DATA;
-			return;
-
 		case WIN_SETMULT:
-			args->handler = task_no_data_intr;
-			args->command_type = IDE_DRIVE_TASK_NO_DATA;
-			return;
-
 		case WIN_NOP:
-			args->handler = task_no_data_intr;
-			args->command_type = IDE_DRIVE_TASK_NO_DATA;
+			ar->handler = task_no_data_intr;
+			ar->command_type = IDE_DRIVE_TASK_NO_DATA;
 			return;
 
 		case WIN_FORMAT:
@@ -743,7 +731,7 @@ void ide_cmd_type_parser(struct ata_taskfile *args)
 		case WIN_QUEUED_SERVICE:
 		case WIN_PACKETCMD:
 		default:
-			args->command_type = IDE_DRIVE_TASK_INVALID;
+			ar->command_type = IDE_DRIVE_TASK_INVALID;
 			return;
 	}
 }

@@ -164,7 +164,7 @@ int ata_start_dma(struct ata_device *drive, struct request *rq)
 /*
  * Configure a device for DMA operation.
  */
-int XXX_ide_dmaproc(struct ata_device *drive)
+int udma_pci_setup(struct ata_device *drive)
 {
 	int config_allows_dma = 1;
 	struct hd_driveid *id = drive->id;
@@ -427,16 +427,6 @@ int udma_pci_stop(struct ata_device *drive)
 	return (dma_stat & 7) != 4 ? (0x10 | dma_stat) : 0;	/* verify good DMA status */
 }
 
-int udma_pci_read(struct ata_device *drive, struct request *rq)
-{
-	return ata_do_udma(1, drive, rq);
-}
-
-int udma_pci_write(struct ata_device *drive, struct request *rq)
-{
-	return ata_do_udma(0, drive, rq);
-}
-
 /*
  * FIXME: This should be attached to a channel as we can see now!
  */
@@ -490,18 +480,16 @@ void ata_init_dma(struct ata_channel *ch, unsigned long dma_base)
 	 * We could just assign them, and then leave it up to the chipset
 	 * specific code to override these after they've called this function.
 	 */
-	if (!ch->XXX_udma)
-		ch->XXX_udma = XXX_ide_dmaproc;
+	if (!ch->udma_setup)
+		ch->udma_setup = udma_pci_setup;
 	if (!ch->udma_enable)
 		ch->udma_enable = udma_pci_enable;
 	if (!ch->udma_start)
 		ch->udma_start = udma_pci_start;
 	if (!ch->udma_stop)
 		ch->udma_stop = udma_pci_stop;
-	if (!ch->udma_read)
-		ch->udma_read = udma_pci_read;
-	if (!ch->udma_write)
-		ch->udma_write = udma_pci_write;
+	if (!ch->udma_init)
+		ch->udma_init = udma_pci_init;
 	if (!ch->udma_irq_status)
 		ch->udma_irq_status = udma_pci_irq_status;
 	if (!ch->udma_timeout)
@@ -528,16 +516,20 @@ dma_alloc_failure:
  * It's exported only for host chips which use it for fallback or (too) late
  * capability checking.
  */
-
-int ata_do_udma(unsigned int reading, struct ata_device *drive, struct request *rq)
+int udma_pci_init(struct ata_device *drive, struct request *rq)
 {
+	u8 cmd;
+
 	if (ata_start_dma(drive, rq))
 		return 1;
 
 	if (drive->type != ATA_DISK)
 		return 0;
 
-	reading <<= 3;
+	if (rq_data_dir(rq) == READ)
+		cmd = 0x08;
+	else
+		cmd = 0x00;
 
 	ide_set_handler(drive, ide_dma_intr, WAIT_CMD, dma_timer_expiry);	/* issue cmd to drive */
 	if ((rq->flags & REQ_DRIVE_ACB) && (drive->addressing == 1)) {
@@ -545,22 +537,19 @@ int ata_do_udma(unsigned int reading, struct ata_device *drive, struct request *
 		struct ata_taskfile *args = rq->special;
 
 		outb(args->cmd, IDE_COMMAND_REG);
-	} else if (drive->addressing) {
-		outb(reading ? WIN_READDMA_EXT : WIN_WRITEDMA_EXT, IDE_COMMAND_REG);
-	} else {
-		outb(reading ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
-	}
+	} else if (drive->addressing)
+		outb(cmd ? WIN_READDMA_EXT : WIN_WRITEDMA_EXT, IDE_COMMAND_REG);
+	else
+		outb(cmd ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
 
 	return udma_start(drive, rq);
 }
 
-EXPORT_SYMBOL(ata_do_udma);
 EXPORT_SYMBOL(ide_dma_intr);
 EXPORT_SYMBOL(udma_pci_enable);
 EXPORT_SYMBOL(udma_pci_start);
 EXPORT_SYMBOL(udma_pci_stop);
-EXPORT_SYMBOL(udma_pci_read);
-EXPORT_SYMBOL(udma_pci_write);
+EXPORT_SYMBOL(udma_pci_init);
 EXPORT_SYMBOL(udma_pci_irq_status);
 EXPORT_SYMBOL(udma_pci_timeout);
 EXPORT_SYMBOL(udma_pci_irq_lost);

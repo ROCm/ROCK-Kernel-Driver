@@ -260,11 +260,9 @@ static void pmac_ide_setup_dma(struct device_node *np, int ix);
 static void pmac_udma_enable(struct ata_device *drive, int on, int verbose);
 static int pmac_udma_start(struct ata_device *drive, struct request *rq);
 static int pmac_udma_stop(struct ata_device *drive);
-static int pmac_do_udma(unsigned int reading, struct ata_device *drive, struct request *rq);
-static int pmac_udma_read(struct ata_device *drive, struct request *rq);
-static int pmac_udma_write(struct ata_device *drive, struct request *rq);
+static int pmac_udma_init(struct ata_device *drive, struct request *rq);
 static int pmac_udma_irq_status(struct ata_device *drive);
-static int pmac_ide_dmaproc(struct ata_device *drive);
+static int pmac_udma_setup(struct ata_device *drive);
 static int pmac_ide_build_dmatable(struct ata_device *drive, struct request *rq, int ix, int wr);
 static int pmac_ide_tune_chipset(struct ata_device *drive, byte speed);
 static void pmac_ide_tuneproc(struct ata_device *drive, byte pio);
@@ -334,10 +332,9 @@ pmac_ide_init_hwif_ports(hw_regs_t *hw,
 		ide_hwifs[ix].udma_enable = pmac_udma_enable;
 		ide_hwifs[ix].udma_start = pmac_udma_start;
 		ide_hwifs[ix].udma_stop = pmac_udma_stop;
-		ide_hwifs[ix].udma_read = pmac_udma_read;
-		ide_hwifs[ix].udma_write = pmac_udma_write;
+		ide_hwifs[ix].udma_init = pmac_udma_init;
 		ide_hwifs[ix].udma_irq_status = pmac_udma_irq_status;
-		ide_hwifs[ix].XXX_udma = pmac_ide_dmaproc;
+		ide_hwifs[ix].udma_setup = pmac_udma_setup;
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC_AUTO
 		if (!noautodma)
 			ide_hwifs[ix].autodma = 1;
@@ -1043,10 +1040,9 @@ pmac_ide_setup_dma(struct device_node *np, int ix)
 	ide_hwifs[ix].udma_enable = pmac_udma_enable;
 	ide_hwifs[ix].udma_start = pmac_udma_start;
 	ide_hwifs[ix].udma_stop = pmac_udma_stop;
-	ide_hwifs[ix].udma_read = pmac_udma_read;
-	ide_hwifs[ix].udma_write = pmac_udma_write;
+	ide_hwifs[ix].udma_init = pmac_udma_init;
 	ide_hwifs[ix].udma_irq_status = pmac_udma_irq_status;
-	ide_hwifs[ix].XXX_udma = pmac_ide_dmaproc;
+	ide_hwifs[ix].udma_setup = pmac_udma_setup;
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC_AUTO
 	if (!noautodma)
 		ide_hwifs[ix].autodma = 1;
@@ -1405,11 +1401,12 @@ static int pmac_udma_stop(struct ata_device *drive)
 	return (dstat & (RUN|DEAD|ACTIVE)) != RUN;
 }
 
-static int pmac_do_udma(unsigned int reading, struct ata_device *drive, struct request *rq)
+static int pmac_udma_init(struct ata_device *drive, struct request *rq)
 {
 	int ix, ata4;
 	volatile struct dbdma_regs *dma;
-	byte unit = (drive->select.b.unit & 0x01);
+	u8 unit = (drive->select.b.unit & 0x01);
+	int reading;
 
 	/* Can we stuff a pointer to our intf structure in config_data
 	 * or select_data in hwif ?
@@ -1417,6 +1414,12 @@ static int pmac_do_udma(unsigned int reading, struct ata_device *drive, struct r
 	ix = pmac_ide_find(drive);
 	if (ix < 0)
 		return 0;
+
+	if (rq_data_dir(rq) == READ)
+		reading = 1;
+	else
+		reading = 0;
+
 	dma = pmac_ide[ix].dma_regs;
 	ata4 = (pmac_ide[ix].kind == controller_kl_ata4 ||
 		pmac_ide[ix].kind == controller_kl_ata4_80);
@@ -1445,16 +1448,6 @@ static int pmac_do_udma(unsigned int reading, struct ata_device *drive, struct r
 	}
 
 	return udma_start(drive, rq);
-}
-
-static int pmac_udma_read(struct ata_device *drive, struct request *rq)
-{
-	return pmac_do_udma(1, drive, rq);
-}
-
-static int pmac_udma_write(struct ata_device *drive, struct request *rq)
-{
-	return pmac_do_udma(0, drive, rq);
 }
 
 /*
@@ -1514,7 +1507,7 @@ static int pmac_udma_irq_status(struct ata_device *drive)
 	return 0;
 }
 
-static int pmac_ide_dmaproc(struct ata_device *drive)
+static int pmac_udma_setup(struct ata_device *drive)
 {
 	/* Change this to better match ide-dma.c */
 	pmac_ide_check_dma(drive);
