@@ -316,69 +316,6 @@ static unsigned int zoned_raid_size(mddev_t *mddev)
 	return 0;
 }
 
-/*
- * We check wether all devices are numbered from 0 to nb_dev-1. The
- * order is guaranteed even after device name changes.
- *
- * Some personalities (raid0, linear) use this. Personalities that
- * provide data have to be able to deal with loss of individual
- * disks, so they do their checking themselves.
- */
-int md_check_ordering(mddev_t *mddev)
-{
-	int i, c;
-	mdk_rdev_t *rdev;
-	struct list_head *tmp;
-
-	/*
-	 * First, all devices must be fully functional
-	 */
-	ITERATE_RDEV(mddev,rdev,tmp) {
-		if (rdev->faulty) {
-			printk(KERN_ERR "md: md%d's device %s faulty, aborting.\n",
-			       mdidx(mddev), partition_name(rdev->dev));
-			goto abort;
-		}
-	}
-
-	c = 0;
-	ITERATE_RDEV(mddev,rdev,tmp) {
-		c++;
-	}
-	if (c != mddev->nb_dev) {
-		MD_BUG();
-		goto abort;
-	}
-	if (mddev->nb_dev != mddev->sb->raid_disks) {
-		printk(KERN_ERR "md: md%d, array needs %d disks, has %d, aborting.\n",
-			mdidx(mddev), mddev->sb->raid_disks, mddev->nb_dev);
-		goto abort;
-	}
-	/*
-	 * Now the numbering check
-	 */
-	for (i = 0; i < mddev->nb_dev; i++) {
-		c = 0;
-		ITERATE_RDEV(mddev,rdev,tmp) {
-			if (rdev->desc_nr == i)
-				c++;
-		}
-		if (!c) {
-			printk(KERN_ERR "md: md%d, missing disk #%d, aborting.\n",
-			       mdidx(mddev), i);
-			goto abort;
-		}
-		if (c > 1) {
-			printk(KERN_ERR "md: md%d, too many disks #%d, aborting.\n",
-			       mdidx(mddev), i);
-			goto abort;
-		}
-	}
-	return 0;
-abort:
-	return 1;
-}
-
 static void remove_descriptor(mdp_disk_t *disk, mdp_super_t *sb)
 {
 	if (disk_active(disk)) {
@@ -608,8 +545,7 @@ static void bind_rdev_to_array(mdk_rdev_t * rdev, mddev_t * mddev)
 
 	list_add(&rdev->same_set, &mddev->disks);
 	rdev->mddev = mddev;
-	mddev->nb_dev++;
-	printk(KERN_INFO "md: bind<%s,%d>\n", partition_name(rdev->dev), mddev->nb_dev);
+	printk(KERN_INFO "md: bind<%s>\n", partition_name(rdev->dev));
 }
 
 static void unbind_rdev_from_array(mdk_rdev_t * rdev)
@@ -619,9 +555,7 @@ static void unbind_rdev_from_array(mdk_rdev_t * rdev)
 		return;
 	}
 	list_del_init(&rdev->same_set);
-	rdev->mddev->nb_dev--;
-	printk(KERN_INFO "md: unbind<%s,%d>\n", partition_name(rdev->dev),
-						 rdev->mddev->nb_dev);
+	printk(KERN_INFO "md: unbind<%s>\n", partition_name(rdev->dev));
 	rdev->mddev = NULL;
 }
 
@@ -709,7 +643,7 @@ static void export_array(mddev_t *mddev)
 		}
 		kick_rdev_from_array(rdev);
 	}
-	if (mddev->nb_dev)
+	if (!list_empty(&mddev->disks))
 		MD_BUG();
 }
 
@@ -1589,7 +1523,7 @@ static int do_md_run(mddev_t * mddev)
 	mdk_rdev_t *rdev;
 
 
-	if (!mddev->nb_dev) {
+	if (list_empty(&mddev->disks)) {
 		MD_BUG();
 		return -EINVAL;
 	}
@@ -1729,7 +1663,7 @@ static int restart_array(mddev_t *mddev)
 	/*
 	 * Complain if it has no devices
 	 */
-	if (!mddev->nb_dev)
+	if (list_empty(&mddev->disks))
 		OUT(-ENXIO);
 
 	if (mddev->pers) {
@@ -2174,7 +2108,7 @@ static int add_new_disk(mddev_t * mddev, mdu_disk_info_t *info)
 			MD_BUG();
 			return -EINVAL;
 		}
-		if (mddev->nb_dev) {
+		if (!list_empty(&mddev->disks)) {
 			mdk_rdev_t *rdev0 = list_entry(mddev->disks.next,
 							mdk_rdev_t, same_set);
 			if (!uuid_equal(rdev0, rdev)) {
@@ -3111,7 +3045,7 @@ static int md_status_read_proc(char *page, char **start, off_t off,
 			size += rdev->size;
 		}
 
-		if (mddev->nb_dev) {
+		if (!list_empty(&mddev->disks)) {
 			if (mddev->pers)
 				sz += sprintf(page + sz, "\n      %d blocks",
 						 md_size[mdidx(mddev)]);
@@ -3947,6 +3881,5 @@ EXPORT_SYMBOL(md_print_devices);
 EXPORT_SYMBOL(find_rdev_nr);
 EXPORT_SYMBOL(md_interrupt_thread);
 EXPORT_SYMBOL(mddev_map);
-EXPORT_SYMBOL(md_check_ordering);
 EXPORT_SYMBOL(get_spare);
 MODULE_LICENSE("GPL");

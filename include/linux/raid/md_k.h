@@ -196,14 +196,12 @@ struct mddev_s
 	mdk_personality_t		*pers;
 	int				__minor;
 	mdp_super_t			*sb;
-	int				nb_dev;
 	struct list_head 		disks;
 	int				sb_dirty;
 	int				ro;
 	unsigned long			curr_resync;	/* blocks scheduled */
 	unsigned long			resync_mark;	/* a recent timestamp */
 	unsigned long			resync_mark_cnt;/* blocks written at resync_mark */
-	char				*name;
 	int				recovery_running;
 	struct semaphore		reconfig_sem;
 	struct semaphore		recovery_sem;
@@ -279,13 +277,6 @@ extern mdp_disk_t *get_spare(mddev_t *mddev);
  */
 #define ITERATE_RDEV(mddev,rdev,tmp)					\
 	ITERATE_RDEV_GENERIC((mddev)->disks,same_set,rdev,tmp)
-
-/*
- * Same as above, but assumes that the device has rdev->desc_nr numbered
- * from 0 to mddev->nb_dev, and iterates through rdevs in ascending order.
- */
-#define ITERATE_RDEV_ORDERED(mddev,rdev,i)				\
-	for (i = 0; rdev = find_rdev_nr(mddev, i), i < mddev->nb_dev; i++)
 
 
 /*
