@@ -1,6 +1,7 @@
 #include <asm/asmmacro.h>
 #include <asm/offsets.h>
 #include <asm/signal.h>
+#include <asm/thread_info.h>
 
 #include "../kernel/minstate.h"
 
@@ -87,18 +88,21 @@ END(sys32_sigsuspend)
 
 GLOBAL_ENTRY(ia32_ret_from_clone)
 	PT_REGS_UNWIND_INFO(0)
+#if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
 	/*
 	 * We need to call schedule_tail() to complete the scheduling process.
 	 * Called by ia64_switch_to after do_fork()->copy_thread().  r8 contains the
 	 * address of the previously executing task.
 	 */
 	br.call.sptk.many rp=ia64_invoke_schedule_tail
-.ret1:	adds r2=IA64_TASK_PTRACE_OFFSET,r13
+.ret1:
+#endif
+	adds r2=TI_FLAGS+IA64_TASK_SIZE,r13
 	;;
-	ld8 r2=[r2]
+	ld4 r2=[r2]
 	;;
 	mov r8=0
-	tbit.nz p6,p0=r2,PT_SYSCALLTRACE_BIT
+	tbit.nz p6,p0=r2,TIF_SYSCALL_TRACE
 (p6)	br.cond.spnt .ia32_strace_check_retval
 	;;					// prevent RAW on r8
 END(ia32_ret_from_clone)
