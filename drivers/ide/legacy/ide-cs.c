@@ -473,7 +473,7 @@ int ide_event(event_t event, int priority,
 static struct pcmcia_driver ide_cs_driver = {
 	.owner		= THIS_MODULE,
 	.drv		= {
-		.name	= "ide_cs",
+		.name	= "ide-cs",
 	},
 	.attach		= ide_attach,
 	.detach		= ide_detach,
