@@ -1351,8 +1351,12 @@ A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
 	A_PUT_OUTPUT(A_EXTOUT_LFE, playback+5 + SND_EMU10K1_PLAYBACK_CHANNELS);
 
 	/* ADC buffer */
+#ifdef EMU10K1_CAPTURE_DIGITAL_OUT
+	A_PUT_STEREO_OUTPUT(A_EXTOUT_ADC_CAP_L, A_EXTOUT_ADC_CAP_R, playback + SND_EMU10K1_PLAYBACK_CHANNELS);
+#else
 	A_PUT_OUTPUT(A_EXTOUT_ADC_CAP_L, capture);
 	A_PUT_OUTPUT(A_EXTOUT_ADC_CAP_R, capture+1);
+#endif
 
 	/*
 	 * ok, set up done..
