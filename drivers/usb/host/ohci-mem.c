@@ -42,12 +42,6 @@ static void ohci_hcd_free (struct usb_hcd *hcd)
 
 /*-------------------------------------------------------------------------*/
 
-#ifndef CONFIG_PCI
-#	error "usb-ohci currently requires PCI-based controllers"
-	/* to support non-PCI OHCIs, you need custom bus/mem/... glue */
-#endif
-
-
 /* Recover a TD/ED using its collision chain */
 static inline void *
 dma_to_ed_td (struct hash_list_t * entry, dma_addr_t dma)

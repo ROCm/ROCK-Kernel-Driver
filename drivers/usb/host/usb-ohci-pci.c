@@ -21,6 +21,12 @@
 #endif
 #endif
 
+int __devinit
+hc_add_ohci(struct pci_dev *dev, int irq, void *membase, unsigned long flags,
+	    ohci_t **ohci, const char *name, const char *slot_name);
+extern void hc_remove_ohci(ohci_t *ohci);
+extern int hc_start (ohci_t * ohci, struct device *parent_dev);
+extern int hc_reset (ohci_t * ohci);
 
 /*-------------------------------------------------------------------------*/
 
@@ -103,7 +109,8 @@ static void hc_restart (ohci_t *ohci)
 	ohci->ed_controltail = NULL;
 	ohci->ed_bulktail    = NULL;
 
-	if ((temp = hc_reset (ohci)) < 0 || (temp = hc_start (ohci)) < 0) {
+	if ((temp = hc_reset (ohci)) < 0 || 
+	    (temp = hc_start (ohci, &ohci->ohci_dev->dev)) < 0) {
 		err ("can't restart usb-%s, %d", ohci->ohci_dev->slot_name, temp);
 	} else
 		dbg ("restart usb-%s completed", ohci->ohci_dev->slot_name);
@@ -171,6 +178,7 @@ static void __devexit
 ohci_pci_remove (struct pci_dev *dev)
 {
 	ohci_t		*ohci = (ohci_t *) pci_get_drvdata(dev);
+	void		*membase = ohci->regs;
 
 	dbg ("remove %s controller usb-%s%s%s",
 		hcfs2string (ohci->hc_control & OHCI_CTRL_HCFS),
@@ -181,6 +189,9 @@ ohci_pci_remove (struct pci_dev *dev)
 
 	hc_remove_ohci(ohci);
 
+ 	/* unmap the IO address space */
+ 	iounmap (membase);
+ 
 	release_mem_region (pci_resource_start (dev, 0), pci_resource_len (dev, 0));
 }
 

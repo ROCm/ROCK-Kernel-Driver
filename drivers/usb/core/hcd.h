@@ -50,9 +50,9 @@ struct usb_hcd {	/* usb_bus.hcpriv points to this */
 	int			irq;		/* irq allocated */
 	void			*regs;		/* device memory/io */
 
-#ifdef	CONFIG_PCI
 	/* a few non-PCI controllers exist, mostly for OHCI */
 	struct pci_dev		*pdev;		/* pci is typical */
+#ifdef	CONFIG_PCI
 	int			region;		/* pci region for regs */
 	u32			pci_state [16];	/* for PM state save */
 	atomic_t		resume_count;	/* multiple resumes issue */

@@ -37,9 +37,9 @@ struct ed {
 			u8	int_period;
 			u8	int_branch;
 			u8	int_load; 
-		};
+		} intr_info;
 		u16		last_iso;	/* isochronous */
-	};
+	} intriso;
 
 	u8			state;		/* ED_{NEW,UNLINK,OPER} */
 #define ED_NEW 		0x00		/* unused, no dummy td */
@@ -331,6 +331,11 @@ struct hash_list_t {
 struct ohci_hcd {
 	spinlock_t		lock;
 
+        /*
+	 * parent device
+	 */
+        struct device		*parent_dev;
+
 	/*
 	 * I/O memory used to communicate with the HC (uncached);
 	 */
@@ -348,12 +353,10 @@ struct ohci_hcd {
 	struct ed		*ed_controltail;	/* last in ctrl list */
  	struct ed		*ed_isotail;		/* last in iso list */
 
-#ifdef CONFIG_PCI
 	struct pci_pool		*td_cache;
 	struct pci_pool		*ed_cache;
 	struct hash_list_t	td_hash [TD_HASH_SIZE];
 	struct hash_list_t	ed_hash [ED_HASH_SIZE];
-#endif
 
 	/*
 	 * driver state
