@@ -244,9 +244,6 @@ extern struct file_operations fat_dir_operations;
 extern int fat_search_long(struct inode *inode, const unsigned char *name,
 			   int name_len, int anycase,
 			   loff_t *spos, loff_t *lpos);
-extern int fat_readdir(struct file *filp, void *dirent, filldir_t filldir);
-extern int fat_dir_ioctl(struct inode * inode, struct file * filp,
-			 unsigned int cmd, unsigned long arg);
 extern int fat_add_entries(struct inode *dir, int slots, struct buffer_head **bh,
 			struct msdos_dir_entry **de, loff_t *i_pos);
 extern int fat_new_dir(struct inode *dir, struct inode *parent, int is_vfat);
@@ -270,13 +267,8 @@ extern void fat_detach(struct inode *inode);
 extern struct inode *fat_iget(struct super_block *sb, loff_t i_pos);
 extern struct inode *fat_build_inode(struct super_block *sb,
 			struct msdos_dir_entry *de, loff_t i_pos, int *res);
-extern void fat_delete_inode(struct inode *inode);
-extern void fat_clear_inode(struct inode *inode);
-extern void fat_put_super(struct super_block *sb);
 int fat_fill_super(struct super_block *sb, void *data, int silent,
 		   struct inode_operations *fs_dir_inode_ops, int isvfat);
-extern int fat_statfs(struct super_block *sb, struct kstatfs *buf);
-extern int fat_write_inode(struct inode *inode, int wait);
 extern int fat_notify_change(struct dentry * dentry, struct iattr * attr);
 
 /* fat/misc.c */

@@ -22,6 +22,10 @@
 
 #include <asm/uaccess.h>
 
+static int fat_dir_ioctl(struct inode * inode, struct file * filp,
+		  unsigned int cmd, unsigned long arg);
+static int fat_readdir(struct file *filp, void *dirent, filldir_t filldir);
+
 struct file_operations fat_dir_operations = {
 	.read		= generic_read_dir,
 	.readdir	= fat_readdir,
@@ -567,7 +571,7 @@ out:
 	return ret;
 }
 
-int fat_readdir(struct file *filp, void *dirent, filldir_t filldir)
+static int fat_readdir(struct file *filp, void *dirent, filldir_t filldir)
 {
 	struct inode *inode = filp->f_dentry->d_inode;
 	return fat_readdirx(inode, filp, dirent, filldir, 0, 0);
@@ -624,7 +628,7 @@ efault:
 	return -EFAULT;
 }
 
-int fat_dir_ioctl(struct inode * inode, struct file * filp,
+static int fat_dir_ioctl(struct inode * inode, struct file * filp,
 		  unsigned int cmd, unsigned long arg)
 {
 	struct fat_ioctl_filldir_callback buf;

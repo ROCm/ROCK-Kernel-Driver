@@ -31,6 +31,9 @@
 static int fat_default_codepage = CONFIG_FAT_DEFAULT_CODEPAGE;
 static char fat_default_iocharset[] = CONFIG_FAT_DEFAULT_IOCHARSET;
 
+static int fat_statfs(struct super_block *sb, struct kstatfs *buf);
+static void fat_write_inode(struct inode *inode, int wait);
+
 /*
  * New FAT inode stuff. We do the following:
  *	a) i_ino is constant and has nothing with on-disk location.
@@ -143,7 +146,7 @@ out:
 	return inode;
 }
 
-void fat_delete_inode(struct inode *inode)
+static void fat_delete_inode(struct inode *inode)
 {
 	if (!is_bad_inode(inode)) {
 		inode->i_size = 0;
@@ -152,7 +155,7 @@ void fat_delete_inode(struct inode *inode)
 	clear_inode(inode);
 }
 
-void fat_clear_inode(struct inode *inode)
+static void fat_clear_inode(struct inode *inode)
 {
 	if (is_bad_inode(inode))
 		return;
@@ -164,7 +167,7 @@ void fat_clear_inode(struct inode *inode)
 	unlock_kernel();
 }
 
-void fat_put_super(struct super_block *sb)
+static void fat_put_super(struct super_block *sb)
 {
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 
@@ -1072,7 +1075,7 @@ out_fail:
 	return error;
 }
 
-int fat_statfs(struct super_block *sb, struct kstatfs *buf)
+static int fat_statfs(struct super_block *sb, struct kstatfs *buf)
 {
 	int free, nr, ret;
        
