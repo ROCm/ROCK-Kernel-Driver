@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
+ * (C) Copyright IBM Corp. 2001, 2003
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001-2003 International Business Machines, Corp.
  * Copyright (c) 2001-2003 Intel Corp.
  *
  * This file is part of the SCTP kernel reference Implementation
@@ -40,6 +40,7 @@
  *    Sridhar Samudrala     <sri@us.ibm.com>
  *    Ardelle Fan           <ardelle.fan@intel.com>
  *    Ryan Layer            <rmlayer@us.ibm.com>
+ *    Kevin Gao             <kevin.gao@intel.com> 
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -145,6 +146,7 @@ int sctp_primitive_SHUTDOWN(struct sctp_association *, void *arg);
 int sctp_primitive_ABORT(struct sctp_association *, void *arg);
 int sctp_primitive_SEND(struct sctp_association *, void *arg);
 int sctp_primitive_REQUESTHEARTBEAT(struct sctp_association *, void *arg);
+int sctp_primitive_ASCONF(struct sctp_association *, void *arg);
 
 /*
  * sctp/crc32c.c

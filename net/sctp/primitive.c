@@ -39,6 +39,7 @@
  *    Narasimha Budihal     <narasimha@refcode.org>
  *    Karl Knutson          <karl@athena.chicago.il.us>
  *    Ardelle Fan	    <ardelle.fan@intel.com>
+ *    Kevin Gao             <kevin.gao@intel.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -203,3 +204,16 @@ DECLARE_PRIMITIVE(SEND);
  */
 
 DECLARE_PRIMITIVE(REQUESTHEARTBEAT);
+
+/* ADDIP
+* 3.1.1 Address Configuration Change Chunk (ASCONF)
+* 
+* This chunk is used to communicate to the remote endpoint one of the
+* configuration change requests that MUST be acknowledged.  The
+* information carried in the ASCONF Chunk uses the form of a
+* Type-Length-Value (TLV), as described in "3.2.1 Optional/
+* Variable-length Parameter Format" in RFC2960 [5], forall variable
+* parameters.
+*/
+
+DECLARE_PRIMITIVE(ASCONF);

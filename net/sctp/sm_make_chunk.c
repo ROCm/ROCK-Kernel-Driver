@@ -1,8 +1,8 @@
 /* SCTP kernel reference Implementation
+ * Copyright (C) IBM Corp. 2001, 2003
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
  * Copyright (c) 2001-2002 Intel Corp.
- * Copyright (c) 2001-2002 International Business Machines Corp.
  *
  * This file is part of the SCTP kernel reference Implementation
  *
@@ -48,6 +48,7 @@
  *    Sridhar Samudrala	    <sri@us.ibm.com>
  *    Daisy Chang	    <daisyc@us.ibm.com>
  *    Ardelle Fan	    <ardelle.fan@intel.com>
+ *    Kevin Gao             <kevin.gao@intel.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -2135,7 +2136,50 @@ struct sctp_chunk *sctp_make_asconf(struct sctp_association *asoc,
 	retval->subh.addip_hdr =
 		sctp_addto_chunk(retval, sizeof(asconf), &asconf);
 	retval->param_hdr.v =
-		sctp_addto_chunk(retval, addrlen, &addr);
+		sctp_addto_chunk(retval, addrlen, &addrparam);
+
+	return retval;
+}
+
+/* ADDIP
+ * 3.2.4 Set Primary IP Address
+ *	0                   1                   2                   3
+ *	0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+ *     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *     |        Type =0xC004           |    Length = Variable          |
+ *     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *     |               ASCONF-Request Correlation ID                   |
+ *     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *     |                       Address Parameter                       |
+ *     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *
+ * Create an ASCONF chunk with Set Primary IP address parameter. 
+ */
+struct sctp_chunk *sctp_make_asconf_set_prim(struct sctp_association *asoc,
+					     union sctp_addr *addr)
+{
+	sctp_addip_param_t	param;
+	struct sctp_chunk 	*retval;
+	int 			len = sizeof(param);
+	union sctp_params	addrparam;
+	int			addrlen;
+
+	addrlen = sockaddr2sctp_addr(addr, (union sctp_addr_param *)&addrparam);
+	if (!addrlen)
+		return NULL;
+	len += addrlen;
+
+	/* Create the chunk and make asconf header. */
+	retval = sctp_make_asconf(asoc, addr, len);
+	if (!retval)
+		return NULL;
+
+	param.param_hdr.type = SCTP_PARAM_SET_PRIMARY;
+	param.param_hdr.length = htons(len);
+	param.crr_id = 0;
+
+	sctp_addto_chunk(retval, sizeof(param), &param);
+	sctp_addto_chunk(retval, addrlen, &addrparam);
 
 	return retval;
 }

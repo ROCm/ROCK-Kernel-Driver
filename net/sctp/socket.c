@@ -1,6 +1,7 @@
-/* Copyright (c) 1999-2000 Cisco, Inc.
+/* SCTP kernel reference Implementation
+ * (C) Copyright IBM Corp. 2001, 2003
+ * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001-2003 International Business Machines, Corp.
  * Copyright (c) 2001-2003 Intel Corp.
  * Copyright (c) 2001-2002 Nokia, Inc.
  * Copyright (c) 2001 La Monte H.P. Yarroll
@@ -50,6 +51,7 @@
  *    Ardelle Fan	    <ardelle.fan@intel.com>
  *    Ryan Layer	    <rmlayer@us.ibm.com>
  *    Anup Pemmaiah         <pemmaiah@cc.usu.edu>
+ *    Kevin Gao             <kevin.gao@intel.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -1522,7 +1524,7 @@ static int sctp_setsockopt_default_send_param(struct sock *sk,
 	return 0;
 }
 
-/* 7.1.10 Set Peer Primary Address (SCTP_PRIMARY_ADDR)
+/* 7.1.10 Set Primary Address (SCTP_PRIMARY_ADDR)
  *
  * Requests that the local SCTP stack use the enclosed peer address as
  * the association primary.  The enclosed address must be one of the
@@ -1727,6 +1729,62 @@ static int sctp_setsockopt_maxseg(struct sock *sk, char *optval, int optlen)
 	return 0;
 }
 
+
+/*
+ *  7.1.9 Set Peer Primary Address (SCTP_SET_PEER_PRIMARY_ADDR)
+ *
+ *   Requests that the peer mark the enclosed address as the association
+ *   primary. The enclosed address must be one of the association's
+ *   locally bound addresses. The following structure is used to make a
+ *   set primary request:
+ */
+static int sctp_setsockopt_peer_primary_addr(struct sock *sk, char *optval,
+					     int optlen)
+{
+	struct sctp_opt		*sp;
+	struct sctp_endpoint	*ep;
+	struct sctp_association	*asoc = NULL;
+	struct sctp_setpeerprim	prim;
+	struct sctp_chunk	*chunk;
+	int 			err;
+
+	sp = sctp_sk(sk);
+	ep = sp->ep;
+
+	if (optlen != sizeof(struct sctp_setpeerprim))
+		return -EINVAL;
+
+	if (copy_from_user(&prim, optval, optlen))
+		return -EFAULT;
+
+	asoc = sctp_id2assoc(sk, prim.sspp_assoc_id);
+	if (!asoc) 
+		return -EINVAL;
+
+	if (!sctp_state(asoc, ESTABLISHED))
+		return -ENOTCONN;
+
+	if (!sctp_assoc_lookup_laddr(asoc, (union sctp_addr *)&prim.sspp_addr))
+		return -EADDRNOTAVAIL;
+
+	/* Create an ASCONF chunk with SET_PRIMARY parameter	*/
+	chunk = sctp_make_asconf_set_prim(asoc,
+					  (union sctp_addr *)&prim.sspp_addr);
+	if (!chunk)
+		return -ENOMEM;
+
+	err = sctp_primitive_ASCONF(asoc, chunk);
+	if (err) {
+		sctp_chunk_free(chunk);
+		return err;
+	}
+
+	SCTP_DEBUG_PRINTK("We set peer primary addr primitively.\n");
+
+	return 0;
+}
+
+
 /* API 6.2 setsockopt(), getsockopt()
  *
  * Applications use setsockopt() and getsockopt() to set or retrieve
@@ -1808,6 +1866,9 @@ SCTP_STATIC int sctp_setsockopt(struct sock *sk, int level, int optname,
 		break;
 	case SCTP_PRIMARY_ADDR:
 		retval = sctp_setsockopt_primary_addr(sk, optval, optlen);
+		break;
+	case SCTP_SET_PEER_PRIMARY_ADDR:
+		retval = sctp_setsockopt_peer_primary_addr(sk, optval, optlen);
 		break;
 	case SCTP_NODELAY:
 		retval = sctp_setsockopt_nodelay(sk, optval, optlen);
