@@ -5,7 +5,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2000-2003 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 2000-2004 Silicon Graphics, Inc. All rights reserved.
  */
 
 #include <linux/init.h>
@@ -27,6 +27,8 @@
 #include <asm/delay.h>
 #include <asm/io.h>
 #include <asm/smp.h>
+#include <asm/numa.h>
+#include <asm/bitops.h>
 #include <asm/hw_irq.h>
 #include <asm/current.h>
 #include <asm/sn/sn_cpuid.h>
@@ -67,14 +69,56 @@ wait_piowc(void)
  *
  * Purges the translation caches of all processors of the given virtual address
  * range.
+ *
+ * Note:
+ * 	- cpu_vm_mask is a bit mask that indicates which cpus have loaded the context.
+ * 	- cpu_vm_mask is converted into a nodemask of the nodes containing the
+ * 	  cpus in cpu_vm_mask.
+ *	- if only one bit is set in cpu_vm_mask & it is the current cpu,
+ *	  then only the local TLB needs to be flushed. This flushing can be done
+ *	  using ptc.l. This is the common case & avoids the global spinlock.
+ *	- if multiple cpus have loaded the context, then flushing has to be
+ *	  done with ptc.g/MMRs under protection of the global ptc_lock.
  */
 
 void
 sn2_global_tlb_purge (unsigned long start, unsigned long end, unsigned long nbits)
 {
-	int			cnode, mycnode, nasid, flushed=0;
+	int			i, cnode, mynasid, cpu, lcpu=0, nasid, flushed=0;
 	volatile unsigned	long	*ptc0, *ptc1;
 	unsigned long		flags=0, data0, data1;
+	struct mm_struct	*mm=current->active_mm;
+	short			nasids[NR_NODES], nix;
+	DECLARE_BITMAP(nodes_flushed, NR_NODES);
+
+	CLEAR_BITMAP(nodes_flushed, NR_NODES);
+
+	i = 0;
+
+	for_each_cpu_mask(cpu, mm->cpu_vm_mask) {
+		cnode = cpu_to_node(cpu);
+		__set_bit(cnode, nodes_flushed);
+		lcpu = cpu;
+		i++;
+	}
+
+	preempt_disable();
+
+	if (likely(i == 1 && lcpu == smp_processor_id())) {
+		do {
+			ia64_ptcl(start, nbits<<2);
+			start += (1UL << nbits);
+		} while (start < end);
+		ia64_srlz_i();
+		preempt_enable();
+		return;
+	}
+
+	nix = 0;
+	for (cnode=find_first_bit(&nodes_flushed, NR_NODES); cnode < NR_NODES; 
+			cnode=find_next_bit(&nodes_flushed, NR_NODES, ++cnode))
+		nasids[nix++] = cnodeid_to_nasid(cnode);
+
 
 	data0 = (1UL<<SH_PTC_0_A_SHFT) |
 		(nbits<<SH_PTC_0_PS_SHFT) |
@@ -84,20 +128,19 @@ sn2_global_tlb_purge (unsigned long start, unsigned long end, unsigned long nbit
 	ptc0 = (long*)GLOBAL_MMR_PHYS_ADDR(0, SH_PTC_0);
 	ptc1 = (long*)GLOBAL_MMR_PHYS_ADDR(0, SH_PTC_1);
 
-	mycnode = numa_node_id();
+
+	mynasid = smp_physical_node_id();
 
 	spin_lock_irqsave(&sn2_global_ptc_lock, flags);
 
 	do {
 		data1 = start | (1UL<<SH_PTC_1_START_SHFT);
-		for (cnode = 0; cnode < numnodes; cnode++) {
-			if (is_headless_node(cnode))
-				continue;
-			if (cnode == mycnode) {
+		for (i=0; i<nix; i++) {
+			nasid = nasids[i];
+			if (likely(nasid == mynasid)) {
 				ia64_ptcga(start, nbits<<2);
 				ia64_srlz_i();
 			} else {
-				nasid = cnodeid_to_nasid(cnode);
 				ptc0 = CHANGE_NASID(nasid, ptc0);
 				ptc1 = CHANGE_NASID(nasid, ptc1);
 				pio_atomic_phys_write_mmrs(ptc0, data0, ptc1, data1);
@@ -115,6 +158,7 @@ sn2_global_tlb_purge (unsigned long start, unsigned long end, unsigned long nbit
 
 	spin_unlock_irqrestore(&sn2_global_ptc_lock, flags);
 
+	preempt_enable();
 }
 
 /*
