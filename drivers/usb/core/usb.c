@@ -1162,10 +1162,15 @@ struct urb * usb_get_urb(struct urb *urb)
  */
 int usb_submit_urb(struct urb *urb, int mem_flags)
 {
-	if (urb && urb->dev && urb->dev->bus && urb->dev->bus->op)
+
+	if (urb && urb->dev && urb->dev->bus && urb->dev->bus->op) {
+		if (usb_maxpacket(urb->dev, urb->pipe, usb_pipeout(urb->pipe)) <= 0) {
+			err("%s: pipe %x has invalid size (<= 0)", __FUNCTION__, urb->pipe);
+			return -EMSGSIZE;
+		}
 		return urb->dev->bus->op->submit_urb(urb, mem_flags);
-	else
-		return -ENODEV;
+	}
+	return -ENODEV;
 }
 
 /*-------------------------------------------------------------------*/
