@@ -201,7 +201,7 @@ static void psmouse_interrupt(struct serio *serio, unsigned char data, unsigned 
 	psmouse->packet[psmouse->pktcnt++] = data;
 
 	if (psmouse->pktcnt == 3 + (psmouse->type >= PSMOUSE_GENPS)) {
-		if ((psmouse->packet[0] & 0x08) == 0x08) psmouse_process_packet(psmouse);
+		psmouse_process_packet(psmouse);
 		psmouse->pktcnt = 0;
 		return;
 	}
