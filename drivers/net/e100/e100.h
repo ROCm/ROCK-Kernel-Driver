@@ -97,6 +97,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <asm/processor.h>
 #include <linux/ethtool.h>
 #include <linux/inetdevice.h>
+#include <linux/bitops.h>
 
 #include <linux/if.h>
 #include <asm/uaccess.h>
