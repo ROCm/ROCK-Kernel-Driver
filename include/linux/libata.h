@@ -27,6 +27,7 @@
 #include <linux/interrupt.h>
 #include <asm/io.h>
 #include <linux/ata.h>
+#include <linux/workqueue.h>
 
 /*
  * compile-time options
@@ -150,7 +151,6 @@ enum {
 	THR_PIO_LAST		= (THR_PIO + 1),
 	THR_PIO_LAST_POLL	= (THR_PIO_LAST + 1),
 	THR_PIO_ERR		= (THR_PIO_LAST_POLL + 1),
-	THR_PACKET		= (THR_PIO_ERR + 1),
 
 	/* SATA port states */
 	PORT_UNKNOWN		= 0,
@@ -316,6 +316,8 @@ struct ata_port {
 	struct semaphore	thr_sem;
 	struct timer_list	thr_timer;
 	unsigned long		thr_timeout;
+
+	struct work_struct	packet_task;
 
 	void			*private_data;
 };

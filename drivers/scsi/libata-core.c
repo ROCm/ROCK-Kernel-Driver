@@ -35,6 +35,7 @@
 #include <linux/timer.h>
 #include <linux/interrupt.h>
 #include <linux/suspend.h>
+#include <linux/workqueue.h>
 #include <scsi/scsi.h>
 #include "scsi.h"
 #include "hosts.h"
@@ -44,7 +45,6 @@
 
 #include "libata.h"
 
-static void atapi_cdb_send(struct ata_port *ap);
 static unsigned int ata_busy_sleep (struct ata_port *ap,
 				    unsigned long tmout_pat,
 			    	    unsigned long tmout);
@@ -59,6 +59,7 @@ static void ata_set_mode(struct ata_port *ap);
 static int ata_qc_issue_prot(struct ata_queued_cmd *qc);
 
 static unsigned int ata_unique_id = 1;
+struct workqueue_struct *ata_wq = NULL;
 
 MODULE_AUTHOR("Jeff Garzik");
 MODULE_DESCRIPTION("Library module for ATA devices");
@@ -78,7 +79,6 @@ static const char * thr_state_name[] = {
 	"THR_PIO_LAST",
 	"THR_PIO_LAST_POLL",
 	"THR_PIO_ERR",
-	"THR_PACKET",
 };
 
 /**
@@ -2785,10 +2785,6 @@ static unsigned long ata_thread_iter(struct ata_port *ap)
 		timeout = 11 * HZ;
 		break;
 
-	case THR_PACKET:
-		atapi_cdb_send(ap);
-		break;
-
 	default:
 		printk(KERN_DEBUG "ata%u: unknown thr state %s\n",
 		       ap->id, ata_thr_state_name(ap->thr_state));
@@ -2825,10 +2821,10 @@ static int ata_thread (void *data)
 
                 if (signal_pending (current))
                         flush_signals(current);
-                        
+
                 if (current->flags & PF_FREEZE)
 			refrigerator(PF_FREEZE);
-                                                        
+
 
                 if ((timeout < 0) || (ap->time_to_die))
                         break;
@@ -2879,8 +2875,8 @@ static int ata_thread_kill(struct ata_port *ap)
 }
 
 /**
- *	atapi_cdb_send - Write CDB bytes to hardware
- *	@ap: Port to which ATAPI device is attached.
+ *	atapi_packet_task - Write CDB bytes to hardware
+ *	@_data: Port to which ATAPI device is attached.
  *
  *	When device has indicated its readiness to accept
  *	a CDB, this function is called.  Send the CDB.
@@ -2892,8 +2888,9 @@ static int ata_thread_kill(struct ata_port *ap)
  *	Kernel thread context (may sleep)
  */
 
-static void atapi_cdb_send(struct ata_port *ap)
+static void atapi_packet_task(void *_data)
 {
+	struct ata_port *ap = _data;
 	struct ata_queued_cmd *qc;
 	u8 status;
 
@@ -2916,6 +2913,8 @@ static void atapi_cdb_send(struct ata_port *ap)
 	DPRINTK("send cdb\n");
 	outsl(ap->ioaddr.data_addr,
 	      qc->scsicmd->cmnd, ap->host->max_cmd_len / 4);
+
+	/* FIXME: start DMA here */
 
 	/* if we are DMA'ing, irq handler takes over from here */
 	if (qc->tf.feature == ATAPI_PKT_DMA)
@@ -2951,7 +2950,7 @@ int ata_port_start (struct ata_port *ap)
 	ap->prd = pci_alloc_consistent(pdev, ATA_PRD_TBL_SZ, &ap->prd_dma);
 	if (!ap->prd)
 		return -ENOMEM;
-	
+
 	DPRINTK("prd alloc, virt %p, dma %llx\n", ap->prd, (unsigned long long) ap->prd_dma);
 
 	return 0;
@@ -3029,6 +3028,7 @@ static void ata_host_init(struct ata_port *ap, struct Scsi_Host *host,
 	/* ata_engine init */
 	ap->eng.flags = 0;
 	INIT_LIST_HEAD(&ap->eng.q);
+	INIT_WORK(&ap->packet_task, atapi_packet_task, ap);
 
 	for (i = 0; i < ATA_MAX_DEVICES; i++)
 		ap->device[i].devno = i;
@@ -3557,11 +3557,21 @@ int pci_test_config_bits(struct pci_dev *pdev, struct pci_bits *bits)
 
 static int __init ata_init(void)
 {
+	ata_wq = create_workqueue("ata");
+	if (!ata_wq)
+		return -ENOMEM;
+
 	printk(KERN_DEBUG "libata version " DRV_VERSION " loaded.\n");
 	return 0;
 }
 
+static void __exit ata_exit(void)
+{
+	destroy_workqueue(ata_wq);
+}
+
 module_init(ata_init);
+module_exit(ata_exit);
 
 /*
  * libata is essentially a library of internal helper functions for

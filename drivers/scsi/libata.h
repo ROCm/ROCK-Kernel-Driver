@@ -35,6 +35,7 @@ struct ata_scsi_args {
 	void			(*done)(struct scsi_cmnd *);
 };
 
+extern struct workqueue_struct *ata_wq;
 
 /* libata-core.c */
 extern void ata_dev_id_string(struct ata_device *dev, unsigned char *s,

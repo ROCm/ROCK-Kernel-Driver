@@ -29,6 +29,7 @@
 #include "scsi.h"
 #include "hosts.h"
 #include <linux/libata.h>
+#include <linux/workqueue.h>
 
 #include "libata.h"
 
@@ -950,7 +951,7 @@ static void atapi_scsi_queuecmd(struct ata_port *ap, struct ata_device *dev,
 
 	status = ata_busy_wait(ap, ATA_BUSY, 1000);
 	if (status & ATA_BUSY) {
-		ata_thread_wake(ap, THR_PACKET);
+		queue_work(ata_wq, &ap->packet_task);
 		return;
 	}
 	if ((status & ATA_DRQ) == 0)
@@ -961,7 +962,7 @@ static void atapi_scsi_queuecmd(struct ata_port *ap, struct ata_device *dev,
 	outsl(ap->ioaddr.data_addr, scsicmd, ap->host->max_cmd_len / 4);
 
 	if (!doing_dma)
-		ata_thread_wake(ap, THR_PACKET);
+		queue_work(ata_wq, &ap->packet_task);
 
 	VPRINTK("EXIT\n");
 	return;
