@@ -638,16 +638,22 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 				goto inval;
 
 			field = report->field[uref->field_index];
-			if (uref->usage_index >= field->maxusage)
+
+			if (cmd == HIDIOCGCOLLECTIONINDEX) {
+				if (uref->usage_index >= field->maxusage)
+					goto inval;
+			} else if (uref->usage_index >= field->report_count)
 				goto inval;
 
-			if (cmd == HIDIOCGUSAGES || cmd == HIDIOCSUSAGES) {
-				if (uref_multi->num_values >= HID_MAX_USAGES || 
-				    uref->usage_index >= field->maxusage || 
-				   (uref->usage_index + uref_multi->num_values) >= field->maxusage)
-					goto inval;
+			else if ((cmd == HIDIOCGUSAGES ||
+				  cmd == HIDIOCSUSAGES) &&
+				 (uref->usage_index + uref_multi->num_values >=
+				  field->report_count ||
+				  uref->usage_index + uref_multi->num_values <
+				  uref->usage_index))
+				goto inval;
+
 			}
-		}
 
 		switch (cmd) {
 			case HIDIOCGUSAGE:

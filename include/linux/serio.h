@@ -17,6 +17,7 @@
 #ifdef __KERNEL__
 
 #include <linux/list.h>
+#include <linux/spinlock.h>
 
 struct serio {
 	void *private;
@@ -32,11 +33,13 @@ struct serio {
 	unsigned long type;
 	unsigned long event;
 
+	spinlock_t lock;
+
 	int (*write)(struct serio *, unsigned char);
 	int (*open)(struct serio *);
 	void (*close)(struct serio *);
 
-	struct serio_dev *dev;
+	struct serio_dev *dev; /* Accessed from interrupt, writes must be protected by serio_lock */
 
 	struct list_head node;
 };

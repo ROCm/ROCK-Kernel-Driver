@@ -142,34 +142,45 @@ static irqreturn_t psmouse_interrupt(struct serio *serio,
 			printk(KERN_WARNING "psmouse.c: bad data from KBC -%s%s\n",
 				flags & SERIO_TIMEOUT ? " timeout" : "",
 				flags & SERIO_PARITY ? " bad parity" : "");
-		if (psmouse->acking) {
-			psmouse->ack = -1;
-			psmouse->acking = 0;
-		}
-		psmouse->pktcnt = 0;
+		psmouse->nak = 1;
+		clear_bit(PSMOUSE_FLAG_ACK, &psmouse->flags);
+		clear_bit(PSMOUSE_FLAG_CMD,  &psmouse->flags);
 		goto out;
 	}
 
-	if (psmouse->acking) {
+	if (test_bit(PSMOUSE_FLAG_ACK, &psmouse->flags))
 		switch (data) {
 			case PSMOUSE_RET_ACK:
-				psmouse->ack = 1;
+				psmouse->nak = 0;
+				clear_bit(PSMOUSE_FLAG_ACK, &psmouse->flags);
+				goto out;
 				break;
 			case PSMOUSE_RET_NAK:
-				psmouse->ack = -1;
-				break;
+				psmouse->nak = 1;
+				clear_bit(PSMOUSE_FLAG_ACK, &psmouse->flags);
+				goto out;
 			default:
-				psmouse->ack = 1;	/* Workaround for mice which don't ACK the Get ID command */
-				if (psmouse->cmdcnt)
-					psmouse->cmdbuf[--psmouse->cmdcnt] = data;
-				break;
-		}
-		psmouse->acking = 0;
-		goto out;
-	}
+				psmouse->nak = 0;	/* Workaround for mice which don't ACK the Get ID command */
+				clear_bit(PSMOUSE_FLAG_ACK, &psmouse->flags);
+				if (!test_bit(PSMOUSE_FLAG_CMD, &psmouse->flags))
+					goto out;
 
-	if (psmouse->cmdcnt) {
-		psmouse->cmdbuf[--psmouse->cmdcnt] = data;
+		}
+
+	if (test_bit(PSMOUSE_FLAG_CMD, &psmouse->flags)) {
+
+		psmouse->cmdcnt--;
+		psmouse->cmdbuf[psmouse->cmdcnt] = data;
+
+		if (psmouse->cmdcnt == 1) {
+			if (data != 0xab && data != 0xac)
+				clear_bit(PSMOUSE_FLAG_ID, &psmouse->flags);
+			clear_bit(PSMOUSE_FLAG_CMD1, &psmouse->flags);
+		}
+
+		if (!psmouse->cmdcnt)
+			clear_bit(PSMOUSE_FLAG_CMD, &psmouse->flags);
+
 		goto out;
 	}
 
@@ -242,18 +253,15 @@ out:
 
 static int psmouse_sendbyte(struct psmouse *psmouse, unsigned char byte)
 {
-	int timeout = 10000; /* 100 msec */
-	psmouse->ack = 0;
-	psmouse->acking = 1;
+	int timeout = 200000; /* 200 msec */
 
-	if (serio_write(psmouse->serio, byte)) {
-		psmouse->acking = 0;
+	set_bit(PSMOUSE_FLAG_ACK, &psmouse->flags);
+	if (serio_write(psmouse->serio, byte))
 		return -1;
-	}
+	while (test_bit(PSMOUSE_FLAG_ACK, &psmouse->flags) && timeout--) udelay(1);
+	clear_bit(PSMOUSE_FLAG_ACK, &psmouse->flags);
 
-	while (!psmouse->ack && timeout--) udelay(10);
-
-	return -(psmouse->ack <= 0);
+	return -psmouse->nak;
 }
 
 /*
@@ -271,45 +279,61 @@ int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command)
 	psmouse->cmdcnt = receive;
 
 	if (command == PSMOUSE_CMD_RESET_BAT)
-                timeout = 4000000; /* 4 sec */
+		timeout = 4000000; /* 4 sec */
 
-	/* initialize cmdbuf with preset values from param */
-	if (receive)
-	   for (i = 0; i < receive; i++)
-		psmouse->cmdbuf[(receive - 1) - i] = param[i];
+	if (receive && param)
+		for (i = 0; i < receive; i++)
+			psmouse->cmdbuf[(receive - 1) - i] = param[i];
+
+	if (receive) {
+		set_bit(PSMOUSE_FLAG_CMD, &psmouse->flags);
+		set_bit(PSMOUSE_FLAG_CMD1, &psmouse->flags);
+		set_bit(PSMOUSE_FLAG_ID, &psmouse->flags);
+	}
 
 	if (command & 0xff)
-		if (psmouse_sendbyte(psmouse, command & 0xff))
-			return (psmouse->cmdcnt = 0) - 1;
+		if (psmouse_sendbyte(psmouse, command & 0xff)) {
+			clear_bit(PSMOUSE_FLAG_CMD, &psmouse->flags);
+			return -1;
+		}
 
 	for (i = 0; i < send; i++)
-		if (psmouse_sendbyte(psmouse, param[i]))
-			return (psmouse->cmdcnt = 0) - 1;
+		if (psmouse_sendbyte(psmouse, param[i])) {
+			clear_bit(PSMOUSE_FLAG_CMD, &psmouse->flags);
+			return -1;
+		}
 
-	while (psmouse->cmdcnt && timeout--) {
+	while (test_bit(PSMOUSE_FLAG_CMD, &psmouse->flags) && timeout--) {
 
-		if (psmouse->cmdcnt == 1 && command == PSMOUSE_CMD_RESET_BAT &&
-				timeout > 100000) /* do not run in a endless loop */
-			timeout = 100000; /* 1 sec */
+		if (!test_bit(PSMOUSE_FLAG_CMD1, &psmouse->flags)) {
+		    
+			if (command == PSMOUSE_CMD_RESET_BAT && timeout > 100000)
+				timeout = 100000;
 
-		if (psmouse->cmdcnt == 1 && command == PSMOUSE_CMD_GETID &&
-		    psmouse->cmdbuf[1] != 0xab && psmouse->cmdbuf[1] != 0xac) {
-			psmouse->cmdcnt = 0;
-			break;
+			if (command == PSMOUSE_CMD_GETID && !test_bit(PSMOUSE_FLAG_ID, &psmouse->flags)) {
+				clear_bit(PSMOUSE_FLAG_CMD, &psmouse->flags);
+				psmouse->cmdcnt = 0;
+				break;
+			}
 		}
 
 		udelay(1);
 	}
 
-	for (i = 0; i < receive; i++)
-		param[i] = psmouse->cmdbuf[(receive - 1) - i];
+	clear_bit(PSMOUSE_FLAG_CMD, &psmouse->flags);
+
+	if (param)
+		for (i = 0; i < receive; i++)
+			param[i] = psmouse->cmdbuf[(receive - 1) - i];
+
+	if (command == PSMOUSE_CMD_RESET_BAT && psmouse->cmdcnt == 1)
+		return 0;
 
 	if (psmouse->cmdcnt)
-		return (psmouse->cmdcnt = 0) - 1;
+		return -1;
 
 	return 0;
 }
-
 
 /*
  * psmouse_sliced_command() sends an extended PS/2 command to the mouse
@@ -735,7 +759,12 @@ static int psmouse_reconnect(struct serio *serio)
 	}
 
 	psmouse->state = PSMOUSE_CMD_MODE;
-	psmouse->acking = psmouse->cmdcnt = psmouse->pktcnt = psmouse->out_of_sync = 0;
+
+	clear_bit(PSMOUSE_FLAG_ACK, &psmouse->flags);
+	clear_bit(PSMOUSE_FLAG_CMD,  &psmouse->flags);
+
+	psmouse->pktcnt = psmouse->out_of_sync = 0;
+
 	if (psmouse->reconnect) {
 	       if (psmouse->reconnect(psmouse))
 			return -1;
