@@ -1,4 +1,4 @@
-/* $Id: kcapi.c,v 1.1.2.4 2004/02/10 01:07:11 keil Exp $
+/* $Id: kcapi.c,v 1.1.2.5 2004/03/15 12:32:31 armin Exp $
  * 
  * Kernel CAPI 2.0 Module
  * 
@@ -31,7 +31,7 @@
 #include <linux/b1lli.h>
 #endif
 
-static char *revision = "$Revision: 1.1.2.4 $";
+static char *revision = "$Revision: 1.1.2.5 $";
 
 /* ------------------------------------------------------------- */
 
@@ -242,7 +242,9 @@ static void notify_up(u32 contr)
 	struct capi20_appl *ap;
 	u16 applid;
 
-        printk(KERN_DEBUG "kcapi: notify up contr %d\n", contr);
+	if (showcapimsgs & 1) {
+	        printk(KERN_DEBUG "kcapi: notify up contr %d\n", contr);
+	}
 
 	for (applid = 1; applid <= CAPI_MAXAPPL; applid++) {
 		ap = get_capi_appl_by_nr(applid);
@@ -258,7 +260,9 @@ static void notify_down(u32 contr)
 	struct capi20_appl *ap;
 	u16 applid;
 
-        printk(KERN_DEBUG "kcapi: notify down contr %d\n", contr);
+	if (showcapimsgs & 1) {
+        	printk(KERN_DEBUG "kcapi: notify down contr %d\n", contr);
+	}
 
 	for (applid = 1; applid <= CAPI_MAXAPPL; applid++) {
 		ap = get_capi_appl_by_nr(applid);
@@ -565,7 +569,9 @@ u16 capi20_register(struct capi20_appl *ap)
 			continue;
 		register_appl(capi_cards[i], applid, &ap->rparam);
 	}
-	printk(KERN_DEBUG "kcapi: appl %d up\n", applid);
+	if (showcapimsgs & 1) {
+		printk(KERN_DEBUG "kcapi: appl %d up\n", applid);
+	}
 
 	return CAPI_NOERROR;
 }
@@ -584,7 +590,9 @@ u16 capi20_release(struct capi20_appl *ap)
 		release_appl(capi_cards[i], ap->applid);
 	}
 	capi_applications[ap->applid - 1] = NULL;
-	printk(KERN_DEBUG "kcapi: appl %d down\n", ap->applid);
+	if (showcapimsgs & 1) {
+		printk(KERN_DEBUG "kcapi: appl %d down\n", ap->applid);
+	}
 
 	return CAPI_NOERROR;
 }
