@@ -10,6 +10,7 @@
 #include "linux/sched.h"
 #include "asm/processor.h"
 #include "asm/page.h"
+#include "asm/fixmap.h"
 
 extern pgd_t swapper_pg_dir[1024];
 
