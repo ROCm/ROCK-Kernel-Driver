@@ -666,9 +666,9 @@ static int tg3_phy_reset(struct tg3 *tp, int force)
 	if ((phy_status & BMSR_LSTATUS) != 0 && (force == 0))
 		return 0;
 
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5703 ||
-	    GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5704 ||
-	    GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703 ||
+	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704 ||
+	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) {
 		err = tg3_phy_reset_5703_4_5(tp);
 		if (err)
 			return err;
