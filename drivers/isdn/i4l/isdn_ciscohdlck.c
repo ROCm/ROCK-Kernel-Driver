@@ -164,7 +164,7 @@ isdn_net_ciscohdlck_slarp_send_keepalive(unsigned long data)
 	p += put_u32(p, lp->cisco_yourseq);
 	p += put_u16(p, 0xffff); // reliablity, always 0xffff
 
-	isdn_net_write_super(lp, skb);
+	isdn_net_write_super(idev, skb);
 
 	lp->cisco_timer.expires = jiffies + lp->cisco_keepalive_period * HZ;
 	
@@ -174,6 +174,7 @@ isdn_net_ciscohdlck_slarp_send_keepalive(unsigned long data)
 static void
 isdn_net_ciscohdlck_slarp_send_request(isdn_net_local *lp)
 {
+	isdn_net_dev *idev = lp->netdev;
 	struct sk_buff *skb;
 	unsigned char *p;
 
@@ -194,7 +195,7 @@ isdn_net_ciscohdlck_slarp_send_request(isdn_net_local *lp)
 	p += put_u32(p, 0); // netmask
 	p += put_u16(p, 0); // unused
 
-	isdn_net_write_super(lp, skb);
+	isdn_net_write_super(idev, skb);
 }
 
 static void 
@@ -218,7 +219,7 @@ isdn_ciscohdlck_connected(isdn_net_local *lp)
 		lp->cisco_timer.expires = jiffies + lp->cisco_keepalive_period * HZ;
 		add_timer(&lp->cisco_timer);
 	}
-	isdn_net_device_wake_queue(lp);
+	isdn_net_dev_wake_queue(lp->netdev);
 }
 
 static void 
@@ -232,6 +233,7 @@ isdn_ciscohdlck_disconnected(isdn_net_local *lp)
 static void
 isdn_net_ciscohdlck_slarp_send_reply(isdn_net_local *lp)
 {
+	isdn_net_dev *idev = lp->netdev;
 	struct sk_buff *skb;
 	unsigned char *p;
 	struct in_device *in_dev = NULL;
@@ -265,7 +267,7 @@ isdn_net_ciscohdlck_slarp_send_reply(isdn_net_local *lp)
 	p += put_u32(p, mask);	// netmask
 	p += put_u16(p, 0);	// unused
 
-	isdn_net_write_super(lp, skb);
+	isdn_net_write_super(idev, skb);
 }
 
 static void

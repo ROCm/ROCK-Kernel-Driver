@@ -585,7 +585,6 @@ static unsigned int
 isdn_ppp_poll(struct file *file, poll_table * wait)
 {
 	unsigned int mask;
-	unsigned long flags;
 	struct ippp_struct *is;
 
 	is = file->private_data;
@@ -782,7 +781,7 @@ isdn_ppp_write(struct file *file, const char *buf, size_t count, loff_t *off)
 
 			isdn_ppp_send_ccp(idev,&idev->local,skb); /* keeps CCP/compression states in sync */
 
-			isdn_net_write_super(&idev->local, skb);
+			isdn_net_write_super(idev, skb);
 		}
 	}
 	retval = count;
@@ -1127,7 +1126,7 @@ static unsigned char *isdn_ppp_skb_push(struct sk_buff **skb_p,int len)
 int
 isdn_ppp_xmit(struct sk_buff *skb, struct net_device *netdev)
 {
-	isdn_net_local *lp,*mlp;
+	isdn_net_local *mlp;
 	isdn_net_dev *idev;
 	isdn_net_dev *nd;
 	unsigned int proto = PPP_IP;     /* 0x21 */
@@ -1166,13 +1165,12 @@ isdn_ppp_xmit(struct sk_buff *skb, struct net_device *netdev)
 			return 0;
 	}
 
-	lp = isdn_net_get_locked_lp(nd);
-	if (!lp) {
+	idev = isdn_net_get_locked_dev(nd);
+	if (!idev) {
 		printk(KERN_WARNING "%s: all channels busy - requeuing!\n", netdev->name);
 		return 1;
 	}
 	/* we have our lp locked from now on */
-	idev = lp->netdev;
 	slot = idev->ppp_slot;
 	if (slot < 0 || slot > ISDN_MAX_CHANNELS) {
 		printk(KERN_ERR "isdn_ppp_xmit: lp->ppp_slot(%d)\n",
@@ -1325,10 +1323,10 @@ isdn_ppp_xmit(struct sk_buff *skb, struct net_device *netdev)
 		isdn_ppp_frame_log("xmit", skb->data, skb->len, 32,ipt->unit,idev->ppp_slot);
 	}
 	
-	isdn_net_writebuf_skb(lp, skb);
+	isdn_net_writebuf_skb(idev, skb);
 
  unlock:
-	spin_unlock_bh(&lp->xmit_lock);
+	spin_unlock_bh(&idev->xmit_lock);
 	return 0;
 }
 
@@ -1938,7 +1936,7 @@ isdn_ppp_dial_slave(char *name)
 	if (!sdev)
 		return 2;
 
-	isdn_net_dial_req((isdn_net_local *) sdev->priv);
+	isdn_net_dial_req(((isdn_net_local *) sdev->priv)->netdev);
 	return 0;
 #else
 	return -1;
@@ -2079,7 +2077,7 @@ static void isdn_ppp_ccp_xmit_reset(struct ippp_struct *is, int proto,
 	printk(KERN_DEBUG "Sending CCP Frame:\n");
 	isdn_ppp_frame_log("ccp-xmit", skb->data, skb->len, 32, is->unit,idev->ppp_slot);
 
-	isdn_net_write_super(&idev->local, skb);
+	isdn_net_write_super(idev, skb);
 }
 
 /* Allocate the reset state vector */
