@@ -1139,7 +1139,7 @@ static void idedisk_setup (ide_drive_t *drive)
 	 * LBA48 is not available so we don't need to recheck that.
 	 */
 	barrier = 0;
-	if (ide_id_has_flush_cache(id))
+	if (ide_id_has_flush_cache(id) && !drive->noflush)
 		barrier = 1;
 	if (drive->addressing == 1) {
 		/* Can't issue the correct flush ? */
