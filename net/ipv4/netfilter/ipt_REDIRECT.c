@@ -83,7 +83,7 @@ redirect_target(struct sk_buff **pskb,
 
 		/* Device might not have an associated in_device. */
 		indev = (struct in_device *)(*pskb)->dev->ip_ptr;
-		if (indev == NULL)
+		if (indev == NULL || indev->ifa_list == NULL)
 			return NF_DROP;
 
 		/* Grab first address on interface. */
