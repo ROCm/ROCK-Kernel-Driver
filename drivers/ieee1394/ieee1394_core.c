@@ -1042,10 +1042,11 @@ static int hpsbpkt_thread(void *__hi)
 
 static int __init ieee1394_init(void)
 {
-	int i;
+	int i, ret;
 
 	skb_queue_head_init(&hpsbpkt_queue);
 
+	/* non-fatal error */
 	if (hpsb_init_config_roms()) {
 		HPSB_ERR("Failed to initialize some config rom entries.\n");
 		HPSB_ERR("Some features may not be available\n");
@@ -1054,32 +1055,85 @@ static int __init ieee1394_init(void)
 	khpsbpkt_pid = kernel_thread(hpsbpkt_thread, NULL, CLONE_KERNEL);
 	if (khpsbpkt_pid < 0) {
 		HPSB_ERR("Failed to start hpsbpkt thread!\n");
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto exit_cleanup_config_roms;
 	}
-
-	devfs_mk_dir("ieee1394");
 
 	if (register_chrdev_region(IEEE1394_CORE_DEV, 256, "ieee1394")) {
 		HPSB_ERR("unable to register character device major %d!\n", IEEE1394_MAJOR);
-		return -ENODEV;
+		ret = -ENODEV;
+		goto exit_release_kernel_thread;
 	}
 
-	devfs_mk_dir("ieee1394");
+	/* actually this is a non-fatal error */
+	ret = devfs_mk_dir("ieee1394");
+	if (ret < 0) {
+		HPSB_ERR("unable to make devfs dir for device major %d!\n", IEEE1394_MAJOR);
+		goto release_chrdev;
+	}
 
-	bus_register(&ieee1394_bus_type);
-	for (i = 0; fw_bus_attrs[i]; i++)
-		bus_create_file(&ieee1394_bus_type, fw_bus_attrs[i]);
-	class_register(&hpsb_host_class);
+	ret = bus_register(&ieee1394_bus_type);
+	if (ret < 0) {
+		HPSB_INFO("bus register failed");
+		goto release_devfs;
+	}
 
-	if (init_csr())
-		return -ENOMEM;
+	for (i = 0; fw_bus_attrs[i]; i++) {
+		ret = bus_create_file(&ieee1394_bus_type, fw_bus_attrs[i]);
+		if (ret < 0) {
+			while (i >= 0) {
+				bus_remove_file(&ieee1394_bus_type,
+						fw_bus_attrs[i--]);
+			}
+			bus_unregister(&ieee1394_bus_type);
+			goto release_devfs;
+		}
+	}
 
-	if (!disable_nodemgr)
-		init_ieee1394_nodemgr();
-	else
+	ret = class_register(&hpsb_host_class);
+	if (ret < 0)
+		goto release_all_bus;
+
+	ret = init_csr();
+	if (ret) {
+		HPSB_INFO("init csr failed");
+		ret = -ENOMEM;
+		goto release_class;
+	}
+
+	if (disable_nodemgr) {
 		HPSB_INFO("nodemgr functionality disabled");
+		return 0;
+	}
+
+	ret = init_ieee1394_nodemgr();
+	if (ret < 0) {
+		HPSB_INFO("init nodemgr failed");
+		goto cleanup_csr;
+	}
 
 	return 0;
+
+cleanup_csr:
+	cleanup_csr();
+release_class:
+	class_unregister(&hpsb_host_class);
+release_all_bus:
+	for (i = 0; fw_bus_attrs[i]; i++)
+		bus_remove_file(&ieee1394_bus_type, fw_bus_attrs[i]);
+	bus_unregister(&ieee1394_bus_type);
+release_devfs:
+	devfs_remove("ieee1394");
+release_chrdev:
+	unregister_chrdev_region(IEEE1394_CORE_DEV, 256);
+exit_release_kernel_thread:
+	if (khpsbpkt_pid >= 0) {
+		kill_proc(khpsbpkt_pid, SIGTERM, 1);
+		wait_for_completion(&khpsbpkt_complete);
+	}
+exit_cleanup_config_roms:
+	hpsb_cleanup_config_roms();
+	return ret;
 }
 
 static void __exit ieee1394_cleanup(void)
