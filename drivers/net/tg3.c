@@ -1490,6 +1490,18 @@ static int tg3_setup_copper_phy(struct tg3 *tp, int force_reset)
 	current_speed = SPEED_INVALID;
 	current_duplex = DUPLEX_INVALID;
 
+	if (tp->tg3_flags2 & TG3_FLG2_CAPACITIVE_COUPLING) {
+		u32 val;
+
+		tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x4007);
+		tg3_readphy(tp, MII_TG3_AUX_CTRL, &val);
+		if (!(val & (1 << 10))) {
+			val |= (1 << 10);
+			tg3_writephy(tp, MII_TG3_AUX_CTRL, val);
+			goto relink;
+		}
+	}
+
 	bmsr = 0;
 	for (i = 0; i < 100; i++) {
 		tg3_readphy(tp, MII_BMSR, &bmsr);
@@ -1569,7 +1581,7 @@ static int tg3_setup_copper_phy(struct tg3 *tp, int force_reset)
 			tg3_setup_flow_control(tp, local_adv, remote_adv);
 		}
 	}
-
+relink:
 	if (current_link_up == 0) {
 		u32 tmp;
 
@@ -7052,7 +7064,7 @@ static int __devinit tg3_phy_probe(struct tg3 *tp)
 	tg3_read_mem(tp, NIC_SRAM_DATA_SIG, &val);
 	if (val == NIC_SRAM_DATA_SIG_MAGIC) {
 		u32 nic_cfg, led_cfg;
-		u32 nic_phy_id;
+		u32 nic_phy_id, cfg2;
 
 		tg3_read_mem(tp, NIC_SRAM_DATA_CFG, &nic_cfg);
 		tp->nic_sram_data_cfg = nic_cfg;
@@ -7134,6 +7146,10 @@ static int __devinit tg3_phy_probe(struct tg3 *tp)
 		}
 		if (nic_cfg & NIC_SRAM_DATA_CFG_FIBER_WOL)
 			tp->tg3_flags |= TG3_FLAG_SERDES_WOL_CAP;
+
+		tg3_read_mem(tp, NIC_SRAM_DATA_PHY_ID, &cfg2);
+		if (cfg2 & (1 << 17))
+			tp->tg3_flags2 |= TG3_FLG2_CAPACITIVE_COUPLING;
 	}
 
 	/* Reading the PHY ID register can conflict with ASF
