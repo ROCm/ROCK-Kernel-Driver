@@ -1976,13 +1976,10 @@ static inline void unix_sysctl_register(void) {}
 static inline void unix_sysctl_unregister(void) {}
 #endif
 
-static char banner[] __initdata = KERN_INFO "NET4: Unix domain sockets 1.0/SMP for Linux NET4.0.\n";
-
 static int __init af_unix_init(void)
 {
 	struct sk_buff *dummy_skb;
 
-	printk(banner);
 	if (sizeof(struct unix_skb_parms) > sizeof(dummy_skb->cb)) {
 		printk(KERN_CRIT "%s: panic\n", __FUNCTION__);
 		return -1;

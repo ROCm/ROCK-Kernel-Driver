@@ -723,8 +723,6 @@ static int __init inet6_init(void)
 #endif
 #endif
 
-	printk(KERN_INFO "IPv6 v0.8 for NET4.0\n");
-
 	if (sizeof(struct inet6_skb_parm) > sizeof(dummy_skb->cb))
 	{
 		printk(KERN_CRIT "inet6_proto_init: size fault\n");
