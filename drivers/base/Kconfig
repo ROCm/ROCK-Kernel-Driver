@@ -1,5 +1,14 @@
 menu "Generic Driver Options"
 
+config STANDALONE
+	bool "Select only drivers that don't need compile-time external firmware" if EXPERIMENTAL
+	default y
+	help
+	  Select this option if you don't have magic firmware for drivers that
+	  need it.
+
+	  If unsure, say Y.
+
 config PREVENT_FIRMWARE_BUILD
 	bool "Prevent firmware from being built"
 	default y
