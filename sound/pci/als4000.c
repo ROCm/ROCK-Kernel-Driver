@@ -297,11 +297,10 @@ static int snd_als4000_playback_prepare(snd_pcm_substream_t *substream)
 
 static int snd_als4000_capture_trigger(snd_pcm_substream_t * substream, int cmd)
 {
-	unsigned long flags;
 	sb_t *chip = snd_pcm_substream_chip(substream);
 	int result = 0;
 	
-	spin_lock_irqsave(&chip->mixer_lock, flags);
+	spin_lock(&chip->mixer_lock);
 	if (cmd == SNDRV_PCM_TRIGGER_START) {
 		chip->mode |= SB_RATE_LOCK_CAPTURE;
 		snd_sbmixer_write(chip, 0xde, capture_cmd(chip));
@@ -311,17 +310,16 @@ static int snd_als4000_capture_trigger(snd_pcm_substream_t * substream, int cmd)
 	} else {
 		result = -EINVAL;
 	}
-	spin_unlock_irqrestore(&chip->mixer_lock, flags);
+	spin_unlock(&chip->mixer_lock);
 	return result;
 }
 
 static int snd_als4000_playback_trigger(snd_pcm_substream_t * substream, int cmd)
 {
-	unsigned long flags;
 	sb_t *chip = snd_pcm_substream_chip(substream);
 	int result = 0;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock(&chip->reg_lock);
 	if (cmd == SNDRV_PCM_TRIGGER_START) {
 		chip->mode |= SB_RATE_LOCK_PLAYBACK;
 		snd_sbdsp_command(chip, playback_cmd(chip).dma_on);
@@ -331,38 +329,35 @@ static int snd_als4000_playback_trigger(snd_pcm_substream_t * substream, int cmd
 	} else {
 		result = -EINVAL;
 	}
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock(&chip->reg_lock);
 	return result;
 }
 
 static snd_pcm_uframes_t snd_als4000_capture_pointer(snd_pcm_substream_t * substream)
 {
-	unsigned long flags;
 	sb_t *chip = snd_pcm_substream_chip(substream);
 	unsigned int result;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);	
+	spin_lock(&chip->reg_lock);	
 	result = snd_als4000_gcr_read(chip, 0xa4) & 0xffff;
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock(&chip->reg_lock);
 	return bytes_to_frames( substream->runtime, result );
 }
 
 static snd_pcm_uframes_t snd_als4000_playback_pointer(snd_pcm_substream_t * substream)
 {
-	unsigned long flags;
 	sb_t *chip = snd_pcm_substream_chip(substream);
 	unsigned result;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);	
+	spin_lock(&chip->reg_lock);	
 	result = snd_als4000_gcr_read(chip, 0xa0) & 0xffff;
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock(&chip->reg_lock);
 	return bytes_to_frames( substream->runtime, result );
 }
 
 static irqreturn_t snd_als4000_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	sb_t *chip = dev_id;
-	unsigned long flags;
 	unsigned gcr_status;
 	unsigned sb_status;
 
@@ -378,9 +373,9 @@ static irqreturn_t snd_als4000_interrupt(int irq, void *dev_id, struct pt_regs *
 	/* release the gcr */
 	outb(gcr_status, chip->alt_port + 0xe);
 	
-	spin_lock_irqsave(&chip->mixer_lock, flags);
+	spin_lock(&chip->mixer_lock);
 	sb_status = snd_sbmixer_read(chip, SB_DSP4_IRQSTATUS);
-	spin_unlock_irqrestore(&chip->mixer_lock, flags);
+	spin_unlock(&chip->mixer_lock);
 	
 	if (sb_status & SB_IRQTYPE_8BIT) 
 		snd_sb_ack_8bit(chip);
@@ -550,27 +545,26 @@ static void snd_als4000_set_addr(unsigned long gcr,
 
 static void __devinit snd_als4000_configure(sb_t *chip)
 {
-	unsigned long flags;
 	unsigned tmp;
 	int i;
 
 	/* do some more configuration */
-	spin_lock_irqsave(&chip->mixer_lock, flags);
+	spin_lock_irq(&chip->mixer_lock);
 	tmp = snd_sbmixer_read(chip, 0xc0);
 	snd_sbmixer_write(chip, 0xc0, tmp|0x80);
 	/* always select DMA channel 0, since we do not actually use DMA */
 	snd_sbmixer_write(chip, SB_DSP4_DMASETUP, SB_DMASETUP_DMA0);
 	snd_sbmixer_write(chip, 0xc0, tmp&0x7f);
-	spin_unlock_irqrestore(&chip->mixer_lock, flags);
+	spin_unlock_irq(&chip->mixer_lock);
 	
-	spin_lock_irqsave(&chip->reg_lock,flags);
+	spin_lock_irq(&chip->reg_lock);
 	/* magic number. Enables interrupts(?) */
 	snd_als4000_gcr_write(chip, 0x8c, 0x28000);
 	for(i = 0x91; i <= 0x96; ++i)
 		snd_als4000_gcr_write(chip, i, 0);
 	
 	snd_als4000_gcr_write(chip, 0x99, snd_als4000_gcr_read(chip, 0x99));
-	spin_unlock_irqrestore(&chip->reg_lock,flags);
+	spin_unlock_irq(&chip->reg_lock);
 }
 
 static void snd_card_als4000_free( snd_card_t *card )

@@ -1565,14 +1565,14 @@ static int snd_korg1212_prepare(snd_pcm_substream_t *substream)
 		K1212_DEBUG_PRINTK("K1212_DEBUG: snd_korg1212_prepare [%s]\n", stateName[korg1212->cardState]);
 #endif
 
-        spin_lock(&korg1212->lock);
+	spin_lock_irq(&korg1212->lock);
 
 	/* FIXME: we should wait for ack! */
 	if (korg1212->stop_pending_cnt > 0) {
 #if K1212_DEBUG_LEVEL > 0
 		K1212_DEBUG_PRINTK("K1212_DEBUG: snd_korg1212_prepare - Stop is pending... [%s]\n", stateName[korg1212->cardState]);
 #endif
-        	spin_unlock(&korg1212->lock);
+        	spin_unlock_irq(&korg1212->lock);
 		return -EAGAIN;
 		/*
 		writel(0, &korg1212->sharedBufferPtr->cardCommand);
@@ -1585,7 +1585,7 @@ static int snd_korg1212_prepare(snd_pcm_substream_t *substream)
 
         korg1212->currentBuffer = 0;
 
-        spin_unlock(&korg1212->lock);
+        spin_unlock_irq(&korg1212->lock);
 
 	return rc ? -EINVAL : 0;
 }
@@ -1748,17 +1748,16 @@ static int snd_korg1212_control_phase_info(snd_kcontrol_t *kcontrol, snd_ctl_ele
 static int snd_korg1212_control_phase_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *u)
 {
 	korg1212_t *korg1212 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int i = kcontrol->private_value;
 
-	spin_lock_irqsave(&korg1212->lock, flags);
+	spin_lock_irq(&korg1212->lock);
 
         u->value.integer.value[0] = korg1212->volumePhase[i];
 
 	if (i >= 8)
         	u->value.integer.value[1] = korg1212->volumePhase[i+1];
 
-        spin_unlock_irqrestore(&korg1212->lock, flags);
+	spin_unlock_irq(&korg1212->lock);
 
         return 0;
 }
@@ -1766,11 +1765,10 @@ static int snd_korg1212_control_phase_get(snd_kcontrol_t *kcontrol, snd_ctl_elem
 static int snd_korg1212_control_phase_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *u)
 {
 	korg1212_t *korg1212 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
         int change = 0;
         int i, val;
 
-	spin_lock_irqsave(&korg1212->lock, flags);
+	spin_lock_irq(&korg1212->lock);
 
 	i = kcontrol->private_value;
 
@@ -1796,7 +1794,7 @@ static int snd_korg1212_control_phase_put(snd_kcontrol_t *kcontrol, snd_ctl_elem
 		}
 	}
 
-	spin_unlock_irqrestore(&korg1212->lock, flags);
+	spin_unlock_irq(&korg1212->lock);
 
         return change;
 }
@@ -1813,10 +1811,9 @@ static int snd_korg1212_control_volume_info(snd_kcontrol_t *kcontrol, snd_ctl_el
 static int snd_korg1212_control_volume_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *u)
 {
 	korg1212_t *korg1212 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
         int i;
 
-	spin_lock_irqsave(&korg1212->lock, flags);
+	spin_lock_irq(&korg1212->lock);
 
 	i = kcontrol->private_value;
         u->value.integer.value[0] = abs(korg1212->sharedBufferPtr->volumeData[i]);
@@ -1824,7 +1821,7 @@ static int snd_korg1212_control_volume_get(snd_kcontrol_t *kcontrol, snd_ctl_ele
 	if (i >= 8) 
                 u->value.integer.value[1] = abs(korg1212->sharedBufferPtr->volumeData[i+1]);
 
-        spin_unlock_irqrestore(&korg1212->lock, flags);
+        spin_unlock_irq(&korg1212->lock);
 
         return 0;
 }
@@ -1832,12 +1829,11 @@ static int snd_korg1212_control_volume_get(snd_kcontrol_t *kcontrol, snd_ctl_ele
 static int snd_korg1212_control_volume_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *u)
 {
 	korg1212_t *korg1212 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
         int change = 0;
         int i;
 	int val;
 
-	spin_lock_irqsave(&korg1212->lock, flags);
+	spin_lock_irq(&korg1212->lock);
 
 	i = kcontrol->private_value;
 
@@ -1857,7 +1853,7 @@ static int snd_korg1212_control_volume_put(snd_kcontrol_t *kcontrol, snd_ctl_ele
 		}
 	}
 
-	spin_unlock_irqrestore(&korg1212->lock, flags);
+	spin_unlock_irq(&korg1212->lock);
 
         return change;
 }
@@ -1877,10 +1873,9 @@ static int snd_korg1212_control_route_info(snd_kcontrol_t *kcontrol, snd_ctl_ele
 static int snd_korg1212_control_route_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *u)
 {
 	korg1212_t *korg1212 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
         int i;
 
-	spin_lock_irqsave(&korg1212->lock, flags);
+	spin_lock_irq(&korg1212->lock);
 
 	i = kcontrol->private_value;
 	u->value.enumerated.item[0] = korg1212->sharedBufferPtr->routeData[i];
@@ -1888,7 +1883,7 @@ static int snd_korg1212_control_route_get(snd_kcontrol_t *kcontrol, snd_ctl_elem
 	if (i >= 8) 
 		u->value.enumerated.item[1] = korg1212->sharedBufferPtr->routeData[i+1];
 
-        spin_unlock_irqrestore(&korg1212->lock, flags);
+        spin_unlock_irq(&korg1212->lock);
 
         return 0;
 }
@@ -1896,10 +1891,9 @@ static int snd_korg1212_control_route_get(snd_kcontrol_t *kcontrol, snd_ctl_elem
 static int snd_korg1212_control_route_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *u)
 {
 	korg1212_t *korg1212 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
         int change = 0, i;
 
-	spin_lock_irqsave(&korg1212->lock, flags);
+	spin_lock_irq(&korg1212->lock);
 
 	i = kcontrol->private_value;
 
@@ -1915,7 +1909,7 @@ static int snd_korg1212_control_route_put(snd_kcontrol_t *kcontrol, snd_ctl_elem
 		}
 	}
 
-	spin_unlock_irqrestore(&korg1212->lock, flags);
+	spin_unlock_irq(&korg1212->lock);
 
         return change;
 }
@@ -1932,14 +1926,13 @@ static int snd_korg1212_control_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info
 static int snd_korg1212_control_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *u)
 {
 	korg1212_t *korg1212 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 
-	spin_lock_irqsave(&korg1212->lock, flags);
+	spin_lock_irq(&korg1212->lock);
 
         u->value.integer.value[0] = korg1212->leftADCInSens;
         u->value.integer.value[1] = korg1212->rightADCInSens;
 
-        spin_unlock_irqrestore(&korg1212->lock, flags);
+	spin_unlock_irq(&korg1212->lock);
 
         return 0;
 }
@@ -1947,10 +1940,9 @@ static int snd_korg1212_control_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value
 static int snd_korg1212_control_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *u)
 {
 	korg1212_t *korg1212 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
         int change = 0;
 
-	spin_lock_irqsave(&korg1212->lock, flags);
+	spin_lock_irq(&korg1212->lock);
 
         if (u->value.integer.value[0] != korg1212->leftADCInSens) {
                 korg1212->leftADCInSens = u->value.integer.value[0];
@@ -1961,7 +1953,7 @@ static int snd_korg1212_control_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value
                 change = 1;
         }
 
-	spin_unlock_irqrestore(&korg1212->lock, flags);
+	spin_unlock_irq(&korg1212->lock);
 
         if (change)
                 snd_korg1212_WriteADCSensitivity(korg1212);
@@ -1984,28 +1976,26 @@ static int snd_korg1212_control_sync_info(snd_kcontrol_t *kcontrol, snd_ctl_elem
 static int snd_korg1212_control_sync_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	korg1212_t *korg1212 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 
-	spin_lock_irqsave(&korg1212->lock, flags);
+	spin_lock_irq(&korg1212->lock);
 
 	ucontrol->value.enumerated.item[0] = korg1212->clkSource;
 
-	spin_unlock_irqrestore(&korg1212->lock, flags);
+	spin_unlock_irq(&korg1212->lock);
 	return 0;
 }
 
 static int snd_korg1212_control_sync_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	korg1212_t *korg1212 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	unsigned int val;
 	int change;
 
 	val = ucontrol->value.enumerated.item[0] % 3;
-	spin_lock_irqsave(&korg1212->lock, flags);
+	spin_lock_irq(&korg1212->lock);
 	change = val != korg1212->clkSource;
         snd_korg1212_SetClockSource(korg1212, val);
-	spin_unlock_irqrestore(&korg1212->lock, flags);
+	spin_unlock_irq(&korg1212->lock);
 	return change;
 }
 

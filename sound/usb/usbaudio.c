@@ -2154,7 +2154,7 @@ static int add_audio_endpoint(snd_usb_audio_t *chip, int stream, struct audiofor
 	as->pcm = pcm;
 	pcm->private_data = as;
 	pcm->private_free = snd_usb_audio_pcm_free;
-	pcm->info_flags = SNDRV_PCM_INFO_NONATOMIC_OPS;
+	pcm->info_flags = 0;
 	if (chip->pcm_devs > 0)
 		sprintf(pcm->name, "USB Audio #%d", chip->pcm_devs);
 	else

@@ -1157,12 +1157,11 @@ snd_m3_pcm_trigger(snd_pcm_substream_t *subs, int cmd)
 {
 	m3_t *chip = snd_pcm_substream_chip(subs);
 	m3_dma_t *s = (m3_dma_t*)subs->runtime->private_data;
-	unsigned long flags;
 	int err = -EINVAL;
 
 	snd_assert(s != NULL, return -ENXIO);
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock(&chip->reg_lock);
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
@@ -1183,7 +1182,7 @@ snd_m3_pcm_trigger(snd_pcm_substream_t *subs, int cmd)
 		}
 		break;
 	}
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock(&chip->reg_lock);
 	return err;
 }
 
@@ -1469,7 +1468,6 @@ snd_m3_pcm_prepare(snd_pcm_substream_t *subs)
 	m3_t *chip = snd_pcm_substream_chip(subs);
 	snd_pcm_runtime_t *runtime = subs->runtime;
 	m3_dma_t *s = (m3_dma_t*)runtime->private_data;
-	unsigned long flags;
 
 	snd_assert(s != NULL, return -ENXIO);
 
@@ -1480,7 +1478,7 @@ snd_m3_pcm_prepare(snd_pcm_substream_t *subs)
 	    runtime->rate < 8000)
 		return -EINVAL;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 
 	snd_m3_pcm_setup1(chip, s, subs);
 
@@ -1491,7 +1489,7 @@ snd_m3_pcm_prepare(snd_pcm_substream_t *subs)
 
 	snd_m3_pcm_setup2(chip, s, runtime);
 
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 
 	return 0;
 }
@@ -1662,20 +1660,19 @@ snd_m3_substream_open(m3_t *chip, snd_pcm_substream_t *subs)
 {
 	int i;
 	m3_dma_t *s;
-	unsigned long flags;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	for (i = 0; i < chip->num_substreams; i++) {
 		s = &chip->substreams[i];
 		if (! s->opened)
 			goto __found;
 	}
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 	return -ENOMEM;
 __found:
 	s->opened = 1;
 	s->running = 0;
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 
 	subs->runtime->private_data = s;
 	s->substream = subs;
@@ -1695,12 +1692,11 @@ static void
 snd_m3_substream_close(m3_t *chip, snd_pcm_substream_t *subs)
 {
 	m3_dma_t *s = (m3_dma_t*) subs->runtime->private_data;
-	unsigned long flags;
 
 	if (s == NULL)
 		return; /* not opened properly */
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	if (s->substream && s->running)
 		snd_m3_pcm_stop(chip, s, s->substream); /* does this happen? */
 	if (s->in_lists) {
@@ -1711,7 +1707,7 @@ snd_m3_substream_close(m3_t *chip, snd_pcm_substream_t *subs)
 	}
 	s->running = 0;
 	s->opened = 0;
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 }
 
 static int
@@ -2361,19 +2357,18 @@ snd_m3_enable_ints(m3_t *chip)
 
 static int snd_m3_free(m3_t *chip)
 {
-	unsigned long flags;
 	m3_dma_t *s;
 	int i;
 
 	if (chip->substreams) {
-		spin_lock_irqsave(&chip->reg_lock, flags);
+		spin_lock_irq(&chip->reg_lock);
 		for (i = 0; i < chip->num_substreams; i++) {
 			s = &chip->substreams[i];
 			/* check surviving pcms; this should not happen though.. */
 			if (s->substream && s->running)
 				snd_m3_pcm_stop(chip, s, s->substream);
 		}
-		spin_unlock_irqrestore(&chip->reg_lock, flags);
+		spin_unlock_irq(&chip->reg_lock);
 		kfree(chip->substreams);
 	}
 	if (chip->iobase_res) {

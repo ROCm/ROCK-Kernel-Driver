@@ -568,11 +568,10 @@ static int snd_emu10k1_playback_trigger(snd_pcm_substream_t * substream,
 	emu10k1_t *emu = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	emu10k1_pcm_t *epcm = runtime->private_data;
-	unsigned long flags;
 	int result = 0;
 
 	// printk("trigger - emu10k1 = 0x%x, cmd = %i, pointer = %i\n", (int)emu, cmd, substream->ops->pointer(substream));
-	spin_lock_irqsave(&emu->reg_lock, flags);
+	spin_lock(&emu->reg_lock);
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 		snd_emu10k1_playback_invalidate_cache(emu, epcm->extra);	/* do we need this? */
@@ -595,7 +594,7 @@ static int snd_emu10k1_playback_trigger(snd_pcm_substream_t * substream,
 		result = -EINVAL;
 		break;
 	}
-	spin_unlock_irqrestore(&emu->reg_lock, flags);
+	spin_unlock(&emu->reg_lock);
 	return result;
 }
 
@@ -605,11 +604,10 @@ static int snd_emu10k1_capture_trigger(snd_pcm_substream_t * substream,
 	emu10k1_t *emu = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	emu10k1_pcm_t *epcm = runtime->private_data;
-	unsigned long flags;
 	int result = 0;
 
 	// printk("trigger - emu10k1 = %p, cmd = %i, pointer = %i\n", emu, cmd, substream->ops->pointer(substream));
-	spin_lock_irqsave(&emu->reg_lock, flags);
+	spin_lock(&emu->reg_lock);
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 		outl(epcm->capture_ipr, emu->port + IPR);
@@ -656,7 +654,7 @@ static int snd_emu10k1_capture_trigger(snd_pcm_substream_t * substream,
 	default:
 		result = -EINVAL;
 	}
-	spin_unlock_irqrestore(&emu->reg_lock, flags);
+	spin_unlock(&emu->reg_lock);
 	return result;
 }
 
@@ -909,7 +907,6 @@ static int snd_emu10k1_capture_efx_open(snd_pcm_substream_t * substream)
 	emu10k1_t *emu = snd_pcm_substream_chip(substream);
 	emu10k1_pcm_t *epcm;
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	unsigned long flags;
 	int nefx = emu->audigy ? 64 : 32;
 	int idx;
 
@@ -929,7 +926,7 @@ static int snd_emu10k1_capture_efx_open(snd_pcm_substream_t * substream)
 	runtime->hw = snd_emu10k1_capture;
 	runtime->hw.rates = SNDRV_PCM_RATE_48000;
 	runtime->hw.rate_min = runtime->hw.rate_max = 48000;
-	spin_lock_irqsave(&emu->reg_lock, flags);
+	spin_lock_irq(&emu->reg_lock);
 	runtime->hw.channels_min = runtime->hw.channels_max = 0;
 	for (idx = 0; idx < nefx; idx++) {
 		if (emu->efx_voices_mask[idx/32] & (1 << (idx%32))) {
@@ -939,7 +936,7 @@ static int snd_emu10k1_capture_efx_open(snd_pcm_substream_t * substream)
 	}
 	epcm->capture_cr_val = emu->efx_voices_mask[0];
 	epcm->capture_cr_val2 = emu->efx_voices_mask[1];
-	spin_unlock_irqrestore(&emu->reg_lock, flags);
+	spin_unlock_irq(&emu->reg_lock);
 	emu->capture_efx_interrupt = snd_emu10k1_pcm_efx_interrupt;
 	emu->pcm_capture_efx_substream = substream;
 	snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_PERIOD_SIZE, &hw_constraints_capture_period_sizes);
@@ -1080,21 +1077,19 @@ static int snd_emu10k1_pcm_efx_voices_mask_info(snd_kcontrol_t *kcontrol, snd_ct
 static int snd_emu10k1_pcm_efx_voices_mask_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	emu10k1_t *emu = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int nefx = emu->audigy ? 64 : 32;
 	int idx;
 	
-	spin_lock_irqsave(&emu->reg_lock, flags);
+	spin_lock_irq(&emu->reg_lock);
 	for (idx = 0; idx < nefx; idx++)
 		ucontrol->value.integer.value[idx] = (emu->efx_voices_mask[idx / 32] & (1 << (idx % 32))) ? 1 : 0;
-	spin_unlock_irqrestore(&emu->reg_lock, flags);
+	spin_unlock_irq(&emu->reg_lock);
 	return 0;
 }
 
 static int snd_emu10k1_pcm_efx_voices_mask_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	emu10k1_t *emu = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	unsigned int nval[2], bits;
 	int nefx = emu->audigy ? 64 : 32;
 	int change, idx;
@@ -1107,12 +1102,12 @@ static int snd_emu10k1_pcm_efx_voices_mask_put(snd_kcontrol_t * kcontrol, snd_ct
 		}
 	if (bits != 1 && bits != 2 && bits != 4 && bits != 8)
 		return -EINVAL;
-	spin_lock_irqsave(&emu->reg_lock, flags);
+	spin_lock_irq(&emu->reg_lock);
 	change = (nval[0] != emu->efx_voices_mask[0]) ||
 		(nval[1] != emu->efx_voices_mask[1]);
 	emu->efx_voices_mask[0] = nval[0];
 	emu->efx_voices_mask[1] = nval[1];
-	spin_unlock_irqrestore(&emu->reg_lock, flags);
+	spin_unlock_irq(&emu->reg_lock);
 	return change;
 }
 
@@ -1251,10 +1246,9 @@ static int snd_emu10k1_fx8010_playback_trigger(snd_pcm_substream_t * substream, 
 {
 	emu10k1_t *emu = snd_pcm_substream_chip(substream);
 	snd_emu10k1_fx8010_pcm_t *pcm = &emu->fx8010.pcm[substream->number];
-	unsigned long flags;
 	int result = 0;
 
-	spin_lock_irqsave(&emu->reg_lock, flags);
+	spin_lock(&emu->reg_lock);
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 		/* follow thru */
@@ -1289,7 +1283,7 @@ static int snd_emu10k1_fx8010_playback_trigger(snd_pcm_substream_t * substream, 
 		break;
 	}
       __err:
-	spin_unlock_irqrestore(&emu->reg_lock, flags);
+	spin_unlock(&emu->reg_lock);
 	return result;
 }
 
@@ -1332,13 +1326,13 @@ static int snd_emu10k1_fx8010_playback_open(snd_pcm_substream_t * substream)
 	runtime->hw = snd_emu10k1_fx8010_playback;
 	runtime->hw.channels_min = runtime->hw.channels_max = pcm->channels;
 	runtime->hw.period_bytes_max = (pcm->buffer_size * 2) / 2;
-	spin_lock(&emu->reg_lock);
+	spin_lock_irq(&emu->reg_lock);
 	if (pcm->valid == 0) {
-		spin_unlock(&emu->reg_lock);
+		spin_unlock_irq(&emu->reg_lock);
 		return -ENODEV;
 	}
 	pcm->opened = 1;
-	spin_unlock(&emu->reg_lock);
+	spin_unlock_irq(&emu->reg_lock);
 	return 0;
 }
 
@@ -1347,9 +1341,9 @@ static int snd_emu10k1_fx8010_playback_close(snd_pcm_substream_t * substream)
 	emu10k1_t *emu = snd_pcm_substream_chip(substream);
 	snd_emu10k1_fx8010_pcm_t *pcm = &emu->fx8010.pcm[substream->number];
 
-	spin_lock(&emu->reg_lock);
+	spin_lock_irq(&emu->reg_lock);
 	pcm->opened = 0;
-	spin_unlock(&emu->reg_lock);
+	spin_unlock_irq(&emu->reg_lock);
 	return 0;
 }
 

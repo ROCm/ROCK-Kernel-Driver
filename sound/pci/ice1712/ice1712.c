@@ -584,7 +584,7 @@ static int snd_ice1712_playback_prepare(snd_pcm_substream_t * substream)
 	rate = (runtime->rate * 8192) / 375;
 	if (rate > 0x000fffff)
 		rate = 0x000fffff;
-	spin_lock(&ice->reg_lock);
+	spin_lock_irq(&ice->reg_lock);
 	outb(0, ice->ddma_port + 15);
 	outb(ICE1712_DMA_MODE_WRITE | ICE1712_DMA_AUTOINIT, ice->ddma_port + 0x0b);
 	outl(runtime->dma_addr, ice->ddma_port + 0);
@@ -597,7 +597,7 @@ static int snd_ice1712_playback_prepare(snd_pcm_substream_t * substream)
 	snd_ice1712_write(ice, ICE1712_IREG_PBK_COUNT_HI, period_size >> 8);
 	snd_ice1712_write(ice, ICE1712_IREG_PBK_LEFT, 0);
 	snd_ice1712_write(ice, ICE1712_IREG_PBK_RIGHT, 0);
-	spin_unlock(&ice->reg_lock);
+	spin_unlock_irq(&ice->reg_lock);
 	return 0;
 }
 
@@ -620,7 +620,7 @@ static int snd_ice1712_playback_ds_prepare(snd_pcm_substream_t * substream)
 	ice->playback_con_active_buf[substream->number] = 0;
 	ice->playback_con_virt_addr[substream->number] = runtime->dma_addr;
 	chn = substream->number * 2;
-	spin_lock(&ice->reg_lock);
+	spin_lock_irq(&ice->reg_lock);
 	snd_ice1712_ds_write(ice, chn, ICE1712_DSC_ADDR0, runtime->dma_addr);
 	snd_ice1712_ds_write(ice, chn, ICE1712_DSC_COUNT0, period_size);
 	snd_ice1712_ds_write(ice, chn, ICE1712_DSC_ADDR1, runtime->dma_addr + (runtime->periods > 1 ? period_size + 1 : 0));
@@ -632,7 +632,7 @@ static int snd_ice1712_playback_ds_prepare(snd_pcm_substream_t * substream)
 		snd_ice1712_ds_write(ice, chn + 1, ICE1712_DSC_RATE, rate);
 		snd_ice1712_ds_write(ice, chn + 1, ICE1712_DSC_VOLUME, 0);
 	}
-	spin_unlock(&ice->reg_lock);
+	spin_unlock_irq(&ice->reg_lock);
 	return 0;
 }
 
@@ -650,13 +650,13 @@ static int snd_ice1712_capture_prepare(snd_pcm_substream_t * substream)
 		tmp &= ~0x04;
 	if (runtime->channels == 2)
 		tmp &= ~0x02;
-	spin_lock(&ice->reg_lock);
+	spin_lock_irq(&ice->reg_lock);
 	outl(ice->capture_con_virt_addr = runtime->dma_addr, ICEREG(ice, CONCAP_ADDR));
 	outw(buf_size, ICEREG(ice, CONCAP_COUNT));
 	snd_ice1712_write(ice, ICE1712_IREG_CAP_COUNT_HI, period_size >> 8);
 	snd_ice1712_write(ice, ICE1712_IREG_CAP_COUNT_LO, period_size & 0xff);
 	snd_ice1712_write(ice, ICE1712_IREG_CAP_CTRL, tmp);
-	spin_unlock(&ice->reg_lock);
+	spin_unlock_irq(&ice->reg_lock);
 	snd_ac97_set_rate(ice->ac97, AC97_PCM_LR_ADC_RATE, runtime->rate);
 	return 0;
 }
@@ -1071,11 +1071,11 @@ static int snd_ice1712_playback_pro_prepare(snd_pcm_substream_t * substream)
 	ice1712_t *ice = snd_pcm_substream_chip(substream);
 
 	ice->playback_pro_size = snd_pcm_lib_buffer_bytes(substream);
-	spin_lock(&ice->reg_lock);
+	spin_lock_irq(&ice->reg_lock);
 	outl(substream->runtime->dma_addr, ICEMT(ice, PLAYBACK_ADDR));
 	outw((ice->playback_pro_size >> 2) - 1, ICEMT(ice, PLAYBACK_SIZE));
 	outw((snd_pcm_lib_period_bytes(substream) >> 2) - 1, ICEMT(ice, PLAYBACK_COUNT));
-	spin_unlock(&ice->reg_lock);
+	spin_unlock_irq(&ice->reg_lock);
 
 	return 0;
 }
@@ -1094,11 +1094,11 @@ static int snd_ice1712_capture_pro_prepare(snd_pcm_substream_t * substream)
 	ice1712_t *ice = snd_pcm_substream_chip(substream);
 
 	ice->capture_pro_size = snd_pcm_lib_buffer_bytes(substream);
-	spin_lock(&ice->reg_lock);
+	spin_lock_irq(&ice->reg_lock);
 	outl(substream->runtime->dma_addr, ICEMT(ice, CAPTURE_ADDR));
 	outw((ice->capture_pro_size >> 2) - 1, ICEMT(ice, CAPTURE_SIZE));
 	outw((snd_pcm_lib_period_bytes(substream) >> 2) - 1, ICEMT(ice, CAPTURE_COUNT));
-	spin_unlock(&ice->reg_lock);
+	spin_unlock_irq(&ice->reg_lock);
 	return 0;
 }
 

@@ -433,25 +433,22 @@ static int snd_bt87x_prepare(snd_pcm_substream_t *substream)
 {
 	bt87x_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	unsigned long flags;
 	int decimation;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	chip->reg_control &= ~(CTL_DA_SDR_MASK | CTL_DA_SBR);
 	decimation = (1792000 + 5) / runtime->rate;
 	chip->reg_control |= decimation << CTL_DA_SDR_SHIFT;
 	if (runtime->format == SNDRV_PCM_FORMAT_S8)
 		chip->reg_control |= CTL_DA_SBR;
 	snd_bt87x_writel(chip, REG_GPIO_DMA_CTL, chip->reg_control);
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 	return 0;
 }
 
 static int snd_bt87x_start(bt87x_t *chip)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock(&chip->reg_lock);
 	chip->current_line = 0;
 	chip->reg_control |= CTL_FIFO_ENABLE | CTL_RISC_ENABLE | CTL_ACAP_EN;
 	snd_bt87x_writel(chip, REG_RISC_STRT_ADD, chip->dma_risc.addr);
@@ -459,20 +456,18 @@ static int snd_bt87x_start(bt87x_t *chip)
 			 chip->line_bytes | (chip->lines << 16));
 	snd_bt87x_writel(chip, REG_INT_MASK, MY_INTERRUPTS);
 	snd_bt87x_writel(chip, REG_GPIO_DMA_CTL, chip->reg_control);
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock(&chip->reg_lock);
 	return 0;
 }
 
 static int snd_bt87x_stop(bt87x_t *chip)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock(&chip->reg_lock);
 	chip->reg_control &= ~(CTL_FIFO_ENABLE | CTL_RISC_ENABLE | CTL_ACAP_EN);
 	snd_bt87x_writel(chip, REG_GPIO_DMA_CTL, chip->reg_control);
 	snd_bt87x_writel(chip, REG_INT_MASK, 0);
 	snd_bt87x_writel(chip, REG_INT_STAT, MY_INTERRUPTS);
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock(&chip->reg_lock);
 	return 0;
 }
 
@@ -530,17 +525,16 @@ static int snd_bt87x_capture_volume_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_v
 static int snd_bt87x_capture_volume_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *value)
 {
 	bt87x_t *chip = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	u32 old_control;
 	int changed;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	old_control = chip->reg_control;
 	chip->reg_control = (chip->reg_control & ~CTL_A_GAIN_MASK)
 		| (value->value.integer.value[0] << CTL_A_GAIN_SHIFT);
 	snd_bt87x_writel(chip, REG_GPIO_DMA_CTL, chip->reg_control);
 	changed = old_control != chip->reg_control;
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 	return changed;
 }
 
@@ -572,17 +566,16 @@ static int snd_bt87x_capture_boost_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_va
 static int snd_bt87x_capture_boost_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *value)
 {
 	bt87x_t *chip = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	u32 old_control;
 	int changed;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	old_control = chip->reg_control;
 	chip->reg_control = (chip->reg_control & ~CTL_A_G2X)
 		| (value->value.integer.value[0] ? CTL_A_G2X : 0);
 	snd_bt87x_writel(chip, REG_GPIO_DMA_CTL, chip->reg_control);
 	changed = chip->reg_control != old_control;
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 	return changed;
 }
 
@@ -618,17 +611,16 @@ static int snd_bt87x_capture_source_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_v
 static int snd_bt87x_capture_source_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *value)
 {
 	bt87x_t *chip = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	u32 old_control;
 	int changed;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	old_control = chip->reg_control;
 	chip->reg_control = (chip->reg_control & ~CTL_A_SEL_MASK)
 		| (value->value.enumerated.item[0] << CTL_A_SEL_SHIFT);
 	snd_bt87x_writel(chip, REG_GPIO_DMA_CTL, chip->reg_control);
 	changed = chip->reg_control != old_control;
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 	return changed;
 }
 

@@ -1333,13 +1333,13 @@ static int __devinit snd_mixart_probe(struct pci_dev *pci,
 	sprintf(mgr->longname, "%s at 0x%lx & 0x%lx, irq %i", mgr->shortname, mgr->mem[0].phys, mgr->mem[1].phys, mgr->irq);
 
 	/* ISR spinlock  */
-	mgr->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&mgr->lock);
 
 	/* init mailbox  */
 	mgr->msg_fifo_readptr = 0;
 	mgr->msg_fifo_writeptr = 0;
 
-	mgr->msg_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&mgr->msg_lock);
 	init_MUTEX(&mgr->msg_mutex);
 	init_waitqueue_head(&mgr->msg_sleep);
 	atomic_set(&mgr->msg_processed, 0);

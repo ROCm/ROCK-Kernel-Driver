@@ -788,6 +788,7 @@ static inline void snd_intel8x0_update(intel8x0_t *chip, ichdev_t *ichdev)
 	int status, civ, i, step;
 	int ack = 0;
 
+	spin_lock(&chip->reg_lock);
 	status = igetbyte(chip, port + ichdev->roff_sr);
 	civ = igetbyte(chip, port + ICH_REG_OFF_CIV);
 	if (!(status & ICH_BCIS)) {
@@ -821,10 +822,9 @@ static inline void snd_intel8x0_update(intel8x0_t *chip, ichdev_t *ichdev)
 			ack = 1;
 		}
 	}
+	spin_unlock(&chip->reg_lock);
 	if (ack && ichdev->substream) {
-		spin_unlock(&chip->reg_lock);
 		snd_pcm_period_elapsed(ichdev->substream);
-		spin_lock(&chip->reg_lock);
 	}
 	iputbyte(chip, port + ichdev->roff_sr,
 		 status & (ICH_FIFOE | ICH_BCIS | ICH_LVBCI));
@@ -837,7 +837,6 @@ static irqreturn_t snd_intel8x0_interrupt(int irq, void *dev_id, struct pt_regs 
 	unsigned int status;
 	unsigned int i;
 
-	spin_lock(&chip->reg_lock);
 	status = igetdword(chip, chip->int_sta_reg);
 	if ((status & chip->int_sta_mask) == 0) {
 		if (status) {
@@ -849,7 +848,6 @@ static irqreturn_t snd_intel8x0_interrupt(int irq, void *dev_id, struct pt_regs 
 			if (chip->device_type != DEVICE_NFORCE)
 				status = 0;
 		}
-		spin_unlock(&chip->reg_lock);
 		return IRQ_RETVAL(status);
 	}
 
@@ -861,7 +859,6 @@ static irqreturn_t snd_intel8x0_interrupt(int irq, void *dev_id, struct pt_regs 
 
 	/* ack them */
 	iputdword(chip, chip->int_sta_reg, status & chip->int_sta_mask);
-	spin_unlock(&chip->reg_lock);
 	
 	return IRQ_HANDLED;
 }
@@ -1051,16 +1048,16 @@ static int snd_intel8x0_pcm_prepare(snd_pcm_substream_t * substream)
 	ichdev->physbuf = runtime->dma_addr;
 	ichdev->size = snd_pcm_lib_buffer_bytes(substream);
 	ichdev->fragsize = snd_pcm_lib_period_bytes(substream);
+	spin_lock_irq(&chip->reg_lock);
 	if (ichdev->ichd == ICHD_PCMOUT) {
-		spin_lock(&chip->reg_lock);
 		snd_intel8x0_setup_pcm_out(chip, runtime->channels,
 					   runtime->sample_bits);
-		spin_unlock(&chip->reg_lock);
 		if (chip->device_type == DEVICE_INTEL_ICH4) {
 			ichdev->pos_shift = (runtime->sample_bits > 16) ? 2 : 1;
 		}
 	}
 	snd_intel8x0_setup_periods(chip, ichdev);
+	spin_unlock_irq(&chip->reg_lock);
 	return 0;
 }
 
@@ -1072,6 +1069,7 @@ static snd_pcm_uframes_t snd_intel8x0_pcm_pointer(snd_pcm_substream_t * substrea
 	int civ, timeout = 10;
 	unsigned int position;
 
+	spin_lock(&chip->reg_lock);
 	do {
 		civ = igetbyte(chip, ichdev->reg_offset + ICH_REG_OFF_CIV);
 		ptr1 = igetword(chip, ichdev->reg_offset + ichdev->roff_picb);
@@ -1085,6 +1083,7 @@ static snd_pcm_uframes_t snd_intel8x0_pcm_pointer(snd_pcm_substream_t * substrea
 	ptr1 <<= ichdev->pos_shift;
 	ptr = ichdev->fragsize1 - ptr1;
 	ptr += position;
+	spin_unlock(&chip->reg_lock);
 	if (ptr >= ichdev->size)
 		return 0;
 	return bytes_to_frames(substream->runtime, ptr);
@@ -1267,14 +1266,14 @@ static int snd_intel8x0_spdif_close(snd_pcm_substream_t * substream)
 static int snd_intel8x0_ali_ac97spdifout_open(snd_pcm_substream_t * substream)
 {
 	intel8x0_t *chip = snd_pcm_substream_chip(substream);
-	unsigned long flags;
 	unsigned int val;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	val = igetdword(chip, ICHREG(ALI_INTERFACECR));
 	val |= ICH_ALI_IF_AC97SP;
+	iputdword(chip, ICHREG(ALI_INTERFACECR), val);
 	/* also needs to set ALI_SC_CODEC_SPDF correctly */
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 
 	return snd_intel8x0_pcm_open(substream, &chip->ichd[ALID_AC97SPDIFOUT]);
 }
@@ -1282,14 +1281,14 @@ static int snd_intel8x0_ali_ac97spdifout_open(snd_pcm_substream_t * substream)
 static int snd_intel8x0_ali_ac97spdifout_close(snd_pcm_substream_t * substream)
 {
 	intel8x0_t *chip = snd_pcm_substream_chip(substream);
-	unsigned long flags;
 	unsigned int val;
 
 	chip->ichd[ALID_AC97SPDIFOUT].substream = NULL;
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	val = igetdword(chip, ICHREG(ALI_INTERFACECR));
 	val &= ~ICH_ALI_IF_AC97SP;
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	iputdword(chip, ICHREG(ALI_INTERFACECR), val);
+	spin_unlock_irq(&chip->reg_lock);
 
 	return 0;
 }
@@ -2283,7 +2282,6 @@ static void __devinit intel8x0_measure_ac97_clock(intel8x0_t *chip)
 	ichdev_t *ichdev;
 	unsigned long port;
 	unsigned long pos, t;
-	unsigned long flags;
 	struct timeval start_time, stop_time;
 
 	if (chip->ac97_bus->clock != 48000)
@@ -2306,7 +2304,7 @@ static void __devinit intel8x0_measure_ac97_clock(intel8x0_t *chip)
 	}
 	snd_intel8x0_setup_periods(chip, ichdev);
 	port = ichdev->reg_offset;
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	/* trigger */
 	if (chip->device_type != DEVICE_ALI)
 		iputbyte(chip, port + ICH_REG_OFF_CR, ICH_IOCE | ICH_STARTBM);
@@ -2315,7 +2313,7 @@ static void __devinit intel8x0_measure_ac97_clock(intel8x0_t *chip)
 		iputdword(chip, ICHREG(ALI_DMACR), 1 << ichdev->ali_slot);
 	}
 	do_gettimeofday(&start_time);
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 #if 0
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout(HZ / 20);
@@ -2323,7 +2321,7 @@ static void __devinit intel8x0_measure_ac97_clock(intel8x0_t *chip)
 	/* FIXME: schedule() can take too long time and overlap the boundary.. */
 	mdelay(50);
 #endif
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	/* check the position */
 	pos = ichdev->fragsize1;
 	pos -= igetword(chip, ichdev->reg_offset + ichdev->roff_picb) << ichdev->pos_shift;
@@ -2341,7 +2339,7 @@ static void __devinit intel8x0_measure_ac97_clock(intel8x0_t *chip)
 			;
 	}
 	iputbyte(chip, port + ICH_REG_OFF_CR, ICH_RESETREGS);
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 
 	t = stop_time.tv_sec - start_time.tv_sec;
 	t *= 1000000;

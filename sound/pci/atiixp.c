@@ -646,9 +646,8 @@ static snd_pcm_uframes_t snd_atiixp_pcm_pointer(snd_pcm_substream_t *substream)
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	atiixp_dma_t *dma = (atiixp_dma_t *)runtime->private_data;
 	unsigned int curptr;
-	unsigned long flags;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock(&chip->reg_lock);
 	curptr = readl(chip->remap_addr + dma->ops->dt_cur);
 	if (curptr < dma->buf_addr) {
 		snd_printdd("curptr = %x, base = %x\n", curptr, dma->buf_addr);
@@ -660,7 +659,7 @@ static snd_pcm_uframes_t snd_atiixp_pcm_pointer(snd_pcm_substream_t *substream)
 			curptr = 0;
 		}
 	}
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock(&chip->reg_lock);
 	return bytes_to_frames(runtime, curptr);
 }
 
@@ -845,7 +844,7 @@ static int snd_atiixp_spdif_prepare(snd_pcm_substream_t *substream)
 {
 	atiixp_t *chip = snd_pcm_substream_chip(substream);
 
-	spin_lock(&chip->reg_lock);
+	spin_lock_irq(&chip->reg_lock);
 	if (chip->spdif_over_aclink) {
 		unsigned int data;
 		/* enable slots 10/11 */
@@ -863,7 +862,7 @@ static int snd_atiixp_spdif_prepare(snd_pcm_substream_t *substream)
 		atiixp_update(chip, CMD, ATI_REG_CMD_SPDF_CONFIG_MASK, 0);
 		atiixp_update(chip, CMD, ATI_REG_CMD_INTERLEAVE_SPDF, 0);
 	}
-	spin_unlock(&chip->reg_lock);
+	spin_unlock_irq(&chip->reg_lock);
 	return 0;
 }
 
@@ -873,7 +872,7 @@ static int snd_atiixp_playback_prepare(snd_pcm_substream_t *substream)
 	atiixp_t *chip = snd_pcm_substream_chip(substream);
 	unsigned int data;
 
-	spin_lock(&chip->reg_lock);
+	spin_lock_irq(&chip->reg_lock);
 	data = atiixp_read(chip, OUT_DMA_SLOT) & ~ATI_REG_OUT_DMA_SLOT_MASK;
 	switch (substream->runtime->channels) {
 	case 8:
@@ -908,7 +907,7 @@ static int snd_atiixp_playback_prepare(snd_pcm_substream_t *substream)
 	atiixp_update(chip, 6CH_REORDER, ATI_REG_6CH_REORDER_EN,
 		      substream->runtime->channels >= 6 ? ATI_REG_6CH_REORDER_EN: 0);
     
-	spin_unlock(&chip->reg_lock);
+	spin_unlock_irq(&chip->reg_lock);
 	return 0;
 }
 
@@ -917,11 +916,11 @@ static int snd_atiixp_capture_prepare(snd_pcm_substream_t *substream)
 {
 	atiixp_t *chip = snd_pcm_substream_chip(substream);
 
-	spin_lock(&chip->reg_lock);
+	spin_lock_irq(&chip->reg_lock);
 	atiixp_update(chip, CMD, ATI_REG_CMD_INTERLEAVE_IN,
 		      substream->runtime->format == SNDRV_PCM_FORMAT_S16_LE ?
 		      ATI_REG_CMD_INTERLEAVE_IN : 0);
-	spin_unlock(&chip->reg_lock);
+	spin_unlock_irq(&chip->reg_lock);
 	return 0;
 }
 
@@ -1008,7 +1007,6 @@ static int snd_atiixp_pcm_open(snd_pcm_substream_t *substream, atiixp_dma_t *dma
 {
 	atiixp_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	unsigned long flags;
 	int err;
 
 	snd_assert(dma->ops && dma->ops->enable_dma, return -EINVAL);
@@ -1030,9 +1028,9 @@ static int snd_atiixp_pcm_open(snd_pcm_substream_t *substream, atiixp_dma_t *dma
 	runtime->private_data = dma;
 
 	/* enable DMA bits */
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	dma->ops->enable_dma(chip, 1);
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 	dma->opened = 1;
 
 	return 0;

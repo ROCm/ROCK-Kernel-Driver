@@ -480,36 +480,34 @@ static int snd_fm801_capture_prepare(snd_pcm_substream_t * substream)
 static snd_pcm_uframes_t snd_fm801_playback_pointer(snd_pcm_substream_t * substream)
 {
 	fm801_t *chip = snd_pcm_substream_chip(substream);
-	unsigned long flags;
 	size_t ptr;
 
 	if (!(chip->ply_ctrl & FM801_START))
 		return 0;
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock(&chip->reg_lock);
 	ptr = chip->ply_pos + (chip->ply_count - 1) - inw(FM801_REG(chip, PLY_COUNT));
 	if (inw(FM801_REG(chip, IRQ_STATUS)) & FM801_IRQ_PLAYBACK) {
 		ptr += chip->ply_count;
 		ptr %= chip->ply_size;
 	}
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock(&chip->reg_lock);
 	return bytes_to_frames(substream->runtime, ptr);
 }
 
 static snd_pcm_uframes_t snd_fm801_capture_pointer(snd_pcm_substream_t * substream)
 {
 	fm801_t *chip = snd_pcm_substream_chip(substream);
-	unsigned long flags;
 	size_t ptr;
 
 	if (!(chip->cap_ctrl & FM801_START))
 		return 0;
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock(&chip->reg_lock);
 	ptr = chip->cap_pos + (chip->cap_count - 1) - inw(FM801_REG(chip, CAP_COUNT));
 	if (inw(FM801_REG(chip, IRQ_STATUS)) & FM801_IRQ_CAPTURE) {
 		ptr += chip->cap_count;
 		ptr %= chip->cap_size;
 	}
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock(&chip->reg_lock);
 	return bytes_to_frames(substream->runtime, ptr);
 }
 
@@ -1069,10 +1067,10 @@ static int snd_fm801_get_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 	int mask = (kcontrol->private_value >> 16) & 0xff;
 	int invert = (kcontrol->private_value >> 24) & 0xff;
 
-	spin_lock(&chip->reg_lock);
+	spin_lock_irq(&chip->reg_lock);
 	ucontrol->value.integer.value[0] = (inw(chip->port + reg) >> shift_left) & mask;
 	ucontrol->value.integer.value[1] = (inw(chip->port + reg) >> shift_right) & mask;
-	spin_unlock(&chip->reg_lock);
+	spin_unlock_irq(&chip->reg_lock);
 	if (invert) {
 		ucontrol->value.integer.value[0] = mask - ucontrol->value.integer.value[0];
 		ucontrol->value.integer.value[1] = mask - ucontrol->value.integer.value[1];

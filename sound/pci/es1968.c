@@ -1298,9 +1298,8 @@ static int snd_es1968_pcm_trigger(snd_pcm_substream_t *substream, int cmd)
 {
 	es1968_t *chip = snd_pcm_substream_chip(substream);
 	esschan_t *es = substream->runtime->private_data;
-	unsigned long flags;
 
-	spin_lock_irqsave(&chip->substream_lock, flags);
+	spin_lock(&chip->substream_lock);
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
@@ -1321,7 +1320,7 @@ static int snd_es1968_pcm_trigger(snd_pcm_substream_t *substream, int cmd)
 		snd_es1968_bob_dec(chip);
 		break;
 	}
-	spin_unlock_irqrestore(&chip->substream_lock, flags);
+	spin_unlock(&chip->substream_lock);
 	return 0;
 }
 
@@ -1601,7 +1600,6 @@ static int snd_es1968_playback_open(snd_pcm_substream_t *substream)
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	esschan_t *es;
 	int apu1;
-	unsigned long flags;
 
 	/* search 2 APUs */
 	apu1 = snd_es1968_alloc_apu_pair(chip, ESM_APU_PCM_PLAY);
@@ -1632,9 +1630,9 @@ static int snd_es1968_playback_open(snd_pcm_substream_t *substream)
 	snd_pcm_hw_constraint_step(runtime, 0, SNDRV_PCM_HW_PARAM_BUFFER_BYTES,
 				   1024);
 #endif
-	spin_lock_irqsave(&chip->substream_lock, flags);
+	spin_lock_irq(&chip->substream_lock);
 	list_add(&es->list, &chip->substream_list);
-	spin_unlock_irqrestore(&chip->substream_lock, flags);
+	spin_unlock_irq(&chip->substream_lock);
 
 	return 0;
 }
@@ -1645,7 +1643,6 @@ static int snd_es1968_capture_open(snd_pcm_substream_t *substream)
 	es1968_t *chip = snd_pcm_substream_chip(substream);
 	esschan_t *es;
 	int apu1, apu2;
-	unsigned long flags;
 
 	apu1 = snd_es1968_alloc_apu_pair(chip, ESM_APU_PCM_CAPTURE);
 	if (apu1 < 0)
@@ -1694,9 +1691,9 @@ static int snd_es1968_capture_open(snd_pcm_substream_t *substream)
 	snd_pcm_hw_constraint_step(runtime, 0, SNDRV_PCM_HW_PARAM_BUFFER_BYTES,
 				   1024);
 #endif
-	spin_lock_irqsave(&chip->substream_lock, flags);
+	spin_lock_irq(&chip->substream_lock);
 	list_add(&es->list, &chip->substream_list);
-	spin_unlock_irqrestore(&chip->substream_lock, flags);
+	spin_unlock_irq(&chip->substream_lock);
 
 	return 0;
 }
@@ -1705,14 +1702,13 @@ static int snd_es1968_playback_close(snd_pcm_substream_t * substream)
 {
 	es1968_t *chip = snd_pcm_substream_chip(substream);
 	esschan_t *es;
-	unsigned long flags;
 
 	if (substream->runtime->private_data == NULL)
 		return 0;
 	es = substream->runtime->private_data;
-	spin_lock_irqsave(&chip->substream_lock, flags);
+	spin_lock_irq(&chip->substream_lock);
 	list_del(&es->list);
-	spin_unlock_irqrestore(&chip->substream_lock, flags);
+	spin_unlock_irq(&chip->substream_lock);
 	snd_es1968_free_apu_pair(chip, es->apu[0]);
 	kfree(es);
 
@@ -1723,14 +1719,13 @@ static int snd_es1968_capture_close(snd_pcm_substream_t * substream)
 {
 	es1968_t *chip = snd_pcm_substream_chip(substream);
 	esschan_t *es;
-	unsigned long flags;
 
 	if (substream->runtime->private_data == NULL)
 		return 0;
 	es = substream->runtime->private_data;
-	spin_lock_irqsave(&chip->substream_lock, flags);
+	spin_lock_irq(&chip->substream_lock);
 	list_del(&es->list);
-	spin_unlock_irqrestore(&chip->substream_lock, flags);
+	spin_unlock_irq(&chip->substream_lock);
 	snd_es1968_free_memory(chip, es->mixbuf);
 	snd_es1968_free_apu_pair(chip, es->apu[0]);
 	snd_es1968_free_apu_pair(chip, es->apu[2]);
@@ -1772,7 +1767,6 @@ static void __devinit es1968_measure_clock(es1968_t *chip)
 	int i, apu;
 	unsigned int pa, offset, t;
 	esm_memory_t *memory;
-	unsigned long flags;
 	struct timeval start_time, stop_time;
 
 	if (chip->clock == 0)
@@ -1809,18 +1803,18 @@ static void __devinit es1968_measure_clock(es1968_t *chip)
 	apu_set_register(chip, apu, 9, 0xD000);
 	apu_set_register(chip, apu, 10, 0x8F08);
 	apu_set_register(chip, apu, 11, 0x0000);
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	outw(1, chip->io_port + 0x04); /* clear WP interrupts */
 	outw(inw(chip->io_port + ESM_PORT_HOST_IRQ) | ESM_HIRQ_DSIE, chip->io_port + ESM_PORT_HOST_IRQ); /* enable WP ints */
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 
 	snd_es1968_apu_set_freq(chip, apu, ((unsigned int)48000 << 16) / chip->clock); /* 48000 Hz */
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	__apu_set_register(chip, apu, 5, pa & 0xffff);
 	snd_es1968_trigger_apu(chip, apu, ESM_APU_16BITLINEAR);
 	do_gettimeofday(&start_time);
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 #if 0
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout(HZ / 20); /* 50 msec */
@@ -1831,11 +1825,11 @@ static void __devinit es1968_measure_clock(es1968_t *chip)
 	 */
 	mdelay(50);
 #endif
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	offset = __apu_get_register(chip, apu, 5);
 	do_gettimeofday(&stop_time);
 	snd_es1968_trigger_apu(chip, apu, 0); /* stop */
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 
 	/* check the current position */
 	offset -= (pa & 0xffff);

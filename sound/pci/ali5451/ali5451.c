@@ -1521,16 +1521,15 @@ static snd_pcm_uframes_t snd_ali_playback_pointer(snd_pcm_substream_t *substream
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	snd_ali_voice_t *pvoice = (snd_ali_voice_t *) runtime->private_data;
 	unsigned int cso;
-	unsigned long flags;
 
-	spin_lock_irqsave(&codec->reg_lock, flags);
+	spin_lock(&codec->reg_lock);
 	if (!pvoice->running) {
-		spin_unlock_irqrestore(&codec->reg_lock, flags);
+		spin_unlock(&codec->reg_lock);
 		return 0;
 	}
 	outb(pvoice->number, ALI_REG(codec, ALI_GC_CIR));
 	cso = inw(ALI_REG(codec, ALI_CSO_ALPHA_FMS + 2));
-	spin_unlock_irqrestore(&codec->reg_lock, flags);
+	spin_unlock(&codec->reg_lock);
 	snd_ali_printk("playback pointer returned cso=%xh.\n", cso);
 
 	return cso;

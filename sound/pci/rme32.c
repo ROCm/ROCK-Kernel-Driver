@@ -741,7 +741,6 @@ static int
 snd_rme32_capture_hw_params(snd_pcm_substream_t * substream,
 			    snd_pcm_hw_params_t * params)
 {
-	unsigned long flags;
 	int err, isadat, rate;
 	rme32_t *rme32 = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
@@ -756,27 +755,27 @@ snd_rme32_capture_hw_params(snd_pcm_substream_t * substream,
 		runtime->dma_bytes = RME32_BUFFER_SIZE;
 	}
 
-	spin_lock_irqsave(&rme32->lock, flags);
+	spin_lock_irq(&rme32->lock);
 	/* enable AutoSync for record-preparing */
 	rme32->wcreg |= RME32_WCR_AUTOSYNC;
 	writel(rme32->wcreg, rme32->iobase + RME32_IO_CONTROL_REGISTER);
 
 	if ((err = snd_rme32_setformat(rme32, params_format(params))) < 0) {
-		spin_unlock_irqrestore(&rme32->lock, flags);
+		spin_unlock_irq(&rme32->lock);
 		return err;
 	}
 	if ((err = snd_rme32_playback_setrate(rme32, params_rate(params))) < 0) {
-		spin_unlock_irqrestore(&rme32->lock, flags);
+		spin_unlock_irq(&rme32->lock);
 		return err;
 	}
 	if ((rate = snd_rme32_capture_getrate(rme32, &isadat)) > 0) {
                 if ((int)params_rate(params) != rate) {
-                        spin_unlock_irqrestore(&rme32->lock, flags);
+			spin_unlock_irq(&rme32->lock);
                         return -EIO;                    
                 }
                 if ((isadat && runtime->hw.channels_min == 2) ||
                     (!isadat && runtime->hw.channels_min == 8)) {
-                        spin_unlock_irqrestore(&rme32->lock, flags);
+			spin_unlock_irq(&rme32->lock);
                         return -EIO;
                 }
 	}
@@ -788,13 +787,13 @@ snd_rme32_capture_hw_params(snd_pcm_substream_t * substream,
 	if (rme32->playback_periodsize != 0) {
 		if (params_period_size(params) << rme32->capture_frlog !=
 		    rme32->playback_periodsize) {
-			spin_unlock_irqrestore(&rme32->lock, flags);
+			spin_unlock_irq(&rme32->lock);
 			return -EBUSY;
 		}
 	}
 	rme32->capture_periodsize =
 	    params_period_size(params) << rme32->capture_frlog;
-	spin_unlock_irqrestore(&rme32->lock, flags);
+	spin_unlock_irq(&rme32->lock);
 
 	return 0;
 }
@@ -880,22 +879,21 @@ static void snd_rme32_set_buffer_constraint(rme32_t *rme32, snd_pcm_runtime_t *r
 
 static int snd_rme32_playback_spdif_open(snd_pcm_substream_t * substream)
 {
-	unsigned long flags;
 	int rate, dummy;
 	rme32_t *rme32 = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
 	snd_pcm_set_sync(substream);
 
-	spin_lock_irqsave(&rme32->lock, flags);
+	spin_lock_irq(&rme32->lock);
 	if (rme32->playback_substream != NULL) {
-		spin_unlock_irqrestore(&rme32->lock, flags);
+		spin_unlock_irq(&rme32->lock);
 		return -EBUSY;
 	}
 	rme32->wcreg &= ~RME32_WCR_ADAT;
 	writel(rme32->wcreg, rme32->iobase + RME32_IO_CONTROL_REGISTER);
 	rme32->playback_substream = substream;
-	spin_unlock_irqrestore(&rme32->lock, flags);
+	spin_unlock_irq(&rme32->lock);
 
 	if (rme32->fullduplex_mode)
 		runtime->hw = snd_rme32_spdif_fd_info;
@@ -924,20 +922,19 @@ static int snd_rme32_playback_spdif_open(snd_pcm_substream_t * substream)
 
 static int snd_rme32_capture_spdif_open(snd_pcm_substream_t * substream)
 {
-	unsigned long flags;
 	int isadat, rate;
 	rme32_t *rme32 = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
 	snd_pcm_set_sync(substream);
 
-	spin_lock_irqsave(&rme32->lock, flags);
+	spin_lock_irq(&rme32->lock);
         if (rme32->capture_substream != NULL) {
-	        spin_unlock_irqrestore(&rme32->lock, flags);
+		spin_unlock_irq(&rme32->lock);
                 return -EBUSY;
         }
 	rme32->capture_substream = substream;
-	spin_unlock_irqrestore(&rme32->lock, flags);
+	spin_unlock_irq(&rme32->lock);
 
 	if (rme32->fullduplex_mode)
 		runtime->hw = snd_rme32_spdif_fd_info;
@@ -964,22 +961,21 @@ static int snd_rme32_capture_spdif_open(snd_pcm_substream_t * substream)
 static int
 snd_rme32_playback_adat_open(snd_pcm_substream_t *substream)
 {
-	unsigned long flags;
 	int rate, dummy;
 	rme32_t *rme32 = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	
 	snd_pcm_set_sync(substream);
 
-	spin_lock_irqsave(&rme32->lock, flags);	
+	spin_lock_irq(&rme32->lock);	
         if (rme32->playback_substream != NULL) {
-	        spin_unlock_irqrestore(&rme32->lock, flags);
+		spin_unlock_irq(&rme32->lock);
                 return -EBUSY;
         }
 	rme32->wcreg |= RME32_WCR_ADAT;
 	writel(rme32->wcreg, rme32->iobase + RME32_IO_CONTROL_REGISTER);
 	rme32->playback_substream = substream;
-	spin_unlock_irqrestore(&rme32->lock, flags);
+	spin_unlock_irq(&rme32->lock);
 	
 	if (rme32->fullduplex_mode)
 		runtime->hw = snd_rme32_adat_fd_info;
@@ -1000,7 +996,6 @@ snd_rme32_playback_adat_open(snd_pcm_substream_t *substream)
 static int
 snd_rme32_capture_adat_open(snd_pcm_substream_t *substream)
 {
-	unsigned long flags;
 	int isadat, rate;
 	rme32_t *rme32 = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
@@ -1020,13 +1015,13 @@ snd_rme32_capture_adat_open(snd_pcm_substream_t *substream)
 
 	snd_pcm_set_sync(substream);
         
-	spin_lock_irqsave(&rme32->lock, flags);	
+	spin_lock_irq(&rme32->lock);	
 	if (rme32->capture_substream != NULL) {
-		spin_unlock_irqrestore(&rme32->lock, flags);
+		spin_unlock_irq(&rme32->lock);
 		return -EBUSY;
         }
 	rme32->capture_substream = substream;
-	spin_unlock_irqrestore(&rme32->lock, flags);
+	spin_unlock_irq(&rme32->lock);
 
 	snd_rme32_set_buffer_constraint(rme32, runtime);
 	return 0;
@@ -1034,15 +1029,14 @@ snd_rme32_capture_adat_open(snd_pcm_substream_t *substream)
 
 static int snd_rme32_playback_close(snd_pcm_substream_t * substream)
 {
-	unsigned long flags;
 	rme32_t *rme32 = snd_pcm_substream_chip(substream);
 	int spdif = 0;
 
-	spin_lock_irqsave(&rme32->lock, flags);
+	spin_lock_irq(&rme32->lock);
 	rme32->playback_substream = NULL;
 	rme32->playback_periodsize = 0;
 	spdif = (rme32->wcreg & RME32_WCR_ADAT) == 0;
-	spin_unlock_irqrestore(&rme32->lock, flags);
+	spin_unlock_irq(&rme32->lock);
 	if (spdif) {
 		rme32->spdif_ctl->vd[0].access |= SNDRV_CTL_ELEM_ACCESS_INACTIVE;
 		snd_ctl_notify(rme32->card, SNDRV_CTL_EVENT_MASK_VALUE |
@@ -1054,13 +1048,12 @@ static int snd_rme32_playback_close(snd_pcm_substream_t * substream)
 
 static int snd_rme32_capture_close(snd_pcm_substream_t * substream)
 {
-	unsigned long flags;
 	rme32_t *rme32 = snd_pcm_substream_chip(substream);
 
-	spin_lock_irqsave(&rme32->lock, flags);
+	spin_lock_irq(&rme32->lock);
 	rme32->capture_substream = NULL;
 	rme32->capture_periodsize = 0;
-	spin_unlock_irqrestore(&rme32->lock, flags);
+	spin_unlock(&rme32->lock);
 	return 0;
 }
 
@@ -1068,7 +1061,7 @@ static int snd_rme32_playback_prepare(snd_pcm_substream_t * substream)
 {
 	rme32_t *rme32 = snd_pcm_substream_chip(substream);
 
-	spin_lock(&rme32->lock);
+	spin_lock_irq(&rme32->lock);
 	if (rme32->fullduplex_mode) {
 		memset(&rme32->playback_pcm, 0, sizeof(rme32->playback_pcm));
 		rme32->playback_pcm.hw_buffer_size = RME32_BUFFER_SIZE;
@@ -1080,7 +1073,7 @@ static int snd_rme32_playback_prepare(snd_pcm_substream_t * substream)
 	if (rme32->wcreg & RME32_WCR_SEL)
 		rme32->wcreg &= ~RME32_WCR_MUTE;
 	writel(rme32->wcreg, rme32->iobase + RME32_IO_CONTROL_REGISTER);
-	spin_unlock(&rme32->lock);
+	spin_unlock_irq(&rme32->lock);
 	return 0;
 }
 
@@ -1088,7 +1081,7 @@ static int snd_rme32_capture_prepare(snd_pcm_substream_t * substream)
 {
 	rme32_t *rme32 = snd_pcm_substream_chip(substream);
 
-	spin_lock(&rme32->lock);
+	spin_lock_irq(&rme32->lock);
 	if (rme32->fullduplex_mode) {
 		memset(&rme32->capture_pcm, 0, sizeof(rme32->capture_pcm));
 		rme32->capture_pcm.hw_buffer_size = RME32_BUFFER_SIZE;
@@ -1097,7 +1090,7 @@ static int snd_rme32_capture_prepare(snd_pcm_substream_t * substream)
 	} else {
 		writel(0, rme32->iobase + RME32_IO_RESET_POS);
 	}
-	spin_unlock(&rme32->lock);
+	spin_unlock_irq(&rme32->lock);
 	return 0;
 }
 
@@ -1604,12 +1597,11 @@ snd_rme32_get_loopback_control(snd_kcontrol_t * kcontrol,
 			       snd_ctl_elem_value_t * ucontrol)
 {
 	rme32_t *rme32 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 
-	spin_lock_irqsave(&rme32->lock, flags);
+	spin_lock_irq(&rme32->lock);
 	ucontrol->value.integer.value[0] =
 	    rme32->wcreg & RME32_WCR_SEL ? 0 : 1;
-	spin_unlock_irqrestore(&rme32->lock, flags);
+	spin_unlock_irq(&rme32->lock);
 	return 0;
 }
 static int
@@ -1617,12 +1609,11 @@ snd_rme32_put_loopback_control(snd_kcontrol_t * kcontrol,
 			       snd_ctl_elem_value_t * ucontrol)
 {
 	rme32_t *rme32 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	unsigned int val;
 	int change;
 
 	val = ucontrol->value.integer.value[0] ? 0 : RME32_WCR_SEL;
-	spin_lock_irqsave(&rme32->lock, flags);
+	spin_lock_irq(&rme32->lock);
 	val = (rme32->wcreg & ~RME32_WCR_SEL) | val;
 	change = val != rme32->wcreg;
 	if (ucontrol->value.integer.value[0])
@@ -1631,7 +1622,7 @@ snd_rme32_put_loopback_control(snd_kcontrol_t * kcontrol,
 		val |= RME32_WCR_MUTE;
 	writel(rme32->wcreg =
 	       val, rme32->iobase + RME32_IO_CONTROL_REGISTER);
-	spin_unlock_irqrestore(&rme32->lock, flags);
+	spin_unlock_irq(&rme32->lock);
 	return change;
 }
 
@@ -1670,10 +1661,9 @@ snd_rme32_get_inputtype_control(snd_kcontrol_t * kcontrol,
 				snd_ctl_elem_value_t * ucontrol)
 {
 	rme32_t *rme32 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	unsigned int items = 3;
 
-	spin_lock_irqsave(&rme32->lock, flags);
+	spin_lock_irq(&rme32->lock);
 	ucontrol->value.enumerated.item[0] = snd_rme32_getinputtype(rme32);
 
 	switch (rme32->pci->device) {
@@ -1692,7 +1682,7 @@ snd_rme32_get_inputtype_control(snd_kcontrol_t * kcontrol,
 		ucontrol->value.enumerated.item[0] = items - 1;
 	}
 
-	spin_unlock_irqrestore(&rme32->lock, flags);
+	spin_unlock_irq(&rme32->lock);
 	return 0;
 }
 static int
@@ -1700,7 +1690,6 @@ snd_rme32_put_inputtype_control(snd_kcontrol_t * kcontrol,
 				snd_ctl_elem_value_t * ucontrol)
 {
 	rme32_t *rme32 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	unsigned int val;
 	int change, items = 3;
 
@@ -1718,10 +1707,10 @@ snd_rme32_put_inputtype_control(snd_kcontrol_t * kcontrol,
 	}
 	val = ucontrol->value.enumerated.item[0] % items;
 
-	spin_lock_irqsave(&rme32->lock, flags);
+	spin_lock_irq(&rme32->lock);
 	change = val != (unsigned int)snd_rme32_getinputtype(rme32);
 	snd_rme32_setinputtype(rme32, val);
-	spin_unlock_irqrestore(&rme32->lock, flags);
+	spin_unlock_irq(&rme32->lock);
 	return change;
 }
 
@@ -1749,11 +1738,10 @@ snd_rme32_get_clockmode_control(snd_kcontrol_t * kcontrol,
 				snd_ctl_elem_value_t * ucontrol)
 {
 	rme32_t *rme32 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 
-	spin_lock_irqsave(&rme32->lock, flags);
+	spin_lock_irq(&rme32->lock);
 	ucontrol->value.enumerated.item[0] = snd_rme32_getclockmode(rme32);
-	spin_unlock_irqrestore(&rme32->lock, flags);
+	spin_unlock_irq(&rme32->lock);
 	return 0;
 }
 static int
@@ -1761,15 +1749,14 @@ snd_rme32_put_clockmode_control(snd_kcontrol_t * kcontrol,
 				snd_ctl_elem_value_t * ucontrol)
 {
 	rme32_t *rme32 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	unsigned int val;
 	int change;
 
 	val = ucontrol->value.enumerated.item[0] % 3;
-	spin_lock_irqsave(&rme32->lock, flags);
+	spin_lock_irq(&rme32->lock);
 	change = val != (unsigned int)snd_rme32_getclockmode(rme32);
 	snd_rme32_setclockmode(rme32, val);
-	spin_unlock_irqrestore(&rme32->lock, flags);
+	spin_unlock_irq(&rme32->lock);
 	return change;
 }
 
@@ -1815,15 +1802,14 @@ static int snd_rme32_control_spdif_put(snd_kcontrol_t * kcontrol,
 				       snd_ctl_elem_value_t * ucontrol)
 {
 	rme32_t *rme32 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	u32 val;
 
 	val = snd_rme32_convert_from_aes(&ucontrol->value.iec958);
-	spin_lock_irqsave(&rme32->lock, flags);
+	spin_lock_irq(&rme32->lock);
 	change = val != rme32->wcreg_spdif;
 	rme32->wcreg_spdif = val;
-	spin_unlock_irqrestore(&rme32->lock, flags);
+	spin_unlock_irq(&rme32->lock);
 	return change;
 }
 
@@ -1851,17 +1837,16 @@ static int snd_rme32_control_spdif_stream_put(snd_kcontrol_t * kcontrol,
 					      ucontrol)
 {
 	rme32_t *rme32 = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	u32 val;
 
 	val = snd_rme32_convert_from_aes(&ucontrol->value.iec958);
-	spin_lock_irqsave(&rme32->lock, flags);
+	spin_lock_irq(&rme32->lock);
 	change = val != rme32->wcreg_spdif_stream;
 	rme32->wcreg_spdif_stream = val;
 	rme32->wcreg &= ~(RME32_WCR_PRO | RME32_WCR_EMP);
 	writel(rme32->wcreg |= val, rme32->iobase + RME32_IO_CONTROL_REGISTER);
-	spin_unlock_irqrestore(&rme32->lock, flags);
+	spin_unlock_irq(&rme32->lock);
 	return change;
 }
 

@@ -769,12 +769,6 @@ static int snd_cs46xx_playback_trigger(snd_pcm_substream_t * substream,
 
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
 	cs46xx_pcm_t *cpcm = substream->runtime->private_data;
-#else
-	spin_lock(&chip->reg_lock);
-#endif
-
-#ifdef CONFIG_SND_CS46XX_NEW_DSP
-
 	if (! cpcm->pcm_channel) {
 		return -ENXIO;
 	}
@@ -793,6 +787,7 @@ static int snd_cs46xx_playback_trigger(snd_pcm_substream_t * substream,
 		if (substream->runtime->periods != CS46XX_FRAGS)
 			snd_cs46xx_playback_transfer(substream);
 #else
+		spin_lock(&chip->reg_lock);
 		if (substream->runtime->periods != CS46XX_FRAGS)
 			snd_cs46xx_playback_transfer(substream);
 		{ unsigned int tmp;
@@ -800,6 +795,7 @@ static int snd_cs46xx_playback_trigger(snd_pcm_substream_t * substream,
 		tmp &= 0x0000ffff;
 		snd_cs46xx_poke(chip, BA1_PCTL, chip->play_ctl | tmp);
 		}
+		spin_unlock(&chip->reg_lock);
 #endif
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
@@ -812,21 +808,19 @@ static int snd_cs46xx_playback_trigger(snd_pcm_substream_t * substream,
 		if (!cpcm->pcm_channel->unlinked)
 			cs46xx_dsp_pcm_unlink(chip,cpcm->pcm_channel);
 #else
+		spin_lock(&chip->reg_lock);
 		{ unsigned int tmp;
 		tmp = snd_cs46xx_peek(chip, BA1_PCTL);
 		tmp &= 0x0000ffff;
 		snd_cs46xx_poke(chip, BA1_PCTL, tmp);
 		}
+		spin_unlock(&chip->reg_lock);
 #endif
 		break;
 	default:
 		result = -EINVAL;
 		break;
 	}
-
-#ifndef CONFIG_SND_CS46XX_NEW_DSP
-	spin_unlock(&chip->reg_lock);
-#endif
 
 	return result;
 }
@@ -1221,7 +1215,9 @@ static irqreturn_t snd_cs46xx_interrupt(int irq, void *dev_id, struct pt_regs *r
 			c = snd_cs46xx_peekBA0(chip, BA0_MIDRP);
 			if ((chip->midcr & MIDCR_RIE) == 0)
 				continue;
+			spin_unlock(&chip->reg_lock);
 			snd_rawmidi_receive(chip->midi_input, &c, 1);
+			spin_lock(&chip->reg_lock);
 		}
 		while ((snd_cs46xx_peekBA0(chip, BA0_MIDSR) & MIDSR_TBF) == 0) {
 			if ((chip->midcr & MIDCR_TIE) == 0)
@@ -2523,11 +2519,10 @@ static void snd_cs46xx_midi_reset(cs46xx_t *chip)
 
 static int snd_cs46xx_midi_input_open(snd_rawmidi_substream_t * substream)
 {
-	unsigned long flags;
 	cs46xx_t *chip = substream->rmidi->private_data;
 
 	chip->active_ctrl(chip, 1);
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	chip->uartm |= CS46XX_MODE_INPUT;
 	chip->midcr |= MIDCR_RXE;
 	chip->midi_input = substream;
@@ -2536,16 +2531,15 @@ static int snd_cs46xx_midi_input_open(snd_rawmidi_substream_t * substream)
 	} else {
 		snd_cs46xx_pokeBA0(chip, BA0_MIDCR, chip->midcr);
 	}
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 	return 0;
 }
 
 static int snd_cs46xx_midi_input_close(snd_rawmidi_substream_t * substream)
 {
-	unsigned long flags;
 	cs46xx_t *chip = substream->rmidi->private_data;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	chip->midcr &= ~(MIDCR_RXE | MIDCR_RIE);
 	chip->midi_input = NULL;
 	if (!(chip->uartm & CS46XX_MODE_OUTPUT)) {
@@ -2554,19 +2548,18 @@ static int snd_cs46xx_midi_input_close(snd_rawmidi_substream_t * substream)
 		snd_cs46xx_pokeBA0(chip, BA0_MIDCR, chip->midcr);
 	}
 	chip->uartm &= ~CS46XX_MODE_INPUT;
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 	chip->active_ctrl(chip, -1);
 	return 0;
 }
 
 static int snd_cs46xx_midi_output_open(snd_rawmidi_substream_t * substream)
 {
-	unsigned long flags;
 	cs46xx_t *chip = substream->rmidi->private_data;
 
 	chip->active_ctrl(chip, 1);
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	chip->uartm |= CS46XX_MODE_OUTPUT;
 	chip->midcr |= MIDCR_TXE;
 	chip->midi_output = substream;
@@ -2575,16 +2568,15 @@ static int snd_cs46xx_midi_output_open(snd_rawmidi_substream_t * substream)
 	} else {
 		snd_cs46xx_pokeBA0(chip, BA0_MIDCR, chip->midcr);
 	}
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 	return 0;
 }
 
 static int snd_cs46xx_midi_output_close(snd_rawmidi_substream_t * substream)
 {
-	unsigned long flags;
 	cs46xx_t *chip = substream->rmidi->private_data;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	chip->midcr &= ~(MIDCR_TXE | MIDCR_TIE);
 	chip->midi_output = NULL;
 	if (!(chip->uartm & CS46XX_MODE_INPUT)) {
@@ -2593,7 +2585,7 @@ static int snd_cs46xx_midi_output_close(snd_rawmidi_substream_t * substream)
 		snd_cs46xx_pokeBA0(chip, BA0_MIDCR, chip->midcr);
 	}
 	chip->uartm &= ~CS46XX_MODE_OUTPUT;
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 	chip->active_ctrl(chip, -1);
 	return 0;
 }

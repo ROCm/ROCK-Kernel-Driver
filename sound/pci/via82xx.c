@@ -626,7 +626,6 @@ static irqreturn_t snd_via82xx_interrupt(int irq, void *dev_id, struct pt_regs *
 	unsigned int status;
 	unsigned int i;
 
-	spin_lock(&chip->reg_lock);
 #if 0
 	/* FIXME: does it work on via823x? */
 	if (chip->chip_type != TYPE_VIA686)
@@ -634,7 +633,6 @@ static irqreturn_t snd_via82xx_interrupt(int irq, void *dev_id, struct pt_regs *
 #endif
 	status = inl(VIAREG(chip, SGD_SHADOW));
 	if (! (status & chip->intr_mask)) {
-		spin_unlock(&chip->reg_lock);
 		if (chip->rmidi)
 			/* check mpu401 interrupt */
 			return snd_mpu401_uart_interrupt(irq, chip->rmidi->private_data, regs);
@@ -643,6 +641,7 @@ static irqreturn_t snd_via82xx_interrupt(int irq, void *dev_id, struct pt_regs *
 // _skip_sgd:
 
 	/* check status for each stream */
+	spin_lock(&chip->reg_lock);
 	for (i = 0; i < chip->num_devs; i++) {
 		viadev_t *viadev = &chip->devs[i];
 		unsigned char c_status = inb(VIADEV_REG(viadev, OFFSET_STATUS));
@@ -898,7 +897,7 @@ static int via_lock_rate(struct via_rate_lock *rec, int rate)
 {
 	int changed = 0;
 
-	spin_lock(&rec->lock);
+	spin_lock_irq(&rec->lock);
 	if (rec->rate != rate) {
 		if (rec->rate && rec->used > 1) /* already set */
 			changed = -EINVAL;
@@ -907,7 +906,7 @@ static int via_lock_rate(struct via_rate_lock *rec, int rate)
 			changed = 1;
 		}
 	}
-	spin_unlock(&rec->lock);
+	spin_unlock_irq(&rec->lock);
 	return changed;
 }
 
@@ -1053,14 +1052,13 @@ static int snd_via82xx_pcm_open(via82xx_t *chip, viadev_t *viadev, snd_pcm_subst
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	int err;
-	unsigned long flags;
 	struct via_rate_lock *ratep;
 
 	runtime->hw = snd_via82xx_hw;
 	
 	/* set the hw rate condition */
 	ratep = &chip->rates[viadev->direction];
-	spin_lock_irqsave(&ratep->lock, flags);
+	spin_lock_irq(&ratep->lock);
 	ratep->used++;
 	if (chip->spdif_on && viadev->reg_offset == 0x30) {
 		/* DXS#3 and spdif is on */
@@ -1079,7 +1077,7 @@ static int snd_via82xx_pcm_open(via82xx_t *chip, viadev_t *viadev, snd_pcm_subst
 		runtime->hw.rates = SNDRV_PCM_RATE_KNOT;
 		runtime->hw.rate_max = runtime->hw.rate_min = ratep->rate;
 	}
-	spin_unlock_irqrestore(&ratep->lock, flags);
+	spin_unlock_irq(&ratep->lock);
 
 	/* we may remove following constaint when we modify table entries
 	   in interrupt */
@@ -1153,16 +1151,15 @@ static int snd_via82xx_pcm_close(snd_pcm_substream_t * substream)
 {
 	via82xx_t *chip = snd_pcm_substream_chip(substream);
 	viadev_t *viadev = (viadev_t *)substream->runtime->private_data;
-	unsigned long flags;
 	struct via_rate_lock *ratep;
 
 	/* release the rate lock */
 	ratep = &chip->rates[viadev->direction];
-	spin_lock_irqsave(&ratep->lock, flags);
+	spin_lock_irq(&ratep->lock);
 	ratep->used--;
 	if (! ratep->used)
 		ratep->rate = 0;
-	spin_unlock_irqrestore(&ratep->lock, flags);
+	spin_unlock_irq(&ratep->lock);
 
 	viadev->substream = NULL;
 	return 0;
@@ -1415,17 +1412,16 @@ static int snd_via8233_capture_source_put(snd_kcontrol_t *kcontrol, snd_ctl_elem
 {
 	via82xx_t *chip = snd_kcontrol_chip(kcontrol);
 	unsigned long port = chip->port + (kcontrol->id.index ? (VIA_REG_CAPTURE_CHANNEL + 0x10) : VIA_REG_CAPTURE_CHANNEL);
-	unsigned long flags;
 	u8 val, oval;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	oval = inb(port);
 	val = oval & ~VIA_REG_CAPTURE_CHANNEL_MIC;
 	if (ucontrol->value.enumerated.item[0])
 		val |= VIA_REG_CAPTURE_CHANNEL_MIC;
 	if (val != oval)
 		outb(val, port);
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 	return val != oval;
 }
 

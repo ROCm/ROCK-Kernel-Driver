@@ -620,9 +620,8 @@ static snd_pcm_uframes_t snd_atiixp_pcm_pointer(snd_pcm_substream_t *substream)
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	atiixp_dma_t *dma = (atiixp_dma_t *)runtime->private_data;
 	unsigned int curptr;
-	unsigned long flags;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock(&chip->reg_lock);
 	curptr = readl(chip->remap_addr + dma->ops->dt_cur);
 	if (curptr < dma->buf_addr) {
 		snd_printdd("curptr = %x, base = %x\n", curptr, dma->buf_addr);
@@ -634,7 +633,7 @@ static snd_pcm_uframes_t snd_atiixp_pcm_pointer(snd_pcm_substream_t *substream)
 			curptr = 0;
 		}
 	}
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock(&chip->reg_lock);
 	return bytes_to_frames(runtime, curptr);
 }
 
@@ -786,13 +785,13 @@ static int snd_atiixp_playback_prepare(snd_pcm_substream_t *substream)
 	atiixp_t *chip = snd_pcm_substream_chip(substream);
 	unsigned int data;
 
-	spin_lock(&chip->reg_lock);
+	spin_lock_irq(&chip->reg_lock);
 	/* set output threshold */
 	data = atiixp_read(chip, MODEM_OUT_FIFO);
 	data &= ~ATI_REG_MODEM_OUT1_DMA_THRESHOLD_MASK;
 	data |= 0x04 << ATI_REG_MODEM_OUT1_DMA_THRESHOLD_SHIFT;
 	atiixp_write(chip, MODEM_OUT_FIFO, data);
-	spin_unlock(&chip->reg_lock);
+	spin_unlock_irq(&chip->reg_lock);
 	return 0;
 }
 
@@ -872,7 +871,6 @@ static int snd_atiixp_pcm_open(snd_pcm_substream_t *substream, atiixp_dma_t *dma
 {
 	atiixp_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	unsigned long flags;
 	int err;
 	static unsigned int rates[] = { 8000,  9600, 12000, 16000 };
 	static snd_pcm_hw_constraint_list_t hw_constraints_rates = {
@@ -895,9 +893,9 @@ static int snd_atiixp_pcm_open(snd_pcm_substream_t *substream, atiixp_dma_t *dma
 	runtime->private_data = dma;
 
 	/* enable DMA bits */
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	dma->ops->enable_dma(chip, 1);
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 	dma->opened = 1;
 
 	return 0;

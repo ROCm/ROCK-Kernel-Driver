@@ -537,7 +537,7 @@ static int snd_vt1724_playback_pro_prepare(snd_pcm_substream_t * substream)
 	unsigned char val;
 	unsigned int size;
 
-	spin_lock(&ice->reg_lock);
+	spin_lock_irq(&ice->reg_lock);
 	val = (8 - substream->runtime->channels) >> 1;
 	outb(val, ICEMT1724(ice, BURST));
 
@@ -552,7 +552,7 @@ static int snd_vt1724_playback_pro_prepare(snd_pcm_substream_t * substream)
 	outw(size, ICEMT1724(ice, PLAYBACK_COUNT));
 	outb(size >> 16, ICEMT1724(ice, PLAYBACK_COUNT) + 2);
 
-	spin_unlock(&ice->reg_lock);
+	spin_unlock_irq(&ice->reg_lock);
 
 	// printk("pro prepare: ch = %d, addr = 0x%x, buffer = 0x%x, period = 0x%x\n", substream->runtime->channels, (unsigned int)substream->runtime->dma_addr, snd_pcm_lib_buffer_bytes(substream), snd_pcm_lib_period_bytes(substream));
 	return 0;
@@ -598,11 +598,11 @@ static int snd_vt1724_pcm_prepare(snd_pcm_substream_t *substream)
 	ice1712_t *ice = snd_pcm_substream_chip(substream);
 	struct vt1724_pcm_reg *reg = substream->runtime->private_data;
 
-	spin_lock(&ice->reg_lock);
+	spin_lock_irq(&ice->reg_lock);
 	outl(substream->runtime->dma_addr, ice->profi_port + reg->addr);
 	outw((snd_pcm_lib_buffer_bytes(substream) >> 2) - 1, ice->profi_port + reg->size);
 	outw((snd_pcm_lib_period_bytes(substream) >> 2) - 1, ice->profi_port + reg->count);
-	spin_unlock(&ice->reg_lock);
+	spin_unlock_irq(&ice->reg_lock);
 	return 0;
 }
 
@@ -1078,11 +1078,11 @@ static int snd_vt1724_playback_indep_prepare(snd_pcm_substream_t * substream)
 	ice1712_t *ice = snd_pcm_substream_chip(substream);
 	unsigned char val;
 
-	spin_lock(&ice->reg_lock);
+	spin_lock_irq(&ice->reg_lock);
 	val = 3 - substream->number;
 	if (inb(ICEMT1724(ice, BURST)) < val)
 		outb(val, ICEMT1724(ice, BURST));
-	spin_unlock(&ice->reg_lock);
+	spin_unlock_irq(&ice->reg_lock);
 	return snd_vt1724_pcm_prepare(substream);
 }
 
@@ -1355,14 +1355,13 @@ static int snd_vt1724_spdif_default_put(snd_kcontrol_t * kcontrol,
 {
 	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
 	unsigned int val, old;
-	unsigned long flags;
 
 	val = encode_spdif_bits(&ucontrol->value.iec958);
-	spin_lock_irqsave(&ice->reg_lock, flags);
+	spin_lock_irq(&ice->reg_lock);
 	old = inw(ICEMT1724(ice, SPDIF_CTRL));
 	if (val != old)
 		update_spdif_bits(ice, val);
-	spin_unlock_irqrestore(&ice->reg_lock, flags);
+	spin_unlock_irq(&ice->reg_lock);
 	return (val != old);
 }
 
@@ -1436,15 +1435,15 @@ static int snd_vt1724_spdif_sw_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value
 {
 	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
 	unsigned char old, val;
-	unsigned long flags;
-	spin_lock_irqsave(&ice->reg_lock, flags);
+
+	spin_lock_irq(&ice->reg_lock);
 	old = val = inb(ICEREG1724(ice, SPDIF_CFG));
 	val &= ~VT1724_CFG_SPDIF_OUT_EN;
 	if (ucontrol->value.integer.value[0])
 		val |= VT1724_CFG_SPDIF_OUT_EN;
 	if (old != val)
 		outb(val, ICEREG1724(ice, SPDIF_CFG));
-	spin_unlock_irqrestore(&ice->reg_lock, flags);
+	spin_unlock_irq(&ice->reg_lock);
 	return old != val;
 }
 
@@ -1511,7 +1510,7 @@ int snd_ice1712_gpio_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucont
  */
 static int snd_vt1724_pro_internal_clock_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
-	static char *texts[] = {
+	static char *texts_1724[] = {
 		"8000",		/* 0: 6 */
 		"9600",		/* 1: 3 */
 		"11025",	/* 2: 10 */
@@ -1529,12 +1528,32 @@ static int snd_vt1724_pro_internal_clock_info(snd_kcontrol_t *kcontrol, snd_ctl_
 		"192000",	/* 14: 14 */
 		"IEC958 Input",	/* 15: -- */
 	};
+	static char *texts_1720[] = {
+		"8000",		/* 0: 6 */
+		"9600",		/* 1: 3 */
+		"11025",	/* 2: 10 */
+		"12000",	/* 3: 2 */
+		"16000",	/* 4: 5 */
+		"22050",	/* 5: 9 */
+		"24000",	/* 6: 1 */
+		"32000",	/* 7: 4 */
+		"44100",	/* 8: 8 */
+		"48000",	/* 9: 0 */
+		"64000",	/* 10: 15 */
+		"88200",	/* 11: 11 */
+		"96000",	/* 12: 7 */
+		"IEC958 Input",	/* 13: -- */
+	};
+	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
+
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
 	uinfo->count = 1;
-	uinfo->value.enumerated.items = 16;
+	uinfo->value.enumerated.items = ice->vt1720 ? 14 : 16;
 	if (uinfo->value.enumerated.item >= uinfo->value.enumerated.items)
 		uinfo->value.enumerated.item = uinfo->value.enumerated.items - 1;
-	strcpy(uinfo->value.enumerated.name, texts[uinfo->value.enumerated.item]);
+	strcpy(uinfo->value.enumerated.name,
+	       ice->vt1720 ? texts_1720[uinfo->value.enumerated.item] :
+	       texts_1724[uinfo->value.enumerated.item]);
 	return 0;
 }
 
@@ -1548,7 +1567,7 @@ static int snd_vt1724_pro_internal_clock_get(snd_kcontrol_t * kcontrol, snd_ctl_
 	
 	spin_lock_irq(&ice->reg_lock);
 	if (is_spdif_master(ice)) {
-		ucontrol->value.enumerated.item[0] = 15;
+		ucontrol->value.enumerated.item[0] = ice->vt1720 ? 13 : 15;
 	} else {
 		val = xlate[inb(ICEMT1724(ice, RATE)) & 15];
 		if (val == 255) {
@@ -1567,10 +1586,11 @@ static int snd_vt1724_pro_internal_clock_put(snd_kcontrol_t * kcontrol, snd_ctl_
 	unsigned char oval;
 	int rate;
 	int change = 0;
+	int spdif = ice->vt1720 ? 13 : 15;
 
 	spin_lock_irq(&ice->reg_lock);
 	oval = inb(ICEMT1724(ice, RATE));
-	if (ucontrol->value.enumerated.item[0] == 15) {
+	if (ucontrol->value.enumerated.item[0] == spdif) {
 		outb(oval | VT1724_SPDIF_MASTER, ICEMT1724(ice, RATE));
 	} else {
 		rate = rates[ucontrol->value.integer.value[0] % 15];

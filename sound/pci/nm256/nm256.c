@@ -531,12 +531,11 @@ snd_nm256_playback_trigger(snd_pcm_substream_t *substream, int cmd)
 {
 	nm256_t *chip = snd_pcm_substream_chip(substream);
 	nm256_stream_t *s = (nm256_stream_t*)substream->runtime->private_data;
-	unsigned long flags;
 	int err = 0;
 
 	snd_assert(s != NULL, return -ENXIO);
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock(&chip->reg_lock);
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
@@ -556,7 +555,7 @@ snd_nm256_playback_trigger(snd_pcm_substream_t *substream, int cmd)
 		err = -EINVAL;
 		break;
 	}
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock(&chip->reg_lock);
 	return err;
 }
 
@@ -565,12 +564,11 @@ snd_nm256_capture_trigger(snd_pcm_substream_t *substream, int cmd)
 {
 	nm256_t *chip = snd_pcm_substream_chip(substream);
 	nm256_stream_t *s = (nm256_stream_t*)substream->runtime->private_data;
-	unsigned long flags;
 	int err = 0;
 
 	snd_assert(s != NULL, return -ENXIO);
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock(&chip->reg_lock);
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
@@ -590,7 +588,7 @@ snd_nm256_capture_trigger(snd_pcm_substream_t *substream, int cmd)
 		err = -EINVAL;
 		break;
 	}
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock(&chip->reg_lock);
 	return err;
 }
 
@@ -603,7 +601,6 @@ static int snd_nm256_pcm_prepare(snd_pcm_substream_t *substream)
 	nm256_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	nm256_stream_t *s = (nm256_stream_t*)runtime->private_data;
-	unsigned long flags;
 
 	snd_assert(s, return -ENXIO);
 	s->dma_size = frames_to_bytes(runtime, substream->runtime->buffer_size);
@@ -611,10 +608,10 @@ static int snd_nm256_pcm_prepare(snd_pcm_substream_t *substream)
 	s->periods = substream->runtime->periods;
 	s->cur_period = 0;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	s->running = 0;
 	snd_nm256_set_format(chip, s, substream);
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 
 	return 0;
 }
@@ -917,16 +914,14 @@ snd_nm256_pcm(nm256_t *chip, int device)
 static void
 snd_nm256_init_chip(nm256_t *chip)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	/* Reset everything. */
 	snd_nm256_writeb(chip, 0x0, 0x11);
 	snd_nm256_writew(chip, 0x214, 0);
 	/* stop sounds.. */
 	//snd_nm256_playback_stop(chip);
 	//snd_nm256_capture_stop(chip);
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 }
 
 
@@ -1167,9 +1162,8 @@ static void
 snd_nm256_ac97_reset(ac97_t *ac97)
 {
 	nm256_t *chip = ac97->private_data;
-	unsigned long flags;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock(&chip->reg_lock);
 	/* Reset the mixer.  'Tis magic!  */
 	snd_nm256_writeb(chip, 0x6c0, 1);
 	if (chip->latitude_workaround) {
@@ -1178,7 +1172,7 @@ snd_nm256_ac97_reset(ac97_t *ac97)
 	}
 	snd_nm256_writeb(chip, 0x6cc, 0x80);
 	snd_nm256_writeb(chip, 0x6cc, 0x0);
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock(&chip->reg_lock);
 }
 
 /* create an ac97 mixer interface */

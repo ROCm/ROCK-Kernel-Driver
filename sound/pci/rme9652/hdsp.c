@@ -1423,13 +1423,12 @@ static void snd_hdsp_midi_output_trigger(snd_rawmidi_substream_t * substream, in
 static int snd_hdsp_midi_input_open(snd_rawmidi_substream_t * substream)
 {
 	hdsp_midi_t *hmidi;
-	unsigned long flags;
 
 	hmidi = (hdsp_midi_t *) substream->rmidi->private_data;
-	spin_lock_irqsave (&hmidi->lock, flags);
+	spin_lock_irq (&hmidi->lock);
 	snd_hdsp_flush_midi_input (hmidi->hdsp, hmidi->id);
 	hmidi->input = substream;
-	spin_unlock_irqrestore (&hmidi->lock, flags);
+	spin_unlock_irq (&hmidi->lock);
 
 	return 0;
 }
@@ -1437,12 +1436,11 @@ static int snd_hdsp_midi_input_open(snd_rawmidi_substream_t * substream)
 static int snd_hdsp_midi_output_open(snd_rawmidi_substream_t * substream)
 {
 	hdsp_midi_t *hmidi;
-	unsigned long flags;
 
 	hmidi = (hdsp_midi_t *) substream->rmidi->private_data;
-	spin_lock_irqsave (&hmidi->lock, flags);
+	spin_lock_irq (&hmidi->lock);
 	hmidi->output = substream;
-	spin_unlock_irqrestore (&hmidi->lock, flags);
+	spin_unlock_irq (&hmidi->lock);
 
 	return 0;
 }
@@ -1450,14 +1448,13 @@ static int snd_hdsp_midi_output_open(snd_rawmidi_substream_t * substream)
 static int snd_hdsp_midi_input_close(snd_rawmidi_substream_t * substream)
 {
 	hdsp_midi_t *hmidi;
-	unsigned long flags;
 
 	snd_hdsp_midi_input_trigger (substream, 0);
 
 	hmidi = (hdsp_midi_t *) substream->rmidi->private_data;
-	spin_lock_irqsave (&hmidi->lock, flags);
+	spin_lock_irq (&hmidi->lock);
 	hmidi->input = NULL;
-	spin_unlock_irqrestore (&hmidi->lock, flags);
+	spin_unlock_irq (&hmidi->lock);
 
 	return 0;
 }
@@ -1465,14 +1462,13 @@ static int snd_hdsp_midi_input_close(snd_rawmidi_substream_t * substream)
 static int snd_hdsp_midi_output_close(snd_rawmidi_substream_t * substream)
 {
 	hdsp_midi_t *hmidi;
-	unsigned long flags;
 
 	snd_hdsp_midi_output_trigger (substream, 0);
 
 	hmidi = (hdsp_midi_t *) substream->rmidi->private_data;
-	spin_lock_irqsave (&hmidi->lock, flags);
+	spin_lock_irq (&hmidi->lock);
 	hmidi->output = NULL;
-	spin_unlock_irqrestore (&hmidi->lock, flags);
+	spin_unlock_irq (&hmidi->lock);
 
 	return 0;
 }
@@ -1566,15 +1562,14 @@ static int snd_hdsp_control_spdif_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_va
 static int snd_hdsp_control_spdif_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	u32 val;
 	
 	val = snd_hdsp_convert_from_aes(&ucontrol->value.iec958);
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	change = val != hdsp->creg_spdif;
 	hdsp->creg_spdif = val;
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -1596,17 +1591,16 @@ static int snd_hdsp_control_spdif_stream_get(snd_kcontrol_t * kcontrol, snd_ctl_
 static int snd_hdsp_control_spdif_stream_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	u32 val;
 	
 	val = snd_hdsp_convert_from_aes(&ucontrol->value.iec958);
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	change = val != hdsp->creg_spdif_stream;
 	hdsp->creg_spdif_stream = val;
 	hdsp->control_register &= ~(HDSP_SPDIFProfessional | HDSP_SPDIFNonAudio | HDSP_SPDIFEmphasis);
 	hdsp_write(hdsp, HDSP_controlRegister, hdsp->control_register |= val);
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -1669,18 +1663,17 @@ static int snd_hdsp_get_spdif_in(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 static int snd_hdsp_put_spdif_in(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	unsigned int val;
 	
 	if (!snd_hdsp_use_is_exclusive(hdsp))
 		return -EBUSY;
 	val = ucontrol->value.enumerated.item[0] % ((hdsp->io_type == H9632) ? 4 : 3);
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	change = val != hdsp_spdif_in(hdsp);
 	if (change)
 		hdsp_set_spdif_input(hdsp, val);
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -1725,17 +1718,16 @@ static int snd_hdsp_get_spdif_out(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_
 static int snd_hdsp_put_spdif_out(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	unsigned int val;
 	
 	if (!snd_hdsp_use_is_exclusive(hdsp))
 		return -EBUSY;
 	val = ucontrol->value.integer.value[0] & 1;
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	change = (int)val != hdsp_spdif_out(hdsp);
 	hdsp_set_spdif_output(hdsp, val);
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -1771,17 +1763,16 @@ static int snd_hdsp_get_spdif_professional(snd_kcontrol_t * kcontrol, snd_ctl_el
 static int snd_hdsp_put_spdif_professional(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	unsigned int val;
 	
 	if (!snd_hdsp_use_is_exclusive(hdsp))
 		return -EBUSY;
 	val = ucontrol->value.integer.value[0] & 1;
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	change = (int)val != hdsp_spdif_professional(hdsp);
 	hdsp_set_spdif_professional(hdsp, val);
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -1817,17 +1808,16 @@ static int snd_hdsp_get_spdif_emphasis(snd_kcontrol_t * kcontrol, snd_ctl_elem_v
 static int snd_hdsp_put_spdif_emphasis(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	unsigned int val;
 	
 	if (!snd_hdsp_use_is_exclusive(hdsp))
 		return -EBUSY;
 	val = ucontrol->value.integer.value[0] & 1;
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	change = (int)val != hdsp_spdif_emphasis(hdsp);
 	hdsp_set_spdif_emphasis(hdsp, val);
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -1863,17 +1853,16 @@ static int snd_hdsp_get_spdif_nonaudio(snd_kcontrol_t * kcontrol, snd_ctl_elem_v
 static int snd_hdsp_put_spdif_nonaudio(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	unsigned int val;
 	
 	if (!snd_hdsp_use_is_exclusive(hdsp))
 		return -EBUSY;
 	val = ucontrol->value.integer.value[0] & 1;
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	change = (int)val != hdsp_spdif_nonaudio(hdsp);
 	hdsp_set_spdif_nonaudio(hdsp, val);
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -2178,7 +2167,6 @@ static int snd_hdsp_get_clock_source(snd_kcontrol_t * kcontrol, snd_ctl_elem_val
 static int snd_hdsp_put_clock_source(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	int val;
 	
@@ -2191,13 +2179,13 @@ static int snd_hdsp_put_clock_source(snd_kcontrol_t * kcontrol, snd_ctl_elem_val
 	} else {
 	    if (val > 6) val = 6;
 	}
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	if (val != hdsp_clock_source(hdsp)) {
 		change = (hdsp_set_clock_source(hdsp, val) == 0) ? 1 : 0;
 	} else {
 		change = 0;
 	}
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -2269,7 +2257,6 @@ static int snd_hdsp_get_da_gain(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 static int snd_hdsp_put_da_gain(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	int val;
 	
@@ -2278,13 +2265,13 @@ static int snd_hdsp_put_da_gain(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 	val = ucontrol->value.enumerated.item[0];
 	if (val < 0) val = 0;
 	if (val > 2) val = 2;
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	if (val != hdsp_da_gain(hdsp)) {
 		change = (hdsp_set_da_gain(hdsp, val) == 0) ? 1 : 0;
 	} else {
 		change = 0;
 	}
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -2356,7 +2343,6 @@ static int snd_hdsp_get_ad_gain(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 static int snd_hdsp_put_ad_gain(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	int val;
 	
@@ -2365,13 +2351,13 @@ static int snd_hdsp_put_ad_gain(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 	val = ucontrol->value.enumerated.item[0];
 	if (val < 0) val = 0;
 	if (val > 2) val = 2;
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	if (val != hdsp_ad_gain(hdsp)) {
 		change = (hdsp_set_ad_gain(hdsp, val) == 0) ? 1 : 0;
 	} else {
 		change = 0;
 	}
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -2443,7 +2429,6 @@ static int snd_hdsp_get_phone_gain(snd_kcontrol_t * kcontrol, snd_ctl_elem_value
 static int snd_hdsp_put_phone_gain(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	int val;
 	
@@ -2452,13 +2437,13 @@ static int snd_hdsp_put_phone_gain(snd_kcontrol_t * kcontrol, snd_ctl_elem_value
 	val = ucontrol->value.enumerated.item[0];
 	if (val < 0) val = 0;
 	if (val > 2) val = 2;
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	if (val != hdsp_phone_gain(hdsp)) {
 		change = (hdsp_set_phone_gain(hdsp, val) == 0) ? 1 : 0;
 	} else {
 		change = 0;
 	}
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -2510,17 +2495,16 @@ static int snd_hdsp_get_xlr_breakout_cable(snd_kcontrol_t * kcontrol, snd_ctl_el
 static int snd_hdsp_put_xlr_breakout_cable(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	int val;
 	
 	if (!snd_hdsp_use_is_exclusive(hdsp))
 		return -EBUSY;
 	val = ucontrol->value.integer.value[0] & 1;
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	change = (int)val != hdsp_xlr_breakout_cable(hdsp);
 	hdsp_set_xlr_breakout_cable(hdsp, val);
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -2576,17 +2560,16 @@ static int snd_hdsp_get_aeb(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * uc
 static int snd_hdsp_put_aeb(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	int val;
 	
 	if (!snd_hdsp_use_is_exclusive(hdsp))
 		return -EBUSY;
 	val = ucontrol->value.integer.value[0] & 1;
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	change = (int)val != hdsp_aeb(hdsp);
 	hdsp_set_aeb(hdsp, val);
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -2694,7 +2677,6 @@ static int snd_hdsp_get_pref_sync_ref(snd_kcontrol_t * kcontrol, snd_ctl_elem_va
 static int snd_hdsp_put_pref_sync_ref(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change, max;
 	unsigned int val;
 	
@@ -2717,10 +2699,10 @@ static int snd_hdsp_put_pref_sync_ref(snd_kcontrol_t * kcontrol, snd_ctl_elem_va
 	}
 
 	val = ucontrol->value.enumerated.item[0] % max;
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	change = (int)val != hdsp_pref_sync_ref(hdsp);
 	hdsp_set_pref_sync_ref(hdsp, val);
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -2801,18 +2783,16 @@ static int snd_hdsp_info_passthru(snd_kcontrol_t * kcontrol, snd_ctl_elem_info_t
 static int snd_hdsp_get_passthru(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	ucontrol->value.integer.value[0] = hdsp->passthru;
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return 0;
 }
 
 static int snd_hdsp_put_passthru(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	unsigned int val;
 	int err = 0;
@@ -2821,11 +2801,11 @@ static int snd_hdsp_put_passthru(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 		return -EBUSY;
 
 	val = ucontrol->value.integer.value[0] & 1;
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	change = (ucontrol->value.integer.value[0] != hdsp->passthru);
 	if (change)
 		err = hdsp_set_passthru(hdsp, val);
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return err ? err : change;
 }
 
@@ -2866,28 +2846,26 @@ static int snd_hdsp_info_line_out(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t 
 static int snd_hdsp_get_line_out(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	ucontrol->value.integer.value[0] = hdsp_line_out(hdsp);
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return 0;
 }
 
 static int snd_hdsp_put_line_out(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	unsigned int val;
 	
 	if (!snd_hdsp_use_is_exclusive(hdsp))
 		return -EBUSY;
 	val = ucontrol->value.integer.value[0] & 1;
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	change = (int)val != hdsp_line_out(hdsp);
 	hdsp_set_line_output(hdsp, val);
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -2915,7 +2893,6 @@ static int snd_hdsp_info_mixer(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * u
 static int snd_hdsp_get_mixer(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int source;
 	int destination;
 	int addr;
@@ -2929,16 +2906,15 @@ static int snd_hdsp_get_mixer(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * 
 		addr = hdsp_input_to_output_key(hdsp,source, destination);
 	}
 	
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	ucontrol->value.integer.value[2] = hdsp_read_gain (hdsp, addr);
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return 0;
 }
 
 static int snd_hdsp_put_mixer(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	int source;
 	int destination;
@@ -2959,11 +2935,11 @@ static int snd_hdsp_put_mixer(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * 
 
 	gain = ucontrol->value.integer.value[2];
 
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	change = gain != hdsp_read_gain(hdsp, addr);
 	if (change)
 		hdsp_write_gain(hdsp, addr, gain);
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -4117,10 +4093,10 @@ static int snd_hdsp_prepare(snd_pcm_substream_t *substream)
 		return -EIO;
 	}
 
-	spin_lock(&hdsp->lock);
+	spin_lock_irq(&hdsp->lock);
 	if (!hdsp->running)
 		hdsp_reset_hw_pointer(hdsp);
-	spin_unlock(&hdsp->lock);
+	spin_unlock_irq(&hdsp->lock);
 	return result;
 }
 
@@ -4359,7 +4335,6 @@ static int snd_hdsp_hw_rule_rate_in_channels(snd_pcm_hw_params_t *params,
 static int snd_hdsp_playback_open(snd_pcm_substream_t *substream)
 {
 	hdsp_t *hdsp = snd_pcm_substream_chip(substream);
-	unsigned long flags;
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
 	if (hdsp_check_for_iobox (hdsp)) {
@@ -4377,7 +4352,7 @@ static int snd_hdsp_playback_open(snd_pcm_substream_t *substream)
 		return -EIO;
 	}
 
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 
 	snd_pcm_set_sync(substream);
 
@@ -4393,7 +4368,7 @@ static int snd_hdsp_playback_open(snd_pcm_substream_t *substream)
 	hdsp->playback_pid = current->pid;
 	hdsp->playback_substream = substream;
 
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 
 	snd_pcm_hw_constraint_msbits(runtime, 0, 32, 24);
 	snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_PERIOD_SIZE, &hdsp_hw_constraints_period_sizes);
@@ -4425,14 +4400,13 @@ static int snd_hdsp_playback_open(snd_pcm_substream_t *substream)
 static int snd_hdsp_playback_release(snd_pcm_substream_t *substream)
 {
 	hdsp_t *hdsp = snd_pcm_substream_chip(substream);
-	unsigned long flags;
 
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 
 	hdsp->playback_pid = -1;
 	hdsp->playback_substream = NULL;
 
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 
 	hdsp->spdif_ctl->vd[0].access |= SNDRV_CTL_ELEM_ACCESS_INACTIVE;
 	snd_ctl_notify(hdsp->card, SNDRV_CTL_EVENT_MASK_VALUE |
@@ -4444,7 +4418,6 @@ static int snd_hdsp_playback_release(snd_pcm_substream_t *substream)
 static int snd_hdsp_capture_open(snd_pcm_substream_t *substream)
 {
 	hdsp_t *hdsp = snd_pcm_substream_chip(substream);
-	unsigned long flags;
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
 	if (hdsp_check_for_iobox (hdsp)) {
@@ -4462,7 +4435,7 @@ static int snd_hdsp_capture_open(snd_pcm_substream_t *substream)
 		return -EIO;
 	}
 
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 
 	snd_pcm_set_sync(substream);
 
@@ -4478,7 +4451,7 @@ static int snd_hdsp_capture_open(snd_pcm_substream_t *substream)
 	hdsp->capture_pid = current->pid;
 	hdsp->capture_substream = substream;
 
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 
 	snd_pcm_hw_constraint_msbits(runtime, 0, 32, 24);
 	snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_PERIOD_SIZE, &hdsp_hw_constraints_period_sizes);
@@ -4504,14 +4477,13 @@ static int snd_hdsp_capture_open(snd_pcm_substream_t *substream)
 static int snd_hdsp_capture_release(snd_pcm_substream_t *substream)
 {
 	hdsp_t *hdsp = snd_pcm_substream_chip(substream);
-	unsigned long flags;
 
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 
 	hdsp->capture_pid = -1;
 	hdsp->capture_substream = NULL;
 
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return 0;
 }
 
