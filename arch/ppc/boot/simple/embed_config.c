@@ -50,7 +50,7 @@ embed_config(bd_t **bdp)
 {
 	u_char	*mp;
 	u_char	eebuf[128];
-	int i;
+	int i = 8;
 	bd_t    *bd;
 
 	bd = *bdp;
@@ -62,11 +62,21 @@ embed_config(bd_t **bdp)
 
 	/* All we are looking for is the Ethernet MAC address.  The
 	 * first 8 bytes are 'MOTOROLA', so check for part of that.
+	 * Next, the VPD describes a MAC 'packet' as being of type 08
+	 * and size 06.  So we look for that and the MAC must follow.
+	 * If there are more than one, we still only care about the first.
 	 * If it's there, assume we have a valid MAC address.  If not,
 	 * grab our default one.
 	 */
-	if ((*(uint *)eebuf) == 0x4d4f544f)
-		mp = &eebuf[0x4c];
+	if ((*(uint *)eebuf) == 0x4d4f544f) {
+		while (i < 127 && !(eebuf[i] == 0x08 && eebuf[i + 1] == 0x06))
+			 i += eebuf[i + 1] + 2;  /* skip this packet */
+
+		if (i == 127)	/* Couldn't find. */
+			mp = (u_char *)def_enet_addr;
+		else
+			mp = &eebuf[i + 2];
+	}
 	else
 		mp = (u_char *)def_enet_addr;
 
