@@ -154,7 +154,6 @@ struct _snd_fm801 {
 	int irq;
 
 	unsigned long port;	/* I/O port number */
-	struct resource *res_port;
 	unsigned int multichannel: 1,	/* multichannel support */
 		     secondary: 1;	/* secondary codec */
 	unsigned char secondary_addr;	/* address of the secondary codec */
@@ -301,10 +300,8 @@ static unsigned int rates[] = {
   38400, 44100, 48000
 };
 
-#define RATES sizeof(rates) / sizeof(rates[0])
-
 static snd_pcm_hw_constraint_list_t hw_constraints_rates = {
-	.count = RATES,
+	.count = ARRAY_SIZE(rates),
 	.list = rates,
 	.mask = 0,
 };
@@ -329,11 +326,11 @@ static unsigned short snd_fm801_rate_bits(unsigned int rate)
 {
 	unsigned int idx;
 
-	for (idx = 0; idx < 11; idx++)
+	for (idx = 0; idx < ARRAY_SIZE(rates); idx++)
 		if (rates[idx] == rate)
 			return idx;
 	snd_BUG();
-	return RATES - 1;
+	return ARRAY_SIZE(rates) - 1;
 }
 
 /*
@@ -480,36 +477,34 @@ static int snd_fm801_capture_prepare(snd_pcm_substream_t * substream)
 static snd_pcm_uframes_t snd_fm801_playback_pointer(snd_pcm_substream_t * substream)
 {
 	fm801_t *chip = snd_pcm_substream_chip(substream);
-	unsigned long flags;
 	size_t ptr;
 
 	if (!(chip->ply_ctrl & FM801_START))
 		return 0;
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock(&chip->reg_lock);
 	ptr = chip->ply_pos + (chip->ply_count - 1) - inw(FM801_REG(chip, PLY_COUNT));
 	if (inw(FM801_REG(chip, IRQ_STATUS)) & FM801_IRQ_PLAYBACK) {
 		ptr += chip->ply_count;
 		ptr %= chip->ply_size;
 	}
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock(&chip->reg_lock);
 	return bytes_to_frames(substream->runtime, ptr);
 }
 
 static snd_pcm_uframes_t snd_fm801_capture_pointer(snd_pcm_substream_t * substream)
 {
 	fm801_t *chip = snd_pcm_substream_chip(substream);
-	unsigned long flags;
 	size_t ptr;
 
 	if (!(chip->cap_ctrl & FM801_START))
 		return 0;
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock(&chip->reg_lock);
 	ptr = chip->cap_pos + (chip->cap_count - 1) - inw(FM801_REG(chip, CAP_COUNT));
 	if (inw(FM801_REG(chip, IRQ_STATUS)) & FM801_IRQ_CAPTURE) {
 		ptr += chip->cap_count;
 		ptr %= chip->cap_size;
 	}
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock(&chip->reg_lock);
 	return bytes_to_frames(substream->runtime, ptr);
 }
 
@@ -1069,10 +1064,10 @@ static int snd_fm801_get_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 	int mask = (kcontrol->private_value >> 16) & 0xff;
 	int invert = (kcontrol->private_value >> 24) & 0xff;
 
-	spin_lock(&chip->reg_lock);
+	spin_lock_irq(&chip->reg_lock);
 	ucontrol->value.integer.value[0] = (inw(chip->port + reg) >> shift_left) & mask;
 	ucontrol->value.integer.value[1] = (inw(chip->port + reg) >> shift_right) & mask;
-	spin_unlock(&chip->reg_lock);
+	spin_unlock_irq(&chip->reg_lock);
 	if (invert) {
 		ucontrol->value.integer.value[0] = mask - ucontrol->value.integer.value[0];
 		ucontrol->value.integer.value[1] = mask - ucontrol->value.integer.value[1];
@@ -1185,18 +1180,17 @@ static void snd_fm801_mixer_free_ac97(ac97_t *ac97)
 
 static int __devinit snd_fm801_mixer(fm801_t *chip)
 {
-	ac97_bus_t bus;
-	ac97_t ac97;
+	ac97_template_t ac97;
 	unsigned int i;
 	int err;
+	static ac97_bus_ops_t ops = {
+		.write = snd_fm801_codec_write,
+		.read = snd_fm801_codec_read,
+	};
 
-	memset(&bus, 0, sizeof(bus));
-	bus.write = snd_fm801_codec_write;
-	bus.read = snd_fm801_codec_read;
-	bus.private_data = chip;
-	bus.private_free = snd_fm801_mixer_free_ac97_bus;
-	if ((err = snd_ac97_bus(chip->card, &bus, &chip->ac97_bus)) < 0)
+	if ((err = snd_ac97_bus(chip->card, 0, &ops, chip, &chip->ac97_bus)) < 0)
 		return err;
+	chip->ac97_bus->private_free = snd_fm801_mixer_free_ac97_bus;
 
 	memset(&ac97, 0, sizeof(ac97));
 	ac97.private_data = chip;
@@ -1238,12 +1232,9 @@ static int snd_fm801_free(fm801_t *chip)
 #ifdef TEA575X_RADIO
 	snd_tea575x_exit(&chip->tea);
 #endif
-	if (chip->res_port) {
-		release_resource(chip->res_port);
-		kfree_nocheck(chip->res_port);
-	}
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
+	pci_release_regions(chip->pci);
 
 	kfree(chip);
 	return 0;
@@ -1279,12 +1270,11 @@ static int __devinit snd_fm801_create(snd_card_t * card,
 	chip->card = card;
 	chip->pci = pci;
 	chip->irq = -1;
-	chip->port = pci_resource_start(pci, 0);
-	if ((chip->res_port = request_region(chip->port, 0x80, "FM801")) == NULL) {
-		snd_printk("unable to grab region 0x%lx-0x%lx\n", chip->port, chip->port + 0x80 - 1);
-		snd_fm801_free(chip);
-		return -EBUSY;
+	if ((err = pci_request_regions(pci, "FM801")) < 0) {
+		kfree(chip);
+		return err;
 	}
+	chip->port = pci_resource_start(pci, 0);
 	if (request_irq(pci->irq, snd_fm801_interrupt, SA_INTERRUPT|SA_SHIRQ, "FM801", (void *)chip)) {
 		snd_printk("unable to grab IRQ %d\n", chip->irq);
 		snd_fm801_free(chip);

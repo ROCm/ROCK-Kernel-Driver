@@ -87,7 +87,7 @@ static int snd_ak4531_get_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 	}
 	ucontrol->value.integer.value[0] = val;
 	return 0;
-}                                                                                                                                                                                                                                                                                                            
+}
 
 static int snd_ak4531_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
@@ -111,7 +111,7 @@ static int snd_ak4531_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 	ak4531->write(ak4531, reg, ak4531->regs[reg] = val);
 	spin_unlock_irqrestore(&ak4531->reg_lock, flags);
 	return change;
-}                                                                                                                                                                                                                                                                                                            
+}
 
 #define AK4531_DOUBLE(xname, xindex, left_reg, right_reg, left_shift, right_shift, mask, invert) \
 { .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
@@ -153,7 +153,7 @@ static int snd_ak4531_get_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 	ucontrol->value.integer.value[0] = left;
 	ucontrol->value.integer.value[1] = right;
 	return 0;
-}                                                                                                                                                                                                                                                                                                            
+}
 
 static int snd_ak4531_put_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
@@ -190,7 +190,7 @@ static int snd_ak4531_put_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 	}
 	spin_unlock_irqrestore(&ak4531->reg_lock, flags);
 	return change;
-}                                                                                                                                                                                                                                                                                                            
+}
 
 #define AK4531_INPUT_SW(xname, xindex, reg1, reg2, left_shift, right_shift) \
 { .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
@@ -223,7 +223,7 @@ static int snd_ak4531_get_input_sw(snd_kcontrol_t * kcontrol, snd_ctl_elem_value
 	ucontrol->value.integer.value[3] = (ak4531->regs[reg2] >> right_shift) & 1;
 	spin_unlock_irqrestore(&ak4531->reg_lock, flags);
 	return 0;
-}                                                                                                                                                                                                                                                                                                            
+}
 
 static int snd_ak4531_put_input_sw(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
@@ -248,9 +248,7 @@ static int snd_ak4531_put_input_sw(snd_kcontrol_t * kcontrol, snd_ctl_elem_value
 	ak4531->write(ak4531, reg2, ak4531->regs[reg2] = val2);
 	spin_unlock_irqrestore(&ak4531->reg_lock, flags);
 	return change;
-}                                                                                                                                                                                                                                                                                                            
-
-#define AK4531_CONTROLS (sizeof(snd_ak4531_controls)/sizeof(snd_kcontrol_new_t))
+}
 
 static snd_kcontrol_new_t snd_ak4531_controls[] = {
 
@@ -383,7 +381,7 @@ int snd_ak4531_mixer(snd_card_t * card, ak4531_t * _ak4531, ak4531_t ** rak4531)
 			continue;
 		ak4531->write(ak4531, idx, ak4531->regs[idx] = snd_ak4531_initial_map[idx]);	/* recording source is mixer */
 	}
-	for (idx = 0; idx < AK4531_CONTROLS; idx++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_ak4531_controls); idx++) {
 		if ((err = snd_ctl_add(card, snd_ctl_new1(&snd_ak4531_controls[idx], ak4531))) < 0) {
 			snd_ak4531_free(ak4531);
 			return err;

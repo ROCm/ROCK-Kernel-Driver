@@ -238,10 +238,8 @@ static unsigned int snd_card_harmony_rates[] = {
 	44100, 48000
 };
 
-#define RATES sizeof(snd_card_harmony_rates) / sizeof(snd_card_harmony_rates[0])
-
 static snd_pcm_hw_constraint_list_t hw_constraint_rates = {
-	.count = RATES,
+	.count = ARRAY_SIZE(snd_card_harmony_rates),
 	.list = snd_card_harmony_rates,
 	.mask = 0,
 };
@@ -278,7 +276,7 @@ static unsigned int snd_card_harmony_rate_bits(int rate)
 {
 	unsigned int idx;
 	
-	for (idx = 0; idx <= RATES; idx++)
+	for (idx = 0; idx <= ARRAY_SIZE(snd_card_harmony_rates); idx++)
 		if (snd_card_harmony_rates[idx] == rate)
 			return rate_bits[idx];
 	return HARMONY_SR_44KHZ; /* fallback */
@@ -808,13 +806,17 @@ static int snd_card_harmony_pcm_init(snd_card_harmony_t *harmony)
 	/* initialize graveyard buffer */
 	harmony->dma_dev.type = SNDRV_DMA_TYPE_DEV;
 	harmony->dma_dev.dev = &harmony->pa_dev->dev;
-	err = snd_dma_alloc_pages(&harmony->dma_dev, HARMONY_BUF_SIZE*GRAVEYARD_BUFS,
+	err = snd_dma_alloc_pages(harmony->dma_dev.type,
+				  harmony->dma_dev.dev,
+				  HARMONY_BUF_SIZE*GRAVEYARD_BUFS,
 				  &harmony->graveyard_dma);
 	if (err == -ENOMEM) {
 		/* use continuous buffers */
 		harmony->dma_dev.type = SNDRV_DMA_TYPE_CONTINUOUS;
 		harmony->dma_dev.dev = snd_dma_continuous_data(GFP_KERNEL);
-		err = snd_dma_alloc_pages(&harmony->dma_dev, HARMONY_BUF_SIZE*GRAVEYARD_BUFS,
+		err = snd_dma_alloc_pages(harmony->dma_dev.type,
+					  harmony->dma_dev.dev,
+					  HARMONY_BUF_SIZE*GRAVEYARD_BUFS,
 					  &harmony->graveyard_dma);
 	}
 	if (err < 0) {
@@ -824,7 +826,9 @@ static int snd_card_harmony_pcm_init(snd_card_harmony_t *harmony)
 	harmony->graveyard_count = 0;
 	
 	/* initialize silence buffers */
-	err = snd_dma_alloc_pages(&harmony->dma_dev, HARMONY_BUF_SIZE*SILENCE_BUFS,
+	err = snd_dma_alloc_pages(harmony->dma_dev.type,
+				  harmony->dma_dev.dev,
+				  HARMONY_BUF_SIZE*SILENCE_BUFS,
 				  &harmony->silence_dma);
 	if (err < 0) {
 		printk(KERN_ERR PFX "can't allocate silence buffer\n");

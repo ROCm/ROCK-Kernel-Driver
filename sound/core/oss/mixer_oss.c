@@ -21,6 +21,7 @@
 
 #include <sound/driver.h>
 #include <linux/init.h>
+#include <linux/smp_lock.h>
 #include <linux/slab.h>
 #include <linux/time.h>
 #include <sound/core.h>
@@ -358,10 +359,16 @@ static int snd_mixer_oss_ioctl1(snd_mixer_oss_file_t *fmixer, unsigned int cmd, 
 	return -ENXIO;
 }
 
+/* FIXME: need to unlock BKL to allow preemption */
 int snd_mixer_oss_ioctl(struct inode *inode, struct file *file,
 			unsigned int cmd, unsigned long arg)
 {
-	return snd_mixer_oss_ioctl1((snd_mixer_oss_file_t *) file->private_data, cmd, arg);
+	int err;
+	/* FIXME: need to unlock BKL to allow preemption */
+	unlock_kernel();
+	err = snd_mixer_oss_ioctl1((snd_mixer_oss_file_t *) file->private_data, cmd, arg);
+	lock_kernel();
+	return err;
 }
 
 int snd_mixer_oss_ioctl_card(snd_card_t *card, unsigned int cmd, unsigned long arg)
@@ -968,8 +975,10 @@ static int snd_mixer_oss_build_input(snd_mixer_oss_t *mixer, struct snd_mixer_os
 		snd_ctl_elem_info_t uinfo;
 
 		memset(&uinfo, 0, sizeof(uinfo));
-		if (kctl->info(kctl, &uinfo))
+		if (kctl->info(kctl, &uinfo)) {
+			up_read(&mixer->card->controls_rwsem);
 			return 0;
+		}
 		strcpy(str, ptr->name);
 		if (!strcmp(str, "Master"))
 			strcpy(str, "Mix");
@@ -1210,7 +1219,7 @@ static void snd_mixer_oss_build(snd_mixer_oss_t *mixer)
 	};
 	unsigned int idx;
 	
-	for (idx = 0; idx < sizeof(table) / sizeof(struct snd_mixer_oss_assign_table); idx++)
+	for (idx = 0; idx < ARRAY_SIZE(table); idx++)
 		snd_mixer_oss_build_input(mixer, &table[idx], 0, 0);
 	if (mixer->mask_recsrc) {
 		mixer->get_recsrc = snd_mixer_oss_get_recsrc2;

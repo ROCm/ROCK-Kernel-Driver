@@ -977,8 +977,6 @@ static int snd_es1688_put_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 	return change;
 }
 
-#define ES1688_CONTROLS (sizeof(snd_es1688_controls)/sizeof(snd_kcontrol_new_t))
-
 static snd_kcontrol_new_t snd_es1688_controls[] = {
 ES1688_DOUBLE("Master Playback Volume", 0, ES1688_MASTER_DEV, ES1688_MASTER_DEV, 4, 0, 15, 0),
 ES1688_DOUBLE("PCM Playback Volume", 0, ES1688_PCM_DEV, ES1688_PCM_DEV, 4, 0, 15, 0),
@@ -1027,7 +1025,7 @@ int snd_es1688_mixer(es1688_t *chip)
 
 	strcpy(card->mixername, snd_es1688_chip_id(chip));
 
-	for (idx = 0; idx < ES1688_CONTROLS; idx++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_es1688_controls); idx++) {
 		if ((err = snd_ctl_add(card, snd_ctl_new1(&snd_es1688_controls[idx], chip))) < 0)
 			return err;
 	}

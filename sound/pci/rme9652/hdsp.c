@@ -456,12 +456,12 @@ struct _hdsp {
 	unsigned char	      qs_out_channels;	    
 	unsigned char         ds_out_channels;
 	unsigned char         ss_out_channels;
-	void                 *capture_buffer_unaligned;	 /* original buffer addresses */
-	void                 *playback_buffer_unaligned; /* original buffer addresses */
+
+	struct snd_dma_buffer capture_dma_buf;
+	struct snd_dma_buffer playback_dma_buf;
 	unsigned char        *capture_buffer;	    /* suitably aligned address */
 	unsigned char        *playback_buffer;	    /* suitably aligned address */
-	dma_addr_t            capture_buffer_addr;
-	dma_addr_t            playback_buffer_addr;
+
 	pid_t                 capture_pid;
 	pid_t                 playback_pid;
 	int                   running;
@@ -471,7 +471,6 @@ struct _hdsp {
 	int                   dev;
 	int                   irq;
 	unsigned long         port;
-	struct resource      *res_port;
         unsigned long         iobase;
 	snd_card_t           *card;
 	snd_pcm_t            *pcm;
@@ -555,50 +554,24 @@ static char channel_map_H9632_qs[HDSP_MAX_CHANNELS] = {
 	-1, -1
 };
 
-#define HDSP_PREALLOCATE_MEMORY	/* via module snd-hdsp_mem */
-
-#ifdef HDSP_PREALLOCATE_MEMORY
-static void *snd_hammerfall_get_buffer(struct pci_dev *pci, size_t size, dma_addr_t *addrp, int capture)
+static int snd_hammerfall_get_buffer(struct pci_dev *pci, struct snd_dma_buffer *dmab, size_t size)
 {
-	struct snd_dma_device pdev;
-	struct snd_dma_buffer dmbuf;
-
-	memset(&pdev, 0, sizeof(pdev));
-	pdev.type = SNDRV_DMA_TYPE_DEV;
-	pdev.dev = snd_dma_pci_data(pci);
-	pdev.id = capture;
-	dmbuf.bytes = 0;
-	if (! snd_dma_get_reserved(&pdev, &dmbuf)) {
-		if (snd_dma_alloc_pages(&pdev, size, &dmbuf) < 0)
-			return NULL;
-		snd_dma_set_reserved(&pdev, &dmbuf);
+	dmab->dev.type = SNDRV_DMA_TYPE_DEV;
+	dmab->dev.dev = snd_dma_pci_data(pci);
+	if (! snd_dma_get_reserved_buf(dmab, snd_dma_pci_buf_id(pci))) {
+		if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(pci),
+					size, dmab) < 0)
+			return -ENOMEM;
 	}
-	*addrp = dmbuf.addr;
-	return dmbuf.area;
+	return 0;
 }
 
-static void snd_hammerfall_free_buffer(struct pci_dev *pci, size_t size, void *ptr, dma_addr_t addr, int capture)
+static void snd_hammerfall_free_buffer(struct snd_dma_buffer *dmab, struct pci_dev *pci)
 {
-	struct snd_dma_device pdev;
-
-	memset(&pdev, 0, sizeof(pdev));
-	pdev.type = SNDRV_DMA_TYPE_DEV;
-	pdev.dev = snd_dma_pci_data(pci);
-	pdev.id = capture;
-	snd_dma_free_reserved(&pdev);
+	if (dmab->area)
+		snd_dma_reserve_buf(dmab, snd_dma_pci_buf_id(pci));
 }
 
-#else
-static void *snd_hammerfall_get_buffer(struct pci_dev *pci, size_t size, dma_addr_t *addrp, int capture)
-{
-	return snd_malloc_pci_pages(pci, size, addrp);
-}
-
-static void snd_hammerfall_free_buffer(struct pci_dev *pci, size_t size, void *ptr, dma_addr_t addr, int capture)
-{
-	snd_free_pci_pages(pci, size, ptr, addr);
-}
-#endif
 
 static struct pci_device_id snd_hdsp_ids[] = {
 	{
@@ -615,15 +588,15 @@ MODULE_DEVICE_TABLE(pci, snd_hdsp_ids);
 /* prototypes */
 static int __devinit snd_hdsp_create_alsa_devices(snd_card_t *card, hdsp_t *hdsp);
 static int __devinit snd_hdsp_create_pcm(snd_card_t *card, hdsp_t *hdsp);
-static inline int snd_hdsp_enable_io (hdsp_t *hdsp);
-static inline void snd_hdsp_initialize_midi_flush (hdsp_t *hdsp);
-static inline void snd_hdsp_initialize_channels (hdsp_t *hdsp);
-static inline int hdsp_fifo_wait(hdsp_t *hdsp, int count, int timeout);
+static int snd_hdsp_enable_io (hdsp_t *hdsp);
+static void snd_hdsp_initialize_midi_flush (hdsp_t *hdsp);
+static void snd_hdsp_initialize_channels (hdsp_t *hdsp);
+static int hdsp_fifo_wait(hdsp_t *hdsp, int count, int timeout);
 static int hdsp_autosync_ref(hdsp_t *hdsp);
 static int snd_hdsp_set_defaults(hdsp_t *hdsp);
-static inline void snd_hdsp_9652_enable_mixer (hdsp_t *hdsp);
+static void snd_hdsp_9652_enable_mixer (hdsp_t *hdsp);
 
-static inline int hdsp_playback_to_output_key (hdsp_t *hdsp, int in, int out)
+static int hdsp_playback_to_output_key (hdsp_t *hdsp, int in, int out)
 {
 	switch (hdsp->firmware_rev) {
 	case 0xa:
@@ -636,7 +609,7 @@ static inline int hdsp_playback_to_output_key (hdsp_t *hdsp, int in, int out)
 	}
 }
 
-static inline int hdsp_input_to_output_key (hdsp_t *hdsp, int in, int out)
+static int hdsp_input_to_output_key (hdsp_t *hdsp, int in, int out)
 {
 	switch (hdsp->firmware_rev) {
 	case 0xa:
@@ -649,17 +622,17 @@ static inline int hdsp_input_to_output_key (hdsp_t *hdsp, int in, int out)
 	}
 }
 
-static inline void hdsp_write(hdsp_t *hdsp, int reg, int val)
+static void hdsp_write(hdsp_t *hdsp, int reg, int val)
 {
 	writel(val, hdsp->iobase + reg);
 }
 
-static inline unsigned int hdsp_read(hdsp_t *hdsp, int reg)
+static unsigned int hdsp_read(hdsp_t *hdsp, int reg)
 {
 	return readl (hdsp->iobase + reg);
 }
 
-static inline int hdsp_check_for_iobox (hdsp_t *hdsp)
+static int hdsp_check_for_iobox (hdsp_t *hdsp)
 {
 
 	if (hdsp->io_type == H9652 || hdsp->io_type == H9632) return 0;
@@ -732,7 +705,7 @@ static int snd_hdsp_load_firmware_from_cache(hdsp_t *hdsp) {
 	return 0;
 }
 
-static inline int hdsp_get_iobox_version (hdsp_t *hdsp)
+static int hdsp_get_iobox_version (hdsp_t *hdsp)
 {
 	int err;
 	
@@ -775,7 +748,7 @@ static inline int hdsp_get_iobox_version (hdsp_t *hdsp)
 }
 
 
-static inline int hdsp_check_for_firmware (hdsp_t *hdsp)
+static int hdsp_check_for_firmware (hdsp_t *hdsp)
 {
 	if (hdsp->io_type == H9652 || hdsp->io_type == H9632) return 0;
 	if ((hdsp_read (hdsp, HDSP_statusRegister) & HDSP_DllError) != 0) {
@@ -787,7 +760,7 @@ static inline int hdsp_check_for_firmware (hdsp_t *hdsp)
 }
 
 
-static inline int hdsp_fifo_wait(hdsp_t *hdsp, int count, int timeout)
+static int hdsp_fifo_wait(hdsp_t *hdsp, int count, int timeout)
 {    
 	int i;
 
@@ -812,7 +785,7 @@ static inline int hdsp_fifo_wait(hdsp_t *hdsp, int count, int timeout)
 	return -1;
 }
 
-static inline int hdsp_read_gain (hdsp_t *hdsp, unsigned int addr)
+static int hdsp_read_gain (hdsp_t *hdsp, unsigned int addr)
 {
 	if (addr >= HDSP_MATRIX_MIXER_SIZE) {
 		return 0;
@@ -820,7 +793,7 @@ static inline int hdsp_read_gain (hdsp_t *hdsp, unsigned int addr)
 	return hdsp->mixer_matrix[addr];
 }
 
-static inline int hdsp_write_gain(hdsp_t *hdsp, unsigned int addr, unsigned short data)
+static int hdsp_write_gain(hdsp_t *hdsp, unsigned int addr, unsigned short data)
 {
 	unsigned int ad;
 
@@ -829,7 +802,7 @@ static inline int hdsp_write_gain(hdsp_t *hdsp, unsigned int addr, unsigned shor
 	
 	if (hdsp->io_type == H9652 || hdsp->io_type == H9632) {
 
-		/* from martin björnsen:
+		/* from martin bjÃ¶rnsen:
 		   
 		   "You can only write dwords to the
 		   mixer memory which contain two
@@ -883,7 +856,7 @@ static inline int hdsp_write_gain(hdsp_t *hdsp, unsigned int addr, unsigned shor
 	return 0;
 }
 
-static inline int snd_hdsp_use_is_exclusive(hdsp_t *hdsp)
+static int snd_hdsp_use_is_exclusive(hdsp_t *hdsp)
 {
 	unsigned long flags;
 	int ret = 1;
@@ -897,7 +870,7 @@ static inline int snd_hdsp_use_is_exclusive(hdsp_t *hdsp)
 	return ret;
 }
 
-static inline int hdsp_external_sample_rate (hdsp_t *hdsp)
+static int hdsp_external_sample_rate (hdsp_t *hdsp)
 {
 	unsigned int status2 = hdsp_read(hdsp, HDSP_status2Register);
 	unsigned int rate_bits = status2 & HDSP_systemFrequencyMask;
@@ -914,7 +887,7 @@ static inline int hdsp_external_sample_rate (hdsp_t *hdsp)
 	}
 }
 
-static inline int hdsp_spdif_sample_rate(hdsp_t *hdsp)
+static int hdsp_spdif_sample_rate(hdsp_t *hdsp)
 {
 	unsigned int status = hdsp_read(hdsp, HDSP_statusRegister);
 	unsigned int rate_bits = (status & HDSP_spdifFrequencyMask);
@@ -946,7 +919,7 @@ static inline int hdsp_spdif_sample_rate(hdsp_t *hdsp)
 	return 0;
 }
 
-static inline void hdsp_compute_period_size(hdsp_t *hdsp)
+static void hdsp_compute_period_size(hdsp_t *hdsp)
 {
 	hdsp->period_bytes = 1 << ((hdsp_decode_latency(hdsp->control_register) + 8));
 }
@@ -968,24 +941,24 @@ static snd_pcm_uframes_t hdsp_hw_pointer(hdsp_t *hdsp)
 	return position;
 }
 
-static inline void hdsp_reset_hw_pointer(hdsp_t *hdsp)
+static void hdsp_reset_hw_pointer(hdsp_t *hdsp)
 {
 	hdsp_write (hdsp, HDSP_resetPointer, 0);
 }
 
-static inline void hdsp_start_audio(hdsp_t *s)
+static void hdsp_start_audio(hdsp_t *s)
 {
 	s->control_register |= (HDSP_AudioInterruptEnable | HDSP_Start);
 	hdsp_write(s, HDSP_controlRegister, s->control_register);
 }
 
-static inline void hdsp_stop_audio(hdsp_t *s)
+static void hdsp_stop_audio(hdsp_t *s)
 {
 	s->control_register &= ~(HDSP_Start | HDSP_AudioInterruptEnable);
 	hdsp_write(s, HDSP_controlRegister, s->control_register);
 }
 
-static inline void hdsp_silence_playback(hdsp_t *hdsp)
+static void hdsp_silence_playback(hdsp_t *hdsp)
 {
 	memset(hdsp->playback_buffer, 0, HDSP_DMA_AREA_BYTES);
 }
@@ -1230,7 +1203,7 @@ static int hdsp_set_passthru(hdsp_t *hdsp, int onoff)
    MIDI
   ----------------------------------------------------------------------------*/
 
-static inline unsigned char snd_hdsp_midi_read_byte (hdsp_t *hdsp, int id)
+static unsigned char snd_hdsp_midi_read_byte (hdsp_t *hdsp, int id)
 {
 	/* the hardware already does the relevant bit-mask with 0xff */
 	if (id) {
@@ -1240,7 +1213,7 @@ static inline unsigned char snd_hdsp_midi_read_byte (hdsp_t *hdsp, int id)
 	}
 }
 
-static inline void snd_hdsp_midi_write_byte (hdsp_t *hdsp, int id, int val)
+static void snd_hdsp_midi_write_byte (hdsp_t *hdsp, int id, int val)
 {
 	/* the hardware already does the relevant bit-mask with 0xff */
 	if (id) {
@@ -1250,7 +1223,7 @@ static inline void snd_hdsp_midi_write_byte (hdsp_t *hdsp, int id, int val)
 	}
 }
 
-static inline int snd_hdsp_midi_input_available (hdsp_t *hdsp, int id)
+static int snd_hdsp_midi_input_available (hdsp_t *hdsp, int id)
 {
 	if (id) {
 		return (hdsp_read(hdsp, HDSP_midiStatusIn1) & 0xff);
@@ -1259,7 +1232,7 @@ static inline int snd_hdsp_midi_input_available (hdsp_t *hdsp, int id)
 	}
 }
 
-static inline int snd_hdsp_midi_output_possible (hdsp_t *hdsp, int id)
+static int snd_hdsp_midi_output_possible (hdsp_t *hdsp, int id)
 {
 	int fifo_bytes_used;
 
@@ -1276,7 +1249,7 @@ static inline int snd_hdsp_midi_output_possible (hdsp_t *hdsp, int id)
 	}
 }
 
-static inline void snd_hdsp_flush_midi_input (hdsp_t *hdsp, int id)
+static void snd_hdsp_flush_midi_input (hdsp_t *hdsp, int id)
 {
 	while (snd_hdsp_midi_input_available (hdsp, id)) {
 		snd_hdsp_midi_read_byte (hdsp, id);
@@ -1423,13 +1396,12 @@ static void snd_hdsp_midi_output_trigger(snd_rawmidi_substream_t * substream, in
 static int snd_hdsp_midi_input_open(snd_rawmidi_substream_t * substream)
 {
 	hdsp_midi_t *hmidi;
-	unsigned long flags;
 
 	hmidi = (hdsp_midi_t *) substream->rmidi->private_data;
-	spin_lock_irqsave (&hmidi->lock, flags);
+	spin_lock_irq (&hmidi->lock);
 	snd_hdsp_flush_midi_input (hmidi->hdsp, hmidi->id);
 	hmidi->input = substream;
-	spin_unlock_irqrestore (&hmidi->lock, flags);
+	spin_unlock_irq (&hmidi->lock);
 
 	return 0;
 }
@@ -1437,12 +1409,11 @@ static int snd_hdsp_midi_input_open(snd_rawmidi_substream_t * substream)
 static int snd_hdsp_midi_output_open(snd_rawmidi_substream_t * substream)
 {
 	hdsp_midi_t *hmidi;
-	unsigned long flags;
 
 	hmidi = (hdsp_midi_t *) substream->rmidi->private_data;
-	spin_lock_irqsave (&hmidi->lock, flags);
+	spin_lock_irq (&hmidi->lock);
 	hmidi->output = substream;
-	spin_unlock_irqrestore (&hmidi->lock, flags);
+	spin_unlock_irq (&hmidi->lock);
 
 	return 0;
 }
@@ -1450,14 +1421,13 @@ static int snd_hdsp_midi_output_open(snd_rawmidi_substream_t * substream)
 static int snd_hdsp_midi_input_close(snd_rawmidi_substream_t * substream)
 {
 	hdsp_midi_t *hmidi;
-	unsigned long flags;
 
 	snd_hdsp_midi_input_trigger (substream, 0);
 
 	hmidi = (hdsp_midi_t *) substream->rmidi->private_data;
-	spin_lock_irqsave (&hmidi->lock, flags);
+	spin_lock_irq (&hmidi->lock);
 	hmidi->input = NULL;
-	spin_unlock_irqrestore (&hmidi->lock, flags);
+	spin_unlock_irq (&hmidi->lock);
 
 	return 0;
 }
@@ -1465,14 +1435,13 @@ static int snd_hdsp_midi_input_close(snd_rawmidi_substream_t * substream)
 static int snd_hdsp_midi_output_close(snd_rawmidi_substream_t * substream)
 {
 	hdsp_midi_t *hmidi;
-	unsigned long flags;
 
 	snd_hdsp_midi_output_trigger (substream, 0);
 
 	hmidi = (hdsp_midi_t *) substream->rmidi->private_data;
-	spin_lock_irqsave (&hmidi->lock, flags);
+	spin_lock_irq (&hmidi->lock);
 	hmidi->output = NULL;
-	spin_unlock_irqrestore (&hmidi->lock, flags);
+	spin_unlock_irq (&hmidi->lock);
 
 	return 0;
 }
@@ -1566,15 +1535,14 @@ static int snd_hdsp_control_spdif_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_va
 static int snd_hdsp_control_spdif_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	u32 val;
 	
 	val = snd_hdsp_convert_from_aes(&ucontrol->value.iec958);
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	change = val != hdsp->creg_spdif;
 	hdsp->creg_spdif = val;
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -1596,17 +1564,16 @@ static int snd_hdsp_control_spdif_stream_get(snd_kcontrol_t * kcontrol, snd_ctl_
 static int snd_hdsp_control_spdif_stream_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	u32 val;
 	
 	val = snd_hdsp_convert_from_aes(&ucontrol->value.iec958);
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	change = val != hdsp->creg_spdif_stream;
 	hdsp->creg_spdif_stream = val;
 	hdsp->control_register &= ~(HDSP_SPDIFProfessional | HDSP_SPDIFNonAudio | HDSP_SPDIFEmphasis);
 	hdsp_write(hdsp, HDSP_controlRegister, hdsp->control_register |= val);
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -1669,18 +1636,17 @@ static int snd_hdsp_get_spdif_in(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 static int snd_hdsp_put_spdif_in(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	unsigned int val;
 	
 	if (!snd_hdsp_use_is_exclusive(hdsp))
 		return -EBUSY;
 	val = ucontrol->value.enumerated.item[0] % ((hdsp->io_type == H9632) ? 4 : 3);
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	change = val != hdsp_spdif_in(hdsp);
 	if (change)
 		hdsp_set_spdif_input(hdsp, val);
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -1725,17 +1691,16 @@ static int snd_hdsp_get_spdif_out(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_
 static int snd_hdsp_put_spdif_out(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	unsigned int val;
 	
 	if (!snd_hdsp_use_is_exclusive(hdsp))
 		return -EBUSY;
 	val = ucontrol->value.integer.value[0] & 1;
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	change = (int)val != hdsp_spdif_out(hdsp);
 	hdsp_set_spdif_output(hdsp, val);
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -1771,17 +1736,16 @@ static int snd_hdsp_get_spdif_professional(snd_kcontrol_t * kcontrol, snd_ctl_el
 static int snd_hdsp_put_spdif_professional(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	unsigned int val;
 	
 	if (!snd_hdsp_use_is_exclusive(hdsp))
 		return -EBUSY;
 	val = ucontrol->value.integer.value[0] & 1;
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	change = (int)val != hdsp_spdif_professional(hdsp);
 	hdsp_set_spdif_professional(hdsp, val);
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -1817,17 +1781,16 @@ static int snd_hdsp_get_spdif_emphasis(snd_kcontrol_t * kcontrol, snd_ctl_elem_v
 static int snd_hdsp_put_spdif_emphasis(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	unsigned int val;
 	
 	if (!snd_hdsp_use_is_exclusive(hdsp))
 		return -EBUSY;
 	val = ucontrol->value.integer.value[0] & 1;
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	change = (int)val != hdsp_spdif_emphasis(hdsp);
 	hdsp_set_spdif_emphasis(hdsp, val);
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -1863,17 +1826,16 @@ static int snd_hdsp_get_spdif_nonaudio(snd_kcontrol_t * kcontrol, snd_ctl_elem_v
 static int snd_hdsp_put_spdif_nonaudio(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	unsigned int val;
 	
 	if (!snd_hdsp_use_is_exclusive(hdsp))
 		return -EBUSY;
 	val = ucontrol->value.integer.value[0] & 1;
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	change = (int)val != hdsp_spdif_nonaudio(hdsp);
 	hdsp_set_spdif_nonaudio(hdsp, val);
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -2178,7 +2140,6 @@ static int snd_hdsp_get_clock_source(snd_kcontrol_t * kcontrol, snd_ctl_elem_val
 static int snd_hdsp_put_clock_source(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	int val;
 	
@@ -2191,13 +2152,13 @@ static int snd_hdsp_put_clock_source(snd_kcontrol_t * kcontrol, snd_ctl_elem_val
 	} else {
 	    if (val > 6) val = 6;
 	}
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	if (val != hdsp_clock_source(hdsp)) {
 		change = (hdsp_set_clock_source(hdsp, val) == 0) ? 1 : 0;
 	} else {
 		change = 0;
 	}
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -2269,7 +2230,6 @@ static int snd_hdsp_get_da_gain(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 static int snd_hdsp_put_da_gain(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	int val;
 	
@@ -2278,13 +2238,13 @@ static int snd_hdsp_put_da_gain(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 	val = ucontrol->value.enumerated.item[0];
 	if (val < 0) val = 0;
 	if (val > 2) val = 2;
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	if (val != hdsp_da_gain(hdsp)) {
 		change = (hdsp_set_da_gain(hdsp, val) == 0) ? 1 : 0;
 	} else {
 		change = 0;
 	}
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -2356,7 +2316,6 @@ static int snd_hdsp_get_ad_gain(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 static int snd_hdsp_put_ad_gain(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	int val;
 	
@@ -2365,13 +2324,13 @@ static int snd_hdsp_put_ad_gain(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 	val = ucontrol->value.enumerated.item[0];
 	if (val < 0) val = 0;
 	if (val > 2) val = 2;
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	if (val != hdsp_ad_gain(hdsp)) {
 		change = (hdsp_set_ad_gain(hdsp, val) == 0) ? 1 : 0;
 	} else {
 		change = 0;
 	}
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -2443,7 +2402,6 @@ static int snd_hdsp_get_phone_gain(snd_kcontrol_t * kcontrol, snd_ctl_elem_value
 static int snd_hdsp_put_phone_gain(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	int val;
 	
@@ -2452,13 +2410,13 @@ static int snd_hdsp_put_phone_gain(snd_kcontrol_t * kcontrol, snd_ctl_elem_value
 	val = ucontrol->value.enumerated.item[0];
 	if (val < 0) val = 0;
 	if (val > 2) val = 2;
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	if (val != hdsp_phone_gain(hdsp)) {
 		change = (hdsp_set_phone_gain(hdsp, val) == 0) ? 1 : 0;
 	} else {
 		change = 0;
 	}
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -2510,17 +2468,16 @@ static int snd_hdsp_get_xlr_breakout_cable(snd_kcontrol_t * kcontrol, snd_ctl_el
 static int snd_hdsp_put_xlr_breakout_cable(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	int val;
 	
 	if (!snd_hdsp_use_is_exclusive(hdsp))
 		return -EBUSY;
 	val = ucontrol->value.integer.value[0] & 1;
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	change = (int)val != hdsp_xlr_breakout_cable(hdsp);
 	hdsp_set_xlr_breakout_cable(hdsp, val);
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -2576,17 +2533,16 @@ static int snd_hdsp_get_aeb(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * uc
 static int snd_hdsp_put_aeb(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	int val;
 	
 	if (!snd_hdsp_use_is_exclusive(hdsp))
 		return -EBUSY;
 	val = ucontrol->value.integer.value[0] & 1;
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	change = (int)val != hdsp_aeb(hdsp);
 	hdsp_set_aeb(hdsp, val);
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -2694,7 +2650,6 @@ static int snd_hdsp_get_pref_sync_ref(snd_kcontrol_t * kcontrol, snd_ctl_elem_va
 static int snd_hdsp_put_pref_sync_ref(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change, max;
 	unsigned int val;
 	
@@ -2717,10 +2672,10 @@ static int snd_hdsp_put_pref_sync_ref(snd_kcontrol_t * kcontrol, snd_ctl_elem_va
 	}
 
 	val = ucontrol->value.enumerated.item[0] % max;
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	change = (int)val != hdsp_pref_sync_ref(hdsp);
 	hdsp_set_pref_sync_ref(hdsp, val);
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -2801,18 +2756,16 @@ static int snd_hdsp_info_passthru(snd_kcontrol_t * kcontrol, snd_ctl_elem_info_t
 static int snd_hdsp_get_passthru(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	ucontrol->value.integer.value[0] = hdsp->passthru;
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return 0;
 }
 
 static int snd_hdsp_put_passthru(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	unsigned int val;
 	int err = 0;
@@ -2821,11 +2774,11 @@ static int snd_hdsp_put_passthru(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 		return -EBUSY;
 
 	val = ucontrol->value.integer.value[0] & 1;
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	change = (ucontrol->value.integer.value[0] != hdsp->passthru);
 	if (change)
 		err = hdsp_set_passthru(hdsp, val);
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return err ? err : change;
 }
 
@@ -2866,28 +2819,26 @@ static int snd_hdsp_info_line_out(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t 
 static int snd_hdsp_get_line_out(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	ucontrol->value.integer.value[0] = hdsp_line_out(hdsp);
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return 0;
 }
 
 static int snd_hdsp_put_line_out(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	unsigned int val;
 	
 	if (!snd_hdsp_use_is_exclusive(hdsp))
 		return -EBUSY;
 	val = ucontrol->value.integer.value[0] & 1;
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	change = (int)val != hdsp_line_out(hdsp);
 	hdsp_set_line_output(hdsp, val);
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -2915,7 +2866,6 @@ static int snd_hdsp_info_mixer(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * u
 static int snd_hdsp_get_mixer(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int source;
 	int destination;
 	int addr;
@@ -2929,16 +2879,15 @@ static int snd_hdsp_get_mixer(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * 
 		addr = hdsp_input_to_output_key(hdsp,source, destination);
 	}
 	
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	ucontrol->value.integer.value[2] = hdsp_read_gain (hdsp, addr);
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return 0;
 }
 
 static int snd_hdsp_put_mixer(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	int change;
 	int source;
 	int destination;
@@ -2959,11 +2908,11 @@ static int snd_hdsp_put_mixer(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * 
 
 	gain = ucontrol->value.integer.value[2];
 
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 	change = gain != hdsp_read_gain(hdsp, addr);
 	if (change)
 		hdsp_write_gain(hdsp, addr, gain);
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return change;
 }
 
@@ -3188,10 +3137,6 @@ HDSP_PASSTHRU("Passthru", 0),
 HDSP_LINE_OUT("Line Out", 0),
 };
 
-#define HDSP_CONTROLS (sizeof(snd_hdsp_controls)/sizeof(snd_kcontrol_new_t))
-
-#define HDSP_9632_CONTROLS (sizeof(snd_hdsp_9632_controls)/sizeof(snd_kcontrol_new_t))
-
 static snd_kcontrol_new_t snd_hdsp_96xx_aeb = HDSP_AEB("Analog Extension Board", 0);
 static snd_kcontrol_new_t snd_hdsp_adat_sync_check = HDSP_ADAT_SYNC_CHECK;
 
@@ -3201,7 +3146,7 @@ int snd_hdsp_create_controls(snd_card_t *card, hdsp_t *hdsp)
 	int err;
 	snd_kcontrol_t *kctl;
 
-	for (idx = 0; idx < HDSP_CONTROLS; idx++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_hdsp_controls); idx++) {
 		if ((err = snd_ctl_add(card, kctl = snd_ctl_new1(&snd_hdsp_controls[idx], hdsp))) < 0) {
 			return err;
 		}
@@ -3226,7 +3171,7 @@ int snd_hdsp_create_controls(snd_card_t *card, hdsp_t *hdsp)
 	
 	/* DA, AD and Phone gain and XLR breakout cable controls for H9632 cards */
 	if (hdsp->io_type == H9632) {
-		for (idx = 0; idx < HDSP_9632_CONTROLS; idx++) {
+		for (idx = 0; idx < ARRAY_SIZE(snd_hdsp_9632_controls); idx++) {
 			if ((err = snd_ctl_add(card, kctl = snd_ctl_new1(&snd_hdsp_9632_controls[idx], hdsp))) < 0) {
 				return err;
 			}
@@ -3577,59 +3522,34 @@ static void __devinit snd_hdsp_proc_init(hdsp_t *hdsp)
 
 static void snd_hdsp_free_buffers(hdsp_t *hdsp)
 {
-	if (hdsp->capture_buffer_unaligned) {
-		snd_hammerfall_free_buffer(hdsp->pci, HDSP_DMA_AREA_BYTES,
-					   hdsp->capture_buffer_unaligned,
-					   hdsp->capture_buffer_addr, 1);
-	}
-
-	if (hdsp->playback_buffer_unaligned) {
-		snd_hammerfall_free_buffer(hdsp->pci, HDSP_DMA_AREA_BYTES,
-					   hdsp->playback_buffer_unaligned,
-					   hdsp->playback_buffer_addr, 0);
-	}
+	snd_hammerfall_free_buffer(&hdsp->capture_dma_buf, hdsp->pci);
+	snd_hammerfall_free_buffer(&hdsp->playback_dma_buf, hdsp->pci);
 }
 
 static int __devinit snd_hdsp_initialize_memory(hdsp_t *hdsp)
 {
-	void *pb, *cb;
-	dma_addr_t pb_addr, cb_addr;
 	unsigned long pb_bus, cb_bus;
 
-	cb = snd_hammerfall_get_buffer(hdsp->pci, HDSP_DMA_AREA_BYTES, &cb_addr, 1);
-	pb = snd_hammerfall_get_buffer(hdsp->pci, HDSP_DMA_AREA_BYTES, &pb_addr, 0);
-
-	if (cb == 0 || pb == 0) {
-		if (cb) {
-			snd_hammerfall_free_buffer(hdsp->pci, HDSP_DMA_AREA_BYTES, cb, cb_addr, 1);
-		}
-		if (pb) {
-			snd_hammerfall_free_buffer(hdsp->pci, HDSP_DMA_AREA_BYTES, pb, pb_addr, 0);
-		}
-
+	if (snd_hammerfall_get_buffer(hdsp->pci, &hdsp->capture_dma_buf, HDSP_DMA_AREA_BYTES) < 0 ||
+	    snd_hammerfall_get_buffer(hdsp->pci, &hdsp->playback_dma_buf, HDSP_DMA_AREA_BYTES) < 0) {
+		if (hdsp->capture_dma_buf.area)
+			snd_dma_free_pages(&hdsp->capture_dma_buf);
 		printk(KERN_ERR "%s: no buffers available\n", hdsp->card_name);
 		return -ENOMEM;
 	}
 
-	/* save raw addresses for use when freeing memory later */
-
-	hdsp->capture_buffer_unaligned = cb;
-	hdsp->playback_buffer_unaligned = pb;
-	hdsp->capture_buffer_addr = cb_addr;
-	hdsp->playback_buffer_addr = pb_addr;
-
 	/* Align to bus-space 64K boundary */
 
-	cb_bus = (cb_addr + 0xFFFF) & ~0xFFFFl;
-	pb_bus = (pb_addr + 0xFFFF) & ~0xFFFFl;
+	cb_bus = (hdsp->capture_dma_buf.addr + 0xFFFF) & ~0xFFFFl;
+	pb_bus = (hdsp->playback_dma_buf.addr + 0xFFFF) & ~0xFFFFl;
 
 	/* Tell the card where it is */
 
 	hdsp_write(hdsp, HDSP_inputBufferAddress, cb_bus);
 	hdsp_write(hdsp, HDSP_outputBufferAddress, pb_bus);
 
-	hdsp->capture_buffer = cb + (cb_bus - cb_addr);
-	hdsp->playback_buffer = pb + (pb_bus - pb_addr);
+	hdsp->capture_buffer = hdsp->capture_dma_buf.area + (cb_bus - hdsp->capture_dma_buf.addr);
+	hdsp->playback_buffer = hdsp->playback_dma_buf.area + (pb_bus - hdsp->playback_dma_buf.addr);
 
 	return 0;
 }
@@ -4117,10 +4037,10 @@ static int snd_hdsp_prepare(snd_pcm_substream_t *substream)
 		return -EIO;
 	}
 
-	spin_lock(&hdsp->lock);
+	spin_lock_irq(&hdsp->lock);
 	if (!hdsp->running)
 		hdsp_reset_hw_pointer(hdsp);
-	spin_unlock(&hdsp->lock);
+	spin_unlock_irq(&hdsp->lock);
 	return result;
 }
 
@@ -4177,20 +4097,16 @@ static snd_pcm_hardware_t snd_hdsp_capture_subinfo =
 
 static unsigned int hdsp_period_sizes[] = { 64, 128, 256, 512, 1024, 2048, 4096, 8192 };
 
-#define HDSP_PERIOD_SIZES sizeof(hdsp_period_sizes) / sizeof(hdsp_period_sizes[0])
-
 static snd_pcm_hw_constraint_list_t hdsp_hw_constraints_period_sizes = {
-	.count = HDSP_PERIOD_SIZES,
+	.count = ARRAY_SIZE(hdsp_period_sizes),
 	.list = hdsp_period_sizes,
 	.mask = 0
 };
 
 static unsigned int hdsp_9632_sample_rates[] = { 32000, 44100, 48000, 64000, 88200, 96000, 128000, 176400, 192000 };
 
-#define HDSP_9632_SAMPLE_RATES sizeof(hdsp_9632_sample_rates) / sizeof(hdsp_9632_sample_rates[0])
-
 static snd_pcm_hw_constraint_list_t hdsp_hw_constraints_9632_sample_rates = {
-	.count = HDSP_9632_SAMPLE_RATES,
+	.count = ARRAY_SIZE(hdsp_9632_sample_rates),
 	.list = hdsp_9632_sample_rates,
 	.mask = 0
 };
@@ -4359,7 +4275,6 @@ static int snd_hdsp_hw_rule_rate_in_channels(snd_pcm_hw_params_t *params,
 static int snd_hdsp_playback_open(snd_pcm_substream_t *substream)
 {
 	hdsp_t *hdsp = snd_pcm_substream_chip(substream);
-	unsigned long flags;
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
 	if (hdsp_check_for_iobox (hdsp)) {
@@ -4377,7 +4292,7 @@ static int snd_hdsp_playback_open(snd_pcm_substream_t *substream)
 		return -EIO;
 	}
 
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 
 	snd_pcm_set_sync(substream);
 
@@ -4393,7 +4308,7 @@ static int snd_hdsp_playback_open(snd_pcm_substream_t *substream)
 	hdsp->playback_pid = current->pid;
 	hdsp->playback_substream = substream;
 
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 
 	snd_pcm_hw_constraint_msbits(runtime, 0, 32, 24);
 	snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_PERIOD_SIZE, &hdsp_hw_constraints_period_sizes);
@@ -4425,14 +4340,13 @@ static int snd_hdsp_playback_open(snd_pcm_substream_t *substream)
 static int snd_hdsp_playback_release(snd_pcm_substream_t *substream)
 {
 	hdsp_t *hdsp = snd_pcm_substream_chip(substream);
-	unsigned long flags;
 
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 
 	hdsp->playback_pid = -1;
 	hdsp->playback_substream = NULL;
 
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 
 	hdsp->spdif_ctl->vd[0].access |= SNDRV_CTL_ELEM_ACCESS_INACTIVE;
 	snd_ctl_notify(hdsp->card, SNDRV_CTL_EVENT_MASK_VALUE |
@@ -4444,7 +4358,6 @@ static int snd_hdsp_playback_release(snd_pcm_substream_t *substream)
 static int snd_hdsp_capture_open(snd_pcm_substream_t *substream)
 {
 	hdsp_t *hdsp = snd_pcm_substream_chip(substream);
-	unsigned long flags;
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
 	if (hdsp_check_for_iobox (hdsp)) {
@@ -4462,7 +4375,7 @@ static int snd_hdsp_capture_open(snd_pcm_substream_t *substream)
 		return -EIO;
 	}
 
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 
 	snd_pcm_set_sync(substream);
 
@@ -4478,7 +4391,7 @@ static int snd_hdsp_capture_open(snd_pcm_substream_t *substream)
 	hdsp->capture_pid = current->pid;
 	hdsp->capture_substream = substream;
 
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 
 	snd_pcm_hw_constraint_msbits(runtime, 0, 32, 24);
 	snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_PERIOD_SIZE, &hdsp_hw_constraints_period_sizes);
@@ -4504,14 +4417,13 @@ static int snd_hdsp_capture_open(snd_pcm_substream_t *substream)
 static int snd_hdsp_capture_release(snd_pcm_substream_t *substream)
 {
 	hdsp_t *hdsp = snd_pcm_substream_chip(substream);
-	unsigned long flags;
 
-	spin_lock_irqsave(&hdsp->lock, flags);
+	spin_lock_irq(&hdsp->lock);
 
 	hdsp->capture_pid = -1;
 	hdsp->capture_substream = NULL;
 
-	spin_unlock_irqrestore(&hdsp->lock, flags);
+	spin_unlock_irq(&hdsp->lock);
 	return 0;
 }
 
@@ -4824,19 +4736,13 @@ static int __devinit snd_hdsp_create_pcm(snd_card_t *card,
 	return 0;
 }
 
-static inline void snd_hdsp_9652_enable_mixer (hdsp_t *hdsp)
+static void snd_hdsp_9652_enable_mixer (hdsp_t *hdsp)
 {
         hdsp->control2_register |= HDSP_9652_ENABLE_MIXER;
 	hdsp_write (hdsp, HDSP_control2Reg, hdsp->control2_register);
 }
 
-static inline void snd_hdsp_9652_disable_mixer (hdsp_t *hdsp)
-{
-        hdsp->control2_register &= ~HDSP_9652_ENABLE_MIXER;
-	hdsp_write (hdsp, HDSP_control2Reg, hdsp->control2_register);
-}
-
-static inline int snd_hdsp_enable_io (hdsp_t *hdsp)
+static int snd_hdsp_enable_io (hdsp_t *hdsp)
 {
 	int i;
 	
@@ -4852,7 +4758,7 @@ static inline int snd_hdsp_enable_io (hdsp_t *hdsp)
 	return 0;
 }
 
-static inline void snd_hdsp_initialize_channels(hdsp_t *hdsp)
+static void snd_hdsp_initialize_channels(hdsp_t *hdsp)
 {
 	int status, aebi_channels, aebo_channels;
 	
@@ -4895,7 +4801,7 @@ static inline void snd_hdsp_initialize_channels(hdsp_t *hdsp)
 	}
 }
 
-static inline void snd_hdsp_initialize_midi_flush (hdsp_t *hdsp)
+static void snd_hdsp_initialize_midi_flush (hdsp_t *hdsp)
 {
 	snd_hdsp_flush_midi_input (hdsp, 0);
 	snd_hdsp_flush_midi_input (hdsp, 1);
@@ -4974,7 +4880,6 @@ static int __devinit snd_hdsp_create(snd_card_t *card,
 	spin_lock_init(&hdsp->midi[0].lock);
 	spin_lock_init(&hdsp->midi[1].lock);
 	hdsp->iobase = 0;
-	hdsp->res_port = NULL;
 	hdsp->control_register = 0;
 	hdsp->control2_register = 0;
 	hdsp->io_type = Undefined;
@@ -5029,13 +4934,9 @@ static int __devinit snd_hdsp_create(snd_card_t *card,
 
 	pci_set_master(hdsp->pci);
 
+	if ((err = pci_request_regions(pci, "hdsp")) < 0)
+		return err;
 	hdsp->port = pci_resource_start(pci, 0);
-
-	if ((hdsp->res_port = request_mem_region(hdsp->port, HDSP_IO_EXTENT, "hdsp")) == NULL) {
-		snd_printk("unable to grab memory region 0x%lx-0x%lx\n", hdsp->port, hdsp->port + HDSP_IO_EXTENT - 1);
-		return -EBUSY;
-	}
-
 	if ((hdsp->iobase = (unsigned long) ioremap_nocache(hdsp->port, HDSP_IO_EXTENT)) == 0) {
 		snd_printk("unable to remap region 0x%lx-0x%lx\n", hdsp->port, hdsp->port + HDSP_IO_EXTENT - 1);
 		return -EBUSY;
@@ -5108,7 +5009,7 @@ static int __devinit snd_hdsp_create(snd_card_t *card,
 
 static int snd_hdsp_free(hdsp_t *hdsp)
 {
-	if (hdsp->res_port) {
+	if (hdsp->port) {
 		/* stop the audio, and cancel all interrupts */
 		hdsp->control_register &= ~(HDSP_Start|HDSP_AudioInterruptEnable|HDSP_Midi0InterruptEnable|HDSP_Midi1InterruptEnable);
 		hdsp_write (hdsp, HDSP_controlRegister, hdsp->control_register);
@@ -5122,10 +5023,8 @@ static int snd_hdsp_free(hdsp_t *hdsp)
 	if (hdsp->iobase)
 		iounmap((void *) hdsp->iobase);
 
-	if (hdsp->res_port) {
-		release_resource(hdsp->res_port);
-		kfree_nocheck(hdsp->res_port);
-	}
+	if (hdsp->port)
+		pci_release_regions(hdsp->pci);
 		
 	return 0;
 }

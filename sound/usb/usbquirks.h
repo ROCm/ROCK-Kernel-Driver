@@ -267,7 +267,8 @@ YAMAHA_DEVICE(0x5008, "01V96"),
 	}
 },
 {
-	/* thanks to Emiliano Grilli <emillo@libero.it> for helping researching this data */
+	/* thanks to Emiliano Grilli <emillo@libero.it>
+	 * for helping researching this data */
 	USB_DEVICE(0x0582, 0x000c),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "Roland",
@@ -942,6 +943,21 @@ YAMAHA_DEVICE(0x5008, "01V96"),
 		.vendor_name = "Terratec",
 		.product_name = "PHASE 26",
 		.ifnum = 3,
+		.type = QUIRK_MIDI_STANDARD_INTERFACE
+	}
+},
+
+{
+	/*
+	 * Some USB MIDI devices don't have an audio control interface,
+	 * so we have to grab MIDI streaming interfaces here.
+	 */
+	.match_flags = USB_DEVICE_ID_MATCH_INT_CLASS |
+		       USB_DEVICE_ID_MATCH_INT_SUBCLASS,
+	.bInterfaceClass = USB_CLASS_AUDIO,
+	.bInterfaceSubClass = USB_SUBCLASS_MIDI_STREAMING,
+	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
+		.ifnum = QUIRK_ANY_INTERFACE,
 		.type = QUIRK_MIDI_STANDARD_INTERFACE
 	}
 },

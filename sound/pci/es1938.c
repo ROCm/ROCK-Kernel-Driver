@@ -201,15 +201,10 @@ struct _snd_es1938 {
 	int irq;
 
 	unsigned long io_port;
-	struct resource *res_io_port;
 	unsigned long sb_port;
-	struct resource *res_sb_port;
 	unsigned long vc_port;
-	struct resource *res_vc_port;
 	unsigned long mpu_port;
-	struct resource *res_mpu_port;
 	unsigned long game_port;
-	struct resource *res_game_port;
 	unsigned long ddma_port;
 
 	unsigned char irqmask;
@@ -1350,28 +1345,9 @@ static int snd_es1938_free(es1938_t *chip)
 	if (chip->gameport.io)
 		gameport_unregister_port(&chip->gameport);
 #endif
-	if (chip->res_io_port) {
-		release_resource(chip->res_io_port);
-		kfree_nocheck(chip->res_io_port);
-	}
-	if (chip->res_sb_port) {
-		release_resource(chip->res_sb_port);
-		kfree_nocheck(chip->res_sb_port);
-	}
-	if (chip->res_vc_port) {
-		release_resource(chip->res_vc_port);
-		kfree_nocheck(chip->res_vc_port);
-	}
-	if (chip->res_mpu_port) {
-		release_resource(chip->res_mpu_port);
-		kfree_nocheck(chip->res_mpu_port);
-	}
-	if (chip->res_game_port) {
-		release_resource(chip->res_game_port);
-		kfree_nocheck(chip->res_game_port);
-	}
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
+	pci_release_regions(chip->pci);
 	kfree(chip);
 	return 0;
 }
@@ -1411,36 +1387,15 @@ static int __devinit snd_es1938_create(snd_card_t * card,
 	spin_lock_init(&chip->mixer_lock);
 	chip->card = card;
 	chip->pci = pci;
+	if ((err = pci_request_regions(pci, "ESS Solo-1")) < 0) {
+		kfree(chip);
+		return err;
+	}
 	chip->io_port = pci_resource_start(pci, 0);
-	if ((chip->res_io_port = request_region(chip->io_port, 8, "ESS Solo-1")) == NULL) {
-		snd_printk("unable to grab region 0x%lx-0x%lx\n", chip->io_port, chip->io_port + 8 - 1);
-		snd_es1938_free(chip);
-		return -EBUSY;
-	}
 	chip->sb_port = pci_resource_start(pci, 1);
-	if ((chip->res_sb_port = request_region(chip->sb_port, 0x10, "ESS Solo-1 SB")) == NULL) {
-		snd_printk("unable to grab SB region 0x%lx-0x%lx\n", chip->sb_port, chip->sb_port + 0x10 - 1);
-		snd_es1938_free(chip);
-		return -EBUSY;
-	}
 	chip->vc_port = pci_resource_start(pci, 2);
-	if ((chip->res_vc_port = request_region(chip->vc_port, 0x10, "ESS Solo-1 VC (DMA)")) == NULL) {
-		snd_printk("unable to grab VC (DMA) region 0x%lx-0x%lx\n", chip->vc_port, chip->vc_port + 0x10 - 1);
-		snd_es1938_free(chip);
-		return -EBUSY;
-	}
 	chip->mpu_port = pci_resource_start(pci, 3);
-	if ((chip->res_mpu_port = request_region(chip->mpu_port, 4, "ESS Solo-1 MIDI")) == NULL) {
-		snd_printk("unable to grab MIDI region 0x%lx-0x%lx\n", chip->mpu_port, chip->mpu_port + 4 - 1);
-		snd_es1938_free(chip);
-		return -EBUSY;
-	}
 	chip->game_port = pci_resource_start(pci, 4);
-	if ((chip->res_game_port = request_region(chip->game_port, 4, "ESS Solo-1 GAME")) == NULL) {
-		snd_printk("unable to grab GAME region 0x%lx-0x%lx\n", chip->game_port, chip->game_port + 4 - 1);
-		snd_es1938_free(chip);
-		return -EBUSY;
-	}
 	if (request_irq(pci->irq, snd_es1938_interrupt, SA_INTERRUPT|SA_SHIRQ, "ES1938", (void *)chip)) {
 		snd_printk("unable to grab IRQ %d\n", pci->irq);
 		snd_es1938_free(chip);

@@ -345,8 +345,6 @@ send_array(emu8000_t *emu, unsigned short *data, int size)
 		EMU8000_INIT4_WRITE(emu, i, *p);
 }
 
-#define NELEM(arr) (sizeof(arr)/sizeof((arr)[0]))
-
 
 /*
  * Send initialization arrays to start up, this just follows the
@@ -355,18 +353,18 @@ send_array(emu8000_t *emu, unsigned short *data, int size)
 static void __init
 init_arrays(emu8000_t *emu)
 {
-	send_array(emu, init1, NELEM(init1)/4);
+	send_array(emu, init1, ARRAY_SIZE(init1)/4);
 
 	set_current_state(TASK_INTERRUPTIBLE);
 	schedule_timeout((HZ * (44099 + 1024)) / 44100); /* wait for 1024 clocks */
-	send_array(emu, init2, NELEM(init2)/4);
-	send_array(emu, init3, NELEM(init3)/4);
+	send_array(emu, init2, ARRAY_SIZE(init2)/4);
+	send_array(emu, init3, ARRAY_SIZE(init3)/4);
 
 	EMU8000_HWCF4_WRITE(emu, 0);
 	EMU8000_HWCF5_WRITE(emu, 0x83);
 	EMU8000_HWCF6_WRITE(emu, 0x8000);
 
-	send_array(emu, init4, NELEM(init4)/4);
+	send_array(emu, init4, ARRAY_SIZE(init4)/4);
 }
 
 

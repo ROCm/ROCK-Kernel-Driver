@@ -1020,8 +1020,8 @@ static int snd_ctl_set_power_state(snd_card_t *card, unsigned int power_state)
 }
 #endif
 
-static int snd_ctl_ioctl(struct inode *inode, struct file *file,
-			 unsigned int cmd, unsigned long arg)
+static inline int _snd_ctl_ioctl(struct inode *inode, struct file *file,
+				 unsigned int cmd, unsigned long arg)
 {
 	snd_ctl_file_t *ctl;
 	snd_card_t *card;
@@ -1094,6 +1094,17 @@ static int snd_ctl_ioctl(struct inode *inode, struct file *file,
 	return -ENOTTY;
 }
 
+/* FIXME: need to unlock BKL to allow preemption */
+static int snd_ctl_ioctl(struct inode *inode, struct file *file,
+			 unsigned int cmd, unsigned long arg)
+{
+	int err;
+	unlock_kernel();
+	err = _snd_ctl_ioctl(inode, file, cmd, arg);
+	lock_kernel();
+	return err;
+}
+
 static ssize_t snd_ctl_read(struct file *file, char __user *buffer, size_t count, loff_t * offset)
 {
 	snd_ctl_file_t *ctl;
@@ -1114,7 +1125,7 @@ static ssize_t snd_ctl_read(struct file *file, char __user *buffer, size_t count
 			wait_queue_t wait;
 			if ((file->f_flags & O_NONBLOCK) != 0 || result > 0) {
 				err = -EAGAIN;
-				goto __end;
+				goto __end_lock;
 			}
 			init_waitqueue_entry(&wait, current);
 			add_wait_queue(&ctl->change_sleep, &wait);
@@ -1135,16 +1146,16 @@ static ssize_t snd_ctl_read(struct file *file, char __user *buffer, size_t count
 		kfree(kev);
 		if (copy_to_user(buffer, &ev, sizeof(snd_ctl_event_t))) {
 			err = -EFAULT;
-			goto out;
+			goto __end;
 		}
 		spin_lock_irq(&ctl->read_lock);
 		buffer += sizeof(snd_ctl_event_t);
 		count -= sizeof(snd_ctl_event_t);
 		result += sizeof(snd_ctl_event_t);
 	}
-__end:
+      __end_lock:
 	spin_unlock_irq(&ctl->read_lock);
-out:
+      __end:
       	return result > 0 ? result : err;
 }
 

@@ -430,8 +430,6 @@ static int snd_cs8427_spdif_mask_get(snd_kcontrol_t * kcontrol,
 	return 0;
 }
 
-#define CONTROLS (sizeof(snd_cs8427_iec958_controls)/sizeof(snd_kcontrol_new_t))
-
 static snd_kcontrol_new_t snd_cs8427_iec958_controls[] = {
 {
 	.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
@@ -491,7 +489,7 @@ int snd_cs8427_iec958_build(snd_i2c_device_t *cs8427,
 	int err;
 
 	snd_assert(play_substream && cap_substream, return -EINVAL);
-	for (idx = 0; idx < CONTROLS; idx++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_cs8427_iec958_controls); idx++) {
 		kctl = snd_ctl_new1(&snd_cs8427_iec958_controls[idx], cs8427);
 		if (kctl == NULL)
 			return -ENOMEM;

@@ -462,16 +462,12 @@ int snd_opl3sa2_put_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * uco
 	return change;
 }
 
-#define OPL3SA2_CONTROLS (sizeof(snd_opl3sa2_controls)/sizeof(snd_kcontrol_new_t))
-
 static snd_kcontrol_new_t snd_opl3sa2_controls[] = {
 OPL3SA2_DOUBLE("Master Playback Switch", 0, 0x07, 0x08, 7, 7, 1, 1),
 OPL3SA2_DOUBLE("Master Playback Volume", 0, 0x07, 0x08, 0, 0, 15, 1),
 OPL3SA2_SINGLE("Mic Playback Switch", 0, 0x09, 7, 1, 1),
 OPL3SA2_SINGLE("Mic Playback Volume", 0, 0x09, 0, 31, 1)
 };
-
-#define OPL3SA2_TONE_CONTROLS (sizeof(snd_opl3sa2_tone_controls)/sizeof(snd_kcontrol_new_t))
 
 static snd_kcontrol_new_t snd_opl3sa2_tone_controls[] = {
 OPL3SA2_DOUBLE("3D Control - Wide", 0, 0x14, 0x14, 4, 0, 7, 0),
@@ -516,7 +512,7 @@ static int __init snd_opl3sa2_mixer(opl3sa2_t *chip)
         if ((err = snd_ctl_rename_id(card, &id1, &id2)) < 0)
                 return err;
 	/* add OPL3SA2 controls */
-	for (idx = 0; idx < OPL3SA2_CONTROLS; idx++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_opl3sa2_controls); idx++) {
 		if ((err = snd_ctl_add(card, kctl = snd_ctl_new1(&snd_opl3sa2_controls[idx], chip))) < 0)
 			return err;
 		switch (idx) {
@@ -525,7 +521,7 @@ static int __init snd_opl3sa2_mixer(opl3sa2_t *chip)
 		}
 	}
 	if (chip->version > 2) {
-		for (idx = 0; idx < OPL3SA2_TONE_CONTROLS; idx++)
+		for (idx = 0; idx < ARRAY_SIZE(snd_opl3sa2_tone_controls); idx++)
 			if ((err = snd_ctl_add(card, snd_ctl_new1(&snd_opl3sa2_tone_controls[idx], chip))) < 0)
 				return err;
 	}

@@ -201,7 +201,6 @@ static int snd_pmac_pcm_prepare(pmac_t *chip, pmac_stream_t *rec, snd_pcm_substr
 {
 	int i;
 	volatile struct dbdma_cmd *cp;
-	unsigned long flags;
 	snd_pcm_runtime_t *runtime = subs->runtime;
 	int rate_index;
 	long offset;
@@ -226,7 +225,7 @@ static int snd_pmac_pcm_prepare(pmac_t *chip, pmac_stream_t *rec, snd_pcm_substr
 	 * For reasons I don't understand, it stops the hissing noise
 	 * common to many PowerBook G3 systems (like mine :-).
 	 */
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	snd_pmac_dma_stop(rec);
 	if (rec->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		st_le16(&chip->extra_dma.cmds->command, DBDMA_STOP);
@@ -250,7 +249,7 @@ static int snd_pmac_pcm_prepare(pmac_t *chip, pmac_stream_t *rec, snd_pcm_substr
 
 	snd_pmac_dma_stop(rec);
 	snd_pmac_dma_set_command(rec, &rec->cmd);
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 
 	return 0;
 }
@@ -262,7 +261,6 @@ static int snd_pmac_pcm_prepare(pmac_t *chip, pmac_stream_t *rec, snd_pcm_substr
 static int snd_pmac_pcm_trigger(pmac_t *chip, pmac_stream_t *rec,
 				snd_pcm_substream_t *subs, int cmd)
 {
-	unsigned long flags;
 	volatile struct dbdma_cmd *cp;
 	int i, command;
 
@@ -273,7 +271,7 @@ static int snd_pmac_pcm_trigger(pmac_t *chip, pmac_stream_t *rec,
 			return -EBUSY;
 		command = (subs->stream == SNDRV_PCM_STREAM_PLAYBACK ?
 			   OUTPUT_MORE : INPUT_MORE) + INTR_ALWAYS;
-		spin_lock_irqsave(&chip->reg_lock, flags);
+		spin_lock(&chip->reg_lock);
 		snd_pmac_beep_stop(chip);
 		snd_pmac_pcm_set_format(chip);
 		for (i = 0, cp = rec->cmd.cmds; i < rec->nperiods; i++, cp++)
@@ -282,18 +280,18 @@ static int snd_pmac_pcm_trigger(pmac_t *chip, pmac_stream_t *rec,
 		(void)in_le32(&rec->dma->status);
 		snd_pmac_dma_run(rec, RUN|WAKE);
 		rec->running = 1;
-		spin_unlock_irqrestore(&chip->reg_lock, flags);
+		spin_unlock(&chip->reg_lock);
 		break;
 
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
-		spin_lock_irqsave(&chip->reg_lock, flags);
+		spin_lock(&chip->reg_lock);
 		rec->running = 0;
 		/*printk("stopped!!\n");*/
 		snd_pmac_dma_stop(rec);
 		for (i = 0, cp = rec->cmd.cmds; i < rec->nperiods; i++, cp++)
 			out_le16(&cp->command, DBDMA_STOP);
-		spin_unlock_irqrestore(&chip->reg_lock, flags);
+		spin_unlock(&chip->reg_lock);
 		break;
 
 	default:

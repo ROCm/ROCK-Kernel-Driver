@@ -54,26 +54,21 @@ static int preallocate_pcm_pages(snd_pcm_substream_t *substream, size_t size)
 	snd_assert(size > 0, return -EINVAL);
 
 	/* already reserved? */
-	if (snd_dma_get_reserved(&substream->dma_device, dmab) > 0) {
+	if (snd_dma_get_reserved_buf(dmab, substream->dma_buf_id) > 0) {
 		if (dmab->bytes >= size)
 			return 0; /* yes */
-		/* no, reset the reserved block */
-		/* if we can find bigger pages below, this block will be
-		 * automatically removed in snd_dma_set_reserved().
-		 */
-		snd_dma_free_reserved(&substream->dma_device);
+		/* no, free the reserved block */
+		snd_dma_free_pages(dmab);
 		dmab->bytes = 0;
 	}
 
 	do {
-		if ((err = snd_dma_alloc_pages(&substream->dma_device, size, dmab)) < 0) {
+		if ((err = snd_dma_alloc_pages(dmab->dev.type, dmab->dev.dev,
+					       size, dmab)) < 0) {
 			if (err != -ENOMEM)
 				return err; /* fatal error */
-		} else {
-			/* remember this one */
-			snd_dma_set_reserved(&substream->dma_device, dmab);
+		} else
 			return 0;
-		}
 		size >>= 1;
 	} while (size >= snd_minimum_buffer);
 	dmab->bytes = 0; /* tell error */
@@ -87,7 +82,10 @@ static void snd_pcm_lib_preallocate_dma_free(snd_pcm_substream_t *substream)
 {
 	if (substream->dma_buffer.area == NULL)
 		return;
-	snd_dma_free_reserved(&substream->dma_device);
+	if (substream->dma_buf_id)
+		snd_dma_reserve_buf(&substream->dma_buffer, substream->dma_buf_id);
+	else
+		snd_dma_free_pages(&substream->dma_buffer);
 	substream->dma_buffer.area = NULL;
 }
 
@@ -106,7 +104,6 @@ int snd_pcm_lib_preallocate_free(snd_pcm_substream_t *substream)
 		snd_info_unregister(substream->proc_prealloc_entry);
 		substream->proc_prealloc_entry = NULL;
 	}
-	substream->dma_device.type = SNDRV_DMA_TYPE_UNKNOWN;
 	return 0;
 }
 
@@ -168,18 +165,20 @@ static void snd_pcm_lib_preallocate_proc_write(snd_info_entry_t *entry,
 		if (substream->dma_buffer.bytes == size)
 			return;
 		memset(&new_dmab, 0, sizeof(new_dmab));
+		new_dmab.dev = substream->dma_buffer.dev;
 		if (size > 0) {
-
-			if (snd_dma_alloc_pages(&substream->dma_device, size, &new_dmab) < 0) {
+			if (snd_dma_alloc_pages(substream->dma_buffer.dev.type,
+						substream->dma_buffer.dev.dev,
+						size, &new_dmab) < 0) {
 				buffer->error = -ENOMEM;
 				return;
 			}
 			substream->buffer_bytes_max = size;
-			snd_dma_free_reserved(&substream->dma_device);
 		} else {
 			substream->buffer_bytes_max = UINT_MAX;
 		}
-		snd_dma_set_reserved(&substream->dma_device, &new_dmab);
+		if (substream->dma_buffer.area)
+			snd_dma_free_pages(&substream->dma_buffer);
 		substream->dma_buffer = new_dmab;
 	} else {
 		buffer->error = -EINVAL;
@@ -194,7 +193,6 @@ static int snd_pcm_lib_preallocate_pages1(snd_pcm_substream_t *substream,
 {
 	snd_info_entry_t *entry;
 
-	memset(&substream->dma_buffer, 0, sizeof(substream->dma_buffer));
 	if (size > 0 && preallocate_dma && substream->number < maximum_substreams)
 		preallocate_pcm_pages(substream, size);
 
@@ -217,20 +215,6 @@ static int snd_pcm_lib_preallocate_pages1(snd_pcm_substream_t *substream,
 }
 
 
-/*
- * set up the unique pcm id
- */
-static inline void setup_pcm_id(snd_pcm_substream_t *subs)
-{
-	if (! subs->dma_device.id) {
-		subs->dma_device.id = subs->pcm->device << 16 |
-			subs->stream << 8 | (subs->number + 1);
-		if (subs->dma_device.type == SNDRV_DMA_TYPE_CONTINUOUS ||
-		    subs->dma_device.dev == NULL)
-			subs->dma_device.id |= (subs->pcm->card->number + 1) << 24;
-	}
-}
-
 /**
  * snd_pcm_lib_preallocate_pages - pre-allocation for the given DMA type
  * @substream: the pcm substream instance
@@ -239,7 +223,12 @@ static inline void setup_pcm_id(snd_pcm_substream_t *subs)
  * @size: the requested pre-allocation size in bytes
  * @max: the max. allowed pre-allocation size
  *
- * Do pre-allocation for the given DMA type.
+ * Do pre-allocation for the given DMA buffer type.
+ *
+ * When substream->dma_buf_id is set, the function tries to look for
+ * the reserved buffer, and the buffer is not freed but reserved at
+ * destruction time.  The dma_buf_id must be unique for all systems
+ * (in the same DMA buffer type) e.g. using snd_dma_pci_buf_id().
  *
  * Returns zero if successful, or a negative error code on failure.
  */
@@ -247,9 +236,8 @@ int snd_pcm_lib_preallocate_pages(snd_pcm_substream_t *substream,
 				  int type, struct device *data,
 				  size_t size, size_t max)
 {
-	substream->dma_device.type = type;
-	substream->dma_device.dev = data;
-	setup_pcm_id(substream);
+	substream->dma_buffer.dev.type = type;
+	substream->dma_buffer.dev.dev = data;
 	return snd_pcm_lib_preallocate_pages1(substream, size, max);
 }
 
@@ -314,7 +302,7 @@ int snd_pcm_lib_malloc_pages(snd_pcm_substream_t *substream, size_t size)
 	snd_pcm_runtime_t *runtime;
 	struct snd_dma_buffer *dmab = NULL;
 
-	snd_assert(substream->dma_device.type != SNDRV_DMA_TYPE_UNKNOWN, return -EINVAL);
+	snd_assert(substream->dma_buffer.dev.type != SNDRV_DMA_TYPE_UNKNOWN, return -EINVAL);
 	snd_assert(substream != NULL, return -EINVAL);
 	runtime = substream->runtime;
 	snd_assert(runtime != NULL, return -EINVAL);
@@ -335,7 +323,10 @@ int snd_pcm_lib_malloc_pages(snd_pcm_substream_t *substream, size_t size)
 		dmab = kcalloc(1, sizeof(*dmab), GFP_KERNEL);
 		if (! dmab)
 			return -ENOMEM;
-		if (snd_dma_alloc_pages(&substream->dma_device, size, dmab) < 0) {
+		dmab->dev = substream->dma_buffer.dev;
+		if (snd_dma_alloc_pages(substream->dma_buffer.dev.type,
+					substream->dma_buffer.dev.dev,
+					size, dmab) < 0) {
 			kfree(dmab);
 			return -ENOMEM;
 		}
@@ -364,7 +355,7 @@ int snd_pcm_lib_free_pages(snd_pcm_substream_t *substream)
 		return 0;
 	if (runtime->dma_buffer_p != &substream->dma_buffer) {
 		/* it's a newly allocated buffer.  release it now. */
-		snd_dma_free_pages(&substream->dma_device, runtime->dma_buffer_p);
+		snd_dma_free_pages(runtime->dma_buffer_p);
 		kfree(runtime->dma_buffer_p);
 	}
 	snd_pcm_set_runtime_buffer(substream, NULL);

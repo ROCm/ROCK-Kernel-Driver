@@ -393,7 +393,7 @@ static void snd_usbmidi_do_output(snd_usb_midi_out_endpoint_t* ep)
 	int p;
 	struct urb* urb = ep->urb;
 	unsigned long flags;
-	
+
 	spin_lock_irqsave(&ep->buffer_lock, flags);
 	if (urb->status == -EINPROGRESS || ep->umidi->chip->shutdown) {
 		spin_unlock_irqrestore(&ep->buffer_lock, flags);
@@ -418,7 +418,7 @@ static void snd_usbmidi_do_output(snd_usb_midi_out_endpoint_t* ep)
 static void snd_usbmidi_out_tasklet(unsigned long data)
 {
 	snd_usb_midi_out_endpoint_t* ep = (snd_usb_midi_out_endpoint_t *) data;
-	
+
 	snd_usbmidi_do_output(ep);
 }
 
@@ -964,7 +964,7 @@ static int snd_usbmidi_get_ms_info(snd_usb_midi_t* umidi,
  * If the endpoints aren't specified, use the first bulk endpoints in the
  * first alternate setting of the interface.
  */
-static int snd_usbmidi_detect_endpoint(snd_usb_midi_t* umidi, 
+static int snd_usbmidi_detect_endpoint(snd_usb_midi_t* umidi,
 				       snd_usb_midi_endpoint_info_t* endpoint)
 {
 	struct usb_interface* intf;
@@ -998,7 +998,7 @@ static int snd_usbmidi_detect_endpoint(snd_usb_midi_t* umidi,
 /*
  * Detects the endpoints and ports of Yamaha devices.
  */
-static int snd_usbmidi_detect_yamaha(snd_usb_midi_t* umidi, 
+static int snd_usbmidi_detect_yamaha(snd_usb_midi_t* umidi,
 				     snd_usb_midi_endpoint_info_t* endpoint)
 {
 	struct usb_interface* intf;
@@ -1145,7 +1145,7 @@ static int snd_usbmidi_create_rawmidi(snd_usb_midi_t* umidi,
 }
 
 /*
- * Temporarily stop input. 
+ * Temporarily stop input.
  */
 void snd_usbmidi_input_stop(struct list_head* p)
 {
@@ -1163,7 +1163,7 @@ void snd_usbmidi_input_stop(struct list_head* p)
 static void snd_usbmidi_input_start_ep(snd_usb_midi_in_endpoint_t* ep)
 {
 	if (ep) {
-		struct urb* urb = ep->urb; 
+		struct urb* urb = ep->urb;
 		urb->dev = ep->umidi->chip->dev;
 		snd_usbmidi_submit_urb(urb, GFP_KERNEL);
 	}

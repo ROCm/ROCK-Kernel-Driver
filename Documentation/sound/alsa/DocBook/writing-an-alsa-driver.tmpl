@@ -18,8 +18,8 @@
       </affiliation>
      </author>
 
-     <date>June 29, 2004</date>
-     <edition>0.3.2</edition>
+     <date>July 11, 2004</date>
+     <edition>0.3.3</edition>
 
     <abstract>
       <para>
@@ -395,7 +395,6 @@
   #include <linux/pci.h>
   #include <linux/slab.h>
   #include <sound/core.h>
-  #define SNDRV_GET_ID
   #include <sound/initval.h>
 
   // module parameters (see "Module Parameters")
@@ -739,7 +738,6 @@
   #include <linux/pci.h>
   #include <linux/slab.h>
   #include <sound/core.h>
-  #define SNDRV_GET_ID
   #include <sound/initval.h>
 ]]>
           </programlisting>
@@ -1024,6 +1022,7 @@
           where <function>snd_mychip_free()</function> is the real destructor.
         </para>
       </section>
+    </section>
 
     <section id="card-management-registration">
       <title>Registration and Release</title>
@@ -1085,8 +1084,6 @@
           struct pci_dev *pci;
 
           unsigned long port;
-          struct resource *res_port;
-
           int irq;
   };
 
@@ -1095,14 +1092,11 @@
           // disable hardware here if any
           // (not implemented in this document)
 
-          // release the i/o port
-          if (chip->res_port) {
-                  release_resource(chip->res_port);
-                  kfree_nocheck(chip->res_port);
-          }
           // release the irq
           if (chip->irq >= 0)
                   free_irq(chip->irq, (void *)chip);
+          // release the i/o ports
+          pci_release_regions(chip->pci);
           // release the data
           kfree(chip);
           return 0;
@@ -1140,18 +1134,16 @@
           chip->irq = -1;
 
           // (1) PCI resource allocation
-          chip->port = pci_resource_start(pci, 0);
-          if ((chip->res_port = request_region(chip->port, 8,
-                                                 "My Chip")) == NULL) { 
-                  snd_mychip_free(chip);
-                  printk(KERN_ERR "cannot allocate the port\n");
-                  return -EBUSY;
+          if ((err = pci_request_regions(pci, "My Chip")) < 0) {
+                  kfree(chip);
+                  return err;
           }
+          chip->port = pci_resource_start(pci, 0);
           if (request_irq(pci->irq, snd_mychip_interrupt,
                           SA_INTERRUPT|SA_SHIRQ, "My Chip",
                           (void *)chip)) {
+                  printk(KERN_ERR "cannot grab irq %d\n", pci->irq);
                   snd_mychip_free(chip);
-                  printk(KERN_ERR "cannot grab irq\n");
                   return -EBUSY;
           }
           chip->irq = pci->irq;
@@ -1267,8 +1259,6 @@
           snd_card_t *card;
 
           unsigned long port;
-          struct resource *res_port;
-
           int irq;
   };
 ]]>
@@ -1293,14 +1283,11 @@
         <informalexample>
           <programlisting>
 <![CDATA[
-  chip->port = pci_resource_start(pci, 0);
-  if ((chip->res_port = request_region(chip->port, 8,
-                                       "My Chip")) == NULL) { 
-          printk(KERN_ERR "cannot allocate the port 0x%lx\n",
-                 chip->port);
-          snd_mychip_free(chip);
-          return -EBUSY;
+  if ((err = pci_request_regions(pci, "My Chip")) < 0) { 
+          kfree(chip);
+          return err;
   }
+  chip->port = pci_resource_start(pci, 0);
 ]]>
           </programlisting>
         </informalexample>
@@ -1324,8 +1311,8 @@
   if (request_irq(pci->irq, snd_mychip_interrupt,
                   SA_INTERRUPT|SA_SHIRQ, "My Chip",
                   (void *)chip)) {
-          snd_mychip_free(chip);
           printk(KERN_ERR "cannot grab irq %d\n", pci->irq);
+          snd_mychip_free(chip);
           return -EBUSY;
   }
   chip->irq = pci->irq;
@@ -1382,7 +1369,45 @@
 
       <para>
         For releasing the resources, <quote>check-and-release</quote>
-        method is a safer way. For the i/o port, do like this: 
+        method is a safer way. For the interrupt, do like this: 
+
+        <informalexample>
+          <programlisting>
+<![CDATA[
+  if (chip->irq >= 0)
+          free_irq(chip->irq, (void *)chip);
+]]>
+          </programlisting>
+        </informalexample>
+
+        Since the irq number can start from 0, you should initialize
+        chip-&gt;irq with a negative value (e.g. -1), so that you can
+        check the validity of the irq number as above.
+      </para>
+
+      <para>
+        When you requested I/O ports or memory regions via
+	<function>pci_request_region()</function> or
+	<function>pci_request_regions()</function> like this example,
+	release the resource(s) using the corresponding function,
+	<function>pci_release_region()</function> or
+	<function>pci_release_regions()</function>.
+
+        <informalexample>
+          <programlisting>
+<![CDATA[
+  pci_release_regions(chip->pci);
+]]>
+          </programlisting>
+        </informalexample>
+      </para>
+
+      <para>
+	When you requested manually via <function>request_region()</function>
+	or <function>request_mem_region</function>, you can release it via
+	<function>release_resource()</function>.  Suppose that you keep
+	the resource pointer returned from <function>request_region()</function>
+	in chip-&gt;res_port, the release procedure looks like below:
 
         <informalexample>
           <programlisting>
@@ -1394,10 +1419,8 @@
 ]]>
           </programlisting>
         </informalexample>
-      </para>
 
-      <para>
-        As you can see, the i/o resource pointer is also to be freed
+      As you can see, the resource pointer is also to be freed
       via <function>kfree_nocheck()</function> after
       <function>release_resource()</function> is called. You
       cannot use <function>kfree()</function> here, because on ALSA,
@@ -1411,17 +1434,6 @@
       </para>
 
       <para>
-        For releasing the interrupt, do like this:
-
-        <informalexample>
-          <programlisting>
-<![CDATA[
-  if (chip->irq >= 0)
-          free_irq(chip->irq, (void *)chip);
-]]>
-          </programlisting>
-        </informalexample>
-
         And finally, release the chip-specific record.
 
         <informalexample>
@@ -1468,7 +1480,6 @@
           ....
           unsigned long iobase_phys;
           unsigned long iobase_virt;
-          struct resource *res_iobase;
   };
 ]]>
           </programlisting>
@@ -1479,15 +1490,14 @@
         <informalexample>
           <programlisting>
 <![CDATA[
+  if ((err = pci_request_regions(pci, "My Chip")) < 0) {
+          kfree(chip);
+          return err;
+  }
   chip->iobase_phys = pci_resource_start(pci, 0);
   chip->iobase_virt = (unsigned long)
-                      ioremap_nocache(chip->iobase_phys, 512);
-  if ((chip->res_port = request_mem_region(chip->iobase_phys, 512,
-                                           "My Chip")) == NULL) {
-          printk(KERN_ERR "cannot allocate the memory region\n");
-          snd_mychip_free(chip);
-          return -EBUSY;
-  }
+                      ioremap_nocache(chip->iobase_phys,
+                                      pci_resource_len(pci, 0));
 ]]>
           </programlisting>
         </informalexample>
@@ -1502,10 +1512,8 @@
           ....
           if (chip->iobase_virt)
                   iounmap((void *)chip->iobase_virt);
-          if (chip->res_iobase) {
-                  release_resource(chip->res_iobase);
-                  kfree_nocheck(chip->res_iobase);
-          }
+          ....
+          pci_release_regions(chip->pci);
           ....
   }
 ]]>
@@ -2724,10 +2732,10 @@ struct _snd_pcm_runtime {
         <para>
           Another note is that this callback is non-atomic
         (schedulable). This is important, because the
-        <structfield>prepare</structfield> callback 
+        <structfield>trigger</structfield> callback 
         is atomic (non-schedulable). That is, mutex or any
-        schedule-related functions are available only in
-        <structfield>hw_params</structfield> callback. 
+        schedule-related functions are not available in
+        <structfield>trigger</structfield> callback.
 	Please see the subsection
 	<link linkend="pcm-interface-atomicity"><citetitle>
 	Atomicity</citetitle></link> for details.
@@ -2793,7 +2801,8 @@ struct _snd_pcm_runtime {
         </para>
 
         <para>
-          As mentioned above, this callback is atomic.
+	Note that this callback became non-atomic since the recent version.
+	You can use schedule-related fucntions safely in this callback now.
         </para>
 
         <para>
@@ -2878,7 +2887,12 @@ struct _snd_pcm_runtime {
         </para>
 
         <para>
-          This callback is also atomic.
+          As mentioned, this callback is atomic.  You cannot call
+	  the function going to sleep.
+	  The trigger callback should be as minimal as possible,
+	  just really triggering the DMA.  The other stuff should be
+	  initialized hw_params and prepare callbacks properly
+	  beforehand.
         </para>
       </section>
 
@@ -3124,7 +3138,7 @@ struct _snd_pcm_runtime {
       <para>
       As already seen, some pcm callbacks are atomic and some are
       not.  For example, <parameter>hw_params</parameter> callback is
-      non-atomic, while <parameter>prepare</parameter> callback is
+      non-atomic, while <parameter>trigger</parameter> callback is
       atomic.  This means, the latter is called already in a spinlock
       held by the PCM middle layer. Please take this atomicity into
       account when you use a spinlock or a semaphore in the callbacks.
@@ -3135,7 +3149,7 @@ struct _snd_pcm_runtime {
       <function>schedule</function> or go to
       <function>sleep</function>.  The semaphore and mutex do sleep,
       and hence they cannot be used inside the atomic callbacks
-      (e.g. <parameter>prepare</parameter> callback).
+      (e.g. <parameter>trigger</parameter> callback).
       For taking a certain delay in such a callback, please use
       <function>udelay()</function> or <function>mdelay()</function>.
       </para>
@@ -3162,7 +3176,7 @@ struct _snd_pcm_runtime {
   static unsigned int rates[] =
           {4000, 10000, 22050, 44100};
   static snd_pcm_hw_constraint_list_t constraints_rates = {
-          .count = sizeof(rates) / sizeof(rates[0]),
+          .count = ARRAY_SIZE(rates),
           .list = rates,
           .mask = 0,
   };
@@ -3841,18 +3855,19 @@ struct _snd_pcm_runtime {
 
   static int snd_mychip_ac97(mychip_t *chip)
   {
-          ac97_bus_t bus, *pbus;
-          ac97_t ac97;
+          ac97_bus_t *bus;
+          ac97_template_t ac97;
           int err;
+          static ac97_bus_ops_t ops = {
+                  .write = snd_mychip_ac97_write,
+                  .read = snd_mychip_ac97_read,
+          };
 
-          memset(&bus, 0, sizeof(bus));
-          bus.write = snd_mychip_ac97_write;
-          bus.read = snd_mychip_ac97_read;
-          if ((err = snd_ac97_bus(chip->card, &bus, &pbus)) < 0)
+          if ((err = snd_ac97_bus(chip->card, 0, &ops, NULL, &bus)) < 0)
                   return err;
           memset(&ac97, 0, sizeof(ac97));
           ac97.private_data = chip;
-          return snd_ac97_mixer(pbus, &ac97, &chip->ac97);
+          return snd_ac97_mixer(bus, &ac97, &chip->ac97);
   }
 
 ]]>
@@ -3865,18 +3880,18 @@ struct _snd_pcm_runtime {
       <title>Constructor</title>
       <para>
         For creating an ac97 instance, first call <function>snd_ac97_bus</function>
-      with <type>ac97_bus_t</type> record including callback functions.
+      with an <type>ac97_bus_ops_t</type> record with callback functions.
 
         <informalexample>
           <programlisting>
 <![CDATA[
-  ac97_bus_t bus, *pbus;
-  int err;
+  ac97_bus_t *bus;
+  static ac97_bus_ops_t ops = {
+        .write = snd_mychip_ac97_write,
+        .read = snd_mychip_ac97_read,
+  };
 
-  memset(&bus, 0, sizeof(bus));
-  bus.write = snd_mychip_ac97_write;
-  bus.read = snd_mychip_ac97_read;
-  snd_ac97_bus(card, &bus, &pbus);
+  snd_ac97_bus(card, 0, &ops, NULL, &pbus);
 ]]>
           </programlisting>
         </informalexample>
@@ -3885,13 +3900,13 @@ struct _snd_pcm_runtime {
       </para>
 
       <para>
-      And then call <function>snd_ac97_mixer()</function> with an <type>ac97_t</type>
+      And then call <function>snd_ac97_mixer()</function> with an <type>ac97_template_t</type>
       record together with the bus pointer created above.
 
         <informalexample>
           <programlisting>
 <![CDATA[
-  ac97_t ac97;
+  ac97_template_t ac97;
   int err;
 
   memset(&ac97, 0, sizeof(ac97));
@@ -4075,7 +4090,7 @@ struct _snd_pcm_runtime {
       <para>
         On some chip, the clock of the codec isn't 48000 but using a
       PCI clock (to save a quartz!). In this case, change the field
-      ac97-&gt;clock to the corresponding
+      bus-&gt;clock to the corresponding
       value. For example, intel8x0 
       and es1968 drivers have the auto-measurement function of the
       clock. 
@@ -5448,14 +5463,14 @@ struct _snd_pcm_runtime {
   SND_TOPDIR=../..
   endif
 
-  include $(TOPDIR)/toplevel.config
-  include $(TOPDIR)/Makefile.conf
+  include $(SND_TOPDIR)/toplevel.config
+  include $(SND_TOPDIR)/Makefile.conf
 
   snd-xyz-objs := xyz.o abc.o def.o
 
   obj-$(CONFIG_SND_XYZ) += snd-xyz.o
 
-  include $(TOPDIR)/Rules.make
+  include $(SND_TOPDIR)/Rules.make
 ]]>
         </programlisting>
       </example>

@@ -558,13 +558,11 @@ struct snd_es1968 {
 	unsigned int clock;		/* clock */
 
 	/* buffer */
-	struct snd_dma_device dma_dev;
 	struct snd_dma_buffer dma;
 
 	/* Resources... */
 	int irq;
 	unsigned long io_port;
-	struct resource *res_io_port;
 	int type;
 	struct pci_dev *pci;
 	snd_card_t *card;
@@ -1298,9 +1296,8 @@ static int snd_es1968_pcm_trigger(snd_pcm_substream_t *substream, int cmd)
 {
 	es1968_t *chip = snd_pcm_substream_chip(substream);
 	esschan_t *es = substream->runtime->private_data;
-	unsigned long flags;
 
-	spin_lock_irqsave(&chip->substream_lock, flags);
+	spin_lock(&chip->substream_lock);
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
@@ -1321,7 +1318,7 @@ static int snd_es1968_pcm_trigger(snd_pcm_substream_t *substream, int cmd)
 		snd_es1968_bob_dec(chip);
 		break;
 	}
-	spin_unlock_irqrestore(&chip->substream_lock, flags);
+	spin_unlock(&chip->substream_lock);
 	return 0;
 }
 
@@ -1471,7 +1468,7 @@ static void snd_es1968_free_dmabuf(es1968_t *chip)
 
 	if (! chip->dma.area)
 		return;
-	snd_dma_free_reserved(&chip->dma_dev);
+	snd_dma_reserve_buf(&chip->dma, snd_dma_pci_buf_id(chip->pci));
 	while ((p = chip->buf_list.next) != &chip->buf_list) {
 		esm_memory_t *chunk = list_entry(p, esm_memory_t, list);
 		list_del(p);
@@ -1485,22 +1482,22 @@ snd_es1968_init_dmabuf(es1968_t *chip)
 	int err;
 	esm_memory_t *chunk;
 
-	chip->dma_dev.type = SNDRV_DMA_TYPE_DEV;
-	chip->dma_dev.dev = snd_dma_pci_data(chip->pci);
-	chip->dma_dev.id = 0;
-	if (! snd_dma_get_reserved(&chip->dma_dev, &chip->dma)) {
-		err = snd_dma_alloc_pages_fallback(&chip->dma_dev, chip->total_bufsize, &chip->dma);
+	chip->dma.dev.type = SNDRV_DMA_TYPE_DEV;
+	chip->dma.dev.dev = snd_dma_pci_data(chip->pci);
+	if (! snd_dma_get_reserved_buf(&chip->dma, snd_dma_pci_buf_id(chip->pci))) {
+		err = snd_dma_alloc_pages_fallback(SNDRV_DMA_TYPE_DEV,
+						   snd_dma_pci_data(chip->pci),
+						   chip->total_bufsize, &chip->dma);
 		if (err < 0 || ! chip->dma.area) {
 			snd_printk("es1968: can't allocate dma pages for size %d\n",
 				   chip->total_bufsize);
 			return -ENOMEM;
 		}
 		if ((chip->dma.addr + chip->dma.bytes - 1) & ~((1 << 28) - 1)) {
-			snd_dma_free_pages(&chip->dma_dev, &chip->dma);
+			snd_dma_free_pages(&chip->dma);
 			snd_printk("es1968: DMA buffer beyond 256MB.\n");
 			return -ENOMEM;
 		}
-		snd_dma_set_reserved(&chip->dma_dev, &chip->dma);
 	}
 
 	INIT_LIST_HEAD(&chip->buf_list);
@@ -1601,7 +1598,6 @@ static int snd_es1968_playback_open(snd_pcm_substream_t *substream)
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	esschan_t *es;
 	int apu1;
-	unsigned long flags;
 
 	/* search 2 APUs */
 	apu1 = snd_es1968_alloc_apu_pair(chip, ESM_APU_PCM_PLAY);
@@ -1622,8 +1618,6 @@ static int snd_es1968_playback_open(snd_pcm_substream_t *substream)
 	es->substream = substream;
 	es->mode = ESM_MODE_PLAY;
 
-	substream->dma_device = chip->dma_dev; /* for mmap */
-
 	runtime->private_data = es;
 	runtime->hw = snd_es1968_playback;
 	runtime->hw.buffer_bytes_max = runtime->hw.period_bytes_max =
@@ -1632,9 +1626,9 @@ static int snd_es1968_playback_open(snd_pcm_substream_t *substream)
 	snd_pcm_hw_constraint_step(runtime, 0, SNDRV_PCM_HW_PARAM_BUFFER_BYTES,
 				   1024);
 #endif
-	spin_lock_irqsave(&chip->substream_lock, flags);
+	spin_lock_irq(&chip->substream_lock);
 	list_add(&es->list, &chip->substream_list);
-	spin_unlock_irqrestore(&chip->substream_lock, flags);
+	spin_unlock_irq(&chip->substream_lock);
 
 	return 0;
 }
@@ -1645,7 +1639,6 @@ static int snd_es1968_capture_open(snd_pcm_substream_t *substream)
 	es1968_t *chip = snd_pcm_substream_chip(substream);
 	esschan_t *es;
 	int apu1, apu2;
-	unsigned long flags;
 
 	apu1 = snd_es1968_alloc_apu_pair(chip, ESM_APU_PCM_CAPTURE);
 	if (apu1 < 0)
@@ -1684,8 +1677,6 @@ static int snd_es1968_capture_open(snd_pcm_substream_t *substream)
         }
 	memset(es->mixbuf->buf.area, 0, ESM_MIXBUF_SIZE);
 
-	substream->dma_device = chip->dma_dev; /* for mmap */
-
 	runtime->private_data = es;
 	runtime->hw = snd_es1968_capture;
 	runtime->hw.buffer_bytes_max = runtime->hw.period_bytes_max =
@@ -1694,9 +1685,9 @@ static int snd_es1968_capture_open(snd_pcm_substream_t *substream)
 	snd_pcm_hw_constraint_step(runtime, 0, SNDRV_PCM_HW_PARAM_BUFFER_BYTES,
 				   1024);
 #endif
-	spin_lock_irqsave(&chip->substream_lock, flags);
+	spin_lock_irq(&chip->substream_lock);
 	list_add(&es->list, &chip->substream_list);
-	spin_unlock_irqrestore(&chip->substream_lock, flags);
+	spin_unlock_irq(&chip->substream_lock);
 
 	return 0;
 }
@@ -1705,14 +1696,13 @@ static int snd_es1968_playback_close(snd_pcm_substream_t * substream)
 {
 	es1968_t *chip = snd_pcm_substream_chip(substream);
 	esschan_t *es;
-	unsigned long flags;
 
 	if (substream->runtime->private_data == NULL)
 		return 0;
 	es = substream->runtime->private_data;
-	spin_lock_irqsave(&chip->substream_lock, flags);
+	spin_lock_irq(&chip->substream_lock);
 	list_del(&es->list);
-	spin_unlock_irqrestore(&chip->substream_lock, flags);
+	spin_unlock_irq(&chip->substream_lock);
 	snd_es1968_free_apu_pair(chip, es->apu[0]);
 	kfree(es);
 
@@ -1723,14 +1713,13 @@ static int snd_es1968_capture_close(snd_pcm_substream_t * substream)
 {
 	es1968_t *chip = snd_pcm_substream_chip(substream);
 	esschan_t *es;
-	unsigned long flags;
 
 	if (substream->runtime->private_data == NULL)
 		return 0;
 	es = substream->runtime->private_data;
-	spin_lock_irqsave(&chip->substream_lock, flags);
+	spin_lock_irq(&chip->substream_lock);
 	list_del(&es->list);
-	spin_unlock_irqrestore(&chip->substream_lock, flags);
+	spin_unlock_irq(&chip->substream_lock);
 	snd_es1968_free_memory(chip, es->mixbuf);
 	snd_es1968_free_apu_pair(chip, es->apu[0]);
 	snd_es1968_free_apu_pair(chip, es->apu[2]);
@@ -1772,7 +1761,6 @@ static void __devinit es1968_measure_clock(es1968_t *chip)
 	int i, apu;
 	unsigned int pa, offset, t;
 	esm_memory_t *memory;
-	unsigned long flags;
 	struct timeval start_time, stop_time;
 
 	if (chip->clock == 0)
@@ -1809,18 +1797,18 @@ static void __devinit es1968_measure_clock(es1968_t *chip)
 	apu_set_register(chip, apu, 9, 0xD000);
 	apu_set_register(chip, apu, 10, 0x8F08);
 	apu_set_register(chip, apu, 11, 0x0000);
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	outw(1, chip->io_port + 0x04); /* clear WP interrupts */
 	outw(inw(chip->io_port + ESM_PORT_HOST_IRQ) | ESM_HIRQ_DSIE, chip->io_port + ESM_PORT_HOST_IRQ); /* enable WP ints */
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 
 	snd_es1968_apu_set_freq(chip, apu, ((unsigned int)48000 << 16) / chip->clock); /* 48000 Hz */
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	__apu_set_register(chip, apu, 5, pa & 0xffff);
 	snd_es1968_trigger_apu(chip, apu, ESM_APU_16BITLINEAR);
 	do_gettimeofday(&start_time);
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 #if 0
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout(HZ / 20); /* 50 msec */
@@ -1831,11 +1819,11 @@ static void __devinit es1968_measure_clock(es1968_t *chip)
 	 */
 	mdelay(50);
 #endif
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	offset = __apu_get_register(chip, apu, 5);
 	do_gettimeofday(&stop_time);
 	snd_es1968_trigger_apu(chip, apu, 0); /* stop */
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 
 	/* check the current position */
 	offset -= (pa & 0xffff);
@@ -2031,15 +2019,16 @@ static irqreturn_t snd_es1968_interrupt(int irq, void *dev_id, struct pt_regs *r
 static int __devinit
 snd_es1968_mixer(es1968_t *chip)
 {
-	ac97_bus_t bus, *pbus;
-	ac97_t ac97;
+	ac97_bus_t *pbus;
+	ac97_template_t ac97;
 	snd_ctl_elem_id_t id;
 	int err;
+	static ac97_bus_ops_t ops = {
+		.write = snd_es1968_ac97_write,
+		.read = snd_es1968_ac97_read,
+	};
 
-	memset(&bus, 0, sizeof(bus));
-	bus.write = snd_es1968_ac97_write;
-	bus.read = snd_es1968_ac97_read;
-	if ((err = snd_ac97_bus(chip->card, &bus, &pbus)) < 0)
+	if ((err = snd_ac97_bus(chip->card, 0, &ops, NULL, &pbus)) < 0)
 		return err;
 
 	memset(&ac97, 0, sizeof(ac97));
@@ -2455,7 +2444,7 @@ static int es1968_resume(snd_card_t *card, unsigned int state)
 
 static int snd_es1968_free(es1968_t *chip)
 {
-	if (chip->res_io_port) {
+	if (chip->io_port) {
 		synchronize_irq(chip->irq);
 		outw(1, chip->io_port + 0x04); /* clear WP interrupts */
 		outw(0, chip->io_port + ESM_PORT_HOST_IRQ); /* disable IRQ */
@@ -2473,10 +2462,7 @@ static int snd_es1968_free(es1968_t *chip)
 	snd_es1968_set_acpi(chip, ACPI_D3);
 	chip->master_switch = NULL;
 	chip->master_volume = NULL;
-	if (chip->res_io_port) {
-		release_resource(chip->res_io_port);
-		kfree_nocheck(chip->res_io_port);
-	}
+	pci_release_regions(chip->pci);
 	kfree(chip);
 	return 0;
 }
@@ -2550,12 +2536,11 @@ static int __devinit snd_es1968_create(snd_card_t * card,
 	chip->playback_streams = play_streams;
 	chip->capture_streams = capt_streams;
 
-	chip->io_port = pci_resource_start(pci, 0);
-	if ((chip->res_io_port = request_region(chip->io_port, 0x100, "ESS Maestro")) == NULL) {
-		snd_printk("unable to grab region 0x%lx-0x%lx\n", chip->io_port, chip->io_port + 0x100 - 1);
-		snd_es1968_free(chip);
-		return -EBUSY;
+	if ((err = pci_request_regions(pci, "ESS Maestro")) < 0) {
+		kfree(chip);
+		return err;
 	}
+	chip->io_port = pci_resource_start(pci, 0);
 	if (request_irq(pci->irq, snd_es1968_interrupt, SA_INTERRUPT|SA_SHIRQ,
 			"ESS Maestro", (void*)chip)) {
 		snd_printk("unable to grab IRQ %d\n", pci->irq);

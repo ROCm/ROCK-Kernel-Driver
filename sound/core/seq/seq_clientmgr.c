@@ -23,6 +23,7 @@
 
 #include <sound/driver.h>
 #include <linux/init.h>
+#include <linux/smp_lock.h>
 #include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/minors.h>
@@ -2176,10 +2177,15 @@ static int snd_seq_ioctl(struct inode *inode, struct file *file,
 			 unsigned int cmd, unsigned long arg)
 {
 	client_t *client = (client_t *) file->private_data;
+	int err;
 
 	snd_assert(client != NULL, return -ENXIO);
 		
-	return snd_seq_do_ioctl(client, cmd, (void __user *) arg);
+	/* FIXME: need to unlock BKL to allow preemption */
+	unlock_kernel();
+	err = snd_seq_do_ioctl(client, cmd, (void __user *) arg);
+	lock_kernel();
+	return err;
 }
 
 

@@ -121,6 +121,8 @@ typedef struct _snd_pcm_ops {
 #define SNDRV_PCM_TRIGGER_SUSPEND	5
 #define SNDRV_PCM_TRIGGER_RESUME	6
 
+#define SNDRV_PCM_POS_XRUN		((snd_pcm_uframes_t)-1)
+
 /* If you change this don't forget to change rates[] table in pcm_native.c */
 #define SNDRV_PCM_RATE_5512		(1<<0)		/* 5512Hz */
 #define SNDRV_PCM_RATE_8000		(1<<1)		/* 8000Hz */
@@ -371,8 +373,8 @@ struct _snd_pcm_substream {
 	char name[32];			/* substream name */
 	int stream;			/* stream (direction) */
 	size_t buffer_bytes_max;	/* limit ring buffer size */
-	struct snd_dma_device dma_device;
 	struct snd_dma_buffer dma_buffer;
+	unsigned int dma_buf_id;
 	size_t dma_max;
 	/* -- hardware operations -- */
 	unsigned int open_flag: 1;	/* lowlevel device has been opened */

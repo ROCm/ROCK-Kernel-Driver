@@ -334,39 +334,29 @@ int __exit snd_minor_info_done(void)
 static int __init alsa_sound_init(void)
 {
 	short controlnum;
-#ifdef CONFIG_SND_OSSEMUL
 	int err;
-#endif
 	int card;
 
 	snd_major = major;
 	snd_ecards_limit = cards_limit;
 	for (card = 0; card < SNDRV_CARDS; card++)
 		INIT_LIST_HEAD(&snd_minors_hash[card]);
-#ifdef CONFIG_SND_OSSEMUL
 	if ((err = snd_oss_init_module()) < 0)
 		return err;
-#endif
 	devfs_mk_dir("snd");
 	if (register_chrdev(major, "alsa", &snd_fops)) {
 		snd_printk(KERN_ERR "unable to register native major device number %d\n", major);
 		devfs_remove("snd");
 		return -EIO;
 	}
-#ifdef CONFIG_SND_DEBUG_MEMORY
 	snd_memory_init();
-#endif
 	if (snd_info_init() < 0) {
-#ifdef CONFIG_SND_DEBUG_MEMORY
 		snd_memory_done();
-#endif
 		unregister_chrdev(major, "alsa");
 		devfs_remove("snd");
 		return -ENOMEM;
 	}
-#ifdef CONFIG_SND_OSSEMUL
 	snd_info_minor_register();
-#endif
 	for (controlnum = 0; controlnum < cards_limit; controlnum++) {
 		devfs_mk_cdev(MKDEV(major, controlnum<<5), S_IFCHR | device_mode, "snd/controlC%d", controlnum);
 		class_simple_device_add(sound_class, MKDEV(major, controlnum<<5), NULL, "controlC%d", controlnum);
@@ -386,13 +376,9 @@ static void __exit alsa_sound_exit(void)
 		class_simple_device_remove(MKDEV(major, controlnum<<5));
 	}
 
-#ifdef CONFIG_SND_OSSEMUL
 	snd_info_minor_unregister();
-#endif
 	snd_info_done();
-#ifdef CONFIG_SND_DEBUG_MEMORY
 	snd_memory_done();
-#endif
 	if (unregister_chrdev(major, "alsa") != 0)
 		snd_printk(KERN_ERR "unable to unregister major device number %d\n", major);
 	devfs_remove("snd");
@@ -400,24 +386,6 @@ static void __exit alsa_sound_exit(void)
 
 module_init(alsa_sound_init)
 module_exit(alsa_sound_exit)
-
-#ifndef MODULE
-
-/* format is: snd=major,cards_limit[,device_mode] */
-
-static int __init alsa_sound_setup(char *str)
-{
-	(void)(get_option(&str,&major) == 2 &&
-	       get_option(&str,&cards_limit) == 2);
-#ifdef CONFIG_DEVFS_FS
-	(void)(get_option(&str,&device_mode) == 2);
-#endif
-	return 1;
-}
-
-__setup("snd=", alsa_sound_setup);
-
-#endif /* ifndef MODULE */
 
   /* sound.c */
 EXPORT_SYMBOL(snd_major);

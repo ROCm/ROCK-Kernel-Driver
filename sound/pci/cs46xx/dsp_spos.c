@@ -74,7 +74,7 @@ static int shadow_and_reallocate_code (cs46xx_t * chip,u32 * data,u32 size, u32 
 			    (mop_operands & WIDE_LADD_INSTR_MASK) == 0 &&
 			    (mop_operands & WIDE_INSTR_MASK) != 0) {
 				wide_op = loval & 0x7f;
-				for (j = 0;j < sizeof(wide_opcodes) / sizeof(wide_opcode_t); ++j) {
+				for (j = 0;j < ARRAY_SIZE(wide_opcodes); ++j) {
 					if (wide_opcodes[j] == wide_op) {
 						/* need to reallocate instruction */
 						address  = (hival & 0x00FFF) << 5;

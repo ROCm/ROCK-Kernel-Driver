@@ -1710,8 +1710,6 @@ struct _snd_cs46xx {
 	unsigned int midcr;
 	unsigned int uartm;
 
-	struct snd_dma_device dma_dev;
-
 	int amplifier;
 	void (*amplifier_ctrl)(cs46xx_t *, int);
 	void (*active_ctrl)(cs46xx_t *, int);

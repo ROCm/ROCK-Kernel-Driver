@@ -370,7 +370,7 @@ int snd_pcm_plug_slave_format(int format, snd_mask_t *format_mask)
 		unsigned int i;
 		switch (format) {
 		case SNDRV_PCM_FORMAT_MU_LAW:
-			for (i = 0; i < sizeof(preferred_formats) / sizeof(preferred_formats[0]); ++i) {
+			for (i = 0; i < ARRAY_SIZE(preferred_formats); ++i) {
 				int format1 = preferred_formats[i];
 				if (snd_mask_test(format_mask, format1))
 					return format1;

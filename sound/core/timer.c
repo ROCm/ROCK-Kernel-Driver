@@ -22,6 +22,7 @@
 #include <sound/driver.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/smp_lock.h>
 #include <linux/slab.h>
 #include <linux/time.h>
 #include <linux/moduleparam.h>
@@ -1656,8 +1657,8 @@ static int snd_timer_user_continue(struct file *file)
 	return (err = snd_timer_continue(tu->timeri)) < 0 ? err : 0;
 }
 
-static int snd_timer_user_ioctl(struct inode *inode, struct file *file,
-				unsigned int cmd, unsigned long arg)
+static inline int _snd_timer_user_ioctl(struct inode *inode, struct file *file,
+					unsigned int cmd, unsigned long arg)
 {
 	snd_timer_user_t *tu;
 	void __user *argp = (void __user *)arg;
@@ -1702,6 +1703,17 @@ static int snd_timer_user_ioctl(struct inode *inode, struct file *file,
 		return snd_timer_user_continue(file);
 	}
 	return -ENOTTY;
+}
+
+/* FIXME: need to unlock BKL to allow preemption */
+static int snd_timer_user_ioctl(struct inode *inode, struct file * file,
+				unsigned int cmd, unsigned long arg)
+{
+	int err;
+	unlock_kernel();
+	err = _snd_timer_user_ioctl(inode, file, cmd, arg);
+	lock_kernel();
+	return err;
 }
 
 static int snd_timer_user_fasync(int fd, struct file * file, int on)

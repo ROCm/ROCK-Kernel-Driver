@@ -71,8 +71,7 @@ void snd_memory_done(void)
 		snd_printk(KERN_ERR "Not freed snd_alloc_kmalloc = %li\n", snd_alloc_kmalloc);
 	if (snd_alloc_vmalloc > 0)
 		snd_printk(KERN_ERR "Not freed snd_alloc_vmalloc = %li\n", snd_alloc_vmalloc);
-	for (head = snd_alloc_kmalloc_list.prev;
-	     head != &snd_alloc_kmalloc_list; head = head->prev) {
+	list_for_each_prev(head, &snd_alloc_kmalloc_list) {
 		t = list_entry(head, struct snd_alloc_track, list);
 		if (t->magic != KMALLOC_MAGIC) {
 			snd_printk(KERN_ERR "Corrupted kmalloc\n");
@@ -80,8 +79,7 @@ void snd_memory_done(void)
 		}
 		snd_printk(KERN_ERR "kmalloc(%ld) from %p not freed\n", (long) t->size, t->caller);
 	}
-	for (head = snd_alloc_vmalloc_list.prev;
-	     head != &snd_alloc_vmalloc_list; head = head->prev) {
+	list_for_each_prev(head, &snd_alloc_vmalloc_list) {
 		t = list_entry(head, struct snd_alloc_track, list);
 		if (t->magic != VMALLOC_MAGIC) {
 			snd_printk(KERN_ERR "Corrupted vmalloc\n");

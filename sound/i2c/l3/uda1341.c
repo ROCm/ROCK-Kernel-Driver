@@ -17,7 +17,7 @@
  * 2002-05-12   Tomas Kasparek  another code cleanup
  */
 
-/* $Id: uda1341.c,v 1.12 2004/07/01 08:33:42 tiwai Exp $ */
+/* $Id: uda1341.c,v 1.13 2004/07/20 15:54:13 cladisch Exp $ */
 
 #include <sound/driver.h>
 #include <linux/module.h>
@@ -617,8 +617,6 @@ static int snd_uda1341_put_2regs(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 
 /* }}} */
   
-#define UDA1341_CONTROLS (sizeof(snd_uda1341_controls)/sizeof(snd_kcontrol_new_t))
-
 static snd_kcontrol_new_t snd_uda1341_controls[] = {
 	UDA1341_SINGLE("Master Playback Switch", CMD_MUTE, data0_2, 2, 1, 1),
 	UDA1341_SINGLE("Master Playback Volume", CMD_VOLUME, data0_0, 0, 63, 1),
@@ -687,7 +685,7 @@ int __init snd_chip_uda1341_mixer_new(snd_card_t *card, struct l3_client **clnt)
 		return err;
 	}
 
-	for (idx = 0; idx < UDA1341_CONTROLS; idx++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_uda1341_controls); idx++) {
 		if ((err = snd_ctl_add(card, snd_ctl_new1(&snd_uda1341_controls[idx], uda1341))) < 0)
 			return err;
 	}

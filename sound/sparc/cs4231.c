@@ -1816,8 +1816,6 @@ int snd_cs4231_put_double(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontr
 	return change;
 }
 
-#define CS4231_CONTROLS (sizeof(snd_cs4231_controls)/sizeof(snd_kcontrol_new_t))
-
 #define CS4231_SINGLE(xname, xindex, reg, shift, mask, invert) \
 { .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
   .info = snd_cs4231_info_single, \
@@ -1870,7 +1868,7 @@ int snd_cs4231_mixer(cs4231_t *chip)
 
 	strcpy(card->mixername, chip->pcm->name);
 
-	for (idx = 0; idx < CS4231_CONTROLS; idx++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_cs4231_controls); idx++) {
 		if ((err = snd_ctl_add(card,
 				       snd_ctl_new1(&snd_cs4231_controls[idx],
 						    chip))) < 0)

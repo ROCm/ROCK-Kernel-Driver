@@ -225,9 +225,9 @@ int snd_card_pci_resume(struct pci_dev *dev);
 static inline int snd_power_wait(snd_card_t *card, unsigned int state, struct file *file) { return 0; }
 #define snd_power_get_state(card)	SNDRV_CTL_POWER_D0
 #define snd_power_change_state(card, state)	do { (void)(card); } while (0)
-#define snd_card_set_pm_callback(card,suspend,resume,data) -EINVAL
-#define snd_card_set_dev_pm_callback(card,suspend,resume,data) -EINVAL
-#define snd_card_set_isa_pm_callback(card,suspend,resume,data) -EINVAL
+#define snd_card_set_pm_callback(card,suspend,resume,data)
+#define snd_card_set_dev_pm_callback(card,suspend,resume,data)
+#define snd_card_set_isa_pm_callback(card,suspend,resume,data)
 #ifdef CONFIG_PCI
 #define SND_PCI_PM_CALLBACKS
 #endif
@@ -272,7 +272,7 @@ int snd_oss_init_module(void);
 #else
 #define snd_minor_info_oss_init() /*NOP*/
 #define snd_minor_info_oss_done() /*NOP*/
-#define snd_oss_init_module() /*NOP*/
+#define snd_oss_init_module() 0
 #endif
 
 /* memory.c */
@@ -416,7 +416,7 @@ void snd_verbose_printd(const char *file, int line, const char *format, ...)
  * not checked.
  */
 #define snd_assert(expr, args...) do {\
-	if (!(expr)) {\
+	if (unlikely(!(expr))) {				\
 		snd_printk("BUG? (%s) (called from %p)\n", __ASTRING__(expr), __builtin_return_address(0));\
 		args;\
 	}\
@@ -432,7 +432,7 @@ void snd_verbose_printd(const char *file, int line, const char *format, ...)
  * CONFIG_SND_DEBUG is not set but without any error messages.
  */
 #define snd_runtime_check(expr, args...) do {\
-	if (!(expr)) {\
+	if (unlikely(!(expr))) {				\
 		snd_printk("ERROR (%s) (called from %p)\n", __ASTRING__(expr), __builtin_return_address(0));\
 		args;\
 	}\

@@ -1,10 +1,10 @@
-#ifndef __SOUND_VT1720_MOBO_H
-#define __SOUND_VT1720_MOBO_H
+#ifndef __SOUND_PONTIS_H
+#define __SOUND_PONTIS_H
 
 /*
- *   ALSA driver for VT1720/VT1724 (Envy24PT/Envy24HT)
+ *   ALSA driver for VIA VT1724 (Envy24HT)
  *
- *   Lowlevel functions for VT1720-based motherboards
+ *   Lowlevel functions for Pontis MS300 boards
  *
  *	Copyright (c) 2004 Takashi Iwai <tiwai@suse.de>
  *
@@ -24,14 +24,10 @@
  *
  */      
 
-#define VT1720_MOBO_DEVICE_DESC        "{Albatron,K8X800 Pro II},"\
-				       "{Chaintech,ZNF3-150},"\
-				       "{Chaintech,ZNF3-250},"
+#define PONTIS_DEVICE_DESC 	       "{Pontis,MS300},"
 
-#define VT1720_SUBDEVICE_K8X800		0xf217052c
-#define VT1720_SUBDEVICE_ZNF3_150	0x0f2741f6
-#define VT1720_SUBDEVICE_ZNF3_250	0x0f2745f6
+#define VT1720_SUBDEVICE_PONTIS_MS300	0x00020002	/* a dummy id for MS300 */
 
-extern struct snd_ice1712_card_info  snd_vt1720_mobo_cards[];
+extern struct snd_ice1712_card_info  snd_vt1720_pontis_cards[];
 
-#endif /* __SOUND_VT1720_MOBO_H */
+#endif /* __SOUND_PONTIS_H */
