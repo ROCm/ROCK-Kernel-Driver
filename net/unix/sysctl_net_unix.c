@@ -15,20 +15,37 @@
 extern int sysctl_unix_max_dgram_qlen;
 
 ctl_table unix_table[] = {
-	{NET_UNIX_MAX_DGRAM_QLEN, "max_dgram_qlen",
-	&sysctl_unix_max_dgram_qlen, sizeof(int), 0600, NULL, 
-	 &proc_dointvec },
-	{0}
+	{
+		.ctl_name	= NET_UNIX_MAX_DGRAM_QLEN,
+		.procname	= "max_dgram_qlen",
+		.data		= &sysctl_unix_max_dgram_qlen,
+		.maxlen		= sizeof(int),
+		.mode		= 0600,
+		.proc_handler	= &proc_dointvec
+	},
+	{ .ctl_name = 0 }
 };
 
 static ctl_table unix_net_table[] = {
-	{NET_UNIX, "unix", NULL, 0, 0555, unix_table},
-	{0}
+	{
+		.ctl_name	= NET_UNIX,
+		.procname	= "unix",
+		.maxlen		= 0,
+		.mode		= 0555,
+		.child		= unix_table
+	},
+	{ .ctl_name = 0 }
 };
 
 static ctl_table unix_root_table[] = {
-	{CTL_NET, "net", NULL, 0, 0555, unix_net_table},
-	{0}
+	{
+		.ctl_name	= CTL_NET,
+		.procname	= "net",
+		.maxlen		= 0,
+		.mode		= 0555,
+		.child		= unix_net_table
+	},
+	{ .ctl_name = 0 }
 };
 
 static struct ctl_table_header * unix_sysctl_header;
