@@ -148,6 +148,8 @@ static snd_timer_t *snd_timer_find(snd_timer_id_t *tid)
 
 static void snd_timer_request(snd_timer_id_t *tid)
 {
+	if (! current->fs->root)
+		return;
 	switch (tid->dev_class) {
 	case SNDRV_TIMER_CLASS_GLOBAL:
 		if (tid->device < timer_limit)
