@@ -95,6 +95,8 @@ static int ntfs_extend_mft(ntfs_volume *vol)
 	ntfs_io io;
 
 	mdata = ntfs_find_attr(vol->mft_ino, vol->at_data, 0);
+	if (!mdata)
+		return -EINVAL;
 	/* First check whether there is uninitialized space. */
 	if (mdata->allocated < mdata->size + vol->mft_record_size) {
 		size = (__s64)ntfs_get_free_cluster_count(vol->bitmap) <<
@@ -127,6 +129,8 @@ static int ntfs_extend_mft(ntfs_volume *vol)
 	/* Now extend the bitmap if necessary. */
 	rcount = mdata->size >> vol->mft_record_size_bits;
 	bmp = ntfs_find_attr(vol->mft_ino, vol->at_bitmap, 0);
+	if (!bmp)
+		return -EINVAL;
 	if (bmp->size * 8 < rcount) { /* Less bits than MFT records. */
 		ntfs_u8 buf[1];
 		/* Extend bitmap by one byte. */
@@ -1305,6 +1309,8 @@ static int ntfs_new_inode(ntfs_volume *vol, unsigned long *result)
 	*result = 0;
 	/* Determine the number of mft records in the mft. */
 	data = ntfs_find_attr(vol->mft_ino, vol->at_data, 0);
+	if (!data)
+		return -EINVAL;
 	length = data->size >> vol->mft_record_size_bits;
 	/* Allocate sufficient space for the mft bitmap attribute value,
 	   inferring it from the number of mft records. */

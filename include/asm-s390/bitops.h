@@ -831,7 +831,7 @@ ext2_find_next_zero_bit(void *vaddr, unsigned size, unsigned offset)
                         "   icm  %0,2,1(%1)\n"
                         "   icm  %0,4,2(%1)\n"
                         "   icm  %0,8,3(%1)"
-                        : "=&a" (word) : "a" (p) );
+                        : "=&a" (word) : "a" (p) : "cc" );
 		word >>= bit;
                 res = bit;
                 /* Look for zero in first longword */

@@ -121,9 +121,15 @@ extern wait_queue_head_t kswapd_wait;
 extern wait_queue_head_t kreclaimd_wait;
 extern int page_launder(int, int);
 extern int free_shortage(void);
+extern int total_free_shortage(void);
 extern int inactive_shortage(void);
+extern int total_inactive_shortage(void);
 extern void wakeup_kswapd(void);
 extern int try_to_free_pages(unsigned int gfp_mask);
+
+extern unsigned int zone_free_shortage(zone_t *zone);
+extern unsigned int zone_inactive_shortage(zone_t *zone);
+extern unsigned int zone_inactive_plenty(zone_t *zone);
 
 /* linux/mm/page_io.c */
 extern void rw_swap_page(int, struct page *);

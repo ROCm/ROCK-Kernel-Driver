@@ -1,4 +1,4 @@
-/* $Id: head.S,v 1.34 2001/05/15 07:08:14 hp Exp $
+/* $Id: head.S,v 1.36 2001/06/29 12:39:31 pkj Exp $
  * 
  * Head of the kernel - alter with care
  *
@@ -7,6 +7,19 @@
  * Authors:	Bjorn Wesen (bjornw@axis.com)
  * 
  * $Log: head.S,v $
+ * Revision 1.36  2001/06/29 12:39:31  pkj
+ * Added support for mirroring the first flash to just below the
+ * second one, to make them look consecutive to cramfs.
+ *
+ * Revision 1.35  2001/06/25 14:07:00  hp
+ * 	Fix review comment.
+ * 	* head.S: Use IO_STATE, IO_FIELD and IO_MASK constructs instead of
+ * 	magic numbers.  Add comment that -traditional must not be used.
+ * 	* entry.S (SYMBOL_NAME): Change redefinition to use ## concatenation.
+ * 	Correct and update comment.
+ * 	* Makefile (.S.o): Don't use -traditional.  Add comment why the
+ * 	toplevel rule can't be used (now that there's a reason).
+ *
  * Revision 1.34  2001/05/15 07:08:14  hp
  * Tweak "notice" to reflect that both r8 r9 are used
  *
@@ -122,6 +135,8 @@
 	
 #include <linux/config.h>
 #define ASSEMBLER_MACROS_ONLY
+/* The IO_* macros use the ## token concatenation operator, so
+   -traditional must not be used when assembling this file.  */
 #include <asm/sv_addr_ag.h>
 
 #define CRAMFS_MAGIC 0x28cd3d45
@@ -165,22 +180,72 @@
 	;; 1G per process with CONFIG_CRIS_LOW_MAP.
 
 #ifdef CONFIG_CRIS_LOW_MAP
-	move.d	0x0004b098, r0	; kseg mappings, temporary map of 0xc0->0x40
+	; kseg mappings, temporary map of 0xc0->0x40
+ 	move.d	  IO_FIELD (R_MMU_KBASE_HI, base_c, 4)		\
+		| IO_FIELD (R_MMU_KBASE_HI, base_b, 0xb)	\
+		| IO_FIELD (R_MMU_KBASE_HI, base_9, 9)		\
+		| IO_FIELD (R_MMU_KBASE_HI, base_8, 8), r0
 	move.d	r0, [R_MMU_KBASE_HI]
 
-	move.d	0x04040000, r0	; temporary map of 0x40->0x40 and 0x00->0x00 
+	; temporary map of 0x40->0x40 and 0x60->0x40 
+ 	move.d	  IO_FIELD (R_MMU_KBASE_LO, base_6, 4)		\
+		| IO_FIELD (R_MMU_KBASE_LO, base_4, 4), r0
 	move.d	r0, [R_MMU_KBASE_LO]
 
-	move.d	0x80075c71, r0	; mmu enable, segs c,b,9,8,6,5,4,0 segment mapped
+	; mmu enable, segs e,c,b,a,6,5,4,0 segment mapped
+ 	move.d	  IO_STATE (R_MMU_CONFIG, mmu_enable, enable)	\
+		| IO_STATE (R_MMU_CONFIG, inv_excp, enable)	\
+		| IO_STATE (R_MMU_CONFIG, acc_excp, enable)	\
+		| IO_STATE (R_MMU_CONFIG, we_excp, enable)	\
+		| IO_STATE (R_MMU_CONFIG, seg_f, page)		\
+		| IO_STATE (R_MMU_CONFIG, seg_e, seg)		\
+		| IO_STATE (R_MMU_CONFIG, seg_d, page)		\
+		| IO_STATE (R_MMU_CONFIG, seg_c, seg)		\
+		| IO_STATE (R_MMU_CONFIG, seg_b, seg)		\
+		| IO_STATE (R_MMU_CONFIG, seg_a, seg)		\
+		| IO_STATE (R_MMU_CONFIG, seg_9, page)		\
+		| IO_STATE (R_MMU_CONFIG, seg_8, page)		\
+		| IO_STATE (R_MMU_CONFIG, seg_7, page)		\
+		| IO_STATE (R_MMU_CONFIG, seg_6, seg)		\
+		| IO_STATE (R_MMU_CONFIG, seg_5, seg)		\
+		| IO_STATE (R_MMU_CONFIG, seg_4, seg)		\
+		| IO_STATE (R_MMU_CONFIG, seg_3, page)		\
+		| IO_STATE (R_MMU_CONFIG, seg_2, page)		\
+		| IO_STATE (R_MMU_CONFIG, seg_1, page)		\
+		| IO_STATE (R_MMU_CONFIG, seg_0, seg), r0
 	move.d	r0, [R_MMU_CONFIG]
 #else
-	move.d	0x0804b000, r0	; kseg mappings
+	; kseg mappings
+ 	move.d	  IO_FIELD (R_MMU_KBASE_HI, base_e, 8)		\
+		| IO_FIELD (R_MMU_KBASE_HI, base_c, 4)		\
+		| IO_FIELD (R_MMU_KBASE_HI, base_b, 0xb), r0
 	move.d	r0, [R_MMU_KBASE_HI]
 
-	move.d	0x00040000, r0	; temporary map of 0x40->0x40 and 0x00->0x00 
+	; temporary map of 0x40->0x40 and 0x00->0x00 
+	move.d	  IO_FIELD (R_MMU_KBASE_LO, base_4, 4), r0
 	move.d	r0, [R_MMU_KBASE_LO]
 
-	move.d	0x8007d811, r0	; mmu enable, segs f,e,c,b,4,0 segment mapped
+	; mmu enable, segs f,e,c,b,4,0 segment mapped
+ 	move.d	  IO_STATE (R_MMU_CONFIG, mmu_enable, enable)	\
+		| IO_STATE (R_MMU_CONFIG, inv_excp, enable)	\
+		| IO_STATE (R_MMU_CONFIG, acc_excp, enable)	\
+		| IO_STATE (R_MMU_CONFIG, we_excp, enable)	\
+		| IO_STATE (R_MMU_CONFIG, seg_f, seg)		\
+		| IO_STATE (R_MMU_CONFIG, seg_e, seg)		\
+		| IO_STATE (R_MMU_CONFIG, seg_d, page)		\
+		| IO_STATE (R_MMU_CONFIG, seg_c, seg)		\
+		| IO_STATE (R_MMU_CONFIG, seg_b, seg)		\
+		| IO_STATE (R_MMU_CONFIG, seg_a, page)		\
+		| IO_STATE (R_MMU_CONFIG, seg_9, page)		\
+		| IO_STATE (R_MMU_CONFIG, seg_8, page)		\
+		| IO_STATE (R_MMU_CONFIG, seg_7, page)		\
+		| IO_STATE (R_MMU_CONFIG, seg_6, page)		\
+		| IO_STATE (R_MMU_CONFIG, seg_5, page)		\
+		| IO_STATE (R_MMU_CONFIG, seg_4, seg)		\
+		| IO_STATE (R_MMU_CONFIG, seg_3, page)		\
+		| IO_STATE (R_MMU_CONFIG, seg_2, page)		\
+		| IO_STATE (R_MMU_CONFIG, seg_1, page)		\
+		| IO_STATE (R_MMU_CONFIG, seg_0, seg), r0
 	move.d	r0, [R_MMU_CONFIG]
 #endif
 
@@ -309,6 +374,9 @@ inram:
 #else
 	add.d   0xf0000000, r9	; add flash start in virtual memory (cached)
 #endif
+#ifdef CONFIG_ETRAX_FLASH_MIRRORING_FOR_CRAMFS
+	add.d   MEM_CSE1_START-CONFIG_ETRAX_FLASH_SIZE*0x100000, r9   ; move flash start to upper mirror
+#endif
 	move.d	r9, [_romfs_start]
 
 	moveq	1, r0
@@ -406,26 +474,34 @@ start_it:
 	
 	moveq	0,r0
 	move.d	r0,[R_EXT_DMA_0_ADDR]
-	move.d	0x860000,r0	; cnt enable, word size, output, stop, size 0
+	; cnt enable, word size, output, stop, size 0
+	move.d	  IO_STATE (R_EXT_DMA_0_CMD, cnt, enable)	\
+		| IO_STATE (R_EXT_DMA_0_CMD, rqpol, ahigh)	\
+		| IO_STATE (R_EXT_DMA_0_CMD, apol, ahigh)	\
+		| IO_STATE (R_EXT_DMA_0_CMD, rq_ack, burst)	\
+		| IO_STATE (R_EXT_DMA_0_CMD, wid, word)		\
+		| IO_STATE (R_EXT_DMA_0_CMD, dir, output)	\
+		| IO_STATE (R_EXT_DMA_0_CMD, run, stop)		\
+		| IO_FIELD (R_EXT_DMA_0_CMD, trf_count, 0),r0
 	move.d	r0,[R_EXT_DMA_0_CMD]
 
 	;; reset dma4 and wait for completion
 	
-	moveq	4,r0
+	moveq	IO_STATE (R_DMA_CH4_CMD, cmd, reset),r0
 	move.b	r0,[R_DMA_CH4_CMD]
 w4u:	move.b	[R_DMA_CH4_CMD],r0
-	and.b	7,r0
-	cmp.b	4,r0
+	and.b	IO_MASK (R_DMA_CH4_CMD, cmd),r0
+	cmp.b	IO_STATE (R_DMA_CH4_CMD, cmd, reset),r0
 	beq	w4u
 	nop
 
 	;; reset dma5 and wait for completion
 	
-	moveq	4,r0
+	moveq	IO_STATE (R_DMA_CH5_CMD, cmd, reset),r0
 	move.b	r0,[R_DMA_CH5_CMD]
 w5u:	move.b	[R_DMA_CH5_CMD],r0
-	and.b	7,r0
-	cmp.b	4,r0
+	and.b	IO_MASK (R_DMA_CH5_CMD, cmd),r0
+	cmp.b	IO_STATE (R_DMA_CH5_CMD, cmd, reset),r0
 	beq	w5u
 	nop
 #endif	
@@ -434,42 +510,66 @@ w5u:	move.b	[R_DMA_CH5_CMD],r0
 
 	moveq	0,r0
 #if !defined(CONFIG_ETRAX_KGDB) && !defined(CONFIG_DMA_MEMCPY)
-	or.d	0x140000,r0	; DMA channels 6 and 7 to ser0, kgdb doesnt want DMA
+	; DMA channels 6 and 7 to ser0, kgdb doesnt want DMA
+	or.d	  IO_STATE (R_GEN_CONFIG, dma7, serial0)	\
+		| IO_STATE (R_GEN_CONFIG, dma6, serial0),r0
 #endif
 #if !defined(CONFIG_ETRAX_KGDB) || !defined(CONFIG_ETRAX_DEBUG_PORT1)	
-	or.d	0xc00000,r0	; DMA channels 8 and 9 to ser1, kgdb doesnt want DMA
+	or.d	  IO_STATE (R_GEN_CONFIG, dma9, serial1)	\
+		| IO_STATE (R_GEN_CONFIG, dma8, serial1),r0
 #endif	
 #ifdef CONFIG_DMA_MEMCPY
-	or.d	0x003c0000,r0	; 6/7 memory-memory DMA
+	; 6/7 memory-memory DMA
+	or.d	  IO_STATE (R_GEN_CONFIG, dma7, intdma6)	\
+		| IO_STATE (R_GEN_CONFIG, dma6, intdma7),r0
 #endif
 #ifdef CONFIG_ETRAX_SERIAL_PORT2
-	or.d	0x2808,r0	; DMA channels 2 and 3 to serport 2, port 2 enabled
+	; DMA channels 2 and 3 to serport 2, port 2 enabled
+	or.d	  IO_STATE (R_GEN_CONFIG, dma3, serial2)	\
+		| IO_STATE (R_GEN_CONFIG, dma2, serial2)	\
+		| IO_STATE (R_GEN_CONFIG, ser2, select),r0
 #endif
 #if defined(CONFIG_ETRAX_SERIAL_PORT3) || defined(CONFIG_ETRAX_SYNCHRONOUS_SERIAL_PORT1)
-	or.d	0x28100,r0	; DMA channels 4 and 5 to serport 3, port 3 enabled
+	; DMA channels 4 and 5 to serport 3, port 3 enabled
+	or.d	  IO_STATE (R_GEN_CONFIG, dma5, serial3)	\
+		| IO_STATE (R_GEN_CONFIG, dma4, serial3)	\
+		| IO_STATE (R_GEN_CONFIG, ser3, select),r0
 #endif	
 #if defined(CONFIG_ETRAX_PARALLEL_PORT0) || defined(CONFIG_ETRAX_ETHERNET_LPSLAVE)
-	or.w	0x4,r0	; parport 0 enabled using DMA 2/3
+	; parport 0 enabled using DMA 2/3
+	or.w	IO_STATE (R_GEN_CONFIG, par0, select),r0
 #endif
 #if defined(CONFIG_ETRAX_PARALLEL_PORT1) || defined(CONFIG_ETRAX_ETHERNET_LPSLAVE)
-	or.w	0x80,r0	; parport 1 enabled using DMA 4/5
+	; parport 1 enabled using DMA 4/5
+	or.w	IO_STATE (R_GEN_CONFIG, par1, select),r0
 #endif
 #ifdef CONFIG_ETRAX_IDE
-	or.d	0x3c02,r0	; DMA channels 2 and 3 to ATA, ATA enabled
+	; DMA channels 2 and 3 to ATA, ATA enabled
+	or.d	  IO_STATE (R_GEN_CONFIG, dma3, ata)	\
+		| IO_STATE (R_GEN_CONFIG, dma2, ata)	\
+		| IO_STATE (R_GEN_CONFIG, ata, select),r0
 #endif
 	
 #ifdef CONFIG_ETRAX_USB_HOST_PORT1
-	or.d	0x20000000,r0	; Set the USB port 1 enable bit
+	; Set the USB port 1 enable bit
+	or.d	IO_STATE (R_GEN_CONFIG, usb1, select),r0
 #endif
 #ifdef CONFIG_ETRAX_USB_HOST_PORT2
-	or.d	0x40000000,r0	; Set the USB port 2 enable bit
+	; Set the USB port 2 enable bit
+	or.d	IO_STATE (R_GEN_CONFIG, usb2, select),r0
 #endif
 #ifdef CONFIG_ETRAX_USB_HOST
-	and.d	0xff3fffff,r0	; Connect DMA channels 8 and 9 to USB
+	; Connect DMA channels 8 and 9 to USB
+	and.d	(~(IO_MASK (R_GEN_CONFIG, dma9)		\
+		   | IO_MASK (R_GEN_CONFIG, dma8)))	\
+		| IO_STATE (R_GEN_CONFIG, dma9, usb)	\
+		| IO_STATE (R_GEN_CONFIG, dma8, usb),r0
 #endif
 	
 #ifdef CONFIG_JULIETTE
-	or.d	0x3c000,r0	; DMA channels 4 and 5 to EXTDMA0, for Juliette
+	; DMA channels 4 and 5 to EXTDMA0, for Juliette
+	or.d	  IO_STATE (R_GEN_CONFIG, dma5, extdma0)	\
+		| IO_STATE (R_GEN_CONFIG, dma4, extdma0),r0
 #endif
 	move.d	r0,[_genconfig_shadow] ; init a shadow register of R_GEN_CONFIG
 
@@ -492,17 +592,17 @@ w71:	move.b	[R_DMA_CH7_CMD],r0	; wait for reset cycle to finish
 	nop
 #endif
 	
-	moveq	4,r0
+	moveq	IO_STATE (R_DMA_CH8_CMD, cmd, reset),r0
 	move.b	r0,[R_DMA_CH8_CMD]	; reset (ser1 dma out)
 	move.b	r0,[R_DMA_CH9_CMD]	; reset (ser1 dma in)
 w81:	move.b	[R_DMA_CH8_CMD],r0	; wait for reset cycle to finish
-	and.b	7,r0
-	cmp.b	4,r0
+	and.b	IO_MASK (R_DMA_CH8_CMD, cmd),r0
+	cmp.b	IO_STATE (R_DMA_CH8_CMD, cmd, reset),r0
 	beq	w81
 	nop
 w91:	move.b	[R_DMA_CH9_CMD],r0	; wait for reset cycle to finish
-	and.b	7,r0
-	cmp.b	4,r0
+	and.b	IO_MASK (R_DMA_CH9_CMD, cmd),r0
+	cmp.b	IO_STATE (R_DMA_CH9_CMD, cmd, reset),r0
 	beq	w91
 	nop
 
@@ -535,46 +635,106 @@ w91:	move.b	[R_DMA_CH9_CMD],r0	; wait for reset cycle to finish
 	
 	;; setup the serial port 0 at 115200 baud for debug purposes
 	
-	moveq	0,r0
+	moveq	  IO_STATE (R_SERIAL0_XOFF, tx_stop, enable)		\
+		| IO_STATE (R_SERIAL0_XOFF, auto_xoff, disable)		\
+		| IO_FIELD (R_SERIAL0_XOFF, xoff_char, 0),r0
 	move.d	r0,[R_SERIAL0_XOFF] 
 
-	move.b	0x99,r0
-	move.b	r0,[R_SERIAL0_BAUD]	; 115.2kbaud for both transmit and receive
+	; 115.2kbaud for both transmit and receive
+	move.b	  IO_STATE (R_SERIAL0_BAUD, tr_baud, c115k2Hz)		\
+		| IO_STATE (R_SERIAL0_BAUD, rec_baud, c115k2Hz),r0
+	move.b	r0,[R_SERIAL0_BAUD]
 
-	move.b	0x40,r0			; rec enable
+	; Set up and enable the serial0 receiver.
+	move.b	  IO_STATE (R_SERIAL0_REC_CTRL, dma_err, stop)		\
+		| IO_STATE (R_SERIAL0_REC_CTRL, rec_enable, enable)	\
+		| IO_STATE (R_SERIAL0_REC_CTRL, rts_, active)		\
+		| IO_STATE (R_SERIAL0_REC_CTRL, sampling, middle)	\
+		| IO_STATE (R_SERIAL0_REC_CTRL, rec_stick_par, normal)	\
+		| IO_STATE (R_SERIAL0_REC_CTRL, rec_par, even)		\
+		| IO_STATE (R_SERIAL0_REC_CTRL, rec_par_en, disable)	\
+		| IO_STATE (R_SERIAL0_REC_CTRL, rec_bitnr, rec_8bit),r0
 	move.b	r0,[R_SERIAL0_REC_CTRL] 
 	
-	move.b	0x40,r0			; tr enable
+	; Set up and enable the serial0 transmitter.
+	move.b	  IO_FIELD (R_SERIAL0_TR_CTRL, txd, 0)			\
+		| IO_STATE (R_SERIAL0_TR_CTRL, tr_enable, enable)	\
+		| IO_STATE (R_SERIAL0_TR_CTRL, auto_cts, disabled)	\
+		| IO_STATE (R_SERIAL0_TR_CTRL, stop_bits, one_bit)	\
+		| IO_STATE (R_SERIAL0_TR_CTRL, tr_stick_par, normal)	\
+		| IO_STATE (R_SERIAL0_TR_CTRL, tr_par, even)		\
+		| IO_STATE (R_SERIAL0_TR_CTRL, tr_par_en, disable)	\
+		| IO_STATE (R_SERIAL0_TR_CTRL, tr_bitnr, tr_8bit),r0
 	move.b	r0,[R_SERIAL0_TR_CTRL]
 
 	;; setup the serial port 1 at 115200 baud for debug purposes
 	
-	moveq	0,r0
+	moveq	  IO_STATE (R_SERIAL1_XOFF, tx_stop, enable)		\
+		| IO_STATE (R_SERIAL1_XOFF, auto_xoff, disable)		\
+		| IO_FIELD (R_SERIAL1_XOFF, xoff_char, 0),r0
 	move.d	r0,[R_SERIAL1_XOFF] 
 
-	move.b	0x99,r0
-	move.b	r0,[R_SERIAL1_BAUD]	; 115.2kbaud for both transmit and receive
+	; 115.2kbaud for both transmit and receive
+	move.b	  IO_STATE (R_SERIAL1_BAUD, tr_baud, c115k2Hz)		\
+		| IO_STATE (R_SERIAL1_BAUD, rec_baud, c115k2Hz),r0
+	move.b	r0,[R_SERIAL1_BAUD]
 
-	move.b	0x40,r0			; rec enable
+	; Set up and enable the serial1 receiver.
+	move.b	  IO_STATE (R_SERIAL1_REC_CTRL, dma_err, stop)		\
+		| IO_STATE (R_SERIAL1_REC_CTRL, rec_enable, enable)	\
+		| IO_STATE (R_SERIAL1_REC_CTRL, rts_, active)		\
+		| IO_STATE (R_SERIAL1_REC_CTRL, sampling, middle)	\
+		| IO_STATE (R_SERIAL1_REC_CTRL, rec_stick_par, normal)	\
+		| IO_STATE (R_SERIAL1_REC_CTRL, rec_par, even)		\
+		| IO_STATE (R_SERIAL1_REC_CTRL, rec_par_en, disable)	\
+		| IO_STATE (R_SERIAL1_REC_CTRL, rec_bitnr, rec_8bit),r0
 	move.b	r0,[R_SERIAL1_REC_CTRL] 
 	
-	move.b	0x40,r0			; tr enable
+	; Set up and enable the serial1 transmitter.
+	move.b	  IO_FIELD (R_SERIAL1_TR_CTRL, txd, 0)			\
+		| IO_STATE (R_SERIAL1_TR_CTRL, tr_enable, enable)	\
+		| IO_STATE (R_SERIAL1_TR_CTRL, auto_cts, disabled)	\
+		| IO_STATE (R_SERIAL1_TR_CTRL, stop_bits, one_bit)	\
+		| IO_STATE (R_SERIAL1_TR_CTRL, tr_stick_par, normal)	\
+		| IO_STATE (R_SERIAL1_TR_CTRL, tr_par, even)		\
+		| IO_STATE (R_SERIAL1_TR_CTRL, tr_par_en, disable)	\
+		| IO_STATE (R_SERIAL1_TR_CTRL, tr_bitnr, tr_8bit),r0
 	move.b	r0,[R_SERIAL1_TR_CTRL]
 
 	
 #ifdef CONFIG_ETRAX_SERIAL_PORT3	
 	;; setup the serial port 3 at 115200 baud for debug purposes
 	
-	moveq	0,r0
+	moveq	  IO_STATE (R_SERIAL3_XOFF, tx_stop, enable)		\
+		| IO_STATE (R_SERIAL3_XOFF, auto_xoff, disable)		\
+		| IO_FIELD (R_SERIAL3_XOFF, xoff_char, 0),r0
 	move.d	r0,[R_SERIAL3_XOFF] 
 
-	move.b	0x99,r0
-	move.b	r0,[R_SERIAL3_BAUD]	; 115.2kbaud for both transmit and receive
+	; 115.2kbaud for both transmit and receive
+	move.b	  IO_STATE (R_SERIAL3_BAUD, tr_baud, c115k2Hz)		\
+		| IO_STATE (R_SERIAL3_BAUD, rec_baud, c115k2Hz),r0
+	move.b	r0,[R_SERIAL3_BAUD]
 
-	move.b	0x40,r0			; rec enable
+	; Set up and enable the serial3 receiver.
+	move.b	  IO_STATE (R_SERIAL3_REC_CTRL, dma_err, stop)		\
+		| IO_STATE (R_SERIAL3_REC_CTRL, rec_enable, enable)	\
+		| IO_STATE (R_SERIAL3_REC_CTRL, rts_, active)		\
+		| IO_STATE (R_SERIAL3_REC_CTRL, sampling, middle)	\
+		| IO_STATE (R_SERIAL3_REC_CTRL, rec_stick_par, normal)	\
+		| IO_STATE (R_SERIAL3_REC_CTRL, rec_par, even)		\
+		| IO_STATE (R_SERIAL3_REC_CTRL, rec_par_en, disable)	\
+		| IO_STATE (R_SERIAL3_REC_CTRL, rec_bitnr, rec_8bit),r0
 	move.b	r0,[R_SERIAL3_REC_CTRL] 
 	
-	move.b	0x40,r0			; tr enable
+	; Set up and enable the serial3 transmitter.
+	move.b	  IO_FIELD (R_SERIAL3_TR_CTRL, txd, 0)			\
+		| IO_STATE (R_SERIAL3_TR_CTRL, tr_enable, enable)	\
+		| IO_STATE (R_SERIAL3_TR_CTRL, auto_cts, disabled)	\
+		| IO_STATE (R_SERIAL3_TR_CTRL, stop_bits, one_bit)	\
+		| IO_STATE (R_SERIAL3_TR_CTRL, tr_stick_par, normal)	\
+		| IO_STATE (R_SERIAL3_TR_CTRL, tr_par, even)		\
+		| IO_STATE (R_SERIAL3_TR_CTRL, tr_par_en, disable)	\
+		| IO_STATE (R_SERIAL3_TR_CTRL, tr_bitnr, tr_8bit),r0
 	move.b	r0,[R_SERIAL3_TR_CTRL]
 #endif
 	

@@ -240,47 +240,47 @@ struct i2o_sys_tbl
 /*
  *	Messenger inlines
  */
-extern inline u32 I2O_POST_READ32(struct i2o_controller *c)
+static inline u32 I2O_POST_READ32(struct i2o_controller *c)
 {
 	return *c->post_port;
 }
 
-extern inline void I2O_POST_WRITE32(struct i2o_controller *c, u32 Val)
+static inline void I2O_POST_WRITE32(struct i2o_controller *c, u32 Val)
 {
 	*c->post_port = Val;
 }
 
 
-extern inline u32 I2O_REPLY_READ32(struct i2o_controller *c)
+static inline u32 I2O_REPLY_READ32(struct i2o_controller *c)
 {
 	return *c->reply_port;
 }
 
-extern inline void I2O_REPLY_WRITE32(struct i2o_controller *c, u32 Val)
+static inline void I2O_REPLY_WRITE32(struct i2o_controller *c, u32 Val)
 {
 	*c->reply_port= Val;
 }
  
 
-extern inline u32 I2O_IRQ_READ32(struct i2o_controller *c)
+static inline u32 I2O_IRQ_READ32(struct i2o_controller *c)
 {
 	return *c->irq_mask;
 }
 
-extern inline void I2O_IRQ_WRITE32(struct i2o_controller *c, u32 Val)
+static inline void I2O_IRQ_WRITE32(struct i2o_controller *c, u32 Val)
 {
 	*c->irq_mask = Val;
 }
 
 
-extern inline void i2o_post_message(struct i2o_controller *c, u32 m)
+static inline void i2o_post_message(struct i2o_controller *c, u32 m)
 {
 	/* The second line isnt spurious - thats forcing PCI posting */
 	I2O_POST_WRITE32(c,m);
 	(void) I2O_IRQ_READ32(c);
 }
 
-extern inline void i2o_flush_reply(struct i2o_controller *c, u32 m)
+static inline void i2o_flush_reply(struct i2o_controller *c, u32 m)
 {
 	I2O_REPLY_WRITE32(c,m);
 }

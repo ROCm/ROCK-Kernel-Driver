@@ -748,6 +748,7 @@ int sb_mixer_init(sb_devc * devc, struct module *owner)
 
 void sb_mixer_unload(sb_devc *devc)
 {
+	kfree(mixer_devs[devc->my_mixerdev]);
 	sound_unload_mixerdev(devc->my_mixerdev);
 	sbmixnum--;
 }

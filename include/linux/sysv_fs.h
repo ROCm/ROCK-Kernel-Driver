@@ -271,14 +271,14 @@ struct sysv_inode {
  */
 #define COH_KLUDGE_SYMLINK_MODE	(S_IFREG | S_ISVTX)
 #define COH_KLUDGE_NOT_SYMLINK	(S_IFREG | S_ISVTX | S_IRUSR) /* force read access */
-extern inline mode_t from_coh_imode(unsigned short mode)
+static inline mode_t from_coh_imode(unsigned short mode)
 {
 	if (mode == COH_KLUDGE_SYMLINK_MODE)
 		return (S_IFLNK | 0777);
 	else
 		return mode;
 }
-extern inline unsigned short to_coh_imode(mode_t mode)
+static inline unsigned short to_coh_imode(mode_t mode)
 {
 	if (S_ISLNK(mode))
 		return COH_KLUDGE_SYMLINK_MODE;

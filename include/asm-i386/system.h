@@ -141,7 +141,7 @@ struct __xchg_dummy { unsigned long a[100]; };
  * might have an implicit FPU-save as a cost, so it's not
  * clear which path to go.)
  */
-extern inline void __set_64bit (unsigned long long * ptr,
+static inline void __set_64bit (unsigned long long * ptr,
 		unsigned int low, unsigned int high)
 {
 	__asm__ __volatile__ (
@@ -157,7 +157,7 @@ extern inline void __set_64bit (unsigned long long * ptr,
 		:	"ax","dx","memory");
 }
 
-extern void inline __set_64bit_constant (unsigned long long *ptr,
+static inline void __set_64bit_constant (unsigned long long *ptr,
 						 unsigned long long value)
 {
 	__set_64bit(ptr,(unsigned int)(value), (unsigned int)((value)>>32ULL));
@@ -165,7 +165,7 @@ extern void inline __set_64bit_constant (unsigned long long *ptr,
 #define ll_low(x)	*(((unsigned int*)&(x))+0)
 #define ll_high(x)	*(((unsigned int*)&(x))+1)
 
-extern void inline __set_64bit_var (unsigned long long *ptr,
+static inline void __set_64bit_var (unsigned long long *ptr,
 			 unsigned long long value)
 {
 	__set_64bit(ptr,ll_low(value), ll_high(value));

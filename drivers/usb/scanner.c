@@ -858,6 +858,10 @@ ioctl_scanner(struct inode *inode, struct file *file,
 
 	switch (cmd)
 	{
+	case IOCTL_SCANNER_VENDOR :
+		return (put_user(dev->descriptor.idVendor, (unsigned int *) arg));
+	case IOCTL_SCANNER_PRODUCT :
+		return (put_user(dev->descriptor.idProduct, (unsigned int *) arg));
 	case PV8630_IOCTL_INREQUEST :
 	{
 		struct {

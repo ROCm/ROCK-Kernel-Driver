@@ -32,7 +32,7 @@
 #include <linux/sem.h>
 #include <linux/msg.h>
 #include <linux/shm.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/uio.h>
 #include <linux/nfs_fs.h>
 #include <linux/smb_fs.h>
@@ -4176,8 +4176,8 @@ static inline long do_mmap2(
 	unsigned long prot, unsigned long flags,
 	unsigned long fd, unsigned long pgoff)
 {
-	int error = -EBADF;
 	struct file * file = NULL;
+	unsigned long error = -EBADF;
 
 	flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
 	if (!(flags & MAP_ANONYMOUS)) {
@@ -4188,6 +4188,11 @@ static inline long do_mmap2(
 
 	down_write(&current->mm->mmap_sem);
 	error = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);
+	if (!IS_ERR((void *) error) && error + len >= 0x80000000ULL) {
+		/* Result is out of bounds.  */
+		do_munmap(current->mm, addr, len);
+		error = -ENOMEM;
+	}
 	up_write(&current->mm->mmap_sem);
 
 	if (file)

@@ -39,11 +39,11 @@
 	(type)__i;				\
 })
 
-extern inline int
+static inline int
 __list_cmp_same(const void *p1, const void *p2) { return p1 == p2; }
 
 /* Is this entry in the list? */
-extern inline int
+static inline int
 list_inlist(struct list_head *head, const void *entry)
 {
 	return LIST_FIND(head, __list_cmp_same, void *, entry) != NULL;
@@ -64,7 +64,7 @@ do {									\
 #endif
 
 /* Append. */
-extern inline void
+static inline void
 list_append(struct list_head *head, void *new)
 {
 	ASSERT_WRITE_LOCK(head);
@@ -72,7 +72,7 @@ list_append(struct list_head *head, void *new)
 }
 
 /* Prepend. */
-extern inline void
+static inline void
 list_prepend(struct list_head *head, void *new)
 {
 	ASSERT_WRITE_LOCK(head);
@@ -92,13 +92,13 @@ do {								\
 
 /* If the field after the list_head is a nul-terminated string, you
    can use these functions. */
-extern inline int __list_cmp_name(const void *i, const char *name)
+static inline int __list_cmp_name(const void *i, const char *name)
 {
 	return strcmp(name, i+sizeof(struct list_head)) == 0;
 }
 
 /* Returns false if same name already in list, otherwise does insert. */
-extern inline int
+static inline int
 list_named_insert(struct list_head *head, void *new)
 {
 	if (LIST_FIND(head, __list_cmp_name, void *,

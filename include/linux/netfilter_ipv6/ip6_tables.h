@@ -295,7 +295,7 @@ struct ip6t_get_entries
 #define IP6T_ERROR_TARGET "ERROR"
 
 /* Helper functions */
-extern __inline__ struct ip6t_entry_target *
+static __inline__ struct ip6t_entry_target *
 ip6t_get_target(struct ip6t_entry *e)
 {
 	return (void *)e + e->target_offset;

@@ -210,43 +210,43 @@ void unregister_hdlc_device(hdlc_device *hdlc);
 void hdlc_netif_rx(hdlc_device *hdlc, struct sk_buff *skb);
 
 
-extern __inline__ struct net_device* hdlc_to_dev(hdlc_device *hdlc)
+static __inline__ struct net_device* hdlc_to_dev(hdlc_device *hdlc)
 {
 	return &hdlc->netdev;
 }
 
 
-extern __inline__ hdlc_device* dev_to_hdlc(struct net_device *dev)
+static __inline__ hdlc_device* dev_to_hdlc(struct net_device *dev)
 {
 	return (hdlc_device*)dev;
 }
 
 
-extern __inline__ struct net_device* pvc_to_dev(pvc_device *pvc)
+static __inline__ struct net_device* pvc_to_dev(pvc_device *pvc)
 {
 	return &pvc->netdev;
 }
 
 
-extern __inline__ pvc_device* dev_to_pvc(struct net_device *dev)
+static __inline__ pvc_device* dev_to_pvc(struct net_device *dev)
 {
 	return (pvc_device*)dev;
 }
 
 
-extern __inline__ const char *hdlc_to_name(hdlc_device *hdlc)
+static __inline__ const char *hdlc_to_name(hdlc_device *hdlc)
 {
 	return hdlc_to_dev(hdlc)->name;
 }
 
 
-extern __inline__ const char *pvc_to_name(pvc_device *pvc)
+static __inline__ const char *pvc_to_name(pvc_device *pvc)
 {
 	return pvc_to_dev(pvc)->name;
 }
 
 
-extern __inline__ u16 status_to_dlci(hdlc_device *hdlc, u8 *status, u8 *state)
+static __inline__ u16 status_to_dlci(hdlc_device *hdlc, u8 *status, u8 *state)
 {
 	*state &= ~(PVC_STATE_ACTIVE | PVC_STATE_NEW);
 	if (status[2] & 0x08)
@@ -258,7 +258,7 @@ extern __inline__ u16 status_to_dlci(hdlc_device *hdlc, u8 *status, u8 *state)
 }
 
 
-extern __inline__ void dlci_to_status(hdlc_device *hdlc, u16 dlci, u8 *status,
+static __inline__ void dlci_to_status(hdlc_device *hdlc, u16 dlci, u8 *status,
 				      u8 state)
 {
 	status[0] = (dlci>>4) & 0x3F;
@@ -273,21 +273,21 @@ extern __inline__ void dlci_to_status(hdlc_device *hdlc, u16 dlci, u8 *status,
 
 
 
-extern __inline__ u16 netdev_dlci(struct net_device *dev)
+static __inline__ u16 netdev_dlci(struct net_device *dev)
 {
 	return ntohs(*(u16*)dev->dev_addr);
 }
 
 
 
-extern __inline__ u16 q922_to_dlci(u8 *hdr)
+static __inline__ u16 q922_to_dlci(u8 *hdr)
 {
 	return ((hdr[0] & 0xFC)<<2) | ((hdr[1] & 0xF0)>>4);
 }
 
 
 
-extern __inline__ void dlci_to_q922(u8 *hdr, u16 dlci)
+static __inline__ void dlci_to_q922(u8 *hdr, u16 dlci)
 {
 	hdr[0] = (dlci>>2) & 0xFC;
 	hdr[1] = ((dlci<<4) & 0xF0) | 0x01;
@@ -295,14 +295,14 @@ extern __inline__ void dlci_to_q922(u8 *hdr, u16 dlci)
 
 
 
-extern __inline__ int mode_is(hdlc_device *hdlc, int mask)
+static __inline__ int mode_is(hdlc_device *hdlc, int mask)
 {
 	return (hdlc->mode & mask) == mask;
 }
 
 
 
-extern __inline__ pvc_device* find_pvc(hdlc_device *hdlc, u16 dlci)
+static __inline__ pvc_device* find_pvc(hdlc_device *hdlc, u16 dlci)
 {
 	pvc_device *pvc=hdlc->first_pvc;
 	
@@ -317,7 +317,7 @@ extern __inline__ pvc_device* find_pvc(hdlc_device *hdlc, u16 dlci)
 
 
 
-extern __inline__ void debug_frame(const struct sk_buff *skb)
+static __inline__ void debug_frame(const struct sk_buff *skb)
 {
 	int i;
 

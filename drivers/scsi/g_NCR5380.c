@@ -399,6 +399,7 @@ int __init generic_NCR5380_detect(Scsi_Host_Template * tpnt){
 		release_mem_region(overrides[current_override].NCR5380_map_name,
 	                                  	NCR5380_region_size);
 #endif
+		continue;
 	}
 	
 	instance->NCR5380_instance_name = overrides[current_override].NCR5380_map_name;

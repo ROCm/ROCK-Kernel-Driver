@@ -63,11 +63,12 @@ typedef enum {
     TE_START=0, TE_DONE, TE_FAILED, TE_ERROR, TE_OTHER,
     TE_SIZE } tape_events;
 
+typedef void (*tape_disc_shutdown_t) (int);
 typedef void (*tape_event_handler_t) (struct _tape_info_t*);
-typedef ccw_req_t* (*tape_ccwgen_t)(struct _tape_info_t* tape,int count);
-typedef ccw_req_t* (*tape_reqgen_t)(struct request* req,struct _tape_info_t* tape,int tapeblock_major);
-typedef ccw_req_t* (*tape_rwblock_t)(const char* data,size_t count,struct _tape_info_t* tape);
-typedef void (*tape_freeblock_t)(ccw_req_t* cqr,struct _tape_info_t* tape);
+typedef ccw_req_t* (*tape_ccwgen_t)(struct _tape_info_t* ti,int count);
+typedef ccw_req_t* (*tape_reqgen_t)(struct request* req,struct _tape_info_t* ti,int tapeblock_major);
+typedef ccw_req_t* (*tape_rwblock_t)(const char* data,size_t count,struct _tape_info_t* ti);
+typedef void (*tape_freeblock_t)(ccw_req_t* cqr,struct _tape_info_t* ti);
 typedef void (*tape_setup_assist_t) (struct _tape_info_t*);
 #ifdef CONFIG_DEVFS_FS
 typedef void (*tape_devfs_handler_t) (struct _tape_info_t*);
@@ -108,6 +109,7 @@ typedef struct _tape_discipline_t {
     tape_ccwgen_t mtmkpart;
     tape_ccwgen_t mtiocget;
     tape_ccwgen_t mtiocpos;
+    tape_disc_shutdown_t shutdown;
     int (*discipline_ioctl_overload)(struct inode *,struct file*, unsigned int,unsigned long);
     tape_event_table_t* event_table;
     tape_event_handler_t default_handler;
@@ -145,6 +147,7 @@ typedef struct _tape_info_t {
     struct request* current_request;
     int blk_retries;
     long position;
+    int medium_is_unloaded;  // Becomes true when a unload-type operation was issued, false again when medium-insert was detected
     ccw_req_t* cqr;
     atomic_t bh_scheduled;
     struct tq_struct bh_tq;
@@ -167,7 +170,7 @@ int tape_init(void);
 int tape_setup (tape_info_t * ti, int irq, int minor);
 
 /* functoins for alloc'ing ccw stuff */
-inline  ccw_req_t * tape_alloc_ccw_req (tape_info_t* tape, int cplength, int datasize);
+inline  ccw_req_t * tape_alloc_ccw_req (tape_info_t* ti, int cplength, int datasize);
 void tape_free_request (ccw_req_t * request);
 
 /* a function for dumping device sense info */
@@ -179,9 +182,9 @@ int tape_oper_handler ( int irq, struct _devreg *dreg);
 #endif
 
 /* functions for handling the status of a device */
-inline void tapestate_set (tape_info_t * tape, int newstate);
-inline int tapestate_get (tape_info_t * tape);
-void tapestate_event (tape_info_t * tape, int event);
+inline void tapestate_set (tape_info_t * ti, int newstate);
+inline int tapestate_get (tape_info_t * ti);
+void tapestate_event (tape_info_t * ti, int event);
 extern char* state_verbose[TS_SIZE];
 extern char* event_verbose[TE_SIZE];
 

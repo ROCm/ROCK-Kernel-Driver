@@ -1,11 +1,11 @@
 /*
  * Interrupt handling assembler and defines for Linux/CRIS
  *
- * Copyright (c) 2000 Axis Communications AB
+ * Copyright (c) 2000, 2001 Axis Communications AB
  *
  * Authors:   Bjorn Wesen (bjornw@axis.com)
  *
- * $Id: irq.h,v 1.11 2001/06/01 14:57:17 starvik Exp $
+ * $Id: irq.h,v 1.13 2001/07/06 18:52:08 hp Exp $
  */
 
 #ifndef _ASM_IRQ_H
@@ -29,7 +29,7 @@
 /* par1, scsi1 on 5 */
 #define NETWORK_STATUS_IRQ_NBR IO_BITNR(R_VECT_MASK_RD, network) /* 6 */
 
-#define SERIAL_IRQ_NBR IO_BITNR(R_VECT_MASK_RD, network) /* 8 */
+#define SERIAL_IRQ_NBR IO_BITNR(R_VECT_MASK_RD, serial) /* 8 */
 #define PA_IRQ_NBR IO_BITNR(R_VECT_MASK_RD, pa) /* 11 */
 /* extdma0 and extdma1 is at irq 12 and 13 and/or same as dma5 and dma6 ? */
 #define EXTDMA0_IRQ_NBR IO_BITNR(R_VECT_MASK_RD, ext_dma0)

@@ -6,6 +6,16 @@
  *  Authors:  Bjorn Wesen 
  * 
  *  $Log: fault.c,v $
+ *  Revision 1.18  2001/07/18 22:14:32  bjornw
+ *  Enable interrupts in the bulk of do_page_fault
+ *
+ *  Revision 1.17  2001/07/18 13:07:23  bjornw
+ *  * Detect non-existant PTE's in vmalloc pmd synchronization
+ *  * Remove comment about fast-paths for VMALLOC_START etc, because all that
+ *    was totally bogus anyway it turned out :)
+ *  * Fix detection of vmalloc-area synchronization
+ *  * Add some comments
+ *
  *  Revision 1.16  2001/06/13 00:06:08  bjornw
  *  current_pgd should be volatile
  *
@@ -76,7 +86,9 @@ asmlinkage void do_page_fault(unsigned long address, struct pt_regs *regs,
 
 volatile pgd_t *current_pgd;
 
-/* fast TLB-fill fault handler */
+/* fast TLB-fill fault handler
+ * this is called from entry.S with interrupts disabled
+ */
 
 void
 handle_mmu_bus_fault(struct pt_regs *regs)
@@ -85,10 +97,9 @@ handle_mmu_bus_fault(struct pt_regs *regs)
 	int index;
 	int page_id;
 	int miss, we, acc, inv;  
-	struct mm_struct *mm = current->active_mm;
 	pmd_t *pmd;
 	pte_t pte;
-	int errcode = 0;
+	int errcode;
 	unsigned long address;
 
 	cause = *R_MMU_CAUSE;
@@ -103,6 +114,20 @@ handle_mmu_bus_fault(struct pt_regs *regs)
 	miss    = IO_EXTRACT(R_MMU_CAUSE,  miss_excp, cause);
 	we      = IO_EXTRACT(R_MMU_CAUSE,  we_excp,   cause);
 	
+	/* Note: the reason we don't set errcode's r/w flag here
+	 * using the 'we' flag, is because the latter is only given
+	 * if there is a write-protection exception, not given as a
+	 * general r/w access mode flag. It is currently not possible
+	 * to get this from the MMU (TODO: check if this is the case
+	 * for LXv2).
+	 * 
+	 * The page-fault code won't care, but there will be two page-
+	 * faults instead of one for the case of a write to a non-tabled
+	 * page (miss, then write-protection).
+	 */
+
+	errcode = 0;
+
 	D(printk("bus_fault from IRP 0x%x: addr 0x%x, miss %d, inv %d, we %d, acc %d, "
 		 "idx %d pid %d\n",
 		 regs->irp, address, miss, inv, we, acc, index, page_id));
@@ -157,14 +182,14 @@ handle_mmu_bus_fault(struct pt_regs *regs)
 		 * the write to R_TLB_LO also writes the vpn and page_id fields from
 		 * R_MMU_CAUSE, which we in this case obviously want to keep
 		 */
-		
+
 		*R_TLB_LO = pte_val(pte);
 
 		return;
 	} 
 
-	errcode = 0x01 | (we << 1);
-
+	errcode = 1 | (we << 1);
+	
  dofault:
 	/* leave it to the MM system fault handler below */
 	D(printk("do_page_fault %p errcode %d\n", address, errcode));
@@ -214,24 +239,20 @@ do_page_fault(unsigned long address, struct pt_regs *regs,
 	 * NOTE2: This is done so that, when updating the vmalloc
 	 * mappings we don't have to walk all processes pgdirs and
 	 * add the high mappings all at once. Instead we do it as they
-	 * are used.
+	 * are used. However vmalloc'ed page entries have the PAGE_GLOBAL
+	 * bit set so sometimes the TLB can use a lingering entry.
 	 *
-	 * TODO: On CRIS, we have a PTE Global bit which should be set in
-	 * all the PTE's related to vmalloc in all processes - that means if
-	 * we switch process and a vmalloc PTE is still in the TLB, it won't
-	 * need to be reloaded. It's an optimization.
-	 *
-	 * Linux/CRIS's kernel is not page-mapped, so the comparision below
-	 * should really be >= VMALLOC_START, however, kernel fixup errors
-	 * will be handled more quickly by going through vmalloc_fault and then
-	 * into bad_area_nosemaphore than falling through the find_vma user-mode
-	 * tests.  As an aside can be mentioned that the difference in
-	 * compiled code is neglibible; the instruction is the same, just a
-	 * comparison with a different address of the same size.
+	 * This verifies that the fault happens in kernel space
+         * and that the fault was not a protection error (error_code & 1).
          */
 
-        if (address >= TASK_SIZE)
+        if (address >= VMALLOC_START &&
+	    !(error_code & 1) &&
+	    !user_mode(regs))
                 goto vmalloc_fault;
+
+	/* we can and should enable interrupts at this point */
+	sti();
 
 	mm = tsk->mm;
 	writeaccess = error_code & 2;
@@ -409,29 +430,48 @@ vmalloc_fault:
 		 * Use current_pgd instead of tsk->active_mm->pgd
 		 * since the latter might be unavailable if this
 		 * code is executed in a misfortunately run irq
+		 * (like inside schedule() between switch_mm and
+		 *  switch_to...).
                  */
 
                 int offset = pgd_index(address);
                 pgd_t *pgd, *pgd_k;
                 pmd_t *pmd, *pmd_k;
+		pte_t *pte_k;
 
                 pgd = current_pgd + offset;
                 pgd_k = init_mm.pgd + offset;
 
-                if (!pgd_present(*pgd)) {
-                        if (!pgd_present(*pgd_k))
-                                goto bad_area_nosemaphore;
-                        set_pgd(pgd, *pgd_k);
-                        return;
-                }
+		/* Since we're two-level, we don't need to do both
+		 * set_pgd and set_pmd (they do the same thing). If
+		 * we go three-level at some point, do the right thing
+		 * with pgd_present and set_pgd here. 
+		 * 
+		 * Also, since the vmalloc area is global, we don't
+		 * need to copy individual PTE's, it is enough to
+		 * copy the pgd pointer into the pte page of the
+		 * root task. If that is there, we'll find our pte if
+		 * it exists.
+		 */
 
                 pmd = pmd_offset(pgd, address);
                 pmd_k = pmd_offset(pgd_k, address);
 
                 if (!pmd_present(*pmd_k))
                         goto bad_area_nosemaphore;
+
                 set_pmd(pmd, *pmd_k);
+
+		/* Make sure the actual PTE exists as well to
+		 * catch kernel vmalloc-area accesses to non-mapped
+		 * addresses. If we don't do this, this will just
+		 * silently loop forever.
+		 */
+
+                pte_k = pte_offset(pmd_k, address);
+                if (!pte_present(*pte_k))
+                        goto no_context;
+
                 return;
         }
-
 }

@@ -739,9 +739,12 @@ sys_sigsuspend:
 	mov	$30,$17
 	br	$1,do_switch_stack
 	mov	$30,$18
+	subq	$30,16,$30
+	stq	$26,0($30)
 	jsr	$26,do_sigsuspend
-	lda	$30,SWITCH_STACK_SIZE($30)
-	br	ret_from_sys_call
+	ldq	$26,0($30)
+	lda	$30,SWITCH_STACK_SIZE+16($30)
+	ret	$31,($26),1
 .end sys_sigsuspend
 
 .align 3
@@ -750,9 +753,12 @@ sys_rt_sigsuspend:
 	mov	$30,$18
 	br	$1,do_switch_stack
 	mov	$30,$19
+	subq	$30,16,$30
+	stq	$26,0($30)
 	jsr	$26,do_rt_sigsuspend
-	lda	$30,SWITCH_STACK_SIZE($30)
-	br	ret_from_sys_call
+	ldq	$26,0($30)
+	lda	$30,SWITCH_STACK_SIZE+16($30)
+	ret	$31,($26),1
 .end sys_rt_sigsuspend
 
 	.data

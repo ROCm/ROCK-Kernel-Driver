@@ -10,7 +10,7 @@
  */
 
 #include <linux/module.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/version.h>
 
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2,3,98))

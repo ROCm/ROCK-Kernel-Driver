@@ -47,6 +47,8 @@ static int gdth_set_info(char *buffer,int length,int vh,int hanum,int busnum)
 #if LINUX_VERSION_CODE >= 0x020322
     sdev = scsi_get_host_dev(gdth_ctr_vtab[vh]);
     scp  = scsi_allocate_device(sdev, 1, FALSE);
+    if (!scp)
+	    return -ENOMEM;
     scp->cmd_len = 12;
     scp->use_sg = 0;
 #else

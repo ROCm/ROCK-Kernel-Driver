@@ -1,4 +1,4 @@
-	;; $Id: e100lpslave.S,v 1.2 2001/06/11 12:50:01 olof Exp $
+	;; $Id: e100lpslave.S,v 1.3 2001/06/21 16:55:26 olof Exp $
 	;;
 	;; Etrax100 slave network<->parport forwarder
 	;;
@@ -98,7 +98,7 @@ start:
 
 	move.d	r0, [R_PAR1_CONFIG]
 
-	moveq	IO_FIELD(R_PAR1_DELAY, setup, 1), r0    ; setup time of value * 160 + 20
+	moveq	IO_FIELD(R_PAR1_DELAY, setup, 0), r0    ; setup time of value * 160 + 20 == 20 ns
 	move.d	r0, [R_PAR1_DELAY]
 
 	;; we got four descriptors, that can be active at the same time:

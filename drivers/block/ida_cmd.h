@@ -18,9 +18,6 @@
  *
  *    Questions/Comments/Bugfixes to arrays@compaq.com
  *
- *    If you want to make changes, improve or add functionality to this
- *    driver, you'll probably need the Compaq Array Controller Interface
- *    Specificiation (Document number ECG086/1198)
  */
 #ifndef ARRAYCMD_H
 #define ARRAYCMD_H
@@ -342,6 +339,11 @@ typedef struct {
 } scsi_param_t;
 
 #define RESUME_BACKGROUND_ACTIVITY	0x99
+#define SENSE_CONTROLLER_PERFORMANCE	0xa8
+#define FLUSH_CACHE			0xc2
+#define COLLECT_BUFFER			0xd2
+#define READ_FLASH_ROM			0xf6
+#define WRITE_FLASH_ROM			0xf7
 #pragma pack()	
 
 #endif /* ARRAYCMD_H */

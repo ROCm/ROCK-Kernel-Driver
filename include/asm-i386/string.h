@@ -300,7 +300,7 @@ static inline void * __constant_memcpy3d(void * to, const void * from, size_t le
 	return _mmx_memcpy(to, from, len);
 }
 
-extern __inline__ void *__memcpy3d(void *to, const void *from, size_t len)
+static __inline__ void *__memcpy3d(void *to, const void *from, size_t len)
 {
 	if (len < 512)
 		return __memcpy(to, from, len);

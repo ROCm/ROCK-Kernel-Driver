@@ -19,7 +19,7 @@ typedef struct poll_table_struct {
 
 extern void __pollwait(struct file * filp, wait_queue_head_t * wait_address, poll_table *p);
 
-extern inline void poll_wait(struct file * filp, wait_queue_head_t * wait_address, poll_table *p)
+static inline void poll_wait(struct file * filp, wait_queue_head_t * wait_address, poll_table *p)
 {
 	if (p && wait_address)
 		__pollwait(filp, wait_address, p);

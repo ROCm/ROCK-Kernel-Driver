@@ -12,7 +12,7 @@
 #include "tubio.h"
 static int tty3270_size_io(tub_t *tubp);
 static void tty3270_size_int(tub_t *tubp, devstat_t *dsp);
-static int tty3270_size_wait(tub_t *tubp, int *flags, int stat);
+static int tty3270_size_wait(tub_t *tubp, long *flags, int stat);
 
 /*
  * Structure representing Usable Area Query Reply Base
@@ -71,7 +71,7 @@ typedef struct {
  * Try to determine screen size using Read Partition (Query)
  */
 int
-tty3270_size(tub_t *tubp, int *flags)
+tty3270_size(tub_t *tubp, long *flags)
 {
 	char wbuf[7] = { 0x00, 0x07, 0x01, 0xff, 0x03, 0x00, 0x81 };
 	int     rc = 0;
@@ -285,7 +285,7 @@ tty3270_size_int(tub_t *tubp, devstat_t *dsp)
  * Return 0 unless signal pending, in which case -ERESTARTSYS.
  */
 static int
-tty3270_size_wait(tub_t *tubp, int *flags, int stat)
+tty3270_size_wait(tub_t *tubp, long *flags, int stat)
 {
 	DECLARE_WAITQUEUE(wait, current);
 

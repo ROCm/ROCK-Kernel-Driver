@@ -1,4 +1,4 @@
-/* $Id: e100lpslavenet.c,v 1.2 2001/06/11 15:39:52 olof Exp $
+/* $Id: e100lpslavenet.c,v 1.4 2001/06/21 16:55:26 olof Exp $
  *
  * e100lpslavenet.c: A network driver for the ETRAX 100LX slave controller.
  *
@@ -7,6 +7,12 @@
  * The outline of this driver comes from skeleton.c.
  *
  * $Log: e100lpslavenet.c,v $
+ * Revision 1.4  2001/06/21 16:55:26  olof
+ * Minimized par port setup time to gain bandwidth
+ *
+ * Revision 1.3  2001/06/21 15:49:02  olof
+ * Removed setting of default MAC address
+ *
  * Revision 1.2  2001/06/11 15:39:52  olof
  * Clean up and sync with ethernet.c rev 1.16. Increased reset time of slave.
  *
@@ -198,10 +204,6 @@ etrax_ethernet_lpslave_init(struct net_device *dev)
 	dev->get_stats          = e100_get_stats;
 	dev->set_multicast_list = set_multicast_list;
 	dev->set_mac_address    = e100_set_mac_address;
-        
-        /* set the default MAC address */
-
-	e100_set_mac_address(dev, &default_mac);
 
 	/* Initialise the list of Etrax DMA-descriptors */
 
@@ -385,8 +387,8 @@ e100_open(struct net_device *dev)
           /* We want ECP forward mode since PAR1 is TX */
 	 	IO_STATE(R_PAR1_CONFIG, mode, ecp_fwd);        
 
-        /* Setup time of value * 160 + 20 ns == 180 ns below */
-        *R_PAR1_DELAY = IO_FIELD(R_PAR1_DELAY, setup, 1);  
+        /* Setup time of value * 160 + 20 ns == 20 ns below */
+        *R_PAR1_DELAY = IO_FIELD(R_PAR1_DELAY, setup, 0);  
 
         *R_PAR1_CTRL = 0;
 
@@ -944,7 +946,6 @@ boot_slave(unsigned char *code)
 	TxDescList[1].ctrl = d_eol | d_int; 
                                                       
 	TxDescList[1].buf = virt_to_phys(code);
-        /*TxDescList[1].buf = code;*/
 	TxDescList[1].next = 0;
         
         /* setup the dma channel and start it */

@@ -461,7 +461,7 @@ start:
         .org  0x10000
 startup:basr  %r13,0                     # get base
 .LPG1:  lctl  %c0,%c15,.Lctl-.LPG1(%r13) # load control registers
-	l     %r12,.Lparm1-.LPG1(%r13)   # pointer to parameter area
+	la    %r12,parmarea-.LPG1(%r13)  # pointer to parameter area
 					 # move IPL device to lowcore
         mvc   __LC_IPLDEV(4),IPL_DEVICE-PARMAREA(%r12)
 	
@@ -502,9 +502,7 @@ startup:basr  %r13,0                     # get base
 # find out if we have an IEEE fpu
 #
         mvc    __LC_PGM_NEW_PSW(8),.Lpcfpu-.LPG1(%r13)
-        ld     %f0,.Lflt0-.LPG1(%r13)   # load (float) 0.0
-        ldr    %f2,%f0
-        adbr   %f0,%f2                  # test IEEE add instruction
+	efpc   %r0,0                    # test IEEE extract fpc instruction
         oi     3(%r12),2                # set IEEE fpu flag
 .Lchkfpu:
 
@@ -514,7 +512,7 @@ startup:basr  %r13,0                     # get base
        mvc    __LC_PGM_NEW_PSW(8),.Lpccsp-.LPG1(%r13)
        la     %r0,0
        lr     %r1,%r0
-       la     %r2,.Lflt0-.LPG1(%r13)
+       la     %r2,4
        csp    %r0,%r2                   # Test CSP instruction
        oi     3(%r12),8                 # set CSP flag
 .Lchkcsp:
@@ -554,12 +552,7 @@ startup:basr  %r13,0                     # get base
 .Lpcfpu:.long  0x00080000,0x80000000 + .Lchkfpu
 .Lpccsp:.long  0x00080000,0x80000000 + .Lchkcsp
 .Lpcmvpg:.long 0x00080000,0x80000000 + .Lchkmvpg
-.Lflt0: .double 0
-.Lparm1:.long  PARMAREA
 .L4malign:.long 0xffc00000
-.Lbigmem:.long 0x04000000
-.Lrdstart:.long 0x02000000
-.Lmaxchunk:.long  0x00ffffff
 .Lmemsize:.long memory_size
 .Lmflags:.long machine_flags
 
@@ -567,6 +560,7 @@ startup:basr  %r13,0                     # get base
 # params at 10400 (setup.h)
 #
 	.org   PARMAREA
+parmarea:	
         .long  0,0                      # IPL_DEVICE
         .long  0,RAMDISK_ORIGIN         # INITRD_START
         .long  0,0x800000               # INITRD_SIZE
@@ -578,7 +572,11 @@ startup:basr  %r13,0                     # get base
 #
 # startup-code, running in virtual mode
 #
+#ifdef CONFIG_SHARED_KERNEL
+	.org   0x100000
+#else
         .org   0x10800
+#endif
         .globl _stext
 _stext:	basr  %r13,0                    # get base
 .LPG2:
@@ -608,8 +606,8 @@ _stext:	basr  %r13,0                    # get base
         jo    .-4                       # branch back, if not finish
 # check control registers
         stctl  %c0,%c15,0(%r15)
-        oc     2(1,%r15),.Locbits+5-.LPG2(%r13) # enable sigp external ints.
-        oc     0(1,%r15),.Locbits+4-.LPG2(%r13) # low addresss proctection
+	oi     2(%r15),0x20             # enable sigp external interrupts
+	oi     0(%r15),0x10             # switch on low address protection
         lctl   %c0,%c15,0(%r15)
 
 #
@@ -622,15 +620,12 @@ _stext:	basr  %r13,0                    # get base
         basr  %r13,0
 	lpsw  .Ldw-.(%r13)           # load disabled wait psw
 #
-.Lstart:    .long  start_kernel
             .align 8
+.Ldw:	    .long  0x000a0000,0x00000000
 .Lprefix:   .long  init_S390_lowcore	
 .Linittu:   .long  init_task_union
+.Lstart:    .long  start_kernel
 .Lbss_bgn:  .long  __bss_start
 .Lbss_end:  .long  _end
-.Locbits:   .long  0x01020408,0x10204080
-            .align 4
 .Laregs:    .long  0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0
-	    .align 8
-.Ldw:	    .long  0x000a0000,0x00000000
 

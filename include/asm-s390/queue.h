@@ -7,7 +7,8 @@
  *
  *  A little set of queue utilies.
  */
-
+#ifndef __ASM_QUEUE_H
+#define __ASM_QUEUE_H
 #include <linux/stddef.h>
 
 typedef struct queue
@@ -29,12 +30,11 @@ static __inline__ void init_queue(qheader *qhead)
 }
 
 static __inline__ void enqueue_tail(qheader *qhead,queue *member)
-{
-	queue *tail=qhead->tail;
-	member->next=NULL;
-	
+{	
 	if(member)
 	{
+		queue *tail=qhead->tail;
+
 		if(tail)
 			tail->next=member;
 		else
@@ -166,5 +166,5 @@ static __inline__ int remove_from_queue(qheader *qhead,queue *member)
 	return(0);
 }
 
-
+#endif /* __ASM_QUEUE_H */
 

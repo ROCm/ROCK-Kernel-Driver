@@ -9,7 +9,7 @@
 
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <asm/lowcore.h>
 #include <asm/s390_ext.h>
 
@@ -17,12 +17,13 @@
  * Simple hash strategy: index = code & 0xff;
  * ext_int_hash[index] is the start of the list for all external interrupts
  * that hash to this index. With the current set of external interrupts 
- * (0x1202 external call, 0x1004 cpu timer, 0x2401 hwc console and 0x4000
- * iucv) this is always the first element. 
+ * (0x1202 external call, 0x1004 cpu timer, 0x2401 hwc console, 0x4000
+ * iucv and 0x2603 pfault) this is always the first element. 
  */
 ext_int_info_t *ext_int_hash[256] = { 0, };
 ext_int_info_t ext_int_info_timer;
 ext_int_info_t ext_int_info_hwc;
+ext_int_info_t ext_int_pfault;
 
 int register_external_interrupt(__u16 code, ext_int_handler_t handler) {
         ext_int_info_t *p;
@@ -39,6 +40,8 @@ int register_external_interrupt(__u16 code, ext_int_handler_t handler) {
                 p = &ext_int_info_timer;
         else if (code == 0x2401) /* hwc_init is done too early too */
                 p = &ext_int_info_hwc;
+        else if (code == 0x2603) /* pfault_init is done too early too */
+                p = &ext_int_pfault;
         else
                 p = (ext_int_info_t *)
                           kmalloc(sizeof(ext_int_info_t), GFP_ATOMIC);
@@ -70,7 +73,7 @@ int unregister_external_interrupt(__u16 code, ext_int_handler_t handler) {
                 q->next = p->next;
         else
                 ext_int_hash[index] = p->next;
-        if (code != 0x1004 && code != 0x2401)
+        if (code != 0x1004 && code != 0x2401 && code != 0x2603)
                 kfree(p);
         return 0;
 }

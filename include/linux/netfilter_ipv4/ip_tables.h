@@ -289,7 +289,7 @@ struct ipt_get_entries
 #define IPT_ERROR_TARGET "ERROR"
 
 /* Helper functions */
-extern __inline__ struct ipt_entry_target *
+static __inline__ struct ipt_entry_target *
 ipt_get_target(struct ipt_entry *e)
 {
 	return (void *)e + e->target_offset;

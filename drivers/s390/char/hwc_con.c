@@ -4,7 +4,7 @@
  *
  *  S390 version
  *    Copyright (C) 1999 IBM Deutschland Entwicklung GmbH, IBM Corporation
- *    Author(s): Martin Peschke <peschke@fh-brandenburg.de>
+ *    Author(s): Martin Peschke <mpeschke@de.ibm.com>
  */
 
 #include <linux/config.h>
@@ -17,7 +17,6 @@
 #include <linux/fs.h>
 #include <linux/init.h>
 
-#include "ctrlchar.h"
 #include "hwc_rw.h"
 
 #ifdef CONFIG_HWC_CONSOLE
@@ -82,20 +81,14 @@ hwc_console_unblank (void)
 void __init 
 hwc_console_init (void)
 {
-
-#if defined(CONFIG_3215_CONSOLE) || defined(CONFIG_3270_CONSOLE)
-	if (MACHINE_IS_VM)
-		return;
-#endif
-	if (MACHINE_IS_P390)
+	if (!MACHINE_HAS_HWC)
 		return;
 
-	ctrlchar_init ();
-  
 	if (hwc_init () == 0) {
 #ifdef CONFIG_HWC_CONSOLE
 
-		register_console (&hwc_console);
+		if (CONSOLE_IS_HWC)
+			register_console (&hwc_console);
 #endif
 	} else
 		panic (HWC_CON_PRINT_HEADER "hwc initialisation failed !");

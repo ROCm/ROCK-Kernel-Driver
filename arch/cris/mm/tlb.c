@@ -40,6 +40,10 @@
  *
  * The last page_id is never running - it is used as an invalid page_id
  * so we can make TLB entries that will never match.
+ *
+ * Notice that we need to make the flushes atomic, otherwise an interrupt
+ * handler that uses vmalloced memory might cause a TLB load in the middle
+ * of a flush causing.
  */
 
 struct mm_struct *page_id_map[NUM_PAGEID];
@@ -49,17 +53,18 @@ static int map_replace_ptr = 1;  /* which page_id_map entry to replace next */
 /* invalidate all TLB entries */
 
 void
-flush_tlb_all()
+flush_tlb_all(void)
 {
 	int i;
+	unsigned long flags;
 
 	/* the vpn of i & 0xf is so we dont write similar TLB entries
 	 * in the same 4-way entry group. details.. 
 	 */
 
+	save_and_cli(flags); /* flush needs to be atomic */
 	for(i = 0; i < NUM_TLB_ENTRIES; i++) {
 		*R_TLB_SELECT = ( IO_FIELD(R_TLB_SELECT, index, i) );
-
 		*R_TLB_HI = ( IO_FIELD(R_TLB_HI, page_id, INVALID_PAGEID ) |
 			      IO_FIELD(R_TLB_HI, vpn,     i & 0xf ) );
 		
@@ -69,6 +74,7 @@ flush_tlb_all()
 			      IO_STATE(R_TLB_LO, we,    no       ) |
 			      IO_FIELD(R_TLB_LO, pfn,   0        ) );
 	}
+	restore_flags(flags);
 	D(printk("tlb: flushed all\n"));
 }
 
@@ -79,6 +85,7 @@ flush_tlb_mm(struct mm_struct *mm)
 {
 	int i;
 	int page_id = mm->context;
+	unsigned long flags;
 
 	D(printk("tlb: flush mm context %d (%p)\n", page_id, mm));
 
@@ -90,6 +97,7 @@ flush_tlb_mm(struct mm_struct *mm)
 	 * global pages. is it worth the extra I/O ? 
 	 */
 
+	save_and_cli(flags);  /* flush needs to be atomic */
 	for(i = 0; i < NUM_TLB_ENTRIES; i++) {
 		*R_TLB_SELECT = IO_FIELD(R_TLB_SELECT, index, i);
 		if (IO_EXTRACT(R_TLB_HI, page_id, *R_TLB_HI) == page_id) {
@@ -103,6 +111,7 @@ flush_tlb_mm(struct mm_struct *mm)
 				      IO_FIELD(R_TLB_LO, pfn,   0   ) );
 		}
 	}
+	restore_flags(flags);
 }
 
 /* invalidate a single page */
@@ -114,6 +123,7 @@ flush_tlb_page(struct vm_area_struct *vma,
 	struct mm_struct *mm = vma->vm_mm;
 	int page_id = mm->context;
 	int i;
+	unsigned long flags;
 
 	D(printk("tlb: flush page %p in context %d (%p)\n", addr, page_id, mm));
 
@@ -126,6 +136,7 @@ flush_tlb_page(struct vm_area_struct *vma,
 	 * and the virtual address requested 
 	 */
 
+	save_and_cli(flags);  /* flush needs to be atomic */
 	for(i = 0; i < NUM_TLB_ENTRIES; i++) {
 		unsigned long tlb_hi;
 		*R_TLB_SELECT = IO_FIELD(R_TLB_SELECT, index, i);
@@ -142,6 +153,7 @@ flush_tlb_page(struct vm_area_struct *vma,
 				      IO_FIELD(R_TLB_LO, pfn,   0   ) );
 		}
 	}
+	restore_flags(flags);
 }
 
 /* invalidate a page range */
@@ -153,6 +165,7 @@ flush_tlb_range(struct mm_struct *mm,
 {
 	int page_id = mm->context;
 	int i;
+	unsigned long flags;
 
 	D(printk("tlb: flush range %p<->%p in context %d (%p)\n",
 		 start, end, page_id, mm));
@@ -167,6 +180,7 @@ flush_tlb_range(struct mm_struct *mm,
 	 * and the virtual address range
 	 */
 
+	save_and_cli(flags);  /* flush needs to be atomic */
 	for(i = 0; i < NUM_TLB_ENTRIES; i++) {
 		unsigned long tlb_hi, vpn;
 		*R_TLB_SELECT = IO_FIELD(R_TLB_SELECT, index, i);
@@ -184,7 +198,29 @@ flush_tlb_range(struct mm_struct *mm,
 				      IO_FIELD(R_TLB_LO, pfn,   0   ) );
 		}
 	}
+	restore_flags(flags);
 }
+
+/* dump the entire TLB for debug purposes */
+
+#if 0
+void
+dump_tlb_all(void)
+{
+	int i;
+	unsigned long flags;
+	
+	printk("TLB dump. LO is: pfn | reserved | global | valid | kernel | we  |\n");
+
+	save_and_cli(flags);
+	for(i = 0; i < NUM_TLB_ENTRIES; i++) {
+		*R_TLB_SELECT = ( IO_FIELD(R_TLB_SELECT, index, i) );
+		printk("Entry %d: HI 0x%08lx, LO 0x%08lx\n",
+		       i, *R_TLB_HI, *R_TLB_LO);
+	}
+	restore_flags(flags);
+}
+#endif
 
 /*
  * Initialize the context related info for a new mm_struct
@@ -228,8 +264,7 @@ alloc_context(struct mm_struct *mm)
 	map_replace_ptr++;
 
 	if(map_replace_ptr == INVALID_PAGEID)
-		map_replace_ptr = 0;         /* wrap around */
-	
+		map_replace_ptr = 0;         /* wrap around */	
 }
 
 /* 

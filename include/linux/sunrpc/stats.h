@@ -59,13 +59,13 @@ void			svc_proc_zero(struct svc_program *);
 
 #else
 
-extern inline void svc_proc_unregister(const char *p) {}
-extern inline struct proc_dir_entry*svc_proc_register(struct svc_stat *s)
+static inline void svc_proc_unregister(const char *p) {}
+static inline struct proc_dir_entry*svc_proc_register(struct svc_stat *s)
 {
 	return NULL;
 }
 
-extern inline int svc_proc_read(char *a, char **b, off_t c, int d, int *e, void *f)
+static inline int svc_proc_read(char *a, char **b, off_t c, int d, int *e, void *f)
 {
 	return 0;
 }

@@ -103,7 +103,7 @@ void *data)
 	DEV_NET				*pNet;
 	SK_AC				*pAC;
 	char 				test_buf[100];
-	unsigned int			Flags;		
+	unsigned long			Flags;		
 	unsigned int			Size;
 	struct net_device 		*next;
 	struct net_device 		*SkgeProcDev = root_dev;

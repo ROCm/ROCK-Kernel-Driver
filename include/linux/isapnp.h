@@ -217,37 +217,37 @@ extern struct list_head isapnp_devices;
 #else /* !CONFIG_ISAPNP */
 
 /* lowlevel configuration */
-extern inline int isapnp_present(void) { return 0; }
-extern inline int isapnp_cfg_begin(int csn, int device) { return -ENODEV; }
-extern inline int isapnp_cfg_end(void) { return -ENODEV; }
-extern inline unsigned char isapnp_read_byte(unsigned char idx) { return 0xff; }
-extern inline unsigned short isapnp_read_word(unsigned char idx) { return 0xffff; }
-extern inline unsigned int isapnp_read_dword(unsigned char idx) { return 0xffffffff; }
-extern inline void isapnp_write_byte(unsigned char idx, unsigned char val) { ; }
-extern inline void isapnp_write_word(unsigned char idx, unsigned short val) { ; }
-extern inline void isapnp_write_dword(unsigned char idx, unsigned int val) { ; }
-extern inline void isapnp_wake(unsigned char csn) { ; }
-extern inline void isapnp_device(unsigned char device) { ; }
-extern inline void isapnp_activate(unsigned char device) { ; }
-extern inline void isapnp_deactivate(unsigned char device) { ; }
+static inline int isapnp_present(void) { return 0; }
+static inline int isapnp_cfg_begin(int csn, int device) { return -ENODEV; }
+static inline int isapnp_cfg_end(void) { return -ENODEV; }
+static inline unsigned char isapnp_read_byte(unsigned char idx) { return 0xff; }
+static inline unsigned short isapnp_read_word(unsigned char idx) { return 0xffff; }
+static inline unsigned int isapnp_read_dword(unsigned char idx) { return 0xffffffff; }
+static inline void isapnp_write_byte(unsigned char idx, unsigned char val) { ; }
+static inline void isapnp_write_word(unsigned char idx, unsigned short val) { ; }
+static inline void isapnp_write_dword(unsigned char idx, unsigned int val) { ; }
+static inline void isapnp_wake(unsigned char csn) { ; }
+static inline void isapnp_device(unsigned char device) { ; }
+static inline void isapnp_activate(unsigned char device) { ; }
+static inline void isapnp_deactivate(unsigned char device) { ; }
 /* manager */
-extern inline struct pci_bus *isapnp_find_card(unsigned short vendor,
+static inline struct pci_bus *isapnp_find_card(unsigned short vendor,
 					       unsigned short device,
 					       struct pci_bus *from) { return NULL; }
-extern inline struct pci_dev *isapnp_find_dev(struct pci_bus *card,
+static inline struct pci_dev *isapnp_find_dev(struct pci_bus *card,
 					      unsigned short vendor,
 					      unsigned short function,
 					      struct pci_dev *from) { return NULL; }
-extern inline int isapnp_probe_cards(const struct isapnp_card_id *ids,
+static inline int isapnp_probe_cards(const struct isapnp_card_id *ids,
 				     int (*probe)(struct pci_bus *card,
 						  const struct isapnp_card_id *id)) { return -ENODEV; }
-extern inline int isapnp_probe_devs(const struct isapnp_device_id *ids,
+static inline int isapnp_probe_devs(const struct isapnp_device_id *ids,
 				    int (*probe)(struct pci_dev *dev,
 						 const struct isapnp_device_id *id)) { return -ENODEV; }
-extern inline void isapnp_resource_change(struct resource *resource,
+static inline void isapnp_resource_change(struct resource *resource,
 					  unsigned long start,
 					  unsigned long size) { ; }
-extern inline int isapnp_activate_dev(struct pci_dev *dev, const char *name) { return -ENODEV; }
+static inline int isapnp_activate_dev(struct pci_dev *dev, const char *name) { return -ENODEV; }
 
 #endif /* CONFIG_ISAPNP */
 

@@ -293,34 +293,6 @@ void truncate_inode_pages(struct address_space * mapping, loff_t lstart)
 	spin_unlock(&pagecache_lock);
 }
 
-/*
- * This function is pretty much like __find_page_nolock(), but it only
- * requires 2 arguments and doesn't mark the page as touched, making it
- * ideal for ->writepage() clustering and other places where you don't
- * want to mark the page referenced.
- *
- * The caller needs to hold the pagecache_lock.
- */
-static struct page * FASTCALL(__find_page_simple(struct address_space *, unsigned long));
-static struct page * __find_page_simple(struct address_space *mapping, unsigned long index)
-{
-	struct page **next = page_hash(mapping, index);;
-
-	for (;;) {
-		struct page *page = *next;
-		if (!page)
-			break;
-		next = &page->next_hash;
-		if (page->mapping != mapping)
-			continue;
-		if (page->index != index)
-			continue;
-		return page;
-	}
-
-	return NULL;
-}
-
 static inline struct page * __find_page_nolock(struct address_space *mapping, unsigned long offset, struct page *page)
 {
 	goto inside;
@@ -778,51 +750,6 @@ repeat:
 #endif
 
 /*
- * We combine this with read-ahead to deactivate pages when we
- * think there's sequential IO going on. Note that this is
- * harmless since we don't actually evict the pages from memory
- * but just move them to the inactive list.
- *
- * TODO:
- * - make the readahead code smarter
- * - move readahead to the VMA level so we can do the same
- *   trick with mmap()
- *
- * Rik van Riel, 2000
- */
-static void drop_behind(struct file * file, unsigned long index)
-{
-	struct inode *inode = file->f_dentry->d_inode;
-	struct address_space *mapping = inode->i_mapping;
-	struct page *page;
-	unsigned long start;
-
-	/* Nothing to drop-behind if we're on the first page. */
-	if (!index)
-		return;
-
-	if (index > file->f_rawin)
-		start = index - file->f_rawin;
-	else
-		start = 0;
-
-	/*
-	 * Go backwards from index-1 and drop all pages in the
-	 * readahead window. Since the readahead window may have
-	 * been increased since the last time we were called, we
-	 * stop when the page isn't there.
-	 */
-	spin_lock(&pagecache_lock);
-	while (--index >= start) {
-		page = __find_page_simple(mapping, index);
-		if (!page)
-			break;
-		deactivate_page(page);
-	}
-	spin_unlock(&pagecache_lock);
-}
-
-/*
  * Read-ahead profiling information
  * --------------------------------
  * Every PROFILE_MAXREADCOUNT, the following information is written 
@@ -1041,12 +968,6 @@ static void generic_file_readahead(int reada_ok,
 		if (filp->f_ramax > max_readahead)
 			filp->f_ramax = max_readahead;
 
-		/*
-		 * Move the pages that have already been passed
-		 * to the inactive list.
-		 */
-		drop_behind(filp, index);
-
 #ifdef PROFILE_READAHEAD
 		profile_readahead((reada_ok == 2), filp);
 #endif
@@ -1055,6 +976,14 @@ static void generic_file_readahead(int reada_ok,
 	return;
 }
 
+
+static inline void check_used_once (struct page *page)
+{
+	if (!page->age) {
+		page->age = PAGE_AGE_START;
+		ClearPageReferenced(page);
+	}
+}
 
 /*
  * This is a generic file read routine, and uses the
@@ -1171,7 +1100,8 @@ page_ok:
 		offset += ret;
 		index += offset >> PAGE_CACHE_SHIFT;
 		offset &= ~PAGE_CACHE_MASK;
-	
+
+		check_used_once (page);
 		page_cache_release(page);
 		if (ret == nr && desc->count)
 			continue;
@@ -2608,7 +2538,6 @@ generic_file_write(struct file *file,const char *buf,size_t count,loff_t *ppos)
 	while (count) {
 		unsigned long index, offset;
 		char *kaddr;
-		int deactivate = 1;
 
 		/*
 		 * Try to find the page in the cache. If it isn't there,
@@ -2617,10 +2546,8 @@ generic_file_write(struct file *file,const char *buf,size_t count,loff_t *ppos)
 		offset = (pos & (PAGE_CACHE_SIZE -1)); /* Within page */
 		index = pos >> PAGE_CACHE_SHIFT;
 		bytes = PAGE_CACHE_SIZE - offset;
-		if (bytes > count) {
+		if (bytes > count)
 			bytes = count;
-			deactivate = 0;
-		}
 
 		/*
 		 * Bring in the user page that we will copy from _first_.
@@ -2664,8 +2591,7 @@ generic_file_write(struct file *file,const char *buf,size_t count,loff_t *ppos)
 unlock:
 		/* Mark it unlocked again and drop the page.. */
 		UnlockPage(page);
-		if (deactivate)
-			deactivate_page(page);
+		check_used_once(page);
 		page_cache_release(page);
 
 		if (status < 0)

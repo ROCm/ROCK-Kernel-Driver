@@ -1,5 +1,5 @@
 /*
- * $Id: ctctty.h,v 1.2 2001/01/30 22:09:28 uweigand Exp $
+ * $Id: ctctty.h,v 1.4 2001/03/22 12:46:01 felfert Exp $
  *
  * CTC / ESCON network driver, tty interface.
  *
@@ -34,10 +34,11 @@ typedef struct device      net_device;
 typedef struct net_device  net_device;
 #endif
 
-extern int  ctc_tty_register_netdev(net_device *dev);
-extern void ctc_tty_unregister_netdev(net_device *dev);
-extern void ctc_tty_netif_rx(struct sk_buff *skb);
+extern int  ctc_tty_register_netdev(net_device *);
+extern void ctc_tty_unregister_netdev(net_device *);
+extern void ctc_tty_netif_rx(struct sk_buff *);
 extern int  ctc_tty_init(void);
-extern void ctc_tty_cleanup(void);
+extern void ctc_tty_cleanup(int);
+extern void ctc_tty_setcarrier(net_device *, int);
 
 #endif

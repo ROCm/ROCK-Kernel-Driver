@@ -16,9 +16,9 @@ int fs3270_major = -1;			/* init to impossible -1 */
 static int fs3270_open(struct inode *, struct file *);
 static int fs3270_close(struct inode *, struct file *);
 static int fs3270_ioctl(struct inode *, struct file *, unsigned int, unsigned long);
-static int fs3270_read(struct file *, char *, size_t, loff_t *);
-static int fs3270_write(struct file *, const char *, size_t, loff_t *);
-static int fs3270_wait(tub_t *, int *);
+static ssize_t fs3270_read(struct file *, char *, size_t, loff_t *);
+static ssize_t fs3270_write(struct file *, const char *, size_t, loff_t *);
+static int fs3270_wait(tub_t *, long *);
 static void fs3270_int(tub_t *tubp, devstat_t *dsp);
 extern void tty3270_refresh(tub_t *);
 
@@ -33,6 +33,42 @@ static struct file_operations fs3270_fops = {
 	release:fs3270_close,	/* release */
 };
 
+#ifdef CONFIG_DEVFS_FS
+devfs_handle_t fs3270_devfs_dir;
+devfs_handle_t fs3270_devfs_tub;
+extern struct file_operations tty_fops;
+
+void fs3270_devfs_register(tub_t *tubp)
+{
+	char name[16];
+
+	sprintf(name, "tub%x", tubp->devno);
+	devfs_register(fs3270_devfs_dir, name, DEVFS_FL_DEFAULT,
+		       IBM_FS3270_MAJOR, tubp->minor,
+		       S_IFCHR | S_IRUSR | S_IWUSR, &fs3270_fops, NULL);
+	sprintf(name, "tty%x", tubp->devno);
+	tty_register_devfs_name(&tty3270_driver, 0, tubp->minor,
+				fs3270_devfs_dir, name);
+}
+
+void fs3270_devfs_unregister(tub_t *tubp)
+{
+	char name[16];
+	devfs_handle_t handle;
+
+	sprintf(name, "tub%x", tubp->devno);
+	handle = devfs_find_handle (fs3270_devfs_dir, name,
+				    IBM_FS3270_MAJOR, tubp->minor,
+				    DEVFS_SPECIAL_CHR, 0);
+	devfs_unregister (handle);
+	sprintf(name, "tty%x", tubp->devno);
+	handle = devfs_find_handle (fs3270_devfs_dir, name,
+				    IBM_TTY3270_MAJOR, tubp->minor,
+				    DEVFS_SPECIAL_CHR, 0);
+	devfs_unregister(handle);
+}
+#endif
+
 /*
  * fs3270_init() -- Initialize fullscreen tubes
  */
@@ -41,15 +77,29 @@ fs3270_init(void)
 {
 	int rc;
 
+#ifdef CONFIG_DEVFS_FS
+	rc = devfs_register_chrdev (IBM_FS3270_MAJOR, "fs3270", &fs3270_fops);
+	if (rc) {
+		printk(KERN_ERR "tubmod can't get major nbr %d: error %d\n",
+			IBM_FS3270_MAJOR, rc);
+		return -1;
+	}
+	fs3270_devfs_dir = devfs_mk_dir(NULL, "3270", NULL);
+	fs3270_devfs_tub = 
+		devfs_register(fs3270_devfs_dir, "tub", DEVFS_FL_DEFAULT,
+			       IBM_FS3270_MAJOR, 0,
+			       S_IFCHR | S_IRUSR | S_IWUSR, 
+			       &fs3270_fops, NULL);
+#else
 	rc = register_chrdev(IBM_FS3270_MAJOR, "fs3270", &fs3270_fops);
 	if (rc) {
 		printk(KERN_ERR "tubmod can't get major nbr %d: error %d\n",
 			IBM_FS3270_MAJOR, rc);
 		return -1;
-	} else {
-		fs3270_major = IBM_FS3270_MAJOR;
-		return 0;
 	}
+#endif
+	fs3270_major = IBM_FS3270_MAJOR;
+	return 0;
 }
 
 /*
@@ -59,6 +109,10 @@ void
 fs3270_fini(void)
 {
 	if (fs3270_major != -1) {
+#ifdef CONFIG_DEVFS_FS
+		devfs_unregister(fs3270_devfs_tub);
+		devfs_unregister(fs3270_devfs_dir);
+#endif
 		unregister_chrdev(fs3270_major, "fs3270");
 		fs3270_major = -1;
 	}
@@ -71,7 +125,7 @@ static int
 fs3270_open(struct inode *ip, struct file *fp)
 {
 	tub_t *tubp;
-	int flags;
+	long flags;
 
 	/* See INODE2TUB(ip) for handling of "/dev/3270/tub" */
 	if ((tubp = INODE2TUB(ip)) == NULL)
@@ -101,7 +155,7 @@ static int
 fs3270_close(struct inode *ip, struct file *fp)
 {
 	tub_t *tubp;
-	int flags;
+	long flags;
 
 	if ((tubp = INODE2TUB(ip)) == NULL)
 		return -ENODEV;
@@ -123,7 +177,7 @@ fs3270_close(struct inode *ip, struct file *fp)
 void
 fs3270_release(tub_t *tubp)
 {
-	int flags;
+	long flags;
 
 	if (tubp->mode != TBM_FS)
 		return;
@@ -145,7 +199,7 @@ fs3270_release(tub_t *tubp)
  *      * Value is 0 or -ERESTARTSYS
  */
 static int
-fs3270_wait(tub_t *tubp, int *flags)
+fs3270_wait(tub_t *tubp, long *flags)
 {
 	DECLARE_WAITQUEUE(wait, current);
 
@@ -185,7 +239,7 @@ fs3270_io(tub_t *tubp, ccw1_t *ccwp)
 static void
 fs3270_bh(void *data)
 {
-	int flags;
+	long flags;
 	tub_t *tubp;
 
 	tubp = data;
@@ -283,7 +337,8 @@ fs3270_ioctl(struct inode *ip, struct file *fp,
 	unsigned int cmd, unsigned long arg)
 {
 	tub_t *tubp;
-	int rc = 0, flags;
+	int rc = 0;
+	long flags;
 
 	if ((tubp = INODE2TUB(ip)) == NULL)
 		return -ENODEV;
@@ -310,13 +365,14 @@ fs3270_ioctl(struct inode *ip, struct file *fp,
 /*
  * process read commands for the tube driver
  */
-static int
+static ssize_t
 fs3270_read(struct file *fp, char *dp, size_t len, loff_t *off)
 {
 	tub_t *tubp;
 	char *kp;
 	ccw1_t *cp;
-	int rc, flags;
+	int rc;
+	long flags;
 
 	if ((tubp = INODE2TUB((struct inode *)fp->private_data)) == NULL)
 		return -ENODEV;
@@ -325,7 +381,7 @@ fs3270_read(struct file *fp, char *dp, size_t len, loff_t *off)
 		return rc;
 	}
 
-	kp = kmalloc(len, GFP_KERNEL);
+	kp = kmalloc(len, GFP_KERNEL|GFP_DMA);
 	if (kp == NULL) {
 		TUBUNLOCK(tubp->irq, flags);
 		return -ENOMEM;
@@ -352,10 +408,10 @@ fs3270_read(struct file *fp, char *dp, size_t len, loff_t *off)
 	if (tubdebug & 1)
 		printk(KERN_DEBUG "minor %d: %.8x %.8x %.8x %.8x\n",
 			tubp->minor,
-			*(int*)((int)kp + 0),
-			*(int*)((int)kp + 4),
-			*(int*)((int)kp + 8),
-			*(int*)((int)kp + 12));
+			*(int*)((long)kp + 0),
+			*(int*)((long)kp + 4),
+			*(int*)((long)kp + 8),
+			*(int*)((long)kp + 12));
 	copy_to_user(dp, kp, len);
 	kfree(kp);
 	return len;
@@ -364,12 +420,13 @@ fs3270_read(struct file *fp, char *dp, size_t len, loff_t *off)
 /*
  * process write commands for the tube driver
  */
-static int
+static ssize_t
 fs3270_write(struct file *fp, const char *dp, size_t len, loff_t *off)
 {
 	tub_t *tubp;
 	ccw1_t *cp;
-	int rc, flags;
+	int rc;
+	long flags;
 	void *kb;
 
 	/* Locate the tube */
@@ -377,7 +434,7 @@ fs3270_write(struct file *fp, const char *dp, size_t len, loff_t *off)
 		return -ENODEV;
 
 	/* Copy data to write from user address space */
-	if ((kb = kmalloc(len, GFP_KERNEL)) == NULL)
+	if ((kb = kmalloc(len, GFP_KERNEL|GFP_DMA)) == NULL)
 		return -ENOMEM;
 	if (copy_from_user(kb, dp, len) != 0) {
 		kfree(kb);

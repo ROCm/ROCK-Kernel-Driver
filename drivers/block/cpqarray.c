@@ -18,9 +18,6 @@
  *
  *    Questions/Comments/Bugfixes to arrays@compaq.com
  *
- *    If you want to make changes, improve or add functionality to this
- *    driver, you'll probably need the Compaq Array Controller Interface
- *    Specificiation (Document number ECG086/1198)
  */
 #include <linux/config.h>	/* CONFIG_PROC_FS */
 #include <linux/module.h>
@@ -44,8 +41,8 @@
 
 #define SMART2_DRIVER_VERSION(maj,min,submin) ((maj<<16)|(min<<8)|(submin))
 
-#define DRIVER_NAME "Compaq SMART2 Driver (v 2.4.4)"
-#define DRIVER_VERSION SMART2_DRIVER_VERSION(2,4,4)
+#define DRIVER_NAME "Compaq SMART2 Driver (v 2.4.5)"
+#define DRIVER_VERSION SMART2_DRIVER_VERSION(2,4,5)
 
 /* Embedded module documentation macros - see modules.h */
 /* Original author Chris Frantz - Compaq Computer Corporation */
@@ -206,7 +203,7 @@ static struct block_device_operations ida_fops  = {
 static void __init ida_procinit(int i)
 {
 	if (proc_array == NULL) {
-		proc_array = proc_mkdir("array", proc_root_driver);
+		proc_array = proc_mkdir("cpqarray", proc_root_driver);
 		if (!proc_array) return;
 	}
 
@@ -315,11 +312,18 @@ void cleanup_module(void)
 {
 	int i;
 	struct gendisk *g;
-
-	remove_proc_entry("array", proc_root_driver);
+	char buff[4]; 
 
 	for(i=0; i<nr_ctlr; i++) {
-		hba[i]->access.set_intr_mask(hba[i], 0);
+
+		/* sendcmd will turn off interrupt, and send the flush... 
+		 * To write all data in the battery backed cache to disks    
+		 * no data returned, but don't want to send NULL to sendcmd */	
+		if( sendcmd(FLUSH_CACHE, i, buff, 4, 0, 0, 0))
+		{
+			printk(KERN_WARNING "Unable to flush cache on "
+				"controller %d\n", i);	
+		}
 		free_irq(hba[i]->intr, hba[i]);
 		iounmap(hba[i]->vaddr);
 		unregister_blkdev(MAJOR_NR+i, hba[i]->devname);
@@ -342,7 +346,7 @@ void cleanup_module(void)
 			}
 		}
 	}
-
+	remove_proc_entry("cpqarray", proc_root_driver);
 	kfree(ida);
 	kfree(ida_sizes);
 	kfree(ida_hardsizes);
@@ -1079,7 +1083,7 @@ static inline void complete_command(cmdlist_t *cmd, int timeout)
 
 	if (cmd->req.hdr.rcode & RCODE_NONFATAL &&
 	   (hba[cmd->ctlr]->misc_tflags & MISC_NONFATAL_WARN) == 0) {
-		printk(KERN_WARNING "Non Fatal error on ida/c%dd%d\n",
+		printk(KERN_NOTICE "Non Fatal error on ida/c%dd%d\n",
 				cmd->ctlr, cmd->hdr.unit);
 		hba[cmd->ctlr]->misc_tflags |= MISC_NONFATAL_WARN;
 	}
@@ -1148,6 +1152,15 @@ static void do_ida_intr(int irq, void *dev_id, struct pt_regs *regs)
 			 */
 			if (c->busaddr == a) {
 				removeQ(&h->cmpQ, c);
+				/*  Check for invalid command.
+                                 *  Controller returns command error,
+                                 *  But rcode = 0.
+                                 */
+
+				if((a1 & 0x03) && (c->req.hdr.rcode == 0))
+                                {
+                                	c->req.hdr.rcode = RCODE_INVREQ;
+                                }
 				if (c->type == CMD_RWREQ) {
 					complete_command(c, 0);
 					cmd_free(h, c, 1);
@@ -1315,6 +1328,8 @@ static int ida_ctlr_ioctl(int ctlr, int dsk, ida_ioctl_t *io)
 		c->req.hdr.sg_cnt = 1;
 		break;
 	case IDA_READ:
+	case READ_FLASH_ROM:
+	case SENSE_CONTROLLER_PERFORMANCE:
 		p = kmalloc(io->sg[0].size, GFP_KERNEL);
 		if (!p) 
 		{ 
@@ -1331,6 +1346,8 @@ static int ida_ctlr_ioctl(int ctlr, int dsk, ida_ioctl_t *io)
 	case IDA_WRITE:
 	case IDA_WRITE_MEDIA:
 	case DIAG_PASS_THRU:
+	case COLLECT_BUFFER:
+	case WRITE_FLASH_ROM:
 		p = kmalloc(io->sg[0].size, GFP_KERNEL);
 		if (!p) 
  		{ 
@@ -1373,10 +1390,14 @@ static int ida_ctlr_ioctl(int ctlr, int dsk, ida_ioctl_t *io)
                                 PCI_DMA_BIDIRECTIONAL);
 	case IDA_READ:
 	case DIAG_PASS_THRU:
+	case SENSE_CONTROLLER_PERFORMANCE:
+	case READ_FLASH_ROM:
 		copy_to_user((void*)io->sg[0].addr, p, io->sg[0].size);
 		/* fall through and free p */
 	case IDA_WRITE:
 	case IDA_WRITE_MEDIA:
+	case COLLECT_BUFFER:
+	case WRITE_FLASH_ROM:
 		kfree(p);
 		break;
 	default:;

@@ -58,7 +58,7 @@ extern int __verify_write(const void *, unsigned long);
 
 #endif
 
-extern inline int verify_area(int type, const void * addr, unsigned long size)
+static inline int verify_area(int type, const void * addr, unsigned long size)
 {
 	return access_ok(type,addr,size) ? 0 : -EFAULT;
 }

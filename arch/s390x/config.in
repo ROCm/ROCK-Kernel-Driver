@@ -53,6 +53,8 @@ define_bool CONFIG_KCORE_ELF y
 tristate 'Kernel support for ELF binaries' CONFIG_BINFMT_ELF
 tristate 'Kernel support for MISC binaries' CONFIG_BINFMT_MISC
 bool 'Show crashed user process info' CONFIG_PROCESS_DEBUG
+bool 'Pseudo page fault support' CONFIG_PFAULT
+bool 'VM shared kernel support' CONFIG_SHARED_KERNEL
 endmenu
 
 

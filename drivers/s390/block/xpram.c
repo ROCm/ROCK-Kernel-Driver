@@ -74,7 +74,7 @@ char kernel_version [] = UTS_RELEASE;
 #endif /* V24 */
 #include <linux/sched.h>
 #include <linux/kernel.h> /* printk() */
-#include <linux/malloc.h> /* kmalloc() */
+#include <linux/slab.h> /* kmalloc() */
 #if (XPRAM_VERSION == 24)
 #  include <linux/devfs_fs_kernel.h>
 #endif /* V24 */
@@ -92,6 +92,7 @@ char kernel_version [] = UTS_RELEASE;
 #if (XPRAM_VERSION == 24)
 #define MAJOR_NR xpram_major /* force definitions on in blk.h */
 int xpram_major;   /* must be declared before including blk.h */
+devfs_handle_t xpram_devfs_handle;
 
 #define DEVICE_NR(device) MINOR(device)   /* xpram has no partition bits */
 #define DEVICE_NAME "xpram"               /* name for messaging */
@@ -999,12 +1000,18 @@ int xpram_init(void)
 #elif (XPRAM_VERSION == 24)
 	result = devfs_register_blkdev(xpram_major, "xpram", &xpram_devops);
 #endif /* V22/V24 */
-	
 	if (result < 0) {
 		PRINT_ERR("Can't get major %d\n",xpram_major);
                 PRINT_ERR("Giving up xpram\n");
 		return result;
 	}
+#if (XPRAM_VERSION == 24)
+	xpram_devfs_handle = devfs_mk_dir (NULL, "slram", NULL);
+	devfs_register_series (xpram_devfs_handle, "%u", XPRAM_MAX_DEVS,
+			       DEVFS_FL_DEFAULT, XPRAM_MAJOR, 0,
+			       S_IFBLK | S_IRUSR | S_IWUSR,
+			       &xpram_devops, NULL);
+#endif /* V22/V24 */
 	if (xpram_major == 0) xpram_major = result; /* dynamic */
 	major = xpram_major; /* Use `major' later on to save typing */
 
@@ -1226,6 +1233,12 @@ void cleanup_module(void)
 	kfree(xpram_offsets);
 
 				/* finally, the usual cleanup */
+#if (XPRAM_VERSION == 22)
 	unregister_blkdev(major, "xpram");
+#elif (XPRAM_VERSION == 24)
+	devfs_unregister(xpram_devfs_handle);
+	if (devfs_unregister_blkdev(MAJOR_NR, "xpram"))
+		printk(KERN_WARNING "xpram: cannot unregister blkdev\n");
+#endif /* V22/V24 */
 	kfree(xpram_devices);
 }

@@ -35,13 +35,13 @@ extern int  dquot_transfer(struct dentry *dentry, struct iattr *iattr);
 /*
  * Operations supported for diskquotas.
  */
-extern __inline__ void DQUOT_INIT(struct inode *inode)
+static __inline__ void DQUOT_INIT(struct inode *inode)
 {
 	if (inode->i_sb && inode->i_sb->dq_op)
 		inode->i_sb->dq_op->initialize(inode, -1);
 }
 
-extern __inline__ void DQUOT_DROP(struct inode *inode)
+static __inline__ void DQUOT_DROP(struct inode *inode)
 {
 	if (IS_QUOTAINIT(inode)) {
 		if (inode->i_sb && inode->i_sb->dq_op)
@@ -49,7 +49,7 @@ extern __inline__ void DQUOT_DROP(struct inode *inode)
 	}
 }
 
-extern __inline__ int DQUOT_PREALLOC_BLOCK(struct super_block *sb, const struct inode *inode, int nr)
+static __inline__ int DQUOT_PREALLOC_BLOCK(struct super_block *sb, const struct inode *inode, int nr)
 {
 	if (sb->dq_op) {
 		if (sb->dq_op->alloc_block(inode, fs_to_dq_blocks(nr, sb->s_blocksize), 1) == NO_QUOTA)
@@ -58,7 +58,7 @@ extern __inline__ int DQUOT_PREALLOC_BLOCK(struct super_block *sb, const struct 
 	return 0;
 }
 
-extern __inline__ int DQUOT_ALLOC_BLOCK(struct super_block *sb, const struct inode *inode, int nr)
+static __inline__ int DQUOT_ALLOC_BLOCK(struct super_block *sb, const struct inode *inode, int nr)
 {
 	if (sb->dq_op) {
 		if (sb->dq_op->alloc_block(inode, fs_to_dq_blocks(nr, sb->s_blocksize), 0) == NO_QUOTA)
@@ -67,7 +67,7 @@ extern __inline__ int DQUOT_ALLOC_BLOCK(struct super_block *sb, const struct ino
 	return 0;
 }
 
-extern __inline__ int DQUOT_ALLOC_INODE(struct super_block *sb, struct inode *inode)
+static __inline__ int DQUOT_ALLOC_INODE(struct super_block *sb, struct inode *inode)
 {
 	if (sb->dq_op) {
 		sb->dq_op->initialize (inode, -1);
@@ -78,19 +78,19 @@ extern __inline__ int DQUOT_ALLOC_INODE(struct super_block *sb, struct inode *in
 	return 0;
 }
 
-extern __inline__ void DQUOT_FREE_BLOCK(struct super_block *sb, const struct inode *inode, int nr)
+static __inline__ void DQUOT_FREE_BLOCK(struct super_block *sb, const struct inode *inode, int nr)
 {
 	if (sb->dq_op)
 		sb->dq_op->free_block(inode, fs_to_dq_blocks(nr, sb->s_blocksize));
 }
 
-extern __inline__ void DQUOT_FREE_INODE(struct super_block *sb, struct inode *inode)
+static __inline__ void DQUOT_FREE_INODE(struct super_block *sb, struct inode *inode)
 {
 	if (sb->dq_op)
 		sb->dq_op->free_inode(inode, 1);
 }
 
-extern __inline__ int DQUOT_TRANSFER(struct dentry *dentry, struct iattr *iattr)
+static __inline__ int DQUOT_TRANSFER(struct dentry *dentry, struct iattr *iattr)
 {
 	int error = -EDQUOT;
 

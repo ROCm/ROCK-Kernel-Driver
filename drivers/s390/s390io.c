@@ -15,6 +15,11 @@
  *                                       decrease retry2 on busy while 
  *                                        disabling sync_isc; reset isc_cnt
  *                                        on io error during sync_isc enablement
+ *               05/09/2001 Cornelia Huck added exploitation of debug feature
+ *               05/16/2001 Cornelia Huck added /proc/deviceinfo/<devno>/
+ *               05/22/2001 Cornelia Huck added /proc/cio_ignore
+ *                                        un-ignore blacklisted devices by piping 
+ *                                        to /proc/cio_ignore
  */
 
 #include <linux/module.h>
@@ -24,7 +29,7 @@
 #include <linux/signal.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/smp.h>
 #include <linux/threads.h>
@@ -49,6 +54,7 @@
 #include <asm/s390io.h>
 #include <asm/s390dyn.h>
 #include <asm/s390mach.h>
+#include <asm/debug.h>
 
 #ifndef TRUE
 #define TRUE  1
@@ -79,10 +85,17 @@ static irb_t     *p_init_irb        = NULL;
 static __u64      irq_IPL_TOD;
 static adapter_int_handler_t adapter_handler   = NULL;
 
+/* for use of debug feature */
+debug_info_t *cio_debug_msg_id = NULL;  
+debug_info_t *cio_debug_trace_id = NULL;
+debug_info_t *cio_debug_crw_id = NULL;
+int cio_debug_initialized = 0;
+
 static void init_IRQ_handler( int irq, void *dev_id, struct pt_regs *regs);
 static void s390_process_subchannels( void);
 static void s390_device_recognition_all( void);
 static void s390_device_recognition_irq( int irq);
+static void s390_redo_validation(void);
 static int  s390_validate_subchannel( int irq, int enable);
 static int  s390_SenseID( int irq, senseid_t *sid, __u8 lpm);
 static int  s390_SetPGID( int irq, __u8 lpm, pgid_t *pgid);
@@ -91,7 +104,7 @@ static int  s390_process_IRQ( unsigned int irq );
 static int  enable_subchannel( unsigned int irq);
 static int  disable_subchannel( unsigned int irq);
 
-void chan_proc_init( void );
+static int chan_proc_init( void );
 
 static inline void do_adapter_IO( __u32 intparm );
 
@@ -105,6 +118,16 @@ extern int  disable_none(unsigned int irq);
 
 asmlinkage void do_IRQ( struct pt_regs regs );
 
+#define MAX_CIO_PROCFS_ENTRIES 0x300
+/* magic number; we want to have some room to spare */
+
+int cio_procfs_device_create(int devno);
+int cio_procfs_device_remove(int devno);
+int cio_procfs_device_purge(void);
+
+int cio_notoper_msg = 1;
+int cio_proc_devinfo = 0; /* switch off the /proc/deviceinfo/ stuff by default
+			     until problems are dealt with */
 
 /* 
  * "Blacklisting" of certain devices:
@@ -123,6 +146,7 @@ typedef struct dev_blacklist_range_t {
 
 static dev_blacklist_range_t *dev_blacklist_range_head = NULL; /* Anchor for list of ranges */
 static spinlock_t blacklist_lock = SPIN_LOCK_UNLOCKED;
+static int nr_blacklisted_ranges = 0;
 
 /* Handling of the blacklist ranges */
 
@@ -133,7 +157,16 @@ static spinlock_t blacklist_lock = SPIN_LOCK_UNLOCKED;
 static inline dev_blacklist_range_t *blacklist_range_create( int from, int to)
 {
      dev_blacklist_range_t *range = NULL;
-     range = ( dev_blacklist_range_t *) alloc_bootmem( sizeof( dev_blacklist_range_t ) );
+
+     if (to && (from>to)) {
+	     printk("Invalid blacklist range %x to %x, skipping\n", from, to);
+	     return NULL;
+     }
+     if (init_IRQ_complete) {
+	     range = ( dev_blacklist_range_t *) kmalloc( sizeof( dev_blacklist_range_t ), GFP_KERNEL);
+     } else {
+	     range = ( dev_blacklist_range_t *) alloc_bootmem( sizeof( dev_blacklist_range_t ) );
+     }
      if (range == NULL)
 	  return NULL;
      memset( range, 0, sizeof( dev_blacklist_range_t ));
@@ -143,6 +176,7 @@ static inline dev_blacklist_range_t *blacklist_range_create( int from, int to)
      } else {
 	  range->to = to;
      }
+     nr_blacklisted_ranges++;
      return range;
 }
 
@@ -153,7 +187,12 @@ static inline dev_blacklist_range_t *blacklist_range_create( int from, int to)
 
 static inline void blacklist_range_destroy( dev_blacklist_range_t *range )
 {
-     kfree( range );
+	nr_blacklisted_ranges--;
+	/*
+	 * FIXME: the memory was allocated as bootmem, 
+	 * how to get it free again ?! 
+	 */
+	/* kfree( range ); */
 }
 
 /*
@@ -207,7 +246,7 @@ static inline void blacklist_range_dechain( dev_blacklist_range_t *range )
 /* 
  * Function: blacklist_range_add
  * Creates a range from the specified arguments and appends it to the list of
- * blacklisted devices 
+ * blacklisted devices
  */
 
 static inline dev_blacklist_range_t *blacklist_range_add( int from, int to )
@@ -342,6 +381,9 @@ void __init blacklist_init( void )
 #ifdef CONFIG_DEBUG_IO     
      printk( "Reading blacklist...\n");
 #endif
+     if (cio_debug_initialized)
+	     debug_sprintf_event(cio_debug_msg_id, 6,
+				 "Reading blacklist\n");
      blacklist_split_parm_string( blacklist_parm_string );
      blacklist_parse( blacklist );
 }
@@ -366,6 +408,9 @@ int __init blacklist_call_setup (char *str)
 #ifdef CONFIG_DEBUG_IO
 	printk( "Reading blacklist parameters...\n" );
 #endif
+	if (cio_debug_initialized)
+		debug_sprintf_event(cio_debug_msg_id, 6,
+				    "Reading blacklist parameters\n");
         blacklist_setup(str,&dummy);
 	
 	blacklist_init(); /* Blacklist ranges must be ready when device recognition starts */
@@ -401,10 +446,107 @@ static inline int is_blacklisted( int devno )
      return 0;
 }
 
+/*
+ * Function: blacklist_free_all_ranges
+ * set all blacklisted devices free...
+ */
+
+void blacklist_free_all_ranges(void) 
+{
+	dev_blacklist_range_t *tmp = dev_blacklist_range_head;
+
+	while (tmp) {
+		blacklist_range_dechain(tmp);
+		blacklist_range_destroy(tmp);
+		tmp = dev_blacklist_range_head;
+	}
+}
+
+/*
+ * Function: blacklist_parse_proc_parameters
+ * parse the stuff which is piped to /proc/cio_ignore
+ */
+void blacklist_parse_proc_parameters(char *buf)
+{
+	char *tmp;
+	int i;
+	char *end;
+	int len = -1;
+	char *param;
+	int from = 0;
+	int to = 0;
+	int changed = 0;
+	dev_blacklist_range_t *range, *temp;
+
+	tmp = buf;
+	if (strstr(tmp, "free ")) {
+		for (i=0; i<5; i++) {
+			tmp++;
+		}
+		if (strstr(tmp, "all")) {
+			blacklist_free_all_ranges();
+			s390_redo_validation();
+		} else {
+			while (tmp != NULL) {
+				end = strchr(tmp, ',');
+				if (end == NULL) {
+					len = strlen(tmp) + 1;
+				} else {
+					len = (long)end - (long) tmp + 1;
+					*end = '\0';
+					end++;
+				}
+				param =  (char*) kmalloc(len * sizeof(char) + 1, GFP_KERNEL);
+				strncpy(param, (const char *) tmp, len);
+				tmp = end;
+				from = blacklist_strtoul(param, &param);
+				if (*param == '-') {
+					param++;
+					to = blacklist_strtoul(param, &param);
+				} else {
+					to = from;
+				}
+				range = dev_blacklist_range_head;
+				while (range != NULL) {
+					temp = range->next;
+					if ((from <= range->from) && (to >= range->to)) {
+						blacklist_range_dechain(range);
+						blacklist_range_destroy(range);
+						changed = 1;
+					} else if ((from <= range->from) && (to>=range->from) && (to < range->to)) {
+						blacklist_range_add(to+1, range->to);
+						blacklist_range_dechain(range);
+						blacklist_range_destroy(range);
+						changed = 1;
+					} else if ((from > range->from) && (from<=range->to) && (to >= range->to)) {
+						blacklist_range_add(range->from, from-1);
+						blacklist_range_dechain(range);
+						blacklist_range_destroy(range);
+						changed = 1;
+					} else if ((from > range->from) && (to < range->to)) {
+						blacklist_range_add(range->from, from-1);
+						blacklist_range_add(to+1, range->to);
+						blacklist_range_dechain(range);
+						blacklist_range_destroy(range);
+						changed = 1;
+					}
+					range = temp;
+				}
+				kfree(param);
+			}
+			if (changed)
+				s390_redo_validation();
+		}
+	} else {
+		printk("cio_ignore: Parse error; try using 'free all|<devno-range>,<devno-range>,...'\n");
+	}
+}
+
 /* End of blacklist handling */
 
 
 void s390_displayhex(char *str,void *ptr,s32 cnt);
+void s390_displayhex2(char *str, void *ptr, s32 cnt, int level);
 
 void s390_displayhex(char *str,void *ptr,s32 cnt)
 {
@@ -422,6 +564,23 @@ void s390_displayhex(char *str,void *ptr,s32 cnt)
 		for(cnt2=0;cnt2<maxcnt2;cnt2+=4)
 			printk("%08X ",*currptr++);
 		printk("\n");
+	}
+}
+
+void s390_displayhex2(char *str, void *ptr, s32 cnt, int level)
+{
+	s32 cnt1, cnt2, maxcnt2;
+	u32 *currptr = (__u32 *)ptr;
+
+	debug_sprintf_event(cio_debug_msg_id, level, "%s\n", str);
+
+	for (cnt1 = 0; cnt1<cnt; cnt1+=16) {
+		debug_sprintf_event(cio_debug_msg_id, level, "%08lX ", (unsigned long)currptr);
+		maxcnt2 = cnt - cnt1;
+		if (maxcnt2 > 16)
+			maxcnt2 = 16;
+		for (cnt2 = 0; cnt2 < maxcnt2; cnt2 += 4)
+			debug_sprintf_event(cio_debug_msg_id, level, "%08X ", *currptr++);
 	}
 }
 
@@ -446,6 +605,35 @@ static int __init cio_setup( char *parm )
 
 __setup("cio_msg=", cio_setup);
 
+static int __init cio_notoper_setup(char *parm)
+{
+	if (!strcmp(parm, "yes")) {
+		cio_notoper_msg = 1;
+	} else if (!strcmp(parm, "no")) {
+		cio_notoper_msg = 0;
+	} else {
+		printk("cio_notoper_setup: invalid cio_notoper_msg parameter '%s'", parm);
+	}
+
+	return 1;
+}
+	
+__setup("cio_notoper_msg=", cio_notoper_setup);
+
+static int __init cio_proc_devinfo_setup(char *parm)
+{
+	if (!strcmp(parm, "yes")) {
+		cio_proc_devinfo = 1;
+	} else if (!strcmp(parm, "no")) {
+		cio_proc_devinfo = 0;
+	} else {
+		printk("cio_proc_devinfo_setup: invalid parameter '%s'\n",parm);
+	}
+
+	return 1;
+}
+
+__setup("cio_proc_devinfo=", cio_proc_devinfo_setup);
 
 /*
  * register for adapter interrupts
@@ -461,6 +649,9 @@ __setup("cio_msg=", cio_setup);
 int  s390_register_adapter_interrupt( adapter_int_handler_t handler )
 {
 	int ret = 0;
+	
+	if (cio_debug_initialized)
+		debug_text_event(cio_debug_trace_id, 4, "rgaint");
 
 	spin_lock( &adapter_lock );
 
@@ -480,6 +671,9 @@ int  s390_register_adapter_interrupt( adapter_int_handler_t handler )
 int  s390_unregister_adapter_interrupt( adapter_int_handler_t handler )
 {
 	int ret = 0;
+	
+	if (cio_debug_initialized)
+		debug_text_event(cio_debug_trace_id, 4, "urgaint");
 
 	spin_lock( &adapter_lock ); 	
 
@@ -497,6 +691,9 @@ int  s390_unregister_adapter_interrupt( adapter_int_handler_t handler )
 
 static inline void do_adapter_IO( __u32 intparm )
 {
+	if (cio_debug_initialized)
+		debug_text_event(cio_debug_trace_id, 4, "doaio");
+	
 	spin_lock( &adapter_lock ); 	
 
 	if ( adapter_handler )
@@ -507,7 +704,6 @@ static inline void do_adapter_IO( __u32 intparm )
 	return;  	
 }
 
-
 int s390_request_irq_special( int                      irq,
                               io_handler_func_t        io_handler,
                               not_oper_handler_func_t  not_oper_handler,
@@ -517,6 +713,7 @@ int s390_request_irq_special( int                      irq,
 {
 	int		retval = 0;
 	unsigned long	flags;
+	char            dbf_txt[15];
 
 	if (irq >= __MAX_SUBCHANNELS)
 		return -EINVAL;
@@ -527,6 +724,12 @@ int s390_request_irq_special( int                      irq,
 	if ( ioinfo[irq] == INVALID_STORAGE_AREA )
 		return -ENODEV;
 
+
+	if (cio_debug_initialized) {
+		debug_text_event(cio_debug_trace_id, 4, "reqsp");
+		sprintf(dbf_txt, "%x", irq);
+		debug_text_event(cio_debug_trace_id, 4, dbf_txt);
+	}
 
 	/*
 	 * The following block of code has to be executed atomically
@@ -598,12 +801,19 @@ void s390_free_irq(unsigned int irq, void *dev_id)
 	int          ret;
 
 	unsigned int count = 0;
+	char dbf_txt[15];
 
 	if ( irq >= __MAX_SUBCHANNELS || ioinfo[irq] == INVALID_STORAGE_AREA )
 	{
 		return;
 
 	} /* endif */
+
+	if (cio_debug_initialized) {
+		debug_text_event(cio_debug_trace_id, 2, "free");
+		sprintf(dbf_txt, "%x", irq);
+		debug_text_event(cio_debug_trace_id, 2, dbf_txt);
+	}
 
 	s390irq_spin_lock_irqsave( irq, flags);
 
@@ -614,6 +824,8 @@ void s390_free_irq(unsigned int irq, void *dev_id)
 
 	} /* endif */
 #endif
+	if (cio_debug_initialized)
+		debug_sprintf_event(cio_debug_msg_id, 2, "Trying to free IRQ %d\n", irq);
 
 	/*
 	 * disable the device and reset all IRQ info if
@@ -687,6 +899,10 @@ void s390_free_irq(unsigned int irq, void *dev_id)
 							       "count exceeded\n",
 						   	    irq,
 						      	 ioinfo[irq]->devstat.devno);
+							if (cio_debug_initialized)
+								debug_sprintf_event(cio_debug_msg_id, 0,
+										    "free_irq(%04X) - device %04X busy, retry count exceeded\n",
+										    irq, ioinfo[irq]->devstat.devno);
 
                   } /* endif */
 						
@@ -710,7 +926,10 @@ void s390_free_irq(unsigned int irq, void *dev_id)
 			s390irq_spin_unlock_irqrestore( irq, flags);
 
 			printk( "free_irq(%04X) : error, "
-			        "dev_id does not match !", irq);
+			        "dev_id does not match !\n", irq);
+			if (cio_debug_initialized)
+				debug_sprintf_event(cio_debug_msg_id, 0, 
+						    "free_irq(%04X) : error, dev_id does not match !\n", irq);
 
 		} /* endif */
 
@@ -721,6 +940,9 @@ void s390_free_irq(unsigned int irq, void *dev_id)
 
 		printk( "free_irq(%04X) : error, "
 		        "no action block ... !\n", irq);
+		if (cio_debug_initialized)
+			debug_sprintf_event(cio_debug_msg_id, 0,
+					    "free_irq(%04X) : error, no action block ... !\n", irq);
 
 	} /* endif */
 
@@ -733,12 +955,19 @@ int disable_irq(unsigned int irq)
 {
 	unsigned long flags;
 	int           ret;
+	char dbf_txt[15];
 
 	if ( ioinfo[irq] == INVALID_STORAGE_AREA )
 		return( -ENODEV);
 
 	if ( !ioinfo[irq]->ui.flags.ready )
 		return -ENODEV;
+
+	if (cio_debug_initialized) {
+		debug_text_event(cio_debug_trace_id, 4, "disirq");
+		sprintf(dbf_txt, "%x", irq);
+		debug_text_event(cio_debug_trace_id, 4, dbf_txt);
+	}
 
 	s390irq_spin_lock_irqsave(irq, flags);
 	ret = disable_subchannel(irq);
@@ -753,12 +982,19 @@ int enable_irq(unsigned int irq)
 {
 	unsigned long flags;
 	int           ret;
+	char dbf_txt[15];
 
 	if ( ioinfo[irq] == INVALID_STORAGE_AREA )
 		return( -ENODEV);
 
 	if ( !ioinfo[irq]->ui.flags.ready )
 		return -ENODEV;
+
+	if (cio_debug_initialized) {
+		debug_text_event(cio_debug_trace_id, 4, "enirq");
+		sprintf(dbf_txt, "%x", irq);
+		debug_text_event(cio_debug_trace_id, 4, dbf_txt);
+	}
 
 	s390irq_spin_lock_irqsave(irq, flags);
 	ret = enable_subchannel(irq);
@@ -775,6 +1011,7 @@ static int enable_subchannel( unsigned int irq)
 	int   ret;
 	int   ccode;
 	int   retry = 5;
+	char dbf_txt[15];
 
 	if ( irq > highest_subchannel || irq < 0 )
 	{
@@ -784,6 +1021,12 @@ static int enable_subchannel( unsigned int irq)
 
 	if ( ioinfo[irq] == INVALID_STORAGE_AREA )
 		return( -ENODEV);
+
+	if (cio_debug_initialized) {
+		debug_text_event(cio_debug_trace_id, 2, "ensch");
+		sprintf(dbf_txt, "%x", irq);
+		debug_text_event(cio_debug_trace_id, 2, dbf_txt);
+	}
 
 	/*
 	 * If a previous disable request is pending we reset it. However, this
@@ -862,6 +1105,10 @@ static int enable_subchannel( unsigned int irq)
 					        "%04X received !\n",
 					        irq,
 					        ioinfo[irq]->devstat.devno);
+					if (cio_debug_initialized)
+						debug_sprintf_event(cio_debug_msg_id, 0,
+								    "enable_subchannel(%04X) : ccode 2 on msch() for device %04X received !\n",
+								    irq, ioinfo[irq]->devstat.devno);
 
 					ret = -ENODEV; // never reached
 				}
@@ -884,6 +1131,7 @@ static int disable_subchannel( unsigned int irq)
 	int  cc;          /* condition code */
 	int  ret;         /* function return value */
 	int  retry = 5;
+	char dbf_txt[15];
 
 	if ( irq > highest_subchannel )
 	{
@@ -903,6 +1151,12 @@ static int disable_subchannel( unsigned int irq)
 	}
 	else
 	{
+		if (cio_debug_initialized) {
+			debug_text_event(cio_debug_trace_id, 2, "dissch");
+			sprintf(dbf_txt, "%x", irq);
+			debug_text_event(cio_debug_trace_id, 2, dbf_txt);
+		}
+		
 		/*
 		 * If device isn't operational we have to perform delayed
 		 *  disabling when the next interrupt occurs - unless the
@@ -962,6 +1216,10 @@ static int disable_subchannel( unsigned int irq)
 							  "device %04X received !\n",
 					        irq,
 					        ioinfo[irq]->devstat.devno);
+					if (cio_debug_initialized)
+						debug_sprintf_event(cio_debug_msg_id, 0, 
+								    "disable_subchannel(%04X) - unexpected busy condition for device %04X received !\n",
+								    irq, ioinfo[irq]->devstat.devno);
 					ret = -EBUSY;
 					break;
 
@@ -997,14 +1255,6 @@ void s390_init_IRQ( void )
 {
 	unsigned long flags;     /* PSW flags */
 	long          cr6 __attribute__ ((aligned (8)));
-
-	// Hopefully bh_count's will get set when we copy the prefix lowcore
-	// structure to other CPI's ( DJB )
-	softirq_active(smp_processor_id()) = 0;
-	softirq_mask(smp_processor_id()) = 0;
-	local_bh_count(smp_processor_id()) = 0;
-	local_irq_count(smp_processor_id()) = 0;
-	syscall_count(smp_processor_id()) = 0;
 
 	asm volatile ("STCK %0" : "=m" (irq_IPL_TOD));
 
@@ -1065,6 +1315,8 @@ int s390_start_IO( int            irq,      /* IRQ */
 {
 	int            ccode;
 	int            ret = 0;
+	char buffer[80];
+	char dbf_txt[15];
 
 	/*
 	 * The flag usage is mutal exclusive ...
@@ -1075,6 +1327,12 @@ int s390_start_IO( int            irq,      /* IRQ */
 		return( -EINVAL );
 
 	} /* endif */
+
+	if (cio_debug_initialized) {
+		debug_text_event(cio_debug_trace_id, 4, "stIO");
+		sprintf(dbf_txt, "%x", irq);
+		debug_text_event(cio_debug_trace_id, 4, dbf_txt);
+	}
 
 	/*
 	 * setup ORB
@@ -1367,18 +1625,17 @@ io_wakeup:
 			{
 				ret                         = -ENODEV;
 				ioinfo[irq]->ui.flags.oper  = 0;
-         }
+			}
 			else
 			{
 				ret = -EIO;
 
-         } /* endif */
+			} /* endif */
 
 			ioinfo[irq]->devstat.flag  |= DEVSTAT_NOT_OPER;
 
 #ifdef CONFIG_DEBUG_IO
 			{
-			char buffer[80];
 
 			stsch(irq, &(ioinfo[irq]->schib) );
 
@@ -1416,6 +1673,41 @@ io_wakeup:
 			} /* endif */
 			}
 #endif
+			if (cio_debug_initialized) {
+				stsch(irq, &(ioinfo[irq]->schib) );
+				
+				sprintf( buffer, "s390_start_IO(%04X) - irb for "
+					 "device %04X, after status pending\n",
+					 irq,
+					 ioinfo[irq]->devstat.devno );
+				
+				s390_displayhex2( buffer,
+						 &(ioinfo[irq]->devstat.ii.irb) ,
+						 sizeof(irb_t), 2);
+				
+				sprintf( buffer, "s390_start_IO(%04X) - schib for "
+					 "device %04X, after status pending\n",
+					 irq,
+					 ioinfo[irq]->devstat.devno );
+				
+				s390_displayhex2( buffer,
+						 &(ioinfo[irq]->schib) ,
+						 sizeof(schib_t), 2);
+				
+				
+				if (ioinfo[irq]->devstat.flag & DEVSTAT_FLAG_SENSE_AVAIL) {
+					sprintf( buffer, "s390_start_IO(%04X) - sense "
+						 "data for "
+						 "device %04X, after status pending\n",
+						 irq,
+						 ioinfo[irq]->devstat.devno );
+					
+					s390_displayhex2( buffer,
+							  ioinfo[irq]->irq_desc.dev_id->ii.sense.data,
+							  ioinfo[irq]->irq_desc.dev_id->rescnt, 2);
+					
+				} /* endif */
+			}
 		}
 		else
 		{
@@ -1457,9 +1749,8 @@ io_wakeup:
 		        &(ioinfo[irq]->devstat),
 		        sizeof( devstat_t) );
 
+
 #ifdef CONFIG_DEBUG_IO
-		{
-			char buffer[80];
 
    			stsch(irq, &(ioinfo[irq]->schib) );
 
@@ -1471,8 +1762,20 @@ io_wakeup:
 			s390_displayhex( buffer,
 			                 &(ioinfo[irq]->schib),
 			                 sizeof(schib_t));
-      	}
 #endif
+		if (cio_debug_initialized) {
+			stsch(irq, &(ioinfo[irq]->schib) );
+
+			sprintf( buffer, "s390_start_IO(%04X) - schib for "
+			         "device %04X, after 'not oper' status\n",
+			         irq,
+			         ioinfo[irq]->devstat.devno );
+
+			s390_displayhex2( buffer,
+			                 &(ioinfo[irq]->schib),
+			                 sizeof(schib_t), 2);
+		}
+			
 		break;
 
 	} /* endswitch */
@@ -1499,6 +1802,7 @@ int do_IO( int            irq,          /* IRQ */
            unsigned long  flag)         /* flags : see above */
 {
 	int ret = 0;
+	char dbf_txt[15];
 
 	if ( irq > highest_subchannel || irq < 0 )
 	{
@@ -1517,6 +1821,12 @@ int do_IO( int            irq,          /* IRQ */
 		return( -ENODEV );
 
 	} /* endif */
+
+	if (cio_debug_initialized) {
+		debug_text_event(cio_debug_trace_id, 4, "doIO");
+		sprintf(dbf_txt, "%x", irq);
+		debug_text_event(cio_debug_trace_id, 4, dbf_txt);
+	}
 
 	/*
 	 * Note: We ignore the device operational status - if not operational,
@@ -1567,6 +1877,7 @@ int do_IO( int            irq,          /* IRQ */
 int resume_IO( int irq)
 {
 	int ret = 0;
+	char dbf_txt[15];
 
 	if ( irq > highest_subchannel || irq < 0 )
 	{
@@ -1577,6 +1888,12 @@ int resume_IO( int irq)
 	if ( ioinfo[irq] == INVALID_STORAGE_AREA )
 	{
 		return( -ENODEV);
+	}
+
+	if (cio_debug_initialized) {
+		debug_text_event(cio_debug_trace_id, 4, "resIO");
+		sprintf(dbf_txt, "%x", irq);
+		debug_text_event(cio_debug_trace_id, 4, dbf_txt);
 	}
 
 	/*
@@ -1635,16 +1952,17 @@ int halt_IO( int           irq,
 {
 	int            ret;
 	int            ccode;
+	char dbf_txt[15];
 
 	if ( irq > highest_subchannel || irq < 0 )
 	{
-		ret = -ENODEV;
+		return -ENODEV;
 	}
 
 	if ( ioinfo[irq] == INVALID_STORAGE_AREA )
 	{
 		return( -ENODEV);
-   }
+	}
 
 	/*
 	 * we only allow for halt_IO if the device has an I/O handler associated
@@ -1671,6 +1989,11 @@ int halt_IO( int           irq,
 	}
 	else
 	{
+		if (cio_debug_initialized) {
+			debug_text_event(cio_debug_trace_id, 2, "haltIO");
+			sprintf(dbf_txt, "%x", irq);
+			debug_text_event(cio_debug_trace_id, 2, dbf_txt);
+		}
 		/*
 		 * If sync processing was requested we lock the sync ISC,
 		 *  modify the device to present interrupts for this ISC only
@@ -1895,10 +2218,11 @@ int clear_IO( int           irq,
 {
 	int            ret;
 	int            ccode;
+	char dbf_txt[15];
 
 	if ( irq > highest_subchannel || irq < 0 )
 	{
-		ret = -ENODEV;
+		return -ENODEV;
 	}
 
 	if ( ioinfo[irq] == INVALID_STORAGE_AREA )
@@ -1932,6 +2256,11 @@ int clear_IO( int           irq,
 	}
 	else
 	{
+		if (cio_debug_initialized) {
+			debug_text_event(cio_debug_trace_id, 2, "clearIO");
+			sprintf(dbf_txt, "%x", irq);
+			debug_text_event(cio_debug_trace_id, 2, dbf_txt);
+		}
 		/*
 		 * If sync processing was requested we lock the sync ISC,
 		 *  modify the device to present interrupts for this ISC only
@@ -2066,7 +2395,7 @@ cio_wakeup:
 			break;
 
 		case 1 :            /* status pending */
-	
+
 			ioinfo[irq]->devstat.flag |= DEVSTAT_STATUS_PENDING;
 
 			/*
@@ -2117,7 +2446,7 @@ cio_wakeup:
 				ioinfo[irq]->devstat.flag  &= ~DEVSTAT_NOT_OPER;
 				ioinfo[irq]->ui.flags.oper  = 1;
 
-			} /* endif */
+			} /* endif */ 
 
 			break;
 
@@ -2172,7 +2501,6 @@ asmlinkage void do_IRQ( struct pt_regs regs )
 		return;
 	} /* endif */
 
-	
 #ifdef CONFIG_FAST_IRQ
 	do {
 #endif /*  CONFIG_FAST_IRQ */
@@ -2252,11 +2580,19 @@ int s390_process_IRQ( unsigned int irq )
 	int               chnchk          = 0;
 	devstat_t        *dp;
 	devstat_t        *udp;
+
+	char dbf_txt[15];
 #if 0
 	int               cpu             = smp_processor_id();
 
 	kstat.irqs[cpu][irq]++;
 #endif
+
+	if (cio_debug_initialized) {
+		debug_text_event(cio_debug_trace_id, 3, "procIRQ");
+		sprintf(dbf_txt, "%x", irq);
+		debug_text_event(cio_debug_trace_id, 3, dbf_txt);
+	}
 
 	if ( ioinfo[irq] == INVALID_STORAGE_AREA )
 	{
@@ -2270,7 +2606,6 @@ int s390_process_IRQ( unsigned int irq )
 	udp = ioinfo[irq]->irq_desc.dev_id;
 	
 
-#ifdef CONFIG_DEBUG_IO
 	/*
 	 * It might be possible that a device was not-oper. at the time
 	 *  of free_irq() processing. This means the handler is no longer
@@ -2281,16 +2616,20 @@ int s390_process_IRQ( unsigned int irq )
 	{
 		if ( !ioinfo[irq]->ui.flags.d_disable )
 		{
+#ifdef CONFIG_DEBUG_IO
 			printk( KERN_CRIT"s390_process_IRQ(%04X) "
 			        "- no interrupt handler registered "
 					  "for device %04X !\n",
 			        irq,
 			        ioinfo[irq]->devstat.devno);
-
+#endif /* CONFIG_DEBUG_IO */
+			if (cio_debug_initialized)
+				debug_sprintf_event(cio_debug_msg_id, 0,
+						    "s390_process_IRQ(%04X) - no interrupt handler registered for device %04X !\n",
+						    irq, ioinfo[irq]->devstat.devno);
 		} /* endif */
 
 	} /* endif */
-#endif
 
 	/*
 	 * retrieve the i/o interrupt information (irb),
@@ -2360,6 +2699,10 @@ int s390_process_IRQ( unsigned int irq )
 			        "residual count from irb after tsch() %d\n",
 			        irq, dp->rescnt );
 #endif
+		if (cio_debug_initialized)
+			debug_sprintf_event(cio_debug_msg_id, 6,
+					    "s390_process_IRQ( %04X ) : residual count from irq after tsch() %d\n",
+					    irq, dp->rescnt);
 
 	} /* endif */
 
@@ -2372,17 +2715,24 @@ int s390_process_IRQ( unsigned int irq )
 	if (    (dp->ii.irb.scsw.cstat
 	            & (  SCHN_STAT_CHN_DATA_CHK
 	               | SCHN_STAT_CHN_CTRL_CHK
-	               | SCHN_STAT_INTF_CTRL_CHK )       )
-	     && (irq != cons_dev                         ) )
+			 | SCHN_STAT_INTF_CTRL_CHK )))
 	{
-		printk( "Channel-Check or Interface-Control-Check "
-		        "received\n"
-		        " ... device %04X on subchannel %04X, dev_stat "
-		        ": %02X sch_stat : %02X\n",
-		        ioinfo[irq]->devstat.devno,
-		        irq,
-		        dp->dstat,
-		        dp->cstat);
+		if (irq != cons_dev)
+			printk( "Channel-Check or Interface-Control-Check "
+				"received\n"
+				" ... device %04X on subchannel %04X, dev_stat "
+				": %02X sch_stat : %02X\n",
+				ioinfo[irq]->devstat.devno,
+				irq,
+				dp->dstat,
+				dp->cstat);
+		if (cio_debug_initialized) {
+			debug_sprintf_event(cio_debug_msg_id, 0,
+					    "Channel-Check or Interface-Control-Check received\n");
+			debug_sprintf_event(cio_debug_msg_id, 0,
+					    "... device %04X on subchannel %04X, dev_stat: %02X sch_stat: %02X\n",
+					    ioinfo[irq]->devstat.devno, irq, dp->dstat, dp->cstat);
+		}
 
 		chnchk = 1;
 
@@ -2422,6 +2772,10 @@ int s390_process_IRQ( unsigned int irq )
 			        "concurrent sense bytes avail %d\n",
 			        irq, dp->scnt );
 #endif
+		if (cio_debug_initialized)
+			debug_sprintf_event(cio_debug_msg_id, 4,
+					    "s390_process_IRQ( %04X ): concurrent sense bytes avail %d\n",
+					    irq, dp->scnt);
 	}
 	else
 	{
@@ -2453,6 +2807,17 @@ int s390_process_IRQ( unsigned int irq )
 			s390_displayhex( buffer,
 			                 &(dp->ii.irb) ,
 			                 sizeof(irb_t));
+			if (cio_debug_initialized) {
+				
+				sprintf( buffer, "s390_process_IRQ(%04X) - irb for "
+			         "device %04X after channel check\n",
+			         irq,
+			         dp->devno );
+
+				s390_displayhex2( buffer,
+						  &(dp->ii.irb) ,
+						  sizeof(irb_t), 0);
+			}
 		} /* endif */
 			
 		ioinfo[irq]->stctl |= stctl;
@@ -2473,20 +2838,19 @@ int s390_process_IRQ( unsigned int irq )
 		 *       unsolicited interrupt applies to the console device
 		 *       itself !
 		 */
-#ifdef CONFIG_DEBUG_IO
-		if (     ( irq != cons_dev                 )
-			 && !( stctl & SCSW_STCTL_ALERT_STATUS )
-			 &&  ( ioinfo[irq]->ui.flags.busy == 0  ) )
+		if ( !( stctl & SCSW_STCTL_ALERT_STATUS )
+		     &&  ( ioinfo[irq]->ui.flags.busy == 0  ) )
 		{
 			char buffer[80];
-
-			printk( "Unsolicited interrupt received for device %04X on subchannel %04X\n"
-				" ... device status : %02X subchannel status : %02X\n",
-				dp->devno,
-				irq,
-				dp->dstat,
-				dp->cstat);
-
+#ifdef CONFIG_DEBUG_IO
+			if (irq != cons_dev)
+				printk( "Unsolicited interrupt received for device %04X on subchannel %04X\n"
+					" ... device status : %02X subchannel status : %02X\n",
+					dp->devno,
+					irq,
+					dp->dstat,
+					dp->cstat);
+			
 			sprintf( buffer, "s390_process_IRQ(%04X) - irb for "
 			         "device %04X, ending_status %d\n",
 			         irq,
@@ -2496,10 +2860,27 @@ int s390_process_IRQ( unsigned int irq )
 			s390_displayhex( buffer,
 			                 &(dp->ii.irb) ,
 			                 sizeof(irb_t));
-
+#endif
+			if (cio_debug_initialized) {
+				debug_sprintf_event(cio_debug_msg_id, 2, 
+						    "Unsolicited interrupt received for device %04X on subchannel %04X\n"
+						    " ... device status : %02X subchannel status : %02X\n",
+						    dp->devno,
+						    irq,
+						    dp->dstat,
+						    dp->cstat);
+				sprintf( buffer, "s390_process_IRQ(%04X) - irb for "
+					 "device %04X, ending_status %d\n",
+					 irq,
+					 dp->devno,
+					 ending_status);
+				
+				s390_displayhex2( buffer,
+						 &(dp->ii.irb) ,
+						 sizeof(irb_t), 2);	
+			}
 		} /* endif */
 
-#endif
 		/*
 		 * take fast exit if no handler is available
 		 */
@@ -2639,11 +3020,15 @@ int s390_process_IRQ( unsigned int irq )
 				int sense_count = SENSE_MAX_COUNT-ioinfo[irq]->devstat.rescnt;
 
 #ifdef CONFIG_DEBUG_IO
-      if ( irq != cons_dev )
-         printk( "s390_process_IRQ( %04X ) : "
-                 "BASIC SENSE bytes avail %d\n",
-                 irq, sense_count );
+				if ( irq != cons_dev )
+					printk( "s390_process_IRQ( %04X ) : "
+						"BASIC SENSE bytes avail %d\n",
+						irq, sense_count );
 #endif
+				if (cio_debug_initialized)
+					debug_sprintf_event(cio_debug_msg_id, 4,
+							    "s390_process_IRQ( %04X ): BASIC SENSE bytes avail %d\n",
+							    irq, sense_count);
 				ioinfo[irq]->ui.flags.w4sense = 0;
 				udp->flag |= DEVSTAT_FLAG_SENSE_AVAIL;
 				udp->scnt  = sense_count;
@@ -2664,6 +3049,11 @@ int s390_process_IRQ( unsigned int irq )
 					printk( KERN_CRIT"s390_process_IRQ(%04x) encountered "
 					        "negative sense count\n",
 					        irq);
+					if (cio_debug_initialized)
+						debug_sprintf_event(cio_debug_msg_id, 0,
+								    "s390_process_IRQ(%04x) encountered "
+								    "negative sense count\n",
+								    irq);		    
 #endif
 				} /* endif */
 			}
@@ -2906,6 +3296,7 @@ int set_cons_dev( int irq )
 	int           ccode;
 	unsigned long cr6 __attribute__ ((aligned (8)));
 	int           rc = 0;
+	char dbf_txt[15];
 
 	if ( cons_dev != -1  )
 	{
@@ -2921,6 +3312,12 @@ int set_cons_dev( int irq )
    }
 	else
 	{
+		if (cio_debug_initialized) {
+			debug_text_event(cio_debug_trace_id, 4, "scons");
+			sprintf(dbf_txt, "%x", irq);
+			debug_text_event(cio_debug_trace_id, 4, dbf_txt);
+		}
+		
 		/*
 		 * modify the indicated console device to operate
 		 *  on special console interrupt sublass 7
@@ -2967,6 +3364,7 @@ int reset_cons_dev( int irq)
 	int     rc = 0;
 	int     ccode;
 	long    cr6 __attribute__ ((aligned (8)));
+	char dbf_txt[15];
 
 	if ( cons_dev != -1  )
 	{
@@ -2982,6 +3380,12 @@ int reset_cons_dev( int irq)
    }
 	else
 	{
+		if (cio_debug_initialized) {
+			debug_text_event(cio_debug_trace_id, 4, "rcons");
+			sprintf(dbf_txt, "%x", irq);
+			debug_text_event(cio_debug_trace_id, 4, dbf_txt);
+		}
+
 		/*
 		 * reset the indicated console device to operate
 		 *  on default console interrupt sublass 3
@@ -3028,9 +3432,16 @@ int wait_cons_dev( int irq )
 {
 	int              rc = 0;
 	long             save_cr6;
+	char dbf_txt[15];
 
 	if ( irq == cons_dev )
 	{
+
+		if (cio_debug_initialized) {
+			debug_text_event(cio_debug_trace_id, 4, "wcons");
+			sprintf(dbf_txt, "%x", irq);
+			debug_text_event(cio_debug_trace_id, 4, dbf_txt);
+		}
 
 		/*
 		 * before entering the spinlock we may already have
@@ -3087,6 +3498,13 @@ int enable_cpu_sync_isc( int irq )
 
 	int             count = 0;
 	int             rc    = 0;
+	char dbf_txt[15];
+
+	if (cio_debug_initialized) {
+		debug_text_event(cio_debug_trace_id, 4, "enisc");
+		sprintf(dbf_txt, "%x", irq);
+		debug_text_event(cio_debug_trace_id, 4, dbf_txt);
+	}
 
 	/* This one spins until it can get the sync_isc lock for irq# irq */
 
@@ -3171,6 +3589,7 @@ int enable_cpu_sync_isc( int irq )
 
 		} /* endif */
 
+
 		if ( rc )	/* can only happen if stsch/msch fails */
 		{
 			sync_isc_cnt = 0;
@@ -3199,6 +3618,14 @@ int disable_cpu_sync_isc( int irq)
 
 	int     ccode;
 	long    cr6 __attribute__ ((aligned (8)));
+
+	char dbf_txt[15];
+
+	if (cio_debug_initialized) {
+		debug_text_event(cio_debug_trace_id, 4, "disisc");
+		sprintf(dbf_txt, "%x", irq);
+		debug_text_event(cio_debug_trace_id, 4, dbf_txt);
+	}
 
 	if ( irq <= highest_subchannel && ioinfo[irq] != INVALID_STORAGE_AREA )
 	{
@@ -3310,6 +3737,9 @@ void VM_virtual_device_info( __u16      devno,
 	int        ccode;
 
 	int        error = 0;
+
+	if (cio_debug_initialized) 
+		debug_text_event(cio_debug_trace_id, 4, "VMvdinf");
 
 	if ( init_IRQ_complete )
 	{
@@ -3596,6 +4026,19 @@ void VM_virtual_device_info( __u16      devno,
 			p_diag_data->vrdcrccl,
 			p_diag_data->vrdccrty,
 			p_diag_data->vrdccrmd );
+		if (cio_debug_initialized)
+			debug_sprintf_event( cio_debug_msg_id, 0,
+					     "DIAG X'210' for "
+					     "device %04X returned "
+					     "(cc = %d): vdev class : %02X, "
+					     "vdev type : %04X \n ...  rdev class : %02X, rdev type : %04X, rdev model: %02X\n",
+					     devno,
+					     ccode,
+					     p_diag_data->vrdcvcla,
+					     p_diag_data->vrdcvtyp,
+					     p_diag_data->vrdcrccl,
+					     p_diag_data->vrdccrty,
+					     p_diag_data->vrdccrmd );
 
 	} /* endif */
 
@@ -3636,6 +4079,8 @@ int read_dev_chars( int irq, void **buffer, int length )
 	int           emulated = 0;
 	int           retry    = 5;
 
+	char dbf_txt[15];
+
 	if ( !buffer || !length )
 	{
 		return( -EINVAL );
@@ -3650,13 +4095,19 @@ int read_dev_chars( int irq, void **buffer, int length )
 	else if ( ioinfo[irq] == INVALID_STORAGE_AREA )
 	{
 		return( -ENODEV);
-   }
+	}
 
 	if ( ioinfo[irq]->ui.flags.oper == 0 )
 	{
 		return( -ENODEV );
 
 	} /* endif */
+
+	if (cio_debug_initialized) {
+		debug_text_event(cio_debug_trace_id, 4, "rddevch");
+		sprintf(dbf_txt, "%x", irq);
+		debug_text_event(cio_debug_trace_id, 4, dbf_txt);
+	}
 
 	/*
 	 * Before playing around with irq locks we should assure
@@ -3769,6 +4220,8 @@ int read_conf_data( int irq, void **buffer, int *length, __u8 lpm )
 	int           found  = 0; // RCD CIW found
 	int           ret    = 0; // return code
 
+	char dbf_txt[15];
+
 	if ( (irq > highest_subchannel) || (irq < 0 ) )
 	{
 		return( -ENODEV );
@@ -3790,6 +4243,12 @@ int read_conf_data( int irq, void **buffer, int *length, __u8 lpm )
 		return( -EOPNOTSUPP );
 
 	} /* endif */
+
+	if (cio_debug_initialized) {
+		debug_text_event(cio_debug_trace_id, 4, "rdconf");
+		sprintf(dbf_txt, "%x", irq);
+		debug_text_event(cio_debug_trace_id, 4, dbf_txt);
+	}
 
 	/*
 	 * scan for RCD command in extended SenseID data
@@ -4262,6 +4721,13 @@ unsigned int get_devno_by_irq( int irq )
 void s390_device_recognition_irq( int irq )
 {
 	int           ret;
+	char dbf_txt[15];
+
+	if (cio_debug_initialized) {
+		debug_text_event(cio_debug_trace_id, 4, "devrec");
+		sprintf(dbf_txt, "%x", irq);
+		debug_text_event(cio_debug_trace_id, 4, dbf_txt);
+	}
 
 	/*
 	 * We issue the SenseID command on I/O subchannels we think are
@@ -4274,7 +4740,7 @@ void s390_device_recognition_irq( int irq )
 		int       irq_ret;
 		devstat_t devstat;
 
-	   irq_ret = request_irq( irq,
+		irq_ret = request_irq( irq,
 		                       init_IRQ_handler,
 		                       0,
 		                       "INIT",
@@ -4284,7 +4750,7 @@ void s390_device_recognition_irq( int irq )
 		{
 			ret = enable_cpu_sync_isc( irq );
 
-			if ( !ret )
+			if ( !ret ) 
 			{
 				ioinfo[irq]->ui.flags.unknown = 0;
 
@@ -4305,9 +4771,8 @@ void s390_device_recognition_irq( int irq )
 
 					if ( !ret )	// on success only ...
 					{
-#ifdef CONFIG_DEBUG_IO
 						char buffer[80];
-
+#ifdef CONFIG_DEBUG_IO
 						sprintf( buffer,
 						         "RCD for device(%04X)/"
 						         "subchannel(%04X) returns :\n",
@@ -4316,6 +4781,15 @@ void s390_device_recognition_irq( int irq )
 
 						s390_displayhex( buffer, prcd, lrcd );
 #endif      				
+						if (cio_debug_initialized) {
+							sprintf( buffer,
+								 "RCD for device(%04X)/"
+								 "subchannel(%04X) returns :\n",
+								 ioinfo[irq]->schib.pmcw.dev,
+								 irq );
+							
+							s390_displayhex2( buffer, prcd, lrcd, 2);
+						}
 						if ( init_IRQ_complete )
 						{
 							kfree( prcd );
@@ -4326,9 +4800,9 @@ void s390_device_recognition_irq( int irq )
 
  			  			} /* endif */
 
-	   			} /* endif */
-
-     	      } /* endif */
+					} /* endif */
+					
+				} /* endif */
 #endif
 				s390_DevicePathVerification( irq, 0 );
 
@@ -4364,6 +4838,44 @@ void s390_device_recognition_all( void)
 
 }
 
+/*
+ * Function: s390_redo_validation
+ * Look for no longer blacklisted devices
+ * FIXME: there must be a better way to do this...
+ */
+
+void s390_redo_validation(void) 
+{
+	int irq = 0;
+	int ret;
+
+	if (cio_debug_initialized) {
+		debug_text_event(cio_debug_trace_id, 0, "redoval");
+	}
+	do {
+		if (ioinfo[irq] == INVALID_STORAGE_AREA) {
+			ret = s390_validate_subchannel(irq, 0);
+			if (!ret) {
+				s390_device_recognition_irq(irq);
+				if (ioinfo[irq]->ui.flags.oper) {
+					devreg_t *pdevreg;
+					
+					pdevreg = s390_search_devreg( ioinfo[irq] );
+					if ( pdevreg != NULL ) {
+						if ( pdevreg->oper_func != NULL )
+							pdevreg->oper_func( irq, pdevreg );
+						
+					} 
+				}
+				if (cio_proc_devinfo) 
+					if (irq < MAX_CIO_PROCFS_ENTRIES) {
+						cio_procfs_device_create(ioinfo[irq]->devno);
+				}
+			}
+		}
+		irq++;
+	} while (irq<=highest_subchannel);
+}
 
 /*
  * s390_search_devices
@@ -4389,6 +4901,10 @@ void s390_process_subchannels( void)
 
 	printk( "Highest subchannel number detected (hex) : %04X\n",
 	        highest_subchannel);
+	if (cio_debug_initialized)
+		debug_sprintf_event(cio_debug_msg_id, 0, 
+				    "Highest subchannel number detected (hex) : %04X\n",
+				    highest_subchannel);	
 }
 
 /*
@@ -4405,6 +4921,14 @@ int s390_validate_subchannel( int irq, int enable )
 	int      ccode2;    /* condition code for other I/O routines */
 	schib_t *p_schib;
 	int      ret;
+	
+	char dbf_txt[15];
+
+	if (cio_debug_initialized) {
+		debug_text_event(cio_debug_trace_id, 4, "valsch");
+		sprintf(dbf_txt, "%x", irq);
+		debug_text_event(cio_debug_trace_id, 4, dbf_txt);
+	}
 
 	/*
 	 * The first subchannel that is not-operational (ccode==3)
@@ -4444,6 +4968,10 @@ int s390_validate_subchannel( int irq, int enable )
 			        "non-I/O subchannel type %04X\n",
 			        irq,
 			        p_schib->pmcw.st);
+			if (cio_debug_initialized)
+				debug_sprintf_event(cio_debug_msg_id, 0,
+						    "Subchannel %04X reports non-I/O subchannel type %04X\n",
+						    irq, p_schib->pmcw.st);
 
 			if ( ioinfo[irq] != INVALID_STORAGE_AREA )
 				ioinfo[irq]->ui.flags.oper = 0;
@@ -4460,6 +4988,10 @@ int s390_validate_subchannel( int irq, int enable )
 #ifdef CONFIG_DEBUG_IO
 			  printk( "Blacklisted device detected at devno %04X\n", p_schib->pmcw.dev );
 #endif
+			  if (cio_debug_initialized)
+				  debug_sprintf_event(cio_debug_msg_id, 0,
+						      "Blacklisted device detected at devno %04X\n",
+						      p_schib->pmcw.dev);
 			  ret = -ENODEV;
 		     } else {
 		        if ( ioinfo[irq] == INVALID_STORAGE_AREA )
@@ -4547,6 +5079,16 @@ int s390_validate_subchannel( int irq, int enable )
 			 	       ioinfo[irq]->schib.pmcw.pom);
 
 			} /* endif */
+			if (cio_debug_initialized)
+				debug_sprintf_event(cio_debug_msg_id, 0,
+						    "Detected device %04X "
+						    "on subchannel %04X"
+						    " - PIM = %02X, PAM = %02X, POM = %02X\n",
+						    ioinfo[irq]->schib.pmcw.dev,
+						    irq,
+						    ioinfo[irq]->schib.pmcw.pim,
+						    ioinfo[irq]->schib.pmcw.pam,
+						    ioinfo[irq]->schib.pmcw.pom);
 
 			/*
 			 * initialize ioinfo structure
@@ -4661,6 +5203,10 @@ int s390_validate_subchannel( int irq, int enable )
 							{
 								printk( " ... msch() (2) failed with CC = %X\n",
 								        ccode2 );
+								if (cio_debug_initialized)
+									debug_sprintf_event(cio_debug_msg_id, 0,
+											    "msch() (2) failed with CC=%X\n",
+											    ccode2);
 								ioinfo[irq]->ui.flags.oper = 0;
 								ret                        = -EIO;
 							}
@@ -4676,6 +5222,10 @@ int s390_validate_subchannel( int irq, int enable )
 						{
 							printk( " ... msch() (1) failed with CC = %X\n",
 							        ccode2);
+							if (cio_debug_initialized)
+								debug_sprintf_event(cio_debug_msg_id, 0,
+										    "msch() (1) failed with CC = %X\n",
+										    ccode2);
 							ioinfo[irq]->ui.flags.oper = 0;
 							ret                        = -EIO;
 
@@ -4694,6 +5244,11 @@ int s390_validate_subchannel( int irq, int enable )
 					        "subchannel %04X exceeded, CC = %d\n",
 					        irq,
 					        ccode2);
+					if (cio_debug_initialized)
+						debug_sprintf_event(cio_debug_msg_id, 0,
+								    " ... msch() retry count for "
+								    "subchannel %04X exceeded, CC = %d\n",
+								    irq, ccode2);		    
 
 				} /* endif */
 			}
@@ -4750,6 +5305,8 @@ int s390_SenseID( int irq, senseid_t *sid, __u8 lpm )
 	senseid_t *psid     = sid;/* start with the external buffer */	
 	int        sbuffer  = 0; /* switch SID data buffer */
 
+	char dbf_txt[15];
+
 	if ( (irq > highest_subchannel) || (irq < 0 ) )
 	{
 		return( -ENODEV );
@@ -4766,6 +5323,12 @@ int s390_SenseID( int irq, senseid_t *sid, __u8 lpm )
 		return( -ENODEV );
 
 	} /* endif */
+
+	if (cio_debug_initialized) {
+		debug_text_event(cio_debug_trace_id, 4, "snsID");
+		sprintf(dbf_txt, "%x", irq);
+		debug_text_event(cio_debug_trace_id, 4, dbf_txt);
+	}
 
 	if ( !ioinfo[irq]->ui.flags.ready )
 	{
@@ -4792,8 +5355,8 @@ int s390_SenseID( int irq, senseid_t *sid, __u8 lpm )
   	} /* endif */
 
 	if ( irq_ret == 0 )
-   {
-      int i;
+	{
+		int i;
 
 		s390irq_spin_lock( irq);
 
@@ -4888,6 +5451,15 @@ int s390_SenseID( int irq, senseid_t *sid, __u8 lpm )
 					   		     irq,
 							        retry);
 #endif
+							if (cio_debug_initialized)
+								debug_sprintf_event(cio_debug_msg_id, 2,
+										    "SenseID : device %04X on "
+										    "Subchannel %04X "
+										    "reports pending status, "
+										    "retry : %d\n",
+										    ioinfo[irq]->schib.pmcw.dev,
+										    irq,
+										    retry);		    
 						} /* endif */
 
 						if ( pdevstat->flag & DEVSTAT_FLAG_SENSE_AVAIL )
@@ -4907,11 +5479,20 @@ int s390_SenseID( int irq, senseid_t *sid, __u8 lpm )
 								        ioinfo[irq]->schib.pmcw.dev,
 								        irq);
 #endif
+								if (cio_debug_initialized)
+									debug_sprintf_event(cio_debug_msg_id, 2,
+											    "SenseID : device %04X on "
+											    "Subchannel %04X "
+											    "reports cmd reject or "
+											    "intervention required\n",
+											    ioinfo[irq]->schib.pmcw.dev,
+											    irq);		    
 								io_retry = 1;
 							}
-#ifdef CONFIG_DEBUG_IO
+
 							else
 							{
+#ifdef CONFIG_DEBUG_IO							
 								printk( "SenseID : UC on "
 								        "dev %04X, "
 								        "retry %d, "
@@ -4932,9 +5513,31 @@ int s390_SenseID( int irq, senseid_t *sid, __u8 lpm )
 								        pdevstat->ii.sense.data[5],
 								        pdevstat->ii.sense.data[6],
 								        pdevstat->ii.sense.data[7]);
-
-							} /* endif */
 #endif
+								if (cio_debug_initialized)
+									debug_sprintf_event(cio_debug_msg_id, 2,
+											    "SenseID : UC on "
+											    "dev %04X, "
+											    "retry %d, "
+											    "lpum %02X, "
+											    "cnt %02d, "
+											    "sns :"
+											    " %02X%02X%02X%02X "
+											    "%02X%02X%02X%02X ...\n",
+											    ioinfo[irq]->schib.pmcw.dev,
+											    retry,
+											    pdevstat->lpum,
+											    pdevstat->scnt,
+											    pdevstat->ii.sense.data[0],
+											    pdevstat->ii.sense.data[1],
+											    pdevstat->ii.sense.data[2],
+											    pdevstat->ii.sense.data[3],
+											    pdevstat->ii.sense.data[4],
+											    pdevstat->ii.sense.data[5],
+											    pdevstat->ii.sense.data[6],
+											    pdevstat->ii.sense.data[7]);	    
+							} /* endif */
+
 						}
 						else if (    ( pdevstat->flag & DEVSTAT_NOT_OPER )
 					             || ( irq_ret        == -ENODEV         ) )
@@ -4948,18 +5551,28 @@ int s390_SenseID( int irq, senseid_t *sid, __u8 lpm )
 							        ioinfo[irq]->schib.pmcw.dev,
 							        irq);
 #endif
+							if (cio_debug_initialized)
+								debug_sprintf_event(cio_debug_msg_id, 2, 
+										    "SenseID : path %02X for "
+										    "device %04X on "
+										    "subchannel %04X "
+										    "is 'not operational'\n",
+										    domask,
+										    ioinfo[irq]->schib.pmcw.dev,
+										    irq);		    
 
 							io_retry          = 0;
 							ioinfo[irq]->opm &= ~domask;
       	
 						}
-#ifdef CONFIG_DEBUG_IO
+
 						else if (     (pdevstat->flag !=
 						                    (   DEVSTAT_START_FUNCTION
 						                      | DEVSTAT_FINAL_STATUS    ) )
 						           && !(pdevstat->flag &
 						                    DEVSTAT_STATUS_PENDING        ) )
 						{
+#ifdef CONFIG_DEBUG_IO
 							printk( "SenseID : start_IO() for "
 							        "device %04X on "
 							        "subchannel %04X "
@@ -4970,9 +5583,22 @@ int s390_SenseID( int irq, senseid_t *sid, __u8 lpm )
 							        irq_ret,
 							        retry,
 							        pdevstat->flag);
+#endif
+							if (cio_debug_initialized)
+								debug_sprintf_event(cio_debug_msg_id, 2,
+										    "SenseID : start_IO() for "
+										    "device %04X on "
+										    "subchannel %04X "
+										    "returns %d, retry %d, "
+										    "status %04X\n",
+										    ioinfo[irq]->schib.pmcw.dev,
+										    irq,
+										    irq_ret,
+										    retry,
+										    pdevstat->flag);		    
 
 						} /* endif */
-#endif
+
 					}
 					else   // we got it ...
 					{
@@ -5079,38 +5705,54 @@ int s390_SenseID( int irq, senseid_t *sid, __u8 lpm )
 			        ioinfo[irq]->schib.pmcw.dev,
 			        irq);
 #endif
+			if (cio_debug_initialized)
+				debug_sprintf_event(cio_debug_msg_id, 2,
+						    "SenseID : unknown device %04X on subchannel %04X\n",
+						    ioinfo[irq]->schib.pmcw.dev,
+						    irq);		    
 			ioinfo[irq]->ui.flags.unknown = 1;
 
 		} /* endif */
 
-		if ( cio_show_msg )
-		{
+	
 			/*
 			 * Issue device info message if unit was operational .
 			 */
-			if ( !ioinfo[irq]->ui.flags.unknown )
-			{
-				if ( sid->dev_type != 0 )
-				{
+		if ( !ioinfo[irq]->ui.flags.unknown ) {
+			if ( sid->dev_type != 0 ) {
+				if ( cio_show_msg ) 
 					printk( KERN_INFO"SenseID : device %04X reports: "
-					        "CU  Type/Mod = %04X/%02X,"
-				      	  " Dev Type/Mod = %04X/%02X\n",
-				   	     ioinfo[irq]->schib.pmcw.dev,
-					        sid->cu_type,
-					        sid->cu_model,
-					        sid->dev_type,
-					        sid->dev_model);
-				}
-				else
-				{
+						"CU  Type/Mod = %04X/%02X,"
+						" Dev Type/Mod = %04X/%02X\n",
+						ioinfo[irq]->schib.pmcw.dev,
+						sid->cu_type,
+						sid->cu_model,
+						sid->dev_type,
+						sid->dev_model);
+				if (cio_debug_initialized)
+					debug_sprintf_event(cio_debug_msg_id, 2,
+							    "SenseID : device %04X reports: "
+							    "CU  Type/Mod = %04X/%02X,"
+							    " Dev Type/Mod = %04X/%02X\n",
+							    ioinfo[irq]->schib.pmcw.dev,
+							    sid->cu_type,
+							    sid->cu_model,
+							    sid->dev_type,
+							    sid->dev_model);
+			} else {
+				if ( cio_show_msg ) 
 					printk( KERN_INFO"SenseID : device %04X reports:"
-				   	     " Dev Type/Mod = %04X/%02X\n",
-					        ioinfo[irq]->schib.pmcw.dev,
-					        sid->cu_type,
-					        sid->cu_model);
-
-				} /* endif */
-
+						" Dev Type/Mod = %04X/%02X\n",
+						ioinfo[irq]->schib.pmcw.dev,
+						sid->cu_type,
+						sid->cu_model);
+				if (cio_debug_initialized)
+					debug_sprintf_event(cio_debug_msg_id, 2,
+							    "SenseID : device %04X reports:"
+							    " Dev Type/Mod = %04X/%02X\n",
+							    ioinfo[irq]->schib.pmcw.dev,
+							    sid->cu_type,
+							    sid->cu_model);		    
 			} /* endif */
 
 		} /* endif */
@@ -5158,6 +5800,14 @@ int s390_DevicePathVerification( int irq, __u8 usermask )
 	__u8 domask;
 
 	int ret = 0;
+
+	char dbf_txt[15];
+
+	if (cio_debug_initialized) {
+		debug_text_event(cio_debug_trace_id, 4, "dpver");
+		sprintf(dbf_txt, "%x", irq);
+		debug_text_event(cio_debug_trace_id, 4, dbf_txt);
+	}
 
 	if ( ioinfo[irq]->ui.flags.pgid_supp == 0 )
 	{
@@ -5270,16 +5920,30 @@ int s390_DevicePathVerification( int irq, __u8 usermask )
 						        irq,
 						        ioinfo[irq]->schib.pmcw.dev);
 #endif
+						if (cio_debug_initialized)
+							debug_sprintf_event(cio_debug_msg_id, 2,
+									    "PathVerification(%04X) "
+									    "- Device %04X doesn't "
+									    " support path grouping\n",
+									    irq,
+									    ioinfo[irq]->schib.pmcw.dev);		    
 
 					} /* endif */
 				}
-				else if ( ret == -EIO )
+				else if ( ret == -EIO ) 
 				{
 #ifdef CONFIG_DEBUG_IO
 					printk("PathVerification(%04X) - I/O error "
 					       "on device %04X\n", irq,
 					       ioinfo[irq]->schib.pmcw.dev);
 #endif
+
+					if (cio_debug_initialized)
+						debug_sprintf_event(cio_debug_msg_id, 2,
+								    "PathVerification(%04X) - I/O error "
+								    "on device %04X\n", irq,
+								    ioinfo[irq]->schib.pmcw.dev);
+
 					ioinfo[irq]->ui.flags.pgid_supp = 0;
 		    
 				} else {
@@ -5289,6 +5953,13 @@ int s390_DevicePathVerification( int irq, __u8 usermask )
 						irq,
 						ioinfo[irq]->schib.pmcw.dev);
 #endif
+					if (cio_debug_initialized)
+						debug_sprintf_event(cio_debug_msg_id, 2,
+								    "PathVerification(%04X) - "
+								    "Unexpected error on device %04X\n",
+								    irq,
+								    ioinfo[irq]->schib.pmcw.dev);		    
+					
 					ioinfo[irq]->ui.flags.pgid_supp = 0;
 					
 				} /* endif */
@@ -5357,7 +6028,7 @@ int s390_SetPGID( int irq, __u8 lpm, pgid_t *pgid )
 
 		if ( irq_ret == 0 )
 			inlreq = 1;
-   }
+	}
 	else
 	{
 		pdevstat = ioinfo[irq]->irq_desc.dev_id;
@@ -5419,6 +6090,15 @@ int s390_SetPGID( int irq, __u8 lpm, pgid_t *pgid )
 					        irq,
 					        retry);
 #endif
+					if (cio_debug_initialized)
+						debug_sprintf_event(cio_debug_msg_id, 2,
+								    "SPID - Device %04X "
+								    "on Subchannel %04X "
+								    "reports pending status, "
+								    "retry : %d\n",
+								    ioinfo[irq]->schib.pmcw.dev,
+								    irq,
+								    retry);	    
 				} /* endif */
 
 				if ( pdevstat->flag == (   DEVSTAT_START_FUNCTION
@@ -5468,19 +6148,50 @@ int s390_SetPGID( int irq, __u8 lpm, pgid_t *pgid )
 						        pdevstat->ii.sense.data[5],
 						        pdevstat->ii.sense.data[6],
 						        pdevstat->ii.sense.data[7]);
-
 #endif
-						retry--;
 
+						if (cio_debug_initialized)
+							debug_sprintf_event(cio_debug_msg_id, 2,
+									    "SPID - device %04X,"
+									    " unit check,"
+									    " retry %d, cnt %02d,"
+									    " sns :"
+									    " %02X%02X%02X%02X %02X%02X%02X%02X ...\n",
+									    ioinfo[irq]->schib.pmcw.dev,
+									    retry,
+									    pdevstat->scnt,
+									    pdevstat->ii.sense.data[0],
+									    pdevstat->ii.sense.data[1],
+									    pdevstat->ii.sense.data[2],
+									    pdevstat->ii.sense.data[3],
+									    pdevstat->ii.sense.data[4],
+									    pdevstat->ii.sense.data[5],
+									    pdevstat->ii.sense.data[6],
+									    pdevstat->ii.sense.data[7]);
+
+						retry--;
+		    
 					} /* endif */
+
 				}
 				else if ( pdevstat->flag & DEVSTAT_NOT_OPER )
 				{
-					printk( "SPID - Device %04X "
-					        "on Subchannel %04X "
-					        "became 'not operational'\n",
-					        ioinfo[irq]->schib.pmcw.dev,
-					        irq);
+					/* don't issue warnings during startup unless requested*/
+					if (init_IRQ_complete || cio_notoper_msg) {   
+						
+						printk( "SPID - Device %04X "
+							"on Subchannel %04X "
+							"became 'not operational'\n",
+							ioinfo[irq]->schib.pmcw.dev,
+							irq);
+						if (cio_debug_initialized)
+							debug_sprintf_event(cio_debug_msg_id, 2,
+									    "SPID - Device %04X "
+									    "on Subchannel %04X "
+									    "became 'not operational'\n",
+									    ioinfo[irq]->schib.pmcw.dev,
+									    irq);		    
+					}
 
 					retry = 0;
 					irq_ret = -EIO;
@@ -5503,7 +6214,7 @@ int s390_SetPGID( int irq, __u8 lpm, pgid_t *pgid )
 		{
 			irq_ret = -EIO;
 
-		} /* endif */		
+		} /* endif */
 
 		if ( init_IRQ_complete )
 		{
@@ -5659,17 +6370,47 @@ int s390_SensePGID( int irq, __u8 lpm, pgid_t *pgid )
 						        pdevstat->ii.sense.data[7]);
 
 #endif
+						if (cio_debug_initialized)
+							debug_sprintf_event(cio_debug_msg_id, 2,
+									    "SNID - device %04X,"
+									    " unit check,"
+									    " flag %04X, "
+									    " retry %d, cnt %02d,"
+									    " sns :"
+									    " %02X%02X%02X%02X %02X%02X%02X%02X ...\n",
+									    ioinfo[irq]->schib.pmcw.dev,
+									    pdevstat->flag,
+									    retry,
+									    pdevstat->scnt,
+									    pdevstat->ii.sense.data[0],
+									    pdevstat->ii.sense.data[1],
+									    pdevstat->ii.sense.data[2],
+									    pdevstat->ii.sense.data[3],
+									    pdevstat->ii.sense.data[4],
+									    pdevstat->ii.sense.data[5],
+									    pdevstat->ii.sense.data[6],
+									    pdevstat->ii.sense.data[7]);		    
 						retry--;
 
 					} /* endif */
 				}
 				else if ( pdevstat->flag & DEVSTAT_NOT_OPER )
 				{
-					printk( "SNID - Device %04X "
-					        "on Subchannel %04X "
-					        "became 'not operational'\n",
-					        ioinfo[irq]->schib.pmcw.dev,
-					        irq);
+					/* don't issue warnings during startup unless requested*/
+					if (init_IRQ_complete || cio_notoper_msg) {  
+						printk( "SNID - Device %04X "
+							"on Subchannel %04X "
+							"became 'not operational'\n",
+							ioinfo[irq]->schib.pmcw.dev,
+							irq);
+						if (cio_debug_initialized)
+							debug_sprintf_event(cio_debug_msg_id, 2,
+									    "SNID - Device %04X "
+									    "on Subchannel %04X "
+									    "became 'not operational'\n",
+									    ioinfo[irq]->schib.pmcw.dev,
+									    irq);		    
+					}
 
 					retry = 0;
 
@@ -5682,9 +6423,10 @@ int s390_SensePGID( int irq, __u8 lpm, pgid_t *pgid )
 			}
 			else if ( irq_ret != -ENODEV ) // -EIO, or -EBUSY
 			{
-#ifdef CONFIG_DEBUG_IO
+
 				if ( pdevstat->flag & DEVSTAT_STATUS_PENDING )
 				{
+#ifdef CONFIG_DEBUG_IO
 					printk( "SNID - Device %04X "
 					        "on Subchannel %04X "
 					        "reports pending status, "
@@ -5692,13 +6434,29 @@ int s390_SensePGID( int irq, __u8 lpm, pgid_t *pgid )
 					        ioinfo[irq]->schib.pmcw.dev,
 					        irq,
 					        retry);
-				} /* endif */
 #endif
+					if (cio_debug_initialized)
+						debug_sprintf_event(cio_debug_msg_id, 2,
+								    "SNID - Device %04X "
+								    "on Subchannel %04X "
+								    "reports pending status, "
+								    "retry : %d\n",
+								    ioinfo[irq]->schib.pmcw.dev,
+								    irq,
+								    retry);		    
+				} /* endif */
+
 
 				printk( "SNID - device %04X,"
 				        " start_io() reports rc : %d, retrying ...\n",
 				        ioinfo[irq]->schib.pmcw.dev,
 				        irq_ret);
+				if (cio_debug_initialized)
+					debug_sprintf_event(cio_debug_msg_id, 2, 
+							    "SNID - device %04X,"
+							    " start_io() reports rc : %d, retrying ...\n",
+							    ioinfo[irq]->schib.pmcw.dev,
+							    irq_ret);
 				retry--;
 			}
 			else	// -ENODEV ...
@@ -5758,7 +6516,9 @@ void s390_do_crw_pending( crwe_t *pcrwe )
 #ifdef CONFIG_DEBUG_CRW
 	printk( "do_crw_pending : starting ...\n");
 #endif
-
+	if (cio_debug_initialized) 
+		debug_sprintf_event(cio_debug_crw_id, 2, 
+				    "do_crw_pending: starting\n");
 	while ( pcrwe != NULL )
 	{
 		int is_owned = 0;
@@ -5772,7 +6532,9 @@ void s390_do_crw_pending( crwe_t *pcrwe )
 			printk( KERN_INFO"do_crw_pending : source is "
 			        "subchannel %04X\n", irq);
 #endif
-
+			if (cio_debug_initialized)
+				debug_sprintf_event(cio_debug_crw_id, 2,
+						    "source is subchannel %04X\n", irq);
 			/*
 			 * If the device isn't known yet
 			 *   we can't lock it ...
@@ -5794,6 +6556,9 @@ void s390_do_crw_pending( crwe_t *pcrwe )
 #ifdef CONFIG_DEBUG_CRW
 			printk( "do_crw_pending : subchannel validation - start ...\n");
 #endif
+			if (cio_debug_initialized)
+				debug_sprintf_event(cio_debug_crw_id, 4,
+						    "subchannel validation - start\n");
 			s390_validate_subchannel( irq, is_owned );
 
 			if ( irq > highest_subchannel )
@@ -5802,6 +6567,9 @@ void s390_do_crw_pending( crwe_t *pcrwe )
 #ifdef CONFIG_DEBUG_CRW
 			printk( "do_crw_pending : subchannel validation - done\n");
 #endif
+			if (cio_debug_initialized)
+				debug_sprintf_event(cio_debug_crw_id, 4,
+						    "subchannel validation - done\n");
 			/*
 			 * After the validate processing
 			 *   the ioinfo control block
@@ -5813,26 +6581,34 @@ void s390_do_crw_pending( crwe_t *pcrwe )
 
 			} /* endif */
 
-#ifdef CONFIG_DEBUG_CRW
+
 			if ( ioinfo[irq] != INVALID_STORAGE_AREA )
 			{
+#ifdef CONFIG_DEBUG_CRW
 				printk( "do_crw_pending : ioinfo at %08X\n",
 				        (unsigned)ioinfo[irq]);
-
-			} /* endif */
 #endif
+				if (cio_debug_initialized)
+					debug_sprintf_event(cio_debug_crw_id, 4,
+							    "ioinfo at %08X\n");
+			} /* endif */
+
 
 			if ( ioinfo[irq] != INVALID_STORAGE_AREA )
 			{
 				if ( ioinfo[irq]->ui.flags.oper == 0 )
 				{
 					 not_oper_handler_func_t nopfunc=ioinfo[irq]->nopfunc;
+					 
+					 /* remove procfs entry */
+					 if (cio_proc_devinfo)
+						 cio_procfs_device_remove(dev_no);
 					/*
 					 * If the device has gone
 					 *  call not oper handler        	
 					 */       	
-					if (    (             dev_oper == 1    )
-					     && ( nopfunc != NULL ) )
+					 if (( dev_oper == 1 )
+					     && ( nopfunc != NULL))
 					{
 						
 						free_irq( irq,ioinfo[irq]->irq_desc.dev_id );
@@ -5846,13 +6622,18 @@ void s390_do_crw_pending( crwe_t *pcrwe )
 					printk( "do_crw_pending : device "
 					        "recognition - start ...\n");
 #endif
+					if (cio_debug_initialized)
+						debug_sprintf_event(cio_debug_crw_id, 4,
+								    "device recognition - start\n");
 					s390_device_recognition_irq( irq );
 
 #ifdef CONFIG_DEBUG_CRW
 					printk( "do_crw_pending : device "
 					        "recognition - done\n");
 #endif
-		
+					if (cio_debug_initialized)
+						debug_sprintf_event(cio_debug_crw_id, 4,
+								    "device recognition - done\n");
 					/*
 					 * the device became operational
 					 */
@@ -5868,6 +6649,12 @@ void s390_do_crw_pending( crwe_t *pcrwe )
 								pdevreg->oper_func( irq, pdevreg );
 
 						} /* endif */
+
+						/* add new procfs entry */
+						if (cio_proc_devinfo) 
+							if (highest_subchannel < MAX_CIO_PROCFS_ENTRIES) {
+								cio_procfs_device_create(ioinfo[irq]->devno);
+							}
 					}
 					/*
 					 * ... it is and was operational, but
@@ -5875,12 +6662,22 @@ void s390_do_crw_pending( crwe_t *pcrwe )
 					 */
 					else if ((ioinfo[irq]->devno != dev_no) && ( ioinfo[irq]->nopfunc != NULL ))   					
 					{
+						int devno_old = ioinfo[irq]->devno;
 						ioinfo[irq]->nopfunc( irq,
 						                      DEVSTAT_REVALIDATE );				
 
+						/* remove old entry, add new */
+						if (cio_proc_devinfo) {
+							cio_procfs_device_remove(devno_old);
+							cio_procfs_device_create(ioinfo[irq]->devno);
+						}
 					} /* endif */
 
 				} /* endif */
+
+				/* get rid of dead procfs entries */
+				if (cio_proc_devinfo) 
+					cio_procfs_device_purge();
 
 			} /* endif */
 
@@ -5892,6 +6689,9 @@ void s390_do_crw_pending( crwe_t *pcrwe )
 			printk( "do_crw_pending : source is "
 			        "monitoring facility\n");
 #endif
+			if (cio_debug_initialized)
+				debug_sprintf_event(cio_debug_crw_id, 2,
+						    "source is monitoring facility\n");
 			break;
 
 		case CRW_RSC_CPATH :   	
@@ -5902,6 +6702,9 @@ void s390_do_crw_pending( crwe_t *pcrwe )
 			printk( "do_crw_pending : source is "
 			        "channel path %02X\n", chpid);
 #endif
+			if (cio_debug_initialized)
+				debug_sprintf_event(cio_debug_crw_id, 2,
+						    "source is channel path %02X\n");
 			break;
 
 		case CRW_RSC_CONFIG : 	
@@ -5910,6 +6713,9 @@ void s390_do_crw_pending( crwe_t *pcrwe )
 			printk( "do_crw_pending : source is "
 			        "configuration-alert facility\n");
 #endif
+			if (cio_debug_initialized)
+				debug_sprintf_event(cio_debug_crw_id, 2,
+						    "source is configuration-alert facility\n");
 			break;
 
 		case CRW_RSC_CSS :
@@ -5918,6 +6724,9 @@ void s390_do_crw_pending( crwe_t *pcrwe )
 			printk( "do_crw_pending : source is "
 			        "channel subsystem\n");
 #endif
+			if (cio_debug_initialized)
+				debug_sprintf_event(cio_debug_crw_id, 2,
+						    "source is channel subsystem\n");
 			break;
 
 		default :
@@ -5925,6 +6734,9 @@ void s390_do_crw_pending( crwe_t *pcrwe )
 #ifdef CONFIG_DEBUG_CRW
 			printk( "do_crw_pending : unknown source\n");
 #endif
+			if (cio_debug_initialized)
+				debug_sprintf_event(cio_debug_crw_id, 2,
+						    "unknown source\n");
 			break;		
 
 		} /* endswitch */
@@ -5936,7 +6748,9 @@ void s390_do_crw_pending( crwe_t *pcrwe )
 #ifdef CONFIG_DEBUG_CRW
 	printk( "do_crw_pending : done\n");
 #endif
-
+	if (cio_debug_initialized)
+		debug_sprintf_event(cio_debug_crw_id, 2,
+				    "do_crw_pending: done\n");
    return;
 }
 
@@ -5964,8 +6778,64 @@ reipl ( int sch )
 		do_reipl( 0x10000 | sch );
 }
 
-/* Display info on subchannels in /proc/subchannels. *
- * Adapted from procfs stuff in dasd.c by Cornelia Huck, 02/28/01.      */
+
+/*
+ * Function: cio_debug_init
+ * Initializes three debug logs (under /proc/s390dbf) for common I/O:
+ * - cio_msg logs the messages which are printk'ed when CONFIG_DEBUG_IO is on
+ * - cio_trace logs the calling of different functions
+ * - cio_crw logs the messages which are printk'ed when CONFIG_DEBUG_CRW is on
+ * debug levels depend on CONFIG_DEBUG_IO resp. CONFIG_DEBUG_CRW
+ */
+int cio_debug_init( void )
+{
+	int ret = 0;
+
+	cio_debug_msg_id = debug_register("cio_msg",2,4,16*sizeof(long));
+	if (cio_debug_msg_id != NULL) {
+		debug_register_view(cio_debug_msg_id, &debug_sprintf_view);
+#ifdef CONFIG_DEBUG_IO
+		debug_set_level(cio_debug_msg_id, 6);
+#else /* CONFIG_DEBUG_IO */
+		debug_set_level(cio_debug_msg_id, 2);
+#endif /* CONFIG_DEBUG_IO */
+	} else {
+		ret = -1;
+	}
+	cio_debug_trace_id = debug_register("cio_trace",4,4,8);
+	if (cio_debug_trace_id != NULL) {
+		debug_register_view(cio_debug_trace_id, &debug_hex_ascii_view);
+#ifdef CONFIG_DEBUG_IO
+		debug_set_level(cio_debug_trace_id, 6);
+#else /* CONFIG_DEBUG_IO */
+		debug_set_level(cio_debug_trace_id, 2);
+#endif /* CONFIG_DEBUG_IO */
+	} else {
+		ret = -1;
+	}
+	cio_debug_crw_id = debug_register("cio_crw",2,4,16*sizeof(long));
+	if (cio_debug_crw_id != NULL) {
+		debug_register_view(cio_debug_crw_id, &debug_sprintf_view);
+#ifdef CONFIG_DEBUG_CRW
+		debug_set_level(cio_debug_crw_id, 6);
+#else /* CONFIG_DEBUG_CRW */
+		debug_set_level(cio_debug_crw_id, 2);
+#endif /* CONFIG_DEBUG_CRW */
+	} else {
+		ret = -1;
+	}
+	if (ret)
+		return ret;
+	cio_debug_initialized = 1;
+	return 0;
+}
+
+__initcall(cio_debug_init);
+
+/* 
+ * Display info on subchannels in /proc/subchannels. 
+ * Adapted from procfs stuff in dasd.c by Cornelia Huck, 02/28/01.      
+ */
 
 typedef struct {
      char *data;
@@ -6090,10 +6960,12 @@ static struct file_operations chan_subch_file_ops =
      release:chan_subch_close,
 };
 
-void chan_proc_init( void )
+static int chan_proc_init( void )
 {
      chan_subch_entry = create_proc_entry( "subchannels", S_IFREG|S_IRUGO, &proc_root);
      chan_subch_entry->proc_fops = &chan_subch_file_ops;
+
+     return 1;
 }
 
 __initcall(chan_proc_init);
@@ -6102,6 +6974,531 @@ void chan_proc_cleanup( void )
 {
      remove_proc_entry( "subchannels", &proc_root);
 }
+
+/* 
+ * Display device specific information under /proc/deviceinfo/<devno>
+ */
+
+static struct proc_dir_entry *cio_procfs_deviceinfo_root = NULL;
+
+/* 
+ * cio_procfs_device_list holds all devno-specific procfs directories
+ */
+
+typedef struct {
+	int devno;
+	struct proc_dir_entry *cio_device_entry;
+	struct proc_dir_entry *cio_sensedata_entry;
+	struct proc_dir_entry *cio_in_use_entry;
+	struct proc_dir_entry *cio_chpid_entry;
+} cio_procfs_entry_t;
+
+typedef struct _cio_procfs_device{
+	struct _cio_procfs_device *next;
+	cio_procfs_entry_t *entry;
+} cio_procfs_device_t;
+
+cio_procfs_device_t *cio_procfs_device_list = NULL;
+
+/*
+ * File operations
+ */
+
+static int cio_device_entry_close( struct inode *inode, struct file *file)
+{
+     int rc = 0;
+     tempinfo_t *p_info = (tempinfo_t *) file->private_data;
+
+     if (p_info) {
+	  if (p_info->data)
+	       vfree( p_info->data );
+	  vfree( p_info );
+     }
+     
+     return rc;
+}
+
+static ssize_t cio_device_entry_read( struct file *file, char *user_buf, size_t user_len, loff_t * offset)
+{
+     loff_t len;
+     tempinfo_t *p_info = (tempinfo_t *) file->private_data;
+     
+     if ( *offset>=p_info->len) {
+	  return 0;
+     } else {
+	  len = MIN(user_len, (p_info->len - *offset));
+	  if (copy_to_user( user_buf, &(p_info->data[*offset]), len))
+	       return -EFAULT; 
+	  (* offset) += len;
+	  return len;
+     }
+}
+
+int cio_search_devno_by_inode(struct inode *inode)
+{
+	int devno = -1;
+	struct proc_dir_entry *pde;
+	cio_procfs_device_t *tmp;
+	
+	pde = (struct proc_dir_entry *)inode->u.generic_ip;
+	tmp = cio_procfs_device_list;
+
+	while (tmp) {
+		if ((tmp->entry->cio_device_entry == pde) ||
+		    (tmp->entry->cio_sensedata_entry == pde) ||
+		    (tmp->entry->cio_in_use_entry == pde) ||
+		    (tmp->entry->cio_chpid_entry == pde))
+			break;
+		tmp = tmp->next;
+	}
+
+	if (tmp)
+		devno = tmp->entry->devno;
+		
+	return devno;
+}
+
+
+static int cio_sensedata_entry_open( struct inode *inode, struct file *file)
+{
+	int rc = 0;
+	int size = 1;
+	int len = 0;
+	tempinfo_t *info;
+	int irq;
+	int devno;
+
+	info = (tempinfo_t *) vmalloc(sizeof(tempinfo_t));
+	if (info == NULL) {
+		printk( KERN_WARNING "No memory available for data\n");
+		rc = -ENOMEM;
+	} else {
+		file->private_data = (void *) info;
+		size += 2 * 32;
+		info->data = (char *) vmalloc(size);
+		if (size && info->data == NULL) {
+			printk(KERN_WARNING "No memory available for data\n");
+			vfree(info);
+			rc = -ENOMEM;
+		} else {
+			devno = cio_search_devno_by_inode(inode);
+			if (devno != 0xFFFF) {
+				irq = get_irq_by_devno(devno);
+				if (irq != -1) {
+					len += sprintf(info->data+len, "Dev Type/Mod: ");
+					if (ioinfo[irq]->senseid.dev_type == 0) {
+						len += sprintf(info->data+len, "%04X/%02X\n",
+							       ioinfo[irq]->senseid.cu_type,
+							       ioinfo[irq]->senseid.cu_model);
+					} else {
+						len += sprintf(info->data+len, "%04X/%02X\n",
+							       ioinfo[irq]->senseid.dev_type,
+							       ioinfo[irq]->senseid.dev_model);
+						len+= sprintf(info->data+len, "CU Type/Mod:  %04X/%02X\n",
+							      ioinfo[irq]->senseid.cu_type,
+							      ioinfo[irq]->senseid.cu_model);
+					}
+				}
+			}
+			info->len = len;
+		}
+	}
+	
+	return rc;
+}
+
+static int cio_in_use_entry_open( struct inode *inode, struct file *file)
+{
+	int rc = 0;
+	int size = 1;
+	int len = 0;
+	tempinfo_t *info;
+	int irq;
+	int devno;
+
+	info = (tempinfo_t *) vmalloc(sizeof(tempinfo_t));
+	if (info == NULL) {
+		printk( KERN_WARNING "No memory available for data\n");
+		rc = -ENOMEM;
+	} else {
+		file->private_data = (void *) info;
+		size += 8;
+		info->data = (char *) vmalloc(size);
+		if (size && info->data == NULL) {
+			printk(KERN_WARNING "No memory available for data\n");
+			vfree(info);
+			rc = -ENOMEM;
+		} else {
+			devno = cio_search_devno_by_inode(inode);
+			if (devno != -1) {
+				irq = get_irq_by_devno(devno);
+				if (irq != -1) {
+					len += sprintf(info->data+len, "%s\n", ioinfo[irq]->ui.flags.ready?"yes":"no");
+				}
+			}
+			info->len = len;
+		}
+	}
+	
+	return rc;
+}
+
+static int cio_chpid_entry_open( struct inode *inode, struct file *file)
+{
+	int rc = 0;
+	int size = 1;
+	int len = 0;
+	tempinfo_t *info;
+	int irq;
+	int devno;
+	int i;
+
+	info = (tempinfo_t *) vmalloc(sizeof(tempinfo_t));
+	if (info == NULL) {
+		printk( KERN_WARNING "No memory available for data\n");
+		rc = -ENOMEM;
+	} else {
+		file->private_data = (void *) info;
+		size += 8*16;
+		info->data = (char *) vmalloc(size);
+		if (size && info->data == NULL) {
+			printk(KERN_WARNING "No memory available for data\n");
+			vfree(info);
+			rc = -ENOMEM;
+		} else {
+			devno = cio_search_devno_by_inode(inode);
+			if (devno != -1) {
+				irq = get_irq_by_devno(devno);
+				if (irq != -1) {
+					for (i=0; i<8; i++) {
+						len += sprintf(info->data+len, "CHPID[%d]: ", i);
+						len += sprintf(info->data+len, "%02X\n", ioinfo[irq]->schib.pmcw.chpid[i]);
+					}
+				}
+			}
+			info->len = len;
+		}
+	}
+
+	return rc;
+}
+
+static struct file_operations cio_sensedata_entry_file_ops =
+{
+     read:cio_device_entry_read,
+     open:cio_sensedata_entry_open,
+     release:cio_device_entry_close,
+};
+
+static struct file_operations cio_in_use_entry_file_ops =
+{
+     read:cio_device_entry_read,
+     open:cio_in_use_entry_open,
+     release:cio_device_entry_close,
+};
+
+static struct file_operations cio_chpid_entry_file_ops =
+{
+     read:cio_device_entry_read,
+     open:cio_chpid_entry_open,
+     release:cio_device_entry_close,
+};
+
+/*
+ * Function: cio_procfs_device_create
+ * create procfs entry for given device number
+ * and insert it into list
+ */
+int cio_procfs_device_create(int devno)
+{
+	cio_procfs_entry_t *entry;
+	cio_procfs_device_t *tmp;
+	cio_procfs_device_t *where;
+	char buf[8];
+	int i;
+	int rc = 0;
+
+
+	/* create the directory entry */
+	entry = (cio_procfs_entry_t *)kmalloc(sizeof(cio_procfs_entry_t), GFP_KERNEL);
+	if (entry) {
+		entry->devno = devno;
+		sprintf(buf, "%x", devno);
+		entry->cio_device_entry = proc_mkdir(buf, cio_procfs_deviceinfo_root);
+		
+		if (entry->cio_device_entry) {
+			tmp = (cio_procfs_device_t *)kmalloc(sizeof(cio_procfs_device_t), GFP_KERNEL);
+			if (tmp) {
+				tmp->entry = entry;
+				
+				if (cio_procfs_device_list == NULL) {
+					cio_procfs_device_list = tmp;
+					tmp->next = NULL;
+				} else {
+					where = cio_procfs_device_list;
+					i = where->entry->devno;
+					while ((devno>i) && (where->next != NULL)) {
+						where = where->next;
+						i = where->entry->devno;
+					}
+					if (where->next == NULL) {
+						where->next = tmp;
+						tmp->next = NULL;
+					} else {
+						tmp->next = where->next;
+						where->next = tmp;
+					}
+				}
+				/* create the different entries */
+				entry->cio_sensedata_entry = create_proc_entry( "sensedata", S_IFREG|S_IRUGO, entry->cio_device_entry);
+				entry->cio_sensedata_entry->proc_fops = &cio_sensedata_entry_file_ops;
+				entry->cio_in_use_entry = create_proc_entry( "in_use", S_IFREG|S_IRUGO, entry->cio_device_entry);
+				entry->cio_in_use_entry->proc_fops = &cio_in_use_entry_file_ops;
+				entry->cio_chpid_entry = create_proc_entry( "chpids", S_IFREG|S_IRUGO, entry->cio_device_entry);
+				entry->cio_chpid_entry->proc_fops = &cio_chpid_entry_file_ops;
+			} else {
+				printk("Error, could not allocate procfs structure!\n");
+				remove_proc_entry(buf, cio_procfs_deviceinfo_root);
+				kfree(entry);
+				rc = -ENOMEM;
+			}
+		} else {
+			printk("Error, could not allocate procfs structure!\n");
+			kfree(entry);
+			rc = -ENOMEM;
+		}
+
+	} else {
+		printk("Error, could not allocate procfs structure!\n");
+		rc = -ENOMEM;
+	}
+	return rc;
+}
+
+/*
+ * Function: cio_procfs_device_remove
+ * remove procfs entry for given device number
+ */
+int cio_procfs_device_remove(int devno)
+{
+	int rc = 0;
+	cio_procfs_device_t *tmp;
+	cio_procfs_device_t *prev = NULL;
+
+	tmp=cio_procfs_device_list;
+	while (tmp) {
+		if (tmp->entry->devno == devno)
+			break;
+		prev = tmp;
+		tmp = tmp->next;
+	}
+
+	if (tmp) {
+		char buf[8];
+		
+		remove_proc_entry("sensedata", tmp->entry->cio_device_entry);
+		remove_proc_entry("in_use", tmp->entry->cio_device_entry);
+		remove_proc_entry("chpid", tmp->entry->cio_device_entry);
+		sprintf(buf, "%x", devno);
+		remove_proc_entry(buf, cio_procfs_deviceinfo_root);
+		
+		if (tmp == cio_procfs_device_list) {
+			cio_procfs_device_list = tmp->next;
+		} else {
+			prev->next = tmp->next;
+		}
+		kfree(tmp->entry);
+		kfree(tmp);
+	} else {
+		rc = -ENODEV;
+	}
+
+	return rc;
+}
+
+/*
+ * Function: cio_procfs_purge
+ * purge /proc/deviceinfo of entries for gone devices
+ */
+
+int cio_procfs_device_purge(void) 
+{
+	int i;
+
+	for (i=0; i<=highest_subchannel; i++) {
+		if (ioinfo[i] != INVALID_STORAGE_AREA) {
+			if (!ioinfo[i]->ui.flags.oper) 
+				cio_procfs_device_remove(ioinfo[i]->devno);
+		}
+	}
+
+	return 0;
+}
+
+/*
+ * Function: cio_procfs_create
+ * create /proc/deviceinfo/ and subdirs for the devices
+ */
+static int cio_procfs_create( void )
+{
+	int irq;
+
+	if (cio_proc_devinfo) {
+
+		cio_procfs_deviceinfo_root = proc_mkdir( "deviceinfo", &proc_root);
+		
+		if (highest_subchannel >= MAX_CIO_PROCFS_ENTRIES) {
+			printk(KERN_ALERT "Warning: Not enough inodes for creating all entries under /proc/deviceinfo/. "
+			       "Not every device will get an entry.\n");
+		}
+		
+		for (irq=0; irq<=highest_subchannel; irq++) {
+			if (irq >= MAX_CIO_PROCFS_ENTRIES)
+				break;
+			if (ioinfo[irq] != INVALID_STORAGE_AREA) {
+				if (ioinfo[irq]->ui.flags.oper) 
+					if (cio_procfs_device_create(ioinfo[irq]->devno) == -ENOMEM) {
+						printk(KERN_CRIT "Out of memory while creating entries in /proc/deviceinfo/, "
+						       "not all devices might show up\n");
+					break;
+					}
+			}
+		}
+	
+	}
+	
+	return 1;
+}
+
+__initcall(cio_procfs_create);
+
+/*
+ * Entry /proc/cio_ignore to display blacklisted ranges of devices.
+ * un-ignore devices by piping to /proc/cio_ignore:
+ * free all frees all blacklisted devices, free <range>,<range>,...
+ * frees specified ranges of devnos
+ */
+
+static struct proc_dir_entry *cio_ignore_proc_entry;
+
+static int cio_ignore_proc_open(struct inode *inode, struct file *file)
+{
+	int rc = 0;
+	int size = 1;
+	int len = 0;
+	tempinfo_t *info;
+	dev_blacklist_range_t *tmp;
+
+	info = (tempinfo_t *) vmalloc(sizeof(tempinfo_t));
+	if (info == NULL) {
+		printk( KERN_WARNING "No memory available for data\n");
+		rc = -ENOMEM;
+	} else {
+		file->private_data = (void *) info;
+		size += nr_blacklisted_ranges * 32;
+		info->data = (char *) vmalloc(size);
+		if (size && info->data == NULL) {
+			printk( KERN_WARNING "No memory available for data\n");
+			vfree (info);
+			rc = -ENOMEM;
+		} else {
+			tmp = dev_blacklist_range_head;
+			while (tmp) {
+				len += sprintf(info->data+len, "%04x ", tmp->from);
+				if (tmp->to != tmp->from) 
+					len += sprintf(info->data+len, "- %04x", tmp->to);
+				len += sprintf(info->data+len, "\n");
+				tmp = tmp->next;
+			}
+			info->len = len;
+		}
+	}
+	return rc;
+}
+
+static int cio_ignore_proc_close(struct inode *inode, struct file *file)
+{
+	int rc = 0;
+	tempinfo_t *p_info = (tempinfo_t *) file->private_data;
+
+     if (p_info) {
+	  if (p_info->data)
+	       vfree( p_info->data );
+	  vfree( p_info );
+     }
+     
+     return rc;
+}
+
+static ssize_t cio_ignore_proc_read( struct file *file, char *user_buf, size_t user_len, loff_t * offset)
+{
+     loff_t len;
+     tempinfo_t *p_info = (tempinfo_t *) file->private_data;
+     
+     if ( *offset>=p_info->len) {
+	  return 0;
+     } else {
+	  len = MIN(user_len, (p_info->len - *offset));
+	  if (copy_to_user( user_buf, &(p_info->data[*offset]), len))
+	       return -EFAULT; 
+	  (* offset) += len;
+	  return len;
+     }
+}
+
+static ssize_t cio_ignore_proc_write (struct file *file, const char *user_buf,
+				      size_t user_len, loff_t * offset)
+{
+	char *buffer = vmalloc (user_len);
+
+	if (buffer == NULL)
+		return -ENOMEM;
+	if (copy_from_user (buffer, user_buf, user_len)) {
+		vfree (buffer);
+		return -EFAULT;
+	}
+	buffer[user_len]='\0';
+#ifdef CIO_DEBUG_IO
+	printk ("/proc/cio_ignore: '%s'\n", buffer);
+#endif /* CIO_DEBUG_IO */
+	if (cio_debug_initialized)
+		debug_sprintf_event(cio_debug_msg_id, 2, "/proc/cio_ignore: '%s'\n",buffer);
+
+	blacklist_parse_proc_parameters(buffer);
+
+	return user_len;
+}
+
+static struct file_operations cio_ignore_proc_file_ops =
+{
+	read:cio_ignore_proc_read,
+	open:cio_ignore_proc_open,
+	write:cio_ignore_proc_write,
+	release:cio_ignore_proc_close,
+};
+
+static int cio_ignore_proc_init(void)
+{
+	cio_ignore_proc_entry = create_proc_entry("cio_ignore", S_IFREG|S_IRUGO|S_IWUSR, &proc_root);
+	cio_ignore_proc_entry->proc_fops = &cio_ignore_proc_file_ops;
+
+	return 1;
+}
+
+__initcall(cio_ignore_proc_init);
+
+/* end of procfs stuff */
+
+schib_t *s390_get_schib( int irq )
+{
+	if ( (irq > highest_subchannel) || (irq < 0) )
+		return NULL;
+	if ( ioinfo[irq] == INVALID_STORAGE_AREA )
+		return NULL;
+	return &ioinfo[irq]->schib;
+
+}
+
 
 EXPORT_SYMBOL(halt_IO);
 EXPORT_SYMBOL(clear_IO);
@@ -6117,3 +7514,6 @@ EXPORT_SYMBOL(get_irq_next);
 EXPORT_SYMBOL(read_conf_data);
 EXPORT_SYMBOL(read_dev_chars);
 EXPORT_SYMBOL(s390_request_irq_special);
+EXPORT_SYMBOL(s390_get_schib);
+EXPORT_SYMBOL(s390_register_adapter_interrupt);
+EXPORT_SYMBOL(s390_unregister_adapter_interrupt);

@@ -27,7 +27,7 @@ int tape_ioctl(struct inode *,struct file *,unsigned int,unsigned long);
 int tape_open (struct inode *,struct file *);
 int tape_release (struct inode *,struct file *);
 #ifdef CONFIG_DEVFS_FS
-void tapechar_mkdevfstree (tape_info_t* tape);
+void tapechar_mkdevfstree (tape_info_t* ti);
 #endif
 void tapechar_init (void);
 void tapechar_uninit (void);

@@ -15,12 +15,14 @@ struct dmi_header
 };
 
 #define dmi_printk(x)
-//#define dmi_printk(x) printk(x)
+//#define dmi_printk(x) printk x
 
 static char * __init dmi_string(struct dmi_header *dm, u8 s)
 {
 	u8 *bp=(u8 *)dm;
 	bp+=dm->length;
+	if(!s)
+		return "";
 	s--;
 	while(s>0)
 	{

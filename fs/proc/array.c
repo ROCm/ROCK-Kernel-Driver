@@ -258,7 +258,7 @@ static inline char * task_sig(struct task_struct *p, char *buffer)
 	return buffer;
 }
 
-extern inline char *task_cap(struct task_struct *p, char *buffer)
+static inline char *task_cap(struct task_struct *p, char *buffer)
 {
     return buffer + sprintf(buffer, "CapInh:\t%016x\n"
 			    "CapPrm:\t%016x\n"

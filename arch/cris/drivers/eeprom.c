@@ -20,6 +20,18 @@
 *!                                  in the spin-lock.
 *!
 *!  $Log: eeprom.c,v $
+*!  Revision 1.8  2001/06/15 13:24:29  jonashg
+*!  * Added verification of pointers from userspace in read and write.
+*!  * Made busy counter volatile.
+*!  * Added define for inital write delay.
+*!  * Removed warnings by using loff_t instead of unsigned long.
+*!
+*!  Revision 1.7  2001/06/14 15:26:54  jonashg
+*!  Removed test because condition is always true.
+*!
+*!  Revision 1.6  2001/06/14 15:18:20  jonashg
+*!  Kb -> kB (makes quite a difference if you don't know if you have 2k or 16k).
+*!
 *!  Revision 1.5  2001/06/14 14:39:51  jonashg
 *!  Forgot to use name when registering the driver.
 *!
@@ -59,6 +71,7 @@
 #include <linux/fs.h>
 #include <linux/init.h>
 #include <linux/delay.h>
+#include <asm/uaccess.h>
 #include "i2c.h"
 
 #define D(x) 
@@ -69,6 +82,10 @@
 #define EEPROM_MAJOR_NR 122  /* use a LOCAL/EXPERIMENTAL major for now */
 #define EEPROM_MINOR_NR 0
 
+/* Empirical sane initial value of the delay, the value will be adapted to
+ * what the chip needs when using EEPROM_ADAPTIVE_TIMING.
+ */
+#define INITIAL_WRITEDELAY_US 4000
 #define MAX_WRITEDELAY_US 10000 /* 10 ms according to spec for 2KB EEPROM */
 
 /* This one defines how many times to try when eeprom fails. */
@@ -98,7 +115,7 @@ struct eeprom_type
   
   /* this one is to keep the read/write operations atomic */
   wait_queue_head_t wait_q;
-  int busy;
+  volatile int busy;
   int retry_cnt_addr; /* Used to keep track of number of retries for
                          adaptive timing adjustments */
   int retry_cnt_read;
@@ -114,9 +131,8 @@ static int eeprom_close(struct inode * inode, struct file * file);
 
 static int  eeprom_address(unsigned long addr);
 static int  read_from_eeprom(char * buf, int count);
-static int eeprom_write_buf(unsigned long addr, const char * buf, int count);
-static int eeprom_read_buf(unsigned long addr,
-                           char * buf, int count);
+static int eeprom_write_buf(loff_t addr, const char * buf, int count);
+static int eeprom_read_buf(loff_t addr, char * buf, int count);
 
 static void eeprom_disable_write_protect(void);
 
@@ -159,7 +175,7 @@ int __init eeprom_init(void)
 
   /*
    *  Note: Most of this probing method was taken from the printserver (5470e)
-   *        codebase. It did not contain a way of finding the 16Kb chips
+   *        codebase. It did not contain a way of finding the 16kB chips
    *        (M24128 or variants). The method used here might not work
    *        for all models. If you encounter problems the easiest way
    *        is probably to define your model within #ifdef's, and hard-
@@ -167,7 +183,7 @@ int __init eeprom_init(void)
    */
 
   eeprom.size = 0;
-  eeprom.usec_delay_writecycles = 4000;/*MAX_WRITEDELAY_US / EEPROM_RETRIES;*/
+  eeprom.usec_delay_writecycles = INITIAL_WRITEDELAY_US;
   eeprom.usec_delay_step = 128;
   eeprom.adapt_state = 0;
   
@@ -181,7 +197,7 @@ int __init eeprom_init(void)
     unsigned char buf_2k_start[16];
     
     /* Im not sure this will work... :) */
-    /* assume 2Kb, if failure go for 16Kb */
+    /* assume 2kB, if failure go for 16kB */
     /* Test with 16kB settings.. */
     /* If it's a 2kB EEPROM and we address it outside it's range
      * it will mirror the address space:
@@ -373,17 +389,17 @@ int __init eeprom_init(void)
   switch(eeprom.size)
   {
    case (EEPROM_2KB):
-     printk("%s: " EETEXT " i2c compatible 2Kb eeprom.\n", eeprom_name);
+     printk("%s: " EETEXT " i2c compatible 2kB eeprom.\n", eeprom_name);
      eeprom.sequential_write_pagesize = 16;
      eeprom.select_cmd = 0xA0;
      break;
    case (EEPROM_8KB):
-     printk("%s: " EETEXT " i2c compatible 8Kb eeprom.\n", eeprom_name);
+     printk("%s: " EETEXT " i2c compatible 8kB eeprom.\n", eeprom_name);
      eeprom.sequential_write_pagesize = 16;
      eeprom.select_cmd = 0x80;
      break;
    case (EEPROM_16KB):
-     printk("%s: " EETEXT " i2c compatible 16Kb eeprom.\n", eeprom_name);
+     printk("%s: " EETEXT " i2c compatible 16kB eeprom.\n", eeprom_name);
      eeprom.sequential_write_pagesize = 64;
      eeprom.select_cmd = 0xA0;     
      break;
@@ -463,8 +479,7 @@ static loff_t eeprom_lseek(struct file * file, loff_t offset, int orig)
 
 /* Reads data from eeprom. */
 
-static int eeprom_read_buf(unsigned long addr,
-                           char * buf, int count)
+static int eeprom_read_buf(loff_t addr, char * buf, int count)
 {
   struct file f;
 
@@ -543,7 +558,7 @@ static ssize_t eeprom_read(struct file * file, char * buf, size_t count, loff_t 
 
 /* Writes data to eeprom. */
 
-static int eeprom_write_buf(unsigned long addr, const char * buf, int count)
+static int eeprom_write_buf(loff_t addr, const char * buf, int count)
 {
   struct file f;
 
@@ -560,6 +575,11 @@ static ssize_t eeprom_write(struct file * file, const char * buf, size_t count,
 {
   int i, written, restart=1;
   unsigned long p;
+
+  if (verify_area(VERIFY_READ, buf, count))
+  {
+    return -EFAULT;
+  }
 
   while(eeprom.busy)
   {
@@ -641,11 +661,8 @@ static ssize_t eeprom_write(struct file * file, const char * buf, size_t count,
           /* To High before */
           if (eeprom.usec_delay_step > 1)
           {
-            if (eeprom.usec_delay_step > 0)
-            {
-              eeprom.usec_delay_step *= 2;
-              eeprom.usec_delay_step--;
-            }
+            eeprom.usec_delay_step *= 2;
+            eeprom.usec_delay_step--;
             
             if (eeprom.usec_delay_writecycles > eeprom.usec_delay_step)
             {
@@ -807,7 +824,12 @@ static int read_from_eeprom(char * buf, int count)
 
   while( (read < count))
   {    
-    buf[read++] = i2c_inbyte();      
+    if (put_user(i2c_inbyte(), &buf[read++]))
+    {
+      i2c_stop();
+
+      return -EFAULT;
+    }
 
     /*
      *  make sure we don't ack last byte or you will get very strange

@@ -448,7 +448,7 @@ try_again:
 		 * to give up than to deadlock the kernel looping here.
 		 */
 		if (gfp_mask & __GFP_WAIT) {
-			if (!order || free_shortage()) {
+			if (!order || total_free_shortage()) {
 				int progress = try_to_free_pages(gfp_mask);
 				if (progress || (gfp_mask & __GFP_FS))
 					goto try_again;
@@ -621,6 +621,53 @@ unsigned int nr_free_highpages (void)
 	return pages;
 }
 #endif
+
+unsigned int zone_free_shortage(zone_t *zone)
+{
+	int sum = 0;
+
+	if (!zone->size)
+		goto ret;
+
+	if (zone->inactive_clean_pages + zone->free_pages
+			< zone->pages_min) {
+		sum += zone->pages_min;
+		sum -= zone->free_pages;
+		sum -= zone->inactive_clean_pages;
+	}
+ret:
+	return sum;
+}
+
+unsigned int zone_inactive_plenty(zone_t *zone)
+{
+	int inactive;
+
+	if (!zone->size)
+		return 0;
+		
+	inactive = zone->inactive_dirty_pages;
+	inactive += zone->inactive_clean_pages;
+	inactive += zone->free_pages;
+
+	return (inactive > (zone->size / 3));
+
+}
+unsigned int zone_inactive_shortage(zone_t *zone) 
+{
+	int sum = 0;
+
+	if (!zone->size)
+		goto ret;
+
+	sum = zone->pages_high;
+	sum -= zone->inactive_dirty_pages;
+	sum -= zone->inactive_clean_pages;
+	sum -= zone->free_pages;
+
+ret:
+     return (sum > 0 ? sum : 0);
+}
 
 /*
  * Show free area list (used inside shift_scroll-lock stuff)

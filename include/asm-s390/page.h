@@ -28,7 +28,7 @@ static inline void clear_page(void *page)
 	rp.subreg.odd = (unsigned long) 4096;
         asm volatile ("   slr  1,1\n"
 		      "   mvcl %0,0"
-		      : "+&a" (rp) : : "memory", "1" );
+		      : "+&a" (rp) : : "memory", "cc", "1" );
 }
 
 static inline void copy_page(void *to, void *from)
@@ -37,7 +37,7 @@ static inline void copy_page(void *to, void *from)
 		asm volatile ("   sr   0,0\n"
 			      "   mvpg %0,%1"
 			      : : "a" ((void *)(to)), "a" ((void *)(from))
-			      : "memory", "0" );
+			      : "memory", "cc", "0" );
 	else
 		asm volatile ("   mvc  0(256,%0),0(%1)\n"
 			      "   mvc  256(256,%0),256(%1)\n"

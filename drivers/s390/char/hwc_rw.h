@@ -4,7 +4,7 @@
  *
  *  S390 version
  *    Copyright (C) 1999 IBM Deutschland Entwicklung GmbH, IBM Corporation
- *    Author(s): Martin Peschke <peschke@fh-brandenburg.de>
+ *    Author(s): Martin Peschke <mpeschke@de.ibm.com>
  */
 
 #ifndef __HWC_RW_H__
@@ -18,6 +18,25 @@ typedef struct {
 
 	void (*wake_up) (void);
 } hwc_high_level_calls_t;
+
+struct _hwc_request;
+
+typedef void hwc_callback_t (struct _hwc_request *);
+
+typedef struct _hwc_request {
+	void *block;
+	u32 word;
+	hwc_callback_t *callback;
+	void *data;
+} __attribute__ ((packed)) 
+
+hwc_request_t;
+
+#define HWC_ASCEBC(x) ((MACHINE_IS_VM ? _ascebc[x] : _ascebc_500[x]))
+
+#define HWC_EBCASC_STR(s,c) ((MACHINE_IS_VM ? EBCASC(s,c) : EBCASC_500(s,c)))
+
+#define HWC_ASCEBC_STR(s,c) ((MACHINE_IS_VM ? ASCEBC(s,c) : ASCEBC_500(s,c)))
 
 #define IN_HWCB      1
 #define IN_WRITE_BUF 2
@@ -105,6 +124,8 @@ extern int hwc_printk (const char *,...);
 extern signed int hwc_register_calls (hwc_high_level_calls_t *);
 
 extern signed int hwc_unregister_calls (hwc_high_level_calls_t *);
+
+extern int hwc_send (hwc_request_t *);
 
 #endif
 

@@ -573,6 +573,8 @@ static int moxa_open(struct tty_struct *tty, struct file *filp)
 			up(&moxaBuffSem);
 			return (-ENOMEM);
 		}
+		/* This test is guarded by the BuffSem so no longer needed
+		   delete me in 2.5 */
 		if (moxaXmitBuff)
 			free_page(page);
 		else

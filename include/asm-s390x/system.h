@@ -63,7 +63,7 @@ static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
                                 "   jl    1b\n"
                                 "   ex    0,4(2)"     /* store *ptr to x */
                                 : "+&a" (ptr) : "a" (&x)
-                                : "memory", "0", "1", "2");
+                                : "memory", "cc", "0", "1", "2");
 			break;
                 case 2:
                         if(((addr_t)ptr)&1)
@@ -86,7 +86,7 @@ static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
                                 "   jl    1b\n"
                                 "   ex    0,4(2)"     /* store *ptr to x */
                                 : "+&a" (ptr) : "a" (&x)
-                                : "memory", "0", "1", "2");
+                                : "memory", "cc", "0", "1", "2");
                         break;
                 case 4:
                         if(((addr_t)ptr)&3)
@@ -97,7 +97,7 @@ static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
                                 "    jl   0b\n"
                                 "    lgfr %0,0\n"
                                 : "+d" (x) : "a" (ptr)
-                                : "memory", "0" );
+                                : "memory", "cc", "0" );
                         break;
                 case 8:
                         if(((addr_t)ptr)&7)
@@ -108,7 +108,7 @@ static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
                                 "    jl  0b\n"
                                 "    lgr %0,0\n"
                                 : "+d" (x) : "a" (ptr)
-                                : "memory", "0" );
+                                : "memory", "cc", "0" );
                         break;
                default:
                         abort();
@@ -161,7 +161,7 @@ static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
         __asm__ __volatile__("ssm   %0" : : "m" (x) : "memory")
 
 #define __load_psw(psw) \
-        __asm__ __volatile__("lpswe %0" : : "m" (psw));
+        __asm__ __volatile__("lpswe %0" : : "m" (psw) : "cc" );
 
 #define __ctl_load(array, low, high) ({ \
 	__asm__ __volatile__ ( \
@@ -196,7 +196,7 @@ static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
                 "    stg   0,0(1)\n" \
                 "1:  ex    %1,6(2)"      /* execute lctl */ \
                 : "=m" (dummy) : "a" (cr*17), "a" (1L<<(bit)) \
-                : "0", "1", "2"); \
+                : "cc", "0", "1", "2"); \
         })
 
 #define __ctl_clear_bit(cr, bit) ({ \
@@ -214,7 +214,7 @@ static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
                 "    stg   0,0(1)\n" \
                 "1:  ex    %1,6(2)"      /* execute lctl */ \
                 : "=m" (dummy) : "a" (cr*17), "a" (~(1L<<(bit))) \
-                : "0", "1", "2"); \
+                : "cc", "0", "1", "2"); \
         })
 
 /* For spinlocks etc */

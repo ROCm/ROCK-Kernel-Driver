@@ -18,6 +18,7 @@
 #include <linux/kernel.h>
 #include <linux/version.h>
 #include <linux/proc_fs.h>
+#include <linux/init.h>
 #include <asm/types.h>
 #include <asm/ccwcache.h>
 #include <asm/idals.h>
@@ -26,9 +27,7 @@
 #ifdef MODULE
 #include <linux/module.h>
 #endif   
-#ifdef TAPE_DEBUG
 #include <asm/debug.h>
-#endif
 #ifdef CONFIG_S390_TAPE_DYNAMIC
 #include <asm/s390dyn.h>
 #endif
@@ -50,15 +49,19 @@
 #endif
 #define PRINTK_HEADER "T390:"
 
+
 /* state handling routines */
-inline void tapestate_set (tape_info_t * tape, int newstate);
-inline int tapestate_get (tape_info_t * tape);
-void tapestate_event (tape_info_t * tape, int event);
+inline void tapestate_set (tape_info_t * ti, int newstate);
+inline int tapestate_get (tape_info_t * ti);
+void tapestate_event (tape_info_t * ti, int event);
 
 /* our globals */
 tape_info_t *first_tape_info = NULL;
 tape_discipline_t *first_discipline = NULL;
 tape_frontend_t *first_frontend = NULL;
+devreg_t* tape_devreg[128];
+int devregct=0;
+
 #ifdef TAPE_DEBUG
 debug_info_t *tape_debug_area = NULL;
 #endif
@@ -107,17 +110,17 @@ char* event_verbose[TE_SIZE]= {
 devfs_handle_t tape_devfs_root_entry;
 
 inline void
-tape_mkdevfsroots (tape_info_t* tape) 
+tape_mkdevfsroots (tape_info_t* ti) 
 {
     char devno [5];
-    sprintf (devno,"%04X",tape->devinfo.devno);
-    tape->devfs_dir=devfs_mk_dir (tape_devfs_root_entry, devno, tape);
+    sprintf (devno,"%04x",ti->devinfo.devno);
+    ti->devfs_dir=devfs_mk_dir (tape_devfs_root_entry, devno, ti);
 }
 
 inline void
-tape_rmdevfsroots (tape_info_t* tape)
+tape_rmdevfsroots (tape_info_t* ti)
 {
-    devfs_unregister (tape->devfs_dir);
+    devfs_unregister (ti->devfs_dir);
 }
 #endif
 
@@ -135,14 +138,14 @@ static int
 tape_devices_open (struct inode *inode, struct file *file)
 {
     int size=80;
-    tape_info_t* tape;
+    tape_info_t* ti;
     tempinfo_t* tempinfo;
     char* data;
     int pos=0;
     tempinfo = kmalloc (sizeof(tempinfo_t),GFP_KERNEL);
     if (!tempinfo)
         return -ENOMEM;
-    for (tape=first_tape_info;tape!=NULL;tape=tape->next)
+    for (ti=first_tape_info;ti!=NULL;ti=ti->next)
         size+=80; // FIXME: Guess better!
     data=vmalloc(size);
     if (!data) {
@@ -150,13 +153,13 @@ tape_devices_open (struct inode *inode, struct file *file)
         return -ENOMEM;
     }
     pos+=sprintf(data+pos,"TapeNo\tDevNo\tCuType\tCuModel\tDevType\tDevModel\tState\n");
-    for (tape=first_tape_info;tape!=NULL;tape=tape->next) {
-        pos+=sprintf(data+pos,"%d\t%04X\t%04X\t%02X\t%04X\t%02X\t\t%s\n",tape->rew_minor/2,
-                     tape->devinfo.devno,tape->devinfo.sid_data.cu_type,
-                     tape->devinfo.sid_data.cu_model,tape->devinfo.sid_data.dev_type,
-                     tape->devinfo.sid_data.dev_model,((tapestate_get(tape) >= 0) &&
-                                                       (tapestate_get(tape) < TS_SIZE)) ?
-                     state_verbose[tapestate_get (tape)] : "TS UNKNOWN");
+    for (ti=first_tape_info;ti!=NULL;ti=ti->next) {
+        pos+=sprintf(data+pos,"%d\t%04X\t%04X\t%02X\t%04X\t%02X\t\t%s\n",ti->rew_minor/2,
+                     ti->devinfo.devno,ti->devinfo.sid_data.cu_type,
+                     ti->devinfo.sid_data.cu_model,ti->devinfo.sid_data.dev_type,
+                     ti->devinfo.sid_data.dev_model,((tapestate_get(ti) >= 0) &&
+                                                       (tapestate_get(ti) < TS_SIZE)) ?
+                     state_verbose[tapestate_get (ti)] : "TS UNKNOWN");
     }
     tempinfo->len=pos;
     tempinfo->data=data;
@@ -214,6 +217,183 @@ static struct inode_operations tape_devices_inode_ops =
 #endif				/* LINUX_IS_24 */
 };
 #endif /* CONFIG_PROC_FS */
+
+/* SECTION: Parameters for tape */
+char *tape[256] = { NULL, };
+
+#ifndef MODULE
+static char tape_parm_string[1024] __initdata = { 0, };
+static void
+tape_split_parm_string (char *str)
+{
+	char *tmp = str;
+	int count = 0;
+	while (tmp != NULL && *tmp != '\0') {
+		char *end;
+		int len;
+		end = strchr (tmp, ',');
+		if (end == NULL) {
+			len = strlen (tmp) + 1;
+		} else {
+			len = (long) end - (long) tmp + 1;
+			*end = '\0';
+			end++;
+		}
+		tape[count] = kmalloc (len * sizeof (char), GFP_ATOMIC);
+		if (tape[count] == NULL) {
+			printk (KERN_WARNING PRINTK_HEADER
+				"can't store tape= parameter no %d\n",
+				count + 1);
+			break;
+		}
+		memset (tape[count], 0, len * sizeof (char));
+		memcpy (tape[count], tmp, len * sizeof (char));
+		count++;
+		tmp = end;
+	};
+}
+
+void __init
+tape_parm_setup (char *str, int *ints)
+{
+	int len = strlen (tape_parm_string);
+	if (len != 0) {
+		strcat (tape_parm_string, ",");
+	}
+	strcat (tape_parm_string, str);
+}
+
+int __init
+tape_parm_call_setup (char *str)
+{
+	int dummy;
+	tape_parm_setup (str, &dummy);
+	return 1;
+}
+
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,2,16))
+__setup("tape=", tape_parm_call_setup);
+#endif   /* kernel <2.2.19 */
+#endif   /* not defined MODULE */
+
+static inline int
+tape_parm_strtoul (char *str, char **stra)
+{
+	char *temp = str;
+	int val;
+	if (*temp == '0') {
+		temp++;		/* strip leading zero */
+		if (*temp == 'x')
+			temp++;	/* strip leading x */
+	}
+	val = simple_strtoul (temp, &temp, 16);	/* interpret anything as hex */
+	*stra = temp;
+	return val;
+}
+
+static inline devreg_t *
+tape_create_devreg (int devno)
+{
+	devreg_t *devreg = kmalloc (sizeof (devreg_t), GFP_KERNEL);
+	if (devreg != NULL) {
+		memset (devreg, 0, sizeof (devreg_t));
+		devreg->ci.devno = devno;
+		devreg->flag = DEVREG_TYPE_DEVNO;
+		devreg->oper_func = tape_oper_handler;
+	}
+	return devreg;
+}
+
+static inline void
+tape_parm_parse (char **str)
+{
+	char *temp;
+	int from, to,i,irq=0,rc,retries=0,tape_num=0;
+        s390_dev_info_t dinfo;
+        tape_info_t* ti,*tempti;
+        tape_discipline_t* disc;
+        long lockflags;
+	if (*str==NULL) {
+            /* no params present -> leave */
+            return;
+	}
+	while (*str) {
+		temp = *str;
+		from = 0;
+		to = 0;
+
+                /* turn off autodetect mode, if any range is present */
+                from = tape_parm_strtoul (temp, &temp);
+                to = from;
+                if (*temp == '-') {
+                    temp++;
+                    to = tape_parm_strtoul (temp, &temp);
+                }
+                for (i=from;i<=to;i++) {
+                    retries=0;
+                    // register for attch/detach of a devno
+                    tape_devreg[devregct]=tape_create_devreg(i);
+                    if (tape_devreg[devregct]==NULL) {
+                        PRINT_WARN ("Could not create devreg for devno %04x, dyn. attach for this devno deactivated.\n",i);
+                    } else {
+                        s390_device_register (tape_devreg[devregct++]);
+                    }
+                    // we are activating a device if it is present
+                    for (irq = get_irq_first(); irq!=-ENODEV; irq=get_irq_next(irq)) {
+                        rc = get_dev_info_by_irq (irq, &dinfo);
+                     
+                        disc = first_discipline;
+                        while ((dinfo.devno == i) && (disc != NULL) && (disc->cu_type != dinfo.sid_data.cu_type))
+                            disc = (tape_discipline_t *) (disc->next);
+                        if ((disc == NULL) || (rc == -ENODEV) || (i!=dinfo.devno)) {
+                            continue;
+                        }
+#ifdef TAPE_DEBUG
+                        debug_text_event (tape_debug_area,3,"det irq:  ");
+                        debug_int_event (tape_debug_area,3,irq);
+                        debug_text_event (tape_debug_area,3,"cu:       ");
+                        debug_int_event (tape_debug_area,3,disc->cu_type);
+#endif /* TAPE_DEBUG */
+                        PRINT_INFO ("using devno %04x with discipline %04x on irq %d as tape device %d\n",dinfo.devno,dinfo.sid_data.cu_type,irq,tape_num/2);
+                        /* Allocate tape structure  */
+                        ti = kmalloc (sizeof (tape_info_t), GFP_ATOMIC);
+                        if (ti == NULL) {
+#ifdef TAPE_DEBUG
+                            debug_text_exception (tape_debug_area,3,"ti:no mem ");
+#endif /* TAPE_DEBUG */
+                            PRINT_INFO ("tape: can't allocate memory for "
+                                        "tape info structure\n");
+                            continue;
+                        }
+                        memset(ti,0,sizeof(tape_info_t));
+                        ti->discipline = disc;
+                        disc->tape = ti;
+                        rc = tape_setup (ti, irq, tape_num);
+                        if (rc) {
+#ifdef TAPE_DEBUG
+                            debug_text_event (tape_debug_area,3,"tsetup err");
+                            debug_int_exception (tape_debug_area,3,rc);
+#endif /* TAPE_DEBUG */
+                            kfree (ti);
+                        } else {
+                            s390irq_spin_lock_irqsave (irq, lockflags);
+                            if (first_tape_info == NULL) {
+                                first_tape_info = ti;
+                            } else {
+                                tempti = first_tape_info;
+                                while (tempti->next != NULL)
+                                    tempti = tempti->next;
+                                tempti->next = ti;
+                            }
+                            s390irq_spin_unlock_irqrestore (irq, lockflags);
+                        }
+                    }
+                    tape_num+=2;
+                }
+                str++;
+        }
+}
+
 
 /* SECTION: Managing wrappers for ccwcache */
 
@@ -286,7 +466,6 @@ tape_free_request (ccw_req_t * request)
 		*((ccw_req_t **) (request->cache)) = request;
 	} else {
 		clear_normalized_cda ((ccw1_t *) (request->cpaddr));	// avoid memory leak caused by modeset_byte
-
 		ccw_free_request (request);
 	}
 }
@@ -296,12 +475,12 @@ tape_free_request (ccw_req_t * request)
  */
 inline
  ccw_req_t *
-tape_alloc_ccw_req (tape_info_t * tape, int cplength, int datasize)
+tape_alloc_ccw_req (tape_info_t * ti, int cplength, int datasize)
 {
 	char tape_magic_id[] = "tape";
 	ccw_req_t *cqr = NULL;
 
-	if (!tape)
+	if (!ti)
 		return NULL;
 	cqr = tape_alloc_request (tape_magic_id, cplength, datasize);
 
@@ -311,7 +490,7 @@ tape_alloc_ccw_req (tape_info_t * tape, int cplength, int datasize)
 #endif
 	}
 	cqr->magic = TAPE_MAGIC;	/* sets an identifier for tape driver   */
-	cqr->device = tape;	/* save pointer to tape info    */
+	cqr->device = ti;	/* save pointer to tape info    */
 	return cqr;
 }
 
@@ -321,15 +500,15 @@ tape_alloc_ccw_req (tape_info_t * tape, int cplength, int datasize)
 static inline tape_info_t *
 tapedev_find_info (int irq)
 {
-	tape_info_t *tape;
+	tape_info_t *ti;
 
-	tape = first_tape_info;
-	if (tape != NULL)
+	ti = first_tape_info;
+	if (ti != NULL)
 		do {
-			if (tape->devinfo.irq == irq)
+			if (ti->devinfo.irq == irq)
 				break;
-		} while ((tape = (tape_info_t *) tape->next) != NULL);
-	return tape;
+		} while ((ti = (tape_info_t *) ti->next) != NULL);
+	return ti;
 }
 
 #define QUEUE_THRESHOLD 5
@@ -340,32 +519,31 @@ tapedev_find_info (int irq)
 void
 tape_irq (int irq, void *int_parm, struct pt_regs *regs)
 {
-	tape_info_t *tape = tapedev_find_info (irq);
+	tape_info_t *ti = tapedev_find_info (irq);
 
 	/* analyse devstat and fire event */
-	if (tape->devstat.dstat & DEV_STAT_UNIT_CHECK) {
-		tapestate_event (tape, TE_ERROR);
-	} else if (tape->devstat.dstat & (DEV_STAT_DEV_END)) {
-		tapestate_event (tape, TE_DONE);
+	if (ti->devstat.dstat & DEV_STAT_UNIT_CHECK) {
+		tapestate_event (ti, TE_ERROR);
+	} else if (ti->devstat.dstat & (DEV_STAT_DEV_END)) {
+		tapestate_event (ti, TE_DONE);
 	} else
-		tapestate_event (tape, TE_OTHER);
+		tapestate_event (ti, TE_OTHER);
 }
 
 int 
 tape_oper_handler ( int irq, struct _devreg *dreg) {
-    tape_info_t* tape=first_tape_info;
+    tape_info_t* ti=first_tape_info;
     tape_info_t* newtape;
-    int rc,tape_num,retries=0;
+    int rc,tape_num,retries=0,i;
     s390_dev_info_t dinfo;
     tape_discipline_t* disc;
 #ifdef CONFIG_DEVFS_FS
     tape_frontend_t* frontend;
 #endif
     long lockflags;
-    PRINT_WARN ("oper handler was called\n");
-    while ((tape!=NULL) && (tape->devinfo.irq!=irq)) 
-        tape=tape->next;
-    if (tape!=NULL) {
+    while ((ti!=NULL) && (ti->devinfo.irq!=irq)) 
+        ti=ti->next;
+    if (ti!=NULL) {
         // irq is (still) used by tape. tell ingo to try again later
         PRINT_WARN ("Oper handler for irq %d called while irq still (internaly?) used.\n",irq);
         return -EAGAIN;
@@ -384,51 +562,61 @@ tape_oper_handler ( int irq, struct _devreg *dreg) {
     while ((disc != NULL) && (disc->cu_type != dinfo.sid_data.cu_type))
         disc = (tape_discipline_t *) (disc->next);
     if (disc == NULL)
-        PRINT_WARN ("No matching discipline for cu_type %x found\n",dinfo.sid_data.cu_type);
+        PRINT_WARN ("No matching discipline for cu_type %x found, ignoring device %04x.\n",dinfo.sid_data.cu_type,dinfo.devno);
     if (rc == -ENODEV) 
         PRINT_WARN ("No device information for new dev. could be retrieved.\n");
     if ((disc == NULL) || (rc == -ENODEV))
         return -ENODEV;
     
     /* Allocate tape structure  */
-    tape = kmalloc (sizeof (tape_info_t), GFP_ATOMIC);
-    if (tape == NULL) {
-        PRINT_INFO (KERN_ERR "tape: can't allocate memory for "
+    ti = kmalloc (sizeof (tape_info_t), GFP_ATOMIC);
+    if (ti == NULL) {
+        PRINT_INFO ( "tape: can't allocate memory for "
                     "tape info structure\n");
         return -ENOBUFS;
     }
-    memset(tape,0,sizeof(tape_info_t));
-    tape->discipline = disc;
-    disc->tape = tape;
+    memset(ti,0,sizeof(tape_info_t));
+    ti->discipline = disc;
+    disc->tape = ti;
     tape_num=0;
-    newtape=first_tape_info;
-    while (newtape!=NULL) {
-        if (newtape->rew_minor==tape_num) {
-            // tape num in use. try next one
-            tape_num+=2;
-            newtape=first_tape_info;
-        } else {
-            // tape num not used by newtape. look at next tape info
-            newtape=newtape->next;
+    if (*tape) {
+        // we have static device ranges, so fingure out the tape_num of the attached tape
+        for (i=0;i<devregct;i++)
+            if (tape_devreg[i]->ci.devno==dinfo.devno) {
+                tape_num=2*i;
+                break;
+            }
+    } else {
+        // we are running in autoprobe mode, find a free tape_num
+        newtape=first_tape_info;
+        while (newtape!=NULL) {
+            if (newtape->rew_minor==tape_num) {
+                // tape num in use. try next one
+                tape_num+=2;
+                newtape=first_tape_info;
+            } else {
+                // tape num not used by newtape. look at next tape info
+                newtape=newtape->next;
+            }
         }
     }
-    rc = tape_setup (tape, irq, tape_num);
+    rc = tape_setup (ti, irq, tape_num);
     if (rc) {
-        kfree (tape);
+        kfree (ti);
         return -ENOBUFS;
     }
 #ifdef CONFIG_DEVFS_FS
     for (frontend=first_frontend;frontend!=NULL;frontend=frontend->next) 
-        frontend->mkdevfstree(tape);
+        frontend->mkdevfstree(ti);
 #endif
     s390irq_spin_lock_irqsave (irq,lockflags);
     if (first_tape_info == NULL) {
-        first_tape_info = tape;
+        first_tape_info = ti;
     } else {
         newtape = first_tape_info;
         while (newtape->next != NULL)
             newtape = newtape->next;
-        newtape->next = tape;
+        newtape->next = ti;
     }
     s390irq_spin_unlock_irqrestore (irq, lockflags);
     return 0;
@@ -492,8 +680,11 @@ tape_noper_handler ( int irq, int status ) {
 void
 tape_dump_sense (devstat_t * stat)
 {
-	int sl;
+#ifdef TAPE_DEBUG
+        int sl;
+#endif
 #if 0
+
 	PRINT_WARN ("------------I/O resulted in unit check:-----------\n");
 	for (sl = 0; sl < 4; sl++) {
 		PRINT_WARN ("Sense:");
@@ -542,6 +733,10 @@ tape_setup (tape_info_t * ti, int irq, int minor)
 	long lockflags;
 	int rc = 0;
 
+        if (minor>254) {
+            PRINT_WARN ("Device id %d on irq %d will not be accessible since this driver is restricted to 128 devices.\n",minor/2,irq);
+            return -EINVAL;
+        }
 	rc = get_dev_info_by_irq (irq, &(ti->devinfo));
 	if (rc == -ENODEV) {	/* end of device list */
 		return rc;
@@ -560,10 +755,8 @@ tape_setup (tape_info_t * ti, int irq, int minor)
 #endif
 	s390irq_spin_lock_irqsave (irq, lockflags);
 	ti->next = NULL;
-	if (rc) {
-		PRINT_WARN ("Cannot register irq %d, rc=%d\n", irq, rc);
-	} else
-		PRINT_WARN ("Register irq %d for using with discipline %x dev #%d\n", irq, ti->discipline->cu_type,ti->blk_minor/2);
+	if (rc)
+            PRINT_WARN ("Cannot register irq %d, rc=%d\n", irq, rc);
 	init_waitqueue_head (&ti->wq);
 	ti->kernbuf = ti->userbuf = ti->discdata = NULL;
 	tapestate_set (ti, TS_UNUSED);
@@ -599,7 +792,7 @@ tape_init (void)
 #endif /* TAPE_DEBUG */
 
         /* print banner */        
-        PRINT_WARN ("IBM S/390 Tape Device Driver (BETA).\n");
+        PRINT_WARN ("IBM S/390 Tape Device Driver (v1.01).\n");
         PRINT_WARN ("(C) IBM Deutschland Entwicklung GmbH, 2000\n");
         opt_char=opt_block=opt_3480=opt_3490="not present";
 #ifdef CONFIG_S390_TAPE_CHAR
@@ -620,18 +813,33 @@ tape_init (void)
         PRINT_WARN ("support for 3480 compatible : %s\n",opt_3480);
         PRINT_WARN ("support for 3490 compatible : %s\n",opt_3490);
         
-
+#ifndef MODULE
+        tape_split_parm_string(tape_parm_string);
+#endif
+        if (*tape) 
+            PRINT_INFO ("Using ranges supplied in parameters, disabling autoprobe mode.\n");
+        else
+            PRINT_INFO ("No parameters supplied, enabling autoprobe mode for all supported devices.\n");
 #ifdef CONFIG_S390_TAPE_3490
-	first_discipline = tape3490_init ();
+        if (*tape)
+            first_discipline = tape3490_init (0); // no autoprobe for devices
+        else
+            first_discipline = tape3490_init (1); // do autoprobe since no parm specified
 	first_discipline->next = NULL;
 #endif
 
 #ifdef CONFIG_S390_TAPE_3480
         if (first_discipline == NULL) {
-            first_discipline = tape3480_init ();
+            if (*tape)
+                first_discipline = tape3480_init (0); // no autoprobe for devices
+            else 
+                first_discipline = tape3480_init (1); // do autoprobe since no parm specified
             first_discipline->next = NULL;
         } else {
-            first_discipline->next = tape3480_init ();
+            if (*tape)
+                first_discipline->next = tape3480_init (0); // no autoprobe for devices
+            else
+                first_discipline->next = tape3480_init (1); // do autoprobe since no parm specified
             ((tape_discipline_t*) (first_discipline->next))->next=NULL;
         }
 #endif
@@ -643,33 +851,32 @@ tape_init (void)
         debug_text_event (tape_debug_area,3,"dev detect");
 #endif /* TAPE_DEBUG */
 	/* Allocate the tape structures */
-	for (irq = 0; irq < NR_IRQS; irq++) {
+        if (*tape!=NULL) {
+            // we have parameters, continue with parsing the parameters and set the devices online
+            tape_parm_parse (tape);
+        } else {
+            // we are running in autodetect mode, search all devices for compatibles
+            for (irq = get_irq_first(); irq!=-ENODEV; irq=get_irq_next(irq)) {
 		rc = get_dev_info_by_irq (irq, &dinfo);
-
-		if (rc == -ENODEV) {
-			retries++;
-			if (retries > 5)
-				irq = NR_IRQS;
-		}
 		disc = first_discipline;
 		while ((disc != NULL) && (disc->cu_type != dinfo.sid_data.cu_type))
-			disc = (tape_discipline_t *) (disc->next);
-
+                    disc = (tape_discipline_t *) (disc->next);
 		if ((disc == NULL) || (rc == -ENODEV))
-			continue;
+                    continue;
 #ifdef TAPE_DEBUG
                 debug_text_event (tape_debug_area,3,"det irq:  ");
                 debug_int_event (tape_debug_area,3,irq);
                 debug_text_event (tape_debug_area,3,"cu:       ");
                 debug_int_event (tape_debug_area,3,disc->cu_type);
 #endif /* TAPE_DEBUG */
+                PRINT_INFO ("using devno %04x with discipline %04x on irq %d as tape device %d\n",dinfo.devno,dinfo.sid_data.cu_type,irq,tape_num/2);
 		/* Allocate tape structure  */
 		ti = kmalloc (sizeof (tape_info_t), GFP_ATOMIC);
 		if (ti == NULL) {
 #ifdef TAPE_DEBUG
                     debug_text_exception (tape_debug_area,3,"ti:no mem ");
 #endif /* TAPE_DEBUG */
-                    PRINT_INFO (KERN_ERR "tape: can't allocate memory for "
+                    PRINT_INFO ("tape: can't allocate memory for "
 				    "tape info structure\n");
                     continue;
 		}
@@ -679,25 +886,26 @@ tape_init (void)
 		rc = tape_setup (ti, irq, tape_num);
 		if (rc) {
 #ifdef TAPE_DEBUG
-                        debug_text_event (tape_debug_area,3,"tsetup err");
-                        debug_int_exception (tape_debug_area,3,rc);
+                    debug_text_event (tape_debug_area,3,"tsetup err");
+                    debug_int_exception (tape_debug_area,3,rc);
 #endif /* TAPE_DEBUG */
-			kfree (ti);
+                    kfree (ti);
 		} else {
-			s390irq_spin_lock_irqsave (irq, lockflags);
-			if (first_tape_info == NULL) {
-				first_tape_info = ti;
-			} else {
-				tempti = first_tape_info;
-				while (tempti->next != NULL)
-					tempti = tempti->next;
-				tempti->next = ti;
-			}
-			tape_num += 2;
-			s390irq_spin_unlock_irqrestore (irq, lockflags);
+                    s390irq_spin_lock_irqsave (irq, lockflags);
+                    if (first_tape_info == NULL) {
+                        first_tape_info = ti;
+                    } else {
+                        tempti = first_tape_info;
+                        while (tempti->next != NULL)
+                            tempti = tempti->next;
+                        tempti->next = ti;
+                    }
+                    tape_num += 2;
+                    s390irq_spin_unlock_irqrestore (irq, lockflags);
 		}
-	}
-
+            }
+        }
+            
 	/* Allocate local buffer for the ccwcache       */
 	tape_init_emergency_req ();
 #ifdef CONFIG_PROC_FS
@@ -733,6 +941,7 @@ tape_init (void)
 #ifdef MODULE
 MODULE_AUTHOR("(C) 2001 IBM Deutschland Entwicklung GmbH by Carsten Otte (cotte@de.ibm.com)");
 MODULE_DESCRIPTION("Linux for S/390 channel attached tape device driver");
+MODULE_PARM (tape, "1-" __MODULE_STRING (256) "s");
 
 int
 init_module (void)
@@ -749,17 +958,24 @@ init_module (void)
 void
 cleanup_module (void)
 {
-        tape_info_t *tape ,*temp;
+        tape_info_t *ti ,*temp;
         tape_frontend_t* frontend, *tempfe;
         tape_discipline_t* disc ,*tempdi;
+        int i;
 #ifdef TAPE_DEBUG
         debug_text_event (tape_debug_area,6,"cleaup mod");
 #endif /* TAPE_DEBUG */
 
-	tape = first_tape_info;
-	while (tape != NULL) {
-		temp = tape;
-		tape = tape->next;
+        if (*tape) {
+            // we are running with parameters. we'll now deregister from our devno's
+            for (i=0;i<devregct;i++) {
+                s390_device_unregister(tape_devreg[devregct]);
+            }
+        }
+	ti = first_tape_info;
+	while (ti != NULL) {
+		temp = ti;
+		ti = ti->next;
                 //cleanup a device 
 #ifdef TAPE_DEBUG
                 debug_text_event (tape_debug_area,6,"free irq:");
@@ -781,7 +997,7 @@ cleanup_module (void)
 #endif CONFIG_DEVFS_FS
 #ifdef CONFIG_PROC_FS
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2,3,98))
-	remove_proc_entry ("devices", &proc_root);
+	remove_proc_entry ("tapedevices", &proc_root);
 #else
 	proc_unregister (&proc_root, tape_devices_entry->low_ino);
 	kfree (tape_devices_entry);
@@ -801,6 +1017,10 @@ cleanup_module (void)
 	}
         disc=first_discipline;
 	while (disc != NULL) {
+                if (*tape)
+                    disc->shutdown(0);
+                else
+                    disc->shutdown(1);
 		tempdi = disc;
 		disc = disc->next;
 		kfree (tempdi);
@@ -814,9 +1034,9 @@ cleanup_module (void)
 #endif				/* MODULE */
 
 inline void
-tapestate_set (tape_info_t * tape, int newstate)
+tapestate_set (tape_info_t * ti, int newstate)
 {
-    if (tape->tape_state == TS_NOT_OPER) {
+    if (ti->tape_state == TS_NOT_OPER) {
 #ifdef TAPE_DEBUG
         debug_text_event (tape_debug_area,3,"ts_set err");
         debug_text_exception (tape_debug_area,3,"dev n.oper");
@@ -824,11 +1044,11 @@ tapestate_set (tape_info_t * tape, int newstate)
     } else {
 #ifdef TAPE_DEBUG
         debug_text_event (tape_debug_area,4,"ts. dev:  ");
-        debug_int_event (tape_debug_area,4,tape->blk_minor);
+        debug_int_event (tape_debug_area,4,ti->blk_minor);
         debug_text_event (tape_debug_area,4,"old ts:   ");
-        debug_text_event (tape_debug_area,4,(((tapestate_get (tape) < TS_SIZE) &&
-                                             (tapestate_get (tape) >=0 )) ?
-                                            state_verbose[tapestate_get (tape)] :
+        debug_text_event (tape_debug_area,4,(((tapestate_get (ti) < TS_SIZE) &&
+                                             (tapestate_get (ti) >=0 )) ?
+                                            state_verbose[tapestate_get (ti)] :
                                             "UNKNOWN TS"));
         debug_text_event (tape_debug_area,4,"new ts:   ");
         debug_text_event (tape_debug_area,4,(((newstate < TS_SIZE) &&
@@ -836,46 +1056,46 @@ tapestate_set (tape_info_t * tape, int newstate)
                                              state_verbose[newstate] :
                                              "UNKNOWN TS"));
 #endif /* TAPE_DEBUG */
-	tape->tape_state = newstate;
+	ti->tape_state = newstate;
     }
 }
 
 inline int
-tapestate_get (tape_info_t * tape)
+tapestate_get (tape_info_t * ti)
 {
-	return (tape->tape_state);
+	return (ti->tape_state);
 }
 
 void
-tapestate_event (tape_info_t * tape, int event)
+tapestate_event (tape_info_t * ti, int event)
 {
 #ifdef TAPE_DEBUG
         debug_text_event (tape_debug_area,6,"te! dev:  ");
-        debug_int_event (tape_debug_area,6,tape->blk_minor);
+        debug_int_event (tape_debug_area,6,ti->blk_minor);
         debug_text_event (tape_debug_area,6,"event:");
         debug_text_event (tape_debug_area,6,((event >=0) &&
                                             (event < TE_SIZE)) ?
                          event_verbose[event] : "TE UNKNOWN");
         debug_text_event (tape_debug_area,6,"state:");
-        debug_text_event (tape_debug_area,6,((tapestate_get(tape) >= 0) &&
-                                            (tapestate_get(tape) < TS_SIZE)) ?
-                         state_verbose[tapestate_get (tape)] :
+        debug_text_event (tape_debug_area,6,((tapestate_get(ti) >= 0) &&
+                                            (tapestate_get(ti) < TS_SIZE)) ?
+                         state_verbose[tapestate_get (ti)] :
                          "TS UNKNOWN");
 #endif /* TAPE_DEBUG */    
         if (event == TE_ERROR) { 
-            tape->discipline->error_recovery(tape);
+            ti->discipline->error_recovery(ti);
         } else {
             if ((event >= 0) &&
                 (event < TE_SIZE) &&
-                (tapestate_get (tape) >= 0) &&
-                (tapestate_get (tape) < TS_SIZE) &&
-                ((*(tape->discipline->event_table))[tapestate_get (tape)][event] != NULL))
-		((*(tape->discipline->event_table))[tapestate_get (tape)][event]) (tape);
+                (tapestate_get (ti) >= 0) &&
+                (tapestate_get (ti) < TS_SIZE) &&
+                ((*(ti->discipline->event_table))[tapestate_get (ti)][event] != NULL))
+		((*(ti->discipline->event_table))[tapestate_get (ti)][event]) (ti);
             else {
 #ifdef TAPE_DEBUG
                 debug_text_exception (tape_debug_area,3,"TE UNEXPEC");
 #endif /* TAPE_DEBUG */
-		tape->discipline->default_handler (tape);
+		ti->discipline->default_handler (ti);
             }
         }
 }

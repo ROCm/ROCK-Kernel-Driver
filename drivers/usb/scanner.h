@@ -53,7 +53,7 @@ MODULE_PARM_DESC(read_timeout, "User specified read timeout in seconds");
 
 /* Enable to activate the ioctl interface.  This is mainly meant for */
 /* development purposes until an ioctl number is officially registered */
-// #define SCN_IOCTL
+#define SCN_IOCTL
 
 /* WARNING: These DATA_DUMP's can produce a lot of data. Caveat Emptor. */
 // #define RD_DATA_DUMP /* Enable to dump data - limited to 24 bytes */
@@ -123,6 +123,7 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x04b8, 0x010a) }, /* Perfection 1640SU and 1640SU Photo */
 	{ USB_DEVICE(0x04b8, 0x010b) }, /* Perfection 1240U */
 	{ USB_DEVICE(0x04b8, 0x010c) }, /* Perfection 640U */
+	{ USB_DEVICE(0x04b8, 0x010e) }, /* Expression 1680 */
 	/* Umax */
 	{ USB_DEVICE(0x1606, 0x0010) },	/* Astra 1220U */
 	{ USB_DEVICE(0x1606, 0x0030) },	/* Astra 2000U */
@@ -163,6 +164,10 @@ MODULE_DEVICE_TABLE (usb, scanner_device_ids);
 /* FIXME: These are NOT registered ioctls()'s */
 #define PV8630_IOCTL_INREQUEST 69
 #define PV8630_IOCTL_OUTREQUEST 70
+
+/* read vendor and product IDs */
+#define IOCTL_SCANNER_VENDOR _IOR('u', 0xa0, int)
+#define IOCTL_SCANNER_PRODUCT _IOR('u', 0xa1, int)
 
 #define SCN_MAX_MNR 16		/* We're allocated 16 minors */
 #define SCN_BASE_MNR 48		/* USB Scanners start at minor 48 */

@@ -1,4 +1,4 @@
-/* $Id: parport.c,v 1.5 2001/05/09 12:38:42 johana Exp $
+/* $Id: parport.c,v 1.7 2001/06/25 16:17:30 jonashg Exp $
  * 
  * Elinux parallel port driver
  * NOTE!
@@ -49,7 +49,7 @@ static inline int DPRINTK(void *nothing, ...) {return 0;}
  * Par0 in  : DMA3
  * Par1 out : DMA4
  * Par1 in  : DMA5
- * NOTE! par0 is hared with ser2 and par1 is shared with ser3 regarding
+ * NOTE! par0 is shared with ser2 and par1 is shared with ser3 regarding
  *       DMA and DMA irq
  */
 
@@ -80,8 +80,6 @@ struct etrax100par_struct {
 	volatile char *iclrintradr; /* adr to R_DMA_CHx_CLR_INTR, input */
 	volatile u32 *ifirstadr;   /* adr to R_DMA_CHx_FIRST, input */
 	volatile char *icmdadr;     /* adr to R_DMA_CHx_CMD, input */
-	const volatile u8 *istatusadr;  /* adr to R_DMA_CHx_STATUS, input */
-	volatile u32 *ihwswadr;    /* adr to R_DMA_CHx_HWSW, input */
 
 	/* Non DMA interrupt stuff */
 	unsigned long int_irq; /* R_VECT_MASK_RD */
@@ -97,15 +95,6 @@ struct etrax100par_struct {
   
 	/* ----- end of fields initialised in port_table[] below ----- */
 
-	//  struct etrax_dma_descr tr_descr;
-	//  unsigned char tr_buf[LP_BUFFER_SIZE];
-	//  const unsigned char *tr_buf_curr; /* current char sent */
-	//  const unsigned char *tr_buf_last; /* last char in buf */
-  
-	//  int fifo_magic; /* fifo amount - bytes left in dma buffer */
-	//  unsigned char         fifo_didmagic; /* a fifo eop has been forced */
-	//  volatile int          tr_running; /* 1 if output is running */
-	
 	struct parport *port;
   
 	/* Shadow registers */
@@ -132,8 +121,6 @@ static struct etrax100par_struct port_table[] = {
 		R_DMA_CH3_CLR_INTR,
 		R_DMA_CH3_FIRST,
 		R_DMA_CH3_CMD,
-		R_DMA_CH3_STATUS,
-		R_DMA_CH3_HWSW,
 		/* Non DMA interrupt stuff */
 		IO_BITNR(R_VECT_MASK_RD, par0),
 		R_IRQ_MASK0_RD,
@@ -161,8 +148,6 @@ static struct etrax100par_struct port_table[] = {
 		R_DMA_CH5_CLR_INTR,
 		R_DMA_CH5_FIRST,
 		R_DMA_CH5_CMD,
-		R_DMA_CH5_STATUS,
-		R_DMA_CH5_HWSW,
 		/* Non DMA interrupt stuff */
 		IO_BITNR(R_VECT_MASK_RD, par1),
 		R_IRQ_MASK1_RD,
@@ -418,7 +403,7 @@ parport_etrax_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 /* ----------- Initialisation code --------------------------------- */
 
-static void 
+static void __init
 parport_etrax_show_parallel_version(void)
 {
 	printk("ETRAX 100LX parallel port driver v1.0, (c) 2001 Axis Communications AB\n");
@@ -436,15 +421,11 @@ parport_etrax_show_parallel_version(void)
 #define PAR1_USE_DMA 0
 #endif
 
-static void 
+static void __init
 parport_etrax_init_registers(void)
 {
 	struct etrax100par_struct *info;
 	int i;
-
-	/* The different times below will be (value*160 + 20) ns,    */
-	/* i.e. 20ns-4.98us. E.g. if setup is set to 00110 (0x6),    */
-	/* the setup time will be (6*160+20) = 980ns.                */
 
 	for (i = 0, info = port_table; i < 2; i++, info++) {
 #ifndef CONFIG_ETRAX_PARALLEL_PORT0

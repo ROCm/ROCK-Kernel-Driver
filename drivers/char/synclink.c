@@ -1,7 +1,7 @@
 /*
  * linux/drivers/char/synclink.c
  *
- * $Id: synclink.c,v 3.8 2001/03/30 17:30:38 ez Exp $
+ * $Id: synclink.c,v 3.12 2001/07/18 19:14:21 paulkf Exp $
  *
  * Device driver for Microgate SyncLink ISA and PCI
  * high speed multiprotocol serial adapters.
@@ -879,35 +879,35 @@ static int mgsl_loopmode_send_done( struct mgsl_struct * info );
 /*
  * Global linked list of SyncLink devices
  */
-struct mgsl_struct *mgsl_device_list = NULL;
-int mgsl_device_count = 0;
+struct mgsl_struct *mgsl_device_list;
+int mgsl_device_count;
 
 /*
  * Set this param to non-zero to load eax with the
  * .text section address and breakpoint on module load.
  * This is useful for use with gdb and add-symbol-file command.
  */
-int break_on_load=0;
+int break_on_load;
 
 /*
  * Driver major number, defaults to zero to get auto
  * assigned major number. May be forced as module parameter.
  */
-int ttymajor=0;
+int ttymajor;
 
-int cuamajor=0;
+int cuamajor;
 
 /*
  * Array of user specified options for ISA adapters.
  */
-static int io[MAX_ISA_DEVICES] = {0,};
-static int irq[MAX_ISA_DEVICES] = {0,};
-static int dma[MAX_ISA_DEVICES] = {0,};
-static int debug_level = 0;
-static int maxframe[MAX_TOTAL_DEVICES] = {0,};
-static int dosyncppp[MAX_TOTAL_DEVICES] = {0,};
-static int txdmabufs[MAX_TOTAL_DEVICES] = {0,};
-static int txholdbufs[MAX_TOTAL_DEVICES] = {0,};
+static int io[MAX_ISA_DEVICES];
+static int irq[MAX_ISA_DEVICES];
+static int dma[MAX_ISA_DEVICES];
+static int debug_level;
+static int maxframe[MAX_TOTAL_DEVICES];
+static int dosyncppp[MAX_TOTAL_DEVICES];
+static int txdmabufs[MAX_TOTAL_DEVICES];
+static int txholdbufs[MAX_TOTAL_DEVICES];
 	
 MODULE_PARM(break_on_load,"i");
 MODULE_PARM(ttymajor,"i");
@@ -922,7 +922,7 @@ MODULE_PARM(txdmabufs,"1-" __MODULE_STRING(MAX_TOTAL_DEVICES) "i");
 MODULE_PARM(txholdbufs,"1-" __MODULE_STRING(MAX_TOTAL_DEVICES) "i");
 
 static char *driver_name = "SyncLink serial driver";
-static char *driver_version = "3.8";
+static char *driver_version = "$Revision: 3.12 $";
 
 static int __init synclink_init_one (struct pci_dev *dev,
 				     const struct pci_device_id *ent);
@@ -4356,9 +4356,9 @@ int mgsl_claim_resources(struct mgsl_struct *info)
 			goto errout;
 		}
 		info->shared_mem_requested = 1;
-		if (request_mem_region(info->phys_lcr_base,128,"synclink") == NULL) {
+		if (request_mem_region(info->phys_lcr_base + info->lcr_offset,128,"synclink") == NULL) {
 			printk( "%s(%d):lcr mem addr conflict device %s Addr=%08X\n",
-				__FILE__,__LINE__,info->device_name, info->phys_lcr_base);
+				__FILE__,__LINE__,info->device_name, info->phys_lcr_base + info->lcr_offset);
 			goto errout;
 		}
 		info->lcr_mem_requested = 1;
@@ -4440,7 +4440,7 @@ void mgsl_release_resources(struct mgsl_struct *info)
 		info->shared_mem_requested = 0;
 	}
 	if ( info->lcr_mem_requested ) {
-		release_mem_region(info->phys_lcr_base,128);
+		release_mem_region(info->phys_lcr_base + info->lcr_offset,128);
 		info->lcr_mem_requested = 0;
 	}
 	if (info->memory_base){
@@ -4520,7 +4520,9 @@ void mgsl_add_device( struct mgsl_struct *info )
 	}
 
 #ifdef CONFIG_SYNCLINK_SYNCPPP
+#ifdef MODULE
 	if (info->dosyncppp)
+#endif
 		mgsl_sppp_init(info);
 #endif
 }	/* end of mgsl_add_device() */
@@ -4637,7 +4639,7 @@ int mgsl_init_tty()
 		printk("%s(%d):Couldn't register callout driver\n",
 			__FILE__,__LINE__);
 
- 	printk("%s version %s, tty major#%d callout major#%d\n",
+ 	printk("%s %s, tty major#%d callout major#%d\n",
 		driver_name, driver_version,
 		serial_driver.major, callout_driver.major);
 		
@@ -4703,7 +4705,7 @@ int __init mgsl_init(void)
 
 	EXPORT_NO_SYMBOLS;
 	
- 	printk("%s version %s\n", driver_name, driver_version);
+ 	printk("%s %s\n", driver_name, driver_version);
 	
 	mgsl_enum_isa_devices();
 	pci_register_driver(&synclink_pci_driver);
@@ -4739,7 +4741,7 @@ static void __exit synclink_exit(void)
 	struct mgsl_struct *info;
 	struct mgsl_struct *tmp;
 
-	printk("Unloading %s: version %s\n", driver_name, driver_version);
+	printk("Unloading %s: %s\n", driver_name, driver_version);
 	save_flags(flags);
 	cli();
 	if ((rc = tty_unregister_driver(&serial_driver)))
@@ -7985,6 +7987,10 @@ void mgsl_sppp_init(struct mgsl_struct *info)
 	d->get_stats = mgsl_net_stats;
 	d->tx_timeout = mgsl_sppp_tx_timeout;
 	d->watchdog_timeo = 10*HZ;
+
+#if LINUX_VERSION_CODE < VERSION(2,4,4) 
+	dev_init_buffers(d);
+#endif
 
 	if (register_netdev(d) == -1) {
 		printk(KERN_WARNING "%s: register_netdev failed.\n", d->name);

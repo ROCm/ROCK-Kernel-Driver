@@ -4,7 +4,7 @@
  *
  *  S390 version
  *    Copyright (C) 1999 IBM Deutschland Entwicklung GmbH, IBM Corporation
- *    Author(s): Martin Peschke <peschke@fh-brandenburg.de>
+ *    Author(s): Martin Peschke <mpeschke@de.ibm.com>
  *
  *  Thanks to Martin Schwidefsky.
  */
@@ -22,6 +22,7 @@
 #include <asm/uaccess.h>
 
 #include "hwc_rw.h"
+#include "ctrlchar.h"
 
 #define HWC_TTY_PRINT_HEADER "hwc tty driver: "
 
@@ -217,12 +218,10 @@ hwc_tty_input (unsigned char *buf, unsigned int count)
 void 
 hwc_tty_init (void)
 {
-#if defined(CONFIG_3215_CONSOLE) || defined(CONFIG_3270_CONSOLE)
-	if (MACHINE_IS_VM)
+	if (!CONSOLE_IS_HWC)
 		return;
-#endif
-	if (MACHINE_IS_P390)
-		return;
+
+	ctrlchar_init ();
 
 	memset (&hwc_tty_driver, 0, sizeof (struct tty_driver));
 	memset (&hwc_tty_data, 0, sizeof (hwc_tty_data_struct));

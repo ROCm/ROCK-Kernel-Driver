@@ -180,7 +180,7 @@ extern char empty_zero_page[PAGE_SIZE];
  */
 #define _REGION_THIRD       0x4
 #define _REGION_THIRD_LEN   0x3 
-#define _REGION_TABLE       (_REGION_THIRD|_REGION_THIRD_LEN)
+#define _REGION_TABLE       (_REGION_THIRD|_REGION_THIRD_LEN|0x40)
 
 /* Bits in the storage key */
 #define _PAGE_CHANGED    0x02          /* HW changed bit                   */
@@ -363,7 +363,7 @@ extern inline pte_t pte_mkdirty(pte_t pte)
 
 extern inline pte_t pte_mkold(pte_t pte)
 {
-	asm volatile ("rrbe 0,%0" : : "a" (pte_val(pte)));
+	asm volatile ("rrbe 0,%0" : : "a" (pte_val(pte)) : "cc" );
 	return pte;
 }
 
@@ -382,7 +382,8 @@ static inline int ptep_test_and_clear_young(pte_t *ptep)
 
 	asm volatile ("rrbe 0,%1\n\t"
 		      "ipm  %0\n\t"
-		      "srl  %0,28\n\t" : "=d" (ccode) : "a" (pte_val(*ptep)));
+		      "srl  %0,28\n\t"
+		      : "=d" (ccode) : "a" (pte_val(*ptep)) : "cc" );
 	return ccode & 2;
 }
 

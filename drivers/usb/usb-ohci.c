@@ -2,7 +2,7 @@
  * URB OHCI HCD (Host Controller Driver) for USB.
  *
  * (C) Copyright 1999 Roman Weissgaerber <weissg@vienna.at>
- * (C) Copyright 2000 David Brownell <david-b@pacbell.net>
+ * (C) Copyright 2000-2001 David Brownell <dbrownell@users.sourceforge.net>
  * 
  * [ Initialisation is based on Linus'  ]
  * [ uhci code and gregs ohci fragments ]
@@ -12,7 +12,7 @@
  * 
  * History:
  * 
- * 2001/04/08 Identify version on module load gb
+ * 2001/07/17 power management and pmac cleanup (Benjamin Herrenschmidt)
  * 2001/03/24 td/ed hashing to remove bus_to_virt (Steve Longerbeam);
  	pci_map_single (db)
  * 2001/03/21 td and dev/ed allocation uses new pci_pool API (db)
@@ -75,11 +75,8 @@
 
 
 #ifdef CONFIG_PMAC_PBOOK
-/* All this PMAC_PBOOK stuff should disappear when those
- * platforms fully support the 2.4 kernel PCI APIs.
- */
-#include <linux/adb.h>
-#include <linux/pmu.h>
+#include <asm/feature.h>
+#include <asm/pci-bridge.h>
 #ifndef CONFIG_PM
 #define CONFIG_PM
 #endif
@@ -89,7 +86,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v5.2"
+#define DRIVER_VERSION "v5.3"
 #define DRIVER_AUTHOR "Roman Weissgaerber <weissg@vienna.at>, David Brownell"
 #define DRIVER_DESC "USB OHCI Host Controller Driver"
 
@@ -136,28 +133,39 @@ static void urb_free_priv (struct ohci *hc, urb_priv_t * urb_priv)
 {
 	int		i;
 	int		last = urb_priv->length - 1;
+	int		len;
+	int		dir;
 	struct td	*td;
 
-	for (i = 0; i <= last; i++) {
-		td = urb_priv->td [i];
-		if (td) {
-			int		len;
-			int		dir;
+	if (last >= 0) {
 
-			if ((td->hwINFO & cpu_to_le32 (TD_DP)) == TD_DP_SETUP) {
-				len = 8;
-				dir = PCI_DMA_TODEVICE;
-			} else if (i == last) {
-				len = td->urb->transfer_buffer_length,
-				dir = usb_pipeout (td->urb->pipe)
+		/* ISOC, BULK, INTR data buffer starts at td 0 
+		 * CTRL setup starts at td 0 */
+		td = urb_priv->td [0];
+
+		len = td->urb->transfer_buffer_length,
+		dir = usb_pipeout (td->urb->pipe)
 					? PCI_DMA_TODEVICE
 					: PCI_DMA_FROMDEVICE;
-			} else
-				len = dir = 0;
-			if (len && td->data_dma)
-				pci_unmap_single (hc->ohci_dev,
-					td->data_dma, len, dir);
-			td_free (hc, urb_priv->td [i]);
+
+		/* unmap CTRL URB setup */
+		if (usb_pipecontrol (td->urb->pipe)) {
+			pci_unmap_single (hc->ohci_dev, 
+					td->data_dma, 8, PCI_DMA_TODEVICE);
+			
+			/* CTRL data buffer starts at td 1 if len > 0 */
+			if (len && last > 0)
+				td = urb_priv->td [1]; 		
+		} 
+
+		/* unmap data buffer */
+		if (len && td->data_dma)
+			pci_unmap_single (hc->ohci_dev, td->data_dma, len, dir);
+		
+		for (i = 0; i <= last; i++) {
+			td = urb_priv->td [i];
+			if (td)
+				td_free (hc, td);
 		}
 	}
 
@@ -981,7 +989,7 @@ static int ep_link (ohci_t * ohci, ed_t * edi)
 		}
 		ed->ed_prev = ohci->ed_controltail;
 		if (!ohci->ed_controltail && !ohci->ed_rm_list[0] &&
-			!ohci->ed_rm_list[1]) {
+			!ohci->ed_rm_list[1] && !ohci->sleeping) {
 			ohci->hc_control |= OHCI_CTRL_CLE;
 			writel (ohci->hc_control, &ohci->regs->control);
 		}
@@ -997,7 +1005,7 @@ static int ep_link (ohci_t * ohci, ed_t * edi)
 		}
 		ed->ed_prev = ohci->ed_bulktail;
 		if (!ohci->ed_bulktail && !ohci->ed_rm_list[0] &&
-			!ohci->ed_rm_list[1]) {
+			!ohci->ed_rm_list[1] && !ohci->sleeping) {
 			ohci->hc_control |= OHCI_CTRL_BLE;
 			writel (ohci->hc_control, &ohci->regs->control);
 		}
@@ -1260,7 +1268,7 @@ static void ep_rm_ed (struct usb_device * usb_dev, ed_t * ed)
 	ed->ed_rm_list = ohci->ed_rm_list[frame];
 	ohci->ed_rm_list[frame] = ed;
 
-	if (!ohci->disabled) {
+	if (!ohci->disabled && !ohci->sleeping) {
 		/* enable SOF interrupt */
 		writel (OHCI_INTR_SF, &ohci->regs->intrstatus);
 		writel (OHCI_INTR_SF, &ohci->regs->intrenable);
@@ -1366,7 +1374,8 @@ static void td_submit_urb (urb_t * urb)
 				TD_CC | TD_DP_OUT : TD_CC | TD_R | TD_DP_IN ;
 			td_fill (ohci, info | (cnt? TD_T_TOGGLE:toggle), data, data_len, urb, cnt);
 			cnt++;
-			writel (OHCI_BLF, &ohci->regs->cmdstatus); /* start bulk list */
+			if (!ohci->sleeping)
+				writel (OHCI_BLF, &ohci->regs->cmdstatus); /* start bulk list */
 			break;
 
 		case PIPE_INTERRUPT:
@@ -1391,7 +1400,8 @@ static void td_submit_urb (urb_t * urb)
 			info = usb_pipeout (urb->pipe)? 
  				TD_CC | TD_DP_IN | TD_T_DATA1: TD_CC | TD_DP_OUT | TD_T_DATA1;
 			td_fill (ohci, info, data, 0, urb, cnt++);
-			writel (OHCI_CLF, &ohci->regs->cmdstatus); /* start Control list */
+			if (!ohci->sleeping)
+				writel (OHCI_CLF, &ohci->regs->cmdstatus); /* start Control list */
 			break;
 
 		case PIPE_ISOCHRONOUS:
@@ -1611,7 +1621,7 @@ static void dl_del_list (ohci_t  * ohci, unsigned int frame)
 			writel (0, &ohci->regs->ed_controlcurrent);
 		if (bulk)	/* reset bulk list */
 			writel (0, &ohci->regs->ed_bulkcurrent);
-		if (!ohci->ed_rm_list[!frame]) {
+		if (!ohci->ed_rm_list[!frame] && !ohci->sleeping) {
 			if (ohci->ed_controltail)
 				ohci->hc_control |= OHCI_CTRL_CLE;
 			if (ohci->ed_bulktail)
@@ -2321,6 +2331,7 @@ static ohci_t * __devinit hc_alloc_ohci (struct pci_dev *dev, void * mem_base)
         memset (ohci->hcca, 0, sizeof (struct ohci_hcca));
 
 	ohci->disabled = 1;
+	ohci->sleeping = 0;
 	ohci->irq = -1;
 	ohci->regs = mem_base;   
 
@@ -2480,6 +2491,7 @@ static void hc_restart (ohci_t *ohci)
 		pci_write_config_byte (ohci->ohci_dev, PCI_LATENCY_TIMER, ohci->pci_latency);
 
 	ohci->disabled = 1;
+	ohci->sleeping = 0;
 	if (ohci->bus->root_hub)
 		usb_disconnect (&ohci->bus->root_hub);
 	
@@ -2588,7 +2600,9 @@ ohci_pci_remove (struct pci_dev *dev)
 static int
 ohci_pci_suspend (struct pci_dev *dev, u32 state)
 {
-	ohci_t		*ohci = (ohci_t *) dev->driver_data;
+	ohci_t			*ohci = (ohci_t *) dev->driver_data;
+	unsigned long		flags;
+	u16 cmd;
 
 	if ((ohci->hc_control & OHCI_CTRL_HCFS) != OHCI_USB_OPER) {
 		dbg ("can't suspend usb-%s (state is %s)", dev->slot_name,
@@ -2598,14 +2612,65 @@ ohci_pci_suspend (struct pci_dev *dev, u32 state)
 
 	/* act as if usb suspend can always be used */
 	info ("USB suspend: usb-%s", dev->slot_name);
+	ohci->sleeping = 1;
+
+	/* First stop processing */
+  	spin_lock_irqsave (&usb_ed_lock, flags);
+	ohci->hc_control &= ~(OHCI_CTRL_PLE|OHCI_CTRL_CLE|OHCI_CTRL_BLE|OHCI_CTRL_IE);
+	writel (ohci->hc_control, &ohci->regs->control);
+	writel (OHCI_INTR_SF, &ohci->regs->intrstatus);
+	(void) readl (&ohci->regs->intrstatus);
+  	spin_unlock_irqrestore (&usb_ed_lock, flags);
+
+	/* Wait a frame or two */
+	mdelay(1);
+	if (!readl (&ohci->regs->intrstatus) & OHCI_INTR_SF)
+		mdelay (1);
+		
 #ifdef CONFIG_PMAC_PBOOK
-	disable_irq (ohci->irq);
+	if (_machine == _MACH_Pmac)
+		disable_irq (ohci->irq);
 	/* else, 2.4 assumes shared irqs -- don't disable */
 #endif
+	/* Enable remote wakeup */
+	writel (readl(&ohci->regs->intrenable) | OHCI_INTR_RD, &ohci->regs->intrenable);
+
+	/* Suspend chip and let things settle down a bit */
 	ohci->hc_control = OHCI_USB_SUSPEND;
 	writel (ohci->hc_control, &ohci->regs->control);
-	wait_ms (10);
+	(void) readl (&ohci->regs->control);
+	mdelay (500); /* No schedule here ! */
+	switch (readl (&ohci->regs->control) & OHCI_CTRL_HCFS) {
+		case OHCI_USB_RESET:
+			dbg("Bus in reset phase ???");
+			break;
+		case OHCI_USB_RESUME:
+			dbg("Bus in resume phase ???");
+			break;
+		case OHCI_USB_OPER:
+			dbg("Bus in operational phase ???");
+			break;
+		case OHCI_USB_SUSPEND:
+			dbg("Bus suspended");
+			break;
+	}
+	/* In some rare situations, Apple's OHCI have happily trashed
+	 * memory during sleep. We disable it's bus master bit during
+	 * suspend
+	 */
+	pci_read_config_word (dev, PCI_COMMAND, &cmd);
+	cmd &= ~PCI_COMMAND_MASTER;
+	pci_write_config_word (dev, PCI_COMMAND, cmd);
+#ifdef CONFIG_PMAC_PBOOK
+	{
+   	struct device_node	*of_node;
 
+	/* Disable USB PAD & cell clock */
+	of_node = pci_device_to_OF_node (ohci->ohci_dev);
+	if (of_node && _machine == _MACH_Pmac)
+		feature_set_usb_power (of_node, 0);
+	}
+#endif
 	return 0;
 }
 
@@ -2616,14 +2681,26 @@ ohci_pci_resume (struct pci_dev *dev)
 {
 	ohci_t		*ohci = (ohci_t *) dev->driver_data;
 	int		temp;
+	unsigned long	flags;
 
 	/* guard against multiple resumes */
 	atomic_inc (&ohci->resume_count);
 	if (atomic_read (&ohci->resume_count) != 1) {
 		err ("concurrent PCI resumes for usb-%s", dev->slot_name);
 		atomic_dec (&ohci->resume_count);
-		return -EBUSY;
+		return 0;
 	}
+
+#ifdef CONFIG_PMAC_PBOOK
+	{
+	struct device_node *of_node;
+
+	/* Re-enable USB PAD & cell clock */
+	of_node = pci_device_to_OF_node (ohci->ohci_dev);
+	if (of_node && _machine == _MACH_Pmac)
+		feature_set_usb_power (of_node, 1);
+	}
+#endif
 
 	/* did we suspend, or were we powered off? */
 	ohci->hc_control = readl (&ohci->regs->control);
@@ -2634,6 +2711,9 @@ ohci_pci_resume (struct pci_dev *dev)
 	ohci_dump_status (ohci);
 #endif
 
+	/* Re-enable bus mastering */
+	pci_set_master(ohci->ohci_dev);
+	
 	switch (temp) {
 
 	case OHCI_USB_RESET:	// lost power
@@ -2648,8 +2728,10 @@ ohci_pci_resume (struct pci_dev *dev)
 				? "host" : "remote");
 		ohci->hc_control = OHCI_USB_RESUME;
 		writel (ohci->hc_control, &ohci->regs->control);
-		wait_ms (20);
-
+		(void) readl (&ohci->regs->control);
+		mdelay (20); /* no schedule here ! */
+		/* Some controllers (lucent) need a longer delay here */
+		mdelay (15);
 		temp = readl (&ohci->regs->control);
 		temp = ohci->hc_control & OHCI_CTRL_HCFS;
 		if (temp != OHCI_USB_RESUME) {
@@ -2658,18 +2740,38 @@ ohci_pci_resume (struct pci_dev *dev)
 			return -EIO;
 		}
 
+		/* Some chips likes being resumed first */
+		writel (OHCI_USB_OPER, &ohci->regs->control);
+		(void) readl (&ohci->regs->control);
+		mdelay (3);
+
+		/* Then re-enable operations */
+		spin_lock_irqsave (&usb_ed_lock, flags);
 		ohci->disabled = 0;
+		ohci->sleeping = 0;
 		ohci->hc_control = OHCI_CONTROL_INIT | OHCI_USB_OPER;
-		if (!ohci->ed_rm_list[0] & !ohci->ed_rm_list[1]) {
+		if (!ohci->ed_rm_list[0] && !ohci->ed_rm_list[1]) {
 			if (ohci->ed_controltail)
 				ohci->hc_control |= OHCI_CTRL_CLE;
 			if (ohci->ed_bulktail)
 				ohci->hc_control |= OHCI_CTRL_BLE;
 		}
 		writel (ohci->hc_control, &ohci->regs->control);
+		writel (OHCI_INTR_SF, &ohci->regs->intrstatus);
+		writel (OHCI_INTR_SF, &ohci->regs->intrenable);
+		/* Check for a pending done list */
+		writel (OHCI_INTR_WDH, &ohci->regs->intrdisable);	
+		(void) readl (&ohci->regs->intrdisable);
+		spin_unlock_irqrestore (&usb_ed_lock, flags);
 #ifdef CONFIG_PMAC_PBOOK
-		enable_irq (ohci->irq);
+		if (_machine == _MACH_Pmac)
+			enable_irq (ohci->irq);
 #endif
+		if (ohci->hcca->done_head)
+			dl_done_list (ohci, dl_reverse_done_list (ohci));
+		writel (OHCI_INTR_WDH, &ohci->regs->intrenable); 
+		writel (OHCI_BLF, &ohci->regs->cmdstatus); /* start bulk list */
+		writel (OHCI_CLF, &ohci->regs->cmdstatus); /* start Control list */
 		break;
 
 	default:
@@ -2724,71 +2826,24 @@ static struct pci_driver ohci_pci_driver = {
 	probe:		ohci_pci_probe,
 	remove:		ohci_pci_remove,
 
-#ifdef	CONFIG_PMAC_PBOOK
-	/* pbook PCI thinks different ... for now :-) */
-#else
 #ifdef	CONFIG_PM
 	suspend:	ohci_pci_suspend,
 	resume:		ohci_pci_resume,
 #endif	/* PM */
-#endif	/* PBOOK */
 };
 
  
-#ifdef CONFIG_PMAC_PBOOK
-
-/*-------------------------------------------------------------------------*/
-
-static int ohci_sleep_notify (struct pmu_sleep_notifier * self, int when)
-{
-	struct list_head * ohci_l;
-	ohci_t * ohci;
-       
-	for (ohci_l = ohci_hcd_list.next; ohci_l != &ohci_hcd_list; ohci_l = ohci_l->next) {
-	ohci = list_entry (ohci_l, ohci_t, ohci_hcd_list);
-
-		switch (when) {
-		case PBOOK_SLEEP_NOW:
-			ohci_pci_suspend (ohci->ohci_dev, 3);
-			break;
-		case PBOOK_WAKE:
-			ohci_pci_resume (ohci->ohci_dev);
-			break;
-		}
-	}
-	return PBOOK_SLEEP_OK;
-}
-
-static struct pmu_sleep_notifier ohci_sleep_notifier = {
-       ohci_sleep_notify, SLEEP_LEVEL_MISC,
-};
-#endif /* CONFIG_PMAC_PBOOK */
-
-
 /*-------------------------------------------------------------------------*/
 
 static int __init ohci_hcd_init (void) 
 {
-	int ret;
-
-	if ((ret = pci_module_init (&ohci_pci_driver)) < 0) {
-		return ret;
-	}
-
-#ifdef CONFIG_PMAC_PBOOK
-	pmu_register_sleep_notifier (&ohci_sleep_notifier);
-#endif  
-	info(DRIVER_VERSION ":" DRIVER_DESC);
-	return ret;
+	return pci_module_init (&ohci_pci_driver);
 }
 
 /*-------------------------------------------------------------------------*/
 
 static void __exit ohci_hcd_cleanup (void) 
 {	
-#ifdef CONFIG_PMAC_PBOOK
-	pmu_unregister_sleep_notifier (&ohci_sleep_notifier);
-#endif  
 	pci_unregister_driver (&ohci_pci_driver);
 }
 

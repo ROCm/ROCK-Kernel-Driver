@@ -26,7 +26,7 @@ static inline void clear_page(void *page)
                       "   slgr 1,1\n"
                       "   mvcl 2,0"
                       : : "a" ((void *) (page))
-		      : "memory", "1", "2", "3" );
+		      : "memory", "cc", "1", "2", "3" );
 }
 
 static inline void copy_page(void *to, void *from)
@@ -35,7 +35,7 @@ static inline void copy_page(void *to, void *from)
 		asm volatile ("   sgr  0,0\n"
 			      "   mvpg %0,%1"
 			      : : "a" ((void *)(to)), "a" ((void *)(from))
-			      : "memory", "0" );
+			      : "memory", "cc", "0" );
 	else
 		asm volatile ("   mvc  0(256,%0),0(%1)\n"
 			      "   mvc  256(256,%0),256(%1)\n"

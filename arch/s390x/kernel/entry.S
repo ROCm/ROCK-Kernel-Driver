@@ -14,6 +14,7 @@
 #include <linux/sys.h>
 #include <linux/linkage.h>
 #include <linux/config.h>
+#include <asm/cache.h>
 #include <asm/lowcore.h>
 #include <asm/errno.h>
 #include <asm/smp.h>
@@ -80,7 +81,7 @@ flags        =  8
 sigpending   = 16
 need_resched = 32
 tsk_ptrace   = 40
-processor    = 100
+processor    = 92
 
 /*
  * Register usage in interrupt handlers:
@@ -194,8 +195,11 @@ sysc_return:
 #
 # check, if bottom-half has to be done
 #
-        l       %r0,__LC_IRQ_STAT     # get softirq_active
-        n       %r0,__LC_IRQ_STAT+4   # and it with softirq_mask
+	lgf     %r1,processor(%r9)    # get cpu number from task struture
+	larl    %r2,irq_stat
+	sll     %r1,L1_CACHE_SHIFT
+	la      %r1,0(%r1,%r2)
+	icm     %r0,15,0(%r1)         # test irq_stat[#cpu].__softirq_pending
         jnz     sysc_handle_bottom_half
 #
 # check, if reschedule is needed
@@ -607,7 +611,7 @@ sys_call_table:
         .long  SYSCALL(sys_pivot_root,sys32_pivot_root_wrapper)
         .long  SYSCALL(sys_mincore,sys32_mincore_wrapper)
         .long  SYSCALL(sys_madvise,sys32_madvise_wrapper)
-	.long  SYSCALL(sys_ni_syscall,sys32_getdents64_wrapper)/* 220 */
+	.long  SYSCALL(sys_getdents64,sys32_getdents64_wrapper)/* 220 */
 	.long  SYSCALL(sys_ni_syscall,sys32_fcntl64_wrapper)
         .rept  255-221
 	.long  SYSCALL(sys_ni_syscall,sys_ni_syscall)
@@ -700,8 +704,11 @@ io_return:
 #
 # check, if bottom-half has to be done
 #
-        l       %r0,__LC_IRQ_STAT     # get softirq_active
-        n       %r0,__LC_IRQ_STAT+4   # and it with softirq_mask
+	lgf     %r1,processor(%r9)    # get cpu number from task struture
+	larl    %r2,irq_stat
+	sll     %r1,L1_CACHE_SHIFT
+	la      %r1,0(%r1,%r2)
+	icm     %r0,15,0(%r1)         # test irq_stat[#cpu].__softirq_pending
         jnz     io_handle_bottom_half
 io_return_bh:	
 #

@@ -1,4 +1,4 @@
-/* $Id: sys_cris.c,v 1.9 2001/05/30 06:20:26 markusl Exp $
+/* $Id: sys_cris.c,v 1.10 2001/06/27 21:16:15 hp Exp $
  *
  * linux/arch/cris/kernel/sys_cris.c
  *
@@ -42,34 +42,6 @@ asmlinkage int sys_pipe(unsigned long * fildes)
                         error = -EFAULT;
         }
         return error;
-}
-
-/* sys_mmap used to take a ptr to a buffer instead containing the args
- * but we support syscalls with 6 arguments now 
- */
-
-asmlinkage unsigned long sys_mmap(unsigned long addr, size_t len,
-				  unsigned long prot, unsigned long flags,
-                                  unsigned long fd, off_t offset)
-{
-	struct file * file = NULL;
-        int ret = -EBADF;
-	
-        lock_kernel();
-        if (!(flags & MAP_ANONYMOUS)) {
-                if (!(file = fget(fd)))
-                        goto out;
-        }
-        
-        flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
-        down_write(&current->mm->mmap_sem);
-        ret = do_mmap(file, addr, len, prot, flags, offset);
-        up_write(&current->mm->mmap_sem);
-        if (file)
-                fput(file);
- out:
-        unlock_kernel();
-        return ret;
 }
 
 /* common code for old and new mmaps */

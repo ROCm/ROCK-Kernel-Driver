@@ -1,4 +1,4 @@
-/* $Id: checksum.h,v 1.3 2000/11/15 17:35:16 bjornw Exp $ */
+/* $Id: checksum.h,v 1.4 2001/06/28 03:58:36 hp Exp $ */
 /* TODO: csum_tcpudp_magic could be speeded up, and csum_fold as well */
 
 #ifndef _CRIS_CHECKSUM_H
@@ -69,17 +69,9 @@ csum_tcpudp_nofold(unsigned long saddr, unsigned long daddr, unsigned short len,
 	return res;
 }	
 
-
-/* TODO we need to write this properly to handle userland VM exceptions!! */
-
-#define csum_partial_copy_from_user(a,b,c,d,errptr) csum_partial_copy_nocheck(a,b,c,d)
-
-#if 0
-unsigned int csum_partial_copy_from_user(const char *src, char *dst,
-					int len, unsigned int sum);
-#endif
-
-
+extern unsigned int csum_partial_copy_from_user(const char *src, char *dst,
+						int len, unsigned int sum, 
+						int *errptr);
 
 /*
  *	This is a version of ip_compute_csum() optimized for IP headers,

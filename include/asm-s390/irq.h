@@ -572,6 +572,10 @@ int s390_request_irq_special( int                      irq,
 extern int set_cons_dev(int irq);
 extern int reset_cons_dev(int irq);
 extern int wait_cons_dev(int irq);
+extern schib_t *s390_get_schib( int irq );
+
+extern int s390_register_adapter_interrupt(adapter_int_handler_t handler);
+extern int s390_unregister_adapter_interrupt(adapter_int_handler_t handler);
 
 /*
  * Some S390 specific IO instructions as inline

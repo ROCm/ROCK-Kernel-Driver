@@ -57,6 +57,8 @@
 #include <pcmcia/ss.h>
 #include <pcmcia/cs.h>
 
+#include <linux/isapnp.h>
+
 /* ISA-bus controllers */
 #include "i82365.h"
 #include "cirrus.h"
@@ -816,10 +818,56 @@ static void __init add_pcic(int ns, int type)
 
 #ifdef CONFIG_ISA
 
+#if defined(CONFIG_ISAPNP) || (defined(CONFIG_ISAPNP_MODULE) && defined(MODULE))
+#define I82365_ISAPNP
+#endif
+
+#ifdef I82365_ISAPNP
+static struct isapnp_device_id id_table[] __initdata = {
+	{ 	ISAPNP_ANY_ID, ISAPNP_ANY_ID, ISAPNP_VENDOR('P', 'N', 'P'),
+		ISAPNP_FUNCTION(0x0e00), (unsigned long) "Intel 82365-Compatible" },
+	{ 	ISAPNP_ANY_ID, ISAPNP_ANY_ID, ISAPNP_VENDOR('P', 'N', 'P'),
+		ISAPNP_FUNCTION(0x0e01), (unsigned long) "Cirrus Logic CL-PD6720" },
+	{ 	ISAPNP_ANY_ID, ISAPNP_ANY_ID, ISAPNP_VENDOR('P', 'N', 'P'),
+		ISAPNP_FUNCTION(0x0e02), (unsigned long) "VLSI VL82C146" },
+	{	0 }
+};
+MODULE_DEVICE_TABLE(isapnp, id_table);
+
+static struct pci_dev *i82365_pnpdev;
+#endif
+
 static void __init isa_probe(void)
 {
     int i, j, sock, k, ns, id;
     ioaddr_t port;
+#ifdef I82365_ISAPNP
+    struct isapnp_device_id *devid;
+    struct pci_dev *dev;
+
+    for (devid = id_table; devid->vendor; devid++) {
+	if ((dev = isapnp_find_dev(NULL, devid->vendor, devid->function, NULL))) {
+	    printk("ISAPNP ");
+
+	    if (dev->prepare && dev->prepare(dev) < 0) {
+		printk("prepare failed\n");
+		break;
+	    }
+
+	    if (dev->activate && dev->activate(dev) < 0) {
+		printk("activate failed\n");
+		break;
+	    }
+
+	    if ((i365_base = pci_resource_start(dev, 0))) {
+		printk("no resources ?\n");
+		break;
+	    }
+	    i82365_pnpdev = dev;
+	    break;
+	}
+    }
+#endif
 
     if (check_region(i365_base, 2) != 0) {
 	if (sockets == 0)
@@ -1604,6 +1652,10 @@ static void __exit exit_i82365(void)
 	i365_set(i, I365_CSCINT, 0);
 	release_region(socket[i].ioaddr, 2);
     }
+#if defined(CONFIG_ISA) && defined(I82365_ISAPNP)
+    if (i82365_pnpdev && i82365_pnpdev->deactivate)
+		i82365_pnpdev->deactivate(i82365_pnpdev);
+#endif
 } /* exit_i82365 */
 
 module_init(init_i82365);

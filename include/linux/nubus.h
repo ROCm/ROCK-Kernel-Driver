@@ -314,7 +314,7 @@ void nubus_get_rsrc_str(void* dest,
 			int maxlen);
 
 /* We'd like to get rid of this eventually.  Only daynaport.c uses it now. */
-extern inline void *nubus_slot_addr(int slot)
+static inline void *nubus_slot_addr(int slot)
 {
 	return (void *)(0xF0000000|(slot<<24));
 }

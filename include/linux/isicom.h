@@ -169,7 +169,7 @@ struct	isi_port {
  *  ISI Card specific ops ...
  */
  
-extern inline void raise_dtr(struct isi_port * port)
+static inline void raise_dtr(struct isi_port * port)
 {
 	struct isi_board * card = port->card;
 	unsigned short base = card->base;
@@ -189,7 +189,7 @@ extern inline void raise_dtr(struct isi_port * port)
 	port->status |= ISI_DTR;
 }
 
-extern inline void drop_dtr(struct isi_port * port)
+static inline void drop_dtr(struct isi_port * port)
 {	
 	struct isi_board * card = port->card;
 	unsigned short base = card->base;
@@ -208,7 +208,7 @@ extern inline void drop_dtr(struct isi_port * port)
 	InterruptTheCard(base);	
 	port->status &= ~ISI_DTR;
 }
-extern inline void raise_rts(struct isi_port * port)
+static inline void raise_rts(struct isi_port * port)
 {
 	struct isi_board * card = port->card;
 	unsigned short base = card->base;
@@ -227,7 +227,7 @@ extern inline void raise_rts(struct isi_port * port)
 	InterruptTheCard(base);	
 	port->status |= ISI_RTS;
 }
-extern inline void drop_rts(struct isi_port * port)
+static inline void drop_rts(struct isi_port * port)
 {
 	struct isi_board * card = port->card;
 	unsigned short base = card->base;
@@ -246,7 +246,7 @@ extern inline void drop_rts(struct isi_port * port)
 	InterruptTheCard(base);	
 	port->status &= ~ISI_RTS;
 }
-extern inline void raise_dtr_rts(struct isi_port * port)
+static inline void raise_dtr_rts(struct isi_port * port)
 {
 	struct isi_board * card = port->card;
 	unsigned short base = card->base;
@@ -265,7 +265,7 @@ extern inline void raise_dtr_rts(struct isi_port * port)
 	InterruptTheCard(base);
 	port->status |= (ISI_DTR | ISI_RTS);
 }
-extern inline void drop_dtr_rts(struct isi_port * port)
+static inline void drop_dtr_rts(struct isi_port * port)
 {
 	struct isi_board * card = port->card;
 	unsigned short base = card->base;
@@ -285,7 +285,7 @@ extern inline void drop_dtr_rts(struct isi_port * port)
 	port->status &= ~(ISI_RTS | ISI_DTR);
 }
 
-extern inline void kill_queue(struct isi_port * port, short queue)
+static inline void kill_queue(struct isi_port * port, short queue)
 {
 	struct isi_board * card = port->card;
 	unsigned short base = card->base;

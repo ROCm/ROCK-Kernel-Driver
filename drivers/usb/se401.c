@@ -486,12 +486,8 @@ static void se401_auto_resetlevel(struct usb_se401 *se401)
 /* irq handler for snapshot button */
 static void se401_button_irq(struct urb *urb)
 {
-	struct usb_se401 *se401=urb->context;
+	struct usb_se401 *se401 = urb->context;
 	
-	if (!urb) {
-		info("ohoh: null urb");
-		return;
-	}
 	if (!se401->dev) {
 		info("ohoh: device vapourished");
 		return;
@@ -505,17 +501,13 @@ static void se401_button_irq(struct urb *urb)
 
 static void se401_video_irq(struct urb *urb)
 {
-	struct usb_se401 *se401=urb->context;
-	int length=urb->actual_length;
+	struct usb_se401 *se401 = urb->context;
+	int length = urb->actual_length;
 
 	/* ohoh... */
-	if (!se401->streaming) {
+	if (!se401->streaming)
 		return;
-	}
-	if (!urb) {
-		info ("ohoh: null urb");
-		return;
-	}
+
 	if (!se401->dev) {
 		info ("ohoh: device vapourished");
 		return;

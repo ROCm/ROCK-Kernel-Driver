@@ -62,7 +62,7 @@ typedef	int (* transfer_proc_t)(struct loop_device *, int cmd,
 				char *raw_buf, char *loop_buf, int size,
 				int real_block);
 
-extern inline int lo_do_transfer(struct loop_device *lo, int cmd, char *rbuf,
+static inline int lo_do_transfer(struct loop_device *lo, int cmd, char *rbuf,
 				 char *lbuf, int size, int rblock)
 {
 	if (!lo->transfer)

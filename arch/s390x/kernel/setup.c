@@ -43,6 +43,8 @@
 /*
  * Machine setup..
  */
+unsigned int console_mode = 0;
+unsigned int console_device = -1;
 unsigned long memory_size = 0;
 unsigned long machine_flags = 0;
 __u16 boot_cpu_addr;
@@ -141,6 +143,93 @@ static int __init vmpoff_setup(char *str)
 __setup("vmpoff=", vmpoff_setup);
 
 /*
+ * condev= and conmode= setup parameter.
+ */
+
+static int __init condev_setup(char *str)
+{
+	int vdev;
+
+	vdev = simple_strtoul(str, &str, 0);
+	if (vdev >= 0 && vdev < 65536)
+		console_device = vdev;
+	return 1;
+}
+
+__setup("condev=", condev_setup);
+
+static int __init conmode_setup(char *str)
+{
+#if defined(CONFIG_HWC_CONSOLE)
+	if (strncmp(str, "hwc", 4) == 0 && !MACHINE_IS_P390)
+                SET_CONSOLE_HWC;
+#endif
+#if defined(CONFIG_TN3215_CONSOLE)
+	if (strncmp(str, "3215", 5) == 0 && (MACHINE_IS_VM || MACHINE_IS_P390))
+		SET_CONSOLE_3215;
+#endif
+#if defined(CONFIG_TN3270_CONSOLE)
+	if (strncmp(str, "3270", 5) == 0 && (MACHINE_IS_VM || MACHINE_IS_P390))
+		SET_CONSOLE_3270;
+#endif
+        return 1;
+}
+
+__setup("conmode=", conmode_setup);
+
+static void __init conmode_default(void)
+{
+	char query_buffer[1024];
+	char *ptr;
+
+        if (MACHINE_IS_VM) {
+		cpcmd("QUERY TERM", query_buffer, 1024);
+		ptr = strstr(query_buffer, "CONMODE");
+		/*
+		 * Set the conmode to 3215 so that the device recognition 
+		 * will set the cu_type of the console to 3215. If the
+		 * conmode is 3270 and we don't set it back then both
+		 * 3215 and the 3270 driver will try to access the console
+		 * device (3215 as console and 3270 as normal tty).
+		 */
+		cpcmd("TERM CONMODE 3215", NULL, 0);
+		if (ptr == NULL) {
+#if defined(CONFIG_HWC_CONSOLE)
+			SET_CONSOLE_HWC;
+#endif
+			return;
+		}
+		if (strncmp(ptr + 8, "3270", 4) == 0) {
+#if defined(CONFIG_TN3270_CONSOLE)
+			SET_CONSOLE_3270;
+#elif defined(CONFIG_TN3215_CONSOLE)
+			SET_CONSOLE_3215;
+#elif defined(CONFIG_HWC_CONSOLE)
+			SET_CONSOLE_HWC;
+#endif
+		} else if (strncmp(ptr + 8, "3215", 4) == 0) {
+#if defined(CONFIG_TN3215_CONSOLE)
+			SET_CONSOLE_3215;
+#elif defined(CONFIG_TN3270_CONSOLE)
+			SET_CONSOLE_3270;
+#elif defined(CONFIG_HWC_CONSOLE)
+			SET_CONSOLE_HWC;
+#endif
+		}
+        } else if (MACHINE_IS_P390) {
+#if defined(CONFIG_TN3215_CONSOLE)
+		SET_CONSOLE_3215;
+#elif defined(CONFIG_TN3270_CONSOLE)
+		SET_CONSOLE_3270;
+#endif
+	} else {
+#if defined(CONFIG_HWC_CONSOLE)
+		SET_CONSOLE_HWC;
+#endif
+	}
+}
+
+/*
  * Reboot, halt and power_off routines for non SMP.
  */
 #ifndef CONFIG_SMP
@@ -177,13 +266,10 @@ void __init setup_arch(char **cmdline_p)
 	unsigned long start_pfn, end_pfn;
         static unsigned int smptrap=0;
         unsigned long delay = 0;
-        int len = 0;
 
         if (smptrap)
                 return;
         smptrap=1;
-
-        printk("Command line is: %s\n", COMMAND_LINE);
 
         /*
          * Setup lowcore information for boot cpu
@@ -221,7 +307,6 @@ void __init setup_arch(char **cmdline_p)
                  * "mem=XXX[kKmM]" sets memsize 
                  */
                 if (c == ' ' && strncmp(from, "mem=", 4) == 0) {
-                        if (to != command_line) to--;
                         memory_end = simple_strtoul(from+4, &from, 0);
                         if ( *from == 'K' || *from == 'k' ) {
                                 memory_end = memory_end << 10;
@@ -235,7 +320,6 @@ void __init setup_arch(char **cmdline_p)
                  * "ipldelay=XXX[sm]" sets ipl delay in seconds or minutes
                  */
                 if (c == ' ' && strncmp(from, "ipldelay=", 9) == 0) {
-			if (to != command_line) to--;
                         delay = simple_strtoul(from+9, &from, 0);
 			if (*from == 's' || *from == 'S') {
 				delay = delay*1000000;
@@ -244,7 +328,7 @@ void __init setup_arch(char **cmdline_p)
 				delay = delay*60*1000000;
 				from++;
 			}
-			/* now wait for the requestion amount of time */
+			/* now wait for the requested amount of time */
 			udelay(delay);
                 }
                 cn = *(from++);
@@ -252,10 +336,12 @@ void __init setup_arch(char **cmdline_p)
                         break;
                 if (cn == '\n')
                         cn = ' ';  /* replace newlines with space */
+		if (cn == 0x0d)
+			cn = ' ';  /* replace 0x0d with space */
                 if (cn == ' ' && c == ' ')
                         continue;  /* remove additional spaces */
                 c = cn;
-                if (COMMAND_LINE_SIZE <= ++len)
+                if (to - command_line >= COMMAND_LINE_SIZE)
                         break;
                 *(to++) = c;
         }
@@ -313,6 +399,9 @@ void __init setup_arch(char **cmdline_p)
 	request_resource(&iomem_resource, res);
 	request_resource(res, &code_resource);
 	request_resource(res, &data_resource);
+
+        /* Setup default console */
+	conmode_default();
 }
 
 void print_cpu_info(struct cpuinfo_S390 *cpuinfo)

@@ -19,17 +19,17 @@
  * Basic functions accessing APICs.
  */
 
-extern __inline void apic_write(unsigned long reg, unsigned long v)
+static __inline void apic_write(unsigned long reg, unsigned long v)
 {
 	*((volatile unsigned long *)(APIC_BASE+reg)) = v;
 }
 
-extern __inline void apic_write_atomic(unsigned long reg, unsigned long v)
+static __inline void apic_write_atomic(unsigned long reg, unsigned long v)
 {
 	xchg((volatile unsigned long *)(APIC_BASE+reg), v);
 }
 
-extern __inline unsigned long apic_read(unsigned long reg)
+static __inline unsigned long apic_read(unsigned long reg)
 {
 	return *((volatile unsigned long *)(APIC_BASE+reg));
 }
@@ -51,7 +51,7 @@ extern unsigned int apic_timer_irqs [NR_CPUS];
 # define apic_write_around(x,y) apic_write_atomic((x),(y))
 #endif
 
-extern inline void ack_APIC_irq(void)
+static inline void ack_APIC_irq(void)
 {
 	/*
 	 * ack_APIC_irq() actually gets compiled as a single instruction:

@@ -1,4 +1,4 @@
-/* $Id: atomic.h,v 1.2 2000/07/13 16:51:57 bjornw Exp $ */
+/* $Id: atomic.h,v 1.3 2001/07/25 16:15:19 bjornw Exp $ */
 
 #ifndef __ASM_CRIS_ATOMIC__
 #define __ASM_CRIS_ATOMIC__
@@ -138,5 +138,11 @@ static __inline__ int atomic_inc_and_test(volatile atomic_t *v)
 	restore_flags(flags);
 	return retval;
 }
+
+/* Atomic operations are already serializing */
+#define smp_mb__before_atomic_dec()    barrier()
+#define smp_mb__after_atomic_dec()     barrier()
+#define smp_mb__before_atomic_inc()    barrier()
+#define smp_mb__after_atomic_inc()     barrier()
 
 #endif

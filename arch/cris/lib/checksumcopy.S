@@ -1,4 +1,4 @@
-/* $Id: checksumcopy.S,v 1.5 2001/05/29 11:40:14 markusl Exp $
+/* $Id: checksumcopy.S,v 1.6 2001/06/28 03:57:16 hp Exp $
  * A fast checksum+copy routine using movem
  * Copyright (c) 1998, 2001 Axis Communications AB
  *
@@ -37,6 +37,7 @@ _csum_partial_copy_nocheck:
 	subq	10*4,r12	; update length for the first loop
 	
 mloop:	movem	[r10+],r9	; read 10 longwords
+1:	;; A failing userspace access will have this as PC.
 	movem	r9,[r11+]	; write 10 longwords
 
 	;; perform dword checksumming on the 10 longwords
@@ -105,6 +106,7 @@ no_fold:
 	subq	2,r12
 	
 wloop:	move.w	[r10+],r9
+2:	;; A failing userspace access will have this as PC.
 	addu.w	r9,r13
 	subq	2,r12
 	bge	wloop
@@ -123,9 +125,8 @@ no_words:
 do_byte:	
 	;; copy and checksum the last byte
 	move.b	[r10],r9
+3:	;; A failing userspace access will have this as PC.
 	addu.b	r9,r13
 	move.b	r9,[r11]
 	ret
 	move.d	r13, r10
-		
-	

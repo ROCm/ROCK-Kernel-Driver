@@ -2254,6 +2254,7 @@ static int ov511_ioctl(struct video_device *vdev, unsigned int cmd, void *arg)
 
 		PDEBUG (4, "VIDIOCGCAP");
 
+		memset(&b, 0, sizeof(b));
 		strcpy(b.name, "OV511 USB Camera");
 		b.type = VID_TYPE_CAPTURE | VID_TYPE_SUBCAPTURE;
 		b.channels = 1;
@@ -2305,9 +2306,11 @@ static int ov511_ioctl(struct video_device *vdev, unsigned int cmd, void *arg)
 
 		PDEBUG (4, "VIDIOCGPICT");
 
+		memset(&p, 0, sizeof(p));
+
 		if (ov7610_get_picture(ov511, &p))
 			return -EIO;
-							
+
 		if (copy_to_user(arg, &p, sizeof(p)))
 			return -EFAULT;
 
@@ -2422,11 +2425,11 @@ static int ov511_ioctl(struct video_device *vdev, unsigned int cmd, void *arg)
 	{
 		struct video_window vw;
 
+		memset(&vw, 0, sizeof(vw));
 		vw.x = 0;		/* FIXME */
 		vw.y = 0;
 		vw.width = ov511->frame[0].width;
 		vw.height = ov511->frame[0].height;
-		vw.chromakey = 0;
 		vw.flags = 30;
 
 		PDEBUG (4, "VIDIOCGWIN: %dx%d", vw.width, vw.height);
@@ -2439,12 +2442,16 @@ static int ov511_ioctl(struct video_device *vdev, unsigned int cmd, void *arg)
 	case VIDIOCGMBUF:
 	{
 		struct video_mbuf vm;
-
+		int i;
+		
 		memset(&vm, 0, sizeof(vm));
 		vm.size = OV511_NUMFRAMES * MAX_DATA_SIZE;
 		vm.frames = OV511_NUMFRAMES;
 		vm.offsets[0] = 0;
-		vm.offsets[1] = MAX_FRAME_SIZE + sizeof (struct timeval);
+		for (i = 1; i < OV511_NUMFRAMES; i++) {
+			vm.offsets[i] = vm.offsets[i-1] + MAX_FRAME_SIZE
+				+ sizeof (struct timeval);
+		}
 
 		if (copy_to_user((void *)arg, (void *)&vm, sizeof(vm)))
 			return -EFAULT;
@@ -2469,7 +2476,7 @@ static int ov511_ioctl(struct video_device *vdev, unsigned int cmd, void *arg)
 			return -EINVAL;
 		}
 
-		if ((vm.frame != 0) && (vm.frame != 1)) {
+		if ((unsigned)vm.frame >= OV511_NUMFRAMES) {
 			err("VIDIOCMCAPTURE: invalid frame (%d)", vm.frame);
 			return -EINVAL;
 		}
@@ -2518,6 +2525,11 @@ static int ov511_ioctl(struct video_device *vdev, unsigned int cmd, void *arg)
 
 		if (copy_from_user((void *)&frame, arg, sizeof(int)))
 			return -EFAULT;
+
+		if ((unsigned)frame >= OV511_NUMFRAMES) {
+			err("VIDIOCSYNC: invalid frame (%d)", frame);
+			return -EINVAL;
+		}
 
 		PDEBUG(4, "syncing to frame %d, grabstate = %d", frame,
 		       ov511->frame[frame].grabstate);

@@ -76,10 +76,9 @@ create an ISO9660 filesystem:
 - ensure the tape is at the beginning 
      mt -f /dev/ntibm0 rewind 
 
-- set the blocksize of the character driver. The blocksizes 512, 1024
-  and 2048 bytes are supported by ISO9660. 1024 is the default, u
-  which will be used here. 
-     mt -f /dev/ntibm0 setblk 1024 
+- set the blocksize of the character driver. The blocksize 2048 bytes
+  is commonly used on ISO9660 CD-Roms
+     mt -f /dev/ntibm0 setblk 2048 
 
 - write the filesystem to the character device driver 
      mkisofs -o /dev/ntibm0 somedir 
@@ -88,18 +87,16 @@ create an ISO9660 filesystem:
      mt -f /dev/ntibm0 rewind 
 
 - Now you can mount your new filesystem as a block device: 
-     mount -t iso9660 -o ro,block=1024 /dev/btibm0 /mnt 
+     mount -t iso9660 -o ro,block=2048 /dev/btibm0 /mnt 
 
 TODO List 
 
-- The backend code has to be enhanced to support error-recovery actions. 
-
-- The seeking algorithm of the block device has to be improved to speed 
-  things up 
+   - Driver has to be stabelized still
 
 BUGS 
 
-There are lots of weaknesses still in the code. This is why it is EXPERIMENTAL.
+This driver is considered BETA, which means some weaknesses may still
+be in it.
 If an error occurs which cannot be handled by the code you will get a 
 sense-data dump.In that case please do the following: 
 

@@ -40,7 +40,7 @@ do { \
  * so we only need to worry about other
  * CPU's.
  */
-extern __inline__ void lock_kernel(void)
+static __inline__ void lock_kernel(void)
 {
 #if 1
 	if (!++current->lock_depth)
@@ -56,7 +56,7 @@ extern __inline__ void lock_kernel(void)
 #endif
 }
 
-extern __inline__ void unlock_kernel(void)
+static __inline__ void unlock_kernel(void)
 {
 	if (current->lock_depth < 0)
 		BUG();

@@ -107,7 +107,7 @@ struct autofs_sb_info {
 	unsigned long symlink_bitmap[AUTOFS_SYMLINK_BITMAP_LEN];
 };
 
-extern inline struct autofs_sb_info *autofs_sbi(struct super_block *sb)
+static inline struct autofs_sb_info *autofs_sbi(struct super_block *sb)
 {
 	return (struct autofs_sb_info *)(sb->u.generic_sbp);
 }

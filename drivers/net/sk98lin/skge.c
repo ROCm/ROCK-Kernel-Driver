@@ -1473,7 +1473,7 @@ struct net_device	*dev)
 {
 DEV_NET			*pNet;
 SK_AC			*pAC;
-unsigned int	Flags;		/* for spin lock */
+unsigned long	Flags;		/* for spin lock */
 int		i;
 SK_EVPARA		EvPara;		/* an event parameter union */
 
@@ -1580,7 +1580,7 @@ struct net_device	*dev)
 DEV_NET		*pNet;
 SK_AC		*pAC;
 
-unsigned int	Flags;		/* for spin lock */
+unsigned long	Flags;		/* for spin lock */
 int				i;
 int				PortIdx;
 SK_EVPARA		EvPara;
@@ -1732,7 +1732,7 @@ TX_PORT		*pTxPort,	/* pointer to struct of port to send to */
 struct sk_buff	*pMessage)	/* pointer to send-message */
 {
 TXD		*pTxd;		/* the rxd to fill */
-unsigned int	Flags;
+unsigned long	Flags;
 SK_U64		PhysAddr;
 int		BytesSend;
 
@@ -1898,7 +1898,7 @@ SK_AC		*pAC,		/* pointer to the adapter context */
 RX_PORT		*pRxPort)	/* ptr to port struct for which the ring
 				   should be filled */
 {
-unsigned int	Flags;
+unsigned long	Flags;
 
 	spin_lock_irqsave(&pRxPort->RxDesRingLock, Flags);
 	while (pRxPort->RxdRingFree > pRxPort->RxFillLimit) {
@@ -2329,7 +2329,7 @@ SK_AC	*pAC,		/* pointer to adapter context */
 RX_PORT	*pRxPort)	/* pointer to rx port struct */
 {
 RXD		*pRxd;	/* pointer to the current descriptor */
-unsigned int	Flags;
+unsigned long	Flags;
  SK_U64		PhysAddr;
 
 	if (pRxPort->RxdRingFree == pAC->RxDescrPerRing) {
@@ -2376,7 +2376,7 @@ TX_PORT	*pTxPort)	/* pointer to tx prt struct */
 {
 TXD		*pTxd;		/* pointer to the current descriptor */
 int		i;
-unsigned int	Flags;
+unsigned long	Flags;
 
 	spin_lock_irqsave(&pTxPort->TxDesRingLock, Flags);
 	pTxd = pTxPort->pTxdRingHead;
@@ -2500,8 +2500,8 @@ DEV_NET *pNet = (DEV_NET*) dev->priv;
 SK_AC	*pAC = pNet->pAC;
 
 struct sockaddr	*addr = p;
-unsigned int	Flags;
-	
+unsigned long	Flags;
+
 	SK_DBG_MSG(NULL, SK_DBGMOD_DRV, SK_DBGCAT_DRV_ENTRY,
 		("SkGeSetMacAddr starts now...\n"));
 	if(netif_running(dev)) {
@@ -2548,7 +2548,7 @@ SK_AC		*pAC;
 struct dev_mc_list	*pMcList;
 int			i;
 int			PortIdx;
-unsigned int		Flags;
+unsigned long		Flags;
 
 	SK_DBG_MSG(NULL, SK_DBGMOD_DRV, SK_DBGCAT_DRV_ENTRY,
 		("SkGeSetRxMode starts now... "));
@@ -2619,7 +2619,7 @@ static int SkGeChangeMtu(struct net_device *dev, int NewMtu)
 DEV_NET		*pNet;
 DEV_NET		*pOtherNet;
 SK_AC		*pAC;
-unsigned int	Flags;
+unsigned long	Flags;
 int		i;
 SK_EVPARA 	EvPara;
 
@@ -2842,7 +2842,7 @@ SK_AC	*pAC = pNet->pAC;
 SK_PNMI_STRUCT_DATA *pPnmiStruct;       /* structure for all Pnmi-Data */
 SK_PNMI_STAT    *pPnmiStat;             /* pointer to virtual XMAC stat. data */SK_PNMI_CONF    *pPnmiConf;             /* pointer to virtual link config. */
 unsigned int    Size;                   /* size of pnmi struct */
-unsigned int	Flags;			/* for spin lock */
+unsigned long	Flags;			/* for spin lock */
 
 	SK_DBG_MSG(NULL, SK_DBGMOD_DRV, SK_DBGCAT_DRV_ENTRY,
 		("SkGeStats starts now...\n"));
@@ -2966,7 +2966,7 @@ DEV_NET		*pNet,	/* pointer to the adapter context */
 unsigned int	Size,	/* length of ioctl data */
 int		mode)	/* flag for set/preset */
 {
-unsigned int	Flags;	/* for spin lock */
+unsigned long	Flags;	/* for spin lock */
 SK_AC		*pAC;
 
 	SK_DBG_MSG(NULL, SK_DBGMOD_DRV, SK_DBGCAT_DRV_ENTRY,
@@ -3370,7 +3370,7 @@ SK_AC	*pAC		/* pointer to adapter context */
 int	StrLen = 80;		/* length of the string, defined in SK_AC */
 char	Keyword[] = VPD_NAME;	/* vpd productname identifier */
 int	ReturnCode;		/* return code from vpd_read */
-unsigned int Flags;
+unsigned long Flags;
 
 	spin_lock_irqsave(&pAC->SlowPathLock, Flags);
 	ReturnCode = VpdRead(pAC, pAC->IoBase, Keyword, pAC->DeviceStr,
@@ -3639,7 +3639,7 @@ int		FromPort;	/* the port from which we switch away */
 int		ToPort;		/* the port we switch to */
 SK_EVPARA	NewPara;	/* parameter for further events */
 int		Stat;
-unsigned int	Flags;
+unsigned long	Flags;
 
 	switch (Event) {
 	case SK_DRV_ADAP_FAIL:

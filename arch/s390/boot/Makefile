@@ -1,5 +1,5 @@
 #
-# Makefile for the linux s390-specific parts of the memory manager.
+# arch/s390/boot/Makefile
 #
 # Note! Dependencies are done automagically by 'make dep', which also
 # removes any old dependencies. DON'T put your own dependencies here

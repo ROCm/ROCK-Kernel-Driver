@@ -1,23 +1,14 @@
 /**
- * $Id: fsm.c,v 1.1 2000/11/30 11:21:08 bird Exp $
+ * $Id: fsm.c,v 1.3 2001/06/18 16:49:19 felfert Exp $
  *
  * A generic FSM based on fsm used in isdn4linux
- *
- * $Log: fsm.c,v $
- * Revision 1.1  2000/11/30 11:21:08  bird
- * Support for new ctc driver
- *
- * Revision 1.2  2000/11/10 17:25:11  felfert
- * Changes for kernel 2.4
- *
- * Revision 1.1  2000/11/03 16:58:45  felfert
- * Initial import
- *
  *
  */
 
 #include "fsm.h"
 #include <linux/version.h>
+#include <linux/config.h>
+#include <linux/module.h>
 
 fsm_instance *
 init_fsm(char *name, const char **state_names, const char **event_names, int nr_states,
@@ -228,3 +219,16 @@ fsm_modtimer(fsm_timer *this, int millisec, int event, void *arg)
 	this->tl.expires = jiffies + (millisec * HZ) / 1000;
 	add_timer(&this->tl);
 }
+
+EXPORT_SYMBOL(init_fsm);
+EXPORT_SYMBOL(kfree_fsm);
+EXPORT_SYMBOL(fsm_settimer);
+EXPORT_SYMBOL(fsm_deltimer);
+EXPORT_SYMBOL(fsm_addtimer);
+EXPORT_SYMBOL(fsm_modtimer);
+EXPORT_SYMBOL(fsm_getstate_str);
+
+#if FSM_DEBUG_HISTORY
+EXPORT_SYMBOL(fsm_print_history);
+EXPORT_SYMBOL(fsm_record_history);
+#endif

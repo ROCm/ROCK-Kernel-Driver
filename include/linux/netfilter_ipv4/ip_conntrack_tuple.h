@@ -82,14 +82,14 @@ enum ip_conntrack_dir
 	IP_CT_DIR_MAX
 };
 
-extern inline int ip_ct_tuple_src_equal(const struct ip_conntrack_tuple *t1,
+static inline int ip_ct_tuple_src_equal(const struct ip_conntrack_tuple *t1,
 				        const struct ip_conntrack_tuple *t2)
 {
 	return t1->src.ip == t2->src.ip
 		&& t1->src.u.all == t2->src.u.all;
 }
 
-extern inline int ip_ct_tuple_dst_equal(const struct ip_conntrack_tuple *t1,
+static inline int ip_ct_tuple_dst_equal(const struct ip_conntrack_tuple *t1,
 				        const struct ip_conntrack_tuple *t2)
 {
 	return t1->dst.ip == t2->dst.ip
@@ -97,13 +97,13 @@ extern inline int ip_ct_tuple_dst_equal(const struct ip_conntrack_tuple *t1,
 		&& t1->dst.protonum == t2->dst.protonum;
 }
 
-extern inline int ip_ct_tuple_equal(const struct ip_conntrack_tuple *t1,
+static inline int ip_ct_tuple_equal(const struct ip_conntrack_tuple *t1,
 				    const struct ip_conntrack_tuple *t2)
 {
 	return ip_ct_tuple_src_equal(t1, t2) && ip_ct_tuple_dst_equal(t1, t2);
 }
 
-extern inline int ip_ct_tuple_mask_cmp(const struct ip_conntrack_tuple *t,
+static inline int ip_ct_tuple_mask_cmp(const struct ip_conntrack_tuple *t,
 				       const struct ip_conntrack_tuple *tuple,
 				       const struct ip_conntrack_tuple *mask)
 {

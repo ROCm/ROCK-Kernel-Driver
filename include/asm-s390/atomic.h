@@ -25,13 +25,13 @@ typedef struct { volatile int counter; } atomic_t __attribute__ ((aligned (4)));
 
 #define atomic_eieio()          __asm__ __volatile__ ("BCR 15,0")
 
-#define __CS_LOOP(old, new, ptr, op_val, op_string)			\
+#define __CS_LOOP(old_val, new_val, ptr, op_val, op_string)		\
         __asm__ __volatile__("   l     %0,0(%2)\n"			\
                              "0: lr    %1,%0\n"				\
                              op_string "  %1,%3\n"			\
                              "   cs    %0,%1,0(%2)\n"			\
                              "   jl    0b"				\
-                             : "=&d" (old), "=&d" (new)			\
+                             : "=&d" (old_val), "=&d" (new_val)		\
 			     : "a" (ptr), "d" (op_val) : "cc" );
 
 static __inline__ int atomic_read(atomic_t *v)
@@ -52,80 +52,80 @@ static __inline__ void atomic_set(atomic_t *v, int i)
 
 static __inline__ void atomic_add(int i, atomic_t *v)
 {
-	int old, new;
-	__CS_LOOP(old, new, v, i, "ar");
+	int old_val, new_val;
+	__CS_LOOP(old_val, new_val, v, i, "ar");
 }
 
 static __inline__ int atomic_add_return (int i, atomic_t *v)
 {
-	int old, new;
-	__CS_LOOP(old, new, v, i, "ar");
-	return new;
+	int old_val, new_val;
+	__CS_LOOP(old_val, new_val, v, i, "ar");
+	return new_val;
 }
 
 static __inline__ int atomic_add_negative(int i, atomic_t *v)
 {
-	int old, new;
-        __CS_LOOP(old, new, v, i, "ar");
-        return new < 0;
+	int old_val, new_val;
+        __CS_LOOP(old_val, new_val, v, i, "ar");
+        return new_val < 0;
 }
 
 static __inline__ void atomic_sub(int i, atomic_t *v)
 {
-	int old, new;
-	__CS_LOOP(old, new, v, i, "sr");
+	int old_val, new_val;
+	__CS_LOOP(old_val, new_val, v, i, "sr");
 }
 
 static __inline__ void atomic_inc(volatile atomic_t *v)
 {
-	int old, new;
-	__CS_LOOP(old, new, v, 1, "ar");
+	int old_val, new_val;
+	__CS_LOOP(old_val, new_val, v, 1, "ar");
 }
 
 static __inline__ int atomic_inc_return(volatile atomic_t *v)
 {
-	int old, new;
-	__CS_LOOP(old, new, v, 1, "ar");
-        return new;
+	int old_val, new_val;
+	__CS_LOOP(old_val, new_val, v, 1, "ar");
+        return new_val;
 }
 
 static __inline__ int atomic_inc_and_test(volatile atomic_t *v)
 {
-	int old, new;
-	__CS_LOOP(old, new, v, 1, "ar");
-	return new != 0;
+	int old_val, new_val;
+	__CS_LOOP(old_val, new_val, v, 1, "ar");
+	return new_val != 0;
 }
 
 static __inline__ void atomic_dec(volatile atomic_t *v)
 {
-	int old, new;
-	__CS_LOOP(old, new, v, 1, "sr");
+	int old_val, new_val;
+	__CS_LOOP(old_val, new_val, v, 1, "sr");
 }
 
 static __inline__ int atomic_dec_return(volatile atomic_t *v)
 {
-	int old, new;
-	__CS_LOOP(old, new, v, 1, "sr");
-        return new;
+	int old_val, new_val;
+	__CS_LOOP(old_val, new_val, v, 1, "sr");
+        return new_val;
 }
 
 static __inline__ int atomic_dec_and_test(volatile atomic_t *v)
 {
-	int old, new;
-	__CS_LOOP(old, new, v, 1, "sr");
-        return new == 0;
+	int old_val, new_val;
+	__CS_LOOP(old_val, new_val, v, 1, "sr");
+        return new_val == 0;
 }
 
 static __inline__ void atomic_clear_mask(unsigned long mask, atomic_t *v)
 {
-	int old, new;
-	__CS_LOOP(old, new, v, ~mask, "nr");
+	int old_val, new_val;
+	__CS_LOOP(old_val, new_val, v, ~mask, "nr");
 }
 
 static __inline__ void atomic_set_mask(unsigned long mask, atomic_t *v)
 {
-	int old, new;
-	__CS_LOOP(old, new, v, mask, "or");
+	int old_val, new_val;
+	__CS_LOOP(old_val, new_val, v, mask, "or");
 }
 
 /*

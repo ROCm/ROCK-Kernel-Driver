@@ -101,9 +101,10 @@ void do_gettimeofday(struct timeval *tv)
 {
 	unsigned long flags;
 	unsigned long usec, sec;
-	unsigned long lost_ticks = jiffies - wall_jiffies;
+	unsigned long lost_ticks;
 
 	read_lock_irqsave(&xtime_lock, flags);
+	lost_ticks = jiffies - wall_jiffies;
 	usec = do_gettimeoffset();
 	if (lost_ticks)
 		usec +=(USECS_PER_JIFFY*lost_ticks);

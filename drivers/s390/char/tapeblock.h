@@ -25,11 +25,11 @@
 
 int tapeblock_open(struct inode *, struct file *);
 int tapeblock_release(struct inode *, struct file *);
-void tapeblock_setup(tape_info_t* tape);
-void schedule_tapeblock_exec_IO (tape_info_t *tape);
-int tapeblock_mediumdetect(tape_info_t* tape);
+void tapeblock_setup(tape_info_t* ti);
+void schedule_tapeblock_exec_IO (tape_info_t *ti);
+int tapeblock_mediumdetect(tape_info_t* ti);
 #ifdef CONFIG_DEVFS_FS
-void tapeblock_mkdevfstree (tape_info_t* tape);
+void tapeblock_mkdevfstree (tape_info_t* ti);
 #endif
 int tapeblock_init (void);
 void tapeblock_uninit (void);

@@ -36,7 +36,7 @@
 #include <asm/uaccess.h>
 #include <asm/unaligned.h>
 
-extern struct cvf_format default_cvf, bigblock_cvf;
+extern struct cvf_format default_cvf;
 
 /* #define FAT_PARANOIA 1 */
 #define DEBUG_LEVEL 0
@@ -448,8 +448,6 @@ fat_read_super(struct super_block *sb, void *data, int silent,
 	hard_blksize = get_hardsect_size(sb->s_dev);
 	if (!hard_blksize)
 		hard_blksize = 512;
-	if (hard_blksize != 512)
-		printk("MSDOS: Hardware sector size is %d\n", hard_blksize);
 
 	opts.isvfat = sbi->options.isvfat;
 	if (!parse_options((char *) data, &fat, &debug, &opts,
@@ -464,8 +462,8 @@ fat_read_super(struct super_block *sb, void *data, int silent,
 	set_blocksize(sb->s_dev, hard_blksize);
 	bh = bread(sb->s_dev, 0, sb->s_blocksize);
 	if (bh == NULL) {
-		brelse (bh);
-		goto out_no_bread;
+		printk("FAT: unable to read boot sector\n");
+		goto out_fail;
 	}
 
 /*
@@ -489,15 +487,23 @@ fat_read_super(struct super_block *sb, void *data, int silent,
 		CF_LE_W(get_unaligned((unsigned short *) &b->sector_size));
 	if (!logical_sector_size
 	    || (logical_sector_size & (logical_sector_size - 1))) {
-		printk("fatfs: bogus logical sector size %d\n",
+		printk("FAT: bogus logical sector size %d\n",
 		       logical_sector_size);
 		brelse(bh);
 		goto out_invalid;
 	}
 
 	sbi->cluster_size = b->cluster_size;
-	if (!sbi->cluster_size || (sbi->cluster_size & (sbi->cluster_size - 1))) {
-		printk("fatfs: bogus cluster size %d\n", sbi->cluster_size);
+	if (!sbi->cluster_size
+	    || (sbi->cluster_size & (sbi->cluster_size - 1))) {
+		printk("FAT: bogus cluster size %d\n", sbi->cluster_size);
+		brelse(bh);
+		goto out_invalid;
+	}
+
+	if (logical_sector_size < hard_blksize) {
+		printk("FAT: logical sector size too small for device"
+		       " (logical sector size = %d)\n", logical_sector_size);
 		brelse(bh);
 		goto out_invalid;
 	}
@@ -528,8 +534,8 @@ fat_read_super(struct super_block *sb, void *data, int silent,
 		if (bh->b_blocknr != fsinfo_block) {
 			fsinfo_bh = bread(sb->s_dev, fsinfo_block, hard_blksize);
 			if (fsinfo_bh == NULL) {
-				printk("FAT: bread failed, fsinfo block %d\n",
-				       fsinfo_block);
+				printk("FAT: bread failed, FSINFO block"
+				       " (blocknr = %d)\n", fsinfo_block);
 				brelse(bh);
 				goto out_invalid;
 			}
@@ -585,20 +591,14 @@ fat_read_super(struct super_block *sb, void *data, int silent,
 
 	sb->s_blocksize = logical_sector_size;
 	sb->s_blocksize_bits = ffs(logical_sector_size) - 1;
-	if (sb->s_blocksize >= hard_blksize) {
-		set_blocksize(sb->s_dev, sb->s_blocksize);
-		sbi->cvf_format = &default_cvf;
-	} else {
-		set_blocksize(sb->s_dev, hard_blksize);
-		sbi->cvf_format = &bigblock_cvf;
-	}
-
-	if (!strcmp(cvf_format,"none"))
+	set_blocksize(sb->s_dev, sb->s_blocksize);
+	sbi->cvf_format = &default_cvf;
+	if (!strcmp(cvf_format, "none"))
 		i = -1;
 	else
 		i = detect_cvf(sb,cvf_format);
 	if (i >= 0)
-		error = cvf_formats[i]->mount_cvf(sb,cvf_options);
+		error = cvf_formats[i]->mount_cvf(sb, cvf_options);
 	if (error || debug) {
 		/* The MSDOS_CAN_BMAP is obsolete, but left just to remember */
 		printk("[MS-DOS FS Rel. 12,FAT %d,check=%c,conv=%c,"
@@ -607,16 +607,14 @@ fat_read_super(struct super_block *sb, void *data, int silent,
 		       opts.conversion,opts.fs_uid,opts.fs_gid,opts.fs_umask,
 		       MSDOS_CAN_BMAP(sbi) ? ",bmap" : "");
 		printk("[me=0x%x,cs=%d,#f=%d,fs=%d,fl=%ld,ds=%ld,de=%d,data=%ld,"
-		       "se=%d,ts=%ld,ls=%d,rc=%ld,fc=%u]\n",
-		       b->media,sbi->cluster_size,
-		       sbi->fats,sbi->fat_start,
-		       sbi->fat_length,
-		       sbi->dir_start,sbi->dir_entries,
-		       sbi->data_start,
-		       CF_LE_W(*(unsigned short *) &b->sectors),
-		       (unsigned long)b->total_sect,logical_sector_size,
-		       sbi->root_cluster,sbi->free_clusters);
-		printk ("Transaction block size = %d\n", hard_blksize);
+		       "se=%u,ts=%u,ls=%d,rc=%ld,fc=%u]\n",
+		       b->media, sbi->cluster_size, sbi->fats,
+		       sbi->fat_start, sbi->fat_length, sbi->dir_start,
+		       sbi->dir_entries, sbi->data_start,
+		       CF_LE_W(get_unaligned((unsigned short *)&b->sectors)),
+		       CF_LE_L(b->total_sect), logical_sector_size,
+		       sbi->root_cluster, sbi->free_clusters);
+		printk ("hard sector size = %d\n", hard_blksize);
 	}
 	if (i < 0)
 		if (sbi->clusters + 2 > fat_clusters)
@@ -653,7 +651,7 @@ fat_read_super(struct super_block *sb, void *data, int silent,
 	if (! sbi->nls_io)
 		sbi->nls_io = load_nls_default();
 
-	root_inode=new_inode(sb);
+	root_inode = new_inode(sb);
 	if (!root_inode)
 		goto out_unload_nls;
 	root_inode->i_ino = MSDOS_ROOT_INO;
@@ -662,29 +660,27 @@ fat_read_super(struct super_block *sb, void *data, int silent,
 	sb->s_root = d_alloc_root(root_inode);
 	if (!sb->s_root)
 		goto out_no_root;
-	if(i>=0) {
+	if(i >= 0) {
 		sbi->cvf_format = cvf_formats[i];
 		++cvf_format_use_count[i];
 	}
 	return sb;
 
 out_no_root:
-	printk("get root inode failed\n");
+	printk("FAT: get root inode failed\n");
 	iput(root_inode);
 	unload_nls(sbi->nls_io);
 out_unload_nls:
 	unload_nls(sbi->nls_disk);
 	goto out_fail;
 out_invalid:
-	if (!silent)
-		printk("VFS: Can't find a valid MSDOS filesystem on dev %s.\n",
+	if (!silent) {
+		printk("VFS: Can't find a valid FAT filesystem on dev %s.\n",
 			kdevname(sb->s_dev));
-	goto out_fail;
-out_no_bread:
-	printk("FAT bread failed\n");
+	}
 out_fail:
 	if (opts.iocharset) {
-		printk("VFS: freeing iocharset=%s\n", opts.iocharset);
+		printk("FAT: freeing iocharset=%s\n", opts.iocharset);
 		kfree(opts.iocharset);
 	}
 	if(sbi->private_data)

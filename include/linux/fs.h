@@ -997,7 +997,7 @@ static inline int locks_verify_truncate(struct inode *inode,
 	return 0;
 }
 
-extern inline int get_lease(struct inode *inode, unsigned int mode)
+static inline int get_lease(struct inode *inode, unsigned int mode)
 {
 	if (inode->i_flock && (inode->i_flock->fl_flags & FL_LEASE))
 		return __get_lease(inode, mode);

@@ -13,7 +13,6 @@ SECTIONS
 		_stext = . ;
 		*(.text)
 		*(.rodata)
-		*(.rodata.*)
 		_etext = . ;
 	} > dram
 	.data :

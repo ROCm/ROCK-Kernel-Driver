@@ -60,7 +60,7 @@ asmlinkage void div_Xsig(Xsig *x1, const Xsig *x2, const Xsig *dest);
 /* Some versions of gcc make it difficult to stop eax from being clobbered.
    Merely specifying that it is used doesn't work...
  */
-extern inline unsigned long mul_32_32(const unsigned long arg1,
+static inline unsigned long mul_32_32(const unsigned long arg1,
 				      const unsigned long arg2)
 {
   int retval;
@@ -73,7 +73,7 @@ extern inline unsigned long mul_32_32(const unsigned long arg1,
 
 
 /* Add the 12 byte Xsig x2 to Xsig dest, with no checks for overflow. */
-extern inline void add_Xsig_Xsig(Xsig *dest, const Xsig *x2)
+static inline void add_Xsig_Xsig(Xsig *dest, const Xsig *x2)
 {
   asm volatile ("movl %1,%%edi; movl %2,%%esi;
                  movl (%%esi),%%eax; addl %%eax,(%%edi);
@@ -88,7 +88,7 @@ extern inline void add_Xsig_Xsig(Xsig *dest, const Xsig *x2)
 /* Note: the constraints in the asm statement didn't always work properly
    with gcc 2.5.8.  Changing from using edi to using ecx got around the
    problem, but keep fingers crossed! */
-extern inline void add_two_Xsig(Xsig *dest, const Xsig *x2, long int *exp)
+static inline void add_two_Xsig(Xsig *dest, const Xsig *x2, long int *exp)
 {
   asm volatile ("movl %2,%%ecx; movl %3,%%esi;
                  movl (%%esi),%%eax; addl %%eax,(%%ecx);
@@ -108,7 +108,7 @@ extern inline void add_two_Xsig(Xsig *dest, const Xsig *x2, long int *exp)
 
 /* Negate (subtract from 1.0) the 12 byte Xsig */
 /* This is faster in a loop on my 386 than using the "neg" instruction. */
-extern inline void negate_Xsig(Xsig *x)
+static inline void negate_Xsig(Xsig *x)
 {
   asm volatile("movl %1,%%esi; "
                "xorl %%ecx,%%ecx; "

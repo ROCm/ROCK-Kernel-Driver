@@ -2,7 +2,7 @@
  * URB OHCI HCD (Host Controller Driver) for USB.
  * 
  * (C) Copyright 1999 Roman Weissgaerber <weissg@vienna.at>
- * (C) Copyright 2000 David Brownell <david-b@pacbell.net>
+ * (C) Copyright 2000-2001 David Brownell <dbrownell@users.sourceforge.net>
  * 
  * usb-ohci.h
  */
@@ -380,6 +380,7 @@ typedef struct ohci {
 
 	int irq;
 	int disabled;			/* e.g. got a UE, we're hung */
+	int sleeping;
 	atomic_t resume_count;		/* defending against multiple resumes */
 	unsigned long flags;		/* for HC bugs */
 #define	OHCI_QUIRK_AMD756	0x01		/* erratum #4 */

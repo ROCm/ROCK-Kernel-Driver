@@ -22,6 +22,7 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/compatmac.h>
+#include <linux/init.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -52,25 +53,14 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
         unsigned long address;
         unsigned long fixup;
         int write;
-        unsigned long psw_mask;
-        unsigned long psw_addr;
 	int si_code = SEGV_MAPERR;
 	int kernel_address = 0;
-
-        /*
-         *  get psw mask of Program old psw to find out,
-         *  if user or kernel mode
-         */
-
-        psw_mask = S390_lowcore.program_old_psw.mask;
-        psw_addr = S390_lowcore.program_old_psw.addr;
 
         /* 
          * get the failing address 
          * more specific the segment and page table portion of 
          * the address 
          */
-
         address = S390_lowcore.trans_exc_code&0x7ffff000;
 
         tsk = current;
@@ -185,7 +175,7 @@ bad_area:
         up_read(&mm->mmap_sem);
 
         /* User mode accesses just cause a SIGSEGV */
-        if (psw_mask & PSW_PROBLEM_STATE) {
+        if (regs->psw.mask & PSW_PROBLEM_STATE) {
 		struct siginfo si;
                 tsk->thread.prot_addr = address;
                 tsk->thread.trap_no = error_code;
@@ -243,7 +233,7 @@ no_context:
 out_of_memory:
 	up_read(&mm->mmap_sem);
 	printk("VM: killing process %s\n", tsk->comm);
-	if (psw_mask & PSW_PROBLEM_STATE)
+	if (regs->psw.mask & PSW_PROBLEM_STATE)
 		do_exit(SIGKILL);
 	goto no_context;
 
@@ -259,7 +249,7 @@ do_sigbus:
 	force_sig(SIGBUS, tsk);
 
 	/* Kernel mode? Handle exceptions or die */
-	if (!(psw_mask & PSW_PROBLEM_STATE))
+	if (!(regs->psw.mask & PSW_PROBLEM_STATE))
 		goto no_context;
 }
 
@@ -275,23 +265,15 @@ static pseudo_wait_t *pseudo_lock_queue = NULL;
 static spinlock_t pseudo_wait_spinlock; /* spinlock to protect lock queue */
 
 /*
- * This routine handles pseudo page faults.
+ * This routine handles 'pagex' pseudo page faults.
  */
 asmlinkage void
 do_pseudo_page_fault(struct pt_regs *regs, unsigned long error_code)
 {
-        DECLARE_WAITQUEUE(wait, current);
         pseudo_wait_t wait_struct;
         pseudo_wait_t *ptr, *last, *next;
-        unsigned long psw_mask;
         unsigned long address;
         int kernel_address;
-
-        /*
-         *  get psw mask of Program old psw to find out,
-         *  if user or kernel mode
-         */
-        psw_mask = S390_lowcore.program_old_psw.mask;
 
         /*
          * get the failing address
@@ -332,7 +314,7 @@ do_pseudo_page_fault(struct pt_regs *regs, unsigned long error_code)
                 spin_unlock(&pseudo_wait_spinlock);
         } else {
                 /* Pseudo page faults in kernel mode is a bad idea */
-                if (!(psw_mask & PSW_PROBLEM_STATE)) {
+                if (!(regs->psw.mask & PSW_PROBLEM_STATE)) {
                         /*
 			 * VM presents pseudo page faults if the interrupted
 			 * state was not disabled for interrupts. So we can
@@ -383,4 +365,127 @@ do_pseudo_page_fault(struct pt_regs *regs, unsigned long error_code)
                 wait_event(wait_struct.queue, wait_struct.resolved);
         }
 }
-    
+
+#ifdef CONFIG_PFAULT 
+/*
+ * 'pfault' pseudo page faults routines.
+ */
+static int pfault_disable = 0;
+
+static int __init nopfault(char *str)
+{
+	pfault_disable = 1;
+	return 1;
+}
+
+__setup("nopfault", nopfault);
+
+typedef struct {
+	__u16 refdiagc;
+	__u16 reffcode;
+	__u16 refdwlen;
+	__u16 refversn;
+	__u64 refgaddr;
+	__u64 refselmk;
+	__u64 refcmpmk;
+	__u64 reserved;
+} __attribute__ ((packed)) pfault_refbk_t;
+
+int pfault_init(void)
+{
+	pfault_refbk_t refbk =
+	{ 0x258, 0, 5, 2, __LC_KERNEL_STACK, 1ULL << 48, 1ULL << 48, 0ULL };
+        int rc;
+
+	if (pfault_disable)
+		return -1;
+        __asm__ __volatile__(
+                "    diag  %1,%0,0x258\n"
+		"0:  j     2f\n"
+		"1:  la    %0,8\n"
+		"2:\n"
+		".section __ex_table,\"a\"\n"
+		"   .align 4\n"
+		"   .long  0b,1b\n"
+		".previous"
+                : "=d" (rc) : "a" (&refbk) : "cc" );
+        __ctl_set_bit(0, 9);
+        return rc;
+}
+
+void pfault_fini(void)
+{
+	pfault_refbk_t refbk =
+	{ 0x258, 1, 5, 2, 0ULL, 0ULL, 0ULL, 0ULL };
+
+	if (pfault_disable)
+		return;
+	__ctl_clear_bit(0,9);
+        __asm__ __volatile__(
+                "    diag  %0,0,0x258\n"
+		"0:\n"
+		".section __ex_table,\"a\"\n"
+		"   .align 4\n"
+		"   .long  0b,0b\n"
+		".previous"
+		: : "a" (&refbk) : "cc" );
+}
+
+asmlinkage void
+pfault_interrupt(struct pt_regs *regs, __u16 error_code)
+{
+        DECLARE_WAITQUEUE(wait, current);
+	struct task_struct *tsk;
+	wait_queue_head_t queue;
+	wait_queue_head_t *qp;
+	__u16 subcode;
+
+	/*
+	 * Get the external interruption subcode & pfault
+	 * initial/completion signal bit. VM stores this 
+	 * in the 'cpu address' field associated with the
+         * external interrupt. 
+	 */
+	subcode = S390_lowcore.cpu_addr;
+	if ((subcode & 0xff00) != 0x06)
+		return;
+
+	/*
+	 * Get the token (= address of kernel stack of affected task).
+	 */
+	tsk = (struct task_struct *)
+		(*((unsigned long *) __LC_PFAULT_INTPARM) - THREAD_SIZE);
+	
+	if (subcode & 0x0080) {
+		/* signal bit is set -> a page has been swapped in by VM */
+		qp = (wait_queue_head_t *)
+			xchg(&tsk->thread.pfault_wait, -1);
+		if (qp != NULL) {
+			/* Initial interrupt was faster than the completion
+			 * interrupt. pfault_wait is valid. Set pfault_wait
+			 * back to zero and wake up the process. This can
+			 * safely be done because the task is still sleeping
+			 * and can't procude new pfaults. */
+			tsk->thread.pfault_wait = 0ULL;
+			wake_up(qp);
+		}
+	} else {
+		/* signal bit not set -> a real page is missing. */
+                init_waitqueue_head (&queue);
+		qp = (wait_queue_head_t *)
+			xchg(&tsk->thread.pfault_wait, (addr_t) &queue);
+		if (qp != NULL) {
+			/* Completion interrupt was faster than the initial
+			 * interrupt (swapped in a -1 for pfault_wait). Set
+			 * pfault_wait back to zero and exit. This can be
+			 * done safely because tsk is running in kernel 
+			 * mode and can't produce new pfaults. */
+			tsk->thread.pfault_wait = 0ULL;
+		}
+
+                /* go to sleep */
+                wait_event(queue, tsk->thread.pfault_wait == 0ULL);
+	}
+}
+#endif
+

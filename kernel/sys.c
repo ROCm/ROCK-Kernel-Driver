@@ -472,7 +472,7 @@ asmlinkage long sys_setgid(gid_t gid)
  * files..
  * Thanks to Olaf Kirch and Peter Benie for spotting this.
  */
-extern inline void cap_emulate_setxuid(int old_ruid, int old_euid, 
+static inline void cap_emulate_setxuid(int old_ruid, int old_euid, 
 				       int old_suid)
 {
 	if ((old_ruid == 0 || old_euid == 0 || old_suid == 0) &&

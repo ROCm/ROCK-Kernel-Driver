@@ -12,7 +12,7 @@
 #include <linux/kernel.h>
 #include <asm/debug.h>
 
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/hdreg.h>	/* HDIO_GETGEO                      */
 #include <linux/blk.h>
 #include <asm/ccwcache.h>

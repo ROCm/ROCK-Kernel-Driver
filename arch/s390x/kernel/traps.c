@@ -35,6 +35,8 @@
 #if CONFIG_REMOTE_DEBUG
 #include <asm/gdb-stub.h>
 #endif
+#include <asm/cpcmd.h>
+#include <asm/s390_ext.h>
 
 /* Called from entry.S only */
 extern void handle_per_exception(struct pt_regs *regs);
@@ -51,6 +53,11 @@ int sysctl_userprocess_debug = 0;
 #endif
 
 extern pgm_check_handler_t do_page_fault;
+#ifdef CONFIG_PFAULT
+extern int pfault_init(void);
+extern void pfault_fini(void);
+extern void pfault_interrupt(struct pt_regs *regs, __u16 error_code);
+#endif
 
 spinlock_t die_lock;
 
@@ -152,7 +159,6 @@ asmlinkage void illegal_op(struct pt_regs * regs, long interruption_code)
 	__u16 *location;
 	int do_sig = 0;
 
-        lock_kernel();
 	location = (__u16 *)(regs->psw.addr-S390_lowcore.pgm_ilc);
 	/* WARNING don't change this check back to */
 	/* int problem_state=(regs->psw.mask & PSW_PROBLEM_STATE); */
@@ -171,7 +177,6 @@ asmlinkage void illegal_op(struct pt_regs * regs, long interruption_code)
 		do_sig = 1;
 	if (do_sig)
 		do_trap(interruption_code, SIGILL, "illegal operation", regs, NULL);
-        unlock_kernel();
 }
 
 asmlinkage void data_exception(struct pt_regs * regs, long interruption_code)
@@ -179,7 +184,6 @@ asmlinkage void data_exception(struct pt_regs * regs, long interruption_code)
 	__u16 *location;
 	int do_sig = 0;
 
-        lock_kernel();
 	location = (__u16 *)(regs->psw.addr-S390_lowcore.pgm_ilc);
 	__asm__ volatile ("stfpc %0\n\t" 
 			  : "=m" (current->thread.fp_regs.fpc));
@@ -194,7 +198,6 @@ asmlinkage void data_exception(struct pt_regs * regs, long interruption_code)
 		do_sig = 1;
         if (do_sig)
                 do_trap(interruption_code, SIGILL, "data exception", regs, NULL);
-        unlock_kernel();
 }
 
 
@@ -223,6 +226,21 @@ void __init trap_init(void)
         pgm_check_table[0x1C] = &privileged_op;
         pgm_check_table[0x38] = &addressing_exception;
         pgm_check_table[0x3B] = &do_page_fault;
+#ifdef CONFIG_PFAULT
+	if (MACHINE_IS_VM) {
+		/* request the 0x2603 external interrupt */
+		if (register_external_interrupt(0x2603, pfault_interrupt) != 0)
+			panic("Couldn't request external interrupt 0x2603");
+		/*
+		 * Try to get pfault pseudo page faults going.
+		 */
+		if (pfault_init() != 0) {
+			/* Tough luck, no pfault. */
+			unregister_external_interrupt(0x2603,
+						      pfault_interrupt);
+		}
+	}
+#endif
 }
 
 

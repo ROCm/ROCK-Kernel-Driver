@@ -38,13 +38,14 @@
 #include <linux/spinlock.h>
 #include <linux/usb.h>
 #include <linux/smp_lock.h>
+#include <linux/devfs_fs_kernel.h>
 
 #include "rio500_usb.h"
 
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.0.0"
+#define DRIVER_VERSION "v1.1"
 #define DRIVER_AUTHOR "Cesar Miquel <miquel@df.uba.ar>"
 #define DRIVER_DESC "USB Rio 500 driver"
 
@@ -60,6 +61,7 @@
 
 struct rio_usb_data {
         struct usb_device *rio_dev;     /* init: probe_rio */
+        devfs_handle_t devfs;           /* devfs device */
         unsigned int ifnum;             /* Interface number of the USB device */
         int isopen;                     /* nz if open */
         int present;                    /* Device is present on the bus */
@@ -68,6 +70,8 @@ struct rio_usb_data {
         wait_queue_head_t wait_q;       /* for timeouts */
 	struct semaphore lock;          /* general race avoidance */
 };
+
+extern devfs_handle_t usb_devfs_handle;	/* /dev/usb dir. */
 
 static struct rio_usb_data rio_instance;
 
@@ -350,13 +354,15 @@ read_rio(struct file *file, char *buffer, size_t count, loff_t * ppos)
 	int this_read;
 	int result;
 	int maxretry = 10;
-	char *ibuf = rio->ibuf;
+	char *ibuf;
 
         /* Sanity check to make sure rio is connected, powered, etc */
         if ( rio == NULL ||
              rio->present == 0 ||
              rio->rio_dev == NULL )
           return -1;
+
+	ibuf = rio->ibuf;
 
 	read_count = 0;
 
@@ -416,6 +422,15 @@ read_rio(struct file *file, char *buffer, size_t count, loff_t * ppos)
 	return read_count;
 }
 
+static struct
+file_operations usb_rio_fops = {
+	read:		read_rio,
+	write:		write_rio,
+	ioctl:		ioctl_rio,
+	open:		open_rio,
+	release:	close_rio,
+};
+
 static void *probe_rio(struct usb_device *dev, unsigned int ifnum,
 		       const struct usb_device_id *id)
 {
@@ -439,6 +454,14 @@ static void *probe_rio(struct usb_device *dev, unsigned int ifnum,
 	}
 	dbg("probe_rio: ibuf address:%p", rio->ibuf);
 
+	rio->devfs = devfs_register(usb_devfs_handle, "rio500",
+				    DEVFS_FL_DEFAULT, USB_MAJOR,
+				    RIO_MINOR,
+				    S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP |
+				    S_IWGRP, &usb_rio_fops, NULL);
+	if (rio->devfs == NULL)
+		dbg("probe_rio: device node registration failed");
+	
 	init_MUTEX(&(rio->lock));
 
 	return rio;
@@ -447,6 +470,8 @@ static void *probe_rio(struct usb_device *dev, unsigned int ifnum,
 static void disconnect_rio(struct usb_device *dev, void *ptr)
 {
 	struct rio_usb_data *rio = (struct rio_usb_data *) ptr;
+
+	devfs_unregister(rio->devfs);
 
 	if (rio->isopen) {
 		rio->isopen = 0;
@@ -461,15 +486,6 @@ static void disconnect_rio(struct usb_device *dev, void *ptr)
 
 	rio->present = 0;
 }
-
-static struct
-file_operations usb_rio_fops = {
-	read:		read_rio,
-	write:		write_rio,
-	ioctl:		ioctl_rio,
-	open:		open_rio,
-	release:	close_rio,
-};
 
 static struct usb_device_id rio_table [] = {
 	{ USB_DEVICE(0x0841, 1) }, 		/* Rio 500 */

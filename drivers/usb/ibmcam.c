@@ -2591,11 +2591,11 @@ static int ibmcam_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 		{
 			struct video_window vw;
 
+			memset(&vw, 0, sizeof(vw));
 			vw.x = 0;
 			vw.y = 0;
 			vw.width = imgwidth;
 			vw.height = imgheight;
-			vw.chromakey = 0;
 			vw.flags = usb_ibmcam_calculate_fps();
 
 			if (copy_to_user(arg, &vw, sizeof(vw)))
@@ -2657,6 +2657,11 @@ static int ibmcam_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 
 			if (copy_from_user((void *)&frame, arg, sizeof(int)))
 				return -EFAULT;
+
+			if ((unsigned)frame >= IBMCAM_NUMFRAMES) {
+				err("VIDIOCSYNC: invalid frame %d.", frame);
+				return -EINVAL;
+			}
 
 			if (debug >= 1)
 				printk(KERN_DEBUG "ibmcam: syncing to frame %d\n", frame);
@@ -3161,5 +3166,3 @@ module_exit(usb_ibmcam_cleanup);
 
 MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
-
-

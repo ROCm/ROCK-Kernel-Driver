@@ -38,17 +38,18 @@
 #define __LC_MCCK_CODE                  0x0E8
 
 #define __LC_SAVE_AREA                  0xC00
-#define __LC_CREGS_SAVE_AREA            0xC80
-#define __LC_AREGS_SAVE_AREA            0xD00
 #define __LC_KERNEL_STACK               0xD40
 #define __LC_KERNEL_LEVEL               0xD48
-#define __LC_IRQ_STAT                   0xD50
 #define __LC_CPUID                      0xD90
 #define __LC_CPUADDR                    0xD98
 #define __LC_IPLDEV                     0xDB8
 
 #define __LC_PANIC_MAGIC                0xE00
 
+#define __LC_AREGS_SAVE_AREA            0x1340
+#define __LC_CREGS_SAVE_AREA            0x1380
+
+#define __LC_PFAULT_INTPARM             0x11B8
 
 /* interrupt handler start with all io, external and mcck interrupt disabled */
 
@@ -139,21 +140,14 @@ struct _lowcore
         __u8         pad8[0xc00-0x214];        /* 0x214 */
         /* System info area */
 	__u64        save_area[16];            /* 0xc00 */
-	__u64        cregs_save_area[16];      /* 0xc80 */
-	__u32        access_regs_save_area[16];/* 0xd00 */
+        __u8         pad9[0xd40-0xc80];        /* 0xc80 */
  	__u64        kernel_stack;             /* 0xd40 */
 	__u64        kernel_level;             /* 0xd48 */
 	/* entry.S sensitive area start */
-	/* Next 6 words are the s390 equivalent of irq_stat */
-	__u32        __softirq_active;         /* 0xd50 */
-	__u32        __softirq_mask;           /* 0xd54 */
-	__u32        __local_irq_count;        /* 0xd58 */
-	__u32        __local_bh_count;         /* 0xd5c */
-	__u32        __syscall_count;          /* 0xd60 */
-	__u8         pad10[0xd80-0xd64];       /* 0xd64 */
+	__u8         pad10[0xd80-0xd50];       /* 0xd64 */
 	struct       cpuinfo_S390 cpu_data;    /* 0xd80 */
 	__u32        ipl_device;               /* 0xdb8 */
-	__u32        pad13;                    /* 0xdbc was lsw word of ipl_device until a bug was found DJB */
+	__u32        pad11;                    /* 0xdbc was lsw word of ipl_device until a bug was found DJB */
 	/* entry.S sensitive area end */
 
         /* SMP info area: defined by DJB */
@@ -162,14 +156,33 @@ struct _lowcore
 	__u64        ext_call_queue;           /* 0xdd0 */
         __u64        ext_call_count;           /* 0xdd8 */
 
-        __u8         pad11[0xe00-0xde0];       /* 0xde0 */
+        __u8         pad12[0xe00-0xde0];       /* 0xde0 */
 
         /* 0xe00 is used as indicator for dump tools */
         /* whether the kernel died with panic() or not */
         __u32        panic_magic;              /* 0xe00 */
 
-        /* Align to the top 1k of prefix area */
-	__u8         pad12[0x1000-0xe04];      /* 0xe04 */
+	__u8         pad13[0x1200-0xe04];      /* 0xe04 */
+
+        /* System info area */ 
+
+	__u64        floating_pt_save_area[16]; /* 0x1200 */
+	__u64        gpregs_save_area[16];      /* 0x1280 */
+	__u32        st_status_fixed_logout[4]; /* 0x1300 */
+	__u8         pad14[0x1318-0x1310];      /* 0x1310 */
+	__u32        prefixreg_save_area;       /* 0x1318 */
+	__u32        fpt_creg_save_area;        /* 0x131c */
+	__u8         pad15[0x1324-0x1320];      /* 0x1320 */
+	__u32        tod_progreg_save_area;     /* 0x1324 */
+	__u32        cpu_timer_save_area[2];    /* 0x1328 */
+	__u32        clock_comp_save_area[2];   /* 0x1330 */
+	__u8         pad16[0x1340-0x1338];      /* 0x1338 */ 
+	__u32        access_regs_save_area[16]; /* 0x1340 */ 
+	__u64        cregs_save_area[16];       /* 0x1380 */
+
+	/* align to the top of the prefix area */
+
+	__u8         pad17[0x2000-0x1400];      /* 0x1400 */
 } __attribute__((packed)); /* End structure*/
 
 extern __inline__ void set_prefix(__u32 address)

@@ -1,4 +1,4 @@
-/* $Id: entry.S,v 1.27 2001/05/29 11:25:27 markusl Exp $
+/* $Id: entry.S,v 1.31 2001/07/25 16:07:42 bjornw Exp $
  *
  *  linux/arch/cris/entry.S
  *
@@ -7,6 +7,36 @@
  *  Authors:	Bjorn Wesen (bjornw@axis.com)
  *
  *  $Log: entry.S,v $
+ *  Revision 1.31  2001/07/25 16:07:42  bjornw
+ *  softirq_active/mask -> softirq_pending only
+ *
+ *  Revision 1.30  2001/07/05 01:03:32  hp
+ *  - include asm/errno.h to get ENOSYS.
+ *  - Use ENOSYS, not local constant LENOSYS; tweak comments.
+ *  - Explain why .include, not #include is used.
+ *  - Make oops-register-dump if watchdog bits and it's not expected.
+ *  - Don't jsr, use jump _hard_reset_now, and skip spurious nop.
+ *  - Use correct section attribute for section .rodata.
+ *  - Adjust sys_ni_syscall fill number.
+ *
+ *  Revision 1.29  2001/06/25 14:07:00  hp
+ *  	Fix review comment.
+ *  	* head.S: Use IO_STATE, IO_FIELD and IO_MASK constructs instead of
+ *  	magic numbers.  Add comment that -traditional must not be used.
+ *  	* entry.S (SYMBOL_NAME): Change redefinition to use ## concatenation.
+ *  	Correct and update comment.
+ *  	* Makefile (.S.o): Don't use -traditional.  Add comment why the
+ *  	toplevel rule can't be used (now that there's a reason).
+ *
+ *  Revision 1.28  2001/06/21 02:00:40  hp
+ *  	* entry.S: Include asm/unistd.h.
+ *  	(_sys_call_table): Use section .rodata, not .data.
+ *  	(_kernel_thread): Move from...
+ *  	* process.c: ... here.
+ *  	* entryoffsets.c (VAL): Break out from...
+ *  	(OF): Use VAL.
+ *  	(LCLONE_VM): New asmified value from CLONE_VM.
+ *
  *  Revision 1.27  2001/05/29 11:25:27  markusl
  *  In case of "spurious_interrupt", do hard_reset instead of hanging system in a loop...
  *
@@ -130,7 +160,9 @@
 #include <linux/config.h>
 #include <linux/linkage.h>
 #include <linux/sys.h>
+#include <asm/unistd.h>
 #include <asm/sv_addr_ag.h>
+#include <asm/errno.h>
 	
 	;; functions exported from this file
 	
@@ -151,11 +183,9 @@
 			
 	.globl _sys_call_table
 	
-	;; syscall error codes
-	
-LENOSYS = 38
-
-	;; Get offsets into various structs.
+	;; Get values and offsets into various structs.  The file isn't
+	;; suitable for consumption by the preprocessor, so don't use
+	;; #include.
 	.include "entryoffsets.s"
 
 	;; process bits for ptrace.  FIXME: Should be in a header file.
@@ -227,7 +257,7 @@ _system_call:
 	push	r10		; push orig_r10
 	clear.d [sp=sp-4]	; frametype == 0, normal stackframe
 	
-	movs.w	-LENOSYS,r0
+	movs.w	-ENOSYS,r0
 	move.d	r0,[sp+LR10]	; put the default return value in r10 in the frame
 
 	;; check if this process is syscall-traced
@@ -271,9 +301,7 @@ _ret_from_sys_call:
 		
 	;; check if any bottom halves need service
 	
-	move.d	_irq_stat,r10
-	move.d	[r10+],r0	       ; softirq_active
-	and.d	[r10],r0	       ; softirq_mask
+	test.d	[_irq_stat]	       ; softirq_pending
 	bne	handle_softirq
 	nop
 
@@ -320,8 +348,8 @@ RBFexit:
 
 tracesys:
 	;; this first invocation of syscall_trace _requires_ that
-	;; LR10 in the frame contains -LENOSYS (as is set in the beginning
-	;; of system_call
+	;; LR10 in the frame contains -ENOSYS (as is set in the beginning
+	;; of system_call).
 
 	jsr	_syscall_trace
 
@@ -333,7 +361,7 @@ tracesys:
 	;; check for sanity in the requested syscall number
 
 	move.d	[sp+LR9], r9
-	movs.w	-LENOSYS, r10
+	movs.w	-ENOSYS, r10
 	cmpu.w	NR_syscalls,r9	
 	bcc	1f
 	lslq	2,r9		;  multiply by 4, in the delay slot
@@ -344,7 +372,7 @@ tracesys:
 
 	;; restore r10, r11, r12, r13, mof and srp into the needed registers
 
-	move.d	[sp+LORIG_R10], r10  ; LR10 is already filled with -LENOSYS
+	move.d	[sp+LORIG_R10], r10  ; LR10 is already filled with -ENOSYS.
 	move.d	[sp+LR11],      r11
 	move.d	[sp+LR12],      r12
 	move.d	[sp+LR13],      r13
@@ -484,10 +512,72 @@ nobp:	pop	r11
 #endif
 	
 _IRQ1_interrupt:
+
+#if defined(CONFIG_ETRAX_WATCHDOG) && !defined(CONFIG_SVINTO_SIM)
+;; If we receive a watchdog interrupt while it is not expected, then set
+;; up a canonical frame and dump register contents before dying.
+
+	;; this prologue MUST match the one in irq.h and the struct in ptregs.h!!!
+	move	brp,[sp=sp-16]	; instruction pointer and room for a fake SBFS frame
+	push	srp
+	push	dccr
+	push	mof
+	di
+	subq	14*4,sp
+	movem	r13,[sp]
+	push	r10		; push orig_r10
+	clear.d [sp=sp-4]	; frametype == 0, normal frame
+
+;; We don't check that we actually were bit by the watchdog as opposed to
+;; an external NMI, since there is currently no handler for external NMI.
+
+;; We'll see this in ksymoops dumps.
+Watchdog_bite:
+
+;; We need to extend the 3.3ms after the NMI at watchdog bite, so we have
+;; time for an oops-dump over a 115k2 serial wire.  Another 100ms should do.
+
+;; Change the watchdog key to an arbitrary 3-bit value and restart the
+;; watchdog.
+#define WD_INIT 2
+	moveq	  IO_FIELD (R_WATCHDOG, key, WD_INIT), r10
+	move.d	R_WATCHDOG, r11
+
+	move.d	r10,[r11]
+	moveq	  IO_FIELD (R_WATCHDOG, key,				\
+			    IO_EXTRACT (R_WATCHDOG, key,		\
+					IO_MASK (R_WATCHDOG, key))	\
+			    ^ WD_INIT)					\
+		| IO_STATE (R_WATCHDOG, enable, start),r10
+	move.d	r10,[r11]
+
+;; Note that we don't do "setf m" here (or after two necessary NOPs),
+;; since *not* doing that saves us from re-entrancy checks.  We don't want
+;; to get here again due to possible subsequent NMIs; we want the watchdog
+;; to reset us.
+
+	move.d	watchdogmsg,r10
+	jsr	_printk
+
+	move.d	sp,r10
+	jsr	_show_registers
+
+;; This nop is here so we see the "Watchdog_bite" label in ksymoops dumps
+;; rather than "_spurious_interrupt".
+	nop
+;; At this point we drop down into _spurious_interrupt, which will do a
+;; hard reset.
+
+	.section .rodata,"a"
+watchdogmsg:
+	.ascii	"Oops: bitten by watchdog\n\0"
+	.previous
+
+#endif /* CONFIG_ETRAX_WATCHDOG and not CONFIG_SVINTO_SIM */
+
 _spurious_interrupt:	
 	di
-	jsr _hard_reset_now
-	nop
+	jump _hard_reset_now
 
 	;; this handles the case when multiple interrupts arrive at the same time
 	;; we jump to the first set interrupt bit in a priority fashion
@@ -579,14 +669,80 @@ _hw_bp_trigs:
 _hw_bp_trig_ptr:
 	.dword _hw_bp_trigs
 
-/* Because we compile this file with -traditional, we need to redefine
-   token-concatenation to the traditional trick, using an empty comment.
-   Normally (in other files, with ISO C as in gcc default) this is done
-   with the ## preprocessor operator.  */
+/*
+ * This is the mechanism for creating a new kernel thread.
+ *
+ * NOTE! Only a kernel-only process (i.e. the swapper or direct descendants
+ * who haven't done an "execve()") should use this: it will work within
+ * a system call from a "real" process, but the process memory space will
+ * not be free'd until both the parent and the child have exited.
+ *
+ * This *can* be done in C with an single-asm-wrapped-in-a-function, but you
+ * get more or less gross code.  The safer you make the asm-constraints,
+ * the grosser the code, at least with the gcc version in cris-dist-1.13.
+ */
+
+/* int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags) */
+/*                   r10                r11         r12  */
+
+	.text
+	.global _kernel_thread
+_kernel_thread:
+
+	/* Save ARG for later.  */
+	move.d r11,r13
+
+	/* r11 is argument 2 to clone, the flags */
+	move.d r12,r11
+	or.w	LCLONE_VM,r11
+
+	/* Save FN for later.  */
+	move.d	r10,r12
+
+	/* r9 contains syscall number, to sys_clone */
+	movu.w	__NR_clone,r9
+
+	/* r10 is argument 1 to clone */
+	clear.d	r10
+	
+	/* call sys_clone, this will fork */
+	break	13
+
+	/* parent or child? child returns 0 here. */
+	test.d	r10
+
+	/* jump if parent */
+	bne	1f
+	nop              /* delay slot */
+
+	/* set argument to function to call */
+	move.d	r13,r10
+
+	/* call specified function */
+	jsr	r12
+	/* If we ever return from the function, something bad has happened.  */
+
+	/* r9 is sys_exit syscall number */
+	movu.w	__NR_exit,r9
+
+	/* Give a really bad exit-value */
+	moveq	-1,r10
+
+	/* call sys_exit, killing the child */
+	break	13
+1:
+	ret
+	nop              /* delay slot */
+
+
+/* The file include/linux/linkage.h is wrong for compiling the
+   Linux/CRIS kernel.  We currently have C symbols in the kernel (only
+   the kernel) prefixed with _, hence, we need to redefine SYMBOL_NAME.  */
 
 #undef SYMBOL_NAME
-#define SYMBOL_NAME(X) _/**/X
-		
+#define SYMBOL_NAME(X) _##X
+
+	.section .rodata,"a"
 _sys_call_table:	
 	.long SYMBOL_NAME(sys_ni_syscall)	/* 0  -  old "setup()" system call*/
 	.long SYMBOL_NAME(sys_exit)
@@ -819,7 +975,7 @@ _sys_call_table:
          * been shrunk every time we add a new system call.
          */
 
-	.rept NR_syscalls-221
+	.rept NR_syscalls-222
 		.long SYMBOL_NAME(sys_ni_syscall)
 	.endr
 	

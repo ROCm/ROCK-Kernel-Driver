@@ -42,11 +42,12 @@
 #define __LC_SAVE_AREA                  0xC00
 #define __LC_KERNEL_STACK               0xC40
 #define __LC_KERNEL_LEVEL               0xC44
-#define __LC_IRQ_STAT                   0xC48
 #define __LC_CPUID                      0xC60
 #define __LC_CPUADDR                    0xC68
 #define __LC_IPLDEV                     0xC7C
 #define __LC_PANIC_MAGIC                0xE00
+
+#define __LC_PFAULT_INTPARM             0x080
 
 /* interrupt handler start with all io, external and mcck interrupt disabled */
 
@@ -148,13 +149,7 @@ struct _lowcore
 	__u32        kernel_stack;             /* 0xc40 */
 	__u32        kernel_level;             /* 0xc44 */
 	/* entry.S sensitive area start */
-	/* Next 6 words are the s390 equivalent of irq_stat */
-	__u32        __softirq_active;         /* 0xc48 */
-	__u32        __softirq_mask;           /* 0xc4c */
-	__u32        __local_irq_count;        /* 0xc50 */
-	__u32        __local_bh_count;         /* 0xc54 */
-	__u32        __syscall_count;          /* 0xc58 */
-	__u8         pad10[0xc60-0xc5c];       /* 0xc5c */
+	__u8         pad10[0xc60-0xc48];       /* 0xc5c */
 	struct       cpuinfo_S390 cpu_data;    /* 0xc60 */
 	__u32        ipl_device;               /* 0xc7c */
 	/* entry.S sensitive area end */

@@ -7,6 +7,18 @@
  *  Authors:  Bjorn Wesen (bjornw@axis.com)
  *
  *  $Log: init.c,v $
+ *  Revision 1.29  2001/07/25 16:09:50  bjornw
+ *  val->sharedram will stay 0
+ *
+ *  Revision 1.28  2001/06/28 16:30:17  bjornw
+ *  Oops. This needs to wait until 2.4.6 is merged
+ *
+ *  Revision 1.27  2001/06/28 14:04:07  bjornw
+ *  Fill in sharedram
+ *
+ *  Revision 1.26  2001/06/18 06:36:02  hp
+ *  Enable free_initmem of __init-type pages
+ *
  *  Revision 1.25  2001/06/13 00:02:23  bjornw
  *  Use a separate variable to store the current pgd to avoid races in schedule
  *
@@ -438,11 +450,6 @@ init_ioremap(void)
 void 
 free_initmem(void)
 {
-#if 0
-	/* currently this is a bad idea since the cramfs image is catted onto
-	 * the vmlinux image, and the end of that image is not page-padded so
-	 * part of the cramfs image will be freed here
-	 */
         unsigned long addr;
 
         addr = (unsigned long)(&__init_begin);
@@ -454,7 +461,6 @@ free_initmem(void)
         }
         printk ("Freeing unused kernel memory: %dk freed\n", 
 		(&__init_end - &__init_begin) >> 10);
-#endif
 }
 
 void 
@@ -464,7 +470,7 @@ si_meminfo(struct sysinfo *val)
 
 	i = max_mapnr;
 	val->totalram = 0;
-	val->sharedram = atomic_read(&shmem_nrpages);
+	val->sharedram = 0;
 	val->freeram = nr_free_pages();
 	val->bufferram = atomic_read(&buffermem_pages);
 	while (i-- > 0)  {

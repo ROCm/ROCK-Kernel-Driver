@@ -231,11 +231,8 @@ void lru_cache_add(struct page * page)
 	spin_lock(&pagemap_lru_lock);
 	if (!PageLocked(page))
 		BUG();
-	DEBUG_ADD_PAGE
-	add_page_to_active_list(page);
-	/* This should be relatively rare */
-	if (!page->age)
-		deactivate_page_nolock(page);
+	add_page_to_inactive_dirty_list(page);
+	page->age = 0;
 	spin_unlock(&pagemap_lru_lock);
 }
 

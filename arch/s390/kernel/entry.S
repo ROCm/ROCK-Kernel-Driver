@@ -14,6 +14,7 @@
 #include <linux/sys.h>
 #include <linux/linkage.h>
 #include <linux/config.h>
+#include <asm/cache.h>
 #include <asm/lowcore.h>
 #include <asm/errno.h>
 #include <asm/smp.h>
@@ -200,8 +201,10 @@ sysc_return:
 #
 # check, if bottom-half has to be done
 #
-        l       %r0,__LC_IRQ_STAT     # get softirq_active
-        n       %r0,__LC_IRQ_STAT+4   # and it with softirq_mask
+	l       %r1,processor(%r9)    # get cpu number from task struture
+	sll     %r1,L1_CACHE_SHIFT
+	al      %r1,BASED(.Lirq_stat) # get address of irq_stat
+	icm     %r0,15,0(%r1)         # test irq_stat[#cpu].__softirq_pending
         bnz     BASED(sysc_handle_bottom_half)
 #
 # check, if reschedule is needed
@@ -657,10 +660,9 @@ pgm_sv:
         lh      %r7,__LC_PGM_ILC         # load instruction length
 	GET_CURRENT
 pgm_no_sv:
+	la	%r3,0x7f
         lh      %r8,__LC_PGM_INT_CODE  # N.B. saved int code used later KEEP it
-        lr      %r3,%r8
-        la      %r0,0x7f
-        nr      %r3,%r0           # clear per-event-bit
+	nr      %r3,%r8           # reload & clear per-event-bit
         be      BASED(pgm_dn)     # none of Martins exceptions occurred bypass
         l       %r1,BASED(.Ljump_table)
         sll     %r3,2
@@ -676,8 +678,7 @@ pgm_per:cl      %r3,BASED(.Lc20)  # pseudo page fault ?
         be      BASED(pgm_go)     # if yes then don't reenable interrupts
         stosm   24(%r15),0x03     # reenable interrupts
 pgm_go: basr    %r14,%r1          # branch to interrupt-handler
-pgm_dn: la      %r0,0x80
-        nr      %r8,%r0           # check for per exception
+pgm_dn: n	%r8,BASED(.Lc128) # check for per excepton
         be      BASED(pgm_return)
         la      %r2,SP_PTREGS(15) # address of register-save area
         l       %r1,BASED(.Lhandle_per) # load adr. of per handler
@@ -713,8 +714,10 @@ io_return:
 #
 # check, if bottom-half has to be done
 #
-        l       %r0,__LC_IRQ_STAT     # get softirq_active
-        n       %r0,__LC_IRQ_STAT+4   # and it with softirq_mask
+	l       %r1,processor(%r9)    # get cpu number from task struture
+	sll     %r1,L1_CACHE_SHIFT
+	al      %r1,BASED(.Lirq_stat) # get address of irq_stat
+	icm     %r0,15,0(%r1)         # test irq_stat[#cpu].__softirq_pending
         bnz     BASED(io_handle_bottom_half)
 io_return_bh:	
 #
@@ -843,6 +846,7 @@ restart_go:
 .Lc0x2401:     .long  0x2401
 .Lc0x4000:     .long  0x4000
 .Lc0xff:       .long  0xff
+.Lc128:        .long  128
 
 /*
  * Symbol constants
@@ -854,6 +858,7 @@ restart_go:
 .Lentry_base:  .long  entry_base
 .Lext_hash:    .long  ext_int_hash
 .Lhandle_per:  .long  handle_per_exception
+.Lirq_stat:    .long  irq_stat
 .Ljump_table:  .long  pgm_check_table
 .Lschedule:    .long  schedule
 .Lclone:       .long  sys_clone

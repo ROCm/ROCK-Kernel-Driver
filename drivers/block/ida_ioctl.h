@@ -18,9 +18,6 @@
  *
  *    Questions/Comments/Bugfixes to arrays@compaq.com
  *
- *    If you want to make changes, improve or add functionality to this
- *    driver, you'll probably need the Compaq Array Controller Interface
- *    Specificiation (Document number ECG086/1198)
  */
 #ifndef IDA_IOCTL_H
 #define IDA_IOCTL_H

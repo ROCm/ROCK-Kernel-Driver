@@ -376,6 +376,7 @@ struct video_code
 #define VID_HARDWARE_SE401	30	/* SE401 USB webcams */
 #define VID_HARDWARE_PWC	31	/* Philips webcams */
 #define VID_HARDWARE_MEYE	32	/* Sony Vaio MotionEye cameras */
+#define VID_HARDWARE_CPIA2	33
 
 /*
  *	Initialiser list

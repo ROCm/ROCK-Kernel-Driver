@@ -15,7 +15,9 @@
  * tools/mkptable is used to generate the ptable. 
  */
 
-/* The partition table starts with code to "jump over" it: */
+/* The partition table starts with code to "jump over" it.  The ba
+   instruction and delay-slot is modified elsewhere (for example the
+   mkptable script); don't change this to fill the delay-slot.  */
 #define PARTITIONTABLE_CODE_START { \
  0x0f, 0x05, /* nop 0 */\
  0x25, 0xf0, /* di  2 */\
@@ -53,7 +55,7 @@ struct partitiontable_entry {
 #define PARTITIONTABLE_END_MARKER_SIZE 4
 
 /*#define PARTITION_TYPE_RESCUE 0x0000?*/  /* Not used, maybe it should? */
-#define PARTITION_TYPE_PARAM  0x0001 /* Hmm.. */
+#define PARTITION_TYPE_PARAM  0x0001
 #define PARTITION_TYPE_KERNEL 0x0002
 #define PARTITION_TYPE_JFFS   0x0003
 

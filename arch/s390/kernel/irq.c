@@ -21,7 +21,7 @@
 #include <linux/ioport.h>
 #include <linux/interrupt.h>
 #include <linux/timex.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/random.h>
 #include <linux/smp.h>
@@ -119,7 +119,7 @@ int get_irq_list(char *buf)
  */
 #ifdef CONFIG_SMP
 atomic_t global_irq_holder = ATOMIC_INIT(NO_PROC_ID);
-atomic_t global_irq_lock;
+atomic_t global_irq_lock = ATOMIC_INIT(0);
 atomic_t global_irq_count = ATOMIC_INIT(0);
 atomic_t global_bh_count;
 
@@ -188,7 +188,7 @@ static inline void wait_on_irq(int cpu)
 		}
 
 		/* Duh, we have to loop. Release the lock to avoid deadlocks */
-		clear_bit(0,&global_irq_lock);
+		atomic_set(&global_irq_lock, 0);
 
 		for (;;) {
 			if (!--count) {
@@ -206,10 +206,8 @@ static inline void wait_on_irq(int cpu)
 			if (!local_bh_count(cpu)
 			    && atomic_read(&global_bh_count))
 				continue;
-			/* this works even though global_irq_lock not
-                           a long, but is arch-specific --RR */
-			if (!test_and_set_bit(0,&global_irq_lock))
-				break;
+			if (!atomic_compare_and_swap(0, 1, &global_irq_lock))
+				 break;
 		}
 	}
 }
@@ -246,18 +244,14 @@ void synchronize_irq(void)
 
 static inline void get_irqlock(int cpu)
 {
-	/* this works even though global_irq_lock not a long, but is
-	   arch-specific --RR */
-	if (test_and_set_bit(0,&global_irq_lock)) {
+	if (atomic_compare_and_swap(0, 1, &global_irq_lock) != 0) {
 		/* do we already hold the lock? */
 		if ( cpu == atomic_read(&global_irq_holder))
 			return;
 		/* Uhhuh.. Somebody else got it. Wait.. */
 		do {
-			do {
-				check_smp_invalidate(cpu);
-			} while (test_bit(0,&global_irq_lock));
-		} while (test_and_set_bit(0,&global_irq_lock));
+			check_smp_invalidate(cpu);
+		} while (atomic_compare_and_swap(0, 1, &global_irq_lock) != 0);
 	}
 	/*
 	 * We also to make sure that nobody else is running
@@ -391,6 +385,10 @@ EXPORT_SYMBOL(__global_cli);
 EXPORT_SYMBOL(__global_sti);
 EXPORT_SYMBOL(__global_save_flags);
 EXPORT_SYMBOL(__global_restore_flags);
+EXPORT_SYMBOL(global_irq_holder);
+EXPORT_SYMBOL(global_irq_lock);
+EXPORT_SYMBOL(global_irq_count);
+EXPORT_SYMBOL(global_bh_count);
 #endif
 
 EXPORT_SYMBOL(global_bh_lock);

@@ -97,7 +97,7 @@ extern inline int __put_user_asm_8(__u64 x, void *ptr)
 				".previous"
                                 : "=m" (*((__u64*) ptr)) , "=&d" (err)
                                 : "d" (x), "K" (-EFAULT)
-                                : "4" );
+                                : "cc", "4" );
         return err;
 }
 extern inline int __put_user_asm_4(__u32 x, void *ptr)
@@ -119,7 +119,7 @@ extern inline int __put_user_asm_4(__u32 x, void *ptr)
 				".previous"
                                 : "=m" (*((__u32*) ptr)) , "=&d" (err)
                                 : "d" (x), "K" (-EFAULT)
-                                : "4" );
+                                : "cc", "4" );
         return err;
 }
 
@@ -142,7 +142,7 @@ extern inline int __put_user_asm_2(__u16 x, void *ptr)
 				".previous"
                                 : "=m" (*((__u16*) ptr)) , "=&d" (err)
                                 : "d" (x), "K" (-EFAULT)
-                                : "4" );
+                                : "cc", "4" );
         return err;
 }
 
@@ -165,7 +165,7 @@ extern inline int __put_user_asm_1(__u8 x, void *ptr)
 				".previous"
                                 : "=m" (*((__u8*) ptr)) , "=&d" (err)
                                 : "d" (x), "K" (-EFAULT)
-                                : "1", "4" );
+                                : "cc", "1", "4" );
         return err;
 }
 
@@ -228,7 +228,7 @@ extern int __put_user_bad(void);
                                 ".previous"                                \
                                 : "=d" (x) , "=&d" (err)                   \
                                 : "m" (*(const __u64*)(ptr)),"K" (-EFAULT) \
-                                : "4" );                                   \
+                                : "cc", "4" );                             \
 })
 #define __get_user_asm_4(x, ptr, err)                                      \
 ({                                                                         \
@@ -247,7 +247,7 @@ extern int __put_user_bad(void);
                                 ".previous"                                \
                                 : "=d" (x) , "=&d" (err)                   \
                                 : "m" (*(const __u32*)(ptr)),"K" (-EFAULT) \
-                                : "4" );                                   \
+                                : "cc", "4" );                             \
 })
 
 #define __get_user_asm_2(x, ptr, err)                                      \
@@ -267,7 +267,7 @@ extern int __put_user_bad(void);
                                 ".previous"                                \
                                 : "=d" (x) , "=&d" (err)                   \
                                 : "m" (*(const __u16*)(ptr)),"K" (-EFAULT) \
-                                : "4" );                                   \
+                                : "cc", "4" );                             \
 })
 
 #define __get_user_asm_1(x, ptr, err)                                     \
@@ -288,7 +288,7 @@ extern int __put_user_bad(void);
                                 ".previous"                               \
                                 : "=d" (x) , "=&d" (err)                  \
                                 : "m" (*(const __u8*)(ptr)),"K" (-EFAULT) \
-                                : "4" );                                  \
+                                : "cc", "4" );                            \
 })
 
 #define __get_user(x, ptr)                                      \
@@ -357,7 +357,7 @@ __copy_to_user_asm(void* to, const void* from,  long n)
 				"   .quad  0b,__copy_to_user_fixup\n"
 				".previous"
                                 : "+&d" (n) : "d" (to), "d" (from)
-                                : "1", "2", "3", "4", "5" );
+                                : "cc", "1", "2", "3", "4", "5" );
         return n;
 }
 
@@ -395,7 +395,7 @@ __copy_from_user_asm(void* to, const void* from,  long n)
 				"   .quad  0b,__copy_from_user_fixup\n"
 				".previous"
                                 : "+&d" (n) : "d" (to), "d" (from)
-                                : "1", "2", "3", "4", "5" );
+                                : "cc", "1", "2", "3", "4", "5" );
         return n;
 }
 
@@ -450,7 +450,7 @@ __strncpy_from_user(char *dst, const char *src, long count)
                                 : "=&a" (len)
                                 : "a"  (dst), "d" (src), "d" (count),
                                   "K" (-EFAULT)
-                                : "2" ,"3", "4" );
+                                : "cc", "2" ,"3", "4" );
         return len;
 }
 

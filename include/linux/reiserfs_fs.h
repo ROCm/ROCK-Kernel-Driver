@@ -118,7 +118,7 @@
 #define REISERFS_SUPER_MAGIC_STRING "ReIsErFs"
 #define REISER2FS_SUPER_MAGIC_STRING "ReIsEr2Fs"
 
-extern inline int is_reiserfs_magic_string (struct reiserfs_super_block * rs)
+static inline int is_reiserfs_magic_string (struct reiserfs_super_block * rs)
 {
     return (!strncmp (rs->s_magic, REISERFS_SUPER_MAGIC_STRING, 
 		      strlen ( REISERFS_SUPER_MAGIC_STRING)) ||
@@ -434,7 +434,7 @@ struct item_head
 //
 // here are conversion routines
 //
-extern inline int uniqueness2type (__u32 uniqueness)
+static inline int uniqueness2type (__u32 uniqueness)
 {
     switch (uniqueness) {
     case V1_SD_UNIQUENESS: return TYPE_STAT_DATA;
@@ -451,7 +451,7 @@ extern inline int uniqueness2type (__u32 uniqueness)
     return TYPE_ANY;
 }
 
-extern inline __u32 type2uniqueness (int type)
+static inline __u32 type2uniqueness (int type)
 {
     switch (type) {
     case TYPE_STAT_DATA: return V1_SD_UNIQUENESS;
@@ -472,46 +472,46 @@ extern inline __u32 type2uniqueness (int type)
 // there is no way to get version of object from key, so, provide
 // version to these defines
 //
-extern inline loff_t le_key_k_offset (int version, struct key * key)
+static inline loff_t le_key_k_offset (int version, struct key * key)
 {
     return (version == ITEM_VERSION_1) ? key->u.k_offset_v1.k_offset :
 	le64_to_cpu (key->u.k_offset_v2.k_offset);
 }
-extern inline loff_t le_ih_k_offset (struct item_head * ih)
+static inline loff_t le_ih_k_offset (struct item_head * ih)
 {
     return le_key_k_offset (ih_version (ih), &(ih->ih_key));
 }
 
 
-extern inline loff_t le_key_k_type (int version, struct key * key)
+static inline loff_t le_key_k_type (int version, struct key * key)
 {
     return (version == ITEM_VERSION_1) ? uniqueness2type (key->u.k_offset_v1.k_uniqueness) :
 	le16_to_cpu (key->u.k_offset_v2.k_type);
 }
-extern inline loff_t le_ih_k_type (struct item_head * ih)
+static inline loff_t le_ih_k_type (struct item_head * ih)
 {
     return le_key_k_type (ih_version (ih), &(ih->ih_key));
 }
 
 
-extern inline void set_le_key_k_offset (int version, struct key * key, loff_t offset)
+static inline void set_le_key_k_offset (int version, struct key * key, loff_t offset)
 {
     (version == ITEM_VERSION_1) ? (key->u.k_offset_v1.k_offset = offset) :
 	(key->u.k_offset_v2.k_offset = cpu_to_le64 (offset));
 }
-extern inline void set_le_ih_k_offset (struct item_head * ih, loff_t offset)
+static inline void set_le_ih_k_offset (struct item_head * ih, loff_t offset)
 {
     set_le_key_k_offset (ih_version (ih), &(ih->ih_key), offset);
 }
 
 
 
-extern inline void set_le_key_k_type (int version, struct key * key, int type)
+static inline void set_le_key_k_type (int version, struct key * key, int type)
 {
     (version == ITEM_VERSION_1) ? (key->u.k_offset_v1.k_uniqueness = type2uniqueness (type)) :
 	(key->u.k_offset_v2.k_type = cpu_to_le16 (type));
 }
-extern inline void set_le_ih_k_type (struct item_head * ih, int type)
+static inline void set_le_ih_k_type (struct item_head * ih, int type)
 {
     set_le_key_k_type (ih_version (ih), &(ih->ih_key), type);
 }
@@ -535,32 +535,32 @@ extern inline void set_le_ih_k_type (struct item_head * ih, int type)
 //
 // key is pointer to cpu key, result is cpu
 //
-extern inline loff_t cpu_key_k_offset (struct cpu_key * key)
+static inline loff_t cpu_key_k_offset (struct cpu_key * key)
 {
     return (key->version == ITEM_VERSION_1) ? key->on_disk_key.u.k_offset_v1.k_offset :
 	key->on_disk_key.u.k_offset_v2.k_offset;
 }
 
-extern inline loff_t cpu_key_k_type (struct cpu_key * key)
+static inline loff_t cpu_key_k_type (struct cpu_key * key)
 {
     return (key->version == ITEM_VERSION_1) ? uniqueness2type (key->on_disk_key.u.k_offset_v1.k_uniqueness) :
 	key->on_disk_key.u.k_offset_v2.k_type;
 }
 
-extern inline void set_cpu_key_k_offset (struct cpu_key * key, loff_t offset)
+static inline void set_cpu_key_k_offset (struct cpu_key * key, loff_t offset)
 {
     (key->version == ITEM_VERSION_1) ? (key->on_disk_key.u.k_offset_v1.k_offset = offset) :
 	(key->on_disk_key.u.k_offset_v2.k_offset = offset);
 }
 
 
-extern inline void set_cpu_key_k_type (struct cpu_key * key, int type)
+static inline void set_cpu_key_k_type (struct cpu_key * key, int type)
 {
     (key->version == ITEM_VERSION_1) ? (key->on_disk_key.u.k_offset_v1.k_uniqueness = type2uniqueness (type)) :
 	(key->on_disk_key.u.k_offset_v2.k_type = type);
 }
 
-extern inline void cpu_key_k_offset_dec (struct cpu_key * key)
+static inline void cpu_key_k_offset_dec (struct cpu_key * key)
 {
     if (key->version == ITEM_VERSION_1)
 	key->on_disk_key.u.k_offset_v1.k_offset --;
@@ -828,7 +828,7 @@ struct reiserfs_de_head
 
 /* compose directory item containing "." and ".." entries (entries are
    not aligned to 4 byte boundary) */
-extern inline void make_empty_dir_item_v1 (char * body, __u32 dirid, __u32 objid,
+static inline void make_empty_dir_item_v1 (char * body, __u32 dirid, __u32 objid,
 					   __u32 par_dirid, __u32 par_objid)
 {
     struct reiserfs_de_head * deh;
@@ -859,7 +859,7 @@ extern inline void make_empty_dir_item_v1 (char * body, __u32 dirid, __u32 objid
 }
 
 /* compose directory item containing "." and ".." entries */
-extern inline void make_empty_dir_item (char * body, __u32 dirid, __u32 objid,
+static inline void make_empty_dir_item (char * body, __u32 dirid, __u32 objid,
 					__u32 par_dirid, __u32 par_objid)
 {
     struct reiserfs_de_head * deh;
@@ -905,7 +905,7 @@ extern inline void make_empty_dir_item (char * body, __u32 dirid, __u32 objid,
 #define I_DEH_N_ENTRY_LENGTH(ih,deh,i) \
 ((i) ? (((deh)-1)->deh_location - (deh)->deh_location) : ((ih)->ih_item_len) - (deh)->deh_location)
 */
-extern inline int entry_length (struct buffer_head * bh, struct item_head * ih,
+static inline int entry_length (struct buffer_head * bh, struct item_head * ih,
 				int pos_in_item)
 {
     struct reiserfs_de_head * deh;
@@ -1137,7 +1137,7 @@ struct path var = {ILLEGAL_PATH_ELEMENT_OFFSET, }
 
 // reiserfs version 2 has max offset 60 bits. Version 1 - 32 bit offset
 #define U32_MAX (~(__u32)0)
-extern inline loff_t max_reiserfs_offset (struct inode * inode)
+static inline loff_t max_reiserfs_offset (struct inode * inode)
 {
     if (inode_items_version (inode) == ITEM_VERSION_1)
 	return (loff_t)U32_MAX;
@@ -1673,7 +1673,7 @@ extern inline int comp_short_le_keys (struct key *, struct key *);
 //
 // get key version from on disk key - kludge
 //
-extern inline int le_key_version (struct key * key)
+static inline int le_key_version (struct key * key)
 {
     int type;
     
@@ -1686,7 +1686,7 @@ extern inline int le_key_version (struct key * key)
 }
 
 
-extern inline void copy_key (void * to, void * from)
+static inline void copy_key (void * to, void * from)
 {
   memcpy (to, from, KEY_SIZE);
 }
@@ -1963,7 +1963,7 @@ char *reiserfs_get_version_string(void) ;
 
 #ifdef __i386__
 
-extern __inline__ int 
+static __inline__ int 
 find_first_nonzero_bit(void * addr, unsigned size) {
   int res;
   int __d0;
@@ -1992,7 +1992,7 @@ find_first_nonzero_bit(void * addr, unsigned size) {
 
 #else /* __i386__ */
 
-extern __inline__ int find_next_nonzero_bit(void * addr, unsigned size, unsigned offset)
+static __inline__ int find_next_nonzero_bit(void * addr, unsigned size, unsigned offset)
 {
 	unsigned int * p = ((unsigned int *) addr) + (offset >> 5);
 	unsigned int result = offset & ~31UL;
@@ -2040,10 +2040,10 @@ found_middle:
    absolutely safe */
 #define SPARE_SPACE 500
 
-extern inline unsigned long reiserfs_get_journal_block(struct super_block *s) {
+static inline unsigned long reiserfs_get_journal_block(struct super_block *s) {
     return le32_to_cpu(SB_DISK_SUPER_BLOCK(s)->s_journal_block) ;
 }
-extern inline unsigned long reiserfs_get_journal_orig_size(struct super_block *s) {
+static inline unsigned long reiserfs_get_journal_orig_size(struct super_block *s) {
     return le32_to_cpu(SB_DISK_SUPER_BLOCK(s)->s_orig_journal_size) ;
 }
 

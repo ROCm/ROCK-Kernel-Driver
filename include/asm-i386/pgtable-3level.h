@@ -33,9 +33,9 @@
 #define pgd_ERROR(e) \
 	printk("%s:%d: bad pgd %p(%016Lx).\n", __FILE__, __LINE__, &(e), pgd_val(e))
 
-extern inline int pgd_none(pgd_t pgd)		{ return 0; }
-extern inline int pgd_bad(pgd_t pgd)		{ return 0; }
-extern inline int pgd_present(pgd_t pgd)	{ return 1; }
+static inline int pgd_none(pgd_t pgd)		{ return 0; }
+static inline int pgd_bad(pgd_t pgd)		{ return 0; }
+static inline int pgd_present(pgd_t pgd)	{ return 1; }
 
 /* Rules for using set_pte: the pte being assigned *must* be
  * either not present or in a state where the hardware will
@@ -60,7 +60,7 @@ static inline void set_pte(pte_t *ptep, pte_t pte)
  * We do not let the generic code free and clear pgd entries due to
  * this erratum.
  */
-extern inline void pgd_clear (pgd_t * pgd) { }
+static inline void pgd_clear (pgd_t * pgd) { }
 
 #define pgd_page(pgd) \
 ((unsigned long) __va(pgd_val(pgd) & PAGE_MASK))

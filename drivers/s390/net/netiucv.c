@@ -14,16 +14,19 @@
  *    Re-write:   Alan Altmark (Alan_Altmark@us.ibm.com)  Sept. 2000
  *                Uses iucv.c kernel module for IUCV services. 
  *
+ *    2.4 Updates Alan Altmark (Alan_Altmark@us.ibm.com)  June 2001
+ *                Update to use changed IUCV (iucv.c) interface.
+ *
  * -------------------------------------------------------------------------- 
  *  An IUCV frame consists of one or more packets preceded by a 16-bit
  *  header.   The header contains the offset to the next packet header,
  *  measured from the beginning of the _frame_.  If zero, there are no more
  *  packets in the frame.  Consider a frame which contains a 10-byte packet
  *  followed by a 20-byte packet:
- *        +-----+----------------+-----+----------------------------+-----+
- *        |h'12'| 10-byte packet |h'34'|  20-byte packet            |h'00'|
- *        +-----+----------------+-----+----------------------------+-----+
- * Offset: 0     2                12    14                           34  
+ *        +-----+----------------+--------------------------------+-----+
+ *        |h'12'| 10-byte packet |h'34'|  20-byte packet          |h'00'|
+ *        +-----+----------------+-----+--------------------------+-----+
+ * Offset: 0     2                12    14                         34  
  *
  *  This means that each header will always have a larger value than the
  *  previous one (except for the final zero header, of course).
@@ -46,10 +49,13 @@
  * --------------------------------------------------------------------------
 */
 //#define DEBUG 1
+//#define DEBUG2 1
+//#define IPDEBUG 1
+#define LEVEL "1.1"
 
 /* If MAX_DEVICES increased, add initialization data to iucv_netdev[] array */
 /* (See bottom of program.)						    */
-#define MAX_DEVICES 10		/* Allows "iucv0" to "iucv9"    */
+#define MAX_DEVICES 20		/* Allows "iucv0" to "iucv19"   */
 #define MAX_VM_MTU 32764	/* 32K IUCV buffer, minus 4     */
 #define MAX_TX_Q 50		/* Maximum pending TX           */
 
@@ -60,11 +66,14 @@
 #include <linux/module.h>
 MODULE_AUTHOR
     ("(C) 2000 IBM Corporation by Alan Altmark (Alan_Altmark@us.ibm.com)");
-MODULE_DESCRIPTION ("Linux for S/390 IUCV network driver");
+MODULE_DESCRIPTION ("Linux for S/390 IUCV network driver " LEVEL);
 MODULE_PARM (iucv, "1-" __MODULE_STRING (MAX_DEVICES) "s");
 MODULE_PARM_DESC (iucv,
 		  "Specify the userids associated with iucv0-iucv9:\n"
 		  "iucv=userid1,userid2,...,userid10\n");
+#ifdef MODVERSIONS
+#include <linux/modversions.h>
+#endif
 #else
 #define MOD_INC_USE_COUNT
 #define MOD_DEC_USE_COUNT
@@ -77,18 +86,22 @@ MODULE_PARM_DESC (iucv,
 #include <linux/interrupt.h>	/* mark_bh                      */
 #include <linux/netdevice.h>	/* struct net_device, etc.      */
 #include <linux/if_arp.h>	/* ARPHRD_SLIP                  */
+#include <linux/ip.h>		/* IP header                    */
 #include <linux/skbuff.h>	/* skb                          */
 #include <linux/init.h>		/* __setup()                    */
-#include <asm/io.h>		/* virt_to_phys()               */
 #include <asm/string.h>		/* memset, memcpy, etc.         */
 #include "iucv.h"
 #define min(a,b) (a < b) ? a : b
 
-#ifdef DEBUG
+#if defined( DEBUG )
 #undef KERN_INFO
 #undef KERN_DEBUG
+#undef KERN_NOTICE
+#undef KERN_ERR
 #define KERN_INFO    KERN_EMERG
 #define KERN_DEBUG   KERN_EMERG
+#define KERN_NOTICE  KERN_EMERG
+#define KERN_ERR     KERN_EMERG
 #endif
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0))
@@ -145,14 +158,14 @@ static int iucv_start (net_device *);
 static int iucv_stop (net_device *);
 static int iucv_change_mtu (net_device *, int);
 static int iucv_init (net_device *);
-static void iucv_rx (net_device *, uchar *, int);
+static void iucv_rx (net_device *, u32, uchar *, int);
 static int iucv_tx (struct sk_buff *, net_device *);
 
-static void connection_severed (iucv_ConnectionSevered *, ulong);
-static void connection_pending (iucv_ConnectionPending *, ulong);
-static void connection_complete (iucv_ConnectionComplete *, ulong);
-static void message_pending (iucv_MessagePending *, ulong);
-static void send_complete (iucv_MessageComplete *, ulong);
+static void connection_severed (iucv_ConnectionSevered *, void *);
+static void connection_pending (iucv_ConnectionPending *, void *);
+static void connection_complete (iucv_ConnectionComplete *, void *);
+static void message_pending (iucv_MessagePending *, void *);
+static void send_complete (iucv_MessageComplete *, void *);
 
 void register_iucv_dev (int, char *);
 
@@ -168,7 +181,6 @@ static iucv_interrupt_ops_t netiucv_ops = {
 
 static char iucv_userid[MAX_DEVICES][8];
 net_device iucv_netdev[MAX_DEVICES];
-static char eodata[2] = { '\0', '\0' };
 
 /* This structure is private to each device. It contains the    */
 /* information necessary to do IUCV operations.                 */
@@ -188,12 +200,6 @@ struct iucv_priv {
 	u16 pathid;
 };
 
-struct iucvtag {
-	iucv_array_t iucvvec[3];
-	u16 framelen;
-	struct sk_buff *skb;
-};
-
 uchar iucv_host[8] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 uchar iucvMagic[16] = { 0xF0, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40,
 	0xF0, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40
@@ -207,7 +213,7 @@ const char mask[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
 };
 
-#ifdef DEBUG
+#if defined( DEBUG2 ) || defined( IPDEBUG )
 /*--------------------------*/
 /* Dump buffer formatted    */
 /*--------------------------*/
@@ -260,8 +266,6 @@ static int
 iucv_start (net_device * dev)
 {
 	int rc, i;
-	uchar pri;
-	uchar unused = '\0';
 	struct iucv_priv *p = (struct iucv_priv *) dev->priv;
 
 	pr_debug ("iucv_start(%s)\n", dev->name);
@@ -269,7 +273,7 @@ iucv_start (net_device * dev)
 	if (p == NULL) {
 		/* Allocate priv data */
 		p = (struct iucv_priv *) kmalloc (sizeof (struct iucv_priv),
-						  GFP_KERNEL);
+						  GFP_ATOMIC);
 		if (p == NULL) {
 			printk (KERN_CRIT "%s: no memory for dev->priv.\n",
 				dev->name);
@@ -292,11 +296,11 @@ iucv_start (net_device * dev)
 		atomic_set (&p->state, FREE);
 		p->handle =
 		    iucv_register_program (iucvMagic, p->userid2, (char *) mask,
-					   &netiucv_ops, (ulong) dev);
+					   &netiucv_ops, (void *) dev);
 		if (p->handle <= 0) {
 			printk (KERN_ERR
-				"%s: iucv_register_program error, rc=%i\n",
-				dev->name, (int) p->handle);
+				"%s: iucv_register_program error, rc=%p\n",
+				dev->name, p->handle);
 			dev->priv = NULL;
 			kfree (p);
 			return -ENODEV;
@@ -312,8 +316,7 @@ iucv_start (net_device * dev)
 
 	rc =
 	    iucv_connect (&(p->pathid), MAX_TX_Q, iucvMagic, p->userid2,
-			  iucv_host, unused, unused, unused, unused, unused,
-			  &pri, p->handle, (ulong) p);
+			  iucv_host, 0, NULL, NULL, p->handle, p);
 
 	/* Some errors are not fatal.  In these cases we will report "OK". */
 	switch (rc) {
@@ -321,30 +324,30 @@ iucv_start (net_device * dev)
 		pr_debug ("...waiting for connection to complete...");
 		return 0;
 	case 11:		/* Wait for parter to connect */
-		printk (KERN_NOTICE "Device %s: "
+		printk (KERN_NOTICE "%s: "
 			"User %s is not available now.\n",
 			dev->name, p->userid);
 		atomic_set (&p->state, FREE);
 		return 0;
 	case 12:		/* Wait for partner to connect */
-		printk (KERN_NOTICE "Device %s: "
+		printk (KERN_NOTICE "%s: "
 			"User %s is not ready to talk now.\n",
 			dev->name, p->userid);
 		atomic_set (&p->state, FREE);
 		return 0;
 	case 13:		/* Fatal */
-		printk (KERN_ERR "Device %s: "
+		printk (KERN_ERR "%s: "
 			"You have too many IUCV connections."
 			"Check MAXCONN in CP directory.\n", dev->name);
 		break;
 	case 14:		/* Fatal */
-		printk (KERN_ERR "Device %s: "
+		printk (KERN_ERR "%s: "
 			"User %s has too many IUCV connections."
 			"Check MAXCONN in CP directory.\n",
 			dev->name, p->userid);
 		break;
 	case 15:		/* Fatal */
-		printk (KERN_ERR "Device %s: "
+		printk (KERN_ERR "%s: "
 			"No IUCV authorization found in CP directory.\n",
 			dev->name);
 		break;
@@ -353,7 +356,7 @@ iucv_start (net_device * dev)
 			"return code %i from iucv_connect()\n", dev->name, rc);
 	}
 
-	rc = iucv_unregister (p->handle);
+	rc = iucv_unregister_program (p->handle);
 	dev->priv = NULL;
 	kfree (p);
 	MOD_DEC_USE_COUNT;
@@ -364,7 +367,7 @@ iucv_start (net_device * dev)
 /* Our connection TO another stack has been accepted.                */
 /*********************************************************************/
 static void
-connection_complete (iucv_ConnectionComplete * cci, ulong pgm_data)
+connection_complete (iucv_ConnectionComplete * cci, void *pgm_data)
 {
 	struct iucv_priv *p = (struct iucv_priv *) pgm_data;
 	pr_debug ("...%s connection complete... txq=%u\n",
@@ -374,7 +377,7 @@ connection_complete (iucv_ConnectionComplete * cci, ulong pgm_data)
 	p->dev->tx_queue_len = cci->ipmsglim;
 	netif_start (p->dev);
 	netif_start_queue (p->dev);
-	printk (KERN_INFO "%s: Connection to user %s is up\n",
+	printk (KERN_NOTICE "%s: Connection to user %s is up\n",
 		p->dev->name, p->userid);
 }				/* end connection_complete() */
 
@@ -386,7 +389,7 @@ connection_complete (iucv_ConnectionComplete * cci, ulong pgm_data)
 /* the remote user is the correct user.                              */
 /*********************************************************************/
 static void
-connection_pending (iucv_ConnectionPending * cpi, ulong pgm_data)
+connection_pending (iucv_ConnectionPending * cpi, void *pgm_data)
 {
 	/* Only get this far if handler is set up, so we know userid is ok. */
 	/* and the device is started.                                       */
@@ -394,9 +397,8 @@ connection_pending (iucv_ConnectionPending * cpi, ulong pgm_data)
 	net_device *dev = (net_device *) pgm_data;
 	struct iucv_priv *p = (struct iucv_priv *) dev->priv;
 	int rc;
+	u16 msglimit;
 	uchar udata[16];
-	uchar no = '\0';
-	uchar na;
 
 	/* If we're not waiting on a connect, reject the connection */
 	if (atomic_compare_and_swap (FREE, CONNECTING, &p->state) != 0) {
@@ -404,27 +406,25 @@ connection_pending (iucv_ConnectionPending * cpi, ulong pgm_data)
 		return;
 	}
 
-	rc = iucv_accept (cpi->ippathid,	/* Path id              */
-			  MAX_TX_Q,	/* msglimit                     */
+	rc = iucv_accept (cpi->ippathid,	/* Path id                      */
+			  MAX_TX_Q,	/* desired IUCV msg limit       */
 			  udata,	/* user_Data                    */
-			  no,	/* will we send priority msgs?  */
-			  no,	/* do we accept prmdata?        */
-			  no,	/* quiece immediately?          */
-			  no,	/* control path?                */
-			  &na,	/* other side accept prmdata?   */
-			  p->handle,	/* registration handle  */
-			  (ulong) p);	/* private data         */
+			  0,	/* No flags                     */
+			  p->handle,	/* registration handle          */
+			  p,	/* private data                 */
+			  NULL,	/* don't care about output flags */
+			  &msglimit);	/* Actual IUCV msg limit        */
 	if (rc != 0) {
 		atomic_set (&p->state, FREE);
 		printk (KERN_ERR "%s: iucv accept failed rc=%i\n",
 			p->dev->name, rc);
 	} else {
+		atomic_set (&p->state, CONNECTED);
 		p->pathid = cpi->ippathid;
-		p->dev->tx_queue_len = cpi->ipmsglim;
+		p->dev->tx_queue_len = (u32) msglimit;
 		netif_start (p->dev);
 		netif_start_queue (p->dev);
-		atomic_set (&p->state, CONNECTED);
-		printk (KERN_INFO "Device %s: Connection to user %s is up\n",
+		printk (KERN_NOTICE "%s: Connection to user %s is up\n",
 			p->dev->name, p->userid);
 	}
 }				/* end connection_pending() */
@@ -433,15 +433,21 @@ connection_pending (iucv_ConnectionPending * cpi, ulong pgm_data)
 /* Our connection to another stack has been severed.                 */
 /*********************************************************************/
 static void
-connection_severed (iucv_ConnectionSevered * eib, ulong pgm_data)
+connection_severed (iucv_ConnectionSevered * eib, void *pgm_data)
 {
 	struct iucv_priv *p = (struct iucv_priv *) pgm_data;
 
 	printk (KERN_INFO "%s: Connection to user %s is down\n",
 		p->dev->name, p->userid);
 
+	/* FIXME: We can also get a severed interrupt while in
+	          state CONNECTING!  Fix the state machine ... */
+#if 0
 	if (atomic_compare_and_swap (CONNECTED, FREE, &p->state) != 0)
 		return;		/* In case reconnect in progress already */
+#else
+	atomic_set (&p->state, FREE);
+#endif
 
 	netif_stop_queue (p->dev);
 	netif_stop (p->dev);
@@ -464,7 +470,8 @@ iucv_stop (net_device * dev)
 	if (p == NULL)
 		return 0;
 
-	rc = iucv_unregister (p->handle);	/* Will sever connections */
+	/* Unregister will sever associated connections */
+	rc = iucv_unregister_program (p->handle);
 	dev->priv = NULL;
 	kfree (p);
 	MOD_DEC_USE_COUNT;
@@ -477,7 +484,7 @@ iucv_stop (net_device * dev)
 /* separate packets, and send them to the "generic" packet processor.  */
 /*---------------------------------------------------------------------*/
 static void
-message_pending (iucv_MessagePending * mpi, ulong pgm_data)
+message_pending (iucv_MessagePending * mpi, void *pgm_data)
 {
 	struct iucv_priv *p = (struct iucv_priv *) pgm_data;
 	int rc;
@@ -486,22 +493,21 @@ message_pending (iucv_MessagePending * mpi, ulong pgm_data)
 	void *buffer;
 
 	buffer_length = mpi->ln1msg2.ipbfln1f;
-	pr_debug ("message_pending: ID=%p Length=%u\n", (void *) mpi->ipmsgid,
-		  buffer_length);
+	pr_debug ("%s: MP id=%i Length=%u\n",
+		  p->dev->name, mpi->ipmsgid, buffer_length);
 
 	buffer = kmalloc (buffer_length, GFP_ATOMIC | GFP_DMA);
 	if (buffer == NULL) {
 		p->stats.rx_dropped++;
 		return;
 	}
-
-	rc = iucv_receive_simple (p->pathid, mpi->ipmsgid, mpi->iptrgcls,
-				  buffer, buffer_length);
+	rc = iucv_receive (p->pathid, mpi->ipmsgid, mpi->iptrgcls,
+			   buffer, buffer_length, NULL, NULL, NULL);
 
 	if (rc != 0 || buffer_length < 5) {
 		printk (KERN_INFO
-			"%s: iucv_receive error. rc=%X, length=%u\n",
-			p->dev->name, rc, buffer_length);
+			"%s: IUCV rcv error. rc=%X ID=%i length=%u\n",
+			p->dev->name, rc, mpi->ipmsgid, buffer_length);
 		p->stats.rx_errors++;
 		kfree (buffer);
 		return;
@@ -519,7 +525,7 @@ message_pending (iucv_MessagePending * mpi, ulong pgm_data)
 			break;
 		} else {
 			/* Kick the packet upstairs */
-			iucv_rx (p->dev,
+			iucv_rx (p->dev, mpi->ipmsgid,
 				 buffer + prev_offset + 2,
 				 packet_offset - prev_offset - 2);
 			prev_offset = packet_offset;
@@ -535,20 +541,23 @@ message_pending (iucv_MessagePending * mpi, ulong pgm_data)
 /* Add meta-data to packet and send upstairs.                  */
 /*-------------------------------------------------------------*/
 static void
-iucv_rx (net_device * dev, uchar * buf, int len)
+iucv_rx (net_device * dev, u32 msgid, uchar * buf, int len)
 {
 	struct iucv_priv *p = (struct iucv_priv *) dev->priv;
 	struct sk_buff *skb;
 
-	pr_debug ("%s: iucv_rx len=%u\n", p->dev->name, len);
-#ifdef DEBUG
+#ifdef IPDEBUG
+	printk (KERN_DEBUG "RX id=%i\n", msgid);
 	dumpit (buf, 20);
+	dumpit (buf + 20, 20);
 #endif
+
+	pr_debug ("%s: RX len=%u\n", p->dev->name, len);
 
 	if (len > p->dev->mtu) {
 		printk (KERN_INFO
-			"%s: inbound packet length %u exceeds MTU %i\n",
-			p->dev->name, len, p->dev->mtu);
+			"%s: inbound packet id# %i length %u exceeds MTU %i\n",
+			p->dev->name, msgid, len, p->dev->mtu);
 		p->stats.rx_errors++;
 		return;
 	}
@@ -585,81 +594,86 @@ static int
 iucv_tx (struct sk_buff *skb, net_device * dev)
 {
 	int rc, pktlen;
-	struct iucvtag *tag;
+	u32 framelen, msgid;
+	void *frame;
 	struct iucv_priv *p = (struct iucv_priv *) dev->priv;
 
-	if (skb == NULL)	/* Nothing to do */
-		return 0;
+	if (skb == NULL) {	/* Nothing to do */
+		printk (KERN_WARNING "%s: TX Kernel passed null sk_buffer\n",
+			dev->name);
+		p->stats.tx_dropped++;
+		return -EIO;
+	}
 
-	if (netif_is_busy (dev)) {
+	if (netif_is_busy (dev))
+		return -EBUSY;
+
+	dev->trans_start = jiffies;	/* save the timestamp */
+
+	/* IUCV frame will be released when MessageComplete   */
+	/* interrupt is received.                             */
+	pktlen = skb->len;
+	framelen = pktlen + 4;
+
+	frame = kmalloc (framelen, GFP_ATOMIC | GFP_DMA);
+	if (!frame) {
 		p->stats.tx_dropped++;
 		dev_kfree_skb (skb);
-		printk (KERN_ERR "%s: tx conflict! leave iucv_tx.\n",
-			dev->name);
-		return -EBUSY;
+		return 0;
 	}
 
 	netif_stop_queue (dev);	/* transmission is busy */
 
-	dev->trans_start = jiffies;	/* save the timestamp */
+	*(u16 *) frame = pktlen + 2;	/* Set header   */
+	memcpy (frame + 2, skb->data, pktlen);	/* Copy data    */
+	memset (frame + pktlen + 2, 0, 2);	/* Set trailer  */
 
-	/* Tag contains data that must survive exit from this */
-	/* routine.  MessageComplete exit will free the tag   */
-	/* and any structures it points to.                   */
-	tag =
-	    (struct iucvtag *) kmalloc (sizeof (struct iucvtag),
-					GFP_DMA | GFP_KERNEL);
-	if (!tag) {
-		p->stats.tx_dropped++;
-		dev_kfree_skb (skb);
-		return -ENOMEM;
-	}
-
-	pktlen = skb->len;
-	tag->framelen = (u16) pktlen + 2;
-	tag->skb = skb;
-	tag->iucvvec[0].address = &tag->framelen;
-	tag->iucvvec[0].length = 2;
-	tag->iucvvec[1].address = (void *) virt_to_phys (skb->data);
-	tag->iucvvec[1].length = pktlen;
-	tag->iucvvec[2].address = (void *) virt_to_phys (eodata);
-	tag->iucvvec[2].length = 2;
-	pr_debug ("iucv_tx: length=%i, skb=%p tag=%p\n", pktlen, tag->skb, tag);
-
-	/* Ok, now the packet is ready for transmission: send it. */
-	rc =
-	    iucv_send_array (p->pathid, NULL, 0, 0, (ulong) tag, 0,
-			     tag->iucvvec, pktlen + 4);
-	if (rc == 0)
+	/* Ok, now the frame is ready for transmission: send it. */
+	rc = iucv_send (p->pathid, &msgid, 0, 0,
+			(u32) frame,	/* Msg tag      */
+			0,	/* No flags     */
+			frame, framelen);
+	if (rc == 0) {
+#ifdef IPDEBUG
+		printk (KERN_DEBUG "TX id=%i\n", msgid);
+		dumpit (skb->data, 20);
+		dumpit (skb->data + 20, 20);
+#endif
+		pr_debug ("%s: tx START %i.%i @=%p len=%i\n",
+			  p->dev->name, p->pathid, msgid, frame, framelen);
 		p->stats.tx_packets++;
-	else {
+	} else {
 		if (rc == 3)	/* Exceeded MSGLIMIT */
 			p->stats.tx_dropped++;
 		else {
 			p->stats.tx_errors++;
-			printk (KERN_INFO "%s: iucv send failed, rc=%i\n",
-				p->dev->name, rc);
+			printk (KERN_INFO "%s: tx ERROR id=%i.%i rc=%i\n",
+				p->dev->name, p->pathid, msgid, rc);
 		}
-		dev_kfree_skb (skb);
-		kfree (tag);
+		/* We won't get interrupt.  Free frame now. */
+		kfree (frame);
 	}
+	dev_kfree_skb (skb);	/* Finished with skb            */
 
 	netif_wake_queue (p->dev);
-	return rc;		/* zero == done; nonzero == fail */
+	return 0;
 }				/* end iucv_tx() */
 
 /*-----------------------------------------------------------*/
 /* SEND COMPLETE                    Called by IUCV handler.  */
-/* Free SKB associated with this transmission and free       */
-/* the IUCV buffer list and SKB pointer.                     */
+/* Free the IUCV frame that was used for this transmission.  */
 /*-----------------------------------------------------------*/
 static void
-send_complete (iucv_MessageComplete * mci, ulong pgm_data)
+send_complete (iucv_MessageComplete * mci, void *pgm_data)
 {
-	struct iucvtag *tag = (struct iucvtag *) mci->ipmsgtag;
-	pr_debug ("TX COMPLETE: Tag=%p skb=%p\n", tag, tag->skb);
-	dev_kfree_skb (tag->skb);
-	kfree (tag);
+	void *frame;
+#ifdef DEBUG
+	struct iucv_priv *p = (struct iucv_priv *) pgm_data;
+#endif
+	frame = (void *) (ulong) mci->ipmsgtag;
+	kfree (frame);
+	pr_debug ("%s: TX DONE %i.%i @=%p\n",
+		  p->dev->name, mci->ippathid, mci->ipmsgid, frame);
 }				/* end send_complete() */
 
 /*-----------------------------------------------------------*/
@@ -704,9 +718,10 @@ iucv_init (net_device * dev)
 	dev->type = ARPHRD_SLIP;
 	dev->tx_queue_len = MAX_TX_Q;	/* Default - updated based on IUCV */
 	/* keep the default flags, just add NOARP and POINTOPOINT */
-	dev->flags = IFF_NOARP | IFF_POINTOPOINT;
+	dev->flags |= IFF_NOARP | IFF_POINTOPOINT;
 	dev->mtu = 9216;
 
+	dev_init_buffers (dev);
 	pr_debug ("%s: iucv_init  dev@=%p\n", dev->name, dev);
 	return 0;
 }
@@ -734,6 +749,7 @@ __initfunc (void iucv_setup (char *iucv, int *ints))
 	i = devnumber = 0;
 	memset (temp_userid, ' ', 8);
 	temp_userid[8] = '\0';
+	printk (KERN_NOTICE "netiucv: IUCV network driver " LEVEL "\n");
 
 	if (!iucv)
 		init_return (0);
@@ -784,6 +800,7 @@ int
 init_module (void)
 {
 	int i;
+	printk (KERN_NOTICE "netiucv: IUCV network driver " LEVEL "\n");
 	for (i = 0; i < MAX_DEVICES; i++) {
 		if (iucv[i] == NULL)
 			break;
@@ -838,60 +855,120 @@ net_device iucv_netdev[MAX_DEVICES] = {
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
 		name: &iucv_names[0][0],  /* Name filled in at load time  */
 #endif
-		init: iucv_init 	  /* probe function               */
+		init: iucv_init           /* probe function               */
 	},
 	{
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
 		name: &iucv_names[1][0],  /* Name filled in at load time  */
 #endif
-		init: iucv_init 	  /* probe function               */
+		init: iucv_init           /* probe function               */
 	},
 	{
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
 		name: &iucv_names[2][0],  /* Name filled in at load time  */
 #endif
-		init: iucv_init 	  /* probe function               */
+		init: iucv_init           /* probe function               */
 	},
 	{
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
 		name: &iucv_names[3][0],  /* Name filled in at load time  */
 #endif
-		init: iucv_init 	  /* probe function               */
+		init: iucv_init           /* probe function               */
 	},
 	{
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
 		name: &iucv_names[4][0],  /* Name filled in at load time  */
 #endif
-		init: iucv_init 	  /* probe function               */
+		init: iucv_init           /* probe function               */
 	},
 	{
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
 		name: &iucv_names[5][0],  /* Name filled in at load time  */
 #endif
-		init: iucv_init 	  /* probe function               */
+		init: iucv_init           /* probe function               */
 	},
 	{
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
 		name: &iucv_names[6][0],  /* Name filled in at load time  */
 #endif
-		init: iucv_init 	  /* probe function               */
+		init: iucv_init           /* probe function               */
 	},
 	{
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
 		name: &iucv_names[7][0],  /* Name filled in at load time  */
 #endif
-		init: iucv_init 	  /* probe function               */
+		init: iucv_init           /* probe function               */
 	},
 	{
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
 		name: &iucv_names[8][0],  /* Name filled in at load time  */
 #endif
-		init: iucv_init 	  /* probe function               */
+		init: iucv_init           /* probe function               */
 	},
 	{
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
 		name: &iucv_names[9][0],  /* Name filled in at load time  */
 #endif
-		init: iucv_init 	  /* probe function               */
+		init: iucv_init           /* probe function               */
+	},
+	{
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
+		name: &iucv_names[10][0], /* Name filled in at load time  */
+#endif
+		init: iucv_init           /* probe function               */
+	},
+	{
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
+		name: &iucv_names[11][0], /* Name filled in at load time  */
+#endif
+		init: iucv_init           /* probe function               */
+	},
+	{
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
+		name: &iucv_names[12][0], /* Name filled in at load time  */
+#endif
+		init: iucv_init           /* probe function               */
+	},
+	{
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
+		name: &iucv_names[13][0], /* Name filled in at load time  */
+#endif
+		init: iucv_init           /* probe function               */
+	},
+	{
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
+		name: &iucv_names[14][0], /* Name filled in at load time  */
+#endif
+		init: iucv_init           /* probe function               */
+	},
+	{
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
+		name: &iucv_names[15][0], /* Name filled in at load time  */
+#endif
+		init: iucv_init           /* probe function               */
+	},
+	{
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
+		name: &iucv_names[16][0], /* Name filled in at load time  */
+#endif
+		init: iucv_init           /* probe function               */
+	},
+	{
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
+		name: &iucv_names[17][0], /* Name filled in at load time  */
+#endif
+		init: iucv_init           /* probe function               */
+	},
+	{
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
+		name: &iucv_names[18][0], /* Name filled in at load time  */
+#endif
+		init: iucv_init           /* probe function               */
+	},
+	{
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
+		name: &iucv_names[19][0], /* Name filled in at load time  */
+#endif
+		init: iucv_init           /* probe function               */
 	},
 };

@@ -39,7 +39,7 @@ static inline int pers_to_level (int pers)
 	return MD_RESERVED;
 }
 
-extern inline int level_to_pers (int level)
+static inline int level_to_pers (int level)
 {
 	switch (level) {
 		case -3: return HSM;

@@ -17,44 +17,28 @@
 #include <asm/lowcore.h>
 #include <linux/sched.h>
 
-/* No irq_cpustat_t for s390, the data is held directly in S390_lowcore */
+/* entry.S is sensitive to the offsets of these fields */
+typedef struct {
+	unsigned int __softirq_pending;
+	unsigned int __local_irq_count;
+	unsigned int __local_bh_count;
+	unsigned int __syscall_count;
+	struct task_struct * __ksoftirqd_task; /* waitqueue is too large */
+} ____cacheline_aligned irq_cpustat_t;
 
-/*
- * Simple wrappers reducing source bloat.  S390 specific because each
- * cpu stores its data in S390_lowcore (PSA) instead of using a cache
- * aligned array element like most architectures.
- */
-
-#ifdef CONFIG_SMP
-
-#define softirq_active(cpu)	(safe_get_cpu_lowcore(cpu).__softirq_active)
-#define softirq_mask(cpu)	(safe_get_cpu_lowcore(cpu).__softirq_mask)
-#define local_irq_count(cpu)	(safe_get_cpu_lowcore(cpu).__local_irq_count)
-#define local_bh_count(cpu)	(safe_get_cpu_lowcore(cpu).__local_bh_count)
-#define syscall_count(cpu)	(safe_get_cpu_lowcore(cpu).__syscall_count)
-
-#else	/* CONFIG_SMP */
-
-/* Optimize away the cpu calculation, it is always current PSA */
-#define softirq_active(cpu)	((void)(cpu), S390_lowcore.__softirq_active)
-#define softirq_mask(cpu)	((void)(cpu), S390_lowcore.__softirq_mask)
-#define local_irq_count(cpu)	((void)(cpu), S390_lowcore.__local_irq_count)
-#define local_bh_count(cpu)	((void)(cpu), S390_lowcore.__local_bh_count)
-#define syscall_count(cpu)	((void)(cpu), S390_lowcore.__syscall_count)
-
-#endif	/* CONFIG_SMP */
+#include <linux/irq_cpustat.h>	/* Standard mappings for irq_cpustat_t above */
 
 /*
  * Are we in an interrupt context? Either doing bottom half
  * or hardware interrupt processing?
- * Special definitions for s390, always access current PSA.
  */
-#define in_interrupt() ((S390_lowcore.__local_irq_count + S390_lowcore.__local_bh_count) != 0)
-  
-#define in_irq() (S390_lowcore.__local_irq_count != 0)
+#define in_interrupt() ({ int __cpu = smp_processor_id(); \
+	(local_irq_count(__cpu) + local_bh_count(__cpu) != 0); })
+
+#define in_irq() (local_irq_count(smp_processor_id()) != 0)
   
 #ifndef CONFIG_SMP
-  
+
 #define hardirq_trylock(cpu)	(local_irq_count(cpu) == 0)
 #define hardirq_endlock(cpu)	do { } while (0)
   
@@ -63,7 +47,7 @@
 
 #define synchronize_irq()	do { } while (0)
 
-#else
+#else	/* CONFIG_SMP */
 
 #include <asm/atomic.h>
 #include <asm/smp.h>
@@ -77,7 +61,7 @@ static inline void release_irqlock(int cpu)
 	/* if we didn't own the irq lock, just ignore.. */
 	if (atomic_read(&global_irq_holder) ==  cpu) {
 		atomic_set(&global_irq_holder,NO_PROC_ID);
-		clear_bit(0,&global_irq_lock);
+		atomic_set(&global_irq_lock,0);
 	}
 }
 
@@ -95,13 +79,14 @@ static inline void hardirq_exit(int cpu)
 
 static inline int hardirq_trylock(int cpu)
 {
-	return !atomic_read(&global_irq_count) && !test_bit(0,&global_irq_lock);
+	return !atomic_read(&global_irq_count) &&
+	       !atomic_read(&global_irq_lock);
 }
 
 #define hardirq_endlock(cpu)	do { } while (0)
 
 extern void synchronize_irq(void);
 
-#endif /* CONFIG_SMP */
+#endif	/* CONFIG_SMP */
 
 #endif /* __ASM_HARDIRQ_H */

@@ -31,7 +31,7 @@
 #include <linux/kernel.h>
 #include <linux/tqueue.h>
 #include <linux/timer.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/genhd.h>
 #include <linux/hdreg.h>
 #include <linux/interrupt.h>
@@ -67,6 +67,10 @@
 #ifdef CONFIG_DASD_DIAG
 #include "dasd_diag.h"
 #endif				/*  CONFIG_DASD_DIAG */
+
+/* SECTION: exported variables of dasd.c */
+
+debug_info_t *dasd_debug_area;
 
 MODULE_AUTHOR ("Holger Smolinski <Holger.Smolinski@de.ibm.com>");
 MODULE_DESCRIPTION ("Linux on S/390 DASD device driver,"

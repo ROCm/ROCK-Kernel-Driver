@@ -30,6 +30,20 @@
 #define PT_USP       23    /* special case - USP is not in the pt_regs */
 #define PT_MAX       23
 
+/* Condition code bit numbers.  The same numbers apply to CCR of course,
+   but we use DCCR everywhere else, so let's try and be consistent.  */
+#define C_DCCR_BITNR 0
+#define V_DCCR_BITNR 1
+#define Z_DCCR_BITNR 2
+#define N_DCCR_BITNR 3
+#define X_DCCR_BITNR 4
+#define I_DCCR_BITNR 5
+#define B_DCCR_BITNR 6
+#define M_DCCR_BITNR 7
+#define U_DCCR_BITNR 8
+#define P_DCCR_BITNR 9
+#define F_DCCR_BITNR 10
+
 /* Frame types */
 
 #define CRIS_FRAME_NORMAL   0 /* normal frame without SBFS stacking */
@@ -98,7 +112,7 @@ struct switch_stack {
 #define PTRACE_SETREGS            13
 
 /* bit 8 is user-mode flag */
-#define user_mode(regs) ((regs)->dccr & 0x100)
+#define user_mode(regs) (((regs)->dccr & 0x100) != 0)
 #define instruction_pointer(regs) ((regs)->irp)
 extern void show_regs(struct pt_regs *);
 #endif

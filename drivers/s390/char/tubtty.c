@@ -37,7 +37,7 @@ static int tty3270_write_proc(struct file *, const char *,
 /* tty3270 utility functions */
 static void tty3270_bh(void *);
        void tty3270_sched_bh(tub_t *);
-static int tty3270_wait(tub_t *, int *);
+static int tty3270_wait(tub_t *, long *);
        void tty3270_int(tub_t *, devstat_t *);
        int tty3270_try_logging(tub_t *);
 static void tty3270_start_input(tub_t *);
@@ -48,20 +48,19 @@ static void tty3270_do_showi(tub_t *, char *, int);
 static int tty3270_show_tube(int, char *, int);
 
 int tty3270_major = -1;
-char tty3270_major_string[16];
 struct tty_driver tty3270_driver;
 int tty3270_refcount;
 struct tty_struct *tty3270_table[TUBMAXMINS];
 struct termios *tty3270_termios[TUBMAXMINS];
 struct termios *tty3270_termios_locked[TUBMAXMINS];
-#ifdef CONFIG_3270_CONSOLE
+#ifdef CONFIG_TN3270_CONSOLE
 int con3270_major = -1;
 struct tty_driver con3270_driver;
 int con3270_refcount;
 struct tty_struct *con3270_table[1];
 struct termios *con3270_termios[1];
 struct termios *con3270_termios_locked[1];
-#endif /* CONFIG_3270_CONSOLE */
+#endif /* CONFIG_TN3270_CONSOLE */
 
 int tty3270_proc_index;
 int tty3270_proc_data;
@@ -88,6 +87,9 @@ tty3270_init(void)
 	td->subtype = SYSTEM_TYPE_TTY;
 	td->init_termios = tty_std_termios;
 	td->flags = TTY_DRIVER_RESET_TERMIOS;
+#ifdef CONFIG_DEVFS_FS
+	td->flags |= TTY_DRIVER_NO_DEVFS;
+#endif
 	td->refcount = &tty3270_refcount;
 	td->table = tty3270_table;
 	td->termios = tty3270_termios;
@@ -121,32 +123,36 @@ tty3270_init(void)
 		printk(KERN_ERR "tty3270 registration failed with %d\n", rc);
 	} else {
 		tty3270_major = IBM_TTY3270_MAJOR;
-		sprintf(tty3270_major_string, "%d", tty3270_major);
 		if (td->proc_entry != NULL)
 			td->proc_entry->mode = S_IRUGO | S_IWUGO;
 	}
-#ifdef CONFIG_3270_CONSOLE
-	tty3270_con_driver = *td;
-	td = &tty3270_con_driver;
-	td->driver_name = "con3270";
-	td->name = "con3270";
-	td->major = MAJOR(S390_CONSOLE_DEV);
-	td->minor_start = MINOR(S390_CONSOLE_DEV);
-	td->num = 1;
-	td->refcount = &con3270_refcount;
-	td->table = con3270_table;
-	td->termios = con3270_termios;
-	td->termios_locked = con3270_termios_locked;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
+#ifdef CONFIG_TN3270_CONSOLE
+	if (CONSOLE_IS_3270) {
+		tty3270_con_driver = *td;
+		td = &tty3270_con_driver;
+		td->driver_name = "con3270";
+		td->name = "con3270";
+		td->major = MAJOR(S390_CONSOLE_DEV);
+		td->minor_start = MINOR(S390_CONSOLE_DEV);
+		td->num = 1;
+		td->refcount = &con3270_refcount;
+		td->table = con3270_table;
+		td->termios = con3270_termios;
+		td->termios_locked = con3270_termios_locked;
 
-	rc = tty_register_driver(td);
-	if (rc) {
-		printk(KERN_ERR "con3270 registration failed with %d\n", rc);
-	} else {
-		con3270_major = MAJOR(S390_CONSOLE_DEV);
-		if (td->proc_entry != NULL)
-			td->proc_entry->mode = S_IRUGO | S_IWUGO;
+		rc = tty_register_driver(td);
+		if (rc) {
+			printk(KERN_ERR
+			       "con3270 registration failed with %d\n", rc);
+		} else {
+			con3270_major = MAJOR(S390_CONSOLE_DEV);
+			if (td->proc_entry != NULL)
+				td->proc_entry->mode = S_IRUGO | S_IWUGO;
+		}
 	}
-#endif /* if CONFIG_3270_CONSOLE */
+#endif /* ifdef CONFIG_TN3270_CONSOLE */
+#endif /* if LINUX_VERSION_CODE */
 
 	return rc;
 }
@@ -161,8 +167,8 @@ tty3270_fini(void)
 		tty_unregister_driver(&tty3270_driver);
 		tty3270_major = -1;
 	}
-#ifdef CONFIG_3270_CONSOLE
-	if (con3270_major != -1) {
+#ifdef CONFIG_TN3270_CONSOLE
+	if (CONSOLE_IS_3270 && con3270_major != -1) {
 		tty_unregister_driver(&con3270_driver);
 		con3270_major = -1;
 	}
@@ -173,7 +179,7 @@ static int
 tty3270_open(struct tty_struct *tty, struct file *filp)
 {
 	tub_t *tubp;
-	int flags;
+	long flags;
 	int rc;
 	int cmd;
 
@@ -229,7 +235,7 @@ static void
 tty3270_close(struct tty_struct *tty, struct file *filp)
 {
 	tub_t *tubp;
-	int flags;
+	long flags;
 
 	if ((tubp = tty->driver_data) == NULL)
 		return;
@@ -252,24 +258,24 @@ tty3270_write(struct tty_struct *tty, int fromuser,
 		const unsigned char *buf, int count)
 {
 	tub_t *tubp;
-	int flags;
+	long flags;
 	bcb_t obcb;
 	int rc = 0;
 
 	if ((tubp = tty->driver_data) == NULL)
 		return -1;
 
-#ifdef CONFIG_3270_CONSOLE
-	if (tub3270_con_tubp == tubp)
+#ifdef CONFIG_TN3270_CONSOLE
+	if (CONSOLE_IS_3270 && tub3270_con_tubp == tubp)
 		tub3270_con_copy(tubp);
-#endif /* CONFIG_3270_CONSOLE */
+#endif /* CONFIG_TN3270_CONSOLE */
 
 	obcb.bc_buf = (char *)buf;
 	obcb.bc_len = obcb.bc_cnt = obcb.bc_wr = count;
 	obcb.bc_rd = 0;
 
 	TUBLOCK(tubp->irq, flags);
-	rc = tub3270_movedata(&obcb, &tubp->tty_bcb);
+	rc = tub3270_movedata(&obcb, &tubp->tty_bcb, fromuser);
 	tty3270_try_logging(tubp);
 	TUBUNLOCK(tubp->irq, flags);
 	return rc;
@@ -278,7 +284,7 @@ tty3270_write(struct tty_struct *tty, int fromuser,
 static void
 tty3270_put_char(struct tty_struct *tty, unsigned char ch)
 {
-	int flags;
+	long flags;
 	tub_t *tubp;
 	bcb_t *ob;
 
@@ -301,7 +307,7 @@ static void
 tty3270_flush_chars(struct tty_struct *tty)
 {
 	tub_t *tubp;
-	int flags;
+	long flags;
 
 	if ((tubp = tty->driver_data) == NULL)
 		return;
@@ -342,7 +348,7 @@ tty3270_ioctl(struct tty_struct *tty, struct file *file,
 		unsigned int cmd, unsigned long arg)
 {
 	tub_t *tubp;
-	int flags;
+	long flags;
 	int ret = 0;
 	struct termios termios;
 
@@ -394,7 +400,7 @@ static void
 tty3270_set_termios(struct tty_struct *tty, struct termios *old)
 {
 	tub_t *tubp;
-	int flags;
+	long flags;
 	int new;
 
 	if ((tubp = tty->driver_data) == NULL)
@@ -420,7 +426,7 @@ tty3270_flush_buffer(struct tty_struct *tty)
 {
 	tub_t *tubp;
 	bcb_t *ob;
-	int flags;
+	long flags;
 
 	if ((tubp = tty->driver_data) == NULL)
 		return;
@@ -452,7 +458,6 @@ tty3270_read_proc(char *buf, char **start, off_t off, int count,
 	int i;
 	int rc;
 	int len = 0;
-	char *majstr;
 
 	if (tty3270_proc_what == TW_CONFIG) {
 		/*
@@ -464,13 +469,14 @@ tty3270_read_proc(char *buf, char **start, off_t off, int count,
 		len += sprintf(buf + len, "0 %d 0\n", fs3270_major);
 		for (i = 1; i <= tubnummins; i++) {
 			tubp = (*tubminors)[i];
-			majstr = tty3270_major_string;
-#ifdef CONFIG_3270_CONSOLE
-			if (tubp == tub3270_con_tubp)
-				majstr = "CONSOLE";
-#endif /* CONFIG_3270_CONSOLE */
-			len += sprintf(buf + len, "%.3x %s %d\n",
-				tubp->devno, majstr, i);
+#ifdef CONFIG_TN3270_CONSOLE
+			if (CONSOLE_IS_3270 && tubp == tub3270_con_tubp)
+				len += sprintf(buf + len, "%.3x CONSOLE %d\n",
+					       tubp->devno, i);
+			else
+#endif
+				len += sprintf(buf + len, "%.3x %d %d\n",
+					       tubp->devno, tty3270_major, i);
 			if (begin + len > off + count)
 				break;
 			if (begin + len < off) {
@@ -536,10 +542,12 @@ tty3270_write_proc(struct file *file, const char *buffer,
 	if (device) {
 		if (MAJOR(device) == IBM_TTY3270_MAJOR)
 			tubp = (*tubminors)[MINOR(device)];
-#ifdef CONFIG_3270_CONSOLE
-		if (device == S390_CONSOLE_DEV)
+#ifdef CONFIG_TN3270_CONSOLE
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
+		if (CONSOLE_IS_3270 && device == S390_CONSOLE_DEV)
 			tubp = tub3270_con_tubp;
-#endif /* CONFIG_3270_CONSOLE */
+#endif /* LINUX_VERSION_CODE */
+#endif /* CONFIG_TN3270_CONSOLE */
 	}
 	if (tubp) {
 		if ((rc = tty3270_aid_set(tubp, mybuf, mycount + 1)))
@@ -595,7 +603,7 @@ tty3270_hangup(struct tty_struct *tty)
 static void
 tty3270_bh(void *data)
 {
-	int flags;
+	long flags;
 	tub_t *tubp;
 	struct tty_struct *tty;
 
@@ -675,7 +683,7 @@ tty3270_io(tub_t *tubp)
  * On entry the lock must not be held; on exit it is held.
  */
 static int
-tty3270_wait(tub_t *tubp, int *flags)
+tty3270_wait(tub_t *tubp, long *flags)
 {
 	DECLARE_WAITQUEUE(wait, current);
 
@@ -766,10 +774,10 @@ tty3270_try_logging(tub_t *tubp)
 		return 0;
 	if (tubp->stat == TBS_MORE)
 		return 0;
-#ifdef CONFIG_3270_CONSOLE
-	if (tub3270_con_tubp == tubp)
+#ifdef CONFIG_TN3270_CONSOLE
+	if (CONSOLE_IS_3270 && tub3270_con_tubp == tubp)
 		tub3270_con_copy(tubp);
-#endif /* CONFIG_3270_CONSOLE */
+#endif /* CONFIG_TN3270_CONSOLE */
 	if (tubp->tty_bcb.bc_cnt == 0)
 		return 0;
 	if (tubp->intv != tty3270_int)
@@ -953,48 +961,44 @@ tty3270_show_tube(int minor, char *buf, int count)
 	if (minor < 0 || minor > tubnummins ||
 	    (tubp = (*tubminors)[minor]) == NULL)
 		return sprintf(buf, "No tube at index=%d\n", minor);
-
+	
 	tty = tubp->tty;
 	len = 0;
 
-	len += sprintf(buf+len,
-"Info for tub_t[%d] at %.8x:\n",
-	minor, (int)tubp);
+	len += sprintf(buf+len, "Info for tub_t[%d] at %p:\n", minor, tubp);
 
-	len += sprintf(buf+len, "inattr is at %.8x\n",
-		(int)&tubp->tty_inattr);
+	len += sprintf(buf+len, "inattr is at %p\n", &tubp->tty_inattr);
 
 
-	len += sprintf(buf+len,
-"    geom:  rows=%.2d cols=%.2d model=%.1d\n",
-	tubp->geom_rows, tubp->geom_cols, tubp->tubiocb.model);
+	len += sprintf(buf+len, "    geom:  rows=%.2d cols=%.2d model=%.1d\n",
+		       tubp->geom_rows, tubp->geom_cols, tubp->tubiocb.model);
 
 	len += sprintf(buf+len,
-"    lnopen=%-2d     fsopen=%-2d   waitq=%.8x\n",
-	tubp->lnopen, tubp->fsopen, (int)&tubp->waitq);
+		       "    lnopen=%-2d     fsopen=%-2d   waitq=%p\n",
+		       tubp->lnopen, tubp->fsopen, &tubp->waitq);
 
-	len += sprintf(buf+len,
-"    dstat=%.2x      mode=%-2d     stat=%-2d     flags=%-4x\n",
-	tubp->dstat, tubp->mode, tubp->stat, tubp->flags);
+	len += sprintf(buf+len, "    dstat=%.2x      mode=%-2d     "
+		       "stat=%-2d     flags=%-4x\n", tubp->dstat,
+		       tubp->mode, tubp->stat, tubp->flags);
 
 #ifdef RBH_FIXTHIS
 	len += sprintf(buf+len,
-"    oucount=%-4d  ourd=%-5d  ouwr=%-5d  nextlogx=%-5d\n",
-	tubp->tty_oucount, tubp->tty_ourd, tubp->tty_ouwr,
-	tubp->tty_nextlogx);
+		       "    oucount=%-4d  ourd=%-5d  ouwr=%-5d"
+		       "  nextlogx=%-5d\n", tubp->tty_oucount,
+		       tubp->tty_ourd, tubp->tty_ouwr, tubp->tty_nextlogx);
 #endif
 
-	len += sprintf(buf+len,
-"    tty=%.8x\n",
-	(int)tubp->tty);
+	len += sprintf(buf+len, "    tty=%p\n",tubp->tty);
 
-	if (tty) len += sprintf(buf+len,
-"    write_wait=%.8x read_wait=%.8x\n",
-	(int)&tty->write_wait, (int)&tty->read_wait);
+	if (tty)
+		len += sprintf(buf+len,
+				"    write_wait=%.8x read_wait=%.8x\n",
+				tty->write_wait, tty->read_wait);
 
-	if (tty && ((mp = tty->termios))) len += sprintf(buf+len,
-"    iflag=%.8x oflag=%.8x cflag=%.8x lflag=%.8x\n",
-	mp->c_iflag, mp->c_oflag, mp->c_cflag, mp->c_lflag);
+	if (tty && ((mp = tty->termios)))
+		len += sprintf(buf+len,"    iflag=%.8x oflag=%.8x "
+			       "cflag=%.8x lflag=%.8x\n", mp->c_iflag,
+			       mp->c_oflag, mp->c_cflag, mp->c_lflag);
 
 
 	return len;

@@ -57,7 +57,7 @@ static void cpuid_smp_cpuid(void *cmd_block)
     cpuid(cmd->reg, &cmd->data[0], &cmd->data[1], &cmd->data[2], &cmd->data[3]);
 }
 
-extern inline void do_cpuid(int cpu, u32 reg, u32 *data)
+static inline void do_cpuid(int cpu, u32 reg, u32 *data)
 {
   struct cpuid_command cmd;
   
@@ -73,7 +73,7 @@ extern inline void do_cpuid(int cpu, u32 reg, u32 *data)
 }
 #else /* ! CONFIG_SMP */
 
-extern inline void do_cpuid(int cpu, u32 reg, u32 *data)
+static inline void do_cpuid(int cpu, u32 reg, u32 *data)
 {
   cpuid(reg, &data[0], &data[1], &data[2], &data[3]);
 }

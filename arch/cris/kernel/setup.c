@@ -1,4 +1,4 @@
-/* $Id: setup.c,v 1.16 2001/05/15 01:23:13 hp Exp $
+/* $Id: setup.c,v 1.18 2001/06/28 04:47:16 hp Exp $
  *
  *  linux/arch/cris/kernel/setup.c
  *
@@ -162,9 +162,9 @@ setup_arch(char **cmdline_p)
 
 	paging_init();
 
-	/* we dont use a command line yet, so just let it be an empty string 
-	   to start with */
-        
+	/* We dont use a command line yet, so just re-initialize it without
+	   saving anything that might be there.  */
+
 	*cmdline_p = command_line;
 	strcpy(command_line, "root=/dev/rom"); /* use the appended romdisk as root */
 
@@ -249,7 +249,7 @@ int get_cpuinfo(char *buffer)
 		       cpu_info[revision].flags & HAS_SCSI ? "yes" : "no",
 		       cpu_info[revision].flags & HAS_ATA ? "yes" : "no",
 		       cpu_info[revision].flags & HAS_USB ? "yes" : "no",
-		       (loops_per_jiffy * HZ + 500) / 100000,
-		       ((loops_per_jiffy * HZ + 500) / 1000) % 100);
+		       (loops_per_jiffy * HZ + 500) / 500000,
+		       ((loops_per_jiffy * HZ + 500) / 5000) % 100);
 }
 #endif /* CONFIG_PROC_FS */

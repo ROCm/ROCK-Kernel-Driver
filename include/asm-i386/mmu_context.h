@@ -40,6 +40,7 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, str
 		cpu_tlbstate[cpu].active_mm = next;
 #endif
 		set_bit(cpu, &next->cpu_vm_mask);
+		set_bit(cpu, &next->context.cpuvalid);
 		/* Re-load page tables */
 		asm volatile("movl %0,%%cr3": :"r" (__pa(next->pgd)));
 	}
@@ -54,6 +55,8 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, str
 			 */
 			local_flush_tlb();
 		}
+		if (!test_and_set_bit(cpu, &next->context.cpuvalid))
+			load_LDT(next);
 	}
 #endif
 }

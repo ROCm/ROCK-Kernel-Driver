@@ -14,13 +14,13 @@
  */
 extern void __wait_on_buffer(struct buffer_head *);
 
-extern inline void wait_on_buffer(struct buffer_head * bh)
+static inline void wait_on_buffer(struct buffer_head * bh)
 {
 	if (test_bit(BH_Lock, &bh->b_state))
 		__wait_on_buffer(bh);
 }
 
-extern inline void lock_buffer(struct buffer_head * bh)
+static inline void lock_buffer(struct buffer_head * bh)
 {
 	while (test_and_set_bit(BH_Lock, &bh->b_state))
 		__wait_on_buffer(bh);
@@ -34,12 +34,12 @@ extern void unlock_buffer(struct buffer_head *bh);
  * nfs may need it).
  */
 
-extern inline void lock_super(struct super_block * sb)
+static inline void lock_super(struct super_block * sb)
 {
 	down(&sb->s_lock);
 }
 
-extern inline void unlock_super(struct super_block * sb)
+static inline void unlock_super(struct super_block * sb)
 {
 	up(&sb->s_lock);
 }

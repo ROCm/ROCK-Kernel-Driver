@@ -1,9 +1,9 @@
-/* $Id: time.c,v 1.6 2001/05/29 11:29:42 markusl Exp $
+/* $Id: time.c,v 1.8 2001/07/18 14:01:03 bjornw Exp $
  *
  *  linux/arch/cris/kernel/time.c
  *
  *  Copyright (C) 1991, 1992, 1995  Linus Torvalds
- *  Copyright (C) 1999, 2000 Axis Communications AB
+ *  Copyright (C) 1999, 2000, 2001 Axis Communications AB
  *
  * 1994-07-02    Alan Modra
  *	fixed set_rtc_mmss, fixed time.year for >= 2000, new mktime
@@ -228,7 +228,7 @@ static int watchdog_key = 0;  /* arbitrary number */
 
 #define WATCHDOG_MIN_FREE_PAGES 8
 
-static inline void
+void
 reset_watchdog(void)
 {
 #if defined(CONFIG_ETRAX_WATCHDOG) && !defined(CONFIG_SVINTO_SIM)
@@ -240,6 +240,18 @@ reset_watchdog(void)
 			IO_STATE(R_WATCHDOG, enable, start);
 	}
 #endif
+}
+
+/* stop the watchdog - we still need the correct key */
+
+void 
+stop_watchdog(void)
+{
+#if defined(CONFIG_ETRAX_WATCHDOG) && !defined(CONFIG_SVINTO_SIM)
+	watchdog_key ^= 0x7; /* invert key, which is 3 bits */
+	*R_WATCHDOG = IO_FIELD(R_WATCHDOG, key, watchdog_key) |
+		IO_STATE(R_WATCHDOG, enable, stop);
+#endif	
 }
 
 /* last time the cmos clock got updated */
@@ -443,6 +455,19 @@ time_init(void)
 #if defined(CONFIG_ETRAX_WATCHDOG) && !defined(CONFIG_SVINTO_SIM)
 	printk("Enabling watchdog...\n");
 	start_watchdog();
-#endif
 
+	/* If we use the hardware watchdog, we want to trap it as an NMI
+	   and dump registers before it resets us.  For this to happen, we
+	   must set the "m" NMI enable flag (which once set, is unset only
+	   when an NMI is taken).
+
+	   The same goes for the external NMI, but that doesn't have any
+	   driver or infrastructure support yet.  */
+	asm ("setf m");
+
+	*R_IRQ_MASK0_SET =
+		IO_STATE(R_IRQ_MASK0_SET, watchdog_nmi, set);
+	*R_VECT_MASK_SET =
+		IO_STATE(R_VECT_MASK_SET, nmi, set);
+#endif
 }

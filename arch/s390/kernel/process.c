@@ -63,8 +63,7 @@ int cpu_idle(void *unused)
 	wait_psw.mask = _WAIT_PSW_MASK;
 	wait_psw.addr = (unsigned long) &&idle_wakeup | 0x80000000L;
 	while(1) {
-                if (softirq_active(smp_processor_id()) &
-		    softirq_mask(smp_processor_id())) {
+                if (softirq_pending(smp_processor_id())) {
                         do_softirq();
                         __sti();
                         if (!current->need_resched)
@@ -307,11 +306,11 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long new_stackp,
 
         frame = (struct stack_frame *) (2*PAGE_SIZE + (unsigned long) p) -1;
         frame = (struct stack_frame *) (((unsigned long) frame)&-8L);
-        p->thread.regs = &frame->childregs;
+        p->thread.regs = (struct pt_regs *)&frame->childregs;
         p->thread.ksp = (unsigned long) frame;
-        frame->childregs = *regs;
+        memcpy(&frame->childregs,regs,sizeof(struct pt_regs));
         frame->childregs.gprs[15] = new_stackp;
-        frame->eos = 0;
+        frame->back_chain = frame->eos = 0;
 
         /* new return point is ret_from_sys_call */
         frame->gprs[8] = ((unsigned long) &ret_from_fork) | 0x80000000;
@@ -466,54 +465,3 @@ unsigned long get_wchan(struct task_struct *p)
 #undef last_sched
 #undef first_sched
 
-/*
- * This should be safe even if called from tq_scheduler
- * A typical mask would be sigmask(SIGKILL)|sigmask(SIGINT)|sigmask(SIGTERM) or 0.
- *
- */
-void s390_daemonize(char *name,unsigned long mask,int use_init_fs)
-{
-	struct fs_struct *fs;
-	extern struct task_struct *child_reaper;
-	struct task_struct *this_process=current;
-	
-	/*
-	 * If we were started as result of loading a module, close all of the
-	 * user space pages.  We don't need them, and if we didn't close them
-	 * they would be locked into memory.
-	 */
-	exit_mm(current);
-
-	this_process->session = 1;
-	this_process->pgrp = 1;
-	if(name)
-	{
-		strncpy(current->comm,name,15);
-		current->comm[15]=0;
-	}
-	else
-		current->comm[0]=0;
-	/* set signal mask to what we want to respond */
-        siginitsetinv(&current->blocked,mask);
-	/* exit_signal isn't set up */
-        /* if we inherit from cpu idle  */
-	this_process->exit_signal=SIGCHLD;
-	/* if priority=0 schedule can go into a tight loop */
-	this_process->policy= SCHED_OTHER;
-	/* nice goes priority=20-nice; */
-	this_process->nice=10;
-	if(use_init_fs)
-	{
-		exit_fs(this_process);	/* current->fs->count--; */
-		fs = init_task.fs;
-		current->fs = fs;
-		atomic_inc(&fs->count);
-		exit_files(current);
-	}
-	write_lock_irq(&tasklist_lock);
-	/* We want init as our parent */
-	REMOVE_LINKS(this_process);
-	this_process->p_opptr=this_process->p_pptr=child_reaper;
-	SET_LINKS(this_process);
-	write_unlock_irq(&tasklist_lock);
-}

@@ -67,18 +67,24 @@ csum_partial_copy(const char *src, char *dst, int len,unsigned int sum)
  *
  * here even more important to align src and dst on a 32-bit (or even
  * better 64-bit) boundary
+ *
+ * Copy from userspace and compute checksum.  If we catch an exception
+ * then zero the rest of the buffer.
  */
-
 extern inline unsigned int 
-csum_partial_copy_from_user(const char *src, char *dst,
-                            int len, unsigned int sum, int *errp)
+csum_partial_copy_from_user (const char *src, char *dst,
+                                          int len, unsigned int sum,
+                                          int *err_ptr)
 {
-	if (copy_from_user(dst, src, len)) {
-		*errp = -EFAULT;
-		memset(dst, 0, len);
-		return sum;
-        }
-        return csum_partial_inline(dst, len, sum);
+	int missing;
+
+	missing = copy_from_user(dst, src, len);
+	if (missing) {
+		memset(dst + len - missing, 0, missing);
+		*err_ptr = -EFAULT;
+	}
+		
+	return csum_partial(dst, len, sum);
 }
 
 extern inline unsigned int

@@ -96,7 +96,7 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 } while (0)
 
 /* Pure 2^n version of get_order */
-extern __inline__ int get_order(unsigned long size)
+static __inline__ int get_order(unsigned long size)
 {
 	int order;
 

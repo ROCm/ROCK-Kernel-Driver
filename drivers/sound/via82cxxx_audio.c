@@ -1640,7 +1640,8 @@ static void via_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if (!(status32 & VIA_INTR_MASK))
         {
 #ifdef CONFIG_MIDI_VIA82CXXX
-                uart401intr(irq, card->midi_devc, regs);
+	    	 if (card->midi_devc)
+                    	uart401intr(irq, card->midi_devc, regs);
 #endif
 		return;
     	}	    

@@ -374,8 +374,6 @@ extern int (*genhd_dasd_fillgeo) (int, struct hd_geometry *);
 int dasd_oper_handler (int irq, devreg_t * devreg);
 void dasd_schedule_bh (dasd_device_t *);
 
-debug_info_t *dasd_debug_area;
-
 #endif /* __KERNEL__ */
 
 #endif				/* DASD_H */

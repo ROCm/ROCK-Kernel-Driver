@@ -48,7 +48,7 @@ static void
 tty3270_scl_timeout(unsigned long data)
 {
 	tub_t *tubp = (void *)data;
-	int flags;
+	long flags;
 
 	TUBLOCK(tubp->irq, flags);
 	tubp->stat = TBS_RUNNING;
@@ -72,9 +72,9 @@ tty3270_scl_set(tub_t *tubp, char *buf, int count)
 int
 tty3270_scl_init(tub_t *tubp)
 {
-	extern int tubscrollparm;
+	extern int tubscrolltime;
 
-	tubp->tty_scrolltime = tubscrollparm;
+	tubp->tty_scrolltime = tubscrolltime;
 	if (tubp->tty_scrolltime < 0)
 		tubp->tty_scrolltime = DEFAULT_SCROLLTIME;
 	return 0;

@@ -4,6 +4,8 @@
 # CONFIG_ISA is not set
 # CONFIG_EISA is not set
 # CONFIG_MCA is not set
+CONFIG_RWSEM_GENERIC_SPINLOCK=y
+# CONFIG_RWSEM_XCHGADD_ALGORITHM is not set
 CONFIG_ARCH_S390=y
 CONFIG_ARCH_S390X=y
 
@@ -41,6 +43,8 @@ CONFIG_KCORE_ELF=y
 CONFIG_BINFMT_ELF=y
 # CONFIG_BINFMT_MISC is not set
 # CONFIG_PROCESS_DEBUG is not set
+CONFIG_PFAULT=y
+# CONFIG_SHARED_KERNEL is not set
 
 #
 # Block device drivers
@@ -58,7 +62,6 @@ CONFIG_BLK_DEV_XPRAM=m
 CONFIG_DASD=y
 CONFIG_DASD_ECKD=y
 CONFIG_DASD_FBA=y
-# CONFIG_DASD_DIAG is not set
 
 #
 # Multi-device support (RAID and LVM)
@@ -80,10 +83,13 @@ CONFIG_UNIX98_PTY_COUNT=256
 #
 # S/390 character device drivers
 #
-CONFIG_3215=y
-CONFIG_3215_CONSOLE=y
+CONFIG_TN3270=y
+CONFIG_TN3270_CONSOLE=y
+CONFIG_TN3215=y
+CONFIG_TN3215_CONSOLE=y
 CONFIG_HWC=y
 CONFIG_HWC_CONSOLE=y
+CONFIG_HWC_CPI=m
 CONFIG_S390_TAPE=m
 
 #
@@ -103,6 +109,9 @@ CONFIG_S390_TAPE_3480=y
 #
 CONFIG_NETDEVICES=y
 # CONFIG_DUMMY is not set
+# CONFIG_BONDING is not set
+# CONFIG_EQUALIZER is not set
+# CONFIG_TUN is not set
 CONFIG_NET_ETHERNET=y
 CONFIG_TR=y
 # CONFIG_FDDI is not set
@@ -110,7 +119,8 @@ CONFIG_TR=y
 #
 # S/390 network device drivers
 #
-# CONFIG_CHANDEV is not set
+CONFIG_CHANDEV=y
+CONFIG_HOTPLUG=y
 CONFIG_CTC=m
 CONFIG_IUCV=m
 
@@ -134,7 +144,8 @@ CONFIG_IP_MULTICAST=y
 # CONFIG_IP_MROUTE is not set
 # CONFIG_INET_ECN is not set
 # CONFIG_SYN_COOKIES is not set
-# CONFIG_IPV6 is not set
+CONFIG_IPV6=m
+# CONFIG_IPV6_NETLINK is not set
 # CONFIG_KHTTPD is not set
 # CONFIG_ATM is not set
 
@@ -179,16 +190,18 @@ CONFIG_IP_MULTICAST=y
 # CONFIG_EFS_FS is not set
 # CONFIG_JFFS_FS is not set
 # CONFIG_CRAMFS is not set
+# CONFIG_TMPFS is not set
 # CONFIG_RAMFS is not set
 # CONFIG_ISO9660_FS is not set
 # CONFIG_JOLIET is not set
 # CONFIG_MINIX_FS is not set
+# CONFIG_VXFS_FS is not set
 # CONFIG_NTFS_FS is not set
 # CONFIG_NTFS_RW is not set
 # CONFIG_HPFS_FS is not set
 CONFIG_PROC_FS=y
-# CONFIG_DEVFS_FS is not set
-# CONFIG_DEVFS_MOUNT is not set
+CONFIG_DEVFS_FS=y
+CONFIG_DEVFS_MOUNT=y
 # CONFIG_DEVFS_DEBUG is not set
 # CONFIG_DEVPTS_FS is not set
 # CONFIG_QNX4FS_FS is not set
@@ -196,7 +209,6 @@ CONFIG_PROC_FS=y
 # CONFIG_ROMFS_FS is not set
 CONFIG_EXT2_FS=y
 # CONFIG_SYSV_FS is not set
-# CONFIG_SYSV_FS_WRITE is not set
 # CONFIG_UDF_FS is not set
 # CONFIG_UDF_RW is not set
 # CONFIG_UFS_FS is not set
@@ -244,4 +256,4 @@ CONFIG_IBM_PARTITION=y
 #
 # Kernel hacking
 #
-# CONFIG_MAGIC_SYSRQ is not set
+CONFIG_MAGIC_SYSRQ=y

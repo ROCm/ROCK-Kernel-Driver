@@ -894,6 +894,11 @@ int ntfs_getdir_unsorted(ntfs_inode *ino, ntfs_u32 *p_high, ntfs_u32* p_low,
 		return -EIO;
 	}
 	attr = ntfs_find_attr(ino, vol->at_index_allocation, I30);
+	if (!attr) {
+		ntfs_free(buf);
+		ntfs_debug(DEBUG_DIR3, "unsorted 9.5\n");
+		return -EIO;
+	}
 	while (1) {
 		if ((__s64)*p_high << vol->cluster_size_bits > attr->size) {
 			/* No more index records. */

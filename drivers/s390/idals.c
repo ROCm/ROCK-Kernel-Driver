@@ -11,44 +11,33 @@
 
 #include <linux/module.h>
 #include <linux/config.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 
 #include <asm/irq.h>
 #include <asm/idals.h>
 
 #ifdef CONFIG_ARCH_S390X
-#define IDA_SIZE_LOG 12 /* 11 for 2k , 12 for 4k */
-#define IDA_BLOCK_SIZE (1L<<IDA_SIZE_LOG)
-void 
-set_normalized_cda ( ccw1_t * cp, unsigned long address )
+
+unsigned long __create_idal (unsigned long address, int count)
 {
 	int nridaws;
-	idaw_t *idal;
-        int count = cp->count;
+	unsigned long *idal, *tmp;
 
-	if (cp->flags & CCW_FLAG_IDA)
-		BUG();
-	if (((address + count) >> 31) == 0) { 
-		cp -> cda = address;
-		return;
-	}
         nridaws = ((address & (IDA_BLOCK_SIZE-1)) + count + 
 		   (IDA_BLOCK_SIZE-1)) >> IDA_SIZE_LOG;
 	idal = idal_alloc(nridaws);
-	if ( idal == NULL ) {
-		/* probably we should have a fallback here */
-		panic ("Cannot allocate memory for IDAL\n");
+	if (idal != NULL) {
+		tmp = idal;
+		*tmp++ = address;
+		address &= -IDA_BLOCK_SIZE;
+		while (--nridaws > 0) {
+			address += IDA_BLOCK_SIZE;
+			*tmp++ = address;
+		}
 	}
-	cp->flags |= CCW_FLAG_IDA;
-	cp->cda = (__u32)(unsigned long)(idaw_t *)idal;
-        do {
-		*idal++ = address;
-		address = (address & -(IDA_BLOCK_SIZE)) + (IDA_BLOCK_SIZE);
-		nridaws --;
-        } while ( nridaws > 0 );
-	return;
+	return (unsigned long) idal;
 }
 
-EXPORT_SYMBOL (set_normalized_cda);
+EXPORT_SYMBOL (__create_idal);
 
 #endif

@@ -75,69 +75,69 @@ extern int do_poke_blanked_console;
 
 extern void (*kbd_ledfunc)(unsigned int led);
 
-extern inline void show_console(void)
+static inline void show_console(void)
 {
 	do_poke_blanked_console = 1;
 	tasklet_schedule(&console_tasklet);
 }
 
-extern inline void set_console(int nr)
+static inline void set_console(int nr)
 {
 	want_console = nr;
 	tasklet_schedule(&console_tasklet);
 }
 
-extern inline void set_leds(void)
+static inline void set_leds(void)
 {
 	tasklet_schedule(&keyboard_tasklet);
 }
 
-extern inline int vc_kbd_mode(struct kbd_struct * kbd, int flag)
+static inline int vc_kbd_mode(struct kbd_struct * kbd, int flag)
 {
 	return ((kbd->modeflags >> flag) & 1);
 }
 
-extern inline int vc_kbd_led(struct kbd_struct * kbd, int flag)
+static inline int vc_kbd_led(struct kbd_struct * kbd, int flag)
 {
 	return ((kbd->ledflagstate >> flag) & 1);
 }
 
-extern inline void set_vc_kbd_mode(struct kbd_struct * kbd, int flag)
+static inline void set_vc_kbd_mode(struct kbd_struct * kbd, int flag)
 {
 	kbd->modeflags |= 1 << flag;
 }
 
-extern inline void set_vc_kbd_led(struct kbd_struct * kbd, int flag)
+static inline void set_vc_kbd_led(struct kbd_struct * kbd, int flag)
 {
 	kbd->ledflagstate |= 1 << flag;
 }
 
-extern inline void clr_vc_kbd_mode(struct kbd_struct * kbd, int flag)
+static inline void clr_vc_kbd_mode(struct kbd_struct * kbd, int flag)
 {
 	kbd->modeflags &= ~(1 << flag);
 }
 
-extern inline void clr_vc_kbd_led(struct kbd_struct * kbd, int flag)
+static inline void clr_vc_kbd_led(struct kbd_struct * kbd, int flag)
 {
 	kbd->ledflagstate &= ~(1 << flag);
 }
 
-extern inline void chg_vc_kbd_lock(struct kbd_struct * kbd, int flag)
+static inline void chg_vc_kbd_lock(struct kbd_struct * kbd, int flag)
 {
 	kbd->lockstate ^= 1 << flag;
 }
 
-extern inline void chg_vc_kbd_slock(struct kbd_struct * kbd, int flag)
+static inline void chg_vc_kbd_slock(struct kbd_struct * kbd, int flag)
 {
 	kbd->slockstate ^= 1 << flag;
 }
 
-extern inline void chg_vc_kbd_mode(struct kbd_struct * kbd, int flag)
+static inline void chg_vc_kbd_mode(struct kbd_struct * kbd, int flag)
 {
 	kbd->modeflags ^= 1 << flag;
 }
 
-extern inline void chg_vc_kbd_led(struct kbd_struct * kbd, int flag)
+static inline void chg_vc_kbd_led(struct kbd_struct * kbd, int flag)
 {
 	kbd->ledflagstate ^= 1 << flag;
 }
@@ -161,7 +161,7 @@ extern unsigned int keymap_count;
 
 extern task_queue con_task_queue;
 
-extern inline void con_schedule_flip(struct tty_struct *t)
+static inline void con_schedule_flip(struct tty_struct *t)
 {
 	queue_task(&t->flip.tqueue, &con_task_queue);
 	tasklet_schedule(&console_tasklet);

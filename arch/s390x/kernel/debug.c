@@ -14,7 +14,7 @@
 #include <linux/stddef.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/ctype.h>
 #include <linux/version.h>
 #include <asm/uaccess.h>

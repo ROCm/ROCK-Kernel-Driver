@@ -3157,6 +3157,9 @@ static int rs_open(struct tty_struct *tty, struct file * filp)
 	info->tty->low_latency = (info->flags & ASYNC_LOW_LATENCY) ? 1 : 0;
 #endif
 
+	/*
+	 *	This relies on lock_kernel() stuff so wants tidying for 2.5
+	 */
 	if (!tmp_buf) {
 		page = get_zeroed_page(GFP_KERNEL);
 		if (!page) {

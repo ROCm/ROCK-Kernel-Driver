@@ -30,6 +30,7 @@
 #include <asm/delay.h>
 #include <asm/cpcmd.h>
 #include <asm/irq.h>
+#include <asm/setup.h>
 
 #include "ctrlchar.h"
 
@@ -114,18 +115,6 @@ static int tty3215_refcount;
 #ifndef MIN
 #define MIN(a,b)	((a) < (b) ? (a) : (b))
 #endif
-
-static int __init con3215_setup(char *str)
-{
-        int vdev;
-
-        vdev = simple_strtoul(str,&str,0);
-        if (vdev >= 0 && vdev < 65536)
-                raw3215_condevice = vdev;
-        return 1;
-}
-
-__setup("condev=", con3215_setup);
 
 /*
  * Get a request structure from the free list
@@ -765,7 +754,7 @@ raw3215_find_dev(int number)
         while (count <= number && irq != -ENODEV) {
                 if (get_dev_info(irq, &dinfo) == -ENODEV)
                         break;
-                if (dinfo.devno == raw3215_condevice ||
+                if (dinfo.devno == console_device ||
                     dinfo.sid_data.cu_type == 0x3215) {
                         count++;
                     if (count > number)
@@ -776,7 +765,7 @@ raw3215_find_dev(int number)
         return -1;            /* console not found */
 }
 
-#ifdef CONFIG_3215_CONSOLE
+#ifdef CONFIG_TN3215_CONSOLE
 
 /*
  * Write a string to the 3215 console
@@ -1070,14 +1059,19 @@ void __init con3215_init(void)
 {
 	raw3215_info *raw;
 	raw3215_req *req;
+	int irq;
 	int i;
 
-	if (!MACHINE_IS_VM && !MACHINE_IS_P390)
-                return;
-        if (MACHINE_IS_VM) {
-	        cpcmd("TERM CONMODE 3215", NULL, 0);
-	        cpcmd("TERM AUTOCR OFF", NULL, 0);
-        }
+	/* Check if 3215 is to be the console */
+	if (!CONSOLE_IS_3215)
+		return;
+	irq = raw3215_find_dev(0);
+
+	/* Set the console mode for VM */
+	if (MACHINE_IS_VM) {
+		cpcmd("TERM CONMODE 3215", NULL, 0);
+		cpcmd("TERM AUTOCR OFF", NULL, 0);
+	}
 
 	/* allocate 3215 request structures */
 	raw3215_freelist = NULL;
@@ -1090,7 +1084,7 @@ void __init con3215_init(void)
 
 	ctrlchar_init();
 
-#ifdef CONFIG_3215_CONSOLE
+#ifdef CONFIG_TN3215_CONSOLE
         raw3215[0] = raw = (raw3215_info *)
                 alloc_bootmem_low(sizeof(raw3215_info));
 	memset(raw, 0, sizeof(raw3215_info));
@@ -1126,8 +1120,6 @@ void __init con3215_init(void)
  */
 void __init tty3215_init(void)
 {
-	if (!MACHINE_IS_VM && !MACHINE_IS_P390)
-                return;
 	/*
 	 * Initialize the tty_driver structure
 	 * Entries in tty3215_driver that are NOT initialized:

@@ -21,7 +21,7 @@ struct rpc_listitem	{
 	struct rpc_listitem *	next;
 };
 
-extern __inline__ void
+static __inline__ void
 __rpc_append_list(struct rpc_listitem **q, struct rpc_listitem *item)
 {
 	struct rpc_listitem	*next, *prev;
@@ -37,14 +37,14 @@ __rpc_append_list(struct rpc_listitem **q, struct rpc_listitem *item)
 	}
 }
 
-extern __inline__ void
+static __inline__ void
 __rpc_insert_list(struct rpc_listitem **q, struct rpc_listitem *item)
 {
 	__rpc_append_list(q, item);
 	*q = item;
 }
 
-extern __inline__ void
+static __inline__ void
 __rpc_remove_list(struct rpc_listitem **q, struct rpc_listitem *item)
 {
 	struct rpc_listitem	*prev = item->prev,

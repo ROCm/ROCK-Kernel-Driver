@@ -112,32 +112,23 @@ static inline devreg_t *s390_search_devreg_internal(ioinfo_t *ioinfo)
                         if (ioinfo->ui.flags.dval != 1 ||
 		            ioinfo->devno != pdevreg->ci.devno)
 				continue;
-                } else if ((flag & DEVREG_TYPE_DEVCHARS) &&
-		           (flag & DEVREG_EXACT_MATCH)) {
-			if (pdevreg->ci.hc.ctype != sid->cu_type ||
-			    pdevreg->ci.hc.cmode != sid->cu_model ||
-			    pdevreg->ci.hc.dtype != sid->dev_type ||
-			    pdevreg->ci.hc.dmode != sid->dev_model)
-				continue;
 		} else if (flag & DEVREG_TYPE_DEVCHARS) {
-			if (!(flag & DEVREG_NO_CU_INFO) &&
-			    pdevreg->ci.hc.ctype != sid->cu_type)
+			if ( (flag & DEVREG_MATCH_CU_TYPE) &&
+			     pdevreg->ci.hc.ctype != sid->cu_type )
 				continue;
-
-                        if (!(flag & DEVREG_NO_CU_INFO) &&
-			    !(flag & DEVREG_MATCH_CU_TYPE) &&
-                            pdevreg->ci.hc.cmode != sid->cu_model)
-                                continue;
-
-                        if (!(flag & DEVREG_NO_DEV_INFO) &&
-                            pdevreg->ci.hc.dtype != sid->dev_type)
-                                continue;
-
-                        if (!(flag & DEVREG_NO_DEV_INFO) &&
-                            !(flag & DEVREG_MATCH_DEV_TYPE) &&
-                            pdevreg->ci.hc.dmode != sid->dev_model)
-                                continue;
+			if ( (flag & DEVREG_MATCH_CU_MODEL) &&
+			     pdevreg->ci.hc.cmode != sid->cu_model )
+				continue;
+			if ( (flag & DEVREG_MATCH_DEV_TYPE) &&
+			     pdevreg->ci.hc.dtype != sid->dev_type )
+				continue;
+			if ( (flag & DEVREG_MATCH_DEV_MODEL) &&
+			     pdevreg->ci.hc.dmode != sid->dev_model )
+				continue;
+		} else {
+			continue;
 		}
+		
 		return pdevreg;
 	}
 	return NULL;

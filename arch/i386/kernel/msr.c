@@ -43,7 +43,7 @@
 /* Note: "err" is handled in a funny way below.  Otherwise one version
    of gcc or another breaks. */
 
-extern inline int wrmsr_eio(u32 reg, u32 eax, u32 edx)
+static inline int wrmsr_eio(u32 reg, u32 eax, u32 edx)
 {
   int err;
 
@@ -64,7 +64,7 @@ extern inline int wrmsr_eio(u32 reg, u32 eax, u32 edx)
   return err;
 }
 
-extern inline int rdmsr_eio(u32 reg, u32 *eax, u32 *edx)
+static inline int rdmsr_eio(u32 reg, u32 *eax, u32 *edx)
 {
   int err;
 
@@ -110,7 +110,7 @@ static void msr_smp_rdmsr(void *cmd_block)
     cmd->err = rdmsr_eio(cmd->reg, &cmd->data[0], &cmd->data[1]);
 }
 
-extern inline int do_wrmsr(int cpu, u32 reg, u32 eax, u32 edx)
+static inline int do_wrmsr(int cpu, u32 reg, u32 eax, u32 edx)
 {
   struct msr_command cmd;
 
@@ -127,7 +127,7 @@ extern inline int do_wrmsr(int cpu, u32 reg, u32 eax, u32 edx)
   }
 }
 
-extern inline int do_rdmsr(int cpu, u32 reg, u32 *eax, u32 *edx)
+static inline int do_rdmsr(int cpu, u32 reg, u32 *eax, u32 *edx)
 {
   struct msr_command cmd;
 
@@ -148,12 +148,12 @@ extern inline int do_rdmsr(int cpu, u32 reg, u32 *eax, u32 *edx)
 
 #else /* ! CONFIG_SMP */
 
-extern inline int do_wrmsr(int cpu, u32 reg, u32 eax, u32 edx)
+static inline int do_wrmsr(int cpu, u32 reg, u32 eax, u32 edx)
 {
   return wrmsr_eio(reg, eax, edx);
 }
 
-extern inline int do_rdmsr(int cpu, u32 reg, u32 *eax, u32 *edx)
+static inline int do_rdmsr(int cpu, u32 reg, u32 *eax, u32 *edx)
 {
   return rdmsr_eio(reg, eax, edx);
 }

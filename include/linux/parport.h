@@ -415,7 +415,7 @@ extern void parport_release(struct pardevice *dev);
  * timeslice is half a second, but it can be adjusted via the /proc
  * interface.
  **/
-extern __inline__ int parport_yield(struct pardevice *dev)
+static __inline__ int parport_yield(struct pardevice *dev)
 {
 	unsigned long int timeslip = (jiffies - dev->time);
 	if ((dev->port->waithead == NULL) || (timeslip < dev->timeslice))
@@ -433,7 +433,7 @@ extern __inline__ int parport_yield(struct pardevice *dev)
  * parport_claim_or_block(), and the return value is the same as for
  * parport_claim_or_block().
  **/
-extern __inline__ int parport_yield_blocking(struct pardevice *dev)
+static __inline__ int parport_yield_blocking(struct pardevice *dev)
 {
 	unsigned long int timeslip = (jiffies - dev->time);
 	if ((dev->port->waithead == NULL) || (timeslip < dev->timeslice))
@@ -518,7 +518,7 @@ extern int parport_find_device (const char *mfg, const char *mdl, int from);
 extern int parport_find_class (parport_device_class cls, int from);
 
 /* Lowlevel drivers _can_ call this support function to handle irqs.  */
-extern __inline__ void parport_generic_irq(int irq, struct parport *port,
+static __inline__ void parport_generic_irq(int irq, struct parport *port,
 					   struct pt_regs *regs)
 {
 	parport_ieee1284_interrupt (irq, port, regs);

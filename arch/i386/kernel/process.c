@@ -518,6 +518,7 @@ void copy_segments(struct task_struct *p, struct mm_struct *new_mm)
 			memcpy(ldt, old_ldt, LDT_ENTRIES*LDT_ENTRY_SIZE);
 	}
 	new_mm->context.segments = ldt;
+	new_mm->context.cpuvalid = ~0UL;	/* valid on all CPU's - they can't have stale data */
 }
 
 /*

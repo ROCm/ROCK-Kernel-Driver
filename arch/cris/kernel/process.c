@@ -1,4 +1,4 @@
-/* $Id: process.c,v 1.14 2001/05/29 11:27:59 markusl Exp $
+/* $Id: process.c,v 1.16 2001/06/21 02:00:40 hp Exp $
  * 
  *  linux/arch/cris/kernel/process.c
  *
@@ -8,6 +8,18 @@
  *  Authors:   Bjorn Wesen (bjornw@axis.com)
  *
  *  $Log: process.c,v $
+ *  Revision 1.16  2001/06/21 02:00:40  hp
+ *  	* entry.S: Include asm/unistd.h.
+ *  	(_sys_call_table): Use section .rodata, not .data.
+ *  	(_kernel_thread): Move from...
+ *  	* process.c: ... here.
+ *  	* entryoffsets.c (VAL): Break out from...
+ *  	(OF): Use VAL.
+ *  	(LCLONE_VM): New asmified value from CLONE_VM.
+ *
+ *  Revision 1.15  2001/06/20 16:31:57  hp
+ *  Add comments to describe empty functions according to review.
+ *
  *  Revision 1.14  2001/05/29 11:27:59  markusl
  *  Fixed so that hard_reset_now will do reset even if watchdog wasn't enabled
  *
@@ -71,6 +83,15 @@ union task_union init_task_union
       __attribute__((__section__(".data.init_task"))) =
              { INIT_TASK(init_task_union.task) };
 
+/*
+ * The hlt_counter, disable_hlt and enable_hlt is just here as a hook if
+ * there would ever be a halt sequence (for power save when idle) with
+ * some largish delay when halting or resuming *and* a driver that can't
+ * afford that delay.  The hlt_counter would then be checked before
+ * executing the halt sequence, and the driver marks the unhaltable
+ * region by enable_hlt/disable_hlt.
+ */
+
 static int hlt_counter=0;
 
 void disable_hlt(void)
@@ -116,52 +137,27 @@ void machine_restart(void)
 	hard_reset_now();
 }
 
-/* can't do much here... */
+/*
+ * Similar to machine_power_off, but don't shut off power.  Add code
+ * here to freeze the system for e.g. post-mortem debug purpose when
+ * possible.  This halt has nothing to do with the idle halt.
+ */
 
 void machine_halt(void)
 {
 }
+
+/* If or when software power-off is implemented, add code here.  */
 
 void machine_power_off(void)
 {
 }
 
 /*
- * This is the mechanism for creating a new kernel thread.
- *
- * NOTE! Only a kernel-only process(ie the swapper or direct descendants
- * who haven't done an "execve()") should use this: it will work within
- * a system call from a "real" process, but the process memory space will
- * not be free'd until both the parent and the child have exited.
+ * When a process does an "exec", machine state like FPU and debug
+ * registers need to be reset.  This is a hook function for that.
+ * Currently we don't have any such state to reset, so this is empty.
  */
-
-int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
-{
-	register long __a __asm__ ("r10");
-	
-	__asm__ __volatile__
-		("movu.w %1,r9\n\t"     /* r9 contains syscall number, to sys_clone */
-		 "clear.d r10\n\t"      /* r10 is argument 1 to clone */
-		 "move.d %2,r11\n\t"    /* r11 is argument 2 to clone, the flags */
-		 "break 13\n\t"         /* call sys_clone, this will fork */
-		 "test.d r10\n\t"       /* parent or child? child returns 0 here. */
-		 "bne 1f\n\t"           /* jump if parent */
-		 "nop\n\t"              /* delay slot */
-		 "move.d %4,r10\n\t"    /* set argument to function to call */
-		 "jsr %5\n\t"           /* call specified function */
-		 "movu.w %3,r9\n\t"     /* r9 is sys_exit syscall number */
-		 "moveq -1,r10\n\t"     /* Give a really bad exit-value */
-		 "break 13\n\t"         /* call sys_exit, killing the child */
-		 "1:\n\t"
-		 : "=r" (__a) 
-		 : "g" (__NR_clone), "r" (flags | CLONE_VM), "g" (__NR_exit),
-		   "r" (arg), "r" (fn) 
-		 : "r10", "r11", "r9");
-	
-	return __a;
-}
-
-
 
 void flush_thread(void)
 {

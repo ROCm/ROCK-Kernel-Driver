@@ -40,10 +40,7 @@
    - Bottom halves: globally serialized, grr...
  */
 
-/* No separate irq_stat for s390, it is part of PSA */
-#if !defined(CONFIG_ARCH_S390)
 irq_cpustat_t irq_stat[NR_CPUS];
-#endif	/* CONFIG_ARCH_S390 */
 
 static struct softirq_action softirq_vec[32] __cacheline_aligned;
 

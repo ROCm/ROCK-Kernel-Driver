@@ -180,13 +180,13 @@ void		rpciod_wake_up(void);
 void		rpc_show_tasks(void);
 #endif
 
-extern __inline__ void *
+static __inline__ void *
 rpc_malloc(struct rpc_task *task, unsigned int size)
 {
 	return rpc_allocate(task->tk_flags, size);
 }
 
-extern __inline__ void
+static __inline__ void
 rpc_exit(struct rpc_task *task, int status)
 {
 	task->tk_status = status;
@@ -194,7 +194,7 @@ rpc_exit(struct rpc_task *task, int status)
 }
 
 #ifdef RPC_DEBUG
-extern __inline__ char *
+static __inline__ char *
 rpc_qname(struct rpc_wait_queue *q)
 {
 	return q->name? q->name : "unknown";

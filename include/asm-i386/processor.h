@@ -119,7 +119,7 @@ extern void dodgy_tsc(void);
 /*
  * Generic CPUID function
  */
-extern inline void cpuid(int op, int *eax, int *ebx, int *ecx, int *edx)
+static inline void cpuid(int op, int *eax, int *ebx, int *ecx, int *edx)
 {
 	__asm__("cpuid"
 		: "=a" (*eax),
@@ -132,7 +132,7 @@ extern inline void cpuid(int op, int *eax, int *ebx, int *ecx, int *edx)
 /*
  * CPUID functions returning a single datum
  */
-extern inline unsigned int cpuid_eax(unsigned int op)
+static inline unsigned int cpuid_eax(unsigned int op)
 {
 	unsigned int eax;
 
@@ -142,7 +142,7 @@ extern inline unsigned int cpuid_eax(unsigned int op)
 		: "bx", "cx", "dx");
 	return eax;
 }
-extern inline unsigned int cpuid_ebx(unsigned int op)
+static inline unsigned int cpuid_ebx(unsigned int op)
 {
 	unsigned int eax, ebx;
 
@@ -152,7 +152,7 @@ extern inline unsigned int cpuid_ebx(unsigned int op)
 		: "cx", "dx" );
 	return ebx;
 }
-extern inline unsigned int cpuid_ecx(unsigned int op)
+static inline unsigned int cpuid_ecx(unsigned int op)
 {
 	unsigned int eax, ecx;
 
@@ -162,7 +162,7 @@ extern inline unsigned int cpuid_ecx(unsigned int op)
 		: "bx", "dx" );
 	return ecx;
 }
-extern inline unsigned int cpuid_edx(unsigned int op)
+static inline unsigned int cpuid_edx(unsigned int op)
 {
 	unsigned int eax, edx;
 
@@ -439,7 +439,7 @@ extern void release_segments(struct mm_struct * mm);
 /*
  * Return saved PC of a blocked thread.
  */
-extern inline unsigned long thread_saved_pc(struct thread_struct *t)
+static inline unsigned long thread_saved_pc(struct thread_struct *t)
 {
 	return ((unsigned long *)t->esp)[3];
 }
@@ -472,7 +472,7 @@ struct microcode {
 #define MICROCODE_IOCFREE	_IO('6',0)
 
 /* REP NOP (PAUSE) is a good thing to insert into busy-wait loops. */
-extern inline void rep_nop(void)
+static inline void rep_nop(void)
 {
 	__asm__ __volatile__("rep;nop");
 }

@@ -23,7 +23,7 @@
 extern void *kmalloc(size_t, int);
 extern void kfree(const void *);
 
-extern __inline__ pgd_t *get_pgd_slow(void)
+static __inline__ pgd_t *get_pgd_slow(void)
 {
 	int i;
 	pgd_t *pgd = kmalloc(PTRS_PER_PGD * sizeof(pgd_t), GFP_KERNEL);
@@ -48,7 +48,7 @@ out_oom:
 
 #else
 
-extern __inline__ pgd_t *get_pgd_slow(void)
+static __inline__ pgd_t *get_pgd_slow(void)
 {
 	pgd_t *pgd = (pgd_t *)__get_free_page(GFP_KERNEL);
 
@@ -61,7 +61,7 @@ extern __inline__ pgd_t *get_pgd_slow(void)
 
 #endif
 
-extern __inline__ pgd_t *get_pgd_fast(void)
+static __inline__ pgd_t *get_pgd_fast(void)
 {
 	unsigned long *ret;
 
@@ -74,14 +74,14 @@ extern __inline__ pgd_t *get_pgd_fast(void)
 	return (pgd_t *)ret;
 }
 
-extern __inline__ void free_pgd_fast(pgd_t *pgd)
+static __inline__ void free_pgd_fast(pgd_t *pgd)
 {
 	*(unsigned long *)pgd = (unsigned long) pgd_quicklist;
 	pgd_quicklist = (unsigned long *) pgd;
 	pgtable_cache_size++;
 }
 
-extern __inline__ void free_pgd_slow(pgd_t *pgd)
+static __inline__ void free_pgd_slow(pgd_t *pgd)
 {
 #if CONFIG_X86_PAE
 	int i;
@@ -116,14 +116,14 @@ static inline pte_t *pte_alloc_one_fast(struct mm_struct *mm, unsigned long addr
 	return (pte_t *)ret;
 }
 
-extern __inline__ void pte_free_fast(pte_t *pte)
+static __inline__ void pte_free_fast(pte_t *pte)
 {
 	*(unsigned long *)pte = (unsigned long) pte_quicklist;
 	pte_quicklist = (unsigned long *) pte;
 	pgtable_cache_size++;
 }
 
-extern __inline__ void pte_free_slow(pte_t *pte)
+static __inline__ void pte_free_slow(pte_t *pte)
 {
 	free_page((unsigned long)pte);
 }
@@ -219,7 +219,7 @@ extern struct tlb_state cpu_tlbstate[NR_CPUS];
 
 #endif
 
-extern inline void flush_tlb_pgtables(struct mm_struct *mm,
+static inline void flush_tlb_pgtables(struct mm_struct *mm,
 				      unsigned long start, unsigned long end)
 {
 	/* i386 does not keep any page table caches in TLB */

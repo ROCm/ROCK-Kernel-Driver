@@ -253,7 +253,7 @@ static inline void global_flush_tlb(void)
                 "    slr  2,2\n"
                 "    slr  3,3\n"
                 "    csp  2,4"
-                : : "a" (&dummy) : "2", "3", "4" );
+                : : "a" (&dummy) : "cc", "2", "3", "4" );
 }
 
 /*

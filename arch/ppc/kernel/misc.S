@@ -813,7 +813,7 @@ _GLOBAL(_get_HID0)
 _GLOBAL(_set_HID0)
 	sync
 	mtspr	HID0, r3
-	SYNC		/* Handle erratas in some cases */
+	SYNC		/* Handle errata in some cases */
 	blr
 
 _GLOBAL(_get_ICTC)

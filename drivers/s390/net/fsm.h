@@ -1,13 +1,4 @@
-/* $Id: fsm.h,v 1.1 2000/11/30 11:21:08 bird Exp $
- *
- * $Log: fsm.h,v $
- * Revision 1.1  2000/11/30 11:21:08  bird
- * Support for new ctc driver
- *
- * Revision 1.1  2000/11/03 16:58:45  felfert
- * Initial import
- *
- *
+/* $Id: fsm.h,v 1.3 2001/06/18 16:49:19 felfert Exp $
  */
 #ifndef _FSM_H_
 #define _FSM_H_
@@ -16,7 +7,7 @@
 #include <linux/types.h>
 #include <linux/timer.h>
 #include <linux/time.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/sched.h>
 #include <linux/string.h>
 #include <asm/atomic.h>
@@ -115,10 +106,11 @@ typedef struct {
  * @param tmpl_len    Length of the describing array.
  * @param order       Parameter for allocation of the FSM data structs.
  */
-fsm_instance * init_fsm(char *name, const char **state_names,
-			const char **event_names,
-			int nr_states, int nr_events, const fsm_node *tmpl,
-			int tmpl_len, int order);
+extern fsm_instance *
+init_fsm(char *name, const char **state_names,
+	 const char **event_names,
+	 int nr_states, int nr_events, const fsm_node *tmpl,
+	 int tmpl_len, int order);
 
 /**
  * Releases an FSM

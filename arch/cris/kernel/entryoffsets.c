@@ -18,15 +18,19 @@ __asm__ (".if 0");
 #include <asm/processor.h>
 
 /* Exclude everything except the assembly by wrapping it in ".if 0".  */
-#undef OF
-#define OF(NAME, TYPE, MEMBER)			\
+#undef VAL
+#define VAL(NAME, VALUE)			\
 void NAME ## _fun (void)			\
  {						\
   __asm__ (".endif \n"				\
 	   #NAME " = %0 \n"			\
 	   ".if 0\n"				\
-	   : : "i" (offsetof (TYPE, MEMBER)));	\
+	   : : "i" (VALUE));			\
  }
+
+#undef OF
+#define OF(NAME, TYPE, MEMBER)			\
+  VAL (NAME, offsetof (TYPE, MEMBER))
 
 /* task_struct offsets.  */
 OF (LTASK_SIGPENDING, struct task_struct, sigpending)
@@ -50,5 +54,8 @@ OF (LIRP, struct pt_regs, irp)
 OF (LTHREAD_KSP, struct thread_struct, ksp)
 OF (LTHREAD_USP, struct thread_struct, usp)
 OF (LTHREAD_DCCR, struct thread_struct, dccr)
+
+/* linux/sched.h values - doesn't have an #ifdef __ASSEMBLY__ for these.  */
+VAL (LCLONE_VM, CLONE_VM)
 
 __asm__ (".endif");

@@ -4,7 +4,7 @@
  *
  *  S390 version
  *    Copyright (C) 1999 IBM Deutschland Entwicklung GmbH, IBM Corporation
- *    Author(s): Martin Peschke <peschke@fh-brandenburg.de>
+ *    Author(s): Martin Peschke <mpeschke@de.ibm.com>
  *
  * 
  * 
@@ -13,17 +13,22 @@
 #ifndef __HWC_H__
 #define __HWC_H__
 
+#define HWC_EXT_INT_PARAM_ADDR	0xFFFFFFF8
+#define HWC_EXT_INT_PARAM_PEND 0x00000001
+
 #define ET_OpCmd		0x01
 #define ET_Msg		0x02
 #define ET_StateChange	0x08
 #define ET_PMsgCmd		0x09
 #define ET_CntlProgOpCmd	0x20
+#define ET_CntlProgIdent	0x0B
 
 #define ET_OpCmd_Mask	0x80000000
 #define ET_Msg_Mask		0x40000000
 #define ET_StateChange_Mask	0x01000000
 #define ET_PMsgCmd_Mask	0x00800000
 #define ET_CtlProgOpCmd_Mask	0x00000001
+#define ET_CtlProgIdent_Mask	0x00200000
 
 #define GMF_DOM		0x8000
 #define GMF_SndAlrm	0x4000
@@ -210,7 +215,7 @@ static init_hwcb_t init_hwcb_template =
 	0x0000,
 	sizeof (_hwcb_mask_t),
 	ET_OpCmd_Mask | ET_PMsgCmd_Mask | ET_StateChange_Mask,
-	ET_Msg_Mask | ET_PMsgCmd_Mask
+	ET_Msg_Mask | ET_PMsgCmd_Mask | ET_CtlProgIdent_Mask
 };
 
 typedef struct {

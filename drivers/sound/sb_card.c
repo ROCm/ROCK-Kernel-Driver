@@ -299,7 +299,17 @@ static struct {
 		0,0,0,0,
 		0,1,1,-1},
 	{"Sound Blaster 16", 
+		ISAPNP_VENDOR('C','T','L'), ISAPNP_DEVICE(0x002c), 
+		ISAPNP_VENDOR('C','T','L'), ISAPNP_FUNCTION(0x0031),
+		0,0,0,0,
+		0,1,1,-1},
+	{"Sound Blaster 16", 
 		ISAPNP_VENDOR('C','T','L'), ISAPNP_DEVICE(0x00ed), 
+		ISAPNP_VENDOR('C','T','L'), ISAPNP_FUNCTION(0x0041),
+		0,0,0,0,
+		0,1,1,-1},
+	{"Sound Blaster 16", 
+		ISAPNP_VENDOR('C','T','L'), ISAPNP_DEVICE(0x0086), 
 		ISAPNP_VENDOR('C','T','L'), ISAPNP_FUNCTION(0x0041),
 		0,0,0,0,
 		0,1,1,-1},
@@ -524,7 +534,13 @@ static struct isapnp_device_id id_table[] __devinitdata = {
 	{	ISAPNP_VENDOR('C','T','L'), ISAPNP_DEVICE(0x002b), 
 		ISAPNP_VENDOR('C','T','L'), ISAPNP_FUNCTION(0x0031), 0 },
 
+	{	ISAPNP_VENDOR('C','T','L'), ISAPNP_DEVICE(0x002c), 
+		ISAPNP_VENDOR('C','T','L'), ISAPNP_FUNCTION(0x0031), 0 },
+
 	{	ISAPNP_VENDOR('C','T','L'), ISAPNP_DEVICE(0x00ed), 
+		ISAPNP_VENDOR('C','T','L'), ISAPNP_FUNCTION(0x0041), 0 },
+
+	{	ISAPNP_VENDOR('C','T','L'), ISAPNP_DEVICE(0x0086), 
 		ISAPNP_VENDOR('C','T','L'), ISAPNP_FUNCTION(0x0041), 0 },
 
 	{	ISAPNP_VENDOR('C','T','L'), ISAPNP_DEVICE(0x0051), 

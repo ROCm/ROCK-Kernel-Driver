@@ -166,9 +166,9 @@ struct sigaction {
           __sighandler_t _sa_handler;
           void (*_sa_sigaction)(int, struct siginfo *, void *);
         } _u;
-        sigset_t sa_mask;
         unsigned long sa_flags;
         void (*sa_restorer)(void);
+	sigset_t sa_mask;
 };
 
 #define sa_handler      _u._sa_handler

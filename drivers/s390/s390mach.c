@@ -11,7 +11,7 @@
 #include <linux/config.h>
 #include <linux/spinlock.h>
 #include <linux/init.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #ifdef CONFIG_SMP
 #include <linux/smp.h>
 #endif

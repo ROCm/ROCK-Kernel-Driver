@@ -87,8 +87,10 @@ struct thread_struct
         /* perform syscall argument validation (get/set_fs) */
         mm_segment_t fs;
         per_struct per_info;/* Must be aligned on an 4 byte boundary*/
-	addr_t  ieee_instruction_pointer; 
 	/* Used to give failing instruction back to user for ieee exceptions */
+	addr_t  ieee_instruction_pointer; 
+        /* pfault_wait is used to block the process on a pfault event */
+	addr_t  pfault_wait;
 };
 
 typedef struct thread_struct thread_struct;
@@ -105,7 +107,8 @@ VM_READ | VM_WRITE | VM_EXEC, 1, NULL, NULL }
               (__pa((__u32) &swapper_pg_dir[0]) + _SEGMENT_TABLE),\
                      0,0,0,                                       \
                      (mm_segment_t) { 0,1},                       \
-                     (per_struct) {{{{0,}}},0,0,0,0,{{0,}}}       \
+                     (per_struct) {{{{0,}}},0,0,0,0,{{0,}}},      \
+                     0, 0                                         \
 }
 
 /* need to define ... */
@@ -196,7 +199,7 @@ static inline void disabled_wait(unsigned long code)
                       "    stctl 0,15,0x1c0\n" /* store control registers */
                       "    oi    0(%1),0x10\n" /* fake protection bit */
                       "    lpsw 0(%0)"
-                      : : "a" (dw_psw), "a" (&ctl_buf));
+                      : : "a" (dw_psw), "a" (&ctl_buf) : "cc" );
 }
 
 #endif                                 /* __ASM_S390_PROCESSOR_H           */

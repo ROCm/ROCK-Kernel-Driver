@@ -29,7 +29,7 @@
 
 #ifdef __i386__
 /* 001 */
-extern __inline__ int md_cpu_has_mmx(void)
+static __inline__ int md_cpu_has_mmx(void)
 {
 	return test_bit(X86_FEATURE_MMX,  &boot_cpu_data.x86_capability);
 }
@@ -51,7 +51,7 @@ extern __inline__ int md_cpu_has_mmx(void)
 #define md_put_user put_user
 
 /* 007 */
-extern inline int md_capable_admin(void)
+static inline int md_capable_admin(void)
 {
 	return capable(CAP_SYS_ADMIN);
 }
@@ -60,7 +60,7 @@ extern inline int md_capable_admin(void)
 #define MD_FILE_TO_INODE(file) ((file)->f_dentry->d_inode)
 
 /* 009 */
-extern inline void md_flush_signals (void)
+static inline void md_flush_signals (void)
 {
 	spin_lock(&current->sigmask_lock);
 	flush_signals(current);
@@ -68,7 +68,7 @@ extern inline void md_flush_signals (void)
 }
  
 /* 010 */
-extern inline void md_init_signals (void)
+static inline void md_init_signals (void)
 {
         current->exit_signal = SIGCHLD;
         siginitsetinv(&current->blocked, sigmask(SIGKILL));

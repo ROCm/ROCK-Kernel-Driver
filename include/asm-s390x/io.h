@@ -31,7 +31,7 @@ extern inline unsigned long virt_to_phys(volatile void * address)
                  "   jz     0f\n"
                  "   slgr   %0,%0\n"
                  "0:"
-                 : "=a" (real_address) : "a" (address) );
+                 : "=a" (real_address) : "a" (address) : "cc" );
         return real_address;
 }
 

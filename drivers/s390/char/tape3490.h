@@ -20,5 +20,5 @@
 typedef struct _tape3490_disc_data_t {
     __u8 modeset_byte;
 } tape3490_disc_data_t  __attribute__ ((packed, aligned(8)));
-tape_discipline_t * tape3490_init (void);
+tape_discipline_t * tape3490_init (int);
 #endif // _TAPE3490_H

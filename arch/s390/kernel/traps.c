@@ -36,6 +36,7 @@
 #include <asm/gdb-stub.h>
 #endif
 #include <asm/cpcmd.h>
+#include <asm/s390_ext.h>
 
 /* Called from entry.S only */
 extern void handle_per_exception(struct pt_regs *regs);
@@ -53,6 +54,11 @@ int sysctl_userprocess_debug = 0;
 
 extern pgm_check_handler_t do_page_fault;
 extern pgm_check_handler_t do_pseudo_page_fault;
+#ifdef CONFIG_PFAULT
+extern int pfault_init(void);
+extern void pfault_fini(void);
+extern void pfault_interrupt(struct pt_regs *regs, __u16 error_code);
+#endif
 
 spinlock_t die_lock;
 
@@ -142,7 +148,7 @@ DO_ERROR(SIGSEGV, "Unknown program exception", default_trap_handler)
 DO_ERROR(SIGILL,  "privileged operation", privileged_op)
 DO_ERROR(SIGILL,  "execute exception", execute_exception)
 DO_ERROR(SIGSEGV, "addressing exception", addressing_exception)
-DO_ERROR(SIGILL,  "fixpoint divide exception", divide_exception)
+DO_ERROR(SIGFPE,  "fixpoint divide exception", divide_exception)
 DO_ERROR(SIGILL,  "translation exception", translation_exception)
 DO_ERROR(SIGILL,  "special operand exception", special_op_exception)
 DO_ERROR(SIGILL,  "operand exception", operand_exception)
@@ -154,7 +160,6 @@ asmlinkage void illegal_op(struct pt_regs * regs, long interruption_code)
 	int signal = 0;
 	int problem_state=(regs->psw.mask & PSW_PROBLEM_STATE);
 
-        lock_kernel();
 	location = (__u16 *)(regs->psw.addr-S390_lowcore.pgm_ilc);
 	if(problem_state)
 		get_user(*((__u16 *) opcode), location);
@@ -197,7 +202,6 @@ asmlinkage void illegal_op(struct pt_regs * regs, long interruption_code)
         } else if (signal)
 		do_trap(interruption_code, signal,
 			"illegal operation", regs, NULL);
-        unlock_kernel();
 }
 
 
@@ -210,7 +214,6 @@ specification_exception(struct pt_regs * regs, long interruption_code)
 	__u16 *location;
 	int signal = 0;
 
-        lock_kernel();
         if (regs->psw.mask & PSW_PROBLEM_STATE) {
 		location = (__u16 *)(regs->psw.addr-S390_lowcore.pgm_ilc);
 		get_user(*((__u16 *) opcode), location);
@@ -250,7 +253,6 @@ specification_exception(struct pt_regs * regs, long interruption_code)
         } else if (signal)
                 do_trap(interruption_code, signal,
 			"specification exception", regs, NULL);
-        unlock_kernel();
 }
 #else
 DO_ERROR(SIGILL, "specification exception", specification_exception)
@@ -262,7 +264,6 @@ asmlinkage void data_exception(struct pt_regs * regs, long interruption_code)
 	__u16 *location;
 	int signal = 0;
 
-        lock_kernel();
 	location = (__u16 *)(regs->psw.addr-S390_lowcore.pgm_ilc);
 	if (MACHINE_HAS_IEEE)
 		__asm__ volatile ("stfpc %0\n\t" 
@@ -333,7 +334,6 @@ asmlinkage void data_exception(struct pt_regs * regs, long interruption_code)
 	} else if (signal) 
                 do_trap(interruption_code, signal,
 			"data exception", regs, NULL);
-        unlock_kernel();
 }
 
 
@@ -361,8 +361,26 @@ void __init trap_init(void)
  	pgm_check_table[0x14] = &do_pseudo_page_fault;
         pgm_check_table[0x15] = &operand_exception;
         pgm_check_table[0x1C] = &privileged_op;
+#ifdef CONFIG_PFAULT
+	if (MACHINE_IS_VM) {
+		/* request the 0x2603 external interrupt */
+		if (register_external_interrupt(0x2603, pfault_interrupt) != 0)
+			panic("Couldn't request external interrupt 0x2603");
+		/*
+		 * First try to get pfault pseudo page faults going.
+		 * If this isn't available turn on pagex page faults.
+		 */
+		if (pfault_init() != 0) {
+			/* Tough luck, no pfault. */
+			unregister_external_interrupt(0x2603,
+						      pfault_interrupt);
+			cpcmd("SET PAGEX ON", NULL, 0);
+		}
+	}
+#else
 	if (MACHINE_IS_VM)
-	        cpcmd("SET PAGEX ON", NULL, 0);
+		cpcmd("SET PAGEX ON", NULL, 0);
+#endif
 }
 
 

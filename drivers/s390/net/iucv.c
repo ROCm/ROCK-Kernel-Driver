@@ -1,15 +1,30 @@
-/*
- *  drivers/s390/net/iucv.c
+/*                                                                                             
+ *   drivers/s390/net/iucv.c
  *    Support for VM IUCV functions for use by other part of the
  *    kernel or loadable modules.
  *
  *  S390 version
  *    Copyright (C) 2000 IBM Corporation
- *    Author(s): Xenia Tkatschow (xenia@us.ibm.com)
- *               Alan Altmark (Alan_Altmark@us.ibm.com)
- */
-
+ *    Author(s): Alan Altmark (Alan_Altmark@us.ibm.com)
+ *               Xenia Tkatschow (xenia@us.ibm.com)
+ * Functionality:                                                    
+ * To explore any of the IUCV functions, one must first register     
+ * their program using iucv_register(). Once your program has        
+ * successfully completed a register, it can use the other functions.
+ * For furthur reference on all IUCV functionality, refer to the     
+ * CP Programming Services book, also available on the web            
+ * thru www.ibm.com/s390/vm/pubs , manual # SC24-5760.               
+ *                                                                    
+ *      Definition of Return Codes                                    
+ *      -All positive return codes including zero are reflected back 
+ *       from CP and the definition can be found in CP Programming    
+ *       Services book.                  
+ *      - (-ENOMEM) Out of memory
+ *      - (-EINVAL) Invalid value                             
+*/
+/* #define DEBUG 1 */
 #include <linux/module.h>
+#include <linux/config.h>
 #include <linux/version.h>
 #include <linux/spinlock.h>
 #include <linux/kernel.h>
@@ -20,25 +35,67 @@
 #include <asm/atomic.h>
 #include "iucv.h"
 #include <asm/io.h>
+#include <asm/irq.h>
 #include <asm/s390_ext.h>
 #include <asm/ebcdic.h>
 
+#ifndef min
+#define min(a,b) (((a)<(b))?(a):(b))
+#endif
+#ifndef max
+#define max(a,b) (((a)>(b))?(a):(b))
+#endif
+
+#ifdef DEBUG
+#undef KERN_INFO
 #undef KERN_DEBUG
+#define KERN_INFO KERN_EMERG
 #define KERN_DEBUG KERN_EMERG
-//#define DEBUG3
-//#define DEBUG         /* Turns Printk's on                         */
-//#define DEBUG2        /* This prints the parameter list before and */
-		      /* after the b2f0 call to cp                 */
+#endif
+
 #undef NULL
 #define NULL 0
-#define ADDED_STOR 64		/* ADDITIONAL STORAGE FOR PATHID @'S */
-ulong declare_flag = 0;
-static uchar iucv_external_int_buffer[40];
-struct tq_struct short_task;	/* automatically initialized to zero */
-static iucv_interrupt_ops_t my_ops;
-spinlock_t lock = SPIN_LOCK_UNLOCKED;
 
-static void do_int (iucv_ConnectionPending *);
+#define PRRTY_PRMTD    0x01	/* priority permitted */
+#define RPY_RQRD       0x01	/* reply required */
+#define ADDED_STOR  64		/* ADDITIONAL STORAGE FOR PATHID @'S */
+#define BUFFER_SIZE 40		/* Size of 31-bit iparml */
+
+/* FLAGS:
+ * All flags are defined in the field IPFLAGS1 of each function
+ * and can be found in CP Programming Services.
+ * IPSRCCLS - Indicates you have specified a source class
+ * IPFGMCL  - Indicates you have specified a target class
+ * IPFGPID  - Indicates you have specified a pathid
+ * IPFGMID  - Indicates you have specified a message ID
+ * IPANSLST - Indicates that you are using an address list for
+ *            reply data
+ * IPBUFLST - Indicates that you are using an address list for
+ *            message data
+ */
+
+#define IPSRCCLS 	0x01
+#define IPFGMCL         0x01
+#define IPFGPID         0x02
+#define IPFGMID         0x04
+#define IPANSLST        0x08
+#define IPBUFLST        0x40
+
+static uchar iucv_external_int_buffer[40];
+
+/* Spin Lock declaration */
+struct tq_struct short_task;	/* automatically initialized to zero */
+static spinlock_t iucv_lock = SPIN_LOCK_UNLOCKED;
+
+/* General IUCV interrupt structure */
+typedef struct {
+	u16 ippathid;
+	uchar res1;
+	uchar iptype;
+	u32 res2;
+	uchar ipvmid[8];
+	uchar res3[24];
+} iucv_GeneralInterrupt;
 
 /***************INTERRUPT HANDLING DEFINITIONS***************/
 typedef struct _iucv_packet {
@@ -46,1984 +103,2323 @@ typedef struct _iucv_packet {
 	uchar data[40];
 } iucv_packet;
 struct tq_struct short_task;
+
 static spinlock_t iucv_packets_lock = SPIN_LOCK_UNLOCKED;
+
 iucv_packet *iucv_packets_head, *iucv_packets_tail;
 
 static atomic_t bh_scheduled = ATOMIC_INIT (0);
+
+/* 
+ *Internal function prototypes 
+ */
+
+static ulong iucv_vmsize (void);
+
+int iucv_declare_buffer (void);
+
+int iucv_retrieve_buffer (void);
+
+static int iucv_add_pathid (u16 pathid, iucv_handle_t handle, void *pgm_data);
+
+static void iucv_remove_pathid (u16 pathid);
+
 void bottom_half_interrupt (void);
 
-/************FUNCTION ID'S****************************/
-#define accept          10
-#define connect         11
-#define declare_buffer  12
-#define purge           9
-#define query           0
-#define quiesc          13
-#define receive         5
-#define reject          8
-#define reply           6
-#define resume          14
-#define retrieve_buffer 2
-#define send            4
-#define setmask         16
-#define sever           15
+static void do_int (iucv_GeneralInterrupt *);
 
-/*****************************************************************/
-/*  Structure: handler                                           */
-/*  members: next - is a pointer to next handler on chain        */
-/*           prev - is a pointer to prev handler on chain        */
-/*           vmid - 8 char array of machine identification       */
-/*           user_data - 16 char array for user identification   */
-/*           mask - 24 char array used to compare the 2 previous */
-/*           interrupt_table - functions for interrupts          */
-/*           start - pointer to start of block of pointers to    */
-/*                   handler_table_entries                       */
-/*           end - pointer to end of block of pointers to        */
-/*                 handler_table_entries                         */
-/*           size - ulong, size of block                         */
-/*           pgm_data - ulong, program data                      */
-/* NOTE: Keep vmid and user_data together in this order          */
-/*****************************************************************/
+inline void top_half_interrupt (struct pt_regs *regs, __u16 code);
+/************FUNCTION ID'S****************************/
+
+#define ACCEPT          10
+#define CONNECT         11
+#define DECLARE_BUFFER  12
+#define PURGE           9
+#define QUERY           0
+#define QUIESCE         13
+#define RECEIVE         5
+#define REJECT          8
+#define REPLY           6
+#define RESUME          14
+#define RETRIEVE_BUFFER 2
+#define SEND            4
+#define SETMASK         16
+#define SEVER           15
+
+/*                                                               
+ * Structure: handler                                            
+ * members: next - is a pointer to next handler on chain         
+ *          prev - is a pointer to prev handler on chain         
+ *          structure: id                                        
+ *             vmid - 8 char array of machine identification     
+ *             user_data - 16 char array for user identification 
+ *             mask - 24 char array used to compare the 2 previous  
+ *          interrupt_table - vector of interrupt functions.     
+ *          pathid_head - pointer to start of user_pathid_table  
+ *          pathid_tail - pointer to end of user_pathid_table    
+ *          entries -  ulong, size of user_pathid_table          
+ *          pgm_data -  ulong, application data that is passed   
+ *                      to the interrupt handlers                
+*/
 typedef struct {
 	ulong *next;
 	ulong *prev;
-	uchar vmid[8];
-	uchar user_data[16];
-	uchar mask[24];
+	struct {
+		uchar userid[8];
+		uchar user_data[16];
+		uchar mask[24];
+	} id;
 	iucv_interrupt_ops_t *interrupt_table;
-	ulong *start;
-	ulong *end;
-	ulong size;
-	ulong pgm_data;
+	ulong *pathid_head;
+	ulong *pathid_tail;
+	ulong entries;
+	void *pgm_data;
 } handler;
 
-/*******************************************************************/
-/* Structure: handler_table_entry                                  */
-/* members: addrs - pointer to a handler                           */
-/*          pathid - ushort containing path identification         */
-/*          pgm_data - ulong, program data                         */
-/*******************************************************************/
+/*                                                         
+ * Structure: handler_table_entry                          
+ * members: addrs - pointer to a handler                   
+ *          pathid - ushort containing path identification 
+ *          pgm_data - ulong, application data that is     
+ *                     passed to the interrupt handlers    
+ *          ops - pointer to iucv interrupt vector         
+ */
+
 typedef struct {
 	handler *addrs;
-	ushort pathid;
-	ulong pgm_data;
+	u16 pathid;
+	void *pgm_data;
+	iucv_interrupt_ops_t *ops;
 } handler_table_entry;
 
-/* main_table: array of pointers to handler_tables         */
-static handler_table_entry *main_table[128];
-/* handler_anchor: points to first handler on chain        */
-static handler *handler_anchor;
+/* 
+ * Internal function prototypes 
+ */
 
-/****************FIVE  STRUCTURES************************************/
-/* Data struct 1: iparml_control                                    */
-/*                Used for iucv_accept                              */
-/*                         iucv_connect                             */
-/*                         iucv_quiesce                             */
-/*                         iucv_resume                              */
-/*                         iucv_sever                               */
-/*                         iucv_retrieve_buffer                     */
-/* Data struct 2: iparml_dpl  (data in parameter list)              */
-/*                Used for iucv_send_prmmsg                         */
-/*                         iucv_send2way_prmmsg                     */
-/*                         iucv_send2way_prmmsg_array               */
-/*                         iucv_reply_prmmsg                        */
-/* Data struct 3: iparml_db    (data in a buffer)                   */
-/*                Used for iucv_receive                             */
-/*                         iucv_receive_array                       */
-/*                         iucv_receive_simple                      */
-/*                         iucv_reject                              */
-/*                         iucv_reply                               */
-/*                         iucv_reply_array                         */
-/*                         iucv_send                                */
-/*                         iucv_send_simple                         */
-/*                         iucv_send_array                          */
-/*                         iucv_send2way                            */
-/*                         iucv_send2way_array                      */
-/*                         iucv_declare_buffer                      */
-/* Data struct 4: iparml_purge                                      */
-/*                Used for iucv_purge                               */
-/*                         iucv_query                               */
-/* Data struct 5: iparml_set_mask                                   */
-/*                Used for iucv_set_mask                            */
-/********************************************************************/
+static int iucv_add_handler (handler * new_handler);
+
+static void iucv_remove_handler (handler * users_handler);
+
+/* handler_anchor: points to first handler on chain */
+/* handler_tail: points to last handler on chain */
+/* handler_table_anchor: points to beginning of handler_table_entries*/
+
+static handler *handler_anchor = NULL;
+
+static handler *handler_tail = NULL;
+
+static handler_table_entry *handler_table_anchor = NULL;
+
+/* declare_flag: is 0 when iucv_declare_buffer has not been called */
+
+static ulong declare_flag = 0;
+
+/****************FIVE 40-BYTE PARAMETER STRUCTURES******************/
+/* Data struct 1: iparml_control                                      
+ * Used for iucv_accept                                               
+ *          iucv_connect                                              
+ *          iucv_quiesce                                              
+ *          iucv_resume                                               
+ *          iucv_sever                                                
+ *          iucv_retrieve_buffer                                      
+ * Data struct 2: iparml_dpl     (data in parameter list)             
+ * Used for iucv_send_prmmsg                                          
+ *          iucv_send2way_prmmsg                                      
+ *          iucv_send2way_prmmsg_array                                
+ *          iucv_reply_prmmsg                                         
+ * Data struct 3: iparml_db       (data in a buffer)                  
+ * Used for iucv_receive                                              
+ *          iucv_receive_array                                        
+ *          iucv_reject                                               
+ *          iucv_reply                                                
+ *          iucv_reply_array                
+ *          iucv_send                       
+ *          iucv_send_array                 
+ *          iucv_send2way                   
+ *          iucv_send2way_array             
+ *          iucv_declare_buffer             
+ * Data struct 4: iparml_purge              
+ * Used for iucv_purge                      
+ *          iucv_query                      
+ * Data struct 5: iparml_set_mask           
+ * Used for iucv_set_mask                   
+*/
+
 typedef struct {
-	ushort ippathid;
+	u16 ippathid;
 	uchar ipflags1;
 	uchar iprcode;
-	ushort ipmsglim;
-	ushort res1;
+	u16 ipmsglim;
+	u16 res1;
 	uchar ipvmid[8];
 	uchar ipuser[16];
 	uchar iptarget[8];
 } iparml_control;
 
-/******************/
 typedef struct {
-	ushort ippathid;
+	u16 ippathid;
 	uchar ipflags1;
 	uchar iprcode;
-	ulong ipmsgid;
-	ulong iptrgcls;
+	u32 ipmsgid;
+	u32 iptrgcls;
 	uchar iprmmsg[8];
-	ulong ipsrccls;
-	ulong ipmsgtag;
-	ulong ipbfadr2;
-	ulong ipbfln2f;
-	ulong res;
+	u32 ipsrccls;
+	u32 ipmsgtag;
+	u32 ipbfadr2;
+	u32 ipbfln2f;
+	u32 res;
 } iparml_dpl;
 
-/*******************/
 typedef struct {
-	ushort ippathid;
+	u16 ippathid;
 	uchar ipflags1;
 	uchar iprcode;
-	ulong ipmsgid;
-	ulong iptrgcls;
-	ulong ipbfadr1;
-	ulong ipbfln1f;
-	ulong ipsrccls;
-	ulong ipmsgtag;
-	ulong ipbfadr2;
-	ulong ipbfln2f;
-	ulong res;
+	u32 ipmsgid;
+	u32 iptrgcls;
+	u32 ipbfadr1;
+	u32 ipbfln1f;
+	u32 ipsrccls;
+	u32 ipmsgtag;
+	u32 ipbfadr2;
+	u32 ipbfln2f;
+	u32 res;
 } iparml_db;
 
-/********************/
 typedef struct {
-	ushort ippathid;
+	u16 ippathid;
 	uchar ipflags1;
 	uchar iprcode;
-	ulong ipmsgid;
-	uchar ipaudit[4];
-	uchar res1[4];
-	ulong res2;
-	ulong ipsrccls;
-	ulong ipmsgtag;
-	ulong res3[3];
+	u32 ipmsgid;
+	uchar ipaudit[3];
+	uchar res1[5];
+	u32 res2;
+	u32 ipsrccls;
+	u32 ipmsgtag;
+	u32 res3[3];
 } iparml_purge;
 
-/*******************/
 typedef struct {
 	uchar ipmask;
 	uchar res1[2];
 	uchar iprcode;
-	ulong res2[9];
+	u32 res2[9];
 } iparml_set_mask;
 
 /*********************INTERNAL FUNCTIONS*****************************/
-/********************************************************************/
-/* Name: b2f0                                                       */
-/* Purpose: this function calls cp to execute iucv commands.        */
-/* Input: code - int, identifier of iucv call to cp.                */
-/*        parm - void *, pointer to 40 byte iparml area passed to cp */
-/* Output: iprcode- return code from iucv call to cp                */
-/********************************************************************/
-/* Assembler code performing iucv call                             */
-/*******************************************************************/
-inline ulong
-b2f0 (int code, void *parm)
+
+static ulong
+iucv_vmsize (void)
 {
-	uchar *iprcode;		/* used to extract iprcode */
-#ifdef DEBUG2
+	extern unsigned long memory_size;
+	return memory_size;
+}
+
+/*
+ * Name: dumpit                                                     
+ * Purpose: print to the console buffers of a given length          
+ * Input: buf - (* uchar) - pointer to buffer to be printed         
+ *        len - int - length of buffer being printed                
+ * Output: void                                                     
+ */
+
+#ifdef DEBUG
+
+static void
+iucv_dumpit (uchar * buf, int len)
+{
 	int i;
-	uchar *prt_parm;
-	prt_parm = (uchar *) (parm);
-	printk (KERN_DEBUG "parameter list before b2f0 call\n");
-	for (i = 0; i < 40; i++)
-		printk (KERN_DEBUG "%02x ", prt_parm[i]);
-	printk (KERN_DEBUG "\n");
+	for (i = 0; i < len; i++) {
+		if (!(i % 16) && i != 0)
+			printk ("\n");
+		else if (!(i % 4) && i != 0)
+			printk (" ");
+		printk ("%02X", buf[i]);
+	}
+	if (len % 16)
+		printk ("\n");
+	return;
+}
+
+#else
+static void
+iucv_dumpit (uchar * buf, int len)
+{
+}
+
 #endif
+
+/*
+ * Name iucv_add_handler
+ * Purpose: Place new handle on handler_anchor chain, if identical handler is not
+ *	    found. Handlers are ordered with largest mask integer value first.
+ * Input: new_handler - handle that is being entered into chain
+ * Return: int
+ *	   0 - handler added
+ *	   1 - identical handler found, handler not added to chain
+*/
+int
+iucv_add_handler (handler * new_handler)
+{
+	handler *R = new_handler;
+	int rc = 1, comp = 0;	/* return code (rc = 1 not added) or (rc = 0 added) */
+	ulong flags;
+	pr_debug ("iucv_add_handler: entering\n");
+	iucv_dumpit ((uchar *) new_handler, sizeof (handler));
+	spin_lock_irqsave (&iucv_lock, flags);
+	if (handler_anchor == NULL) {
+		/* add to beginning of chain */
+		handler_anchor = handler_tail = new_handler;
+		rc = 0;
+	} else
+		for (R = handler_anchor; R != NULL; R = (handler *) R->next) {
+			comp = memcmp ((void *) &(new_handler->id),
+				       (void *) &(R->id), sizeof (R->id));
+			pr_debug ("comp = %d\n", comp);
+			if (comp == 0)	/* identicle handler found */
+				break;	/* break out of for loop */
+			else if (comp > 0) {	/* new_handler > R */
+				pr_debug
+				    ("iucv_add_handler: Found a place to add,"
+				     "R is\n");
+				iucv_dumpit ((uchar *) R, sizeof (handler));
+				if ((R->prev != NULL)) {
+					/* add to middle of chain */
+					pr_debug
+					    ("iucv_add_handler: added to middle\n");
+					new_handler->prev = R->prev;
+					new_handler->next = (ulong *) R;
+					((handler *) (R->prev))->next =
+					    (ulong *) new_handler;
+					R->prev = (ulong *) new_handler;
+					rc = 0;
+					break;	/* break out of FOR loop */
+				} else {	/* R->prev == NULL */
+					/* add to start of chain;  */
+					pr_debug ("iucv_add_handler:"
+						  "added to beginning\n");
+					R->prev = (ulong *) new_handler;
+					new_handler->next = (ulong *) R;
+					handler_anchor = new_handler;
+					rc = 0;
+					break;	/* break out of FOR loop */
+				}
+			}	/* end of else if */
+		}		/* end of for loop */
+	if (R == NULL) {
+		/* add to end of chain */
+		pr_debug ("iucv_add_handler: added to end\n");
+		handler_tail->next = (ulong *) new_handler;
+		new_handler->prev = (ulong *) handler_tail;
+		handler_tail = new_handler;
+		rc = 0;
+	}
+	spin_unlock_irqrestore (&iucv_lock, flags);
+
+	pr_debug ("Current Chain of handlers is\n");
+	for (R = handler_anchor; R != NULL; R = (handler *) R->next)
+		iucv_dumpit ((uchar *) R, (int) sizeof (handler));
+
+	pr_debug ("iucv_add_handler: exiting\n");
+	return rc;
+}
+
+/* 
+ * Name: iucv_remove_handler
+ * Purpose: Remove handler when application unregisters.
+ * Input: users_handler - handler to be removed
+ * Output: void
+*/
+void
+iucv_remove_handler (handler * users_handler)
+{
+	handler *R;		/* used for Debugging */
+	pr_debug ("iucv_remove_handler: entering\n");
+	if ((users_handler->next != NULL) & (users_handler->prev != NULL)) {
+		/* remove from middle of chain */
+		((handler *) (users_handler->next))->prev =
+		    (ulong *) users_handler->prev;
+		((handler *) (users_handler->prev))->next =
+		    (ulong *) users_handler->next;
+	} else if ((users_handler->next != NULL) &
+		   (users_handler->prev == NULL)) {
+		/* remove from start of chain */
+		((handler *) (users_handler->next))->prev = NULL;
+		handler_anchor = (handler *) users_handler->next;
+	} else if ((users_handler->next == NULL) &
+		   (users_handler->prev != NULL)) {
+		/* remove from end of chain */
+		((handler *) (users_handler->prev))->next = NULL;
+		handler_tail = (handler *) users_handler->prev;
+	} else {
+		handler_anchor = NULL;
+		handler_tail = NULL;
+	}
+
+	pr_debug ("Current Chain of handlers is\n");
+	for (R = handler_anchor; R != NULL; R = (handler *) R->next)
+		iucv_dumpit ((uchar *) R, (int) sizeof (handler));
+
+	pr_debug ("iucv_remove_handler: exiting\n");
+	return;
+}
+
+/*
+ * Name: b2f0
+ * Purpose: This function calls CP to execute IUCV commands.
+ * Input: code -  identifier of IUCV call to CP.
+ *        parm -  pointer to 40 byte iparml area
+ *               passed to CP
+ * Output: iprcode- return code from CP's IUCV call
+ * NOTE: Assembler code performing IUCV call
+*/
+inline ulong
+b2f0 (u32 code, void *parm)
+{
+	uchar *iprcode;
+	pr_debug ("iparml before b2f0 call\n");
+	iucv_dumpit ((uchar *) parm, (int) BUFFER_SIZE);
 	asm volatile ("LRA   1,0(%1)\n\t"
 		      "LR    0,%0\n\t"
-		      ".long 0xb2f01000"
-		      : : "d" (code), "a" (parm) : "0", "1");
-#ifdef DEBUG2
-	printk (KERN_DEBUG "parameter list after b2f0 call\n");
-	for (i = 0; i < 40; i++)
-		printk (KERN_DEBUG "%02x ", prt_parm[i]);
-	printk (KERN_DEBUG "\n");
-#endif
+		      ".long 0xb2f01000"::"d" (code), "a" (parm):"0", "1");
+	pr_debug ("iparml after b2f0 call\n");
+	iucv_dumpit ((uchar *) parm, (int) BUFFER_SIZE);
 	iprcode = (uchar *) (parm + 3);
 	return (ulong) (*iprcode);
 }
 
-/**************************************************************/
-/* Name: iucv_retrieve_buffer                                 */
-/* Purpose: terminates all use of iucv                        */
-/* Input: void                                                */
-/* Output: Return code from CP                                */
-/**************************************************************/
+/*
+ * Name: iucv_add_pathid                                            
+ * Purpose: Adds a path id to the system.                       
+ * Input: pathid -  pathid that is going to be entered into system              
+ *        handle -  address of handler that the pathid will be associated
+ *		   with.
+ *        pgm_data - token passed in by application.                
+ * Output: 0: successful addition of pathid
+ *	   - EINVAL - pathid entry is being used by another application
+ *	   - ENOMEM - storage allocation for a new pathid table failed      
+*/
 int
-iucv_retrieve_buffer (void)
+iucv_add_pathid (u16 pathid, iucv_handle_t handle, void *pgm_data)
 {
-	iparml_control parm;
-	ulong b2f0_result;
-#ifdef DEBUG
-	printk (KERN_DEBUG "entering iucv_retrieve_buffer\n");
-#endif
-	memset (&(parm), 0, sizeof (parm));
-	b2f0_result = b2f0 (retrieve_buffer, &parm);
-	if (b2f0_result == NULL)
-		declare_flag = 0;
-#ifdef DEBUG
-	printk (KERN_DEBUG "exiting iucv_retrieve_buffer\n");
-#endif
-	return b2f0_result;
-}
-
-/**************************************************************/
-/* Name: iucv_declare_buffer                                  */
-/* Purpose: specifies the guests real address of an external  */
-/*          interrupt.                                        */
-/* Input: bfr - pointer to  buffer                            */
-/* Output: iprcode - return code from b2f0 call               */
-/* Note : See output options for b2f0 call                    */
-/**************************************************************/
-int
-iucv_declare_buffer (uchar * bfr)
-{
-	iparml_db parm;
-	ulong b2f0_result;
-#ifdef DEBUG
-	printk (KERN_DEBUG "Entering iucv_declare_buffer\n");
-#endif
-	memset (&(parm), 0, sizeof (parm));
-	parm.ipbfadr1 = virt_to_phys (bfr);
-	b2f0_result = b2f0 (declare_buffer, &parm);
-#ifdef DEBUG
-	printk (KERN_DEBUG "Address of EIB = %p\n", bfr);
-	printk (KERN_DEBUG "Exiting iucv_declare_buffer\n");
-#endif
-	return b2f0_result;
-}
-
-/**************************************************************/
-/* Name: add_pathid                                           */
-/* Purpose: adds a path id to the system                      */
-/* Input: pathid - ushort, pathid to enter system             */
-/*        handle - iucv_handle_t, address of handler to add to */
-/*        pgm_data - ulong, pathid identifier.                */
-/* Output: 0: successful addition of pathid                   */
-/**************************************************************/
-int
-add_pathid (ushort pathid, iucv_handle_t handle, ulong pgm_data)
-{
-	ulong index1, index2;	/* index1 into main_table */
 	ulong add_flag = 0;
 	ulong old_size = 0, new_size = 0;
+	ulong flags;
 	uchar *to, *from;	/* pointer for copying the table */
-	handler_table_entry *P = 0;	/*P is a pointer to H_T_E */
-	handler *Q = 0;		/*Q is a pointer to handler */
-	ulong *X = 0;		/*Points to array of pointers */
-#ifdef DEBUG
-	printk (KERN_DEBUG "entering add_pathid\n");
-#endif
-	Q = (handler *) handle;	/* Q points to a handler    */
+	handler_table_entry *P = 0;	/*P is a pointer to the users H_T_E */
+	handler *users_handler = 0;
+	ulong *X = 0;		/* Points to array of pointers to H-T_E */
+
+	pr_debug ("iucv_add_pathid: entering\n");
+
+	users_handler = (handler *) handle;
+
+	pr_debug ("iucv_add_pathid: users_handler is pointing to %p ",
+		  users_handler);
+
+	spin_lock_irqsave (&iucv_lock, flags);
+
 	/*
-	 * main_table has 128 entries.
-	 * 128*512 = 65536 maximum number of pathid's allowed
-	 */
-	index1 = ((ulong) pathid) / 512;
-	index2 = ((ulong) pathid) % 512;
-#ifdef DEBUG
-	printk (KERN_DEBUG "index1 = %d\n ", (int) index1);
-	printk (KERN_DEBUG "index2 = %d\n ", (int) index2);
-	printk (KERN_DEBUG "Q is pointing to %p ", Q);
-#endif
-	spin_lock (&lock);
-	/*
-	 * If NULL then handler table does not exist and need to get storage
-	 *  and have main_table[index1] point to it
-	 * If allocating storage failed, return
-	 */
-	if (main_table[index1] == NULL) {
-		main_table[index1] = (handler_table_entry *) kmalloc
-		    (512 * sizeof (handler_table_entry), GFP_KERNEL);
-		if (main_table[index1] == NULL) {
-			spin_unlock (&lock);
-			return -ENOBUFS;
-		}
-		memset (main_table[index1], 0,
-			512 * sizeof (handler_table_entry));
-#ifdef DEBUG
-		printk (KERN_DEBUG "address of table H_T is %p \n",
-			main_table[index1]);
-#endif
-	}
-	/*
-	 * P points to a handler table entry (H_T_E) in which all entries in
+	 * P points to the users handler table entry (H_T_E) in which all entries in
 	 * that structure should be NULL. If they're not NULL, then there
-	 * is a bad pointer and it will return(-2) immediately, otherwise
+	 * is a bad pointer and it will return(-EINVAL) immediately, otherwise users
 	 * data will be entered into H_T_E.
 	 */
-	P = main_table[index1];
-	if ((P + index2)->addrs) {
-#ifdef DEBUG
-		printk (KERN_DEBUG "main_table[index1] = %p \n",
-			main_table[index1]);
-		printk (KERN_DEBUG "P+index2 = %p \n", P + index2);
-		printk (KERN_DEBUG "(P+index2)->addrs is %p \n",
-			(P + index2)->addrs);
-#endif
-		spin_unlock (&lock);
-		printk (KERN_DEBUG "bad pointer1\n");
-		return (-2);
+
+	P = handler_table_anchor + pathid;	/* index into users handler table */
+
+	pr_debug ("handler_table_anchor is %p\n", handler_table_anchor);
+	pr_debug ("P=handler_table_anchor+pathid = %p\n", P);
+
+	if (P->addrs) {
+		pr_debug ("iucv_add_pathid: P = %p \n", P);
+		pr_debug ("iucv_add_pathid: P->addrs is %p \n", P->addrs);
+		spin_unlock_irqrestore (&iucv_lock, flags);
+		/* This message should be sent to syslog */
+		printk (KERN_WARNING "iucv_add_pathid: Pathid being used,"
+			"error.\n");
+		return (-EINVAL);
 	}
-	(P + index2)->addrs = handle;
+
+	P->addrs = handle;
+	P->pathid = pathid;
+
 	/*
-	 * checking if address of handle is valid, if it's not valid,
-	 * unlock the lock and return(-2) immediately.
+	 * pgm_data provided in iucv_register may be overwritten on a connect, accept. 
 	 */
-	if ((P + index2)->addrs == NULL) {
-		spin_unlock (&lock);
-		printk (KERN_DEBUG "bad pointer2\n");
-		return (-2);
-	}
-	(P + index2)->pathid = pathid;
+
 	if (pgm_data)
-		(P + index2)->pgm_data = pgm_data;
+		P->pgm_data = pgm_data;
 	else
-		(P + index2)->pgm_data = Q->pgm_data;
+		P->pgm_data = users_handler->pgm_data;
+
+	/*
+	 * Address of pathid's iucv_interrupt_ops is taken from the associated handler
+	 * and added here for quicker access to the interrupt tables during interrupt
+	 * handling.
+	 */
+
+	P->ops = (P->addrs)->interrupt_table;
+
+	pr_debug ("Complete users H_T_E is\n");
+	iucv_dumpit ((uchar *) P, sizeof (handler_table_entry));
+
 	/*
 	 * Step thru the table of addresses of pathid's to find the first
 	 * available entry (NULL). If an entry is found, add the pathid,
 	 * unlock and exit. If an available entry is not found, allocate a
-	 * new, larger table, copy over the old table and deallocate the
-	 * old table and add the pathid.
+	 * new, larger table, copy over the old table to the new table. De-allocate the
+	 * old table and enter the new pathid.
 	 */
-#ifdef DEBUG
-	printk (KERN_DEBUG "address of handle is %p\n", handle);
-	printk (KERN_DEBUG "&(Q->start) is %p\n", &(Q->start));
-	printk (KERN_DEBUG "&(Q->end) is %p\n", &(Q->end));
-	printk (KERN_DEBUG "start of pathid table is %p\n", (Q->start));
-	printk (KERN_DEBUG "end of pathid table is %p\n", (Q->end));
-	for (X = (Q->start); X < (Q->end); X++)
-		printk (KERN_DEBUG "X = %p ", X);
-	printk (KERN_DEBUG "\n");
-#endif
-	for (X = (Q->start); X < (Q->end); X++) {
+
+	pr_debug ("iucv_add_pathid: address of handle is %p\n", handle);
+	pr_debug ("iucv_add_pathid: &(users_handler->pathid_head) is %p\n",
+		  &(users_handler->pathid_head));
+	pr_debug ("iucv_add_pathid: &(users_handler->pathid_tail) is %p\n",
+		  &(users_handler->pathid_tail));
+	pr_debug ("iucv_add_pathid: start of pathid table is %p\n",
+		  (users_handler->pathid_head));
+	pr_debug ("iucv_add_pathid: end of pathid table is %p\n",
+		  (users_handler->pathid_tail));
+	iucv_dumpit ((uchar *) users_handler->pathid_head,
+		     (int) (users_handler->pathid_tail -
+			    users_handler->pathid_head));
+
+	for (X = (users_handler->pathid_head);
+	     X <
+	     (users_handler->pathid_head +
+	      users_handler->entries * sizeof (ulong)); X++)
 		if (*X == NULL) {
-#ifdef DEBUG
-			printk (KERN_DEBUG "adding pathid, %p = P+index2\n",
-				(P + index2));
-#endif
-			*X = (ulong) (P + index2);
+			pr_debug ("adding pathid, %p = P\n", P);
+			*X = (ulong) P;
 			add_flag = 1;
+			break;	/* breaks out of for loop */
 		}
-		if (add_flag == 1)
-			break;
-	}
-	if (add_flag == 0) {	/* element not added to list */
-		X = Q->start;
-		old_size = Q->size;
-		new_size = old_size + ADDED_STOR;	/* size of new table */
-		from = (uchar *) (Q->start);	/* address of old table */
-		(*Q).start = kmalloc (new_size * sizeof (ulong), GFP_KERNEL);
-		if ((Q->start) == NULL) {
-			spin_unlock (&lock);
-			return -ENOBUFS;
+
+	pr_debug ("Addresses of HTE's are\n");
+	iucv_dumpit ((uchar *) users_handler->pathid_head,
+		     users_handler->entries * sizeof (ulong));
+
+	if (add_flag == 0) {	/* element not added to list: must get a new table */
+		X = users_handler->pathid_head;
+		old_size = users_handler->entries;
+		new_size = old_size + ADDED_STOR;	/*number of entries of new table */
+		from = (uchar *) (users_handler->pathid_head);	/*address of old table */
+		users_handler->pathid_head =
+		    kmalloc (new_size * sizeof (ulong), GFP_ATOMIC);
+
+		if (users_handler->pathid_head == NULL) {
+			users_handler->pathid_head = X;	/*setting old condition */
+			spin_unlock_irqrestore (&iucv_lock, flags);
+			printk (KERN_WARNING
+				"iucv_add_pathid: storage allocation"
+				"failed for new pathid table \n ");
+			memset (P, 0, sizeof (handler_table_entry));
+			return -ENOMEM;
 		}
-		memset ((*Q).start, 0, new_size * sizeof (ulong));
-		to = (uchar *) (Q->start);	/* address of new table */
+
+		memset (users_handler->pathid_head, 0,
+			new_size * sizeof (ulong));
+		to = (uchar *) (users_handler->pathid_head);	/* address of new table */
 		/* copy old table to new  */
 		memcpy (to, from, old_size * (sizeof (ulong)));
-#ifdef DEBUG
-		printk (KERN_DEBUG "Getting a new pathid table\n");
-		printk (KERN_DEBUG "to is %p \n", to);
-		printk (KERN_DEBUG "from is %p \n", from);
-#endif
-		Q->size = new_size;	/* storing new size of table */
-		Q->end = (Q->start) + (Q->size);
-		X = Q->start + old_size;	/* next blank in table */
-		*X = (ulong) (P + index2);	/* adding element to new table */
-#ifdef DEBUG
-		printk (KERN_DEBUG "Q->size is %u \n", (int) (Q->size));
-		printk (KERN_DEBUG "Q->end is %p \n", Q->end);
-		printk (KERN_DEBUG "Q->start is %p \n", Q->start);
-		printk (KERN_DEBUG "X is %p \n", X);
-		printk (KERN_DEBUG "*X is %u \n", (int) (*X));
-#endif
+
+		pr_debug ("iucv: add_pathid: Getting a new pathid table\n");
+		pr_debug ("iucv: add_pathid: to is %p \n", to);
+		pr_debug ("iucv: add_pathid: from is %p \n", from);
+
+		users_handler->entries = new_size;	/* storing new size of table */
+		users_handler->pathid_tail =
+		    (users_handler->pathid_head) + (users_handler->entries);
+		X = users_handler->pathid_head + old_size;
+		*X = (ulong) P;	/* adding element to new table */
+
+		pr_debug ("iucv: add_pathid: users_handler->entries is %u \n",
+			  (int) (users_handler->entries));
+		pr_debug
+		    ("iucv: add_pathid: users_handler->pathid_tail is %p\n",
+		     users_handler->pathid_tail);
+		pr_debug ("users_handler->pathid_head is %p \n",
+			  users_handler->pathid_head);
+		pr_debug ("iucv: add_pathid: X is %p \n", X);
+		pr_debug ("iucv: add_pathid: *X is %u \n", (int) (*X));
+		pr_debug ("Addresses of HTE's after getting new table is\n");
+		iucv_dumpit ((uchar *) users_handler->pathid_head,
+			     users_handler->entries * sizeof (ulong));
+		pr_debug ("New handler is\n");
+		iucv_dumpit ((uchar *) users_handler, sizeof (handler));
+
 		kfree (from);	/* free old table */
 	}
-	spin_unlock (&lock);
-#ifdef DEBUG
-	printk (KERN_DEBUG "exiting add_pathid\n");
-#endif
+	spin_unlock_irqrestore (&iucv_lock, flags);
+	pr_debug ("iucv_dd_pathid: exiting\n");
 	return (0);
 }				/* end of add_pathid function */
 
-/***********************EXTERNAL FUNCTIONS***************************/
-/**************************************************************/
-/* Name: iucv_query                                           */
-/* Purpose: determines how large an external interrupt buffer */
-/*          IUCV requires to store information                */
-/* Input : bufsize - ulong: size of interrupt buffer          */
-/*         - filled in by function and returned to caller     */
-/*         conmax  - ulong: maximum number of connections that */
-/*           can be outstanding for this VM                   */
-/*         - filled in by function and returned to caller     */
-/* Output: void                                               */
-/**************************************************************/
-void
-iucv_query (ulong * bufsize, ulong * conmax)
+/*
+ * Name: iucv_declare_buffer                                    
+ * Purpose: Specifies the guests real address of an external  
+ *          interrupt.                                        
+ * Input: void                             
+ * Output: iprcode - return code from b2f0 call               
+*/
+int
+iucv_declare_buffer (void)
+{
+	iparml_db parm;
+	ulong b2f0_result;
+	pr_debug ("iucv_declare_buffer: entering\n");
+	memset (&parm, 0, sizeof (parm));
+	parm.ipbfadr1 = virt_to_phys ((uchar *) iucv_external_int_buffer);
+	b2f0_result = b2f0 (DECLARE_BUFFER, &parm);
+	pr_debug ("iucv_declare_buffer: Address of EIB = %p\n",
+		  iucv_external_int_buffer);
+	pr_debug ("iucv_declare_buffer: exiting\n");
+	return b2f0_result;
+}
+
+/*
+ * Name: iucv_retrieve_buffer
+ * Purpose: Terminates all use of IUCV.
+ * Input: void
+ * Output:
+ *      b2f0_result: return code from CP
+*/
+int
+iucv_retrieve_buffer (void)
+{
+	iparml_control parm;
+	ulong b2f0_result = 0;
+	pr_debug ("iucv_retrieve_buffer: entering\n");
+	memset (&parm, 0, sizeof (parm));
+	b2f0_result = b2f0 (RETRIEVE_BUFFER, &parm);
+	if (b2f0_result == NULL) {
+		kfree (handler_table_anchor);
+		handler_table_anchor = NULL;
+		declare_flag = 0;
+	}
+	pr_debug ("iucv_retrieve_buffer: exiting\n");
+	return b2f0_result;
+}
+
+/*
+ * Name: iucv_register_program
+ * Purpose: Registers an application with IUCV.   
+ * Input: prmname - user identification
+ *        userid  - machine identification
+ *        pgmmask - indicates which bits in the prmname and userid combined will be used
+ *	   to determine who is given control
+ *        ops - address of vector of interrupt handlers
+ *        pgm_data- application data passed to interrupt handlers
+ * Output: NA
+ * Return: type: iucv_handle_t
+ *          address of handler
+ *         (0) - registration failed
+ *	       - Machine size > 2GB
+ *	       - new_handler kmalloc failed
+ * 	       - pgmname was not provided
+ *	       - pathid_table kmalloc failed
+ *             - application with identical pgmname, userid, and pgmmask is registered
+ * 	       - iucv_declare_buffer failed
+ * NOTE: pgmmask
+ *	When pgmname, userid, pgmmask is provided, mask is entered into the handler
+ *	as is.
+ *	When pgmname, userid is provided, pgmmask is all 0xff's
+ *	When pgmname, pgmmask is provided, the first 8 bytes = 0x00 and the last 16
+ *      bytes are as provided by pgmmask. 
+ *	When pgmname is provided is provided, the first 8 bytes = 0x00 and the last
+ *	16 bytes are 0xff.   
+*/
+
+iucv_handle_t
+iucv_register_program (uchar pgmname[16],
+		       uchar userid[8],
+		       uchar pgmmask[24],
+		       iucv_interrupt_ops_t * ops, void *pgm_data)
+{
+	ulong rc = 0;		/* return code from function calls */
+	ulong machine_size = 0;	/* size of virtual machine */
+	static u32 maxconn1;
+	handler *new_handler = NULL;
+
+	pr_debug ("iucv_register_program:entering\n");
+
+	if (ops == NULL) {
+		/* interrupt table is not defined */
+		printk (KERN_WARNING "iucv_register_program:"
+			"Interrupt table is not defined, exiting\n");
+		return NULL;
+	}
+
+	if (declare_flag == 0) {
+		/* check size of virtual machine */
+		if ((machine_size = iucv_vmsize ()) > 0x100000000) {	/* 2GB */
+			printk (KERN_WARNING "iucv_register_progam: Virtual"
+				"storage = %lx hex," "exiting\n", machine_size);
+			return NULL;
+		}
+
+		pr_debug ("machine_size is %lx\n", machine_size);
+
+		maxconn1 = iucv_query_maxconn ();
+		handler_table_anchor = kmalloc (maxconn1 * sizeof
+						(handler_table_entry),
+						GFP_KERNEL);
+
+		if (handler_table_anchor == NULL) {
+			printk (KERN_WARNING "iucv_register_program:"
+				"handler_table_anchor"
+				"storage allocation failed\n");
+			return NULL;
+		}
+
+		memset (handler_table_anchor, 0,
+			maxconn1 * sizeof (handler_table_entry));
+
+	}
+	/* Allocate handler table */
+	new_handler = (handler *) kmalloc (sizeof (handler), GFP_KERNEL);
+	if (new_handler == NULL) {
+		printk (KERN_WARNING "iucv_register_program: storage allocation"
+			"for new handler failed. \n ");
+		return NULL;
+	}
+	memset (new_handler, 0, sizeof (handler));
+	if (pgmname) {
+		memcpy (new_handler->id.user_data, pgmname,
+			sizeof (new_handler->id.user_data));
+		if (userid) {
+			memcpy (new_handler->id.userid, userid,
+				sizeof (new_handler->id.userid));
+			ASCEBC (new_handler->id.userid,
+				sizeof (new_handler->id.userid));
+			EBC_TOUPPER (new_handler->id.userid,
+				     sizeof (new_handler->id.userid));
+
+			if (pgmmask) {
+				memcpy (new_handler->id.mask, pgmmask,
+					sizeof (new_handler->id.mask));
+			} else {
+				memset (new_handler->id.mask, 0xFF,
+					sizeof (new_handler->id.mask));
+			}
+		} else {
+			if (pgmmask) {
+				memcpy (new_handler->id.mask, pgmmask,
+					sizeof (new_handler->id.mask));
+			} else {
+				memset (new_handler->id.mask, 0xFF,
+					sizeof (new_handler->id.mask));
+			}
+			memset (new_handler->id.mask, 0x00,
+				sizeof (new_handler->id.userid));
+		}
+	} else {
+		kfree (new_handler);
+		printk (KERN_WARNING "iucv_register_program: pgmname not"
+			"provided\n");
+		return NULL;
+	}
+	/* fill in the rest of handler */
+	new_handler->pgm_data = pgm_data;
+	new_handler->interrupt_table = ops;
+	new_handler->entries = ADDED_STOR;
+	/* Allocate storage for pathid table */
+	new_handler->pathid_head =
+	    kmalloc (new_handler->entries * sizeof (ulong), GFP_KERNEL);
+	if (new_handler->pathid_head == NULL) {
+		printk (KERN_WARNING "iucv_register_program: storage allocation"
+			"failed\n");
+		kfree (new_handler);
+		return NULL;
+	}
+
+	memset (new_handler->pathid_head, 0,
+		new_handler->entries * sizeof (ulong));
+	new_handler->pathid_tail =
+	    new_handler->pathid_head + new_handler->entries;
+	/* 
+	 * Check if someone else is registered with same pgmname, userid, and mask. 
+	 * If someone is already registered with same pgmname, userid, and mask 
+	 * registration will fail and NULL will be returned to the application. 
+	 * If identical handler not found, then handler is added to list.
+	 */
+	rc = iucv_add_handler (new_handler);
+	if (rc) {
+		printk (KERN_WARNING "iucv_register_program: Someone already"
+			"registered with same pgmname, userid, pgmmask\n");
+		kfree (new_handler->pathid_head);
+		kfree (new_handler);
+		return NULL;
+	}
+
+	if (declare_flag == 0) {
+		rc = iucv_declare_buffer ();
+		if (rc) {
+			kfree (handler_table_anchor);
+			kfree (new_handler->pathid_head);
+			kfree (new_handler);
+			handler_table_anchor = NULL;
+			printk (KERN_WARNING "iucv_register_program: rc from"
+				"iucv_declare_buffer is:% ld \n ", rc);
+			return NULL;
+		}
+		/* request the 0x4000 external interrupt */
+		rc = register_external_interrupt (0x4000, top_half_interrupt);
+		if (rc) {
+			iucv_retrieve_buffer ();
+			kfree (new_handler->pathid_head);
+			kfree (new_handler);
+			printk (KERN_WARNING "iucv_register_program: rc from"
+				"register_external_interrupt is:% ld \n ", rc);
+			return NULL;
+
+		}
+		declare_flag = 1;
+	}
+	pr_debug ("iucv_register_program: exiting\n");
+	return new_handler;
+}				/* end of register function */
+
+/*
+ * Name: iucv_unregister_program
+ * Purpose: Unregister application with IUCV.
+ * Input: handle address of handler
+ * Output: NA
+ * Return: (0) - Normal return
+ *         (-EINVAL)- Matching handler was not found
+*/
+
+int
+iucv_unregister_program (iucv_handle_t handle)
+{
+	handler *users_handler = 0, *R;
+	handler_table_entry *H_T_E = 0;
+	ulong *S = 0;		/*points to the beginning of block of h_t_e's */
+	ulong flags;
+	u16 pathid_sever = 0;
+	pr_debug ("iucv_unregister_program: entering\n");
+	pr_debug ("iucv_unregister_program: address of handle is %p\n", handle);
+	spin_lock_irqsave (&iucv_lock, flags);
+	users_handler = (handler *) handle;
+	/* 
+	 * Checking if handle is still registered: if yes, continue
+	 *  if not registered, return.
+	 */
+	for (R = handler_anchor; R != NULL; R = (handler *) R->next)
+		if (users_handler == R) {
+			pr_debug ("iucv_unregister_program: found a matching"
+				  "handler\n");
+			break;
+		}
+	if (!R) {
+		pr_debug ("You are not registered\n");
+		spin_unlock_irqrestore (&iucv_lock, flags);
+		return (0);
+	}
+	S = users_handler->pathid_head;
+	while (S < (users_handler->pathid_tail)) {	/* index thru table */
+		if (*S) {
+			H_T_E = (handler_table_entry *) (*S);
+
+			pr_debug ("iucv_unregister_program: pointer to H_T_E is"
+				  "%p\n", H_T_E);
+			pr_debug
+			    ("iucv_unregister_program: address of handle in"
+			     "H_T_E is %p", (H_T_E->addrs));
+			pathid_sever = H_T_E->pathid;
+			spin_unlock_irqrestore (&iucv_lock, flags);
+			iucv_sever (pathid_sever, users_handler->id.user_data);
+			spin_lock_irqsave (&iucv_lock, flags);
+		}
+
+		S++;		/* index by address */
+	}
+
+	kfree (users_handler->pathid_head);
+	iucv_remove_handler (users_handler);
+	spin_unlock_irqrestore (&iucv_lock, flags);
+	kfree (handle);
+	pr_debug ("iucv_unregister_program: exiting\n");
+	return 0;
+}
+
+/*
+ * Name: iucv_accept
+ * Purpose: This function is issued after the user receives a Connection Pending external
+ *          interrupt and now wishes to complete the IUCV communication path.
+ * Input:  pathid - u16 , path identification number   
+ *         msglim_reqstd - u16, The number of outstanding messages requested.
+ *         user_data - uchar[16], Data specified by the iucv_connect function.
+ *	   flags1 - int, Contains options for this path.
+ *           -IPPRTY - 0x20- Specifies if you want to send priority message.
+ *           -IPRMDATA - 0x80, Specifies whether your program can handle a message
+ *            	in  the parameter list.
+ *           -IPQUSCE - 0x40, Specifies whether you want to quiesce the path being
+ *		established.
+ *         handle - iucv_handle_t, Address of handler.
+ *         pgm_data - ulong, Application data passed to interrupt handlers.
+ *	   flags1_out - int *, Options for path.
+ *           IPPRTY - 0x20 - Indicates you may send a priority message.
+ *         priority_permitted -uchar *, Indicates you may send priority messages.
+ *         msglim - *u16, Number of outstanding messages.
+ * Output: b2f0_result - return code from CP
+*/
+int
+iucv_accept (u16 pathid, u16 msglim_reqstd,
+	     uchar user_data[16], int flags1,
+	     iucv_handle_t handle, void *pgm_data,
+	     int *flags1_out, u16 * msglim)
+{
+	iparml_control parm;
+	ulong b2f0_result = 0;
+	ulong flags;
+	handler *R = NULL;
+	pr_debug ("iucv_accept: entering \n");
+	pr_debug ("iucv_accept: pathid = %d\n", pathid);
+
+	/* Checking if handle is valid  */
+	spin_lock_irqsave (&iucv_lock, flags);
+
+	for (R = handler_anchor; R != NULL; R = (handler *) R->next)
+		if (R == handle)
+			break;
+
+	spin_unlock_irqrestore (&iucv_lock, flags);
+	if (R == NULL) {
+		printk (KERN_WARNING "iucv_connect: NULL handle passed by"
+			"application\n");
+		return -EINVAL;
+	}
+
+	memset (&parm, 0, sizeof (parm));
+	parm.ippathid = pathid;
+	parm.ipmsglim = msglim_reqstd;
+	if (user_data)
+		memcpy (parm.ipuser, user_data, sizeof (parm.ipuser));
+	parm.ipflags1 = (uchar) flags1;
+	b2f0_result = b2f0 (ACCEPT, &parm);
+
+	if (b2f0_result == 0) {
+		if (pgm_data)
+			(handler_table_anchor + pathid)->pgm_data = pgm_data;
+		if (parm.ipflags1 & IPPRTY)
+			if (flags1_out) {
+				pr_debug ("*flags1_out = %d\n", *flags1_out);
+				*flags1_out = 0;
+				*flags1_out |= IPPRTY;
+				pr_debug (" *flags1_out = %d\n", *flags1_out);
+			}
+	}
+
+	pr_debug ("iucv_accept: exiting\n");
+	return b2f0_result;
+}
+
+/*
+ * Name: iucv_connect                                         
+ * Purpose: This function establishes an IUCV path. Although the connect may complete
+ *	    successfully, you are not able to use the path until you receive an IUCV 
+ *          Connection Complete external interrupt.            
+ * Input: pathid - u16 *, path identification number          
+ *        msglim_reqstd - u16, number of outstanding messages requested       
+ *        user_data - uchar[16], 16-byte user data                    
+ *        userid - uchar[8], 8-byte of user identification                        
+ *        system_name - uchar[8], 8-byte identifying the system name 
+ *        flags1 - int, Contains options for this path.
+ *          -IPPRTY - 0x20- Specifies if you want to send priority message.
+ *          -IPRMDATA - 0x80, Specifies whether your program can handle a message
+ *               in  the parameter list.
+ *          -IPQUSCE - 0x40, Specifies whether you want to quiesce the path being
+ *              established.
+ *          -IPLOCAL - 0X01, allows an application to force the partner to be on the
+ *              local system. If local is specified then target class cannot be
+ *              specified.  
+ *         flags1_out - int *, Options for path. 
+ *           IPPRTY - 0x20 - Indicates you may send a priority message.
+ *        msglim - * u16, number of outstanding messages
+ *        handle - iucv_handle_t, address of handler                         
+ *        pgm_data - *void, application data passed to interrupt handlers                  
+ * Output: b2f0_result - return code from CP
+ *         -ENOMEM
+ *         rc - return code from iucv_declare_buffer
+ *         -EINVAL - invalid handle passed by application 
+ *         -EINVAL - pathid address is NULL 
+ *	   -ENOMEM - pathid table storage allocation failed
+ *         add_pathid_result - return code from internal function add_pathid             
+*/
+int
+iucv_connect (u16 * pathid, u16 msglim_reqstd,
+	      uchar user_data[16], uchar userid[8],
+	      uchar system_name[8], int flags1,
+	      int *flags1_out, u16 * msglim,
+	      iucv_handle_t handle, void *pgm_data)
+{
+	iparml_control parm;
+	ulong b2f0_result = 0;
+	ulong flags;
+	int add_pathid_result = 0;
+	handler *R = NULL;
+	uchar no_memory[16] = "NO MEMORY";
+
+	pr_debug ("iucv_connect: entering \n");
+
+	/* Checking if handle is valid  */
+	spin_lock_irqsave (&iucv_lock, flags);
+
+	for (R = handler_anchor; R != NULL; R = (handler *) R->next)
+		if (R == handle)
+			break;
+
+	spin_unlock_irqrestore (&iucv_lock, flags);
+
+	if (R == NULL) {
+		printk (KERN_WARNING "iucv_connect: NULL handle passed by"
+			"application\n");
+		return -EINVAL;
+	}
+
+	if (pathid == NULL) {
+		printk (KERN_WARNING "iucv_connect: NULL pathid pointer\n");
+		return -EINVAL;
+	}
+	memset (&parm, 0, sizeof (iparml_control));
+	parm.ipmsglim = msglim_reqstd;
+
+	if (user_data)
+		memcpy (parm.ipuser, user_data, sizeof (parm.ipuser));
+
+	if (userid) {
+		memcpy (parm.ipvmid, userid, sizeof (parm.ipvmid));
+		ASCEBC (parm.ipvmid, sizeof (parm.ipvmid));
+		EBC_TOUPPER (parm.ipvmid, sizeof (parm.ipvmid));
+	}
+
+	if (system_name) {
+		memcpy (parm.iptarget, system_name, sizeof (parm.iptarget));
+		ASCEBC (parm.iptarget, sizeof (parm.iptarget));
+		EBC_TOUPPER (parm.iptarget, sizeof (parm.iptarget));
+	}
+
+	parm.ipflags1 = (uchar) flags1;
+	b2f0_result = b2f0 (CONNECT, &parm);
+	if (b2f0_result)
+		return b2f0_result;
+
+	add_pathid_result = iucv_add_pathid (parm.ippathid, handle, pgm_data);
+	if (add_pathid_result) {
+
+		iucv_sever (parm.ippathid, no_memory);
+		printk (KERN_WARNING "iucv_connect: add_pathid failed with rc ="
+			"%d\n", add_pathid_result);
+		return (add_pathid_result);
+	}
+
+	*pathid = parm.ippathid;
+
+	if (msglim)
+		*msglim = parm.ipmsglim;
+
+	if (parm.ipflags1 & IPPRTY)
+		if (flags1_out) {
+			*flags1_out = 0;
+			*flags1_out |= IPPRTY;
+		}
+
+	pr_debug ("iucv_connect: exiting\n");
+	return b2f0_result;
+}
+
+/*
+ * Name: iucv_purge                                           
+ * Purpose: Cancels a message you have sent.                   
+ * Input: pathid -   address of pathid                                  
+ *        msgid  -   address of message identification             
+ *        srccls -   address of source message class                     
+ *        audit  -  contains information about                              
+ *                 asynchronous error that may have affected                           
+ *                 the normal completion of this message.                  
+ * Output:b2f0_result - return code from CP                   
+*/
+int
+iucv_purge (u16 pathid, u32 msgid, u32 srccls, uchar audit[3])
+{
+	iparml_purge parm;
+	ulong b2f0_result = 0;
+	pr_debug ("iucv_purge: entering\n");
+	pr_debug ("iucv_purge: pathid = %d \n", pathid);
+	memset (&parm, 0, sizeof (parm));
+	parm.ipmsgid = msgid;
+	parm.ippathid = pathid;
+	parm.ipsrccls = srccls;
+	parm.ipflags1 |= (IPSRCCLS | IPFGMID | IPFGPID);
+	b2f0_result = b2f0 (PURGE, &parm);
+
+	if ((b2f0_result == 0) && (audit))
+		memcpy (audit, parm.ipaudit, sizeof (parm.ipaudit));
+
+	pr_debug ("iucv_purge: b2f0_result = %ld \n", b2f0_result);
+	pr_debug ("iucv_purge: exiting\n");
+	return b2f0_result;
+}
+
+/*
+ * Name: iucv_query_maxconn                                            
+ * Purpose: Determines the maximum number of connections thay may be established.
+ * Output: maxconn - ulong: Maximum number of connections that can be.     
+*/
+ulong
+iucv_query_maxconn (void)
 {
 	iparml_purge parm;	/* DOESN'T MATTER WHICH IPARML IS USED    */
-#ifdef DEBUG
-	printk (KERN_DEBUG "entering iucv_purge\n");
-#endif
-	memset (&(parm), 0, sizeof (parm));
-	/*
-	 * Assembler instruction calling b2f0  and storing R0 and R1
-	 */
+	static u32 maxconn1, bufsize1;
+
+	pr_debug ("iucv_query_maxconn: entering\n");
+
+	memset (&parm, 0, sizeof (parm));
+
+	/* Assembler instruction calling b2f0  and storing R0 and R1 */
 	asm volatile ("LRA   1,0(%3)\n\t"
 		      "LR    0,%2\n\t"
 		      ".long 0xb2f01000\n\t"
 		      "ST    0,%0\n\t"
-		      "ST    1,%1\n\t":"=m" (*bufsize),
-		      "=m" (*conmax):"d" (query), "a" (&parm):"0", "1");
-	return;
+		      "ST    1,%1\n\t":"=m" (bufsize1),
+		      "=m" (maxconn1):"d" (QUERY), "a" (&parm):"0", "1");
+
+	pr_debug (" bufsize1 = %d and maxconn1 = %d \n", bufsize1, maxconn1);
+	pr_debug ("iucv_query_maxconn: exiting\n");
+
+	return maxconn1;
 }
 
-/**************************************************************/
-/* Name: iucv_purge                                           */
-/* Purpose: cancels a message you have sent                   */
-/* Input: pathid - ushort, pathid                             */
-/*        msgid  - ulong, mid of message                      */
-/*        srccls - ulong, sourse message class                */
-/*        audit  - uchar[4], info about ansync. error condit. */
-/*                 filled in by function and passed back      */
-/* Output: void                                               */
-/* NOTE: pathid is required, flag is always turned on         */
-/**************************************************************/
-int
-iucv_purge (ulong msgid, ushort pathid, ulong srccls, uchar audit[4])
+/*
+ * Name: iucv_query_bufsize
+ * Purpose: Determines the size of the external interrupt buffer.
+ * Output: bufsize - ulong: Size of external interrupt buffer.
+ */
+ulong
+iucv_query_bufsize (void)
 {
-	iparml_purge parm;
-	ulong b2f0_result;
-#ifdef DEBUG
-	printk (KERN_DEBUG "entering iucv_purge\n");
-#endif
-	memset (&(parm), 0, sizeof (parm));
-	parm.ipmsgid = msgid;
-	parm.ippathid = pathid;
-	parm.ipsrccls = srccls;
-	parm.ipflags1 |= specify_pathid;	/* pathid id flag */
-	if (parm.ipmsgid)
-		parm.ipflags1 |= specify_msgid;
-	if (parm.ipsrccls)
-		parm.ipflags1 |= source_class;
-	b2f0_result = b2f0 (purge, &parm);
-	if (b2f0_result != NULL)
-		return b2f0_result;
-	memcpy (audit, parm.ipaudit, 4);
-#ifdef DEBUG
-	printk (KERN_DEBUG "exiting iucv_purge\n");
-#endif
-	return b2f0_result;
+	iparml_purge parm;	/* DOESN'T MATTER WHICH IPARML IS USED    */
+	static u32 maxconn1, bufsize1;
+
+	pr_debug ("iucv_query_bufsize: entering\n");
+	pr_debug ("iucv_query_maxconn: entering\n");
+
+	memset (&parm, 0, sizeof (parm));
+
+	/* Assembler instruction calling b2f0  and storing R0 and R1 */
+	asm volatile ("LRA   1,0(%3)\n\t"
+		      "LR    0,%2\n\t"
+		      ".long 0xb2f01000\n\t"
+		      "ST    0,%0\n\t"
+		      "ST    1,%1\n\t":"=m" (bufsize1),
+		      "=m" (maxconn1):"d" (QUERY), "a" (&parm):"0", "1");
+
+	pr_debug (" bufsize1 = %d and maxconn1 = %d \n", bufsize1, maxconn1);
+	pr_debug ("iucv_query_bufsize: exiting\n");
+
+	return bufsize1;
 }
 
-/**************************************************************/
-/* Name: iucv_quiesce                                         */
-/* Purpose: temporarily suspends incoming messages            */
-/* Input: pathid - ushort, pathid                             */
-/*        user_data - uchar[16], user id                      */
-/* Output: iprcode - return code from b2f0 call               */
-/* NOTE: see b2f0 output list                                 */
-/**************************************************************/
+/*
+ * Name: iucv_quiesce                                         
+ * Purpose: temporarily suspends incoming messages on an IUCV path.
+ *          You can later reactivate the path by invoking the iucv_resume function        
+ * Input: pathid - u16, path identification number                             
+ *        user_data - uchar[16], 16-byte user data                      
+ * Output: b2f0_result - return code from CP               
+ */
 int
-iucv_quiesce (ushort pathid, uchar user_data[16])
+iucv_quiesce (u16 pathid, uchar user_data[16])
 {
 	iparml_control parm;
-	ulong b2f0_result;
-#ifdef DEBUG
-	printk (KERN_DEBUG "entering iucv_quiesce\n");
-#endif
-	memset (&(parm), 0, sizeof (parm));
-	memcpy (parm.ipuser, user_data, 16);
+	ulong b2f0_result = 0;
+
+	pr_debug ("iucv_quiesce: entering \n");
+	pr_debug ("iucv_quiesce: pathid = %d\n", pathid);
+
+	memset (&parm, 0, sizeof (parm));
+	memcpy (parm.ipuser, user_data, sizeof (parm.ipuser));
 	parm.ippathid = pathid;
-	b2f0_result = b2f0 (quiesc, &parm);
-#ifdef DEBUG
-	printk (KERN_DEBUG "exiting iucv_quiesce\n");
-#endif
+
+	b2f0_result = b2f0 (QUIESCE, &parm);
+
+	pr_debug ("iucv_quiesce: b2f0_result = %ld\n", b2f0_result);
+	pr_debug ("iucv_quiesce: exiting\n");
+
 	return b2f0_result;
 }
 
-/**************************************************************/
-/* Name: iucv_resume                                          */
-/* Purpose: restores communication over a quiesced path       */
-/* Input: pathid - ushort, pathid                             */
-/*        user_data - uchar[16], user id                      */
-/* Output: iprcode - return code from b2f0 call               */
-/* NOTE: see b2f0 output list                                 */
-/**************************************************************/
+/*
+ * Name: iucv_receive
+ * Purpose: This function receives messages that are being sent to you
+ *          over established paths. 
+ * Input:
+ *        pathid - path identification number
+ *        buffer - address of buffer to receive
+ *        buflen - length of buffer to receive
+ *        msgid - specifies the message ID.
+ *        trgcls - specifies target class
+ * Output:
+ *	 flags1_out: Options for path.
+ *         IPNORPY - 0x10 specifies whether a reply is required
+ *         IPPRTY - 0x20 specifies if you want to send priority message
+ *         IPRMDATA - 0x80 specifies the data is contained in the parameter list
+ *       residual_buffer - address of buffer updated by the number
+ *                         of bytes you have received.
+ *       residual_length - 
+ *		Contains one of the following values, if the receive buffer is:
+ *		 The same length as the message, this field is zero.
+ *		 Longer than the message, this field contains the number of
+ *		  bytes remaining in the buffer.
+ *		 Shorter than the message, this field contains the residual
+ *		  count (that is, the number of bytes remaining in the
+ *		  message that does not fit into the buffer. In this
+ *		  case b2f0_result = 5. 
+ * Return: b2f0_result - return code from CP IUCV call.
+ *         (-EINVAL) - buffer address is pointing to NULL
+ */
 int
-iucv_resume (ushort pathid, uchar user_data[16])
-{
-	iparml_control parm;
-	ulong b2f0_result;
-#ifdef DEBUG
-	printk (KERN_DEBUG "entering iucv_resume\n");
-#endif
-	memset (&(parm), 0, sizeof (parm));
-	memcpy (parm.ipuser, user_data, 16);
-	parm.ippathid = pathid;
-	b2f0_result = b2f0 (resume, &parm);
-#ifdef DEBUG
-	printk (KERN_DEBUG "exiting iucv_resume\n");
-#endif
-	return b2f0_result;
-}
-
-/**************************************************************/
-/* Name: iucv_reject                                          */
-/* Purpose: rejects a message                                 */
-/* Input: pathid - ushort, pathid                             */
-/*        msgid  - ulong, mid of message                      */
-/*        trgcls - ulong, target message class                */
-/* Output: iprcode - return code from b2f0 call               */
-/* NOTE: pathid is required field, flag always turned on      */
-/*       RESTRICTION: target class cannot be zero             */
-/* NOTE: see b2f0 output list                                 */
-/**************************************************************/
-int
-iucv_reject (ushort pathid, ulong msgid, ulong trgcls)
-{
-	iparml_db parm;
-	ulong b2f0_result;
-#ifdef DEBUG
-	printk (KERN_DEBUG "entering iucv_reject\n");
-#endif
-	memset (&(parm), 0, sizeof (parm));
-	parm.ipmsgid = msgid;
-	parm.ippathid = pathid;
-	parm.iptrgcls = trgcls;
-	parm.ipflags1 |= specify_pathid;	/* flag for pathid */
-	if (parm.ipmsgid)
-		parm.ipflags1 |= specify_msgid;
-	if (parm.iptrgcls)
-		parm.ipflags1 |= target_class;
-	b2f0_result = b2f0 (reject, &parm);
-#ifdef DEBUG
-	printk (KERN_DEBUG "exiting iucv_reject\n");
-#endif
-	return b2f0_result;
-}
-
-/**************************************************************/
-/* Name: iucv_setmask                                         */
-/* Purpose: enables or disables certain iucv external interr. */
-/* Input: non_priority_interrupts - uchar                     */
-/*        priority_interrupts - uchar                         */
-/*        non_priority_completion_interrupts - uchar          */
-/*        priority_completion_interrupts) - uchar             */
-/* Output: iprcode - return code from b2f0 call               */
-/* NOTE: see b2f0 output list                                 */
-/**************************************************************/
-int
-iucv_setmask (uchar non_priority_interrupts,
-	      uchar priority_interrupts,
-	      uchar non_priority_completion_interrupts,
-	      uchar priority_completion_interrupts)
-{
-	iparml_set_mask parm;
-	ulong b2f0_result;
-#ifdef DEBUG
-	printk (KERN_DEBUG "entering iucv_setmask\n");
-#endif
-	memset (&(parm), 0, sizeof (parm));
-	if (non_priority_interrupts)
-		parm.ipmask |= 0x80;
-	if (priority_interrupts)
-		parm.ipmask |= 0x40;
-	if (non_priority_completion_interrupts)
-		parm.ipmask |= 0x20;
-	if (priority_completion_interrupts)
-		parm.ipmask |= 0x10;
-	b2f0_result = b2f0 (setmask, &parm);
-#ifdef DEBUG
-	printk (KERN_DEBUG "exiting iucv_setmask\n");
-#endif
-	return b2f0_result;
-}
-
-/**************************************************************/
-/* Name: iucv_sever                                           */
-/* Purpose: terminates an iucv path to another machine        */
-/* Input: pathid - ushort, pathid                             */
-/*        user_data - uchar[16], user id                      */
-/* Output: iprcode - return code from b2f0 call               */
-/* NOTE: see b2f0 output list                                 */
-/**************************************************************/
-int
-iucv_sever (ushort pathid, uchar user_data[16])
-{
-	ulong index1, index2;
-	ulong b2f0_result;
-	handler_table_entry *P = 0;
-	handler *Q = 0;
-	ulong *X;
-	iparml_control parm;
-#ifdef DEBUG
-	printk (KERN_DEBUG "entering iucv_sever\n");
-#endif
-	memset (&(parm), 0, sizeof (parm));
-	memcpy (parm.ipuser, user_data, 16);
-	parm.ippathid = pathid;
-	b2f0_result = b2f0 (sever, &parm);
-	if (b2f0_result)
-		return b2f0_result;
-	index1 = ((ulong) pathid) / 512;
-	index2 = ((ulong) pathid) % 512;
-	spin_lock (&lock);
-	P = main_table[index1];
-	if (((P + index2)->addrs) == NULL) {	/* called from interrupt code */
-		spin_unlock (&lock);
-		return (-2);	/* bad pointer */
-	}
-	Q = (*(P + index2)).addrs;
-#ifdef DEBUG
-	printk (KERN_DEBUG "pathid is %d\n", pathid);
-	printk (KERN_DEBUG "index1 is %d\n", (int) index1);
-	printk (KERN_DEBUG "index2 is %d\n", (int) index2);
-	printk (KERN_DEBUG "H_T_E is %p\n", P);
-	printk (KERN_DEBUG "address of handler is %p\n", Q);
-	for (X = ((*Q).start); X < ((*Q).end); X++)
-		printk (KERN_DEBUG " %x ", (int) (*X));
-	printk (KERN_DEBUG "\n above is pathid table\n");
-#endif
-/********************************************************************/
-/* Searching the pathid address table for matching address, once    */
-/* found, NULL the field. Then Null the H_T_E fields.               */
-/********************************************************************/
-	for (X = ((*Q).start); X < ((*Q).end); X++)
-		if (*X == (ulong) (P + index2)) {
-#ifdef DEBUG
-			printk (KERN_DEBUG "found a path to sever\n");
-			printk (KERN_DEBUG "severing %d \n", (int) (*X));
-#endif
-			*X = NULL;
-			(*(P + index2)).addrs = NULL;	/*clearing the fields */
-			(*(P + index2)).pathid = 0;
-			(*(P + index2)).pgm_data = 0;
-		}
-	spin_unlock (&lock);
-#ifdef DEBUG
-	printk (KERN_DEBUG "exiting iucv_sever\n");
-#endif
-	return b2f0_result;
-}
-
-/**************************************************************/
-/* Name: iucv_receive                                         */
-/* Purpose: receives incoming message                         */
-/* Input: pathid - ushort, pathid                             */
-/*        msgid  - *ulong, mid of message                     */
-/*        trgcls - *ulong, target message class               */
-/*        buffer - pointer of buffer                          */
-/*        buflen - length of buffer                           */
-/*        adds_curr_buffer - pointer to updated buffer address*/
-/*                           to write to                      */
-/*        adds_curr_length - pointer to updated length in     */
-/*                           buffer available to write to     */
-/*        reply_required - uchar *, flag                      */
-/*        priority_msg - uchar *, flag                        */
-/* Output: iprcode - return code from b2f0 call               */
-/* NOTE: pathid must be specified, flag being turned on       */
-/* RESTRICTIONS: target class CANNOT be zero because the code */
-/* checks for a non-NULL value to turn flag on, therefore if  */
-/* target class = zero, flag will not be turned on.           */
-/**************************************************************/
-int
-iucv_receive (ushort pathid, ulong * msgid, ulong * trgcls,
+iucv_receive (u16 pathid, u32 msgid, u32 trgcls,
 	      void *buffer, ulong buflen,
-	      uchar * reply_required,
-	      uchar * priority_msg,
-	      ulong * adds_curr_buffer, ulong * adds_curr_length)
+	      int *flags1_out, ulong * residual_buffer, ulong * residual_length)
 {
 	iparml_db parm;
 	ulong b2f0_result;
-#ifdef DEBUG
-	printk (KERN_DEBUG "entering iucv_receive\n");
-#endif
-	memset (&(parm), 0, sizeof (parm));
-	parm.ipmsgid = *msgid;
-	parm.ippathid = pathid;
-	parm.iptrgcls = *trgcls;
-	parm.ipflags1 |= specify_pathid;	/* turning pathid flag */
-	if (parm.ipmsgid)
-		parm.ipflags1 |= 0x05;
-	if (parm.iptrgcls)
-		parm.ipflags1 |= target_class;
-	parm.ipbfadr1 = (ulong) buffer;
-	parm.ipbfln1f = buflen;
-	b2f0_result = b2f0 (receive, &parm);
-	if (b2f0_result)
-		return b2f0_result;
-	if (msgid)
-		*msgid = parm.ipmsgid;
-	if (trgcls)
-		*trgcls = parm.iptrgcls;
-	if (parm.ipflags1 & prior_msg)
-		if (priority_msg)
-			*priority_msg = 0x01;	/*yes, priority msg */
-	if (!(parm.ipflags1 & 0x10))	/*& with X'10'     */
-		if (reply_required)
-			*reply_required = 0x01;	/*yes, reply required */
-	if (!(parm.ipflags1 & parm_data)) {	/*msg not in parmlist */
-		if (adds_curr_length)
-			*adds_curr_length = parm.ipbfln1f;
-		if (adds_curr_buffer)
-			*adds_curr_buffer = parm.ipbfadr1;
-	} else {
-		if ((buflen) >= 8) {
-			if (buffer)
-				memcpy ((char *) buffer,
-					(char *) parm.ipbfadr1, 8);
-			if (adds_curr_length)
-				*adds_curr_length = ((buflen) - 8);
-			if (adds_curr_buffer)
-				*adds_curr_buffer = (ulong) buffer + 8;
-		} else {
-			parm.iprcode |= 0x05;
-			b2f0_result = (ulong) parm.iprcode;
-		}
-	}
-#ifdef DEBUG
-	printk (KERN_DEBUG "exiting iucv_receive\n");
-#endif
-	return b2f0_result;
-}
+	int moved = 0;		/* number of bytes moved from parmlist to buffer */
+	pr_debug ("iucv_receive: entering\n");
 
-/**************************************************************/
-/* Name: iucv_receive_simple                                  */
-/* Purpose: receives fully-qualified message                  */
-/* Input: pathid - ushort, pathid                             */
-/*        msgid  - ulong, id of message                       */
-/*        trgcls - ulong, target message class                */
-/*        buffer - pointer of buffer                          */
-/*        buflen - length of buffer                           */
-/* Output: iprcode - return code from b2f0 call               */
-/**************************************************************/
-int
-iucv_receive_simple (ushort pathid, ulong msgid, ulong trgcls,
-		     void *buffer, ulong buflen)
-{
-	iparml_db parm;
-	ulong b2f0_result;
-	pr_debug ("entering iucv_receive_simple\n");
+	if (!buffer)
+		return -EINVAL;
 
-	memset (&(parm), 0, sizeof (parm));
+	memset (&parm, 0, sizeof (parm));
+	parm.ipbfadr1 = (u32) buffer;
+	parm.ipbfln1f = (u32) ((ulong) buflen);
 	parm.ipmsgid = msgid;
 	parm.ippathid = pathid;
 	parm.iptrgcls = trgcls;
-	parm.ipflags1 = IPFGMID + IPFGPID + IPFGMCL;
-	parm.ipbfadr1 = (ulong) buffer;
-	parm.ipbfln1f = buflen;
+	parm.ipflags1 = (IPFGPID | IPFGMID | IPFGMCL);
 
-	b2f0_result = b2f0 (receive, &parm);
-	if (b2f0_result)
-		return b2f0_result;
+	b2f0_result = b2f0 (RECEIVE, &parm);
 
-	if (parm.ipflags1 & IPRMDATA) {	/*msg in parmlist */
-		if ((buflen) >= 8)
-			memcpy ((char *) buffer, (char *) parm.ipbfadr1, 8);
-		else
-			b2f0_result = 5;
-	}
-	pr_debug ("exiting iucv_receive_simple\n");
-	return b2f0_result;
-}
+	if (b2f0_result == 0 || b2f0_result == 5) {
+		if (flags1_out) {
+			pr_debug ("*flags1_out = %d\n", *flags1_out);
+			*flags1_out = (parm.ipflags1 & (~0x07));
+			pr_debug ("*flags1_out = %d\n", *flags1_out);
+		}
 
-/**************************************************************/
-/* Name: iucv_receive_array                                   */
-/* Purpose: receives incoming message                         */
-/* Input: pathid - ushort, pathid                             */
-/*        msgid  -* ulong, mid of message                     */
-/*        trgcls -* ulong, target message class               */
-/*        buffer - pointer of iucv_array_t                    */
-/*        buflen - ulong , length of buffer                   */
-/*        reply_required - uchar *, flag returned to caller   */
-/*        priority_msg - uchar *, flag returned to caller     */
-/*        adds_curr_buffer - pointer to updated buffer array  */
-/*                   to write to                              */
-/*        adds_curr_length - pointer to updated length in     */
-/*                   buffer available to write to             */
-/* Output: iprcode - return code from b2f0 call               */
-/* NOTE: pathid must be specified, flag being turned on       */
-/* RESTRICTIONS: target class CANNOT be zero because the code */
-/* checks for a non-NULL value to turn flag on, therefore if  */
-/* target class = if target class = zero flag will not be     */
-/* turned on, therefore if target class is specified it cannot */
-/* be zero.                                                   */
-/**************************************************************/
-int
-iucv_receive_array (ushort pathid, ulong * msgid, ulong * trgcls,
-		    iucv_array_t * buffer, ulong * buflen,
-		    uchar * reply_required,
-		    uchar * priority_msg,
-		    ulong * adds_curr_buffer, ulong * adds_curr_length)
-{
-	iparml_db parm;
-	ulong b2f0_result;
-#ifdef DEBUG
-	printk (KERN_DEBUG "entering iucv_receive_array\n");
-#endif
-	memset (&(parm), 0, sizeof (parm));
-	parm.ipmsgid = *msgid;
-	parm.ippathid = pathid;
-	parm.iptrgcls = *trgcls;
-	parm.ipflags1 |= array;	/* using an address list  */
-	parm.ipflags1 |= specify_pathid;	/*turning on pathid flag */
-	if (parm.ipmsgid)
-		parm.ipflags1 |= 0x05;
-	if (parm.iptrgcls)
-		parm.ipflags1 |= target_class;
-	parm.ipbfadr1 = (ulong) buffer;
-	parm.ipbfln1f = *buflen;
-	b2f0_result = b2f0 (receive, &parm);
-	if (b2f0_result)
-		return b2f0_result;
-	if (msgid)
-		*msgid = parm.ipmsgid;
-	if (trgcls)
-		*trgcls = parm.iptrgcls;
-	if (parm.ipflags1 & prior_msg)
-		if (priority_msg)
-			*priority_msg = 0x01;	/*yes, priority msg */
-	if (!(parm.ipflags1 & 0x10))	/*& with X'10'     */
-		if (reply_required)
-			*reply_required = 0x01;	/*yes, reply required */
-	if (!(parm.ipflags1 & parm_data)) {	/*msg not in parmlist */
-		if (adds_curr_length)
-			*adds_curr_length = parm.ipbfln1f;
-		if (adds_curr_buffer)
-			*adds_curr_buffer = parm.ipbfadr1;
-	} else {
-		if ((buffer->length) >= 8) {
-			memcpy ((char *) buffer->address,
-				(char *) parm.ipbfadr1, 8);
-			if (adds_curr_buffer)
-				*adds_curr_buffer =
-				    (ulong) ((buffer->address) + 8);
-			if (adds_curr_length)
-				*adds_curr_length = ((buffer->length) - 8);
+		if (!(parm.ipflags1 & IPRMDATA)) {	/*msg not in parmlist */
+			if (residual_length)
+				*residual_length = parm.ipbfln1f;
 
+			if (residual_buffer)
+				*residual_buffer = parm.ipbfadr1;
 		} else {
-			parm.iprcode |= 0x05;
-			b2f0_result = (ulong) parm.iprcode;
+			moved = min (buflen, 8);
+
+			memcpy ((char *) buffer,
+				(char *) &parm.ipbfadr1, moved);
+
+			if (buflen < 8)
+				b2f0_result = 5;
+
+			if (residual_length)
+				*residual_length = abs (buflen - 8);
+
+			if (residual_buffer)
+				*residual_buffer = (ulong) (buffer + moved);
 		}
 	}
-#ifdef DEBUG
-	printk (KERN_DEBUG "exiting iucv_receive\n");
-#endif
+	pr_debug ("iucv_receive: exiting \n");
 	return b2f0_result;
 }
 
-/**************************************************************/
-/* Name: iucv_send                                            */
-/* Purpose: sends messages                                    */
-/* Input: pathid - ushort, pathid                             */
-/*        msgid  - ulong *, id of message returned to caller  */
-/*        trgcls - ulong, target message class                */
-/*        srccls - ulong, source message class                */
-/*        msgtag - ulong, message tag                         */
-/*        priority_msg - uchar, flag                          */
-/*        buffer - pointer to buffer                          */
-/*        buflen - ulong, length of buffer                    */
-/* Output: iprcode - return code from b2f0 call               */
-/*         msgid - returns message id                         */
-/**************************************************************/
+/*
+ * Name: iucv_receive_array
+ * Purpose: This function receives messages that are being sent to you
+ *          over established paths. 
+ * Input: pathid - path identification number
+ *        buffer - address of array of buffers
+ *        buflen - total length of buffers
+ *        msgid - specifies the message ID.
+ *        trgcls - specifies target class
+ * Output:
+ *        flags1_out: Options for path.
+ *          IPNORPY - 0x10 specifies whether a reply is required
+ *          IPPRTY - 0x20 specifies if you want to send priority message
+ *         IPRMDATA - 0x80 specifies the data is contained in the parameter list
+ *       residual_buffer - address points to the current list entry IUCV
+ *                         is working on.
+ *       residual_length -
+ *              Contains one of the following values, if the receive buffer is:
+ *               The same length as the message, this field is zero.
+ *               Longer than the message, this field contains the number of
+ *                bytes remaining in the buffer.
+ *               Shorter than the message, this field contains the residual
+ *                count (that is, the number of bytes remaining in the
+ *                message that does not fit into the buffer. In this case
+ *		  b2f0_result = 5.
+ * Return: b2f0_result - return code from CP
+ *         (-EINVAL) - buffer address is NULL
+ */
 int
-iucv_send (ushort pathid, ulong * msgid,
-	   ulong trgcls, ulong srccls,
-	   ulong msgtag, uchar priority_msg, void *buffer, ulong buflen)
+iucv_receive_array (u16 pathid,
+		    u32 msgid, u32 trgcls,
+		    iucv_array_t * buffer, ulong buflen,
+		    int *flags1_out,
+		    ulong * residual_buffer, ulong * residual_length)
 {
 	iparml_db parm;
 	ulong b2f0_result;
-#ifdef DEBUG
-	printk (KERN_DEBUG "entering iucv_send\n");
-#endif
-	memset (&(parm), 0, sizeof (parm));
+	int i = 0, moved = 0, need_to_move = 8, dyn_len;
+	pr_debug ("iucv_receive_array: entering\n");
+
+	if (!buffer)
+		return -EINVAL;
+
+	memset (&parm, 0, sizeof (parm));
+	parm.ipbfadr1 = (u32) ((ulong) buffer);
+	parm.ipbfln1f = (u32) buflen;
+	parm.ipmsgid = msgid;
 	parm.ippathid = pathid;
 	parm.iptrgcls = trgcls;
-	parm.ipbfadr1 = (ulong) buffer;
-	parm.ipbfln1f = buflen;	/* length of message */
-	parm.ipsrccls = srccls;
-	parm.ipmsgtag = msgtag;
-	parm.ipflags1 |= one_way_msg;	/* one way message */
-	if (priority_msg)
-		parm.ipflags1 |= prior_msg;	/* priority message */
-	b2f0_result = b2f0 (send, &parm);
-	if (b2f0_result)
-		return b2f0_result;
-	if (msgid)
-		*msgid = parm.ipmsgid;
-#ifdef DEBUG
-	printk (KERN_DEBUG "exiting iucv_send\n");
-#endif
+	parm.ipflags1 = (IPBUFLST | IPFGPID | IPFGMID | IPFGMCL);
+
+	b2f0_result = b2f0 (RECEIVE, &parm);
+
+	if (b2f0_result == 0 || b2f0_result == 5) {
+
+		if (flags1_out) {
+			pr_debug ("*flags1_out = %d\n", *flags1_out);
+			*flags1_out = (parm.ipflags1 & (~0x07));
+			pr_debug ("*flags1_out = %d\n", *flags1_out);
+		}
+
+		if (!(parm.ipflags1 & IPRMDATA)) {	/*msg not in parmlist */
+
+			if (residual_length)
+				*residual_length = parm.ipbfln1f;
+
+			if (residual_buffer)
+				*residual_buffer = parm.ipbfadr1;
+
+		} else {
+			/* copy msg from parmlist to users array. */
+
+			while ((moved < 8) && (moved < buflen)) {
+				dyn_len =
+				    min ((buffer + i)->length, need_to_move);
+
+				memcpy ((char *)((ulong)((buffer + i)->address)),
+					((char *) &parm.ipbfadr1) + moved,
+					dyn_len);
+
+				moved += dyn_len;
+				need_to_move -= dyn_len;
+
+				(buffer + i)->address =
+				    	(u32)  
+				((ulong)(uchar *) ((ulong)(buffer + i)->address) 
+						+ dyn_len);
+
+				(buffer + i)->length -= dyn_len;
+				i++;
+			}
+
+			if (need_to_move)	/* buflen < 8 bytes */
+				b2f0_result = 5;
+
+			if (residual_length)
+				*residual_length = abs (buflen - 8);
+
+			if (residual_buffer) {
+				if (moved == 0)
+					*residual_buffer = (ulong) buffer;
+				else
+					*residual_buffer =
+					    (ulong) (buffer + (i - 1));
+			}
+
+		}
+	}
+
+	pr_debug ("iucv_receive_array: exiting\n");
 	return b2f0_result;
 }
 
-/**************************************************************/
-/* Name: iucv_send_array                                      */
-/* Purpose: sends messages in buffer array                    */
-/* Input: pathid - ushort, pathid                             */
-/*        msgid  - ulong *, id of message returned to caller  */
-/*        trgcls - ulong, target message class                */
-/*        srccls - ulong, source message class                */
-/*        msgtag - ulong, message tag                         */
-/*        priority_msg - uchar, flag                          */
-/*        buffer - pointer to iucv_array_t                    */
-/*        buflen - ulong, length of buffer                    */
-/* Output: iprcode - return code from b2f0 call               */
-/*         msgid - returns message id                         */
-/**************************************************************/
+/*
+ * Name: iucv_reject                                          
+ * Purpose: Refuses a specified message. Between the time you are notified of a 
+ *          message and the time that you complete the message, the message may
+ *          be rejected.                                 
+ * Input: pathid - u16, path identification number.                            
+ *        msgid  - u32, specifies the message ID.
+ *        trgcls - u32, specifies target class.                
+ * Output: b2f0_result - return code from CP
+ * NOTE: see b2f0 output list                                 
+*/
 int
-iucv_send_array (ushort pathid, ulong * msgid,
-		 ulong trgcls, ulong srccls,
-		 ulong msgtag, uchar priority_msg,
-		 iucv_array_t * buffer, ulong buflen)
+iucv_reject (u16 pathid, u32 msgid, u32 trgcls)
+{
+	iparml_db parm;
+	ulong b2f0_result = 0;
+
+	pr_debug ("iucv_reject: entering \n");
+	pr_debug ("iucv_reject: pathid = %d\n", pathid);
+
+	memset (&parm, 0, sizeof (parm));
+	parm.ippathid = pathid;
+	parm.ipmsgid = msgid;
+	parm.iptrgcls = trgcls;
+	parm.ipflags1 = (IPFGMCL | IPFGMID | IPFGPID);
+
+	b2f0_result = b2f0 (REJECT, &parm);
+
+	pr_debug ("iucv_reject: b2f0_result = %ld\n", b2f0_result);
+	pr_debug ("iucv_reject: exiting\n");
+
+	return b2f0_result;
+}
+
+/* 
+ * Name: iucv_reply
+ * Purpose: This function responds to the two-way messages that you
+ *          receive. You must identify completely the message to
+ *          which you wish to reply. ie, pathid, msgid, and trgcls.
+ * Input: pathid - path identification number
+ *        msgid - specifies the message ID. 
+ *        trgcls - specifies target class
+ *        flags1 - option for path
+ *                 IPPRTY- 0x20 - specifies if you want to send priority message
+ *        buffer - address of reply buffer
+ *        buflen - length of reply buffer
+ * Output: ipbfadr2 - Address of buffer updated by the number
+ *                    of bytes you have moved.
+ *         ipbfln2f - Contains on the the following values
+ *              If the answer buffer is the same length as the reply, this field
+ *               contains zero.
+ *              If the answer buffer is longer than the reply, this field contains
+ *               the number of bytes remaining in the buffer.
+ *              If the answer buffer is shorter than the reply, this field contains
+ *               a residual count (that is, the number of bytes remianing in the
+ *               reply that does not fit into the buffer. In this
+ *                case b2f0_result = 5.
+ * Return: b2f0_result - return code from CP
+ *         (-EINVAL) - buffer address is NULL
+ */
+int
+iucv_reply (u16 pathid,
+	    u32 msgid, u32 trgcls,
+	    int flags1,
+	    void *buffer, ulong buflen, ulong * ipbfadr2, ulong * ipbfln2f)
 {
 	iparml_db parm;
 	ulong b2f0_result;
-#ifdef DEBUG
-	printk (KERN_DEBUG "entering iucv_send_array\n");
-#endif
-	memset (&(parm), 0, sizeof (parm));
+
+	pr_debug ("iucv_reply: entering\n");
+
+	if (!buffer)
+		return -EINVAL;
+
+	memset (&parm, 0, sizeof (parm));
+	parm.ipbfadr2 = (u32) ((ulong) buffer);
+	parm.ipbfln2f = (u32) buflen;	/* length of message */
 	parm.ippathid = pathid;
+	parm.ipmsgid = msgid;
 	parm.iptrgcls = trgcls;
-	parm.ipbfadr1 = (ulong) buffer;
-	parm.ipbfln1f = buflen;	/* length of message */
-	parm.ipsrccls = srccls;
-	parm.ipmsgtag = msgtag;
-	parm.ipflags1 |= one_way_msg;	/* one way message */
-	parm.ipflags1 |= array;	/* one way w/ array */
-	if (priority_msg)
-		parm.ipflags1 |= prior_msg;	/* priority message */
-	b2f0_result = b2f0 (send, &parm);
-	if (msgid)
-		*msgid = parm.ipmsgid;
-#ifdef DEBUG
-	printk (KERN_DEBUG "exiting iucv_send_array\n");
-#endif
+	parm.ipflags1 = (uchar) flags1;	/* priority message */
+
+	b2f0_result = b2f0 (REPLY, &parm);
+
+	if ((b2f0_result == 0) || (b2f0_result == 5)) {
+		if (ipbfadr2)
+			*ipbfadr2 = parm.ipbfadr2;
+		if (ipbfln2f)
+			*ipbfln2f = parm.ipbfln2f;
+	}
+
+	pr_debug ("iucv_reply: exiting\n");
+
 	return b2f0_result;
 }
 
-/**************************************************************/
-/* Name: iucv_send_prmmsg                                     */
-/* Purpose: sends messages in parameter list                  */
-/* Input: pathid - ushort, pathid                             */
-/*        msgid  - ulong *, id of message                     */
-/*        trgcls - ulong, target message class                */
-/*        srccls - ulong, source message class                */
-/*        msgtag - ulong, message tag                         */
-/*        priority_msg - uchar, flag                          */
-/*        prmmsg - uchar[8], message being sent               */
-/* Output: iprcode - return code from b2f0 call               */
-/*         msgid - returns message id                         */
-/**************************************************************/
+/*
+ * Name: iucv_reply_array
+ * Purpose: This function responds to the two-way messages that you
+ *          receive. You must identify completely the message to   
+ *          which you wish to reply. ie, pathid, msgid, and trgcls.
+ *          The array identifies a list of addresses and lengths of
+ *          discontiguous buffers that contains the reply data.
+ * Input: pathid - path identification number
+ *        msgid - specifies the message ID. 
+ *        trgcls - specifies target class 
+ *        flags1 - option for path
+ *                 IPPRTY- specifies if you want to send priority message
+ *        buffer - address of array of reply buffers
+ *        buflen - total length of reply buffers
+ * Output: ipbfadr2 - Address of buffer which IUCV is currently working on.
+ *         ipbfln2f - Contains on the the following values
+ *              If the answer buffer is the same length as the reply, this field
+ *               contains zero.
+ *              If the answer buffer is longer than the reply, this field contains
+ *               the number of bytes remaining in the buffer.
+ *              If the answer buffer is shorter than the reply, this field contains
+ *               a residual count (that is, the number of bytes remianing in the
+ *               reply that does not fit into the buffer. In this
+ *               case b2f0_result = 5.
+ * Return: b2f0_result - return code from CP
+ *             (-EINVAL) - buffer address is NULL
+*/
 int
-iucv_send_prmmsg (ushort pathid, ulong * msgid,
-		  ulong trgcls, ulong srccls,
-		  ulong msgtag, uchar priority_msg, uchar prmmsg[8])
+iucv_reply_array (u16 pathid,
+		  u32 msgid, u32 trgcls,
+		  int flags1,
+		  iucv_array_t * buffer,
+		  ulong buflen, ulong * ipbfadr2, ulong * ipbfln2f)
+{
+	iparml_db parm;
+	ulong b2f0_result;
+
+	pr_debug ("iucv_reply_array: entering\n");
+
+	if (!buffer)
+		return -EINVAL;
+
+	memset (&parm, 0, sizeof (parm));
+	parm.ipbfadr2 = (u32) ((ulong) buffer);
+	parm.ipbfln2f = buflen;	/* length of message */
+	parm.ippathid = pathid;
+	parm.ipmsgid = msgid;
+	parm.iptrgcls = trgcls;
+	parm.ipflags1 = (IPANSLST | flags1);
+
+	b2f0_result = b2f0 (REPLY, &parm);
+
+	if ((b2f0_result == 0) || (b2f0_result == 5)) {
+
+		if (ipbfadr2)
+			*ipbfadr2 = parm.ipbfadr2;
+		if (ipbfln2f)
+			*ipbfln2f = parm.ipbfln2f;
+	}
+
+	pr_debug ("iucv_reply_array: exiting\n");
+
+	return b2f0_result;
+}
+
+/*
+ * Name: iucv_reply_prmmsg
+ * Purpose: This function responds to the two-way messages that you
+ *          receive. You must identify completely the message to
+ *          which you wish to reply. ie, pathid, msgid, and trgcls.
+ *          Prmmsg signifies the data is moved into the
+ *          parameter list.
+ * Input: pathid - path identification number
+ *        msgid - specifies the message ID. 
+ *        trgcls - specifies target class
+ *        flags1 - option for path
+ *                 IPPRTY- specifies if you want to send priority message
+ *        prmmsg - 8-bytes of data to be placed into the parameter
+ *                 list.
+ * Output: NA
+ * Return: b2f0_result - return code from CP
+*/
+int
+iucv_reply_prmmsg (u16 pathid,
+		   u32 msgid, u32 trgcls, int flags1, uchar prmmsg[8])
 {
 	iparml_dpl parm;
 	ulong b2f0_result;
-#ifdef DEBUG
-	printk (KERN_DEBUG "entering iucv_send_prmmsg\n");
-#endif
-	memset (&(parm), 0, sizeof (parm));
+
+	pr_debug ("iucv_reply_prmmsg: entering\n");
+
+	memset (&parm, 0, sizeof (parm));
+	parm.ippathid = pathid;
+	parm.ipmsgid = msgid;
+	parm.iptrgcls = trgcls;
+	memcpy (parm.iprmmsg, prmmsg, sizeof (parm.iprmmsg));
+	parm.ipflags1 = (IPRMDATA | flags1);
+
+	b2f0_result = b2f0 (REPLY, &parm);
+
+	pr_debug ("iucv_reply_prmmsg: exiting\n");
+
+	return b2f0_result;
+}
+
+/*
+ * Name: iucv_resume                                          
+ * Purpose: This function restores communication over a quiesced path.       
+ * Input: pathid - u16, path identification number                             
+ *        user_data - uchar[16], 16-byte of user data                     
+ * Output: b2f0_result - return code from CP               
+ */
+int
+iucv_resume (u16 pathid, uchar user_data[16])
+{
+	iparml_control parm;
+	ulong b2f0_result = 0;
+
+	pr_debug ("iucv_resume: entering\n");
+	pr_debug ("iucv_resume: pathid = %d\n", pathid);
+
+	memset (&parm, 0, sizeof (parm));
+	memcpy (parm.ipuser, user_data, sizeof (*user_data));
+	parm.ippathid = pathid;
+
+	b2f0_result = b2f0 (RESUME, &parm);
+
+	pr_debug ("iucv_resume: exiting \n");
+
+	return b2f0_result;
+}
+
+/*
+ * Name: iucv_send                                             
+ * Purpose: sends messages                                    
+ * Input: pathid - ushort, pathid                            
+ *        msgid  - ulong *, id of message returned to caller   
+ *        trgcls - ulong, target message class              
+ *        srccls - ulong, source message class              
+ *        msgtag - ulong, message tag                    
+ *	  flags1  - Contains options for this path.
+ *		IPPRTY - Ox20 - specifies if you want to send a priority message.
+ *        buffer - pointer to buffer                           
+ *        buflen - ulong, length of buffer                     
+ * Output: b2f0_result - return code from b2f0 call               
+ *         msgid - returns message id                         
+ */
+int
+iucv_send (u16 pathid, u32 * msgid,
+	   u32 trgcls, u32 srccls,
+	   u32 msgtag, int flags1, void *buffer, ulong buflen)
+{
+	iparml_db parm;
+	ulong b2f0_result;
+
+	pr_debug ("iucv_send: entering\n");
+
+	if (!buffer)
+		return -EINVAL;
+
+	memset (&parm, 0, sizeof (parm));
+	parm.ipbfadr1 = (u32) ((ulong) buffer);
+	parm.ippathid = pathid;
+	parm.iptrgcls = trgcls;
+	parm.ipbfln1f = (u32) buflen;	/* length of message */
+	parm.ipsrccls = srccls;
+	parm.ipmsgtag = msgtag;
+	parm.ipflags1 = (IPNORPY | flags1);	/* one way priority message */
+
+	b2f0_result = b2f0 (SEND, &parm);
+
+	if ((b2f0_result == 0) && (msgid))
+		*msgid = parm.ipmsgid;
+
+	pr_debug ("iucv_send: exiting\n");
+
+	return b2f0_result;
+}
+
+/*
+ * Name: iucv_send_array
+ * Purpose: This function transmits data to another application.
+ *          The contents of buffer is the address of the array of
+ *          addresses and lengths of discontiguous buffers that hold
+ *          the message text. This is a one-way message and the
+ *          receiver will not reply to the message.
+ * Input: pathid - path identification number
+ *        trgcls - specifies target class
+ *        srccls - specifies the source message class
+ *        msgtag - specifies a tag to be associated witht the message
+ *        flags1 - option for path
+ *                 IPPRTY- specifies if you want to send priority message
+ *        buffer - address of array of send buffers
+ *        buflen - total length of send buffers
+ * Output: msgid - specifies the message ID.
+ * Return: b2f0_result - return code from CP 
+ *         (-EINVAL) - buffer address is NULL
+ */
+int
+iucv_send_array (u16 pathid,
+		 u32 * msgid,
+		 u32 trgcls,
+		 u32 srccls,
+		 u32 msgtag, int flags1, iucv_array_t * buffer, ulong buflen)
+{
+	iparml_db parm;
+	ulong b2f0_result;
+
+	pr_debug ("iucv_send_array: entering\n");
+
+	if (!buffer)
+		return -EINVAL;
+
+	memset (&parm, 0, sizeof (parm));
+	parm.ippathid = pathid;
+	parm.iptrgcls = trgcls;
+	parm.ipbfadr1 = (u32) ((ulong) buffer);
+	parm.ipbfln1f = (u32) buflen;	/* length of message */
+	parm.ipsrccls = srccls;
+	parm.ipmsgtag = msgtag;
+	parm.ipflags1 = (IPNORPY | IPBUFLST | flags1);
+	b2f0_result = b2f0 (SEND, &parm);
+
+	if ((b2f0_result == 0) && (msgid))
+		*msgid = parm.ipmsgid;
+	pr_debug ("iucv_send_array: exiting\n");
+	return b2f0_result;
+}
+
+/*
+ * Name: iucv_send_prmmsg
+ * Purpose: This function transmits data to another application. 
+ *          Prmmsg specifies that the 8-bytes of data are to be moved
+ *          into the parameter list. This is a one-way message and the
+ *          receiver will not reply to the message.
+ * Input: pathid - path identification number
+ *        trgcls - specifies target class
+ *        srccls - specifies the source message class
+ *        msgtag - specifies a tag to be associated with the message
+ *        flags1 - option for path
+ *                 IPPRTY- specifies if you want to send priority message
+ *        prmmsg - 8-bytes of data to be placed into parameter list
+ * Output: msgid - specifies the message ID.   
+ * Return: b2f0_result - return code from CP
+*/
+int
+iucv_send_prmmsg (u16 pathid,
+		  u32 * msgid,
+		  u32 trgcls,
+		  u32 srccls, u32 msgtag, int flags1, uchar prmmsg[8])
+{
+	iparml_dpl parm;
+	ulong b2f0_result;
+
+	pr_debug ("iucv_send_prmmsg: entering\n");
+
+	memset (&parm, 0, sizeof (parm));
 	parm.ippathid = pathid;
 	parm.iptrgcls = trgcls;
 	parm.ipsrccls = srccls;
 	parm.ipmsgtag = msgtag;
-	parm.ipflags1 |= parm_data;	/* message in prmlist */
-	parm.ipflags1 |= one_way_msg;	/* one way message */
-	if (priority_msg)
-		parm.ipflags1 |= prior_msg;	/* priority message */
-	memcpy (parm.iprmmsg, prmmsg, 8);
-	b2f0_result = b2f0 (send, &parm);
-	if (msgid)
+	parm.ipflags1 = (IPRMDATA | IPNORPY | flags1);
+	memcpy (parm.iprmmsg, prmmsg, sizeof (parm.iprmmsg));
+
+	b2f0_result = b2f0 (SEND, &parm);
+
+	if ((b2f0_result == 0) && (msgid))
 		*msgid = parm.ipmsgid;
-#ifdef DEBUG
-	printk (KERN_DEBUG "exiting iucv_send_prmmsg\n");
-#endif
+
+	pr_debug ("iucv_send_prmmsg: exiting\n");
 	return b2f0_result;
 }
 
-/**************************************************************/
-/* Name: iucv_send2way                                        */
-/* Purpose: sends messages in both directions                 */
-/* Input: pathid - ushort, pathid                             */
-/*        msgid  - ulong *, id of message                     */
-/*        trgcls - ulong, target message class                */
-/*        srccls - ulong, source message class                */
-/*        msgtag - ulong, message tag                         */
-/*        priority_msg - uchar, flag                          */
-/*        buffer - pointer to buffer                          */
-/*        buflen - ulong, length of buffer                    */
-/*        ansbuf - pointer to buffer on reply                 */
-/*        anslen - length of ansbuf buffer                    */
-/* Output: iprcode - return code from b2f0 call               */
-/*         msgid - returns message id                         */
-/**************************************************************/
+/*
+ * Name: iucv_send2way
+ * Purpose: This function transmits data to another application.
+ *          Data to be transmitted is in a buffer. The receiver
+ *          of the send is expected to reply to the message and
+ *          a buffer is provided into which IUCV moves the reply 
+ *          to this message.
+ * Input: pathid - path identification number
+ *        trgcls - specifies target class
+ *        srccls - specifies the source message class
+ *        msgtag - specifies a tag associated with the message
+ *        flags1 - option for path
+ *                 IPPRTY- specifies if you want to send priority message
+ *        buffer - address of send buffer
+ *        buflen - length of send buffer
+ *        ansbuf - address of buffer to reply with
+ *        anslen - length of buffer to reply with
+ * Output: msgid - specifies the message ID.
+ * Return: b2f0_result - return code from CP
+ *         (-EINVAL) - buffer or ansbuf address is NULL
+ */
 int
-iucv_send2way (ushort pathid, ulong * msgid,
-	       ulong trgcls, ulong srccls,
-	       ulong msgtag, uchar priority_msg,
+iucv_send2way (u16 pathid,
+	       u32 * msgid,
+	       u32 trgcls,
+	       u32 srccls,
+	       u32 msgtag,
+	       int flags1,
 	       void *buffer, ulong buflen, void *ansbuf, ulong anslen)
 {
 	iparml_db parm;
 	ulong b2f0_result;
-#ifdef DEBUG
-	printk (KERN_DEBUG "entering iucv_send2way\n");
-#endif
-	memset (&(parm), 0, sizeof (parm));
-	parm.ippathid = pathid;
-	parm.iptrgcls = trgcls;
-	parm.ipbfadr1 = (ulong) buffer;
-	parm.ipbfln1f = buflen;	/* length of message */
-	parm.ipbfadr2 = (ulong) ansbuf;
-	parm.ipbfln2f = anslen;
-	parm.ipsrccls = srccls;
-	parm.ipmsgtag = msgtag;
-	if (priority_msg)
-		parm.ipflags1 |= prior_msg;	/* priority message */
-	b2f0_result = b2f0 (send, &parm);
-	if (msgid)
-		*msgid = parm.ipmsgid;
-#ifdef DEBUG
-	printk (KERN_DEBUG "exiting iucv_send2way\n");
-#endif
-	return b2f0_result;
-}
+	pr_debug ("iucv_send2way: entering\n");
 
-/**************************************************************/
-/* Name: iucv_send2way_array                                  */
-/* Purpose: sends messages in both directions in arrays       */
-/* Input: pathid - ushort, pathid                             */
-/*        msgid  - ulong *, id of message                     */
-/*        trgcls - ulong, target message class                */
-/*        srccls - ulong, source message class                */
-/*        msgtag - ulong, message tag                         */
-/*        priority_msg - uchar, flag                          */
-/*        buffer - pointer to iucv_array_t                    */
-/*        buflen - ulong, length of buffer                    */
-/*        ansbuf - pointer to iucv_array_t on reply           */
-/*        anslen - length of ansbuf buffer                    */
-/* Output: iprcode - return code from b2f0 call               */
-/*         msgid - returns message id                         */
-/**************************************************************/
-int
-iucv_send2way_array (ushort pathid, ulong * msgid,
-		     ulong trgcls, ulong srccls,
-		     ulong msgtag, uchar priority_msg,
-		     iucv_array_t * buffer, ulong buflen,
-		     iucv_array_t * ansbuf, ulong anslen)
-{
-	iparml_db parm;
-	ulong b2f0_result;
-#ifdef DEBUG
-	printk (KERN_DEBUG "entering iucv_send2way_array\n");
-#endif
-	memset (&(parm), 0, sizeof (parm));
-	parm.ippathid = pathid;
-	parm.iptrgcls = trgcls;
-	parm.ipbfadr1 = (ulong) buffer;
-	parm.ipbfln1f = buflen;	/* length of message */
-	parm.ipbfadr2 = (ulong) ansbuf;
-	parm.ipbfln2f = anslen;
-	parm.ipsrccls = srccls;
-	parm.ipmsgtag = msgtag;
-	parm.ipflags1 |= array;	/* send  w/ array  */
-	parm.ipflags1 |= reply_array;	/* reply w/ array  */
-	if (priority_msg)
-		parm.ipflags1 |= prior_msg;	/* priority message */
-	b2f0_result = b2f0 (send, &parm);
-	if (msgid)
-		*msgid = parm.ipmsgid;
-#ifdef DEBUG
-	printk (KERN_DEBUG "exiting iucv_send2way_array\n");
-#endif
-	return b2f0_result;
-}
+	if (!buffer || !ansbuf)
+		return -EINVAL;
 
-/**************************************************************/
-/* Name: iucv_send2way_prmmsg                                 */
-/* Purpose: sends messages in both directions w/parameter lst */
-/* Input: pathid - ushort, pathid                             */
-/*        msgid  - ulong *, id of message                     */
-/*        trgcls - ulong, target message class                */
-/*        srccls - ulong, source message class                */
-/*        msgtag - ulong, message tag                         */
-/*        priority_msg - uchar, flag                          */
-/*        prmmsg - uchar[8], message being sent in parameter  */
-/*        ansbuf - pointer to buffer                          */
-/*        anslen - length of ansbuf buffer                    */
-/* Output: iprcode - return code from b2f0 call               */
-/*         msgid - returns message id                         */
-/**************************************************************/
-int
-iucv_send2way_prmmsg (ushort pathid, ulong * msgid,
-		      ulong trgcls, ulong srccls,
-		      ulong msgtag, uchar priority_msg,
-		      uchar prmmsg[8], void *ansbuf, ulong anslen)
-{
-	iparml_dpl parm;
-	ulong b2f0_result;
-#ifdef DEBUG
-	printk (KERN_DEBUG "entering iucv_send2way_prmmsg\n");
-#endif
-	memset (&(parm), 0, sizeof (parm));
-	parm.ippathid = pathid;
-	parm.iptrgcls = trgcls;
-	parm.ipsrccls = srccls;
-	parm.ipmsgtag = msgtag;
-	parm.ipbfadr2 = (ulong) ansbuf;
-	parm.ipbfln2f = anslen;
-	parm.ipflags1 |= parm_data;	/* message in prmlist */
-	if (priority_msg)
-		parm.ipflags1 |= prior_msg;	/* priority message */
-	memcpy (parm.iprmmsg, prmmsg, 8);
-	b2f0_result = b2f0 (send, &parm);
-	if (msgid)
-		*msgid = parm.ipmsgid;
-#ifdef DEBUG
-	printk (KERN_DEBUG "exiting iucv_send2way_prmmsg\n");
-#endif
-	return b2f0_result;
-}
-
-/**************************************************************/
-/* Name: iucv_reply                                           */
-/* Purpose: responds to the two-way messages that you receive */
-/* Input: pathid - ushort, pathid                             */
-/*        msgid  - ulong, id of message                       */
-/*        trgcls - ulong, target message class                */
-/*        priority_msg - uchar, flag                          */
-/*        buf    - pointer, address of buffer                 */
-/*        buflen - length of buffer                           */
-/* Output: iprcode - return code from b2f0 call               */
-/**************************************************************/
-int
-iucv_reply (ushort pathid, ulong msgid, ulong trgcls,
-	    uchar priority_msg, void *buf, ulong buflen)
-{
-	iparml_db parm;
-	ulong b2f0_result;
-#ifdef DEBUG
-	printk (KERN_DEBUG "entering iucv_reply\n");
-#endif
-	memset (&(parm), 0, sizeof (parm));
-	parm.ippathid = pathid;
-	parm.ipmsgid = msgid;
-	parm.iptrgcls = trgcls;
-	parm.ipbfadr2 = (ulong) buf;
-	parm.ipbfln2f = buflen;	/* length of message */
-	if (priority_msg)
-		parm.ipflags1 |= prior_msg;	/* priority message */
-	b2f0_result = b2f0 (reply, &parm);
-#ifdef DEBUG
-	printk (KERN_DEBUG "exiting iucv_reply\n");
-#endif
-	return b2f0_result;
-}
-
-/**************************************************************/
-/* Name: iucv_reply_array                                     */
-/* Purpose: responds to the two-way messages that you receive */
-/* Input: pathid - ushort, pathid                             */
-/*        msgid  - ulong, id of message                       */
-/*        trgcls - ulong, target message class                */
-/*        priority_msg - uchar, flag                          */
-/*        buf    - pointer, address of array                  */
-/*        buflen - length of buffer                           */
-/* Output: iprcode - return code from b2f0 call               */
-/**************************************************************/
-int
-iucv_reply_array (ushort pathid, ulong msgid, ulong trgcls,
-		  uchar priority_msg, iucv_array_t * buffer, ulong buflen)
-{
-	iparml_db parm;
-	ulong b2f0_result;
-#ifdef DEBUG
-	printk (KERN_DEBUG "entering iucv_reply_array\n");
-#endif
-	memset (&(parm), 0, sizeof (parm));
-	parm.ippathid = pathid;
-	parm.ipmsgid = msgid;
-	parm.iptrgcls = trgcls;
-	parm.ipbfadr2 = (ulong) buffer;
-	parm.ipbfln2f = buflen;	/* length of message */
-	parm.ipflags1 |= reply_array;	/* reply w/ array  */
-	if (priority_msg)
-		parm.ipflags1 |= prior_msg;	/* priority message */
-	b2f0_result = b2f0 (reply, &parm);
-#ifdef DEBUG
-	printk (KERN_DEBUG "exiting iucv_reply_array\n");
-#endif
-	return b2f0_result;
-}
-
-/**************************************************************/
-/* Name: iucv_reply_prmmsg                                    */
-/* Purpose: responds to the two-way messages in parameter list */
-/* Input: pathid - ushort, pathid                             */
-/*        msgid  - ulong, id of message                       */
-/*        trgcls - ulong, target message class                */
-/*        priority_msg - uchar, flag                          */
-/*        prmmsg - uchar[8], message in parameter list        */
-/* Output: iprcode - return code from b2f0 call               */
-/**************************************************************/
-int
-iucv_reply_prmmsg (ushort pathid, ulong msgid, ulong trgcls,
-		   uchar priority_msg, uchar prmmsg[8])
-{
-	iparml_dpl parm;
-	ulong b2f0_result;
-#ifdef DEBUG
-	printk (KERN_DEBUG "entering iucv_reply_prmmsg\n");
-#endif
-	memset (&(parm), 0, sizeof (parm));
-	parm.ippathid = pathid;
-	parm.ipmsgid = msgid;
-	parm.iptrgcls = trgcls;
-	memcpy (parm.iprmmsg, prmmsg, 8);
-	parm.ipflags1 |= parm_data;
-	if (priority_msg)
-		parm.ipflags1 |= prior_msg;	/* priority message */
-	b2f0_result = b2f0 (reply, &parm);
-#ifdef DEBUG
-	printk (KERN_DEBUG "exiting iucv_reply_prmmsg\n");
-#endif
-	return b2f0_result;
-}
-
-/**************************************************************/
-/* Name: iucv_connect                                         */
-/* Purpose: establishes an IUCV path to another vm            */
-/* Input: pathid - ushort *, pathid returned to user          */
-/*        msglim - ushort, limit of outstanding messages      */
-/*        user_data - uchar[16], user data                    */
-/*        userid - uchar[8], user's id                        */
-/*        system_name - uchar[8], system identification       */
-/*        priority_requested - uchar- flag                    */
-/*        prmdata - uchar, flag prgrm can handler messages    */
-/*                  in parameter list                         */
-/*        quiesce - uchar, flag to quiesce a path being establ */
-/*        control - uchar, flag, option not used              */
-/*        local   - uchar, flag, establish connection only on */
-/*                  local system                              */
-/*        priority_permitted - uchar *, flag returned to user */
-/*        handle - address of handler                         */
-/*        pgm_data - ulong                                    */
-/* Output: iprcode - return code from b2f0 call               */
-/**************************************************************/
-int
-iucv_connect (ushort * pathid, ushort msglim, uchar user_data[16],
-	      uchar userid[8], uchar system_name[8],
-	      uchar priority_requested, uchar prmdata,
-	      uchar quiesce, uchar control,
-	      uchar local, uchar * priority_permitted,
-	      iucv_handle_t handle, ulong pgm_data)
-{
-	iparml_control parm;
-	ulong b2f0_result;
-	int add_pathid_result, rc;
-	handler *R;
-#ifdef DEBUG
-	printk (KERN_DEBUG "entering iucv_connect\n");
-#endif
 	memset (&parm, 0, sizeof (parm));
-	if (declare_flag == NULL) {
-		rc = iucv_declare_buffer (iucv_external_int_buffer);
-		if (rc) {
-			printk (KERN_DEBUG "IUCV: registration failed\n");
-#ifdef DEBUG
-			printk (KERN_DEBUG "rc from declare buffer is: %i\n",
-				rc);
-#endif
-			return rc;
-		} else
-			declare_flag = 1;
-	}
-	/* Checking if handle is valid  */
-	spin_lock (&lock);
-	for (R = handler_anchor; R != NULL; R = (handler *) R->next)
-		if (R == handle)
-			break;
-	if (R == NULL) {
-		spin_unlock (&lock);
-#ifdef DEBUG
-		printk (KERN_DEBUG "iucv_connect: Invalid Handle\n");
-#endif
-		return (-2);
-	}
-	if (pathid == NULL) {
-		spin_unlock (&lock);
-#ifdef DEBUG
-		printk (KERN_DEBUG "iucv_connect: invalid pathid pointer\n");
-#endif
-		return (-3);
-	}
-	spin_unlock (&lock);
-	parm.ipmsglim = msglim;
-	memcpy (parm.ipuser, user_data, 16);
-	memcpy (parm.ipvmid, userid, 8);
-	memcpy (parm.iptarget, system_name, 8);
-	if (parm.iptarget)
-		ASCEBC (parm.iptarget, 8);
-	if (parm.ipvmid) {
-		ASCEBC (parm.ipvmid, 8);
-		EBC_TOUPPER(parm.ipvmid, 8);
-	}
-	if (priority_requested)
-		parm.ipflags1 |= prior_msg;
-	if (prmdata)
-		parm.ipflags1 |= parm_data;	/*data in parameter list */
-	if (quiesce)
-		parm.ipflags1 |= quiesce_msg;
-	if (control) {
-		/* do nothing at the time being  */
-		/*control not provided yet */
-	}
-	if (local)
-		parm.ipflags1 |= local_conn;	/*connect on local system */
-	b2f0_result = b2f0 (connect, &parm);
-	if (b2f0_result)
-		return b2f0_result;
-	add_pathid_result = add_pathid (parm.ippathid, handle, pgm_data);
-	if (add_pathid_result) {
-#ifdef DEBUG
-		printk (KERN_DEBUG "iucv_connect: add_pathid failed \n");
-#endif
-		return (add_pathid_result);
-	}
-	*pathid = parm.ippathid;
-	if (parm.ipflags1 & prior_msg)
-		if (priority_permitted)
-			*priority_permitted = 0x01;
-#ifdef DEBUG
-	printk (KERN_DEBUG "exiting iucv_connect\n");
-#endif
-	return b2f0_result;
-}
-
-/**************************************************************/
-/* Name: iucv_accept                                          */
-/* Purpose: completes the iucv communication path             */
-/* Input: pathid - ushort , pathid                            */
-/*        msglim - ushort, limit of outstanding messages      */
-/*        user_data - uchar[16], user data                    */
-/*        priority_requested - uchar- flag                    */
-/*        prmdata - uchar, flag prgrm can handler messages    */
-/*                  in parameter list                         */
-/*        quiesce - uchar, flag to quiesce a path being establ*/
-/*        control - uchar, flag, option not used              */
-/*        priority_permitted -uchar *, flag returned to caller*/
-/*        handle - address of handler                         */
-/*        pgm_data - ulong                                    */
-/* Output: iprcode - return code from b2f0 call               */
-/**************************************************************/
-int
-iucv_accept (ushort pathid, ushort msglim, uchar user_data[16],
-	     uchar priority_requested,
-	     uchar prmdata, uchar quiesce, uchar control,
-	     uchar * priority_permitted, iucv_handle_t handle, ulong pgm_data)
-{
-	ulong index1, index2;
-	handler_table_entry *P = 0;
-	iparml_control parm;
-	ulong b2f0_result;
-#ifdef DEBUG
-	printk (KERN_DEBUG "entering iucv_accept\n");
-#endif
-	memset (&(parm), 0, sizeof (parm));
 	parm.ippathid = pathid;
-	parm.ipmsglim = msglim;
-	memcpy (parm.ipuser, user_data, 16);
-	if (priority_requested)
-		parm.ipflags1 |= prior_msg;
-	if (prmdata)
-		parm.ipflags1 |= parm_data;	/*data in parameter list */
-	if (quiesce)
-		parm.ipflags1 |= quiesce_msg;
-	if (control) {
-		/* do nothing at the time being  */
-		/*control not provided yet */
-	}
-	b2f0_result = b2f0 (accept, &parm);
-	if (b2f0_result)
-		return b2f0_result;
-	index1 = ((ulong) pathid) / 512;
-	index2 = ((ulong) pathid) % 512;
-	spin_lock (&lock);
-	if (pgm_data) {
-		P = main_table[index1];
-		(P + index2)->pgm_data = pgm_data;
-	}
-	spin_unlock (&lock);
-	if (parm.ipflags1 & prior_msg)
-		if (priority_permitted)
-			*priority_permitted = 0x01;
-#ifdef DEBUG
-	printk (KERN_DEBUG "exiting iucv_accept\n");
-#endif
+	parm.iptrgcls = trgcls;
+	parm.ipbfadr1 = (u32) ((ulong) buffer);
+	parm.ipbfln1f = (u32) buflen;	/* length of message */
+	parm.ipbfadr2 = (u32) ((ulong) ansbuf);
+	parm.ipbfln2f = (u32) anslen;
+	parm.ipsrccls = srccls;
+	parm.ipmsgtag = msgtag;
+	parm.ipflags1 = flags1;	/* priority message */
+
+	b2f0_result = b2f0 (SEND, &parm);
+
+	if ((b2f0_result == 0) && (msgid))
+		*msgid = parm.ipmsgid;
+
+	pr_debug ("iucv_send2way: exiting\n");
+
 	return b2f0_result;
 }
 
-/**************************************************************/
-/* Name: iucv_send2way_prmmsg_array                           */
-/* Purpose: sends messages in both directions w/parameter lst */
-/* Input: pathid - ushort, pathid                             */
-/*        msgid  - ulong *, id of message returned to caller  */
-/*        trgcls - ulong, target message class                */
-/*        srccls - ulong, source message class                */
-/*        msgtag - ulong, message tag                         */
-/*        priority_msg - uchar, flag                          */
-/*        prmmsg - uchar[8], message being sent in parameter  */
-/*        ansbuf - pointer to array of buffers                */
-/*        anslen - length of ansbuf buffer                    */
-/* Output: iprcode - return code from b2f0 call               */
-/*         msgid - returns message id                         */
-/**************************************************************/
+/*
+ * Name: iucv_send2way_array
+ * Purpose: This function transmits data to another application.
+ *          The contents of buffer is the address of the array of
+ *          addresses and lengths of discontiguous buffers that hold
+ *          the message text. The receiver of the send is expected to
+ *          reply to the message and a buffer is provided into which
+ *          IUCV moves the reply to this message.
+ * Input: pathid - path identification number
+ *        trgcls - specifies target class
+ *        srccls - specifies the source message class
+ *        msgtag - spcifies a tag to be associated with the message
+ *        flags1 - option for path
+ *                 IPPRTY- specifies if you want to send priority message
+ *        buffer - address of array of send buffers
+ *        buflen - total length of send buffers
+ *        ansbuf - address of buffer to reply with                       
+ *        anslen - length of buffer to reply with     
+ * Output: msgid - specifies the message ID.
+ * Return: b2f0_result - return code from CP
+ *         (-EINVAL) - buffer address is NULL
+ */
 int
-iucv_send2way_prmmsg_array (ushort pathid, ulong * msgid,
-			    ulong trgcls, ulong srccls,
-			    ulong msgtag, uchar priority_msg,
+iucv_send2way_array (u16 pathid,
+		     u32 * msgid,
+		     u32 trgcls,
+		     u32 srccls,
+		     u32 msgtag,
+		     int flags1,
+		     iucv_array_t * buffer,
+		     ulong buflen, iucv_array_t * ansbuf, ulong anslen)
+{
+	iparml_db parm;
+	ulong b2f0_result;
+
+	pr_debug ("iucv_send2way_array: entering\n");
+
+	if (!buffer || !ansbuf)
+		return -EINVAL;
+
+	memset (&parm, 0, sizeof (parm));
+	parm.ippathid = pathid;
+	parm.iptrgcls = trgcls;
+	parm.ipbfadr1 = (u32) ((ulong) buffer);
+	parm.ipbfln1f = (u32) buflen;	/* length of message */
+	parm.ipbfadr2 = (u32) ((ulong) ansbuf);
+	parm.ipbfln2f = (u32) anslen;
+	parm.ipsrccls = srccls;
+	parm.ipmsgtag = msgtag;
+	parm.ipflags1 = (IPBUFLST | IPANSLST | flags1);
+	b2f0_result = b2f0 (SEND, &parm);
+	if ((b2f0_result == 0) && (msgid))
+		*msgid = parm.ipmsgid;
+	pr_debug ("iucv_send2way_array: exiting\n");
+	return b2f0_result;
+}
+
+/*
+ * Name: iucv_send2way_prmmsg
+ * Purpose: This function transmits data to another application.
+ *          Prmmsg specifies that the 8-bytes of data are to be moved
+ *          into the parameter list. This is a two-way message and the
+ *          receiver of the message is expected to reply. A buffer
+ *          is provided into which IUCV moves the reply to this
+ *          message.
+ * Input: pathid - path identification number  
+ *        trgcls - specifies target class
+ *        srccls - specifies the source message class
+ *        msgtag - specifies a tag to be associated with the message
+ *        flags1 - option for path
+ *                 IPPRTY- specifies if you want to send priority message
+ *        prmmsg - 8-bytes of data to be placed in parameter list
+ *        ansbuf - address of buffer to reply with                       
+ *        anslen - length of buffer to reply with     
+ * Output: msgid - specifies the message ID.
+ * Return: b2f0_result - return code from CP
+ *         (-EINVAL) - buffer address is NULL
+*/
+int
+iucv_send2way_prmmsg (u16 pathid,
+		      u32 * msgid,
+		      u32 trgcls,
+		      u32 srccls,
+		      u32 msgtag,
+		      ulong flags1, uchar prmmsg[8], void *ansbuf, ulong anslen)
+{
+	iparml_dpl parm;
+	ulong b2f0_result;
+	pr_debug ("iucv_send2way_prmmsg: entering\n");
+
+	if (!ansbuf)
+		return -EINVAL;
+
+	memset (&parm, 0, sizeof (parm));
+	parm.ippathid = pathid;
+	parm.iptrgcls = trgcls;
+	parm.ipsrccls = srccls;
+	parm.ipmsgtag = msgtag;
+	parm.ipbfadr2 = (u32) ((ulong) ansbuf);
+	parm.ipbfln2f = (u32) anslen;
+	parm.ipflags1 = (IPRMDATA | flags1);	/* message in prmlist */
+	memcpy (parm.iprmmsg, prmmsg, sizeof (parm.iprmmsg));
+
+	b2f0_result = b2f0 (SEND, &parm);
+
+	if ((b2f0_result == 0) && (msgid))
+		*msgid = parm.ipmsgid;
+
+	pr_debug ("iucv_send2way_prmmsg: exiting\n");
+
+	return b2f0_result;
+}
+
+/*
+ * Name: iucv_send2way_prmmsg_array
+ * Purpose: This function transmits data to another application.
+ *          Prmmsg specifies that the 8-bytes of data are to be moved
+ *          into the parameter list. This is a two-way message and the
+ *          receiver of the message is expected to reply. A buffer
+ *          is provided into which IUCV moves the reply to this
+ *          message. The contents of ansbuf is the address of the
+ *          array of addresses and lengths of discontiguous buffers
+ *          that contain the reply.
+ * Input: pathid - path identification number
+ *        trgcls - specifies target class
+ *        srccls - specifies the source message class   
+ *        msgtag - specifies a tag to be associated with the message
+ *        flags1 - option for path
+ *                 IPPRTY- specifies if you want to send priority message
+ *        prmmsg - 8-bytes of data to be placed into the parameter list
+ *        ansbuf - address of buffer to reply with                       
+ *        anslen - length of buffer to reply with     
+ * Output: msgid - specifies the message ID.
+ * Return: b2f0_result - return code from CP
+ *         (-EINVAL) - ansbuf address is NULL
+ */
+int
+iucv_send2way_prmmsg_array (u16 pathid,
+			    u32 * msgid,
+			    u32 trgcls,
+			    u32 srccls,
+			    u32 msgtag,
+			    int flags1,
 			    uchar prmmsg[8],
 			    iucv_array_t * ansbuf, ulong anslen)
 {
 	iparml_dpl parm;
 	ulong b2f0_result;
-#ifdef DEBUG
-	printk (KERN_DEBUG "entering iucv_send2way_prmmsg\n");
-#endif
-	memset (&(parm), 0, sizeof (parm));
+
+	pr_debug ("iucv_send2way_prmmsg_array: entering\n");
+
+	if (!ansbuf)
+		return -EINVAL;
+
+	memset (&parm, 0, sizeof (parm));
 	parm.ippathid = pathid;
 	parm.iptrgcls = trgcls;
 	parm.ipsrccls = srccls;
 	parm.ipmsgtag = msgtag;
-	parm.ipbfadr2 = (ulong) ansbuf;
-	parm.ipbfln2f = anslen;
-	parm.ipflags1 |= 0x88;	/* message in prmlist */
-	if (priority_msg)
-		parm.ipflags1 |= prior_msg;	/* priority message */
-	memcpy (parm.iprmmsg, prmmsg, 8);
-	b2f0_result = b2f0 (send, &parm);
-	if (msgid)
+	parm.ipbfadr2 = (u32) ((ulong) ansbuf);
+	parm.ipbfln2f = (u32) anslen;
+	parm.ipflags1 = (IPRMDATA | IPANSLST | flags1);
+	memcpy (parm.iprmmsg, prmmsg, sizeof (parm.iprmmsg));
+	b2f0_result = b2f0 (SEND, &parm);
+	if ((b2f0_result == 0) && (msgid))
 		*msgid = parm.ipmsgid;
-#ifdef DEBUG
-	printk (KERN_DEBUG "exiting iucv_send2way_prmmsg\n");
-#endif
+	pr_debug ("iucv_send2way_prmmsg_array: exiting\n");
 	return b2f0_result;
 }
 
-/******************************************************************/
-/* Name: top_half_handler                                         */
-/* Purpose: handle minimum amount of interrupt in fastest time    */
-/*  possible and then pass interrupt to bottom half handler.      */
-/* Input: external interrupt buffer                               */
-/* Output: void                                                   */
-/******************************************************************/
+/*
+ * Name: iucv_setmask
+ * Purpose: This function enables or disables the following IUCV   
+ *          external interruptions: Nonpriority and priority message
+ *          interrupts, nonpriority and priority reply interrupts.
+ * Input: SetMaskFlag - options for interrupts
+ *           0x80 - Nonpriority_MessagePendingInterruptsFlag
+ *           0x40 - Priority_MessagePendingInterruptsFlag
+ *           0x20 - Nonpriority_MessageCompletionInterruptsFlag
+ *           0x10 - Priority_MessageCompletionInterruptsFlag
+ * Output: NA
+ * Return: b2f0_result - return code from CP
+*/
+int
+iucv_setmask (int SetMaskFlag)
+{
+	iparml_set_mask parm;
+	ulong b2f0_result = 0;
+	pr_debug ("iucv_setmask: entering \n");
+
+	memset (&parm, 0, sizeof (parm));
+	parm.ipmask = (uchar) SetMaskFlag;
+
+	b2f0_result = b2f0 (SETMASK, &parm);
+
+	pr_debug ("iucv_setmask: b2f0_result = %ld\n", b2f0_result);
+	pr_debug ("iucv_setmask: exiting\n");
+
+	return b2f0_result;
+}
+
+/*
+ * Name: iucv_sever                                           
+ * Purpose: This function terminates an iucv path         
+ * Input: pathid - u16, path identification number                             
+ *        user_data - uchar[16], 16-byte of user data                     
+ * Output: b2f0_result - return code from CP          
+ *         -EINVAL - NULL address found for handler                                 
+ */
+int
+iucv_sever (u16 pathid, uchar user_data[16])
+{
+	iparml_control parm;
+	ulong b2f0_result = 0;
+	pr_debug ("iucv_sever: entering\n");
+	memset (&parm, 0, sizeof (parm));
+	memcpy (parm.ipuser, user_data, sizeof (parm.ipuser));
+	parm.ippathid = pathid;
+
+	b2f0_result = b2f0 (SEVER, &parm);
+
+	if (!b2f0_result)
+		iucv_remove_pathid (pathid);
+
+	pr_debug ("iucv_sever: exiting \n");
+	return b2f0_result;
+}
+
+static void
+iucv_remove_pathid (u16 pathid)
+{
+	handler_table_entry *users_hte = NULL;	/*users handler_table_entry */
+	handler *users_handler = NULL;
+	ulong *users_pathid = NULL;
+	ulong flags;
+	spin_lock_irqsave (&iucv_lock, flags);
+	users_hte = handler_table_anchor + (int) pathid;
+
+	if ((users_hte->addrs) == NULL) {
+		spin_unlock_irqrestore (&iucv_lock, flags);
+		return;		/* wild pointer has been found */
+	}
+
+	users_handler = users_hte->addrs;
+
+	pr_debug ("iucv_sever: pathid is %d\n", pathid);
+	pr_debug ("iucv_sever: H_T_E is %p\n", users_hte);
+	pr_debug ("iucv_sever: address of handler is %p\n", users_handler);
+	pr_debug ("iucv_sever: below is pathid table\n");
+	iucv_dumpit ((uchar *) users_handler->pathid_head,
+		     (int) users_handler->entries * sizeof (ulong));
+
+/*
+ * Searching the pathid address table for matching address, once    
+ * found, NULL the handler_table_entry field and then zero the H_T_E fields.               
+ */
+
+	for (users_pathid = (users_handler->pathid_head);
+	     users_pathid < (users_handler->pathid_tail); users_pathid++)
+
+		if (*users_pathid == (ulong) users_hte) {
+			pr_debug ("iucv_sever: found a path to remove from"
+				  "table\n");
+			pr_debug ("iucv_sever: removing %d \n",
+				  (int) (*users_pathid)); *users_pathid = NULL;
+
+			memset (users_hte, 0, sizeof (handler_table_entry));
+		}
+	spin_unlock_irqrestore (&iucv_lock, flags);
+	return;
+}
+
+/*
+ * Interrupt Handling Functions
+ * 	top_half_interrupt
+ * 	bottom_half_interrupt
+ * 	do_int
+ */
+
+/*
+ * Name: top_half_interrupt                                         
+ * Purpose: Handles interrupts coming in from CP.  Places the interrupt on a queue and  
+ * 	    calls bottom_half_interrupt          
+ * Input: external interrupt buffer                                
+ * Output: void                                                    
+ */
 
 inline void
 top_half_interrupt (struct pt_regs *regs, __u16 code)
 {
 	iucv_packet *pkt;
-	pkt = (iucv_packet *) kmalloc
-	    (sizeof (iucv_packet), GFP_ATOMIC);
+	int cpu = smp_processor_id();
+
+	irq_enter(cpu, 0x4000);
+
+	pkt = (iucv_packet *) kmalloc (sizeof (iucv_packet), GFP_ATOMIC);
 	if (pkt == NULL) {
-		printk (KERN_DEBUG "out of memory\n");
+		printk (KERN_WARNING
+			"iucv:top_half_interrupt: out of memory\n");
+		irq_exit(cpu, 0x4000);
 		return;
 	}
-	memcpy (pkt->data, iucv_external_int_buffer, 40);
-#ifdef DEBUG3
-printk (KERN_EMERG "TH: Got INT: %08x\n", *(int *)(pkt->data+4));
-#endif
+
+	memcpy (pkt->data, iucv_external_int_buffer, BUFFER_SIZE);
+
+	pr_debug ("TH: Got INT: %08x\n", *(int *) (pkt->data + 4));
+
 	/* put new packet on the list */
 	spin_lock (&iucv_packets_lock);
 	pkt->next = NULL;
+
 	if (iucv_packets_tail != NULL)
 		iucv_packets_tail->next = pkt;
 	else
 		iucv_packets_head = pkt;
+
 	iucv_packets_tail = pkt;
 	spin_unlock (&iucv_packets_lock);
 
 	if (atomic_compare_and_swap (0, 1, &bh_scheduled) == 0) {
-#ifdef DEBUG3
-printk (KERN_EMERG "TH: Queuing BH\n");
-#endif
-		INIT_LIST_HEAD(&short_task.list);
-		short_task.sync = 0;
 		short_task.routine = (void *) bottom_half_interrupt;
 		queue_task (&short_task, &tq_immediate);
 		mark_bh (IMMEDIATE_BH);
 	}
+	irq_exit(cpu, 0x4000);
 	return;
 }
 
-/*******************************************************************/
-/* Name: bottom_half_interrupt                                     */
-/* Purpose: Handle interrupt at a more safer time                  */
-/* Input: void                                                     */
-/* Output: void                                                    */
-/*******************************************************************/
+/*
+ * Name: bottom_half_interrupt                                      
+ * Purpose: Handle interrupt at a more safer time                  
+ * Input: void                                                     
+ * Output: void                                                    
+ */
 void
 bottom_half_interrupt (void)
 {
 	iucv_packet *iucv_packet_list;
 	iucv_packet *tmp;
 	ulong flags;
-
 	atomic_set (&bh_scheduled, 0);
+
 	spin_lock_irqsave (&iucv_packets_lock, flags);
 	iucv_packet_list = iucv_packets_head;
 	iucv_packets_head = iucv_packets_tail = NULL;
 	spin_unlock_irqrestore (&iucv_packets_lock, flags);
 
 	/* now process all the request in the iucv_packet_list */
-#ifdef DEBUG3
-	printk (KERN_EMERG "BH: Process all packets\n");
-#endif
+	pr_debug ("BH: Process all packets\n");
 	while (iucv_packet_list != NULL) {
-#ifdef DEBUG3
-		printk( KERN_EMERG "BH:>  %08x\n", 
-			*(int *)(iucv_packet_list->data+4));
-#endif
-		do_int ((iucv_ConnectionPending *) iucv_packet_list->data);
-#ifdef DEBUG3
-		printk( KERN_EMERG "BH:<  %08x\n",
-			*(int *)(iucv_packet_list->data+4));
-#endif
+		pr_debug ("BH:>  %08x\n",
+			  *(int *) (iucv_packet_list->data + 4));
+
+		do_int ((iucv_GeneralInterrupt *) iucv_packet_list->data);
+
+		pr_debug ("BH:<  %08x\n",
+			  *(int *) (iucv_packet_list->data + 4));
 		tmp = iucv_packet_list;
 		iucv_packet_list = iucv_packet_list->next;
 		kfree (tmp);
 	}
-#ifdef DEBUG3
-	printk (KERN_EMERG "BH: Done\n");
-#endif
+	pr_debug ("BH: Done\n");
 	return;
 }
-/*******************************************************************/
-/* Name: do_int                                                    */
-/* Purpose: Handle interrupt in a more safe environment            */
-/* Inuput: int_buf - pointer to copy of external interrupt buffer  */
-/* Output: void                                                    */
-/*******************************************************************/
+
+/*
+ * Name: do_int                                                     
+ * Purpose: Handles the interrupts in a more safe environment             
+ * Input: int_buf - pointer to copy of external interrupt buffer  
+ * Output: void                                                     
+ */
 void
-do_int (iucv_ConnectionPending * int_buf)
+do_int (iucv_GeneralInterrupt * int_buf)
 {
-	ulong index1 = 0, index2 = 0;
-	handler_table_entry *P = 0;	/* P is a pointer */
-	handler *Q = 0, *R;	/* Q and R are pointers */
+	handler_table_entry *P = 0;
+	ulong flags;
+	handler *Q = 0, *R;
 	iucv_interrupt_ops_t *interrupt = 0;	/* interrupt addresses */
 	uchar temp_buff1[24], temp_buff2[24];	/* masked handler id. */
 	int add_pathid_result = 0, j = 0;
 	uchar no_listener[16] = "NO LISTENER";
-#ifdef DEBUG
-	int i;
-	uchar *prt_parm;
-#endif
-#ifdef DEBUG3
-	printk (KERN_DEBUG "BH:-  Entered do_int "
-	                   "pathid %d, type %02X\n",
-		int_buf->ippathid, int_buf->iptype);
-#endif
-#ifdef DEBUG
-	prt_parm = (uchar *) (int_buf);
-	printk (KERN_DEBUG "External Interrupt Buffer\n");
-	for (i = 0; i < 40; i++)
-		printk (KERN_DEBUG "%02x ", prt_parm[i]);
-	printk (KERN_DEBUG "\n");
-#endif
+
+	pr_debug ("IUCV: BHI: -  Entered do_int "
+		  "pathid %d, type %02X\n", int_buf->ippathid, int_buf->iptype);
+	pr_debug ("BHI:External Interrupt Buffer\n");
+	iucv_dumpit ((uchar *) int_buf, sizeof (iucv_GeneralInterrupt));
+
 	ASCEBC (no_listener, 16);
 	if (int_buf->iptype != 01) {
-		index1 = ((ulong) (int_buf->ippathid)) / 512;
-		index2 = ((ulong) (int_buf->ippathid)) % 512;
-		spin_lock (&lock);
+		spin_lock_irqsave (&iucv_lock, flags);
+		P = handler_table_anchor + int_buf->ippathid;
+		Q = P->addrs;
+		interrupt = P->ops;	/* interrupt functions */
 
-		P = main_table[index1];
-		Q = (P + index2)->addrs;
-		interrupt = Q->interrupt_table;	/* interrupt functions */
-		spin_unlock (&lock);
-#ifdef DEBUG
-		printk (KERN_DEBUG "Handler is: \n");
-		prt_parm = (uchar *) Q;
-		for (i = 0; i < sizeof (handler); i++)
-			printk (KERN_DEBUG " %02x ", prt_parm[i]);
-		printk (KERN_DEBUG "\n");
-#endif
-	}			/* end of if statement */
+		pr_debug ("iucv: do_int: Handler\n");
+		iucv_dumpit ((uchar *) Q, sizeof (handler));
+		spin_unlock_irqrestore (&iucv_lock, flags);
+	}
+	/* end of if statement */
 	switch (int_buf->iptype) {
 	case 0x01:		/* connection pending */
-		spin_lock (&lock);
+		spin_lock_irqsave (&iucv_lock, flags);
 		for (R = handler_anchor; R != NULL; R = (handler *) R->next) {
 			memcpy (temp_buff1, &(int_buf->ipvmid), 24);
-			memcpy (temp_buff2, &(R->vmid), 24);
+			memcpy (temp_buff2, &(R->id.userid), 24);
 			for (j = 0; j < 24; j++) {
-				temp_buff1[j] = (temp_buff1[j]) & (R->mask)[j];
-				temp_buff2[j] = (temp_buff2[j]) & (R->mask)[j];
+				temp_buff1[j] =
+				    (temp_buff1[j]) & (R->id.mask)[j];
+				temp_buff2[j] =
+				    (temp_buff2[j]) & (R->id.mask)[j];
 			}
-#ifdef DEBUG
-			for (i = 0; i < sizeof (temp_buff1); i++)
-				printk (KERN_DEBUG " %c ", temp_buff1[i]);
-			printk (KERN_DEBUG "\n");
-			for (i = 0; i < sizeof (temp_buff2); i++)
-				printk (KERN_DEBUG " %c ", temp_buff2[i]);
-			printk (KERN_DEBUG "\n");
-#endif
-			if (memcmp((void *) temp_buff1,
-				   (void *) temp_buff2, 24) == 0) {
-#ifdef DEBUG
-				printk (KERN_DEBUG
-					"found a matching handler\n");
-#endif
+
+			pr_debug ("iucv:do_int: temp_buff1\n");
+			iucv_dumpit (temp_buff1, sizeof (temp_buff1));
+			pr_debug ("iucv:do_int: temp_buff2\n");
+			iucv_dumpit (temp_buff2, sizeof (temp_buff2));
+
+			if (memcmp ((void *) temp_buff1,
+				    (void *) temp_buff2, 24) == 0) {
+
+				pr_debug
+				    ("iucv:do_int: found a matching handler\n");
 				break;
 			}
 		}
-		spin_unlock (&lock);
+		spin_unlock_irqrestore (&iucv_lock, flags);
+
 		if (R) {
 			/* ADD PATH TO PATHID TABLE */
-			add_pathid_result =
-			    add_pathid (int_buf->ippathid, R, R->pgm_data);
+			add_pathid_result = iucv_add_pathid (int_buf->ippathid,
+							     R, R->pgm_data);
 			if (add_pathid_result == NULL) {
 				interrupt = R->interrupt_table;
-				if ((*interrupt).ConnectionPending) {
+				if (interrupt->ConnectionPending) {
+
 					EBCASC (int_buf->ipvmid, 8);
-					
-					    ((*interrupt).
-					 ConnectionPending) (int_buf,
-							     R->pgm_data);
+
+					(interrupt->ConnectionPending)
+					    ((iucv_ConnectionPending *) int_buf,
+					     (R->pgm_data));
 				} else {
 					iucv_sever (int_buf->ippathid,
 						    no_listener);
 				}
-			} /* end if if(add_p...... */
+			} /* end of if(add_p...... */
 			else {
 				iucv_sever (int_buf->ippathid, no_listener);
-#ifdef DEBUG
-				printk (KERN_DEBUG
-					"add_pathid failed with rc = %d\n",
-					(int) add_pathid_result);
-#endif
+				pr_debug ("iucv:do_int:add_pathid failed"
+					  "with rc = %d\n",
+					  (int) add_pathid_result);
 			}
 		} else
 			iucv_sever (int_buf->ippathid, no_listener);
 		break;
+
 	case 0x02:		/*connection complete */
 		if (Q) {
-			if ((*interrupt).ConnectionComplete)
-				((*interrupt).ConnectionComplete)
-				    
-				    ((iucv_ConnectionComplete *) int_buf,
-				     (P + index2)->pgm_data);
-			else {
-#ifdef DEBUG
-				printk (KERN_DEBUG
-					"ConnectionComplete not called\n");
-				printk (KERN_DEBUG "routine@ is %p\n",
-					(*interrupt).ConnectionComplete);
-#endif
-			}
+			if (interrupt->ConnectionComplete)
+				(interrupt->ConnectionComplete)
+				    ((iucv_ConnectionComplete *) int_buf, (P->pgm_data));
+			else
+				pr_debug ("iucv:do_int:"
+					  "ConnectionComplete not called\n");
 		}
+		
 		break;
+
 	case 0x03:		/* connection severed */
 		if (Q) {
-			if ((*interrupt).ConnectionSevered)
-				((*interrupt).ConnectionSevered)
-				    
+			if (interrupt->ConnectionSevered)
+				(interrupt->ConnectionSevered)
 				    ((iucv_ConnectionSevered *) int_buf,
-				     (P + index2)->pgm_data);
+				     (P->pgm_data));
+
 			else
 				iucv_sever (int_buf->ippathid, no_listener);
 		} else
 			iucv_sever (int_buf->ippathid, no_listener);
 		break;
+
 	case 0x04:		/* connection quiesced */
 		if (Q) {
-			if ((*interrupt).ConnectionQuiesced)
-				((*interrupt).ConnectionQuiesced)
-				    
+			if (interrupt->ConnectionQuiesced)
+				(interrupt->ConnectionQuiesced)
 				    ((iucv_ConnectionQuiesced *) int_buf,
-				     (P + index2)->pgm_data);
-			else {
-#ifdef DEBUG
-				printk (KERN_DEBUG
-					"ConnectionQuiesced not called\n");
-				printk (KERN_DEBUG "routine@ is %p\n",
-					(*interrupt).ConnectionQuiesced);
-#endif
-			}
+				     (P->pgm_data));
+			else
+				pr_debug ("iucv:do_int:"
+					  "ConnectionQuiesced not called\n");
 		}
 		break;
+
 	case 0x05:		/* connection resumed */
 		if (Q) {
-			if ((*interrupt).ConnectionResumed)
-				((*interrupt).ConnectionResumed)
-				    
-				    ((iucv_ConnectionResumed *) int_buf,
-				     (P + index2)->pgm_data);
-			else {
-#ifdef DEBUG
-				printk (KERN_DEBUG
-					"ConnectionResumed not called\n");
-				printk (KERN_DEBUG "routine@ is %p\n",
-					(*interrupt).ConnectionResumed);
-#endif
-			}
+			if (interrupt->ConnectionResumed)
+				(interrupt->ConnectionResumed)
+				    ((iucv_ConnectionResumed *) int_buf, (P->pgm_data));
+			else
+				pr_debug ("iucv:do_int:"
+					  "ConnectionResumed not called\n");
 		}
 		break;
+
 	case 0x06:		/* priority message complete */
 	case 0x07:		/* nonpriority message complete */
 		if (Q) {
-			if ((*interrupt).MessageComplete)
-				((*interrupt).MessageComplete)
-				    
-				    ((iucv_MessageComplete *) int_buf,
-				     (P + index2)->pgm_data);
-			else {
-#ifdef DEBUG
-				printk (KERN_DEBUG
-					"MessageComplete not called\n");
-				printk (KERN_DEBUG "routine@ is %p\n",
-					(*interrupt).MessageComplete);
-#endif
-			}
+			if (interrupt->MessageComplete)
+				(interrupt->MessageComplete)
+				    ((iucv_MessageComplete *) int_buf, (P->pgm_data));
+			else
+				pr_debug ("iucv:do_int:"
+					  "MessageComplete not called\n");
 		}
 		break;
+
 	case 0x08:		/* priority message pending  */
 	case 0x09:		/* nonpriority message pending  */
 		if (Q) {
-			if ((*interrupt).MessagePending)
-				((*interrupt).MessagePending)
-				    
-				    ((iucv_MessagePending *) int_buf,
-				     (P + index2)->pgm_data);
-			else {
-#ifdef DEBUG
-				printk (KERN_DEBUG
-					"MessagePending not called\n");
-				printk (KERN_DEBUG "routine@ is %p\n",
-					(*interrupt).MessagePending);
-#endif
-			}
+			if (interrupt->MessagePending)
+				(interrupt->MessagePending)
+				    ((iucv_MessagePending *) int_buf, (P->pgm_data));
+			else
+				pr_debug ("iucv:do_int:"
+					  "MessagePending not called\n");
 		}
 		break;
 	default:		/* unknown iucv type */
-		printk (KERN_DEBUG "unknown iucv interrupt \n");
+		printk (KERN_WARNING "iucv:do_int: unknown iucv interrupt \n");
 		break;
 	}			/* end switch */
-#ifdef DEBUG3
-	printk (KERN_DEBUG "BH:-  Exiting do_int "
-	                   "pathid %d, type %02X\n",
-		int_buf->ippathid, int_buf->iptype);
-#endif
+
+	pr_debug ("BH:-  Exiting do_int "
+		  "pathid %d, type %02X\n", int_buf->ippathid, int_buf->iptype);
+
 	return;
-}				/* end of function call */
-
-/**************************************************************/
-/* Name: iucv_register_program                                */
-/* Purpose: registers a new handler                           */
-/* Input: pgmname- uchar[16], user id                         */
-/*        userid - uchar[8], machine id                       */
-/*        prmmask- mask                                       */
-/*        ops    - pointer to iucv_interrupt_ops buffer       */
-/* Output: new_handler - address of new handler               */
-/**************************************************************/
-iucv_handle_t
-iucv_register_program (uchar pgmname[16],
-		       uchar userid[8],
-		       uchar pgmmask[24],
-		       iucv_interrupt_ops_t * ops, ulong pgm_data)
-{
-	int rc;
-	handler *new_handler = 0;
-#ifdef DEBUG
-	int i;
-	uchar *prt_parm;
-	printk (KERN_DEBUG "enter iucv_register_program\n");
-#endif
-	my_ops = *ops;
-	/* Allocate handler table */
-	new_handler = (handler *) kmalloc (sizeof (handler), GFP_KERNEL);
-	if (new_handler == NULL) {
-#ifdef DEBUG
-		printk (KERN_DEBUG
-			"IUCV: returned NULL address for new handle \n");
-#endif
-		return NULL;
-	}
-	/* fill in handler table */
-	memcpy (new_handler->user_data, pgmname, 16);
-	memcpy (new_handler->vmid, userid, 8);
-	memcpy (new_handler->mask, pgmmask, 24);
-	new_handler->pgm_data = pgm_data;
-	/* Convert from ASCII to EBCDIC */
-	if (new_handler->vmid) {
-		ASCEBC (new_handler->vmid, 8);
-		EBC_TOUPPER(new_handler->vmid, 8);
-	}
-	/* fill in handler table */
-	new_handler->interrupt_table = ops;
-	new_handler->size = ADDED_STOR;
-	/* Allocate storage for pathid table */
-	new_handler->start = kmalloc (ADDED_STOR * sizeof (ulong), GFP_KERNEL);
-	if (new_handler->start == NULL) {
-#ifdef DEBUG
-		printk (KERN_DEBUG
-			"IUCV: returned NULL address for pathid table,"
-			" exiting\n");
-#endif
-		kfree(new_handler);
-		return NULL;
-	}
-	memset (new_handler->start, 0, ADDED_STOR * sizeof (ulong));
-	new_handler->end = (*new_handler).start + ADDED_STOR;
-	new_handler->next = 0;
-	new_handler->prev = 0;
-	/* Place handler at beginning of chain */
-	spin_lock (&lock);
-	if (handler_anchor == NULL)
-		handler_anchor = new_handler;
-	else {
-		handler_anchor->prev = (ulong *) new_handler;
-		new_handler->next = (ulong *) handler_anchor;
-		handler_anchor = new_handler;
-#ifdef DEBUG
-		printk (KERN_DEBUG "adding a another handler to list\n");
-		printk (KERN_DEBUG "handler_anchor->prev is %p \n",
-			handler_anchor->prev);
-		printk (KERN_DEBUG "new_handler->next is %p \n",
-			new_handler->next);
-		printk (KERN_DEBUG "handler_anchor is %p \n", handler_anchor);
-#endif
-	}
-	spin_unlock (&lock);
-	if (declare_flag == NULL) {
-		rc = iucv_declare_buffer (iucv_external_int_buffer);
-		if (rc == 0) {
-			declare_flag = 1;
-			/* request the 0x4000 external interrupt */
-			rc =
-			    register_external_interrupt (0x4000,
-							 top_half_interrupt);
-		} else {
-			panic ("Registration failed");
-#ifdef DEBUG
-			printk (KERN_DEBUG "rc from declare buffer is: %i\n",
-				rc);
-#endif
-		}
-	}
-#ifdef DEBUG
-	printk (KERN_DEBUG "address of handle is %p ", new_handler);
-	printk (KERN_DEBUG "size of handle is %d ", (int) (sizeof (handler)));
-	printk (KERN_DEBUG "exit iucv_register_program\n");
-	printk (KERN_DEBUG "main_table is %p \n", main_table);
-	printk (KERN_DEBUG "handler_anchor is %p \n", handler_anchor);
-	printk (KERN_DEBUG "Handler is: \n");
-	prt_parm = (uchar *) new_handler;
-	for (i = 0; i < sizeof (handler); i++)
-		printk (KERN_DEBUG " %02x ", prt_parm[i]);
-	printk (KERN_DEBUG "\n");
-#endif
-	return new_handler;	/* send buffer address back */
-}				/* end of register function */
-
-/**************************************************************/
-/* Name: iucv_unregister                                      */
-/* Purpose: remove handler from chain and sever all paths     */
-/* Input: handle - address of handler to be severed           */
-/* Output: returns 0                                          */
-/**************************************************************/
-int
-iucv_unregister (iucv_handle_t handle)
-{
-	handler *temp_next = 0, *temp_prev = 0;
-	handler *Q = 0, *R;
-	handler_table_entry *H_T_E = 0;
-	ulong *S = 0;		/*points to the beginning of block of h_t_e's*/
-#ifdef DEBUG
-	printk (KERN_DEBUG "enter iucv_unregister\n");
-	printk (KERN_DEBUG "address of handle is %p ", handle);
-	printk (KERN_DEBUG "size of handle is %u ", (int) (sizeof (handle)));
-#endif
-	spin_lock (&lock);
-	Q = (handler *) handle;
-	/*
-	 * Checking if handle is still registered: if yes, continue
-	 *  if not registered, return.
-	 */
-	for (R = handler_anchor; R != NULL; R = (handler *) R->next)
-		if (Q == R) {
-#ifdef DEBUG
-			printk (KERN_DEBUG "found a matching handler\n");
-#endif
-			break;
-		}
-	if (!R) {
-		spin_unlock (&lock);
-		return (0);
-	}
-	S = Q->start;
-#ifdef DEBUG
-	printk (KERN_DEBUG "Q is handle? %p ", Q);
-	printk (KERN_DEBUG "Q->start is %p ", Q->start);
-	printk (KERN_DEBUG "&(Q->start) is %p ", &(Q->start));
-	printk (KERN_DEBUG "Q->end is %p ", Q->end);
-	printk (KERN_DEBUG "&(Q->end) is %p ", &(Q->end));
-#endif
-	while (S < (Q->end)) {	/* index thru table */
-		if (*S) {
-			H_T_E = (handler_table_entry *) (*S);
-#ifdef DEBUG
-			printk (KERN_DEBUG "Pointer to H_T_E is %p ", H_T_E);
-			printk (KERN_DEBUG "Address of handle in H_T_E is %p",
-				(H_T_E->addrs));
-#endif
-			if ((H_T_E->addrs) != handle) {
-				spin_unlock (&lock);
-				return (-2);	/*handler addresses don't match */
-			} else {
-				spin_unlock (&lock);
-				iucv_sever (H_T_E->pathid, Q->user_data);
-				spin_lock (&lock);
-			}
-		}
-		S++;		/* index by size of ulong */
-	}
-	kfree (Q->start);
-	temp_next = (handler *) Q->next;	/* address of next handler on list */
-	temp_prev = (handler *) Q->prev;	/* address of prev handler on list */
-	if ((temp_next != NULL) & (temp_prev != NULL)) {
-		(*temp_next).prev = (ulong *) temp_prev;
-		(*temp_prev).next = (ulong *) temp_next;
-	} else if ((temp_next != NULL) & (temp_prev == NULL)) {
-		(*temp_next).prev = NULL;
-		handler_anchor = temp_next;
-	} else if ((temp_next == NULL) & (temp_prev != NULL))
-		(*temp_prev).next = NULL;
-	else
-		handler_anchor = NULL;
-	if (handler_anchor == NULL)
-		iucv_retrieve_buffer ();
-	kfree (handle);
-	spin_unlock (&lock);
-#ifdef DEBUG
-	printk (KERN_DEBUG "exit iucv_unregister\n");
-#endif
-	return 0;
 }
+/* end of function call */
 
 EXPORT_SYMBOL (iucv_accept);
 EXPORT_SYMBOL (iucv_connect);
 EXPORT_SYMBOL (iucv_purge);
-EXPORT_SYMBOL (iucv_query);
+EXPORT_SYMBOL (iucv_query_maxconn);
+EXPORT_SYMBOL (iucv_query_bufsize);
 EXPORT_SYMBOL (iucv_quiesce);
 EXPORT_SYMBOL (iucv_receive);
-EXPORT_SYMBOL (iucv_receive_simple);
 EXPORT_SYMBOL (iucv_receive_array);
 EXPORT_SYMBOL (iucv_reject);
 EXPORT_SYMBOL (iucv_reply);
@@ -2040,5 +2436,4 @@ EXPORT_SYMBOL (iucv_send_prmmsg);
 EXPORT_SYMBOL (iucv_setmask);
 EXPORT_SYMBOL (iucv_sever);
 EXPORT_SYMBOL (iucv_register_program);
-EXPORT_SYMBOL (iucv_unregister);
-
+EXPORT_SYMBOL (iucv_unregister_program);

@@ -147,41 +147,41 @@ int pm_send_all(pm_request_t rqst, void *data);
  */
 struct pm_dev *pm_find(pm_dev_t type, struct pm_dev *from);
 
-extern inline void pm_access(struct pm_dev *dev) {}
-extern inline void pm_dev_idle(struct pm_dev *dev) {}
+static inline void pm_access(struct pm_dev *dev) {}
+static inline void pm_dev_idle(struct pm_dev *dev) {}
 
 #else /* CONFIG_PM */
 
 #define PM_IS_ACTIVE() 0
 
-extern inline struct pm_dev *pm_register(pm_dev_t type,
+static inline struct pm_dev *pm_register(pm_dev_t type,
 					 unsigned long id,
 					 pm_callback callback)
 {
 	return 0;
 }
 
-extern inline void pm_unregister(struct pm_dev *dev) {}
+static inline void pm_unregister(struct pm_dev *dev) {}
 
-extern inline void pm_unregister_all(pm_callback callback) {}
+static inline void pm_unregister_all(pm_callback callback) {}
 
-extern inline int pm_send(struct pm_dev *dev, pm_request_t rqst, void *data)
+static inline int pm_send(struct pm_dev *dev, pm_request_t rqst, void *data)
 {
 	return 0;
 }
 
-extern inline int pm_send_all(pm_request_t rqst, void *data)
+static inline int pm_send_all(pm_request_t rqst, void *data)
 {
 	return 0;
 }
 
-extern inline struct pm_dev *pm_find(pm_dev_t type, struct pm_dev *from)
+static inline struct pm_dev *pm_find(pm_dev_t type, struct pm_dev *from)
 {
 	return 0;
 }
 
-extern inline void pm_access(struct pm_dev *dev) {}
-extern inline void pm_dev_idle(struct pm_dev *dev) {}
+static inline void pm_access(struct pm_dev *dev) {}
+static inline void pm_dev_idle(struct pm_dev *dev) {}
 
 #endif /* CONFIG_PM */
 

@@ -2220,7 +2220,6 @@ int usb_new_device(struct usb_device *dev)
 			dev->devnum, err);
 		clear_bit(dev->devnum, &dev->bus->devmap.devicemap);
 		dev->devnum = -1;
-		usb_free_dev(dev);
 		return 1;
 	}
 

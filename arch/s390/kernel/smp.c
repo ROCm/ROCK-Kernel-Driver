@@ -556,6 +556,7 @@ void smp_count_cpus(void)
  *      Activate a secondary processor.
  */
 extern void init_100hz_timer(void);
+extern int pfault_token(void);
 
 int __init start_secondary(void *cpuvoid)
 {
@@ -568,6 +569,10 @@ int __init start_secondary(void *cpuvoid)
                 /* nothing */ ;
         /* init per CPU 100 hz timer */
         init_100hz_timer();
+#ifdef CONFIG_PFAULT
+	/* Enable pfault pseudo page faults on this cpu. */
+	pfault_init();
+#endif
         /* cpu_idle will call schedule for us */
         return cpu_idle(NULL);
 }

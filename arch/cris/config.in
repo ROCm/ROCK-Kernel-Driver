@@ -49,6 +49,10 @@ fi
 int 'DRAM size (dec, in MB)' CONFIG_ETRAX_DRAM_SIZE 8
 
 int 'Buswidth of flash in bytes' CONFIG_ETRAX_FLASH_BUSWIDTH 2
+bool 'Use flash mirroring (for cramfs)' CONFIG_ETRAX_FLASH_MIRRORING_FOR_CRAMFS
+if [ "$CONFIG_ETRAX_FLASH_MIRRORING_FOR_CRAMFS" = "y" ]; then
+	int '  Individual flash chip size (in MB)' CONFIG_ETRAX_FLASH_SIZE 2
+fi
 
 choice 'Product LED port' \
 	"Port-PA-LEDs	CONFIG_ETRAX_PA_LEDS	\
@@ -61,8 +65,8 @@ if [ "$CONFIG_ETRAX_NO_LEDS" != "y" ]; then
   int '  First red LED bit' CONFIG_ETRAX_LED1R 3
   int '  Second green LED bit' CONFIG_ETRAX_LED2G 4
   int '  Second red LED bit' CONFIG_ETRAX_LED2R 5
-  int '  Third green LED bit' CONFIG_ETRAX_LED3R 2
-  int '  Third red LED bit' CONFIG_ETRAX_LED3G 2
+  int '  Third green LED bit' CONFIG_ETRAX_LED3G 2
+  int '  Third red LED bit' CONFIG_ETRAX_LED3R 2
 fi
 
 if [ "$CONFIG_ETRAX_CSP0_LEDS" = "y" ]; then
@@ -169,7 +173,7 @@ endmenu
 
 source drivers/ieee1394/Config.in
 
-source drivers/message/i2o/Config.in
+source drivers/i2o/Config.in
 
 if [ "$CONFIG_NET" = "y" ]; then
   mainmenu_option next_comment

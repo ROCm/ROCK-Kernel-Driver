@@ -1,5 +1,5 @@
 /*
- * $Id: ctctty.c,v 1.1 2001/01/23 14:23:51 felfert Exp $
+ * $Id: ctctty.c,v 1.8 2001/05/16 16:28:31 felfert Exp $
  *
  * CTC / ESCON network driver, tty interface.
  *
@@ -33,7 +33,23 @@
 #  include <linux/devfs_fs_kernel.h>
 #endif
 #include "ctctty.h"
-#include <net/dst.h>
+
+#if LINUX_VERSION_CODE < 0x020212
+typedef struct wait_queue wait_queue_t;
+typedef struct wait_queue *wait_queue_head_t;
+#define DECLARE_WAITQUEUE(wait, current) \
+	struct wait_queue wait = { current, NULL }
+#define init_waitqueue_head(x) *(x)=NULL
+#define __set_current_state(state_value) \
+	do { current->state = state_value; } while (0)
+#ifdef __SMP__
+#define set_current_state(state_value) \
+	do { __set_current_state(state_value); mb(); } while (0)
+#else
+#define set_current_state(state_value) __set_current_state(state_value)
+#endif
+#define init_MUTEX(x) *(x)=MUTEX
+#endif
 
 #define CTC_TTY_MAJOR       43
 #define CTC_TTY_MAX_DEVICES 64
@@ -45,6 +61,8 @@
 #define CTC_ASYNC_CTS_FLOW       0x04000000 /* Do CTS flow control          */
 #define CTC_ASYNC_CHECK_CD       0x02000000 /* i.e., CLOCAL                 */
 #define CTC_ASYNC_HUP_NOTIFY         0x0001 /* Notify tty on hangups/closes */
+#define CTC_ASYNC_NETDEV_OPEN        0x0002 /* Underlying netdev is open    */
+#define CTC_ASYNC_TX_LINESTAT        0x0004 /* Must send line status        */
 #define CTC_ASYNC_SPLIT_TERMIOS      0x0008 /* Sep. termios for dialin/out  */
 #define CTC_TTY_XMIT_SIZE              1024 /* Default bufsize for write    */
 #define CTC_SERIAL_XMIT_MAX            4000 /* Maximum bufsize for write    */
@@ -54,14 +72,13 @@
 typedef struct {
   int			magic;
   int			flags;		 /* defined in tty.h               */
-  int			x_char;		 /* xon/xoff character             */
   int			mcr;		 /* Modem control register         */
   int                   msr;             /* Modem status register          */
   int                   lsr;             /* Line status register           */
   int			line;
   int			count;		 /* # of fd on device              */
   int			blocked_open;	 /* # of blocked opens             */
-	net_device            *netdev;
+  net_device            *netdev;
   struct sk_buff_head   tx_queue;        /* transmit queue                 */
   struct sk_buff_head   rx_queue;        /* receive queue                  */
   struct tty_struct 	*tty;            /* Pointer to corresponding tty   */
@@ -69,7 +86,8 @@ typedef struct {
   wait_queue_head_t	open_wait;
   wait_queue_head_t	close_wait;
   struct semaphore      write_sem;
-	struct tq_struct tq;
+  struct tq_struct      tq;
+  struct timer_list     stoptimer;
 } ctc_tty_info;
 
 /* Description of one CTC-tty */
@@ -88,7 +106,7 @@ static ctc_tty_driver *driver;
 #define MODEM_PARANOIA_CHECK
 #define MODEM_DO_RESTART
 
-#define CTC_TTY_NAME "ttyZ"
+#define CTC_TTY_NAME "ctctty"
 
 #ifdef CONFIG_DEVFS_FS
 static char *ctc_ttyname = "ctc/" CTC_TTY_NAME "%d";
@@ -96,7 +114,12 @@ static char *ctc_ttyname = "ctc/" CTC_TTY_NAME "%d";
 static char *ctc_ttyname = CTC_TTY_NAME;
 #endif
 
-char *ctc_tty_revision = "$Revision: 1.1 $";
+char *ctc_tty_revision = "$Revision: 1.8 $";
+
+static __u32 ctc_tty_magic = CTC_ASYNC_MAGIC;
+static int ctc_tty_shuttingdown = 0;
+
+static spinlock_t ctc_tty_lock;
 
 /* ctc_tty_try_read() is called from within ctc_tty_rcv_skb()
  * to stuff incoming data directly into a tty's flip-buffer. If the
@@ -120,11 +143,11 @@ ctc_tty_try_read(ctc_tty_info * info, struct sk_buff *skb)
 			len = skb->len;
 			if (c >= len) {
 				memcpy(tty->flip.char_buf_ptr, skb->data, len);
+				memset(tty->flip.flag_buf_ptr, 0, len);
 				tty->flip.count += len;
 				tty->flip.char_buf_ptr += len;
-				memset(tty->flip.flag_buf_ptr, 0, len);
 				tty->flip.flag_buf_ptr += len;
-				queue_task(&tty->flip.tqueue, &tq_timer);
+				tty_flip_buffer_push(tty);
 				kfree_skb(skb);
 				return 1;
 			}
@@ -140,7 +163,7 @@ ctc_tty_try_read(ctc_tty_info * info, struct sk_buff *skb)
 static int
 ctc_tty_readmodem(ctc_tty_info *info)
 {
-	int ret = 0;
+	int ret = 1;
 	struct tty_struct *tty;
 
 	if ((tty = info->tty)) {
@@ -152,20 +175,42 @@ ctc_tty_readmodem(ctc_tty_info *info)
 				int len = skb->len;
 				if (len > c)
 					len = c;
-				memcpy(tty->flip.char_buf_ptr, skb_pull(skb, len), len);
-				tty->flip.count += len;
+				memcpy(tty->flip.char_buf_ptr, skb->data, len);
+				skb_pull(skb, len);
 				memset(tty->flip.flag_buf_ptr, 0, len);
+				tty->flip.count += len;
+				tty->flip.char_buf_ptr += len;
 				tty->flip.flag_buf_ptr += len;
-				queue_task(&tty->flip.tqueue, &tq_timer);
-				if (skb->len) {
+				tty_flip_buffer_push(tty);
+				if (skb->len > 0)
 					skb_queue_head(&info->rx_queue, skb);
-					ret = 1;
-				} else
+				else {
 					kfree_skb(skb);
+					ret = skb_queue_len(&info->rx_queue);
+				}
 			}
 		}
 	}
 	return ret;
+}
+
+void
+ctc_tty_setcarrier(net_device *netdev, int on)
+{
+	int i;
+
+	if ((!driver) || ctc_tty_shuttingdown)
+		return;
+	for (i = 0; i < CTC_TTY_MAX_DEVICES; i++)
+		if (driver->info[i].netdev == netdev) {
+			ctc_tty_info *info = &driver->info[i];
+			if (on)
+				info->msr |= UART_MSR_DCD;
+			else
+				info->msr &= ~UART_MSR_DCD;
+			if ((info->flags & CTC_ASYNC_CHECK_CD) && (!on))
+				tty_hangup(info->tty);
+		}
 }
 
 void
@@ -176,7 +221,7 @@ ctc_tty_netif_rx(struct sk_buff *skb)
 
 	if (!skb)
 		return;
-	if (!skb->dev) {
+	if ((!skb->dev) || (!driver) || ctc_tty_shuttingdown) {
 		dev_kfree_skb(skb);
 		return;
 	}
@@ -189,7 +234,35 @@ ctc_tty_netif_rx(struct sk_buff *skb)
 		dev_kfree_skb(skb);
 		return;
 	}
-	skb_pull(skb, sizeof(int));
+	if (skb->len < 6) {
+		dev_kfree_skb(skb);
+		return;
+	}
+	if (memcmp(skb->data, &ctc_tty_magic, sizeof(__u32))) {
+		dev_kfree_skb(skb);
+		return;
+	}
+	skb_pull(skb, sizeof(__u32));
+
+	i = *((int *)skb->data);
+	skb_pull(skb, sizeof(info->mcr));
+	if (i & UART_MCR_RTS) {
+		info->msr |= UART_MSR_CTS;
+		if (info->flags & CTC_ASYNC_CTS_FLOW)
+			info->tty->hw_stopped = 0;
+	} else {
+		info->msr &= ~UART_MSR_CTS;
+		if (info->flags & CTC_ASYNC_CTS_FLOW)
+			info->tty->hw_stopped = 1;
+	}
+	if (i & UART_MCR_DTR)
+		info->msr |= UART_MSR_DSR;
+	else
+		info->msr &= ~UART_MSR_DSR;
+	if (skb->len <= 0) {
+		kfree_skb(skb);
+		return;
+	}
 	/* Try to deliver directly via tty-flip-buf if queue is empty */
 	if (skb_queue_empty(&info->rx_queue))
 		if (ctc_tty_try_read(info, skb))
@@ -203,46 +276,70 @@ ctc_tty_netif_rx(struct sk_buff *skb)
 	mark_bh(IMMEDIATE_BH);
 }
 
-static void
-ctc_tty_dstfail(struct sk_buff *skb) {
-	if (!skb)
-		return;
-	dev_kfree_skb(skb);
-	return;
-}
-
-static struct dst_entry dst_e;
-static struct dst_ops   dst_o;
-
 static int
 ctc_tty_tint(ctc_tty_info * info)
 {
 	struct sk_buff *skb = skb_dequeue(&info->tx_queue);
+	int stopped = (info->tty->hw_stopped || info->tty->stopped);
+	int wake = 1;
 	int rc;
-	int l;
-	char c;
 
-	if (!skb)
-		return 0;
 	if (!info->netdev) {
-		kfree(skb);
+		if (skb)
+			kfree(skb);
 		return 0;
 	}
-	skb->dst = &dst_e;
-	l = skb->len;
-	c = *(skb->data);
-	rc = info->netdev->hard_start_xmit(skb, info->netdev);
-printk(KERN_DEBUG "xmit: l=%d rc=%d '%02x'\n", l, rc, c);
-	if (rc) {
+	if (info->flags & CTC_ASYNC_TX_LINESTAT) {
+		int skb_res = info->netdev->hard_header_len +
+			sizeof(info->mcr) + sizeof(__u32);
+		/* If we must update line status,
+		 * create an empty dummy skb and insert it.
+		 */
+		if (skb)
+			skb_queue_head(&info->tx_queue, skb);
+
+		skb = dev_alloc_skb(skb_res);
+		if (!skb) {
+			printk(KERN_WARNING
+			       "ctc_tty: Out of memory in %s%d tint\n",
+			       CTC_TTY_NAME, info->line);
+			return 1;
+		}
+		skb_reserve(skb, skb_res);
+		stopped = 0;
+		wake = 0;
+	}
+	if (!skb)
+		return 0;
+	if (stopped) {
 		skb_queue_head(&info->tx_queue, skb);
 		return 1;
+	}
+#if 0
+	if (skb->len > 0)
+		printk(KERN_DEBUG "tint: %d %02x\n", skb->len, *(skb->data));
+	else
+		printk(KERN_DEBUG "tint: %d STAT\n", skb->len);
+#endif
+	memcpy(skb_push(skb, sizeof(info->mcr)), &info->mcr, sizeof(info->mcr));
+	memcpy(skb_push(skb, sizeof(__u32)), &ctc_tty_magic, sizeof(__u32));
+	rc = info->netdev->hard_start_xmit(skb, info->netdev);
+	if (rc) {
+		skb_pull(skb, sizeof(info->mcr) + sizeof(__u32));
+		if (skb->len > 0)
+			skb_queue_head(&info->tx_queue, skb);
+		else
+			kfree_skb(skb);
 	} else {
 		struct tty_struct *tty = info->tty;
-		info->lsr |= UART_LSR_TEMT;
-		if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-		    tty->ldisc.write_wakeup)
-			(tty->ldisc.write_wakeup)(tty);
-		wake_up_interruptible(&tty->write_wait);
+
+		info->flags &= ~CTC_ASYNC_TX_LINESTAT;
+		if (tty) {
+			if (wake && (tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
+			    tty->ldisc.write_wakeup)
+				(tty->ldisc.write_wakeup)(tty);
+			wake_up_interruptible(&tty->write_wait);
+		}
 	}
 	return (skb_queue_empty(&info->tx_queue) ? 0 : 1);
 }
@@ -274,6 +371,40 @@ ctc_tty_paranoia_check(ctc_tty_info * info, kdev_t device, const char *routine)
 }
 
 static void
+ctc_tty_inject(ctc_tty_info *info, char c)
+{
+	int skb_res;
+	struct sk_buff *skb;
+	
+	if (ctc_tty_shuttingdown)
+		return;
+	skb_res = info->netdev->hard_header_len + sizeof(info->mcr) +
+		sizeof(__u32) + 1;
+	skb = dev_alloc_skb(skb_res);
+	if (!skb) {
+		printk(KERN_WARNING
+		       "ctc_tty: Out of memory in %s%d tx_inject\n",
+		       CTC_TTY_NAME, info->line);
+		return;
+	}
+	skb_reserve(skb, skb_res);
+	*(skb_put(skb, 1)) = c;
+	skb_queue_head(&info->tx_queue, skb);
+	queue_task(&info->tq, &tq_immediate);
+	mark_bh(IMMEDIATE_BH);
+}
+
+static void
+ctc_tty_transmit_status(ctc_tty_info *info)
+{
+	if (ctc_tty_shuttingdown)
+		return;
+	info->flags |= CTC_ASYNC_TX_LINESTAT;
+	queue_task(&info->tq, &tq_immediate);
+	mark_bh(IMMEDIATE_BH);
+}
+
+static void
 ctc_tty_change_speed(ctc_tty_info * info)
 {
 	unsigned int cflag;
@@ -294,8 +425,12 @@ ctc_tty_change_speed(ctc_tty_info * info)
 	}
 	if (quot) {
 		info->mcr |= UART_MCR_DTR;
+		info->mcr |= UART_MCR_RTS;
+		ctc_tty_transmit_status(info);
 	} else {
 		info->mcr &= ~UART_MCR_DTR;
+		info->mcr &= ~UART_MCR_RTS;
+		ctc_tty_transmit_status(info);
 		return;
 	}
 
@@ -331,9 +466,22 @@ ctc_tty_startup(ctc_tty_info * info)
 	ctc_tty_change_speed(info);
 
 	info->flags |= CTC_ASYNC_INITIALIZED;
-	info->msr |= (UART_MSR_DSR | UART_MSR_CTS);
-	info->netdev->open(info->netdev);
+	if (!(info->flags & CTC_ASYNC_NETDEV_OPEN))
+		info->netdev->open(info->netdev);
+	info->flags |= CTC_ASYNC_NETDEV_OPEN;
 	return 0;
+}
+
+static void
+ctc_tty_stopdev(unsigned long data)
+{
+	ctc_tty_info *info = (ctc_tty_info *)data;
+
+	if ((!info) || (!info->netdev) ||
+	    (info->flags & CTC_ASYNC_INITIALIZED))
+		return;
+	info->netdev->stop(info->netdev);
+	info->flags &= ~CTC_ASYNC_NETDEV_OPEN;
 }
 
 /*
@@ -349,12 +497,11 @@ ctc_tty_shutdown(ctc_tty_info * info)
 	printk(KERN_DEBUG "Shutting down %s%d ....\n", CTC_TTY_NAME, info->line);
 #endif
 	info->msr &= ~UART_MSR_RI;
-	if (!info->tty || (info->tty->termios->c_cflag & HUPCL)) {
+	if (!info->tty || (info->tty->termios->c_cflag & HUPCL))
 		info->mcr &= ~(UART_MCR_DTR | UART_MCR_RTS);
-	}
 	if (info->tty)
 		set_bit(TTY_IO_ERROR, &info->tty->flags);
-	info->netdev->stop(info->netdev);
+	mod_timer(&info->stoptimer, jiffies + (10 * HZ));
 	skb_queue_purge(&info->tx_queue);
 	skb_queue_purge(&info->rx_queue);
 	info->flags &= ~CTC_ASYNC_INITIALIZED;
@@ -376,6 +523,8 @@ ctc_tty_write(struct tty_struct *tty, int from_user, const u_char * buf, int cou
 	int total = 0;
 	ctc_tty_info *info = (ctc_tty_info *) tty->driver_data;
 
+	if (ctc_tty_shuttingdown)
+		return 0;
 	if (ctc_tty_paranoia_check(info, tty->device, "ctc_tty_write"))
 		return 0;
 	if (!tty)
@@ -392,7 +541,8 @@ ctc_tty_write(struct tty_struct *tty, int from_user, const u_char * buf, int cou
 		if (c <= 0)
 			break;
 		
-		skb_res = info->netdev->hard_header_len + sizeof(int);
+		skb_res = info->netdev->hard_header_len + sizeof(info->mcr) +
+			+ sizeof(__u32);
 		skb = dev_alloc_skb(skb_res + c);
 		if (!skb) {
 			printk(KERN_WARNING
@@ -411,6 +561,7 @@ ctc_tty_write(struct tty_struct *tty, int from_user, const u_char * buf, int cou
 		count -= c;
 	}
 	if (skb_queue_len(&info->tx_queue)) {
+		info->lsr &= ~UART_LSR_TEMT;
 		queue_task(&info->tq, &tq_immediate);
 		mark_bh(IMMEDIATE_BH);
 	}
@@ -457,6 +608,7 @@ ctc_tty_flush_buffer(struct tty_struct *tty)
 		return;
 	}
 	skb_queue_purge(&info->tx_queue);
+	info->lsr |= UART_LSR_TEMT;
 	restore_flags(flags);
 	wake_up_interruptible(&tty->write_wait);
 	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
@@ -469,12 +621,14 @@ ctc_tty_flush_chars(struct tty_struct *tty)
 {
 	ctc_tty_info *info = (ctc_tty_info *) tty->driver_data;
 
+	if (ctc_tty_shuttingdown)
+		return;
 	if (ctc_tty_paranoia_check(info, tty->device, "ctc_tty_flush_chars"))
 		return;
-	if (skb_queue_len(&info->tx_queue)) {
-		queue_task(&info->tq, &tq_immediate);
-		mark_bh(IMMEDIATE_BH);
-	}
+	if (tty->stopped || tty->hw_stopped || (!skb_queue_len(&info->tx_queue)))
+		return;
+	queue_task(&info->tq, &tq_immediate);
+	mark_bh(IMMEDIATE_BH);
 }
 
 /*
@@ -492,9 +646,10 @@ ctc_tty_throttle(struct tty_struct *tty)
 
 	if (ctc_tty_paranoia_check(info, tty->device, "ctc_tty_throttle"))
 		return;
-	if (I_IXOFF(tty))
-		info->x_char = STOP_CHAR(tty);
 	info->mcr &= ~UART_MCR_RTS;
+	if (I_IXOFF(tty))
+		ctc_tty_inject(info, STOP_CHAR(tty));
+	ctc_tty_transmit_status(info);
 }
 
 static void
@@ -504,13 +659,10 @@ ctc_tty_unthrottle(struct tty_struct *tty)
 
 	if (ctc_tty_paranoia_check(info, tty->device, "ctc_tty_unthrottle"))
 		return;
-	if (I_IXOFF(tty)) {
-		if (info->x_char)
-			info->x_char = 0;
-		else
-			info->x_char = START_CHAR(tty);
-	}
 	info->mcr |= UART_MCR_RTS;
+	if (I_IXOFF(tty))
+		ctc_tty_inject(info, START_CHAR(tty));
+	ctc_tty_transmit_status(info);
 }
 
 /*
@@ -573,6 +725,7 @@ static int
 ctc_tty_set_ctc_tty_info(ctc_tty_info * info, uint cmd, uint * value)
 {
 	uint arg;
+	int old_mcr = info->mcr & (UART_MCR_RTS | UART_MCR_DTR);
 
 	get_user(arg, (uint *) value);
 	switch (cmd) {
@@ -581,24 +734,20 @@ ctc_tty_set_ctc_tty_info(ctc_tty_info * info, uint cmd, uint * value)
 			printk(KERN_DEBUG "%s%d ioctl TIOCMBIS\n", CTC_TTY_NAME,
 			       info->line);
 #endif
-			if (arg & TIOCM_RTS) {
+			if (arg & TIOCM_RTS)
 				info->mcr |= UART_MCR_RTS;
-			}
-			if (arg & TIOCM_DTR) {
+			if (arg & TIOCM_DTR)
 				info->mcr |= UART_MCR_DTR;
-			}
 			break;
 		case TIOCMBIC:
 #ifdef CTC_DEBUG_MODEM_IOCTL
 			printk(KERN_DEBUG "%s%d ioctl TIOCMBIC\n", CTC_TTY_NAME,
 			       info->line);
 #endif
-			if (arg & TIOCM_RTS) {
+			if (arg & TIOCM_RTS)
 				info->mcr &= ~UART_MCR_RTS;
-			}
-			if (arg & TIOCM_DTR) {
+			if (arg & TIOCM_DTR)
 				info->mcr &= ~UART_MCR_DTR;
-			}
 			break;
 		case TIOCMSET:
 #ifdef CTC_DEBUG_MODEM_IOCTL
@@ -612,6 +761,8 @@ ctc_tty_set_ctc_tty_info(ctc_tty_info * info, uint cmd, uint * value)
 		default:
 			return -EINVAL;
 	}
+	if ((info->mcr  & (UART_MCR_RTS | UART_MCR_DTR)) != old_mcr)
+		ctc_tty_transmit_status(info);
 	return 0;
 }
 
@@ -709,18 +860,30 @@ static void
 ctc_tty_set_termios(struct tty_struct *tty, struct termios *old_termios)
 {
 	ctc_tty_info *info = (ctc_tty_info *) tty->driver_data;
+	unsigned int cflag = tty->termios->c_cflag;
 
-	if (!old_termios)
-		ctc_tty_change_speed(info);
-	else {
-		if (tty->termios->c_cflag == old_termios->c_cflag)
-			return;
-		ctc_tty_change_speed(info);
-		if ((old_termios->c_cflag & CRTSCTS) &&
-		    !(tty->termios->c_cflag & CRTSCTS)) {
-			tty->hw_stopped = 0;
-		}
+	ctc_tty_change_speed(info);
+
+	/* Handle transition to B0 */
+	if ((old_termios->c_cflag & CBAUD) && !(cflag & CBAUD)) {
+		info->mcr &= ~(UART_MCR_DTR|UART_MCR_RTS);
+		ctc_tty_transmit_status(info);
 	}
+
+	/* Handle transition from B0 to other */
+	if (!(old_termios->c_cflag & CBAUD) && (cflag & CBAUD)) {
+		info->mcr |= UART_MCR_DTR;
+		if (!(tty->termios->c_cflag & CRTSCTS) ||
+                    !test_bit(TTY_THROTTLED, &tty->flags)) {
+                        info->mcr |= UART_MCR_RTS;
+                }
+		ctc_tty_transmit_status(info);
+	}
+
+	/* Handle turning off CRTSCTS */
+	if ((old_termios->c_cflag & CRTSCTS) &&
+            !(tty->termios->c_cflag & CRTSCTS))
+                tty->hw_stopped = 0;
 }
 
 /*
@@ -836,6 +999,7 @@ static int
 ctc_tty_open(struct tty_struct *tty, struct file *filp)
 {
 	ctc_tty_info *info;
+	unsigned long saveflags;
 	int retval,
 	 line;
 
@@ -851,9 +1015,11 @@ ctc_tty_open(struct tty_struct *tty, struct file *filp)
 	printk(KERN_DEBUG "ctc_tty_open %s%d, count = %d\n", tty->driver.name,
 	       info->line, info->count);
 #endif
+	spin_lock_irqsave(&ctc_tty_lock, saveflags);
 	info->count++;
 	tty->driver_data = info;
 	info->tty = tty;
+	spin_unlock_irqrestore(&ctc_tty_lock, saveflags);
 	/*
 	 * Start up serial port
 	 */
@@ -885,6 +1051,7 @@ static void
 ctc_tty_close(struct tty_struct *tty, struct file *filp)
 {
 	ctc_tty_info *info = (ctc_tty_info *) tty->driver_data;
+	unsigned long saveflags;
 	ulong flags;
 	ulong timeout;
 
@@ -958,7 +1125,9 @@ ctc_tty_close(struct tty_struct *tty, struct file *filp)
 		tty->driver.flush_buffer(tty);
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
+	spin_lock_irqsave(&ctc_tty_lock, saveflags);
 	info->tty = 0;
+	spin_unlock_irqrestore(&ctc_tty_lock, saveflags);
 	tty->closing = 0;
 	if (info->blocked_open) {
 		set_current_state(TASK_INTERRUPTIBLE);
@@ -980,13 +1149,16 @@ static void
 ctc_tty_hangup(struct tty_struct *tty)
 {
 	ctc_tty_info *info = (ctc_tty_info *)tty->driver_data;
+	unsigned long saveflags;
 
 	if (ctc_tty_paranoia_check(info, tty->device, "ctc_tty_hangup"))
 		return;
 	ctc_tty_shutdown(info);
 	info->count = 0;
 	info->flags &= ~CTC_ASYNC_NORMAL_ACTIVE;
+	spin_lock_irqsave(&ctc_tty_lock, saveflags);
 	info->tty = 0;
+	spin_unlock_irqrestore(&ctc_tty_lock, saveflags);
 	wake_up_interruptible(&info->open_wait);
 }
 
@@ -998,14 +1170,21 @@ ctc_tty_hangup(struct tty_struct *tty)
 static void
 ctc_tty_task(ctc_tty_info *info)
 {
+	unsigned long saveflags;
 	int again;
 
-	again = ctc_tty_tint(info);
-	again |= ctc_tty_readmodem(info);
-	if (again) {
-		queue_task(&info->tq, &tq_immediate);
-		mark_bh(IMMEDIATE_BH);
+	spin_lock_irqsave(&ctc_tty_lock, saveflags);
+	if ((!ctc_tty_shuttingdown) && info) {
+		again = ctc_tty_tint(info);
+		if (!again)
+			info->lsr |= UART_LSR_TEMT;
+		again |= ctc_tty_readmodem(info);
+		if (again) {
+			queue_task(&info->tq, &tq_immediate);
+			mark_bh(IMMEDIATE_BH);
+		}
 	}
+	spin_unlock_irqrestore(&ctc_tty_lock, saveflags);
 }
 
 int
@@ -1015,8 +1194,6 @@ ctc_tty_init(void)
 	ctc_tty_info *info;
 	struct tty_driver *device;
 
-	dst_e.ops = &dst_o;
-	dst_o.link_failure = ctc_tty_dstfail;
 	driver = kmalloc(sizeof(ctc_tty_driver), GFP_KERNEL);
 	if (driver == NULL) {
 		printk(KERN_WARNING "Out of memory in ctc_tty_modem_init\n");
@@ -1064,14 +1241,17 @@ ctc_tty_init(void)
 	for (i = 0; i < CTC_TTY_MAX_DEVICES; i++) {
 		info = &driver->info[i];
 		init_MUTEX(&info->write_sem);
+#if LINUX_VERSION_CODE >= 0x020400
 		INIT_LIST_HEAD(&info->tq.list);
+#else
+		info->tq.next    = NULL;
+#endif
 		info->tq.sync    = 0;
 		info->tq.routine = (void *)(void *)ctc_tty_task;
 		info->tq.data    = info;
 		info->magic = CTC_ASYNC_MAGIC;
 		info->line = i;
 		info->tty = 0;
-		info->x_char = 0;
 		info->count = 0;
 		info->blocked_open = 0;
 		info->normal_termios = device->init_termios;
@@ -1079,6 +1259,10 @@ ctc_tty_init(void)
 		init_waitqueue_head(&info->close_wait);
 		skb_queue_head_init(&info->tx_queue);
 		skb_queue_head_init(&info->rx_queue);
+		init_timer(&info->stoptimer);
+		info->stoptimer.function = ctc_tty_stopdev;
+		info->stoptimer.data = (unsigned long)info;
+		info->mcr = UART_MCR_RTS;
 	}
 	return 0;
 }
@@ -1118,8 +1302,10 @@ ctc_tty_register_netdev(net_device *dev) {
 void
 ctc_tty_unregister_netdev(net_device *dev) {
 	int i;
+	unsigned long saveflags;
 	ctc_tty_info *info = NULL;
 
+	spin_lock_irqsave(&ctc_tty_lock, saveflags);
 	for (i = 0; i < CTC_TTY_MAX_DEVICES; i++)
 		if (driver->info[i].netdev == dev) {
 			info = &driver->info[i];
@@ -1130,10 +1316,24 @@ ctc_tty_unregister_netdev(net_device *dev) {
 		skb_queue_purge(&info->tx_queue);
 		skb_queue_purge(&info->rx_queue);
 	}
+	spin_unlock_irqrestore(&ctc_tty_lock, saveflags);
 }
 
 void
-ctc_tty_cleanup(void) {
-	tty_unregister_driver(&driver->ctc_tty_device);
-	kfree(driver);
+ctc_tty_cleanup(int final) {
+	unsigned long saveflags;
+	
+	spin_lock_irqsave(&ctc_tty_lock, saveflags);
+	ctc_tty_shuttingdown = 1;
+	if (final) {
+		kfree(driver);
+		driver = NULL;
+	} else {
+		int i;
+
+		for (i = 0; i < CTC_TTY_MAX_DEVICES; i++)
+			driver->info[i].tq.routine = NULL;
+		tty_unregister_driver(&driver->ctc_tty_device);
+	}
+	spin_unlock_irqrestore(&ctc_tty_lock, saveflags);
 }

@@ -23,7 +23,7 @@ static __inline__ __const__ __u32 ___arch__swab32(__u32 x)
           "        icm   %0,4,2(%1)\n"
           "        icm   %0,2,1(%1)\n"
           "        ic    %0,0(%1)"
-          : "+&d" (x) : "a" (&temp) : "memory" );
+          : "+&d" (x) : "a" (&temp) : "cc" );
   return x;
 }
 
@@ -36,7 +36,7 @@ static __inline__ __const__ __u32 ___arch__swab32p(__u32 *x)
           "        icm   %0,4,2(%1)\n"
           "        icm   %0,2,1(%1)\n"
           "        ic    %0,0(%1)"
-          : "=&d" (result) : "a" (x) );
+          : "=&d" (result) : "a" (x) : "cc" );
   return result;
 }
 
@@ -48,7 +48,7 @@ static __inline__ void ___arch__swab32s(__u32 *x)
           "        icm   0,2,1(%0)\n"
           "        ic    0,0(%0)\n"
           "        st    0,0(%0)"
-          : : "a" (x) : "0", "memory");
+          : : "a" (x) : "0", "memory", "cc");
 }
 
 static __inline__ __const__ __u16 ___arch__swab16(__u16 x)
@@ -59,7 +59,7 @@ static __inline__ __const__ __u16 ___arch__swab16(__u16 x)
           "        sth   %0,0(%1)\n"
           "        icm   %0,2,1(%1)\n"
           "        ic    %0,0(%1)\n"
-          : "+&d" (x) : "a" (&temp) : "memory");
+          : "+&d" (x) : "a" (&temp) : "memory", "cc" );
   return x;
 }
 
@@ -71,7 +71,7 @@ static __inline__ __const__ __u16 ___arch__swab16p(__u16 *x)
           "        sr    %0,%0\n"
           "        icm   %0,2,1(%1)\n"
           "        ic    %0,0(%1)\n"
-          : "=&d" (result) : "a" (x) );
+          : "=&d" (result) : "a" (x) : "cc" );
   return result;
 }
 
@@ -81,7 +81,7 @@ static __inline__ void ___arch__swab16s(__u16 *x)
           "        icm   0,2,1(%0)\n"
           "        ic    0,0(%0)\n"
           "        sth   0,0(%0)"
-          : : "a" (x) : "0", "memory");
+          : : "a" (x) : "0", "memory", "cc" );
 }
 
 #define __arch__swab32(x) ___arch__swab32(x)

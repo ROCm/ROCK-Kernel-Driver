@@ -24,7 +24,7 @@ SECTIONS
 		*(.fixup)
 		*(.text.__*)
 		*(.rodata)
-		*(.rodata.*)
+		*(.rodata.__*)
 	}
 
 	. = ALIGN(4);                /* Exception table */
@@ -56,11 +56,18 @@ SECTIONS
   	___setup_start = .;
   	.setup.init : { *(.setup.init) }
   	___setup_end = .;
-  	___initcall_start = .;
-  	.initcall.init : { *(.initcall.init) }
-  	___initcall_end = .;
+  	.initcall.init : {
+		___initcall_start = .;
+		*(.initcall.init);
+		___initcall_end = .;
+
+		/* We fill to the next page, so we can discard all init
+		   pages without needing to consider what payload might be
+		   appended to the kernel image.  */
+		FILL (0);
+		. = ALIGN (8192);
+	}
 	__vmlinux_end = .;            /* last address of the physical file */
-  	. = ALIGN(8192);
   	___init_end = .;
 
 	__data_end = . ;              /* Move to _edata ? */

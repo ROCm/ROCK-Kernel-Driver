@@ -1,5 +1,5 @@
               
-                          Debugging on Linux for s/390 & zSeries
+                          Debugging on Linux for s/390 & z/Architecture
 			               by
 		Denis Joseph Barrow (djbarrow@de.ibm.com,barrow_dj@yahoo.com)
 		Copyright (C) 2000-2001 IBM Deutschland Entwicklung GmbH, IBM Corporation
@@ -8,7 +8,7 @@
 Overview of Document:
 =====================
 This document is intended to give an good overview of how to debug 
-Linux for s/390 & zSeries it isn't intended as a complete reference & not a
+Linux for s/390 & z/Architecture it isn't intended as a complete reference & not a
 tutorial on the fundamentals of C & assembly, it dosen't go into
 390 IO in any detail. It is intended to compliment the documents in the
 reference section below & any other worthwhile references you get.
@@ -21,46 +21,46 @@ Contents
 ========
 Register Set
 Address Spaces on Intel Linux
-Address Spaces on Linux for s/390 & zSeries
-The Linux for s/390 & zSeries Kernel Task Structure
-Register Usage & Stackframes on Linux for s/390 & zSeries
+Address Spaces on Linux for s/390 & z/Architecture
+The Linux for s/390 & z/Architecture Kernel Task Structure
+Register Usage & Stackframes on Linux for s/390 & z/Architecture
 A sample program with comments
-Compiling programs for debugging on Linux for s/390 & zSeries
+Compiling programs for debugging on Linux for s/390 & z/Architecture
 Figuring out gcc compile errors
 Debugging Tools
 objdump
 strace
 Performance Debugging 
 Debugging under VM
-s/390 & zSeries IO Overview
-Debugging IO on s/390 & zSeries under VM
-GDB on s/390 & zSeries
+s/390 & z/Architecture IO Overview
+Debugging IO on s/390 & z/Architecture under VM
+GDB on s/390 & z/Architecture
 Stack chaining in gdb by hand
 Examining core dumps
 ldd
 Debugging modules
 The proc file system
 Starting points for debugging scripting languages etc.
-Tools soon to be available
 SysRq
 References
+Special Thanks
 
 Register Set
 ============
 The current architectures have the following registers.
  
-16  General propose registers, 32 bit on s/390 64 bit on zSeries, r0-r15 or gpr0-gpr15 used for arithmetic & addressing. 
+16  General propose registers, 32 bit on s/390 64 bit on z/Architecture, r0-r15 or gpr0-gpr15 used for arithmetic & addressing. 
 
-16 Control registers, 32 bit on s/390 64 bit on zSeries, ( cr0-cr15 kernel usage only ) used for memory managment,
+16 Control registers, 32 bit on s/390 64 bit on z/Architecture, ( cr0-cr15 kernel usage only ) used for memory managment,
 interrupt control,debugging control etc.
 
-16 Access registers ( ar0-ar15 ) 32 bit on s/390 & zSeries
+16 Access registers ( ar0-ar15 ) 32 bit on s/390 & z/Architecture
 not used by normal programs but potentially could 
 be used as temporary storage. Their main purpose is their 1 to 1
 association with general purpose registers and are used in
 the kernel for copying data between kernel & user address spaces.
-Access register 0 ( & access register 1 on z/Series ( needs 64 bit pointer ) )
-is currently used by the pthread library as a pointer to
+Access register 0 ( & access register 1 on z/Architecture ( needs 64 bit 
+pointer ) ) is currently used by the pthread library as a pointer to
 the current running threads private area.
 
 16 64 bit floating point registers (fp0-fp15 ) IEEE & HFP floating 
@@ -72,7 +72,7 @@ Linux (currently) always uses IEEE & emulates G5 IEEE format on older machines,
 
 
 The PSW is the most important register on the machine it
-is 64 bit on s/390 & 128 bit on zSeries & serves the roles of 
+is 64 bit on s/390 & 128 bit on z/Architecture & serves the roles of 
 a program counter (pc), condition code register,memory space designator.
 In IBM standard notation I am counting bit 0 as the MSB.
 It has several advantages over a normal program counter
@@ -83,7 +83,7 @@ have a logical=physical mapping for the address you are
 currently running at.
 
       Bit           Value
-s/390 zSeries
+s/390 z/Architecture
 0       0     Reserved ( must be 0 ) otherwise specification exception occurs.
 
 1       1     Program Event Recording 1 PER enabled, 
@@ -100,7 +100,7 @@ s/390 zSeries
 
 8-11  8-11    PSW Key used for complex memory protection mechanism not used under linux
 
-12      12    1 on s/390 0 on zSeries
+12      12    1 on s/390 0 on z/Architecture
 
 13      13    Machine Check Mask 1=enable machine check interrupts
 
@@ -175,15 +175,19 @@ s/390 zSeries
                compatible.
  	  
 	  
-Prefix Page
------------	  
+Prefix Page(s)
+--------------	  
 This per cpu memory area is too intimately tied to the processor not to mention.
-It exists between the real addresses 0-4096 on the processor & is exchanged 
-with a page in absolute storage by the set prefix instruction in linux'es startup. 
-This page different on each processor.
-Bytes 0-512 ( 200 hex ) are used by the processor itself for holding such
-information as exception indications & entry points for exceptions.
-Bytes after 0xc00 hex are used by linux for per processor globals.
+It exists between the real addresses 0-4096 on s/390 & 0-8192 z/Architecture & is exchanged 
+with a 1 page on s/390 or 2 pages on z/Architecture in absolute storage by the set 
+prefix instruction in linux'es startup. 
+This page is mapped to a different prefix for each processor in an SMP configuration
+( assuming the os designer is sane of course :-) ).
+Bytes 0-512 ( 200 hex ) on s/390 & 0-512,4096-4544,4604-5119 currently on z/Architecture 
+are used by the processor itself for holding such information as exception indications & 
+entry points for exceptions.
+Bytes after 0xc00 hex are used by linux for per processor globals on s/390 & z/Architecture 
+( there is a gap on z/Architecure too currently between 0xc00 & 1000 which linux uses ).
 The closest thing to this on traditional architectures is the interrupt
 vector table. This is a good thing & does simplify some of the kernel coding
 however it means that we now cannot catch stray NULL pointers in the
@@ -219,9 +223,6 @@ processor ( if an smp box ).
 If using the virtual machine ( VM ) as a debugger it is quite difficult to
 know which user process is running as the address space you are looking at
 could be from any process in the run queue.
-Thankfully you normally get lucky as address spaces don't overlap that &
-you can recognise the code at by cross referencing with a dump made by objdump
-( more about that later ).
 
 The limitation of Intels addressing technique is that the linux
 kernel uses a very simple real address to virtual addressing technique
@@ -240,35 +241,77 @@ For backward compatibility we are only allowed use 31 bits (2GB)
 of our 32 bit addresses,however, we use entirely separate address 
 spaces for the user & kernel.
 
-This means we can support 2GB of non Extended RAM, & more
-with the Extended memory managment swap device & 64 Bit
-when it comes along.
+This means we can support 2GB of non Extended RAM on s/390, & more
+with the Extended memory managment swap device & 
+currently 4TB of physical memory currently on z/Architecture.
 
 
-Address Spaces on Linux for S390
-================================
+Address Spaces on Linux for s/390 & z/Architecture
+==================================================
 
 Our addressing scheme is as follows
 
 
-Himem 0x7fffffff 2GB on s/390   *****************          ****************
-2^64 bytes on zSeries           *  User Stack   *          *              *
-				*****************          *              *
-		                *  Shared Libs  *          *              *          
-                                *****************          *              *  
-			        *               *          *    Kernel    *  
-		                *  User Program *          *              *
-		                *   Data BSS    *          *              *
-                                *    Text       *          *              *
-            			*   Sections    *          *              *
-0x00000000                      *****************          ****************
+Himem 0x7fffffff 2GB on s/390    *****************          ****************
+currently 0x3ffffffffff (2^42)-1 *  User Stack   *          *              *
+on z/Architecture.		 *****************          *              *
+		                 *  Shared Libs  *          *              *      
+                                 *****************          *              *  
+			         *               *          *    Kernel    *  
+		                 *  User Program *          *              *
+		                 *   Data BSS    *          *              *
+                                 *    Text       *          *              *
+            			 *   Sections    *          *              *
+0x00000000                       *****************          ****************
 
 This also means that we need to look at the PSW problem state bit
 or the addressing mode to decide whether we are looking at
-user or kernel space. 
+user or kernel space.
 
-The Linux for s/390 & zSeries Kernel Task Structure
-===================================================
+Virtual Addresses on s/390 & z/Architecture
+===========================================
+
+A virtual address on s/390 is made up of 3 parts
+The SX ( segment index, roughly corresponding to the PGD & PMD in linux terminology ) 
+being bits 1-11.
+The PX ( page index, corresponding to the page table entry (pte) in linux terminology )
+being bits 12-19. 
+The remaining bits BX (the byte index are the offset in the page )
+i.e. bits 20 to 31.
+
+On z/Architecture in linux we currently make up an address from 4 parts.
+The region index bits (RX) 0-32 we currently use bits 22-32
+The segment index (SX) being bits 33-43
+The page index (PX) being bits  44-51
+The byte index (BX) being bits  52-63
+
+Notes:
+1) s/390 has no PMD so the PMD is really the PGD also.
+A lot of this stuff is defined in pgtable.h.
+
+2) Also seeing as s/390's page indexes are only 1k  in size 
+(bits 12-19 x 4 bytes per pte ) we use 1 ( page 4k )
+to make the best use of memory by updating 4 segment indices 
+entries each time we mess with a PMD & use offsets 
+0,1024,2048 & 3072 in this page as for our segment indexes.
+On z/Architecture our page indexes are now 2k in size
+( bits 12-19 x 8 bytes per pte ) we do a similar trick
+but only mess with 2 segment indices each time we mess with
+a PMD.
+
+3) As z/Architecture supports upto a massive 5-level page table lookup we 
+can only use 3 currently on Linux ( as this is all the generic kernel
+currently supports ) however this may change in future
+this allows us to access ( according to my sums )
+4TB of virtual storage per process i.e.
+4096*512(PTES)*1024(PMDS)*2048(PGD) = 4398046511104 bytes,
+enough for another 2 or 3 of years I think :-).
+to do this we use a region-third-table designation type in
+our address space control registers.
+ 
+
+The Linux for s/390 & z/Architecture Kernel Task Structure
+==========================================================
 Each process/thread under Linux for S390 has its own kernel task_struct
 defined in linux/include/linux/sched.h
 The S390 on initialisation & resuming of a process on a cpu sets
@@ -287,7 +330,7 @@ each processor as follows.
             *        ( 4K )        *
 8K aligned  ************************ 
 
-                     zSeries
+                 z/Architecture
             ************************
             *  2 page kernel stack *
 	    *        ( 8K )        *
@@ -298,7 +341,7 @@ each processor as follows.
 
 What this means is that we don't need to dedicate any register or global variable
 to point to the current running process & can retrieve it with the following
-very simple construct for s/390 & one very similar for zSeries.
+very simple construct for s/390 & one very similar for z/Architecture.
 
 static inline struct task_struct * get_current(void)
 {
@@ -317,8 +360,8 @@ short amounts of time we don't need a separate stack for interrupts.
 
 
 
-Register Usage & Stackframes on Linux for s/390 & zSeries
-=========================================================
+Register Usage & Stackframes on Linux for s/390 & z/Architecture
+=================================================================
 Overview:
 ---------
 This is the code that gcc produces at the top & the bottom of
@@ -331,7 +374,7 @@ Note: To follow stackframes requires a knowledge of C or Pascal &
 limited knowledge of one assembly language.
 
 It should be noted that there are some differences between the
-s/390 & zSeries stack layouts as the zSeries stack layout didn't have
+s/390 & z/Architecture stack layouts as the z/Architecture stack layout didn't have
 to maintain compatibility with older linkage formats.
 
 Glossary:
@@ -367,8 +410,8 @@ epilogue:
 The code generated by the compiler to return to the caller.
 
 frameless-function
-A frameless function in Linux for s390 & zSeries is one which doesn't need 
-more than the register save area ( 96 bytes on s/390, 160 on zSeries )
+A frameless function in Linux for s390 & z/Architecture is one which doesn't 
+need more than the register save area ( 96 bytes on s/390, 160 on z/Architecture )
 given to it by the caller.
 A frameless function never:
 1) Sets up a back chain.
@@ -428,8 +471,8 @@ int FunctionA(int a)
 }
 
 
-s/390 & zSeries Register usage
-==============================
+s/390 & z/Architecture Register usage
+=====================================
 r0       used by syscalls/assembly                  call-clobbered
 r1	 used by syscalls/assembly                  call-clobbered
 r2       argument 0 / return value 0                call-clobbered
@@ -449,8 +492,8 @@ r15      stack-pointer                              saved
 
 f0       argument 0 / return value ( float/double ) call-clobbered
 f2       argument 1                                 call-clobbered
-f4       zSeries argument 2                           saved
-f6       zSeries argument 3                           saved
+f4       z/Architecture argument 2                  saved
+f6       z/Architecture argument 3                  saved
 The remaining floating points
 f1,f3,f5 f7-f15 are call-clobbered.
 
@@ -479,12 +522,13 @@ outgoing args area. It must be purely in the outgoing args
 area if crossing this boundary.
 6) Floating point parameters are mixed with outgoing args
 on the outgoing args area in the order the are passed in as parameters.
-7) Floating point arguments 2 & 3 are saved in the outgoing args area for zSeries
+7) Floating point arguments 2 & 3 are saved in the outgoing args area for 
+z/Architecture
 
 
 Stack Frame Layout
 ------------------
-s/390     zSeries
+s/390     z/Architecture
 0         0             back chain ( a 0 here signifies end of back chain )
 4         8             eos ( end of stack, not used on Linux for S390 used in other linkage formats )
 8         16            glue used in other s/390 linkage formats for saved routine descriptors etc.
@@ -598,8 +642,8 @@ Hartmut ( our compiler developer ) also has been threatening to take out the
 stack backchain in optimised code as this also causes pipeline stalls, you
 have been warned.
 
-64 bit zSeries code disassembly
--------------------------------
+64 bit z/Architecture code disassembly
+--------------------------------------
 
 If you understand the stuff above you'll understand the stuff
 below too so I'll avoid repeating myself & just say that 
@@ -637,12 +681,14 @@ main(int argc,char *argv[])
 
 
 
-Compiling programs for debugging on Linux for s/390 & zSeries
-=============================================================
--gdwarf2 now works & normal -g debugging works much better now
+Compiling programs for debugging on Linux for s/390 & z/Architecture
+====================================================================
+-gdwarf-2 now works it should be considered the default debugging
+format for s/390 & z/Architecture as it is more reliable for debugging
+shared libraries,  normal -g debugging works much better now
 Thanks to the IBM java compiler developers bug reports. 
 
-This is typically done adding/appending the flags -g to the 
+This is typically done adding/appending the flags -g or -gdwarf-2 to the 
 CFLAGS & LDFLAGS variables Makefile of the program concerned.
 
 If using gdb & you would like accurate displays of registers &
@@ -1148,7 +1194,7 @@ Displaying & modifying Registers
 --------------------------------
 D G will display all the gprs
 Adding a extra G to all the commands is neccessary to access the full 64 bit 
-content in VM on zSeries obviously this isn't required for access registers
+content in VM on z/Architecture obviously this isn't required for access registers
 as these are still 32 bit.
 e.g. DGG instead of DG 
 D X will display all the control registers
@@ -1251,7 +1297,7 @@ To get the address of main in the program.
 tr i pswa <address of main>
 Start the program, if VM drops to CP on what looks like the entry
 point of the main function this is most likely the process you wish to debug.
-Now do a D X13 or D XG13 on zSeries.
+Now do a D X13 or D XG13 on z/Architecture.
 On 31 bit the STD is bits 1-19 ( the STO segment table origin ) 
 & 25-31 ( the STL segment table length ) of CR13.
 now type
@@ -1260,7 +1306,48 @@ e.g.
 TR I R STD 8F32E1FF 0.7fffffff
 Another very useful variation is
 TR STORE INTO STD <CR13's value> <address range>
+for finding out when a particular variable changes.
 
+An alternative way of finding the STD of a currently running process 
+is to do the following, ( this method is more complex but
+could be quite convient if you aren't updating the kernel much &
+so your kernel structures will stay constant for a reasonable period of
+time ).
+
+grep task /proc/<pid>/status
+from this you should see something like
+task: 0f160000 ksp: 0f161de8 pt_regs: 0f161f68
+This now gives you a pointer to the task structure.
+Now make CC:="s390-gcc -g" kernel/sched.s
+To get the task_struct stabinfo.
+( task_struct is defined in include/linux/sched.h ).
+Now we want to look at
+task->active_mm->pgd
+on my machine the active_mm in the task structure stab is
+active_mm:(4,12),672,32
+its offset is 672/8=84=0x54
+the pgd member in the mm_struct stab is
+pgd:(4,6)=*(29,5),96,32
+so its offset is 96/8=12=0xc
+
+so we'll
+hexdump -s 0xf160054 /dev/mem | more
+i.e. task_struct+active_mm offset
+to look at the active_mm member
+f160054 0fee cc60 0019 e334 0000 0000 0000 0011
+hexdump -s 0x0feecc6c /dev/mem | more
+i.e. active_mm+pgd offset
+feecc6c 0f2c 0000 0000 0001 0000 0001 0000 0010
+we get something like
+now do 
+TR I R STD <pgd|0x7f> 0.7fffffff
+i.e. the 0x7f is added because the pgd only
+gives the page table origin & we need to set the low bits
+to the maximum possible segment table length.
+TR I R STD 0f2c007f 0.7fffffff
+on z/Architecture you'll probably need to do
+TR I R STD <pgd|0x7> 0.ffffffffffffffff
+to set the TableType to 0x1 & the Table length to 3.
 
 
 
@@ -1347,10 +1434,18 @@ will get your guests cpus back.
 
 Help for displaying ascii textstrings
 -------------------------------------
-As textstrings are cannot be displayed in ASCII under the VM debugger ( I love EBDIC too ) I have 
-written this little program which will convert a command line of hex digits to ascii text
-which can be compiled under linux & you can copy the hex digits from your x3270 terminal to
-your xterm if you are debugging from a linuxbox.
+On the very latest VM Nucleus'es VM can now display ascii
+( thanks Neale for the hint ) by doing
+D TX<lowaddr>.<len>
+e.g.
+D TX0.100
+
+Alternatively
+=============
+Under older VM debuggers ( I love EBDIC too ) you can use this little program I wrote which
+will convert a command line of hex digits to ascii text which can be compiled under linux & 
+you can copy the hex digits from your x3270 terminal to your xterm if you are debugging
+from a linuxbox.
 
 This is quite useful when looking at a parameter passed in as a text string
 under VM ( unless you are good at decoding ASCII in your head ).
@@ -1532,8 +1627,8 @@ Congrats you've done your first backchain.
 
 
 
-s/390 & zSeries IO Overview
-===========================
+s/390 & z/Architecture IO Overview
+==================================
 
 I am not going to give a course in 390 IO architecture as this would take me quite a
 while & I'm no expert. Instead I'll give a 390 IO architecture summary for Dummies if you have 
@@ -1685,15 +1780,15 @@ ESCON or Paralell Cables used as a very high speed serial link
 between 2 machines. We use 2 cables under linux to do a bi-directional serial link.
 
 
-Debugging IO on s/390 & zSeries under VM
-=========================================
+Debugging IO on s/390 & z/Architecture under VM
+===============================================
 
 Now we are ready to go on with IO tracing commands under VM
 
 A few self explanatory queries:
 Q OSA
 Q CTC
-Q DISK
+Q DISK ( This command is CMS specific )
 Q DASD
 
 
@@ -1998,9 +2093,14 @@ stack chaining in gdb by hand
 This is done using a the same trick described for VM 
 p/x (*($sp+56))&0x7fffffff get the first backchain.
 
-For zSeries do
-p/x *($sp+112) i.e. replace 56 with 112 & ignore the &0x7fffffff
-in the macros below.
+For z/Architecture
+Replace 56 with 112 & ignore the &0x7fffffff
+in the macros below & do nasty casts to longs like the following
+as gdb unfortunately deals with printed arguments as ints which
+messes up everything.
+i.e. here is a 3rd backchain dereference
+p/x *(long *)(***(long ***)$sp+112)
+
 
 this outputs 
 $5 = 0x528f18 
@@ -2265,6 +2365,21 @@ in the kernel for some unknown reason.
 
 Some driver debugging techniques
 ================================
+debug feature
+-------------
+Some of our drivers now support a "debug feature" in
+/proc/s390dbf see s390dbf.txt in the linux/Documentation directory
+for more info.
+e.g. 
+to switch on the lcs "debug feature"
+echo 5 > /proc/s390dbf/lcs/level
+& then after the error occured.
+cat /proc/s390dbf/lcs/sprintf >/logfile
+the logfile now contains some information which may help
+tech support resolve a problem in the field.
+
+
+
 high level debugging network drivers
 ------------------------------------
 ifconfig is a quite useful command
@@ -2339,65 +2454,10 @@ jdb <filename> another fully interactive gdb style debugger.
 & type ? in the debugger for help.
 
 
-Debugging Drivers
-=================
-Some of our drivers now support a debug logging feature in
-/proc/s390dbf see s390dbf.txt in the linux/Documentation directory
-for more info.
-e.g. 
-to switch on lcs debugging
-echo 5 > /proc/s390dbf/lcs/level
-& then after the error occured.
-cat /proc/s390dbf/lcs/sprintf >/logfile
-the logfile now contains some information which may help
-tech support resolve a problem in the field.
-
-If you have VM look at the chapter Debugging IO on S390 under VM.
-
-
-
-
-Tools soon to be available
-==========================
-
-Dumptool & Lcrash
------------------
-Michael Holzheu & others here at IBM have a fairly mature port of 
-SGI's lcrash tool which allows one to look at kernel structures in a
-running kernel.
-
-It also complements a tool called dumptool which dumps all the kernels
-memory pages & registers to either a tape or a disk.
-This can be used by tech support or an ambitous end user do
-post mortem debugging of a machine like gdb core dumps.
-
-Going into how to use this tool in detail will be explained
-in other documentation supplied by IBM & the lcrash homepage
-http://oss.sgi.com/projects/lkcd/.
-
-How they work
--------------
-Lcrash is a perfectly normal application
-however it requires an additional file.
-It is built using a patch to the kernel source base.
-
-
-Debugging a live system it uses /dev/mem
-alternatively for post mortem debugging it uses the data 
-collected by dumptool.
-
-
-Ltrace
-------
-We also have a tool called ltrace in our CVS repository 
-no plans on a delivery date yet.
-ltrace is a superset of strace in that it also allows
-tracing of shared libraries calls as well as system calls,
-man ltrace for more info.
 
 SysRq
 =====
-This is now supported by linux for s/390 & zSeries.
+This is now supported by linux for s/390 & z/Architecture.
 To enable it do compile the kernel with 
 Kernel Hacking -> Magic SysRq Key Enabled
 echo "1" > /proc/sys/kernel/sysrq.
@@ -2426,14 +2486,14 @@ Linux & GDB source.
 Various info & man pages.
 CMS Help on tracing commands.
 Linux for s/390 Elf Application Binary Interface
-Linux for zSeries Elf Application Binary Interface ( Both Highly Recommended )
+Linux for z/Series Elf Application Binary Interface ( Both Highly Recommended )
 z/Architecture Principles of Operation SA22-7832-00
 Enterprise Systems Architecture/390 Reference Summary SA22-7209-01 & the
 Enterprise Systems Architecture/390 Principles of Operation SA22-7201-05
 
-
-
-
-
-
+Special Thanks
+==============
+Special thanks to Neale Ferguson who maintains a much
+prettier HTML version of this page at
+http://penguinvm.princeton.edu/notes.html#Debug390
 

@@ -23,7 +23,7 @@
 #define __INITDATA      .section        ".data.init",#alloc,#write
 */
 
-#define __cacheline_aligned __attribute__ ((__aligned__(16)))
+#define __cacheline_aligned __attribute__ ((__aligned__(256)))
 
 #endif
 

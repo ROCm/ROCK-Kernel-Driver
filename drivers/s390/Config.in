@@ -35,19 +35,18 @@ fi
 
 comment 'S/390 character device drivers'
 
-tristate 'Support for locally attached 3270 tubes' CONFIG_3270
-if [ "$CONFIG_3270" = "y" ]; then
-  bool 'Support for console on 3270 line mode terminal' CONFIG_3270_CONSOLE
+tristate 'Support for locally attached 3270 tubes' CONFIG_TN3270
+if [ "$CONFIG_TN3270" = "y" ]; then
+  bool 'Support for console on 3270 line mode terminal' CONFIG_TN3270_CONSOLE
 fi
-if [ "$CONFIG_3270_CONSOLE" != "y" ]; then
-  bool 'Support for 3215 line mode terminal' CONFIG_3215
-  if [ "$CONFIG_3215" = "y" ]; then
-    bool 'Support for console on 3215 line mode terminal' CONFIG_3215_CONSOLE
-  fi
+bool 'Support for 3215 line mode terminal' CONFIG_TN3215
+if [ "$CONFIG_TN3215" = "y" ]; then
+  bool 'Support for console on 3215 line mode terminal' CONFIG_TN3215_CONSOLE
 fi
 bool 'Support for HWC line mode terminal' CONFIG_HWC
 if [ "$CONFIG_HWC" = "y" ]; then
-  bool 'console on HWC line mode terminal' CONFIG_HWC_CONSOLE
+  bool '   console on HWC line mode terminal' CONFIG_HWC_CONSOLE
+  tristate '   Control-Program Identification' CONFIG_HWC_CPI
 fi
 tristate 'S/390 tape device support' CONFIG_S390_TAPE
 if [ "$CONFIG_S390_TAPE" != "n" ]; then
@@ -67,11 +66,18 @@ if [ "$CONFIG_NET" = "y" ]; then
 
   if [ "$CONFIG_NETDEVICES" = "y" ]; then
     tristate 'Dummy net driver support' CONFIG_DUMMY
+    tristate 'Bonding driver support' CONFIG_BONDING
+    tristate 'EQL (serial line load balancing) support' CONFIG_EQUALIZER
+    tristate 'Universal TUN/TAP device driver support' CONFIG_TUN
     bool 'Ethernet (10 or 100Mbit)' CONFIG_NET_ETHERNET
     bool 'Token Ring driver support' CONFIG_TR
     bool 'FDDI driver support' CONFIG_FDDI
     comment 'S/390 network device drivers'
-    bool 'Channel Device Configuration (Temporary Option)' CONFIG_CHANDEV
+    bool 'Channel Device Configuration' CONFIG_CHANDEV
+    if [ "$CONFIG_CHANDEV" = "y" ]; then
+	define_bool CONFIG_HOTPLUG y
+    fi
+
     tristate 'CTC device support' CONFIG_CTC
     tristate 'IUCV device support (VM only)' CONFIG_IUCV
   fi

@@ -173,7 +173,7 @@ void		  nlm_release_file(struct nlm_file *);
 void		  nlmsvc_mark_resources(void);
 void		  nlmsvc_free_host_resources(struct nlm_host *);
 
-extern __inline__ struct inode *
+static __inline__ struct inode *
 nlmsvc_file_inode(struct nlm_file *file)
 {
 	return file->f_file.f_dentry->d_inode;
@@ -182,7 +182,7 @@ nlmsvc_file_inode(struct nlm_file *file)
 /*
  * Compare two host addresses (needs modifying for ipv6)
  */
-extern __inline__ int
+static __inline__ int
 nlm_cmp_addr(struct sockaddr_in *sin1, struct sockaddr_in *sin2)
 {
 	return sin1->sin_addr.s_addr == sin2->sin_addr.s_addr;
@@ -192,7 +192,7 @@ nlm_cmp_addr(struct sockaddr_in *sin1, struct sockaddr_in *sin2)
  * Compare two NLM locks.
  * When the second lock is of type F_UNLCK, this acts like a wildcard.
  */
-extern __inline__ int
+static __inline__ int
 nlm_compare_locks(struct file_lock *fl1, struct file_lock *fl2)
 {
 	return	fl1->fl_pid   == fl2->fl_pid

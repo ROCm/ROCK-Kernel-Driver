@@ -7,6 +7,7 @@
  */
 typedef struct { 
 	void *segments;
+	unsigned long cpuvalid;
 } mm_context_t;
 
 #endif

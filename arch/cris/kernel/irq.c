@@ -1,4 +1,4 @@
-/* $Id: irq.c,v 1.15 2001/06/10 11:18:46 bjornw Exp $
+/* $Id: irq.c,v 1.17 2001/07/25 16:08:01 bjornw Exp $
  *
  *	linux/arch/cris/kernel/irq.c
  *
@@ -32,6 +32,7 @@
 #include <linux/timex.h>
 #include <linux/slab.h>
 #include <linux/random.h>
+#include <linux/init.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
@@ -278,7 +279,7 @@ asmlinkage void do_IRQ(int irq, struct pt_regs * regs)
         }
         irq_exit(cpu);
 
-	if (softirq_active(cpu) & softirq_mask(cpu))
+	if (softirq_pending(cpu))
                 do_softirq();
 
         /* unmasking and bottom half handling is done magically for us. */
@@ -422,7 +423,8 @@ void system_call(void);  /* from entry.S */
 void do_sigtrap(void); /* from entry.S */
 void gdb_handle_breakpoint(void); /* from entry.S */
 
-void init_IRQ(void)
+void __init
+init_IRQ(void)
 {
 	int i;
 
@@ -488,7 +490,8 @@ void init_IRQ(void)
 
 #if defined(CONFIG_PROC_FS) && defined(CONFIG_SYSCTL)
 /* Used by other archs to show/control IRQ steering during SMP */
-void init_irq_proc(void)
+void __init
+init_irq_proc(void)
 {
 }
 #endif

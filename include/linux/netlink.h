@@ -127,7 +127,7 @@ struct netlink_callback
 	long		args[4];
 };
 
-extern __inline__ struct nlmsghdr *
+static __inline__ struct nlmsghdr *
 __nlmsg_put(struct sk_buff *skb, u32 pid, u32 seq, int type, int len)
 {
 	struct nlmsghdr *nlh;

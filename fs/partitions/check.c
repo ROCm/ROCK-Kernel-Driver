@@ -25,6 +25,7 @@
 #include "acorn.h"
 #include "amiga.h"
 #include "atari.h"
+#include "ldm.h"
 #include "mac.h"
 #include "msdos.h"
 #include "osf.h"
@@ -41,6 +42,9 @@ int warn_no_part = 1; /*This is ugly: should make genhd removable media aware*/
 static int (*check_part[])(struct gendisk *hd, kdev_t dev, unsigned long first_sect, int first_minor) = {
 #ifdef CONFIG_ACORN_PARTITION
 	acorn_partition,
+#endif
+#ifdef CONFIG_LDM_PARTITION
+	ldm_partition,		/* this must come before msdos */
 #endif
 #ifdef CONFIG_MSDOS_PARTITION
 	msdos_partition,

@@ -23,79 +23,32 @@
 
 struct buffer_head *default_fat_bread(struct super_block *,int);
 struct buffer_head *default_fat_getblk(struct super_block *, int);
-struct buffer_head *bigblock_fat_bread(struct super_block *, int);
 void default_fat_brelse(struct super_block *, struct buffer_head *);
-void bigblock_fat_brelse(struct super_block *, struct buffer_head *);
-void default_fat_mark_buffer_dirty (struct super_block *,
-	struct buffer_head *);
-void bigblock_fat_mark_buffer_dirty (struct super_block *,
-	struct buffer_head *);
+void default_fat_mark_buffer_dirty (struct super_block *, struct buffer_head *);
 void default_fat_set_uptodate (struct super_block *, struct buffer_head *,int);
-void bigblock_fat_set_uptodate (struct super_block *, struct buffer_head *,int);
 int default_fat_is_uptodate(struct super_block *, struct buffer_head *);
-int bigblock_fat_is_uptodate(struct super_block *, struct buffer_head *);
 int default_fat_access(struct super_block *sb,int nr,int new_value);
-void default_fat_ll_rw_block (
-	struct super_block *sb,
-	int opr,
-	int nbreq,
-	struct buffer_head *bh[32]);
-void bigblock_fat_ll_rw_block (
-	struct super_block *sb,
-	int opr,
-	int nbreq,
-	struct buffer_head *bh[32]);
+void default_fat_ll_rw_block (struct super_block *sb, int opr, int nbreq,
+			      struct buffer_head *bh[32]);
 int default_fat_bmap(struct inode *inode,int block);
-ssize_t default_fat_file_write(
-	struct file *filp,
-	const char *buf,
-	size_t count,
-	loff_t *ppos);
+ssize_t default_fat_file_write(struct file *filp, const char *buf,
+			       size_t count, loff_t *ppos);
 
 struct cvf_format default_cvf = {
-	0,	/* version - who cares? */	
-	"plain",
-	0,	/* flags - who cares? */
-	NULL,
-	NULL,
-	NULL,
-	default_fat_bread,
-	default_fat_getblk,
-	default_fat_brelse,
-	default_fat_mark_buffer_dirty,
-	default_fat_set_uptodate,
-	default_fat_is_uptodate,
-	default_fat_ll_rw_block,
-	default_fat_access,
-	NULL,
-	default_fat_bmap,
-	generic_file_read,
-	default_fat_file_write,
-	NULL,
-	NULL
-};
-
-struct cvf_format bigblock_cvf = {
-	0,	/* version - who cares? */	
-	"big_blocks",
-	0,	/* flags - who cares? */
-	NULL,
-	NULL,
-	NULL,
-	bigblock_fat_bread,
-	bigblock_fat_bread,
-	bigblock_fat_brelse,
-	bigblock_fat_mark_buffer_dirty,
-	bigblock_fat_set_uptodate,
-	bigblock_fat_is_uptodate,
-	bigblock_fat_ll_rw_block,
-	default_fat_access,
-	NULL,
-	default_fat_bmap,
-	NULL,
-	default_fat_file_write,
-	NULL,
-	NULL
+	cvf_version: 		0,	/* version - who cares? */	
+	cvf_version_text: 	"plain",
+	flags:			0,	/* flags - who cares? */
+	cvf_bread:		default_fat_bread,
+	cvf_getblk:		default_fat_getblk,
+	cvf_brelse:		default_fat_brelse,
+	cvf_mark_buffer_dirty:	default_fat_mark_buffer_dirty,
+	cvf_set_uptodate:	default_fat_set_uptodate,
+	cvf_is_uptodate:	default_fat_is_uptodate,
+	cvf_ll_rw_block:	default_fat_ll_rw_block,
+	fat_access:		default_fat_access,
+	cvf_bmap:		default_fat_bmap,
+	cvf_file_read:		generic_file_read,
+	cvf_file_write:		default_fat_file_write,
 };
 
 struct cvf_format *cvf_formats[MAX_CVF_FORMATS];

@@ -120,22 +120,22 @@ struct knfsd_fh {
 /*
  * Conversion macros for the filehandle fields.
  */
-extern inline __u32 kdev_t_to_u32(kdev_t dev)
+static inline __u32 kdev_t_to_u32(kdev_t dev)
 {
 	return (__u32) dev;
 }
 
-extern inline kdev_t u32_to_kdev_t(__u32 udev)
+static inline kdev_t u32_to_kdev_t(__u32 udev)
 {
 	return (kdev_t) udev;
 }
 
-extern inline __u32 ino_t_to_u32(ino_t ino)
+static inline __u32 ino_t_to_u32(ino_t ino)
 {
 	return (__u32) ino;
 }
 
-extern inline ino_t u32_to_ino_t(__u32 uino)
+static inline ino_t u32_to_ino_t(__u32 uino)
 {
 	return (ino_t) uino;
 }

@@ -332,6 +332,7 @@ static void *setup_frame_common(int sig, struct k_sigaction *ka,
 		/* Set up registers for signal handler */
 		regs->gprs[15] = (addr_t)frame;
 		regs->psw.addr = FIX_PSW(ka->sa.sa_handler);
+		regs->psw.mask = _USER_PSW_MASK;
 	}
 	/* Set up to return from userspace.  If provided, use a stub
 	   already in userspace.  */
@@ -358,6 +359,11 @@ static void setup_frame(int sig, struct k_sigaction *ka,
 #endif
 	/* Martin wants this for pthreads */
 	regs->gprs[3] = (addr_t)&frame->sc;
+
+	/* We forgot to include these in the sigcontext.
+	   To avoid breaking binary compatibility, they are passed as args. */
+	regs->gprs[4] = current->thread.trap_no;
+	regs->gprs[5] = current->thread.prot_addr;
 	return;
 
 give_sigsegv:
@@ -414,7 +420,7 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
 	      siginfo_t *info, sigset_t *oldset, struct pt_regs * regs)
 {
 	/* Are we from a system call? */
-	if (regs->orig_gpr2 >= 0) {
+	if (regs->trap == __LC_SVC_OLD_PSW) {
 		/* If so, check system call restarting.. */
 		switch (regs->gprs[2]) {
 			case -ERESTARTNOHAND:
@@ -561,7 +567,6 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
                                 /* FALLTHRU */
 
 			default:
-				lock_kernel();
 				sigaddset(&current->pending.signal, signr);
 				recalc_sigpending(current);
 				current->flags |= PF_SIGNALED;

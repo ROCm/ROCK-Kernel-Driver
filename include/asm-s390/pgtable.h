@@ -345,7 +345,7 @@ extern inline pte_t pte_mkdirty(pte_t pte)
 
 extern inline pte_t pte_mkold(pte_t pte)
 {
-	asm volatile ("rrbe 0,%0" : : "a" (pte_val(pte)));
+	asm volatile ("rrbe 0,%0" : : "a" (pte_val(pte)) : "cc" );
 	return pte;
 }
 
@@ -364,7 +364,8 @@ static inline int ptep_test_and_clear_young(pte_t *ptep)
 
 	asm volatile ("rrbe 0,%1\n\t"
 		      "ipm  %0\n\t"
-		      "srl  %0,28\n\t" : "=d" (ccode) : "a" (pte_val(*ptep)));
+		      "srl  %0,28\n\t" 
+                      : "=d" (ccode) : "a" (pte_val(*ptep)) : "cc" );
 	return ccode & 2;
 }
 

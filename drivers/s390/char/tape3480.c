@@ -72,22 +72,29 @@ devreg_t tape3480_devreg = {
 
 
 void
-tape3480_setup_assist (tape_info_t * tape)
+tape3480_setup_assist (tape_info_t * ti)
 {
 	tape3480_disc_data_t *data = NULL;
 #ifdef TAPE_DEBUG
     debug_text_event (tape_debug_area,6,"3480 dsetu");
     debug_text_event (tape_debug_area,6,"dev:");
-    debug_int_event (tape_debug_area,6,tape->blk_minor);
+    debug_int_event (tape_debug_area,6,ti->blk_minor);
 #endif /* TAPE_DEBUG */
 	while (data == NULL)
 		data = kmalloc (sizeof (tape3480_disc_data_t), GFP_KERNEL);
 	data->modeset_byte = 0x00;
-	tape->discdata = (void *) data;
+	ti->discdata = (void *) data;
+}
+
+
+void
+tape3480_shutdown (int autoprobe) {
+    if (autoprobe)
+	s390_device_unregister(&tape3480_devreg);
 }
 
 tape_discipline_t *
-tape3480_init (void)
+tape3480_init (int autoprobe)
 {
 	tape_discipline_t *disc;
 #ifdef TAPE_DEBUG
@@ -132,6 +139,7 @@ tape3480_init (void)
 	disc->mtmkpart = tape34xx_mtmkpart;
 	disc->mtiocget = tape34xx_mtiocget;
 	disc->mtiocpos = tape34xx_mtiocpos;
+	disc->shutdown = tape3480_shutdown;
 	disc->discipline_ioctl_overload = tape34xx_ioctl_overload;
 	disc->event_table = &tape3480_event_handler_table;
 	disc->default_handler = tape34xx_default_handler;
@@ -139,7 +147,8 @@ tape3480_init (void)
 	disc->free_bread = tape34xx_free_bread;
 	disc->tape = NULL;	/* pointer for backreference */
 	disc->next = NULL;
-	s390_device_register(&tape3480_devreg);
+	if (autoprobe)
+	    s390_device_register(&tape3480_devreg);
 #ifdef TAPE_DEBUG
 	debug_text_event (tape_debug_area,3,"3480 regis");
 #endif /* TAPE_DEBUG */

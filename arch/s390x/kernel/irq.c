@@ -21,7 +21,7 @@
 #include <linux/ioport.h>
 #include <linux/interrupt.h>
 #include <linux/timex.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/random.h>
 #include <linux/smp.h>
@@ -385,6 +385,10 @@ EXPORT_SYMBOL(__global_cli);
 EXPORT_SYMBOL(__global_sti);
 EXPORT_SYMBOL(__global_save_flags);
 EXPORT_SYMBOL(__global_restore_flags);
+EXPORT_SYMBOL(global_irq_holder);
+EXPORT_SYMBOL(global_irq_lock);
+EXPORT_SYMBOL(global_irq_count);
+EXPORT_SYMBOL(global_bh_count);
 #endif
 
 EXPORT_SYMBOL(global_bh_lock);

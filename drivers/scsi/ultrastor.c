@@ -602,6 +602,12 @@ static int ultrastor_24f_detect(Scsi_Host_Template * tpnt)
       tpnt->sg_tablesize = ULTRASTOR_24F_MAX_SG;
 
       shpnt = scsi_register(tpnt, 0);
+      if (!shpnt) {
+             printk(KERN_WARNING "(ultrastor:) Could not register scsi device. Aborting registration.\n");
+             free_irq(config.interrupt, do_ultrastor_interrupt);
+             return FALSE;
+      }
+
       shpnt->irq = config.interrupt;
       shpnt->dma_channel = config.dma_channel;
       shpnt->io_port = config.port_address;

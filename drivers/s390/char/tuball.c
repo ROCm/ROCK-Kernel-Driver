@@ -23,8 +23,7 @@
 
 /* Module parameters */
 int tubdebug;
-int tubscrolltime;
-int tubscrollparm;
+int tubscrolltime = -1;
 int tubxcorrect = 1;            /* Do correct ebc<->asc tables */
 #ifdef MODULE
 MODULE_PARM(tubdebug, "i");
@@ -67,14 +66,14 @@ unsigned char tub_ebcgraf[64] =
 	  0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7,
 	  0xf8, 0xf9, 0x7a, 0x7b, 0x7c, 0x7d, 0x7e, 0x7f };
 
-static int tub3270_init(void);
+int tub3270_init(void);
 
 #ifndef MODULE
 
 /*
  * Can't have this driver a module & support console at the same time
  */
-#ifdef CONFIG_3270_CONSOLE
+#ifdef CONFIG_TN3270_CONSOLE
 static kdev_t tub3270_con_device(struct console *);
 static void tub3270_con_unblank(void);
 static void tub3270_con_write(struct console *, const char *,
@@ -94,7 +93,6 @@ static struct console tub3270_con = {
 	NULL			/* next */
 };
 
-int tub3270_con_devno = -1;		/* set by tub3270_con_setup() */
 bcb_t tub3270_con_bcb;			/* Buffer that receives con writes */
 spinlock_t tub3270_con_bcblock;		/* Lock for the buffer */
 int tub3270_con_irq = -1;		/* set nonneg by _activate() */
@@ -102,54 +100,45 @@ tub_t *tub3270_con_tubp;		/* set nonzero by _activate() */
 struct tty_driver tty3270_con_driver;	/* for /dev/console at 4, 64 */
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
+int tub3270_con_devno = -1;		/* set by tub3270_con_setup() */
 __initfunc(void tub3270_con_setup(char *str, int *ints))
-#else
-static int __init tub3270_con_setup(char *str)
-#endif
 {
 	int vdev;
 
 	vdev = simple_strtoul(str, 0, 16);
 	if (vdev >= 0 && vdev < 65536)
 		tub3270_con_devno = vdev;
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
 	return;
-#else
-	return 1;
-#endif
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0))
-__setup("condev=", tub3270_con_setup);
-#endif
-
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
 __initfunc (long tub3270_con_init(long kmem_start, long kmem_end))
-#else
-void __init tub3270_con_init(void)
-#endif
 {
 	tub3270_con_bcb.bc_len = 65536;
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
 	if (!MACHINE_IS_VM && !MACHINE_IS_P390)
 		return kmem_start;
 	tub3270_con_bcb.bc_buf = (void *)kmem_start;
 	kmem_start += tub3270_con_bcb.bc_len;
 	register_console(&tub3270_con);
 	return kmem_start;
+}
 #else
-	if (!MACHINE_IS_VM && !MACHINE_IS_P390)
+#define tub3270_con_devno console_device
+
+void __init tub3270_con_init(void)
+{
+	tub3270_con_bcb.bc_len = 65536;
+	if (!CONSOLE_IS_3270)
 		return;
 	tub3270_con_bcb.bc_buf = (void *)alloc_bootmem_low(
 		tub3270_con_bcb.bc_len);
 	register_console(&tub3270_con);
-#endif
 }
+#endif
 
 static kdev_t
 tub3270_con_device(struct console *conp)
 {
-	return MKDEV(IBM_TTY3270_MAJOR, conp->index);
+	return MKDEV(IBM_TTY3270_MAJOR, conp->index + 1);
 }
 
 static void
@@ -164,7 +153,7 @@ static void
 tub3270_con_write(struct console *conp,
 	const char *buf, unsigned int count)
 {
-	int flags;
+	long flags;
 	tub_t *tubp = tub3270_con_tubp;
 	void tty3270_sched_bh(tub_t *);
 	int rc;
@@ -176,7 +165,7 @@ tub3270_con_write(struct console *conp,
 	obcb.bc_rd = 0;
 
 	spin_lock_irqsave(&tub3270_con_bcblock, flags);
-	rc = tub3270_movedata(&obcb, &tub3270_con_bcb);
+	rc = tub3270_movedata(&obcb, &tub3270_con_bcb, 0);
 	spin_unlock_irqrestore(&tub3270_con_bcblock, flags);
 
 	if (tubp && rc && TUBTRYLOCK(tubp->irq, flags)) {
@@ -187,27 +176,15 @@ tub3270_con_write(struct console *conp,
 	
 int tub3270_con_copy(tub_t *tubp)
 {
-	int flags;
+	long flags;
 	int rc;
 
 	spin_lock_irqsave(&tub3270_con_bcblock, flags);
-	rc = tub3270_movedata(&tub3270_con_bcb, &tubp->tty_bcb);
+	rc = tub3270_movedata(&tub3270_con_bcb, &tubp->tty_bcb, 0);
 	spin_unlock_irqrestore(&tub3270_con_bcblock, flags);
 	return rc;
 }
-#endif /* CONFIG_3270_CONSOLE */
-
-
-
-
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
-__initfunc(void tub3270_initfunc(void))
-#else
-void __init tub3270_initfunc(void)
-#endif
-{
-	tub3270_init();
-}
+#endif /* CONFIG_TN3270_CONSOLE */
 #else /* If generated as a MODULE */
 /*
  * module init:  find tubes; get a major nbr
@@ -249,20 +226,11 @@ tub_dec_use_count(void)
 /*
  * tub3270_init() called by kernel or module initialization
  */
-static int
+int
 tub3270_init(void)
 {
 	s390_dev_info_t d;
 	int i, rc;
-
-	/*
-	 * Initialize default scrolltime to either -1 or the
-	 * module parameter tubscrolltime.
-	 */
-	if (tubscrolltime)
-		tubscrollparm = tubscrolltime;
-	else
-		tubscrollparm = -1;
 
 	/*
 	 * Copy and correct ebcdic - ascii translate tables
@@ -283,43 +251,46 @@ tub3270_init(void)
 	if (rc != 0)
 		return rc;
 
-	for (i = get_irq_first(); i >= 0; i = get_irq_next(i)) {
-		if ((rc = get_dev_info_by_irq(i, &d)))
-			continue;
-		if (d.status)
-			continue;
-#ifdef CONFIG_3270_CONSOLE
-		if (d.sid_data.cu_type == 0x3215 && MACHINE_IS_VM) {
-			cpcmd("TERM CONMODE 3270", NULL, 0);
-			d.sid_data.cu_type = 0x3270;
-		}
-#endif /* CONFIG_3270_CONSOLE */
-		if ((d.sid_data.cu_type & 0xfff0) != 0x3270)
-			continue;
-
-		rc = tubmakemin(i, &d);
-		if (rc < 0) {
-			if (tubnummins == 1) {  /* if first time */
-				tubfiniminors();
-				printk(KERN_ERR "No kernel memory available"
-					" for 3270 tube devices.\n");
-				return rc;
-			}
-			printk(KERN_WARNING "3270 tube registration ran out of memory"
-				" after %d devices\n", tubnummins - 1);
-			break;
-		} else {
-			printk(KERN_INFO "3270: %.4x on sch %d, minor %d\n",
-				d.devno, d.irq, rc);
-		}
-	}
-
 	if (fs3270_init() || tty3270_init()) {
 		printk(KERN_ERR "fs3270_init() or tty3270_init() failed\n");
 		fs3270_fini();
 		tty3270_fini();
 		tubfiniminors();
 		return -1;
+	}
+
+	for (i = get_irq_first(); i >= 0; i = get_irq_next(i)) {
+		if ((rc = get_dev_info_by_irq(i, &d)))
+			continue;
+		if (d.status)
+			continue;
+
+#ifdef CONFIG_TN3270_CONSOLE
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
+		if (d.sid_data.cu_type == 0x3215 && MACHINE_IS_VM) {
+			cpcmd("TERM CONMODE 3270", NULL, 0);
+			d.sid_data.cu_type = 0x3270;
+		}
+#else
+		if (d.sid_data.cu_type == 0x3215 && CONSOLE_IS_3270) {
+			cpcmd("TERM CONMODE 3270", NULL, 0);
+			d.sid_data.cu_type = 0x3270;
+		}
+#endif /* LINUX_VERSION_CODE */
+#endif /* CONFIG_TN3270_CONSOLE */
+		if ((d.sid_data.cu_type & 0xfff0) != 0x3270)
+			continue;
+
+		rc = tubmakemin(i, &d);
+		if (rc < 0) {
+			printk(KERN_WARNING 
+			       "3270 tube registration ran out of memory"
+			       " after %d devices\n", tubnummins - 1);
+			break;
+		} else {
+			printk(KERN_INFO "3270: %.4x on sch %d, minor %d\n",
+				d.devno, d.irq, rc);
+		}
 	}
 
 	return 0;
@@ -329,7 +300,7 @@ tub3270_init(void)
  * tub3270_movedata(bcb_t *, bcb_t *) -- Move data stream
  */
 int
-tub3270_movedata(bcb_t *ib, bcb_t *ob)
+tub3270_movedata(bcb_t *ib, bcb_t *ob, int fromuser)
 {
 	int count;			/* Total move length */
 	int rc;
@@ -354,11 +325,21 @@ tub3270_movedata(bcb_t *ib, bcb_t *ob)
 				len2 = ob->bc_len - ob->bc_wr;
 			if (len2 > len1)
 				len2 = len1;
-
-			memcpy(ob->bc_buf + ob->bc_wr,
-				ib->bc_buf + ib->bc_rd,
-				len2);
-
+			
+			if (fromuser) {
+				len2 -= copy_from_user(ob->bc_buf + ob->bc_wr,
+						       ib->bc_buf + ib->bc_rd,
+						       len2);
+				if (len2 == 0) {
+					if (!rc)
+						rc = -EFAULT;
+					break;
+				}
+			} else
+				memcpy(ob->bc_buf + ob->bc_wr,
+				       ib->bc_buf + ib->bc_rd,
+				       len2);
+			
 			ib->bc_rd += len2;
 			if (ib->bc_rd == ib->bc_len)
 				ib->bc_rd = 0;
@@ -422,7 +403,7 @@ tubmakemin(int irq, s390_dev_info_t *dp)
 {
 	tub_t *tubp;
 	int minor;
-	int flags;
+	long flags;
 
 	if ((minor = ++tubnummins) == TUBMAXMINS)
 		return -ENODEV;
@@ -446,7 +427,7 @@ tubmakemin(int irq, s390_dev_info_t *dp)
 
 	tubp->tty_bcb.bc_len = TTY_OUTPUT_SIZE;
 	tubp->tty_bcb.bc_buf = (void *)kmalloc(tubp->tty_bcb.bc_len,
-		GFP_KERNEL);
+		GFP_KERNEL|GFP_DMA);
 	if (tubp->tty_bcb.bc_buf == NULL) {
 		TUBUNLOCK(tubp->irq, flags);
 		tubdelbyirq(tubp, irq);
@@ -457,24 +438,34 @@ tubmakemin(int irq, s390_dev_info_t *dp)
 	tubp->tty_bcb.bc_wr = 0;
 	tubp->tty_bcb.bc_rd = 0;
 	(*tubminors)[minor] = tubp;
-#ifdef CONFIG_3270_CONSOLE
-	if (tub3270_con_tubp == NULL && tub3270_con_bcb.bc_buf != NULL &&
-	    (tub3270_con_devno == -1 ||
-	     tub3270_con_devno == dp->devno)) {
-		extern void tty3270_int(tub_t *, devstat_t *);
- 
-		tubp->cmd = TBC_CONOPEN;
-		tubp->flags |= TUB_OPEN_STET;
-		tty3270_size(tubp, &flags);
-		tty3270_aid_init(tubp);
-		tty3270_scl_init(tubp);
-		tub3270_con_irq = tubp->irq;
-		tub3270_con_tubp = tubp;
-		tubp->intv = tty3270_int;
-		tubp->cmd = TBC_UPDSTAT;
-		tty3270_build(tubp);
+
+#ifdef CONFIG_TN3270_CONSOLE
+	if (CONSOLE_IS_3270) {
+		if (tub3270_con_tubp == NULL && 
+		    tub3270_con_bcb.bc_buf != NULL &&
+		    (tub3270_con_devno == -1 ||
+		     tub3270_con_devno == dp->devno)) {
+			extern void tty3270_int(tub_t *, devstat_t *);
+			
+			tub3270_con_devno = dp->devno;
+			tubp->cmd = TBC_CONOPEN;
+			tubp->flags |= TUB_OPEN_STET;
+			tty3270_size(tubp, &flags);
+			tty3270_aid_init(tubp);
+			tty3270_scl_init(tubp);
+			tub3270_con_irq = tubp->irq;
+			tub3270_con_tubp = tubp;
+			tubp->intv = tty3270_int;
+			tubp->cmd = TBC_UPDSTAT;
+			tty3270_build(tubp);
+		}
 	}
-#endif /* CONFIG_3270_CONSOLE */
+#endif /* CONFIG_TN3270_CONSOLE */
+
+#ifdef CONFIG_DEVFS_FS
+	fs3270_devfs_register(tubp);
+#endif
+
 	TUBUNLOCK(tubp->irq, flags);
 	return minor;
 }
@@ -495,6 +486,9 @@ tubfiniminors(void)
 	for (i = 0; i < TUBMAXMINS; i++) {
 		tubpp = &(*tubminors)[i];
 		if ((tubp = *tubpp)) {
+#ifdef CONFIG_DEVFS_FS
+			fs3270_devfs_unregister(tubp);
+#endif
 			tubdelbyirq(tubp, tubp->irq);
 			tty3270_rcl_fini(tubp);
 			kfree(tubp->tty_bcb.bc_buf);

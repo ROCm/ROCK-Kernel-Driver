@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.5 2001/05/15 05:10:00 hp Exp $
+# $Id: Makefile,v 1.7 2001/07/05 01:11:48 hp Exp $
 #
 # Makefile for the linux kernel.
 #
@@ -8,8 +8,10 @@
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
+# These assembly files can't be assembld with -traditional, so we
+# need another build rule than the one in the toplevel Makefile.
 .S.o:
-	$(CC) $(AFLAGS) -traditional -c $< -o $*.o
+	$(CC) $(AFLAGS) -c $< -o $*.o
 
 all: kernel.o head.o
 
@@ -20,6 +22,7 @@ obj-y   := process.o signal.o entry.o traps.o irq.o \
 
 obj-$(CONFIG_ETRAX_KGDB) += kgdb.o
 
+# This dependency isn't caught by mkdep.  See entry.S.
 entry.o: entryoffsets.s
 
 entryoffsets.s: entryoffsets.c

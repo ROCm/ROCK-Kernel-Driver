@@ -13,6 +13,10 @@
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
  * 
+ * (07/16/2001) gb
+ *	remove unused code in empeg_close() (thanks to Oliver Neukum for pointing this
+ *	out) and rewrote empeg_set_termios().
+ * 
  * (05/30/2001) gkh
  *	switched from using spinlock to a semaphore, which fixes lots of problems.
  *
@@ -74,7 +78,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.1"
+#define DRIVER_VERSION "v1.2"
 #define DRIVER_AUTHOR "Greg Kroah-Hartman <greg@kroah.com>, Gary Brubaker <xavyer@ix.netcom.com>"
 #define DRIVER_DESC "USB Empeg Mark I/II Driver"
 
@@ -164,55 +168,8 @@ static int empeg_open (struct usb_serial_port *port, struct file *filp)
 
 	if (!port->active) {
 
-		/* gb - 2000/11/05
-		 * personally, I think these termios should be set in
-		 * empeg_startup(), but it appears doing so leads to one
-		 * of those chicken/egg problems. :)
-		 */
-		port->tty->termios->c_iflag
-			&= ~(IGNBRK
-			| BRKINT
-			| PARMRK
-			| ISTRIP
-			| INLCR
-			| IGNCR
-			| ICRNL
-			| IXON);
-
-		port->tty->termios->c_oflag
-			&= ~OPOST;
-
-		port->tty->termios->c_lflag
-			&= ~(ECHO
-			| ECHONL
-			| ICANON
-			| ISIG
-			| IEXTEN);
-
-		port->tty->termios->c_cflag
-			&= ~(CSIZE
-			| PARENB);
-
-		port->tty->termios->c_cflag
-			|= CS8;
-
-		/* gb - 2000/12/03
-		 * Contributed by Borislav Deianov
-		 * Notify the tty driver that the termios have changed!!
-		 */
-		port->tty->ldisc.set_termios(port->tty, NULL);
-
-		/* gb - 2000/11/05
-		 * force low_latency on
-		 *
-		 * The tty_flip_buffer_push()'s in empeg_read_bulk_callback() will actually
-		 * force the data through if low_latency is set.  Otherwise the pushes are
-		 * scheduled; this is bad as it opens up the possibility of dropping bytes
-		 * on the floor.  We are trying to sustain high data transfer rates; and
-		 * don't want to drop bytes on the floor.
-		 * Moral: use low_latency - drop no bytes - life is good. :)
-		 */
-		port->tty->low_latency = 1;
+		/* Force default termio settings */
+		empeg_set_termios (port, NULL) ;
 
 		port->active = 1;
 		bytes_in = 0;
@@ -578,65 +535,63 @@ static int empeg_ioctl (struct usb_serial_port *port, struct file * file, unsign
 }
 
 
-/* This function is all nice and good, but we don't change anything based on it :) */
 static void empeg_set_termios (struct usb_serial_port *port, struct termios *old_termios)
 {
-	unsigned int cflag = port->tty->termios->c_cflag;
 
 	dbg(__FUNCTION__ " - port %d", port->number);
-
-	/* check that they really want us to change something */
-	if (old_termios) {
-		if ((cflag == old_termios->c_cflag) &&
-		    (RELEVANT_IFLAG(port->tty->termios->c_iflag) == RELEVANT_IFLAG(old_termios->c_iflag))) {
-			dbg(__FUNCTION__ " - nothing to change...");
-			return;
-		}
-	}
 
 	if ((!port->tty) || (!port->tty->termios)) {
 		dbg(__FUNCTION__" - no tty structures");
 		return;
 	}
 
-	/* get the byte size */
-	switch (cflag & CSIZE) {
-		case CS5:	dbg(__FUNCTION__ " - data bits = 5");   break;
-		case CS6:	dbg(__FUNCTION__ " - data bits = 6");   break;
-		case CS7:	dbg(__FUNCTION__ " - data bits = 7");   break;
-		default:
-		case CS8:	dbg(__FUNCTION__ " - data bits = 8");   break;
-	}
+	/*
+         * The empeg-car player wants these particular tty settings.
+         * You could, for example, change the baud rate, however the
+         * player only supports 115200 (currently), so there is really
+         * no point in support for changes to the tty settings.
+         * (at least for now)
+         *
+         * The default requirements for this device are:
+         */
+	port->tty->termios->c_iflag
+		&= ~(IGNBRK	/* disable ignore break */
+		| BRKINT	/* disable break causes interrupt */
+		| PARMRK	/* disable mark parity errors */
+		| ISTRIP	/* disable clear high bit of input characters */
+		| INLCR		/* disable translate NL to CR */
+		| IGNCR		/* disable ignore CR */
+		| ICRNL		/* disable translate CR to NL */
+		| IXON);	/* disable enable XON/XOFF flow control */
 
-	/* determine the parity */
-	if (cflag & PARENB)
-		if (cflag & PARODD)
-			dbg(__FUNCTION__ " - parity = odd");
-		else
-			dbg(__FUNCTION__ " - parity = even");
-	else
-		dbg(__FUNCTION__ " - parity = none");
+	port->tty->termios->c_oflag
+		&= ~OPOST;	/* disable postprocess output characters */
 
-	/* figure out the stop bits requested */
-	if (cflag & CSTOPB)
-		dbg(__FUNCTION__ " - stop bits = 2");
-	else
-		dbg(__FUNCTION__ " - stop bits = 1");
+	port->tty->termios->c_lflag
+		&= ~(ECHO	/* disable echo input characters */
+		| ECHONL	/* disable echo new line */
+		| ICANON	/* disable erase, kill, werase, and rprnt special characters */
+		| ISIG		/* disable interrupt, quit, and suspend special characters */
+		| IEXTEN);	/* disable non-POSIX special characters */
 
-	/* figure out the flow control settings */
-	if (cflag & CRTSCTS)
-		dbg(__FUNCTION__ " - RTS/CTS is enabled");
-	else
-		dbg(__FUNCTION__ " - RTS/CTS is disabled");
+	port->tty->termios->c_cflag
+		&= ~(CSIZE	/* no size */
+		| PARENB	/* disable parity bit */
+		| CBAUD);	/* clear current baud rate */
 
-	/* determine software flow control */
-	if (I_IXOFF(port->tty))
-		dbg(__FUNCTION__ " - XON/XOFF is enabled, XON = %2x, XOFF = %2x", START_CHAR(port->tty), STOP_CHAR(port->tty));
-	else
-		dbg(__FUNCTION__ " - XON/XOFF is disabled");
+	port->tty->termios->c_cflag
+		|= (CS8		/* character size 8 bits */
+		| B115200);	/* baud rate 115200 */
 
-	/* get the baud rate wanted */
-	dbg(__FUNCTION__ " - baud rate = %d", tty_get_baud_rate(port->tty));
+	/*
+	 * Force low_latency on; otherwise the pushes are scheduled;
+	 * this is bad as it opens up the possibility of dropping bytes
+	 * on the floor.  We don't want to drop bytes on the floor. :)
+	 */
+	port->tty->low_latency = 1;
+
+	/* Notify the tty driver that the termios have changed. */
+	port->tty->ldisc.set_termios(port->tty, NULL);
 
 	return;
 

@@ -130,7 +130,7 @@ int rpc_call(struct rpc_clnt *clnt, u32 proc, void *argp, void *resp, int flags)
 }
 		
 
-extern __inline__ void
+static __inline__ void
 rpc_set_timeout(struct rpc_clnt *clnt, unsigned int retr, unsigned long incr)
 {
 	xprt_set_timeout(&clnt->cl_timeout, retr, incr);

@@ -50,7 +50,7 @@
 #include <linux/fs.h>
 #include <linux/kernel.h>
 #include <linux/major.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/mm.h>
 #include <linux/pci.h>
 #include <linux/signal.h>
@@ -3752,6 +3752,9 @@ static int do_zoran_ioctl(struct zoran *zr, unsigned int cmd,
 			/*
 			 *   Write the overlay mask if clips are wanted.
 			 */
+			 
+			if (vw.clipcount > 2048)
+				return -EINVAL;
 			if (vw.clipcount) {
 				vcp =
 				    vmalloc(sizeof(struct video_clip) *

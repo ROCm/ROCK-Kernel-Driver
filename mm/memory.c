@@ -865,7 +865,6 @@ static inline void establish_pte(struct vm_area_struct * vma, unsigned long addr
 static inline void break_cow(struct vm_area_struct * vma, struct page *	old_page, struct page * new_page, unsigned long address, 
 		pte_t *page_table)
 {
-	copy_cow_page(old_page,new_page,address);
 	flush_page_to_ram(new_page);
 	flush_cache_page(vma, address);
 	establish_pte(vma, address, page_table, pte_mkwrite(pte_mkdirty(mk_pte(new_page, vma->vm_page_prot))));
@@ -937,14 +936,16 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	 * Ok, we need to copy. Oh, well..
 	 */
 	spin_unlock(&mm->page_table_lock);
+
 	new_page = alloc_page(GFP_HIGHUSER);
-	spin_lock(&mm->page_table_lock);
 	if (!new_page)
-		return -1;
+		goto no_mem;
+	copy_cow_page(old_page,new_page,address);
 
 	/*
 	 * Re-check the pte - we dropped the lock
 	 */
+	spin_lock(&mm->page_table_lock);
 	if (pte_same(*page_table, pte)) {
 		if (PageReserved(old_page))
 			++mm->rss;
@@ -958,6 +959,9 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 
 bad_wp_page:
 	printk("do_wp_page: bogus page at address %08lx (page 0x%lx)\n",address,(unsigned long)old_page);
+	return -1;
+no_mem:
+	spin_lock(&mm->page_table_lock);
 	return -1;
 }
 
@@ -1163,16 +1167,18 @@ static int do_anonymous_page(struct mm_struct * mm, struct vm_area_struct * vma,
 
 		/* Allocate our own private page. */
 		spin_unlock(&mm->page_table_lock);
+
 		page = alloc_page(GFP_HIGHUSER);
-		spin_lock(&mm->page_table_lock);
 		if (!page)
-			return -1;
+			goto no_mem;
+		clear_user_highpage(page, addr);
+
+		spin_lock(&mm->page_table_lock);
 		if (!pte_none(*page_table)) {
 			page_cache_release(page);
 			return 1;
 		}
 		mm->rss++;
-		clear_user_highpage(page, addr);
 		flush_page_to_ram(page);
 		entry = pte_mkwrite(pte_mkdirty(mk_pte(page, vma->vm_page_prot)));
 	}
@@ -1182,6 +1188,10 @@ static int do_anonymous_page(struct mm_struct * mm, struct vm_area_struct * vma,
 	/* No need to invalidate - it was non-present before */
 	update_mmu_cache(vma, addr, entry);
 	return 1;	/* Minor fault */
+
+no_mem:
+	spin_lock(&mm->page_table_lock);
+	return -1;
 }
 
 /*
