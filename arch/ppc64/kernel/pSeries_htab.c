@@ -220,10 +220,12 @@ static long pSeries_hpte_updatepp(unsigned long slot, unsigned long newpp,
 	if ((cur_cpu_spec->cpu_features & CPU_FTR_TLBIEL) && !large && local) {
 		tlbiel(va);
 	} else {
-		if (!(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE))
+		int lock_tlbie = !(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE);
+
+		if (lock_tlbie)
 			spin_lock(&pSeries_tlbie_lock);
 		tlbie(va, large);
-		if (!(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE))
+		if (lock_tlbie)
 			spin_unlock(&pSeries_tlbie_lock);
 	}
 
@@ -243,6 +245,7 @@ static void pSeries_hpte_updateboltedpp(unsigned long newpp, unsigned long ea)
 	unsigned long vsid, va, vpn, flags;
 	long slot;
 	HPTE *hptep;
+	int lock_tlbie = !(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE);
 
 	vsid = get_kernel_vsid(ea);
 	va = (vsid << 28) | (ea & 0x0fffffff);
@@ -256,10 +259,10 @@ static void pSeries_hpte_updateboltedpp(unsigned long newpp, unsigned long ea)
 	set_pp_bit(newpp, hptep);
 
 	/* Ensure it is out of the tlb too */
-	if (!(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE))
+	if (lock_tlbie)
 		spin_lock_irqsave(&pSeries_tlbie_lock, flags);
 	tlbie(va, 0);
-	if (!(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE))
+	if (lock_tlbie)
 		spin_unlock_irqrestore(&pSeries_tlbie_lock, flags);
 }
 
@@ -270,6 +273,7 @@ static void pSeries_hpte_invalidate(unsigned long slot, unsigned long va,
 	Hpte_dword0 dw0;
 	unsigned long avpn = va >> 23;
 	unsigned long flags;
+	int lock_tlbie = !(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE);
 
 	if (large)
 		avpn &= ~0x1UL;
@@ -291,10 +295,10 @@ static void pSeries_hpte_invalidate(unsigned long slot, unsigned long va,
 	if ((cur_cpu_spec->cpu_features & CPU_FTR_TLBIEL) && !large && local) {
 		tlbiel(va);
 	} else {
-		if (!(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE))
+		if (lock_tlbie)
 			spin_lock(&pSeries_tlbie_lock);
 		tlbie(va, large);
-		if (!(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE))
+		if (lock_tlbie)
 			spin_unlock(&pSeries_tlbie_lock);
 	}
 	local_irq_restore(flags);
@@ -364,8 +368,9 @@ static void pSeries_flush_hash_range(unsigned long context,
 
 		asm volatile("ptesync":::"memory");
 	} else {
-		/* XXX double check that it is safe to take this late */
-		if (!(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE))
+		int lock_tlbie = !(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE);
+
+		if (lock_tlbie)
 			spin_lock(&pSeries_tlbie_lock);
 
 		asm volatile("ptesync":::"memory");
@@ -375,7 +380,7 @@ static void pSeries_flush_hash_range(unsigned long context,
 
 		asm volatile("eieio; tlbsync; ptesync":::"memory");
 
-		if (!(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE))
+		if (lock_tlbie)
 			spin_unlock(&pSeries_tlbie_lock);
 	}
 
