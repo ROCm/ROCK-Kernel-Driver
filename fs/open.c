@@ -859,7 +859,6 @@ struct file *dentry_open_it(struct dentry *dentry, struct vfsmount *mnt, int fla
 	}
 
 	f->f_mapping = inode->i_mapping;
-	file_ra_state_init(&f->f_ra, f->f_mapping);
 	f->f_dentry = dentry;
 	f->f_vfsmnt = mnt;
 	f->f_pos = 0;
@@ -873,6 +872,8 @@ struct file *dentry_open_it(struct dentry *dentry, struct vfsmount *mnt, int fla
 		intent_release(it);
 	}
 	f->f_flags &= ~(O_CREAT | O_EXCL | O_NOCTTY | O_TRUNC);
+
+	file_ra_state_init(&f->f_ra, f->f_mapping->host->i_mapping);
 
 	/* NB: we're sure to have correct a_ops only after f_op->open */
 	if (f->f_flags & O_DIRECT) {
