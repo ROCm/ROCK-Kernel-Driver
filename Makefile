@@ -577,9 +577,8 @@ vmlinux-lds  := arch/$(ARCH)/kernel/vmlinux.lds
 
 # Rule to link vmlinux - also used during CONFIG_KALLSYMS
 # May be overridden by arch/$(ARCH)/Makefile
-# Require first prerequisite to be the lds file
-quiet_cmd_vmlinux__  = LD      $@
-      cmd_vmlinux__  = $(LD) $(LDFLAGS) $(LDFLAGS_vmlinux) -o $@ \
+quiet_cmd_vmlinux__ ?= LD      $@
+      cmd_vmlinux__ ?= $(LD) $(LDFLAGS) $(LDFLAGS_vmlinux) -o $@ \
       -T $(vmlinux-lds) $(vmlinux-init)                          \
       --start-group $(vmlinux-main) --end-group                  \
       $(filter-out $(vmlinux-lds) $(vmlinux-init) $(vmlinux-main) FORCE ,$^)
