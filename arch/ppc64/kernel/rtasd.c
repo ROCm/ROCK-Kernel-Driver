@@ -44,7 +44,6 @@ static int surveillance_requested;
 static unsigned int rtas_event_scan_rate;
 static unsigned int rtas_error_log_max;
 
-#define EVENT_SCAN_ALL_EVENTS	0xf0000000
 #define SURVEILLANCE_TOKEN	9000
 #define SURVEILLANCE_TIMEOUT	1
 #define SURVEILLANCE_SCANRATE	1
@@ -234,7 +233,7 @@ repeat:
 		do {
 			memset(logdata, 0, rtas_error_log_max);
 			error = rtas_call(event_scan, 4, 1, NULL,
-					EVENT_SCAN_ALL_EVENTS, 0,
+					RTAS_EVENT_SCAN_ALL_EVENTS, 0,
 					__pa(logdata), rtas_error_log_max);
 			if (error == -1) {
 				printk(KERN_ERR "event-scan failed\n");
