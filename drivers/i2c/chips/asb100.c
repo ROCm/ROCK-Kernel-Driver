@@ -56,8 +56,7 @@
 #define ASB100_VERSION "1.0.0"
 
 /* I2C addresses to scan */
-static unsigned short normal_i2c[] = { 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d,
-					0x2e, 0x2f, I2C_CLIENT_END };
+static unsigned short normal_i2c[] = { 0x2d, I2C_CLIENT_END };
 
 /* ISA addresses to scan (none) */
 static unsigned int normal_isa[] = { I2C_CLIENT_ISA_END };
