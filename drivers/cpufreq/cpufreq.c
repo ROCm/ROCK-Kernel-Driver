@@ -63,7 +63,7 @@ static DECLARE_RWSEM		(cpufreq_notifier_rwsem);
 static LIST_HEAD(cpufreq_governor_list);
 static DECLARE_MUTEX		(cpufreq_governor_sem);
 
-static struct cpufreq_policy * cpufreq_cpu_get(unsigned int cpu)
+struct cpufreq_policy * cpufreq_cpu_get(unsigned int cpu)
 {
 	struct cpufreq_policy *data;
 	unsigned long flags;
@@ -102,12 +102,14 @@ static struct cpufreq_policy * cpufreq_cpu_get(unsigned int cpu)
  err_out:
 	return NULL;
 }
+EXPORT_SYMBOL_GPL(cpufreq_cpu_get);
 
-static void cpufreq_cpu_put(struct cpufreq_policy *data)
+void cpufreq_cpu_put(struct cpufreq_policy *data)
 {
 	kobject_put(&data->kobj);
 	module_put(cpufreq_driver->owner);
 }
+EXPORT_SYMBOL_GPL(cpufreq_cpu_put);
 
 
 /*********************************************************************
