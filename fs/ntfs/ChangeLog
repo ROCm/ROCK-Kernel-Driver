@@ -8,7 +8,7 @@ ToDo:
 	  functions need to clone block_read_full_page and modify it to cope
 	  with the significance of the different attribute sizes.
 	  Still need to go through:
-		aops.c, dir.c
+		aops.c
 	- Find and fix bugs.
 	- W.r.t. s_maxbytes still need to be careful on reading/truncating as
 	  there are dragons lurking in the details, e.g. read_inode() currently
@@ -17,8 +17,8 @@ ToDo:
 	  truncate the visible i_size? Will the user just get -E2BIG (or
 	  whatever) on open()? Or will (s)he be able to open() but lseek() and
 	  read() will fail when s_maxbytes is reached? -> Investigate this!
-	- Implement/allow non-resident index bitmaps in ntfs_readdir() and
-	  consider initialized_size, etc.
+	- Implement/allow non-resident index bitmaps in dir.c::ntfs_readdir()
+	  and then also consider initialized_size w.r.t. the bitmaps, etc.
 	- vcn_to_lcn() should somehow return the correct pointer within the
 	  ->run_list so we can get at the lcns for the following vcns, this is
 	  strictly a speed optimization. Obviously need to keep the ->run_list
@@ -46,6 +46,15 @@ tng-0.0.9 - Work in progress
 	  clean up compress.c a little, removing some uncommented/unused debug
 	  code.
 	- Tidy up dir.c a little bit.
+	- Merge mft.c::ntfs_mft_readpage() and aops.c::ntfs_index_readpage()
+	  creating aops.c::ntfs_mst_readpage(), improving the handling of
+	  holes and overflow in the process and implementing the correct
+	  equivalent of ntfs_file_get_block() in ntfs_mst_readpage() itself.
+	  I am aiming for correctness at the moment. Modularisation can come
+	  later.
+	- Rename aops.c::end_buffer_read_index_async() to
+	  end_buffer_read_mst_async() and optimize the overflow checking and
+	  handling.
 
 - Don't bother getting the run list in inode.c::ntfs_read_inode().
 

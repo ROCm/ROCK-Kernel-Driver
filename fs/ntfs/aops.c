@@ -66,10 +66,6 @@ int ntfs_file_get_block(struct inode *vi, const sector_t blk,
 	int ofs;
 	BOOL is_retry = FALSE;
 
-	//ntfs_debug("Entering for blk 0x%lx.", blk);
-	//printk(KERN_DEBUG "NTFS: " __FUNCTION__ "(): Entering for blk "
-	//		"0x%lx.\n", blk);
-
 	bh->b_dev = vi->i_dev;
 	bh->b_blocknr = -1;
 	bh->b_state &= ~(1UL << BH_Mapped);
@@ -406,7 +402,7 @@ static int ntfs_mftbmp_readpage(ntfs_volume *vol, struct page *page)
 }
 
 /**
- * end_buffer_read_index_async - async io completion for reading index records
+ * end_buffer_read_mst_async - async io completion for reading index records
  * @bh:		buffer head on which io is completed
  * @uptodate:	whether @bh is now uptodate or not
  *
@@ -425,7 +421,7 @@ static int ntfs_mftbmp_readpage(ntfs_volume *vol, struct page *page)
  * size of the volume (vol->mft_record_size), and index_block_size_bits to
  * mft_record_size_bits, respectively.
  */
-void end_buffer_read_index_async(struct buffer_head *bh, int uptodate)
+static void end_buffer_read_mst_async(struct buffer_head *bh, int uptodate)
 {
 	static spinlock_t page_uptodate_lock = SPIN_LOCK_UNLOCKED;
 	unsigned long flags;
@@ -438,36 +434,20 @@ void end_buffer_read_index_async(struct buffer_head *bh, int uptodate)
 	page = bh->b_page;
 	ni = NTFS_I(page->mapping->host);
 	if (likely(uptodate)) {
-		/*
-		 * The below code is very cpu intensive so we add an extra
-		 * check to ensure it is only run when processing buffer heads
-		 * in pages reaching beyond the initialized data size.
-		 */
-		if ((page->index + 1) << PAGE_CACHE_SHIFT >
-				ni->initialized_size) {
-			s64 file_ofs;
-			char *addr;
-			int page_ofs;
+		s64 file_ofs;
 
+		file_ofs = (page->index << PAGE_CACHE_SHIFT) + bh_offset(bh);
+		/* Check for the current buffer head overflowing. */
+		if (file_ofs + bh->b_size > ni->initialized_size) {
+			char *addr;
+			int ofs = 0;
+
+			if (file_ofs < ni->initialized_size)
+				ofs = ni->initialized_size - file_ofs;
 			addr = kmap_atomic(page, KM_BIO_IRQ);
-			BUG_ON(bh->b_data < addr);
-			BUG_ON(bh->b_data + bh->b_size > addr +
-					PAGE_CACHE_SIZE);
-			page_ofs = bh->b_data - addr;
-			file_ofs = (page->index << PAGE_CACHE_SHIFT) + page_ofs;
-			/* Check for the current buffer head overflowing. */
-			if (file_ofs + bh->b_size > ni->initialized_size) {
-				int bh_ofs = 0;
-				if (file_ofs < ni->initialized_size) {
-					bh_ofs = ni->initialized_size -
-							file_ofs;
-					BUG_ON(bh_ofs < 0);
-					BUG_ON(bh_ofs >= bh->b_size);
-				}
-				memset(bh->b_data + bh_ofs, 0,
-						bh->b_size - bh_ofs);
-				flush_dcache_page(page);
-			}
+			memset(addr + bh_offset(bh) + ofs, 0,
+					bh->b_size - ofs);
+			flush_dcache_page(page);
 			kunmap_atomic(addr, KM_BIO_IRQ);
 		}
 	} else
@@ -505,9 +485,9 @@ void end_buffer_read_index_async(struct buffer_head *bh, int uptodate)
 		unsigned int i, recs, nr_err = 0;
 		u32 rec_size;
 
-		addr = kmap_atomic(page, KM_BIO_IRQ);
 		rec_size = ni->_IDM(index_block_size);
 		recs = PAGE_CACHE_SIZE / rec_size;
+		addr = kmap_atomic(page, KM_BIO_IRQ);
 		for (i = 0; i < recs; i++) {
 			if (!post_read_mst_fixup((NTFS_RECORD*)(addr +
 					i * rec_size), rec_size))
@@ -522,7 +502,7 @@ void end_buffer_read_index_async(struct buffer_head *bh, int uptodate)
 		}
 		flush_dcache_page(page);
 		kunmap_atomic(addr, KM_BIO_IRQ);
-		if (!nr_err && recs)
+		if (likely(!nr_err && recs))
 			SetPageUptodate(page);
 		else {
 			ntfs_error(ni->vol->sb, "Setting page error, index "
@@ -538,90 +518,126 @@ still_busy:
 }
 
 /**
- * ntfs_dir_readpage - fill a @page of a directory with data from the device
- * @dir:	open directory to which the page @page belongs
+ * ntfs_mst_readpage - fill a @page of the mft or a directory with data
+ * @file:	open file/directory to which the page @page belongs or NULL
  * @page:	page cache page to fill with data
  *
- * Fill the page @page of the open directory @dir. We read each buffer
- * asynchronously and when all buffers are read in our io completion
- * handler end_buffer_read_index_block_async() automatically applies the mst
- * fixups to the page before finally marking it uptodate and unlocking it.
+ * Readpage method for the VFS address space operations.
  *
- * Contains an adapted version of fs/buffer.c::block_read_full_page(), a
- * generic "read page" function for block devices that have the normal
- * get_block functionality. This is most of the block device filesystems.
- * Reads the page asynchronously --- the unlock_buffer() and
- * mark_buffer_uptodate() functions propagate buffer state into the
- * page struct once IO has completed.
+ * Fill the page @page of the $MFT or the open directory @dir. We read each
+ * buffer asynchronously and when all buffers are read in our io completion
+ * handler end_buffer_read_mst_async() automatically applies the mst fixups to
+ * the page before finally marking it uptodate and unlocking it.
+ *
+ * Contains an adapted version of fs/buffer.c::block_read_full_page().
+ *
+ * TODO:/FIXME: The current implementation is simple but wasteful as we perform
+ * actual i/o from disk for all data up to allocated size completely ignoring
+ * the fact that initialized size, and data size for that matter, may well be
+ * lower and hence there is no point in reading them in. We can just zero the
+ * page range, which is what is currently done in our async i/o completion
+ * handler anyway, once the read from disk completes. However, I am not sure how
+ * to setup the buffer heads in that case, so for now we do the pointless i/o.
+ * Any help with this would be appreciated...
  */
-static int ntfs_dir_readpage(struct file *dir, struct page *page)
+int ntfs_mst_readpage(struct file *dir, struct page *page)
 {
+	VCN vcn;
+	LCN lcn;
 	struct inode *vi;
+	ntfs_inode *ni;
 	struct super_block *sb;
+	ntfs_volume *vol;
 	struct buffer_head *bh, *head, *arr[MAX_BUF_PER_PAGE];
 	sector_t iblock, lblock;
-	unsigned int blocksize, blocks, nr_bu;
-	int nr, i;
+	unsigned int blocksize, blocks, vcn_ofs;
+	int i, nr;
 	unsigned char blocksize_bits;
 
 	/* The page must be locked. */
 	if (!PageLocked(page))
 		PAGE_BUG(page);
-	/*
-	 * Get the VFS/ntfs inodes, the super block and ntfs volume associated
-	 * with the page.
-	 */
+	/* Get the VFS and ntfs nodes as well as the super blocks for page. */
 	vi = page->mapping->host;
+	ni = NTFS_I(vi);
 	sb = vi->i_sb;
+	vol = NTFS_SB(sb);
 
-	/* We need to create buffers for the page so we can do low level io. */
 	blocksize = sb->s_blocksize;
 	blocksize_bits = sb->s_blocksize_bits;
 
-	if (!page->buffers)
-		create_empty_buffers(page, blocksize);
-	else
-		ntfs_error(sb, "Page (index 0x%lx) already has buffers.",
-				page->index);
+	/* We need to create buffers for the page so we can do low level io. */
+	create_empty_buffers(page, blocksize);
 
-	nr_bu = blocks = PAGE_CACHE_SIZE >> blocksize_bits;
+	blocks = PAGE_CACHE_SIZE >> blocksize_bits;
 	iblock = page->index << (PAGE_CACHE_SHIFT - blocksize_bits);
-	lblock = (vi->i_size + blocksize - 1) >> blocksize_bits;
+	lblock = (ni->allocated_size + blocksize - 1) >> blocksize_bits;
 
 	bh = head = page->buffers;
 	BUG_ON(!bh);
 
+#ifdef DEBUG
+	if (unlikely(!ni->run_list.rl && !ni->mft_no))
+		panic("NTFS: $MFT/$DATA run list has been unmapped! This is a "
+				"very serious bug! Cannot continue...");
+#endif
+
 	/* Loop through all the buffers in the page. */
 	i = nr = 0;
 	do {
-		if (buffer_uptodate(bh)) {
-			nr_bu--;
-			continue;
-		}
-		if (!buffer_mapped(bh)) {
-			/* Is the block within the allowed limits? */
-			if (iblock < lblock) {
-				/* Remap the inode offset to its disk block. */
-				if (ntfs_file_get_block(vi, iblock, bh, 0))
-					continue;
-			}
-			if (!buffer_mapped(bh)) {
-				/*
-				 * Error. Zero this portion of the page and set
-				 * the buffer uptodate.
-				 */
-				memset(kmap(page) + i * blocksize, 0,
-						blocksize);
-				flush_dcache_page(page);
-				kunmap(page);
-				set_bit(BH_Uptodate, &bh->b_state);
+		BUG_ON(buffer_mapped(bh) || buffer_uptodate(bh));
+		bh->b_dev = vi->i_dev;
+		/* Is the block within the allowed limits? */
+		if (iblock < lblock) {
+			BOOL is_retry = FALSE;
+
+			/* Convert iblock into corresponding vcn and offset. */
+			vcn = (VCN)iblock << blocksize_bits >>
+					vol->cluster_size_bits;
+			vcn_ofs = ((VCN)iblock << blocksize_bits) &
+					vol->cluster_size_mask;
+retry_remap:
+			/* Convert the vcn to the corresponding lcn. */
+			down_read(&ni->run_list.lock);
+			lcn = vcn_to_lcn(ni->run_list.rl, vcn);
+			up_read(&ni->run_list.lock);
+			/* Successful remap. */
+			if (lcn >= 0) {
+				/* Setup buffer head to correct block. */
+				bh->b_blocknr = ((lcn << vol->cluster_size_bits)
+						+ vcn_ofs) >> blocksize_bits;
+				bh->b_state |= (1UL << BH_Mapped);
+				arr[nr++] = bh;
 				continue;
 			}
-			/* The buffer might have been updated synchronousle. */
-			if (buffer_uptodate(bh))
-				continue;
+			/* It is a hole, need to zero it. */
+			if (lcn == LCN_HOLE)
+				goto handle_hole;
+			/* If first try and run list unmapped, map and retry. */
+			if (!is_retry && lcn == LCN_RL_NOT_MAPPED) {
+				is_retry = TRUE;
+				if (!map_run_list(ni, vcn))
+					goto retry_remap;
+			}
+			/* Hard error, zero out region. */
+			ntfs_error(sb, "vcn_to_lcn(vcn = 0x%Lx) failed with "
+					"error code 0x%Lx%s.", (long long)vcn,
+					(long long)-lcn, is_retry ? " even "
+					"after retrying" : "");
+			// FIXME: Depending on vol->on_errors, do something.
 		}
-		arr[nr++] = bh;
+		/*
+		 * Either iblock was outside lblock limits or vcn_to_lcn()
+		 * returned error. Just zero that portion of the page and set
+		 * the buffer uptodate.
+		 */
+handle_hole:
+		bh->b_blocknr = -1UL;
+		bh->b_state &= ~(1UL << BH_Mapped);
+		memset(kmap(page) + i * blocksize, 0, blocksize);
+		flush_dcache_page(page);
+		kunmap(page);
+		set_bit(BH_Uptodate, &bh->b_state);
 	} while (i++, iblock++, (bh = bh->b_this_page) != head);
 
 	/* Check we have at least one buffer ready for io. */
@@ -630,25 +646,16 @@ static int ntfs_dir_readpage(struct file *dir, struct page *page)
 		for (i = 0; i < nr; i++) {
 			struct buffer_head *tbh = arr[i];
 			lock_buffer(tbh);
-			tbh->b_end_io = end_buffer_read_index_async;
+			tbh->b_end_io = end_buffer_read_mst_async;
 			mark_buffer_async(tbh, 1);
 		}
 		/* Finally, start io on the buffers. */
 		for (i = 0; i < nr; i++)
 			submit_bh(READ, arr[i]);
-		/* We are done. */
 		return 0;
 	}
-	if (!nr_bu) {
-		ntfs_debug("All buffers in the page were already uptodate, "
-				"assuming mst fixups were already applied.");
-		SetPageUptodate(page);
-		UnlockPage(page);
-		return 0;
-	}
-	ntfs_error(sb, "No io was scheduled on any of the buffers in the page, "
-			"but buffers were not all uptodate to start with. "
-			"Setting page error flag and returning io error.");
+	/* We didn't schedule any io on any of the buffers. */
+	ntfs_error(sb, "No I/O was scheduled on any buffers. Page I/O error.");
 	SetPageError(page);
 	UnlockPage(page);
 	return -EIO;
@@ -662,12 +669,11 @@ struct address_space_operations ntfs_file_aops = {
 						   disk request queue. */
 	prepare_write:	NULL,			/* . */
 	commit_write:	NULL,			/* . */
-	//truncatepage:	NULL,			/* . */
 };
 
 typedef int readpage_t(struct file *, struct page *);
 
-/* FIXME: Kludge: Address space operations for accessing mftbmp. */
+/* Address space operations for accessing mftbmp. */
 struct address_space_operations ntfs_mftbmp_aops = {
 	writepage:	NULL,			/* Write dirty page to disk. */
 	readpage:	(readpage_t*)ntfs_mftbmp_readpage, /* Fill page with
@@ -676,7 +682,6 @@ struct address_space_operations ntfs_mftbmp_aops = {
 						   disk request queue. */
 	prepare_write:	NULL,			/* . */
 	commit_write:	NULL,			/* . */
-	//truncatepage:	NULL,			/* . */
 };
 
 /*
@@ -687,11 +692,10 @@ struct address_space_operations ntfs_mftbmp_aops = {
  */
 struct address_space_operations ntfs_dir_aops = {
 	writepage:	NULL,			/* Write dirty page to disk. */
-	readpage:	ntfs_dir_readpage,	/* Fill page with data. */
+	readpage:	ntfs_mst_readpage,	/* Fill page with data. */
 	sync_page:	block_sync_page,	/* Currently, just unplugs the
 						   disk request queue. */
 	prepare_write:	NULL,			/* . */
 	commit_write:	NULL,			/* . */
-	//truncatepage:	NULL,			/* . */
 };
 

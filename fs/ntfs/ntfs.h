@@ -200,11 +200,6 @@ static inline struct page *ntfs_map_page(struct address_space *mapping,
 
 /* Declarations of functions and global variables. */
 
-/* From fs/ntfs/aops.c */
-extern int ntfs_file_get_block(struct inode *vi, const sector_t blk,
-		struct buffer_head *bh, const int create);
-extern void end_buffer_read_index_async(struct buffer_head *bh, int uptodate);
-
 /* From fs/ntfs/compress.c */
 extern int ntfs_file_read_compressed_block(struct page *page);
 

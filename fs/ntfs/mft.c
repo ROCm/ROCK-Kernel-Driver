@@ -136,136 +136,8 @@ int format_mft_record(ntfs_inode *ni, MFT_RECORD *mft_rec)
 	return 0;
 }
 
-/**
- * ntfs_mft_readpage - read a page of the data attribute of $MFT
- * @file:	open file to which the page @page belongs or NULL
- * @page:	page cache page to fill with data
- *
- * Readpage method for the VFS address space operations.
- *
- * ntfs_mft_readpage() reads the page specified by @page and returns 0 on
- * success or -EIO on error.
- *
- * Note, we only setup asynchronous I/O on the page and return. I/O completion
- * is signalled via our asynchronous I/O completion handler
- * end_buffer_read_index_async(). We also take care of the nitty gritty
- * details towards the end of the file and zero out non-initialized regions.
- *
- * TODO:/FIXME: The current implementation is simple but wasteful as we perform
- * actual i/o from disk for all data up to allocated size completely ignoring
- * the fact that initialized size, and data size for that matter, may well be
- * lower and hence there is no point in reading them in. We can just zero the
- * page range, which is what is currently done in our async i/o completion
- * handler anyway once the read from disk completes. However, I am not sure how
- * to setup the buffer heads in that case, so for now we do the pointless i/o.
- * Any help with this would be appreciated...
- */
-static int ntfs_mft_readpage(struct file *file, struct page *page)
-{
-	VCN vcn;
-	LCN lcn;
-	struct inode *vi;
-	ntfs_inode *ni;
-	struct super_block *sb;
-	ntfs_volume *vol;
-	struct buffer_head *bh, *head, *arr[MAX_BUF_PER_PAGE];
-	sector_t iblock, lblock;
-	unsigned int blocksize, blocks, vcn_ofs;
-	int i, nr;
-	unsigned char blocksize_bits;
-
-	/* The page must be locked. */
-	if (!PageLocked(page))
-		PAGE_BUG(page);
-	/* Get the VFS and ntfs inodes as well as the super blocks for page. */
-	vi = page->mapping->host;
-	ni = NTFS_I(vi);
-	sb = vi->i_sb;
-	vol = NTFS_SB(sb);
-
-	blocksize = sb->s_blocksize;
-	blocksize_bits = sb->s_blocksize_bits;
-
-	if (!page->buffers)
-		create_empty_buffers(page, blocksize);
-
-	blocks = PAGE_CACHE_SIZE >> blocksize_bits;
-	iblock = page->index << (PAGE_CACHE_SHIFT - blocksize_bits);
-	lblock = (ni->allocated_size + blocksize - 1) >> blocksize_bits;
-
-	bh = head = page->buffers;
-	BUG_ON(!bh);
-
-#ifdef DEBUG
-	if (!ni->run_list.rl)
-		panic("NTFS: $MFT/$DATA run list has been unmapped! This is a "
-				"very serious bug! Cannot continue...");
-#endif
-
-	nr = i = 0;
-	/* Loop through all the buffers in the page. */
-	do {
-		if (buffer_mapped(bh))
-			BUG();
-		/* Is the block within the allowed limits? */
-		if (iblock < lblock) {
-			/* Convert iblock into corresponding vcn and offset. */
-			vcn = (VCN)iblock << blocksize_bits >>
-					vol->cluster_size_bits;
-			vcn_ofs = ((VCN)iblock << blocksize_bits) &
-					vol->cluster_size_mask;
-			/* Convert the vcn to the corresponding lcn. */
-			down_read(&ni->run_list.lock);
-			lcn = vcn_to_lcn(ni->run_list.rl, vcn);
-			up_read(&ni->run_list.lock);
-			if (lcn >= 0) {
-				/* Setup buffer head to correct block. */
-				bh->b_dev = vi->i_dev;
-				bh->b_blocknr = ((lcn << vol->cluster_size_bits)
-						+ vcn_ofs) >> blocksize_bits;
-				bh->b_state |= (1UL << BH_Mapped);
-				arr[nr++] = bh;
-				continue;
-			}
-			ntfs_error(sb, "vcn_to_lcn(vcn = 0x%Lx) failed with "
-					"error code 0x%Lx.", (long long)vcn,
-					(long long)-lcn);
-			// FIXME: Depending on vol->on_errors, do something.
-		}
-		/*
-		 * Either iblock was outside lblock limits or vcn_to_lcn()
-		 * returned error. Just zero that portion of the page and set
-		 * the buffer uptodate.
-		 */
-		bh->b_dev = vi->i_dev;
-		bh->b_blocknr = -1UL;
-		bh->b_state &= ~(1UL << BH_Mapped);
-		memset(kmap(page) + i * blocksize, 0, blocksize);
-		flush_dcache_page(page);
-		kunmap(page);
-		set_bit(BH_Uptodate, &bh->b_state);
-	} while (i++, iblock++, (bh = bh->b_this_page) != head);
-
-	/* Check we have at least one buffer ready for io. */
-	if (nr) {
-		/* Lock the buffers. */
-		for (i = 0; i < nr; i++) {
-			struct buffer_head *tbh = arr[i];
-			lock_buffer(tbh);
-			tbh->b_end_io = end_buffer_read_index_async;
-			mark_buffer_async(tbh, 1);
-		}
-		/* And start io on the buffers. */
-		for (i = 0; i < nr; i++)
-			submit_bh(READ, arr[i]);
-		return 0;
-	}
-	/* We didn't schedule any io on any of the buffers. */
-	ntfs_error(sb, "No I/O was scheduled on any buffers. Page I/O error.");
-	SetPageError(page);
-	UnlockPage(page);
-	return -EIO;
-}
+/* From fs/ntfs/aops.c */
+extern int ntfs_mst_readpage(struct file *, struct page *);
 
 /**
  * ntfs_mft_aops - address space operations for access to $MFT
@@ -275,7 +147,7 @@ static int ntfs_mft_readpage(struct file *file, struct page *page)
  */
 struct address_space_operations ntfs_mft_aops = {
 	writepage:	NULL,			/* Write dirty page to disk. */
-	readpage:	ntfs_mft_readpage,	/* Fill page with data. */
+	readpage:	ntfs_mst_readpage,	/* Fill page with data. */
 	sync_page:	block_sync_page,	/* Currently, just unplugs the
 						   disk request queue. */
 	prepare_write:	NULL,			/* . */
@@ -390,7 +262,7 @@ static inline void unmap_mft_record_page(ntfs_inode *ni)
  * necessary, increments the use count on the page so that it cannot disappear
  * under us and returns a reference to the page cache page).
  *
- * If read_cache_page() invokes ntfs_mft_readpage() to load the page from disk,
+ * If read_cache_page() invokes ntfs_mst_readpage() to load the page from disk,
  * it sets PG_locked and clears PG_uptodate on the page. Once I/O has
  * completed and the post-read mst fixups on each mft record in the page have
  * been performed, the page gets PG_uptodate set and PG_locked cleared (this is
