@@ -1,5 +1,6 @@
 /* 
  * Copyright (C) 2000, 2001, 2002 Jeff Dike (jdike@karaya.com)
+ * Copyright 2003 PathScale, Inc.
  * Licensed under the GPL
  */
 
@@ -225,7 +226,7 @@ int page_size(void)
 	return(PAGE_SIZE);
 }
 
-int page_mask(void)
+unsigned long page_mask(void)
 {
 	return(PAGE_MASK);
 }
