@@ -32,8 +32,8 @@ do { \
 
 #define preempt_enable_no_resched() \
 do { \
-	dec_preempt_count(); \
 	barrier(); \
+	dec_preempt_count(); \
 } while (0)
 
 #define preempt_check_resched() \
