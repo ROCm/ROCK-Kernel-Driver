@@ -62,7 +62,7 @@
 #include <asm/semaphore.h>
 #include <asm/byteorder.h>
 
-#define DEBUG
+#undef DEBUG
 
 #ifdef DEBUG
 #define kaweth_dbg(format, arg...) printk(KERN_DEBUG __FILE__ ": " format "\n" ,##arg)
@@ -592,7 +592,7 @@ static void kaweth_usb_receive(struct urb *urb, struct pt_regs *regs)
 
 	struct sk_buff *skb;
 
-	if(unlikely(urb->status == -ECONNRESET || urb->status == -ECONNABORTED))
+	if(unlikely(urb->status == -ECONNRESET || urb->status == -ECONNABORTED || urb->status == -ESHUTDOWN))
 	/* we are killed - set a flag and wake the disconnect handler */
 	{
 		kaweth->end = 1;
