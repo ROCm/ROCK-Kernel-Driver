@@ -2,6 +2,9 @@
 #define _NAMESPACE_H_
 #ifdef __KERNEL__
 
+#include <linux/dcache.h>
+#include <linux/sched.h>
+
 struct namespace {
 	atomic_t		count;
 	struct vfsmount *	root;
