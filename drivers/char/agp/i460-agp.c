@@ -525,7 +525,6 @@ static unsigned long i460_mask_memory (unsigned long addr, int type)
 
 static int __init intel_i460_setup (struct pci_dev *pdev __attribute__((unused)))
 {
-	agp_bridge.num_of_masks = 1;
 	agp_bridge.masks = i460_masks;
 	agp_bridge.aperture_sizes = (void *) i460_sizes;
 	agp_bridge.size_type = U8_APER_SIZE;
