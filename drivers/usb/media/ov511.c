@@ -6115,13 +6115,16 @@ ov511_deregister_decomp_module(int ov518, int mmx)
 static int __init
 usb_ov511_init(void)
 {
+	int retval;
 
-	if (usb_register(&ov511_driver) < 0)
-		return -1;
+	retval = usb_register(&ov511_driver);
+	if (retval)
+		goto out;
 
 	info(DRIVER_VERSION " : " DRIVER_DESC);
 
-	return 0;
+out:
+	return retval;
 }
 
 static void __exit
