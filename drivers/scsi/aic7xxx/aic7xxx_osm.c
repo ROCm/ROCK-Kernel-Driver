@@ -3774,7 +3774,7 @@ ahc_linux_run_device_queue(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 		 */
 		hscb->control = 0;
 		hscb->scsiid = BUILD_SCSIID(ahc, cmd);
-		hscb->lun = cmd->lun;
+		hscb->lun = cmd->device->lun;
 		mask = SCB_GET_TARGET_MASK(ahc, scb);
 		tinfo = ahc_fetch_transinfo(ahc, SCB_GET_CHANNEL(ahc, scb),
 					    SCB_GET_OUR_ID(scb),
@@ -5090,7 +5090,7 @@ ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag)
 		wait = TRUE;
 	} else {
 		printf("%s:%d:%d:%d: Unable to deliver message\n",
-		       ahc_name(ahc), cmd->channel, cmd->device->id,
+		       ahc_name(ahc), cmd->device->channel, cmd->device->id,
 		       cmd->device->lun);
 		retval = FAILED;
 		goto done;

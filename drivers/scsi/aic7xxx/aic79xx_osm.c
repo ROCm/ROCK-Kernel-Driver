@@ -1645,7 +1645,7 @@ ahd_linux_bus_reset(Scsi_Cmnd *cmd)
 		       ahd_name(ahd), cmd);
 #endif
 	ahd_midlayer_entrypoint_lock(ahd, &s);
-	found = ahd_reset_channel(ahd, cmd->channel + 'A',
+	found = ahd_reset_channel(ahd, cmd->device->channel + 'A',
 				  /*initiate reset*/TRUE);
 	acmd = TAILQ_FIRST(&ahd->platform_data->completeq);
 	TAILQ_INIT(&ahd->platform_data->completeq);
@@ -3996,7 +3996,7 @@ ahd_linux_dv_timeout(struct scsi_cmnd *cmd)
 		ahd_set_transaction_status(scb, CAM_AUTOSENSE_FAIL);
 	else
 		ahd_set_transaction_status(scb, CAM_CMD_TIMEOUT);
-	ahd_reset_channel(ahd, cmd->channel + 'A', /*initiate*/TRUE);
+	ahd_reset_channel(ahd, cmd->device->channel + 'A', /*initiate*/TRUE);
 
 	/*
 	 * Add a minimal bus settle delay for devices that are slow to
@@ -4275,7 +4275,6 @@ ahd_linux_run_device_queue(struct ahd_softc *ahd, struct ahd_linux_device *dev)
 		 */
 		hscb->control = 0;
 		hscb->scsiid = BUILD_SCSIID(ahd, cmd);
-		hscb->lun = cmd->lun;
 		scb->hscb->task_management = 0;
 		mask = SCB_GET_TARGET_MASK(ahd, scb);
 
@@ -4975,7 +4974,7 @@ ahd_linux_queue_cmd_complete(struct ahd_softc *ahd, Scsi_Cmnd *cmd)
 			uint32_t action;
 			u_int scsi_status;
 
-			dev = ahd_linux_get_device(ahd, cmd->channel,
+			dev = ahd_linux_get_device(ahd, cmd->device->channel,
 						   cmd->device->id,
 						   cmd->device->lun,
 						   /*alloc*/FALSE);
