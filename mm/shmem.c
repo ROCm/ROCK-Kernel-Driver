@@ -1211,6 +1211,8 @@ shmem_file_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 		buf += bytes;
 		if (pos > inode->i_size)
 			inode->i_size = pos;
+
+		cond_resched();
 	} while (count);
 
 	*ppos = pos;
@@ -1302,6 +1304,8 @@ static void do_shmem_file_read(struct file *filp, loff_t *ppos, read_descriptor_
 		page_cache_release(page);
 		if (ret != nr || !desc->count)
 			break;
+
+		cond_resched();
 	}
 
 	*ppos = ((loff_t) index << PAGE_CACHE_SHIFT) + offset;
