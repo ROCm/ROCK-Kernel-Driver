@@ -52,6 +52,7 @@ struct kparam_array
 #define __module_param_call(prefix, name, set, get, arg, perm)		\
 	static char __param_str_##name[] __initdata = prefix #name;	\
 	static struct kernel_param const __param_##name			\
+	__attribute_used__						\
     __attribute__ ((unused,__section__ ("__param"),aligned(sizeof(void *)))) \
 	= { __param_str_##name, perm, set, get, arg }
 
