@@ -460,33 +460,34 @@ static int corkscrew_scan(struct net_device *dev)
 	if(nopnp == 1)
 		goto no_pnp;
 	for(i=0; corkscrew_isapnp_adapters[i].vendor != 0; i++) {
-		struct pci_dev *idev = NULL;
+		struct pnp_dev *idev = NULL;
 		int irq;
-		while((idev = isapnp_find_dev(NULL,
-						corkscrew_isapnp_adapters[i].vendor,
-						corkscrew_isapnp_adapters[i].function,
-						idev))) {
+		while((idev = pnp_find_dev(NULL,
+					   corkscrew_isapnp_adapters[i].vendor,
+					   corkscrew_isapnp_adapters[i].function,
+					   idev))) {
 
-			if(idev->active) idev->deactivate(idev);
-
-			if(idev->prepare(idev)<0)
+			if (pnp_device_attach(idev) < 0)
 				continue;
-			if (!(idev->resource[0].flags & IORESOURCE_IO))
-				continue;
-			if(idev->activate(idev)<0) {
-				printk("isapnp configure failed (out of resources?)\n");
+			if (pnp_activate_dev(idev, NULL) < 0) {
+				printk("pnp activate failed (out of resources?)\n");
+				pnp_device_detach(idev);
 				return -ENOMEM;
 			}
-			if (!idev->resource[0].start || check_region(idev->resource[0].start,16))
+			if (!pnp_port_valid(idev, 0) || !pnp_irq_valid(idev, 0)) {
+				pnp_device_detach(idev);
 				continue;
-			ioaddr = idev->resource[0].start;
-			irq = idev->irq_resource[0].start;
+			}
+			ioaddr = pnp_port_start(idev, 0);
+			irq = pnp_irq(idev, 0);
 			if(corkscrew_debug)
 				printk ("ISAPNP reports %s at i/o 0x%x, irq %d\n",
 					(char*) corkscrew_isapnp_adapters[i].driver_data, ioaddr, irq);
 					
-			if ((inw(ioaddr + 0x2002) & 0x1f0) != (ioaddr & 0x1f0))
+			if ((inw(ioaddr + 0x2002) & 0x1f0) != (ioaddr & 0x1f0)) {
+				pnp_device_detach(idev);
 				continue;
+			}
 			/* Verify by reading the device ID from the EEPROM. */
 			{
 				int timer;
@@ -498,8 +499,10 @@ static int corkscrew_scan(struct net_device *dev)
 				    		== 0)
 							break;
 				}
-				if (inw(ioaddr + Wn0EepromData) != 0x6d50)
+				if (inw(ioaddr + Wn0EepromData) != 0x6d50) {
+					pnp_device_detach(idev);
 					continue;
+				}
 			}
 			printk(KERN_INFO "3c515 Resource configuration register %#4.4x, DCR %4.4x.\n",
 		     		inl(ioaddr + 0x2002), inw(ioaddr + 0x2000));

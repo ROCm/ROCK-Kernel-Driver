@@ -314,30 +314,34 @@ int __init generic_NCR5380_detect(Scsi_Host_Template * tpnt)
 		overrides[0].board = BOARD_DTC3181E;
 
 	if (!current_override && isapnp_present()) {
-		struct pci_dev *dev = NULL;
+		struct pnp_dev *dev = NULL;
 		count = 0;
-		while ((dev = isapnp_find_dev(NULL, ISAPNP_VENDOR('D', 'T', 'C'), ISAPNP_FUNCTION(0x436e), dev))) {
+		while ((dev = pnp_find_dev(NULL, ISAPNP_VENDOR('D', 'T', 'C'), ISAPNP_FUNCTION(0x436e), dev))) {
 			if (count >= NO_OVERRIDES)
 				break;
-			if (!dev->active && dev->prepare(dev) < 0) {
-				printk(KERN_ERR "dtc436e probe: prepare failed\n");
+			if (pnp_device_attach(dev) < 0) {
+				printk(KERN_ERR "dtc436e probe: attach failed\n");
 				continue;
 			}
-			if (!(dev->resource[0].flags & IORESOURCE_IO))
-				continue;
-			if (!dev->active && dev->activate(dev) < 0) {
+			if (pnp_activate_dev(dev, NULL) < 0) {
 				printk(KERN_ERR "dtc436e probe: activate failed\n");
+				pnp_device_detach(dev);
 				continue;
 			}
-			if (dev->irq_resource[0].flags & IORESOURCE_IRQ)
-				overrides[count].irq = dev->irq_resource[0].start;
+			if (!pnp_port_valid(dev, 0)) {
+				printk(KERN_ERR "dtc436e probe: no valid port\n");
+				pnp_device_detach(dev);
+				continue;
+			}
+			if (pnp_irq_valid(dev, 0))
+				overrides[count].irq = pnp_irq(dev, 0);
 			else
 				overrides[count].irq = IRQ_NONE;
-			if (dev->dma_resource[0].flags & IORESOURCE_DMA)
-				overrides[count].dma = dev->dma_resource[0].start;
+			if (pnp_dma_valid(dev, 0))
+				overrides[count].dma = pnp_dma(dev, 0);
 			else
 				overrides[count].dma = DMA_NONE;
-			overrides[count].NCR5380_map_name = (NCR5380_map_type) dev->resource[0].start;
+			overrides[count].NCR5380_map_name = (NCR5380_map_type) pnp_port_start(dev, 0);
 			overrides[count].board = BOARD_DTC3181E;
 			count++;
 		}

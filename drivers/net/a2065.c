@@ -573,7 +573,7 @@ static int lance_start_xmit (struct sk_buff *skb, struct net_device *dev)
 	len = skblen;
 	
 	if (len < ETH_ZLEN) {
-		len = ETH_ZLEN:
+		len = ETH_ZLEN;
 		skb = skb_padto(skb, ETH_ZLEN);
 		if (skb == NULL)
 			return 0;

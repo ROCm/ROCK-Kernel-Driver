@@ -185,7 +185,6 @@ int usb_hcd_sa1111_probe (const struct hc_driver *driver,
 		goto err1;
 	}
 
-	set_irq_type(hcd->irq, IRQT_RISING);
 	retval = request_irq (hcd->irq, usb_hcd_sa1111_hcim_irq, SA_INTERRUPT,
 			      hcd->description, hcd);
 	if (retval != 0) {
@@ -399,7 +398,7 @@ static int ohci_hcd_sa1111_drv_resume(struct device *dev, u32 level)
 
 static struct sa1111_driver ohci_hcd_sa1111_driver = {
 	.drv = {
-		.name		= "SA1111 OHCI",
+		.name		= "sa1111-ohci",
 		.bus		= &sa1111_bus_type,
 		.probe		= ohci_hcd_sa1111_drv_probe,
 		.remove		= ohci_hcd_sa1111_drv_remove,

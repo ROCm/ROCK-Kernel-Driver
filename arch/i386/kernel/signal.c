@@ -350,6 +350,7 @@ get_sigframe(struct k_sigaction *ka, struct pt_regs * regs, size_t frame_size)
 static void setup_frame(int sig, struct k_sigaction *ka,
 			sigset_t *set, struct pt_regs * regs)
 {
+	void *restorer;
 	struct sigframe *frame;
 	int err = 0;
 
@@ -378,8 +379,12 @@ static void setup_frame(int sig, struct k_sigaction *ka,
 	if (err)
 		goto give_sigsegv;
 
+	restorer = (void *) (fix_to_virt(FIX_VSYSCALL) + 32);
+	if (ka->sa.sa_flags & SA_RESTORER)
+		restorer = ka->sa.sa_restorer;
+
 	/* Set up to return from userspace.  */
-	err |= __put_user(fix_to_virt(FIX_VSYSCALL) + 32, &frame->pretcode);
+	err |= __put_user(restorer, &frame->pretcode);
 	 
 	/*
 	 * This is popl %eax ; movl $,%eax ; int $0x80
@@ -422,6 +427,7 @@ give_sigsegv:
 static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 			   sigset_t *set, struct pt_regs * regs)
 {
+	void *restorer;
 	struct rt_sigframe *frame;
 	int err = 0;
 
@@ -456,7 +462,10 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 		goto give_sigsegv;
 
 	/* Set up to return from userspace.  */
-	err |= __put_user(fix_to_virt(FIX_VSYSCALL) + 64, &frame->pretcode);
+	restorer = (void *) (fix_to_virt(FIX_VSYSCALL) + 64);
+	if (ka->sa.sa_flags & SA_RESTORER)
+		restorer = ka->sa.sa_restorer;
+	err |= __put_user(restorer, &frame->pretcode);
 	 
 	/*
 	 * This is movl $,%eax ; int $0x80

@@ -1144,12 +1144,12 @@ static int __init aha1542_detect(Scsi_Host_Template * tpnt)
 	 
 	if(isapnp)
 	{
-		struct pci_dev *pdev = NULL;
+		struct pnp_dev *pdev = NULL;
 		for(indx = 0; indx <sizeof(bases)/sizeof(bases[0]);indx++)
 		{
 			if(bases[indx])
 				continue;
-			pdev = isapnp_find_dev(NULL, ISAPNP_VENDOR('A', 'D', 'P'), 
+			pdev = pnp_find_dev(NULL, ISAPNP_VENDOR('A', 'D', 'P'), 
 				ISAPNP_FUNCTION(0x1542), pdev);
 			if(pdev==NULL)
 				break;
@@ -1157,18 +1157,20 @@ static int __init aha1542_detect(Scsi_Host_Template * tpnt)
 			 *	Activate the PnP card
 			 */
 			 
-			if(pdev->prepare(pdev)<0)
+			if(pnp_device_attach(pdev)<0)
 				continue;
-				
-			if(!(pdev->resource[0].flags&IORESOURCE_IO))
+			
+			if(pnp_activate_dev(pdev, NULL)<0) {
+				pnp_device_detach(pdev);
 				continue;
-				
-			pdev->resource[0].flags|=IORESOURCE_AUTO;
-
-			if(pdev->activate(pdev)<0)
+			}
+			
+			if(!pnp_port_valid(pdev, 0)) {
+				pnp_device_detach(pdev);
 				continue;
+			}
 				
-			bases[indx] = pdev->resource[0].start;
+			bases[indx] = pnp_port_start(pdev, 0);
 			
 			/* The card can be queried for its DMA, we have 
 			   the DMA set up that is enough */

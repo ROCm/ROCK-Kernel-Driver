@@ -211,7 +211,7 @@ static struct card_ops niccy_ops = {
 
 static struct pci_dev *niccy_dev __initdata = NULL;
 #ifdef __ISAPNP__
-static struct pci_bus *pnp_c __devinitdata = NULL;
+static struct pnp_card *pnp_c __devinitdata = NULL;
 #endif
 
 int __init
@@ -226,32 +226,38 @@ setup_niccy(struct IsdnCard *card)
 		return (0);
 #ifdef __ISAPNP__
 	if (!card->para[1] && isapnp_present()) {
-		struct pci_bus *pb;
-		struct pci_dev *pd;
+		struct pnp_card *pb;
+		struct pnp_dev  *pd;
 
-		if ((pb = isapnp_find_card(
+		if ((pb = pnp_find_card(
 			ISAPNP_VENDOR('S', 'D', 'A'),
 			ISAPNP_FUNCTION(0x0150), pnp_c))) {
 			pnp_c = pb;
 			pd = NULL;
-			if (!(pd = isapnp_find_dev(pnp_c,
+			if (!(pd = pnp_find_dev(pnp_c,
 				ISAPNP_VENDOR('S', 'D', 'A'),
 				ISAPNP_FUNCTION(0x0150), pd))) {
 				printk(KERN_ERR "NiccyPnP: PnP error card found, no device\n");
 				return (0);
 			}
-			pd->prepare(pd);
-			pd->deactivate(pd);
-			pd->activate(pd);
-			card->para[1] = pd->resource[0].start;
-			card->para[2] = pd->resource[1].start;
-			card->para[0] = pd->irq_resource[0].start;
-			if (!card->para[0] || !card->para[1] || !card->para[2]) {
+			if (pnp_device_attach(pd) < 0) {
+				printk(KERN_ERR "NiccyPnP: attach failed\n");
+				return 0;
+			}
+			if (pnp_activate_dev(pd, NULL) < 0) {
+				printk(KERN_ERR "NiccyPnP: activate failed\n");
+				pnp_device_detach(pd);
+				return 0;
+			}
+			if (!pnp_irq_valid(pd, 0) || !pnp_port_valid(pd, 0) || !pnp_port_valid(pd, 1)) {
 				printk(KERN_ERR "NiccyPnP:some resources are missing %ld/%lx/%lx\n",
-					card->para[0], card->para[1], card->para[2]);
-				pd->deactivate(pd);
+					pnp_irq(pd, 0), pnp_port_start(pd, 0), pnp_port_start(pd, 1));
+				pnp_device_detach(pd);
 				return(0);
 			}
+			card->para[1] = pnp_port_start(pd, 0);
+			card->para[2] = pnp_port_start(pd, 1);
+			card->para[0] = pnp_irq(pd, 0);
 		} else {
 			printk(KERN_INFO "NiccyPnP: no ISAPnP card found\n");
 		}

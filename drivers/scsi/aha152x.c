@@ -970,7 +970,7 @@ static void swintr(int irqno, void *dev_id, struct pt_regs *regs)
 }
 
 #ifdef __ISAPNP__
-static struct pci_dev *pnpdev[2];
+static struct pnp_dev *pnpdev[2];
 static int num_pnpdevs;
 #endif
 int aha152x_detect(Scsi_Host_Template * tpnt)
@@ -979,7 +979,7 @@ int aha152x_detect(Scsi_Host_Template * tpnt)
 #if defined(AUTOCONF)
 	aha152x_config conf;
 #ifdef __ISAPNP__
-	struct pci_dev *dev = NULL;
+	struct pnp_dev *dev = NULL;
 #endif
 #endif
 	tpnt->proc_name = "aha152x"; 
@@ -1128,22 +1128,23 @@ int aha152x_detect(Scsi_Host_Template * tpnt)
 #endif
 
 #ifdef __ISAPNP__
-	while ( setup_count<ARRAY_SIZE(setup) && (dev=isapnp_find_dev(NULL, ISAPNP_VENDOR('A','D','P'), ISAPNP_FUNCTION(0x1505), dev)) ) {
-		if (dev->prepare(dev) < 0)
+	while ( setup_count<ARRAY_SIZE(setup) && (dev=pnp_find_dev(NULL, ISAPNP_VENDOR('A','D','P'), ISAPNP_FUNCTION(0x1505), dev)) ) {
+		if (pnp_device_attach(dev) < 0)
 			continue;
-		if (dev->active)
-			continue;
-		if (!(dev->resource[0].flags & IORESOURCE_IO))
-			continue;
-		dev->resource[0].flags |= IORESOURCE_AUTO;
-		if (dev->activate(dev) < 0)
-			continue;
-		if ( setup_count==1 && dev->resource[0].start==setup[0].io_port) {
-			dev->deactivate(dev);
+		if (pnp_activate_dev(dev, NULL) < 0) {
+			pnp_device_detach(dev);
 			continue;
 		}
-		setup[setup_count].io_port     = dev->resource[0].start;
-		setup[setup_count].irq         = dev->irq_resource[0].start;
+		if (!pnp_port_valid(dev, 0)) {
+			pnp_device_detach(dev);
+			continue;
+		}
+		if (setup_count==1 && pnp_port_start(dev, 0)==setup[0].io_port) {
+			pnp_device_detach(dev);
+			continue;
+		}
+		setup[setup_count].io_port     = pnp_port_start(dev, 0);
+		setup[setup_count].irq         = pnp_irq(dev, 0);
 		setup[setup_count].scsiid      = 7;
 		setup[setup_count].reconnect   = 1;
 		setup[setup_count].parity      = 1;
@@ -1421,7 +1422,7 @@ int aha152x_release(struct Scsi_Host *shpnt)
 
 #ifdef __ISAPNP__
 	while (num_pnpdevs--)
-		pnpdev[num_pnpdevs]->deactivate(pnpdev[num_pnpdevs]);
+		pnp_device_detach(pnpdev[num_pnpdevs]);
 #endif
 	scsi_unregister(shpnt);
 

@@ -168,8 +168,6 @@ ENTRY(cpu_arm720_reset)
 		mov	pc, r0
 
 	
-cpu_armvlsi_name:
-		.asciz	"ARM"
 cpu_arm720_name:
 		.asciz	"ARM720T"
 		.align
@@ -223,14 +221,8 @@ ENTRY(arm720_processor_functions)
 
 		.size	arm720_processor_functions, . - arm720_processor_functions
 
-		.type	cpu_arm720_info, #object
-cpu_arm720_info:
-		.long	cpu_armvlsi_name
-		.long	cpu_arm720_name
-		.size	cpu_arm720_info, . - cpu_arm720_info
-	
 		.type	cpu_arch_name, #object
-cpu_arch_name:	.asciz	"armv4"
+cpu_arch_name:	.asciz	"armv4t"
 		.size	cpu_arch_name, . - cpu_arch_name
 
 		.type	cpu_elf_name, #object
@@ -253,7 +245,7 @@ __arm720_proc_info:
 		.long	cpu_arch_name				@ arch_name
 		.long	cpu_elf_name				@ elf_name
 		.long	HWCAP_SWP | HWCAP_HALF | HWCAP_THUMB	@ elf_hwcap
-		.long	cpu_arm720_info				@ info
+		.long	cpu_arm720_name				@ name
 		.long	arm720_processor_functions
 		.long	v4_tlb_fns
 		.long	v4wt_user_fns

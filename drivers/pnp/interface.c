@@ -251,29 +251,33 @@ static ssize_t pnp_show_current_resources(struct device *dmdev, char *buf)
 		str += sprintf(str,"DISABLED\n");
 		goto done;
 	}
-	for (i = 0; i < DEVICE_COUNT_RESOURCE; i++) {
-			if (dev->resource[i].flags & IORESOURCE_IO){
-				str += sprintf(str,"io");
-				str += sprintf(str," 0x%lx-0x%lx \n",
-					       dev->resource[i].start,
-					       dev->resource[i].end);
-			}
-			if (dev->resource[i].flags & IORESOURCE_MEM){
-				str += sprintf(str,"mem");
-				str += sprintf(str," 0x%lx-0x%lx \n",
-					       dev->resource[i].start,
-					       dev->resource[i].end);
-			}
+	for (i = 0; i < DEVICE_COUNT_IO; i++) {
+		if (pnp_port_valid(dev, i)) {
+			str += sprintf(str,"io");
+			str += sprintf(str," 0x%lx-0x%lx \n",
+						pnp_port_start(dev, i),
+						pnp_port_end(dev, i));
+		}
 	}
-	for (i = 0; i < DEVICE_COUNT_IRQ && dev->irq_resource[i].flags
-			 & IORESOURCE_IRQ; i++) {
+	for (i = 0; i < DEVICE_COUNT_MEM; i++) {
+		if (pnp_mem_valid(dev, i)) {
+			str += sprintf(str,"mem");
+			str += sprintf(str," 0x%lx-0x%lx \n",
+						pnp_mem_start(dev, i),
+						pnp_mem_end(dev, i));
+		}
+	}
+	for (i = 0; i < DEVICE_COUNT_IRQ; i++) {
+		if (pnp_irq_valid(dev, i)) {
 			str += sprintf(str,"irq");
-			str += sprintf(str," %ld \n", dev->irq_resource[i].start);
+			str += sprintf(str," %ld \n", pnp_irq(dev, i));
+		}
 	}
-	for (i = 0; i < DEVICE_COUNT_DMA && dev->dma_resource[i].flags
-			 & IORESOURCE_DMA; i++) {
+	for (i = 0; i < DEVICE_COUNT_DMA; i++) {
+		if (pnp_dma_valid(dev, i)) {
 			str += sprintf(str,"dma");
-			str += sprintf(str," %ld \n", dev->dma_resource[i].start);
+			str += sprintf(str," %ld \n", pnp_dma(dev, i));
+		}
 	}
 	done:
 	return (str - buf);
@@ -284,12 +288,11 @@ pnp_set_current_resources(struct device * dmdev, const char * buf)
 {
 	struct pnp_dev *dev = to_pnp_dev(dmdev);
 	char	command[20];
-	char	type[20];
 	int	num_args;
 	int	error = 0;
-	int	depnum, mode = 0;
+	int	depnum;
 
-	num_args = sscanf(buf,"%10s %i %10s",command,&depnum,type);
+	num_args = sscanf(buf,"%10s %i",command,&depnum);
 	if (!num_args)
 		goto done;
 	if (!strnicmp(command,"lock",4)) {
@@ -317,11 +320,9 @@ pnp_set_current_resources(struct device * dmdev, const char * buf)
 		goto done;
 	}
 	if (!strnicmp(command,"manual",6)) {
-		if (num_args != 3)
+		if (num_args != 2)
 			goto done;
-		if (!strnicmp(type,"static",6))
-			mode = PNP_STATIC;
-		error = pnp_raw_set_dev(dev,depnum,NULL,mode);
+		error = pnp_raw_set_dev(dev,depnum,NULL);
 		goto done;
 	}
  done:

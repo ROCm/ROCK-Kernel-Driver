@@ -19,7 +19,6 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/pci.h>
-#include <linux/isapnp.h>
 #include <linux/kmod.h>
 #include <linux/slab.h>
 #include <linux/skbuff.h>
