@@ -123,7 +123,6 @@ static void hexdump( const unsigned char *buf, unsigned short len )
 struct dvb_net_priv {
 	int in_use;
         struct net_device_stats stats;
-        char name[6];
 	u16 pid;
 	struct dvb_net *host;
         struct dmx_demux *demux;
@@ -1165,12 +1164,17 @@ static int dvb_net_add_if(struct dvb_net *dvbnet, u16 pid, u8 feedtype)
 	if ((if_num = get_if(dvbnet)) < 0)
 		return -EINVAL;
 
-	net = alloc_netdev(sizeof(struct dvb_net_priv), "dvb",
-			   dvb_net_setup);
+	net = alloc_netdev(sizeof(struct dvb_net_priv), "dvb", dvb_net_setup);
 	if (!net)
 		return -ENOMEM;
 	
-	sprintf(net->name, "dvb%d_%d", dvbnet->dvbdev->adapter->num, if_num);
+	if (dvbnet->dvbdev->id)
+		snprintf(net->name, IFNAMSIZ, "dvb%d%u%d",
+			 dvbnet->dvbdev->adapter->num, dvbnet->dvbdev->id, if_num);
+	else
+		/* compatibility fix to keep dvb0_0 format */
+		snprintf(net->name, IFNAMSIZ, "dvb%d_%d",
+			 dvbnet->dvbdev->adapter->num, if_num);
 
 	net->addr_len  		= 6;
 	memcpy(net->dev_addr, dvbnet->dvbdev->adapter->proposed_mac, 6);
@@ -1196,6 +1200,7 @@ static int dvb_net_add_if(struct dvb_net *dvbnet, u16 pid, u8 feedtype)
 		free_netdev(net);
 		return result;
 	}
+	printk("dvb_net: created network interface %s\n", net->name);
 
         return if_num;
 }
@@ -1214,6 +1219,7 @@ static int dvb_net_remove_if(struct dvb_net *dvbnet, unsigned int num)
 
 	dvb_net_stop(net);
 	flush_scheduled_work();
+	printk("dvb_net: removed network interface %s\n", net->name);
         unregister_netdev(net);
 	dvbnet->state[num]=0;
 	dvbnet->device[num] = NULL;
