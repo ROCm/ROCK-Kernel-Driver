@@ -675,7 +675,7 @@ bad_blk:
      * Now we need to make sure head_blk is not pointing to a block in
      * the middle of a log record.
      */
-    num_scan_bblks = BTOBB(XLOG_MAX_RECORD_BSIZE);
+    num_scan_bblks = XLOG_REC_SHIFT(log);
     if (head_blk >= num_scan_bblks) {
 	start_blk = head_blk - num_scan_bblks;  /* don't read head_blk */
 
