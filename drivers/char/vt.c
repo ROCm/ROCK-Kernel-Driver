@@ -3170,16 +3170,23 @@ int con_font_default(int currcons, struct console_font_op *op)
 
 int con_font_copy(int currcons, struct console_font_op *op)
 {
+	int con = op->height;
+	struct vc_data *vc;
 	int rc;
 
 	if (vt_cons[currcons]->vc_mode != KD_TEXT)
 		return -EINVAL;
 
 	acquire_console_sem();
-	if (sw->con_font_copy)
-		rc = sw->con_font_copy(vc_cons[currcons].d, op);
-	else
+	vc = vc_cons[currcons].d;
+	if (!sw->con_font_copy)
 		rc = -ENOSYS;
+	else if (con < 0 || !vc_cons_allocated(con))
+		rc = -ENOTTY;
+	else if (con == vc->vc_num)	/* nothing to do */
+		rc = 0;
+	else
+		rc = sw->con_font_copy(vc, con);
 	release_console_sem();
 	return rc;
 }

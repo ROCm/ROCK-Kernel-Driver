@@ -2167,21 +2167,17 @@ static int fbcon_do_set_font(struct vc_data *vc, struct console_font_op *op,
 	return 0;
 }
 
-static int fbcon_copy_font(struct vc_data *vc, struct console_font_op *op)
+static int fbcon_copy_font(struct vc_data *vc, int con)
 {
-	struct display *od;
-	int h = op->height;
+	struct display *od = &fb_display[con];
+	struct console_font_op crap;
 
-	if (h < 0 || !vc_cons_allocated(h))
-		return -ENOTTY;
-	if (h == vc->vc_num)
-		return 0;	/* nothing to do */
-	od = &fb_display[h];
 	if (od->fontdata == vc->vc_font.data)
 		return 0;	/* already the same font... */
-	op->width = vc->vc_font.width;
-	op->height = vc->vc_font.height;
-	return fbcon_do_set_font(vc, op, od->fontdata, od->userfont);
+	crap.op = KD_FONT_OP_COPY;
+	crap.width = vc->vc_font.width;
+	crap.height = vc->vc_font.height;
+	return fbcon_do_set_font(vc, &crap, od->fontdata, od->userfont);
 }
 
 static int fbcon_set_font(struct vc_data *vc, struct console_font_op *op)
