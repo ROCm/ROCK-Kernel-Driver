@@ -130,11 +130,11 @@ sys32_alarm_wrapper:
 
 #sys32_pause_wrapper			# void 
 
-	.globl  sys32_utime_wrapper 
-sys32_utime_wrapper:
+	.globl  compat_sys_utime_wrapper 
+compat_sys_utime_wrapper:
 	llgtr	%r2,%r2			# char *
-	llgtr	%r3,%r3			# struct utimbuf_emu31 *
-	jg	sys32_utime		# branch to system call
+	llgtr	%r3,%r3			# struct compat_utimbuf *
+	jg	compat_sys_utime		# branch to system call
 
 	.globl  sys32_access_wrapper 
 sys32_access_wrapper:
@@ -182,10 +182,10 @@ sys32_pipe_wrapper:
 	llgtr	%r2,%r2			# u32 *
 	jg	sys_pipe		# branch to system call
 
-	.globl  sys32_times_wrapper 
-sys32_times_wrapper:
-	llgtr	%r2,%r2			# struct tms_emu31 *
-	jg	sys32_times		# branch to system call
+	.globl  compat_sys_times_wrapper 
+compat_sys_times_wrapper:
+	llgtr	%r2,%r2			# struct compat_tms *
+	jg	compat_sys_times	# branch to system call
 
 	.globl  sys32_brk_wrapper 
 sys32_brk_wrapper:
@@ -465,36 +465,36 @@ sys32_syslog_wrapper:
 	lgfr	%r4,%r4			# int
 	jg	sys_syslog		# branch to system call
 
-	.globl  sys32_setitimer_wrapper 
-sys32_setitimer_wrapper:
+	.globl  compat_sys_setitimer_wrapper 
+compat_sys_setitimer_wrapper:
 	lgfr	%r2,%r2			# int
 	llgtr	%r3,%r3			# struct itimerval_emu31 *
 	llgtr	%r4,%r4			# struct itimerval_emu31 *
-	jg	sys32_setitimer		# branch to system call
+	jg	compat_sys_setitimer	# branch to system call
 
-	.globl  sys32_getitimer_wrapper 
-sys32_getitimer_wrapper:
+	.globl  compat_sys_getitimer_wrapper 
+compat_sys_getitimer_wrapper:
 	lgfr	%r2,%r2			# int
 	llgtr	%r3,%r3			# struct itimerval_emu31 *
-	jg	sys32_getitimer		# branch to system call
+	jg	compat_sys_getitimer	# branch to system call
 
-	.globl  sys32_newstat_wrapper 
-sys32_newstat_wrapper:
+	.globl  compat_sys_newstat_wrapper 
+compat_sys_newstat_wrapper:
 	llgtr	%r2,%r2			# char *
 	llgtr	%r3,%r3			# struct stat_emu31 *
-	jg	sys32_newstat		# branch to system call
+	jg	compat_sys_newstat	# branch to system call
 
-	.globl  sys32_newlstat_wrapper 
-sys32_newlstat_wrapper:
+	.globl  compat_sys_newlstat_wrapper 
+compat_sys_newlstat_wrapper:
 	llgtr	%r2,%r2			# char *
 	llgtr	%r3,%r3			# struct stat_emu31 *
-	jg	sys32_newlstat		# branch to system call
+	jg	compat_sys_newlstat	# branch to system call
 
-	.globl  sys32_newfstat_wrapper 
-sys32_newfstat_wrapper:
+	.globl  compat_sys_newfstat_wrapper 
+compat_sys_newfstat_wrapper:
 	llgfr	%r2,%r2			# unsigned int
 	llgtr	%r3,%r3			# struct stat_emu31 *
-	jg	sys32_newfstat		# branch to system call
+	jg	compat_sys_newfstat	# branch to system call
 
 #sys32_vhangup_wrapper			# void 
 
@@ -743,14 +743,14 @@ sys32_sched_get_priority_min_wrapper:
 	.globl  sys32_sched_rr_get_interval_wrapper 
 sys32_sched_rr_get_interval_wrapper:
 	lgfr	%r2,%r2			# pid_t
-	llgtr	%r3,%r3			# struct timespec_emu31 *
+	llgtr	%r3,%r3			# struct compat_timespec *
 	jg	sys32_sched_rr_get_interval	# branch to system call
 
-	.globl  sys32_nanosleep_wrapper 
-sys32_nanosleep_wrapper:
-	llgtr	%r2,%r2			# struct timespec_emu31 *
-	llgtr	%r3,%r3			# struct timespec_emu31 *
-	jg	sys32_nanosleep		# branch to system call
+	.globl  compat_sys_nanosleep_wrapper 
+compat_sys_nanosleep_wrapper:
+	llgtr	%r2,%r2			# struct compat_timespec *
+	llgtr	%r3,%r3			# struct compat_timespec *
+	jg	compat_sys_nanosleep		# branch to system call
 
 	.globl  sys32_mremap_wrapper 
 sys32_mremap_wrapper:
@@ -839,7 +839,7 @@ sys32_rt_sigpending_wrapper:
 sys32_rt_sigtimedwait_wrapper:
 	llgtr	%r2,%r2			# const sigset_emu31_t *
 	llgtr	%r3,%r3			# siginfo_emu31_t *
-	llgtr	%r4,%r4			# const struct timespec_emu31 *
+	llgtr	%r4,%r4			# const struct compat_timespec *
 	llgfr	%r5,%r5			# size_t
 	jg	sys32_rt_sigtimedwait	# branch to system call
 
