@@ -52,6 +52,12 @@ static DECLARE_MUTEX(port_sem);
 
 #define uart_users(state)	((state)->count + ((state)->info ? (state)->info->blocked_open : 0))
 
+#ifdef CONFIG_SERIAL_CORE_CONSOLE
+#define uart_console(port)	((port)->cons && (port)->cons->index == (port)->line)
+#else
+#define uart_console(port)	(0)
+#endif
+
 static void uart_change_speed(struct uart_state *state, struct termios *old_termios);
 static void uart_wait_until_sent(struct tty_struct *tty, int timeout);
 static void uart_change_pm(struct uart_state *state, int pm_state);
@@ -1284,7 +1290,7 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 			schedule_timeout(state->close_delay);
 			set_current_state(TASK_RUNNING);
 		}
-	} else if (!port->cons || port->cons->index != port->line) {
+	} else if (!uart_console(port)) {
 		uart_change_pm(state, 3);
 	}
 
@@ -1392,15 +1398,12 @@ static void uart_hangup(struct tty_struct *tty)
 static void uart_update_termios(struct uart_state *state)
 {
 	struct tty_struct *tty = state->info->tty;
+	struct uart_port *port = state->port;
 
-#ifdef CONFIG_SERIAL_CORE_CONSOLE
-	struct console *c = state->port->cons;
-
-	if (c && c->cflag && c->index == state->port->line) {
-		tty->termios->c_cflag = c->cflag;
-		c->cflag = 0;
+	if (uart_console(port)) {
+		tty->termios->c_cflag = port->cons->cflag;
+		port->cons->cflag = 0;
 	}
-#endif
 
 	/*
 	 * If the device failed to grab its irq resources,
@@ -1417,7 +1420,7 @@ static void uart_update_termios(struct uart_state *state)
 		 * And finally enable the RTS and DTR signals.
 		 */
 		if (tty->termios->c_cflag & CBAUD)
-			uart_set_mctrl(state->port, TIOCM_DTR | TIOCM_RTS);
+			uart_set_mctrl(port, TIOCM_DTR | TIOCM_RTS);
 	}
 }
 
@@ -1914,7 +1917,7 @@ int uart_suspend_port(struct uart_driver *drv, struct uart_port *port, u32 level
 		/*
 		 * Disable the console device before suspending.
 		 */
-		if (port->cons && port->cons->index == port->line)
+		if (uart_console(port))
 			port->cons->flags &= ~CON_ENABLED;
 
 		uart_change_pm(state, 3);
@@ -1939,7 +1942,7 @@ int uart_resume_port(struct uart_driver *drv, struct uart_port *port, u32 level)
 		/*
 		 * Re-enable the console device after suspending.
 		 */
-		if (port->cons && port->cons->index == port->line) {
+		if (uart_console(port)) {
 			uart_change_speed(state, NULL);
 			port->cons->flags |= CON_ENABLED;
 		}
@@ -2025,7 +2028,7 @@ uart_configure_port(struct uart_driver *drv, struct uart_state *state,
 		 * Power down all ports by default, except the
 		 * console if we have one.
 		 */
-		if (!port->cons || port->cons->index != port->line)
+		if (!uart_console(port))
 			uart_change_pm(state, 3);
 	}
 }
