@@ -48,17 +48,22 @@ int smb_symlink(struct inode *inode, struct dentry *dentry, const char *oldname)
 
 int smb_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
-	char link[256];		/* FIXME: pain ... */
-	int len;
+	char *link;
+	int len, res;
 	DEBUG1("followlink of %s/%s\n", DENTRY_PATH(dentry));
 
-	len = smb_proc_read_link(server_from_dentry(dentry), dentry, link,
-				 sizeof(link) - 1);
-	if(len < 0)
-		return -ENOENT;
+	if (!(link = kmalloc(256, GFP_KERNEL)))
+		return -ENOMEM;
 
-	link[len] = 0;
-	return vfs_follow_link(nd, link);
+	len = smb_proc_read_link(server_from_dentry(dentry), dentry, link, 255);
+
+	res = -ENOENT;
+	if (len >= 0) {
+		link[len] = 0;
+		res = vfs_follow_link(nd, link);
+	}
+	kfree(link);
+	return res;
 }
 
 
