@@ -786,21 +786,22 @@ __rpc_schedule(void)
 
 	dprintk("RPC:      rpc_schedule enter\n");
 	while (1) {
-		spin_lock_bh(&rpc_queue_lock);
 
 		task_for_first(task, &schedq.tasks[0]) {
 			__rpc_remove_wait_queue(task);
 			spin_unlock_bh(&rpc_queue_lock);
 
 			__rpc_execute(task);
+			spin_lock_bh(&rpc_queue_lock);
 		} else {
-			spin_unlock_bh(&rpc_queue_lock);
 			break;
 		}
 
 		if (++count >= 200 || need_resched()) {
 			count = 0;
+			spin_unlock_bh(&rpc_queue_lock);
 			schedule();
+			spin_lock_bh(&rpc_queue_lock);
 		}
 	}
 	dprintk("RPC:      rpc_schedule leave\n");
@@ -1114,27 +1115,41 @@ rpciod(void *ptr)
 	allow_signal(SIGKILL);
 
 	dprintk("RPC: rpciod starting (pid %d)\n", rpciod_pid);
+	spin_lock_bh(&rpc_queue_lock);
 	while (rpciod_users) {
+		DEFINE_WAIT(wait);
 		if (signalled()) {
+			spin_unlock_bh(&rpc_queue_lock);
 			rpciod_killall();
 			flush_signals(current);
+			spin_lock_bh(&rpc_queue_lock);
 		}
 		__rpc_schedule();
-		if (current->flags & PF_FREEZE)
+		if (current->flags & PF_FREEZE) {
+			spin_unlock_bh(&rpc_queue_lock);
 			refrigerator(PF_IOTHREAD);
+			spin_lock_bh(&rpc_queue_lock);
+		}
 
 		if (++rounds >= 64) {	/* safeguard */
+			spin_unlock_bh(&rpc_queue_lock);
 			schedule();
 			rounds = 0;
+			spin_lock_bh(&rpc_queue_lock);
 		}
 
-		if (!rpciod_task_pending()) {
-			dprintk("RPC: rpciod back to sleep\n");
-			wait_event_interruptible(rpciod_idle, rpciod_task_pending());
-			dprintk("RPC: switch to rpciod\n");
+		dprintk("RPC: rpciod back to sleep\n");
+		prepare_to_wait(&rpciod_idle, &wait, TASK_INTERRUPTIBLE);
+		if (!rpciod_task_pending() && !signalled()) {
+			spin_unlock_bh(&rpc_queue_lock);
+			schedule();
 			rounds = 0;
+			spin_lock_bh(&rpc_queue_lock);
 		}
+		finish_wait(&rpciod_idle, &wait);
+		dprintk("RPC: switch to rpciod\n");
 	}
+	spin_unlock_bh(&rpc_queue_lock);
 
 	dprintk("RPC: rpciod shutdown commences\n");
 	if (!list_empty(&all_tasks)) {
@@ -1158,7 +1173,9 @@ rpciod_killall(void)
 	while (!list_empty(&all_tasks)) {
 		clear_thread_flag(TIF_SIGPENDING);
 		rpc_killall_tasks(NULL);
+		spin_lock_bh(&rpc_queue_lock);
 		__rpc_schedule();
+		spin_unlock_bh(&rpc_queue_lock);
 		if (!list_empty(&all_tasks)) {
 			dprintk("rpciod_killall: waiting for tasks to exit\n");
 			yield();
