@@ -32,7 +32,6 @@
  */
 
 
-#define __KERNEL_SYSCALLS__
 #include <linux/kernel.h>
 #include <linux/vmalloc.h>
 #include <linux/module.h>
@@ -40,7 +39,6 @@
 #include <linux/string.h>
 #include <linux/slab.h>
 #include <linux/fs.h>
-#include <linux/unistd.h>
 #include <linux/fcntl.h>
 #include <linux/errno.h>
 #include <linux/syscalls.h>
@@ -399,13 +397,13 @@ static int tda1004x_fwupload(struct dvb_i2c_bus *i2c, struct tda1004x_state *tda
 
 	// Load the firmware
 	set_fs(get_ds());
-	fd = open(tda1004x_firmware, 0, 0);
+	fd = sys_open(tda1004x_firmware, 0, 0);
 	if (fd < 0) {
 		printk("%s: Unable to open firmware %s\n", __FUNCTION__,
 		       tda1004x_firmware);
 		return -EIO;
 	}
-	filesize = lseek(fd, 0L, 2);
+	filesize = sys_lseek(fd, 0L, 2);
 	if (filesize <= 0) {
 		printk("%s: Firmware %s is empty\n", __FUNCTION__,
 		       tda1004x_firmware);
@@ -436,8 +434,8 @@ static int tda1004x_fwupload(struct dvb_i2c_bus *i2c, struct tda1004x_state *tda
 	}
 
 	// read it!
-	lseek(fd, fw_offset, 0);
-	if (read(fd, firmware, fw_size) != fw_size) {
+	sys_lseek(fd, fw_offset, 0);
+	if (sys_read(fd, firmware, fw_size) != fw_size) {
 		printk("%s: Failed to read firmware\n", __FUNCTION__);
 		vfree(firmware);
 		sys_close(fd);
