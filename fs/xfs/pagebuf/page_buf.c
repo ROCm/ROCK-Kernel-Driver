@@ -1371,7 +1371,6 @@ pagebuf_iorequest(			/* start real I/O		*/
 	int			offset = pb->pb_offset;
 	int			size = pb->pb_count_desired;
 	sector_t		sector = pb->pb_bn;
-	unsigned int		sectorshift = pb->pb_target->pbr_sshift;
 	unsigned int		blocksize = pb->pb_target->pbr_bsize;
 	int			locking;
 
