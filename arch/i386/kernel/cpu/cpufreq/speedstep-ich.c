@@ -7,7 +7,7 @@
  *  for chipsets ICH2-M and ICH3-M.
  *
  *  Many thanks to Ducrot Bruno for finding and fixing the last
- *  "missing link" for ICH2-M/ICH3-M support, and to Thomas Winkler 
+ *  "missing link" for ICH2-M/ICH3-M support, and to Thomas Winkler
  *  for extensive testing.
  *
  *  BIG FAT DISCLAIMER: Work in progress code. Possibly *dangerous*
@@ -19,7 +19,7 @@
  *********************************************************************/
 
 #include <linux/kernel.h>
-#include <linux/module.h> 
+#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/cpufreq.h>
 #include <linux/pci.h>
@@ -29,24 +29,24 @@
 
 
 /* speedstep_chipset:
- *   It is necessary to know which chipset is used. As accesses to 
- * this device occur at various places in this module, we need a 
+ *   It is necessary to know which chipset is used. As accesses to
+ * this device occur at various places in this module, we need a
  * static struct pci_dev * pointing to that device.
  */
-static struct pci_dev			*speedstep_chipset_dev;
+static struct pci_dev *speedstep_chipset_dev;
 
 
 /* speedstep_processor
  */
-static unsigned int			speedstep_processor = 0;
+static unsigned int speedstep_processor = 0;
 
 
-/* 
+/*
  *   There are only two frequency states for each processor. Values
  * are in kHz for the time being.
  */
 static struct cpufreq_frequency_table speedstep_freqs[] = {
-	{SPEEDSTEP_HIGH, 	0},
+	{SPEEDSTEP_HIGH,	0},
 	{SPEEDSTEP_LOW,		0},
 	{0,			CPUFREQ_TABLE_END},
 };
@@ -68,22 +68,21 @@ static struct cpufreq_frequency_table speedstep_freqs[] = {
  * speedstep_set_state - set the SpeedStep state
  * @state: new processor frequency state (SPEEDSTEP_LOW or SPEEDSTEP_HIGH)
  *
- *   Tries to change the SpeedStep state. 
+ *   Tries to change the SpeedStep state.
  */
 static void speedstep_set_state (unsigned int state)
 {
-	u32			pmbase;
-	u8			pm2_blk;
-	u8			value;
-	unsigned long		flags;
+	u32 pmbase;
+	u8 pm2_blk;
+	u8 value;
+	unsigned long flags;
 
 	if (!speedstep_chipset_dev || (state > 0x1))
 		return;
 
 	/* get PMBASE */
 	pci_read_config_dword(speedstep_chipset_dev, 0x40, &pmbase);
-	if (!(pmbase & 0x01))
-	{
+	if (!(pmbase & 0x01)) {
 		printk(KERN_ERR "cpufreq: could not find speedstep register\n");
 		return;
 	}
@@ -146,18 +145,16 @@ static void speedstep_set_state (unsigned int state)
  */
 static int speedstep_activate (void)
 {
-	u16		value = 0;
+	u16 value = 0;
 
 	if (!speedstep_chipset_dev)
 		return -EINVAL;
 
-	pci_read_config_word(speedstep_chipset_dev, 
-			     0x00A0, &value);
+	pci_read_config_word(speedstep_chipset_dev, 0x00A0, &value);
 	if (!(value & 0x08)) {
 		value |= 0x08;
 		dprintk(KERN_DEBUG "cpufreq: activating SpeedStep (TM) registers\n");
-		pci_write_config_word(speedstep_chipset_dev, 
-				      0x00A0, value);
+		pci_write_config_word(speedstep_chipset_dev, 0x00A0, value);
 	}
 
 	return 0;
@@ -167,15 +164,15 @@ static int speedstep_activate (void)
 /**
  * speedstep_detect_chipset - detect the Southbridge which contains SpeedStep logic
  *
- *   Detects ICH2-M, ICH3-M and ICH4-M so far. The pci_dev points to 
- * the LPC bridge / PM module which contains all power-management 
+ *   Detects ICH2-M, ICH3-M and ICH4-M so far. The pci_dev points to
+ * the LPC bridge / PM module which contains all power-management
  * functions. Returns the SPEEDSTEP_CHIPSET_-number for the detected
  * chipset, or zero on failure.
  */
 static unsigned int speedstep_detect_chipset (void)
 {
 	speedstep_chipset_dev = pci_find_subsys(PCI_VENDOR_ID_INTEL,
-			      PCI_DEVICE_ID_INTEL_82801DB_12, 
+			      PCI_DEVICE_ID_INTEL_82801DB_12,
 			      PCI_ANY_ID,
 			      PCI_ANY_ID,
 			      NULL);
@@ -183,7 +180,7 @@ static unsigned int speedstep_detect_chipset (void)
 		return 4; /* 4-M */
 
 	speedstep_chipset_dev = pci_find_subsys(PCI_VENDOR_ID_INTEL,
-			      PCI_DEVICE_ID_INTEL_82801CA_12, 
+			      PCI_DEVICE_ID_INTEL_82801CA_12,
 			      PCI_ANY_ID,
 			      PCI_ANY_ID,
 			      NULL);
@@ -198,11 +195,11 @@ static unsigned int speedstep_detect_chipset (void)
 			      NULL);
 	if (speedstep_chipset_dev) {
 		/* speedstep.c causes lockups on Dell Inspirons 8000 and
-		 * 8100 which use a pretty old revision of the 82815 
+		 * 8100 which use a pretty old revision of the 82815
 		 * host brige. Abort on these systems.
 		 */
-		static struct pci_dev	*hostbridge;
-		u8			rev = 0;
+		static struct pci_dev *hostbridge;
+		u8 rev = 0;
 
 		hostbridge  = pci_find_subsys(PCI_VENDOR_ID_INTEL,
 			      PCI_DEVICE_ID_INTEL_82815_MC,
@@ -212,7 +209,7 @@ static unsigned int speedstep_detect_chipset (void)
 
 		if (!hostbridge)
 			return 2; /* 2-M */
-			
+
 		pci_read_config_byte(hostbridge, PCI_REVISION_ID, &rev);
 		if (rev < 5) {
 			dprintk(KERN_INFO "cpufreq: hostbridge does not support speedstep\n");
@@ -228,8 +225,8 @@ static unsigned int speedstep_detect_chipset (void)
 
 static unsigned int speedstep_get(unsigned int cpu)
 {
- 	unsigned int	speed;
-	cpumask_t       cpus_allowed,affected_cpu_map;
+	unsigned int speed;
+	cpumask_t cpus_allowed,affected_cpu_map;
 
 	/* only run on CPU to be set, or on its sibling */
 	cpus_allowed = current->cpus_allowed;
@@ -256,7 +253,7 @@ static int speedstep_target (struct cpufreq_policy *policy,
 			     unsigned int target_freq,
 			     unsigned int relation)
 {
-	unsigned int	newstate = 0;
+	unsigned int newstate = 0;
 	struct cpufreq_freqs freqs;
 	cpumask_t cpus_allowed, affected_cpu_map;
 	int i;
@@ -318,9 +315,9 @@ static int speedstep_verify (struct cpufreq_policy *policy)
 
 static int speedstep_cpu_init(struct cpufreq_policy *policy)
 {
-	int		result = 0;
-	unsigned int	speed;
-	cpumask_t       cpus_allowed,affected_cpu_map;
+	int result = 0;
+	unsigned int speed;
+	cpumask_t cpus_allowed,affected_cpu_map;
 
 
 	/* capability check */
@@ -342,16 +339,15 @@ static int speedstep_cpu_init(struct cpufreq_policy *policy)
 				     &speedstep_freqs[SPEEDSTEP_HIGH].frequency,
 				     &speedstep_set_state);
 	set_cpus_allowed(current, cpus_allowed);
-	if (result) {
+	if (result)
 		return result;
-	}
 
 	/* get current speed setting */
 	speed = speedstep_get(policy->cpu);
 	if (!speed)
 		return -EIO;
 
-	dprintk(KERN_INFO "cpufreq: currently at %s speed setting - %i MHz\n", 
+	dprintk(KERN_INFO "cpufreq: currently at %s speed setting - %i MHz\n",
 		(speed == speedstep_freqs[SPEEDSTEP_LOW].frequency) ? "low" : "high",
 		(speed / 1000));
 
@@ -383,14 +379,14 @@ static struct freq_attr* speedstep_attr[] = {
 
 
 static struct cpufreq_driver speedstep_driver = {
-	.name		= "speedstep-ich",
-	.verify 	= speedstep_verify,
-	.target 	= speedstep_target,
-	.init		= speedstep_cpu_init,
-	.exit		= speedstep_cpu_exit,
-	.get		= speedstep_get,
-	.owner		= THIS_MODULE,
-	.attr		= speedstep_attr,
+	.name	= "speedstep-ich",
+	.verify	= speedstep_verify,
+	.target	= speedstep_target,
+	.init	= speedstep_cpu_init,
+	.exit	= speedstep_cpu_exit,
+	.get	= speedstep_get,
+	.owner	= THIS_MODULE,
+	.attr	= speedstep_attr,
 };
 
 
