@@ -4,7 +4,6 @@
 #include <linux/config.h>
 #include <linux/bio.h>
 #include <linux/fs.h>
-#include <asm/pgalloc.h>
 
 #ifdef CONFIG_HIGHMEM
 
