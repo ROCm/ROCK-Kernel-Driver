@@ -343,7 +343,9 @@ out_sig:
 
 #define EXTRA_STACK_VM_PAGES	20	/* random */
 
-int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
+int setup_arg_pages(struct linux_binprm *bprm,
+		    unsigned long stack_top,
+		    int executable_stack)
 {
 	unsigned long stack_base;
 	struct vm_area_struct *mpnt;
@@ -384,7 +386,7 @@ int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
 	stack_base = current->signal->rlim[RLIMIT_STACK].rlim_max;
 	if (stack_base > (1 << 30))
 		stack_base = 1 << 30;
-	stack_base = PAGE_ALIGN(STACK_TOP - stack_base);
+	stack_base = PAGE_ALIGN(stack_top - stack_base);
 
 	/* Adjust bprm->p to point to the end of the strings. */
 	bprm->p = stack_base + PAGE_SIZE * i - offset;
@@ -396,10 +398,10 @@ int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
 	while (i < MAX_ARG_PAGES)
 		bprm->page[i++] = NULL;
 #else
-	stack_base = STACK_TOP - MAX_ARG_PAGES * PAGE_SIZE;
+	stack_base = stack_top - MAX_ARG_PAGES * PAGE_SIZE;
 	bprm->p += stack_base;
 	mm->arg_start = bprm->p;
-	arg_size = STACK_TOP - (PAGE_MASK & (unsigned long) mm->arg_start);
+	arg_size = stack_top - (PAGE_MASK & (unsigned long) mm->arg_start);
 #endif
 
 	arg_size += EXTRA_STACK_VM_PAGES * PAGE_SIZE;
@@ -426,7 +428,7 @@ int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
 		mpnt->vm_start = stack_base;
 		mpnt->vm_end = stack_base + arg_size;
 #else
-		mpnt->vm_end = STACK_TOP;
+		mpnt->vm_end = stack_top;
 		mpnt->vm_start = mpnt->vm_end - arg_size;
 #endif
 		/* Adjust stack execute permissions; explicitly enable
