@@ -935,6 +935,14 @@ int snd_timer_global_unregister(snd_timer_t *timer)
  *  System timer
  */
 
+struct snd_timer_system_private {
+	struct timer_list tlist;
+	struct timer * timer;
+	unsigned long last_expires;
+	unsigned long last_jiffies;
+	unsigned long correction;
+};
+
 unsigned int snd_timer_system_resolution(void)
 {
 	return 1000000000L / HZ;
@@ -943,26 +951,44 @@ unsigned int snd_timer_system_resolution(void)
 static void snd_timer_s_function(unsigned long data)
 {
 	snd_timer_t *timer = (snd_timer_t *)data;
-	snd_timer_interrupt(timer, timer->sticks);
+	struct snd_timer_system_private *priv = timer->private_data;
+	unsigned long jiff = jiffies;
+	if (time_after(jiff, priv->last_expires))
+		priv->correction = (long)jiff - (long)priv->last_expires;
+	snd_timer_interrupt(timer, (long)jiff - (long)priv->last_jiffies);
 }
 
 static int snd_timer_s_start(snd_timer_t * timer)
 {
-	struct timer_list *tlist;
+	struct snd_timer_system_private *priv;
+	unsigned long njiff;
 
-	tlist = (struct timer_list *) timer->private_data;
-	tlist->expires = jiffies + timer->sticks;
-	add_timer(tlist);
+	priv = (struct snd_timer_system_private *) timer->private_data;
+	njiff = (priv->last_jiffies = jiffies);
+	if (priv->correction > timer->sticks - 1) {
+		priv->correction -= timer->sticks - 1;
+		njiff++;
+	} else {
+		njiff += timer->sticks - priv->correction;
+		priv->correction -= timer->sticks;
+	}
+	priv->last_expires = priv->tlist.expires = njiff;
+	add_timer(&priv->tlist);
 	return 0;
 }
 
 static int snd_timer_s_stop(snd_timer_t * timer)
 {
-	struct timer_list *tlist;
+	struct snd_timer_system_private *priv;
+	unsigned long jiff;
 
-	tlist = (struct timer_list *) timer->private_data;
-	del_timer(tlist);
-	timer->sticks = tlist->expires - jiffies;
+	priv = (struct snd_timer_system_private *) timer->private_data;
+	del_timer(&priv->tlist);
+	jiff = jiffies;
+	if (time_before(jiff, priv->last_expires))
+		timer->sticks = priv->last_expires - jiff;
+	else
+		timer->sticks = 1;
 	return 0;
 }
 
@@ -984,22 +1010,22 @@ static void snd_timer_free_system(snd_timer_t *timer)
 static int snd_timer_register_system(void)
 {
 	snd_timer_t *timer;
-	struct timer_list *tlist;
+	struct snd_timer_system_private *priv;
 	int err;
 
 	if ((err = snd_timer_global_new("system", SNDRV_TIMER_GLOBAL_SYSTEM, &timer)) < 0)
 		return err;
 	strcpy(timer->name, "system timer");
 	timer->hw = snd_timer_system;
-	tlist = (struct timer_list *) snd_kcalloc(sizeof(struct timer_list), GFP_KERNEL);
-	if (tlist == NULL) {
+	priv = (struct snd_timer_system_private *) snd_kcalloc(sizeof(struct snd_timer_system_private), GFP_KERNEL);
+	if (priv == NULL) {
 		snd_timer_free(timer);
 		return -ENOMEM;
 	}
-	init_timer(tlist);
-	tlist->function = snd_timer_s_function;
-	tlist->data = (unsigned long) timer;
-	timer->private_data = tlist;
+	init_timer(&priv->tlist);
+	priv->tlist.function = snd_timer_s_function;
+	priv->tlist.data = (unsigned long) timer;
+	timer->private_data = priv;
 	timer->private_free = snd_timer_free_system;
 	return snd_timer_global_register(timer);
 }
