@@ -52,6 +52,7 @@ static inline cpumask_t __pcibus_to_cpumask(int bus)
 	.cache_nice_tries	= 1,			\
 	.per_cpu_gain		= 100,			\
 	.flags			= SD_LOAD_BALANCE	\
+				| SD_BALANCE_NEWIDLE	\
 				| SD_BALANCE_EXEC	\
 				| SD_WAKE_IDLE		\
 				| SD_WAKE_BALANCE,	\
