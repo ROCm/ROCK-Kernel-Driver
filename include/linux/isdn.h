@@ -285,9 +285,10 @@ typedef struct {
 typedef struct isdn_net_local_s {
   ulong                  magic;
   char                   name[10];     /* Name of device                   */
-  struct timer_list      dial_timer;   /* dial timeout                     */
+  struct timer_list      dial_timer;   /* dial events timer                */
   int                    dial_event;   /* event in case of timer expiry    */
   struct net_device_stats stats;       /* Ethernet Statistics              */
+  struct timer_list      hup_timer;    /* auto hangup timer                */
   int                    isdn_slot;    /* Index to isdn device/channel     */
   int			 ppp_slot;     /* PPPD device slot number          */
   int                    pre_device;   /* Preselected isdn-device          */

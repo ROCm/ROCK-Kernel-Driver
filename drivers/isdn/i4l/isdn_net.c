@@ -357,23 +357,23 @@ isdn_net_unbind_channel(isdn_net_local * lp)
  * charge-info.
  */
 
-static int isdn_net_hup_timer(unsigned long data)
+static void isdn_net_hup_timer(unsigned long data)
 {
 	isdn_net_local *lp = (isdn_net_local *) data;
 
 	if (!(lp->flags & ISDN_NET_CONNECTED) || lp->dialstate != ST_ACTIVE) {
 		isdn_BUG();
-		return 1;
+		return;
 	}
 	
 	dbg_net_dial("%s: huptimer %d, onhtime %d, chargetime %ld, chargeint %d\n",
 		     l->name, l->huptimer, l->onhtime, l->chargetime, l->chargeint);
 
 	if (!(lp->onhtime))
-		return 0;
+		return;
 	
 	if (lp->huptimer++ <= lp->onhtime)
-		return 1;
+		goto mod_timer;
 
 	if (lp->hupflags & ISDN_MANCHARGE && lp->hupflags & ISDN_CHARGEHUP) {
 		while (time_after(jiffies, lp->chargetime + lp->chargeint))
@@ -382,7 +382,7 @@ static int isdn_net_hup_timer(unsigned long data)
 		if (time_after(jiffies, lp->chargetime + lp->chargeint - 2 * HZ)) {
 			if (lp->outgoing || lp->hupflags & ISDN_INHUP) {
 				isdn_net_hangup(lp);
-				return 0;
+				return;
 			}
 		}
 	} else if (lp->outgoing) {
@@ -390,45 +390,37 @@ static int isdn_net_hup_timer(unsigned long data)
 			if (lp->charge_state != ST_CHARGE_HAVE_CINT) {
 				dbg_net_dial("%s: did not get CINT\n", lp->name);
 				isdn_net_hangup(lp);
-				return 0;
+				return;
 			} else if (time_after(jiffies, lp->chargetime + lp->chargeint)) {
 				dbg_net_dial("%s: chtime = %lu, chint = %d\n",
 					     lp->name, lp->chargetime, lp->chargeint);
 				isdn_net_hangup(lp);
-				return 0;
+				return;
 			}
 		}
 	} else if (lp->hupflags & ISDN_INHUP) {
 		isdn_net_hangup(lp);
-		return 0;
+		return;
 	}
-	return 1;
+ mod_timer:
+	mod_timer(&lp->hup_timer, lp->hup_timer.expires + HZ);
 }
 
 void
 isdn_net_autohup()
 {
 	struct list_head *l;
-	int anymore;
 
-	anymore = 0;
 	list_for_each(l, &isdn_net_devs) {
 		isdn_net_dev *p = list_entry(l, isdn_net_dev, global_list);
 		isdn_net_local *l = &p->local;
-
-		if (!(l->flags & ISDN_NET_CONNECTED) || l->dialstate != ST_ACTIVE)
-			continue;
 
 		if(dev->global_flags & ISDN_GLOBAL_STOPPED || 
 		   ISDN_NET_DIALMODE(*l) == ISDN_NET_DM_OFF) {
 			isdn_net_hangup(l);
 			continue;
 		}
-		
-		if (isdn_net_hup_timer((unsigned long) l))
-			anymore = 1;
 	}
-	isdn_timer_ctrl(ISDN_TIMER_NETHANGUP, anymore);
 }
 
 static void isdn_net_lp_disconnected(isdn_net_local *lp)
@@ -443,7 +435,9 @@ static void isdn_net_connected(isdn_net_local *lp)
 	struct concap_proto_ops *pops = cprot ? cprot -> pops : 0;
 #endif
 	lp->dialstate = ST_ACTIVE;
-	isdn_timer_ctrl(ISDN_TIMER_NETHANGUP, 1);
+	lp->hup_timer.expires = jiffies + HZ;
+	add_timer(&lp->hup_timer);
+
 	if (lp->p_encap == ISDN_NET_ENCAP_CISCOHDLCK)
 		isdn_net_ciscohdlck_connected(lp);
 	if (lp->p_encap != ISDN_NET_ENCAP_SYNCPPP) {
@@ -838,6 +832,7 @@ isdn_net_hangup(isdn_net_local *lp)
 	struct concap_proto_ops *pops = cprot ? cprot -> pops : 0;
 #endif
 
+	del_timer_sync(&lp->hup_timer);
 	if (lp->flags & ISDN_NET_CONNECTED) {
 		if (lp->slave != NULL) {
 			isdn_net_local *slp = (isdn_net_local *)lp->slave->priv;
@@ -2615,6 +2610,9 @@ isdn_net_new(char *name, struct net_device *master)
 	init_timer(&netdev->local.dial_timer);
 	netdev->local.dial_timer.data = (unsigned long) &netdev->local;
 	netdev->local.dial_timer.function = isdn_net_dial_timer;
+	init_timer(&netdev->local.hup_timer);
+	netdev->local.hup_timer.data = (unsigned long) &netdev->local;
+	netdev->local.hup_timer.function = isdn_net_hup_timer;
 
 	/* Put into to netdev-chain */
 	list_add(&netdev->global_list, &isdn_net_devs);
