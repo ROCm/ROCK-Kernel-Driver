@@ -117,6 +117,11 @@
 #define RTL8139_DRIVER_NAME   DRV_NAME " Fast Ethernet driver " DRV_VERSION
 #define PFX DRV_NAME ": "
 
+/* Default Message level */
+#define RTL8139_DEF_MSG_ENABLE   (NETIF_MSG_DRV   | \
+                                 NETIF_MSG_PROBE  | \
+                                 NETIF_MSG_LINK)
+
 
 /* enable PIO instead of MMIO, if CONFIG_8139TOO_PIO is selected */
 #ifdef CONFIG_8139TOO_PIO
@@ -560,6 +565,7 @@ struct rtl8139_private {
 	int drv_flags;
 	struct pci_dev *pci_dev;
 	u32 pci_state[16];
+	u32 msg_enable;
 	struct net_device_stats stats;
 	unsigned char *rx_ring;
 	unsigned int cur_rx;	/* Index into the Rx buffer of next Rx pkt. */
@@ -986,6 +992,8 @@ static int __devinit rtl8139_init_one (struct pci_dev *pdev,
 	/* note: tp->chipset set in rtl8139_init_board */
 	tp->drv_flags = board_info[ent->driver_data].hw_flags;
 	tp->mmio_addr = ioaddr;
+	tp->msg_enable =
+		(debug < 0 ? RTL8139_DEF_MSG_ENABLE : ((1 << debug) - 1));
 	spin_lock_init (&tp->lock);
 	init_waitqueue_head (&tp->thr_wait);
 	init_completion (&tp->thr_exited);
@@ -1288,9 +1296,7 @@ static int rtl8139_open (struct net_device *dev)
 {
 	struct rtl8139_private *tp = dev->priv;
 	int retval;
-#ifdef RTL8139_DEBUG
 	void *ioaddr = tp->mmio_addr;
-#endif
 
 	retval = request_irq (dev->irq, rtl8139_interrupt, SA_SHIRQ, dev->name, dev);
 	if (retval)
@@ -1320,7 +1326,8 @@ static int rtl8139_open (struct net_device *dev)
 	rtl8139_init_ring (dev);
 	rtl8139_hw_start (dev);
 
-	DPRINTK ("%s: rtl8139_open() ioaddr %#lx IRQ %d"
+	if (netif_msg_ifup(tp))
+		printk(KERN_DEBUG "%s: rtl8139_open() ioaddr %#lx IRQ %d"
 			" GP Pins %2.2x %s-duplex.\n",
 			dev->name, pci_resource_start (tp->pci_dev, 1),
 			dev->irq, RTL_R8 (MediaStatus),
@@ -1337,7 +1344,7 @@ static void rtl_check_media (struct net_device *dev, unsigned int init_media)
 	struct rtl8139_private *tp = dev->priv;
 
 	if (tp->phys[0] >= 0) {
-		mii_check_media(&tp->mii, 1, init_media);
+		mii_check_media(&tp->mii, netif_msg_link(tp), init_media);
 	}
 }
 
@@ -1720,8 +1727,9 @@ static int rtl8139_start_xmit (struct sk_buff *skb, struct net_device *dev)
 		netif_stop_queue (dev);
 	spin_unlock_irq(&tp->lock);
 
-	DPRINTK ("%s: Queued Tx packet size %u to slot %d.\n",
-		 dev->name, len, entry);
+	if (netif_msg_tx_queued(tp))
+		printk (KERN_DEBUG "%s: Queued Tx packet size %u to slot %d.\n",
+			dev->name, len, entry);
 
 	return 0;
 }
@@ -1751,8 +1759,9 @@ static void rtl8139_tx_interrupt (struct net_device *dev,
 		/* Note: TxCarrierLost is always asserted at 100mbps. */
 		if (txstatus & (TxOutOfWindow | TxAborted)) {
 			/* There was an major error, log it. */
-			DPRINTK ("%s: Transmit error, Tx status %8.8x.\n",
-				 dev->name, txstatus);
+			if (netif_msg_tx_err(tp))
+				printk(KERN_DEBUG "%s: Transmit error, Tx status %8.8x.\n",
+					dev->name, txstatus);
 			tp->stats.tx_errors++;
 			if (txstatus & TxAborted) {
 				tp->stats.tx_aborted_errors++;
@@ -1807,8 +1816,9 @@ static void rtl8139_rx_err (u32 rx_status, struct net_device *dev,
 	int tmp_work;
 #endif
 
-	DPRINTK ("%s: Ethernet frame had errors, status %8.8x.\n",
-	         dev->name, rx_status);
+	if (netif_msg_rx_err (tp)) 
+		printk(KERN_DEBUG "%s: Ethernet frame had errors, status %8.8x.\n",
+			dev->name, rx_status);
 	tp->stats.rx_errors++;
 	if (!(rx_status & RxStatusOK)) {
 		if (rx_status & RxTooLong) {
@@ -1912,8 +1922,9 @@ static void rtl8139_rx_interrupt (struct net_device *dev,
 		rx_size = rx_status >> 16;
 		pkt_size = rx_size - 4;
 
-		DPRINTK ("%s:  rtl8139_rx() status %4.4x, size %4.4x,"
-			 " cur %4.4x.\n", dev->name, rx_status,
+		if (netif_msg_rx_status(tp))
+			printk(KERN_DEBUG "%s:  rtl8139_rx() status %4.4x, size %4.4x,"
+				" cur %4.4x.\n", dev->name, rx_status,
 			 rx_size, cur_rx);
 #if RTL8139_DEBUG > 2
 		{
@@ -2074,8 +2085,9 @@ static irqreturn_t rtl8139_interrupt (int irq, void *dev_instance,
 		ackstat = status & ~(RxAckBits | TxErr);
 		RTL_W16 (IntrStatus, ackstat);
 
-		DPRINTK ("%s: interrupt  status=%#4.4x ackstat=%#4.4x new intstat=%#4.4x.\n",
-			 dev->name, status, ackstat, RTL_R16 (IntrStatus));
+		if (netif_msg_intr(tp))
+			printk (KERN_DEBUG "%s: interrupt  status=%#4.4x ackstat=%#4.4x new intstat=%#4.4x.\n",
+				dev->name, status, ackstat, RTL_R16 (IntrStatus));
 
 		if (netif_running (dev) && (status & RxAckBits))
 			rtl8139_rx_interrupt (dev, tp, ioaddr);
@@ -2130,8 +2142,9 @@ static int rtl8139_close (struct net_device *dev)
 		}
 		wait_for_completion (&tp->thr_exited);
 	}
-
-	DPRINTK ("%s: Shutting down ethercard, status was 0x%4.4x.\n",
+	
+	if (netif_msg_ifdown(tp))
+		printk(KERN_DEBUG "%s: Shutting down ethercard, status was 0x%4.4x.\n",
 			dev->name, RTL_R16 (IntrStatus));
 
 	spin_lock_irqsave (&tp->lock, flags);
@@ -2289,12 +2302,14 @@ static u32 rtl8139_get_link(struct net_device *dev)
 
 static u32 rtl8139_get_msglevel(struct net_device *dev)
 {
-	return debug;
+	struct rtl8139_private *np = dev->priv;
+	return np->msg_enable;
 }
 
 static void rtl8139_set_msglevel(struct net_device *dev, u32 datum)
 {
-	debug = datum;
+	struct rtl8139_private *np = dev->priv;
+	np->msg_enable = datum;
 }
 
 /* TODO: we are too slack to do reg dumping for pio, for now */
