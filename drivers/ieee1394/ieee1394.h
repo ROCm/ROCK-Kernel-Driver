@@ -46,14 +46,14 @@
 #define ACKX_TIMEOUT             (-4)
 
 
-#define SPEED_100		0x00
-#define SPEED_200		0x01
-#define SPEED_400		0x02
-#define SPEED_800		0x03
-#define SPEED_1600		0x04
-#define SPEED_3200		0x05
+#define IEEE1394_SPEED_100		0x00
+#define IEEE1394_SPEED_200		0x01
+#define IEEE1394_SPEED_400		0x02
+#define IEEE1394_SPEED_800		0x03
+#define IEEE1394_SPEED_1600		0x04
+#define IEEE1394_SPEED_3200		0x05
 /* The current highest tested speed supported by the subsystem */
-#define SPEED_MAX		SPEED_800
+#define IEEE1394_SPEED_MAX		IEEE1394_SPEED_800
 
 /* Maps speed values above to a string representation */
 extern const char *hpsb_speedto_str[];

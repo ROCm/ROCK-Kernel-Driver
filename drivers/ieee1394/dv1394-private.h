@@ -97,7 +97,7 @@ static inline void fill_output_more_immediate(struct output_more_immediate *omi,
 	omi->q[3] = 0;
 	
 	/* IT packet header */
-	omi->q[4] = cpu_to_le32(  (0x0 << 16)  /* DMA_SPEED_100 */
+	omi->q[4] = cpu_to_le32(  (0x0 << 16)  /* IEEE1394_SPEED_100 */
 				  | (tag << 14)
 				  | (channel << 8)
 				  | (TCODE_ISO_DATA << 4) 
@@ -129,10 +129,10 @@ static inline void fill_output_last(struct output_last *ol,
 	u32 temp = 0;
 	temp |= 1 << 28; /* OUTPUT_LAST */
 
-	if(want_timestamp) /* controller will update timestamp at DMA time */
+	if (want_timestamp) /* controller will update timestamp at DMA time */
 		temp |= 1 << 27;
 
-	if(want_interrupt)
+	if (want_interrupt)
 		temp |= 3 << 20;
 
 	temp |= 3 << 18; /* must take branch */

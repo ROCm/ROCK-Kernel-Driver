@@ -732,7 +732,7 @@ static void fill_packet(struct stream *s, struct packet *packet, int nevents)
 
 	/* Fill IEEE1394 headers */
 	packet->db->header_desc.header[0] =
-		(SPEED_100 << 16) | (0x01 << 14) | 
+		(IEEE1394_SPEED_100 << 16) | (0x01 << 14) | 
 		(s->iso_channel << 8) | (TCODE_ISO_DATA << 4);
 	packet->db->header_desc.header[1] = size << 16;
 	

@@ -289,7 +289,7 @@ static void build_speed_map(struct hpsb_host *host, int nodecount)
 
         for (i = 0; i < (nodecount * 64); i += 64) {
                 for (j = 0; j < nodecount; j++) {
-                        map[i+j] = SPEED_MAX;
+                        map[i+j] = IEEE1394_SPEED_MAX;
                 }
         }
 
@@ -458,7 +458,7 @@ int hpsb_send_phy_config(struct hpsb_host *host, int rootid, int gapcnt)
 	struct hpsb_packet *packet;
 	int retval = 0;
 
-	if(rootid >= ALL_NODES || rootid < -1 || gapcnt > 0x3f || gapcnt < -1 ||
+	if (rootid >= ALL_NODES || rootid < -1 || gapcnt > 0x3f || gapcnt < -1 ||
 	   (rootid == -1 && gapcnt == -1)) {
 		HPSB_DEBUG("Invalid Parameter: rootid = %d   gapcnt = %d",
 			   rootid, gapcnt);
@@ -470,22 +470,21 @@ int hpsb_send_phy_config(struct hpsb_host *host, int rootid, int gapcnt)
 		return -ENOMEM;
 
 	packet->host = host;
-	packet->header_size = 16;
+	packet->header_size = 8;
 	packet->data_size = 0;
 	packet->expect_response = 0;
 	packet->no_waiter = 0;
 	packet->type = hpsb_raw;
 	packet->header[0] = 0;
-	if(rootid != -1)
+	if (rootid != -1)
 		packet->header[0] |= rootid << 24 | 1 << 23;
-	if(gapcnt != -1)
+	if (gapcnt != -1)
 		packet->header[0] |= gapcnt << 16 | 1 << 22;
 
 	packet->header[1] = ~packet->header[0];
 
 	packet->generation = get_hpsb_generation(host);
 
-	HPSB_DEBUG("Sending PHY configuration packet (I hope)...");
 	if (!hpsb_send_packet(packet)) {
 		retval = -EINVAL;
 		goto fail;
@@ -1030,12 +1029,12 @@ int ieee1394_register_chardev(int blocknum,
 {
 	int retval;
 
-	if( (blocknum < 0) || (blocknum > 15) )
+	if ( (blocknum < 0) || (blocknum > 15) )
 		return -EINVAL;
 
 	write_lock(&ieee1394_chardevs_lock);
 
-	if(ieee1394_chardevs[blocknum].file_ops == NULL) {
+	if (ieee1394_chardevs[blocknum].file_ops == NULL) {
 		/* grab the minor block */
 		ieee1394_chardevs[blocknum].file_ops = file_ops;
 		ieee1394_chardevs[blocknum].module = module;
@@ -1054,12 +1053,12 @@ int ieee1394_register_chardev(int blocknum,
 /* release a block of minor numbers */
 void ieee1394_unregister_chardev(int blocknum)
 {
-	if( (blocknum < 0) || (blocknum > 15) )
+	if ( (blocknum < 0) || (blocknum > 15) )
 		return;
 
 	write_lock(&ieee1394_chardevs_lock);
 
-	if(ieee1394_chardevs[blocknum].file_ops) {
+	if (ieee1394_chardevs[blocknum].file_ops) {
 		ieee1394_chardevs[blocknum].file_ops = NULL;
 		ieee1394_chardevs[blocknum].module = NULL;
 	}
@@ -1139,7 +1138,7 @@ static int ieee1394_dispatch_open(struct inode *inode, struct file *file)
 
 	/* look up the driver */
 
-	if(ieee1394_get_chardev(blocknum, &module, &file_ops) == 0)
+	if (ieee1394_get_chardev(blocknum, &module, &file_ops) == 0)
 		return -ENODEV;
 
 	/* redirect all subsequent requests to the driver's
